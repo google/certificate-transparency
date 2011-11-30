@@ -14,10 +14,10 @@
 The aim of Certificate Transparency is to have every issued public end-entity TLS certificate recorded in one or more certificate logs. In order to detect mis-issuance of certificates, all logs are public. In particular, domain owners will be able to monitor logs for certificates issued on their own domain.
 </t>
 <t>
-In order to protect clients from unlogged certificates, logs provide audit proofs of all recorded certificates, and clients can choose not to trust certificates that are not accompanied by an appropriate audit proof. Audit proofs are embedded in the TLS handshake to eliminate privacy concerns.
+In order to protect clients from unlogged certificates, logs provide audit proofs of all recorded certificates, and clients can choose not to trust certificates that are not accompanied by an appropriate audit proof. Audit proofs are embedded in the TLS handshake to for privacy and performance reasons.
 </t>
 <t>
-In order to ensure the correct behaviour of logs, logs will also provide a global audit proof over the entire log. Any misbehaviour of logs will be detectable through cross-checks on the global audit proof.
+In order to ensure the correct behaviour of logs, logs also provide a global audit proof over the entire log. Any misbehaviour of logs can be detected through cross-checks on the global audit proof.
 </t>
 <t>
 Logs are only expected to certify that they have seen a certificate and thus, we do not specify any revocation mechanism for audit proofs in this document. Logs will be append-only, and audit proofs will be valid indefinitely. 
@@ -76,7 +76,7 @@ D0 D1   D2  D3 D4 D5
 	    Logs may verify the leaf certificate, using their set of trusted roots. Logs shall periodically publish received certificates. Logs may refuse to publish certificates they cannot validate.
 	  </t>
 	  <t>
-	    Each certificate entry in the log must include the following components:
+	    Each certificate entry in the log MUST include the following components:
 	  </t>
 	  <figure>
 	    <artwork>
@@ -84,20 +84,21 @@ struct {
     Certificate leaf_certificate;
     Certificate certificate_chain&lt;0..2^24-1&gt;;
 } LogEntry;
+[benl: Should we consider a small number for the certificate_chain? Or perhaps note that a log can impose a limit?]
 	    </artwork>
 	  </figure>
 	  <t>
 	    <spanx style="verb">leaf_certificate</spanx> is the end-entity certificate submitted for auditing.
 	  </t>
 	  <t>
-	    <spanx style="verb">certificate_list</spanx> is the sequence of additional certificates required to verify the leaf certificate. The first certificate in this list must certify the <spanx style="verb">leaf_certificate</spanx>. Each subsequent certificate must certify the previous one.
+	    <spanx style="verb">certificate_list</spanx> is the collection of additional certificates required to verify the leaf certificate. This collection MUST be ordered by the content of each certificate, read first byte first, in ascending order.
 	  </t>
 	</section>
 	<section title="Log Segments">
-	  <t> A certificate log shall periodically publish all new log entries as a log segment. The log shall sign these entries by constructing a binary Log Segment Merkle Hash Tree with the hashes of log entries as leaves, and signing the root of that tree. The hashing algorithm is SHA-256. The signature algorithm is ECDSA with the curve NIST P-256.
+	  <t> A certificate log MUST periodically publish all new log entries as a log segment. The log MUST sign these entries by constructing a binary Log Segment Merkle Hash Tree with the hashes of log entries as leaves, and signing the root of that tree. The hashing algorithm is SHA-256. The signature algorithm is ECDSA with the curve NIST P-256.
 	  </t>
 	  <t>
-	   Log segments shall have an incrementing sequence number. At every update, logs shall sign a secondary Segment Info Merkle Hash Tree of all log segment root hashes signed so far, ordered according to the sequence number.
+	   Log segments MUST have an incrementing sequence number and the increment MUST be one. At every update, logs MUST sign a secondary Segment Info Merkle Hash Tree of all log segment root hashes signed so far, ordered according to the sequence number.
 </t>
 	  <t>
 	    Structure of the signature:
@@ -124,13 +125,13 @@ digitally-signed struct {
 	    <spanx style="verb">tree_size</spanx> is the number of leaves in the tree.
 	  </t>
 	  <t>
-	    <spanx style="verb">sequence_number</spanx> is the number of the current segment. In the case of a <spanx style="verb">SegmentInfo</spanx> signature, the <spanx style="verb">sequence_number</spanx> must equal the <spanx style="verb">tree_size</spanx>.
+	    <spanx style="verb">sequence_number</spanx> is the number of the current segment. In the case of a <spanx style="verb">SegmentInfo</spanx> signature, the <spanx style="verb">sequence_number</spanx> MUST equal the <spanx style="verb">tree_size</spanx>.
 	  </t>
 	  <t>
 	    <spanx style="verb">root_hash</spanx> is the root of the Merkle Hash Tree.
 	  </t>
 <t>
-For every segment, logs shall publish all the log entries corresponding to that segment, as well as a segment info record containing the signatures on the Log Segment Merkle Hash Tree and the current Segment Info Merkle Hash Tree.
+For every segment, logs MUST publish all the log entries corresponding to that segment, as well as a segment info record containing the signatures on the Log Segment Merkle Hash Tree and the current Segment Info Merkle Hash Tree.
 </t>
 <t>
 Structure of the segment info record:
@@ -148,7 +149,7 @@ struct {
 <spanx style="verb">signed_log_segment_tree</spanx> is the signature on the Log Segment Merkle Hash Tree.
 </t>
 	  <t>
-	    <spanx style="verb">signed_segment_info_tree</spanx> is the signature on the current Segment Info Merkle Hash Tree. The <spanx style="verb">sequence_number</spanx> in the <spanx style="verb">signed_log_segment_tree</spanx> must match the <spanx style="verb">sequence_number</spanx> in the <spanx style="verb">signed_segment_info_tree</spanx>.
+	    <spanx style="verb">signed_segment_info_tree</spanx> is the signature on the current Segment Info Merkle Hash Tree. The <spanx style="verb">sequence_number</spanx> in the <spanx style="verb">signed_log_segment_tree</spanx> MUST match the <spanx style="verb">sequence_number</spanx> in the <spanx style="verb">signed_segment_info_tree</spanx>.
 	  </t> 
 	</section>
 	<section title="Audit Proofs">
@@ -158,10 +159,10 @@ struct {
 	    Additionally, logs provide two types of audit proofs for partial checks.
 	  </t>
 	  <t>
-	    Logs shall provide servers with an audit proof for each logged certificate. Servers may present audit proofs from one or more logs to the client together with the certificate. Clients may reject certificates that do not have a desired number of valid audit proofs.
+	    Logs MUST provide servers with an audit proof for each logged certificate. Servers may present audit proofs from one or more logs to the client together with the certificate. Clients may reject certificates that do not have a desired number of valid audit proofs. [ben: can anyone request these proofs? don't see why not]
 	  </t>
 <t>
-Logs shall also provide audit proofs for the Segment Info Merkle Hash Tree. Clients may request such audit proofs for a segment to verify that the segment appears in the global log.
+Logs MUST also provide audit proofs for the Segment Info Merkle Hash Tree. Clients may request such audit proofs for a segment to verify that the segment appears in the global log.
 </t>
 	  <t>
 	    Structure of the audit proof:
@@ -186,7 +187,7 @@ struct {
 	    <spanx style="verb">leaf_index</spanx> is the index of the audited node in the Merkle tree.
 	  </t>
 	  <t>
-	    <spanx style="verb">audit_path</spanx> is a list of additional nodes in the Merkle tree required for reconstructing the root hash. Nodes must be listed in the input order. <spanx style="emph">Notice that the left-right ordering is determined by the position of the leaf.</spanx> The leaf node under audit as well as the root node shall be omitted from the path.
+	    <spanx style="verb">audit_path</spanx> is a list of additional nodes in the Merkle tree required for reconstructing the root hash. Nodes must be listed in the input order [make this ordering clearer!]. <spanx style="emph">Notice that the left-right ordering is determined by the position of the leaf.</spanx> The leaf node under audit as well as the root node shall be omitted from the path.
 	  </t>
 	  <t>
 	    <spanx style="verb">signed_tree</spanx> is the signature on the tree.
