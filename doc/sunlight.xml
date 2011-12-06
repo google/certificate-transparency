@@ -26,21 +26,21 @@ Logs are only expected to certify that they have seen a certificate and thus, we
     <section title="Cryptographic components">
       <section title="Merkle Hash Trees">
 	<t>
-	  Logs use binary Merkle hash trees for efficient audit proofs. The hashing algorithm is SHA-256. The input to the Merkle tree hash is a list of 32-byte entries; these entries form the leaves of the Merkle hash tree. The output is a single 32-byte root hash. Given an ordered list of n input hashes, D[n] = {D(0), D(1), ..., D(n-1)}, the Merkle Tree Hash (MTH) is defined as follows:
+	  Logs use binary Merkle hash trees for efficient audit proofs. The hashing algorithm is SHA-256. The input to the Merkle tree hash is a list of data entries; these entries will be hashed to form the leaves of the Merkle hash tree. The output is a single 32-byte root hash. Given an ordered list of n input hashes, D[n] = {D(0), D(1), ..., D(n-1)}, the Merkle Tree Hash (MTH) is thus defined as follows:
 	</t>
 	<t>
-	  The hash of a list with one entry is the identity function:
+	  The hash of a list with one entry is :
 	  <vspace blankLines='1' />
-	  MTH({D(0)}) = D(0).
+	  MTH({D(0)}) = SHA-256(0 || D(0)).
 	  <vspace blankLines='1' />
 	  For n &gt; 1, let k be the largest power of two smaller than n. The Merkle Tree Hash is then defined recursively as
 	  <vspace blankLines='1' />
-	  MTH({D(0), D(1), ..., D(n-1)}) = SHA-256(MTH({D(0), ... , D(k-1)}) + MTH({D(k), ..., D(n-1)})),
+	  MTH({D(0), D(1), ..., D(n-1)}) = SHA-256(1 || MTH({D(0), ... , D(k-1)}) || MTH({D(k), ..., D(n-1)})),
 	  <vspace blankLines='1' />
-	  where + is concatenation.
+	  where || is concatenation.
 	</t>
 <t>
-Note that we do not require the length of the input list to be a power of two. The resulting Merkle tree may thus not be balanced, however, its shape is uniquely determined by the number of leaves. <spanx style="emph">This Merkle tree is essentially the same as the</spanx> <eref target='http://tamperevident.cs.rice.edu/Logging.html/'>history tree</eref> <spanx style="emph">proposal. Our current definition omits dummy leaves - I think we can do this, given that we put the number of leaves under the signature (thus providing domain separation between leaves and intermediate nodes), but I am also fine with going the conventional way and building the domain separation into the hash function itself.</spanx>
+Note that we do not require the length of the input list to be a power of two. The resulting Merkle tree may thus not be balanced, however, its shape is uniquely determined by the number of leaves. <spanx style="emph">This Merkle tree is essentially the same as the</spanx> <eref target='http://tamperevident.cs.rice.edu/Logging.html/'>history tree</eref> <spanx style="emph">proposal except our current definition omits dummy leaves.</spanx>
 </t>
 
 	<section title="Example">
@@ -58,9 +58,11 @@ Note that we do not require the length of the input list to be a power of two. T
      / \            / \
     /   \          /   \ 
    /     \        /     \    
-  *       *      *      D6
- / \     / \    / \        
-D0 D1   D2  D3 D4 D5   
+  *       *      *      *
+ / \     / \    / \     |
+ * *     * *    * *     D6       
+ | |     | |    | |                               
+D0 D1   D2 D3  D4 D5    
 </artwork>
 </figure>
 	  </t>
@@ -95,10 +97,10 @@ struct {
 	  </t>
 	</section>
 	<section title="Log Segments">
-	  <t> A certificate log MUST periodically publish all new log entries as a log segment. The log MUST sign these entries by constructing a binary Log Segment Merkle Hash Tree with the hashes of log entries as leaves, and signing the root of that tree. The hashing algorithm is SHA-256. The signature algorithm is ECDSA with the curve NIST P-256.
+	  <t> A certificate log MUST periodically publish all new log entries as a log segment. The log MUST sign these entries by constructing a binary Log Segment Merkle Hash Tree with log entries as consecutive inputs to the tree, and signing the root of that tree. The hashing algorithm is SHA-256. The signature algorithm is ECDSA with the curve NIST P-256.
 	  </t>
 	  <t>
-	   Log segments MUST have an incrementing sequence number and the increment MUST be one. At every update, logs MUST sign a secondary Segment Info Merkle Hash Tree of all log segment root hashes signed so far, ordered according to the sequence number.
+	   Log segments MUST have an incrementing sequence number and the increment MUST be one. At every update, logs MUST sign a secondary Segment Info Merkle Hash Tree of all log segment signatures issued so far, ordered in the tree according to the sequence number.
 </t>
 	  <t>
 	    Structure of the signature:
