@@ -2,32 +2,27 @@
 #define TREEHASHER_H
 #include <string>
 
-using std::string;
-
 #include "SerialHasher.h"
 
 class TreeHasher {
  public:
-  typedef enum {
-    SHA256
-    // etc
-  } HashAlgorithm;
-
-  // Instantiates a Hasher of the desired subclass.
-  TreeHasher(HashAlgorithm alg);
+  // Takes ownership of the SerialHasher.
+  TreeHasher(SerialHasher *hasher);
   ~TreeHasher();
-
-  HashAlgorithm HashAlgorithm() const { return alg_; }
 
   size_t DigestSize() const { return hasher_->DigestSize(); }
 
-  void HashLeaf(const string &data, string *digest);
+  std::string HashEmpty();
 
-  void HashChildren(const string &left_child,
-                    const string &right_child, string *digest);
+  std::string HashLeaf(const std::string &data);
+
+  // Accepts arbitrary strings as children. When hashing
+  // digests, it is the responsibility of the caller to
+  // ensure the inputs are of correct size.
+  std::string HashChildren(const std::string &left_child,
+                           const std::string &right_child);
 
  private:
   SerialHasher *hasher_;
-  HashAlgorithm alg_;
 };
 #endif
