@@ -29,7 +29,11 @@ Logs are only expected to certify that they have seen a certificate and thus, we
 	  Logs use binary Merkle hash trees for efficient audit proofs. The hashing algorithm is SHA-256. The input to the Merkle tree hash is a list of data entries; these entries will be hashed to form the leaves of the Merkle hash tree. The output is a single 32-byte root hash. Given an ordered list of n input hashes, D[n] = {D(0), D(1), ..., D(n-1)}, the Merkle Tree Hash (MTH) is thus defined as follows:
 	</t>
 	<t>
-	  The hash of a list with one entry is :
+	  The hash of an empty list is the hash of an empty string:
+	  <vspace blankLines='1' />
+	  MTH({}) = SHA-256().
+	  <vspace blankLines='1' />
+	  The hash of a list with one entry is:
 	  <vspace blankLines='1' />
 	  MTH({D(0)}) = SHA-256(0 || D(0)).
 	  <vspace blankLines='1' />
