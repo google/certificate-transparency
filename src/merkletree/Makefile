@@ -1,14 +1,16 @@
-CC=g++
+CXXFLAGS= -Wall
+LIBS= -lssl
 
 all: test
 
 test: SerialHasherTest
 
-SerialHasherTest: SerialHasher.o SerialHasherTest.cc
-	$(CC) -lssl -o SerialHasherTest SerialHasher.o SerialHasherTest.cc
+SerialHasherTest: SerialHasher.o SerialHasherTest.o
+	$(CXX) -o SerialHasherTest SerialHasher.o SerialHasherTest.o $(LIBS)
+
+SerialHasherTest.o: SerialHasherTest.cc
 
 SerialHasher.o: SerialHasher.cc
-	$(CC) -Wall -c SerialHasher.cc
 
 clean:
 	rm SerialHasherTest *.o
