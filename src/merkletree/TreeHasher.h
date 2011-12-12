@@ -24,5 +24,9 @@ class TreeHasher {
 
  private:
   SerialHasher *hasher_;
+  static const std::string kLeafPrefix;
+  static const std::string kNodePrefix;
+  // The dummy hash of an empty tree.
+  std::string emptyhash_;
 };
 #endif

@@ -3,14 +3,13 @@ LIBS= -lssl
 
 all: test
 
-test: SerialHasherTest
+test: SerialHasherTest TreeHasherTest
 
 SerialHasherTest: SerialHasher.o SerialHasherTest.o
 	$(CXX) -o SerialHasherTest SerialHasher.o SerialHasherTest.o $(LIBS)
 
-SerialHasherTest.o: SerialHasherTest.cc
-
-SerialHasher.o: SerialHasher.cc
+TreeHasherTest: SerialHasher.o TreeHasher.o TreeHasherTest.o
+	$(CXX) -o TreeHasherTest SerialHasher.o TreeHasher.o TreeHasherTest.o $(LIBS)
 
 clean:
-	rm SerialHasherTest *.o
+	rm *Test *.o
