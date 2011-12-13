@@ -1,5 +1,5 @@
 CXXFLAGS= -Wall
-LIBS= -lssl
+LIBS= -lcrypto
 
 all: test
 

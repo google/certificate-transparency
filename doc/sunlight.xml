@@ -90,9 +90,10 @@ struct {
     Certificate leaf_certificate;
     Certificate certificate_chain&lt;0..2^24-1&gt;;
 } LogEntry;
-[benl: Should we consider a small number for the certificate_chain? Or perhaps note that a log can impose a limit?]
 	    </artwork>
 	  </figure>
+	  <t>[benl: Should we consider a small number for the certificate_chain? Or perhaps note that a log can impose a limit?]
+	  </t>
 	  <t>
 	    <spanx style="verb">leaf_certificate</spanx> is the end-entity certificate submitted for auditing.
 	  </t>
