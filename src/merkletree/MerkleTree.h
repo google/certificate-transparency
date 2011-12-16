@@ -23,7 +23,7 @@ class MerkleTree {
   // Number of levels. An empty tree has 0 levels, a tree with 1 leaf has
   // 1 level, a tree with 2 leaves has 2 levels, and a tree with n leaves has
   // ceil(log2(n)) + 1 levels.
-  unsigned int LevelCount() const;
+  unsigned int LevelCount() const { return level_count_; }
 
   // Add a new leaf to the hash tree. Stores the hash of the leaf data in the
   // tree structure, does not store the data itself.
@@ -34,7 +34,7 @@ class MerkleTree {
   // so position = number of leaves in the tree after this update.
   //
   // @param data Binary input blob
-  unsigned int AddLeaf(const std::string& data);
+  unsigned int AddLeaf(const std::string &data);
 
   // Get the current root of the tree.
   // Update the root to reflect the current shape of the tree,
@@ -52,7 +52,7 @@ class MerkleTree {
   // (i.e., the tree is not large enough).
   //
   // @param snapshot point in time (= number of leaves at that point).
-  std::string RootAtSnapShot(unsigned int snapshot);
+  std::string RootAtSnapshot(unsigned int snapshot);
 
 
   // Get the Merkle path from leaf to root.
@@ -77,12 +77,50 @@ class MerkleTree {
                                                 unsigned int snapshot);
 
  private:
+  // Update to a given snapshot, return the root.
+  std::string UpdateToSnapshot(unsigned int snapshot);
+  // Return the root of a past snapshot.
+  // If node is not NULL, additionally record the rightmost node
+  // for the given snapshot and node_level.
+  std::string RecomputePastSnapshot(unsigned int snapshot,
+                                    unsigned int node_level, std::string *node);
   // A container for nodes, organized according to levels and sorted
   // left-to-right in each level. tree_[0] is the leaf level, etc.
+  // The hash of nodes tree_[i][j] and tree_[i][j+1] (j even) is stored
+  // at tree_[i+1][j/2]. When tree_[i][j] is the last node of the level with
+  // no right sibling, we store its dummy copy: tree_[i+1][j/2] = tree_[i][j].
+  //
+  // For example, a tree with 5 leaf hashes a0, a1, a2, a3, a4
+  //
+  //        __ hash__
+  //       |         |
+  //    __ h20__     a4
+  //   |        |
+  //  h10     h11
+  //  | |     | |
+  // a0 a1   a2 a3
+  //
+  // is internally represented, top-down
+  //
+  // --------
+  // | hash |                        tree_[3]
+  // --------------
+  // | h20  | a4  |                  tree_[2]
+  // -------------------
+  // | h10  | h11 | a4 |             tree_[1]
+  // -----------------------------
+  // | a0   | a1  | a2 | a3 | a4 |   tree_[0]
+  // -----------------------------
+  //
+  // Since the tree is append-only from the right, at any given point in time,
+  // at each level, all nodes computed so far, except possibly the last node,
+  // are fixed and will no longer change.
   std::vector< std::vector<std::string> > tree_;
   TreeHasher treehasher_;
   // Number of leaves propagated up to the root,
   // to keep track of lazy evaluation.
   unsigned int leaves_processed_;
+  // The "true" level count for a fully evaluated tree.
+  unsigned int level_count_;
 };
 #endif

@@ -3,7 +3,10 @@ LIBS= -lcrypto
 
 all: test
 
-test: SerialHasherTest TreeHasherTest
+test: MerkleTreeTest SerialHasherTest TreeHasherTest
+
+MerkleTreeTest: MerkleTree.o SerialHasher.o TreeHasher.o MerkleTreeTest.o
+	$(CXX) -o  MerkleTreeTest MerkleTree.o SerialHasher.o TreeHasher.o MerkleTreeTest.o $(LIBS)
 
 SerialHasherTest: SerialHasher.o SerialHasherTest.o
 	$(CXX) -o SerialHasherTest SerialHasher.o SerialHasherTest.o $(LIBS)
