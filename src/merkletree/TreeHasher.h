@@ -1,5 +1,6 @@
 #ifndef TREEHASHER_H
 #define TREEHASHER_H
+#include <stddef.h>
 #include <string>
 
 #include "SerialHasher.h"

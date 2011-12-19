@@ -1,4 +1,5 @@
 #include <openssl/sha.h>
+#include <stddef.h>
 #include <string>
 
 #include "SerialHasher.h"

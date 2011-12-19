@@ -1,5 +1,6 @@
 #include <assert.h>
 #include <iostream>
+#include <stddef.h>
 #include <string>
 
 #include "SerialHasher.h"

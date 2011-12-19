@@ -1,6 +1,7 @@
 #ifndef SERIALHASHER_H
 #define SERIALHASHER_H
 #include <openssl/sha.h>
+#include <stddef.h>
 #include <string>
 
 class SerialHasher {
