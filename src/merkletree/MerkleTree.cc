@@ -1,4 +1,5 @@
 #include <assert.h>
+#include <stddef.h>
 #include <string>
 #include <vector>
 
@@ -13,26 +14,26 @@ MerkleTree::MerkleTree(SerialHasher *hasher) : treehasher_(hasher),
 
 MerkleTree::~MerkleTree() {}
 
-static inline unsigned int Parent(unsigned int leaf) {
+static inline size_t Parent(size_t leaf) {
   return leaf >> 1;
 }
 
-static inline bool IsRightChild(unsigned int leaf) {
+static inline bool IsRightChild(size_t leaf) {
   return leaf & 1;
 }
 
-static inline unsigned int Sibling(unsigned int leaf) {
+static inline size_t Sibling(size_t leaf) {
   return (leaf & 1) ? (leaf - 1) : (leaf + 1);
 }
 
-unsigned int MerkleTree::AddLeaf(const std::string &data) {
+size_t MerkleTree::AddLeaf(const std::string &data) {
   if (tree_.empty()) {
     tree_.push_back(std::vector<std::string>(0));
     // The first leaf hash is also the first root.
     leaves_processed_ = 1;
   }
   tree_[0].push_back(treehasher_.HashLeaf(data));
-  unsigned int leaf_count = LeafCount();
+  size_t leaf_count = LeafCount();
   // Update level count. Do not update the root; we evaluate the tree lazily.
   if (leaf_count < 2 || !((leaf_count - 1) & (leaf_count - 2)))
     ++level_count_;
@@ -44,10 +45,10 @@ std::string MerkleTree::CurrentRoot() {
   return RootAtSnapshot(LeafCount());
 }
 
-std::string MerkleTree::RootAtSnapshot(unsigned int snapshot) {
+std::string MerkleTree::RootAtSnapshot(size_t snapshot) {
   if (snapshot == 0)
     return treehasher_.HashEmpty();
-  unsigned int leaf_count = LeafCount();
+  size_t leaf_count = LeafCount();
   if (snapshot > leaf_count)
     return "";
   if (snapshot >= leaves_processed_)
@@ -56,24 +57,15 @@ std::string MerkleTree::RootAtSnapshot(unsigned int snapshot) {
   return RecomputePastSnapshot(snapshot, 0, NULL);
 }
 
-std::vector<std::string> MerkleTree::PathToCurrentRoot(unsigned int leaf) {
+std::vector<std::string> MerkleTree::PathToCurrentRoot(size_t leaf) {
   return PathToRootAtSnapshot(leaf, LeafCount());
 }
 
 std::vector<std::string>
-MerkleTree::PathToRootAtSnapshot(unsigned int leaf, unsigned int snapshot) {
+MerkleTree::PathToRootAtSnapshot(size_t leaf, size_t snapshot) {
   std::vector<std::string> path;
-  unsigned int leaf_count = LeafCount();
-  if (leaf > snapshot || snapshot > leaf_count)
-    return path;
-  if (leaf == 0) {
-    path.push_back(treehasher_.HashEmpty());
-    return path;
-  }
-
-  // Add the leaf itself.
-  path.push_back(tree_[0][leaf - 1]);
-  if (snapshot == 1)
+  size_t leaf_count = LeafCount();
+  if (leaf > snapshot || snapshot > leaf_count || leaf == 0)
     return path;
 
   std::string root;
@@ -81,15 +73,15 @@ MerkleTree::PathToRootAtSnapshot(unsigned int leaf, unsigned int snapshot) {
     // Bring the tree sufficiently up to date.
     root = UpdateToSnapshot(snapshot);
 
-  unsigned int level = 0;
+  size_t level = 0;
   // Position of the current node on the path at the current level.
-  unsigned int node = leaf - 1;
+  size_t node = leaf - 1;
   // Index of the last node at the current level for this snapshot view.
-  unsigned int last_node = snapshot - 1;
+  size_t last_node = snapshot - 1;
 
   // Move up, recording the sibling of the current node at each level.
-  do {
-    unsigned int sibling = Sibling(node);
+  while (last_node) {
+    size_t sibling = Sibling(node);
     if (sibling < last_node)
       // The sibling is not the last node of the level in the snapshot
       // tree, so its value is correct in the tree.
@@ -107,7 +99,7 @@ MerkleTree::PathToRootAtSnapshot(unsigned int leaf, unsigned int snapshot) {
     node = Parent(node);
     last_node = Parent(last_node);
     ++level;
-  } while (last_node);
+  };
 
   // Finally, attach the root, recomputing if necessary.
   if (root.empty())
@@ -116,7 +108,7 @@ MerkleTree::PathToRootAtSnapshot(unsigned int leaf, unsigned int snapshot) {
   return path;
 }
 
-std::string MerkleTree::UpdateToSnapshot(unsigned int snapshot) {
+std::string MerkleTree::UpdateToSnapshot(size_t snapshot) {
   if (snapshot == 0)
     return treehasher_.HashEmpty();
   if (snapshot == leaves_processed_)
@@ -125,11 +117,11 @@ std::string MerkleTree::UpdateToSnapshot(unsigned int snapshot) {
   assert(snapshot > leaves_processed_);
 
   // Update tree, moving up level-by-level.
-  unsigned int level = 0;
+  size_t level = 0;
   // Index of the first node to be processed at the current level.
-  unsigned int first_node = leaves_processed_;
+  size_t first_node = leaves_processed_;
   // Index of the last node.
-  unsigned int last_node = snapshot - 1;
+  size_t last_node = snapshot - 1;
 
   // Process level-by-level until we converge to a single node.
   // (first_node, last_node) = (0, 0) means we have reached the root level.
@@ -144,7 +136,7 @@ std::string MerkleTree::UpdateToSnapshot(unsigned int snapshot) {
 
     // Compute the parents of new nodes at the current level.
     // Start with a left sibling and parse an even number of nodes.
-    for (unsigned int j = first_node & ~1; j < last_node; j += 2) {
+    for (size_t j = first_node & ~1; j < last_node; j += 2) {
       tree_[level + 1].push_back(treehasher_.HashChildren(
           tree_[level][j], tree_[level][j + 1]));
     }
@@ -163,12 +155,12 @@ std::string MerkleTree::UpdateToSnapshot(unsigned int snapshot) {
   return tree_.back()[0];
 }
 
-std::string MerkleTree::RecomputePastSnapshot(unsigned int snapshot,
-                                              unsigned int node_level,
+std::string MerkleTree::RecomputePastSnapshot(size_t snapshot,
+                                              size_t node_level,
                                               std::string *node) {
-  unsigned int level = 0;
+  size_t level = 0;
   // Index of the rightmost node at the current level for this snapshot.
-  unsigned int last_node = snapshot - 1;
+  size_t last_node = snapshot - 1;
 
   if (snapshot == leaves_processed_) {
     // Nothing to recompute.

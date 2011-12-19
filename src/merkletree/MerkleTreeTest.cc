@@ -1,5 +1,6 @@
 #include <assert.h>
 #include <iostream>
+#include <stddef.h>
 #include <stdlib.h>
 #include <string>
 #include <time.h>
@@ -55,21 +56,20 @@ std::string sha256_roots[8] = {
 
 // Some paths for this tree.
 typedef struct {
-  unsigned int leaf;
-  unsigned int snapshot;
-  unsigned int path_length;
+  size_t leaf;
+  size_t snapshot;
+  size_t path_length;
   std::string path[5];
 } PathTestVector;
 
 // Generated from ReferenceMerklePath.
-PathTestVector sha256_paths[5] = {
-  { 0, 0, 1, {
-      S("\xe3\xb0\xc4\x42\x98\xfc\x1c\x14\x9a\xfb\xf4\xc8\x99\x6f\xb9\x24"
-        "\x27\xae\x41\xe4\x64\x9b\x93\x4c\xa4\x95\x99\x1b\x78\x52\xb8\x55", 32),
-      "", "", "", "" }},
-  { 1, 8, 5, {
+PathTestVector sha256_paths[6] = {
+  { 0, 0, 0, { "", "", "", "", "" }},
+  { 1, 1, 1, {
       S("\x6e\x34\x0b\x9c\xff\xb3\x7a\x98\x9c\xa5\x44\xe6\xbb\x78\x0a\x2c"
-        "\x78\x90\x1d\x3f\xb3\x37\x38\x76\x85\x11\xa3\x06\x17\xaf\xa0\x1d", 32),
+        "\x78\x90\x1d\x3f\xb3\x37\x38\x76\x85\x11\xa3\x06\x17\xaf\xa0\x1d", 32)
+    }},
+  { 1, 8, 4, {
       S("\x96\xa2\x96\xd2\x24\xf2\x85\xc6\x7b\xee\x93\xc3\x0f\x8a\x30\x91"
         "\x57\xf0\xda\xa3\x5d\xc5\xb8\x7e\x41\x0b\x78\x63\x0a\x09\xcf\xc7", 32),
       S("\x5f\x08\x3f\x0a\x1a\x33\xca\x07\x6a\x95\x27\x98\x32\x58\x0d\xb3"
@@ -79,9 +79,7 @@ PathTestVector sha256_paths[5] = {
       S("\x5d\xc9\xda\x79\xa7\x06\x59\xa9\xad\x55\x9c\xb7\x01\xde\xd9\xa2"
         "\xab\x9d\x82\x3a\xad\x2f\x49\x60\xcf\xe3\x70\xef\xf4\x60\x43\x28", 32)
     }},
-  { 6, 8, 5, {
-      S("\x42\x71\xa2\x6b\xe0\xd8\xa8\x4f\x0b\xd5\x4c\x8c\x30\x2e\x7c\xb3"
-        "\xa3\xb5\xd1\xfa\x67\x80\xa4\x0b\xcc\xe2\x87\x34\x77\xda\xb6\x58", 32),
+  { 6, 8, 4, {
       S("\xbc\x1a\x06\x43\xb1\x2e\x4d\x2d\x7c\x77\x91\x8f\x44\xe0\xf4\xf7"
         "\x9a\x83\x8b\x6c\xf9\xec\x5b\x5c\x28\x3e\x1f\x4d\x88\x59\x9e\x6b", 32),
       S("\xca\x85\x4e\xa1\x28\xed\x05\x0b\x41\xb3\x5f\xfc\x1b\x87\xb8\xeb"
@@ -91,17 +89,13 @@ PathTestVector sha256_paths[5] = {
       S("\x5d\xc9\xda\x79\xa7\x06\x59\xa9\xad\x55\x9c\xb7\x01\xde\xd9\xa2"
         "\xab\x9d\x82\x3a\xad\x2f\x49\x60\xcf\xe3\x70\xef\xf4\x60\x43\x28", 32)
     }},
-  { 3, 3, 3, {
-      S("\x02\x98\xd1\x22\x90\x6d\xcf\xc1\x08\x92\xcb\x53\xa7\x39\x92\xfc"
-        "\x5b\x9f\x49\x3e\xa4\xc9\xba\xdb\x27\xb7\x91\xb4\x12\x7a\x7f\xe7", 32),
+  { 3, 3, 2, {
       S("\xfa\xc5\x42\x03\xe7\xcc\x69\x6c\xf0\xdf\xcb\x42\xc9\x2a\x1d\x9d"
         "\xba\xf7\x0a\xd9\xe6\x21\xf4\xbd\x8d\x98\x66\x2f\x00\xe3\xc1\x25", 32),
       S("\xae\xb6\xbc\xfe\x27\x4b\x70\xa1\x4f\xb0\x67\xa5\xe5\x57\x82\x64"
         "\xdb\x0f\xa9\xb5\x1a\xf5\xe0\xba\x15\x91\x58\xf3\x29\xe0\x6e\x77", 32),
       "", "" }},
-  { 2, 5, 5, {
-      S("\x96\xa2\x96\xd2\x24\xf2\x85\xc6\x7b\xee\x93\xc3\x0f\x8a\x30\x91"
-        "\x57\xf0\xda\xa3\x5d\xc5\xb8\x7e\x41\x0b\x78\x63\x0a\x09\xcf\xc7", 32),
+  { 2, 5, 4, {
       S("\x6e\x34\x0b\x9c\xff\xb3\x7a\x98\x9c\xa5\x44\xe6\xbb\x78\x0a\x2c"
         "\x78\x90\x1d\x3f\xb3\x37\x38\x76\x85\x11\xa3\x06\x17\xaf\xa0\x1d", 32),
       S("\x5f\x08\x3f\x0a\x1a\x33\xca\x07\x6a\x95\x27\x98\x32\x58\x0d\xb3"
@@ -114,10 +108,10 @@ PathTestVector sha256_paths[5] = {
 };
 
 // Get the largest power of two smaller than i.
-unsigned int DownToPowerOfTwo(unsigned int i) {
+size_t DownToPowerOfTwo(size_t i) {
   assert(i >= 2);
   // Find the smallest power of two greater than or equal to i.
-  unsigned int split = 1;
+  size_t split = 1;
   do {
     split <<= 1;
   } while (split < i);
@@ -127,40 +121,37 @@ unsigned int DownToPowerOfTwo(unsigned int i) {
 }
 
 // Reference implementation of Merkle hash, for cross-checking.
-std::string ReferenceMerkleTreeHash(std::string inputs[],
-                                    unsigned int input_size,
+std::string ReferenceMerkleTreeHash(std::string inputs[], size_t input_size,
                                     TreeHasher *treehasher) {
   if (!input_size)
     return treehasher->HashEmpty();
   if (input_size == 1)
     return treehasher->HashLeaf(inputs[0]);
 
-  unsigned int split = DownToPowerOfTwo(input_size);
+  size_t split = DownToPowerOfTwo(input_size);
 
   return treehasher->HashChildren(
       ReferenceMerkleTreeHash(&inputs[0], split, treehasher),
       ReferenceMerkleTreeHash(&inputs[split], input_size - split, treehasher));
 }
 
-// Reference implementation of Merkle paths, for cross-checking.
+// Reference implementation of Merkle paths. Path from leaf to root,
+// excluding the leaf itself.
 std::vector<std::string>
-ReferenceMerklePath(std::string inputs[], unsigned int input_size,
-                    unsigned int leaf, TreeHasher *treehasher, bool add_root) {
+ReferenceMerklePath(std::string inputs[], size_t input_size, size_t leaf,
+                    TreeHasher *treehasher, bool add_root) {
   std::vector<std::string> path;
-  if (leaf > input_size)
+  if (leaf > input_size || leaf == 0)
     return path;
-  if (leaf == 0) {
-    path.push_back(treehasher->HashEmpty());
-    return path;
-  }
 
   if (input_size == 1) {
-    // Include the leaf itself in the path.
-    path.push_back(treehasher->HashLeaf(inputs[0]));
+    // Reached the leaf. If the leaf is also the root, add it now.
+    if (add_root)
+      path.push_back(ReferenceMerkleTreeHash(inputs, input_size, treehasher));
     return path;
   }
 
-  unsigned int split = DownToPowerOfTwo(input_size);
+  size_t split = DownToPowerOfTwo(input_size);
 
   std::vector<std::string> subpath;
   if (leaf <= split) {
@@ -291,7 +282,7 @@ void PathKatTest() {
   assert(tree1.CurrentRoot() == sha256_roots[7]);
 
   assert(tree1.PathToCurrentRoot(9).empty());
-  for (unsigned int i = 0; i < 5; ++i) {
+  for (unsigned int i = 0; i < 6; ++i) {
     std::vector<std::string> path = tree1.PathToRootAtSnapshot(
         sha256_paths[i].leaf, sha256_paths[i].snapshot);
     assert(path.size() == sha256_paths[i].path_length);
