@@ -7,6 +7,7 @@
 #include <vector>
 
 #include "MerkleTree.h"
+#include "MerkleVerifier.h"
 #include "SerialHasher.h"
 #include "TreeHasher.h"
 
@@ -30,7 +31,7 @@ std::string inputs[8] = {
   S("\x60\x61\x62\x63\x64\x65\x66\x67\x68\x69\x6a\x6b\x6c\x6d\x6e\x6f", 16),
 };
 
-// Level counts for number of leaves in [0, 8]
+// Level counts for number of leaves in [1, 8]
 unsigned int level_counts[8] = {1, 2, 3, 3, 4, 4, 4, 4};
 
 // Incremental roots from building the tree from inputs leaf-by-leaf.
@@ -179,7 +180,6 @@ void RootFuzzTest() {
     data[i] = (char)(i);
   TreeHasher treehasher(new Sha256Hasher());
 
-  srand(time(NULL));
   // Repeat test for each tree size in 1...256.
   for (unsigned int tree_size = 1; tree_size < 257; ++tree_size) {
     MerkleTree tree(new Sha256Hasher());
@@ -204,7 +204,6 @@ void PathFuzzTest() {
     data[i] = (char)(i);
   TreeHasher treehasher(new Sha256Hasher());
 
-  srand(time(NULL));
   // Repeat test for each tree size in 1...256.
   for (unsigned int tree_size = 1; tree_size < 257; ++tree_size) {
     MerkleTree tree(new Sha256Hasher());
@@ -285,10 +284,10 @@ void PathKatTest() {
   for (unsigned int i = 0; i < 6; ++i) {
     std::vector<std::string> path = tree1.PathToRootAtSnapshot(
         sha256_paths[i].leaf, sha256_paths[i].snapshot);
-    assert(path.size() == sha256_paths[i].path_length);
-    for (unsigned int j = 0; j < path.size(); ++j) {
-      assert(path[j] == sha256_paths[i].path[j]);
-    }
+    std::vector<std::string> kat_path(sha256_paths[i].path,
+                                      sha256_paths[i].path +
+                                      sha256_paths[i].path_length);
+    assert(path == kat_path);
   }
 
   // Second tree: build incrementally.
@@ -307,6 +306,103 @@ void PathKatTest() {
   }
 }
 
+void VerifierCheck(size_t leaf, size_t tree_size,
+                   const std::vector<std::string> &path,
+                   const std::string &data, MerkleVerifier *verifier) {
+  // Verify the original path.
+  assert(verifier->VerifyPath(leaf, tree_size, path, data));
+
+  // Wrong leaf index.
+  assert(!verifier->VerifyPath(leaf - 1, tree_size, path, data));
+  assert(!verifier->VerifyPath(leaf + 1, tree_size, path, data));
+  assert(!verifier->VerifyPath(leaf ^ 2, tree_size, path, data));
+
+  // Wrong tree height.
+  assert(!verifier->VerifyPath(leaf, tree_size * 2, path, data));
+  assert(!verifier->VerifyPath(leaf, tree_size / 2, path, data));
+
+  // Wrong leaf.
+  assert(!verifier->VerifyPath(leaf, tree_size, path, "WrongLeaf"));
+
+  // Wrong paths.
+  std::vector<std::string> wrong_path;
+  // Empty path.
+  assert(!verifier->VerifyPath(leaf, tree_size, wrong_path, data));
+
+  // Modify a single element on the path.
+  for (size_t j = 0; j < path.size(); ++j) {
+    wrong_path = path;
+    wrong_path[j] = sha256_empty_tree_hash;
+    assert(!verifier->VerifyPath(leaf, tree_size, wrong_path, data));
+  }
+
+  // Add garbage at the end of the path.
+  wrong_path = path;
+  wrong_path.push_back("");
+  assert(!verifier->VerifyPath(leaf, tree_size, wrong_path, data));
+  wrong_path.pop_back();
+
+  wrong_path.push_back(path.back());
+  assert(!verifier->VerifyPath(leaf, tree_size, wrong_path, data));
+  wrong_path.pop_back();
+
+  // Remove a node from the end.
+  wrong_path.pop_back();
+  assert(!verifier->VerifyPath(leaf, tree_size, wrong_path, data));
+
+  // Add garbage in the beginning of the path.
+  wrong_path.clear();
+  wrong_path.push_back("");
+  wrong_path.insert(wrong_path.end(), path.begin(), path.end());
+  assert(!verifier->VerifyPath(leaf, tree_size, wrong_path, data));
+
+  wrong_path[0] = path[0];
+  assert(!verifier->VerifyPath(leaf, tree_size, wrong_path, data));
+}
+
+void VerifierTest() {
+  MerkleVerifier verifier(new Sha256Hasher());
+  std::vector<std::string> path;
+  // Various invalid paths.
+  assert(!verifier.VerifyPath(0, 0, path, ""));
+  assert(!verifier.VerifyPath(0, 1, path, ""));
+  assert(!verifier.VerifyPath(1, 0, path, ""));
+  assert(!verifier.VerifyPath(2, 1, path, ""));
+
+  path.push_back(sha256_empty_tree_hash);
+  assert(!verifier.VerifyPath(0, 0, path, ""));
+  assert(!verifier.VerifyPath(0, 1, path, ""));
+  assert(!verifier.VerifyPath(1, 0, path, ""));
+  assert(!verifier.VerifyPath(2, 1, path, ""));
+
+  // Known good paths.
+  // i = 0 is an invalid path.
+  for (unsigned int i = 1; i < 6; ++i) {
+    // Construct the path.
+    path = std::vector<std::string>(sha256_paths[i].path,
+                                    sha256_paths[i].path +
+                                    sha256_paths[i].path_length);
+    VerifierCheck(sha256_paths[i].leaf, sha256_paths[i].snapshot,
+                  path, inputs[sha256_paths[i].leaf - 1], &verifier);
+  }
+
+  // More tests with reference path generator.
+  std::string data[128];
+  data[0] = S("\x00", 1);
+  for (unsigned int i = 1; i < 128; ++i)
+    data[i] = (char)(i);
+  TreeHasher treehasher(new Sha256Hasher());
+
+  // Repeat test for each tree size in 1...256.
+  for (unsigned int tree_size = 1; tree_size <= 128; ++tree_size) {
+    // Repeat for each leaf in range.
+    for (unsigned int leaf = 1; leaf < tree_size; ++leaf) {
+      path = ReferenceMerklePath(data, tree_size, leaf, &treehasher, true);
+      VerifierCheck(leaf, tree_size, path, data[leaf - 1], &verifier);
+    }
+  }
+}
+
 void MerkleTreeTest() {
   std::cout << "Checking test vectors... ";
   RootKatTest();
@@ -314,8 +410,12 @@ void MerkleTreeTest() {
   std::cout << "OK\n";
   std::cout << "Testing against reference implementation... ";
   // Randomized tests.
+  srand(time(NULL));
   RootFuzzTest();
   PathFuzzTest();
+  std::cout << "OK\n";
+  std::cout << "Testing path verification... ";
+  VerifierTest();
   std::cout << "OK\n";
 }
 

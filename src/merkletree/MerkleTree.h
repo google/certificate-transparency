@@ -9,8 +9,7 @@
 class SerialHasher;
 
 // Class for manipulating Merkle Hash Trees
-// TODO(ekasper): an equivalent "public" counterpart for verifying Merkle paths
-// emitted by this class, using the same underlying TreeHasher.
+// TODO: consistency proofs between snapshots.
 class MerkleTree {
  public:
   // Takes ownership of the SerialHasher.

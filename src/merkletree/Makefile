@@ -5,8 +5,10 @@ all: test
 
 test: MerkleTreeTest SerialHasherTest TreeHasherTest
 
-MerkleTreeTest: MerkleTree.o SerialHasher.o TreeHasher.o MerkleTreeTest.o
-	$(CXX) -o  MerkleTreeTest MerkleTree.o SerialHasher.o TreeHasher.o MerkleTreeTest.o $(LIBS)
+MerkleTreeTest: MerkleTree.o MerkleVerifier.o SerialHasher.o TreeHasher.o \
+		MerkleTreeTest.o
+	$(CXX) -o  MerkleTreeTest MerkleVerifier.o MerkleTree.o SerialHasher.o \
+	TreeHasher.o MerkleTreeTest.o $(LIBS)
 
 SerialHasherTest: SerialHasher.o SerialHasherTest.o
 	$(CXX) -o SerialHasherTest SerialHasher.o SerialHasherTest.o $(LIBS)
