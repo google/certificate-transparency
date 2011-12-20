@@ -26,7 +26,7 @@ Logs are only expected to certify that they have seen a certificate and thus, we
     <section title="Cryptographic components">
       <section title="Merkle Hash Trees">
 	<t>
-	  Logs use binary Merkle hash trees for efficient audit proofs. The hashing algorithm is SHA-256. The input to the Merkle tree hash is a list of data entries; these entries will be hashed to form the leaves of the Merkle hash tree. The output is a single 32-byte root hash. Given an ordered list of n input hashes, D[n] = {D(0), D(1), ..., D(n-1)}, the Merkle Tree Hash (MTH) is thus defined as follows:
+	  Logs use binary Merkle hash trees for efficient audit proofs. The hashing algorithm is SHA-256. The input to the Merkle tree hash is a list of data entries; these entries will be hashed to form the leaves of the Merkle hash tree. The output is a single 32-byte root hash. Given an ordered list of n inputs, D[0:n] = {d(0), d(1), ..., d(n-1)}, the Merkle Tree Hash (MTH) is thus defined as follows:
 	</t>
 	<t>
 	  The hash of an empty list is the hash of an empty string:
@@ -35,17 +35,37 @@ Logs are only expected to certify that they have seen a certificate and thus, we
 	  <vspace blankLines='1' />
 	  The hash of a list with one entry is:
 	  <vspace blankLines='1' />
-	  MTH({D(0)}) = SHA-256(0 || D(0)).
+	  MTH({d(0)}) = SHA-256(0 || d(0)).
 	  <vspace blankLines='1' />
-	  For n &gt; 1, let k be the largest power of two smaller than n. The Merkle Tree Hash is then defined recursively as
+	  For n &gt; 1, let k be the largest power of two smaller than n. The Merkle Tree Hash of an n-element list D[0:n] is then defined recursively as
 	  <vspace blankLines='1' />
-	  MTH({D(0), D(1), ..., D(n-1)}) = SHA-256(1 || MTH({D(0), ... , D(k-1)}) || MTH({D(k), ..., D(n-1)})),
+	  MTH(D[0:n]) = SHA-256(1 || MTH(D[0:k]) || MTH(D[k:n])),
 	  <vspace blankLines='1' />
-	  where || is concatenation.
+	  where || is concatenation and D[k1:k2] denotes the length (k2 - k1) list {d(k1), d(k1+1),..., d(k2-1)}.
 	</t>
 <t>
 Note that we do not require the length of the input list to be a power of two. The resulting Merkle tree may thus not be balanced, however, its shape is uniquely determined by the number of leaves. <spanx style="emph">This Merkle tree is essentially the same as the</spanx> <eref target='http://tamperevident.cs.rice.edu/Logging.html/'>history tree</eref> <spanx style="emph">proposal except our current definition omits dummy leaves.</spanx>
 </t>
+      <section title="Merkle audit paths" anchor='merkle_paths'>
+	<t>
+	  A Merkle audit path for a leaf in a Merkle hash tree is the list of all additional nodes in the Merkle tree required to compute the Merkle Tree Hash for that tree. If the root computed from the audit path matches the true root, then the audit path is proof that the leaf exists in the tree.
+	</t>
+	<t> Given an ordered list of n inputs to the tree, D[0:n] = {d(0), ..., d(n-1)}, the Merkle audit path PATH(m, D[0:n]) for the (m+1)th input d(m), 0 &lt;= m &lt; n, is defined as follows:
+	</t>
+	<t>
+	  The path for the single leaf in a tree with a one-element input list D[0:1] = {d(0)} is empty:
+	  <vspace blankLines='1' />
+	  PATH(0, {d(0)}) = {}
+	  <vspace blankLines='1' />
+	  For n > 1, let k be the largest power of two smaller than n. The path for the (m+1)th element d(m) in a list of n &gt m elements is then defined recursively as
+	  <vspace blankLines='1' />
+	  PATH(m, D[0:n]) = PATH(m, D[0:k]) : MTH(D[k:n]) for m &lt; k; and
+	  <vspace blankLines='1' />
+	  PATH(m, D[0:n]) = PATH(m - k, D[k:n]) : MTH(D[0:k]) for k &lt;= m &lt; n,
+	  <vspace blankLines='1' />
+	  where : is concatenation of lists and D[k1:k2] denotes the length (k2 - k1) list {d(k1), d(k1+1),..., d(k2-1)} as before.
+	</t>
+      </section>
 
 	<section title="Example">
 	  <t>
@@ -58,21 +78,33 @@ Note that we do not require the length of the input list to be a power of two. T
          /        \
         /          \
        /            \
-      *              *
+      k              l
      / \            / \
     /   \          /   \ 
    /     \        /     \    
-  *       *      *      *
+  g       h      i      j
  / \     / \    / \     |
- * *     * *    * *     D6       
+ a b     c d    e f     D6       
  | |     | |    | |                               
 D0 D1   D2 D3  D4 D5    
 </artwork>
 </figure>
 	  </t>
+	  <t>
+	    The audit path for D0 is [b, h, l].
+	  </t>
+	  <t>
+	    The audit path for D3 is [c, g, l].
+	  </t>
+	  <t>
+	    The audit path for D4 is [f, j, k].
+	  </t>
+	  <t>
+	    The audit path for D6 is [i, k].
+	  </t>
 	</section>
       </section>
-</section>
+    </section>
       <section title="Log Format">
 	<section title="Log Entries">
 	  <t>
@@ -191,16 +223,32 @@ struct {
 	    </artwork>
 	  </figure>
 	  <t>
-	    <spanx style="verb">leaf_index</spanx> is the index of the audited node in the Merkle tree.
+	    <spanx style="verb">leaf_index</spanx> is the index of the audited node in the Merkle tree, from 1 to <spanx style="verb">tree_size</spanx> [or 0 to tree_size - 1 ?].
 	  </t>
 	  <t>
-	    <spanx style="verb">audit_path</spanx> is a list of additional nodes in the Merkle tree required for reconstructing the root hash. Nodes must be listed in the input order [make this ordering clearer!]. <spanx style="emph">Notice that the left-right ordering is determined by the position of the leaf.</spanx> The leaf node under audit as well as the root node shall be omitted from the path.
+	    <spanx style="verb">audit_path</spanx> is a list of additional nodes in the Merkle tree required for reconstructing the root hash. Nodes must be listed from leaf to root level, i.e., in the order they are used in the Merkle Tree Hash computation, as defined in <xref target='merkle_paths' />. <spanx style="emph">Notice that the left-right ordering is determined by the position of the leaf.</spanx> The leaf node under audit as well as the root node shall be omitted from the path.
 	  </t>
 	  <t>
 	    <spanx style="verb">signed_tree</spanx> is the signature on the tree.
 	  </t>
 	  <t>
-	    Servers who send an audit proof for a certificate must also serve all intermediate certificates recorded in the  <spanx style="verb">certificate_list</spanx> of the <spanx style="verb">LogEntry</spanx>. Clients who verify the certificate audit proof use these certificates to reconstruct the leaf node of the Log Segment Merkle Hash Tree and verify the signature on the <spanx style="verb">root_hash</spanx> reconstructed from the <spanx style="verb">audit_path</spanx>. Clients must additionally check that the <spanx style="verb">tree_type</spanx> of the <spanx style="verb">signed_tree</spanx> is <spanx style="verb">LogSegment</spanx>.
+	    Servers who send an audit proof for a certificate must also serve all intermediate certificates recorded in the  <spanx style="verb">certificate_list</spanx> of the <spanx style="verb">LogEntry</spanx>. Clients who verify the certificate audit proof use these certificates to reconstruct the leaf node of the Log Segment Merkle Hash Tree. A valid audit proof MUST satisfy the following:
+	  </t>
+	  <t>
+	    <list style='symbols'>
+	      <t>
+		The <spanx style="verb">leaf_index</spanx> MUST be greater than 0 and MUST NOT exceed <spanx style="verb">tree_size</spanx> in <spanx style="verb">signed_tree</spanx>;
+	      </t>
+	      <t>
+		The root hash reconstructed from the leaf and the <spanx style="verb">audit_path</spanx> MUST equal the <spanx style="verb">root_hash</spanx> of <spanx style="verb">signed_tree</spanx>;
+	      </t>
+	      <t>
+		The signature on <spanx style="verb">signed_tree</spanx> MUST be a valid log signature;
+	      </t>
+	      <t>
+		The <spanx style="verb">tree_type</spanx> of <spanx style="verb">signed_tree</spanx> MUST be <spanx style="verb">LogSegment</spanx> for certificate audit proofs, and MUST be <spanx style="verb">SegmentInfo</spanx> for a Segment Info audit proof.
+	      </t>
+	    </list>
 	  </t>
 	  <t>
 	    Clients may construct a different certificate chain than the one recorded in the <spanx style="verb">LogEntry</spanx> to verify the validity of the leaf certificate. Clients who do so must additionally check that the public key sequence of the constructed chain matches the public key sequence in the <spanx style="verb">LogEntry</spanx> <spanx style="verb">certificate_list</spanx>, with only two exceptions:
@@ -214,8 +262,6 @@ struct {
 		The constructed chain may contain additional public keys after the keys in the <spanx style="verb">certificate_list</spanx>. In this case, the first extra certificate in the chain must directly certify the top public key in the  <spanx style="verb">certificate_list</spanx>.
 	      </t>
 	    </list>
-	  </t>
-	  <t>Clients who verify a segment audit proof must check that the <spanx style="verb">tree_type</spanx> is <spanx style="verb">SegmentInfo</spanx>. They must also check that the <spanx style="verb">leaf_index</spanx> of the segment audit proof matches the <spanx style="verb">sequence_number</spanx> of the segment.
 	  </t>
 	</section>
       </section>
