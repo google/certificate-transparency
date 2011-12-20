@@ -1,7 +1,10 @@
-CXXFLAGS= -Wall
+CXXFLAGS= -Wall -Werror -O3
 LIBS= -lcrypto
 
-all: test
+all: .depend test
+
+.depend: *.cc *.h
+	$(CXX) -MM *.cc > .depend
 
 test: MerkleTreeTest SerialHasherTest TreeHasherTest
 
