@@ -5,3 +5,4 @@ doc/sunlight\.txt
 src/merkletree/MerkleTreeTest
 src/merkletree/SerialHasherTest
 src/merkletree/TreeHasherTest
+\.depend
