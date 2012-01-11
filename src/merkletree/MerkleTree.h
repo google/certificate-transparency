@@ -74,6 +74,16 @@ class MerkleTree {
   // @param snapshot point in time (= number of leaves at that point)
   std::vector<std::string> PathToRootAtSnapshot(size_t leaf, size_t snapshot);
 
+  // Get the Merkle consistency proof between two snapshots.
+  // Returns a vector of node hashes, ordered according to levels.
+  // Returns an empty vector if snapshot1 is 0, snapshot 1 >= snapshot2,
+  // or one of the snapshots requested is in the future.
+  //
+  // @param snapshot1 the first point in time
+  // @param snapshot2 the second point in time
+  std::vector<std::string> SnapshotConsistency(size_t snapshot1,
+                                               size_t snapshot2);
+
  private:
   // Update to a given snapshot, return the root.
   std::string UpdateToSnapshot(size_t snapshot);
@@ -82,6 +92,11 @@ class MerkleTree {
   // for the given snapshot and node_level.
   std::string RecomputePastSnapshot(size_t snapshot, size_t node_level,
                                     std::string *node);
+  // Path from a node at a given level (both indexed starting with 0)
+  // to the root at a given snapshot.
+  std::vector<std::string>
+  PathFromNodeToRootAtSnapshot(size_t node_index, size_t level,
+                               size_t snapshot, bool add_root);
   // A container for nodes, organized according to levels and sorted
   // left-to-right in each level. tree_[0] is the leaf level, etc.
   // The hash of nodes tree_[i][j] and tree_[i][j+1] (j even) is stored

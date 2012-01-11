@@ -29,6 +29,9 @@ class MerkleVerifier {
                   const std::vector<std::string> &path,
                   const std::string &data);
 
+  bool VerifyConsistency(size_t snapshot1, size_t snapshot2,
+                         const std::string &root1, const std::string &root2,
+                         const std::vector<std::string> &proof);
  private:
   TreeHasher treehasher_;
 };

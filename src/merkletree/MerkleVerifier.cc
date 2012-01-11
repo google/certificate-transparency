@@ -54,3 +54,72 @@ bool MerkleVerifier::VerifyPath(size_t leaf, size_t tree_size,
     return false;
   return true;
 }
+
+bool MerkleVerifier::VerifyConsistency(size_t snapshot1, size_t snapshot2,
+                                       const std::string &root1,
+                                       const std::string &root2,
+                                       const std::vector<std::string> &proof) {
+  if (snapshot1 > snapshot2)
+    // Can't go back in time.
+    return false;
+  if (snapshot1 == snapshot2)
+    return root1 == root2 && proof.empty();
+  if (snapshot1 == 0)
+    // Any snapshot greater than 0 is consistent with snapshot 0.
+    return proof.empty();
+  // Now 0 < snapshot1 < snapshot2.
+  // Verify the roots.
+  size_t node = snapshot1 - 1;
+  size_t last_node = snapshot2 - 1;
+  if (proof.empty())
+    return false;
+  std::vector<std::string>::const_iterator it = proof.begin();
+  // Move up until the first mutable node.
+  while (IsRightChild(node)) {
+    node = Parent(node);
+    last_node = Parent(last_node);
+  }
+
+  std::string node1_hash;
+  std::string node2_hash;
+  if (node)
+    node2_hash = node1_hash = *it++;
+  else
+    // The tree at snapshot1 was balanced, nothing to verify for root1.
+    node2_hash = node1_hash = root1;
+  while (node) {
+    if (it == proof.end())
+      return false;
+
+    if (IsRightChild(node)) {
+      node1_hash = treehasher_.HashChildren(*it, node1_hash);
+      node2_hash = treehasher_.HashChildren(*it, node2_hash);
+      ++it;
+    }
+    else if (node < last_node)
+      // The sibling only exists in the later tree. The parent in the
+      // snapshot1 tree is a dummy copy.
+      node2_hash = treehasher_.HashChildren(node2_hash, *it++);
+    // Else the sibling does not exist in either tree. Do nothing.
+
+    node = Parent(node);
+    last_node = Parent(last_node);
+  }
+
+  // Verify the first root.
+  if (node1_hash != root1)
+    return false;
+
+  // Continue until the second root.
+  while (last_node) {
+    if (it == proof.end())
+      // We've reached the end but we're not done yet.
+      return false;
+
+    node2_hash = treehasher_.HashChildren(node2_hash, *it++);
+    last_node = Parent(last_node);
+  }
+
+  // Verify the second root.
+  return node2_hash == root2 && it == proof.end();
+}

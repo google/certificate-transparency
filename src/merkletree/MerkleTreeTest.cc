@@ -60,16 +60,16 @@ typedef struct {
   size_t leaf;
   size_t snapshot;
   size_t path_length;
-  std::string path[5];
+  std::string path[4];
 } PathTestVector;
 
 // Generated from ReferenceMerklePath.
 PathTestVector sha256_paths[6] = {
-  { 0, 0, 0, { "", "", "", "", "" }},
+  { 0, 0, 0, { "", "", "", "" }},
   { 1, 1, 1, {
       S("\x6e\x34\x0b\x9c\xff\xb3\x7a\x98\x9c\xa5\x44\xe6\xbb\x78\x0a\x2c"
-        "\x78\x90\x1d\x3f\xb3\x37\x38\x76\x85\x11\xa3\x06\x17\xaf\xa0\x1d", 32)
-    }},
+        "\x78\x90\x1d\x3f\xb3\x37\x38\x76\x85\x11\xa3\x06\x17\xaf\xa0\x1d", 32),
+      "", "", "" }},
   { 1, 8, 4, {
       S("\x96\xa2\x96\xd2\x24\xf2\x85\xc6\x7b\xee\x93\xc3\x0f\x8a\x30\x91"
         "\x57\xf0\xda\xa3\x5d\xc5\xb8\x7e\x41\x0b\x78\x63\x0a\x09\xcf\xc7", 32),
@@ -106,6 +106,40 @@ PathTestVector sha256_paths[6] = {
       S("\x4e\x3b\xbb\x1f\x7b\x47\x8d\xcf\xe7\x1f\xb6\x31\x63\x15\x19\xa3"
         "\xbc\xa1\x2c\x9a\xef\xca\x16\x12\xbf\xce\x4c\x13\xa8\x62\x64\xd4", 32)
     }}
+};
+
+typedef struct {
+  size_t snapshot1;
+  size_t snapshot2;
+  size_t proof_length;
+  std::string proof[3];
+} ProofTestVector;
+
+// Generated from ReferenceSnapshotConsistency.
+ProofTestVector sha256_proofs[4] = {
+  { 1, 1, 0, { "", "", "" }},
+  { 1, 8, 3, {
+      S("\x96\xa2\x96\xd2\x24\xf2\x85\xc6\x7b\xee\x93\xc3\x0f\x8a\x30\x91"
+        "\x57\xf0\xda\xa3\x5d\xc5\xb8\x7e\x41\x0b\x78\x63\x0a\x09\xcf\xc7", 32),
+      S("\x5f\x08\x3f\x0a\x1a\x33\xca\x07\x6a\x95\x27\x98\x32\x58\x0d\xb3"
+        "\xe0\xef\x45\x84\xbd\xff\x1f\x54\xc8\xa3\x60\xf5\x0d\xe3\x03\x1e", 32),
+      S("\x6b\x47\xaa\xf2\x9e\xe3\xc2\xaf\x9a\xf8\x89\xbc\x1f\xb9\x25\x4d"
+        "\xab\xd3\x11\x77\xf1\x62\x32\xdd\x6a\xab\x03\x5c\xa3\x9b\xf6\xe4", 32)
+    }},
+  { 6, 8, 3, {
+      S("\x0e\xbc\x5d\x34\x37\xfb\xe2\xdb\x15\x8b\x9f\x12\x6a\x1d\x11\x8e"
+        "\x30\x81\x81\x03\x1d\x0a\x94\x9f\x8d\xed\xed\xeb\xc5\x58\xef\x6a", 32),
+      S("\xca\x85\x4e\xa1\x28\xed\x05\x0b\x41\xb3\x5f\xfc\x1b\x87\xb8\xeb"
+        "\x2b\xde\x46\x1e\x9e\x3b\x55\x96\xec\xe6\xb9\xd5\x97\x5a\x0a\xe0", 32),
+      S("\xd3\x7e\xe4\x18\x97\x6d\xd9\x57\x53\xc1\xc7\x38\x62\xb9\x39\x8f"
+        "\xa2\xa2\xcf\x9b\x4f\xf0\xfd\xfe\x8b\x30\xcd\x95\x20\x96\x14\xb7", 32)
+    }},
+  { 2, 5, 2, {
+      S("\x5f\x08\x3f\x0a\x1a\x33\xca\x07\x6a\x95\x27\x98\x32\x58\x0d\xb3"
+        "\xe0\xef\x45\x84\xbd\xff\x1f\x54\xc8\xa3\x60\xf5\x0d\xe3\x03\x1e", 32),
+      S("\xbc\x1a\x06\x43\xb1\x2e\x4d\x2d\x7c\x77\x91\x8f\x44\xe0\xf4\xf7"
+        "\x9a\x83\x8b\x6c\xf9\xec\x5b\x5c\x28\x3e\x1f\x4d\x88\x59\x9e\x6b", 32),
+      "" }}
 };
 
 // Get the largest power of two smaller than i.
@@ -172,6 +206,52 @@ ReferenceMerklePath(std::string inputs[], size_t input_size, size_t leaf,
   return path;
 }
 
+// Reference implementation of snapshot consistency.
+// Call with have_root1 = true.
+std::vector<std::string>
+ReferenceSnapshotConsistency(std::string inputs[], size_t snapshot2,
+                             size_t snapshot1, TreeHasher *treehasher,
+                             bool have_root1) {
+  std::vector<std::string> proof;
+  if (snapshot1 == 0 || snapshot1 > snapshot2)
+    return proof;
+  if (snapshot1 == snapshot2) {
+    // Consistency proof for two equal subtrees is empty.
+    if (!have_root1)
+      // Record the hash of this subtree unless it's the root for which
+      // the proof was originally requested. (This happens when the snapshot1
+      // tree is balanced.)
+      proof.push_back(ReferenceMerkleTreeHash(inputs, snapshot1, treehasher));
+    return proof;
+  }
+
+  // 0 < snapshot1 < snapshot2
+  size_t split = DownToPowerOfTwo(snapshot2);
+
+  std::vector<std::string> subproof;
+  if (snapshot1 <= split) {
+    // Root of snapshot1 is in the left subtree of snapshot2.
+    // Prove that the left subtrees are consistent.
+    subproof = ReferenceSnapshotConsistency(inputs, split, snapshot1,
+                                            treehasher, have_root1);
+    proof.insert(proof.end(), subproof.begin(), subproof.end());
+    // Record the hash of the right subtree (only present in snapshot2).
+    proof.push_back(ReferenceMerkleTreeHash(&inputs[split], snapshot2 - split,
+                                            treehasher));
+  } else {
+    // Snapshot1 root is at the same level as snapshot2 root.
+    // Prove that the right subtrees are consistent. The right subtree
+    // doesn't contain the root of snapshot1, so set have_root1 = false.
+    subproof = ReferenceSnapshotConsistency(&inputs[split], snapshot2 - split,
+                                            snapshot1 - split, treehasher,
+                                            false);
+    proof.insert(proof.end(), subproof.begin(), subproof.end());
+    // Record the hash of the left subtree (equal in both trees).
+    proof.push_back(ReferenceMerkleTreeHash(&inputs[0], split, treehasher));
+  }
+  return proof;
+}
+
 // Make random root queries and check against the reference hash.
 void RootFuzzTest() {
   std::string data[256];
@@ -219,6 +299,34 @@ void PathFuzzTest() {
       unsigned int leaf = rand() % (snapshot + 1);
       assert(tree.PathToRootAtSnapshot(leaf, snapshot) ==
              ReferenceMerklePath(data, snapshot, leaf, &treehasher, true));
+    }
+  }
+}
+
+// Make random proof queries and check against the reference implementation.
+void ConsistencyFuzzTest() {
+  std::string data[256];
+  data[0] = S("\x00", 1);
+  for (unsigned int i = 1; i < 256; ++i)
+    data[i] = (char)(i);
+  TreeHasher treehasher(new Sha256Hasher());
+
+  // Repeat test for each tree size in 1...256.
+  for (unsigned int tree_size = 1; tree_size < 257; ++tree_size) {
+    MerkleTree tree(new Sha256Hasher());
+    for (unsigned int j = 0; j < tree_size; ++j)
+      tree.AddLeaf(data[j]);
+
+    // Since the tree is evaluated lazily, the order of queries is significant.
+    // Generate a random sequence of 8 queries for each tree.
+    for (unsigned int j = 0; j < 8; ++j) {
+      // A snapshot in the range 0... length.
+      unsigned int snapshot2 = rand() % (tree_size + 1);
+      // A snapshot in the range 0... snapshot.
+      unsigned int snapshot1 = rand() % (snapshot2 + 1);
+      assert(tree.SnapshotConsistency(snapshot1, snapshot2) ==
+             ReferenceSnapshotConsistency(data, snapshot2, snapshot1,
+                                          &treehasher, true));
     }
   }
 }
@@ -306,6 +414,24 @@ void PathKatTest() {
   }
 }
 
+void ConsistencyKatTest() {
+  MerkleTree tree1(new Sha256Hasher());
+  for (unsigned int i = 0; i < 8; ++i) {
+    tree1.AddLeaf(inputs[i]);
+  }
+  assert(tree1.LeafCount() == 8);
+  assert(tree1.CurrentRoot() == sha256_roots[7]);
+
+  for (unsigned int i = 0; i < 4; ++i) {
+    std::vector<std::string> proof = tree1.SnapshotConsistency(
+        sha256_proofs[i].snapshot1, sha256_proofs[i].snapshot2);
+    std::vector<std::string> kat_proof(sha256_proofs[i].proof,
+                                       sha256_proofs[i].proof +
+                                       sha256_proofs[i].proof_length);
+    assert(proof == kat_proof);
+  }
+}
+
 void VerifierCheck(size_t leaf, size_t tree_size,
                    const std::vector<std::string> &path,
                    const std::string &data, MerkleVerifier *verifier) {
@@ -360,6 +486,86 @@ void VerifierCheck(size_t leaf, size_t tree_size,
   assert(!verifier->VerifyPath(leaf, tree_size, wrong_path, data));
 }
 
+void VerifierConsistencyCheck(size_t snapshot1, size_t snapshot2,
+                              const std::string &root1,
+                              const std::string &root2,
+                              const std::vector<std::string> &proof,
+                              MerkleVerifier *verifier) {
+  // Verify the original consistency proof.
+  assert(verifier->VerifyConsistency(snapshot1, snapshot2, root1, root2,
+                                     proof));
+
+  if (proof.empty())
+    // For simplicity test only non-trivial proofs that have root1 != root2
+    // snapshot1 != 0 and snapshot1 != snapshot2.
+    return;
+
+  // Wrong snapshot index.
+  assert(!verifier->VerifyConsistency(snapshot1 - 1, snapshot2, root1, root2,
+                                     proof));
+  assert(!verifier->VerifyConsistency(snapshot1 + 1, snapshot2, root1, root2,
+                                     proof));
+  assert(!verifier->VerifyConsistency(snapshot1 ^ 2, snapshot2, root1, root2,
+                                     proof));
+
+  // Wrong tree height.
+  assert(!verifier->VerifyConsistency(snapshot1, snapshot2 * 2, root1, root2,
+                                     proof));
+  assert(!verifier->VerifyConsistency(snapshot1, snapshot2 / 2, root1, root2,
+                                     proof));
+
+  // Wrong root.
+  assert(!verifier->VerifyConsistency(snapshot1, snapshot2, root1, "WrongRoot",
+                                      proof));
+  assert(!verifier->VerifyConsistency(snapshot1, snapshot2, "WrongRoot", root2,
+                                      proof));
+  // Swap roots.
+  assert(!verifier->VerifyConsistency(snapshot1, snapshot2, root2, root1,
+                                      proof));
+
+  // Wrong proofs.
+  std::vector<std::string> wrong_proof;
+  // Empty proof.
+  assert(!verifier->VerifyConsistency(snapshot1, snapshot2, root1, root2,
+                                      wrong_proof));
+
+  // Modify a single element in the proof.
+  for (size_t j = 0; j < proof.size(); ++j) {
+    wrong_proof = proof;
+    wrong_proof[j] = sha256_empty_tree_hash;
+    assert(!verifier->VerifyConsistency(snapshot1, snapshot2, root1, root2,
+                                        wrong_proof));
+  }
+
+  // Add garbage at the end of the proof.
+  wrong_proof = proof;
+  wrong_proof.push_back("");
+  assert(!verifier->VerifyConsistency(snapshot1, snapshot2, root1, root2,
+                                      wrong_proof));
+  wrong_proof.pop_back();
+
+  wrong_proof.push_back(proof.back());
+  assert(!verifier->VerifyConsistency(snapshot1, snapshot2, root1, root2,
+                                      wrong_proof));
+  wrong_proof.pop_back();
+
+  // Remove a node from the end.
+  wrong_proof.pop_back();
+  assert(!verifier->VerifyConsistency(snapshot1, snapshot2, root1, root2,
+                                      wrong_proof));
+
+  // Add garbage in the beginning of the proof.
+  wrong_proof.clear();
+  wrong_proof.push_back("");
+  wrong_proof.insert(wrong_proof.end(), proof.begin(), proof.end());
+  assert(!verifier->VerifyConsistency(snapshot1, snapshot2, root1, root2,
+                                      wrong_proof));
+
+  wrong_proof[0] = proof[0];
+  assert(!verifier->VerifyConsistency(snapshot1, snapshot2, root1, root2,
+                                      wrong_proof));
+}
+
 void VerifierTest() {
   MerkleVerifier verifier(new Sha256Hasher());
   std::vector<std::string> path;
@@ -393,12 +599,65 @@ void VerifierTest() {
     data[i] = (char)(i);
   TreeHasher treehasher(new Sha256Hasher());
 
-  // Repeat test for each tree size in 1...256.
+  // Repeat test for each tree size in 1...128.
   for (unsigned int tree_size = 1; tree_size <= 128; ++tree_size) {
     // Repeat for each leaf in range.
-    for (unsigned int leaf = 1; leaf < tree_size; ++leaf) {
+    for (unsigned int leaf = 1; leaf <= tree_size; ++leaf) {
       path = ReferenceMerklePath(data, tree_size, leaf, &treehasher, true);
       VerifierCheck(leaf, tree_size, path, data[leaf - 1], &verifier);
+    }
+  }
+
+  std::vector<std::string> proof;
+  std::string root1;
+  std::string root2;
+  // Snapshots that are always consistent.
+  assert(verifier.VerifyConsistency(0, 0, root1, root2, proof));
+  assert(verifier.VerifyConsistency(0, 1, root1, root2, proof));
+  assert(verifier.VerifyConsistency(1, 1, root1, root2, proof));
+
+  // Invalid consistency proofs.
+  // Time travel to the past.
+  assert(!verifier.VerifyConsistency(1, 0, root1, root2, proof));
+  assert(!verifier.VerifyConsistency(2, 1, root1, root2, proof));
+  // Empty proof.
+  assert(!verifier.VerifyConsistency(1, 2, root1, root2, proof));
+
+  root1 = sha256_empty_tree_hash;
+  // Roots don't match.
+  assert(!verifier.VerifyConsistency(0, 0, root1, root2, proof));
+  assert(!verifier.VerifyConsistency(1, 1, root1, root2, proof));
+  // Roots match but the proof is not empty.
+  root2 = sha256_empty_tree_hash;
+  proof.push_back(sha256_empty_tree_hash);
+  assert(!verifier.VerifyConsistency(0, 0, root1, root2, proof));
+  assert(!verifier.VerifyConsistency(0, 1, root1, root2, proof));
+  assert(!verifier.VerifyConsistency(1, 1, root1, root2, proof));
+
+  // Known good proofs.
+  for (unsigned int i = 0; i < 4; ++i) {
+    proof = std::vector<std::string>(sha256_proofs[i].proof,
+                                     sha256_proofs[i].proof +
+                                     sha256_proofs[i].proof_length);
+    unsigned snapshot1 = sha256_proofs[i].snapshot1;
+    unsigned snapshot2 = sha256_proofs[i].snapshot2;
+    VerifierConsistencyCheck(snapshot1, snapshot2,
+                             sha256_roots[snapshot1 - 1],
+                             sha256_roots[snapshot2 - 1],
+                             proof, &verifier);
+  }
+
+  // More tests with reference proof generator.
+  // Repeat test for each tree size in 1...128.
+  for (unsigned int tree_size = 1; tree_size <= 128; ++tree_size) {
+    root2 = ReferenceMerkleTreeHash(data, tree_size, &treehasher);
+    // Repeat for each snapshot in range.
+    for (unsigned int snapshot = 1; snapshot <= tree_size; ++snapshot) {
+      proof = ReferenceSnapshotConsistency(data, tree_size, snapshot,
+                                           &treehasher, true);
+      root1 = ReferenceMerkleTreeHash(data, snapshot, &treehasher);
+      VerifierConsistencyCheck(snapshot, tree_size, root1, root2, proof,
+                               &verifier);
     }
   }
 }
@@ -407,14 +666,16 @@ void MerkleTreeTest() {
   std::cout << "Checking test vectors... ";
   RootKatTest();
   PathKatTest();
+  ConsistencyKatTest();
   std::cout << "OK\n";
   std::cout << "Testing against reference implementation... ";
   // Randomized tests.
   srand(time(NULL));
   RootFuzzTest();
   PathFuzzTest();
+  ConsistencyFuzzTest();
   std::cout << "OK\n";
-  std::cout << "Testing path verification... ";
+  std::cout << "Testing verification... ";
   VerifierTest();
   std::cout << "OK\n";
 }
