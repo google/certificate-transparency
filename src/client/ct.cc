@@ -6,6 +6,7 @@
 #include <assert.h>
 #include <netinet/in.h>
 #include <stdlib.h>
+#include <string.h>
 #include <sys/socket.h>
 
 typedef unsigned char byte;

@@ -3,7 +3,7 @@ LIBS= -lcrypto
 
 all: .depend ct
 
-.depend: *.cc *.h
+.depend: *.cc
 	$(CXX) -MM *.cc > .depend
 
 clean:
