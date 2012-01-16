@@ -1,8 +1,9 @@
-.*~
-doc/sunlight\.html
-doc/sunlight\.txt
-.*\.o
-src/merkletree/MerkleTreeTest
-src/merkletree/SerialHasherTest
-src/merkletree/TreeHasherTest
+.*~$
+^doc/sunlight\.html$
+^doc/sunlight\.txt$
+.*\.o$
+^src/merkletree/MerkleTreeTest$
+^src/merkletree/SerialHasherTest$
+^src/merkletree/TreeHasherTest$
 \.depend
+^src/client/ct$
