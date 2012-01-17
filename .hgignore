@@ -7,3 +7,4 @@
 ^src/merkletree/TreeHasherTest$
 \.depend
 ^src/client/ct$
+^src/server/ct-server$

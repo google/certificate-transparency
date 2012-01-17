@@ -1,3 +1,5 @@
+#include "../include/ct.h"
+
 #include <deque>
 #include <iostream>
 #include <string>
@@ -12,9 +14,6 @@
 #include <time.h>
 
 #define VV(x)
-
-typedef unsigned char byte;
-typedef std::basic_string<byte> bstring;
 
 class EventLoop;
 

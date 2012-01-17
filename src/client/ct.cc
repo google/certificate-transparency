@@ -1,3 +1,5 @@
+#include "../include/ct.h"
+
 #include <fstream>
 #include <iostream>
 #include <string>
@@ -27,6 +29,12 @@ void readAll(std::string *contents, std::ifstream &in) {
       return;
   }
 }
+
+class CTResponse {
+public:
+  byte code;
+  bstring data;
+};
 
 // Provisional packet format
 // struct {
@@ -69,6 +77,8 @@ public:
   void uploadBundle(const std::string &bundle) {
     writeCommand(UPLOAD_BUNDLE, bundle.length());
     write(bundle.data(), bundle.length());
+    CTResponse response;
+    readResponse(&response);
   }
 
 private:
@@ -96,6 +106,35 @@ private:
     }
   }
 
+  void read(void *buf, size_t length) const {
+    for (size_t offset = 0; offset < length; ) {
+      int n = ::read(fd_, ((char *)buf) + offset, length - offset);
+      assert(n > 0);
+      offset += n;
+    }
+  }
+
+  byte readByte() const {
+    byte buf[1];
+    read(buf, 1);
+    return buf[0];
+  }
+
+  size_t readLength(size_t lengthOfLength) const {
+    byte buf[lengthOfLength];
+    read(buf, lengthOfLength);
+    size_t length = 0;
+    for (size_t n = 0; n < lengthOfLength; ++n)
+      length = (length << 8) + buf[n];
+    return length;
+  }
+
+  void readString(bstring *dst, size_t length) const {
+    byte buf[length];
+    read(buf, length);
+    dst->assign(buf, length);
+  }
+
   enum Command {
     UPLOAD_BUNDLE = 1,
   };
@@ -105,6 +144,16 @@ private:
     writeByte(cmd);
     writeLength(length, 3);
   }
+
+  void readResponse(CTResponse *response) {
+    byte version = readByte();
+    assert(version == VERSION);
+    response->code = readByte();
+    size_t length = readLength(3);
+    readString(&response->data, length);
+    std::cout << "Response code is " << (int)response->code << ", data length "
+	      << length << std::endl;
+  } 
 
   int fd_;
 
