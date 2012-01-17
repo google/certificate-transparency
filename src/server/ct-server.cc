@@ -1,5 +1,6 @@
 #include <deque>
 #include <iostream>
+#include <string>
 
 #include <assert.h>
 #include <netinet/in.h>
@@ -11,6 +12,9 @@
 #include <time.h>
 
 #define VV(x)
+
+typedef unsigned char byte;
+typedef std::basic_string<byte> bstring;
 
 class EventLoop;
 
@@ -112,9 +116,12 @@ public:
     int in = accept(fd(), NULL, NULL);
     assert(in >= 0);
     if (!WillAccept(in)) {
-      static char sorry[] = "You're too big.\n";
+      static char sorry[] = "No free connections.\n";
     
-      write(in, sorry, sizeof sorry);
+      // we have to consume the result.
+      ssize_t s = write(in, sorry, sizeof sorry);
+      // but we don't care what it is...
+      s = s;
       shutdown(in, SHUT_RDWR);
       close(in);
       return;
@@ -262,7 +269,7 @@ public:
   bool WantsRead() const { return true; }
 
   void ReadIsAllowed() {
-    char buf[1024];
+    byte buf[1024];
 
     ssize_t n = read(fd(), buf, sizeof buf);
     VV(std::cout << "read " << n << " from " << fd() << std::endl);
@@ -278,12 +285,12 @@ public:
   // responsibility to remove consumed bytes from rbuffer. This will
   // NOT be called again until more data arrives from the network,
   // even if there are unconsumed bytes in rbuffer.
-  virtual void BytesRead(std::string *rbuffer) = 0;
+  virtual void BytesRead(bstring *rbuffer) = 0;
 
   bool WantsWrite() const { return !wbuffer_.empty(); }
 
   void WriteIsAllowed() {
-    int n = write(fd(), wbuffer_.data(), wbuffer_.length());
+    ssize_t n = write(fd(), wbuffer_.data(), wbuffer_.length());
     VV(std::cout << "wrote " << n << " to " << fd() << std::endl);
     if (n <= 0) {
       Close();
@@ -293,10 +300,11 @@ public:
   }
 
   void Write(std::string str) {	wbuffer_.append(str); }
+  void Write(byte ch) { wbuffer_.push_back(ch); }
 
 private:
 
-  std::string rbuffer_;
+  bstring rbuffer_;
   std::string wbuffer_;
 };
 
@@ -331,19 +339,83 @@ public:
 
   void LineRead(const std::string &line) {
     Write(line);
-    Write("\n");
+    Write('\n');
   }
 };
 
-class EchoListener : public Listener {
+template <class Server> class ServerListener : public Listener {
 public:
 
-  EchoListener(EventLoop *loop, int fd) : Listener(loop, fd) {}
+  ServerListener(EventLoop *loop, int fd) : Listener(loop, fd) {}
 
   void Accepted(int fd)	{
     std::cout << "Accepted " << fd << std::endl;
-    new EchoServer(loop(), fd);
+    new Server(loop(), fd);
   }
+};
+
+class CTServer : public Server {
+public:
+
+  CTServer(EventLoop *loop, int fd) : Server(loop, fd) {}
+
+private:
+
+  enum Response {
+    ERROR = 0,
+  };
+
+  enum Error {
+    BAD_VERSION = 0,
+    BAD_COMMAND = 1,
+  };
+
+  void BytesRead(bstring *rbuffer) {
+    for ( ; ; ) {
+      if (rbuffer->size() < 5)
+	return;
+      size_t length = DecodeLength(rbuffer->substr(2, 3));
+      if (rbuffer->size() < length + 5)
+	return;
+      PacketRead((*rbuffer)[0], (*rbuffer)[1], rbuffer->substr(5, length));
+      rbuffer->erase(0, length + 5);
+    }
+  }
+
+  void PacketRead(byte version, byte command, const bstring &data) {
+    if (version != 0) {
+      SendError(BAD_VERSION);
+      return;
+    }
+    std::cout << "Command is " << (int)command << " data length "
+	      << data.size() << std::endl;
+    SendError(BAD_COMMAND);
+  }
+
+  size_t DecodeLength(const bstring &length) {
+    size_t len = 0;
+    for (size_t n = 0; n < length.size(); ++n)
+      len = (len << 8) + length[n];
+    return len;
+  }
+
+  void WriteLength(size_t length, size_t lengthOfLength) {
+    assert(lengthOfLength <= sizeof length);
+    assert(length < 1U << (lengthOfLength * 8));
+    for ( ; lengthOfLength > 0; --lengthOfLength) {
+      size_t b = length & (0xff << ((lengthOfLength - 1) * 8));
+      Write(b >> ((lengthOfLength - 1) * 8));
+    }
+  }
+
+  void SendError(Error error) {
+    Write(VERSION);
+    Write(ERROR);
+    WriteLength(1, 3);
+    Write(error);
+  }
+
+  static const byte VERSION = 0;
 };
 
 static bool init_server(int *sock, int port, const char *ip, int type) {
@@ -388,12 +460,18 @@ static bool init_server(int *sock, int port, const char *ip, int type) {
 }
 
 int main(int argc, char **argv) {
+  if (argc != 2) {
+    std::cerr << argv[0] << " <port>\n";
+    exit(1);
+  }
+
   int port = atoi(argv[1]);
 
   int fd;
   assert(init_server(&fd, port, NULL, SOCK_STREAM));
 
   EventLoop loop;
-  EchoListener l(&loop, fd);
+  //ServerListener<EchoServer> l(&loop, fd);
+  ServerListener<CTServer> l(&loop, fd);
   loop.Forever();
 }
