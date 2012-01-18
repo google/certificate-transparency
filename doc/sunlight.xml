@@ -6,7 +6,7 @@
     <author initials="B" surname="Laurie" fullname="Ben Laurie"></author>
     <author initials="A" surname="Langley" fullname="Adam Langley"></author>
     <author initials="E" surname="Kasper" fullname="Emilia Kasper"></author>
-    <date year='2011'></date>
+    <date year='2012'></date>
   </front>
   <middle>
 <section title="Design">
@@ -57,13 +57,45 @@ Note that we do not require the length of the input list to be a power of two. T
 	  <vspace blankLines='1' />
 	  PATH(0, {d(0)}) = {}
 	  <vspace blankLines='1' />
-	  For n > 1, let k be the largest power of two smaller than n. The path for the (m+1)th element d(m) in a list of n &gt m elements is then defined recursively as
+	  For n &gt; 1, let k be the largest power of two smaller than n. The path for the (m+1)th element d(m) in a list of n &gt m elements is then defined recursively as
 	  <vspace blankLines='1' />
 	  PATH(m, D[0:n]) = PATH(m, D[0:k]) : MTH(D[k:n]) for m &lt; k; and
 	  <vspace blankLines='1' />
 	  PATH(m, D[0:n]) = PATH(m - k, D[k:n]) : MTH(D[0:k]) for k &lt;= m &lt; n,
 	  <vspace blankLines='1' />
 	  where : is concatenation of lists and D[k1:k2] denotes the length (k2 - k1) list {d(k1), d(k1+1),..., d(k2-1)} as before.
+	</t>
+      </section>
+
+      <section title="Merkle consistency proofs" anchor='consistency'>
+	<t>
+	  Merkle consistency proofs prove the append-only property of the tree. A Merkle consistency proof for a Merkle Tree Hash MTH(D[0:n]) and a previously advertised hash MTH(D[0:m]) of the first m leaves, m &lt;= n, is the list of nodes in the Merkle tree required to verify that the first m inputs D[0:m] are equal in both trees. Thus, a consistency proof must contain a set of intermediate nodes (i.e., commitments to inputs) sufficient to verify MTH(D[0:n]), such that (a subset of) the same nodes can be used to verify MTH(D[0:m]). We define an algorithm that outputs the (unique) minimal consistency proof. 
+	</t>
+	<t> Given an ordered list of n inputs to the tree, D[0:n] = {d(0), ..., d(n-1)}, the Merkle consistency proof PROOF(m, D[0:n]) for a previous root hash MTH(D[0:m]), 0 &lt; m &lt; n, is defined as PROOF(m, D[0:n]) = SUBPROOF(m, D[0:n], true):
+	</t>
+	<t>
+	  The subproof for m = n is empty if m is the value for which PROOF was originally requested (meaning that the subtree root hash MTH(D[0:m]) is known):
+	  <vspace blankLines='1' />
+	  SUBPROOF(m, D[0:m], true) = {}
+	  <vspace blankLines='1' />
+ 	  The subproof for m = n is the root hash committing inputs D[0:m] otherwise:
+	  <vspace blankLines='1' />
+	  SUBPROOF(m, D[0:m], false) = {MTH(D[0:m])}
+	  <vspace blankLines='1' />    
+	  For m &lt n, let k be the largest power of two smaller than n. The subproof is then defined recursively.
+	  <vspace blankLines='1' />
+If m &lt;= k, the right subtree entries D[k:n] only exist in the current tree. We prove that the left subtree entries D[0:k] are consistent and add a commitment to D[k:n]:
+	  <vspace blankLines='1' />
+	  SUBPROOF(m, D[0:n], b) = SUBPROOF(m, D[0:k], b) : MTH(D[k:n]).
+	  <vspace blankLines='1' />
+If m > k, the left subtree entries D[0:k] are identical in both trees. We prove that the right subtree entries D[k:n] are consistent and add a commitment to D[0:k].
+	  <vspace blankLines='1' />
+	  SUBPROOF(m, D[0:n], b) = SUBPROOF(m - k, D[k:n], false) : MTH(D[0:k]).
+	  <vspace blankLines='1' />
+	  Here : is concatenation of lists and D[k1:k2] denotes the length (k2 - k1) list {d(k1), d(k1+1),..., d(k2-1)} as before.
+	</t>
+	<t>
+	  The number of nodes in the resulting proof is bounded above by ceil(log2(n)) + 1.
 	</t>
       </section>
 
@@ -84,23 +116,64 @@ Note that we do not require the length of the input list to be a power of two. T
    /     \        /     \    
   g       h      i      j
  / \     / \    / \     |
- a b     c d    e f     D6       
+ a b     c d    e f     d6       
  | |     | |    | |                               
-D0 D1   D2 D3  D4 D5    
+d0 d1   d2 d3  d4 d5    
 </artwork>
 </figure>
 	  </t>
 	  <t>
-	    The audit path for D0 is [b, h, l].
+	    The audit path for d0 is [b, h, l].
 	  </t>
 	  <t>
-	    The audit path for D3 is [c, g, l].
+	    The audit path for d3 is [c, g, l].
 	  </t>
 	  <t>
-	    The audit path for D4 is [f, j, k].
+	    The audit path for d4 is [f, j, k].
 	  </t>
 	  <t>
-	    The audit path for D6 is [i, k].
+	    The audit path for d6 is [i, k].
+	  </t>
+	  <t>
+	    The same tree, built incrementally in four steps:
+<figure>
+<artwork>    
+    hash0          hash1=k 
+    / \              /  \  
+   /   \            /    \ 
+  /     \          /      \ 
+  g      c         g       h 
+ / \     |        / \     / \ 
+ a b     d2       a b     c d 
+ | |              | |     | |                   
+d0 d1            d0 d1   d2 d3
+
+          hash2                    hash
+          /  \                    /    \
+         /    \                  /      \
+        /      \                /        \
+       /        \              /          \
+      /          \            /            \
+     k            i          k              l
+    / \          / \        / \            / \
+   /   \         e f       /   \          /   \
+  /     \        | |      /     \        /     \    
+ g       h      d4 d5    g       h      i      j
+/ \     / \             / \     / \    / \     |
+a b     c d             a b     c d    e f     d6       
+| |     | |             | |     | |    | |                               
+d0 d1   d2 d3           d0 d1   d2 d3  d4 d5    
+</artwork>
+</figure>
+	  </t>
+	  <t>
+	    The consistency proof between hash0 and hash is PROOF(3, D[0:7]) = [c, d, g, l]. c, g are used to verify hash0, and d, l are additionally used to verify hash.
+	  </t>
+	  <t>
+	    The consistency proof between hash1 and hash is PROOF(4, D[0:7]) = [l]. hash can be verified, using hash1=k and l.
+	  </t>
+	  <t>
+	    The consistency proof between hash2 and hash is PROOF(6, D[0:7]) = [i, j, k]. k, i are used to verify hash1, and j is additionally used to verify hash.
 	  </t>
 	</section>
       </section>
@@ -271,6 +344,9 @@ struct {
 	</t>
 	<t>
 	  Auditing the log for integrity does not require third parties to maintain a copy of the entire log. The Segment Info Merkle Hash Tree root hash can be updated incrementally as new segments become available, without recomputing the entire tree. Third party auditors need only store a logarithmic number of intermediate nodes in the Segment Info Merkle Hash Tree.
+	</t>
+	<t>
+	 Additionally, the Merkle consistency proofs defined in <xref target='consistency' /> can be used to efficiently prove the append-only property of an incremental update to the Segment Info Merkle Hash Tree, without auditing the entire tree. [ekasper: are logs required to provide these proofs?]
 	</t>
       </section>
   </middle>
