@@ -191,10 +191,19 @@ d0 d1   d2 d3           d0 d1   d2 d3  d4 d5
 	  </t>
 	  <figure>
 	    <artwork>
+enum { x509_chain_entry(0), (65535) } LogEntryType;
+
+struct {
+    LogEntryType type;
+    select (type) {
+    case x509_chain_entry: X509ChainEntry;
+    } entry;
+} LogEntry;
+
 struct {
     Certificate leaf_certificate;
     Certificate certificate_chain&lt;0..2^24-1&gt;;
-} LogEntry;
+} X509ChainEntry;
 	    </artwork>
 	  </figure>
 	  <t>[benl: Should we consider a small number for the certificate_chain? Or perhaps note that a log can impose a limit?]
@@ -203,7 +212,7 @@ struct {
 	    <spanx style="verb">leaf_certificate</spanx> is the end-entity certificate submitted for auditing.
 	  </t>
 	  <t>
-	    <spanx style="verb">certificate_list</spanx> is the collection of additional certificates required to verify the leaf certificate. This collection MUST be ordered by the content of each certificate, read first byte first, in ascending order.
+	    <spanx style="verb">certificate_list</spanx> is the collection of additional certificates required to verify the leaf certificate. This collection MUST be ordered by the content of each certificate, read first byte first, in ascending order. [agl: why aren't we requiring them to be in verification order? It would make the logs simplier which is a good thing.]
 	  </t>
 	</section>
 	<section title="Log Segments">
@@ -296,7 +305,7 @@ struct {
 	    </artwork>
 	  </figure>
 	  <t>
-	    <spanx style="verb">leaf_index</spanx> is the index of the audited node in the Merkle tree, from 1 to <spanx style="verb">tree_size</spanx> [or 0 to tree_size - 1 ?].
+	    <spanx style="verb">leaf_index</spanx> is the index of the audited node in the Merkle tree, from 0 to <spanx style="verb">tree_size - 1</spanx>.
 	  </t>
 	  <t>
 	    <spanx style="verb">audit_path</spanx> is a list of additional nodes in the Merkle tree required for reconstructing the root hash. Nodes must be listed from leaf to root level, i.e., in the order they are used in the Merkle Tree Hash computation, as defined in <xref target='merkle_paths' />. <spanx style="emph">Notice that the left-right ordering is determined by the position of the leaf.</spanx> The leaf node under audit as well as the root node shall be omitted from the path.
@@ -305,7 +314,7 @@ struct {
 	    <spanx style="verb">signed_tree</spanx> is the signature on the tree.
 	  </t>
 	  <t>
-	    Servers who send an audit proof for a certificate must also serve all intermediate certificates recorded in the  <spanx style="verb">certificate_list</spanx> of the <spanx style="verb">LogEntry</spanx>. Clients who verify the certificate audit proof use these certificates to reconstruct the leaf node of the Log Segment Merkle Hash Tree. A valid audit proof MUST satisfy the following:
+	    Servers who send an audit proof for a certificate must also serve all intermediate certificates recorded in the  <spanx style="verb">certificate_list</spanx> of the <spanx style="verb">X509ChainEntry</spanx>. Clients who verify the certificate audit proof use these certificates to reconstruct the leaf node of the Log Segment Merkle Hash Tree. A valid audit proof MUST satisfy the following:
 	  </t>
 	  <t>
 	    <list style='symbols'>
@@ -324,7 +333,7 @@ struct {
 	    </list>
 	  </t>
 	  <t>
-	    Clients may construct a different certificate chain than the one recorded in the <spanx style="verb">LogEntry</spanx> to verify the validity of the leaf certificate. Clients who do so must additionally check that the public key sequence of the constructed chain matches the public key sequence in the <spanx style="verb">LogEntry</spanx> <spanx style="verb">certificate_list</spanx>, with only two exceptions:
+	    Clients may construct a different certificate chain than the one recorded in the <spanx style="verb">X509ChainEntry</spanx> to verify the validity of the leaf certificate. Clients who do so must additionally check that the public key sequence of the constructed chain matches the public key sequence in the <spanx style="verb">LogEntry</spanx> <spanx style="verb">certificate_list</spanx>, with only two exceptions [agl: here we're talking about sequences of public keys, but we ordered the certificates by contents, destroying the sequence]:
 	  </t>
 	  <t>
 	    <list style='symbols'>
