@@ -2,7 +2,6 @@
 #define LOGDB_H
 #include <map>
 #include <string>
-#include <utility>
 #include <vector>
 
 #include <stddef.h>
@@ -12,7 +11,7 @@ typedef std::map<std::string,size_t> index;
 class LogDB {
  public:
   LogDB() {}
-  ~LogDB() {}
+  virtual ~LogDB() {}
 
   enum Status {
     NOT_FOUND,

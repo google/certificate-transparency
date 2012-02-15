@@ -201,8 +201,8 @@ struct {
 } LogEntry;
 
 struct {
-    Certificate leaf_certificate;
-    Certificate certificate_chain&lt;0..2^24-1&gt;;
+    ASN.1Cert leaf_certificate;
+    ASN.1Cert certificate_chain&lt;0..2^24-1&gt;;
 } X509ChainEntry;
 	    </artwork>
 	  </figure>
@@ -219,37 +219,43 @@ struct {
 	  <t> A certificate log MUST periodically publish all new log entries as a log segment. The log MUST sign these entries by constructing a binary Log Segment Merkle Hash Tree with log entries as consecutive inputs to the tree, and signing the root of that tree. The hashing algorithm is SHA-256. The signature algorithm is ECDSA with the curve NIST P-256.
 	  </t>
 	  <t>
-	   Log segments MUST have an incrementing sequence number and the increment MUST be one. At every update, logs MUST sign a secondary Segment Info Merkle Hash Tree of all log segment signatures issued so far, ordered in the tree according to the sequence number.
+	   Log segments MUST have an incrementing sequence number. The first sequence number MUST be zero and the increment MUST be one. At every update, logs MUST sign a secondary Segment Info Merkle Hash Tree of all log segment signatures issued so far, ordered in the tree according to the sequence number.
 </t>
 	  <t>
 	    Structure of the signature:
 	  </t>
 	  <figure>
 	    <artwork>
-enum { LogSegment, SegmentInfo } TreeType;
+enum { log_segment(0), segment_info(1), (255) } TreeType;
 	    </artwork>
 	  </figure>
 	  <figure>
 	    <artwork>
 digitally-signed struct {
     TreeType tree_type;
-    uint32 tree_size;
     uint32 sequence_number;
-    opaque root_hash[32];
+    select (tree_type) {
+        case log_segment: uint32 tree_size;
+        case segment_info: struct { };
+    }
+    opaque sha256_root_hash[32];
 } MerkleTreeSignature;
 	    </artwork>
 	  </figure>
+<t>
+The encoding of the digitally-signed element is defined in <xref target='RFC5246'/>.
+</t>
 	  <t>
 	    <spanx style="verb">tree_type</spanx> is the type of the Merkle tree (either a Log Segment tree, or a Segment Info tree).
 	  </t>
 	  <t>
-	    <spanx style="verb">tree_size</spanx> is the number of leaves in the tree.
+	    <spanx style="verb">sequence_number</spanx> is the number of the corresponding segment.
 	  </t>
 	  <t>
-	    <spanx style="verb">sequence_number</spanx> is the number of the current segment. In the case of a <spanx style="verb">SegmentInfo</spanx> signature, the <spanx style="verb">sequence_number</spanx> MUST equal the <spanx style="verb">tree_size</spanx>.
+	    <spanx style="verb">tree_size</spanx> is the number of leaves in the tree. In the case of a <spanx style="verb">SegmentInfo</spanx> signature, tree size equals <spanx style="verb">sequence_number + 1</spanx> and is thus omitted.
 	  </t>
 	  <t>
-	    <spanx style="verb">root_hash</spanx> is the root of the Merkle Hash Tree.
+	    <spanx style="verb">sha256_root_hash</spanx> is the root of the Merkle Hash Tree.
 	  </t>
 <t>
 For every segment, logs MUST publish all the log entries corresponding to that segment, as well as a segment info record containing the signatures on the Log Segment Merkle Hash Tree and the current Segment Info Merkle Hash Tree.
@@ -260,17 +266,25 @@ Structure of the segment info record:
 <figure>
   <artwork>
 struct {
+    uint32 sequence_number;
     uint32 timestamp;
+    uint32 segment_size;
     MerkleTreeSignature signed_log_segment_tree;
     MerkleTreeSignature signed_segment_info_tree;
 } SegmentInfo;
   </artwork>
 </figure>
 <t>
+<spanx style="verb">sequence_number</spanx> is the number of the segment.
+</t>
+<t>
+<spanx style="verb">segment_size</spanx> is the size of the segment, i.e., the number of leaves in the log segment tree.
+</t>
+<t>
 <spanx style="verb">signed_log_segment_tree</spanx> is the signature on the Log Segment Merkle Hash Tree.
 </t>
 	  <t>
-	    <spanx style="verb">signed_segment_info_tree</spanx> is the signature on the current Segment Info Merkle Hash Tree. The <spanx style="verb">sequence_number</spanx> in the <spanx style="verb">signed_log_segment_tree</spanx> MUST match the <spanx style="verb">sequence_number</spanx> in the <spanx style="verb">signed_segment_info_tree</spanx>.
+	    <spanx style="verb">signed_segment_info_tree</spanx> is the signature on the current Segment Info Merkle Hash Tree.
 	  </t> 
 	</section>
 	<section title="Audit Proofs">
@@ -291,19 +305,32 @@ Logs MUST also provide audit proofs for the Segment Info Merkle Hash Tree. Clien
 	  <figure>
 	    <artwork>
 struct {
-    opaque hash[32];
+    opaque sha256_hash[32];
 } MerkleNode;
 	    </artwork>
 	  </figure>
 	  <figure>
 	    <artwork>
 struct {
+    uint32 sequence_number;
+    select (TreeType) {
+        case log_segment: uint32 tree_size;
+        case segment_info: struct { };
+    }
     uint32 leaf_index;
-    MerkleNode audit_path&lt;0..2^16-1&gt;;
     MerkleTreeSignature signed_tree;
+    MerkleNode audit_path&lt;0..2^16-1&gt;;
 } AuditProof;
 	    </artwork>
 	  </figure>
+<t>[ekasper: If we want to allow other hash functions than sha2, the hash function of the audit_path can be read from the SignatureAndHashAlgorithm field in signed_tree. (We require the two hash functions to always be the same.)]
+</t>
+	  <t>
+	    <spanx style="verb">sequence_number</spanx> is the segment number associated with the tree.
+	  </t>
+	  <t>
+	    <spanx style="verb">tree_size</spanx> is the number of leaves in the tree. In the case of a <spanx style="verb">SegmentInfo</spanx> AuditProof, tree size equals <spanx style="verb">sequence_number + 1</spanx> and is thus omitted.
+	  </t>
 	  <t>
 	    <spanx style="verb">leaf_index</spanx> is the index of the audited node in the Merkle tree, from 0 to <spanx style="verb">tree_size - 1</spanx>.
 	  </t>
@@ -314,21 +341,18 @@ struct {
 	    <spanx style="verb">signed_tree</spanx> is the signature on the tree.
 	  </t>
 	  <t>
-	    Servers who send an audit proof for a certificate must also serve all intermediate certificates recorded in the  <spanx style="verb">certificate_list</spanx> of the <spanx style="verb">X509ChainEntry</spanx>. Clients who verify the certificate audit proof use these certificates to reconstruct the leaf node of the Log Segment Merkle Hash Tree. A valid audit proof MUST satisfy the following:
+	    Servers who send an audit proof for a certificate must also serve all intermediate certificates recorded in the  <spanx style="verb">certificate_list</spanx> of the <spanx style="verb">X509ChainEntry</spanx>. Clients who verify the certificate audit proof use these certificates to reconstruct the leaf node of the Log Segment Merkle Hash Tree. The leaf node, <spanx style="verb">leaf_index</spanx> and <spanx style="verb">audit_path</spanx> together determine the root hash of the tree. A valid audit proof MUST satisfy the following:
 	  </t>
 	  <t>
 	    <list style='symbols'>
 	      <t>
-		The <spanx style="verb">leaf_index</spanx> MUST be greater than 0 and MUST NOT exceed <spanx style="verb">tree_size</spanx> in <spanx style="verb">signed_tree</spanx>;
+		The <spanx style="verb">tree_size</spanx> MUST be at least 1;
 	      </t>
 	      <t>
-		The root hash reconstructed from the leaf and the <spanx style="verb">audit_path</spanx> MUST equal the <spanx style="verb">root_hash</spanx> of <spanx style="verb">signed_tree</spanx>;
+		The <spanx style="verb">leaf_index</spanx> MUST NOT exceed <spanx style="verb">tree_size - 1</spanx>;
 	      </t>
 	      <t>
-		The signature on <spanx style="verb">signed_tree</spanx> MUST be a valid log signature;
-	      </t>
-	      <t>
-		The <spanx style="verb">tree_type</spanx> of <spanx style="verb">signed_tree</spanx> MUST be <spanx style="verb">LogSegment</spanx> for certificate audit proofs, and MUST be <spanx style="verb">SegmentInfo</spanx> for a Segment Info audit proof.
+		The <spanx style="verb">signed_tree</spanx> signature MUST be a valid signature on the corresponding TreeType, <spanx style="verb">sequence_number</spanx>, <spanx style="verb">tree_size</spanx> (in case of a Log Segment Tree), and the root hash reconstructed from the leaf data, <spanx style="verb">leaf_index</spanx> and <spanx style="verb">audit_path</spanx>.
 	      </t>
 	    </list>
 	  </t>
@@ -360,5 +384,20 @@ struct {
       </section>
   </middle>
   <back>
+    <references>
+      <reference anchor='RFC5246'>
+
+	<front>
+	  <title>The Transport Layer Security (TLS) Protocol Version 1.2</title>
+	  <author initials='T.' surname='Dierks' fullname='T. Dierks'>
+	    <organization /></author>
+	  <author initials='E.' surname='Rescorla' fullname='E. Rescorla'>
+	    <organization /></author>
+	  <date year='2008' month='August' />
+</front>
+
+	<seriesInfo name='RFC' value='5246' />
+      </reference>
+    </references>
   </back>
 </rfc>

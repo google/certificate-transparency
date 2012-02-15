@@ -3,15 +3,68 @@
 #include <stddef.h>
 #include <string>
 
+#include <openssl/bio.h>
+#include <openssl/crypto.h>
+#include <openssl/evp.h>
+#include <openssl/pem.h>
+#include <openssl/rand.h>
+
 #include "LogDB.h"
+#include "LogRecord.h"
+#include "LogVerifier.h"
+#include "MerkleTree.h"
+#include "SerialHasher.h"
 #include "TreeLogger.h"
 
 namespace {
 
+const char *ecp256_private_key = {
+  "-----BEGIN EC PRIVATE KEY-----\n"
+  "MHcCAQEEIG8QAquNnarN6Ik2cMIZtPBugh9wNRe0e309MCmDfBGuoAoGCCqGSM49\n"
+  "AwEHoUQDQgAES0AfBkjr7b8b19p5Gk8plSAN16wWXZyhYsH6FMCEUK60t7pem/ck\n"
+  "oPX8hupuaiJzJS0ZQ0SEoJGlFxkUFwft5g==\n"
+  "-----END EC PRIVATE KEY-----\n"
+};
+
+const char *ecp256_public_key = {
+  "-----BEGIN PUBLIC KEY-----\n"
+  "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAES0AfBkjr7b8b19p5Gk8plSAN16wW\n"
+  "XZyhYsH6FMCEUK60t7pem/ckoPX8hupuaiJzJS0ZQ0SEoJGlFxkUFwft5g==\n"
+  "-----END PUBLIC KEY-----\n"
+};
+
+EVP_PKEY* PrivateKeyFromPem(const std::string &pemkey) {
+  BIO *bio = BIO_new_mem_buf(const_cast<char*>(pemkey.data()), pemkey.size());
+  EVP_PKEY *pkey = PEM_read_bio_PrivateKey(bio, NULL, NULL, NULL);
+  assert(pkey != NULL);
+  BIO_free(bio);
+  return pkey;
+}
+
+EVP_PKEY* PublicKeyFromPem(const std::string &pemkey) {
+  BIO *bio = BIO_new_mem_buf(const_cast<char*>(pemkey.data()), pemkey.size());
+  EVP_PKEY *pkey = PEM_read_bio_PUBKEY(bio, NULL, NULL, NULL);
+  assert(pkey != NULL);
+  BIO_free(bio);
+  return pkey;
+}
+
+const char *nibble = "0123456789abcdef";
+
+std::string HexString(const std::string &data) {
+  std::string ret;
+  for (unsigned int i = 0; i < data.size(); ++i) {
+    ret.push_back(nibble[(data[i] >> 4) & 0xf]);
+    ret.push_back(nibble[data[i] & 0xf]);
+  }
+  return ret;
+}
+
 void MemoryLoggerTest() {
-  TreeLogger treelogger(new MemoryDB());
+  EVP_PKEY *pkey = PrivateKeyFromPem(ecp256_private_key);
+  TreeLogger treelogger(new MemoryDB(), pkey);
   std::string key0, key1, key2, key3, value0, value1, value2, value3,
-      segment0, segment1;
+    segment0, segment1;
   assert(treelogger.QueueEntry("Unicorn", &key0) == LogDB::NEW);
   assert(treelogger.QueueEntry("Alice", &key1) == LogDB::NEW);
 
@@ -58,6 +111,7 @@ void MemoryLoggerTest() {
   assert(treelogger.SegmentCount() == 1);
   assert(treelogger.SegmentInfo(0, &segment0) == LogDB::LOGGED);
   assert(!segment0.empty());
+  std::cout << HexString(segment0) << '\n';
 
   value0.clear();
   value1.clear();
@@ -103,8 +157,8 @@ void MemoryLoggerTest() {
   assert(treelogger.LogSize(LogDB::ANY) == 3);
   assert(treelogger.SegmentCount() == 2);
   assert(treelogger.SegmentInfo(1, &segment1) == LogDB::LOGGED);
-  // TODO: test tree manipulation to ensure segments are computed correctly.
   assert(segment0 != segment1);
+  std::cout << HexString(segment1) << '\n';
 
   // Look up the logged entry.
   assert(treelogger.EntryInfo(2, LogDB::ANY, NULL) == LogDB::LOGGED);
@@ -123,11 +177,72 @@ void MemoryLoggerTest() {
   assert(treelogger.SegmentInfo(3, NULL) == LogDB::NOT_FOUND);
 }
 
+void LogVerifierTest() {
+  EVP_PKEY *pkey = PrivateKeyFromPem(ecp256_private_key);
+  EVP_PKEY *pubkey = PublicKeyFromPem(ecp256_public_key);
+  TreeLogger treelogger(new MemoryDB(), pkey);
+  LogVerifier verifier(pubkey);
+  assert(treelogger.QueueEntry("Unicorn", NULL) == LogDB::NEW);
+  assert(treelogger.QueueEntry("Alice", NULL) == LogDB::NEW);
+  treelogger.LogSegment();
+  std::string segment;
+  assert(treelogger.SegmentInfo(0, &segment) == LogDB::LOGGED);
+  assert(!segment.empty());
+  std::cout << HexString(segment) << '\n';
+  SegmentData data;
+  assert(data.DeserializeSegmentInfo(segment));
+
+  // Construct the trees.
+  MerkleTree log_segment_tree(new Sha256Hasher());
+  log_segment_tree.AddLeaf("Unicorn");
+  log_segment_tree.AddLeaf("Alice");
+  data.segment_root = log_segment_tree.CurrentRoot();
+
+  MerkleTree segment_info_tree(new Sha256Hasher());
+  segment_info_tree.AddLeaf(data.segment_sig.signature);
+  data.segment_info_root = segment_info_tree.CurrentRoot();
+
+  // Verify the signatures.
+  assert(data.sequence_number == 0);
+  assert(data.segment_size == 2);
+  assert(verifier.VerifyLogSegmentSignature(data));
+  assert(verifier.VerifySegmentInfoSignature(data));
+
+  SegmentData wrong_data = data;
+
+  // Various invalid signatures.
+  ++wrong_data.segment_size;
+  assert(!verifier.VerifyLogSegmentSignature(wrong_data));
+  --wrong_data.segment_size;
+
+  ++wrong_data.sequence_number;
+  assert(!verifier.VerifyLogSegmentSignature(wrong_data));
+  assert(!verifier.VerifySegmentInfoSignature(wrong_data));
+  --wrong_data.sequence_number;
+
+  wrong_data.segment_root = data.segment_info_root;
+  wrong_data.segment_info_root = data.segment_root;
+  assert(!verifier.VerifyLogSegmentSignature(wrong_data));
+  assert(!verifier.VerifySegmentInfoSignature(wrong_data));
+  wrong_data.segment_root = data.segment_root;
+  wrong_data.segment_info_root = data.segment_info_root;
+
+  wrong_data.segment_sig = data.segment_info_sig;
+  wrong_data.segment_info_sig = data.segment_sig;
+  assert(!verifier.VerifyLogSegmentSignature(wrong_data));
+  assert(!verifier.VerifySegmentInfoSignature(wrong_data));
+}
+
 } // namespace
 
 int main(int, char**) {
+  assert(SSLeay() >= 0x10000000L);
+  assert(RAND_status());
   std::cout << "Testing MemoryLogger\n";
   MemoryLoggerTest();
+  std::cout << "PASS\n";
+  std::cout << "Testing LogVerifier\n";
+  LogVerifierTest();
   std::cout << "PASS\n";
   return 0;
 }

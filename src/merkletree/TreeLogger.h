@@ -1,10 +1,11 @@
 #ifndef TREELOGGER_H
 #define TREELOGGER_H
 #include <string>
-#include <utility>
 #include <vector>
 
 #include <stddef.h>
+
+#include <openssl/evp.h>
 
 #include "LogDB.h"
 #include "MerkleTree.h"
@@ -12,12 +13,12 @@
 class TreeLogger {
  public:
   // TODO: make the hash function pluggable.
-  TreeLogger(LogDB *db);
+  TreeLogger(LogDB *db, EVP_PKEY *pkey);
   ~TreeLogger();
 
   // Add an entry to the current, pending segment if it doesn't already exist.
-  // Writes a key (= leaf hash) that can be used to look up the data
-  // and its associated signatures and audit proofs later on.
+  // If key is not NULL, writes a key (= leaf hash) that can be used to look up
+  // the data and its associated signatures and audit proofs later on.
   LogDB::Status QueueEntry(const std::string &data, std::string *key);
 
   // Get the status of a data record corresponding to an absolute index.
@@ -51,9 +52,12 @@ class TreeLogger {
 
  private:
   LogDB *db_;
+  EVP_PKEY *pkey_;
 
   // Keep all trees in memory for now.
   std::vector<MerkleTree*> logsegments_;
-  MerkleTree segment_info_;
+  MerkleTree segment_infos_;
+
+  std::string Sign(const std::string &data);
 };
 #endif
