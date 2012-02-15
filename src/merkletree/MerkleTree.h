@@ -20,6 +20,15 @@ class MerkleTree {
 
   size_t LeafCount() const { return tree_.empty() ? 0 : tree_[0].size(); }
 
+  std::string LeafHash(size_t leaf) const {
+    return leaf > LeafCount() ? "" : tree_[0][leaf-1];
+  }
+
+  // Return the leaf hash, but do not append the data to the tree.
+  std::string LeafHash(const std::string &data) {
+    return treehasher_.HashLeaf(data);
+  }
+
   // Number of levels. An empty tree has 0 levels, a tree with 1 leaf has
   // 1 level, a tree with 2 leaves has 2 levels, and a tree with n leaves has
   // ceil(log2(n)) + 1 levels.

@@ -6,7 +6,7 @@ all: .depend test
 .depend: *.cc *.h
 	$(CXX) -MM *.cc > .depend
 
-test: MerkleTreeTest SerialHasherTest TreeHasherTest
+test: MerkleTreeTest SerialHasherTest TreeLoggerTest TreeHasherTest
 
 MerkleTreeTest: MerkleTree.o MerkleVerifier.o SerialHasher.o TreeHasher.o \
 		MerkleTreeTest.o
@@ -15,6 +15,11 @@ MerkleTreeTest: MerkleTree.o MerkleVerifier.o SerialHasher.o TreeHasher.o \
 
 SerialHasherTest: SerialHasher.o SerialHasherTest.o
 	$(CXX) -o SerialHasherTest SerialHasher.o SerialHasherTest.o $(LIBS)
+
+TreeLoggerTest: LogDB.o MerkleTree.o SerialHasher.o TreeHasher.o TreeLogger.o \
+		TreeLoggerTest.o
+	$(CXX) -o TreeLoggerTest LogDB.o MerkleTree.o SerialHasher.o \
+		TreeHasher.o TreeLogger.o TreeLoggerTest.o $(LIBS)
 
 TreeHasherTest: SerialHasher.o TreeHasher.o TreeHasherTest.o
 	$(CXX) -o TreeHasherTest SerialHasher.o TreeHasher.o TreeHasherTest.o $(LIBS)

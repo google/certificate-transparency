@@ -4,6 +4,7 @@
 .*\.o$
 ^src/merkletree/MerkleTreeTest$
 ^src/merkletree/SerialHasherTest$
+^src/merkletree/TreeLoggerTest$
 ^src/merkletree/TreeHasherTest$
 \.depend
 ^src/client/ct$
