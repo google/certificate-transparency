@@ -65,8 +65,9 @@ class MerkleTree {
 
   // Get the Merkle path from leaf to root.
   //
-  // Returns a vector of node hashes, ordered according to levels from leaf to root.
-  // The first element is the sibling of the leaf hash, and the last element is the root.
+  // Returns a vector of node hashes, ordered by levels from leaf to root.
+  // The first element is the sibling of the leaf hash, and the last element
+  // is one below the root.
   // Returns an empty vector if the tree is not large enough or the leaf index is 0.
   //
   // @param leaf the index of the leaf the path is for.
@@ -74,8 +75,9 @@ class MerkleTree {
 
   // Get the Merkle path from leaf to the root of a previous snapshot.
   //
-  // Returns a vector of node hashes, ordered according to levels from leaf to root.
-  // The first element is the sibling of the leaf hash, and the last element is the root.
+  // Returns a vector of node hashes, ordered by levels from leaf to root.
+  // The first element is the sibling of the leaf hash, and the last element
+  // is one below the root.
   // Returns an empty vector if the leaf index is 0, the snapshot requested is in the
   // future or the snapshot tree is not large enough.
   //
@@ -103,9 +105,9 @@ class MerkleTree {
                                     std::string *node);
   // Path from a node at a given level (both indexed starting with 0)
   // to the root at a given snapshot.
-  std::vector<std::string>
-  PathFromNodeToRootAtSnapshot(size_t node_index, size_t level,
-                               size_t snapshot, bool add_root);
+  std::vector<std::string> PathFromNodeToRootAtSnapshot(size_t node_index,
+                                                        size_t level,
+                                                        size_t snapshot);
   // A container for nodes, organized according to levels and sorted
   // left-to-right in each level. tree_[0] is the leaf level, etc.
   // The hash of nodes tree_[i][j] and tree_[i][j+1] (j even) is stored
