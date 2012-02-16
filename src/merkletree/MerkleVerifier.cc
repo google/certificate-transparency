@@ -21,20 +21,31 @@ static inline bool IsRightChild(size_t leaf) {
 
 bool MerkleVerifier::VerifyPath(size_t leaf, size_t tree_size,
                                 const std::vector<std::string> &path,
+                                const std::string &root,
                                 const std::string &data) {
+  std::string path_root = RootFromPath(leaf, tree_size, path, data);
+  if (path_root.empty())
+    return false;
+  return path_root == root; 
+}
+
+std::string MerkleVerifier::RootFromPath(size_t leaf, size_t tree_size,
+                                         const std::vector<std::string> &path,
+                                         const std::string &data) {
   if (leaf > tree_size || leaf == 0)
     // No valid path exists.
-    return false;
+    return "";
 
   size_t node = leaf - 1;
   size_t last_node = tree_size  - 1;
 
   std::string node_hash = treehasher_.HashLeaf(data);
-  if (path.empty())
-    return false;
   std::vector<std::string>::const_iterator it = path.begin();
 
   while (last_node) {
+    if (it == path.end())
+      // We've reached the end but we're not done yet.
+      return "";
     if (IsRightChild(node))
       node_hash = treehasher_.HashChildren(*it++, node_hash);
     else if (node < last_node)
@@ -42,17 +53,14 @@ bool MerkleVerifier::VerifyPath(size_t leaf, size_t tree_size,
     // Else the sibling does not exist and the parent is a dummy copy.
     // Do nothing.
 
-    if (it == path.end())
-      // We've reached the end but we're not done yet.
-      return false;
     node = Parent(node);
     last_node = Parent(last_node);
   }
 
-  // Check that the result equals the root and that we've reached the end.
-  if (node_hash != *it || ++it != path.end())
-    return false;
-  return true;
+  // Check that we've reached the end.
+  if (it != path.end())
+    return "";
+  return node_hash;
 }
 
 bool MerkleVerifier::VerifyConsistency(size_t snapshot1, size_t snapshot2,

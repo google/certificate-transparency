@@ -67,7 +67,7 @@ MerkleTree::PathToRootAtSnapshot(size_t leaf, size_t snapshot) {
   size_t leaf_count = LeafCount();
   if (leaf > snapshot || snapshot > leaf_count || leaf == 0)
     return path;
-  return PathFromNodeToRootAtSnapshot(leaf - 1, 0, snapshot, true);
+  return PathFromNodeToRootAtSnapshot(leaf - 1, 0, snapshot);
 }
 
 std::vector<std::string> MerkleTree::SnapshotConsistency(size_t snapshot1,
@@ -97,8 +97,7 @@ std::vector<std::string> MerkleTree::SnapshotConsistency(size_t snapshot1,
 
   // Now record the path from this node to the root of snapshot2.
   std::vector<std::string> path = PathFromNodeToRootAtSnapshot(node, level,
-                                                               snapshot2,
-                                                               false);
+                                                               snapshot2);
   proof.insert(proof.end(), path.begin(), path.end());
   return proof;
 }
@@ -206,7 +205,7 @@ std::string MerkleTree::RecomputePastSnapshot(size_t snapshot,
 
 std::vector<std::string>
 MerkleTree::PathFromNodeToRootAtSnapshot(size_t node, size_t level,
-                                         size_t snapshot, bool add_root) {
+                                         size_t snapshot) {
 
   std::vector<std::string> path;
   if (snapshot == 0)
@@ -216,10 +215,9 @@ MerkleTree::PathFromNodeToRootAtSnapshot(size_t node, size_t level,
   if (level >= level_count_ || node > last_node || snapshot > LeafCount())
     return path;
 
-  std::string root;
   if (snapshot > leaves_processed_)
     // Bring the tree sufficiently up to date.
-    root = UpdateToSnapshot(snapshot);
+    UpdateToSnapshot(snapshot);
 
   // Move up, recording the sibling of the current node at each level.
   while (last_node) {
@@ -232,7 +230,7 @@ MerkleTree::PathFromNodeToRootAtSnapshot(size_t node, size_t level,
       // The sibling is the last node of the level in the snapshot tree,
       // so we get its value for the snapshot. Get the root in the same pass.
       std::string recompute_node;
-      root = RecomputePastSnapshot(snapshot, level, &recompute_node);
+      RecomputePastSnapshot(snapshot, level, &recompute_node);
       path.push_back(recompute_node);
     }
     // Else sibling > last_node so the sibling does not exist. Do nothing.
@@ -243,11 +241,5 @@ MerkleTree::PathFromNodeToRootAtSnapshot(size_t node, size_t level,
     ++level;
   };
 
-  // Finally, attach the root if desired, recomputing if necessary.
-  if (add_root) {
-    if (root.empty())
-      root = RecomputePastSnapshot(snapshot, 0, NULL);
-    path.push_back(root);
-  }
   return path;
 }

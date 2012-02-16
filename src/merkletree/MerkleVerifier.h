@@ -24,10 +24,25 @@ class MerkleVerifier {
   // @param leaf index of the leaf.
   // @param tree_size number of leaves in the tree.
   // @param path a vector of node hashes ordered according to levels from leaf
-  // to root. Does not include the leaf hash.
+  // to root. Does not include the leaf hash or the root.
+  // @ param root The root hash
+  // @ param data The leaf data
   bool VerifyPath(size_t leaf, size_t tree_size,
                   const std::vector<std::string> &path,
+                  const std::string &root,
                   const std::string &data);
+
+  // Compute the root corresponding to a Merkle audit path.
+  // Returns an empty string if the path is not valid.
+  //
+  // @param leaf index of the leaf.
+  // @param tree_size number of leaves in the tree.
+  // @param path a vector of node hashes ordered according to levels from leaf
+  // to root. Does not include the leaf hash or the root.
+  // @ param data The leaf data
+  std::string RootFromPath(size_t leaf, size_t tree_size,
+			   const std::vector<std::string> &path,
+			   const std::string &data);
 
   bool VerifyConsistency(size_t snapshot1, size_t snapshot2,
                          const std::string &root1, const std::string &root2,

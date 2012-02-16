@@ -6,7 +6,7 @@
     <author initials="B" surname="Laurie" fullname="Ben Laurie"></author>
     <author initials="A" surname="Langley" fullname="Adam Langley"></author>
     <author initials="E" surname="Kasper" fullname="Emilia Kasper"></author>
-    <date year='2011'></date>
+    <date year='2012'></date>
   </front>
   <middle>
 <section title="Design">
@@ -57,13 +57,45 @@ Note that we do not require the length of the input list to be a power of two. T
 	  <vspace blankLines='1' />
 	  PATH(0, {d(0)}) = {}
 	  <vspace blankLines='1' />
-	  For n > 1, let k be the largest power of two smaller than n. The path for the (m+1)th element d(m) in a list of n &gt m elements is then defined recursively as
+	  For n &gt; 1, let k be the largest power of two smaller than n. The path for the (m+1)th element d(m) in a list of n &gt m elements is then defined recursively as
 	  <vspace blankLines='1' />
 	  PATH(m, D[0:n]) = PATH(m, D[0:k]) : MTH(D[k:n]) for m &lt; k; and
 	  <vspace blankLines='1' />
 	  PATH(m, D[0:n]) = PATH(m - k, D[k:n]) : MTH(D[0:k]) for k &lt;= m &lt; n,
 	  <vspace blankLines='1' />
 	  where : is concatenation of lists and D[k1:k2] denotes the length (k2 - k1) list {d(k1), d(k1+1),..., d(k2-1)} as before.
+	</t>
+      </section>
+
+      <section title="Merkle consistency proofs" anchor='consistency'>
+	<t>
+	  Merkle consistency proofs prove the append-only property of the tree. A Merkle consistency proof for a Merkle Tree Hash MTH(D[0:n]) and a previously advertised hash MTH(D[0:m]) of the first m leaves, m &lt;= n, is the list of nodes in the Merkle tree required to verify that the first m inputs D[0:m] are equal in both trees. Thus, a consistency proof must contain a set of intermediate nodes (i.e., commitments to inputs) sufficient to verify MTH(D[0:n]), such that (a subset of) the same nodes can be used to verify MTH(D[0:m]). We define an algorithm that outputs the (unique) minimal consistency proof. 
+	</t>
+	<t> Given an ordered list of n inputs to the tree, D[0:n] = {d(0), ..., d(n-1)}, the Merkle consistency proof PROOF(m, D[0:n]) for a previous root hash MTH(D[0:m]), 0 &lt; m &lt; n, is defined as PROOF(m, D[0:n]) = SUBPROOF(m, D[0:n], true):
+	</t>
+	<t>
+	  The subproof for m = n is empty if m is the value for which PROOF was originally requested (meaning that the subtree root hash MTH(D[0:m]) is known):
+	  <vspace blankLines='1' />
+	  SUBPROOF(m, D[0:m], true) = {}
+	  <vspace blankLines='1' />
+ 	  The subproof for m = n is the root hash committing inputs D[0:m] otherwise:
+	  <vspace blankLines='1' />
+	  SUBPROOF(m, D[0:m], false) = {MTH(D[0:m])}
+	  <vspace blankLines='1' />    
+	  For m &lt n, let k be the largest power of two smaller than n. The subproof is then defined recursively.
+	  <vspace blankLines='1' />
+If m &lt;= k, the right subtree entries D[k:n] only exist in the current tree. We prove that the left subtree entries D[0:k] are consistent and add a commitment to D[k:n]:
+	  <vspace blankLines='1' />
+	  SUBPROOF(m, D[0:n], b) = SUBPROOF(m, D[0:k], b) : MTH(D[k:n]).
+	  <vspace blankLines='1' />
+If m > k, the left subtree entries D[0:k] are identical in both trees. We prove that the right subtree entries D[k:n] are consistent and add a commitment to D[0:k].
+	  <vspace blankLines='1' />
+	  SUBPROOF(m, D[0:n], b) = SUBPROOF(m - k, D[k:n], false) : MTH(D[0:k]).
+	  <vspace blankLines='1' />
+	  Here : is concatenation of lists and D[k1:k2] denotes the length (k2 - k1) list {d(k1), d(k1+1),..., d(k2-1)} as before.
+	</t>
+	<t>
+	  The number of nodes in the resulting proof is bounded above by ceil(log2(n)) + 1.
 	</t>
       </section>
 
@@ -84,23 +116,64 @@ Note that we do not require the length of the input list to be a power of two. T
    /     \        /     \    
   g       h      i      j
  / \     / \    / \     |
- a b     c d    e f     D6       
+ a b     c d    e f     d6       
  | |     | |    | |                               
-D0 D1   D2 D3  D4 D5    
+d0 d1   d2 d3  d4 d5    
 </artwork>
 </figure>
 	  </t>
 	  <t>
-	    The audit path for D0 is [b, h, l].
+	    The audit path for d0 is [b, h, l].
 	  </t>
 	  <t>
-	    The audit path for D3 is [c, g, l].
+	    The audit path for d3 is [c, g, l].
 	  </t>
 	  <t>
-	    The audit path for D4 is [f, j, k].
+	    The audit path for d4 is [f, j, k].
 	  </t>
 	  <t>
-	    The audit path for D6 is [i, k].
+	    The audit path for d6 is [i, k].
+	  </t>
+	  <t>
+	    The same tree, built incrementally in four steps:
+<figure>
+<artwork>    
+    hash0          hash1=k 
+    / \              /  \  
+   /   \            /    \ 
+  /     \          /      \ 
+  g      c         g       h 
+ / \     |        / \     / \ 
+ a b     d2       a b     c d 
+ | |              | |     | |                   
+d0 d1            d0 d1   d2 d3
+
+          hash2                    hash
+          /  \                    /    \
+         /    \                  /      \
+        /      \                /        \
+       /        \              /          \
+      /          \            /            \
+     k            i          k              l
+    / \          / \        / \            / \
+   /   \         e f       /   \          /   \
+  /     \        | |      /     \        /     \    
+ g       h      d4 d5    g       h      i      j
+/ \     / \             / \     / \    / \     |
+a b     c d             a b     c d    e f     d6       
+| |     | |             | |     | |    | |                               
+d0 d1   d2 d3           d0 d1   d2 d3  d4 d5    
+</artwork>
+</figure>
+	  </t>
+	  <t>
+	    The consistency proof between hash0 and hash is PROOF(3, D[0:7]) = [c, d, g, l]. c, g are used to verify hash0, and d, l are additionally used to verify hash.
+	  </t>
+	  <t>
+	    The consistency proof between hash1 and hash is PROOF(4, D[0:7]) = [l]. hash can be verified, using hash1=k and l.
+	  </t>
+	  <t>
+	    The consistency proof between hash2 and hash is PROOF(6, D[0:7]) = [i, j, k]. k, i are used to verify hash1, and j is additionally used to verify hash.
 	  </t>
 	</section>
       </section>
@@ -118,10 +191,19 @@ D0 D1   D2 D3  D4 D5
 	  </t>
 	  <figure>
 	    <artwork>
+enum { x509_chain_entry(0), (65535) } LogEntryType;
+
 struct {
-    Certificate leaf_certificate;
-    Certificate certificate_chain&lt;0..2^24-1&gt;;
+    LogEntryType type;
+    select (type) {
+    case x509_chain_entry: X509ChainEntry;
+    } entry;
 } LogEntry;
+
+struct {
+    ASN.1Cert leaf_certificate;
+    ASN.1Cert certificate_chain&lt;0..2^24-1&gt;;
+} X509ChainEntry;
 	    </artwork>
 	  </figure>
 	  <t>[benl: Should we consider a small number for the certificate_chain? Or perhaps note that a log can impose a limit?]
@@ -130,44 +212,50 @@ struct {
 	    <spanx style="verb">leaf_certificate</spanx> is the end-entity certificate submitted for auditing.
 	  </t>
 	  <t>
-	    <spanx style="verb">certificate_list</spanx> is the collection of additional certificates required to verify the leaf certificate. This collection MUST be ordered by the content of each certificate, read first byte first, in ascending order.
+	    <spanx style="verb">certificate_list</spanx> is the collection of additional certificates required to verify the leaf certificate. This collection MUST be ordered by the content of each certificate, read first byte first, in ascending order. [agl: why aren't we requiring them to be in verification order? It would make the logs simplier which is a good thing.]
 	  </t>
 	</section>
 	<section title="Log Segments">
 	  <t> A certificate log MUST periodically publish all new log entries as a log segment. The log MUST sign these entries by constructing a binary Log Segment Merkle Hash Tree with log entries as consecutive inputs to the tree, and signing the root of that tree. The hashing algorithm is SHA-256. The signature algorithm is ECDSA with the curve NIST P-256.
 	  </t>
 	  <t>
-	   Log segments MUST have an incrementing sequence number and the increment MUST be one. At every update, logs MUST sign a secondary Segment Info Merkle Hash Tree of all log segment signatures issued so far, ordered in the tree according to the sequence number.
+	   Log segments MUST have an incrementing sequence number. The first sequence number MUST be zero and the increment MUST be one. At every update, logs MUST sign a secondary Segment Info Merkle Hash Tree of all log segment signatures issued so far, ordered in the tree according to the sequence number.
 </t>
 	  <t>
 	    Structure of the signature:
 	  </t>
 	  <figure>
 	    <artwork>
-enum { LogSegment, SegmentInfo } TreeType;
+enum { log_segment(0), segment_info(1), (255) } TreeType;
 	    </artwork>
 	  </figure>
 	  <figure>
 	    <artwork>
 digitally-signed struct {
     TreeType tree_type;
-    uint32 tree_size;
     uint32 sequence_number;
-    opaque root_hash[32];
+    select (tree_type) {
+        case log_segment: uint32 tree_size;
+        case segment_info: struct { };
+    }
+    opaque sha256_root_hash[32];
 } MerkleTreeSignature;
 	    </artwork>
 	  </figure>
+<t>
+The encoding of the digitally-signed element is defined in <xref target='RFC5246'/>.
+</t>
 	  <t>
 	    <spanx style="verb">tree_type</spanx> is the type of the Merkle tree (either a Log Segment tree, or a Segment Info tree).
 	  </t>
 	  <t>
-	    <spanx style="verb">tree_size</spanx> is the number of leaves in the tree.
+	    <spanx style="verb">sequence_number</spanx> is the number of the corresponding segment.
 	  </t>
 	  <t>
-	    <spanx style="verb">sequence_number</spanx> is the number of the current segment. In the case of a <spanx style="verb">SegmentInfo</spanx> signature, the <spanx style="verb">sequence_number</spanx> MUST equal the <spanx style="verb">tree_size</spanx>.
+	    <spanx style="verb">tree_size</spanx> is the number of leaves in the tree. In the case of a <spanx style="verb">SegmentInfo</spanx> signature, tree size equals <spanx style="verb">sequence_number + 1</spanx> and is thus omitted.
 	  </t>
 	  <t>
-	    <spanx style="verb">root_hash</spanx> is the root of the Merkle Hash Tree.
+	    <spanx style="verb">sha256_root_hash</spanx> is the root of the Merkle Hash Tree.
 	  </t>
 <t>
 For every segment, logs MUST publish all the log entries corresponding to that segment, as well as a segment info record containing the signatures on the Log Segment Merkle Hash Tree and the current Segment Info Merkle Hash Tree.
@@ -178,17 +266,25 @@ Structure of the segment info record:
 <figure>
   <artwork>
 struct {
+    uint32 sequence_number;
     uint32 timestamp;
+    uint32 segment_size;
     MerkleTreeSignature signed_log_segment_tree;
     MerkleTreeSignature signed_segment_info_tree;
 } SegmentInfo;
   </artwork>
 </figure>
 <t>
+<spanx style="verb">sequence_number</spanx> is the number of the segment.
+</t>
+<t>
+<spanx style="verb">segment_size</spanx> is the size of the segment, i.e., the number of leaves in the log segment tree.
+</t>
+<t>
 <spanx style="verb">signed_log_segment_tree</spanx> is the signature on the Log Segment Merkle Hash Tree.
 </t>
 	  <t>
-	    <spanx style="verb">signed_segment_info_tree</spanx> is the signature on the current Segment Info Merkle Hash Tree. The <spanx style="verb">sequence_number</spanx> in the <spanx style="verb">signed_log_segment_tree</spanx> MUST match the <spanx style="verb">sequence_number</spanx> in the <spanx style="verb">signed_segment_info_tree</spanx>.
+	    <spanx style="verb">signed_segment_info_tree</spanx> is the signature on the current Segment Info Merkle Hash Tree.
 	  </t> 
 	</section>
 	<section title="Audit Proofs">
@@ -209,21 +305,34 @@ Logs MUST also provide audit proofs for the Segment Info Merkle Hash Tree. Clien
 	  <figure>
 	    <artwork>
 struct {
-    opaque hash[32];
+    opaque sha256_hash[32];
 } MerkleNode;
 	    </artwork>
 	  </figure>
 	  <figure>
 	    <artwork>
 struct {
+    uint32 sequence_number;
+    select (TreeType) {
+        case log_segment: uint32 tree_size;
+        case segment_info: struct { };
+    }
     uint32 leaf_index;
-    MerkleNode audit_path&lt;0..2^16-1&gt;;
     MerkleTreeSignature signed_tree;
+    MerkleNode audit_path&lt;0..2^16-1&gt;;
 } AuditProof;
 	    </artwork>
 	  </figure>
+<t>[ekasper: If we want to allow other hash functions than sha2, the hash function of the audit_path can be read from the SignatureAndHashAlgorithm field in signed_tree. (We require the two hash functions to always be the same.)]
+</t>
 	  <t>
-	    <spanx style="verb">leaf_index</spanx> is the index of the audited node in the Merkle tree, from 1 to <spanx style="verb">tree_size</spanx> [or 0 to tree_size - 1 ?].
+	    <spanx style="verb">sequence_number</spanx> is the segment number associated with the tree.
+	  </t>
+	  <t>
+	    <spanx style="verb">tree_size</spanx> is the number of leaves in the tree. In the case of a <spanx style="verb">SegmentInfo</spanx> AuditProof, tree size equals <spanx style="verb">sequence_number + 1</spanx> and is thus omitted.
+	  </t>
+	  <t>
+	    <spanx style="verb">leaf_index</spanx> is the index of the audited node in the Merkle tree, from 0 to <spanx style="verb">tree_size - 1</spanx>.
 	  </t>
 	  <t>
 	    <spanx style="verb">audit_path</spanx> is a list of additional nodes in the Merkle tree required for reconstructing the root hash. Nodes must be listed from leaf to root level, i.e., in the order they are used in the Merkle Tree Hash computation, as defined in <xref target='merkle_paths' />. <spanx style="emph">Notice that the left-right ordering is determined by the position of the leaf.</spanx> The leaf node under audit as well as the root node shall be omitted from the path.
@@ -232,26 +341,23 @@ struct {
 	    <spanx style="verb">signed_tree</spanx> is the signature on the tree.
 	  </t>
 	  <t>
-	    Servers who send an audit proof for a certificate must also serve all intermediate certificates recorded in the  <spanx style="verb">certificate_list</spanx> of the <spanx style="verb">LogEntry</spanx>. Clients who verify the certificate audit proof use these certificates to reconstruct the leaf node of the Log Segment Merkle Hash Tree. A valid audit proof MUST satisfy the following:
+	    Servers who send an audit proof for a certificate must also serve all intermediate certificates recorded in the  <spanx style="verb">certificate_list</spanx> of the <spanx style="verb">X509ChainEntry</spanx>. Clients who verify the certificate audit proof use these certificates to reconstruct the leaf node of the Log Segment Merkle Hash Tree. The leaf node, <spanx style="verb">leaf_index</spanx> and <spanx style="verb">audit_path</spanx> together determine the root hash of the tree. A valid audit proof MUST satisfy the following:
 	  </t>
 	  <t>
 	    <list style='symbols'>
 	      <t>
-		The <spanx style="verb">leaf_index</spanx> MUST be greater than 0 and MUST NOT exceed <spanx style="verb">tree_size</spanx> in <spanx style="verb">signed_tree</spanx>;
+		The <spanx style="verb">tree_size</spanx> MUST be at least 1;
 	      </t>
 	      <t>
-		The root hash reconstructed from the leaf and the <spanx style="verb">audit_path</spanx> MUST equal the <spanx style="verb">root_hash</spanx> of <spanx style="verb">signed_tree</spanx>;
+		The <spanx style="verb">leaf_index</spanx> MUST NOT exceed <spanx style="verb">tree_size - 1</spanx>;
 	      </t>
 	      <t>
-		The signature on <spanx style="verb">signed_tree</spanx> MUST be a valid log signature;
-	      </t>
-	      <t>
-		The <spanx style="verb">tree_type</spanx> of <spanx style="verb">signed_tree</spanx> MUST be <spanx style="verb">LogSegment</spanx> for certificate audit proofs, and MUST be <spanx style="verb">SegmentInfo</spanx> for a Segment Info audit proof.
+		The <spanx style="verb">signed_tree</spanx> signature MUST be a valid signature on the corresponding TreeType, <spanx style="verb">sequence_number</spanx>, <spanx style="verb">tree_size</spanx> (in case of a Log Segment Tree), and the root hash reconstructed from the leaf data, <spanx style="verb">leaf_index</spanx> and <spanx style="verb">audit_path</spanx>.
 	      </t>
 	    </list>
 	  </t>
 	  <t>
-	    Clients may construct a different certificate chain than the one recorded in the <spanx style="verb">LogEntry</spanx> to verify the validity of the leaf certificate. Clients who do so must additionally check that the public key sequence of the constructed chain matches the public key sequence in the <spanx style="verb">LogEntry</spanx> <spanx style="verb">certificate_list</spanx>, with only two exceptions:
+	    Clients may construct a different certificate chain than the one recorded in the <spanx style="verb">X509ChainEntry</spanx> to verify the validity of the leaf certificate. Clients who do so must additionally check that the public key sequence of the constructed chain matches the public key sequence in the <spanx style="verb">LogEntry</spanx> <spanx style="verb">certificate_list</spanx>, with only two exceptions [agl: here we're talking about sequences of public keys, but we ordered the certificates by contents, destroying the sequence]:
 	  </t>
 	  <t>
 	    <list style='symbols'>
@@ -272,8 +378,26 @@ struct {
 	<t>
 	  Auditing the log for integrity does not require third parties to maintain a copy of the entire log. The Segment Info Merkle Hash Tree root hash can be updated incrementally as new segments become available, without recomputing the entire tree. Third party auditors need only store a logarithmic number of intermediate nodes in the Segment Info Merkle Hash Tree.
 	</t>
+	<t>
+	 Additionally, the Merkle consistency proofs defined in <xref target='consistency' /> can be used to efficiently prove the append-only property of an incremental update to the Segment Info Merkle Hash Tree, without auditing the entire tree. [ekasper: are logs required to provide these proofs?]
+	</t>
       </section>
   </middle>
   <back>
+    <references>
+      <reference anchor='RFC5246'>
+
+	<front>
+	  <title>The Transport Layer Security (TLS) Protocol Version 1.2</title>
+	  <author initials='T.' surname='Dierks' fullname='T. Dierks'>
+	    <organization /></author>
+	  <author initials='E.' surname='Rescorla' fullname='E. Rescorla'>
+	    <organization /></author>
+	  <date year='2008' month='August' />
+</front>
+
+	<seriesInfo name='RFC' value='5246' />
+      </reference>
+    </references>
   </back>
 </rfc>
