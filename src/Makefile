@@ -1,7 +1,10 @@
-all: client server
+all: client server merkletree
 
 client::
-	cd client && make
+	cd client && $(MAKE)
 
 server::
-	cd server && make
+	cd server && $(MAKE)
+
+merkletree::
+	cd merkletree && $(MAKE)
