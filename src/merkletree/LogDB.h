@@ -6,8 +6,6 @@
 
 #include <stddef.h>
 
-typedef std::map<std::string,size_t> index;
-
 class LogDB {
  public:
   LogDB() {}
@@ -103,6 +101,8 @@ class MemoryDB : public LogDB {
   std::vector<std::string> entries_;
   std::vector<size_t> segment_offsets_;
   std::vector<std::string> segment_infos_;
+
+  typedef std::map<std::string,size_t> index;
   // Map the key to the location.
   index index_;
 };
