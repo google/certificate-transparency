@@ -5,10 +5,8 @@
 
 #include "LogRecord.h"
 
-namespace {
-
 // Serialize MSB to LSB, write |bytes| least significant bytes.
-std::string SerializeUint(size_t in, size_t bytes) {
+static std::string SerializeUint(size_t in, size_t bytes) {
   assert(bytes <= sizeof in);
   assert(in >> (8 * bytes) == 0);
   std::string result;
@@ -18,7 +16,7 @@ std::string SerializeUint(size_t in, size_t bytes) {
   return result;
 }
 
-size_t DeserializeUint(const std::string &in) {
+static size_t DeserializeUint(const std::string &in) {
   size_t len = in.length();
   assert(len <= sizeof(size_t));
   size_t res = 0;
@@ -27,19 +25,17 @@ size_t DeserializeUint(const std::string &in) {
   return res;
 }
 
-bool IsValidHashAlgorithmEnum(size_t h) {
+static bool IsValidHashAlgorithmEnum(size_t h) {
   if (h > 6)
     return false;
   return true;
 }
 
-bool IsValidSignatureAlgorithmEnum(size_t s) {
+static bool IsValidSignatureAlgorithmEnum(size_t s) {
   if (s > 3)
     return false;
   return true;
 }
-
-} // namespace
 
 std::string DigitallySigned::Serialize() const {
   std::string result = SerializeUint(hash_algo, 1);
