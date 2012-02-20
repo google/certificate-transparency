@@ -48,6 +48,8 @@ public:
 
   FD(EventLoop *loop, int fd, CanDelete deletable = DELETE);
 
+  virtual ~FD() {}
+
   virtual bool WantsWrite() const = 0;
 
   virtual void WriteIsAllowed() = 0;
