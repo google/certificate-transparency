@@ -25,11 +25,12 @@ MerkleTreeTest: MerkleTree.o MerkleVerifier.o SerialHasher.o TreeHasher.o \
 SerialHasherTest: SerialHasher.o SerialHasherTest.o
 	$(CXX) -o SerialHasherTest SerialHasher.o SerialHasherTest.o $(LIBS)
 
-TreeLoggerTest: LogDB.o LogRecord.o LogVerifier.o MerkleTree.o SerialHasher.o \
-		TreeHasher.o TreeLogger.o TreeLoggerTest.o
+TreeLoggerTest: LogDB.o LogRecord.o LogVerifier.o MerkleTree.o \
+		MerkleVerifier.o SerialHasher.o TreeHasher.o TreeLogger.o \
+		TreeLoggerTest.o
 	$(CXX) -o TreeLoggerTest LogDB.o LogRecord.o LogVerifier.o \
-	MerkleTree.o SerialHasher.o TreeHasher.o TreeLogger.o TreeLoggerTest.o \
-	$(LIBS)
+	MerkleTree.o MerkleVerifier.o SerialHasher.o TreeHasher.o TreeLogger.o \
+	TreeLoggerTest.o $(LIBS)
 
 TreeHasherTest: SerialHasher.o TreeHasher.o TreeHasherTest.o
 	$(CXX) -o TreeHasherTest SerialHasher.o TreeHasher.o TreeHasherTest.o \

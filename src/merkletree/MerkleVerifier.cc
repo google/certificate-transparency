@@ -26,7 +26,7 @@ bool MerkleVerifier::VerifyPath(size_t leaf, size_t tree_size,
   std::string path_root = RootFromPath(leaf, tree_size, path, data);
   if (path_root.empty())
     return false;
-  return path_root == root; 
+  return path_root == root;
 }
 
 std::string MerkleVerifier::RootFromPath(size_t leaf, size_t tree_size,

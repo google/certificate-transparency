@@ -6,14 +6,33 @@
 
 #include "LogRecord.h"
 #include "LogVerifier.h"
+#include "MerkleVerifier.h"
 #include "SerialHasher.h"
 
-LogVerifier::LogVerifier(EVP_PKEY *pkey) : pkey_(pkey) {
+LogVerifier::LogVerifier(EVP_PKEY *pkey) : pkey_(pkey),
+                                           verifier_(new Sha256Hasher()) {
   assert(pkey_ != NULL && pkey_->type == EVP_PKEY_EC);
 }
 
 LogVerifier::~LogVerifier() {
   EVP_PKEY_free(pkey_);
+}
+
+bool LogVerifier::VerifyLogSegmentAuditProof(const AuditProof &audit_proof,
+                                             const std::string &leaf) {
+  assert(audit_proof.tree_type == SegmentData::LOG_SEGMENT_TREE);
+  SegmentData data;
+  data.sequence_number = audit_proof.sequence_number;
+  data.segment_size = audit_proof.tree_size;
+  std::string root = verifier_.RootFromPath(audit_proof.leaf_index + 1,
+                                            audit_proof.tree_size,
+                                            audit_proof.audit_path, leaf);
+  if (root.empty())
+    return false;
+  assert(root.size() == 32);
+  data.segment_root = root;
+  data.segment_sig = audit_proof.signature;
+  return VerifyLogSegmentSignature(data);
 }
 
 bool LogVerifier::VerifyLogSegmentSignature(const SegmentData &data) {
@@ -46,4 +65,3 @@ bool LogVerifier::VerifySignature(const std::string &data,
   EVP_MD_CTX_cleanup(&ctx);
   return ret;
 }
-

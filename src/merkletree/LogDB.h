@@ -56,6 +56,10 @@ class LogDB {
   virtual Status LookupEntry(const std::string &key, Lookup type,
                              std::string *result) const = 0;
 
+  // Retrieve the location of an entry by key.
+  virtual Status EntryLocation(const std::string &key, size_t *segment,
+                               size_t *index) const = 0;
+
   // Retrieve segment info. Indexing starts at 0.
   // Writes the segment info record if result is not NULL.
   virtual Status LookupSegmentInfo(size_t index, std::string *result) const = 0;
@@ -95,6 +99,9 @@ class MemoryDB : public LogDB {
   Status LookupEntry(const std::string &key, Lookup type,
                      std::string *result) const;
 
+  Status EntryLocation(const std::string &key, size_t *segment,
+                       size_t *index) const;
+
   Status LookupSegmentInfo(size_t index, std::string *result) const;
 
  private:
@@ -102,8 +109,16 @@ class MemoryDB : public LogDB {
   std::vector<size_t> segment_offsets_;
   std::vector<std::string> segment_infos_;
 
-  typedef std::map<std::string,size_t> index;
+  // (segment, index_in_segment), counting from 0.
+  struct Location {
+    Location(size_t s, size_t i) : segment_number(s),
+                                   index_in_segment(i) {}
+
+    size_t segment_number;
+    size_t index_in_segment;
+  };
+  typedef std::map<std::string, Location> LocationMap;
   // Map the key to the location.
-  index index_;
+  LocationMap map_;
 };
 #endif

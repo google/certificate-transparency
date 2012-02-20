@@ -35,6 +35,11 @@ class TreeLogger {
   LogDB::Status EntryInfo(const std::string &key, LogDB::Lookup type,
                           std::string *result);
 
+  // If the key matches a logged entry in the database, populate the fields
+  // of the AuditProof (overwriting old values). If the key does not match
+  // a logged entry, return the corresponding status (PENDING or NOT_FOUND).
+  LogDB::Status EntryAuditProof(const std::string &key, AuditProof *proof);
+
   // Get the status of a segment by its index.
   // Write the segment info if the result is not NULL.
   LogDB::Status SegmentInfo(size_t index, std::string *result);

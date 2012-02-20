@@ -108,3 +108,50 @@ bool SegmentData::DeserializeSegmentInfo(const std::string &segment_info) {
     return false;
   return true;
 }
+
+std::string AuditProof::Serialize() const {
+  std::string result = SerializeUint(sequence_number, 4);
+  if (tree_type == SegmentData::LOG_SEGMENT_TREE)
+    result.append(SerializeUint(tree_size, 4));
+  result.append(SerializeUint(leaf_index, 4));
+  result.append(signature.Serialize());
+  for (size_t i = 0; i < audit_path.size(); ++i) {
+    // Hard-code sha256.
+    assert(audit_path[i].size() == 32);
+    result.append(audit_path[i]);
+  }
+  return result;
+}
+
+bool AuditProof::Deserialize(SegmentData::TreeType type,
+                             const std::string &proof) {
+  tree_type = type;
+  size_t pos = 0;
+  if (proof.size() < pos + 4)
+    return false;
+  sequence_number = DeserializeUint(proof.substr(pos, 4));
+  pos += 4;
+  if (tree_type == SegmentData::LOG_SEGMENT_TREE) {
+    if (proof.size() < pos + 4)
+      return false;
+    tree_size = DeserializeUint(proof.substr(pos, 4));
+    pos +=4;
+  } else
+    tree_size = sequence_number + 1;
+  if (proof.size() < pos + 4)
+    return false;
+  leaf_index = DeserializeUint(proof.substr(pos, 4));
+  pos += 4;
+  size_t sig_size = signature.ReadFromString(proof.substr(pos));
+  if (sig_size == 0)
+    return false;
+  pos += sig_size;
+  if (proof.substr(pos).size() % 32)
+    return false;
+  audit_path.clear();
+  while (!proof.substr(pos).empty()) {
+    audit_path.push_back(proof.substr(pos, 32));
+    pos += 32;
+  }
+  return true;
+}

@@ -77,6 +77,27 @@ LogDB::Status TreeLogger::SegmentInfo(size_t index,
   return db_->LookupSegmentInfo(index, result);
 }
 
+LogDB::Status TreeLogger::EntryAuditProof(const std::string &key,
+                                          AuditProof *proof) {
+  size_t segment, index;
+  LogDB::Status status = db_->EntryLocation(key, &segment, &index);
+  if (status != LogDB::LOGGED)
+    return status;
+  assert(proof != NULL);
+  proof->tree_type = SegmentData::LOG_SEGMENT_TREE;
+  proof->sequence_number = segment;
+  proof->tree_size = logsegments_[segment]->LeafCount();
+  assert(logsegments_[segment]->LeafHash(index + 1) == key);
+  proof->leaf_index = index;
+  std::string segment_info;
+  assert(SegmentInfo(segment, &segment_info) == LogDB::LOGGED);
+  SegmentData data;
+  assert(data.DeserializeSegmentInfo(segment_info));
+  proof->signature = data.segment_sig;
+  proof->audit_path = logsegments_[segment]->PathToCurrentRoot(index + 1);
+  return status;
+}
+
 void TreeLogger::LogSegment() {
   SegmentData data;
   data.segment_size = LogSize(LogDB::PENDING_ONLY);
@@ -90,9 +111,9 @@ void TreeLogger::LogSegment() {
 
   std::string treedata = data.SerializeLogSegmentTreeData();
   data.segment_sig.hash_algo = DigitallySigned::SHA256;
-  data.segment_sig.sig_algo = DigitallySigned::ECDSA; 
+  data.segment_sig.sig_algo = DigitallySigned::ECDSA;
   data.segment_sig.signature = Sign(treedata);
- 
+
   assert(!data.segment_sig.signature.empty());
 
   // Append the signature to the segment info tree.

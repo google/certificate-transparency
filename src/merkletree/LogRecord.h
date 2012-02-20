@@ -1,6 +1,11 @@
 #ifndef LOGRECORD_H
 #define LOGRECORD_H
 
+#include <string>
+#include <vector>
+
+#include <stddef.h>
+
 // RFC5246.
 struct DigitallySigned {
   // One byte.
@@ -83,5 +88,16 @@ struct SegmentData {
   // Parse the SegmentInfo record from a string. If the encoding is valid,
   // return true and populate the fields; else return false.
   bool DeserializeSegmentInfo(const std::string &segment_info);
+};
+
+struct AuditProof {
+  SegmentData::TreeType tree_type;
+  size_t sequence_number;
+  size_t tree_size;
+  size_t leaf_index;
+  DigitallySigned signature;
+  std::vector<std::string> audit_path;
+  std::string Serialize() const;
+  bool Deserialize(SegmentData::TreeType type, const std::string &data);
 };
 #endif

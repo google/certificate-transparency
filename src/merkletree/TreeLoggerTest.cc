@@ -182,8 +182,9 @@ void LogVerifierTest() {
   EVP_PKEY *pubkey = PublicKeyFromPem(ecp256_public_key);
   TreeLogger treelogger(new MemoryDB(), pkey);
   LogVerifier verifier(pubkey);
-  assert(treelogger.QueueEntry("Unicorn", NULL) == LogDB::NEW);
-  assert(treelogger.QueueEntry("Alice", NULL) == LogDB::NEW);
+  std::string key0, key1;
+  assert(treelogger.QueueEntry("Unicorn", &key0) == LogDB::NEW);
+  assert(treelogger.QueueEntry("Alice", &key1) == LogDB::NEW);
   treelogger.LogSegment();
   std::string segment;
   assert(treelogger.SegmentInfo(0, &segment) == LogDB::LOGGED);
@@ -231,6 +232,40 @@ void LogVerifierTest() {
   wrong_data.segment_info_sig = data.segment_sig;
   assert(!verifier.VerifyLogSegmentSignature(wrong_data));
   assert(!verifier.VerifySegmentInfoSignature(wrong_data));
+
+  // Query an audit proof, and verify it.
+  assert(!key0.empty());
+  AuditProof proof0, proof1;
+  assert(treelogger.EntryAuditProof(key0, &proof0) == LogDB::LOGGED);
+  assert(verifier.VerifyLogSegmentAuditProof(proof0, "Unicorn"));
+  assert(!key1.empty());
+  assert(treelogger.EntryAuditProof(key1, &proof1) == LogDB::LOGGED);
+  assert(verifier.VerifyLogSegmentAuditProof(proof1, "Alice"));
+
+  // Some invalid proofs.
+  assert(!verifier.VerifyLogSegmentAuditProof(proof0, "Alice"));
+  assert(!verifier.VerifyLogSegmentAuditProof(proof1, "Unicorn"));
+
+  AuditProof wrong_proof = proof0;
+  // Wrong sequence number.
+  ++wrong_proof.sequence_number;
+  assert(!verifier.VerifyLogSegmentAuditProof(wrong_proof, "Alice"));
+  --wrong_proof.sequence_number;
+  // Wrong tree size.
+  ++wrong_proof.tree_size;
+  assert(!verifier.VerifyLogSegmentAuditProof(wrong_proof, "Alice"));
+  --wrong_proof.tree_size;
+  // Wrong leaf index.
+  ++wrong_proof.leaf_index;
+  assert(!verifier.VerifyLogSegmentAuditProof(wrong_proof, "Alice"));
+  --wrong_proof.leaf_index;
+  // Wrong signature.
+  wrong_proof.signature = proof1.signature;
+  assert(!verifier.VerifyLogSegmentAuditProof(wrong_proof, "Alice"));
+  wrong_proof.signature = proof0.signature;
+  // Wrong audit path.
+  wrong_proof.audit_path = proof1.audit_path;
+  assert(!verifier.VerifyLogSegmentAuditProof(wrong_proof, "Alice"));
 }
 
 } // namespace
