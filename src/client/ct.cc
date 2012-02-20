@@ -153,7 +153,7 @@ private:
     readString(&response->data, length);
     std::cout << "Response code is " << (int)response->code << ", data length "
 	      << length << std::endl;
-  } 
+  }
 
   int fd_;
 

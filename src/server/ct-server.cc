@@ -116,7 +116,7 @@ public:
     assert(in >= 0);
     if (!WillAccept(in)) {
       static char sorry[] = "No free connections.\n";
-    
+
       // we have to consume the result.
       ssize_t s = write(in, sorry, sizeof sorry);
       // but we don't care what it is...
@@ -222,8 +222,8 @@ private:
 
   bool EraseCheck(std::deque<FD *>::iterator *pfd) {
     if ((**pfd)->WantsErase()) {
-      *pfd = fds_.erase(*pfd);
       delete **pfd;
+      *pfd = fds_.erase(*pfd);
       return true;
     }
     return false;
