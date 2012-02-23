@@ -8,6 +8,7 @@
 #include <openssl/evp.h>
 
 #include "LogDB.h"
+#include "LogRecord.h"
 #include "MerkleTree.h"
 
 class TreeLogger {

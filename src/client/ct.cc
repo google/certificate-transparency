@@ -11,7 +11,16 @@
 #include <string.h>
 #include <sys/socket.h>
 
-typedef unsigned char byte;
+static const char nibble[] = "0123456789abcdef";
+
+static std::string HexString(const bstring &data) {
+  std::string ret;
+  for (unsigned int i = 0; i < data.size(); ++i) {
+    ret.push_back(nibble[(data[i] >> 4) & 0xf]);
+    ret.push_back(nibble[data[i] & 0xf]);
+  }
+  return ret;
+}
 
 void unknownCommand(const std::string &cmd) {
   std::cerr << "Unknown command: " << cmd << '\n';
@@ -75,7 +84,7 @@ public:
   //   opaque bundle[ClientCommand.length];
   // } ClientCommandUploadBundle;
   void uploadBundle(const std::string &bundle) {
-    writeCommand(UPLOAD_BUNDLE, bundle.length());
+    writeCommand(ct::UPLOAD_BUNDLE, bundle.length());
     write(bundle.data(), bundle.length());
     CTResponse response;
     readResponse(&response);
@@ -135,11 +144,7 @@ private:
     dst->assign(buf, length);
   }
 
-  enum Command {
-    UPLOAD_BUNDLE = 1,
-  };
-
-  void writeCommand(Command cmd, size_t length) const {
+  void writeCommand(ct::ClientCommand cmd, size_t length) const {
     writeByte(VERSION);
     writeByte(cmd);
     writeLength(length, 3);
@@ -153,6 +158,8 @@ private:
     readString(&response->data, length);
     std::cout << "Response code is " << (int)response->code << ", data length "
 	      << length << std::endl;
+    if (response->code == ct::SUBMITTED)
+      std::cout << "Token is " << HexString(response->data) << std::endl;
   }
 
   int fd_;

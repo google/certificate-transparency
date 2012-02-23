@@ -1,4 +1,6 @@
 #include "../include/ct.h"
+#include "../merkletree/LogDB.h"
+#include "../merkletree/TreeLogger.h"
 
 #include <deque>
 #include <iostream>
@@ -12,6 +14,9 @@
 #include <sys/socket.h>
 #include <sys/types.h>
 #include <time.h>
+
+#include <openssl/evp.h>
+#include <openssl/pem.h>
 
 #define VV(x)
 
@@ -357,20 +362,11 @@ public:
 
 class CTServer : public Server {
 public:
-
-  CTServer(EventLoop *loop, int fd) : Server(loop, fd) {}
+  // Does not grab ownership of the logger.
+  CTServer(EventLoop *loop, int fd, TreeLogger *logger) : Server(loop, fd),
+                                                          logger_(logger) {}
 
 private:
-
-  enum Response {
-    ERROR = 0,
-  };
-
-  enum Error {
-    BAD_VERSION = 0,
-    BAD_COMMAND = 1,
-  };
-
   void BytesRead(bstring *rbuffer) {
     for ( ; ; ) {
       if (rbuffer->size() < 5)
@@ -385,12 +381,23 @@ private:
 
   void PacketRead(byte version, byte command, const bstring &data) {
     if (version != 0) {
-      SendError(BAD_VERSION);
+      SendError(ct::BAD_VERSION);
       return;
     }
     std::cout << "Command is " << (int)command << " data length "
 	      << data.size() << std::endl;
-    SendError(BAD_COMMAND);
+    if (command != ct::UPLOAD_BUNDLE) {
+      SendError(ct::BAD_COMMAND);
+      return;
+    }
+    std::string key;
+    // TODO globally: sort out this bstring/string mess.
+    LogDB::Status status = logger_->QueueEntry(
+        *(reinterpret_cast<const std::string*>(&data)), &key);
+    assert(status == LogDB::NEW || status == LogDB::PENDING ||
+           status == LogDB::LOGGED);
+    assert(!key.empty());
+    SendToken(key);
   }
 
   size_t DecodeLength(const bstring &length) {
@@ -409,14 +416,36 @@ private:
     }
   }
 
-  void SendError(Error error) {
+  void SendError(ct::ServerError error) {
     Write(VERSION);
-    Write(ERROR);
+    Write(ct::ERROR);
     WriteLength(1, 3);
     Write(error);
   }
 
+  void SendToken(const std::string &token) {
+    Write(VERSION);
+    Write(ct::SUBMITTED);
+    WriteLength(token.length(), 3);
+    Write(token);
+  }
+
   static const byte VERSION = 0;
+  TreeLogger *logger_;
+};
+
+class CTServerListener : public Listener {
+ public:
+  CTServerListener(EventLoop *loop, int fd,
+                   TreeLogger *logger) : Listener(loop, fd),
+                                         logger_(logger) {}
+
+  void Accepted(int fd)	{
+    std::cout << "Accepted " << fd << std::endl;
+    new CTServer(loop(), fd, logger_);
+  }
+ private:
+  TreeLogger *logger_;
 };
 
 static bool init_server(int *sock, int port, const char *ip, int type) {
@@ -461,18 +490,30 @@ static bool init_server(int *sock, int port, const char *ip, int type) {
 }
 
 int main(int argc, char **argv) {
-  if (argc != 2) {
-    std::cerr << argv[0] << " <port>\n";
+  if (argc != 3) {
+    std::cerr << argv[0] << " <port> <key>\n";
     exit(1);
   }
 
   int port = atoi(argv[1]);
 
+  EVP_PKEY *pkey = NULL;
+
+  FILE *fp = fopen(argv[2], "r");
+  // No password.
+  if (fp == NULL || PEM_read_PrivateKey(fp, &pkey, NULL, NULL) == NULL) {
+    std::cerr << "Could not read private key.\n";
+    exit(1);
+  }
+
+  fclose(fp);
+
   int fd;
   assert(init_server(&fd, port, NULL, SOCK_STREAM));
 
   EventLoop loop;
-  //ServerListener<EchoServer> l(&loop, fd);
-  ServerListener<CTServer> l(&loop, fd);
+
+  TreeLogger logger(new MemoryDB(), pkey);
+  CTServerListener l(&loop, fd, &logger);
   loop.Forever();
 }

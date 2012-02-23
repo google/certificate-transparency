@@ -4,6 +4,7 @@
 #include <string>
 #include <vector>
 
+#include <assert.h>
 #include <stddef.h>
 
 class LogDB {
