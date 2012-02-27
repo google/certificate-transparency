@@ -29,19 +29,19 @@ public:
   // time sampled within this event handling loop. So, the main loop
   // needs to call SetRoughTime() appropriately.
   static time_t RoughTime() {
-    if (roughTime_ == 0)
-      roughTime_ = time(NULL);
-    return roughTime_;
+    if (rough_time_ == 0)
+      rough_time_ = time(NULL);
+    return rough_time_;
   }
 
-  static void SetRoughTime() { roughTime_ = 0; }
+  static void SetRoughTime() { rough_time_ = 0; }
 
 private:
 
-  static time_t roughTime_;
+  static time_t rough_time_;
 };
 
-time_t Services::roughTime_;
+time_t Services::rough_time_;
 
 class FD {
 public:
@@ -63,17 +63,17 @@ public:
 
   virtual void ReadIsAllowed() = 0;
 
-  bool WantsErase() const { return wantsErase_; }
+  bool WantsErase() const { return wants_erase_; }
 
   void Close() {
     assert(deletable_ == DELETE);
-    if (wantsErase_)
+    if (wants_erase_)
 	{
 	std::cout << "Already closed " << fd() << std::endl;
 	return;
 	}
     std::cout << "Closing " << fd() << std::endl;
-    wantsErase_ = true;
+    wants_erase_ = true;
     shutdown(fd(), SHUT_RDWR);
     close(fd());
   }
@@ -84,9 +84,9 @@ public:
 
   // Don't forget to call me if anything happens!
   // FIXME: time() is expensive - just a serial number instead?
-  void Activity() { lastActivity_ = Services::RoughTime(); }
+  void Activity() { last_activity_ = Services::RoughTime(); }
 
-  time_t LastActivity() const { return lastActivity_; }
+  time_t LastActivity() const { return last_activity_; }
 
 protected:
 
@@ -98,17 +98,17 @@ private:
 
   int fd_;
   EventLoop *loop_;
-  bool wantsErase_;
+  bool wants_erase_;
   CanDelete deletable_;
-  time_t lastActivity_;
+  time_t last_activity_;
 
   // Note that while you can set these low for test, they behave a
   // bit strangely when set low - for example, it is quite easy to
   // hit the limit even if the window is not 0. I'm guessing 1000
-  // and 100 would be good numbers. Note EventLoop::idleTime_ below,
+  // and 100 would be good numbers. Note EventLoop::kIdleTime below,
   // also.
-  static const int fdLimit_ = 1000;
-  static const int fdLimitWindow_ = 1;
+  static const int kFDLimit = 1000;
+  static const int kFDLimitWindow = 1;
 };
 
 class Listener : public FD {
@@ -210,7 +210,7 @@ public:
 
   void MaybeDropOne() {
     std::deque<FD *>::iterator drop = fds_.end();
-    time_t oldest = Services::RoughTime() - idleTime_;
+    time_t oldest = Services::RoughTime() - kIdleTime;
 
     for (std::deque<FD *>::iterator pfd = fds_.begin();
 	 pfd != fds_.end(); ++pfd) {
@@ -245,16 +245,16 @@ private:
   }
 
   std::deque<FD *> fds_;
-  time_t roughTime_;
+  time_t rough_time_;
   // This should probably be set to 2 for anything but test (or 1 or 0).
   // 2: everything gets a chance to speak.
   // 1: sometimes the clock will tick before some get a chance to speak.
   // 0: maybe no-one ever gets a chance to speak.
-  static const time_t idleTime_ = 20;
+  static const time_t kIdleTime = 20;
 };
 
 FD::FD(EventLoop *loop, int fd, CanDelete deletable)
-  : fd_(fd), loop_(loop), wantsErase_(false), deletable_(deletable) {
+  : fd_(fd), loop_(loop), wants_erase_(false), deletable_(deletable) {
   assert(fd >= 0);
   assert((unsigned)fd < FD_SETSIZE);
   loop->Add(this);
@@ -262,9 +262,9 @@ FD::FD(EventLoop *loop, int fd, CanDelete deletable)
 }
 
 bool FD::WillAccept(int fd) {
-  if (fd >= fdLimit_ - fdLimitWindow_)
+  if (fd >= kFDLimit - kFDLimitWindow)
     loop()->MaybeDropOne();
-  return fd < fdLimit_;
+  return fd < kFDLimit;
 }
 
 class Server : public FD {
@@ -448,7 +448,7 @@ class CTServerListener : public Listener {
   TreeLogger *logger_;
 };
 
-static bool init_server(int *sock, int port, const char *ip, int type) {
+static bool InitServer(int *sock, int port, const char *ip, int type) {
   bool ret = false;
   struct sockaddr_in server;
   int s = -1;
@@ -460,7 +460,7 @@ static bool init_server(int *sock, int port, const char *ip, int type) {
     server.sin_addr.s_addr = INADDR_ANY;
   else
     memcpy(&server.sin_addr.s_addr, ip, 4);
-  
+
   if (type == SOCK_STREAM)
     s = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
   else /* type == SOCK_DGRAM */
@@ -509,7 +509,7 @@ int main(int argc, char **argv) {
   fclose(fp);
 
   int fd;
-  assert(init_server(&fd, port, NULL, SOCK_STREAM));
+  assert(InitServer(&fd, port, NULL, SOCK_STREAM));
 
   EventLoop loop;
 

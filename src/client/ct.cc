@@ -22,11 +22,11 @@ static std::string HexString(const bstring &data) {
   return ret;
 }
 
-void unknownCommand(const std::string &cmd) {
+static void UnknownCommand(const std::string &cmd) {
   std::cerr << "Unknown command: " << cmd << '\n';
 }
 
-void readAll(std::string *contents, std::ifstream &in) {
+static void ReadAll(std::string *contents, std::ifstream &in) {
   for ( ; ; ) {
     char buf[1024];
 
@@ -39,8 +39,7 @@ void readAll(std::string *contents, std::ifstream &in) {
   }
 }
 
-class CTResponse {
-public:
+struct CTResponse {
   byte code;
   bstring data;
 };
@@ -62,18 +61,18 @@ public:
       exit(3);
     }
 
-    static struct sockaddr_in serverSocket;
-    memset(&serverSocket, 0, sizeof serverSocket);
-    serverSocket.sin_family = AF_INET;
-    serverSocket.sin_port = htons(port);
-    if (inet_aton(server, &serverSocket.sin_addr) != 1) {
+    static struct sockaddr_in server_socket;
+    memset(&server_socket, 0, sizeof server_socket);
+    server_socket.sin_family = AF_INET;
+    server_socket.sin_port = htons(port);
+    if (inet_aton(server, &server_socket.sin_addr) != 1) {
       std::cerr << "Can't parse server address: " << server << '.' << std::endl;
       exit(5);
     }
 
     std::cout << "Connecting to " << server << ':' << port << '.' << std::endl;
-    int ret = connect(fd_, (struct sockaddr *)&serverSocket,
-		      sizeof serverSocket);
+    int ret = connect(fd_, (struct sockaddr *)&server_socket,
+		      sizeof server_socket);
     if (ret < 0) {
       close(fd_);
       perror("Connect failed");
@@ -83,11 +82,11 @@ public:
   // struct {
   //   opaque bundle[ClientCommand.length];
   // } ClientCommandUploadBundle;
-  void uploadBundle(const std::string &bundle) {
-    writeCommand(ct::UPLOAD_BUNDLE, bundle.length());
-    write(bundle.data(), bundle.length());
+  void UploadBundle(const std::string &bundle) {
+    WriteCommand(ct::UPLOAD_BUNDLE);
+    WriteData(bundle.data(), bundle.length());
     CTResponse response;
-    readResponse(&response);
+    ReadResponse(&response);
   }
 
 private:
@@ -99,20 +98,30 @@ private:
     }
   }
 
-  void writeByte(size_t b) const {
+  void WriteByte(size_t b) const {
     char buf[1];
     buf[0] = b;
     write(buf, 1);
   }
 
   // Write MSB first.
-  void writeLength(size_t length, size_t lengthOfLength) const {
-    assert(lengthOfLength <= sizeof length);
-    assert(length < 1U << (lengthOfLength * 8));
-    for ( ; lengthOfLength > 0; --lengthOfLength) {
-      size_t b = length & (0xff << ((lengthOfLength - 1) * 8));
-      writeByte(b >> ((lengthOfLength - 1) * 8));
+  void WriteLength(size_t length, size_t length_of_length) const {
+    assert(length_of_length <= sizeof length);
+    assert(length < 1U << (length_of_length * 8));
+    for ( ; length_of_length > 0; --length_of_length) {
+      size_t b = length & (0xff << ((length_of_length - 1) * 8));
+      WriteByte(b >> ((length_of_length - 1) * 8));
     }
+  }
+
+  void WriteCommand(ct::ClientCommand cmd) const {
+    WriteByte(VERSION);
+    WriteByte(cmd);
+  }
+
+  void WriteData(const void *buf, size_t length) const {
+    WriteLength(length, 3);
+    write(buf, length);
   }
 
   void read(void *buf, size_t length) const {
@@ -123,39 +132,33 @@ private:
     }
   }
 
-  byte readByte() const {
+  byte ReadByte() const {
     byte buf[1];
     read(buf, 1);
     return buf[0];
   }
 
-  size_t readLength(size_t lengthOfLength) const {
-    byte buf[lengthOfLength];
-    read(buf, lengthOfLength);
+  size_t ReadLength(size_t length_of_length) const {
+    byte buf[length_of_length];
+    read(buf, length_of_length);
     size_t length = 0;
-    for (size_t n = 0; n < lengthOfLength; ++n)
+    for (size_t n = 0; n < length_of_length; ++n)
       length = (length << 8) + buf[n];
     return length;
   }
 
-  void readString(bstring *dst, size_t length) const {
+  void ReadString(bstring *dst, size_t length) const {
     byte buf[length];
     read(buf, length);
     dst->assign(buf, length);
   }
 
-  void writeCommand(ct::ClientCommand cmd, size_t length) const {
-    writeByte(VERSION);
-    writeByte(cmd);
-    writeLength(length, 3);
-  }
-
-  void readResponse(CTResponse *response) {
-    byte version = readByte();
+  void ReadResponse(CTResponse *response) {
+    byte version = ReadByte();
     assert(version == VERSION);
-    response->code = readByte();
-    size_t length = readLength(3);
-    readString(&response->data, length);
+    response->code = ReadByte();
+    size_t length = ReadLength(3);
+    ReadString(&response->data, length);
     std::cout << "Response code is " << (int)response->code << ", data length "
 	      << length << std::endl;
     if (response->code == ct::SUBMITTED)
@@ -167,13 +170,13 @@ private:
   static const byte VERSION = 0;
 };
 
-void uploadBundle(int argc, const char **argv) {
+static void Upload(int argc, const char **argv) {
   if (argc < 4) {
     std::cerr << argv[0] << " <file> <server> <port>\n";
     exit(2);
   }
   const char *file = argv[1];
-  const char *serverName = argv[2];
+  const char *server_name = argv[2];
   unsigned port = atoi(argv[3]);
 
   std::cout << "Uploading certificate bundle from " << file << '.' << std::endl;
@@ -186,12 +189,12 @@ void uploadBundle(int argc, const char **argv) {
   }
 
   std::string contents;
-  readAll(&contents, in);
+  ReadAll(&contents, in);
 
   std::cout << file << " is " << contents.length() << " bytes." << std::endl;
 
-  CTClient client(serverName, port);
-  client.uploadBundle(contents);
+  CTClient client(server_name, port);
+  client.UploadBundle(contents);
 }
 
 int main(int argc, const char **argv) {
@@ -202,7 +205,7 @@ int main(int argc, const char **argv) {
 
   const std::string cmd(argv[1]);
   if (cmd == "upload")
-    uploadBundle(argc - 1, argv + 1);
+    Upload(argc - 1, argv + 1);
   else
-    unknownCommand(cmd);
+    UnknownCommand(cmd);
 }
