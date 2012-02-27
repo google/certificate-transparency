@@ -1,5 +1,6 @@
 #include "../include/ct.h"
 #include "../merkletree/LogDB.h"
+#include "../merkletree/LogRecord.h"
 #include "../merkletree/TreeLogger.h"
 
 #include <deque>
@@ -360,11 +361,75 @@ public:
   }
 };
 
+class CTLogManager {
+ public:
+  CTLogManager(TreeLogger *logger, size_t max_segment_size,
+               time_t max_segment_delay)
+      : logger_(logger),
+        max_segment_size_(max_segment_size),
+        max_segment_delay_(max_segment_delay) {
+    // Else nothing ever gets logged.
+    assert(max_segment_size_ > 0);
+    assert(max_segment_delay_ > 0);
+    segment_start_time_ = time(NULL);
+}
+
+  ~CTLogManager() { delete logger_; }
+
+  enum LogReply {
+    TOKEN,
+    PROOF,
+  };
+
+  // Submit an entry and write a token, if the entry is pending,
+  // or an audit proof, if it is already logged.
+  LogReply SubmitEntry(const std::string &data, std::string *result) {
+    std::string key;
+    LogReply reply;
+    LogDB::Status logreply = logger_->QueueEntry(data, &key);
+    assert(!key.empty());
+    if (logreply == LogDB::NEW || logreply == LogDB::PENDING) {
+      if (result != NULL)
+        result->assign(key);
+      reply = TOKEN;
+    } else {
+      assert(logreply == LogDB::LOGGED);
+      AuditProof proof;
+      assert(logger_->EntryAuditProof(key, &proof) == LogDB::LOGGED);
+      if (result != NULL)
+        result->assign(proof.Serialize());
+      reply = PROOF;
+    }
+    Manage();
+    return reply;
+  }
+
+ private:
+  void Manage() {
+    time_t now = time(NULL);
+    assert(now >= segment_start_time_);
+    if (logger_->LogSize(LogDB::PENDING_ONLY) >= max_segment_size_ ||
+        now - segment_start_time_ > max_segment_delay_) {
+      logger_->LogSegment();
+      segment_start_time_ = now;
+    }
+  }
+
+  TreeLogger *logger_;
+  // Max number of entries to log in one segment.
+  size_t max_segment_size_;
+  // Max time to wait before finalizing a segment. The manager will
+  // start a new segment when the first of the two limits is met.
+  time_t max_segment_delay_;
+  time_t segment_start_time_;
+};
+
 class CTServer : public Server {
 public:
-  // Does not grab ownership of the logger.
-  CTServer(EventLoop *loop, int fd, TreeLogger *logger) : Server(loop, fd),
-                                                          logger_(logger) {}
+  // Does not grab ownership of the manager.
+  CTServer(EventLoop *loop, int fd, CTLogManager *manager)
+  : Server(loop, fd),
+    manager_(manager) {}
 
 private:
   void BytesRead(bstring *rbuffer) {
@@ -390,14 +455,21 @@ private:
       SendError(ct::BAD_COMMAND);
       return;
     }
-    std::string key;
+    std::string result;
     // TODO globally: sort out this bstring/string mess.
-    LogDB::Status status = logger_->QueueEntry(
-        *(reinterpret_cast<const std::string*>(&data)), &key);
-    assert(status == LogDB::NEW || status == LogDB::PENDING ||
-           status == LogDB::LOGGED);
-    assert(!key.empty());
-    SendToken(key);
+    CTLogManager::LogReply reply = manager_->SubmitEntry(
+        *(reinterpret_cast<const std::string*>(&data)), &result);
+    assert(!result.empty());
+    switch(reply) {
+      case CTLogManager::TOKEN:
+        SendResponse(ct::SUBMITTED, result);
+        break;
+      case CTLogManager::PROOF:
+        SendResponse(ct::LOGGED, result);
+        break;
+      default:
+        assert(false);
+    }
   }
 
   size_t DecodeLength(const bstring &length) {
@@ -423,29 +495,29 @@ private:
     Write(error);
   }
 
-  void SendToken(const std::string &token) {
+  void SendResponse(ct::ServerResponse code, const std::string &response) {
     Write(VERSION);
-    Write(ct::SUBMITTED);
-    WriteLength(token.length(), 3);
-    Write(token);
+    Write(code);
+    WriteLength(response.length(), 3);
+    Write(response);
   }
 
   static const byte VERSION = 0;
-  TreeLogger *logger_;
+  CTLogManager *manager_;
 };
 
 class CTServerListener : public Listener {
  public:
   CTServerListener(EventLoop *loop, int fd,
-                   TreeLogger *logger) : Listener(loop, fd),
-                                         logger_(logger) {}
+                   CTLogManager *manager) : Listener(loop, fd),
+                                            manager_(manager) {}
 
   void Accepted(int fd)	{
     std::cout << "Accepted " << fd << std::endl;
-    new CTServer(loop(), fd, logger_);
+    new CTServer(loop(), fd, manager_);
   }
  private:
-  TreeLogger *logger_;
+  CTLogManager *manager_;
 };
 
 static bool InitServer(int *sock, int port, const char *ip, int type) {
@@ -490,8 +562,8 @@ static bool InitServer(int *sock, int port, const char *ip, int type) {
 }
 
 int main(int argc, char **argv) {
-  if (argc != 3) {
-    std::cerr << argv[0] << " <port> <key>\n";
+  if (argc != 5) {
+    std::cerr << argv[0] << " <port> <key> <size_limit> <time_limit>\n";
     exit(1);
   }
 
@@ -514,6 +586,9 @@ int main(int argc, char **argv) {
   EventLoop loop;
 
   TreeLogger logger(new MemoryDB(), pkey);
-  CTServerListener l(&loop, fd, &logger);
+  size_t size_limit = atoi(argv[3]);
+  time_t time_limit = atoi(argv[4]);
+  CTLogManager manager(&logger, size_limit, time_limit);
+  CTServerListener l(&loop, fd, &manager);
   loop.Forever();
 }

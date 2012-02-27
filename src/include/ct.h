@@ -17,6 +17,7 @@ enum ClientCommand {
 enum ServerResponse {
   ERROR = 0,
   SUBMITTED = 1,
+  LOGGED = 2,
 };
 
 // The server's error codes sent with response code ERROR.

@@ -1,4 +1,6 @@
 #include "../include/ct.h"
+#include "../merkletree/LogRecord.h"
+#include "../merkletree/LogVerifier.h"
 
 #include <fstream>
 #include <iostream>
@@ -7,9 +9,13 @@
 #include <arpa/inet.h>
 #include <assert.h>
 #include <netinet/in.h>
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <sys/socket.h>
+
+#include <openssl/evp.h>
+#include <openssl/pem.h>
 
 static const char nibble[] = "0123456789abcdef";
 
@@ -54,7 +60,8 @@ struct CTResponse {
 
 class CTClient {
 public:
-  CTClient(const char *server, unsigned port) {
+  CTClient(const char *server, unsigned port, EVP_PKEY *pkey)
+      : verifier_(NULL) {
     fd_ = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
     if (fd_ < 0) {
       perror("Socket creation failed");
@@ -78,7 +85,16 @@ public:
       perror("Connect failed");
       exit(4);
     }
+
+    if (pkey != NULL)
+      verifier_  = new LogVerifier(pkey);
   }
+
+  ~CTClient() {
+    if (verifier_ != NULL)
+      delete verifier_;
+  }
+
   // struct {
   //   opaque bundle[ClientCommand.length];
   // } ClientCommandUploadBundle;
@@ -87,6 +103,35 @@ public:
     WriteData(bundle.data(), bundle.length());
     CTResponse response;
     ReadResponse(&response);
+    AuditProof proof;
+    bool verified = false;
+    switch (response.code) {
+      case ct::SUBMITTED:
+        std::cout << "Token is " << HexString(response.data) << std::endl;
+        break;
+      case ct::LOGGED:
+        std::cout << "Received proof " << HexString(response.data) << std::endl;
+        verified = proof.Deserialize(
+            SegmentData::LOG_SEGMENT_TREE,
+            *(reinterpret_cast<const std::string*>(&response.data)));
+        if (!verified) {
+          std::cout << "ERROR: invalid proof encoding." << std::endl;
+          break;
+        }
+        if (verifier_ == NULL) {
+          std::cout << "No server key supplied, unable to verify proof." <<
+              std::endl;
+          break;
+        }
+        verified = verifier_->VerifyLogSegmentAuditProof(proof, bundle);
+        if (!verified)
+          std::cout << "Invalid audit proof." << std::endl;
+        else
+          std::cout << "Proof successfully verified." << std::endl;
+        break;
+      default:
+        std::cout << "Unknown response code." << std::endl;
+    }
   }
 
 private:
@@ -161,23 +206,33 @@ private:
     ReadString(&response->data, length);
     std::cout << "Response code is " << (int)response->code << ", data length "
 	      << length << std::endl;
-    if (response->code == ct::SUBMITTED)
-      std::cout << "Token is " << HexString(response->data) << std::endl;
   }
 
   int fd_;
-
   static const byte VERSION = 0;
+  // Can be NULL if a server public key is not supplied.
+  LogVerifier *verifier_;
 };
 
 static void Upload(int argc, const char **argv) {
   if (argc < 4) {
-    std::cerr << argv[0] << " <file> <server> <port>\n";
+    std::cerr << argv[0] << " <file> <server> <port> [server_key]\n";
     exit(2);
   }
   const char *file = argv[1];
   const char *server_name = argv[2];
   unsigned port = atoi(argv[3]);
+
+  EVP_PKEY *pkey = NULL;
+
+  if (argc > 4) {
+    FILE *fp = fopen(argv[4], "r");
+    if (fp == NULL || PEM_read_PUBKEY(fp, &pkey, NULL, NULL) == NULL) {
+      std::cerr << "Could not read server public key.\n";
+      exit(1);
+    }
+    fclose(fp);
+  }
 
   std::cout << "Uploading certificate bundle from " << file << '.' << std::endl;
 
@@ -193,7 +248,7 @@ static void Upload(int argc, const char **argv) {
 
   std::cout << file << " is " << contents.length() << " bytes." << std::endl;
 
-  CTClient client(server_name, port);
+  CTClient client(server_name, port, pkey);
   client.UploadBundle(contents);
 }
 
