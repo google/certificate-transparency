@@ -8,14 +8,18 @@
 
 #include <arpa/inet.h>
 #include <assert.h>
+#include <fcntl.h>
 #include <netinet/in.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <sys/socket.h>
 
+#include <openssl/asn1.h>
+#include <openssl/bn.h>
 #include <openssl/evp.h>
 #include <openssl/pem.h>
+#include <openssl/x509.h>
 
 static const char nibble[] = "0123456789abcdef";
 
@@ -252,6 +256,92 @@ static void Upload(int argc, const char **argv) {
   client.UploadBundle(contents);
 }
 
+// FIXME: fix all the memory leaks in this code.
+static void MakeCert(int argc, const char **argv) {
+  if (argc != 3) {
+    std::cerr << argv[0] << " <input proof> <output certificate>\n";
+    exit(7);
+  }
+  const char *proof_file = argv[1];
+  const char *cert_file = argv[2];
+
+  int proof_fd = open(proof_file, O_RDONLY);
+  assert(proof_fd >= 0);
+  unsigned char proof[2048];
+  ssize_t proof_len = read(proof_fd, proof, sizeof proof);
+  assert(proof_len >= 0);
+  assert(proof_len < (ssize_t)sizeof proof);
+
+  int cert_fd = open(cert_file, O_CREAT | O_TRUNC | O_WRONLY, 0666);
+  assert(cert_fd >= 0);
+  BIO *out = BIO_new_fd(cert_fd, BIO_CLOSE);
+
+  X509 *x = X509_new();
+
+  // X509v3 (== 2)
+  X509_set_version(x, 2);
+
+  // Random 128 bit serial number
+  BIGNUM *serial = BN_new();
+  BN_rand(serial, 128, 0, 0);
+  BN_to_ASN1_INTEGER(serial, X509_get_serialNumber(x));
+  BN_free(serial);
+
+  // Set signature algorithm
+  // FIXME: is there an opaque way to get the algorithm structure?
+  x->cert_info->signature->algorithm = OBJ_nid2obj(NID_sha1WithRSAEncryption);
+  x->cert_info->signature->parameter = NULL;
+
+  // Set the start date to now
+  X509_gmtime_adj(X509_get_notBefore(x), 0);
+  // End date to now + 1 second
+  X509_gmtime_adj(X509_get_notAfter(x), 1);
+
+  // Create the issuer name
+  X509_NAME *issuer = X509_NAME_new();
+  X509_NAME_add_entry_by_NID(issuer, NID_commonName, V_ASN1_PRINTABLESTRING,
+			     const_cast<unsigned char *>(
+			       reinterpret_cast<const unsigned char *>("Test")),
+			     4, 0, -1);
+  X509_set_issuer_name(x, issuer);
+
+  // Create the subject name
+  X509_NAME *subject = X509_NAME_new();
+  X509_NAME_add_entry_by_NID(subject, NID_commonName, V_ASN1_PRINTABLESTRING,
+			     const_cast<unsigned char *>(
+			       reinterpret_cast<const unsigned char *>("tseT")),
+			     4, 0, -1);
+  X509_set_subject_name(x, subject);
+
+  // Public key
+  RSA *rsa = RSA_new();
+  static const unsigned char bits[1] = { 3 };
+  rsa->n = BN_bin2bn(bits, 1, NULL);
+  rsa->e = BN_bin2bn(bits, 1, NULL);
+  EVP_PKEY *evp_pkey = EVP_PKEY_new();
+  EVP_PKEY_assign_RSA(evp_pkey, rsa);
+  X509_PUBKEY_set(&X509_get_X509_PUBKEY(x) , evp_pkey);
+
+  // And finally, the proof in an extension
+  unsigned char obj_buf[100];
+  char oid[] = "1.2.3.4";
+  int obj_len = a2d_ASN1_OBJECT(obj_buf, sizeof obj_buf, oid, sizeof oid - 1);
+  assert(obj_len > 0);
+  ASN1_OBJECT *obj = ASN1_OBJECT_create(0, obj_buf, obj_len, NULL, NULL);
+  ASN1_OCTET_STRING *data = ASN1_OCTET_STRING_new();
+  ASN1_OCTET_STRING_set(data, proof, proof_len);
+  X509_EXTENSION *ext = X509_EXTENSION_new();
+  X509_EXTENSION_set_object(ext, obj);
+  X509_EXTENSION_set_critical(ext, 1);
+  X509_EXTENSION_set_data(ext, data);
+  X509_add_ext(x, ext, -1);
+
+  int i = i2d_X509_bio(out, x);
+  assert(i != 0);
+
+  BIO_free(out);
+}
+
 int main(int argc, const char **argv) {
   if (argc < 2) {
     std::cerr << argv[0] << " <command> ...\n";
@@ -261,6 +351,8 @@ int main(int argc, const char **argv) {
   const std::string cmd(argv[1]);
   if (cmd == "upload")
     Upload(argc - 1, argv + 1);
+  else if (cmd == "certificate")
+    MakeCert(argc - 1, argv + 1);
   else
     UnknownCommand(cmd);
 }
