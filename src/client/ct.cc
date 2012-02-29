@@ -38,11 +38,11 @@ static void UnknownCommand(const std::string &cmd) {
   std::cerr << "Unknown command: " << cmd << '\n';
 }
 
-static void ReadAll(std::string *contents, std::ifstream &in) {
+static void ReadAll(bstring *contents, std::ifstream &in) {
   for ( ; ; ) {
-    char buf[1024];
+    unsigned char buf[1024];
 
-    size_t n = in.read(buf, sizeof buf).gcount();
+    size_t n = in.read(reinterpret_cast<char*>(buf), sizeof buf).gcount();
     assert(!in.fail() || in.eof());
     assert(n >= 0);
     contents->append(buf, n);
@@ -53,13 +53,13 @@ static void ReadAll(std::string *contents, std::ifstream &in) {
 
 // Make the object that we use to recognize the extension.
 static ASN1_OBJECT *ProofExtensionObject() {
-      unsigned char obj_buf[100];
-      char oid[] = "1.2.3.4";
-      int obj_len = a2d_ASN1_OBJECT(obj_buf, sizeof obj_buf, oid,
-                                    sizeof oid - 1);
-      assert(obj_len > 0);
-      ASN1_OBJECT *obj = ASN1_OBJECT_create(0, obj_buf, obj_len, NULL, NULL);
-      return obj;
+  unsigned char obj_buf[100];
+  char oid[] = "1.2.3.4";
+  int obj_len = a2d_ASN1_OBJECT(obj_buf, sizeof obj_buf, oid,
+                                sizeof oid - 1);
+  assert(obj_len > 0);
+  ASN1_OBJECT *obj = ASN1_OBJECT_create(0, obj_buf, obj_len, NULL, NULL);
+  return obj;
 }
 
 struct CTResponse {
@@ -115,7 +115,7 @@ public:
   // struct {
   //   opaque bundle[ClientCommand.length];
   // } ClientCommandUploadBundle;
-  void UploadBundle(const std::string &bundle) {
+  void UploadBundle(const bstring &bundle) {
     CTResponse response = Upload(bundle);
     switch (response.code) {
       case ct::SUBMITTED:
@@ -140,7 +140,7 @@ public:
 
   // Upload bundle; if the server returns a proof that successfully verifies,
   // write the proof string.
-  bool RetrieveProof(const std::string &bundle, bstring *proof) {
+  bool RetrieveProof(const bstring &bundle, bstring *proof) {
     if (verifier_ == NULL) {
       std::cout << "No log server public key. Unable to verify proof." <<
           std::endl;
@@ -304,7 +304,7 @@ private:
 	      << length << std::endl;
   }
 
-  CTResponse Upload(const std::string &bundle) {
+  CTResponse Upload(const bstring &bundle) {
     WriteCommand(ct::UPLOAD_BUNDLE);
     WriteData(bundle.data(), bundle.length());
     CTResponse response;
@@ -312,7 +312,7 @@ private:
     return response;
   }
 
-  bool VerifyProof(const bstring &proofstring, const std::string &bundle) {
+  bool VerifyProof(const bstring &proofstring, const bstring &bundle) {
     assert(verifier_ != NULL);
     AuditProof proof;
     bool verified = proof.Deserialize(
@@ -320,7 +320,10 @@ private:
         *(reinterpret_cast<const std::string*>(&proofstring)));
     if (!verified)
       return false;
-    return verifier_->VerifyLogSegmentAuditProof(proof, bundle);
+    return
+        verifier_->VerifyLogSegmentAuditProof(proof,
+                                              *(reinterpret_cast<const
+                                                std::string*>(&bundle)));
   }
 
   int fd_;
@@ -361,17 +364,25 @@ static void Upload(int argc, const char **argv) {
 
   std::cout << "Uploading certificate bundle from " << file << '.' << std::endl;
 
-  // FIXME: do some kind of sanity check on the contents?
   std::ifstream in(file);
   if (!in.is_open()) {
     perror(file);
     exit(6);
   }
 
-  std::string contents;
+  // Assume for now that we get a single leaf cert.
+  // TODO: properly encode the submission with length prefixes, to match the spec.
+  bstring contents;
   ReadAll(&contents, in);
-
   std::cout << file << " is " << contents.length() << " bytes." << std::endl;
+
+  X509 *cert = NULL;
+  const unsigned char *dataptr = contents.data();
+  if ((cert = d2i_X509(&cert, &dataptr, contents.size())) == NULL) {
+    std::cerr << "Input is not a valid DER-encoded certificate." << std::endl;
+    exit(1);
+  }
+  X509_free(cert);
 
   CTClient client(server_name, port, pkey);
   if (proof_file) {
