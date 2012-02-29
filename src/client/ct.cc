@@ -163,10 +163,16 @@ public:
   static int VerifyCallback(X509_STORE_CTX *ctx, void *arg) {
     // Verify the proof, if present.
     LogVerifier *verifier = reinterpret_cast<LogVerifier*>(arg);
-    if (verifier == NULL)
+    if (verifier == NULL) {
+      std::cout << "No log server public key supplied. Dropping connection." <<
+          std::endl;
       return 0;
-    if (ctx->cert == NULL)
+    }
+    if (ctx->cert == NULL) {
+      std::cout << "No server certificate received. Dropping connection." <<
+          std::endl;
       return 0;
+    }
     // Read the leaf certificate.
     unsigned char *buf = NULL;
     int cert_len = i2d_X509(ctx->cert, &buf);
@@ -185,6 +191,7 @@ public:
         X509 *cert = sk_X509_value(sk, i);
         int extension_index = X509_get_ext_by_OBJ(cert, obj, -1);
         if (extension_index != -1) {
+          std::cout << "Proof extension found, verifying...";
           X509_EXTENSION *ext = X509_get_ext(cert, extension_index);
           ASN1_OCTET_STRING *ext_data = X509_EXTENSION_get_data(ext);
           std::string proofstring(
@@ -192,18 +199,29 @@ public:
           AuditProof proof;
           if(proof.Deserialize(SegmentData::LOG_SEGMENT_TREE, proofstring))
             proof_verified = verifier->VerifyLogSegmentAuditProof(proof, leaf);
-          if (proof_verified)
+          if (proof_verified) {
+            std::cout << "OK." << std::endl;
             break;
+          } else {
+            std::cout << "FAIL." << std::endl;
+          }
         }
       }
       ASN1_OBJECT_free(obj);
     }
 
-    if (!proof_verified)
+    if (!proof_verified) {
+      std::cout << "No log proof found. Dropping connection." << std::endl;
       return 0;
+    }
 
     std::cout << "Log proof verified." << std::endl;
-    return X509_verify_cert(ctx);
+    int vfy = X509_verify_cert(ctx);
+    if (vfy != 1) {
+      std::cout << "Certificate verification failed. Dropping connection."
+                << std::endl;
+    }
+    return vfy;
   }
 
   void SSLConnect() {
