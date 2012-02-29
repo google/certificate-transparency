@@ -1,13 +1,21 @@
-To build this, you need OpenSSL >= 1.0.0.
+To build the log server, you need OpenSSL >= 1.0.0.
 
-If that means you have to make a local version, then you can point at
-it like:
+To find out your system version of OpenSSL:
 
-$ OPENSSLDIR=<path to openssl> make
-
-This should work whether you point at an OpenSSL source tree or a
-local install.
+$ openssl version
 
 If the system version of OpenSSL is appropriate, then you can simply:
 
 $ make
+
+Else you have to make a local version. To build a local version on
+Linux, download and unpack OpenSSL source
+(http://www.openssl.org/source/) and, in the openssl directory, run
+
+$ ./config shared
+$ make
+
+Then, you can build the log server by pointing to your custom OpenSSL:
+
+$ OPENSSLDIR=<path to openssl directory> make
+

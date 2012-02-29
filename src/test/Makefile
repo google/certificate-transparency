@@ -31,13 +31,13 @@ run-server: ct-server-key.pem
 	../server/ct-server 8124 ct-server-key.pem 1 1
 
 run-apache: test-cert.pem test-key.pem test-cert-proof.pem
-	apachectl -d `pwd` -f `pwd`/httpd.conf -k start
+	apache2ctl -d `pwd` -f `pwd`/httpd.conf -k start
 
 restart-apache:
-	apachectl -d `pwd` -f `pwd`/httpd.conf -k restart
+	apache2ctl -d `pwd` -f `pwd`/httpd.conf -k restart
 
 stop-apache:
-	apachectl -d `pwd` -f `pwd`/httpd.conf -k stop
+	apache2ctl -d `pwd` -f `pwd`/httpd.conf -k stop
 
 connect: ct-server-key-public.pem
 	../client/ct connect 127.0.0.1 8123 ct-server-key-public.pem 

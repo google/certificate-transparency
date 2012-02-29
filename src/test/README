@@ -6,7 +6,17 @@ with Apache, and verifying the log proof.
 To understand the various steps in detail, inspection of the Makefile
 is suggested.
 
-The steps are as follows:
+To compile the log server and client, follow the instructions in src/README.
+
+To run a test SSL server, you will also need Apache. On Debian based
+systems, running
+
+$ sudo apt-get install apache2
+
+should suffice. On other systems, you may also need to modify the
+Makefile and/or the httpd.conf.
+
+The steps for the end-to-end test are as follows:
 
 1. Run the Log Server:
 
@@ -14,8 +24,8 @@ $ make run-server
 
 Note that this does not detach, so...
 
-2. From another window, generate the server certificate, get the
-log proof, convert it to a proof certificate, and run Apache:
+2. From another window, generate the server certificate, get the log
+proof, convert it to a proof certificate, and run Apache:
 
 $ make run-apache
 $ make run-apache

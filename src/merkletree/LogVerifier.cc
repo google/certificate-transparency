@@ -3,6 +3,10 @@
 #include <assert.h>
 
 #include <openssl/evp.h>
+#include <openssl/opensslv.h>
+#if OPENSSL_VERSION_NUMBER < 0x10000000
+# error "Need OpenSSL >= 1.0.0"
+#endif
 
 #include "LogRecord.h"
 #include "LogVerifier.h"
