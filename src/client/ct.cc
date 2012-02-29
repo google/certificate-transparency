@@ -218,10 +218,10 @@ public:
     std::cout << "Log proof verified." << std::endl;
     int vfy = X509_verify_cert(ctx);
     if (vfy != 1) {
-      std::cout << "Certificate verification failed. Dropping connection."
-                << std::endl;
+      // Echo a warning, but continue with connection.
+      std::cout << "WARNING. Certificate verification failed." << std::endl;
     }
-    return vfy;
+    return 1;
   }
 
   void SSLConnect() {
@@ -238,6 +238,7 @@ public:
     // Takes ownership of bio.
     SSL_set_bio(ssl, bio, bio);
     int ret = SSL_connect(ssl);
+    // TODO: check and report certificate verification errors.
     if (ret == 1)
       std::cout << "Connected." << std::endl;
     else std::cout << "Connection failed." << std::endl;
