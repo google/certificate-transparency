@@ -6,6 +6,10 @@
 #include <time.h>
 
 #include <openssl/evp.h>
+#include <openssl/opensslv.h>                             
+#if OPENSSL_VERSION_NUMBER < 0x10000000
+# error "Need OpenSSL >= 1.0.0"
+#endif
 
 #include "LogDB.h"
 #include "LogRecord.h"

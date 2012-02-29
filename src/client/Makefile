@@ -3,7 +3,7 @@ INCLUDE=
 # Need OpenSSL >= 1.0.0
 ifneq ($(OPENSSLDIR),)
   INCLUDE = -I $(OPENSSLDIR)/include
-  LIBS= -L $(OPENSSLDIR)/lib -lcrypto -lssl -Wl,-rpath,$(OPENSSLDIR)/lib
+  LIBS= -L $(OPENSSLDIR) -L $(OPENSSLDIR)/lib -lssl -lcrypto -Wl,-rpath,$(OPENSSLDIR)  -Wl,-rpath,$(OPENSSLDIR)/lib
 else
   LIBS= -lcrypto -lssl
 endif

@@ -1,0 +1,13 @@
+To build this, you need OpenSSL >= 1.0.0.
+
+If that means you have to make a local version, then you can point at
+it like:
+
+$ OPENSSLDIR=<path to openssl> make
+
+This should work whether you point at an OpenSSL source tree or a
+local install.
+
+If the system version of OpenSSL is appropriate, then you can simply:
+
+$ make

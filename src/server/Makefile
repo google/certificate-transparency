@@ -1,9 +1,9 @@
-CXXFLAG= -Wall -Werror -O3
+CXXFLAG= -Wall -Werror -g
 INCLUDE=
 # Need OpenSSL >= 1.0.0
 ifneq ($(OPENSSLDIR),)
   INCLUDE = -I $(OPENSSLDIR)/include
-  LIBS= -L $(OPENSSLDIR)/lib -lcrypto -Wl,-rpath,$(OPENSSLDIR)/lib
+  LIBS= -L $(OPENSSLDIR)  -L $(OPENSSLDIR)/lib -lcrypto -Wl,-rpath,$(OPENSSLDIR)  -Wl,-rpath,$(OPENSSLDIR)/lib
 else
   LIBS= -lcrypto
 endif
@@ -17,13 +17,10 @@ OBJS= ../merkletree/LogDB.o ../merkletree/LogRecord.o \
 all: .depend ct-server
 
 .depend: *.cc
-	$(CXX) -MM *.cc > .depend
+	$(CXX) $(CXXFLAGS) -MM *.cc > .depend
 
 ct-server: ct-server.cc $(OBJS)
-	$(CXX) -o ct-server ct-server.cc $(OBJS) $(LIBS)
+	$(CXX) $(CXXFLAGS) -o ct-server ct-server.cc $(OBJS) $(LIBS)
 
 clean:
 	rm -f *.o ct-server
-
-
-

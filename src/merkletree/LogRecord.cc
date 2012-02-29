@@ -8,7 +8,7 @@
 // Serialize MSB to LSB, write |bytes| least significant bytes.
 static std::string SerializeUint(size_t in, size_t bytes) {
   assert(bytes <= sizeof in);
-  assert(in >> (8 * bytes) == 0);
+  assert(bytes == sizeof in || in >> (bytes * 8) == 0);
   std::string result;
   for ( ; bytes > 0; --bytes)
     result.push_back((char)

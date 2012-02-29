@@ -1,0 +1,42 @@
+You can do an end-to-end demo of the process of creating a server
+certificate, sending it to the log server and getting back a log
+proof, converting it to a proof certificate, serving the certificate
+with Apache, and verifying the log proof.
+
+To understand the various steps in detail, inspection of the Makefile
+is suggested.
+
+The steps are as follows:
+
+1. Run the Log Server:
+
+$ make run-server
+
+Note that this does not detach, so...
+
+2. From another window, generate the server certificate, get the
+log proof, convert it to a proof certificate, and run Apache:
+
+$ make run-apache
+$ make run-apache
+
+You have to run it twice because the server cannot produce a proof
+until the log segment is complete, so the first run fails at the point
+where the proof is needed. The second should retrieve the proof and
+end up running Apache.
+
+3. Test the proof
+
+$ make connect
+
+This should show something like:
+
+../client/ct connect 127.0.0.1 8123 ct-server-key-public.pem
+Connecting to 127.0.0.1:8123.
+Proof extension found, verifying...OK.
+Log proof verified.
+WARNING. Certificate verification failed.
+Connected.
+
+The certificate verification fails because the server certificate is
+self-signed.

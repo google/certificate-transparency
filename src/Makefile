@@ -1,4 +1,4 @@
-all: client server merkletree
+all: merkletree client server
 
 client::
 	cd client && $(MAKE)
@@ -8,3 +8,8 @@ server::
 
 merkletree::
 	cd merkletree && $(MAKE)
+
+clean:
+	cd client && $(MAKE) clean
+	cd server && $(MAKE) clean
+	cd merkletree && $(MAKE) clean

@@ -3,7 +3,7 @@ INCLUDE=
 # Need OpenSSL >= 1.0.0
 ifneq ($(OPENSSLDIR),)
   INCLUDE = -I $(OPENSSLDIR)/include
-  LIBS= -L $(OPENSSLDIR)/lib -lcrypto -Wl,-rpath,$(OPENSSLDIR)/lib
+  LIBS= -L $(OPENSSLDIR) -L $(OPENSSLDIR)/lib -lcrypto -Wl,-rpath,$(OPENSSLDIR) -Wl,-rpath,$(OPENSSLDIR)/lib
 else
   LIBS= -lcrypto
 endif
@@ -13,7 +13,7 @@ CXXFLAGS= $(INCLUDE) $(CXXFLAG)
 all: .depend test
 
 .depend: *.cc *.h
-	$(CXX) -MM *.cc > .depend
+	$(CXX) $(CXXFLAGS) -MM *.cc > .depend
 
 test: MerkleTreeTest SerialHasherTest TreeLoggerTest TreeHasherTest
 

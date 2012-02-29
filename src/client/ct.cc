@@ -241,7 +241,8 @@ public:
     // TODO: check and report certificate verification errors.
     if (ret == 1)
       std::cout << "Connected." << std::endl;
-    else std::cout << "Connection failed." << std::endl;
+    else
+      std::cout << "Connection failed." << std::endl;
     if (ssl) {
       SSL_shutdown(ssl);
       SSL_free(ssl);
