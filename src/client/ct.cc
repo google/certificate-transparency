@@ -116,32 +116,19 @@ public:
   //   opaque bundle[ClientCommand.length];
   // } ClientCommandUploadBundle;
   void UploadBundle(const std::string &bundle) {
-    WriteCommand(ct::UPLOAD_BUNDLE);
-    WriteData(bundle.data(), bundle.length());
-    CTResponse response;
-    ReadResponse(&response);
-    AuditProof proof;
-    bool verified = false;
+    CTResponse response = Upload(bundle);
     switch (response.code) {
       case ct::SUBMITTED:
         std::cout << "Token is " << HexString(response.data) << std::endl;
         break;
       case ct::LOGGED:
         std::cout << "Received proof " << HexString(response.data) << std::endl;
-        verified = proof.Deserialize(
-            SegmentData::LOG_SEGMENT_TREE,
-            *(reinterpret_cast<const std::string*>(&response.data)));
-        if (!verified) {
-          std::cout << "ERROR: invalid proof encoding." << std::endl;
-          break;
-        }
         if (verifier_ == NULL) {
-          std::cout << "No server key supplied, unable to verify proof." <<
+          std::cout << "No log server key supplied. Unable to verify proof." <<
               std::endl;
           break;
         }
-        verified = verifier_->VerifyLogSegmentAuditProof(proof, bundle);
-        if (!verified)
+        if (!VerifyProof(response.data, bundle))
           std::cout << "Invalid audit proof." << std::endl;
         else
           std::cout << "Proof successfully verified." << std::endl;
@@ -149,6 +136,28 @@ public:
       default:
         std::cout << "Unknown response code." << std::endl;
     }
+  }
+
+  // Upload bundle; if the server returns a proof that successfully verifies,
+  // write the proof string.
+  bool RetrieveProof(const std::string &bundle, bstring *proof) {
+    if (verifier_ == NULL) {
+      std::cout << "No log server public key. Unable to verify proof." <<
+          std::endl;
+      return false;
+    }
+    CTResponse response = Upload(bundle);
+    if (response.code != ct::LOGGED) {
+      std::cout << "No log proof received. Try again later." << std::endl;
+      return false;
+    }
+    if (!VerifyProof(response.data, bundle)) {
+      std::cout << "Invalid audit proof." << std::endl;
+      return false;
+    }
+    if (proof != NULL)
+      proof->assign(response.data);
+    return true;
   }
 
   static int VerifyCallback(X509_STORE_CTX *ctx, void *arg) {
@@ -295,6 +304,25 @@ private:
 	      << length << std::endl;
   }
 
+  CTResponse Upload(const std::string &bundle) {
+    WriteCommand(ct::UPLOAD_BUNDLE);
+    WriteData(bundle.data(), bundle.length());
+    CTResponse response;
+    ReadResponse(&response);
+    return response;
+  }
+
+  bool VerifyProof(const bstring &proofstring, const std::string &bundle) {
+    assert(verifier_ != NULL);
+    AuditProof proof;
+    bool verified = proof.Deserialize(
+        SegmentData::LOG_SEGMENT_TREE,
+        *(reinterpret_cast<const std::string*>(&proofstring)));
+    if (!verified)
+      return false;
+    return verifier_->VerifyLogSegmentAuditProof(proof, bundle);
+  }
+
   int fd_;
   static const byte VERSION = 0;
   // Can be NULL if a server public key is not supplied.
@@ -303,7 +331,7 @@ private:
 
 static void Upload(int argc, const char **argv) {
   if (argc < 4) {
-    std::cerr << argv[0] << " <file> <server> <port> [server_key]\n";
+    std::cerr << argv[0] << " <file> <server> <port> [server_key] [proof_file]\n";
     exit(2);
   }
   const char *file = argv[1];
@@ -321,6 +349,16 @@ static void Upload(int argc, const char **argv) {
     fclose(fp);
   }
 
+  FILE *proof_file = NULL;
+
+  if (argc > 5) {
+    proof_file = fopen(argv[5], "wb");
+    if (proof_file == NULL) {
+      std::cerr << "Could not create log file\n";
+      exit(1);
+    }
+  }
+
   std::cout << "Uploading certificate bundle from " << file << '.' << std::endl;
 
   // FIXME: do some kind of sanity check on the contents?
@@ -336,7 +374,19 @@ static void Upload(int argc, const char **argv) {
   std::cout << file << " is " << contents.length() << " bytes." << std::endl;
 
   CTClient client(server_name, port, pkey);
-  client.UploadBundle(contents);
+  if (proof_file) {
+    bstring proof;
+    if(client.RetrieveProof(contents, &proof)) {
+      fwrite(proof.data(), 1, proof.size(), proof_file);
+      fclose(proof_file);
+      std::cout << "Success." << std::endl;
+    } else {
+      fclose(proof_file);
+      remove(argv[5]);
+    }
+  } else {
+    client.UploadBundle(contents);
+  }
 }
 
 // FIXME: fix all the memory leaks in this code.
