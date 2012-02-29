@@ -16,9 +16,11 @@
 #include <sys/socket.h>
 
 #include <openssl/asn1.h>
+#include <openssl/bio.h>
 #include <openssl/bn.h>
 #include <openssl/evp.h>
 #include <openssl/pem.h>
+#include <openssl/ssl.h>
 #include <openssl/x509.h>
 
 static const char nibble[] = "0123456789abcdef";
@@ -47,6 +49,17 @@ static void ReadAll(std::string *contents, std::ifstream &in) {
     if (in.eof())
       return;
   }
+}
+
+// Make the object that we use to recognize the extension.
+static ASN1_OBJECT *ProofExtensionObject() {
+      unsigned char obj_buf[100];
+      char oid[] = "1.2.3.4";
+      int obj_len = a2d_ASN1_OBJECT(obj_buf, sizeof obj_buf, oid,
+                                    sizeof oid - 1);
+      assert(obj_len > 0);
+      ASN1_OBJECT *obj = ASN1_OBJECT_create(0, obj_buf, obj_len, NULL, NULL);
+      return obj;
 }
 
 struct CTResponse {
@@ -136,6 +149,76 @@ public:
       default:
         std::cout << "Unknown response code." << std::endl;
     }
+  }
+
+  static int VerifyCallback(X509_STORE_CTX *ctx, void *arg) {
+    // Verify the proof, if present.
+    LogVerifier *verifier = reinterpret_cast<LogVerifier*>(arg);
+    if (verifier == NULL)
+      return 0;
+    if (ctx->cert == NULL)
+      return 0;
+    // Read the leaf certificate.
+    unsigned char *buf = NULL;
+    int cert_len = i2d_X509(ctx->cert, &buf);
+    assert(cert_len > 0);
+    std::string leaf(reinterpret_cast<const char*>(buf), cert_len);
+    OPENSSL_free(buf);
+
+    bool proof_verified = false;
+    // TODO: is there an API call for accessing the bag of certs?
+    STACK_OF(X509) *sk = ctx->untrusted;
+    if (sk) {
+      // Create the object by which we recognize the proof extension.
+      ASN1_OBJECT *obj = ProofExtensionObject();
+      assert(obj != NULL);
+      for (int i = 0; i < sk_X509_num(sk); ++i) {
+        X509 *cert = sk_X509_value(sk, i);
+        int extension_index = X509_get_ext_by_OBJ(cert, obj, -1);
+        if (extension_index != -1) {
+          X509_EXTENSION *ext = X509_get_ext(cert, extension_index);
+          ASN1_OCTET_STRING *ext_data = X509_EXTENSION_get_data(ext);
+          std::string proofstring(
+              reinterpret_cast<const char*>(ext_data->data), ext_data->length);
+          AuditProof proof;
+          if(proof.Deserialize(SegmentData::LOG_SEGMENT_TREE, proofstring))
+            proof_verified = verifier->VerifyLogSegmentAuditProof(proof, leaf);
+          if (proof_verified)
+            break;
+        }
+      }
+      ASN1_OBJECT_free(obj);
+    }
+
+    if (!proof_verified)
+      return 0;
+
+    std::cout << "Log proof verified." << std::endl;
+    return X509_verify_cert(ctx);
+  }
+
+  void SSLConnect() {
+    SSL_CTX *ctx = SSL_CTX_new(SSLv3_client_method());
+    assert(ctx != NULL);
+    // SSL_VERIFY_PEER makes the connection abort immediately
+    // if verification fails.
+    SSL_CTX_set_verify(ctx, SSL_VERIFY_PEER, NULL);
+    SSL_CTX_set_cert_verify_callback(ctx, &VerifyCallback, verifier_);
+    SSL *ssl = SSL_new(ctx);
+    assert(ssl != NULL);
+    BIO *bio = BIO_new_socket(fd_, BIO_NOCLOSE);
+    assert(bio != NULL);
+    // Takes ownership of bio.
+    SSL_set_bio(ssl, bio, bio);
+    int ret = SSL_connect(ssl);
+    if (ret == 1)
+      std::cout << "Connected." << std::endl;
+    else std::cout << "Connection failed." << std::endl;
+    if (ssl) {
+      SSL_shutdown(ssl);
+      SSL_free(ssl);
+    }
+    SSL_CTX_free(ctx);
   }
 
 private:
@@ -232,7 +315,7 @@ static void Upload(int argc, const char **argv) {
   if (argc > 4) {
     FILE *fp = fopen(argv[4], "r");
     if (fp == NULL || PEM_read_PUBKEY(fp, &pkey, NULL, NULL) == NULL) {
-      std::cerr << "Could not read server public key.\n";
+      std::cerr << "Could not read log server public key.\n";
       exit(1);
     }
     fclose(fp);
@@ -323,11 +406,7 @@ static void MakeCert(int argc, const char **argv) {
   X509_PUBKEY_set(&X509_get_X509_PUBKEY(x) , evp_pkey);
 
   // And finally, the proof in an extension
-  unsigned char obj_buf[100];
-  char oid[] = "1.2.3.4";
-  int obj_len = a2d_ASN1_OBJECT(obj_buf, sizeof obj_buf, oid, sizeof oid - 1);
-  assert(obj_len > 0);
-  ASN1_OBJECT *obj = ASN1_OBJECT_create(0, obj_buf, obj_len, NULL, NULL);
+  ASN1_OBJECT *obj = ProofExtensionObject();
   ASN1_OCTET_STRING *data = ASN1_OCTET_STRING_new();
   ASN1_OCTET_STRING_set(data, proof, proof_len);
   X509_EXTENSION *ext = X509_EXTENSION_new();
@@ -342,6 +421,29 @@ static void MakeCert(int argc, const char **argv) {
   BIO_free(out);
 }
 
+static void Connect(int argc, const char **argv) {
+  if (argc < 3) {
+    std::cerr << argv[0] << " <server> <port>\n";
+    exit(2);
+  }
+  const char *server_name = argv[1];
+  unsigned port = atoi(argv[2]);
+
+  EVP_PKEY *pkey = NULL;
+
+  if (argc > 3) {
+    FILE *fp = fopen(argv[3], "r");
+    if (fp == NULL || PEM_read_PUBKEY(fp, &pkey, NULL, NULL) == NULL) {
+      std::cerr << "Could not read log server public key.\n";
+      exit(1);
+    }
+    fclose(fp);
+  }
+
+  CTClient client(server_name, port, pkey);
+  client.SSLConnect();
+}
+
 int main(int argc, const char **argv) {
   if (argc < 2) {
     std::cerr << argv[0] << " <command> ...\n";
@@ -353,6 +455,10 @@ int main(int argc, const char **argv) {
     Upload(argc - 1, argv + 1);
   else if (cmd == "certificate")
     MakeCert(argc - 1, argv + 1);
+  else if (cmd == "connect") {
+    SSL_library_init();
+    Connect(argc - 1, argv + 1);
+  }
   else
     UnknownCommand(cmd);
 }
