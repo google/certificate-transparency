@@ -18,13 +18,19 @@ Makefile and/or the httpd.conf.
 
 The steps for the end-to-end test are as follows:
 
-1. Run the Log Server:
+1. Make platform dependent links:
+
+$ make <platform>-links
+
+e.g. "make linux-links"
+
+2. Run the Log Server:
 
 $ make run-server
 
 Note that this does not detach, so...
 
-2. From another window, generate the server certificate, get the log
+3. From another window, generate the server certificate, get the log
 proof, convert it to a proof certificate, and run Apache:
 
 $ make run-apache
@@ -35,7 +41,7 @@ until the log segment is complete, so the first run fails at the point
 where the proof is needed. The second should retrieve the proof and
 end up running Apache.
 
-3. Test the proof
+4. Test the proof
 
 $ make connect
 

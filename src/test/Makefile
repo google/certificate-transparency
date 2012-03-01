@@ -31,13 +31,13 @@ run-server: ct-server-key.pem
 	../server/ct-server 8124 ct-server-key.pem 1 1
 
 run-apache: test-cert.pem test-key.pem test-cert-proof.pem
-	apache2ctl -d `pwd` -f `pwd`/httpd.conf -k start
+	./apachectl -d `pwd` -f `pwd`/httpd.conf -k start
 
 restart-apache:
-	apache2ctl -d `pwd` -f `pwd`/httpd.conf -k restart
+	./apachectl -d `pwd` -f `pwd`/httpd.conf -k restart
 
 stop-apache:
-	apache2ctl -d `pwd` -f `pwd`/httpd.conf -k stop
+	./apachectl -d `pwd` -f `pwd`/httpd.conf -k stop
 
 connect: ct-server-key-public.pem
 	../client/ct connect 127.0.0.1 8123 ct-server-key-public.pem 
@@ -45,3 +45,10 @@ connect: ct-server-key-public.pem
 clean:
 	rm -f test-key.* test-cert.* test-cert-proof.* ct-server-key.* ct-server-key-public.*
 
+freebsd-links:
+	ln -sf `which apachectl` apachectl
+	ln -sf /usr/local/libexec/apache22/mod_ssl.so mod_ssl.so
+
+linux-links:
+	ln -sf `which apache2ctl` apachectl
+	ln -sf /usr/lib/apache2/modules/mod_ssl.so mod_ssl.so
