@@ -62,23 +62,26 @@ static ASN1_OBJECT *ProofExtensionObject() {
   return obj;
 }
 
-struct CTResponse {
-  byte code;
-  bstring data;
-};
+static bool VerifyLogSegmentProof(const bstring &proofstring,
+                                  const bstring &bundle,
+                                  LogVerifier *verifier) {
+  assert(verifier != NULL);
+  AuditProof proof;
+  bool verified = proof.Deserialize(
+      SegmentData::LOG_SEGMENT_TREE,
+      *(reinterpret_cast<const std::string*>(&proofstring)));
+  if (!verified)
+    return false;
+  return
+      verifier->VerifyLogSegmentAuditProof(proof,
+                                            *(reinterpret_cast<const
+                                              std::string*>(&bundle)));
+}
 
-// Provisional packet format
-// struct {
-//  uint8 version;
-//  uint8 command;
-//  uint24 length;
-//  opaque fragment[ClientCommand.length];
-// } ClientCommand;
-
+// A generic client.
 class CTClient {
 public:
-  CTClient(const char *server, unsigned port, EVP_PKEY *pkey)
-      : verifier_(NULL) {
+  CTClient(const char *server, uint16_t port) {
     fd_ = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
     if (fd_ < 0) {
       perror("Socket creation failed");
@@ -102,158 +105,65 @@ public:
       perror("Connect failed");
       exit(4);
     }
-
-    if (pkey != NULL)
-      verifier_  = new LogVerifier(pkey);
   }
 
   ~CTClient() {
-    if (verifier_ != NULL)
-      delete verifier_;
+    close(fd_);
   }
 
+ protected:
+  int fd() const { return fd_; }
+
+ private:
+  int fd_;
+}; // class CTClient
+
+// A client for talking to the log server.
+class LogClient : public CTClient {
+ public:
+  LogClient(const char *server, uint16_t port) : CTClient(server, port) {}
   // struct {
   //   opaque bundle[ClientCommand.length];
   // } ClientCommandUploadBundle;
-  void UploadBundle(const bstring &bundle) {
+  // Uploads the bundle; if the server returns a proof, writes the proof string
+  // and returns true; else returns false.
+  bool UploadBundle(const bstring &bundle, bstring *proof) {
     CTResponse response = Upload(bundle);
+    bool ret = false;
     switch (response.code) {
       case ct::SUBMITTED:
         std::cout << "Token is " << HexString(response.data) << std::endl;
         break;
       case ct::LOGGED:
         std::cout << "Received proof " << HexString(response.data) << std::endl;
-        if (verifier_ == NULL) {
-          std::cout << "No log server key supplied. Unable to verify proof." <<
-              std::endl;
-          break;
+        if (proof != NULL) {
+          proof->assign(response.data);
+          ret = true;
         }
-        if (!VerifyProof(response.data, bundle))
-          std::cout << "Invalid audit proof." << std::endl;
-        else
-          std::cout << "Proof successfully verified." << std::endl;
         break;
       default:
         std::cout << "Unknown response code." << std::endl;
     }
-  }
-
-  // Upload bundle; if the server returns a proof that successfully verifies,
-  // write the proof string.
-  bool RetrieveProof(const bstring &bundle, bstring *proof) {
-    if (verifier_ == NULL) {
-      std::cout << "No log server public key. Unable to verify proof." <<
-          std::endl;
-      return false;
-    }
-    CTResponse response = Upload(bundle);
-    if (response.code != ct::LOGGED) {
-      std::cout << "No log proof received. Try again later." << std::endl;
-      return false;
-    }
-    if (!VerifyProof(response.data, bundle)) {
-      std::cout << "Invalid audit proof." << std::endl;
-      return false;
-    }
-    if (proof != NULL)
-      proof->assign(response.data);
-    return true;
-  }
-
-  static int VerifyCallback(X509_STORE_CTX *ctx, void *arg) {
-    // Verify the proof, if present.
-    LogVerifier *verifier = reinterpret_cast<LogVerifier*>(arg);
-    if (verifier == NULL) {
-      std::cout << "No log server public key supplied. Dropping connection." <<
-          std::endl;
-      return 0;
-    }
-    if (ctx->cert == NULL) {
-      std::cout << "No server certificate received. Dropping connection." <<
-          std::endl;
-      return 0;
-    }
-    // Read the leaf certificate.
-    unsigned char *buf = NULL;
-    int cert_len = i2d_X509(ctx->cert, &buf);
-    assert(cert_len > 0);
-    std::string leaf(reinterpret_cast<const char*>(buf), cert_len);
-    OPENSSL_free(buf);
-
-    bool proof_verified = false;
-    // TODO: is there an API call for accessing the bag of certs?
-    STACK_OF(X509) *sk = ctx->untrusted;
-    if (sk) {
-      // Create the object by which we recognize the proof extension.
-      ASN1_OBJECT *obj = ProofExtensionObject();
-      assert(obj != NULL);
-      for (int i = 0; i < sk_X509_num(sk); ++i) {
-        X509 *cert = sk_X509_value(sk, i);
-        int extension_index = X509_get_ext_by_OBJ(cert, obj, -1);
-        if (extension_index != -1) {
-          std::cout << "Proof extension found, verifying...";
-          X509_EXTENSION *ext = X509_get_ext(cert, extension_index);
-          ASN1_OCTET_STRING *ext_data = X509_EXTENSION_get_data(ext);
-          std::string proofstring(
-              reinterpret_cast<const char*>(ext_data->data), ext_data->length);
-          AuditProof proof;
-          if(proof.Deserialize(SegmentData::LOG_SEGMENT_TREE, proofstring))
-            proof_verified = verifier->VerifyLogSegmentAuditProof(proof, leaf);
-          if (proof_verified) {
-            std::cout << "OK." << std::endl;
-            break;
-          } else {
-            std::cout << "FAIL." << std::endl;
-          }
-        }
-      }
-      ASN1_OBJECT_free(obj);
-    }
-
-    if (!proof_verified) {
-      std::cout << "No log proof found. Dropping connection." << std::endl;
-      return 0;
-    }
-
-    std::cout << "Log proof verified." << std::endl;
-    int vfy = X509_verify_cert(ctx);
-    if (vfy != 1) {
-      // Echo a warning, but continue with connection.
-      std::cout << "WARNING. Certificate verification failed." << std::endl;
-    }
-    return 1;
-  }
-
-  void SSLConnect() {
-    SSL_CTX *ctx = SSL_CTX_new(SSLv3_client_method());
-    assert(ctx != NULL);
-    // SSL_VERIFY_PEER makes the connection abort immediately
-    // if verification fails.
-    SSL_CTX_set_verify(ctx, SSL_VERIFY_PEER, NULL);
-    SSL_CTX_set_cert_verify_callback(ctx, &VerifyCallback, verifier_);
-    SSL *ssl = SSL_new(ctx);
-    assert(ssl != NULL);
-    BIO *bio = BIO_new_socket(fd_, BIO_NOCLOSE);
-    assert(bio != NULL);
-    // Takes ownership of bio.
-    SSL_set_bio(ssl, bio, bio);
-    int ret = SSL_connect(ssl);
-    // TODO: check and report certificate verification errors.
-    if (ret == 1)
-      std::cout << "Connected." << std::endl;
-    else
-      std::cout << "Connection failed." << std::endl;
-    if (ssl) {
-      SSL_shutdown(ssl);
-      SSL_free(ssl);
-    }
-    SSL_CTX_free(ctx);
+    return ret;
   }
 
 private:
+  struct CTResponse {
+    byte code;
+    bstring data;
+  };
+
+  // Provisional packet format
+  // struct {
+  //  uint8 version;
+  //  uint8 command;
+  //  uint24 length;
+  //  opaque fragment[ClientCommand.length];
+  // } ClientCommand;
+
   void write(const void *buf, size_t length) const {
     for (size_t offset = 0; offset < length; ) {
-      int n = ::write(fd_, ((char *)buf) + offset, length - offset);
+      int n = ::write(fd(), ((char *)buf) + offset, length - offset);
       assert(n > 0);
       offset += n;
     }
@@ -287,7 +197,7 @@ private:
 
   void read(void *buf, size_t length) const {
     for (size_t offset = 0; offset < length; ) {
-      int n = ::read(fd_, ((char *)buf) + offset, length - offset);
+      int n = ::read(fd(), ((char *)buf) + offset, length - offset);
       assert(n > 0);
       offset += n;
     }
@@ -331,67 +241,186 @@ private:
     ReadResponse(&response);
     return response;
   }
+  static const byte VERSION = 0;
+}; // class LogClient
 
-  bool VerifyProof(const bstring &proofstring, const bstring &bundle) {
-    assert(verifier_ != NULL);
-    AuditProof proof;
-    bool verified = proof.Deserialize(
-        SegmentData::LOG_SEGMENT_TREE,
-        *(reinterpret_cast<const std::string*>(&proofstring)));
-    if (!verified)
-      return false;
-    return
-        verifier_->VerifyLogSegmentAuditProof(proof,
-                                              *(reinterpret_cast<const
-                                                std::string*>(&bundle)));
+class SSLClient : public CTClient {
+ public:
+  SSLClient(const char *server, uint16_t port) : CTClient(server, port) {}
+
+  static int VerifyCallback(X509_STORE_CTX *ctx, void *arg) {
+    // Verify the proof, if present.
+    LogVerifier *verifier = reinterpret_cast<LogVerifier*>(arg);
+    if (verifier == NULL) {
+      std::cout << "No log server public key supplied. Dropping connection." <<
+          std::endl;
+      return 0;
+    }
+
+    if (ctx->cert == NULL) {
+      std::cout << "No server certificate received. Dropping connection." <<
+          std::endl;
+      return 0;
+    }
+    // Read the leaf certificate.
+    unsigned char *buf = NULL;
+    int cert_len = i2d_X509(ctx->cert, &buf);
+    assert(cert_len > 0);
+    bstring leaf(buf, cert_len);
+    OPENSSL_free(buf);
+
+    bool proof_verified = false;
+    // TODO: is there an API call for accessing the bag of certs?
+    STACK_OF(X509) *sk = ctx->untrusted;
+    if (sk) {
+      // Create the object by which we recognize the proof extension.
+      ASN1_OBJECT *obj = ProofExtensionObject();
+      assert(obj != NULL);
+      for (int i = 0; i < sk_X509_num(sk); ++i) {
+        X509 *cert = sk_X509_value(sk, i);
+        int extension_index = X509_get_ext_by_OBJ(cert, obj, -1);
+        if (extension_index != -1) {
+          std::cout << "Proof extension found, verifying...";
+          X509_EXTENSION *ext = X509_get_ext(cert, extension_index);
+          ASN1_OCTET_STRING *ext_data = X509_EXTENSION_get_data(ext);
+          bstring proofstring(ext_data->data, ext_data->length);
+          proof_verified = VerifyLogSegmentProof(proofstring, leaf, verifier);
+          if (proof_verified) {
+            std::cout << "OK." << std::endl;
+            break;
+          } else {
+            std::cout << "FAIL." << std::endl;
+          }
+        }
+      }
+      ASN1_OBJECT_free(obj);
+    }
+
+    if (!proof_verified) {
+      std::cout << "No log proof found. Dropping connection." << std::endl;
+      return 0;
+    }
+
+    std::cout << "Log proof verified." << std::endl;
+    int vfy = X509_verify_cert(ctx);
+    if (vfy != 1) {
+      // Echo a warning, but continue with connection.
+      std::cout << "WARNING. Certificate verification failed." << std::endl;
+    }
+    return 1;
   }
 
-  int fd_;
-  static const byte VERSION = 0;
-  // Can be NULL if a server public key is not supplied.
-  LogVerifier *verifier_;
-};
+  // VerifyCallback uses this verifier for verifying log proofs.
+  void SSLConnect(LogVerifier *verifier) {
+    SSL_CTX *ctx = SSL_CTX_new(SSLv3_client_method());
+    assert(ctx != NULL);
+    // SSL_VERIFY_PEER makes the connection abort immediately
+    // if verification fails.
+    SSL_CTX_set_verify(ctx, SSL_VERIFY_PEER, NULL);
+    SSL_CTX_set_cert_verify_callback(ctx, &VerifyCallback, verifier);
+    SSL *ssl = SSL_new(ctx);
+    assert(ssl != NULL);
+    BIO *bio = BIO_new_socket(fd(), BIO_NOCLOSE);
+    assert(bio != NULL);
+    // Takes ownership of bio.
+    SSL_set_bio(ssl, bio, bio);
+    int ret = SSL_connect(ssl);
+    // TODO: check and report certificate verification errors.
+    if (ret == 1)
+      std::cout << "Connected." << std::endl;
+    else
+      std::cout << "Connection failed." << std::endl;
+    if (ssl) {
+      SSL_shutdown(ssl);
+      SSL_free(ssl);
+    }
+    SSL_CTX_free(ctx);
+  }
+}; // class SSLCLient
+
+static void UploadHelp() {
+    std::cerr << "upload <file> <server> <port> [-server_key key_file] " <<
+        "[-out proof_file]" << std::endl;
+}
 
 static void Upload(int argc, const char **argv) {
   if (argc < 4) {
-    std::cerr << argv[0] << " <file> <server> <port> [server_key] [proof_file]\n";
-    exit(2);
+    UploadHelp();
+    exit(1);
   }
   const char *file = argv[1];
   const char *server_name = argv[2];
-  unsigned port = atoi(argv[3]);
+  uint16_t port = atoi(argv[3]);
+
+  const char *key_file = NULL;
+  const char *proof_file = NULL;
 
   EVP_PKEY *pkey = NULL;
+  FILE *out = NULL;
 
-  if (argc > 4) {
-    FILE *fp = fopen(argv[4], "r");
-    if (fp == NULL || PEM_read_PUBKEY(fp, &pkey, NULL, NULL) == NULL) {
-      std::cerr << "Could not read log server public key.\n";
+  argc -= 4;
+  argv += 4;
+
+  while (argc >= 2) {
+    if (strcmp(argv[0], "-server_key") == 0) {
+      if (key_file != NULL) {
+        UploadHelp();
+        exit(1);
+      }
+      key_file = argv[1];
+      argc -= 2;
+      argv += 2;
+    } else if (strcmp(argv[0], "-out") == 0) {
+      if (proof_file != NULL) {
+        UploadHelp();
+        exit(1);
+      }
+      proof_file = argv[1];
+      argc -= 2;
+      argv += 2;
+    } else {
+      UploadHelp();
       exit(1);
+    }
+  }
+
+  if (argc) {
+    UploadHelp();
+    exit(1);
+  }
+
+  std::ifstream in(file);
+  if (!in.is_open()) {
+    perror(file);
+    exit(2);
+  }
+
+  if (key_file != NULL) {
+    FILE *fp = fopen(key_file, "r");
+    if (fp == NULL) {
+      perror(key_file);
+      exit(2);
+    }
+    if (PEM_read_PUBKEY(fp, &pkey, NULL, NULL) == NULL) {
+      std::cerr << "Could not read log server public key" << std::endl;
+      exit(6);
     }
     fclose(fp);
   }
 
-  FILE *proof_file = NULL;
-
-  if (argc > 5) {
-    proof_file = fopen(argv[5], "wb");
-    if (proof_file == NULL) {
-      std::cerr << "Could not create log file\n";
-      exit(1);
+  if (proof_file != NULL) {
+    out = fopen(proof_file, "wb");
+    if (out == NULL) {
+      perror(proof_file);
+      exit(2);
     }
   }
 
   std::cout << "Uploading certificate bundle from " << file << '.' << std::endl;
 
-  std::ifstream in(file);
-  if (!in.is_open()) {
-    perror(file);
-    exit(6);
-  }
-
   // Assume for now that we get a single leaf cert.
-  // TODO: properly encode the submission with length prefixes, to match the spec.
+  // TODO: properly encode the submission with length prefixes,
+  // to match the spec.
   bstring contents;
   ReadAll(&contents, in);
   std::cout << file << " is " << contents.length() << " bytes." << std::endl;
@@ -404,19 +433,32 @@ static void Upload(int argc, const char **argv) {
   }
   X509_free(cert);
 
-  CTClient client(server_name, port, pkey);
-  if (proof_file) {
-    bstring proof;
-    if(client.RetrieveProof(contents, &proof)) {
-      fwrite(proof.data(), 1, proof.size(), proof_file);
-      fclose(proof_file);
-      std::cout << "Success." << std::endl;
-    } else {
-      fclose(proof_file);
-      remove(argv[5]);
+  LogClient client(server_name, port);
+  bstring proof;
+  if(!client.UploadBundle(contents, &proof)) {
+    std::cout << "No log proof received. Try again later." << std::endl;
+    if (out != NULL) {
+      fclose(out);
+      remove(proof_file);
     }
+    if (pkey != NULL)
+      EVP_PKEY_free(pkey);
   } else {
-    client.UploadBundle(contents);
+    if (pkey == NULL) {
+      std::cout << "WARNING: no log server key supplied. Cannot verify proof."
+                << std::endl;
+    } else {
+      LogVerifier verifier(pkey);
+      if (VerifyLogSegmentProof(proof, contents, &verifier))
+        std::cout << "Proof verified." << std::endl;
+      else
+        std::cout << "ERROR: invalid proof." << std::endl;
+    }
+    if (out != NULL) {
+      fwrite(proof.data(), 1, proof.size(), out);
+      fclose(out);
+      std::cout << "Wrote proof to " << proof_file << std::endl;
+    }
   }
 }
 
@@ -521,8 +563,12 @@ static void Connect(int argc, const char **argv) {
     fclose(fp);
   }
 
-  CTClient client(server_name, port, pkey);
-  client.SSLConnect();
+  LogVerifier *verifier = NULL;
+  if (pkey != NULL)
+    verifier = new LogVerifier(pkey);
+  SSLClient client(server_name, port);
+  client.SSLConnect(verifier);
+  delete verifier;
 }
 
 int main(int argc, const char **argv) {

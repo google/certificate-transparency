@@ -13,7 +13,8 @@ test-cert.der: test-cert.pem
 	openssl x509 -in test-cert.pem -out test-cert.der -outform DER
 
 test-cert.proof: test-cert.der ct-server-key-public.pem
-	../client/ct upload test-cert.der 127.0.0.1 8124 ct-server-key-public.pem test-cert.proof
+	../client/ct upload test-cert.der 127.0.0.1 8124 -server_key \
+	ct-server-key-public.pem -out test-cert.proof
 
 test-cert-proof.der: test-cert.proof
 	../client/ct certificate test-cert.proof test-cert-proof.der
