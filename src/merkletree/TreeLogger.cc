@@ -104,7 +104,7 @@ LogDB::Status TreeLogger::EntryAuditProof(const std::string &key,
 
 void TreeLogger::LogSegment() {
   SegmentData data;
-  data.segment_size = LogSize(LogDB::PENDING_ONLY);
+  data.segment_size = PendingLogSize();
   assert(data.segment_size == logsegments_.back()->LeafCount());
 
   data.sequence_number = SegmentCount();

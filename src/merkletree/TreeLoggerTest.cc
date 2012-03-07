@@ -49,9 +49,9 @@ EVP_PKEY* PublicKeyFromPem(const std::string &pemkey) {
   return pkey;
 }
 
-const char *nibble = "0123456789abcdef";
+static const char *nibble = "0123456789abcdef";
 
-std::string HexString(const std::string &data) {
+static std::string HexString(const std::string &data) {
   std::string ret;
   for (unsigned int i = 0; i < data.size(); ++i) {
     ret.push_back(nibble[(data[i] >> 4) & 0xf]);
@@ -69,16 +69,14 @@ void MemoryLoggerTest() {
   assert(treelogger.QueueEntry("Alice", &key1) == LogDB::NEW);
 
   // Count with and without pending entries.
-  assert(treelogger.LogSize(LogDB::LOGGED_ONLY) == 0);
-  assert(treelogger.LogSize(LogDB::PENDING_ONLY) == 2);
-  assert(treelogger.LogSize(LogDB::ANY) == 2);
+  assert(treelogger.LoggedLogSize() == 0);
+  assert(treelogger.PendingLogSize() == 2);
 
   // Try to enter a duplicate.
   assert(treelogger.QueueEntry("Unicorn", &key2) == LogDB::PENDING);
   assert(key0 == key2);
-  assert(treelogger.LogSize(LogDB::LOGGED_ONLY) == 0);
-  assert(treelogger.LogSize(LogDB::PENDING_ONLY) == 2);
-  assert(treelogger.LogSize(LogDB::ANY) == 2);
+  assert(treelogger.LoggedLogSize() == 0);
+  assert(treelogger.PendingLogSize() == 2);
 
   // Look up pending entries.
   assert(treelogger.SegmentCount() == 0);
@@ -105,9 +103,8 @@ void MemoryLoggerTest() {
 
   // Log the first segment.
   treelogger.LogSegment();
-  assert(treelogger.LogSize(LogDB::LOGGED_ONLY) == 2);
-  assert(treelogger.LogSize(LogDB::PENDING_ONLY) == 0);
-  assert(treelogger.LogSize(LogDB::ANY) == 2);
+  assert(treelogger.LoggedLogSize() == 2);
+  assert(treelogger.PendingLogSize() == 0);
   assert(treelogger.SegmentCount() == 1);
   assert(treelogger.SegmentInfo(0, &segment0) == LogDB::LOGGED);
   assert(!segment0.empty());
@@ -148,13 +145,11 @@ void MemoryLoggerTest() {
   assert(value3 == "Banana");
 
   // Log the segment.
-  assert(treelogger.LogSize(LogDB::LOGGED_ONLY) == 2);
-  assert(treelogger.LogSize(LogDB::PENDING_ONLY) == 1);
-  assert(treelogger.LogSize(LogDB::ANY) == 3);
+  assert(treelogger.LoggedLogSize() == 2);
+  assert(treelogger.PendingLogSize() == 1);
   treelogger.LogSegment();
-  assert(treelogger.LogSize(LogDB::LOGGED_ONLY) == 3);
-  assert(treelogger.LogSize(LogDB::PENDING_ONLY) == 0);
-  assert(treelogger.LogSize(LogDB::ANY) == 3);
+  assert(treelogger.LoggedLogSize() == 3);
+  assert(treelogger.PendingLogSize() == 0);
   assert(treelogger.SegmentCount() == 2);
   assert(treelogger.SegmentInfo(1, &segment1) == LogDB::LOGGED);
   assert(segment0 != segment1);

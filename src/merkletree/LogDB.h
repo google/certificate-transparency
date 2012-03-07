@@ -25,9 +25,9 @@ class LogDB {
     LOGGED_ONLY, // Logged entries only
   };
 
-  // Return the number of logged/pending or logged and pending entries,
-  // depending on the Lookup type.
-  virtual size_t LogSize(Lookup type) const = 0;
+  // Return the number of logged or pending entries.
+  virtual size_t PendingLogSize() const = 0;
+  virtual size_t LoggedLogSize() const = 0;
 
   // Number of finished segments.
   virtual size_t SegmentCount() const = 0;
@@ -71,17 +71,12 @@ class MemoryDB : public LogDB {
  public:
   MemoryDB();
 
-  size_t LogSize(Lookup type) const {
-    switch (type) {
-      case LogDB::ANY:
-        return entries_.size();
-      case LogDB::PENDING_ONLY:
-        return entries_.size() - segment_offsets_.back();
-      case LogDB::LOGGED_ONLY:
-        return segment_offsets_.back();
-      default:
-        assert(false);
-    }
+  size_t PendingLogSize() const {
+    return entries_.size() - segment_offsets_.back();
+  }
+
+  size_t LoggedLogSize() const {
+    return segment_offsets_.back();
   }
 
   size_t SegmentCount() const {

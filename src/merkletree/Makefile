@@ -12,6 +12,8 @@ CXXFLAGS= $(INCLUDE) $(CXXFLAG)
 
 all: .depend test
 
+include .depend
+
 .depend: *.cc *.h
 	$(CXX) $(CXXFLAGS) -MM *.cc > .depend
 

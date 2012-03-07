@@ -408,7 +408,7 @@ class CTLogManager {
   void Manage() {
     time_t now = time(NULL);
     assert(now >= segment_start_time_);
-    if (logger_->LogSize(LogDB::PENDING_ONLY) >= max_segment_size_ ||
+    if (logger_->PendingLogSize() >= max_segment_size_ ||
         now - segment_start_time_ > max_segment_delay_) {
       logger_->LogSegment();
       segment_start_time_ = now;
