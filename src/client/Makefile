@@ -12,12 +12,15 @@ CXXFLAGS= $(INCLUDE) $(CXXFLAG)
 
 OBJS= cache.o ../merkletree/LogDB.o ../merkletree/LogRecord.o \
 ../merkletree/MerkleVerifier.o ../merkletree/SerialHasher.o \
-../merkletree/TreeHasher.o ../merkletree/LogVerifier.o 
+../merkletree/TreeHasher.o ../merkletree/LogVerifier.o \
+../util/ct_debug.o ../util/util.o 
 
 all: .depend ct
 
 .depend: *.cc
 	$(CXX) $(CXXFLAGS) -MM *.cc > .depend
+
+include .depend
 
 ct: ct.cc $(OBJS)
 	$(CXX) $(CXXFLAGS) -o ct ct.cc $(OBJS) $(LIBS)

@@ -12,7 +12,8 @@ CXXFLAGS= $(INCLUDE) $(CXXFLAG)
 
 OBJS= ../merkletree/LogDB.o ../merkletree/LogRecord.o \
 ../merkletree/MerkleTree.o ../merkletree/SerialHasher.o \
-../merkletree/TreeHasher.o ../merkletree/TreeLogger.o 
+../merkletree/TreeHasher.o ../merkletree/TreeLogger.o \
+../util/ct_debug.o ../util/util.o
 
 all: .depend ct-server
 

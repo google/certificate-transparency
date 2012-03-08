@@ -27,10 +27,10 @@ SerialHasherTest: SerialHasher.o SerialHasherTest.o
 
 TreeLoggerTest: LogDB.o LogRecord.o LogVerifier.o MerkleTree.o \
 		MerkleVerifier.o SerialHasher.o TreeHasher.o TreeLogger.o \
-		TreeLoggerTest.o
+		TreeLoggerTest.o ../util/ct_debug.o ../util/util.o
 	$(CXX) -o TreeLoggerTest LogDB.o LogRecord.o LogVerifier.o \
 	MerkleTree.o MerkleVerifier.o SerialHasher.o TreeHasher.o TreeLogger.o \
-	TreeLoggerTest.o $(LIBS)
+	TreeLoggerTest.o ../util/ct_debug.o ../util/util.o $(LIBS)
 
 TreeHasherTest: SerialHasher.o TreeHasher.o TreeHasherTest.o
 	$(CXX) -o TreeHasherTest SerialHasher.o TreeHasher.o TreeHasherTest.o \

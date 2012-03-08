@@ -3,6 +3,7 @@
 #include <assert.h>
 #include <stddef.h>
 
+#include "../util/ct_debug.h"
 #include "LogRecord.h"
 
 // Serialize MSB to LSB, write |bytes| least significant bytes.
@@ -46,19 +47,34 @@ std::string DigitallySigned::Serialize() const {
 }
 
 size_t DigitallySigned::ReadFromString(const std::string &data) {
-  if (data.size() < 4)
+  DLOG_BEGIN_PARSE("signature");
+  if (data.size() < 4) {
+    DLOG_ERROR("Signature too short");
+    DLOG_END_PARSE;
     return 0;
+  }
   size_t h = data[0];
+  DLOG_UINT("hash algorithm", h);
   size_t s = data[1];
-  if (!IsValidHashAlgorithmEnum(h) || !IsValidSignatureAlgorithmEnum(s))
+  DLOG_UINT("signature algorithm", s);
+  if (!IsValidHashAlgorithmEnum(h) || !IsValidSignatureAlgorithmEnum(s)) {
+    DLOG_ERROR("Invalid algorithm");
+    DLOG_END_PARSE;
     return 0;
+  }
 
   size_t sig_size = DeserializeUint(data.substr(2,2));
-  if (data.size() < 4 + sig_size)
+  DLOG_UINT("signature size", sig_size);
+  if (data.size() < 4 + sig_size) {
+    DLOG_ERROR("Signature too short");
+    DLOG_END_PARSE;
     return 0;
+  }
   hash_algo = static_cast<HashAlgorithm>(h);
   sig_algo = static_cast<SignatureAlgorithm>(s);
   sig_string = data.substr(4, sig_size);
+  DLOG_BINARY("signature", sig_string.data(), sig_string.size());
+  DLOG_END_PARSE;
   return 4 + sig_size;
 }
 
@@ -175,33 +191,56 @@ std::string AuditProof::Serialize() const {
 
 bool AuditProof::Deserialize(SegmentData::TreeType type,
                              const std::string &proof) {
+  DLOG_BEGIN_PARSE("audit proof");
   tree_type = type;
   size_t pos = 0;
-  if (proof.size() < pos + 4)
+  if (proof.size() < pos + 4) {
+    DLOG_ERROR("Proof too short");
+    DLOG_END_PARSE;
     return false;
+  }
   sequence_number = DeserializeUint(proof.substr(pos, 4));
+  DLOG_UINT("sequence number", sequence_number);
   pos += 4;
   if (tree_type == SegmentData::LOG_SEGMENT_TREE) {
-    if (proof.size() < pos + 4)
+    if (proof.size() < pos + 4) {
+      DLOG_ERROR("Proof too short");
+      DLOG_END_PARSE;
       return false;
+    }
     tree_size = DeserializeUint(proof.substr(pos, 4));
+    DLOG_UINT("tree size", tree_size);
     pos +=4;
   } else
     tree_size = sequence_number + 1;
-  if (proof.size() < pos + 4)
+  if (proof.size() < pos + 4) {
+    DLOG_ERROR("Proof too short");
+    DLOG_END_PARSE;
     return false;
+  }
   leaf_index = DeserializeUint(proof.substr(pos, 4));
+  DLOG_UINT("leaf index", leaf_index);
   pos += 4;
   size_t sig_size = signature.ReadFromString(proof.substr(pos));
-  if (sig_size == 0)
+  if (sig_size == 0) {
+    DLOG_ERROR("Failed to parse signature");
+    DLOG_END_PARSE;
     return false;
+  }
   pos += sig_size;
-  if (proof.substr(pos).size() % 32)
+  if (proof.substr(pos).size() % 32) {
+    DLOG_ERROR("Failed to parse audit path");
+    DLOG_END_PARSE;
     return false;
+  }
   audit_path.clear();
+  DLOG_BEGIN_PARSE("audit path");
   while (!proof.substr(pos).empty()) {
     audit_path.push_back(proof.substr(pos, 32));
+    DLOG_BINARY("node", audit_path.back().data(), audit_path.back().size());
     pos += 32;
   }
+  DLOG_END_PARSE;
+  DLOG_END_PARSE;
   return true;
 }

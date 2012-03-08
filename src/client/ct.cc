@@ -1,5 +1,7 @@
 #include "cache.h"
 #include "../include/ct.h"
+#include "../util/ct_debug.h"
+#include "../util/util.h"
 #include "../merkletree/LogRecord.h"
 #include "../merkletree/LogVerifier.h"
 
@@ -25,17 +27,6 @@
 #include <openssl/pem.h>
 #include <openssl/ssl.h>
 #include <openssl/x509.h>
-
-static const char nibble[] = "0123456789abcdef";
-
-static std::string HexString(const bstring &data) {
-  std::string ret;
-  for (unsigned int i = 0; i < data.size(); ++i) {
-    ret.push_back(nibble[(data[i] >> 4) & 0xf]);
-    ret.push_back(nibble[data[i] & 0xf]);
-  }
-  return ret;
-}
 
 static void UnknownCommand(const std::string &cmd) {
   std::cerr << "Unknown command: " << cmd << '\n';
@@ -192,10 +183,11 @@ class LogClient : public CTClient {
     bool ret = false;
     switch (response.code) {
       case ct::SUBMITTED:
-        std::cout << "Token is " << HexString(response.data) << std::endl;
+        std::cout << "Token is " << util::HexString(response.data) << std::endl;
         break;
       case ct::LOGGED:
-        std::cout << "Received proof " << HexString(response.data) << std::endl;
+        std::cout << "Received proof " << util::HexString(response.data)
+                  << std::endl;
         if (proof != NULL) {
           proof->assign(response.data);
           ret = true;
@@ -227,6 +219,7 @@ private:
       assert(n > 0);
       offset += n;
     }
+    DLOG_BINARY("send", buf, length);
   }
 
   void WriteByte(size_t b) const {
@@ -239,14 +232,19 @@ private:
   void WriteLength(size_t length, size_t length_of_length) const {
     assert(length_of_length <= sizeof length);
     assert(length < 1U << (length_of_length * 8));
-    for ( ; length_of_length > 0; --length_of_length) {
-      size_t b = length & (0xff << ((length_of_length - 1) * 8));
-      WriteByte(b >> ((length_of_length - 1) * 8));
+    DLOG_UINT("length", length);
+    char buf[length_of_length];
+    for (size_t i = length_of_length; i > 0; --i) {
+      size_t b = length & (0xff << ((i - 1) * 8));
+      buf[length_of_length - i] = (b >> ((i - 1) * 8));
     }
+    write(buf, length_of_length);
   }
 
   void WriteCommand(ct::ClientCommand cmd) const {
+    DLOG_UINT("version", VERSION);
     WriteByte(VERSION);
+    DLOG_UINT("command", cmd);
     WriteByte(cmd);
   }
 
@@ -261,6 +259,7 @@ private:
       assert(n > 0);
       offset += n;
     }
+    DLOG_BINARY("read", buf, length);
   }
 
   byte ReadByte() const {
@@ -275,6 +274,7 @@ private:
     size_t length = 0;
     for (size_t n = 0; n < length_of_length; ++n)
       length = (length << 8) + buf[n];
+    DLOG_UINT("length", length);
     return length;
   }
 
@@ -285,18 +285,24 @@ private:
   }
 
   void ReadResponse(CTResponse *response) {
+    DLOG_BEGIN_SERVER_MESSAGE;
     byte version = ReadByte();
+    DLOG_UINT("version", version);
     assert(version == VERSION);
     response->code = ReadByte();
+    DLOG_UINT("response code", response->code);
     size_t length = ReadLength(3);
     ReadString(&response->data, length);
     std::cout << "Response code is " << (int)response->code << ", data length "
 	      << length << std::endl;
+    DLOG_END_SERVER_MESSAGE;
   }
 
   CTResponse Upload(const bstring &bundle) {
+    DLOG_BEGIN_CLIENT_MESSAGE;
     WriteCommand(ct::UPLOAD_BUNDLE);
     WriteData(bundle.data(), bundle.length());
+    DLOG_END_CLIENT_MESSAGE;
     CTResponse response;
     ReadResponse(&response);
     return response;
@@ -738,21 +744,58 @@ static void Connect(int argc, const char **argv) {
   delete verifier;
 }
 
+static void UsageHelp(const std::string &cmd) {
+  std::cerr << cmd <<  " [-debug [-debug_out file]] <command> ..."
+            << std::endl;
+}
+
 int main(int argc, const char **argv) {
+  const std::string main_command(argv[0]);
   if (argc < 2) {
-    std::cerr << argv[0] << " <command> ...\n";
+    UsageHelp(main_command);
     return 1;
   }
 
-  const std::string cmd(argv[1]);
+  ++argv;
+  --argc;
+
+  if (strcmp(argv[0], "-debug") == 0) {
+    ++argv;
+    --argc;
+    if (argc == 0) {
+      UsageHelp(main_command);
+      return 1;
+    }
+    if (strcmp(argv[0], "-debug_out") == 0) {
+      ++argv;
+      --argc;
+      if (argc == 0) {
+        UsageHelp(main_command);
+        return 1;
+      }
+      InitDebug(argv[0]);
+      ++argv;
+      --argc;
+    } else {
+      InitDebug();
+    }
+  }
+
+  if (argc < 2) {
+    UsageHelp(main_command);
+    return 1;
+  }
+
+  const std::string cmd(argv[0]);
   if (cmd == "upload")
-    Upload(argc - 1, argv + 1);
+    Upload(argc, argv);
   else if (cmd == "certificate")
-    MakeCert(argc - 1, argv + 1);
+    MakeCert(argc, argv);
   else if (cmd == "connect") {
     SSL_library_init();
-    Connect(argc - 1, argv + 1);
-  }
-  else
+    Connect(argc, argv);
+  } else {
     UnknownCommand(cmd);
+    UsageHelp(main_command);
+  }
 }
