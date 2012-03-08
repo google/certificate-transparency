@@ -40,8 +40,8 @@ static bool IsValidSignatureAlgorithmEnum(size_t s) {
 std::string DigitallySigned::Serialize() const {
   std::string result = SerializeUint(hash_algo, 1);
   result.append(SerializeUint(sig_algo, 1));
-  result.append(SerializeUint(signature.size(), 2));
-  result.append(signature);
+  result.append(SerializeUint(sig_string.size(), 2));
+  result.append(sig_string);
   return result;
 }
 
@@ -58,7 +58,7 @@ size_t DigitallySigned::ReadFromString(const std::string &data) {
     return 0;
   hash_algo = static_cast<HashAlgorithm>(h);
   sig_algo = static_cast<SignatureAlgorithm>(s);
-  signature = data.substr(4, sig_size);
+  sig_string = data.substr(4, sig_size);
   return 4 + sig_size;
 }
 
@@ -68,43 +68,93 @@ bool DigitallySigned::Deserialize(const std::string &data) {
   return true;
 }
 
-std::string SegmentData::SerializeLogSegmentTreeData() const {
-  std::string result(SerializeUint(LOG_SEGMENT_TREE, 1));
-  result.append(SerializeUint(sequence_number, 4));
+std::string LogSegmentCheckpoint::Serialize() const {
+  std::string result = SerializeUint(sequence_number, 4);
   result.append(SerializeUint(segment_size, 4));
-  assert(segment_root.size() == 32);
-  result.append(segment_root);
+  result.append(signature.Serialize());
+  assert(root.size() == 32);
+  result.append(root);
   return result;
 }
 
-std::string SegmentData::SerializeSegmentInfoTreeData() const {
-  std::string result(SerializeUint(SEGMENT_INFO_TREE, 1));
+std::string LogSegmentCheckpoint::SerializeTreeData() const {
+  std::string result(SerializeUint(SegmentData::LOG_SEGMENT_TREE, 1));
   result.append(SerializeUint(sequence_number, 4));
-  assert(segment_info_root.size() == 32);
-  result.append(segment_info_root);
+  result.append(SerializeUint(segment_size, 4));
+  assert(root.size() == 32);
+  result.append(root);
   return result;
+}
+
+bool LogSegmentCheckpoint::Deserialize(const std::string &data) {
+  if (data.size() < 8)
+    return false;
+  sequence_number = DeserializeUint(data.substr(0, 4));
+  segment_size = DeserializeUint(data.substr(4, 4));
+  size_t pos = 8;
+  size_t sig_size =signature.ReadFromString(data.substr(pos));
+  if (sig_size == 0)
+    return false;
+  pos += sig_size;
+  if (data.size() != pos + 32)
+    return false;
+  root = data.substr(pos);
+  return true;
+}
+
+std::string LogHeadCheckpoint::Serialize() const {
+  std::string result = SerializeUint(sequence_number, 4);
+  result.append(signature.Serialize());
+  assert(root.size() == 32);
+  result.append(root);
+  return result;
+}
+
+std::string LogHeadCheckpoint::SerializeTreeData() const {
+  std::string result(SerializeUint(SegmentData::SEGMENT_INFO_TREE, 1));
+  result.append(SerializeUint(sequence_number, 4));
+  assert(root.size() == 32);
+  result.append(root);
+  return result;
+}
+
+bool LogHeadCheckpoint::Deserialize(const std::string &data) {
+  if (data.size() < 4)
+    return false;
+  sequence_number = DeserializeUint(data.substr(0, 4));
+  size_t pos = 4;
+  size_t sig_size = signature.ReadFromString(data.substr(pos));
+  if (sig_size == 0)
+    return false;
+  pos += sig_size;
+  if (data.size() != pos + 32)
+    return false;
+  root = data.substr(pos);
+  return true;
 }
 
 std::string SegmentData::SerializeSegmentInfo() const {
-  std::string result = SerializeUint(sequence_number, 4);
+  assert(log_segment.sequence_number == log_head.sequence_number);
+  std::string result = SerializeUint(log_segment.sequence_number, 4);
   result.append(SerializeUint(timestamp, 4));
-  result.append(SerializeUint(segment_size, 4));
-  result.append(segment_sig.Serialize());
-  result.append(segment_info_sig.Serialize());
+  result.append(SerializeUint(log_segment.segment_size, 4));
+  result.append(log_segment.signature.Serialize());
+  result.append(log_head.signature.Serialize());
   return result;
 }
 
-bool SegmentData::DeserializeSegmentInfo(const std::string &segment_info) {
+bool SegmentData::DeserializeSegmentInfo(const std::string &data) {
   size_t pos = 12;
-  if (segment_info.size() < pos)
+  if (data.size() < pos)
     return false;
-  sequence_number = DeserializeUint(segment_info.substr(0, 4));
-  timestamp = DeserializeUint(segment_info.substr(4, 4));
-  segment_size = DeserializeUint(segment_info.substr(8,4));
-  size_t sig1_size = segment_sig.ReadFromString(segment_info.substr(12));
+  log_segment.sequence_number = DeserializeUint(data.substr(0, 4));
+  log_head.sequence_number = log_segment.sequence_number;
+  timestamp = DeserializeUint(data.substr(4, 4));
+  log_segment.segment_size = DeserializeUint(data.substr(8,4));
+  size_t sig1_size = log_segment.signature.ReadFromString(data.substr(12));
   if (sig1_size == 0)
     return false;
-  if(!segment_info_sig.Deserialize(segment_info.substr(12 + sig1_size)))
+  if(!log_head.signature.Deserialize(data.substr(12 + sig1_size)))
     return false;
   return true;
 }

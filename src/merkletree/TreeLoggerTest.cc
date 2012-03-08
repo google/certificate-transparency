@@ -197,75 +197,86 @@ void LogVerifierTest() {
   MerkleTree log_segment_tree(new Sha256Hasher());
   log_segment_tree.AddLeaf("Unicorn");
   log_segment_tree.AddLeaf("Alice");
-  data.segment_root = log_segment_tree.CurrentRoot();
+  data.log_segment.root = log_segment_tree.CurrentRoot();
 
   MerkleTree segment_info_tree(new Sha256Hasher());
-  segment_info_tree.AddLeaf(data.segment_sig.signature);
-  data.segment_info_root = segment_info_tree.CurrentRoot();
+  segment_info_tree.AddLeaf(data.log_segment.SerializeTreeData());
+  data.log_head.root = segment_info_tree.CurrentRoot();
 
   // Verify the signatures.
-  assert(data.sequence_number == 0);
-  assert(data.segment_size == 2);
-  assert(verifier.VerifyLogSegmentSignature(data));
-  assert(verifier.VerifySegmentInfoSignature(data));
+  assert(data.log_segment.sequence_number == 0);
+  assert(data.log_segment.segment_size == 2);
+  assert(verifier.VerifyLogSegmentSignature(data.log_segment));
+  assert(verifier.VerifySegmentInfoSignature(data.log_head));
 
   SegmentData wrong_data = data;
 
   // Various invalid signatures.
-  ++wrong_data.segment_size;
-  assert(!verifier.VerifyLogSegmentSignature(wrong_data));
-  --wrong_data.segment_size;
+  ++wrong_data.log_segment.segment_size;
+  assert(!verifier.VerifyLogSegmentSignature(wrong_data.log_segment));
+  --wrong_data.log_segment.segment_size;
 
-  ++wrong_data.sequence_number;
-  assert(!verifier.VerifyLogSegmentSignature(wrong_data));
-  assert(!verifier.VerifySegmentInfoSignature(wrong_data));
-  --wrong_data.sequence_number;
+  ++wrong_data.log_segment.sequence_number;
+  ++wrong_data.log_head.sequence_number;
+  assert(!verifier.VerifyLogSegmentSignature(wrong_data.log_segment));
+  assert(!verifier.VerifySegmentInfoSignature(wrong_data.log_head));
+  ++wrong_data.log_segment.sequence_number;
+  ++wrong_data.log_head.sequence_number;
 
-  wrong_data.segment_root = data.segment_info_root;
-  wrong_data.segment_info_root = data.segment_root;
-  assert(!verifier.VerifyLogSegmentSignature(wrong_data));
-  assert(!verifier.VerifySegmentInfoSignature(wrong_data));
-  wrong_data.segment_root = data.segment_root;
-  wrong_data.segment_info_root = data.segment_info_root;
+  wrong_data.log_segment.root = data.log_head.root;
+  wrong_data.log_head.root = data.log_segment.root;
+  assert(!verifier.VerifyLogSegmentSignature(wrong_data.log_segment));
+  assert(!verifier.VerifySegmentInfoSignature(wrong_data.log_head));
+  wrong_data.log_segment.root = data.log_segment.root;
+  wrong_data.log_head.root = data.log_head.root;
 
-  wrong_data.segment_sig = data.segment_info_sig;
-  wrong_data.segment_info_sig = data.segment_sig;
-  assert(!verifier.VerifyLogSegmentSignature(wrong_data));
-  assert(!verifier.VerifySegmentInfoSignature(wrong_data));
+  wrong_data.log_segment.signature = data.log_head.signature;
+  wrong_data.log_head.signature = data.log_head.signature;
+  assert(!verifier.VerifyLogSegmentSignature(wrong_data.log_segment));
+  assert(!verifier.VerifySegmentInfoSignature(wrong_data.log_head));
 
   // Query an audit proof, and verify it.
   assert(!key0.empty());
   AuditProof proof0, proof1;
   assert(treelogger.EntryAuditProof(key0, &proof0) == LogDB::LOGGED);
-  assert(verifier.VerifyLogSegmentAuditProof(proof0, "Unicorn"));
+  assert(verifier.VerifyLogSegmentAuditProof(proof0, "Unicorn") ==
+         LogVerifier::VERIFY_OK);
   assert(!key1.empty());
   assert(treelogger.EntryAuditProof(key1, &proof1) == LogDB::LOGGED);
-  assert(verifier.VerifyLogSegmentAuditProof(proof1, "Alice"));
+  assert(verifier.VerifyLogSegmentAuditProof(proof1, "Alice") ==
+         LogVerifier::VERIFY_OK);
 
   // Some invalid proofs.
-  assert(!verifier.VerifyLogSegmentAuditProof(proof0, "Alice"));
-  assert(!verifier.VerifyLogSegmentAuditProof(proof1, "Unicorn"));
+  assert(verifier.VerifyLogSegmentAuditProof(proof0, "Alice") !=
+         LogVerifier::VERIFY_OK);
+  assert(verifier.VerifyLogSegmentAuditProof(proof1, "Unicorn") !=
+         LogVerifier::VERIFY_OK);
 
   AuditProof wrong_proof = proof0;
   // Wrong sequence number.
   ++wrong_proof.sequence_number;
-  assert(!verifier.VerifyLogSegmentAuditProof(wrong_proof, "Alice"));
+  assert(verifier.VerifyLogSegmentAuditProof(wrong_proof, "Alice") !=
+         LogVerifier::VERIFY_OK);
   --wrong_proof.sequence_number;
   // Wrong tree size.
   ++wrong_proof.tree_size;
-  assert(!verifier.VerifyLogSegmentAuditProof(wrong_proof, "Alice"));
+  assert(verifier.VerifyLogSegmentAuditProof(wrong_proof, "Alice") !=
+         LogVerifier::VERIFY_OK);
   --wrong_proof.tree_size;
   // Wrong leaf index.
   ++wrong_proof.leaf_index;
-  assert(!verifier.VerifyLogSegmentAuditProof(wrong_proof, "Alice"));
+  assert(verifier.VerifyLogSegmentAuditProof(wrong_proof, "Alice") !=
+         LogVerifier::VERIFY_OK);
   --wrong_proof.leaf_index;
   // Wrong signature.
   wrong_proof.signature = proof1.signature;
-  assert(!verifier.VerifyLogSegmentAuditProof(wrong_proof, "Alice"));
+  assert(verifier.VerifyLogSegmentAuditProof(wrong_proof, "Alice") !=
+         LogVerifier::VERIFY_OK);
   wrong_proof.signature = proof0.signature;
   // Wrong audit path.
   wrong_proof.audit_path = proof1.audit_path;
-  assert(!verifier.VerifyLogSegmentAuditProof(wrong_proof, "Alice"));
+  assert(verifier.VerifyLogSegmentAuditProof(wrong_proof, "Alice") !=
+         LogVerifier::VERIFY_OK);
 }
 
 } // namespace

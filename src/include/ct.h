@@ -1,3 +1,5 @@
+#ifndef CT_H
+#define CT_H
 #include <string>
 
 typedef unsigned char byte;
@@ -9,6 +11,8 @@ namespace ct {
 // Client commands the server understands.
 // One byte.
 enum ClientCommand {
+  // Upload a certificate bundle, and retrieve
+  // a submission token, or an audit proof.
   UPLOAD_BUNDLE = 1,
 };
 
@@ -27,3 +31,4 @@ enum ServerError {
 };
 
 } // namespace ct
+#endif

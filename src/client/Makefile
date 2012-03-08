@@ -10,7 +10,7 @@ endif
 
 CXXFLAGS= $(INCLUDE) $(CXXFLAG)
 
-OBJS= ../merkletree/LogDB.o ../merkletree/LogRecord.o \
+OBJS= cache.o ../merkletree/LogDB.o ../merkletree/LogRecord.o \
 ../merkletree/MerkleVerifier.o ../merkletree/SerialHasher.o \
 ../merkletree/TreeHasher.o ../merkletree/LogVerifier.o 
 

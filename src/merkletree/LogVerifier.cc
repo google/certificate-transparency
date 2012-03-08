@@ -22,37 +22,93 @@ LogVerifier::~LogVerifier() {
   EVP_PKEY_free(pkey_);
 }
 
-bool LogVerifier::VerifyLogSegmentAuditProof(const AuditProof &audit_proof,
-                                             const std::string &leaf) {
+// static
+LogVerifier::VerifyResult
+LogVerifier::LogSegmentCheckpointConsistency(const LogSegmentCheckpoint &a,
+                                             const LogSegmentCheckpoint &b) {
+  if (a.sequence_number != b.sequence_number)
+    return LogVerifier::VERIFY_OK;
+  if (a.segment_size != b.segment_size)
+    return LogVerifier::SEGMENT_SIZE_MISMATCH;
+  if (a.root != b.root)
+    return LogVerifier::ROOT_MISMATCH;
+  return LogVerifier::VERIFY_OK;
+}
+
+LogVerifier::VerifyResult
+LogVerifier::VerifyLogSegmentAuditProof(const AuditProof &audit_proof,
+                                        const std::string &leaf) {
+  return VerifyLogSegmentAuditProof(audit_proof, leaf, NULL);
+}
+
+LogVerifier::VerifyResult
+LogVerifier::VerifyLogSegmentAuditProof(const AuditProof &audit_proof,
+                                        const std::string &leaf,
+                                        LogSegmentCheckpoint *checkpoint) {
   assert(audit_proof.tree_type == SegmentData::LOG_SEGMENT_TREE);
-  SegmentData data;
-  data.sequence_number = audit_proof.sequence_number;
-  data.segment_size = audit_proof.tree_size;
   std::string root = verifier_.RootFromPath(audit_proof.leaf_index + 1,
                                             audit_proof.tree_size,
                                             audit_proof.audit_path, leaf);
   if (root.empty())
-    return false;
+    return LogVerifier::INVALID_PATH;
   assert(root.size() == 32);
-  data.segment_root = root;
-  data.segment_sig = audit_proof.signature;
-  return VerifyLogSegmentSignature(data);
+  LogSegmentCheckpoint local;
+  local.sequence_number = audit_proof.sequence_number;
+  local.segment_size = audit_proof.tree_size;
+  local.root = root;
+  local.signature = audit_proof.signature;
+  if (!VerifyLogSegmentSignature(local))
+    return LogVerifier::INVALID_SIGNATURE;
+  if (checkpoint != NULL)
+    *checkpoint = local;
+  return LogVerifier::VERIFY_OK;
 }
 
-bool LogVerifier::VerifyLogSegmentSignature(const SegmentData &data) {
-  if (data.segment_sig.hash_algo != DigitallySigned::SHA256 ||
-      data.segment_sig.sig_algo != DigitallySigned::ECDSA)
-    return false;
-  std::string in = data.SerializeLogSegmentTreeData();
-  return VerifySignature(in, data.segment_sig.signature);
+LogVerifier::VerifyResult
+LogVerifier::VerifySegmentInfoAuditProof(const AuditProof &audit_proof,
+                                         const LogSegmentCheckpoint &data) {
+  return VerifySegmentInfoAuditProof(audit_proof, data, NULL);
 }
 
-bool LogVerifier::VerifySegmentInfoSignature(const SegmentData &data) {
-  if (data.segment_info_sig.hash_algo != DigitallySigned::SHA256 ||
-      data.segment_info_sig.sig_algo != DigitallySigned::ECDSA)
+LogVerifier::VerifyResult
+LogVerifier::VerifySegmentInfoAuditProof(const AuditProof &audit_proof,
+                                         const LogSegmentCheckpoint &data,
+                                         LogHeadCheckpoint *checkpoint) {
+  assert(audit_proof.tree_type == SegmentData::SEGMENT_INFO_TREE);
+  std::string leaf = data.SerializeTreeData();
+  std::string root = verifier_.RootFromPath(audit_proof.leaf_index + 1,
+                                            audit_proof.tree_size,
+                                            audit_proof.audit_path, leaf);
+  if (root.empty())
+    return LogVerifier::INVALID_PATH;
+  assert(root.size() == 32);
+  LogHeadCheckpoint local;
+  local.sequence_number = audit_proof.sequence_number;
+  local.root = root;
+  local.signature = audit_proof.signature;
+  if (!VerifySegmentInfoSignature(local))
+    return LogVerifier::INVALID_SIGNATURE;
+  if (checkpoint != NULL)
+    *checkpoint = local;
+  return LogVerifier::VERIFY_OK;
+}
+
+bool
+LogVerifier::VerifyLogSegmentSignature(const LogSegmentCheckpoint &checkpoint) {
+  if (checkpoint.signature.hash_algo != DigitallySigned::SHA256 ||
+      checkpoint.signature.sig_algo != DigitallySigned::ECDSA)
     return false;
-  std::string in = data.SerializeSegmentInfoTreeData();
-  return VerifySignature(in, data.segment_info_sig.signature);
+  std::string in = checkpoint.SerializeTreeData();
+  return VerifySignature(in, checkpoint.signature.sig_string);
+}
+
+bool LogVerifier::VerifySegmentInfoSignature(const LogHeadCheckpoint
+                                             &checkpoint) {
+  if (checkpoint.signature.hash_algo != DigitallySigned::SHA256 ||
+      checkpoint.signature.sig_algo != DigitallySigned::ECDSA)
+    return false;
+  std::string in = checkpoint.SerializeTreeData();
+  return VerifySignature(in, checkpoint.signature.sig_string);
 }
 
 bool LogVerifier::VerifySignature(const std::string &data,
@@ -63,9 +119,9 @@ bool LogVerifier::VerifySignature(const std::string &data,
   assert(EVP_VerifyInit(&ctx, EVP_sha256()) == 1);
   assert(EVP_VerifyUpdate(&ctx, data.data(), data.size()) == 1);
   bool ret =
-    (EVP_VerifyFinal(&ctx,
-		     reinterpret_cast<const unsigned char*>(signature.data()),
-		     signature.size(), pkey_) == 1);
+      (EVP_VerifyFinal(&ctx,
+                       reinterpret_cast<const unsigned char*>(signature.data()),
+                       signature.size(), pkey_) == 1);
   EVP_MD_CTX_cleanup(&ctx);
   return ret;
 }

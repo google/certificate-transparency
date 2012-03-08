@@ -27,7 +27,7 @@ struct DigitallySigned {
   };
   HashAlgorithm hash_algo;
   SignatureAlgorithm sig_algo;
-  std::string signature;
+  std::string sig_string;
   // Serialized format:
   // uint8 hash_algo;
   // uint8 sig_algo;
@@ -40,21 +40,12 @@ struct DigitallySigned {
   bool Deserialize(const std::string &data);
 };
 
-struct SegmentData {
-  // One byte.
-  enum TreeType {
-    LOG_SEGMENT_TREE = 0,
-    SEGMENT_INFO_TREE = 1,
-  };
-
+struct LogSegmentCheckpoint {
   size_t sequence_number;
-  size_t timestamp;
   size_t segment_size;
-  std::string segment_root;
-  std::string segment_info_root;
-  DigitallySigned segment_sig; // signature on LogSegmentTreeData
-  DigitallySigned segment_info_sig; // signature on SegmentInfoTreeData
-
+  DigitallySigned signature;
+  std::string root;
+  std::string Serialize() const;
   // Input to segment_sig.
   // Serialized format:
   // struct {
@@ -63,8 +54,15 @@ struct SegmentData {
   //   uint32 tree_size;
   //   opaque segment_root[32];
   // } LogSegmentTreeData;
-  std::string SerializeLogSegmentTreeData() const;
+  std::string SerializeTreeData() const;
+  bool Deserialize(const std::string &data);
+};
 
+struct LogHeadCheckpoint {
+  size_t sequence_number;
+  DigitallySigned signature;
+  std::string root;
+  std::string Serialize() const;
   // Input to segment_info_sig.
   // Serialized format:
   // struct {
@@ -72,7 +70,21 @@ struct SegmentData {
   //   uint32 sequence_number;
   //   opaque segment_info_root[32];
   // } SegmentInfoTreeData;
-  std::string SerializeSegmentInfoTreeData() const;
+  std::string SerializeTreeData() const;
+  bool Deserialize(const std::string &data);
+};
+
+struct SegmentData {
+  // One byte.
+  enum TreeType {
+    LOG_SEGMENT_TREE = 0,
+    SEGMENT_INFO_TREE = 1,
+  };
+
+  size_t timestamp;
+  // log_segment.sequence_number = log_head.sequence_number
+  LogSegmentCheckpoint log_segment;
+  LogHeadCheckpoint log_head;
 
   // The SegmentInfo log record.
   // Serialized format:

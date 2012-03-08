@@ -97,45 +97,51 @@ LogDB::Status TreeLogger::EntryAuditProof(const std::string &key,
   assert(SegmentInfo(segment, &segment_info) == LogDB::LOGGED);
   SegmentData data;
   assert(data.DeserializeSegmentInfo(segment_info));
-  proof->signature = data.segment_sig;
+  proof->signature = data.log_segment.signature;
   proof->audit_path = logsegments_[segment]->PathToCurrentRoot(index + 1);
   return status;
 }
 
 void TreeLogger::LogSegment() {
+  size_t sequence_number = SegmentCount();
+  assert(sequence_number + 1 == logsegments_.size());
+  LogSegmentCheckpoint log_segment;
+  log_segment.sequence_number = sequence_number;
+  log_segment.segment_size = LogSize(LogDB::PENDING_ONLY);
+  assert(log_segment.segment_size == logsegments_.back()->LeafCount());
+
+  log_segment.root = logsegments_.back()->CurrentRoot();
+  assert(!log_segment.root.empty());
+
+  std::string treedata = log_segment.SerializeTreeData();
+  log_segment.signature.hash_algo = DigitallySigned::SHA256;
+  log_segment.signature.sig_algo = DigitallySigned::ECDSA;
+  log_segment.signature.sig_string = Sign(treedata);
+
+  assert(!log_segment.signature.sig_string.empty());
+
+  // Append the tree root and info to the second level tree.
+  segment_infos_.AddLeaf(treedata);
+  assert(segment_infos_.LeafCount() == sequence_number + 1);
+
+  LogHeadCheckpoint log_head;
+  log_head.sequence_number = sequence_number;
+  log_head.root = segment_infos_.CurrentRoot();
+  assert(!log_head.root.empty());
+
+  treedata = log_head.SerializeTreeData();
+  log_head.signature.hash_algo = DigitallySigned::SHA256;
+  log_head.signature.sig_algo = DigitallySigned::ECDSA;
+  log_head.signature.sig_string = Sign(treedata);
+
+  assert(!log_head.signature.sig_string.empty());
+
   SegmentData data;
-  data.segment_size = LogSize(LogDB::PENDING_ONLY);
-  assert(data.segment_size == logsegments_.back()->LeafCount());
-
-  data.sequence_number = SegmentCount();
-  assert(data.sequence_number + 1 == logsegments_.size());
-
-  data.segment_root = logsegments_.back()->CurrentRoot();
-  assert(!data.segment_root.empty());
-
-  std::string treedata = data.SerializeLogSegmentTreeData();
-  data.segment_sig.hash_algo = DigitallySigned::SHA256;
-  data.segment_sig.sig_algo = DigitallySigned::ECDSA;
-  data.segment_sig.signature = Sign(treedata);
-
-  assert(!data.segment_sig.signature.empty());
-
-  // Append the signature to the segment info tree.
-  segment_infos_.AddLeaf(data.segment_sig.signature);
-  assert(segment_infos_.LeafCount() == data.sequence_number + 1);
-
-  data.segment_info_root = segment_infos_.CurrentRoot();
-  assert(!data.segment_info_root.empty());
-
-  treedata = data.SerializeSegmentInfoTreeData();
-  data.segment_info_sig.hash_algo = DigitallySigned::SHA256;
-  data.segment_info_sig.sig_algo = DigitallySigned::ECDSA;
-  data.segment_info_sig.signature = Sign(treedata);
-
-  assert(!data.segment_info_sig.signature.empty());
 
   // Currently ignored.
   data.timestamp = time(NULL);
+  data.log_segment = log_segment;
+  data.log_head = log_head;
 
   std::string segment_info = data.SerializeSegmentInfo();
 

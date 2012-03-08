@@ -1,3 +1,4 @@
+#include "cache.h"
 #include "../include/ct.h"
 #include "../merkletree/LogRecord.h"
 #include "../merkletree/LogVerifier.h"
@@ -8,12 +9,14 @@
 
 #include <arpa/inet.h>
 #include <assert.h>
+#include <dirent.h>
 #include <fcntl.h>
 #include <netinet/in.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <sys/socket.h>
+#include <unistd.h>
 
 #include <openssl/asn1.h>
 #include <openssl/bio.h>
@@ -51,6 +54,61 @@ static void ReadAll(bstring *contents, std::ifstream &in) {
   }
 }
 
+// Really really dumb and temporary filestore methods.
+static void WriteAllFiles(const std::vector<bstring> &files,
+                          const char *dirname) {
+  // Store current directory.
+  char current_dir[1024];
+  assert(getcwd(current_dir, sizeof current_dir) != NULL);
+  if (chdir(dirname) != 0) {
+    perror(dirname);
+    exit(1);
+  }
+  for (unsigned int i = 0; i < files.size(); ++i) {
+    char filename[20];
+    // 0000000000.tmp, 0000000001.tmp, etc.
+    sprintf(filename, "%010d.tmp", i);
+    FILE *out = fopen(filename, "wb");
+    assert(out != NULL);
+    fwrite(files[i].data(), 1, files[i].size(), out);
+    fclose(out);
+  }
+  // Change back to working directory.
+  assert(chdir(current_dir) == 0);
+}
+
+static std::vector<bstring> ReadAllFiles(const char *dirname) {
+  std::vector<bstring> result;
+  // Store current directory.
+  char current_dir[1024];
+  assert(getcwd(current_dir, sizeof current_dir) != NULL);
+  if (chdir(dirname) != 0) {
+    perror(dirname);
+    exit(1);
+  }
+  DIR *dir = opendir(".");
+  if (dir == NULL) {
+    perror(dirname);
+    exit(1);
+  }
+
+  dirent *file = NULL;
+  while ((file = readdir(dir)) != NULL) {
+    if (file->d_type == DT_REG) {
+      bstring contents;
+      std::ifstream in(file->d_name);
+      assert(in.is_open());
+      ReadAll(&contents, in);
+      result.push_back(contents);
+      in.close();
+    }
+  }
+
+  closedir(dir);
+  assert(chdir(current_dir) == 0);
+  return result;
+}
+
 // Make the object that we use to recognize the extension.
 static ASN1_OBJECT *ProofExtensionObject() {
   unsigned char obj_buf[100];
@@ -62,20 +120,22 @@ static ASN1_OBJECT *ProofExtensionObject() {
   return obj;
 }
 
-static bool VerifyLogSegmentProof(const bstring &proofstring,
-                                  const bstring &bundle,
-                                  LogVerifier *verifier) {
+static LogVerifier::VerifyResult
+VerifyLogSegmentProof(const bstring &proofstring,
+                      const bstring &bundle,
+                      LogVerifier *verifier,
+                      LogSegmentCheckpoint *checkpoint) {
   assert(verifier != NULL);
   AuditProof proof;
-  bool verified = proof.Deserialize(
+  bool serialized = proof.Deserialize(
       SegmentData::LOG_SEGMENT_TREE,
       *(reinterpret_cast<const std::string*>(&proofstring)));
-  if (!verified)
-    return false;
-  return
-      verifier->VerifyLogSegmentAuditProof(proof,
-                                            *(reinterpret_cast<const
-                                              std::string*>(&bundle)));
+  if (!serialized)
+    return LogVerifier::INVALID_FORMAT;
+  return verifier->VerifyLogSegmentAuditProof(proof,
+                                              *(reinterpret_cast<const
+                                                std::string*>(&bundle)),
+                                              checkpoint);
 }
 
 // A generic client.
@@ -248,9 +308,29 @@ class SSLClient : public CTClient {
  public:
   SSLClient(const char *server, uint16_t port) : CTClient(server, port) {}
 
+  SSLClient(const char *server, uint16_t port,
+            const std::vector<bstring> &cache) : CTClient(server, port),
+                                                 cache_(cache) {}
+
+  std::vector<bstring> WriteCache() const {
+    return cache_.WriteCache();
+  }
+
+  struct VerifyCallbackArgs {
+    // The verifier for checking log proofs.
+    LogVerifier *verifier;
+    // The verification result.
+    bool proof_verified;
+    // The resulting checkpoint.
+    LogSegmentCheckpoint checkpoint;
+  };
+
   static int VerifyCallback(X509_STORE_CTX *ctx, void *arg) {
+    VerifyCallbackArgs *args = reinterpret_cast<VerifyCallbackArgs*>(arg);
+    assert(args != NULL);
     // Verify the proof, if present.
-    LogVerifier *verifier = reinterpret_cast<LogVerifier*>(arg);
+    args->proof_verified = false;
+    LogVerifier *verifier = args->verifier;
     if (verifier == NULL) {
       std::cout << "No log server public key supplied. Dropping connection." <<
           std::endl;
@@ -269,7 +349,6 @@ class SSLClient : public CTClient {
     bstring leaf(buf, cert_len);
     OPENSSL_free(buf);
 
-    bool proof_verified = false;
     // TODO: is there an API call for accessing the bag of certs?
     STACK_OF(X509) *sk = ctx->untrusted;
     if (sk) {
@@ -284,19 +363,25 @@ class SSLClient : public CTClient {
           X509_EXTENSION *ext = X509_get_ext(cert, extension_index);
           ASN1_OCTET_STRING *ext_data = X509_EXTENSION_get_data(ext);
           bstring proofstring(ext_data->data, ext_data->length);
-          proof_verified = VerifyLogSegmentProof(proofstring, leaf, verifier);
-          if (proof_verified) {
+          // Only writes the checkpoint if verification succeeds.
+          // Note: an optimized client could only verify the signature if it's
+          // a checkpoint it hasn't seen before.
+          LogVerifier::VerifyResult result =
+              VerifyLogSegmentProof(proofstring, leaf, verifier,
+                                    &args->checkpoint);
+          if (result == LogVerifier::VERIFY_OK) {
+            args->proof_verified = true;
             std::cout << "OK." << std::endl;
             break;
           } else {
-            std::cout << "FAIL." << std::endl;
+            std::cout << LogVerifier::VerifyResultString(result) << std::endl;
           }
         }
       }
       ASN1_OBJECT_free(obj);
     }
 
-    if (!proof_verified) {
+    if (!args->proof_verified) {
       std::cout << "No log proof found. Dropping connection." << std::endl;
       return 0;
     }
@@ -317,7 +402,9 @@ class SSLClient : public CTClient {
     // SSL_VERIFY_PEER makes the connection abort immediately
     // if verification fails.
     SSL_CTX_set_verify(ctx, SSL_VERIFY_PEER, NULL);
-    SSL_CTX_set_cert_verify_callback(ctx, &VerifyCallback, verifier);
+    VerifyCallbackArgs args;
+    args.verifier = verifier;
+    SSL_CTX_set_cert_verify_callback(ctx, &VerifyCallback, &args);
     SSL *ssl = SSL_new(ctx);
     assert(ssl != NULL);
     BIO *bio = BIO_new_socket(fd(), BIO_NOCLOSE);
@@ -330,12 +417,34 @@ class SSLClient : public CTClient {
       std::cout << "Connected." << std::endl;
     else
       std::cout << "Connection failed." << std::endl;
+    // Cache the checkpoint.
+    if (args.proof_verified) {
+      switch(cache_.Insert(args.checkpoint)) {
+        case LogSegmentCheckpointCache::NEW:
+          std::cout << "Cached new checkpoint." << std::endl;
+          break;
+        case LogSegmentCheckpointCache::CACHED:
+          std::cout << "Checkpoint already in cache." << std::endl;
+          break;
+        case LogSegmentCheckpointCache::MISMATCH:
+          std::cout << "ERROR: checkpoint mismatch!" << std::endl;
+          break;
+        default:
+          assert(false);
+      }
+    }
+
+    // TODO: if the server closes the socket then the client cannot
+    // connect again. Make sure we only allow SSLConnect() once.
     if (ssl) {
       SSL_shutdown(ssl);
       SSL_free(ssl);
     }
     SSL_CTX_free(ctx);
   }
+
+ private:
+  LogSegmentCheckpointCache cache_;
 }; // class SSLCLient
 
 static void UploadHelp() {
@@ -449,10 +558,13 @@ static void Upload(int argc, const char **argv) {
                 << std::endl;
     } else {
       LogVerifier verifier(pkey);
-      if (VerifyLogSegmentProof(proof, contents, &verifier))
+      LogVerifier::VerifyResult result = VerifyLogSegmentProof(proof, contents,
+                                                               &verifier, NULL);
+      if (result == LogVerifier::VERIFY_OK)
         std::cout << "Proof verified." << std::endl;
       else
-        std::cout << "ERROR: invalid proof." << std::endl;
+        std::cout << "ERROR: " << LogVerifier::VerifyResultString(result)
+                  << std::endl;
     }
     if (out != NULL) {
       fwrite(proof.data(), 1, proof.size(), out);
@@ -544,21 +656,64 @@ static void MakeCert(int argc, const char **argv) {
   BIO_free(out);
 }
 
+static void ConnectHelp() {
+    std::cerr << "connect <server> <port> [-log_server_key key_file] " <<
+        "[-cache cache_dir]" << std::endl;
+}
+
 static void Connect(int argc, const char **argv) {
   if (argc < 3) {
-    std::cerr << argv[0] << " <server> <port>\n";
-    exit(2);
+    ConnectHelp();
+    exit(1);
   }
   const char *server_name = argv[1];
   unsigned port = atoi(argv[2]);
 
+  const char *key_file = NULL;
+  const char *cache_dir = NULL;
+
   EVP_PKEY *pkey = NULL;
 
-  if (argc > 3) {
-    FILE *fp = fopen(argv[3], "r");
-    if (fp == NULL || PEM_read_PUBKEY(fp, &pkey, NULL, NULL) == NULL) {
-      std::cerr << "Could not read log server public key.\n";
+  argc -= 3;
+  argv += 3;
+
+  while (argc >= 2) {
+    if (strcmp(argv[0], "-log_server_key") == 0) {
+      if (key_file != NULL) {
+        ConnectHelp();
+        exit(1);
+      }
+      key_file = argv[1];
+      argc -= 2;
+      argv += 2;
+    } else if (strcmp(argv[0], "-cache") == 0) {
+      if (cache_dir != NULL) {
+        ConnectHelp();
+        exit(1);
+      }
+      cache_dir = argv[1];
+      argc -= 2;
+      argv += 2;
+    } else {
+      ConnectHelp();
       exit(1);
+    }
+  }
+
+  if (argc) {
+    ConnectHelp();
+    exit(1);
+  }
+
+  if (key_file != NULL) {
+    FILE *fp = fopen(key_file, "r");
+    if (fp == NULL) {
+      perror(key_file);
+      exit(2);
+    }
+    if (PEM_read_PUBKEY(fp, &pkey, NULL, NULL) == NULL) {
+      std::cerr << "Could not read log server public key" << std::endl;
+      exit(6);
     }
     fclose(fp);
   }
@@ -566,8 +721,20 @@ static void Connect(int argc, const char **argv) {
   LogVerifier *verifier = NULL;
   if (pkey != NULL)
     verifier = new LogVerifier(pkey);
-  SSLClient client(server_name, port);
+  std::vector<bstring> cache;
+  if (cache_dir != NULL) {
+    std::cout << "Reading cache...";
+    cache = ReadAllFiles(cache_dir);
+    std::cout << "OK." << std::endl;
+  }
+  SSLClient client(server_name, port, cache);
   client.SSLConnect(verifier);
+  if (cache_dir != NULL) {
+    std::cout << "Writing cache...";
+    cache = client.WriteCache();
+    WriteAllFiles(cache, cache_dir);
+    std::cout << "OK." << std::endl;
+  }
   delete verifier;
 }
 
