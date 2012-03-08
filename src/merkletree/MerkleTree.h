@@ -1,3 +1,4 @@
+// Opened for readability review.
 #ifndef MERKLETREE_H
 #define MERKLETREE_H
 #include <stddef.h>
@@ -8,20 +9,34 @@
 
 class SerialHasher;
 
-// Class for manipulating Merkle Hash Trees
-// TODO: consistency proofs between snapshots.
+// Class for manipulating Merkle Hash Trees, as specified in the
+// Certificate Transparency specificationdoc/sunlight.xml
+// Implement binary Merkle Hash Trees, using an arbitrary hash function
+// provided by the SerialHasher interface.
+// Rather than using the hash function directly, we use a TreeHasher that
+// does domain separation for leaves and nodes, and thus ensures collision
+// resistance.
+//
+// This class is thread-compatible, but not thread-safe.
 class MerkleTree {
  public:
-  // Takes ownership of the SerialHasher.
-  MerkleTree(SerialHasher *hasher);
+  // The constructor takes a pointer to some concrete hash function
+  // instantiation of the SerialHasher abstract class.
+  // Takes ownership of the hasher.
+  explicit MerkleTree(SerialHasher *hasher);
   ~MerkleTree();
 
+  // Length of a node (i.e., a hash), in bytes.
   size_t NodeSize() const { return treehasher_.DigestSize(); };
 
+  // Number of leaves in the tree.
   size_t LeafCount() const { return tree_.empty() ? 0 : tree_[0].size(); }
 
+  // The |leaf|th leaf hash in the tree. Indexing starts from 1.
   std::string LeafHash(size_t leaf) const {
-    return leaf > LeafCount() ? "" : tree_[0][leaf-1];
+    if (leaf == 0 || leaf > LeafCount())
+      return "";
+    return tree_[0][leaf-1];
   }
 
   // Return the leaf hash, but do not append the data to the tree.
@@ -68,7 +83,8 @@ class MerkleTree {
   // Returns a vector of node hashes, ordered by levels from leaf to root.
   // The first element is the sibling of the leaf hash, and the last element
   // is one below the root.
-  // Returns an empty vector if the tree is not large enough or the leaf index is 0.
+  // Returns an empty vector if the tree is not large enough
+  // or the leaf index is 0.
   //
   // @param leaf the index of the leaf the path is for.
   std::vector<std::string> PathToCurrentRoot(size_t leaf);
