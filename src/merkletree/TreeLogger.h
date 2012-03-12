@@ -24,8 +24,8 @@ class TreeLogger {
 
   // Get the status of a data record corresponding to an absolute index.
   // |result| is only filled in if the retrieved record is of the right |type|.
-  LogDB::Status EntryInfo(size_t index, LogDB::Lookup type,
-                          std::string *result);
+  //LogDB::Status EntryInfo(size_t index, LogDB::Lookup type,
+  //                        std::string *result);
 
   // Get the data record corresponding to an index in a segment.
   LogDB::Status EntryInfo(size_t segment, size_t index, LogDB::Lookup type,
@@ -49,7 +49,7 @@ class TreeLogger {
   }
 
   size_t PendingLogSize() const { return db_->PendingLogSize(); }
-  size_t LoggedLogSize() const { return db_->LoggedLogSize(); }
+  //size_t LoggedLogSize() const { return db_->LoggedLogSize(); }
 
   // Finalize the current segment, write it to the DB and start a new one.
   void LogSegment();

@@ -1,4 +1,4 @@
-CXXFLAG= -Wall -Werror -O3
+CXXFLAG= -Wall -Werror -O3 -g
 INCLUDE=
 # Need OpenSSL >= 1.0.0
 ifneq ($(OPENSSLDIR),)

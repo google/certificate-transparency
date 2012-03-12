@@ -16,6 +16,8 @@ OBJS= ../merkletree/LogDB.o ../merkletree/LogRecord.o \
 
 all: .depend ct-server
 
+include .depend
+
 .depend: *.cc
 	$(CXX) $(CXXFLAGS) -MM *.cc > .depend
 

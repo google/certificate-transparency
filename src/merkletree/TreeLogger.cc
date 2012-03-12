@@ -58,11 +58,13 @@ LogDB::Status TreeLogger::QueueEntry(const std::string &data,
   return status;
 }
 
+/*
 LogDB::Status TreeLogger::EntryInfo(size_t index,
                                     LogDB::Lookup type,
                                     std::string *result) {
   return db_->LookupEntry(index, type, result);
 }
+*/
 
 LogDB::Status TreeLogger::EntryInfo(size_t segment, size_t index,
                                     LogDB::Lookup type,
