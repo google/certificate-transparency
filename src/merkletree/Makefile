@@ -1,4 +1,4 @@
-CXXFLAG= -Wall -Werror -O3
+CXXFLAG= -Wall -Werror -O3 -g
 INCLUDE=
 # Need OpenSSL >= 1.0.0
 ifneq ($(OPENSSLDIR),)
@@ -11,6 +11,8 @@ endif
 CXXFLAGS= $(INCLUDE) $(CXXFLAG)
 
 all: .depend test
+
+include .depend
 
 .depend: *.cc *.h
 	$(CXX) $(CXXFLAGS) -MM *.cc > .depend

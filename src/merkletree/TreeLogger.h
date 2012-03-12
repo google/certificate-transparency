@@ -23,10 +23,9 @@ class TreeLogger {
   LogDB::Status QueueEntry(const std::string &data, std::string *key);
 
   // Get the status of a data record corresponding to an absolute index.
-  // Write the data record if result is not NULL. Only write pending entries
-  // if write_pending is true.
-  LogDB::Status EntryInfo(size_t index, LogDB::Lookup type,
-                          std::string *result);
+  // |result| is only filled in if the retrieved record is of the right |type|.
+  //LogDB::Status EntryInfo(size_t index, LogDB::Lookup type,
+  //                        std::string *result);
 
   // Get the data record corresponding to an index in a segment.
   LogDB::Status EntryInfo(size_t segment, size_t index, LogDB::Lookup type,
@@ -49,9 +48,8 @@ class TreeLogger {
     return db_->SegmentCount();
   }
 
-  size_t LogSize(LogDB::Lookup type) const {
-    return db_->LogSize(type);
-  }
+  size_t PendingLogSize() const { return db_->PendingLogSize(); }
+  //size_t LoggedLogSize() const { return db_->LoggedLogSize(); }
 
   // Finalize the current segment, write it to the DB and start a new one.
   void LogSegment();

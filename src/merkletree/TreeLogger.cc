@@ -58,11 +58,13 @@ LogDB::Status TreeLogger::QueueEntry(const std::string &data,
   return status;
 }
 
+/*
 LogDB::Status TreeLogger::EntryInfo(size_t index,
                                     LogDB::Lookup type,
                                     std::string *result) {
   return db_->LookupEntry(index, type, result);
 }
+*/
 
 LogDB::Status TreeLogger::EntryInfo(size_t segment, size_t index,
                                     LogDB::Lookup type,
@@ -107,7 +109,7 @@ void TreeLogger::LogSegment() {
   assert(sequence_number + 1 == logsegments_.size());
   LogSegmentCheckpoint log_segment;
   log_segment.sequence_number = sequence_number;
-  log_segment.segment_size = LogSize(LogDB::PENDING_ONLY);
+  log_segment.segment_size = PendingLogSize();
   assert(log_segment.segment_size == logsegments_.back()->LeafCount());
 
   log_segment.root = logsegments_.back()->CurrentRoot();

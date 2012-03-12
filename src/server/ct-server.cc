@@ -408,7 +408,7 @@ class CTLogManager {
   void Manage() {
     time_t now = time(NULL);
     assert(now >= segment_start_time_);
-    if (logger_->LogSize(LogDB::PENDING_ONLY) >= max_segment_size_ ||
+    if (logger_->PendingLogSize() >= max_segment_size_ ||
         now - segment_start_time_ > max_segment_delay_) {
       logger_->LogSegment();
       segment_start_time_ = now;
@@ -585,7 +585,7 @@ int main(int argc, char **argv) {
 
   EventLoop loop;
 
-  TreeLogger logger(new MemoryDB(), pkey);
+  TreeLogger logger(new FileDB(), pkey);
   size_t size_limit = atoi(argv[3]);
   time_t time_limit = atoi(argv[4]);
   CTLogManager manager(&logger, size_limit, time_limit);
