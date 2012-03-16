@@ -22,14 +22,8 @@ class TreeLogger {
   // the data and its associated signatures and audit proofs later on.
   LogDB::Status QueueEntry(const std::string &data, std::string *key);
 
-  // Get the status of a data record corresponding to an absolute index.
-  // |result| is only filled in if the retrieved record is of the right |type|.
-  //LogDB::Status EntryInfo(size_t index, LogDB::Lookup type,
-  //                        std::string *result);
-
   // Get the data record corresponding to an index in a segment.
-  LogDB::Status EntryInfo(size_t segment, size_t index, LogDB::Lookup type,
-                          std::string *result);
+  LogDB::Status EntryInfo(size_t segment, size_t index, std::string *result);
 
   // Get the data record corresponding to a leaf hash.
   LogDB::Status EntryInfo(const std::string &key, LogDB::Lookup type,
@@ -62,6 +56,8 @@ class TreeLogger {
   std::vector<MerkleTree*> logsegments_;
   MerkleTree segment_infos_;
 
+  // Called by constructor.
+  void ReadDB();
   std::string Sign(const std::string &data);
 };
 #endif

@@ -21,8 +21,37 @@ TreeLogger::TreeLogger(LogDB *db, EVP_PKEY *pkey)
   : db_(db), pkey_(pkey), segment_infos_(new Sha256Hasher()) {
   // For now, the signature and hash algorithms are hard-coded.
   assert(pkey_ != NULL && pkey_->type == EVP_PKEY_EC);
-  // Start the first segment.
-  logsegments_.push_back(new MerkleTree(new Sha256Hasher()));
+  ReadDB();
+}
+
+// Currently, this rehashes the whole database.
+// We could modify MerkleTrees to resume directly from leaf hashes instead.
+void TreeLogger::ReadDB() {
+  std::string data;
+  const size_t segment_count = db_->SegmentCount();
+  for (size_t segment = 0; segment < segment_count; ++segment) {
+    size_t index = 0;
+    MerkleTree *segment_tree = new MerkleTree(new Sha256Hasher());
+    while (EntryInfo(segment, index++, &data) ==
+           LogDB::LOGGED)
+      segment_tree->AddLeaf(data);
+    LogSegmentCheckpoint log_segment;
+    log_segment.sequence_number = segment;
+    log_segment.segment_size = segment_tree->LeafCount();
+    log_segment.root = segment_tree->CurrentRoot();
+    assert(!log_segment.root.empty());
+    logsegments_.push_back(segment_tree);
+    std::string treedata = log_segment.SerializeTreeData();
+    // Append the tree root and info to the second level tree.
+    segment_infos_.AddLeaf(treedata);
+  }
+  assert(segment_infos_.LeafCount() == segment_count);
+
+  // Finally, see if there's a locked segment we should sign and release.
+  if (db_->HasPendingSegment())
+      LogSegment();
+
+  assert(!db_->HasPendingSegment());
 }
 
 TreeLogger::~TreeLogger() {
@@ -37,17 +66,15 @@ TreeLogger::~TreeLogger() {
 LogDB::Status TreeLogger::QueueEntry(const std::string &data,
                                      std::string *key) {
   // First check whether the entry already exists.
-  std::string hash = logsegments_.back()->LeafHash(data);
+  // Use the hasher of segment_infos_ to derive the key.
+  std::string hash = segment_infos_.LeafHash(data);
   assert(!hash.empty());
   LogDB::Status status = db_->WriteEntry(hash, data);
 
   switch(status) {
   case(LogDB::LOGGED):
   case(LogDB::PENDING):
-    break;
   case(LogDB::NEW):
-    // Work the data into the tree.
-    logsegments_.back()->AddLeaf(data);
     break;
   default:
     assert(false);
@@ -58,18 +85,9 @@ LogDB::Status TreeLogger::QueueEntry(const std::string &data,
   return status;
 }
 
-/*
-LogDB::Status TreeLogger::EntryInfo(size_t index,
-                                    LogDB::Lookup type,
-                                    std::string *result) {
-  return db_->LookupEntry(index, type, result);
-}
-*/
-
 LogDB::Status TreeLogger::EntryInfo(size_t segment, size_t index,
-                                    LogDB::Lookup type,
                                     std::string *result) {
-  return db_->LookupEntry(segment, index, type, result);
+  return db_->LookupEntry(segment, index, result);
 }
 
 LogDB::Status TreeLogger::EntryInfo(const std::string &key,
@@ -105,26 +123,39 @@ LogDB::Status TreeLogger::EntryAuditProof(const std::string &key,
 }
 
 void TreeLogger::LogSegment() {
-  size_t sequence_number = SegmentCount();
-  assert(sequence_number + 1 == logsegments_.size());
+  // Make a segment. This will simply return if there already is a pending
+  // segment.
+  db_->MakeSegment();
+  size_t sequence_number = db_->PendingSegmentNumber();
+  assert(sequence_number == logsegments_.size());
   LogSegmentCheckpoint log_segment;
   log_segment.sequence_number = sequence_number;
-  log_segment.segment_size = PendingLogSize();
-  assert(log_segment.segment_size == logsegments_.back()->LeafCount());
+  log_segment.segment_size = db_->PendingSegmentSize();
 
-  log_segment.root = logsegments_.back()->CurrentRoot();
+  MerkleTree *segment_tree = new MerkleTree(new Sha256Hasher());
+
+  std::string entry;
+
+  for (size_t i = 0; i < log_segment.segment_size; ++i) {
+    assert(db_->PendingSegmentEntry(i, &entry));
+    assert(segment_tree->AddLeaf(entry) == i + 1);
+  }
+  assert(segment_tree->LeafCount() == log_segment.segment_size);
+  log_segment.root = segment_tree->CurrentRoot();
   assert(!log_segment.root.empty());
 
+  logsegments_.push_back(segment_tree);
+
   std::string treedata = log_segment.SerializeTreeData();
+  // Append the tree root and info to the second level tree.
+  segment_infos_.AddLeaf(treedata);
+  assert(segment_infos_.LeafCount() == sequence_number + 1);
+
   log_segment.signature.hash_algo = DigitallySigned::SHA256;
   log_segment.signature.sig_algo = DigitallySigned::ECDSA;
   log_segment.signature.sig_string = Sign(treedata);
 
   assert(!log_segment.signature.sig_string.empty());
-
-  // Append the tree root and info to the second level tree.
-  segment_infos_.AddLeaf(treedata);
-  assert(segment_infos_.LeafCount() == sequence_number + 1);
 
   LogHeadCheckpoint log_head;
   log_head.sequence_number = sequence_number;
@@ -146,12 +177,7 @@ void TreeLogger::LogSegment() {
   data.log_head = log_head;
 
   std::string segment_info = data.SerializeSegmentInfo();
-
-  // Log the segment info.
-  db_->WriteSegmentInfo(segment_info);
-
-  // Start a new segment.
-  logsegments_.push_back(new MerkleTree(new Sha256Hasher()));
+  db_->WriteSegmentAndInfo(segment_info);
 }
 
 std::string TreeLogger::Sign(const std::string &data) {

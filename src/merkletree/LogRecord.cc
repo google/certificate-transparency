@@ -4,27 +4,8 @@
 #include <stddef.h>
 
 #include "../util/ct_debug.h"
+#include "../util/util.h"
 #include "LogRecord.h"
-
-// Serialize MSB to LSB, write |bytes| least significant bytes.
-static std::string SerializeUint(size_t in, size_t bytes) {
-  assert(bytes <= sizeof in);
-  assert(bytes == sizeof in || in >> (bytes * 8) == 0);
-  std::string result;
-  for ( ; bytes > 0; --bytes)
-    result.push_back((char)
-                     ((in & (0xff << ((bytes - 1) * 8))) >> ((bytes - 1) * 8)));
-  return result;
-}
-
-static size_t DeserializeUint(const std::string &in) {
-  size_t len = in.length();
-  assert(len <= sizeof(size_t));
-  size_t res = 0;
-  for (size_t i = 0; i < len; ++i)
-    res = (res << 8) + in[i];
-  return res;
-}
 
 static bool IsValidHashAlgorithmEnum(size_t h) {
   if (h > 6)
@@ -39,9 +20,9 @@ static bool IsValidSignatureAlgorithmEnum(size_t s) {
 }
 
 std::string DigitallySigned::Serialize() const {
-  std::string result = SerializeUint(hash_algo, 1);
-  result.append(SerializeUint(sig_algo, 1));
-  result.append(SerializeUint(sig_string.size(), 2));
+  std::string result = util::SerializeUint(hash_algo, 1);
+  result.append(util::SerializeUint(sig_algo, 1));
+  result.append(util::SerializeUint(sig_string.size(), 2));
   result.append(sig_string);
   return result;
 }
@@ -63,7 +44,7 @@ size_t DigitallySigned::ReadFromString(const std::string &data) {
     return 0;
   }
 
-  size_t sig_size = DeserializeUint(data.substr(2,2));
+  size_t sig_size = util::DeserializeUint(data.substr(2,2));
   DLOG_UINT("signature size", sig_size);
   if (data.size() < 4 + sig_size) {
     DLOG_ERROR("Signature too short");
@@ -85,8 +66,8 @@ bool DigitallySigned::Deserialize(const std::string &data) {
 }
 
 std::string LogSegmentCheckpoint::Serialize() const {
-  std::string result = SerializeUint(sequence_number, 4);
-  result.append(SerializeUint(segment_size, 4));
+  std::string result = util::SerializeUint(sequence_number, 4);
+  result.append(util::SerializeUint(segment_size, 4));
   result.append(signature.Serialize());
   assert(root.size() == 32);
   result.append(root);
@@ -94,9 +75,9 @@ std::string LogSegmentCheckpoint::Serialize() const {
 }
 
 std::string LogSegmentCheckpoint::SerializeTreeData() const {
-  std::string result(SerializeUint(SegmentData::LOG_SEGMENT_TREE, 1));
-  result.append(SerializeUint(sequence_number, 4));
-  result.append(SerializeUint(segment_size, 4));
+  std::string result(util::SerializeUint(SegmentData::LOG_SEGMENT_TREE, 1));
+  result.append(util::SerializeUint(sequence_number, 4));
+  result.append(util::SerializeUint(segment_size, 4));
   assert(root.size() == 32);
   result.append(root);
   return result;
@@ -105,8 +86,8 @@ std::string LogSegmentCheckpoint::SerializeTreeData() const {
 bool LogSegmentCheckpoint::Deserialize(const std::string &data) {
   if (data.size() < 8)
     return false;
-  sequence_number = DeserializeUint(data.substr(0, 4));
-  segment_size = DeserializeUint(data.substr(4, 4));
+  sequence_number = util::DeserializeUint(data.substr(0, 4));
+  segment_size = util::DeserializeUint(data.substr(4, 4));
   size_t pos = 8;
   size_t sig_size =signature.ReadFromString(data.substr(pos));
   if (sig_size == 0)
@@ -119,7 +100,7 @@ bool LogSegmentCheckpoint::Deserialize(const std::string &data) {
 }
 
 std::string LogHeadCheckpoint::Serialize() const {
-  std::string result = SerializeUint(sequence_number, 4);
+  std::string result = util::SerializeUint(sequence_number, 4);
   result.append(signature.Serialize());
   assert(root.size() == 32);
   result.append(root);
@@ -127,8 +108,8 @@ std::string LogHeadCheckpoint::Serialize() const {
 }
 
 std::string LogHeadCheckpoint::SerializeTreeData() const {
-  std::string result(SerializeUint(SegmentData::SEGMENT_INFO_TREE, 1));
-  result.append(SerializeUint(sequence_number, 4));
+  std::string result(util::SerializeUint(SegmentData::SEGMENT_INFO_TREE, 1));
+  result.append(util::SerializeUint(sequence_number, 4));
   assert(root.size() == 32);
   result.append(root);
   return result;
@@ -137,7 +118,7 @@ std::string LogHeadCheckpoint::SerializeTreeData() const {
 bool LogHeadCheckpoint::Deserialize(const std::string &data) {
   if (data.size() < 4)
     return false;
-  sequence_number = DeserializeUint(data.substr(0, 4));
+  sequence_number = util::DeserializeUint(data.substr(0, 4));
   size_t pos = 4;
   size_t sig_size = signature.ReadFromString(data.substr(pos));
   if (sig_size == 0)
@@ -151,9 +132,9 @@ bool LogHeadCheckpoint::Deserialize(const std::string &data) {
 
 std::string SegmentData::SerializeSegmentInfo() const {
   assert(log_segment.sequence_number == log_head.sequence_number);
-  std::string result = SerializeUint(log_segment.sequence_number, 4);
-  result.append(SerializeUint(timestamp, 4));
-  result.append(SerializeUint(log_segment.segment_size, 4));
+  std::string result = util::SerializeUint(log_segment.sequence_number, 4);
+  result.append(util::SerializeUint(timestamp, 4));
+  result.append(util::SerializeUint(log_segment.segment_size, 4));
   result.append(log_segment.signature.Serialize());
   result.append(log_head.signature.Serialize());
   return result;
@@ -163,10 +144,10 @@ bool SegmentData::DeserializeSegmentInfo(const std::string &data) {
   size_t pos = 12;
   if (data.size() < pos)
     return false;
-  log_segment.sequence_number = DeserializeUint(data.substr(0, 4));
+  log_segment.sequence_number = util::DeserializeUint(data.substr(0, 4));
   log_head.sequence_number = log_segment.sequence_number;
-  timestamp = DeserializeUint(data.substr(4, 4));
-  log_segment.segment_size = DeserializeUint(data.substr(8,4));
+  timestamp = util::DeserializeUint(data.substr(4, 4));
+  log_segment.segment_size = util::DeserializeUint(data.substr(8,4));
   size_t sig1_size = log_segment.signature.ReadFromString(data.substr(12));
   if (sig1_size == 0)
     return false;
@@ -176,10 +157,10 @@ bool SegmentData::DeserializeSegmentInfo(const std::string &data) {
 }
 
 std::string AuditProof::Serialize() const {
-  std::string result = SerializeUint(sequence_number, 4);
+  std::string result = util::SerializeUint(sequence_number, 4);
   if (tree_type == SegmentData::LOG_SEGMENT_TREE)
-    result.append(SerializeUint(tree_size, 4));
-  result.append(SerializeUint(leaf_index, 4));
+    result.append(util::SerializeUint(tree_size, 4));
+  result.append(util::SerializeUint(leaf_index, 4));
   result.append(signature.Serialize());
   for (size_t i = 0; i < audit_path.size(); ++i) {
     // Hard-code sha256.
@@ -199,7 +180,7 @@ bool AuditProof::Deserialize(SegmentData::TreeType type,
     DLOG_END_PARSE;
     return false;
   }
-  sequence_number = DeserializeUint(proof.substr(pos, 4));
+  sequence_number = util::DeserializeUint(proof.substr(pos, 4));
   DLOG_UINT("sequence number", sequence_number);
   pos += 4;
   if (tree_type == SegmentData::LOG_SEGMENT_TREE) {
@@ -208,7 +189,7 @@ bool AuditProof::Deserialize(SegmentData::TreeType type,
       DLOG_END_PARSE;
       return false;
     }
-    tree_size = DeserializeUint(proof.substr(pos, 4));
+    tree_size = util::DeserializeUint(proof.substr(pos, 4));
     DLOG_UINT("tree size", tree_size);
     pos +=4;
   } else
@@ -218,7 +199,7 @@ bool AuditProof::Deserialize(SegmentData::TreeType type,
     DLOG_END_PARSE;
     return false;
   }
-  leaf_index = DeserializeUint(proof.substr(pos, 4));
+  leaf_index = util::DeserializeUint(proof.substr(pos, 4));
   DLOG_UINT("leaf index", leaf_index);
   pos += 4;
   size_t sig_size = signature.ReadFromString(proof.substr(pos));

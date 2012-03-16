@@ -2,6 +2,7 @@
 ^doc/sunlight\.html$
 ^doc/sunlight\.txt$
 .*\.o$
+^src/merkletree/LogDBTest$
 ^src/merkletree/MerkleTreeTest$
 ^src/merkletree/SerialHasherTest$
 ^src/merkletree/TreeLoggerTest$

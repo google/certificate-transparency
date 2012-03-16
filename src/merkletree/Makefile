@@ -17,7 +17,10 @@ include .depend
 .depend: *.cc *.h
 	$(CXX) $(CXXFLAGS) -MM *.cc > .depend
 
-test: MerkleTreeTest SerialHasherTest TreeLoggerTest TreeHasherTest
+test: LogDBTest MerkleTreeTest SerialHasherTest TreeLoggerTest TreeHasherTest
+
+LogDBTest: LogDB.o LogDBTest.o ../util/util.o
+	$(CXX) -o LogDBTest LogDB.o LogDBTest.o ../util/util.o
 
 MerkleTreeTest: MerkleTree.o MerkleVerifier.o SerialHasher.o TreeHasher.o \
 		MerkleTreeTest.o

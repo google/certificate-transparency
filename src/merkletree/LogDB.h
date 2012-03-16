@@ -4,6 +4,7 @@
 #define LOGDB_H
 
 #include <map>
+#include <set>
 #include <string>
 #include <vector>
 
@@ -11,7 +12,6 @@
 
 class LogDB {
  public:
-  LogDB() {}
   virtual ~LogDB() {}
 
   enum Status {
@@ -27,23 +27,39 @@ class LogDB {
     LOGGED_ONLY, // Logged entries only
   };
 
-  // Return the number of logged or pending entries.
+  // Return the number of pending entries.
   virtual size_t PendingLogSize() const = 0;
-  //virtual size_t LoggedLogSize() const = 0;
 
   // Number of finished segments.
   virtual size_t SegmentCount() const = 0;
 
-  // Append an entry to the pending segment if it doesn't already exist.
+  // Add an entry to the pending bag of entries if it doesn't already exist.
   // The entry will be considered pending until the segment info is logged.
   // Returns NEW if the entry did not previously exist.
   // Returns PENDING or LOGGED if the entry already existed.
   virtual Status WriteEntry(const std::string &key,
                             const std::string &data) = 0;
 
-  // Move all currently pending data to a new segment, and add |data|
-  // as the info. FIXME: rename to WriteNewSegmentAndInfo()?
-  virtual void WriteSegmentInfo(const std::string &data) = 0;
+  // Construct a new segment from pending entries. Fix the order of entries,
+  // and lock the segment, so that it can no longer be modified.
+  // The segment will be written when WriteSegmentAndInfo() is called.
+  // This should not be called again until the segment is written, i.e.,
+  // the database can only have one pending segment at a time, and cannot
+  // create new segments while a segment is pending.
+  // Entries in this segment are considered as pending, but can also be read
+  // sequentially via PendingSegmentEntry calls.
+  virtual void MakeSegment() = 0;
+
+  virtual bool HasPendingSegment() const = 0;
+
+  virtual size_t PendingSegmentNumber() const = 0;
+
+  virtual size_t PendingSegmentSize() const = 0;
+
+  virtual Status PendingSegmentEntry(size_t index, std::string *data) const = 0;
+
+  // Finalize the pending segment and info.
+  virtual void WriteSegmentAndInfo(const std::string &info) = 0;
 
   // Retrieve the status of a log entry by absolute index. Indexing starts at 0.
   // Fill in |result| if it matches the |type| and |result| is not NULL.
@@ -52,7 +68,7 @@ class LogDB {
 
   // Retrieve a log entry by index in segment. Indexing starts at 0.
   // Fill in |result| if it matches the |type| and |result| is not NULL.
-  virtual Status LookupEntry(size_t segment, size_t index, Lookup type,
+  virtual Status LookupEntry(size_t segment, size_t index,
                              std::string *result) const = 0;
 
   // Retrieve a log entry by its key.
@@ -75,11 +91,7 @@ class MemoryDB : public LogDB {
   MemoryDB();
 
   size_t PendingLogSize() const {
-    return entries_.size() - segment_offsets_.back();
-  }
-
-  size_t LoggedLogSize() const {
-    return segment_offsets_.back();
+    return pending_.size();
   }
 
   size_t SegmentCount() const {
@@ -88,10 +100,19 @@ class MemoryDB : public LogDB {
 
   Status WriteEntry(const std::string &key, const std::string &data);
 
-  void WriteSegmentInfo(const std::string &data);
+  void MakeSegment();
 
-  Status LookupEntry(size_t segment, size_t index, Lookup type,
-                     std::string *result) const;
+  bool HasPendingSegment() const { return has_pending_segment_; }
+
+  size_t PendingSegmentNumber() const;
+
+  size_t PendingSegmentSize() const;
+
+  Status PendingSegmentEntry(size_t index, std::string *data) const;
+
+  void WriteSegmentAndInfo(const std::string &data);
+
+  Status LookupEntry(size_t segment, size_t index, std::string *result) const;
 
   Status LookupEntry(const std::string &key, Lookup type,
                      std::string *result) const;
@@ -104,10 +125,6 @@ class MemoryDB : public LogDB {
  private:
   Status LookupEntry(size_t index, Lookup type, std::string *result) const;
 
-  std::vector<std::string> entries_;
-  std::vector<size_t> segment_offsets_;
-  std::vector<std::string> segment_infos_;
-
   // (segment, index_in_segment), counting from 0.
   struct Location {
     Location(size_t s, size_t i) : segment_number(s),
@@ -116,9 +133,28 @@ class MemoryDB : public LogDB {
     size_t segment_number;
     size_t index_in_segment;
   };
+  // <key, data>
+  typedef std::map<std::string, std::string> DataMap;
+  // <<key>, <segment, index>>
   typedef std::map<std::string, Location> LocationMap;
-  // Map the key to the location.
-  LocationMap map_;
+
+  typedef std::set<std::string> KeySet;
+
+  // All <key, data> entries.
+  DataMap map_;
+  // Pending keys.
+  KeySet pending_;
+  // Pending segment keys, ordered. These keys are also still in the
+  // pending set.
+  std::vector<std::string> pending_segment_;
+  // Logged keys, ordered.
+  std::vector<std::vector<std::string> > logged_;
+  // Location map key -> location for logged entries.
+  LocationMap logged_map_;
+
+  std::vector<std::string> segment_infos_;
+
+  bool has_pending_segment_;
 };
 
 std::string HexString(const std::string &data);
@@ -159,26 +195,29 @@ std::string HexString(const std::string &data);
 
 class FileDB : public LogDB {
  public:
-  FileDB(const std::string &file_base, unsigned storage_depth)
-    : file_base_(file_base), storage_depth_(storage_depth) {
-  }
+  FileDB(const std::string &file_base, unsigned storage_depth);
 
   size_t PendingLogSize() const;
   size_t SegmentCount() const;
   Status WriteEntry(const std::string &key, const std::string &data);
-  void WriteSegmentInfo(const std::string &data);
-  Status LookupEntry(size_t segment, size_t index, Lookup type,
-                     std::string *result) const;
+  void MakeSegment();
+  bool HasPendingSegment() const;
+  size_t PendingSegmentNumber() const;
+  size_t PendingSegmentSize() const;
+  Status PendingSegmentEntry(size_t index, std::string *data) const;
+  void WriteSegmentAndInfo(const std::string &info);
+
+  Status LookupEntry(size_t segment, size_t index, std::string *result) const;
   Status LookupEntry(const std::string &key, Lookup type,
                      std::string *result) const;
   Status EntryLocation(const std::string &key, size_t *segment,
-                       size_t *index) const {
-    assert(false);
-  }
+                       size_t *index) const;
+
   Status LookupSegmentInfo(size_t index, std::string *result) const;
 
  private:
   void ReadFile(const std::string &file, std::string *result) const;
+  // Atomic: writes a tmp file and moves to place.
   void WriteFile(const std::string &filename, const std::string &data);
   // The last part of the storage directory.
   std::string StorageDirectoryBasename(const std::string &hex) const;
@@ -189,13 +228,48 @@ class FileDB : public LogDB {
   void AddToPending(const std::string &key);
   unsigned CountDirectory(const std::string &dir_name) const;
 
-  const std::string file_base_;
+  // Create missing directories. Called by constructor.
+  void MakeDirectories();
+  // True if we have any temporarily locked data.
+  bool HasTmpLockedData() const;
+  // Constructing a segment did not complete; move locked entries back to pending.
+  void UnlockTmp();
+  // True if the pending segment directory contains a segment_info file.
+  bool HasPendingSegmentInfo() const;
+  void WritePendingSegment();
+
+  // Called by constructor: completes or undoes any pending operations.
+  void Heal();
+
+  // Count the segments.
+  size_t CountSegments() const;
+
+  // Read the pending segment count from a file.
+  size_t ReadPendingSegmentCount() const;
+
+  // Convert a number to a decimal-base string.
+  std::string ToString(size_t number) const;
+
+  const std::string kFileBase;
+  // This directory only exists while we have a segment locked,
+  // and are waiting for the segment info.
+  const std::string kPendingSegmentDir;
+  const std::string kPendingDir;
+  const std::string kSegmentsDir;
+  const std::string kStorageDir;
+  // Scrapbook for atomic writes.
+  const std::string kTmpDir;
+
   const unsigned storage_depth_;
   static const char kKeyFile[];
   static const char kDataFile[];
   static const char kInfoFile[];  // This file will only be present if
                                   // the data has been logged in a
                                   // completed segment.
+  static const char kLockFile[];
+  static const char kCountFile[];
+  size_t segment_count_;
+  size_t pending_segment_size_;
 };
 
 #endif  // ndef LOGDB_H
