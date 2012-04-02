@@ -10,7 +10,7 @@ endif
 
 CXXFLAGS= $(INCLUDE) $(CXXFLAG)
 
-all: .depend test
+all: .depend test faildb
 
 include .depend
 
@@ -19,8 +19,9 @@ include .depend
 
 test: LogDBTest MerkleTreeTest SerialHasherTest TreeLoggerTest TreeHasherTest
 
-LogDBTest: LogDB.o LogDBTest.o ../util/util.o
-	$(CXX) -o LogDBTest LogDB.o LogDBTest.o ../util/util.o
+LogDBTest: LogDB.o LogDBTestConstants.o LogDBTest.o ../util/util.o
+	$(CXX) -o LogDBTest LogDB.o LogDBTestConstants.o LogDBTest.o \
+	../util/util.o
 
 MerkleTreeTest: MerkleTree.o MerkleVerifier.o SerialHasher.o TreeHasher.o \
 		MerkleTreeTest.o
@@ -40,6 +41,10 @@ TreeLoggerTest: LogDB.o LogRecord.o LogVerifier.o MerkleTree.o \
 TreeHasherTest: SerialHasher.o TreeHasher.o TreeHasherTest.o
 	$(CXX) -o TreeHasherTest SerialHasher.o TreeHasher.o TreeHasherTest.o \
 	$(LIBS)
+
+faildb: faildb.cc LogDB.o LogDBTestConstants.o ../util/util.o
+	$(CXX) $(CXXFLAGS) -o faildb faildb.cc LogDB.o LogDBTestConstants.o \
+	../util/util.o $(LIBS)
 
 clean:
 	rm *Test *.o

@@ -164,16 +164,17 @@ FileDB::FileDB(const std::string &file_base, unsigned storage_depth)
       kSegmentsDir(file_base + "/segments"),
       kStorageDir(file_base + "/storage"),
       kTmpDir(file_base + "/tmp"),
-      storage_depth_(storage_depth) {
+      storage_depth_(storage_depth) {}
+
+// We do not call this in the constructor, since it invokes virtual methods.
+void FileDB::Init() {
   // Create missing directories.
   MakeDirectories();
   // Count segments.
   segment_count_ = CountSegments();
-  if (HasPendingSegment())
-    pending_segment_size_ = ReadPendingSegmentCount();
-
   // Heal locked data.
   Heal();
+
   assert(!HasTmpLockedData());
   assert(!HasPendingSegment() || !HasPendingSegmentInfo());
 }
@@ -291,6 +292,7 @@ bool FileDB::HasPendingSegment() const {
     assert(errno == ENOENT);
     return false;
   }
+
   // A pending segment directory must have a count file.
   assert(access((kPendingSegmentDir + "/" + kCountFile).c_str(), R_OK) == 0);
   return true;
@@ -594,10 +596,13 @@ void FileDB::Heal() {
     // We have no master lock, but have locked data.
     // We failed befor completing the segment; undo.
     UnlockTmp();
-  } else if (HasPendingSegment() && HasPendingSegmentInfo()) {
-    // We already have the segment info so we must have failed
-    // just before writing it; do so now.;
-    WritePendingSegment();
+  } else if (HasPendingSegment()) {
+    pending_segment_size_ = ReadPendingSegmentCount();
+    if (HasPendingSegmentInfo()) {
+      // We already have the segment info so we must have failed
+      // just before writing it; do so now.;
+      WritePendingSegment();
+    }
   }
 }
 
@@ -616,4 +621,16 @@ std::string FileDB::ToString(size_t number) const {
   char buf[20];
   sprintf(buf, "%zu", number);
   return std::string(buf);
+}
+
+int FileDB::mkdir(const char *path, mode_t mode) {
+  return ::mkdir(path, mode);
+}
+
+int FileDB::remove(const char *path) {
+  return ::remove(path);
+}
+
+int FileDB::rename(const char *old_name, const char *new_name) {
+  return ::rename(old_name, new_name);
 }

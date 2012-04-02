@@ -8,44 +8,20 @@
 #include <sys/stat.h>
 
 #include "LogDB.h"
-
-namespace {
-
-const size_t kNumberOfSegments = 4;
-const size_t kLogSize = 15;
-const size_t kSegmentSizes[4] = { 5, 2, 0, 8 };
-// Nice human-readable test entries for easier debugging.
-const char kEntries[15][20] = {
-  // Segment 1
-  "Angelfish", "Bananafish", "Unicorn fish", "Upside-down catfish",
-  "Weasel shark",
-  // Segment 2
-  "Arsenic", "Cyanide",
-  // Segment 3 is empty
-  // Segment 4
-  "0", "1", "2", "3", "4", "5", "6", "7"
-};
-
-const char kKeys[15][8] = {
-  "abcdef0", "abcdef1", "xyzabc2", "zyxabc3", "ijklmn4", "jklmni5", "klmnij6",
-  "lmnijk7", "mnijkl8", "nijklm9", "opqrs10", "wxyza11", "gfedc12", "gfedc13",
-  "gfedc14"
-};
-
-const char kSegmentInfos[4][10] = { "Fish", "Poison", "Empty", "Sequence" };
+#include "LogDBTestConstants.h"
 
 // Helper test functions.
 
 // Insert all the entries in a segment; get back a segment set.
-std::set<std::string> InsertSegmentEntries(LogDB *db, size_t segment,
-                                           size_t offset) {
+static std::set<std::string> InsertSegmentEntries(LogDB *db, size_t segment,
+                                                  size_t offset) {
   std::string key, data, result;
   std::set<std::string> segment_set;
   assert(db->PendingLogSize() == 0);
-  for (size_t index = 0; index < kSegmentSizes[segment]; ++index) {
+  for (size_t index = 0; index < logdbtest::kSegmentSizes[segment]; ++index) {
     // Insert the entries of this segment.
-    key = kKeys[offset + index];
-    data = kEntries[offset + index];
+    key = logdbtest::kKeys[offset + index];
+    data = logdbtest::kEntries[offset + index];
     assert(db->WriteEntry(key, data) == LogDB::NEW);
     segment_set.insert(data);
     // Check that the entry is listed as pending...
@@ -70,15 +46,15 @@ std::set<std::string> InsertSegmentEntries(LogDB *db, size_t segment,
 }
 
 // Test reading the pending segment.
-std::vector<std::string> CheckPendingSegment(LogDB *db, size_t segment,
-                                             size_t offset) {
+static std::vector<std::string> CheckPendingSegment(LogDB *db, size_t segment,
+                                                    size_t offset) {
   std::string key, data, result;
   std::vector<std::string> pending_segment;
   size_t index;
   const size_t pending_size = db->PendingLogSize();
-  for (index = 0; index < kSegmentSizes[segment]; ++index) {
-    key = kKeys[offset + index];
-    data = kEntries[offset + index];
+  for (index = 0; index < logdbtest::kSegmentSizes[segment]; ++index) {
+    key = logdbtest::kKeys[offset + index];
+    data = logdbtest::kEntries[offset + index];
     assert(db->LookupEntry(key, LogDB::ANY, &result) == LogDB::PENDING);
     assert(result == data);
     assert(db->LookupEntry(segment, index, NULL) == LogDB::NOT_FOUND);
@@ -95,14 +71,14 @@ std::vector<std::string> CheckPendingSegment(LogDB *db, size_t segment,
 }
 
 // Test reading a logged segment.
-std::vector<std::string> CheckLoggedSegment(LogDB *db, size_t segment,
-                                            size_t offset) {
+static std::vector<std::string> CheckLoggedSegment(LogDB *db, size_t segment,
+                                                   size_t offset) {
   std::string key, data, result;
   std::vector<std::string> logged_segment;
   size_t index;
-  for (index = 0; index < kSegmentSizes[segment]; ++index) {
-    key = kKeys[offset + index];
-    data = kEntries[offset + index];
+  for (index = 0; index < logdbtest::kSegmentSizes[segment]; ++index) {
+    key = logdbtest::kKeys[offset + index];
+    data = logdbtest::kEntries[offset + index];
     result.clear();
     assert(db->LookupEntry(key, LogDB::ANY, &result) == LogDB::LOGGED);
     assert(result == data);
@@ -128,19 +104,19 @@ std::vector<std::string> CheckLoggedSegment(LogDB *db, size_t segment,
 void CheckLog(LogDB *db) {
   assert(db->PendingLogSize() == 0);
   assert(!db->HasPendingSegment());
-  size_t segment, index, offset;
+  size_t segment, index = 0, offset;
   std::string key, data, result;
   std::set<std::string> expected_segment;
   std::set<std::string> logged_segment;
 
   // Look up by indices.
-  for (segment = 0, offset = 0; segment < kNumberOfSegments;
-       offset += kSegmentSizes[segment++]) {
+  for (segment = 0, offset = 0; segment < logdbtest::kNumberOfSegments;
+       offset += logdbtest::kSegmentSizes[segment++]) {
     expected_segment.clear();
     logged_segment.clear();
-    for (index = 0; index < kSegmentSizes[segment]; ++index) {
+    for (index = 0; index < logdbtest::kSegmentSizes[segment]; ++index) {
       assert(db->LookupEntry(segment, index, &result) == LogDB::LOGGED);
-      expected_segment.insert(kEntries[offset + index]);
+      expected_segment.insert(logdbtest::kEntries[offset + index]);
       logged_segment.insert(result);
     }
     assert(db->LookupEntry(segment, index, NULL) == LogDB::NOT_FOUND);
@@ -149,9 +125,9 @@ void CheckLog(LogDB *db) {
   assert(db->LookupEntry(segment, index, NULL) == LogDB::NOT_FOUND);
 
   // Look up by keys.
-  for (index = 0; index < kLogSize; ++index) {
-    key = kKeys[index];
-    data = kEntries[index];
+  for (index = 0; index < logdbtest::kLogSize; ++index) {
+    key = logdbtest::kKeys[index];
+    data = logdbtest::kEntries[index];
     assert(db->LookupEntry(key, LogDB::ANY, &result) == LogDB::LOGGED);
     assert(result == data);
   }
@@ -160,7 +136,7 @@ void CheckLog(LogDB *db) {
 // Tests
 
 // Test building the log segment by segment.
-void LogDBTest(LogDB *db) {
+static void LogDBTest(LogDB *db) {
   assert(db->PendingLogSize() == 0);
   assert(db->LookupEntry(0, 0, NULL) == LogDB::NOT_FOUND);
   assert(!db->HasPendingSegment());
@@ -171,8 +147,8 @@ void LogDBTest(LogDB *db) {
   std::vector<std::string> pending_segment;
   // The logged segment, ordered.
   std::vector<std::string> logged_segment;
-  for (size_t segment = 0, offset = 0; segment < kNumberOfSegments;
-       offset += kSegmentSizes[segment++]) {
+  for (size_t segment = 0, offset = 0; segment < logdbtest::kNumberOfSegments;
+       offset += logdbtest::kSegmentSizes[segment++]) {
     pending_segment.clear();
     logged_segment.clear();
 
@@ -184,8 +160,8 @@ void LogDBTest(LogDB *db) {
     assert(db->HasPendingSegment());
     assert(db->PendingSegmentNumber() == segment);
     assert(db->SegmentCount() == segment);
-    assert(db->PendingSegmentSize() == kSegmentSizes[segment]);
-    assert(db->PendingLogSize() == kSegmentSizes[segment]);
+    assert(db->PendingSegmentSize() == logdbtest::kSegmentSizes[segment]);
+    assert(db->PendingLogSize() == logdbtest::kSegmentSizes[segment]);
 
     // Check the pending segment.
     pending_segment = CheckPendingSegment(db, segment, offset);
@@ -195,7 +171,7 @@ void LogDBTest(LogDB *db) {
                                                 pending_segment.end()));
     // Finalize the segment.
     assert(db->LookupSegmentInfo(segment, NULL) == LogDB::NOT_FOUND);
-    db->WriteSegmentAndInfo(kSegmentInfos[segment]);
+    db->WriteSegmentAndInfo(logdbtest::kSegmentInfos[segment]);
     assert(db->SegmentCount() == segment + 1);
     assert(!db->HasPendingSegment());
     assert(db->PendingLogSize() == 0);
@@ -203,7 +179,7 @@ void LogDBTest(LogDB *db) {
     // Look up the segment info.
     std::string result;
     assert(db->LookupSegmentInfo(segment, &result) == LogDB::LOGGED);
-    assert(result == kSegmentInfos[segment]);
+    assert(result == logdbtest::kSegmentInfos[segment]);
 
     // Check the logged segment.
     logged_segment = CheckLoggedSegment(db, segment, offset);
@@ -218,7 +194,7 @@ void LogDBTest(LogDB *db) {
 
 // Test that we can add new pending entries while there is a pending segment
 // that has not been finalized (i.e., we are waiting for segment info).
-void InterleaveTest(LogDB *db) {
+static void InterleaveTest(LogDB *db) {
   assert(db->PendingLogSize() == 0);
   assert(db->LookupEntry(0, 0, NULL) == LogDB::NOT_FOUND);
   assert(!db->HasPendingSegment());
@@ -237,17 +213,17 @@ void InterleaveTest(LogDB *db) {
   db->MakeSegment();
   assert(db->HasPendingSegment());
   assert(db->PendingSegmentNumber() == 0);
-  assert(db->PendingSegmentSize() == kSegmentSizes[0]);
-  assert(db->PendingLogSize() == kSegmentSizes[0]);
+  assert(db->PendingSegmentSize() == logdbtest::kSegmentSizes[0]);
+  assert(db->PendingLogSize() == logdbtest::kSegmentSizes[0]);
 
   pending_segment = CheckPendingSegment(db, 0, 0);
   assert(segment_set == std::set<std::string>(pending_segment.begin(),
                                               pending_segment.end()));
 
   // Now insert another pending entry.
-  size_t index = kSegmentSizes[0];
-  std::string iKey = kKeys[index];
-  std::string iData = kEntries[index];
+  size_t index = logdbtest::kSegmentSizes[0];
+  std::string iKey = logdbtest::kKeys[index];
+  std::string iData = logdbtest::kEntries[index];
   assert(db->WriteEntry(iKey, iData) == LogDB::NEW);
   // Check that the entry is listed as pending...
   std::string result;
@@ -256,9 +232,9 @@ void InterleaveTest(LogDB *db) {
 
   assert(db->HasPendingSegment());
   assert(db->PendingSegmentNumber() == 0);
-  assert(db->PendingSegmentSize() == kSegmentSizes[0]);
+  assert(db->PendingSegmentSize() == logdbtest::kSegmentSizes[0]);
   // Check that the pending log has grown by one.
-  assert(db->PendingLogSize() == kSegmentSizes[0] + 1);
+  assert(db->PendingLogSize() == logdbtest::kSegmentSizes[0] + 1);
 
   // Check that the pending segment is still correct.
   pending_segment = CheckPendingSegment(db, 0, 0);
@@ -266,7 +242,7 @@ void InterleaveTest(LogDB *db) {
                                               pending_segment.end()));
 
   // Finalize the segment.
-  db->WriteSegmentAndInfo(kSegmentInfos[0]);
+  db->WriteSegmentAndInfo(logdbtest::kSegmentInfos[0]);
   assert(db->SegmentCount() == 1);
   assert(!db->HasPendingSegment());
   assert(db->PendingLogSize() == 1);
@@ -280,37 +256,38 @@ void InterleaveTest(LogDB *db) {
   assert(result == iData);
 }
 
-void MemoryDBTest() {
+static void MemoryDBTest() {
   MemoryDB db, db2;
   LogDBTest(&db);
   InterleaveTest(&db2);
 }
 
-void FileDBTest() {
+static void FileDBTest() {
   // Create a new directory for testing.
   assert(mkdir("/tmp/ct/a", 0777) == 0);
   FileDB db("/tmp/ct/a", 5);
+  db.Init();
   LogDBTest(&db);
   assert(system("rm -r /tmp/ct/a") == 0);
   assert(mkdir("/tmp/ct/a", 0777) == 0);
   FileDB db2("/tmp/ct/a", 5);
+  db2.Init();
   InterleaveTest(&db2);
   assert(system("rm -r /tmp/ct/a") == 0);
 }
 
-void FileDBResumeTest() {
+static void FileDBResumeTest() {
   // Create a new directory for testing.
   assert(mkdir("/tmp/ct/a", 0777) == 0);
   // Resume the full log.
   FileDB db("/tmp/ct/a", 5);
+  db.Init();
   LogDBTest(&db);
   FileDB db2("/tmp/ct/a", 5);
+  db2.Init();
   CheckLog(&db2);
   assert(system("rm -r /tmp/ct/a") == 0);
-  // TODO: resume from arbitrary points, including failed file ops.
 }
-
-} // namespace
 
 int main(int, char**) {
   std::cout << "Testing MemoryDB\n";

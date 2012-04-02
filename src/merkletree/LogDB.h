@@ -6,6 +6,7 @@
 #include <map>
 #include <set>
 #include <string>
+#include <sys/stat.h>
 #include <vector>
 
 #include <assert.h>
@@ -196,6 +197,8 @@ std::string HexString(const std::string &data);
 class FileDB : public LogDB {
  public:
   FileDB(const std::string &file_base, unsigned storage_depth);
+  // This class requires explicit initialization.
+  void Init();
 
   size_t PendingLogSize() const;
   size_t SegmentCount() const;
@@ -238,7 +241,7 @@ class FileDB : public LogDB {
   bool HasPendingSegmentInfo() const;
   void WritePendingSegment();
 
-  // Called by constructor: completes or undoes any pending operations.
+  // Called by Init(): completes or undoes any pending operations.
   void Heal();
 
   // Count the segments.
@@ -249,6 +252,14 @@ class FileDB : public LogDB {
 
   // Convert a number to a decimal-base string.
   std::string ToString(size_t number) const;
+
+  // Make file operations virtual, so we can override in a test class
+  // and simulate their failure.
+  virtual int mkdir(const char *path, mode_t mode);
+
+  virtual int remove(const char *path);
+
+  virtual int rename(const char *old_name, const char *new_name);
 
   const std::string kFileBase;
   // This directory only exists while we have a segment locked,
