@@ -111,6 +111,7 @@ static ASN1_OBJECT *ProofExtensionObject() {
   return obj;
 }
 
+// Verify the proof on a log entry bundle.
 static LogVerifier::VerifyResult
 VerifyLogSegmentProof(const bstring &proofstring,
                       const bstring &bundle,
@@ -127,6 +128,19 @@ VerifyLogSegmentProof(const bstring &proofstring,
                                               *(reinterpret_cast<const
                                                 std::string*>(&bundle)),
                                               checkpoint);
+}
+
+// Verify the proof on a single leaf certificate.
+static LogVerifier::VerifyResult
+VerifyLogSegmentProof(const bstring &proofstring, X509 *cert,
+                      LogVerifier *verifier,
+                      LogSegmentCheckpoint *checkpoint) {
+  unsigned char *buf = NULL;
+  int cert_len = i2d_X509(cert, &buf);
+  assert(cert_len > 0);
+  bstring leaf(buf, cert_len);
+  OPENSSL_free(buf);
+  return VerifyLogSegmentProof(proofstring, leaf, verifier, checkpoint);
 }
 
 // A generic client.
@@ -331,11 +345,64 @@ class SSLClient : public CTClient {
     LogSegmentCheckpoint checkpoint;
   };
 
+#ifdef TLSEXT_AUTHZDATAFORMAT_audit_proof
+  // The callback for verifying the proof in a TLS extension.
+  static int AuditProofCallback(SSL *s, void *arg) {
+    VerifyCallbackArgs *args = reinterpret_cast<VerifyCallbackArgs*>(arg);
+    assert(args != NULL);
+    // If we already received the proof in a superfluous cert, do nothing.
+    if (args->proof_verified)
+      return 1;
+
+    LogVerifier *verifier = args->verifier;
+    if (verifier == NULL) {
+      std::cout << "No log server public key supplied. Dropping connection." <<
+          std::endl;
+      return 0;
+    }
+
+    SSL_SESSION *sess = SSL_get_session(s);
+    // Get the leaf certificate.
+    // TODO: verify proofs on entire certificate chains.
+    X509 *cert = SSL_SESSION_get0_peer(sess);
+    if (cert == NULL) {
+      // VerifyCallback should have caught that already.
+      std::cout << "No server certificate received. Dropping connection." <<
+          std::endl;
+      return 0;
+    }
+
+    // Get the proof.
+    size_t proof_length;
+    unsigned char *proof =
+        SSL_SESSION_get_tlsext_server_authz_audit_proof(sess, &proof_length);
+    if (proof == NULL) {
+      std::cout << "No log proof received. Dropping connection." << std::endl;
+      return 0;
+    }
+
+    std::cout << "Found an audit proof in the TLS extension, verifying...";
+
+    bstring proofstring(proof, proof_length);
+    LogVerifier::VerifyResult result =
+        VerifyLogSegmentProof(proofstring, cert, verifier,
+                              &args->checkpoint);
+
+    if (result == LogVerifier::VERIFY_OK) {
+      args->proof_verified = true;
+      std::cout << "OK." << std::endl;
+      return 1;
+    } else {
+      std::cout << LogVerifier::VerifyResultString(result) << std::endl;
+      return 0;
+    }
+  }
+#endif
+
+// The callback for verifying the proof in a superfluous cert.
   static int VerifyCallback(X509_STORE_CTX *ctx, void *arg) {
     VerifyCallbackArgs *args = reinterpret_cast<VerifyCallbackArgs*>(arg);
     assert(args != NULL);
-    // Verify the proof, if present.
-    args->proof_verified = false;
     LogVerifier *verifier = args->verifier;
     if (verifier == NULL) {
       std::cout << "No log server public key supplied. Dropping connection." <<
@@ -348,12 +415,6 @@ class SSLClient : public CTClient {
           std::endl;
       return 0;
     }
-    // Read the leaf certificate.
-    unsigned char *buf = NULL;
-    int cert_len = i2d_X509(ctx->cert, &buf);
-    assert(cert_len > 0);
-    bstring leaf(buf, cert_len);
-    OPENSSL_free(buf);
 
     // TODO: is there an API call for accessing the bag of certs?
     STACK_OF(X509) *sk = ctx->untrusted;
@@ -365,7 +426,7 @@ class SSLClient : public CTClient {
         X509 *cert = sk_X509_value(sk, i);
         int extension_index = X509_get_ext_by_OBJ(cert, obj, -1);
         if (extension_index != -1) {
-          std::cout << "Proof extension found, verifying...";
+          std::cout << "Proof extension found in certificate, verifying...";
           X509_EXTENSION *ext = X509_get_ext(cert, extension_index);
           ASN1_OCTET_STRING *ext_data = X509_EXTENSION_get_data(ext);
           bstring proofstring(ext_data->data, ext_data->length);
@@ -373,7 +434,7 @@ class SSLClient : public CTClient {
           // Note: an optimized client could only verify the signature if it's
           // a checkpoint it hasn't seen before.
           LogVerifier::VerifyResult result =
-              VerifyLogSegmentProof(proofstring, leaf, verifier,
+              VerifyLogSegmentProof(proofstring, ctx->cert, verifier,
                                     &args->checkpoint);
           if (result == LogVerifier::VERIFY_OK) {
             args->proof_verified = true;
@@ -387,12 +448,16 @@ class SSLClient : public CTClient {
       ASN1_OBJECT_free(obj);
     }
 
-    if (!args->proof_verified) {
-      std::cout << "No log proof found. Dropping connection." << std::endl;
+    if (args->proof_verified)
+      std::cout << "Log proof verified." << std::endl;
+#ifndef TLSEXT_AUTHZDATAFORMAT_audit_proof
+    // If we don't support the TLS extension, we fail here. Else we wait to see
+    // if the extension callback finds a valid proof.
+    else {
+      std::cout << "No log proof received. Dropping connection." << std::endl;
       return 0;
     }
-
-    std::cout << "Log proof verified." << std::endl;
+#endif
     int vfy = X509_verify_cert(ctx);
     if (vfy != 1) {
       // Echo a warning, but continue with connection.
@@ -401,16 +466,22 @@ class SSLClient : public CTClient {
     return 1;
   }
 
-  // VerifyCallback uses this verifier for verifying log proofs.
+  // Verification callbacks use this verifier for verifying log proofs.
   void SSLConnect(LogVerifier *verifier) {
-    SSL_CTX *ctx = SSL_CTX_new(SSLv3_client_method());
+    SSL_CTX *ctx = SSL_CTX_new(TLSv1_client_method());
     assert(ctx != NULL);
     // SSL_VERIFY_PEER makes the connection abort immediately
     // if verification fails.
     SSL_CTX_set_verify(ctx, SSL_VERIFY_PEER, NULL);
     VerifyCallbackArgs args;
     args.verifier = verifier;
+    args.proof_verified = false;
+    // The verify callback gets called before the audit proof callback.
     SSL_CTX_set_cert_verify_callback(ctx, &VerifyCallback, &args);
+#ifdef TLSEXT_AUTHZDATAFORMAT_audit_proof
+    SSL_CTX_set_tlsext_server_authz_audit_proof_cb(ctx, &AuditProofCallback);
+    SSL_CTX_set_tlsext_server_authz_audit_proof_cb_arg(ctx, &args);
+#endif
     SSL *ssl = SSL_new(ctx);
     assert(ssl != NULL);
     BIO *bio = BIO_new_socket(fd(), BIO_NOCLOSE);
