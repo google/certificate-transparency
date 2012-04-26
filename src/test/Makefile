@@ -1,11 +1,26 @@
 all: test-cert-proof.pem
 
-test-key.pem:
-	openssl genrsa -out test-key.pem 1024
+# Generate a self-signed root CA certificate and private key file
+ca-cert.pem:
+	openssl req -x509 -newkey rsa:1024 -keyout ca-key.pem -out ca-cert.pem \
+	-config ca-cert.conf -passout pass:password1
 
-test-cert.csr: test-key.pem
-	openssl req -new -key test-key.pem -out test-cert.csr < \
-	test-csr-responses
+# Generate a certificate for signing log requests
+ca-protocert.pem: ca-cert.pem
+	openssl req -newkey rsa:1024 -keyout ca-protokey.pem \
+	-out ca-protocert.csr -config ca-protocert.conf -passout pass:password1
+	openssl x509 -req -days 365 -in ca-protocert.csr -CA ca-cert.pem \
+	-CAkey ca-key.pem -CAcreateserial -extfile ca-protocert.conf \
+	-extensions ct_ext -out ca-protocert.pem -passin pass:password1
+
+test-cert.csr:
+	openssl req -new -newkey rsa:1024 -keyout test-key.pem \
+	-out test-cert.csr -config protocert.conf -passout pass:password1
+
+# Generate a protocert for submitting to the log
+test-protocert.der: ca-protocert.pem test-cert.csr
+	../client/ct protocert test-cert.csr test-protocert.der \
+	ca-protocert.pem ca-protokey.pem password1 ca-cert.pem protocert.conf
 
 test-cert.pem: test-cert.csr
 	openssl x509 -req -days 365 -in test-cert.csr -signkey test-key.pem \
@@ -49,8 +64,7 @@ connect: ct-server-key-public.pem
 	ct-server-key-public.pem -cache .cache
 
 clean:
-	rm -f test-key.* test-cert.* test-cert-proof.* ct-server-key.* \
-	ct-server-key-public.*
+	rm -f *.pem *.der *.csr *.proof *.srl
 	rm -rf .cache
 
 freebsd-links:

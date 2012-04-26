@@ -24,9 +24,11 @@
 #include <openssl/bio.h>
 #include <openssl/bn.h>
 #include <openssl/evp.h>
+#include <openssl/ossl_typ.h>
 #include <openssl/pem.h>
 #include <openssl/ssl.h>
 #include <openssl/x509.h>
+#include <openssl/x509v3.h>
 
 static void UnknownCommand(const std::string &cmd) {
   std::cerr << "Unknown command: " << cmd << '\n';
@@ -733,6 +735,138 @@ static void MakeCert(int argc, const char **argv) {
   BIO_free(out);
 }
 
+// Input: a certificate request (in PEM format).
+// Output: a signed proto-certificate (in DER format).
+// The protocert is formatted like a regular X509v3 certificate,
+// except it is signed with the protocert signing certificate,
+// and contains two additional extensions:
+// - A critical "Certificate Transparency" poison extension to indicate
+//   its proto status.
+// - An Authority issuer/keyid extension that specifies the signing key of the
+//   final certificate (rather than the protocert signing key)
+// The conf file MUST contain a "proto" section with all desired extensions,
+// as well as the following lines:
+// authorityKeyIdentifier=keyid:always,issuer:always
+// 1.2.3.4=critical,ASN1:UTF8String:poison
+// TODO: define a "real" poison extension.
+static void MakeProtoCert(int argc, const char **argv) {
+  if (argc != 8) {
+    std::cerr << argv[0] << " <input request> <output signed ProtoCert> "
+              << "<CA protocert signing cert> <CA protocert signing key> "
+              << "<CA protocert signing key password> <CA cert> <conf file> \n";
+    exit(7);
+  }
+  const char *req_file = argv[1];
+  const char *out_file = argv[2];
+  const char *ca_protocert_file = argv[3];
+  const char *ca_protokey_file = argv[4];
+  const char *password = argv[5];
+  const char *ca_cert_file = argv[6];
+  const char *conf_file = argv[7];
+
+  const char kSection[] = "proto";
+
+  BIO *req_bio = BIO_new(BIO_s_file());
+  assert(req_bio != NULL);
+  assert(BIO_read_filename(req_bio, req_file) == 1);
+  X509_REQ *req = PEM_read_bio_X509_REQ(req_bio, NULL, NULL, NULL);
+  assert(req != NULL);
+  BIO_free(req_bio);
+
+  BIO *ca_protocert_bio = BIO_new(BIO_s_file());
+  assert(ca_protocert_bio != NULL);
+  assert(BIO_read_filename(ca_protocert_bio, ca_protocert_file) == 1);
+  X509 *ca_protocert = PEM_read_bio_X509(ca_protocert_bio, NULL, NULL, NULL);
+  assert(ca_protocert != NULL);
+  BIO_free(ca_protocert_bio);
+
+  BIO *ca_protokey_bio = BIO_new(BIO_s_file());
+  assert(ca_protokey_bio != NULL);
+  assert(BIO_read_filename(ca_protokey_bio, ca_protokey_file) == 1);
+  EVP_PKEY *ca_protokey = PEM_read_bio_PrivateKey(ca_protokey_bio, NULL, NULL,
+                                                  const_cast<char*>(password));
+  assert(ca_protokey != NULL);
+  BIO_free(ca_protokey_bio);
+
+  BIO *ca_cert_bio = BIO_new(BIO_s_file());
+  assert(ca_cert_bio != NULL);
+  assert(BIO_read_filename(ca_cert_bio, ca_cert_file) == 1);
+  X509 *ca_cert = PEM_read_bio_X509(ca_cert_bio, NULL, NULL, NULL);
+  assert(ca_cert != NULL);
+  BIO_free(ca_cert_bio);
+
+  //
+  // The following code mostly follows the logic of 'openssl x509 -req'
+  // as implemented in openssl/apps/x509.c
+  //
+
+  X509 *proto = X509_new();
+  // Set the version to v3.
+  assert(X509_set_version(proto, 2) == 1);
+
+  // Random 128-bit serial number.
+  // TODO: take a serial file as input.
+  BIGNUM *serial = BN_new();
+  BN_rand(serial, 128, 0, 0);
+  BN_to_ASN1_INTEGER(serial, X509_get_serialNumber(proto));
+  BN_free(serial);
+
+  // Subject name.
+  X509_NAME *subject = X509_REQ_get_subject_name(req);
+  assert(subject != NULL);
+  assert(X509_set_subject_name(proto, subject) == 1);
+
+  // Subject public key.
+  EVP_PKEY *pkey = X509_REQ_get_pubkey(req);
+  assert(pkey != NULL);
+  // Verify the signature on the request.
+  assert(X509_REQ_verify(req, pkey) == 1);
+  assert(X509_set_pubkey(proto, pkey) == 1);
+
+  // The eventual issuer shall be the CA cert.
+  X509_NAME *issuer = X509_get_subject_name(ca_cert);
+  assert(issuer != NULL);
+  // Check that this is the same as the issuer of the CA protocert.
+  X509_NAME *proto_issuer = X509_get_issuer_name(ca_protocert);
+  assert(proto_issuer != NULL);
+  assert(X509_NAME_cmp(issuer, proto_issuer) == 0);
+  X509_set_issuer_name(proto, issuer);
+
+  // Validity.
+  // Set the start date to now.
+  X509_gmtime_adj(X509_get_notBefore(proto), 0);
+  // End date to now + 1 year.
+  // TODO: this, too, should be configurable.
+  X509_time_adj_ex(X509_get_notAfter(proto), 365, 0, NULL);
+
+  // Add the extensions.
+  X509V3_CTX ctx;
+  CONF *extconf = NCONF_new(NULL);
+  long errorline = -1;
+  assert(NCONF_load(extconf, conf_file, &errorline) == 1);
+
+  X509V3_set_ctx(&ctx, ca_cert, proto, NULL, NULL, 0);
+  X509V3_set_nconf(&ctx, extconf);
+  assert(X509V3_EXT_add_nconf(extconf, &ctx, const_cast<char*>(kSection),
+                              proto));
+
+  // Sign.
+  assert(X509_sign(proto, ca_protokey, NULL) > 0);
+
+  int out_fd = open(out_file, O_CREAT | O_TRUNC | O_WRONLY, 0666);
+  assert(out_fd >= 0);
+  BIO *out_bio = BIO_new_fd(out_fd, BIO_CLOSE);
+  assert(i2d_X509_bio(out_bio, proto) > 0);
+  BIO_free(out_bio);
+
+  X509_REQ_free(req);
+  X509_free(proto);
+  X509_free(ca_protocert);
+  X509_free(ca_cert);
+  EVP_PKEY_free(ca_protokey);
+  NCONF_free(extconf);
+}
+
 static void ConnectHelp() {
     std::cerr << "connect <server> <port> [-log_server_key key_file] " <<
         "[-cache cache_dir]" << std::endl;
@@ -857,14 +991,17 @@ int main(int argc, const char **argv) {
     return 1;
   }
 
+  SSL_library_init();
+
   const std::string cmd(argv[0]);
   if (cmd == "upload")
     Upload(argc, argv);
   else if (cmd == "certificate")
     MakeCert(argc, argv);
   else if (cmd == "connect") {
-    SSL_library_init();
     Connect(argc, argv);
+  } else if (cmd == "protocert") {
+    MakeProtoCert(argc, argv);
   } else {
     UnknownCommand(cmd);
     UsageHelp(main_command);
