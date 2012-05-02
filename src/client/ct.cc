@@ -52,7 +52,8 @@ static void WriteAllFiles(const std::vector<bstring> &files,
                           const char *dirname) {
   // Store current directory.
   char current_dir[1024];
-  assert(getcwd(current_dir, sizeof current_dir) != NULL);
+  char *retbuf = getcwd(current_dir, sizeof current_dir);
+  assert(retbuf != NULL);
   if (chdir(dirname) != 0) {
     perror(dirname);
     exit(1);
@@ -67,14 +68,16 @@ static void WriteAllFiles(const std::vector<bstring> &files,
     fclose(out);
   }
   // Change back to working directory.
-  assert(chdir(current_dir) == 0);
+  int ret = chdir(current_dir);
+  assert(ret == 0);
 }
 
 static std::vector<bstring> ReadAllFiles(const char *dirname) {
   std::vector<bstring> result;
   // Store current directory.
   char current_dir[1024];
-  assert(getcwd(current_dir, sizeof current_dir) != NULL);
+  char *retbuf = getcwd(current_dir, sizeof current_dir);
+  assert(retbuf != NULL);
   if (chdir(dirname) != 0) {
     perror(dirname);
     exit(1);
@@ -98,19 +101,52 @@ static std::vector<bstring> ReadAllFiles(const char *dirname) {
   }
 
   closedir(dir);
-  assert(chdir(current_dir) == 0);
+  int ret = chdir(current_dir);
+  assert(ret == 0);
   return result;
 }
 
-// Make the object that we use to recognize the extension.
-static ASN1_OBJECT *ProofExtensionObject() {
+// The proof extension in a superfluous certificate.
+static const char kProofExtensionOID[] = "1.2.3.0";
+// TODO: embedded proof, proto algorithm and proto signature could/should
+// all be in the same extension. We keep them separate now for easier debugging.
+// The proof.
+static const char kEmbeddedProofExtensionOID[] = "1.2.3.1";
+// The poison extension in the ProtoCert (critical).
+static const char kPoisonExtensionOID[] = "1.2.3.2";
+// The algorithm of the ProtoCert signature.
+static const char kProtoAlgorExtensionOID[] = "1.2.3.3";
+// The Protocert signature.
+static const char kProtoSigExtensionOID[] = "1.2.3.4";
+
+static ASN1_OBJECT *ExtensionObject(const char *oid) {
   unsigned char obj_buf[100];
-  char oid[] = "1.2.3.4";
   int obj_len = a2d_ASN1_OBJECT(obj_buf, sizeof obj_buf, oid,
                                 sizeof oid - 1);
   assert(obj_len > 0);
   ASN1_OBJECT *obj = ASN1_OBJECT_create(0, obj_buf, obj_len, NULL, NULL);
   return obj;
+}
+
+static void AddExtension(X509 *cert, const char *oid, unsigned char *data,
+                         int data_len, int critical) {
+  ASN1_OBJECT *obj = ExtensionObject(oid);
+  assert(obj != NULL);
+  X509_EXTENSION *ext = X509_EXTENSION_new();
+  assert(ext != NULL);
+  int ret = X509_EXTENSION_set_object(ext, obj);
+  assert(ret == 1);
+  ret = X509_EXTENSION_set_critical(ext, critical);
+  assert(ret == 1);
+  if (data != NULL) {
+    ASN1_OCTET_STRING *asn1_data = ASN1_OCTET_STRING_new();
+    ASN1_OCTET_STRING_set(asn1_data, data, data_len);
+    ret = X509_EXTENSION_set_data(ext, asn1_data);
+    assert(ret == 1);
+  }
+  assert(cert != NULL);
+  ret = X509_add_ext(cert, ext, -1);
+  assert(ret == 1);
 }
 
 // Verify the proof on a log entry bundle.
@@ -418,36 +454,91 @@ class SSLClient : public CTClient {
       return 0;
     }
 
-    // TODO: is there an API call for accessing the bag of certs?
-    STACK_OF(X509) *sk = ctx->untrusted;
-    if (sk) {
-      // Create the object by which we recognize the proof extension.
-      ASN1_OBJECT *obj = ProofExtensionObject();
-      assert(obj != NULL);
-      for (int i = 0; i < sk_X509_num(sk); ++i) {
-        X509 *cert = sk_X509_value(sk, i);
-        int extension_index = X509_get_ext_by_OBJ(cert, obj, -1);
-        if (extension_index != -1) {
-          std::cout << "Proof extension found in certificate, verifying...";
-          X509_EXTENSION *ext = X509_get_ext(cert, extension_index);
-          ASN1_OCTET_STRING *ext_data = X509_EXTENSION_get_data(ext);
-          bstring proofstring(ext_data->data, ext_data->length);
-          // Only writes the checkpoint if verification succeeds.
-          // Note: an optimized client could only verify the signature if it's
-          // a checkpoint it hasn't seen before.
-          LogVerifier::VerifyResult result =
-              VerifyLogSegmentProof(proofstring, ctx->cert, verifier,
-                                    &args->checkpoint);
-          if (result == LogVerifier::VERIFY_OK) {
-            args->proof_verified = true;
-            std::cout << "OK." << std::endl;
-            break;
-          } else {
-            std::cout << LogVerifier::VerifyResultString(result) << std::endl;
+    // Make a local copy of the leaf cert so that we can modify it.
+    X509 *leaf_cert = X509_dup(ctx->cert);
+    bstring proofstring;
+    // First, see if the cert has an embedded proof.
+    ASN1_OBJECT *proof_obj = ExtensionObject(kEmbeddedProofExtensionOID);
+    assert(proof_obj != NULL);
+    int extension_index = X509_get_ext_by_OBJ(ctx->cert, proof_obj, -1);
+    if (extension_index != -1) {
+      std::cout << "Embedded proof extension found in certificate, "
+                << "verifying...";
+      X509_EXTENSION *ext = X509_get_ext(ctx->cert, extension_index);
+      ASN1_OCTET_STRING *ext_data = X509_EXTENSION_get_data(ext);
+      proofstring = bstring(ext_data->data, ext_data->length);
+      // Delete the embedded proof extension.
+      X509_delete_ext(leaf_cert, extension_index);
+      unsigned char data[] = "poison";
+
+      // Insert the poison extension.
+      AddExtension(leaf_cert, kPoisonExtensionOID, data, 6, 1);
+      // Find the protocert signature and plug it in.
+      ASN1_OBJECT *algor_obj = ExtensionObject(kProtoAlgorExtensionOID);
+      assert(algor_obj != NULL);
+      extension_index = X509_get_ext_by_OBJ(leaf_cert, algor_obj, -1);
+      assert(extension_index != -1);
+      ext = X509_get_ext(leaf_cert, extension_index);
+      ext_data = X509_EXTENSION_get_data(ext);
+
+      if (leaf_cert->sig_alg != NULL)
+        X509_ALGOR_free(leaf_cert->sig_alg);
+      const unsigned char *algor_ptr = ext_data->data;
+      leaf_cert->sig_alg = d2i_X509_ALGOR(NULL, &algor_ptr, ext_data->length);
+      assert(leaf_cert->sig_alg != NULL);
+      X509_delete_ext(leaf_cert, extension_index);
+
+      ASN1_OBJECT *sig_obj = ExtensionObject(kProtoSigExtensionOID);
+      assert(sig_obj != NULL);
+      extension_index = X509_get_ext_by_OBJ(leaf_cert, sig_obj, -1);
+      assert(extension_index != -1);
+      ext = X509_get_ext(leaf_cert, extension_index);
+      ext_data = X509_EXTENSION_get_data(ext);
+
+      if (leaf_cert->signature != NULL)
+        ASN1_BIT_STRING_free(leaf_cert->signature);
+      const unsigned char *sig_ptr = ext_data->data;
+      leaf_cert->signature =
+          c2i_ASN1_BIT_STRING(NULL, &sig_ptr, ext_data->length);
+      X509_delete_ext(leaf_cert, extension_index);
+
+      // Let OpenSSL know that it needs to re-encode the cert.
+      leaf_cert->cert_info->enc.modified = 1;
+
+    } else {
+      // Look for the proof in a superfluous cert.
+      // TODO: is there an API call for accessing the bag of certs?
+      STACK_OF(X509) *sk = ctx->untrusted;
+      if (sk) {
+        // Create the object by which we recognize the proof extension.
+        ASN1_OBJECT *obj = ExtensionObject(kProofExtensionOID);
+        assert(obj != NULL);
+        for (int i = 0; i < sk_X509_num(sk); ++i) {
+          X509 *cert = sk_X509_value(sk, i);
+          int extension_index = X509_get_ext_by_OBJ(cert, obj, -1);
+          if (extension_index != -1) {
+            std::cout << "Proof extension found in certificate, verifying...";
+            X509_EXTENSION *ext = X509_get_ext(cert, extension_index);
+            ASN1_OCTET_STRING *ext_data = X509_EXTENSION_get_data(ext);
+            proofstring = bstring(ext_data->data, ext_data->length);
           }
         }
       }
-      ASN1_OBJECT_free(obj);
+    }
+
+    if (!proofstring.empty()) {
+      // Only writes the checkpoint if verification succeeds.
+      // Note: an optimized client could only verify the signature if it's
+      // a checkpoint it hasn't seen before.
+      LogVerifier::VerifyResult result =
+          VerifyLogSegmentProof(proofstring, leaf_cert, verifier,
+                                &args->checkpoint);
+      if (result == LogVerifier::VERIFY_OK) {
+        args->proof_verified = true;
+        std::cout << "OK." << std::endl;
+      } else {
+        std::cout << LogVerifier::VerifyResultString(result) << std::endl;
+      }
     }
 
     if (args->proof_verified)
@@ -720,14 +811,7 @@ static void MakeCert(int argc, const char **argv) {
   X509_PUBKEY_set(&X509_get_X509_PUBKEY(x) , evp_pkey);
 
   // And finally, the proof in an extension
-  ASN1_OBJECT *obj = ProofExtensionObject();
-  ASN1_OCTET_STRING *data = ASN1_OCTET_STRING_new();
-  ASN1_OCTET_STRING_set(data, proof, proof_len);
-  X509_EXTENSION *ext = X509_EXTENSION_new();
-  X509_EXTENSION_set_object(ext, obj);
-  X509_EXTENSION_set_critical(ext, 1);
-  X509_EXTENSION_set_data(ext, data);
-  X509_add_ext(x, ext, -1);
+  AddExtension(x, kProofExtensionOID, proof, proof_len, 1);
 
   int i = i2d_X509_bio(out, x);
   assert(i != 0);
@@ -768,21 +852,24 @@ static void MakeProtoCert(int argc, const char **argv) {
 
   BIO *req_bio = BIO_new(BIO_s_file());
   assert(req_bio != NULL);
-  assert(BIO_read_filename(req_bio, req_file) == 1);
+  int ret = BIO_read_filename(req_bio, req_file);
+  assert(ret == 1);
   X509_REQ *req = PEM_read_bio_X509_REQ(req_bio, NULL, NULL, NULL);
   assert(req != NULL);
   BIO_free(req_bio);
 
   BIO *ca_protocert_bio = BIO_new(BIO_s_file());
   assert(ca_protocert_bio != NULL);
-  assert(BIO_read_filename(ca_protocert_bio, ca_protocert_file) == 1);
+  ret = BIO_read_filename(ca_protocert_bio, ca_protocert_file);
+  assert(ret == 1);
   X509 *ca_protocert = PEM_read_bio_X509(ca_protocert_bio, NULL, NULL, NULL);
   assert(ca_protocert != NULL);
   BIO_free(ca_protocert_bio);
 
   BIO *ca_protokey_bio = BIO_new(BIO_s_file());
   assert(ca_protokey_bio != NULL);
-  assert(BIO_read_filename(ca_protokey_bio, ca_protokey_file) == 1);
+  ret = BIO_read_filename(ca_protokey_bio, ca_protokey_file);
+  assert(ret == 1);
   EVP_PKEY *ca_protokey = PEM_read_bio_PrivateKey(ca_protokey_bio, NULL, NULL,
                                                   const_cast<char*>(password));
   assert(ca_protokey != NULL);
@@ -790,7 +877,8 @@ static void MakeProtoCert(int argc, const char **argv) {
 
   BIO *ca_cert_bio = BIO_new(BIO_s_file());
   assert(ca_cert_bio != NULL);
-  assert(BIO_read_filename(ca_cert_bio, ca_cert_file) == 1);
+  ret = BIO_read_filename(ca_cert_bio, ca_cert_file);
+  assert(ret == 1);
   X509 *ca_cert = PEM_read_bio_X509(ca_cert_bio, NULL, NULL, NULL);
   assert(ca_cert != NULL);
   BIO_free(ca_cert_bio);
@@ -802,7 +890,8 @@ static void MakeProtoCert(int argc, const char **argv) {
 
   X509 *proto = X509_new();
   // Set the version to v3.
-  assert(X509_set_version(proto, 2) == 1);
+  ret = X509_set_version(proto, 2);
+  assert(ret == 1);
 
   // Random 128-bit serial number.
   // TODO: take a serial file as input.
@@ -814,14 +903,19 @@ static void MakeProtoCert(int argc, const char **argv) {
   // Subject name.
   X509_NAME *subject = X509_REQ_get_subject_name(req);
   assert(subject != NULL);
-  assert(X509_set_subject_name(proto, subject) == 1);
+  ret = X509_set_subject_name(proto, subject);
+  assert(ret == 1);
 
   // Subject public key.
   EVP_PKEY *pkey = X509_REQ_get_pubkey(req);
   assert(pkey != NULL);
   // Verify the signature on the request.
-  assert(X509_REQ_verify(req, pkey) == 1);
-  assert(X509_set_pubkey(proto, pkey) == 1);
+  ret = X509_REQ_verify(req, pkey);
+  assert(ret == 1);
+  X509_set_pubkey(proto, pkey);
+  assert(ret == 1);
+  // X509_REQ_get_pubkey increases the reference count, so decrease it again.
+  EVP_PKEY_free(pkey);
 
   // The eventual issuer shall be the CA cert.
   X509_NAME *issuer = X509_get_subject_name(ca_cert);
@@ -829,7 +923,8 @@ static void MakeProtoCert(int argc, const char **argv) {
   // Check that this is the same as the issuer of the CA protocert.
   X509_NAME *proto_issuer = X509_get_issuer_name(ca_protocert);
   assert(proto_issuer != NULL);
-  assert(X509_NAME_cmp(issuer, proto_issuer) == 0);
+  ret = X509_NAME_cmp(issuer, proto_issuer);
+  assert(ret == 0);
   X509_set_issuer_name(proto, issuer);
 
   // Validity.
@@ -843,20 +938,24 @@ static void MakeProtoCert(int argc, const char **argv) {
   X509V3_CTX ctx;
   CONF *extconf = NCONF_new(NULL);
   long errorline = -1;
-  assert(NCONF_load(extconf, conf_file, &errorline) == 1);
+  ret = NCONF_load(extconf, conf_file, &errorline);
+  assert(ret == 1);
 
   X509V3_set_ctx(&ctx, ca_cert, proto, NULL, NULL, 0);
   X509V3_set_nconf(&ctx, extconf);
-  assert(X509V3_EXT_add_nconf(extconf, &ctx, const_cast<char*>(kSection),
-                              proto));
+  ret = X509V3_EXT_add_nconf(extconf, &ctx, const_cast<char*>(kSection),
+                              proto);
+  assert(ret == 1);
 
   // Sign.
-  assert(X509_sign(proto, ca_protokey, NULL) > 0);
+  ret = X509_sign(proto, ca_protokey, NULL);
+  assert(ret > 0);
 
   int out_fd = open(out_file, O_CREAT | O_TRUNC | O_WRONLY, 0666);
   assert(out_fd >= 0);
   BIO *out_bio = BIO_new_fd(out_fd, BIO_CLOSE);
-  assert(i2d_X509_bio(out_bio, proto) > 0);
+  ret = i2d_X509_bio(out_bio, proto);
+  assert(ret > 0);
   BIO_free(out_bio);
 
   X509_REQ_free(req);
@@ -865,6 +964,88 @@ static void MakeProtoCert(int argc, const char **argv) {
   X509_free(ca_cert);
   EVP_PKEY_free(ca_protokey);
   NCONF_free(extconf);
+}
+
+// Input: a protocert (in DER format) and a proof (raw binary).
+// Output: a signed certificate (in PEM format).
+static void ProtoCertToCert(int argc, const char **argv) {
+  if (argc != 6) {
+    std::cerr << argv[0] << " <protocert> <proof> <output cert> <CA key> "
+              << "<CA key password>\n";
+    exit(7);
+  }
+  const char *protocert_file = argv[1];
+  const char *proof_file = argv[2];
+  const char *out_file = argv[3];
+  const char *ca_key_file = argv[4];
+  const char *password = argv[5];
+
+  BIO *protocert_bio = BIO_new(BIO_s_file());
+  assert(protocert_bio != NULL);
+  int ret = BIO_read_filename(protocert_bio, protocert_file);
+  assert(ret == 1);
+  X509 *protocert = d2i_X509_bio(protocert_bio, NULL);
+  assert(protocert != NULL);
+  BIO_free(protocert_bio);
+
+  int proof_fd = open(proof_file, O_RDONLY);
+  assert(proof_fd >= 0);
+  unsigned char proof[2048];
+  ssize_t proof_len = read(proof_fd, proof, sizeof proof);
+  assert(proof_len >= 0);
+  assert(proof_len < (ssize_t)sizeof proof);
+
+  // TODO: verify the proof.
+
+  BIO *ca_key_bio = BIO_new(BIO_s_file());
+  assert(ca_key_bio != NULL);
+  ret = BIO_read_filename(ca_key_bio, ca_key_file);
+  assert(ret == 1);
+  EVP_PKEY *ca_key = PEM_read_bio_PrivateKey(ca_key_bio, NULL, NULL,
+                                             const_cast<char*>(password));
+  assert(ca_key != NULL);
+  BIO_free(ca_key_bio);
+
+  // Remove the poison extension.
+  ASN1_OBJECT *poison = ExtensionObject(kPoisonExtensionOID);
+  assert(poison != NULL);
+  int extension_index = X509_get_ext_by_OBJ(protocert, poison, -1);
+  assert(extension_index != -1);
+  X509_delete_ext(protocert, extension_index);
+
+  // Add the proof extension.
+  AddExtension(protocert, kEmbeddedProofExtensionOID, proof, proof_len, 0);
+
+  // Move the protocert algorithm and signature to a new extension.
+  unsigned char *algor_buf = NULL;
+  int algor_length = i2d_X509_ALGOR(protocert->sig_alg, &algor_buf);
+  assert(algor_length > 0);
+  AddExtension(protocert, kProtoAlgorExtensionOID, algor_buf, algor_length, 0);
+  OPENSSL_free(algor_buf);
+
+  int sig_length = i2c_ASN1_BIT_STRING(protocert->signature, NULL);
+  assert(sig_length > 0);
+  unsigned char *sig_buf = new unsigned char[sig_length];
+  // i2c modifies sig_buf
+  unsigned char *sig_buf_save = sig_buf;
+  ret = i2c_ASN1_BIT_STRING(protocert->signature, &sig_buf);
+  assert(ret > 0);
+  AddExtension(protocert, kProtoSigExtensionOID, sig_buf_save, sig_length, 0);
+  delete[] sig_buf_save;
+
+  // Sign with the CA cert.
+  ret = X509_sign(protocert, ca_key, NULL);
+  assert(ret > 0);
+
+  int out_fd = open(out_file, O_CREAT | O_TRUNC | O_WRONLY, 0666);
+  assert(out_fd >= 0);
+  BIO *out_bio = BIO_new_fd(out_fd, BIO_CLOSE);
+  ret = PEM_write_bio_X509(out_bio, protocert);
+  assert(ret > 0);
+  BIO_free(out_bio);
+
+  X509_free(protocert);
+  EVP_PKEY_free(ca_key);
 }
 
 static void ConnectHelp() {
@@ -1002,6 +1183,8 @@ int main(int argc, const char **argv) {
     Connect(argc, argv);
   } else if (cmd == "protocert") {
     MakeProtoCert(argc, argv);
+  } else if (cmd == "sign") {
+    ProtoCertToCert(argc, argv);
   } else {
     UnknownCommand(cmd);
     UsageHelp(main_command);
