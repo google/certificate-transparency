@@ -188,7 +188,7 @@ public:
     fd_ = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
     if (fd_ < 0) {
       perror("Socket creation failed");
-      exit(3);
+      exit(1);
     }
 
     static struct sockaddr_in server_socket;
@@ -197,7 +197,7 @@ public:
     server_socket.sin_port = htons(port);
     if (inet_aton(server, &server_socket.sin_addr) != 1) {
       std::cerr << "Can't parse server address: " << server << '.' << std::endl;
-      exit(5);
+      exit(1);
     }
 
     std::cout << "Connecting to " << server << ':' << port << '.' << std::endl;
@@ -206,7 +206,7 @@ public:
     if (ret < 0) {
       close(fd_);
       perror("Connect failed");
-      exit(4);
+      exit(1);
     }
   }
 
@@ -364,11 +364,14 @@ private:
 
 class SSLClient : public CTClient {
  public:
-  SSLClient(const char *server, uint16_t port) : CTClient(server, port) {}
+  SSLClient(const char *server, uint16_t port) : CTClient(server, port),
+                                                 ca_file_(NULL) {}
 
   SSLClient(const char *server, uint16_t port,
-            const std::vector<bstring> &cache) : CTClient(server, port),
-                                                 cache_(cache) {}
+            const std::vector<bstring> &cache,
+            const char *ca_file) : CTClient(server, port),
+                                   cache_(cache),
+                                   ca_file_(ca_file) {}
 
   std::vector<bstring> WriteCache() const {
     return cache_.WriteCache();
@@ -560,12 +563,19 @@ class SSLClient : public CTClient {
   }
 
   // Verification callbacks use this verifier for verifying log proofs.
-  void SSLConnect(LogVerifier *verifier) {
+  // Return true if a valid proof is found; false otherwise.
+  bool SSLConnect(LogVerifier *verifier) {
     SSL_CTX *ctx = SSL_CTX_new(TLSv1_client_method());
     assert(ctx != NULL);
     // SSL_VERIFY_PEER makes the connection abort immediately
     // if verification fails.
     SSL_CTX_set_verify(ctx, SSL_VERIFY_PEER, NULL);
+    // Set trusted CA certs.
+    int ret;
+    if (ca_file_ != NULL) {
+      ret = SSL_CTX_load_verify_locations(ctx, ca_file_, NULL);
+      assert(ret == 1);
+    }
     VerifyCallbackArgs args;
     args.verifier = verifier;
     args.proof_verified = false;
@@ -581,7 +591,7 @@ class SSLClient : public CTClient {
     assert(bio != NULL);
     // Takes ownership of bio.
     SSL_set_bio(ssl, bio, bio);
-    int ret = SSL_connect(ssl);
+    ret = SSL_connect(ssl);
     // TODO: check and report certificate verification errors.
     if (ret == 1)
       std::cout << "Connected." << std::endl;
@@ -611,10 +621,12 @@ class SSLClient : public CTClient {
       SSL_free(ssl);
     }
     SSL_CTX_free(ctx);
+    return args.proof_verified;
   }
 
  private:
   LogSegmentCheckpointCache cache_;
+  const char *ca_file_;
 }; // class SSLCLient
 
 static void UploadHelp() {
@@ -671,18 +683,18 @@ static void Upload(int argc, const char **argv) {
   std::ifstream in(file);
   if (!in.is_open()) {
     perror(file);
-    exit(2);
+    exit(1);
   }
 
   if (key_file != NULL) {
     FILE *fp = fopen(key_file, "r");
     if (fp == NULL) {
       perror(key_file);
-      exit(2);
+      exit(1);
     }
     if (PEM_read_PUBKEY(fp, &pkey, NULL, NULL) == NULL) {
       std::cerr << "Could not read log server public key" << std::endl;
-      exit(6);
+      exit(1);
     }
     fclose(fp);
   }
@@ -691,7 +703,7 @@ static void Upload(int argc, const char **argv) {
     out = fopen(proof_file, "wb");
     if (out == NULL) {
       perror(proof_file);
-      exit(2);
+      exit(1);
     }
   }
 
@@ -748,7 +760,7 @@ static void Upload(int argc, const char **argv) {
 static void MakeCert(int argc, const char **argv) {
   if (argc != 3) {
     std::cerr << argv[0] << " <input proof> <output certificate>\n";
-    exit(7);
+    exit(1);
   }
   const char *proof_file = argv[1];
   const char *cert_file = argv[2];
@@ -838,7 +850,7 @@ static void MakeProtoCert(int argc, const char **argv) {
     std::cerr << argv[0] << " <input request> <output signed ProtoCert> "
               << "<CA protocert signing cert> <CA protocert signing key> "
               << "<CA protocert signing key password> <CA cert> <conf file> \n";
-    exit(7);
+    exit(1);
   }
   const char *req_file = argv[1];
   const char *out_file = argv[2];
@@ -972,7 +984,7 @@ static void ProtoCertToCert(int argc, const char **argv) {
   if (argc != 6) {
     std::cerr << argv[0] << " <protocert> <proof> <output cert> <CA key> "
               << "<CA key password>\n";
-    exit(7);
+    exit(1);
   }
   const char *protocert_file = argv[1];
   const char *proof_file = argv[2];
@@ -1049,11 +1061,11 @@ static void ProtoCertToCert(int argc, const char **argv) {
 }
 
 static void ConnectHelp() {
-    std::cerr << "connect <server> <port> [-log_server_key key_file] " <<
-        "[-cache cache_dir]" << std::endl;
+  std::cerr << "connect <server> <port> [-log_server_key key_file] "
+            << "[-cache cache_dir] [-ca_file ca_file]" << std::endl;
 }
 
-static void Connect(int argc, const char **argv) {
+static bool Connect(int argc, const char **argv) {
   if (argc < 3) {
     ConnectHelp();
     exit(1);
@@ -1063,6 +1075,7 @@ static void Connect(int argc, const char **argv) {
 
   const char *key_file = NULL;
   const char *cache_dir = NULL;
+  const char *ca_file = NULL;
 
   EVP_PKEY *pkey = NULL;
 
@@ -1086,6 +1099,14 @@ static void Connect(int argc, const char **argv) {
       cache_dir = argv[1];
       argc -= 2;
       argv += 2;
+    } else if (strcmp(argv[0], "-ca_file") == 0) {
+      if (ca_file != NULL) {
+        ConnectHelp();
+        exit(1);
+      }
+      ca_file = argv[1];
+      argc -= 2;
+      argv += 2;
     } else {
       ConnectHelp();
       exit(1);
@@ -1101,11 +1122,11 @@ static void Connect(int argc, const char **argv) {
     FILE *fp = fopen(key_file, "r");
     if (fp == NULL) {
       perror(key_file);
-      exit(2);
+      exit(1);
     }
     if (PEM_read_PUBKEY(fp, &pkey, NULL, NULL) == NULL) {
       std::cerr << "Could not read log server public key" << std::endl;
-      exit(6);
+      exit(1);
     }
     fclose(fp);
   }
@@ -1119,8 +1140,8 @@ static void Connect(int argc, const char **argv) {
     cache = ReadAllFiles(cache_dir);
     std::cout << "OK." << std::endl;
   }
-  SSLClient client(server_name, port, cache);
-  client.SSLConnect(verifier);
+  SSLClient client(server_name, port, cache, ca_file);
+  bool proof_verified = client.SSLConnect(verifier);
   if (cache_dir != NULL) {
     std::cout << "Writing cache...";
     cache = client.WriteCache();
@@ -1128,6 +1149,7 @@ static void Connect(int argc, const char **argv) {
     std::cout << "OK." << std::endl;
   }
   delete verifier;
+  return proof_verified;
 }
 
 static void UsageHelp(const std::string &cmd) {
@@ -1135,6 +1157,10 @@ static void UsageHelp(const std::string &cmd) {
             << std::endl;
 }
 
+// Return value:
+// 0: success
+// 1: system error/invalid argument/etc
+// 2: proof verification error (for Connect())
 int main(int argc, const char **argv) {
   const std::string main_command(argv[0]);
   if (argc < 2) {
@@ -1175,13 +1201,19 @@ int main(int argc, const char **argv) {
   SSL_library_init();
 
   const std::string cmd(argv[0]);
+
+  if (cmd == "connect") {
+    if(!Connect(argc, argv))
+      // Connection succeeded but the server presented no valid proof.
+      return 2;
+    return 0;
+  }
+
   if (cmd == "upload")
     Upload(argc, argv);
   else if (cmd == "certificate")
     MakeCert(argc, argv);
-  else if (cmd == "connect") {
-    Connect(argc, argv);
-  } else if (cmd == "protocert") {
+  else if (cmd == "protocert") {
     MakeProtoCert(argc, argv);
   } else if (cmd == "sign") {
     ProtoCertToCert(argc, argv);

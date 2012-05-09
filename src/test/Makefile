@@ -25,9 +25,11 @@ test-protocert.der: ca-protocert.pem test-cert.csr
 	../client/ct protocert test-cert.csr test-protocert.der \
 	ca-protocert.pem ca-protokey.pem password1 ca-cert.pem protocert.conf
 
-test-cert.pem: test-cert.csr
-	openssl x509 -req -days 365 -in test-cert.csr -signkey test-key.pem \
-	-out test-cert.pem
+# Generate a simple certificate without an embedded proof
+test-cert.pem: test-cert.csr ca-cert.pem
+	openssl x509 -req -days 365 -in test-cert.csr -CA ca-cert.pem \
+	-CAkey ca-key.pem -CAcreateserial -extfile protocert.conf \
+	-extensions simple -passin pass:password1 -out test-cert.pem
 
 test-cert.der: test-cert.pem
 	openssl x509 -in test-cert.pem -out test-cert.der -outform DER
@@ -66,7 +68,8 @@ ct-server-key-public.pem: ct-server-key.pem
 run-server: ct-server-key.pem
 	../server/ct-server 8124 ct-server-key.pem 1 1
 
-run-apache: test-cert.pem test-key.pem test-cert-proof.pem
+run-apache: test-cert.pem test-key.pem test-cert-proof.pem \
+	test-embedded-cert.pem
 	./apachectl -d `pwd` -f `pwd`/httpd.conf -k start
 
 restart-apache:
@@ -75,24 +78,15 @@ restart-apache:
 stop-apache:
 	./apachectl -d `pwd` -f `pwd`/httpd.conf -k stop
 
-run-apache-embedded: test-embedded-cert.pem test-key.pem
-	./apachectl -d `pwd` -f `pwd`/httpd-embedded.conf -k start
-
-restart-apache-embedded:
-	./apachectl -d `pwd` -f `pwd`/httpd-embedded.conf -k restart
-
-stop-apache-embedded:
-	./apachectl -d `pwd` -f `pwd`/httpd-embedded.conf -k stop
-
 connect: ct-server-key-public.pem
 	mkdir -p .cache
-	../client/ct connect 127.0.0.1 8123 -log_server_key \
-	ct-server-key-public.pem -cache .cache
+	../client/ct connect 127.0.0.1 8122 -log_server_key \
+	ct-server-key-public.pem -cache .cache -ca_file ca-cert.pem
 
 connect-embedded: ct-server-key-public.pem
 	mkdir -p .cache
 	../client/ct connect 127.0.0.1 8123 -log_server_key \
-	ct-server-key-public.pem -cache .cache
+	ct-server-key-public.pem -cache .cache -ca_file ca-cert.pem
 
 clean:
 	rm -f *.pem *.der *.csr *.proof *.srl

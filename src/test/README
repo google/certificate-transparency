@@ -35,67 +35,45 @@ proof, convert it to a proof certificate, and run Apache:
 
 $ make run-apache
 
-4. Test the proof
+This does the following steps:
+
+a) Create a CA root certificate and issue a CA ProtoCert signing certificate.
+b) Create a client Certificate Signing Request (CSR).
+c1) Sign the CSR with the CA root certificate. Submit the certificate
+to the log server, retrieve a proof, and embed it in a superfluous certificate.
+c2) Sign the CSR with the CA ProtoCert signing key and submit the
+signed request to the log server. Retrieve a proof, embed it in the
+leaf certificate and sign the certificate with the CA root key.
+d) Run two Apache VirtualHosts with the resulting client certificates.
+
+4a. Test the proof in a superfluous certificate
 
 $ make connect
 
 This should show something like:
 
-../client/ct connect 127.0.0.1 8123 ct-server-key-public.pem
 Reading cache...OK.
-Connecting to 127.0.0.1:8123.
+Connecting to 127.0.0.1:8122.
 Proof extension found in certificate, verifying...OK.
 Log proof verified.
-WARNING. Certificate verification failed.
 Connected.
 Cached new checkpoint.
 Writing cache...OK.
 
-
-The certificate verification fails because the server certificate is
-self-signed.
-
-5. When done, stop Apache
-
-$ make stop-apache
-
-The second demo creates a leaf certificate with an embedded proof.
-
-1. If the log server is not already running, do
-
-$ make run-server
-
-2. In another window, run Apache
-
-$ make run-apache-embedded
-
-This does the following steps:
-
-a) Create a CA root certificate and issue a CA ProtoCert signing certificate.
-b) Create a client Certificate Signing Request (CSR).
-c) Sign the CSR with the CA ProtoCert signing key and submit the
-signed request to the log server.
-d) Retrieve a proof, embed it in the client certificate and sign the
-certificate with the CA root key.
-e) Run Apache with the resulting client certificate.
-
-3. Connect to the server:
+4b. Test the certificate with an embedded proof
 
 $ make connect-embedded
 
-connects to the server. You should see this output:
+You should see this output:
+
 Reading cache...OK.
 Connecting to 127.0.0.1:8123.
 Embedded proof extension found in certificate, verifying...OK.
 Log proof verified.
-WARNING. Certificate verification failed.
 Connected.
 Cached new checkpoint.
 Writing cache...OK.
 
-4. Stop apache:
+5. When done, stop Apache
 
-$ make stop-apache-embedded
-
-
-
+$ make stop-apache
