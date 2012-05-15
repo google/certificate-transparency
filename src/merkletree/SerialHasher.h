@@ -7,7 +7,7 @@
 class SerialHasher {
  public:
   SerialHasher() {}
-  ~SerialHasher() {}
+  virtual ~SerialHasher() {}
 
   virtual size_t DigestSize() const = 0;
   virtual void Reset() = 0;
