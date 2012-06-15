@@ -1060,6 +1060,56 @@ static void ProtoCertToCert(int argc, const char **argv) {
   EVP_PKEY_free(ca_key);
 }
 
+// The number currently assigned in OpenSSL for
+// TLSEXT_AUTHDATAFORMAT_audit_proof.
+static const unsigned char kAuditProofFormat = 182;
+
+// Wrap the proof in a server_authz format, so that we can feed it to OpenSSL.
+static void ProofToAuthz(int argc, const char **argv) {
+  if (argc != 3) {
+    std::cerr << argv[0] << " <input proof> <output authz>\n";
+    exit(1);
+  }
+  const char *proof_in_file = argv[1];
+  const char *authz_out_file = argv[2];
+
+  std::ifstream proof_in(proof_in_file, std::ios::in|std::ios::binary);
+  if (!proof_in.good()) {
+    perror(proof_in_file);
+    exit(1);
+  }
+
+  std::ofstream authz_out(authz_out_file, std::ios::out|std::ios::binary);
+  if (!authz_out.good()) {
+    perror(authz_out_file);
+    exit(1);
+  }
+
+  // TLSEXT_AUTHDATAFORMAT_audit_proof
+  authz_out << kAuditProofFormat;
+
+  // Count proof length.
+  proof_in.seekg(0, std::ios::end);
+  int proof_length = proof_in.tellg();
+  // Rewind.
+  proof_in.seekg(0, std::ios::beg);
+
+  // Write the length.
+  authz_out << static_cast<unsigned char>(proof_length >> 8)
+            << static_cast<unsigned char>(proof_length);
+
+  // Now write the proof.
+  char *buf = new char[proof_length];
+  proof_in.read(buf, proof_length);
+  assert(proof_in.gcount() == proof_length);
+  authz_out.write(buf, proof_length);
+  assert(!authz_out.bad());
+
+  delete[] buf;
+  proof_in.close();
+  authz_out.close();
+}
+
 static void ConnectHelp() {
   std::cerr << "connect <server> <port> [-log_server_key key_file] "
             << "[-cache cache_dir] [-ca_file ca_file]" << std::endl;
@@ -1217,6 +1267,8 @@ int main(int argc, const char **argv) {
     MakeProtoCert(argc, argv);
   } else if (cmd == "sign") {
     ProtoCertToCert(argc, argv);
+  } else if (cmd == "authz") {
+    ProofToAuthz(argc, argv);
   } else {
     UnknownCommand(cmd);
     UsageHelp(main_command);
