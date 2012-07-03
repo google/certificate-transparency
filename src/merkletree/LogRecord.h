@@ -1,10 +1,10 @@
 #ifndef LOGRECORD_H
 #define LOGRECORD_H
 
-#include <string>
+#include <stddef.h>
 #include <vector>
 
-#include <stddef.h>
+#include "../include/types.h"
 
 // RFC5246.
 struct DigitallySigned {
@@ -27,25 +27,25 @@ struct DigitallySigned {
   };
   HashAlgorithm hash_algo;
   SignatureAlgorithm sig_algo;
-  std::string sig_string;
+  bstring sig_string;
   // Serialized format:
   // uint8 hash_algo;
   // uint8 sig_algo;
   // opaque signature<0..2^16-1>
-  std::string Serialize() const;
+  bstring Serialize() const;
   // Like Deserialize, but the input string can be longer.
   // Returns the number of consumed bytes if the beginning
   // of the string encodes a valid signature, and 0 otherwise.
-  size_t ReadFromString(const std::string &data);
-  bool Deserialize(const std::string &data);
+  size_t ReadFromString(const bstring &data);
+  bool Deserialize(const bstring &data);
 };
 
 struct LogSegmentCheckpoint {
   size_t sequence_number;
   size_t segment_size;
   DigitallySigned signature;
-  std::string root;
-  std::string Serialize() const;
+  bstring root;
+  bstring Serialize() const;
   // Input to segment_sig.
   // Serialized format:
   // struct {
@@ -54,15 +54,15 @@ struct LogSegmentCheckpoint {
   //   uint32 tree_size;
   //   opaque segment_root[32];
   // } LogSegmentTreeData;
-  std::string SerializeTreeData() const;
-  bool Deserialize(const std::string &data);
+  bstring SerializeTreeData() const;
+  bool Deserialize(const bstring &data);
 };
 
 struct LogHeadCheckpoint {
   size_t sequence_number;
   DigitallySigned signature;
-  std::string root;
-  std::string Serialize() const;
+  bstring root;
+  bstring Serialize() const;
   // Input to segment_info_sig.
   // Serialized format:
   // struct {
@@ -70,8 +70,8 @@ struct LogHeadCheckpoint {
   //   uint32 sequence_number;
   //   opaque segment_info_root[32];
   // } SegmentInfoTreeData;
-  std::string SerializeTreeData() const;
-  bool Deserialize(const std::string &data);
+  bstring SerializeTreeData() const;
+  bool Deserialize(const bstring &data);
 };
 
 struct SegmentData {
@@ -95,11 +95,11 @@ struct SegmentData {
   //   DigitallySigned segment_sig;
   //   DigitallySigned segment_info_sig;
   // } SegmentInfo;
-  std::string SerializeSegmentInfo() const;
+  bstring SerializeSegmentInfo() const;
 
   // Parse the SegmentInfo record from a string. If the encoding is valid,
   // return true and populate the fields; else return false.
-  bool DeserializeSegmentInfo(const std::string &segment_info);
+  bool DeserializeSegmentInfo(const bstring &segment_info);
 };
 
 struct AuditProof {
@@ -108,8 +108,8 @@ struct AuditProof {
   size_t tree_size;
   size_t leaf_index;
   DigitallySigned signature;
-  std::vector<std::string> audit_path;
-  std::string Serialize() const;
-  bool Deserialize(SegmentData::TreeType type, const std::string &data);
+  std::vector<bstring> audit_path;
+  bstring Serialize() const;
+  bool Deserialize(SegmentData::TreeType type, const bstring &data);
 };
 #endif

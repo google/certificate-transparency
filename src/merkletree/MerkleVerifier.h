@@ -1,9 +1,10 @@
 #ifndef MERKLEVERIFIER_H
 #define MERKLEVERIFIER_H
+
 #include <stddef.h>
-#include <string>
 #include <vector>
 
+#include "../include/types.h"
 #include "TreeHasher.h"
 
 class SerialHasher;
@@ -28,9 +29,8 @@ class MerkleVerifier {
   // @ param root The root hash
   // @ param data The leaf data
   bool VerifyPath(size_t leaf, size_t tree_size,
-                  const std::vector<std::string> &path,
-                  const std::string &root,
-                  const std::string &data);
+                  const std::vector<bstring> &path, const bstring &root,
+                  const bstring &data);
 
   // Compute the root corresponding to a Merkle audit path.
   // Returns an empty string if the path is not valid.
@@ -40,13 +40,12 @@ class MerkleVerifier {
   // @param path a vector of node hashes ordered according to levels from leaf
   // to root. Does not include the leaf hash or the root.
   // @ param data The leaf data
-  std::string RootFromPath(size_t leaf, size_t tree_size,
-			   const std::vector<std::string> &path,
-			   const std::string &data);
+  bstring RootFromPath(size_t leaf, size_t tree_size,
+                       const std::vector<bstring> &path, const bstring &data);
 
   bool VerifyConsistency(size_t snapshot1, size_t snapshot2,
-                         const std::string &root1, const std::string &root2,
-                         const std::vector<std::string> &proof);
+                         const bstring &root1, const bstring &root2,
+                         const std::vector<bstring> &proof);
  private:
   TreeHasher treehasher_;
 };

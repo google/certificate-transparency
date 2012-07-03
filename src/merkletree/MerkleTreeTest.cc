@@ -1,4 +1,3 @@
-// Opened for readability review.
 #include <assert.h>
 #include <stddef.h>
 #include <stdio.h>
@@ -7,6 +6,8 @@
 #include <time.h>
 #include <vector>
 
+#include "../include/types.h"
+#include "../util/util.h"
 #include "MerkleTree.h"
 #include "MerkleVerifier.h"
 #include "SerialHasher.h"
@@ -31,8 +32,8 @@ int DownToPowerOfTwo(int i) {
 }
 
 // Reference implementation of Merkle hash, for cross-checking.
-std::string ReferenceMerkleTreeHash(std::string inputs[], int input_size,
-                                    TreeHasher *treehasher) {
+bstring ReferenceMerkleTreeHash(bstring inputs[], int input_size,
+                                TreeHasher *treehasher) {
   if (!input_size)
     return treehasher->HashEmpty();
   if (input_size == 1)
@@ -47,10 +48,10 @@ std::string ReferenceMerkleTreeHash(std::string inputs[], int input_size,
 
 // Reference implementation of Merkle paths. Path from leaf to root,
 // excluding the leaf and root themselves.
-std::vector<std::string>
-ReferenceMerklePath(std::string inputs[], int input_size, int leaf,
+std::vector<bstring>
+ReferenceMerklePath(bstring inputs[], int input_size, int leaf,
                     TreeHasher *treehasher) {
-  std::vector<std::string> path;
+  std::vector<bstring> path;
   if (leaf > input_size || leaf == 0)
     return path;
 
@@ -59,7 +60,7 @@ ReferenceMerklePath(std::string inputs[], int input_size, int leaf,
 
   const int split = DownToPowerOfTwo(input_size);
 
-  std::vector<std::string> subpath;
+  std::vector<bstring> subpath;
   if (leaf <= split) {
     subpath = ReferenceMerklePath(&inputs[0], split, leaf, treehasher);
     path.insert(path.end(), subpath.begin(), subpath.end());
@@ -77,11 +78,11 @@ ReferenceMerklePath(std::string inputs[], int input_size, int leaf,
 
 // Reference implementation of snapshot consistency.
 // Call with have_root1 = true.
-std::vector<std::string>
-ReferenceSnapshotConsistency(std::string inputs[], int snapshot2,
+std::vector<bstring>
+ReferenceSnapshotConsistency(bstring inputs[], int snapshot2,
                              int snapshot1, TreeHasher *treehasher,
                              bool have_root1) {
-  std::vector<std::string> proof;
+  std::vector<bstring> proof;
   if (snapshot1 == 0 || snapshot1 > snapshot2)
     return proof;
   if (snapshot1 == snapshot2) {
@@ -97,7 +98,7 @@ ReferenceSnapshotConsistency(std::string inputs[], int snapshot2,
   // 0 < snapshot1 < snapshot2
   const int split = DownToPowerOfTwo(snapshot2);
 
-  std::vector<std::string> subproof;
+  std::vector<bstring> subproof;
   if (snapshot1 <= split) {
     // Root of snapshot1 is in the left subtree of snapshot2.
     // Prove that the left subtrees are consistent.
@@ -127,9 +128,9 @@ ReferenceSnapshotConsistency(std::string inputs[], int snapshot2,
 
 // Make random root queries and check against the reference hash.
 void RootFuzzTest() {
-  std::string data[256];
+  bstring data[256];
   for (int i = 0; i < 256; ++i)
-    data[i] = std::string(1, static_cast<char>(i));
+    data[i] = bstring(1, i);
   TreeHasher treehasher(new Sha256Hasher());
 
   // Repeat test for each tree size in 1...256.
@@ -150,9 +151,9 @@ void RootFuzzTest() {
 
 // Make random path queries and check against the reference implementation.
 void PathFuzzTest() {
-  std::string data[256];
+  bstring data[256];
   for (int i = 0; i < 256; ++i)
-    data[i] = std::string(1, static_cast<char>(i));
+    data[i] = bstring(1, i);
   TreeHasher treehasher(new Sha256Hasher());
 
   // Repeat test for each tree size in 1...256.
@@ -176,9 +177,9 @@ void PathFuzzTest() {
 
 // Make random proof queries and check against the reference implementation.
 void ConsistencyFuzzTest() {
-  std::string data[256];
+  bstring data[256];
   for (int i = 0; i < 256; ++i)
-    data[i] = std::string(1, static_cast<char>(i));
+    data[i] = bstring(1, i);
   TreeHasher treehasher(new Sha256Hasher());
 
   // Repeat test for each tree size in 1...256.
@@ -207,29 +208,28 @@ void ConsistencyFuzzTest() {
 
 typedef struct {
   const char *str;
-  int length;
+  int length_bytes;
 } TestVector;
 
 // A slightly shorter notation for constructing binary blobs from test vectors.
-#define S(t) std::string(t.str, t.length)
+#define S(t) util::BinaryString(std::string(t.str, 2 * t.length_bytes))
 
 // The hash of an empty tree is the hash of the empty string.
 // (see SerialHasherTest and http://csrc.nist.gov/groups/STM/cavp/)
 const TestVector kSHA256EmptyTreeHash = {
-  "\xe3\xb0\xc4\x42\x98\xfc\x1c\x14\x9a\xfb\xf4\xc8\x99\x6f\xb9\x24"
-  "\x27\xae\x41\xe4\x64\x9b\x93\x4c\xa4\x95\x99\x1b\x78\x52\xb8\x55", 32
+  "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855", 32
 };
 
 // Inputs to the reference tree, which has eight leaves.
 const TestVector kInputs[8] = {
   { "", 0 },
-  { "\x00", 1 },
-  { "\x10", 1 },
-  { "\x20\x21", 2 },
-  { "\x30\x31", 2 },
-  { "\x40\x41\x42\x43", 4 },
-  { "\x50\x51\x52\x53\x54\x55\x56\x57", 8 },
-  { "\x60\x61\x62\x63\x64\x65\x66\x67\x68\x69\x6a\x6b\x6c\x6d\x6e\x6f", 16 },
+  { "00", 1 },
+  { "10", 1 },
+  { "2021", 2 },
+  { "3031", 2 },
+  { "40414243", 4 },
+  { "5051525354555657", 8 },
+  { "606162636465666768696a6b6c6d6e6f", 16 },
 };
 
 // Level counts for number of leaves in [1, 8]
@@ -238,22 +238,14 @@ const size_t kLevelCounts[8] = {1, 2, 3, 3, 4, 4, 4, 4};
 // Incremental roots from building the reference tree from inputs leaf-by-leaf.
 // Generated from ReferenceMerkleTreeHash.
 const TestVector kSHA256Roots[8] = {
-  { "\x6e\x34\x0b\x9c\xff\xb3\x7a\x98\x9c\xa5\x44\xe6\xbb\x78\x0a\x2c"
-    "\x78\x90\x1d\x3f\xb3\x37\x38\x76\x85\x11\xa3\x06\x17\xaf\xa0\x1d", 32 },
-  { "\xfa\xc5\x42\x03\xe7\xcc\x69\x6c\xf0\xdf\xcb\x42\xc9\x2a\x1d\x9d"
-    "\xba\xf7\x0a\xd9\xe6\x21\xf4\xbd\x8d\x98\x66\x2f\x00\xe3\xc1\x25", 32 },
-  { "\xae\xb6\xbc\xfe\x27\x4b\x70\xa1\x4f\xb0\x67\xa5\xe5\x57\x82\x64"
-    "\xdb\x0f\xa9\xb5\x1a\xf5\xe0\xba\x15\x91\x58\xf3\x29\xe0\x6e\x77", 32 },
-  { "\xd3\x7e\xe4\x18\x97\x6d\xd9\x57\x53\xc1\xc7\x38\x62\xb9\x39\x8f"
-    "\xa2\xa2\xcf\x9b\x4f\xf0\xfd\xfe\x8b\x30\xcd\x95\x20\x96\x14\xb7", 32 },
-  { "\x4e\x3b\xbb\x1f\x7b\x47\x8d\xcf\xe7\x1f\xb6\x31\x63\x15\x19\xa3"
-    "\xbc\xa1\x2c\x9a\xef\xca\x16\x12\xbf\xce\x4c\x13\xa8\x62\x64\xd4", 32 },
-  { "\x76\xe6\x7d\xad\xbc\xdf\x1e\x10\xe1\xb7\x4d\xdc\x60\x8a\xbd\x2f"
-    "\x98\xdf\xb1\x6f\xbc\xe7\x52\x77\xb5\x23\x2a\x12\x7f\x20\x87\xef", 32 },
-  { "\xdd\xb8\x9b\xe4\x03\x80\x9e\x32\x57\x50\xd3\xd2\x63\xcd\x78\x92"
-    "\x9c\x29\x42\xb7\x94\x2a\x34\xb7\x7e\x12\x2c\x95\x94\xa7\x4c\x8c", 32 },
-  { "\x5d\xc9\xda\x79\xa7\x06\x59\xa9\xad\x55\x9c\xb7\x01\xde\xd9\xa2"
-    "\xab\x9d\x82\x3a\xad\x2f\x49\x60\xcf\xe3\x70\xef\xf4\x60\x43\x28", 32 }
+  { "6e340b9cffb37a989ca544e6bb780a2c78901d3fb33738768511a30617afa01d", 32 },
+  { "fac54203e7cc696cf0dfcb42c92a1d9dbaf70ad9e621f4bd8d98662f00e3c125", 32 },
+  { "aeb6bcfe274b70a14fb067a5e5578264db0fa9b51af5e0ba159158f329e06e77", 32 },
+  { "d37ee418976dd95753c1c73862b9398fa2a2cf9b4ff0fdfe8b30cd95209614b7", 32 },
+  { "4e3bbb1f7b478dcfe71fb631631519a3bca12c9aefca1612bfce4c13a86264d4", 32 },
+  { "76e67dadbcdf1e10e1b74ddc608abd2f98dfb16fbce75277b5232a127f2087ef", 32 },
+  { "ddb89be403809e325750d3d263cd78929c2942b7942a34b77e122c9594a74c8c", 32 },
+  { "5dc9da79a70659a9ad559cb701ded9a2ab9d823aad2f4960cfe370eff4604328", 32 }
 };
 
 void RootKatTest() {
@@ -273,7 +265,7 @@ void RootKatTest() {
     }
 
     for (size_t j = i + 1; j < 8; ++j) {
-      assert(tree1.RootAtSnapshot(j + 1) == "");
+      assert(tree1.RootAtSnapshot(j + 1) == bstring());
     }
   }
 
@@ -317,42 +309,32 @@ const PathTestVector kSHA256Paths[6] = {
   { 0, 0, 0, { { "", 0 }, { "", 0 }, { "", 0 }}},
   { 1, 1, 0, { { "", 0 }, { "", 0 }, { "", 0 }}},
   { 1, 8, 3, {
-      { "\x96\xa2\x96\xd2\x24\xf2\x85\xc6\x7b\xee\x93\xc3\x0f\x8a\x30\x91"
-        "\x57\xf0\xda\xa3\x5d\xc5\xb8\x7e\x41\x0b\x78\x63\x0a\x09\xcf\xc7",
+      { "96a296d224f285c67bee93c30f8a309157f0daa35dc5b87e410b78630a09cfc7",
         32 },
-      { "\x5f\x08\x3f\x0a\x1a\x33\xca\x07\x6a\x95\x27\x98\x32\x58\x0d\xb3"
-        "\xe0\xef\x45\x84\xbd\xff\x1f\x54\xc8\xa3\x60\xf5\x0d\xe3\x03\x1e",
+      { "5f083f0a1a33ca076a95279832580db3e0ef4584bdff1f54c8a360f50de3031e",
         32 },
-      { "\x6b\x47\xaa\xf2\x9e\xe3\xc2\xaf\x9a\xf8\x89\xbc\x1f\xb9\x25\x4d"
-        "\xab\xd3\x11\x77\xf1\x62\x32\xdd\x6a\xab\x03\x5c\xa3\x9b\xf6\xe4",
+      { "6b47aaf29ee3c2af9af889bc1fb9254dabd31177f16232dd6aab035ca39bf6e4",
         32 }
     }},
   { 6, 8, 3, {
-      { "\xbc\x1a\x06\x43\xb1\x2e\x4d\x2d\x7c\x77\x91\x8f\x44\xe0\xf4\xf7"
-        "\x9a\x83\x8b\x6c\xf9\xec\x5b\x5c\x28\x3e\x1f\x4d\x88\x59\x9e\x6b",
+      { "bc1a0643b12e4d2d7c77918f44e0f4f79a838b6cf9ec5b5c283e1f4d88599e6b",
         32 },
-      { "\xca\x85\x4e\xa1\x28\xed\x05\x0b\x41\xb3\x5f\xfc\x1b\x87\xb8\xeb"
-        "\x2b\xde\x46\x1e\x9e\x3b\x55\x96\xec\xe6\xb9\xd5\x97\x5a\x0a\xe0",
+      { "ca854ea128ed050b41b35ffc1b87b8eb2bde461e9e3b5596ece6b9d5975a0ae0",
         32 },
-      { "\xd3\x7e\xe4\x18\x97\x6d\xd9\x57\x53\xc1\xc7\x38\x62\xb9\x39\x8f"
-        "\xa2\xa2\xcf\x9b\x4f\xf0\xfd\xfe\x8b\x30\xcd\x95\x20\x96\x14\xb7",
+      { "d37ee418976dd95753c1c73862b9398fa2a2cf9b4ff0fdfe8b30cd95209614b7",
         32 }
     }},
   { 3, 3, 1, {
-      { "\xfa\xc5\x42\x03\xe7\xcc\x69\x6c\xf0\xdf\xcb\x42\xc9\x2a\x1d\x9d"
-        "\xba\xf7\x0a\xd9\xe6\x21\xf4\xbd\x8d\x98\x66\x2f\x00\xe3\xc1\x25",
+      { "fac54203e7cc696cf0dfcb42c92a1d9dbaf70ad9e621f4bd8d98662f00e3c125",
         32 },
       { "", 0 }, { "", 0 }
     }},
   { 2, 5, 3, {
-      { "\x6e\x34\x0b\x9c\xff\xb3\x7a\x98\x9c\xa5\x44\xe6\xbb\x78\x0a\x2c"
-        "\x78\x90\x1d\x3f\xb3\x37\x38\x76\x85\x11\xa3\x06\x17\xaf\xa0\x1d",
+      { "6e340b9cffb37a989ca544e6bb780a2c78901d3fb33738768511a30617afa01d",
         32 },
-      { "\x5f\x08\x3f\x0a\x1a\x33\xca\x07\x6a\x95\x27\x98\x32\x58\x0d\xb3"
-        "\xe0\xef\x45\x84\xbd\xff\x1f\x54\xc8\xa3\x60\xf5\x0d\xe3\x03\x1e",
+      { "5f083f0a1a33ca076a95279832580db3e0ef4584bdff1f54c8a360f50de3031e",
         32 },
-      { "\xbc\x1a\x06\x43\xb1\x2e\x4d\x2d\x7c\x77\x91\x8f\x44\xe0\xf4\xf7"
-        "\x9a\x83\x8b\x6c\xf9\xec\x5b\x5c\x28\x3e\x1f\x4d\x88\x59\x9e\x6b",
+      { "bc1a0643b12e4d2d7c77918f44e0f4f79a838b6cf9ec5b5c283e1f4d88599e6b",
         32 }
     }}
 };
@@ -368,9 +350,9 @@ void PathKatTest() {
 
   assert(tree1.PathToCurrentRoot(9).empty());
   for (int i = 0; i < 6; ++i) {
-    std::vector<std::string> path = tree1.PathToRootAtSnapshot(
+    std::vector<bstring> path = tree1.PathToRootAtSnapshot(
         kSHA256Paths[i].leaf, kSHA256Paths[i].snapshot);
-    std::vector<std::string> kat_path;
+    std::vector<bstring> kat_path;
     for (int j = 0; j < kSHA256Paths[i].path_length; ++j)
       kat_path.push_back(S(kSHA256Paths[i].path[j]));
     assert(path == kat_path);
@@ -403,33 +385,25 @@ typedef struct {
 const ProofTestVector kSHA256Proofs[4] = {
   { 1, 1, 0, { { "", 0 }, { "", 0 }, { "", 0 } }},
   { 1, 8, 3, {
-      { "\x96\xa2\x96\xd2\x24\xf2\x85\xc6\x7b\xee\x93\xc3\x0f\x8a\x30\x91"
-        "\x57\xf0\xda\xa3\x5d\xc5\xb8\x7e\x41\x0b\x78\x63\x0a\x09\xcf\xc7",
+      { "96a296d224f285c67bee93c30f8a309157f0daa35dc5b87e410b78630a09cfc7",
         32 },
-      { "\x5f\x08\x3f\x0a\x1a\x33\xca\x07\x6a\x95\x27\x98\x32\x58\x0d\xb3"
-        "\xe0\xef\x45\x84\xbd\xff\x1f\x54\xc8\xa3\x60\xf5\x0d\xe3\x03\x1e",
+      { "5f083f0a1a33ca076a95279832580db3e0ef4584bdff1f54c8a360f50de3031e",
         32 },
-      { "\x6b\x47\xaa\xf2\x9e\xe3\xc2\xaf\x9a\xf8\x89\xbc\x1f\xb9\x25\x4d"
-        "\xab\xd3\x11\x77\xf1\x62\x32\xdd\x6a\xab\x03\x5c\xa3\x9b\xf6\xe4",
+      { "6b47aaf29ee3c2af9af889bc1fb9254dabd31177f16232dd6aab035ca39bf6e4",
         32 }
     }},
   { 6, 8, 3, {
-      { "\x0e\xbc\x5d\x34\x37\xfb\xe2\xdb\x15\x8b\x9f\x12\x6a\x1d\x11\x8e"
-        "\x30\x81\x81\x03\x1d\x0a\x94\x9f\x8d\xed\xed\xeb\xc5\x58\xef\x6a",
+      { "0ebc5d3437fbe2db158b9f126a1d118e308181031d0a949f8dededebc558ef6a",
         32 },
-      { "\xca\x85\x4e\xa1\x28\xed\x05\x0b\x41\xb3\x5f\xfc\x1b\x87\xb8\xeb"
-        "\x2b\xde\x46\x1e\x9e\x3b\x55\x96\xec\xe6\xb9\xd5\x97\x5a\x0a\xe0",
+      { "ca854ea128ed050b41b35ffc1b87b8eb2bde461e9e3b5596ece6b9d5975a0ae0",
         32 },
-      { "\xd3\x7e\xe4\x18\x97\x6d\xd9\x57\x53\xc1\xc7\x38\x62\xb9\x39\x8f"
-        "\xa2\xa2\xcf\x9b\x4f\xf0\xfd\xfe\x8b\x30\xcd\x95\x20\x96\x14\xb7",
+      { "d37ee418976dd95753c1c73862b9398fa2a2cf9b4ff0fdfe8b30cd95209614b7",
         32 }
     }},
   { 2, 5, 2, {
-      { "\x5f\x08\x3f\x0a\x1a\x33\xca\x07\x6a\x95\x27\x98\x32\x58\x0d\xb3"
-        "\xe0\xef\x45\x84\xbd\xff\x1f\x54\xc8\xa3\x60\xf5\x0d\xe3\x03\x1e",
+      { "5f083f0a1a33ca076a95279832580db3e0ef4584bdff1f54c8a360f50de3031e",
         32 },
-      { "\xbc\x1a\x06\x43\xb1\x2e\x4d\x2d\x7c\x77\x91\x8f\x44\xe0\xf4\xf7"
-        "\x9a\x83\x8b\x6c\xf9\xec\x5b\x5c\x28\x3e\x1f\x4d\x88\x59\x9e\x6b",
+      { "bc1a0643b12e4d2d7c77918f44e0f4f79a838b6cf9ec5b5c283e1f4d88599e6b",
         32 },
       { "", 0 } }}
 };
@@ -443,9 +417,9 @@ void ConsistencyKatTest() {
   assert(tree1.CurrentRoot() == S(kSHA256Roots[7]));
 
   for (int i = 0; i < 4; ++i) {
-    std::vector<std::string> proof = tree1.SnapshotConsistency(
+    std::vector<bstring> proof = tree1.SnapshotConsistency(
         kSHA256Proofs[i].snapshot1, kSHA256Proofs[i].snapshot2);
-    std::vector<std::string> kat_proof;
+    std::vector<bstring> kat_proof;
     for (int j = 0; j < kSHA256Proofs[i].proof_length; ++j)
       kat_proof.push_back(S(kSHA256Proofs[i].proof[j]));
     assert(proof == kat_proof);
@@ -457,9 +431,9 @@ void ConsistencyKatTest() {
 ////////////////////////////////////////////////////////////////////////////////
 
 void VerifierCheck(int leaf, int tree_size,
-                   const std::vector<std::string> &path,
-                   const std::string &root,
-                   const std::string &data, MerkleVerifier *verifier) {
+                   const std::vector<bstring> &path,
+                   const bstring &root,
+                   const bstring &data, MerkleVerifier *verifier) {
   // Verify the original path.
   assert(verifier->RootFromPath(leaf, tree_size, path, data) == root);
   assert(verifier->VerifyPath(leaf, tree_size, path, root, data));
@@ -474,14 +448,15 @@ void VerifierCheck(int leaf, int tree_size,
   assert(!verifier->VerifyPath(leaf, tree_size / 2, path, root, data));
 
   // Wrong leaf.
-  assert(!verifier->VerifyPath(leaf, tree_size, path, root, "WrongLeaf"));
+  const unsigned char wrong_leaf[] = "WrongLeaf";
+  assert(!verifier->VerifyPath(leaf, tree_size, path, root, bstring(wrong_leaf, 9)));
 
   // Wrong root.
   assert(!verifier->VerifyPath(leaf, tree_size, path,
                                S(kSHA256EmptyTreeHash), data));
 
   // Wrong paths.
-  std::vector<std::string> wrong_path;
+  std::vector<bstring> wrong_path;
 
   // Modify a single element on the path.
   for (size_t j = 0; j < path.size(); ++j) {
@@ -492,7 +467,7 @@ void VerifierCheck(int leaf, int tree_size,
 
   // Add garbage at the end of the path.
   wrong_path = path;
-  wrong_path.push_back("");
+  wrong_path.push_back(bstring());
   assert(!verifier->VerifyPath(leaf, tree_size, wrong_path, root, data));
   wrong_path.pop_back();
 
@@ -508,7 +483,7 @@ void VerifierCheck(int leaf, int tree_size,
 
   // Add garbage in the beginning of the path.
   wrong_path.clear();
-  wrong_path.push_back("");
+  wrong_path.push_back(bstring());
   wrong_path.insert(wrong_path.end(), path.begin(), path.end());
   assert(!verifier->VerifyPath(leaf, tree_size, wrong_path, root, data));
 
@@ -517,9 +492,9 @@ void VerifierCheck(int leaf, int tree_size,
 }
 
 void VerifierConsistencyCheck(int snapshot1, int snapshot2,
-                              const std::string &root1,
-                              const std::string &root2,
-                              const std::vector<std::string> &proof,
+                              const bstring &root1,
+                              const bstring &root2,
+                              const std::vector<bstring> &proof,
                               MerkleVerifier *verifier) {
   // Verify the original consistency proof.
   assert(verifier->VerifyConsistency(snapshot1, snapshot2, root1, root2,
@@ -532,29 +507,31 @@ void VerifierConsistencyCheck(int snapshot1, int snapshot2,
 
   // Wrong snapshot index.
   assert(!verifier->VerifyConsistency(snapshot1 - 1, snapshot2, root1, root2,
-                                     proof));
+                                      proof));
   assert(!verifier->VerifyConsistency(snapshot1 + 1, snapshot2, root1, root2,
-                                     proof));
+                                      proof));
   assert(!verifier->VerifyConsistency(snapshot1 ^ 2, snapshot2, root1, root2,
-                                     proof));
+                                      proof));
 
   // Wrong tree height.
   assert(!verifier->VerifyConsistency(snapshot1, snapshot2 * 2, root1, root2,
-                                     proof));
+                                      proof));
   assert(!verifier->VerifyConsistency(snapshot1, snapshot2 / 2, root1, root2,
-                                     proof));
+                                      proof));
 
   // Wrong root.
-  assert(!verifier->VerifyConsistency(snapshot1, snapshot2, root1, "WrongRoot",
+  const unsigned char wrong_root[] = "WrongRoot";
+  const bstring bwrong_root(wrong_root, 9);
+  assert(!verifier->VerifyConsistency(snapshot1, snapshot2, root1, bwrong_root,
                                       proof));
-  assert(!verifier->VerifyConsistency(snapshot1, snapshot2, "WrongRoot", root2,
+  assert(!verifier->VerifyConsistency(snapshot1, snapshot2, bwrong_root, root2,
                                       proof));
   // Swap roots.
   assert(!verifier->VerifyConsistency(snapshot1, snapshot2, root2, root1,
                                       proof));
 
   // Wrong proofs.
-  std::vector<std::string> wrong_proof;
+  std::vector<bstring> wrong_proof;
   // Empty proof.
   assert(!verifier->VerifyConsistency(snapshot1, snapshot2, root1, root2,
                                       wrong_proof));
@@ -569,7 +546,7 @@ void VerifierConsistencyCheck(int snapshot1, int snapshot2,
 
   // Add garbage at the end of the proof.
   wrong_proof = proof;
-  wrong_proof.push_back("");
+  wrong_proof.push_back(bstring());
   assert(!verifier->VerifyConsistency(snapshot1, snapshot2, root1, root2,
                                       wrong_proof));
   wrong_proof.pop_back();
@@ -586,7 +563,7 @@ void VerifierConsistencyCheck(int snapshot1, int snapshot2,
 
   // Add garbage in the beginning of the proof.
   wrong_proof.clear();
-  wrong_proof.push_back("");
+  wrong_proof.push_back(bstring());
   wrong_proof.insert(wrong_proof.end(), proof.begin(), proof.end());
   assert(!verifier->VerifyConsistency(snapshot1, snapshot2, root1, root2,
                                       wrong_proof));
@@ -598,17 +575,17 @@ void VerifierConsistencyCheck(int snapshot1, int snapshot2,
 
 void VerifierTest() {
   MerkleVerifier verifier(new Sha256Hasher());
-  std::vector<std::string> path;
+  std::vector<bstring> path;
   // Various invalid paths.
-  assert(!verifier.VerifyPath(0, 0, path, "", ""));
-  assert(!verifier.VerifyPath(0, 1, path, "", ""));
-  assert(!verifier.VerifyPath(1, 0, path, "", ""));
-  assert(!verifier.VerifyPath(2, 1, path, "", ""));
+  assert(!verifier.VerifyPath(0, 0, path, bstring(), bstring()));
+  assert(!verifier.VerifyPath(0, 1, path, bstring(), bstring()));
+  assert(!verifier.VerifyPath(1, 0, path, bstring(), bstring()));
+  assert(!verifier.VerifyPath(2, 1, path, bstring(), bstring()));
 
-  assert(!verifier.VerifyPath(0, 0, path, S(kSHA256EmptyTreeHash), ""));
-  assert(!verifier.VerifyPath(0, 1, path, S(kSHA256EmptyTreeHash), ""));
-  assert(!verifier.VerifyPath(1, 0, path, S(kSHA256EmptyTreeHash), ""));
-  assert(!verifier.VerifyPath(2, 1, path, S(kSHA256EmptyTreeHash), ""));
+  assert(!verifier.VerifyPath(0, 0, path, S(kSHA256EmptyTreeHash), bstring()));
+  assert(!verifier.VerifyPath(0, 1, path, S(kSHA256EmptyTreeHash), bstring()));
+  assert(!verifier.VerifyPath(1, 0, path, S(kSHA256EmptyTreeHash), bstring()));
+  assert(!verifier.VerifyPath(2, 1, path, S(kSHA256EmptyTreeHash), bstring()));
 
   // Known good paths.
   // i = 0 is an invalid path.
@@ -623,12 +600,12 @@ void VerifierTest() {
   }
 
   // More tests with reference path generator.
-  std::string data[128];
+  bstring data[128];
   for (int i = 0; i < 128; ++i)
-    data[i] = std::string(1, static_cast<char>(i));
+    data[i] = bstring(1, static_cast<char>(i));
   TreeHasher treehasher(new Sha256Hasher());
 
-  std::string root;
+  bstring root;
   // Repeat test for each tree size in 1...128.
   for (int tree_size = 1; tree_size <= 128; ++tree_size) {
     // Repeat for each leaf in range.
@@ -639,9 +616,8 @@ void VerifierTest() {
     }
   }
 
-  std::vector<std::string> proof;
-  std::string root1;
-  std::string root2;
+  std::vector<bstring> proof;
+  bstring root1, root2;
   // Snapshots that are always consistent.
   assert(verifier.VerifyConsistency(0, 0, root1, root2, proof));
   assert(verifier.VerifyConsistency(0, 1, root1, root2, proof));

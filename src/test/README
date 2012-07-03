@@ -1,14 +1,13 @@
-You can do an end-to-end demo of the process of creating a server
+sslconnect_test.sh does an end-to-end demo of creating a server
 certificate, sending it to the log server and getting back a log
-proof, converting it to a proof certificate, serving the certificate
-with Apache, and verifying the log proof.
+proof, serving the certificate and proof with Apache, and verifying
+the log proof.
 
-To understand the various steps in detail, inspection of the Makefile
-is suggested.
+To run sslconnect_test, you will need to do the following:
 
-To compile the log server and client, follow the instructions in src/README.
+1. Compile the log server and client, following the instructions in src/README.
 
-To run a test SSL server, you will also need Apache. On Debian based
+2. To run a test SSL server, you will also need Apache. On Debian based
 systems, running
 
 $ sudo apt-get install apache2
@@ -16,64 +15,41 @@ $ sudo apt-get install apache2
 should suffice. On other systems, you may also need to modify the
 Makefile and/or the httpd.conf.
 
-The steps for the end-to-end test are as follows:
-
-1. Make platform dependent links:
+3. Make platform dependent links:
 
 $ make <platform>-links
 
 e.g. "make linux-links"
 
-2. Run the Log Server:
+4. Run the test. If your system's OpenSSL is older than 1.0.0, you
+have to point the test to a more recent local binary
 
-$ make run-server
-
-Note that this does not detach, so...
-
-3. From another window, generate the server certificate, get the log
-proof, convert it to a proof certificate, and run Apache:
-
-$ make run-apache
+$ MY_OPENSSL=$my_recent_openssl_bin ./sslconnect_test.sh
 
 This does the following steps:
 
-a) Create a CA root certificate and issue a CA ProtoCert signing certificate.
+a) Create a CA root certificate and issue a CA ProtoCert signing
+certificate.
+
 b) Create a client Certificate Signing Request (CSR).
+
 c1) Sign the CSR with the CA root certificate. Submit the certificate
-to the log server, retrieve a proof, and embed it in a superfluous certificate.
+to the log server, retrieve a proof, and embed it in a superfluous
+certificate.
+
 c2) Sign the CSR with the CA ProtoCert signing key and submit the
 signed request to the log server. Retrieve a proof, embed it in the
 leaf certificate and sign the certificate with the CA root key.
+
 d) Run two Apache VirtualHosts with the resulting client certificates.
 
-4a. Test the proof in a superfluous certificate
+e) Connect a CT-enabled SSL client to the server and verify the proofs.
 
-$ make connect
+The client should report something like this:
 
-This should show something like:
-
-Reading cache...OK.
-Connecting to 127.0.0.1:8122.
-Proof extension found in certificate, verifying...OK.
+Connecting to 127.0.0.1:8125.
+Proof extension found in certificate, verifying...OK
 Log proof verified.
 Connected.
 Cached new checkpoint.
-Writing cache...OK.
-
-4b. Test the certificate with an embedded proof
-
-$ make connect-embedded
-
-You should see this output:
-
-Reading cache...OK.
-Connecting to 127.0.0.1:8123.
-Embedded proof extension found in certificate, verifying...OK.
-Log proof verified.
-Connected.
-Cached new checkpoint.
-Writing cache...OK.
-
-5. When done, stop Apache
-
-$ make stop-apache
+PASS

@@ -1,23 +1,25 @@
-#include "../include/ct.h"
-#include "../merkletree/LogDB.h"
-#include "../merkletree/LogRecord.h"
-#include "../merkletree/TreeLogger.h"
-
+#include <assert.h>
 #include <deque>
 #include <iostream>
-#include <string>
-
-#include <assert.h>
 #include <netinet/in.h>
+#include <openssl/evp.h>
+#include <openssl/pem.h>
+#include <openssl/ssl.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <string>
 #include <string.h>
 #include <sys/socket.h>
 #include <sys/types.h>
 #include <time.h>
 
-#include <openssl/evp.h>
-#include <openssl/pem.h>
+#include "../include/ct.h"
+#include "../include/types.h"
+#include "../log/cert_checker.h"
+#include "../log/cert_submission_handler.h"
+#include "../merkletree/LogDB.h"
+#include "../merkletree/LogRecord.h"
+#include "../merkletree/TreeLogger.h"
 
 #define VV(x)
 
@@ -306,48 +308,13 @@ public:
     wbuffer_.erase(0, n);
   }
 
-  void Write(std::string str) {	wbuffer_.append(str); }
+  void Write(bstring str) { wbuffer_.append(str); }
   void Write(byte ch) { wbuffer_.push_back(ch); }
 
 private:
 
   bstring rbuffer_;
-  std::string wbuffer_;
-};
-
-class LineServer : public Server {
-public:
-
-  LineServer(EventLoop *loop, int fd) : Server(loop, fd) {}
-
-  void BytesRead(std::string *rbuffer) {
-    for ( ; ; ) {
-      size_t end;
-      end = rbuffer->find('\n');
-      if (end == std::string::npos)
-	break;
-      size_t use = end;
-      if (use > 0 && (*rbuffer)[use - 1] == '\r')
-	--use;
-      LineRead(rbuffer->substr(0, use));
-      rbuffer->erase(0, end+1);
-    }
-  }
-
-  // A line has been read from the network. The newline has been
-  // removed.
-  virtual void LineRead(const std::string &line) = 0;
-};
-
-class EchoServer : public LineServer {
-public:
-
-  EchoServer(EventLoop *loop, int fd) : LineServer(loop, fd) {}
-
-  void LineRead(const std::string &line) {
-    Write(line);
-    Write('\n');
-  }
+  bstring wbuffer_;
 };
 
 template <class Server> class ServerListener : public Listener {
@@ -372,21 +339,26 @@ class CTLogManager {
     assert(max_segment_size_ > 0);
     assert(max_segment_delay_ > 0);
     segment_start_time_ = time(NULL);
-}
+  }
 
   ~CTLogManager() { delete logger_; }
 
   enum LogReply {
+    INVALID_SUBMISSION,
     TOKEN,
     PROOF,
   };
 
   // Submit an entry and write a token, if the entry is pending,
   // or an audit proof, if it is already logged.
-  LogReply SubmitEntry(const std::string &data, std::string *result) {
-    std::string key;
+  LogReply SubmitEntry(LogEntry::LogEntryType type, const bstring &data,
+                       bstring *result) {
+    bstring key;
     LogReply reply;
-    LogDB::Status logreply = logger_->QueueEntry(data, &key);
+    LogDB::Status logreply = logger_->QueueEntry(type, data, &key);
+    if (logreply == LogDB::REJECTED)
+      return INVALID_SUBMISSION;
+
     assert(!key.empty());
     if (logreply == LogDB::NEW || logreply == LogDB::PENDING) {
       if (result != NULL)
@@ -451,20 +423,28 @@ private:
     }
     std::cout << "Command is " << (int)command << " data length "
 	      << data.size() << std::endl;
-    if (command != ct::UPLOAD_BUNDLE) {
+    if (command != ct::UPLOAD_BUNDLE && command != ct::UPLOAD_CA_BUNDLE) {
       SendError(ct::BAD_COMMAND);
       return;
     }
-    std::string result;
-    // TODO globally: sort out this bstring/string mess.
-    CTLogManager::LogReply reply = manager_->SubmitEntry(
-        *(reinterpret_cast<const std::string*>(&data)), &result);
-    assert(!result.empty());
+    bstring result;
+    CTLogManager::LogReply reply;
+   // TODO globally: sort out this bstring/string mess.
+    if (command == ct::UPLOAD_BUNDLE) {
+      reply = manager_->SubmitEntry(LogEntry::X509_CHAIN_ENTRY, data, &result);
+    } else {
+      reply = manager_->SubmitEntry(LogEntry::PROTOCERT_CHAIN_ENTRY, data, &result);
+    }
     switch(reply) {
+      case CTLogManager::INVALID_SUBMISSION:
+        SendError(ct::BAD_BUNDLE);
+        break;
       case CTLogManager::TOKEN:
+        assert(!result.empty());
         SendResponse(ct::SUBMITTED, result);
         break;
       case CTLogManager::PROOF:
+        assert(!result.empty());
         SendResponse(ct::LOGGED, result);
         break;
       default:
@@ -495,7 +475,7 @@ private:
     Write(error);
   }
 
-  void SendResponse(ct::ServerResponse code, const std::string &response) {
+  void SendResponse(ct::ServerResponse code, const bstring &response) {
     Write(VERSION);
     Write(code);
     WriteLength(response.length(), 3);
@@ -562,8 +542,9 @@ static bool InitServer(int *sock, int port, const char *ip, int type) {
 }
 
 int main(int argc, char **argv) {
-  if (argc != 5) {
-    std::cerr << argv[0] << " <port> <key> <size_limit> <time_limit>\n";
+  if (argc != 6) {
+    std::cerr << argv[0] << " <port> <key> <size_limit> <time_limit> "
+              << "<trusted_cert_dir>\n";
     exit(1);
   }
 
@@ -580,12 +561,21 @@ int main(int argc, char **argv) {
 
   fclose(fp);
 
+  SSL_library_init();
+
   int fd;
   assert(InitServer(&fd, port, NULL, SOCK_STREAM));
 
   EventLoop loop;
 
-  TreeLogger logger(new MemoryDB(), pkey);
+  CertChecker checker;
+  if(!checker.LoadTrustedCertificateDir(argv[5])) {
+    std::cerr << "Could not load CA certs.\n";
+    perror(argv[5]);
+    exit(1);
+  }
+
+  TreeLogger logger(new MemoryDB(), pkey, new CertSubmissionHandler(&checker));
   size_t size_limit = atoi(argv[3]);
   time_t time_limit = atoi(argv[4]);
   CTLogManager manager(&logger, size_limit, time_limit);

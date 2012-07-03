@@ -1,7 +1,7 @@
 #include <stddef.h>
-#include <string>
 #include <vector>
 
+#include "../include/types.h"
 #include "MerkleVerifier.h"
 
 class SerialHasher;
@@ -20,32 +20,31 @@ static inline bool IsRightChild(size_t leaf) {
 }
 
 bool MerkleVerifier::VerifyPath(size_t leaf, size_t tree_size,
-                                const std::vector<std::string> &path,
-                                const std::string &root,
-                                const std::string &data) {
-  std::string path_root = RootFromPath(leaf, tree_size, path, data);
+                                const std::vector<bstring> &path,
+                                const bstring &root, const bstring &data) {
+  bstring path_root = RootFromPath(leaf, tree_size, path, data);
   if (path_root.empty())
     return false;
   return path_root == root;
 }
 
-std::string MerkleVerifier::RootFromPath(size_t leaf, size_t tree_size,
-                                         const std::vector<std::string> &path,
-                                         const std::string &data) {
+bstring MerkleVerifier::RootFromPath(size_t leaf, size_t tree_size,
+                                     const std::vector<bstring> &path,
+                                     const bstring &data) {
   if (leaf > tree_size || leaf == 0)
     // No valid path exists.
-    return "";
+    return bstring();
 
   size_t node = leaf - 1;
   size_t last_node = tree_size  - 1;
 
-  std::string node_hash = treehasher_.HashLeaf(data);
-  std::vector<std::string>::const_iterator it = path.begin();
+  bstring node_hash = treehasher_.HashLeaf(data);
+  std::vector<bstring>::const_iterator it = path.begin();
 
   while (last_node) {
     if (it == path.end())
       // We've reached the end but we're not done yet.
-      return "";
+      return bstring();
     if (IsRightChild(node))
       node_hash = treehasher_.HashChildren(*it++, node_hash);
     else if (node < last_node)
@@ -59,14 +58,14 @@ std::string MerkleVerifier::RootFromPath(size_t leaf, size_t tree_size,
 
   // Check that we've reached the end.
   if (it != path.end())
-    return "";
+    return bstring();
   return node_hash;
 }
 
 bool MerkleVerifier::VerifyConsistency(size_t snapshot1, size_t snapshot2,
-                                       const std::string &root1,
-                                       const std::string &root2,
-                                       const std::vector<std::string> &proof) {
+                                       const bstring &root1,
+                                       const bstring &root2,
+                                       const std::vector<bstring> &proof) {
   if (snapshot1 > snapshot2)
     // Can't go back in time.
     return false;
@@ -81,15 +80,15 @@ bool MerkleVerifier::VerifyConsistency(size_t snapshot1, size_t snapshot2,
   size_t last_node = snapshot2 - 1;
   if (proof.empty())
     return false;
-  std::vector<std::string>::const_iterator it = proof.begin();
+  std::vector<bstring>::const_iterator it = proof.begin();
   // Move up until the first mutable node.
   while (IsRightChild(node)) {
     node = Parent(node);
     last_node = Parent(last_node);
   }
 
-  std::string node1_hash;
-  std::string node2_hash;
+  bstring node1_hash;
+  bstring node2_hash;
   if (node)
     node2_hash = node1_hash = *it++;
   else

@@ -3,9 +3,9 @@ INCLUDE=
 # Need OpenSSL >= 1.0.0
 ifneq ($(OPENSSLDIR),)
   INCLUDE = -I $(OPENSSLDIR)/include
-  LIBS= -L $(OPENSSLDIR)  -L $(OPENSSLDIR)/lib -lcrypto -Wl,-rpath,$(OPENSSLDIR)  -Wl,-rpath,$(OPENSSLDIR)/lib
+  LIBS= -L $(OPENSSLDIR)  -L $(OPENSSLDIR)/lib -lcrypto -lssl -Wl,-rpath,$(OPENSSLDIR)  -Wl,-rpath,$(OPENSSLDIR)/lib
 else
-  LIBS= -lcrypto
+  LIBS= -lcrypto -lssl
 endif
 
 CXXFLAGS= $(INCLUDE) $(CXXFLAG)
@@ -13,7 +13,8 @@ CXXFLAGS= $(INCLUDE) $(CXXFLAG)
 OBJS= ../merkletree/LogDB.o ../merkletree/LogRecord.o \
 ../merkletree/MerkleTree.o ../merkletree/SerialHasher.o \
 ../merkletree/TreeHasher.o ../merkletree/TreeLogger.o \
-../util/ct_debug.o ../util/util.o
+../util/ct_debug.o ../util/util.o ../log/cert_checker.o ../log/cert.o \
+../log/submission_handler.o ../log/cert_submission_handler.o ../log/log_entry.o
 
 all: .depend ct-server
 

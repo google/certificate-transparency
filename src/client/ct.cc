@@ -1,25 +1,10 @@
-#include "cache.h"
-#include "../include/ct.h"
-#include "../util/ct_debug.h"
-#include "../util/util.h"
-#include "../merkletree/LogRecord.h"
-#include "../merkletree/LogVerifier.h"
-
-#include <fstream>
-#include <iostream>
-#include <string>
-
 #include <arpa/inet.h>
 #include <assert.h>
 #include <dirent.h>
 #include <fcntl.h>
+#include <fstream>
+#include <iostream>
 #include <netinet/in.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-#include <sys/socket.h>
-#include <unistd.h>
-
 #include <openssl/asn1.h>
 #include <openssl/bio.h>
 #include <openssl/bn.h>
@@ -29,23 +14,22 @@
 #include <openssl/ssl.h>
 #include <openssl/x509.h>
 #include <openssl/x509v3.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string>
+#include <string.h>
+#include <sys/socket.h>
+#include <unistd.h>
 
-static void UnknownCommand(const std::string &cmd) {
-  std::cerr << "Unknown command: " << cmd << '\n';
-}
-
-static void ReadAll(bstring *contents, std::ifstream &in) {
-  for ( ; ; ) {
-    unsigned char buf[1024];
-
-    size_t n = in.read(reinterpret_cast<char*>(buf), sizeof buf).gcount();
-    assert(!in.fail() || in.eof());
-    assert(n >= 0);
-    contents->append(buf, n);
-    if (in.eof())
-      return;
-  }
-}
+#include "../include/ct.h"
+#include "../include/types.h"
+#include "../log/cert.h"
+#include "../log/cert_submission_handler.h"
+#include "../log/log_entry.h"
+#include "../merkletree/LogVerifier.h"
+#include "../util/ct_debug.h"
+#include "../util/util.h"
+#include "cache.h"
 
 // Really really dumb and temporary filestore methods.
 static void WriteAllFiles(const std::vector<bstring> &files,
@@ -92,11 +76,9 @@ static std::vector<bstring> ReadAllFiles(const char *dirname) {
   while ((file = readdir(dir)) != NULL) {
     if (file->d_type == DT_REG) {
       bstring contents;
-      std::ifstream in(file->d_name);
-      assert(in.is_open());
-      ReadAll(&contents, in);
+      bool read_success = util::ReadBinaryFile(file->d_name, &contents);
+      assert(read_success);
       result.push_back(contents);
-      in.close();
     }
   }
 
@@ -106,31 +88,9 @@ static std::vector<bstring> ReadAllFiles(const char *dirname) {
   return result;
 }
 
-// The proof extension in a superfluous certificate.
-static const char kProofExtensionOID[] = "1.2.3.0";
-// TODO: embedded proof, proto algorithm and proto signature could/should
-// all be in the same extension. We keep them separate now for easier debugging.
-// The proof.
-static const char kEmbeddedProofExtensionOID[] = "1.2.3.1";
-// The poison extension in the ProtoCert (critical).
-static const char kPoisonExtensionOID[] = "1.2.3.2";
-// The algorithm of the ProtoCert signature.
-static const char kProtoAlgorExtensionOID[] = "1.2.3.3";
-// The Protocert signature.
-static const char kProtoSigExtensionOID[] = "1.2.3.4";
-
-static ASN1_OBJECT *ExtensionObject(const char *oid) {
-  unsigned char obj_buf[100];
-  int obj_len = a2d_ASN1_OBJECT(obj_buf, sizeof obj_buf, oid,
-                                sizeof oid - 1);
-  assert(obj_len > 0);
-  ASN1_OBJECT *obj = ASN1_OBJECT_create(0, obj_buf, obj_len, NULL, NULL);
-  return obj;
-}
-
 static void AddExtension(X509 *cert, const char *oid, unsigned char *data,
                          int data_len, int critical) {
-  ASN1_OBJECT *obj = ExtensionObject(oid);
+  ASN1_OBJECT *obj = Cert::ExtensionObject(oid);
   assert(obj != NULL);
   X509_EXTENSION *ext = X509_EXTENSION_new();
   assert(ext != NULL);
@@ -157,28 +117,35 @@ VerifyLogSegmentProof(const bstring &proofstring,
                       LogSegmentCheckpoint *checkpoint) {
   assert(verifier != NULL);
   AuditProof proof;
-  bool serialized = proof.Deserialize(
-      SegmentData::LOG_SEGMENT_TREE,
-      *(reinterpret_cast<const std::string*>(&proofstring)));
+  bool serialized = proof.Deserialize(SegmentData::LOG_SEGMENT_TREE,
+                                      proofstring);
   if (!serialized)
     return LogVerifier::INVALID_FORMAT;
-  return verifier->VerifyLogSegmentAuditProof(proof,
-                                              *(reinterpret_cast<const
-                                                std::string*>(&bundle)),
-                                              checkpoint);
+
+  return verifier->VerifyLogSegmentAuditProof(proof, bundle, checkpoint);
 }
 
-// Verify the proof on a single leaf certificate.
 static LogVerifier::VerifyResult
-VerifyLogSegmentProof(const bstring &proofstring, X509 *cert,
-                      LogVerifier *verifier,
+VerifyX509ChainProof(const bstring &proofstring, const CertChain &cert_chain,
+                     LogVerifier *verifier, LogSegmentCheckpoint *checkpoint) {
+  X509ChainEntry entry(cert_chain);
+  bstring signed_part;
+  if (!entry.SerializeSigned(&signed_part))
+    return LogVerifier::INVALID_INPUT;
+  return VerifyLogSegmentProof(proofstring, signed_part, verifier,
+                               checkpoint);
+}
+
+static LogVerifier::VerifyResult
+VerifyProtoChainProof(const bstring &proofstring,
+                      const CertChain &cert_chain, LogVerifier *verifier,
                       LogSegmentCheckpoint *checkpoint) {
-  unsigned char *buf = NULL;
-  int cert_len = i2d_X509(cert, &buf);
-  assert(cert_len > 0);
-  bstring leaf(buf, cert_len);
-  OPENSSL_free(buf);
-  return VerifyLogSegmentProof(proofstring, leaf, verifier, checkpoint);
+  bstring signed_part;
+  ProtoCertChainEntry entry(cert_chain);
+  if (!entry.SerializeSigned(&signed_part))
+    return LogVerifier::INVALID_INPUT;
+  return VerifyLogSegmentProof(proofstring, signed_part, verifier,
+                               checkpoint);
 }
 
 // A generic client.
@@ -230,15 +197,20 @@ class LogClient : public CTClient {
   // } ClientCommandUploadBundle;
   // Uploads the bundle; if the server returns a proof, writes the proof string
   // and returns true; else returns false.
-  bool UploadBundle(const bstring &bundle, bstring *proof) {
-    CTResponse response = Upload(bundle);
+  bool UploadBundle(const bstring &bundle, bool proto, bstring *proof) {
+    CTResponse response = Upload(bundle, proto);
     bool ret = false;
     switch (response.code) {
+      case ct::ERROR:
+        assert(response.data.size() == 1);
+        std::cout << "Error: " << ErrorString(response.data[0]) << std::endl;
+        break;
       case ct::SUBMITTED:
-        std::cout << "Token is " << util::HexString(response.data) << std::endl;
+        std::cout << "Token is " << util::HexString(response.data, ' ')
+                  << std::endl;
         break;
       case ct::LOGGED:
-        std::cout << "Received proof " << util::HexString(response.data)
+        std::cout << "Received proof " << util::HexString(response.data, ' ')
                   << std::endl;
         if (proof != NULL) {
           proof->assign(response.data);
@@ -249,6 +221,19 @@ class LogClient : public CTClient {
         std::cout << "Unknown response code." << std::endl;
     }
     return ret;
+  }
+
+  static std::string ErrorString(byte error) {
+    switch(error) {
+      case ct::BAD_VERSION:
+        return "Bad version";
+      case ct::BAD_COMMAND:
+        return "Bad command";
+      case ct::BAD_BUNDLE:
+        return "Bad bundle";
+      default:
+        return "Unknown error code";
+    }
   }
 
 private:
@@ -350,9 +335,12 @@ private:
     DLOG_END_SERVER_MESSAGE;
   }
 
-  CTResponse Upload(const bstring &bundle) {
+  CTResponse Upload(const bstring &bundle, bool proto) {
     DLOG_BEGIN_CLIENT_MESSAGE;
-    WriteCommand(ct::UPLOAD_BUNDLE);
+    if (proto)
+      WriteCommand(ct::UPLOAD_CA_BUNDLE);
+    else
+      WriteCommand(ct::UPLOAD_BUNDLE);
     WriteData(bundle.data(), bundle.length());
     DLOG_END_CLIENT_MESSAGE;
     CTResponse response;
@@ -365,13 +353,13 @@ private:
 class SSLClient : public CTClient {
  public:
   SSLClient(const char *server, uint16_t port) : CTClient(server, port),
-                                                 ca_file_(NULL) {}
+                                                 ca_dir_(NULL) {}
 
   SSLClient(const char *server, uint16_t port,
             const std::vector<bstring> &cache,
-            const char *ca_file) : CTClient(server, port),
+            const char *ca_dir) : CTClient(server, port),
                                    cache_(cache),
-                                   ca_file_(ca_file) {}
+                                   ca_dir_(ca_dir) {}
 
   std::vector<bstring> WriteCache() const {
     return cache_.WriteCache();
@@ -405,8 +393,8 @@ class SSLClient : public CTClient {
     SSL_SESSION *sess = SSL_get_session(s);
     // Get the leaf certificate.
     // TODO: verify proofs on entire certificate chains.
-    X509 *cert = SSL_SESSION_get0_peer(sess);
-    if (cert == NULL) {
+    X509 *x509 = SSL_SESSION_get0_peer(sess);
+    if (x509 == NULL) {
       // VerifyCallback should have caught that already.
       std::cout << "No server certificate received. Dropping connection." <<
           std::endl;
@@ -425,9 +413,13 @@ class SSLClient : public CTClient {
     std::cout << "Found an audit proof in the TLS extension, verifying...";
 
     bstring proofstring(proof, proof_length);
+    Cert *leaf = new Cert(x509);
+    // TODO: also add the intermediates.
+    CertChain chain;
+    chain.AddCert(leaf);
+
     LogVerifier::VerifyResult result =
-        VerifyLogSegmentProof(proofstring, cert, verifier,
-                              &args->checkpoint);
+        VerifyX509ChainProof(proofstring, chain, verifier, &args->checkpoint);
 
     if (result == LogVerifier::VERIFY_OK) {
       args->proof_verified = true;
@@ -457,90 +449,51 @@ class SSLClient : public CTClient {
       return 0;
     }
 
-    // Make a local copy of the leaf cert so that we can modify it.
-    X509 *leaf_cert = X509_dup(ctx->cert);
-    bstring proofstring;
+    Cert *leaf_cert = new Cert(ctx->cert);
+    CertChain chain;
+    // Give ownership of leaf_cert to the chain.
+    // TODO: also add intermediates.
+    chain.AddCert(leaf_cert);
+
     // First, see if the cert has an embedded proof.
-    ASN1_OBJECT *proof_obj = ExtensionObject(kEmbeddedProofExtensionOID);
-    assert(proof_obj != NULL);
-    int extension_index = X509_get_ext_by_OBJ(ctx->cert, proof_obj, -1);
-    if (extension_index != -1) {
+    if (chain.LeafCert()->HasExtension(Cert::kEmbeddedProofExtensionOID)) {
       std::cout << "Embedded proof extension found in certificate, "
                 << "verifying...";
-      X509_EXTENSION *ext = X509_get_ext(ctx->cert, extension_index);
-      ASN1_OCTET_STRING *ext_data = X509_EXTENSION_get_data(ext);
-      proofstring = bstring(ext_data->data, ext_data->length);
-      // Delete the embedded proof extension.
-      X509_delete_ext(leaf_cert, extension_index);
-      unsigned char data[] = "poison";
+      bstring proofstring =
+          chain.LeafCert()->ExtensionData(Cert::kEmbeddedProofExtensionOID);
 
-      // Insert the poison extension.
-      AddExtension(leaf_cert, kPoisonExtensionOID, data, 6, 1);
-      // Find the protocert signature and plug it in.
-      ASN1_OBJECT *algor_obj = ExtensionObject(kProtoAlgorExtensionOID);
-      assert(algor_obj != NULL);
-      extension_index = X509_get_ext_by_OBJ(leaf_cert, algor_obj, -1);
-      assert(extension_index != -1);
-      ext = X509_get_ext(leaf_cert, extension_index);
-      ext_data = X509_EXTENSION_get_data(ext);
-
-      if (leaf_cert->sig_alg != NULL)
-        X509_ALGOR_free(leaf_cert->sig_alg);
-      const unsigned char *algor_ptr = ext_data->data;
-      leaf_cert->sig_alg = d2i_X509_ALGOR(NULL, &algor_ptr, ext_data->length);
-      assert(leaf_cert->sig_alg != NULL);
-      X509_delete_ext(leaf_cert, extension_index);
-
-      ASN1_OBJECT *sig_obj = ExtensionObject(kProtoSigExtensionOID);
-      assert(sig_obj != NULL);
-      extension_index = X509_get_ext_by_OBJ(leaf_cert, sig_obj, -1);
-      assert(extension_index != -1);
-      ext = X509_get_ext(leaf_cert, extension_index);
-      ext_data = X509_EXTENSION_get_data(ext);
-
-      if (leaf_cert->signature != NULL)
-        ASN1_BIT_STRING_free(leaf_cert->signature);
-      const unsigned char *sig_ptr = ext_data->data;
-      leaf_cert->signature =
-          c2i_ASN1_BIT_STRING(NULL, &sig_ptr, ext_data->length);
-      X509_delete_ext(leaf_cert, extension_index);
-
-      // Let OpenSSL know that it needs to re-encode the cert.
-      leaf_cert->cert_info->enc.modified = 1;
+    // Only writes the checkpoint if verification succeeds.
+    // Note: an optimized client could only verify the signature if it's
+    // a checkpoint it hasn't seen before.
+      if (VerifyProtoChainProof(proofstring, chain, verifier,
+                                &args->checkpoint) == LogVerifier::VERIFY_OK) {
+        std::cout << "OK" << std::endl;
+        args->proof_verified = true;
+      } else {
+        std::cout << "Invalid proof" << std::endl;
+      }
 
     } else {
       // Look for the proof in a superfluous cert.
       // TODO: is there an API call for accessing the bag of certs?
       STACK_OF(X509) *sk = ctx->untrusted;
-      if (sk) {
-        // Create the object by which we recognize the proof extension.
-        ASN1_OBJECT *obj = ExtensionObject(kProofExtensionOID);
-        assert(obj != NULL);
+      if (sk != NULL) {
         for (int i = 0; i < sk_X509_num(sk); ++i) {
-          X509 *cert = sk_X509_value(sk, i);
-          int extension_index = X509_get_ext_by_OBJ(cert, obj, -1);
-          if (extension_index != -1) {
+          Cert cert(sk_X509_value(sk, i));
+          if (cert.HasExtension(Cert::kProofExtensionOID)) {
             std::cout << "Proof extension found in certificate, verifying...";
-            X509_EXTENSION *ext = X509_get_ext(cert, extension_index);
-            ASN1_OCTET_STRING *ext_data = X509_EXTENSION_get_data(ext);
-            proofstring = bstring(ext_data->data, ext_data->length);
+            bstring proofstring = cert.ExtensionData(Cert::kProofExtensionOID);
+            if (VerifyX509ChainProof(proofstring, chain, verifier,
+                                     &args->checkpoint) ==
+                LogVerifier::VERIFY_OK) {
+              std::cout << "OK" << std::endl;
+              args->proof_verified = true;
+            } else {
+              std::cout << "Invalid proof" << std::endl;
+            }
+            break;
           }
         }
-      }
-    }
-
-    if (!proofstring.empty()) {
-      // Only writes the checkpoint if verification succeeds.
-      // Note: an optimized client could only verify the signature if it's
-      // a checkpoint it hasn't seen before.
-      LogVerifier::VerifyResult result =
-          VerifyLogSegmentProof(proofstring, leaf_cert, verifier,
-                                &args->checkpoint);
-      if (result == LogVerifier::VERIFY_OK) {
-        args->proof_verified = true;
-        std::cout << "OK." << std::endl;
-      } else {
-        std::cout << LogVerifier::VerifyResultString(result) << std::endl;
       }
     }
 
@@ -572,8 +525,8 @@ class SSLClient : public CTClient {
     SSL_CTX_set_verify(ctx, SSL_VERIFY_PEER, NULL);
     // Set trusted CA certs.
     int ret;
-    if (ca_file_ != NULL) {
-      ret = SSL_CTX_load_verify_locations(ctx, ca_file_, NULL);
+    if (ca_dir_ != NULL) {
+      ret = SSL_CTX_load_verify_locations(ctx, NULL, ca_dir_);
       assert(ret == 1);
     }
     VerifyCallbackArgs args;
@@ -626,12 +579,12 @@ class SSLClient : public CTClient {
 
  private:
   LogSegmentCheckpointCache cache_;
-  const char *ca_file_;
+  const char *ca_dir_;
 }; // class SSLCLient
 
 static void UploadHelp() {
     std::cerr << "upload <file> <server> <port> [-server_key key_file] " <<
-        "[-out proof_file]" << std::endl;
+        "[-out proof_file] [-proto]" << std::endl;
 }
 
 static void Upload(int argc, const char **argv) {
@@ -649,12 +602,14 @@ static void Upload(int argc, const char **argv) {
   EVP_PKEY *pkey = NULL;
   FILE *out = NULL;
 
+  bool proto = false;
+
   argc -= 4;
   argv += 4;
 
-  while (argc >= 2) {
+  while (argc) {
     if (strcmp(argv[0], "-server_key") == 0) {
-      if (key_file != NULL) {
+      if (key_file != NULL || argc == 1) {
         UploadHelp();
         exit(1);
       }
@@ -662,28 +617,21 @@ static void Upload(int argc, const char **argv) {
       argc -= 2;
       argv += 2;
     } else if (strcmp(argv[0], "-out") == 0) {
-      if (proof_file != NULL) {
+      if (proof_file != NULL || argc == 1) {
         UploadHelp();
         exit(1);
       }
       proof_file = argv[1];
       argc -= 2;
       argv += 2;
+    } else if (strcmp(argv[0], "-proto") == 0) {
+      proto = true;
+      --argc;
+      ++argv;
     } else {
       UploadHelp();
       exit(1);
     }
-  }
-
-  if (argc) {
-    UploadHelp();
-    exit(1);
-  }
-
-  std::ifstream in(file);
-  if (!in.is_open()) {
-    perror(file);
-    exit(1);
   }
 
   if (key_file != NULL) {
@@ -709,24 +657,17 @@ static void Upload(int argc, const char **argv) {
 
   std::cout << "Uploading certificate bundle from " << file << '.' << std::endl;
 
-  // Assume for now that we get a single leaf cert.
-  // TODO: properly encode the submission with length prefixes,
-  // to match the spec.
+  // Contents should be concatenated PEM entries.
   bstring contents;
-  ReadAll(&contents, in);
-  std::cout << file << " is " << contents.length() << " bytes." << std::endl;
-
-  X509 *cert = NULL;
-  const unsigned char *dataptr = contents.data();
-  if ((cert = d2i_X509(&cert, &dataptr, contents.size())) == NULL) {
-    std::cerr << "Input is not a valid DER-encoded certificate." << std::endl;
+  if (!util::ReadBinaryFile(file, &contents)) {
+    perror(file);
     exit(1);
   }
-  X509_free(cert);
+  std::cout << file << " is " << contents.length() << " bytes." << std::endl;
 
   LogClient client(server_name, port);
   bstring proof;
-  if(!client.UploadBundle(contents, &proof)) {
+  if(!client.UploadBundle(contents, proto, &proof)) {
     std::cout << "No log proof received. Try again later." << std::endl;
     if (out != NULL) {
       fclose(out);
@@ -738,16 +679,18 @@ static void Upload(int argc, const char **argv) {
     if (pkey == NULL) {
       std::cout << "WARNING: no log server key supplied. Cannot verify proof."
                 << std::endl;
-    } else {
-      LogVerifier verifier(pkey);
-      LogVerifier::VerifyResult result = VerifyLogSegmentProof(proof, contents,
-                                                               &verifier, NULL);
-      if (result == LogVerifier::VERIFY_OK)
-        std::cout << "Proof verified." << std::endl;
-      else
-        std::cout << "ERROR: " << LogVerifier::VerifyResultString(result)
-                  << std::endl;
     }
+    // TODO: Process the |contents| bundle so that we can verify the proof.
+    //      else {
+    //       LogVerifier verifier(pkey);
+    //       LogVerifier::VerifyResult result = VerifyLogSegmentProof(proof, contents,
+    //                                                                &verifier, NULL);
+    //       if (result == LogVerifier::VERIFY_OK)
+    //         std::cout << "Proof verified." << std::endl;
+    //       else
+    //         std::cout << "ERROR: " << LogVerifier::VerifyResultString(result)
+    //                   << std::endl;
+    //     }
     if (out != NULL) {
       fwrite(proof.data(), 1, proof.size(), out);
       fclose(out);
@@ -823,7 +766,7 @@ static void MakeCert(int argc, const char **argv) {
   X509_PUBKEY_set(&X509_get_X509_PUBKEY(x) , evp_pkey);
 
   // And finally, the proof in an extension
-  AddExtension(x, kProofExtensionOID, proof, proof_len, 1);
+  AddExtension(x, Cert::kProofExtensionOID, proof, proof_len, 1);
 
   int i = i2d_X509_bio(out, x);
   assert(i != 0);
@@ -831,233 +774,50 @@ static void MakeCert(int argc, const char **argv) {
   BIO_free(out);
 }
 
-// Input: a certificate request (in PEM format).
-// Output: a signed proto-certificate (in DER format).
-// The protocert is formatted like a regular X509v3 certificate,
-// except it is signed with the protocert signing certificate,
-// and contains two additional extensions:
-// - A critical "Certificate Transparency" poison extension to indicate
-//   its proto status.
-// - An Authority issuer/keyid extension that specifies the signing key of the
-//   final certificate (rather than the protocert signing key)
-// The conf file MUST contain a "proto" section with all desired extensions,
-// as well as the following lines:
-// authorityKeyIdentifier=keyid:always,issuer:always
-// 1.2.3.4=critical,ASN1:UTF8String:poison
-// TODO: define a "real" poison extension.
-static void MakeProtoCert(int argc, const char **argv) {
-  if (argc != 8) {
-    std::cerr << argv[0] << " <input request> <output signed ProtoCert> "
-              << "<CA protocert signing cert> <CA protocert signing key> "
-              << "<CA protocert signing key password> <CA cert> <conf file> \n";
+static const char kProofSectionPrefix[] = "1.2.3.1=DER:";
+
+// A sample tool for CAs showing how to add the CT proof as an extension.
+// We write the CT proof to the certificate config, so that we can
+// sign using the standard openssl signing flow.
+// Input:
+// (1) an X509v3 configuration file
+// (2) A binary proof file.
+// Output:
+// Append the following line to the end of the file.
+// (This means the relevant section should be last in the configuration.)
+// 1.2.3.1=DER:[raw encoding of proof]
+static void WriteProofToConfig(int argc, const char **argv) {
+  if (argc != 3) {
+    std::cerr << argv[0] << " <config> <proof>\n";
     exit(1);
   }
-  const char *req_file = argv[1];
-  const char *out_file = argv[2];
-  const char *ca_protocert_file = argv[3];
-  const char *ca_protokey_file = argv[4];
-  const char *password = argv[5];
-  const char *ca_cert_file = argv[6];
-  const char *conf_file = argv[7];
 
-  const char kSection[] = "proto";
-
-  BIO *req_bio = BIO_new(BIO_s_file());
-  assert(req_bio != NULL);
-  int ret = BIO_read_filename(req_bio, req_file);
-  assert(ret == 1);
-  X509_REQ *req = PEM_read_bio_X509_REQ(req_bio, NULL, NULL, NULL);
-  assert(req != NULL);
-  BIO_free(req_bio);
-
-  BIO *ca_protocert_bio = BIO_new(BIO_s_file());
-  assert(ca_protocert_bio != NULL);
-  ret = BIO_read_filename(ca_protocert_bio, ca_protocert_file);
-  assert(ret == 1);
-  X509 *ca_protocert = PEM_read_bio_X509(ca_protocert_bio, NULL, NULL, NULL);
-  assert(ca_protocert != NULL);
-  BIO_free(ca_protocert_bio);
-
-  BIO *ca_protokey_bio = BIO_new(BIO_s_file());
-  assert(ca_protokey_bio != NULL);
-  ret = BIO_read_filename(ca_protokey_bio, ca_protokey_file);
-  assert(ret == 1);
-  EVP_PKEY *ca_protokey = PEM_read_bio_PrivateKey(ca_protokey_bio, NULL, NULL,
-                                                  const_cast<char*>(password));
-  assert(ca_protokey != NULL);
-  BIO_free(ca_protokey_bio);
-
-  BIO *ca_cert_bio = BIO_new(BIO_s_file());
-  assert(ca_cert_bio != NULL);
-  ret = BIO_read_filename(ca_cert_bio, ca_cert_file);
-  assert(ret == 1);
-  X509 *ca_cert = PEM_read_bio_X509(ca_cert_bio, NULL, NULL, NULL);
-  assert(ca_cert != NULL);
-  BIO_free(ca_cert_bio);
-
-  //
-  // The following code mostly follows the logic of 'openssl x509 -req'
-  // as implemented in openssl/apps/x509.c
-  //
-
-  X509 *proto = X509_new();
-  // Set the version to v3.
-  ret = X509_set_version(proto, 2);
-  assert(ret == 1);
-
-  // Random 128-bit serial number.
-  // TODO: take a serial file as input.
-  BIGNUM *serial = BN_new();
-  BN_rand(serial, 128, 0, 0);
-  BN_to_ASN1_INTEGER(serial, X509_get_serialNumber(proto));
-  BN_free(serial);
-
-  // Subject name.
-  X509_NAME *subject = X509_REQ_get_subject_name(req);
-  assert(subject != NULL);
-  ret = X509_set_subject_name(proto, subject);
-  assert(ret == 1);
-
-  // Subject public key.
-  EVP_PKEY *pkey = X509_REQ_get_pubkey(req);
-  assert(pkey != NULL);
-  // Verify the signature on the request.
-  ret = X509_REQ_verify(req, pkey);
-  assert(ret == 1);
-  X509_set_pubkey(proto, pkey);
-  assert(ret == 1);
-  // X509_REQ_get_pubkey increases the reference count, so decrease it again.
-  EVP_PKEY_free(pkey);
-
-  // The eventual issuer shall be the CA cert.
-  X509_NAME *issuer = X509_get_subject_name(ca_cert);
-  assert(issuer != NULL);
-  // Check that this is the same as the issuer of the CA protocert.
-  X509_NAME *proto_issuer = X509_get_issuer_name(ca_protocert);
-  assert(proto_issuer != NULL);
-  ret = X509_NAME_cmp(issuer, proto_issuer);
-  assert(ret == 0);
-  X509_set_issuer_name(proto, issuer);
-
-  // Validity.
-  // Set the start date to now.
-  X509_gmtime_adj(X509_get_notBefore(proto), 0);
-  // End date to now + 1 year.
-  // TODO: this, too, should be configurable.
-  X509_time_adj_ex(X509_get_notAfter(proto), 365, 0, NULL);
-
-  // Add the extensions.
-  X509V3_CTX ctx;
-  CONF *extconf = NCONF_new(NULL);
-  long errorline = -1;
-  ret = NCONF_load(extconf, conf_file, &errorline);
-  assert(ret == 1);
-
-  X509V3_set_ctx(&ctx, ca_cert, proto, NULL, NULL, 0);
-  X509V3_set_nconf(&ctx, extconf);
-  ret = X509V3_EXT_add_nconf(extconf, &ctx, const_cast<char*>(kSection),
-                              proto);
-  assert(ret == 1);
-
-  // Sign.
-  ret = X509_sign(proto, ca_protokey, NULL);
-  assert(ret > 0);
-
-  int out_fd = open(out_file, O_CREAT | O_TRUNC | O_WRONLY, 0666);
-  assert(out_fd >= 0);
-  BIO *out_bio = BIO_new_fd(out_fd, BIO_CLOSE);
-  ret = i2d_X509_bio(out_bio, proto);
-  assert(ret > 0);
-  BIO_free(out_bio);
-
-  X509_REQ_free(req);
-  X509_free(proto);
-  X509_free(ca_protocert);
-  X509_free(ca_cert);
-  EVP_PKEY_free(ca_protokey);
-  NCONF_free(extconf);
-}
-
-// Input: a protocert (in DER format) and a proof (raw binary).
-// Output: a signed certificate (in PEM format).
-static void ProtoCertToCert(int argc, const char **argv) {
-  if (argc != 6) {
-    std::cerr << argv[0] << " <protocert> <proof> <output cert> <CA key> "
-              << "<CA key password>\n";
-    exit(1);
-  }
-  const char *protocert_file = argv[1];
+  const char *conf_file = argv[1];
   const char *proof_file = argv[2];
-  const char *out_file = argv[3];
-  const char *ca_key_file = argv[4];
-  const char *password = argv[5];
 
-  BIO *protocert_bio = BIO_new(BIO_s_file());
-  assert(protocert_bio != NULL);
-  int ret = BIO_read_filename(protocert_bio, protocert_file);
-  assert(ret == 1);
-  X509 *protocert = d2i_X509_bio(protocert_bio, NULL);
-  assert(protocert != NULL);
-  BIO_free(protocert_bio);
+  FILE *conf_fp = fopen(conf_file, "a");
+    if (conf_fp == NULL) {
+      perror(conf_file);
+      exit(1);
+    }
 
-  int proof_fd = open(proof_file, O_RDONLY);
-  assert(proof_fd >= 0);
-  unsigned char proof[2048];
-  ssize_t proof_len = read(proof_fd, proof, sizeof proof);
-  assert(proof_len >= 0);
-  assert(proof_len < (ssize_t)sizeof proof);
+    FILE *proof_fp = fopen(proof_file, "rb");
+    if (proof_fp == NULL) {
+      perror(proof_file);
+      exit(1);
+    }
 
-  // TODO: verify the proof.
+    fputs(kProofSectionPrefix, conf_fp);
 
-  BIO *ca_key_bio = BIO_new(BIO_s_file());
-  assert(ca_key_bio != NULL);
-  ret = BIO_read_filename(ca_key_bio, ca_key_file);
-  assert(ret == 1);
-  EVP_PKEY *ca_key = PEM_read_bio_PrivateKey(ca_key_bio, NULL, NULL,
-                                             const_cast<char*>(password));
-  assert(ca_key != NULL);
-  BIO_free(ca_key_bio);
+    int proof_byte = fgetc(proof_fp);
+    while (proof_byte != EOF) {
+      fprintf(conf_fp, "%02X:", proof_byte);
+      proof_byte = fgetc(proof_fp);
+    };
 
-  // Remove the poison extension.
-  ASN1_OBJECT *poison = ExtensionObject(kPoisonExtensionOID);
-  assert(poison != NULL);
-  int extension_index = X509_get_ext_by_OBJ(protocert, poison, -1);
-  assert(extension_index != -1);
-  X509_delete_ext(protocert, extension_index);
-
-  // Add the proof extension.
-  AddExtension(protocert, kEmbeddedProofExtensionOID, proof, proof_len, 0);
-
-  // Move the protocert algorithm and signature to a new extension.
-  unsigned char *algor_buf = NULL;
-  int algor_length = i2d_X509_ALGOR(protocert->sig_alg, &algor_buf);
-  assert(algor_length > 0);
-  AddExtension(protocert, kProtoAlgorExtensionOID, algor_buf, algor_length, 0);
-  OPENSSL_free(algor_buf);
-
-  int sig_length = i2c_ASN1_BIT_STRING(protocert->signature, NULL);
-  assert(sig_length > 0);
-  unsigned char *sig_buf = new unsigned char[sig_length];
-  // i2c modifies sig_buf
-  unsigned char *sig_buf_save = sig_buf;
-  ret = i2c_ASN1_BIT_STRING(protocert->signature, &sig_buf);
-  assert(ret > 0);
-  AddExtension(protocert, kProtoSigExtensionOID, sig_buf_save, sig_length, 0);
-  delete[] sig_buf_save;
-
-  // Sign with the CA cert.
-  ret = X509_sign(protocert, ca_key, NULL);
-  assert(ret > 0);
-
-  int out_fd = open(out_file, O_CREAT | O_TRUNC | O_WRONLY, 0666);
-  assert(out_fd >= 0);
-  BIO *out_bio = BIO_new_fd(out_fd, BIO_CLOSE);
-  ret = PEM_write_bio_X509(out_bio, protocert);
-  assert(ret > 0);
-  BIO_free(out_bio);
-
-  X509_free(protocert);
-  EVP_PKEY_free(ca_key);
+    fclose(proof_fp);
+    fprintf(conf_fp, "\n");
+    fclose(conf_fp);
 }
 
 // The number currently assigned in OpenSSL for
@@ -1112,7 +872,7 @@ static void ProofToAuthz(int argc, const char **argv) {
 
 static void ConnectHelp() {
   std::cerr << "connect <server> <port> [-log_server_key key_file] "
-            << "[-cache cache_dir] [-ca_file ca_file]" << std::endl;
+            << "[-cache cache_dir] [-ca_dir ca_dir]" << std::endl;
 }
 
 static bool Connect(int argc, const char **argv) {
@@ -1125,7 +885,7 @@ static bool Connect(int argc, const char **argv) {
 
   const char *key_file = NULL;
   const char *cache_dir = NULL;
-  const char *ca_file = NULL;
+  const char *ca_dir = NULL;
 
   EVP_PKEY *pkey = NULL;
 
@@ -1149,12 +909,12 @@ static bool Connect(int argc, const char **argv) {
       cache_dir = argv[1];
       argc -= 2;
       argv += 2;
-    } else if (strcmp(argv[0], "-ca_file") == 0) {
-      if (ca_file != NULL) {
+    } else if (strcmp(argv[0], "-ca_dir") == 0) {
+      if (ca_dir != NULL) {
         ConnectHelp();
         exit(1);
       }
-      ca_file = argv[1];
+      ca_dir = argv[1];
       argc -= 2;
       argv += 2;
     } else {
@@ -1190,7 +950,7 @@ static bool Connect(int argc, const char **argv) {
     cache = ReadAllFiles(cache_dir);
     std::cout << "OK." << std::endl;
   }
-  SSLClient client(server_name, port, cache, ca_file);
+  SSLClient client(server_name, port, cache, ca_dir);
   bool proof_verified = client.SSLConnect(verifier);
   if (cache_dir != NULL) {
     std::cout << "Writing cache...";
@@ -1205,6 +965,19 @@ static bool Connect(int argc, const char **argv) {
 static void UsageHelp(const std::string &cmd) {
   std::cerr << cmd <<  " [-debug [-debug_out file]] <command> ..."
             << std::endl;
+  std::cerr << "Known commands:" << std::endl;
+  std::cerr << "connect - connect to an SSL server" << std::endl;
+  std::cerr << "upload - upload a submission to a CT log server" << std::endl;
+  std::cerr << "certificate - make a superfluous proof certificate" << std::endl;
+  std::cerr << "authz - convert an audit proof to authz format" << std::endl;
+  std::cerr << "configure_proof - write the proof in an X509v3 "
+            << "configuration file" << std::endl;
+}
+
+static void UnknownCommand(const std::string &cmd,
+                           const std::string &main_command) {
+  std::cerr << "Unknown command: " << cmd << '\n';
+  UsageHelp(main_command);
 }
 
 // Return value:
@@ -1263,14 +1036,10 @@ int main(int argc, const char **argv) {
     Upload(argc, argv);
   else if (cmd == "certificate")
     MakeCert(argc, argv);
-  else if (cmd == "protocert") {
-    MakeProtoCert(argc, argv);
-  } else if (cmd == "sign") {
-    ProtoCertToCert(argc, argv);
-  } else if (cmd == "authz") {
+  else if (cmd == "authz")
     ProofToAuthz(argc, argv);
-  } else {
-    UnknownCommand(cmd);
-    UsageHelp(main_command);
-  }
+  else if (cmd == "configure_proof")
+    WriteProofToConfig(argc, argv);
+  else
+    UnknownCommand(cmd, main_command);
 }

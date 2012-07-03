@@ -1,22 +1,20 @@
-#include "cache.h"
+#include <assert.h>
+#include <map>
+
+#include "../include/types.h"
 #include "../merkletree/LogRecord.h"
 #include "../merkletree/LogVerifier.h"
+#include "cache.h"
 
-#include <map>
-#include <string>
-
-#include <assert.h>
 
 LogSegmentCheckpointCache::LogSegmentCheckpointCache(
     const std::vector<bstring> &cache) {
   std::vector<bstring>::const_iterator it;
   for (it = cache.begin(); it != cache.end(); ++it) {
     LogSegmentCheckpoint checkpoint;
-    // I will sort this casting mess out, I promise.
-    bstring b = *it;
 
     // Tolerate no cache errors, for now.
-    assert(checkpoint.Deserialize(*(reinterpret_cast<const std::string*>(&b))));
+    assert(checkpoint.Deserialize(*it));
     // Tolerate duplicates, but do not allow mismatches.
     assert(Insert(checkpoint) == LogSegmentCheckpointCache::NEW ||
            LogSegmentCheckpointCache::CACHED);
@@ -27,8 +25,7 @@ std::vector<bstring> LogSegmentCheckpointCache::WriteCache() const {
   std::vector<bstring> result;
   Cache::const_iterator it;
   for (it = cache_.begin(); it != cache_.end(); ++it) {
-    std::string r = it->second.Serialize();
-    result.push_back(*(reinterpret_cast<bstring*>(&r)));
+    result.push_back(it->second.Serialize());
   }
   return result;
 }

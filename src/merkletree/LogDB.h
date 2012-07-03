@@ -3,13 +3,14 @@
 #ifndef LOGDB_H
 #define LOGDB_H
 
+#include <assert.h>
 #include <map>
 #include <set>
 #include <string>
 #include <sys/stat.h>
 #include <vector>
 
-#include <assert.h>
+#include "../include/types.h"
 
 class LogDB {
  public:
@@ -17,6 +18,7 @@ class LogDB {
 
   enum Status {
     NOT_FOUND,
+    REJECTED,
     NEW,
     PENDING,
     LOGGED
@@ -38,8 +40,7 @@ class LogDB {
   // The entry will be considered pending until the segment info is logged.
   // Returns NEW if the entry did not previously exist.
   // Returns PENDING or LOGGED if the entry already existed.
-  virtual Status WriteEntry(const std::string &key,
-                            const std::string &data) = 0;
+  virtual Status WriteEntry(const bstring &key, const bstring &data) = 0;
 
   // Construct a new segment from pending entries. Fix the order of entries,
   // and lock the segment, so that it can no longer be modified.
@@ -57,10 +58,10 @@ class LogDB {
 
   virtual size_t PendingSegmentSize() const = 0;
 
-  virtual Status PendingSegmentEntry(size_t index, std::string *data) const = 0;
+  virtual Status PendingSegmentEntry(size_t index, bstring *data) const = 0;
 
   // Finalize the pending segment and info.
-  virtual void WriteSegmentAndInfo(const std::string &info) = 0;
+  virtual void WriteSegmentAndInfo(const bstring &info) = 0;
 
   // Retrieve the status of a log entry by absolute index. Indexing starts at 0.
   // Fill in |result| if it matches the |type| and |result| is not NULL.
@@ -70,20 +71,20 @@ class LogDB {
   // Retrieve a log entry by index in segment. Indexing starts at 0.
   // Fill in |result| if it matches the |type| and |result| is not NULL.
   virtual Status LookupEntry(size_t segment, size_t index,
-                             std::string *result) const = 0;
+                             bstring *result) const = 0;
 
   // Retrieve a log entry by its key.
   // Fill in |result| if it matches the |type| and |result| is not NULL.
-  virtual Status LookupEntry(const std::string &key, Lookup type,
-                             std::string *result) const = 0;
+  virtual Status LookupEntry(const bstring &key, Lookup type,
+                             bstring *result) const = 0;
 
   // Retrieve the location of an entry by key.
-  virtual Status EntryLocation(const std::string &key, size_t *segment,
+  virtual Status EntryLocation(const bstring &key, size_t *segment,
                                size_t *index) const = 0;
 
   // Retrieve segment info. Indexing starts at 0.
   // Writes the segment info record if result is not NULL.
-  virtual Status LookupSegmentInfo(size_t index, std::string *result) const = 0;
+  virtual Status LookupSegmentInfo(size_t index, bstring *result) const = 0;
 };
 
 // A dumb memory-only logger.
@@ -99,7 +100,7 @@ class MemoryDB : public LogDB {
     return segment_infos_.size();
   }
 
-  Status WriteEntry(const std::string &key, const std::string &data);
+  Status WriteEntry(const bstring &key, const bstring &data);
 
   void MakeSegment();
 
@@ -109,22 +110,21 @@ class MemoryDB : public LogDB {
 
   size_t PendingSegmentSize() const;
 
-  Status PendingSegmentEntry(size_t index, std::string *data) const;
+  Status PendingSegmentEntry(size_t index, bstring *data) const;
 
-  void WriteSegmentAndInfo(const std::string &data);
+  void WriteSegmentAndInfo(const bstring &data);
 
-  Status LookupEntry(size_t segment, size_t index, std::string *result) const;
+  Status LookupEntry(size_t segment, size_t index, bstring *result) const;
 
-  Status LookupEntry(const std::string &key, Lookup type,
-                     std::string *result) const;
+  Status LookupEntry(const bstring &key, Lookup type, bstring *result) const;
 
-  Status EntryLocation(const std::string &key, size_t *segment,
+  Status EntryLocation(const bstring &key, size_t *segment,
                        size_t *index) const;
 
-  Status LookupSegmentInfo(size_t index, std::string *result) const;
+  Status LookupSegmentInfo(size_t index, bstring *result) const;
 
  private:
-  Status LookupEntry(size_t index, Lookup type, std::string *result) const;
+  Status LookupEntry(size_t index, Lookup type, bstring *result) const;
 
   // (segment, index_in_segment), counting from 0.
   struct Location {
@@ -135,11 +135,11 @@ class MemoryDB : public LogDB {
     size_t index_in_segment;
   };
   // <key, data>
-  typedef std::map<std::string, std::string> DataMap;
+  typedef std::map<bstring, bstring> DataMap;
   // <<key>, <segment, index>>
-  typedef std::map<std::string, Location> LocationMap;
+  typedef std::map<bstring, Location> LocationMap;
 
-  typedef std::set<std::string> KeySet;
+  typedef std::set<bstring> KeySet;
 
   // All <key, data> entries.
   DataMap map_;
@@ -147,18 +147,16 @@ class MemoryDB : public LogDB {
   KeySet pending_;
   // Pending segment keys, ordered. These keys are also still in the
   // pending set.
-  std::vector<std::string> pending_segment_;
+  std::vector<bstring> pending_segment_;
   // Logged keys, ordered.
-  std::vector<std::vector<std::string> > logged_;
+  std::vector<std::vector<bstring> > logged_;
   // Location map key -> location for logged entries.
   LocationMap logged_map_;
 
-  std::vector<std::string> segment_infos_;
+  std::vector<bstring> segment_infos_;
 
   bool has_pending_segment_;
 };
-
-std::string HexString(const std::string &data);
 
 /*
  * FileDB uses a simple filesystem-based store, structured as follows:
@@ -202,33 +200,32 @@ class FileDB : public LogDB {
 
   size_t PendingLogSize() const;
   size_t SegmentCount() const;
-  Status WriteEntry(const std::string &key, const std::string &data);
+  Status WriteEntry(const bstring &key, const bstring &data);
   void MakeSegment();
   bool HasPendingSegment() const;
   size_t PendingSegmentNumber() const;
   size_t PendingSegmentSize() const;
-  Status PendingSegmentEntry(size_t index, std::string *data) const;
-  void WriteSegmentAndInfo(const std::string &info);
+  Status PendingSegmentEntry(size_t index, bstring *data) const;
+  void WriteSegmentAndInfo(const bstring &info);
 
-  Status LookupEntry(size_t segment, size_t index, std::string *result) const;
-  Status LookupEntry(const std::string &key, Lookup type,
-                     std::string *result) const;
-  Status EntryLocation(const std::string &key, size_t *segment,
+  Status LookupEntry(size_t segment, size_t index, bstring *result) const;
+  Status LookupEntry(const bstring &key, Lookup type, bstring *result) const;
+  Status EntryLocation(const bstring &key, size_t *segment,
                        size_t *index) const;
 
-  Status LookupSegmentInfo(size_t index, std::string *result) const;
+  Status LookupSegmentInfo(size_t index, bstring *result) const;
 
  private:
-  void ReadFile(const std::string &file, std::string *result) const;
+  void ReadFile(const std::string &file, bstring *result) const;
   // Atomic: writes a tmp file and moves to place.
-  void WriteFile(const std::string &filename, const std::string &data);
+  void WriteFile(const std::string &filename, const bstring &data);
   // The last part of the storage directory.
   std::string StorageDirectoryBasename(const std::string &hex) const;
   // The names of intermediate directories.
   std::string StorageComponent(const std::string &hex, unsigned n) const;
-  std::string StorageDirectory(const std::string &key) const;
-  void CreateStorageEntry(const std::string &key, const std::string &data);
-  void AddToPending(const std::string &key);
+  std::string StorageDirectory(const bstring &key) const;
+  void CreateStorageEntry(const bstring &key, const bstring &data);
+  void AddToPending(const bstring &key);
   unsigned CountDirectory(const std::string &dir_name) const;
 
   // Create missing directories. Called by constructor.

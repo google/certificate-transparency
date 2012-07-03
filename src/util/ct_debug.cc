@@ -65,7 +65,7 @@ class CTDebugger {
              << std::endl;
     for (size_t i = 0; i < data.size(); i += 20) {
       PrintTab();
-      *stream_ << util::HexString(data.substr(i, 20)) << std::endl;
+      *stream_ << util::HexString(data.substr(i, 20), ' ') << std::endl;
     }
   }
 

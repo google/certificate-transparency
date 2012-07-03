@@ -7,16 +7,17 @@
 #include <stdlib.h>
 #include <sys/stat.h>
 
+#include "../include/types.h"
 #include "LogDB.h"
 #include "LogDBTestConstants.h"
 
 // Helper test functions.
 
 // Insert all the entries in a segment; get back a segment set.
-static std::set<std::string> InsertSegmentEntries(LogDB *db, size_t segment,
+static std::set<bstring> InsertSegmentEntries(LogDB *db, size_t segment,
                                                   size_t offset) {
-  std::string key, data, result;
-  std::set<std::string> segment_set;
+  bstring key, data, result;
+  std::set<bstring> segment_set;
   assert(db->PendingLogSize() == 0);
   for (size_t index = 0; index < logdbtest::kSegmentSizes[segment]; ++index) {
     // Insert the entries of this segment.
@@ -46,10 +47,10 @@ static std::set<std::string> InsertSegmentEntries(LogDB *db, size_t segment,
 }
 
 // Test reading the pending segment.
-static std::vector<std::string> CheckPendingSegment(LogDB *db, size_t segment,
+static std::vector<bstring> CheckPendingSegment(LogDB *db, size_t segment,
                                                     size_t offset) {
-  std::string key, data, result;
-  std::vector<std::string> pending_segment;
+  bstring key, data, result;
+  std::vector<bstring> pending_segment;
   size_t index;
   const size_t pending_size = db->PendingLogSize();
   for (index = 0; index < logdbtest::kSegmentSizes[segment]; ++index) {
@@ -71,10 +72,10 @@ static std::vector<std::string> CheckPendingSegment(LogDB *db, size_t segment,
 }
 
 // Test reading a logged segment.
-static std::vector<std::string> CheckLoggedSegment(LogDB *db, size_t segment,
+static std::vector<bstring> CheckLoggedSegment(LogDB *db, size_t segment,
                                                    size_t offset) {
-  std::string key, data, result;
-  std::vector<std::string> logged_segment;
+  bstring key, data, result;
+  std::vector<bstring> logged_segment;
   size_t index;
   for (index = 0; index < logdbtest::kSegmentSizes[segment]; ++index) {
     key = logdbtest::kKeys[offset + index];
@@ -96,7 +97,7 @@ static std::vector<std::string> CheckLoggedSegment(LogDB *db, size_t segment,
     assert(db->WriteEntry(key, data) == LogDB::LOGGED);
   }
   // Check that the segment contains no more entries.
-  assert(db->LookupEntry(segment, index, NULL) == LogDB::NOT_FOUND);
+  assert(db->LookupEntry(segment, index, static_cast<bstring*>(NULL)) == LogDB::NOT_FOUND);
   return logged_segment;
 }
 
@@ -105,9 +106,9 @@ void CheckLog(LogDB *db) {
   assert(db->PendingLogSize() == 0);
   assert(!db->HasPendingSegment());
   size_t segment, index = 0, offset;
-  std::string key, data, result;
-  std::set<std::string> expected_segment;
-  std::set<std::string> logged_segment;
+  bstring key, data, result;
+  std::set<bstring> expected_segment;
+  std::set<bstring> logged_segment;
 
   // Look up by indices.
   for (segment = 0, offset = 0; segment < logdbtest::kNumberOfSegments;
@@ -142,11 +143,11 @@ static void LogDBTest(LogDB *db) {
   assert(!db->HasPendingSegment());
 
   // The initial set, unordered.
-  std::set<std::string> segment_set;
+  std::set<bstring> segment_set;
   // The segment, ordered as the DB constructed it.
-  std::vector<std::string> pending_segment;
+  std::vector<bstring> pending_segment;
   // The logged segment, ordered.
-  std::vector<std::string> logged_segment;
+  std::vector<bstring> logged_segment;
   for (size_t segment = 0, offset = 0; segment < logdbtest::kNumberOfSegments;
        offset += logdbtest::kSegmentSizes[segment++]) {
     pending_segment.clear();
@@ -167,8 +168,8 @@ static void LogDBTest(LogDB *db) {
     pending_segment = CheckPendingSegment(db, segment, offset);
 
     // The two sets should be the same, modulo ordering.
-    assert(segment_set == std::set<std::string>(pending_segment.begin(),
-                                                pending_segment.end()));
+    assert(segment_set == std::set<bstring>(pending_segment.begin(),
+                                            pending_segment.end()));
     // Finalize the segment.
     assert(db->LookupSegmentInfo(segment, NULL) == LogDB::NOT_FOUND);
     db->WriteSegmentAndInfo(logdbtest::kSegmentInfos[segment]);
@@ -177,7 +178,7 @@ static void LogDBTest(LogDB *db) {
     assert(db->PendingLogSize() == 0);
 
     // Look up the segment info.
-    std::string result;
+    bstring result;
     assert(db->LookupSegmentInfo(segment, &result) == LogDB::LOGGED);
     assert(result == logdbtest::kSegmentInfos[segment]);
 
@@ -200,11 +201,11 @@ static void InterleaveTest(LogDB *db) {
   assert(!db->HasPendingSegment());
 
   // The initial set, unordered.
-  std::set<std::string> segment_set;
+  std::set<bstring> segment_set;
   // The segment, ordered as the DB constructed it.
-  std::vector<std::string> pending_segment;
+  std::vector<bstring> pending_segment;
   // The logged segment, ordered.
-  std::vector<std::string> logged_segment;
+  std::vector<bstring> logged_segment;
 
   // Insert the entries in the first segment.
   segment_set = InsertSegmentEntries(db, 0, 0);
@@ -217,16 +218,16 @@ static void InterleaveTest(LogDB *db) {
   assert(db->PendingLogSize() == logdbtest::kSegmentSizes[0]);
 
   pending_segment = CheckPendingSegment(db, 0, 0);
-  assert(segment_set == std::set<std::string>(pending_segment.begin(),
-                                              pending_segment.end()));
+  assert(segment_set == std::set<bstring>(pending_segment.begin(),
+                                          pending_segment.end()));
 
   // Now insert another pending entry.
   size_t index = logdbtest::kSegmentSizes[0];
-  std::string iKey = logdbtest::kKeys[index];
-  std::string iData = logdbtest::kEntries[index];
+  bstring iKey = logdbtest::kKeys[index];
+  bstring iData = logdbtest::kEntries[index];
   assert(db->WriteEntry(iKey, iData) == LogDB::NEW);
   // Check that the entry is listed as pending...
-  std::string result;
+  bstring result;
   assert(db->LookupEntry(iKey, LogDB::ANY, &result) == LogDB::PENDING);
   assert(result == iData);
 
@@ -238,7 +239,7 @@ static void InterleaveTest(LogDB *db) {
 
   // Check that the pending segment is still correct.
   pending_segment = CheckPendingSegment(db, 0, 0);
-  assert(segment_set == std::set<std::string>(pending_segment.begin(),
+  assert(segment_set == std::set<bstring>(pending_segment.begin(),
                                               pending_segment.end()));
 
   // Finalize the segment.

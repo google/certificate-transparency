@@ -3,9 +3,14 @@
 #include <stddef.h>
 #include <string>
 
+#include "../include/types.h"
+#include "../util/util.h"
 #include "SerialHasher.h"
 
 namespace {
+
+const unsigned char kTestString[] = "Hello world!";
+const size_t kTestStringLength = 12;
 
 typedef struct {
   size_t input_length;
@@ -17,30 +22,27 @@ typedef struct {
 HashTestVector test_sha256[] = {
   { 0,
     "",
-    "\xe3\xb0\xc4\x42\x98\xfc\x1c\x14\x9a\xfb\xf4\xc8\x99\x6f\xb9\x24"
-    "\x27\xae\x41\xe4\x64\x9b\x93\x4c\xa4\x95\x99\x1b\x78\x52\xb8\x55" },
+    "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855" },
   { 8,
-    "\x57\x38\xc9\x29\xc4\xf4\xcc\xb6",
-    "\x96\x3b\xb8\x8f\x27\xf5\x12\x77\x7a\xab\x6c\x8b\x1a\x02\xc7\x0e"
-    "\xc0\xad\x65\x1d\x42\x8f\x87\x00\x36\xe1\x91\x71\x20\xfb\x48\xbf" },
+    "5738c929c4f4ccb6",
+    "963bb88f27f512777aab6c8b1a02c70ec0ad651d428f870036e1917120fb48bf" },
   { 63,
-    "\xe2\xf7\x6e\x97\x60\x6a\x87\x2e\x31\x74\x39\xf1\xa0\x3f\xcd\x92"
-    "\xe6\x32\xe5\xbd\x4e\x7c\xbc\x4e\x97\xf1\xaf\xc1\x9a\x16\xfd\xe9"
-    "\x2d\x77\xcb\xe5\x46\x41\x6b\x51\x64\x0c\xdd\xb9\x2a\xf9\x96\x53"
-    "\x4d\xfd\x81\xed\xb1\x7c\x44\x24\xcf\x1a\xc4\xd7\x5a\xce\xeb",
-    "\x18\x04\x1b\xd4\x66\x50\x83\x00\x1f\xba\x8c\x54\x11\xd2\xd7\x48"
-    "\xe8\xab\xbf\xdc\xdf\xd9\x21\x8c\xb0\x2b\x68\xa7\x8e\x7d\x4c\x23" },
+    "e2f76e97606a872e317439f1a03fcd92e632e5bd4e7cbc4e97f1afc19a16fde9"
+    "2d77cbe546416b51640cddb92af996534dfd81edb17c4424cf1ac4d75aceeb",
+    "18041bd4665083001fba8c5411d2d748e8abbfdcdfd9218cb02b68a78e7d4c23" },
   // to indicate the end
   { 0, NULL, NULL }
 };
 
 // Known Answer Tests
 void KatTest(SerialHasher *hasher, HashTestVector test_vector[]) {
-  std::string input, output, digest;
+  bstring input, output, digest;
 
   for (int i = 0; test_vector[i].input != NULL; ++i) {
-    input.assign(test_vector[i].input, test_vector[i].input_length);
-    output.assign(test_vector[i].output, hasher->DigestSize());
+    std::string hex_input(test_vector[i].input, test_vector[i].input_length * 2);
+    std::string hex_output(test_vector[i].output, hasher->DigestSize() * 2);
+    input = util::BinaryString(hex_input);
+    output = util::BinaryString(hex_output);
     hasher->Reset();
     hasher->Update(input);
     digest = hasher->Final();
@@ -50,7 +52,7 @@ void KatTest(SerialHasher *hasher, HashTestVector test_vector[]) {
 
 // Test fragmented updates
 void UpdateTest(SerialHasher *hasher) {
-  std::string input = "Hello world!", output, digest;
+  bstring input(kTestString, kTestStringLength),  output, digest;
 
   hasher->Reset();
   hasher->Update(input);

@@ -1,12 +1,12 @@
 #ifndef LOGVERIFIER_H
 #define LOGVERIFIER_H
-#include <string>
 
 #include <assert.h>
-#include <stddef.h>
-
 #include <openssl/evp.h>
+#include <stddef.h>
+#include <string>
 
+#include "../include/types.h"
 #include "LogRecord.h"
 #include "MerkleVerifier.h"
 
@@ -19,6 +19,8 @@ class LogVerifier {
 
   enum VerifyResult {
     VERIFY_OK,
+    // The input data is not a valid input to the log.
+    INVALID_INPUT,
     // The proof did not deserialize.
     INVALID_FORMAT,
     // The path does not match the tree size and leaf index.
@@ -66,14 +68,14 @@ class LogVerifier {
   // Compute the Merkle root from AuditProof.audit_path and
   // verify the signature on the segment data.
   VerifyResult VerifyLogSegmentAuditProof(const AuditProof &audit_proof,
-                                          const std::string &leaf);
+                                          const bstring &leaf);
 
   // Verify the audit proof. Additionally populate the
   // sequence_number, segment_size, segment_root, and segment_sig
   // fields of the segment_data structure from the audit_proof
   // if the proof is valid.
   VerifyResult VerifyLogSegmentAuditProof(const AuditProof &audit_proof,
-                                          const std::string &leaf,
+                                          const bstring &leaf,
                                           LogSegmentCheckpoint *checkpoint);
 
   // Compute the Merkle root from AuditProof.audit_path and
@@ -100,6 +102,6 @@ class LogVerifier {
   EVP_PKEY *pkey_;
   MerkleVerifier verifier_;
 
-  bool VerifySignature(const std::string &data, const std::string &signature);
+  bool VerifySignature(const bstring &data, const bstring &signature);
 };
 #endif

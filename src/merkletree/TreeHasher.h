@@ -1,8 +1,9 @@
 #ifndef TREEHASHER_H
 #define TREEHASHER_H
-#include <stddef.h>
-#include <string>
 
+#include <stddef.h>
+
+#include "../include/types.h"
 #include "SerialHasher.h"
 
 class TreeHasher {
@@ -13,21 +14,20 @@ class TreeHasher {
 
   size_t DigestSize() const { return hasher_->DigestSize(); }
 
-  std::string HashEmpty();
+  bstring HashEmpty();
 
-  std::string HashLeaf(const std::string &data);
+  bstring HashLeaf(const bstring &data);
 
   // Accepts arbitrary strings as children. When hashing
   // digests, it is the responsibility of the caller to
   // ensure the inputs are of correct size.
-  std::string HashChildren(const std::string &left_child,
-                           const std::string &right_child);
+  bstring HashChildren(const bstring &left_child, const bstring &right_child);
 
  private:
   SerialHasher *hasher_;
-  static const std::string kLeafPrefix;
-  static const std::string kNodePrefix;
+  static const bstring kLeafPrefix;
+  static const bstring kNodePrefix;
   // The dummy hash of an empty tree.
-  std::string emptyhash_;
+  bstring emptyhash_;
 };
 #endif

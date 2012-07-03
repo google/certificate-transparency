@@ -1,9 +1,7 @@
 #ifndef CT_H
 #define CT_H
-#include <string>
 
-typedef unsigned char byte;
-typedef std::basic_string<byte> bstring;
+#include "types.h"
 
 // Some codes that we send across the wire.
 namespace ct {
@@ -14,6 +12,7 @@ enum ClientCommand {
   // Upload a certificate bundle, and retrieve
   // a submission token, or an audit proof.
   UPLOAD_BUNDLE = 1,
+  UPLOAD_CA_BUNDLE = 2,
 };
 
 // The server's response codes.
@@ -25,9 +24,11 @@ enum ServerResponse {
 };
 
 // The server's error codes sent with response code ERROR.
+// One byte.
 enum ServerError {
   BAD_VERSION = 0,
   BAD_COMMAND = 1,
+  BAD_BUNDLE = 2,
 };
 
 } // namespace ct

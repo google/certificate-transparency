@@ -3,6 +3,7 @@
 #include <stddef.h>
 #include <string>
 
+#include "../util/util.h"
 #include "SerialHasher.h"
 #include "TreeHasher.h"
 
@@ -22,40 +23,33 @@ typedef struct {
 } NodeTestVector;
 
 const char sha256_empty_hash[] =
-    "\xe3\xb0\xc4\x42\x98\xfc\x1c\x14\x9a\xfb\xf4\xc8\x99\x6f\xb9\x24"
-    "\x27\xae\x41\xe4\x64\x9b\x93\x4c\xa4\x95\x99\x1b\x78\x52\xb8\x55";
+    "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855";
 
 LeafTestVector sha256_leaves[] = {
   { 0,
     "",
-    "\x6e\x34\x0b\x9c\xff\xb3\x7a\x98\x9c\xa5\x44\xe6\xbb\x78\x0a\x2c"
-    "\x78\x90\x1d\x3f\xb3\x37\x38\x76\x85\x11\xa3\x06\x17\xaf\xa0\x1d" },
+    "6e340b9cffb37a989ca544e6bb780a2c78901d3fb33738768511a30617afa01d" },
   { 1,
-    "\x00",
-    "\x96\xa2\x96\xd2\x24\xf2\x85\xc6\x7b\xee\x93\xc3\x0f\x8a\x30\x91"
-    "\x57\xf0\xda\xa3\x5d\xc5\xb8\x7e\x41\x0b\x78\x63\x0a\x09\xcf\xc7" },
+    "00",
+    "96a296d224f285c67bee93c30f8a309157f0daa35dc5b87e410b78630a09cfc7" },
 
   { 16,
-    "\x10\x11\x12\x13\x14\x15\x16\x17\x18\x19\x1a\x1b\x1c\x1d\x1e\x1f",
-    "\x3b\xfb\x96\x04\x53\xeb\xae\xbf\x33\x72\x7d\xa7\xa1\xf4\xdb\x38"
-    "\xac\xc0\x51\xd3\x81\xb6\xda\x20\xd6\xd4\xe8\x8f\x0e\xab\xfd\x7a" },
+    "101112131415161718191a1b1c1d1e1f",
+    "3bfb960453ebaebf33727da7a1f4db38acc051d381b6da20d6d4e88f0eabfd7a" },
   { 0, NULL, NULL}
 };
 
 NodeTestVector sha256_nodes[] = {
-  { "\x00\x01\x02\x03\x04\x05\x06\x07\x08\x09\x0a\x0b\x0c\x0d\x0e\x0f"
-    "\x10\x11\x12\x13\x14\x15\x16\x17\x18\x19\x1a\x1b\x1c\x1d\x1e\x1f",
-    "\x20\x21\x22\x23\x24\x25\x26\x27\x28\x29\x2a\x2b\x2c\x2d\x2e\x2f"
-    "\x30\x31\x32\x33\x34\x35\x36\x37\x38\x39\x3a\x3b\x3c\x3d\x3e\x3f",
-    "\x1a\x37\x87\x04\xc1\x7d\xa3\x1e\x2d\x05\xb6\xd1\x21\xc2\xbb\x2c"
-    "\x7d\x76\xf6\xee\x6f\xa8\xf9\x83\xe5\x96\xc2\xd0\x34\x96\x3c\x57" },
+  { "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f",
+    "202122232425262728292a2b2c2d2e2f303132333435363738393a3b3c3d3e3f",
+    "1a378704c17da31e2d05b6d121c2bb2c7d76f6ee6fa8f983e596c2d034963c57" },
   { NULL, NULL, NULL }
 };
 
 // TreeHashers are collision resistant when used correctly, i.e.,
 // when HashChildren() is called on the (fixed-length) outputs of HashLeaf().
 void CollisionTest(TreeHasher *treehasher) {
-  std::string leaf1_digest, leaf2_digest, node1_digest, node2_digest;
+  bstring leaf1_digest, leaf2_digest, node1_digest, node2_digest;
 
   const size_t digestsize = treehasher->DigestSize();
 
@@ -63,14 +57,16 @@ void CollisionTest(TreeHasher *treehasher) {
   leaf1_digest = treehasher->HashEmpty();
   assert(leaf1_digest.size() == digestsize);
 
-  leaf2_digest = treehasher->HashLeaf("");
+  leaf2_digest = treehasher->HashLeaf(bstring());
   assert(leaf2_digest.size() == digestsize);
 
   assert(leaf1_digest != leaf2_digest);
 
   // Check that different leaves hash to different digests.
-  std::string leaf1 = "Hello";
-  std::string leaf2 = "World";
+  const unsigned char hello[] = "Hello";
+  const unsigned char world[] = "World";
+  bstring leaf1(hello, 5);
+  bstring leaf2(world, 5);
   leaf1_digest = treehasher->HashLeaf(leaf1);
   assert(leaf1_digest.size() == digestsize);
 
@@ -96,29 +92,30 @@ void CollisionTest(TreeHasher *treehasher) {
   assert(node1_digest != node2_digest);
 }
 
-void KatTest(TreeHasher *treehasher, const char *empty_hash,
+void KatTest(TreeHasher *treehasher, const char *hex_empty_hash,
              LeafTestVector leaves[], NodeTestVector nodes[]) {
-  const size_t digestsize = treehasher->DigestSize();
-  std::string leaf, left, right, output, digest;
+  const size_t hex_digest_size = treehasher->DigestSize() * 2;
+  bstring leaf, left, right, output, digest;
 
   // The empty hash
-  output.assign(empty_hash, digestsize);
+  output = util::BinaryString(std::string(hex_empty_hash, hex_digest_size));
   digest = treehasher->HashEmpty();
   assert(output == digest);
 
   // Leaf hashes
   for (int i = 0; leaves[i].input != NULL; ++i) {
-    leaf.assign(leaves[i].input, leaves[i].input_length);
-    output.assign(leaves[i].output,digestsize);
+    leaf = util::BinaryString(std::string(leaves[i].input,
+                                          leaves[i].input_length * 2));
+    output = util::BinaryString(std::string(leaves[i].output, hex_digest_size));
     digest = treehasher->HashLeaf(leaf);
     assert(output == digest);
   }
 
   // Node hashes
   for (int i = 0; nodes[i].left != NULL; ++i) {
-    left.assign(nodes[i].left, digestsize);
-    right.assign(nodes[i].right, digestsize);
-    output.assign(nodes[i].output, digestsize);
+    left = util::BinaryString(std::string(nodes[i].left, hex_digest_size));
+    right = util::BinaryString(std::string(nodes[i].right, hex_digest_size));
+    output = util::BinaryString(std::string(nodes[i].output, hex_digest_size));
     digest = treehasher->HashChildren(left, right);
     assert(output == digest);
   }

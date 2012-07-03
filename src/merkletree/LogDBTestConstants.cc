@@ -6,7 +6,7 @@ const size_t kNumberOfSegments = 4;
 const size_t kLogSize = 15;
 const size_t kSegmentSizes[4] = { 5, 2, 0, 8 };
 // Nice human-readable test entries for easier debugging.
-const char kEntries[15][20] = {
+const unsigned char kEntries[15][20] = {
   // Segment 1
   "Angelfish", "Bananafish", "Unicorn fish", "Upside-down catfish",
   "Weasel shark",
@@ -17,12 +17,12 @@ const char kEntries[15][20] = {
   "0", "1", "2", "3", "4", "5", "6", "7"
 };
 
-const char kKeys[15][8] = {
+const unsigned char kKeys[15][8] = {
   "abcdef0", "abcdef1", "xyzabc2", "zyxabc3", "ijklmn4", "jklmni5", "klmnij6",
   "lmnijk7", "mnijkl8", "nijklm9", "opqrs10", "wxyza11", "gfedc12", "gfedc13",
   "gfedc14"
 };
 
-const char kSegmentInfos[4][10] = { "Fish", "Poison", "Empty", "Sequence" };
+const unsigned char kSegmentInfos[4][10] = { "Fish", "Poison", "Empty", "Sequence" };
 
 } // logdbtest

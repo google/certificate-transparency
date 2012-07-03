@@ -8,9 +8,9 @@ namespace logdbtest {
 extern const size_t kNumberOfSegments;
 extern const size_t kLogSize;
 extern const size_t kSegmentSizes[];
-extern const char kEntries[][20];
-extern const char kKeys[][8];
-extern const char kSegmentInfos[][10];
+extern const unsigned char kEntries[][20];
+extern const unsigned char kKeys[][8];
+extern const unsigned char kSegmentInfos[][10];
 
 } // logdbtest
 

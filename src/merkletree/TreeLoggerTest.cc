@@ -1,17 +1,17 @@
-#include <iostream>
-#include <string>
-
 #include <assert.h>
-#include <stddef.h>
-#include <stdlib.h>
-#include <sys/stat.h>
-
+#include <iostream>
 #include <openssl/bio.h>
 #include <openssl/crypto.h>
 #include <openssl/evp.h>
 #include <openssl/pem.h>
 #include <openssl/rand.h>
+#include <stddef.h>
+#include <stdlib.h>
+#include <string>
+#include <sys/stat.h>
 
+#include "../include/types.h"
+#include "../util/util.h"
 #include "LogDB.h"
 #include "LogRecord.h"
 #include "LogVerifier.h"
@@ -52,43 +52,56 @@ EVP_PKEY* PublicKeyFromPem(const std::string &pemkey) {
   return pkey;
 }
 
-static const char *nibble = "0123456789abcdef";
-
-static std::string HexString(const std::string &data) {
-  std::string ret;
-  for (unsigned int i = 0; i < data.size(); ++i) {
-    ret.push_back(nibble[(data[i] >> 4) & 0xf]);
-    ret.push_back(nibble[data[i] & 0xf]);
-  }
-  return ret;
-}
-
 void LogVerifierTest(LogDB *db) {
+  const unsigned char unicorn[] = "Unicorn";
+  const bstring kUnicorn(unicorn, 7);
+  const unsigned char alice[] = "Alice";
+  const bstring kAlice(alice, 5);
+
   EVP_PKEY *pkey = PrivateKeyFromPem(ecp256_private_key);
   EVP_PKEY *pubkey = PublicKeyFromPem(ecp256_public_key);
   TreeLogger treelogger(db, pkey);
   LogVerifier verifier(pubkey);
-  std::string key0, key1;
-  assert(treelogger.QueueEntry("Unicorn", &key0) == LogDB::NEW);
-  assert(treelogger.QueueEntry("Alice", &key1) == LogDB::NEW);
+  bstring key0, key1;
+  assert(treelogger.QueueEntry(kUnicorn, &key0) == LogDB::NEW);
+  assert(treelogger.QueueEntry(kAlice, &key1) == LogDB::NEW);
   treelogger.LogSegment();
-  std::string segment;
+  bstring segment;
   assert(treelogger.SegmentInfo(0, &segment) == LogDB::LOGGED);
   assert(!segment.empty());
-  std::cout << HexString(segment) << '\n';
+  std::cout << "Segment info:\n" << util::HexString(segment, ' ') << '\n';
   SegmentData data;
   assert(data.DeserializeSegmentInfo(segment));
 
   // Construct the trees.
+  // (TODO: a monitor that can do this automatically.)
   MerkleTree log_segment_tree(new Sha256Hasher());
-  std::string result0, result1;
+  bstring result0, result1;
+
   assert(treelogger.EntryInfo(0, 0, &result0) == LogDB::LOGGED);
-  assert(result0 == "Unicorn" || result0 == "Alice");
-  log_segment_tree.AddLeaf(result0);
+  LogEntry *entry0 = LogEntry::Deserialize(result0);
+  assert(entry0 != NULL);
+  assert(entry0->Type() == LogEntry::TEST_ENTRY);
+
+  // Default submission handling signs the type (2 bytes) + raw submission.
+  bstring signed0;
+  assert(entry0->SerializeSigned(&signed0));
+  assert(signed0.substr(2) == kUnicorn || signed0.substr(2) == kAlice);
+  log_segment_tree.AddLeaf(signed0);
+
   assert(treelogger.EntryInfo(0, 1, &result1) == LogDB::LOGGED);
-  assert(result1 == "Unicorn" || result1 == "Alice");
-  assert(result0 != result1);
-  log_segment_tree.AddLeaf(result1);
+  LogEntry *entry1 = LogEntry::Deserialize(result1);
+  assert(entry1 != NULL);
+  assert(entry1->Type() == LogEntry::TEST_ENTRY);
+
+  bstring signed1;
+  assert(entry1->SerializeSigned(&signed1));
+  assert(signed0.substr(2) == kUnicorn || signed0.substr(2) == kAlice);
+
+  assert(signed0 != signed1);
+  log_segment_tree.AddLeaf(signed1);
+  delete entry0;
+  delete entry1;
   data.log_segment.root = log_segment_tree.CurrentRoot();
 
   MerkleTree segment_info_tree(new Sha256Hasher());
@@ -130,44 +143,65 @@ void LogVerifierTest(LogDB *db) {
   // Query an audit proof, and verify it.
   assert(!key0.empty());
   AuditProof proof0, proof1;
+  assert(treelogger.EntryInfo(key0, LogDB::LOGGED_ONLY, &result0)
+         == LogDB::LOGGED);
   assert(treelogger.EntryAuditProof(key0, &proof0) == LogDB::LOGGED);
-  assert(verifier.VerifyLogSegmentAuditProof(proof0, "Unicorn") ==
-         LogVerifier::VERIFY_OK);
-  assert(!key1.empty());
-  assert(treelogger.EntryAuditProof(key1, &proof1) == LogDB::LOGGED);
-  assert(verifier.VerifyLogSegmentAuditProof(proof1, "Alice") ==
+
+  entry0 = LogEntry::Deserialize(result0);
+  assert(entry0 != NULL);
+  assert(entry0->SerializeSigned(&signed0));
+
+  assert(verifier.VerifyLogSegmentAuditProof(proof0, signed0) ==
          LogVerifier::VERIFY_OK);
 
-  // Some invalid proofs.
-  assert(verifier.VerifyLogSegmentAuditProof(proof0, "Alice") !=
+  assert(!key1.empty());
+  assert(treelogger.EntryInfo(key1, LogDB::LOGGED_ONLY, &result1)
+         == LogDB::LOGGED);
+
+  entry1 = LogEntry::Deserialize(result1);
+  assert(entry1 != NULL);
+  assert(entry1->SerializeSigned(&signed1));
+  assert(treelogger.EntryAuditProof(key1, &proof1) == LogDB::LOGGED);
+
+  assert(verifier.VerifyLogSegmentAuditProof(proof1, signed1) ==
          LogVerifier::VERIFY_OK);
-  assert(verifier.VerifyLogSegmentAuditProof(proof1, "Unicorn") !=
+
+  delete entry0;
+  delete entry1;
+
+  // Some invalid proofs.
+  assert(verifier.VerifyLogSegmentAuditProof(proof0, signed1) !=
+         LogVerifier::VERIFY_OK);
+  assert(verifier.VerifyLogSegmentAuditProof(proof1, signed0) !=
          LogVerifier::VERIFY_OK);
 
   AuditProof wrong_proof = proof0;
+  // Not wrong yet...
+  assert(verifier.VerifyLogSegmentAuditProof(wrong_proof, signed0) ==
+         LogVerifier::VERIFY_OK);
   // Wrong sequence number.
   ++wrong_proof.sequence_number;
-  assert(verifier.VerifyLogSegmentAuditProof(wrong_proof, "Alice") !=
+  assert(verifier.VerifyLogSegmentAuditProof(wrong_proof, signed0) !=
          LogVerifier::VERIFY_OK);
   --wrong_proof.sequence_number;
   // Wrong tree size.
   ++wrong_proof.tree_size;
-  assert(verifier.VerifyLogSegmentAuditProof(wrong_proof, "Alice") !=
+  assert(verifier.VerifyLogSegmentAuditProof(wrong_proof, signed0) !=
          LogVerifier::VERIFY_OK);
   --wrong_proof.tree_size;
   // Wrong leaf index.
   ++wrong_proof.leaf_index;
-  assert(verifier.VerifyLogSegmentAuditProof(wrong_proof, "Alice") !=
+  assert(verifier.VerifyLogSegmentAuditProof(wrong_proof, signed0) !=
          LogVerifier::VERIFY_OK);
   --wrong_proof.leaf_index;
   // Wrong signature.
-  wrong_proof.signature = proof1.signature;
-  assert(verifier.VerifyLogSegmentAuditProof(wrong_proof, "Alice") !=
+  wrong_proof.signature = data.log_head.signature;
+  assert(verifier.VerifyLogSegmentAuditProof(wrong_proof, signed0) !=
          LogVerifier::VERIFY_OK);
   wrong_proof.signature = proof0.signature;
   // Wrong audit path.
   wrong_proof.audit_path = proof1.audit_path;
-  assert(verifier.VerifyLogSegmentAuditProof(wrong_proof, "Alice") !=
+  assert(verifier.VerifyLogSegmentAuditProof(wrong_proof, signed0) !=
          LogVerifier::VERIFY_OK);
 }
 
@@ -178,7 +212,9 @@ void MemoryLoggerTest() {
 void FileLoggerTest() {
   // Create a new directory for testing.
   assert(mkdir("/tmp/ct/b", 0777) == 0);
-  LogVerifierTest(new FileDB("/tmp/ct/b", 5));
+  FileDB *db = new FileDB("/tmp/ct/b", 5);
+  db->Init();
+  LogVerifierTest(db);
   assert(system("rm -r /tmp/ct/b") == 0);
 }
 

@@ -1,10 +1,10 @@
-// Opened for readability review.
 #ifndef MERKLETREE_H
 #define MERKLETREE_H
+
 #include <stddef.h>
-#include <string>
 #include <vector>
 
+#include "../include/types.h"
 #include "TreeHasher.h"
 
 class SerialHasher;
@@ -33,14 +33,14 @@ class MerkleTree {
   size_t LeafCount() const { return tree_.empty() ? 0 : tree_[0].size(); }
 
   // The |leaf|th leaf hash in the tree. Indexing starts from 1.
-  std::string LeafHash(size_t leaf) const {
+  bstring LeafHash(size_t leaf) const {
     if (leaf == 0 || leaf > LeafCount())
-      return "";
+      return bstring();
     return tree_[0][leaf-1];
   }
 
   // Return the leaf hash, but do not append the data to the tree.
-  std::string LeafHash(const std::string &data) {
+  bstring LeafHash(const bstring &data) {
     return treehasher_.HashLeaf(data);
   }
 
@@ -58,7 +58,7 @@ class MerkleTree {
   // so position = number of leaves in the tree after this update.
   //
   // @param data Binary input blob
-  size_t AddLeaf(const std::string &data);
+  size_t AddLeaf(const bstring &data);
 
   // Get the current root of the tree.
   // Update the root to reflect the current shape of the tree,
@@ -66,7 +66,7 @@ class MerkleTree {
   //
   // Returns the hash of an empty string if the tree has no leaves
   // (and hence, no root).
-  std::string CurrentRoot();
+  bstring CurrentRoot();
 
   // Get the root of the tree for a previous snapshot,
   // where snapshot 0 is an empty tree, snapshot 1 is the tree with
@@ -76,7 +76,7 @@ class MerkleTree {
   // (i.e., the tree is not large enough).
   //
   // @param snapshot point in time (= number of leaves at that point).
-  std::string RootAtSnapshot(size_t snapshot);
+  bstring RootAtSnapshot(size_t snapshot);
 
   // Get the Merkle path from leaf to root.
   //
@@ -87,7 +87,7 @@ class MerkleTree {
   // or the leaf index is 0.
   //
   // @param leaf the index of the leaf the path is for.
-  std::vector<std::string> PathToCurrentRoot(size_t leaf);
+  std::vector<bstring> PathToCurrentRoot(size_t leaf);
 
   // Get the Merkle path from leaf to the root of a previous snapshot.
   //
@@ -99,7 +99,7 @@ class MerkleTree {
   //
   // @param leaf the index of the leaf the path is for.
   // @param snapshot point in time (= number of leaves at that point)
-  std::vector<std::string> PathToRootAtSnapshot(size_t leaf, size_t snapshot);
+  std::vector<bstring> PathToRootAtSnapshot(size_t leaf, size_t snapshot);
 
   // Get the Merkle consistency proof between two snapshots.
   // Returns a vector of node hashes, ordered according to levels.
@@ -108,22 +108,21 @@ class MerkleTree {
   //
   // @param snapshot1 the first point in time
   // @param snapshot2 the second point in time
-  std::vector<std::string> SnapshotConsistency(size_t snapshot1,
-                                               size_t snapshot2);
+  std::vector<bstring> SnapshotConsistency(size_t snapshot1, size_t snapshot2);
 
  private:
   // Update to a given snapshot, return the root.
-  std::string UpdateToSnapshot(size_t snapshot);
+  bstring UpdateToSnapshot(size_t snapshot);
   // Return the root of a past snapshot.
   // If node is not NULL, additionally record the rightmost node
   // for the given snapshot and node_level.
-  std::string RecomputePastSnapshot(size_t snapshot, size_t node_level,
-                                    std::string *node);
+  bstring RecomputePastSnapshot(size_t snapshot, size_t node_level,
+                                bstring *node);
   // Path from a node at a given level (both indexed starting with 0)
   // to the root at a given snapshot.
-  std::vector<std::string> PathFromNodeToRootAtSnapshot(size_t node_index,
-                                                        size_t level,
-                                                        size_t snapshot);
+  std::vector<bstring> PathFromNodeToRootAtSnapshot(size_t node_index,
+                                                    size_t level,
+                                                    size_t snapshot);
   // A container for nodes, organized according to levels and sorted
   // left-to-right in each level. tree_[0] is the leaf level, etc.
   // The hash of nodes tree_[i][j] and tree_[i][j+1] (j even) is stored
@@ -155,7 +154,7 @@ class MerkleTree {
   // Since the tree is append-only from the right, at any given point in time,
   // at each level, all nodes computed so far, except possibly the last node,
   // are fixed and will no longer change.
-  std::vector< std::vector<std::string> > tree_;
+  std::vector< std::vector<bstring> > tree_;
   TreeHasher treehasher_;
   // Number of leaves propagated up to the root,
   // to keep track of lazy evaluation.

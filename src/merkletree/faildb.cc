@@ -7,9 +7,10 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "../include/types.h"
+#include "../util/util.h"
 #include "LogDB.h"
 #include "LogDBTestConstants.h"
-#include "../util/util.h"
 
 namespace {
 
@@ -38,12 +39,13 @@ static const char kReportFile[] = "/tmp/ct/fail/report";
 static void MakeReport() {
   if (access(kWorkingDir, W_OK) < 0)
     return;
-  std::string res = util::SerializeUint(report.op, 1);
+  bstring res = util::SerializeUint(report.op, 1);
   res.append(util::SerializeUint(report.segment, 4));
   res.append(util::SerializeUint(report.index, 4));
-  std::ofstream report_file(kReportFile, std::ios::out | std::ios::trunc);
+  std::ofstream report_file(kReportFile, std::ios::out | std::ios::trunc |
+                            std::ios::binary);
   assert(report_file.good());
-  report_file.write(res.data(), res.length());
+  report_file.write(reinterpret_cast<const char*>(res.data()), res.length());
   assert(report_file.good());
   report_file.close();
 }
@@ -116,14 +118,9 @@ class FailDB : public FileDB {
 }  // namespace
 
 static FailReport ReadReport() {
-  std::ifstream data(kReportFile);
-  assert(data.good());
-  char buf[100];
-  data.read(buf, sizeof buf);
-  std::streamsize count = data.gcount();
-  assert(data.eof());
-  assert(!data.bad());
-  std::string result = std::string(buf, count);
+  bstring result;
+  bool read_success = util::ReadBinaryFile(kReportFile, &result);
+  assert(read_success);
   assert(result.size() == 9);
   FailReport ret;
   ret.op = static_cast<FailedOp>(util::DeserializeUint(result.substr(0, 1)));
@@ -163,13 +160,13 @@ static void MakeLog(FailDB *db) {
 
 static void CheckLog(FileDB *db, size_t logged_segments,
                      size_t pending_entries) {
-  std::string result;
+  bstring result;
 
   assert(db->SegmentCount() == logged_segments);
   assert(db->PendingLogSize() == pending_entries);
 
-  std::set<std::string> expected_segment;
-  std::set<std::string> logged_segment;
+  std::set<bstring> expected_segment;
+  std::set<bstring> logged_segment;
   size_t segment, offset, index;
   for (segment = 0, offset = 0; segment < logged_segments;
        offset += logdbtest::kSegmentSizes[segment++]) {

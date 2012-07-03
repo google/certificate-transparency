@@ -2,6 +2,7 @@
 ^doc/sunlight\.html$
 ^doc/sunlight\.txt$
 .*\.o$
+^src/merkletree/faildb
 ^src/merkletree/LogDBTest$
 ^src/merkletree/MerkleTreeTest$
 ^src/merkletree/SerialHasherTest$
@@ -10,3 +11,6 @@
 \.depend
 ^src/client/ct$
 ^src/server/ct-server$
+^src/log/cert_test$
+^src/log/cert_checker_test$
+^src/log/submission_handler_test$

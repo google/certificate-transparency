@@ -1,39 +1,26 @@
-#include <fstream>
-#include <map>
-#include <set>
-#include <string>
-#include <utility>
-#include <vector>
-
 #include <assert.h>
 #include <dirent.h>
 #include <errno.h>
+#include <fstream>
+#include <map>
+#include <set>
 #include <stddef.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <string>
 #include <sys/stat.h>
 #include <unistd.h>
+#include <utility>
+#include <vector>
 
+#include "../include/types.h"
 #include "../util/util.h"
 #include "LogDB.h"
 
-static const char *nibble = "0123456789abcdef";
-
-std::string HexString(const std::string &data) {
-  if (data.empty())
-    return "-";
-  std::string ret;
-  for (unsigned int i = 0; i < data.size(); ++i) {
-    ret.push_back(nibble[(data[i] >> 4) & 0xf]);
-    ret.push_back(nibble[data[i] & 0xf]);
-  }
-  return ret;
-}
-
 MemoryDB::MemoryDB() : has_pending_segment_(false) {}
 
-LogDB::Status MemoryDB::WriteEntry(const std::string &key,
-                                   const std::string &data) {
+LogDB::Status MemoryDB::WriteEntry(const bstring &key,
+                                   const bstring &data) {
   // Try to insert.
   std::pair<DataMap::iterator, bool> inserted =
       map_.insert(DataMap::value_type(key, data));
@@ -70,7 +57,7 @@ size_t MemoryDB::PendingSegmentSize() const {
 }
 
 LogDB::Status
-MemoryDB::PendingSegmentEntry(size_t index, std::string *data) const {
+MemoryDB::PendingSegmentEntry(size_t index, bstring *data) const {
   assert(HasPendingSegment());
   if (index >= pending_segment_.size())
     return NOT_FOUND;
@@ -80,12 +67,12 @@ MemoryDB::PendingSegmentEntry(size_t index, std::string *data) const {
   return PENDING;
 }
 
-void MemoryDB::WriteSegmentAndInfo(const std::string &data) {
+void MemoryDB::WriteSegmentAndInfo(const bstring &data) {
   // Remove the keys from the pending bag.
   size_t segment = PendingSegmentNumber();
   for (size_t index = 0; index < pending_segment_.size(); ++index) {
     Location loc(segment, index);
-    std::string key = pending_segment_[index];
+    bstring key = pending_segment_[index];
     logged_map_.insert(LocationMap::value_type(key, loc));
     pending_.erase(key);
   }
@@ -96,11 +83,11 @@ void MemoryDB::WriteSegmentAndInfo(const std::string &data) {
 }
 
 LogDB::Status MemoryDB::LookupEntry(size_t segment, size_t index,
-                                    std::string *result) const {
+                                    bstring *result) const {
   if (segment >= logged_.size() || index >= logged_[segment].size())
     return NOT_FOUND;
   if (result) {
-    const std::string key = logged_[segment][index];
+    const bstring key = logged_[segment][index];
     DataMap::const_iterator it = map_.find(key);
     assert(it != map_.end());
     result->assign(it->second);
@@ -108,8 +95,8 @@ LogDB::Status MemoryDB::LookupEntry(size_t segment, size_t index,
   return LOGGED;
 }
 
-LogDB::Status MemoryDB::LookupEntry(const std::string &key, LogDB::Lookup type,
-                                    std::string *result) const {
+LogDB::Status MemoryDB::LookupEntry(const bstring &key, LogDB::Lookup type,
+                                    bstring *result) const {
   DataMap::const_iterator data_it = map_.find(key);
   if (data_it == map_.end())
     return NOT_FOUND;
@@ -131,7 +118,7 @@ LogDB::Status MemoryDB::LookupEntry(const std::string &key, LogDB::Lookup type,
   return ret;
 }
 
-LogDB::Status MemoryDB::EntryLocation(const std::string &key, size_t *segment,
+LogDB::Status MemoryDB::EntryLocation(const bstring &key, size_t *segment,
                                       size_t *index) const {
   LocationMap::const_iterator it = logged_map_.find(key);
   if (it == logged_map_.end())
@@ -142,8 +129,7 @@ LogDB::Status MemoryDB::EntryLocation(const std::string &key, size_t *segment,
   return LogDB::LOGGED;
 }
 
-LogDB::Status MemoryDB::LookupSegmentInfo(size_t index,
-                                          std::string *result) const {
+LogDB::Status MemoryDB::LookupSegmentInfo(size_t index, bstring *result) const {
   if (index >= segment_infos_.size())
     return LogDB::NOT_FOUND;
   if (result != NULL)
@@ -190,8 +176,7 @@ size_t FileDB::SegmentCount() const {
   return segment_count_;
 }
 
-LogDB::Status FileDB::WriteEntry(const std::string &key,
-				 const std::string &data) {
+LogDB::Status FileDB::WriteEntry(const bstring &key, const bstring &data) {
   std::string dir = StorageDirectory(key);
   // kDataFile must be created last in a pending entry.
   if (access((dir + "/" + kDataFile).c_str(), R_OK) < 0) {
@@ -259,17 +244,17 @@ void FileDB::MakeSegment() {
   assert(dir);
   unsigned count = 0;
   struct dirent *entry;
-  std::string segment_bytestring = util::SerializeUint(segment_count_, 4);
+  bstring segment_bytestring = util::SerializeUint(segment_count_, 4);
   while ((entry = readdir(dir)) != NULL) {
     if (entry->d_name[0] == '.')
       continue;
     std::string from(kPendingDir + "/" + entry->d_name);
-    std::string index_bytestring = util::SerializeUint(count, 4);
+    bstring index_bytestring = util::SerializeUint(count, 4);
     std::string index = ToString(count++);
     std::string to(kPendingSegmentDir + "/" + index);
     ret = rename(from.c_str(), to.c_str());
     assert(ret >= 0);
-    std::string info(segment_bytestring + index_bytestring);
+    bstring info(segment_bytestring + index_bytestring);
     // Write a lock file to indicate that the entry is queued for logging
     // and we shouldn't try to add it back to the pending bag.
     // Include the entry info in the lock file, so in step 5, we can simply
@@ -279,7 +264,7 @@ void FileDB::MakeSegment() {
     // wise...
     rewinddir(dir);
   }
-  std::string count_bytestring = util::SerializeUint(count, 4);
+  bstring count_bytestring = util::SerializeUint(count, 4);
   closedir(dir);
 
   // Done; write the count. This commits the segment.
@@ -309,41 +294,44 @@ size_t FileDB::PendingSegmentSize() const {
 }
 
 LogDB::Status
-FileDB::PendingSegmentEntry(size_t index, std::string *result) const {
+FileDB::PendingSegmentEntry(size_t index, bstring *result) const {
   assert(HasPendingSegment());
   std::string entry_dir(kPendingSegmentDir + "/" + ToString(index));
   if (access(entry_dir.c_str(), R_OK) < 0) {
     assert(errno == ENOENT);
     return NOT_FOUND;
   }
-  std::string data_file(entry_dir + "/" + kDataFile);
-  assert(access(data_file.c_str(), R_OK) == 0);
-  ReadFile(data_file, result);
+  if (result != NULL) {
+    std::string data_file(entry_dir + "/" + kDataFile);
+    assert(access(data_file.c_str(), R_OK) == 0);
+    ReadFile(data_file, result);
+  }
   return PENDING;
 }
 
-void FileDB::WriteSegmentAndInfo(const std::string &info) {
+void FileDB::WriteSegmentAndInfo(const bstring &info) {
   assert(HasPendingSegment());
   WriteFile(kPendingSegmentDir + "/segment_info", info);
   WritePendingSegment();
 }
 
 LogDB::Status FileDB::LookupEntry(size_t segment, size_t index,
-                                  std::string *result) const {
+                                  bstring *result) const {
   if (segment >= SegmentCount())
     return NOT_FOUND;
   std::string dirname(kSegmentsDir + "/" + ToString(segment) + "/" +
                       ToString(index));
   if (access(dirname.c_str(), R_OK) < 0)
     return NOT_FOUND;
-  std::string data_file(dirname + "/" + kDataFile);
-  if (result)
+  if (result != NULL) {
+    std::string data_file(dirname + "/" + kDataFile);
     ReadFile(data_file, result);
+  }
   return LOGGED;
 }
 
-LogDB::Status FileDB::LookupEntry(const std::string &key, Lookup type,
-				  std::string *result) const {
+LogDB::Status FileDB::LookupEntry(const bstring &key, Lookup type,
+                                  bstring *result) const {
   std::string dir = StorageDirectory(key);
   Status ret = PENDING;
   std::string data_file(dir + "/" + kDataFile);
@@ -365,7 +353,7 @@ LogDB::Status FileDB::LookupEntry(const std::string &key, Lookup type,
   return ret;
 }
 
-LogDB::Status FileDB::EntryLocation(const std::string &key, size_t *segment,
+LogDB::Status FileDB::EntryLocation(const bstring &key, size_t *segment,
                                     size_t *index) const {
   std::string dir = StorageDirectory(key);
   std::string info_file(dir + "/" + kInfoFile);
@@ -376,7 +364,7 @@ LogDB::Status FileDB::EntryLocation(const std::string &key, size_t *segment,
     assert(errno == ENOENT);
     return PENDING;
   } else {
-    std::string info;
+    bstring info;
     ReadFile(info_file, &info);
     assert(info.size() == 8);
     *segment = util::DeserializeUint(info.substr(0, 4));
@@ -385,35 +373,29 @@ LogDB::Status FileDB::EntryLocation(const std::string &key, size_t *segment,
   }
 }
 
-LogDB::Status FileDB::LookupSegmentInfo(size_t index, std::string *result)
-  const {
+LogDB::Status FileDB::LookupSegmentInfo(size_t index, bstring *result) const {
   std::string info(kSegmentsDir + "/" + ToString(index) + "/segment_info");
   if (access(info.c_str(), R_OK) < 0) {
     assert(errno == ENOENT);
     return NOT_FOUND;
   }
-  ReadFile(info, result);
+  if (result != NULL)
+    ReadFile(info, result);
   return LOGGED;
 }
 
-void FileDB::ReadFile(const std::string &file, std::string *result) const {
+void FileDB::ReadFile(const std::string &file, bstring *result) const {
   assert(result != NULL);
-  std::ifstream data(file.c_str());
-  assert(data.good());
-  // FIXME: do something better about reading all the data
-  char buf[10240];
-  data.read(buf, sizeof buf);
-  std::streamsize count = data.gcount();
-  assert(data.eof());
-  assert(!data.bad());
-  *result = std::string(buf, count);
+  bool read_success = util::ReadBinaryFile(file, result);
+  assert(read_success);
 }
 
-void FileDB::WriteFile(const std::string &filename, const std::string &data) {
+void FileDB::WriteFile(const std::string &filename, const bstring &data) {
   std::string tmp_file(kTmpDir + "/tmp_file");
-  std::ofstream file(tmp_file.c_str(), std::ios::out | std::ios::trunc);
+  std::ofstream file(tmp_file.c_str(),
+                     std::ios::out | std::ios::trunc | std::ios::binary);
   assert(file.good());
-  file.write(data.data(), data.length());
+  file.write(reinterpret_cast<const char*>(data.data()), data.length());
   assert(file.good());
   file.close();
   assert(rename(tmp_file.c_str(), filename.c_str()) == 0);
@@ -432,17 +414,16 @@ std::string FileDB::StorageComponent(const std::string &hex, unsigned n) const {
   return std::string(1, hex[n]);
 }
 
-std::string FileDB::StorageDirectory(const std::string &key) const {
-  std::string hex = HexString(key);
+std::string FileDB::StorageDirectory(const bstring &key) const {
+  std::string hex = util::HexString(key);
   std::string dirname = kStorageDir + "/";
   for (unsigned n = 0; n < storage_depth_; ++n)
     dirname += StorageComponent(hex, n) + "/";
   return dirname + StorageDirectoryBasename(hex);
 }
 
-void FileDB::CreateStorageEntry(const std::string &key,
-				const std::string &data) {
-  std::string hex = HexString(key);
+void FileDB::CreateStorageEntry(const bstring &key, const bstring &data) {
+  std::string hex = util::HexString(key);
   std::string dir = StorageDirectoryBasename(hex);
   std::string tmpdir = kTmpDir + "/" + dir;
 
@@ -466,8 +447,8 @@ void FileDB::CreateStorageEntry(const std::string &key,
   assert(ret >= 0);
 }
 
-void FileDB::AddToPending(const std::string &key) {
-  std::string pending = kPendingDir + "/" + HexString(key);
+void FileDB::AddToPending(const bstring &key) {
+  std::string pending = kPendingDir + "/" + util::HexString(key);
   int ret = symlink(StorageDirectory(key).c_str(), pending.c_str());
   // FIXME: if EEXIST, then check the file is correct and fix if not.
   assert(ret >= 0 || errno == EEXIST);
@@ -533,7 +514,7 @@ void FileDB::UnlockTmp() {
     if (entry->d_name[0] == '.')
       continue;
     std::string from(kPendingSegmentDir + "/" + entry->d_name);
-    std::string key;
+    bstring key;
     ReadFile(from + "/" + kKeyFile, &key);
     AddToPending(key);
     std::string lock_file(from + "/" + kLockFile);
@@ -611,7 +592,7 @@ size_t FileDB::CountSegments() const {
 }
 
 size_t FileDB::ReadPendingSegmentCount() const {
-  std::string count;
+  bstring count;
   ReadFile(kPendingSegmentDir + "/count", &count);
   assert(count.size() == 4);
   return util::DeserializeUint(count);

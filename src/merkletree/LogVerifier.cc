@@ -1,5 +1,3 @@
-#include <string>
-
 #include <assert.h>
 
 #include <openssl/evp.h>
@@ -8,6 +6,7 @@
 # error "Need OpenSSL >= 1.0.0"
 #endif
 
+#include "../include/types.h"
 #include "LogRecord.h"
 #include "LogVerifier.h"
 #include "MerkleVerifier.h"
@@ -37,18 +36,18 @@ LogVerifier::LogSegmentCheckpointConsistency(const LogSegmentCheckpoint &a,
 
 LogVerifier::VerifyResult
 LogVerifier::VerifyLogSegmentAuditProof(const AuditProof &audit_proof,
-                                        const std::string &leaf) {
+                                        const bstring &leaf) {
   return VerifyLogSegmentAuditProof(audit_proof, leaf, NULL);
 }
 
 LogVerifier::VerifyResult
 LogVerifier::VerifyLogSegmentAuditProof(const AuditProof &audit_proof,
-                                        const std::string &leaf,
+                                        const bstring &leaf,
                                         LogSegmentCheckpoint *checkpoint) {
   assert(audit_proof.tree_type == SegmentData::LOG_SEGMENT_TREE);
-  std::string root = verifier_.RootFromPath(audit_proof.leaf_index + 1,
-                                            audit_proof.tree_size,
-                                            audit_proof.audit_path, leaf);
+  bstring root = verifier_.RootFromPath(audit_proof.leaf_index + 1,
+                                        audit_proof.tree_size,
+                                        audit_proof.audit_path, leaf);
   if (root.empty())
     return LogVerifier::INVALID_PATH;
   assert(root.size() == 32);
@@ -75,10 +74,10 @@ LogVerifier::VerifySegmentInfoAuditProof(const AuditProof &audit_proof,
                                          const LogSegmentCheckpoint &data,
                                          LogHeadCheckpoint *checkpoint) {
   assert(audit_proof.tree_type == SegmentData::SEGMENT_INFO_TREE);
-  std::string leaf = data.SerializeTreeData();
-  std::string root = verifier_.RootFromPath(audit_proof.leaf_index + 1,
-                                            audit_proof.tree_size,
-                                            audit_proof.audit_path, leaf);
+  bstring leaf = data.SerializeTreeData();
+  bstring root = verifier_.RootFromPath(audit_proof.leaf_index + 1,
+                                        audit_proof.tree_size,
+                                        audit_proof.audit_path, leaf);
   if (root.empty())
     return LogVerifier::INVALID_PATH;
   assert(root.size() == 32);
@@ -98,7 +97,7 @@ LogVerifier::VerifyLogSegmentSignature(const LogSegmentCheckpoint &checkpoint) {
   if (checkpoint.signature.hash_algo != DigitallySigned::SHA256 ||
       checkpoint.signature.sig_algo != DigitallySigned::ECDSA)
     return false;
-  std::string in = checkpoint.SerializeTreeData();
+  bstring in = checkpoint.SerializeTreeData();
   return VerifySignature(in, checkpoint.signature.sig_string);
 }
 
@@ -107,21 +106,19 @@ bool LogVerifier::VerifySegmentInfoSignature(const LogHeadCheckpoint
   if (checkpoint.signature.hash_algo != DigitallySigned::SHA256 ||
       checkpoint.signature.sig_algo != DigitallySigned::ECDSA)
     return false;
-  std::string in = checkpoint.SerializeTreeData();
+  bstring in = checkpoint.SerializeTreeData();
   return VerifySignature(in, checkpoint.signature.sig_string);
 }
 
-bool LogVerifier::VerifySignature(const std::string &data,
-                                  const std::string &signature) {
+bool LogVerifier::VerifySignature(const bstring &data,
+                                  const bstring &signature) {
   EVP_MD_CTX ctx;
   EVP_MD_CTX_init(&ctx);
   // NOTE: this syntax for setting the hash function requires OpenSSL >= 1.0.0.
   assert(EVP_VerifyInit(&ctx, EVP_sha256()) == 1);
   assert(EVP_VerifyUpdate(&ctx, data.data(), data.size()) == 1);
   bool ret =
-      (EVP_VerifyFinal(&ctx,
-                       reinterpret_cast<const unsigned char*>(signature.data()),
-                       signature.size(), pkey_) == 1);
+      (EVP_VerifyFinal(&ctx, signature.data(), signature.size(), pkey_) == 1);
   EVP_MD_CTX_cleanup(&ctx);
   return ret;
 }

@@ -1,11 +1,10 @@
-#include <string>
-
+#include "../include/types.h"
 #include "SerialHasher.h"
 #include "TreeHasher.h"
 
 
-const std::string TreeHasher::kLeafPrefix("\x00", 1);
-const std::string TreeHasher::kNodePrefix("\x01", 1);
+const bstring TreeHasher::kLeafPrefix(1, '\x00');
+const bstring TreeHasher::kNodePrefix(1, '\x01');
 
 TreeHasher::TreeHasher(SerialHasher *hasher) : hasher_(hasher) {}
 
@@ -13,7 +12,7 @@ TreeHasher::~TreeHasher() {
   delete hasher_;
 }
 
-std::string TreeHasher::HashEmpty() {
+bstring TreeHasher::HashEmpty() {
   if (emptyhash_.empty()) {
     // First call to HashEmpty(); since the hash of an empty string is constant,
     // set it up once and for all.
@@ -23,15 +22,15 @@ std::string TreeHasher::HashEmpty() {
   return emptyhash_;
 }
 
-std::string TreeHasher::HashLeaf(const std::string &data) {
+bstring TreeHasher::HashLeaf(const bstring &data) {
   hasher_->Reset();
   hasher_->Update(kLeafPrefix);
   hasher_->Update(data);
   return hasher_->Final();
 }
 
-std::string TreeHasher::HashChildren(const std::string &left_child,
-                                     const std::string &right_child) {
+bstring TreeHasher::HashChildren(const bstring &left_child,
+                                 const bstring &right_child) {
   hasher_->Reset();
   hasher_->Update(kNodePrefix);
   hasher_->Update(left_child);
