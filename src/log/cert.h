@@ -90,7 +90,11 @@ class CertChain {
   explicit CertChain(const std::string &pem_string);
   ~CertChain();
 
+  // Add a cert to the end of the chain.
   void AddCert(Cert *cert);
+
+  // Remove a cert from the end of the chain.
+  void RemoveCert();
 
   // True if the chain loaded correctly, and contains at least one valid cert.
   bool IsLoaded() const { return !chain_.empty(); }

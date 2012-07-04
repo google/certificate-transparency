@@ -7,7 +7,7 @@ source generate_certs.sh
 PASSED=0
 FAILED=0
 
-if [ $MY_OPENSSL == "" ]; then
+if [ ! $MY_OPENSSL ]; then
 # Try to use the system OpenSSL
   MY_OPENSSL=openssl
 fi
@@ -104,12 +104,13 @@ make_ca_certs `pwd`/tmp `pwd`/tmp/ca-hashes ca $MY_OPENSSL
 echo "Generating log server keys in tmp"
 make_log_server_keys `pwd`/tmp ct-server
 echo "Generating test certificates"
-# TODO: also make a set of certs that chain through an intermediate
-make_certs `pwd`/tmp `pwd`/tmp/ca-hashes test ca ct-server
+make_certs `pwd`/tmp `pwd`/tmp/ca-hashes test ca ct-server false
+# Generate a second set of certs that chain through an intermediate
 # Note: this will start the log server twice and thus generate an inconsistent
 # log view; however, our client is stateless and won't notice
 # TODO: add cache tests for detecting inconsistencies.
-make_certs `pwd`/tmp `pwd`/tmp/ca-hashes test2 ca ct-server
+make_intermediate_ca_certs `pwd`/tmp intermediate ca
+make_certs `pwd`/tmp `pwd`/tmp/ca-hashes test2 intermediate ct-server true
 
 echo "Testing valid configurations with new certificates" 
 test_valid_range tmp tmp/ca-hashes ct-server ca

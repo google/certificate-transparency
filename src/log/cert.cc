@@ -297,6 +297,12 @@ void CertChain::AddCert(Cert *cert) {
   chain_.push_back(cert);
 }
 
+void CertChain::RemoveCert() {
+  assert(IsLoaded());
+  delete chain_.back();
+  chain_.pop_back();
+}
+
 CertChain::~CertChain() {
   ClearChain();
 }

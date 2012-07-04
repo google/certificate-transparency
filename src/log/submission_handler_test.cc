@@ -16,9 +16,13 @@ static const char kCaCert[] = "ca-cert.pem";
 // Issued by ca.pem
 static const char kLeafCert[] = "test-cert.pem";
 // Issued by ca.pem
-static const char kCaProtoCert[] = "ca-protocert.pem";
+static const char kCaProtoCert[] = "ca-proto-cert.pem";
 // Issued by ca-protocert.pem
-static const char kProtoCert[] = "test-protocert.pem";
+static const char kProtoCert[] = "test-proto-cert.pem";
+// Issued by ca-cert.pem
+static const char kIntermediateCert[] = "intermediate-cert.pem";
+// Issued by intermediate-cert.pem
+static const char kChainLeafCert[] = "test2-cert.pem";
 
 static void CertChainSubmitTest() {
   CertChecker checker;
@@ -32,6 +36,21 @@ static void CertChainSubmitTest() {
   LogEntry *entry = handler.ProcessSubmission(LogEntry::X509_CHAIN_ENTRY, leaf);
   assert(entry != NULL);
   // TODO: further checks.
+  delete entry;
+
+  // Submit a leaf cert with a missing intermediate.
+  bstring chain_leaf;
+  assert(util::ReadBinaryFile(cert_dir + "/" + kChainLeafCert, &chain_leaf));
+  entry = handler.ProcessSubmission(LogEntry::X509_CHAIN_ENTRY, chain_leaf);
+  assert(entry == NULL);
+
+  // Submit a chain.
+  bstring intermediate;
+  assert(util::ReadBinaryFile(cert_dir + "/" + kIntermediateCert,
+                            &intermediate));
+  bstring submit = chain_leaf + intermediate;
+  entry = handler.ProcessSubmission(LogEntry::X509_CHAIN_ENTRY, submit);
+  assert(entry != NULL);
   delete entry;
 
   // An invalid chain with two certs in wrong order.

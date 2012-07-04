@@ -449,11 +449,16 @@ class SSLClient : public CTClient {
       return 0;
     }
 
-    Cert *leaf_cert = new Cert(ctx->cert);
     CertChain chain;
-    // Give ownership of leaf_cert to the chain.
-    // TODO: also add intermediates.
-    chain.AddCert(leaf_cert);
+    // ctx->untrusted is the chain of X509s, as passed in.
+    // Let's hope OpenSSL keeps them in the order they were passed in.
+    STACK_OF(X509) *sk = ctx->untrusted;
+    assert(sk != NULL);
+    int chain_size = sk_X509_num(sk);
+    // Should contain at least the leaf.
+    assert(chain_size >= 1);
+    for (int i = 0; i < chain_size; ++i)
+      chain.AddCert(new Cert(sk_X509_value(sk, i)));
 
     // First, see if the cert has an embedded proof.
     if (chain.LeafCert()->HasExtension(Cert::kEmbeddedProofExtensionOID)) {
@@ -473,27 +478,21 @@ class SSLClient : public CTClient {
         std::cout << "Invalid proof" << std::endl;
       }
 
-    } else {
-      // Look for the proof in a superfluous cert.
-      // TODO: is there an API call for accessing the bag of certs?
-      STACK_OF(X509) *sk = ctx->untrusted;
-      if (sk != NULL) {
-        for (int i = 0; i < sk_X509_num(sk); ++i) {
-          Cert cert(sk_X509_value(sk, i));
-          if (cert.HasExtension(Cert::kProofExtensionOID)) {
-            std::cout << "Proof extension found in certificate, verifying...";
-            bstring proofstring = cert.ExtensionData(Cert::kProofExtensionOID);
-            if (VerifyX509ChainProof(proofstring, chain, verifier,
-                                     &args->checkpoint) ==
-                LogVerifier::VERIFY_OK) {
-              std::cout << "OK" << std::endl;
-              args->proof_verified = true;
-            } else {
-              std::cout << "Invalid proof" << std::endl;
-            }
-            break;
-          }
-        }
+      // Else look for the proof in a superfluous cert.
+      // Let's assume the superfluous cert is always last in the chain.
+    } else if (chain.Length() > 1 && chain.LastCert()->HasExtension(
+        Cert::kProofExtensionOID)) {
+      std::cout << "Proof extension found in certificate, verifying...";
+      bstring proofstring = chain.LastCert()->ExtensionData(
+          Cert::kProofExtensionOID);
+      chain.RemoveCert();
+      if (VerifyX509ChainProof(proofstring, chain, verifier,
+                               &args->checkpoint) ==
+          LogVerifier::VERIFY_OK) {
+        std::cout << "OK" << std::endl;
+        args->proof_verified = true;
+      } else {
+        std::cout << "Invalid proof" << std::endl;
       }
     }
 
