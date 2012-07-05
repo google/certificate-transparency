@@ -157,8 +157,7 @@ make_certs() {
   else
     cat $cert_dir/$server-cert.pem > $cert_dir/$server-cert-bundle.pem
   fi
-  ../client/ct upload $cert_dir/$server-cert-bundle.pem 127.0.0.1 8124 \
-    -server_key $cert_dir/$log_server-key-public.pem
+
   ../client/ct upload $cert_dir/$server-cert-bundle.pem 127.0.0.1 8124 \
     -server_key $cert_dir/$log_server-key-public.pem \
     -out $cert_dir/$server-cert.proof
@@ -173,8 +172,7 @@ make_certs() {
     cat $cert_dir/$server-proto-cert.pem $cert_dir/$ca-proto-cert.pem > \
       $cert_dir/$server-protocert-bundle.pem
   fi
-  ../client/ct upload $cert_dir/$server-protocert-bundle.pem 127.0.0.1 8124 \
-    -server_key $cert_dir/$log_server-key-public.pem -proto
+
   ../client/ct upload $cert_dir/$server-protocert-bundle.pem 127.0.0.1 8124 \
     -server_key $cert_dir/$log_server-key-public.pem \
     -out $cert_dir/$server-proto-cert.proof -proto

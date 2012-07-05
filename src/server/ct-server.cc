@@ -354,26 +354,31 @@ class CTLogManager {
   LogReply SubmitEntry(LogEntry::LogEntryType type, const bstring &data,
                        bstring *result) {
     bstring key;
-    LogReply reply;
     LogDB::Status logreply = logger_->QueueEntry(type, data, &key);
     if (logreply == LogDB::REJECTED)
       return INVALID_SUBMISSION;
 
     assert(!key.empty());
     if (logreply == LogDB::NEW || logreply == LogDB::PENDING) {
-      if (result != NULL)
-        result->assign(key);
-      reply = TOKEN;
-    } else {
-      assert(logreply == LogDB::LOGGED);
-      AuditProof proof;
-      assert(logger_->EntryAuditProof(key, &proof) == LogDB::LOGGED);
+      // Try to log it now.
+      Manage();
+    }
+
+    AuditProof proof;
+    LogDB::Status newreply = logger_->EntryAuditProof(key, &proof);
+    // Consistency check.
+    if (logreply == LogDB::LOGGED)
+      assert(newreply == LogDB::LOGGED);
+
+    if (newreply == LogDB::LOGGED) {
       if (result != NULL)
         result->assign(proof.Serialize());
-      reply = PROOF;
+      return PROOF;
     }
-    Manage();
-    return reply;
+    assert(newreply == LogDB::PENDING);
+    if (result != NULL)
+      result->assign(key);
+    return TOKEN;
   }
 
  private:
