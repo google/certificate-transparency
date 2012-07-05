@@ -2,11 +2,11 @@
 #define LOGVERIFIER_H
 
 #include <assert.h>
-#include <openssl/evp.h>
 #include <stddef.h>
 #include <string>
 
 #include "../include/types.h"
+#include "../log/log_signer.h"
 #include "LogRecord.h"
 #include "MerkleVerifier.h"
 
@@ -14,7 +14,7 @@ class SerialHasher;
 
 class LogVerifier {
  public:
-  LogVerifier(EVP_PKEY *pkey);
+  LogVerifier(LogSigVerifier *sig_verifier);
   ~LogVerifier();
 
   enum VerifyResult {
@@ -62,8 +62,8 @@ class LogVerifier {
   // NOTE: We do not verify whether the signatures are valid
   // or whether they match (should we?)
   static VerifyResult
-  LogSegmentCheckpointConsistency(const LogSegmentCheckpoint &a,
-                                  const LogSegmentCheckpoint &b);
+  LogSegmentTreeDataConsistency(const LogSegmentTreeData &a,
+                                const LogSegmentTreeData &b);
 
   // Compute the Merkle root from AuditProof.audit_path and
   // verify the signature on the segment data.
@@ -92,16 +92,18 @@ class LogVerifier {
 
   // Caller is responsible for ensuring that the segment checkpoint fields
   // have valid format.
-  bool VerifyLogSegmentSignature(const LogSegmentCheckpoint &checkpoint);
+  bool VerifyLogSegmentSignature(const LogSegmentCheckpoint &checkpoint) const {
+    return sig_verifier_->VerifyLogSegmentSignature(checkpoint);
+  }
 
   // Caller is responsible for ensuring that the segment checkpoint fields
   // have valid format.
-  bool VerifySegmentInfoSignature(const LogHeadCheckpoint &checkpoint);
+  bool VerifySegmentInfoSignature(const LogHeadCheckpoint &checkpoint) const {
+    return sig_verifier_->VerifySegmentInfoSignature(checkpoint);
+  }
 
  private:
-  EVP_PKEY *pkey_;
-  MerkleVerifier verifier_;
-
-  bool VerifySignature(const bstring &data, const bstring &signature);
+  LogSigVerifier *sig_verifier_;
+  MerkleVerifier tree_verifier_;
 };
 #endif

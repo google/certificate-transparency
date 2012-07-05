@@ -40,47 +40,49 @@ struct DigitallySigned {
   bool Deserialize(const bstring &data);
 };
 
-struct LogSegmentCheckpoint {
+struct LogSegmentTreeData {
   size_t sequence_number;
   size_t segment_size;
-  DigitallySigned signature;
   bstring root;
-  bstring Serialize() const;
   // Input to segment_sig.
   // Serialized format:
   // struct {
-  //   uint8 tree_type = LOG_SEGMENT;
   //   uint32 sequence_number;
-  //   uint32 tree_size;
+  //   uint32 segment_size;
   //   opaque segment_root[32];
   // } LogSegmentTreeData;
-  bstring SerializeTreeData() const;
+  bstring Serialize() const;
+  size_t ReadFromString(const bstring &data);
+};
+
+struct LogSegmentCheckpoint {
+  LogSegmentTreeData tree_data;
+  DigitallySigned signature;
+  bstring Serialize() const;
   bool Deserialize(const bstring &data);
 };
 
-struct LogHeadCheckpoint {
+struct LogHeadTreeData {
   size_t sequence_number;
-  DigitallySigned signature;
   bstring root;
-  bstring Serialize() const;
   // Input to segment_info_sig.
   // Serialized format:
   // struct {
-  //   uint8 tree_type = SEGMENT_INFO;
   //   uint32 sequence_number;
   //   opaque segment_info_root[32];
-  // } SegmentInfoTreeData;
-  bstring SerializeTreeData() const;
+  // } LogHeadTreeData;
+  bstring Serialize() const;
+  size_t ReadFromString(const bstring &data);
+};
+
+struct LogHeadCheckpoint {
+  LogHeadTreeData tree_data;
+  DigitallySigned signature;
+  bstring Serialize() const;
   bool Deserialize(const bstring &data);
 };
 
 struct SegmentData {
-  // One byte.
-  enum TreeType {
-    LOG_SEGMENT_TREE = 0,
-    SEGMENT_INFO_TREE = 1,
-  };
-
   size_t timestamp;
   // log_segment.sequence_number = log_head.sequence_number
   LogSegmentCheckpoint log_segment;
@@ -103,13 +105,17 @@ struct SegmentData {
 };
 
 struct AuditProof {
-  SegmentData::TreeType tree_type;
+  enum ProofType {
+    LOG_SEGMENT_PROOF,
+    LOG_HEAD_PROOF,
+  };
+  ProofType proof_type;
   size_t sequence_number;
   size_t tree_size;
   size_t leaf_index;
   DigitallySigned signature;
   std::vector<bstring> audit_path;
   bstring Serialize() const;
-  bool Deserialize(SegmentData::TreeType type, const bstring &data);
+  bool Deserialize(ProofType type, const bstring &data);
 };
 #endif

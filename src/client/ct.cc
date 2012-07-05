@@ -26,6 +26,7 @@
 #include "../log/cert.h"
 #include "../log/cert_submission_handler.h"
 #include "../log/log_entry.h"
+#include "../log/log_signer.h"
 #include "../merkletree/LogVerifier.h"
 #include "../util/ct_debug.h"
 #include "../util/util.h"
@@ -117,7 +118,7 @@ VerifyLogSegmentProof(const bstring &proofstring,
                       LogSegmentCheckpoint *checkpoint) {
   assert(verifier != NULL);
   AuditProof proof;
-  bool serialized = proof.Deserialize(SegmentData::LOG_SEGMENT_TREE,
+  bool serialized = proof.Deserialize(AuditProof::LOG_SEGMENT_PROOF,
                                       proofstring);
   if (!serialized)
     return LogVerifier::INVALID_FORMAT;
@@ -942,7 +943,7 @@ static bool Connect(int argc, const char **argv) {
 
   LogVerifier *verifier = NULL;
   if (pkey != NULL)
-    verifier = new LogVerifier(pkey);
+    verifier = new LogVerifier(new LogSigVerifier(pkey));
   std::vector<bstring> cache;
   if (cache_dir != NULL) {
     std::cout << "Reading cache...";

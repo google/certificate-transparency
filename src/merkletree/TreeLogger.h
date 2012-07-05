@@ -7,6 +7,7 @@
 #include <openssl/evp.h>
 
 #include "../include/types.h"
+#include "../log/log_signer.h"
 #include "../log/submission_handler.h"
 #include "LogDB.h"
 #include "LogRecord.h"
@@ -15,8 +16,8 @@
 class TreeLogger {
  public:
   // TODO: make the hash function pluggable.
-  TreeLogger(LogDB *db, EVP_PKEY *pkey);
-  TreeLogger(LogDB *db, EVP_PKEY *pkey, SubmissionHandler *handler);
+  TreeLogger(LogDB *db, LogSigner *signer);
+  TreeLogger(LogDB *db, LogSigner *signer, SubmissionHandler *handler);
   ~TreeLogger();
 
   // Add an entry to the current, pending segment if it doesn't already exist.
@@ -55,7 +56,7 @@ class TreeLogger {
 
  private:
   LogDB *db_;
-  EVP_PKEY *pkey_;
+  LogSigner *signer_;
   SubmissionHandler *handler_;
 
   // Keep all trees in memory for now.
@@ -64,6 +65,5 @@ class TreeLogger {
 
   // Called by constructor.
   void ReadDB();
-  bstring Sign(const bstring &data);
 };
 #endif

@@ -64,76 +64,70 @@ bool DigitallySigned::Deserialize(const bstring &data) {
   return true;
 }
 
-bstring LogSegmentCheckpoint::Serialize() const {
-  bstring result = util::SerializeUint(sequence_number, 4);
+bstring LogSegmentTreeData::Serialize() const {
+  bstring result(util::SerializeUint(sequence_number, 4));
   result.append(util::SerializeUint(segment_size, 4));
-  result.append(signature.Serialize());
   assert(root.size() == 32);
   result.append(root);
   return result;
 }
 
-bstring LogSegmentCheckpoint::SerializeTreeData() const {
-  bstring result(util::SerializeUint(SegmentData::LOG_SEGMENT_TREE, 1));
-  result.append(util::SerializeUint(sequence_number, 4));
-  result.append(util::SerializeUint(segment_size, 4));
-  assert(root.size() == 32);
-  result.append(root);
+size_t LogSegmentTreeData::ReadFromString(const bstring &data) {
+  if (data.size() < 40)
+    return 0;
+  sequence_number = util::DeserializeUint(data.substr(0, 4));
+  segment_size = util::DeserializeUint(data.substr(4, 4));
+  root = data.substr(8, 32);
+  return 40;
+}
+
+bstring LogSegmentCheckpoint::Serialize() const {
+  bstring result = tree_data.Serialize();
+  result.append(signature.Serialize());
   return result;
 }
 
 bool LogSegmentCheckpoint::Deserialize(const bstring &data) {
-  if (data.size() < 8)
+  size_t tree_data_length = tree_data.ReadFromString(data);
+  if (tree_data_length == 0)
     return false;
-  sequence_number = util::DeserializeUint(data.substr(0, 4));
-  segment_size = util::DeserializeUint(data.substr(4, 4));
-  size_t pos = 8;
-  size_t sig_size =signature.ReadFromString(data.substr(pos));
-  if (sig_size == 0)
-    return false;
-  pos += sig_size;
-  if (data.size() != pos + 32)
-    return false;
-  root = data.substr(pos);
-  return true;
+  return signature.Deserialize(data.substr(tree_data_length));
 }
 
-bstring LogHeadCheckpoint::Serialize() const {
-  bstring result = util::SerializeUint(sequence_number, 4);
-  result.append(signature.Serialize());
+bstring LogHeadTreeData::Serialize() const {
+  bstring result(util::SerializeUint(sequence_number, 4));
   assert(root.size() == 32);
   result.append(root);
   return result;
 }
 
-bstring LogHeadCheckpoint::SerializeTreeData() const {
-  bstring result(util::SerializeUint(SegmentData::SEGMENT_INFO_TREE, 1));
-  result.append(util::SerializeUint(sequence_number, 4));
-  assert(root.size() == 32);
-  result.append(root);
+size_t LogHeadTreeData::ReadFromString(const bstring &data) {
+  if (data.size() < 36)
+    return 0;
+  sequence_number = util::DeserializeUint(data.substr(0, 4));
+  root = data.substr(4, 32);
+  return 36;
+}
+
+bstring LogHeadCheckpoint::Serialize() const {
+  bstring result = tree_data.Serialize();
+  result.append(signature.Serialize());
   return result;
 }
 
 bool LogHeadCheckpoint::Deserialize(const bstring &data) {
-  if (data.size() < 4)
+  size_t tree_data_length = tree_data.ReadFromString(data);
+  if (tree_data_length == 0)
     return false;
-  sequence_number = util::DeserializeUint(data.substr(0, 4));
-  size_t pos = 4;
-  size_t sig_size = signature.ReadFromString(data.substr(pos));
-  if (sig_size == 0)
-    return false;
-  pos += sig_size;
-  if (data.size() != pos + 32)
-    return false;
-  root = data.substr(pos);
-  return true;
+  return signature.Deserialize(data.substr(tree_data_length));
 }
 
 bstring SegmentData::SerializeSegmentInfo() const {
-  assert(log_segment.sequence_number == log_head.sequence_number);
-  bstring result = util::SerializeUint(log_segment.sequence_number, 4);
+  assert(log_segment.tree_data.sequence_number ==
+         log_head.tree_data.sequence_number);
+  bstring result(util::SerializeUint(log_segment.tree_data.sequence_number, 4));
   result.append(util::SerializeUint(timestamp, 4));
-  result.append(util::SerializeUint(log_segment.segment_size, 4));
+  result.append(util::SerializeUint(log_segment.tree_data.segment_size, 4));
   result.append(log_segment.signature.Serialize());
   result.append(log_head.signature.Serialize());
   return result;
@@ -143,10 +137,11 @@ bool SegmentData::DeserializeSegmentInfo(const bstring &data) {
   size_t pos = 12;
   if (data.size() < pos)
     return false;
-  log_segment.sequence_number = util::DeserializeUint(data.substr(0, 4));
-  log_head.sequence_number = log_segment.sequence_number;
+  log_segment.tree_data.sequence_number =
+      util::DeserializeUint(data.substr(0, 4));
+  log_head.tree_data.sequence_number = log_segment.tree_data.sequence_number;
   timestamp = util::DeserializeUint(data.substr(4, 4));
-  log_segment.segment_size = util::DeserializeUint(data.substr(8,4));
+  log_segment.tree_data.segment_size = util::DeserializeUint(data.substr(8,4));
   size_t sig1_size = log_segment.signature.ReadFromString(data.substr(12));
   if (sig1_size == 0)
     return false;
@@ -157,7 +152,7 @@ bool SegmentData::DeserializeSegmentInfo(const bstring &data) {
 
 bstring AuditProof::Serialize() const {
   bstring result = util::SerializeUint(sequence_number, 4);
-  if (tree_type == SegmentData::LOG_SEGMENT_TREE)
+  if (proof_type == LOG_SEGMENT_PROOF)
     result.append(util::SerializeUint(tree_size, 4));
   result.append(util::SerializeUint(leaf_index, 4));
   result.append(signature.Serialize());
@@ -169,9 +164,9 @@ bstring AuditProof::Serialize() const {
   return result;
 }
 
-bool AuditProof::Deserialize(SegmentData::TreeType type, const bstring &proof) {
+bool AuditProof::Deserialize(ProofType type, const bstring &proof) {
   DLOG_BEGIN_PARSE("audit proof");
-  tree_type = type;
+  proof_type = type;
   size_t pos = 0;
   if (proof.size() - pos < 4) {
     DLOG_ERROR("Proof too short");
@@ -181,7 +176,7 @@ bool AuditProof::Deserialize(SegmentData::TreeType type, const bstring &proof) {
   sequence_number = util::DeserializeUint(proof.substr(pos, 4));
   DLOG_UINT("sequence number", sequence_number);
   pos += 4;
-  if (tree_type == SegmentData::LOG_SEGMENT_TREE) {
+  if (proof_type == LOG_SEGMENT_PROOF) {
     if (proof.size() - pos < 4) {
       DLOG_ERROR("Proof too short");
       DLOG_END_PARSE;

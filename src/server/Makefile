@@ -14,7 +14,8 @@ OBJS= ../merkletree/LogDB.o ../merkletree/LogRecord.o \
 ../merkletree/MerkleTree.o ../merkletree/SerialHasher.o \
 ../merkletree/TreeHasher.o ../merkletree/TreeLogger.o \
 ../util/ct_debug.o ../util/util.o ../log/cert_checker.o ../log/cert.o \
-../log/submission_handler.o ../log/cert_submission_handler.o ../log/log_entry.o
+../log/submission_handler.o ../log/cert_submission_handler.o \
+../log/log_entry.o ../log/log_signer.o
 
 all: .depend ct-server
 

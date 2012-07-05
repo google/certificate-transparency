@@ -35,11 +35,13 @@ SerialHasherTest: SerialHasher.o SerialHasherTest.o ../util/util.o
 TreeLoggerTest: LogDB.o LogRecord.o LogVerifier.o MerkleTree.o \
 		MerkleVerifier.o SerialHasher.o TreeHasher.o TreeLogger.o \
 		TreeLoggerTest.o ../util/ct_debug.o ../util/util.o \
-		../log/submission_handler.o ../log/log_entry.o ../log/cert.o
+		../log/submission_handler.o ../log/log_entry.o ../log/cert.o \
+		../log/log_signer.o
 	$(CXX) -o TreeLoggerTest LogDB.o LogRecord.o LogVerifier.o \
 	MerkleTree.o MerkleVerifier.o SerialHasher.o TreeHasher.o TreeLogger.o \
 	TreeLoggerTest.o ../util/ct_debug.o ../util/util.o \
-	../log/submission_handler.o ../log/log_entry.o ../log/cert.o $(LIBS)
+	../log/submission_handler.o ../log/log_entry.o ../log/cert.o \
+	../log/log_signer.o $(LIBS)
 
 TreeHasherTest: SerialHasher.o TreeHasher.o TreeHasherTest.o ../util/util.o
 	$(CXX) -o TreeHasherTest SerialHasher.o TreeHasher.o TreeHasherTest.o \

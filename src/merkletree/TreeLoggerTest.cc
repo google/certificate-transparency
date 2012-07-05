@@ -11,6 +11,7 @@
 #include <sys/stat.h>
 
 #include "../include/types.h"
+#include "../log/log_signer.h"
 #include "../util/util.h"
 #include "LogDB.h"
 #include "LogRecord.h"
@@ -60,8 +61,8 @@ void LogVerifierTest(LogDB *db) {
 
   EVP_PKEY *pkey = PrivateKeyFromPem(ecp256_private_key);
   EVP_PKEY *pubkey = PublicKeyFromPem(ecp256_public_key);
-  TreeLogger treelogger(db, pkey);
-  LogVerifier verifier(pubkey);
+  TreeLogger treelogger(db, new LogSigner(pkey));
+  LogVerifier verifier(new LogSigVerifier(pubkey));
   bstring key0, key1;
   assert(treelogger.QueueEntry(kUnicorn, &key0) == LogDB::NEW);
   assert(treelogger.QueueEntry(kAlice, &key1) == LogDB::NEW);
@@ -102,38 +103,38 @@ void LogVerifierTest(LogDB *db) {
   log_segment_tree.AddLeaf(signed1);
   delete entry0;
   delete entry1;
-  data.log_segment.root = log_segment_tree.CurrentRoot();
+  data.log_segment.tree_data.root = log_segment_tree.CurrentRoot();
 
   MerkleTree segment_info_tree(new Sha256Hasher());
-  segment_info_tree.AddLeaf(data.log_segment.SerializeTreeData());
-  data.log_head.root = segment_info_tree.CurrentRoot();
+  segment_info_tree.AddLeaf(data.log_segment.tree_data.Serialize());
+  data.log_head.tree_data.root = segment_info_tree.CurrentRoot();
 
   // Verify the signatures.
-  assert(data.log_segment.sequence_number == 0);
-  assert(data.log_segment.segment_size == 2);
+  assert(data.log_segment.tree_data.sequence_number == 0);
+  assert(data.log_segment.tree_data.segment_size == 2);
   assert(verifier.VerifyLogSegmentSignature(data.log_segment));
   assert(verifier.VerifySegmentInfoSignature(data.log_head));
 
   SegmentData wrong_data = data;
 
   // Various invalid signatures.
-  ++wrong_data.log_segment.segment_size;
+  ++wrong_data.log_segment.tree_data.segment_size;
   assert(!verifier.VerifyLogSegmentSignature(wrong_data.log_segment));
-  --wrong_data.log_segment.segment_size;
+  --wrong_data.log_segment.tree_data.segment_size;
 
-  ++wrong_data.log_segment.sequence_number;
-  ++wrong_data.log_head.sequence_number;
+  ++wrong_data.log_segment.tree_data.sequence_number;
+  ++wrong_data.log_head.tree_data.sequence_number;
   assert(!verifier.VerifyLogSegmentSignature(wrong_data.log_segment));
   assert(!verifier.VerifySegmentInfoSignature(wrong_data.log_head));
-  ++wrong_data.log_segment.sequence_number;
-  ++wrong_data.log_head.sequence_number;
+  ++wrong_data.log_segment.tree_data.sequence_number;
+  ++wrong_data.log_head.tree_data.sequence_number;
 
-  wrong_data.log_segment.root = data.log_head.root;
-  wrong_data.log_head.root = data.log_segment.root;
+  wrong_data.log_segment.tree_data.root = data.log_head.tree_data.root;
+  wrong_data.log_head.tree_data.root = data.log_segment.tree_data.root;
   assert(!verifier.VerifyLogSegmentSignature(wrong_data.log_segment));
   assert(!verifier.VerifySegmentInfoSignature(wrong_data.log_head));
-  wrong_data.log_segment.root = data.log_segment.root;
-  wrong_data.log_head.root = data.log_head.root;
+  wrong_data.log_segment.tree_data.root = data.log_segment.tree_data.root;
+  wrong_data.log_head.tree_data.root = data.log_head.tree_data.root;
 
   wrong_data.log_segment.signature = data.log_head.signature;
   wrong_data.log_head.signature = data.log_head.signature;

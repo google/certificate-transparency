@@ -32,13 +32,14 @@ std::vector<bstring> LogSegmentCheckpointCache::WriteCache() const {
 
 LogSegmentCheckpointCache::CacheReply
 LogSegmentCheckpointCache::Insert(const LogSegmentCheckpoint &checkpoint) {
-    std::pair<Cache::iterator, bool> inserted =
-        cache_.insert(Cache::value_type(checkpoint.sequence_number,
-                                        checkpoint));
-    if (inserted.second)
-      return LogSegmentCheckpointCache::NEW;
-    else if (LogVerifier::LogSegmentCheckpointConsistency(
-        inserted.first->second, checkpoint) == LogVerifier::VERIFY_OK)
-      return LogSegmentCheckpointCache::CACHED;
-    else return LogSegmentCheckpointCache::MISMATCH;
-  }
+  std::pair<Cache::iterator, bool> inserted =
+      cache_.insert(Cache::value_type(checkpoint.tree_data.sequence_number,
+                                      checkpoint));
+  if (inserted.second)
+    return LogSegmentCheckpointCache::NEW;
+  else if (LogVerifier::LogSegmentTreeDataConsistency(
+      inserted.first->second.tree_data, checkpoint.tree_data) ==
+           LogVerifier::VERIFY_OK)
+    return LogSegmentCheckpointCache::CACHED;
+  else return LogSegmentCheckpointCache::MISMATCH;
+}

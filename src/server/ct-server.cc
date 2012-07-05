@@ -575,7 +575,8 @@ int main(int argc, char **argv) {
     exit(1);
   }
 
-  TreeLogger logger(new MemoryDB(), pkey, new CertSubmissionHandler(&checker));
+  TreeLogger logger(new MemoryDB(), new LogSigner(pkey),
+                    new CertSubmissionHandler(&checker));
   size_t size_limit = atoi(argv[3]);
   time_t time_limit = atoi(argv[4]);
   CTLogManager manager(&logger, size_limit, time_limit);
