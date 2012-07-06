@@ -362,6 +362,13 @@ class SSLClient : public CTClient {
                                    cache_(cache),
                                    ca_dir_(ca_dir) {}
 
+  enum ConnectResult {
+    PROOF_VERIFIED = 0,
+    NO_VALID_PROOF = 2,
+    // Found a valid proof that contradicts a previous, valid proof.
+    INCONSISTENT_PROOF = 3,
+  };
+
   std::vector<bstring> WriteCache() const {
     return cache_.WriteCache();
   }
@@ -516,8 +523,7 @@ class SSLClient : public CTClient {
   }
 
   // Verification callbacks use this verifier for verifying log proofs.
-  // Return true if a valid proof is found; false otherwise.
-  bool SSLConnect(LogVerifier *verifier) {
+  ConnectResult SSLConnect(LogVerifier *verifier) {
     SSL_CTX *ctx = SSL_CTX_new(TLSv1_client_method());
     assert(ctx != NULL);
     // SSL_VERIFY_PEER makes the connection abort immediately
@@ -550,21 +556,28 @@ class SSLClient : public CTClient {
       std::cout << "Connected." << std::endl;
     else
       std::cout << "Connection failed." << std::endl;
+
+    ConnectResult result;
     // Cache the checkpoint.
     if (args.proof_verified) {
       switch(cache_.Insert(args.checkpoint)) {
         case LogSegmentCheckpointCache::NEW:
           std::cout << "Cached new checkpoint." << std::endl;
+          result = PROOF_VERIFIED;
           break;
         case LogSegmentCheckpointCache::CACHED:
           std::cout << "Checkpoint already in cache." << std::endl;
+          result = PROOF_VERIFIED;
           break;
         case LogSegmentCheckpointCache::MISMATCH:
           std::cout << "ERROR: checkpoint mismatch!" << std::endl;
+          result = INCONSISTENT_PROOF;
           break;
         default:
           assert(false);
       }
+    } else {
+      result = NO_VALID_PROOF;
     }
 
     // TODO: if the server closes the socket then the client cannot
@@ -574,7 +587,7 @@ class SSLClient : public CTClient {
       SSL_free(ssl);
     }
     SSL_CTX_free(ctx);
-    return args.proof_verified;
+    return result;
   }
 
  private:
@@ -875,7 +888,11 @@ static void ConnectHelp() {
             << "[-cache cache_dir] [-ca_dir ca_dir]" << std::endl;
 }
 
-static bool Connect(int argc, const char **argv) {
+// Return values
+//  0: a proof was successfully verified
+//  2: no valid proof found
+//  3: inconsistent proof
+static int Connect(int argc, const char **argv) {
   if (argc < 3) {
     ConnectHelp();
     exit(1);
@@ -951,7 +968,7 @@ static bool Connect(int argc, const char **argv) {
     std::cout << "OK." << std::endl;
   }
   SSLClient client(server_name, port, cache, ca_dir);
-  bool proof_verified = client.SSLConnect(verifier);
+  SSLClient::ConnectResult result = client.SSLConnect(verifier);
   if (cache_dir != NULL) {
     std::cout << "Writing cache...";
     cache = client.WriteCache();
@@ -959,7 +976,8 @@ static bool Connect(int argc, const char **argv) {
     std::cout << "OK." << std::endl;
   }
   delete verifier;
-  return proof_verified;
+
+  return result;
 }
 
 static void UsageHelp(const std::string &cmd) {
@@ -984,6 +1002,7 @@ static void UnknownCommand(const std::string &cmd,
 // 0: success
 // 1: system error/invalid argument/etc
 // 2: proof verification error (for Connect())
+// 3: cache inconsistency error (for Connect())
 int main(int argc, const char **argv) {
   const std::string main_command(argv[0]);
   if (argc < 2) {
@@ -1025,12 +1044,8 @@ int main(int argc, const char **argv) {
 
   const std::string cmd(argv[0]);
 
-  if (cmd == "connect") {
-    if(!Connect(argc, argv))
-      // Connection succeeded but the server presented no valid proof.
-      return 2;
-    return 0;
-  }
+  if (cmd == "connect")
+    return Connect(argc, argv);
 
   if (cmd == "upload")
     Upload(argc, argv);

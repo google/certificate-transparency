@@ -18,10 +18,16 @@ test_connect() {
   log_server=$3
   ca=$4
   port=$5
-  expected_retcode=$6
+  cache=$6
+  expected_retcode=$7
 
+  if [ "$cache" != "" ]; then
+    cache_args="-cache $cache"
+  fi
+ 
   ../client/ct connect 127.0.0.1 $port -log_server_key \
-	$cert_dir/$log_server-key-public.pem -ca_dir $hash_dir
+    $cert_dir/$log_server-key-public.pem -ca_dir $hash_dir \
+    $cache_args
   local retcode=$?
 
   if [ $retcode -eq $expected_retcode ]; then
@@ -39,8 +45,9 @@ test_range() {
   hash_dir=$3
   log_server=$4
   ca=$5
-  conf=$6
-  retcode=$7
+  cache=$6
+  conf=$7
+  retcode=$8
 
   # Tell Apache where to find mod_ssl by copying the symlink in test
   if [ ! -f $cert_dir/mod_ssl.so ]; then
@@ -52,7 +59,7 @@ test_range() {
 
   echo "Testing valid configurations"
   for port in $ports; do
-    test_connect $cert_dir $hash_dir $log_server $ca $port $retcode;
+    test_connect $cert_dir $hash_dir $log_server $ca $port "$cache" $retcode;
   done
 
   echo "Stopping Apache"
@@ -68,21 +75,25 @@ test_valid_range() {
   hash_dir=$2
   log_server=$3
   ca=$4
+  cache=$5
+  ret=$6
   conf="httpd-valid.conf"
 
-  test_range "$ports" $cert_dir $hash_dir $log_server $ca $conf 0
+  test_range "$ports" $cert_dir $hash_dir $log_server $ca "$cache" $conf $ret
 }
 
 test_invalid_range() {
-  # Inalid ranges from httpd-invalid.conf
+  # Invalid ranges from httpd-invalid.conf
   ports="8125 8126 8127 8128 8129"
   cert_dir=$1
   hash_dir=$2
   log_server=$3
   ca=$4
+  cache=$5
+  ret=$6
   conf="httpd-invalid.conf"
 
-  test_range "$ports" $cert_dir $hash_dir $log_server $ca $conf 2
+  test_range "$ports" $cert_dir $hash_dir $log_server $ca "$cache" $conf $ret
 }
 
 # Regression tests against known good/bad certificates
@@ -90,8 +101,8 @@ mkdir -p ca-hashes
 hash=$($MY_OPENSSL x509 -in testdata/ca-cert.pem -hash -noout)
 cp testdata/ca-cert.pem ca-hashes/$hash.0
 
-test_valid_range testdata ca-hashes ct-server ca
-test_invalid_range testdata ca-hashes ct-server ca
+test_valid_range testdata ca-hashes ct-server ca "" 0
+test_invalid_range testdata ca-hashes ct-server ca "" 2
 
 rm -rf ca-hashes
 
@@ -103,17 +114,47 @@ echo "Generating CA certificates in tmp and hashes in tmp/ca"
 make_ca_certs `pwd`/tmp `pwd`/tmp/ca-hashes ca $MY_OPENSSL
 echo "Generating log server keys in tmp"
 make_log_server_keys `pwd`/tmp ct-server
-echo "Generating test certificates"
-make_certs `pwd`/tmp `pwd`/tmp/ca-hashes test ca ct-server false
-# Generate a second set of certs that chain through an intermediate
-# Note: this will start the log server twice and thus generate an inconsistent
-# log view; however, our client is stateless and won't notice
-# TODO: add cache tests for detecting inconsistencies.
-make_intermediate_ca_certs `pwd`/tmp intermediate ca
-make_certs `pwd`/tmp `pwd`/tmp/ca-hashes test2 intermediate ct-server true
 
+# Start the log server and wait for it to come up
+echo "Starting CT server with trusted certs in $hash_dir"
+../server/ct-server 8124 $cert_dir/$log_server-key.pem 1 1 $hash_dir &
+server_pid=$!
+sleep 2
+
+echo "Generating test certificates"
+make_certs `pwd`/tmp `pwd`/tmp/ca-hashes test ca ct-server 8124 false
+# Generate a second set of certs that chain through an intermediate
+make_intermediate_ca_certs `pwd`/tmp intermediate ca
+make_certs `pwd`/tmp `pwd`/tmp/ca-hashes test2 intermediate ct-server 8124 true
+
+# Stop the log server
+kill -9 $server_pid  
+sleep 2
+
+mkdir -p tmp/cache
 echo "Testing valid configurations with new certificates" 
-test_valid_range tmp tmp/ca-hashes ct-server ca
+test_valid_range tmp tmp/ca-hashes ct-server ca tmp/cache 0
+
+# Start the log server again and generate a second set of (inconsistent) proofs
+echo "Starting CT server with trusted certs in $hash_dir"
+../server/ct-server 8124 $cert_dir/$log_server-key.pem 1 1 $hash_dir &
+server_pid=$!
+sleep 2
+
+echo "Generating test certificates"
+make_certs `pwd`/tmp `pwd`/tmp/ca-hashes test ca ct-server 8124 false
+# Generate a second set of certs that chain through an intermediate
+make_intermediate_ca_certs `pwd`/tmp intermediate ca
+make_certs `pwd`/tmp `pwd`/tmp/ca-hashes test2 intermediate ct-server 8124 true
+
+# Stop the log server
+kill -9 $server_pid  
+sleep 2
+
+# Test again and expect failure
+echo "Testing valid configurations with new certificates against existing cache" 
+test_valid_range tmp tmp/ca-hashes ct-server ca tmp/cache 3
+
 echo "Cleaning up"
 rm -rf tmp
 echo "PASSED $PASSED tests"

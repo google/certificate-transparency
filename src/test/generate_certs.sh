@@ -125,7 +125,8 @@ make_certs() {
   server=$3
   ca=$4
   log_server=$5
-  ca_is_intermediate=$6
+  log_server_port=$6
+  ca_is_intermediate=$7
 
   # Generate a new private key and CSR
   request_cert $cert_dir $server protocert.conf
@@ -143,12 +144,6 @@ make_certs() {
   # Sign the CSR with the CA protocert key to get a log request
   issue_cert $cert_dir $ca-proto $server protocert.conf proto false $server-proto
 
-  # Start the log server and wait for it to come up
-  echo "Starting CT server with trusted certs in $hash_dir"
-  ../server/ct-server 8124 $cert_dir/$log_server-key.pem 1 1 $hash_dir &
-  server_pid=$!
-  sleep 2
-
   # Upload the signed certificate
   # If the CA is an intermediate, then we need to include its certificate, too.
   if [ $ca_is_intermediate == "true" ]; then
@@ -158,8 +153,8 @@ make_certs() {
     cat $cert_dir/$server-cert.pem > $cert_dir/$server-cert-bundle.pem
   fi
 
-  ../client/ct upload $cert_dir/$server-cert-bundle.pem 127.0.0.1 8124 \
-    -server_key $cert_dir/$log_server-key-public.pem \
+  ../client/ct upload $cert_dir/$server-cert-bundle.pem 127.0.0.1 \
+    $log_server_port -server_key $cert_dir/$log_server-key-public.pem \
     -out $cert_dir/$server-cert.proof
   rm $cert_dir/$server-cert-bundle.pem
 
@@ -173,8 +168,8 @@ make_certs() {
       $cert_dir/$server-protocert-bundle.pem
   fi
 
-  ../client/ct upload $cert_dir/$server-protocert-bundle.pem 127.0.0.1 8124 \
-    -server_key $cert_dir/$log_server-key-public.pem \
+  ../client/ct upload $cert_dir/$server-protocert-bundle.pem 127.0.0.1 \
+    $log_server_port -server_key $cert_dir/$log_server-key-public.pem \
     -out $cert_dir/$server-proto-cert.proof -proto
   rm $cert_dir/$server-protocert-bundle.pem
 
@@ -207,8 +202,4 @@ make_certs() {
 
   # Restore the serial number
   mv $cert_dir/$ca-serial.bak $cert_dir/$ca-serial
-
-  # Stop the log server
-  kill -9 $server_pid  
-  sleep 2
 }
