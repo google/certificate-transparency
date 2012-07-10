@@ -41,6 +41,9 @@ test-cert.proof: test-cert.der ct-server-key-public.pem
 	../client/ct upload test-cert.der 127.0.0.1 8124 -server_key \
 	ct-server-key-public.pem -out test-cert.proof
 
+test-cert.authz: test-cert.proof
+	../client/ct authz test-cert.proof test-cert.authz
+
 test-protocert.proof: test-protocert.der ct-server-key-public.pem
 # upload twice: the first run will not issue a proof
 	../client/ct upload test-protocert.der 127.0.0.1 8124 -server_key \
@@ -71,6 +74,9 @@ run-server: ct-server-key.pem
 run-apache: test-cert.pem test-key.pem test-cert-proof.pem \
 	test-embedded-cert.pem
 	./apachectl -d `pwd` -f `pwd`/httpd.conf -k start
+
+run-test-apache: test-cert.authz
+	LD_LIBRARY_PATH=../../../../work/openssl-1.0.2 ../../../../svn-work/httpd/httpd -d `pwd` -f `pwd`/httpd2.conf
 
 restart-apache:
 	./apachectl -d `pwd` -f `pwd`/httpd.conf -k restart
