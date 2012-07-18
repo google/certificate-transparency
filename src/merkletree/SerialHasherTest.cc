@@ -1,5 +1,4 @@
-#include <assert.h>
-#include <iostream>
+#include <gtest/gtest.h>
 #include <stddef.h>
 #include <string>
 
@@ -34,51 +33,71 @@ HashTestVector test_sha256[] = {
   { 0, NULL, NULL }
 };
 
+// A slightly shorter notation for constructing binary blobs from test vectors.
+#define S(t, n) util::BinaryString(std::string((t),(2 * n)))
+// The reverse
+#define H(t) util::HexString(t)
+
+template <class T> HashTestVector *TestVectors();
+
+template <> HashTestVector *TestVectors<Sha256Hasher>() {
+  return test_sha256;
+}
+
+template <class T>
+class SerialHasherTest : public ::testing::Test {
+ protected:
+  SerialHasher *hasher_;
+  HashTestVector *test_vectors_;
+
+  SerialHasherTest() : hasher_(new T()),
+                       test_vectors_(TestVectors<T>()) {}
+
+  ~SerialHasherTest() {
+    delete hasher_;
+  }
+};
+
+typedef ::testing::Types<Sha256Hasher> Hashers;
+
+TYPED_TEST_CASE(SerialHasherTest, Hashers);
+
 // Known Answer Tests
-void KatTest(SerialHasher *hasher, HashTestVector test_vector[]) {
+TYPED_TEST(SerialHasherTest, TestVectors) {
   bstring input, output, digest;
 
-  for (int i = 0; test_vector[i].input != NULL; ++i) {
-    std::string hex_input(test_vector[i].input, test_vector[i].input_length * 2);
-    std::string hex_output(test_vector[i].output, hasher->DigestSize() * 2);
-    input = util::BinaryString(hex_input);
-    output = util::BinaryString(hex_output);
-    hasher->Reset();
-    hasher->Update(input);
-    digest = hasher->Final();
-    assert(digest == output);
+  for (size_t i = 0; this->test_vectors_[i].input != NULL; ++i) {
+    this->hasher_->Reset();
+    this->hasher_->Update(S(this->test_vectors_[i].input,
+                            this->test_vectors_[i].input_length));
+    digest = this->hasher_->Final();
+    EXPECT_STREQ(H(digest).c_str(), this->test_vectors_[i].output);
   }
 }
 
 // Test fragmented updates
-void UpdateTest(SerialHasher *hasher) {
+TYPED_TEST(SerialHasherTest, Update) {
   bstring input(kTestString, kTestStringLength),  output, digest;
 
-  hasher->Reset();
-  hasher->Update(input);
-  digest = hasher->Final();
-  assert(digest.size() == hasher->DigestSize());
+  this->hasher_->Reset();
+  this->hasher_->Update(input);
+  digest = this->hasher_->Final();
+  EXPECT_EQ(digest.size(), this->hasher_->DigestSize());
 
   // The same in two chunks
-  hasher->Reset();
-  hasher->Update(input.substr(0,5));
-  hasher->Update(input.substr(5));
-  output = hasher->Final();
-  assert(digest == output);
+  this->hasher_->Reset();
+  this->hasher_->Update(input.substr(0, kTestStringLength/2));
+  this->hasher_->Update(input.substr(kTestStringLength/2));
+  output = this->hasher_->Final();
+  EXPECT_EQ(H(digest), H(output));
 }
 
-
-void Sha256Test() {
-  Sha256Hasher hasher;
-  KatTest(&hasher, test_sha256);
-  UpdateTest(&hasher);
-}
+#undef S
+#undef H
 
 } // namespace
 
-int main(int, char**) {
-  std::cout << "SHA-256... ";
-  Sha256Test();
-  std::cout << "PASS\n";
-  return 0;
+int main(int argc, char**argv) {
+  ::testing::InitGoogleTest(&argc, argv);
+  return RUN_ALL_TESTS();
 }

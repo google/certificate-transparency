@@ -1,5 +1,4 @@
-#include <assert.h>
-#include <iostream>
+#include <gtest/gtest.h>
 #include <stddef.h>
 #include <string>
 
@@ -46,94 +45,115 @@ NodeTestVector sha256_nodes[] = {
   { NULL, NULL, NULL }
 };
 
+typedef struct {
+  const char *empty_hash;
+  LeafTestVector *leaves;
+  NodeTestVector *nodes;
+} TestVector;
+
+TestVector test_sha256 = { sha256_empty_hash, sha256_leaves, sha256_nodes };
+
+// A slightly shorter notation for constructing binary blobs from test vectors.
+#define S(t, n) util::BinaryString(std::string((t),(2 * n)))
+// The reverse
+#define H(t) util::HexString(t)
+
+template <class T> TestVector *TestVectors();
+
+template <> TestVector *TestVectors<Sha256Hasher>() {
+  return &test_sha256;
+}
+
+template <class T>
+class TreeHasherTest : public ::testing::Test {
+ protected:
+  TreeHasher tree_hasher_;
+  TestVector *test_vectors_;
+  TreeHasherTest()
+      : tree_hasher_(new T()),
+        test_vectors_(TestVectors<T>()) {}
+};
+
+typedef ::testing::Types<Sha256Hasher> Hashers;
+
+TYPED_TEST_CASE(TreeHasherTest, Hashers);
+
 // TreeHashers are collision resistant when used correctly, i.e.,
 // when HashChildren() is called on the (fixed-length) outputs of HashLeaf().
-void CollisionTest(TreeHasher *treehasher) {
+TYPED_TEST(TreeHasherTest, CollisionTest) {
   bstring leaf1_digest, leaf2_digest, node1_digest, node2_digest;
 
-  const size_t digestsize = treehasher->DigestSize();
+  const size_t digestsize = this->tree_hasher_.DigestSize();
 
   // Check that the empty hash is not the same as the hash of an empty leaf.
-  leaf1_digest = treehasher->HashEmpty();
-  assert(leaf1_digest.size() == digestsize);
+  leaf1_digest = this->tree_hasher_.HashEmpty();
+  EXPECT_EQ(leaf1_digest.size(), digestsize);
 
-  leaf2_digest = treehasher->HashLeaf(bstring());
-  assert(leaf2_digest.size() == digestsize);
+  leaf2_digest = this->tree_hasher_.HashLeaf(bstring());
+  EXPECT_EQ(leaf2_digest.size(), digestsize);
 
-  assert(leaf1_digest != leaf2_digest);
+  EXPECT_NE(H(leaf1_digest), H(leaf2_digest));
 
   // Check that different leaves hash to different digests.
   const unsigned char hello[] = "Hello";
   const unsigned char world[] = "World";
   bstring leaf1(hello, 5);
   bstring leaf2(world, 5);
-  leaf1_digest = treehasher->HashLeaf(leaf1);
-  assert(leaf1_digest.size() == digestsize);
+  leaf1_digest = this->tree_hasher_.HashLeaf(leaf1);
+  EXPECT_EQ(leaf1_digest.size(), digestsize);
 
-  leaf2_digest = treehasher->HashLeaf(leaf2);
-  assert(leaf2_digest.size() == digestsize);
+  leaf2_digest = this->tree_hasher_.HashLeaf(leaf2);
+  EXPECT_EQ(leaf2_digest.size(), digestsize);
 
-  assert(leaf1_digest != leaf2_digest);
+  EXPECT_NE(H(leaf1_digest), H(leaf2_digest));
 
   // Compute an intermediate node digest.
-  node1_digest = treehasher->HashChildren(leaf1_digest, leaf2_digest);
-  assert(node1_digest.size() == digestsize);
+  node1_digest = this->tree_hasher_.HashChildren(leaf1_digest, leaf2_digest);
+  EXPECT_EQ(node1_digest.size(), digestsize);
 
   // Check that this is not the same as a leaf hash of their concatenation.
-  node2_digest = treehasher->HashLeaf(leaf1_digest + leaf2_digest);
-  assert(node2_digest.size() == digestsize);
+  node2_digest = this->tree_hasher_.HashLeaf(leaf1_digest + leaf2_digest);
+  EXPECT_EQ(node2_digest.size(), digestsize);
 
-  assert(node1_digest != node2_digest);
+  EXPECT_NE(H(node1_digest), H(node2_digest));
 
   // Swap the order of nodes and check that the hash is different.
-  node2_digest = treehasher->HashChildren(leaf2_digest, leaf1_digest);
-  assert(node2_digest.size() == digestsize);
+  node2_digest = this->tree_hasher_.HashChildren(leaf2_digest, leaf1_digest);
+  EXPECT_EQ(node2_digest.size(), digestsize);
 
-  assert(node1_digest != node2_digest);
+  EXPECT_NE(H(node1_digest), H(node2_digest));
 }
 
-void KatTest(TreeHasher *treehasher, const char *hex_empty_hash,
-             LeafTestVector leaves[], NodeTestVector nodes[]) {
-  const size_t hex_digest_size = treehasher->DigestSize() * 2;
-  bstring leaf, left, right, output, digest;
-
+TYPED_TEST(TreeHasherTest, TestVectors) {
   // The empty hash
-  output = util::BinaryString(std::string(hex_empty_hash, hex_digest_size));
-  digest = treehasher->HashEmpty();
-  assert(output == digest);
+  bstring digest = this->tree_hasher_.HashEmpty();
+  EXPECT_STREQ(this->test_vectors_->empty_hash, H(digest).c_str());
 
   // Leaf hashes
-  for (int i = 0; leaves[i].input != NULL; ++i) {
-    leaf = util::BinaryString(std::string(leaves[i].input,
-                                          leaves[i].input_length * 2));
-    output = util::BinaryString(std::string(leaves[i].output, hex_digest_size));
-    digest = treehasher->HashLeaf(leaf);
-    assert(output == digest);
+  for (size_t i = 0; this->test_vectors_->leaves[i].input != NULL; ++i) {
+    digest = this->tree_hasher_.HashLeaf(
+        S(this->test_vectors_->leaves[i].input,
+          this->test_vectors_->leaves[i].input_length));
+    EXPECT_STREQ(this->test_vectors_->leaves[i].output, H(digest).c_str());
   }
 
   // Node hashes
-  for (int i = 0; nodes[i].left != NULL; ++i) {
-    left = util::BinaryString(std::string(nodes[i].left, hex_digest_size));
-    right = util::BinaryString(std::string(nodes[i].right, hex_digest_size));
-    output = util::BinaryString(std::string(nodes[i].output, hex_digest_size));
-    digest = treehasher->HashChildren(left, right);
-    assert(output == digest);
+  for (size_t i = 0; this->test_vectors_->nodes[i].left != NULL; ++i) {
+    digest = this->tree_hasher_.HashChildren(
+        S(this->test_vectors_->nodes[i].left,
+          this->tree_hasher_.DigestSize()),
+        S(this->test_vectors_->nodes[i].right,
+          this->tree_hasher_.DigestSize()));
+    EXPECT_STREQ(this->test_vectors_->nodes[i].output, H(digest).c_str());
   }
 }
 
-void TreeHasherTest() {
-  std::cout << "SHA256... ";
-  TreeHasher treehasher(new Sha256Hasher());
-  CollisionTest(&treehasher);
-  KatTest(&treehasher, sha256_empty_hash, sha256_leaves, sha256_nodes);
-  std::cout << "OK\n";
-}
+#undef S
+#undef H
 
 } // namespace
 
-int main(int, char**) {
-  std::cout << "Testing TreeHashers\n";
-  TreeHasherTest();
-  std::cout << "PASS\n";
-  return 0;
+int main(int argc, char**argv) {
+  ::testing::InitGoogleTest(&argc, argv);
+  return RUN_ALL_TESTS();
 }

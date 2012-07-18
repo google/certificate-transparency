@@ -1,8 +1,8 @@
-#include <assert.h>
+#include <gtest/gtest.h>
 #include <openssl/ssl.h>
-#include <stdio.h>
 #include <string>
 
+#include "../include/types.h"
 #include "../util/util.h"
 #include "cert_checker.h"
 #include "cert_submission_handler.h"
@@ -24,72 +24,89 @@ static const char kIntermediateCert[] = "intermediate-cert.pem";
 // Issued by intermediate-cert.pem
 static const char kChainLeafCert[] = "test2-cert.pem";
 
-static void CertChainSubmitTest() {
-  CertChecker checker;
-  const std::string cert_dir = std::string(kCertDir);
-  checker.LoadTrustedCertificate(cert_dir + "/" + kCaCert);
-  CertSubmissionHandler handler(&checker);
+namespace {
 
+class CertSubmissionHandlerTest : public ::testing::Test {
+ protected:
+  bstring ca_;
+  bstring leaf_;
+  bstring ca_protocert_;
+  bstring protocert_;
+  bstring intermediate_;
+  bstring chain_leaf_;
+  std::string cert_dir_;
+  CertSubmissionHandler *handler_;
+  CertChecker *checker_;
+
+  CertSubmissionHandlerTest() : handler_(NULL) {}
+
+  void SetUp() {
+    cert_dir_ = std::string(kCertDir);
+    checker_ = new CertChecker();
+    checker_->LoadTrustedCertificate(cert_dir_ + "/" + kCaCert);
+    handler_ = new CertSubmissionHandler(checker_);
+    ASSERT_TRUE(util::ReadBinaryFile(cert_dir_ + "/" + kCaCert, &ca_));
+    ASSERT_TRUE(util::ReadBinaryFile(cert_dir_ + "/" + kLeafCert, &leaf_));
+    ASSERT_TRUE(util::ReadBinaryFile(cert_dir_ + "/" + kCaProtoCert,
+                                     &ca_protocert_));
+    ASSERT_TRUE(util::ReadBinaryFile(cert_dir_ + "/" + kProtoCert,
+                                     &protocert_));
+    ASSERT_TRUE(util::ReadBinaryFile(cert_dir_ + "/" + kIntermediateCert,
+                                     &intermediate_));
+    ASSERT_TRUE(util::ReadBinaryFile(cert_dir_ + "/" + kChainLeafCert,
+                                     &chain_leaf_));
+  }
+
+  ~CertSubmissionHandlerTest() {
+    delete checker_;
+    delete handler_;
+  }
+};
+
+TEST_F(CertSubmissionHandlerTest, SubmitCertChain) {
   // Submit a leaf cert.
-  bstring leaf;
-  assert(util::ReadBinaryFile(cert_dir + "/" + kLeafCert, &leaf));
-  LogEntry *entry = handler.ProcessSubmission(LogEntry::X509_CHAIN_ENTRY, leaf);
-  assert(entry != NULL);
+  LogEntry *entry = handler_->ProcessSubmission(LogEntry::X509_CHAIN_ENTRY,
+                                                leaf_);
+  ASSERT_TRUE(entry != NULL);
   // TODO: further checks.
   delete entry;
 
   // Submit a leaf cert with a missing intermediate.
-  bstring chain_leaf;
-  assert(util::ReadBinaryFile(cert_dir + "/" + kChainLeafCert, &chain_leaf));
-  entry = handler.ProcessSubmission(LogEntry::X509_CHAIN_ENTRY, chain_leaf);
-  assert(entry == NULL);
+  entry = handler_->ProcessSubmission(LogEntry::X509_CHAIN_ENTRY, chain_leaf_);
+  EXPECT_EQ(NULL, entry);
 
   // Submit a chain.
-  bstring intermediate;
-  assert(util::ReadBinaryFile(cert_dir + "/" + kIntermediateCert,
-                            &intermediate));
-  bstring submit = chain_leaf + intermediate;
-  entry = handler.ProcessSubmission(LogEntry::X509_CHAIN_ENTRY, submit);
-  assert(entry != NULL);
+  bstring submit = chain_leaf_ + intermediate_;
+  entry = handler_->ProcessSubmission(LogEntry::X509_CHAIN_ENTRY, submit);
+  ASSERT_TRUE(entry != NULL);
   delete entry;
 
   // An invalid chain with two certs in wrong order.
-  bstring invalid_submit;
-  assert(util::ReadBinaryFile(cert_dir + "/" + kCaCert, &invalid_submit));
-  invalid_submit.append(leaf);
-  entry = handler.ProcessSubmission(LogEntry::X509_CHAIN_ENTRY, invalid_submit);
-  assert(entry == NULL);
+  bstring invalid_submit = ca_;
+  invalid_submit.append(leaf_);
+  entry = handler_->ProcessSubmission(LogEntry::X509_CHAIN_ENTRY,
+                                      invalid_submit);
+  EXPECT_EQ(NULL, entry);
 }
 
-static void ProtoCertChainSubmitTest() {
-  CertChecker checker;
-  const std::string cert_dir = std::string(kCertDir);
-  checker.LoadTrustedCertificate(cert_dir + "/" + kCaCert);
-  CertSubmissionHandler handler(&checker);
+TEST_F(CertSubmissionHandlerTest, SubmitProtoCertChain) {
+  bstring submit = protocert_ + ca_protocert_;
 
-  bstring proto;
-  assert(util::ReadBinaryFile(cert_dir + "/" + kProtoCert, &proto));
-  bstring ca_proto;
-  assert(util::ReadBinaryFile(cert_dir + "/" + kCaProtoCert, &ca_proto));
-  bstring submit = proto + ca_proto;
-
-  LogEntry *entry = handler.ProcessSubmission(LogEntry::PROTOCERT_CHAIN_ENTRY,
-                                              submit);
-  assert(entry != NULL);
+  LogEntry *entry = handler_->ProcessSubmission(LogEntry::PROTOCERT_CHAIN_ENTRY,
+                                                submit);
+  ASSERT_TRUE(entry != NULL);
   delete entry;
 
   // In wrong order.
-  submit = ca_proto + proto;
-  entry = handler.ProcessSubmission(LogEntry::PROTOCERT_CHAIN_ENTRY, submit);
-  assert(entry == NULL);
+  submit = ca_protocert_ + protocert_;
+  entry = handler_->ProcessSubmission(LogEntry::PROTOCERT_CHAIN_ENTRY, submit);
+  EXPECT_EQ(NULL, entry);
 }
 
-int main(int, char**) {
+}  // namespace
+
+int main(int argc, char**argv) {
+  ::testing::InitGoogleTest(&argc, argv);
   SSL_library_init();
-  printf("Testing certificate verification\n");
-  CertChainSubmitTest();
-  printf("Testing proto-certificate verification\n");
-  ProtoCertChainSubmitTest();
-  printf("PASS\n");
-  return 0;
+  return RUN_ALL_TESTS();
 }

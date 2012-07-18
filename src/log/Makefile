@@ -1,16 +1,18 @@
 CXXFLAG= -Wall -Werror -O3 -g
-INCLUDE=
+GTEST_INCLUDE= -I $(GTESTDIR)/include
+GTEST_LIBS= $(GTESTDIR)/libgtest.a -lpthread
 # Need OpenSSL >= 1.0.0
 ifneq ($(OPENSSLDIR),)
-  INCLUDE = -I $(OPENSSLDIR)/include
-  LIBS= -L $(OPENSSLDIR) -L $(OPENSSLDIR)/lib -lssl -lcrypto -Wl,-rpath,$(OPENSSLDIR) -Wl,-rpath,$(OPENSSLDIR)/lib
+  INCLUDE= $(GTEST_INCLUDE) -I $(OPENSSLDIR)/include
+  LIBS= $(GTEST_LIBS) -L $(OPENSSLDIR) -L $(OPENSSLDIR)/lib -lssl -lcrypto -Wl,-rpath,$(OPENSSLDIR) -Wl,-rpath,$(OPENSSLDIR)/lib
 else
-  LIBS= -lssl -lcrypto
+  INCLUDE= $(GTEST_INCLUDE)
+  LIBS= $(GTEST_LIBS) -lssl -lcrypto
 endif
 
 CXXFLAGS= $(INCLUDE) $(CXXFLAG)
 
-all: .depend test
+all: .depend cert_test cert_checker_test submission_handler_test
 
 .depend: *.cc
 	$(CXX) $(CXXFLAGS) -MM *.cc > .depend
@@ -18,6 +20,9 @@ all: .depend test
 include .depend
 
 test: cert_test cert_checker_test submission_handler_test
+	./cert_test
+	./cert_checker_test
+	./submission_handler_test
 
 cert_test: cert_test.o cert.o ../util/util.o
 	$(CXX) -o cert_test cert_test.o cert.o ../util/util.o $(LIBS)

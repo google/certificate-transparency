@@ -1,16 +1,19 @@
 CXXFLAG= -Wall -Werror -O3 -g
-INCLUDE=
+GTEST_INCLUDE= -I $(GTESTDIR)/include
+GTEST_LIBS= $(GTESTDIR)/libgtest.a -lpthread
 # Need OpenSSL >= 1.0.0
 ifneq ($(OPENSSLDIR),)
-  INCLUDE = -I $(OPENSSLDIR)/include
-  LIBS= -L $(OPENSSLDIR) -L $(OPENSSLDIR)/lib -lcrypto -Wl,-rpath,$(OPENSSLDIR) -Wl,-rpath,$(OPENSSLDIR)/lib
+  INCLUDE= $(GTEST_INCLUDE) -I $(OPENSSLDIR)/include
+  LIBS= $(GTEST_LIBS) -L $(OPENSSLDIR) -L $(OPENSSLDIR)/lib -lcrypto -Wl,-rpath,$(OPENSSLDIR) -Wl,-rpath,$(OPENSSLDIR)/lib
 else
-  LIBS= -lcrypto
+  INCLUDE= $(GTEST_INCLUDE)
+  LIBS= $(GTEST_LIBS) -lcrypto
 endif
 
 CXXFLAGS= $(INCLUDE) $(CXXFLAG)
 
-all: .depend test faildb
+all: .depend LogDBTest MerkleTreeTest SerialHasherTest TreeLoggerTest \
+	TreeHasherTest faildb
 
 include .depend
 
@@ -18,10 +21,15 @@ include .depend
 	$(CXX) $(CXXFLAGS) -MM *.cc > .depend
 
 test: LogDBTest MerkleTreeTest SerialHasherTest TreeLoggerTest TreeHasherTest
+	./SerialHasherTest
+	./TreeHasherTest
+	./MerkleTreeTest
+	./LogDBTest
+	./TreeLoggerTest
 
 LogDBTest: LogDB.o LogDBTestConstants.o LogDBTest.o ../util/util.o
 	$(CXX) -o LogDBTest LogDB.o LogDBTestConstants.o LogDBTest.o \
-	../util/util.o
+	../util/util.o $(LIBS)
 
 MerkleTreeTest: MerkleTree.o MerkleVerifier.o SerialHasher.o TreeHasher.o \
 		MerkleTreeTest.o ../util/util.o

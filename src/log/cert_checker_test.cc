@@ -1,6 +1,5 @@
-#include <assert.h>
+#include <gtest/gtest.h>
 #include <openssl/ssl.h>
-#include <stdio.h>
 #include <string>
 
 #include "../util/util.h"
@@ -23,73 +22,87 @@ static const char kIntermediateCert[] = "intermediate-cert.pem";
 // Issued by intermediate-cert.pem
 static const char kChainLeafCert[] = "test2-cert.pem";
 
-static void CertCheckTest() {
-  CertChecker checker;
-  const std::string cert_dir = std::string(kCertDir);
-  std::string leaf_pem, ca_pem, chain_leaf_pem, intermediate_pem;
-  assert(util::ReadTextFile(cert_dir + "/" + kLeafCert, &leaf_pem));
-  assert(util::ReadTextFile(cert_dir + "/" + kCaCert, &ca_pem));
-  assert(util::ReadTextFile(cert_dir + "/" + kChainLeafCert, &chain_leaf_pem));
-  assert(util::ReadTextFile(cert_dir + "/" + kIntermediateCert,
-                            &intermediate_pem));
-  CertChain chain(leaf_pem);
-  assert(chain.IsLoaded());
+namespace {
+
+class CertCheckerTest : public ::testing::Test {
+ protected:
+  std::string leaf_pem_;
+  std::string ca_protocert_pem_;
+  std::string protocert_pem_;
+  std::string intermediate_pem_;
+  std::string chain_leaf_pem_;
+  CertChecker checker_;
+  std::string cert_dir_;
+
+  void SetUp() {
+    cert_dir_ = std::string(kCertDir);
+    ASSERT_TRUE(util::ReadTextFile(cert_dir_ + "/" + kLeafCert, &leaf_pem_));
+    ASSERT_TRUE(util::ReadTextFile(cert_dir_ + "/" + kCaProtoCert,
+                                   &ca_protocert_pem_));
+    ASSERT_TRUE(util::ReadTextFile(cert_dir_ + "/" + kProtoCert,
+                                   &protocert_pem_));
+    ASSERT_TRUE(util::ReadTextFile(cert_dir_ + "/" + kIntermediateCert,
+                                   &intermediate_pem_));
+    ASSERT_TRUE(util::ReadTextFile(cert_dir_ + "/" + kChainLeafCert,
+                                   &chain_leaf_pem_));
+  }
+};
+
+TEST_F(CertCheckerTest, Certificate) {
+  CertChain chain(leaf_pem_);
+  ASSERT_TRUE(chain.IsLoaded());
 
   // Fail as we have no CA certs.
-  assert(!checker.CheckCertChain(chain));
+  EXPECT_FALSE(checker_.CheckCertChain(chain));
 
   // Load CA certs and expect success.
-  assert(checker.LoadTrustedCertificate(cert_dir + "/" + kCaCert));
-  assert(checker.CheckCertChain(chain));
+  EXPECT_TRUE(checker_.LoadTrustedCertificate(cert_dir_ + "/" + kCaCert));
+  EXPECT_TRUE(checker_.CheckCertChain(chain));
+}
 
-  // A second chain with an intermediate.
-  CertChain chain2(chain_leaf_pem);
-  assert(chain2.IsLoaded());
+TEST_F(CertCheckerTest, Intermediates) {
+  // Load CA certs.
+  EXPECT_TRUE(checker_.LoadTrustedCertificate(cert_dir_ + "/" + kCaCert));
+  // A chain with an intermediate.
+  CertChain chain(chain_leaf_pem_);
+  ASSERT_TRUE(chain.IsLoaded());
   // Fail as it doesn't chain to a trusted CA.
-  assert(!checker.CheckCertChain(chain2));
+  EXPECT_FALSE(checker_.CheckCertChain(chain));
   // Add the intermediate and expect success.
-  chain2.AddCert(new Cert(intermediate_pem));
-  assert(checker.CheckCertChain(chain2));
+  chain.AddCert(new Cert(intermediate_pem_));
+  EXPECT_TRUE(checker_.CheckCertChain(chain));
 
   // An invalid chain, with two certs in wrong order.
-  CertChain invalid(intermediate_pem + chain_leaf_pem);
-  assert(invalid.IsLoaded());
-  assert(!checker.CheckCertChain(invalid));
+  CertChain invalid(intermediate_pem_ + chain_leaf_pem_);
+  ASSERT_TRUE(invalid.IsLoaded());
+  EXPECT_FALSE(checker_.CheckCertChain(invalid));
 }
 
-static void ProtoCertCheckTest() {
-  CertChecker checker;
-  const std::string cert_dir = std::string(kCertDir);
-
-  std::string protocert_pem, ca_protocert_pem;
-  assert(util::ReadTextFile(cert_dir + "/" + kProtoCert, &protocert_pem));
-  assert(util::ReadTextFile(cert_dir + "/" + kCaProtoCert, &ca_protocert_pem));
-  const std::string chain_pem = protocert_pem + ca_protocert_pem;
+TEST_F(CertCheckerTest, ProtoCert) {
+  const std::string chain_pem = protocert_pem_ + ca_protocert_pem_;
   ProtoCertChain chain(chain_pem);
 
-  assert(chain.IsLoaded());
-  assert(chain.IsWellFormed());
+  ASSERT_TRUE(chain.IsLoaded());
+  EXPECT_TRUE(chain.IsWellFormed());
 
   // Fail as we have no CA certs.
-  assert(!checker.CheckProtoCertChain(chain));
+  EXPECT_FALSE(checker_.CheckProtoCertChain(chain));
 
   // Load CA certs and expect success.
-  checker.LoadTrustedCertificate(cert_dir + "/" + kCaCert);
-  assert(checker.CheckProtoCertChain(chain));
+  checker_.LoadTrustedCertificate(cert_dir_ + "/" + kCaCert);
+  EXPECT_TRUE(checker_.CheckProtoCertChain(chain));
 
   // A second, invalid chain, with no CA protocert.
-  ProtoCertChain chain2(protocert_pem);
-  assert(chain2.IsLoaded());
-  assert (!chain2.IsWellFormed());
-  assert(!checker.CheckProtoCertChain(chain2));
+  ProtoCertChain chain2(protocert_pem_);
+  ASSERT_TRUE(chain2.IsLoaded());
+  EXPECT_FALSE(chain2.IsWellFormed());
+  EXPECT_FALSE(checker_.CheckProtoCertChain(chain2));
 }
 
-int main(int, char**) {
+}  // namespace
+
+int main(int argc, char**argv) {
+  ::testing::InitGoogleTest(&argc, argv);
   SSL_library_init();
-  printf("Testing certificate verification\n");
-  CertCheckTest();
-  printf("Testing proto-certificate verification\n");
-  ProtoCertCheckTest();
-  printf("PASS\n");
-  return 0;
+  return RUN_ALL_TESTS();
 }

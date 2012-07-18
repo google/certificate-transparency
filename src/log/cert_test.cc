@@ -1,6 +1,5 @@
-#include <assert.h>
+#include <gtest/gtest.h>
 #include <openssl/ssl.h>
-#include <stdio.h>
 #include <string>
 
 #include "../util/util.h"
@@ -10,139 +9,144 @@ static const char kCertDir[] = "../test/testdata";
 
 // TODO: add test certs with intermediates.
 // Valid certificates.
-static const char kCACert[] = "ca-cert.pem";
+static const char kCaCert[] = "ca-cert.pem";
 // Issued by ca-cert.pem
 static const char kLeafCert[] = "test-cert.pem";
 // Issued by ca-cert.pem
-static const char kCAProtoCert[] = "ca-protocert.pem";
+static const char kCaProtoCert[] = "ca-proto-cert.pem";
 // Issued by ca-protocert.pem
-static const char kProtoCert[] = "test-protocert.pem";
+static const char kProtoCert[] = "test-proto-cert.pem";
 
-static void CertTest() {
-  const std::string cert_dir = std::string(kCertDir);
-  std::string leaf_pem, ca_pem, ca_protocert_pem, protocert_pem;
-  assert(util::ReadTextFile(cert_dir + "/" + kLeafCert, &leaf_pem));
-  assert(util::ReadTextFile(cert_dir + "/" + kCACert, &ca_pem));
-  assert(util::ReadTextFile(cert_dir + "/" + kCAProtoCert, &ca_protocert_pem));
-  assert(util::ReadTextFile(cert_dir + "/" + kProtoCert, &protocert_pem));
+namespace {
 
-  Cert leaf(leaf_pem);
-  assert(leaf.IsLoaded());
+class CertTest : public ::testing::Test {
+ protected:
+  std::string leaf_pem_;
+  std::string ca_pem_;
+  std::string ca_protocert_pem_;
+  std::string protocert_pem_;
 
-  Cert ca(ca_pem);
-  assert(ca.IsLoaded());
+  void SetUp() {
+    const std::string cert_dir = std::string(kCertDir);
+    ASSERT_TRUE(util::ReadTextFile(cert_dir + "/" + kLeafCert, &leaf_pem_));
+    ASSERT_TRUE(util::ReadTextFile(cert_dir + "/" + kCaCert, &ca_pem_));
+    ASSERT_TRUE(util::ReadTextFile(cert_dir + "/" + kCaProtoCert,
+                                   &ca_protocert_pem_));
+    ASSERT_TRUE(util::ReadTextFile(cert_dir + "/" + kProtoCert,
+                                   &protocert_pem_));
+  }
+};
 
-  Cert ca_proto(ca_protocert_pem);
-  assert(ca_proto.IsLoaded());
+TEST_F(CertTest, Cert) {
+  Cert leaf(leaf_pem_);
+  ASSERT_TRUE(leaf.IsLoaded());
 
-  Cert proto(protocert_pem);
-  assert(proto.IsLoaded());
+  Cert ca(ca_pem_);
+  ASSERT_TRUE(ca.IsLoaded());
+
+  Cert ca_proto(ca_protocert_pem_);
+  ASSERT_TRUE(ca_proto.IsLoaded());
+
+  Cert proto(protocert_pem_);
+  ASSERT_TRUE(proto.IsLoaded());
 
   // Some facts we know are true about those test certs.
-  assert(leaf.HasExtension(NID_authority_key_identifier));
-  assert(ca.HasExtension(NID_authority_key_identifier));
+  EXPECT_TRUE(leaf.HasExtension(NID_authority_key_identifier));
+  EXPECT_TRUE(ca.HasExtension(NID_authority_key_identifier));
 
-  assert(leaf.HasExtension(NID_basic_constraints));
-  assert(ca.HasExtension(NID_basic_constraints));
+  EXPECT_TRUE(leaf.HasExtension(NID_basic_constraints));
+  EXPECT_TRUE(ca.HasExtension(NID_basic_constraints));
 
-  assert(!leaf.HasBasicConstraintCA());
-  assert(ca.HasBasicConstraintCA());
-  assert(leaf.IsIssuedBy(ca));
-  assert(leaf.IsSignedBy(ca));
+  EXPECT_FALSE(leaf.HasBasicConstraintCA());
+  EXPECT_TRUE(ca.HasBasicConstraintCA());
+  EXPECT_TRUE(leaf.IsIssuedBy(ca));
+  EXPECT_TRUE(leaf.IsSignedBy(ca));
 
-  assert(!ca.IsIssuedBy(leaf));
-  assert(!ca.IsSignedBy(leaf));
+  EXPECT_FALSE(ca.IsIssuedBy(leaf));
+  EXPECT_FALSE(ca.IsSignedBy(leaf));
 
   // Some more extensions.
-  assert(ca_proto.HasExtendedKeyUsage(Cert::kCtExtendedKeyUsageOID));
-  assert(proto.HasExtension(Cert::kPoisonExtensionOID));
-  assert(proto.IsCriticalExtension(Cert::kPoisonExtensionOID));
+  EXPECT_TRUE(ca_proto.HasExtendedKeyUsage(Cert::kCtExtendedKeyUsageOID));
+  EXPECT_TRUE(proto.HasExtension(Cert::kPoisonExtensionOID));
+  EXPECT_TRUE(proto.IsCriticalExtension(Cert::kPoisonExtensionOID));
 
   // Bogus certs.
   Cert invalid("");
-  assert(!invalid.IsLoaded());
+  EXPECT_FALSE(invalid.IsLoaded());
 
   Cert invalid2("-----BEGIN CERTIFICATE-----invalid-----END CERTIFICATE-----");
-  assert(!invalid2.IsLoaded());
+  EXPECT_FALSE(invalid2.IsLoaded());
 }
 
-static void CertChainTest() {
-  const std::string cert_dir = std::string(kCertDir);
-  std::string leaf_pem, ca_pem, ca_protocert_pem, protocert_pem;
-  assert(util::ReadTextFile(cert_dir + "/" + kLeafCert, &leaf_pem));
-  assert(util::ReadTextFile(cert_dir + "/" + kCACert, &ca_pem));
-  assert(util::ReadTextFile(cert_dir + "/" + kCAProtoCert, &ca_protocert_pem));
-  assert(util::ReadTextFile(cert_dir + "/" + kProtoCert, &protocert_pem));
-
+TEST_F(CertTest, CertChain) {
   // A single certificate.
-  CertChain chain(leaf_pem);
-  assert(chain.IsLoaded());
+  CertChain chain(leaf_pem_);
+  ASSERT_TRUE(chain.IsLoaded());
 
-  assert(chain.Length() == 1);
-  assert(chain.IsValidIssuerChain());
-  assert(chain.IsValidSignatureChain());
+  EXPECT_EQ(chain.Length(), 1U);
+  EXPECT_TRUE(chain.IsValidIssuerChain());
+  EXPECT_TRUE(chain.IsValidSignatureChain());
 
   // Add its issuer.
-  chain.AddCert(new Cert(ca_pem));
-  assert(chain.IsLoaded());
-  assert(chain.Length() == 2);
-  assert(chain.IsValidIssuerChain());
-  assert(chain.IsValidSignatureChain());
+  chain.AddCert(new Cert(ca_pem_));
+  ASSERT_TRUE(chain.IsLoaded());
+  EXPECT_EQ(chain.Length(), 2U);
+  EXPECT_TRUE(chain.IsValidIssuerChain());
+  EXPECT_TRUE(chain.IsValidSignatureChain());
 
   // In reverse order.
-  CertChain chain2(ca_pem);
-  assert(chain2.IsLoaded());
-  assert(chain2.Length() == 1);
-  assert(chain2.IsValidIssuerChain());
-  assert(chain2.IsValidSignatureChain());
+  CertChain chain2(ca_pem_);
+  ASSERT_TRUE(chain2.IsLoaded());
+  EXPECT_EQ(chain2.Length(), 1U);
+  EXPECT_TRUE(chain2.IsValidIssuerChain());
+  EXPECT_TRUE(chain2.IsValidSignatureChain());
 
-  chain2.AddCert(new Cert(leaf_pem));
-  assert(chain2.IsLoaded());
-  assert(chain2.Length() == 2);
-  assert(!chain2.IsValidIssuerChain());
-  assert(!chain2.IsValidSignatureChain());
+  chain2.AddCert(new Cert(leaf_pem_));
+  ASSERT_TRUE(chain2.IsLoaded());
+  EXPECT_EQ(chain2.Length(), 2U);
+  EXPECT_FALSE(chain2.IsValidIssuerChain());
+  EXPECT_FALSE(chain2.IsValidSignatureChain());
 
   // Invalid
   CertChain invalid("");
-  assert(!invalid.IsLoaded());
+  EXPECT_FALSE(invalid.IsLoaded());
 
   // A chain with three certificates. Construct from concatenated PEM entries.
-  std::string pem_bundle = protocert_pem + ca_protocert_pem + ca_pem;
+  std::string pem_bundle = protocert_pem_ + ca_protocert_pem_ + ca_pem_;
   CertChain chain3(pem_bundle);
-  assert(chain3.IsLoaded());
-  assert(chain3.Length() == 3);
-  assert(chain3.IsValidIssuerChain());
-  assert(chain3.IsValidSignatureChain());
+  ASSERT_TRUE(chain3.IsLoaded());
+  EXPECT_EQ(chain3.Length(), 3U);
+  EXPECT_TRUE(chain3.IsValidIssuerChain());
+  EXPECT_TRUE(chain3.IsValidSignatureChain());
+}
 
+TEST_F(CertTest, ProtoCertChain) {
   // A protocert chain.
-  pem_bundle = protocert_pem + ca_protocert_pem;
+  std::string pem_bundle = protocert_pem_ + ca_protocert_pem_;
   ProtoCertChain proto_chain(pem_bundle);
-  assert(proto_chain.IsLoaded());
-  assert(proto_chain.Length() == 2);
-  assert(proto_chain.IntermediateLength() == 0);
-  assert(proto_chain.IsValidIssuerChain());
-  assert(proto_chain.IsValidSignatureChain());
-  assert(proto_chain.IsWellFormed());
+  ASSERT_TRUE(proto_chain.IsLoaded());
+  EXPECT_EQ(proto_chain.Length(), 2U);
+  EXPECT_EQ(proto_chain.IntermediateLength(), 0U);
+  EXPECT_TRUE(proto_chain.IsValidIssuerChain());
+  EXPECT_TRUE(proto_chain.IsValidSignatureChain());
+  EXPECT_TRUE(proto_chain.IsWellFormed());
 
   // Try to construct a protocert chain from regular certs.
   // The chain should load, but is not well-formed.
-  pem_bundle = leaf_pem + ca_pem;
+  pem_bundle = leaf_pem_ + ca_pem_;
   ProtoCertChain proto_chain2(pem_bundle);
-  assert(proto_chain2.IsLoaded());
-  assert(proto_chain2.Length() == 2);
-  assert(proto_chain2.IntermediateLength() == 0);
-  assert(proto_chain2.IsValidIssuerChain());
-  assert(proto_chain2.IsValidSignatureChain());
-  assert(!proto_chain2.IsWellFormed());
+  ASSERT_TRUE(proto_chain2.IsLoaded());
+  EXPECT_EQ(proto_chain2.Length(), 2U);
+  EXPECT_EQ(proto_chain2.IntermediateLength(), 0U);
+  EXPECT_TRUE(proto_chain2.IsValidIssuerChain());
+  EXPECT_TRUE(proto_chain2.IsValidSignatureChain());
+  EXPECT_FALSE(proto_chain2.IsWellFormed());
 }
 
+}  // namespace
 
-int main(int, char**) {
+int main(int argc, char**argv) {
+  ::testing::InitGoogleTest(&argc, argv);
   SSL_library_init();
-  printf("Testing certificates\n");
-  CertTest();
-  printf("Testing certificate chains\n");
-  CertChainTest();
-  printf("PASS\n");
-  return 0;
+  return RUN_ALL_TESTS();
 }
