@@ -26,6 +26,6 @@ bstring Sha256Hasher::Final() {
 
   unsigned char hash[SHA256_DIGEST_LENGTH];
   SHA256_Final(hash, &ctx_);
-  return bstring(hash, SHA256_DIGEST_LENGTH);
+  return bstring(reinterpret_cast<byte*>(hash), SHA256_DIGEST_LENGTH);
   initialized_ = false;
 }

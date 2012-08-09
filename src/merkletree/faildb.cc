@@ -8,44 +8,29 @@
 #include <string.h>
 
 #include "../include/types.h"
+#include "../proto/ct.pb.h"
 #include "../util/util.h"
 #include "LogDB.h"
 #include "LogDBTestConstants.h"
 
-namespace {
-
-enum FailedOp {
-  INIT = 0,
-  WRITE_ENTRY = 1,
-  MAKE_SEGMENT = 2,
-  WRITE_SEGMENT_AND_INFO = 3,
-  NO_FAIL = 4,
-};
-
-struct FailReport {
-  FailReport() : op(NO_FAIL), segment(0), index(0) {}
-  FailedOp op;
-  size_t segment;
-  size_t index;
-};
-
-}  // namespace
 
 static FailReport report;
 
-static const char kWorkingDir[] = "/tmp/ct/fail";
-static const char kReportFile[] = "/tmp/ct/fail/report";
+// The main function gets as input a temporary directory, tmp_dir.
+// We create the database in tmp_dir/ct; and the report in tmp_dir/report.
+static const char kWorkingDir[] = "ct";
+static const char kReportFile[] = "report";
 
-static void MakeReport() {
-  if (access(kWorkingDir, W_OK) < 0)
+static void MakeReport(const std::string &tmp_dir) {
+  if (access(tmp_dir.c_str(), W_OK) < 0)
     return;
-  bstring res = util::SerializeUint(report.op, 1);
-  res.append(util::SerializeUint(report.segment, 4));
-  res.append(util::SerializeUint(report.index, 4));
-  std::ofstream report_file(kReportFile, std::ios::out | std::ios::trunc |
-                            std::ios::binary);
+  std::string res;
+  report.SerializeToString(&res);
+  std::string report_loc(tmp_dir + "/" + kReportFile);
+  std::ofstream report_file(report_loc.c_str(),
+                            std::ios::out | std::ios::trunc | std::ios::binary);
   assert(report_file.good());
-  report_file.write(reinterpret_cast<const char*>(res.data()), res.length());
+  report_file.write(res.data(), res.length());
   assert(report_file.good());
   report_file.close();
 }
@@ -56,9 +41,10 @@ namespace {
 // and fails at a specific point.
 class FailDB : public FileDB {
  public:
-  FailDB(const std::string &file_base, unsigned storage_depth,
+  FailDB(const std::string &tmp_dir, unsigned storage_depth,
          unsigned fail_point, bool crash)
-      : FileDB(file_base, storage_depth),
+      : FileDB(tmp_dir + "/" + kWorkingDir, storage_depth),
+        tmp_dir_(tmp_dir),
         op_count_(0),
         fail_point_(fail_point),
         crash_(crash),
@@ -70,7 +56,7 @@ class FailDB : public FileDB {
   int mkdir(const char *path, mode_t mode) {
     if (fail_point_ == op_count_++) {
       failed_ = true;
-      MakeReport();
+      MakeReport(tmp_dir_);
       if (crash_) {
         exit(0);
       } else {
@@ -84,7 +70,7 @@ class FailDB : public FileDB {
   int remove(const char *path) {
     if (fail_point_ == op_count_++) {
       failed_ = true;
-      MakeReport();
+      MakeReport(tmp_dir_);
       if (crash_) {
         exit(0);
       } else {
@@ -98,7 +84,7 @@ class FailDB : public FileDB {
   int rename(const char *old_name, const char *new_name) {
     if (fail_point_ == op_count_++) {
       failed_ = true;
-      MakeReport();
+      MakeReport(tmp_dir_);
       if (crash_) {
         exit(0);
       } else {
@@ -109,6 +95,7 @@ class FailDB : public FileDB {
     return ::rename(old_name, new_name);
   }
 
+  std::string tmp_dir_;
   unsigned op_count_;
   unsigned fail_point_;
   bool crash_; // If true, crash on fail.
@@ -117,28 +104,26 @@ class FailDB : public FileDB {
 
 }  // namespace
 
-static FailReport ReadReport() {
+static FailReport ReadReport(const std::string &tmp_dir) {
   bstring result;
-  bool read_success = util::ReadBinaryFile(kReportFile, &result);
+  bool read_success = util::ReadBinaryFile(tmp_dir + "/" + kReportFile, &result);
   assert(read_success);
-  assert(result.size() == 9);
+
   FailReport ret;
-  ret.op = static_cast<FailedOp>(util::DeserializeUint(result.substr(0, 1)));
-  ret.segment = util::DeserializeUint(result.substr(1, 4));
-  ret.index = util::DeserializeUint(result.substr(5, 4));
+  ret.ParseFromString(result);
   return ret;
 }
 
 // Returns true if no file ops failed; false otherwise.
 static void MakeLog(FailDB *db) {
-  report.op = INIT;
+  report.set_op(FailReport::INIT);
   db->Init();
 
   for (size_t segment = 0, offset = 0; segment < logdbtest::kNumberOfSegments;
        offset += logdbtest::kSegmentSizes[segment++]) {
-    report.index = 0;
+    report.set_index(0);
     for (size_t index = 0; index < logdbtest::kSegmentSizes[segment]; ++index) {
-      report.op = WRITE_ENTRY;
+      report.set_op(FailReport::WRITE_ENTRY);
       db->WriteEntry(logdbtest::kKeys[index + offset],
                      logdbtest::kEntries[index + offset]);
       // For now we operate under the assumption that a failed file op is fatal,
@@ -146,15 +131,15 @@ static void MakeLog(FailDB *db) {
       // If FileDB ever starts doing anything more clever, then this test
       // should be changed to account for self-healing.
       assert(!db->Failed());
-      ++report.index;
+      report.set_index(report.index() + 1);
     }
-    report.op = MAKE_SEGMENT;
+    report.set_op(FailReport::MAKE_SEGMENT);
     db->MakeSegment();
     assert(!db->Failed());
-    report.op = WRITE_SEGMENT_AND_INFO;
+    report.set_op(FailReport::WRITE_SEGMENT_AND_INFO);
     db->WriteSegmentAndInfo(logdbtest::kSegmentInfos[segment]);
     assert(!db->Failed());
-    ++report.segment;
+    report.set_segment(report.segment() + 1);
   }
 }
 
@@ -205,30 +190,31 @@ static void CheckLog(FileDB *db, size_t logged_segments,
   }
 }
 
-static void Clean() {
-  std::string removedir = "rm -r " + std::string(kWorkingDir);
-  assert(system(removedir.c_str()) == 0);
-}
+static void Fail(std::string tmp_dir, unsigned fail_point, bool crash) {
+  std::string faildb_dir(tmp_dir + "/" + kWorkingDir);
+  int ret = mkdir(faildb_dir.c_str(), 0700);
+  assert(ret == 0);
 
-static void Fail(unsigned fail_point, bool crash) {
-  FailDB faildb(kWorkingDir, 5, fail_point, crash);
+  FailDB faildb(tmp_dir, 5, fail_point, crash);
   MakeLog(&faildb);
   // If we reached here, the fail point was larger than the number of file ops:
   // we cycled through all file ops without failure.
-  Clean();
   exit(42);
 }
 
-static void Resume(const FailReport &report) {
-  if (report.op == NO_FAIL)
+static void Resume(const std::string &tmp_dir) {
+  FailReport report = ReadReport(tmp_dir);
+  if (report.op() == FailReport::NO_FAIL)
     return;
-  FileDB filedb(kWorkingDir, 5);
+
+  FileDB filedb(tmp_dir + "/" + kWorkingDir, 5);
   filedb.Init();
-  size_t logged_segments = report.segment;
-  size_t pending_entries = report.index;
+  size_t logged_segments = report.segment();
+  size_t pending_entries = report.index();
   // FIXME: we should also assume that WriteEntry() may complete on resume.
   // If we don't have a pending segment, then the write must be complete.
-  if (report.op == WRITE_SEGMENT_AND_INFO && !filedb.HasPendingSegment()) {
+  if (report.op() == FailReport::WRITE_SEGMENT_AND_INFO &&
+      !filedb.HasPendingSegment()) {
     ++logged_segments;
     pending_entries = 0;
   }
@@ -240,25 +226,25 @@ static void Resume(const FailReport &report) {
 // cmd fail failpoint [crash|fail]
 // cmd resume
 int main(int argc, char **argv) {
-  assert(argc >= 2);
+  assert(argc >= 3);
+  std::string tmp_dir(argv[1]);
 
-  if (strcmp(argv[1], "fail") == 0) {
-    assert(argc == 4);
-    int fail_point = atoi(argv[2]);
+  if (strcmp(argv[2], "fail") == 0) {
+    assert(argc == 5);
+
+    int fail_point = atoi(argv[3]);
     assert(fail_point >= 0);
-    assert(mkdir(kWorkingDir, 0777) == 0);
-    if (strcmp(argv[3], "crash") == 0) {
-      Fail(fail_point, true);
+
+    if (strcmp(argv[4], "crash") == 0) {
+      Fail(tmp_dir, fail_point, true);
     }
     else {
-      assert(strcmp(argv[3], "fail") == 0);
-      Fail(fail_point, false);
+      assert(strcmp(argv[4], "fail") == 0);
+      Fail(tmp_dir, fail_point, false);
     }
   } else {
-    assert(argc == 2);
-    assert(strcmp(argv[1], "resume") == 0);
-    FailReport rep = ReadReport();
-    atexit(Clean);
-    Resume(rep);
+    assert(argc == 3);
+    assert(strcmp(argv[2], "resume") == 0);
+    Resume(tmp_dir);
   }
 }

@@ -458,7 +458,7 @@ class MerkleVerifierTest : public MerkleTreeTest {
     EXPECT_FALSE(verifier_.VerifyPath(leaf, tree_size / 2, path, root, data));
 
     // Wrong leaf.
-    const unsigned char wrong_leaf[] = "WrongLeaf";
+    const byte wrong_leaf[] = "WrongLeaf";
     EXPECT_FALSE(verifier_.VerifyPath(leaf, tree_size, path, root,
                                       bstring(wrong_leaf, 9)));
 
@@ -532,7 +532,7 @@ class MerkleVerifierTest : public MerkleTreeTest {
                                              root2, proof));
 
     // Wrong root.
-    const unsigned char wrong_root[] = "WrongRoot";
+    const byte wrong_root[] = "WrongRoot";
     const bstring bwrong_root(wrong_root, 9);
     EXPECT_FALSE(verifier_.VerifyConsistency(snapshot1, snapshot2, root1,
                                              bwrong_root, proof));

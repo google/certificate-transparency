@@ -226,6 +226,9 @@ class FileDB : public LogDB {
   std::string StorageDirectory(const bstring &key) const;
   void CreateStorageEntry(const bstring &key, const bstring &data);
   void AddToPending(const bstring &key);
+  bool IsPending(const bstring &key);
+  bool IsQueuedForLogging(const bstring &key);
+  bool IsLogged(const bstring &key);
   unsigned CountDirectory(const std::string &dir_name) const;
 
   // Create missing directories. Called by constructor.

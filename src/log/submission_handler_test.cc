@@ -3,10 +3,10 @@
 #include <string>
 
 #include "../include/types.h"
+#include "../proto/ct.pb.h"
 #include "../util/util.h"
 #include "cert_checker.h"
 #include "cert_submission_handler.h"
-#include "log_entry.h"
 
 static const char kCertDir[] = "../test/testdata";
 
@@ -16,9 +16,9 @@ static const char kCaCert[] = "ca-cert.pem";
 // Issued by ca.pem
 static const char kLeafCert[] = "test-cert.pem";
 // Issued by ca.pem
-static const char kCaProtoCert[] = "ca-proto-cert.pem";
-// Issued by ca-protocert.pem
-static const char kProtoCert[] = "test-proto-cert.pem";
+static const char kCaPreCert[] = "ca-proto-cert.pem";
+// Issued by ca-precert.pem
+static const char kPreCert[] = "test-proto-cert.pem";
 // Issued by ca-cert.pem
 static const char kIntermediateCert[] = "intermediate-cert.pem";
 // Issued by intermediate-cert.pem
@@ -30,8 +30,8 @@ class CertSubmissionHandlerTest : public ::testing::Test {
  protected:
   bstring ca_;
   bstring leaf_;
-  bstring ca_protocert_;
-  bstring protocert_;
+  bstring ca_precert_;
+  bstring precert_;
   bstring intermediate_;
   bstring chain_leaf_;
   std::string cert_dir_;
@@ -47,10 +47,10 @@ class CertSubmissionHandlerTest : public ::testing::Test {
     handler_ = new CertSubmissionHandler(checker_);
     ASSERT_TRUE(util::ReadBinaryFile(cert_dir_ + "/" + kCaCert, &ca_));
     ASSERT_TRUE(util::ReadBinaryFile(cert_dir_ + "/" + kLeafCert, &leaf_));
-    ASSERT_TRUE(util::ReadBinaryFile(cert_dir_ + "/" + kCaProtoCert,
-                                     &ca_protocert_));
-    ASSERT_TRUE(util::ReadBinaryFile(cert_dir_ + "/" + kProtoCert,
-                                     &protocert_));
+    ASSERT_TRUE(util::ReadBinaryFile(cert_dir_ + "/" + kCaPreCert,
+                                     &ca_precert_));
+    ASSERT_TRUE(util::ReadBinaryFile(cert_dir_ + "/" + kPreCert,
+                                     &precert_));
     ASSERT_TRUE(util::ReadBinaryFile(cert_dir_ + "/" + kIntermediateCert,
                                      &intermediate_));
     ASSERT_TRUE(util::ReadBinaryFile(cert_dir_ + "/" + kChainLeafCert,
@@ -65,41 +65,41 @@ class CertSubmissionHandlerTest : public ::testing::Test {
 
 TEST_F(CertSubmissionHandlerTest, SubmitCertChain) {
   // Submit a leaf cert.
-  LogEntry *entry = handler_->ProcessSubmission(LogEntry::X509_CHAIN_ENTRY,
-                                                leaf_);
+  CertificateEntry *entry =
+      handler_->ProcessSubmission(CertificateEntry::X509_ENTRY, leaf_);
   ASSERT_TRUE(entry != NULL);
   // TODO: further checks.
   delete entry;
 
   // Submit a leaf cert with a missing intermediate.
-  entry = handler_->ProcessSubmission(LogEntry::X509_CHAIN_ENTRY, chain_leaf_);
+  entry = handler_->ProcessSubmission(CertificateEntry::X509_ENTRY, chain_leaf_);
   EXPECT_EQ(NULL, entry);
 
   // Submit a chain.
   bstring submit = chain_leaf_ + intermediate_;
-  entry = handler_->ProcessSubmission(LogEntry::X509_CHAIN_ENTRY, submit);
+  entry = handler_->ProcessSubmission(CertificateEntry::X509_ENTRY, submit);
   ASSERT_TRUE(entry != NULL);
   delete entry;
 
   // An invalid chain with two certs in wrong order.
   bstring invalid_submit = ca_;
   invalid_submit.append(leaf_);
-  entry = handler_->ProcessSubmission(LogEntry::X509_CHAIN_ENTRY,
+  entry = handler_->ProcessSubmission(CertificateEntry::X509_ENTRY,
                                       invalid_submit);
   EXPECT_EQ(NULL, entry);
 }
 
-TEST_F(CertSubmissionHandlerTest, SubmitProtoCertChain) {
-  bstring submit = protocert_ + ca_protocert_;
+TEST_F(CertSubmissionHandlerTest, SubmitPreCertChain) {
+  bstring submit = precert_ + ca_precert_;
 
-  LogEntry *entry = handler_->ProcessSubmission(LogEntry::PROTOCERT_CHAIN_ENTRY,
-                                                submit);
+  CertificateEntry *entry =
+      handler_->ProcessSubmission(CertificateEntry::PRECERT_ENTRY, submit);
   ASSERT_TRUE(entry != NULL);
   delete entry;
 
   // In wrong order.
-  submit = ca_protocert_ + protocert_;
-  entry = handler_->ProcessSubmission(LogEntry::PROTOCERT_CHAIN_ENTRY, submit);
+  submit = ca_precert_ + precert_;
+  entry = handler_->ProcessSubmission(CertificateEntry::PRECERT_ENTRY, submit);
   EXPECT_EQ(NULL, entry);
 }
 

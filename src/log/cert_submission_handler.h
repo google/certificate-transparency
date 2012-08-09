@@ -1,11 +1,12 @@
 #ifndef CERT_SUBMISSION_HANDLER_H
 #define CERT_SUBMISSION_HANDLER_H
 
-#include "../include/types.h"
-#include "cert_checker.h"
-#include "log_entry.h"
-#include "submission_handler.h"
+#include <string>
 
+#include "../include/types.h"
+#include "../proto/ct.pb.h"
+#include "cert_checker.h"
+#include "submission_handler.h"
 
 // Parse incoming submissions, do preliminary sanity checks and pass them
 // through cert checker.
@@ -17,13 +18,22 @@ class CertSubmissionHandler : public SubmissionHandler {
   CertSubmissionHandler(CertChecker *cert_checker);
   ~CertSubmissionHandler() {}
 
-  // Caller owns the result.
-  LogEntry *ProcessSubmission(LogEntry::LogEntryType type,
-                              const bstring &submission) const;
- private:
-  X509ChainEntry *ProcessX509Submission(const bstring &submission) const;
 
-  ProtoCertChainEntry *ProcessProtoSubmission(const bstring &submission) const;
+  // For clients, to reconstruct the bytestring under the signature
+  // from the observed chain. Caller owns the returned pointer.
+  static CertificateEntry *X509ChainToEntry(const CertChain &chain);
+
+ protected:
+  bool ProcessX509Submission(const bstring &submission,
+                             CertificateEntry *entry);
+
+
+  bool ProcessPreCertSubmission(const bstring &submission,
+                                CertificateEntry *entry);
+
+ private:
+  static bstring TbsCertificate(const CertChain &chain);
+  static bstring TbsCertificate(const PreCertChain &chain);
 
   CertChecker *cert_checker_;
 };

@@ -95,8 +95,8 @@ TYPED_TEST(TreeHasherTest, CollisionTest) {
   EXPECT_NE(H(leaf1_digest), H(leaf2_digest));
 
   // Check that different leaves hash to different digests.
-  const unsigned char hello[] = "Hello";
-  const unsigned char world[] = "World";
+  const byte hello[] = "Hello";
+  const byte world[] = "World";
   bstring leaf1(hello, 5);
   bstring leaf2(world, 5);
   leaf1_digest = this->tree_hasher_.HashLeaf(leaf1);

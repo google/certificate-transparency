@@ -1,35 +1,41 @@
 CXXFLAG= -Wall -Werror -O3 -g
-GTEST_INCLUDE= -I $(GTESTDIR)/include
-GTEST_LIBS= $(GTESTDIR)/libgtest.a -lpthread
+G_INCLUDE= -I $(GTESTDIR)/include -I $(PROTOBUFDIR)
+G_LIBS= $(GTESTDIR)/libgtest.a -lpthread $(PROTOBUFDIR)/.libs/libprotobuf.a
 # Need OpenSSL >= 1.0.0
 ifneq ($(OPENSSLDIR),)
-  INCLUDE= $(GTEST_INCLUDE) -I $(OPENSSLDIR)/include
-  LIBS= $(GTEST_LIBS) -L $(OPENSSLDIR) -L $(OPENSSLDIR)/lib -lcrypto -Wl,-rpath,$(OPENSSLDIR) -Wl,-rpath,$(OPENSSLDIR)/lib
+  INCLUDE= $(G_INCLUDE) -I $(OPENSSLDIR)/include
+  LIBS= $(G_LIBS) -L $(OPENSSLDIR) -L $(OPENSSLDIR)/lib -lssl -lcrypto -Wl,-rpath,$(OPENSSLDIR) -Wl,-rpath,$(OPENSSLDIR)/lib
 else
-  INCLUDE= $(GTEST_INCLUDE)
-  LIBS= $(GTEST_LIBS) -lcrypto
+  INCLUDE= $(G_INCLUDE)
+  LIBS= $(G_LIBS) -lssl -lcrypto
 endif
 
 CXXFLAGS= $(INCLUDE) $(CXXFLAG)
 
-all: .depend LogDBTest MerkleTreeTest SerialHasherTest TreeLoggerTest \
+all: proto .depend LogDBTest MerkleTreeTest SerialHasherTest \
 	TreeHasherTest faildb
+
+proto::
+	cd ../proto && $(MAKE)
+
+clean:
+	rm -f *Test *.o
 
 include .depend
 
 .depend: *.cc *.h
 	$(CXX) $(CXXFLAGS) -MM *.cc > .depend
 
-test: LogDBTest MerkleTreeTest SerialHasherTest TreeLoggerTest TreeHasherTest
+test: LogDBTest MerkleTreeTest SerialHasherTest TreeHasherTest
 	./SerialHasherTest
 	./TreeHasherTest
 	./MerkleTreeTest
 	./LogDBTest
-	./TreeLoggerTest
 
-LogDBTest: LogDB.o LogDBTestConstants.o LogDBTest.o ../util/util.o
+LogDBTest: LogDB.o LogDBTestConstants.o LogDBTest.o ../util/util.o \
+	../proto/ct.pb.o
 	$(CXX) -o LogDBTest LogDB.o LogDBTestConstants.o LogDBTest.o \
-	../util/util.o $(LIBS)
+	../util/util.o ../proto/ct.pb.o $(LIBS)
 
 MerkleTreeTest: MerkleTree.o MerkleVerifier.o SerialHasher.o TreeHasher.o \
 		MerkleTreeTest.o ../util/util.o
@@ -40,24 +46,11 @@ SerialHasherTest: SerialHasher.o SerialHasherTest.o ../util/util.o
 	$(CXX) -o SerialHasherTest SerialHasher.o SerialHasherTest.o \
 	../util/util.o $(LIBS)
 
-TreeLoggerTest: LogDB.o LogRecord.o LogVerifier.o MerkleTree.o \
-		MerkleVerifier.o SerialHasher.o TreeHasher.o TreeLogger.o \
-		TreeLoggerTest.o ../util/ct_debug.o ../util/util.o \
-		../log/submission_handler.o ../log/log_entry.o ../log/cert.o \
-		../log/log_signer.o
-	$(CXX) -o TreeLoggerTest LogDB.o LogRecord.o LogVerifier.o \
-	MerkleTree.o MerkleVerifier.o SerialHasher.o TreeHasher.o TreeLogger.o \
-	TreeLoggerTest.o ../util/ct_debug.o ../util/util.o \
-	../log/submission_handler.o ../log/log_entry.o ../log/cert.o \
-	../log/log_signer.o $(LIBS)
-
 TreeHasherTest: SerialHasher.o TreeHasher.o TreeHasherTest.o ../util/util.o
 	$(CXX) -o TreeHasherTest SerialHasher.o TreeHasher.o TreeHasherTest.o \
 	../util/util.o $(LIBS)
 
-faildb: faildb.cc LogDB.o LogDBTestConstants.o ../util/util.o
+faildb: faildb.cc ../proto/ct.pb.o LogDB.o LogDBTestConstants.o ../util/util.o
 	$(CXX) $(CXXFLAGS) -o faildb faildb.cc LogDB.o LogDBTestConstants.o \
-	../util/util.o $(LIBS)
+	../proto/ct.pb.o ../util/util.o $(LIBS)
 
-clean:
-	rm *Test *.o

@@ -35,7 +35,7 @@ bool CertChecker::CheckCertChain(const CertChain &chain) const {
   return VerifyTrustedCaSignature(*chain.LastCert());
 }
 
-bool CertChecker::CheckProtoCertChain(const ProtoCertChain &chain) const {
+bool CertChecker::CheckPreCertChain(const PreCertChain &chain) const {
   assert(chain.IsLoaded());
   if (!chain.IsWellFormed())
     return false;
@@ -45,10 +45,10 @@ bool CertChecker::CheckProtoCertChain(const ProtoCertChain &chain) const {
   // chain (appears to be) ordered correctly.
   // Only check the signature on the leaf certificate (full verification would
   // fail since the leaf contains an unrecognized critical extension).
-  const Cert *proto = chain.ProtoCert();
-  const Cert *proto_ca = chain.CaProtoCert();
-  return proto->IsSignedBy(*proto_ca) && chain.IsValidIssuerChain() &&
-      VerifyProtoCaChain(chain);
+  const Cert *pre = chain.PreCert();
+  const Cert *pre_ca = chain.CaPreCert();
+  return pre->IsSignedBy(*pre_ca) && chain.IsValidIssuerChain() &&
+      VerifyPreCaChain(chain);
 }
 
 bool CertChecker::VerifyTrustedCaSignature(const Cert &subject) const {
@@ -76,9 +76,9 @@ bool CertChecker::VerifyTrustedCaSignature(const Cert &subject) const {
   return subject.IsSignedBy(issuer);
 }
 
-bool CertChecker::VerifyProtoCaChain(const ProtoCertChain &chain) const {
+bool CertChecker::VerifyPreCaChain(const PreCertChain &chain) const {
   assert(chain.IsLoaded());
-  X509 *leaf = chain.CaProtoCert()->x509_;
+  X509 *leaf = chain.CaPreCert()->x509_;
   assert(leaf != NULL);
   // The remaining certificates.
   STACK_OF(X509) *intermediates = NULL;

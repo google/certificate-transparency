@@ -8,7 +8,7 @@
 
 namespace {
 
-const unsigned char kTestString[] = "Hello world!";
+const byte kTestString[] = "Hello world!";
 const size_t kTestStringLength = 12;
 
 typedef struct {

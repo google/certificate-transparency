@@ -1,23 +1,31 @@
-CXXFLAG= -Wall -Werror -g
-INCLUDE=
+CXXFLAG= -Wall -Werror -O3 -g
+G_INCLUDE= -I $(GTESTDIR)/include -I $(PROTOBUFDIR)
+G_LIBS= $(GTESTDIR)/libgtest.a -lpthread $(PROTOBUFDIR)/.libs/libprotobuf.a
 # Need OpenSSL >= 1.0.0
 ifneq ($(OPENSSLDIR),)
-  INCLUDE = -I $(OPENSSLDIR)/include
-  LIBS= -L $(OPENSSLDIR)  -L $(OPENSSLDIR)/lib -lcrypto -lssl -Wl,-rpath,$(OPENSSLDIR)  -Wl,-rpath,$(OPENSSLDIR)/lib
+  INCLUDE= $(G_INCLUDE) -I $(OPENSSLDIR)/include
+  LIBS= $(G_LIBS) -L $(OPENSSLDIR) -L $(OPENSSLDIR)/lib -lssl -lcrypto -Wl,-rpath,$(OPENSSLDIR) -Wl,-rpath,$(OPENSSLDIR)/lib
 else
-  LIBS= -lcrypto -lssl
+  INCLUDE= $(G_INCLUDE)
+  LIBS= $(G_LIBS) -lssl -lcrypto
 endif
 
 CXXFLAGS= $(INCLUDE) $(CXXFLAG)
 
-OBJS= ../merkletree/LogDB.o ../merkletree/LogRecord.o \
-../merkletree/MerkleTree.o ../merkletree/SerialHasher.o \
-../merkletree/TreeHasher.o ../merkletree/TreeLogger.o \
-../util/ct_debug.o ../util/util.o ../log/cert_checker.o ../log/cert.o \
+OBJS= ../merkletree/LogDB.o ../merkletree/SerialHasher.o \
+../util/ct_debug.o ../util/util.o \
+../log/cert_checker.o ../log/cert.o \
 ../log/submission_handler.o ../log/cert_submission_handler.o \
-../log/log_entry.o ../log/log_signer.o
+../log/log_signer.o ../log/frontend_signer.o \
+../proto/ct.pb.o ../proto/serializer.o
 
-all: .depend ct-server
+all: proto .depend ct-server
+
+proto::
+	cd ../proto && $(MAKE)
+
+clean:
+	rm -f *.o ct-server
 
 include .depend
 
@@ -26,6 +34,3 @@ include .depend
 
 ct-server: ct-server.cc $(OBJS)
 	$(CXX) $(CXXFLAGS) -o ct-server ct-server.cc $(OBJS) $(LIBS)
-
-clean:
-	rm -f *.o ct-server

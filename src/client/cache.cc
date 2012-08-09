@@ -1,45 +1,45 @@
 #include <assert.h>
 #include <map>
+#include <string>
 
-#include "../include/types.h"
-#include "../merkletree/LogRecord.h"
-#include "../merkletree/LogVerifier.h"
+#include "../log/log_verifier.h"
 #include "cache.h"
 
-
-LogSegmentCheckpointCache::LogSegmentCheckpointCache(
-    const std::vector<bstring> &cache) {
-  std::vector<bstring>::const_iterator it;
+SignedCertificateHashCache::SignedCertificateHashCache(
+    const std::vector<std::string> &cache) {
+  std::vector<std::string>::const_iterator it;
   for (it = cache.begin(); it != cache.end(); ++it) {
-    LogSegmentCheckpoint checkpoint;
+    SignedCertificateHash sch;
 
     // Tolerate no cache errors, for now.
-    assert(checkpoint.Deserialize(*it));
+    sch.ParseFromString(*it);
     // Tolerate duplicates, but do not allow mismatches.
-    assert(Insert(checkpoint) == LogSegmentCheckpointCache::NEW ||
-           LogSegmentCheckpointCache::CACHED);
+    CacheReply reply = Insert(sch);
+    assert(reply == SignedCertificateHashCache::NEW ||
+           reply == SignedCertificateHashCache::CACHED);
   }
 }
 
-std::vector<bstring> LogSegmentCheckpointCache::WriteCache() const {
-  std::vector<bstring> result;
+std::vector<std::string> SignedCertificateHashCache::WriteCache() const {
+  std::vector<std::string> result;
   Cache::const_iterator it;
   for (it = cache_.begin(); it != cache_.end(); ++it) {
-    result.push_back(it->second.Serialize());
+    std::string entry;
+    it->second.SerializeToString(&entry);
+    result.push_back(entry);
   }
   return result;
 }
 
-LogSegmentCheckpointCache::CacheReply
-LogSegmentCheckpointCache::Insert(const LogSegmentCheckpoint &checkpoint) {
+SignedCertificateHashCache::CacheReply
+SignedCertificateHashCache::Insert(const SignedCertificateHash &sch) {
+  // TODO: key by hash.
   std::pair<Cache::iterator, bool> inserted =
-      cache_.insert(Cache::value_type(checkpoint.tree_data.sequence_number,
-                                      checkpoint));
+      cache_.insert(Cache::value_type(sch.entry().leaf_certificate(), sch));
   if (inserted.second)
-    return LogSegmentCheckpointCache::NEW;
-  else if (LogVerifier::LogSegmentTreeDataConsistency(
-      inserted.first->second.tree_data, checkpoint.tree_data) ==
+    return SignedCertificateHashCache::NEW;
+  else if (LogVerifier::VerifySCHConsistency(inserted.first->second, sch) ==
            LogVerifier::VERIFY_OK)
-    return LogSegmentCheckpointCache::CACHED;
-  else return LogSegmentCheckpointCache::MISMATCH;
+    return SignedCertificateHashCache::CACHED;
+  else return SignedCertificateHashCache::MISMATCH;
 }

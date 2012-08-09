@@ -15,10 +15,10 @@ class Cert {
   static const char kProofExtensionOID[];
   // The embedded proof extension.
   static const char kEmbeddedProofExtensionOID[];
-  // The poison extension in the ProtoCert (critical).
+  // The poison extension in the PreCert (critical).
   static const char kPoisonExtensionOID[];
   // The Certificate Transparency Extended Key Usage OID
-  // (indicating that a certificate can be used for protocert signing
+  // (indicating that a certificate can be used for precert signing
   // on behalf of the issuing CA)
   static const char kCtExtendedKeyUsageOID[];
 
@@ -56,7 +56,7 @@ class Cert {
 
   // WARNING WARNING The following methods modify the x509_ structure
   // and thus invalidate the cert.
-  // They are mostly needed for processing protocerts. Use with care.
+  // They are mostly needed for processing precerts. Use with care.
 
   // Delete the matching extension, if present.
   void DeleteExtension(const std::string &extension_oid);
@@ -131,25 +131,25 @@ class CertChain {
   std::vector<Cert*> chain_;
 };
 
-class ProtoCertChain : public CertChain {
+class PreCertChain : public CertChain {
  public:
-  ProtoCertChain() {}
+  PreCertChain() {}
 
-  explicit ProtoCertChain(const std::string &pem_string)
+  explicit PreCertChain(const std::string &pem_string)
       : CertChain(pem_string) {}
 
   // Some convenient aliases.
-  // A pointer to the protocert.
-  Cert const *ProtoCert() const {
+  // A pointer to the precert.
+  Cert const *PreCert() const {
     return LeafCert();
   }
 
-  // A pointer to the issuing CA protocert.
-  Cert const *CaProtoCert() const {
+  // A pointer to the issuing CA precert.
+  Cert const *CaPreCert() const {
     return Length() >= 2 ? CertAt(1) : NULL;
   }
 
-  // The chain is protocert -- ca_protocert -- intermediates
+  // The chain is precert -- ca_precert -- intermediates
   size_t IntermediateLength() const {
     assert(IsLoaded());
     return Length() < 2 ? 0 : Length() - 2;

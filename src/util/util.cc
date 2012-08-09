@@ -1,18 +1,20 @@
 #include <assert.h>
 #include <iostream>
 #include <fstream>
+#include <stdint.h>
+#include <stdlib.h>
 #include <string>
+#include <sys/time.h>
 
 #include "../include/types.h"
 #include "util.h"
 
-
-
 namespace util {
 
-static const char nibble[] = "0123456789abcdef";
+namespace {
+const char nibble[] = "0123456789abcdef";
 
-static const byte ByteValue(char high, char low) {
+byte ByteValue(char high, char low) {
   assert(('0' <= high && high <= '9') || ('a' <= high && high <= 'f'));
   assert(('0' <= high && high <= '9') || ('a' <= high && high <= 'f'));
   byte ret;
@@ -26,6 +28,18 @@ static const byte ByteValue(char high, char low) {
     ret += low - 'W';
   return ret;
 }
+
+}  // namespace
+
+size_t PrefixLength(size_t max_length) {
+  size_t prefix_length = 0;
+
+  for ( ; max_length > 0; max_length >>= 8)
+    ++prefix_length;
+
+  return prefix_length;
+}
+
 
 std::string HexString(const bstring &data) {
   std::string ret;
@@ -52,25 +66,6 @@ bstring BinaryString(const std::string &hex_string) {
   for (size_t i = 0; i < hex_string.size(); i += 2)
     ret.push_back(ByteValue(hex_string[i], hex_string[i+1]));
   return ret;
-}
-
-bstring SerializeUint(size_t in, size_t bytes) {
-  assert(bytes <= sizeof in);
-  assert(bytes == sizeof in || in >> (bytes * 8) == 0);
-  bstring result;
-  for ( ; bytes > 0; --bytes)
-    result.push_back((char)
-                     ((in & (0xff << ((bytes - 1) * 8))) >> ((bytes - 1) * 8)));
-  return result;
-}
-
-size_t DeserializeUint(const bstring &in) {
-  size_t len = in.length();
-  assert(len <= sizeof(size_t));
-  size_t res = 0;
-  for (size_t i = 0; i < len; ++i)
-    res = (res << 8) + in[i];
-  return res;
 }
 
 static char *ReadFileStreamToBuffer(std::ifstream &in, int *length) {
@@ -111,10 +106,30 @@ bool ReadBinaryFile(const std::string &file, bstring *contents) {
     return false;
 
   char *buf = ReadFileStreamToBuffer(in, &file_length);
-  contents->assign(bstring(reinterpret_cast<unsigned char*>(buf), file_length));
+  contents->assign(bstring(reinterpret_cast<byte*>(buf), file_length));
 
   delete[] buf;
   return true;
+}
+
+uint64_t TimeInMilliseconds() {
+  struct timeval tv;
+  gettimeofday(&tv, NULL);
+  return static_cast<uint64_t>(tv.tv_sec) * 1000 +
+      static_cast<uint64_t>(tv.tv_usec) / 1000;
+}
+
+std::string CreateTemporaryDirectory(const std::string &dir_template) {
+  size_t strlen = dir_template.size() + 1;
+  char *template_buf = new char[strlen];
+  memcpy(template_buf, dir_template.data(), dir_template.size());
+  template_buf[strlen - 1] = '\0';
+  char *tmpdir = mkdtemp(template_buf);
+  std::string ret;
+  if (tmpdir != NULL)
+    ret = std::string(tmpdir);
+  delete[] template_buf;
+  return ret;
 }
 
 } // namespace util

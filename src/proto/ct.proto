@@ -1,0 +1,71 @@
+message DigitallySigned {
+  enum HashAlgorithm {
+    NONE = 0;
+    MD5 = 1;
+    SHA1 = 2;
+    SHA224 = 3;
+    SHA256 = 4;
+    SHA384 = 5;
+    SHA512 = 6;
+  }
+
+  enum SignatureAlgorithm {
+    ANONYMOUS = 0;
+    RSA = 1;
+    DSA = 2;
+    ECDSA = 3;
+  }
+
+  required HashAlgorithm hash_algorithm = 1 [ default = NONE ];
+  required SignatureAlgorithm sig_algorithm = 2 [ default = ANONYMOUS ];
+  optional bytes signature = 3;
+}
+
+message CertificateEntry {
+  enum Type {
+    X509_ENTRY = 0;
+    PRECERT_ENTRY = 1;
+  }
+
+  required Type type = 1 [ default = X509_ENTRY ];
+  // In the case of a regular entry, the leaf certificate.
+  // In the case of a pre-cert entry, the tbs part of the leaf certificate.
+  // Signed.
+  optional bytes leaf_certificate = 2;
+
+  // In the case of a regular entry, a chain from the leaf
+  // to a trusted root (excluding leaf and root).
+  // In the case of a pre-cert entry, this contains the full original
+  // pre-cert chain, as submitted by the CA.
+  // Unsigned, kept as evidence.
+  repeated bytes intermediates = 3;
+}
+
+message SignedCertificateHash {
+  optional uint64 timestamp = 1;
+  optional CertificateEntry entry = 2;
+  optional DigitallySigned signature = 3;
+}
+
+message FailReport {
+  enum FailedOp {
+    INIT = 0;
+    WRITE_ENTRY = 1;
+    MAKE_SEGMENT = 2;
+    WRITE_SEGMENT_AND_INFO = 3;
+    NO_FAIL = 4;
+  }
+
+  optional FailedOp op = 1;
+  optional uint32 segment = 2;
+  optional uint32 index = 3;
+}
+
+message EntryInfo {
+  optional uint32 segment = 1;
+  optional uint32 index = 2;
+}
+
+message EntryCount {
+  optional uint64 count = 1;
+}

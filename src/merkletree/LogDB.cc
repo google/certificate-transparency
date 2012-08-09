@@ -14,6 +14,7 @@
 #include <vector>
 
 #include "../include/types.h"
+#include "../proto/ct.pb.h"
 #include "../util/util.h"
 #include "LogDB.h"
 
@@ -177,25 +178,17 @@ size_t FileDB::SegmentCount() const {
 }
 
 LogDB::Status FileDB::WriteEntry(const bstring &key, const bstring &data) {
-  std::string dir = StorageDirectory(key);
-  // kDataFile must be created last in a pending entry.
-  if (access((dir + "/" + kDataFile).c_str(), R_OK) < 0) {
-    assert(errno == ENOENT);
-    CreateStorageEntry(key, data);
-    AddToPending(key);
-    return LogDB::NEW;
-  }
-
-  if (access((dir + "/" + kInfoFile).c_str(), R_OK) < 0) {
-    assert(errno == ENOENT);
-    // in case the storage was created but not the pending entry.
-    if (access((dir + "/" + kLockFile).c_str(), R_OK) < 0) {
-      assert(errno == ENOENT);
-      AddToPending(key);
-    }
+  if (IsPending(key) || IsQueuedForLogging(key))
     return LogDB::PENDING;
-  }
-  return LogDB::LOGGED;
+  if (IsLogged(key))
+    return LogDB::LOGGED;
+
+  std::string dir = StorageDirectory(key);
+  // If we failed before AddToPending completed, treat the data as lost and
+  // recreate the storage entry, to avoid stale timestamps.
+  CreateStorageEntry(key, data);
+  AddToPending(key);
+  return LogDB::NEW;
 }
 
 // The steps for logging a segment are as follows:
@@ -244,17 +237,19 @@ void FileDB::MakeSegment() {
   assert(dir);
   unsigned count = 0;
   struct dirent *entry;
-  bstring segment_bytestring = util::SerializeUint(segment_count_, 4);
   while ((entry = readdir(dir)) != NULL) {
     if (entry->d_name[0] == '.')
       continue;
     std::string from(kPendingDir + "/" + entry->d_name);
-    bstring index_bytestring = util::SerializeUint(count, 4);
     std::string index = ToString(count++);
     std::string to(kPendingSegmentDir + "/" + index);
     ret = rename(from.c_str(), to.c_str());
     assert(ret >= 0);
-    bstring info(segment_bytestring + index_bytestring);
+    EntryInfo entry_info;
+    entry_info.set_segment(segment_count_);
+    entry_info.set_index(count);
+    bstring info;
+    entry_info.SerializeToString(&info);
     // Write a lock file to indicate that the entry is queued for logging
     // and we shouldn't try to add it back to the pending bag.
     // Include the entry info in the lock file, so in step 5, we can simply
@@ -264,7 +259,11 @@ void FileDB::MakeSegment() {
     // wise...
     rewinddir(dir);
   }
-  bstring count_bytestring = util::SerializeUint(count, 4);
+
+  EntryCount segment_count;
+  segment_count.set_count(count);
+  bstring count_bytestring;
+  segment_count.SerializeToString(&count_bytestring);
   closedir(dir);
 
   // Done; write the count. This commits the segment.
@@ -366,9 +365,11 @@ LogDB::Status FileDB::EntryLocation(const bstring &key, size_t *segment,
   } else {
     bstring info;
     ReadFile(info_file, &info);
-    assert(info.size() == 8);
-    *segment = util::DeserializeUint(info.substr(0, 4));
-    *index = util::DeserializeUint(info.substr(4));
+
+    EntryInfo entry_info;
+    entry_info.ParseFromString(info);
+    *segment = entry_info.segment();
+    *index = entry_info.index();
     return LOGGED;
   }
 }
@@ -452,6 +453,35 @@ void FileDB::AddToPending(const bstring &key) {
   int ret = symlink(StorageDirectory(key).c_str(), pending.c_str());
   // FIXME: if EEXIST, then check the file is correct and fix if not.
   assert(ret >= 0 || errno == EEXIST);
+}
+
+bool FileDB::IsPending(const bstring &key) {
+  std::string pending = kPendingDir + "/" + util::HexString(key);
+  if (access(pending.c_str(), F_OK) < 0) {
+    assert(errno == ENOENT);
+    return false;
+  }
+  return true;
+}
+
+// The entry has been committed to a segment, but we are still
+// waiting for the segment signature.
+bool FileDB::IsQueuedForLogging(const bstring &key) {
+  std::string dir = StorageDirectory(key);
+  if (access((dir + "/" + kLockFile).c_str(), R_OK) < 0) {
+    assert(errno == ENOENT);
+    return false;
+  }
+  return true;
+}
+
+bool FileDB::IsLogged(const bstring &key) {
+  std::string dir = StorageDirectory(key);
+  if (access((dir + "/" + kInfoFile).c_str(), R_OK) < 0) {
+    assert(errno == ENOENT);
+    return false;
+  }
+  return true;
 }
 
 unsigned FileDB::CountDirectory(const std::string &dir_name) const {
@@ -594,8 +624,10 @@ size_t FileDB::CountSegments() const {
 size_t FileDB::ReadPendingSegmentCount() const {
   bstring count;
   ReadFile(kPendingSegmentDir + "/count", &count);
-  assert(count.size() == 4);
-  return util::DeserializeUint(count);
+
+  EntryCount pending_count;
+  pending_count.ParseFromString(count);
+  return pending_count.count();
 }
 
 std::string FileDB::ToString(size_t number) const {

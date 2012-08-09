@@ -25,9 +25,12 @@
 #include "../include/types.h"
 #include "../log/cert.h"
 #include "../log/cert_submission_handler.h"
-#include "../log/log_entry.h"
 #include "../log/log_signer.h"
-#include "../merkletree/LogVerifier.h"
+#include "../log/log_verifier.h"
+#include "../merkletree/MerkleVerifier.h"
+#include "../merkletree/SerialHasher.h"
+#include "../proto/ct.pb.h"
+#include "../proto/serializer.h"
 #include "../util/ct_debug.h"
 #include "../util/util.h"
 #include "cache.h"
@@ -110,43 +113,27 @@ static void AddExtension(X509 *cert, const char *oid, unsigned char *data,
   assert(ret == 1);
 }
 
-// Verify the proof on a log entry bundle.
+
 static LogVerifier::VerifyResult
-VerifyLogSegmentProof(const bstring &proofstring,
-                      const bstring &bundle,
-                      LogVerifier *verifier,
-                      LogSegmentCheckpoint *checkpoint) {
-  assert(verifier != NULL);
-  AuditProof proof;
-  bool serialized = proof.Deserialize(AuditProof::LOG_SEGMENT_PROOF,
-                                      proofstring);
-  if (!serialized)
+VerifyLogSignature(const bstring &token, const CertChain &cert_chain,
+                   LogVerifier *verifier, SignedCertificateHash *sch) {
+  CertificateEntry *entry = CertSubmissionHandler::X509ChainToEntry(cert_chain);
+  if (entry == NULL)
     return LogVerifier::INVALID_FORMAT;
 
-  return verifier->VerifyLogSegmentAuditProof(proof, bundle, checkpoint);
-}
+  SignedCertificateHash local_sch;
+  if (!Deserializer::DeserializeSCHToken(token, &local_sch))
+    return LogVerifier::INVALID_FORMAT;
 
-static LogVerifier::VerifyResult
-VerifyX509ChainProof(const bstring &proofstring, const CertChain &cert_chain,
-                     LogVerifier *verifier, LogSegmentCheckpoint *checkpoint) {
-  X509ChainEntry entry(cert_chain);
-  bstring signed_part;
-  if (!entry.SerializeSigned(&signed_part))
-    return LogVerifier::INVALID_INPUT;
-  return VerifyLogSegmentProof(proofstring, signed_part, verifier,
-                               checkpoint);
-}
+  local_sch.mutable_entry()->CopyFrom(*entry);
+  delete entry;
 
-static LogVerifier::VerifyResult
-VerifyProtoChainProof(const bstring &proofstring,
-                      const CertChain &cert_chain, LogVerifier *verifier,
-                      LogSegmentCheckpoint *checkpoint) {
-  bstring signed_part;
-  ProtoCertChainEntry entry(cert_chain);
-  if (!entry.SerializeSigned(&signed_part))
-    return LogVerifier::INVALID_INPUT;
-  return VerifyLogSegmentProof(proofstring, signed_part, verifier,
-                               checkpoint);
+  LogVerifier::VerifyResult result =
+      verifier->VerifySignedCertificateHash(local_sch);
+  if (result != LogVerifier::VERIFY_OK)
+    return result;
+  sch->CopyFrom(local_sch);
+  return LogVerifier::VERIFY_OK;
 }
 
 // A generic client.
@@ -196,9 +183,9 @@ class LogClient : public CTClient {
   // struct {
   //   opaque bundle[ClientCommand.length];
   // } ClientCommandUploadBundle;
-  // Uploads the bundle; if the server returns a proof, writes the proof string
-  // and returns true; else returns false.
-  bool UploadBundle(const bstring &bundle, bool proto, bstring *proof) {
+  // Uploads the bundle; if the server returns a signature token, writes
+  // the token and returns true; else returns false.
+  bool UploadBundle(const bstring &bundle, bool proto, bstring *token) {
     CTResponse response = Upload(bundle, proto);
     bool ret = false;
     switch (response.code) {
@@ -209,12 +196,8 @@ class LogClient : public CTClient {
       case ct::SUBMITTED:
         std::cout << "Token is " << util::HexString(response.data, ' ')
                   << std::endl;
-        break;
-      case ct::LOGGED:
-        std::cout << "Received proof " << util::HexString(response.data, ' ')
-                  << std::endl;
-        if (proof != NULL) {
-          proof->assign(response.data);
+        if (token != NULL) {
+          token->assign(response.data);
           ret = true;
         }
         break;
@@ -379,7 +362,7 @@ class SSLClient : public CTClient {
     // The verification result.
     bool proof_verified;
     // The resulting checkpoint.
-    LogSegmentCheckpoint checkpoint;
+    SignedCertificateHash sch;
   };
 
 #ifdef TLSEXT_AUTHZDATAFORMAT_audit_proof
@@ -420,14 +403,14 @@ class SSLClient : public CTClient {
 
     std::cout << "Found an audit proof in the TLS extension, verifying...";
 
-    bstring proofstring(proof, proof_length);
+    bstring proofstring(reinterpret_cast<byte*>(proof), proof_length);
     Cert *leaf = new Cert(x509);
     // TODO: also add the intermediates.
     CertChain chain;
     chain.AddCert(leaf);
 
     LogVerifier::VerifyResult result =
-        VerifyX509ChainProof(proofstring, chain, verifier, &args->checkpoint);
+        VerifyLogSignature(proofstring, chain, verifier, &args->sch);
 
     if (result == LogVerifier::VERIFY_OK) {
       args->proof_verified = true;
@@ -475,15 +458,17 @@ class SSLClient : public CTClient {
       bstring proofstring =
           chain.LeafCert()->ExtensionData(Cert::kEmbeddedProofExtensionOID);
 
-    // Only writes the checkpoint if verification succeeds.
-    // Note: an optimized client could only verify the signature if it's
-    // a checkpoint it hasn't seen before.
-      if (VerifyProtoChainProof(proofstring, chain, verifier,
-                                &args->checkpoint) == LogVerifier::VERIFY_OK) {
+      // Only writes the checkpoint if verification succeeds.
+      // Note: an optimized client could only verify the signature if it's
+      // a checkpoint it hasn't seen before.
+      LogVerifier::VerifyResult result = VerifyLogSignature(proofstring, chain,
+                                                            verifier,
+                                                            &args->sch);
+      if (result == LogVerifier::VERIFY_OK) {
         std::cout << "OK" << std::endl;
         args->proof_verified = true;
       } else {
-        std::cout << "Invalid proof" << std::endl;
+        std::cout << LogVerifier::VerifyResultString(result) << std::endl;
       }
 
       // Else look for the proof in a superfluous cert.
@@ -494,13 +479,14 @@ class SSLClient : public CTClient {
       bstring proofstring = chain.LastCert()->ExtensionData(
           Cert::kProofExtensionOID);
       chain.RemoveCert();
-      if (VerifyX509ChainProof(proofstring, chain, verifier,
-                               &args->checkpoint) ==
-          LogVerifier::VERIFY_OK) {
+      LogVerifier::VerifyResult result = VerifyLogSignature(proofstring, chain,
+                                                            verifier,
+                                                            &args->sch);
+      if (result == LogVerifier::VERIFY_OK) {
         std::cout << "OK" << std::endl;
         args->proof_verified = true;
       } else {
-        std::cout << "Invalid proof" << std::endl;
+        std::cout << LogVerifier::VerifyResultString(result) << std::endl;
       }
     }
 
@@ -560,16 +546,16 @@ class SSLClient : public CTClient {
     ConnectResult result;
     // Cache the checkpoint.
     if (args.proof_verified) {
-      switch(cache_.Insert(args.checkpoint)) {
-        case LogSegmentCheckpointCache::NEW:
+      switch(cache_.Insert(args.sch)) {
+        case SignedCertificateHashCache::NEW:
           std::cout << "Cached new checkpoint." << std::endl;
           result = PROOF_VERIFIED;
           break;
-        case LogSegmentCheckpointCache::CACHED:
+        case SignedCertificateHashCache::CACHED:
           std::cout << "Checkpoint already in cache." << std::endl;
           result = PROOF_VERIFIED;
           break;
-        case LogSegmentCheckpointCache::MISMATCH:
+        case SignedCertificateHashCache::MISMATCH:
           std::cout << "ERROR: checkpoint mismatch!" << std::endl;
           result = INCONSISTENT_PROOF;
           break;
@@ -591,7 +577,7 @@ class SSLClient : public CTClient {
   }
 
  private:
-  LogSegmentCheckpointCache cache_;
+  SignedCertificateHashCache cache_;
   const char *ca_dir_;
 }; // class SSLCLient
 
@@ -960,7 +946,8 @@ static int Connect(int argc, const char **argv) {
 
   LogVerifier *verifier = NULL;
   if (pkey != NULL)
-    verifier = new LogVerifier(new LogSigVerifier(pkey));
+    verifier = new LogVerifier(new LogSigVerifier(pkey),
+                               new MerkleVerifier(new Sha256Hasher()));
   std::vector<bstring> cache;
   if (cache_dir != NULL) {
     std::cout << "Reading cache...";

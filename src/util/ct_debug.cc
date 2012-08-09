@@ -1,4 +1,5 @@
 #include "ct_debug.h"
+#include "../include/types.h"
 #include "util.h"
 
 #include <iostream>
@@ -119,7 +120,7 @@ void UintValue(const std::string &name, size_t value) {
 void BinaryData(const std::string &label, const void *buf, size_t length) {
   if (debugger_initialized)
     debugger->BinaryData(label,
-                         bstring(static_cast<const unsigned char*>(buf),
+                         bstring(static_cast<const byte*>(buf),
                                  length));
 }
 

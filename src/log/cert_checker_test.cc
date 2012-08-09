@@ -14,9 +14,10 @@ static const char kCaCert[] = "ca-cert.pem";
 // Issued by ca-cert.pem
 static const char kLeafCert[] = "test-cert.pem";
 // Issued by ca-cert.pem
-static const char kCaProtoCert[] = "ca-proto-cert.pem";
+// TODO(ekasper): update test data and rename the certs proto->pre.
+static const char kCaPreCert[] = "ca-proto-cert.pem";
 // Issued by ca-proto-cert.pem
-static const char kProtoCert[] = "test-proto-cert.pem";
+static const char kPreCert[] = "test-proto-cert.pem";
 // Issued by ca-cert.pem
 static const char kIntermediateCert[] = "intermediate-cert.pem";
 // Issued by intermediate-cert.pem
@@ -27,8 +28,8 @@ namespace {
 class CertCheckerTest : public ::testing::Test {
  protected:
   std::string leaf_pem_;
-  std::string ca_protocert_pem_;
-  std::string protocert_pem_;
+  std::string ca_precert_pem_;
+  std::string precert_pem_;
   std::string intermediate_pem_;
   std::string chain_leaf_pem_;
   CertChecker checker_;
@@ -37,10 +38,10 @@ class CertCheckerTest : public ::testing::Test {
   void SetUp() {
     cert_dir_ = std::string(kCertDir);
     ASSERT_TRUE(util::ReadTextFile(cert_dir_ + "/" + kLeafCert, &leaf_pem_));
-    ASSERT_TRUE(util::ReadTextFile(cert_dir_ + "/" + kCaProtoCert,
-                                   &ca_protocert_pem_));
-    ASSERT_TRUE(util::ReadTextFile(cert_dir_ + "/" + kProtoCert,
-                                   &protocert_pem_));
+    ASSERT_TRUE(util::ReadTextFile(cert_dir_ + "/" + kCaPreCert,
+                                   &ca_precert_pem_));
+    ASSERT_TRUE(util::ReadTextFile(cert_dir_ + "/" + kPreCert,
+                                   &precert_pem_));
     ASSERT_TRUE(util::ReadTextFile(cert_dir_ + "/" + kIntermediateCert,
                                    &intermediate_pem_));
     ASSERT_TRUE(util::ReadTextFile(cert_dir_ + "/" + kChainLeafCert,
@@ -78,25 +79,25 @@ TEST_F(CertCheckerTest, Intermediates) {
   EXPECT_FALSE(checker_.CheckCertChain(invalid));
 }
 
-TEST_F(CertCheckerTest, ProtoCert) {
-  const std::string chain_pem = protocert_pem_ + ca_protocert_pem_;
-  ProtoCertChain chain(chain_pem);
+TEST_F(CertCheckerTest, PreCert) {
+  const std::string chain_pem = precert_pem_ + ca_precert_pem_;
+  PreCertChain chain(chain_pem);
 
   ASSERT_TRUE(chain.IsLoaded());
   EXPECT_TRUE(chain.IsWellFormed());
 
   // Fail as we have no CA certs.
-  EXPECT_FALSE(checker_.CheckProtoCertChain(chain));
+  EXPECT_FALSE(checker_.CheckPreCertChain(chain));
 
   // Load CA certs and expect success.
   checker_.LoadTrustedCertificate(cert_dir_ + "/" + kCaCert);
-  EXPECT_TRUE(checker_.CheckProtoCertChain(chain));
+  EXPECT_TRUE(checker_.CheckPreCertChain(chain));
 
-  // A second, invalid chain, with no CA protocert.
-  ProtoCertChain chain2(protocert_pem_);
+  // A second, invalid chain, with no CA precert.
+  PreCertChain chain2(precert_pem_);
   ASSERT_TRUE(chain2.IsLoaded());
   EXPECT_FALSE(chain2.IsWellFormed());
-  EXPECT_FALSE(checker_.CheckProtoCertChain(chain2));
+  EXPECT_FALSE(checker_.CheckPreCertChain(chain2));
 }
 
 }  // namespace

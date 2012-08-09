@@ -5,19 +5,22 @@ fail_resume() {
   fail_point=$1
   crash=$2
 
-  ./faildb fail $fail_point $crash
-  local retcode=$?
-  if [ $retcode -eq 42 ]; then
+  tmpdir=$(mktemp -d "/tmp/ctlogXXXXXX")
+
+  ./faildb $tmpdir fail $fail_point $crash
+  ret=$?
+  if [ $ret -eq 42 ]; then
     echo "Failed to fail at fail point $fail_point"
-    return 42
   else
-    ./faildb resume
-    if [ $? != 0 ]; then
+    ./faildb $tmpdir resume
+    ret=$?
+    if [ $ret != 0 ]; then
       echo "Failed to resume at fail point $fail_point"
-      return 1
     fi
   fi
-  return 0
+
+  rm -r $tmpdir
+  return $ret
 }
 
 loop_all_fail_points() {

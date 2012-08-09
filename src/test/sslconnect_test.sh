@@ -101,8 +101,8 @@ mkdir -p ca-hashes
 hash=$($MY_OPENSSL x509 -in testdata/ca-cert.pem -hash -noout)
 cp testdata/ca-cert.pem ca-hashes/$hash.0
 
-test_valid_range testdata ca-hashes ct-server ca "" 0
-test_invalid_range testdata ca-hashes ct-server ca "" 2
+# test_valid_range testdata ca-hashes ct-server ca "" 0
+# test_invalid_range testdata ca-hashes ct-server ca "" 2
 
 rm -rf ca-hashes
 
@@ -117,7 +117,7 @@ make_log_server_keys `pwd`/tmp ct-server
 
 # Start the log server and wait for it to come up
 echo "Starting CT server with trusted certs in $hash_dir"
-../server/ct-server 8124 $cert_dir/$log_server-key.pem 1 1 $hash_dir &
+../server/ct-server 8124 $cert_dir/$log_server-key.pem $hash_dir &
 server_pid=$!
 sleep 2
 
@@ -135,25 +135,25 @@ mkdir -p tmp/cache
 echo "Testing valid configurations with new certificates" 
 test_valid_range tmp tmp/ca-hashes ct-server ca tmp/cache 0
 
-# Start the log server again and generate a second set of (inconsistent) proofs
-echo "Starting CT server with trusted certs in $hash_dir"
-../server/ct-server 8124 $cert_dir/$log_server-key.pem 1 1 $hash_dir &
-server_pid=$!
-sleep 2
+# Start the log server again and generate a second set of (inconsistent) signatures
+# echo "Starting CT server with trusted certs in $hash_dir"
+# ../server/ct-server 8124 $cert_dir/$log_server-key.pem $hash_dir &
+# server_pid=$!
+# sleep 2
 
-echo "Generating test certificates"
-make_certs `pwd`/tmp `pwd`/tmp/ca-hashes test ca ct-server 8124 false
+# echo "Generating test certificates"
+# make_certs `pwd`/tmp `pwd`/tmp/ca-hashes test ca ct-server 8124 false
 # Generate a second set of certs that chain through an intermediate
-make_intermediate_ca_certs `pwd`/tmp intermediate ca
-make_certs `pwd`/tmp `pwd`/tmp/ca-hashes test2 intermediate ct-server 8124 true
+# make_intermediate_ca_certs `pwd`/tmp intermediate ca
+# make_certs `pwd`/tmp `pwd`/tmp/ca-hashes test2 intermediate ct-server 8124 true
 
 # Stop the log server
-kill -9 $server_pid  
-sleep 2
+# kill -9 $server_pid  
+# sleep 2
 
 # Test again and expect failure
-echo "Testing valid configurations with new certificates against existing cache" 
-test_valid_range tmp tmp/ca-hashes ct-server ca tmp/cache 3
+# echo "Testing valid configurations with new certificates against existing cache" 
+# test_valid_range tmp tmp/ca-hashes ct-server ca tmp/cache 3
 
 echo "Cleaning up"
 rm -rf tmp

@@ -17,9 +17,10 @@
 #include "../include/types.h"
 #include "../log/cert_checker.h"
 #include "../log/cert_submission_handler.h"
+#include "../log/frontend_signer.h"
 #include "../merkletree/LogDB.h"
-#include "../merkletree/LogRecord.h"
-#include "../merkletree/TreeLogger.h"
+#include "../proto/ct.pb.h"
+#include "../proto/serializer.h"
 
 #define VV(x)
 
@@ -330,75 +331,29 @@ public:
 
 class CTLogManager {
  public:
-  CTLogManager(TreeLogger *logger, size_t max_segment_size,
-               time_t max_segment_delay)
-      : logger_(logger),
-        max_segment_size_(max_segment_size),
-        max_segment_delay_(max_segment_delay) {
-    // Else nothing ever gets logged.
-    assert(max_segment_size_ > 0);
-    assert(max_segment_delay_ > 0);
-    segment_start_time_ = time(NULL);
-  }
+  CTLogManager(FrontendSigner *signer)
+      : signer_(signer) {}
 
-  ~CTLogManager() { delete logger_; }
+  ~CTLogManager() { delete signer_; }
 
   enum LogReply {
     INVALID_SUBMISSION,
-    TOKEN,
-    PROOF,
+    SIGNATURE,
   };
 
   // Submit an entry and write a token, if the entry is pending,
   // or an audit proof, if it is already logged.
-  LogReply SubmitEntry(LogEntry::LogEntryType type, const bstring &data,
+  LogReply SubmitEntry(CertificateEntry::Type type, const bstring &data,
                        bstring *result) {
-    bstring key;
-    LogDB::Status logreply = logger_->QueueEntry(type, data, &key);
+    SignedCertificateHash sch;
+    LogDB::Status logreply = signer_->QueueEntry(type, data, &sch);
     if (logreply == LogDB::REJECTED)
       return INVALID_SUBMISSION;
 
-    assert(!key.empty());
-    if (logreply == LogDB::NEW || logreply == LogDB::PENDING) {
-      // Try to log it now.
-      Manage();
-    }
-
-    AuditProof proof;
-    LogDB::Status newreply = logger_->EntryAuditProof(key, &proof);
-    // Consistency check.
-    if (logreply == LogDB::LOGGED)
-      assert(newreply == LogDB::LOGGED);
-
-    if (newreply == LogDB::LOGGED) {
-      if (result != NULL)
-        result->assign(proof.Serialize());
-      return PROOF;
-    }
-    assert(newreply == LogDB::PENDING);
-    if (result != NULL)
-      result->assign(key);
-    return TOKEN;
+    Serializer::SerializeSCHToken(sch, result);
+    return SIGNATURE;
   }
-
- private:
-  void Manage() {
-    time_t now = time(NULL);
-    assert(now >= segment_start_time_);
-    if (logger_->PendingLogSize() >= max_segment_size_ ||
-        now - segment_start_time_ > max_segment_delay_) {
-      logger_->LogSegment();
-      segment_start_time_ = now;
-    }
-  }
-
-  TreeLogger *logger_;
-  // Max number of entries to log in one segment.
-  size_t max_segment_size_;
-  // Max time to wait before finalizing a segment. The manager will
-  // start a new segment when the first of the two limits is met.
-  time_t max_segment_delay_;
-  time_t segment_start_time_;
+  FrontendSigner *signer_;
 };
 
 class CTServer : public Server {
@@ -436,21 +391,17 @@ private:
     CTLogManager::LogReply reply;
    // TODO globally: sort out this bstring/string mess.
     if (command == ct::UPLOAD_BUNDLE) {
-      reply = manager_->SubmitEntry(LogEntry::X509_CHAIN_ENTRY, data, &result);
+      reply = manager_->SubmitEntry(CertificateEntry::X509_ENTRY, data, &result);
     } else {
-      reply = manager_->SubmitEntry(LogEntry::PROTOCERT_CHAIN_ENTRY, data, &result);
+      reply = manager_->SubmitEntry(CertificateEntry::PRECERT_ENTRY, data, &result);
     }
     switch(reply) {
       case CTLogManager::INVALID_SUBMISSION:
         SendError(ct::BAD_BUNDLE);
         break;
-      case CTLogManager::TOKEN:
+      case CTLogManager::SIGNATURE:
         assert(!result.empty());
         SendResponse(ct::SUBMITTED, result);
-        break;
-      case CTLogManager::PROOF:
-        assert(!result.empty());
-        SendResponse(ct::LOGGED, result);
         break;
       default:
         assert(false);
@@ -460,7 +411,7 @@ private:
   size_t DecodeLength(const bstring &length) {
     size_t len = 0;
     for (size_t n = 0; n < length.size(); ++n)
-      len = (len << 8) + length[n];
+      len = (len << 8) | static_cast<unsigned char>(length[n]);
     return len;
   }
 
@@ -547,9 +498,8 @@ static bool InitServer(int *sock, int port, const char *ip, int type) {
 }
 
 int main(int argc, char **argv) {
-  if (argc != 6) {
-    std::cerr << argv[0] << " <port> <key> <size_limit> <time_limit> "
-              << "<trusted_cert_dir>\n";
+  if (argc != 4) {
+    std::cerr << argv[0] << " <port> <key> <trusted_cert_dir>\n";
     exit(1);
   }
 
@@ -574,17 +524,16 @@ int main(int argc, char **argv) {
   EventLoop loop;
 
   CertChecker checker;
-  if(!checker.LoadTrustedCertificateDir(argv[5])) {
+  if(!checker.LoadTrustedCertificateDir(argv[3])) {
     std::cerr << "Could not load CA certs.\n";
-    perror(argv[5]);
+    perror(argv[3]);
     exit(1);
   }
 
-  TreeLogger logger(new MemoryDB(), new LogSigner(pkey),
-                    new CertSubmissionHandler(&checker));
-  size_t size_limit = atoi(argv[3]);
-  time_t time_limit = atoi(argv[4]);
-  CTLogManager manager(&logger, size_limit, time_limit);
+  FrontendSigner signer(new MemoryDB(), new LogSigner(pkey),
+                        new CertSubmissionHandler(&checker));
+
+  CTLogManager manager(&signer);
   CTServerListener l(&loop, fd, &manager);
   loop.Forever();
 }

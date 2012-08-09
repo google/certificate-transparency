@@ -7,39 +7,10 @@
 
 #include "../include/types.h"
 #include "LogDB.h"
+#include "test_db.h"
 #include "LogDBTestConstants.h"
 
 namespace {
-
-// For FileDB.
-const char *kFileBase="/tmp/ct/a";
-const unsigned kStorageDepth=5;
-
-// Set up files for the LogDB.
-template <class T> void SetupDB() {}
-
-template <class T> LogDB *CreateLogDB() {
-  return new T();
-}
-
-// Clean up files written on disk.
-// Does not delete the LogDB object itself.
-template <class T> void DestroyDB() {}
-
-template <> void SetupDB<FileDB>() {
-  ASSERT_EQ(mkdir(kFileBase, 0777), 0);
-}
-
-template <> LogDB *CreateLogDB<FileDB>() {
-  FileDB *file_db = new FileDB(kFileBase, kStorageDepth);
-  file_db->Init();
-  return file_db;
-}
-
-template <> void DestroyDB<FileDB>() {
-  std::string system_cmd = "rm -r " + std::string(kFileBase);
-  ASSERT_EQ(system(system_cmd.c_str()), 0);
-}
 
 template <class T>
 class LogDBTest : public ::testing::Test {
@@ -48,8 +19,7 @@ class LogDBTest : public ::testing::Test {
       : db_(NULL) {}
 
   void SetUp() {
-    SetupDB<T>();
-    db_ = CreateLogDB<T>();
+    db_ = t_.GetDB();
     ASSERT_TRUE(db_ != NULL);
   }
 
@@ -138,14 +108,11 @@ class LogDBTest : public ::testing::Test {
     return logged_segment;
   }
 
-  void TearDown() {
-    DestroyDB<T>();
-  }
-
   ~LogDBTest() {
     delete db_;
   }
 
+  T t_;
   LogDB *db_;
 };
 
@@ -182,7 +149,7 @@ void CheckLog(LogDB *db) {
   }
 }
 
-typedef ::testing::Types<MemoryDB, FileDB> LogDBImplementations;
+typedef ::testing::Types<TestMemoryDB, TestFileDB> LogDBImplementations;
 
 TYPED_TEST_CASE(LogDBTest, LogDBImplementations);
 
@@ -309,25 +276,30 @@ TYPED_TEST(LogDBTest, Interleave) {
   EXPECT_EQ(result, iData);
 }
 
-class ResumeFileDBTest : public LogDBTest<FileDB> {
+class ResumeFileDBTest : public LogDBTest<TestFileDB> {
+ protected:
+  LogDB *GetResumeDB() const {
+    return t_.GetDB();
+  }
 };
 
 TEST_F(ResumeFileDBTest, Resume) {
  // Create the log.
   for (size_t segment = 0, offset = 0; segment < logdbtest::kNumberOfSegments;
        offset += logdbtest::kSegmentSizes[segment++]) {
-    this->InsertSegmentEntries(segment, offset);
-    this->db_->MakeSegment();
-    this->db_->WriteSegmentAndInfo(logdbtest::kSegmentInfos[segment]);
+    InsertSegmentEntries(segment, offset);
+    db_->MakeSegment();
+    db_->WriteSegmentAndInfo(logdbtest::kSegmentInfos[segment]);
   }
   // Check the log.
-  CheckLog(this->db_);
+  CheckLog(db_);
 
   // Resume from disk.
-  FileDB db2(kFileBase, kStorageDepth);
-  db2.Init();
+  LogDB *db2 = GetResumeDB();
+  ASSERT_TRUE(db2 != NULL);
   // Check that all is good.
-  CheckLog(&db2);
+  CheckLog(db2);
+  delete db2;
 }
 
 }  // namespace

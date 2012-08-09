@@ -2,19 +2,23 @@
 #define SUBMISSION_HANDLER_H
 
 #include "../include/types.h"
-#include "log_entry.h"
+#include "../proto/ct.pb.h"
 
 // The submission handler is responsible for parsing submissions and
 // deciding whether they are accepted for logging.
-// The submission handler controls the entry types that a log accepts.
-// The default submission handler accepts only test entries.
 class SubmissionHandler {
  public:
   SubmissionHandler() {}
   virtual ~SubmissionHandler() {}
 
   // Caller owns the result.
-  virtual LogEntry *ProcessSubmission(LogEntry::LogEntryType type,
-                                      const bstring &submission) const;
+  CertificateEntry *ProcessSubmission(CertificateEntry::Type type,
+                                      const bstring &submission);
+
+ protected:
+  virtual bool ProcessX509Submission(const bstring &submission,
+                                     CertificateEntry *entry);
+  virtual bool ProcessPreCertSubmission(const bstring &submission,
+                                    CertificateEntry *entry);
 };
 #endif

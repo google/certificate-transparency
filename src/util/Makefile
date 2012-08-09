@@ -1,11 +1,18 @@
-CXXFLAGS= -Wall -Werror -g
+CXXFLAG= -Wall -Werror -O3 -g
+G_INCLUDE= -I $(PROTOBUFDIR)
+G_LIBS= $(PROTOBUFDIR)/.libs/libprotobuf.a
+
+INCLUDE= $(G_INCLUDE)
+LIBS= $(G_LIBS)
+
+CXXFLAGS= $(INCLUDE) $(CXXFLAG)
 
 all: .depend ct_debug.o util.o
 
 .depend: *.cc
 	$(CXX) $(CXXFLAGS) -MM *.cc > .depend
 
-include .depend
-
 clean:
 	rm -f *.o
+
+include .depend

@@ -1,4 +1,7 @@
-all: util merkletree client server
+all: proto util merkletree client server
+
+proto::
+	cd proto && $(MAKE)
 
 util::
 	cd util && $(MAKE)

@@ -40,17 +40,17 @@ class CertChecker {
   // (2) The next certificate in the chain is CA:FALSE and contains
   //     the Extended Key Usage extension for CT.
   // (3) The leaf is correctly signed by the second certificate.
-  // (4) The chain starting with the second certificate is valid (protocerts are
+  // (4) The chain starting with the second certificate is valid (precerts are
   //     coming directly from CAs, so we can safely reject invalid submissions).
   // (5) The last certificate is issued by a certificate in our trusted store.
-  bool CheckProtoCertChain(const ProtoCertChain &proto_chain) const;
+  bool CheckPreCertChain(const PreCertChain &chain) const;
 
  private:
   // Look issuer up from the trusted store, and verify signature.
   bool VerifyTrustedCaSignature(const Cert &subject) const;
   // Verify the certificate chain according to standard rules, except
-  // start verification from the ca_protocert.
-  bool VerifyProtoCaChain(const ProtoCertChain &chain) const;
+  // start verification from the ca_precert.
+  bool VerifyPreCaChain(const PreCertChain &chain) const;
 
   X509_STORE *trusted_;
 };

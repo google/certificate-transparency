@@ -1,12 +1,12 @@
 #ifndef CACHE_H
 #define CACHE_H
 #include "../include/ct.h"
-#include "../merkletree/LogRecord.h"
+#include "../proto/ct.pb.h"
 
 #include <map>
 #include <string>
 
-class LogSegmentCheckpointCache {
+class SignedCertificateHashCache {
 public:
   enum CacheReply {
     // A new entry.
@@ -19,18 +19,18 @@ public:
     MISMATCH,
   };
 
-  LogSegmentCheckpointCache() {}
-  explicit LogSegmentCheckpointCache(const std::vector<bstring> &cache);
+  SignedCertificateHashCache() {}
+  explicit SignedCertificateHashCache(const std::vector<std::string> &cache);
 
-  ~LogSegmentCheckpointCache() {}
+  ~SignedCertificateHashCache() {}
 
   // Serialize the cache.
-  std::vector<bstring> WriteCache() const;
+  std::vector<std::string> WriteCache() const;
 
-  CacheReply Insert(const LogSegmentCheckpoint &checkpoint);
+  CacheReply Insert(const SignedCertificateHash &sch);
 
  private:
-  typedef std::map<size_t, LogSegmentCheckpoint> Cache;
+  typedef std::map<std::string, SignedCertificateHash> Cache;
   Cache cache_;
 };
 #endif

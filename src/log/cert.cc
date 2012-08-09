@@ -67,7 +67,7 @@ bstring Cert::ExtensionData(const std::string &extension_oid) const {
   // Always check if the extension exists first.
   assert(ext != NULL);
   ASN1_OCTET_STRING *ext_data = X509_EXTENSION_get_data(ext);
-  return bstring(ext_data->data, ext_data->length);
+  return bstring(reinterpret_cast<byte*>(ext_data->data), ext_data->length);
 }
 
 bool Cert::HasBasicConstraintCA() const {
@@ -131,7 +131,7 @@ bstring Cert::DerEncoding() const {
   unsigned char *der_buf = NULL;
   int der_length = i2d_X509(x509_, &der_buf);
   assert(der_length > 0);
-  bstring ret(der_buf, der_length);
+  bstring ret(reinterpret_cast<byte*>(der_buf), der_length);
   OPENSSL_free(der_buf);
   return ret;
 }
@@ -338,35 +338,35 @@ void CertChain::ClearChain() {
   chain_.clear();
 }
 
-bool ProtoCertChain::IsWellFormed() const {
+bool PreCertChain::IsWellFormed() const {
   assert(IsLoaded());
   // We must have at least a leaf certificate and an issuing certificate.
   if (Length() < 2)
     return false;
 
-  const Cert *proto = ProtoCert();
-  assert(proto != NULL);
+  const Cert *pre = PreCert();
+  assert(pre != NULL);
 
   // First, check that the leaf contains the critical poison extension.
-  if (!proto->HasExtension(Cert::kPoisonExtensionOID) ||
-      !proto->IsCriticalExtension(Cert::kPoisonExtensionOID))
+  if (!pre->HasExtension(Cert::kPoisonExtensionOID) ||
+      !pre->IsCriticalExtension(Cert::kPoisonExtensionOID))
     return false;
 
-  // The next cert should be the issuing protocert.
+  // The next cert should be the issuing precert.
   // Check that it is CA:FALSE, and contains the desired Extended Key Usage.
-  const Cert *proto_ca = CaProtoCert();
-  assert(proto_ca != NULL);
+  const Cert *pre_ca = CaPreCert();
+  assert(pre_ca != NULL);
 
-  // Check that proto is issued by proto_ca.
-  if (!proto->IsIssuedBy(*proto_ca))
+  // Check that pre is issued by pre_ca.
+  if (!pre->IsIssuedBy(*pre_ca))
     return false;
 
-  if (!proto_ca->HasExtension(NID_basic_constraints) ||
-      proto_ca->HasBasicConstraintCA() ||
-      !proto_ca->HasExtendedKeyUsage(Cert::kCtExtendedKeyUsageOID))
+  if (!pre_ca->HasExtension(NID_basic_constraints) ||
+      pre_ca->HasBasicConstraintCA() ||
+      !pre_ca->HasExtendedKeyUsage(Cert::kCtExtendedKeyUsageOID))
     return false;
 
   // Check that both certs have an Authority KeyID extension.
-  return proto->HasExtension(NID_authority_key_identifier) &&
-      proto_ca->HasExtension(NID_authority_key_identifier);
+  return pre->HasExtension(NID_authority_key_identifier) &&
+      pre_ca->HasExtension(NID_authority_key_identifier);
 }
