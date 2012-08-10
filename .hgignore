@@ -17,6 +17,7 @@
 ^src/log/frontend_signer_test$
 .*\.pb.h$
 .*\.pb.cc$
+^src/proto/serializer_test
 ^src/test/apachectl
 ^src/test/mod_ssl.so
 ^src/test/testdata/error.log
