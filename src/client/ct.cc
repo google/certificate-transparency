@@ -395,7 +395,7 @@ class SSLClient : public CTClient {
     // Get the proof.
     size_t proof_length;
     unsigned char *proof =
-        SSL_SESSION_get_tlsext_server_authz_audit_proof(sess, &proof_length);
+        SSL_SESSION_get_tlsext_authz_server_audit_proof(sess, &proof_length);
     if (proof == NULL) {
       std::cout << "No log proof received. Dropping connection." << std::endl;
       return 0;
@@ -527,8 +527,8 @@ class SSLClient : public CTClient {
     // The verify callback gets called before the audit proof callback.
     SSL_CTX_set_cert_verify_callback(ctx, &VerifyCallback, &args);
 #ifdef TLSEXT_AUTHZDATAFORMAT_audit_proof
-    SSL_CTX_set_tlsext_server_authz_audit_proof_cb(ctx, &AuditProofCallback);
-    SSL_CTX_set_tlsext_server_authz_audit_proof_cb_arg(ctx, &args);
+    SSL_CTX_set_tlsext_authz_server_audit_proof_cb(ctx, &AuditProofCallback);
+    SSL_CTX_set_tlsext_authz_server_audit_proof_cb_arg(ctx, &args);
 #endif
     SSL *ssl = SSL_new(ctx);
     assert(ssl != NULL);
