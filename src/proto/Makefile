@@ -1,13 +1,13 @@
 CXXFLAG= -Wall -Werror -O3 -g
-INCLUDE= -I $(GTESTDIR)/include -I $(PROTOBUFDIR)
-LIBS= $(GTESTDIR)/libgtest.a -lpthread $(PROTOBUFDIR)/.libs/libprotobuf.a
+INCLUDE= -I $(GTESTDIR)/include -I $(PROTOBUFDIR)/src
+LIBS= $(GTESTDIR)/make/gtest.a -lpthread $(PROTOBUFDIR)/src/.libs/libprotobuf.a
 
 CXXFLAGS= $(INCLUDE) $(CXXFLAG)
 
 all: ct.pb.h .depend serializer_test
 
 ct.pb.h: ct.proto
-	$(PROTOBUFDIR)/protoc ct.proto --cpp_out=.
+	$(PROTOBUFDIR)/src/protoc ct.proto --cpp_out=.
 
 .depend: *.cc
 	$(CXX) $(CXXFLAGS) -MM *.cc > .depend
