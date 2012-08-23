@@ -1,9 +1,9 @@
 # Ben's magic local targets. To be generalized.
 test-cert.authz: test-cert.proof
-        ../client/ct authz test-cert.proof test-cert.authz
+	../client/ct authz test-cert.proof test-cert.authz
 
 run-test-apache: test-cert.authz
-        LD_LIBRARY_PATH=../../../../work/openssl-1.0.2 ../../../../svn-work/httpd/httpd -d `pwd` -f `pwd`/httpd2.conf
+	LD_LIBRARY_PATH=../../../../work/openssl-1.0.2 ../../../../svn-work/httpd/httpd -d `pwd` -f `pwd`/httpd2.conf
 
 freebsd-links:
 	ln -sf `which apachectl` apachectl
