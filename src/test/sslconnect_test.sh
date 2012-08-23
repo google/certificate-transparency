@@ -2,6 +2,8 @@
 
 # Note: run make freebsd-links or make linux-links before running this test
 
+# TODO: also test passing authz data in a TLS extension
+
 source generate_certs.sh
 
 PASSED=0

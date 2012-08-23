@@ -15,6 +15,7 @@ CXXFLAGS= $(INCLUDE) $(CXXFLAG)
 all: proto .depend LogDBTest MerkleTreeTest SerialHasherTest \
 	TreeHasherTest faildb
 
+# Preprocessing step for compiling .proto files.
 proto::
 	cd ../proto && $(MAKE)
 
@@ -26,13 +27,14 @@ include .depend
 .depend: *.cc *.h
 	$(CXX) $(CXXFLAGS) -MM *.cc > .depend
 
-test: LogDBTest MerkleTreeTest SerialHasherTest TreeHasherTest
+test: LogDBTest MerkleTreeTest SerialHasherTest TreeHasherTest faildb
 	./SerialHasherTest
 	./TreeHasherTest
 	./MerkleTreeTest
 	./LogDBTest
+	./file_op_fail_test.sh
 
-LogDBTest: LogDB.o LogDBTestConstants.o LogDBTest.o ../util/util.o \
+LogDBTest: proto LogDB.o LogDBTestConstants.o LogDBTest.o ../util/util.o \
 	../proto/ct.pb.o
 	$(CXX) -o LogDBTest LogDB.o LogDBTestConstants.o LogDBTest.o \
 	../util/util.o ../proto/ct.pb.o $(LIBS)
@@ -50,7 +52,8 @@ TreeHasherTest: SerialHasher.o TreeHasher.o TreeHasherTest.o ../util/util.o
 	$(CXX) -o TreeHasherTest SerialHasher.o TreeHasher.o TreeHasherTest.o \
 	../util/util.o $(LIBS)
 
-faildb: faildb.cc ../proto/ct.pb.o LogDB.o LogDBTestConstants.o ../util/util.o
+faildb: proto faildb.cc ../proto/ct.pb.o LogDB.o LogDBTestConstants.o \
+	../util/util.o
 	$(CXX) $(CXXFLAGS) -o faildb faildb.cc LogDB.o LogDBTestConstants.o \
 	../proto/ct.pb.o ../util/util.o $(LIBS)
 

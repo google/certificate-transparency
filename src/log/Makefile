@@ -1,6 +1,6 @@
 CXXFLAG= -Wall -Werror -O3 -g
-G_INCLUDE= -I $(GTESTDIR)/include -I $(PROTOBUFDIR)
-G_LIBS= $(GTESTDIR)/libgtest.a -lpthread $(PROTOBUFDIR)/.libs/libprotobuf.a
+G_INCLUDE= -I $(GTESTDIR)/include -I $(PROTOBUFDIR)/src
+G_LIBS= $(GTESTDIR)/make/gtest.a -lpthread $(PROTOBUFDIR)/src/.libs/libprotobuf.a
 # Need OpenSSL >= 1.0.0
 ifneq ($(OPENSSLDIR),)
   INCLUDE= $(G_INCLUDE) -I $(OPENSSLDIR)/include
@@ -14,6 +14,7 @@ CXXFLAGS= $(INCLUDE) $(CXXFLAG)
 
 all: proto .depend cert_test cert_checker_test submission_handler_test
 
+# Preprocessing step for compiling .proto files.
 proto::
 	cd ../proto && $(MAKE)
 
@@ -38,7 +39,7 @@ cert_checker_test: cert_checker_test.o cert_checker.o cert.o ../util/util.o
 	$(CXX) -o cert_checker_test cert_checker_test.o cert_checker.o \
 	cert.o ../util/util.o $(LIBS)
 
-submission_handler_test: submission_handler_test.o submission_handler.o \
+submission_handler_test: proto submission_handler_test.o submission_handler.o \
 	cert_checker.o cert.o cert_submission_handler.o \
 	../util/util.o ../proto/ct.pb.o ../proto/serializer.o
 	$(CXX) -o submission_handler_test submission_handler_test.o \
@@ -46,7 +47,7 @@ submission_handler_test: submission_handler_test.o submission_handler.o \
 	../util/util.o ../proto/ct.pb.o ../proto/serializer.o \
 	cert_submission_handler.o $(LIBS)
 
-frontend_signer_test: frontend_signer_test.o frontend_signer.o \
+frontend_signer_test: proto frontend_signer_test.o frontend_signer.o \
 	log_signer.o log_verifier.o submission_handler.o ../util/util.o \
 	../proto/ct.pb.o ../proto/serializer.o \
 	../merkletree/SerialHasher.o ../merkletree/TreeHasher.o \

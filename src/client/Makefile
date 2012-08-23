@@ -21,6 +21,7 @@ OBJS= cache.o ../merkletree/MerkleVerifier.o \
 
 all: proto .depend ct
 
+# Preprocessing step for compiling .proto files.
 proto::
 	cd ../proto && $(MAKE)
 
@@ -29,7 +30,7 @@ proto::
 
 include .depend
 
-ct: ct.cc $(OBJS)
+ct: proto ct.cc $(OBJS)
 	$(CXX) $(CXXFLAGS) -o ct ct.cc $(OBJS) $(LIBS)
 
 clean:

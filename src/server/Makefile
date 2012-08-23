@@ -21,6 +21,7 @@ OBJS= ../merkletree/LogDB.o ../merkletree/SerialHasher.o \
 
 all: proto .depend ct-server
 
+# Preprocessing step for compiling .proto files.
 proto::
 	cd ../proto && $(MAKE)
 
@@ -32,5 +33,5 @@ include .depend
 .depend: *.cc
 	$(CXX) $(CXXFLAGS) -MM *.cc > .depend
 
-ct-server: ct-server.cc $(OBJS)
+ct-server: proto ct-server.cc $(OBJS)
 	$(CXX) $(CXXFLAGS) -o ct-server ct-server.cc $(OBJS) $(LIBS)

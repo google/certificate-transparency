@@ -20,7 +20,7 @@ include .depend
 test: serializer_test
 	./serializer_test
 
-serializer_test: serializer_test.o serializer.o ct.pb.o ../util/util.o
+serializer_test: ct.pb.h serializer_test.o serializer.o ct.pb.o ../util/util.o
 	$(CXX) -o serializer_test serializer_test.o serializer.o ct.pb.o \
 	../util/util.o $(LIBS)
 
