@@ -11,22 +11,22 @@
   <middle>
 <section title="Design">
 <t>
-The aim of Certificate Transparency is to have every issued public end-entity TLS certificate recorded in one or more certificate logs. In order to detect mis-issuance of certificates, all logs are public. In particular, domain owners will be able to monitor logs for certificates issued on their own domain.
+The aim of Certificate Transparency is to have every public end-entity TLS certificate issued by a known Certficate Authority recorded in one or more certificate logs. In order to detect mis-issuance of certificates, all logs are publicly verifiable. In particular, domain owners will be able to monitor logs for certificates issued on their own domain.
 </t>
 <t>
-In order to protect clients from unlogged certificates, logs provide audit proofs of all recorded certificates, and clients can choose not to trust certificates that are not accompanied by an appropriate audit proof. Audit proofs are embedded in the TLS handshake to for privacy and performance reasons.
+In order to protect clients from unlogged certificates, logs sign all recorded certificates, and clients can choose not to trust certificates that are not accompanied by an appropriate signature. For privacy and performance reasons log signatures are embedded in the TLS handshake via the TLS authorization extension <xref target='RFC5878'/>, or in the certificate itself via an X.509v3 certificate extension <xref target='RFC5280'/>.
 </t>
 <t>
 In order to ensure the correct behaviour of logs, logs also provide a global audit proof over the entire log. Any misbehaviour of logs can be detected through cross-checks on the global audit proof.
 </t>
 <t>
-Logs are only expected to certify that they have seen a certificate and thus, we do not specify any revocation mechanism for audit proofs in this document. Logs will be append-only, and audit proofs will be valid indefinitely. 
+Logs are only expected to certify that they have seen a certificate and thus, we do not specify any revocation mechanism for audit proofs in this document. Logs will be append-only, and signatures will be valid indefinitely. 
 </t>
 </section>
     <section title="Cryptographic components">
       <section title="Merkle Hash Trees">
 	<t>
-	  Logs use binary Merkle hash trees for efficient audit proofs. The hashing algorithm is SHA-256. The input to the Merkle tree hash is a list of data entries; these entries will be hashed to form the leaves of the Merkle hash tree. The output is a single 32-byte root hash. Given an ordered list of n inputs, D[0:n] = {d(0), d(1), ..., d(n-1)}, the Merkle Tree Hash (MTH) is thus defined as follows:
+	  Logs use a binary Merkle hash tree for efficient audit proofs. The hashing algorithm is SHA-256. The input to the Merkle tree hash is a list of data entries; these entries will be hashed to form the leaves of the Merkle hash tree. The output is a single 32-byte root hash. Given an ordered list of n inputs, D[0:n] = {d(0), d(1), ..., d(n-1)}, the Merkle Tree Hash (MTH) is thus defined as follows:
 	</t>
 	<t>
 	  The hash of an empty list is the hash of an empty string:
@@ -178,210 +178,211 @@ d0 d1   d2 d3           d0 d1   d2 d3  d4 d5
 	</section>
       </section>
     </section>
-      <section title="Log Format">
-	<section title="Log Entries">
-	  <t>
-	    Certificate owners may submit each leaf certificate to certificate logs for public auditing. Each submitted certificate must be accompanied by all additional certificates required to verify the certificate. The root certificate may be omitted.
-	  </t>
-	  <t>
-	    Logs may verify the leaf certificate, using their set of trusted roots. Logs shall periodically publish received certificates. Logs may refuse to publish certificates they cannot validate.
-	  </t>
-	  <t>
-	    Each certificate entry in the log MUST include the following components:
-	  </t>
-	  <figure>
-	    <artwork>
-enum { x509_chain_entry(0), (65535) } LogEntryType;
-
-struct {
-    LogEntryType type;
-    select (type) {
-    case x509_chain_entry: X509ChainEntry;
-    } entry;
-} LogEntry;
-
-struct {
-    ASN.1Cert leaf_certificate;
-    ASN.1Cert certificate_chain&lt;0..2^24-1&gt;;
-} X509ChainEntry;
-	    </artwork>
-	  </figure>
-	  <t>[benl: Should we consider a small number for the certificate_chain? Or perhaps note that a log can impose a limit?]
-	  </t>
-	  <t>
-	    <spanx style="verb">leaf_certificate</spanx> is the end-entity certificate submitted for auditing.
-	  </t>
-	  <t>
-	    <spanx style="verb">certificate_list</spanx> is the collection of additional certificates required to verify the leaf certificate. This collection MUST be ordered by the content of each certificate, read first byte first, in ascending order. [agl: why aren't we requiring them to be in verification order? It would make the logs simplier which is a good thing.]
-	  </t>
-	</section>
-	<section title="Log Segments">
-	  <t> A certificate log MUST periodically publish all new log entries as a log segment. The log MUST sign these entries by constructing a binary Log Segment Merkle Hash Tree with log entries as consecutive inputs to the tree, and signing the root of that tree. The hashing algorithm is SHA-256. The signature algorithm is ECDSA with the curve NIST P-256.
-	  </t>
-	  <t>
-	   Log segments MUST have an incrementing sequence number. The first sequence number MUST be zero and the increment MUST be one. At every update, logs MUST sign a secondary Segment Info Merkle Hash Tree of all log segment signatures issued so far, ordered in the tree according to the sequence number.
-</t>
-	  <t>
-	    Structure of the signature:
-	  </t>
-	  <figure>
-	    <artwork>
-enum { log_segment(0), segment_info(1), (255) } TreeType;
-	    </artwork>
-	  </figure>
-	  <figure>
-	    <artwork>
-digitally-signed struct {
-    TreeType tree_type;
-    uint32 sequence_number;
-    select (tree_type) {
-        case log_segment: uint32 tree_size;
-        case segment_info: struct { };
-    }
-    opaque sha256_root_hash[32];
-} MerkleTreeSignature;
-	    </artwork>
-	  </figure>
-<t>
-The encoding of the digitally-signed element is defined in <xref target='RFC5246'/>.
-</t>
-	  <t>
-	    <spanx style="verb">tree_type</spanx> is the type of the Merkle tree (either a Log Segment tree, or a Segment Info tree).
-	  </t>
-	  <t>
-	    <spanx style="verb">sequence_number</spanx> is the number of the corresponding segment.
-	  </t>
-	  <t>
-	    <spanx style="verb">tree_size</spanx> is the number of leaves in the tree. In the case of a <spanx style="verb">SegmentInfo</spanx> signature, tree size equals <spanx style="verb">sequence_number + 1</spanx> and is thus omitted.
-	  </t>
-	  <t>
-	    <spanx style="verb">sha256_root_hash</spanx> is the root of the Merkle Hash Tree.
-	  </t>
-<t>
-For every segment, logs MUST publish all the log entries corresponding to that segment, as well as a segment info record containing the signatures on the Log Segment Merkle Hash Tree and the current Segment Info Merkle Hash Tree.
-</t>
-<t>
-Structure of the segment info record:
-</t>
+    <section title="Log Format">
+      <t>
+	Certificate owners will be expected to submit certificates to certificate logs for public auditing. A log is a single, ever-growing, append-only Merkle Tree of such certificates.
+      </t>
+      <t>
+	After accepting a certificate submission, the log MUST immediately return a Signed Certificate Hash (SCH). The SCH is the log's promise to incorporate the certificate in the Merkle Tree within a fixed amount of time known as the Maximum Merge Delay (MMD). Servers MUST present an SCH from one or more logs to the client together with the certificate. Clients MUST reject certificates that do not have a valid Signed Certificate Hash. [ben: can anyone request these proofs? don't see why not]
+      </t>
+      <t>
+	Periodically, the log appends all new entries to the Merkle Tree, and signs the root of the tree. Clients and auditors can thus verify that each certificate for which an SCH has been issued indeed appears in the log. The log MUST incorporate a certificate in its Merkle Tree within the period defined by Maximum Merge Delay after the issuance of the SCH.
+      </t>
+      <section title="Log Entries">
+	<t>
+	  Anyone can submit a certificate to the log. In order to attribute each logged certificate to its issuer, the log shall publish a list of acceptable root certificates (this list should be the union of root certificates trusted by major browser vendors). Each submitted certificate MUST be accompanied by all additional certificates required to verify the certificate chain up to an accepted root certificate. The self-signed root certificate itself MAY be omitted from this list. 
+	</t>
+        <t>
+	  Alternatively, Certificate Authorities may submit a certificate to the log prior to issuance. [TODO(ekasper): describe this procedure.] The Signed Certificate Hash can then be directly embedded in the final certificate via an X.509v3 certificate extension <xref target='RFC5280'/>.
+	</t>
+	<t>
+	  The log MUST verify that the submitted leaf certificate has a valid signature chain leading back to a trusted root CA certificate, using the chain of intermediate CA certificates provided by the submitter. The log MAY accept certificates that have expired, are not yet valid, have been revoked or are otherwise not fully valid according to X509 verification rules. However, the log MUST refuse to publish certificates without a valid chain to a known root CA. If a certificate is accepted and an SCH issued, the log MUST store the chain used for verification, and MUST present this chain for auditing upon request.
+	</t>
+	<t>
+	  Each certificate entry in the log MUST include the following components:
+	</t>
 <figure>
   <artwork>
-struct {
-    uint32 sequence_number;
-    uint32 timestamp;
-    uint32 segment_size;
-    MerkleTreeSignature signed_log_segment_tree;
-    MerkleTreeSignature signed_segment_info_tree;
-} SegmentInfo;
+    enum { x509_entry(0), precert_entry(1), (65535) } LogEntryType;
+
+    struct {
+        LogEntryType type;
+            select (type) {
+            case x509_entry: X509ChainEntry;
+            case precert_entry: PrecertChainEntry;
+        } entry;
+    } LogEntry;
+
+    opaque ASN.1Cert&lt;1..2^24-1&gt;;
+
+    struct {
+        ASN.1Cert leaf_certificate;
+        ASN.1Cert certificate_chain&lt;0..2^24-1&gt;;
+    } X509ChainEntry;
+
+    struct {
+        ASN.1Cert tbs_certificate;
+        ASN.1Cert precertificate_chain&lt;1..2^24-1&gt;;
+    } PrecertChainEntry;
   </artwork>
 </figure>
-<t>
-<spanx style="verb">sequence_number</spanx> is the number of the segment.
-</t>
-<t>
-<spanx style="verb">segment_size</spanx> is the size of the segment, i.e., the number of leaves in the log segment tree.
-</t>
-<t>
-<spanx style="verb">signed_log_segment_tree</spanx> is the signature on the Log Segment Merkle Hash Tree.
-</t>
-	  <t>
-	    <spanx style="verb">signed_segment_info_tree</spanx> is the signature on the current Segment Info Merkle Hash Tree.
-	  </t> 
-	</section>
-	<section title="Audit Proofs">
-	  <t> It is possible to audit the entire log by computing the <spanx style="verb">root_hash</spanx> values corresponding to individual segment trees, reconstructing the current Segment Info Merkle Hash Tree and verifying the <spanx style="verb">signed_segment_info_tree</spanx> signature. We rely on cross-checks of this signature between auditors to verify that their views of the log are consistent.
-	  </t>
-	  <t>
-	    Additionally, logs provide two types of audit proofs for partial checks.
-	  </t>
-	  <t>
-	    Logs MUST provide servers with an audit proof for each logged certificate. Servers may present audit proofs from one or more logs to the client together with the certificate. Clients may reject certificates that do not have a desired number of valid audit proofs. [ben: can anyone request these proofs? don't see why not]
-	  </t>
-<t>
-Logs MUST also provide audit proofs for the Segment Info Merkle Hash Tree. Clients may request such audit proofs for a segment to verify that the segment appears in the global log.
-</t>
-	  <t>
-	    Structure of the audit proof:
-	  </t>
-	  <figure>
-	    <artwork>
-struct {
-    opaque sha256_hash[32];
-} MerkleNode;
-	    </artwork>
-	  </figure>
-	  <figure>
-	    <artwork>
-struct {
-    uint32 sequence_number;
-    select (TreeType) {
-        case log_segment: uint32 tree_size;
-        case segment_info: struct { };
-    }
-    uint32 leaf_index;
-    MerkleTreeSignature signed_tree;
-    MerkleNode audit_path&lt;0..2^16-1&gt;;
-} AuditProof;
-	    </artwork>
-	  </figure>
-<t>[ekasper: If we want to allow other hash functions than sha2, the hash function of the audit_path can be read from the SignatureAndHashAlgorithm field in signed_tree. (We require the two hash functions to always be the same.)]
-</t>
-	  <t>
-	    <spanx style="verb">sequence_number</spanx> is the segment number associated with the tree.
-	  </t>
-	  <t>
-	    <spanx style="verb">tree_size</spanx> is the number of leaves in the tree. In the case of a <spanx style="verb">SegmentInfo</spanx> AuditProof, tree size equals <spanx style="verb">sequence_number + 1</spanx> and is thus omitted.
-	  </t>
-	  <t>
-	    <spanx style="verb">leaf_index</spanx> is the index of the audited node in the Merkle tree, from 0 to <spanx style="verb">tree_size - 1</spanx>.
-	  </t>
-	  <t>
-	    <spanx style="verb">audit_path</spanx> is a list of additional nodes in the Merkle tree required for reconstructing the root hash. Nodes must be listed from leaf to root level, i.e., in the order they are used in the Merkle Tree Hash computation, as defined in <xref target='merkle_paths' />. <spanx style="emph">Notice that the left-right ordering is determined by the position of the leaf.</spanx> The leaf node under audit as well as the root node shall be omitted from the path.
-	  </t>
-	  <t>
-	    <spanx style="verb">signed_tree</spanx> is the signature on the tree.
-	  </t>
-	  <t>
-	    Servers who send an audit proof for a certificate must also serve all intermediate certificates recorded in the  <spanx style="verb">certificate_list</spanx> of the <spanx style="verb">X509ChainEntry</spanx>. Clients who verify the certificate audit proof use these certificates to reconstruct the leaf node of the Log Segment Merkle Hash Tree. The leaf node, <spanx style="verb">leaf_index</spanx> and <spanx style="verb">audit_path</spanx> together determine the root hash of the tree. A valid audit proof MUST satisfy the following:
-	  </t>
-	  <t>
-	    <list style='symbols'>
-	      <t>
-		The <spanx style="verb">tree_size</spanx> MUST be at least 1;
-	      </t>
-	      <t>
-		The <spanx style="verb">leaf_index</spanx> MUST NOT exceed <spanx style="verb">tree_size - 1</spanx>;
-	      </t>
-	      <t>
-		The <spanx style="verb">signed_tree</spanx> signature MUST be a valid signature on the corresponding TreeType, <spanx style="verb">sequence_number</spanx>, <spanx style="verb">tree_size</spanx> (in case of a Log Segment Tree), and the root hash reconstructed from the leaf data, <spanx style="verb">leaf_index</spanx> and <spanx style="verb">audit_path</spanx>.
-	      </t>
-	    </list>
-	  </t>
-	  <t>
-	    Clients may construct a different certificate chain than the one recorded in the <spanx style="verb">X509ChainEntry</spanx> to verify the validity of the leaf certificate. Clients who do so must additionally check that the public key sequence of the constructed chain matches the public key sequence in the <spanx style="verb">LogEntry</spanx> <spanx style="verb">certificate_list</spanx>, with only two exceptions [agl: here we're talking about sequences of public keys, but we ordered the certificates by contents, destroying the sequence]:
-	  </t>
-	  <t>
-	    <list style='symbols'>
-	      <t>
-		The public keys in the constructed chain may form a subsequence of the public keys in the <spanx style="verb">certificate_list</spanx>. In this case, the root public key in the constructed chain must be present in the <spanx style="verb">certificate_list</spanx>.
-	      </t>
-	      <t>
-		The constructed chain may contain additional public keys after the keys in the <spanx style="verb">certificate_list</spanx>. In this case, the first extra certificate in the chain must directly certify the top public key in the  <spanx style="verb">certificate_list</spanx>.
-	      </t>
-	    </list>
-	  </t>
-	</section>
-      </section>
-      <section title="Efficiency Considerations">
-	<t>
-	  The two-tier Merkle proof design serves the purpose of keeping communication overhead low. <spanx style="emph">Logs should choose an appropriate refresh rate. The log refresh period should be short enough to keep certificate issuance latency low and certificate audit proofs small. At the same time, it should be long enough to make integrity cross-checks efficient (clients should not have to query and compare segment audit proofs for new segments too often).</spanx>
+	<t>[benl: Should we consider a small number for the certificate_chain? Or perhaps note that a log can impose a limit?]
 	</t>
 	<t>
-	  Auditing the log for integrity does not require third parties to maintain a copy of the entire log. The Segment Info Merkle Hash Tree root hash can be updated incrementally as new segments become available, without recomputing the entire tree. Third party auditors need only store a logarithmic number of intermediate nodes in the Segment Info Merkle Hash Tree.
+	  <spanx style="verb">leaf_certificate</spanx> is the end-entity certificate submitted for auditing.
 	</t>
 	<t>
-	 Additionally, the Merkle consistency proofs defined in <xref target='consistency' /> can be used to efficiently prove the append-only property of an incremental update to the Segment Info Merkle Hash Tree, without auditing the entire tree. [ekasper: are logs required to provide these proofs?]
+	  <spanx style="verb">certificate_chain</spanx> is a chain of additional certificates required to verify the leaf certificate. The first certificate MUST certify the leaf certificate. Each following certificate MUST directly certify the one preceding it. The self-signed root certificate MAY be omitted from the chain.
+	</t>
+	<t>
+	  Structure of the Signed Certificate Hash:
+	</t>
+<figure>
+  <artwork>
+    struct {
+        uint64 timestamp;
+        digitally-signed struct {
+            uint64 timestamp;
+            LogEntryType type;
+            ASN.1Cert signed_certificate;
+        };
+    } SignedCertificateHash;
+  </artwork>
+</figure>
+	<t>
+	  The encoding of the digitally-signed element is defined in <xref target='RFC5246'/>.
+	</t>
+	<t>
+	  <spanx style="verb">timestamp</spanx> is the current UTC time [ekasper: since January 1, 1970, in milliseconds?]
+	</t>
+	<t>
+	  <spanx style="verb">signed_certificate</spanx> is the <spanx style="verb">leaf_certificate</spanx> (in case of an X509ChainEntry), or <spanx style="verb">tbs_certificate</spanx> (in case of a PrecertChainEntry).
 	</t>
       </section>
+
+      <section title="Merkle Tree">
+	<t> A certificate log MUST periodically append all new log entries to the log Merkle Tree. The log MUST sign these entries by constructing a binary Merkle Tree with log entries as consecutive inputs to the tree, signing the corresponding Merkle Tree Hash, and publishing each update to the tree in a Signed Merkle Tree Update. The hashing algorithm for the Merkle Tree Hash is SHA-256.
+	</t>
+	<t>
+	  Structure of the Merkle Tree input:
+	</t>
+<figure>
+  <artwork>
+    struct {
+        uint64 sch_timestamp;
+        LogEntryType type;
+        ASN.1Cert signed_certificate;
+    } MerkleTreeLeaf;
+  </artwork>
+</figure>
+	<t>
+	  Structure of the Signed Merkle Tree Update:
+	</t>
+<figure>
+  <artwork>
+    struct {
+        uint64 old_tree_size;
+        uint64 timestamp;
+        MerkleTreeLeaf new_leaves&lt;0..2^64-1&gt;;
+        digitally-signed struct {
+            uint64 timestamp;
+            uint64 tree_size;
+            opaque sha256_root_hash[32];
+        } SignedTreeHead;
+    } SignedMerkleTreeUpdate;
+  </artwork>
+</figure>
+<t>[ekasper: I didn't like the idea of adding dummy entries so I changed this back to including the current timestamp, rather than the most recent sch timestamp. Ben, I seem to recall this was somehow inconvenient, but I forget why?]
+</t>
+	<t>
+	  <spanx style="verb">old_tree_size</spanx>  is the size of the tree prior to this update.
+	</t>
+	<t>
+	  <spanx style="verb">timestamp</spanx> is the current time. The timestamp MUST be at least as recent as the most recent SCH timestamp in the tree. Each subsequent timestamp MUST be more recent than the timestamp of the previous update. [ekasper: requiring unique timestamps allows us to have a unique answer to the question "What does the log contain at time t?". Any practical complications here?]
+	</t>
+	<t>
+	  <spanx style="verb">tree_size</spanx> equals the number of entries in the new tree.
+	</t>
+	<t>
+	  <spanx style="verb">new_leaves</spanx> is the list of leaves added to the tree in this update, ordered by leaf index. This order can be fixed arbitrarily amongst new entries.
+	</t>
+	<t>
+	  <spanx style="verb">sha256_root_hash</spanx> is the root of the Merkle Hash Tree.
+	</t>
+	<t>The log MUST produce a Signed Merkle Tree Update at least as often as the Maximum Merge Delay. In the unlikely event that it receives no new submissions during an MMD period, the log SHALL sign the same Merkle Tree Hash with a fresh timestamp.
+	</t>
+      </section>
+      <section title="Audit Proofs">
+	<t> It is possible to audit the entire log by computing the current <spanx style="verb">sha256_root_hash</spanx> value from consecutive Signed Merkle Tree Updates, and verifying the Tree Head Signature. We rely on cross-checks of the Signed Tree Head between auditors to verify that their views of the log are consistent.
+	</t>
+	<t>
+	  Additionally, logs provide Merkle audit proofs for efficient partial checks. (In fact, anyone can compute audit proofs from the full log.)
+	</t>
+	<t>
+	  Structure of the Merkle audit proof:
+	</t>
+<figure>
+  <artwork>
+    struct {
+        opaque sha256_hash[32];
+    } MerkleNode;
+  </artwork>
+</figure>
+<figure>
+  <artwork>
+    struct {
+        uint64 tree_size;
+        uint64 timestamp;
+        uint64 leaf_index;
+        MerkleNode audit_path&lt;0..2^16-1&gt;;
+        TreeHeadSignature signature;
+    } MerkleAuditProof;
+  </artwork>
+</figure>
+	<t>
+	  <spanx style="verb">tree_size</spanx> is the generation of the tree that this proof is for.
+	</t>
+	<t>
+	  <spanx style="verb">timestamp</spanx> is the corresponding timestamp.
+	</t>
+	<t>
+	  <spanx style="verb">leaf_index</spanx> is the index of the audited node in the Merkle tree, from 0 to <spanx style="verb">tree_size - 1</spanx>.
+	</t>
+	<t>
+	  <spanx style="verb">audit_path</spanx> is a list of additional nodes in the Merkle tree required for reconstructing the root hash corresponding to the <spanx style="verb">tree_size</spanx>. Nodes must be listed from leaf to root level, i.e., in the order they are used in the Merkle Tree Hash computation, as defined in <xref target='merkle_paths' />. <spanx style="emph">Notice that the left-right ordering is determined by the position of the leaf.</spanx> The leaf node under audit as well as the root node shall be omitted from the path.
+	</t>
+	<t>
+	  <spanx style="verb">tree_signature</spanx> is the signature on the tree for generation <spanx style="verb">tree_size</spanx>.
+	</t>
+	<t>
+          A valid audit proof for a Merkle Tree Leaf MUST satisfy the following:
+	</t>
+	<t>
+	  <list style='symbols'>
+	    <t>
+	      The <spanx style="verb">tree_size</spanx> MUST be at least 1;
+	    </t>
+	    <t>
+	      The <spanx style="verb">leaf_index</spanx> MUST NOT exceed <spanx style="verb">tree_size - 1</spanx>;
+	    </t>
+	    <t>
+	      The <spanx style="verb">tree_signature</spanx> MUST be a valid signature on the corresponding <spanx style="verb">timestamp</spanx>, <spanx style="verb">tree_size</spanx>, and the root hash reconstructed from the Merkle Tree Leaf, <spanx style="verb">leaf_index</spanx> and <spanx style="verb">audit_path</spanx>.
+	    </t>
+	  </list>
+	</t>
+      </section>
+    </section>
+    <section title="Efficiency Considerations">
+      <t>
+	The Merkle tree design serves the purpose of keeping communication overhead low.
+      </t>
+      <t>
+	Auditing the log for integrity does not require third parties to maintain a copy of the entire log. The Signed Tree Head root hash can be updated incrementally as new entries become available, without recomputing the entire tree. Third party auditors need only store a logarithmic number of intermediate nodes in the Merkle Tree.
+      </t>
+      <t>
+	Additionally, the Merkle consistency proofs defined in <xref target='consistency' /> can be used to efficiently prove the append-only property of an incremental update to the Merkle Tree, without auditing the entire tree.
+      </t>
+    </section>
   </middle>
   <back>
     <references>
@@ -394,9 +395,46 @@ struct {
 	  <author initials='E.' surname='Rescorla' fullname='E. Rescorla'>
 	    <organization /></author>
 	  <date year='2008' month='August' />
-</front>
+	</front>
 
 	<seriesInfo name='RFC' value='5246' />
+      </reference>
+
+      <reference anchor='RFC5878'>
+
+	<front>
+	  <title>The Transport Layer Security (TLS) Authorization Extensions</title>
+	  <author initials='M.' surname='Brown' fullname='M. Brown'>
+	    <organization >RedPhone Security</organization></author>
+	  <author initials='R.' surname='Housley' fullname='R. Housley'>
+	    <organization>Vigil Security</organization></author>
+	  <date year='2010' month='May' />
+	</front>
+
+	<seriesInfo name='RFC' value='5280' />
+      </reference>
+
+      <reference anchor='RFC5280'>
+
+	<front>
+	  <title>Internet X.509 Public Key Infrastructure Certificate
+	    and Certificate Revocation List (CRL) Profile</title>
+	  <author initials='D.' surname='Cooper' fullname='D. Cooper'>
+	    <organization>NIST</organization></author>
+	  <author initials='S.' surname='Santesson' fullname='S. Santesson'>
+	    <organization>Microsoft</organization></author>
+	  <author initials='S.' surname='Farrell' fullname='S. Farrell'>
+	    <organization>Trinity College Dublin</organization></author>
+	  <author initials='S.' surname='Boeyen' fullname='S. Boeyen'>
+	    <organization>Entrust</organization></author>
+	  <author initials='R.' surname='Housley' fullname='R. Housley'>
+	    <organization>Vigil Security</organization></author>
+	  <author initials='W.' surname='Polk' fullname='W. Polk'>
+	    <organization>NIST</organization></author>
+	  <date year='2008' month='May' />
+	</front>
+
+	<seriesInfo name='RFC' value='5280' />
       </reference>
     </references>
   </back>
