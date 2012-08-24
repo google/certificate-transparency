@@ -13,8 +13,7 @@ linux-links:
 	ln -sf `which apache2ctl` apachectl
 	ln -sf /usr/lib/apache2/modules/mod_ssl.so mod_ssl.so
 
-
 test:
 	cd ../client && $(MAKE)
 	cd ../server && $(MAKE)
-	./sslconnect_test.sh
+	OPENSSLDIR=$(OPENSSLDIR) ./sslconnect_test.sh

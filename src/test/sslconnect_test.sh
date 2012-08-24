@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 # Note: run make freebsd-links or make linux-links before running this test
 
@@ -8,6 +8,11 @@ source generate_certs.sh
 
 PASSED=0
 FAILED=0
+
+if [ "$OPENSSLDIR" != "" ]; then
+  MY_OPENSSL="$OPENSSLDIR/apps/openssl"
+  export LD_LIBRARY_PATH=$OPENSSLDIR
+fi
 
 if [ ! $MY_OPENSSL ]; then
 # Try to use the system OpenSSL

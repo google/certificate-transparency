@@ -19,10 +19,11 @@ OBJS= cache.o ../merkletree/MerkleVerifier.o \
 ../log/cert_submission_handler.o ../log/cert_checker.o \
 ../proto/ct.pb.o ../proto/serializer.o
 
-all: proto .depend ct
+all: .depend ct
 
 # Preprocessing step for compiling .proto files.
-proto::
+# TODO(ekasper): some versions of gcc don't flatten the path
+../proto/ct.pb.h:
 	cd ../proto && $(MAKE)
 
 .depend: *.cc
@@ -30,7 +31,7 @@ proto::
 
 include .depend
 
-ct: proto ct.cc $(OBJS)
+ct: ct.cc $(OBJS)
 	$(CXX) $(CXXFLAGS) -o ct ct.cc $(OBJS) $(LIBS)
 
 clean:

@@ -1,3 +1,5 @@
+set -e
+
 ca_setup() {
   cert_dir=$1
   ca=$2

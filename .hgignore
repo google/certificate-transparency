@@ -4,6 +4,7 @@
 .*\.o$
 .*\.so$
 ^src/merkletree/faildb$
+^src/merkletree/file_op_fail_test.log$
 ^src/merkletree/LogDBTest$
 ^src/merkletree/MerkleTreeTest$
 ^src/merkletree/SerialHasherTest$
