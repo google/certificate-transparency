@@ -2,11 +2,11 @@
 #include <openssl/ssl.h>
 #include <string>
 
-#include "../include/types.h"
-#include "../proto/ct.pb.h"
-#include "../util/util.h"
 #include "cert_checker.h"
 #include "cert_submission_handler.h"
+#include "ct.pb.h"
+#include "types.h"
+#include "util.h"
 
 static const char kCertDir[] = "../test/testdata";
 

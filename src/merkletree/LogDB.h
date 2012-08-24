@@ -10,7 +10,7 @@
 #include <sys/stat.h>
 #include <vector>
 
-#include "../include/types.h"
+#include "types.h"
 
 class LogDB {
  public:

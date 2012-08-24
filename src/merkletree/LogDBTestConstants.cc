@@ -1,5 +1,5 @@
-#include "../include/types.h"
-#include "LogDBTestConstants.h"
+#include "log_db_test_constants.h"
+#include "types.h"
 
 namespace logdbtest {
 

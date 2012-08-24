@@ -13,14 +13,14 @@
 #include <sys/types.h>
 #include <time.h>
 
-#include "../include/ct.h"
-#include "../include/types.h"
-#include "../log/cert_checker.h"
-#include "../log/cert_submission_handler.h"
-#include "../log/frontend_signer.h"
-#include "../merkletree/LogDB.h"
-#include "../proto/ct.pb.h"
-#include "../proto/serializer.h"
+#include "cert_checker.h"
+#include "cert_submission_handler.h"
+#include "ct.h"
+#include "ct.pb.h"
+#include "frontend_signer.h"
+#include "log_db.h"
+#include "serializer.h"
+#include "types.h"
 
 #define VV(x)
 

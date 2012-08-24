@@ -7,7 +7,7 @@
 #include <string>
 #include <vector>
 
-#include "../include/types.h"
+#include "types.h"
 
 class Cert {
  public:

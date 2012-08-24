@@ -4,8 +4,8 @@
 #include <stddef.h>
 #include <vector>
 
-#include "../include/types.h"
-#include "TreeHasher.h"
+#include "tree_hasher.h"
+#include "types.h"
 
 class SerialHasher;
 

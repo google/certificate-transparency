@@ -1,6 +1,6 @@
-#include "../include/types.h"
-#include "../proto/serializer.h"
+#include "serializer.h"
 #include "submission_handler.h"
+#include "types.h"
 
 CertificateEntry
 *SubmissionHandler::ProcessSubmission(CertificateEntry::Type type,

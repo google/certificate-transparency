@@ -3,8 +3,8 @@
 
 #include <openssl/evp.h>
 
-#include "../include/types.h"
-#include "../proto/ct.pb.h"
+#include "ct.pb.h"
+#include "types.h"
 
 class LogSigner {
  public:

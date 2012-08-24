@@ -21,19 +21,19 @@
 #include <sys/socket.h>
 #include <unistd.h>
 
-#include "../include/ct.h"
-#include "../include/types.h"
-#include "../log/cert.h"
-#include "../log/cert_submission_handler.h"
-#include "../log/log_signer.h"
-#include "../log/log_verifier.h"
-#include "../merkletree/MerkleVerifier.h"
-#include "../merkletree/SerialHasher.h"
-#include "../proto/ct.pb.h"
-#include "../proto/serializer.h"
-#include "../util/ct_debug.h"
-#include "../util/util.h"
 #include "cache.h"
+#include "cert.h"
+#include "cert_submission_handler.h"
+#include "ct.h"
+#include "ct.pb.h"
+#include "ct_debug.h"
+#include "log_signer.h"
+#include "log_verifier.h"
+#include "merkle_verifier.h"
+#include "serial_hasher.h"
+#include "serializer.h"
+#include "util.h"
+#include "types.h"
 
 // Really really dumb and temporary filestore methods.
 static void WriteAllFiles(const std::vector<bstring> &files,

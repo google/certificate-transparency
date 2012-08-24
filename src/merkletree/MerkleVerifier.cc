@@ -1,8 +1,8 @@
 #include <stddef.h>
 #include <vector>
 
-#include "../include/types.h"
-#include "MerkleVerifier.h"
+#include "merkle_verifier.h"
+#include "types.h"
 
 class SerialHasher;
 

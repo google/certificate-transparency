@@ -1,8 +1,8 @@
 #include <string>
 
-#include "../include/types.h"
 #include "ct.pb.h"
 #include "serializer.h"
+#include "types.h"
 
 const size_t Serializer::kMaxCertificateLength = (1 << 24) - 1;
 const size_t Serializer::kMaxCertificateChainLength = (1 << 24) - 1;

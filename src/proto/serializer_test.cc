@@ -1,10 +1,10 @@
 #include <gtest/gtest.h>
 #include <string>
 
-#include "../include/types.h"
-#include "../util/util.h"
 #include "ct.pb.h"
 #include "serializer.h"
+#include "types.h"
+#include "util.h"
 
 namespace {
 

@@ -1,10 +1,10 @@
 #ifndef CACHE_H
 #define CACHE_H
-#include "../include/ct.h"
-#include "../proto/ct.pb.h"
-
 #include <map>
 #include <string>
+
+#include "ct.h"
+#include "ct.pb.h"
 
 class SignedCertificateHashCache {
 public:

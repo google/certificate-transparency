@@ -5,10 +5,10 @@
 #include <string>
 #include <sys/stat.h>
 
-#include "../include/types.h"
-#include "LogDB.h"
+#include "log_db.h"
+#include "log_db_test_constants.h"
 #include "test_db.h"
-#include "LogDBTestConstants.h"
+#include "types.h"
 
 namespace {
 

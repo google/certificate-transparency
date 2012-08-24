@@ -3,7 +3,7 @@
 
 #include <stddef.h>
 
-#include "../include/types.h"
+#include "types.h"
 
 namespace logdbtest {
 

@@ -5,11 +5,11 @@
 # error "Need OpenSSL >= 1.0.0"
 #endif
 
-#include "../include/types.h"
-#include "../proto/ct.pb.h"
-#include "../proto/serializer.h"
-#include "../util/util.h"
+#include "ct.pb.h"
 #include "log_signer.h"
+#include "serializer.h"
+#include "types.h"
+#include "util.h"
 
 LogSigner::LogSigner(EVP_PKEY *pkey)
     : pkey_(pkey) {

@@ -3,7 +3,7 @@
 
 #include <stdint.h>
 
-#include "../proto/ct.pb.h"
+#include "ct.pb.h"
 
 class LogSigVerifier;
 class MerkleVerifier;

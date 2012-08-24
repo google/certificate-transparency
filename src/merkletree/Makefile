@@ -1,5 +1,5 @@
 CXXFLAG= -Wall -Werror -O3 -g
-G_INCLUDE= -I $(GTESTDIR)/include -I $(PROTOBUFDIR)/src
+G_INCLUDE= -I $(GTESTDIR)/include -I $(PROTOBUFDIR)/src -I ../include
 G_LIBS= $(GTESTDIR)/make/gtest.a -lpthread $(PROTOBUFDIR)/src/.libs/libprotobuf.a
 # Need OpenSSL >= 1.0.0
 ifneq ($(OPENSSLDIR),)
@@ -16,7 +16,7 @@ all: .depend LogDBTest MerkleTreeTest SerialHasherTest \
 	TreeHasherTest faildb
 
 # Preprocessing step for compiling .proto files.
-../proto/ct.pb.h:
+../include/ct.pb.h: ../proto/ct.proto
 	cd ../proto && $(MAKE)
 
 clean:
@@ -24,8 +24,8 @@ clean:
 
 include .depend
 
-.depend: *.cc *.h
-	$(CXX) $(CXXFLAGS) -MM *.cc > .depend
+.depend: *.cc *.h ../include/ct.pb.h
+	$(CXX) $(CXXFLAGS) -MM *.cc *.h > .depend
 
 test: LogDBTest MerkleTreeTest SerialHasherTest TreeHasherTest faildb
 	./SerialHasherTest

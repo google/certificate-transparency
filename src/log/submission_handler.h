@@ -1,8 +1,8 @@
 #ifndef SUBMISSION_HANDLER_H
 #define SUBMISSION_HANDLER_H
 
-#include "../include/types.h"
-#include "../proto/ct.pb.h"
+#include "ct.pb.h"
+#include "types.h"
 
 // The submission handler is responsible for parsing submissions and
 // deciding whether they are accepted for logging.

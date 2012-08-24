@@ -1,18 +1,16 @@
+#include <errno.h>
 #include <fstream>
 #include <set>
-#include <string>
-
-#include <errno.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <string>
 #include <string.h>
 
-#include "../include/types.h"
-#include "../proto/ct.pb.h"
-#include "../util/util.h"
-#include "LogDB.h"
-#include "LogDBTestConstants.h"
-
+#include "ct.pb.h"
+#include "log_db.h"
+#include "log_db_test_constants.h"
+#include "util.h"
+#include "types.h"
 
 static FailReport report;
 

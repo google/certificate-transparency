@@ -6,12 +6,12 @@
 #include <time.h>
 #include <vector>
 
-#include "../include/types.h"
-#include "../util/util.h"
-#include "MerkleTree.h"
-#include "MerkleVerifier.h"
-#include "SerialHasher.h"
-#include "TreeHasher.h"
+#include "merkle_tree.h"
+#include "merkle_verifier.h"
+#include "serial_hasher.h"
+#include "tree_hasher.h"
+#include "types.h"
+#include "util.h"
 
 namespace {
 

@@ -3,10 +3,10 @@
 
 #include <string>
 
-#include "../include/types.h"
-#include "../proto/ct.pb.h"
 #include "cert_checker.h"
+#include "ct.pb.h"
 #include "submission_handler.h"
+#include "types.h"
 
 // Parse incoming submissions, do preliminary sanity checks and pass them
 // through cert checker.

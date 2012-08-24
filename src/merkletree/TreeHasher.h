@@ -3,8 +3,8 @@
 
 #include <stddef.h>
 
-#include "../include/types.h"
-#include "SerialHasher.h"
+#include "serial_hasher.h"
+#include "types.h"
 
 class TreeHasher {
  public:

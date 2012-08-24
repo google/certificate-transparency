@@ -9,8 +9,8 @@
 #include <string>
 #include <vector>
 
-#include "../include/types.h"
 #include "cert.h"
+#include "types.h"
 
 const char Cert::kProofExtensionOID[] = "1.2.3.0";
 const char Cert::kEmbeddedProofExtensionOID[] = "1.2.3.1";

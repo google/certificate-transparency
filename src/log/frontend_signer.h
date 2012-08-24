@@ -1,9 +1,9 @@
 #ifndef FRONTEND_SIGNER_H
 #define FRONTEND_SIGNER_H
 
-#include "../merkletree/LogDB.h"
-#include "../proto/ct.pb.h"
+#include "ct.pb.h"
 #include "frontend_signer.h"
+#include "log_db.h"
 #include "log_signer.h"
 #include "submission_handler.h"
 

@@ -1,12 +1,12 @@
-#include "ct_debug.h"
-#include "../include/types.h"
-#include "util.h"
-
 #include <iostream>
 #include <fstream>
+#include <stdlib.h>
 #include <string>
 
-#include <stdlib.h>
+#include "ct_debug.h"
+#include "types.h"
+#include "util.h"
+
 
 #ifndef NDEBUG
 

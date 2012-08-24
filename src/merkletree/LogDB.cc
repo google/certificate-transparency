@@ -13,10 +13,10 @@
 #include <utility>
 #include <vector>
 
-#include "../include/types.h"
-#include "../proto/ct.pb.h"
-#include "../util/util.h"
-#include "LogDB.h"
+#include "ct.pb.h"
+#include "log_db.h"
+#include "types.h"
+#include "util.h"
 
 MemoryDB::MemoryDB() : has_pending_segment_(false) {}
 

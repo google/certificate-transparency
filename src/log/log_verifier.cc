@@ -1,12 +1,12 @@
 #include <stdint.h>
 
-#include "../merkletree/MerkleVerifier.h"
-#include "../proto/ct.pb.h"
-#include "../proto/serializer.h"
-#include "../util/util.h"
+#include "ct.pb.h"
 #include "log_signer.h"
 #include "log_verifier.h"
+#include "merkle_verifier.h"
+#include "serializer.h"
 #include "submission_handler.h"
+#include "util.h"
 
 LogVerifier::LogVerifier(LogSigVerifier *sig_verifier,
                          MerkleVerifier *tree_verifier)

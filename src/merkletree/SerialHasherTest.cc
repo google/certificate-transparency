@@ -2,9 +2,9 @@
 #include <stddef.h>
 #include <string>
 
-#include "../include/types.h"
-#include "../util/util.h"
-#include "SerialHasher.h"
+#include "serial_hasher.h"
+#include "types.h"
+#include "util.h"
 
 namespace {
 

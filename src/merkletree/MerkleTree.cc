@@ -2,8 +2,8 @@
 #include <stddef.h>
 #include <vector>
 
-#include "../include/types.h"
-#include "MerkleTree.h"
+#include "merkle_tree.h"
+#include "types.h"
 
 class SerialHasher;
 

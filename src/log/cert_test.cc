@@ -2,8 +2,8 @@
 #include <openssl/ssl.h>
 #include <string>
 
-#include "../util/util.h"
 #include "cert.h"
+#include "util.h"
 
 static const char kCertDir[] = "../test/testdata";
 

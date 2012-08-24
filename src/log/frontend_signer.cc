@@ -1,13 +1,13 @@
 #include <assert.h>
 #include <stdint.h>
 
-#include "../merkletree/LogDB.h"
-#include "../merkletree/SerialHasher.h"
-#include "../proto/ct.pb.h"
-#include "../util/util.h"
+#include "ct.pb.h"
 #include "frontend_signer.h"
+#include "log_db.h"
 #include "log_signer.h"
+#include "serial_hasher.h"
 #include "submission_handler.h"
+#include "util.h"
 
 FrontendSigner::FrontendSigner(LogDB *db, LogSigner *signer)
     : db_(db),

@@ -1,5 +1,5 @@
 CXXFLAG= -Wall -Werror -O3 -g
-G_INCLUDE= -I $(PROTOBUFDIR)/src
+G_INCLUDE= -I $(PROTOBUFDIR)/src -I ../include
 G_LIBS= $(PROTOBUFDIR)/.libs/libprotobuf.a
 
 INCLUDE= $(G_INCLUDE)
@@ -9,8 +9,12 @@ CXXFLAGS= $(INCLUDE) $(CXXFLAG)
 
 all: .depend ct_debug.o util.o
 
-.depend: *.cc
-	$(CXX) $(CXXFLAGS) -MM *.cc > .depend
+# Preprocessing step for compiling .proto files.
+../include/ct.pb.h: ../proto/ct.proto
+	cd ../proto && $(MAKE)
+
+.depend: *.cc *.h ../include/ct.pb.h
+	$(CXX) $(CXXFLAGS) -MM *.cc *.h > .depend
 
 clean:
 	rm -f *.o

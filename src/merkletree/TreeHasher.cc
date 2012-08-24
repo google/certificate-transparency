@@ -1,7 +1,6 @@
-#include "../include/types.h"
-#include "SerialHasher.h"
-#include "TreeHasher.h"
-
+#include "serial_hasher.h"
+#include "tree_hasher.h"
+#include "types.h"
 
 const bstring TreeHasher::kLeafPrefix(1, '\x00');
 const bstring TreeHasher::kNodePrefix(1, '\x01');

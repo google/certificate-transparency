@@ -1,8 +1,8 @@
 #include <openssl/sha.h>
 #include <stddef.h>
 
-#include "../include/ct.h"
-#include "SerialHasher.h"
+#include "ct.h"
+#include "serial_hasher.h"
 
 const size_t Sha256Hasher::kDigestSize = SHA256_DIGEST_LENGTH;
 

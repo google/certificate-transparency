@@ -6,7 +6,7 @@
 #include <string>
 #include <sys/time.h>
 
-#include "../include/types.h"
+#include "types.h"
 #include "util.h"
 
 namespace util {

@@ -1,5 +1,5 @@
 CXXFLAG= -Wall -Werror -O3 -g
-G_INCLUDE= -I $(GTESTDIR)/include -I $(PROTOBUFDIR)/src
+G_INCLUDE= -I $(GTESTDIR)/include -I $(PROTOBUFDIR)/src -I ../include
 G_LIBS= $(GTESTDIR)/make/gtest.a -lpthread $(PROTOBUFDIR)/src/.libs/libprotobuf.a
 # Need OpenSSL >= 1.0.0
 ifneq ($(OPENSSLDIR),)
@@ -22,12 +22,11 @@ OBJS= cache.o ../merkletree/MerkleVerifier.o \
 all: .depend ct
 
 # Preprocessing step for compiling .proto files.
-# TODO(ekasper): some versions of gcc don't flatten the path
-../proto/ct.pb.h:
+../include/ct.pb.h: ../proto/ct.proto
 	cd ../proto && $(MAKE)
 
-.depend: *.cc
-	$(CXX) $(CXXFLAGS) -MM *.cc > .depend
+.depend: *.cc *.h ../include/ct.pb.h
+	$(CXX) $(CXXFLAGS) -MM *.cc *.h > .depend
 
 include .depend
 

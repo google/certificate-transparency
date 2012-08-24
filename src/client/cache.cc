@@ -2,8 +2,9 @@
 #include <map>
 #include <string>
 
-#include "../log/log_verifier.h"
 #include "cache.h"
+#include "ct.pb.h"
+#include "log_verifier.h"
 
 SignedCertificateHashCache::SignedCertificateHashCache(
     const std::vector<std::string> &cache) {

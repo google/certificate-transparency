@@ -1,12 +1,12 @@
 #include <assert.h>
 #include <string>
 
-#include "../include/types.h"
-#include "../proto/ct.pb.h"
-#include "../proto/serializer.h"
 #include "cert.h"
 #include "cert_checker.h"
 #include "cert_submission_handler.h"
+#include "ct.pb.h"
+#include "serializer.h"
+#include "types.h"
 
 CertSubmissionHandler::CertSubmissionHandler(CertChecker *cert_checker)
     : cert_checker_(cert_checker) {

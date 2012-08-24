@@ -1,5 +1,5 @@
 CXXFLAG= -Wall -Werror -O3 -g
-G_INCLUDE= -I $(GTESTDIR)/include -I $(PROTOBUFDIR)/src
+G_INCLUDE= -I $(GTESTDIR)/include -I $(PROTOBUFDIR)/src -I ../include
 G_LIBS= $(GTESTDIR)/make/gtest.a -lpthread $(PROTOBUFDIR)/src/.libs/libprotobuf.a
 # Need OpenSSL >= 1.0.0
 ifneq ($(OPENSSLDIR),)
@@ -22,16 +22,16 @@ OBJS= ../merkletree/LogDB.o ../merkletree/SerialHasher.o \
 all: .depend ct-server
 
 # Preprocessing step for compiling .proto files.
-../proto/ct.pb.h:
+../include/ct.pb.h: ../proto/ct.proto
 	cd ../proto && $(MAKE)
 
-clean:
-	rm -f *.o ct-server
+.depend: *.cc ../include/ct.pb.h
+	$(CXX) $(CXXFLAGS) -MM *.cc > .depend
 
 include .depend
 
-.depend: *.cc
-	$(CXX) $(CXXFLAGS) -MM *.cc > .depend
-
 ct-server: ct-server.cc $(OBJS)
 	$(CXX) $(CXXFLAGS) -o ct-server ct-server.cc $(OBJS) $(LIBS)
+
+clean:
+	rm -f *.o ct-server

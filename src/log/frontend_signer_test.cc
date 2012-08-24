@@ -7,15 +7,15 @@
 #include <sys/stat.h>
 #include <unistd.h>
 
-#include "../include/types.h"
-#include "../merkletree/LogDB.h"
-#include "../merkletree/test_db.h"
-#include "../merkletree/MerkleVerifier.h"
-#include "../proto/ct.pb.h"
-#include "../util/util.h"
+#include "ct.pb.h"
 #include "frontend_signer.h"
+#include "log_db.h"
 #include "log_signer.h"
 #include "log_verifier.h"
+#include "merkle_verifier.h"
+#include "test_db.h"
+#include "types.h"
+#include "util.h"
 
 namespace {
 

@@ -5,8 +5,8 @@
 #include <iostream>
 #include <string>
 
-#include "LogDB.h"
-#include "../util/util.h"
+#include "log_db.h"
+#include "util.h"
 
 // Helper classes that provide a unified interface for setting up typed tests.
 class TestMemoryDB {
