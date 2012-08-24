@@ -185,8 +185,8 @@ class LogClient : public CTClient {
   // } ClientCommandUploadBundle;
   // Uploads the bundle; if the server returns a signature token, writes
   // the token and returns true; else returns false.
-  bool UploadBundle(const bstring &bundle, bool proto, bstring *token) {
-    CTResponse response = Upload(bundle, proto);
+  bool UploadBundle(const bstring &bundle, bool pre, bstring *token) {
+    CTResponse response = Upload(bundle, pre);
     bool ret = false;
     switch (response.code) {
       case ct::ERROR:
@@ -319,9 +319,9 @@ private:
     DLOG_END_SERVER_MESSAGE;
   }
 
-  CTResponse Upload(const bstring &bundle, bool proto) {
+  CTResponse Upload(const bstring &bundle, bool pre) {
     DLOG_BEGIN_CLIENT_MESSAGE;
-    if (proto)
+    if (pre)
       WriteCommand(ct::UPLOAD_CA_BUNDLE);
     else
       WriteCommand(ct::UPLOAD_BUNDLE);
@@ -583,7 +583,7 @@ class SSLClient : public CTClient {
 
 static void UploadHelp() {
     std::cerr << "upload <file> <server> <port> [-server_key key_file] " <<
-        "[-out proof_file] [-proto]" << std::endl;
+        "[-out proof_file] [-pre]" << std::endl;
 }
 
 static void Upload(int argc, const char **argv) {
@@ -601,7 +601,7 @@ static void Upload(int argc, const char **argv) {
   EVP_PKEY *pkey = NULL;
   FILE *out = NULL;
 
-  bool proto = false;
+  bool pre = false;
 
   argc -= 4;
   argv += 4;
@@ -623,8 +623,8 @@ static void Upload(int argc, const char **argv) {
       proof_file = argv[1];
       argc -= 2;
       argv += 2;
-    } else if (strcmp(argv[0], "-proto") == 0) {
-      proto = true;
+    } else if (strcmp(argv[0], "-pre") == 0) {
+      pre = true;
       --argc;
       ++argv;
     } else {
@@ -666,7 +666,7 @@ static void Upload(int argc, const char **argv) {
 
   LogClient client(server_name, port);
   bstring proof;
-  if(!client.UploadBundle(contents, proto, &proof)) {
+  if(!client.UploadBundle(contents, pre, &proof)) {
     std::cout << "No log proof received. Try again later." << std::endl;
     if (out != NULL) {
       fclose(out);

@@ -3,16 +3,16 @@ set -e
 ca_setup() {
   cert_dir=$1
   ca=$2
-  proto=$3
+  pre=$3
 
   # Create serial and database files.
   serial="$cert_dir/$ca-serial"
-  # The ProtoCA shall share the CA's serial file.
+  # The PreCA shall share the CA's serial file.
   # However, it needs a separate database, since we want to be able to issue
-  # a cert with the same serial twice (once by the ProtoCA, once by the CA).
-  if [ $proto == "true" ]; then
-    database="$cert_dir/$ca-proto-database"
-    conf=$ca-proto
+  # a cert with the same serial twice (once by the PreCA, once by the CA).
+  if [ $pre == "true" ]; then
+    database="$cert_dir/$ca-pre-database"
+    conf=$ca-pre
   else
     database="$cert_dir/$ca-database"
     conf=$ca
@@ -83,10 +83,10 @@ make_ca_certs() {
   hash=$($my_openssl x509 -in $cert_dir/$ca-cert.pem -hash -noout)
   cp $cert_dir/$ca-cert.pem $hash_dir/$hash.0
 
-  # Create a CA protocert signing request.
-  request_cert $cert_dir $ca-proto ca-protocert.conf
-  # Sign the CA protocert.
-  issue_cert $cert_dir $ca $ca-proto ca-protocert.conf ct_ext false $ca-proto
+  # Create a CA precert signing request.
+  request_cert $cert_dir $ca-pre ca-precert.conf
+  # Sign the CA precert.
+  issue_cert $cert_dir $ca $ca-pre ca-precert.conf ct_ext false $ca-pre
   ca_setup $cert_dir $ca true
 }
 
@@ -112,10 +112,10 @@ make_intermediate_ca_certs() {
   # Setup a database for the intermediate CA
   ca_setup $cert_dir $intermediate false
 
-  # Issue a protocert signing cert
-  request_cert $cert_dir $intermediate-proto intermediate-ca-protocert.conf
-  issue_cert $cert_dir $intermediate $intermediate-proto \
-    intermediate-ca-protocert.conf ct_ext false $intermediate-proto
+  # Issue a precert signing cert
+  request_cert $cert_dir $intermediate-pre intermediate-ca-precert.conf
+  issue_cert $cert_dir $intermediate $intermediate-pre \
+    intermediate-ca-precert.conf ct_ext false $intermediate-pre
 
   ca_setup $cert_dir $intermediate true
 }
@@ -131,20 +131,20 @@ make_certs() {
   ca_is_intermediate=$7
 
   # Generate a new private key and CSR
-  request_cert $cert_dir $server protocert.conf
+  request_cert $cert_dir $server precert.conf
 
   openssl rsa -in $cert_dir/$server-key.pem -out $cert_dir/$server-key.pem \
     -passin pass:password1
 
   # Sign the CSR with the CA key
-  issue_cert $cert_dir $ca $server protocert.conf simple false $server
+  issue_cert $cert_dir $ca $server precert.conf simple false $server
 
   # Make a DER version
   openssl x509 -in $cert_dir/$server-cert.pem -out $cert_dir/$server-cert.der \
     -outform DER
 
-  # Sign the CSR with the CA protocert key to get a log request
-  issue_cert $cert_dir $ca-proto $server protocert.conf proto false $server-proto
+  # Sign the CSR with the CA precert key to get a log request
+  issue_cert $cert_dir $ca-pre $server precert.conf pre false $server-pre
 
   # Upload the signed certificate
   # If the CA is an intermediate, then we need to include its certificate, too.
@@ -160,43 +160,46 @@ make_certs() {
     -out $cert_dir/$server-cert.proof
   rm $cert_dir/$server-cert-bundle.pem
 
-  # Upload the protocert bundle
+  # Upload the precert bundle
   # If the CA is an intermediate, then we need to include its certificate, too.
   if [ $ca_is_intermediate == "true" ]; then
-    cat $cert_dir/$server-proto-cert.pem $cert_dir/$ca-proto-cert.pem \
-      $cert_dir/$ca-cert.pem > $cert_dir/$server-protocert-bundle.pem
+    cat $cert_dir/$server-pre-cert.pem $cert_dir/$ca-pre-cert.pem \
+      $cert_dir/$ca-cert.pem > $cert_dir/$server-precert-bundle.pem
   else
-    cat $cert_dir/$server-proto-cert.pem $cert_dir/$ca-proto-cert.pem > \
-      $cert_dir/$server-protocert-bundle.pem
+    cat $cert_dir/$server-pre-cert.pem $cert_dir/$ca-pre-cert.pem > \
+      $cert_dir/$server-precert-bundle.pem
   fi
 
-  ../client/ct upload $cert_dir/$server-protocert-bundle.pem 127.0.0.1 \
+  ../client/ct upload $cert_dir/$server-precert-bundle.pem 127.0.0.1 \
     $log_server_port -server_key $cert_dir/$log_server-key-public.pem \
-    -out $cert_dir/$server-proto-cert.proof -proto
-  rm $cert_dir/$server-protocert-bundle.pem
+    -out $cert_dir/$server-pre-cert.proof -pre
+  rm $cert_dir/$server-precert-bundle.pem
 
   # Create a superfluous certificate
   ../client/ct certificate $cert_dir/$server-cert.proof \
     $cert_dir/$server-cert-proof.der
 
+  # Create authz for TLS extension
+  ../client/ct authz $cert_dir/$server-cert.proof $cert_dir/$server-cert.authz
+
   openssl x509 -in $cert_dir/$server-cert-proof.der -inform DER -out \
     $cert_dir/$server-cert-proof.pem
 
-# If the CA is an intermediate, create a single chain file
+  # If the CA is an intermediate, create a single chain file
   if [ $ca_is_intermediate == "true" ]; then
     cat $cert_dir/$ca-cert.pem $cert_dir/$server-cert-proof.pem > \
       $cert_dir/$server-cert-chain.pem
   fi
 
   # Create a new extensions config with the embedded proof
-  cp protocert.conf $cert_dir/$server-extensions.conf
+  cp precert.conf $cert_dir/$server-extensions.conf
   ../client/ct configure_proof $cert_dir/$server-extensions.conf \
-    $cert_dir/$server-proto-cert.proof 
+    $cert_dir/$server-pre-cert.proof 
   # Sign the certificate
   # Store the current serial number
   mv $cert_dir/$ca-serial $cert_dir/$ca-serial.bak
-  # Instead reuse the serial number from the protocert
-  openssl x509 -in $cert_dir/$server-proto-cert.pem -serial -noout | \
+  # Instead reuse the serial number from the precert
+  openssl x509 -in $cert_dir/$server-pre-cert.pem -serial -noout | \
     sed 's/serial=//' > $cert_dir/$ca-serial
 
   issue_cert $cert_dir $ca $server $cert_dir/$server-extensions.conf embedded \

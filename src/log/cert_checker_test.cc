@@ -14,10 +14,9 @@ static const char kCaCert[] = "ca-cert.pem";
 // Issued by ca-cert.pem
 static const char kLeafCert[] = "test-cert.pem";
 // Issued by ca-cert.pem
-// TODO(ekasper): update test data and rename the certs proto->pre.
-static const char kCaPreCert[] = "ca-proto-cert.pem";
-// Issued by ca-proto-cert.pem
-static const char kPreCert[] = "test-proto-cert.pem";
+static const char kCaPreCert[] = "ca-pre-cert.pem";
+// Issued by ca-pre-cert.pem
+static const char kPreCert[] = "test-pre-cert.pem";
 // Issued by ca-cert.pem
 static const char kIntermediateCert[] = "intermediate-cert.pem";
 // Issued by intermediate-cert.pem

@@ -29,5 +29,6 @@
 .*\.pb.cc$
 ^src/proto/serializer_test
 ^src/test/apachectl
-^src/test/mod_ssl.so
+^src/test/httpd-new
+^src/test/*.so
 ^src/test/testdata/error.log
