@@ -30,7 +30,7 @@ bool CertChecker::LoadTrustedCertificateDir(const std::string &cert_dir) {
 
 bool CertChecker::CheckCertChain(const CertChain &chain) const {
   assert(chain.IsLoaded());
-  if (!chain.IsValidIssuerChain() || !chain.IsValidSignatureChain())
+  if (!chain.IsValidCaIssuerChain() || !chain.IsValidSignatureChain())
     return false;
   return VerifyTrustedCaSignature(*chain.LastCert());
 }
@@ -47,6 +47,8 @@ bool CertChecker::CheckPreCertChain(const PreCertChain &chain) const {
   // fail since the leaf contains an unrecognized critical extension).
   const Cert *pre = chain.PreCert();
   const Cert *pre_ca = chain.CaPreCert();
+  // IsValidIssuerChain only checks that the issuing order is correct;
+  // CA constraints are handled in VerifyPreCaChain.
   return pre->IsSignedBy(*pre_ca) && chain.IsValidIssuerChain() &&
       VerifyPreCaChain(chain);
 }

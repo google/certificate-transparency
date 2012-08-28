@@ -314,7 +314,19 @@ bool CertChain::IsValidIssuerChain() const {
     Cert *subject = *it;
     Cert *issuer = *(it + 1);
     if (!subject->IsIssuedBy(*issuer))
-    return false;
+      return false;
+  }
+  return true;
+}
+
+bool CertChain::IsValidCaIssuerChain() const {
+  assert(IsLoaded());
+  for (std::vector<Cert*>::const_iterator it = chain_.begin();
+       it + 1 < chain_.end(); ++it) {
+    Cert *subject = *it;
+    Cert *issuer = *(it + 1);
+    if (!issuer->HasBasicConstraintCA() || !subject->IsIssuedBy(*issuer))
+      return false;
   }
   return true;
 }

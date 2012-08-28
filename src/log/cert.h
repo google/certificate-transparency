@@ -119,7 +119,12 @@ class CertChain {
   }
 
   // True if the issuer of each cert is the subject of the next cert.
+  // Does not check the CA bit of issuing certs.
   bool IsValidIssuerChain() const;
+
+  // True if the issuer of each cert is the subject of the next cert,
+  // and each issuer has BasicConstraints CA:true.
+  bool IsValidCaIssuerChain() const;
 
   // True if each cert is signed by the next one.
   bool IsValidSignatureChain() const;
