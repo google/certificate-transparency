@@ -18,8 +18,6 @@
 ^src/test/.*\.csr$
 ^src/test/.*\.der$
 ^src/test/.*\.log$
-^src/test/.*\.pem$
-^src/test/.*\.proof$
 ^src/test/.*\.srl$
 ^src/log/cert_test$
 ^src/log/cert_checker_test$
@@ -27,7 +25,7 @@
 ^src/log/frontend_signer_test$
 .*\.pb.h$
 .*\.pb.cc$
-^src/proto/serializer_test
+^src/proto/serializer_test$
 ^src/test/apachectl
 ^src/test/httpd-new
 ^src/test/*.so
