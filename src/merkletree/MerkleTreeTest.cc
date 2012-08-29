@@ -1,8 +1,10 @@
 #include <assert.h>
 #include <gtest/gtest.h>
+#include <iostream>
 #include <stddef.h>
 #include <stdlib.h>
 #include <string>
+#include <sys/resource.h>
 #include <time.h>
 #include <vector>
 
@@ -679,6 +681,33 @@ TEST_F(MerkleVerifierTest, VerifyConsistencyProof) {
     }
   }
 }
+
+class StressTest : public ::testing::TestWithParam<size_t> {
+ protected:
+  MerkleTree tree_;
+  bstring data_;
+  StressTest() : tree_(new Sha256Hasher()),
+                 data_(bstring(1024, 0x42)) {}
+};
+
+TEST_P(StressTest, BuildLargeTree) {
+  struct rusage ru;
+  getrusage(RUSAGE_SELF, &ru);
+  long max_rss_before = ru.ru_maxrss;
+  size_t tree_size = GetParam();
+  std::cout << "Building a tree with " << tree_size << " leaves." << std::endl;
+  for (size_t i = 0; i < tree_size; ++i)
+    tree_.AddLeaf(data_);
+  EXPECT_FALSE(tree_.CurrentRoot().empty());
+  EXPECT_TRUE(tree_.LeafCount() == tree_size);
+  getrusage(RUSAGE_SELF, &ru);
+  std::cout << "Peak RSS delta (as reported by getrusage()) was "
+            << ru.ru_maxrss - max_rss_before << " kB" << std::endl;
+}
+
+INSTANTIATE_TEST_CASE_P(TreeSizes, StressTest,
+                        ::testing::Values(1000, 10000, 100000, 1000000,
+                                          4000000));
 
 #undef S
 #undef H

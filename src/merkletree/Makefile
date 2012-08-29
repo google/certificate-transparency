@@ -30,7 +30,8 @@ include .depend
 test: LogDBTest MerkleTreeTest SerialHasherTest TreeHasherTest faildb
 	./SerialHasherTest
 	./TreeHasherTest
-	./MerkleTreeTest
+# Do not run performance stress tests by default
+	./MerkleTreeTest --gtest_filter=-*StressTest*
 	./LogDBTest
 	./file_op_fail_test.sh 2> file_op_fail_test.log
 
