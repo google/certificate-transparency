@@ -116,23 +116,23 @@ static void AddExtension(X509 *cert, const char *oid, unsigned char *data,
 
 static LogVerifier::VerifyResult
 VerifyLogSignature(const bstring &token, const CertChain &cert_chain,
-                   LogVerifier *verifier, SignedCertificateHash *sch) {
+                   LogVerifier *verifier, SignedCertificateTimestamp *sct) {
   CertificateEntry *entry = CertSubmissionHandler::X509ChainToEntry(cert_chain);
   if (entry == NULL)
     return LogVerifier::INVALID_FORMAT;
 
-  SignedCertificateHash local_sch;
-  if (!Deserializer::DeserializeSCHToken(token, &local_sch))
+  SignedCertificateTimestamp local_sct;
+  if (!Deserializer::DeserializeSCTToken(token, &local_sct))
     return LogVerifier::INVALID_FORMAT;
 
-  local_sch.mutable_entry()->CopyFrom(*entry);
+  local_sct.mutable_entry()->CopyFrom(*entry);
   delete entry;
 
   LogVerifier::VerifyResult result =
-      verifier->VerifySignedCertificateHash(local_sch);
+      verifier->VerifySignedCertificateTimestamp(local_sct);
   if (result != LogVerifier::VERIFY_OK)
     return result;
-  sch->CopyFrom(local_sch);
+  sct->CopyFrom(local_sct);
   return LogVerifier::VERIFY_OK;
 }
 
@@ -362,7 +362,7 @@ class SSLClient : public CTClient {
     // The verification result.
     bool proof_verified;
     // The resulting checkpoint.
-    SignedCertificateHash sch;
+    SignedCertificateTimestamp sct;
   };
 
 #ifdef TLSEXT_AUTHZDATAFORMAT_audit_proof
@@ -410,7 +410,7 @@ class SSLClient : public CTClient {
     chain.AddCert(leaf);
 
     LogVerifier::VerifyResult result =
-        VerifyLogSignature(proofstring, chain, verifier, &args->sch);
+        VerifyLogSignature(proofstring, chain, verifier, &args->sct);
 
     if (result == LogVerifier::VERIFY_OK) {
       args->proof_verified = true;
@@ -463,7 +463,7 @@ class SSLClient : public CTClient {
       // a checkpoint it hasn't seen before.
       LogVerifier::VerifyResult result = VerifyLogSignature(proofstring, chain,
                                                             verifier,
-                                                            &args->sch);
+                                                            &args->sct);
       if (result == LogVerifier::VERIFY_OK) {
         std::cout << "OK" << std::endl;
         args->proof_verified = true;
@@ -481,7 +481,7 @@ class SSLClient : public CTClient {
       chain.RemoveCert();
       LogVerifier::VerifyResult result = VerifyLogSignature(proofstring, chain,
                                                             verifier,
-                                                            &args->sch);
+                                                            &args->sct);
       if (result == LogVerifier::VERIFY_OK) {
         std::cout << "OK" << std::endl;
         args->proof_verified = true;
@@ -546,16 +546,16 @@ class SSLClient : public CTClient {
     ConnectResult result;
     // Cache the checkpoint.
     if (args.proof_verified) {
-      switch(cache_.Insert(args.sch)) {
-        case SignedCertificateHashCache::NEW:
+      switch(cache_.Insert(args.sct)) {
+        case SCTCache::NEW:
           std::cout << "Cached new checkpoint." << std::endl;
           result = PROOF_VERIFIED;
           break;
-        case SignedCertificateHashCache::CACHED:
+        case SCTCache::CACHED:
           std::cout << "Checkpoint already in cache." << std::endl;
           result = PROOF_VERIFIED;
           break;
-        case SignedCertificateHashCache::MISMATCH:
+        case SCTCache::MISMATCH:
           std::cout << "ERROR: checkpoint mismatch!" << std::endl;
           result = INCONSISTENT_PROOF;
           break;
@@ -577,7 +577,7 @@ class SSLClient : public CTClient {
   }
 
  private:
-  SignedCertificateHashCache cache_;
+  SCTCache cache_;
   const char *ca_dir_;
 }; // class SSLCLient
 

@@ -19,10 +19,11 @@ class FrontendSigner {
 
   ~FrontendSigner();
 
-  LogDB::Status QueueEntry(const bstring &data, SignedCertificateHash *sch);
+  LogDB::Status QueueEntry(const bstring &data,
+                           SignedCertificateTimestamp *sct);
 
   LogDB::Status QueueEntry(CertificateEntry::Type type, const bstring data,
-                           SignedCertificateHash *sch);
+                           SignedCertificateTimestamp *sct);
 
  private:
   LogDB *db_;
@@ -31,6 +32,6 @@ class FrontendSigner {
   SubmissionHandler *handler_;
   bstring ComputePrimaryKey(const CertificateEntry &entry) const;
 
-  void TimestampAndSign(SignedCertificateHash *sch) const;
+  void TimestampAndSign(SignedCertificateTimestamp *sct) const;
 };
 #endif

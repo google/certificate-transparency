@@ -22,6 +22,7 @@ message DigitallySigned {
 }
 
 message CertificateEntry {
+  // Maps 1-1 to LogSigner::CertificateEntryType
   enum Type {
     X509_ENTRY = 0;
     PRECERT_ENTRY = 1;
@@ -41,7 +42,8 @@ message CertificateEntry {
   repeated bytes intermediates = 3;
 }
 
-message SignedCertificateHash {
+message SignedCertificateTimestamp {
+  // UTC time in milliseconds, since January 1, 1970, 00:00.
   optional uint64 timestamp = 1;
   optional CertificateEntry entry = 2;
   optional DigitallySigned signature = 3;

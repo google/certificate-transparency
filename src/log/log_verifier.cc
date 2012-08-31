@@ -20,14 +20,14 @@ LogVerifier::~LogVerifier() {
 
 // static
 LogVerifier::VerifyResult
-LogVerifier::VerifySCHConsistency(const SignedCertificateHash &sch,
-                                  const SignedCertificateHash &sch2) {
+LogVerifier::VerifySCTConsistency(const SignedCertificateTimestamp &sct,
+                                  const SignedCertificateTimestamp &sct2) {
   bstring signed_part, signed_part2;
 
-  if (!Serializer::SerializeForSigning(sch, &signed_part) ||
-      !Serializer::SerializeForSigning(sch2, &signed_part2))
+  if (!Serializer::SerializeSCTForSigning(sct, &signed_part) ||
+      !Serializer::SerializeSCTForSigning(sct2, &signed_part2))
     return INVALID_FORMAT;
-  if (signed_part != signed_part2 || sch.timestamp() == sch2.timestamp())
+  if (signed_part != signed_part2 || sct.timestamp() == sct2.timestamp())
     return VERIFY_OK;
   // Now we have two identical entries with different timestamps.
   // (Caller should check that they both have valid signatures).
@@ -35,21 +35,23 @@ LogVerifier::VerifySCHConsistency(const SignedCertificateHash &sch,
 }
 
 LogVerifier::VerifyResult
-LogVerifier::VerifySignedCertificateHash(const SignedCertificateHash &sch,
-                                         uint64_t begin_range,
-                                         uint64_t end_range) const {
-  if (!IsBetween(sch.timestamp(), begin_range, end_range))
+LogVerifier::VerifySignedCertificateTimestamp(const
+                                              SignedCertificateTimestamp &sct,
+                                              uint64_t begin_range,
+                                              uint64_t end_range) const {
+  if (!IsBetween(sct.timestamp(), begin_range, end_range))
     return INVALID_TIMESTAMP;
 
-  if (!sig_verifier_->VerifyCertificateHashSignature(sch))
+  if (!sig_verifier_->VerifySCTSignature(sct))
     return INVALID_SIGNATURE;
   return VERIFY_OK;
 }
 
-LogVerifier::VerifyResult LogVerifier::VerifySignedCertificateHash(
-    const SignedCertificateHash &sch) const {
+LogVerifier::VerifyResult LogVerifier::VerifySignedCertificateTimestamp(
+    const SignedCertificateTimestamp &sct) const {
   // Allow a bit of slack, say 1 second into the future.
-  return VerifySignedCertificateHash(sch, 0, util::TimeInMilliseconds() + 1000);
+  return VerifySignedCertificateTimestamp(sct, 0,
+                                          util::TimeInMilliseconds() + 1000);
 }
 
 bool LogVerifier::IsBetween(uint64_t timestamp, uint64_t earliest,

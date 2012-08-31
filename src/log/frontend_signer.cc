@@ -38,13 +38,13 @@ FrontendSigner::~FrontendSigner() {
 }
 
 LogDB::Status FrontendSigner::QueueEntry(const bstring &data,
-                                         SignedCertificateHash *sch) {
-  return QueueEntry(CertificateEntry::X509_ENTRY, data, sch);
+                                         SignedCertificateTimestamp *sct) {
+  return QueueEntry(CertificateEntry::X509_ENTRY, data, sct);
 }
 
 LogDB::Status FrontendSigner::QueueEntry(CertificateEntry::Type type,
                                          const bstring data,
-                                         SignedCertificateHash *sch) {
+                                         SignedCertificateTimestamp *sct) {
   // Verify the submission and compute signed and unsigned parts.
   CertificateEntry *entry = handler_->ProcessSubmission(type, data);
   if (entry == NULL)
@@ -57,28 +57,28 @@ LogDB::Status FrontendSigner::QueueEntry(CertificateEntry::Type type,
   bstring record;
   LogDB::Status status = db_->LookupEntry(primary_key, LogDB::ANY, &record);
   if (status == LogDB::LOGGED || status == LogDB::PENDING) {
-    if (sch != NULL)
-      sch->ParseFromString(record);
+    if (sct != NULL)
+      sct->ParseFromString(record);
     delete entry;
     return status;
   }
 
   assert(status == LogDB::NOT_FOUND);
 
-  SignedCertificateHash local_sch;
-  local_sch.mutable_entry()->CopyFrom(*entry);
+  SignedCertificateTimestamp local_sct;
+  local_sct.mutable_entry()->CopyFrom(*entry);
   // TODO(ekasper): switch to (Boost?) smart pointers.
   delete entry;
 
-  TimestampAndSign(&local_sch);
+  TimestampAndSign(&local_sct);
 
-  local_sch.SerializeToString(&record);
+  local_sct.SerializeToString(&record);
   status = db_->WriteEntry(primary_key, record);
 
   // Assume for now that nobody interfered while we were busy signing.
   assert(status == LogDB::NEW);
-  if (sch != NULL)
-    sch->CopyFrom(local_sch);
+  if (sct != NULL)
+    sct->CopyFrom(local_sct);
   return status;
 }
 
@@ -89,7 +89,10 @@ bstring FrontendSigner::ComputePrimaryKey(const CertificateEntry &entry) const {
   return hasher_->Final();
 }
 
-void FrontendSigner::TimestampAndSign(SignedCertificateHash *sch) const {
-  sch->set_timestamp(util::TimeInMilliseconds());
-  signer_->SignCertificateHash(sch);
+void FrontendSigner::TimestampAndSign(SignedCertificateTimestamp *sct) const {
+  sct->set_timestamp(util::TimeInMilliseconds());
+  // The submission handler has already verified the format of this entry,
+  // so this should never fail.
+  bool ret = signer_->SignCertificateTimestamp(sct);
+  assert(ret);
 }

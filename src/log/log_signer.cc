@@ -4,6 +4,7 @@
 #if OPENSSL_VERSION_NUMBER < 0x10000000
 # error "Need OpenSSL >= 1.0.0"
 #endif
+#include <stdint.h>
 
 #include "ct.pb.h"
 #include "log_signer.h"
@@ -28,10 +29,29 @@ LogSigner::~LogSigner() {
   EVP_PKEY_free(pkey_);
 }
 
-void LogSigner::SignCertificateHash(SignedCertificateHash *sch) const {
-  bstring serialized_sch;
-  Serializer::SerializeForSigning(*sch, &serialized_sch);
-  return Sign(CERTIFICATE_HASH, serialized_sch, sch->mutable_signature());
+// TODO(ekasper): propagate serialization errors all the way up so that
+// we know the exact failure reason.
+bool LogSigner::SignCertificateTimestamp(uint64_t timestamp,
+                                         CertificateEntryType type,
+                                         const bstring &leaf_certificate,
+                                         bstring *result) const {
+  bstring serialized_sct;
+  if (!Serializer::SerializeSCTForSigning(timestamp, type, leaf_certificate,
+                                          &serialized_sct))
+    return false;
+  DigitallySigned signature;
+  Sign(CERTIFICATE_TIMESTAMP, serialized_sct, &signature);
+  Serializer::SerializeDigitallySigned(signature, result);
+  return true;
+}
+
+bool
+LogSigner::SignCertificateTimestamp(SignedCertificateTimestamp *sct) const {
+  bstring serialized_sct;
+  if(!Serializer::SerializeSCTForSigning(*sct, &serialized_sct))
+    return false;
+  Sign(CERTIFICATE_TIMESTAMP, serialized_sct, sct->mutable_signature());
+  return true;
 }
 
 void LogSigner::Sign(SignatureType type, const bstring &data,
@@ -79,12 +99,27 @@ LogSigVerifier::~LogSigVerifier() {
   EVP_PKEY_free(pkey_);
 }
 
-bool LogSigVerifier::VerifyCertificateHashSignature(
-    const SignedCertificateHash &sch) const {
-  bstring serialized_sch;
-  if (!Serializer::SerializeForSigning(sch, &serialized_sch))
+bool LogSigVerifier::VerifySCTSignature(uint64_t timestamp,
+                                        LogSigner::CertificateEntryType type,
+                                        const bstring &leaf_cert,
+                                        const bstring &serialized_sig) const {
+  DigitallySigned signature;
+  if (!Deserializer::DeserializeDigitallySigned(serialized_sig, &signature))
     return false;
-  return Verify(LogSigner::CERTIFICATE_HASH, serialized_sch, sch.signature());
+  bstring serialized_sct;
+  if (!Serializer::SerializeSCTForSigning(timestamp, type, leaf_cert,
+                                          &serialized_sct))
+    return false;
+  return Verify(LogSigner::CERTIFICATE_TIMESTAMP, serialized_sct, signature);
+}
+
+bool LogSigVerifier::VerifySCTSignature(
+    const SignedCertificateTimestamp &sct) const {
+  bstring serialized_sct;
+  if (!Serializer::SerializeSCTForSigning(sct, &serialized_sct))
+    return false;
+  return Verify(LogSigner::CERTIFICATE_TIMESTAMP, serialized_sct,
+                sct.signature());
 }
 
 bool LogSigVerifier::Verify(LogSigner::SignatureType type, const bstring &input,

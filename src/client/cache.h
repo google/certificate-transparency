@@ -6,7 +6,8 @@
 #include "ct.h"
 #include "ct.pb.h"
 
-class SignedCertificateHashCache {
+// Signed Certificate Timestamp cache.
+class SCTCache {
 public:
   enum CacheReply {
     // A new entry.
@@ -19,18 +20,18 @@ public:
     MISMATCH,
   };
 
-  SignedCertificateHashCache() {}
-  explicit SignedCertificateHashCache(const std::vector<std::string> &cache);
+  SCTCache() {}
+  explicit SCTCache(const std::vector<std::string> &cache);
 
-  ~SignedCertificateHashCache() {}
+  ~SCTCache() {}
 
   // Serialize the cache.
   std::vector<std::string> WriteCache() const;
 
-  CacheReply Insert(const SignedCertificateHash &sch);
+  CacheReply Insert(const SignedCertificateTimestamp &sct);
 
  private:
-  typedef std::map<std::string, SignedCertificateHash> Cache;
+  typedef std::map<std::string, SignedCertificateTimestamp> Cache;
   Cache cache_;
 };
 #endif

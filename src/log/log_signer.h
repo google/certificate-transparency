@@ -2,6 +2,7 @@
 #define LOG_SIGNER_H
 
 #include <openssl/evp.h>
+#include <stdint.h>
 
 #include "ct.pb.h"
 #include "types.h"
@@ -14,12 +15,28 @@ class LogSigner {
   // One byte.
   // Each struct we digitally sign has a unique type identifier.
   enum SignatureType {
-    CERTIFICATE_HASH = 0,
+    CERTIFICATE_TIMESTAMP = 0,
     TREE_HASH = 1,
   };
 
+  enum CertificateEntryType {
+    X509_ENTRY = 0,
+    PRECERT_ENTRY = 1,
+  };
 
-  void SignCertificateHash(SignedCertificateHash *sch) const;
+  // The protobuf-agnostic library version:
+  // sign the cert timestamp and return the result as a serialized
+  // signature string.
+  // In accordance with the spec, timestamp should be UTC time,
+  // since January 1, 1970, 00:00, in milliseconds.
+  bool SignCertificateTimestamp(uint64_t timestamp,
+                                CertificateEntryType type,
+                                const bstring &leaf_certificate,
+                                bstring *result) const;
+
+  // Sign the cert timestamp and write the resulting DigitallySigned
+  // signature message into |sct|.
+  bool SignCertificateTimestamp(SignedCertificateTimestamp *sct) const;
 
  private:
   void Sign(SignatureType type, const bstring &data,
@@ -37,7 +54,13 @@ class LogSigVerifier {
   LogSigVerifier(EVP_PKEY *pkey);
   ~LogSigVerifier();
 
-  bool VerifyCertificateHashSignature(const SignedCertificateHash &sch) const;
+  // The protobuf-agnostic library version.
+  bool VerifySCTSignature(uint64_t timestamp,
+                          LogSigner::CertificateEntryType type,
+                          const bstring &leaf_cert,
+                          const bstring &signature) const;
+
+  bool VerifySCTSignature(const SignedCertificateTimestamp &sct) const;
 
  private:
   bool Verify(LogSigner::SignatureType type, const bstring &input,

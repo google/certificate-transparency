@@ -345,12 +345,12 @@ class CTLogManager {
   // or an audit proof, if it is already logged.
   LogReply SubmitEntry(CertificateEntry::Type type, const bstring &data,
                        bstring *result) {
-    SignedCertificateHash sch;
-    LogDB::Status logreply = signer_->QueueEntry(type, data, &sch);
+    SignedCertificateTimestamp sct;
+    LogDB::Status logreply = signer_->QueueEntry(type, data, &sct);
     if (logreply == LogDB::REJECTED)
       return INVALID_SUBMISSION;
 
-    Serializer::SerializeSCHToken(sch, result);
+    Serializer::SerializeSCTToken(sct, result);
     return SIGNATURE;
   }
   FrontendSigner *signer_;

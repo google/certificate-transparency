@@ -6,22 +6,22 @@
 #include "ct.pb.h"
 #include "log_verifier.h"
 
-SignedCertificateHashCache::SignedCertificateHashCache(
+SCTCache::SCTCache(
     const std::vector<std::string> &cache) {
   std::vector<std::string>::const_iterator it;
   for (it = cache.begin(); it != cache.end(); ++it) {
-    SignedCertificateHash sch;
+    SignedCertificateTimestamp sct;
 
     // Tolerate no cache errors, for now.
-    sch.ParseFromString(*it);
+    sct.ParseFromString(*it);
     // Tolerate duplicates, but do not allow mismatches.
-    CacheReply reply = Insert(sch);
-    assert(reply == SignedCertificateHashCache::NEW ||
-           reply == SignedCertificateHashCache::CACHED);
+    CacheReply reply = Insert(sct);
+    assert(reply == SCTCache::NEW ||
+           reply == SCTCache::CACHED);
   }
 }
 
-std::vector<std::string> SignedCertificateHashCache::WriteCache() const {
+std::vector<std::string> SCTCache::WriteCache() const {
   std::vector<std::string> result;
   Cache::const_iterator it;
   for (it = cache_.begin(); it != cache_.end(); ++it) {
@@ -32,15 +32,15 @@ std::vector<std::string> SignedCertificateHashCache::WriteCache() const {
   return result;
 }
 
-SignedCertificateHashCache::CacheReply
-SignedCertificateHashCache::Insert(const SignedCertificateHash &sch) {
+SCTCache::CacheReply
+SCTCache::Insert(const SignedCertificateTimestamp &sct) {
   // TODO: key by hash.
   std::pair<Cache::iterator, bool> inserted =
-      cache_.insert(Cache::value_type(sch.entry().leaf_certificate(), sch));
+      cache_.insert(Cache::value_type(sct.entry().leaf_certificate(), sct));
   if (inserted.second)
-    return SignedCertificateHashCache::NEW;
-  else if (LogVerifier::VerifySCHConsistency(inserted.first->second, sch) ==
+    return SCTCache::NEW;
+  else if (LogVerifier::VerifySCTConsistency(inserted.first->second, sct) ==
            LogVerifier::VERIFY_OK)
-    return SignedCertificateHashCache::CACHED;
-  else return SignedCertificateHashCache::MISMATCH;
+    return SCTCache::CACHED;
+  else return SCTCache::MISMATCH;
 }

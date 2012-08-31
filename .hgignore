@@ -21,6 +21,7 @@
 ^src/test/.*\.srl$
 ^src/log/cert_test$
 ^src/log/cert_checker_test$
+^src/log/log_signer_test$
 ^src/log/submission_handler_test$
 ^src/log/frontend_signer_test$
 .*\.pb.h$

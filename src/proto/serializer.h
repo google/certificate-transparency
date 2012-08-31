@@ -2,6 +2,7 @@
 #define SERIALIZER_H
 
 #include <assert.h>
+#include <stdint.h>
 #include <string>
 
 #include "ct.pb.h"
@@ -25,12 +26,19 @@ class Serializer {
 
   static bool CheckFormat(const CertificateEntry &entry);
 
-  static bool SerializeForSigning(const SignedCertificateHash &sch,
-                                  bstring *result);
+  static bool SerializeSCTForSigning(uint64_t timestamp, int type,
+                                     const bstring &leaf_certificate,
+                                     bstring *result);
 
-  bool WriteSCHToken(const SignedCertificateHash &sch);
+  static bool SerializeSCTForSigning(const SignedCertificateTimestamp &sct,
+                                     bstring *result) {
+    return SerializeSCTForSigning(sct.timestamp(), sct.entry().type(),
+                                  sct.entry().leaf_certificate(), result);
+  }
 
-  static bool SerializeSCHToken(const SignedCertificateHash &sch,
+  bool WriteSCTToken(const SignedCertificateTimestamp &sct);
+
+  static bool SerializeSCTToken(const SignedCertificateTimestamp &sct,
                                 bstring *result);
 
   template <class T>
@@ -39,6 +47,9 @@ class Serializer {
     serializer.WriteUint(in, bytes);
     return serializer.SerializedString();
   }
+
+  static bool SerializeDigitallySigned(const DigitallySigned &sig,
+                                       bstring *result);
 
  private:
   template <class T>
@@ -86,10 +97,13 @@ class Deserializer {
 
   bool ReachedEnd() const { return bytes_remaining_ == 0; }
 
-  bool ReadSCHToken(SignedCertificateHash *sch);
+  bool ReadSCTToken(SignedCertificateTimestamp *sct);
 
-  static bool DeserializeSCHToken(const bstring &in,
-                                  SignedCertificateHash *sch);
+  static bool DeserializeSCTToken(const bstring &in,
+                                  SignedCertificateTimestamp *sct);
+
+  static bool DeserializeDigitallySigned(const bstring &in,
+                                         DigitallySigned *sig);
 
  private:
   template<class T>
