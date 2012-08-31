@@ -183,20 +183,20 @@ d0 d1   d2 d3           d0 d1   d2 d3  d4 d5
 	Certificate owners will be expected to submit certificates to certificate logs for public auditing. A log is a single, ever-growing, append-only Merkle Tree of such certificates.
       </t>
       <t>
-	After accepting a certificate submission, the log MUST immediately return a Signed Certificate Hash (SCH). The SCH is the log's promise to incorporate the certificate in the Merkle Tree within a fixed amount of time known as the Maximum Merge Delay (MMD). Servers MUST present an SCH from one or more logs to the client together with the certificate. Clients MUST reject certificates that do not have a valid Signed Certificate Hash. [ben: can anyone request these proofs? don't see why not]
+	After accepting a certificate submission, the log MUST immediately return a Signed Certificate Timestamp (SCT). The SCT is the log's promise to incorporate the certificate in the Merkle Tree within a fixed amount of time known as the Maximum Merge Delay (MMD). Servers MUST present an SCT from one or more logs to the client together with the certificate. Clients MUST reject certificates that do not have a valid Signed Certificate Timestamp.
       </t>
       <t>
-	Periodically, the log appends all new entries to the Merkle Tree, and signs the root of the tree. Clients and auditors can thus verify that each certificate for which an SCH has been issued indeed appears in the log. The log MUST incorporate a certificate in its Merkle Tree within the period defined by Maximum Merge Delay after the issuance of the SCH.
+	Periodically, the log appends all new entries to the Merkle Tree, and signs the root of the tree. Clients and auditors can thus verify that each certificate for which an SCT has been issued indeed appears in the log. The log MUST incorporate a certificate in its Merkle Tree within the period defined by Maximum Merge Delay after the issuance of the SCT.
       </t>
       <section title="Log Entries">
 	<t>
 	  Anyone can submit a certificate to the log. In order to attribute each logged certificate to its issuer, the log shall publish a list of acceptable root certificates (this list should be the union of root certificates trusted by major browser vendors). Each submitted certificate MUST be accompanied by all additional certificates required to verify the certificate chain up to an accepted root certificate. The self-signed root certificate itself MAY be omitted from this list. 
 	</t>
         <t>
-	  Alternatively, Certificate Authorities may submit a certificate to the log prior to issuance. [TODO(ekasper): describe this procedure.] The Signed Certificate Hash can then be directly embedded in the final certificate via an X.509v3 certificate extension <xref target='RFC5280'/>.
+	  Alternatively, Certificate Authorities may submit a certificate to the log prior to issuance. [TODO(ekasper): describe this procedure.] The Signed Certificate Timestamp can then be directly embedded in the final certificate via an X.509v3 certificate extension <xref target='RFC5280'/>.
 	</t>
 	<t>
-	  The log MUST verify that the submitted leaf certificate has a valid signature chain leading back to a trusted root CA certificate, using the chain of intermediate CA certificates provided by the submitter. The log MAY accept certificates that have expired, are not yet valid, have been revoked or are otherwise not fully valid according to X509 verification rules. However, the log MUST refuse to publish certificates without a valid chain to a known root CA. If a certificate is accepted and an SCH issued, the log MUST store the chain used for verification, and MUST present this chain for auditing upon request.
+	  The log MUST verify that the submitted leaf certificate has a valid signature chain leading back to a trusted root CA certificate, using the chain of intermediate CA certificates provided by the submitter. The log MAY accept certificates that have expired, are not yet valid, have been revoked or are otherwise not fully valid according to X509 verification rules. However, the log MUST refuse to publish certificates without a valid chain to a known root CA. If a certificate is accepted and an SCT issued, the log MUST store the chain used for verification, and MUST present this chain for auditing upon request.
 	</t>
 	<t>
 	  Each certificate entry in the log MUST include the following components:
@@ -206,8 +206,8 @@ d0 d1   d2 d3           d0 d1   d2 d3  d4 d5
     enum { x509_entry(0), precert_entry(1), (65535) } LogEntryType;
 
     struct {
-        LogEntryType type;
-            select (type) {
+        LogEntryType entry_type;
+            select (entry_type) {
             case x509_entry: X509ChainEntry;
             case precert_entry: PrecertChainEntry;
         } entry;
@@ -235,18 +235,25 @@ d0 d1   d2 d3           d0 d1   d2 d3  d4 d5
 	  <spanx style="verb">certificate_chain</spanx> is a chain of additional certificates required to verify the leaf certificate. The first certificate MUST certify the leaf certificate. Each following certificate MUST directly certify the one preceding it. The self-signed root certificate MAY be omitted from the chain.
 	</t>
 	<t>
-	  Structure of the Signed Certificate Hash:
+	  Structure of the Signed Certificate Timestamp:
 	</t>
+<figure>
+  <artwork>
+    enum { certificate_timestamp(0), tree_hash(1), 255 }
+      SignatureType;
+  </artwork>
+</figure>
 <figure>
   <artwork>
     struct {
         uint64 timestamp;
         digitally-signed struct {
+            SignatureType signature_type = certificate_timestamp;	    
             uint64 timestamp;
-            LogEntryType type;
-            ASN.1Cert signed_certificate;
+            LogEntryType entry_type;
+            ASN.1Cert certificate;
         };
-    } SignedCertificateHash;
+    } SignedCertificateTimestamp;
   </artwork>
 </figure>
 	<t>
@@ -269,12 +276,15 @@ d0 d1   d2 d3           d0 d1   d2 d3  d4 d5
 <figure>
   <artwork>
     struct {
-        uint64 sch_timestamp;
-        LogEntryType type;
-        ASN.1Cert signed_certificate;
+        uint64 timestamp;
+        LogEntryType entry_type;
+        ASN.1Cert certificate;
     } MerkleTreeLeaf;
   </artwork>
 </figure>
+<t>
+  Here <spanx style="verb">timestamp</spanx> is the timestamp of the corresponding SCT issued for this certificate.
+</t>
 	<t>
 	  Structure of the Signed Merkle Tree Update:
 	</t>
@@ -285,6 +295,7 @@ d0 d1   d2 d3           d0 d1   d2 d3  d4 d5
         uint64 timestamp;
         MerkleTreeLeaf new_leaves&lt;0..2^64-1&gt;;
         digitally-signed struct {
+            SignatureType signature_type = tree_hash;
             uint64 timestamp;
             uint64 tree_size;
             opaque sha256_root_hash[32];
@@ -292,13 +303,13 @@ d0 d1   d2 d3           d0 d1   d2 d3  d4 d5
     } SignedMerkleTreeUpdate;
   </artwork>
 </figure>
-<t>[ekasper: I didn't like the idea of adding dummy entries so I changed this back to including the current timestamp, rather than the most recent sch timestamp. Ben, I seem to recall this was somehow inconvenient, but I forget why?]
+<t>[ekasper: I didn't like the idea of adding dummy entries so I changed this back to including the current timestamp, rather than the most recent certificate timestamp. Ben, I seem to recall this was somehow inconvenient, but I forget why?]
 </t>
 	<t>
 	  <spanx style="verb">old_tree_size</spanx>  is the size of the tree prior to this update.
 	</t>
 	<t>
-	  <spanx style="verb">timestamp</spanx> is the current time. The timestamp MUST be at least as recent as the most recent SCH timestamp in the tree. Each subsequent timestamp MUST be more recent than the timestamp of the previous update. [ekasper: requiring unique timestamps allows us to have a unique answer to the question "What does the log contain at time t?". Any practical complications here?]
+	  <spanx style="verb">timestamp</spanx> is the current time. The timestamp MUST be at least as recent as the most recent SCT timestamp in the tree. Each subsequent timestamp MUST be more recent than the timestamp of the previous update. [ekasper: requiring unique timestamps allows us to have a unique answer to the question "What does the log contain at time t?". Any practical complications here?]
 	</t>
 	<t>
 	  <spanx style="verb">tree_size</spanx> equals the number of entries in the new tree.
