@@ -93,6 +93,6 @@ void FrontendSigner::TimestampAndSign(SignedCertificateTimestamp *sct) const {
   sct->set_timestamp(util::TimeInMilliseconds());
   // The submission handler has already verified the format of this entry,
   // so this should never fail.
-  bool ret = signer_->SignCertificateTimestamp(sct);
-  assert(ret);
+  LogSigner::SignResult ret = signer_->SignCertificateTimestamp(sct);
+  assert(ret == LogSigner::OK);
 }

@@ -24,8 +24,8 @@ LogVerifier::VerifySCTConsistency(const SignedCertificateTimestamp &sct,
                                   const SignedCertificateTimestamp &sct2) {
   bstring signed_part, signed_part2;
 
-  if (!Serializer::SerializeSCTForSigning(sct, &signed_part) ||
-      !Serializer::SerializeSCTForSigning(sct2, &signed_part2))
+  if (Serializer::SerializeSCTForSigning(sct, &signed_part) != Serializer::OK ||
+      Serializer::SerializeSCTForSigning(sct2, &signed_part2) != Serializer::OK)
     return INVALID_FORMAT;
   if (signed_part != signed_part2 || sct.timestamp() == sct2.timestamp())
     return VERIFY_OK;
@@ -42,7 +42,7 @@ LogVerifier::VerifySignedCertificateTimestamp(const
   if (!IsBetween(sct.timestamp(), begin_range, end_range))
     return INVALID_TIMESTAMP;
 
-  if (!sig_verifier_->VerifySCTSignature(sct))
+  if (sig_verifier_->VerifySCTSignature(sct) != LogSigVerifier::OK)
     return INVALID_SIGNATURE;
   return VERIFY_OK;
 }

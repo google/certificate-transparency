@@ -27,7 +27,7 @@ CertificateEntry
     entry->set_leaf_certificate(chain.LeafCert()->DerEncoding());
   }
 
-  if (!Serializer::CheckSignedFormat(*entry)) {
+  if (Serializer::CheckSignedFormat(*entry) != Serializer::OK) {
     delete entry;
     return NULL;
   }

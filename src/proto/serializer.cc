@@ -20,46 +20,52 @@ size_t Serializer::PrefixLength(size_t max_length) {
 }
 
 // static
-bool Serializer::SerializeSCTForSigning(uint64_t timestamp, int type,
-                                        const bstring &leaf_certificate,
-                                        bstring *result) {
-  if (!CertificateEntry_Type_IsValid(type) ||
-      // Check that the leaf certificate length is within accepted limits.
-      !CheckFormat(leaf_certificate))
-    return false;
+Serializer::SerializeResult
+Serializer::SerializeSCTForSigning(uint64_t timestamp, int type,
+                                   const bstring &leaf_certificate,
+                                   bstring *result) {
+  if (!CertificateEntry_Type_IsValid(type))
+    return INVALID_TYPE;
+  // Check that the leaf certificate length is within accepted limits.
+  SerializeResult res = CheckFormat(leaf_certificate);
+  if (res != OK)
+    return res;
   Serializer serializer;
   serializer.WriteUint(timestamp, 8);
   serializer.WriteUint(type, 1);
   serializer.WriteVarBytes(leaf_certificate, kMaxCertificateLength);
   result->assign(serializer.SerializedString());
-  return true;
+  return OK;
 }
 
-bool Serializer::WriteSCTToken(const SignedCertificateTimestamp &sct) {
+Serializer::SerializeResult
+Serializer::WriteSCTToken(const SignedCertificateTimestamp &sct) {
   WriteUint(sct.timestamp(), 8);
-  if (!WriteDigitallySigned(sct.signature()))
-    return false;
-  return true;
+  return WriteDigitallySigned(sct.signature());
 }
 
 // static
-bool Serializer::SerializeSCTToken(const SignedCertificateTimestamp &sct,
-                                   bstring *result) {
+Serializer::SerializeResult
+Serializer::SerializeSCTToken(const SignedCertificateTimestamp &sct,
+                              bstring *result) {
   Serializer serializer;
-  if (!serializer.WriteSCTToken(sct))
-    return false;
+  SerializeResult res = serializer.WriteSCTToken(sct);
+  if (res != OK)
+    return res;
   result->assign(serializer.SerializedString());
-  return true;
+  return OK;
 }
 
 // static
-bool Serializer::SerializeDigitallySigned(const DigitallySigned &sig,
-                                          bstring *result) {
+Serializer::SerializeResult
+Serializer::SerializeDigitallySigned(const DigitallySigned &sig,
+                                     bstring *result) {
   Serializer serializer;
-  if (!serializer.WriteDigitallySigned(sig))
-    return false;
+  SerializeResult res = serializer.WriteDigitallySigned(sig);
+  if (res != OK)
+    return res;
   result->assign(serializer.SerializedString());
-  return true;
+  return OK;
 }
 
 void Serializer::WriteFixedBytes(const bstring &in) {
@@ -93,65 +99,100 @@ size_t Serializer::SerializedLength(const repeated_string &in,
   return total_length + PrefixLength(max_total_length);
 }
 
-bool Serializer::WriteDigitallySigned(const DigitallySigned &sig) {
-  if (!CheckFormat(sig))
-    return false;
+Serializer::SerializeResult
+Serializer::WriteDigitallySigned(const DigitallySigned &sig) {
+  SerializeResult res = CheckFormat(sig);
+  if (res != OK)
+    return res;
   WriteUint(sig.hash_algorithm(), 1);
   WriteUint(sig.sig_algorithm(), 1);
   WriteVarBytes(sig.signature(), kMaxSignatureLength);
-  return true;
+  return OK;
 }
 
-bool Serializer::CheckFormat(const DigitallySigned &sig) {
-  return sig.signature().size() <= kMaxSignatureLength;
+Serializer::SerializeResult
+Serializer::CheckFormat(const DigitallySigned &sig) {
+  // This is just DCHECKED upon setting, so check again.
+  if (!DigitallySigned_HashAlgorithm_IsValid(sig.hash_algorithm()))
+    return INVALID_HASH_ALGORITHM;
+  if (!DigitallySigned_SignatureAlgorithm_IsValid(sig.sig_algorithm()))
+    return INVALID_SIGNATURE_ALGORITHM;
+  if (sig.signature().size() > kMaxSignatureLength)
+    return SIGNATURE_TOO_LONG;
+  return OK;
 }
 
-bool Serializer::CheckSignedFormat(const CertificateEntry &entry) {
+Serializer::SerializeResult
+Serializer::CheckSignedFormat(const CertificateEntry &entry) {
   return CheckFormat(entry.leaf_certificate());
 }
 
-bool Serializer::CheckFormat(const CertificateEntry &entry) {
-  return CheckFormat(entry.leaf_certificate()) &&
-      CheckFormat(entry.intermediates());
+Serializer::SerializeResult
+Serializer::CheckFormat(const CertificateEntry &entry) {
+  SerializeResult res = CheckFormat(entry.leaf_certificate());
+  if (res != OK)
+    return res;
+  return CheckFormat(entry.intermediates());
 }
 
-bool Serializer::CheckFormat(const std::string &cert) {
-  return !cert.empty() && cert.size() <= kMaxCertificateLength;
+Serializer::SerializeResult Serializer::CheckFormat(const std::string &cert) {
+  if (cert.empty())
+    return EMPTY_CERTIFICATE;
+  if (cert.size() > kMaxCertificateLength)
+    return CERTIFICATE_TOO_LONG;
+  return OK;
 }
 
-bool Serializer::CheckFormat(const repeated_string &chain) {
+Serializer::SerializeResult
+Serializer::CheckFormat(const repeated_string &chain) {
   for (int i = 0; i < chain.size(); ++i) {
-    if (!CheckFormat(chain.Get(i)))
-      return false;
+    SerializeResult res = CheckFormat(chain.Get(i));
+    if (res != OK)
+      return res;
   }
-  return Serializer::CanSerialize(chain, kMaxCertificateLength,
-                                  kMaxCertificateChainLength);
+  if (!Serializer::CanSerialize(chain, kMaxCertificateLength,
+                                kMaxCertificateChainLength))
+    return CERTIFICATE_CHAIN_TOO_LONG;
+  return OK;
 }
 
 Deserializer::Deserializer(const bstring &input)
     : current_pos_(input.data()),
       bytes_remaining_(input.size()) {}
 
-bool Deserializer::ReadSCTToken(SignedCertificateTimestamp *sct) {
+Deserializer::DeserializeResult
+Deserializer::ReadSCTToken(SignedCertificateTimestamp *sct) {
   uint64_t timestamp = 0;
   if (!ReadUint(8, &timestamp))
-    return false;
+    return INPUT_TOO_SHORT;
   sct->set_timestamp(timestamp);
   return ReadDigitallySigned(sct->mutable_signature());
 }
 
 // static
-bool Deserializer::DeserializeSCTToken(const bstring &in,
-                                       SignedCertificateTimestamp *sct) {
+Deserializer::DeserializeResult
+Deserializer::DeserializeSCTToken(const bstring &in,
+                                  SignedCertificateTimestamp *sct) {
   Deserializer deserializer(in);
-  return deserializer.ReadSCTToken(sct) && deserializer.ReachedEnd();
+  DeserializeResult res = deserializer.ReadSCTToken(sct);
+  if (res != OK)
+    return res;
+  if (!deserializer.ReachedEnd())
+    return INPUT_TOO_LONG;
+  return OK;
 }
 
 // static
-bool Deserializer::DeserializeDigitallySigned(const bstring &in,
-                                              DigitallySigned *sig) {
+Deserializer::DeserializeResult
+Deserializer::DeserializeDigitallySigned(const bstring &in,
+                                         DigitallySigned *sig) {
   Deserializer deserializer(in);
-  return deserializer.ReadDigitallySigned(sig) && deserializer.ReachedEnd();
+  DeserializeResult res = deserializer.ReadDigitallySigned(sig);
+  if (res != OK)
+    return res;
+  if (!deserializer.ReachedEnd())
+    return INPUT_TOO_LONG;
+  return OK;
 }
 
 bool Deserializer::ReadFixedBytes(size_t bytes, bstring *result) {
@@ -171,22 +212,25 @@ bool Deserializer::ReadVarBytes(size_t max_length, bstring *result) {
   return ReadFixedBytes(length, result);
 }
 
-bool Deserializer::ReadDigitallySigned(DigitallySigned *sig) {
+Deserializer::DeserializeResult
+Deserializer::ReadDigitallySigned(DigitallySigned *sig) {
   int hash_algo = -1, sig_algo = -1;
-  if (!ReadUint(1, &hash_algo) ||
-      !DigitallySigned_HashAlgorithm_IsValid(hash_algo))
-    return false;
-  if (!ReadUint(1, &sig_algo) ||
-      !DigitallySigned_SignatureAlgorithm_IsValid(sig_algo))
-    return false;
+  if (!ReadUint(1, &hash_algo))
+    return INPUT_TOO_SHORT;
+  if (!DigitallySigned_HashAlgorithm_IsValid(hash_algo))
+    return INVALID_HASH_ALGORITHM;
+  if (!ReadUint(1, &sig_algo))
+    return INPUT_TOO_SHORT;
+  if (!DigitallySigned_SignatureAlgorithm_IsValid(sig_algo))
+    return INVALID_SIGNATURE_ALGORITHM;
 
   bstring sig_string;
   if (!ReadVarBytes(Serializer::kMaxSignatureLength, &sig_string))
-    return false;
+    return INPUT_TOO_SHORT;
   sig->set_hash_algorithm(
       static_cast<DigitallySigned::HashAlgorithm>(hash_algo));
   sig->set_sig_algorithm(
       static_cast<DigitallySigned::SignatureAlgorithm>(sig_algo));
   sig->set_signature(sig_string);
-  return true;
+  return OK;
 }

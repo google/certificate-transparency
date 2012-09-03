@@ -5,6 +5,7 @@
 #include <stdint.h>
 
 #include "ct.pb.h"
+#include "serializer.h"
 #include "types.h"
 
 class LogSigner {
@@ -24,21 +25,31 @@ class LogSigner {
     PRECERT_ENTRY = 1,
   };
 
+  enum SignResult {
+    OK,
+    INVALID_ENTRY_TYPE,
+    EMPTY_CERTIFICATE,
+    CERTIFICATE_TOO_LONG,
+    UNKNOWN_ERROR,
+  };
+
   // The protobuf-agnostic library version:
   // sign the cert timestamp and return the result as a serialized
   // signature string.
   // In accordance with the spec, timestamp should be UTC time,
   // since January 1, 1970, 00:00, in milliseconds.
-  bool SignCertificateTimestamp(uint64_t timestamp,
-                                CertificateEntryType type,
-                                const bstring &leaf_certificate,
-                                bstring *result) const;
+  SignResult SignCertificateTimestamp(uint64_t timestamp,
+                                      CertificateEntryType type,
+                                      const bstring &leaf_certificate,
+                                      bstring *result) const;
 
   // Sign the cert timestamp and write the resulting DigitallySigned
   // signature message into |sct|.
-  bool SignCertificateTimestamp(SignedCertificateTimestamp *sct) const;
+  SignResult SignCertificateTimestamp(SignedCertificateTimestamp *sct) const;
 
  private:
+  static SignResult GetSerializeSCTError(Serializer::SerializeResult result);
+
   void Sign(SignatureType type, const bstring &data,
             DigitallySigned *result) const;
 
@@ -54,17 +65,38 @@ class LogSigVerifier {
   LogSigVerifier(EVP_PKEY *pkey);
   ~LogSigVerifier();
 
-  // The protobuf-agnostic library version.
-  bool VerifySCTSignature(uint64_t timestamp,
-                          LogSigner::CertificateEntryType type,
-                          const bstring &leaf_cert,
-                          const bstring &signature) const;
+  enum VerifyResult {
+    OK,
+    INVALID_HASH_ALGORITHM,
+    INVALID_SIGNATURE_ALGORITHM,
+    SIGNATURE_TOO_SHORT,
+    SIGNATURE_TOO_LONG,
+    INVALID_ENTRY_TYPE,
+    EMPTY_CERTIFICATE,
+    CERTIFICATE_TOO_LONG,
+    HASH_ALGORITHM_MISMATCH,
+    SIGNATURE_ALGORITHM_MISMATCH,
+    INVALID_SIGNATURE,
+    UNKNOWN_ERROR,
+  };
 
-  bool VerifySCTSignature(const SignedCertificateTimestamp &sct) const;
+  // The protobuf-agnostic library version.
+  VerifyResult VerifySCTSignature(uint64_t timestamp,
+                                  LogSigner::CertificateEntryType type,
+                                  const bstring &leaf_cert,
+                                  const bstring &signature) const;
+
+  VerifyResult VerifySCTSignature(const SignedCertificateTimestamp &sct) const;
 
  private:
-  bool Verify(LogSigner::SignatureType type, const bstring &input,
-              const DigitallySigned &signature) const;
+  static VerifyResult
+  GetSerializeSCTError(Serializer::SerializeResult result);
+
+  static VerifyResult
+  GetDeserializeSignatureError(Deserializer::DeserializeResult result);
+
+  VerifyResult Verify(LogSigner::SignatureType type, const bstring &input,
+                      const DigitallySigned &signature) const;
 
   bool RawVerify(const bstring &data, const bstring &sig_string) const;
 

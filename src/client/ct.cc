@@ -122,7 +122,7 @@ VerifyLogSignature(const bstring &token, const CertChain &cert_chain,
     return LogVerifier::INVALID_FORMAT;
 
   SignedCertificateTimestamp local_sct;
-  if (!Deserializer::DeserializeSCTToken(token, &local_sct))
+  if (Deserializer::DeserializeSCTToken(token, &local_sct) != Deserializer::OK)
     return LogVerifier::INVALID_FORMAT;
 
   local_sct.mutable_entry()->CopyFrom(*entry);

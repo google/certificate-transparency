@@ -14,6 +14,19 @@ class Serializer {
   Serializer() {}
   ~Serializer() {}
 
+  // Serialization methods return OK on success,
+  // or the first encountered error on failure.
+  enum SerializeResult {
+    OK,
+    INVALID_TYPE,
+    EMPTY_CERTIFICATE,
+    CERTIFICATE_TOO_LONG,
+    CERTIFICATE_CHAIN_TOO_LONG,
+    INVALID_HASH_ALGORITHM,
+    INVALID_SIGNATURE_ALGORITHM,
+    SIGNATURE_TOO_LONG,
+  };
+
   static const size_t kMaxCertificateLength;
   static const size_t kMaxCertificateChainLength;
   static const size_t kMaxSignatureLength;
@@ -22,24 +35,26 @@ class Serializer {
 
   bstring SerializedString() const { return output_; }
 
-  static bool CheckSignedFormat(const CertificateEntry &entry);
+  static SerializeResult CheckSignedFormat(const CertificateEntry &entry);
 
-  static bool CheckFormat(const CertificateEntry &entry);
+  static SerializeResult CheckFormat(const CertificateEntry &entry);
 
-  static bool SerializeSCTForSigning(uint64_t timestamp, int type,
-                                     const bstring &leaf_certificate,
-                                     bstring *result);
+  static SerializeResult SerializeSCTForSigning(uint64_t timestamp, int type,
+                                                const bstring &leaf_certificate,
+                                                bstring *result);
 
-  static bool SerializeSCTForSigning(const SignedCertificateTimestamp &sct,
-                                     bstring *result) {
+  static SerializeResult
+  SerializeSCTForSigning(const SignedCertificateTimestamp &sct,
+                         bstring *result) {
     return SerializeSCTForSigning(sct.timestamp(), sct.entry().type(),
                                   sct.entry().leaf_certificate(), result);
   }
 
-  bool WriteSCTToken(const SignedCertificateTimestamp &sct);
+  SerializeResult WriteSCTToken(const SignedCertificateTimestamp &sct);
 
-  static bool SerializeSCTToken(const SignedCertificateTimestamp &sct,
-                                bstring *result);
+  static SerializeResult
+  SerializeSCTToken(const SignedCertificateTimestamp &sct,
+                    bstring *result);
 
   template <class T>
   static bstring SerializeUint(T in, size_t bytes) {
@@ -48,8 +63,8 @@ class Serializer {
     return serializer.SerializedString();
   }
 
-  static bool SerializeDigitallySigned(const DigitallySigned &sig,
-                                       bstring *result);
+  static SerializeResult SerializeDigitallySigned(const DigitallySigned &sig,
+                                                  bstring *result);
 
  private:
   template <class T>
@@ -78,13 +93,13 @@ class Serializer {
                                  size_t max_elem_length,
                                  size_t max_total_length);
 
-  bool WriteDigitallySigned(const DigitallySigned &sig);
+  SerializeResult WriteDigitallySigned(const DigitallySigned &sig);
 
-  static bool CheckFormat(const DigitallySigned &sig);
+  static SerializeResult CheckFormat(const DigitallySigned &sig);
 
-  static bool CheckFormat(const std::string &cert);
+  static SerializeResult CheckFormat(const std::string &cert);
 
-  static bool CheckFormat(const repeated_string &chain);
+  static SerializeResult CheckFormat(const repeated_string &chain);
 
   bstring output_;
 };
@@ -95,14 +110,22 @@ class Deserializer {
   Deserializer(const bstring &input);
   ~Deserializer() {}
 
+  enum DeserializeResult {
+    OK,
+    INPUT_TOO_SHORT,
+    INVALID_HASH_ALGORITHM,
+    INVALID_SIGNATURE_ALGORITHM,
+    INPUT_TOO_LONG,
+  };
+
   bool ReachedEnd() const { return bytes_remaining_ == 0; }
 
-  bool ReadSCTToken(SignedCertificateTimestamp *sct);
+  DeserializeResult ReadSCTToken(SignedCertificateTimestamp *sct);
 
-  static bool DeserializeSCTToken(const bstring &in,
+  static DeserializeResult DeserializeSCTToken(const bstring &in,
                                   SignedCertificateTimestamp *sct);
 
-  static bool DeserializeDigitallySigned(const bstring &in,
+  static DeserializeResult DeserializeDigitallySigned(const bstring &in,
                                          DigitallySigned *sig);
 
  private:
@@ -125,7 +148,7 @@ class Deserializer {
 
   bool ReadVarBytes(size_t max_length, bstring *result);
 
-  bool ReadDigitallySigned(DigitallySigned *sig);
+  DeserializeResult ReadDigitallySigned(DigitallySigned *sig);
 
   const byte *current_pos_;
   size_t bytes_remaining_;

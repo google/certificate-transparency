@@ -21,7 +21,8 @@ CertificateEntry
       break;
   }
 
-  if (!is_valid || !Serializer::CheckFormat(*entry)) {
+  // TODO(ekasper): also propagate these errors.
+  if (!is_valid || Serializer::CheckFormat(*entry) != Serializer::OK) {
     delete entry;
     return NULL;
   }

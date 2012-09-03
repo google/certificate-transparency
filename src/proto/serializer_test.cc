@@ -89,33 +89,38 @@ const size_t kDefaultSCTSignedLength = 23;
 
 TEST_F(SerializerTest, SerializeDigitallySignedKatTest) {
   bstring result;
-  EXPECT_TRUE(Serializer::SerializeDigitallySigned(DefaultDS(), &result));
+  EXPECT_EQ(Serializer::OK,
+            Serializer::SerializeDigitallySigned(DefaultDS(), &result));
   EXPECT_EQ(S(kDefaultDSHexString, kDefaultDSLength), H(result));
 }
 
 TEST_F(SerializerTest, SerializeSCTTokenKatTest) {
   bstring result;
-  EXPECT_TRUE(Serializer::SerializeSCTToken(DefaultSCT(), &result));
+  EXPECT_EQ(Serializer::OK,
+            Serializer::SerializeSCTToken(DefaultSCT(), &result));
   EXPECT_EQ(S(kDefaultSCTTokenHexString, kDefaultSCTTokenLength), H(result));
 }
 
 TEST_F(SerializerTest, SerializeSCTForSigningKatTest) {
   bstring result;
-  EXPECT_TRUE(Serializer::SerializeSCTForSigning(DefaultSCT(), &result));
+  EXPECT_EQ(Serializer::OK,
+            Serializer::SerializeSCTForSigning(DefaultSCT(), &result));
   EXPECT_EQ(S(kDefaultSCTSignedHexString, kDefaultSCTSignedLength), H(result));
 }
 
 TEST_F(SerializerTest, DeserializeSCTTokenKatTest) {
   bstring token = B(kDefaultSCTTokenHexString, kDefaultSCTTokenLength);
   SignedCertificateTimestamp sct;
-  EXPECT_TRUE(Deserializer::DeserializeSCTToken(token, &sct));
+  EXPECT_EQ(Deserializer::OK, Deserializer::DeserializeSCTToken(token, &sct));
   CompareSCTToken(DefaultSCT(), sct);
 }
 
 TEST_F(SerializerTest, DeserializeDigitallySignedKatTest) {
   bstring serialized_sig = B(kDefaultDSHexString, kDefaultDSLength);
   DigitallySigned signature;
-  EXPECT_TRUE(Deserializer::DeserializeDigitallySigned(serialized_sig, &signature));
+  EXPECT_EQ(Deserializer::OK,
+            Deserializer::DeserializeDigitallySigned(serialized_sig,
+                                                     &signature));
   CompareDS(DefaultDS(), signature);
 }
 
@@ -125,7 +130,7 @@ TEST_F(SerializerTest, SerializeSCTForSigningChangeType) {
   sct.CopyFrom(DefaultSCT());
   sct.mutable_entry()->set_type(CertificateEntry::PRECERT_ENTRY);
   bstring result;
-  EXPECT_TRUE(Serializer::SerializeSCTForSigning(sct, &result));
+  EXPECT_EQ(Serializer::OK, Serializer::SerializeSCTForSigning(sct, &result));
 
   std::string default_result =
       S(kDefaultSCTSignedHexString, kDefaultSCTSignedLength);
@@ -140,7 +145,7 @@ TEST_F(SerializerTest, SerializeDeserializeSCTTokenChangeHashAlgorithm) {
   sct.mutable_signature()->set_hash_algorithm(DigitallySigned::SHA224);
 
   bstring result;
-  EXPECT_TRUE(Serializer::SerializeSCTToken(sct, &result));
+  EXPECT_EQ(Serializer::OK, Serializer::SerializeSCTToken(sct, &result));
 
   std::string default_result =
       S(kDefaultSCTTokenHexString, kDefaultSCTTokenLength);
@@ -149,7 +154,8 @@ TEST_F(SerializerTest, SerializeDeserializeSCTTokenChangeHashAlgorithm) {
   EXPECT_NE(default_result, new_result);
 
   SignedCertificateTimestamp read_sct;
-  EXPECT_TRUE(Deserializer::DeserializeSCTToken(result, &read_sct));
+  EXPECT_EQ(Deserializer::OK,
+            Deserializer::DeserializeSCTToken(result, &read_sct));
   CompareSCTToken(read_sct, sct);
 }
 
@@ -159,12 +165,22 @@ TEST_F(SerializerTest, SerializeDeserializeSCTTokenChangeSignature) {
   sct.mutable_signature()->set_signature("bazinga");
 
   bstring result;
-  EXPECT_TRUE(Serializer::SerializeSCTToken(sct, &result));
+  EXPECT_EQ(Serializer::OK, Serializer::SerializeSCTToken(sct, &result));
   EXPECT_NE(S(kDefaultSCTTokenHexString, kDefaultSCTTokenLength), H(result));
 
   SignedCertificateTimestamp read_sct;
-  EXPECT_TRUE(Deserializer::DeserializeSCTToken(result, &read_sct));
+  EXPECT_EQ(Deserializer::OK,
+            Deserializer::DeserializeSCTToken(result, &read_sct));
   CompareSCTToken(read_sct, sct);
+}
+
+TEST_F(SerializerTest, SerializeSCTForSigningEmptyCertificate) {
+  SignedCertificateTimestamp sct;
+  sct.CopyFrom(DefaultSCT());
+  sct.mutable_entry()->set_leaf_certificate("");
+  bstring result;
+  EXPECT_EQ(Serializer::EMPTY_CERTIFICATE,
+            Serializer::SerializeSCTForSigning(sct, &result));
 }
 
 TEST_F(SerializerTest, DeserializeSCTTokenBadHashType) {
@@ -173,7 +189,8 @@ TEST_F(SerializerTest, DeserializeSCTTokenBadHashType) {
   token[8] = 0xff;
 
   SignedCertificateTimestamp sct;
-  EXPECT_FALSE(Deserializer::DeserializeSCTToken(token, &sct));
+  EXPECT_EQ(Deserializer::INVALID_HASH_ALGORITHM,
+            Deserializer::DeserializeSCTToken(token, &sct));
 }
 
 TEST_F(SerializerTest, DeserializeSCTTokenBadSignatureType) {
@@ -182,7 +199,8 @@ TEST_F(SerializerTest, DeserializeSCTTokenBadSignatureType) {
   token[9] = 0xff;
 
   SignedCertificateTimestamp sct;
-  EXPECT_FALSE(Deserializer::DeserializeSCTToken(token, &sct));
+  EXPECT_EQ(Deserializer::INVALID_SIGNATURE_ALGORITHM,
+            Deserializer::DeserializeSCTToken(token, &sct));
 }
 
 TEST_F(SerializerTest, DeserializeSCTTokenTooShort) {
@@ -190,7 +208,8 @@ TEST_F(SerializerTest, DeserializeSCTTokenTooShort) {
 
   for (size_t i = 0; i < token.size(); ++i) {
     SignedCertificateTimestamp sct;
-    EXPECT_FALSE(Deserializer::DeserializeSCTToken(token.substr(0, i), &sct));
+    EXPECT_EQ(Deserializer::INPUT_TOO_SHORT,
+              Deserializer::DeserializeSCTToken(token.substr(0, i), &sct));
   }
 }
 
@@ -202,12 +221,13 @@ TEST_F(SerializerTest, DeserializeSCTTokenTooLong) {
 
   // We can still read from the beginning of a longer string...
   Deserializer deserializer(token);
-  EXPECT_TRUE(deserializer.ReadSCTToken(&sct));
+  EXPECT_EQ(Deserializer::OK, deserializer.ReadSCTToken(&sct));
   EXPECT_FALSE(deserializer.ReachedEnd());
   CompareSCTToken(DefaultSCT(), sct);
 
   // ... but we can't deserialize.
-  EXPECT_FALSE(Deserializer::DeserializeSCTToken(token, &sct));
+  EXPECT_EQ(Deserializer::INPUT_TOO_LONG,
+            Deserializer::DeserializeSCTToken(token, &sct));
 }
 
 }  // namespace

@@ -29,29 +29,55 @@ LogSigner::~LogSigner() {
   EVP_PKEY_free(pkey_);
 }
 
-// TODO(ekasper): propagate serialization errors all the way up so that
-// we know the exact failure reason.
-bool LogSigner::SignCertificateTimestamp(uint64_t timestamp,
-                                         CertificateEntryType type,
-                                         const bstring &leaf_certificate,
-                                         bstring *result) const {
+LogSigner::SignResult
+LogSigner::SignCertificateTimestamp(uint64_t timestamp,
+                                    CertificateEntryType type,
+                                    const bstring &leaf_certificate,
+                                    bstring *result) const {
   bstring serialized_sct;
-  if (!Serializer::SerializeSCTForSigning(timestamp, type, leaf_certificate,
-                                          &serialized_sct))
-    return false;
+  Serializer::SerializeResult res =
+      Serializer::SerializeSCTForSigning(timestamp, type, leaf_certificate,
+                                         &serialized_sct);
+
+  if (res != Serializer::OK)
+    return GetSerializeSCTError(res);
+
   DigitallySigned signature;
   Sign(CERTIFICATE_TIMESTAMP, serialized_sct, &signature);
-  Serializer::SerializeDigitallySigned(signature, result);
-  return true;
+  res = Serializer::SerializeDigitallySigned(signature, result);
+  assert(res == Serializer::OK);
+  return OK;
 }
 
-bool
+LogSigner::SignResult
 LogSigner::SignCertificateTimestamp(SignedCertificateTimestamp *sct) const {
   bstring serialized_sct;
-  if(!Serializer::SerializeSCTForSigning(*sct, &serialized_sct))
-    return false;
+  Serializer::SerializeResult res =
+      Serializer::SerializeSCTForSigning(*sct, &serialized_sct);
+  if (res != Serializer::OK)
+    return GetSerializeSCTError(res);
   Sign(CERTIFICATE_TIMESTAMP, serialized_sct, sct->mutable_signature());
-  return true;
+  return OK;
+}
+
+// static
+LogSigner::SignResult
+LogSigner::GetSerializeSCTError(Serializer::SerializeResult result) {
+  SignResult sign_result = UNKNOWN_ERROR;
+  switch (result) {
+    case Serializer::INVALID_TYPE:
+      sign_result = INVALID_ENTRY_TYPE;
+      break;
+    case Serializer::EMPTY_CERTIFICATE:
+      sign_result = EMPTY_CERTIFICATE;
+      break;
+    case Serializer::CERTIFICATE_TOO_LONG:
+      sign_result = CERTIFICATE_TOO_LONG;
+      break;
+    default:
+      assert(false);
+  }
+  return sign_result;
 }
 
 void LogSigner::Sign(SignatureType type, const bstring &data,
@@ -99,37 +125,94 @@ LogSigVerifier::~LogSigVerifier() {
   EVP_PKEY_free(pkey_);
 }
 
-bool LogSigVerifier::VerifySCTSignature(uint64_t timestamp,
-                                        LogSigner::CertificateEntryType type,
-                                        const bstring &leaf_cert,
-                                        const bstring &serialized_sig) const {
+LogSigVerifier::VerifyResult
+LogSigVerifier::VerifySCTSignature(uint64_t timestamp,
+                                   LogSigner::CertificateEntryType type,
+                                   const bstring &leaf_cert,
+                                   const bstring &serialized_sig) const {
   DigitallySigned signature;
-  if (!Deserializer::DeserializeDigitallySigned(serialized_sig, &signature))
-    return false;
+  Deserializer::DeserializeResult result =
+      Deserializer::DeserializeDigitallySigned(serialized_sig, &signature);
+  if (result != Deserializer::OK)
+    return GetDeserializeSignatureError(result);
+
   bstring serialized_sct;
-  if (!Serializer::SerializeSCTForSigning(timestamp, type, leaf_cert,
-                                          &serialized_sct))
-    return false;
+  Serializer::SerializeResult serialize_result =
+      Serializer::SerializeSCTForSigning(timestamp, type, leaf_cert,
+                                         &serialized_sct);
+  if (serialize_result != Serializer::OK)
+    return GetSerializeSCTError(serialize_result);
   return Verify(LogSigner::CERTIFICATE_TIMESTAMP, serialized_sct, signature);
 }
 
-bool LogSigVerifier::VerifySCTSignature(
-    const SignedCertificateTimestamp &sct) const {
+LogSigVerifier::VerifyResult
+LogSigVerifier::VerifySCTSignature(const SignedCertificateTimestamp &sct)
+    const {
   bstring serialized_sct;
-  if (!Serializer::SerializeSCTForSigning(sct, &serialized_sct))
-    return false;
+  Serializer::SerializeResult serialize_result =
+      Serializer::SerializeSCTForSigning(sct, &serialized_sct);
+  if (serialize_result != Serializer::OK)
+    return GetSerializeSCTError(serialize_result);
   return Verify(LogSigner::CERTIFICATE_TIMESTAMP, serialized_sct,
                 sct.signature());
 }
 
-bool LogSigVerifier::Verify(LogSigner::SignatureType type, const bstring &input,
-                            const DigitallySigned &signature) const {
-  if (signature.hash_algorithm() != hash_algo_ ||
-      signature.sig_algorithm() != sig_algo_)
-    return false;
+// static
+LogSigVerifier::VerifyResult
+LogSigVerifier::GetSerializeSCTError(Serializer::SerializeResult result) {
+  VerifyResult verify_result = UNKNOWN_ERROR;
+  switch (result) {
+    case Serializer::INVALID_TYPE:
+      verify_result = INVALID_ENTRY_TYPE;
+      break;
+    case Serializer::EMPTY_CERTIFICATE:
+      verify_result = EMPTY_CERTIFICATE;
+      break;
+    case Serializer::CERTIFICATE_TOO_LONG:
+      verify_result = CERTIFICATE_TOO_LONG;
+      break;
+    default:
+      assert(false);
+  }
+  return verify_result;
+}
+
+// static
+LogSigVerifier::VerifyResult
+LogSigVerifier::GetDeserializeSignatureError(
+    Deserializer::DeserializeResult result) {
+  VerifyResult verify_result = UNKNOWN_ERROR;
+  switch (result) {
+    case Deserializer::INPUT_TOO_SHORT:
+      verify_result = SIGNATURE_TOO_SHORT;
+      break;
+    case Deserializer::INVALID_HASH_ALGORITHM:
+      verify_result = INVALID_HASH_ALGORITHM;
+      break;
+    case Deserializer::INVALID_SIGNATURE_ALGORITHM:
+      verify_result = INVALID_SIGNATURE_ALGORITHM;
+      break;
+    case Deserializer::INPUT_TOO_LONG:
+      verify_result = SIGNATURE_TOO_LONG;
+      break;
+    default:
+      assert(false);
+  }
+  return verify_result;
+}
+
+LogSigVerifier::VerifyResult
+LogSigVerifier::Verify(LogSigner::SignatureType type, const bstring &input,
+                       const DigitallySigned &signature) const {
+  if (signature.hash_algorithm() != hash_algo_)
+    return HASH_ALGORITHM_MISMATCH;
+  if (signature.sig_algorithm() != sig_algo_)
+    return SIGNATURE_ALGORITHM_MISMATCH;
   bstring to_be_signed = Serializer::SerializeUint(type, 1);
   to_be_signed.append(input);
-  return RawVerify(to_be_signed, signature.signature());
+  if (!RawVerify(to_be_signed, signature.signature()))
+    return INVALID_SIGNATURE;
+  return OK;
 }
 
 bool LogSigVerifier::RawVerify(const bstring &data,
