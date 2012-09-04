@@ -1,12 +1,13 @@
 #ifndef FRONTEND_SIGNER_H
 #define FRONTEND_SIGNER_H
 
+#include <string>
+
 #include "ct.pb.h"
-#include "frontend_signer.h"
-#include "log_db.h"
-#include "log_signer.h"
 #include "submission_handler.h"
 
+class LogDB;
+class LogSigner;
 class SerialHasher;
 
 class FrontendSigner {
@@ -19,11 +20,24 @@ class FrontendSigner {
 
   ~FrontendSigner();
 
-  LogDB::Status QueueEntry(const bstring &data,
-                           SignedCertificateTimestamp *sct);
+  enum SubmitResult {
+    LOGGED,
+    PENDING,
+    NEW,
+    BAD_PEM_FORMAT,
+    SUBMISSION_TOO_LONG,
+    CERTIFICATE_VERIFY_ERROR,
+    PRECERT_CHAIN_NOT_WELL_FORMED,
+    UNKNOWN_ERROR,
+  };
 
-  LogDB::Status QueueEntry(CertificateEntry::Type type, const bstring data,
-                           SignedCertificateTimestamp *sct);
+  SubmitResult QueueEntry(const bstring &data,
+                          SignedCertificateTimestamp *sct);
+
+  SubmitResult QueueEntry(CertificateEntry::Type type, const bstring data,
+                          SignedCertificateTimestamp *sct);
+
+  static std::string SubmitResultString(SubmitResult result);
 
  private:
   LogDB *db_;
@@ -33,5 +47,7 @@ class FrontendSigner {
   bstring ComputePrimaryKey(const CertificateEntry &entry) const;
 
   void TimestampAndSign(SignedCertificateTimestamp *sct) const;
+
+  static SubmitResult GetSubmitError(SubmissionHandler::SubmitResult result);
 };
 #endif

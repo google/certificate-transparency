@@ -31,6 +31,7 @@ class CertCheckerTest : public ::testing::Test {
   std::string precert_pem_;
   std::string intermediate_pem_;
   std::string chain_leaf_pem_;
+  std::string ca_pem_;
   CertChecker checker_;
   std::string cert_dir_;
 
@@ -45,6 +46,7 @@ class CertCheckerTest : public ::testing::Test {
                                    &intermediate_pem_));
     ASSERT_TRUE(util::ReadTextFile(cert_dir_ + "/" + kChainLeafCert,
                                    &chain_leaf_pem_));
+    ASSERT_TRUE(util::ReadTextFile(cert_dir_ + "/" + kCaCert, &ca_pem_));
   }
 };
 
@@ -53,11 +55,26 @@ TEST_F(CertCheckerTest, Certificate) {
   ASSERT_TRUE(chain.IsLoaded());
 
   // Fail as we have no CA certs.
-  EXPECT_FALSE(checker_.CheckCertChain(chain));
+  EXPECT_EQ(CertChecker::ROOT_NOT_IN_LOCAL_STORE,
+            checker_.CheckCertChain(chain));
 
   // Load CA certs and expect success.
   EXPECT_TRUE(checker_.LoadTrustedCertificate(cert_dir_ + "/" + kCaCert));
-  EXPECT_TRUE(checker_.CheckCertChain(chain));
+  EXPECT_EQ(CertChecker::OK, checker_.CheckCertChain(chain));
+}
+
+TEST_F(CertCheckerTest, CertificateWithRoot) {
+  CertChain chain(leaf_pem_);
+  ASSERT_TRUE(chain.IsLoaded());
+  chain.AddCert(new Cert(ca_pem_));
+
+  // Fail as even though we give a CA cert, it's not in the local store.
+  EXPECT_EQ(CertChecker::ROOT_NOT_IN_LOCAL_STORE,
+            checker_.CheckCertChain(chain));
+
+  // Load CA certs and expect success.
+  EXPECT_TRUE(checker_.LoadTrustedCertificate(cert_dir_ + "/" + kCaCert));
+  EXPECT_EQ(CertChecker::OK, checker_.CheckCertChain(chain));
 }
 
 TEST_F(CertCheckerTest, Intermediates) {
@@ -67,15 +84,17 @@ TEST_F(CertCheckerTest, Intermediates) {
   CertChain chain(chain_leaf_pem_);
   ASSERT_TRUE(chain.IsLoaded());
   // Fail as it doesn't chain to a trusted CA.
-  EXPECT_FALSE(checker_.CheckCertChain(chain));
+  EXPECT_EQ(CertChecker::ROOT_NOT_IN_LOCAL_STORE,
+            checker_.CheckCertChain(chain));
   // Add the intermediate and expect success.
   chain.AddCert(new Cert(intermediate_pem_));
-  EXPECT_TRUE(checker_.CheckCertChain(chain));
+  EXPECT_EQ(CertChecker::OK, checker_.CheckCertChain(chain));
 
   // An invalid chain, with two certs in wrong order.
   CertChain invalid(intermediate_pem_ + chain_leaf_pem_);
   ASSERT_TRUE(invalid.IsLoaded());
-  EXPECT_FALSE(checker_.CheckCertChain(invalid));
+  EXPECT_EQ(CertChecker::INVALID_CERTIFICATE_CHAIN,
+            checker_.CheckCertChain(invalid));
 }
 
 TEST_F(CertCheckerTest, PreCert) {
@@ -86,17 +105,19 @@ TEST_F(CertCheckerTest, PreCert) {
   EXPECT_TRUE(chain.IsWellFormed());
 
   // Fail as we have no CA certs.
-  EXPECT_FALSE(checker_.CheckPreCertChain(chain));
+  EXPECT_EQ(CertChecker::ROOT_NOT_IN_LOCAL_STORE,
+            checker_.CheckPreCertChain(chain));
 
   // Load CA certs and expect success.
   checker_.LoadTrustedCertificate(cert_dir_ + "/" + kCaCert);
-  EXPECT_TRUE(checker_.CheckPreCertChain(chain));
+  EXPECT_EQ(CertChecker::OK, checker_.CheckPreCertChain(chain));
 
   // A second, invalid chain, with no CA precert.
   PreCertChain chain2(precert_pem_);
   ASSERT_TRUE(chain2.IsLoaded());
   EXPECT_FALSE(chain2.IsWellFormed());
-  EXPECT_FALSE(checker_.CheckPreCertChain(chain2));
+  EXPECT_EQ(CertChecker::PRECERT_CHAIN_NOT_WELL_FORMED,
+            checker_.CheckPreCertChain(chain2));
 }
 
 }  // namespace

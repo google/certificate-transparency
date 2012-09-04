@@ -92,11 +92,13 @@ TYPED_TEST(FrontendSignerTest, Log) {
 
   // Log and expect success.
   SignedCertificateTimestamp sct0, sct1;
-  EXPECT_EQ(this->frontend_->QueueEntry(kUnicorn, &sct0), LogDB::NEW);
+  EXPECT_EQ(FrontendSigner::NEW,
+            this->frontend_->QueueEntry(kUnicorn, &sct0));
   EXPECT_EQ(sct0.entry().type(), CertificateEntry::X509_ENTRY);
   EXPECT_EQ(sct0.entry().leaf_certificate(), kUnicorn);
 
-  EXPECT_EQ(this->frontend_->QueueEntry(kAlice, &sct1), LogDB::NEW);
+  EXPECT_EQ(FrontendSigner::NEW,
+            this->frontend_->QueueEntry(kAlice, &sct1));
   EXPECT_EQ(sct1.entry().type(), CertificateEntry::X509_ENTRY);
   EXPECT_EQ(sct1.entry().leaf_certificate(), kAlice);
 }
@@ -107,11 +109,12 @@ TYPED_TEST(FrontendSignerTest, Time) {
 
   // Log and expect success.
   SignedCertificateTimestamp sct0, sct1;
-  EXPECT_EQ(this->frontend_->QueueEntry(kUnicorn, &sct0), LogDB::NEW);
+  EXPECT_EQ(FrontendSigner::NEW,
+            this->frontend_->QueueEntry(kUnicorn, &sct0));
   EXPECT_LE(sct0.timestamp(), util::TimeInMilliseconds());
   EXPECT_GT(sct0.timestamp(), 0U);
 
-  EXPECT_EQ(this->frontend_->QueueEntry(kAlice, &sct1), LogDB::NEW);
+  EXPECT_EQ(FrontendSigner::NEW, this->frontend_->QueueEntry(kAlice, &sct1));
   EXPECT_LE(sct0.timestamp(), sct1.timestamp());
   EXPECT_LE(sct1.timestamp(), util::TimeInMilliseconds());
 }
@@ -121,12 +124,13 @@ TYPED_TEST(FrontendSignerTest, LogDuplicates) {
 
   SignedCertificateTimestamp sct0, sct1;
   // Log and expect success.
-  EXPECT_EQ(this->frontend_->QueueEntry(kUnicorn, &sct0), LogDB::NEW);
+  EXPECT_EQ(FrontendSigner::NEW,
+            this->frontend_->QueueEntry(kUnicorn, &sct0));
   // Wait for time to change.
   usleep(2000);
   // Try to log again.
-  EXPECT_EQ(this->frontend_->QueueEntry(kUnicorn, &sct1),
-            LogDB::PENDING);
+  EXPECT_EQ(FrontendSigner::PENDING,
+            this->frontend_->QueueEntry(kUnicorn, &sct1));
 
   EXPECT_EQ(sct0.entry().type(), sct1.entry().type());
   EXPECT_EQ(sct0.entry().leaf_certificate(), sct1.entry().leaf_certificate());
@@ -140,9 +144,11 @@ TYPED_TEST(FrontendSignerTest, Verify) {
 
   // Log and expect success.
   SignedCertificateTimestamp sct, sct2;
-  EXPECT_EQ(this->frontend_->QueueEntry(kUnicorn, &sct), LogDB::NEW);
-  EXPECT_EQ(this->frontend_->QueueEntry(CertificateEntry::PRECERT_ENTRY,
-                                        kAlice, &sct2), LogDB::NEW);
+  EXPECT_EQ(FrontendSigner::NEW,
+            this->frontend_->QueueEntry(kUnicorn, &sct));
+  EXPECT_EQ(FrontendSigner::NEW,
+            this->frontend_->QueueEntry(CertificateEntry::PRECERT_ENTRY,
+                                        kAlice, &sct2));
 
   // Verify results.
   EXPECT_EQ(this->verifier_->VerifySignedCertificateTimestamp(sct),
@@ -166,11 +172,13 @@ TYPED_TEST(FrontendSignerTest, TimedVerify) {
 
   // Log and expect success.
   SignedCertificateTimestamp sct, sct2;
-  EXPECT_EQ(this->frontend_->QueueEntry(kUnicorn, &sct), LogDB::NEW);
+  EXPECT_EQ(FrontendSigner::NEW,
+            this->frontend_->QueueEntry(kUnicorn, &sct));
   // Make sure we get different timestamps.
   usleep(2000);
-  EXPECT_EQ(this->frontend_->QueueEntry(CertificateEntry::PRECERT_ENTRY,
-                                        kAlice, &sct2), LogDB::NEW);
+  EXPECT_EQ(FrontendSigner::NEW,
+            this->frontend_->QueueEntry(CertificateEntry::PRECERT_ENTRY,
+                                        kAlice, &sct2));
 
   EXPECT_GT(sct2.timestamp(), sct.timestamp());
 

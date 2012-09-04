@@ -14,11 +14,11 @@ CertSubmissionHandler::CertSubmissionHandler(CertChecker *cert_checker)
 }
 
 // static
-CertificateEntry
-*CertSubmissionHandler::X509ChainToEntry(const CertChain &chain) {
+SubmissionHandler::SubmitResult
+CertSubmissionHandler::X509ChainToEntry(const CertChain &chain,
+                                        CertificateEntry *entry) {
   if (!chain.IsLoaded())
-    return NULL;
-  CertificateEntry *entry = new CertificateEntry();
+    return CHAIN_NOT_LOADED;
   if (chain.LeafCert()->HasExtension(Cert::kEmbeddedProofExtensionOID)) {
     entry->set_type(CertificateEntry::PRECERT_ENTRY);
     entry->set_leaf_certificate(TbsCertificate(chain));
@@ -27,39 +27,52 @@ CertificateEntry
     entry->set_leaf_certificate(chain.LeafCert()->DerEncoding());
   }
 
-  if (Serializer::CheckSignedFormat(*entry) != Serializer::OK) {
-    delete entry;
-    return NULL;
-  }
+  Serializer::SerializeResult serialize_result =
+      Serializer::CheckSignedFormat(*entry);
+  if (serialize_result != Serializer::OK)
+    return GetFormatError(serialize_result);
 
-  return entry;
+  return OK;
 }
 
 // Inputs must be concatenated PEM entries.
 // Format checking is done in the parent class.
-bool CertSubmissionHandler::ProcessX509Submission(const bstring &submission,
-                                                  CertificateEntry *entry) {
+SubmissionHandler::SubmitResult
+CertSubmissionHandler::ProcessX509Submission(const bstring &submission,
+                                             CertificateEntry *entry) {
   std::string pem_string(reinterpret_cast<const char*>(submission.data()),
                          submission.size());
   CertChain chain(pem_string);
 
-  if (!chain.IsLoaded() || !cert_checker_->CheckCertChain(chain))
-    return false;
+  if (!chain.IsLoaded())
+    return INVALID_PEM_ENCODED_CHAIN;
+
+  CertChecker::CertVerifyResult result = cert_checker_->CheckCertChain(chain);
+  if (result != CertChecker::OK)
+    return GetVerifyError(result);
 
   // We have a valid chain; make the entry.
+  // TODO(ekasper): the trusted CA cert MAY be included in the submission.
+  // Should we discard it?
   entry->set_leaf_certificate(chain.LeafCert()->DerEncoding());
   for (size_t i = 1; i < chain.Length(); ++i)
     entry->add_intermediates(chain.CertAt(i)->DerEncoding());
-  return true;
+  return OK;
 }
 
-bool CertSubmissionHandler::ProcessPreCertSubmission(const bstring &submission,
-                                                     CertificateEntry *entry) {
+SubmissionHandler::SubmitResult
+CertSubmissionHandler::ProcessPreCertSubmission(const bstring &submission,
+                                                CertificateEntry *entry) {
   std::string pem_string(reinterpret_cast<const char*>(submission.data()),
                          submission.size());
   PreCertChain chain(pem_string);
-  if (!chain.IsLoaded() || !cert_checker_->CheckPreCertChain(chain))
-    return false;
+  if (!chain.IsLoaded())
+    return INVALID_PEM_ENCODED_CHAIN;
+
+  CertChecker::CertVerifyResult result =
+      cert_checker_->CheckPreCertChain(chain);
+  if (result != CertChecker::OK)
+    return GetVerifyError(result);
 
   // We have a valid chain; make the entry.
   entry->set_leaf_certificate(TbsCertificate(chain));
@@ -67,7 +80,7 @@ bool CertSubmissionHandler::ProcessPreCertSubmission(const bstring &submission,
   entry->add_intermediates(chain.CaPreCert()->DerEncoding());
   for (size_t i = 0; i < chain.IntermediateLength(); ++i)
     entry->add_intermediates(chain.IntermediateAt(i)->DerEncoding());
-  return true;
+  return OK;
 }
 
 bstring CertSubmissionHandler::TbsCertificate(const PreCertChain &chain) {

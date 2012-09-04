@@ -117,16 +117,16 @@ static void AddExtension(X509 *cert, const char *oid, unsigned char *data,
 static LogVerifier::VerifyResult
 VerifyLogSignature(const bstring &token, const CertChain &cert_chain,
                    LogVerifier *verifier, SignedCertificateTimestamp *sct) {
-  CertificateEntry *entry = CertSubmissionHandler::X509ChainToEntry(cert_chain);
-  if (entry == NULL)
+  CertificateEntry entry;
+  if (CertSubmissionHandler::X509ChainToEntry(cert_chain, &entry) !=
+      SubmissionHandler::OK)
     return LogVerifier::INVALID_FORMAT;
 
   SignedCertificateTimestamp local_sct;
   if (Deserializer::DeserializeSCTToken(token, &local_sct) != Deserializer::OK)
     return LogVerifier::INVALID_FORMAT;
 
-  local_sct.mutable_entry()->CopyFrom(*entry);
-  delete entry;
+  local_sct.mutable_entry()->CopyFrom(entry);
 
   LogVerifier::VerifyResult result =
       verifier->VerifySignedCertificateTimestamp(local_sct);
@@ -190,12 +190,16 @@ class LogClient : public CTClient {
     bool ret = false;
     switch (response.code) {
       case ct::ERROR:
-        assert(response.data.size() == 1);
         std::cout << "Error: " << ErrorString(response.data[0]) << std::endl;
+        if (response.data.size() > 1)
+          std::cout << "CT server said: " << response.data.substr(1)
+                    << std::endl;
+        else
+          std::cout << "Sorry, that's all we know." << std::endl;
         break;
-      case ct::SUBMITTED:
-        std::cout << "Token is " << util::HexString(response.data, ' ')
-                  << std::endl;
+      case ct::SIGNED_CERTIFICATE_TIMESTAMP:
+        std::cout << "Signed certificate timestamp token is " <<
+            util::HexString(response.data, ' ') << std::endl;
         if (token != NULL) {
           token->assign(response.data);
           ret = true;
@@ -210,13 +214,13 @@ class LogClient : public CTClient {
   static std::string ErrorString(byte error) {
     switch(error) {
       case ct::BAD_VERSION:
-        return "Bad version";
+        return "bad version";
       case ct::BAD_COMMAND:
-        return "Bad command";
-      case ct::BAD_BUNDLE:
-        return "Bad bundle";
+        return "bad command";
+      case ct::REJECTED:
+        return "rejected";
       default:
-        return "Unknown error code";
+        return "unknown error code";
     }
   }
 

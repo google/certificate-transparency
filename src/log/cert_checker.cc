@@ -28,17 +28,19 @@ bool CertChecker::LoadTrustedCertificateDir(const std::string &cert_dir) {
   return ret == 1;
 }
 
-bool CertChecker::CheckCertChain(const CertChain &chain) const {
+CertChecker::CertVerifyResult
+CertChecker::CheckCertChain(const CertChain &chain) const {
   assert(chain.IsLoaded());
   if (!chain.IsValidCaIssuerChain() || !chain.IsValidSignatureChain())
-    return false;
+    return INVALID_CERTIFICATE_CHAIN;
   return VerifyTrustedCaSignature(*chain.LastCert());
 }
 
-bool CertChecker::CheckPreCertChain(const PreCertChain &chain) const {
+CertChecker::CertVerifyResult
+CertChecker::CheckPreCertChain(const PreCertChain &chain) const {
   assert(chain.IsLoaded());
   if (!chain.IsWellFormed())
-    return false;
+    return PRECERT_CHAIN_NOT_WELL_FORMED;
 
   // Check that the chain is valid.
   // OpenSSL does not enforce an ordering of the chain, so check that the
@@ -49,11 +51,13 @@ bool CertChecker::CheckPreCertChain(const PreCertChain &chain) const {
   const Cert *pre_ca = chain.CaPreCert();
   // IsValidIssuerChain only checks that the issuing order is correct;
   // CA constraints are handled in VerifyPreCaChain.
-  return pre->IsSignedBy(*pre_ca) && chain.IsValidIssuerChain() &&
-      VerifyPreCaChain(chain);
+  if (!pre->IsSignedBy(*pre_ca) || !chain.IsValidIssuerChain())
+    return INVALID_CERTIFICATE_CHAIN;
+  return VerifyPreCaChain(chain);
 }
 
-bool CertChecker::VerifyTrustedCaSignature(const Cert &subject) const {
+CertChecker::CertVerifyResult
+CertChecker::VerifyTrustedCaSignature(const Cert &subject) const {
   // Look up issuer from the trusted store.
   X509_STORE_CTX *ctx = X509_STORE_CTX_new();
   assert(ctx != NULL);
@@ -66,7 +70,7 @@ bool CertChecker::VerifyTrustedCaSignature(const Cert &subject) const {
                                   X509_get_issuer_name(subject.x509_), &obj);
   X509_STORE_CTX_free(ctx);
   if (ret <= 0)
-    return false;
+    return ROOT_NOT_IN_LOCAL_STORE;
 
   // X509_STORE_get_by_subject increments the ref count.
   // Pass ownership to the cert object.
@@ -75,10 +79,13 @@ bool CertChecker::VerifyTrustedCaSignature(const Cert &subject) const {
   X509_OBJECT_free_contents(&obj);
   assert(issuer.IsLoaded());
   // TODO: do we need to do any other checks on issuer?
-  return subject.IsSignedBy(issuer);
+  if(!subject.IsSignedBy(issuer))
+    return INVALID_CERTIFICATE_CHAIN;
+  return OK;
 }
 
-bool CertChecker::VerifyPreCaChain(const PreCertChain &chain) const {
+CertChecker::CertVerifyResult
+CertChecker::VerifyPreCaChain(const PreCertChain &chain) const {
   assert(chain.IsLoaded());
   X509 *leaf = chain.CaPreCert()->x509_;
   assert(leaf != NULL);
@@ -98,9 +105,19 @@ bool CertChecker::VerifyPreCaChain(const PreCertChain &chain) const {
 
   ret = X509_verify_cert(ctx);
 
+  CertVerifyResult result = INVALID_CERTIFICATE_CHAIN;
+  if (ret != 1) {
+    int err = X509_STORE_CTX_get_error(ctx);
+    if (err == X509_V_ERR_UNABLE_TO_GET_ISSUER_CERT_LOCALLY ||
+        err == X509_V_ERR_UNABLE_TO_GET_ISSUER_CERT)
+      result = ROOT_NOT_IN_LOCAL_STORE;
+  } else {
+    result = OK;
+  }
+
   X509_STORE_CTX_free(ctx);
   if (intermediates != NULL)
     sk_X509_free(intermediates);
 
-  return ret == 1;
+  return result;
 }

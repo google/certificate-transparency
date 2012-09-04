@@ -20,16 +20,17 @@ class CertSubmissionHandler : public SubmissionHandler {
 
 
   // For clients, to reconstruct the bytestring under the signature
-  // from the observed chain. Caller owns the returned pointer.
-  static CertificateEntry *X509ChainToEntry(const CertChain &chain);
+  // from the observed chain.
+  static SubmitResult X509ChainToEntry(const CertChain &chain,
+                                       CertificateEntry *entry);
 
  protected:
-  bool ProcessX509Submission(const bstring &submission,
-                             CertificateEntry *entry);
+  SubmitResult ProcessX509Submission(const bstring &submission,
+                                     CertificateEntry *entry);
 
 
-  bool ProcessPreCertSubmission(const bstring &submission,
-                                CertificateEntry *entry);
+  SubmitResult ProcessPreCertSubmission(const bstring &submission,
+                                        CertificateEntry *entry);
 
  private:
   static bstring TbsCertificate(const CertChain &chain);

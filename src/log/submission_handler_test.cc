@@ -63,44 +63,96 @@ class CertSubmissionHandlerTest : public ::testing::Test {
   }
 };
 
-TEST_F(CertSubmissionHandlerTest, SubmitCertChain) {
+TEST_F(CertSubmissionHandlerTest, SubmitCert) {
+  CertificateEntry entry;
+  entry.set_type(CertificateEntry::X509_ENTRY);
   // Submit a leaf cert.
-  CertificateEntry *entry =
-      handler_->ProcessSubmission(CertificateEntry::X509_ENTRY, leaf_);
-  ASSERT_TRUE(entry != NULL);
-  // TODO: further checks.
-  delete entry;
+  EXPECT_EQ(SubmissionHandler::OK, handler_->ProcessSubmission(leaf_, &entry));
+  EXPECT_TRUE(entry.has_leaf_certificate());
+  EXPECT_EQ(0, entry.intermediates_size());
+}
 
-  // Submit a leaf cert with a missing intermediate.
-  entry = handler_->ProcessSubmission(CertificateEntry::X509_ENTRY, chain_leaf_);
-  EXPECT_EQ(NULL, entry);
+TEST_F(CertSubmissionHandlerTest, SubmitEmptyCert) {
+  CertificateEntry entry;
+  entry.set_type(CertificateEntry::X509_ENTRY);
+  EXPECT_EQ(SubmissionHandler::EMPTY_SUBMISSION,
+            handler_->ProcessSubmission("", &entry));
+}
 
+TEST_F(CertSubmissionHandlerTest, SubmitInvalidCert) {
+  CertificateEntry entry;
+  entry.set_type(CertificateEntry::X509_ENTRY);
+  EXPECT_EQ(SubmissionHandler::INVALID_PEM_ENCODED_CHAIN,
+            handler_->ProcessSubmission("-----BEGIN CERTIFICATE-----\ninvalid"
+                                        "\n-----END CERTIFICATE-----", &entry));
+}
+
+TEST_F(CertSubmissionHandlerTest, SubmitChain) {
   // Submit a chain.
   bstring submit = chain_leaf_ + intermediate_;
-  entry = handler_->ProcessSubmission(CertificateEntry::X509_ENTRY, submit);
-  ASSERT_TRUE(entry != NULL);
-  delete entry;
+  CertificateEntry entry;
+  entry.set_type(CertificateEntry::X509_ENTRY);
+  EXPECT_EQ(SubmissionHandler::OK, handler_->ProcessSubmission(submit, &entry));
+  EXPECT_TRUE(entry.has_leaf_certificate());
+  EXPECT_EQ(1, entry.intermediates_size());
+}
 
-  // An invalid chain with two certs in wrong order.
+TEST_F(CertSubmissionHandlerTest, SubmitPartialChain) {
+  CertificateEntry entry;
+  entry.set_type(CertificateEntry::X509_ENTRY);
+  // Submit a leaf cert with a missing intermediate.
+  EXPECT_EQ(SubmissionHandler::UNKNOWN_ROOT,
+            handler_->ProcessSubmission(chain_leaf_, &entry));
+}
+
+TEST_F(CertSubmissionHandlerTest, SubmitInvalidChain) {
   bstring invalid_submit = ca_;
   invalid_submit.append(leaf_);
-  entry = handler_->ProcessSubmission(CertificateEntry::X509_ENTRY,
-                                      invalid_submit);
-  EXPECT_EQ(NULL, entry);
+  CertificateEntry entry;
+  entry.set_type(CertificateEntry::X509_ENTRY);
+  // An invalid chain with two certs in wrong order.
+  EXPECT_EQ(SubmissionHandler::INVALID_CERTIFICATE_CHAIN,
+            handler_->ProcessSubmission(invalid_submit, &entry));
+}
+
+TEST_F(CertSubmissionHandlerTest, SubmitCertAsPreCert) {
+  CertificateEntry entry;
+  entry.set_type(CertificateEntry::PRECERT_ENTRY);
+  // Various things are wrong here, so do not expect a specific error.
+  EXPECT_NE(SubmissionHandler::OK, handler_->ProcessSubmission(leaf_, &entry));
+}
+
+TEST_F(CertSubmissionHandlerTest, SubmitCertChainAsPreCert) {
+  bstring submit = chain_leaf_ + intermediate_;
+  CertificateEntry entry;
+  entry.set_type(CertificateEntry::PRECERT_ENTRY);
+  EXPECT_NE(SubmissionHandler::OK, handler_->ProcessSubmission(submit, &entry));
 }
 
 TEST_F(CertSubmissionHandlerTest, SubmitPreCertChain) {
   bstring submit = precert_ + ca_precert_;
+  CertificateEntry entry;
+  entry.set_type(CertificateEntry::PRECERT_ENTRY);
+  EXPECT_EQ(SubmissionHandler::OK, handler_->ProcessSubmission(submit, &entry));
+  EXPECT_TRUE(entry.has_leaf_certificate());
+  // |intermediates| is the entire precert chain (excluding root).
+  EXPECT_EQ(2, entry.intermediates_size());
+}
 
-  CertificateEntry *entry =
-      handler_->ProcessSubmission(CertificateEntry::PRECERT_ENTRY, submit);
-  ASSERT_TRUE(entry != NULL);
-  delete entry;
-
+TEST_F(CertSubmissionHandlerTest, SubmitInvalidPreCertChain) {
   // In wrong order.
-  submit = ca_precert_ + precert_;
-  entry = handler_->ProcessSubmission(CertificateEntry::PRECERT_ENTRY, submit);
-  EXPECT_EQ(NULL, entry);
+  bstring submit = ca_precert_ + precert_;
+  CertificateEntry entry;
+  entry.set_type(CertificateEntry::PRECERT_ENTRY);
+  EXPECT_NE(SubmissionHandler::OK, handler_->ProcessSubmission(submit, &entry));
+}
+
+TEST_F(CertSubmissionHandlerTest, SubmitPreCertChainAsCertChain) {
+  bstring submit = precert_ + ca_precert_;
+  CertificateEntry entry;
+  entry.set_type(CertificateEntry::X509_ENTRY);
+  // This should fail since ca_precert_ is not a CA cert (CA:false).
+  EXPECT_NE(SubmissionHandler::OK, handler_->ProcessSubmission(submit, &entry));
 }
 
 }  // namespace

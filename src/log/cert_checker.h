@@ -21,11 +21,18 @@ class CertChecker {
 
   ~CertChecker();
 
+  enum CertVerifyResult {
+    OK,
+    // Until we know what the precise cert chain policy is, bag all chain errors
+    // into INVALID_CERTIFICATE_CHAIN.
+    INVALID_CERTIFICATE_CHAIN,
+    PRECERT_CHAIN_NOT_WELL_FORMED,
+    ROOT_NOT_IN_LOCAL_STORE,
+  };
+
   bool LoadTrustedCertificate(const std::string &trusted_cert_file);
 
   bool LoadTrustedCertificateDir(const std::string &trusted_cert_dir);
-
-  // TODO: return something more meaningful than a bool?
 
   // Check that:
   // (1) Each certificate is correctly signed by the next one in the chain; and
@@ -33,7 +40,7 @@ class CertChecker {
   // We do not check that the certificates are otherwise valid. In particular,
   // we accept certificates that have expired, are not yet valid, or have
   // critical extensions we do not recognize.
-  bool CheckCertChain(const CertChain &chain) const;
+  CertVerifyResult CheckCertChain(const CertChain &chain) const;
 
   // Check that:
   // (1) The leaf certificate contains the critical poison extension.
@@ -43,14 +50,14 @@ class CertChecker {
   // (4) The chain starting with the second certificate is valid (precerts are
   //     coming directly from CAs, so we can safely reject invalid submissions).
   // (5) The last certificate is issued by a certificate in our trusted store.
-  bool CheckPreCertChain(const PreCertChain &chain) const;
+  CertVerifyResult CheckPreCertChain(const PreCertChain &chain) const;
 
  private:
   // Look issuer up from the trusted store, and verify signature.
-  bool VerifyTrustedCaSignature(const Cert &subject) const;
+  CertVerifyResult VerifyTrustedCaSignature(const Cert &subject) const;
   // Verify the certificate chain according to standard rules, except
   // start verification from the ca_precert.
-  bool VerifyPreCaChain(const PreCertChain &chain) const;
+  CertVerifyResult VerifyPreCaChain(const PreCertChain &chain) const;
 
   X509_STORE *trusted_;
 };

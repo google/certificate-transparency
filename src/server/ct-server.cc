@@ -19,6 +19,7 @@
 #include "ct.pb.h"
 #include "frontend_signer.h"
 #include "log_db.h"
+#include "log_signer.h"
 #include "serializer.h"
 #include "types.h"
 
@@ -337,22 +338,32 @@ class CTLogManager {
   ~CTLogManager() { delete signer_; }
 
   enum LogReply {
-    INVALID_SUBMISSION,
-    SIGNATURE,
+    SIGNED_CERTIFICATE_TIMESTAMP,
+    REJECT,
   };
 
-  // Submit an entry and write a token, if the entry is pending,
-  // or an audit proof, if it is already logged.
+  // Submit an entry and write a token, if the entry is accepted,
+  // or an error otherwise.
   LogReply SubmitEntry(CertificateEntry::Type type, const bstring &data,
                        bstring *result) {
     SignedCertificateTimestamp sct;
-    LogDB::Status logreply = signer_->QueueEntry(type, data, &sct);
-    if (logreply == LogDB::REJECTED)
-      return INVALID_SUBMISSION;
+    FrontendSigner::SubmitResult submit_result =
+        signer_->QueueEntry(type, data, &sct);
 
-    Serializer::SerializeSCTToken(sct, result);
-    return SIGNATURE;
+    LogReply reply = REJECT;
+    switch (submit_result) {
+      case FrontendSigner::LOGGED:
+      case FrontendSigner::PENDING:
+      case FrontendSigner::NEW:
+        Serializer::SerializeSCTToken(sct, result);
+        reply = SIGNED_CERTIFICATE_TIMESTAMP;
+        break;
+      default:
+        result->assign(FrontendSigner::SubmitResultString(submit_result));
+    }
+    return reply;
   }
+ private:
   FrontendSigner *signer_;
 };
 
@@ -389,19 +400,18 @@ private:
     }
     bstring result;
     CTLogManager::LogReply reply;
-   // TODO globally: sort out this bstring/string mess.
     if (command == ct::UPLOAD_BUNDLE) {
       reply = manager_->SubmitEntry(CertificateEntry::X509_ENTRY, data, &result);
     } else {
       reply = manager_->SubmitEntry(CertificateEntry::PRECERT_ENTRY, data, &result);
     }
     switch(reply) {
-      case CTLogManager::INVALID_SUBMISSION:
-        SendError(ct::BAD_BUNDLE);
+      case CTLogManager::REJECT:
+        SendError(ct::REJECTED, result);
         break;
-      case CTLogManager::SIGNATURE:
+      case CTLogManager::SIGNED_CERTIFICATE_TIMESTAMP:
         assert(!result.empty());
-        SendResponse(ct::SUBMITTED, result);
+        SendResponse(ct::SIGNED_CERTIFICATE_TIMESTAMP, result);
         break;
       default:
         assert(false);
@@ -429,6 +439,14 @@ private:
     Write(ct::ERROR);
     WriteLength(1, 3);
     Write(error);
+  }
+
+  void SendError(ct::ServerError error, const std::string &error_string) {
+    Write(VERSION);
+    Write(ct::ERROR);
+    WriteLength(1 + error_string.length(), 3);
+    Write(error);
+    Write(error_string);
   }
 
   void SendResponse(ct::ServerResponse code, const bstring &response) {
