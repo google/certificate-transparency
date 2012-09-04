@@ -40,3 +40,15 @@ Again, download, unpack and build.
 $ make OPENSSLDIR=<path to openssl> PROTOBUFDIR=<path to protobuf> GTESTDIR=<path to gtest>
 
 Once more, use gmake on BSD systems.
+
+5. Finally, test:
+
+$ make OPENSSLDIR=<path to openssl> PROTOBUFDIR=<path to protobuf> GTESTDIR=<path to gtest> test
+
+6. If you know how to build Apache to test the authz extension, then
+first:
+
+$ cd test
+$ make APACHEDIR=<path to httpd> local-links
+
+and run tests.
