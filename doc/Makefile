@@ -1,4 +1,4 @@
-VERSION=00
+VERSION=01
 BASE=draft-laurie-pki-sunlight-$(VERSION)
 
 all: $(BASE).html $(BASE).txt
