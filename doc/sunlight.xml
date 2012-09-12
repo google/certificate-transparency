@@ -1,28 +1,40 @@
 <?xml version="1.0"?>
 <?rfc symrefs="yes"?>
-<rfc ipr="trust200902" docName="certificate-transparency-draft">
+<rfc ipr="trust200902" docName="draft-laurie-pki-sunlight-00">
   <front>
     <title>Certificate Transparency</title>
-    <author initials="B" surname="Laurie" fullname="Ben Laurie"></author>
-    <author initials="A" surname="Langley" fullname="Adam Langley"></author>
-    <author initials="E" surname="Kasper" fullname="Emilia Kasper"></author>
+    <author initials="B" surname="Laurie" fullname="Ben Laurie">
+      <address>
+	<email>benl@google.com</email>
+      </address>
+    </author>
+    <author initials="A" surname="Langley" fullname="Adam Langley">
+      <address>
+	<email>agl@google.com</email>
+      </address>
+    </author>
+    <author initials="E" surname="Kasper" fullname="Emilia Kasper">
+      <address>
+	<email>ekasper@google.com</email>
+      </address>
+    </author>
     <date year='2012'></date>
+    <abstract>
+      <t>
+	The aim of Certificate Transparency is to have every public end-entity TLS certificate issued by a known Certificate Authority recorded in one or more certificate logs. In order to detect mis-issuance of certificates, all logs are publicly auditable. In particular, domain owners will be able to monitor logs for certificates issued on their own domain.
+      </t>
+      <t>
+	In order to protect clients from unlogged mis-issued certificates, logs sign all recorded certificates, and clients can choose not to trust certificates that are not accompanied by an appropriate log signature. For privacy and performance reasons log signatures are embedded in the TLS handshake via the TLS authorization extension <xref target='RFC5878'/>, or in the certificate itself via an X.509v3 certificate extension <xref target='RFC5280'/>.
+      </t>
+      <t>
+	In order to ensure a globally consistent view of the log, logs also provide a global signature over the entire log. Any inconsistency of logs can be detected through cross-checks on the global signature.
+      </t>
+      <t>
+	Logs are only expected to certify that they have seen a certificate and thus, we do not specify any revocation mechanism for log signatures in this document. Logs will be append-only, and log signatures will be valid indefinitely. 
+      </t>
+    </abstract>
   </front>
   <middle>
-<section title="Design">
-<t>
-The aim of Certificate Transparency is to have every public end-entity TLS certificate issued by a known Certificate Authority recorded in one or more certificate logs. In order to detect mis-issuance of certificates, all logs are publicly auditable. In particular, domain owners will be able to monitor logs for certificates issued on their own domain.
-</t>
-<t>
-In order to protect clients from unlogged mis-issued certificates, logs sign all recorded certificates, and clients can choose not to trust certificates that are not accompanied by an appropriate log signature. For privacy and performance reasons log signatures are embedded in the TLS handshake via the TLS authorization extension <xref target='RFC5878'/>, or in the certificate itself via an X.509v3 certificate extension <xref target='RFC5280'/>.
-</t>
-<t>
-In order to ensure a globally consistent view of the log, logs also provide a global signature over the entire log. Any inconsistency of logs can be detected through cross-checks on the global signature.
-</t>
-<t>
-Logs are only expected to certify that they have seen a certificate and thus, we do not specify any revocation mechanism for log signatures in this document. Logs will be append-only, and log signatures will be valid indefinitely. 
-</t>
-</section>
     <section title="Cryptographic components">
       <section title="Merkle Hash Trees">
 	<t>

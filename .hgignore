@@ -1,6 +1,6 @@
 .*~$
-^doc/sunlight\.html$
-^doc/sunlight\.txt$
+^doc/draft-laurie-pki-sunlight-..\.html$
+^doc/draft-laurie-pki-sunlight-..\.txt$
 .*\.o$
 .*\.so$
 ^src/merkletree/faildb$

@@ -1,7 +1,10 @@
-all: sunlight.html sunlight.txt
+VERSION=00
+BASE=draft-laurie-pki-sunlight-$(VERSION)
 
-sunlight.html: sunlight.xml
-	xml2rfc sunlight.xml sunlight.html
+all: $(BASE).html $(BASE).txt
 
-sunlight.txt: sunlight.xml
-	xml2rfc sunlight.xml sunlight.txt
+$(BASE).html: sunlight.xml
+	xml2rfc sunlight.xml $(BASE).html
+
+$(BASE).txt: sunlight.xml
+	xml2rfc sunlight.xml $(BASE).txt
