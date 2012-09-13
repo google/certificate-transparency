@@ -32,10 +32,10 @@ class FrontendSigner {
   };
 
   SubmitResult QueueEntry(const bstring &data,
-                          SignedCertificateTimestamp *sct);
+                          ct::SignedCertificateTimestamp *sct);
 
-  SubmitResult QueueEntry(CertificateEntry::Type type, const bstring data,
-                          SignedCertificateTimestamp *sct);
+  SubmitResult QueueEntry(ct::CertificateEntry::Type type, const bstring data,
+                          ct::SignedCertificateTimestamp *sct);
 
   static std::string SubmitResultString(SubmitResult result);
 
@@ -44,9 +44,9 @@ class FrontendSigner {
   SerialHasher *hasher_;
   LogSigner *signer_;
   SubmissionHandler *handler_;
-  bstring ComputePrimaryKey(const CertificateEntry &entry) const;
+  bstring ComputePrimaryKey(const ct::CertificateEntry &entry) const;
 
-  void TimestampAndSign(SignedCertificateTimestamp *sct) const;
+  void TimestampAndSign(ct::SignedCertificateTimestamp *sct) const;
 
   static SubmitResult GetSubmitError(SubmissionHandler::SubmitResult result);
 };

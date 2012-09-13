@@ -8,6 +8,8 @@
 #include "submission_handler.h"
 #include "util.h"
 
+using ct::SignedCertificateTimestamp;
+
 LogVerifier::LogVerifier(LogSigVerifier *sig_verifier,
                          MerkleVerifier *tree_verifier)
     : sig_verifier_(sig_verifier),

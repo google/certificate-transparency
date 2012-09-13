@@ -28,10 +28,10 @@ public:
   // Serialize the cache.
   std::vector<std::string> WriteCache() const;
 
-  CacheReply Insert(const SignedCertificateTimestamp &sct);
+  CacheReply Insert(const ct::SignedCertificateTimestamp &sct);
 
  private:
-  typedef std::map<std::string, SignedCertificateTimestamp> Cache;
+  typedef std::map<std::string, ct::SignedCertificateTimestamp> Cache;
   Cache cache_;
 };
 #endif

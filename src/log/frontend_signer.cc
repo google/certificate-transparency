@@ -9,6 +9,9 @@
 #include "submission_handler.h"
 #include "util.h"
 
+using ct::CertificateEntry;
+using ct::SignedCertificateTimestamp;
+
 FrontendSigner::FrontendSigner(LogDB *db, LogSigner *signer)
     : db_(db),
       hasher_(new Sha256Hasher),

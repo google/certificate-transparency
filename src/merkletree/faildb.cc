@@ -12,7 +12,7 @@
 #include "util.h"
 #include "types.h"
 
-static FailReport report;
+static ct::FailReport report;
 
 // The main function gets as input a temporary directory, tmp_dir.
 // We create the database in tmp_dir/ct; and the report in tmp_dir/report.
@@ -34,6 +34,8 @@ static void MakeReport(const std::string &tmp_dir) {
 }
 
 namespace {
+
+using ct::FailReport;
 
 // A class that behaves exactly like FileDB, except it counts file ops
 // and fails at a specific point.

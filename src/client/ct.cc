@@ -35,6 +35,9 @@
 #include "util.h"
 #include "types.h"
 
+using ct::CertificateEntry;
+using ct::SignedCertificateTimestamp;
+
 // Really really dumb and temporary filestore methods.
 static void WriteAllFiles(const std::vector<bstring> &files,
                           const char *dirname) {

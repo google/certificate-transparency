@@ -8,6 +8,8 @@
 #include "serializer.h"
 #include "types.h"
 
+using ct::CertificateEntry;
+
 CertSubmissionHandler::CertSubmissionHandler(CertChecker *cert_checker)
     : cert_checker_(cert_checker) {
   assert(cert_checker_ != NULL);

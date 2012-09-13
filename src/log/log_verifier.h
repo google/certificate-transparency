@@ -47,21 +47,22 @@ class LogVerifier {
 
   // Verify that the two entries, if equal, also have consistent timestamps.
   static VerifyResult
-  VerifySCTConsistency(const SignedCertificateTimestamp &sct,
-                       const SignedCertificateTimestamp &sct2);
+  VerifySCTConsistency(const ct::SignedCertificateTimestamp &sct,
+                       const ct::SignedCertificateTimestamp &sct2);
 
   // Verify that the timestamp is in the given range,
   // and the signature is valid.
   // Timestamps are given in milliseconds, since January 1, 1970,
   // 00:00 UTC time.
   VerifyResult
-  VerifySignedCertificateTimestamp(const SignedCertificateTimestamp &sct,
+  VerifySignedCertificateTimestamp(const ct::SignedCertificateTimestamp &sct,
                                    uint64_t begin_range,
                                    uint64_t end_range) const;
 
   // Verify that the timestamp is not in the future, and the signature is valid.
   VerifyResult
-  VerifySignedCertificateTimestamp(const SignedCertificateTimestamp &sct) const;
+  VerifySignedCertificateTimestamp(
+      const ct::SignedCertificateTimestamp &sct) const;
 
  private:
   LogSigVerifier *sig_verifier_;

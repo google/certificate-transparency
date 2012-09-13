@@ -26,6 +26,8 @@ static const char kChainLeafCert[] = "test2-cert.pem";
 
 namespace {
 
+using ct::CertificateEntry;
+
 class CertSubmissionHandlerTest : public ::testing::Test {
  protected:
   bstring ca_;

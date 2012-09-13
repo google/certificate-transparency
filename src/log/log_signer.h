@@ -45,19 +45,20 @@ class LogSigner {
 
   // Sign the cert timestamp and write the resulting DigitallySigned
   // signature message into |sct|.
-  SignResult SignCertificateTimestamp(SignedCertificateTimestamp *sct) const;
+  SignResult SignCertificateTimestamp(
+      ct::SignedCertificateTimestamp *sct) const;
 
  private:
   static SignResult GetSerializeSCTError(Serializer::SerializeResult result);
 
   void Sign(SignatureType type, const bstring &data,
-            DigitallySigned *result) const;
+            ct::DigitallySigned *result) const;
 
   bstring RawSign(const bstring &data) const;
 
   EVP_PKEY *pkey_;
-  DigitallySigned::HashAlgorithm hash_algo_;
-  DigitallySigned::SignatureAlgorithm sig_algo_;
+  ct::DigitallySigned::HashAlgorithm hash_algo_;
+  ct::DigitallySigned::SignatureAlgorithm sig_algo_;
 };
 
 class LogSigVerifier {
@@ -86,7 +87,8 @@ class LogSigVerifier {
                                   const bstring &leaf_cert,
                                   const bstring &signature) const;
 
-  VerifyResult VerifySCTSignature(const SignedCertificateTimestamp &sct) const;
+  VerifyResult VerifySCTSignature(
+      const ct::SignedCertificateTimestamp &sct) const;
 
  private:
   static VerifyResult
@@ -96,12 +98,12 @@ class LogSigVerifier {
   GetDeserializeSignatureError(Deserializer::DeserializeResult result);
 
   VerifyResult Verify(LogSigner::SignatureType type, const bstring &input,
-                      const DigitallySigned &signature) const;
+                      const ct::DigitallySigned &signature) const;
 
   bool RawVerify(const bstring &data, const bstring &sig_string) const;
 
   EVP_PKEY *pkey_;
-  DigitallySigned::HashAlgorithm hash_algo_;
-  DigitallySigned::SignatureAlgorithm sig_algo_;
+  ct::DigitallySigned::HashAlgorithm hash_algo_;
+  ct::DigitallySigned::SignatureAlgorithm sig_algo_;
 };
 #endif

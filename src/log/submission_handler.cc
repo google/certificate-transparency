@@ -3,6 +3,8 @@
 #include "submission_handler.h"
 #include "types.h"
 
+using ct::CertificateEntry;
+
 SubmissionHandler::SubmitResult
 SubmissionHandler::ProcessSubmission(const bstring &submission,
                                      CertificateEntry *entry) {

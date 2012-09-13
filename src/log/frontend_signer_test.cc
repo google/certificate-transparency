@@ -19,6 +19,9 @@
 
 namespace {
 
+using ct::CertificateEntry;
+using ct::SignedCertificateTimestamp;
+
 const char *ecp256_private_key = {
   "-----BEGIN EC PRIVATE KEY-----\n"
   "MHcCAQEEIG8QAquNnarN6Ik2cMIZtPBugh9wNRe0e309MCmDfBGuoAoGCCqGSM49\n"

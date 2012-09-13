@@ -35,25 +35,24 @@ class Serializer {
 
   bstring SerializedString() const { return output_; }
 
-  static SerializeResult CheckSignedFormat(const CertificateEntry &entry);
+  static SerializeResult CheckSignedFormat(const ct::CertificateEntry &entry);
 
-  static SerializeResult CheckFormat(const CertificateEntry &entry);
+  static SerializeResult CheckFormat(const ct::CertificateEntry &entry);
 
   static SerializeResult SerializeSCTForSigning(uint64_t timestamp, int type,
-                                                const bstring &leaf_certificate,
-                                                bstring *result);
+      const bstring &leaf_certificate, bstring *result);
 
   static SerializeResult
-  SerializeSCTForSigning(const SignedCertificateTimestamp &sct,
+  SerializeSCTForSigning(const ct::SignedCertificateTimestamp &sct,
                          bstring *result) {
     return SerializeSCTForSigning(sct.timestamp(), sct.entry().type(),
                                   sct.entry().leaf_certificate(), result);
   }
 
-  SerializeResult WriteSCTToken(const SignedCertificateTimestamp &sct);
+  SerializeResult WriteSCTToken(const ct::SignedCertificateTimestamp &sct);
 
   static SerializeResult
-  SerializeSCTToken(const SignedCertificateTimestamp &sct,
+  SerializeSCTToken(const ct::SignedCertificateTimestamp &sct,
                     bstring *result);
 
   template <class T>
@@ -63,8 +62,8 @@ class Serializer {
     return serializer.SerializedString();
   }
 
-  static SerializeResult SerializeDigitallySigned(const DigitallySigned &sig,
-                                                  bstring *result);
+  static SerializeResult SerializeDigitallySigned(
+      const ct::DigitallySigned &sig, bstring *result);
 
  private:
   template <class T>
@@ -93,9 +92,9 @@ class Serializer {
                                  size_t max_elem_length,
                                  size_t max_total_length);
 
-  SerializeResult WriteDigitallySigned(const DigitallySigned &sig);
+  SerializeResult WriteDigitallySigned(const ct::DigitallySigned &sig);
 
-  static SerializeResult CheckFormat(const DigitallySigned &sig);
+  static SerializeResult CheckFormat(const ct::DigitallySigned &sig);
 
   static SerializeResult CheckFormat(const std::string &cert);
 
@@ -120,13 +119,13 @@ class Deserializer {
 
   bool ReachedEnd() const { return bytes_remaining_ == 0; }
 
-  DeserializeResult ReadSCTToken(SignedCertificateTimestamp *sct);
+  DeserializeResult ReadSCTToken(ct::SignedCertificateTimestamp *sct);
 
-  static DeserializeResult DeserializeSCTToken(const bstring &in,
-                                  SignedCertificateTimestamp *sct);
+  static DeserializeResult
+  DeserializeSCTToken(const bstring &in, ct::SignedCertificateTimestamp *sct);
 
-  static DeserializeResult DeserializeDigitallySigned(const bstring &in,
-                                         DigitallySigned *sig);
+  static DeserializeResult
+  DeserializeDigitallySigned(const bstring &in, ct::DigitallySigned *sig);
 
  private:
   template<class T>
@@ -148,7 +147,7 @@ class Deserializer {
 
   bool ReadVarBytes(size_t max_length, bstring *result);
 
-  DeserializeResult ReadDigitallySigned(DigitallySigned *sig);
+  DeserializeResult ReadDigitallySigned(ct::DigitallySigned *sig);
 
   const byte *current_pos_;
   size_t bytes_remaining_;

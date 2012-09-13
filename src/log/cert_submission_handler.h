@@ -22,15 +22,15 @@ class CertSubmissionHandler : public SubmissionHandler {
   // For clients, to reconstruct the bytestring under the signature
   // from the observed chain.
   static SubmitResult X509ChainToEntry(const CertChain &chain,
-                                       CertificateEntry *entry);
+                                       ct::CertificateEntry *entry);
 
  protected:
   SubmitResult ProcessX509Submission(const bstring &submission,
-                                     CertificateEntry *entry);
+                                     ct::CertificateEntry *entry);
 
 
   SubmitResult ProcessPreCertSubmission(const bstring &submission,
-                                        CertificateEntry *entry);
+                                        ct::CertificateEntry *entry);
 
  private:
   static bstring TbsCertificate(const CertChain &chain);

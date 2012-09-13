@@ -8,6 +8,13 @@ const size_t Serializer::kMaxCertificateLength = (1 << 24) - 1;
 const size_t Serializer::kMaxCertificateChainLength = (1 << 24) - 1;
 const size_t Serializer::kMaxSignatureLength = (1 << 16) - 1;
 
+using ct::CertificateEntry;
+using ct::CertificateEntry_Type_IsValid;
+using ct::DigitallySigned;
+using ct::DigitallySigned_HashAlgorithm_IsValid;
+using ct::DigitallySigned_SignatureAlgorithm_IsValid;
+using ct::SignedCertificateTimestamp;
+
 // static
 size_t Serializer::PrefixLength(size_t max_length) {
   assert(max_length > 0);

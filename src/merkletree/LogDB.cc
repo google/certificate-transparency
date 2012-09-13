@@ -18,6 +18,9 @@
 #include "types.h"
 #include "util.h"
 
+using ct::EntryCount;
+using ct::EntryInfo;
+
 MemoryDB::MemoryDB() : has_pending_segment_(false) {}
 
 LogDB::Status MemoryDB::WriteEntry(const bstring &key,

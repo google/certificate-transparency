@@ -12,6 +12,10 @@
 #include "types.h"
 #include "util.h"
 
+using ct::CertificateEntry;
+using ct::DigitallySigned;
+using ct::SignedCertificateTimestamp;
+
 LogSigner::LogSigner(EVP_PKEY *pkey)
     : pkey_(pkey) {
   assert(pkey_ != NULL);

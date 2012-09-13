@@ -28,13 +28,13 @@ class SubmissionHandler {
 
   // entry should have the expected type set.
   SubmitResult ProcessSubmission(const bstring &submission,
-                                 CertificateEntry *entry);
+                                 ct::CertificateEntry *entry);
 
  protected:
   virtual SubmitResult ProcessX509Submission(const bstring &submission,
-                                             CertificateEntry *entry);
+                                             ct::CertificateEntry *entry);
   virtual SubmitResult ProcessPreCertSubmission(const bstring &submission,
-                                                CertificateEntry *entry);
+                                                ct::CertificateEntry *entry);
 
   static SubmitResult GetFormatError(Serializer::SerializeResult result);
 

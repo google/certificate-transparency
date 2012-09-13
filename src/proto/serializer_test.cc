@@ -8,6 +8,10 @@
 
 namespace {
 
+using ct::CertificateEntry;
+using ct::DigitallySigned;
+using ct::SignedCertificateTimestamp;
+
 // A slightly shorter notation for constructing binary blobs from test vectors.
 std::string S(const char *hexstring, size_t byte_length) {
   return std::string(hexstring, 2 * byte_length);

@@ -31,7 +31,7 @@ class TestFileDB {
       std::string command = "rm -r " + file_base_;
       int ret = system(command.c_str());
       // Can't ignore the return value.
-      ret = 0;
+      ret = ret;
     }
   }
 

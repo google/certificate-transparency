@@ -25,6 +25,9 @@
 
 #define VV(x)
 
+using ct::CertificateEntry;
+using ct::SignedCertificateTimestamp;
+
 class EventLoop;
 
 class Services {

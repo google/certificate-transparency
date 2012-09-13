@@ -6,6 +6,8 @@
 #include "ct.pb.h"
 #include "log_verifier.h"
 
+using ct::SignedCertificateTimestamp;
+
 SCTCache::SCTCache(
     const std::vector<std::string> &cache) {
   std::vector<std::string>::const_iterator it;
