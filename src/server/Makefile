@@ -12,11 +12,12 @@ endif
 
 CXXFLAGS= $(INCLUDE) $(CXXFLAG)
 
-OBJS= ../merkletree/LogDB.o ../merkletree/SerialHasher.o \
+OBJS= ../merkletree/SerialHasher.o \
 ../util/ct_debug.o ../util/util.o \
 ../log/cert_checker.o ../log/cert.o \
 ../log/submission_handler.o ../log/cert_submission_handler.o \
 ../log/log_signer.o ../log/frontend_signer.o \
+../log/certificate_db.o ../log/file_db.o ../log/filesystem_op.o \
 ../proto/ct.pb.o ../proto/serializer.o
 
 all: .depend ct-server

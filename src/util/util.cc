@@ -2,9 +2,11 @@
 #include <iostream>
 #include <fstream>
 #include <stdint.h>
+#include <stdio.h>
 #include <stdlib.h>
 #include <string>
 #include <sys/time.h>
+#include <unistd.h>
 
 #include "types.h"
 #include "util.h"
@@ -30,16 +32,6 @@ byte ByteValue(char high, char low) {
 }
 
 }  // namespace
-
-size_t PrefixLength(size_t max_length) {
-  size_t prefix_length = 0;
-
-  for ( ; max_length > 0; max_length >>= 8)
-    ++prefix_length;
-
-  return prefix_length;
-}
-
 
 std::string HexString(const bstring &data) {
   std::string ret;
@@ -112,11 +104,29 @@ bool ReadBinaryFile(const std::string &file, bstring *contents) {
   return true;
 }
 
-uint64_t TimeInMilliseconds() {
-  struct timeval tv;
-  gettimeofday(&tv, NULL);
-  return static_cast<uint64_t>(tv.tv_sec) * 1000 +
-      static_cast<uint64_t>(tv.tv_usec) / 1000;
+std::string WriteTemporaryBinaryFile(const std::string &file_template,
+                                     const bstring &data) {
+  size_t strlen = file_template.size() + 1;
+  char *template_buf = new char[strlen];
+  memcpy(template_buf, file_template.data(), file_template.size());
+  template_buf[strlen - 1] = '\0';
+  int fd = mkstemp(template_buf);
+  std::string tmp_file;
+  if (fd >= 0) {
+    tmp_file = std::string(template_buf);
+    ssize_t bytes_written = write(fd,
+                                  reinterpret_cast<const char*>(data.data()),
+                                  data.length());
+    close(fd);
+    if (bytes_written < 0 ||
+        static_cast<size_t>(bytes_written) < data.length()) {
+          // Write failed; try to clean up.
+          remove(tmp_file.c_str());
+          tmp_file.clear();
+        }
+  }
+  delete[] template_buf;
+  return tmp_file;
 }
 
 std::string CreateTemporaryDirectory(const std::string &dir_template) {
@@ -130,6 +140,13 @@ std::string CreateTemporaryDirectory(const std::string &dir_template) {
     ret = std::string(tmpdir);
   delete[] template_buf;
   return ret;
+}
+
+uint64_t TimeInMilliseconds() {
+  struct timeval tv;
+  gettimeofday(&tv, NULL);
+  return static_cast<uint64_t>(tv.tv_sec) * 1000 +
+      static_cast<uint64_t>(tv.tv_usec) / 1000;
 }
 
 } // namespace util

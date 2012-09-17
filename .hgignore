@@ -3,12 +3,8 @@
 ^doc/draft-laurie-pki-sunlight-..\.txt$
 .*\.o$
 .*\.so$
-^src/merkletree/faildb$
-^src/merkletree/file_op_fail_test.log$
-^src/merkletree/LogDBTest$
 ^src/merkletree/MerkleTreeTest$
 ^src/merkletree/SerialHasherTest$
-^src/merkletree/TreeLoggerTest$
 ^src/merkletree/TreeHasherTest$
 \.depend
 ^src/client/ct$
@@ -24,6 +20,8 @@
 ^src/log/log_signer_test$
 ^src/log/submission_handler_test$
 ^src/log/frontend_signer_test$
+^src/log/file_db_test$
+^src/log/certificate_db_test$
 .*\.pb.h$
 .*\.pb.cc$
 ^src/proto/serializer_test$

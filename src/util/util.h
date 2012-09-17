@@ -18,9 +18,16 @@ bool ReadTextFile(const std::string &file, std::string *result);
 
 bool ReadBinaryFile(const std::string &file, bstring *result);
 
-uint64_t TimeInMilliseconds();
+// Write to a temporary file and return the filename, or an
+// empty string on error.
+std::string WriteTemporaryBinaryFile(const std::string &file_template,
+                                     const bstring &data);
 
+// Create a temporary directory, and return the dirname, or an
+// empty string on error.
 std::string CreateTemporaryDirectory(const std::string &dir_template);
+
+uint64_t TimeInMilliseconds();
 
 }  // namespace util
 #endif

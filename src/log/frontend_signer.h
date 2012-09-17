@@ -6,17 +6,18 @@
 #include "ct.pb.h"
 #include "submission_handler.h"
 
-class LogDB;
+class CertificateDB;
 class LogSigner;
 class SerialHasher;
 
 class FrontendSigner {
  public:
   // Takes ownership of db and signer.
-  FrontendSigner(LogDB *db, LogSigner *signer);
+  FrontendSigner(CertificateDB *db, LogSigner *signer);
 
   // Takes ownership of db, signer and handler.
-  FrontendSigner(LogDB *db, LogSigner *signer, SubmissionHandler *handler);
+  FrontendSigner(CertificateDB *db, LogSigner *signer,
+                 SubmissionHandler *handler);
 
   ~FrontendSigner();
 
@@ -40,7 +41,7 @@ class FrontendSigner {
   static std::string SubmitResultString(SubmitResult result);
 
  private:
-  LogDB *db_;
+  CertificateDB *db_;
   SerialHasher *hasher_;
   LogSigner *signer_;
   SubmissionHandler *handler_;

@@ -53,25 +53,8 @@ message SignedCertificateTimestamp {
   optional DigitallySigned signature = 3;
 }
 
-message FailReport {
-  enum FailedOp {
-    INIT = 0;
-    WRITE_ENTRY = 1;
-    MAKE_SEGMENT = 2;
-    WRITE_SEGMENT_AND_INFO = 3;
-    NO_FAIL = 4;
-  }
-
-  optional FailedOp op = 1;
-  optional uint32 segment = 2;
-  optional uint32 index = 3;
-}
-
-message EntryInfo {
-  optional uint32 segment = 1;
-  optional uint32 index = 2;
-}
-
-message EntryCount {
-  optional uint64 count = 1;
+message LoggedCertificate {
+  required SignedCertificateTimestamp sct = 1;
+  required bytes certificate_key = 2;
+  optional uint64 sequence_number = 3;
 }

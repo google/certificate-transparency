@@ -15,10 +15,11 @@
 
 #include "cert_checker.h"
 #include "cert_submission_handler.h"
+#include "certificate_db.h"
 #include "ct.h"
 #include "ct.pb.h"
+#include "file_db.h"
 #include "frontend_signer.h"
-#include "log_db.h"
 #include "log_signer.h"
 #include "serializer.h"
 #include "types.h"
@@ -519,8 +520,9 @@ static bool InitServer(int *sock, int port, const char *ip, int type) {
 }
 
 int main(int argc, char **argv) {
-  if (argc != 4) {
-    std::cerr << argv[0] << " <port> <key> <trusted_cert_dir>\n";
+  if (argc != 6) {
+    std::cerr << argv[0] << " <port> <key> <trusted_cert_dir> "
+        "<file_base> <storage_depth>\n";
     exit(1);
   }
 
@@ -551,7 +553,11 @@ int main(int argc, char **argv) {
     exit(1);
   }
 
-  FrontendSigner signer(new MemoryDB(), new LogSigner(pkey),
+  std::string file_base = argv[4];
+  unsigned storage_depth = atoi(argv[5]);
+
+  FrontendSigner signer(new CertificateDB(new FileDB(file_base, storage_depth)),
+                        new LogSigner(pkey),
                         new CertSubmissionHandler(&checker));
 
   CTLogManager manager(&signer);

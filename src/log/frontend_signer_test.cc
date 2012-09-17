@@ -4,16 +4,14 @@
 #include <openssl/pem.h>
 #include <stddef.h>
 #include <string>
-#include <sys/stat.h>
-#include <unistd.h>
 
+#include "certificate_db.h"
 #include "ct.pb.h"
+#include "file_db.h"
 #include "frontend_signer.h"
-#include "log_db.h"
 #include "log_signer.h"
 #include "log_verifier.h"
 #include "merkle_verifier.h"
-#include "test_db.h"
 #include "types.h"
 #include "util.h"
 
@@ -53,7 +51,8 @@ EVP_PKEY* PublicKeyFromPem(const std::string &pemkey) {
   return pkey;
 }
 
-template <class T>
+const unsigned kStorageDepth = 3;
+
 class FrontendSignerTest : public ::testing::Test {
  protected:
   FrontendSignerTest()
@@ -65,11 +64,25 @@ class FrontendSignerTest : public ::testing::Test {
     EVP_PKEY *pubkey = PublicKeyFromPem(ecp256_public_key);
     verifier_ = new LogVerifier(new LogSigVerifier(pubkey),
                                 new MerkleVerifier(new Sha256Hasher()));
-    LogDB *db = t_.GetDB();
-    ASSERT_TRUE(db != NULL);
-    frontend_ = new FrontendSigner(db, new LogSigner(pkey));
+    file_base_ = util::CreateTemporaryDirectory("/tmp/ctlogXXXXXX");
+    ASSERT_EQ("/tmp/ctlog", file_base_.substr(0, 10));
+    ASSERT_EQ(16U, file_base_.length());
+
+    frontend_ = new FrontendSigner(new CertificateDB(
+        new FileDB(file_base_, kStorageDepth)), new LogSigner(pkey));
     ASSERT_TRUE(verifier_ != NULL);
     ASSERT_TRUE(frontend_ != NULL);
+  }
+
+  void TearDown() {
+    // Check again that it is safe to empty file_base_.
+    ASSERT_EQ("/tmp/ctlog", file_base_.substr(0, 10));
+    ASSERT_EQ(16U, file_base_.length());
+    std::string command = "rm -r " + file_base_;
+    int ret = system(command.c_str());
+    if (ret != 0)
+      std::cout << "Failed to delete temporary directory in "
+                << file_base_ << std::endl;
   }
 
   ~FrontendSignerTest() {
@@ -79,17 +92,13 @@ class FrontendSignerTest : public ::testing::Test {
 
   LogVerifier *verifier_;
   FrontendSigner *frontend_;
-  T t_;
+  std::string file_base_;
 };
-
-typedef ::testing::Types<TestMemoryDB, TestFileDB> LogDBImplementations;
-
-TYPED_TEST_CASE(FrontendSignerTest, LogDBImplementations);
 
 const byte unicorn[] = "Unicorn";
 const byte alice[] = "Alice";
 
-TYPED_TEST(FrontendSignerTest, Log) {
+TEST_F(FrontendSignerTest, Log) {
   const bstring kUnicorn(unicorn, 7);
   const bstring kAlice(alice, 5);
 
@@ -106,7 +115,7 @@ TYPED_TEST(FrontendSignerTest, Log) {
   EXPECT_EQ(sct1.entry().leaf_certificate(), kAlice);
 }
 
-TYPED_TEST(FrontendSignerTest, Time) {
+TEST_F(FrontendSignerTest, Time) {
   const bstring kUnicorn(unicorn, 7);
   const bstring kAlice(alice, 5);
 
@@ -122,7 +131,7 @@ TYPED_TEST(FrontendSignerTest, Time) {
   EXPECT_LE(sct1.timestamp(), util::TimeInMilliseconds());
 }
 
-TYPED_TEST(FrontendSignerTest, LogDuplicates) {
+TEST_F(FrontendSignerTest, LogDuplicates) {
   const bstring kUnicorn(unicorn, 7);
 
   SignedCertificateTimestamp sct0, sct1;
@@ -141,7 +150,7 @@ TYPED_TEST(FrontendSignerTest, LogDuplicates) {
   EXPECT_EQ(sct0.timestamp(), sct1.timestamp());
 }
 
-TYPED_TEST(FrontendSignerTest, Verify) {
+TEST_F(FrontendSignerTest, Verify) {
   const bstring kUnicorn(unicorn, 7);
   const bstring kAlice(alice, 5);
 
@@ -166,7 +175,7 @@ TYPED_TEST(FrontendSignerTest, Verify) {
             LogVerifier::INVALID_SIGNATURE);
 }
 
-TYPED_TEST(FrontendSignerTest, TimedVerify) {
+TEST_F(FrontendSignerTest, TimedVerify) {
   const bstring kUnicorn(unicorn, 7);
   const bstring kAlice(alice, 5);
 
