@@ -1,6 +1,7 @@
 .*~$
 ^doc/draft-laurie-pki-sunlight-..\.html$
 ^doc/draft-laurie-pki-sunlight-..\.txt$
+^doc/draft-laurie-pki-sunlight-..-..-diff\.html$
 .*\.o$
 .*\.so$
 ^src/merkletree/MerkleTreeTest$
