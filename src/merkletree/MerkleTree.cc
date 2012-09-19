@@ -40,12 +40,18 @@ static inline bool IsPowerOfTwoPlusOne(size_t leaf_count) {
 }
 
 size_t MerkleTree::AddLeaf(const bstring &data) {
+  return AddLeafHash(treehasher_.HashLeaf(data));
+}
+
+size_t MerkleTree::AddLeafHash(const bstring &hash) {
+  assert(treehasher_.DigestSize() == hash.size());
+
   if (tree_.empty()) {
     tree_.push_back(std::vector<bstring>(0));
     // The first leaf hash is also the first root.
     leaves_processed_ = 1;
   }
-  tree_[0].push_back(treehasher_.HashLeaf(data));
+  tree_[0].push_back(hash);
   size_t leaf_count = LeafCount();
   // Update level count: a k-level tree can hold 2^{k-1} leaves,
   // so increment level count every time we overflow a power of two.

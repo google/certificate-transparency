@@ -60,6 +60,18 @@ class MerkleTree {
   // @param data Binary input blob
   size_t AddLeaf(const bstring &data);
 
+  // Add a new leaf to the hash tree. Stores the provided hash in the
+  // tree structure.  It is the caller's responsibility to ensure that
+  // the hash is correct.
+  //
+  // (We will evaluate the tree lazily, and not update the root here.)
+  //
+  // Returns the position of the leaf in the tree. Indexing starts at 1,
+  // so position = number of leaves in the tree after this update.
+  //
+  // @param hash leaf hash
+  size_t AddLeafHash(const bstring &hash);
+
   // Get the current root of the tree.
   // Update the root to reflect the current shape of the tree,
   // and return the tree digest.

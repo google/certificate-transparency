@@ -431,6 +431,14 @@ TEST_F(MerkleTreeTest, ConsistencyTestVectors) {
   }
 }
 
+TEST_F(MerkleTreeTest, AddLeafHash) {
+  const byte* kHashValue = "0123456789abcdef0123456789abcdef";
+  MerkleTree tree(new Sha256Hasher());
+  size_t index = tree.AddLeafHash(kHashValue);
+  EXPECT_EQ(1U, index);
+  EXPECT_EQ(kHashValue, tree.LeafHash(index));
+}
+
 ////////////////////////////////////////////////////////////////////////////////
 //                          VERIFICATION TESTS                                //
 ////////////////////////////////////////////////////////////////////////////////
