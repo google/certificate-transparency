@@ -442,6 +442,11 @@ d0 d1   d2 d3           d0 d1   d2 d3  d4 d5
 	  Misissued certificates that have not been publicly logged, and thus do not have a valid SCT, will be rejected by clients. Misissued certificates that do have an SCT from a log will appear in the public log within the Maximum Merge Delay, assuming the log is operating correctly. Thus, the maximum period of time during which a misissued certificate can be used without being available for audit is the MMD. 
 	</t>
       </section>
+      <section title="Detection of Misissue">
+	<t>
+	  The log does not itself detect misissued certificate, it relies instead on interested parties, such as domain owners, to monitor it and take corrective action when a misissue is detected.
+	</t>
+      </section>
       <section title="Misbehaving logs">
 	<t>
 	  A log can misbehave in two ways: (1), by failing to incorporate a certificate with an SCT in the Merkle Tree within the MMD; and (2), by violating its append-only property by presenting two different, conflicting views of the Merkle Tree at different times and/or to different parties. Both forms of violation will be promptly and publicly detectable.
