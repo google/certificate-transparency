@@ -54,3 +54,7 @@ $ cd test
 $ make APACHEDIR=<path to httpd> local-links
 
 and run tests.
+
+7. To build Apache, check out OpenSSL 1.0.2 or higher and build that. You'll also need to install it somewhere. Check out the head of Apache, and configure it like:
+
+$ ./configure --enable-ssl --with-ssl=<path to your install>
