@@ -217,6 +217,12 @@ class FailingFileDBDeathTest : public ::testing::Test {
   std::string file_base_;
 };
 
+TEST(DeathTest, SupportDeath) {
+#ifndef EXPECT_DEATH
+  FAIL() << "Death tests not supported on this platform.";
+#endif
+};
+
 // TODO(ekasper): death tests throw the following warning
 // (at least on some platforms):
 //
@@ -253,14 +259,14 @@ TEST_F(FailingFileDBDeathTest, DieOnFailedCreate) {
   for (int i = op_count_init; i < op_count0; ++i) {
     FileDB db(GetTemporaryDirectory(), kStorageDepth,
               new FailingFilesystemOp(i));
-    EXPECT_DEATH(db.CreateEntry(key0, value0), "");
+    EXPECT_DEATH_IF_SUPPORTED(db.CreateEntry(key0, value0), "");
   }
 
   for (int i = op_count0; i < op_count1; ++i) {
     FileDB db(GetTemporaryDirectory(), kStorageDepth,
               new FailingFilesystemOp(i));
     EXPECT_EQ(FileDB::OK, db.CreateEntry(key0, value0));
-    EXPECT_DEATH(db.CreateEntry(key1, value1), "");
+    EXPECT_DEATH_IF_SUPPORTED(db.CreateEntry(key1, value1), "");
   }
 };
 
@@ -287,7 +293,7 @@ TEST_F(FailingFileDBDeathTest, DieOnFailedUpdate) {
     FileDB db(GetTemporaryDirectory(), kStorageDepth,
               new FailingFilesystemOp(i));
     EXPECT_EQ(FileDB::OK, db.CreateEntry(key, value));
-    EXPECT_DEATH(db.UpdateEntry(key, new_value), "");
+    EXPECT_DEATH_IF_SUPPORTED(db.UpdateEntry(key, new_value), "");
   }
 };
 
@@ -315,7 +321,7 @@ TEST_F(FailingFileDBDeathTest, ResumeOnFailedCreate) {
   for (int i = op_count_init; i < op_count0; ++i) {
     std::string db_dir = GetTemporaryDirectory();
     FileDB db(db_dir, kStorageDepth, new FailingFilesystemOp(i));
-    EXPECT_DEATH(db.CreateEntry(key0, value0), "");
+    EXPECT_DEATH_IF_SUPPORTED(db.CreateEntry(key0, value0), "");
     FileDB db2(db_dir, kStorageDepth);
     // Entry should not be there, and we should be able to insert it.
     EXPECT_EQ(FileDB::NOT_FOUND, db2.LookupEntry(key0, NULL));
@@ -330,7 +336,7 @@ TEST_F(FailingFileDBDeathTest, ResumeOnFailedCreate) {
     std::string db_dir = GetTemporaryDirectory();
     FileDB db(db_dir, kStorageDepth, new FailingFilesystemOp(i));
     EXPECT_EQ(FileDB::OK, db.CreateEntry(key0, value0));
-    EXPECT_DEATH(db.CreateEntry(key1, value1), "");
+    EXPECT_DEATH_IF_SUPPORTED(db.CreateEntry(key1, value1), "");
     FileDB db2(db_dir, kStorageDepth);
     // First entry should be there just fine.
     bstring lookup_result;
@@ -369,7 +375,7 @@ TEST_F(FailingFileDBDeathTest, ResumeOnFailedUpdate) {
     std::string db_dir = GetTemporaryDirectory();
     FileDB db(db_dir, kStorageDepth, new FailingFilesystemOp(i));
     EXPECT_EQ(FileDB::OK, db.CreateEntry(key, value));
-    EXPECT_DEATH(db.UpdateEntry(key, new_value), "");
+    EXPECT_DEATH_IF_SUPPORTED(db.UpdateEntry(key, new_value), "");
     FileDB db2(db_dir, kStorageDepth);
     // The entry should be there just fine...
     bstring lookup_result;

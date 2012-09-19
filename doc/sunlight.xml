@@ -219,7 +219,7 @@ d0 d1   d2 d3           d0 d1   d2 d3  d4 d5
 
     struct {
         LogEntryType entry_type;
-            select (entry_type) {
+        select (entry_type) {
             case x509_entry: X509ChainEntry;
             case precert_entry: PrecertChainEntry;
         } entry;
@@ -282,7 +282,10 @@ d0 d1   d2 d3           d0 d1   d2 d3  d4 d5
             SignatureType signature_type = certificate_timestamp;	    
             uint64 timestamp;
             LogEntryType entry_type;
-            ASN.1Cert certificate;
+            select(entry_type) {
+                case x509_entry: ASN.1Cert;
+                case precert_entry: ASN.1Cert;
+            } signed_entry;
         };
     } SignedCertificateTimestamp;
 	  </artwork>
@@ -297,7 +300,7 @@ d0 d1   d2 d3           d0 d1   d2 d3  d4 d5
 	  <spanx style="verb">timestamp</spanx> is the current UTC time since epoch (January 1, 1970, 00:00), in milliseconds.
 	</t>
 	<t>
-	  <spanx style="verb">signed_certificate</spanx> is the <spanx style="verb">leaf_certificate</spanx> (in case of an X509ChainEntry), or <spanx style="verb">tbs_certificate</spanx> (in case of a PrecertChainEntry).
+	  <spanx style="verb">signed_entry</spanx> is the <spanx style="verb">leaf_certificate</spanx> (in case of an X509ChainEntry), or <spanx style="verb">tbs_certificate</spanx> (in case of a PrecertChainEntry).
 	</t>
       </section>
 
@@ -312,12 +315,18 @@ d0 d1   d2 d3           d0 d1   d2 d3  d4 d5
     struct {
         uint64 timestamp;
         LogEntryType entry_type;
-        ASN.1Cert certificate;
+        select(entry_type) {
+            case x509_entry: ASN.1Cert;
+            case precert_entry: ASN.1Cert;
+        } signed_entry;
     } MerkleTreeLeaf;
   </artwork>
 </figure>
 <t>
   Here <spanx style="verb">timestamp</spanx> is the timestamp of the corresponding SCT issued for this certificate.
+</t>
+<t>
+  <spanx style="verb">signed_entry</spanx> is the <spanx style="verb">signed_entry</spanx> of the corresponding SCT.
 </t>
 	<t>
 	  Structure of the Signed Merkle Tree Update:
