@@ -1,4 +1,4 @@
-VERSION=01
+VERSION=02
 PREV=$(shell expr $(VERSION) - 1 | printf '%02d')
 NAME=draft-laurie-pki-sunlight
 BASE=$(NAME)-$(VERSION)
