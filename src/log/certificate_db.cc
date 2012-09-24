@@ -21,7 +21,7 @@ CertificateDB::~CertificateDB() {
   delete cert_db_;
 }
 
-CertificateDB::WriteResult CertificateDB::CreatePendingCertificateEntry(
+Database::WriteResult CertificateDB::CreatePendingCertificateEntry(
     const bstring &pending_key, const SignedCertificateTimestamp &sct) {
   if (pending_keys_.find(pending_key) != pending_keys_.end())
     return ENTRY_ALREADY_PENDING;
@@ -47,7 +47,7 @@ std::set<bstring> CertificateDB::PendingKeys() const {
   return pending_keys_;
 }
 
-CertificateDB::WriteResult CertificateDB::AssignCertificateSequenceNumber(
+Database::WriteResult CertificateDB::AssignCertificateSequenceNumber(
     const bstring &pending_key, uint64_t sequence_number) {
   std::set<bstring>::iterator pending_it = pending_keys_.find(pending_key);
   if (pending_it == pending_keys_.end()) {
@@ -79,7 +79,7 @@ CertificateDB::WriteResult CertificateDB::AssignCertificateSequenceNumber(
   return OK;
 }
 
-CertificateDB::LookupResult CertificateDB::LookupCertificateEntry(
+Database::LookupResult CertificateDB::LookupCertificateEntry(
     const bstring &certificate_key, uint64_t *sequence_number,
     SignedCertificateTimestamp *result) const {
   bstring cert_data;
@@ -105,7 +105,7 @@ CertificateDB::LookupResult CertificateDB::LookupCertificateEntry(
   return PENDING;
 }
 
-CertificateDB::LookupResult CertificateDB::LookupCertificateEntry(
+Database::LookupResult CertificateDB::LookupCertificateEntry(
     uint64_t sequence_number, SignedCertificateTimestamp *result) const {
   std::map<uint64_t, bstring>::const_iterator it =
       sequence_map_.find(sequence_number);

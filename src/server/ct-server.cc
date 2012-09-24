@@ -557,8 +557,8 @@ int main(int argc, char **argv) {
   unsigned storage_depth = atoi(argv[5]);
 
   FrontendSigner signer(new CertificateDB(new FileDB(file_base, storage_depth)),
-                        new LogSigner(pkey),
-                        new CertSubmissionHandler(&checker));
+			new LogSigner(pkey),
+			new CertSubmissionHandler(&checker));
 
   CTLogManager manager(&signer);
   CTServerListener l(&loop, fd, &manager);

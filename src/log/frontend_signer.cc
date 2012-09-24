@@ -1,7 +1,7 @@
 #include <assert.h>
 #include <stdint.h>
 
-#include "certificate_db.h"
+#include "database.h"
 #include "ct.pb.h"
 #include "frontend_signer.h"
 #include "log_signer.h"
@@ -12,7 +12,7 @@
 using ct::CertificateEntry;
 using ct::SignedCertificateTimestamp;
 
-FrontendSigner::FrontendSigner(CertificateDB *db, LogSigner *signer)
+FrontendSigner::FrontendSigner(Database *db, LogSigner *signer)
     : db_(db),
       hasher_(new Sha256Hasher),
       signer_(signer),
@@ -22,7 +22,7 @@ FrontendSigner::FrontendSigner(CertificateDB *db, LogSigner *signer)
   assert(db_ != NULL);
 }
 
-FrontendSigner::FrontendSigner(CertificateDB *db, LogSigner *signer,
+FrontendSigner::FrontendSigner(Database *db, LogSigner *signer,
                                SubmissionHandler *handler)
     : db_(db),
       hasher_(new Sha256Hasher),
@@ -62,25 +62,25 @@ FrontendSigner::QueueEntry(CertificateEntry::Type type,
   bstring primary_key = ComputePrimaryKey(entry);
   assert(!primary_key.empty());
 
-  CertificateDB::LookupResult db_result =
+  Database::LookupResult db_result =
       db_->LookupCertificateEntry(primary_key, sct);
-  if (db_result == CertificateDB::LOGGED)
+  if (db_result == Database::LOGGED)
       return LOGGED;
-  if (db_result == CertificateDB::PENDING)
+  if (db_result == Database::PENDING)
     return PENDING;
 
-  assert(db_result == CertificateDB::NOT_FOUND);
+  assert(db_result == Database::NOT_FOUND);
 
   SignedCertificateTimestamp local_sct;
   local_sct.mutable_entry()->CopyFrom(entry);
 
   TimestampAndSign(&local_sct);
 
-  CertificateDB::WriteResult write_result =
+  Database::WriteResult write_result =
       db_->CreatePendingCertificateEntry(primary_key, local_sct);
 
   // Assume for now that nobody interfered while we were busy signing.
-  assert(write_result == CertificateDB::OK);
+  assert(write_result == Database::OK);
   if (sct != NULL)
     sct->CopyFrom(local_sct);
   return NEW;
