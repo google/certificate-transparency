@@ -70,8 +70,9 @@ class FrontendSignerTest : public ::testing::Test {
     ASSERT_EQ("/tmp/ctlog", file_base_.substr(0, 10));
     ASSERT_EQ(16U, file_base_.length());
 
-    frontend_ = new FrontendSigner(new CertificateDB(
-        new FileStorage(file_base_, kStorageDepth)), new LogSigner(pkey));
+    frontend_ = new FrontendSigner(new FileDB(new FileStorage(file_base_,
+                                                              kStorageDepth)),
+                                   new LogSigner(pkey));
     ASSERT_TRUE(verifier_ != NULL);
     ASSERT_TRUE(frontend_ != NULL);
   }

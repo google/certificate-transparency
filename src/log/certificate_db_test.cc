@@ -37,14 +37,14 @@ template <class T> class DBTest : public ::testing::Test {
   std::string file_base_;
 };
 
-template <> void DBTest<CertificateDB>::SetUp() {
+template <> void DBTest<FileDB>::SetUp() {
   file_base_ = util::CreateTemporaryDirectory("/tmp/ctlogXXXXXX");
   ASSERT_EQ("/tmp/ctlog", file_base_.substr(0, 10));
   ASSERT_EQ(16U, file_base_.length());
-  db_ = new CertificateDB(new FileStorage(file_base_, kStorageDepth));
+  db_ = new FileDB(new FileStorage(file_base_, kStorageDepth));
 }
 
-template <> void DBTest<CertificateDB>::TearDown() {
+template <> void DBTest<FileDB>::TearDown() {
   // Check again that it is safe to empty file_base_.
   ASSERT_EQ("/tmp/ctlog", file_base_.substr(0, 10));
   ASSERT_EQ(16U, file_base_.length());
@@ -55,11 +55,11 @@ template <> void DBTest<CertificateDB>::TearDown() {
               << file_base_ << std::endl;
 }
 
-template <> Database *DBTest<CertificateDB>::SecondDB() {
-  return new CertificateDB(new FileStorage(this->file_base_, kStorageDepth));
+template <> Database *DBTest<FileDB>::SecondDB() {
+  return new FileDB(new FileStorage(this->file_base_, kStorageDepth));
 }
 
-TYPED_TEST_CASE(DBTest, CertificateDB);
+TYPED_TEST_CASE(DBTest, FileDB);
 
 TYPED_TEST(DBTest, CreatePending) {
   bstring key("1234xyzw", 8);

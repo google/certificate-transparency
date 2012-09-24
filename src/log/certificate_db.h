@@ -13,10 +13,9 @@
 
 class FileStorage;
 
-// Database interface for storing certificates and tree head signatures.
-// TODO(ekasper): separate an abstract base class so that we can make
-// the underlying DB pluggable.
-class CertificateDB : public Database {
+// Database interface that stores certificates and tree head
+// signatures in the filesystem.
+class FileDB : public Database {
  public:
   // Reference implementation: reads the entire database on boot
   // and builds an in-memory index.
@@ -24,8 +23,8 @@ class CertificateDB : public Database {
   // file system operations such as 'rename' are atomic) which should
   // guarantee full recoverability from crashes/power failures.
   // Takes ownership of |storage|.
-  CertificateDB(FileStorage *storage);
-  ~CertificateDB();
+  FileDB(FileStorage *storage);
+  ~FileDB();
 
   // Implement abstract functions, see database.h for comments.
   virtual WriteResult

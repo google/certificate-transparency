@@ -14,16 +14,16 @@
 using ct::SignedCertificateTimestamp;
 using ct::LoggedCertificate;
 
-CertificateDB::CertificateDB(FileStorage *storage)
+FileDB::FileDB(FileStorage *storage)
     : storage_(storage) {
   BuildIndex();
 }
 
-CertificateDB::~CertificateDB() {
+FileDB::~FileDB() {
   delete storage_;
 }
 
-Database::WriteResult CertificateDB::CreatePendingCertificateEntry(
+Database::WriteResult FileDB::CreatePendingCertificateEntry(
     const bstring &pending_key, const SignedCertificateTimestamp &sct) {
   if (pending_keys_.find(pending_key) != pending_keys_.end())
     return ENTRY_ALREADY_PENDING;
@@ -46,11 +46,11 @@ Database::WriteResult CertificateDB::CreatePendingCertificateEntry(
   return OK;
 }
 
-std::set<bstring> CertificateDB::PendingKeys() const {
+std::set<bstring> FileDB::PendingKeys() const {
   return pending_keys_;
 }
 
-Database::WriteResult CertificateDB::AssignCertificateSequenceNumber(
+Database::WriteResult FileDB::AssignCertificateSequenceNumber(
     const bstring &pending_key, uint64_t sequence_number) {
   std::set<bstring>::iterator pending_it = pending_keys_.find(pending_key);
   if (pending_it == pending_keys_.end()) {
@@ -83,7 +83,7 @@ Database::WriteResult CertificateDB::AssignCertificateSequenceNumber(
   return OK;
 }
 
-Database::LookupResult CertificateDB::LookupCertificateEntry(
+Database::LookupResult FileDB::LookupCertificateEntry(
     const bstring &certificate_key, uint64_t *sequence_number,
     SignedCertificateTimestamp *result) const {
   bstring cert_data;
@@ -109,7 +109,7 @@ Database::LookupResult CertificateDB::LookupCertificateEntry(
   return PENDING;
 }
 
-Database::LookupResult CertificateDB::LookupCertificateEntry(
+Database::LookupResult FileDB::LookupCertificateEntry(
     uint64_t sequence_number, SignedCertificateTimestamp *result) const {
   std::map<uint64_t, bstring>::const_iterator it =
       sequence_map_.find(sequence_number);
@@ -133,7 +133,7 @@ Database::LookupResult CertificateDB::LookupCertificateEntry(
   return LOGGED;
 }
 
-void CertificateDB::BuildIndex() {
+void FileDB::BuildIndex() {
   pending_keys_ = storage_->Scan();
   if (pending_keys_.empty())
     return;
