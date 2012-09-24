@@ -1,3 +1,5 @@
+/* -*- indent-tabs-mode: nil -*- */
+
 #include <gtest/gtest.h>
 #include <iostream>
 #include <set>
@@ -39,7 +41,7 @@ template <> void DBTest<CertificateDB>::SetUp() {
   file_base_ = util::CreateTemporaryDirectory("/tmp/ctlogXXXXXX");
   ASSERT_EQ("/tmp/ctlog", file_base_.substr(0, 10));
   ASSERT_EQ(16U, file_base_.length());
-  db_ = new CertificateDB(new FileDB(file_base_, kStorageDepth));
+  db_ = new CertificateDB(new FileStorage(file_base_, kStorageDepth));
 }
 
 template <> void DBTest<CertificateDB>::TearDown() {
@@ -54,7 +56,7 @@ template <> void DBTest<CertificateDB>::TearDown() {
 }
 
 template <> Database *DBTest<CertificateDB>::SecondDB() {
-  return new CertificateDB(new FileDB(this->file_base_, kStorageDepth));
+  return new CertificateDB(new FileStorage(this->file_base_, kStorageDepth));
 }
 
 TYPED_TEST_CASE(DBTest, CertificateDB);

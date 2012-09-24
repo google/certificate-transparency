@@ -1,3 +1,5 @@
+/* -*- indent-tabs-mode: nil -*- */
+
 #include <gtest/gtest.h>
 #include <openssl/bio.h>
 #include <openssl/evp.h>
@@ -69,7 +71,7 @@ class FrontendSignerTest : public ::testing::Test {
     ASSERT_EQ(16U, file_base_.length());
 
     frontend_ = new FrontendSigner(new CertificateDB(
-        new FileDB(file_base_, kStorageDepth)), new LogSigner(pkey));
+        new FileStorage(file_base_, kStorageDepth)), new LogSigner(pkey));
     ASSERT_TRUE(verifier_ != NULL);
     ASSERT_TRUE(frontend_ != NULL);
   }

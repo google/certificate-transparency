@@ -33,17 +33,17 @@ class FilesystemOp;
 // <root>/tmp     - Temporary storage for atomicity. Must be on the
 //                  same filesystem as <root>/storage.
 
-// FileDB aborts Upon any FilesystemOp error.
-class FileDB {
+// FileStorage aborts Upon any FilesystemOp error.
+class FileStorage {
  public:
   // Default constructor, uses BasicFilesystemOp.
-  FileDB(const std::string &file_base, unsigned storage_depth);
+  FileStorage(const std::string &file_base, unsigned storage_depth);
   // Takes ownership of the FilesystemOp.
-  FileDB(const std::string &file_base, unsigned storage_depth,
+  FileStorage(const std::string &file_base, unsigned storage_depth,
          FilesystemOp *file_op);
-  ~FileDB();
+  ~FileStorage();
 
-  enum FileDBResult {
+  enum FileStorageResult {
     OK,
     // Create failed.
     ENTRY_ALREADY_EXISTS,
@@ -55,13 +55,13 @@ class FileDB {
   std::set<bstring> Scan() const;
 
   // Write (key, data) unless an entry matching |key| already exists.
-  FileDBResult CreateEntry(const bstring &key, const bstring &data);
+  FileStorageResult CreateEntry(const bstring &key, const bstring &data);
 
   // Update an existing entry; fail if it doesn't already exist.
-  FileDBResult UpdateEntry(const bstring &key, const bstring &data);
+  FileStorageResult UpdateEntry(const bstring &key, const bstring &data);
 
   // Lookup entry based on key.
-  FileDBResult LookupEntry(const bstring &key, bstring *result) const;
+  FileStorageResult LookupEntry(const bstring &key, bstring *result) const;
 
  private:
   std::string StoragePathBasename(const std::string &hex) const;

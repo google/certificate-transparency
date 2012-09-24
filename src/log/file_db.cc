@@ -9,7 +9,7 @@
 #include "types.h"
 #include "util.h"
 
-FileDB::FileDB(const std::string &file_base, unsigned storage_depth)
+FileStorage::FileStorage(const std::string &file_base, unsigned storage_depth)
     : storage_dir_(file_base + "/storage"),
       tmp_dir_(file_base + "/tmp"),
       tmp_file_template_(tmp_dir_ + "/tmpXXXXXX"),
@@ -20,8 +20,8 @@ FileDB::FileDB(const std::string &file_base, unsigned storage_depth)
   CreateMissingDirectory(tmp_dir_);
 }
 
-FileDB::FileDB(const std::string &file_base, unsigned storage_depth,
-               FilesystemOp *file_op)
+FileStorage::FileStorage(const std::string &file_base, unsigned storage_depth,
+                         FilesystemOp *file_op)
     : storage_dir_(file_base + "/storage"),
       tmp_dir_(file_base + "/tmp"),
       tmp_file_template_(tmp_dir_ + "/tmpXXXXXX"),
@@ -32,34 +32,34 @@ FileDB::FileDB(const std::string &file_base, unsigned storage_depth,
   CreateMissingDirectory(tmp_dir_);
 }
 
-FileDB::~FileDB() {
+FileStorage::~FileStorage() {
   delete file_op_;
 }
 
-std::set<bstring> FileDB::Scan() const {
+std::set<bstring> FileStorage::Scan() const {
   std::set<bstring> storage_keys;
   ScanDir(storage_dir_, storage_depth_, &storage_keys);
   return storage_keys;
 }
 
-FileDB::FileDBResult
-FileDB::CreateEntry(const bstring &key, const bstring &data) {
+FileStorage::FileStorageResult
+FileStorage::CreateEntry(const bstring &key, const bstring &data) {
   if (LookupEntry(key, NULL) == OK)
     return ENTRY_ALREADY_EXISTS;
   WriteStorageEntry(key, data);
   return OK;
 }
 
-FileDB::FileDBResult
-FileDB::UpdateEntry(const bstring &key, const bstring &data) {
+FileStorage::FileStorageResult
+FileStorage::UpdateEntry(const bstring &key, const bstring &data) {
   if (LookupEntry(key, NULL) != OK)
     return NOT_FOUND;
   WriteStorageEntry(key, data);
   return OK;
 }
 
-FileDB::FileDBResult
-FileDB::LookupEntry(const bstring &key, bstring *result) const {
+FileStorage::FileStorageResult
+FileStorage::LookupEntry(const bstring &key, bstring *result) const {
   std::string data_file = StoragePath(key);
   if (!FileExists(data_file))
     return NOT_FOUND;
@@ -68,21 +68,21 @@ FileDB::LookupEntry(const bstring &key, bstring *result) const {
   return OK;
 }
 
-std::string FileDB::StoragePathBasename(const std::string &hex) const {
+std::string FileStorage::StoragePathBasename(const std::string &hex) const {
   if (hex.length() <= storage_depth_)
     return "-";
   return hex.substr(storage_depth_);
 }
 
 std::string
-FileDB::StoragePathComponent(const std::string &hex, unsigned n) const {
+FileStorage::StoragePathComponent(const std::string &hex, unsigned n) const {
   assert(n < storage_depth_);
   if (n >= hex.length())
     return "-";
   return std::string(1, hex[n]);
 }
 
-std::string FileDB::StoragePath(const bstring &key) const {
+std::string FileStorage::StoragePath(const bstring &key) const {
   std::string hex = util::HexString(key);
   std::string dirname = storage_dir_ + "/";
   for (unsigned n = 0; n < storage_depth_; ++n)
@@ -90,7 +90,7 @@ std::string FileDB::StoragePath(const bstring &key) const {
   return dirname + StoragePathBasename(hex);
 }
 
-bstring FileDB::StorageKey(const std::string &storage_path) const {
+bstring FileStorage::StorageKey(const std::string &storage_path) const {
   assert(storage_path.substr(0, storage_dir_.size()) == storage_dir_);
   std::string key_path = storage_path.substr(storage_dir_.size() + 1);
   std::string hex_key;
@@ -106,7 +106,7 @@ bstring FileDB::StorageKey(const std::string &storage_path) const {
   return util::BinaryString(hex_key);
 }
 
-void FileDB::WriteStorageEntry(const bstring &key, const bstring &data) {
+void FileStorage::WriteStorageEntry(const bstring &key, const bstring &data) {
   std::string hex = util::HexString(key);
 
   // Make the intermediate directories, if needed.
@@ -122,8 +122,8 @@ void FileDB::WriteStorageEntry(const bstring &key, const bstring &data) {
   AtomicWriteBinaryFile(filename, data);
 }
 
-void FileDB::ScanFiles(const std::string &dir_path,
-                       std::set<bstring> *keys) const {
+void FileStorage::ScanFiles(const std::string &dir_path,
+                            std::set<bstring> *keys) const {
   DIR *dir = opendir(dir_path.c_str());
   if (dir == NULL)
     abort();
@@ -136,8 +136,8 @@ void FileDB::ScanFiles(const std::string &dir_path,
   closedir(dir);
 }
 
-void FileDB::ScanDir(const std::string &dir_path,
-                     unsigned depth, std::set<bstring> *keys) const {
+void FileStorage::ScanDir(const std::string &dir_path,
+                          unsigned depth, std::set<bstring> *keys) const {
   if (depth > 0) {
     // Parse subdirectories. (TODO: make opendir part of filesystemop).
     DIR *dir = opendir(dir_path.c_str());
@@ -157,7 +157,7 @@ void FileDB::ScanDir(const std::string &dir_path,
   }
 }
 
-bool FileDB::FileExists(const std::string &file_path) const {
+bool FileStorage::FileExists(const std::string &file_path) const {
   if (file_op_->access(file_path.c_str(), F_OK) == 0)
     return true;
   if (errno == ENOENT)
@@ -166,8 +166,8 @@ bool FileDB::FileExists(const std::string &file_path) const {
   abort();
 }
 
-void FileDB::AtomicWriteBinaryFile(const std::string &file_path,
-                                   const bstring &data) {
+void FileStorage::AtomicWriteBinaryFile(const std::string &file_path,
+                                        const bstring &data) {
   std::string tmp_file =
       util::WriteTemporaryBinaryFile(tmp_file_template_, data);
   if (tmp_file.empty() ||
@@ -175,7 +175,7 @@ void FileDB::AtomicWriteBinaryFile(const std::string &file_path,
     abort();
 }
 
-void FileDB::CreateMissingDirectory(const std::string &dir_path) {
+void FileStorage::CreateMissingDirectory(const std::string &dir_path) {
   if (file_op_->mkdir(dir_path.c_str(), 0700) != 0 && errno != EEXIST)
     abort();
 }

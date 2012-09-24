@@ -1,3 +1,5 @@
+/* -*- indent-tabs-mode: nil -*- */
+
 #include <map>
 #include <set>
 #include <stdint.h>
@@ -12,13 +14,13 @@
 using ct::SignedCertificateTimestamp;
 using ct::LoggedCertificate;
 
-CertificateDB::CertificateDB(FileDB *cert_db)
-    : cert_db_(cert_db) {
+CertificateDB::CertificateDB(FileStorage *storage)
+    : storage_(storage) {
   BuildIndex();
 }
 
 CertificateDB::~CertificateDB() {
-  delete cert_db_;
+  delete storage_;
 }
 
 Database::WriteResult CertificateDB::CreatePendingCertificateEntry(
@@ -34,11 +36,12 @@ Database::WriteResult CertificateDB::CreatePendingCertificateEntry(
   bool ret = logged_cert.SerializeToString(&data);
   assert(ret);
   // Try to create.
-  FileDB::FileDBResult result = cert_db_->CreateEntry(pending_key, data);
-  if (result == FileDB::ENTRY_ALREADY_EXISTS)
+  FileStorage::FileStorageResult result = storage_->CreateEntry(pending_key,
+                                                                data);
+  if (result == FileStorage::ENTRY_ALREADY_EXISTS)
     // It's not pending, so it must be logged.
     return ENTRY_ALREADY_LOGGED;
-  assert(result == FileDB::OK);
+  assert(result == FileStorage::OK);
   pending_keys_.insert(pending_key);
   return OK;
 }
@@ -52,7 +55,7 @@ Database::WriteResult CertificateDB::AssignCertificateSequenceNumber(
   std::set<bstring>::iterator pending_it = pending_keys_.find(pending_key);
   if (pending_it == pending_keys_.end()) {
     // Caller should have ensured we don't get here...
-    if (cert_db_->LookupEntry(pending_key, NULL) == FileDB::OK)
+    if (storage_->LookupEntry(pending_key, NULL) == FileStorage::OK)
       return ENTRY_ALREADY_LOGGED;
     return ENTRY_NOT_FOUND;
   }
@@ -61,8 +64,9 @@ Database::WriteResult CertificateDB::AssignCertificateSequenceNumber(
     return SEQUENCE_NUMBER_ALREADY_IN_USE;
 
   bstring cert_data;
-  FileDB::FileDBResult result = cert_db_->LookupEntry(pending_key, &cert_data);
-  assert(result == FileDB::OK);
+  FileStorage::FileStorageResult result = storage_->LookupEntry(pending_key,
+                                                                &cert_data);
+  assert(result == FileStorage::OK);
 
   LoggedCertificate logged_cert;
   bool ret = logged_cert.ParseFromString(cert_data);
@@ -70,8 +74,8 @@ Database::WriteResult CertificateDB::AssignCertificateSequenceNumber(
   assert(!logged_cert.has_sequence_number());
   logged_cert.set_sequence_number(sequence_number);
   logged_cert.SerializeToString(&cert_data);
-  result = cert_db_->UpdateEntry(pending_key, cert_data);
-  assert(result == FileDB::OK);
+  result = storage_->UpdateEntry(pending_key, cert_data);
+  assert(result == FileStorage::OK);
 
   pending_keys_.erase(pending_it);
   sequence_map_.insert(std::pair<uint64_t, bstring>(sequence_number,
@@ -83,11 +87,11 @@ Database::LookupResult CertificateDB::LookupCertificateEntry(
     const bstring &certificate_key, uint64_t *sequence_number,
     SignedCertificateTimestamp *result) const {
   bstring cert_data;
-  FileDB::FileDBResult db_result =
-      cert_db_->LookupEntry(certificate_key, &cert_data);
-  if (db_result == FileDB::NOT_FOUND)
+  FileStorage::FileStorageResult db_result =
+      storage_->LookupEntry(certificate_key, &cert_data);
+  if (db_result == FileStorage::NOT_FOUND)
     return NOT_FOUND;
-  assert (db_result == FileDB::OK);
+  assert (db_result == FileStorage::OK);
 
   LoggedCertificate logged_cert;
   bool ret = logged_cert.ParseFromString(cert_data);
@@ -114,9 +118,9 @@ Database::LookupResult CertificateDB::LookupCertificateEntry(
 
   if (result != NULL) {
     bstring cert_data;
-    FileDB::FileDBResult db_result =
-        cert_db_->LookupEntry(it->second, &cert_data);
-    assert(db_result == FileDB::OK);
+    FileStorage::FileStorageResult db_result =
+        storage_->LookupEntry(it->second, &cert_data);
+    assert(db_result == FileStorage::OK);
 
     LoggedCertificate logged_cert;
     bool ret = logged_cert.ParseFromString(cert_data);
@@ -130,7 +134,7 @@ Database::LookupResult CertificateDB::LookupCertificateEntry(
 }
 
 void CertificateDB::BuildIndex() {
-  pending_keys_ = cert_db_->Scan();
+  pending_keys_ = storage_->Scan();
   if (pending_keys_.empty())
     return;
   // Now read the entries: remove those that have a sequence number
@@ -141,8 +145,9 @@ void CertificateDB::BuildIndex() {
     std::set<bstring>::iterator it2 = it++;
     bstring cert_data;
     // Read the data; tolerate no errors.
-    FileDB::FileDBResult result = cert_db_->LookupEntry(*it2, &cert_data);
-    if (result != FileDB::OK)
+    FileStorage::FileStorageResult result = storage_->LookupEntry(*it2,
+                                                                  &cert_data);
+    if (result != FileStorage::OK)
       abort();
     LoggedCertificate logged_cert;
     if (!logged_cert.ParseFromString(cert_data))

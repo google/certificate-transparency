@@ -1,3 +1,5 @@
+/* -*- indent-tabs-mode: nil -*- */
+
 #include <assert.h>
 #include <deque>
 #include <iostream>
@@ -556,7 +558,8 @@ int main(int argc, char **argv) {
   std::string file_base = argv[4];
   unsigned storage_depth = atoi(argv[5]);
 
-  FrontendSigner signer(new CertificateDB(new FileDB(file_base, storage_depth)),
+  FrontendSigner signer(new CertificateDB(new FileStorage(file_base,
+                                                          storage_depth)),
 			new LogSigner(pkey),
 			new CertSubmissionHandler(&checker));
 

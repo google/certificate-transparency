@@ -1,3 +1,5 @@
+/* -*- mode: c++; indent-tabs-mode: nil -*- */
+
 #ifndef CERTIFICATE_DB_H
 #define CERTIFICATE_DB_H
 #include <map>
@@ -9,7 +11,7 @@
 #include "database.h"
 #include "types.h"
 
-class FileDB;
+class FileStorage;
 
 // Database interface for storing certificates and tree head signatures.
 // TODO(ekasper): separate an abstract base class so that we can make
@@ -18,11 +20,11 @@ class CertificateDB : public Database {
  public:
   // Reference implementation: reads the entire database on boot
   // and builds an in-memory index.
-  // Writes to the underlying FileDB are atomic (assuming underlying
+  // Writes to the underlying FileStorage are atomic (assuming underlying
   // file system operations such as 'rename' are atomic) which should
   // guarantee full recoverability from crashes/power failures.
-  // Takes ownership of |cert_db|.
-  CertificateDB(FileDB *cert_db);
+  // Takes ownership of |storage|.
+  CertificateDB(FileStorage *storage);
   ~CertificateDB();
 
   // Implement abstract functions, see database.h for comments.
@@ -45,6 +47,6 @@ class CertificateDB : public Database {
   void BuildIndex();
   std::set<bstring> pending_keys_;
   std::map<uint64_t, bstring> sequence_map_;
-  FileDB *cert_db_;
+  FileStorage *storage_;
 };
 #endif
