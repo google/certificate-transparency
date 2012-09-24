@@ -13,7 +13,7 @@ endif
 CXXFLAGS= $(INCLUDE) $(CXXFLAG)
 
 all: .depend cert_test cert_checker_test submission_handler_test \
-	file_db_test certificate_db_test frontend_signer_test
+	file_storage_test certificate_db_test frontend_signer_test
 
 # Preprocessing step for compiling .proto files.
 ../include/ct.pb.h: ../proto/ct.proto
@@ -28,12 +28,12 @@ clean:
 include .depend
 
 test: cert_test cert_checker_test submission_handler_test log_signer_test \
-	file_db_test certificate_db_test frontend_signer_test
+	file_storage_test certificate_db_test frontend_signer_test
 	./cert_test
 	./cert_checker_test
 	./submission_handler_test
 	./log_signer_test
-	./file_db_test
+	./file_storage_test
 	./certificate_db_test
 	./frontend_signer_test
 
@@ -57,24 +57,27 @@ log_signer_test: log_signer_test.o log_signer.o ../util/util.o \
 	$(CXX) -o log_signer_test log_signer_test.o log_signer.o \
 	../util/util.o ../proto/ct.pb.o ../proto/serializer.o $(LIBS)
 
-file_db_test: file_db_test.o file_db.o filesystem_op.o ../util/util.o
-	$(CXX) -o file_db_test file_db_test.o file_db.o filesystem_op.o \
-	../util/util.o $(LIBS)
+file_storage_test: file_storage_test.o file_storage.o filesystem_op.o \
+		   ../util/util.o
+	$(CXX) -o file_storage_test file_storage_test.o file_storage.o \
+		filesystem_op.o ../util/util.o $(LIBS)
 
-certificate_db_test: certificate_db_test.o certificate_db.o file_db.o \
-	filesystem_op.o ../util/util.o ../proto/ct.pb.o
+certificate_db_test: certificate_db_test.o certificate_db.o file_storage.o \
+		     filesystem_op.o ../util/util.o ../proto/ct.pb.o
 	$(CXX) -o certificate_db_test certificate_db_test.o certificate_db.o \
-	file_db.o filesystem_op.o ../util/util.o ../proto/ct.pb.o $(LIBS)
+		file_storage.o filesystem_op.o ../util/util.o ../proto/ct.pb.o \
+		$(LIBS)
 
 frontend_signer_test: frontend_signer_test.o frontend_signer.o \
-	log_signer.o log_verifier.o submission_handler.o ../util/util.o \
-	../proto/ct.pb.o ../proto/serializer.o \
-	../merkletree/SerialHasher.o ../merkletree/TreeHasher.o \
-	../merkletree/MerkleVerifier.o certificate_db.o file_db.o filesystem_op.o
+		      log_signer.o log_verifier.o submission_handler.o \
+		      ../util/util.o ../proto/ct.pb.o ../proto/serializer.o \
+		      ../merkletree/SerialHasher.o ../merkletree/TreeHasher.o \
+		      ../merkletree/MerkleVerifier.o certificate_db.o \
+		      file_storage.o filesystem_op.o
 	$(CXX) -o frontend_signer_test frontend_signer_test.o \
-	frontend_signer.o log_signer.o log_verifier.o \
-	submission_handler.o ../util/util.o \
-	../proto/ct.pb.o ../proto/serializer.o \
-	../merkletree/SerialHasher.o ../merkletree/TreeHasher.o \
-	../merkletree/MerkleVerifier.o certificate_db.o file_db.o \
-	filesystem_op.o $(LIBS)
+		frontend_signer.o log_signer.o log_verifier.o \
+		submission_handler.o ../util/util.o \
+		../proto/ct.pb.o ../proto/serializer.o \
+		../merkletree/SerialHasher.o ../merkletree/TreeHasher.o \
+		../merkletree/MerkleVerifier.o certificate_db.o file_storage.o \
+		filesystem_op.o $(LIBS)

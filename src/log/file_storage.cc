@@ -1,10 +1,12 @@
+/* -*- indent-tabs-mode: nil -*- */
+
 #include <dirent.h>
 #include <errno.h>
 #include <set>
 #include <string>
 #include <sys/stat.h>
 
-#include "file_db.h"
+#include "file_storage.h"
 #include "filesystem_op.h"
 #include "types.h"
 #include "util.h"

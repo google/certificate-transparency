@@ -7,7 +7,7 @@
 #include <sys/stat.h>
 #include <unistd.h>
 
-#include "file_db.h"
+#include "file_storage.h"
 #include "filesystem_op.h"
 #include "types.h"
 #include "util.h"

@@ -20,7 +20,7 @@
 #include "certificate_db.h"
 #include "ct.h"
 #include "ct.pb.h"
-#include "file_db.h"
+#include "file_storage.h"
 #include "frontend_signer.h"
 #include "log_signer.h"
 #include "serializer.h"

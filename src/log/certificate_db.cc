@@ -8,7 +8,7 @@
 
 #include "certificate_db.h"
 #include "ct.pb.h"
-#include "file_db.h"
+#include "file_storage.h"
 #include "types.h"
 
 using ct::SignedCertificateTimestamp;
