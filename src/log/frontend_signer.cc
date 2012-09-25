@@ -14,7 +14,7 @@ using ct::SignedCertificateTimestamp;
 
 FrontendSigner::FrontendSigner(Database *db, LogSigner *signer)
     : db_(db),
-      hasher_(new Sha256Hasher),
+      hasher_(new Sha256Hasher()),
       signer_(signer),
       // Default handler.
       handler_(new SubmissionHandler()) {
@@ -25,7 +25,7 @@ FrontendSigner::FrontendSigner(Database *db, LogSigner *signer)
 FrontendSigner::FrontendSigner(Database *db, LogSigner *signer,
                                SubmissionHandler *handler)
     : db_(db),
-      hasher_(new Sha256Hasher),
+      hasher_(new Sha256Hasher()),
       signer_(signer),
       handler_(handler) {
   assert(signer_ != NULL);
@@ -34,7 +34,6 @@ FrontendSigner::FrontendSigner(Database *db, LogSigner *signer,
 }
 
 FrontendSigner::~FrontendSigner() {
-  delete db_;
   delete hasher_;
   delete signer_;
   delete handler_;

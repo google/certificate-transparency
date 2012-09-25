@@ -110,7 +110,11 @@ make_log_server_keys `pwd`/tmp ct-server
 # Start the log server and wait for it to come up
 echo "Starting CT server with trusted certs in $hash_dir"
 mkdir -p tmp/storage
-../server/ct-server 8124 $cert_dir/$log_server-key.pem $hash_dir `pwd`/tmp/storage 3 &
+mkdir -p tmp/storage/certs
+mkdir -p tmp/storage/tree
+
+../server/ct-server 8124 $cert_dir/$log_server-key.pem $hash_dir \
+  `pwd`/tmp/storage 3 8 &
 server_pid=$!
 sleep 2
 

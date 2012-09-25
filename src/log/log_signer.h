@@ -17,7 +17,7 @@ class LogSigner {
   // Each struct we digitally sign has a unique type identifier.
   enum SignatureType {
     CERTIFICATE_TIMESTAMP = 0,
-    TREE_HASH = 1,
+    TREE_HEAD = 1,
   };
 
   enum CertificateEntryType {
@@ -30,6 +30,7 @@ class LogSigner {
     INVALID_ENTRY_TYPE,
     EMPTY_CERTIFICATE,
     CERTIFICATE_TOO_LONG,
+    INVALID_HASH_LENGTH,
     UNKNOWN_ERROR,
   };
 
@@ -48,8 +49,13 @@ class LogSigner {
   SignResult SignCertificateTimestamp(
       ct::SignedCertificateTimestamp *sct) const;
 
+  SignResult SignTreeHead(uint64_t timestamp, uint64_t tree_size,
+                          const bstring &root_hash, bstring *result) const;
+
+  SignResult SignTreeHead(ct::SignedTreeHead *sth) const;
+
  private:
-  static SignResult GetSerializeSCTError(Serializer::SerializeResult result);
+  static SignResult GetSerializeError(Serializer::SerializeResult result);
 
   void Sign(SignatureType type, const bstring &data,
             ct::DigitallySigned *result) const;
@@ -78,6 +84,7 @@ class LogSigVerifier {
     HASH_ALGORITHM_MISMATCH,
     SIGNATURE_ALGORITHM_MISMATCH,
     INVALID_SIGNATURE,
+    INVALID_HASH_LENGTH,
     UNKNOWN_ERROR,
   };
 
@@ -90,9 +97,16 @@ class LogSigVerifier {
   VerifyResult VerifySCTSignature(
       const ct::SignedCertificateTimestamp &sct) const;
 
+  // The protobuf-agnostic library version.
+  VerifyResult VerifySTHSignature(uint64_t timestamp, uint64_t tree_size,
+                                  const bstring &root_hash,
+                                  const bstring &signature) const;
+
+  VerifyResult VerifySTHSignature(const ct::SignedTreeHead &sth) const;
+
  private:
   static VerifyResult
-  GetSerializeSCTError(Serializer::SerializeResult result);
+  GetSerializeError(Serializer::SerializeResult result);
 
   static VerifyResult
   GetDeserializeSignatureError(Deserializer::DeserializeResult result);

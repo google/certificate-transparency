@@ -11,6 +11,7 @@ namespace {
 using ct::CertificateEntry;
 using ct::DigitallySigned;
 using ct::SignedCertificateTimestamp;
+using ct::SignedTreeHead;
 
 // A slightly shorter notation for constructing binary blobs from test vectors.
 std::string S(const char *hexstring, size_t byte_length) {
@@ -28,16 +29,24 @@ std::string H(const bstring &byte_string) {
 
 class SerializerTest : public ::testing::Test {
  protected:
-  SerializerTest() : sct_() {
+  SerializerTest() : sct_(), sth_() {
     sct_.set_timestamp(1234);
     sct_.mutable_entry()->set_type(CertificateEntry::X509_ENTRY);
     sct_.mutable_entry()->set_leaf_certificate("certificate");
     sct_.mutable_signature()->set_hash_algorithm(DigitallySigned::SHA256);
     sct_.mutable_signature()->set_sig_algorithm(DigitallySigned::ECDSA);
     sct_.mutable_signature()->set_signature("signature");
+    sth_.set_timestamp(2345);
+    sth_.set_tree_size(6);
+    sth_.set_root_hash("imustbeexactlythirtytwobyteslong");
+    sth_.mutable_signature()->set_hash_algorithm(DigitallySigned::SHA256);
+    sth_.mutable_signature()->set_sig_algorithm(DigitallySigned::ECDSA);
+    sth_.mutable_signature()->set_signature("tree_signature");
   }
 
   const SignedCertificateTimestamp &DefaultSCT() const { return sct_; }
+
+  const SignedTreeHead &DefaultSTH() const { return sth_; }
 
   const DigitallySigned &DefaultDS() const { return sct_.signature(); }
 
@@ -55,6 +64,7 @@ class SerializerTest : public ::testing::Test {
 
  private:
   SignedCertificateTimestamp sct_;
+  SignedTreeHead sth_;
 };
 
 const char kDefaultDSHexString[] =
@@ -90,6 +100,16 @@ const char kDefaultSCTSignedHexString[] =
     "6365727469666963617465";
 
 const size_t kDefaultSCTSignedLength = 23;
+
+const char kDefaultSTHSignedHexString[] =
+    // timestamp, 8 bytes
+    "0000000000000929"
+    // tree size, 8 bytes
+    "0000000000000006"
+    // root hash, 32 bytes
+    "696d757374626565786163746c7974686972747974776f62797465736c6f6e67";
+
+const size_t kSTHSignedLength = 48;
 
 TEST_F(SerializerTest, SerializeDigitallySignedKatTest) {
   bstring result;
@@ -232,6 +252,22 @@ TEST_F(SerializerTest, DeserializeSCTTokenTooLong) {
   // ... but we can't deserialize.
   EXPECT_EQ(Deserializer::INPUT_TOO_LONG,
             Deserializer::DeserializeSCTToken(token, &sct));
+}
+
+TEST_F(SerializerTest, SerializeSTHForSigningKatTest) {
+  bstring result;
+  EXPECT_EQ(Serializer::OK,
+            Serializer::SerializeSTHForSigning(DefaultSTH(), &result));
+  EXPECT_EQ(S(kDefaultSTHSignedHexString, kSTHSignedLength), H(result));
+}
+
+TEST_F(SerializerTest, SerializeSTHForSigningBadHash) {
+  SignedTreeHead sth;
+  sth.CopyFrom(DefaultSTH());
+  sth.set_root_hash("thisisnotthirtytwobyteslong");
+  bstring result;
+  EXPECT_EQ(Serializer::INVALID_HASH_LENGTH,
+            Serializer::SerializeSTHForSigning(sth, &result));
 }
 
 }  // namespace

@@ -9,6 +9,7 @@ class LogSigVerifier;
 class MerkleVerifier;
 
 // A verifier for verifying signed statements of the log.
+// TODO(ekasper): unit tests.
 class LogVerifier {
  public:
   LogVerifier(LogSigVerifier *sig_verifier,
@@ -25,6 +26,9 @@ class LogVerifier {
     INCONSISTENT_TIMESTAMPS,
     // The signature does not verify.
     INVALID_SIGNATURE,
+    // The Merkle path is not valid for the given index
+    // and tree size
+    INVALID_MERKLE_PATH,
   };
 
   static std::string VerifyResultString(VerifyResult result) {
@@ -63,6 +67,17 @@ class LogVerifier {
   VerifyResult
   VerifySignedCertificateTimestamp(
       const ct::SignedCertificateTimestamp &sct) const;
+
+  // Verify that the timestamp is in the given range,
+  // and the signature is valid.
+  // Timestamps are given in milliseconds, since January 1, 1970,
+  // 00:00 UTC time.
+  VerifyResult
+  VerifySignedTreeHead(const ct::SignedTreeHead &sth, uint64_t begin_range,
+                       uint64_t end_range) const;
+
+  // Verify that the timestamp is not in the future, and the signature is valid.
+  VerifyResult VerifySignedTreeHead(const ct::SignedTreeHead &sth) const;
 
  private:
   LogSigVerifier *sig_verifier_;

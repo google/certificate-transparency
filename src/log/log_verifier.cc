@@ -9,6 +9,7 @@
 #include "util.h"
 
 using ct::SignedCertificateTimestamp;
+using ct::SignedTreeHead;
 
 LogVerifier::LogVerifier(LogSigVerifier *sig_verifier,
                          MerkleVerifier *tree_verifier)
@@ -54,6 +55,24 @@ LogVerifier::VerifyResult LogVerifier::VerifySignedCertificateTimestamp(
   // Allow a bit of slack, say 1 second into the future.
   return VerifySignedCertificateTimestamp(sct, 0,
                                           util::TimeInMilliseconds() + 1000);
+}
+
+LogVerifier::VerifyResult
+LogVerifier::VerifySignedTreeHead(const SignedTreeHead &sth,
+                                  uint64_t begin_range,
+                                  uint64_t end_range) const {
+  if (!IsBetween(sth.timestamp(), begin_range, end_range))
+    return INVALID_TIMESTAMP;
+
+  if (sig_verifier_->VerifySTHSignature(sth) != LogSigVerifier::OK)
+    return INVALID_SIGNATURE;
+  return VERIFY_OK;
+}
+
+LogVerifier::VerifyResult LogVerifier::VerifySignedTreeHead(
+    const SignedTreeHead &sth) const {
+  // Allow a bit of slack, say 1 second into the future.
+  return VerifySignedTreeHead(sth, 0, util::TimeInMilliseconds() + 1000);
 }
 
 bool LogVerifier::IsBetween(uint64_t timestamp, uint64_t earliest,

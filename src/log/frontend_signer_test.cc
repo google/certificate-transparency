@@ -53,12 +53,14 @@ EVP_PKEY* PublicKeyFromPem(const std::string &pemkey) {
   return pkey;
 }
 
-const unsigned kStorageDepth = 3;
+const unsigned kCertStorageDepth = 3;
+const unsigned kTreeStorageDepth = 8;
 
 class FrontendSignerTest : public ::testing::Test {
  protected:
   FrontendSignerTest()
-      : verifier_(NULL),
+      : file_db_(NULL),
+        verifier_(NULL),
         frontend_(NULL) {}
 
   void SetUp() {
@@ -70,9 +72,17 @@ class FrontendSignerTest : public ::testing::Test {
     ASSERT_EQ("/tmp/ctlog", file_base_.substr(0, 10));
     ASSERT_EQ(16U, file_base_.length());
 
-    frontend_ = new FrontendSigner(new FileDB(new FileStorage(file_base_,
-                                                              kStorageDepth)),
-                                   new LogSigner(pkey));
+    std::string certs_dir = file_base_ + "/certs";
+    std::string tree_dir = file_base_ + "/tree";
+    int ret = mkdir(certs_dir.c_str(), 0700);
+    ASSERT_EQ(ret, 0);
+    ret = mkdir(tree_dir.c_str(), 0700);
+    ASSERT_EQ(ret, 0);
+
+    file_db_ = new FileDB(new FileStorage(certs_dir, kCertStorageDepth),
+                          new FileStorage(tree_dir, kTreeStorageDepth));
+
+    frontend_ = new FrontendSigner(file_db_, new LogSigner(pkey));
     ASSERT_TRUE(verifier_ != NULL);
     ASSERT_TRUE(frontend_ != NULL);
   }
@@ -91,8 +101,10 @@ class FrontendSignerTest : public ::testing::Test {
   ~FrontendSignerTest() {
     delete verifier_;
     delete frontend_;
+    delete file_db_;
   }
 
+  FileDB *file_db_;
   LogVerifier *verifier_;
   FrontendSigner *frontend_;
   std::string file_base_;

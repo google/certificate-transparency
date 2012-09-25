@@ -20,6 +20,9 @@ class Database {
     // We only report this if the entry is pending (i.e., ENTRY_NOT_FOUND
     // and ENTRY_ALREADY_LOGGED did not happen).
     SEQUENCE_NUMBER_ALREADY_IN_USE,
+    // Timestamp is primary key, it must exist and be unique,
+    DUPLICATE_TREE_HEAD_TIMESTAMP,
+    MISSING_TREE_HEAD_TIMESTAMP,
   };
 
   enum LookupResult {
@@ -69,6 +72,14 @@ class Database {
   // List the keys of all pending entries, i.e. all entries without a
   // sequence number.
   virtual std::set<bstring> PendingKeys() const = 0;
+
+  // Attempt to write a tree head. Fails only if a tree head with this timestamp
+  // already exists (i.e., |timestamp| is primary key). Does not check that
+  // the timestamp is newer than previous entries.
+  virtual WriteResult WriteTreeHead(const ct::SignedTreeHead &sth) = 0;
+
+  // Return the tree head with the freshest timestamp.
+  virtual LookupResult LatestTreeHead(ct::SignedTreeHead *result) const = 0;
 };
 
 #endif  // ndef DATABASE_H

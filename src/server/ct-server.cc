@@ -522,9 +522,9 @@ static bool InitServer(int *sock, int port, const char *ip, int type) {
 }
 
 int main(int argc, char **argv) {
-  if (argc != 6) {
+  if (argc != 7) {
     std::cerr << argv[0] << " <port> <key> <trusted_cert_dir> "
-        "<file_base> <storage_depth>\n";
+        "<file_base> <cert_storage_depth> <tree_storage_depth>\n";
     exit(1);
   }
 
@@ -556,9 +556,12 @@ int main(int argc, char **argv) {
   }
 
   std::string file_base = argv[4];
-  unsigned storage_depth = atoi(argv[5]);
+  unsigned cert_storage_depth = atoi(argv[5]);
+  unsigned tree_storage_depth = atoi(argv[6]);
 
-  FrontendSigner signer(new FileDB(new FileStorage(file_base, storage_depth)),
+  FrontendSigner signer(new FileDB(
+      new FileStorage(file_base + "/certs", cert_storage_depth),
+      new FileStorage(file_base + "/tree", tree_storage_depth)),
 			new LogSigner(pkey),
                         new CertSubmissionHandler(&checker));
 

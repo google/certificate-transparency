@@ -45,6 +45,20 @@ Serializer::SerializeSCTForSigning(uint64_t timestamp, int type,
   return OK;
 }
 
+// static
+Serializer::SerializeResult
+Serializer::SerializeSTHForSigning(uint64_t timestamp, uint64_t tree_size,
+                                   const bstring &root_hash, bstring *result) {
+  if (root_hash.size() != 32)
+    return INVALID_HASH_LENGTH;
+  Serializer serializer;
+  serializer.WriteUint(timestamp, 8);
+  serializer.WriteUint(tree_size, 8);
+  serializer.WriteFixedBytes(root_hash);
+  result->assign(serializer.SerializedString());
+  return OK;
+}
+
 Serializer::SerializeResult
 Serializer::WriteSCTToken(const SignedCertificateTimestamp &sct) {
   WriteUint(sct.timestamp(), 8);

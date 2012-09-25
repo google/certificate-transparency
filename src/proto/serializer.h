@@ -25,6 +25,7 @@ class Serializer {
     INVALID_HASH_ALGORITHM,
     INVALID_SIGNATURE_ALGORITHM,
     SIGNATURE_TOO_LONG,
+    INVALID_HASH_LENGTH,
   };
 
   static const size_t kMaxCertificateLength;
@@ -40,13 +41,38 @@ class Serializer {
   static SerializeResult CheckFormat(const ct::CertificateEntry &entry);
 
   static SerializeResult SerializeSCTForSigning(uint64_t timestamp, int type,
-      const bstring &leaf_certificate, bstring *result);
+                                                const bstring &leaf_certificate,
+                                                bstring *result);
 
   static SerializeResult
   SerializeSCTForSigning(const ct::SignedCertificateTimestamp &sct,
                          bstring *result) {
     return SerializeSCTForSigning(sct.timestamp(), sct.entry().type(),
                                   sct.entry().leaf_certificate(), result);
+  }
+
+  static SerializeResult SerializeSCTForTree(uint64_t timestamp, int type,
+                                             const bstring &leaf_certificate,
+                                             bstring *result) {
+    return SerializeSCTForSigning(timestamp, type, leaf_certificate, result);
+  }
+
+  static SerializeResult
+  SerializeSCTForTree(const ct::SignedCertificateTimestamp &sct,
+                      bstring *result) {
+    return SerializeSCTForTree(sct.timestamp(), sct.entry().type(),
+                               sct.entry().leaf_certificate(), result);
+  }
+
+  static SerializeResult SerializeSTHForSigning(uint64_t timestamp,
+                                                uint64_t tree_size,
+                                                const bstring &root_hash,
+                                                bstring *result);
+
+  static SerializeResult
+  SerializeSTHForSigning(const ct::SignedTreeHead &sth, bstring *result) {
+    return SerializeSTHForSigning(sth.timestamp(), sth.tree_size(),
+                                  sth.root_hash(), result);
   }
 
   SerializeResult WriteSCTToken(const ct::SignedCertificateTimestamp &sct);
@@ -126,6 +152,18 @@ class Deserializer {
 
   static DeserializeResult
   DeserializeDigitallySigned(const bstring &in, ct::DigitallySigned *sig);
+
+  template<class T>
+  static DeserializeResult DeserializeUint(const bstring &in, size_t bytes,
+                                           T *result) {
+    Deserializer deserializer(in);
+    bool res = deserializer.ReadUint(bytes, result);
+    if (!res)
+      return INPUT_TOO_SHORT;
+    if (!deserializer.ReachedEnd())
+      return INPUT_TOO_LONG;
+    return OK;
+  }
 
  private:
   template<class T>

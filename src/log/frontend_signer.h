@@ -1,6 +1,7 @@
 #ifndef FRONTEND_SIGNER_H
 #define FRONTEND_SIGNER_H
 
+#include <stdint.h>
 #include <string>
 
 #include "ct.pb.h"
@@ -12,10 +13,10 @@ class SerialHasher;
 
 class FrontendSigner {
  public:
-  // Takes ownership of db and signer.
+  // Takes ownership of |signer|.
   FrontendSigner(Database *db, LogSigner *signer);
 
-  // Takes ownership of db, signer and handler.
+  // Takes ownership of |signer| and |handler|.
   FrontendSigner(Database *db, LogSigner *signer, SubmissionHandler *handler);
 
   ~FrontendSigner();
@@ -44,6 +45,7 @@ class FrontendSigner {
   SerialHasher *hasher_;
   LogSigner *signer_;
   SubmissionHandler *handler_;
+
   bstring ComputePrimaryKey(const ct::CertificateEntry &entry) const;
 
   void TimestampAndSign(ct::SignedCertificateTimestamp *sct) const;

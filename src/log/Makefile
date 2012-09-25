@@ -28,7 +28,7 @@ clean:
 include .depend
 
 test: cert_test cert_checker_test submission_handler_test log_signer_test \
-	file_storage_test database_test frontend_signer_test
+	file_storage_test database_test frontend_signer_test tree_signer_test
 	./cert_test
 	./cert_checker_test
 	./submission_handler_test
@@ -36,6 +36,7 @@ test: cert_test cert_checker_test submission_handler_test log_signer_test \
 	./file_storage_test
 	./database_test
 	./frontend_signer_test
+	./tree_signer_test
 
 cert_test: cert_test.o cert.o ../util/util.o
 	$(CXX) -o cert_test cert_test.o cert.o ../util/util.o $(LIBS)
@@ -63,9 +64,10 @@ file_storage_test: file_storage_test.o file_storage.o filesystem_op.o \
 		filesystem_op.o ../util/util.o $(LIBS)
 
 database_test: database_test.o file_db.o file_storage.o \
-	 filesystem_op.o ../util/util.o ../proto/ct.pb.o
+	 filesystem_op.o ../util/util.o ../proto/ct.pb.o ../proto/serializer.o
 	$(CXX) -o database_test database_test.o file_db.o file_storage.o \
-		filesystem_op.o ../util/util.o ../proto/ct.pb.o $(LIBS)
+		filesystem_op.o ../util/util.o ../proto/ct.pb.o \
+		../proto/serializer.o $(LIBS)
 
 frontend_signer_test: frontend_signer_test.o frontend_signer.o \
 		      log_signer.o log_verifier.o submission_handler.o \
@@ -78,5 +80,17 @@ frontend_signer_test: frontend_signer_test.o frontend_signer.o \
 		submission_handler.o ../util/util.o \
 		../proto/ct.pb.o ../proto/serializer.o \
 		../merkletree/SerialHasher.o ../merkletree/TreeHasher.o \
+		../merkletree/MerkleVerifier.o file_db.o file_storage.o \
+		filesystem_op.o $(LIBS)
+
+tree_signer_test: tree_signer_test.o tree_signer.o log_signer.o log_verifier.o \
+	../util/util.o ../proto/ct.pb.o ../proto/serializer.o \
+	../merkletree/SerialHasher.o ../merkletree/TreeHasher.o \
+	../merkletree/MerkleTree.o ../merkletree/MerkleVerifier.o \
+	file_db.o file_storage.o filesystem_op.o
+	$(CXX) -o tree_signer_test tree_signer_test.o tree_signer.o \
+		log_signer.o log_verifier.o ../util/util.o ../proto/ct.pb.o \
+		../proto/serializer.o ../merkletree/SerialHasher.o \
+		../merkletree/TreeHasher.o ../merkletree/MerkleTree.o \
 		../merkletree/MerkleVerifier.o file_db.o file_storage.o \
 		filesystem_op.o $(LIBS)

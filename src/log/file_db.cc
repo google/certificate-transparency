@@ -9,18 +9,25 @@
 #include "ct.pb.h"
 #include "file_db.h"
 #include "file_storage.h"
+#include "serializer.h"
 #include "types.h"
 
 using ct::SignedCertificateTimestamp;
 using ct::LoggedCertificate;
+using ct::SignedTreeHead;
 
-FileDB::FileDB(FileStorage *storage)
-    : storage_(storage) {
+const size_t FileDB::kTimestampBytesIndexed = 6;
+
+FileDB::FileDB(FileStorage *cert_storage, FileStorage *tree_storage)
+    : cert_storage_(cert_storage),
+      tree_storage_(tree_storage),
+      latest_tree_timestamp_(0) {
   BuildIndex();
 }
 
 FileDB::~FileDB() {
-  delete storage_;
+  delete cert_storage_;
+  delete tree_storage_;
 }
 
 Database::WriteResult FileDB::CreatePendingCertificateEntry(
@@ -36,8 +43,8 @@ Database::WriteResult FileDB::CreatePendingCertificateEntry(
   bool ret = logged_cert.SerializeToString(&data);
   assert(ret);
   // Try to create.
-  FileStorage::FileStorageResult result = storage_->CreateEntry(pending_key,
-                                                                data);
+  FileStorage::FileStorageResult result =
+      cert_storage_->CreateEntry(pending_key, data);
   if (result == FileStorage::ENTRY_ALREADY_EXISTS)
     // It's not pending, so it must be logged.
     return ENTRY_ALREADY_LOGGED;
@@ -55,7 +62,7 @@ Database::WriteResult FileDB::AssignCertificateSequenceNumber(
   std::set<bstring>::iterator pending_it = pending_keys_.find(pending_key);
   if (pending_it == pending_keys_.end()) {
     // Caller should have ensured we don't get here...
-    if (storage_->LookupEntry(pending_key, NULL) == FileStorage::OK)
+    if (cert_storage_->LookupEntry(pending_key, NULL) == FileStorage::OK)
       return ENTRY_ALREADY_LOGGED;
     return ENTRY_NOT_FOUND;
   }
@@ -64,8 +71,8 @@ Database::WriteResult FileDB::AssignCertificateSequenceNumber(
     return SEQUENCE_NUMBER_ALREADY_IN_USE;
 
   bstring cert_data;
-  FileStorage::FileStorageResult result = storage_->LookupEntry(pending_key,
-                                                                &cert_data);
+  FileStorage::FileStorageResult result =
+      cert_storage_->LookupEntry(pending_key, &cert_data);
   assert(result == FileStorage::OK);
 
   LoggedCertificate logged_cert;
@@ -74,7 +81,7 @@ Database::WriteResult FileDB::AssignCertificateSequenceNumber(
   assert(!logged_cert.has_sequence_number());
   logged_cert.set_sequence_number(sequence_number);
   logged_cert.SerializeToString(&cert_data);
-  result = storage_->UpdateEntry(pending_key, cert_data);
+  result = cert_storage_->UpdateEntry(pending_key, cert_data);
   assert(result == FileStorage::OK);
 
   pending_keys_.erase(pending_it);
@@ -88,7 +95,7 @@ Database::LookupResult FileDB::LookupCertificateEntry(
     SignedCertificateTimestamp *result) const {
   bstring cert_data;
   FileStorage::FileStorageResult db_result =
-      storage_->LookupEntry(certificate_key, &cert_data);
+      cert_storage_->LookupEntry(certificate_key, &cert_data);
   if (db_result == FileStorage::NOT_FOUND)
     return NOT_FOUND;
   assert (db_result == FileStorage::OK);
@@ -119,7 +126,7 @@ Database::LookupResult FileDB::LookupCertificateEntry(
   if (result != NULL) {
     bstring cert_data;
     FileStorage::FileStorageResult db_result =
-        storage_->LookupEntry(it->second, &cert_data);
+        cert_storage_->LookupEntry(it->second, &cert_data);
     assert(db_result == FileStorage::OK);
 
     LoggedCertificate logged_cert;
@@ -133,8 +140,54 @@ Database::LookupResult FileDB::LookupCertificateEntry(
   return LOGGED;
 }
 
+Database::WriteResult
+FileDB::WriteTreeHead(const SignedTreeHead &sth) {
+  if (!sth.has_timestamp())
+    return MISSING_TREE_HEAD_TIMESTAMP;
+  // 6 bytes are good enough for some 9000 years.
+  bstring timestamp_key =
+      Serializer::SerializeUint(sth.timestamp(),
+                                FileDB::kTimestampBytesIndexed);
+  bstring data;
+  bool ret = sth.SerializeToString(&data);
+  assert(ret);
+
+  FileStorage::FileStorageResult result =
+      tree_storage_->CreateEntry(timestamp_key, data);
+  if (result == FileStorage::ENTRY_ALREADY_EXISTS)
+    return DUPLICATE_TREE_HEAD_TIMESTAMP;
+  assert(result == FileStorage::OK);
+
+  if (sth.timestamp() > latest_tree_timestamp_) {
+    latest_tree_timestamp_ = sth.timestamp();
+    latest_timestamp_key_ = timestamp_key;
+  }
+
+  return OK;
+}
+
+Database::LookupResult
+FileDB::LatestTreeHead(SignedTreeHead *result) const {
+  if (latest_tree_timestamp_ == 0)
+    return NOT_FOUND;
+
+  bstring tree_data;
+  FileStorage::FileStorageResult db_result =
+      tree_storage_->LookupEntry(latest_timestamp_key_, &tree_data);
+  assert(db_result == FileStorage::OK);
+
+  SignedTreeHead local_sth;
+
+  bool ret = local_sth.ParseFromString(tree_data);
+  assert(ret);
+  assert(local_sth.timestamp() == latest_tree_timestamp_);
+
+  result->CopyFrom(local_sth);
+  return LOGGED;
+}
+
 void FileDB::BuildIndex() {
-  pending_keys_ = storage_->Scan();
+  pending_keys_ = cert_storage_->Scan();
   if (pending_keys_.empty())
     return;
   // Now read the entries: remove those that have a sequence number
@@ -145,8 +198,8 @@ void FileDB::BuildIndex() {
     std::set<bstring>::iterator it2 = it++;
     bstring cert_data;
     // Read the data; tolerate no errors.
-    FileStorage::FileStorageResult result = storage_->LookupEntry(*it2,
-                                                                  &cert_data);
+    FileStorage::FileStorageResult result =
+        cert_storage_->LookupEntry(*it2, &cert_data);
     if (result != FileStorage::OK)
       abort();
     LoggedCertificate logged_cert;
@@ -158,4 +211,16 @@ void FileDB::BuildIndex() {
       pending_keys_.erase(it2);
     }
   } while (it != pending_keys_.end());
+
+  // Now read the STH entries.
+  std::set<bstring> sth_timestamps = tree_storage_->Scan();
+
+  if (!sth_timestamps.empty())
+    latest_timestamp_key_ = *sth_timestamps.rbegin();
+  Deserializer::DeserializeResult result =
+      Deserializer::DeserializeUint<uint64_t>(latest_timestamp_key_,
+                                              FileDB::kTimestampBytesIndexed,
+                                              &latest_tree_timestamp_);
+  if (result != Deserializer::OK)
+    abort();
 }
