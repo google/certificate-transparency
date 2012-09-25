@@ -46,7 +46,7 @@ class FrontendSigner {
   LogSigner *signer_;
   SubmissionHandler *handler_;
 
-  bstring ComputePrimaryKey(const ct::CertificateEntry &entry) const;
+  bstring ComputeCertificateHash(const ct::CertificateEntry &entry) const;
 
   void TimestampAndSign(ct::SignedCertificateTimestamp *sct) const;
 

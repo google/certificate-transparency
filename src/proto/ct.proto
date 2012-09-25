@@ -55,7 +55,7 @@ message SignedCertificateTimestamp {
 
 message LoggedCertificate {
   required SignedCertificateTimestamp sct = 1;
-  required bytes certificate_key = 2;
+  required bytes certificate_sha256_hash = 2;
   optional uint64 sequence_number = 3;
 }
 

@@ -18,7 +18,7 @@
 namespace {
 
 using ct::CertificateEntry;
-using ct::SignedCertificateTimestamp;
+using ct::LoggedCertificate;
 using ct::SignedTreeHead;
 
 const char *ecp256_private_key = {
@@ -116,35 +116,38 @@ class TreeSignerTest : public ::testing::Test {
 
 // TODO(ekasper): KAT tests.
 TEST_F(TreeSignerTest, Sign) {
-  bstring key("1234xyzw", 8);
+  bstring hash("1234xyzw", 8);
 
-  SignedCertificateTimestamp sct;
-  sct.set_timestamp(1234);
-  sct.mutable_entry()->set_type(CertificateEntry::X509_ENTRY);
-  sct.mutable_entry()->set_leaf_certificate("certificate");
+  LoggedCertificate logged_cert;
+  logged_cert.set_certificate_sha256_hash(hash);
+  logged_cert.mutable_sct()->set_timestamp(1234);
+  logged_cert.mutable_sct()->mutable_entry()->set_type(
+      CertificateEntry::X509_ENTRY);
+  logged_cert.mutable_sct()->mutable_entry()->set_leaf_certificate("cert");
 
   EXPECT_EQ(Database::OK,
-            file_db_->CreatePendingCertificateEntry(key, sct));
+            file_db_->CreatePendingCertificateEntry(logged_cert));
 
   EXPECT_EQ(TreeSigner::OK, tree_signer_->UpdateTree());
 
   SignedTreeHead sth;
-  EXPECT_EQ(Database::LOGGED, file_db_->LatestTreeHead(&sth));
+  EXPECT_EQ(Database::LOOKUP_OK, file_db_->LatestTreeHead(&sth));
   EXPECT_EQ(1U, sth.tree_size());
   EXPECT_EQ(sth.timestamp(), tree_signer_->LastUpdateTime());
 }
 
 TEST_F(TreeSignerTest, Timestamp) {
-  bstring key("1234xyzw", 8);
+  bstring hash("1234xyzw", 8);
 
-  SignedCertificateTimestamp sct;
-
-  sct.set_timestamp(1234U);
-  sct.mutable_entry()->set_type(CertificateEntry::X509_ENTRY);
-  sct.mutable_entry()->set_leaf_certificate("certificate");
+  LoggedCertificate logged_cert;
+  logged_cert.set_certificate_sha256_hash(hash);
+  logged_cert.mutable_sct()->set_timestamp(1234);
+  logged_cert.mutable_sct()->mutable_entry()->set_type(
+      CertificateEntry::X509_ENTRY);
+  logged_cert.mutable_sct()->mutable_entry()->set_leaf_certificate("cert");
 
   EXPECT_EQ(Database::OK,
-            file_db_->CreatePendingCertificateEntry(key, sct));
+            file_db_->CreatePendingCertificateEntry(logged_cert));
 
   EXPECT_EQ(TreeSigner::OK, tree_signer_->UpdateTree());
   uint64_t last_update = tree_signer_->LastUpdateTime();
@@ -153,48 +156,53 @@ TEST_F(TreeSignerTest, Timestamp) {
   // Now create a second entry with a timestamp some time in the future
   // and verify that the signer's timestamp is greater than that.
   uint64_t future = last_update + 10000;
-  sct.set_timestamp(future);
-  bstring key2("1234abcd", 8);
+  logged_cert.mutable_sct()->set_timestamp(future);
+  bstring hash2("1234abcd", 8);
+  logged_cert.set_certificate_sha256_hash(hash2);
 
   EXPECT_EQ(Database::OK,
-            file_db_->CreatePendingCertificateEntry(key2, sct));
+            file_db_->CreatePendingCertificateEntry(logged_cert));
   EXPECT_EQ(TreeSigner::OK, tree_signer_->UpdateTree());
   EXPECT_GE(tree_signer_->LastUpdateTime(), future);
 }
 
 TEST_F(TreeSignerTest, Verify) {
-  bstring key("1234xyzw", 8);
+  bstring hash("1234xyzw", 8);
 
-  SignedCertificateTimestamp sct;
-  sct.set_timestamp(1234);
-  sct.mutable_entry()->set_type(CertificateEntry::X509_ENTRY);
-      sct.mutable_entry()->set_leaf_certificate("certificate");
+  LoggedCertificate logged_cert;
+  logged_cert.set_certificate_sha256_hash(hash);
+  logged_cert.mutable_sct()->set_timestamp(1234);
+  logged_cert.mutable_sct()->mutable_entry()->set_type(
+      CertificateEntry::X509_ENTRY);
+  logged_cert.mutable_sct()->mutable_entry()->set_leaf_certificate("cert");
 
   EXPECT_EQ(Database::OK,
-            file_db_->CreatePendingCertificateEntry(key, sct));
+            file_db_->CreatePendingCertificateEntry(logged_cert));
 
   EXPECT_EQ(TreeSigner::OK, tree_signer_->UpdateTree());
 
   SignedTreeHead sth;
-  EXPECT_EQ(Database::LOGGED, file_db_->LatestTreeHead(&sth));
+  EXPECT_EQ(Database::LOOKUP_OK, file_db_->LatestTreeHead(&sth));
   EXPECT_EQ(LogVerifier::VERIFY_OK, verifier_->VerifySignedTreeHead(sth));
 }
 
 TEST_F(TreeSignerTest, ResumeClean) {
-  bstring key("1234xyzw", 8);
+  bstring hash("1234xyzw", 8);
 
-  SignedCertificateTimestamp sct;
-  sct.set_timestamp(1234);
-  sct.mutable_entry()->set_type(CertificateEntry::X509_ENTRY);
-  sct.mutable_entry()->set_leaf_certificate("certificate");
+  LoggedCertificate logged_cert;
+  logged_cert.set_certificate_sha256_hash(hash);
+  logged_cert.mutable_sct()->set_timestamp(1234);
+  logged_cert.mutable_sct()->mutable_entry()->set_type(
+      CertificateEntry::X509_ENTRY);
+  logged_cert.mutable_sct()->mutable_entry()->set_leaf_certificate("cert");
 
   EXPECT_EQ(Database::OK,
-            file_db_->CreatePendingCertificateEntry(key, sct));
+            file_db_->CreatePendingCertificateEntry(logged_cert));
 
   EXPECT_EQ(TreeSigner::OK, tree_signer_->UpdateTree());
   SignedTreeHead sth;
 
-  EXPECT_EQ(Database::LOGGED, file_db_->LatestTreeHead(&sth));
+  EXPECT_EQ(Database::LOOKUP_OK, file_db_->LatestTreeHead(&sth));
 
   TreeSigner *signer2 = GetSimilar();
   EXPECT_EQ(signer2->LastUpdateTime(), sth.timestamp());
@@ -203,7 +211,7 @@ TEST_F(TreeSignerTest, ResumeClean) {
   EXPECT_EQ(TreeSigner::OK, signer2->UpdateTree());
   SignedTreeHead sth2;
 
-  EXPECT_EQ(Database::LOGGED, file_db_->LatestTreeHead(&sth2));
+  EXPECT_EQ(Database::LOOKUP_OK, file_db_->LatestTreeHead(&sth2));
   EXPECT_LT(sth.timestamp(), sth2.timestamp());
   EXPECT_EQ(sth.root_hash(), sth2.root_hash());
   EXPECT_EQ(sth.tree_size(), sth2.tree_size());
@@ -216,27 +224,31 @@ TEST_F(TreeSignerTest, ResumeClean) {
 TEST_F(TreeSignerTest, ResumePartialSign) {
   EXPECT_EQ(TreeSigner::OK, tree_signer_->UpdateTree());
   SignedTreeHead sth;
-  EXPECT_EQ(Database::LOGGED, file_db_->LatestTreeHead(&sth));
+  EXPECT_EQ(Database::LOOKUP_OK, file_db_->LatestTreeHead(&sth));
   EXPECT_EQ(0U, sth.tree_size());
 
   // Log a pending entry.
-  bstring key("1234xyzw", 8);
-  SignedCertificateTimestamp sct;
-  sct.set_timestamp(1234);
-  sct.mutable_entry()->set_type(CertificateEntry::X509_ENTRY);
-  sct.mutable_entry()->set_leaf_certificate("certificate");
+  bstring hash("1234xyzw", 8);
+
+  LoggedCertificate logged_cert;
+  logged_cert.set_certificate_sha256_hash(hash);
+  logged_cert.mutable_sct()->set_timestamp(1234);
+  logged_cert.mutable_sct()->mutable_entry()->set_type(
+      CertificateEntry::X509_ENTRY);
+  logged_cert.mutable_sct()->mutable_entry()->set_leaf_certificate("cert");
+
   EXPECT_EQ(Database::OK,
-            file_db_->CreatePendingCertificateEntry(key, sct));
+            file_db_->CreatePendingCertificateEntry(logged_cert));
 
   // Simulate the case where we assign a sequence number but fail
   // before signing.
   EXPECT_EQ(Database::OK,
-            file_db_->AssignCertificateSequenceNumber(key, 0));
+            file_db_->AssignCertificateSequenceNumber(hash, 0));
 
   TreeSigner *signer2 = GetSimilar();
   EXPECT_EQ(TreeSigner::OK, signer2->UpdateTree());
   SignedTreeHead sth2;
-  EXPECT_EQ(Database::LOGGED, file_db_->LatestTreeHead(&sth2));
+  EXPECT_EQ(Database::LOOKUP_OK, file_db_->LatestTreeHead(&sth2));
   // The signer should have picked up the sequence number commit.
   EXPECT_EQ(1U, sth2.tree_size());
   EXPECT_LT(sth.timestamp(), sth2.timestamp());
@@ -249,7 +261,7 @@ TEST_F(TreeSignerTest, SignEmpty) {
   EXPECT_EQ(TreeSigner::OK, tree_signer_->UpdateTree());
   SignedTreeHead sth;
 
-  EXPECT_EQ(Database::LOGGED, file_db_->LatestTreeHead(&sth));
+  EXPECT_EQ(Database::LOOKUP_OK, file_db_->LatestTreeHead(&sth));
   EXPECT_GT(sth.timestamp(), 0U);
   EXPECT_EQ(sth.tree_size(), 0U);
 }
@@ -267,24 +279,27 @@ TEST_F(TreeSignerTest, FailInconsistentTreeHead) {
 
 TEST_F(TreeSignerTest, FailInconsistentSequenceNumbers) {
   EXPECT_EQ(TreeSigner::OK, tree_signer_->UpdateTree());
-  bstring key("1234xyzw", 8);
+  bstring hash("1234xyzw", 8);
 
-  SignedCertificateTimestamp sct;
-
-  sct.set_timestamp(1234U);
-  sct.mutable_entry()->set_type(CertificateEntry::X509_ENTRY);
-  sct.mutable_entry()->set_leaf_certificate("certificate");
+  LoggedCertificate logged_cert;
+  logged_cert.set_certificate_sha256_hash(hash);
+  logged_cert.mutable_sct()->set_timestamp(1234);
+  logged_cert.mutable_sct()->mutable_entry()->set_type(
+      CertificateEntry::X509_ENTRY);
+  logged_cert.mutable_sct()->mutable_entry()->set_leaf_certificate("cert");
 
   EXPECT_EQ(Database::OK,
-            file_db_->CreatePendingCertificateEntry(key, sct));
+            file_db_->CreatePendingCertificateEntry(logged_cert));
+
   // Assign a sequence number the signer does not know about.
   EXPECT_EQ(Database::OK,
-            file_db_->AssignCertificateSequenceNumber(key, 0));
+            file_db_->AssignCertificateSequenceNumber(hash, 0));
 
   // Create another pending entry.
-  bstring key2("1234abcd", 8);
+  bstring hash2("1234abcd", 8);
+  logged_cert.set_certificate_sha256_hash(hash2);
   EXPECT_EQ(Database::OK,
-            file_db_->CreatePendingCertificateEntry(key2, sct));
+            file_db_->CreatePendingCertificateEntry(logged_cert));
 
   // Update should fail because we cannot commit a sequence number.
   EXPECT_EQ(TreeSigner::DB_ERROR, tree_signer_->UpdateTree());

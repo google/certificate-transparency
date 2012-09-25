@@ -35,23 +35,21 @@ class FileDB : public Database {
 
   // Implement abstract functions, see database.h for comments.
   virtual WriteResult
-  CreatePendingCertificateEntry(const bstring &pending_key,
-                                const ct::SignedCertificateTimestamp &sct);
+  CreatePendingCertificateEntry(const ct::LoggedCertificate &logged_cert);
 
   virtual WriteResult
-  AssignCertificateSequenceNumber(const bstring &pending_key,
+  AssignCertificateSequenceNumber(const bstring &certificate_sha256_hash,
 				  uint64_t sequence_number);
 
   virtual LookupResult
-  LookupCertificateEntry(const bstring &certificate_key,
-                         uint64_t *sequence_number,
-                         ct::SignedCertificateTimestamp *result) const;
+  LookupCertificateByHash(const bstring &certificate_sha256_hash,
+                          ct::LoggedCertificate *result) const;
 
   virtual LookupResult
-  LookupCertificateEntry(uint64_t sequence_number,
-                         ct::SignedCertificateTimestamp *result) const;
+  LookupCertificateByIndex(uint64_t sequence_number,
+                           ct::LoggedCertificate *result) const;
 
-  virtual std::set<bstring> PendingKeys() const;
+  virtual std::set<bstring> PendingHashes() const;
 
 
   virtual WriteResult WriteTreeHead(const ct::SignedTreeHead &sth);
@@ -60,7 +58,7 @@ class FileDB : public Database {
 
  private:
   void BuildIndex();
-  std::set<bstring> pending_keys_;
+  std::set<bstring> pending_hashes_;
   std::map<uint64_t, bstring> sequence_map_;
   FileStorage *cert_storage_;
   // Store all tree heads, but currently only support looking up the latest one.

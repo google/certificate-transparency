@@ -10,6 +10,7 @@
 #include "util.h"
 
 using ct::CertificateEntry;
+using ct::LoggedCertificate;
 using ct::SignedCertificateTimestamp;
 
 FrontendSigner::FrontendSigner(Database *db, LogSigner *signer)
@@ -58,30 +59,37 @@ FrontendSigner::QueueEntry(CertificateEntry::Type type,
     return GetSubmitError(result);
 
   // Check if the entry already exists.
-  bstring primary_key = ComputePrimaryKey(entry);
-  assert(!primary_key.empty());
+  bstring sha256_hash = ComputeCertificateHash(entry);
+  assert(!sha256_hash.empty());
 
+  LoggedCertificate logged_cert;
   Database::LookupResult db_result =
-      db_->LookupCertificateEntry(primary_key, sct);
-  if (db_result == Database::LOGGED)
+      db_->LookupCertificateByHash(sha256_hash, &logged_cert);
+
+  if (db_result == Database::LOOKUP_OK) {
+    if(sct != NULL)
+      sct->CopyFrom(logged_cert.sct());
+
+    if (logged_cert.has_sequence_number())
       return LOGGED;
-  if (db_result == Database::PENDING)
     return PENDING;
+  }
 
   assert(db_result == Database::NOT_FOUND);
 
-  SignedCertificateTimestamp local_sct;
-  local_sct.mutable_entry()->CopyFrom(entry);
+  LoggedCertificate new_cert;
+  new_cert.set_certificate_sha256_hash(sha256_hash);
+  new_cert.mutable_sct()->mutable_entry()->CopyFrom(entry);
 
-  TimestampAndSign(&local_sct);
+  TimestampAndSign(new_cert.mutable_sct());
 
   Database::WriteResult write_result =
-      db_->CreatePendingCertificateEntry(primary_key, local_sct);
+      db_->CreatePendingCertificateEntry(new_cert);
 
   // Assume for now that nobody interfered while we were busy signing.
   assert(write_result == Database::OK);
   if (sct != NULL)
-    sct->CopyFrom(local_sct);
+    sct->CopyFrom(new_cert.sct());
   return NEW;
 }
 
@@ -122,7 +130,7 @@ std::string FrontendSigner::SubmitResultString(SubmitResult result) {
   return result_string;
 }
 
-bstring FrontendSigner::ComputePrimaryKey(const CertificateEntry &entry) const {
+bstring FrontendSigner::ComputeCertificateHash(const CertificateEntry &entry) const {
   // Compute the SHA-256 hash of the leaf certificate.
   hasher_->Reset();
   hasher_->Update(entry.leaf_certificate());

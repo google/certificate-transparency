@@ -81,6 +81,7 @@ class Serializer {
   SerializeSCTToken(const ct::SignedCertificateTimestamp &sct,
                     bstring *result);
 
+  // TODO(ekasper): tests for these!
   template <class T>
   static bstring SerializeUint(T in, size_t bytes) {
     Serializer serializer;
@@ -98,8 +99,8 @@ class Serializer {
     assert(bytes == sizeof in || in >> (bytes * 8) == 0);
     bstring result;
     for ( ; bytes > 0; --bytes)
-      output_.push_back(
-          ((in & (0xff << ((bytes - 1) * 8))) >> ((bytes - 1) * 8)));
+      output_.push_back(((in & (static_cast<T>(0xff) << ((bytes - 1) * 8)))
+           >> ((bytes - 1) * 8)));
   }
 
   // Fixed-length byte array.

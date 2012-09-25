@@ -31,38 +31,43 @@ FileDB::~FileDB() {
 }
 
 Database::WriteResult FileDB::CreatePendingCertificateEntry(
-    const bstring &pending_key, const SignedCertificateTimestamp &sct) {
-  if (pending_keys_.find(pending_key) != pending_keys_.end())
-    return ENTRY_ALREADY_PENDING;
+    const LoggedCertificate &logged_cert) {
+  assert(!logged_cert.has_sequence_number());
+  if (!logged_cert.has_certificate_sha256_hash())
+    return MISSING_CERTIFICATE_HASH;
+  if (pending_hashes_.find(logged_cert.certificate_sha256_hash()) !=
+      pending_hashes_.end())
+    return DUPLICATE_CERTIFICATE_HASH;
+
+  LoggedCertificate local;
+  local.CopyFrom(logged_cert);
+  local.clear_sequence_number();
 
   bstring data;
-  LoggedCertificate logged_cert;
-  logged_cert.mutable_sct()->CopyFrom(sct);
-  logged_cert.set_certificate_key(pending_key);
-
-  bool ret = logged_cert.SerializeToString(&data);
+  bool ret = local.SerializeToString(&data);
   assert(ret);
   // Try to create.
   FileStorage::FileStorageResult result =
-      cert_storage_->CreateEntry(pending_key, data);
+      cert_storage_->CreateEntry(logged_cert.certificate_sha256_hash(), data);
   if (result == FileStorage::ENTRY_ALREADY_EXISTS)
-    // It's not pending, so it must be logged.
-    return ENTRY_ALREADY_LOGGED;
+    return DUPLICATE_CERTIFICATE_HASH;
   assert(result == FileStorage::OK);
-  pending_keys_.insert(pending_key);
+  pending_hashes_.insert(logged_cert.certificate_sha256_hash());
   return OK;
 }
 
-std::set<bstring> FileDB::PendingKeys() const {
-  return pending_keys_;
+std::set<bstring> FileDB::PendingHashes() const {
+  return pending_hashes_;
 }
 
 Database::WriteResult FileDB::AssignCertificateSequenceNumber(
-    const bstring &pending_key, uint64_t sequence_number) {
-  std::set<bstring>::iterator pending_it = pending_keys_.find(pending_key);
-  if (pending_it == pending_keys_.end()) {
+    const bstring &certificate_sha256_hash, uint64_t sequence_number) {
+  std::set<bstring>::iterator pending_it =
+      pending_hashes_.find(certificate_sha256_hash);
+  if (pending_it == pending_hashes_.end()) {
     // Caller should have ensured we don't get here...
-    if (cert_storage_->LookupEntry(pending_key, NULL) == FileStorage::OK)
+    if (cert_storage_->LookupEntry(certificate_sha256_hash, NULL) ==
+        FileStorage::OK)
       return ENTRY_ALREADY_LOGGED;
     return ENTRY_NOT_FOUND;
   }
@@ -72,7 +77,7 @@ Database::WriteResult FileDB::AssignCertificateSequenceNumber(
 
   bstring cert_data;
   FileStorage::FileStorageResult result =
-      cert_storage_->LookupEntry(pending_key, &cert_data);
+      cert_storage_->LookupEntry(certificate_sha256_hash, &cert_data);
   assert(result == FileStorage::OK);
 
   LoggedCertificate logged_cert;
@@ -81,21 +86,21 @@ Database::WriteResult FileDB::AssignCertificateSequenceNumber(
   assert(!logged_cert.has_sequence_number());
   logged_cert.set_sequence_number(sequence_number);
   logged_cert.SerializeToString(&cert_data);
-  result = cert_storage_->UpdateEntry(pending_key, cert_data);
+  result = cert_storage_->UpdateEntry(certificate_sha256_hash, cert_data);
   assert(result == FileStorage::OK);
 
-  pending_keys_.erase(pending_it);
+  pending_hashes_.erase(pending_it);
   sequence_map_.insert(std::pair<uint64_t, bstring>(sequence_number,
-                                                    pending_key));
+                                                    certificate_sha256_hash));
   return OK;
 }
 
-Database::LookupResult FileDB::LookupCertificateEntry(
-    const bstring &certificate_key, uint64_t *sequence_number,
-    SignedCertificateTimestamp *result) const {
+Database::LookupResult FileDB::LookupCertificateByHash(
+    const bstring &certificate_sha256_hash,
+    LoggedCertificate *result) const {
   bstring cert_data;
   FileStorage::FileStorageResult db_result =
-      cert_storage_->LookupEntry(certificate_key, &cert_data);
+      cert_storage_->LookupEntry(certificate_sha256_hash, &cert_data);
   if (db_result == FileStorage::NOT_FOUND)
     return NOT_FOUND;
   assert (db_result == FileStorage::OK);
@@ -105,19 +110,13 @@ Database::LookupResult FileDB::LookupCertificateEntry(
   assert(ret);
 
   if (result != NULL)
-    result->CopyFrom(logged_cert.sct());
+    result->CopyFrom(logged_cert);
 
-  if (logged_cert.has_sequence_number()) {
-    if (sequence_number != NULL)
-      *sequence_number = logged_cert.sequence_number();
-    return LOGGED;
-  }
-
-  return PENDING;
+  return LOOKUP_OK;
 }
 
-Database::LookupResult FileDB::LookupCertificateEntry(
-    uint64_t sequence_number, SignedCertificateTimestamp *result) const {
+Database::LookupResult FileDB::LookupCertificateByIndex(
+    uint64_t sequence_number, LoggedCertificate *result) const {
   std::map<uint64_t, bstring>::const_iterator it =
       sequence_map_.find(sequence_number);
   if (it == sequence_map_.end())
@@ -134,10 +133,10 @@ Database::LookupResult FileDB::LookupCertificateEntry(
     assert(ret);
     assert(logged_cert.sequence_number() == sequence_number);
 
-    result->CopyFrom(logged_cert.sct());
+    result->CopyFrom(logged_cert);
   }
 
-  return LOGGED;
+  return LOOKUP_OK;
 }
 
 Database::WriteResult
@@ -183,16 +182,16 @@ FileDB::LatestTreeHead(SignedTreeHead *result) const {
   assert(local_sth.timestamp() == latest_tree_timestamp_);
 
   result->CopyFrom(local_sth);
-  return LOGGED;
+  return LOOKUP_OK;
 }
 
 void FileDB::BuildIndex() {
-  pending_keys_ = cert_storage_->Scan();
-  if (pending_keys_.empty())
+  pending_hashes_ = cert_storage_->Scan();
+  if (pending_hashes_.empty())
     return;
   // Now read the entries: remove those that have a sequence number
   // from the set of pending entries and add them to the index.
-  std::set<bstring>::iterator it = pending_keys_.begin();
+  std::set<bstring>::iterator it = pending_hashes_.begin();
   do {
     // Increment before any erase operations.
     std::set<bstring>::iterator it2 = it++;
@@ -208,9 +207,9 @@ void FileDB::BuildIndex() {
     if (logged_cert.has_sequence_number()) {
       sequence_map_.insert(
           std::pair<uint64_t, bstring>(logged_cert.sequence_number(), *it2));
-      pending_keys_.erase(it2);
+      pending_hashes_.erase(it2);
     }
-  } while (it != pending_keys_.end());
+  } while (it != pending_hashes_.end());
 
   // Now read the STH entries.
   std::set<bstring> sth_timestamps = tree_storage_->Scan();
