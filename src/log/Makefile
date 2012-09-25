@@ -13,7 +13,7 @@ endif
 CXXFLAGS= $(INCLUDE) $(CXXFLAG)
 
 all: .depend cert_test cert_checker_test submission_handler_test \
-	file_storage_test certificate_db_test frontend_signer_test
+	file_storage_test database_test frontend_signer_test
 
 # Preprocessing step for compiling .proto files.
 ../include/ct.pb.h: ../proto/ct.proto
@@ -28,13 +28,13 @@ clean:
 include .depend
 
 test: cert_test cert_checker_test submission_handler_test log_signer_test \
-	file_storage_test certificate_db_test frontend_signer_test
+	file_storage_test database_test frontend_signer_test
 	./cert_test
 	./cert_checker_test
 	./submission_handler_test
 	./log_signer_test
 	./file_storage_test
-	./certificate_db_test
+	./database_test
 	./frontend_signer_test
 
 cert_test: cert_test.o cert.o ../util/util.o
@@ -62,22 +62,21 @@ file_storage_test: file_storage_test.o file_storage.o filesystem_op.o \
 	$(CXX) -o file_storage_test file_storage_test.o file_storage.o \
 		filesystem_op.o ../util/util.o $(LIBS)
 
-certificate_db_test: certificate_db_test.o certificate_db.o file_storage.o \
-		     filesystem_op.o ../util/util.o ../proto/ct.pb.o
-	$(CXX) -o certificate_db_test certificate_db_test.o certificate_db.o \
-		file_storage.o filesystem_op.o ../util/util.o ../proto/ct.pb.o \
-		$(LIBS)
+database_test: database_test.o file_db.o file_storage.o \
+	 filesystem_op.o ../util/util.o ../proto/ct.pb.o
+	$(CXX) -o database_test database_test.o file_db.o file_storage.o \
+		filesystem_op.o ../util/util.o ../proto/ct.pb.o $(LIBS)
 
 frontend_signer_test: frontend_signer_test.o frontend_signer.o \
 		      log_signer.o log_verifier.o submission_handler.o \
 		      ../util/util.o ../proto/ct.pb.o ../proto/serializer.o \
 		      ../merkletree/SerialHasher.o ../merkletree/TreeHasher.o \
-		      ../merkletree/MerkleVerifier.o certificate_db.o \
-		      file_storage.o filesystem_op.o
+		      ../merkletree/MerkleVerifier.o file_db.o file_storage.o \
+		      filesystem_op.o
 	$(CXX) -o frontend_signer_test frontend_signer_test.o \
 		frontend_signer.o log_signer.o log_verifier.o \
 		submission_handler.o ../util/util.o \
 		../proto/ct.pb.o ../proto/serializer.o \
 		../merkletree/SerialHasher.o ../merkletree/TreeHasher.o \
-		../merkletree/MerkleVerifier.o certificate_db.o file_storage.o \
+		../merkletree/MerkleVerifier.o file_db.o file_storage.o \
 		filesystem_op.o $(LIBS)

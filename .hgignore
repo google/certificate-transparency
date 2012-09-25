@@ -22,7 +22,7 @@
 ^src/log/submission_handler_test$
 ^src/log/frontend_signer_test$
 ^src/log/file_storage_test$
-^src/log/certificate_db_test$
+^src/log/db_test$
 .*\.pb.h$
 .*\.pb.cc$
 ^src/proto/serializer_test$

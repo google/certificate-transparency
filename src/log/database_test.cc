@@ -6,8 +6,8 @@
 #include <stdint.h>
 #include <string>
 
-#include "certificate_db.h"
 #include "database.h"
+#include "file_db.h"
 #include "file_storage.h"
 #include "types.h"
 #include "util.h"

@@ -6,8 +6,8 @@
 #include <utility> // for std::pair
 #include <vector>
 
-#include "certificate_db.h"
 #include "ct.pb.h"
+#include "file_db.h"
 #include "file_storage.h"
 #include "types.h"
 
