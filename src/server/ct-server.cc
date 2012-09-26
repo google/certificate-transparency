@@ -2,6 +2,7 @@
 
 #include <assert.h>
 #include <deque>
+#include <gflags/gflags.h>
 #include <iostream>
 #include <netinet/in.h>
 #include <openssl/evp.h>
@@ -25,8 +26,79 @@
 #include "log_signer.h"
 #include "serializer.h"
 #include "types.h"
+#include "unistd.h"
 
 #define VV(x)
+
+DEFINE_int32(port, 0, "Server port");
+DEFINE_string(key, "", "PEM-encoded server private key file");
+DEFINE_string(trusted_cert_dir, "",
+              "Directory for trusted CA certificates, in OpenSSL hash format");
+DEFINE_string(cert_dir, "", "Storage directory for certificates");
+DEFINE_string(tree_dir, "", "Storage directory for trees");
+// TODO(ekasper): sanity-check these against the directory structure.
+DEFINE_int32(cert_storage_depth, 0,
+             "Subdirectory depth for certificates; if the directory is not "
+             "empty, must match the existing depth.");
+DEFINE_int32(tree_storage_depth, 0,
+             "Subdirectory depth for tree signatures; if the directory is not "
+             "empty, must match the existing depth");
+
+using google::RegisterFlagValidator;
+
+// Basic sanity checks on flag values.
+static bool ValidatePort(const char *flagname, int port) {
+  if (port <= 0 || port > 65535) {
+    std::cout << "Port value " << port << " is invalid. " << std::endl;
+    return false;
+  }
+  return true;
+}
+
+static const bool port_dummy = RegisterFlagValidator(&FLAGS_port,
+                                                     &ValidatePort);
+
+static bool ValidateRead(const char *flagname, const std::string &path) {
+  if (access(path.c_str(), R_OK) != 0) {
+    std::cout << "Cannot access " << flagname << " at " << path << std::endl;
+    return false;
+  }
+  return true;
+}
+
+static const bool key_dummy = RegisterFlagValidator(&FLAGS_key,
+                                                     &ValidateRead);
+
+static const bool cert_dummy = RegisterFlagValidator(&FLAGS_trusted_cert_dir,
+                                                     &ValidateRead);
+
+static bool ValidateWrite(const char *flagname, const std::string &path) {
+  if (access(path.c_str(), W_OK) != 0) {
+    std::cout << "Cannot modify " << flagname << " at " << path << std::endl;
+    return false;
+  }
+  return true;
+}
+
+static const bool cert_dir_dummy = RegisterFlagValidator(&FLAGS_cert_dir,
+                                                         &ValidateWrite);
+
+static const bool tree_dir_dummy = RegisterFlagValidator(&FLAGS_tree_dir,
+                                                         &ValidateWrite);
+
+
+static bool ValidateIsNonNegative(const char *flagname, int value) {
+  if (value < 0) {
+    std::cout << flagname << " must not be negative" << std::endl;
+    return false;
+  }
+  return true;
+}
+
+static const bool c_st_dummy = RegisterFlagValidator(&FLAGS_cert_storage_depth,
+                                                     &ValidateIsNonNegative);
+static const bool t_st_dummy = RegisterFlagValidator(&FLAGS_tree_storage_depth,
+                                                     &ValidateIsNonNegative);
 
 using ct::CertificateEntry;
 using ct::SignedCertificateTimestamp;
@@ -522,17 +594,12 @@ static bool InitServer(int *sock, int port, const char *ip, int type) {
 }
 
 int main(int argc, char **argv) {
-  if (argc != 7) {
-    std::cerr << argv[0] << " <port> <key> <trusted_cert_dir> "
-        "<file_base> <cert_storage_depth> <tree_storage_depth>\n";
-    exit(1);
-  }
-
-  int port = atoi(argv[1]);
+  google::ParseCommandLineFlags(&argc, &argv, true);
+  SSL_library_init();
 
   EVP_PKEY *pkey = NULL;
 
-  FILE *fp = fopen(argv[2], "r");
+  FILE *fp = fopen(FLAGS_key.c_str(), "r");
   // No password.
   if (fp == NULL || PEM_read_PrivateKey(fp, &pkey, NULL, NULL) == NULL) {
     std::cerr << "Could not read private key.\n";
@@ -541,28 +608,27 @@ int main(int argc, char **argv) {
 
   fclose(fp);
 
-  SSL_library_init();
-
   int fd;
-  assert(InitServer(&fd, port, NULL, SOCK_STREAM));
+  assert(InitServer(&fd, FLAGS_port, NULL, SOCK_STREAM));
 
   EventLoop loop;
 
   CertChecker checker;
-  if(!checker.LoadTrustedCertificateDir(argv[3])) {
+  if(!checker.LoadTrustedCertificateDir(FLAGS_trusted_cert_dir)) {
     std::cerr << "Could not load CA certs.\n";
-    perror(argv[3]);
+    perror(FLAGS_trusted_cert_dir.c_str());
     exit(1);
   }
 
-  std::string file_base = argv[4];
-  unsigned cert_storage_depth = atoi(argv[5]);
-  unsigned tree_storage_depth = atoi(argv[6]);
+  if (FLAGS_cert_dir == FLAGS_tree_dir) {
+    std::cerr << "Certificate directory and tree directory must differ.\n";
+    exit(1);
+  }
 
   FrontendSigner signer(new FileDB(
-      new FileStorage(file_base + "/certs", cert_storage_depth),
-      new FileStorage(file_base + "/tree", tree_storage_depth)),
-			new LogSigner(pkey),
+      new FileStorage(FLAGS_cert_dir, FLAGS_cert_storage_depth),
+      new FileStorage(FLAGS_tree_dir, FLAGS_tree_storage_depth)),
+                        new LogSigner(pkey),
                         new CertSubmissionHandler(&checker));
 
   CTLogManager manager(&signer);

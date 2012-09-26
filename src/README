@@ -36,24 +36,31 @@ http://code.google.com/p/protobuf/downloads/list.
 
 Again, download, unpack and build.
 
-4. Then, you can build the log server by pointing to your custom OpenSSL
+4. You will also need gflags, from:
+http://http://code.google.com/p/gflags
+
+(Tested with gflags-2.0)
+
+Download, unpack, and follow the instructions to build and install.
+
+5. Then, you can build the log server by pointing to your custom OpenSSL
 (if needed), protobuf and gtest:
 
 $ make OPENSSLDIR=<path to openssl> PROTOBUFDIR=<path to protobuf> GTESTDIR=<path to gtest>
 
 Once more, use gmake on BSD systems.
 
-5. Finally, test:
+6. Finally, test:
 
 $ make OPENSSLDIR=<path to openssl> PROTOBUFDIR=<path to protobuf> GTESTDIR=<path to gtest> test
 
-6. If you want to test the authz extension in Apache, check out
+7. If you want to test the authz extension in Apache, check out
 OpenSSL 1.0.2 or higher and build that. You'll also need to install it
 somewhere. Check out the head of Apache, and configure it like:
 
 $ ./configure --enable-ssl --with-ssl=<path to your install>
 
-7. To test the authz extension:
+8. To test the authz extension:
 
 $ cd test
 $ make APACHEDIR=<path to httpd> local-links

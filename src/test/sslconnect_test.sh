@@ -11,7 +11,7 @@ SKIPPED=0
 
 if [ "$OPENSSLDIR" != "" ]; then
   MY_OPENSSL="$OPENSSLDIR/apps/openssl"
-  export LD_LIBRARY_PATH=$OPENSSLDIR
+  export LD_LIBRARY_PATH=$OPENSSLDIR:$LD_LIBRARY_PATH
 fi
 
 if [ ! $MY_OPENSSL ]; then
@@ -113,8 +113,10 @@ mkdir -p tmp/storage
 mkdir -p tmp/storage/certs
 mkdir -p tmp/storage/tree
 
-../server/ct-server 8124 $cert_dir/$log_server-key.pem $hash_dir \
-  `pwd`/tmp/storage 3 8 &
+../server/ct-server --port=8124 --key="$cert_dir/$log_server-key.pem" \
+  --trusted_cert_dir="$hash_dir" --cert_dir="tmp/storage/certs" \
+  --tree_dir="tmp/storage/tree" --cert_storage_depth=3 --tree_storage_depth=8 &
+
 server_pid=$!
 sleep 2
 

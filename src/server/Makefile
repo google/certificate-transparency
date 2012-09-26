@@ -1,6 +1,7 @@
 CXXFLAG= -Wall -Werror -O3 -g
 G_INCLUDE= -I $(GTESTDIR)/include -I $(PROTOBUFDIR)/src -I ../include
-G_LIBS= $(GTESTDIR)/make/gtest.a -lpthread $(PROTOBUFDIR)/src/.libs/libprotobuf.a
+# TODO(benl): Test FreeBSD build with gflags and fix if necessary
+G_LIBS= $(GTESTDIR)/make/gtest.a -lpthread $(PROTOBUFDIR)/src/.libs/libprotobuf.a -lgflags
 # Need OpenSSL >= 1.0.0
 ifneq ($(OPENSSLDIR),)
   INCLUDE= $(G_INCLUDE) -I $(OPENSSLDIR)/include
