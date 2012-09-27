@@ -1,8 +1,8 @@
 /* -*- indent-tabs-mode: nil -*- */
 
-#include <assert.h>
 #include <deque>
 #include <gflags/gflags.h>
+#include <glog/logging.h>
 #include <iostream>
 #include <netinet/in.h>
 #include <openssl/evp.h>
@@ -27,8 +27,6 @@
 #include "serializer.h"
 #include "types.h"
 #include "unistd.h"
-
-#define VV(x)
 
 DEFINE_int32(port, 0, "Server port");
 DEFINE_string(key, "", "PEM-encoded server private key file");
@@ -67,7 +65,7 @@ static bool ValidateRead(const char *flagname, const std::string &path) {
 }
 
 static const bool key_dummy = RegisterFlagValidator(&FLAGS_key,
-                                                     &ValidateRead);
+                                                    &ValidateRead);
 
 static const bool cert_dummy = RegisterFlagValidator(&FLAGS_trusted_cert_dir,
                                                      &ValidateRead);
@@ -106,7 +104,7 @@ using ct::SignedCertificateTimestamp;
 class EventLoop;
 
 class Services {
-public:
+ public:
 
   // because time is expensive, for most tasks we can just use some
   // time sampled within this event handling loop. So, the main loop
@@ -119,7 +117,7 @@ public:
 
   static void SetRoughTime() { rough_time_ = 0; }
 
-private:
+ private:
 
   static time_t rough_time_;
 };
@@ -127,7 +125,7 @@ private:
 time_t Services::rough_time_;
 
 class FD {
-public:
+ public:
 
   enum CanDelete {
     DELETE,
@@ -149,13 +147,12 @@ public:
   bool WantsErase() const { return wants_erase_; }
 
   void Close() {
-    assert(deletable_ == DELETE);
-    if (wants_erase_)
-	{
-	std::cout << "Already closed " << fd() << std::endl;
-	return;
-	}
-    std::cout << "Closing " << fd() << std::endl;
+    DCHECK_EQ(deletable_, DELETE) << "Can't call Close() on a non-deletable FD";
+    if (wants_erase_) {
+      LOG(INFO) << "Attempting to close an already closed fd " << fd();
+      return;
+    }
+    LOG(INFO) << "Closing fd " << fd() << std::endl;
     wants_erase_ = true;
     shutdown(fd(), SHUT_RDWR);
     close(fd());
@@ -171,13 +168,13 @@ public:
 
   time_t LastActivity() const { return last_activity_; }
 
-protected:
+ protected:
 
   EventLoop *loop() const { return loop_; }
 
   bool WillAccept(int fd);
 
-private:
+ private:
 
   int fd_;
   EventLoop *loop_;
@@ -195,7 +192,7 @@ private:
 };
 
 class Listener : public FD {
-public:
+ public:
 
   Listener(EventLoop *loop, int fd) : FD(loop, fd, NO_DELETE) {}
 
@@ -203,7 +200,7 @@ public:
 
   void ReadIsAllowed() {
     int in = accept(fd(), NULL, NULL);
-    assert(in >= 0);
+    CHECK_GE(in, 0);
     if (!WillAccept(in)) {
       static char sorry[] = "No free connections.\n";
 
@@ -220,13 +217,15 @@ public:
 
   bool WantsWrite() const { return false; }
 
-  void WriteIsAllowed() { assert(false); }
+  void WriteIsAllowed() {
+    DLOG(FATAL) << "WriteIsAllowed() called on a read-only Listener.";
+  }
 
   virtual void Accepted(int fd) = 0;
 };
 
 class EventLoop {
-public:
+ public:
 
   void Add(FD *fd) { fds_.push_back(fd); }
 
@@ -237,21 +236,21 @@ public:
     memset(&readers, '\0', sizeof readers);
     memset(&writers, '\0', sizeof writers);
     for (std::deque<FD *>::const_iterator pfd = fds_.begin();
-	 pfd != fds_.end(); ++pfd) {
+         pfd != fds_.end(); ++pfd) {
       FD *fd = *pfd;
 
-      assert(!fd->WantsErase());
+      DCHECK(!fd->WantsErase());
       if (fd->WantsWrite())
-	Set(fd->fd(), &writers, &max);
+        Set(fd->fd(), &writers, &max);
       if (fd->WantsRead())
-	Set(fd->fd(), &readers, &max);
+        Set(fd->fd(), &readers, &max);
     }
 
-    assert(max >= 0);
-    VV(std::cout << "Before select" << std::endl);
+    CHECK_GE(max, 0);
+
     int r = select(max+1, &readers, &writers, NULL, NULL);
-    VV(std::cout << "After select" << std::endl);
-    assert(r > 0);
+
+    CHECK_GT(r, 0);
 
     Services::SetRoughTime();
     int n = 0;
@@ -259,31 +258,31 @@ public:
       FD *fd = *pfd;
 
       if (EraseCheck(&pfd))
-	  continue;
+        continue;
 
       if (FD_ISSET(fd->fd(), &writers)) {
-	assert(fd->WantsWrite());
-	fd->WriteIsAllowed();
-	fd->Activity();
-	++n;
+        DCHECK(fd->WantsWrite());
+        fd->WriteIsAllowed();
+        fd->Activity();
+        ++n;
       }
 
       if (EraseCheck(&pfd))
-	  continue;
+        continue;
 
-      if (FD_ISSET(fd->fd(), &readers))	{
-	assert(fd->WantsRead());
-	fd->ReadIsAllowed();
-	fd->Activity();
-	++n;
+      if (FD_ISSET(fd->fd(), &readers)) {
+        DCHECK(fd->WantsRead());
+        fd->ReadIsAllowed();
+        fd->Activity();
+        ++n;
       }
 
       if (EraseCheck(&pfd))
-	  continue;
+        continue;
 
       ++pfd;
     }
-    assert(n <= r);
+    CHECK_LE(n, r);
   }
 
   void Forever() {
@@ -296,19 +295,19 @@ public:
     time_t oldest = Services::RoughTime() - kIdleTime;
 
     for (std::deque<FD *>::iterator pfd = fds_.begin();
-	 pfd != fds_.end(); ++pfd) {
+         pfd != fds_.end(); ++pfd) {
       FD *fd = *pfd;
 
       if (fd->CanDrop() && fd->LastActivity() < oldest) {
-	oldest = fd->LastActivity();
-	drop = pfd;
+        oldest = fd->LastActivity();
+        drop = pfd;
       }
     }
     if (drop != fds_.end())
-	(*drop)->Close();
+      (*drop)->Close();
   }
 
-private:
+ private:
 
   bool EraseCheck(std::deque<FD *>::iterator *pfd) {
     if ((**pfd)->WantsErase()) {
@@ -320,8 +319,8 @@ private:
   }
 
   static void Set(int fd, fd_set *fdset, int *max) {
-    assert(fd >= 0);
-    assert((unsigned)fd < FD_SETSIZE);
+    DCHECK_GE(fd, 0);
+    CHECK_LT(fd, FD_SETSIZE);
     FD_SET(fd, fdset);
     if (fd > *max)
       *max = fd;
@@ -337,9 +336,9 @@ private:
 };
 
 FD::FD(EventLoop *loop, int fd, CanDelete deletable)
-  : fd_(fd), loop_(loop), wants_erase_(false), deletable_(deletable) {
-  assert(fd >= 0);
-  assert((unsigned)fd < FD_SETSIZE);
+    : fd_(fd), loop_(loop), wants_erase_(false), deletable_(deletable) {
+  DCHECK_GE(fd, 0);
+  CHECK_LT(fd, FD_SETSIZE);
   loop->Add(this);
   Activity();
 }
@@ -351,7 +350,7 @@ bool FD::WillAccept(int fd) {
 }
 
 class Server : public FD {
-public:
+ public:
 
   Server(EventLoop *loop, int fd) : FD(loop, fd) {}
 
@@ -361,8 +360,8 @@ public:
     byte buf[1024];
 
     ssize_t n = read(fd(), buf, sizeof buf);
-    VV(std::cout << "read " << n << " from " << fd() << std::endl);
-    if (n <= 0)	{
+    VLOG(5) << "read " << n << " bytes from " << fd();
+    if (n <= 0) {
       Close();
       return;
     }
@@ -380,7 +379,7 @@ public:
 
   void WriteIsAllowed() {
     ssize_t n = write(fd(), wbuffer_.data(), wbuffer_.length());
-    VV(std::cout << "wrote " << n << " to " << fd() << std::endl);
+    VLOG(5) << "wrote " << n << " bytes to " << fd();
     if (n <= 0) {
       Close();
       return;
@@ -391,21 +390,10 @@ public:
   void Write(bstring str) { wbuffer_.append(str); }
   void Write(byte ch) { wbuffer_.push_back(ch); }
 
-private:
+ private:
 
   bstring rbuffer_;
   bstring wbuffer_;
-};
-
-template <class Server> class ServerListener : public Listener {
-public:
-
-  ServerListener(EventLoop *loop, int fd) : Listener(loop, fd) {}
-
-  void Accepted(int fd)	{
-    std::cout << "Accepted " << fd << std::endl;
-    new Server(loop(), fd);
-  }
 };
 
 class CTLogManager {
@@ -446,20 +434,20 @@ class CTLogManager {
 };
 
 class CTServer : public Server {
-public:
+ public:
   // Does not grab ownership of the manager.
   CTServer(EventLoop *loop, int fd, CTLogManager *manager)
-  : Server(loop, fd),
-    manager_(manager) {}
+      : Server(loop, fd),
+        manager_(manager) {}
 
-private:
+ private:
   void BytesRead(bstring *rbuffer) {
     for ( ; ; ) {
       if (rbuffer->size() < 5)
-	return;
+        return;
       size_t length = DecodeLength(rbuffer->substr(2, 3));
       if (rbuffer->size() < length + 5)
-	return;
+        return;
       PacketRead((*rbuffer)[0], (*rbuffer)[1], rbuffer->substr(5, length));
       rbuffer->erase(0, length + 5);
     }
@@ -470,8 +458,8 @@ private:
       SendError(ct::BAD_VERSION);
       return;
     }
-    std::cout << "Command is " << (int)command << " data length "
-	      << data.size() << std::endl;
+    LOG(INFO) << "Command is " << static_cast<int>(command) << ", data length "
+              << data.size();
     if (command != ct::UPLOAD_BUNDLE && command != ct::UPLOAD_CA_BUNDLE) {
       SendError(ct::BAD_COMMAND);
       return;
@@ -488,11 +476,11 @@ private:
         SendError(ct::REJECTED, result);
         break;
       case CTLogManager::SIGNED_CERTIFICATE_TIMESTAMP:
-        assert(!result.empty());
+        CHECK(!result.empty());
         SendResponse(ct::SIGNED_CERTIFICATE_TIMESTAMP, result);
         break;
       default:
-        assert(false);
+        DLOG(FATAL) << "Unknown CTLogManager reply: " << reply;
     }
   }
 
@@ -504,8 +492,8 @@ private:
   }
 
   void WriteLength(size_t length, size_t lengthOfLength) {
-    assert(lengthOfLength <= sizeof length);
-    assert(length < 1U << (lengthOfLength * 8));
+    CHECK_LE(lengthOfLength, sizeof length);
+    CHECK_LT(length, 1U << (lengthOfLength * 8));
     for ( ; lengthOfLength > 0; --lengthOfLength) {
       size_t b = length & (0xff << ((lengthOfLength - 1) * 8));
       Write(b >> ((lengthOfLength - 1) * 8));
@@ -544,8 +532,8 @@ class CTServerListener : public Listener {
                    CTLogManager *manager) : Listener(loop, fd),
                                             manager_(manager) {}
 
-  void Accepted(int fd)	{
-    std::cout << "Accepted " << fd << std::endl;
+  void Accepted(int fd) {
+    LOG(INFO) << "Accepted fd " << fd << std::endl;
     new CTServer(loop(), fd, manager_);
   }
  private:
@@ -585,7 +573,7 @@ static bool InitServer(int *sock, int port, const char *ip, int type) {
   if (type == SOCK_STREAM && listen(s, 128) == -1) goto err;
   *sock = s;
   ret = true;
- err:
+err:
   if (!ret && s != -1) {
     shutdown(s, SHUT_RDWR);
     close(s);
@@ -595,35 +583,33 @@ static bool InitServer(int *sock, int port, const char *ip, int type) {
 
 int main(int argc, char **argv) {
   google::ParseCommandLineFlags(&argc, &argv, true);
+  google::InitGoogleLogging(argv[0]);
   SSL_library_init();
 
   EVP_PKEY *pkey = NULL;
 
   FILE *fp = fopen(FLAGS_key.c_str(), "r");
+
+  PCHECK(fp != static_cast<FILE*>(NULL)) << "Could not read private key file";
   // No password.
-  if (fp == NULL || PEM_read_PrivateKey(fp, &pkey, NULL, NULL) == NULL) {
-    std::cerr << "Could not read private key.\n";
-    exit(1);
-  }
+  PEM_read_PrivateKey(fp, &pkey, NULL, NULL);
+  CHECK_NE(pkey, static_cast<EVP_PKEY*>(NULL)) <<
+      FLAGS_key << " is not a valid PEM-encoded private key.";
 
   fclose(fp);
 
   int fd;
-  assert(InitServer(&fd, FLAGS_port, NULL, SOCK_STREAM));
+  CHECK(InitServer(&fd, FLAGS_port, NULL, SOCK_STREAM));
 
   EventLoop loop;
 
   CertChecker checker;
-  if(!checker.LoadTrustedCertificateDir(FLAGS_trusted_cert_dir)) {
-    std::cerr << "Could not load CA certs.\n";
-    perror(FLAGS_trusted_cert_dir.c_str());
-    exit(1);
-  }
+  CHECK(checker.LoadTrustedCertificateDir(FLAGS_trusted_cert_dir))
+      << "Could not load CA certs from " << FLAGS_trusted_cert_dir;
 
-  if (FLAGS_cert_dir == FLAGS_tree_dir) {
-    std::cerr << "Certificate directory and tree directory must differ.\n";
-    exit(1);
-  }
+  CHECK_NE(FLAGS_cert_dir, FLAGS_tree_dir)
+      << "Certificate directory and tree directory must differ";
+
 
   FrontendSigner signer(new FileDB(
       new FileStorage(FLAGS_cert_dir, FLAGS_cert_storage_depth),
@@ -633,5 +619,6 @@ int main(int argc, char **argv) {
 
   CTLogManager manager(&signer);
   CTServerListener l(&loop, fd, &manager);
+  LOG(INFO) << "Server listening on port " << FLAGS_port;
   loop.Forever();
 }

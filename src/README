@@ -36,10 +36,12 @@ http://code.google.com/p/protobuf/downloads/list.
 
 Again, download, unpack and build.
 
-4. You will also need gflags, from:
-http://http://code.google.com/p/gflags
+4. You will also need gflags and glog, from:
+http://code.google.com/p/gflags/
+and
+http://code.google.com/p/google-glog/
 
-(Tested with gflags-2.0)
+(Tested with gflags-1.6, gflags-2.0 and glog 0.3.2)
 
 Download, unpack, and follow the instructions to build and install.
 

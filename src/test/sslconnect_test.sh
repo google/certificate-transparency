@@ -115,7 +115,8 @@ mkdir -p tmp/storage/tree
 
 ../server/ct-server --port=8124 --key="$cert_dir/$log_server-key.pem" \
   --trusted_cert_dir="$hash_dir" --cert_dir="tmp/storage/certs" \
-  --tree_dir="tmp/storage/tree" --cert_storage_depth=3 --tree_storage_depth=8 &
+  --tree_dir="tmp/storage/tree" --cert_storage_depth=3 --tree_storage_depth=8 \
+  --logtostderr=true &
 
 server_pid=$!
 sleep 2
