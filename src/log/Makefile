@@ -10,7 +10,9 @@ else
   LIBS= $(G_LIBS) -lssl -lcrypto
 endif
 
-CXXFLAGS= $(INCLUDE) $(CXXFLAG)
+LIBS+= -L/usr/local/lib -lsqlite3
+
+CXXFLAGS= $(INCLUDE) -I/usr/local/include $(CXXFLAG)
 
 all: .depend cert_test cert_checker_test submission_handler_test \
 	file_storage_test database_test frontend_signer_test
@@ -64,9 +66,10 @@ file_storage_test: file_storage_test.o file_storage.o filesystem_op.o \
 		filesystem_op.o ../util/util.o $(LIBS)
 
 database_test: database_test.o file_db.o file_storage.o \
-	 filesystem_op.o ../util/util.o ../proto/ct.pb.o ../proto/serializer.o
+	       filesystem_op.o sqlite_db.o ../util/util.o ../proto/ct.pb.o \
+	       ../proto/serializer.o
 	$(CXX) -o database_test database_test.o file_db.o file_storage.o \
-		filesystem_op.o ../util/util.o ../proto/ct.pb.o \
+		filesystem_op.o sqlite_db.o ../util/util.o ../proto/ct.pb.o \
 		../proto/serializer.o $(LIBS)
 
 frontend_signer_test: frontend_signer_test.o frontend_signer.o \

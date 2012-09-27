@@ -30,15 +30,13 @@ FileDB::~FileDB() {
   delete tree_storage_;
 }
 
-Database::WriteResult FileDB::CreatePendingCertificateEntry(
+Database::WriteResult FileDB::CreatePendingCertificateEntry_(
     const LoggedCertificate &logged_cert) {
-  assert(!logged_cert.has_sequence_number());
-  if (!logged_cert.has_certificate_sha256_hash())
-    return MISSING_CERTIFICATE_HASH;
   if (pending_hashes_.find(logged_cert.certificate_sha256_hash()) !=
       pending_hashes_.end())
     return DUPLICATE_CERTIFICATE_HASH;
 
+  // ??? We've already asserted that there is no sequence number!
   LoggedCertificate local;
   local.CopyFrom(logged_cert);
   local.clear_sequence_number();
@@ -139,10 +137,7 @@ Database::LookupResult FileDB::LookupCertificateByIndex(
   return LOOKUP_OK;
 }
 
-Database::WriteResult
-FileDB::WriteTreeHead(const SignedTreeHead &sth) {
-  if (!sth.has_timestamp())
-    return MISSING_TREE_HEAD_TIMESTAMP;
+Database::WriteResult FileDB::WriteTreeHead_(const SignedTreeHead &sth) {
   // 6 bytes are good enough for some 9000 years.
   bstring timestamp_key =
       Serializer::SerializeUint(sth.timestamp(),

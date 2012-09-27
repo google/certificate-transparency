@@ -1,3 +1,5 @@
+/* -*- mode: c++; indent-tabs-mode: nil -*- */
+
 #ifndef DATABASE_H
 #define DATABASE_H
 
@@ -36,8 +38,15 @@ class Database {
   // or an entry with this hash already exists.
   // The entry remains PENDING until a sequence number has been assigned,
   // after which its status changes to LOGGED.
+  WriteResult
+  CreatePendingCertificateEntry(const ct::LoggedCertificate &logged_cert) {
+    assert(!logged_cert.has_sequence_number());
+    if (!logged_cert.has_certificate_sha256_hash())
+      return MISSING_CERTIFICATE_HASH;
+    return CreatePendingCertificateEntry_(logged_cert);
+  }
   virtual WriteResult
-  CreatePendingCertificateEntry(const ct::LoggedCertificate &logged_cert) = 0;
+  CreatePendingCertificateEntry_(const ct::LoggedCertificate &logged_cert) = 0;
 
   // Attempt to add a sequence number to the LoggedCertificate, thereby
   // removing it from the list of pending entries.
@@ -66,7 +75,12 @@ class Database {
   // Attempt to write a tree head. Fails only if a tree head with this timestamp
   // already exists (i.e., |timestamp| is primary key). Does not check that
   // the timestamp is newer than previous entries.
-  virtual WriteResult WriteTreeHead(const ct::SignedTreeHead &sth) = 0;
+  WriteResult WriteTreeHead(const ct::SignedTreeHead &sth) {
+    if (!sth.has_timestamp())
+      return MISSING_TREE_HEAD_TIMESTAMP;
+    return WriteTreeHead_(sth);
+  }
+  virtual WriteResult WriteTreeHead_(const ct::SignedTreeHead &sth) = 0;
 
   // Return the tree head with the freshest timestamp.
   virtual LookupResult LatestTreeHead(ct::SignedTreeHead *result) const = 0;

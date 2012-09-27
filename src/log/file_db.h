@@ -35,7 +35,7 @@ class FileDB : public Database {
 
   // Implement abstract functions, see database.h for comments.
   virtual WriteResult
-  CreatePendingCertificateEntry(const ct::LoggedCertificate &logged_cert);
+  CreatePendingCertificateEntry_(const ct::LoggedCertificate &logged_cert);
 
   virtual WriteResult
   AssignCertificateSequenceNumber(const bstring &certificate_sha256_hash,
@@ -52,7 +52,7 @@ class FileDB : public Database {
   virtual std::set<bstring> PendingHashes() const;
 
 
-  virtual WriteResult WriteTreeHead(const ct::SignedTreeHead &sth);
+  virtual WriteResult WriteTreeHead_(const ct::SignedTreeHead &sth);
 
   virtual LookupResult LatestTreeHead(ct::SignedTreeHead *result) const;
 

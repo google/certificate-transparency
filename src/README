@@ -43,24 +43,26 @@ http://http://code.google.com/p/gflags
 
 Download, unpack, and follow the instructions to build and install.
 
-5. Then, you can build the log server by pointing to your custom OpenSSL
+5. And you will need a copy of sqlite3 installed on your system.
+
+6. Then, you can build the log server by pointing to your custom OpenSSL
 (if needed), protobuf and gtest:
 
 $ make OPENSSLDIR=<path to openssl> PROTOBUFDIR=<path to protobuf> GTESTDIR=<path to gtest>
 
 Once more, use gmake on BSD systems.
 
-6. Finally, test:
+7. Finally, test:
 
 $ make OPENSSLDIR=<path to openssl> PROTOBUFDIR=<path to protobuf> GTESTDIR=<path to gtest> test
 
-7. If you want to test the authz extension in Apache, check out
+8. If you want to test the authz extension in Apache, check out
 OpenSSL 1.0.2 or higher and build that. You'll also need to install it
 somewhere. Check out the head of Apache, and configure it like:
 
 $ ./configure --enable-ssl --with-ssl=<path to your install>
 
-8. To test the authz extension:
+9. To test the authz extension:
 
 $ cd test
 $ make APACHEDIR=<path to httpd> local-links

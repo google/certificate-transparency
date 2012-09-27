@@ -10,6 +10,7 @@
 #include "database.h"
 #include "file_db.h"
 #include "file_storage.h"
+#include "sqlite_db.h"
 #include "types.h"
 #include "util.h"
 
@@ -72,7 +73,7 @@ template <class T> class DBTest : public ::testing::Test {
       logged_cert_(),
       tree_head_() {
     // Some time in September 2012.
-    logged_cert_.mutable_sct()->set_timestamp(1348589665525);
+    logged_cert_.mutable_sct()->set_timestamp(1348589665525LL);
     logged_cert_.mutable_sct()->mutable_entry()->set_type(
         CertificateEntry::X509_ENTRY);
     logged_cert_.mutable_sct()->mutable_entry()->set_leaf_certificate(
@@ -87,7 +88,7 @@ template <class T> class DBTest : public ::testing::Test {
     // (despite the field name).
     logged_cert_.set_certificate_sha256_hash(B(kDefaultHash));
 
-    tree_head_.set_timestamp(1348589665525);
+    tree_head_.set_timestamp(1348589665525LL);
     tree_head_.set_tree_size(42);
     tree_head_.set_root_hash(B(kDefaultHash));
     tree_head_.mutable_signature()->set_hash_algorithm(
@@ -200,7 +201,31 @@ template <> Database *DBTest<FileDB>::SecondDB() {
                     new FileStorage(tree_dir, kTreeStorageDepth));
 }
 
-TYPED_TEST_CASE(DBTest, FileDB);
+template <> void DBTest<SQLiteDB>::SetUp() {
+  file_base_ = util::CreateTemporaryDirectory("/tmp/ctlogXXXXXX");
+  ASSERT_EQ("/tmp/ctlog", file_base_.substr(0, 10));
+  ASSERT_EQ(16U, file_base_.length());
+  db_ = new SQLiteDB(file_base_ + "/ct");
+}
+
+template <> void DBTest<SQLiteDB>::TearDown() {
+  // Check again that it is safe to empty file_base_.
+  ASSERT_EQ("/tmp/ctlog", file_base_.substr(0, 10));
+  ASSERT_EQ(16U, file_base_.length());
+  std::string command = "rm -r " + file_base_;
+  int ret = system(command.c_str());
+  if (ret != 0)
+    std::cout << "Failed to delete temporary directory in "
+              << file_base_ << std::endl;
+}
+
+template <> Database *DBTest<SQLiteDB>::SecondDB() {
+  return new SQLiteDB(file_base_ + "/ct");
+}
+
+typedef testing::Types<FileDB, SQLiteDB> Databases;
+
+TYPED_TEST_CASE(DBTest, Databases);
 
 TYPED_TEST(DBTest, CreatePending) {
   LoggedCertificate lookup_cert;
@@ -213,6 +238,10 @@ TYPED_TEST(DBTest, CreatePending) {
             this->db_->LookupCertificateByHash(this->DefaultHash(),
                                                &lookup_cert));
   CompareLoggedCerts(this->DefaultLoggedCert(), lookup_cert);
+
+  EXPECT_EQ(Database::NOT_FOUND,
+            this->db_->LookupCertificateByHash(this->AlternativeHash(),
+                                               &lookup_cert));
 }
 
 TYPED_TEST(DBTest, GetPending) {
@@ -323,6 +352,9 @@ TYPED_TEST(DBTest, LookupBySequenceNumber) {
   EXPECT_EQ(Database::OK,
             this->db_->AssignCertificateSequenceNumber(this->AlternativeHash(),
                                                        22));
+
+  EXPECT_EQ(Database::NOT_FOUND,
+            this->db_->LookupCertificateByIndex(23, &lookup_cert0));
 
   EXPECT_EQ(Database::LOOKUP_OK,
             this->db_->LookupCertificateByIndex(42, &lookup_cert0));
