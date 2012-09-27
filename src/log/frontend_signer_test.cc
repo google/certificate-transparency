@@ -14,6 +14,7 @@
 #include "log_signer.h"
 #include "log_verifier.h"
 #include "merkle_verifier.h"
+#include "sqlite_db.h"
 #include "types.h"
 #include "util.h"
 
@@ -56,10 +57,10 @@ EVP_PKEY* PublicKeyFromPem(const std::string &pemkey) {
 const unsigned kCertStorageDepth = 3;
 const unsigned kTreeStorageDepth = 8;
 
-class FrontendSignerTest : public ::testing::Test {
+template <class T> class FrontendSignerTest : public ::testing::Test {
  protected:
   FrontendSignerTest()
-      : file_db_(NULL),
+      : db_(NULL),
         verifier_(NULL),
         frontend_(NULL) {}
 
@@ -72,20 +73,14 @@ class FrontendSignerTest : public ::testing::Test {
     ASSERT_EQ("/tmp/ctlog", file_base_.substr(0, 10));
     ASSERT_EQ(16U, file_base_.length());
 
-    std::string certs_dir = file_base_ + "/certs";
-    std::string tree_dir = file_base_ + "/tree";
-    int ret = mkdir(certs_dir.c_str(), 0700);
-    ASSERT_EQ(ret, 0);
-    ret = mkdir(tree_dir.c_str(), 0700);
-    ASSERT_EQ(ret, 0);
+    NewDB();
 
-    file_db_ = new FileDB(new FileStorage(certs_dir, kCertStorageDepth),
-                          new FileStorage(tree_dir, kTreeStorageDepth));
-
-    frontend_ = new FrontendSigner(file_db_, new LogSigner(pkey));
+    frontend_ = new FrontendSigner(db_, new LogSigner(pkey));
     ASSERT_TRUE(verifier_ != NULL);
     ASSERT_TRUE(frontend_ != NULL);
   }
+
+  void NewDB();
 
   void TearDown() {
     // Check again that it is safe to empty file_base_.
@@ -101,19 +96,39 @@ class FrontendSignerTest : public ::testing::Test {
   ~FrontendSignerTest() {
     delete verifier_;
     delete frontend_;
-    delete file_db_;
+    delete db_;
   }
 
-  FileDB *file_db_;
+  Database *db_;
   LogVerifier *verifier_;
   FrontendSigner *frontend_;
   std::string file_base_;
 };
 
+template <> void FrontendSignerTest<FileDB>::NewDB() {
+  std::string certs_dir = file_base_ + "/certs";
+  std::string tree_dir = file_base_ + "/tree";
+  int ret = mkdir(certs_dir.c_str(), 0700);
+  ASSERT_EQ(ret, 0);
+  ret = mkdir(tree_dir.c_str(), 0700);
+  ASSERT_EQ(ret, 0);
+
+  db_ = new FileDB(new FileStorage(certs_dir, kCertStorageDepth),
+                   new FileStorage(tree_dir, kTreeStorageDepth));
+}
+
+template <> void FrontendSignerTest<SQLiteDB>::NewDB() {
+  db_ = new SQLiteDB(file_base_ + "/ct");
+}
+
+typedef testing::Types<FileDB, SQLiteDB> Databases;
+
+TYPED_TEST_CASE(FrontendSignerTest, Databases);
+
 const byte unicorn[] = "Unicorn";
 const byte alice[] = "Alice";
 
-TEST_F(FrontendSignerTest, Log) {
+TYPED_TEST(FrontendSignerTest, Log) {
   const bstring kUnicorn(unicorn, 7);
   const bstring kAlice(alice, 5);
 
@@ -130,7 +145,7 @@ TEST_F(FrontendSignerTest, Log) {
   EXPECT_EQ(sct1.entry().leaf_certificate(), kAlice);
 }
 
-TEST_F(FrontendSignerTest, Time) {
+TYPED_TEST(FrontendSignerTest, Time) {
   const bstring kUnicorn(unicorn, 7);
   const bstring kAlice(alice, 5);
 
@@ -146,7 +161,7 @@ TEST_F(FrontendSignerTest, Time) {
   EXPECT_LE(sct1.timestamp(), util::TimeInMilliseconds());
 }
 
-TEST_F(FrontendSignerTest, LogDuplicates) {
+TYPED_TEST(FrontendSignerTest, LogDuplicates) {
   const bstring kUnicorn(unicorn, 7);
 
   SignedCertificateTimestamp sct0, sct1;
@@ -165,7 +180,7 @@ TEST_F(FrontendSignerTest, LogDuplicates) {
   EXPECT_EQ(sct0.timestamp(), sct1.timestamp());
 }
 
-TEST_F(FrontendSignerTest, Verify) {
+TYPED_TEST(FrontendSignerTest, Verify) {
   const bstring kUnicorn(unicorn, 7);
   const bstring kAlice(alice, 5);
 
@@ -190,7 +205,7 @@ TEST_F(FrontendSignerTest, Verify) {
             LogVerifier::INVALID_SIGNATURE);
 }
 
-TEST_F(FrontendSignerTest, TimedVerify) {
+TYPED_TEST(FrontendSignerTest, TimedVerify) {
   const bstring kUnicorn(unicorn, 7);
   const bstring kAlice(alice, 5);
 
