@@ -466,6 +466,21 @@ TYPED_TEST(DBTest, Resume) {
   delete db2;
 }
 
+TYPED_TEST(DBTest, ResumeEmpty) {
+  Database *db2 = this->SecondDB();
+
+  LoggedCertificate lookup_cert;
+  EXPECT_EQ(Database::NOT_FOUND,
+            db2->LookupCertificateByIndex(0, &lookup_cert));
+
+  SignedTreeHead lookup_sth;
+  EXPECT_EQ(Database::NOT_FOUND, db2->LatestTreeHead(&lookup_sth));
+
+  EXPECT_TRUE(db2->PendingHashes().empty());
+
+  delete db2;
+}
+
 }  // namespace
 
 int main(int argc, char**argv) {
