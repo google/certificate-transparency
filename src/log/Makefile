@@ -15,7 +15,7 @@ LIBS+= -L/usr/local/lib -lsqlite3
 CXXFLAGS= $(INCLUDE) -I/usr/local/include $(CXXFLAG)
 
 all: .depend cert_test cert_checker_test submission_handler_test \
-	file_storage_test database_test frontend_signer_test tree_signer_test
+     file_storage_test database_test frontend_signer_test tree_signer_test
 
 # Preprocessing step for compiling .proto files.
 ../include/ct.pb.h: ../proto/ct.proto
@@ -87,10 +87,10 @@ frontend_signer_test: frontend_signer_test.o frontend_signer.o \
 		filesystem_op.o sqlite_db.o $(LIBS)
 
 tree_signer_test: tree_signer_test.o tree_signer.o log_signer.o log_verifier.o \
-	../util/util.o ../proto/ct.pb.o ../proto/serializer.o \
-	../merkletree/SerialHasher.o ../merkletree/TreeHasher.o \
-	../merkletree/MerkleTree.o ../merkletree/MerkleVerifier.o \
-	file_db.o file_storage.o filesystem_op.o sqlite_db.o
+		  ../util/util.o ../proto/ct.pb.o ../proto/serializer.o \
+		  ../merkletree/SerialHasher.o ../merkletree/TreeHasher.o \
+		  ../merkletree/MerkleTree.o ../merkletree/MerkleVerifier.o \
+		  file_db.o file_storage.o filesystem_op.o sqlite_db.o
 	$(CXX) -o tree_signer_test tree_signer_test.o tree_signer.o \
 		log_signer.o log_verifier.o ../util/util.o ../proto/ct.pb.o \
 		../proto/serializer.o ../merkletree/SerialHasher.o \

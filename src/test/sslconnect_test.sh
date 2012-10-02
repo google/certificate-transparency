@@ -95,7 +95,6 @@ else
 fi
 
 rm -rf ca-hashes
-rm -rf testdata/logs
 
 # Generate new certs dynamically and repeat the test for valid certs
 mkdir -p tmp
@@ -113,36 +112,44 @@ mkdir -p tmp/storage
 mkdir -p tmp/storage/certs
 mkdir -p tmp/storage/tree
 
-../server/ct-server --port=8124 --key="$cert_dir/$log_server-key.pem" \
-  --trusted_cert_dir="$hash_dir" --cert_dir="tmp/storage/certs" \
-  --tree_dir="tmp/storage/tree" --cert_storage_depth=3 --tree_storage_depth=8 \
-  --logtostderr=true &
+test_ct_server() {
+  flags=$@
 
-server_pid=$!
-sleep 2
+  ../server/ct-server --port=8124 --key="$cert_dir/$log_server-key.pem" \
+      --trusted_cert_dir="$hash_dir" --logtostderr=true $flags &
 
-echo "Generating test certificates"
-make_certs `pwd`/tmp `pwd`/tmp/ca-hashes test ca ct-server 8124 false
-# Generate a second set of certs that chain through an intermediate
-make_intermediate_ca_certs `pwd`/tmp intermediate ca
-make_certs `pwd`/tmp `pwd`/tmp/ca-hashes test2 intermediate ct-server 8124 true
+  server_pid=$!
+  sleep 2
 
-# Stop the log server
-kill -9 $server_pid  
-sleep 2
+  echo "Generating test certificates"
+  make_certs `pwd`/tmp `pwd`/tmp/ca-hashes test ca ct-server 8124 false
+  # Generate a second set of certs that chain through an intermediate
+  make_intermediate_ca_certs `pwd`/tmp intermediate ca
+  make_certs `pwd`/tmp `pwd`/tmp/ca-hashes test2 intermediate ct-server 8124 \
+      true
 
-mkdir -p tmp/cache
-echo "Testing valid configurations with new certificates"
-mkdir -p tmp/logs
-if [ -f httpd-new ]; then
-  test_range "8125 8126 8127 8128 8129" tmp tmp/ca-hashes ct-server ca tmp/cache \
-    httpd-valid-new.conf 0 ./httpd-new
-else
-  echo "WARNING: Apache development version not specified, skipping some tests"
-  let SKIPPED=$SKIPPED+1
-  test_range "8125 8126 8127 8128" tmp tmp/ca-hashes ct-server ca tmp/cache \
-    httpd-valid.conf 0 ./apachectl
-fi
+  # Stop the log server
+  kill -9 $server_pid  
+  sleep 2
+
+  mkdir -p tmp/cache
+  echo "Testing valid configurations with new certificates"
+  mkdir -p tmp/logs
+  if [ -f httpd-new ]; then
+    test_range "8125 8126 8127 8128 8129" tmp tmp/ca-hashes ct-server ca \
+	tmp/cache httpd-valid-new.conf 0 ./httpd-new
+  else
+    echo "WARNING: Apache development version not specified, skip some tests"
+    let SKIPPED=$SKIPPED+1
+    test_range "8125 8126 8127 8128" tmp tmp/ca-hashes ct-server ca tmp/cache \
+	httpd-valid.conf 0 ./apachectl
+  fi
+}
+
+test_ct_server --sqlite_db=tmp/storage/ct
+
+test_ct_server --cert_dir="tmp/storage/certs"  --tree_dir="tmp/storage/tree" \
+    --cert_storage_depth=3 --tree_storage_depth=8
 
 # Start the log server again and generate a second set of (inconsistent) signatures
 # echo "Starting CT server with trusted certs in $hash_dir"
@@ -166,6 +173,9 @@ fi
 
 echo "Cleaning up"
 rm -rf tmp
+if [ $FAILED == 0 ]; then
+  rm -rf testdata/logs
+fi
 echo "PASSED $PASSED tests"
 echo "FAILED $FAILED tests"
 echo "SKIPPED $SKIPPED tests"

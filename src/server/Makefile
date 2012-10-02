@@ -10,6 +10,8 @@ else
   LIBS= $(G_LIBS) -lssl -lcrypto
 endif
 
+LIBS+= -L /usr/local/lib -lsqlite3
+
 CXXFLAGS= $(INCLUDE) $(CXXFLAG)
 
 OBJS= ../merkletree/SerialHasher.o \
@@ -18,7 +20,7 @@ OBJS= ../merkletree/SerialHasher.o \
       ../log/submission_handler.o ../log/cert_submission_handler.o \
       ../log/log_signer.o ../log/frontend_signer.o \
       ../log/file_db.o ../log/file_storage.o ../log/filesystem_op.o \
-      ../proto/ct.pb.o ../proto/serializer.o
+      ../log/sqlite_db.o ../proto/ct.pb.o ../proto/serializer.o
 
 all: .depend ct-server
 

@@ -25,6 +25,7 @@
 #include "frontend_signer.h"
 #include "log_signer.h"
 #include "serializer.h"
+#include "sqlite_db.h"
 #include "types.h"
 #include "unistd.h"
 
@@ -34,6 +35,7 @@ DEFINE_string(trusted_cert_dir, "",
               "Directory for trusted CA certificates, in OpenSSL hash format");
 DEFINE_string(cert_dir, "", "Storage directory for certificates");
 DEFINE_string(tree_dir, "", "Storage directory for trees");
+DEFINE_string(sqlite_db, "", "Database for certificate and tree storage");
 // TODO(ekasper): sanity-check these against the directory structure.
 DEFINE_int32(cert_storage_depth, 0,
              "Subdirectory depth for certificates; if the directory is not "
@@ -71,7 +73,7 @@ static const bool cert_dummy = RegisterFlagValidator(&FLAGS_trusted_cert_dir,
                                                      &ValidateRead);
 
 static bool ValidateWrite(const char *flagname, const std::string &path) {
-  if (access(path.c_str(), W_OK) != 0) {
+  if (path != "" && access(path.c_str(), W_OK) != 0) {
     std::cout << "Cannot modify " << flagname << " at " << path << std::endl;
     return false;
   }
@@ -83,7 +85,6 @@ static const bool cert_dir_dummy = RegisterFlagValidator(&FLAGS_cert_dir,
 
 static const bool tree_dir_dummy = RegisterFlagValidator(&FLAGS_tree_dir,
                                                          &ValidateWrite);
-
 
 static bool ValidateIsNonNegative(const char *flagname, int value) {
   if (value < 0) {
@@ -320,7 +321,7 @@ class EventLoop {
 
   static void Set(int fd, fd_set *fdset, int *max) {
     DCHECK_GE(fd, 0);
-    CHECK_LT(fd, FD_SETSIZE);
+    CHECK_LT((unsigned)fd, FD_SETSIZE);
     FD_SET(fd, fdset);
     if (fd > *max)
       *max = fd;
@@ -338,7 +339,7 @@ class EventLoop {
 FD::FD(EventLoop *loop, int fd, CanDelete deletable)
     : fd_(fd), loop_(loop), wants_erase_(false), deletable_(deletable) {
   DCHECK_GE(fd, 0);
-  CHECK_LT(fd, FD_SETSIZE);
+  CHECK_LT((unsigned)fd, FD_SETSIZE);
   loop->Add(this);
   Activity();
 }
@@ -607,14 +608,25 @@ int main(int argc, char **argv) {
   CHECK(checker.LoadTrustedCertificateDir(FLAGS_trusted_cert_dir))
       << "Could not load CA certs from " << FLAGS_trusted_cert_dir;
 
-  CHECK_NE(FLAGS_cert_dir, FLAGS_tree_dir)
-      << "Certificate directory and tree directory must differ";
+  if (FLAGS_sqlite_db == "")
+    CHECK_NE(FLAGS_cert_dir, FLAGS_tree_dir)
+        << "Certificate directory and tree directory must differ";
 
+  if ((FLAGS_cert_dir != "" || FLAGS_tree_dir != "") && FLAGS_sqlite_db != "") {
+    std::cerr << "Choose either file or sqlite database, not both" << std::endl;
+    exit(1);
+  }
 
-  FrontendSigner signer(new FileDB(
-      new FileStorage(FLAGS_cert_dir, FLAGS_cert_storage_depth),
-      new FileStorage(FLAGS_tree_dir, FLAGS_tree_storage_depth)),
-                        new LogSigner(pkey),
+  Database *db;
+
+  if (FLAGS_sqlite_db != "")
+      db = new SQLiteDB(FLAGS_sqlite_db);
+  else
+      db = new FileDB(new FileStorage(FLAGS_cert_dir, FLAGS_cert_storage_depth),
+                      new FileStorage(FLAGS_tree_dir,
+                                      FLAGS_tree_storage_depth));
+
+  FrontendSigner signer(db, new LogSigner(pkey),
                         new CertSubmissionHandler(&checker));
 
   CTLogManager manager(&signer);
