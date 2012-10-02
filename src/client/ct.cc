@@ -21,7 +21,6 @@
 #include <sys/socket.h>
 #include <unistd.h>
 
-#include "cache.h"
 #include "cert.h"
 #include "cert_submission_handler.h"
 #include "ct.h"
@@ -37,63 +36,6 @@
 
 using ct::CertificateEntry;
 using ct::SignedCertificateTimestamp;
-
-// Really really dumb and temporary filestore methods.
-static void WriteAllFiles(const std::vector<bstring> &files,
-                          const char *dirname) {
-  // Store current directory.
-  char current_dir[1024];
-  char *retbuf = getcwd(current_dir, sizeof current_dir);
-  assert(retbuf != NULL);
-  if (chdir(dirname) != 0) {
-    perror(dirname);
-    exit(1);
-  }
-  for (unsigned int i = 0; i < files.size(); ++i) {
-    char filename[20];
-    // 0000000000.tmp, 0000000001.tmp, etc.
-    sprintf(filename, "%010d.tmp", i);
-    FILE *out = fopen(filename, "wb");
-    assert(out != NULL);
-    fwrite(files[i].data(), 1, files[i].size(), out);
-    fclose(out);
-  }
-  // Change back to working directory.
-  int ret = chdir(current_dir);
-  assert(ret == 0);
-}
-
-static std::vector<bstring> ReadAllFiles(const char *dirname) {
-  std::vector<bstring> result;
-  // Store current directory.
-  char current_dir[1024];
-  char *retbuf = getcwd(current_dir, sizeof current_dir);
-  assert(retbuf != NULL);
-  if (chdir(dirname) != 0) {
-    perror(dirname);
-    exit(1);
-  }
-  DIR *dir = opendir(".");
-  if (dir == NULL) {
-    perror(dirname);
-    exit(1);
-  }
-
-  dirent *file = NULL;
-  while ((file = readdir(dir)) != NULL) {
-    if (file->d_type == DT_REG) {
-      bstring contents;
-      bool read_success = util::ReadBinaryFile(file->d_name, &contents);
-      assert(read_success);
-      result.push_back(contents);
-    }
-  }
-
-  closedir(dir);
-  int ret = chdir(current_dir);
-  assert(ret == 0);
-  return result;
-}
 
 static void AddExtension(X509 *cert, const char *oid, unsigned char *data,
                          int data_len, int critical) {
@@ -347,9 +289,7 @@ class SSLClient : public CTClient {
                                                  ca_dir_(NULL) {}
 
   SSLClient(const char *server, uint16_t port,
-            const std::vector<bstring> &cache,
             const char *ca_dir) : CTClient(server, port),
-                                   cache_(cache),
                                    ca_dir_(ca_dir) {}
 
   enum ConnectResult {
@@ -358,10 +298,6 @@ class SSLClient : public CTClient {
     // Found a valid proof that contradicts a previous, valid proof.
     INCONSISTENT_PROOF = 3,
   };
-
-  std::vector<bstring> WriteCache() const {
-    return cache_.WriteCache();
-  }
 
   struct VerifyCallbackArgs {
     // The verifier for checking log proofs.
@@ -551,27 +487,11 @@ class SSLClient : public CTClient {
       std::cout << "Connection failed." << std::endl;
 
     ConnectResult result;
-    // Cache the checkpoint.
-    if (args.proof_verified) {
-      switch(cache_.Insert(args.sct)) {
-        case SCTCache::NEW:
-          std::cout << "Cached new checkpoint." << std::endl;
-          result = PROOF_VERIFIED;
-          break;
-        case SCTCache::CACHED:
-          std::cout << "Checkpoint already in cache." << std::endl;
-          result = PROOF_VERIFIED;
-          break;
-        case SCTCache::MISMATCH:
-          std::cout << "ERROR: checkpoint mismatch!" << std::endl;
-          result = INCONSISTENT_PROOF;
-          break;
-        default:
-          assert(false);
-      }
-    } else {
+
+    if (args.proof_verified)
+      result = PROOF_VERIFIED;
+    else
       result = NO_VALID_PROOF;
-    }
 
     // TODO: if the server closes the socket then the client cannot
     // connect again. Make sure we only allow SSLConnect() once.
@@ -584,7 +504,6 @@ class SSLClient : public CTClient {
   }
 
  private:
-  SCTCache cache_;
   const char *ca_dir_;
 }; // class SSLCLient
 
@@ -878,7 +797,7 @@ static void ProofToAuthz(int argc, const char **argv) {
 
 static void ConnectHelp() {
   std::cerr << "connect <server> <port> [-log_server_key key_file] "
-            << "[-cache cache_dir] [-ca_dir ca_dir]" << std::endl;
+            << "[-ca_dir ca_dir]" << std::endl;
 }
 
 // Return values
@@ -894,7 +813,6 @@ static int Connect(int argc, const char **argv) {
   unsigned port = atoi(argv[2]);
 
   const char *key_file = NULL;
-  const char *cache_dir = NULL;
   const char *ca_dir = NULL;
 
   EVP_PKEY *pkey = NULL;
@@ -909,14 +827,6 @@ static int Connect(int argc, const char **argv) {
         exit(1);
       }
       key_file = argv[1];
-      argc -= 2;
-      argv += 2;
-    } else if (strcmp(argv[0], "-cache") == 0) {
-      if (cache_dir != NULL) {
-        ConnectHelp();
-        exit(1);
-      }
-      cache_dir = argv[1];
       argc -= 2;
       argv += 2;
     } else if (strcmp(argv[0], "-ca_dir") == 0) {
@@ -955,20 +865,9 @@ static int Connect(int argc, const char **argv) {
   if (pkey != NULL)
     verifier = new LogVerifier(new LogSigVerifier(pkey),
                                new MerkleVerifier(new Sha256Hasher()));
-  std::vector<bstring> cache;
-  if (cache_dir != NULL) {
-    std::cout << "Reading cache...";
-    cache = ReadAllFiles(cache_dir);
-    std::cout << "OK." << std::endl;
-  }
-  SSLClient client(server_name, port, cache, ca_dir);
+
+  SSLClient client(server_name, port, ca_dir);
   SSLClient::ConnectResult result = client.SSLConnect(verifier);
-  if (cache_dir != NULL) {
-    std::cout << "Writing cache...";
-    cache = client.WriteCache();
-    WriteAllFiles(cache, cache_dir);
-    std::cout << "OK." << std::endl;
-  }
   delete verifier;
 
   return result;
@@ -996,7 +895,6 @@ static void UnknownCommand(const std::string &cmd,
 // 0: success
 // 1: system error/invalid argument/etc
 // 2: proof verification error (for Connect())
-// 3: cache inconsistency error (for Connect())
 int main(int argc, const char **argv) {
   const std::string main_command(argv[0]);
   if (argc < 2) {

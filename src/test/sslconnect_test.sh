@@ -25,18 +25,13 @@ test_connect() {
   log_server=$3
   ca=$4
   port=$5
-  cache=$6
-  expected_retcode=$7
-
-  if [ "$cache" != "" ]; then
-    cache_args="-cache $cache"
-  fi
+  expected_retcode=$6
  
   # Continue tests on error
   set +e
   ../client/ct connect 127.0.0.1 $port -log_server_key \
-    $cert_dir/$log_server-key-public.pem -ca_dir $hash_dir \
-    $cache_args
+    $cert_dir/$log_server-key-public.pem -ca_dir $hash_dir
+
   local retcode=$?
   set -e
 
@@ -55,16 +50,15 @@ test_range() {
   hash_dir=$3
   log_server=$4
   ca=$5
-  cache=$6
-  conf=$7
-  retcode=$8
-  apache=$9
+  conf=$6
+  retcode=$7
+  apache=$8
 
   echo "Starting Apache"
   $apache -d `pwd`/$cert_dir -f `pwd`/$conf -k start
 
   for port in $ports; do
-    test_connect $cert_dir $hash_dir $log_server $ca $port "$cache" $retcode;
+    test_connect $cert_dir $hash_dir $log_server $ca $port $retcode;
   done
 
   echo "Stopping Apache"
@@ -81,16 +75,16 @@ cp testdata/ca-cert.pem ca-hashes/$hash.0
 echo "Testing known good/bad certificate configurations" 
 mkdir -p testdata/logs
 if [ -f httpd-new ]; then
-  test_range "8125 8126 8127 8128 8129" testdata ca-hashes ct-server ca "" \
+  test_range "8125 8126 8127 8128 8129" testdata ca-hashes ct-server ca \
     httpd-valid-new.conf 0 ./httpd-new
-  test_range "8125 8126 8127 8128 8129" testdata ca-hashes ct-server ca "" \
+  test_range "8125 8126 8127 8128 8129" testdata ca-hashes ct-server ca \
     httpd-invalid-new.conf 2 ./httpd-new
 else
   echo "WARNING: Apache development version not specified, skipping some tests"
   let SKIPPED=$SKIPPED+2
-  test_range "8125 8126 8127 8128" testdata ca-hashes ct-server ca "" \
+  test_range "8125 8126 8127 8128" testdata ca-hashes ct-server ca \
     httpd-valid.conf 0 ./apachectl
-  test_range "8125 8126 8127 8128" testdata ca-hashes ct-server ca "" \
+  test_range "8125 8126 8127 8128" testdata ca-hashes ct-server ca \
     httpd-invalid.conf 2 ./apachectl
 fi
 
@@ -132,17 +126,16 @@ test_ct_server() {
   kill -9 $server_pid  
   sleep 2
 
-  mkdir -p tmp/cache
   echo "Testing valid configurations with new certificates"
   mkdir -p tmp/logs
   if [ -f httpd-new ]; then
-    test_range "8125 8126 8127 8128 8129" tmp tmp/ca-hashes ct-server ca \
-	tmp/cache httpd-valid-new.conf 0 ./httpd-new
+      test_range "8125 8126 8127 8128 8129" tmp tmp/ca-hashes ct-server ca \
+	  httpd-valid-new.conf 0 ./httpd-new
   else
-    echo "WARNING: Apache development version not specified, skip some tests"
-    let SKIPPED=$SKIPPED+1
-    test_range "8125 8126 8127 8128" tmp tmp/ca-hashes ct-server ca tmp/cache \
-	httpd-valid.conf 0 ./apachectl
+      echo "WARNING: Apache development version not specified, skip some tests"
+      let SKIPPED=$SKIPPED+1
+      test_range "8125 8126 8127 8128" tmp tmp/ca-hashes ct-server ca \
+	  httpd-valid.conf 0 ./apachectl
   fi
 }
 
@@ -150,26 +143,6 @@ test_ct_server --sqlite_db=tmp/storage/ct
 
 test_ct_server --cert_dir="tmp/storage/certs"  --tree_dir="tmp/storage/tree" \
     --cert_storage_depth=3 --tree_storage_depth=8
-
-# Start the log server again and generate a second set of (inconsistent) signatures
-# echo "Starting CT server with trusted certs in $hash_dir"
-# ../server/ct-server 8124 $cert_dir/$log_server-key.pem $hash_dir &
-# server_pid=$!
-# sleep 2
-
-# echo "Generating test certificates"
-# make_certs `pwd`/tmp `pwd`/tmp/ca-hashes test ca ct-server 8124 false
-# Generate a second set of certs that chain through an intermediate
-# make_intermediate_ca_certs `pwd`/tmp intermediate ca
-# make_certs `pwd`/tmp `pwd`/tmp/ca-hashes test2 intermediate ct-server 8124 true
-
-# Stop the log server
-# kill -9 $server_pid  
-# sleep 2
-
-# Test again and expect failure
-# echo "Testing valid configurations with new certificates against existing cache" 
-# test_valid_range tmp tmp/ca-hashes ct-server ca tmp/cache 3
 
 echo "Cleaning up"
 rm -rf tmp

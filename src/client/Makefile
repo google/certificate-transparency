@@ -12,7 +12,7 @@ endif
 
 CXXFLAGS= $(INCLUDE) $(CXXFLAG)
 
-OBJS= cache.o ../merkletree/MerkleVerifier.o \
+OBJS= ../merkletree/MerkleVerifier.o \
 ../merkletree/SerialHasher.o ../merkletree/TreeHasher.o \
 ../util/ct_debug.o ../util/util.o ../log/cert.o \
 ../log/log_signer.o ../log/log_verifier.o ../log/submission_handler.o \
@@ -25,7 +25,7 @@ all: .depend ct
 ../include/ct.pb.h: ../proto/ct.proto
 	cd ../proto && $(MAKE)
 
-.depend: *.cc *.h ../include/ct.pb.h
+.depend: *.cc ../include/ct.pb.h
 	$(CXX) $(CXXFLAGS) -MM *.cc *.h > .depend
 
 include .depend
