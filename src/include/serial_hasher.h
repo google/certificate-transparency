@@ -1,1 +1,1 @@
-../merkletree/SerialHasher.h
+../merkletree/serial_hasher.h

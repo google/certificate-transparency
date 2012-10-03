@@ -12,7 +12,7 @@ endif
 
 CXXFLAGS= $(INCLUDE) $(CXXFLAG)
 
-all: .depend MerkleTreeTest SerialHasherTest TreeHasherTest
+all: .depend merkle_tree_test serial_hasher_test tree_hasher_test
 
 clean:
 	rm -f *Test *.o
@@ -22,21 +22,21 @@ include .depend
 .depend: *.cc *.h
 	$(CXX) $(CXXFLAGS) -MM *.cc *.h > .depend
 
-test: MerkleTreeTest SerialHasherTest TreeHasherTest
-	./SerialHasherTest
-	./TreeHasherTest
+test: merkle_tree_test serial_hasher_test tree_hasher_test
+	./serial_hasher_test
+	./tree_hasher_test
 # Do not run performance stress tests by default
-	./MerkleTreeTest --gtest_filter=-*StressTest*
+	./merkle_tree_test --gtest_filter=-*StressTest*
 
-MerkleTreeTest: MerkleTree.o MerkleVerifier.o SerialHasher.o TreeHasher.o \
-		MerkleTreeTest.o ../util/util.o
-	$(CXX) -o  MerkleTreeTest MerkleVerifier.o MerkleTree.o SerialHasher.o \
-	TreeHasher.o MerkleTreeTest.o ../util/util.o $(LIBS)
+merkle_tree_test: merkle_tree.o merkle_verifier.o serial_hasher.o tree_hasher.o \
+		merkle_tree_test.o ../util/util.o
+	$(CXX) -o  merkle_tree_test merkle_verifier.o merkle_tree.o serial_hasher.o \
+	tree_hasher.o merkle_tree_test.o ../util/util.o $(LIBS)
 
-SerialHasherTest: SerialHasher.o SerialHasherTest.o ../util/util.o
-	$(CXX) -o SerialHasherTest SerialHasher.o SerialHasherTest.o \
+serial_hasher_test: serial_hasher.o serial_hasher_test.o ../util/util.o
+	$(CXX) -o serial_hasher_test serial_hasher.o serial_hasher_test.o \
 	../util/util.o $(LIBS)
 
-TreeHasherTest: SerialHasher.o TreeHasher.o TreeHasherTest.o ../util/util.o
-	$(CXX) -o TreeHasherTest SerialHasher.o TreeHasher.o TreeHasherTest.o \
+tree_hasher_test: serial_hasher.o tree_hasher.o tree_hasher_test.o ../util/util.o
+	$(CXX) -o tree_hasher_test serial_hasher.o tree_hasher.o tree_hasher_test.o \
 	../util/util.o $(LIBS)

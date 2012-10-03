@@ -44,6 +44,8 @@ http://code.google.com/p/google-glog/
 (Tested with gflags-1.6, gflags-2.0 and glog 0.3.2)
 
 Download, unpack, and follow the instructions to build and install.
+Be sure to install gflags before building and installing glog to avoid link
+errors later on.
 
 5. And you will need a copy of sqlite3 installed on your system.
 

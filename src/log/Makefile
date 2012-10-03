@@ -75,25 +75,25 @@ database_test: database_test.o file_db.o file_storage.o \
 frontend_signer_test: frontend_signer_test.o frontend_signer.o \
 		      log_signer.o log_verifier.o submission_handler.o \
 		      ../util/util.o ../proto/ct.pb.o ../proto/serializer.o \
-		      ../merkletree/SerialHasher.o ../merkletree/TreeHasher.o \
-		      ../merkletree/MerkleVerifier.o file_db.o file_storage.o \
+		      ../merkletree/serial_hasher.o ../merkletree/tree_hasher.o \
+		      ../merkletree/merkle_verifier.o file_db.o file_storage.o \
 		      filesystem_op.o sqlite_db.o
 	$(CXX) -o frontend_signer_test frontend_signer_test.o \
 		frontend_signer.o log_signer.o log_verifier.o \
 		submission_handler.o ../util/util.o \
 		../proto/ct.pb.o ../proto/serializer.o \
-		../merkletree/SerialHasher.o ../merkletree/TreeHasher.o \
-		../merkletree/MerkleVerifier.o file_db.o file_storage.o \
+		../merkletree/serial_hasher.o ../merkletree/tree_hasher.o \
+		../merkletree/merkle_verifier.o file_db.o file_storage.o \
 		filesystem_op.o sqlite_db.o $(LIBS)
 
 tree_signer_test: tree_signer_test.o tree_signer.o log_signer.o log_verifier.o \
 		  ../util/util.o ../proto/ct.pb.o ../proto/serializer.o \
-		  ../merkletree/SerialHasher.o ../merkletree/TreeHasher.o \
-		  ../merkletree/MerkleTree.o ../merkletree/MerkleVerifier.o \
+		  ../merkletree/serial_hasher.o ../merkletree/tree_hasher.o \
+		  ../merkletree/merkle_tree.o ../merkletree/merkle_verifier.o \
 		  file_db.o file_storage.o filesystem_op.o sqlite_db.o
 	$(CXX) -o tree_signer_test tree_signer_test.o tree_signer.o \
 		log_signer.o log_verifier.o ../util/util.o ../proto/ct.pb.o \
-		../proto/serializer.o ../merkletree/SerialHasher.o \
-		../merkletree/TreeHasher.o ../merkletree/MerkleTree.o \
-		../merkletree/MerkleVerifier.o file_db.o file_storage.o \
+		../proto/serializer.o ../merkletree/serial_hasher.o \
+		../merkletree/tree_hasher.o ../merkletree/merkle_tree.o \
+		../merkletree/merkle_verifier.o file_db.o file_storage.o \
 		filesystem_op.o sqlite_db.o $(LIBS)

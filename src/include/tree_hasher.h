@@ -1,1 +1,1 @@
-../merkletree/TreeHasher.h
+../merkletree/tree_hasher.h

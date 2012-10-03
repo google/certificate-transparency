@@ -1,1 +1,1 @@
-../merkletree/MerkleVerifier.h
+../merkletree/merkle_verifier.h
