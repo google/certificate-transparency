@@ -4,9 +4,9 @@
 ^doc/draft-laurie-pki-sunlight-..-..-diff\.html$
 .*\.o$
 .*\.so$
-^src/merkletree/MerkleTreeTest$
-^src/merkletree/SerialHasherTest$
-^src/merkletree/TreeHasherTest$
+^src/merkletree/merkle_tree_test$
+^src/merkletree/serial_hasher_test$
+^src/merkletree/tree_hasher_test$
 \.depend
 ^src/client/ct$
 ^src/server/ct-server$
