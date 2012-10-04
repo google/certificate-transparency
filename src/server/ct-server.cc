@@ -100,6 +100,9 @@ static const bool t_st_dummy = RegisterFlagValidator(&FLAGS_tree_storage_depth,
                                                      &ValidateIsNonNegative);
 
 using ct::CertificateEntry;
+using ct::ClientMessage;
+using ct::ServerError;
+using ct::ServerMessage;
 using ct::SignedCertificateTimestamp;
 
 class EventLoop;
@@ -412,21 +415,21 @@ class CTLogManager {
   // Submit an entry and write a token, if the entry is accepted,
   // or an error otherwise.
   LogReply SubmitEntry(CertificateEntry::Type type, const bstring &data,
-                       bstring *result) {
-    SignedCertificateTimestamp sct;
+                       SignedCertificateTimestamp *sct, std::string *error) {
+    SignedCertificateTimestamp local_sct;
     FrontendSigner::SubmitResult submit_result =
-        signer_->QueueEntry(type, data, &sct);
+        signer_->QueueEntry(type, data, &local_sct);
 
     LogReply reply = REJECT;
     switch (submit_result) {
       case FrontendSigner::LOGGED:
       case FrontendSigner::PENDING:
       case FrontendSigner::NEW:
-        Serializer::SerializeSCTToken(sct, result);
+        sct->CopyFrom(local_sct);
         reply = SIGNED_CERTIFICATE_TIMESTAMP;
         break;
       default:
-        result->assign(FrontendSigner::SubmitResultString(submit_result));
+        error->assign(FrontendSigner::SubmitResultString(submit_result));
     }
     return reply;
   }
@@ -441,89 +444,130 @@ class CTServer : public Server {
       : Server(loop, fd),
         manager_(manager) {}
 
+  static const ct::Version kVersion = ct::V0;
+  static const ct::MessageFormat kFormat = ct::PROTOBUF;
+  static const size_t kPacketPrefixLength = 3;
+  static const size_t kMaxPacketLength = (1 << 24) - 1;
+
  private:
   void BytesRead(bstring *rbuffer) {
     for ( ; ; ) {
       if (rbuffer->size() < 5)
         return;
-      size_t length = DecodeLength(rbuffer->substr(2, 3));
+      size_t length = kMaxPacketLength + 1;
+      // Just DCHECK: we explicitly feed it the right-size input,
+      // so nothing should really go wrong here.
+      Deserializer::DeserializeResult res =
+          Deserializer::DeserializeUint(rbuffer->substr(2, 3), 3, &length);
+      DCHECK_EQ(Deserializer::OK, res);
       if (rbuffer->size() < length + 5)
         return;
-      PacketRead((*rbuffer)[0], (*rbuffer)[1], rbuffer->substr(5, length));
+      // Can only really happen if max packet length is not aligned with
+      // byte boundaries.
+      if (length > kMaxPacketLength) {
+        Close();
+        return;
+      }
+      // We have to initialize to make the compiler happy,
+      // so initialize to an invalid enum.
+      int version = -1;
+      int format = -1;
+      res = Deserializer::DeserializeUint(rbuffer->substr(0, 1), 1, &version);
+      DCHECK_EQ(Deserializer::OK, res);
+      res = Deserializer::DeserializeUint(rbuffer->substr(1, 1), 1, &format);
+      DCHECK_EQ(Deserializer::OK, res);
+      PacketRead(version, format, rbuffer->substr(5, length));
       rbuffer->erase(0, length + 5);
     }
   }
 
-  void PacketRead(byte version, byte command, const bstring &data) {
-    if (version != 0) {
-      SendError(ct::BAD_VERSION);
+  void PacketRead(int version, int format, const bstring &data) {
+    if (version != kVersion) {
+      SendError(ServerError::BAD_VERSION);
       return;
     }
-    LOG(INFO) << "Command is " << static_cast<int>(command) << ", data length "
-              << data.size();
-    if (command != ct::UPLOAD_BUNDLE && command != ct::UPLOAD_CA_BUNDLE) {
-      SendError(ct::BAD_COMMAND);
+
+    if (format != kFormat) {
+      SendError(ServerError::UNSUPPORTED_FORMAT);
       return;
     }
-    bstring result;
+
+   ClientMessage message;
+   if (!message.ParseFromString(data)) {
+     SendError(ServerError::INVALID_MESSAGE);
+     return;
+   }
+
+   LOG(INFO) << "Command is " << message.command() << ", data length "
+             << message.submission_data().size();
+
+   std::string error;
+   SignedCertificateTimestamp sct;
     CTLogManager::LogReply reply;
-    if (command == ct::UPLOAD_BUNDLE) {
-      reply = manager_->SubmitEntry(CertificateEntry::X509_ENTRY, data, &result);
-    } else {
-      reply = manager_->SubmitEntry(CertificateEntry::PRECERT_ENTRY, data, &result);
+    // Since we successfully parsed the protobuf, apparently we know
+    // the command but don't handle it.
+    if (message.command() != ClientMessage::SUBMIT_BUNDLE &&
+        message.command() != ClientMessage::SUBMIT_CA_BUNDLE) {
+      SendError(ServerError::UNSUPPORTED_COMMAND);
+      return;
     }
-    switch(reply) {
+    if (message.command() == ClientMessage::SUBMIT_BUNDLE)
+      reply = manager_->SubmitEntry(CertificateEntry::X509_ENTRY, data, &sct,
+                                    &error);
+    else
+      reply = manager_->SubmitEntry(CertificateEntry::PRECERT_ENTRY, data, &sct,
+                                    &error);
+
+    switch (reply) {
       case CTLogManager::REJECT:
-        SendError(ct::REJECTED, result);
+        SendError(ServerError::REJECTED, error);
         break;
       case CTLogManager::SIGNED_CERTIFICATE_TIMESTAMP:
-        CHECK(!result.empty());
-        SendResponse(ct::SIGNED_CERTIFICATE_TIMESTAMP, result);
+        SendSCTToken(sct);
         break;
       default:
         DLOG(FATAL) << "Unknown CTLogManager reply: " << reply;
     }
   }
 
-  size_t DecodeLength(const bstring &length) {
-    size_t len = 0;
-    for (size_t n = 0; n < length.size(); ++n)
-      len = (len << 8) | static_cast<unsigned char>(length[n]);
-    return len;
+  void SendError(ServerError::ErrorCode error) {
+    SendError(error, "");
   }
 
-  void WriteLength(size_t length, size_t lengthOfLength) {
-    CHECK_LE(lengthOfLength, sizeof length);
-    CHECK_LT(length, 1U << (lengthOfLength * 8));
-    for ( ; lengthOfLength > 0; --lengthOfLength) {
-      size_t b = length & (0xff << ((lengthOfLength - 1) * 8));
-      Write(b >> ((lengthOfLength - 1) * 8));
-    }
+  void SendError(ServerError::ErrorCode error, const std::string &error_string) {
+    ServerMessage message;
+    message.set_response(ServerMessage::ERROR);
+    message.mutable_error()->set_code(error);
+    message.mutable_error()->set_error_message(error_string);
+
+    SendMessage(message);
   }
 
-  void SendError(ct::ServerError error) {
-    Write(VERSION);
-    Write(ct::ERROR);
-    WriteLength(1, 3);
-    Write(error);
+  void SendSCTToken(const SignedCertificateTimestamp &sct) {
+    ServerMessage message;
+    message.set_response(ServerMessage::SIGNED_CERTIFICATE_TIMESTAMP);
+    // Only send as little as needed (i.e., timestamp and signature).
+    message.mutable_sct()->set_timestamp(sct.timestamp());
+    message.mutable_sct()->mutable_signature()->CopyFrom(sct.signature());
+
+    SendMessage(message);
   }
 
-  void SendError(ct::ServerError error, const std::string &error_string) {
-    Write(VERSION);
-    Write(ct::ERROR);
-    WriteLength(1 + error_string.length(), 3);
-    Write(error);
-    Write(error_string);
+  void SendMessage(const ServerMessage &message) {
+    std::string serialized_message;
+    CHECK(message.SerializeToString(&serialized_message));
+    // TODO(ekasper): remove the CHECK; it's temporary until we decide
+    // how to split large messages.
+    CHECK_LE(serialized_message.size(), kMaxPacketLength) <<
+        "Attempted to send a message that exceeds maximum packet length.";
+
+    Write(Serializer::SerializeUint(kVersion, 1));
+    Write(Serializer::SerializeUint(kFormat, 1));
+    Write(Serializer::SerializeUint(serialized_message.length(),
+                                    kPacketPrefixLength));
+    Write(serialized_message);
   }
 
-  void SendResponse(ct::ServerResponse code, const bstring &response) {
-    Write(VERSION);
-    Write(code);
-    WriteLength(response.length(), 3);
-    Write(response);
-  }
-
-  static const byte VERSION = 0;
   CTLogManager *manager_;
 };
 

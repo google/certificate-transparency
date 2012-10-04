@@ -15,8 +15,7 @@ LIBS+= -L /usr/local/lib -lsqlite3
 CXXFLAGS= $(INCLUDE) $(CXXFLAG)
 
 OBJS= ../merkletree/serial_hasher.o \
-      ../util/ct_debug.o ../util/util.o \
-      ../log/cert_checker.o ../log/cert.o \
+      ../util/util.o ../log/cert_checker.o ../log/cert.o \
       ../log/submission_handler.o ../log/cert_submission_handler.o \
       ../log/log_signer.o ../log/frontend_signer.o \
       ../log/file_db.o ../log/file_storage.o ../log/filesystem_op.o \

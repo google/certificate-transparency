@@ -25,17 +25,21 @@ test_connect() {
   log_server=$3
   ca=$4
   port=$5
-  expected_retcode=$6
+  expect_fail=$6
+  strict=$7
  
   # Continue tests on error
   set +e
-  ../client/ct connect 127.0.0.1 $port -log_server_key \
-    $cert_dir/$log_server-key-public.pem -ca_dir $hash_dir
+  ../client/ct connect --ssl_server="127.0.0.1" --ssl_server_port=$port \
+    --ct_server_public_key=$cert_dir/$log_server-key-public.pem \
+    --ssl_client_trusted_cert_dir=$hash_dir --logtostderr=true \
+    --ssl_client_require_sct=$strict \
+    --ssl_client_expect_handshake_failure=$expect_fail
 
   local retcode=$?
   set -e
 
-  if [ $retcode -eq $expected_retcode ]; then
+  if [ $retcode -eq 0 ]; then
     echo "PASS"
     let PASSED=$PASSED+1
   else
@@ -51,14 +55,15 @@ test_range() {
   log_server=$4
   ca=$5
   conf=$6
-  retcode=$7
-  apache=$8
+  expect_fail=$7
+  strict=$8
+  apache=$9
 
   echo "Starting Apache"
   $apache -d `pwd`/$cert_dir -f `pwd`/$conf -k start
 
   for port in $ports; do
-    test_connect $cert_dir $hash_dir $log_server $ca $port $retcode;
+    test_connect $cert_dir $hash_dir $log_server $ca $port $expect_fail $strict
   done
 
   echo "Stopping Apache"
@@ -76,16 +81,24 @@ echo "Testing known good/bad certificate configurations"
 mkdir -p testdata/logs
 if [ -f httpd-new ]; then
   test_range "8125 8126 8127 8128 8129" testdata ca-hashes ct-server ca \
-    httpd-valid-new.conf 0 ./httpd-new
-  test_range "8125 8126 8127 8128 8129" testdata ca-hashes ct-server ca \
-    httpd-invalid-new.conf 2 ./httpd-new
+    httpd-valid-new.conf false true ./httpd-new
+
+# First check that connection succeeds if we don't require the SCT,
+# to isolate the error
+ test_range "8125 8126 8127 8128 8129" testdata ca-hashes ct-server ca \
+    httpd-invalid-new.conf false false ./httpd-new
+
+test_range "8125 8126 8127 8128 8129" testdata ca-hashes ct-server ca \
+    httpd-invalid-new.conf true true ./httpd-new
 else
   echo "WARNING: Apache development version not specified, skipping some tests"
   let SKIPPED=$SKIPPED+2
   test_range "8125 8126 8127 8128" testdata ca-hashes ct-server ca \
-    httpd-valid.conf 0 ./apachectl
+    httpd-valid.conf false true ./apachectl
   test_range "8125 8126 8127 8128" testdata ca-hashes ct-server ca \
-    httpd-invalid.conf 2 ./apachectl
+    httpd-invalid.conf false false ./apachectl
+  test_range "8125 8126 8127 8128" testdata ca-hashes ct-server ca \
+    httpd-invalid.conf true true ./apachectl
 fi
 
 rm -rf ca-hashes
@@ -130,12 +143,12 @@ test_ct_server() {
   mkdir -p tmp/logs
   if [ -f httpd-new ]; then
       test_range "8125 8126 8127 8128 8129" tmp tmp/ca-hashes ct-server ca \
-	  httpd-valid-new.conf 0 ./httpd-new
+	  httpd-valid-new.conf 0 true ./httpd-new
   else
       echo "WARNING: Apache development version not specified, skip some tests"
       let SKIPPED=$SKIPPED+1
       test_range "8125 8126 8127 8128" tmp tmp/ca-hashes ct-server ca \
-	  httpd-valid.conf 0 ./apachectl
+	  httpd-valid.conf 0 true ./apachectl
   fi
 }
 

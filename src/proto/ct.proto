@@ -65,3 +65,40 @@ message SignedTreeHead {
   optional bytes root_hash = 3;
   optional DigitallySigned signature = 4;
 }
+
+// Server-client messages
+message ClientMessage {
+  enum ClientCommand {
+    // Upload a certificate bundle, and retrieve
+    // a submission token, or an audit proof.
+    SUBMIT_BUNDLE = 1;
+    SUBMIT_CA_BUNDLE = 2;
+  }
+  required ClientCommand command = 2;
+  optional bytes submission_data = 3;
+}
+
+message ServerError {
+  enum ErrorCode {
+    BAD_VERSION = 0;
+    UNSUPPORTED_FORMAT = 1;
+    INVALID_MESSAGE = 2;
+    UNSUPPORTED_COMMAND = 3;
+    REJECTED = 4;
+  }
+  required ErrorCode code = 1;
+  optional string error_message = 2;
+}
+
+message ServerMessage {
+  // The server's response codes.
+  enum ServerResponse {
+    ERROR = 0;
+    SIGNED_CERTIFICATE_TIMESTAMP = 1;
+    LOGGED = 2;
+  }
+  required ServerResponse response = 1;
+  // Normally only one of those will be set.
+  optional ServerError error = 2;
+  optional SignedCertificateTimestamp sct = 3;
+}

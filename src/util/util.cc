@@ -44,10 +44,13 @@ std::string HexString(const bstring &data) {
 
 std::string HexString(const bstring &data, char byte_delimiter) {
   std::string ret;
+  if (data.empty())
+    return ret;
   for (unsigned int i = 0; i < data.size(); ++i) {
+    if (i != 0)
+      ret.push_back(byte_delimiter);
     ret.push_back(nibble[(data[i] >> 4) & 0xf]);
     ret.push_back(nibble[data[i] & 0xf]);
-    ret.push_back(byte_delimiter);
   }
   return ret;
 }

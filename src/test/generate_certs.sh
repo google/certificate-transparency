@@ -155,9 +155,12 @@ make_certs() {
     cat $cert_dir/$server-cert.pem > $cert_dir/$server-cert-bundle.pem
   fi
 
-  ../client/ct upload $cert_dir/$server-cert-bundle.pem 127.0.0.1 \
-    $log_server_port -server_key $cert_dir/$log_server-key-public.pem \
-    -out $cert_dir/$server-cert.proof
+  ../client/ct upload \
+    --ct_server_submission=$cert_dir/$server-cert-bundle.pem \
+    --ct_server="127.0.0.1" --ct_server_port=$log_server_port \
+    --ct_server_public_key=$cert_dir/$log_server-key-public.pem \
+    --ct_server_response_out=$cert_dir/$server-cert.proof \
+    --logtostderr=true 
   rm $cert_dir/$server-cert-bundle.pem
 
   # Upload the precert bundle
@@ -170,17 +173,22 @@ make_certs() {
       $cert_dir/$server-precert-bundle.pem
   fi
 
-  ../client/ct upload $cert_dir/$server-precert-bundle.pem 127.0.0.1 \
-    $log_server_port -server_key $cert_dir/$log_server-key-public.pem \
-    -out $cert_dir/$server-pre-cert.proof -pre
+  ../client/ct upload \
+    --ct_server_submission=$cert_dir/$server-precert-bundle.pem \
+    --ct_server="127.0.0.1" --ct_server_port=$log_server_port \
+    --ct_server_public_key=$cert_dir/$log_server-key-public.pem \
+    --ct_server_response_out=$cert_dir/$server-pre-cert.proof \
+    --precert=true --logtostderr=true
   rm $cert_dir/$server-precert-bundle.pem
 
   # Create a superfluous certificate
-  ../client/ct certificate $cert_dir/$server-cert.proof \
-    $cert_dir/$server-cert-proof.der
+  ../client/ct certificate --sct_token=$cert_dir/$server-cert.proof \
+    --certificate_out=$cert_dir/$server-cert-proof.der \
+    --logtostderr=true
 
-  # Create authz for TLS extension
-  ../client/ct authz $cert_dir/$server-cert.proof $cert_dir/$server-cert.authz
+# Create authz for TLS extension
+  ../client/ct authz --sct_token=$cert_dir/$server-cert.proof \
+    --authz_out=$cert_dir/$server-cert.authz --logtostderr=true
 
   openssl x509 -in $cert_dir/$server-cert-proof.der -inform DER -out \
     $cert_dir/$server-cert-proof.pem
@@ -193,8 +201,9 @@ make_certs() {
 
   # Create a new extensions config with the embedded proof
   cp precert.conf $cert_dir/$server-extensions.conf
-  ../client/ct configure_proof $cert_dir/$server-extensions.conf \
-    $cert_dir/$server-pre-cert.proof 
+  ../client/ct configure_proof \
+    --extensions_config_out=$cert_dir/$server-extensions.conf \
+    --sct_token=$cert_dir/$server-pre-cert.proof --logtostderr=true 
   # Sign the certificate
   # Store the current serial number
   mv $cert_dir/$ca-serial $cert_dir/$ca-serial.bak

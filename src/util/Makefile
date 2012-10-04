@@ -7,7 +7,7 @@ LIBS= $(G_LIBS)
 
 CXXFLAGS= $(INCLUDE) $(CXXFLAG)
 
-all: .depend ct_debug.o util.o
+all: .depend util.o
 
 # Preprocessing step for compiling .proto files.
 ../include/ct.pb.h: ../proto/ct.proto
