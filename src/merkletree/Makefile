@@ -1,13 +1,10 @@
 CXXFLAG= -Wall -Werror -O3 -g
-G_INCLUDE= -I $(GTESTDIR)/include -I $(PROTOBUFDIR)/src -I ../include
-G_LIBS= $(GTESTDIR)/make/gtest.a -lpthread $(PROTOBUFDIR)/src/.libs/libprotobuf.a
+INCLUDE= -I ../include -I $(GTESTDIR)/include -I $(PROTOBUFDIR)/src
+LIBS= $(GTESTDIR)/make/gtest.a -lpthread $(PROTOBUFDIR)/src/.libs/libprotobuf.a -lcrypto
 # Need OpenSSL >= 1.0.0
 ifneq ($(OPENSSLDIR),)
-  INCLUDE= $(G_INCLUDE) -I $(OPENSSLDIR)/include
-  LIBS= $(G_LIBS) -L $(OPENSSLDIR) -L $(OPENSSLDIR)/lib -lcrypto -Wl,-rpath,$(OPENSSLDIR) -Wl,-rpath,$(OPENSSLDIR)/lib
-else
-  INCLUDE= $(G_INCLUDE)
-  LIBS= $(G_LIBS) -lcrypto
+  INCLUDE+= -I $(OPENSSLDIR)/include
+  LIBS+= -L $(OPENSSLDIR) -L $(OPENSSLDIR)/lib -Wl,-rpath,$(OPENSSLDIR) -Wl,-rpath,$(OPENSSLDIR)/lib
 endif
 
 CXXFLAGS= $(INCLUDE) $(CXXFLAG)

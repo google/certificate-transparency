@@ -1,17 +1,14 @@
 CXXFLAG= -Wall -Werror -O3 -g
-G_INCLUDE= -I $(GTESTDIR)/include -I $(PROTOBUFDIR)/src -I ../include -I /usr/local/include
-G_LIBS= $(GTESTDIR)/make/gtest.a -lpthread $(PROTOBUFDIR)/src/.libs/libprotobuf.a -L /usr/local/lib -lgflags -lglog
+INCLUDE= -I ../include -I $(GTESTDIR)/include -I $(PROTOBUFDIR)/src
+LIBS= $(GTESTDIR)/make/gtest.a -lpthread $(PROTOBUFDIR)/src/.libs/libprotobuf.a -lgflags -lglog -lssl -lcrypto -lsqlite3
 # Need OpenSSL >= 1.0.0
 ifneq ($(OPENSSLDIR),)
-  INCLUDE= $(G_INCLUDE) -I $(OPENSSLDIR)/include
-  LIBS= $(G_LIBS) -L $(OPENSSLDIR) -L $(OPENSSLDIR)/lib -lssl -lcrypto -Wl,-rpath,$(OPENSSLDIR) -Wl,-rpath,$(OPENSSLDIR)/lib
-else
-  INCLUDE= $(G_INCLUDE)
-  LIBS= $(G_LIBS) -lssl -lcrypto
+  INCLUDE+= -I $(OPENSSLDIR)/include
+  LIBS+= -L $(OPENSSLDIR) -L $(OPENSSLDIR)/lib -Wl,-rpath,$(OPENSSLDIR) -Wl,-rpath,$(OPENSSLDIR)/lib
 endif
 
-LIBS+= -L /usr/local/lib -lsqlite3
-
+INCLUDE+= -I /usr/local/include
+LIBS+= -L /usr/local/lib
 CXXFLAGS= $(INCLUDE) $(CXXFLAG)
 
 OBJS= ../merkletree/serial_hasher.o \

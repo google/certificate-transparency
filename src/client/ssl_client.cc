@@ -156,7 +156,7 @@ int SSLClient::VerifyCallback(X509_STORE_CTX *ctx, void *arg) {
 #ifndef TLSEXT_AUTHZDATAFORMAT_audit_proof
   // If we don't support the TLS extension, we fail here. Else we wait to see
   // if the extension callback finds a valid proof.
-  if (!args->proof_verified && args->require_token) {
+  if (!args->token_verified && args->require_token) {
     LOG(ERROR) << "No valid SCT found";
     return 0;
   }

@@ -1,9 +1,6 @@
 CXXFLAG= -Wall -Werror -O3 -g
-G_INCLUDE= -I $(PROTOBUFDIR)/src -I ../include
-G_LIBS= $(PROTOBUFDIR)/.libs/libprotobuf.a
-
-INCLUDE= $(G_INCLUDE)
-LIBS= $(G_LIBS)
+INCLUDE= -I ../include -I $(PROTOBUFDIR)/src 
+LIBS= $(PROTOBUFDIR)/.libs/libprotobuf.a
 
 CXXFLAGS= $(INCLUDE) $(CXXFLAG)
 
