@@ -63,7 +63,7 @@ bool Client::Write(const bstring &data) {
     return false;
   }
 
-  CHECK_EQ(data.length(), n);
+  CHECK_EQ(data.length(), (unsigned)n);
 
   VLOG(5) << "wrote " << data.length() << " bytes";
   return true;
