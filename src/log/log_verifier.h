@@ -79,6 +79,14 @@ class LogVerifier {
   // Verify that the timestamp is not in the future, and the signature is valid.
   VerifyResult VerifySignedTreeHead(const ct::SignedTreeHead &sth) const;
 
+  // Verify that
+  // (1) The audit proof signature is valid
+  // (2) sct timestamp <= audit proof timestamp <= now
+  // Does not verify the SCT signature (or even require one).
+  VerifyResult
+  VerifyMerkleAuditProof(const ct::SignedCertificateTimestamp &sct,
+                         const ct::MerkleAuditProof &merkle_proof) const;
+
  private:
   LogSigVerifier *sig_verifier_;
   MerkleVerifier *tree_verifier_;

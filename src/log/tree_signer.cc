@@ -1,3 +1,4 @@
+#include <glog/logging.h>
 #include <set>
 #include <stdint.h>
 
@@ -30,30 +31,51 @@ uint64_t TreeSigner::LastUpdateTime() const {
   return latest_tree_head_.timestamp();
 }
 
+// DB_ERROR: the database is inconsistent with our inner self.
+// However, if the database itself is giving inconsistent answers, or failing
+// reads/writes, then we die.
 TreeSigner::UpdateResult TreeSigner::UpdateTree() {
   // Check that the latest sth is ours.
   SignedTreeHead sth;
   Database::LookupResult db_result = db_->LatestTreeHead(&sth);
 
-  if ((LastUpdateTime() == 0 && db_result != Database::NOT_FOUND) ||
-      (LastUpdateTime() > 0 &&
-       (db_result != Database::LOOKUP_OK ||
-        sth.timestamp() != latest_tree_head_.timestamp() ||
-        sth.tree_size() != latest_tree_head_.tree_size() ||
-        sth.root_hash() != latest_tree_head_.root_hash())))
-    return DB_ERROR;
+  if (db_result == Database::NOT_FOUND) {
+    if (LastUpdateTime() != 0) {
+      LOG(ERROR) << "Latest STH missing from database, signer has:\n"
+          << latest_tree_head_.DebugString();
+      return DB_ERROR;
+    }
+  } else {
+    CHECK_EQ(db_result, Database::OK) << "Latest STH lookup failed";
+    if (sth.timestamp() != latest_tree_head_.timestamp() ||
+            sth.tree_size() != latest_tree_head_.tree_size() ||
+        sth.root_hash() != latest_tree_head_.root_hash()) {
+      LOG(ERROR) << "Database has an STH that does not match ours. "
+                 << "Our STH:\n" << latest_tree_head_.DebugString()
+                 << "Database STH:\n" << sth.DebugString();
+      return DB_ERROR;
+    }
+  }
 
   // Timestamps have to be unique.
-  uint64_t min_timestamp = sth.timestamp() + 1;
+  uint64_t min_timestamp = LastUpdateTime() + 1;
 
   std::set<bstring> pending_hashes = db_->PendingHashes();
   std::set<bstring>::const_iterator it;
   for (it = pending_hashes.begin(); it != pending_hashes.end(); ++it) {
     LoggedCertificate logged_cert;
-    db_result = db_->LookupCertificateByHash(*it, &logged_cert);
-    if (db_result != Database::LOOKUP_OK || logged_cert.has_sequence_number() ||
-        !AppendCertificate(*it, logged_cert.sct()))
+    CHECK_EQ(Database::LOOKUP_OK,
+             db_->LookupCertificateByHash(*it, &logged_cert))
+        << "Failed to look up pending entry with hash " << util::HexString(*it);
+
+    CHECK(!logged_cert.has_sequence_number())
+        << "Pending entry already has a sequence number; entry is "
+        << logged_cert.DebugString();
+
+    if (!AppendCertificate(*it, logged_cert.sct())) {
+      LOG(ERROR) << "Assigning sequence number failed";
       return DB_ERROR;
+    }
 
     if (logged_cert.sct().timestamp() > min_timestamp)
       min_timestamp = logged_cert.sct().timestamp();
@@ -68,43 +90,44 @@ TreeSigner::UpdateResult TreeSigner::UpdateTree() {
   // TODO(ekasper): if we allow multiple processes to modify the database,
   // then we should lock the database file here and check again that we still
   // own the latest STH.
-  Database::WriteResult write_result = db_->WriteTreeHead(new_sth);
-  if (write_result != Database::OK)
-    return DB_ERROR;
+  CHECK_EQ(Database::OK, db_->WriteTreeHead(new_sth));
   latest_tree_head_.CopyFrom(new_sth);
   return OK;
 }
 
 void TreeSigner::BuildTree() {
+  DCHECK_EQ(0U, cert_tree_.LeafCount())
+      << "Attempting to build a tree when one already exists";
   // Read the latest sth.
   SignedTreeHead sth;
   Database::LookupResult db_result = db_->LatestTreeHead(&sth);
-  if (db_result != Database::LOOKUP_OK && db_result != Database::NOT_FOUND)
-    abort();
 
-  if (db_result == Database::LOOKUP_OK) {
-    // If the timestamp is from the future, then either the database is corrupt
-    // or our clock is corrupt; either way we shouldn't be signing things.
-    if (sth.timestamp() > util::TimeInMilliseconds())
-      abort();
+  if (db_result == Database::NOT_FOUND)
+    return;
 
-    // Read all logged and signed entries.
-    for (size_t i = 0; i < sth.tree_size(); ++i) {
-      LoggedCertificate logged_cert;
-      db_result = db_->LookupCertificateByIndex(i, &logged_cert);
-      if (db_result != Database::LOOKUP_OK ||
-          logged_cert.sct().timestamp() > sth.timestamp() ||
-          logged_cert.sequence_number() != i ||
-          !AppendCertificateToTree(logged_cert.sct()))
-        abort();
-    }
+  CHECK(db_result == Database::LOOKUP_OK);
 
-    // Check the root hash.
-    if (cert_tree_.CurrentRoot() != sth.root_hash())
-      abort();
+  // If the timestamp is from the future, then either the database is corrupt
+  // or our clock is corrupt; either way we shouldn't be signing things.
+  uint64_t current_time = util::TimeInMilliseconds();
+  CHECK_LE(sth.timestamp(), current_time)
+      << "Database has a timestamp from the future.";
 
-    latest_tree_head_.CopyFrom(sth);
+  // Read all logged and signed entries.
+  for (size_t i = 0; i < sth.tree_size(); ++i) {
+    LoggedCertificate logged_cert;
+    CHECK_EQ(Database::LOOKUP_OK,
+             db_->LookupCertificateByIndex(i, &logged_cert));
+    CHECK_LE(logged_cert.sct().timestamp(), sth.timestamp());
+    CHECK_EQ(logged_cert.sequence_number(), i);
+
+    AppendCertificateToTree(logged_cert.sct());
   }
+
+  // Check the root hash.
+  CHECK_EQ(cert_tree_.CurrentRoot(), sth.root_hash());
+
+  latest_tree_head_.CopyFrom(sth);
 
   // Read the remaining sequenced entries. Note that it is possible to have more
   // entries with sequence numbers than what the latest sth says. This happens
@@ -116,10 +139,10 @@ void TreeSigner::BuildTree() {
         db_->LookupCertificateByIndex(i, &logged_cert);
     if (db_result == Database::NOT_FOUND)
       break;
-    if (db_result != Database::LOOKUP_OK ||
-        logged_cert.sequence_number() != i ||
-        !AppendCertificateToTree(logged_cert.sct()))
-      abort();
+    CHECK_EQ(Database::LOOKUP_OK, db_result);
+    CHECK_EQ(logged_cert.sequence_number(), i);
+
+    AppendCertificateToTree(logged_cert.sct());
   }
 }
 
@@ -128,34 +151,35 @@ TreeSigner::AppendCertificate(const bstring &key,
                               const SignedCertificateTimestamp &sct) {
   // Serialize for inclusion in the tree.
   bstring serialized_sct;
-  Serializer::SerializeResult serialize_result =
-      Serializer::SerializeSCTForTree(sct, &serialized_sct);
-  if (serialize_result != Serializer::OK)
-    return false;
+  CHECK_EQ(Serializer::OK,
+           Serializer::SerializeSCTForTree(sct, &serialized_sct))
+      << sct.DebugString();
 
   // Commit the sequence number of this certificate.
-  Database::WriteResult db_write =
+  Database::WriteResult db_result =
       db_->AssignCertificateSequenceNumber(key, cert_tree_.LeafCount());
-  if (db_write != Database::OK)
+
+  if (db_result != Database::OK) {
+    CHECK_EQ(Database::SEQUENCE_NUMBER_ALREADY_IN_USE, db_result);
+    LOG(ERROR) << "Attempt to assign duplicate sequence number "
+               << cert_tree_.LeafCount();
     return false;
+  }
 
   // Update in-memory tree.
   cert_tree_.AddLeaf(serialized_sct);
   return true;
 }
 
-bool
+void
 TreeSigner::AppendCertificateToTree(const SignedCertificateTimestamp &sct) {
   // Serialize for inclusion in the tree.
   bstring serialized_sct;
-  Serializer::SerializeResult serialize_result =
-      Serializer::SerializeSCTForTree(sct, &serialized_sct);
-  if (serialize_result != Serializer::OK)
-    return false;
+  CHECK_EQ(Serializer::OK,
+           Serializer::SerializeSCTForTree(sct, &serialized_sct));
 
   // Update in-memory tree.
   cert_tree_.AddLeaf(serialized_sct);
-  return true;
 }
 
 void TreeSigner::TimestampAndSign(uint64_t min_timestamp, SignedTreeHead *sth) {
