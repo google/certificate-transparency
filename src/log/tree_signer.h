@@ -23,7 +23,7 @@ class TreeSigner {
 
   enum UpdateResult {
     OK,
-    // Something is awry with the database.
+    // The database is inconsistent with our view.
     DB_ERROR,
   };
 
@@ -39,7 +39,7 @@ class TreeSigner {
   void BuildTree();
   bool AppendCertificate(const bstring &key,
                          const ct::SignedCertificateTimestamp &sct);
-  bool AppendCertificateToTree(const ct::SignedCertificateTimestamp &sct);
+  void AppendCertificateToTree(const ct::SignedCertificateTimestamp &sct);
   void TimestampAndSign(uint64_t min_timestamp, ct::SignedTreeHead *sth);
   Database *db_;
   LogSigner *signer_;

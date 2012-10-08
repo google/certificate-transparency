@@ -66,6 +66,14 @@ message SignedTreeHead {
   optional DigitallySigned signature = 4;
 }
 
+message MerkleAuditProof {
+  optional uint64 tree_size = 1;
+  optional uint64 timestamp = 2;
+  optional uint64 leaf_index = 3;
+  repeated bytes path_node = 4;
+  optional DigitallySigned tree_head_signature = 5;
+}
+
 // Server-client messages
 message ClientMessage {
   enum ClientCommand {
