@@ -193,7 +193,7 @@ int SSLClient::SCTTokenCallback(SSL *s, void *arg) {
 
   LOG(INFO) << "Found an SCT token in the TLS extension, verifying...";
 
-  string token(reinterpret_cast<byte*>(proof), proof_length);
+  string token(reinterpret_cast<char*>(proof), proof_length);
   Cert *leaf = new Cert(x509);
   CertChain chain;
   chain.AddCert(leaf);
