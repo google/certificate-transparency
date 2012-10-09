@@ -10,6 +10,8 @@ class SQLiteDB : public Database {
  public:
   SQLiteDB(const std::string &dbfile);
 
+  ~SQLiteDB();
+
   virtual WriteResult
   CreatePendingCertificateEntry_(const ct::LoggedCertificate &logged_cert);
 

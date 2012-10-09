@@ -33,6 +33,8 @@ class Database {
     NOT_FOUND,
   };
 
+  virtual ~Database() {}
+
   // Attempt to create a new entry. Fail if no certificate hash is given,
   // or an entry with this hash already exists.
   // The entry remains PENDING until a sequence number has been assigned,

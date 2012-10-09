@@ -1,6 +1,6 @@
 /* -*- indent-tabs-mode: nil -*- */
 
-#include <iostream>
+#include <glog/logging.h>
 #include <sqlite3.h>
 
 #include "sqlite_db.h"
@@ -8,56 +8,63 @@
 
 using std::string;
 
-SQLiteDB::SQLiteDB(const string &dbfile) {
+SQLiteDB::SQLiteDB(const string &dbfile)
+    : db_(NULL) {
   int ret = sqlite3_open_v2(dbfile.c_str(), &db_, SQLITE_OPEN_READWRITE, NULL);
   if (ret == SQLITE_OK)
     return;
-  assert(ret == SQLITE_CANTOPEN);
+  CHECK_EQ(SQLITE_CANTOPEN, ret);
 
-  ret = sqlite3_open_v2(dbfile.c_str(), &db_,
-                        SQLITE_OPEN_READWRITE | SQLITE_OPEN_CREATE, NULL);
-  assert(ret == SQLITE_OK);
-  ret = sqlite3_exec(db_, "CREATE TABLE leaves(hash BLOB UNIQUE, sct BLOB, "
-                     "sequence INTEGER UNIQUE)",
-                     NULL, NULL, NULL);
-  assert(ret == SQLITE_OK);
-  ret = sqlite3_exec(db_, "CREATE TABLE trees(sth BLOB UNIQUE, "
-                     "timestamp INTEGER UNIQUE)",
-                     NULL, NULL, NULL);
-  assert(ret == SQLITE_OK);
+  // We have to close and reopen to avoid memory leaks.
+  CHECK_EQ(SQLITE_OK, sqlite3_close(db_));
+  db_ = NULL;
+
+  CHECK_EQ(SQLITE_OK,
+           sqlite3_open_v2(dbfile.c_str(), &db_,
+                           SQLITE_OPEN_READWRITE | SQLITE_OPEN_CREATE, NULL));
+
+  CHECK_EQ(SQLITE_OK, sqlite3_exec(db_, "CREATE TABLE leaves(hash BLOB UNIQUE, "
+                                   "sct BLOB, sequence INTEGER UNIQUE)",
+                                   NULL, NULL, NULL));
+
+  CHECK_EQ(SQLITE_OK, sqlite3_exec(db_, "CREATE TABLE trees(sth BLOB UNIQUE, "
+                                   "timestamp INTEGER UNIQUE)",
+                                   NULL, NULL, NULL));
+  LOG(INFO) << "New SQLite database created in " << dbfile;
+}
+
+SQLiteDB::~SQLiteDB() {
+  CHECK_EQ(SQLITE_OK, sqlite3_close(db_));
 }
 
 // Reduce the ugliness of the sqlite3 API.
 class Statement {
-public:
+ public:
   Statement(sqlite3 *db, const char *sql) : stmt_(NULL) {
-    int ret = sqlite3_prepare_v2(db, sql, -1, &stmt_, NULL);
-    assert(ret == SQLITE_OK);
+    CHECK_EQ(SQLITE_OK, sqlite3_prepare_v2(db, sql, -1, &stmt_, NULL));
   }
 
   ~Statement() {
     int ret = sqlite3_finalize(stmt_);
     // can get SQLITE_CONSTRAINT if an insert failed due to a duplicate key.
-    assert(ret == SQLITE_OK || ret == SQLITE_CONSTRAINT);
+    CHECK(ret == SQLITE_OK || ret == SQLITE_CONSTRAINT);
   }
 
   // Fields start at 0! |value| must have lifetime that covers its
   // use, which is up until the SQL statement finishes executing
   // (i.e. after the last Step()).
   void BindBlob(unsigned field, const string &value) {
-    int ret = sqlite3_bind_blob(stmt_, field + 1, value.data(), value.length(),
-                                NULL);
-    assert(ret == SQLITE_OK);
+    CHECK_EQ(SQLITE_OK, sqlite3_bind_blob(stmt_, field + 1, value.data(),
+                                          value.length(), NULL));
   }
 
   void BindUInt64(unsigned field, sqlite3_uint64 value) {
-    int ret = sqlite3_bind_int64(stmt_, field + 1, value);
-    assert(ret == SQLITE_OK);
+    CHECK_EQ(SQLITE_OK, sqlite3_bind_int64(stmt_, field + 1, value));
   }
 
   void GetBlob(unsigned column, string *value) {
     const void *data = sqlite3_column_blob(stmt_, column);
-    assert(data != NULL);
+    CHECK_NOTNULL(data);
     value->assign(static_cast<const char *>(data),
                   sqlite3_column_bytes(stmt_, column));
   }
@@ -74,7 +81,7 @@ public:
     return sqlite3_step(stmt_);
   }
 
-private:
+ private:
   sqlite3_stmt *stmt_;
 };
 
@@ -85,19 +92,17 @@ SQLiteDB::CreatePendingCertificateEntry_(const ct::LoggedCertificate &cert) {
   statement.BindBlob(0, cert.certificate_sha256_hash());
 
   string sct_data;
-  bool r2 = cert.sct().SerializeToString(&sct_data);
-  assert(r2);
+  CHECK(cert.sct().SerializeToString(&sct_data));
   statement.BindBlob(1, sct_data);
 
   int ret = statement.Step();
   if (ret == SQLITE_CONSTRAINT) {
     Statement s2(db_, "SELECT hash FROM leaves WHERE hash = ?");
     s2.BindBlob(0, cert.certificate_sha256_hash());
-    ret = s2.Step();
-    assert(ret == SQLITE_ROW);
+    CHECK_EQ(SQLITE_ROW, s2.Step());
     return DUPLICATE_CERTIFICATE_HASH;
   }
-  assert(ret == SQLITE_DONE);
+  CHECK_EQ(SQLITE_DONE, ret);
 
   return OK;
 }
@@ -114,11 +119,10 @@ SQLiteDB::AssignCertificateSequenceNumber(const string &hash,
   if (ret == SQLITE_CONSTRAINT) {
     Statement s2(db_, "SELECT sequence FROM leaves WHERE sequence = ?");
     s2.BindUInt64(0, sequence_number);
-    int ret = s2.Step();
-    assert(ret == SQLITE_ROW);
+    CHECK_EQ(SQLITE_ROW, s2.Step());
     return SEQUENCE_NUMBER_ALREADY_IN_USE;
   }
-  assert(ret == SQLITE_DONE);
+  CHECK_EQ(SQLITE_DONE, ret);
 
   int changes = sqlite3_changes(db_);
   if (changes == 0) {
@@ -129,7 +133,7 @@ SQLiteDB::AssignCertificateSequenceNumber(const string &hash,
       return ENTRY_ALREADY_LOGGED;
     return ENTRY_NOT_FOUND;
   }
-  assert(changes == 1);
+  CHECK_EQ(1, changes);
 
   return OK;
 }
@@ -144,7 +148,7 @@ SQLiteDB::LookupCertificateByHash(const string &hash,
   int ret = statement.Step();
   if (ret == SQLITE_DONE)
     return NOT_FOUND;
-  assert(ret == SQLITE_ROW);
+  CHECK_EQ(SQLITE_ROW, ret);
 
   string sct;
   statement.GetBlob(0, &sct);
@@ -156,7 +160,7 @@ SQLiteDB::LookupCertificateByHash(const string &hash,
     result->set_sequence_number(statement.GetUInt64(1));
 
   result->set_certificate_sha256_hash(hash);
-      
+
   return LOOKUP_OK;
 }
 
@@ -192,7 +196,7 @@ std::set<string> SQLiteDB::PendingHashes() const {
     statement.GetBlob(0, &hash);
     hashes.insert(hash);
   }
-  assert(ret == SQLITE_DONE);
+  CHECK_EQ(SQLITE_DONE, ret);
 
   return hashes;
 }
@@ -202,33 +206,31 @@ Database::WriteResult SQLiteDB::WriteTreeHead_(const ct::SignedTreeHead &sth) {
   statement.BindUInt64(0, sth.timestamp());
 
   string sth_data;
-  bool ret = sth.SerializeToString(&sth_data);
-  assert(ret);
+  CHECK(sth.SerializeToString(&sth_data));
   statement.BindBlob(1, sth_data);
 
   int r2 = statement.Step();
   if (r2 == SQLITE_CONSTRAINT) {
     Statement s2(db_, "SELECT timestamp FROM trees WHERE timestamp = ?");
     s2.BindUInt64(0, sth.timestamp());
-    r2 = s2.Step();
-    assert(r2 == SQLITE_ROW);
+    CHECK_EQ(SQLITE_ROW, s2.Step());
     return DUPLICATE_TREE_HEAD_TIMESTAMP;
   }
-  assert(r2 == SQLITE_DONE);
+  CHECK_EQ(SQLITE_DONE, r2);
 
   return OK;
 }
 
 Database::LookupResult SQLiteDB::LatestTreeHead(ct::SignedTreeHead *result)
-  const {
+    const {
   Statement statement(db_, "SELECT sth FROM trees WHERE timestamp IN "
                       "(SELECT MAX(timestamp) FROM trees)");
 
   int ret = statement.Step();
   if (ret == SQLITE_DONE)
     return NOT_FOUND;
-  assert(ret == SQLITE_ROW);
-  
+  CHECK_EQ(SQLITE_ROW, ret);
+
   string sth;
   statement.GetBlob(0, &sth);
   result->ParseFromString(sth);
