@@ -11,7 +11,6 @@
 #include "file_db.h"
 #include "file_storage.h"
 #include "sqlite_db.h"
-#include "types.h"
 #include "util.h"
 
 namespace {
@@ -20,17 +19,18 @@ using ct::CertificateEntry;
 using ct::DigitallySigned;
 using ct::LoggedCertificate;
 using ct::SignedTreeHead;
+using std::string;
 
 const unsigned kCertStorageDepth = 3;
 const unsigned kTreeStorageDepth = 8;
 
 // A slightly shorter notation for constructing binary blobs from test vectors.
-bstring B(const char *hexstring) {
+string B(const char *hexstring) {
   return util::BinaryString(hexstring);
 }
 
 // The reverse.
-std::string H(const bstring &byte_string) {
+string H(const string &byte_string) {
   return util::HexString(byte_string);
 }
 
@@ -115,11 +115,11 @@ template <class T> class DBTest : public ::testing::Test {
     return logged_cert_.sct().timestamp();
   }
 
-  const bstring DefaultHash() const {
+  const string DefaultHash() const {
     return logged_cert_.certificate_sha256_hash();
   }
 
-  const bstring AlternativeHash() const {
+  const string AlternativeHash() const {
     return B(kAlternativeHash);
   }
 
@@ -133,7 +133,7 @@ template <class T> class DBTest : public ::testing::Test {
   }
 
   Database *db_;
-  std::string file_base_;
+  string file_base_;
   LoggedCertificate logged_cert_;
   SignedTreeHead tree_head_;
 };
@@ -142,8 +142,8 @@ template <> void DBTest<FileDB>::SetUp() {
   file_base_ = util::CreateTemporaryDirectory("/tmp/ctlogXXXXXX");
   ASSERT_EQ("/tmp/ctlog", file_base_.substr(0, 10));
   ASSERT_EQ(16U, file_base_.length());
-  std::string certs_dir = file_base_ + "/certs";
-  std::string tree_dir = file_base_ + "/tree";
+  string certs_dir = file_base_ + "/certs";
+  string tree_dir = file_base_ + "/tree";
   int ret = mkdir(certs_dir.c_str(), 0700);
   ASSERT_EQ(ret, 0);
   ret = mkdir(tree_dir.c_str(), 0700);
@@ -157,7 +157,7 @@ template <> void DBTest<FileDB>::TearDown() {
   // Check again that it is safe to empty file_base_.
   ASSERT_EQ("/tmp/ctlog", file_base_.substr(0, 10));
   ASSERT_EQ(16U, file_base_.length());
-  std::string command = "rm -r " + file_base_;
+  string command = "rm -r " + file_base_;
   int ret = system(command.c_str());
   if (ret != 0)
     std::cout << "Failed to delete temporary directory in "
@@ -165,8 +165,8 @@ template <> void DBTest<FileDB>::TearDown() {
 }
 
 template <> Database *DBTest<FileDB>::SecondDB() {
-  std::string certs_dir = this->file_base_ + "/certs";
-  std::string tree_dir = this->file_base_ + "/tree";
+  string certs_dir = this->file_base_ + "/certs";
+  string tree_dir = this->file_base_ + "/tree";
   return new FileDB(new FileStorage(certs_dir, kCertStorageDepth),
                     new FileStorage(tree_dir, kTreeStorageDepth));
 }
@@ -182,7 +182,7 @@ template <> void DBTest<SQLiteDB>::TearDown() {
   // Check again that it is safe to empty file_base_.
   ASSERT_EQ("/tmp/ctlog", file_base_.substr(0, 10));
   ASSERT_EQ(16U, file_base_.length());
-  std::string command = "rm -r " + file_base_;
+  string command = "rm -r " + file_base_;
   int ret = system(command.c_str());
   if (ret != 0)
     std::cout << "Failed to delete temporary directory in "
@@ -255,11 +255,11 @@ TYPED_TEST(DBTest, GetPending) {
   EXPECT_EQ(Database::OK,
             this->db_->CreatePendingCertificateEntry(logged_cert));
 
-  std::set<bstring> hashes;
+  std::set<string> hashes;
   hashes.insert(this->DefaultHash());
   hashes.insert(this->AlternativeHash());
 
-  std::set<bstring> pending_hashes = this->db_->PendingHashes();
+  std::set<string> pending_hashes = this->db_->PendingHashes();
   EXPECT_EQ(hashes, pending_hashes);
 }
 
@@ -458,7 +458,7 @@ TYPED_TEST(DBTest, Resume) {
   EXPECT_EQ(Database::LOOKUP_OK, db2->LatestTreeHead(&lookup_sth));
   CompareTreeHeads(this->DefaultTreeHead(), lookup_sth);
 
-  std::set<bstring> pending_hashes;
+  std::set<string> pending_hashes;
   pending_hashes.insert(this->AlternativeHash());
 
   EXPECT_EQ(pending_hashes, db2->PendingHashes());

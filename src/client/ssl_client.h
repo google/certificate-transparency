@@ -42,7 +42,7 @@ class SSLClient {
 
   // Need a static wrapper for the callback.
   static LogVerifier::VerifyResult
-  VerifySCT(const bstring &token, const CertChain &chain,
+  VerifySCT(const std::string &token, const CertChain &chain,
             LogVerifier *verifier, ct::SignedCertificateTimestamp *sct);
 
   // Custom verification callback for verifying the SCT token

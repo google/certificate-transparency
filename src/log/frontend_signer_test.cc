@@ -15,13 +15,13 @@
 #include "log_verifier.h"
 #include "merkle_verifier.h"
 #include "sqlite_db.h"
-#include "types.h"
 #include "util.h"
 
 namespace {
 
 using ct::CertificateEntry;
 using ct::SignedCertificateTimestamp;
+using std::string;
 
 const char *ecp256_private_key = {
   "-----BEGIN EC PRIVATE KEY-----\n"
@@ -38,7 +38,7 @@ const char *ecp256_public_key = {
   "-----END PUBLIC KEY-----\n"
 };
 
-EVP_PKEY* PrivateKeyFromPem(const std::string &pemkey) {
+EVP_PKEY* PrivateKeyFromPem(const string &pemkey) {
   BIO *bio = BIO_new_mem_buf(const_cast<char*>(pemkey.data()), pemkey.size());
   EVP_PKEY *pkey = PEM_read_bio_PrivateKey(bio, NULL, NULL, NULL);
   assert(pkey != NULL);
@@ -46,7 +46,7 @@ EVP_PKEY* PrivateKeyFromPem(const std::string &pemkey) {
   return pkey;
 }
 
-EVP_PKEY* PublicKeyFromPem(const std::string &pemkey) {
+EVP_PKEY* PublicKeyFromPem(const string &pemkey) {
   BIO *bio = BIO_new_mem_buf(const_cast<char*>(pemkey.data()), pemkey.size());
   EVP_PKEY *pkey = PEM_read_bio_PUBKEY(bio, NULL, NULL, NULL);
   assert(pkey != NULL);
@@ -86,7 +86,7 @@ template <class T> class FrontendSignerTest : public ::testing::Test {
     // Check again that it is safe to empty file_base_.
     ASSERT_EQ("/tmp/ctlog", file_base_.substr(0, 10));
     ASSERT_EQ(16U, file_base_.length());
-    std::string command = "rm -r " + file_base_;
+    string command = "rm -r " + file_base_;
     int ret = system(command.c_str());
     if (ret != 0)
       std::cout << "Failed to delete temporary directory in "
@@ -102,12 +102,12 @@ template <class T> class FrontendSignerTest : public ::testing::Test {
   Database *db_;
   LogVerifier *verifier_;
   FrontendSigner *frontend_;
-  std::string file_base_;
+  string file_base_;
 };
 
 template <> void FrontendSignerTest<FileDB>::NewDB() {
-  std::string certs_dir = file_base_ + "/certs";
-  std::string tree_dir = file_base_ + "/tree";
+  string certs_dir = file_base_ + "/certs";
+  string tree_dir = file_base_ + "/tree";
   int ret = mkdir(certs_dir.c_str(), 0700);
   ASSERT_EQ(ret, 0);
   ret = mkdir(tree_dir.c_str(), 0700);
@@ -125,12 +125,12 @@ typedef testing::Types<FileDB, SQLiteDB> Databases;
 
 TYPED_TEST_CASE(FrontendSignerTest, Databases);
 
-const byte unicorn[] = "Unicorn";
-const byte alice[] = "Alice";
+const char unicorn[] = "Unicorn";
+const char alice[] = "Alice";
 
 TYPED_TEST(FrontendSignerTest, Log) {
-  const bstring kUnicorn(unicorn, 7);
-  const bstring kAlice(alice, 5);
+  const string kUnicorn(unicorn, 7);
+  const string kAlice(alice, 5);
 
   // Log and expect success.
   SignedCertificateTimestamp sct0, sct1;
@@ -146,8 +146,8 @@ TYPED_TEST(FrontendSignerTest, Log) {
 }
 
 TYPED_TEST(FrontendSignerTest, Time) {
-  const bstring kUnicorn(unicorn, 7);
-  const bstring kAlice(alice, 5);
+  const string kUnicorn(unicorn, 7);
+  const string kAlice(alice, 5);
 
   // Log and expect success.
   SignedCertificateTimestamp sct0, sct1;
@@ -162,7 +162,7 @@ TYPED_TEST(FrontendSignerTest, Time) {
 }
 
 TYPED_TEST(FrontendSignerTest, LogDuplicates) {
-  const bstring kUnicorn(unicorn, 7);
+  const string kUnicorn(unicorn, 7);
 
   SignedCertificateTimestamp sct0, sct1;
   // Log and expect success.
@@ -181,8 +181,8 @@ TYPED_TEST(FrontendSignerTest, LogDuplicates) {
 }
 
 TYPED_TEST(FrontendSignerTest, Verify) {
-  const bstring kUnicorn(unicorn, 7);
-  const bstring kAlice(alice, 5);
+  const string kUnicorn(unicorn, 7);
+  const string kAlice(alice, 5);
 
   // Log and expect success.
   SignedCertificateTimestamp sct, sct2;
@@ -206,8 +206,8 @@ TYPED_TEST(FrontendSignerTest, Verify) {
 }
 
 TYPED_TEST(FrontendSignerTest, TimedVerify) {
-  const bstring kUnicorn(unicorn, 7);
-  const bstring kAlice(alice, 5);
+  const string kUnicorn(unicorn, 7);
+  const string kAlice(alice, 5);
 
   uint64_t past_time = util::TimeInMilliseconds();
   usleep(2000);

@@ -2,7 +2,6 @@
 #define CLIENT_H
 
 #include <stdint.h>
-#include "types.h"
 
 // Socket creation for client connections.
 class Client {
@@ -24,9 +23,9 @@ public:
 
   void Disconnect();
 
-  bool Write(const bstring &data);
+  bool Write(const std::string &data);
 
-  bool Read(size_t length, bstring *result);
+  bool Read(size_t length, std::string *result);
 
  private:
   const std::string server_;

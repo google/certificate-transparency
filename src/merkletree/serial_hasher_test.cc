@@ -3,12 +3,13 @@
 #include <string>
 
 #include "serial_hasher.h"
-#include "types.h"
 #include "util.h"
 
 namespace {
 
-const byte kTestString[] = "Hello world!";
+using std::string;
+
+const char kTestString[] = "Hello world!";
 const size_t kTestStringLength = 12;
 
 typedef struct {
@@ -34,7 +35,7 @@ HashTestVector test_sha256[] = {
 };
 
 // A slightly shorter notation for constructing binary blobs from test vectors.
-#define S(t, n) util::BinaryString(std::string((t),(2 * n)))
+#define S(t, n) util::BinaryString(string((t),(2 * n)))
 // The reverse
 #define H(t) util::HexString(t)
 
@@ -64,7 +65,7 @@ TYPED_TEST_CASE(SerialHasherTest, Hashers);
 
 // Known Answer Tests
 TYPED_TEST(SerialHasherTest, TestVectors) {
-  bstring input, output, digest;
+  string input, output, digest;
 
   for (size_t i = 0; this->test_vectors_[i].input != NULL; ++i) {
     this->hasher_->Reset();
@@ -77,7 +78,7 @@ TYPED_TEST(SerialHasherTest, TestVectors) {
 
 // Test fragmented updates
 TYPED_TEST(SerialHasherTest, Update) {
-  bstring input(kTestString, kTestStringLength),  output, digest;
+  string input(kTestString, kTestStringLength),  output, digest;
 
   this->hasher_->Reset();
   this->hasher_->Update(input);

@@ -8,6 +8,8 @@
 
 namespace {
 
+using std::string;
+
 typedef struct {
   size_t input_length;
   const char *input;
@@ -54,7 +56,7 @@ typedef struct {
 TestVector test_sha256 = { sha256_empty_hash, sha256_leaves, sha256_nodes };
 
 // A slightly shorter notation for constructing binary blobs from test vectors.
-#define S(t, n) util::BinaryString(std::string((t),(2 * n)))
+#define S(t, n) util::BinaryString(string((t),(2 * n)))
 // The reverse
 #define H(t) util::HexString(t)
 
@@ -81,7 +83,7 @@ TYPED_TEST_CASE(TreeHasherTest, Hashers);
 // TreeHashers are collision resistant when used correctly, i.e.,
 // when HashChildren() is called on the (fixed-length) outputs of HashLeaf().
 TYPED_TEST(TreeHasherTest, CollisionTest) {
-  bstring leaf1_digest, leaf2_digest, node1_digest, node2_digest;
+  string leaf1_digest, leaf2_digest, node1_digest, node2_digest;
 
   const size_t digestsize = this->tree_hasher_.DigestSize();
 
@@ -89,16 +91,16 @@ TYPED_TEST(TreeHasherTest, CollisionTest) {
   leaf1_digest = this->tree_hasher_.HashEmpty();
   EXPECT_EQ(leaf1_digest.size(), digestsize);
 
-  leaf2_digest = this->tree_hasher_.HashLeaf(bstring());
+  leaf2_digest = this->tree_hasher_.HashLeaf(string());
   EXPECT_EQ(leaf2_digest.size(), digestsize);
 
   EXPECT_NE(H(leaf1_digest), H(leaf2_digest));
 
   // Check that different leaves hash to different digests.
-  const byte hello[] = "Hello";
-  const byte world[] = "World";
-  bstring leaf1(hello, 5);
-  bstring leaf2(world, 5);
+  const char hello[] = "Hello";
+  const char world[] = "World";
+  string leaf1(hello, 5);
+  string leaf2(world, 5);
   leaf1_digest = this->tree_hasher_.HashLeaf(leaf1);
   EXPECT_EQ(leaf1_digest.size(), digestsize);
 
@@ -126,7 +128,7 @@ TYPED_TEST(TreeHasherTest, CollisionTest) {
 
 TYPED_TEST(TreeHasherTest, TestVectors) {
   // The empty hash
-  bstring digest = this->tree_hasher_.HashEmpty();
+  string digest = this->tree_hasher_.HashEmpty();
   EXPECT_STREQ(this->test_vectors_->empty_hash, H(digest).c_str());
 
   // Leaf hashes

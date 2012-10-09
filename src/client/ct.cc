@@ -26,7 +26,6 @@
 #include "serializer.h"
 #include "ssl_client.h"
 #include "util.h"
-#include "types.h"
 
 DEFINE_string(ssl_client_trusted_cert_dir, "",
               "Trusted root certificates for the ssl client");
@@ -72,6 +71,7 @@ static const char kUsage[] =
 
 using ct::CertificateEntry;
 using ct::SignedCertificateTimestamp;
+using std::string;
 
 static void AddExtension(X509 *cert, const char *oid, const unsigned char *data,
                          int data_len, int critical) {
@@ -101,8 +101,8 @@ static void AddExtension(X509 *cert, const char *oid, const unsigned char *data,
 // 2 - server unavailable
 static int Upload() {
   // Contents should be concatenated PEM entries.
-  bstring contents;
-  std::string submission_file = FLAGS_ct_server_submission;
+  string contents;
+  string submission_file = FLAGS_ct_server_submission;
   PCHECK(util::ReadBinaryFile(submission_file, &contents))
       << "Could not read CT log server submission from " << submission_file;
 
@@ -126,12 +126,12 @@ static int Upload() {
 
   bool record_response = !FLAGS_ct_server_response_out.empty();
   if (record_response) {
-    std::string response_file = FLAGS_ct_server_response_out;
+    string response_file = FLAGS_ct_server_response_out;
     std::ofstream token_out(response_file.c_str(),
                             std::ios::out | std::ios::binary);
     PCHECK(token_out.good()) << "Could not open response file " << response_file
                              << " for writing";
-    bstring proof;
+    string proof;
     if (Serializer::SerializeSCTToken(sct, &proof) == Serializer::OK) {
       token_out.write(proof.data(), proof.size());
       LOG(INFO) << "SCT token saved in " << response_file;
@@ -147,11 +147,11 @@ static int Upload() {
 
 // FIXME: fix all the memory leaks in this code.
 static void MakeCert() {
-  bstring sct;
+  string sct;
   PCHECK(util::ReadBinaryFile(FLAGS_sct_token, &sct))
       << "Could not read SCT data from " << FLAGS_sct_token;
 
-  std::string cert_file = FLAGS_certificate_out;
+  string cert_file = FLAGS_certificate_out;
 
   int cert_fd = open(cert_file.c_str(), O_CREAT | O_TRUNC | O_WRONLY, 0666);
   PCHECK(cert_fd > 0) << "Could not open certificate file " << cert_file
@@ -232,12 +232,12 @@ static void WriteProofToConfig() {
   CHECK(!FLAGS_sct_token.empty()) << google::ProgramUsage();
   CHECK(!FLAGS_extensions_config_out.empty()) << google::ProgramUsage();
 
-  bstring sct;
+  string sct;
 
   PCHECK(util::ReadBinaryFile(FLAGS_sct_token, &sct))
       << "Could not read SCT data from " << FLAGS_sct_token;
 
-  std::string conf_file = FLAGS_extensions_config_out;
+  string conf_file = FLAGS_extensions_config_out;
 
   std::ofstream conf_out(conf_file.c_str(), std::ios::app);
   PCHECK(conf_out.good()) << "Could not open extensions configuration file "
@@ -297,7 +297,7 @@ static void ProofToAuthz() {
 //  1: handshake error
 //  2: connection error
 static SSLClient::HandshakeResult Connect() {
-  std::string log_server_key = FLAGS_ct_server_public_key;
+  string log_server_key = FLAGS_ct_server_public_key;
   CHECK(!log_server_key.empty()) << "Please give a CT log server public key";
 
   EVP_PKEY *pkey = NULL;
@@ -343,11 +343,11 @@ static SSLClient::HandshakeResult Connect() {
 // Exit code upon abnormal exit (CHECK failures): != 0
 // (on UNIX, 134 is expected)
 int main(int argc, char **argv) {
-  google::SetUsageMessage(argv[0] + std::string(kUsage));
+  google::SetUsageMessage(argv[0] + string(kUsage));
   google::ParseCommandLineFlags(&argc, &argv, true);
   google::InitGoogleLogging(argv[0]);
 
-  const std::string main_command(argv[0]);
+  const string main_command(argv[0]);
   if (argc < 2) {
     std::cout << google::ProgramUsage();
     return 1;
@@ -355,7 +355,7 @@ int main(int argc, char **argv) {
 
   SSL_library_init();
 
-  const std::string cmd(argv[1]);
+  const string cmd(argv[1]);
 
   int ret = 0;
   if (cmd == "connect") {

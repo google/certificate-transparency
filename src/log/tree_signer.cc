@@ -7,12 +7,12 @@
 #include "merkle_tree.h"
 #include "tree_signer.h"
 #include "serializer.h"
-#include "types.h"
 #include "util.h"
 
 using ct::LoggedCertificate;
 using ct::SignedCertificateTimestamp;
 using ct::SignedTreeHead;
+using std::string;
 
 TreeSigner::TreeSigner(Database *db, LogSigner *signer)
     : db_(db),
@@ -60,8 +60,8 @@ TreeSigner::UpdateResult TreeSigner::UpdateTree() {
   // Timestamps have to be unique.
   uint64_t min_timestamp = LastUpdateTime() + 1;
 
-  std::set<bstring> pending_hashes = db_->PendingHashes();
-  std::set<bstring>::const_iterator it;
+  std::set<string> pending_hashes = db_->PendingHashes();
+  std::set<string>::const_iterator it;
   for (it = pending_hashes.begin(); it != pending_hashes.end(); ++it) {
     LoggedCertificate logged_cert;
     CHECK_EQ(Database::LOOKUP_OK,
@@ -147,10 +147,10 @@ void TreeSigner::BuildTree() {
 }
 
 bool
-TreeSigner::AppendCertificate(const bstring &key,
+TreeSigner::AppendCertificate(const string &key,
                               const SignedCertificateTimestamp &sct) {
   // Serialize for inclusion in the tree.
-  bstring serialized_sct;
+  string serialized_sct;
   CHECK_EQ(Serializer::OK,
            Serializer::SerializeSCTForTree(sct, &serialized_sct))
       << sct.DebugString();
@@ -174,7 +174,7 @@ TreeSigner::AppendCertificate(const bstring &key,
 void
 TreeSigner::AppendCertificateToTree(const SignedCertificateTimestamp &sct) {
   // Serialize for inclusion in the tree.
-  bstring serialized_sct;
+  string serialized_sct;
   CHECK_EQ(Serializer::OK,
            Serializer::SerializeSCTForTree(sct, &serialized_sct));
 

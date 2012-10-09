@@ -11,9 +11,10 @@
 
 using ct::SignedCertificateTimestamp;
 using ct::CertificateEntry;
+using std::string;
 
-SSLClient::SSLClient(const std::string &server, uint16_t port,
-                     const std::string &ca_dir, LogVerifier *verifier)
+SSLClient::SSLClient(const string &server, uint16_t port,
+                     const string &ca_dir, LogVerifier *verifier)
     : client_(server, port),
       ctx_(NULL),
       verify_args_(verifier),
@@ -73,7 +74,7 @@ bool SSLClient::GetToken(SignedCertificateTimestamp *sct) const {
 
 // static
 LogVerifier::VerifyResult
-SSLClient::VerifySCT(const bstring &token, const CertChain &chain,
+SSLClient::VerifySCT(const string &token, const CertChain &chain,
                      LogVerifier *verifier, SignedCertificateTimestamp *sct) {
   CertificateEntry entry;
   if (CertSubmissionHandler::X509ChainToEntry(chain, &entry) !=
@@ -121,7 +122,7 @@ int SSLClient::VerifyCallback(X509_STORE_CTX *ctx, void *arg) {
   for (int i = 0; i < chain_size; ++i)
     chain.AddCert(new Cert(sk_X509_value(sk, i)));
 
-  bstring token;
+  string token;
   // First, see if the cert has an embedded proof.
   if (chain.LeafCert()->HasExtension(Cert::kEmbeddedProofExtensionOID)) {
     LOG(INFO) << "Embedded proof extension found in certificate, "
@@ -192,7 +193,7 @@ int SSLClient::SCTTokenCallback(SSL *s, void *arg) {
 
   LOG(INFO) << "Found an SCT token in the TLS extension, verifying...";
 
-  bstring token(reinterpret_cast<byte*>(proof), proof_length);
+  string token(reinterpret_cast<byte*>(proof), proof_length);
   Cert *leaf = new Cert(x509);
   CertChain chain;
   chain.AddCert(leaf);

@@ -4,24 +4,22 @@
 #include <stdint.h>
 #include <string>
 
-#include "types.h"
-
 namespace util {
 
-std::string HexString(const bstring &data);
+std::string HexString(const std::string &data);
 
-std::string HexString(const bstring &data, char byte_delimiter);
+std::string HexString(const std::string &data, char byte_delimiter);
 
-bstring BinaryString(const std::string &hex_string);
+std::string BinaryString(const std::string &hex_string);
 
 bool ReadTextFile(const std::string &file, std::string *result);
 
-bool ReadBinaryFile(const std::string &file, bstring *result);
+bool ReadBinaryFile(const std::string &file, std::string *result);
 
 // Write to a temporary file and return the filename, or an
 // empty string on error.
 std::string WriteTemporaryBinaryFile(const std::string &file_template,
-                                     const bstring &data);
+                                     const std::string &data);
 
 // Create a temporary directory, and return the dirname, or an
 // empty string on error.

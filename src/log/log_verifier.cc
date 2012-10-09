@@ -11,6 +11,7 @@
 using ct::MerkleAuditProof;
 using ct::SignedCertificateTimestamp;
 using ct::SignedTreeHead;
+using std::string;
 
 LogVerifier::LogVerifier(LogSigVerifier *sig_verifier,
                          MerkleVerifier *tree_verifier)
@@ -26,7 +27,7 @@ LogVerifier::~LogVerifier() {
 LogVerifier::VerifyResult
 LogVerifier::VerifySCTConsistency(const SignedCertificateTimestamp &sct,
                                   const SignedCertificateTimestamp &sct2) {
-  bstring signed_part, signed_part2;
+  string signed_part, signed_part2;
 
   if (Serializer::SerializeSCTForSigning(sct, &signed_part) != Serializer::OK ||
       Serializer::SerializeSCTForSigning(sct2, &signed_part2) != Serializer::OK)
@@ -84,18 +85,18 @@ LogVerifier::VerifyMerkleAuditProof(const SignedCertificateTimestamp &sct,
                  util::TimeInMilliseconds() + 1000))
     return INCONSISTENT_TIMESTAMPS;
 
-  bstring serialized_sct;
+  string serialized_sct;
   Serializer::SerializeResult serialize_result =
       Serializer::SerializeSCTForTree(sct, &serialized_sct);
   if (serialize_result != Serializer::OK)
     return INVALID_FORMAT;
 
-  std::vector<bstring> path;
+  std::vector<string> path;
   for (int i = 0; i < merkle_proof.path_node_size(); ++i)
     path.push_back(merkle_proof.path_node(i));
 
   // Leaf indexing in the MerkleTree starts from 1.
-  bstring root_hash =
+  string root_hash =
       tree_verifier_->RootFromPath(merkle_proof.leaf_index() + 1,
                                    merkle_proof.tree_size(), path,
                                    serialized_sct);

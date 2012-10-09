@@ -12,6 +12,7 @@
 using ct::CertificateEntry;
 using ct::LoggedCertificate;
 using ct::SignedCertificateTimestamp;
+using std::string;
 
 FrontendSigner::FrontendSigner(Database *db, LogSigner *signer)
     : db_(db),
@@ -41,14 +42,14 @@ FrontendSigner::~FrontendSigner() {
 }
 
 FrontendSigner::SubmitResult
-FrontendSigner::QueueEntry(const bstring &data,
+FrontendSigner::QueueEntry(const string &data,
                            SignedCertificateTimestamp *sct) {
   return QueueEntry(CertificateEntry::X509_ENTRY, data, sct);
 }
 
 FrontendSigner::SubmitResult
 FrontendSigner::QueueEntry(CertificateEntry::Type type,
-                           const bstring data,
+                           const string data,
                            SignedCertificateTimestamp *sct) {
   // Verify the submission and compute signed and unsigned parts.
   CertificateEntry entry;
@@ -59,7 +60,7 @@ FrontendSigner::QueueEntry(CertificateEntry::Type type,
     return GetSubmitError(result);
 
   // Check if the entry already exists.
-  bstring sha256_hash = ComputeCertificateHash(entry);
+  string sha256_hash = ComputeCertificateHash(entry);
   assert(!sha256_hash.empty());
 
   LoggedCertificate logged_cert;
@@ -94,8 +95,8 @@ FrontendSigner::QueueEntry(CertificateEntry::Type type,
 }
 
 // static
-std::string FrontendSigner::SubmitResultString(SubmitResult result) {
-  std::string result_string;
+string FrontendSigner::SubmitResultString(SubmitResult result) {
+  string result_string;
   switch (result) {
     case LOGGED:
       result_string = "submission already logged";
@@ -130,7 +131,8 @@ std::string FrontendSigner::SubmitResultString(SubmitResult result) {
   return result_string;
 }
 
-bstring FrontendSigner::ComputeCertificateHash(const CertificateEntry &entry) const {
+string
+FrontendSigner::ComputeCertificateHash(const CertificateEntry &entry) const {
   // Compute the SHA-256 hash of the leaf certificate.
   hasher_->Reset();
   hasher_->Update(entry.leaf_certificate());

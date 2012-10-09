@@ -26,7 +26,6 @@
 #include "log_signer.h"
 #include "serializer.h"
 #include "sqlite_db.h"
-#include "types.h"
 #include "unistd.h"
 
 DEFINE_int32(port, 0, "Server port");
@@ -45,6 +44,7 @@ DEFINE_int32(tree_storage_depth, 0,
              "empty, must match the existing depth");
 
 using google::RegisterFlagValidator;
+using std::string;
 
 // Basic sanity checks on flag values.
 static bool ValidatePort(const char *flagname, int port) {
@@ -58,7 +58,7 @@ static bool ValidatePort(const char *flagname, int port) {
 static const bool port_dummy = RegisterFlagValidator(&FLAGS_port,
                                                      &ValidatePort);
 
-static bool ValidateRead(const char *flagname, const std::string &path) {
+static bool ValidateRead(const char *flagname, const string &path) {
   if (access(path.c_str(), R_OK) != 0) {
     std::cout << "Cannot access " << flagname << " at " << path << std::endl;
     return false;
@@ -72,7 +72,7 @@ static const bool key_dummy = RegisterFlagValidator(&FLAGS_key,
 static const bool cert_dummy = RegisterFlagValidator(&FLAGS_trusted_cert_dir,
                                                      &ValidateRead);
 
-static bool ValidateWrite(const char *flagname, const std::string &path) {
+static bool ValidateWrite(const char *flagname, const string &path) {
   if (path != "" && access(path.c_str(), W_OK) != 0) {
     std::cout << "Cannot modify " << flagname << " at " << path << std::endl;
     return false;
@@ -361,7 +361,7 @@ class Server : public FD {
   bool WantsRead() const { return true; }
 
   void ReadIsAllowed() {
-    byte buf[1024];
+    char buf[1024];
 
     ssize_t n = read(fd(), buf, sizeof buf);
     VLOG(5) << "read " << n << " bytes from " << fd();
@@ -377,7 +377,7 @@ class Server : public FD {
   // responsibility to remove consumed bytes from rbuffer. This will
   // NOT be called again until more data arrives from the network,
   // even if there are unconsumed bytes in rbuffer.
-  virtual void BytesRead(bstring *rbuffer) = 0;
+  virtual void BytesRead(string *rbuffer) = 0;
 
   bool WantsWrite() const { return !wbuffer_.empty(); }
 
@@ -391,13 +391,12 @@ class Server : public FD {
     wbuffer_.erase(0, n);
   }
 
-  void Write(bstring str) { wbuffer_.append(str); }
-  void Write(byte ch) { wbuffer_.push_back(ch); }
+  void Write(string str) { wbuffer_.append(str); }
 
  private:
 
-  bstring rbuffer_;
-  bstring wbuffer_;
+  string rbuffer_;
+  string wbuffer_;
 };
 
 class CTLogManager {
@@ -414,8 +413,8 @@ class CTLogManager {
 
   // Submit an entry and write a token, if the entry is accepted,
   // or an error otherwise.
-  LogReply SubmitEntry(CertificateEntry::Type type, const bstring &data,
-                       SignedCertificateTimestamp *sct, std::string *error) {
+  LogReply SubmitEntry(CertificateEntry::Type type, const string &data,
+                       SignedCertificateTimestamp *sct, string *error) {
     SignedCertificateTimestamp local_sct;
     FrontendSigner::SubmitResult submit_result =
         signer_->QueueEntry(type, data, &local_sct);
@@ -450,7 +449,7 @@ class CTServer : public Server {
   static const size_t kMaxPacketLength = (1 << 24) - 1;
 
  private:
-  void BytesRead(bstring *rbuffer) {
+  void BytesRead(string *rbuffer) {
     for ( ; ; ) {
       if (rbuffer->size() < 5)
         return;
@@ -481,7 +480,7 @@ class CTServer : public Server {
     }
   }
 
-  void PacketRead(int version, int format, const bstring &data) {
+  void PacketRead(int version, int format, const string &data) {
     if (version != kVersion) {
       SendError(ServerError::BAD_VERSION);
       return;
@@ -501,7 +500,7 @@ class CTServer : public Server {
    LOG(INFO) << "Command is " << message.command() << ", data length "
              << message.submission_data().size();
 
-   std::string error;
+   string error;
    SignedCertificateTimestamp sct;
     CTLogManager::LogReply reply;
     // Since we successfully parsed the protobuf, apparently we know
@@ -534,7 +533,7 @@ class CTServer : public Server {
     SendError(error, "");
   }
 
-  void SendError(ServerError::ErrorCode error, const std::string &error_string) {
+  void SendError(ServerError::ErrorCode error, const string &error_string) {
     ServerMessage message;
     message.set_response(ServerMessage::ERROR);
     message.mutable_error()->set_code(error);
@@ -554,7 +553,7 @@ class CTServer : public Server {
   }
 
   void SendMessage(const ServerMessage &message) {
-    std::string serialized_message;
+    string serialized_message;
     CHECK(message.SerializeToString(&serialized_message));
     // TODO(ekasper): remove the CHECK; it's temporary until we decide
     // how to split large messages.

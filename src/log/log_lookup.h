@@ -31,11 +31,11 @@ class LogLookup {
 
   // Look up by timestamp + SHA256-hash of the certificate.
   LookupResult CertificateAuditProof(uint64_t timestamp,
-                                     const bstring &certificate_hash,
+                                     const std::string &certificate_hash,
                                      ct::MerkleAuditProof *proof);
 
  private:
-  bstring LeafHash(const ct::SignedCertificateTimestamp &sct);
+  std::string LeafHash(const ct::SignedCertificateTimestamp &sct);
 
   const Database *db_;
   MerkleTree cert_tree_;

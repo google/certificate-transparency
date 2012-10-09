@@ -5,7 +5,6 @@
 #include "cert_checker.h"
 #include "cert_submission_handler.h"
 #include "ct.pb.h"
-#include "types.h"
 #include "util.h"
 
 static const char kCertDir[] = "../test/testdata";
@@ -27,23 +26,24 @@ static const char kChainLeafCert[] = "test2-cert.pem";
 namespace {
 
 using ct::CertificateEntry;
+using std::string;
 
 class CertSubmissionHandlerTest : public ::testing::Test {
  protected:
-  bstring ca_;
-  bstring leaf_;
-  bstring ca_precert_;
-  bstring precert_;
-  bstring intermediate_;
-  bstring chain_leaf_;
-  std::string cert_dir_;
+  string ca_;
+  string leaf_;
+  string ca_precert_;
+  string precert_;
+  string intermediate_;
+  string chain_leaf_;
+  string cert_dir_;
   CertSubmissionHandler *handler_;
   CertChecker *checker_;
 
   CertSubmissionHandlerTest() : handler_(NULL) {}
 
   void SetUp() {
-    cert_dir_ = std::string(kCertDir);
+    cert_dir_ = string(kCertDir);
     checker_ = new CertChecker();
     checker_->LoadTrustedCertificate(cert_dir_ + "/" + kCaCert);
     handler_ = new CertSubmissionHandler(checker_);
@@ -91,7 +91,7 @@ TEST_F(CertSubmissionHandlerTest, SubmitInvalidCert) {
 
 TEST_F(CertSubmissionHandlerTest, SubmitChain) {
   // Submit a chain.
-  bstring submit = chain_leaf_ + intermediate_;
+  string submit = chain_leaf_ + intermediate_;
   CertificateEntry entry;
   entry.set_type(CertificateEntry::X509_ENTRY);
   EXPECT_EQ(SubmissionHandler::OK, handler_->ProcessSubmission(submit, &entry));
@@ -108,7 +108,7 @@ TEST_F(CertSubmissionHandlerTest, SubmitPartialChain) {
 }
 
 TEST_F(CertSubmissionHandlerTest, SubmitInvalidChain) {
-  bstring invalid_submit = ca_;
+  string invalid_submit = ca_;
   invalid_submit.append(leaf_);
   CertificateEntry entry;
   entry.set_type(CertificateEntry::X509_ENTRY);
@@ -125,14 +125,14 @@ TEST_F(CertSubmissionHandlerTest, SubmitCertAsPreCert) {
 }
 
 TEST_F(CertSubmissionHandlerTest, SubmitCertChainAsPreCert) {
-  bstring submit = chain_leaf_ + intermediate_;
+  string submit = chain_leaf_ + intermediate_;
   CertificateEntry entry;
   entry.set_type(CertificateEntry::PRECERT_ENTRY);
   EXPECT_NE(SubmissionHandler::OK, handler_->ProcessSubmission(submit, &entry));
 }
 
 TEST_F(CertSubmissionHandlerTest, SubmitPreCertChain) {
-  bstring submit = precert_ + ca_precert_;
+  string submit = precert_ + ca_precert_;
   CertificateEntry entry;
   entry.set_type(CertificateEntry::PRECERT_ENTRY);
   EXPECT_EQ(SubmissionHandler::OK, handler_->ProcessSubmission(submit, &entry));
@@ -143,14 +143,14 @@ TEST_F(CertSubmissionHandlerTest, SubmitPreCertChain) {
 
 TEST_F(CertSubmissionHandlerTest, SubmitInvalidPreCertChain) {
   // In wrong order.
-  bstring submit = ca_precert_ + precert_;
+  string submit = ca_precert_ + precert_;
   CertificateEntry entry;
   entry.set_type(CertificateEntry::PRECERT_ENTRY);
   EXPECT_NE(SubmissionHandler::OK, handler_->ProcessSubmission(submit, &entry));
 }
 
 TEST_F(CertSubmissionHandlerTest, SubmitPreCertChainAsCertChain) {
-  bstring submit = precert_ + ca_precert_;
+  string submit = precert_ + ca_precert_;
   CertificateEntry entry;
   entry.set_type(CertificateEntry::X509_ENTRY);
   // This should fail since ca_precert_ is not a CA cert (CA:false).

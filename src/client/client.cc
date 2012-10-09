@@ -8,7 +8,9 @@
 
 #include "client.h"
 
-Client::Client(const std::string &server, uint16_t port)
+using std::string;
+
+Client::Client(const string &server, uint16_t port)
     : server_(server),
       port_(port),
       fd_(-1) {}
@@ -53,7 +55,7 @@ void Client::Disconnect() {
   }
 }
 
-bool Client::Write(const bstring &data) {
+bool Client::Write(const string &data) {
   CHECK(Connected());
   int n = send(fd_, data.data(), data.length(), MSG_NOSIGNAL);
   if (n <= 0) {
@@ -69,9 +71,9 @@ bool Client::Write(const bstring &data) {
   return true;
 }
 
-bool Client::Read(size_t length, bstring *result) {
+bool Client::Read(size_t length, string *result) {
   CHECK(Connected());
-  byte *buf = new byte[length];
+  char *buf = new char[length];
   for (size_t offset = 0; offset < length; ) {
     int n = recv(fd_, buf + offset, length - offset, MSG_NOSIGNAL);
     if (n <= 0) {
@@ -83,7 +85,7 @@ bool Client::Read(size_t length, bstring *result) {
 
     offset += n;
   }
-  result->assign(bstring(buf, length));
+  result->assign(string(buf, length));
   delete[] buf;
   VLOG(5) << "read " << length << " bytes";
   return true;

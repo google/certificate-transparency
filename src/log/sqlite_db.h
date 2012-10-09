@@ -14,18 +14,18 @@ class SQLiteDB : public Database {
   CreatePendingCertificateEntry_(const ct::LoggedCertificate &logged_cert);
 
   virtual WriteResult
-  AssignCertificateSequenceNumber(const bstring &pending_hash,
+  AssignCertificateSequenceNumber(const std::string &pending_hash,
 				  uint64_t sequence_number);
 
   virtual LookupResult
-  LookupCertificateByHash(const bstring &certificate_sha256_hash,
+  LookupCertificateByHash(const std::string &certificate_sha256_hash,
                           ct::LoggedCertificate *result) const;
 
   virtual LookupResult
   LookupCertificateByIndex(uint64_t sequence_number,
                            ct::LoggedCertificate *result) const;
 
-  virtual std::set<bstring> PendingHashes() const;
+  virtual std::set<std::string> PendingHashes() const;
 
   virtual WriteResult WriteTreeHead_(const ct::SignedTreeHead &sth);
 

@@ -8,7 +8,6 @@
 #include "ct.pb.h"
 #include "log_signer.h"
 #include "serializer.h"
-#include "types.h"
 #include "util.h"
 
 namespace {
@@ -17,18 +16,19 @@ using ct::CertificateEntry;
 using ct::SignedCertificateTimestamp;
 using ct::DigitallySigned;
 using ct::SignedTreeHead;
+using std::string;
 
 // A slightly shorter notation for constructing binary blobs from test vectors.
-std::string S(const char *hexstring, size_t byte_length) {
-  return std::string(hexstring, 2 * byte_length);
+string S(const char *hexstring, size_t byte_length) {
+  return string(hexstring, 2 * byte_length);
 }
 
-bstring B(const char *hexstring, size_t byte_length) {
+string B(const char *hexstring, size_t byte_length) {
   return util::BinaryString(S(hexstring, byte_length));
 }
 
 // The reverse.
-std::string H(const bstring &byte_string) {
+string H(const string &byte_string) {
   return util::HexString(byte_string);
 }
 
@@ -47,7 +47,7 @@ const char *ecp256_public_key = {
   "-----END PUBLIC KEY-----\n"
 };
 
-EVP_PKEY* PrivateKeyFromPem(const std::string &pemkey) {
+EVP_PKEY* PrivateKeyFromPem(const string &pemkey) {
   BIO *bio = BIO_new_mem_buf(const_cast<char*>(pemkey.data()), pemkey.size());
   EVP_PKEY *pkey = PEM_read_bio_PrivateKey(bio, NULL, NULL, NULL);
   assert(pkey != NULL);
@@ -55,7 +55,7 @@ EVP_PKEY* PrivateKeyFromPem(const std::string &pemkey) {
   return pkey;
 }
 
-EVP_PKEY* PublicKeyFromPem(const std::string &pemkey) {
+EVP_PKEY* PublicKeyFromPem(const string &pemkey) {
   BIO *bio = BIO_new_mem_buf(const_cast<char*>(pemkey.data()), pemkey.size());
   EVP_PKEY *pkey = PEM_read_bio_PUBKEY(bio, NULL, NULL, NULL);
   assert(pkey != NULL);
@@ -103,7 +103,7 @@ class LogSignerTest : public ::testing::Test {
 
   uint64_t DefaultSCTTimestamp() const { return sct_.timestamp(); }
 
-  const bstring &DefaultCert() const {
+  const string &DefaultCert() const {
     return sct_.entry().leaf_certificate();
   }
 
@@ -113,8 +113,8 @@ class LogSignerTest : public ::testing::Test {
 
   const DigitallySigned &DefaultSCTSignature() const { return sct_.signature(); }
 
-  bstring DefaultSerializedSCTSignature() const {
-    bstring serialized_sig;
+  string DefaultSerializedSCTSignature() const {
+    string serialized_sig;
     Serializer::SerializeDigitallySigned(DefaultSCTSignature(), &serialized_sig);
     return serialized_sig;
   }
@@ -125,12 +125,12 @@ class LogSignerTest : public ::testing::Test {
 
   uint64_t DefaultTreeSize() const { return sth_.tree_size(); }
 
-  bstring DefaultRootHash() const { return sth_.root_hash(); }
+  string DefaultRootHash() const { return sth_.root_hash(); }
 
   const DigitallySigned &DefaultSTHSignature() const { return sth_.signature(); }
 
-  bstring DefaultSerializedSTHSignature() const {
-    bstring serialized_sig;
+  string DefaultSerializedSTHSignature() const {
+    string serialized_sig;
     Serializer::SerializeDigitallySigned(DefaultSTHSignature(), &serialized_sig);
     return serialized_sig;
   }
@@ -191,7 +191,7 @@ TEST_F(LogSignerTest, SignAndVerifySCT) {
   EXPECT_EQ(LogSigVerifier::OK, verifier_->VerifySCTSignature(sct));
 
   // The second version.
-  bstring serialized_sig;
+  string serialized_sig;
   EXPECT_EQ(LogSigner::OK,
             signer_->SignCertificateTimestamp(DefaultSCTTimestamp(),
                                               DefaultType(), DefaultCert(),
@@ -221,7 +221,7 @@ TEST_F(LogSignerTest, SignAndVerifySTH) {
   EXPECT_EQ(LogSigVerifier::OK, verifier_->VerifySTHSignature(sth));
 
   // The second version.
-  bstring serialized_sig;
+  string serialized_sig;
   EXPECT_EQ(LogSigner::OK,
             signer_->SignTreeHead(DefaultSTHTimestamp(), DefaultTreeSize(),
                                   DefaultRootHash(), &serialized_sig));
@@ -240,7 +240,7 @@ TEST_F(LogSignerTest, SignAndVerifySCTApiCrossCheck) {
   EXPECT_EQ(LogSigner::OK, signer_->SignCertificateTimestamp(&sct));
 
   // Serialize and verify.
-  bstring serialized_sig;
+  string serialized_sig;
   EXPECT_EQ(Serializer::OK,
             Serializer::SerializeDigitallySigned(sct.signature(),
                                                  &serialized_sig));
@@ -270,7 +270,7 @@ TEST_F(LogSignerTest, SignAndVerifySTHApiCrossCheck) {
   EXPECT_EQ(LogSigner::OK, signer_->SignTreeHead(&sth));
 
   // Serialize and verify.
-  bstring serialized_sig;
+  string serialized_sig;
   EXPECT_EQ(Serializer::OK,
             Serializer::SerializeDigitallySigned(sth.signature(),
                                                  &serialized_sig));
@@ -294,7 +294,7 @@ TEST_F(LogSignerTest, SignAndVerifySTHApiCrossCheck) {
 }
 
 TEST_F(LogSignerTest, SignInvalidType) {
-  bstring serialized_sig;
+  string serialized_sig;
   EXPECT_EQ(LogSigner::INVALID_ENTRY_TYPE, signer_->SignCertificateTimestamp(
       DefaultSCTTimestamp(),
       static_cast<LogSigner::CertificateEntryType>(-1),
@@ -311,8 +311,8 @@ TEST_F(LogSignerTest, SignEmptyCert) {
   EXPECT_EQ(LogSigner::EMPTY_CERTIFICATE,
             signer_->SignCertificateTimestamp(&sct));
 
-  bstring serialized_sig;
-  bstring empty_cert;
+  string serialized_sig;
+  string empty_cert;
   EXPECT_EQ(LogSigner::EMPTY_CERTIFICATE,
             signer_->SignCertificateTimestamp(DefaultSCTTimestamp(), DefaultType(),
                                               empty_cert,
@@ -327,7 +327,7 @@ TEST_F(LogSignerTest, SignBadRootHash) {
 
   EXPECT_EQ(LogSigner::INVALID_HASH_LENGTH, signer_->SignTreeHead(&sth));
 
-  bstring serialized_sig;
+  string serialized_sig;
   EXPECT_EQ(LogSigner::INVALID_HASH_LENGTH,
             signer_->SignTreeHead(DefaultSTHTimestamp(), DefaultTreeSize(),
                                   "bad", &serialized_sig));
@@ -480,7 +480,7 @@ TEST_F(LogSignerTest, VerifyBadSCTSignature) {
   sct.CopyFrom(DefaultSCT());
   EXPECT_EQ(LogSigVerifier::OK, verifier_->VerifySCTSignature(sct));
 
-  bstring bad_signature = DefaultSCTSignature().signature();
+  string bad_signature = DefaultSCTSignature().signature();
   bad_signature.erase(bad_signature.end() - 1);
   sct.mutable_signature()->set_signature(bad_signature);
   EXPECT_EQ(LogSigVerifier::INVALID_SIGNATURE,
@@ -519,7 +519,7 @@ TEST_F(LogSignerTest, VerifyBadSTHSignature) {
   sth.CopyFrom(DefaultSTH());
   EXPECT_EQ(LogSigVerifier::OK, verifier_->VerifySTHSignature(sth));
 
-  bstring bad_signature = DefaultSTHSignature().signature();
+  string bad_signature = DefaultSTHSignature().signature();
   bad_signature.erase(bad_signature.end() - 1);
   sth.mutable_signature()->set_signature(bad_signature);
   EXPECT_EQ(LogSigVerifier::INVALID_SIGNATURE,
@@ -553,12 +553,12 @@ TEST_F(LogSignerTest, VerifyBadSTHSignature) {
 }
 
 TEST_F(LogSignerTest, VerifyBadSerializedSCTSignature) {
-  bstring serialized_sig = DefaultSerializedSCTSignature();
+  string serialized_sig = DefaultSerializedSCTSignature();
   EXPECT_EQ(LogSigVerifier::OK,
             verifier_->VerifySCTSignature(DefaultSCTTimestamp(), DefaultType(),
                                           DefaultCert(), serialized_sig));
   // Too short.
-  bstring bad_signature = serialized_sig.substr(0, serialized_sig.size() - 1);
+  string bad_signature = serialized_sig.substr(0, serialized_sig.size() - 1);
   EXPECT_EQ(LogSigVerifier::SIGNATURE_TOO_SHORT,
             verifier_->VerifySCTSignature(DefaultSCTTimestamp(), DefaultType(),
                                           DefaultCert(), bad_signature));
@@ -582,13 +582,13 @@ TEST_F(LogSignerTest, VerifyBadSerializedSCTSignature) {
 }
 
 TEST_F(LogSignerTest, VerifyBadSerializedSTHSignature) {
-  bstring serialized_sig = DefaultSerializedSTHSignature();
+  string serialized_sig = DefaultSerializedSTHSignature();
   EXPECT_EQ(LogSigVerifier::OK,
             verifier_->VerifySTHSignature(DefaultSTHTimestamp(),
                                           DefaultTreeSize(),
                                           DefaultRootHash(), serialized_sig));
   // Too short.
-  bstring bad_signature = serialized_sig.substr(0, serialized_sig.size() - 1);
+  string bad_signature = serialized_sig.substr(0, serialized_sig.size() - 1);
   EXPECT_EQ(LogSigVerifier::SIGNATURE_TOO_SHORT,
             verifier_->VerifySTHSignature(DefaultSTHTimestamp(),
                                           DefaultTreeSize(),

@@ -12,13 +12,15 @@
 #include "cert.h"
 #include "types.h"
 
+using std::string;
+
 const char Cert::kProofExtensionOID[] = "1.2.3.0";
 const char Cert::kEmbeddedProofExtensionOID[] = "1.2.3.1";
 const char Cert::kPoisonExtensionOID[] = "1.2.3.2";
 const char Cert::kCtExtendedKeyUsageOID[] = "1.2.3.4";
 
 //static
-ASN1_OBJECT *Cert::ExtensionObject(const std::string oid) {
+ASN1_OBJECT *Cert::ExtensionObject(const string oid) {
   unsigned char obj_buf[100];
   int obj_len = a2d_ASN1_OBJECT(obj_buf, sizeof obj_buf, oid.data(),
                                 oid.length());
@@ -29,7 +31,7 @@ ASN1_OBJECT *Cert::ExtensionObject(const std::string oid) {
 
 Cert::Cert(X509 *x509) : x509_(X509_dup(x509)) {}
 
-Cert::Cert(const std::string &pem_string) : x509_(NULL) {
+Cert::Cert(const string &pem_string) : x509_(NULL) {
   // A read-only bio.
   BIO *bio_in = BIO_new_mem_buf(const_cast<char*>(pem_string.data()),
                                 pem_string.length());
@@ -48,7 +50,7 @@ Cert *Cert::Clone() const {
   return clone;
 }
 
-bool Cert::HasExtension(const std::string &extension_oid) const {
+bool Cert::HasExtension(const string &extension_oid) const {
   return ExtensionIndex(extension_oid) != -1;
 }
 
@@ -56,18 +58,18 @@ bool Cert::HasExtension(int extension_nid) const {
   return ExtensionIndex(extension_nid) != -1;
 }
 
-bool Cert::IsCriticalExtension(const std::string &extension_oid) const {
+bool Cert::IsCriticalExtension(const string &extension_oid) const {
   X509_EXTENSION *ext = GetExtension(extension_oid);
   assert (ext != NULL);
   return X509_EXTENSION_get_critical(ext);
 }
 
-bstring Cert::ExtensionData(const std::string &extension_oid) const {
+string Cert::ExtensionData(const string &extension_oid) const {
   X509_EXTENSION *ext = GetExtension(extension_oid);
   // Always check if the extension exists first.
   assert(ext != NULL);
   ASN1_OCTET_STRING *ext_data = X509_EXTENSION_get_data(ext);
-  return bstring(reinterpret_cast<byte*>(ext_data->data), ext_data->length);
+  return string(reinterpret_cast<char*>(ext_data->data), ext_data->length);
 }
 
 bool Cert::HasBasicConstraintCA() const {
@@ -81,7 +83,7 @@ bool Cert::HasBasicConstraintCA() const {
   return is_ca;
 }
 
-bool Cert::HasExtendedKeyUsage(const std::string &key_usage_oid) const {
+bool Cert::HasExtendedKeyUsage(const string &key_usage_oid) const {
   EXTENDED_KEY_USAGE *eku = static_cast<EXTENDED_KEY_USAGE*>(
       X509_get_ext_d2i(x509_, NID_ext_key_usage, NULL, NULL));
   if (eku == NULL)
@@ -126,19 +128,19 @@ bool Cert::IsSignedBy(const Cert &issuer) const {
   return ret > 0;
 }
 
-bstring Cert::DerEncoding() const {
+string Cert::DerEncoding() const {
   assert(IsLoaded());
   unsigned char *der_buf = NULL;
   int der_length = i2d_X509(x509_, &der_buf);
   assert(der_length > 0);
-  bstring ret(reinterpret_cast<byte*>(der_buf), der_length);
+  string ret(reinterpret_cast<char*>(der_buf), der_length);
   OPENSSL_free(der_buf);
   return ret;
 }
 
 // WARNING WARNING this method modifies the x509_ structure
 // and thus invalidates the cert. Use with care.
-void Cert::DeleteExtension(const std::string &extension_oid) {
+void Cert::DeleteExtension(const string &extension_oid) {
   assert(IsLoaded());
   int extension_index = ExtensionIndex(extension_oid);
   if (extension_index == -1)
@@ -233,7 +235,7 @@ void Cert::CopyIssuerFrom(const Cert &from) {
   x509_->cert_info->enc.modified = 1;
 }
 
-int Cert::ExtensionIndex(const std::string &extension_oid) const {
+int Cert::ExtensionIndex(const string &extension_oid) const {
   assert(IsLoaded());
   ASN1_OBJECT *obj = ExtensionObject(extension_oid);
   assert(obj != NULL);
@@ -247,7 +249,7 @@ int Cert::ExtensionIndex(int extension_nid) const {
   return X509_get_ext_by_NID(x509_, extension_nid, -1);
 }
 
-X509_EXTENSION *Cert::GetExtension(const std::string &extension_oid) const {
+X509_EXTENSION *Cert::GetExtension(const string &extension_oid) const {
   assert(IsLoaded());
   int extension_index = ExtensionIndex(extension_oid);
   if (extension_index == -1)
@@ -263,7 +265,7 @@ X509_EXTENSION *Cert::GetExtension(int extension_nid) const {
   return X509_get_ext(x509_, extension_index);
 }
 
-CertChain::CertChain(const std::string &pem_string) {
+CertChain::CertChain(const string &pem_string) {
   // A read-only BIO.
   BIO *bio_in = BIO_new_mem_buf(const_cast<char*>(pem_string.data()),
                                 pem_string.length());

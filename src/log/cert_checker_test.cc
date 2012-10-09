@@ -6,6 +6,8 @@
 #include "cert_checker.h"
 #include "util.h"
 
+using std::string;
+
 static const char kCertDir[] = "../test/testdata";
 
 // Valid certificates.
@@ -26,17 +28,17 @@ namespace {
 
 class CertCheckerTest : public ::testing::Test {
  protected:
-  std::string leaf_pem_;
-  std::string ca_precert_pem_;
-  std::string precert_pem_;
-  std::string intermediate_pem_;
-  std::string chain_leaf_pem_;
-  std::string ca_pem_;
+  string leaf_pem_;
+  string ca_precert_pem_;
+  string precert_pem_;
+  string intermediate_pem_;
+  string chain_leaf_pem_;
+  string ca_pem_;
   CertChecker checker_;
-  std::string cert_dir_;
+  string cert_dir_;
 
   void SetUp() {
-    cert_dir_ = std::string(kCertDir);
+    cert_dir_ = string(kCertDir);
     ASSERT_TRUE(util::ReadTextFile(cert_dir_ + "/" + kLeafCert, &leaf_pem_));
     ASSERT_TRUE(util::ReadTextFile(cert_dir_ + "/" + kCaPreCert,
                                    &ca_precert_pem_));
@@ -98,7 +100,7 @@ TEST_F(CertCheckerTest, Intermediates) {
 }
 
 TEST_F(CertCheckerTest, PreCert) {
-  const std::string chain_pem = precert_pem_ + ca_precert_pem_;
+  const string chain_pem = precert_pem_ + ca_precert_pem_;
   PreCertChain chain(chain_pem);
 
   ASSERT_TRUE(chain.IsLoaded());

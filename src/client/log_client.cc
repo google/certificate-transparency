@@ -6,20 +6,20 @@
 #include "ct.pb.h"
 #include "log_client.h"
 #include "serializer.h"
-#include "types.h"
 
 using ct::CertificateEntry;
 using ct::ClientMessage;
 using ct::ServerError;
 using ct::ServerMessage;
 using ct::SignedCertificateTimestamp;
+using std::string;
 
 const ct::Version LogClient::kVersion = ct::V0;
 const ct::MessageFormat LogClient::kFormat = ct::PROTOBUF;
 const size_t LogClient::kPacketPrefixLength = 3;
 const size_t LogClient::kMaxPacketLength = (1 << 24) - 1;
 
-LogClient::LogClient(const std::string &server, uint16_t port)
+LogClient::LogClient(const string &server, uint16_t port)
     : client_(server, port) {
 }
 
@@ -29,7 +29,7 @@ bool LogClient::Connect() { return client_.Connect(); }
 
 void LogClient::Disconnect() { client_.Disconnect(); }
 
-bool LogClient::UploadSubmission(const bstring &submission, bool pre,
+bool LogClient::UploadSubmission(const string &submission, bool pre,
                                  SignedCertificateTimestamp *sct) {
   ClientMessage message;
   if (pre)
@@ -72,7 +72,7 @@ bool LogClient::UploadSubmission(const bstring &submission, bool pre,
 }
 
 // static
-std::string LogClient::ErrorString(ServerError::ErrorCode error) {
+string LogClient::ErrorString(ServerError::ErrorCode error) {
    switch(error) {
       case ServerError::BAD_VERSION:
         return "bad version";
@@ -90,14 +90,14 @@ std::string LogClient::ErrorString(ServerError::ErrorCode error) {
 }
 
 bool LogClient::SendMessage(const ClientMessage &message) {
-  std::string serialized_message;
+  string serialized_message;
   CHECK(message.SerializeToString(&serialized_message));
   if (serialized_message.size() > kMaxPacketLength) {
     LOG(ERROR) << "Message length exceeds allowed maximum";
     return false;
   }
 
-  bstring packet;
+  string packet;
   packet.append(Serializer::SerializeUint(kVersion, 1));
   packet.append(Serializer::SerializeUint(kFormat, 1));
   packet.append(Serializer::SerializeUint(serialized_message.length(),
@@ -109,7 +109,7 @@ bool LogClient::SendMessage(const ClientMessage &message) {
 
 bool LogClient::ReadReply(ServerMessage *message) {
   // Read the version.
-  bstring version_byte;
+  string version_byte;
   if (!client_.Read(1, &version_byte))
     return false;
 
@@ -130,7 +130,7 @@ bool LogClient::ReadReply(ServerMessage *message) {
   }
 
   // Read the format.
-  bstring format_byte;
+  string format_byte;
   if (!client_.Read(1, &format_byte))
     return false;
 
@@ -149,7 +149,7 @@ bool LogClient::ReadReply(ServerMessage *message) {
     return false;
   }
 
-  bstring serialized_packet_length;
+  string serialized_packet_length;
   if (!client_.Read(kPacketPrefixLength, &serialized_packet_length))
     return false;
 
@@ -158,7 +158,7 @@ bool LogClient::ReadReply(ServerMessage *message) {
                                       kPacketPrefixLength,
                                       &packet_length);
   DCHECK_EQ(Deserializer::OK, res);
-  bstring data;
+  string data;
   if (packet_length > kMaxPacketLength || !client_.Read(packet_length, &data))
     return false;
 

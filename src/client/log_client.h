@@ -6,7 +6,6 @@
 #include "client.h"
 #include "ct.h"
 #include "ct.pb.h"
-#include "types.h"
 
 // V0 client that speaks the protobuf format.
 class LogClient {
@@ -24,7 +23,7 @@ class LogClient {
 
   void Disconnect();
 
-  bool UploadSubmission(const bstring &submission, bool pre,
+  bool UploadSubmission(const std::string &submission, bool pre,
                         ct::SignedCertificateTimestamp *sct);
 
   static std::string ErrorString(ct::ServerError::ErrorCode error);

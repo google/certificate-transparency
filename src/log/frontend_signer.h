@@ -32,10 +32,11 @@ class FrontendSigner {
     UNKNOWN_ERROR,
   };
 
-  SubmitResult QueueEntry(const bstring &data,
+  SubmitResult QueueEntry(const std::string &data,
                           ct::SignedCertificateTimestamp *sct);
 
-  SubmitResult QueueEntry(ct::CertificateEntry::Type type, const bstring data,
+  SubmitResult QueueEntry(ct::CertificateEntry::Type type,
+                          const std::string data,
                           ct::SignedCertificateTimestamp *sct);
 
   static std::string SubmitResultString(SubmitResult result);
@@ -46,7 +47,7 @@ class FrontendSigner {
   LogSigner *signer_;
   SubmissionHandler *handler_;
 
-  bstring ComputeCertificateHash(const ct::CertificateEntry &entry) const;
+  std::string ComputeCertificateHash(const ct::CertificateEntry &entry) const;
 
   void TimestampAndSign(ct::SignedCertificateTimestamp *sct) const;
 

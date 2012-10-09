@@ -12,10 +12,11 @@
 #include "merkle_verifier.h"
 #include "serial_hasher.h"
 #include "tree_hasher.h"
-#include "types.h"
 #include "util.h"
 
 namespace {
+
+using std::string;
 
 ////////////////////////////////////////////////////////////////////////////////
 //                          REFERENCE IMPLEMENTATIONS                         //
@@ -34,7 +35,7 @@ int DownToPowerOfTwo(int i) {
 }
 
 // Reference implementation of Merkle hash, for cross-checking.
-bstring ReferenceMerkleTreeHash(bstring inputs[], int input_size,
+string ReferenceMerkleTreeHash(string inputs[], int input_size,
                                 TreeHasher *treehasher) {
   if (!input_size)
     return treehasher->HashEmpty();
@@ -50,10 +51,10 @@ bstring ReferenceMerkleTreeHash(bstring inputs[], int input_size,
 
 // Reference implementation of Merkle paths. Path from leaf to root,
 // excluding the leaf and root themselves.
-std::vector<bstring>
-ReferenceMerklePath(bstring inputs[], int input_size, int leaf,
+std::vector<string>
+ReferenceMerklePath(string inputs[], int input_size, int leaf,
                     TreeHasher *treehasher) {
-  std::vector<bstring> path;
+  std::vector<string> path;
   if (leaf > input_size || leaf == 0)
     return path;
 
@@ -62,7 +63,7 @@ ReferenceMerklePath(bstring inputs[], int input_size, int leaf,
 
   const int split = DownToPowerOfTwo(input_size);
 
-  std::vector<bstring> subpath;
+  std::vector<string> subpath;
   if (leaf <= split) {
     subpath = ReferenceMerklePath(&inputs[0], split, leaf, treehasher);
     path.insert(path.end(), subpath.begin(), subpath.end());
@@ -80,11 +81,11 @@ ReferenceMerklePath(bstring inputs[], int input_size, int leaf,
 
 // Reference implementation of snapshot consistency.
 // Call with have_root1 = true.
-std::vector<bstring>
-ReferenceSnapshotConsistency(bstring inputs[], int snapshot2,
+std::vector<string>
+ReferenceSnapshotConsistency(string inputs[], int snapshot2,
                              int snapshot1, TreeHasher *treehasher,
                              bool have_root1) {
-  std::vector<bstring> proof;
+  std::vector<string> proof;
   if (snapshot1 == 0 || snapshot1 > snapshot2)
     return proof;
   if (snapshot1 == snapshot2) {
@@ -100,7 +101,7 @@ ReferenceSnapshotConsistency(bstring inputs[], int snapshot2,
   // 0 < snapshot1 < snapshot2
   const int split = DownToPowerOfTwo(snapshot2);
 
-  std::vector<bstring> subproof;
+  std::vector<string> subproof;
   if (snapshot1 <= split) {
     // Root of snapshot1 is in the left subtree of snapshot2.
     // Prove that the left subtrees are consistent.
@@ -127,10 +128,10 @@ ReferenceSnapshotConsistency(bstring inputs[], int snapshot2,
 class MerkleTreeTest : public ::testing::Test {
  protected:
   TreeHasher tree_hasher_;
-  std::vector<bstring> data_;
+  std::vector<string> data_;
   MerkleTreeTest() : tree_hasher_(new Sha256Hasher()) {
     for (int i = 0; i < 256; ++i)
-      data_.push_back(bstring(1, i));
+      data_.push_back(string(1, i));
   }
 };
 
@@ -216,7 +217,7 @@ typedef struct {
 } TestVector;
 
 // A slightly shorter notation for constructing binary blobs from test vectors.
-#define S(t) util::BinaryString(std::string(t.str, 2 * t.length_bytes))
+#define S(t) util::BinaryString(string(t.str, 2 * t.length_bytes))
 // The reverse
 #define H(t) util::HexString(t)
 
@@ -271,7 +272,7 @@ TEST_F(MerkleTreeTest, RootTestVectors) {
     }
 
     for (size_t j = i + 1; j < 8; ++j) {
-      EXPECT_EQ(tree1.RootAtSnapshot(j + 1), bstring());
+      EXPECT_EQ(tree1.RootAtSnapshot(j + 1), string());
     }
   }
 
@@ -356,9 +357,9 @@ TEST_F(MerkleTreeTest, PathTestVectors) {
 
   EXPECT_TRUE(tree1.PathToCurrentRoot(9).empty());
   for (int i = 0; i < 6; ++i) {
-    std::vector<bstring> path = tree1.PathToRootAtSnapshot(
+    std::vector<string> path = tree1.PathToRootAtSnapshot(
         kSHA256Paths[i].leaf, kSHA256Paths[i].snapshot);
-    std::vector<bstring> kat_path;
+    std::vector<string> kat_path;
     for (int j = 0; j < kSHA256Paths[i].path_length; ++j)
       kat_path.push_back(S(kSHA256Paths[i].path[j]));
     EXPECT_EQ(path, kat_path);
@@ -422,9 +423,9 @@ TEST_F(MerkleTreeTest, ConsistencyTestVectors) {
   EXPECT_STREQ(H(tree1.CurrentRoot()).c_str(), kSHA256Roots[7].str);
 
   for (int i = 0; i < 4; ++i) {
-    std::vector<bstring> proof = tree1.SnapshotConsistency(
+    std::vector<string> proof = tree1.SnapshotConsistency(
         kSHA256Proofs[i].snapshot1, kSHA256Proofs[i].snapshot2);
-    std::vector<bstring> kat_proof;
+    std::vector<string> kat_proof;
     for (int j = 0; j < kSHA256Proofs[i].proof_length; ++j)
       kat_proof.push_back(S(kSHA256Proofs[i].proof[j]));
     EXPECT_EQ(proof, kat_proof);
@@ -432,7 +433,7 @@ TEST_F(MerkleTreeTest, ConsistencyTestVectors) {
 }
 
 TEST_F(MerkleTreeTest, AddLeafHash) {
-  const byte* kHashValue = "0123456789abcdef0123456789abcdef";
+  const char* kHashValue = "0123456789abcdef0123456789abcdef";
   MerkleTree tree(new Sha256Hasher());
   size_t index = tree.AddLeafHash(kHashValue);
   EXPECT_EQ(1U, index);
@@ -450,9 +451,9 @@ class MerkleVerifierTest : public MerkleTreeTest {
                          verifier_(new Sha256Hasher()) {}
 
   void VerifierCheck(int leaf, int tree_size,
-                     const std::vector<bstring> &path,
-                     const bstring &root,
-                     const bstring &data) {
+                     const std::vector<string> &path,
+                     const string &root,
+                     const string &data) {
     // Verify the original path.
     EXPECT_EQ(H(verifier_.RootFromPath(leaf, tree_size, path, data)),
               H(root));
@@ -468,16 +469,16 @@ class MerkleVerifierTest : public MerkleTreeTest {
     EXPECT_FALSE(verifier_.VerifyPath(leaf, tree_size / 2, path, root, data));
 
     // Wrong leaf.
-    const byte wrong_leaf[] = "WrongLeaf";
+    const char wrong_leaf[] = "WrongLeaf";
     EXPECT_FALSE(verifier_.VerifyPath(leaf, tree_size, path, root,
-                                      bstring(wrong_leaf, 9)));
+                                      string(wrong_leaf, 9)));
 
     // Wrong root.
     EXPECT_FALSE(verifier_.VerifyPath(leaf, tree_size, path,
                                       S(kSHA256EmptyTreeHash), data));
 
     // Wrong paths.
-    std::vector<bstring> wrong_path;
+    std::vector<string> wrong_path;
 
     // Modify a single element on the path.
     for (size_t j = 0; j < path.size(); ++j) {
@@ -489,7 +490,7 @@ class MerkleVerifierTest : public MerkleTreeTest {
 
     // Add garbage at the end of the path.
     wrong_path = path;
-    wrong_path.push_back(bstring());
+    wrong_path.push_back(string());
     EXPECT_FALSE(verifier_.VerifyPath(leaf, tree_size, wrong_path, root, data));
     wrong_path.pop_back();
 
@@ -506,7 +507,7 @@ class MerkleVerifierTest : public MerkleTreeTest {
 
     // Add garbage in the beginning of the path.
     wrong_path.clear();
-    wrong_path.push_back(bstring());
+    wrong_path.push_back(string());
     wrong_path.insert(wrong_path.end(), path.begin(), path.end());
     EXPECT_FALSE(verifier_.VerifyPath(leaf, tree_size, wrong_path, root, data));
 
@@ -515,9 +516,9 @@ class MerkleVerifierTest : public MerkleTreeTest {
   }
 
   void VerifierConsistencyCheck(int snapshot1, int snapshot2,
-                                const bstring &root1,
-                                const bstring &root2,
-                                const std::vector<bstring> &proof) {
+                                const string &root1,
+                                const string &root2,
+                                const std::vector<string> &proof) {
     // Verify the original consistency proof.
     EXPECT_TRUE(verifier_.VerifyConsistency(snapshot1, snapshot2, root1, root2,
                                             proof));
@@ -542,8 +543,8 @@ class MerkleVerifierTest : public MerkleTreeTest {
                                              root2, proof));
 
     // Wrong root.
-    const byte wrong_root[] = "WrongRoot";
-    const bstring bwrong_root(wrong_root, 9);
+    const char wrong_root[] = "WrongRoot";
+    const string bwrong_root(wrong_root, 9);
     EXPECT_FALSE(verifier_.VerifyConsistency(snapshot1, snapshot2, root1,
                                              bwrong_root, proof));
     EXPECT_FALSE(verifier_.VerifyConsistency(snapshot1, snapshot2, bwrong_root,
@@ -553,7 +554,7 @@ class MerkleVerifierTest : public MerkleTreeTest {
                                              proof));
 
     // Wrong proofs.
-    std::vector<bstring> wrong_proof;
+    std::vector<string> wrong_proof;
     // Empty proof.
     EXPECT_FALSE(verifier_.VerifyConsistency(snapshot1, snapshot2, root1, root2,
                                              wrong_proof));
@@ -568,7 +569,7 @@ class MerkleVerifierTest : public MerkleTreeTest {
 
     // Add garbage at the end of the proof.
     wrong_proof = proof;
-    wrong_proof.push_back(bstring());
+    wrong_proof.push_back(string());
     EXPECT_FALSE(verifier_.VerifyConsistency(snapshot1, snapshot2, root1, root2,
                                              wrong_proof));
     wrong_proof.pop_back();
@@ -585,7 +586,7 @@ class MerkleVerifierTest : public MerkleTreeTest {
 
     // Add garbage in the beginning of the proof.
     wrong_proof.clear();
-    wrong_proof.push_back(bstring());
+    wrong_proof.push_back(string());
     wrong_proof.insert(wrong_proof.end(), proof.begin(), proof.end());
     EXPECT_FALSE(verifier_.VerifyConsistency(snapshot1, snapshot2, root1, root2,
                                              wrong_proof));
@@ -598,21 +599,21 @@ class MerkleVerifierTest : public MerkleTreeTest {
 };
 
 TEST_F(MerkleVerifierTest, VerifyPath) {
-  std::vector<bstring> path;
+  std::vector<string> path;
   // Various invalid paths.
-  EXPECT_FALSE(verifier_.VerifyPath(0, 0, path, bstring(), bstring()));
-  EXPECT_FALSE(verifier_.VerifyPath(0, 1, path, bstring(), bstring()));
-  EXPECT_FALSE(verifier_.VerifyPath(1, 0, path, bstring(), bstring()));
-  EXPECT_FALSE(verifier_.VerifyPath(2, 1, path, bstring(), bstring()));
+  EXPECT_FALSE(verifier_.VerifyPath(0, 0, path, string(), string()));
+  EXPECT_FALSE(verifier_.VerifyPath(0, 1, path, string(), string()));
+  EXPECT_FALSE(verifier_.VerifyPath(1, 0, path, string(), string()));
+  EXPECT_FALSE(verifier_.VerifyPath(2, 1, path, string(), string()));
 
   EXPECT_FALSE(verifier_.VerifyPath(0, 0, path, S(kSHA256EmptyTreeHash),
-                                    bstring()));
+                                    string()));
   EXPECT_FALSE(verifier_.VerifyPath(0, 1, path, S(kSHA256EmptyTreeHash),
-                                    bstring()));
+                                    string()));
   EXPECT_FALSE(verifier_.VerifyPath(1, 0, path, S(kSHA256EmptyTreeHash),
-                                    bstring()));
+                                    string()));
   EXPECT_FALSE(verifier_.VerifyPath(2, 1, path, S(kSHA256EmptyTreeHash),
-                                    bstring()));
+                                    string()));
 
   // Known good paths.
   // i = 0 is an invalid path.
@@ -627,7 +628,7 @@ TEST_F(MerkleVerifierTest, VerifyPath) {
   }
 
   // More tests with reference path generator.
-  bstring root;
+  string root;
   for (size_t tree_size = 1; tree_size <= data_.size()/2; ++tree_size) {
     // Repeat for each leaf in range.
     for (size_t leaf = 1; leaf <= tree_size; ++leaf) {
@@ -639,8 +640,8 @@ TEST_F(MerkleVerifierTest, VerifyPath) {
 }
 
 TEST_F(MerkleVerifierTest, VerifyConsistencyProof) {
-  std::vector<bstring> proof;
-  bstring root1, root2;
+  std::vector<string> proof;
+  string root1, root2;
   // Snapshots that are always consistent.
   EXPECT_TRUE(verifier_.VerifyConsistency(0, 0, root1, root2, proof));
   EXPECT_TRUE(verifier_.VerifyConsistency(0, 1, root1, root2, proof));
@@ -693,9 +694,9 @@ TEST_F(MerkleVerifierTest, VerifyConsistencyProof) {
 class StressTest : public ::testing::TestWithParam<size_t> {
  protected:
   MerkleTree tree_;
-  bstring data_;
+  string data_;
   StressTest() : tree_(new Sha256Hasher()),
-                 data_(bstring(1024, 0x42)) {}
+                 data_(string(1024, 0x42)) {}
 };
 
 TEST_P(StressTest, BuildLargeTree) {

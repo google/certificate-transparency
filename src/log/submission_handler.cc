@@ -1,12 +1,12 @@
 #include "ct.pb.h"
 #include "serializer.h"
 #include "submission_handler.h"
-#include "types.h"
 
 using ct::CertificateEntry;
+using std::string;
 
 SubmissionHandler::SubmitResult
-SubmissionHandler::ProcessSubmission(const bstring &submission,
+SubmissionHandler::ProcessSubmission(const string &submission,
                                      CertificateEntry *entry) {
   assert(entry != NULL);
   assert(entry->has_type());
@@ -42,7 +42,7 @@ SubmissionHandler::ProcessSubmission(const bstring &submission,
 // Default (for testing) - no verification,
 // just write the submission in the leaf cert field.
 SubmissionHandler::SubmitResult
-SubmissionHandler::ProcessX509Submission(const bstring &submission,
+SubmissionHandler::ProcessX509Submission(const string &submission,
                                          CertificateEntry *entry) {
   entry->set_leaf_certificate(submission);
   return OK;
@@ -51,7 +51,7 @@ SubmissionHandler::ProcessX509Submission(const bstring &submission,
 // Default (for testing) - no verification,
 // just write the submission in the leaf cert field.
 SubmissionHandler::SubmitResult
-SubmissionHandler::ProcessPreCertSubmission(const bstring &submission,
+SubmissionHandler::ProcessPreCertSubmission(const string &submission,
                                             CertificateEntry *entry) {
   entry->set_leaf_certificate(submission);
   return OK;

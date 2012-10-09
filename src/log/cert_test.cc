@@ -5,6 +5,8 @@
 #include "cert.h"
 #include "util.h"
 
+using std::string;
+
 static const char kCertDir[] = "../test/testdata";
 
 // TODO: add test certs with intermediates.
@@ -21,13 +23,13 @@ namespace {
 
 class CertTest : public ::testing::Test {
  protected:
-  std::string leaf_pem_;
-  std::string ca_pem_;
-  std::string ca_precert_pem_;
-  std::string precert_pem_;
+  string leaf_pem_;
+  string ca_pem_;
+  string ca_precert_pem_;
+  string precert_pem_;
 
   void SetUp() {
-    const std::string cert_dir = std::string(kCertDir);
+    const string cert_dir = string(kCertDir);
     ASSERT_TRUE(util::ReadTextFile(cert_dir + "/" + kLeafCert, &leaf_pem_));
     ASSERT_TRUE(util::ReadTextFile(cert_dir + "/" + kCaCert, &ca_pem_));
     ASSERT_TRUE(util::ReadTextFile(cert_dir + "/" + kCaPreCert,
@@ -116,7 +118,7 @@ TEST_F(CertTest, CertChain) {
   EXPECT_FALSE(invalid.IsLoaded());
 
   // A chain with three certificates. Construct from concatenated PEM entries.
-  std::string pem_bundle = precert_pem_ + ca_precert_pem_ + ca_pem_;
+  string pem_bundle = precert_pem_ + ca_precert_pem_ + ca_pem_;
   CertChain chain3(pem_bundle);
   ASSERT_TRUE(chain3.IsLoaded());
   EXPECT_EQ(chain3.Length(), 3U);
@@ -128,7 +130,7 @@ TEST_F(CertTest, CertChain) {
 
 TEST_F(CertTest, PreCertChain) {
   // A precert chain.
-  std::string pem_bundle = precert_pem_ + ca_precert_pem_;
+  string pem_bundle = precert_pem_ + ca_precert_pem_;
   PreCertChain pre_chain(pem_bundle);
   ASSERT_TRUE(pre_chain.IsLoaded());
   EXPECT_EQ(pre_chain.Length(), 2U);

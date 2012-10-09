@@ -10,11 +10,11 @@
 #include "file_db.h"
 #include "file_storage.h"
 #include "serializer.h"
-#include "types.h"
 
 using ct::SignedCertificateTimestamp;
 using ct::LoggedCertificate;
 using ct::SignedTreeHead;
+using std::string;
 
 const size_t FileDB::kTimestampBytesIndexed = 6;
 
@@ -41,7 +41,7 @@ Database::WriteResult FileDB::CreatePendingCertificateEntry_(
   local.CopyFrom(logged_cert);
   local.clear_sequence_number();
 
-  bstring data;
+  string data;
   bool ret = local.SerializeToString(&data);
   assert(ret);
   // Try to create.
@@ -54,13 +54,13 @@ Database::WriteResult FileDB::CreatePendingCertificateEntry_(
   return OK;
 }
 
-std::set<bstring> FileDB::PendingHashes() const {
+std::set<string> FileDB::PendingHashes() const {
   return pending_hashes_;
 }
 
 Database::WriteResult FileDB::AssignCertificateSequenceNumber(
-    const bstring &certificate_sha256_hash, uint64_t sequence_number) {
-  std::set<bstring>::iterator pending_it =
+    const string &certificate_sha256_hash, uint64_t sequence_number) {
+  std::set<string>::iterator pending_it =
       pending_hashes_.find(certificate_sha256_hash);
   if (pending_it == pending_hashes_.end()) {
     // Caller should have ensured we don't get here...
@@ -73,7 +73,7 @@ Database::WriteResult FileDB::AssignCertificateSequenceNumber(
   if (sequence_map_.find(sequence_number) != sequence_map_.end())
     return SEQUENCE_NUMBER_ALREADY_IN_USE;
 
-  bstring cert_data;
+  string cert_data;
   FileStorage::FileStorageResult result =
       cert_storage_->LookupEntry(certificate_sha256_hash, &cert_data);
   assert(result == FileStorage::OK);
@@ -88,15 +88,15 @@ Database::WriteResult FileDB::AssignCertificateSequenceNumber(
   assert(result == FileStorage::OK);
 
   pending_hashes_.erase(pending_it);
-  sequence_map_.insert(std::pair<uint64_t, bstring>(sequence_number,
+  sequence_map_.insert(std::pair<uint64_t, string>(sequence_number,
                                                     certificate_sha256_hash));
   return OK;
 }
 
 Database::LookupResult FileDB::LookupCertificateByHash(
-    const bstring &certificate_sha256_hash,
+    const string &certificate_sha256_hash,
     LoggedCertificate *result) const {
-  bstring cert_data;
+  string cert_data;
   FileStorage::FileStorageResult db_result =
       cert_storage_->LookupEntry(certificate_sha256_hash, &cert_data);
   if (db_result == FileStorage::NOT_FOUND)
@@ -115,13 +115,13 @@ Database::LookupResult FileDB::LookupCertificateByHash(
 
 Database::LookupResult FileDB::LookupCertificateByIndex(
     uint64_t sequence_number, LoggedCertificate *result) const {
-  std::map<uint64_t, bstring>::const_iterator it =
+  std::map<uint64_t, string>::const_iterator it =
       sequence_map_.find(sequence_number);
   if (it == sequence_map_.end())
     return NOT_FOUND;
 
   if (result != NULL) {
-    bstring cert_data;
+    string cert_data;
     FileStorage::FileStorageResult db_result =
         cert_storage_->LookupEntry(it->second, &cert_data);
     assert(db_result == FileStorage::OK);
@@ -139,10 +139,10 @@ Database::LookupResult FileDB::LookupCertificateByIndex(
 
 Database::WriteResult FileDB::WriteTreeHead_(const SignedTreeHead &sth) {
   // 6 bytes are good enough for some 9000 years.
-  bstring timestamp_key =
+  string timestamp_key =
       Serializer::SerializeUint(sth.timestamp(),
                                 FileDB::kTimestampBytesIndexed);
-  bstring data;
+  string data;
   bool ret = sth.SerializeToString(&data);
   assert(ret);
 
@@ -165,7 +165,7 @@ FileDB::LatestTreeHead(SignedTreeHead *result) const {
   if (latest_tree_timestamp_ == 0)
     return NOT_FOUND;
 
-  bstring tree_data;
+  string tree_data;
   FileStorage::FileStorageResult db_result =
       tree_storage_->LookupEntry(latest_timestamp_key_, &tree_data);
   assert(db_result == FileStorage::OK);
@@ -186,11 +186,11 @@ void FileDB::BuildIndex() {
     return;
   // Now read the entries: remove those that have a sequence number
   // from the set of pending entries and add them to the index.
-  std::set<bstring>::iterator it = pending_hashes_.begin();
+  std::set<string>::iterator it = pending_hashes_.begin();
   do {
     // Increment before any erase operations.
-    std::set<bstring>::iterator it2 = it++;
-    bstring cert_data;
+    std::set<string>::iterator it2 = it++;
+    string cert_data;
     // Read the data; tolerate no errors.
     FileStorage::FileStorageResult result =
         cert_storage_->LookupEntry(*it2, &cert_data);
@@ -201,13 +201,13 @@ void FileDB::BuildIndex() {
       abort();
     if (logged_cert.has_sequence_number()) {
       sequence_map_.insert(
-          std::pair<uint64_t, bstring>(logged_cert.sequence_number(), *it2));
+          std::pair<uint64_t, string>(logged_cert.sequence_number(), *it2));
       pending_hashes_.erase(it2);
     }
   } while (it != pending_hashes_.end());
 
   // Now read the STH entries.
-  std::set<bstring> sth_timestamps = tree_storage_->Scan();
+  std::set<string> sth_timestamps = tree_storage_->Scan();
 
   if (!sth_timestamps.empty()) {
     latest_timestamp_key_ = *sth_timestamps.rbegin();

@@ -6,7 +6,6 @@
 #include <set>
 
 #include "ct.pb.h"
-#include "types.h"
 
 class Database {
  public:
@@ -54,13 +53,13 @@ class Database {
   // or an entry with this sequence number already exists (i.e.,
   // |sequence_number| is a secondary key.
   virtual WriteResult
-  AssignCertificateSequenceNumber(const bstring &pending_hash,
+  AssignCertificateSequenceNumber(const std::string &pending_hash,
 				  uint64_t sequence_number) = 0;
 
   // Look up certificate by hash. If the entry exists, and result is not NULL,
   // write the result. If the entry is not logged return PENDING.
   virtual LookupResult
-  LookupCertificateByHash(const bstring &certificate_sha256_hash,
+  LookupCertificateByHash(const std::string &certificate_sha256_hash,
                           ct::LoggedCertificate *result) const = 0;
 
   // Look up certificate by sequence number.
@@ -70,7 +69,7 @@ class Database {
 
   // List the hashes of all pending entries, i.e. all entries without a
   // sequence number.
-  virtual std::set<bstring> PendingHashes() const = 0;
+  virtual std::set<std::string> PendingHashes() const = 0;
 
   // Attempt to write a tree head. Fails only if a tree head with this timestamp
   // already exists (i.e., |timestamp| is primary key). Does not check that

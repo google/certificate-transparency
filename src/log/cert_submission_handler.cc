@@ -6,9 +6,9 @@
 #include "cert_submission_handler.h"
 #include "ct.pb.h"
 #include "serializer.h"
-#include "types.h"
 
 using ct::CertificateEntry;
+using std::string;
 
 CertSubmissionHandler::CertSubmissionHandler(CertChecker *cert_checker)
     : cert_checker_(cert_checker) {
@@ -40,9 +40,9 @@ CertSubmissionHandler::X509ChainToEntry(const CertChain &chain,
 // Inputs must be concatenated PEM entries.
 // Format checking is done in the parent class.
 SubmissionHandler::SubmitResult
-CertSubmissionHandler::ProcessX509Submission(const bstring &submission,
+CertSubmissionHandler::ProcessX509Submission(const string &submission,
                                              CertificateEntry *entry) {
-  std::string pem_string(reinterpret_cast<const char*>(submission.data()),
+  string pem_string(reinterpret_cast<const char*>(submission.data()),
                          submission.size());
   CertChain chain(pem_string);
 
@@ -63,9 +63,9 @@ CertSubmissionHandler::ProcessX509Submission(const bstring &submission,
 }
 
 SubmissionHandler::SubmitResult
-CertSubmissionHandler::ProcessPreCertSubmission(const bstring &submission,
+CertSubmissionHandler::ProcessPreCertSubmission(const string &submission,
                                                 CertificateEntry *entry) {
-  std::string pem_string(reinterpret_cast<const char*>(submission.data()),
+  string pem_string(reinterpret_cast<const char*>(submission.data()),
                          submission.size());
   PreCertChain chain(pem_string);
   if (!chain.IsLoaded())
@@ -85,9 +85,9 @@ CertSubmissionHandler::ProcessPreCertSubmission(const bstring &submission,
   return OK;
 }
 
-bstring CertSubmissionHandler::TbsCertificate(const PreCertChain &chain) {
+string CertSubmissionHandler::TbsCertificate(const PreCertChain &chain) {
   if (!chain.IsLoaded() || !chain.IsWellFormed())
-    return bstring();
+    return string();
 
   Cert *tbs = chain.PreCert()->Clone();
   assert(tbs != NULL && tbs->IsLoaded());
@@ -101,14 +101,14 @@ bstring CertSubmissionHandler::TbsCertificate(const PreCertChain &chain) {
   assert(ca_precert != NULL && ca_precert->IsLoaded());
   tbs->CopyIssuerFrom(*ca_precert);
 
-  bstring der_cert = tbs->DerEncoding();
+  string der_cert = tbs->DerEncoding();
   delete tbs;
   return der_cert;
 }
 
-bstring CertSubmissionHandler::TbsCertificate(const CertChain &chain) {
+string CertSubmissionHandler::TbsCertificate(const CertChain &chain) {
   if (!chain.IsLoaded())
-    return bstring();
+    return string();
 
   const Cert *leaf = chain.LeafCert();
   assert(leaf != NULL && leaf->IsLoaded());
@@ -119,7 +119,7 @@ bstring CertSubmissionHandler::TbsCertificate(const CertChain &chain) {
   tbs->DeleteExtension(Cert::kEmbeddedProofExtensionOID);
   tbs->DeleteSignature();
 
-  bstring der_cert = tbs->DerEncoding();
+  string der_cert = tbs->DerEncoding();
   delete tbs;
   return der_cert;
 }

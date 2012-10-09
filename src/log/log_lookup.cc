@@ -8,12 +8,12 @@
 #include "log_lookup.h"
 #include "merkle_tree.h"
 #include "serializer.h"
-#include "types.h"
 
 using ct::LoggedCertificate;
 using ct::MerkleAuditProof;
 using ct::SignedCertificateTimestamp;
 using ct::SignedTreeHead;
+using std::string;
 
 LogLookup::LogLookup(const Database *db)
     : db_(db),
@@ -44,7 +44,7 @@ LogLookup::UpdateResult LogLookup::Update() {
 
   // Record the new hashes: append either all of them, or
   // (if there is an error), none of them.
-  std::vector<bstring> new_hashes;
+  std::vector<string> new_hashes;
   for (uint64_t sequence_number = cert_tree_.LeafCount();
        sequence_number < sth.tree_size(); ++sequence_number) {
     LoggedCertificate logged_cert;
@@ -60,7 +60,7 @@ LogLookup::UpdateResult LogLookup::Update() {
         << "Logged entry has no sequence number";
     CHECK_EQ(sequence_number, logged_cert.sequence_number());
 
-    bstring new_hash = LeafHash(logged_cert.sct());
+    string new_hash = LeafHash(logged_cert.sct());
     new_hashes.push_back(new_hash);
   }
 
@@ -77,7 +77,7 @@ LogLookup::UpdateResult LogLookup::Update() {
 // Look up by timestamp + SHA256-hash of the certificate.
 LogLookup::LookupResult
 LogLookup::CertificateAuditProof(uint64_t timestamp,
-                                 const bstring &certificate_hash,
+                                 const string &certificate_hash,
                                  MerkleAuditProof *proof) {
   LoggedCertificate logged_cert;
   Database::LookupResult db_result =
@@ -99,7 +99,7 @@ LogLookup::CertificateAuditProof(uint64_t timestamp,
   proof->set_leaf_index(logged_cert.sequence_number());
 
   proof->clear_path_node();
-  std::vector<bstring> audit_path =
+  std::vector<string> audit_path =
       cert_tree_.PathToCurrentRoot(logged_cert.sequence_number() + 1);
   for (size_t i = 0; i < audit_path.size(); ++i)
     proof->add_path_node(audit_path[i]);
@@ -108,9 +108,9 @@ LogLookup::CertificateAuditProof(uint64_t timestamp,
   return OK;
 }
 
-bstring LogLookup::LeafHash(const SignedCertificateTimestamp &sct) {
+string LogLookup::LeafHash(const SignedCertificateTimestamp &sct) {
   // Serialize the signed part for inclusion in the tree.
-  bstring serialized_sct;
+  string serialized_sct;
   CHECK_EQ(Serializer::OK,
            Serializer::SerializeSCTForTree(sct, &serialized_sct));
   return cert_tree_.LeafHash(serialized_sct);

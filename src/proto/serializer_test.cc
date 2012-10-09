@@ -12,18 +12,19 @@ using ct::CertificateEntry;
 using ct::DigitallySigned;
 using ct::SignedCertificateTimestamp;
 using ct::SignedTreeHead;
+using std::string;
 
 // A slightly shorter notation for constructing binary blobs from test vectors.
-std::string S(const char *hexstring, size_t byte_length) {
-  return std::string(hexstring, 2 * byte_length);
+string S(const char *hexstring, size_t byte_length) {
+  return string(hexstring, 2 * byte_length);
 }
 
-bstring B(const char *hexstring, size_t byte_length) {
+string B(const char *hexstring, size_t byte_length) {
   return util::BinaryString(S(hexstring, byte_length));
 }
 
 // The reverse.
-std::string H(const bstring &byte_string) {
+string H(const string &byte_string) {
   return util::HexString(byte_string);
 }
 
@@ -112,35 +113,35 @@ const char kDefaultSTHSignedHexString[] =
 const size_t kSTHSignedLength = 48;
 
 TEST_F(SerializerTest, SerializeDigitallySignedKatTest) {
-  bstring result;
+  string result;
   EXPECT_EQ(Serializer::OK,
             Serializer::SerializeDigitallySigned(DefaultDS(), &result));
   EXPECT_EQ(S(kDefaultDSHexString, kDefaultDSLength), H(result));
 }
 
 TEST_F(SerializerTest, SerializeSCTTokenKatTest) {
-  bstring result;
+  string result;
   EXPECT_EQ(Serializer::OK,
             Serializer::SerializeSCTToken(DefaultSCT(), &result));
   EXPECT_EQ(S(kDefaultSCTTokenHexString, kDefaultSCTTokenLength), H(result));
 }
 
 TEST_F(SerializerTest, SerializeSCTForSigningKatTest) {
-  bstring result;
+  string result;
   EXPECT_EQ(Serializer::OK,
             Serializer::SerializeSCTForSigning(DefaultSCT(), &result));
   EXPECT_EQ(S(kDefaultSCTSignedHexString, kDefaultSCTSignedLength), H(result));
 }
 
 TEST_F(SerializerTest, DeserializeSCTTokenKatTest) {
-  bstring token = B(kDefaultSCTTokenHexString, kDefaultSCTTokenLength);
+  string token = B(kDefaultSCTTokenHexString, kDefaultSCTTokenLength);
   SignedCertificateTimestamp sct;
   EXPECT_EQ(Deserializer::OK, Deserializer::DeserializeSCTToken(token, &sct));
   CompareSCTToken(DefaultSCT(), sct);
 }
 
 TEST_F(SerializerTest, DeserializeDigitallySignedKatTest) {
-  bstring serialized_sig = B(kDefaultDSHexString, kDefaultDSLength);
+  string serialized_sig = B(kDefaultDSHexString, kDefaultDSLength);
   DigitallySigned signature;
   EXPECT_EQ(Deserializer::OK,
             Deserializer::DeserializeDigitallySigned(serialized_sig,
@@ -153,12 +154,12 @@ TEST_F(SerializerTest, SerializeSCTForSigningChangeType) {
   SignedCertificateTimestamp sct;
   sct.CopyFrom(DefaultSCT());
   sct.mutable_entry()->set_type(CertificateEntry::PRECERT_ENTRY);
-  bstring result;
+  string result;
   EXPECT_EQ(Serializer::OK, Serializer::SerializeSCTForSigning(sct, &result));
 
-  std::string default_result =
+  string default_result =
       S(kDefaultSCTSignedHexString, kDefaultSCTSignedLength);
-  std::string new_result = H(result);
+  string new_result = H(result);
   EXPECT_EQ(default_result.size(), new_result.size());
   EXPECT_NE(default_result, new_result);
 }
@@ -168,12 +169,12 @@ TEST_F(SerializerTest, SerializeDeserializeSCTTokenChangeHashAlgorithm) {
   sct.CopyFrom(DefaultSCT());
   sct.mutable_signature()->set_hash_algorithm(DigitallySigned::SHA224);
 
-  bstring result;
+  string result;
   EXPECT_EQ(Serializer::OK, Serializer::SerializeSCTToken(sct, &result));
 
-  std::string default_result =
+  string default_result =
       S(kDefaultSCTTokenHexString, kDefaultSCTTokenLength);
-  std::string new_result = H(result);
+  string new_result = H(result);
   EXPECT_EQ(default_result.size(), new_result.size());
   EXPECT_NE(default_result, new_result);
 
@@ -188,7 +189,7 @@ TEST_F(SerializerTest, SerializeDeserializeSCTTokenChangeSignature) {
   sct.CopyFrom(DefaultSCT());
   sct.mutable_signature()->set_signature("bazinga");
 
-  bstring result;
+  string result;
   EXPECT_EQ(Serializer::OK, Serializer::SerializeSCTToken(sct, &result));
   EXPECT_NE(S(kDefaultSCTTokenHexString, kDefaultSCTTokenLength), H(result));
 
@@ -202,13 +203,13 @@ TEST_F(SerializerTest, SerializeSCTForSigningEmptyCertificate) {
   SignedCertificateTimestamp sct;
   sct.CopyFrom(DefaultSCT());
   sct.mutable_entry()->set_leaf_certificate("");
-  bstring result;
+  string result;
   EXPECT_EQ(Serializer::EMPTY_CERTIFICATE,
             Serializer::SerializeSCTForSigning(sct, &result));
 }
 
 TEST_F(SerializerTest, DeserializeSCTTokenBadHashType) {
-  bstring token = B(kDefaultSCTTokenHexString, kDefaultSCTTokenLength);
+  string token = B(kDefaultSCTTokenHexString, kDefaultSCTTokenLength);
   // Overwrite with a non-existent hash algorithm type.
   token[8] = 0xff;
 
@@ -218,7 +219,7 @@ TEST_F(SerializerTest, DeserializeSCTTokenBadHashType) {
 }
 
 TEST_F(SerializerTest, DeserializeSCTTokenBadSignatureType) {
-  bstring token = B(kDefaultSCTTokenHexString, kDefaultSCTTokenLength);
+  string token = B(kDefaultSCTTokenHexString, kDefaultSCTTokenLength);
   // Overwrite with a non-existent signature algorithm type.
   token[9] = 0xff;
 
@@ -228,7 +229,7 @@ TEST_F(SerializerTest, DeserializeSCTTokenBadSignatureType) {
 }
 
 TEST_F(SerializerTest, DeserializeSCTTokenTooShort) {
-  bstring token = B(kDefaultSCTTokenHexString, kDefaultSCTTokenLength);
+  string token = B(kDefaultSCTTokenHexString, kDefaultSCTTokenLength);
 
   for (size_t i = 0; i < token.size(); ++i) {
     SignedCertificateTimestamp sct;
@@ -238,7 +239,7 @@ TEST_F(SerializerTest, DeserializeSCTTokenTooShort) {
 }
 
 TEST_F(SerializerTest, DeserializeSCTTokenTooLong) {
-  bstring token = B(kDefaultSCTTokenHexString, kDefaultSCTTokenLength);
+  string token = B(kDefaultSCTTokenHexString, kDefaultSCTTokenLength);
   token.push_back(0x42);
 
   SignedCertificateTimestamp sct;
@@ -255,7 +256,7 @@ TEST_F(SerializerTest, DeserializeSCTTokenTooLong) {
 }
 
 TEST_F(SerializerTest, SerializeSTHForSigningKatTest) {
-  bstring result;
+  string result;
   EXPECT_EQ(Serializer::OK,
             Serializer::SerializeSTHForSigning(DefaultSTH(), &result));
   EXPECT_EQ(S(kDefaultSTHSignedHexString, kSTHSignedLength), H(result));
@@ -265,7 +266,7 @@ TEST_F(SerializerTest, SerializeSTHForSigningBadHash) {
   SignedTreeHead sth;
   sth.CopyFrom(DefaultSTH());
   sth.set_root_hash("thisisnotthirtytwobyteslong");
-  bstring result;
+  string result;
   EXPECT_EQ(Serializer::INVALID_HASH_LENGTH,
             Serializer::SerializeSTHForSigning(sth, &result));
 }

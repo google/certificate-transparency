@@ -22,6 +22,7 @@ namespace {
 using ct::CertificateEntry;
 using ct::LoggedCertificate;
 using ct::MerkleAuditProof;
+using std::string;
 
 const char *ecp256_private_key = {
   "-----BEGIN EC PRIVATE KEY-----\n"
@@ -38,7 +39,7 @@ const char *ecp256_public_key = {
   "-----END PUBLIC KEY-----\n"
 };
 
-EVP_PKEY* PrivateKeyFromPem(const std::string &pemkey) {
+EVP_PKEY* PrivateKeyFromPem(const string &pemkey) {
   BIO *bio = BIO_new_mem_buf(const_cast<char*>(pemkey.data()), pemkey.size());
   EVP_PKEY *pkey = PEM_read_bio_PrivateKey(bio, NULL, NULL, NULL);
   assert(pkey != NULL);
@@ -46,7 +47,7 @@ EVP_PKEY* PrivateKeyFromPem(const std::string &pemkey) {
   return pkey;
 }
 
-EVP_PKEY* PublicKeyFromPem(const std::string &pemkey) {
+EVP_PKEY* PublicKeyFromPem(const string &pemkey) {
   BIO *bio = BIO_new_mem_buf(const_cast<char*>(pemkey.data()), pemkey.size());
   EVP_PKEY *pkey = PEM_read_bio_PUBKEY(bio, NULL, NULL, NULL);
   assert(pkey != NULL);
@@ -86,7 +87,7 @@ template <class T> class LogLookupTest : public ::testing::Test {
     // Check again that it is safe to empty file_base_.
     ASSERT_EQ("/tmp/ctlog", file_base_.substr(0, 10));
     ASSERT_EQ(16U, file_base_.length());
-    std::string command = "rm -r " + file_base_;
+    string command = "rm -r " + file_base_;
     int ret = system(command.c_str());
     if (ret != 0)
       std::cout << "Failed to delete temporary directory in "
@@ -102,12 +103,12 @@ template <class T> class LogLookupTest : public ::testing::Test {
   Database *db_;
   TreeSigner *tree_signer_;
   LogVerifier *verifier_;
-  std::string file_base_;
+  string file_base_;
 };
 
 template <> void LogLookupTest<FileDB>::NewDB() {
-  std::string certs_dir = file_base_ + "/certs";
-  std::string tree_dir = file_base_ + "/tree";
+  string certs_dir = file_base_ + "/certs";
+  string tree_dir = file_base_ + "/tree";
   int ret = mkdir(certs_dir.c_str(), 0700);
   ASSERT_EQ(ret, 0);
   ret = mkdir(tree_dir.c_str(), 0700);
@@ -127,8 +128,8 @@ TYPED_TEST_CASE(LogLookupTest, Databases);
 
 // TODO(ekasper): use real data.
 TYPED_TEST(LogLookupTest, Lookup) {
-  bstring hash("1234xyzw", 8);
-  bstring wrong_hash("1234xyzq", 8);
+  string hash("1234xyzw", 8);
+  string wrong_hash("1234xyzq", 8);
 
   LoggedCertificate logged_cert;
   logged_cert.set_certificate_sha256_hash(hash);
@@ -149,8 +150,8 @@ TYPED_TEST(LogLookupTest, Lookup) {
 }
 
 TYPED_TEST(LogLookupTest, NotFound) {
-  bstring hash("1234xyzw", 8);
-  bstring wrong_hash("1234xyzq", 8);
+  string hash("1234xyzw", 8);
+  string wrong_hash("1234xyzq", 8);
 
   LoggedCertificate logged_cert;
   logged_cert.set_certificate_sha256_hash(hash);
@@ -175,7 +176,7 @@ TYPED_TEST(LogLookupTest, NotFound) {
 }
 
 TYPED_TEST(LogLookupTest, Update) {
-  bstring hash("1234xyzw", 8);
+  string hash("1234xyzw", 8);
 
   LogLookup lookup(this->db_);
 
@@ -204,8 +205,8 @@ TYPED_TEST(LogLookupTest, Update) {
 // Verify that the audit proof constructed is correct (assuming the signer
 // operates correctly). TODO(ekasper): KAT tests.
 TYPED_TEST(LogLookupTest, Verify) {
-  bstring hash("1234xyzw", 8);
-  bstring wrong_hash("1234xyzq", 8);
+  string hash("1234xyzw", 8);
+  string wrong_hash("1234xyzq", 8);
 
   LoggedCertificate logged_cert;
   logged_cert.set_certificate_sha256_hash(hash);
@@ -229,19 +230,19 @@ TYPED_TEST(LogLookupTest, Verify) {
 
 // Build a bigger tree so that we actually verify a non-empty path.
 TYPED_TEST(LogLookupTest, VerifyWithPath) {
-  bstring hash("1234xyzw", 8);
-  bstring cert("certificate", 11);
+  string hash("1234xyzw", 8);
+  string cert("certificate", 11);
 
   LoggedCertificate logged_certs[13];
 
   // Make the tree not balanced for extra fun.
   for (int i = 0; i < 13; ++i) {
-    logged_certs[i].set_certificate_sha256_hash(hash + static_cast<byte>(i));
+    logged_certs[i].set_certificate_sha256_hash(hash + static_cast<char>(i));
     logged_certs[i].mutable_sct()->set_timestamp(1234 + i);
     logged_certs[i].mutable_sct()->mutable_entry()->set_type(
         CertificateEntry::X509_ENTRY);
     logged_certs[i].mutable_sct()->mutable_entry()->
-        set_leaf_certificate(cert + static_cast<byte>(i));
+        set_leaf_certificate(cert + static_cast<char>(i));
 
     EXPECT_EQ(Database::OK,
               this->db_->CreatePendingCertificateEntry(logged_certs[i]));
@@ -255,7 +256,7 @@ TYPED_TEST(LogLookupTest, VerifyWithPath) {
   for (int i = 0; i < 2; ++i) {
     EXPECT_EQ(LogLookup::OK,
               lookup.CertificateAuditProof(1234 + i,
-                                           hash + static_cast<byte>(i),
+                                           hash + static_cast<char>(i),
                                            &proof));
     EXPECT_EQ(LogVerifier::VERIFY_OK,
               this->verifier_->VerifyMerkleAuditProof(logged_certs[i].sct(),

@@ -7,7 +7,6 @@
 #include <string>
 #include <vector>
 
-#include "types.h"
 
 class Cert {
  public:
@@ -32,6 +31,8 @@ class Cert {
   explicit Cert(const std::string &pem_string);
   ~Cert();
 
+  // TODO(ekasper): comment all of these methods properly.
+
   bool IsLoaded() const { return x509_ != NULL; }
 
   Cert *Clone() const;
@@ -42,7 +43,8 @@ class Cert {
 
   bool IsCriticalExtension(const std::string &extension_oid) const;
 
-  bstring ExtensionData(const std::string &extension_oid) const;
+  // returns binary data
+  std::string ExtensionData(const std::string &extension_oid) const;
 
   bool HasBasicConstraintCA() const;
 
@@ -52,7 +54,8 @@ class Cert {
 
   bool IsSignedBy(const Cert &issuer) const;
 
-  bstring DerEncoding() const;
+  // returns binary data
+  std::string DerEncoding() const;
 
   // WARNING WARNING The following methods modify the x509_ structure
   // and thus invalidate the cert.

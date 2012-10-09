@@ -1,6 +1,7 @@
 #include <assert.h>
-#include <iostream>
+#include <cstring>
 #include <fstream>
+#include <iostream>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -8,18 +9,19 @@
 #include <sys/time.h>
 #include <unistd.h>
 
-#include "types.h"
 #include "util.h"
 
 namespace util {
 
+using std::string;
+
 namespace {
 const char nibble[] = "0123456789abcdef";
 
-byte ByteValue(char high, char low) {
+char ByteValue(char high, char low) {
   assert(('0' <= high && high <= '9') || ('a' <= high && high <= 'f'));
   assert(('0' <= high && high <= '9') || ('a' <= high && high <= 'f'));
-  byte ret;
+  char ret;
   if (high <= '9')
     ret = (high - '0') << 4;
   else
@@ -33,8 +35,8 @@ byte ByteValue(char high, char low) {
 
 }  // namespace
 
-std::string HexString(const bstring &data) {
-  std::string ret;
+string HexString(const string &data) {
+  string ret;
   for (unsigned int i = 0; i < data.size(); ++i) {
     ret.push_back(nibble[(data[i] >> 4) & 0xf]);
     ret.push_back(nibble[data[i] & 0xf]);
@@ -42,8 +44,8 @@ std::string HexString(const bstring &data) {
   return ret;
 }
 
-std::string HexString(const bstring &data, char byte_delimiter) {
-  std::string ret;
+string HexString(const string &data, char byte_delimiter) {
+  string ret;
   if (data.empty())
     return ret;
   for (unsigned int i = 0; i < data.size(); ++i) {
@@ -55,8 +57,8 @@ std::string HexString(const bstring &data, char byte_delimiter) {
   return ret;
 }
 
-bstring BinaryString(const std::string &hex_string) {
-  bstring ret;
+string BinaryString(const string &hex_string) {
+  string ret;
   assert(!(hex_string.size() % 2));
   for (size_t i = 0; i < hex_string.size(); i += 2)
     ret.push_back(ByteValue(hex_string[i], hex_string[i+1]));
@@ -82,41 +84,41 @@ static char *ReadFileStreamToBuffer(std::ifstream &in, int *length) {
   return buf;
 }
 
-bool ReadTextFile(const std::string &file, std::string *contents) {
+bool ReadTextFile(const string &file, string *contents) {
   int file_length;
   std::ifstream in(file.c_str(), std::ios::in);
   if (!in.good())
     return false;
   char *buf = ReadFileStreamToBuffer(in, &file_length);
-  contents->assign(std::string(buf, file_length));
+  contents->assign(string(buf, file_length));
 
   delete[] buf;
   return true;
 }
 
-bool ReadBinaryFile(const std::string &file, bstring *contents) {
+bool ReadBinaryFile(const string &file, string *contents) {
   int file_length;
   std::ifstream in(file.c_str(), std::ios::in | std::ios::binary);
   if (!in.good())
     return false;
 
   char *buf = ReadFileStreamToBuffer(in, &file_length);
-  contents->assign(bstring(reinterpret_cast<byte*>(buf), file_length));
+  contents->assign(string(buf, file_length));
 
   delete[] buf;
   return true;
 }
 
-std::string WriteTemporaryBinaryFile(const std::string &file_template,
-                                     const bstring &data) {
+string WriteTemporaryBinaryFile(const string &file_template,
+                                const string &data) {
   size_t strlen = file_template.size() + 1;
   char *template_buf = new char[strlen];
   memcpy(template_buf, file_template.data(), file_template.size());
   template_buf[strlen - 1] = '\0';
   int fd = mkstemp(template_buf);
-  std::string tmp_file;
+  string tmp_file;
   if (fd >= 0) {
-    tmp_file = std::string(template_buf);
+    tmp_file = string(template_buf);
     ssize_t bytes_written = write(fd,
                                   reinterpret_cast<const char*>(data.data()),
                                   data.length());
@@ -132,15 +134,15 @@ std::string WriteTemporaryBinaryFile(const std::string &file_template,
   return tmp_file;
 }
 
-std::string CreateTemporaryDirectory(const std::string &dir_template) {
+string CreateTemporaryDirectory(const string &dir_template) {
   size_t strlen = dir_template.size() + 1;
   char *template_buf = new char[strlen];
   memcpy(template_buf, dir_template.data(), dir_template.size());
   template_buf[strlen - 1] = '\0';
   char *tmpdir = mkdtemp(template_buf);
-  std::string ret;
+  string ret;
   if (tmpdir != NULL)
-    ret = std::string(tmpdir);
+    ret = string(tmpdir);
   delete[] template_buf;
   return ret;
 }

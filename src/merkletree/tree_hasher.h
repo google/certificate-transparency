@@ -4,7 +4,6 @@
 #include <stddef.h>
 
 #include "serial_hasher.h"
-#include "types.h"
 
 class TreeHasher {
  public:
@@ -14,20 +13,21 @@ class TreeHasher {
 
   size_t DigestSize() const { return hasher_->DigestSize(); }
 
-  bstring HashEmpty();
+  std::string HashEmpty();
 
-  bstring HashLeaf(const bstring &data);
+  std::string HashLeaf(const std::string &data);
 
   // Accepts arbitrary strings as children. When hashing
   // digests, it is the responsibility of the caller to
   // ensure the inputs are of correct size.
-  bstring HashChildren(const bstring &left_child, const bstring &right_child);
+  std::string HashChildren(const std::string &left_child,
+                           const std::string &right_child);
 
  private:
   SerialHasher *hasher_;
-  static const bstring kLeafPrefix;
-  static const bstring kNodePrefix;
+  static const std::string kLeafPrefix;
+  static const std::string kNodePrefix;
   // The dummy hash of an empty tree.
-  bstring emptyhash_;
+  std::string emptyhash_;
 };
 #endif

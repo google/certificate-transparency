@@ -6,7 +6,9 @@
 #include "sqlite_db.h"
 #include "util.h"
 
-SQLiteDB::SQLiteDB(const std::string &dbfile) {
+using std::string;
+
+SQLiteDB::SQLiteDB(const string &dbfile) {
   int ret = sqlite3_open_v2(dbfile.c_str(), &db_, SQLITE_OPEN_READWRITE, NULL);
   if (ret == SQLITE_OK)
     return;
@@ -42,7 +44,7 @@ public:
   // Fields start at 0! |value| must have lifetime that covers its
   // use, which is up until the SQL statement finishes executing
   // (i.e. after the last Step()).
-  void BindBlob(unsigned field, const std::string &value) {
+  void BindBlob(unsigned field, const string &value) {
     int ret = sqlite3_bind_blob(stmt_, field + 1, value.data(), value.length(),
                                 NULL);
     assert(ret == SQLITE_OK);
@@ -53,10 +55,10 @@ public:
     assert(ret == SQLITE_OK);
   }
 
-  void GetBlob(unsigned column, bstring *value) {
+  void GetBlob(unsigned column, string *value) {
     const void *data = sqlite3_column_blob(stmt_, column);
     assert(data != NULL);
-    value->assign(static_cast<const byte *>(data),
+    value->assign(static_cast<const char *>(data),
                   sqlite3_column_bytes(stmt_, column));
   }
 
@@ -74,7 +76,7 @@ public:
 
 private:
   sqlite3_stmt *stmt_;
-};  
+};
 
 Database::WriteResult
 SQLiteDB::CreatePendingCertificateEntry_(const ct::LoggedCertificate &cert) {
@@ -82,7 +84,7 @@ SQLiteDB::CreatePendingCertificateEntry_(const ct::LoggedCertificate &cert) {
 
   statement.BindBlob(0, cert.certificate_sha256_hash());
 
-  bstring sct_data;
+  string sct_data;
   bool r2 = cert.sct().SerializeToString(&sct_data);
   assert(r2);
   statement.BindBlob(1, sct_data);
@@ -101,7 +103,7 @@ SQLiteDB::CreatePendingCertificateEntry_(const ct::LoggedCertificate &cert) {
 }
 
 Database::WriteResult
-SQLiteDB::AssignCertificateSequenceNumber(const bstring &hash,
+SQLiteDB::AssignCertificateSequenceNumber(const string &hash,
                                           uint64_t sequence_number) {
   Statement statement(db_, "UPDATE leaves SET sequence = ? WHERE hash = ? "
                       "AND sequence IS NULL");
@@ -133,7 +135,7 @@ SQLiteDB::AssignCertificateSequenceNumber(const bstring &hash,
 }
 
 Database::LookupResult
-SQLiteDB::LookupCertificateByHash(const bstring &hash,
+SQLiteDB::LookupCertificateByHash(const string &hash,
                                   ct::LoggedCertificate *result) const {
   Statement statement(db_, "SELECT sct, sequence FROM leaves WHERE hash = ?");
 
@@ -144,7 +146,7 @@ SQLiteDB::LookupCertificateByHash(const bstring &hash,
     return NOT_FOUND;
   assert(ret == SQLITE_ROW);
 
-  bstring sct;
+  string sct;
   statement.GetBlob(0, &sct);
   result->mutable_sct()->ParseFromString(sct);
 
@@ -167,11 +169,11 @@ SQLiteDB::LookupCertificateByIndex(uint64_t sequence_number,
   if (ret == SQLITE_DONE)
     return NOT_FOUND;
 
-  bstring sct;
+  string sct;
   statement.GetBlob(0, &sct);
   result->mutable_sct()->ParseFromString(sct);
 
-  bstring hash;
+  string hash;
   statement.GetBlob(1, &hash);
   result->set_certificate_sha256_hash(hash);
 
@@ -180,13 +182,13 @@ SQLiteDB::LookupCertificateByIndex(uint64_t sequence_number,
   return LOOKUP_OK;
 }
 
-std::set<bstring> SQLiteDB::PendingHashes() const {
-  std::set<bstring> hashes;
+std::set<string> SQLiteDB::PendingHashes() const {
+  std::set<string> hashes;
   Statement statement(db_, "SELECT hash FROM leaves WHERE sequence IS NULL");
 
   int ret;
   while ((ret = statement.Step()) == SQLITE_ROW) {
-    bstring hash;
+    string hash;
     statement.GetBlob(0, &hash);
     hashes.insert(hash);
   }
@@ -199,7 +201,7 @@ Database::WriteResult SQLiteDB::WriteTreeHead_(const ct::SignedTreeHead &sth) {
   Statement statement(db_, "INSERT INTO trees(timestamp, sth) VALUES(?, ?)");
   statement.BindUInt64(0, sth.timestamp());
 
-  bstring sth_data;
+  string sth_data;
   bool ret = sth.SerializeToString(&sth_data);
   assert(ret);
   statement.BindBlob(1, sth_data);
@@ -227,7 +229,7 @@ Database::LookupResult SQLiteDB::LatestTreeHead(ct::SignedTreeHead *result)
     return NOT_FOUND;
   assert(ret == SQLITE_ROW);
   
-  bstring sth;
+  string sth;
   statement.GetBlob(0, &sth);
   result->ParseFromString(sth);
 

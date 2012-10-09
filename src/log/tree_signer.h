@@ -37,7 +37,7 @@ class TreeSigner {
 
  private:
   void BuildTree();
-  bool AppendCertificate(const bstring &key,
+  bool AppendCertificate(const std::string &key,
                          const ct::SignedCertificateTimestamp &sct);
   void AppendCertificateToTree(const ct::SignedCertificateTimestamp &sct);
   void TimestampAndSign(uint64_t min_timestamp, ct::SignedTreeHead *sth);

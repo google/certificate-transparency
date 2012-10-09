@@ -15,7 +15,6 @@
 #include "merkle_verifier.h"
 #include "sqlite_db.h"
 #include "tree_signer.h"
-#include "types.h"
 #include "util.h"
 
 namespace {
@@ -23,6 +22,7 @@ namespace {
 using ct::CertificateEntry;
 using ct::LoggedCertificate;
 using ct::SignedTreeHead;
+using std::string;
 
 const char *ecp256_private_key = {
   "-----BEGIN EC PRIVATE KEY-----\n"
@@ -39,7 +39,7 @@ const char *ecp256_public_key = {
   "-----END PUBLIC KEY-----\n"
 };
 
-EVP_PKEY* PrivateKeyFromPem(const std::string &pemkey) {
+EVP_PKEY* PrivateKeyFromPem(const string &pemkey) {
   BIO *bio = BIO_new_mem_buf(const_cast<char*>(pemkey.data()), pemkey.size());
   EVP_PKEY *pkey = PEM_read_bio_PrivateKey(bio, NULL, NULL, NULL);
   assert(pkey != NULL);
@@ -47,7 +47,7 @@ EVP_PKEY* PrivateKeyFromPem(const std::string &pemkey) {
   return pkey;
 }
 
-EVP_PKEY* PublicKeyFromPem(const std::string &pemkey) {
+EVP_PKEY* PublicKeyFromPem(const string &pemkey) {
   BIO *bio = BIO_new_mem_buf(const_cast<char*>(pemkey.data()), pemkey.size());
   EVP_PKEY *pkey = PEM_read_bio_PUBKEY(bio, NULL, NULL, NULL);
   assert(pkey != NULL);
@@ -92,7 +92,7 @@ template <class T> class TreeSignerTest : public ::testing::Test {
     // Check again that it is safe to empty file_base_.
     ASSERT_EQ("/tmp/ctlog", file_base_.substr(0, 10));
     ASSERT_EQ(16U, file_base_.length());
-    std::string command = "rm -r " + file_base_;
+    string command = "rm -r " + file_base_;
     int ret = system(command.c_str());
     if (ret != 0)
       std::cout << "Failed to delete temporary directory in "
@@ -108,12 +108,12 @@ template <class T> class TreeSignerTest : public ::testing::Test {
   Database *db_;
   LogVerifier *verifier_;
   TreeSigner *tree_signer_;
-  std::string file_base_;
+  string file_base_;
 };
 
 template <> void TreeSignerTest<FileDB>::NewDB() {
-  std::string certs_dir = file_base_ + "/certs";
-  std::string tree_dir = file_base_ + "/tree";
+  string certs_dir = file_base_ + "/certs";
+  string tree_dir = file_base_ + "/tree";
   int ret = mkdir(certs_dir.c_str(), 0700);
   ASSERT_EQ(ret, 0);
   ret = mkdir(tree_dir.c_str(), 0700);
@@ -133,7 +133,7 @@ TYPED_TEST_CASE(TreeSignerTest, Databases);
 
 // TODO(ekasper): KAT tests.
 TYPED_TEST(TreeSignerTest, Sign) {
-  bstring hash("1234xyzw", 8);
+  string hash("1234xyzw", 8);
 
   LoggedCertificate logged_cert;
   logged_cert.set_certificate_sha256_hash(hash);
@@ -154,7 +154,7 @@ TYPED_TEST(TreeSignerTest, Sign) {
 }
 
 TYPED_TEST(TreeSignerTest, Timestamp) {
-  bstring hash("1234xyzw", 8);
+  string hash("1234xyzw", 8);
 
   LoggedCertificate logged_cert;
   logged_cert.set_certificate_sha256_hash(hash);
@@ -174,7 +174,7 @@ TYPED_TEST(TreeSignerTest, Timestamp) {
   // and verify that the signer's timestamp is greater than that.
   uint64_t future = last_update + 10000;
   logged_cert.mutable_sct()->set_timestamp(future);
-  bstring hash2("1234abcd", 8);
+  string hash2("1234abcd", 8);
   logged_cert.set_certificate_sha256_hash(hash2);
 
   EXPECT_EQ(Database::OK,
@@ -184,7 +184,7 @@ TYPED_TEST(TreeSignerTest, Timestamp) {
 }
 
 TYPED_TEST(TreeSignerTest, Verify) {
-  bstring hash("1234xyzw", 8);
+  string hash("1234xyzw", 8);
 
   LoggedCertificate logged_cert;
   logged_cert.set_certificate_sha256_hash(hash);
@@ -204,7 +204,7 @@ TYPED_TEST(TreeSignerTest, Verify) {
 }
 
 TYPED_TEST(TreeSignerTest, ResumeClean) {
-  bstring hash("1234xyzw", 8);
+  string hash("1234xyzw", 8);
 
   LoggedCertificate logged_cert;
   logged_cert.set_certificate_sha256_hash(hash);
@@ -245,7 +245,7 @@ TYPED_TEST(TreeSignerTest, ResumePartialSign) {
   EXPECT_EQ(0U, sth.tree_size());
 
   // Log a pending entry.
-  bstring hash("1234xyzw", 8);
+  string hash("1234xyzw", 8);
 
   LoggedCertificate logged_cert;
   logged_cert.set_certificate_sha256_hash(hash);
@@ -296,7 +296,7 @@ TYPED_TEST(TreeSignerTest, FailInconsistentTreeHead) {
 
 TYPED_TEST(TreeSignerTest, FailInconsistentSequenceNumbers) {
   EXPECT_EQ(TreeSigner::OK, this->tree_signer_->UpdateTree());
-  bstring hash("1234xyzw", 8);
+  string hash("1234xyzw", 8);
 
   LoggedCertificate logged_cert;
   logged_cert.set_certificate_sha256_hash(hash);
@@ -313,7 +313,7 @@ TYPED_TEST(TreeSignerTest, FailInconsistentSequenceNumbers) {
             this->db_->AssignCertificateSequenceNumber(hash, 0));
 
   // Create another pending entry.
-  bstring hash2("1234abcd", 8);
+  string hash2("1234abcd", 8);
   logged_cert.set_certificate_sha256_hash(hash2);
   EXPECT_EQ(Database::OK,
             this->db_->CreatePendingCertificateEntry(logged_cert));

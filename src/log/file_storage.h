@@ -5,8 +5,6 @@
 #include <stdint.h>
 #include <string>
 
-#include "types.h"
-
 class FilesystemOp;
 
 // A simple filesystem-based database for (key, data) entries,
@@ -52,32 +50,36 @@ class FileStorage {
   };
 
   // Scan the entire database and return the list of keys.
-  std::set<bstring> Scan() const;
+  std::set<std::string> Scan() const;
 
   // Write (key, data) unless an entry matching |key| already exists.
-  FileStorageResult CreateEntry(const bstring &key, const bstring &data);
+  FileStorageResult CreateEntry(const std::string &key,
+                                const std::string &data);
 
   // Update an existing entry; fail if it doesn't already exist.
-  FileStorageResult UpdateEntry(const bstring &key, const bstring &data);
+  FileStorageResult UpdateEntry(const std::string &key,
+                                const std::string &data);
 
   // Lookup entry based on key.
-  FileStorageResult LookupEntry(const bstring &key, bstring *result) const;
+  FileStorageResult LookupEntry(const std::string &key,
+                                std::string *result) const;
 
  private:
   std::string StoragePathBasename(const std::string &hex) const;
   std::string StoragePathComponent(const std::string &hex, unsigned n) const;
-  std::string StoragePath(const bstring &key) const;
-  bstring StorageKey(const std::string &storage_path) const;
+  std::string StoragePath(const std::string &key) const;
+  std::string StorageKey(const std::string &storage_path) const;
   // Write or overwrite.
-  void WriteStorageEntry(const bstring &key, const bstring &data);
+  void WriteStorageEntry(const std::string &key, const std::string &data);
   void ScanFiles(const std::string &dir_path,
-                 std::set<bstring> *keys) const;
+                 std::set<std::string> *keys) const;
   void ScanDir(const std::string &dir_path,
-               unsigned depth, std::set<bstring> *keys) const;
+               unsigned depth, std::set<std::string> *keys) const;
 
   // The following methods abort upon any error.
   bool FileExists(const std::string &file_path) const;
-  void AtomicWriteBinaryFile(const std::string &file_path, const bstring &data);
+  void AtomicWriteBinaryFile(const std::string &file_path,
+                             const std::string &data);
   // Create directory, unless it already exists.
   void CreateMissingDirectory(const std::string &dir_path);
 

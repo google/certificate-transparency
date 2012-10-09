@@ -9,7 +9,6 @@
 
 #include "ct.pb.h"
 #include "database.h"
-#include "types.h"
 
 class FileStorage;
 
@@ -38,18 +37,18 @@ class FileDB : public Database {
   CreatePendingCertificateEntry_(const ct::LoggedCertificate &logged_cert);
 
   virtual WriteResult
-  AssignCertificateSequenceNumber(const bstring &certificate_sha256_hash,
-				  uint64_t sequence_number);
+  AssignCertificateSequenceNumber(const std::string &certificate_sha256_hash,
+                                 uint64_t sequence_number);
 
   virtual LookupResult
-  LookupCertificateByHash(const bstring &certificate_sha256_hash,
+  LookupCertificateByHash(const std::string &certificate_sha256_hash,
                           ct::LoggedCertificate *result) const;
 
   virtual LookupResult
   LookupCertificateByIndex(uint64_t sequence_number,
                            ct::LoggedCertificate *result) const;
 
-  virtual std::set<bstring> PendingHashes() const;
+  virtual std::set<std::string> PendingHashes() const;
 
 
   virtual WriteResult WriteTreeHead_(const ct::SignedTreeHead &sth);
@@ -58,14 +57,14 @@ class FileDB : public Database {
 
  private:
   void BuildIndex();
-  std::set<bstring> pending_hashes_;
-  std::map<uint64_t, bstring> sequence_map_;
+  std::set<std::string> pending_hashes_;
+  std::map<uint64_t, std::string> sequence_map_;
   FileStorage *cert_storage_;
   // Store all tree heads, but currently only support looking up the latest one.
   // Other necessary lookup indices (by tree size, by timestamp range?) TBD.
   FileStorage *tree_storage_;
   uint64_t latest_tree_timestamp_;
-  // The same as a bstring;
-  bstring latest_timestamp_key_;
+  // The same as a string;
+  std::string latest_timestamp_key_;
 };
 #endif

@@ -34,43 +34,42 @@ class Serializer {
 
   static size_t PrefixLength(size_t max_length);
 
-  bstring SerializedString() const { return output_; }
+  // returns binary data
+  std::string SerializedString() const { return output_; }
 
   static SerializeResult CheckSignedFormat(const ct::CertificateEntry &entry);
 
   static SerializeResult CheckFormat(const ct::CertificateEntry &entry);
 
   static SerializeResult SerializeSCTForSigning(uint64_t timestamp, int type,
-                                                const bstring &leaf_certificate,
-                                                bstring *result);
+      const std::string &leaf_certificate, std::string *result);
 
   static SerializeResult
   SerializeSCTForSigning(const ct::SignedCertificateTimestamp &sct,
-                         bstring *result) {
+                         std::string *result) {
     return SerializeSCTForSigning(sct.timestamp(), sct.entry().type(),
                                   sct.entry().leaf_certificate(), result);
   }
 
   static SerializeResult SerializeSCTForTree(uint64_t timestamp, int type,
-                                             const bstring &leaf_certificate,
-                                             bstring *result) {
+      const std::string &leaf_certificate, std::string *result) {
     return SerializeSCTForSigning(timestamp, type, leaf_certificate, result);
   }
 
   static SerializeResult
   SerializeSCTForTree(const ct::SignedCertificateTimestamp &sct,
-                      bstring *result) {
+                      std::string *result) {
     return SerializeSCTForTree(sct.timestamp(), sct.entry().type(),
                                sct.entry().leaf_certificate(), result);
   }
 
   static SerializeResult SerializeSTHForSigning(uint64_t timestamp,
                                                 uint64_t tree_size,
-                                                const bstring &root_hash,
-                                                bstring *result);
+                                                const std::string &root_hash,
+                                                std::string *result);
 
   static SerializeResult
-  SerializeSTHForSigning(const ct::SignedTreeHead &sth, bstring *result) {
+  SerializeSTHForSigning(const ct::SignedTreeHead &sth, std::string *result) {
     return SerializeSTHForSigning(sth.timestamp(), sth.tree_size(),
                                   sth.root_hash(), result);
   }
@@ -79,35 +78,35 @@ class Serializer {
 
   static SerializeResult
   SerializeSCTToken(const ct::SignedCertificateTimestamp &sct,
-                    bstring *result);
+                    std::string *result);
 
   // TODO(ekasper): tests for these!
   template <class T>
-  static bstring SerializeUint(T in, size_t bytes) {
+  static std::string SerializeUint(T in, size_t bytes) {
     Serializer serializer;
     serializer.WriteUint(in, bytes);
     return serializer.SerializedString();
   }
 
   static SerializeResult SerializeDigitallySigned(
-      const ct::DigitallySigned &sig, bstring *result);
+      const ct::DigitallySigned &sig, std::string *result);
 
  private:
   template <class T>
   void WriteUint(T in, size_t bytes) {
     assert(bytes <= sizeof in);
     assert(bytes == sizeof in || in >> (bytes * 8) == 0);
-    bstring result;
+    std::string result;
     for ( ; bytes > 0; --bytes)
       output_.push_back(((in & (static_cast<T>(0xff) << ((bytes - 1) * 8)))
            >> ((bytes - 1) * 8)));
   }
 
   // Fixed-length byte array.
-  void WriteFixedBytes(const bstring &in);
+  void WriteFixedBytes(const std::string &in);
 
   // Variable-length byte array.
-  void WriteVarBytes(const bstring &in, size_t max_length);
+  void WriteVarBytes(const std::string &in, size_t max_length);
 
   static bool CanSerialize(const repeated_string &in,
                            size_t max_elem_length,
@@ -127,13 +126,13 @@ class Serializer {
 
   static SerializeResult CheckFormat(const repeated_string &chain);
 
-  bstring output_;
+  std::string output_;
 };
 
 class Deserializer {
  public:
   // We do not make a copy, so input must remain valid.
-  Deserializer(const bstring &input);
+  Deserializer(const std::string &input);
   ~Deserializer() {}
 
   enum DeserializeResult {
@@ -149,13 +148,14 @@ class Deserializer {
   DeserializeResult ReadSCTToken(ct::SignedCertificateTimestamp *sct);
 
   static DeserializeResult
-  DeserializeSCTToken(const bstring &in, ct::SignedCertificateTimestamp *sct);
+  DeserializeSCTToken(const std::string &in,
+                      ct::SignedCertificateTimestamp *sct);
 
   static DeserializeResult
-  DeserializeDigitallySigned(const bstring &in, ct::DigitallySigned *sig);
+  DeserializeDigitallySigned(const std::string &in, ct::DigitallySigned *sig);
 
   template<class T>
-  static DeserializeResult DeserializeUint(const bstring &in, size_t bytes,
+  static DeserializeResult DeserializeUint(const std::string &in, size_t bytes,
                                            T *result) {
     Deserializer deserializer(in);
     bool res = deserializer.ReadUint(bytes, result);
@@ -182,13 +182,13 @@ class Deserializer {
     return true;
   }
 
-  bool ReadFixedBytes(size_t bytes, bstring *result);
+  bool ReadFixedBytes(size_t bytes, std::string *result);
 
-  bool ReadVarBytes(size_t max_length, bstring *result);
+  bool ReadVarBytes(size_t max_length, std::string *result);
 
   DeserializeResult ReadDigitallySigned(ct::DigitallySigned *sig);
 
-  const byte *current_pos_;
+  const char *current_pos_;
   size_t bytes_remaining_;
 };
 #endif
