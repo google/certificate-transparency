@@ -13,6 +13,7 @@
 namespace {
 
 using ct::CertificateEntry;
+using ct::CertificateEntryType;
 using ct::SignedCertificateTimestamp;
 using ct::DigitallySigned;
 using ct::SignedTreeHead;
@@ -107,8 +108,8 @@ class LogSignerTest : public ::testing::Test {
     return sct_.entry().leaf_certificate();
   }
 
-  LogSigner::CertificateEntryType DefaultType() const {
-    return static_cast<LogSigner::CertificateEntryType>(sct_.entry().type());
+  ct::CertificateEntryType DefaultType() const {
+    return static_cast<ct::CertificateEntryType>(sct_.entry().type());
   }
 
   const DigitallySigned &DefaultSCTSignature() const { return sct_.signature(); }
@@ -297,7 +298,7 @@ TEST_F(LogSignerTest, SignInvalidType) {
   string serialized_sig;
   EXPECT_EQ(LogSigner::INVALID_ENTRY_TYPE, signer_->SignCertificateTimestamp(
       DefaultSCTTimestamp(),
-      static_cast<LogSigner::CertificateEntryType>(-1),
+      static_cast<ct::CertificateEntryType>(-1),
       DefaultCert(),
       &serialized_sig));
 }
@@ -388,7 +389,7 @@ TEST_F(LogSignerTest, VerifyChangeType) {
 
   EXPECT_EQ(LogSigVerifier::INVALID_SIGNATURE,
             verifier_->VerifySCTSignature(DefaultSCTTimestamp(),
-                                          LogSigner::PRECERT_ENTRY,
+                                          ct::PRECERT_ENTRY,
                                           DefaultCert(),
                                           DefaultSerializedSCTSignature()));
 }

@@ -26,7 +26,7 @@ message DigitallySigned {
 }
 
 message CertificateEntry {
-  // Maps 1-1 to LogSigner::CertificateEntryType
+  // Maps 1-1 to ct::CertificateEntryType
   enum Type {
     X509_ENTRY = 0;
     PRECERT_ENTRY = 1;

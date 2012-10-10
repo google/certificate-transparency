@@ -4,6 +4,7 @@
 #include <openssl/evp.h>
 #include <stdint.h>
 
+#include "ct.h"
 #include "ct.pb.h"
 #include "serializer.h"
 
@@ -17,11 +18,6 @@ class LogSigner {
   enum SignatureType {
     CERTIFICATE_TIMESTAMP = 0,
     TREE_HEAD = 1,
-  };
-
-  enum CertificateEntryType {
-    X509_ENTRY = 0,
-    PRECERT_ENTRY = 1,
   };
 
   enum SignResult {
@@ -39,7 +35,7 @@ class LogSigner {
   // In accordance with the spec, timestamp should be UTC time,
   // since January 1, 1970, 00:00, in milliseconds.
   SignResult SignCertificateTimestamp(uint64_t timestamp,
-                                      CertificateEntryType type,
+                                      ct::CertificateEntryType type,
                                       const std::string &leaf_certificate,
                                       std::string *result) const;
 
@@ -90,7 +86,7 @@ class LogSigVerifier {
 
   // The protobuf-agnostic library version.
   VerifyResult VerifySCTSignature(uint64_t timestamp,
-                                  LogSigner::CertificateEntryType type,
+                                  ct::CertificateEntryType type,
                                   const std::string &leaf_cert,
                                   const std::string &signature) const;
 

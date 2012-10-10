@@ -12,6 +12,7 @@
 #include "util.h"
 
 using ct::CertificateEntry;
+using ct::CertificateEntryType;  // from ct.h
 using ct::DigitallySigned;
 using ct::SignedCertificateTimestamp;
 using ct::SignedTreeHead;
@@ -163,7 +164,7 @@ LogSigVerifier::~LogSigVerifier() {
 
 LogSigVerifier::VerifyResult
 LogSigVerifier::VerifySCTSignature(uint64_t timestamp,
-                                   LogSigner::CertificateEntryType type,
+                                   CertificateEntryType type,
                                    const string &leaf_cert,
                                    const string &serialized_sig) const {
   DigitallySigned signature;

@@ -19,5 +19,10 @@ enum MessageFormat {
   PROTOBUF = 0,
 };
 
+enum CertificateEntryType {
+  X509_ENTRY = 0,
+  PRECERT_ENTRY = 1,
+};
+
 }  // namespace
 #endif
