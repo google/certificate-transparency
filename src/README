@@ -41,7 +41,7 @@ http://code.google.com/p/gflags/
 and
 http://code.google.com/p/google-glog/
 
-(Tested with gflags-1.6, gflags-2.0 and glog 0.3.2)
+(Tested with gflags-1.6, gflags-2.0 and glog 0.3.1 and 0.3.2)
 
 Download, unpack, and follow the instructions to build and install.
 Be sure to install gflags before building and installing glog to avoid link
