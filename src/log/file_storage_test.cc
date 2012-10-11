@@ -1,3 +1,5 @@
+#include <gflags/gflags.h>
+#include <glog/logging.h>
 #include <gtest/gtest.h>
 #include <errno.h>
 #include <iostream>
@@ -9,6 +11,7 @@
 
 #include "file_storage.h"
 #include "filesystem_op.h"
+#include "test_db.h"
 #include "util.h"
 
 namespace {
@@ -20,33 +23,11 @@ const unsigned kStorageDepth = 3;
 class BasicFileStorageTest : public ::testing::Test {
  protected:
   BasicFileStorageTest() :
-      file_db_(NULL) {}
+      test_db_() {}
 
-  void SetUp() {
-    file_base_ = util::CreateTemporaryDirectory("/tmp/ctlogXXXXXX");
-    ASSERT_EQ("/tmp/ctlog", file_base_.substr(0, 10));
-    ASSERT_EQ(16U, file_base_.length());
-    file_db_ = new FileStorage(file_base_, kStorageDepth);
-  }
+  FileStorage *fs() const { return test_db_.db(); }
 
-  void TearDown() {
-    // Check again that it is safe to empty file_base_.
-    ASSERT_EQ("/tmp/ctlog", file_base_.substr(0, 10));
-    ASSERT_EQ(16U, file_base_.length());
-    string command = "rm -r " + file_base_;
-    int ret = system(command.c_str());
-    if (ret != 0)
-      std::cout << "Failed to delete temporary directory in "
-                << file_base_ << std::endl;
-  }
-
-  ~BasicFileStorageTest() {
-    if (file_db_ != NULL)
-    delete file_db_;
-  }
-
-  FileStorage *file_db_;
-  string file_base_;
+  TestDB<FileStorage>test_db_;
 };
 
 TEST_F(BasicFileStorageTest, Create) {
@@ -56,16 +37,16 @@ TEST_F(BasicFileStorageTest, Create) {
   string key1("1245abcd", 8);
   string value1("Alice", 5);
 
-  EXPECT_EQ(FileStorage::NOT_FOUND, file_db_->LookupEntry(key0, NULL));
-  EXPECT_EQ(FileStorage::NOT_FOUND, file_db_->LookupEntry(key1, NULL));
+  EXPECT_EQ(FileStorage::NOT_FOUND, fs()->LookupEntry(key0, NULL));
+  EXPECT_EQ(FileStorage::NOT_FOUND, fs()->LookupEntry(key1, NULL));
 
-  EXPECT_EQ(FileStorage::OK, file_db_->CreateEntry(key0, value0));
+  EXPECT_EQ(FileStorage::OK, fs()->CreateEntry(key0, value0));
   string lookup_result;
-  EXPECT_EQ(FileStorage::OK, file_db_->LookupEntry(key0, &lookup_result));
+  EXPECT_EQ(FileStorage::OK, fs()->LookupEntry(key0, &lookup_result));
   EXPECT_EQ(value0, lookup_result);
 
-  EXPECT_EQ(FileStorage::OK, file_db_->CreateEntry(key1, value1));
-  EXPECT_EQ(FileStorage::OK, file_db_->LookupEntry(key1, &lookup_result));
+  EXPECT_EQ(FileStorage::OK, fs()->CreateEntry(key1, value1));
+  EXPECT_EQ(FileStorage::OK, fs()->LookupEntry(key1, &lookup_result));
   EXPECT_EQ(value1, lookup_result);
 }
 
@@ -76,14 +57,14 @@ TEST_F(BasicFileStorageTest, Scan) {
   string key1("1245abcd", 8);
   string value1("Alice", 5);
 
-  EXPECT_EQ(FileStorage::OK, file_db_->CreateEntry(key0, value0));
-  EXPECT_EQ(FileStorage::OK, file_db_->CreateEntry(key1, value1));
+  EXPECT_EQ(FileStorage::OK, fs()->CreateEntry(key0, value0));
+  EXPECT_EQ(FileStorage::OK, fs()->CreateEntry(key1, value1));
 
   std::set<string> keys;
   keys.insert(key0);
   keys.insert(key1);
 
-  std::set<string> scan_keys = file_db_->Scan();
+  std::set<string> scan_keys = fs()->Scan();
   EXPECT_EQ(keys, scan_keys);
 }
 
@@ -91,18 +72,18 @@ TEST_F(BasicFileStorageTest, CreateDuplicate) {
   string key("1234xyzw", 8);
   string value("unicorn", 7);
 
-  EXPECT_EQ(FileStorage::NOT_FOUND, file_db_->LookupEntry(key, NULL));
-  EXPECT_EQ(FileStorage::OK, file_db_->CreateEntry(key, value));
+  EXPECT_EQ(FileStorage::NOT_FOUND, fs()->LookupEntry(key, NULL));
+  EXPECT_EQ(FileStorage::OK, fs()->CreateEntry(key, value));
   string lookup_result;
-  EXPECT_EQ(FileStorage::OK, file_db_->LookupEntry(key, &lookup_result));
+  EXPECT_EQ(FileStorage::OK, fs()->LookupEntry(key, &lookup_result));
   EXPECT_EQ(value, lookup_result);
 
   // Try to log another entry with the same key.
   string new_value("alice", 5);
   EXPECT_EQ(FileStorage::ENTRY_ALREADY_EXISTS,
-            file_db_->CreateEntry(key, new_value));
+            fs()->CreateEntry(key, new_value));
   lookup_result.clear();
-  EXPECT_EQ(FileStorage::OK, file_db_->LookupEntry(key, &lookup_result));
+  EXPECT_EQ(FileStorage::OK, fs()->LookupEntry(key, &lookup_result));
 
   // Expect to receive the original entry on lookup.
   EXPECT_EQ(value, lookup_result);
@@ -112,16 +93,16 @@ TEST_F(BasicFileStorageTest, Update) {
   string key("1234xyzw", 8);
   string value("unicorn", 7);
 
-  EXPECT_EQ(FileStorage::NOT_FOUND, file_db_->LookupEntry(key, NULL));
-  EXPECT_EQ(FileStorage::OK, file_db_->CreateEntry(key, value));
+  EXPECT_EQ(FileStorage::NOT_FOUND, fs()->LookupEntry(key, NULL));
+  EXPECT_EQ(FileStorage::OK, fs()->CreateEntry(key, value));
   string lookup_result;
-  EXPECT_EQ(FileStorage::OK, file_db_->LookupEntry(key, &lookup_result));
+  EXPECT_EQ(FileStorage::OK, fs()->LookupEntry(key, &lookup_result));
   EXPECT_EQ(value, lookup_result);
 
   // Update.
   string new_value("alice", 5);
-  EXPECT_EQ(FileStorage::OK, file_db_->UpdateEntry(key, new_value));
-  EXPECT_EQ(FileStorage::OK, file_db_->LookupEntry(key, &lookup_result));
+  EXPECT_EQ(FileStorage::OK, fs()->UpdateEntry(key, new_value));
+  EXPECT_EQ(FileStorage::OK, fs()->LookupEntry(key, &lookup_result));
 
   // Expect to receive the new entry on lookup.
   EXPECT_EQ(new_value, lookup_result);
@@ -137,12 +118,12 @@ TEST_F(BasicFileStorageTest, LookupInvalidKey) {
   string similar_key2("123", 3);
   string empty_key;
 
-  EXPECT_EQ(FileStorage::OK, file_db_->CreateEntry(key, value));
-  EXPECT_EQ(FileStorage::OK, file_db_->LookupEntry(key, NULL));
-  EXPECT_EQ(FileStorage::NOT_FOUND, file_db_->LookupEntry(similar_key0, NULL));
-  EXPECT_EQ(FileStorage::NOT_FOUND, file_db_->LookupEntry(similar_key1, NULL));
-  EXPECT_EQ(FileStorage::NOT_FOUND, file_db_->LookupEntry(similar_key2, NULL));
-  EXPECT_EQ(FileStorage::NOT_FOUND, file_db_->LookupEntry(empty_key, NULL));
+  EXPECT_EQ(FileStorage::OK, fs()->CreateEntry(key, value));
+  EXPECT_EQ(FileStorage::OK, fs()->LookupEntry(key, NULL));
+  EXPECT_EQ(FileStorage::NOT_FOUND, fs()->LookupEntry(similar_key0, NULL));
+  EXPECT_EQ(FileStorage::NOT_FOUND, fs()->LookupEntry(similar_key1, NULL));
+  EXPECT_EQ(FileStorage::NOT_FOUND, fs()->LookupEntry(similar_key2, NULL));
+  EXPECT_EQ(FileStorage::NOT_FOUND, fs()->LookupEntry(empty_key, NULL));
 }
 
 TEST_F(BasicFileStorageTest, Resume) {
@@ -152,19 +133,21 @@ TEST_F(BasicFileStorageTest, Resume) {
   string key1("1245abcd", 8);
   string value1("Alice", 5);
 
-  EXPECT_EQ(FileStorage::OK, file_db_->CreateEntry(key0, value0));
-  EXPECT_EQ(FileStorage::OK, file_db_->CreateEntry(key1, value1));
+  EXPECT_EQ(FileStorage::OK, fs()->CreateEntry(key0, value0));
+  EXPECT_EQ(FileStorage::OK, fs()->CreateEntry(key1, value1));
 
   // A second database.
-  FileStorage db2(file_base_, kStorageDepth);
+  FileStorage *db2 = test_db_.SecondDB();
 
   // Look up and expect to find the entries.
   string lookup_result;
-  EXPECT_EQ(FileStorage::OK, db2.LookupEntry(key0, &lookup_result));
+  EXPECT_EQ(FileStorage::OK, db2->LookupEntry(key0, &lookup_result));
   EXPECT_EQ(value0, lookup_result);
 
-  EXPECT_EQ(FileStorage::OK, db2.LookupEntry(key1, &lookup_result));
+  EXPECT_EQ(FileStorage::OK, db2->LookupEntry(key1, &lookup_result));
   EXPECT_EQ(value1, lookup_result);
+
+  delete db2;
 };
 
 TEST_F(BasicFileStorageTest, ScanOnResume) {
@@ -174,48 +157,28 @@ TEST_F(BasicFileStorageTest, ScanOnResume) {
   string key1("1245abcd", 8);
   string value1("Alice", 5);
 
-  EXPECT_EQ(FileStorage::OK, file_db_->CreateEntry(key0, value0));
-  EXPECT_EQ(FileStorage::OK, file_db_->CreateEntry(key1, value1));
+  EXPECT_EQ(FileStorage::OK, fs()->CreateEntry(key0, value0));
+  EXPECT_EQ(FileStorage::OK, fs()->CreateEntry(key1, value1));
 
   // A second database.
-  FileStorage db2(file_base_, kStorageDepth);
+  FileStorage *db2 = test_db_.SecondDB();
 
   std::set<string> keys;
   keys.insert(key0);
   keys.insert(key1);
 
-  std::set<string> scan_keys = db2.Scan();
+  std::set<string> scan_keys = db2->Scan();
   EXPECT_EQ(keys, scan_keys);
+  delete db2;
 }
 
 class FailingFileStorageDeathTest : public ::testing::Test {
  protected:
-  FailingFileStorageDeathTest() {}
-
-  void SetUp() {
-    file_base_ = util::CreateTemporaryDirectory("/tmp/ctlogXXXXXX");
-    ASSERT_EQ("/tmp/ctlog", file_base_.substr(0, 10));
-    ASSERT_EQ(16U, file_base_.length());
-  }
-
   string GetTemporaryDirectory() {
-    return util::CreateTemporaryDirectory(file_base_ + "/ctlogXXXXXX");
+    return util::CreateTemporaryDirectory(
+        tmp_.TmpStorageDir() + "/ctlogXXXXXX");
   }
-
-  void TearDown() {
-    // Check again that it is safe to empty file_base_.
-    ASSERT_EQ("/tmp/ctlog", file_base_.substr(0, 10));
-    ASSERT_EQ(16U, file_base_.length());
-    string command = "rm -r " + file_base_;
-    int ret = system(command.c_str());
-    if (ret != 0)
-      std::cout << "Failed to delete temporary directory in "
-                << file_base_ << std::endl;
-  }
-
-  ~FailingFileStorageDeathTest() {}
-
-  string file_base_;
+  TmpStorage tmp_;
 };
 
 TEST(DeathTest, SupportDeath) {
@@ -388,7 +351,14 @@ TEST_F(FailingFileStorageDeathTest, ResumeOnFailedUpdate) {
 
 }  // namespace
 
-int main(int argc, char**argv) {
+int main(int argc, char **argv) {
+  // Change the defaults. Can be overridden on command line.
+  // Log to stderr instead of log files.
+  FLAGS_logtostderr = true;
+  // Only log fatal messages by default.
+  FLAGS_minloglevel = 3;
+  google::ParseCommandLineFlags(&argc, &argv, true);
+  google::InitGoogleLogging(argv[0]);
   ::testing::InitGoogleTest(&argc, argv);
   return RUN_ALL_TESTS();
 }

@@ -26,7 +26,6 @@ class LogSigner {
     EMPTY_CERTIFICATE,
     CERTIFICATE_TOO_LONG,
     INVALID_HASH_LENGTH,
-    UNKNOWN_ERROR,
   };
 
   // The protobuf-agnostic library version:
@@ -81,7 +80,6 @@ class LogSigVerifier {
     SIGNATURE_ALGORITHM_MISMATCH,
     INVALID_SIGNATURE,
     INVALID_HASH_LENGTH,
-    UNKNOWN_ERROR,
   };
 
   // The protobuf-agnostic library version.

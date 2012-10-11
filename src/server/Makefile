@@ -13,8 +13,8 @@ CXXFLAGS= $(INCLUDE) $(CXXFLAG)
 
 OBJS= ../merkletree/serial_hasher.o \
       ../util/util.o ../log/cert_checker.o ../log/cert.o \
-      ../log/submission_handler.o ../log/cert_submission_handler.o \
-      ../log/log_signer.o ../log/frontend_signer.o \
+      ../log/cert_submission_handler.o \
+      ../log/log_signer.o ../log/frontend_signer.o ../log/frontend.o \
       ../log/file_db.o ../log/file_storage.o ../log/filesystem_op.o \
       ../log/sqlite_db.o ../proto/ct.pb.o ../proto/serializer.o
 

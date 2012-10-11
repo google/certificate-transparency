@@ -1,4 +1,4 @@
-#include <assert.h>
+#include <glog/logging.h>
 #include <openssl/evp.h>
 #include <openssl/opensslv.h>
 #if OPENSSL_VERSION_NUMBER < 0x10000000
@@ -27,7 +27,7 @@ LogSigner::LogSigner(EVP_PKEY *pkey)
       sig_algo_ = DigitallySigned::ECDSA;
       break;
     default:
-      assert(false);
+      LOG(FATAL) << "Unsupported key type";
   }
 }
 
@@ -50,8 +50,8 @@ LogSigner::SignCertificateTimestamp(uint64_t timestamp,
 
   DigitallySigned signature;
   Sign(CERTIFICATE_TIMESTAMP, serialized_sct, &signature);
-  res = Serializer::SerializeDigitallySigned(signature, result);
-  assert(res == Serializer::OK);
+  CHECK_EQ(Serializer::OK,
+           Serializer::SerializeDigitallySigned(signature, result));
   return OK;
 }
 
@@ -79,8 +79,8 @@ LogSigner::SignTreeHead(uint64_t timestamp, uint64_t tree_size,
 
   DigitallySigned signature;
   Sign(TREE_HEAD, serialized_sth, &signature);
-  res = Serializer::SerializeDigitallySigned(signature, result);
-  assert(res == Serializer::OK);
+  CHECK_EQ(Serializer::OK,
+           Serializer::SerializeDigitallySigned(signature, result));
   return OK;
 }
 
@@ -97,7 +97,7 @@ LogSigner::SignResult LogSigner::SignTreeHead(SignedTreeHead *sth) const {
 // static
 LogSigner::SignResult
 LogSigner::GetSerializeError(Serializer::SerializeResult result) {
-  SignResult sign_result = UNKNOWN_ERROR;
+  SignResult sign_result;
   switch (result) {
     case Serializer::INVALID_TYPE:
       sign_result = INVALID_ENTRY_TYPE;
@@ -112,7 +112,7 @@ LogSigner::GetSerializeError(Serializer::SerializeResult result) {
       sign_result = INVALID_HASH_LENGTH;
       break;
     default:
-      assert(false);
+      LOG(FATAL) << "Unknown Serializer error code " << result;
   }
   return sign_result;
 }
@@ -131,12 +131,12 @@ string LogSigner::RawSign(const string &data) const {
   EVP_MD_CTX ctx;
   EVP_MD_CTX_init(&ctx);
   // NOTE: this syntax for setting the hash function requires OpenSSL >= 1.0.0.
-  assert(EVP_SignInit(&ctx, EVP_sha256()) == 1);
-  assert(EVP_SignUpdate(&ctx, data.data(), data.size()) == 1);
+  CHECK_EQ(1, EVP_SignInit(&ctx, EVP_sha256()));
+  CHECK_EQ(1, EVP_SignUpdate(&ctx, data.data(), data.size()));
   unsigned int sig_size = EVP_PKEY_size(pkey_);
   unsigned char *sig = new unsigned char[sig_size];
 
-  assert(EVP_SignFinal(&ctx, sig, &sig_size, pkey_) == 1);
+  CHECK_EQ(1, EVP_SignFinal(&ctx, sig, &sig_size, pkey_));
 
   EVP_MD_CTX_cleanup(&ctx);
   string ret(reinterpret_cast<char*>(sig), sig_size);
@@ -154,7 +154,7 @@ LogSigVerifier::LogSigVerifier(EVP_PKEY *pkey)
       sig_algo_ = DigitallySigned::ECDSA;
       break;
     default:
-      assert(false);
+      LOG(FATAL) << "Unsupported key type";
   }
 }
 
@@ -226,7 +226,7 @@ LogSigVerifier::VerifySTHSignature(const SignedTreeHead &sth) const {
 // static
 LogSigVerifier::VerifyResult
 LogSigVerifier::GetSerializeError(Serializer::SerializeResult result) {
-  VerifyResult verify_result = UNKNOWN_ERROR;
+  VerifyResult verify_result;
   switch (result) {
     case Serializer::INVALID_TYPE:
       verify_result = INVALID_ENTRY_TYPE;
@@ -241,7 +241,7 @@ LogSigVerifier::GetSerializeError(Serializer::SerializeResult result) {
       verify_result = INVALID_HASH_LENGTH;
       break;
     default:
-      assert(false);
+     LOG(FATAL) << "Unknown Deserializer error code " << result;
   }
   return verify_result;
 }
@@ -250,7 +250,7 @@ LogSigVerifier::GetSerializeError(Serializer::SerializeResult result) {
 LogSigVerifier::VerifyResult
 LogSigVerifier::GetDeserializeSignatureError(
     Deserializer::DeserializeResult result) {
-  VerifyResult verify_result = UNKNOWN_ERROR;
+  VerifyResult verify_result;
   switch (result) {
     case Deserializer::INPUT_TOO_SHORT:
       verify_result = SIGNATURE_TOO_SHORT;
@@ -265,7 +265,7 @@ LogSigVerifier::GetDeserializeSignatureError(
       verify_result = SIGNATURE_TOO_LONG;
       break;
     default:
-      assert(false);
+      LOG(FATAL) << "Unknown Deserializer error code " << result;
   }
   return verify_result;
 }
@@ -289,8 +289,8 @@ bool LogSigVerifier::RawVerify(const string &data,
   EVP_MD_CTX ctx;
   EVP_MD_CTX_init(&ctx);
   // NOTE: this syntax for setting the hash function requires OpenSSL >= 1.0.0.
-  assert(EVP_VerifyInit(&ctx, EVP_sha256()) == 1);
-  assert(EVP_VerifyUpdate(&ctx, data.data(), data.size()) == 1);
+  CHECK_EQ(1, EVP_VerifyInit(&ctx, EVP_sha256()));
+  CHECK_EQ(1, EVP_VerifyUpdate(&ctx, data.data(), data.size()));
   bool ret =
       (EVP_VerifyFinal(&ctx,
                        reinterpret_cast<const unsigned char*>(sig_string.data()),

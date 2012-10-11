@@ -57,6 +57,8 @@ class Cert {
   // returns binary data
   std::string DerEncoding() const;
 
+  std::string Sha256Digest() const;
+
   // WARNING WARNING The following methods modify the x509_ structure
   // and thus invalidate the cert.
   // They are mostly needed for processing precerts. Use with care.

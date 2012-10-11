@@ -46,7 +46,7 @@ TreeSigner::UpdateResult TreeSigner::UpdateTree() {
       return DB_ERROR;
     }
   } else {
-    CHECK_EQ(db_result, Database::OK) << "Latest STH lookup failed";
+    CHECK_EQ(db_result, Database::LOOKUP_OK) << "Latest STH lookup failed";
     if (sth.timestamp() != latest_tree_head_.timestamp() ||
             sth.tree_size() != latest_tree_head_.tree_size() ||
         sth.root_hash() != latest_tree_head_.root_hash()) {

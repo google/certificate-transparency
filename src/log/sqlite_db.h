@@ -1,5 +1,7 @@
 /* -*- mode: c++; indent-tabs-mode: nil -*- */
 
+#ifndef SQLITE_DB_H
+#define SQLITE_DB_H
 #include <string>
 
 #include "database.h"
@@ -11,6 +13,15 @@ class SQLiteDB : public Database {
   SQLiteDB(const std::string &dbfile);
 
   ~SQLiteDB();
+
+  // Temporary, for benchmarking. If we want to do this for real, then
+  // we need to implement rollbacks for errors that occur in the middle
+  // of a transaction.
+  virtual bool Transactional() const { return true; }
+
+  void BeginTransaction();
+
+  void EndTransaction();
 
   virtual WriteResult
   CreatePendingCertificateEntry_(const ct::LoggedCertificate &logged_cert);
@@ -36,3 +47,4 @@ class SQLiteDB : public Database {
 private:
   sqlite3 *db_;
 };
+#endif

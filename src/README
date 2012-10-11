@@ -73,3 +73,21 @@ $ make APACHEDIR=<path to httpd> local-links
 
 and run tests.
 
+-----TESTING AND LOGGING OPTIONS-----
+
+Note that several tests write files on disk. The default directory for
+storing temporary testdata is /tmp. You can change
+this by setting TMPDIR=<tmpdir> for make.
+
+End-to-end tests also create temporary certificate and server files in
+src/test/tmp
+All these files are cleaned up after a successful test run.
+
+For logging options, see
+http://google-glog.googlecode.com/svn/trunk/doc/glog.html
+
+By default, unit tests log to stderr, and log only messages with a FATAL level
+(i.e., those that result in abnormal program termination).
+You can override the defaults with command-line flags.
+
+End-to-end tests log everything at INFO level and above.

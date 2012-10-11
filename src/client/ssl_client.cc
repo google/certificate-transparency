@@ -78,7 +78,7 @@ SSLClient::VerifySCT(const string &token, const CertChain &chain,
                      LogVerifier *verifier, SignedCertificateTimestamp *sct) {
   CertificateEntry entry;
   if (CertSubmissionHandler::X509ChainToEntry(chain, &entry) !=
-      SubmissionHandler::OK)
+      CertSubmissionHandler::OK)
     return LogVerifier::INVALID_FORMAT;
 
   SignedCertificateTimestamp local_sct;

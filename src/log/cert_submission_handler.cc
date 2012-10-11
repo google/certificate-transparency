@@ -1,4 +1,4 @@
-#include <assert.h>
+#include <glog/logging.h>
 #include <string>
 
 #include "cert.h"
@@ -11,12 +11,44 @@ using ct::CertificateEntry;
 using std::string;
 
 CertSubmissionHandler::CertSubmissionHandler(CertChecker *cert_checker)
-    : cert_checker_(cert_checker) {
-  assert(cert_checker_ != NULL);
+    : cert_checker_(cert_checker) {}
+
+CertSubmissionHandler::SubmitResult
+CertSubmissionHandler::ProcessSubmission(const string &submission,
+                                         CertificateEntry *entry) {
+  CHECK_NOTNULL(entry);
+  CHECK(entry->has_type());
+
+  if (submission.empty())
+    return EMPTY_SUBMISSION;
+
+  SubmitResult submit_result = INVALID_TYPE;
+  switch (entry->type()) {
+    case CertificateEntry::X509_ENTRY:
+      submit_result = ProcessX509Submission(submission, entry);
+      break;
+    case CertificateEntry::PRECERT_ENTRY:
+      submit_result = ProcessPreCertSubmission(submission, entry);
+      break;
+    default:
+      // We support all types, so we should currently never get here.
+      LOG(FATAL) << "Unknown entry type " << entry->type();
+      break;
+  }
+
+  if (submit_result != OK)
+    return submit_result;
+
+  Serializer::SerializeResult serialize_result =
+      Serializer::CheckFormat(*entry);
+  if (serialize_result != Serializer::OK)
+    return GetFormatError(serialize_result);
+
+  return OK;
 }
 
 // static
-SubmissionHandler::SubmitResult
+CertSubmissionHandler::SubmitResult
 CertSubmissionHandler::X509ChainToEntry(const CertChain &chain,
                                         CertificateEntry *entry) {
   if (!chain.IsLoaded())
@@ -39,7 +71,7 @@ CertSubmissionHandler::X509ChainToEntry(const CertChain &chain,
 
 // Inputs must be concatenated PEM entries.
 // Format checking is done in the parent class.
-SubmissionHandler::SubmitResult
+CertSubmissionHandler::SubmitResult
 CertSubmissionHandler::ProcessX509Submission(const string &submission,
                                              CertificateEntry *entry) {
   string pem_string(reinterpret_cast<const char*>(submission.data()),
@@ -62,7 +94,7 @@ CertSubmissionHandler::ProcessX509Submission(const string &submission,
   return OK;
 }
 
-SubmissionHandler::SubmitResult
+CertSubmissionHandler::SubmitResult
 CertSubmissionHandler::ProcessPreCertSubmission(const string &submission,
                                                 CertificateEntry *entry) {
   string pem_string(reinterpret_cast<const char*>(submission.data()),
@@ -90,7 +122,8 @@ string CertSubmissionHandler::TbsCertificate(const PreCertChain &chain) {
     return string();
 
   Cert *tbs = chain.PreCert()->Clone();
-  assert(tbs != NULL && tbs->IsLoaded());
+  CHECK_NOTNULL(tbs);
+  CHECK(tbs->IsLoaded());
 
   // Remove the poison extension and the signature.
   tbs->DeleteExtension(Cert::kPoisonExtensionOID);
@@ -98,7 +131,8 @@ string CertSubmissionHandler::TbsCertificate(const PreCertChain &chain) {
 
   // Fix the issuer.
   const Cert *ca_precert = chain.CaPreCert();
-  assert(ca_precert != NULL && ca_precert->IsLoaded());
+  CHECK_NOTNULL(ca_precert);
+  CHECK(ca_precert->IsLoaded());
   tbs->CopyIssuerFrom(*ca_precert);
 
   string der_cert = tbs->DerEncoding();
@@ -111,7 +145,8 @@ string CertSubmissionHandler::TbsCertificate(const CertChain &chain) {
     return string();
 
   const Cert *leaf = chain.LeafCert();
-  assert(leaf != NULL && leaf->IsLoaded());
+  CHECK_NOTNULL(leaf);
+  CHECK(leaf->IsLoaded());
 
   Cert *tbs = leaf->Clone();
 
@@ -122,4 +157,44 @@ string CertSubmissionHandler::TbsCertificate(const CertChain &chain) {
   string der_cert = tbs->DerEncoding();
   delete tbs;
   return der_cert;
+}
+
+// static
+CertSubmissionHandler::SubmitResult
+CertSubmissionHandler::GetFormatError(Serializer::SerializeResult result) {
+  SubmitResult submit_result;
+  switch (result) {
+    // Since the submission handler checks that the submission is valid
+    // for a given type, the only error we should be seeing here
+    // is a chain whose canonical encoding is too long.
+    // Anything else (invalid/empty certs) should be caught earlier.
+    case Serializer::CERTIFICATE_TOO_LONG:
+    case Serializer::CERTIFICATE_CHAIN_TOO_LONG:
+      submit_result = SUBMISSION_TOO_LONG;
+      break;
+    default:
+      LOG(FATAL) << "Unknown Serializer error " << result;
+  }
+
+  return submit_result;
+}
+
+// static
+CertSubmissionHandler::SubmitResult
+CertSubmissionHandler::GetVerifyError(CertChecker::CertVerifyResult result) {
+  SubmitResult submit_result;
+  switch (result) {
+    case CertChecker::INVALID_CERTIFICATE_CHAIN:
+      submit_result = INVALID_CERTIFICATE_CHAIN;
+      break;
+    case CertChecker::PRECERT_CHAIN_NOT_WELL_FORMED:
+      submit_result = PRECERT_CHAIN_NOT_WELL_FORMED;
+      break;
+    case CertChecker::ROOT_NOT_IN_LOCAL_STORE:
+      submit_result = UNKNOWN_ROOT;
+      break;
+    default:
+      LOG(FATAL) << "Unknown CertChecker error " << result;
+  }
+  return submit_result;
 }

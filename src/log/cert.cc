@@ -1,4 +1,5 @@
 #include <assert.h>
+#include <glog/logging.h>
 #include <openssl/asn1.h>
 #include <openssl/bio.h>
 #include <openssl/err.h>
@@ -136,6 +137,14 @@ string Cert::DerEncoding() const {
   string ret(reinterpret_cast<char*>(der_buf), der_length);
   OPENSSL_free(der_buf);
   return ret;
+}
+
+string Cert::Sha256Digest() const {
+  assert(IsLoaded());
+  unsigned char digest[EVP_MAX_MD_SIZE];
+  unsigned int len;
+  CHECK_EQ(1, X509_digest(x509_, EVP_sha256(), digest, &len));
+  return string(reinterpret_cast<char*>(digest), len);
 }
 
 // WARNING WARNING this method modifies the x509_ structure

@@ -37,6 +37,14 @@ SQLiteDB::~SQLiteDB() {
   CHECK_EQ(SQLITE_OK, sqlite3_close(db_));
 }
 
+void SQLiteDB::BeginTransaction() {
+  CHECK_EQ(SQLITE_OK, sqlite3_exec(db_, "BEGIN;", NULL, NULL, NULL));
+}
+
+void SQLiteDB::EndTransaction() {
+  CHECK_EQ(SQLITE_OK, sqlite3_exec(db_, "COMMIT;", NULL, NULL, NULL));
+}
+
 // Reduce the ugliness of the sqlite3 API.
 class Statement {
  public:

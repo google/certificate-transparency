@@ -93,6 +93,16 @@ TYPED_TEST(SerialHasherTest, Update) {
   EXPECT_EQ(H(digest), H(output));
 }
 
+TEST(Sha256Test, StaticDigest) {
+  string input, output, digest;
+
+  for (size_t i = 0; test_sha256[i].input != NULL; ++i) {
+    digest = Sha256Hasher::Sha256Digest(S(test_sha256[i].input,
+                                          test_sha256[i].input_length));
+    EXPECT_STREQ(H(digest).c_str(), test_sha256[i].output);
+  }
+}
+
 #undef S
 #undef H
 

@@ -46,6 +46,8 @@ message CertificateEntry {
   repeated bytes intermediates = 3;
 }
 
+// TODO(ekasper): Consider moving the CertificateEntry out of this
+// message to LoggedCertificate, to better match the I-D.
 message SignedCertificateTimestamp {
   // UTC time in milliseconds, since January 1, 1970, 00:00.
   optional uint64 timestamp = 1;

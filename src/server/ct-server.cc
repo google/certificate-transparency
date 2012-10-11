@@ -23,6 +23,7 @@
 #include "file_db.h"
 #include "file_storage.h"
 #include "frontend_signer.h"
+#include "frontend.h"
 #include "log_signer.h"
 #include "serializer.h"
 #include "sqlite_db.h"
@@ -401,10 +402,10 @@ class Server : public FD {
 
 class CTLogManager {
  public:
-  CTLogManager(FrontendSigner *signer)
-      : signer_(signer) {}
+  CTLogManager(Frontend *frontend)
+      : frontend_(frontend) {}
 
-  ~CTLogManager() { delete signer_; }
+  ~CTLogManager() { delete frontend_; }
 
   enum LogReply {
     SIGNED_CERTIFICATE_TIMESTAMP,
@@ -416,24 +417,23 @@ class CTLogManager {
   LogReply SubmitEntry(CertificateEntry::Type type, const string &data,
                        SignedCertificateTimestamp *sct, string *error) {
     SignedCertificateTimestamp local_sct;
-    FrontendSigner::SubmitResult submit_result =
-        signer_->QueueEntry(type, data, &local_sct);
+    Frontend::SubmitResult submit_result =
+        frontend_->QueueEntry(type, data, &local_sct);
 
     LogReply reply = REJECT;
     switch (submit_result) {
-      case FrontendSigner::LOGGED:
-      case FrontendSigner::PENDING:
-      case FrontendSigner::NEW:
+      case Frontend::NEW:
+      case Frontend::DUPLICATE:
         sct->CopyFrom(local_sct);
         reply = SIGNED_CERTIFICATE_TIMESTAMP;
         break;
       default:
-        error->assign(FrontendSigner::SubmitResultString(submit_result));
+        error->assign(Frontend::SubmitResultString(submit_result));
     }
     return reply;
   }
  private:
-  FrontendSigner *signer_;
+  Frontend *frontend_;
 };
 
 class CTServer : public Server {
@@ -669,10 +669,10 @@ int main(int argc, char **argv) {
                       new FileStorage(FLAGS_tree_dir,
                                       FLAGS_tree_storage_depth));
 
-  FrontendSigner signer(db, new LogSigner(pkey),
-                        new CertSubmissionHandler(&checker));
+  Frontend frontend(new CertSubmissionHandler(&checker),
+                    new FrontendSigner(db, new LogSigner(pkey)));
 
-  CTLogManager manager(&signer);
+  CTLogManager manager(&frontend);
   CTServerListener l(&loop, fd, &manager);
   LOG(INFO) << "Server listening on port " << FLAGS_port;
   loop.Forever();

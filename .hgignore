@@ -20,10 +20,12 @@
 ^src/log/cert_checker_test$
 ^src/log/log_lookup_test$
 ^src/log/log_signer_test$
-^src/log/submission_handler_test$
+^src/log/cert_submission_handler_test$
 ^src/log/frontend_signer_test$
+^src/log/frontend_test$
 ^src/log/file_storage_test$
 ^src/log/database_test$
+^src/log/database_large_test$
 ^src/log/tree_signer_test$
 .*\.pb.h$
 .*\.pb.cc$

@@ -13,8 +13,7 @@ CXXFLAGS= $(INCLUDE) $(CXXFLAG)
 
 OBJS= client.o log_client.o ssl_client.o ../merkletree/merkle_verifier.o \
 ../merkletree/serial_hasher.o ../merkletree/tree_hasher.o \
-../util/util.o ../log/cert.o \
-../log/log_signer.o ../log/log_verifier.o ../log/submission_handler.o \
+../util/util.o ../log/cert.o ../log/log_signer.o ../log/log_verifier.o \
 ../log/cert_submission_handler.o ../log/cert_checker.o \
 ../proto/ct.pb.o ../proto/serializer.o
 

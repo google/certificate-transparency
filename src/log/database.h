@@ -3,6 +3,7 @@
 #ifndef DATABASE_H
 #define DATABASE_H
 
+#include <glog/logging.h>
 #include <set>
 
 #include "ct.pb.h"
@@ -34,6 +35,16 @@ class Database {
   };
 
   virtual ~Database() {}
+
+  virtual bool Transactional() const { return false; }
+
+  virtual void BeginTransaction() {
+    DLOG(FATAL) << "Transactions not supported";
+  }
+
+  virtual void EndTransaction() {
+    DLOG(FATAL) << "Transactions not supported";
+  }
 
   // Attempt to create a new entry. Fail if no certificate hash is given,
   // or an entry with this hash already exists.
