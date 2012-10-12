@@ -214,7 +214,7 @@ TYPED_TEST(FrontendTest, TestSubmitPrecert) {
 
   CertChain chain(this->embedded_pem_);
   CertificateEntry entry;
-  CHECK_EQ(SubmissionHandler::OK,
+  CHECK_EQ(CertSubmissionHandler::OK,
            CertSubmissionHandler::X509ChainToEntry(chain, &entry));
 
   // Look it up.
