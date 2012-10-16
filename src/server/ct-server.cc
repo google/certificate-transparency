@@ -29,6 +29,7 @@
 #include "log_signer.h"
 #include "serializer.h"
 #include "sqlite_db.h"
+#include "tree_signer.h"
 #include "unistd.h"
 
 DEFINE_int32(port, 0, "Server port");
@@ -50,6 +51,12 @@ DEFINE_int32(log_stats_frequency_seconds, 3600,
              "will log statistics if in the beginning of its select loop, "
              "at least this period has elapsed since the last log time. "
              "Must be greater than 0.");
+DEFINE_int32(tree_signing_frequency_seconds, 600,
+             "How often should we issue a new signed tree head. Approximate: "
+             "the signer process will kick off if in the beginning of the "
+             "server select loop, at least this period has elapsed since the "
+             "last signing. Set this well below the MMD to ensure we sign "
+             "in a timely manner. Must be greater than 0.");
 
 using google::RegisterFlagValidator;
 using std::string;
@@ -117,6 +124,9 @@ static bool ValidateIsPositive(const char *flagname, int value) {
 
 static const bool stats_dummy = RegisterFlagValidator(
     &FLAGS_log_stats_frequency_seconds, &ValidateIsPositive);
+
+static const bool sign_dummy = RegisterFlagValidator(
+    &FLAGS_tree_signing_frequency_seconds, &ValidateIsPositive);
 
 using ct::CertificateEntry;
 using ct::ClientMessage;
@@ -249,7 +259,7 @@ class Listener : public FD {
 
 class RepeatedEvent {
  public:
-  RepeatedEvent(uint64_t repeat_frequency_seconds)
+  RepeatedEvent(time_t repeat_frequency_seconds)
       : frequency_(repeat_frequency_seconds),
         last_activity_(Services::RoughTime()) {}
 
@@ -266,7 +276,7 @@ class RepeatedEvent {
     last_activity_ = Services::RoughTime();
   }
  private:
- uint64_t frequency_;
+ time_t frequency_;
  time_t last_activity_;
 };
 
@@ -480,10 +490,19 @@ class Server : public FD {
 
 class CTLogManager {
  public:
-  CTLogManager(Frontend *frontend)
-      : frontend_(frontend) {}
+  CTLogManager(Frontend *frontend, TreeSigner *signer)
+      : frontend_(frontend),
+        signer_(signer) {
+    LOG(INFO) << "Starting CT log manager";
+    time_t last_update = static_cast<time_t>(signer_->LastUpdateTime() / 1000);
+    if (last_update > 0)
+      LOG(INFO) << "Last tree update was at " << ctime(&last_update);
+}
 
-  ~CTLogManager() { delete frontend_; }
+  ~CTLogManager() {
+    delete frontend_;
+    delete signer_;
+  }
 
   enum LogReply {
     SIGNED_CERTIFICATE_TIMESTAMP,
@@ -539,13 +558,26 @@ class CTLogManager {
     }
     return reply;
   }
+
+  bool SignMerkleTree() {
+    TreeSigner::UpdateResult res = signer_->UpdateTree();
+    if (res != TreeSigner::OK) {
+      LOG(ERROR) << "Tree update failed with return code " << res;
+      return false;
+    }
+    time_t last_update = static_cast<time_t>(signer_->LastUpdateTime() / 1000);
+    LOG(INFO) << "Tree successfully updated at " << ctime(&last_update);
+    return true;
+  }
+
  private:
   Frontend *frontend_;
+  TreeSigner *signer_;
 };
 
 class FrontendLogEvent : public RepeatedEvent {
  public:
-  FrontendLogEvent(int frequency, CTLogManager *manager)
+  FrontendLogEvent(time_t frequency, CTLogManager *manager)
   : RepeatedEvent(frequency),
     manager_(manager) {}
 
@@ -560,6 +592,24 @@ class FrontendLogEvent : public RepeatedEvent {
   }
  private:
   CTLogManager *manager_;
+};
+
+
+class TreeSigningEvent : public RepeatedEvent {
+ public:
+  TreeSigningEvent(time_t frequency, CTLogManager *manager)
+  : RepeatedEvent(frequency),
+    manager_(manager) {}
+
+  string Description() {
+    return "tree signing";
+  }
+
+  void Execute() {
+    CHECK(manager_->SignMerkleTree());
+   }
+  private:
+   CTLogManager *manager_;
 };
 
 class CTServer : public Server {
@@ -795,13 +845,28 @@ int main(int argc, char **argv) {
                       new FileStorage(FLAGS_tree_dir,
                                       FLAGS_tree_storage_depth));
 
+  // Hmm, there is no EVP_PKEY_dup, so let's read the key again...
+  EVP_PKEY *pkey2 = NULL;
+  fp = fopen(FLAGS_key.c_str(), "r");
+
+  PCHECK(fp != static_cast<FILE*>(NULL)) << "Could not read private key file";
+  // No password.
+  PEM_read_PrivateKey(fp, &pkey2, NULL, NULL);
+  CHECK_NE(pkey, static_cast<EVP_PKEY*>(NULL)) <<
+      FLAGS_key << " is not a valid PEM-encoded private key.";
+
+  fclose(fp);
+
   CTLogManager manager(
       new Frontend(new CertSubmissionHandler(&checker),
-                   new FrontendSigner(db, new LogSigner(pkey))));
+                   new FrontendSigner(db, new LogSigner(pkey))),
+      new TreeSigner(db, new LogSigner(pkey2)));
 
   Services::SetRoughTime();
-  FrontendLogEvent event(FLAGS_log_stats_frequency_seconds, &manager);
-  loop.Add(&event);
+  TreeSigningEvent tree_event(FLAGS_tree_signing_frequency_seconds, &manager);
+  FrontendLogEvent frontend_event(FLAGS_log_stats_frequency_seconds, &manager);
+  loop.Add(&frontend_event);
+  loop.Add(&tree_event);
   CTServerListener l(&loop, fd, &manager);
   LOG(INFO) << "Server listening on port " << FLAGS_port;
   loop.Forever();
