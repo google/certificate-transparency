@@ -8,11 +8,13 @@
 #include <openssl/evp.h>
 #include <openssl/pem.h>
 #include <openssl/ssl.h>
+#include <sstream>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string>
 #include <string.h>
 #include <sys/socket.h>
+#include <sys/time.h>
 #include <sys/types.h>
 #include <time.h>
 
@@ -24,9 +26,11 @@
 #include "file_storage.h"
 #include "frontend_signer.h"
 #include "frontend.h"
+#include "log_lookup.h"
 #include "log_signer.h"
 #include "serializer.h"
 #include "sqlite_db.h"
+#include "tree_signer.h"
 #include "unistd.h"
 
 DEFINE_int32(port, 0, "Server port");
@@ -43,6 +47,17 @@ DEFINE_int32(cert_storage_depth, 0,
 DEFINE_int32(tree_storage_depth, 0,
              "Subdirectory depth for tree signatures; if the directory is not "
              "empty, must match the existing depth");
+DEFINE_int32(log_stats_frequency_seconds, 3600,
+             "Interval for logging summary statistics. Approximate: the server "
+             "will log statistics if in the beginning of its select loop, "
+             "at least this period has elapsed since the last log time. "
+             "Must be greater than 0.");
+DEFINE_int32(tree_signing_frequency_seconds, 600,
+             "How often should we issue a new signed tree head. Approximate: "
+             "the signer process will kick off if in the beginning of the "
+             "server select loop, at least this period has elapsed since the "
+             "last signing. Set this well below the MMD to ensure we sign "
+             "in a timely manner. Must be greater than 0.");
 
 using google::RegisterFlagValidator;
 using std::string;
@@ -100,7 +115,23 @@ static const bool c_st_dummy = RegisterFlagValidator(&FLAGS_cert_storage_depth,
 static const bool t_st_dummy = RegisterFlagValidator(&FLAGS_tree_storage_depth,
                                                      &ValidateIsNonNegative);
 
+static bool ValidateIsPositive(const char *flagname, int value) {
+  if (value <= 0) {
+    std::cout << flagname << " must be greater than 0" << std::endl;
+    return false;
+  }
+  return true;
+}
+
+static const bool stats_dummy = RegisterFlagValidator(
+    &FLAGS_log_stats_frequency_seconds, &ValidateIsPositive);
+
+static const bool sign_dummy = RegisterFlagValidator(
+    &FLAGS_tree_signing_frequency_seconds, &ValidateIsPositive);
+
 using ct::CertificateEntry;
+using ct::MerkleAuditProof;
+using ct::ClientLookup;
 using ct::ClientMessage;
 using ct::ServerError;
 using ct::ServerMessage;
@@ -229,12 +260,66 @@ class Listener : public FD {
   virtual void Accepted(int fd) = 0;
 };
 
+class RepeatedEvent {
+ public:
+  RepeatedEvent(time_t repeat_frequency_seconds)
+      : frequency_(repeat_frequency_seconds),
+        last_activity_(Services::RoughTime()) {}
+
+ // The time when we should execute next.
+  time_t Trigger() {
+    return last_activity_ + frequency_;
+  }
+
+  virtual string Description() = 0;
+
+  virtual void Execute() = 0;
+
+  void Activity() {
+    last_activity_ = Services::RoughTime();
+  }
+ private:
+ time_t frequency_;
+ time_t last_activity_;
+};
+
 class EventLoop {
  public:
 
   void Add(FD *fd) { fds_.push_back(fd); }
 
+  void Add(RepeatedEvent *event) { events_.push_back(event); }
+
+  // Returns remaining time until the next alarm.
+  time_t ProcessRepeatedEvents() {
+    if (events_.empty())
+      return INT_MAX;
+    Services::SetRoughTime();
+    time_t now = Services::RoughTime();
+    time_t earliest = INT_MAX;
+    for (std::vector<RepeatedEvent *>::iterator it = events_.begin();
+         it != events_.end(); ++it) {
+      RepeatedEvent *event = *it;
+      time_t trigger = event->Trigger();
+      if (trigger <= now) {
+        event->Execute();
+        LOG(INFO) << "Executed " << event->Description() << " with a delay of "
+                  << difftime(now, trigger) << " seconds";
+        event->Activity();
+        trigger = event->Trigger();
+        CHECK_GT(trigger, now);
+      }
+      earliest = std::min(earliest, trigger);
+    }
+    CHECK_GT(earliest, 0);
+    return earliest - now;
+  }
   void OneLoop() {
+    time_t select_timeout = ProcessRepeatedEvents();
+    // Do not schedule any repeated events between now and the next
+    // select - they will get ignored until select returns.
+    CHECK_GT(select_timeout, 0);
+
     fd_set readers, writers;
     int max = -1;
 
@@ -253,7 +338,13 @@ class EventLoop {
 
     CHECK_GE(max, 0);
 
-    int r = select(max+1, &readers, &writers, NULL, NULL);
+    struct timeval tv;
+    tv.tv_sec = select_timeout;
+    tv.tv_usec = 0;
+
+    int r = select(max+1, &readers, &writers, NULL, &tv);
+    if (r == 0)
+      return;
 
     CHECK_GT(r, 0);
 
@@ -332,7 +423,7 @@ class EventLoop {
   }
 
   std::deque<FD *> fds_;
-  time_t rough_time_;
+  std::vector<RepeatedEvent *> events_;
   // This should probably be set to 2 for anything but test (or 1 or 0).
   // 2: everything gets a chance to speak.
   // 1: sometimes the clock will tick before some get a chance to speak.
@@ -402,15 +493,60 @@ class Server : public FD {
 
 class CTLogManager {
  public:
-  CTLogManager(Frontend *frontend)
-      : frontend_(frontend) {}
+  CTLogManager(Frontend *frontend, TreeSigner *signer, LogLookup *lookup)
+      : frontend_(frontend),
+        signer_(signer),
+        lookup_(lookup) {
+    LOG(INFO) << "Starting CT log manager";
+    time_t last_update = static_cast<time_t>(signer_->LastUpdateTime() / 1000);
+    if (last_update > 0)
+      LOG(INFO) << "Last tree update was at " << ctime(&last_update);
+}
 
-  ~CTLogManager() { delete frontend_; }
+  ~CTLogManager() {
+    delete frontend_;
+    delete signer_;
+    delete lookup_;
+  }
 
   enum LogReply {
     SIGNED_CERTIFICATE_TIMESTAMP,
     REJECT,
   };
+
+  enum LookupReply {
+    MERKLE_AUDIT_PROOF,
+    NOT_FOUND,
+  };
+
+  string FrontendStats() const {
+    Frontend::FrontendStats stats;
+    frontend_->GetStats(&stats);
+    std::stringstream ss;
+    ss << "Accepted X509 certificates: "
+       << stats.x509_accepted << std::endl;
+    ss << "Duplicate X509 certificates: "
+       << stats.x509_duplicates << std::endl;
+    ss << "Bad PEM X509 certificates: "
+       << stats.x509_bad_pem_certs << std::endl;
+    ss << "Too long X509 certificates: "
+       << stats.x509_too_long_certs << std::endl;
+    ss << "X509 verify errors: "
+       << stats.x509_verify_errors << std::endl;
+    ss << "Accepted precertificates: "
+       << stats.precert_accepted << std::endl;
+    ss << "Duplicate precertificates: "
+       << stats.precert_duplicates << std::endl;
+    ss << "Bad PEM precertificates: "
+       << stats.precert_bad_pem_certs << std::endl;
+    ss << "Too long precertificates: "
+       << stats.precert_too_long_certs << std::endl;
+    ss << "Precertificate verify errors: "
+       << stats.precert_verify_errors << std::endl;
+    ss << "Badly formatted precertificates: "
+       << stats.precert_format_errors << std::endl;
+    return ss.str();
+  }
 
   // Submit an entry and write a token, if the entry is accepted,
   // or an error otherwise.
@@ -432,8 +568,75 @@ class CTLogManager {
     }
     return reply;
   }
+
+  LookupReply QueryAuditProof(uint64_t timestamp,
+                              const std::string &certificate_hash,
+                              ct::MerkleAuditProof *proof) {
+    ct::MerkleAuditProof local_proof;
+    LogLookup::LookupResult res =
+        lookup_->CertificateAuditProof(timestamp, certificate_hash,
+                                       &local_proof);
+    if (res == LogLookup::OK) {
+      proof->CopyFrom(local_proof);
+      return MERKLE_AUDIT_PROOF;
+    }
+    CHECK_EQ(LogLookup::NOT_FOUND, res);
+    return NOT_FOUND;
+  }
+
+  bool SignMerkleTree() {
+    TreeSigner::UpdateResult res = signer_->UpdateTree();
+    if (res != TreeSigner::OK) {
+      LOG(ERROR) << "Tree update failed with return code " << res;
+      return false;
+    }
+    time_t last_update = static_cast<time_t>(signer_->LastUpdateTime() / 1000);
+    LOG(INFO) << "Tree successfully updated at " << ctime(&last_update);
+    CHECK_EQ(LogLookup::UPDATE_OK, lookup_->Update());
+    return true;
+  }
+
  private:
   Frontend *frontend_;
+  TreeSigner *signer_;
+  LogLookup *lookup_;
+};
+
+class FrontendLogEvent : public RepeatedEvent {
+ public:
+  FrontendLogEvent(time_t frequency, CTLogManager *manager)
+  : RepeatedEvent(frequency),
+    manager_(manager) {}
+
+  string Description() {
+    return "frontend statistics logging";
+  }
+
+  void Execute() {
+    time_t roughly_now = Services::RoughTime();
+    LOG(INFO) << "Frontend statistics on " << ctime(&roughly_now);
+    LOG(INFO) << manager_->FrontendStats();
+  }
+ private:
+  CTLogManager *manager_;
+};
+
+
+class TreeSigningEvent : public RepeatedEvent {
+ public:
+  TreeSigningEvent(time_t frequency, CTLogManager *manager)
+  : RepeatedEvent(frequency),
+    manager_(manager) {}
+
+  string Description() {
+    return "tree signing";
+  }
+
+  void Execute() {
+    CHECK(manager_->SignMerkleTree());
+   }
+  private:
+   CTLogManager *manager_;
 };
 
 class CTServer : public Server {
@@ -500,33 +703,54 @@ class CTServer : public Server {
    LOG(INFO) << "Command is " << message.command() << ", data length "
              << message.submission_data().size();
 
-   string error;
-   SignedCertificateTimestamp sct;
-    CTLogManager::LogReply reply;
-    // Since we successfully parsed the protobuf, apparently we know
-    // the command but don't handle it.
-    if (message.command() != ClientMessage::SUBMIT_BUNDLE &&
-        message.command() != ClientMessage::SUBMIT_CA_BUNDLE) {
-      SendError(ServerError::UNSUPPORTED_COMMAND);
-      return;
-    }
-    if (message.command() == ClientMessage::SUBMIT_BUNDLE)
-      reply = manager_->SubmitEntry(CertificateEntry::X509_ENTRY, data, &sct,
-                                    &error);
-    else
-      reply = manager_->SubmitEntry(CertificateEntry::PRECERT_ENTRY, data, &sct,
-                                    &error);
+   // Since we successfully parsed the protobuf, apparently we know
+   // the command but don't handle it.
+   if (message.command() != ClientMessage::SUBMIT_BUNDLE &&
+       message.command() != ClientMessage::SUBMIT_CA_BUNDLE &&
+       (message.command() != ClientMessage::LOOKUP_AUDIT_PROOF
+        || message.lookup().type() !=
+        ClientLookup::MERKLE_AUDIT_PROOF_BY_TIMESTAMP_AND_HASH)) {
+         SendError(ServerError::UNSUPPORTED_COMMAND);
+         return;
+       }
 
-    switch (reply) {
-      case CTLogManager::REJECT:
-        SendError(ServerError::REJECTED, error);
-        break;
-      case CTLogManager::SIGNED_CERTIFICATE_TIMESTAMP:
-        SendSCTToken(sct);
-        break;
-      default:
-        DLOG(FATAL) << "Unknown CTLogManager reply: " << reply;
-    }
+   if (message.command() == ClientMessage::SUBMIT_BUNDLE ||
+       message.command() == ClientMessage::SUBMIT_CA_BUNDLE) {
+     string error;
+     SignedCertificateTimestamp sct;
+     CTLogManager::LogReply reply;
+     if (message.command() == ClientMessage::SUBMIT_BUNDLE)
+       reply = manager_->SubmitEntry(CertificateEntry::X509_ENTRY,
+                                     message.submission_data(), &sct, &error);
+     else
+       reply = manager_->SubmitEntry(CertificateEntry::PRECERT_ENTRY,
+                                     message.submission_data(), &sct,  &error);
+
+     switch (reply) {
+       case CTLogManager::REJECT:
+         SendError(ServerError::REJECTED, error);
+         break;
+       case CTLogManager::SIGNED_CERTIFICATE_TIMESTAMP:
+         SendSCTToken(sct);
+         break;
+       default:
+         DLOG(FATAL) << "Unknown CTLogManager reply: " << reply;
+     }
+   }
+
+   if (message.command() == ClientMessage::LOOKUP_AUDIT_PROOF) {
+     MerkleAuditProof proof;
+     CTLogManager::LookupReply reply =
+         manager_->QueryAuditProof(message.lookup().certificate_timestamp(),
+                                   message.lookup().certificate_sha256_hash(),
+                                   &proof);
+     if (reply == CTLogManager::MERKLE_AUDIT_PROOF) {
+       SendMerkleProof(proof);
+     } else {
+       CHECK_EQ(CTLogManager::NOT_FOUND, reply);
+       SendError(ServerError::NOT_FOUND);
+     }
+   }
   }
 
   void SendError(ServerError::ErrorCode error) {
@@ -549,6 +773,13 @@ class CTServer : public Server {
     message.mutable_sct()->set_timestamp(sct.timestamp());
     message.mutable_sct()->mutable_signature()->CopyFrom(sct.signature());
 
+    SendMessage(message);
+  }
+
+  void SendMerkleProof(const MerkleAuditProof &proof) {
+    ServerMessage message;
+    message.set_response(ServerMessage::MERKLE_AUDIT_PROOF);
+    message.mutable_merkle_proof()->CopyFrom(proof);
     SendMessage(message);
   }
 
@@ -669,10 +900,29 @@ int main(int argc, char **argv) {
                       new FileStorage(FLAGS_tree_dir,
                                       FLAGS_tree_storage_depth));
 
-  Frontend frontend(new CertSubmissionHandler(&checker),
-                    new FrontendSigner(db, new LogSigner(pkey)));
+  // Hmm, there is no EVP_PKEY_dup, so let's read the key again...
+  EVP_PKEY *pkey2 = NULL;
+  fp = fopen(FLAGS_key.c_str(), "r");
 
-  CTLogManager manager(&frontend);
+  PCHECK(fp != static_cast<FILE*>(NULL)) << "Could not read private key file";
+  // No password.
+  PEM_read_PrivateKey(fp, &pkey2, NULL, NULL);
+  CHECK_NE(pkey, static_cast<EVP_PKEY*>(NULL)) <<
+      FLAGS_key << " is not a valid PEM-encoded private key.";
+
+  fclose(fp);
+
+  CTLogManager manager(
+      new Frontend(new CertSubmissionHandler(&checker),
+                   new FrontendSigner(db, new LogSigner(pkey))),
+      new TreeSigner(db, new LogSigner(pkey2)),
+      new LogLookup(db));
+
+  Services::SetRoughTime();
+  TreeSigningEvent tree_event(FLAGS_tree_signing_frequency_seconds, &manager);
+  FrontendLogEvent frontend_event(FLAGS_log_stats_frequency_seconds, &manager);
+  loop.Add(&frontend_event);
+  loop.Add(&tree_event);
   CTServerListener l(&loop, fd, &manager);
   LOG(INFO) << "Server listening on port " << FLAGS_port;
   loop.Forever();
