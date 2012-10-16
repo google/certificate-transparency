@@ -5,12 +5,15 @@
 #include "ct.h"
 #include "ct.pb.h"
 #include "log_client.h"
+#include "serial_hasher.h"
 #include "serializer.h"
 
 using ct::CertificateEntry;
+using ct::ClientLookup;
 using ct::ClientMessage;
 using ct::ServerError;
 using ct::ServerMessage;
+using ct::MerkleAuditProof;
 using ct::SignedCertificateTimestamp;
 using std::string;
 
@@ -66,7 +69,46 @@ bool LogClient::UploadSubmission(const string &submission, bool pre,
       ret = true;
       break;
     default:
-      DLOG(FATAL) << "Unknown response code." << std::endl;
+      DLOG(FATAL) << "Unexpected response code.";
+  }
+  return ret;
+}
+
+bool LogClient::QueryAuditProof(const SignedCertificateTimestamp &sct,
+                                MerkleAuditProof *proof) {
+  CHECK(sct.has_timestamp()) << "Missing SCT timestamp";
+  CHECK(sct.entry().has_leaf_certificate())
+      << "Missing leaf certificate; cannot calculate certificate hash";
+  ClientMessage message;
+  message.set_command(ClientMessage::LOOKUP_AUDIT_PROOF);
+  message.mutable_lookup()->set_type(
+      ClientLookup::MERKLE_AUDIT_PROOF_BY_TIMESTAMP_AND_HASH);
+  message.mutable_lookup()->set_certificate_timestamp(sct.timestamp());
+  message.mutable_lookup()->set_certificate_sha256_hash(
+      Sha256Hasher::Sha256Digest(sct.entry().leaf_certificate()));
+  if (!SendMessage(message))
+    return false;
+  ServerMessage reply;
+  if (!ReadReply(&reply))
+    return false;
+
+  bool ret = false;
+  switch (reply.response()) {
+   case ServerMessage::ERROR:
+      LOG(ERROR) << "CT server replied with error " << reply.error().code()
+                 << ": " << ErrorString(reply.error().code());
+      if (reply.error().has_error_message())
+        LOG(ERROR) << "Error message: " << reply.error().error_message();
+      else
+        LOG(ERROR) << "Sorry, that's all we know.";
+      break;
+    case ServerMessage::MERKLE_AUDIT_PROOF:
+      LOG(INFO) << "Proof retrieved";
+      proof->CopyFrom(reply.merkle_proof());
+      ret = true;
+      break;
+    default:
+      DLOG(FATAL) << "Unexpected response code.";
   }
   return ret;
 }
@@ -84,6 +126,8 @@ string LogClient::ErrorString(ServerError::ErrorCode error) {
         return "unsupported command";
       case ServerError::REJECTED:
         return "rejected";
+     case ServerError::NOT_FOUND:
+       return "not found";
       default:
         return "unknown error code";
     }

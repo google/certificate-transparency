@@ -45,6 +45,9 @@ DEFINE_bool(precert, false,
             "The submission is a CA precertificate chain");
 DEFINE_string(sct_token, "",
               "Input file containing the SCT of the certificate");
+DEFINE_string(ssl_client_sct_checkpoint_out, "",
+              "Output file for recording the server's leaf certificate, "
+              "SCT timestamp and signature.");
 DEFINE_string(certificate_out, "",
               "Output file for the superfluous certificate");
 DEFINE_string(authz_out, "", "Output file for authz data");
@@ -70,6 +73,7 @@ static const char kUsage[] =
     "Use --help to display command-line flag options\n";
 
 using ct::CertificateEntry;
+using ct::MerkleAuditProof;
 using ct::SignedCertificateTimestamp;
 using std::string;
 
@@ -135,6 +139,7 @@ static int Upload() {
     if (Serializer::SerializeSCTToken(sct, &proof) == Serializer::OK) {
       token_out.write(proof.data(), proof.size());
       LOG(INFO) << "SCT token saved in " << response_file;
+      token_out.close();
     } else {
       LOG(ERROR) << "Failed to serialize the server token";
       return 1;
@@ -326,12 +331,78 @@ static SSLClient::HandshakeResult Connect() {
   else
     result = client.SSLConnect();
 
-  if (VLOG_IS_ON(5) && result == SSLClient::OK) {
+  if (result == SSLClient::OK) {
     SignedCertificateTimestamp sct;
-    if (client.GetToken(&sct));
-    VLOG(5) << "Received SCT token:\n" << sct.DebugString();
+    if (client.GetToken(&sct)) {
+      VLOG(5) << "Received SCT token:\n" << sct.DebugString();
+      string sct_out_file = FLAGS_ssl_client_sct_checkpoint_out;
+      if (!sct_out_file.empty()) {
+        std::ofstream checkpoint_out(sct_out_file.c_str(),
+                                     std::ios::out | std::ios::binary);
+        PCHECK(checkpoint_out.good()) << "Could not open checkpoint file "
+                                      << sct_out_file << " for writing";
+        string serialized_sct;
+        CHECK(sct.SerializeToString(&serialized_sct));
+        checkpoint_out << serialized_sct;
+        checkpoint_out.close();
+      }
+    }
   }
   return result;
+}
+
+enum AuditResult {
+  PROOF_OK = 0,
+  PROOF_NOT_FOUND = 1,
+  CT_SERVER_UNAVAILABLE = 2,
+};
+
+static AuditResult Audit() {
+  string serialized_sct;
+  PCHECK(util::ReadBinaryFile(FLAGS_sct_token, &serialized_sct))
+      << "Could not read SCT data from " << FLAGS_sct_token;
+  SignedCertificateTimestamp sct;
+  CHECK(sct.ParseFromString(serialized_sct)) << "Failed to parse the SCT";
+
+  string log_server_key = FLAGS_ct_server_public_key;
+  CHECK(!log_server_key.empty()) << "Please give a CT log server public key";
+
+  EVP_PKEY *pkey = NULL;
+  FILE *fp = fopen(log_server_key.c_str(), "r");
+
+  PCHECK(fp != static_cast<FILE*>(NULL))
+      << "Could not read CT server public key file";
+  // No password.
+  PEM_read_PUBKEY(fp, &pkey, NULL, NULL);
+  CHECK_NE(pkey, static_cast<EVP_PKEY*>(NULL)) <<
+      FLAGS_ct_server_public_key << " is not a valid PEM-encoded public key.";
+
+  fclose(fp);
+
+  LogVerifier *verifier =
+      new LogVerifier(new LogSigVerifier(pkey),
+                      new MerkleVerifier(new Sha256Hasher()));
+
+  LogClient client(FLAGS_ct_server, FLAGS_ct_server_port);
+  if(!client.Connect()) {
+    LOG(ERROR) << "Unable to connect";
+    return CT_SERVER_UNAVAILABLE;
+  }
+
+  MerkleAuditProof proof;
+  if (!client.QueryAuditProof(sct, &proof))
+    return PROOF_NOT_FOUND;
+
+  VLOG(5) << "Received proof " << proof.DebugString();
+  LogVerifier::VerifyResult res = verifier->VerifyMerkleAuditProof(sct, proof);
+  if (res != LogVerifier::VERIFY_OK) {
+    LOG(ERROR) << "Verify error: " << LogVerifier::VerifyResultString(res);
+    LOG(ERROR) << "Retrieved Merkle proof is invalid.";
+    return PROOF_NOT_FOUND;
+  }
+
+  LOG(INFO) << "Proof verified.";
+  return PROOF_OK;
 }
 
 // Exit code upon normal exit:
@@ -340,6 +411,7 @@ static SSLClient::HandshakeResult Connect() {
 // - for log server: connection failed or the server replied with an error
 // - for SSL server: connection failed, handshake failed when success was
 //                   expected or vice versa
+// 2: initial connection to the (log/ssl) server failed
 // Exit code upon abnormal exit (CHECK failures): != 0
 // (on UNIX, 134 is expected)
 int main(int argc, char **argv) {
@@ -366,6 +438,8 @@ int main(int argc, char **argv) {
       ret = 1;
   } else  if (cmd == "upload") {
     ret = Upload();
+  } else if (cmd == "audit") {
+    ret = Audit();
   } else if (cmd == "certificate") {
     MakeCert();
   } else if (cmd == "authz") {

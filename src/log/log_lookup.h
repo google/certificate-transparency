@@ -26,7 +26,6 @@ class LogLookup {
   enum LookupResult {
     OK,
     NOT_FOUND,
-    DB_ERROR,
   };
 
   // Look up by timestamp + SHA256-hash of the certificate.

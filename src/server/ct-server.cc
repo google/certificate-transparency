@@ -26,6 +26,7 @@
 #include "file_storage.h"
 #include "frontend_signer.h"
 #include "frontend.h"
+#include "log_lookup.h"
 #include "log_signer.h"
 #include "serializer.h"
 #include "sqlite_db.h"
@@ -129,6 +130,8 @@ static const bool sign_dummy = RegisterFlagValidator(
     &FLAGS_tree_signing_frequency_seconds, &ValidateIsPositive);
 
 using ct::CertificateEntry;
+using ct::MerkleAuditProof;
+using ct::ClientLookup;
 using ct::ClientMessage;
 using ct::ServerError;
 using ct::ServerMessage;
@@ -490,9 +493,10 @@ class Server : public FD {
 
 class CTLogManager {
  public:
-  CTLogManager(Frontend *frontend, TreeSigner *signer)
+  CTLogManager(Frontend *frontend, TreeSigner *signer, LogLookup *lookup)
       : frontend_(frontend),
-        signer_(signer) {
+        signer_(signer),
+        lookup_(lookup) {
     LOG(INFO) << "Starting CT log manager";
     time_t last_update = static_cast<time_t>(signer_->LastUpdateTime() / 1000);
     if (last_update > 0)
@@ -502,11 +506,17 @@ class CTLogManager {
   ~CTLogManager() {
     delete frontend_;
     delete signer_;
+    delete lookup_;
   }
 
   enum LogReply {
     SIGNED_CERTIFICATE_TIMESTAMP,
     REJECT,
+  };
+
+  enum LookupReply {
+    MERKLE_AUDIT_PROOF,
+    NOT_FOUND,
   };
 
   string FrontendStats() const {
@@ -559,6 +569,21 @@ class CTLogManager {
     return reply;
   }
 
+  LookupReply QueryAuditProof(uint64_t timestamp,
+                              const std::string &certificate_hash,
+                              ct::MerkleAuditProof *proof) {
+    ct::MerkleAuditProof local_proof;
+    LogLookup::LookupResult res =
+        lookup_->CertificateAuditProof(timestamp, certificate_hash,
+                                       &local_proof);
+    if (res == LogLookup::OK) {
+      proof->CopyFrom(local_proof);
+      return MERKLE_AUDIT_PROOF;
+    }
+    CHECK_EQ(LogLookup::NOT_FOUND, res);
+    return NOT_FOUND;
+  }
+
   bool SignMerkleTree() {
     TreeSigner::UpdateResult res = signer_->UpdateTree();
     if (res != TreeSigner::OK) {
@@ -567,12 +592,14 @@ class CTLogManager {
     }
     time_t last_update = static_cast<time_t>(signer_->LastUpdateTime() / 1000);
     LOG(INFO) << "Tree successfully updated at " << ctime(&last_update);
+    CHECK_EQ(LogLookup::UPDATE_OK, lookup_->Update());
     return true;
   }
 
  private:
   Frontend *frontend_;
   TreeSigner *signer_;
+  LogLookup *lookup_;
 };
 
 class FrontendLogEvent : public RepeatedEvent {
@@ -676,33 +703,54 @@ class CTServer : public Server {
    LOG(INFO) << "Command is " << message.command() << ", data length "
              << message.submission_data().size();
 
-   string error;
-   SignedCertificateTimestamp sct;
-    CTLogManager::LogReply reply;
-    // Since we successfully parsed the protobuf, apparently we know
-    // the command but don't handle it.
-    if (message.command() != ClientMessage::SUBMIT_BUNDLE &&
-        message.command() != ClientMessage::SUBMIT_CA_BUNDLE) {
-      SendError(ServerError::UNSUPPORTED_COMMAND);
-      return;
-    }
-    if (message.command() == ClientMessage::SUBMIT_BUNDLE)
-      reply = manager_->SubmitEntry(CertificateEntry::X509_ENTRY, data, &sct,
-                                    &error);
-    else
-      reply = manager_->SubmitEntry(CertificateEntry::PRECERT_ENTRY, data, &sct,
-                                    &error);
+   // Since we successfully parsed the protobuf, apparently we know
+   // the command but don't handle it.
+   if (message.command() != ClientMessage::SUBMIT_BUNDLE &&
+       message.command() != ClientMessage::SUBMIT_CA_BUNDLE &&
+       (message.command() != ClientMessage::LOOKUP_AUDIT_PROOF
+        || message.lookup().type() !=
+        ClientLookup::MERKLE_AUDIT_PROOF_BY_TIMESTAMP_AND_HASH)) {
+         SendError(ServerError::UNSUPPORTED_COMMAND);
+         return;
+       }
 
-    switch (reply) {
-      case CTLogManager::REJECT:
-        SendError(ServerError::REJECTED, error);
-        break;
-      case CTLogManager::SIGNED_CERTIFICATE_TIMESTAMP:
-        SendSCTToken(sct);
-        break;
-      default:
-        DLOG(FATAL) << "Unknown CTLogManager reply: " << reply;
-    }
+   if (message.command() == ClientMessage::SUBMIT_BUNDLE ||
+       message.command() == ClientMessage::SUBMIT_CA_BUNDLE) {
+     string error;
+     SignedCertificateTimestamp sct;
+     CTLogManager::LogReply reply;
+     if (message.command() == ClientMessage::SUBMIT_BUNDLE)
+       reply = manager_->SubmitEntry(CertificateEntry::X509_ENTRY,
+                                     message.submission_data(), &sct, &error);
+     else
+       reply = manager_->SubmitEntry(CertificateEntry::PRECERT_ENTRY,
+                                     message.submission_data(), &sct,  &error);
+
+     switch (reply) {
+       case CTLogManager::REJECT:
+         SendError(ServerError::REJECTED, error);
+         break;
+       case CTLogManager::SIGNED_CERTIFICATE_TIMESTAMP:
+         SendSCTToken(sct);
+         break;
+       default:
+         DLOG(FATAL) << "Unknown CTLogManager reply: " << reply;
+     }
+   }
+
+   if (message.command() == ClientMessage::LOOKUP_AUDIT_PROOF) {
+     MerkleAuditProof proof;
+     CTLogManager::LookupReply reply =
+         manager_->QueryAuditProof(message.lookup().certificate_timestamp(),
+                                   message.lookup().certificate_sha256_hash(),
+                                   &proof);
+     if (reply == CTLogManager::MERKLE_AUDIT_PROOF) {
+       SendMerkleProof(proof);
+     } else {
+       CHECK_EQ(CTLogManager::NOT_FOUND, reply);
+       SendError(ServerError::NOT_FOUND);
+     }
+   }
   }
 
   void SendError(ServerError::ErrorCode error) {
@@ -725,6 +773,13 @@ class CTServer : public Server {
     message.mutable_sct()->set_timestamp(sct.timestamp());
     message.mutable_sct()->mutable_signature()->CopyFrom(sct.signature());
 
+    SendMessage(message);
+  }
+
+  void SendMerkleProof(const MerkleAuditProof &proof) {
+    ServerMessage message;
+    message.set_response(ServerMessage::MERKLE_AUDIT_PROOF);
+    message.mutable_merkle_proof()->CopyFrom(proof);
     SendMessage(message);
   }
 
@@ -860,7 +915,8 @@ int main(int argc, char **argv) {
   CTLogManager manager(
       new Frontend(new CertSubmissionHandler(&checker),
                    new FrontendSigner(db, new LogSigner(pkey))),
-      new TreeSigner(db, new LogSigner(pkey2)));
+      new TreeSigner(db, new LogSigner(pkey2)),
+      new LogLookup(db));
 
   Services::SetRoughTime();
   TreeSigningEvent tree_event(FLAGS_tree_signing_frequency_seconds, &manager);

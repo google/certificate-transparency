@@ -12,7 +12,7 @@ LIBS+= -L /usr/local/lib
 CXXFLAGS= $(INCLUDE) $(CXXFLAG)
 
 OBJS= ../merkletree/serial_hasher.o ../merkletree/tree_hasher.o \
-      ../merkletree/merkle_tree.o \
+      ../merkletree/merkle_tree.o ../log/log_lookup.o \
       ../util/util.o ../log/cert_checker.o ../log/cert.o \
       ../log/cert_submission_handler.o ../log/tree_signer.o \
       ../log/log_signer.o ../log/frontend_signer.o ../log/frontend.o \

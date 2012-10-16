@@ -76,6 +76,15 @@ message MerkleAuditProof {
   optional DigitallySigned tree_head_signature = 5;
 }
 
+message ClientLookup {
+  enum Type {
+    MERKLE_AUDIT_PROOF_BY_TIMESTAMP_AND_HASH = 1;
+  }
+  required Type type = 1;
+  optional uint64 certificate_timestamp = 2;
+  optional bytes certificate_sha256_hash = 3;
+}
+
 // Server-client messages
 message ClientMessage {
   enum ClientCommand {
@@ -83,9 +92,11 @@ message ClientMessage {
     // a submission token, or an audit proof.
     SUBMIT_BUNDLE = 1;
     SUBMIT_CA_BUNDLE = 2;
+    LOOKUP_AUDIT_PROOF = 3;
   }
-  required ClientCommand command = 2;
-  optional bytes submission_data = 3;
+  required ClientCommand command = 1;
+  optional bytes submission_data = 2;
+  optional ClientLookup lookup = 3;
 }
 
 message ServerError {
@@ -95,6 +106,7 @@ message ServerError {
     INVALID_MESSAGE = 2;
     UNSUPPORTED_COMMAND = 3;
     REJECTED = 4;
+    NOT_FOUND = 5;
   }
   required ErrorCode code = 1;
   optional string error_message = 2;
@@ -105,10 +117,11 @@ message ServerMessage {
   enum ServerResponse {
     ERROR = 0;
     SIGNED_CERTIFICATE_TIMESTAMP = 1;
-    LOGGED = 2;
+    MERKLE_AUDIT_PROOF = 2;
   }
   required ServerResponse response = 1;
   // Normally only one of those will be set.
   optional ServerError error = 2;
   optional SignedCertificateTimestamp sct = 3;
+  optional MerkleAuditProof merkle_proof = 4;
 }
