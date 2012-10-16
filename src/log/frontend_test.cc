@@ -77,6 +77,22 @@ template <class T> class FrontendTest : public ::testing::Test {
     ASSERT_TRUE(checker_.LoadTrustedCertificate(cert_dir_ + "/" + kCaCert));
   }
 
+  void CompareStats(const Frontend::FrontendStats &expected) {
+    Frontend::FrontendStats stats;
+    frontend_->GetStats(&stats);
+    EXPECT_EQ(expected.x509_accepted, stats.x509_accepted);
+    EXPECT_EQ(expected.x509_duplicates, stats.x509_duplicates);
+    EXPECT_EQ(expected.x509_bad_pem_certs, stats.x509_bad_pem_certs);
+    EXPECT_EQ(expected.x509_too_long_certs, stats.x509_too_long_certs);
+    EXPECT_EQ(expected.x509_verify_errors, stats.x509_verify_errors);
+    EXPECT_EQ(expected.precert_accepted, stats.precert_accepted);
+    EXPECT_EQ(expected.precert_duplicates, stats.precert_duplicates);
+    EXPECT_EQ(expected.precert_bad_pem_certs, stats.precert_bad_pem_certs);
+    EXPECT_EQ(expected.precert_too_long_certs, stats.precert_too_long_certs);
+    EXPECT_EQ(expected.precert_verify_errors, stats.precert_verify_errors);
+    EXPECT_EQ(expected.precert_format_errors, stats.precert_format_errors);
+  }
+
   ~FrontendTest() {
     delete verifier_;
     delete frontend_;
@@ -125,6 +141,9 @@ TYPED_TEST(FrontendTest, TestSubmitValid) {
   sct.mutable_entry()->set_leaf_certificate(der_string);
   EXPECT_EQ(LogVerifier::VERIFY_OK,
             this->verifier_->VerifySignedCertificateTimestamp(sct));
+
+  Frontend::FrontendStats stats(1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0);
+  this->CompareStats(stats);
 }
 
 TYPED_TEST(FrontendTest, TestSubmitValidWithIntermediate) {
@@ -156,6 +175,8 @@ TYPED_TEST(FrontendTest, TestSubmitValidWithIntermediate) {
   Cert cert2(this->intermediate_pem_);
   EXPECT_EQ(H(cert2.DerEncoding()),
             H(logged_cert.sct().entry().intermediates(0)));
+  Frontend::FrontendStats stats(1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0);
+  this->CompareStats(stats);
 }
 
 TYPED_TEST(FrontendTest, TestSubmitDuplicate) {
@@ -183,6 +204,8 @@ TYPED_TEST(FrontendTest, TestSubmitDuplicate) {
   sct.mutable_entry()->set_leaf_certificate(der_string);
   EXPECT_EQ(LogVerifier::VERIFY_OK,
             this->verifier_->VerifySignedCertificateTimestamp(sct));
+  Frontend::FrontendStats stats(1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0);
+  this->CompareStats(stats);
 }
 
 TYPED_TEST(FrontendTest, TestSubmitInvalidChain) {
@@ -192,6 +215,8 @@ TYPED_TEST(FrontendTest, TestSubmitInvalidChain) {
             this->frontend_->QueueEntry(CertificateEntry::X509_ENTRY,
                                         this->chain_leaf_pem_, &sct));
   EXPECT_FALSE(sct.has_signature());
+  Frontend::FrontendStats stats(0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0);
+  this->CompareStats(stats);
 }
 
 TYPED_TEST(FrontendTest, TestSubmitInvalidPem) {
@@ -203,6 +228,8 @@ TYPED_TEST(FrontendTest, TestSubmitInvalidPem) {
             this->frontend_->QueueEntry(CertificateEntry::X509_ENTRY,
                                         fake_cert, &sct));
   EXPECT_FALSE(sct.has_signature());
+  Frontend::FrontendStats stats(0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0);
+  this->CompareStats(stats);
 }
 
 TYPED_TEST(FrontendTest, TestSubmitPrecert) {
@@ -236,6 +263,8 @@ TYPED_TEST(FrontendTest, TestSubmitPrecert) {
             H(logged_cert.sct().entry().intermediates(0)));
   EXPECT_EQ(H(ca_pre.DerEncoding()),
             H(logged_cert.sct().entry().intermediates(1)));
+  Frontend::FrontendStats stats(0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0);
+  this->CompareStats(stats);
 }
 
 }  // namespace

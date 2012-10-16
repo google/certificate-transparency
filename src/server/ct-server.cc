@@ -8,11 +8,13 @@
 #include <openssl/evp.h>
 #include <openssl/pem.h>
 #include <openssl/ssl.h>
+#include <sstream>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string>
 #include <string.h>
 #include <sys/socket.h>
+#include <sys/time.h>
 #include <sys/types.h>
 #include <time.h>
 
@@ -43,6 +45,11 @@ DEFINE_int32(cert_storage_depth, 0,
 DEFINE_int32(tree_storage_depth, 0,
              "Subdirectory depth for tree signatures; if the directory is not "
              "empty, must match the existing depth");
+DEFINE_int32(log_stats_frequency_seconds, 3600,
+             "Interval for logging summary statistics. Approximate: the server "
+             "will log statistics if in the beginning of its select loop, "
+             "at least this period has elapsed since the last log time. "
+             "Must be greater than 0.");
 
 using google::RegisterFlagValidator;
 using std::string;
@@ -99,6 +106,17 @@ static const bool c_st_dummy = RegisterFlagValidator(&FLAGS_cert_storage_depth,
                                                      &ValidateIsNonNegative);
 static const bool t_st_dummy = RegisterFlagValidator(&FLAGS_tree_storage_depth,
                                                      &ValidateIsNonNegative);
+
+static bool ValidateIsPositive(const char *flagname, int value) {
+  if (value <= 0) {
+    std::cout << flagname << " must be greater than 0" << std::endl;
+    return false;
+  }
+  return true;
+}
+
+static const bool stats_dummy = RegisterFlagValidator(
+    &FLAGS_log_stats_frequency_seconds, &ValidateIsPositive);
 
 using ct::CertificateEntry;
 using ct::ClientMessage;
@@ -229,12 +247,66 @@ class Listener : public FD {
   virtual void Accepted(int fd) = 0;
 };
 
+class RepeatedEvent {
+ public:
+  RepeatedEvent(uint64_t repeat_frequency_seconds)
+      : frequency_(repeat_frequency_seconds),
+        last_activity_(Services::RoughTime()) {}
+
+ // The time when we should execute next.
+  time_t Trigger() {
+    return last_activity_ + frequency_;
+  }
+
+  virtual string Description() = 0;
+
+  virtual void Execute() = 0;
+
+  void Activity() {
+    last_activity_ = Services::RoughTime();
+  }
+ private:
+ uint64_t frequency_;
+ time_t last_activity_;
+};
+
 class EventLoop {
  public:
 
   void Add(FD *fd) { fds_.push_back(fd); }
 
+  void Add(RepeatedEvent *event) { events_.push_back(event); }
+
+  // Returns remaining time until the next alarm.
+  time_t ProcessRepeatedEvents() {
+    if (events_.empty())
+      return INT_MAX;
+    Services::SetRoughTime();
+    time_t now = Services::RoughTime();
+    time_t earliest = INT_MAX;
+    for (std::vector<RepeatedEvent *>::iterator it = events_.begin();
+         it != events_.end(); ++it) {
+      RepeatedEvent *event = *it;
+      time_t trigger = event->Trigger();
+      if (trigger <= now) {
+        event->Execute();
+        LOG(INFO) << "Executed " << event->Description() << " with a delay of "
+                  << difftime(now, trigger) << " seconds";
+        event->Activity();
+        trigger = event->Trigger();
+        CHECK_GT(trigger, now);
+      }
+      earliest = std::min(earliest, trigger);
+    }
+    CHECK_GT(earliest, 0);
+    return earliest - now;
+  }
   void OneLoop() {
+    time_t select_timeout = ProcessRepeatedEvents();
+    // Do not schedule any repeated events between now and the next
+    // select - they will get ignored until select returns.
+    CHECK_GT(select_timeout, 0);
+
     fd_set readers, writers;
     int max = -1;
 
@@ -253,7 +325,13 @@ class EventLoop {
 
     CHECK_GE(max, 0);
 
-    int r = select(max+1, &readers, &writers, NULL, NULL);
+    struct timeval tv;
+    tv.tv_sec = select_timeout;
+    tv.tv_usec = 0;
+
+    int r = select(max+1, &readers, &writers, NULL, &tv);
+    if (r == 0)
+      return;
 
     CHECK_GT(r, 0);
 
@@ -332,7 +410,7 @@ class EventLoop {
   }
 
   std::deque<FD *> fds_;
-  time_t rough_time_;
+  std::vector<RepeatedEvent *> events_;
   // This should probably be set to 2 for anything but test (or 1 or 0).
   // 2: everything gets a chance to speak.
   // 1: sometimes the clock will tick before some get a chance to speak.
@@ -412,6 +490,35 @@ class CTLogManager {
     REJECT,
   };
 
+  string FrontendStats() const {
+    Frontend::FrontendStats stats;
+    frontend_->GetStats(&stats);
+    std::stringstream ss;
+    ss << "Accepted X509 certificates: "
+       << stats.x509_accepted << std::endl;
+    ss << "Duplicate X509 certificates: "
+       << stats.x509_duplicates << std::endl;
+    ss << "Bad PEM X509 certificates: "
+       << stats.x509_bad_pem_certs << std::endl;
+    ss << "Too long X509 certificates: "
+       << stats.x509_too_long_certs << std::endl;
+    ss << "X509 verify errors: "
+       << stats.x509_verify_errors << std::endl;
+    ss << "Accepted precertificates: "
+       << stats.precert_accepted << std::endl;
+    ss << "Duplicate precertificates: "
+       << stats.precert_duplicates << std::endl;
+    ss << "Bad PEM precertificates: "
+       << stats.precert_bad_pem_certs << std::endl;
+    ss << "Too long precertificates: "
+       << stats.precert_too_long_certs << std::endl;
+    ss << "Precertificate verify errors: "
+       << stats.precert_verify_errors << std::endl;
+    ss << "Badly formatted precertificates: "
+       << stats.precert_format_errors << std::endl;
+    return ss.str();
+  }
+
   // Submit an entry and write a token, if the entry is accepted,
   // or an error otherwise.
   LogReply SubmitEntry(CertificateEntry::Type type, const string &data,
@@ -434,6 +541,25 @@ class CTLogManager {
   }
  private:
   Frontend *frontend_;
+};
+
+class FrontendLogEvent : public RepeatedEvent {
+ public:
+  FrontendLogEvent(int frequency, CTLogManager *manager)
+  : RepeatedEvent(frequency),
+    manager_(manager) {}
+
+  string Description() {
+    return "frontend statistics logging";
+  }
+
+  void Execute() {
+    time_t roughly_now = Services::RoughTime();
+    LOG(INFO) << "Frontend statistics on " << ctime(&roughly_now);
+    LOG(INFO) << manager_->FrontendStats();
+  }
+ private:
+  CTLogManager *manager_;
 };
 
 class CTServer : public Server {
@@ -669,10 +795,13 @@ int main(int argc, char **argv) {
                       new FileStorage(FLAGS_tree_dir,
                                       FLAGS_tree_storage_depth));
 
-  Frontend frontend(new CertSubmissionHandler(&checker),
-                    new FrontendSigner(db, new LogSigner(pkey)));
+  CTLogManager manager(
+      new Frontend(new CertSubmissionHandler(&checker),
+                   new FrontendSigner(db, new LogSigner(pkey))));
 
-  CTLogManager manager(&frontend);
+  Services::SetRoughTime();
+  FrontendLogEvent event(FLAGS_log_stats_frequency_seconds, &manager);
+  loop.Add(&event);
   CTServerListener l(&loop, fd, &manager);
   LOG(INFO) << "Server listening on port " << FLAGS_port;
   loop.Forever();
