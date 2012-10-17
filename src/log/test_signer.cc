@@ -173,7 +173,7 @@ string TestSigner::UniqueFakeCertBytestring() {
 
   string ret;
   while (length >= 256) {
-    int offset = rand() & 0xff;
+    unsigned offset = rand() & 0xff;
     DCHECK_LE(offset + 256, default_cert_.size());
     ret.append(default_cert_.substr(offset, 256));
     length -=256;
