@@ -15,6 +15,7 @@
 
 using std::string;
 
+// TODO(ekasper): sync with I-D.
 const char Cert::kProofExtensionOID[] = "1.2.3.0";
 const char Cert::kEmbeddedProofExtensionOID[] = "1.2.3.1";
 const char Cert::kPoisonExtensionOID[] = "1.2.3.2";
