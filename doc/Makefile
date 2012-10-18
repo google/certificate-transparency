@@ -1,5 +1,5 @@
 VERSION=02
-PREV=$(shell expr $(VERSION) - 1 | printf '%02d')
+PREV=01
 NAME=draft-laurie-pki-sunlight
 BASE=$(NAME)-$(VERSION)
 DIFF=$(NAME)-$(PREV)-$(VERSION)-diff.html
