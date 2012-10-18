@@ -1,5 +1,6 @@
-#include <assert.h>
+#include <glog/logging.h>
 #include <stddef.h>
+#include <string>
 #include <vector>
 
 #include "merkle_tree.h"
@@ -45,14 +46,12 @@ size_t MerkleTree::AddLeaf(const string &data) {
 }
 
 size_t MerkleTree::AddLeafHash(const string &hash) {
-  assert(treehasher_.DigestSize() == hash.size());
-
-  if (tree_.empty()) {
-    tree_.push_back(std::vector<string>(0));
+  if (LazyLevelCount() == 0) {
+    AddLevel();
     // The first leaf hash is also the first root.
     leaves_processed_ = 1;
   }
-  tree_[0].push_back(hash);
+  PushBack(0, hash);
   size_t leaf_count = LeafCount();
   // Update level count: a k-level tree can hold 2^{k-1} leaves,
   // so increment level count every time we overflow a power of two.
@@ -116,7 +115,7 @@ std::vector<string> MerkleTree::SnapshotConsistency(size_t snapshot1,
 
   // Record the node, unless we already reached the root of snapshot1.
   if (node)
-    proof.push_back(tree_[level][node]);
+    proof.push_back(Node(level, node));
 
   // Now record the path from this node to the root of snapshot2.
   std::vector<string> path = PathFromNodeToRootAtSnapshot(node, level,
@@ -128,10 +127,12 @@ std::vector<string> MerkleTree::SnapshotConsistency(size_t snapshot1,
 string MerkleTree::UpdateToSnapshot(size_t snapshot) {
   if (snapshot == 0)
     return treehasher_.HashEmpty();
+  if (snapshot == 1)
+    return Node(0, 0);
   if (snapshot == leaves_processed_)
-    return tree_.back()[0];
-  assert(snapshot <= LeafCount());
-  assert(snapshot > leaves_processed_);
+    return Root();
+  CHECK_LE(snapshot, LeafCount());
+  CHECK_GT(snapshot, leaves_processed_);
 
   // Update tree, moving up level-by-level.
   size_t level = 0;
@@ -143,25 +144,24 @@ string MerkleTree::UpdateToSnapshot(size_t snapshot) {
   // Process level-by-level until we converge to a single node.
   // (first_node, last_node) = (0, 0) means we have reached the root level.
   while (last_node) {
-    if (tree_.size() <= level + 1) {
-      tree_.push_back(std::vector<string>(0));
-    } else if (tree_[level + 1].size() == Parent(first_node) + 1) {
+    if (LazyLevelCount() <= level + 1) {
+      AddLevel();
+    } else if (NodeCount(level + 1) == Parent(first_node) + 1) {
       // The leftmost parent at level 'level+1' may already exist,
       // so we need to update it. Nuke the old parent.
-      tree_[level + 1].pop_back();
+      PopBack(level + 1);
     }
-    assert(tree_[level + 1].size() == Parent(first_node));
 
     // Compute the parents of new nodes at the current level.
     // Start with a left sibling and parse an even number of nodes.
     for (size_t j = first_node & ~1; j < last_node; j += 2) {
-      tree_[level + 1].push_back(treehasher_.HashChildren(
-          tree_[level][j], tree_[level][j + 1]));
+      PushBack(level + 1,
+               treehasher_.HashChildren(Node(level, j), Node(level, j + 1)));
     }
     // If the last node at the current level is a left sibling,
     // dummy-propagate it one level up.
     if (!IsRightChild(last_node))
-      tree_[level + 1].push_back(tree_[level][last_node]);
+      PushBack(level + 1, Node(level, last_node));
 
     first_node = Parent(first_node);
     last_node = Parent(last_node);
@@ -169,8 +169,7 @@ string MerkleTree::UpdateToSnapshot(size_t snapshot) {
   };
 
   leaves_processed_ = snapshot;
-  assert(tree_.back().size() == 1);
-  return tree_.back()[0];
+  return Root();
 }
 
 string MerkleTree::RecomputePastSnapshot(size_t snapshot,
@@ -182,23 +181,23 @@ string MerkleTree::RecomputePastSnapshot(size_t snapshot,
 
   if (snapshot == leaves_processed_) {
     // Nothing to recompute.
-    if (node && tree_.size() > node_level) {
+    if (node && LazyLevelCount() > node_level) {
       if (node_level > 0) {
-        node->assign(tree_[node_level].back());
+        node->assign(LastNode(node_level));
       } else {
         // Leaf level: grab the last processed leaf.
-        node->assign(tree_[node_level][last_node]);
+        node->assign(Node(node_level, last_node));
       }
     }
-    return tree_.back()[0];
+    return Root();
   }
 
-  assert(snapshot < leaves_processed_);
+  CHECK_LT(snapshot, leaves_processed_);
 
   // Recompute nodes on the path of the last leaf.
   while (IsRightChild(last_node)) {
     if (node && node_level == level)
-      node->assign(tree_[level][last_node]);
+      node->assign(Node(level, last_node));
     // Left sibling and parent exist in the snapshot, and are equal to
     // those in the tree; no need to rehash, move one level up.
     last_node = Parent(last_node);
@@ -207,7 +206,7 @@ string MerkleTree::RecomputePastSnapshot(size_t snapshot,
 
   // Now last_node is the index of a left sibling with no right sibling.
   // Record the node.
-  string subtree_root = tree_[level][last_node];
+  string subtree_root = Node(level, last_node);
 
   if (node && node_level == level)
     node->assign(subtree_root);
@@ -216,7 +215,7 @@ string MerkleTree::RecomputePastSnapshot(size_t snapshot,
     if (IsRightChild(last_node)) {
       // Recompute the parent of tree_[level][last_node].
       subtree_root = treehasher_.HashChildren(
-          tree_[level][last_node - 1], subtree_root);
+          Node(level, last_node - 1), subtree_root);
     }
     // Else the parent is a dummy copy of the current node; do nothing.
 
@@ -252,7 +251,7 @@ MerkleTree::PathFromNodeToRootAtSnapshot(size_t node, size_t level,
     if (sibling < last_node) {
       // The sibling is not the last node of the level in the snapshot
       // tree, so its value is correct in the tree.
-      path.push_back(tree_[level][sibling]);
+      path.push_back(Node(level, sibling));
     } else if (sibling == last_node) {
       // The sibling is the last node of the level in the snapshot tree,
       // so we get its value for the snapshot. Get the root in the same pass.
@@ -269,4 +268,44 @@ MerkleTree::PathFromNodeToRootAtSnapshot(size_t node, size_t level,
   };
 
   return path;
+}
+
+string MerkleTree::Node(size_t level, size_t index) const {
+  CHECK_GT(NodeCount(level), index);
+  return tree_[level].substr(index * treehasher_.DigestSize(),
+                             treehasher_.DigestSize());
+}
+
+string MerkleTree::Root() const {
+  CHECK_EQ(tree_.back().size(), treehasher_.DigestSize());
+  return tree_.back();
+}
+
+size_t MerkleTree::NodeCount(size_t level) const {
+  CHECK_GT(LazyLevelCount(), level);
+  return tree_[level].size() / treehasher_.DigestSize();
+}
+
+string MerkleTree::LastNode(size_t level) const {
+  CHECK_GE(NodeCount(level), 1);
+  return tree_[level].substr(tree_[level].size() - treehasher_.DigestSize());
+}
+
+void MerkleTree::PopBack(size_t level) {
+  CHECK_GE(NodeCount(level), 1);
+  tree_[level].erase(tree_[level].size() - treehasher_.DigestSize());
+}
+
+void MerkleTree::PushBack(size_t level, string node) {
+  CHECK_EQ(node.size(), treehasher_.DigestSize());
+  CHECK_GT(LazyLevelCount(), level);
+  tree_[level].append(node);
+}
+
+void MerkleTree::AddLevel() {
+  tree_.push_back(string());
+}
+
+size_t MerkleTree::LazyLevelCount() const {
+  return tree_.size();
 }

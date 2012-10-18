@@ -2,6 +2,7 @@
 #define MERKLETREE_H
 
 #include <stddef.h>
+#include <string>
 #include <vector>
 
 #include "tree_hasher.h"
@@ -29,13 +30,13 @@ class MerkleTree {
   size_t NodeSize() const { return treehasher_.DigestSize(); };
 
   // Number of leaves in the tree.
-  size_t LeafCount() const { return tree_.empty() ? 0 : tree_[0].size(); }
+  size_t LeafCount() const { return tree_.empty() ? 0 : NodeCount(0); }
 
   // The |leaf|th leaf hash in the tree. Indexing starts from 1.
   std::string LeafHash(size_t leaf) const {
     if (leaf == 0 || leaf > LeafCount())
       return std::string();
-    return tree_[0][leaf-1];
+    return Node(0, leaf - 1);
   }
 
   // Return the leaf hash, but do not append the data to the tree.
@@ -134,6 +135,32 @@ class MerkleTree {
   std::vector<std::string> PathFromNodeToRootAtSnapshot(size_t node_index,
                                                     size_t level,
                                                     size_t snapshot);
+  // Get the |index|-th node at level |level|. Indexing starts at 0;
+  // caller is responsible for ensuring tree is sufficiently up to date.
+  std::string Node(size_t level, size_t index) const;
+
+  // Get the current root (of the lazily evaluated tree).
+  // Caller is responsible for keeping track of the lazy evaluation status.
+  std::string Root() const;
+
+  // Get the current node count (of the lazily evaluated tree).
+  // Caller is responsible for keeping track of the lazy evaluation status.
+  size_t NodeCount(size_t level) const;
+
+  // Last node of the given level.
+  std::string LastNode(size_t level) const;
+
+  // Pop the last node of the level.
+  void PopBack(size_t level);
+
+  // Append a node to the level.
+  void PushBack(size_t level, std::string node);
+
+  // Start a new level.
+  void AddLevel();
+
+  // Current level count of the lazily evaluated tree.
+  size_t LazyLevelCount() const;
   // A container for nodes, organized according to levels and sorted
   // left-to-right in each level. tree_[0] is the leaf level, etc.
   // The hash of nodes tree_[i][j] and tree_[i][j+1] (j even) is stored
@@ -165,7 +192,7 @@ class MerkleTree {
   // Since the tree is append-only from the right, at any given point in time,
   // at each level, all nodes computed so far, except possibly the last node,
   // are fixed and will no longer change.
-  std::vector< std::vector<std::string> > tree_;
+  std::vector<std::string> tree_;
   TreeHasher treehasher_;
   // Number of leaves propagated up to the root,
   // to keep track of lazy evaluation.

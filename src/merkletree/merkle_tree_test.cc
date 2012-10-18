@@ -1,7 +1,9 @@
-#include <assert.h>
+#include <gflags/gflags.h>
+#include <glog/logging.h>
 #include <gtest/gtest.h>
 #include <iostream>
 #include <stddef.h>
+#include <stdint.h>
 #include <stdlib.h>
 #include <string>
 #include <sys/resource.h>
@@ -23,7 +25,7 @@ using std::string;
 ////////////////////////////////////////////////////////////////////////////////
 // Get the largest power of two smaller than i.
 int DownToPowerOfTwo(int i) {
-  assert(i >= 2);
+  CHECK_GE(i, 2);
   // Find the smallest power of two greater than or equal to i.
   int split = 1;
   do {
@@ -691,39 +693,54 @@ TEST_F(MerkleVerifierTest, VerifyConsistencyProof) {
   }
 }
 
-class StressTest : public ::testing::TestWithParam<size_t> {
+class StressTest : public ::testing::Test {
  protected:
-  MerkleTree tree_;
   string data_;
-  StressTest() : tree_(new Sha256Hasher()),
-                 data_(string(1024, 0x42)) {}
+  StressTest() : data_(string(1024, 0x42)) {}
 };
 
-TEST_P(StressTest, BuildLargeTree) {
-  struct rusage ru;
-  getrusage(RUSAGE_SELF, &ru);
-  long max_rss_before = ru.ru_maxrss;
-  size_t tree_size = GetParam();
-  std::cout << "Building a tree with " << tree_size << " leaves." << std::endl;
-  for (size_t i = 0; i < tree_size; ++i)
-    tree_.AddLeaf(data_);
-  EXPECT_FALSE(tree_.CurrentRoot().empty());
-  EXPECT_TRUE(tree_.LeafCount() == tree_size);
-  getrusage(RUSAGE_SELF, &ru);
-  std::cout << "Peak RSS delta (as reported by getrusage()) was "
-            << ru.ru_maxrss - max_rss_before << " kB" << std::endl;
-}
+TEST_F(StressTest, BuildLargeTree) {
+  std::vector<MerkleTree*> trees;
+  for (size_t tree_size = 1024; tree_size <= 4194304; tree_size *= 4) {
+    struct rusage ru;
+    getrusage(RUSAGE_SELF, &ru);
+    long max_rss_before = ru.ru_maxrss;
+    MerkleTree *tree = new MerkleTree(new Sha256Hasher());
+    trees.push_back(tree);
+    uint64_t time_before = util::TimeInMilliseconds();
+    std::cout << "Building a tree with " << tree_size
+              << " leaves." << std::endl;
+    for (size_t i = 0; i < tree_size; ++i)
+      tree->AddLeaf(data_);
+    EXPECT_FALSE(tree->CurrentRoot().empty());
+    EXPECT_TRUE(tree->LeafCount() == tree_size);
+    getrusage(RUSAGE_SELF, &ru);
+    std::cout << "Peak RSS delta (as reported by getrusage()) was "
+              << ru.ru_maxrss - max_rss_before << " kB" << std::endl;
+    uint64_t time_after = util::TimeInMilliseconds();
+    std::cout << "Elapsed time: " << time_after - time_before
+              << " ms" << std::endl;
+  }
 
-INSTANTIATE_TEST_CASE_P(TreeSizes, StressTest,
-                        ::testing::Values(1000, 10000, 100000, 1000000,
-                                          4000000));
+  for (size_t i = 0; i < trees.size(); ++i) {
+    EXPECT_FALSE(trees[i]->CurrentRoot().empty());
+    delete trees[i];
+  }
+}
 
 #undef S
 #undef H
 
 } // namespace
 
-int main(int argc, char**argv) {
+int main(int argc, char **argv) {
+  // Change the defaults. Can be overridden on command line.
+  // Log to stderr instead of log files.
+  FLAGS_logtostderr = true;
+  // Only log fatal messages by default.
+  FLAGS_minloglevel = 3;
   ::testing::InitGoogleTest(&argc, argv);
+  google::ParseCommandLineFlags(&argc, &argv, true);
+  google::InitGoogleLogging(argv[0]);
   return RUN_ALL_TESTS();
 }
