@@ -279,7 +279,9 @@ d0 d1   d2 d3           d0 d1   d2 d3  d4 d5
         Version version;
         LogID id;
         uint64 timestamp;
+        opaque &lt;0..2^16-1&gt; extensions;
         digitally-signed struct {
+            Version version;
             SignatureType signature_type = certificate_timestamp;	    
             uint64 timestamp;
             LogEntryType entry_type;
@@ -287,6 +289,7 @@ d0 d1   d2 d3           d0 d1   d2 d3  d4 d5
                 case x509_entry: ASN.1Cert;
                 case precert_entry: ASN.1Cert;
             } signed_entry;
+           opaque &lt;0..2^16-1&gt; extensions;
         };
     } SignedCertificateTimestamp;
 	  </artwork>
@@ -303,6 +306,9 @@ d0 d1   d2 d3           d0 d1   d2 d3  d4 d5
 	<t>
 	  <spanx style="verb">signed_entry</spanx> is the <spanx style="verb">leaf_certificate</spanx> (in case of an X509ChainEntry), or <spanx style="verb">tbs_certificate</spanx> (in case of a PrecertChainEntry).
 	</t>
+        <t>
+          <spanx style="verb">extensions</spanx> are future extensions to this protocol version (v1). Currently, no extensions are specified.
+        </t>
       </section>
 
       <section title="Merkle Tree">
@@ -341,6 +347,7 @@ d0 d1   d2 d3           d0 d1   d2 d3  d4 d5
         uint64 timestamp;
         MerkleTreeLeaf new_leaves&lt;0..2^64-1&gt;;
         digitally-signed struct {
+            Version version;
             SignatureType signature_type = tree_hash;
             uint64 timestamp;
             uint64 tree_size;
@@ -350,7 +357,7 @@ d0 d1   d2 d3           d0 d1   d2 d3  d4 d5
   </artwork>
 </figure>
 	<t>
-	  <spanx style="verb">version</spanx> is the version of the protocol the SignedMerkleTreeUpdate conforms to.
+	  <spanx style="verb">version</spanx> is the version of the protocol the SignedMerkleTreeUpdate conforms to. This version is v1.
 	</t>
 	<t>
 	  <spanx style="verb">old_tree_size</spanx> is the size of the tree prior to this update.
