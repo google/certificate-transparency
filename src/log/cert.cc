@@ -1,4 +1,3 @@
-#include <assert.h>
 #include <glog/logging.h>
 #include <openssl/asn1.h>
 #include <openssl/bio.h>
@@ -15,18 +14,17 @@
 
 using std::string;
 
-// TODO(ekasper): sync with I-D.
-const char Cert::kProofExtensionOID[] = "1.2.3.0";
-const char Cert::kEmbeddedProofExtensionOID[] = "1.2.3.1";
-const char Cert::kPoisonExtensionOID[] = "1.2.3.2";
-const char Cert::kCtExtendedKeyUsageOID[] = "1.2.3.4";
+const char Cert::kProofExtensionOID[] = "1.3.6.1.4.1.11129.2.4.1";
+const char Cert::kEmbeddedProofExtensionOID[] = "1.3.6.1.4.1.11129.2.4.2";
+const char Cert::kPoisonExtensionOID[] = "1.3.6.1.4.1.11129.2.4.3";
+const char Cert::kCtExtendedKeyUsageOID[] = "1.3.6.1.4.1.11129.2.4.4";
 
 //static
 ASN1_OBJECT *Cert::ExtensionObject(const string oid) {
   unsigned char obj_buf[100];
   int obj_len = a2d_ASN1_OBJECT(obj_buf, sizeof obj_buf, oid.data(),
                                 oid.length());
-  assert(obj_len > 0);
+  CHECK_GT(obj_len, 0);
   ASN1_OBJECT *obj = ASN1_OBJECT_create(0, obj_buf, obj_len, NULL, NULL);
   return obj;
 }
@@ -48,7 +46,6 @@ Cert::~Cert() {
 
 Cert *Cert::Clone() const {
   Cert *clone = new Cert(x509_);
-  assert(clone != NULL);
   return clone;
 }
 
@@ -62,20 +59,29 @@ bool Cert::HasExtension(int extension_nid) const {
 
 bool Cert::IsCriticalExtension(const string &extension_oid) const {
   X509_EXTENSION *ext = GetExtension(extension_oid);
-  assert (ext != NULL);
+  // Always check if the extension exists first.
+  CHECK_NOTNULL(ext);
   return X509_EXTENSION_get_critical(ext);
 }
 
-string Cert::ExtensionData(const string &extension_oid) const {
+string Cert::OctetStringExtensionData(const string &extension_oid) const {
   X509_EXTENSION *ext = GetExtension(extension_oid);
   // Always check if the extension exists first.
-  assert(ext != NULL);
+  CHECK_NOTNULL(ext);
   ASN1_OCTET_STRING *ext_data = X509_EXTENSION_get_data(ext);
-  return string(reinterpret_cast<char*>(ext_data->data), ext_data->length);
+  CHECK_NOTNULL(ext_data);
+
+  const unsigned char *ptr = ext_data->data;
+  ASN1_OCTET_STRING *octet = d2i_ASN1_OCTET_STRING(NULL, &ptr,
+                                                   ext_data->length);
+  CHECK_NOTNULL(octet);
+  string ret(reinterpret_cast<const char*>(octet->data), octet->length);
+  ASN1_OCTET_STRING_free(octet);
+  return ret;
 }
 
 bool Cert::HasBasicConstraintCA() const {
-  assert(IsLoaded());
+  CHECK(IsLoaded());
   BASIC_CONSTRAINTS *constraints = static_cast<BASIC_CONSTRAINTS*>(
       X509_get_ext_d2i(x509_, NID_basic_constraints, NULL, NULL));
   if (constraints == NULL)
@@ -92,14 +98,12 @@ bool Cert::HasExtendedKeyUsage(const string &key_usage_oid) const {
     return false;
 
   BIO *buf = BIO_new(BIO_s_mem());
-  assert(buf != NULL);
+  CHECK_NOTNULL(buf);
   bool ext_key_usage_found = false;
   for (int i = 0; i < sk_ASN1_OBJECT_num(eku); ++i) {
     (void)BIO_reset(buf);
-    int ret = i2a_ASN1_OBJECT(buf, sk_ASN1_OBJECT_value(eku, i));
-    assert(ret > 0);
-    ret = BIO_write(buf, "", 1); // NULL-terminate
-    assert(ret == 1);
+    CHECK_GT(i2a_ASN1_OBJECT(buf, sk_ASN1_OBJECT_value(eku, i)), 0);
+    CHECK_EQ(1, BIO_write(buf, "", 1)); // NULL-terminate
     char *oid;
     BIO_get_mem_data(buf, &oid);
     if (oid == key_usage_oid) {
@@ -114,14 +118,14 @@ bool Cert::HasExtendedKeyUsage(const string &key_usage_oid) const {
 }
 
 bool Cert::IsIssuedBy(const Cert &issuer) const {
-  assert(IsLoaded());
-  assert(issuer.IsLoaded());
+  CHECK(IsLoaded());
+  CHECK(issuer.IsLoaded());
   return X509_check_issued(const_cast<X509*>(issuer.x509_), x509_) == X509_V_OK;
 }
 
 bool Cert::IsSignedBy(const Cert &issuer) const {
-  assert(IsLoaded());
-  assert(issuer.IsLoaded());
+  CHECK(IsLoaded());
+  CHECK(issuer.IsLoaded());
   EVP_PKEY *issuer_key = X509_get_pubkey(issuer.x509_);
   if (issuer_key == NULL)
     return false;
@@ -131,17 +135,17 @@ bool Cert::IsSignedBy(const Cert &issuer) const {
 }
 
 string Cert::DerEncoding() const {
-  assert(IsLoaded());
+  CHECK(IsLoaded());
   unsigned char *der_buf = NULL;
   int der_length = i2d_X509(x509_, &der_buf);
-  assert(der_length > 0);
+  CHECK_GT(der_length, 0);
   string ret(reinterpret_cast<char*>(der_buf), der_length);
   OPENSSL_free(der_buf);
   return ret;
 }
 
 string Cert::Sha256Digest() const {
-  assert(IsLoaded());
+  CHECK(IsLoaded());
   unsigned char digest[EVP_MAX_MD_SIZE];
   unsigned int len;
   CHECK_EQ(1, X509_digest(x509_, EVP_sha256(), digest, &len));
@@ -151,16 +155,16 @@ string Cert::Sha256Digest() const {
 // WARNING WARNING this method modifies the x509_ structure
 // and thus invalidates the cert. Use with care.
 void Cert::DeleteExtension(const string &extension_oid) {
-  assert(IsLoaded());
+  CHECK(IsLoaded());
   int extension_index = ExtensionIndex(extension_oid);
   if (extension_index == -1)
     return;
   X509_EXTENSION *ext = X509_delete_ext(x509_, extension_index);
   // X509_delete_ext does not free the extension (GAH!), so we need to
   // free separately.
-  assert(ext != NULL);
+  CHECK_NOTNULL(ext);
   X509_EXTENSION_free(ext);
-  assert(!HasExtension(extension_oid));
+  CHECK(!HasExtension(extension_oid));
 
   // Let OpenSSL know that it needs to re_encode.
   x509_->cert_info->enc.modified = 1;
@@ -169,16 +173,16 @@ void Cert::DeleteExtension(const string &extension_oid) {
 // WARNING WARNING this method modifies the x509_ structure
 // and thus invalidates the cert. Use with care.
 void Cert::DeleteExtension(int extension_nid) {
-  assert(IsLoaded());
+  CHECK(IsLoaded());
   int extension_index = ExtensionIndex(extension_nid);
   if (extension_index == -1)
     return;
   X509_EXTENSION *ext = X509_delete_ext(x509_, extension_index);
   // X509_delete_ext does not free the extension (GAH!), so we need to
   // free separately.
-  assert(ext != NULL);
+  CHECK_NOTNULL(ext);
   X509_EXTENSION_free(ext);
-  assert(!HasExtension(extension_nid));
+  CHECK(!HasExtension(extension_nid));
 
   // Let OpenSSL know that it needs to re_encode.
   x509_->cert_info->enc.modified = 1;
@@ -187,7 +191,7 @@ void Cert::DeleteExtension(int extension_nid) {
 // WARNING WARNING this method modifies the x509_ structure
 // and thus invalidates the cert. Use with care.
 void Cert::DeleteSignature() {
-  assert(IsLoaded());
+  CHECK(IsLoaded());
   if (x509_->sig_alg != NULL) {
     X509_ALGOR_free(x509_->sig_alg);
     x509_->sig_alg = X509_ALGOR_new();
@@ -203,10 +207,10 @@ void Cert::DeleteSignature() {
 // WARNING WARNING this method modifies the x509_ structure
 // and thus invalidates the cert. Use with care.
 void Cert::CopyIssuerFrom(const Cert &from) {
-  assert(IsLoaded());
-  assert(from.IsLoaded());
+  CHECK(IsLoaded());
+  CHECK(from.IsLoaded());
   X509_NAME *ca_name = X509_get_issuer_name(from.x509_);
-  assert(ca_name != NULL);
+  CHECK_NOTNULL(ca_name);
   X509_set_issuer_name(x509_, ca_name);
 
   // Fix the authority key extension, if it exists.
@@ -220,14 +224,12 @@ void Cert::CopyIssuerFrom(const Cert &from) {
 
   // If the destination does not have an authority KeyID extension,
   // add it as a last extension to the destination.
-  int ret;
   X509_EXTENSION *to_ext = GetExtension(NID_authority_key_identifier);
   if (to_ext == NULL) {
     to_ext = X509_EXTENSION_create_by_NID(NULL, NID_authority_key_identifier,
                                           0, NULL);
-    assert(to_ext != NULL);
-    ret = X509_add_ext(x509_, to_ext, -1);
-    assert(ret == 1);
+    CHECK_NOTNULL(to_ext);
+    CHECK_EQ(1, X509_add_ext(x509_, to_ext, -1));
 
     // X509_add_ext makes a copy, so find out its address.
     X509_EXTENSION_free(to_ext);
@@ -235,32 +237,32 @@ void Cert::CopyIssuerFrom(const Cert &from) {
   }
 
   // Copy the critical bit.
-  ret = X509_EXTENSION_set_critical(to_ext,
-                                    X509_EXTENSION_get_critical(from_ext));
-  assert(ret == 1);
+  CHECK_EQ(1,
+           X509_EXTENSION_set_critical(to_ext,
+                                       X509_EXTENSION_get_critical(from_ext)));
   // Copy data.
-  ret = X509_EXTENSION_set_data(to_ext, X509_EXTENSION_get_data(from_ext));
-  assert(ret == 1);
+  CHECK_EQ(1,
+           X509_EXTENSION_set_data(to_ext, X509_EXTENSION_get_data(from_ext)));
 
   x509_->cert_info->enc.modified = 1;
 }
 
 int Cert::ExtensionIndex(const string &extension_oid) const {
-  assert(IsLoaded());
+  CHECK(IsLoaded());
   ASN1_OBJECT *obj = ExtensionObject(extension_oid);
-  assert(obj != NULL);
+  CHECK_NOTNULL(obj);
   int extension_index = X509_get_ext_by_OBJ(x509_, obj, -1);
   ASN1_OBJECT_free(obj);
   return extension_index;
 }
 
 int Cert::ExtensionIndex(int extension_nid) const {
-  assert(IsLoaded());
+  CHECK(IsLoaded());
   return X509_get_ext_by_NID(x509_, extension_nid, -1);
 }
 
 X509_EXTENSION *Cert::GetExtension(const string &extension_oid) const {
-  assert(IsLoaded());
+  CHECK(IsLoaded());
   int extension_index = ExtensionIndex(extension_oid);
   if (extension_index == -1)
     return NULL;
@@ -268,7 +270,7 @@ X509_EXTENSION *Cert::GetExtension(const string &extension_oid) const {
 }
 
 X509_EXTENSION *Cert::GetExtension(int extension_nid) const {
-  assert(IsLoaded());
+  CHECK(IsLoaded());
   int extension_index = ExtensionIndex(extension_nid);
   if (extension_index == -1)
     return NULL;
@@ -279,13 +281,13 @@ CertChain::CertChain(const string &pem_string) {
   // A read-only BIO.
   BIO *bio_in = BIO_new_mem_buf(const_cast<char*>(pem_string.data()),
                                 pem_string.length());
-  assert(bio_in != NULL);
+  CHECK_NOTNULL(bio_in);
   X509 *x509 = NULL;
   while ((x509 = PEM_read_bio_X509(bio_in, NULL, NULL, NULL)) != NULL) {
     Cert *cert = new Cert(x509);
     // Cert does not take ownership.
     X509_free(x509);
-    assert(cert->IsLoaded());
+    CHECK(cert->IsLoaded());
     chain_.push_back(cert);
   }
 
@@ -303,14 +305,14 @@ CertChain::CertChain(const string &pem_string) {
 }
 
 void CertChain::AddCert(Cert *cert) {
-  assert(cert != NULL);
-  assert(cert->IsLoaded());
+  CHECK_NOTNULL(cert);
+  CHECK(cert->IsLoaded());
 
   chain_.push_back(cert);
 }
 
 void CertChain::RemoveCert() {
-  assert(IsLoaded());
+  CHECK(IsLoaded());
   delete chain_.back();
   chain_.pop_back();
 }
@@ -320,7 +322,7 @@ CertChain::~CertChain() {
 }
 
 bool CertChain::IsValidIssuerChain() const {
-  assert(IsLoaded());
+  CHECK(IsLoaded());
   for (std::vector<Cert*>::const_iterator it = chain_.begin();
        it + 1 < chain_.end(); ++it) {
     Cert *subject = *it;
@@ -332,7 +334,7 @@ bool CertChain::IsValidIssuerChain() const {
 }
 
 bool CertChain::IsValidCaIssuerChain() const {
-  assert(IsLoaded());
+  CHECK(IsLoaded());
   for (std::vector<Cert*>::const_iterator it = chain_.begin();
        it + 1 < chain_.end(); ++it) {
     Cert *subject = *it;
@@ -344,7 +346,7 @@ bool CertChain::IsValidCaIssuerChain() const {
 }
 
 bool CertChain::IsValidSignatureChain() const {
-  assert(IsLoaded());
+  CHECK(IsLoaded());
   for (std::vector<Cert*>::const_iterator it = chain_.begin();
        it + 1 < chain_.end(); ++it) {
     Cert *subject = *it;
@@ -363,13 +365,13 @@ void CertChain::ClearChain() {
 }
 
 bool PreCertChain::IsWellFormed() const {
-  assert(IsLoaded());
+  CHECK(IsLoaded());
   // We must have at least a leaf certificate and an issuing certificate.
   if (Length() < 2)
     return false;
 
   const Cert *pre = PreCert();
-  assert(pre != NULL);
+  CHECK_NOTNULL(pre);
 
   // First, check that the leaf contains the critical poison extension.
   if (!pre->HasExtension(Cert::kPoisonExtensionOID) ||
@@ -379,7 +381,7 @@ bool PreCertChain::IsWellFormed() const {
   // The next cert should be the issuing precert.
   // Check that it is CA:FALSE, and contains the desired Extended Key Usage.
   const Cert *pre_ca = CaPreCert();
-  assert(pre_ca != NULL);
+  CHECK_NOTNULL(pre_ca);
 
   // Check that pre is issued by pre_ca.
   if (!pre->IsIssuedBy(*pre_ca))

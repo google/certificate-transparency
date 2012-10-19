@@ -127,13 +127,14 @@ int SSLClient::VerifyCallback(X509_STORE_CTX *ctx, void *arg) {
   if (chain.LeafCert()->HasExtension(Cert::kEmbeddedProofExtensionOID)) {
     LOG(INFO) << "Embedded proof extension found in certificate, "
               << "verifying...";
-    token = chain.LeafCert()->ExtensionData(Cert::kEmbeddedProofExtensionOID);
+    token = chain.LeafCert()->OctetStringExtensionData(
+        Cert::kEmbeddedProofExtensionOID);
     // Else look for the proof in a superfluous cert.
     // Let's assume the superfluous cert is always last in the chain.
   } else if (chain.Length() > 1 && chain.LastCert()->HasExtension(
       Cert::kProofExtensionOID)) {
     LOG(INFO) << "Proof extension found in certificate, verifying...";
-    token = chain.LastCert()->ExtensionData(
+    token = chain.LastCert()->OctetStringExtensionData(
         Cert::kProofExtensionOID);
     chain.RemoveCert();
   }

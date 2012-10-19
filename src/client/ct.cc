@@ -77,25 +77,38 @@ using ct::MerkleAuditProof;
 using ct::SignedCertificateTimestamp;
 using std::string;
 
-static void AddExtension(X509 *cert, const char *oid, const unsigned char *data,
-                         int data_len, int critical) {
+// Adds the data to the cert as an extension, formatted as a single
+// ASN.1 octet string.
+static void AddOctetExtension(X509 *cert, const char *oid,
+                              const unsigned char *data,
+                              int data_len, int critical) {
   ASN1_OBJECT *obj = Cert::ExtensionObject(oid);
-  assert(obj != NULL);
+  CHECK_NOTNULL(obj);
   X509_EXTENSION *ext = X509_EXTENSION_new();
-  assert(ext != NULL);
-  int ret = X509_EXTENSION_set_object(ext, obj);
-  assert(ret == 1);
-  ret = X509_EXTENSION_set_critical(ext, critical);
-  assert(ret == 1);
-  if (data != NULL) {
-    ASN1_OCTET_STRING *asn1_data = ASN1_OCTET_STRING_new();
-    ASN1_OCTET_STRING_set(asn1_data, data, data_len);
-    ret = X509_EXTENSION_set_data(ext, asn1_data);
-    assert(ret == 1);
-  }
-  assert(cert != NULL);
-  ret = X509_add_ext(cert, ext, -1);
-  assert(ret == 1);
+  CHECK_NOTNULL(ext);
+  CHECK_EQ(1, X509_EXTENSION_set_object(ext, obj));
+  CHECK_EQ(1, X509_EXTENSION_set_critical(ext, critical));
+
+  // The extension as a single octet string.
+  ASN1_OCTET_STRING *inner = ASN1_OCTET_STRING_new();
+  CHECK_NOTNULL(inner);
+  CHECK_EQ(1, ASN1_OCTET_STRING_set(inner, data, data_len));
+  int buf_len = i2d_ASN1_OCTET_STRING(inner, NULL);
+  CHECK_GT(buf_len, 0);
+
+  unsigned char *buf = new unsigned char[buf_len];
+  unsigned char *p = buf;
+
+  CHECK_EQ(buf_len, i2d_ASN1_OCTET_STRING(inner, &p));
+
+  // The outer, opaque octet string.
+  ASN1_OCTET_STRING *asn1_data = ASN1_OCTET_STRING_new();
+  CHECK_NOTNULL(asn1_data);
+  CHECK_EQ(1, ASN1_OCTET_STRING_set(asn1_data, buf, buf_len));
+  CHECK_EQ(1, X509_EXTENSION_set_data(ext, asn1_data));
+
+  CHECK_EQ(1, X509_add_ext(cert, ext, -1));
+  delete buf;
 }
 
 // Returns true if the server responds with a token; false if
@@ -211,17 +224,15 @@ static void MakeCert() {
   X509_PUBKEY_set(&X509_get_X509_PUBKEY(x) , evp_pkey);
 
   // And finally, the proof in an extension
-  AddExtension(x, Cert::kProofExtensionOID,
-               reinterpret_cast<const unsigned char*>(sct.data()),
-               sct.size(), 1);
+  AddOctetExtension(x, Cert::kProofExtensionOID,
+                    reinterpret_cast<const unsigned char*>(sct.data()),
+                    sct.size(), 1);
 
   int i = i2d_X509_bio(out, x);
   CHECK_GT(i, 0);
 
   BIO_free(out);
 }
-
-static const char kProofSectionPrefix[] = "1.2.3.1=DER:";
 
 // A sample tool for CAs showing how to add the CT proof as an extension.
 // We write the CT proof to the certificate config, so that we can
@@ -248,9 +259,10 @@ static void WriteProofToConfig() {
   PCHECK(conf_out.good()) << "Could not open extensions configuration file "
                           << conf_file << " for writing.";
 
-  conf_out << kProofSectionPrefix;
+  conf_out << string(Cert::kEmbeddedProofExtensionOID)
+           << "=ASN1:FORMAT:HEX,OCTETSTRING:";
 
-  conf_out << util::HexString(sct, ':') << std::endl;
+  conf_out << util::HexString(sct) << std::endl;
   conf_out.close();
 }
 

@@ -10,15 +10,16 @@
 
 class Cert {
  public:
-  // The proof extension in a superfluous certificate.
+  // superfluousCertificateExtension,
+  // the proof extension in a superfluous certificate.
   static const char kProofExtensionOID[];
-  // The embedded proof extension.
+  // sctExtension, the embedded proof extension.
   static const char kEmbeddedProofExtensionOID[];
-  // The poison extension in the PreCert (critical).
+  // poisonExtension, the poison extension in the PreCert (critical).
   static const char kPoisonExtensionOID[];
-  // The Certificate Transparency Extended Key Usage OID
+  // precertificateSigning, The Certificate Transparency Extended Key Usage OID
   // (indicating that a certificate can be used for precert signing
-  // on behalf of the issuing CA)
+  // on behalf of the issuing CA).
   static const char kCtExtendedKeyUsageOID[];
 
   static ASN1_OBJECT *ExtensionObject(const std::string oid);
@@ -44,7 +45,7 @@ class Cert {
   bool IsCriticalExtension(const std::string &extension_oid) const;
 
   // returns binary data
-  std::string ExtensionData(const std::string &extension_oid) const;
+  std::string OctetStringExtensionData(const std::string &extension_oid) const;
 
   bool HasBasicConstraintCA() const;
 
