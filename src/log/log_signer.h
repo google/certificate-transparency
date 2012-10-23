@@ -19,6 +19,8 @@ class LogSigner {
     EMPTY_CERTIFICATE,
     CERTIFICATE_TOO_LONG,
     INVALID_HASH_LENGTH,
+    UNSUPPORTED_VERSION,
+    EXTENSIONS_TOO_LONG,
   };
 
   // The protobuf-agnostic library version:
@@ -26,19 +28,19 @@ class LogSigner {
   // signature string.
   // In accordance with the spec, timestamp should be UTC time,
   // since January 1, 1970, 00:00, in milliseconds.
-  SignResult SignCertificateTimestamp(uint64_t timestamp,
-                                      ct::LogEntryType type,
-                                      const std::string &leaf_certificate,
-                                      std::string *result) const;
+  SignResult SignV1CertificateTimestamp(
+      uint64_t timestamp, ct::LogEntryType type,
+      const std::string &leaf_certificate, const std::string &extensions,
+      std::string *result) const;
 
   // Sign the cert timestamp and write the resulting DigitallySigned
   // signature message into |sct|.
   SignResult SignCertificateTimestamp(
       const ct::LogEntry &entry, ct::SignedCertificateTimestamp *sct) const;
 
-  SignResult SignTreeHead(uint64_t timestamp, uint64_t tree_size,
-                          const std::string &root_hash,
-                          std::string *result) const;
+  SignResult SignV1TreeHead(uint64_t timestamp, uint64_t tree_size,
+                            const std::string &root_hash,
+                            std::string *result) const;
 
   SignResult SignTreeHead(ct::SignedTreeHead *sth) const;
 
@@ -72,22 +74,23 @@ class LogSigVerifier {
     SIGNATURE_ALGORITHM_MISMATCH,
     INVALID_SIGNATURE,
     INVALID_HASH_LENGTH,
+    UNSUPPORTED_VERSION,
+    EXTENSIONS_TOO_LONG,
   };
 
   // The protobuf-agnostic library version.
-  VerifyResult VerifySCTSignature(uint64_t timestamp,
-                                  ct::LogEntryType type,
-                                  const std::string &leaf_cert,
-                                  const std::string &signature) const;
+  VerifyResult VerifyV1SCTSignature(
+      uint64_t timestamp, ct::LogEntryType type, const std::string &leaf_cert,
+      const std::string &extensions, const std::string &signature) const;
 
   VerifyResult VerifySCTSignature(
       const ct::LogEntry &entry,
       const ct::SignedCertificateTimestamp &sct) const;
 
   // The protobuf-agnostic library version.
-  VerifyResult VerifySTHSignature(uint64_t timestamp, uint64_t tree_size,
-                                  const std::string &root_hash,
-                                  const std::string &signature) const;
+  VerifyResult VerifyV1STHSignature(
+      uint64_t timestamp, uint64_t tree_size, const std::string &root_hash,
+      const std::string &signature) const;
 
   VerifyResult VerifySTHSignature(const ct::SignedTreeHead &sth) const;
 

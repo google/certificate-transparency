@@ -276,6 +276,8 @@ d0 d1   d2 d3           d0 d1   d2 d3  d4 d5
       struct {
           opaque key_id[32];
       } LogID;
+
+      opaque CtExtensions&lt;0..2^16-1&gt;;
 	  </artwork>
 	</figure>
 	<t>
@@ -287,7 +289,7 @@ d0 d1   d2 d3           d0 d1   d2 d3  d4 d5
         Version version;
         LogID id;
         uint64 timestamp;
-        opaque &lt;0..2^16-1&gt; extensions;
+        CtExtensions extensions;
         digitally-signed struct {
             Version version;
             SignatureType signature_type = certificate_timestamp;	    
@@ -297,7 +299,7 @@ d0 d1   d2 d3           d0 d1   d2 d3  d4 d5
                 case x509_entry: ASN.1Cert;
                 case precert_entry: ASN.1Cert;
             } signed_entry;
-           opaque &lt;0..2^16-1&gt; extensions;
+           CtExtensions extensions;
         };
     } SignedCertificateTimestamp;
 	  </artwork>
@@ -328,20 +330,28 @@ d0 d1   d2 d3           d0 d1   d2 d3  d4 d5
 <figure>
   <artwork>
     struct {
+        Version version;
         uint64 timestamp;
         LogEntryType entry_type;
         select(entry_type) {
             case x509_entry: ASN.1Cert;
             case precert_entry: ASN.1Cert;
         } signed_entry;
+        CtExtensions extensions;
     } MerkleTreeLeaf;
   </artwork>
 </figure>
 <t>
-  Here <spanx style="verb">timestamp</spanx> is the timestamp of the corresponding SCT issued for this certificate.
+  Here <spanx style="verb">version</spanx> is the version of the protocol the MerkleTreeLeaf (and hence, the corresponding Signed Certificate Timestamp) corresponds to. This version is v1.
+</t>
+<t>
+  <spanx style="verb">timestamp</spanx> is the timestamp of the corresponding SCT issued for this certificate.
 </t>
 <t>
   <spanx style="verb">signed_entry</spanx> is the <spanx style="verb">signed_entry</spanx> of the corresponding SCT.
+</t>
+<t>
+  <spanx style="verb">extensions</spanx> are <spanx style="verb">extensions</spanx> of the corresponding SCT.
 </t>
 	<t>
 	  Structure of the Signed Merkle Tree Update:

@@ -94,6 +94,7 @@ LogLookup::CertificateAuditProof(uint64_t timestamp,
     // The certificate _is_ logged but we're out of date.
     return NOT_FOUND;
 
+  proof->set_version(ct::V1);
   proof->set_tree_size(cert_tree_.LeafCount());
   proof->set_timestamp(latest_tree_head_.timestamp());
   proof->set_leaf_index(logged_cert.sequence_number());
@@ -110,9 +111,7 @@ LogLookup::CertificateAuditProof(uint64_t timestamp,
 
 string LogLookup::LeafHash(const LoggedCertificate &logged_cert) {
   string serialized_leaf;
-  CHECK_EQ(Serializer::OK,
-           Serializer::SerializeMerkleTreeLeaf(logged_cert.entry(),
-                                               logged_cert.sct(),
-                                               &serialized_leaf));
+  CHECK_EQ(Serializer::OK, Serializer::SerializeMerkleTreeLeaf(
+      logged_cert.sct(), logged_cert.entry(), &serialized_leaf));
   return cert_tree_.LeafHash(serialized_leaf);
 }

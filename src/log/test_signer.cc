@@ -64,8 +64,8 @@ const char kDefaultDerCertHash[] =
 const uint64_t kDefaultSCTTimestamp = 1348589665525LL;
 
 const char kDefaultSCTSignature[] =
-    "3046022100e164999c0b7aa7a2d9f73264023663b48c646550f0587a6e044aba2fa608152d"
-    "0221008abf2906f17732c8707e559270121921026f266cded2e130a46bb60016bc519b";
+    "3046022100d3f7690e7ee80d9988a54a3821056393e9eb0c686ad67fbae3686c888fb1a3ce"
+    "022100f9a51c6065bbba7ad7116a31bea1c31dbed6a921e1df02e4b403757fae3254ae";
 
 // Some time in September 2012.
 const uint64_t kDefaultSTHTimestamp = 1348589667204LL;
@@ -77,8 +77,9 @@ const char kDefaultRootHash[] =
     "18041bd4665083001fba8c5411d2d748e8abbfdcdfd9218cb02b68a78e7d4c23";
 
 const char kDefaultSTHSignature[] =
-    "3045022066ab4e7eaad1961c34448ed5dd37959bed95476fc02476def57c63a91b52445c02"
-    "21009887b36a965e04e196753fac4a15cffbb86770bfacf74dfe6e259c967904fecc";
+    "3046022100befd8060563763a5e49ba53e6443c13f7624fd6403178113736e16012aca983e"
+    "022100f572568dbfe9a86490eb915c4ee16ad5ecd708fed35ed4e5cd1b2c3f087b4130";
+
 
 const char kEcP256PrivateKey[] =
     "-----BEGIN EC PRIVATE KEY-----\n"
@@ -153,7 +154,9 @@ void TestSigner::SetDefaults(LogEntry *entry) {
 
 // static
 void TestSigner::SetDefaults(SignedCertificateTimestamp *sct) {
+  sct->set_version(ct::V1);
   sct->set_timestamp(kDefaultSCTTimestamp);
+  sct->clear_extension();
   sct->mutable_signature()->set_hash_algorithm(DigitallySigned::SHA256);
   sct->mutable_signature()->set_sig_algorithm(DigitallySigned::ECDSA);
   sct->mutable_signature()->set_signature(B(kDefaultSCTSignature));
@@ -171,6 +174,7 @@ void TestSigner::SetDefaults(LoggedCertificate *logged_cert) {
 
 // static
 void TestSigner::SetDefaults(SignedTreeHead *tree_head) {
+  tree_head->set_version(ct::V1);
   tree_head->set_timestamp(kDefaultSTHTimestamp);
   tree_head->set_tree_size(kDefaultTreeSize);
   tree_head->set_root_hash(B(kDefaultRootHash));
@@ -262,6 +266,7 @@ void TestSigner::CreateUniqueFakeSignature(LoggedCertificate *logged_cert) {
 }
 
 void TestSigner::CreateUnique(SignedTreeHead *sth) {
+  sth->set_version(ct::V1);
   sth->set_timestamp(util::TimeInMilliseconds());
   sth->set_tree_size(rand());
   sth->set_root_hash(UniqueHash());
@@ -310,6 +315,7 @@ void TestSigner::TestEqualEntries(const LogEntry &entry0,
 // static
 void TestSigner::TestEqualSCTs(const SignedCertificateTimestamp &sct0,
                                const SignedCertificateTimestamp &sct1) {
+  EXPECT_EQ(sct0.version(), sct1.version());
   EXPECT_EQ(sct0.timestamp(), sct1.timestamp());
   TestEqualDigitallySigned(sct0.signature(), sct1.signature());
 }
@@ -330,6 +336,7 @@ void TestSigner::TestEqualLoggedCerts(const LoggedCertificate &c0,
 // static
 void TestSigner::TestEqualTreeHeads(const SignedTreeHead &sth0,
                                     const SignedTreeHead &sth1) {
+  EXPECT_EQ(sth0.version(), sth1.version());
   EXPECT_EQ(sth0.tree_size(), sth1.tree_size());
   EXPECT_EQ(sth0.timestamp(), sth1.timestamp());
   EXPECT_EQ(H(sth0.root_hash()), H(sth1.root_hash()));
@@ -337,7 +344,9 @@ void TestSigner::TestEqualTreeHeads(const SignedTreeHead &sth0,
 }
 
 void TestSigner::FillData(LoggedCertificate *logged_cert) {
+  logged_cert->mutable_sct()->set_version(ct::V1);
   logged_cert->mutable_sct()->set_timestamp(util::TimeInMilliseconds());
+  logged_cert->mutable_sct()->clear_extension();
 
   CreateUnique(logged_cert->mutable_entry());
 

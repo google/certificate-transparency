@@ -10,11 +10,13 @@
 const size_t Serializer::kMaxCertificateLength = (1 << 24) - 1;
 const size_t Serializer::kMaxCertificateChainLength = (1 << 24) - 1;
 const size_t Serializer::kMaxSignatureLength = (1 << 16) - 1;
+const size_t Serializer::kMaxExtensionsLength = (1 << 16) - 1;
 
 const size_t Serializer::kLogEntryTypeLengthInBytes = 2;
 const size_t Serializer::kSignatureTypeLengthInBytes = 1;
 const size_t Serializer::kHashAlgorithmLengthInBytes = 1;
 const size_t Serializer::kSigAlgorithmLengthInBytes = 1;
+const size_t Serializer::kVersionLengthInBytes = 1;
 
 using ct::LogEntry;
 using ct::LogEntryType_IsValid;
@@ -24,6 +26,7 @@ using ct::DigitallySigned_SignatureAlgorithm_IsValid;
 using ct::SignedCertificateTimestamp;
 using ct::X509ChainEntry;
 using ct::PrecertChainEntry;
+using ct::Version_IsValid;
 using std::string;
 
 // static
@@ -39,12 +42,12 @@ size_t Serializer::PrefixLength(size_t max_length) {
 
 // static
 Serializer::SerializeResult
-Serializer::CheckFormat(const LogEntry &entry) {
+Serializer::CheckLogEntryFormat(const LogEntry &entry) {
   switch (entry.type()) {
     case ct::X509_ENTRY:
-      return CheckFormat(entry.x509_entry());
+      return CheckX509ChainEntryFormat(entry.x509_entry());
     case ct::PRECERT_ENTRY:
-      return CheckFormat(entry.precert_entry());
+      return CheckPrecertChainEntryFormat(entry.precert_entry());
     default:
       return INVALID_ENTRY_TYPE;
   }
@@ -71,48 +74,59 @@ string Serializer::CertificateSha256Hash(const LogEntry &entry) {
 
 // static
 Serializer::SerializeResult
-Serializer::SerializeSCTSignatureInput(
+Serializer::SerializeV1SCTSignatureInput(
     uint64_t timestamp, ct::LogEntryType type, const string &certificate,
-    string *result) {
+    const string &extensions, string *result) {
   if (!LogEntryType_IsValid(type) || type == ct::UNKNOWN_ENTRY_TYPE)
     return INVALID_ENTRY_TYPE;
   // Check that the leaf certificate length is within accepted limits.
-  SerializeResult res = CheckFormat(certificate);
+  SerializeResult res = CheckCertificateFormat(certificate);
+  if (res != OK)
+    return res;
+  res = CheckExtensionsFormat(extensions);
   if (res != OK)
     return res;
   Serializer serializer;
+  serializer.WriteUint(ct::V1, kVersionLengthInBytes);
   serializer.WriteUint(ct::CERTIFICATE_TIMESTAMP, kSignatureTypeLengthInBytes);
   serializer.WriteUint(timestamp, 8);
   serializer.WriteUint(type, kLogEntryTypeLengthInBytes);
   serializer.WriteVarBytes(certificate, kMaxCertificateLength);
+  serializer.WriteVarBytes(extensions, kMaxExtensionsLength);
   result->assign(serializer.SerializedString());
   return OK;
 }
 
 // static
 Serializer::SerializeResult Serializer::SerializeSCTSignatureInput(
-    uint64_t timestamp, const LogEntry &entry, string *result) {
+    const SignedCertificateTimestamp &sct, const LogEntry &entry,
+    string *result) {
+  if (sct.version() != ct::V1)
+    return UNSUPPORTED_VERSION;
   switch (entry.type()) {
     case ct::X509_ENTRY:
-      return SerializeSCTSignatureInput(timestamp, ct::X509_ENTRY,
-                                        entry.x509_entry().leaf_certificate(),
-                                        result);
+      return SerializeV1SCTSignatureInput(
+          sct.timestamp(), ct::X509_ENTRY,
+          entry.x509_entry().leaf_certificate(),
+          sct.extension(), result);
     case ct::PRECERT_ENTRY:
-      return SerializeSCTSignatureInput(timestamp, ct::PRECERT_ENTRY,
-                                        entry.precert_entry().tbs_certificate(),
-                                        result);
+      return SerializeV1SCTSignatureInput(
+          sct.timestamp(), ct::PRECERT_ENTRY,
+          entry.precert_entry().tbs_certificate(),
+          sct.extension(), result);
     default:
       return INVALID_ENTRY_TYPE;
   }
 }
 
 // static
-Serializer::SerializeResult
-Serializer::SerializeSTHForSigning(uint64_t timestamp, uint64_t tree_size,
-                                   const string &root_hash, string *result) {
+Serializer::SerializeResult Serializer::SerializeV1STHSignatureInput(
+    uint64_t timestamp, uint64_t tree_size,
+    const string &root_hash, string *result) {
   if (root_hash.size() != 32)
     return INVALID_HASH_LENGTH;
   Serializer serializer;
+  serializer.WriteUint(ct::V1, kVersionLengthInBytes);
   serializer.WriteUint(ct::TREE_HEAD, kSignatureTypeLengthInBytes);
   serializer.WriteUint(timestamp, 8);
   serializer.WriteUint(tree_size, 8);
@@ -121,9 +135,26 @@ Serializer::SerializeSTHForSigning(uint64_t timestamp, uint64_t tree_size,
   return OK;
 }
 
+// static
+Serializer::SerializeResult Serializer::SerializeSTHSignatureInput(
+    const ct::SignedTreeHead &sth, std::string *result) {
+  if (sth.version() != ct::V1)
+    return UNSUPPORTED_VERSION;
+  return SerializeV1STHSignatureInput(sth.timestamp(), sth.tree_size(),
+                                      sth.root_hash(), result);
+}
+
+
 Serializer::SerializeResult
 Serializer::WriteSCT(const SignedCertificateTimestamp &sct) {
+  if (sct.version() != ct::V1)
+    return UNSUPPORTED_VERSION;
+  SerializeResult res = CheckExtensionsFormat(sct.extension());
+  if (res != OK)
+    return res;
+  WriteUint(ct::V1, kVersionLengthInBytes);
   WriteUint(sct.timestamp(), 8);
+  WriteVarBytes(sct.extension(), kMaxExtensionsLength);
   return WriteDigitallySigned(sct.signature());
 }
 
@@ -183,7 +214,7 @@ size_t Serializer::SerializedLength(const repeated_string &in,
 
 Serializer::SerializeResult
 Serializer::WriteDigitallySigned(const DigitallySigned &sig) {
-  SerializeResult res = CheckFormat(sig);
+  SerializeResult res = CheckSignatureFormat(sig);
   if (res != OK)
     return res;
   WriteUint(sig.hash_algorithm(), kHashAlgorithmLengthInBytes);
@@ -193,7 +224,7 @@ Serializer::WriteDigitallySigned(const DigitallySigned &sig) {
 }
 
 Serializer::SerializeResult
-Serializer::CheckFormat(const DigitallySigned &sig) {
+Serializer::CheckSignatureFormat(const DigitallySigned &sig) {
   // This is just DCHECKED upon setting, so check again.
   if (!DigitallySigned_HashAlgorithm_IsValid(sig.hash_algorithm()))
     return INVALID_HASH_ALGORITHM;
@@ -204,7 +235,8 @@ Serializer::CheckFormat(const DigitallySigned &sig) {
   return OK;
 }
 
-Serializer::SerializeResult Serializer::CheckFormat(const string &cert) {
+Serializer::SerializeResult
+Serializer::CheckCertificateFormat(const string &cert) {
   if (cert.empty())
     return EMPTY_CERTIFICATE;
   if (cert.size() > kMaxCertificateLength)
@@ -213,9 +245,16 @@ Serializer::SerializeResult Serializer::CheckFormat(const string &cert) {
 }
 
 Serializer::SerializeResult
-Serializer::CheckFormat(const repeated_string &chain) {
+Serializer::CheckExtensionsFormat(const string &extensions) {
+  if (extensions.size() > kMaxExtensionsLength)
+    return EXTENSIONS_TOO_LONG;
+  return OK;
+}
+
+Serializer::SerializeResult
+Serializer::CheckChainFormat(const repeated_string &chain) {
   for (int i = 0; i < chain.size(); ++i) {
-    SerializeResult res = CheckFormat(chain.Get(i));
+    SerializeResult res = CheckCertificateFormat(chain.Get(i));
     if (res != OK)
       return res;
   }
@@ -227,22 +266,22 @@ Serializer::CheckFormat(const repeated_string &chain) {
 
 // static
 Serializer::SerializeResult
-Serializer::CheckFormat(const X509ChainEntry &entry) {
-  SerializeResult res = CheckFormat(entry.leaf_certificate());
+Serializer::CheckX509ChainEntryFormat(const X509ChainEntry &entry) {
+  SerializeResult res = CheckCertificateFormat(entry.leaf_certificate());
   if (res != OK)
     return res;
-  return CheckFormat(entry.certificate_chain());
+  return CheckChainFormat(entry.certificate_chain());
 }
 
 // static
 Serializer::SerializeResult
-Serializer::CheckFormat(const PrecertChainEntry &entry) {
-  SerializeResult res = CheckFormat(entry.tbs_certificate());
+Serializer::CheckPrecertChainEntryFormat(const PrecertChainEntry &entry) {
+  SerializeResult res = CheckCertificateFormat(entry.tbs_certificate());
   if (res != OK)
     return res;
   if (entry.precertificate_chain_size() == 0)
     return EMPTY_PRECERTIFICATE_CHAIN;
-  return CheckFormat(entry.precertificate_chain());
+  return CheckChainFormat(entry.precertificate_chain());
 }
 
 Deserializer::Deserializer(const string &input)
@@ -251,10 +290,22 @@ Deserializer::Deserializer(const string &input)
 
 Deserializer::DeserializeResult Deserializer::ReadSCT(
     SignedCertificateTimestamp *sct) {
+  int version;
+  if (!ReadUint(Serializer::kVersionLengthInBytes, &version))
+    return INPUT_TOO_SHORT;
+  if (!Version_IsValid(version) || version != ct::V1)
+    return UNSUPPORTED_VERSION;
+  sct->set_version(ct::V1);
+ // V1 encoding.
   uint64_t timestamp = 0;
   if (!ReadUint(8, &timestamp))
     return INPUT_TOO_SHORT;
   sct->set_timestamp(timestamp);
+  string extensions;
+  if (!ReadVarBytes(Serializer::kMaxExtensionsLength, &extensions))
+    // In theory, could also be an invalid length prefix, but not if
+    // length limits follow byte boundaries.
+    return INPUT_TOO_SHORT;
   return ReadDigitallySigned(sct->mutable_signature());
 }
 

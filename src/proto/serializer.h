@@ -28,63 +28,57 @@ class Serializer {
     SIGNATURE_TOO_LONG,
     INVALID_HASH_LENGTH,
     EMPTY_PRECERTIFICATE_CHAIN,
+    UNSUPPORTED_VERSION,
+    EXTENSIONS_TOO_LONG,
   };
 
   static const size_t kMaxCertificateLength;
   static const size_t kMaxCertificateChainLength;
   static const size_t kMaxSignatureLength;
+  static const size_t kMaxExtensionsLength;
 
   static const size_t kLogEntryTypeLengthInBytes;
   static const size_t kSignatureTypeLengthInBytes;
   static const size_t kHashAlgorithmLengthInBytes;
   static const size_t kSigAlgorithmLengthInBytes;
+  static const size_t kVersionLengthInBytes;
 
   static size_t PrefixLength(size_t max_length);
 
   // returns binary data
   std::string SerializedString() const { return output_; }
 
-  static SerializeResult CheckFormat(const ct::LogEntry &entry);
+  static SerializeResult CheckLogEntryFormat(const ct::LogEntry &entry);
 
   static std::string CertificateSha256Hash(const ct::LogEntry &entry);
 
-  static SerializeResult SerializeSCTSignatureInput(
-      uint64_t timestamp, ct::LogEntryType type,
-      const std::string &certificate, std::string *result);
+  static SerializeResult SerializeV1SCTSignatureInput(
+      uint64_t timestamp, ct::LogEntryType type, const std::string &certificate,
+      const std::string &extensions, std::string *result);
 
   static SerializeResult SerializeSCTSignatureInput(
-      uint64_t timestamp, const ct::LogEntry &entry, std::string *result);
+      const ct::SignedCertificateTimestamp &sct,
+      const ct::LogEntry &entry, std::string *result);
 
-  static SerializeResult SerializeMerkleTreeLeaf(
-      uint64_t timestamp, ct::LogEntryType type,
-      const std::string &certificate, std::string *result) {
-    return SerializeSCTSignatureInput(timestamp, type, certificate, result);
+  static SerializeResult SerializeV1MerkleTreeLeaf(
+      uint64_t timestamp, ct::LogEntryType type, const std::string &certificate,
+      const std::string &extensions, std::string *result) {
+    return SerializeV1SCTSignatureInput(timestamp, type, certificate,
+                                        extensions, result);
   }
 
   static SerializeResult
-  SerializeMerkleTreeLeaf(const ct::MerkleTreeLeaf &leaf,
-                          std::string *result) {
-    return SerializeMerkleTreeLeaf(leaf.timestamp(), leaf.type(),
-                                   leaf.certificate(), result);
+  SerializeMerkleTreeLeaf(const ct::SignedCertificateTimestamp &sct,
+                          const ct::LogEntry &entry, std::string *result) {
+    return SerializeSCTSignatureInput(sct, entry, result);
   }
 
-  static SerializeResult
-  SerializeMerkleTreeLeaf(const ct::LogEntry &entry,
-                          const ct::SignedCertificateTimestamp &sct,
-                          std::string *result) {
-    return SerializeSCTSignatureInput(sct.timestamp(), entry, result);
-  }
+  static SerializeResult SerializeV1STHSignatureInput(
+      uint64_t timestamp, uint64_t tree_size,
+      const std::string &root_hash, std::string *result);
 
-  static SerializeResult SerializeSTHForSigning(uint64_t timestamp,
-                                                uint64_t tree_size,
-                                                const std::string &root_hash,
-                                                std::string *result);
-
-  static SerializeResult
-  SerializeSTHForSigning(const ct::SignedTreeHead &sth, std::string *result) {
-    return SerializeSTHForSigning(sth.timestamp(), sth.tree_size(),
-                                  sth.root_hash(), result);
-  }
+  static SerializeResult SerializeSTHSignatureInput(
+      const ct::SignedTreeHead &sth, std::string *result);
 
   SerializeResult WriteSCT(const ct::SignedCertificateTimestamp &sct);
 
@@ -131,15 +125,19 @@ class Serializer {
 
   SerializeResult WriteDigitallySigned(const ct::DigitallySigned &sig);
 
-  static SerializeResult CheckFormat(const ct::DigitallySigned &sig);
+  static SerializeResult CheckSignatureFormat(const ct::DigitallySigned &sig);
 
-  static SerializeResult CheckFormat(const std::string &cert);
+  static SerializeResult CheckCertificateFormat(const std::string &cert);
 
-  static SerializeResult CheckFormat(const repeated_string &chain);
+  static SerializeResult CheckExtensionsFormat(const std::string &extensions);
 
-  static SerializeResult CheckFormat(const ct::X509ChainEntry &entry);
+  static SerializeResult CheckChainFormat(const repeated_string &chain);
 
-  static SerializeResult CheckFormat(const ct::PrecertChainEntry &entry);
+  static SerializeResult
+  CheckX509ChainEntryFormat(const ct::X509ChainEntry &entry);
+
+  static SerializeResult
+  CheckPrecertChainEntryFormat(const ct::PrecertChainEntry &entry);
 
   std::string output_;
 };
@@ -156,6 +154,7 @@ class Deserializer {
     INVALID_HASH_ALGORITHM,
     INVALID_SIGNATURE_ALGORITHM,
     INPUT_TOO_LONG,
+    UNSUPPORTED_VERSION,
   };
 
   bool ReachedEnd() const { return bytes_remaining_ == 0; }
