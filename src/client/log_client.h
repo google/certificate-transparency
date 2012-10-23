@@ -26,8 +26,9 @@ class LogClient {
   bool UploadSubmission(const std::string &submission, bool pre,
                         ct::SignedCertificateTimestamp *sct);
 
-  // SCT must have the leaf certificate set.
-  bool QueryAuditProof(const ct::SignedCertificateTimestamp &sct,
+  // Entry must have the leaf certificate set.
+  bool QueryAuditProof(const ct::LogEntry &entry,
+                       const ct::SignedCertificateTimestamp &sct,
                        ct::MerkleAuditProof *proof);
 
   static std::string ErrorString(ct::ServerError::ErrorCode error);

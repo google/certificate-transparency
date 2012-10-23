@@ -60,7 +60,7 @@ LogLookup::UpdateResult LogLookup::Update() {
         << "Logged entry has no sequence number";
     CHECK_EQ(sequence_number, logged_cert.sequence_number());
 
-    string new_hash = LeafHash(logged_cert.sct());
+    string new_hash = LeafHash(logged_cert);
     new_hashes.push_back(new_hash);
   }
 
@@ -108,10 +108,11 @@ LogLookup::CertificateAuditProof(uint64_t timestamp,
   return OK;
 }
 
-string LogLookup::LeafHash(const SignedCertificateTimestamp &sct) {
-  // Serialize the signed part for inclusion in the tree.
-  string serialized_sct;
+string LogLookup::LeafHash(const LoggedCertificate &logged_cert) {
+  string serialized_leaf;
   CHECK_EQ(Serializer::OK,
-           Serializer::SerializeSCTForTree(sct, &serialized_sct));
-  return cert_tree_.LeafHash(serialized_sct);
+           Serializer::SerializeMerkleTreeLeaf(logged_cert.entry(),
+                                               logged_cert.sct(),
+                                               &serialized_leaf));
+  return cert_tree_.LeafHash(serialized_leaf);
 }

@@ -9,7 +9,7 @@ using std::string;
 
 static const char kCertDir[] = "../test/testdata";
 
-// TODO: add test certs with intermediates.
+// TODO(ekasper): add test certs with intermediates.
 // Valid certificates.
 static const char kCaCert[] = "ca-cert.pem";
 // Issued by ca-cert.pem

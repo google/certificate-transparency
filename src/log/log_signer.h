@@ -10,15 +10,8 @@
 
 class LogSigner {
  public:
-  LogSigner(EVP_PKEY *pkey);
+  explicit LogSigner(EVP_PKEY *pkey);
   ~LogSigner();
-
-  // One byte.
-  // Each struct we digitally sign has a unique type identifier.
-  enum SignatureType {
-    CERTIFICATE_TIMESTAMP = 0,
-    TREE_HEAD = 1,
-  };
 
   enum SignResult {
     OK,
@@ -34,14 +27,14 @@ class LogSigner {
   // In accordance with the spec, timestamp should be UTC time,
   // since January 1, 1970, 00:00, in milliseconds.
   SignResult SignCertificateTimestamp(uint64_t timestamp,
-                                      ct::CertificateEntryType type,
+                                      ct::LogEntryType type,
                                       const std::string &leaf_certificate,
                                       std::string *result) const;
 
   // Sign the cert timestamp and write the resulting DigitallySigned
   // signature message into |sct|.
   SignResult SignCertificateTimestamp(
-      ct::SignedCertificateTimestamp *sct) const;
+      const ct::LogEntry &entry, ct::SignedCertificateTimestamp *sct) const;
 
   SignResult SignTreeHead(uint64_t timestamp, uint64_t tree_size,
                           const std::string &root_hash,
@@ -52,8 +45,7 @@ class LogSigner {
  private:
   static SignResult GetSerializeError(Serializer::SerializeResult result);
 
-  void Sign(SignatureType type, const std::string &data,
-            ct::DigitallySigned *result) const;
+  void Sign(const std::string &data, ct::DigitallySigned *result) const;
 
   std::string RawSign(const std::string &data) const;
 
@@ -64,7 +56,7 @@ class LogSigner {
 
 class LogSigVerifier {
  public:
-  LogSigVerifier(EVP_PKEY *pkey);
+  explicit LogSigVerifier(EVP_PKEY *pkey);
   ~LogSigVerifier();
 
   enum VerifyResult {
@@ -84,11 +76,12 @@ class LogSigVerifier {
 
   // The protobuf-agnostic library version.
   VerifyResult VerifySCTSignature(uint64_t timestamp,
-                                  ct::CertificateEntryType type,
+                                  ct::LogEntryType type,
                                   const std::string &leaf_cert,
                                   const std::string &signature) const;
 
   VerifyResult VerifySCTSignature(
+      const ct::LogEntry &entry,
       const ct::SignedCertificateTimestamp &sct) const;
 
   // The protobuf-agnostic library version.
@@ -105,7 +98,7 @@ class LogSigVerifier {
   static VerifyResult
   GetDeserializeSignatureError(Deserializer::DeserializeResult result);
 
-  VerifyResult Verify(LogSigner::SignatureType type, const std::string &input,
+  VerifyResult Verify(const std::string &input,
                       const ct::DigitallySigned &signature) const;
 
   bool RawVerify(const std::string &data, const std::string &sig_string) const;

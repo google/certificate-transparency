@@ -18,7 +18,6 @@
 
 namespace {
 
-using ct::CertificateEntry;
 using ct::LoggedCertificate;
 using ct::MerkleAuditProof;
 using std::string;
@@ -140,7 +139,8 @@ TYPED_TEST(LogLookupTest, Verify) {
                                          logged_cert.certificate_sha256_hash(),
                                          &proof));
   EXPECT_EQ(LogVerifier::VERIFY_OK,
-            this->verifier_->VerifyMerkleAuditProof(logged_cert.sct(), proof));
+            this->verifier_->VerifyMerkleAuditProof(logged_cert.entry(),
+                                                    logged_cert.sct(), proof));
 }
 
 // Build a bigger tree so that we actually verify a non-empty path.
@@ -166,6 +166,7 @@ TYPED_TEST(LogLookupTest, VerifyWithPath) {
                   logged_certs[i].certificate_sha256_hash(), &proof));
     EXPECT_EQ(LogVerifier::VERIFY_OK,
               this->verifier_->VerifyMerkleAuditProof(
+                  logged_certs[i].entry(),
                   logged_certs[i].sct(), proof));
   }
 }

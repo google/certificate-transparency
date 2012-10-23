@@ -8,6 +8,7 @@
 #include "serializer.h"
 #include "util.h"
 
+using ct::LogEntry;
 using ct::MerkleAuditProof;
 using ct::SignedCertificateTimestamp;
 using ct::SignedTreeHead;
@@ -23,39 +24,22 @@ LogVerifier::~LogVerifier() {
   delete tree_verifier_;
 }
 
-// static
-LogVerifier::VerifyResult
-LogVerifier::VerifySCTConsistency(const SignedCertificateTimestamp &sct,
-                                  const SignedCertificateTimestamp &sct2) {
-  string signed_part, signed_part2;
-
-  if (Serializer::SerializeSCTForSigning(sct, &signed_part) != Serializer::OK ||
-      Serializer::SerializeSCTForSigning(sct2, &signed_part2) != Serializer::OK)
-    return INVALID_FORMAT;
-  if (signed_part != signed_part2 || sct.timestamp() == sct2.timestamp())
-    return VERIFY_OK;
-  // Now we have two identical entries with different timestamps.
-  // (Caller should check that they both have valid signatures).
-  return INCONSISTENT_TIMESTAMPS;
-}
-
-LogVerifier::VerifyResult
-LogVerifier::VerifySignedCertificateTimestamp(const
-                                              SignedCertificateTimestamp &sct,
-                                              uint64_t begin_range,
-                                              uint64_t end_range) const {
+LogVerifier::VerifyResult LogVerifier::VerifySignedCertificateTimestamp(
+    const LogEntry &entry, const SignedCertificateTimestamp &sct,
+    uint64_t begin_range, uint64_t end_range) const {
   if (!IsBetween(sct.timestamp(), begin_range, end_range))
     return INVALID_TIMESTAMP;
 
-  if (sig_verifier_->VerifySCTSignature(sct) != LogSigVerifier::OK)
+  // TODO(ekasper): separate format and signature errors.
+  if (sig_verifier_->VerifySCTSignature(entry, sct) != LogSigVerifier::OK)
     return INVALID_SIGNATURE;
   return VERIFY_OK;
 }
 
 LogVerifier::VerifyResult LogVerifier::VerifySignedCertificateTimestamp(
-    const SignedCertificateTimestamp &sct) const {
+    const LogEntry &entry, const SignedCertificateTimestamp &sct) const {
   // Allow a bit of slack, say 1 second into the future.
-  return VerifySignedCertificateTimestamp(sct, 0,
+  return VerifySignedCertificateTimestamp(entry, sct, 0,
                                           util::TimeInMilliseconds() + 1000);
 }
 
@@ -78,16 +62,18 @@ LogVerifier::VerifyResult LogVerifier::VerifySignedTreeHead(
 }
 
 LogVerifier::VerifyResult
-LogVerifier::VerifyMerkleAuditProof(const SignedCertificateTimestamp &sct,
+LogVerifier::VerifyMerkleAuditProof(const LogEntry &entry,
+                                    const SignedCertificateTimestamp &sct,
                                     const MerkleAuditProof &merkle_proof)
     const {
   if (!IsBetween(merkle_proof.timestamp(), sct.timestamp(),
                  util::TimeInMilliseconds() + 1000))
     return INCONSISTENT_TIMESTAMPS;
 
-  string serialized_sct;
+  string serialized_leaf;
   Serializer::SerializeResult serialize_result =
-      Serializer::SerializeSCTForTree(sct, &serialized_sct);
+      Serializer::SerializeMerkleTreeLeaf(entry, sct, &serialized_leaf);
+
   if (serialize_result != Serializer::OK)
     return INVALID_FORMAT;
 
@@ -99,7 +85,7 @@ LogVerifier::VerifyMerkleAuditProof(const SignedCertificateTimestamp &sct,
   string root_hash =
       tree_verifier_->RootFromPath(merkle_proof.leaf_index() + 1,
                                    merkle_proof.tree_size(), path,
-                                   serialized_sct);
+                                   serialized_leaf);
 
   if (root_hash.empty())
     return INVALID_MERKLE_PATH;

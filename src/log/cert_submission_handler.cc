@@ -7,7 +7,9 @@
 #include "ct.pb.h"
 #include "serializer.h"
 
-using ct::CertificateEntry;
+using ct::LogEntry;
+using ct::PrecertChainEntry;
+using ct::X509ChainEntry;
 using std::string;
 
 CertSubmissionHandler::CertSubmissionHandler(CertChecker *cert_checker)
@@ -15,7 +17,7 @@ CertSubmissionHandler::CertSubmissionHandler(CertChecker *cert_checker)
 
 CertSubmissionHandler::SubmitResult
 CertSubmissionHandler::ProcessSubmission(const string &submission,
-                                         CertificateEntry *entry) {
+                                         LogEntry *entry) {
   CHECK_NOTNULL(entry);
   CHECK(entry->has_type());
 
@@ -24,14 +26,17 @@ CertSubmissionHandler::ProcessSubmission(const string &submission,
 
   SubmitResult submit_result = INVALID_TYPE;
   switch (entry->type()) {
-    case CertificateEntry::X509_ENTRY:
-      submit_result = ProcessX509Submission(submission, entry);
+    case ct::X509_ENTRY:
+      submit_result = ProcessX509Submission(submission,
+                                            entry->mutable_x509_entry());
       break;
-    case CertificateEntry::PRECERT_ENTRY:
-      submit_result = ProcessPreCertSubmission(submission, entry);
+    case ct::PRECERT_ENTRY:
+      submit_result = ProcessPreCertSubmission(submission,
+                                               entry->mutable_precert_entry());
       break;
     default:
-      // We support all types, so we should currently never get here.
+      // We support all types, so we should never get here if the caller sets
+      // a valid type.
       LOG(FATAL) << "Unknown entry type " << entry->type();
       break;
   }
@@ -50,21 +55,17 @@ CertSubmissionHandler::ProcessSubmission(const string &submission,
 // static
 CertSubmissionHandler::SubmitResult
 CertSubmissionHandler::X509ChainToEntry(const CertChain &chain,
-                                        CertificateEntry *entry) {
+                                        LogEntry *entry) {
   if (!chain.IsLoaded())
     return CHAIN_NOT_LOADED;
   if (chain.LeafCert()->HasExtension(Cert::kEmbeddedProofExtensionOID)) {
-    entry->set_type(CertificateEntry::PRECERT_ENTRY);
-    entry->set_leaf_certificate(TbsCertificate(chain));
+    entry->set_type(ct::PRECERT_ENTRY);
+    entry->mutable_precert_entry()->set_tbs_certificate(TbsCertificate(chain));
   } else {
-    entry->set_type(CertificateEntry::X509_ENTRY);
-    entry->set_leaf_certificate(chain.LeafCert()->DerEncoding());
+    entry->set_type(ct::X509_ENTRY);
+    entry->mutable_x509_entry()->set_leaf_certificate(
+        chain.LeafCert()->DerEncoding());
   }
-
-  Serializer::SerializeResult serialize_result =
-      Serializer::CheckSignedFormat(*entry);
-  if (serialize_result != Serializer::OK)
-    return GetFormatError(serialize_result);
 
   return OK;
 }
@@ -73,7 +74,7 @@ CertSubmissionHandler::X509ChainToEntry(const CertChain &chain,
 // Format checking is done in the parent class.
 CertSubmissionHandler::SubmitResult
 CertSubmissionHandler::ProcessX509Submission(const string &submission,
-                                             CertificateEntry *entry) {
+                                             X509ChainEntry *entry) {
   string pem_string(reinterpret_cast<const char*>(submission.data()),
                          submission.size());
   CertChain chain(pem_string);
@@ -90,15 +91,15 @@ CertSubmissionHandler::ProcessX509Submission(const string &submission,
   // Should we discard it?
   entry->set_leaf_certificate(chain.LeafCert()->DerEncoding());
   for (size_t i = 1; i < chain.Length(); ++i)
-    entry->add_intermediates(chain.CertAt(i)->DerEncoding());
+    entry->add_certificate_chain(chain.CertAt(i)->DerEncoding());
   return OK;
 }
 
 CertSubmissionHandler::SubmitResult
 CertSubmissionHandler::ProcessPreCertSubmission(const string &submission,
-                                                CertificateEntry *entry) {
+                                                PrecertChainEntry *entry) {
   string pem_string(reinterpret_cast<const char*>(submission.data()),
-                         submission.size());
+                    submission.size());
   PreCertChain chain(pem_string);
   if (!chain.IsLoaded())
     return INVALID_PEM_ENCODED_CHAIN;
@@ -109,11 +110,11 @@ CertSubmissionHandler::ProcessPreCertSubmission(const string &submission,
     return GetVerifyError(result);
 
   // We have a valid chain; make the entry.
-  entry->set_leaf_certificate(TbsCertificate(chain));
-  entry->add_intermediates(chain.PreCert()->DerEncoding());
-  entry->add_intermediates(chain.CaPreCert()->DerEncoding());
+  entry->set_tbs_certificate(TbsCertificate(chain));
+  entry->add_precertificate_chain(chain.PreCert()->DerEncoding());
+  entry->add_precertificate_chain(chain.CaPreCert()->DerEncoding());
   for (size_t i = 0; i < chain.IntermediateLength(); ++i)
-    entry->add_intermediates(chain.IntermediateAt(i)->DerEncoding());
+    entry->add_precertificate_chain(chain.IntermediateAt(i)->DerEncoding());
   return OK;
 }
 

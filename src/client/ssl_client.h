@@ -37,13 +37,17 @@ class SSLClient {
 
   void Disconnect();
 
+  // The reconstructed (signed part of) log entry for the current connection.
+  bool GetCertificateAsLogEntry(ct::LogEntry *entry) const;
+
   // The SCT for the current connection.
-  bool GetToken(ct::SignedCertificateTimestamp *sct) const;
+  bool GetSCT(ct::SignedCertificateTimestamp *sct) const;
 
   // Need a static wrapper for the callback.
   static LogVerifier::VerifyResult
   VerifySCT(const std::string &token, const CertChain &chain,
-            LogVerifier *verifier, ct::SignedCertificateTimestamp *sct);
+            LogVerifier *verifier, ct::LogEntry *entry,
+            ct::SignedCertificateTimestamp *sct);
 
   // Custom verification callback for verifying the SCT token
   // in a superfluous certificate. Return values:
@@ -86,7 +90,10 @@ class SSLClient {
     // SCT verification result.
     bool token_verified;
     bool require_token;
-    // The resulting checkpoint.
+    // The resulting (partial) entry - the client reconstructs
+    // the signed part of the entry (i.e., type and leaf certificate).
+    ct::LogEntry entry;
+    // ... and SCT.
     ct::SignedCertificateTimestamp sct;
   };
 

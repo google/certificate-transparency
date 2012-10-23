@@ -129,7 +129,6 @@ static const bool stats_dummy = RegisterFlagValidator(
 static const bool sign_dummy = RegisterFlagValidator(
     &FLAGS_tree_signing_frequency_seconds, &ValidateIsPositive);
 
-using ct::CertificateEntry;
 using ct::MerkleAuditProof;
 using ct::ClientLookup;
 using ct::ClientMessage;
@@ -550,7 +549,7 @@ class CTLogManager {
 
   // Submit an entry and write a token, if the entry is accepted,
   // or an error otherwise.
-  LogReply SubmitEntry(CertificateEntry::Type type, const string &data,
+  LogReply SubmitEntry(ct::LogEntryType type, const string &data,
                        SignedCertificateTimestamp *sct, string *error) {
     SignedCertificateTimestamp local_sct;
     Frontend::SubmitResult submit_result =
@@ -646,7 +645,7 @@ class CTServer : public Server {
       : Server(loop, fd),
         manager_(manager) {}
 
-  static const ct::Version kVersion = ct::V0;
+  static const ct::Version kVersion = ct::V1;
   static const ct::MessageFormat kFormat = ct::PROTOBUF;
   static const size_t kPacketPrefixLength = 3;
   static const size_t kMaxPacketLength = (1 << 24) - 1;
@@ -720,10 +719,10 @@ class CTServer : public Server {
      SignedCertificateTimestamp sct;
      CTLogManager::LogReply reply;
      if (message.command() == ClientMessage::SUBMIT_BUNDLE)
-       reply = manager_->SubmitEntry(CertificateEntry::X509_ENTRY,
+       reply = manager_->SubmitEntry(ct::X509_ENTRY,
                                      message.submission_data(), &sct, &error);
      else
-       reply = manager_->SubmitEntry(CertificateEntry::PRECERT_ENTRY,
+       reply = manager_->SubmitEntry(ct::PRECERT_ENTRY,
                                      message.submission_data(), &sct,  &error);
 
      switch (reply) {

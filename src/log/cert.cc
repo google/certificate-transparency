@@ -19,7 +19,7 @@ const char Cert::kEmbeddedProofExtensionOID[] = "1.3.6.1.4.1.11129.2.4.2";
 const char Cert::kPoisonExtensionOID[] = "1.3.6.1.4.1.11129.2.4.3";
 const char Cert::kCtExtendedKeyUsageOID[] = "1.3.6.1.4.1.11129.2.4.4";
 
-//static
+// static
 ASN1_OBJECT *Cert::ExtensionObject(const string oid) {
   unsigned char obj_buf[100];
   int obj_len = a2d_ASN1_OBJECT(obj_buf, sizeof obj_buf, oid.data(),
@@ -103,7 +103,7 @@ bool Cert::HasExtendedKeyUsage(const string &key_usage_oid) const {
   for (int i = 0; i < sk_ASN1_OBJECT_num(eku); ++i) {
     (void)BIO_reset(buf);
     CHECK_GT(i2a_ASN1_OBJECT(buf, sk_ASN1_OBJECT_value(eku, i)), 0);
-    CHECK_EQ(1, BIO_write(buf, "", 1)); // NULL-terminate
+    CHECK_EQ(1, BIO_write(buf, "", 1));  // NULL-terminate
     char *oid;
     BIO_get_mem_data(buf, &oid);
     if (oid == key_usage_oid) {

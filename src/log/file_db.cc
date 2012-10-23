@@ -3,7 +3,7 @@
 #include <map>
 #include <set>
 #include <stdint.h>
-#include <utility> // for std::pair
+#include <utility>  // for std::pair
 #include <vector>
 
 #include "ct.pb.h"
@@ -101,7 +101,7 @@ Database::LookupResult FileDB::LookupCertificateByHash(
       cert_storage_->LookupEntry(certificate_sha256_hash, &cert_data);
   if (db_result == FileStorage::NOT_FOUND)
     return NOT_FOUND;
-  assert (db_result == FileStorage::OK);
+  assert(db_result == FileStorage::OK);
 
   LoggedCertificate logged_cert;
   bool ret = logged_cert.ParseFromString(cert_data);

@@ -10,7 +10,6 @@
 #include "util.h"
 
 using ct::LoggedCertificate;
-using ct::SignedCertificateTimestamp;
 using ct::SignedTreeHead;
 using std::string;
 
@@ -72,7 +71,8 @@ TreeSigner::UpdateResult TreeSigner::UpdateTree() {
         << "Pending entry already has a sequence number; entry is "
         << logged_cert.DebugString();
 
-    if (!AppendCertificate(*it, logged_cert.sct())) {
+    CHECK_EQ(logged_cert.certificate_sha256_hash(), *it);
+    if (!AppendCertificate(logged_cert)) {
       LOG(ERROR) << "Assigning sequence number failed";
       return DB_ERROR;
     }
@@ -121,7 +121,7 @@ void TreeSigner::BuildTree() {
     CHECK_LE(logged_cert.sct().timestamp(), sth.timestamp());
     CHECK_EQ(logged_cert.sequence_number(), i);
 
-    AppendCertificateToTree(logged_cert.sct());
+    AppendCertificateToTree(logged_cert);
   }
 
   // Check the root hash.
@@ -142,22 +142,25 @@ void TreeSigner::BuildTree() {
     CHECK_EQ(Database::LOOKUP_OK, db_result);
     CHECK_EQ(logged_cert.sequence_number(), i);
 
-    AppendCertificateToTree(logged_cert.sct());
+    AppendCertificateToTree(logged_cert);
   }
 }
 
 bool
-TreeSigner::AppendCertificate(const string &key,
-                              const SignedCertificateTimestamp &sct) {
+TreeSigner::AppendCertificate(const LoggedCertificate &logged_cert) {
   // Serialize for inclusion in the tree.
-  string serialized_sct;
+  string serialized_leaf;
   CHECK_EQ(Serializer::OK,
-           Serializer::SerializeSCTForTree(sct, &serialized_sct))
-      << sct.DebugString();
+           Serializer::SerializeMerkleTreeLeaf(logged_cert.entry(),
+                                               logged_cert.sct(),
+                                               &serialized_leaf))
+      << logged_cert.DebugString();
 
+  CHECK(logged_cert.has_certificate_sha256_hash());
   // Commit the sequence number of this certificate.
   Database::WriteResult db_result =
-      db_->AssignCertificateSequenceNumber(key, cert_tree_.LeafCount());
+      db_->AssignCertificateSequenceNumber(
+          logged_cert.certificate_sha256_hash(), cert_tree_.LeafCount());
 
   if (db_result != Database::OK) {
     CHECK_EQ(Database::SEQUENCE_NUMBER_ALREADY_IN_USE, db_result);
@@ -167,19 +170,21 @@ TreeSigner::AppendCertificate(const string &key,
   }
 
   // Update in-memory tree.
-  cert_tree_.AddLeaf(serialized_sct);
+  cert_tree_.AddLeaf(serialized_leaf);
   return true;
 }
 
 void
-TreeSigner::AppendCertificateToTree(const SignedCertificateTimestamp &sct) {
+TreeSigner::AppendCertificateToTree(const LoggedCertificate &logged_cert) {
   // Serialize for inclusion in the tree.
-  string serialized_sct;
+  string serialized_leaf;
   CHECK_EQ(Serializer::OK,
-           Serializer::SerializeSCTForTree(sct, &serialized_sct));
+           Serializer::SerializeMerkleTreeLeaf(logged_cert.entry(),
+                                               logged_cert.sct(),
+                                               &serialized_leaf));
 
   // Update in-memory tree.
-  cert_tree_.AddLeaf(serialized_sct);
+  cert_tree_.AddLeaf(serialized_leaf);
 }
 
 void TreeSigner::TimestampAndSign(uint64_t min_timestamp, SignedTreeHead *sth) {

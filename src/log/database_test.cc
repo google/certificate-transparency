@@ -16,10 +16,12 @@
 
 namespace {
 
-using ct::CertificateEntry;
 using ct::DigitallySigned;
+using ct::LogEntry;
 using ct::LoggedCertificate;
+using ct::PrecertChainEntry;
 using ct::SignedTreeHead;
+using ct::X509ChainEntry;
 using std::string;
 
 // A slightly shorter notation for constructing hex strings from binary blobs.
@@ -45,36 +47,6 @@ typedef testing::Types<FileDB, SQLiteDB> Databases;
 
 TYPED_TEST_CASE(DBTest, Databases);
 
-void CompareDS(const DigitallySigned &ds, const DigitallySigned &ds2) {
-  EXPECT_EQ(ds.hash_algorithm(), ds2.hash_algorithm());
-  EXPECT_EQ(ds.sig_algorithm(), ds2.sig_algorithm());
-  EXPECT_EQ(H(ds.signature()), H(ds2.signature()));
-}
-
-void CompareLoggedCerts(const LoggedCertificate &c1,
-                        const LoggedCertificate &c2) {
-  EXPECT_EQ(c1.sct().timestamp(), c2.sct().timestamp());
-  EXPECT_EQ(c1.sct().entry().type(), c2.sct().entry().type());
-  EXPECT_EQ(H(c1.sct().entry().leaf_certificate()),
-            H(c2.sct().entry().leaf_certificate()));
-  // Skip intermediates for now.
-  CompareDS(c1.sct().signature(), c2.sct().signature());
-
-  EXPECT_EQ(H(c1.certificate_sha256_hash()),
-            H(c2.certificate_sha256_hash()));
-  EXPECT_EQ(c1.has_sequence_number(), c2.has_sequence_number());
-  // Defaults to 0 if not set.
-  EXPECT_EQ(c1.sequence_number(), c2.sequence_number());
-}
-
-void CompareTreeHeads(const SignedTreeHead &sth1,
-                      const SignedTreeHead &sth2) {
-  EXPECT_EQ(sth1.tree_size(), sth2.tree_size());
-  EXPECT_EQ(sth1.timestamp(), sth2.timestamp());
-  EXPECT_EQ(H(sth1.root_hash()), H(sth2.root_hash()));
-  CompareDS(sth1.signature(), sth2.signature());
-}
-
 TYPED_TEST(DBTest, CreatePending) {
   LoggedCertificate logged_cert, lookup_cert;
   this->test_signer_.CreateUnique(&logged_cert);
@@ -85,7 +57,7 @@ TYPED_TEST(DBTest, CreatePending) {
   EXPECT_EQ(Database::LOOKUP_OK,
             this->db()->LookupCertificateByHash(
                 logged_cert.certificate_sha256_hash(), &lookup_cert));
-  CompareLoggedCerts(logged_cert, lookup_cert);
+  TestSigner::TestEqualLoggedCerts(logged_cert, lookup_cert);
 
   string similar_hash = logged_cert.certificate_sha256_hash();
   similar_hash[similar_hash.size() - 1] ^= 1;
@@ -135,7 +107,7 @@ TYPED_TEST(DBTest, CreatePendingDuplicate) {
             this->db()->LookupCertificateByHash(
                 logged_cert.certificate_sha256_hash(), &lookup_cert));
             // Check that we get the original entry back.
-  CompareLoggedCerts(logged_cert, lookup_cert);
+  TestSigner::TestEqualLoggedCerts(logged_cert, lookup_cert);
 }
 
 TYPED_TEST(DBTest, AssignSequenceNumber) {
@@ -154,7 +126,7 @@ TYPED_TEST(DBTest, AssignSequenceNumber) {
   EXPECT_EQ(42U, lookup_cert.sequence_number());
 
   lookup_cert.clear_sequence_number();
-  CompareLoggedCerts(logged_cert, lookup_cert);
+  TestSigner::TestEqualLoggedCerts(logged_cert, lookup_cert);
 }
 
 TYPED_TEST(DBTest, AssignSequenceNumberNotPending) {
@@ -216,14 +188,14 @@ TYPED_TEST(DBTest, LookupBySequenceNumber) {
   EXPECT_EQ(42U, lookup_cert.sequence_number());
 
   lookup_cert.clear_sequence_number();
-  CompareLoggedCerts(logged_cert, lookup_cert);
+  TestSigner::TestEqualLoggedCerts(logged_cert, lookup_cert);
 
   EXPECT_EQ(Database::LOOKUP_OK,
             this->db()->LookupCertificateByIndex(22, &lookup_cert2));
   EXPECT_EQ(22U, lookup_cert2.sequence_number());
 
   lookup_cert2.clear_sequence_number();
-  CompareLoggedCerts(logged_cert2, lookup_cert2);
+  TestSigner::TestEqualLoggedCerts(logged_cert2, lookup_cert2);
 }
 
 TYPED_TEST(DBTest, WriteTreeHead) {
@@ -235,7 +207,7 @@ TYPED_TEST(DBTest, WriteTreeHead) {
   EXPECT_EQ(Database::OK, this->db()->WriteTreeHead(sth));
 
   EXPECT_EQ(Database::LOOKUP_OK, this->db()->LatestTreeHead(&lookup_sth));
-  CompareTreeHeads(sth, lookup_sth);
+  TestSigner::TestEqualTreeHeads(sth, lookup_sth);
 }
 
 TYPED_TEST(DBTest, WriteTreeHeadDuplicateTimestamp) {
@@ -250,7 +222,7 @@ TYPED_TEST(DBTest, WriteTreeHeadDuplicateTimestamp) {
             this->db()->WriteTreeHead(sth2));
 
   EXPECT_EQ(Database::LOOKUP_OK, this->db()->LatestTreeHead(&lookup_sth));
-  CompareTreeHeads(sth, lookup_sth);
+  TestSigner::TestEqualTreeHeads(sth, lookup_sth);
 }
 
 TYPED_TEST(DBTest, WriteTreeHeadNewerTimestamp) {
@@ -264,7 +236,7 @@ TYPED_TEST(DBTest, WriteTreeHeadNewerTimestamp) {
   EXPECT_EQ(Database::OK, this->db()->WriteTreeHead(sth2));
 
   EXPECT_EQ(Database::LOOKUP_OK, this->db()->LatestTreeHead(&lookup_sth));
-  CompareTreeHeads(sth2, lookup_sth);
+  TestSigner::TestEqualTreeHeads(sth2, lookup_sth);
 }
 
 TYPED_TEST(DBTest, WriteTreeHeadOlderTimestamp) {
@@ -278,7 +250,7 @@ TYPED_TEST(DBTest, WriteTreeHeadOlderTimestamp) {
   EXPECT_EQ(Database::OK, this->db()->WriteTreeHead(sth2));
 
   EXPECT_EQ(Database::LOOKUP_OK, this->db()->LatestTreeHead(&lookup_sth));
-  CompareTreeHeads(sth, lookup_sth);
+  TestSigner::TestEqualTreeHeads(sth, lookup_sth);
 }
 
 TYPED_TEST(DBTest, Resume) {
@@ -309,15 +281,15 @@ TYPED_TEST(DBTest, Resume) {
   EXPECT_EQ(42U, lookup_cert.sequence_number());
 
   lookup_cert.clear_sequence_number();
-  CompareLoggedCerts(logged_cert, lookup_cert);
+  TestSigner::TestEqualLoggedCerts(logged_cert, lookup_cert);
 
   EXPECT_EQ(Database::LOOKUP_OK,
             db2->LookupCertificateByHash(
                 logged_cert2.certificate_sha256_hash(), &lookup_cert2));
-  CompareLoggedCerts(logged_cert2, lookup_cert2);
+  TestSigner::TestEqualLoggedCerts(logged_cert2, lookup_cert2);
 
   EXPECT_EQ(Database::LOOKUP_OK, db2->LatestTreeHead(&lookup_sth));
-  CompareTreeHeads(sth, lookup_sth);
+  TestSigner::TestEqualTreeHeads(sth, lookup_sth);
 
   std::set<string> pending_hashes;
   pending_hashes.insert(logged_cert2.certificate_sha256_hash());

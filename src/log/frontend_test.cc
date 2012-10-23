@@ -38,7 +38,7 @@ static const char kChainLeafCert[] = "test2-cert.pem";
 
 namespace {
 
-using ct::CertificateEntry;
+using ct::LogEntry;
 using ct::LoggedCertificate;
 using ct::SignedCertificateTimestamp;
 using std::string;
@@ -122,8 +122,7 @@ TYPED_TEST_CASE(FrontendTest, Databases);
 TYPED_TEST(FrontendTest, TestSubmitValid) {
   SignedCertificateTimestamp sct;
   EXPECT_EQ(Frontend::NEW,
-            this->frontend_->QueueEntry(CertificateEntry::X509_ENTRY,
-                                        this->leaf_pem_, &sct));
+            this->frontend_->QueueEntry(ct::X509_ENTRY, this->leaf_pem_, &sct));
 
   // Look it up and expect to get the right thing back.
   LoggedCertificate logged_cert;
@@ -132,15 +131,16 @@ TYPED_TEST(FrontendTest, TestSubmitValid) {
             this->db()->LookupCertificateByHash(cert.Sha256Digest(),
                                                 &logged_cert));
 
+  EXPECT_EQ(ct::X509_ENTRY, logged_cert.entry().type());
   // Compare the leaf cert.
   string der_string = cert.DerEncoding();
   EXPECT_EQ(H(der_string),
-            H(logged_cert.sct().entry().leaf_certificate()));
+            H(logged_cert.entry().x509_entry().leaf_certificate()));
 
   // And verify the signature.
-  sct.mutable_entry()->set_leaf_certificate(der_string);
   EXPECT_EQ(LogVerifier::VERIFY_OK,
-            this->verifier_->VerifySignedCertificateTimestamp(sct));
+            this->verifier_->VerifySignedCertificateTimestamp(
+                logged_cert.entry(), sct));
 
   Frontend::FrontendStats stats(1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0);
   this->CompareStats(stats);
@@ -150,8 +150,7 @@ TYPED_TEST(FrontendTest, TestSubmitValidWithIntermediate) {
   SignedCertificateTimestamp sct;
   string submission = this->chain_leaf_pem_ + this->intermediate_pem_;
   EXPECT_EQ(Frontend::NEW,
-            this->frontend_->QueueEntry(CertificateEntry::X509_ENTRY,
-                                        submission, &sct));
+            this->frontend_->QueueEntry(ct::X509_ENTRY, submission, &sct));
 
   // Look it up and expect to get the right thing back.
   LoggedCertificate logged_cert;
@@ -160,21 +159,22 @@ TYPED_TEST(FrontendTest, TestSubmitValidWithIntermediate) {
             this->db()->LookupCertificateByHash(cert.Sha256Digest(),
                                                 &logged_cert));
 
+  EXPECT_EQ(ct::X509_ENTRY, logged_cert.entry().type());
   // Compare the leaf cert.
   string der_string = cert.DerEncoding();
   EXPECT_EQ(H(der_string),
-            H(logged_cert.sct().entry().leaf_certificate()));
+            H(logged_cert.entry().x509_entry().leaf_certificate()));
 
   // And verify the signature.
-  sct.mutable_entry()->set_leaf_certificate(der_string);
   EXPECT_EQ(LogVerifier::VERIFY_OK,
-            this->verifier_->VerifySignedCertificateTimestamp(sct));
+            this->verifier_->VerifySignedCertificateTimestamp(
+                logged_cert.entry(), sct));
 
   // Compare the first intermediate.
-  ASSERT_GE(logged_cert.sct().entry().intermediates_size(), 1);
+  ASSERT_GE(logged_cert.entry().x509_entry().certificate_chain_size(), 1);
   Cert cert2(this->intermediate_pem_);
   EXPECT_EQ(H(cert2.DerEncoding()),
-            H(logged_cert.sct().entry().intermediates(0)));
+            H(logged_cert.entry().x509_entry().certificate_chain(0)));
   Frontend::FrontendStats stats(1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0);
   this->CompareStats(stats);
 }
@@ -182,11 +182,9 @@ TYPED_TEST(FrontendTest, TestSubmitValidWithIntermediate) {
 TYPED_TEST(FrontendTest, TestSubmitDuplicate) {
   SignedCertificateTimestamp sct;
   EXPECT_EQ(Frontend::NEW,
-            this->frontend_->QueueEntry(CertificateEntry::X509_ENTRY,
-                                        this->leaf_pem_, NULL));
+            this->frontend_->QueueEntry(ct::X509_ENTRY, this->leaf_pem_, NULL));
   EXPECT_EQ(Frontend::DUPLICATE,
-            this->frontend_->QueueEntry(CertificateEntry::X509_ENTRY,
-                                        this->leaf_pem_, &sct));
+            this->frontend_->QueueEntry(ct::X509_ENTRY, this->leaf_pem_, &sct));
 
   // Look it up and expect to get the right thing back.
   LoggedCertificate logged_cert;
@@ -195,15 +193,16 @@ TYPED_TEST(FrontendTest, TestSubmitDuplicate) {
             this->db()->LookupCertificateByHash(cert.Sha256Digest(),
                                                 &logged_cert));
 
+  EXPECT_EQ(ct::X509_ENTRY, logged_cert.entry().type());
   // Compare the leaf cert.
   string der_string = cert.DerEncoding();
   EXPECT_EQ(H(der_string),
-            H(logged_cert.sct().entry().leaf_certificate()));
+            H(logged_cert.entry().x509_entry().leaf_certificate()));
 
   // And verify the signature.
-  sct.mutable_entry()->set_leaf_certificate(der_string);
   EXPECT_EQ(LogVerifier::VERIFY_OK,
-            this->verifier_->VerifySignedCertificateTimestamp(sct));
+            this->verifier_->VerifySignedCertificateTimestamp(
+                logged_cert.entry(), sct));
   Frontend::FrontendStats stats(1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0);
   this->CompareStats(stats);
 }
@@ -212,7 +211,7 @@ TYPED_TEST(FrontendTest, TestSubmitInvalidChain) {
   SignedCertificateTimestamp sct;
   // Missing intermediate.
   EXPECT_EQ(Frontend::CERTIFICATE_VERIFY_ERROR,
-            this->frontend_->QueueEntry(CertificateEntry::X509_ENTRY,
+            this->frontend_->QueueEntry(ct::X509_ENTRY,
                                         this->chain_leaf_pem_, &sct));
   EXPECT_FALSE(sct.has_signature());
   Frontend::FrontendStats stats(0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0);
@@ -225,8 +224,7 @@ TYPED_TEST(FrontendTest, TestSubmitInvalidPem) {
                    "Iamnotavalidcert\n"
                    "-----END CERTIFICATE-----\n");
   EXPECT_EQ(Frontend::BAD_PEM_FORMAT,
-            this->frontend_->QueueEntry(CertificateEntry::X509_ENTRY,
-                                        fake_cert, &sct));
+            this->frontend_->QueueEntry(ct::X509_ENTRY, fake_cert, &sct));
   EXPECT_FALSE(sct.has_signature());
   Frontend::FrontendStats stats(0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0);
   this->CompareStats(stats);
@@ -236,33 +234,34 @@ TYPED_TEST(FrontendTest, TestSubmitPrecert) {
   SignedCertificateTimestamp sct;
   string submission = this->precert_pem_ + this->ca_precert_pem_;
   EXPECT_EQ(Frontend::NEW,
-            this->frontend_->QueueEntry(CertificateEntry::PRECERT_ENTRY,
-                                        submission, &sct));
+            this->frontend_->QueueEntry(ct::PRECERT_ENTRY, submission, &sct));
 
   CertChain chain(this->embedded_pem_);
-  CertificateEntry entry;
+  LogEntry entry;
   CHECK_EQ(CertSubmissionHandler::OK,
            CertSubmissionHandler::X509ChainToEntry(chain, &entry));
 
   // Look it up.
-  string hash = Sha256Hasher::Sha256Digest(entry.leaf_certificate());
+  string hash = Sha256Hasher::Sha256Digest(
+      entry.precert_entry().tbs_certificate());
   LoggedCertificate logged_cert;
   EXPECT_EQ(Database::LOOKUP_OK,
             this->db()->LookupCertificateByHash(hash, &logged_cert));
   Cert pre(this->precert_pem_);
   Cert ca_pre(this->ca_precert_pem_);
 
+  EXPECT_EQ(ct::PRECERT_ENTRY, logged_cert.entry().type());
   // Verify the signature.
-  sct.mutable_entry()->set_leaf_certificate(entry.leaf_certificate());
   EXPECT_EQ(LogVerifier::VERIFY_OK,
-            this->verifier_->VerifySignedCertificateTimestamp(sct));
+            this->verifier_->VerifySignedCertificateTimestamp(
+                logged_cert.entry(), sct));
 
   // Expect to have the original certs logged in the chain.
-  ASSERT_GE(logged_cert.sct().entry().intermediates_size(), 2);
+  ASSERT_GE(logged_cert.entry().precert_entry().precertificate_chain_size(), 2);
   EXPECT_EQ(H(pre.DerEncoding()),
-            H(logged_cert.sct().entry().intermediates(0)));
+            H(logged_cert.entry().precert_entry().precertificate_chain(0)));
   EXPECT_EQ(H(ca_pre.DerEncoding()),
-            H(logged_cert.sct().entry().intermediates(1)));
+            H(logged_cert.entry().precert_entry().precertificate_chain(1)));
   Frontend::FrontendStats stats(0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0);
   this->CompareStats(stats);
 }
@@ -275,9 +274,9 @@ int main(int argc, char **argv) {
   FLAGS_logtostderr = true;
   // Only log fatal messages by default.
   FLAGS_minloglevel = 3;
+  ::testing::InitGoogleTest(&argc, argv);
   google::ParseCommandLineFlags(&argc, &argv, true);
   google::InitGoogleLogging(argv[0]);
-  ::testing::InitGoogleTest(&argc, argv);
   SSL_library_init();
   return RUN_ALL_TESTS();
 }

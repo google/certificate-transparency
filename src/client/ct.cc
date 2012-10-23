@@ -47,7 +47,7 @@ DEFINE_string(sct_token, "",
               "Input file containing the SCT of the certificate");
 DEFINE_string(ssl_client_sct_checkpoint_out, "",
               "Output file for recording the server's leaf certificate, "
-              "SCT timestamp and signature.");
+              "SCT timestamp and signature as a serialized LoggedCertificate.");
 DEFINE_string(certificate_out, "",
               "Output file for the superfluous certificate");
 DEFINE_string(authz_out, "", "Output file for authz data");
@@ -72,7 +72,7 @@ static const char kUsage[] =
     "configure_proof - write the proof in an X509v3 configuration file\n"
     "Use --help to display command-line flag options\n";
 
-using ct::CertificateEntry;
+using ct::LoggedCertificate;
 using ct::MerkleAuditProof;
 using ct::SignedCertificateTimestamp;
 using std::string;
@@ -149,7 +149,7 @@ static int Upload() {
     PCHECK(token_out.good()) << "Could not open response file " << response_file
                              << " for writing";
     string proof;
-    if (Serializer::SerializeSCTToken(sct, &proof) == Serializer::OK) {
+    if (Serializer::SerializeSCT(sct, &proof) == Serializer::OK) {
       token_out.write(proof.data(), proof.size());
       LOG(INFO) << "SCT token saved in " << response_file;
       token_out.close();
@@ -344,18 +344,19 @@ static SSLClient::HandshakeResult Connect() {
     result = client.SSLConnect();
 
   if (result == SSLClient::OK) {
-    SignedCertificateTimestamp sct;
-    if (client.GetToken(&sct)) {
-      VLOG(5) << "Received SCT token:\n" << sct.DebugString();
+    LoggedCertificate logged_cert;
+    if (client.GetSCT(logged_cert.mutable_sct())) {
+      VLOG(5) << "Received SCT token:\n" << logged_cert.sct().DebugString();
+      CHECK(client.GetCertificateAsLogEntry(logged_cert.mutable_entry()));
       string sct_out_file = FLAGS_ssl_client_sct_checkpoint_out;
       if (!sct_out_file.empty()) {
         std::ofstream checkpoint_out(sct_out_file.c_str(),
                                      std::ios::out | std::ios::binary);
         PCHECK(checkpoint_out.good()) << "Could not open checkpoint file "
                                       << sct_out_file << " for writing";
-        string serialized_sct;
-        CHECK(sct.SerializeToString(&serialized_sct));
-        checkpoint_out << serialized_sct;
+        string serialized_entry;
+        CHECK(logged_cert.SerializeToString(&serialized_entry));
+        checkpoint_out << serialized_entry;
         checkpoint_out.close();
       }
     }
@@ -370,11 +371,14 @@ enum AuditResult {
 };
 
 static AuditResult Audit() {
-  string serialized_sct;
-  PCHECK(util::ReadBinaryFile(FLAGS_sct_token, &serialized_sct))
+  string serialized_entry;
+  PCHECK(util::ReadBinaryFile(FLAGS_sct_token, &serialized_entry))
       << "Could not read SCT data from " << FLAGS_sct_token;
-  SignedCertificateTimestamp sct;
-  CHECK(sct.ParseFromString(serialized_sct)) << "Failed to parse the SCT";
+  LoggedCertificate logged_cert;
+  CHECK(logged_cert.ParseFromString(serialized_entry))
+      << "Failed to parse the stored certificate data";
+  CHECK(logged_cert.has_entry());
+  CHECK(logged_cert.has_sct());
 
   string log_server_key = FLAGS_ct_server_public_key;
   CHECK(!log_server_key.empty()) << "Please give a CT log server public key";
@@ -402,11 +406,13 @@ static AuditResult Audit() {
   }
 
   MerkleAuditProof proof;
-  if (!client.QueryAuditProof(sct, &proof))
+  if (!client.QueryAuditProof(logged_cert.entry(), logged_cert.sct(), &proof))
     return PROOF_NOT_FOUND;
 
   VLOG(5) << "Received proof " << proof.DebugString();
-  LogVerifier::VerifyResult res = verifier->VerifyMerkleAuditProof(sct, proof);
+  LogVerifier::VerifyResult res =
+      verifier->VerifyMerkleAuditProof(logged_cert.entry(), logged_cert.sct(),
+                                       proof);
   if (res != LogVerifier::VERIFY_OK) {
     LOG(ERROR) << "Verify error: " << LogVerifier::VerifyResultString(res);
     LOG(ERROR) << "Retrieved Merkle proof is invalid.";

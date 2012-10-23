@@ -2,6 +2,11 @@ syntax = "proto2";
 
 package ct;
 
+////////////////////////////////////////////////////////////////////////////////
+// These protocol buffers should be kept aligned with the I-D.                //
+////////////////////////////////////////////////////////////////////////////////
+
+// RFC 5246
 message DigitallySigned {
   enum HashAlgorithm {
     NONE = 0;
@@ -20,62 +25,99 @@ message DigitallySigned {
     ECDSA = 3;
   }
 
-  required HashAlgorithm hash_algorithm = 1 [ default = NONE ];
-  required SignatureAlgorithm sig_algorithm = 2 [ default = ANONYMOUS ];
+  // 1 byte
+  optional HashAlgorithm hash_algorithm = 1 [ default = NONE ];
+  // 1 byte
+  optional SignatureAlgorithm sig_algorithm = 2 [ default = ANONYMOUS ];
+  // 0..2^16-1 bytes
   optional bytes signature = 3;
 }
 
-message CertificateEntry {
-  // Maps 1-1 to ct::CertificateEntryType
-  enum Type {
-    X509_ENTRY = 0;
-    PRECERT_ENTRY = 1;
-  }
-
-  required Type type = 1 [ default = X509_ENTRY ];
-  // In the case of a regular entry, the leaf certificate.
-  // In the case of a pre-cert entry, the tbs part of the leaf certificate.
-  // Signed.
-  optional bytes leaf_certificate = 2;
-
-  // In the case of a regular entry, a chain from the leaf
-  // to a trusted root (excluding leaf and root).
-  // In the case of a pre-cert entry, this contains the full original
-  // pre-cert chain, as submitted by the CA.
-  // Unsigned, kept as evidence.
-  repeated bytes intermediates = 3;
+enum LogEntryType {
+  X509_ENTRY = 0;
+  PRECERT_ENTRY = 1;
+  // Not part of the I-D, and outside the valid range.
+  UNKNOWN_ENTRY_TYPE = 65536;
 }
 
-// TODO(ekasper): Consider moving the CertificateEntry out of this
-// message to LoggedCertificate, to better match the I-D.
+message X509ChainEntry {
+  // <1..2^24-1>
+  optional bytes leaf_certificate = 1;
+  // <0..2^24-1>
+  // A chain from the leaf to a trusted root
+  // (excluding leaf and possibly root).
+  repeated bytes certificate_chain = 2;
+}
+
+message PrecertChainEntry {
+  // <0..2^24-1>
+  optional bytes tbs_certificate = 1;
+  // <1..2^24-1>
+  // The full original pre-cert chain, as submitted by the CA.
+  repeated bytes precertificate_chain = 2;
+}
+
+message LogEntry {
+  optional LogEntryType type = 1 [ default = UNKNOWN_ENTRY_TYPE ];
+
+  optional X509ChainEntry x509_entry = 2;
+
+  optional PrecertChainEntry precert_entry = 3;
+}
+
+enum SignatureType {
+  CERTIFICATE_TIMESTAMP = 0;
+  // TODO(ekasper): called tree_hash in I-D.
+  TREE_HEAD = 1;
+}
+
+enum Version {
+  V1 = 0;
+  // Not part of the I-D, and outside the valid range.
+  UNKNOWN_VERSION = 256;
+}
+
+message LogID {
+  // 32 bytes
+  optional bytes key_id = 1;
+}
+
+// TODO(ekasper): implement support for version, id and
+// extensions (currently, these fields are ignored).
 message SignedCertificateTimestamp {
+  optional Version version = 1 [ default = UNKNOWN_VERSION ];
+  optional LogID id = 2;
   // UTC time in milliseconds, since January 1, 1970, 00:00.
-  optional uint64 timestamp = 1;
-  optional CertificateEntry entry = 2;
-  optional DigitallySigned signature = 3;
-}
-
-message LoggedCertificate {
-  required SignedCertificateTimestamp sct = 1;
-  required bytes certificate_sha256_hash = 2;
-  optional uint64 sequence_number = 3;
-}
-
-message SignedTreeHead {
-  optional uint64 timestamp = 1;
-  optional uint64 tree_size = 2;
-  optional bytes root_hash = 3;
+  optional uint64 timestamp = 3;
   optional DigitallySigned signature = 4;
+  optional bytes extension = 5;
 }
 
+// Stuff that's hashed into a Merkle leaf.
+// TODO(ekasper, benl): Should this include extensions?
+message MerkleTreeLeaf {
+  optional uint64 timestamp = 1;
+  optional LogEntryType type = 2;
+  optional bytes certificate = 3;
+}
+
+// TODO(ekasper): implement support for version and id
+// (currently, these fields are ignored).
 message MerkleAuditProof {
-  optional uint64 tree_size = 1;
-  optional uint64 timestamp = 2;
-  optional uint64 leaf_index = 3;
-  repeated bytes path_node = 4;
-  optional DigitallySigned tree_head_signature = 5;
+  optional Version version = 1 [ default = UNKNOWN_VERSION ];
+  optional LogID id = 2;
+  optional uint64 tree_size = 3;
+  optional uint64 timestamp = 4;
+  optional uint64 leaf_index = 5;
+  repeated bytes path_node = 6;
+  optional DigitallySigned tree_head_signature = 7;
 }
 
+////////////////////////////////////////////////////////////////////////////////
+// The following are not in the I-D (yet) but should end up there.            //
+// For now they serve as a quick documentation for protocol messages          //
+// we intend to support.                                                      //
+////////////////////////////////////////////////////////////////////////////////
 message ClientLookup {
   enum Type {
     MERKLE_AUDIT_PROOF_BY_TIMESTAMP_AND_HASH = 1;
@@ -124,4 +166,22 @@ message ServerMessage {
   optional ServerError error = 2;
   optional SignedCertificateTimestamp sct = 3;
   optional MerkleAuditProof merkle_proof = 4;
+}
+
+////////////////////////////////////////////////////////////////////////////////
+// Finally, stuff that's not in the I-D but that we use internally            //
+// for logging entries and tree head state.                                   //
+////////////////////////////////////////////////////////////////////////////////
+message LoggedCertificate {
+  optional SignedCertificateTimestamp sct = 1;
+  optional bytes certificate_sha256_hash = 2;
+  optional uint64 sequence_number = 3;
+  optional LogEntry entry = 4;
+}
+
+message SignedTreeHead {
+  optional uint64 timestamp = 1;
+  optional uint64 tree_size = 2;
+  optional bytes root_hash = 3;
+  optional DigitallySigned signature = 4;
 }

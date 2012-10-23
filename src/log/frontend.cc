@@ -5,7 +5,7 @@
 #include "frontend_signer.h"
 #include "cert_submission_handler.h"
 
-using ct::CertificateEntry;
+using ct::LogEntry;
 using ct::SignedCertificateTimestamp;
 using std::string;
 
@@ -23,12 +23,12 @@ void Frontend::GetStats(Frontend::FrontendStats *stats) const {
   *stats = stats_;
 }
 
-Frontend::SubmitResult Frontend::QueueEntry(CertificateEntry::Type type,
+Frontend::SubmitResult Frontend::QueueEntry(ct::LogEntryType type,
                                             const string &data,
                                             SignedCertificateTimestamp *sct) {
   // Step 1. Preprocessing: convert the submission into a CertificateEntry
   // and verify the chain.
-  CertificateEntry entry;
+  LogEntry entry;
   entry.set_type(type);
   CertSubmissionHandler::SubmitResult pre_result =
       handler_->ProcessSubmission(data, &entry);
@@ -112,9 +112,9 @@ Frontend::GetSubmitError(CertSubmissionHandler::SubmitResult result) {
   return submit_result;
 }
 
-void Frontend::UpdateStats(CertificateEntry::Type type,
+void Frontend::UpdateStats(ct::LogEntryType type,
                            Frontend::SubmitResult result) {
-  if (type == CertificateEntry::X509_ENTRY)
+  if (type == ct::X509_ENTRY)
     UpdateX509Stats (result);
   else
     UpdatePrecertStats(result);

@@ -135,8 +135,6 @@ class CertChain {
   // True if each cert is signed by the next one.
   bool IsValidSignatureChain() const;
 
- protected:
-
  private:
   void ClearChain();
   std::vector<Cert*> chain_;

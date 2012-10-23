@@ -10,7 +10,7 @@ class sqlite3;
 
 class SQLiteDB : public Database {
  public:
-  SQLiteDB(const std::string &dbfile);
+  explicit SQLiteDB(const std::string &dbfile);
 
   ~SQLiteDB();
 
@@ -28,7 +28,7 @@ class SQLiteDB : public Database {
 
   virtual WriteResult
   AssignCertificateSequenceNumber(const std::string &pending_hash,
-				  uint64_t sequence_number);
+                                  uint64_t sequence_number);
 
   virtual LookupResult
   LookupCertificateByHash(const std::string &certificate_sha256_hash,
@@ -44,7 +44,7 @@ class SQLiteDB : public Database {
 
   virtual LookupResult LatestTreeHead(ct::SignedTreeHead *result) const;
 
-private:
+ private:
   sqlite3 *db_;
 };
 #endif

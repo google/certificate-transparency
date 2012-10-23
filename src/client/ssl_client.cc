@@ -10,7 +10,7 @@
 #include "ssl_client.h"
 
 using ct::SignedCertificateTimestamp;
-using ct::CertificateEntry;
+using ct::LogEntry;
 using std::string;
 
 SSLClient::SSLClient(const string &server, uint16_t port,
@@ -63,7 +63,16 @@ void SSLClient::Disconnect() {
   connected_ = false;
 }
 
-bool SSLClient::GetToken(SignedCertificateTimestamp *sct) const {
+bool SSLClient::GetCertificateAsLogEntry(LogEntry *entry) const {
+  CHECK(Connected());
+  if (verify_args_.token_verified) {
+    entry->CopyFrom(verify_args_.entry);
+    return true;
+  }
+  return false;
+}
+
+bool SSLClient::GetSCT(SignedCertificateTimestamp *sct) const {
   CHECK(Connected());
   if (verify_args_.token_verified) {
     sct->CopyFrom(verify_args_.sct);
@@ -75,22 +84,22 @@ bool SSLClient::GetToken(SignedCertificateTimestamp *sct) const {
 // static
 LogVerifier::VerifyResult
 SSLClient::VerifySCT(const string &token, const CertChain &chain,
-                     LogVerifier *verifier, SignedCertificateTimestamp *sct) {
-  CertificateEntry entry;
-  if (CertSubmissionHandler::X509ChainToEntry(chain, &entry) !=
+                     LogVerifier *verifier, LogEntry *entry,
+                     SignedCertificateTimestamp *sct) {
+  LogEntry local_entry;
+  if (CertSubmissionHandler::X509ChainToEntry(chain, &local_entry) !=
       CertSubmissionHandler::OK)
     return LogVerifier::INVALID_FORMAT;
 
   SignedCertificateTimestamp local_sct;
-  if (Deserializer::DeserializeSCTToken(token, &local_sct) != Deserializer::OK)
+  if (Deserializer::DeserializeSCT(token, &local_sct) != Deserializer::OK)
     return LogVerifier::INVALID_FORMAT;
 
-  local_sct.mutable_entry()->CopyFrom(entry);
-
   LogVerifier::VerifyResult result =
-      verifier->VerifySignedCertificateTimestamp(local_sct);
+      verifier->VerifySignedCertificateTimestamp(local_entry, local_sct);
   if (result != LogVerifier::VERIFY_OK)
     return result;
+  entry->CopyFrom(local_entry);
   sct->CopyFrom(local_sct);
   return LogVerifier::VERIFY_OK;
 }
@@ -144,7 +153,8 @@ int SSLClient::VerifyCallback(X509_STORE_CTX *ctx, void *arg) {
     // Note: an optimized client could only verify the signature if it's
     // a certificate it hasn't seen before.
     LogVerifier::VerifyResult result = VerifySCT(token, chain,
-                                                 verifier, &args->sct);
+                                                 verifier, &args->entry,
+                                                 &args->sct);
 
     if (result == LogVerifier::VERIFY_OK) {
       LOG(INFO) << "Token verified";
@@ -200,7 +210,7 @@ int SSLClient::SCTTokenCallback(SSL *s, void *arg) {
   chain.AddCert(leaf);
 
   LogVerifier::VerifyResult result =
-      VerifySCT(token, chain, verifier, &args->sct);
+      VerifySCT(token, chain, verifier, &args->entry, &args->sct);
 
   if (result == LogVerifier::VERIFY_OK) {
     args->token_verified = true;
@@ -217,6 +227,7 @@ int SSLClient::SCTTokenCallback(SSL *s, void *arg) {
 void SSLClient::ResetVerifyCallbackArgs(bool strict) {
   verify_args_.token_verified = false;
   verify_args_.require_token = strict;
+  verify_args_.entry.CopyFrom(LogEntry::default_instance());
   verify_args_.sct.CopyFrom(SignedCertificateTimestamp::default_instance());
 }
 

@@ -74,7 +74,7 @@ class Frontend {
 
   void GetStats(FrontendStats *stats) const;
 
-  SubmitResult QueueEntry(ct::CertificateEntry::Type type,
+  SubmitResult QueueEntry(ct::LogEntryType type,
                           const std::string &data,
                           ct::SignedCertificateTimestamp *sct);
 
@@ -87,7 +87,7 @@ class Frontend {
 
   static SubmitResult
   GetSubmitError(CertSubmissionHandler::SubmitResult result);
-  void UpdateStats(ct::CertificateEntry::Type type, SubmitResult result);
+  void UpdateStats(ct::LogEntryType type, SubmitResult result);
   void UpdateX509Stats(SubmitResult result);
   void UpdatePrecertStats(SubmitResult result);
 };

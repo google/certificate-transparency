@@ -1,3 +1,5 @@
+#include <gflags/gflags.h>
+#include <glog/logging.h>
 #include <gtest/gtest.h>
 #include <openssl/ssl.h>
 #include <string>
@@ -25,7 +27,7 @@ static const char kChainLeafCert[] = "test2-cert.pem";
 
 namespace {
 
-using ct::CertificateEntry;
+using ct::LogEntry;
 using std::string;
 
 class CertSubmissionHandlerTest : public ::testing::Test {
@@ -66,25 +68,27 @@ class CertSubmissionHandlerTest : public ::testing::Test {
 };
 
 TEST_F(CertSubmissionHandlerTest, SubmitCert) {
-  CertificateEntry entry;
-  entry.set_type(CertificateEntry::X509_ENTRY);
+  LogEntry entry;
+  entry.set_type(ct::X509_ENTRY);
   // Submit a leaf cert.
   EXPECT_EQ(CertSubmissionHandler::OK,
             handler_->ProcessSubmission(leaf_, &entry));
-  EXPECT_TRUE(entry.has_leaf_certificate());
-  EXPECT_EQ(0, entry.intermediates_size());
+  EXPECT_TRUE(entry.has_x509_entry());
+  EXPECT_FALSE(entry.has_precert_entry());
+  EXPECT_TRUE(entry.x509_entry().has_leaf_certificate());
+  EXPECT_EQ(0, entry.x509_entry().certificate_chain_size());
 }
 
 TEST_F(CertSubmissionHandlerTest, SubmitEmptyCert) {
-  CertificateEntry entry;
-  entry.set_type(CertificateEntry::X509_ENTRY);
+  LogEntry entry;
+  entry.set_type(ct::X509_ENTRY);
   EXPECT_EQ(CertSubmissionHandler::EMPTY_SUBMISSION,
             handler_->ProcessSubmission("", &entry));
 }
 
 TEST_F(CertSubmissionHandlerTest, SubmitInvalidCert) {
-  CertificateEntry entry;
-  entry.set_type(CertificateEntry::X509_ENTRY);
+  LogEntry entry;
+  entry.set_type(ct::X509_ENTRY);
   EXPECT_EQ(CertSubmissionHandler::INVALID_PEM_ENCODED_CHAIN,
             handler_->ProcessSubmission("-----BEGIN CERTIFICATE-----\ninvalid"
                                         "\n-----END CERTIFICATE-----", &entry));
@@ -93,17 +97,17 @@ TEST_F(CertSubmissionHandlerTest, SubmitInvalidCert) {
 TEST_F(CertSubmissionHandlerTest, SubmitChain) {
   // Submit a chain.
   string submit = chain_leaf_ + intermediate_;
-  CertificateEntry entry;
-  entry.set_type(CertificateEntry::X509_ENTRY);
+  LogEntry entry;
+  entry.set_type(ct::X509_ENTRY);
   EXPECT_EQ(CertSubmissionHandler::OK,
             handler_->ProcessSubmission(submit, &entry));
-  EXPECT_TRUE(entry.has_leaf_certificate());
-  EXPECT_EQ(1, entry.intermediates_size());
+  EXPECT_TRUE(entry.x509_entry().has_leaf_certificate());
+  EXPECT_EQ(1, entry.x509_entry().certificate_chain_size());
 }
 
 TEST_F(CertSubmissionHandlerTest, SubmitPartialChain) {
-  CertificateEntry entry;
-  entry.set_type(CertificateEntry::X509_ENTRY);
+  LogEntry entry;
+  entry.set_type(ct::X509_ENTRY);
   // Submit a leaf cert with a missing intermediate.
   EXPECT_EQ(CertSubmissionHandler::UNKNOWN_ROOT,
             handler_->ProcessSubmission(chain_leaf_, &entry));
@@ -112,16 +116,16 @@ TEST_F(CertSubmissionHandlerTest, SubmitPartialChain) {
 TEST_F(CertSubmissionHandlerTest, SubmitInvalidChain) {
   string invalid_submit = ca_;
   invalid_submit.append(leaf_);
-  CertificateEntry entry;
-  entry.set_type(CertificateEntry::X509_ENTRY);
+  LogEntry entry;
+  entry.set_type(ct::X509_ENTRY);
   // An invalid chain with two certs in wrong order.
   EXPECT_EQ(CertSubmissionHandler::INVALID_CERTIFICATE_CHAIN,
             handler_->ProcessSubmission(invalid_submit, &entry));
 }
 
 TEST_F(CertSubmissionHandlerTest, SubmitCertAsPreCert) {
-  CertificateEntry entry;
-  entry.set_type(CertificateEntry::PRECERT_ENTRY);
+  LogEntry entry;
+  entry.set_type(ct::PRECERT_ENTRY);
   // Various things are wrong here, so do not expect a specific error.
   EXPECT_NE(CertSubmissionHandler::OK,
             handler_->ProcessSubmission(leaf_, &entry));
@@ -129,36 +133,38 @@ TEST_F(CertSubmissionHandlerTest, SubmitCertAsPreCert) {
 
 TEST_F(CertSubmissionHandlerTest, SubmitCertChainAsPreCert) {
   string submit = chain_leaf_ + intermediate_;
-  CertificateEntry entry;
-  entry.set_type(CertificateEntry::PRECERT_ENTRY);
+  LogEntry entry;
+  entry.set_type(ct::PRECERT_ENTRY);
   EXPECT_NE(CertSubmissionHandler::OK,
             handler_->ProcessSubmission(submit, &entry));
 }
 
 TEST_F(CertSubmissionHandlerTest, SubmitPreCertChain) {
   string submit = precert_ + ca_precert_;
-  CertificateEntry entry;
-  entry.set_type(CertificateEntry::PRECERT_ENTRY);
+  LogEntry entry;
+  entry.set_type(ct::PRECERT_ENTRY);
   EXPECT_EQ(CertSubmissionHandler::OK,
             handler_->ProcessSubmission(submit, &entry));
-  EXPECT_TRUE(entry.has_leaf_certificate());
+  EXPECT_TRUE(entry.has_precert_entry());
+  EXPECT_FALSE(entry.has_x509_entry());
+  EXPECT_TRUE(entry.precert_entry().has_tbs_certificate());
   // |intermediates| is the entire precert chain (excluding root).
-  EXPECT_EQ(2, entry.intermediates_size());
+  EXPECT_EQ(2, entry.precert_entry().precertificate_chain_size());
 }
 
 TEST_F(CertSubmissionHandlerTest, SubmitInvalidPreCertChain) {
   // In wrong order.
   string submit = ca_precert_ + precert_;
-  CertificateEntry entry;
-  entry.set_type(CertificateEntry::PRECERT_ENTRY);
+  LogEntry entry;
+  entry.set_type(ct::PRECERT_ENTRY);
   EXPECT_NE(CertSubmissionHandler::OK,
             handler_->ProcessSubmission(submit, &entry));
 }
 
 TEST_F(CertSubmissionHandlerTest, SubmitPreCertChainAsCertChain) {
   string submit = precert_ + ca_precert_;
-  CertificateEntry entry;
-  entry.set_type(CertificateEntry::X509_ENTRY);
+  LogEntry entry;
+  entry.set_type(ct::X509_ENTRY);
   // This should fail since ca_precert_ is not a CA cert (CA:false).
   EXPECT_NE(CertSubmissionHandler::OK,
             handler_->ProcessSubmission(submit, &entry));
@@ -167,7 +173,14 @@ TEST_F(CertSubmissionHandlerTest, SubmitPreCertChainAsCertChain) {
 }  // namespace
 
 int main(int argc, char**argv) {
+  // Change the defaults. Can be overridden on command line.
+  // Log to stderr instead of log files.
+  FLAGS_logtostderr = true;
+  // Only log fatal messages by default.
+  FLAGS_minloglevel = 3;
   ::testing::InitGoogleTest(&argc, argv);
+  google::ParseCommandLineFlags(&argc, &argv, true);
+  google::InitGoogleLogging(argv[0]);
   SSL_library_init();
   return RUN_ALL_TESTS();
 }

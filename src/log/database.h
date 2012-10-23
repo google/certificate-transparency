@@ -67,7 +67,7 @@ class Database {
   // |sequence_number| is a secondary key.
   virtual WriteResult
   AssignCertificateSequenceNumber(const std::string &pending_hash,
-				  uint64_t sequence_number) = 0;
+                                  uint64_t sequence_number) = 0;
 
   // Look up certificate by hash. If the entry exists, and result is not NULL,
   // write the result. If the entry is not logged return PENDING.

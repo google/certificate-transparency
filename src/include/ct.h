@@ -10,18 +10,8 @@ namespace ct {
 // data - |length| bytes
 
 // One byte when serialized.
-enum Version {
-  V0 = 0,
-};
-
-// One byte when serialized.
 enum MessageFormat {
   PROTOBUF = 0,
-};
-
-enum CertificateEntryType {
-  X509_ENTRY = 0,
-  PRECERT_ENTRY = 1,
 };
 
 }  // namespace

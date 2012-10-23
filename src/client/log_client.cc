@@ -8,7 +8,7 @@
 #include "serial_hasher.h"
 #include "serializer.h"
 
-using ct::CertificateEntry;
+using ct::LogEntry;
 using ct::ClientLookup;
 using ct::ClientMessage;
 using ct::ServerError;
@@ -17,7 +17,7 @@ using ct::MerkleAuditProof;
 using ct::SignedCertificateTimestamp;
 using std::string;
 
-const ct::Version LogClient::kVersion = ct::V0;
+const ct::Version LogClient::kVersion = ct::V1;
 const ct::MessageFormat LogClient::kFormat = ct::PROTOBUF;
 const size_t LogClient::kPacketPrefixLength = 3;
 const size_t LogClient::kMaxPacketLength = (1 << 24) - 1;
@@ -62,10 +62,6 @@ bool LogClient::UploadSubmission(const string &submission, bool pre,
     case ServerMessage::SIGNED_CERTIFICATE_TIMESTAMP:
       LOG(INFO) << "Submission successful.";
       sct->CopyFrom(reply.sct());
-      if (pre)
-        sct->mutable_entry()->set_type(CertificateEntry::PRECERT_ENTRY);
-      else
-        sct->mutable_entry()->set_type(CertificateEntry::X509_ENTRY);
       ret = true;
       break;
     default:
@@ -74,18 +70,17 @@ bool LogClient::UploadSubmission(const string &submission, bool pre,
   return ret;
 }
 
-bool LogClient::QueryAuditProof(const SignedCertificateTimestamp &sct,
+bool LogClient::QueryAuditProof(const LogEntry &entry,
+                                const SignedCertificateTimestamp &sct,
                                 MerkleAuditProof *proof) {
   CHECK(sct.has_timestamp()) << "Missing SCT timestamp";
-  CHECK(sct.entry().has_leaf_certificate())
-      << "Missing leaf certificate; cannot calculate certificate hash";
   ClientMessage message;
   message.set_command(ClientMessage::LOOKUP_AUDIT_PROOF);
   message.mutable_lookup()->set_type(
       ClientLookup::MERKLE_AUDIT_PROOF_BY_TIMESTAMP_AND_HASH);
   message.mutable_lookup()->set_certificate_timestamp(sct.timestamp());
   message.mutable_lookup()->set_certificate_sha256_hash(
-      Sha256Hasher::Sha256Digest(sct.entry().leaf_certificate()));
+      Serializer::CertificateSha256Hash(entry));
   if (!SendMessage(message))
     return false;
   ServerMessage reply;
@@ -94,7 +89,7 @@ bool LogClient::QueryAuditProof(const SignedCertificateTimestamp &sct,
 
   bool ret = false;
   switch (reply.response()) {
-   case ServerMessage::ERROR:
+    case ServerMessage::ERROR:
       LOG(ERROR) << "CT server replied with error " << reply.error().code()
                  << ": " << ErrorString(reply.error().code());
       if (reply.error().has_error_message())

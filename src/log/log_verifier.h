@@ -22,7 +22,7 @@ class LogVerifier {
     INVALID_FORMAT,
     // Invalid timestamp
     INVALID_TIMESTAMP,
-   // Timestamps differ.
+    // Timestamps differ.
     INCONSISTENT_TIMESTAMPS,
     // The signature does not verify.
     INVALID_SIGNATURE,
@@ -32,7 +32,7 @@ class LogVerifier {
   };
 
   static std::string VerifyResultString(VerifyResult result) {
-    switch(result) {
+    switch (result) {
       case VERIFY_OK:
         return "Verify OK.";
       case INVALID_FORMAT:
@@ -49,23 +49,17 @@ class LogVerifier {
     }
   }
 
-  // Verify that the two entries, if equal, also have consistent timestamps.
-  static VerifyResult
-  VerifySCTConsistency(const ct::SignedCertificateTimestamp &sct,
-                       const ct::SignedCertificateTimestamp &sct2);
-
   // Verify that the timestamp is in the given range,
   // and the signature is valid.
   // Timestamps are given in milliseconds, since January 1, 1970,
   // 00:00 UTC time.
-  VerifyResult
-  VerifySignedCertificateTimestamp(const ct::SignedCertificateTimestamp &sct,
-                                   uint64_t begin_range,
-                                   uint64_t end_range) const;
+  VerifyResult VerifySignedCertificateTimestamp(
+      const ct::LogEntry &entry, const ct::SignedCertificateTimestamp &sct,
+      uint64_t begin_range, uint64_t end_range) const;
 
   // Verify that the timestamp is not in the future, and the signature is valid.
-  VerifyResult
-  VerifySignedCertificateTimestamp(
+  VerifyResult VerifySignedCertificateTimestamp(
+      const ct::LogEntry &entry,
       const ct::SignedCertificateTimestamp &sct) const;
 
   // Verify that the timestamp is in the given range,
@@ -84,7 +78,8 @@ class LogVerifier {
   // (2) sct timestamp <= audit proof timestamp <= now
   // Does not verify the SCT signature (or even require one).
   VerifyResult
-  VerifyMerkleAuditProof(const ct::SignedCertificateTimestamp &sct,
+  VerifyMerkleAuditProof(const ct::LogEntry &entry,
+                         const ct::SignedCertificateTimestamp &sct,
                          const ct::MerkleAuditProof &merkle_proof) const;
 
  private:

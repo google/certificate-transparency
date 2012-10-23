@@ -1,4 +1,5 @@
 #include <glog/logging.h>
+#include <gtest/gtest.h>
 #include <openssl/bio.h>
 #include <openssl/evp.h>
 #include <openssl/pem.h>
@@ -8,24 +9,30 @@
 
 #include "ct.pb.h"
 #include "log_signer.h"
+#include "serial_hasher.h"
 #include "serializer.h"
 #include "test_signer.h"
 #include "util.h"
 
-#include "serial_hasher.h"
-
 namespace {
 
-using ct::CertificateEntry;
 using ct::DigitallySigned;
+using ct::LogEntry;
 using ct::LoggedCertificate;
+using ct::PrecertChainEntry;
 using ct::SignedCertificateTimestamp;
 using ct::SignedTreeHead;
+using ct::X509ChainEntry;
 using std::string;
 
 // A slightly shorter notation for constructing binary blobs from test vectors.
 string B(const char *hexstring) {
   return util::BinaryString(hexstring);
+}
+
+// A slightly shorter notation for constructing hex strings from binary blobs.
+std::string H(const std::string &byte_string) {
+  return util::HexString(byte_string);
 }
 
 const char kDefaultDerCert[] =
@@ -131,7 +138,7 @@ LogSigner *TestSigner::DefaultSigner() {
 
 // Caller owns result.
 // Call as many times as required to get a fresh copy every time.
-//static
+// static
 LogSigVerifier *TestSigner::DefaultVerifier() {
   EVP_PKEY *pubkey = PublicKeyFromPem(kEcP256PublicKey);
   CHECK_NOTNULL(pubkey);
@@ -139,10 +146,14 @@ LogSigVerifier *TestSigner::DefaultVerifier() {
 }
 
 // static
+void TestSigner::SetDefaults(LogEntry *entry) {
+  entry->set_type(ct::X509_ENTRY);
+  entry->mutable_x509_entry()->set_leaf_certificate(B(kDefaultDerCert));
+}
+
+// static
 void TestSigner::SetDefaults(SignedCertificateTimestamp *sct) {
   sct->set_timestamp(kDefaultSCTTimestamp);
-  sct->mutable_entry()->set_type(CertificateEntry::X509_ENTRY);
-  sct->mutable_entry()->set_leaf_certificate(B(kDefaultDerCert));
   sct->mutable_signature()->set_hash_algorithm(DigitallySigned::SHA256);
   sct->mutable_signature()->set_sig_algorithm(DigitallySigned::ECDSA);
   sct->mutable_signature()->set_signature(B(kDefaultSCTSignature));
@@ -152,6 +163,7 @@ void TestSigner::SetDefaults(SignedCertificateTimestamp *sct) {
 void TestSigner::SetDefaults(LoggedCertificate *logged_cert) {
   // Some time in September 2012.
   SetDefaults(logged_cert->mutable_sct());
+  SetDefaults(logged_cert->mutable_entry());
   // FIXME(ekasper): don't assume SHA256 in test vectors
   // (despite the field name).
   logged_cert->set_certificate_sha256_hash(B(kDefaultDerCertHash));
@@ -193,20 +205,38 @@ string TestSigner::UniqueHash() {
   return Sha256Hasher::Sha256Digest(counter);
 }
 
-void TestSigner::CreateUnique(CertificateEntry *entry) {
-  entry->set_leaf_certificate(UniqueFakeCertBytestring());
+void TestSigner::CreateUnique(LogEntry *entry) {
   int random_bits = rand();
-  CertificateEntry::Type type = random_bits & 1 ?
-      CertificateEntry::X509_ENTRY : CertificateEntry::PRECERT_ENTRY;
+  ct::LogEntryType type = random_bits & 1 ?
+      ct::X509_ENTRY : ct::PRECERT_ENTRY;
 
   entry->set_type(type);
+  entry->clear_x509_entry();
+  entry->clear_precert_entry();
 
-  entry->clear_intermediates();
-  if (random_bits & 2) {
-    entry->add_intermediates(UniqueFakeCertBytestring());
+  if (type == ct::X509_ENTRY) {
+    entry->mutable_x509_entry()->set_leaf_certificate(
+        UniqueFakeCertBytestring());
+    if (random_bits & 2) {
+      entry->mutable_x509_entry()->add_certificate_chain(
+          UniqueFakeCertBytestring());
 
-    if (random_bits & 4) {
-      entry->add_intermediates(UniqueFakeCertBytestring());
+      if (random_bits & 4) {
+        entry->mutable_x509_entry()->add_certificate_chain(
+            UniqueFakeCertBytestring());
+      }
+    }
+  } else {
+    entry->mutable_precert_entry()->set_tbs_certificate(
+        UniqueFakeCertBytestring());
+    if (random_bits & 2) {
+      entry->mutable_precert_entry()->add_precertificate_chain(
+          UniqueFakeCertBytestring());
+
+      if (random_bits & 4) {
+        entry->mutable_precert_entry()->add_precertificate_chain(
+            UniqueFakeCertBytestring());
+      }
     }
   }
 }
@@ -216,6 +246,7 @@ void TestSigner::CreateUnique(LoggedCertificate *logged_cert) {
 
   CHECK_EQ(LogSigner::OK,
            default_signer_->SignCertificateTimestamp(
+               logged_cert->entry(),
                logged_cert->mutable_sct()));
 }
 
@@ -238,13 +269,80 @@ void TestSigner::CreateUnique(SignedTreeHead *sth) {
            default_signer_->SignTreeHead(sth));
 }
 
+// static
+void TestSigner::TestEqualDigitallySigned(const DigitallySigned &ds0,
+                                          const DigitallySigned &ds1) {
+  EXPECT_EQ(ds0.hash_algorithm(), ds1.hash_algorithm());
+  EXPECT_EQ(ds0.sig_algorithm(), ds1.sig_algorithm());
+  EXPECT_EQ(H(ds0.signature()), H(ds1.signature()));
+}
+
+// static
+void TestSigner::TestEqualX509Entries(const X509ChainEntry &entry0,
+                                      const X509ChainEntry &entry1) {
+  EXPECT_EQ(H(entry0.leaf_certificate()), H(entry1.leaf_certificate()));
+  EXPECT_EQ(entry0.certificate_chain_size(), entry1.certificate_chain_size());
+  for (int i = 0; i < entry0.certificate_chain_size(); ++i)
+    EXPECT_EQ(H(entry0.certificate_chain(i)), H(entry1.certificate_chain(i)));
+}
+
+// static
+void TestSigner::TestEqualPreEntries(const PrecertChainEntry &entry0,
+                                     const PrecertChainEntry &entry1) {
+  EXPECT_EQ(H(entry0.tbs_certificate()), H(entry1.tbs_certificate()));
+  EXPECT_EQ(entry0.precertificate_chain_size(),
+            entry1.precertificate_chain_size());
+  for (int i = 0; i < entry0.precertificate_chain_size(); ++i)
+    EXPECT_EQ(H(entry0.precertificate_chain(i)),
+              H(entry1.precertificate_chain(i)));
+}
+
+// static
+void TestSigner::TestEqualEntries(const LogEntry &entry0,
+                                  const LogEntry &entry1) {
+  EXPECT_EQ(entry0.type(), entry1.type());
+  if (entry0.type() == ct::X509_ENTRY)
+    TestEqualX509Entries(entry0.x509_entry(), entry1.x509_entry());
+  if (entry1.type() == ct::PRECERT_ENTRY)
+    TestEqualPreEntries(entry0.precert_entry(), entry1.precert_entry());
+}
+
+// static
+void TestSigner::TestEqualSCTs(const SignedCertificateTimestamp &sct0,
+                               const SignedCertificateTimestamp &sct1) {
+  EXPECT_EQ(sct0.timestamp(), sct1.timestamp());
+  TestEqualDigitallySigned(sct0.signature(), sct1.signature());
+}
+
+// static
+void TestSigner::TestEqualLoggedCerts(const LoggedCertificate &c0,
+                                      const LoggedCertificate &c1) {
+  TestEqualEntries(c0.entry(), c1.entry());
+  TestEqualSCTs(c0.sct(), c1.sct());
+
+  EXPECT_EQ(H(c0.certificate_sha256_hash()),
+            H(c1.certificate_sha256_hash()));
+  EXPECT_EQ(c0.has_sequence_number(), c1.has_sequence_number());
+  // Defaults to 0 if not set.
+  EXPECT_EQ(c0.sequence_number(), c1.sequence_number());
+}
+
+// static
+void TestSigner::TestEqualTreeHeads(const SignedTreeHead &sth0,
+                                    const SignedTreeHead &sth1) {
+  EXPECT_EQ(sth0.tree_size(), sth1.tree_size());
+  EXPECT_EQ(sth0.timestamp(), sth1.timestamp());
+  EXPECT_EQ(H(sth0.root_hash()), H(sth1.root_hash()));
+  TestEqualDigitallySigned(sth0.signature(), sth1.signature());
+}
+
 void TestSigner::FillData(LoggedCertificate *logged_cert) {
   logged_cert->mutable_sct()->set_timestamp(util::TimeInMilliseconds());
 
-  CreateUnique(logged_cert->mutable_sct()->mutable_entry());
+  CreateUnique(logged_cert->mutable_entry());
 
-  logged_cert->set_certificate_sha256_hash(Sha256Hasher::Sha256Digest(
-      logged_cert->sct().entry().leaf_certificate()));
+  logged_cert->set_certificate_sha256_hash(
+      Serializer::CertificateSha256Hash(logged_cert->entry()));
 
   logged_cert->clear_sequence_number();
 }

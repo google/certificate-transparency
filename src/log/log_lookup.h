@@ -11,7 +11,7 @@ class Database;
 // Keeps the entire Merkle Tree in memory to serve audit proofs.
 class LogLookup {
  public:
-  LogLookup(const Database *db);
+  explicit LogLookup(const Database *db);
   ~LogLookup();
 
   enum UpdateResult {
@@ -34,7 +34,7 @@ class LogLookup {
                                      ct::MerkleAuditProof *proof);
 
  private:
-  std::string LeafHash(const ct::SignedCertificateTimestamp &sct);
+  std::string LeafHash(const ct::LoggedCertificate &logged_cert);
 
   const Database *db_;
   MerkleTree cert_tree_;

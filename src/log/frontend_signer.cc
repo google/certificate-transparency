@@ -4,10 +4,10 @@
 #include "database.h"
 #include "frontend_signer.h"
 #include "log_signer.h"
-#include "serial_hasher.h"
+#include "serializer.h"
 #include "util.h"
 
-using ct::CertificateEntry;
+using ct::LogEntry;
 using ct::LoggedCertificate;
 using ct::SignedCertificateTimestamp;
 using std::string;
@@ -21,10 +21,10 @@ FrontendSigner::~FrontendSigner() {
 }
 
 FrontendSigner::SubmitResult
-FrontendSigner::QueueEntry(const CertificateEntry &entry,
+FrontendSigner::QueueEntry(const LogEntry &entry,
                            SignedCertificateTimestamp *sct) {
   // Check if the entry already exists.
-  string sha256_hash = ComputeCertificateHash(entry);
+  string sha256_hash = Serializer::CertificateSha256Hash(entry);
   assert(!sha256_hash.empty());
 
   LoggedCertificate logged_cert;
@@ -40,11 +40,13 @@ FrontendSigner::QueueEntry(const CertificateEntry &entry,
 
   CHECK_EQ(Database::NOT_FOUND, db_result);
 
+  SignedCertificateTimestamp local_sct;
+  TimestampAndSign(entry, &local_sct);
+
   LoggedCertificate new_cert;
   new_cert.set_certificate_sha256_hash(sha256_hash);
-  new_cert.mutable_sct()->mutable_entry()->CopyFrom(entry);
-
-  TimestampAndSign(new_cert.mutable_sct());
+  new_cert.mutable_sct()->CopyFrom(local_sct);
+  new_cert.mutable_entry()->CopyFrom(entry);
 
   Database::WriteResult write_result =
       db_->CreatePendingCertificateEntry(new_cert);
@@ -56,15 +58,10 @@ FrontendSigner::QueueEntry(const CertificateEntry &entry,
   return NEW;
 }
 
-string
-FrontendSigner::ComputeCertificateHash(const CertificateEntry &entry) const {
-  // Compute the SHA-256 hash of the leaf certificate.
-  return Sha256Hasher::Sha256Digest(entry.leaf_certificate());
-}
-
-void FrontendSigner::TimestampAndSign(SignedCertificateTimestamp *sct) const {
+void FrontendSigner::TimestampAndSign(const LogEntry &entry,
+                                      SignedCertificateTimestamp *sct) const {
   sct->set_timestamp(util::TimeInMilliseconds());
   // The submission handler has already verified the format of this entry,
   // so this should never fail.
-  CHECK_EQ(LogSigner::OK, signer_->SignCertificateTimestamp(sct));
+  CHECK_EQ(LogSigner::OK, signer_->SignCertificateTimestamp(entry, sct));
 }

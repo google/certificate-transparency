@@ -25,14 +25,14 @@ class FrontendSigner {
   // and return either a new timestamp-signature pair,
   // or a previously existing one. (Currently also copies the
   // entry to the sct but you shouldn't rely on this.)
-  SubmitResult QueueEntry(const ct::CertificateEntry &entry,
+  SubmitResult QueueEntry(const ct::LogEntry &entry,
                           ct::SignedCertificateTimestamp *sct);
 
  private:
   Database *db_;
   LogSigner *signer_;
-  std::string ComputeCertificateHash(const ct::CertificateEntry &entry) const;
 
-  void TimestampAndSign(ct::SignedCertificateTimestamp *sct) const;
+  void TimestampAndSign(const ct::LogEntry &entry,
+                        ct::SignedCertificateTimestamp *sct) const;
 };
 #endif

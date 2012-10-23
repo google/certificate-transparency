@@ -32,7 +32,7 @@ class BasicFilesystemOp : public FilesystemOp {
 // Fail at an operation with a given op count.
 class FailingFilesystemOp : public FilesystemOp {
  public:
-  FailingFilesystemOp(int fail_point);
+  explicit FailingFilesystemOp(int fail_point);
 
   int OpCount() const { return op_count_; }
 

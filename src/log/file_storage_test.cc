@@ -269,7 +269,7 @@ TEST_F(FailingFileStorageDeathTest, ResumeOnFailedCreate) {
   string key0("1234xyzw", 8);
   string value0("unicorn", 7);
 
- int op_count_init = failing_file_op->OpCount();
+  int op_count_init = failing_file_op->OpCount();
   EXPECT_EQ(FileStorage::OK, db.CreateEntry(key0, value0));
   int op_count0 = failing_file_op->OpCount();
   ASSERT_GT(op_count0, 0);

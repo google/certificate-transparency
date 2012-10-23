@@ -31,20 +31,20 @@ class CertSubmissionHandler {
 
   // entry should have the expected type set.
   SubmitResult ProcessSubmission(const std::string &submission,
-                                 ct::CertificateEntry *entry);
+                                 ct::LogEntry *entry);
 
   // For clients, to reconstruct the bytestring under the signature
   // from the observed chain.
   static SubmitResult X509ChainToEntry(const CertChain &chain,
-                                       ct::CertificateEntry *entry);
+                                       ct::LogEntry *entry);
 
  private:
   SubmitResult ProcessX509Submission(const std::string &submission,
-                                     ct::CertificateEntry *entry);
+                                     ct::X509ChainEntry *entry);
 
 
   SubmitResult ProcessPreCertSubmission(const std::string &submission,
-                                        ct::CertificateEntry *entry);
+                                        ct::PrecertChainEntry *entry);
 
   static std::string TbsCertificate(const CertChain &chain);
   static std::string TbsCertificate(const PreCertChain &chain);

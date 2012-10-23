@@ -66,7 +66,7 @@ CertChecker::VerifyTrustedCaSignature(const Cert &subject) const {
   X509_OBJECT obj;
   // TODO: we may need to do something more clever, in case there is
   // more than one match.
-  ret = X509_STORE_get_by_subject(ctx,X509_LU_X509,
+  ret = X509_STORE_get_by_subject(ctx, X509_LU_X509,
                                   X509_get_issuer_name(subject.x509_), &obj);
   X509_STORE_CTX_free(ctx);
   if (ret <= 0)
@@ -79,7 +79,7 @@ CertChecker::VerifyTrustedCaSignature(const Cert &subject) const {
   X509_OBJECT_free_contents(&obj);
   assert(issuer.IsLoaded());
   // TODO: do we need to do any other checks on issuer?
-  if(!subject.IsSignedBy(issuer))
+  if (!subject.IsSignedBy(issuer))
     return INVALID_CERTIFICATE_CHAIN;
   return OK;
 }
