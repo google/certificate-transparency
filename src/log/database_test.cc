@@ -16,12 +16,8 @@
 
 namespace {
 
-using ct::DigitallySigned;
-using ct::LogEntry;
 using ct::LoggedCertificate;
-using ct::PrecertChainEntry;
 using ct::SignedTreeHead;
-using ct::X509ChainEntry;
 using std::string;
 
 // A slightly shorter notation for constructing hex strings from binary blobs.
