@@ -29,7 +29,7 @@ using std::string;
 
 // static
 size_t Serializer::PrefixLength(size_t max_length) {
-  CHECK_GT(max_length, 0);
+  CHECK_GT(max_length, 0U);
   size_t prefix_length = 0;
 
   for ( ; max_length > 0; max_length >>= 8)

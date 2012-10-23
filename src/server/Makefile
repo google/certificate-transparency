@@ -11,13 +11,8 @@ INCLUDE+= -I /usr/local/include
 LIBS+= -L /usr/local/lib
 CXXFLAGS= $(INCLUDE) $(CXXFLAG)
 
-OBJS= ../merkletree/serial_hasher.o ../merkletree/tree_hasher.o \
-      ../merkletree/merkle_tree.o ../log/log_lookup.o \
-      ../util/util.o ../log/cert_checker.o ../log/cert.o \
-      ../log/cert_submission_handler.o ../log/tree_signer.o \
-      ../log/log_signer.o ../log/frontend_signer.o ../log/frontend.o \
-      ../log/file_db.o ../log/file_storage.o ../log/filesystem_op.o \
-      ../log/sqlite_db.o ../proto/ct.pb.o ../proto/serializer.o
+OBJS= ../util/util.o ../proto/ct.pb.o ../proto/serializer.o ../log/liblog.a \
+      ../merkletree/libmerkle_tree.a
 
 all: .depend ct-server
 

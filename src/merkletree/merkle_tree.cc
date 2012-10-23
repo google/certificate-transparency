@@ -287,12 +287,12 @@ size_t MerkleTree::NodeCount(size_t level) const {
 }
 
 string MerkleTree::LastNode(size_t level) const {
-  CHECK_GE(NodeCount(level), 1);
+  CHECK_GE(NodeCount(level), 1U);
   return tree_[level].substr(tree_[level].size() - treehasher_.DigestSize());
 }
 
 void MerkleTree::PopBack(size_t level) {
-  CHECK_GE(NodeCount(level), 1);
+  CHECK_GE(NodeCount(level), 1U);
   tree_[level].erase(tree_[level].size() - treehasher_.DigestSize());
 }
 

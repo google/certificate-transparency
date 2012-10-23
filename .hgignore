@@ -4,6 +4,7 @@
 ^doc/draft-laurie-pki-sunlight-..-..-diff\.html$
 .*\.o$
 .*\.so$
+.*\.a$
 ^src/merkletree/merkle_tree_test$
 ^src/merkletree/serial_hasher_test$
 ^src/merkletree/tree_hasher_test$

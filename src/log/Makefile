@@ -1,15 +1,20 @@
-CXXFLAG= -Wall -Werror -O3 -g
-INCLUDE= -I ../include -I $(GTESTDIR)/include -I $(PROTOBUFDIR)/src
-LIBS= $(GTESTDIR)/make/gtest.a -lpthread $(PROTOBUFDIR)/src/.libs/libprotobuf.a -lgflags -lglog -lssl -lcrypto -lsqlite3
+CXXFLAGS = -Wall -Werror -O3 -g
+INCLUDE = -I ../include -I $(GTESTDIR)/include -I $(PROTOBUFDIR)/src
+LOCAL_LIBS = liblog.a ../merkletree/libmerkle_tree.a
+LIBS = $(LOCAL_LIBS) $(GTESTDIR)/make/gtest.a \
+       -lpthread $(PROTOBUFDIR)/src/.libs/libprotobuf.a -lgflags -lglog -lssl \
+       -lcrypto -lsqlite3
+
 # Need OpenSSL >= 1.0.0
 ifneq ($(OPENSSLDIR),)
-  INCLUDE+= -I $(OPENSSLDIR)/include
-  LIBS+= -L $(OPENSSLDIR) -L $(OPENSSLDIR)/lib -Wl,-rpath,$(OPENSSLDIR) -Wl,-rpath,$(OPENSSLDIR)/lib
+  INCLUDE += -I $(OPENSSLDIR)/include
+  LIBS += -L $(OPENSSLDIR) -L $(OPENSSLDIR)/lib -Wl,-rpath,$(OPENSSLDIR) \
+	  -Wl,-rpath,$(OPENSSLDIR)/lib
 endif
 
-INCLUDE+= -I /usr/local/include
-LIBS+= -L /usr/local/lib
-CXXFLAGS= $(INCLUDE) $(CXXFLAG)
+INCLUDE += -I /usr/local/include
+LIBS += -L /usr/local/lib
+CXXFLAGS += $(INCLUDE)
 
 all: .depend cert_test cert_checker_test cert_submission_handler_test \
      file_storage_test database_test frontend_signer_test tree_signer_test \
@@ -23,7 +28,7 @@ all: .depend cert_test cert_checker_test cert_submission_handler_test \
 	$(CXX) $(CXXFLAGS) -MM *.cc *.h > .depend
 
 clean:
-	rm -f *test *.o
+	rm -f *test *.o *.a
 
 include .depend
 
@@ -46,108 +51,69 @@ test: cert_test cert_checker_test cert_submission_handler_test log_signer_test \
 	./frontend_test $(FLAGS)
 # Do not run database large test by default
 
-cert_test: cert_test.o cert.o ../util/util.o
-	$(CXX) -o cert_test cert_test.o cert.o ../util/util.o $(LIBS)
+liblog.a: cert.o cert_checker.o cert_submission_handler.o log_signer.o \
+          file_storage.o filesystem_op.o file_db.o sqlite_db.o frontend.o \
+          frontend_signer.o log_verifier.o tree_signer.o log_lookup.o
+	rm -f $@
+	ar -rcs $@ $^
 
-cert_checker_test: cert_checker_test.o cert_checker.o cert.o ../util/util.o
-	$(CXX) -o cert_checker_test cert_checker_test.o cert_checker.o cert.o \
-	       ../util/util.o $(LIBS)
+cert_test: cert_test.o ../util/util.o $(LOCAL_LIBS)
+	$(CXX) -o cert_test cert_test.o liblog.a ../util/util.o $(LIBS)
+
+cert_checker_test: cert_checker_test.o ../util/util.o $(LOCAL_LIBS)
+	$(CXX) -o cert_checker_test cert_checker_test.o ../util/util.o $(LIBS)
 
 cert_submission_handler_test: cert_submission_handler_test.o \
-			      cert_checker.o cert.o cert_submission_handler.o \
 			      ../util/util.o ../proto/ct.pb.o \
-                              ../proto/serializer.o \
-                              ../merkletree/serial_hasher.o
+                              ../proto/serializer.o $(LOCAL_LIBS)
 	$(CXX) -o cert_submission_handler_test cert_submission_handler_test.o \
-	       cert_checker.o cert.o ../util/util.o ../proto/ct.pb.o \
-               ../proto/serializer.o cert_submission_handler.o \
-               ../merkletree/serial_hasher.o $(LIBS)
+	       ../util/util.o ../proto/ct.pb.o ../proto/serializer.o $(LIBS)
 
-log_signer_test: log_signer_test.o log_signer.o ../util/util.o \
+log_signer_test: log_signer_test.o ../util/util.o \
 	         ../proto/ct.pb.o ../proto/serializer.o test_signer.o \
-                 ../merkletree/serial_hasher.o
-	$(CXX) -o log_signer_test log_signer_test.o log_signer.o \
+                 $(LOCAL_LIBS)
+	$(CXX) -o log_signer_test log_signer_test.o \
 	       ../util/util.o ../proto/ct.pb.o ../proto/serializer.o \
-	       test_signer.o ../merkletree/serial_hasher.o $(LIBS)
+	       test_signer.o $(LIBS)
 
-file_storage_test: file_storage_test.o file_storage.o filesystem_op.o \
-		   ../util/util.o file_db.o sqlite_db.o ../proto/ct.pb.o \
-                   ../proto/serializer.o ../merkletree/serial_hasher.o
-	$(CXX) -o file_storage_test file_storage_test.o file_storage.o \
-	       filesystem_op.o ../util/util.o file_db.o sqlite_db.o \
-               ../proto/ct.pb.o ../proto/serializer.o \
-               ../merkletree/serial_hasher.o $(LIBS)
+file_storage_test: file_storage_test.o ../util/util.o ../proto/ct.pb.o \
+                   ../proto/serializer.o $(LOCAL_LIBS)
+	$(CXX) -o file_storage_test file_storage_test.o ../util/util.o \
+               ../proto/ct.pb.o ../proto/serializer.o $(LIBS)
 
-database_test: database_test.o file_db.o file_storage.o \
-	       filesystem_op.o sqlite_db.o ../util/util.o ../proto/ct.pb.o \
-	       ../proto/serializer.o test_signer.o log_signer.o \
-               ../merkletree/serial_hasher.o
-	$(CXX) -o database_test database_test.o file_db.o file_storage.o \
-		filesystem_op.o sqlite_db.o ../util/util.o ../proto/ct.pb.o \
-		../proto/serializer.o test_signer.o log_signer.o \
-                ../merkletree/serial_hasher.o $(LIBS)
+database_test: database_test.o ../util/util.o ../proto/ct.pb.o \
+	       ../proto/serializer.o test_signer.o $(LOCAL_LIBS)
+	$(CXX) -o database_test database_test.o ../util/util.o \
+	       ../proto/ct.pb.o ../proto/serializer.o test_signer.o $(LIBS)
 
-database_large_test: database_large_test.o file_db.o file_storage.o \
-	             filesystem_op.o sqlite_db.o \
-                     ../util/util.o ../proto/ct.pb.o \
-	             ../proto/serializer.o test_signer.o log_signer.o \
-                     ../merkletree/serial_hasher.o
-	$(CXX) -o database_large_test database_large_test.o file_db.o \
-               file_storage.o filesystem_op.o sqlite_db.o ../util/util.o \
-               ../proto/ct.pb.o ../proto/serializer.o test_signer.o \
-               log_signer.o ../merkletree/serial_hasher.o $(LIBS)
+database_large_test: database_large_test.o \
+                     ../util/util.o ../proto/ct.pb.o ../proto/serializer.o \
+                     test_signer.o $(LOCAL_LIBS)
+	$(CXX) -o database_large_test database_large_test.o ../util/util.o \
+               ../proto/ct.pb.o ../proto/serializer.o test_signer.o $(LIBS)
 
-frontend_signer_test: frontend_signer_test.o frontend_signer.o \
-		      log_signer.o log_verifier.o test_signer.o \
+frontend_signer_test: frontend_signer_test.o test_signer.o \
 		      ../util/util.o ../proto/ct.pb.o ../proto/serializer.o \
-		      ../merkletree/serial_hasher.o \
-                      ../merkletree/tree_hasher.o \
-		      ../merkletree/merkle_verifier.o file_db.o file_storage.o \
-		      filesystem_op.o sqlite_db.o
+                      $(LOCAL_LIBS)
 	$(CXX) -o frontend_signer_test frontend_signer_test.o \
-		frontend_signer.o log_signer.o log_verifier.o test_signer.o \
-		../util/util.o ../proto/ct.pb.o ../proto/serializer.o \
-		../merkletree/serial_hasher.o ../merkletree/tree_hasher.o \
-		../merkletree/merkle_verifier.o file_db.o file_storage.o \
-		filesystem_op.o sqlite_db.o $(LIBS)
+		test_signer.o ../util/util.o ../proto/ct.pb.o \
+                ../proto/serializer.o $(LIBS)
 
-frontend_test: frontend_test.o frontend_test.o frontend.o frontend_signer.o \
-	       log_signer.o log_verifier.o test_signer.o \
-               cert.o cert_checker.o cert_submission_handler.o \
+frontend_test: frontend_test.o test_signer.o \
 	       ../util/util.o ../proto/ct.pb.o ../proto/serializer.o \
-	       ../merkletree/serial_hasher.o ../merkletree/tree_hasher.o \
-	       ../merkletree/merkle_verifier.o file_db.o file_storage.o \
-	       filesystem_op.o sqlite_db.o
-	$(CXX) -o frontend_test frontend_test.o frontend.o frontend_signer.o \
-               log_signer.o log_verifier.o test_signer.o \
-               cert.o cert_checker.o cert_submission_handler.o \
-	       ../util/util.o ../proto/ct.pb.o ../proto/serializer.o \
-	       ../merkletree/serial_hasher.o ../merkletree/tree_hasher.o \
-	       ../merkletree/merkle_verifier.o file_db.o file_storage.o \
-	       filesystem_op.o sqlite_db.o $(LIBS)
+               $(LOCAL_LIBS)
+	$(CXX) -o frontend_test frontend_test.o test_signer.o \
+	       ../util/util.o ../proto/ct.pb.o ../proto/serializer.o $(LIBS)
 
-tree_signer_test: tree_signer_test.o tree_signer.o log_signer.o log_verifier.o \
+tree_signer_test: tree_signer_test.o \
 		  ../util/util.o ../proto/ct.pb.o ../proto/serializer.o \
-		  ../merkletree/serial_hasher.o ../merkletree/tree_hasher.o \
-		  ../merkletree/merkle_tree.o ../merkletree/merkle_verifier.o \
-		  file_db.o file_storage.o filesystem_op.o sqlite_db.o \
-                  test_signer.o
-	$(CXX) -o tree_signer_test tree_signer_test.o tree_signer.o \
-		log_signer.o log_verifier.o ../util/util.o ../proto/ct.pb.o \
-		../proto/serializer.o ../merkletree/serial_hasher.o \
-		../merkletree/tree_hasher.o ../merkletree/merkle_tree.o \
-		../merkletree/merkle_verifier.o file_db.o file_storage.o \
-		filesystem_op.o sqlite_db.o test_signer.o $(LIBS)
+                  test_signer.o $(LOCAL_LIBS)
+	$(CXX) -o tree_signer_test tree_signer_test.o ../util/util.o \
+               ../proto/ct.pb.o \
+	       ../proto/serializer.o test_signer.o $(LIBS)
 
-log_lookup_test: log_lookup_test.o log_lookup.o tree_signer.o log_signer.o \
-		 log_verifier.o ../util/util.o ../proto/ct.pb.o \
-	         ../proto/serializer.o ../merkletree/serial_hasher.o \
-		 ../merkletree/tree_hasher.o ../merkletree/merkle_tree.o \
-		 ../merkletree/merkle_verifier.o file_db.o file_storage.o \
-		 filesystem_op.o sqlite_db.o test_signer.o
-	$(CXX) -o log_lookup_test log_lookup_test.o log_lookup.o tree_signer.o \
-		log_signer.o log_verifier.o ../util/util.o ../proto/ct.pb.o \
-		../proto/serializer.o ../merkletree/serial_hasher.o \
-		../merkletree/tree_hasher.o ../merkletree/merkle_tree.o \
-		../merkletree/merkle_verifier.o file_db.o file_storage.o \
-		filesystem_op.o sqlite_db.o test_signer.o $(LIBS)
+log_lookup_test: log_lookup_test.o ../util/util.o ../proto/ct.pb.o \
+	         ../proto/serializer.o test_signer.o $(LOCAL_LIBS)
+	$(CXX) -o log_lookup_test log_lookup_test.o ../util/util.o \
+               ../proto/ct.pb.o ../proto/serializer.o \
+               test_signer.o $(LIBS)
