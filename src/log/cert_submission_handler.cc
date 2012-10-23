@@ -45,7 +45,7 @@ CertSubmissionHandler::ProcessSubmission(const string &submission,
     return submit_result;
 
   Serializer::SerializeResult serialize_result =
-      Serializer::CheckFormat(*entry);
+      Serializer::CheckLogEntryFormat(*entry);
   if (serialize_result != Serializer::OK)
     return GetFormatError(serialize_result);
 

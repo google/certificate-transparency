@@ -768,10 +768,7 @@ class CTServer : public Server {
   void SendSCTToken(const SignedCertificateTimestamp &sct) {
     ServerMessage message;
     message.set_response(ServerMessage::SIGNED_CERTIFICATE_TIMESTAMP);
-    // Only send as little as needed (i.e., timestamp and signature).
-    message.mutable_sct()->set_timestamp(sct.timestamp());
-    message.mutable_sct()->mutable_signature()->CopyFrom(sct.signature());
-
+    message.mutable_sct()->CopyFrom(sct);
     SendMessage(message);
   }
 

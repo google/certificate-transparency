@@ -15,6 +15,7 @@ using ct::LogEntry;
 using ct::LogEntryType;
 using ct::SignedCertificateTimestamp;
 using ct::SignedTreeHead;
+using ct::Version;
 using std::string;
 
 // A slightly shorter notation for constructing binary blobs from test vectors.
@@ -37,10 +38,12 @@ class SerializerTest : public ::testing::Test {
   SerializerTest() : sct_(), sth_() {
     entry_.set_type(ct::X509_ENTRY);
     entry_.mutable_x509_entry()->set_leaf_certificate("certificate");
+    sct_.set_version(ct::V1);
     sct_.set_timestamp(1234);
     sct_.mutable_signature()->set_hash_algorithm(DigitallySigned::SHA256);
     sct_.mutable_signature()->set_sig_algorithm(DigitallySigned::ECDSA);
     sct_.mutable_signature()->set_signature("signature");
+    sth_.set_version(ct::V1);
     sth_.set_timestamp(2345);
     sth_.set_tree_size(6);
     sth_.set_root_hash("imustbeexactlythirtytwobyteslong");
@@ -51,7 +54,7 @@ class SerializerTest : public ::testing::Test {
 
   const LogEntry &DefaultEntry() const { return entry_; }
 
-  uint64_t DefaultTimestamp() const { return sct_.timestamp(); }
+  uint64_t DefaultSCTTimestamp() const { return sct_.timestamp(); }
 
   LogEntryType DefaultEntryType() const { return entry_.type(); }
 
@@ -59,11 +62,25 @@ class SerializerTest : public ::testing::Test {
     return entry_.x509_entry().leaf_certificate();
   }
 
+  string DefaultExtensions() const { return string(); }
+
   const SignedCertificateTimestamp &DefaultSCT() const { return sct_; }
+
+  uint64_t DefaultSTHTimestamp() const { return sth_.timestamp(); }
+
+  uint64_t DefaultTreeSize() const { return sth_.tree_size(); }
+
+  string DefaultRootHash() const { return sth_.root_hash(); }
 
   const SignedTreeHead &DefaultSTH() const { return sth_; }
 
-  const DigitallySigned &DefaultDS() const { return sct_.signature(); }
+  const DigitallySigned &DefaultSCTSignature() const {
+    return sct_.signature();
+  }
+
+  const DigitallySigned &DefaultSTHSignature() const {
+    return sth_.signature();
+  }
 
   static void CompareDS(const DigitallySigned &ds, const DigitallySigned &ds2) {
     EXPECT_EQ(ds.hash_algorithm(), ds2.hash_algorithm());
@@ -73,6 +90,7 @@ class SerializerTest : public ::testing::Test {
 
   static void CompareSCT(const SignedCertificateTimestamp &sct,
                          const SignedCertificateTimestamp &sct2) {
+    EXPECT_EQ(sct.version(), sct2.version());
     EXPECT_EQ(sct.timestamp(), sct2.timestamp());
     CompareDS(sct.signature(), sct2.signature());
   }
@@ -83,7 +101,7 @@ class SerializerTest : public ::testing::Test {
   SignedTreeHead sth_;
 };
 
-const char kDefaultDSHexString[] =
+const char kDefaultSCTSignatureHexString[] =
     // hash algo, sig algo, 2 bytes
     "0403"
     // signature length, 2 bytes
@@ -92,8 +110,13 @@ const char kDefaultDSHexString[] =
     "7369676e6174757265";
 
 const char kDefaultSCTHexString[] =
+    // version, 1 byte
+    "00"
     // timestamp, 8 bytes
     "00000000000004d2"
+    // extensions length, 2 bytes
+    "0000"
+    // extensions, 0 bytes
     // hash algo, sig algo, 2 bytes
     "0403"
     // signature length, 2 bytes
@@ -102,6 +125,8 @@ const char kDefaultSCTHexString[] =
     "7369676e6174757265";
 
 const char kDefaultSCTSignedHexString[] =
+    // version, 1 byte
+    "00"
     // signature type, 1 byte
     "00"
     // timestamp, 8 bytes
@@ -111,9 +136,14 @@ const char kDefaultSCTSignedHexString[] =
     // leaf certificate length, 3 bytes
     "00000b"
     // leaf certificate, 11 bytes
-    "6365727469666963617465";
+    "6365727469666963617465"
+    // extensions length, 2 bytes
+    "0000";
+    // extensions, 0 bytes
 
 const char kDefaultSTHSignedHexString[] =
+    // version, 1 byte
+    "00"
     // signature type, 1 byte
     "01"
     // timestamp, 8 bytes
@@ -126,8 +156,9 @@ const char kDefaultSTHSignedHexString[] =
 TEST_F(SerializerTest, SerializeDigitallySignedKatTest) {
   string result;
   EXPECT_EQ(Serializer::OK,
-            Serializer::SerializeDigitallySigned(DefaultDS(), &result));
-  EXPECT_EQ(S(kDefaultDSHexString), H(result));
+            Serializer::SerializeDigitallySigned(DefaultSCTSignature(),
+                                                 &result));
+  EXPECT_EQ(S(kDefaultSCTSignatureHexString), H(result));
 }
 
 TEST_F(SerializerTest, SerializeSCTKatTest) {
@@ -137,18 +168,18 @@ TEST_F(SerializerTest, SerializeSCTKatTest) {
   EXPECT_EQ(S(kDefaultSCTHexString), H(result));
 }
 
-TEST_F(SerializerTest, SerializeKatTest) {
+TEST_F(SerializerTest, SerializeSCTSignatureInputKatTest) {
   string result;
   EXPECT_EQ(Serializer::OK,
-            Serializer::SerializeSCTSignatureInput(
-                DefaultTimestamp(), DefaultEntryType(),
-                DefaultCertificate(), &result));
+            Serializer::SerializeV1SCTSignatureInput(
+                DefaultSCTTimestamp(), DefaultEntryType(),
+                DefaultCertificate(), DefaultExtensions(), &result));
   EXPECT_EQ(S(kDefaultSCTSignedHexString), H(result));
 
   result.clear();
   EXPECT_EQ(Serializer::OK,
             Serializer::SerializeSCTSignatureInput(
-                DefaultTimestamp(), DefaultEntry(), &result));
+                DefaultSCT(), DefaultEntry(), &result));
   EXPECT_EQ(S(kDefaultSCTSignedHexString), H(result));
 }
 
@@ -160,21 +191,21 @@ TEST_F(SerializerTest, DeserializeSCTKatTest) {
 }
 
 TEST_F(SerializerTest, DeserializeDigitallySignedKatTest) {
-  string serialized_sig = B(kDefaultDSHexString);
+  string serialized_sig = B(kDefaultSCTSignatureHexString);
   DigitallySigned signature;
   EXPECT_EQ(Deserializer::OK,
             Deserializer::DeserializeDigitallySigned(serialized_sig,
                                                      &signature));
-  CompareDS(DefaultDS(), signature);
+  CompareDS(DefaultSCTSignature(), signature);
 }
 
 // Test that the serialized string changes when we change some values.
 TEST_F(SerializerTest, SerializeSCTSignatureInputChangeEntryType) {
   string result;
   EXPECT_EQ(Serializer::OK,
-            Serializer::SerializeSCTSignatureInput(
-                DefaultTimestamp(), ct::PRECERT_ENTRY,
-                DefaultCertificate(), &result));
+            Serializer::SerializeV1SCTSignatureInput(
+                DefaultSCTTimestamp(), ct::PRECERT_ENTRY,
+                DefaultCertificate(), DefaultExtensions(), &result));
 
   string default_result = S(kDefaultSCTSignedHexString);
   string new_result = H(result);
@@ -189,7 +220,7 @@ TEST_F(SerializerTest, SerializeSCTSignatureInputChangeEntryType) {
       entry.x509_entry().leaf_certificate());
   EXPECT_EQ(Serializer::OK,
             Serializer::SerializeSCTSignatureInput(
-                DefaultTimestamp(), entry, &result));
+                DefaultSCT(), entry, &result));
 
   new_result = H(result);
   EXPECT_EQ(default_result.size(), new_result.size());
@@ -233,22 +264,22 @@ TEST_F(SerializerTest, SerializeDeserializeSCTChangeSignature) {
 TEST_F(SerializerTest, SerializeSCTSignatureInputEmptyCertificate) {
   string result;
   EXPECT_EQ(Serializer::EMPTY_CERTIFICATE,
-            Serializer::SerializeSCTSignatureInput(
-                DefaultTimestamp(), DefaultEntryType(),
-                string(), &result));
+            Serializer::SerializeV1SCTSignatureInput(
+                DefaultSCTTimestamp(), DefaultEntryType(),
+                string(), DefaultExtensions(), &result));
 
   LogEntry entry;
   entry.CopyFrom(DefaultEntry());
   entry.mutable_x509_entry()->clear_leaf_certificate();
   EXPECT_EQ(Serializer::EMPTY_CERTIFICATE,
-            Serializer::SerializeSCTSignatureInput(
-                DefaultTimestamp(), entry, &result));
+            Serializer::SerializeSCTSignatureInput(DefaultSCT(), entry,
+                                                   &result));
 }
 
 TEST_F(SerializerTest, DeserializeSCTBadHashType) {
   string token = B(kDefaultSCTHexString);
   // Overwrite with a non-existent hash algorithm type.
-  token[8] = 0xff;
+  token[11] = 0xff;
 
   SignedCertificateTimestamp sct;
   EXPECT_EQ(Deserializer::INVALID_HASH_ALGORITHM,
@@ -258,7 +289,7 @@ TEST_F(SerializerTest, DeserializeSCTBadHashType) {
 TEST_F(SerializerTest, DeserializeSCTBadSignatureType) {
   string token = B(kDefaultSCTHexString);
   // Overwrite with a non-existent signature algorithm type.
-  token[9] = 0xff;
+  token[12] = 0xff;
 
   SignedCertificateTimestamp sct;
   EXPECT_EQ(Deserializer::INVALID_SIGNATURE_ALGORITHM,
@@ -292,20 +323,110 @@ TEST_F(SerializerTest, DeserializeSCTTooLong) {
             Deserializer::DeserializeSCT(token, &sct));
 }
 
-TEST_F(SerializerTest, SerializeSTHForSigningKatTest) {
+TEST_F(SerializerTest, SerializeSTHSignatureInputKatTest) {
   string result;
   EXPECT_EQ(Serializer::OK,
-            Serializer::SerializeSTHForSigning(DefaultSTH(), &result));
+            Serializer::SerializeSTHSignatureInput(DefaultSTH(), &result));
+  EXPECT_EQ(S(kDefaultSTHSignedHexString), H(result));
+
+  result.clear();
+  EXPECT_EQ(Serializer::OK,
+            Serializer::SerializeV1STHSignatureInput(
+                DefaultSTHTimestamp(), DefaultTreeSize(),
+                DefaultRootHash(), &result));
   EXPECT_EQ(S(kDefaultSTHSignedHexString), H(result));
 }
 
-TEST_F(SerializerTest, SerializeSTHForSigningBadHash) {
+TEST_F(SerializerTest, SerializeSTHSignatureInputBadHash) {
   SignedTreeHead sth;
   sth.CopyFrom(DefaultSTH());
   sth.set_root_hash("thisisnotthirtytwobyteslong");
   string result;
   EXPECT_EQ(Serializer::INVALID_HASH_LENGTH,
-            Serializer::SerializeSTHForSigning(sth, &result));
+            Serializer::SerializeSTHSignatureInput(sth, &result));
+}
+
+TEST_F(SerializerTest, SerializeSCTWithExtensionsTest) {
+  SignedCertificateTimestamp sct;
+  sct.CopyFrom(DefaultSCT());
+  sct.set_extension("hello");
+  string result;
+  EXPECT_EQ(Serializer::OK,
+            Serializer::SerializeSCT(sct, &result));
+  EXPECT_NE(S(kDefaultSCTHexString), H(result));
+}
+
+TEST_F(SerializerTest, SerializeSCTSignatureInputWithExtensionsTest) {
+  string result;
+  EXPECT_EQ(Serializer::OK,
+            Serializer::SerializeV1SCTSignatureInput(
+                DefaultSCTTimestamp(), DefaultEntryType(),
+                DefaultCertificate(), "hello", &result));
+  EXPECT_NE(S(kDefaultSCTSignedHexString), H(result));
+
+  result.clear();
+  SignedCertificateTimestamp sct;
+  sct.CopyFrom(DefaultSCT());
+  sct.set_extension("hello");
+  EXPECT_EQ(Serializer::OK,
+            Serializer::SerializeSCTSignatureInput(
+                sct, DefaultEntry(), &result));
+  EXPECT_NE(S(kDefaultSCTSignedHexString), H(result));
+}
+
+TEST_F(SerializerTest, SerializeDeserializeSCTAddExtensions) {
+  SignedCertificateTimestamp sct;
+  sct.CopyFrom(DefaultSCT());
+  sct.set_extension("hello");
+
+  string result;
+  EXPECT_EQ(Serializer::OK, Serializer::SerializeSCT(sct, &result));
+
+  SignedCertificateTimestamp read_sct;
+  EXPECT_EQ(Deserializer::OK,
+            Deserializer::DeserializeSCT(result, &read_sct));
+  CompareSCT(sct, read_sct);
+}
+
+TEST_F(SerializerTest, SerializeSCTUnsupportedVersion) {
+  SignedCertificateTimestamp sct;
+  sct.CopyFrom(DefaultSCT());
+  sct.set_version(ct::UNKNOWN_VERSION);
+
+  string result;
+  EXPECT_EQ(Serializer::UNSUPPORTED_VERSION,
+            Serializer::SerializeSCT(sct, &result));
+}
+
+TEST_F(SerializerTest, SerializeSCTSignatureInputUnsupportedVersion) {
+  SignedCertificateTimestamp sct;
+  sct.CopyFrom(DefaultSCT());
+  sct.set_version(ct::UNKNOWN_VERSION);
+
+  string result;
+  EXPECT_EQ(Serializer::UNSUPPORTED_VERSION,
+            Serializer::SerializeSCTSignatureInput(sct, DefaultEntry(),
+                                                   &result));
+}
+
+TEST_F(SerializerTest, SerializeSTHSignatureInputUnsupportedVersion) {
+  SignedTreeHead sth;
+  sth.CopyFrom(DefaultSTH());
+  sth.set_version(ct::UNKNOWN_VERSION);
+
+  string result;
+  EXPECT_EQ(Serializer::UNSUPPORTED_VERSION,
+            Serializer::SerializeSTHSignatureInput(sth, &result));
+}
+
+TEST_F(SerializerTest, DeserializeSCTUnsupportedVersion) {
+  string token = B(kDefaultSCTHexString);
+  // Overwrite with a non-existent version.
+  token[0] = 0xff;
+
+  SignedCertificateTimestamp sct;
+  EXPECT_EQ(Deserializer::UNSUPPORTED_VERSION,
+            Deserializer::DeserializeSCT(token, &sct));
 }
 
 }  // namespace

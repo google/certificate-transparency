@@ -60,7 +60,9 @@ FrontendSigner::QueueEntry(const LogEntry &entry,
 
 void FrontendSigner::TimestampAndSign(const LogEntry &entry,
                                       SignedCertificateTimestamp *sct) const {
+  sct->set_version(ct::V1);
   sct->set_timestamp(util::TimeInMilliseconds());
+  sct->clear_extension();
   // The submission handler has already verified the format of this entry,
   // so this should never fail.
   CHECK_EQ(LogSigner::OK, signer_->SignCertificateTimestamp(entry, sct));

@@ -72,7 +72,7 @@ LogVerifier::VerifyMerkleAuditProof(const LogEntry &entry,
 
   string serialized_leaf;
   Serializer::SerializeResult serialize_result =
-      Serializer::SerializeMerkleTreeLeaf(entry, sct, &serialized_leaf);
+      Serializer::SerializeMerkleTreeLeaf(sct, entry, &serialized_leaf);
 
   if (serialize_result != Serializer::OK)
     return INVALID_FORMAT;
@@ -91,6 +91,7 @@ LogVerifier::VerifyMerkleAuditProof(const LogEntry &entry,
     return INVALID_MERKLE_PATH;
 
   SignedTreeHead sth;
+  sth.set_version(merkle_proof.version());
   sth.set_timestamp(merkle_proof.timestamp());
   sth.set_tree_size(merkle_proof.tree_size());
   sth.set_root_hash(root_hash);

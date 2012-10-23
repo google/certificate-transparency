@@ -150,11 +150,8 @@ bool
 TreeSigner::AppendCertificate(const LoggedCertificate &logged_cert) {
   // Serialize for inclusion in the tree.
   string serialized_leaf;
-  CHECK_EQ(Serializer::OK,
-           Serializer::SerializeMerkleTreeLeaf(logged_cert.entry(),
-                                               logged_cert.sct(),
-                                               &serialized_leaf))
-      << logged_cert.DebugString();
+  CHECK_EQ(Serializer::OK, Serializer::SerializeMerkleTreeLeaf(
+      logged_cert.sct(), logged_cert.entry(), &serialized_leaf));
 
   CHECK(logged_cert.has_certificate_sha256_hash());
   // Commit the sequence number of this certificate.
@@ -178,16 +175,15 @@ void
 TreeSigner::AppendCertificateToTree(const LoggedCertificate &logged_cert) {
   // Serialize for inclusion in the tree.
   string serialized_leaf;
-  CHECK_EQ(Serializer::OK,
-           Serializer::SerializeMerkleTreeLeaf(logged_cert.entry(),
-                                               logged_cert.sct(),
-                                               &serialized_leaf));
+  CHECK_EQ(Serializer::OK, Serializer::SerializeMerkleTreeLeaf(
+      logged_cert.sct(), logged_cert.entry(), &serialized_leaf));
 
   // Update in-memory tree.
   cert_tree_.AddLeaf(serialized_leaf);
 }
 
 void TreeSigner::TimestampAndSign(uint64_t min_timestamp, SignedTreeHead *sth) {
+  sth->set_version(ct::V1);
   sth->set_root_hash(cert_tree_.CurrentRoot());
   uint64_t timestamp = util::TimeInMilliseconds();
   if (timestamp < min_timestamp)
