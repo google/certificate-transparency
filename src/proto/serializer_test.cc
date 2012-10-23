@@ -106,8 +106,8 @@ const char kDefaultSCTSignedHexString[] =
     "00"
     // timestamp, 8 bytes
     "00000000000004d2"
-    // entry type, 1 byte
-    "00"
+    // entry type, 2 bytes
+    "0000"
     // leaf certificate length, 3 bytes
     "00000b"
     // leaf certificate, 11 bytes
