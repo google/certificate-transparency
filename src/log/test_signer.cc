@@ -64,8 +64,8 @@ const char kDefaultDerCertHash[] =
 const uint64_t kDefaultSCTTimestamp = 1348589665525LL;
 
 const char kDefaultSCTSignature[] =
-    "3044022041dc1ec2dd47ad84bd1da5f88cf5bf0516476cd7822f1f5e8f59e624ee259a1d02"
-    "20522f61d5b0e6d00aa9fff2589e9918dfa8af3faa312ea037a20bc762f71c337c";
+    "3046022100e164999c0b7aa7a2d9f73264023663b48c646550f0587a6e044aba2fa608152d"
+    "0221008abf2906f17732c8707e559270121921026f266cded2e130a46bb60016bc519b";
 
 // Some time in September 2012.
 const uint64_t kDefaultSTHTimestamp = 1348589667204LL;

@@ -11,8 +11,7 @@ const size_t Serializer::kMaxCertificateLength = (1 << 24) - 1;
 const size_t Serializer::kMaxCertificateChainLength = (1 << 24) - 1;
 const size_t Serializer::kMaxSignatureLength = (1 << 16) - 1;
 
-// FIXME(ekasper): should be two bytes according to I-D.
-const size_t Serializer::kLogEntryTypeLengthInBytes = 1;
+const size_t Serializer::kLogEntryTypeLengthInBytes = 2;
 const size_t Serializer::kSignatureTypeLengthInBytes = 1;
 const size_t Serializer::kHashAlgorithmLengthInBytes = 1;
 const size_t Serializer::kSigAlgorithmLengthInBytes = 1;
