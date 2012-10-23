@@ -205,6 +205,14 @@ d0 d1   d2 d3           d0 d1   d2 d3  d4 d5
 	<t>
 	  Anyone can submit a certificate to the log. In order to attribute each logged certificate to its issuer, the log shall publish a list of acceptable root certificates (this list should be the union of root certificates trusted by major browser vendors). Each submitted certificate MUST be accompanied by all additional certificates required to verify the certificate chain up to an accepted root certificate. The self-signed root certificate itself MAY be omitted from this list. 
 	</t>
+	<t>
+	  In this case, the SCT must be included in the TLS handshake, either by using an Authorization Extension <xref target='RFC5878'/> with type 182 containing the SCT, or by using OCSP Stapling (section 8 of <xref target='RFC6066'/>), where the response includes an OCSP extension with OID 1.3.6.1.4.1.11129.2.4.5 (see <xref target='RFC2560'/>) and body:
+	</t>
+	<figure>
+	  <artwork>
+    SignedCertificateTimestamp ::= OCTET STRING
+	  </artwork>
+	</figure>
         <t>
 	  Alternatively, (root as well as intermediate) Certificate Authorities may submit a certificate to the log prior to issuance. To do so, a Certificate Authority constructs a Precertificate by adding a special critical poison extension (OID 1.3.6.1.4.1.11129.2.4.3, ASN.1 NULL data) to the leaf TBSCertificate, and signing the resulting TBSCertificate <xref target='RFC5280'/> with a special-purpose (Extended Key Usage: Certificate Transparency, OID 1.3.6.1.4.1.11129.2.4.4, basicConstraints=critical,CA:FALSE) Precertificate Signing Certificate. The Precertificate Signing Certificate MUST be certified by the CA certificate. As above, the Precertificate submission MUST be accompanied by the Precertificate Signing Certificate and all additional certificates required to verify the chain up to an accepted root certificate. The signature on the TBSCertificate indicates the Certificate Authority's intent to issue a certificate. This intent is considered binding (i.e., misissuance of the Precertificate is considered equal to misissuance of the final certificate). The log verifies the Precertificate signature chain, and issues a Signed Certificate Timestamp on the corresponding TBSCertificate. The SCT can then be directly embedded in the final certificate, by encoding it as an ASN.1 OCTETSTRING and inserting the resulting data in the TBSCertificate as an X.509v3 certificate extension (OID 1.3.6.1.4.1.11129.2.4.2). Upon receiving the certificate, clients can reconstruct the original TBSCertificate to verify the SCT signature.
 	</t>
@@ -481,6 +489,7 @@ d0 d1   d2 d3           d0 d1   d2 d3  d4 d5
   </middle>
   <back>
     <references>
+
       <reference anchor='RFC5246'>
 
 	<front>
@@ -493,6 +502,95 @@ d0 d1   d2 d3           d0 d1   d2 d3  d4 d5
 	</front>
 
 	<seriesInfo name='RFC' value='5246' />
+      </reference>
+
+      <reference anchor="RFC2560">
+	<front>
+	  <title abbrev="PKIX OCSP">
+	    X.509 Internet Public Key Infrastructure Online Certificate Status Protocol - OCSP
+	  </title>
+	  <author initials="M." surname="Myers" fullname="Michael Myers">
+	    <organization>VeriSign, Inc.</organization>
+	    <address>
+	      <postal>
+		<street>1350 Charleston Road</street>
+		<city>Mountain View</city>
+		<region>CA</region>
+		<code>94043</code>
+		<country>US</country>
+	      </postal>
+	      <email>mmyers@verisign.com</email>
+	    </address>
+	  </author>
+	  <author initials="R." surname="Ankney" fullname="Rich Ankney">
+	    <organization>CertCo, LLC</organization>
+	    <address>
+	      <postal>
+		<street>13506 King Charles Dr.</street>
+		<city>Chantilly</city>
+		<region>VA</region>
+		<code>20151</code>
+		<country>US</country>
+	      </postal>
+	      <email>rankney@erols.com</email>
+	    </address>
+	  </author>
+	  <author initials="A." surname="Malpani" fullname="Ambarish Malpani">
+	    <organization>ValiCert, Inc.</organization>
+	    <address>
+	      <postal>
+		<street>1215 Terra Bella Avenue</street>
+		<city>Mountain View</city>
+		<region>CA</region>
+		<code>94043</code>
+		<country>US</country>
+	      </postal>
+	      <phone>+1 650 567 5457</phone>
+	      <email>ambarish@valicert.com</email>
+	    </address>
+	  </author>
+	  <author initials="S." surname="Galperin" fullname="Slava Galperin">
+	    <organization>My CFO, Inc.</organization>
+	    <address>
+	      <postal>
+		<street>1945 Charleston Road</street>
+		<city>Mountain View</city>
+		<region>CA</region>
+		<code>94043</code>
+		<country>US</country>
+	      </postal>
+	      <email>galperin@mycfo.com</email>
+	    </address>
+	  </author>
+	  <author initials="C." surname="Adams" fullname="Carlisle Adams">
+	    <organization>Entrust Technologies</organization>
+	    <address>
+	      <postal>
+		<street>750 Heron Road</street>
+		<street>Suite E08</street>
+		<city>Ottawa</city>
+		<region>Ontario</region>
+		<code>K1V 1A7</code>
+		<country>CA</country>
+	      </postal>
+	      <email>cadams@entrust.com</email>
+	    </address>
+	  </author>
+	  <date year="1999" month="June"/>
+	  <abstract>
+	    <t>
+	      This document specifies a protocol useful in determining the current status of a digital certificate without requiring CRLs. Additional mechanisms addressing PKIX operational requirements are specified in separate documents.
+	    </t>
+	    <t>
+	      An overview of the protocol is provided in section 2. Functional requirements are specified in section 4. Details of the protocol are in section 5. We cover security issues with the protocol in section 6. Appendix A defines OCSP over HTTP, appendix B accumulates ASN.1 syntactic elements and appendix C specifies the mime types for the messages.
+	    </t>
+	    <t>
+	      The key words "MUST", "MUST NOT", "REQUIRED", "SHALL", "SHALL NOT", "SHOULD", "SHOULD NOT", "RECOMMENDED", "MAY", and "OPTIONAL" in this document (in uppercase, as shown) are to be interpreted as described in.
+	    </t>
+	  </abstract>
+	</front>
+	<seriesInfo name="RFC" value="2560"/>
+	<format type="TXT" octets="43243" target="http://www.rfc-editor.org/rfc/rfc2560.txt"/>
       </reference>
 
       <reference anchor='RFC5878'>
@@ -531,6 +629,26 @@ d0 d1   d2 d3           d0 d1   d2 d3  d4 d5
 
 	<seriesInfo name='RFC' value='5280' />
       </reference>
+
+      <reference anchor="RFC6066">
+	<front>
+	  <title>
+	    Transport Layer Security (TLS) Extensions: Extension Definitions
+	  </title>
+	  <author initials="D." surname="Eastlake" fullname="D. Eastlake">
+	    <organization/>
+	  </author>
+	  <date year="2011" month="January"/>
+	  <abstract>
+	    <t>
+	      This document provides specifications for existing TLS extensions. It is a companion document for RFC 5246, "The Transport Layer Security (TLS) Protocol Version 1.2". The extensions specified are server_name, max_fragment_length, client_certificate_url, trusted_ca_keys, truncated_hmac, and status_request. [STANDARDS-TRACK]
+	    </t>
+	  </abstract>
+	</front>
+	<seriesInfo name="RFC" value="6066"/>
+	<format type="TXT" octets="55079" target="http://www.rfc-editor.org/rfc/rfc6066.txt"/>
+      </reference>
+
     </references>
   </back>
 </rfc>
