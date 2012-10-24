@@ -32,6 +32,8 @@ LogLookup::UpdateResult LogLookup::Update() {
     return NO_UPDATES_FOUND;
 
   CHECK(db_result == Database::LOOKUP_OK);
+  CHECK_EQ(ct::V1, sth.version())
+      << "Tree head signed with an unknown version";
 
   if (sth.timestamp() == latest_tree_head_.timestamp())
     return NO_UPDATES_FOUND;
@@ -105,6 +107,7 @@ LogLookup::CertificateAuditProof(uint64_t timestamp,
   for (size_t i = 0; i < audit_path.size(); ++i)
     proof->add_path_node(audit_path[i]);
 
+  proof->mutable_id()->CopyFrom(latest_tree_head_.id());
   proof->mutable_tree_head_signature()->CopyFrom(latest_tree_head_.signature());
   return OK;
 }

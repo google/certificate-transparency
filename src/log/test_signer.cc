@@ -94,6 +94,9 @@ const char kEcP256PublicKey[] =
     "XZyhYsH6FMCEUK60t7pem/ckoPX8hupuaiJzJS0ZQ0SEoJGlFxkUFwft5g==\n"
     "-----END PUBLIC KEY-----\n";
 
+const char kKeyID[] =
+    "b69d879e3f2c4402556dcda2f6b2e02ff6b6df4789c53000e14f4b125ae847aa";
+
 EVP_PKEY* PrivateKeyFromPem(const string &pemkey) {
   // BIO_new_mem_buf is read-only.
   BIO *bio = BIO_new_mem_buf(const_cast<char*>(pemkey.data()), pemkey.size());
@@ -155,6 +158,7 @@ void TestSigner::SetDefaults(LogEntry *entry) {
 // static
 void TestSigner::SetDefaults(SignedCertificateTimestamp *sct) {
   sct->set_version(ct::V1);
+  sct->mutable_id()->set_key_id(B(kKeyID));
   sct->set_timestamp(kDefaultSCTTimestamp);
   sct->clear_extension();
   sct->mutable_signature()->set_hash_algorithm(DigitallySigned::SHA256);
@@ -175,6 +179,7 @@ void TestSigner::SetDefaults(LoggedCertificate *logged_cert) {
 // static
 void TestSigner::SetDefaults(SignedTreeHead *tree_head) {
   tree_head->set_version(ct::V1);
+  tree_head->mutable_id()->set_key_id(B(kKeyID));
   tree_head->set_timestamp(kDefaultSTHTimestamp);
   tree_head->set_tree_size(kDefaultTreeSize);
   tree_head->set_root_hash(B(kDefaultRootHash));
@@ -316,6 +321,7 @@ void TestSigner::TestEqualEntries(const LogEntry &entry0,
 void TestSigner::TestEqualSCTs(const SignedCertificateTimestamp &sct0,
                                const SignedCertificateTimestamp &sct1) {
   EXPECT_EQ(sct0.version(), sct1.version());
+  EXPECT_EQ(sct0.id().key_id(), sct1.id().key_id());
   EXPECT_EQ(sct0.timestamp(), sct1.timestamp());
   TestEqualDigitallySigned(sct0.signature(), sct1.signature());
 }
@@ -337,6 +343,7 @@ void TestSigner::TestEqualLoggedCerts(const LoggedCertificate &c0,
 void TestSigner::TestEqualTreeHeads(const SignedTreeHead &sth0,
                                     const SignedTreeHead &sth1) {
   EXPECT_EQ(sth0.version(), sth1.version());
+  EXPECT_EQ(sth0.id().key_id(), sth1.id().key_id());
   EXPECT_EQ(sth0.tree_size(), sth1.tree_size());
   EXPECT_EQ(sth0.timestamp(), sth1.timestamp());
   EXPECT_EQ(H(sth0.root_hash()), H(sth1.root_hash()));
@@ -345,6 +352,7 @@ void TestSigner::TestEqualTreeHeads(const SignedTreeHead &sth0,
 
 void TestSigner::FillData(LoggedCertificate *logged_cert) {
   logged_cert->mutable_sct()->set_version(ct::V1);
+  logged_cert->mutable_sct()->mutable_id()->set_key_id(B(kKeyID));
   logged_cert->mutable_sct()->set_timestamp(util::TimeInMilliseconds());
   logged_cert->mutable_sct()->clear_extension();
 

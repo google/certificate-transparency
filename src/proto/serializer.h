@@ -30,6 +30,7 @@ class Serializer {
     EMPTY_PRECERTIFICATE_CHAIN,
     UNSUPPORTED_VERSION,
     EXTENSIONS_TOO_LONG,
+    INVALID_KEYID_LENGTH,
   };
 
   static const size_t kMaxCertificateLength;
@@ -42,6 +43,7 @@ class Serializer {
   static const size_t kHashAlgorithmLengthInBytes;
   static const size_t kSigAlgorithmLengthInBytes;
   static const size_t kVersionLengthInBytes;
+  static const size_t kKeyIDLengthInBytes;
 
   static size_t PrefixLength(size_t max_length);
 

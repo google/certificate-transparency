@@ -8,6 +8,7 @@
 
 #include "ct.pb.h"
 #include "log_signer.h"
+#include "serial_hasher.h"
 #include "serializer.h"
 #include "util.h"
 
@@ -29,6 +30,7 @@ LogSigner::LogSigner(EVP_PKEY *pkey)
     default:
       LOG(FATAL) << "Unsupported key type";
   }
+  key_id_ = LogSigVerifier::ComputeKeyID(pkey_);
 }
 
 LogSigner::~LogSigner() {
@@ -65,6 +67,7 @@ LogSigner::SignCertificateTimestamp(const LogEntry &entry,
   if (res != Serializer::OK)
     return GetSerializeError(res);
   Sign(serialized_input, sct->mutable_signature());
+  sct->mutable_id()->set_key_id(KeyID());
   return OK;
 }
 
@@ -93,6 +96,7 @@ LogSigner::SignResult LogSigner::SignTreeHead(SignedTreeHead *sth) const {
   if (res != Serializer::OK)
     return GetSerializeError(res);
   Sign(serialized_sth, sth->mutable_signature());
+  sth->mutable_id()->set_key_id(KeyID());
   return OK;
 }
 
@@ -160,10 +164,24 @@ LogSigVerifier::LogSigVerifier(EVP_PKEY *pkey)
     default:
       LOG(FATAL) << "Unsupported key type";
   }
+  key_id_ = ComputeKeyID(pkey_);
 }
 
 LogSigVerifier::~LogSigVerifier() {
   EVP_PKEY_free(pkey_);
+}
+
+// static
+string LogSigVerifier::ComputeKeyID(EVP_PKEY *pkey) {
+  int buf_len = i2d_PUBKEY(pkey, NULL);
+  CHECK_GT(buf_len, 0);
+  unsigned char *buf = new unsigned char[buf_len];
+  unsigned char *p = buf;
+  CHECK_EQ(i2d_PUBKEY(pkey, &p), buf_len);
+  string keystring(reinterpret_cast<char*>(buf), buf_len);
+  string ret = Sha256Hasher::Sha256Digest(keystring);
+  delete buf;
+  return ret;
 }
 
 LogSigVerifier::VerifyResult LogSigVerifier::VerifyV1SCTSignature(
@@ -188,6 +206,10 @@ LogSigVerifier::VerifyResult
 LogSigVerifier::VerifySCTSignature(const LogEntry &entry,
                                    const SignedCertificateTimestamp &sct)
     const {
+  // Try to catch key mismatches early.
+  if (sct.id().has_key_id() && sct.id().key_id() != KeyID())
+    return KEY_ID_MISMATCH;
+
   string serialized_input;
   Serializer::SerializeResult serialize_result =
       Serializer::SerializeSCTSignatureInput(sct, entry,
@@ -217,6 +239,8 @@ LogSigVerifier::VerifyResult LogSigVerifier::VerifyV1STHSignature(
 
 LogSigVerifier::VerifyResult
 LogSigVerifier::VerifySTHSignature(const SignedTreeHead &sth) const {
+  if (sth.id().has_key_id() && sth.id().key_id() != KeyID())
+    return KEY_ID_MISMATCH;
   string serialized_sth;
   Serializer::SerializeResult serialize_result =
       Serializer::SerializeSTHSignatureInput(sth, &serialized_sth);

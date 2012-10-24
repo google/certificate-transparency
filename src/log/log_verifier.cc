@@ -92,6 +92,7 @@ LogVerifier::VerifyMerkleAuditProof(const LogEntry &entry,
 
   SignedTreeHead sth;
   sth.set_version(merkle_proof.version());
+  sth.mutable_id()->CopyFrom(merkle_proof.id());
   sth.set_timestamp(merkle_proof.timestamp());
   sth.set_tree_size(merkle_proof.tree_size());
   sth.set_root_hash(root_hash);

@@ -39,11 +39,13 @@ class SerializerTest : public ::testing::Test {
     entry_.set_type(ct::X509_ENTRY);
     entry_.mutable_x509_entry()->set_leaf_certificate("certificate");
     sct_.set_version(ct::V1);
+    sct_.mutable_id()->set_key_id("iamapublickeyshatwofivesixdigest");
     sct_.set_timestamp(1234);
     sct_.mutable_signature()->set_hash_algorithm(DigitallySigned::SHA256);
     sct_.mutable_signature()->set_sig_algorithm(DigitallySigned::ECDSA);
     sct_.mutable_signature()->set_signature("signature");
     sth_.set_version(ct::V1);
+    sth_.mutable_id()->set_key_id("iamapublickeyshatwofivesixdigest");
     sth_.set_timestamp(2345);
     sth_.set_tree_size(6);
     sth_.set_root_hash("imustbeexactlythirtytwobyteslong");
@@ -91,6 +93,7 @@ class SerializerTest : public ::testing::Test {
   static void CompareSCT(const SignedCertificateTimestamp &sct,
                          const SignedCertificateTimestamp &sct2) {
     EXPECT_EQ(sct.version(), sct2.version());
+    EXPECT_EQ(sct.id().key_id(), sct2.id().key_id());
     EXPECT_EQ(sct.timestamp(), sct2.timestamp());
     CompareDS(sct.signature(), sct2.signature());
   }
@@ -112,6 +115,8 @@ const char kDefaultSCTSignatureHexString[] =
 const char kDefaultSCTHexString[] =
     // version, 1 byte
     "00"
+    // keyid, 32 bytes
+    "69616d617075626c69636b657973686174776f66697665736978646967657374"
     // timestamp, 8 bytes
     "00000000000004d2"
     // extensions length, 2 bytes
@@ -279,7 +284,7 @@ TEST_F(SerializerTest, SerializeSCTSignatureInputEmptyCertificate) {
 TEST_F(SerializerTest, DeserializeSCTBadHashType) {
   string token = B(kDefaultSCTHexString);
   // Overwrite with a non-existent hash algorithm type.
-  token[11] = 0xff;
+  token[43] = 0xff;
 
   SignedCertificateTimestamp sct;
   EXPECT_EQ(Deserializer::INVALID_HASH_ALGORITHM,
@@ -289,7 +294,7 @@ TEST_F(SerializerTest, DeserializeSCTBadHashType) {
 TEST_F(SerializerTest, DeserializeSCTBadSignatureType) {
   string token = B(kDefaultSCTHexString);
   // Overwrite with a non-existent signature algorithm type.
-  token[12] = 0xff;
+  token[44] = 0xff;
 
   SignedCertificateTimestamp sct;
   EXPECT_EQ(Deserializer::INVALID_SIGNATURE_ALGORITHM,

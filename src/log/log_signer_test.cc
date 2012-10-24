@@ -51,6 +51,13 @@ class LogSignerTest : public ::testing::Test {
   TestSigner test_signer_;
 };
 
+TEST_F(LogSignerTest, KeyIDKatTest) {
+  SignedCertificateTimestamp default_sct;
+  TestSigner::SetDefaults(&default_sct);
+  EXPECT_EQ(signer_->KeyID(), default_sct.id().key_id());
+  EXPECT_EQ(verifier_->KeyID(), default_sct.id().key_id());
+}
+
 TEST_F(LogSignerTest, VerifySCTKatTest) {
   LogEntry default_entry;
   TestSigner::SetDefaults(&default_entry);

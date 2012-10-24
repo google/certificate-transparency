@@ -184,8 +184,9 @@ message SignedTreeHead {
   // (Note that each leaf has its own version, so a V2 tree
   // can contain V1 leaves, too.
   optional Version version = 1 [ default = UNKNOWN_VERSION ];
-  optional uint64 timestamp = 2;
-  optional uint64 tree_size = 3;
-  optional bytes root_hash = 4;
-  optional DigitallySigned signature = 5;
+  optional LogID id = 2;
+  optional uint64 timestamp = 3;
+  optional uint64 tree_size = 4;
+  optional bytes root_hash = 5;
+  optional DigitallySigned signature = 6;
 }

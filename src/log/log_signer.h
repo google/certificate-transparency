@@ -2,6 +2,7 @@
 #define LOG_SIGNER_H
 
 #include <openssl/evp.h>
+#include <openssl/x509.h>  // for i2d_PUBKEY
 #include <stdint.h>
 
 #include "ct.h"
@@ -12,6 +13,8 @@ class LogSigner {
  public:
   explicit LogSigner(EVP_PKEY *pkey);
   ~LogSigner();
+
+  std::string KeyID() const { return key_id_; }
 
   enum SignResult {
     OK,
@@ -54,12 +57,17 @@ class LogSigner {
   EVP_PKEY *pkey_;
   ct::DigitallySigned::HashAlgorithm hash_algo_;
   ct::DigitallySigned::SignatureAlgorithm sig_algo_;
+  std::string key_id_;
 };
 
 class LogSigVerifier {
  public:
   explicit LogSigVerifier(EVP_PKEY *pkey);
   ~LogSigVerifier();
+
+  std::string KeyID() const { return key_id_; }
+
+  static std::string ComputeKeyID(EVP_PKEY *pkey);
 
   enum VerifyResult {
     OK,
@@ -76,6 +84,7 @@ class LogSigVerifier {
     INVALID_HASH_LENGTH,
     UNSUPPORTED_VERSION,
     EXTENSIONS_TOO_LONG,
+    KEY_ID_MISMATCH,
   };
 
   // The protobuf-agnostic library version.
@@ -109,5 +118,6 @@ class LogSigVerifier {
   EVP_PKEY *pkey_;
   ct::DigitallySigned::HashAlgorithm hash_algo_;
   ct::DigitallySigned::SignatureAlgorithm sig_algo_;
+  std::string key_id_;
 };
 #endif

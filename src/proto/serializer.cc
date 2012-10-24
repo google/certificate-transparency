@@ -17,6 +17,7 @@ const size_t Serializer::kSignatureTypeLengthInBytes = 1;
 const size_t Serializer::kHashAlgorithmLengthInBytes = 1;
 const size_t Serializer::kSigAlgorithmLengthInBytes = 1;
 const size_t Serializer::kVersionLengthInBytes = 1;
+const size_t Serializer::kKeyIDLengthInBytes = 32;
 
 using ct::LogEntry;
 using ct::LogEntryType_IsValid;
@@ -152,7 +153,10 @@ Serializer::WriteSCT(const SignedCertificateTimestamp &sct) {
   SerializeResult res = CheckExtensionsFormat(sct.extension());
   if (res != OK)
     return res;
+  if (sct.id().key_id().size() != kKeyIDLengthInBytes)
+    return INVALID_KEYID_LENGTH;
   WriteUint(ct::V1, kVersionLengthInBytes);
+  WriteFixedBytes(sct.id().key_id());
   WriteUint(sct.timestamp(), 8);
   WriteVarBytes(sct.extension(), kMaxExtensionsLength);
   return WriteDigitallySigned(sct.signature());
@@ -296,6 +300,9 @@ Deserializer::DeserializeResult Deserializer::ReadSCT(
   if (!Version_IsValid(version) || version != ct::V1)
     return UNSUPPORTED_VERSION;
   sct->set_version(ct::V1);
+  if (!ReadFixedBytes(Serializer::kKeyIDLengthInBytes,
+                      sct->mutable_id()->mutable_key_id()))
+    return INPUT_TOO_SHORT;
  // V1 encoding.
   uint64_t timestamp = 0;
   if (!ReadUint(8, &timestamp))
