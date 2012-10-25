@@ -110,10 +110,6 @@ test_range() {
 }
 
 # Regression tests against known good/bad certificates
-# Temporarily disabled
-echo "WARNING: regression tests are temporarily disabled"
-let SKIPPED=$SKIPPED+15
-if false; then
 mkdir -p ca-hashes
 hash=$($MY_OPENSSL x509 -in testdata/ca-cert.pem -hash -noout)
 cp testdata/ca-cert.pem ca-hashes/$hash.0
@@ -143,7 +139,6 @@ else
 fi
 
 rm -rf ca-hashes
-fi  # End of temporarily disabled tests
 
 # Generate new certs dynamically and repeat the test for valid certs
 mkdir -p tmp
