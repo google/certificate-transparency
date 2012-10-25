@@ -92,6 +92,11 @@ message SignedCertificateTimestamp {
   optional bytes extension = 5;
 }
 
+message SignedCertificateTimestampList {
+  // One or more SCTs, <1..2^16-1> bytes each
+  repeated bytes sct_list = 1;
+}
+
 // Stuff that's hashed into a Merkle leaf.
 message MerkleTreeLeaf {
   // The version of the corresponding SCT.
@@ -189,4 +194,11 @@ message SignedTreeHead {
   optional uint64 tree_size = 4;
   optional bytes root_hash = 5;
   optional DigitallySigned signature = 6;
+}
+
+// Stuff the SSL client spits out from a connection.
+message SSLClientCTData {
+  optional LogEntry reconstructed_entry = 1;
+  optional bytes certificate_sha256_hash = 2;
+  repeated SignedCertificateTimestamp attached_sct = 3;
 }

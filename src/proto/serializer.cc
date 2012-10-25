@@ -11,6 +11,8 @@ const size_t Serializer::kMaxCertificateLength = (1 << 24) - 1;
 const size_t Serializer::kMaxCertificateChainLength = (1 << 24) - 1;
 const size_t Serializer::kMaxSignatureLength = (1 << 16) - 1;
 const size_t Serializer::kMaxExtensionsLength = (1 << 16) - 1;
+const size_t Serializer::kMaxSerializedSCTLength = (1 << 16) - 1;
+const size_t Serializer::kMaxSCTListLength = (1 << 16) - 1;
 
 const size_t Serializer::kLogEntryTypeLengthInBytes = 2;
 const size_t Serializer::kSignatureTypeLengthInBytes = 1;
@@ -25,6 +27,7 @@ using ct::DigitallySigned;
 using ct::DigitallySigned_HashAlgorithm_IsValid;
 using ct::DigitallySigned_SignatureAlgorithm_IsValid;
 using ct::SignedCertificateTimestamp;
+using ct::SignedCertificateTimestampList;
 using ct::X509ChainEntry;
 using ct::PrecertChainEntry;
 using ct::Version_IsValid;
@@ -174,6 +177,19 @@ Serializer::SerializeResult Serializer::SerializeSCT(
 }
 
 // static
+Serializer::SerializeResult Serializer::SerializeSCTList(
+    const SignedCertificateTimestampList &sct_list, string *result) {
+  if (sct_list.sct_list_size() == 0)
+    return EMPTY_SCT_LIST;
+  for (int i = 0; i < sct_list.sct_list_size(); ++i) {
+    if (sct_list.sct_list(i).empty())
+      return EMPTY_SCT_IN_LIST;
+  }
+  return SerializeList(sct_list.sct_list(), kMaxSerializedSCTLength,
+                       kMaxSCTListLength, result);
+}
+
+// static
 Serializer::SerializeResult
 Serializer::SerializeDigitallySigned(const DigitallySigned &sig,
                                      string *result) {
@@ -198,9 +214,9 @@ void Serializer::WriteVarBytes(const string &in, size_t max_length) {
 }
 
 // static
-size_t Serializer::SerializedLength(const repeated_string &in,
-                                    size_t max_elem_length,
-                                    size_t max_total_length) {
+size_t Serializer::SerializedListLength(const repeated_string &in,
+                                        size_t max_elem_length,
+                                        size_t max_total_length) {
   size_t elem_prefix_length = PrefixLength(max_elem_length);
   size_t total_length = 0;
 
@@ -214,6 +230,24 @@ size_t Serializer::SerializedLength(const repeated_string &in,
   }
 
   return total_length + PrefixLength(max_total_length);
+}
+
+// static
+Serializer::SerializeResult Serializer::SerializeList(
+    const repeated_string&in, size_t max_elem_length, size_t max_total_length,
+    string *result) {
+  size_t length = SerializedListLength(in, max_elem_length, max_total_length);
+  if (length == 0)
+    return LIST_TOO_LONG;
+  size_t prefix_length = PrefixLength(max_total_length);
+  CHECK_GE(length, prefix_length);
+  Serializer serializer;
+  serializer.WriteUint(length - prefix_length, prefix_length);
+
+  for (int i = 0; i < in.size(); ++i)
+    serializer.WriteVarBytes(in.Get(i), max_elem_length);
+  result->assign(serializer.SerializedString());
+  return OK;
 }
 
 Serializer::SerializeResult
@@ -256,14 +290,14 @@ Serializer::CheckExtensionsFormat(const string &extensions) {
 }
 
 Serializer::SerializeResult
-Serializer::CheckChainFormat(const repeated_string &chain) {
+    Serializer::CheckChainFormat(const repeated_string &chain) {
   for (int i = 0; i < chain.size(); ++i) {
     SerializeResult res = CheckCertificateFormat(chain.Get(i));
     if (res != OK)
       return res;
   }
-  if (!Serializer::CanSerialize(chain, kMaxCertificateLength,
-                                kMaxCertificateChainLength))
+  if (Serializer::SerializedListLength(chain, kMaxCertificateLength,
+                                       kMaxCertificateChainLength) == 0)
     return CERTIFICATE_CHAIN_TOO_LONG;
   return OK;
 }
@@ -303,7 +337,7 @@ Deserializer::DeserializeResult Deserializer::ReadSCT(
   if (!ReadFixedBytes(Serializer::kKeyIDLengthInBytes,
                       sct->mutable_id()->mutable_key_id()))
     return INPUT_TOO_SHORT;
- // V1 encoding.
+  // V1 encoding.
   uint64_t timestamp = 0;
   if (!ReadUint(8, &timestamp))
     return INPUT_TOO_SHORT;
@@ -325,6 +359,49 @@ Deserializer::DeserializeResult Deserializer::DeserializeSCT(
     return res;
   if (!deserializer.ReachedEnd())
     return INPUT_TOO_LONG;
+  return OK;
+}
+
+// static
+Deserializer::DeserializeResult Deserializer::DeserializeSCTList(
+    const string &in, SignedCertificateTimestampList *sct_list) {
+  sct_list->clear_sct_list();
+  DeserializeResult res = DeserializeList(
+      in, Serializer::kMaxSCTListLength, Serializer::kMaxSerializedSCTLength,
+      sct_list->mutable_sct_list());
+  if (res != OK)
+    return res;
+  if (sct_list->sct_list_size() == 0)
+    return EMPTY_SCT_LIST;
+  for (int i = 0; i < sct_list->sct_list_size(); ++i) {
+    if (sct_list->sct_list(i).size() == 0)
+      return EMPTY_SCT_IN_LIST;
+  }
+  return OK;
+}
+
+// static
+Deserializer::DeserializeResult Deserializer::DeserializeList(
+    const string &in, size_t max_total_length, size_t max_elem_length,
+    repeated_string *out) {
+  Deserializer deserializer(in);
+  string serialized_list;
+  if (!deserializer.ReadVarBytes(max_total_length, &serialized_list))
+    // TODO(ekasper): could also be a length that's too large, if
+    // length limits don't follow byte boundaries.
+    return INPUT_TOO_SHORT;
+  if (!deserializer.ReachedEnd())
+    return INPUT_TOO_LONG;
+  Deserializer sct_reader(serialized_list);
+  repeated_string local_out;
+  while (!sct_reader.ReachedEnd()) {
+    string serialized_elem;
+    if (!sct_reader.ReadVarBytes(max_elem_length, &serialized_elem))
+      return INVALID_LIST_ENCODING;
+    string *new_elem = local_out.Add();
+    new_elem->assign(serialized_elem);
+  }
+  out->CopyFrom(local_out);
   return OK;
 }
 

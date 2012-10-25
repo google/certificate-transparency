@@ -74,6 +74,10 @@ bool LogClient::QueryAuditProof(const LogEntry &entry,
                                 const SignedCertificateTimestamp &sct,
                                 MerkleAuditProof *proof) {
   CHECK(sct.has_timestamp()) << "Missing SCT timestamp";
+  if (sct.version() != kVersion) {
+    LOG(ERROR) << "SCT has unknown version";
+    return false;
+  }
   ClientMessage message;
   message.set_command(ClientMessage::LOOKUP_AUDIT_PROOF);
   message.mutable_lookup()->set_type(
@@ -110,22 +114,22 @@ bool LogClient::QueryAuditProof(const LogEntry &entry,
 
 // static
 string LogClient::ErrorString(ServerError::ErrorCode error) {
-   switch(error) {
-      case ServerError::BAD_VERSION:
-        return "bad version";
-     case ServerError::UNSUPPORTED_FORMAT:
-       return "unsupported message format";
-     case ServerError::INVALID_MESSAGE:
-       return "invalid message";
-      case ServerError::UNSUPPORTED_COMMAND:
-        return "unsupported command";
-      case ServerError::REJECTED:
-        return "rejected";
-     case ServerError::NOT_FOUND:
-       return "not found";
-      default:
-        return "unknown error code";
-    }
+  switch (error) {
+    case ServerError::BAD_VERSION:
+      return "bad version";
+    case ServerError::UNSUPPORTED_FORMAT:
+      return "unsupported message format";
+    case ServerError::INVALID_MESSAGE:
+      return "invalid message";
+    case ServerError::UNSUPPORTED_COMMAND:
+      return "unsupported command";
+    case ServerError::REJECTED:
+      return "rejected";
+    case ServerError::NOT_FOUND:
+      return "not found";
+    default:
+      return "unknown error code";
+  }
 }
 
 bool LogClient::SendMessage(const ClientMessage &message) {

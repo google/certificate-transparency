@@ -22,7 +22,6 @@ class CertSubmissionHandler {
     INVALID_TYPE,
     EMPTY_SUBMISSION,
     SUBMISSION_TOO_LONG,
-    CHAIN_NOT_LOADED,
     INVALID_PEM_ENCODED_CHAIN,
     INVALID_CERTIFICATE_CHAIN,
     PRECERT_CHAIN_NOT_WELL_FORMED,
@@ -34,9 +33,9 @@ class CertSubmissionHandler {
                                  ct::LogEntry *entry);
 
   // For clients, to reconstruct the bytestring under the signature
-  // from the observed chain.
-  static SubmitResult X509ChainToEntry(const CertChain &chain,
-                                       ct::LogEntry *entry);
+  // from the observed chain. Does not check whether the entry
+  // has valid format (i.e., does not check length limits).
+  static void X509CertToEntry(const Cert &cert, ct::LogEntry *entry);
 
  private:
   SubmitResult ProcessX509Submission(const std::string &submission,
@@ -46,7 +45,7 @@ class CertSubmissionHandler {
   SubmitResult ProcessPreCertSubmission(const std::string &submission,
                                         ct::PrecertChainEntry *entry);
 
-  static std::string TbsCertificate(const CertChain &chain);
+  static std::string TbsCertificate(const Cert &cert);
   static std::string TbsCertificate(const PreCertChain &chain);
 
   CertChecker *cert_checker_;

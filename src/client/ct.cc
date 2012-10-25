@@ -45,9 +45,11 @@ DEFINE_bool(precert, false,
             "The submission is a CA precertificate chain");
 DEFINE_string(sct_token, "",
               "Input file containing the SCT of the certificate");
-DEFINE_string(ssl_client_sct_checkpoint_out, "",
+DEFINE_string(ssl_client_ct_data_in, "",
+              "Input file for reading the SSLClientCTData");
+DEFINE_string(ssl_client_ct_data_out, "",
               "Output file for recording the server's leaf certificate, "
-              "SCT timestamp and signature as a serialized LoggedCertificate.");
+              "as well as all received and validated SCTs.");
 DEFINE_string(certificate_out, "",
               "Output file for the superfluous certificate");
 DEFINE_string(authz_out, "", "Output file for authz data");
@@ -72,10 +74,21 @@ static const char kUsage[] =
     "configure_proof - write the proof in an X509v3 configuration file\n"
     "Use --help to display command-line flag options\n";
 
-using ct::LoggedCertificate;
 using ct::MerkleAuditProof;
 using ct::SignedCertificateTimestamp;
+using ct::SignedCertificateTimestampList;
+using ct::SSLClientCTData;
 using std::string;
+
+// SCTs presented to clients have to be encoded as a list.
+// Helper method for encoding a single SCT.
+static string SCTToList(const string &serialized_sct) {
+  SignedCertificateTimestampList sct_list;
+  sct_list.add_sct_list(serialized_sct);
+  string result;
+  CHECK_EQ(Serializer::OK, Serializer::SerializeSCTList(sct_list, &result));
+  return result;
+}
 
 // Adds the data to the cert as an extension, formatted as a single
 // ASN.1 octet string.
@@ -127,13 +140,13 @@ static int Upload() {
   LOG(INFO) << submission_file << " is " << contents.length() << " bytes.";
 
   LogClient client(FLAGS_ct_server, FLAGS_ct_server_port);
-  if(!client.Connect()) {
+  if (!client.Connect()) {
     LOG(ERROR) << "Unable to connect";
     return 2;
   }
 
   SignedCertificateTimestamp sct;
-  if(!client.UploadSubmission(contents, FLAGS_precert, &sct)) {
+  if (!client.UploadSubmission(contents, FLAGS_precert, &sct)) {
     LOG(ERROR) << "Submission failed";
     return 1;
   }
@@ -200,18 +213,20 @@ static void MakeCert() {
 
   // Create the issuer name
   X509_NAME *issuer = X509_NAME_new();
-  X509_NAME_add_entry_by_NID(issuer, NID_commonName, V_ASN1_PRINTABLESTRING,
-			     const_cast<unsigned char *>(
-			       reinterpret_cast<const unsigned char *>("Test")),
-			     4, 0, -1);
+  X509_NAME_add_entry_by_NID(
+      issuer, NID_commonName, V_ASN1_PRINTABLESTRING,
+      const_cast<unsigned char *>(
+          reinterpret_cast<const unsigned char *>("Test")),
+      4, 0, -1);
   X509_set_issuer_name(x, issuer);
 
   // Create the subject name
   X509_NAME *subject = X509_NAME_new();
-  X509_NAME_add_entry_by_NID(subject, NID_commonName, V_ASN1_PRINTABLESTRING,
-			     const_cast<unsigned char *>(
-			       reinterpret_cast<const unsigned char *>("tseT")),
-			     4, 0, -1);
+  X509_NAME_add_entry_by_NID(
+      subject, NID_commonName, V_ASN1_PRINTABLESTRING,
+      const_cast<unsigned char *>(
+          reinterpret_cast<const unsigned char *>("tseT")),
+      4, 0, -1);
   X509_set_subject_name(x, subject);
 
   // Public key
@@ -224,9 +239,11 @@ static void MakeCert() {
   X509_PUBKEY_set(&X509_get_X509_PUBKEY(x) , evp_pkey);
 
   // And finally, the proof in an extension
+  string serialized_sct_list = SCTToList(sct);
   AddOctetExtension(x, Cert::kProofExtensionOID,
-                    reinterpret_cast<const unsigned char*>(sct.data()),
-                    sct.size(), 1);
+                    reinterpret_cast<const unsigned char*>(
+                        serialized_sct_list.data()),
+                    serialized_sct_list.size(), 1);
 
   int i = i2d_X509_bio(out, x);
   CHECK_GT(i, 0);
@@ -253,6 +270,8 @@ static void WriteProofToConfig() {
   PCHECK(util::ReadBinaryFile(FLAGS_sct_token, &sct))
       << "Could not read SCT data from " << FLAGS_sct_token;
 
+  string serialized_sct_list = SCTToList(sct);
+
   string conf_file = FLAGS_extensions_config_out;
 
   std::ofstream conf_out(conf_file.c_str(), std::ios::app);
@@ -262,7 +281,7 @@ static void WriteProofToConfig() {
   conf_out << string(Cert::kEmbeddedProofExtensionOID)
            << "=ASN1:FORMAT:HEX,OCTETSTRING:";
 
-  conf_out << util::HexString(sct) << std::endl;
+  conf_out << util::HexString(serialized_sct_list) << std::endl;
   conf_out.close();
 }
 
@@ -275,6 +294,9 @@ static void ProofToAuthz() {
   CHECK(!FLAGS_sct_token.empty()) << google::ProgramUsage();
   CHECK(!FLAGS_authz_out.empty()) << google::ProgramUsage();
 
+  string serialized_sct;
+  PCHECK(util::ReadBinaryFile(FLAGS_sct_token, &serialized_sct))
+      << "Could not read SCT data from " << FLAGS_sct_token;
   std::ifstream proof_in(FLAGS_sct_token.c_str(),
                          std::ios::in | std::ios::binary);
   PCHECK(proof_in.good()) << "Could not read SCT data from " << FLAGS_sct_token;
@@ -344,19 +366,22 @@ static SSLClient::HandshakeResult Connect() {
     result = client.SSLConnect();
 
   if (result == SSLClient::OK) {
-    LoggedCertificate logged_cert;
-    if (client.GetSCT(logged_cert.mutable_sct())) {
-      VLOG(5) << "Received SCT token:\n" << logged_cert.sct().DebugString();
-      CHECK(client.GetCertificateAsLogEntry(logged_cert.mutable_entry()));
-      string sct_out_file = FLAGS_ssl_client_sct_checkpoint_out;
-      if (!sct_out_file.empty()) {
-        std::ofstream checkpoint_out(sct_out_file.c_str(),
+    SSLClientCTData ct_data;
+    client.GetSSLClientCTData(&ct_data);
+    if (ct_data.attached_sct_size() > 0) {
+      LOG(INFO) << "Received " << ct_data.attached_sct_size() << " SCTs";
+      VLOG(5) << "Received SCTs:";
+      for (int i = 0; i < ct_data.attached_sct_size(); ++i)
+        VLOG(5) << ct_data.attached_sct(i).DebugString();
+      string ct_data_out_file = FLAGS_ssl_client_ct_data_out;
+      if (!ct_data_out_file.empty()) {
+        std::ofstream checkpoint_out(ct_data_out_file.c_str(),
                                      std::ios::out | std::ios::binary);
         PCHECK(checkpoint_out.good()) << "Could not open checkpoint file "
-                                      << sct_out_file << " for writing";
-        string serialized_entry;
-        CHECK(logged_cert.SerializeToString(&serialized_entry));
-        checkpoint_out << serialized_entry;
+                                      << ct_data_out_file << " for writing";
+        string serialized_data;
+        CHECK(ct_data.SerializeToString(&serialized_data));
+        checkpoint_out << serialized_data;
         checkpoint_out.close();
       }
     }
@@ -371,14 +396,14 @@ enum AuditResult {
 };
 
 static AuditResult Audit() {
-  string serialized_entry;
-  PCHECK(util::ReadBinaryFile(FLAGS_sct_token, &serialized_entry))
-      << "Could not read SCT data from " << FLAGS_sct_token;
-  LoggedCertificate logged_cert;
-  CHECK(logged_cert.ParseFromString(serialized_entry))
-      << "Failed to parse the stored certificate data";
-  CHECK(logged_cert.has_entry());
-  CHECK(logged_cert.has_sct());
+  string serialized_data;
+  PCHECK(util::ReadBinaryFile(FLAGS_ssl_client_ct_data_in, &serialized_data))
+      << "Could not read CT data from " << FLAGS_ssl_client_ct_data_in;
+  SSLClientCTData ct_data;
+  CHECK(ct_data.ParseFromString(serialized_data))
+      << "Failed to parse the stored certificate CT data";
+  CHECK(ct_data.has_reconstructed_entry());
+  CHECK_GT(ct_data.attached_sct_size(), 0);
 
   string log_server_key = FLAGS_ct_server_public_key;
   CHECK(!log_server_key.empty()) << "Please give a CT log server public key";
@@ -395,32 +420,44 @@ static AuditResult Audit() {
 
   fclose(fp);
 
+  LogSigVerifier *lv = new LogSigVerifier(pkey);
+  string key_id = lv->KeyID();
   LogVerifier *verifier =
-      new LogVerifier(new LogSigVerifier(pkey),
-                      new MerkleVerifier(new Sha256Hasher()));
+      new LogVerifier(lv, new MerkleVerifier(new Sha256Hasher()));
 
   LogClient client(FLAGS_ct_server, FLAGS_ct_server_port);
-  if(!client.Connect()) {
+  if (!client.Connect()) {
     LOG(ERROR) << "Unable to connect";
     return CT_SERVER_UNAVAILABLE;
   }
 
-  MerkleAuditProof proof;
-  if (!client.QueryAuditProof(logged_cert.entry(), logged_cert.sct(), &proof))
-    return PROOF_NOT_FOUND;
+  for (int i = 0; i < ct_data.attached_sct_size(); ++i) {
+    string sct_id = ct_data.attached_sct(i).id().key_id();
+    if (sct_id != key_id) {
+      LOG(WARNING) << "Audit for Signed Certificate Timestamp with Key ID "
+                   << sct_id << "skipped: Key ID does not match verifier's ID";
+      continue;
+    }
 
-  VLOG(5) << "Received proof " << proof.DebugString();
-  LogVerifier::VerifyResult res =
-      verifier->VerifyMerkleAuditProof(logged_cert.entry(), logged_cert.sct(),
-                                       proof);
-  if (res != LogVerifier::VERIFY_OK) {
-    LOG(ERROR) << "Verify error: " << LogVerifier::VerifyResultString(res);
-    LOG(ERROR) << "Retrieved Merkle proof is invalid.";
-    return PROOF_NOT_FOUND;
+    MerkleAuditProof proof;
+    if (!client.QueryAuditProof(ct_data.reconstructed_entry(),
+                                ct_data.attached_sct(i), &proof))
+      // Assuming one SCT per KeyID...
+      return PROOF_NOT_FOUND;
+
+    VLOG(5) << "Received proof " << proof.DebugString();
+    LogVerifier::VerifyResult res =
+        verifier->VerifyMerkleAuditProof(ct_data.reconstructed_entry(),
+                                         ct_data.attached_sct(i), proof);
+    if (res != LogVerifier::VERIFY_OK) {
+      LOG(ERROR) << "Verify error: " << LogVerifier::VerifyResultString(res);
+      LOG(ERROR) << "Retrieved Merkle proof is invalid.";
+      return PROOF_NOT_FOUND;
+    }
+
+    LOG(INFO) << "Proof verified.";
+    return PROOF_OK;
   }
-
-  LOG(INFO) << "Proof verified.";
-  return PROOF_OK;
 }
 
 // Exit code upon normal exit:

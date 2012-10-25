@@ -53,21 +53,16 @@ CertSubmissionHandler::ProcessSubmission(const string &submission,
 }
 
 // static
-CertSubmissionHandler::SubmitResult
-CertSubmissionHandler::X509ChainToEntry(const CertChain &chain,
-                                        LogEntry *entry) {
-  if (!chain.IsLoaded())
-    return CHAIN_NOT_LOADED;
-  if (chain.LeafCert()->HasExtension(Cert::kEmbeddedProofExtensionOID)) {
+void
+CertSubmissionHandler::X509CertToEntry(const Cert &cert, LogEntry *entry) {
+  CHECK(cert.IsLoaded());
+  if (cert.HasExtension(Cert::kEmbeddedProofExtensionOID)) {
     entry->set_type(ct::PRECERT_ENTRY);
-    entry->mutable_precert_entry()->set_tbs_certificate(TbsCertificate(chain));
+    entry->mutable_precert_entry()->set_tbs_certificate(TbsCertificate(cert));
   } else {
     entry->set_type(ct::X509_ENTRY);
-    entry->mutable_x509_entry()->set_leaf_certificate(
-        chain.LeafCert()->DerEncoding());
+    entry->mutable_x509_entry()->set_leaf_certificate(cert.DerEncoding());
   }
-
-  return OK;
 }
 
 // Inputs must be concatenated PEM entries.
@@ -141,15 +136,10 @@ string CertSubmissionHandler::TbsCertificate(const PreCertChain &chain) {
   return der_cert;
 }
 
-string CertSubmissionHandler::TbsCertificate(const CertChain &chain) {
-  if (!chain.IsLoaded())
-    return string();
+string CertSubmissionHandler::TbsCertificate(const Cert &cert) {
+  CHECK(cert.IsLoaded());
 
-  const Cert *leaf = chain.LeafCert();
-  CHECK_NOTNULL(leaf);
-  CHECK(leaf->IsLoaded());
-
-  Cert *tbs = leaf->Clone();
+  Cert *tbs = cert.Clone();
 
   // Delete the signature and the embedded proof.
   tbs->DeleteExtension(Cert::kEmbeddedProofExtensionOID);

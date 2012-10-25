@@ -205,17 +205,9 @@ d0 d1   d2 d3           d0 d1   d2 d3  d4 d5
 	<t>
 	  Anyone can submit a certificate to the log. In order to attribute each logged certificate to its issuer, the log shall publish a list of acceptable root certificates (this list should be the union of root certificates trusted by major browser vendors). Each submitted certificate MUST be accompanied by all additional certificates required to verify the certificate chain up to an accepted root certificate. The self-signed root certificate itself MAY be omitted from this list. 
 	</t>
-	<t>
-	  In this case, the SCT must be included in the TLS handshake, either by using an Authorization Extension <xref target='RFC5878'/> with type 182 containing the SCT, or by using OCSP Stapling (section 8 of <xref target='RFC6066'/>), where the response includes an OCSP extension with OID 1.3.6.1.4.1.11129.2.4.5 (see <xref target='RFC2560'/>) and body:
-	</t>
-	<figure>
-	  <artwork>
-    SignedCertificateTimestamp ::= OCTET STRING
-	  </artwork>
-	</figure>
         <t>
-	  Alternatively, (root as well as intermediate) Certificate Authorities may submit a certificate to the log prior to issuance. To do so, a Certificate Authority constructs a Precertificate by adding a special critical poison extension (OID 1.3.6.1.4.1.11129.2.4.3, ASN.1 NULL data) to the leaf TBSCertificate, and signing the resulting TBSCertificate <xref target='RFC5280'/> with a special-purpose (Extended Key Usage: Certificate Transparency, OID 1.3.6.1.4.1.11129.2.4.4, basicConstraints=critical,CA:FALSE) Precertificate Signing Certificate. The Precertificate Signing Certificate MUST be certified by the CA certificate. As above, the Precertificate submission MUST be accompanied by the Precertificate Signing Certificate and all additional certificates required to verify the chain up to an accepted root certificate. The signature on the TBSCertificate indicates the Certificate Authority's intent to issue a certificate. This intent is considered binding (i.e., misissuance of the Precertificate is considered equal to misissuance of the final certificate). The log verifies the Precertificate signature chain, and issues a Signed Certificate Timestamp on the corresponding TBSCertificate. The SCT can then be directly embedded in the final certificate, by encoding it as an ASN.1 OCTETSTRING and inserting the resulting data in the TBSCertificate as an X.509v3 certificate extension (OID 1.3.6.1.4.1.11129.2.4.2). Upon receiving the certificate, clients can reconstruct the original TBSCertificate to verify the SCT signature.
-	</t>
+	  Alternatively, (root as well as intermediate) Certificate Authorities may submit a certificate to the log prior to issuance. To do so, a Certificate Authority constructs a Precertificate by adding a special critical poison extension (OID 1.3.6.1.4.1.11129.2.4.3, ASN.1 NULL data) to the leaf TBSCertificate, and signing the resulting TBSCertificate <xref target='RFC5280'/> with a special-purpose (Extended Key Usage: Certificate Transparency, OID 1.3.6.1.4.1.11129.2.4.4, basicConstraints=critical,CA:FALSE) Precertificate Signing Certificate. The Precertificate Signing Certificate MUST be certified by the CA certificate. As above, the Precertificate submission MUST be accompanied by the Precertificate Signing Certificate and all additional certificates required to verify the chain up to an accepted root certificate. The signature on the TBSCertificate indicates the Certificate Authority's intent to issue a certificate. This intent is considered binding (i.e., misissuance of the Precertificate is considered equal to misissuance of the final certificate). The log verifies the Precertificate signature chain, and issues a Signed Certificate Timestamp on the corresponding TBSCertificate.
+</t>
 	<t>
 	  The log MUST verify that the submitted leaf certificate or Precertificate has a valid signature chain leading back to a trusted root CA certificate, using the chain of intermediate CA certificates provided by the submitter. In case of Precertificates, the log MUST also verify that the Precertificate Signing Certificate has the correct Extended Key Usage extension. The log MAY accept certificates that have expired, are not yet valid, have been revoked or are otherwise not fully valid according to X.509 verification rules. However, the log MUST refuse to publish certificates without a valid chain to a known root CA. If a certificate is accepted and an SCT issued, the log MUST store the chain used for verification including the certificate or Precertificate itself, and MUST present this chain for auditing upon request.
 	</t>
@@ -321,6 +313,37 @@ d0 d1   d2 d3           d0 d1   d2 d3  d4 d5
         </t>
       </section>
 
+      <section title="Including the Signed Certificate Timestamp in the TLS Handshake">
+	<t>
+	The SCT data from at least one log must be included in the TLS handshake, either by using an Authorization Extension <xref target='RFC5878'/> with type 182, or by using OCSP Stapling (section 8 of <xref target='RFC6066'/>), where the response includes an OCSP extension with OID 1.3.6.1.4.1.11129.2.4.5 (see <xref target='RFC2560'/>) and body:
+	</t>
+	<figure>
+	  <artwork>
+    SignedCertificateTimestampList ::= OCTET STRING
+	  </artwork>
+	</figure>
+	<t>
+	  At least one SCT MUST be included. Server operators MAY include more than one SCT.
+	</t>
+	<t>
+	  Similarly, the Certificate Authority MAY submit the precertificate to more than one log, and all obtained SCTs can be directly embedded in the final certificate, by encoding the SignedCertificateTimestampList structure as an ASN.1 OCTET STRING and inserting the resulting data in the TBSCertificate as an X.509v3 certificate extension (OID 1.3.6.1.4.1.11129.2.4.2). Upon receiving the certificate, clients can reconstruct the original TBSCertificate to verify the SCT signature.
+	</t>
+	<t>
+	  The contents of the ASN.1 OCTET STRING embedded in an OCSP extension or X509v3 certificate extension are as follows:
+	</t>
+	<figure>
+	  <artwork>
+     opaque SerializedSCT&lt;1..2^16-1&gt;; 
+
+     struct {
+         SerializedSCT sct_list &lt;1..2^16-1&gt;;
+     } SignedCertificateTimestampList;
+	  </artwork>
+	</figure>
+	<t>
+	  SCTs embedded in the TLS Authorization Extension are each encoded as an individual AuthorizationDataEntry <xref target='RFC5878'/>.
+	</t>
+      </section>
       <section title="Merkle Tree">
 	<t> A certificate log MUST periodically append all new log entries to the log Merkle Tree. The log MUST sign these entries by constructing a binary Merkle Tree with log entries as consecutive inputs to the tree, signing the corresponding Merkle Tree Hash, and publishing each update to the tree in a Signed Merkle Tree Update. The hashing algorithm for the Merkle Tree Hash is SHA-256.
 	</t>

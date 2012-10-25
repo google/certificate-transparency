@@ -12,7 +12,9 @@ class LogVerifier;
 
 class SSLClient {
  public:
-  // Takes ownership of the verifier.
+  // Takes ownership of the verifier. This client can currently
+  // only verify SCTs from a single log at a time.
+  // TODO(ekasper): implement a proper multi-log auditor.
   SSLClient(const std::string &server, uint16_t port,
             const std::string &ca_dir, LogVerifier *verifier);
 
@@ -37,17 +39,12 @@ class SSLClient {
 
   void Disconnect();
 
-  // The reconstructed (signed part of) log entry for the current connection.
-  bool GetCertificateAsLogEntry(ct::LogEntry *entry) const;
-
-  // The SCT for the current connection.
-  bool GetSCT(ct::SignedCertificateTimestamp *sct) const;
+  void GetSSLClientCTData(ct::SSLClientCTData *data) const;
 
   // Need a static wrapper for the callback.
   static LogVerifier::VerifyResult
-  VerifySCT(const std::string &token, const CertChain &chain,
-            LogVerifier *verifier, ct::LogEntry *entry,
-            ct::SignedCertificateTimestamp *sct);
+  VerifySCT(const std::string &token, LogVerifier *verifier,
+            ct::SSLClientCTData *data);
 
   // Custom verification callback for verifying the SCT token
   // in a superfluous certificate. Return values:
@@ -83,7 +80,7 @@ class SSLClient {
         : verifier(log_verifier),
           token_verified(false),
           require_token(false),
-          sct() {}
+          ct_data() {}
 
     // The verifier for checking log proofs.
     LogVerifier *verifier;
@@ -91,10 +88,9 @@ class SSLClient {
     bool token_verified;
     bool require_token;
     // The resulting (partial) entry - the client reconstructs
-    // the signed part of the entry (i.e., type and leaf certificate).
-    ct::LogEntry entry;
-    // ... and SCT.
-    ct::SignedCertificateTimestamp sct;
+    // the signed part of the entry (i.e., type and leaf certificate)
+    // and all valid SCTs.
+    ct::SSLClientCTData ct_data;
   };
 
   VerifyCallbackArgs verify_args_;

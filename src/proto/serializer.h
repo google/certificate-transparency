@@ -31,12 +31,17 @@ class Serializer {
     UNSUPPORTED_VERSION,
     EXTENSIONS_TOO_LONG,
     INVALID_KEYID_LENGTH,
+    EMPTY_SCT_LIST,
+    EMPTY_SCT_IN_LIST,
+    LIST_TOO_LONG,
   };
 
   static const size_t kMaxCertificateLength;
   static const size_t kMaxCertificateChainLength;
   static const size_t kMaxSignatureLength;
   static const size_t kMaxExtensionsLength;
+  static const size_t kMaxSerializedSCTLength;
+  static const size_t kMaxSCTListLength;
 
   static const size_t kLogEntryTypeLengthInBytes;
   static const size_t kSignatureTypeLengthInBytes;
@@ -87,6 +92,9 @@ class Serializer {
   static SerializeResult SerializeSCT(const ct::SignedCertificateTimestamp &sct,
                                       std::string *result);
 
+static SerializeResult SerializeSCTList(
+    const ct::SignedCertificateTimestampList &sct_list, std::string *result);
+
   // TODO(ekasper): tests for these!
   template <class T>
   static std::string SerializeUint(T in, size_t bytes) {
@@ -115,15 +123,15 @@ class Serializer {
   // Variable-length byte array.
   void WriteVarBytes(const std::string &in, size_t max_length);
 
-  static bool CanSerialize(const repeated_string &in,
-                           size_t max_elem_length,
-                           size_t max_total_length) {
-    return SerializedLength(in, max_elem_length, max_total_length) > 0;
-  }
+  // Length of the serialized list (with length prefix).
+  static size_t SerializedListLength(const repeated_string &in,
+                                     size_t max_elem_length,
+                                     size_t max_total_length);
 
-  static size_t SerializedLength(const repeated_string &in,
-                                 size_t max_elem_length,
-                                 size_t max_total_length);
+  // Serialize (with length prefix).
+  static SerializeResult SerializeList(
+      const repeated_string &in, size_t max_elem_length,
+      size_t max_total_length, std::string *result);
 
   SerializeResult WriteDigitallySigned(const ct::DigitallySigned &sig);
 
@@ -157,6 +165,9 @@ class Deserializer {
     INVALID_SIGNATURE_ALGORITHM,
     INPUT_TOO_LONG,
     UNSUPPORTED_VERSION,
+    INVALID_LIST_ENCODING,
+    EMPTY_SCT_LIST,
+    EMPTY_SCT_IN_LIST,
   };
 
   bool ReachedEnd() const { return bytes_remaining_ == 0; }
@@ -165,6 +176,13 @@ class Deserializer {
 
   static DeserializeResult DeserializeSCT(const std::string &in,
                                           ct::SignedCertificateTimestamp *sct);
+
+  static DeserializeResult DeserializeSCTList(
+      const std::string &in, ct::SignedCertificateTimestampList *sct_list);
+
+  static DeserializeResult DeserializeList(
+      const std::string &in, size_t max_total_length,
+      size_t max_elem_length, repeated_string *out);
 
   static DeserializeResult
   DeserializeDigitallySigned(const std::string &in, ct::DigitallySigned *sig);

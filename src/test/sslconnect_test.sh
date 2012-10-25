@@ -32,7 +32,7 @@ test_connect() {
   audit=$8
  
   if [ "$audit" == "true" ]; then
-    local client_flags="--ssl_client_sct_checkpoint_out=$cert_dir/$port.sct"
+    local client_flags="--ssl_client_ct_data_out=$cert_dir/$port.sct"
   fi
 
   # Continue tests on error
@@ -63,7 +63,7 @@ audit() {
   set +e
   ../client/ct audit --ct_server="127.0.0.1" --ct_server_port=8124 \
     --ct_server_public_key=$cert_dir/$log_server-key-public.pem \
-    --sct_token=$cert_dir/$port.sct --logtostderr=true
+    --ssl_client_ct_data_in=$cert_dir/$port.sct --logtostderr=true
   local retcode=$?
   set -e
 

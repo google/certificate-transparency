@@ -7,9 +7,12 @@
 #include "cert_submission_handler.h"
 #include "client.h"
 #include "log_verifier.h"
+#include "serializer.h"
 #include "ssl_client.h"
 
 using ct::SignedCertificateTimestamp;
+using ct::SignedCertificateTimestampList;
+using ct::SSLClientCTData;
 using ct::LogEntry;
 using std::string;
 
@@ -63,43 +66,34 @@ void SSLClient::Disconnect() {
   connected_ = false;
 }
 
-bool SSLClient::GetCertificateAsLogEntry(LogEntry *entry) const {
+void SSLClient::GetSSLClientCTData(SSLClientCTData *data) const {
   CHECK(Connected());
-  if (verify_args_.token_verified) {
-    entry->CopyFrom(verify_args_.entry);
-    return true;
-  }
-  return false;
+  data->CopyFrom(verify_args_.ct_data);
 }
 
-bool SSLClient::GetSCT(SignedCertificateTimestamp *sct) const {
-  CHECK(Connected());
-  if (verify_args_.token_verified) {
-    sct->CopyFrom(verify_args_.sct);
-    return true;
-  }
-  return false;
-}
-
+// FIXME(ekasper): This code assumes in several places that a certificate has
+// *either* embedded proofs *or* regular proofs in a superfluous certificate
+// *or* regular proofs in a TLS extension but not several at the same time.
+// It's of course for example entirely possible that a cert with an embedded
+// proof is re-submitted (or submitted to another log) and the server attaches
+// that proof too, but let's not complicate things for now.
 // static
 LogVerifier::VerifyResult
-SSLClient::VerifySCT(const string &token, const CertChain &chain,
-                     LogVerifier *verifier, LogEntry *entry,
-                     SignedCertificateTimestamp *sct) {
-  LogEntry local_entry;
-  if (CertSubmissionHandler::X509ChainToEntry(chain, &local_entry) !=
-      CertSubmissionHandler::OK)
-    return LogVerifier::INVALID_FORMAT;
-
+SSLClient::VerifySCT(const string &token, LogVerifier *verifier,
+                     SSLClientCTData *data) {
+  CHECK(data->has_reconstructed_entry());
   SignedCertificateTimestamp local_sct;
+  // Skip over bad SCTs. These could be either badly encoded ones, or SCTs whose
+  // version we don't understand.
   if (Deserializer::DeserializeSCT(token, &local_sct) != Deserializer::OK)
     return LogVerifier::INVALID_FORMAT;
 
   LogVerifier::VerifyResult result =
-      verifier->VerifySignedCertificateTimestamp(local_entry, local_sct);
+      verifier->VerifySignedCertificateTimestamp(data->reconstructed_entry(),
+                                                 local_sct);
   if (result != LogVerifier::VERIFY_OK)
     return result;
-  entry->CopyFrom(local_entry);
+  SignedCertificateTimestamp *sct = data->add_attached_sct();
   sct->CopyFrom(local_sct);
   return LogVerifier::VERIFY_OK;
 }
@@ -131,39 +125,53 @@ int SSLClient::VerifyCallback(X509_STORE_CTX *ctx, void *arg) {
   for (int i = 0; i < chain_size; ++i)
     chain.AddCert(new Cert(sk_X509_value(sk, i)));
 
-  string token;
+  string serialized_scts;
   // First, see if the cert has an embedded proof.
   if (chain.LeafCert()->HasExtension(Cert::kEmbeddedProofExtensionOID)) {
     LOG(INFO) << "Embedded proof extension found in certificate, "
               << "verifying...";
-    token = chain.LeafCert()->OctetStringExtensionData(
+    serialized_scts = chain.LeafCert()->OctetStringExtensionData(
         Cert::kEmbeddedProofExtensionOID);
     // Else look for the proof in a superfluous cert.
     // Let's assume the superfluous cert is always last in the chain.
   } else if (chain.Length() > 1 && chain.LastCert()->HasExtension(
       Cert::kProofExtensionOID)) {
     LOG(INFO) << "Proof extension found in certificate, verifying...";
-    token = chain.LastCert()->OctetStringExtensionData(
+    serialized_scts = chain.LastCert()->OctetStringExtensionData(
         Cert::kProofExtensionOID);
     chain.RemoveCert();
   }
 
-  if (!token.empty()) {
+  LogEntry entry;
+  CertSubmissionHandler::X509CertToEntry(*chain.LeafCert(), &entry);
+  args->ct_data.mutable_reconstructed_entry()->CopyFrom(entry);
+  args->ct_data.set_certificate_sha256_hash(
+      Serializer::CertificateSha256Hash(entry));
+
+  if (!serialized_scts.empty()) {
     // Only writes the checkpoint if verification succeeds.
     // Note: an optimized client could only verify the signature if it's
     // a certificate it hasn't seen before.
-    LogVerifier::VerifyResult result = VerifySCT(token, chain,
-                                                 verifier, &args->entry,
-                                                 &args->sct);
-
-    if (result == LogVerifier::VERIFY_OK) {
-      LOG(INFO) << "Token verified";
-      args->token_verified = true;
+    SignedCertificateTimestampList sct_list;
+    if (Deserializer::DeserializeSCTList(serialized_scts, &sct_list) !=
+        Deserializer::OK) {
+      LOG(ERROR) << "Failed to parse SCT list.";
     } else {
-      LOG(ERROR) << "Verification failed: "
-                 << LogVerifier::VerifyResultString(result);
+      LOG(INFO) << "Received " << sct_list.sct_list_size() << " SCTs";
+      for (int i = 0; i < sct_list.sct_list_size(); ++i) {
+        LogVerifier::VerifyResult result = VerifySCT(sct_list.sct_list(i),
+                                                     verifier, &args->ct_data);
+
+        if (result == LogVerifier::VERIFY_OK) {
+          LOG(INFO) << "SCT number " << i + 1 << " verified";
+          args->token_verified = true;
+        } else {
+          LOG(ERROR) << "Verification for SCT number " << i + 1 << " failed: "
+                     << LogVerifier::VerifyResultString(result);
+        }
+      }  // end for
     }
-  }
+  }  // end if (!serialized_scts.empty())
 
 #ifndef TLSEXT_AUTHZDATAFORMAT_audit_proof
   // If we don't support the TLS extension, we fail here. Else we wait to see
@@ -177,6 +185,8 @@ int SSLClient::VerifyCallback(X509_STORE_CTX *ctx, void *arg) {
 }
 
 #ifdef TLSEXT_AUTHZDATAFORMAT_audit_proof
+// TODO(ekasper, agl, benl): modify OpenSSL client code so that it returns
+// *all authz data* with the matching format (not just the first hit).
 // static
 int SSLClient::SCTTokenCallback(SSL *s, void *arg) {
   VerifyCallbackArgs *args = reinterpret_cast<VerifyCallbackArgs*>(arg);
@@ -209,8 +219,7 @@ int SSLClient::SCTTokenCallback(SSL *s, void *arg) {
   CertChain chain;
   chain.AddCert(leaf);
 
-  LogVerifier::VerifyResult result =
-      VerifySCT(token, chain, verifier, &args->entry, &args->sct);
+  LogVerifier::VerifyResult result = VerifySCT(token, verifier, &args->ct_data);
 
   if (result == LogVerifier::VERIFY_OK) {
     args->token_verified = true;
@@ -227,8 +236,7 @@ int SSLClient::SCTTokenCallback(SSL *s, void *arg) {
 void SSLClient::ResetVerifyCallbackArgs(bool strict) {
   verify_args_.token_verified = false;
   verify_args_.require_token = strict;
-  verify_args_.entry.CopyFrom(LogEntry::default_instance());
-  verify_args_.sct.CopyFrom(SignedCertificateTimestamp::default_instance());
+  verify_args_.ct_data.CopyFrom(SSLClientCTData::default_instance());
 }
 
 SSLClient::HandshakeResult SSLClient::SSLConnect(bool strict) {

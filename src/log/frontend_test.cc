@@ -236,10 +236,9 @@ TYPED_TEST(FrontendTest, TestSubmitPrecert) {
   EXPECT_EQ(Frontend::NEW,
             this->frontend_->QueueEntry(ct::PRECERT_ENTRY, submission, &sct));
 
-  CertChain chain(this->embedded_pem_);
+  Cert cert(this->embedded_pem_);
   LogEntry entry;
-  CHECK_EQ(CertSubmissionHandler::OK,
-           CertSubmissionHandler::X509ChainToEntry(chain, &entry));
+  CertSubmissionHandler::X509CertToEntry(cert, &entry);
 
   // Look it up.
   string hash = Sha256Hasher::Sha256Digest(
