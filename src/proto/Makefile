@@ -28,6 +28,6 @@ test: serializer_test
 	./serializer_test
 
 serializer_test: serializer_test.o serializer.o ct.pb.o ../util/util.o \
-                 ../merkletree/serial_hasher.o
+                 ../merkletree/serial_hasher.o ../util/testing.o
 	$(CXX) -o serializer_test serializer_test.o serializer.o ct.pb.o \
-	../util/util.o ../merkletree/serial_hasher.o $(LIBS)
+	../util/util.o ../merkletree/serial_hasher.o ../util/testing.o $(LIBS)

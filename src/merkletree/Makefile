@@ -34,14 +34,17 @@ libmerkle_tree.a: merkle_tree.o merkle_verifier.o serial_hasher.o tree_hasher.o
 	rm -f $@
 	ar -rcs $@ $^
 
-merkle_tree_test: merkle_tree_test.o ../util/util.o libmerkle_tree.a
+merkle_tree_test: merkle_tree_test.o ../util/util.o ../util/testing.o \
+                  libmerkle_tree.a
 	$(CXX) -o merkle_tree_test merkle_tree_test.o ../util/util.o \
-		libmerkle_tree.a $(LIBS)
+		../util/testing.o libmerkle_tree.a $(LIBS)
 
-serial_hasher_test: serial_hasher_test.o ../util/util.o libmerkle_tree.a
+serial_hasher_test: serial_hasher_test.o ../util/util.o ../util/testing.o \
+                    libmerkle_tree.a
 	$(CXX) -o serial_hasher_test serial_hasher_test.o ../util/util.o \
-		libmerkle_tree.a $(LIBS)
+		../util/testing.o libmerkle_tree.a $(LIBS)
 
-tree_hasher_test: tree_hasher_test.o ../util/util.o libmerkle_tree.a
+tree_hasher_test: tree_hasher_test.o ../util/util.o ../util/testing.o \
+                  libmerkle_tree.a
 	$(CXX) -o tree_hasher_test tree_hasher_test.o ../util/util.o \
-		libmerkle_tree.a $(LIBS)
+		../util/testing.o libmerkle_tree.a $(LIBS)

@@ -5,6 +5,7 @@
 
 #include "ct.pb.h"
 #include "serializer.h"
+#include "testing.h"
 #include "types.h"
 #include "util.h"
 
@@ -538,13 +539,6 @@ TEST_F(SerializerTest, DeserializeSCTListInvalidList) {
 }  // namespace
 
 int main(int argc, char**argv) {
-  // Change the defaults. Can be overridden on command line.
-  // Log to stderr instead of log files.
-  FLAGS_logtostderr = true;
-  // Only log fatal messages by default.
-  FLAGS_minloglevel = 3;
-  ::testing::InitGoogleTest(&argc, argv);
-  google::ParseCommandLineFlags(&argc, &argv, true);
-  google::InitGoogleLogging(argv[0]);
+  ct::test::InitTesting(argv[0], &argc, &argv, true);
   return RUN_ALL_TESTS();
 }

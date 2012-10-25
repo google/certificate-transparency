@@ -12,6 +12,7 @@
 #include "sqlite_db.h"
 #include "test_db.h"
 #include "test_signer.h"
+#include "testing.h"
 #include "util.h"
 
 namespace {
@@ -313,13 +314,6 @@ TYPED_TEST(DBTest, ResumeEmpty) {
 }  // namespace
 
 int main(int argc, char **argv) {
-  // Change the defaults. Can be overridden on command line.
-  // Log to stderr instead of log files.
-  FLAGS_logtostderr = true;
-  // Only log fatal messages by default.
-  FLAGS_minloglevel = 3;
-  google::ParseCommandLineFlags(&argc, &argv, true);
-  google::InitGoogleLogging(argv[0]);
-  ::testing::InitGoogleTest(&argc, argv);
+  ct::test::InitTesting(argv[0], &argc, &argv, true);
   return RUN_ALL_TESTS();
 }

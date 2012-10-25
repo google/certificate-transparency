@@ -1,10 +1,11 @@
 CXXFLAG= -Wall -Werror -O3 -g
-INCLUDE= -I ../include -I $(PROTOBUFDIR)/src 
-LIBS= $(PROTOBUFDIR)/.libs/libprotobuf.a
+INCLUDE= -I ../include  -I $(GTESTDIR)/include -I $(PROTOBUFDIR)/src 
+
+INCLUDE += -I /usr/local/include
 
 CXXFLAGS= $(INCLUDE) $(CXXFLAG)
 
-all: .depend util.o
+all: .depend util.o testing.o
 
 # Preprocessing step for compiling .proto files.
 ../include/ct.pb.h: ../proto/ct.proto

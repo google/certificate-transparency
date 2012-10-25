@@ -3,6 +3,7 @@
 #include <string>
 
 #include "serial_hasher.h"
+#include "testing.h"
 #include "tree_hasher.h"
 #include "util.h"
 
@@ -156,6 +157,6 @@ TYPED_TEST(TreeHasherTest, TestVectors) {
 } // namespace
 
 int main(int argc, char**argv) {
-  ::testing::InitGoogleTest(&argc, argv);
+  ct::test::InitTesting(argv[0], &argc, &argv, true);
   return RUN_ALL_TESTS();
 }

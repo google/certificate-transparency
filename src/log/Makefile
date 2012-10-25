@@ -57,63 +57,73 @@ liblog.a: cert.o cert_checker.o cert_submission_handler.o log_signer.o \
 	rm -f $@
 	ar -rcs $@ $^
 
-cert_test: cert_test.o ../util/util.o $(LOCAL_LIBS)
-	$(CXX) -o cert_test cert_test.o liblog.a ../util/util.o $(LIBS)
+cert_test: cert_test.o ../util/util.o ../util/testing.o $(LOCAL_LIBS)
+	$(CXX) -o cert_test cert_test.o liblog.a ../util/util.o \
+        ../util/testing.o $(LIBS)
 
-cert_checker_test: cert_checker_test.o ../util/util.o $(LOCAL_LIBS)
-	$(CXX) -o cert_checker_test cert_checker_test.o ../util/util.o $(LIBS)
+cert_checker_test: cert_checker_test.o ../util/util.o ../util/testing.o \
+                   $(LOCAL_LIBS)
+	$(CXX) -o cert_checker_test cert_checker_test.o ../util/util.o \
+        ../util/testing.o $(LIBS)
 
 cert_submission_handler_test: cert_submission_handler_test.o \
 			      ../util/util.o ../proto/ct.pb.o \
-                              ../proto/serializer.o $(LOCAL_LIBS)
+                              ../proto/serializer.o ../util/testing.o \
+                              $(LOCAL_LIBS)
 	$(CXX) -o cert_submission_handler_test cert_submission_handler_test.o \
-	       ../util/util.o ../proto/ct.pb.o ../proto/serializer.o $(LIBS)
+	       ../util/util.o ../proto/ct.pb.o ../proto/serializer.o \
+               ../util/testing.o $(LIBS)
 
 log_signer_test: log_signer_test.o ../util/util.o \
 	         ../proto/ct.pb.o ../proto/serializer.o test_signer.o \
-                 $(LOCAL_LIBS)
+                 ../util/testing.o $(LOCAL_LIBS)
 	$(CXX) -o log_signer_test log_signer_test.o \
 	       ../util/util.o ../proto/ct.pb.o ../proto/serializer.o \
-	       test_signer.o $(LIBS)
+	       test_signer.o ../util/testing.o $(LIBS)
 
 file_storage_test: file_storage_test.o ../util/util.o ../proto/ct.pb.o \
-                   ../proto/serializer.o $(LOCAL_LIBS)
+                   ../proto/serializer.o ../util/testing.o $(LOCAL_LIBS)
 	$(CXX) -o file_storage_test file_storage_test.o ../util/util.o \
-               ../proto/ct.pb.o ../proto/serializer.o $(LIBS)
+               ../proto/ct.pb.o ../proto/serializer.o ../util/testing.o $(LIBS)
 
 database_test: database_test.o ../util/util.o ../proto/ct.pb.o \
-	       ../proto/serializer.o test_signer.o $(LOCAL_LIBS)
+	       ../proto/serializer.o test_signer.o ../util/testing.o \
+               $(LOCAL_LIBS)
 	$(CXX) -o database_test database_test.o ../util/util.o \
-	       ../proto/ct.pb.o ../proto/serializer.o test_signer.o $(LIBS)
+	       ../proto/ct.pb.o ../proto/serializer.o test_signer.o \
+               ../util/testing.o $(LIBS)
 
 database_large_test: database_large_test.o \
                      ../util/util.o ../proto/ct.pb.o ../proto/serializer.o \
-                     test_signer.o $(LOCAL_LIBS)
+                     test_signer.o ../util/testing.o $(LOCAL_LIBS)
 	$(CXX) -o database_large_test database_large_test.o ../util/util.o \
-               ../proto/ct.pb.o ../proto/serializer.o test_signer.o $(LIBS)
+               ../proto/ct.pb.o ../proto/serializer.o test_signer.o \
+               ../util/testing.o $(LIBS)
 
 frontend_signer_test: frontend_signer_test.o test_signer.o \
 		      ../util/util.o ../proto/ct.pb.o ../proto/serializer.o \
-                      $(LOCAL_LIBS)
+                      ../util/testing.o $(LOCAL_LIBS)
 	$(CXX) -o frontend_signer_test frontend_signer_test.o \
 		test_signer.o ../util/util.o ../proto/ct.pb.o \
-                ../proto/serializer.o $(LIBS)
+                ../proto/serializer.o ../util/testing.o $(LIBS)
 
 frontend_test: frontend_test.o test_signer.o \
 	       ../util/util.o ../proto/ct.pb.o ../proto/serializer.o \
-               $(LOCAL_LIBS)
+               ../util/testing.o $(LOCAL_LIBS)
 	$(CXX) -o frontend_test frontend_test.o test_signer.o \
-	       ../util/util.o ../proto/ct.pb.o ../proto/serializer.o $(LIBS)
+	       ../util/util.o ../proto/ct.pb.o ../proto/serializer.o \
+               ../util/testing.o $(LIBS)
 
 tree_signer_test: tree_signer_test.o \
 		  ../util/util.o ../proto/ct.pb.o ../proto/serializer.o \
-                  test_signer.o $(LOCAL_LIBS)
+                  test_signer.o ../util/testing.o $(LOCAL_LIBS)
 	$(CXX) -o tree_signer_test tree_signer_test.o ../util/util.o \
                ../proto/ct.pb.o \
-	       ../proto/serializer.o test_signer.o $(LIBS)
+	       ../proto/serializer.o test_signer.o ../util/testing.o $(LIBS)
 
 log_lookup_test: log_lookup_test.o ../util/util.o ../proto/ct.pb.o \
-	         ../proto/serializer.o test_signer.o $(LOCAL_LIBS)
+	         ../proto/serializer.o test_signer.o ../util/testing.o \
+                 $(LOCAL_LIBS)
 	$(CXX) -o log_lookup_test log_lookup_test.o ../util/util.o \
                ../proto/ct.pb.o ../proto/serializer.o \
-               test_signer.o $(LIBS)
+               test_signer.o ../util/testing.o $(LIBS)

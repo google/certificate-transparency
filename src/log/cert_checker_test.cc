@@ -4,6 +4,7 @@
 
 #include "cert.h"
 #include "cert_checker.h"
+#include "testing.h"
 #include "util.h"
 
 using std::string;
@@ -125,7 +126,7 @@ TEST_F(CertCheckerTest, PreCert) {
 }  // namespace
 
 int main(int argc, char**argv) {
-  ::testing::InitGoogleTest(&argc, argv);
+  ct::test::InitTesting(argv[0], &argc, &argv, true);
   SSL_library_init();
   return RUN_ALL_TESTS();
 }

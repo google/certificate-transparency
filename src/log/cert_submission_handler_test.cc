@@ -7,6 +7,7 @@
 #include "cert_checker.h"
 #include "cert_submission_handler.h"
 #include "ct.pb.h"
+#include "testing.h"
 #include "util.h"
 
 static const char kCertDir[] = "../test/testdata";
@@ -173,14 +174,7 @@ TEST_F(CertSubmissionHandlerTest, SubmitPreCertChainAsCertChain) {
 }  // namespace
 
 int main(int argc, char**argv) {
-  // Change the defaults. Can be overridden on command line.
-  // Log to stderr instead of log files.
-  FLAGS_logtostderr = true;
-  // Only log fatal messages by default.
-  FLAGS_minloglevel = 3;
-  ::testing::InitGoogleTest(&argc, argv);
-  google::ParseCommandLineFlags(&argc, &argv, true);
-  google::InitGoogleLogging(argv[0]);
+  ct::test::InitTesting(argv[0], &argc, &argv, true);
   SSL_library_init();
   return RUN_ALL_TESTS();
 }
