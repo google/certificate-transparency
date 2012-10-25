@@ -25,7 +25,7 @@
 	The aim of Certificate Transparency is to have every public end-entity and intermediate TLS certificate issued by a known Certificate Authority recorded in one or more certificate logs. In order to detect mis-issuance of certificates, all logs are publicly auditable. In particular, domain owners or their agents will be able to monitor logs for certificates issued on their own domain.
       </t>
       <t>
-	To protect clients from unlogged mis-issued certificates, logs sign all recorded certificates, and clients can choose not to trust certificates that are not accompanied by an appropriate log signature. For privacy and performance reasons log signatures are embedded in the TLS handshake via the TLS authorization extension <xref target='RFC5878'/>, or in the certificate itself via an X.509v3 certificate extension <xref target='RFC5280'/>.
+	To protect clients from unlogged mis-issued certificates, logs sign all recorded certificates, and clients can choose not to trust certificates that are not accompanied by an appropriate log signature. For privacy and performance reasons log signatures are embedded in the TLS handshake via the TLS authorization extension <xref target='RFC5878'/>, in a stapled <xref target ='RFC6066'/> OCSP extension <xref target='RFC2560'/>, or in the certificate itself via an X.509v3 certificate extension <xref target='RFC5280'/>.
       </t>
       <t>
 	To ensure a globally consistent view of the log, logs also provide a global signature over the entire log. Any inconsistency of logs can be detected through cross-checks on the global signature. Consistency between any pair of global signatures, corresponding to snapshots of the log at different times, can be efficiently shown.
@@ -95,7 +95,7 @@
 	  <vspace blankLines='1' />
 	  SUBPROOF(m, D[m], false) = {MTH(D[m])}
 	  <vspace blankLines='1' />    
-	  For m &lt n, let k be the largest power of two smaller than n. The subproof is then defined recursively.
+	  For m &lt; n, let k be the largest power of two smaller than n. The subproof is then defined recursively.
 	  <vspace blankLines='1' />
 If m &le; k, the right subtree entries D[k:n] only exist in the current tree. We prove that the left subtree entries D[0:k] are consistent and add a commitment to D[k:n]:
 	  <vspace blankLines='1' />
