@@ -14,10 +14,9 @@ class LogClient {
 
   ~LogClient();
 
-  static const ct::Version kVersion;
-  static const ct::MessageFormat kFormat;
-  static const size_t kPacketPrefixLength;
-  static const size_t kMaxPacketLength;
+  static const ct::protocol::Version kProtocolVersion;
+  static const ct::protocol::Format kPacketFormat;
+  static const ct::Version kCtVersion;
 
   bool Connect();
 

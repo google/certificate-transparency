@@ -5,7 +5,6 @@
 #include <stdint.h>
 #include <string>
 
-#include "ct.h"
 #include "ct.pb.h"
 #include "types.h"
 

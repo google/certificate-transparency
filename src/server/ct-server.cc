@@ -135,6 +135,8 @@ using ct::ClientMessage;
 using ct::ServerError;
 using ct::ServerMessage;
 using ct::SignedCertificateTimestamp;
+using ct::protocol::kPacketPrefixLength;
+using ct::protocol::kMaxPacketLength;
 
 class EventLoop;
 
@@ -645,10 +647,10 @@ class CTServer : public Server {
       : Server(loop, fd),
         manager_(manager) {}
 
-  static const ct::Version kVersion = ct::V1;
-  static const ct::MessageFormat kFormat = ct::PROTOBUF;
-  static const size_t kPacketPrefixLength = 3;
-  static const size_t kMaxPacketLength = (1 << 24) - 1;
+  static const ct::protocol::Version kProtocolVersion = ct::protocol::V1;
+  static const ct::protocol::Format kPacketFormat = ct::protocol::PROTOBUF;
+  // Version in protobufs should match protocol version.
+  static const ct::Version kCtVersion = ct::V1;
 
  private:
   void BytesRead(string *rbuffer) {
@@ -683,12 +685,12 @@ class CTServer : public Server {
   }
 
   void PacketRead(int version, int format, const string &data) {
-    if (version != kVersion) {
+    if (version != kProtocolVersion) {
       SendError(ServerError::BAD_VERSION);
       return;
     }
 
-    if (format != kFormat) {
+    if (format != kPacketFormat) {
       SendError(ServerError::UNSUPPORTED_FORMAT);
       return;
     }
@@ -766,6 +768,7 @@ class CTServer : public Server {
   }
 
   void SendSCTToken(const SignedCertificateTimestamp &sct) {
+    DCHECK_EQ(kCtVersion, sct.version());
     ServerMessage message;
     message.set_response(ServerMessage::SIGNED_CERTIFICATE_TIMESTAMP);
     message.mutable_sct()->CopyFrom(sct);
@@ -773,6 +776,7 @@ class CTServer : public Server {
   }
 
   void SendMerkleProof(const MerkleAuditProof &proof) {
+    DCHECK_EQ(kCtVersion, proof.version());
     ServerMessage message;
     message.set_response(ServerMessage::MERKLE_AUDIT_PROOF);
     message.mutable_merkle_proof()->CopyFrom(proof);
@@ -787,8 +791,8 @@ class CTServer : public Server {
     CHECK_LE(serialized_message.size(), kMaxPacketLength) <<
         "Attempted to send a message that exceeds maximum packet length.";
 
-    Write(Serializer::SerializeUint(kVersion, 1));
-    Write(Serializer::SerializeUint(kFormat, 1));
+    Write(Serializer::SerializeUint(kProtocolVersion, 1));
+    Write(Serializer::SerializeUint(kPacketFormat, 1));
     Write(Serializer::SerializeUint(serialized_message.length(),
                                     kPacketPrefixLength));
     Write(serialized_message);
@@ -796,6 +800,8 @@ class CTServer : public Server {
 
   CTLogManager *manager_;
 };
+
+const ct::Version CTServer::kCtVersion;
 
 class CTServerListener : public Listener {
  public:

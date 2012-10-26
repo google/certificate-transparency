@@ -16,7 +16,6 @@
 
 #include "cert.h"
 #include "cert_submission_handler.h"
-#include "ct.h"
 #include "ct.pb.h"
 #include "log_client.h"
 #include "log_signer.h"

@@ -2,6 +2,7 @@
 #define CT_H
 
 namespace ct {
+namespace protocol {
 
 // Serialized packet format:
 // version - 1 byte
@@ -10,9 +11,18 @@ namespace ct {
 // data - |length| bytes
 
 // One byte when serialized.
-enum MessageFormat {
+enum Version {
+  V1 = 0,
+};
+
+// One byte when serialized.
+enum Format {
   PROTOBUF = 0,
 };
 
-}  // namespace
+const size_t kPacketPrefixLength = 3;
+const size_t kMaxPacketLength = (1 << 24) - 1;
+
+}  // namespace protocol
+}  // namespace ct
 #endif

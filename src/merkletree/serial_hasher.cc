@@ -1,9 +1,7 @@
 #include <openssl/sha.h>
 #include <stddef.h>
 
-#include "ct.h"
 #include "serial_hasher.h"
-#include "types.h"
 
 using std::string;
 

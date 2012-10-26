@@ -5,7 +5,6 @@
 #include <openssl/x509.h>  // for i2d_PUBKEY
 #include <stdint.h>
 
-#include "ct.h"
 #include "ct.pb.h"
 #include "serializer.h"
 

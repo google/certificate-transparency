@@ -17,10 +17,12 @@ using ct::MerkleAuditProof;
 using ct::SignedCertificateTimestamp;
 using std::string;
 
-const ct::Version LogClient::kVersion = ct::V1;
-const ct::MessageFormat LogClient::kFormat = ct::PROTOBUF;
-const size_t LogClient::kPacketPrefixLength = 3;
-const size_t LogClient::kMaxPacketLength = (1 << 24) - 1;
+const ct::protocol::Version LogClient::kProtocolVersion = ct::protocol::V1;
+const ct::protocol::Format LogClient::kPacketFormat = ct::protocol::PROTOBUF;
+const ct::Version LogClient::kCtVersion = ct::V1;
+
+using ct::protocol::kPacketPrefixLength;
+using ct::protocol::kMaxPacketLength;
 
 LogClient::LogClient(const string &server, uint16_t port)
     : client_(server, port) {
@@ -60,12 +62,17 @@ bool LogClient::UploadSubmission(const string &submission, bool pre,
         LOG(ERROR) << "Sorry, that's all we know.";
       break;
     case ServerMessage::SIGNED_CERTIFICATE_TIMESTAMP:
+      if (reply.sct().version() != kCtVersion) {
+        LOG(ERROR) << "Server replied with a bad SCT version "
+                   << reply.sct().version();
+        break;
+      }
       LOG(INFO) << "Submission successful.";
       sct->CopyFrom(reply.sct());
       ret = true;
       break;
     default:
-      DLOG(FATAL) << "Unexpected response code.";
+      LOG(ERROR) << "Unexpected server response code " << reply.response();
   }
   return ret;
 }
@@ -74,10 +81,8 @@ bool LogClient::QueryAuditProof(const LogEntry &entry,
                                 const SignedCertificateTimestamp &sct,
                                 MerkleAuditProof *proof) {
   CHECK(sct.has_timestamp()) << "Missing SCT timestamp";
-  if (sct.version() != kVersion) {
-    LOG(ERROR) << "SCT has unknown version";
-    return false;
-  }
+  CHECK_EQ(kCtVersion, sct.version()) << "SCT has unknown version";
+
   ClientMessage message;
   message.set_command(ClientMessage::LOOKUP_AUDIT_PROOF);
   message.mutable_lookup()->set_type(
@@ -102,12 +107,17 @@ bool LogClient::QueryAuditProof(const LogEntry &entry,
         LOG(ERROR) << "Sorry, that's all we know.";
       break;
     case ServerMessage::MERKLE_AUDIT_PROOF:
+      if (reply.merkle_proof().version() != kCtVersion) {
+        LOG(ERROR) << "Server replied with a bad Merkle proof version "
+                   << reply.merkle_proof().version();
+        break;
+      }
       LOG(INFO) << "Proof retrieved";
       proof->CopyFrom(reply.merkle_proof());
       ret = true;
       break;
     default:
-      DLOG(FATAL) << "Unexpected response code.";
+      LOG(ERROR) << "Unexpected server response code " << reply.response();
   }
   return ret;
 }
@@ -141,8 +151,8 @@ bool LogClient::SendMessage(const ClientMessage &message) {
   }
 
   string packet;
-  packet.append(Serializer::SerializeUint(kVersion, 1));
-  packet.append(Serializer::SerializeUint(kFormat, 1));
+  packet.append(Serializer::SerializeUint(kProtocolVersion, 1));
+  packet.append(Serializer::SerializeUint(kPacketFormat, 1));
   packet.append(Serializer::SerializeUint(serialized_message.length(),
                                           kPacketPrefixLength));
   packet.append(serialized_message);
@@ -163,7 +173,7 @@ bool LogClient::ReadReply(ServerMessage *message) {
       Deserializer::DeserializeUint(version_byte, 1, &version);
   DCHECK_EQ(Deserializer::OK, res);
 
-  if (version != kVersion) {
+  if (version != kProtocolVersion) {
     LOG(ERROR) << "Unexpected server reply: packet version "
                << version << " unsupported.";
     // We don't understand the server; no point continuing.
@@ -183,7 +193,7 @@ bool LogClient::ReadReply(ServerMessage *message) {
   res = Deserializer::DeserializeUint(format_byte, 1, &format);
   DCHECK_EQ(Deserializer::OK, res);
 
-  if (format != kFormat) {
+  if (format != kPacketFormat) {
     LOG(ERROR) << "Unexpected server reply: message format "
                << format << " unsupported.";
     // We don't understand the server; no point continuing.
