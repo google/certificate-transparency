@@ -1,5 +1,5 @@
 #include <gtest/gtest.h>
-#include <openssl/ssl.h>
+#include <openssl/evp.h>
 #include <string>
 
 #include "cert.h"
@@ -159,6 +159,6 @@ TEST_F(CertTest, PreCertChain) {
 
 int main(int argc, char**argv) {
   ct::test::InitTesting(argv[0], &argc, &argv, true);
-  SSL_library_init();
+  OpenSSL_add_all_algorithms();
   return RUN_ALL_TESTS();
 }

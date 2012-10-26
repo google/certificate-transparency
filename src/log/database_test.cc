@@ -1,7 +1,4 @@
 /* -*- indent-tabs-mode: nil -*- */
-
-#include <gflags/gflags.h>
-#include <glog/logging.h>
 #include <gtest/gtest.h>
 #include <set>
 #include <string>

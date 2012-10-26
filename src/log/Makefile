@@ -2,7 +2,7 @@ CXXFLAGS = -Wall -Werror -O3 -g
 INCLUDE = -I ../include -I $(GTESTDIR)/include -I $(PROTOBUFDIR)/src
 LOCAL_LIBS = liblog.a ../merkletree/libmerkle_tree.a
 LIBS = $(LOCAL_LIBS) $(GTESTDIR)/make/gtest.a \
-       -lpthread $(PROTOBUFDIR)/src/.libs/libprotobuf.a -lgflags -lglog -lssl \
+       -lpthread $(PROTOBUFDIR)/src/.libs/libprotobuf.a -lgflags -lglog \
        -lcrypto -lsqlite3
 
 # Need OpenSSL >= 1.0.0

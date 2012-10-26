@@ -1,12 +1,9 @@
-#include <gflags/gflags.h>
 #include <glog/logging.h>
 #include <gtest/gtest.h>
-#include <iostream>
 #include <stddef.h>
 #include <stdint.h>
 #include <stdlib.h>
 #include <string>
-#include <sys/resource.h>
 #include <time.h>
 #include <vector>
 
@@ -691,41 +688,6 @@ TEST_F(MerkleVerifierTest, VerifyConsistencyProof) {
       root1 = ReferenceMerkleTreeHash(data_.data(), snapshot, &tree_hasher_);
       VerifierConsistencyCheck(snapshot, tree_size, root1, root2, proof);
     }
-  }
-}
-
-class StressTest : public ::testing::Test {
- protected:
-  string data_;
-  StressTest() : data_(string(1024, 0x42)) {}
-};
-
-TEST_F(StressTest, BuildLargeTree) {
-  std::vector<MerkleTree*> trees;
-  for (size_t tree_size = 1024; tree_size <= 4194304; tree_size *= 4) {
-    struct rusage ru;
-    getrusage(RUSAGE_SELF, &ru);
-    long max_rss_before = ru.ru_maxrss;
-    MerkleTree *tree = new MerkleTree(new Sha256Hasher());
-    trees.push_back(tree);
-    uint64_t time_before = util::TimeInMilliseconds();
-    std::cout << "Building a tree with " << tree_size
-              << " leaves." << std::endl;
-    for (size_t i = 0; i < tree_size; ++i)
-      tree->AddLeaf(data_);
-    EXPECT_FALSE(tree->CurrentRoot().empty());
-    EXPECT_TRUE(tree->LeafCount() == tree_size);
-    getrusage(RUSAGE_SELF, &ru);
-    std::cout << "Peak RSS delta (as reported by getrusage()) was "
-              << ru.ru_maxrss - max_rss_before << " kB" << std::endl;
-    uint64_t time_after = util::TimeInMilliseconds();
-    std::cout << "Elapsed time: " << time_after - time_before
-              << " ms" << std::endl;
-  }
-
-  for (size_t i = 0; i < trees.size(); ++i) {
-    EXPECT_FALSE(trees[i]->CurrentRoot().empty());
-    delete trees[i];
   }
 }
 

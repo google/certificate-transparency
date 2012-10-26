@@ -1,5 +1,3 @@
-#include <gflags/gflags.h>
-#include <glog/logging.h>
 #include <gtest/gtest.h>
 #include <errno.h>
 #include <iostream>

@@ -14,7 +14,8 @@ LIBS += -L /usr/local/lib
 
 CXXFLAGS += $(INCLUDE)
 
-all: .depend merkle_tree_test serial_hasher_test tree_hasher_test
+all: .depend merkle_tree_test merkle_tree_large_test serial_hasher_test \
+     tree_hasher_test
 
 clean:
 	rm -f *_test *.o *.a
@@ -24,11 +25,11 @@ include .depend
 .depend: *.cc *.h
 	$(CXX) $(CXXFLAGS) -MM *.cc *.h > .depend
 
-test: merkle_tree_test serial_hasher_test tree_hasher_test
+test: merkle_tree_test merkle_tree_large_test serial_hasher_test tree_hasher_test
 	./serial_hasher_test
 	./tree_hasher_test
-# Do not run performance stress tests by default
-	./merkle_tree_test --gtest_filter=-*StressTest*
+# Do not run merkle_tree_large_test by default
+	./merkle_tree_test
 
 libmerkle_tree.a: merkle_tree.o merkle_verifier.o serial_hasher.o tree_hasher.o
 	rm -f $@
@@ -38,6 +39,11 @@ merkle_tree_test: merkle_tree_test.o ../util/util.o ../util/testing.o \
                   libmerkle_tree.a
 	$(CXX) -o merkle_tree_test merkle_tree_test.o ../util/util.o \
 		../util/testing.o libmerkle_tree.a $(LIBS)
+
+merkle_tree_large_test: merkle_tree_large_test.o ../util/util.o \
+                        ../util/testing.o libmerkle_tree.a
+	$(CXX) -o merkle_tree_large_test merkle_tree_large_test.o \
+                  ../util/util.o ../util/testing.o libmerkle_tree.a $(LIBS)
 
 serial_hasher_test: serial_hasher_test.o ../util/util.o ../util/testing.o \
                     libmerkle_tree.a

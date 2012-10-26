@@ -6,6 +6,7 @@
 .*\.so$
 .*\.a$
 ^src/merkletree/merkle_tree_test$
+^src/merkletree/merkle_tree_large_test$
 ^src/merkletree/serial_hasher_test$
 ^src/merkletree/tree_hasher_test$
 \.depend

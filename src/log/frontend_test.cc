@@ -1,8 +1,7 @@
 /* -*- indent-tabs-mode: nil -*- */
-#include <gflags/gflags.h>
 #include <glog/logging.h>
 #include <gtest/gtest.h>
-#include <openssl/ssl.h>
+#include <openssl/evp.h>
 #include <string>
 
 #include "cert_submission_handler.h"
@@ -270,6 +269,6 @@ TYPED_TEST(FrontendTest, TestSubmitPrecert) {
 
 int main(int argc, char **argv) {
   ct::test::InitTesting(argv[0], &argc, &argv, true);
-  SSL_library_init();
+  OpenSSL_add_all_algorithms();
   return RUN_ALL_TESTS();
 }
