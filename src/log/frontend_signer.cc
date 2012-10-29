@@ -5,6 +5,7 @@
 #include "frontend_signer.h"
 #include "log_signer.h"
 #include "serializer.h"
+#include "serial_hasher.h"
 #include "util.h"
 
 using ct::LogEntry;
@@ -24,7 +25,8 @@ FrontendSigner::SubmitResult
 FrontendSigner::QueueEntry(const LogEntry &entry,
                            SignedCertificateTimestamp *sct) {
   // Check if the entry already exists.
-  string sha256_hash = Serializer::CertificateSha256Hash(entry);
+  string sha256_hash =
+      Sha256Hasher::Sha256Digest(Serializer::LeafCertificate(entry));
   assert(!sha256_hash.empty());
 
   LoggedCertificate logged_cert;

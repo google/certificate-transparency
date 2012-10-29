@@ -2,7 +2,6 @@
 #include <string>
 
 #include "ct.pb.h"
-#include "serial_hasher.h"
 #include "serializer.h"
 #include "types.h"
 
@@ -57,19 +56,16 @@ Serializer::CheckLogEntryFormat(const LogEntry &entry) {
 }
 
 // static
-string Serializer::CertificateSha256Hash(const LogEntry &entry) {
-  // Compute the SHA-256 hash of the leaf certificate.
+string Serializer::LeafCertificate(const LogEntry &entry) {
   switch (entry.type()) {
     case ct::X509_ENTRY:
       CHECK(entry.x509_entry().has_leaf_certificate())
-          << "Cannot calculate hash: missing leaf certificate";
-      return Sha256Hasher::Sha256Digest(
-          entry.x509_entry().leaf_certificate());
+          << "Missing leaf certificate";
+      return entry.x509_entry().leaf_certificate();
     case ct::PRECERT_ENTRY:
       CHECK(entry.precert_entry().has_tbs_certificate())
-          << "Cannot calculate hash: missing tbs certificate";
-      return Sha256Hasher::Sha256Digest(
-          entry.precert_entry().tbs_certificate());
+          << "Missing tbs certificate";
+      return entry.precert_entry().tbs_certificate();
     default:
       LOG(FATAL) << "Invalid entry type " << entry.type();
   }

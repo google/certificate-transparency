@@ -88,7 +88,7 @@ bool LogClient::QueryAuditProof(const LogEntry &entry,
       ClientLookup::MERKLE_AUDIT_PROOF_BY_TIMESTAMP_AND_HASH);
   message.mutable_lookup()->set_certificate_timestamp(sct.timestamp());
   message.mutable_lookup()->set_certificate_sha256_hash(
-      Serializer::CertificateSha256Hash(entry));
+      Sha256Hasher::Sha256Digest(Serializer::LeafCertificate(entry)));
   if (!SendMessage(message))
     return false;
   ServerMessage reply;

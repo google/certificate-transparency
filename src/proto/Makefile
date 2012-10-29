@@ -1,11 +1,6 @@
 CXXFLAG= -Wall -Werror -O3 -g
 INCLUDE= -I $(GTESTDIR)/include -I $(PROTOBUFDIR)/src -I ../include
-LIBS= $(GTESTDIR)/make/gtest.a -lpthread $(PROTOBUFDIR)/src/.libs/libprotobuf.a -lgflags -lglog -lcrypto
-# Need OpenSSL >= 1.0.0
-ifneq ($(OPENSSLDIR),)
-  INCLUDE+= -I $(OPENSSLDIR)/include
-  LIBS+= -L $(OPENSSLDIR) -L $(OPENSSLDIR)/lib -Wl,-rpath,$(OPENSSLDIR) -Wl,-rpath,$(OPENSSLDIR)/lib
-endif
+LIBS= $(GTESTDIR)/make/gtest.a -lpthread $(PROTOBUFDIR)/src/.libs/libprotobuf.a -lgflags -lglog
 
 INCLUDE+= -I /usr/local/include
 LIBS+= -L /usr/local/lib
@@ -28,6 +23,6 @@ test: serializer_test
 	./serializer_test
 
 serializer_test: serializer_test.o serializer.o ct.pb.o ../util/util.o \
-                 ../merkletree/serial_hasher.o ../util/testing.o
+                 ../util/testing.o
 	$(CXX) -o serializer_test serializer_test.o serializer.o ct.pb.o \
-	../util/util.o ../merkletree/serial_hasher.o ../util/testing.o $(LIBS)
+	../util/util.o ../util/testing.o $(LIBS)

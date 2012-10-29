@@ -65,7 +65,8 @@ TYPED_TEST(FrontendSignerTest, LogKatTest) {
 
   // Look it up and expect to get the right thing back.
   LoggedCertificate logged_cert;
-  string hash = Serializer::CertificateSha256Hash(default_entry);
+  string hash =
+      Sha256Hasher::Sha256Digest(Serializer::LeafCertificate(default_entry));
 
   EXPECT_EQ(Database::LOOKUP_OK,
             this->db()->LookupCertificateByHash(hash, &logged_cert));
@@ -84,8 +85,10 @@ TYPED_TEST(FrontendSignerTest, Log) {
 
   // Look it up and expect to get the right thing back.
   LoggedCertificate logged_cert0, logged_cert1;
-  string hash0 = Serializer::CertificateSha256Hash(entry0);
-  string hash1 = Serializer::CertificateSha256Hash(entry1);
+  string hash0 =
+      Sha256Hasher::Sha256Digest(Serializer::LeafCertificate(entry0));
+  string hash1 =
+      Sha256Hasher::Sha256Digest(Serializer::LeafCertificate(entry1));
 
   EXPECT_EQ(Database::LOOKUP_OK,
             this->db()->LookupCertificateByHash(hash0, &logged_cert0));

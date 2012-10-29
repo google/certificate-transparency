@@ -56,7 +56,8 @@ class Serializer {
 
   static SerializeResult CheckLogEntryFormat(const ct::LogEntry &entry);
 
-  static std::string CertificateSha256Hash(const ct::LogEntry &entry);
+  // Helper method to hide some of the ugly select logic.
+  static std::string LeafCertificate(const ct::LogEntry &entry);
 
   static SerializeResult SerializeV1SCTSignatureInput(
       uint64_t timestamp, ct::LogEntryType type, const std::string &certificate,

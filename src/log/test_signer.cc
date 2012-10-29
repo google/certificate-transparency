@@ -358,8 +358,8 @@ void TestSigner::FillData(LoggedCertificate *logged_cert) {
 
   CreateUnique(logged_cert->mutable_entry());
 
-  logged_cert->set_certificate_sha256_hash(
-      Serializer::CertificateSha256Hash(logged_cert->entry()));
+  logged_cert->set_certificate_sha256_hash(Sha256Hasher::Sha256Digest(
+      Serializer::LeafCertificate(logged_cert->entry())));
 
   logged_cert->clear_sequence_number();
 }

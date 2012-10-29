@@ -8,6 +8,7 @@
 #include "client.h"
 #include "log_verifier.h"
 #include "serializer.h"
+#include "serial_hasher.h"
 #include "ssl_client.h"
 
 using ct::SignedCertificateTimestamp;
@@ -146,7 +147,7 @@ int SSLClient::VerifyCallback(X509_STORE_CTX *ctx, void *arg) {
   CertSubmissionHandler::X509CertToEntry(*chain.LeafCert(), &entry);
   args->ct_data.mutable_reconstructed_entry()->CopyFrom(entry);
   args->ct_data.set_certificate_sha256_hash(
-      Serializer::CertificateSha256Hash(entry));
+      Sha256Hasher::Sha256Digest(Serializer::LeafCertificate(entry)));
 
   if (!serialized_scts.empty()) {
     // Only writes the checkpoint if verification succeeds.
