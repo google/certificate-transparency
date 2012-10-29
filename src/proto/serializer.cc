@@ -1,7 +1,6 @@
 #include <glog/logging.h>
 #include <string>
 
-#include "ct.h"
 #include "ct.pb.h"
 #include "serial_hasher.h"
 #include "serializer.h"
