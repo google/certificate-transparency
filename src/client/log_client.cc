@@ -15,14 +15,13 @@ using ct::ServerError;
 using ct::ServerMessage;
 using ct::MerkleAuditProof;
 using ct::SignedCertificateTimestamp;
+using ct::protocol::kPacketPrefixLength;
+using ct::protocol::kMaxPacketLength;
 using std::string;
 
 const ct::protocol::Version LogClient::kProtocolVersion = ct::protocol::V1;
 const ct::protocol::Format LogClient::kPacketFormat = ct::protocol::PROTOBUF;
 const ct::Version LogClient::kCtVersion = ct::V1;
-
-using ct::protocol::kPacketPrefixLength;
-using ct::protocol::kMaxPacketLength;
 
 LogClient::LogClient(const string &server, uint16_t port)
     : client_(server, port) {

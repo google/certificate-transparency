@@ -180,7 +180,7 @@ string LogSigVerifier::ComputeKeyID(EVP_PKEY *pkey) {
   CHECK_EQ(i2d_PUBKEY(pkey, &p), buf_len);
   string keystring(reinterpret_cast<char*>(buf), buf_len);
   string ret = Sha256Hasher::Sha256Digest(keystring);
-  delete buf;
+  delete[] buf;
   return ret;
 }
 

@@ -768,7 +768,7 @@ class CTServer : public Server {
   }
 
   void SendSCTToken(const SignedCertificateTimestamp &sct) {
-    DCHECK_EQ(kCtVersion, sct.version());
+    CHECK_EQ(kCtVersion, sct.version());
     ServerMessage message;
     message.set_response(ServerMessage::SIGNED_CERTIFICATE_TIMESTAMP);
     message.mutable_sct()->CopyFrom(sct);
@@ -776,7 +776,7 @@ class CTServer : public Server {
   }
 
   void SendMerkleProof(const MerkleAuditProof &proof) {
-    DCHECK_EQ(kCtVersion, proof.version());
+    CHECK_EQ(kCtVersion, proof.version());
     ServerMessage message;
     message.set_response(ServerMessage::MERKLE_AUDIT_PROOF);
     message.mutable_merkle_proof()->CopyFrom(proof);
