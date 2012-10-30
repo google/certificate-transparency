@@ -9,8 +9,7 @@
 #include <string>
 #include <vector>
 
-#include "cert.h"
-#include "types.h"
+#include "log/cert.h"
 
 using std::string;
 

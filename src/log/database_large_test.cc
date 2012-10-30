@@ -7,14 +7,14 @@
 #include <string>
 #include <sys/resource.h>
 
-#include "database.h"
-#include "file_db.h"
-#include "file_storage.h"
-#include "sqlite_db.h"
-#include "test_db.h"
-#include "test_signer.h"
-#include "testing.h"
-#include "util.h"
+#include "log/database.h"
+#include "log/file_db.h"
+#include "log/file_storage.h"
+#include "log/sqlite_db.h"
+#include "log/test_db.h"
+#include "log/test_signer.h"
+#include "util/testing.h"
+#include "util/util.h"
 
 DEFINE_int32(database_size, 0, "Number of entries to put in the test database. "
              "Be careful choosing this, as the database will fill up your disk "

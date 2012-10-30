@@ -5,8 +5,8 @@
 #include <stdint.h>
 #include <string>
 
-#include "ct.pb.h"
-#include "types.h"
+#include "include/types.h"
+#include "proto/ct.pb.h"
 
 // A utility class for writing protocol buffer fields in canonical TLS style.
 class Serializer {

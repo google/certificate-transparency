@@ -3,14 +3,14 @@
 #include <set>
 #include <string>
 
-#include "database.h"
-#include "file_db.h"
-#include "file_storage.h"
-#include "sqlite_db.h"
-#include "test_db.h"
-#include "test_signer.h"
-#include "testing.h"
-#include "util.h"
+#include "log/database.h"
+#include "log/file_db.h"
+#include "log/file_storage.h"
+#include "log/sqlite_db.h"
+#include "log/test_db.h"
+#include "log/test_signer.h"
+#include "util/testing.h"
+#include "util/util.h"
 
 namespace {
 

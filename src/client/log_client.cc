@@ -1,12 +1,12 @@
 #include <glog/logging.h>
 #include <stdint.h>
 
-#include "client.h"
-#include "ct.h"
-#include "ct.pb.h"
-#include "log_client.h"
-#include "serial_hasher.h"
-#include "serializer.h"
+#include "include/ct.h"
+#include "client/client.h"
+#include "client/log_client.h"
+#include "merkletree/serial_hasher.h"
+#include "proto/ct.pb.h"
+#include "proto/serializer.h"
 
 using ct::LogEntry;
 using ct::ClientLookup;

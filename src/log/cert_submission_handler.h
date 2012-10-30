@@ -3,9 +3,9 @@
 
 #include <string>
 
-#include "cert_checker.h"
-#include "ct.pb.h"
-#include "serializer.h"
+#include "log/cert_checker.h"
+#include "proto/ct.pb.h"
+#include "proto/serializer.h"
 
 // Parse incoming submissions, do preliminary sanity checks and pass them
 // through cert checker.

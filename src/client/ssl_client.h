@@ -4,9 +4,10 @@
 #include <openssl/ssl.h>
 #include <openssl/x509.h>
 
-#include "client.h"
-#include "ct.pb.h"
-#include "ssl_client.h"
+#include "client/client.h"
+#include "client/ssl_client.h"
+#include "log/log_verifier.h"
+#include "proto/ct.pb.h"
 
 class LogVerifier;
 

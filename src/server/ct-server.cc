@@ -17,21 +17,21 @@
 #include <sys/time.h>
 #include <sys/types.h>
 #include <time.h>
+#include <unistd.h>
 
-#include "cert_checker.h"
-#include "cert_submission_handler.h"
-#include "ct.h"
-#include "ct.pb.h"
-#include "file_db.h"
-#include "file_storage.h"
-#include "frontend_signer.h"
-#include "frontend.h"
-#include "log_lookup.h"
-#include "log_signer.h"
-#include "serializer.h"
-#include "sqlite_db.h"
-#include "tree_signer.h"
-#include "unistd.h"
+#include "include/ct.h"
+#include "log/cert_checker.h"
+#include "log/cert_submission_handler.h"
+#include "log/file_db.h"
+#include "log/file_storage.h"
+#include "log/frontend_signer.h"
+#include "log/frontend.h"
+#include "log/log_lookup.h"
+#include "log/log_signer.h"
+#include "log/sqlite_db.h"
+#include "log/tree_signer.h"
+#include "proto/ct.pb.h"
+#include "proto/serializer.h"
 
 DEFINE_int32(port, 0, "Server port");
 DEFINE_string(key, "", "PEM-encoded server private key file");

@@ -6,11 +6,11 @@
 #endif
 #include <stdint.h>
 
-#include "ct.pb.h"
-#include "log_signer.h"
-#include "serial_hasher.h"
-#include "serializer.h"
-#include "util.h"
+#include "log/log_signer.h"
+#include "merkletree/serial_hasher.h"
+#include "proto/ct.pb.h"
+#include "proto/serializer.h"
+#include "util/util.h"
 
 using ct::LogEntry;
 using ct::LogEntryType;

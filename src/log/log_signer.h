@@ -5,8 +5,8 @@
 #include <openssl/x509.h>  // for i2d_PUBKEY
 #include <stdint.h>
 
-#include "ct.pb.h"
-#include "serializer.h"
+#include "proto/ct.pb.h"
+#include "proto/serializer.h"
 
 class LogSigner {
  public:

@@ -4,7 +4,7 @@
 #define SQLITE_DB_H
 #include <string>
 
-#include "database.h"
+#include "log/database.h"
 
 class sqlite3;
 

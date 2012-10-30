@@ -7,12 +7,12 @@
 #include <stdlib.h>
 #include <string>
 
-#include "ct.pb.h"
-#include "log_signer.h"
-#include "serial_hasher.h"
-#include "serializer.h"
-#include "test_signer.h"
-#include "util.h"
+#include "log/log_signer.h"
+#include "log/test_signer.h"
+#include "merkletree/serial_hasher.h"
+#include "proto/ct.pb.h"
+#include "proto/serializer.h"
+#include "util/util.h"
 
 namespace {
 

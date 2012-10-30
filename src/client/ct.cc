@@ -14,17 +14,17 @@
 #include <stdio.h>
 #include <string>
 
-#include "cert.h"
-#include "cert_submission_handler.h"
-#include "ct.pb.h"
-#include "log_client.h"
-#include "log_signer.h"
-#include "log_verifier.h"
-#include "merkle_verifier.h"
-#include "serial_hasher.h"
-#include "serializer.h"
-#include "ssl_client.h"
-#include "util.h"
+#include "client/log_client.h"
+#include "client/ssl_client.h"
+#include "log/cert.h"
+#include "log/cert_submission_handler.h"
+#include "log/log_signer.h"
+#include "log/log_verifier.h"
+#include "merkletree/merkle_verifier.h"
+#include "merkletree/serial_hasher.h"
+#include "proto/ct.pb.h"
+#include "proto/serializer.h"
+#include "util/util.h"
 
 DEFINE_string(ssl_client_trusted_cert_dir, "",
               "Trusted root certificates for the ssl client");
@@ -453,10 +453,10 @@ static AuditResult Audit() {
       LOG(ERROR) << "Retrieved Merkle proof is invalid.";
       return PROOF_NOT_FOUND;
     }
-
     LOG(INFO) << "Proof verified.";
     return PROOF_OK;
   }
+  return PROOF_NOT_FOUND;
 }
 
 // Exit code upon normal exit:

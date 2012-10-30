@@ -1,15 +1,15 @@
 /* -*- indent-tabs-mode: nil -*- */
-
+#include <glog/logging.h>
 #include <map>
 #include <set>
 #include <stdint.h>
 #include <utility>  // for std::pair
 #include <vector>
 
-#include "ct.pb.h"
-#include "file_db.h"
-#include "file_storage.h"
-#include "serializer.h"
+#include "log/file_db.h"
+#include "log/file_storage.h"
+#include "proto/ct.pb.h"
+#include "proto/serializer.h"
 
 using ct::SignedCertificateTimestamp;
 using ct::LoggedCertificate;
@@ -42,8 +42,7 @@ Database::WriteResult FileDB::CreatePendingCertificateEntry_(
   local.clear_sequence_number();
 
   string data;
-  bool ret = local.SerializeToString(&data);
-  assert(ret);
+  CHECK(local.SerializeToString(&data));
   // Try to create.
   FileStorage::FileStorageResult result =
       cert_storage_->CreateEntry(logged_cert.certificate_sha256_hash(), data);

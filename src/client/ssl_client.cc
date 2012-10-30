@@ -3,13 +3,13 @@
 #include <openssl/ssl.h>
 #include <openssl/x509.h>
 
-#include "cert.h"
-#include "cert_submission_handler.h"
-#include "client.h"
-#include "log_verifier.h"
-#include "serializer.h"
-#include "serial_hasher.h"
-#include "ssl_client.h"
+#include "client/client.h"
+#include "client/ssl_client.h"
+#include "log/cert.h"
+#include "log/cert_submission_handler.h"
+#include "log/log_verifier.h"
+#include "merkletree/serial_hasher.h"
+#include "proto/serializer.h"
 
 using ct::SignedCertificateTimestamp;
 using ct::SignedCertificateTimestampList;

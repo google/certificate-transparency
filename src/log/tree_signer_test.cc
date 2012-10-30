@@ -3,17 +3,17 @@
 #include <stdint.h>
 #include <string>
 
-#include "ct.pb.h"
-#include "file_db.h"
-#include "log_signer.h"
-#include "log_verifier.h"
-#include "merkle_verifier.h"
-#include "sqlite_db.h"
-#include "test_db.h"
-#include "test_signer.h"
-#include "testing.h"
-#include "tree_signer.h"
-#include "util.h"
+#include "log/file_db.h"
+#include "log/log_signer.h"
+#include "log/log_verifier.h"
+#include "log/sqlite_db.h"
+#include "log/test_db.h"
+#include "log/test_signer.h"
+#include "log/tree_signer.h"
+#include "merkletree/merkle_verifier.h"
+#include "proto/ct.pb.h"
+#include "util/testing.h"
+#include "util/util.h"
 
 namespace {
 

@@ -1,14 +1,16 @@
+#include <gflags/gflags.h>
+#include <glog/logging.h>
 #include <gtest/gtest.h>
 #include <openssl/evp.h>
 #include <string>
 
-#include "cert.h"
-#include "testing.h"
-#include "util.h"
+#include "log/cert.h"
+#include "util/testing.h"
+#include "util/util.h"
 
 using std::string;
 
-static const char kCertDir[] = "../test/testdata";
+DEFINE_string(test_certs_dir, "../test/testdata", "Path to test certificates");
 
 // TODO(ekasper): add test certs with intermediates.
 // Valid certificates.
@@ -30,13 +32,13 @@ class CertTest : public ::testing::Test {
   string precert_pem_;
 
   void SetUp() {
-    const string cert_dir = string(kCertDir);
-    ASSERT_TRUE(util::ReadTextFile(cert_dir + "/" + kLeafCert, &leaf_pem_));
-    ASSERT_TRUE(util::ReadTextFile(cert_dir + "/" + kCaCert, &ca_pem_));
-    ASSERT_TRUE(util::ReadTextFile(cert_dir + "/" + kCaPreCert,
-                                   &ca_precert_pem_));
-    ASSERT_TRUE(util::ReadTextFile(cert_dir + "/" + kPreCert,
-                                   &precert_pem_));
+    const string cert_dir = FLAGS_test_certs_dir;
+    CHECK(util::ReadTextFile(cert_dir + "/" + kLeafCert, &leaf_pem_))
+        << "Could not read test data from " << cert_dir
+        << ". Wrong --test_certs_dir?";
+    CHECK(util::ReadTextFile(cert_dir + "/" + kCaCert, &ca_pem_));
+    CHECK(util::ReadTextFile(cert_dir + "/" + kCaPreCert, &ca_precert_pem_));
+    CHECK(util::ReadTextFile(cert_dir + "/" + kPreCert, &precert_pem_));
   }
 };
 

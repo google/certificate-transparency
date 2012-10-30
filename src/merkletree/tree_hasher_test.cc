@@ -2,10 +2,10 @@
 #include <stddef.h>
 #include <string>
 
-#include "serial_hasher.h"
-#include "testing.h"
-#include "tree_hasher.h"
-#include "util.h"
+#include "merkletree/serial_hasher.h"
+#include "merkletree/tree_hasher.h"
+#include "util/testing.h"
+#include "util/util.h"
 
 namespace {
 

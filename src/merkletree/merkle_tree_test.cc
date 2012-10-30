@@ -7,12 +7,12 @@
 #include <time.h>
 #include <vector>
 
-#include "merkle_tree.h"
-#include "merkle_verifier.h"
-#include "serial_hasher.h"
-#include "testing.h"
-#include "tree_hasher.h"
-#include "util.h"
+#include "merkletree/merkle_tree.h"
+#include "merkletree/merkle_verifier.h"
+#include "merkletree/serial_hasher.h"
+#include "merkletree/tree_hasher.h"
+#include "util/testing.h"
+#include "util/util.h"
 
 namespace {
 

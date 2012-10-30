@@ -1,7 +1,7 @@
 #include <stddef.h>
 #include <vector>
 
-#include "merkle_verifier.h"
+#include "merkletree/merkle_verifier.h"
 
 using std::string;
 

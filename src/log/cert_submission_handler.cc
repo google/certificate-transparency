@@ -1,11 +1,11 @@
 #include <glog/logging.h>
 #include <string>
 
-#include "cert.h"
-#include "cert_checker.h"
-#include "cert_submission_handler.h"
-#include "ct.pb.h"
-#include "serializer.h"
+#include "log/cert.h"
+#include "log/cert_checker.h"
+#include "log/cert_submission_handler.h"
+#include "proto/ct.pb.h"
+#include "proto/serializer.h"
 
 using ct::LogEntry;
 using ct::PrecertChainEntry;

@@ -1,9 +1,9 @@
 #include <glog/logging.h>
 #include <string>
 
-#include "ct.pb.h"
-#include "serializer.h"
-#include "types.h"
+#include "include/types.h"
+#include "proto/ct.pb.h"
+#include "proto/serializer.h"
 
 const size_t Serializer::kMaxCertificateLength = (1 << 24) - 1;
 const size_t Serializer::kMaxCertificateChainLength = (1 << 24) - 1;

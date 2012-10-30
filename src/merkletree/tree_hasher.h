@@ -3,7 +3,7 @@
 
 #include <stddef.h>
 
-#include "serial_hasher.h"
+#include "merkletree/serial_hasher.h"
 
 class TreeHasher {
  public:

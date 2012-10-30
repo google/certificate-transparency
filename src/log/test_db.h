@@ -5,11 +5,11 @@
 #include <glog/logging.h>
 #include <string>
 
-#include "database.h"
-#include "file_db.h"
-#include "file_storage.h"
-#include "sqlite_db.h"
-#include "util.h"
+#include "log/database.h"
+#include "log/file_db.h"
+#include "log/file_storage.h"
+#include "log/sqlite_db.h"
+#include "util/util.h"
 
 DEFINE_string(database_test_dir, "/tmp",
               "Test directory for databases that use the disk. We attempt to "

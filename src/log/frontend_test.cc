@@ -4,21 +4,21 @@
 #include <openssl/evp.h>
 #include <string>
 
-#include "cert_submission_handler.h"
-#include "ct.pb.h"
-#include "file_db.h"
-#include "frontend.h"
-#include "frontend_signer.h"
-#include "log_verifier.h"
-#include "merkle_verifier.h"
-#include "serial_hasher.h"
-#include "sqlite_db.h"
-#include "test_db.h"
-#include "test_signer.h"
-#include "testing.h"
-#include "util.h"
+#include "log/cert_submission_handler.h"
+#include "log/file_db.h"
+#include "log/frontend.h"
+#include "log/frontend_signer.h"
+#include "log/log_verifier.h"
+#include "log/sqlite_db.h"
+#include "log/test_db.h"
+#include "log/test_signer.h"
+#include "merkletree/merkle_verifier.h"
+#include "merkletree/serial_hasher.h"
+#include "proto/ct.pb.h"
+#include "util/testing.h"
+#include "util/util.h"
 
-static const char kCertDir[] = "../test/testdata";
+DEFINE_string(test_certs_dir, "test/testdata", "Path to test certificates");
 
 //  Valid certificates.
 // Self-signed
@@ -61,20 +61,19 @@ template <class T> class FrontendTest : public ::testing::Test {
                                    db(), TestSigner::DefaultSigner()))) {}
 
   void SetUp() {
-    cert_dir_ = string(kCertDir);
-    ASSERT_TRUE(util::ReadTextFile(cert_dir_ + "/" + kLeafCert, &leaf_pem_));
-    ASSERT_TRUE(util::ReadTextFile(cert_dir_ + "/" + kCaPreCert,
-                                   &ca_precert_pem_));
-    ASSERT_TRUE(util::ReadTextFile(cert_dir_ + "/" + kPreCert,
-                                   &precert_pem_));
-    ASSERT_TRUE(util::ReadTextFile(cert_dir_ + "/" + kIntermediateCert,
-                                   &intermediate_pem_));
-    ASSERT_TRUE(util::ReadTextFile(cert_dir_ + "/" + kChainLeafCert,
-                                   &chain_leaf_pem_));
-    ASSERT_TRUE(util::ReadTextFile(cert_dir_ + "/" + kCaCert, &ca_pem_));
-    ASSERT_TRUE(util::ReadTextFile(cert_dir_ + "/" + kEmbeddedCert,
-                                   &embedded_pem_));
-    ASSERT_TRUE(checker_.LoadTrustedCertificate(cert_dir_ + "/" + kCaCert));
+    cert_dir_ = FLAGS_test_certs_dir;
+    CHECK(util::ReadTextFile(cert_dir_ + "/" + kLeafCert, &leaf_pem_))
+        << "Could not read test data from " << cert_dir_
+        << ". Wrong --test_certs_dir?";
+    CHECK(util::ReadTextFile(cert_dir_ + "/" + kCaPreCert, &ca_precert_pem_));
+    CHECK(util::ReadTextFile(cert_dir_ + "/" + kPreCert, &precert_pem_));
+    CHECK(util::ReadTextFile(cert_dir_ + "/" + kIntermediateCert,
+                             &intermediate_pem_));
+    CHECK(util::ReadTextFile(cert_dir_ + "/" + kChainLeafCert,
+                             &chain_leaf_pem_));
+    CHECK(util::ReadTextFile(cert_dir_ + "/" + kCaCert, &ca_pem_));
+    CHECK(util::ReadTextFile(cert_dir_ + "/" + kEmbeddedCert,  &embedded_pem_));
+    CHECK(checker_.LoadTrustedCertificate(cert_dir_ + "/" + kCaCert));
   }
 
   void CompareStats(const Frontend::FrontendStats &expected) {

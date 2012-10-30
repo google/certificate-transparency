@@ -3,7 +3,7 @@
 
 #include <stdint.h>
 
-#include "merkle_tree.h"
+#include "merkletree/merkle_tree.h"
 
 class Database;
 

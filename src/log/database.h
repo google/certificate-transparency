@@ -6,7 +6,7 @@
 #include <glog/logging.h>
 #include <set>
 
-#include "ct.pb.h"
+#include "proto/ct.pb.h"
 
 class Database {
  public:
@@ -52,7 +52,7 @@ class Database {
   // after which its status changes to LOGGED.
   WriteResult
   CreatePendingCertificateEntry(const ct::LoggedCertificate &logged_cert) {
-    assert(!logged_cert.has_sequence_number());
+    CHECK(!logged_cert.has_sequence_number());
     if (!logged_cert.has_certificate_sha256_hash())
       return MISSING_CERTIFICATE_HASH;
     return CreatePendingCertificateEntry_(logged_cert);

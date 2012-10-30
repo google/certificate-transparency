@@ -6,7 +6,7 @@
 #include <sys/socket.h>
 #include <unistd.h>
 
-#include "client.h"
+#include "client/client.h"
 
 using std::string;
 

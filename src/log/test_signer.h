@@ -5,8 +5,8 @@
 #include <stdint.h>
 #include <string>
 
-#include "ct.pb.h"
-#include "log_signer.h"
+#include "log/log_signer.h"
+#include "proto/ct.pb.h"
 
 // Helper class for database tests that generates test data
 // that roughly resembles real certificate data in shape and size.

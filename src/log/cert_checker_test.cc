@@ -1,15 +1,17 @@
+#include <gflags/gflags.h>
+#include <glog/logging.h>
 #include <gtest/gtest.h>
 #include <openssl/evp.h>
 #include <string>
 
-#include "cert.h"
-#include "cert_checker.h"
-#include "testing.h"
-#include "util.h"
+#include "log/cert.h"
+#include "log/cert_checker.h"
+#include "util/testing.h"
+#include "util/util.h"
 
 using std::string;
 
-static const char kCertDir[] = "../test/testdata";
+DEFINE_string(test_certs_dir, "test/testdata", "Path to test certificates");
 
 // Valid certificates.
 // Self-signed
@@ -39,17 +41,17 @@ class CertCheckerTest : public ::testing::Test {
   string cert_dir_;
 
   void SetUp() {
-    cert_dir_ = string(kCertDir);
-    ASSERT_TRUE(util::ReadTextFile(cert_dir_ + "/" + kLeafCert, &leaf_pem_));
-    ASSERT_TRUE(util::ReadTextFile(cert_dir_ + "/" + kCaPreCert,
-                                   &ca_precert_pem_));
-    ASSERT_TRUE(util::ReadTextFile(cert_dir_ + "/" + kPreCert,
-                                   &precert_pem_));
-    ASSERT_TRUE(util::ReadTextFile(cert_dir_ + "/" + kIntermediateCert,
-                                   &intermediate_pem_));
-    ASSERT_TRUE(util::ReadTextFile(cert_dir_ + "/" + kChainLeafCert,
-                                   &chain_leaf_pem_));
-    ASSERT_TRUE(util::ReadTextFile(cert_dir_ + "/" + kCaCert, &ca_pem_));
+    cert_dir_ = FLAGS_test_certs_dir;
+    CHECK(util::ReadTextFile(cert_dir_ + "/" + kLeafCert, &leaf_pem_))
+        << "Could not read test data from " << cert_dir_
+        << ". Wrong --test_certs_dir?";
+    CHECK(util::ReadTextFile(cert_dir_ + "/" + kCaPreCert, &ca_precert_pem_));
+    CHECK(util::ReadTextFile(cert_dir_ + "/" + kPreCert, &precert_pem_));
+    CHECK(util::ReadTextFile(cert_dir_ + "/" + kIntermediateCert,
+                             &intermediate_pem_));
+    CHECK(util::ReadTextFile(cert_dir_ + "/" + kChainLeafCert,
+                             &chain_leaf_pem_));
+    CHECK(util::ReadTextFile(cert_dir_ + "/" + kCaCert, &ca_pem_));
   }
 };
 

@@ -1,14 +1,16 @@
+#include <gflags/gflags.h>
+#include <glog/logging.h>
 #include <gtest/gtest.h>
 #include <openssl/evp.h>
 #include <string>
 
-#include "cert_checker.h"
-#include "cert_submission_handler.h"
-#include "ct.pb.h"
-#include "testing.h"
-#include "util.h"
+#include "log/cert_checker.h"
+#include "log/cert_submission_handler.h"
+#include "proto/ct.pb.h"
+#include "util/testing.h"
+#include "util/util.h"
 
-static const char kCertDir[] = "../test/testdata";
+DEFINE_string(test_certs_dir, "test/testdata", "Path to test certificates");
 
 // Valid certificates.
 // Self-signed
@@ -44,19 +46,19 @@ class CertSubmissionHandlerTest : public ::testing::Test {
   CertSubmissionHandlerTest() : handler_(NULL) {}
 
   void SetUp() {
-    cert_dir_ = string(kCertDir);
+    cert_dir_ = FLAGS_test_certs_dir;
     checker_ = new CertChecker();
     checker_->LoadTrustedCertificate(cert_dir_ + "/" + kCaCert);
     handler_ = new CertSubmissionHandler(checker_);
-    ASSERT_TRUE(util::ReadBinaryFile(cert_dir_ + "/" + kCaCert, &ca_));
-    ASSERT_TRUE(util::ReadBinaryFile(cert_dir_ + "/" + kLeafCert, &leaf_));
-    ASSERT_TRUE(util::ReadBinaryFile(cert_dir_ + "/" + kCaPreCert,
-                                     &ca_precert_));
-    ASSERT_TRUE(util::ReadBinaryFile(cert_dir_ + "/" + kPreCert,
-                                     &precert_));
-    ASSERT_TRUE(util::ReadBinaryFile(cert_dir_ + "/" + kIntermediateCert,
+    CHECK(util::ReadBinaryFile(cert_dir_ + "/" + kCaCert, &ca_))
+        << "Could not read test data from " << cert_dir_
+        << ". Wrong --test_certs_dir?";
+    CHECK(util::ReadBinaryFile(cert_dir_ + "/" + kLeafCert, &leaf_));
+    CHECK(util::ReadBinaryFile(cert_dir_ + "/" + kCaPreCert, &ca_precert_));
+    CHECK(util::ReadBinaryFile(cert_dir_ + "/" + kPreCert, &precert_));
+    CHECK(util::ReadBinaryFile(cert_dir_ + "/" + kIntermediateCert,
                                      &intermediate_));
-    ASSERT_TRUE(util::ReadBinaryFile(cert_dir_ + "/" + kChainLeafCert,
+    CHECK(util::ReadBinaryFile(cert_dir_ + "/" + kChainLeafCert,
                                      &chain_leaf_));
   }
 

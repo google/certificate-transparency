@@ -15,6 +15,5 @@ local-links:
 	mod_unixd_new.so
 
 test:
-	cd ../client && $(MAKE)
-	cd ../server && $(MAKE)
+	cd .. && $(MAKE)
 	OPENSSLDIR=$(OPENSSLDIR) ./sslconnect_test.sh

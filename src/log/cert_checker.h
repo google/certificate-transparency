@@ -5,7 +5,7 @@
 #include <string>
 #include <vector>
 
-#include "cert.h"
+#include "log/cert.h"
 
 // A class for doing sanity-checks on log submissions before accepting them.
 // We don't necessarily want to do full certificate verification

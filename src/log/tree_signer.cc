@@ -2,12 +2,12 @@
 #include <set>
 #include <stdint.h>
 
-#include "database.h"
-#include "log_signer.h"
-#include "merkle_tree.h"
-#include "tree_signer.h"
-#include "serializer.h"
-#include "util.h"
+#include "log/database.h"
+#include "log/log_signer.h"
+#include "log/tree_signer.h"
+#include "merkletree/merkle_tree.h"
+#include "proto/serializer.h"
+#include "util/util.h"
 
 using ct::LoggedCertificate;
 using ct::SignedTreeHead;

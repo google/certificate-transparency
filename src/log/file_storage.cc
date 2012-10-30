@@ -8,9 +8,9 @@
 #include <string>
 #include <sys/stat.h>
 
-#include "file_storage.h"
-#include "filesystem_op.h"
-#include "util.h"
+#include "log/file_storage.h"
+#include "log/filesystem_op.h"
+#include "util/util.h"
 
 using std::string;
 

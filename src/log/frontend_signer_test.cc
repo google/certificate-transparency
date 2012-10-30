@@ -3,18 +3,18 @@
 #include <gtest/gtest.h>
 #include <string>
 
-#include "ct.pb.h"
-#include "file_db.h"
-#include "frontend_signer.h"
+#include "log/file_db.h"
+#include "log/frontend_signer.h"
 #include "log_verifier.h"
-#include "merkle_verifier.h"
-#include "serial_hasher.h"
-#include "serializer.h"
-#include "sqlite_db.h"
-#include "test_db.h"
-#include "test_signer.h"
-#include "testing.h"
-#include "util.h"
+#include "log/sqlite_db.h"
+#include "log/test_db.h"
+#include "log/test_signer.h"
+#include "merkletree/merkle_verifier.h"
+#include "merkletree/serial_hasher.h"
+#include "proto/ct.pb.h"
+#include "proto/serializer.h"
+#include "util/testing.h"
+#include "util/util.h"
 
 namespace {
 

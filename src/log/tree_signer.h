@@ -3,8 +3,8 @@
 
 #include <stdint.h>
 
-#include "ct.pb.h"
-#include "merkle_tree.h"
+#include "merkletree/merkle_tree.h"
+#include "proto/ct.pb.h"
 
 class Database;
 class LogSigner;

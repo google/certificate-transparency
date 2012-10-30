@@ -3,8 +3,8 @@
 #include <glog/logging.h>
 #include <sqlite3.h>
 
-#include "sqlite_db.h"
-#include "util.h"
+#include "log/sqlite_db.h"
+#include "util/util.h"
 
 using std::string;
 

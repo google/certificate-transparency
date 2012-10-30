@@ -6,8 +6,8 @@
 #include <string>
 #include <vector>
 
-#include "cert.h"
-#include "cert_checker.h"
+#include "log/cert.h"
+#include "log/cert_checker.h"
 
 CertChecker::CertChecker() : trusted_(NULL) {
   trusted_ = X509_STORE_new();

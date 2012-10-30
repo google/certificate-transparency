@@ -3,11 +3,12 @@
 #include <stdlib.h>
 #include <vector>
 
-#include "database.h"
-#include "ct.pb.h"
-#include "log_lookup.h"
-#include "merkle_tree.h"
-#include "serializer.h"
+#include "log/database.h"
+#include "log/log_lookup.h"
+#include "merkletree/merkle_tree.h"
+#include "merkletree/serial_hasher.h"
+#include "proto/ct.pb.h"
+#include "proto/serializer.h"
 
 using ct::LoggedCertificate;
 using ct::MerkleAuditProof;

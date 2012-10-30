@@ -1,12 +1,12 @@
 #include <glog/logging.h>
 
-#include "ct.pb.h"
-#include "database.h"
-#include "frontend_signer.h"
-#include "log_signer.h"
-#include "serializer.h"
-#include "serial_hasher.h"
-#include "util.h"
+#include "log/database.h"
+#include "log/frontend_signer.h"
+#include "log/log_signer.h"
+#include "merkletree/serial_hasher.h"
+#include "proto/ct.pb.h"
+#include "proto/serializer.h"
+#include "util/util.h"
 
 using ct::LogEntry;
 using ct::LoggedCertificate;

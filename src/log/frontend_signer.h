@@ -4,7 +4,7 @@
 #include <stdint.h>
 #include <string>
 
-#include "ct.pb.h"
+#include "proto/ct.pb.h"
 
 class Database;
 class LogSigner;

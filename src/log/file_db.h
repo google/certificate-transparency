@@ -7,8 +7,8 @@
 #include <stdint.h>
 #include <vector>
 
-#include "ct.pb.h"
-#include "database.h"
+#include "log/database.h"
+#include "proto/ct.pb.h"
 
 class FileStorage;
 

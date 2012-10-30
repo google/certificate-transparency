@@ -1,9 +1,9 @@
 #include <glog/logging.h>
 
-#include "ct.pb.h"
-#include "frontend.h"
-#include "frontend_signer.h"
-#include "cert_submission_handler.h"
+#include "log/cert_submission_handler.h"
+#include "log/frontend.h"
+#include "log/frontend_signer.h"
+#include "proto/ct.pb.h"
 
 using ct::LogEntry;
 using ct::SignedCertificateTimestamp;

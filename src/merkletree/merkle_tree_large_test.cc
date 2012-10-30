@@ -6,10 +6,10 @@
 #include <sys/resource.h>
 #include <vector>
 
-#include "merkle_tree.h"
-#include "serial_hasher.h"
-#include "testing.h"
-#include "util.h"
+#include "merkletree/merkle_tree.h"
+#include "merkletree/serial_hasher.h"
+#include "util/testing.h"
+#include "util/util.h"
 
 namespace {
 

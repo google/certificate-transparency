@@ -3,11 +3,10 @@
 #include <gtest/gtest.h>
 #include <string>
 
-#include "ct.pb.h"
-#include "serializer.h"
-#include "testing.h"
-#include "types.h"
-#include "util.h"
+#include "proto/ct.pb.h"
+#include "proto/serializer.h"
+#include "util/testing.h"
+#include "util/util.h"
 
 namespace {
 

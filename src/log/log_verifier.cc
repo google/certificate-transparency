@@ -1,12 +1,12 @@
 #include <stdint.h>
 
-#include "cert_submission_handler.h"
-#include "ct.pb.h"
-#include "log_signer.h"
-#include "log_verifier.h"
-#include "merkle_verifier.h"
-#include "serializer.h"
-#include "util.h"
+#include "log/cert_submission_handler.h"
+#include "log/log_signer.h"
+#include "log/log_verifier.h"
+#include "merkletree/merkle_verifier.h"
+#include "proto/ct.pb.h"
+#include "proto/serializer.h"
+#include "util/util.h"
 
 using ct::LogEntry;
 using ct::MerkleAuditProof;

@@ -5,7 +5,7 @@
 #include <string>
 #include <vector>
 
-#include "tree_hasher.h"
+#include "merkletree/tree_hasher.h"
 
 class SerialHasher;
 

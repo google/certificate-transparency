@@ -1,8 +1,8 @@
 #ifndef FRONTEND_H
 #define FRONTEND_H
 
-#include "ct.pb.h"
-#include "cert_submission_handler.h"
+#include "log/cert_submission_handler.h"
+#include "proto/ct.pb.h"
 
 class FrontendSigner;
 

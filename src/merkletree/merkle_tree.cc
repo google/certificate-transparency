@@ -3,7 +3,7 @@
 #include <string>
 #include <vector>
 
-#include "merkle_tree.h"
+#include "merkletree/merkle_tree.h"
 
 using std::string;
 

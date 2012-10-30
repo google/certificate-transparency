@@ -3,12 +3,12 @@
 #include <stdint.h>
 #include <string>
 
-#include "ct.pb.h"
-#include "log_signer.h"
-#include "serializer.h"
-#include "test_signer.h"
-#include "testing.h"
-#include "util.h"
+#include "log/log_signer.h"
+#include "log/test_signer.h"
+#include "proto/ct.pb.h"
+#include "proto/serializer.h"
+#include "util/testing.h"
+#include "util/util.h"
 
 namespace {
 
