@@ -10,7 +10,6 @@
 #include "merkletree/serial_hasher.h"
 #include "proto/ct.pb.h"
 #include "proto/serializer.h"
-#include "util/util.h"
 
 using ct::LogEntry;
 using ct::LogEntryType;

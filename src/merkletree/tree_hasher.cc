@@ -1,5 +1,5 @@
-#include "serial_hasher.h"
-#include "tree_hasher.h"
+#include "merkletree/serial_hasher.h"
+#include "merkletree/tree_hasher.h"
 
 using std::string;
 
