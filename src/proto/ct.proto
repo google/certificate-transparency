@@ -97,14 +97,24 @@ message SignedCertificateTimestampList {
   repeated bytes sct_list = 1;
 }
 
+enum MerkleLeafType {
+  TIMESTAMPED_ENTRY = 0;
+  UNKNOWN_LEAF_TYPE = 256;
+}
+
+message TimestampedEntry {
+  optional uint64 timestamp = 1;
+  optional LogEntryType entry_type = 2;
+  optional bytes certificate = 3;
+  optional bytes extension = 4;
+} 
+
 // Stuff that's hashed into a Merkle leaf.
 message MerkleTreeLeaf {
   // The version of the corresponding SCT.
   optional Version version = 1 [ default = UNKNOWN_VERSION ];
-  optional uint64 timestamp = 2;
-  optional LogEntryType entry_type = 3;
-  optional bytes certificate = 4;
-  optional bytes extension = 5;
+  optional MerkleLeafType type = 2 [ default = UNKNOWN_LEAF_TYPE ];
+  optional TimestampedEntry timestamped_entry = 3;
 }
 
 // TODO(ekasper): implement support for id.

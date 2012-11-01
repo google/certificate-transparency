@@ -115,7 +115,7 @@ LogLookup::CertificateAuditProof(uint64_t timestamp,
 
 string LogLookup::LeafHash(const LoggedCertificate &logged_cert) {
   string serialized_leaf;
-  CHECK_EQ(Serializer::OK, Serializer::SerializeMerkleTreeLeaf(
+  CHECK_EQ(Serializer::OK, Serializer::SerializeSCTMerkleTreeLeaf(
       logged_cert.sct(), logged_cert.entry(), &serialized_leaf));
   return cert_tree_.LeafHash(serialized_leaf);
 }

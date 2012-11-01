@@ -72,7 +72,7 @@ LogVerifier::VerifyMerkleAuditProof(const LogEntry &entry,
 
   string serialized_leaf;
   Serializer::SerializeResult serialize_result =
-      Serializer::SerializeMerkleTreeLeaf(sct, entry, &serialized_leaf);
+      Serializer::SerializeSCTMerkleTreeLeaf(sct, entry, &serialized_leaf);
 
   if (serialize_result != Serializer::OK)
     return INVALID_FORMAT;

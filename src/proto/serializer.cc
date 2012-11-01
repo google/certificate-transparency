@@ -18,6 +18,7 @@ const size_t Serializer::kHashAlgorithmLengthInBytes = 1;
 const size_t Serializer::kSigAlgorithmLengthInBytes = 1;
 const size_t Serializer::kVersionLengthInBytes = 1;
 const size_t Serializer::kKeyIDLengthInBytes = 32;
+const size_t Serializer::kMerkleLeafTypeLengthInBytes = 1;
 
 using ct::LogEntry;
 using ct::LogEntryType_IsValid;
@@ -110,6 +111,52 @@ Serializer::SerializeResult Serializer::SerializeSCTSignatureInput(
           sct.extension(), result);
     case ct::PRECERT_ENTRY:
       return SerializeV1SCTSignatureInput(
+          sct.timestamp(), ct::PRECERT_ENTRY,
+          entry.precert_entry().tbs_certificate(),
+          sct.extension(), result);
+    default:
+      return INVALID_ENTRY_TYPE;
+  }
+}
+
+// static
+Serializer::SerializeResult Serializer::SerializeV1SCTMerkleTreeLeaf(
+    uint64_t timestamp, ct::LogEntryType type, const std::string &certificate,
+    const std::string &extensions, std::string *result) {
+  if (!LogEntryType_IsValid(type) || type == ct::UNKNOWN_ENTRY_TYPE)
+    return INVALID_ENTRY_TYPE;
+  // Check that the leaf certificate length is within accepted limits.
+  SerializeResult res = CheckCertificateFormat(certificate);
+  if (res != OK)
+    return res;
+  res = CheckExtensionsFormat(extensions);
+  if (res != OK)
+    return res;
+  Serializer serializer;
+  serializer.WriteUint(ct::V1, kVersionLengthInBytes);
+  serializer.WriteUint(ct::TIMESTAMPED_ENTRY, kMerkleLeafTypeLengthInBytes);
+  serializer.WriteUint(timestamp, 8);
+  serializer.WriteUint(type, kLogEntryTypeLengthInBytes);
+  serializer.WriteVarBytes(certificate, kMaxCertificateLength);
+  serializer.WriteVarBytes(extensions, kMaxExtensionsLength);
+  result->assign(serializer.SerializedString());
+  return OK;
+}
+
+// static
+Serializer::SerializeResult Serializer::SerializeSCTMerkleTreeLeaf(
+    const ct::SignedCertificateTimestamp &sct,
+    const ct::LogEntry &entry, std::string *result) {
+  if (sct.version() != ct::V1)
+    return UNSUPPORTED_VERSION;
+  switch (entry.type()) {
+    case ct::X509_ENTRY:
+      return SerializeV1SCTMerkleTreeLeaf(
+          sct.timestamp(), ct::X509_ENTRY,
+          entry.x509_entry().leaf_certificate(),
+          sct.extension(), result);
+    case ct::PRECERT_ENTRY:
+      return SerializeV1SCTMerkleTreeLeaf(
           sct.timestamp(), ct::PRECERT_ENTRY,
           entry.precert_entry().tbs_certificate(),
           sct.extension(), result);

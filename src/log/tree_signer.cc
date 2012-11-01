@@ -150,7 +150,7 @@ bool
 TreeSigner::AppendCertificate(const LoggedCertificate &logged_cert) {
   // Serialize for inclusion in the tree.
   string serialized_leaf;
-  CHECK_EQ(Serializer::OK, Serializer::SerializeMerkleTreeLeaf(
+  CHECK_EQ(Serializer::OK, Serializer::SerializeSCTMerkleTreeLeaf(
       logged_cert.sct(), logged_cert.entry(), &serialized_leaf));
 
   CHECK(logged_cert.has_certificate_sha256_hash());
@@ -175,7 +175,7 @@ void
 TreeSigner::AppendCertificateToTree(const LoggedCertificate &logged_cert) {
   // Serialize for inclusion in the tree.
   string serialized_leaf;
-  CHECK_EQ(Serializer::OK, Serializer::SerializeMerkleTreeLeaf(
+  CHECK_EQ(Serializer::OK, Serializer::SerializeSCTMerkleTreeLeaf(
       logged_cert.sct(), logged_cert.entry(), &serialized_leaf));
 
   // Update in-memory tree.

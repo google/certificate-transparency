@@ -48,6 +48,7 @@ class Serializer {
   static const size_t kSigAlgorithmLengthInBytes;
   static const size_t kVersionLengthInBytes;
   static const size_t kKeyIDLengthInBytes;
+  static const size_t kMerkleLeafTypeLengthInBytes;
 
   static size_t PrefixLength(size_t max_length);
 
@@ -67,18 +68,13 @@ class Serializer {
       const ct::SignedCertificateTimestamp &sct,
       const ct::LogEntry &entry, std::string *result);
 
-  static SerializeResult SerializeV1MerkleTreeLeaf(
+  static SerializeResult SerializeV1SCTMerkleTreeLeaf(
       uint64_t timestamp, ct::LogEntryType type, const std::string &certificate,
-      const std::string &extensions, std::string *result) {
-    return SerializeV1SCTSignatureInput(timestamp, type, certificate,
-                                        extensions, result);
-  }
+      const std::string &extensions, std::string *result);
 
   static SerializeResult
-  SerializeMerkleTreeLeaf(const ct::SignedCertificateTimestamp &sct,
-                          const ct::LogEntry &entry, std::string *result) {
-    return SerializeSCTSignatureInput(sct, entry, result);
-  }
+  SerializeSCTMerkleTreeLeaf(const ct::SignedCertificateTimestamp &sct,
+                             const ct::LogEntry &entry, std::string *result);
 
   static SerializeResult SerializeV1STHSignatureInput(
       uint64_t timestamp, uint64_t tree_size,

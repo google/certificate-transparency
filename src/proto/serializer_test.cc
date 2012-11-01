@@ -80,6 +80,23 @@ const char kDefaultSCTSignedHexString[] =
     "0000";
     // extensions, 0 bytes
 
+const char kDefaultSCTLeafHexString[] =
+    // version, 1 byte
+    "00"
+    // leaf type, 1 byte
+    "00"
+    // timestamp, 8 bytes
+    "00000000000004d2"
+    // entry type, 2 bytes
+    "0000"
+    // leaf certificate length, 3 bytes
+    "00000b"
+    // leaf certificate, 11 bytes
+    "6365727469666963617465"
+    // extensions length, 2 bytes
+    "0000";
+    // extensions, 0 bytes
+
 const char kDefaultSTHSignedHexString[] =
     // version, 1 byte
     "00"
@@ -216,6 +233,21 @@ TEST_F(SerializerTest, SerializeSCTSignatureInputKatTest) {
   EXPECT_EQ(string(kDefaultSCTSignedHexString), H(result));
 }
 
+TEST_F(SerializerTest, SerializeSCTMerkleTreeLeafKatTest) {
+  string result;
+  EXPECT_EQ(Serializer::OK,
+            Serializer::SerializeV1SCTMerkleTreeLeaf(
+                DefaultSCTTimestamp(), DefaultEntryType(),
+                DefaultCertificate(), DefaultExtensions(), &result));
+  EXPECT_EQ(string(kDefaultSCTLeafHexString), H(result));
+
+  result.clear();
+  EXPECT_EQ(Serializer::OK,
+            Serializer::SerializeSCTSignatureInput(
+                DefaultSCT(), DefaultEntry(), &result));
+  EXPECT_EQ(string(kDefaultSCTLeafHexString), H(result));
+}
+
 TEST_F(SerializerTest, DeserializeSCTKatTest) {
   string token = B(kDefaultSCTHexString);
   SignedCertificateTimestamp sct;
@@ -253,6 +285,34 @@ TEST_F(SerializerTest, SerializeSCTSignatureInputChangeEntryType) {
       entry.x509_entry().leaf_certificate());
   EXPECT_EQ(Serializer::OK,
             Serializer::SerializeSCTSignatureInput(
+                DefaultSCT(), entry, &result));
+
+  new_result = H(result);
+  EXPECT_EQ(default_result.size(), new_result.size());
+  EXPECT_NE(default_result, new_result);
+}
+
+// Test that the serialized string changes when we change some values.
+TEST_F(SerializerTest, SerializeSCTMerkleTreeLeafChangeEntryType) {
+  string result;
+  EXPECT_EQ(Serializer::OK,
+            Serializer::SerializeV1SCTMerkleTreeLeaf(
+                DefaultSCTTimestamp(), ct::PRECERT_ENTRY,
+                DefaultCertificate(), DefaultExtensions(), &result));
+
+  string default_result = string(kDefaultSCTLeafHexString);
+  string new_result = H(result);
+  EXPECT_EQ(default_result.size(), new_result.size());
+  EXPECT_NE(default_result, new_result);
+
+  result.clear();
+  LogEntry entry;
+  entry.CopyFrom(DefaultEntry());
+  entry.set_type(ct::PRECERT_ENTRY);
+  entry.mutable_precert_entry()->set_tbs_certificate(
+      entry.x509_entry().leaf_certificate());
+  EXPECT_EQ(Serializer::OK,
+            Serializer::SerializeSCTMerkleTreeLeaf(
                 DefaultSCT(), entry, &result));
 
   new_result = H(result);
@@ -306,6 +366,21 @@ TEST_F(SerializerTest, SerializeSCTSignatureInputEmptyCertificate) {
   entry.mutable_x509_entry()->clear_leaf_certificate();
   EXPECT_EQ(Serializer::EMPTY_CERTIFICATE,
             Serializer::SerializeSCTSignatureInput(DefaultSCT(), entry,
+                                                   &result));
+}
+
+TEST_F(SerializerTest, SerializeSCTMerkleTreeLeafEmptyCertificate) {
+  string result;
+  EXPECT_EQ(Serializer::EMPTY_CERTIFICATE,
+            Serializer::SerializeV1SCTMerkleTreeLeaf(
+                DefaultSCTTimestamp(), DefaultEntryType(),
+                string(), DefaultExtensions(), &result));
+
+  LogEntry entry;
+  entry.CopyFrom(DefaultEntry());
+  entry.mutable_x509_entry()->clear_leaf_certificate();
+  EXPECT_EQ(Serializer::EMPTY_CERTIFICATE,
+            Serializer::SerializeSCTMerkleTreeLeaf(DefaultSCT(), entry,
                                                    &result));
 }
 
@@ -407,6 +482,24 @@ TEST_F(SerializerTest, SerializeSCTSignatureInputWithExtensionsTest) {
   EXPECT_NE(string(kDefaultSCTSignedHexString), H(result));
 }
 
+TEST_F(SerializerTest, SerializeSCTMerkleTreeLeafWithExtensionsTest) {
+  string result;
+  EXPECT_EQ(Serializer::OK,
+            Serializer::SerializeV1SCTMerkleTreeLeaf(
+                DefaultSCTTimestamp(), DefaultEntryType(),
+                DefaultCertificate(), "hello", &result));
+  EXPECT_NE(string(kDefaultSCTLeafHexString), H(result));
+
+  result.clear();
+  SignedCertificateTimestamp sct;
+  sct.CopyFrom(DefaultSCT());
+  sct.set_extension("hello");
+  EXPECT_EQ(Serializer::OK,
+            Serializer::SerializeSCTMerkleTreeLeaf(
+                sct, DefaultEntry(), &result));
+  EXPECT_NE(string(kDefaultSCTLeafHexString), H(result));
+}
+
 TEST_F(SerializerTest, SerializeDeserializeSCTAddExtensions) {
   SignedCertificateTimestamp sct;
   sct.CopyFrom(DefaultSCT());
@@ -439,6 +532,17 @@ TEST_F(SerializerTest, SerializeSCTSignatureInputUnsupportedVersion) {
   string result;
   EXPECT_EQ(Serializer::UNSUPPORTED_VERSION,
             Serializer::SerializeSCTSignatureInput(sct, DefaultEntry(),
+                                                   &result));
+}
+
+TEST_F(SerializerTest, SerializeSCTMerkleTreeLeafUnsupportedVersion) {
+  SignedCertificateTimestamp sct;
+  sct.CopyFrom(DefaultSCT());
+  sct.set_version(ct::UNKNOWN_VERSION);
+
+  string result;
+  EXPECT_EQ(Serializer::UNSUPPORTED_VERSION,
+            Serializer::SerializeSCTMerkleTreeLeaf(sct, DefaultEntry(),
                                                    &result));
 }
 
