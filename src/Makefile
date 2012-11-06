@@ -1,8 +1,8 @@
 CXXFLAG = -Wall -Werror -g -O3
-INCLUDE = -I. -I $(GTESTDIR)/include
+INCLUDE = -I.
 LOCAL_LIBS = log/libcert.a log/libdatabase.a log/liblog.a \
              merkletree/libmerkletree.a proto/libproto.a util/libutil.a
-SYS_LIBS = $(GTESTDIR)/make/gtest.a -lpthread -lgflags -lglog -lssl -lcrypto \
+SYS_LIBS = -lpthread -lgflags -lglog -lssl -lcrypto \
        -lsqlite3 -lprotobuf
 # Need OpenSSL >= 1.0.0
 ifneq ($(OPENSSLDIR),)
@@ -11,40 +11,64 @@ ifneq ($(OPENSSLDIR),)
           -Wl,-rpath,$(OPENSSLDIR)/lib
 endif
 
+ifdef GTESTDIR
+  INCLUDE += -I $(GTESTDIR)/include
+  SYS_LIBS += $(GTESTDIR)/make/gtest.a 
+else
+  SYS_LIBS += -lgtest
+endif
+
 INCLUDE += -I /usr/local/include
 SYS_LIBS += -L /usr/local/lib
 
 CXXFLAGS = $(INCLUDE) $(CXXFLAG)
 
-SRCS = merkletree/*.cc merkletree/*.h log/*.cc log/*.h proto/*.h proto/*.cc
-
 all: $(LOCAL_LIBS) unit_tests client/ct server/ct-server
 
-.depend: $(SRCS) $(HDRS)
-	$(CXX) $(CXXFLAGS) -MM -MG proto/*.cc | \
-	sed 's,\(.*\)\.o,proto/\1.o,' > .depend
+.DELETE_ON_ERROR:
 
-	$(CXX) $(CXXFLAGS) -MM -MG merkletree/*.cc | \
-	sed 's,\(.*\)\.o,merkletree/\1.o,' >> .depend
+proto/.depend: proto/*.cc */*.h
+	$(CXX) $(CXXFLAGS) -MM -MG proto/*.cc > proto/.depend1
+	sed 's,\(.*\)\.o,proto/\1.o,' > proto/.depend < proto/.depend1
+	rm proto/.depend1
 
-	$(CXX) $(CXXFLAGS) -MM -MG log/*.cc | \
-	sed 's,\(.*\)\.o,log/\1.o,' >> .depend
+merkletree/.depend: merkletree/*.cc */*.h
+	$(CXX) $(CXXFLAGS) -MM -MG merkletree/*.cc > merkletree/.depend1
+	sed 's,\(.*\)\.o,merkletree/\1.o,' > merkletree/.depend \
+					   < merkletree/.depend1
+	rm merkletree/.depend1
 
-	$(CXX) $(CXXFLAGS) -MM -MG util/*.cc | \
-	sed 's,\(.*\)\.o,util/\1.o,' >> .depend
+log/.depend: log/*.cc */*.h
+	$(CXX) $(CXXFLAGS) -MM -MG log/*.cc > log/.depend1
+	sed 's,\(.*\)\.o,log/\1.o,' > log/.depend < log/.depend1
+	rm log/.depend1
 
-	$(CXX) $(CXXFLAGS) -MM -MG client/*.cc | \
-	sed 's,\(.*\)\.o,client/\1.o,' >> .depend
+util/.depend: util/*.cc */*.h
+	$(CXX) $(CXXFLAGS) -MM -MG util/*.cc > util/.depend1
+	sed 's,\(.*\)\.o,util/\1.o,' > util/.depend < util/.depend1
+	rm util/.depend1
 
-	$(CXX) $(CXXFLAGS) -MM -MG server/*.cc | \
-	sed 's,\(.*\)\.o,server/\1.o,' >> .depend
+client/.depend: client/*.cc */*.h
+	$(CXX) $(CXXFLAGS) -MM -MG client/*.cc > client/.depend1
+	sed 's,\(.*\)\.o,client/\1.o,' > client/.depend < client/.depend1
+	rm client/.depend1
+
+server/.depend: server/*.cc */*.h
+	$(CXX) $(CXXFLAGS) -MM -MG server/*.cc > server/.depend1
+	sed 's,\(.*\)\.o,server/\1.o,' > server/.depend < server/.depend1
+	rm server/.depend1
 
 ### proto preprocessing
 proto/%.pb.h proto/%.pb.cc: proto/%.proto
 	protoc $^ --cpp_out=.
 
 ifneq ($(MAKECMDGOALS),clean)
-    include .depend
+    include proto/.depend
+    include merkletree/.depend
+    include log/.depend
+    include util/.depend
+    include client/.depend
+    include server/.depend
 endif
 
 unit_tests: proto_tests merkletree_tests log_tests
@@ -206,4 +230,4 @@ benchmark: merkletree/merkle_tree_large_test log/database_large_test
 clean:
 	find . -name '*.[o|a]' | xargs rm -f
 	find . -name '*_test' | xargs rm -f
-	rm -f proto/*.pb.h proto/*.pb.cc .depend
+	rm -f proto/*.pb.h proto/*.pb.cc */.depend*
