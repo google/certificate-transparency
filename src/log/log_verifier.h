@@ -3,9 +3,9 @@
 
 #include <stdint.h>
 
+#include "log/log_signer.h"
 #include "proto/ct.pb.h"
 
-class LogSigVerifier;
 class MerkleVerifier;
 
 // A verifier for verifying signed statements of the log.
@@ -48,6 +48,8 @@ class LogVerifier {
         return "";
     }
   }
+
+  std::string KeyID() const { return sig_verifier_->KeyID(); }
 
   // Verify that the timestamp is in the given range,
   // and the signature is valid.
