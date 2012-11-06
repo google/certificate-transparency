@@ -43,8 +43,11 @@ class Cert {
 
   bool IsCriticalExtension(const std::string &extension_oid) const;
 
-  // returns binary data
-  std::string OctetStringExtensionData(const std::string &extension_oid) const;
+  // If the extension is a valid ASN.1-encoded octet string, writes the
+  // (binary) contents (with the ASN.1 wrapping removed) to result and returns
+  // true. Else returns false and leaves |result| unmodified.
+  bool OctetStringExtensionData(const std::string &extension_oid,
+                                std::string *result) const;
 
   bool HasBasicConstraintCA() const;
 

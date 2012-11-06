@@ -62,6 +62,7 @@ DEFINE_bool(ssl_client_expect_handshake_failure, false,
             "Expect the handshake to fail. If this is set to true, then "
             "the program exits with 0 iff there is a handshake failure. "
             "Used for testing.");
+DEFINE_string(certificate_in, "", "Certificate to analyze, in PEM format");
 
 static const char kUsage[] =
     " <command> ...\n"
@@ -71,8 +72,10 @@ static const char kUsage[] =
     "certificate - make a superfluous proof certificate\n"
     "authz - convert an audit proof to authz format\n"
     "configure_proof - write the proof in an X509v3 configuration file\n"
+    "diagnose_cert - print info about the SCTs the cert carries\n"
     "Use --help to display command-line flag options\n";
 
+using ct::LogEntry;
 using ct::MerkleAuditProof;
 using ct::SignedCertificateTimestamp;
 using ct::SignedCertificateTimestampList;
@@ -87,6 +90,23 @@ static string SCTToList(const string &serialized_sct) {
   string result;
   CHECK_EQ(Serializer::OK, Serializer::SerializeSCTList(sct_list, &result));
   return result;
+}
+
+static LogVerifier *GetLogVerifierFromFlags() {
+  string log_server_key = FLAGS_ct_server_public_key;
+  EVP_PKEY *pkey = NULL;
+  FILE *fp = fopen(log_server_key.c_str(), "r");
+
+  PCHECK(fp != static_cast<FILE*>(NULL))
+      << "Could not read CT server public key file";
+  // No password.
+  PEM_read_PUBKEY(fp, &pkey, NULL, NULL);
+  CHECK_NE(pkey, static_cast<EVP_PKEY*>(NULL)) <<
+      log_server_key << " is not a valid PEM-encoded public key.";
+  fclose(fp);
+
+  return new LogVerifier(new LogSigVerifier(pkey),
+                         new MerkleVerifier(new Sha256Hasher()));
 }
 
 // Adds the data to the cert as an extension, formatted as a single
@@ -335,24 +355,7 @@ static void ProofToAuthz() {
 //  1: handshake error
 //  2: connection error
 static SSLClient::HandshakeResult Connect() {
-  string log_server_key = FLAGS_ct_server_public_key;
-  CHECK(!log_server_key.empty()) << "Please give a CT log server public key";
-
-  EVP_PKEY *pkey = NULL;
-  FILE *fp = fopen(log_server_key.c_str(), "r");
-
-  PCHECK(fp != static_cast<FILE*>(NULL))
-      << "Could not read CT server public key file";
-  // No password.
-  PEM_read_PUBKEY(fp, &pkey, NULL, NULL);
-  CHECK_NE(pkey, static_cast<EVP_PKEY*>(NULL)) <<
-      FLAGS_ct_server_public_key << " is not a valid PEM-encoded public key.";
-
-  fclose(fp);
-
-  LogVerifier *verifier =
-      new LogVerifier(new LogSigVerifier(pkey),
-                      new MerkleVerifier(new Sha256Hasher()));
+  LogVerifier *verifier = GetLogVerifierFromFlags();
 
   SSLClient client(FLAGS_ssl_server, FLAGS_ssl_server_port,
                    FLAGS_ssl_client_trusted_cert_dir, verifier);
@@ -389,7 +392,11 @@ static SSLClient::HandshakeResult Connect() {
 }
 
 enum AuditResult {
+  // At least one SCT has a valid proof.
+  // (Should be unusual to have more than one SCT from the same log,
+  // but we audit them all and try to see if any are valid).
   PROOF_OK = 0,
+  // No SCTs have valid proofs.
   PROOF_NOT_FOUND = 1,
   CT_SERVER_UNAVAILABLE = 2,
 };
@@ -404,25 +411,8 @@ static AuditResult Audit() {
   CHECK(ct_data.has_reconstructed_entry());
   CHECK_GT(ct_data.attached_sct_size(), 0);
 
-  string log_server_key = FLAGS_ct_server_public_key;
-  CHECK(!log_server_key.empty()) << "Please give a CT log server public key";
-
-  EVP_PKEY *pkey = NULL;
-  FILE *fp = fopen(log_server_key.c_str(), "r");
-
-  PCHECK(fp != static_cast<FILE*>(NULL))
-      << "Could not read CT server public key file";
-  // No password.
-  PEM_read_PUBKEY(fp, &pkey, NULL, NULL);
-  CHECK_NE(pkey, static_cast<EVP_PKEY*>(NULL)) <<
-      FLAGS_ct_server_public_key << " is not a valid PEM-encoded public key.";
-
-  fclose(fp);
-
-  LogSigVerifier *lv = new LogSigVerifier(pkey);
-  string key_id = lv->KeyID();
-  LogVerifier *verifier =
-      new LogVerifier(lv, new MerkleVerifier(new Sha256Hasher()));
+  LogVerifier *verifier = GetLogVerifierFromFlags();
+  string key_id = verifier->KeyID();
 
   LogClient client(FLAGS_ct_server, FLAGS_ct_server_port);
   if (!client.Connect()) {
@@ -430,33 +420,109 @@ static AuditResult Audit() {
     return CT_SERVER_UNAVAILABLE;
   }
 
+  AuditResult audit_result = PROOF_NOT_FOUND;
+
   for (int i = 0; i < ct_data.attached_sct_size(); ++i) {
+    LOG(INFO) << "Signed Certificate Timestamp number " << i + 1 << ":\n"
+              << ct_data.attached_sct(i).DebugString();
+
     string sct_id = ct_data.attached_sct(i).id().key_id();
     if (sct_id != key_id) {
-      LOG(WARNING) << "Audit for Signed Certificate Timestamp with Key ID "
-                   << sct_id << "skipped: Key ID does not match verifier's ID";
+      LOG(WARNING) << "Audit skipped: log server Key ID " << sct_id
+                   << " does not match verifier's ID";
       continue;
     }
 
     MerkleAuditProof proof;
     if (!client.QueryAuditProof(ct_data.reconstructed_entry(),
-                                ct_data.attached_sct(i), &proof))
-      // Assuming one SCT per KeyID...
-      return PROOF_NOT_FOUND;
-
-    VLOG(5) << "Received proof " << proof.DebugString();
-    LogVerifier::VerifyResult res =
-        verifier->VerifyMerkleAuditProof(ct_data.reconstructed_entry(),
-                                         ct_data.attached_sct(i), proof);
-    if (res != LogVerifier::VERIFY_OK) {
-      LOG(ERROR) << "Verify error: " << LogVerifier::VerifyResultString(res);
-      LOG(ERROR) << "Retrieved Merkle proof is invalid.";
-      return PROOF_NOT_FOUND;
+                                ct_data.attached_sct(i), &proof)) {
+      LOG(INFO) << "Failed to retrieve audit proof";
+      continue;
+    } else {
+      LOG(INFO) << "Received proof " << proof.DebugString();
+      LogVerifier::VerifyResult res =
+          verifier->VerifyMerkleAuditProof(ct_data.reconstructed_entry(),
+                                           ct_data.attached_sct(i), proof);
+      if (res != LogVerifier::VERIFY_OK) {
+        LOG(ERROR) << "Verify error: " << LogVerifier::VerifyResultString(res);
+        LOG(ERROR) << "Retrieved Merkle proof is invalid.";
+        continue;
+      }
+      LOG(INFO) << "Proof verified.";
+      audit_result = PROOF_OK;
     }
-    LOG(INFO) << "Proof verified.";
-    return PROOF_OK;
   }
-  return PROOF_NOT_FOUND;
+  return audit_result;
+}
+
+static void DiagnoseCert() {
+  string cert_file = FLAGS_certificate_in;
+  CHECK(!cert_file.empty()) << "Please give a certificate with "
+                                       << "--certificate_in";
+  string pem_cert;
+  PCHECK(util::ReadBinaryFile(cert_file, &pem_cert))
+      << "Could not read certificate from " << cert_file;
+  Cert cert(pem_cert);
+  CHECK(cert.IsLoaded())
+      << cert_file << " is not a valid PEM-encoded certificate";
+
+  if (!cert.HasExtension(Cert::kEmbeddedProofExtensionOID)) {
+    LOG(ERROR) << "Certificate has no embedded SCTs";
+    return;
+  }
+
+  LOG(INFO) << "Embedded proof extension found in certificate";
+
+  LogVerifier *verifier = NULL;
+  LogEntry entry;
+  if (FLAGS_ct_server_public_key.empty()) {
+    LOG(WARNING) << "No log server public key given, skipping verification";
+  } else {
+    verifier = GetLogVerifierFromFlags();
+    CertSubmissionHandler::X509CertToEntry(cert, &entry);
+  }
+
+  string serialized_scts;
+  if (!cert.OctetStringExtensionData(Cert::kEmbeddedProofExtensionOID,
+                                     &serialized_scts)) {
+    LOG(ERROR) << "SCT extension data is invalid.";
+    return;
+  }
+
+  LOG(INFO) << "Embedded SCT extension length is " << serialized_scts.length()
+            << " bytes";
+
+  SignedCertificateTimestampList sct_list;
+  if (Deserializer::DeserializeSCTList(serialized_scts, &sct_list) !=
+      Deserializer::OK) {
+    LOG(ERROR) << "Failed to parse SCT list from certificate";
+    return;
+  }
+
+  LOG(INFO) << "Certificate has " << sct_list.sct_list_size() << " SCTs";
+  for (int i = 0; i < sct_list.sct_list_size(); ++i) {
+    SignedCertificateTimestamp sct;
+    if (Deserializer::DeserializeSCT(sct_list.sct_list(i), &sct) !=
+        Deserializer::OK) {
+      LOG(ERROR) << "Failed to parse SCT number " << i + 1;
+      continue;
+    }
+    LOG(INFO) << "SCT number " << i + 1 << ":\n" << sct.DebugString();
+    if (verifier != NULL) {
+      if (sct.id().key_id() != verifier->KeyID()) {
+        LOG(WARNING) << "SCT key ID does not match verifier's ID, skipping";
+        continue;
+      } else {
+        LogVerifier::VerifyResult res =
+            verifier->VerifySignedCertificateTimestamp(entry, sct);
+        if (res == LogVerifier::VERIFY_OK)
+          LOG(INFO) << "SCT verified";
+        else
+          LOG(ERROR) << "SCT verification failed: "
+                     << LogVerifier::VerifyResultString(res);
+      }
+    }
+  }
 }
 
 // Exit code upon normal exit:
@@ -500,6 +566,8 @@ int main(int argc, char **argv) {
     ProofToAuthz();
   } else if (cmd == "configure_proof") {
     WriteProofToConfig();
+  } else if (cmd == "diagnose_cert") {
+    DiagnoseCert();
   } else {
     std::cout << google::ProgramUsage();
   }

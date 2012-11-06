@@ -63,20 +63,34 @@ bool Cert::IsCriticalExtension(const string &extension_oid) const {
   return X509_EXTENSION_get_critical(ext);
 }
 
-string Cert::OctetStringExtensionData(const string &extension_oid) const {
+bool Cert::OctetStringExtensionData(const string &extension_oid,
+                                    string *result) const {
   X509_EXTENSION *ext = GetExtension(extension_oid);
-  // Always check if the extension exists first.
-  CHECK_NOTNULL(ext);
+  // You should have checked already...
+  if (ext == NULL) {
+    LOG(ERROR) << "Certificate does not have an extension with OID "
+               << extension_oid;
+    return false;
+  }
+
   ASN1_OCTET_STRING *ext_data = X509_EXTENSION_get_data(ext);
-  CHECK_NOTNULL(ext_data);
+  if (ext_data == NULL) {
+    LOG(ERROR) << "NULL extension data";
+    return false;
+  }
 
   const unsigned char *ptr = ext_data->data;
   ASN1_OCTET_STRING *octet = d2i_ASN1_OCTET_STRING(NULL, &ptr,
                                                    ext_data->length);
-  CHECK_NOTNULL(octet);
-  string ret(reinterpret_cast<const char*>(octet->data), octet->length);
+
+  if (octet == NULL) {
+    LOG(ERROR) << "Extension data is not a valid ASN1 octet string";
+    return false;
+  }
+  result->assign(string(reinterpret_cast<const char*>(octet->data),
+                        octet->length));
   ASN1_OCTET_STRING_free(octet);
-  return ret;
+  return true;
 }
 
 bool Cert::HasBasicConstraintCA() const {
