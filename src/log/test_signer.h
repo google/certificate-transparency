@@ -6,6 +6,7 @@
 #include <string>
 
 #include "log/log_signer.h"
+#include "merkletree/tree_hasher.h"
 #include "proto/ct.pb.h"
 
 // Helper class for database tests that generates test data
@@ -99,5 +100,6 @@ class TestSigner {
   uint64_t counter_;
   // Binary blob.
   std::string default_cert_;
+  TreeHasher tree_hasher_;
 };
 #endif

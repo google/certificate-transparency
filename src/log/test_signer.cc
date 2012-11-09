@@ -10,6 +10,7 @@
 #include "log/log_signer.h"
 #include "log/test_signer.h"
 #include "merkletree/serial_hasher.h"
+#include "merkletree/tree_hasher.h"
 #include "proto/ct.pb.h"
 #include "proto/serializer.h"
 #include "util/util.h"
@@ -119,7 +120,8 @@ EVP_PKEY* PublicKeyFromPem(const string &pemkey) {
 TestSigner::TestSigner()
     : default_signer_(NULL),
       counter_(0),
-      default_cert_(B(kDefaultDerCert)) {
+      default_cert_(B(kDefaultDerCert)),
+      tree_hasher_(new Sha256Hasher()) {
   counter_ = util::TimeInMilliseconds();
   srand(counter_);
   EVP_PKEY *pkey = PrivateKeyFromPem(kEcP256PrivateKey);
@@ -360,6 +362,11 @@ void TestSigner::FillData(LoggedCertificate *logged_cert) {
 
   logged_cert->set_certificate_sha256_hash(Sha256Hasher::Sha256Digest(
       Serializer::LeafCertificate(logged_cert->entry())));
+  string serialized_leaf;
+  CHECK_EQ(Serializer::OK,
+           Serializer::SerializeSCTMerkleTreeLeaf(
+               logged_cert->sct(), logged_cert->entry(), &serialized_leaf));
+  logged_cert->set_merkle_leaf_hash(tree_hasher_.HashLeaf(serialized_leaf));
 
   logged_cert->clear_sequence_number();
 }

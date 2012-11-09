@@ -1,3 +1,4 @@
+#include <glog/logging.h>
 #include <stdint.h>
 
 #include "log/cert_submission_handler.h"
@@ -15,32 +16,41 @@ using ct::SignedTreeHead;
 using std::string;
 
 LogVerifier::LogVerifier(LogSigVerifier *sig_verifier,
-                         MerkleVerifier *tree_verifier)
+                         MerkleVerifier *merkle_verifier)
     : sig_verifier_(sig_verifier),
-      tree_verifier_(tree_verifier) {}
+      merkle_verifier_(merkle_verifier) {}
 
 LogVerifier::~LogVerifier() {
   delete sig_verifier_;
-  delete tree_verifier_;
+  delete merkle_verifier_;
 }
 
 LogVerifier::VerifyResult LogVerifier::VerifySignedCertificateTimestamp(
     const LogEntry &entry, const SignedCertificateTimestamp &sct,
-    uint64_t begin_range, uint64_t end_range) const {
+    uint64_t begin_range, uint64_t end_range, string *merkle_leaf_hash) const {
   if (!IsBetween(sct.timestamp(), begin_range, end_range))
     return INVALID_TIMESTAMP;
 
   // TODO(ekasper): separate format and signature errors.
   if (sig_verifier_->VerifySCTSignature(entry, sct) != LogSigVerifier::OK)
     return INVALID_SIGNATURE;
+  string serialized_leaf;
+  // If SCT verification succeeded, then we should never fail here.
+  if (merkle_leaf_hash != NULL) {
+    CHECK_EQ(Serializer::OK,
+             Serializer::SerializeSCTMerkleTreeLeaf(sct, entry,
+                                                    &serialized_leaf));
+    merkle_leaf_hash->assign(merkle_verifier_->LeafHash(serialized_leaf));
+  }
   return VERIFY_OK;
 }
 
 LogVerifier::VerifyResult LogVerifier::VerifySignedCertificateTimestamp(
-    const LogEntry &entry, const SignedCertificateTimestamp &sct) const {
+    const LogEntry &entry, const SignedCertificateTimestamp &sct,
+    string *merkle_leaf_hash) const {
   // Allow a bit of slack, say 1 second into the future.
-  return VerifySignedCertificateTimestamp(entry, sct, 0,
-                                          util::TimeInMilliseconds() + 1000);
+  return VerifySignedCertificateTimestamp(
+      entry, sct, 0, util::TimeInMilliseconds() + 1000, merkle_leaf_hash);
 }
 
 LogVerifier::VerifyResult
@@ -83,9 +93,9 @@ LogVerifier::VerifyMerkleAuditProof(const LogEntry &entry,
 
   // Leaf indexing in the MerkleTree starts from 1.
   string root_hash =
-      tree_verifier_->RootFromPath(merkle_proof.leaf_index() + 1,
-                                   merkle_proof.tree_size(), path,
-                                   serialized_leaf);
+      merkle_verifier_->RootFromPath(merkle_proof.leaf_index() + 1,
+                                     merkle_proof.tree_size(), path,
+                                     serialized_leaf);
 
   if (root_hash.empty())
     return INVALID_MERKLE_PATH;

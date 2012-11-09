@@ -135,11 +135,10 @@ message MerkleAuditProof {
 ////////////////////////////////////////////////////////////////////////////////
 message ClientLookup {
   enum Type {
-    MERKLE_AUDIT_PROOF_BY_TIMESTAMP_AND_HASH = 1;
+    MERKLE_AUDIT_PROOF_BY_LEAF_HASH = 1;
   }
   required Type type = 1;
-  optional uint64 certificate_timestamp = 2;
-  optional bytes certificate_sha256_hash = 3;
+  optional bytes merkle_leaf_hash = 2;
 }
 
 // Server-client messages
@@ -192,6 +191,7 @@ message LoggedCertificate {
   optional bytes certificate_sha256_hash = 2;
   optional uint64 sequence_number = 3;
   optional LogEntry entry = 4;
+  optional bytes merkle_leaf_hash = 5;
 }
 
 message SignedTreeHead {
@@ -210,5 +210,11 @@ message SignedTreeHead {
 message SSLClientCTData {
   optional LogEntry reconstructed_entry = 1;
   optional bytes certificate_sha256_hash = 2;
-  repeated SignedCertificateTimestamp attached_sct = 3;
+
+  message SCTInfo {
+    // There is an entry + sct -> leaf hash mapping.
+    optional SignedCertificateTimestamp sct = 1;
+    optional bytes merkle_leaf_hash = 2;
+  }
+  repeated SCTInfo attached_sct_info = 3;
 }

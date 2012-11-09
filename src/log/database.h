@@ -8,6 +8,10 @@
 
 #include "proto/ct.pb.h"
 
+// NOTE: This is a database interface for the log server.
+// Monitors/auditors shouldn't assume that log entries are keyed
+// uniquely by certificate hash -- it is an artefact of this
+// implementation, not a requirement of the I-D.
 class Database {
  public:
   enum WriteResult {

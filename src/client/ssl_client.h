@@ -79,15 +79,15 @@ class SSLClient {
   struct VerifyCallbackArgs {
     VerifyCallbackArgs(LogVerifier *log_verifier)
         : verifier(log_verifier),
-          token_verified(false),
-          require_token(false),
+          sct_verified(false),
+          require_sct(false),
           ct_data() {}
 
     // The verifier for checking log proofs.
     LogVerifier *verifier;
     // SCT verification result.
-    bool token_verified;
-    bool require_token;
+    bool sct_verified;
+    bool require_sct;
     // The resulting (partial) entry - the client reconstructs
     // the signed part of the entry (i.e., type and leaf certificate)
     // and all valid SCTs.

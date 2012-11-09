@@ -89,13 +89,15 @@ SSLClient::VerifySCT(const string &token, LogVerifier *verifier,
   if (Deserializer::DeserializeSCT(token, &local_sct) != Deserializer::OK)
     return LogVerifier::INVALID_FORMAT;
 
+  string merkle_leaf;
   LogVerifier::VerifyResult result =
       verifier->VerifySignedCertificateTimestamp(data->reconstructed_entry(),
-                                                 local_sct);
+                                                 local_sct, &merkle_leaf);
   if (result != LogVerifier::VERIFY_OK)
     return result;
-  SignedCertificateTimestamp *sct = data->add_attached_sct();
-  sct->CopyFrom(local_sct);
+  SSLClientCTData::SCTInfo *sct_info = data->add_attached_sct_info();
+  sct_info->set_merkle_leaf_hash(merkle_leaf);
+  sct_info->mutable_sct()->CopyFrom(local_sct);
   return LogVerifier::VERIFY_OK;
 }
 
@@ -169,7 +171,7 @@ int SSLClient::VerifyCallback(X509_STORE_CTX *ctx, void *arg) {
 
         if (result == LogVerifier::VERIFY_OK) {
           LOG(INFO) << "SCT number " << i + 1 << " verified";
-          args->token_verified = true;
+          args->sct_verified = true;
         } else {
           LOG(ERROR) << "Verification for SCT number " << i + 1 << " failed: "
                      << LogVerifier::VerifyResultString(result);
@@ -181,7 +183,7 @@ int SSLClient::VerifyCallback(X509_STORE_CTX *ctx, void *arg) {
 #ifndef TLSEXT_AUTHZDATAFORMAT_audit_proof
   // If we don't support the TLS extension, we fail here. Else we wait to see
   // if the extension callback finds a valid proof.
-  if (!args->token_verified && args->require_token) {
+  if (!args->sct_verified && args->require_sct) {
     LOG(ERROR) << "No valid SCT found";
     return 0;
   }
@@ -197,7 +199,7 @@ int SSLClient::SCTTokenCallback(SSL *s, void *arg) {
   VerifyCallbackArgs *args = reinterpret_cast<VerifyCallbackArgs*>(arg);
   CHECK_NOTNULL(args);
   // If we already received the proof in a superfluous cert, do nothing.
-  if (args->token_verified)
+  if (args->sct_verified)
     return 1;
 
   LogVerifier *verifier = args->verifier;
@@ -214,7 +216,7 @@ int SSLClient::SCTTokenCallback(SSL *s, void *arg) {
       SSL_SESSION_get_tlsext_authz_server_audit_proof(sess, &proof_length);
   if (proof == NULL) {
     LOG(WARNING) << "No SCT received.";
-    return args->require_token ? 0 : 1;
+    return args->require_sct ? 0 : 1;
   }
 
   LOG(INFO) << "Found an SCT token in the TLS extension, verifying...";
@@ -227,20 +229,20 @@ int SSLClient::SCTTokenCallback(SSL *s, void *arg) {
   LogVerifier::VerifyResult result = VerifySCT(token, verifier, &args->ct_data);
 
   if (result == LogVerifier::VERIFY_OK) {
-    args->token_verified = true;
+    args->sct_verified = true;
     LOG(INFO) << "Token verified";
     return 1;
   } else {
     LOG(ERROR) << "Verification failed: "
                << LogVerifier::VerifyResultString(result);
-    return args->require_token ? 0 : 1;
+    return args->require_sct ? 0 : 1;
   }
 }
 #endif
 
 void SSLClient::ResetVerifyCallbackArgs(bool strict) {
-  verify_args_.token_verified = false;
-  verify_args_.require_token = strict;
+  verify_args_.sct_verified = false;
+  verify_args_.require_sct = strict;
   verify_args_.ct_data.CopyFrom(SSLClientCTData::default_instance());
 }
 
@@ -261,7 +263,7 @@ SSLClient::HandshakeResult SSLClient::SSLConnect(bool strict) {
   if (ret == 1) {
     LOG(INFO) << "Handshake successful. SSL session started";
     connected_ = true;
-    DCHECK(!verify_args_.require_token || verify_args_.token_verified);
+    DCHECK(!verify_args_.require_sct || verify_args_.sct_verified);
     result = OK;
   } else {
     // TODO(ekasper): look into OpenSSL error stack to determine
