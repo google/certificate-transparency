@@ -576,9 +576,35 @@ class CTUDPDNSServer : public UDPServer {
     ldns_pkt *packet = NULL;
 
     ldns_status ret = ldns_wire2pkt(&packet, (const uint8_t *)buf, len);
-    CHECK_EQ(ret, LDNS_STATUS_OK);
+    if (ret != LDNS_STATUS_OK) {
+      LOG(INFO) << "Bad DNS packet";
+      return;
+    }
  
     ldns_pkt_print(stdout, packet);
+
+    if (ldns_pkt_qr(packet) != 0) {
+      LOG(INFO) << "Packet is not a query";
+      return;
+    }
+
+    if (ldns_pkt_get_opcode(packet) != LDNS_PACKET_QUERY) {
+      LOG(INFO) << "Packet has bad opcode";
+      return;
+    }
+
+    ldns_rr_list *questions = ldns_pkt_question(packet);
+    for (size_t n = 0; n < ldns_rr_list_rr_count(questions); ++n) {
+      ldns_rr *question = ldns_rr_list_rr(questions, n);
+
+      if (ldns_rr_get_type(question) != LDNS_RR_TYPE_TXT) {
+        LOG(INFO) << "Question is not TXT";
+        // FIXME(benl): set error response?
+        continue;
+      }
+
+      LOG(INFO) << "Question is TXT";
+    }
   }
 };
 
