@@ -36,6 +36,20 @@
     </abstract>
   </front>
   <middle>
+    <section title="Informal introduction">
+      <t>
+	Certificate Transparency aims to solve the problem of mis-issued certificates by providing a publicly auditable, append only, untrusted log of all issued certificates. The append only property is achieved using signed Merkle Trees, which can be used to show that any particular version of the log is a superset of any particular previous version. Likewise, Merkle Trees remove the need to trust the log: if the log attempts to show different things to different people, this can be efficiently detected by comparing tree roots and consistency proofs. The logs are publicly auditable because it is possible for anyone to verify the correct operation of the log, and to monitor the certificates added to it. The logs do not themselves prevent mis-issue, but they ensure that interested parties can detect it. Note that this is a general mechanism, but in this document we only decsribe its use for public TLS certificates.
+      </t>
+      <t>
+	The log consists of certificate chains, which can be submitted by anyone. In order to avoid the log being spammed, it is required that the chain is rooted in a known CA certificate, but it is not required that the CA is the one to submit the chain to the log. When a chain is submitted to the log, a signed timestamp is returned, which can later be used to prove to clients that the chain has been submitted. Clients can thus require that all certificates they see have been logged.
+      </t>
+      <t>
+	Those who are concerned about mis-issue can monitor the log, asking it regularly for all new entries, and can thus check whether domains they are responsible for have had certificates issued that they did not expect. What they do then is beyond the scope of this document, but broadly speaking they can invoke existing mechanisms for dealing with mis-issued certificates. Of course, anyone who wants can monitor the log, and if they believe a certificate is incorrectly issued, take action as they see fit.
+      </t>
+      <t>
+	Similarly, those who have seen signed timestamps from the log can later demand a proof of inclusion from the log. If the log is unable to provide this (or, indeed, if the corresponding certificate is absent from monitors' copies of the log) then this is evidence of the log's incorrect operation. Verification is asynchronous to allow TLS connections to proceed without delay, despite network connectivity issues and the vagaries of firewalls.
+      </t>
+    </section>
     <section title="Cryptographic components">
       <section title="Merkle Hash Trees">
 	<t>
@@ -414,7 +428,7 @@ d0 d1   d2 d3           d0 d1   d2 d3  d4 d5
 	  <spanx style="verb">version</spanx> is the version of the protocol the SignedMerkleTreeUpdate conforms to. This version is v1.
 	</t>
 	<t>
-	  <spanx style="verb">old_tree_size</spanx> is the size of the tree prior to this update.
+	  <spanx style="verb">old_tree_size</spanx> is the number of entries in the tree prior to this update.
 	</t>
 	<t>
 	  <spanx style="verb">timestamp</spanx> is the current time. The timestamp MUST be at least as recent as the most recent SCT timestamp in the tree. Each subsequent timestamp MUST be more recent than the timestamp of the previous update.
@@ -487,7 +501,7 @@ d0 d1   d2 d3           d0 d1   d2 d3  d4 d5
 	      The <spanx style="verb">leaf_index</spanx> MUST NOT exceed <spanx style="verb">tree_size - 1</spanx>;
 	    </t>
 	    <t>
-	      The <spanx style="verb">tree_signature</spanx> MUST be a valid signature on the corresponding <spanx style="verb">timestamp</spanx>, <spanx style="verb">tree_size</spanx>, and the root hash reconstructed from the Merkle Tree Leaf, <spanx style="verb">leaf_index</spanx> and <spanx style="verb">audit_path</spanx>.
+	      The <spanx style="verb">tree_head_signature</spanx> MUST be a valid signature on the corresponding <spanx style="verb">version</spanx>, <spanx style="verb">timestamp</spanx>, <spanx style="verb">tree_size</spanx>, and the root hash reconstructed from the Merkle Tree Leaf, <spanx style="verb">leaf_index</spanx> and <spanx style="verb">audit_path</spanx>.
 	    </t>
 	  </list>
 	</t>

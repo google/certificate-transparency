@@ -6,6 +6,8 @@ DIFF=$(NAME)-$(PREV)-$(VERSION)-diff.html
 
 all: $(BASE).html $(BASE).txt $(DIFF)
 
+.DELETE_ON_ERROR:
+
 $(BASE).html: sunlight.xml
 	xml2rfc sunlight.xml $(BASE).html
 
