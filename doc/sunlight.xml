@@ -203,7 +203,7 @@ d0 d1   d2 d3           d0 d1   d2 d3  d4 d5
 	    The consistency proof between hash1 and hash is PROOF(4, D[7]) = [l]. hash can be verified, using hash1=k and l.
 	  </t>
 	  <t>
-	    The consistency proof between hash2 and hash is PROOF(6, D[7]) = [i, j, k]. k, i are used to verify hash1, and j is additionally used to show hash is consistent with hash2.
+	    The consistency proof between hash2 and hash is PROOF(6, D[7]) = [i, j, k]. k, i are used to verify hash2, and j is additionally used to show hash is consistent with hash2.
 	  </t>
 	</section>
       </section>
@@ -478,7 +478,7 @@ d0 d1   d2 d3           d0 d1   d2 d3  d4 d5
   </artwork>
 </figure>
 	<t>
-	  <spanx style="verb">tree_size</spanx> is the generation of the tree that this proof is for.
+	  <spanx style="verb">tree_size</spanx> is the number of entries in the tree that this proof is for.
 	</t>
 	<t>
 	  <spanx style="verb">timestamp</spanx> is the corresponding timestamp.
@@ -511,9 +511,71 @@ d0 d1   d2 d3           d0 d1   d2 d3  d4 d5
       </section>
     </section>
     <section title="Client Messages">
-      <t>
-	TBD. Messages that clients send to logs, e.g. to request an SCT or retrieve entries in the log.
-      </t>
+      <section title="Add Chain to Log">
+	<t>
+	  Inputs: Certificate chain.
+	</t>
+	<t>
+	  Outputs: SCT.
+	</t>
+      </section>
+      <section title="Add PreCertChain to Log">
+	<t>
+	  Inputs: Precertificate chain.
+	</t>
+	<t>
+	  Outputs: SCT.
+	</t>
+      </section>
+      <section title="Retrieve STH">
+	<t>
+	  Inputs: None.
+	</t>
+	<t>
+	  Outputs: STH.
+	</t>
+      </section>
+      <section title="Retrieve STH Consistency Proof">
+	<t>
+	  Inputs: First tree size, second tree size.
+	</t>
+	<t>
+	  Outputs: STH Consistency Proof.
+	</t>
+	<t>
+	  Both tree sizes must be from published STHs.
+	</t>
+      </section>
+      <section title="Retrieve Chain+Proof from Log">
+	<t>
+	  Inputs: Entry number, tree size.
+	</t>
+	<t>
+	  Outputs: Chain or PreCertChain, Proof.
+	</t>
+	<t>
+	  Tree size must designate a published STH. Proof is relative to that STH.
+	</t>
+      </section>
+      <section title="Retrieve Proof from Log by Certificate">
+	<t>
+	  Inputs: Certificate, SCT (if not present in the certificate), tree size.
+	</t>
+	<t>
+	  Outputs: Proof.
+	</t>
+	<t>
+	  Tree size must designate a published STH. Proof is relative to that STH.
+	</t>
+      </section>
+      <section title="Retrieve Chains from Log">
+	<t>
+	  Inputs: Start entry number, end entry number.
+	</t>
+	<t>
+	  Outputs: List of {Chain or PreCertChain}.
+	</t>
+      </section>
     </section>
     <section title="Security and Privacy Considerations">
       <section title="Misissued Certificates">
