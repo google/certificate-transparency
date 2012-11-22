@@ -206,6 +206,11 @@ d0 d1   d2 d3           d0 d1   d2 d3  d4 d5
 	    The consistency proof between hash2 and hash is PROOF(6, D[7]) = [i, j, k]. k, i are used to verify hash2, and j is additionally used to show hash is consistent with hash2.
 	  </t>
 	</section>
+	<section title="Signatures">
+	  <t>
+	    Various data structures are signed. These can use either elliptic curve signatures using the NIST P-256 curve (http://csrc.nist.gov/publications/fips/fips186-3/fips_186-3.pdf section D.1.2.3) or RSA signatures.
+	  </t>
+	</section>
       </section>
     </section>
     <section title="Log Format">
@@ -511,69 +516,189 @@ d0 d1   d2 d3           d0 d1   d2 d3  d4 d5
       </section>
     </section>
     <section title="Client Messages">
+      <t>
+	In general, messages are sent as HTTPS POST requests (GETs are not used because some queries involve more data than may be easily processed by standard libraries in a URL). Parameters and responses are encoded as JSON objects. Binary data is base64 encoded as specified in the individual messages.
+      </t>
+      <t>
+	Note that all CT data structures are defined as TLS structures, so the JSON encoding is a transport for these binary structures, they are not broken out into JSON structures.
+      </t>
+      <t>
+	The &lt;log server&gt; prefix can include a path as well as a server name and a port.
+      </t>
       <section title="Add Chain to Log">
 	<t>
-	  Inputs: Certificate chain.
+	  https://&lt;log server&gt;/ct/v1/add-chain
 	</t>
 	<t>
-	  Outputs: SCT.
+	  Inputs
+	  <list style="hanging">
+	    <t hangText="chain">
+	      An array of base64 encoded certificates. The first element is the leaf certificate, the second chains to the first and so on to the last, which is either the root certificate or a certificate that chains to a known root certificate.
+	    </t>
+	  </list>
+	</t>
+	<t>
+	  Outputs
+	  <list style="hanging">
+	    <t hangText="sct">
+	      A base64 encoded SignedCertificateTimestamp.
+	    </t>
+	  </list>
 	</t>
       </section>
       <section title="Add PreCertChain to Log">
 	<t>
-	  Inputs: Precertificate chain.
+	  https://&lt;log server&gt;/ct/v1/add-pre-chain
 	</t>
 	<t>
-	  Outputs: SCT.
+	  Inputs
+	  <list style="hanging">
+	    <t hangText="chain">
+	      An array of base64 encoded precertificates. The first element is the leaf certificate, the second chains to the first and so on to the last, which is either the root certificate or a certificate that chains to a known root certificate.
+	    </t>
+	  </list>
+	</t>
+	<t>
+	  Outputs
+	  <list style="hanging">
+	    <t hangText="sct">
+	      A base64 encoded SignedCertificateTimestamp.
+	    </t>
+	  </list>
 	</t>
       </section>
       <section title="Retrieve STH">
 	<t>
-	  Inputs: None.
+	  https://&lt;log server&gt;/ct/v1/get-sth
 	</t>
 	<t>
-	  Outputs: STH.
+	  No inputs.
+	</t>
+	<t>
+	  Outputs
+	  <list style="hanging">
+	    <t hangText="sth">
+	      A base64 encoded SignedTreeHead [note: we appear to not have such a structure currently].
+	    </t>
+	  </list>
 	</t>
       </section>
       <section title="Retrieve STH Consistency Proof">
 	<t>
-	  Inputs: First tree size, second tree size.
+	  https://&lt;log server&gt;/ct/v1/get-sth-consistency
 	</t>
 	<t>
-	  Outputs: STH Consistency Proof.
-	</t>
-	<t>
+	  Inputs
+	  <list style="hanging">
+	    <t hangText="first">
+	      The tree_size of the first tree, in decimal.
+	    </t>
+	    <t hangText="second">
+	      The tree_size of the second tree, in decimal.
+	    </t>
+	  </list>
 	  Both tree sizes must be from published STHs.
+	</t>
+	<t>
+	  Outputs
+	  <list style="hanging">
+	    <t hangText="consistency">
+	      A base64 encoded TreeConsistencyProof [TBD].
+	    </t>
+	  </list>
 	</t>
       </section>
       <section title="Retrieve Chain+Proof from Log">
 	<t>
-	  Inputs: Entry number, tree size.
+	  https://&lt;log server&gt;/ct/v1/get-chain-and-proof
 	</t>
 	<t>
-	  Outputs: Chain or PreCertChain, Proof.
+	  Inputs
+	  <list style="hanging">
+	    <t hangText="leaf_index">
+	      The index of the desired entry.
+	    </t>
+	    <t hangText="tree_size">
+	      The tree_size of the tree for which the proof is desired.
+	    </t>
+	  </list>
+	  The tree size must designate a published STH.
 	</t>
 	<t>
-	  Tree size must designate a published STH. Proof is relative to that STH.
+	  Outputs
+	  <list style="hanging">
+	    <t hangText="chain">
+	      An array of base64 encoded certificates forming a certificate chain, if this entry has one.
+	    </t>
+	    <t hangText="pre_chain">
+	      An array of base64 encoded certificates forming a precertificate chain, if this entry has one.
+	    </t>
+	    <t hangText="proof">
+	      A base64 encoded MerkleProof for the requested entry relative to the tree designated by tree_size.
+	    </t>
+	  </list>
+	  Exactly one of chain and pre_chain MUST always be present.
 	</t>
       </section>
       <section title="Retrieve Proof from Log by Certificate">
 	<t>
-	  Inputs: Certificate, SCT (if not present in the certificate), tree size.
+	  https://&lt;log server&gt;/ct/v1/get-proof-by-certificate
 	</t>
 	<t>
-	  Outputs: Proof.
+	  Inputs
+	  <list style="hanging">
+	    <t hangText="certificate">
+	      A base64 encoded certificate.
+	    </t>
+	    <t hangText="sct">
+	      A base64 encoded SignedCertificateTimestamp if not present in the certificate.
+	    </t>
+	    <t hangText="tree_size">
+	      The tree_size of the tree to base the proof on.
+	    </t>
+	  </list>
+	  tree_size must designated a published STH. sct must not be present if the certificate contains an SCT.
 	</t>
 	<t>
-	  Tree size must designate a published STH. Proof is relative to that STH.
+	  Outputs
+	  <list style="hanging">
+	    <t hangText="proof">
+	      A base64 encoded MerkleTreeProof.
+	    </t>
+	  </list>
 	</t>
       </section>
       <section title="Retrieve Chains from Log">
 	<t>
-	  Inputs: Start entry number, end entry number.
+	  https://&lt;log server&gt;/ct/v1/get-chains
 	</t>
 	<t>
-	  Outputs: List of {Chain or PreCertChain}.
+	  Inputs
+	  <list style="hanging">
+	    <t hangText="start">
+	      Index of first chain to retrieve, in decimal.
+	    </t>
+	    <t hangText="end">
+	      Index of last chain to retrieve, in decimal.
+	    </t>
+	  </list>
+	</t>
+	<t>
+	  Outputs
+	  <list style="hanging">
+	    <t hangText="chains">
+	      An array of objects, each consisting of
+	      <list style="hanging">
+		<t hangText="type">
+		  The string "chain" or "pre-chain".
+		</t>
+		<t hangText="chain">
+		  A certificate chain or pre-chain.
+		</t>
+	      </list>
+	    </t>
+	  </list>
+	  [There's obviously many ways to encode the list of chains, I am happy to consider alternatives]
 	</t>
       </section>
     </section>
