@@ -208,7 +208,7 @@ d0 d1   d2 d3           d0 d1   d2 d3  d4 d5
 	</section>
 	<section title="Signatures">
 	  <t>
-	    Various data structures are signed. These can use either elliptic curve signatures using the NIST P-256 curve (http://csrc.nist.gov/publications/fips/fips186-3/fips_186-3.pdf section D.1.2.3) or RSA signatures.
+	    Various data structures are signed. A log can use either elliptic curve signatures using the NIST P-256 curve (http://csrc.nist.gov/publications/fips/fips186-3/fips_186-3.pdf section D.1.2.3) or RSA signatures using a key of at least 2048 bits.
 	  </t>
 	</section>
       </section>
@@ -366,7 +366,7 @@ d0 d1   d2 d3           d0 d1   d2 d3  d4 d5
 	  SCTs embedded in the TLS Authorization Extension are each encoded as an individual AuthorizationDataEntry <xref target='RFC5878'/>.
 	</t>
       </section>
-      <section title="Merkle Tree">
+      <section title="Merkle Tree" anchor="tree">
 	<t> A certificate log MUST periodically append all new log entries to the log Merkle Tree. The log MUST sign these entries by constructing a binary Merkle Tree with log entries as consecutive inputs to the tree, signing the corresponding Merkle Tree Hash, and publishing each update to the tree in a Signed Merkle Tree Update. The hashing algorithm for the Merkle Tree Hash is SHA-256.
 	</t>
 	<t>
@@ -396,21 +396,24 @@ d0 d1   d2 d3           d0 d1   d2 d3  d4 d5
     } MerkleTreeLeaf;
   </artwork>
 </figure>
-<t>
-  Here <spanx style="verb">version</spanx> is the version of the protocol the MerkleTreeLeaf (and hence, the corresponding Signed Certificate Timestamp) corresponds to. This version is v1.
-</t>
-<t>
-  <spanx style="verb">leaf_type</spanx> is the type of the leaf input. Currently, only <spanx style="verb">timestamped_entry</spanx> (corresponding to an SCT) is defined.
-</t>
-<t>
-  <spanx style="verb">timestamp</spanx> is the timestamp of the corresponding SCT issued for this certificate.
-</t>
-<t>
-  <spanx style="verb">signed_entry</spanx> is the <spanx style="verb">signed_entry</spanx> of the corresponding SCT.
-</t>
-<t>
-  <spanx style="verb">extensions</spanx> are <spanx style="verb">extensions</spanx> of the corresponding SCT.
-</t>
+        <t>
+	  Here <spanx style="verb">version</spanx> is the version of the protocol the MerkleTreeLeaf (and hence, the corresponding Signed Certificate Timestamp) corresponds to. This version is v1.
+	</t>
+	<t>
+	  <spanx style="verb">leaf_type</spanx> is the type of the leaf input. Currently, only <spanx style="verb">timestamped_entry</spanx> (corresponding to an SCT) is defined.
+	</t>
+	<t>
+	  <spanx style="verb">timestamp</spanx> is the timestamp of the corresponding SCT issued for this certificate.
+	</t>
+	<t>
+	  <spanx style="verb">signed_entry</spanx> is the <spanx style="verb">signed_entry</spanx> of the corresponding SCT.
+	</t>
+	<t>
+	  <spanx style="verb">extensions</spanx> are <spanx style="verb">extensions</spanx> of the corresponding SCT.
+	</t>
+	<t>
+	  The leaves of the Merkle Tree are the hashes of the corresponding <spanx style="verb">MerkleTreeLeaf</spanx> structures.
+	</t>
 	<t>
 	  Structure of the Signed Merkle Tree Update:
 	</t>
@@ -514,6 +517,36 @@ d0 d1   d2 d3           d0 d1   d2 d3  d4 d5
 	  </list>
 	</t>
       </section>
+      <section title="Signed Tree Head">
+	<t>
+<figure>
+  <artwork>
+    struct {
+        Version version;
+        LogID id;
+        uint64 tree_size;
+        uint64 timestamp;
+        opaque sha256_root_hash[32];
+        TreeHeadSignature tree_head_signature;
+    } SignedTreeHead;
+  </artwork>
+</figure>
+        </t>
+      </section>
+      <section title="Tree Consistency Proof">
+	<t>
+<figure>
+  <artwork>
+    struct {
+        MerkleNode consistency_nodes&lt;0..2^16-1&gt;;
+    } TreeConsistencyProof;
+  </artwork>
+</figure>
+        </t>
+	<t>
+	  This is sent in response to a request for a consistency proof between two STHs, so the log ID, version, tree_sizes and root hashes for the two STHs are known to the requester.
+	</t>
+      </section>
     </section>
     <section title="Client Messages">
       <t>
@@ -567,7 +600,7 @@ d0 d1   d2 d3           d0 d1   d2 d3  d4 d5
 	  </list>
 	</t>
       </section>
-      <section title="Retrieve STH">
+      <section title="Retrieve Latest STH">
 	<t>
 	  https://&lt;log server&gt;/ct/v1/get-sth
 	</t>
@@ -578,7 +611,7 @@ d0 d1   d2 d3           d0 d1   d2 d3  d4 d5
 	  Outputs
 	  <list style="hanging">
 	    <t hangText="sth">
-	      A base64 encoded SignedTreeHead [note: we appear to not have such a structure currently].
+	      A base64 encoded SignedTreeHead.
 	    </t>
 	  </list>
 	</t>
@@ -603,61 +636,26 @@ d0 d1   d2 d3           d0 d1   d2 d3  d4 d5
 	  Outputs
 	  <list style="hanging">
 	    <t hangText="consistency">
-	      A base64 encoded TreeConsistencyProof [TBD].
+	      A base64 encoded TreeConsistencyProof.
 	    </t>
 	  </list>
 	</t>
       </section>
-      <section title="Retrieve Chain+Proof from Log">
+      <section title="Retrieve Proof from Log by Leaf Hash">
 	<t>
-	  https://&lt;log server&gt;/ct/v1/get-chain-and-proof
+	  https://&lt;log server&gt;/ct/v1/get-proof-by-hash
 	</t>
 	<t>
 	  Inputs
 	  <list style="hanging">
-	    <t hangText="leaf_index">
-	      The index of the desired entry.
-	    </t>
-	    <t hangText="tree_size">
-	      The tree_size of the tree for which the proof is desired.
-	    </t>
-	  </list>
-	  The tree size must designate a published STH.
-	</t>
-	<t>
-	  Outputs
-	  <list style="hanging">
-	    <t hangText="chain">
-	      An array of base64 encoded certificates forming a certificate chain, if this entry has one.
-	    </t>
-	    <t hangText="pre_chain">
-	      An array of base64 encoded certificates forming a precertificate chain, if this entry has one.
-	    </t>
-	    <t hangText="proof">
-	      A base64 encoded MerkleProof for the requested entry relative to the tree designated by tree_size.
-	    </t>
-	  </list>
-	  Exactly one of chain and pre_chain MUST always be present.
-	</t>
-      </section>
-      <section title="Retrieve Proof from Log by Certificate">
-	<t>
-	  https://&lt;log server&gt;/ct/v1/get-proof-by-certificate
-	</t>
-	<t>
-	  Inputs
-	  <list style="hanging">
-	    <t hangText="certificate">
-	      A base64 encoded certificate.
-	    </t>
-	    <t hangText="sct">
-	      A base64 encoded SignedCertificateTimestamp if not present in the certificate.
+	    <t hangText="hash">
+	      A base64 encoded leaf hash.
 	    </t>
 	    <t hangText="tree_size">
 	      The tree_size of the tree to base the proof on.
 	    </t>
 	  </list>
-	  tree_size must designated a published STH. sct must not be present if the certificate contains an SCT.
+	  The <spanx style="verb">hash</spanx> must be calculated as defined in <xref target="tree"/>. The <spanx style="verb">tree_size</spanx> must designate a published STH.
 	</t>
 	<t>
 	  Outputs
@@ -699,6 +697,41 @@ d0 d1   d2 d3           d0 d1   d2 d3  d4 d5
 	    </t>
 	  </list>
 	  [There's obviously many ways to encode the list of chains, I am happy to consider alternatives]
+	</t>
+	<t>
+	  Note that this message is not signed - the retrieved data can be verified by constructing the root hash corresponding to a retrieved STH.
+	</t>
+      </section>
+      <section title="Retrieve Chain+Merkle Proof from Log">
+	<t>
+	  https://&lt;log server&gt;/ct/v1/get-chain-and-proof
+	</t>
+	<t>
+	  Inputs
+	  <list style="hanging">
+	    <t hangText="leaf_index">
+	      The index of the desired entry.
+	    </t>
+	    <t hangText="tree_size">
+	      The tree_size of the tree for which the proof is desired.
+	    </t>
+	  </list>
+	  The tree size must designate a published STH.
+	</t>
+	<t>
+	  Outputs
+	  <list style="hanging">
+	    <t hangText="type">
+	      The string "chain" or "pre-chain".
+	    </t>
+	    <t hangText="chain">
+	      An array of base64 encoded certificates forming a certificate chain or pre-chain.
+	    </t>
+	    <t hangText="proof">
+	      A base64 encoded MerkleProof for the requested entry relative to the tree designated by tree_size.
+	    </t>
+	  </list>
+	  This API is probably only useful for debugging.
 	</t>
       </section>
     </section>
