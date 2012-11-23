@@ -46,6 +46,10 @@ class MerkleVerifier {
   bool VerifyConsistency(size_t snapshot1, size_t snapshot2,
                          const std::string &root1, const std::string &root2,
                          const std::vector<std::string> &proof);
+
+  // Return the leaf hash corresponding to the leaf input.
+  std::string LeafHash(const std::string &data);
+
  private:
   TreeHasher treehasher_;
 };

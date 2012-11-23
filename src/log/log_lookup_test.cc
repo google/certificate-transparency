@@ -65,8 +65,7 @@ TYPED_TEST(LogLookupTest, Lookup) {
   LogLookup lookup(this->db());
   // Look the new entry up.
   EXPECT_EQ(LogLookup::OK,
-            lookup.CertificateAuditProof(logged_cert.sct().timestamp(),
-                                         logged_cert.certificate_sha256_hash(),
+            lookup.CertificateAuditProof(logged_cert.merkle_leaf_hash(),
                                          &proof));
 }
 
@@ -84,15 +83,7 @@ TYPED_TEST(LogLookupTest, NotFound) {
   // Look up using a wrong hash.
   string hash = this->test_signer_.UniqueHash();
   EXPECT_EQ(LogLookup::NOT_FOUND,
-            lookup.CertificateAuditProof(logged_cert.sct().timestamp(),
-                                         hash,
-                                         &proof));
-
-  // Wrong timestamp
-  EXPECT_EQ(LogLookup::NOT_FOUND,
-            lookup.CertificateAuditProof(logged_cert.sct().timestamp()  + 1,
-                                         logged_cert.certificate_sha256_hash(),
-                                         &proof));
+            lookup.CertificateAuditProof(hash, &proof));
 }
 
 TYPED_TEST(LogLookupTest, Update) {
@@ -107,16 +98,14 @@ TYPED_TEST(LogLookupTest, Update) {
 
   // There is an entry but we don't know about it yet.
   EXPECT_EQ(LogLookup::NOT_FOUND,
-            lookup.CertificateAuditProof(logged_cert.sct().timestamp(),
-                                         logged_cert.certificate_sha256_hash(),
+            lookup.CertificateAuditProof(logged_cert.merkle_leaf_hash(),
                                          &proof));
 
   // Update
   EXPECT_EQ(LogLookup::UPDATE_OK, lookup.Update());
   // Look the new entry up.
   EXPECT_EQ(LogLookup::OK,
-            lookup.CertificateAuditProof(logged_cert.sct().timestamp(),
-                                         logged_cert.certificate_sha256_hash(),
+            lookup.CertificateAuditProof(logged_cert.merkle_leaf_hash(),
                                          &proof));
 }
 
@@ -134,8 +123,7 @@ TYPED_TEST(LogLookupTest, Verify) {
   LogLookup lookup(this->db());
   // Look the new entry up.
   EXPECT_EQ(LogLookup::OK,
-            lookup.CertificateAuditProof(logged_cert.sct().timestamp(),
-                                         logged_cert.certificate_sha256_hash(),
+            lookup.CertificateAuditProof(logged_cert.merkle_leaf_hash(),
                                          &proof));
   EXPECT_EQ(LogVerifier::VERIFY_OK,
             this->verifier_->VerifyMerkleAuditProof(logged_cert.entry(),
@@ -161,8 +149,7 @@ TYPED_TEST(LogLookupTest, VerifyWithPath) {
   for (int i = 0; i < 13; ++i) {
     EXPECT_EQ(LogLookup::OK,
               lookup.CertificateAuditProof(
-                  logged_certs[i].sct().timestamp(),
-                  logged_certs[i].certificate_sha256_hash(), &proof));
+                  logged_certs[i].merkle_leaf_hash(), &proof));
     EXPECT_EQ(LogVerifier::VERIFY_OK,
               this->verifier_->VerifyMerkleAuditProof(
                   logged_certs[i].entry(),

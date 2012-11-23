@@ -149,18 +149,19 @@ log/cert_submission_handler_test: log/cert_submission_handler_test.o \
                                   util/libutil.a 
 	$(CXX) -o $@ $^ $(SYS_LIBS)
 
+log/database_large_test: log/database_large_test.o log/libdatabase.a \
+                         log/log_signer.o log/test_signer.o \
+                         merkletree/libmerkletree.a proto/libproto.a \
+                         util/libutil.a
+	$(CXX) -o $@ $^ $(SYS_LIBS)
+
 log/database_test: log/database_test.o log/libdatabase.a \
                    log/log_signer.o log/test_signer.o \
-                   merkletree/serial_hasher.o proto/libproto.a util/libutil.a
+                   merkletree/libmerkletree.a proto/libproto.a util/libutil.a
 	$(CXX) -o $@ $^ $(SYS_LIBS)
 
 log/file_storage_test: log/file_storage_test.o log/libdatabase.a \
                        proto/libproto.a util/libutil.a
-	$(CXX) -o $@ $^ $(SYS_LIBS)
-
-log/database_large_test: log/database_large_test.o log/libdatabase.a \
-                         merkletree/serial_hasher.o proto/libproto.a \
-                         log/log_signer.o log/test_signer.o util/libutil.a
 	$(CXX) -o $@ $^ $(SYS_LIBS)
 
 log/frontend_signer_test: log/frontend_signer_test.o log/frontend_signer.o \
@@ -182,7 +183,7 @@ log/log_lookup_test: log/log_lookup_test.o log/test_signer.o log/libdatabase.a \
 	$(CXX) -o $@ $^ $(SYS_LIBS)
 
 log/log_signer_test: log/log_signer_test.o log/log_signer.o log/test_signer.o \
-                     merkletree/serial_hasher.o proto/libproto.a util/libutil.a
+                     merkletree/libmerkletree.a proto/libproto.a util/libutil.a
 	$(CXX) -o $@ $^ $(SYS_LIBS)
 
 log/tree_signer_test: log/tree_signer_test.o log/log_signer.o \
@@ -200,7 +201,7 @@ client/ct: client/ct.o client/client.o client/log_client.o client/ssl_client.o \
 server/ct-server: server/ct-server.o $(LOCAL_LIBS)
 	$(CXX) -o $@ $^ $(SYS_LIBS) -lldns
 
-test: unit_tests
+test: all
 	proto/serializer_test
 	merkletree/serial_hasher_test
 	merkletree/tree_hasher_test

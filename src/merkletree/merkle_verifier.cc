@@ -39,7 +39,7 @@ string MerkleVerifier::RootFromPath(size_t leaf, size_t tree_size,
   size_t node = leaf - 1;
   size_t last_node = tree_size  - 1;
 
-  string node_hash = treehasher_.HashLeaf(data);
+  string node_hash = LeafHash(data);
   std::vector<string>::const_iterator it = path.begin();
 
   while (last_node) {
@@ -130,4 +130,8 @@ bool MerkleVerifier::VerifyConsistency(size_t snapshot1, size_t snapshot2,
 
   // Verify the second root.
   return node2_hash == root2 && it == proof.end();
+}
+
+string MerkleVerifier::LeafHash(const std::string &data) {
+  return treehasher_.HashLeaf(data);
 }

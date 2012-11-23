@@ -687,13 +687,11 @@ class CTLogManager {
     return reply;
   }
 
-  LookupReply QueryAuditProof(uint64_t timestamp,
-                              const std::string &certificate_hash,
+  LookupReply QueryAuditProof(const std::string &merkle_leaf_hash,
                               ct::MerkleAuditProof *proof) {
     ct::MerkleAuditProof local_proof;
     LogLookup::LookupResult res =
-        lookup_->CertificateAuditProof(timestamp, certificate_hash,
-                                       &local_proof);
+        lookup_->CertificateAuditProof(merkle_leaf_hash, &local_proof);
     if (res == LogLookup::OK) {
       proof->CopyFrom(local_proof);
       return MERKLE_AUDIT_PROOF;
@@ -827,7 +825,7 @@ class CTServer : public Server {
        message.command() != ClientMessage::SUBMIT_CA_BUNDLE &&
        (message.command() != ClientMessage::LOOKUP_AUDIT_PROOF
         || message.lookup().type() !=
-        ClientLookup::MERKLE_AUDIT_PROOF_BY_TIMESTAMP_AND_HASH)) {
+        ClientLookup::MERKLE_AUDIT_PROOF_BY_LEAF_HASH)) {
          SendError(ServerError::UNSUPPORTED_COMMAND);
          return;
        }
@@ -859,8 +857,7 @@ class CTServer : public Server {
    if (message.command() == ClientMessage::LOOKUP_AUDIT_PROOF) {
      MerkleAuditProof proof;
      CTLogManager::LookupReply reply =
-         manager_->QueryAuditProof(message.lookup().certificate_timestamp(),
-                                   message.lookup().certificate_sha256_hash(),
+         manager_->QueryAuditProof(message.lookup().merkle_leaf_hash(),
                                    &proof);
      if (reply == CTLogManager::MERKLE_AUDIT_PROOF) {
        SendMerkleProof(proof);

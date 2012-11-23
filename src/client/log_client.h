@@ -7,7 +7,7 @@
 #include "client/client.h"
 #include "proto/ct.pb.h"
 
-// V0 client that speaks the protobuf format.
+// V1 client that speaks the protobuf format.
 class LogClient {
  public:
   LogClient(const std::string &server, uint16_t port);
@@ -25,9 +25,7 @@ class LogClient {
   bool UploadSubmission(const std::string &submission, bool pre,
                         ct::SignedCertificateTimestamp *sct);
 
-  // Entry must have the leaf certificate set.
-  bool QueryAuditProof(const ct::LogEntry &entry,
-                       const ct::SignedCertificateTimestamp &sct,
+  bool QueryAuditProof(const std::string &merkle_leaf_hash,
                        ct::MerkleAuditProof *proof);
 
   static std::string ErrorString(ct::ServerError::ErrorCode error);

@@ -370,11 +370,11 @@ static SSLClient::HandshakeResult Connect() {
   if (result == SSLClient::OK) {
     SSLClientCTData ct_data;
     client.GetSSLClientCTData(&ct_data);
-    if (ct_data.attached_sct_size() > 0) {
-      LOG(INFO) << "Received " << ct_data.attached_sct_size() << " SCTs";
+    if (ct_data.attached_sct_info_size() > 0) {
+      LOG(INFO) << "Received " << ct_data.attached_sct_info_size() << " SCTs";
       VLOG(5) << "Received SCTs:";
-      for (int i = 0; i < ct_data.attached_sct_size(); ++i)
-        VLOG(5) << ct_data.attached_sct(i).DebugString();
+      for (int i = 0; i < ct_data.attached_sct_info_size(); ++i)
+        VLOG(5) << ct_data.attached_sct_info(i).DebugString();
       string ct_data_out_file = FLAGS_ssl_client_ct_data_out;
       if (!ct_data_out_file.empty()) {
         std::ofstream checkpoint_out(ct_data_out_file.c_str(),
@@ -409,7 +409,7 @@ static AuditResult Audit() {
   CHECK(ct_data.ParseFromString(serialized_data))
       << "Failed to parse the stored certificate CT data";
   CHECK(ct_data.has_reconstructed_entry());
-  CHECK_GT(ct_data.attached_sct_size(), 0);
+  CHECK_GT(ct_data.attached_sct_info_size(), 0);
 
   LogVerifier *verifier = GetLogVerifierFromFlags();
   string key_id = verifier->KeyID();
@@ -422,11 +422,11 @@ static AuditResult Audit() {
 
   AuditResult audit_result = PROOF_NOT_FOUND;
 
-  for (int i = 0; i < ct_data.attached_sct_size(); ++i) {
+  for (int i = 0; i < ct_data.attached_sct_info_size(); ++i) {
     LOG(INFO) << "Signed Certificate Timestamp number " << i + 1 << ":\n"
-              << ct_data.attached_sct(i).DebugString();
+              << ct_data.attached_sct_info(i).sct().DebugString();
 
-    string sct_id = ct_data.attached_sct(i).id().key_id();
+    string sct_id = ct_data.attached_sct_info(i).sct().id().key_id();
     if (sct_id != key_id) {
       LOG(WARNING) << "Audit skipped: log server Key ID " << sct_id
                    << " does not match verifier's ID";
@@ -434,15 +434,17 @@ static AuditResult Audit() {
     }
 
     MerkleAuditProof proof;
-    if (!client.QueryAuditProof(ct_data.reconstructed_entry(),
-                                ct_data.attached_sct(i), &proof)) {
+
+    if (!client.QueryAuditProof(ct_data.attached_sct_info(i).merkle_leaf_hash(),
+                                &proof)) {
       LOG(INFO) << "Failed to retrieve audit proof";
       continue;
     } else {
       LOG(INFO) << "Received proof " << proof.DebugString();
       LogVerifier::VerifyResult res =
           verifier->VerifyMerkleAuditProof(ct_data.reconstructed_entry(),
-                                           ct_data.attached_sct(i), proof);
+                                           ct_data.attached_sct_info(i).sct(),
+                                           proof);
       if (res != LogVerifier::VERIFY_OK) {
         LOG(ERROR) << "Verify error: " << LogVerifier::VerifyResultString(res);
         LOG(ERROR) << "Retrieved Merkle proof is invalid.";

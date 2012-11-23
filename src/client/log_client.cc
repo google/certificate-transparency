@@ -4,7 +4,6 @@
 #include "include/ct.h"
 #include "client/client.h"
 #include "client/log_client.h"
-#include "merkletree/serial_hasher.h"
 #include "proto/ct.pb.h"
 #include "proto/serializer.h"
 
@@ -76,19 +75,13 @@ bool LogClient::UploadSubmission(const string &submission, bool pre,
   return ret;
 }
 
-bool LogClient::QueryAuditProof(const LogEntry &entry,
-                                const SignedCertificateTimestamp &sct,
+bool LogClient::QueryAuditProof(const string &merkle_leaf_hash,
                                 MerkleAuditProof *proof) {
-  CHECK(sct.has_timestamp()) << "Missing SCT timestamp";
-  CHECK_EQ(kCtVersion, sct.version()) << "SCT has unknown version";
-
   ClientMessage message;
   message.set_command(ClientMessage::LOOKUP_AUDIT_PROOF);
   message.mutable_lookup()->set_type(
-      ClientLookup::MERKLE_AUDIT_PROOF_BY_TIMESTAMP_AND_HASH);
-  message.mutable_lookup()->set_certificate_timestamp(sct.timestamp());
-  message.mutable_lookup()->set_certificate_sha256_hash(
-      Sha256Hasher::Sha256Digest(Serializer::LeafCertificate(entry)));
+      ClientLookup::MERKLE_AUDIT_PROOF_BY_LEAF_HASH);
+  message.mutable_lookup()->set_merkle_leaf_hash(merkle_leaf_hash);
   if (!SendMessage(message))
     return false;
   ServerMessage reply;

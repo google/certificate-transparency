@@ -57,12 +57,26 @@ class LogVerifier {
   // 00:00 UTC time.
   VerifyResult VerifySignedCertificateTimestamp(
       const ct::LogEntry &entry, const ct::SignedCertificateTimestamp &sct,
-      uint64_t begin_range, uint64_t end_range) const;
+      uint64_t begin_range, uint64_t end_range,
+      std::string *merkle_leaf_hash) const;
 
   // Verify that the timestamp is not in the future, and the signature is valid.
   VerifyResult VerifySignedCertificateTimestamp(
+      const ct::LogEntry &entry, const ct::SignedCertificateTimestamp &sct,
+      std::string *merkle_leaf_hash) const;
+
+  VerifyResult VerifySignedCertificateTimestamp(
+      const ct::LogEntry &entry, const ct::SignedCertificateTimestamp &sct,
+      uint64_t begin_range, uint64_t end_range) const {
+    return VerifySignedCertificateTimestamp(entry, sct, begin_range,
+                                            end_range, NULL);
+  }
+  // Verify that the timestamp is not in the future, and the signature is valid.
+  VerifyResult VerifySignedCertificateTimestamp(
       const ct::LogEntry &entry,
-      const ct::SignedCertificateTimestamp &sct) const;
+      const ct::SignedCertificateTimestamp &sct) const {
+    return VerifySignedCertificateTimestamp(entry, sct, NULL);
+  }
 
   // Verify that the timestamp is in the given range,
   // and the signature is valid.
@@ -86,7 +100,7 @@ class LogVerifier {
 
  private:
   LogSigVerifier *sig_verifier_;
-  MerkleVerifier *tree_verifier_;
+  MerkleVerifier *merkle_verifier_;
 
   bool IsBetween(uint64_t timestamp, uint64_t earliest, uint64_t latest) const;
 };
