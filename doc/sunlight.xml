@@ -414,32 +414,26 @@ d0 d1   d2 d3           d0 d1   d2 d3  d4 d5
 	<t>
 	  The leaves of the Merkle Tree are the hashes of the corresponding <spanx style="verb">MerkleTreeLeaf</spanx> structures.
 	</t>
+      </section>
+      <section title="Tree Head Signature">
 	<t>
-	  Structure of the Signed Merkle Tree Update:
+	  This is used in a Signed Tree Head (STH), see <xref target="fetch_sth"/>.
 	</t>
+	<t>
 <figure>
   <artwork>
-    struct {
+    digitally-signed struct {
         Version version;
-        LogID id;
-        uint64 old_tree_size;
+        SignatureType signature_type = tree_hash;
         uint64 timestamp;
-        MerkleTreeLeaf new_leaves&lt;0..2^64-1&gt;;
-        digitally-signed struct {
-            Version version;
-            SignatureType signature_type = tree_hash;
-            uint64 timestamp;
-            uint64 tree_size;
-            opaque sha256_root_hash[32];
-        } TreeHeadSignature;
-    } SignedMerkleTreeUpdate;
+        uint64 tree_size;
+        opaque sha256_root_hash[32];
+    } TreeHeadSignature;
   </artwork>
 </figure>
-	<t>
-	  <spanx style="verb">version</spanx> is the version of the protocol the SignedMerkleTreeUpdate conforms to. This version is v1.
 	</t>
 	<t>
-	  <spanx style="verb">old_tree_size</spanx> is the number of entries in the tree prior to this update.
+	  <spanx style="verb">version</spanx> is the version of the protocol the TreeHeadSignature conforms to. This version is v1.
 	</t>
 	<t>
 	  <spanx style="verb">timestamp</spanx> is the current time. The timestamp MUST be at least as recent as the most recent SCT timestamp in the tree. Each subsequent timestamp MUST be more recent than the timestamp of the previous update.
@@ -448,73 +442,9 @@ d0 d1   d2 d3           d0 d1   d2 d3  d4 d5
 	  <spanx style="verb">tree_size</spanx> equals the number of entries in the new tree.
 	</t>
 	<t>
-	  <spanx style="verb">new_leaves</spanx> is the list of leaves added to the tree in this update, ordered by leaf index. This order can be fixed arbitrarily amongst new entries.
-	</t>
-	<t>
 	  <spanx style="verb">sha256_root_hash</spanx> is the root of the Merkle Hash Tree.
 	</t>
-	<t>The log MUST produce a Signed Merkle Tree Update at least as often as the Maximum Merge Delay. In the unlikely event that it receives no new submissions during an MMD period, the log SHALL sign the same Merkle Tree Hash with a fresh timestamp.
-	</t>
-      </section>
-      <section title="Audit Proofs">
-	<t> It is possible to audit the entire log by computing the current <spanx style="verb">sha256_root_hash</spanx> value from consecutive Signed Merkle Tree Updates, and verifying the Tree Head Signature. We rely on cross-checks of the Signed Tree Head between auditors to verify that their views of the log are consistent.
-	</t>
-	<t>
-	  Additionally, logs provide Merkle audit proofs for efficient partial checks. (In fact, anyone can compute audit proofs from the full log.) Merkle audit proofs allow auditors to efficiently verify that a certificate for which an SCT has been issued indeed appears in the log, without inspecting the entire log.
-	</t>
-	<t>
-	  Structure of the Merkle audit proof:
-	</t>
-<figure>
-  <artwork>
-    struct {
-        opaque sha256_hash[32];
-    } MerkleNode;
-  </artwork>
-</figure>
-<figure>
-  <artwork>
-    struct {
-        Version version;
-        LogID id;
-        uint64 tree_size;
-        uint64 timestamp;
-        uint64 leaf_index;
-        MerkleNode audit_path&lt;0..2^16-1&gt;;
-        TreeHeadSignature tree_head_signature;
-    } MerkleAuditProof;
-  </artwork>
-</figure>
-	<t>
-	  <spanx style="verb">tree_size</spanx> is the number of entries in the tree that this proof is for.
-	</t>
-	<t>
-	  <spanx style="verb">timestamp</spanx> is the corresponding timestamp.
-	</t>
-	<t>
-	  <spanx style="verb">leaf_index</spanx> is the index of the audited node in the Merkle tree, from 0 to <spanx style="verb">tree_size - 1</spanx>.
-	</t>
-	<t>
-	  <spanx style="verb">audit_path</spanx> is a list of additional nodes in the Merkle tree required for reconstructing the root hash corresponding to the <spanx style="verb">tree_size</spanx>. Nodes must be listed from leaf to root level, i.e., in the order they are used in the Merkle Tree Hash computation, as defined in <xref target='merkle_paths' />. <spanx style="emph">Notice that the left-right ordering is determined by the position of the leaf.</spanx> The leaf node under audit as well as the root node shall be omitted from the path.
-	</t>
-	<t>
-	  <spanx style="verb">tree_head_signature</spanx> is the TreeHeadSignature for generation <spanx style="verb">tree_size</spanx>.
-	</t>
-	<t>
-          A valid audit proof for a Merkle Tree Leaf MUST satisfy the following:
-	</t>
-	<t>
-	  <list style='symbols'>
-	    <t>
-	      The <spanx style="verb">tree_size</spanx> MUST be at least 1;
-	    </t>
-	    <t>
-	      The <spanx style="verb">leaf_index</spanx> MUST NOT exceed <spanx style="verb">tree_size - 1</spanx>;
-	    </t>
-	    <t>
-	      The <spanx style="verb">tree_head_signature</spanx> MUST be a valid signature on the corresponding <spanx style="verb">version</spanx>, <spanx style="verb">timestamp</spanx>, <spanx style="verb">tree_size</spanx>, and the root hash reconstructed from the Merkle Tree Leaf, <spanx style="verb">leaf_index</spanx> and <spanx style="verb">audit_path</spanx>.
-	    </t>
-	  </list>
+	<t>The log MUST produce a Tree Head Signature at least as often as the Maximum Merge Delay. In the unlikely event that it receives no new submissions during an MMD period, the log SHALL sign the same Merkle Tree Hash with a fresh timestamp.
 	</t>
       </section>
     </section>
@@ -578,7 +508,7 @@ d0 d1   d2 d3           d0 d1   d2 d3  d4 d5
 	  Outputs are the same as <xref target="sct"/>.
 	</t>
       </section>
-      <section title="Retrieve Latest STH">
+      <section title="Retrieve Latest STH" anchor="fetch_sth">
 	<t>
 	  GET https://&lt;log server&gt;/ct/v1/get-sth
 	</t>
@@ -591,7 +521,7 @@ d0 d1   d2 d3           d0 d1   d2 d3  d4 d5
 	    <t hangText="tree_size">
 	      The size of the tree, in entries, in decimal.
 	    </t>
-	    <t hangText="tree_size">
+	    <t hangText="timestamp">
 	      The timestamp, in decimal.
 	    </t>
 	    <t hangText="sha256_root_hash">
@@ -603,7 +533,7 @@ d0 d1   d2 d3           d0 d1   d2 d3  d4 d5
 	  </list>
 	</t>
       </section>
-      <section title="Retrieve STH Consistency Proof">
+      <section title="Retrieve STH Consistency Proof" anchor="fetch_consistency">
 	<t>
 	  GET https://&lt;log server&gt;/ct/v1/get-sth-consistency
 	</t>
@@ -629,7 +559,7 @@ d0 d1   d2 d3           d0 d1   d2 d3  d4 d5
 	  Note that no signature is required on this data, as it is used to verify an STH, which is signed.
 	</t>
       </section>
-      <section title="Retrieve Merkle Audit Proof from Log by Leaf Hash">
+      <section title="Retrieve Merkle Audit Proof from Log by Leaf Hash" anchor="fetch_proof">
 	<t>
 	  GET https://&lt;log server&gt;/ct/v1/get-proof-by-hash
 	</t>
@@ -660,7 +590,7 @@ d0 d1   d2 d3           d0 d1   d2 d3  d4 d5
 	  </list>
 	</t>
       </section>
-      <section title="Retrieve Chains from Log">
+      <section title="Retrieve Chains from Log" anchor="fetch_chains">
 	<t>
 	  GET https://&lt;log server&gt;/ct/v1/get-chains
 	</t>
@@ -735,6 +665,82 @@ d0 d1   d2 d3           d0 d1   d2 d3  d4 d5
 	    </t>
 	  </list>
 	  This API is probably only useful for debugging.
+	</t>
+      </section>
+    </section>
+    <section title="Clients">
+      <t>
+	There are various different functions clients of the log might perform. We describe here some typical clients and how they could function. Any inconsistency may be used as evidence that a log has not behaved correctly, and the signatures on the data structures prevent the log from denying that misbehaviour.
+      </t>
+      <t>
+	All clients should gossip with each other, exchanging STHs at least: this is all that is required to ensure that they all have a consistent view. The exact mechanism for gossip is TBD, but it is expected there will be a variety.
+      </t>
+      <section title="Monitor">
+	<t>
+	  Monitors watch the log and check that it behaves correctly. They also watch for certificates of interest.
+	</t>
+	<t>
+	  A monitor needs to, at least, inspect every new entry in the log. It may also want to keep a copy of the entire log. In order to do this, it should follow these steps:
+	  <list style="numbers">
+	    <t>
+	      Fetch the current STH using <xref target="fetch_sth"/>.
+	    </t>
+	    <t>
+	      Verify the STH signature.
+	    </t>
+	    <t>
+	      Fetch all the entries in the tree corresponding to the STH using <xref target="fetch_chains"/>.
+	    </t>
+	    <t>
+	      Confirm that the tree made from the fetched entries produces the same hash as that in the STH.
+	    </t>
+	    <t anchor="monitor_loop">
+	      Fetch the current STH using <xref target="fetch_sth"/>. Repeat until STH changes.
+	    </t>
+	    <t>
+	      Verify the STH signature.
+	    </t>
+	    <t>
+	      Fetch all the new entries in the tree corresponding to the STH using <xref target="fetch_chains"/>. If they remain unavailable for an extended period, then this should be viewed as misbehaviour on the part of the log.
+	    </t>
+	    <t>
+	      Either:
+	      <list style="numbers">
+		<t>
+		  Verify that the updated list of all entries generates a tree with the same hash as the new STH.
+		</t>
+	      </list>
+	      Or, if it is not keeping all log entries:
+	      <list style="numbers">
+		<t>
+		  Fetch a consistency proof for the new STH with the previous STH using <xref target="fetch_consistency"/>.
+		</t>
+		<t>
+		  Verify the consistency proof.
+		</t>
+		<t>
+		  Verify that the new entries generate the corresponding elements in the consistency proof.
+		</t>
+	      </list>
+	    </t>
+	    <t>
+	      Go to <xref target="monitor_loop"/>.
+	    </t>
+	  </list>
+	</t>
+      </section>
+      <section title="Auditor">
+	<t>
+	  Auditors take partial information about a log as input and verify that this information is consistent with other partial information they have. An auditor might be an integral component of a TLS client, it might be a standalone service or it might be a secondary function of a monitor.
+	</t>
+	<t>
+	  Any pair of STHs from the same log can be verified by requesting a consistency proof using <xref target="fetch_consistency"/>.
+	</t>
+	<t>
+	  A certificate accompanied by an SCT can be verified against any STH dated after the SCT timestamp + the Maximum Merge Delay by requesting a Merkle Audit Proof using <xref target="fetch_proof"/>.
+	</t>
+	<t>
+	  Auditors can fetch STHs from time to time of their own accord, of course, using <xref target="fetch_sth"/>.
 	</t>
       </section>
     </section>
