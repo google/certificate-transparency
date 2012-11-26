@@ -300,12 +300,12 @@ d0 d1   d2 d3           d0 d1   d2 d3  d4 d5
 	<figure>
 	  <artwork>
     struct {
-        Version version;
+        Version sct_version;
         LogID id;
         uint64 timestamp;
         CtExtensions extensions;
         digitally-signed struct {
-            Version version;
+            Version sct_version;
             SignatureType signature_type = certificate_timestamp;	    
             uint64 timestamp;
             LogEntryType entry_type;
@@ -517,50 +517,20 @@ d0 d1   d2 d3           d0 d1   d2 d3  d4 d5
 	  </list>
 	</t>
       </section>
-      <section title="Signed Tree Head">
-	<t>
-<figure>
-  <artwork>
-    struct {
-        Version version;
-        LogID id;
-        uint64 tree_size;
-        uint64 timestamp;
-        opaque sha256_root_hash[32];
-        TreeHeadSignature tree_head_signature;
-    } SignedTreeHead;
-  </artwork>
-</figure>
-        </t>
-      </section>
-      <section title="Tree Consistency Proof">
-	<t>
-<figure>
-  <artwork>
-    struct {
-        MerkleNode consistency_nodes&lt;0..2^16-1&gt;;
-    } TreeConsistencyProof;
-  </artwork>
-</figure>
-        </t>
-	<t>
-	  This is sent in response to a request for a consistency proof between two STHs, so the log ID, version, tree_sizes and root hashes for the two STHs are known to the requester.
-	</t>
-      </section>
     </section>
     <section title="Client Messages">
       <t>
-	In general, messages are sent as HTTPS POST requests (GETs are not used because some queries involve more data than may be easily processed by standard libraries in a URL). Parameters and responses are encoded as JSON objects. Binary data is base64 encoded as specified in the individual messages.
+	Messages are sent as HTTPS GET or POST requests. Parameters for POSTs and all responses are encoded as JSON objects. Parameters for GETs are encoded as URL parameters. Binary data is base64 encoded as specified in the individual messages.
       </t>
       <t>
-	Note that all CT data structures are defined as TLS structures, so the JSON encoding is a transport for these binary structures, they are not broken out into JSON structures.
+	The &lt;log server&gt; prefix can include a path as well as a server name and a port. It must map one-to-one to a known public key (how this mapping is distributed is out of scope for this document).
       </t>
       <t>
-	The &lt;log server&gt; prefix can include a path as well as a server name and a port.
+	In general, where needed, the <spanx style="verb">version</spanx> is v1 and the <spanx style="verb">id</spanx> is the log id for the log server queried.
       </t>
-      <section title="Add Chain to Log">
+      <section title="Add Chain to Log" anchor="sct">
 	<t>
-	  https://&lt;log server&gt;/ct/v1/add-chain
+	  POST https://&lt;log server&gt;/ct/v1/add-chain
 	</t>
 	<t>
 	  Inputs
@@ -573,15 +543,28 @@ d0 d1   d2 d3           d0 d1   d2 d3  d4 d5
 	<t>
 	  Outputs
 	  <list style="hanging">
-	    <t hangText="sct">
-	      A base64 encoded SignedCertificateTimestamp.
+	    <t hangText="sct_version">
+	      The version of the SignedCertificateTimestamp structure, in decimal. A compliant v1 implementation MUST NOT expect this to be 0 (i.e. v1).
+	    </t>
+	    <t hangText="id">
+	      The log ID, base64 encoded. Since clients who request an SCT for inclusion in the TLS handshake are not required to verify it, we do not assume they know the ID of the log.
+	    </t>
+	    <t hangText="timestamp">
+	      The SCT timestamp, in decimal.
+	    </t>
+	    <t hangText="extensions">
+	      [TBD]
+	    </t>
+	    <t hangText="signature">
+	      The SCT signature, base64 encoded.
 	    </t>
 	  </list>
+	  If the <spanx style="verb">sct_version</spanx> is not v1, then a v1 client may be unable to verify the signature. It MUST NOT construe this as an error.
 	</t>
       </section>
       <section title="Add PreCertChain to Log">
 	<t>
-	  https://&lt;log server&gt;/ct/v1/add-pre-chain
+	  POST https://&lt;log server&gt;/ct/v1/add-pre-chain
 	</t>
 	<t>
 	  Inputs
@@ -592,17 +575,12 @@ d0 d1   d2 d3           d0 d1   d2 d3  d4 d5
 	  </list>
 	</t>
 	<t>
-	  Outputs
-	  <list style="hanging">
-	    <t hangText="sct">
-	      A base64 encoded SignedCertificateTimestamp.
-	    </t>
-	  </list>
+	  Outputs are the same as <xref target="sct"/>.
 	</t>
       </section>
       <section title="Retrieve Latest STH">
 	<t>
-	  https://&lt;log server&gt;/ct/v1/get-sth
+	  GET https://&lt;log server&gt;/ct/v1/get-sth
 	</t>
 	<t>
 	  No inputs.
@@ -610,15 +588,24 @@ d0 d1   d2 d3           d0 d1   d2 d3  d4 d5
 	<t>
 	  Outputs
 	  <list style="hanging">
-	    <t hangText="sth">
-	      A base64 encoded SignedTreeHead.
+	    <t hangText="tree_size">
+	      The size of the tree, in entries, in decimal.
+	    </t>
+	    <t hangText="tree_size">
+	      The timestamp, in decimal.
+	    </t>
+	    <t hangText="sha256_root_hash">
+	      The root hash of the tree, in base64.
+	    </t>
+	    <t hangText="tree_head_signature">
+	      A TreeHeadSignature for the above data.
 	    </t>
 	  </list>
 	</t>
       </section>
       <section title="Retrieve STH Consistency Proof">
 	<t>
-	  https://&lt;log server&gt;/ct/v1/get-sth-consistency
+	  GET https://&lt;log server&gt;/ct/v1/get-sth-consistency
 	</t>
 	<t>
 	  Inputs
@@ -636,14 +623,15 @@ d0 d1   d2 d3           d0 d1   d2 d3  d4 d5
 	  Outputs
 	  <list style="hanging">
 	    <t hangText="consistency">
-	      A base64 encoded TreeConsistencyProof.
+	      An array of Merkle tree nodes, base64 encoded.
 	    </t>
 	  </list>
+	  Note that no signature is required on this data, as it is used to verify an STH, which is signed.
 	</t>
       </section>
-      <section title="Retrieve Proof from Log by Leaf Hash">
+      <section title="Retrieve Merkle Audit Proof from Log by Leaf Hash">
 	<t>
-	  https://&lt;log server&gt;/ct/v1/get-proof-by-hash
+	  GET https://&lt;log server&gt;/ct/v1/get-proof-by-hash
 	</t>
 	<t>
 	  Inputs
@@ -652,7 +640,7 @@ d0 d1   d2 d3           d0 d1   d2 d3  d4 d5
 	      A base64 encoded leaf hash.
 	    </t>
 	    <t hangText="tree_size">
-	      The tree_size of the tree to base the proof on.
+	      The tree_size of the tree to base the proof on, in decimal.
 	    </t>
 	  </list>
 	  The <spanx style="verb">hash</spanx> must be calculated as defined in <xref target="tree"/>. The <spanx style="verb">tree_size</spanx> must designate a published STH.
@@ -660,15 +648,21 @@ d0 d1   d2 d3           d0 d1   d2 d3  d4 d5
 	<t>
 	  Outputs
 	  <list style="hanging">
-	    <t hangText="proof">
-	      A base64 encoded MerkleTreeProof.
+	    <t hangText="timestamp">
+	      The tree's timestamp, in decimal.
+	    </t>
+	    <t hangText="leaf_index">
+	      The index of the leaf corresponding to the <spanx style="verb">hash</spanx> parameter.
+	    </t>
+	    <t hangText="audit_path">
+	      An array of base64 encoded Merkle tree nodes proving the inclusion of the chosen certificate.
 	    </t>
 	  </list>
 	</t>
       </section>
       <section title="Retrieve Chains from Log">
 	<t>
-	  https://&lt;log server&gt;/ct/v1/get-chains
+	  GET https://&lt;log server&gt;/ct/v1/get-chains
 	</t>
 	<t>
 	  Inputs
@@ -693,6 +687,12 @@ d0 d1   d2 d3           d0 d1   d2 d3  d4 d5
 		<t hangText="chain">
 		  A certificate chain or pre-chain.
 		</t>
+		<t hangText="timestamp">
+		  The timestamp for this entry, in decimal.
+		</t>
+		<t hangText="extensions">
+		  The extensions for this entry [format TBD].
+		</t>
 	      </list>
 	    </t>
 	  </list>
@@ -702,9 +702,9 @@ d0 d1   d2 d3           d0 d1   d2 d3  d4 d5
 	  Note that this message is not signed - the retrieved data can be verified by constructing the root hash corresponding to a retrieved STH.
 	</t>
       </section>
-      <section title="Retrieve Chain+Merkle Proof from Log">
+      <section title="Retrieve Chain+Merkle Audit Proof from Log">
 	<t>
-	  https://&lt;log server&gt;/ct/v1/get-chain-and-proof
+	  GET https://&lt;log server&gt;/ct/v1/get-chain-and-proof
 	</t>
 	<t>
 	  Inputs
@@ -727,8 +727,11 @@ d0 d1   d2 d3           d0 d1   d2 d3  d4 d5
 	    <t hangText="chain">
 	      An array of base64 encoded certificates forming a certificate chain or pre-chain.
 	    </t>
-	    <t hangText="proof">
-	      A base64 encoded MerkleProof for the requested entry relative to the tree designated by tree_size.
+	    <t hangText="timestamp">
+	      The tree's timestamp, in decimal.
+	    </t>
+	    <t hangText="audit_path">
+	      An array of base64 encoded Merkle tree nodes proving the inclusion of the chosen certificate.
 	    </t>
 	  </list>
 	  This API is probably only useful for debugging.
