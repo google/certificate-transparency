@@ -331,7 +331,7 @@ d0 d1   d2 d3           d0 d1   d2 d3  d4 d5
 	  <spanx style="verb">timestamp</spanx> is the current UTC time since epoch (January 1, 1970, 00:00), in milliseconds.
 	</t>
 	<t>
-	  <spanx style="verb">entry_type</spanx> is assumed to be implicit from the context in which the SCT is presented.
+	  <spanx style="verb">entry_type</spanx> may be implicit from the context in which the SCT is presented.
 	</t>
 	<t>
 	  <spanx style="verb">signed_entry</spanx> is the <spanx style="verb">leaf_certificate</spanx> (in case of an X509ChainEntry), or <spanx style="verb">tbs_certificate</spanx> (in case of a PrecertChainEntry).
@@ -498,7 +498,7 @@ d0 d1   d2 d3           d0 d1   d2 d3  d4 d5
 	      The SCT signature, base64 encoded.
 	    </t>
 	  </list>
-	  If the <spanx style="verb">sct_version</spanx> is not v1, then a v1 client may be unable to verify the signature. It MUST NOT construe this as an error.
+	  If the <spanx style="verb">sct_version</spanx> is not v1, then a v1 client may be unable to verify the signature. It MUST NOT construe this as an error. [Note: log clients don't need to be able to verify this structure, only TLS clients do - if we were to serve the structure binary, then we could completely change it without requiring an upgrade to v1 clients].
 	</t>
       </section>
       <section title="Add PreCertChain to Log">
