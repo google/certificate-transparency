@@ -265,6 +265,9 @@ d0 d1   d2 d3           d0 d1   d2 d3  d4 d5
 	  Logs MAY limit the length of chain they will accept.
 	</t>
 	<t>
+	  <spanx style="verb">entry_type</spanx> is the type of this entry. Future revisions of this protocol version may add new LogEntryType values. <xref target="client_messages"/> explains how clients should handle unknown entry types.
+	</t>
+	<t>
 	  <spanx style="verb">leaf_certificate</spanx> is the end-entity certificate submitted for auditing.
 	</t>
 	<t>
@@ -322,10 +325,13 @@ d0 d1   d2 d3           d0 d1   d2 d3  d4 d5
 	  The encoding of the digitally-signed element is defined in <xref target='RFC5246'/>.
 	</t>
 	<t>
-	  <spanx style="verb">version</spanx> is the version of the protocol the SCT conforms to. This version is v1.
+	  <spanx style="verb">sct_version</spanx> is the version of the protocol the SCT conforms to. This version is v1.
 	</t>
 	<t>
 	  <spanx style="verb">timestamp</spanx> is the current UTC time since epoch (January 1, 1970, 00:00), in milliseconds.
+	</t>
+	<t>
+	  <spanx style="verb">entry_type</spanx> is assumed to be implicit from the context in which the SCT is presented.
 	</t>
 	<t>
 	  <spanx style="verb">signed_entry</spanx> is the <spanx style="verb">leaf_certificate</spanx> (in case of an X509ChainEntry), or <spanx style="verb">tbs_certificate</spanx> (in case of a PrecertChainEntry).
@@ -362,6 +368,9 @@ d0 d1   d2 d3           d0 d1   d2 d3  d4 d5
      } SignedCertificateTimestampList;
 	  </artwork>
 	</figure>
+        <t>
+        Here <spanx style="verb">SerializedSCT</spanx> is an opaque bytestring that contains the serialized TLS structure. This encoding ensures that clients can decode each SCT individually (i.e., if there is a version upgrade, out of date clients can still parse old SCTs while skipping over new SCTs whose version they don't understand).
+        </t>
 	<t>
 	  SCTs embedded in the TLS Authorization Extension are each encoded as an individual AuthorizationDataEntry <xref target='RFC5878'/>.
 	</t>
@@ -397,10 +406,10 @@ d0 d1   d2 d3           d0 d1   d2 d3  d4 d5
   </artwork>
 </figure>
         <t>
-	  Here <spanx style="verb">version</spanx> is the version of the protocol the MerkleTreeLeaf (and hence, the corresponding Signed Certificate Timestamp) corresponds to. This version is v1.
+	  Here <spanx style="verb">version</spanx> is the version of the protocol the MerkleTreeLeaf corresponds to. This version is v1.
 	</t>
 	<t>
-	  <spanx style="verb">leaf_type</spanx> is the type of the leaf input. Currently, only <spanx style="verb">timestamped_entry</spanx> (corresponding to an SCT) is defined.
+	  <spanx style="verb">leaf_type</spanx> is the type of the leaf input. Currently, only <spanx style="verb">timestamped_entry</spanx> (corresponding to an SCT) is defined. Future revisions of this protocol version may add new MerkleLeafType types. <xref target="client_messages"/> explains how clients should handle unknown leaf types.
 	</t>
 	<t>
 	  <spanx style="verb">timestamp</spanx> is the timestamp of the corresponding SCT issued for this certificate.
@@ -417,7 +426,7 @@ d0 d1   d2 d3           d0 d1   d2 d3  d4 d5
       </section>
       <section title="Tree Head Signature">
 	<t>
-	  This is used in a Signed Tree Head (STH), see <xref target="fetch_sth"/>.
+        Every time the log appends new entries to the tree, the log MUST sign the corresponding tree hash and tree information (see also the corresponding Signed Tree Head client message in <xref target="fetch_sth"/>). The signature input is structured as follows:
 	</t>
 	<t>
 <figure>
@@ -448,7 +457,7 @@ d0 d1   d2 d3           d0 d1   d2 d3  d4 d5
 	</t>
       </section>
     </section>
-    <section title="Client Messages">
+    <section title="Client Messages" anchor="client_messages">
       <t>
 	Messages are sent as HTTPS GET or POST requests. Parameters for POSTs and all responses are encoded as JSON objects. Parameters for GETs are encoded as URL parameters. Binary data is base64 encoded as specified in the individual messages.
       </t>
@@ -508,7 +517,7 @@ d0 d1   d2 d3           d0 d1   d2 d3  d4 d5
 	  Outputs are the same as <xref target="sct"/>.
 	</t>
       </section>
-      <section title="Retrieve Latest STH" anchor="fetch_sth">
+      <section title="Retrieve Latest Signed Tree Head" anchor="fetch_sth">
 	<t>
 	  GET https://&lt;log server&gt;/ct/v1/get-sth
 	</t>
@@ -533,7 +542,7 @@ d0 d1   d2 d3           d0 d1   d2 d3  d4 d5
 	  </list>
 	</t>
       </section>
-      <section title="Retrieve STH Consistency Proof" anchor="fetch_consistency">
+      <section title="Retrieve Merkle Consistency Proof between two Signed Tree Heads" anchor="fetch_consistency">
 	<t>
 	  GET https://&lt;log server&gt;/ct/v1/get-sth-consistency
 	</t>
@@ -547,13 +556,13 @@ d0 d1   d2 d3           d0 d1   d2 d3  d4 d5
 	      The tree_size of the second tree, in decimal.
 	    </t>
 	  </list>
-	  Both tree sizes must be from published STHs.
+	  Both tree sizes must be from published v1 STHs.
 	</t>
 	<t>
 	  Outputs
 	  <list style="hanging">
 	    <t hangText="consistency">
-	      An array of Merkle tree nodes, base64 encoded.
+	    An array of Merkle tree nodes, base64 encoded.
 	    </t>
 	  </list>
 	  Note that no signature is required on this data, as it is used to verify an STH, which is signed.
@@ -567,13 +576,13 @@ d0 d1   d2 d3           d0 d1   d2 d3  d4 d5
 	  Inputs
 	  <list style="hanging">
 	    <t hangText="hash">
-	      A base64 encoded leaf hash.
+	      A base64 encoded v1 leaf hash.
 	    </t>
 	    <t hangText="tree_size">
 	      The tree_size of the tree to base the proof on, in decimal.
 	    </t>
 	  </list>
-	  The <spanx style="verb">hash</spanx> must be calculated as defined in <xref target="tree"/>. The <spanx style="verb">tree_size</spanx> must designate a published STH.
+	  The <spanx style="verb">hash</spanx> must be calculated as defined in <xref target="tree"/>. The <spanx style="verb">tree_size</spanx> must designate a published v1 STH.
 	</t>
 	<t>
 	  Outputs
@@ -590,51 +599,44 @@ d0 d1   d2 d3           d0 d1   d2 d3  d4 d5
 	  </list>
 	</t>
       </section>
-      <section title="Retrieve Chains from Log" anchor="fetch_chains">
+      <section title="Retrieve Entries from Log" anchor="fetch_entries">
 	<t>
-	  GET https://&lt;log server&gt;/ct/v1/get-chains
+	  GET https://&lt;log server&gt;/ct/v1/get-entries
 	</t>
 	<t>
 	  Inputs
 	  <list style="hanging">
 	    <t hangText="start">
-	      Index of first chain to retrieve, in decimal.
+	      Index of first entry to retrieve, in decimal.
 	    </t>
 	    <t hangText="end">
-	      Index of last chain to retrieve, in decimal.
+	      Index of last entry to retrieve, in decimal.
 	    </t>
 	  </list>
 	</t>
 	<t>
 	  Outputs
 	  <list style="hanging">
-	    <t hangText="chains">
+	    <t hangText="entries">
 	      An array of objects, each consisting of
-	      <list style="hanging">
-		<t hangText="type">
-		  The string "chain" or "pre-chain".
-		</t>
-		<t hangText="chain">
-		  A certificate chain or pre-chain.
-		</t>
-		<t hangText="timestamp">
-		  The timestamp for this entry, in decimal.
-		</t>
-		<t hangText="extensions">
-		  The extensions for this entry [format TBD].
-		</t>
-	      </list>
+              <list style="hanging">
+                <t hangText="leaf_input">
+                  The base64-encoded MerkleTreeLeaf structure.
+                </t>
+                <t hangText="extra_data">
+                  The base64-encoded unsigned data pertaining to the log entry. In the case of an X509ChainEntry, this is the <spanx style="verb">certificate_chain</spanx>. In the case of a PrecertChainEntry, this is the  <spanx style="verb">precertificate_chain</spanx>.
+                </t>
+              </list>
 	    </t>
 	  </list>
-	  [There's obviously many ways to encode the list of chains, I am happy to consider alternatives]
 	</t>
 	<t>
-	  Note that this message is not signed - the retrieved data can be verified by constructing the root hash corresponding to a retrieved STH.
+	  Note that this message is not signed - the retrieved data can be verified by constructing the root hash corresponding to a retrieved STH. All leaves MUST be v1. However, a compliant v1 client MUST NOT construe an unrecognized MerkleLeafType or LogEntryType value as an error. This means it may be unable to parse some entries, but note that each client can inspect the entries it does recognize, as well as verify the integrity of the data by treating unrecognized leaves as opaque input to the tree.
 	</t>
       </section>
-      <section title="Retrieve Chain+Merkle Audit Proof from Log">
+      <section title="Retrieve Entry+Merkle Audit Proof from Log">
 	<t>
-	  GET https://&lt;log server&gt;/ct/v1/get-chain-and-proof
+	  GET https://&lt;log server&gt;/ct/v1/get-entry-and-proof
 	</t>
 	<t>
 	  Inputs
@@ -651,11 +653,16 @@ d0 d1   d2 d3           d0 d1   d2 d3  d4 d5
 	<t>
 	  Outputs
 	  <list style="hanging">
-	    <t hangText="type">
-	      The string "chain" or "pre-chain".
-	    </t>
-	    <t hangText="chain">
-	      An array of base64 encoded certificates forming a certificate chain or pre-chain.
+	    <t hangText="entries">
+	      An array of objects, each consisting of
+              <list style="hanging">
+                <t hangText="leaf_input">
+                  The base64-encoded MerkleTreeLeaf structure.
+                </t>
+                <t hangText="auxiliary_data">
+                  The base64-encoded unsigned data, same as in <xref target='fetch_entries'/>.
+                </t>
+	      </list>
 	    </t>
 	    <t hangText="timestamp">
 	      The tree's timestamp, in decimal.
@@ -689,7 +696,7 @@ d0 d1   d2 d3           d0 d1   d2 d3  d4 d5
 	      Verify the STH signature.
 	    </t>
 	    <t>
-	      Fetch all the entries in the tree corresponding to the STH using <xref target="fetch_chains"/>.
+	      Fetch all the entries in the tree corresponding to the STH using <xref target="fetch_entries"/>.
 	    </t>
 	    <t>
 	      Confirm that the tree made from the fetched entries produces the same hash as that in the STH.
@@ -701,7 +708,7 @@ d0 d1   d2 d3           d0 d1   d2 d3  d4 d5
 	      Verify the STH signature.
 	    </t>
 	    <t>
-	      Fetch all the new entries in the tree corresponding to the STH using <xref target="fetch_chains"/>. If they remain unavailable for an extended period, then this should be viewed as misbehaviour on the part of the log.
+	      Fetch all the new entries in the tree corresponding to the STH using <xref target="fetch_entries"/>. If they remain unavailable for an extended period, then this should be viewed as misbehaviour on the part of the log.
 	    </t>
 	    <t>
 	      Either:
@@ -724,7 +731,7 @@ d0 d1   d2 d3           d0 d1   d2 d3  d4 d5
 	      </list>
 	    </t>
 	    <t>
-	      Go to <xref target="monitor_loop"/>.
+	      Go to Step <xref target="monitor_loop" format='counter'/>.
 	    </t>
 	  </list>
 	</t>
@@ -772,10 +779,7 @@ d0 d1   d2 d3           d0 d1   d2 d3  d4 d5
 	The Merkle tree design serves the purpose of keeping communication overhead low.
       </t>
       <t>
-	Auditing the log for integrity does not require third parties to maintain a copy of the entire log. The Signed Tree Head root hash can be updated incrementally as new entries become available, without recomputing the entire tree. Third party auditors need only store a logarithmic number of intermediate nodes in the Merkle Tree.
-      </t>
-      <t>
-	Additionally, the Merkle consistency proofs defined in <xref target='consistency' /> can be used to efficiently prove the append-only property of an incremental update to the Merkle Tree, without auditing the entire tree.
+	Auditing the log for integrity does not require third parties to maintain a copy of the entire log. The Signed Tree Head can be updated as new entries become available, without recomputing the entire tree. Third party auditors need only fetch the Merkle consistency proof against an existing STH to efficiently verify the append-only property of an update to the Merkle Tree, without auditing the entire tree.
       </t>
     </section>
   </middle>
