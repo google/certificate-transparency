@@ -1,7 +1,7 @@
 <?xml version="1.0"?>
 <?rfc symrefs="yes"?>
 <?rfc toc="yes"?>
-<rfc ipr="trust200902" docName="draft-laurie-pki-sunlight-03">
+<rfc ipr="trust200902" docName="draft-laurie-pki-sunlight-04">
   <front>
     <title>Certificate Transparency</title>
     <author initials="B" surname="Laurie" fullname="Ben Laurie">
@@ -22,10 +22,10 @@
     <date year='2012'></date>
     <abstract>
       <t>
-	The aim of Certificate Transparency is to have every public end-entity and intermediate TLS certificate issued by a known Certificate Authority recorded in one or more certificate logs. In order to detect mis-issuance of certificates, all logs are publicly auditable. In particular, domain owners or their agents will be able to monitor logs for certificates issued on their own domain.
+	The aim of Certificate Transparency is to have every public end-entity and intermediate TLS certificate issued by a known Certificate Authority recorded in one or more certificate logs. In order to detect misissuance of certificates, all logs are publicly auditable. In particular, domain owners or their agents will be able to monitor logs for certificates issued on their own domain.
       </t>
       <t>
-	To protect clients from unlogged mis-issued certificates, logs sign all recorded certificates, and clients can choose not to trust certificates that are not accompanied by an appropriate log signature. For privacy and performance reasons log signatures are embedded in the TLS handshake via the TLS authorization extension <xref target='RFC5878'/>, in a stapled <xref target ='RFC6066'/> OCSP extension <xref target='RFC2560'/>, or in the certificate itself via an X.509v3 certificate extension <xref target='RFC5280'/>.
+	To protect clients from unlogged misissued certificates, logs sign all recorded certificates, and clients can choose not to trust certificates that are not accompanied by an appropriate log signature. For privacy and performance reasons log signatures are embedded in the TLS handshake via the TLS authorization extension <xref target='RFC5878'/>, in a stapled <xref target ='RFC6066'/> OCSP extension <xref target='RFC2560'/>, or in the certificate itself via an X.509v3 certificate extension <xref target='RFC5280'/>.
       </t>
       <t>
 	To ensure a globally consistent view of the log, logs also provide a global signature over the entire log. Any inconsistency of logs can be detected through cross-checks on the global signature. Consistency between any pair of global signatures, corresponding to snapshots of the log at different times, can be efficiently shown.
@@ -34,17 +34,22 @@
 	Logs are only expected to certify that they have seen a certificate, and thus we do not specify any revocation mechanism for log signatures in this document. Logs are append-only, and log signatures will be valid indefinitely. 
       </t>
     </abstract>
+    <note title="Requirements Language">
+      <t>
+	The key words &quot;MUST&quot;, &quot;MUST NOT&quot;, &quot;REQUIRED&quot;, &quot;SHALL&quot;, &quot;SHALL NOT&quot;, &quot;SHOULD&quot;, &quot;SHOULD NOT&quot;, &quot;RECOMMENDED&quot;, &quot;MAY&quot;, and &quot;OPTIONAL&quot; in this document are to be interpreted as described in <xref target="RFC2119">RFC 2119</xref>.
+      </t>
+  </note>
   </front>
   <middle>
     <section title="Informal introduction">
       <t>
-        Certificate Transparency aims to solve the problem of mis-issued certificates by providing a publicly auditable, append-only, untrusted log of all issued certificates. The logs are publicly auditable so that it is possible for anyone to verify the correct operation of the log, and to monitor when new certificates added to it. The logs do not themselves prevent mis-issue, but they ensure that interested parties (particularly those named in certificates) can detect such mis-issuance. Note that this is a general mechanism, but in this document we only decsribe its use for public TLS certificates issued by public CAs.
+        Certificate Transparency aims to solve the problem of misissued certificates by providing a publicly auditable, append-only, untrusted log of all issued certificates. The logs are publicly auditable so that it is possible for anyone to verify the correct operation of the log, and to monitor when new certificates added to it. The logs do not themselves prevent misissue, but they ensure that interested parties (particularly those named in certificates) can detect such misissuance. Note that this is a general mechanism, but in this document we only describe its use for public TLS certificates issued by public CAs.
       </t>
       <t>
         The log consists of certificate chains, which can be submitted by anyone. It is expected that most public CAs will contribute all their newly-issued certificates to the log; it is also expected that certificate holders will also contribute their own certificate chains. In order to avoid the log being spammed into uselessness, it is required that the chain is rooted in a known CA certificate. When a chain is submitted to the log, a signed timestamp is returned, which can later be used to prove to clients that the chain has been submitted. Clients can thus require that all certificates they see have been logged.
       </t>
       <t>
-        Those who are concerned about mis-issue can monitor the log, asking it regularly for all new entries, and can thus check whether domains they are responsible for have had certificates issued that they did not expect. What they do with this information, particularly when they find that a mis-issuance has happened, is beyond the scope of this document, but broadly speaking they can invoke existing business mechanisms for dealing with mis-issued certificates. Of course, anyone who wants can monitor the log, and if they believe a certificate is incorrectly issued, take action as they see fit.
+        Those who are concerned about misissue can monitor the log, asking it regularly for all new entries, and can thus check whether domains they are responsible for have had certificates issued that they did not expect. What they do with this information, particularly when they find that a misissuance has happened, is beyond the scope of this document, but broadly speaking they can invoke existing business mechanisms for dealing with misissued certificates. Of course, anyone who wants can monitor the log, and if they believe a certificate is incorrectly issued, take action as they see fit.
       </t>
       <t>
         Similarly, those who have seen signed timestamps from the log can later demand a proof of inclusion from the log. If the log is unable to provide this (or, indeed, if the corresponding certificate is absent from monitors' copies of the log), that is evidence of the incorrect operation of the log. This operation is asynchronous to allow TLS connections to proceed without delay, despite network connectivity issues and the vagaries of firewalls.
@@ -786,18 +791,43 @@ d0 d1   d2 d3           d0 d1   d2 d3  d4 d5
   <back>
     <references>
 
-      <reference anchor='RFC5246'>
+      <reference anchor='RFC2119'>
 
 	<front>
-	  <title>The Transport Layer Security (TLS) Protocol Version 1.2</title>
-	  <author initials='T.' surname='Dierks' fullname='T. Dierks'>
-	    <organization /></author>
-	  <author initials='E.' surname='Rescorla' fullname='E. Rescorla'>
-	    <organization /></author>
-	  <date year='2008' month='August' />
+	  <title abbrev='RFC Key Words'>Key words for use in RFCs to Indicate Requirement Levels</title>
+	  <author initials='S.' surname='Bradner' fullname='Scott Bradner'>
+	    <organization>Harvard University</organization>
+	    <address>
+	      <postal>
+		<street>1350 Mass. Ave.</street>
+		<street>Cambridge</street>
+	      <street>MA 02138</street></postal>
+	      <phone>- +1 617 495 3864</phone>
+	  <email>sob@harvard.edu</email></address></author>
+	  <date year='1997' month='March' />
+	  <area>General</area>
+	  <keyword>keyword</keyword>
+	  <abstract>
+	    <t>
+	      In many standards track documents several words are used to signify the requirements in the specification.  These words are often capitalized.  This document defines these words as they should be interpreted in IETF documents.  Authors who follow these guidelines should incorporate this phrase near the beginning of their document:
+	      <list>
+		<t>
+		  The key words "MUST", "MUST NOT", "REQUIRED", "SHALL", "SHALL NOT", "SHOULD", "SHOULD NOT", "RECOMMENDED",  "MAY", and "OPTIONAL" in this document are to be interpreted as described in RFC 2119.
+		</t>
+	      </list>
+	    </t>
+	    <t>
+	      Note that the force of these words is modified by the requirement
+	      level of the document in which they are used.
+	    </t>
+	  </abstract>
 	</front>
 
-	<seriesInfo name='RFC' value='5246' />
+	<seriesInfo name='BCP' value='14' />
+	<seriesInfo name='RFC' value='2119' />
+	<format type='TXT' octets='4723' target='http://www.rfc-editor.org/rfc/rfc2119.txt' />
+	<format type='HTML' octets='17970' target='http://xml.resource.org/public/rfc/html/rfc2119.html' />
+	<format type='XML' octets='5777' target='http://xml.resource.org/public/rfc/xml/rfc2119.xml' />
       </reference>
 
       <reference anchor="RFC2560">
@@ -889,18 +919,18 @@ d0 d1   d2 d3           d0 d1   d2 d3  d4 d5
 	<format type="TXT" octets="43243" target="http://www.rfc-editor.org/rfc/rfc2560.txt"/>
       </reference>
 
-      <reference anchor='RFC5878'>
+      <reference anchor='RFC5246'>
 
 	<front>
-	  <title>The Transport Layer Security (TLS) Authorization Extensions</title>
-	  <author initials='M.' surname='Brown' fullname='M. Brown'>
-	    <organization >RedPhone Security</organization></author>
-	  <author initials='R.' surname='Housley' fullname='R. Housley'>
-	    <organization>Vigil Security</organization></author>
-	  <date year='2010' month='May' />
+	  <title>The Transport Layer Security (TLS) Protocol Version 1.2</title>
+	  <author initials='T.' surname='Dierks' fullname='T. Dierks'>
+	    <organization /></author>
+	  <author initials='E.' surname='Rescorla' fullname='E. Rescorla'>
+	    <organization /></author>
+	  <date year='2008' month='August' />
 	</front>
 
-	<seriesInfo name='RFC' value='5280' />
+	<seriesInfo name='RFC' value='5246' />
       </reference>
 
       <reference anchor='RFC5280'>
@@ -924,6 +954,20 @@ d0 d1   d2 d3           d0 d1   d2 d3  d4 d5
 	</front>
 
 	<seriesInfo name='RFC' value='5280' />
+      </reference>
+
+      <reference anchor='RFC5878'>
+
+	<front>
+	  <title>The Transport Layer Security (TLS) Authorization Extensions</title>
+	  <author initials='M.' surname='Brown' fullname='M. Brown'>
+	    <organization >RedPhone Security</organization></author>
+	  <author initials='R.' surname='Housley' fullname='R. Housley'>
+	    <organization>Vigil Security</organization></author>
+	  <date year='2010' month='May' />
+	</front>
+
+	<seriesInfo name='RFC' value='5878' />
       </reference>
 
       <reference anchor="RFC6066">
