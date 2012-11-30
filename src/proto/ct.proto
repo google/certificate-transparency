@@ -186,12 +186,16 @@ message ServerMessage {
 // Finally, stuff that's not in the I-D but that we use internally            //
 // for logging entries and tree head state.                                   //
 ////////////////////////////////////////////////////////////////////////////////
-message LoggedCertificate {
+message LoggablePB {
+  required bytes hash = 1;
+  optional uint64 sequence_number = 2;
+  required bytes data = 3;
+}
+
+message LoggedCertificatePB {
   optional SignedCertificateTimestamp sct = 1;
-  optional bytes certificate_sha256_hash = 2;
-  optional uint64 sequence_number = 3;
-  optional LogEntry entry = 4;
-  optional bytes merkle_leaf_hash = 5;
+  optional LogEntry entry = 2;
+  optional bytes merkle_leaf_hash = 3;
 }
 
 message SignedTreeHead {

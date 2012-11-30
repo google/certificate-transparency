@@ -24,19 +24,17 @@ class SQLiteDB : public Database {
   void EndTransaction();
 
   virtual WriteResult
-  CreatePendingCertificateEntry_(const ct::LoggedCertificate &logged_cert);
+  CreatePendingEntry_(const Loggable &loggable);
 
   virtual WriteResult
-  AssignCertificateSequenceNumber(const std::string &pending_hash,
-                                  uint64_t sequence_number);
+  AssignSequenceNumber(const std::string &pending_hash,
+                       uint64_t sequence_number);
 
   virtual LookupResult
-  LookupCertificateByHash(const std::string &certificate_sha256_hash,
-                          ct::LoggedCertificate *result) const;
+  LookupByHash(const std::string &hash, Loggable *result) const;
 
   virtual LookupResult
-  LookupCertificateByIndex(uint64_t sequence_number,
-                           ct::LoggedCertificate *result) const;
+  LookupByIndex(uint64_t sequence_number, Loggable *result) const;
 
   virtual std::set<std::string> PendingHashes() const;
 

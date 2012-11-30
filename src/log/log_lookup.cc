@@ -4,6 +4,7 @@
 #include <stdlib.h>
 
 #include "log/database.h"
+#include "log/frontend_signer.h"
 #include "log/log_lookup.h"
 #include "merkletree/merkle_tree.h"
 #include "merkletree/serial_hasher.h"
@@ -57,7 +58,7 @@ LogLookup::UpdateResult LogLookup::Update() {
     // a number of times -- but until we know under which conditions
     // the database might fail (database busy?), just die.
     CHECK_EQ(Database::LOOKUP_OK,
-             db_->LookupCertificateByIndex(sequence_number, &logged_cert))
+             db_->LookupByIndex(sequence_number, &logged_cert))
         << "Latest STH has " << sth.tree_size() << "entries but we failed to "
         << "retrieve entry number " << sequence_number;
     CHECK(logged_cert.has_sequence_number())

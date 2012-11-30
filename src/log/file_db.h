@@ -34,19 +34,17 @@ class FileDB : public Database {
 
   // Implement abstract functions, see database.h for comments.
   virtual WriteResult
-  CreatePendingCertificateEntry_(const ct::LoggedCertificate &logged_cert);
+  CreatePendingEntry_(const Loggable &loggable);
 
   virtual WriteResult
-  AssignCertificateSequenceNumber(const std::string &certificate_sha256_hash,
-                                 uint64_t sequence_number);
+  AssignSequenceNumber(const std::string &pending_hash,
+                       uint64_t sequence_number);
 
   virtual LookupResult
-  LookupCertificateByHash(const std::string &certificate_sha256_hash,
-                          ct::LoggedCertificate *result) const;
+  LookupByHash(const std::string &hash, Loggable *result) const;
 
   virtual LookupResult
-  LookupCertificateByIndex(uint64_t sequence_number,
-                           ct::LoggedCertificate *result) const;
+  LookupByIndex(uint64_t sequence_number, Loggable *result) const;
 
   virtual std::set<std::string> PendingHashes() const;
 
@@ -59,7 +57,7 @@ class FileDB : public Database {
   void BuildIndex();
   std::set<std::string> pending_hashes_;
   std::map<uint64_t, std::string> sequence_map_;
-  FileStorage *cert_storage_;
+  FileStorage *log_storage_;
   // Store all tree heads, but currently only support looking up the latest one.
   // Other necessary lookup indices (by tree size, by timestamp range?) TBD.
   FileStorage *tree_storage_;

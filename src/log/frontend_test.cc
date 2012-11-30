@@ -127,8 +127,7 @@ TYPED_TEST(FrontendTest, TestSubmitValid) {
   LoggedCertificate logged_cert;
   Cert cert(this->leaf_pem_);
   EXPECT_EQ(Database::LOOKUP_OK,
-            this->db()->LookupCertificateByHash(cert.Sha256Digest(),
-                                                &logged_cert));
+            this->db()->LookupByHash(cert.Sha256Digest(), &logged_cert));
 
   EXPECT_EQ(ct::X509_ENTRY, logged_cert.entry().type());
   // Compare the leaf cert.
@@ -155,8 +154,7 @@ TYPED_TEST(FrontendTest, TestSubmitValidWithIntermediate) {
   LoggedCertificate logged_cert;
   Cert cert(this->chain_leaf_pem_);
   EXPECT_EQ(Database::LOOKUP_OK,
-            this->db()->LookupCertificateByHash(cert.Sha256Digest(),
-                                                &logged_cert));
+            this->db()->LookupByHash(cert.Sha256Digest(), &logged_cert));
 
   EXPECT_EQ(ct::X509_ENTRY, logged_cert.entry().type());
   // Compare the leaf cert.
@@ -189,8 +187,7 @@ TYPED_TEST(FrontendTest, TestSubmitDuplicate) {
   LoggedCertificate logged_cert;
   Cert cert(this->leaf_pem_);
   EXPECT_EQ(Database::LOOKUP_OK,
-            this->db()->LookupCertificateByHash(cert.Sha256Digest(),
-                                                &logged_cert));
+            this->db()->LookupByHash(cert.Sha256Digest(), &logged_cert));
 
   EXPECT_EQ(ct::X509_ENTRY, logged_cert.entry().type());
   // Compare the leaf cert.
@@ -241,10 +238,9 @@ TYPED_TEST(FrontendTest, TestSubmitPrecert) {
 
   // Look it up.
   string hash = Sha256Hasher::Sha256Digest(
-      entry.precert_entry().tbs_certificate());
+                                      entry.precert_entry().tbs_certificate());
   LoggedCertificate logged_cert;
-  EXPECT_EQ(Database::LOOKUP_OK,
-            this->db()->LookupCertificateByHash(hash, &logged_cert));
+  EXPECT_EQ(Database::LOOKUP_OK, this->db()->LookupByHash(hash, &logged_cert));
   Cert pre(this->precert_pem_);
   Cert ca_pre(this->ca_precert_pem_);
 

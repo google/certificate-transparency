@@ -5,6 +5,7 @@
 #include <stdint.h>
 #include <string>
 
+#include "log/frontend_signer.h"
 #include "log/log_signer.h"
 #include "merkletree/tree_hasher.h"
 #include "proto/ct.pb.h"

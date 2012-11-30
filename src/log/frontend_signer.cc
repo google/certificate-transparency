@@ -30,8 +30,8 @@ FrontendSigner::QueueEntry(const LogEntry &entry,
   assert(!sha256_hash.empty());
 
   LoggedCertificate logged_cert;
-  Database::LookupResult db_result =
-      db_->LookupCertificateByHash(sha256_hash, &logged_cert);
+  Database::LookupResult db_result = 
+      db_->LookupByHash(sha256_hash, &logged_cert);
 
   if (db_result == Database::LOOKUP_OK) {
     if (sct != NULL)
@@ -46,12 +46,12 @@ FrontendSigner::QueueEntry(const LogEntry &entry,
   TimestampAndSign(entry, &local_sct);
 
   LoggedCertificate new_cert;
-  new_cert.set_certificate_sha256_hash(sha256_hash);
+  new_cert.set_hash(sha256_hash);
   new_cert.mutable_sct()->CopyFrom(local_sct);
   new_cert.mutable_entry()->CopyFrom(entry);
 
   Database::WriteResult write_result =
-      db_->CreatePendingCertificateEntry(new_cert);
+      db_->CreatePendingEntry(new_cert);
 
   // Assume for now that nobody interfered while we were busy signing.
   CHECK_EQ(Database::OK, write_result);
