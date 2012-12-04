@@ -3,7 +3,6 @@
 
 #include <stdint.h>
 
-#include "log/frontend_signer.h"
 #include "merkletree/merkle_tree.h"
 #include "proto/ct.pb.h"
 
@@ -38,8 +37,8 @@ class TreeSigner {
 
  private:
   void BuildTree();
-  bool AppendCertificate(const Loggable &loggable);
-  void AppendCertificateToTree(const Loggable &loggable);
+  bool AppendCertificate(const ct::LoggedCertificate &logged_cert);
+  void AppendCertificateToTree(const ct::LoggedCertificate &logged_cert);
   void TimestampAndSign(uint64_t min_timestamp, ct::SignedTreeHead *sth);
   Database *db_;
   LogSigner *signer_;

@@ -24,7 +24,7 @@ SQLiteDB::SQLiteDB(const string &dbfile)
                            SQLITE_OPEN_READWRITE | SQLITE_OPEN_CREATE, NULL));
 
   CHECK_EQ(SQLITE_OK, sqlite3_exec(db_, "CREATE TABLE leaves(hash BLOB UNIQUE, "
-                                   "loggable BLOB, "
+                                   "sct BLOB, entry BLOB, "
                                    "sequence INTEGER UNIQUE)",
                                    NULL, NULL, NULL));
 
@@ -95,22 +95,26 @@ class Statement {
 };
 
 Database::WriteResult
-SQLiteDB::CreatePendingEntry_(const Loggable &loggable) {
-  Statement statement(db_, "INSERT INTO leaves(hash, loggable) "
-                      "VALUES(?, ?)");
+SQLiteDB::CreatePendingCertificateEntry_(const ct::LoggedCertificate &cert) {
+  Statement statement(db_, "INSERT INTO leaves(hash, sct, entry) "
+                      "VALUES(?, ?, ?)");
 
-  statement.BindBlob(0, loggable.hash());
+  statement.BindBlob(0, cert.certificate_sha256_hash());
 
-  string loggable_data;
-  CHECK(loggable.SerializeToString(&loggable_data));
-  statement.BindBlob(1, loggable_data);
+  string sct_data;
+  CHECK(cert.sct().SerializeToString(&sct_data));
+  statement.BindBlob(1, sct_data);
+
+  string entry_data;
+  CHECK(cert.entry().SerializeToString(&entry_data));
+  statement.BindBlob(2, entry_data);
 
   int ret = statement.Step();
   if (ret == SQLITE_CONSTRAINT) {
     Statement s2(db_, "SELECT hash FROM leaves WHERE hash = ?");
-    s2.BindBlob(0, loggable.hash());
+    s2.BindBlob(0, cert.certificate_sha256_hash());
     CHECK_EQ(SQLITE_ROW, s2.Step());
-    return DUPLICATE_HASH;
+    return DUPLICATE_CERTIFICATE_HASH;
   }
   CHECK_EQ(SQLITE_DONE, ret);
 
@@ -118,12 +122,12 @@ SQLiteDB::CreatePendingEntry_(const Loggable &loggable) {
 }
 
 Database::WriteResult
-SQLiteDB::AssignSequenceNumber(const string &pending_hash,
-                               uint64_t sequence_number) {
+SQLiteDB::AssignCertificateSequenceNumber(const string &hash,
+                                          uint64_t sequence_number) {
   Statement statement(db_, "UPDATE leaves SET sequence = ? WHERE hash = ? "
                       "AND sequence IS NULL");
   statement.BindUInt64(0, sequence_number);
-  statement.BindBlob(1, pending_hash);
+  statement.BindBlob(1, hash);
 
   int ret = statement.Step();
   if (ret == SQLITE_CONSTRAINT) {
@@ -137,7 +141,7 @@ SQLiteDB::AssignSequenceNumber(const string &pending_hash,
   int changes = sqlite3_changes(db_);
   if (changes == 0) {
     Statement s2(db_, "SELECT hash FROM leaves WHERE hash = ?");
-    s2.BindBlob(0, pending_hash);
+    s2.BindBlob(0, hash);
     int ret = s2.Step();
     if (ret == SQLITE_ROW)
       return ENTRY_ALREADY_LOGGED;
@@ -149,8 +153,9 @@ SQLiteDB::AssignSequenceNumber(const string &pending_hash,
 }
 
 Database::LookupResult
-SQLiteDB::LookupByHash(const string &hash, Loggable *result) const {
-  Statement statement(db_, "SELECT loggable, sequence FROM leaves "
+SQLiteDB::LookupCertificateByHash(const string &hash,
+                                  ct::LoggedCertificate *result) const {
+  Statement statement(db_, "SELECT sct, entry, sequence FROM leaves "
                       "WHERE hash = ?");
 
   statement.BindBlob(0, hash);
@@ -160,23 +165,28 @@ SQLiteDB::LookupByHash(const string &hash, Loggable *result) const {
     return NOT_FOUND;
   CHECK_EQ(SQLITE_ROW, ret);
 
-  string data;
-  statement.GetBlob(0, &data);
-  CHECK(result->ParseFromString(data));
+  string sct;
+  statement.GetBlob(0, &sct);
+  CHECK(result->mutable_sct()->ParseFromString(sct));
 
-  if (statement.GetType(1) == SQLITE_NULL)
+  string entry;
+  statement.GetBlob(1, &entry);
+  CHECK(result->mutable_entry()->ParseFromString(entry));
+
+  if (statement.GetType(2) == SQLITE_NULL)
     result->clear_sequence_number();
   else
-    result->set_sequence_number(statement.GetUInt64(1));
+    result->set_sequence_number(statement.GetUInt64(2));
 
-  result->set_hash(hash);
+  result->set_certificate_sha256_hash(hash);
 
   return LOOKUP_OK;
 }
 
 Database::LookupResult
-SQLiteDB::LookupByIndex(uint64_t sequence_number, Loggable *result) const {
-  Statement statement(db_, "SELECT loggable, hash FROM leaves "
+SQLiteDB::LookupCertificateByIndex(uint64_t sequence_number,
+                                   ct::LoggedCertificate *result) const {
+  Statement statement(db_, "SELECT sct, entry, hash FROM leaves "
                       "WHERE sequence = ?");
   statement.BindUInt64(0, sequence_number);
   int ret = statement.Step();
@@ -185,11 +195,15 @@ SQLiteDB::LookupByIndex(uint64_t sequence_number, Loggable *result) const {
 
   string sct;
   statement.GetBlob(0, &sct);
-  result->ParseFromString(sct);
+  result->mutable_sct()->ParseFromString(sct);
+
+  string entry;
+  statement.GetBlob(1, &entry);
+  CHECK(result->mutable_entry()->ParseFromString(entry));
 
   string hash;
-  statement.GetBlob(1, &hash);
-  result->set_hash(hash);
+  statement.GetBlob(2, &hash);
+  result->set_certificate_sha256_hash(hash);
 
   result->set_sequence_number(sequence_number);
 

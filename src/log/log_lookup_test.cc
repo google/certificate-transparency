@@ -56,7 +56,8 @@ TYPED_TEST_CASE(LogLookupTest, Databases);
 TYPED_TEST(LogLookupTest, Lookup) {
   LoggedCertificate logged_cert;
   this->test_signer_.CreateUnique(&logged_cert);
-  EXPECT_EQ(Database::OK, this->db()->CreatePendingEntry(logged_cert));
+  EXPECT_EQ(Database::OK,
+            this->db()->CreatePendingCertificateEntry(logged_cert));
 
   MerkleAuditProof proof;
   EXPECT_EQ(TreeSigner::OK, this->tree_signer_->UpdateTree());
@@ -71,7 +72,8 @@ TYPED_TEST(LogLookupTest, Lookup) {
 TYPED_TEST(LogLookupTest, NotFound) {
   LoggedCertificate logged_cert;
   this->test_signer_.CreateUnique(&logged_cert);
-  EXPECT_EQ(Database::OK, this->db()->CreatePendingEntry(logged_cert));
+  EXPECT_EQ(Database::OK,
+            this->db()->CreatePendingCertificateEntry(logged_cert));
 
   MerkleAuditProof proof;
   EXPECT_EQ(TreeSigner::OK, this->tree_signer_->UpdateTree());
@@ -88,7 +90,8 @@ TYPED_TEST(LogLookupTest, Update) {
   LogLookup lookup(this->db());
   LoggedCertificate logged_cert;
   this->test_signer_.CreateUnique(&logged_cert);
-  EXPECT_EQ(Database::OK, this->db()->CreatePendingEntry(logged_cert));
+  EXPECT_EQ(Database::OK,
+            this->db()->CreatePendingCertificateEntry(logged_cert));
 
   MerkleAuditProof proof;
   EXPECT_EQ(TreeSigner::OK, this->tree_signer_->UpdateTree());
@@ -111,7 +114,8 @@ TYPED_TEST(LogLookupTest, Update) {
 TYPED_TEST(LogLookupTest, Verify) {
   LoggedCertificate logged_cert;
   this->test_signer_.CreateUnique(&logged_cert);
-  EXPECT_EQ(Database::OK, this->db()->CreatePendingEntry(logged_cert));
+  EXPECT_EQ(Database::OK,
+            this->db()->CreatePendingCertificateEntry(logged_cert));
 
   MerkleAuditProof proof;
   EXPECT_EQ(TreeSigner::OK, this->tree_signer_->UpdateTree());
@@ -133,7 +137,8 @@ TYPED_TEST(LogLookupTest, VerifyWithPath) {
   // Make the tree not balanced for extra fun.
   for (int i = 0; i < 13; ++i) {
     this->test_signer_.CreateUnique(&logged_certs[i]);
-    EXPECT_EQ(Database::OK, this->db()->CreatePendingEntry(logged_certs[i]));
+    EXPECT_EQ(Database::OK,
+              this->db()->CreatePendingCertificateEntry(logged_certs[i]));
   }
 
   EXPECT_EQ(TreeSigner::OK, this->tree_signer_->UpdateTree());

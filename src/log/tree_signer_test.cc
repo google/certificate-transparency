@@ -59,7 +59,8 @@ TYPED_TEST_CASE(TreeSignerTest, Databases);
 TYPED_TEST(TreeSignerTest, Sign) {
   LoggedCertificate logged_cert;
   this->test_signer_.CreateUnique(&logged_cert);
-  EXPECT_EQ(Database::OK, this->db()->CreatePendingEntry(logged_cert));
+  EXPECT_EQ(Database::OK,
+            this->db()->CreatePendingCertificateEntry(logged_cert));
 
   EXPECT_EQ(TreeSigner::OK, this->tree_signer_->UpdateTree());
 
@@ -72,7 +73,8 @@ TYPED_TEST(TreeSignerTest, Sign) {
 TYPED_TEST(TreeSignerTest, Timestamp) {
   LoggedCertificate logged_cert;
   this->test_signer_.CreateUnique(&logged_cert);
-  EXPECT_EQ(Database::OK, this->db()->CreatePendingEntry(logged_cert));
+  EXPECT_EQ(Database::OK,
+            this->db()->CreatePendingCertificateEntry(logged_cert));
 
   EXPECT_EQ(TreeSigner::OK, this->tree_signer_->UpdateTree());
   uint64_t last_update = this->tree_signer_->LastUpdateTime();
@@ -84,7 +86,8 @@ TYPED_TEST(TreeSignerTest, Timestamp) {
   LoggedCertificate logged_cert2;
   this->test_signer_.CreateUnique(&logged_cert2);
   logged_cert2.mutable_sct()->set_timestamp(future);
-  EXPECT_EQ(Database::OK, this->db()->CreatePendingEntry(logged_cert2));
+  EXPECT_EQ(Database::OK,
+            this->db()->CreatePendingCertificateEntry(logged_cert2));
 
   EXPECT_EQ(TreeSigner::OK, this->tree_signer_->UpdateTree());
   EXPECT_GE(this->tree_signer_->LastUpdateTime(), future);
@@ -93,7 +96,8 @@ TYPED_TEST(TreeSignerTest, Timestamp) {
 TYPED_TEST(TreeSignerTest, Verify) {
   LoggedCertificate logged_cert;
   this->test_signer_.CreateUnique(&logged_cert);
-  EXPECT_EQ(Database::OK, this->db()->CreatePendingEntry(logged_cert));
+  EXPECT_EQ(Database::OK,
+            this->db()->CreatePendingCertificateEntry(logged_cert));
 
   EXPECT_EQ(TreeSigner::OK, this->tree_signer_->UpdateTree());
 
@@ -105,7 +109,8 @@ TYPED_TEST(TreeSignerTest, Verify) {
 TYPED_TEST(TreeSignerTest, ResumeClean) {
   LoggedCertificate logged_cert;
   this->test_signer_.CreateUnique(&logged_cert);
-  EXPECT_EQ(Database::OK, this->db()->CreatePendingEntry(logged_cert));
+  EXPECT_EQ(Database::OK,
+            this->db()->CreatePendingCertificateEntry(logged_cert));
 
   EXPECT_EQ(TreeSigner::OK, this->tree_signer_->UpdateTree());
   SignedTreeHead sth;
@@ -136,12 +141,14 @@ TYPED_TEST(TreeSignerTest, ResumePartialSign) {
 
   LoggedCertificate logged_cert;
   this->test_signer_.CreateUnique(&logged_cert);
-  EXPECT_EQ(Database::OK, this->db()->CreatePendingEntry(logged_cert));
+  EXPECT_EQ(Database::OK,
+            this->db()->CreatePendingCertificateEntry(logged_cert));
 
   // Simulate the case where we assign a sequence number but fail
   // before signing.
   EXPECT_EQ(Database::OK,
-            this->db()->AssignSequenceNumber(logged_cert.hash(), 0));
+            this->db()->AssignCertificateSequenceNumber(
+                logged_cert.certificate_sha256_hash(), 0));
 
   TreeSigner *signer2 = this->GetSimilar();
   EXPECT_EQ(TreeSigner::OK, signer2->UpdateTree());
@@ -180,16 +187,19 @@ TYPED_TEST(TreeSignerTest, FailInconsistentSequenceNumbers) {
 
   LoggedCertificate logged_cert;
   this->test_signer_.CreateUnique(&logged_cert);
-  EXPECT_EQ(Database::OK, this->db()->CreatePendingEntry(logged_cert));
+  EXPECT_EQ(Database::OK,
+            this->db()->CreatePendingCertificateEntry(logged_cert));
 
   // Assign a sequence number the signer does not know about.
   EXPECT_EQ(Database::OK,
-            this->db()->AssignSequenceNumber(logged_cert.hash(), 0));
+            this->db()->AssignCertificateSequenceNumber(
+                logged_cert.certificate_sha256_hash(), 0));
 
   // Create another pending entry.
   LoggedCertificate logged_cert2;
   this->test_signer_.CreateUnique(&logged_cert2);
-  EXPECT_EQ(Database::OK, this->db()->CreatePendingEntry(logged_cert2));
+  EXPECT_EQ(Database::OK,
+            this->db()->CreatePendingCertificateEntry(logged_cert2));
 
   // Update should fail because we cannot commit a sequence number.
   EXPECT_EQ(TreeSigner::DB_ERROR, this->tree_signer_->UpdateTree());

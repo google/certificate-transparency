@@ -6,7 +6,6 @@
 #include "log/database.h"
 #include "log/file_db.h"
 #include "log/file_storage.h"
-#include "log/frontend_signer.h"
 #include "log/sqlite_db.h"
 #include "log/test_db.h"
 #include "log/test_signer.h"
@@ -46,20 +45,23 @@ TYPED_TEST(DBTest, CreatePending) {
   LoggedCertificate logged_cert, lookup_cert;
   this->test_signer_.CreateUnique(&logged_cert);
 
-  EXPECT_EQ(Database::OK, this->db()->CreatePendingEntry(logged_cert));
+  EXPECT_EQ(Database::OK,
+            this->db()->CreatePendingCertificateEntry(logged_cert));
 
   EXPECT_EQ(Database::LOOKUP_OK,
-            this->db()->LookupByHash(logged_cert.hash(), &lookup_cert));
+            this->db()->LookupCertificateByHash(
+                logged_cert.certificate_sha256_hash(), &lookup_cert));
   TestSigner::TestEqualLoggedCerts(logged_cert, lookup_cert);
 
-  string similar_hash = logged_cert.hash();
+  string similar_hash = logged_cert.certificate_sha256_hash();
   similar_hash[similar_hash.size() - 1] ^= 1;
 
-  EXPECT_EQ(Database::NOT_FOUND, this->db()->LookupByHash(similar_hash,
-                                                          &lookup_cert));
   EXPECT_EQ(Database::NOT_FOUND,
-            this->db()->LookupByHash(this->test_signer_.UniqueHash(),
-                                     &lookup_cert));
+            this->db()->LookupCertificateByHash(similar_hash,
+                                                &lookup_cert));
+  EXPECT_EQ(Database::NOT_FOUND,
+            this->db()->LookupCertificateByHash(this->test_signer_.UniqueHash(),
+                                                &lookup_cert));
 }
 
 TYPED_TEST(DBTest, GetPendingHashes) {
@@ -67,12 +69,14 @@ TYPED_TEST(DBTest, GetPendingHashes) {
   this->test_signer_.CreateUnique(&logged_cert);
   this->test_signer_.CreateUnique(&logged_cert2);
 
-  EXPECT_EQ(Database::OK, this->db()->CreatePendingEntry(logged_cert));
-  EXPECT_EQ(Database::OK, this->db()->CreatePendingEntry(logged_cert2));
+  EXPECT_EQ(Database::OK,
+            this->db()->CreatePendingCertificateEntry(logged_cert));
+  EXPECT_EQ(Database::OK,
+            this->db()->CreatePendingCertificateEntry(logged_cert2));
 
   std::set<string> hashes;
-  hashes.insert(logged_cert.hash());
-  hashes.insert(logged_cert2.hash());
+  hashes.insert(logged_cert.certificate_sha256_hash());
+  hashes.insert(logged_cert2.certificate_sha256_hash());
 
   std::set<string> pending_hashes = this->db()->PendingHashes();
   EXPECT_EQ(hashes, pending_hashes);
@@ -87,13 +91,15 @@ TYPED_TEST(DBTest, CreatePendingDuplicate) {
   duplicate_cert.mutable_sct()->set_timestamp(
       logged_cert.sct().timestamp() + 1000);
 
-  EXPECT_EQ(Database::OK, this->db()->CreatePendingEntry(logged_cert));
+  EXPECT_EQ(Database::OK,
+            this->db()->CreatePendingCertificateEntry(logged_cert));
 
-  EXPECT_EQ(Database::DUPLICATE_HASH,
-            this->db()->CreatePendingEntry(duplicate_cert));
+  EXPECT_EQ(Database::DUPLICATE_CERTIFICATE_HASH,
+            this->db()->CreatePendingCertificateEntry(duplicate_cert));
 
-  EXPECT_EQ(Database::LOOKUP_OK, this->db()->LookupByHash(logged_cert.hash(),
-                                                          &lookup_cert));
+  EXPECT_EQ(Database::LOOKUP_OK,
+            this->db()->LookupCertificateByHash(
+                logged_cert.certificate_sha256_hash(), &lookup_cert));
             // Check that we get the original entry back.
   TestSigner::TestEqualLoggedCerts(logged_cert, lookup_cert);
 }
@@ -102,12 +108,15 @@ TYPED_TEST(DBTest, AssignSequenceNumber) {
   LoggedCertificate logged_cert, lookup_cert;
   this->test_signer_.CreateUnique(&logged_cert);
 
-  EXPECT_EQ(Database::OK, this->db()->CreatePendingEntry(logged_cert));
-  EXPECT_EQ(Database::OK, this->db()->AssignSequenceNumber(logged_cert.hash(),
-                                                           42));
+  EXPECT_EQ(Database::OK,
+            this->db()->CreatePendingCertificateEntry(logged_cert));
+  EXPECT_EQ(Database::OK,
+            this->db()->AssignCertificateSequenceNumber(
+                logged_cert.certificate_sha256_hash(), 42));
 
   EXPECT_EQ(Database::LOOKUP_OK,
-            this->db()->LookupByHash(logged_cert.hash(), &lookup_cert));
+            this->db()->LookupCertificateByHash(
+                logged_cert.certificate_sha256_hash(), &lookup_cert));
   EXPECT_EQ(42U, lookup_cert.sequence_number());
 
   lookup_cert.clear_sequence_number();
@@ -118,14 +127,18 @@ TYPED_TEST(DBTest, AssignSequenceNumberNotPending) {
   LoggedCertificate logged_cert;
   this->test_signer_.CreateUnique(&logged_cert);
   EXPECT_EQ(Database::ENTRY_NOT_FOUND,
-            this->db()->AssignSequenceNumber(logged_cert.hash(), 0));
+            this->db()->AssignCertificateSequenceNumber(
+                logged_cert.certificate_sha256_hash(), 0));
 
-  EXPECT_EQ(Database::OK, this->db()->CreatePendingEntry(logged_cert));
-  EXPECT_EQ(Database::OK, this->db()->AssignSequenceNumber(logged_cert.hash(),
-                                                           42));
+  EXPECT_EQ(Database::OK,
+            this->db()->CreatePendingCertificateEntry(logged_cert));
+  EXPECT_EQ(Database::OK,
+            this->db()->AssignCertificateSequenceNumber(
+                logged_cert.certificate_sha256_hash(), 42));
 
   EXPECT_EQ(Database::ENTRY_ALREADY_LOGGED,
-            this->db()->AssignSequenceNumber(logged_cert.hash(), 42));
+            this->db()->AssignCertificateSequenceNumber(
+                logged_cert.certificate_sha256_hash(), 42));
 }
 
 TYPED_TEST(DBTest, AssignSequenceNumberTwice) {
@@ -133,12 +146,16 @@ TYPED_TEST(DBTest, AssignSequenceNumberTwice) {
   this->test_signer_.CreateUnique(&logged_cert);
   this->test_signer_.CreateUnique(&logged_cert2);
 
-  EXPECT_EQ(Database::OK, this->db()->CreatePendingEntry(logged_cert));
-  EXPECT_EQ(Database::OK, this->db()->CreatePendingEntry(logged_cert2));
-  EXPECT_EQ(Database::OK, this->db()->AssignSequenceNumber(logged_cert.hash(),
-                                                           42));
+  EXPECT_EQ(Database::OK,
+            this->db()->CreatePendingCertificateEntry(logged_cert));
+  EXPECT_EQ(Database::OK,
+            this->db()->CreatePendingCertificateEntry(logged_cert2));
+  EXPECT_EQ(Database::OK,
+            this->db()->AssignCertificateSequenceNumber(
+                logged_cert.certificate_sha256_hash(), 42));
   EXPECT_EQ(Database::SEQUENCE_NUMBER_ALREADY_IN_USE,
-            this->db()->AssignSequenceNumber(logged_cert2.hash(), 42));
+            this->db()->AssignCertificateSequenceNumber(
+                logged_cert2.certificate_sha256_hash(), 42));
 }
 
 TYPED_TEST(DBTest, LookupBySequenceNumber) {
@@ -146,22 +163,29 @@ TYPED_TEST(DBTest, LookupBySequenceNumber) {
   this->test_signer_.CreateUnique(&logged_cert);
   this->test_signer_.CreateUnique(&logged_cert2);
 
-  EXPECT_EQ(Database::OK, this->db()->CreatePendingEntry(logged_cert));
-  EXPECT_EQ(Database::OK, this->db()->CreatePendingEntry(logged_cert2));
-  EXPECT_EQ(Database::OK, this->db()->AssignSequenceNumber(logged_cert.hash(),
-                                                           42));
-  EXPECT_EQ(Database::OK, this->db()->AssignSequenceNumber(logged_cert2.hash(),
-                                                           22));
+  EXPECT_EQ(Database::OK,
+            this->db()->CreatePendingCertificateEntry(logged_cert));
+  EXPECT_EQ(Database::OK,
+            this->db()->CreatePendingCertificateEntry(logged_cert2));
+  EXPECT_EQ(Database::OK,
+            this->db()->AssignCertificateSequenceNumber(
+                logged_cert.certificate_sha256_hash(), 42));
+  EXPECT_EQ(Database::OK,
+            this->db()->AssignCertificateSequenceNumber(
+                logged_cert2.certificate_sha256_hash(), 22));
 
-  EXPECT_EQ(Database::NOT_FOUND, this->db()->LookupByIndex(23, &lookup_cert));
+  EXPECT_EQ(Database::NOT_FOUND,
+            this->db()->LookupCertificateByIndex(23, &lookup_cert));
 
-  EXPECT_EQ(Database::LOOKUP_OK, this->db()->LookupByIndex(42, &lookup_cert));
+  EXPECT_EQ(Database::LOOKUP_OK,
+            this->db()->LookupCertificateByIndex(42, &lookup_cert));
   EXPECT_EQ(42U, lookup_cert.sequence_number());
 
   lookup_cert.clear_sequence_number();
   TestSigner::TestEqualLoggedCerts(logged_cert, lookup_cert);
 
-  EXPECT_EQ(Database::LOOKUP_OK, this->db()->LookupByIndex(22, &lookup_cert2));
+  EXPECT_EQ(Database::LOOKUP_OK,
+            this->db()->LookupCertificateByIndex(22, &lookup_cert2));
   EXPECT_EQ(22U, lookup_cert2.sequence_number());
 
   lookup_cert2.clear_sequence_number();
@@ -228,10 +252,13 @@ TYPED_TEST(DBTest, Resume) {
   this->test_signer_.CreateUnique(&logged_cert);
   this->test_signer_.CreateUnique(&logged_cert2);
 
-  EXPECT_EQ(Database::OK, this->db()->CreatePendingEntry(logged_cert));
-  EXPECT_EQ(Database::OK, this->db()->CreatePendingEntry(logged_cert2));
-  EXPECT_EQ(Database::OK, this->db()->AssignSequenceNumber(logged_cert.hash(),
-                                                           42));
+  EXPECT_EQ(Database::OK,
+            this->db()->CreatePendingCertificateEntry(logged_cert));
+  EXPECT_EQ(Database::OK,
+            this->db()->CreatePendingCertificateEntry(logged_cert2));
+  EXPECT_EQ(Database::OK,
+            this->db()->AssignCertificateSequenceNumber(
+                logged_cert.certificate_sha256_hash(), 42));
 
   SignedTreeHead sth, sth2, lookup_sth;
   this->test_signer_.CreateUnique(&sth);
@@ -243,21 +270,23 @@ TYPED_TEST(DBTest, Resume) {
   Database *db2 = this->test_db_.SecondDB();
 
   EXPECT_EQ(Database::LOOKUP_OK,
-            db2->LookupByHash(logged_cert.hash(), &lookup_cert));
+            db2->LookupCertificateByHash(
+                logged_cert.certificate_sha256_hash(), &lookup_cert));
   EXPECT_EQ(42U, lookup_cert.sequence_number());
 
   lookup_cert.clear_sequence_number();
   TestSigner::TestEqualLoggedCerts(logged_cert, lookup_cert);
 
   EXPECT_EQ(Database::LOOKUP_OK,
-            db2->LookupByHash(logged_cert2.hash(), &lookup_cert2));
+            db2->LookupCertificateByHash(
+                logged_cert2.certificate_sha256_hash(), &lookup_cert2));
   TestSigner::TestEqualLoggedCerts(logged_cert2, lookup_cert2);
 
   EXPECT_EQ(Database::LOOKUP_OK, db2->LatestTreeHead(&lookup_sth));
   TestSigner::TestEqualTreeHeads(sth, lookup_sth);
 
   std::set<string> pending_hashes;
-  pending_hashes.insert(logged_cert2.hash());
+  pending_hashes.insert(logged_cert2.certificate_sha256_hash());
 
   EXPECT_EQ(pending_hashes, db2->PendingHashes());
 
@@ -268,7 +297,8 @@ TYPED_TEST(DBTest, ResumeEmpty) {
   Database *db2 = this->test_db_.SecondDB();
 
   LoggedCertificate lookup_cert;
-  EXPECT_EQ(Database::NOT_FOUND, db2->LookupByIndex(0, &lookup_cert));
+  EXPECT_EQ(Database::NOT_FOUND,
+            db2->LookupCertificateByIndex(0, &lookup_cert));
 
   SignedTreeHead lookup_sth;
   EXPECT_EQ(Database::NOT_FOUND, db2->LatestTreeHead(&lookup_sth));

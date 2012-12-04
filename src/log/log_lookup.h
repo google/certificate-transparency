@@ -4,7 +4,6 @@
 #include <map>
 #include <stdint.h>
 
-#include "log/frontend_signer.h"
 #include "merkletree/merkle_tree.h"
 
 class Database;

@@ -40,7 +40,8 @@ template <class T> class LargeDBTest : public ::testing::Test {
     LoggedCertificate logged_cert;
     for (int i = 0; i < entries; ++i) {
       test_signer_.CreateUniqueFakeSignature(&logged_cert);
-      EXPECT_EQ(Database::OK, db()->CreatePendingEntry(logged_cert));
+      EXPECT_EQ(Database::OK,
+                db()->CreatePendingCertificateEntry(logged_cert));
     }
   }
 
@@ -50,7 +51,7 @@ template <class T> class LargeDBTest : public ::testing::Test {
     LoggedCertificate lookup_cert;
     for (it = pending_hashes.begin(); it != pending_hashes.end(); ++it) {
       EXPECT_EQ(Database::LOOKUP_OK,
-                this->db()->LookupByHash(*it, &lookup_cert));
+                this->db()->LookupCertificateByHash(*it, &lookup_cert));
     }
     return pending_hashes.size();
   }

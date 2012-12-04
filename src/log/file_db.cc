@@ -12,44 +12,44 @@
 #include "proto/serializer.h"
 
 using ct::SignedCertificateTimestamp;
-using ct::LoggablePB;
+using ct::LoggedCertificate;
 using ct::SignedTreeHead;
 using std::string;
 
 const size_t FileDB::kTimestampBytesIndexed = 6;
 
-FileDB::FileDB(FileStorage *log_storage, FileStorage *tree_storage)
-    : log_storage_(log_storage),
+FileDB::FileDB(FileStorage *cert_storage, FileStorage *tree_storage)
+    : cert_storage_(cert_storage),
       tree_storage_(tree_storage),
       latest_tree_timestamp_(0) {
   BuildIndex();
 }
 
 FileDB::~FileDB() {
-  delete log_storage_;
+  delete cert_storage_;
   delete tree_storage_;
 }
 
-Database::WriteResult FileDB::CreatePendingEntry_(const Loggable &loggable) {
-  if (pending_hashes_.find(loggable.hash()) != pending_hashes_.end())
-    return DUPLICATE_HASH;
+Database::WriteResult FileDB::CreatePendingCertificateEntry_(
+    const LoggedCertificate &logged_cert) {
+  if (pending_hashes_.find(logged_cert.certificate_sha256_hash()) !=
+      pending_hashes_.end())
+    return DUPLICATE_CERTIFICATE_HASH;
 
-  LoggablePB loggable_pb;
-  CHECK(loggable.SerializeToString(loggable_pb.mutable_data()));
-  if (loggable.has_sequence_number())
-    loggable_pb.set_sequence_number(loggable.sequence_number());
-  loggable_pb.set_hash(loggable.hash());
+  // ??? We've already asserted that there is no sequence number!
+  LoggedCertificate local;
+  local.CopyFrom(logged_cert);
+  local.clear_sequence_number();
 
   string data;
-  CHECK(loggable_pb.SerializeToString(&data));
-
+  CHECK(local.SerializeToString(&data));
   // Try to create.
   FileStorage::FileStorageResult result =
-      log_storage_->CreateEntry(loggable.hash(), data);
+      cert_storage_->CreateEntry(logged_cert.certificate_sha256_hash(), data);
   if (result == FileStorage::ENTRY_ALREADY_EXISTS)
-    return DUPLICATE_HASH;
+    return DUPLICATE_CERTIFICATE_HASH;
   assert(result == FileStorage::OK);
-  pending_hashes_.insert(loggable.hash());
+  pending_hashes_.insert(logged_cert.certificate_sha256_hash());
   return OK;
 }
 
@@ -57,13 +57,14 @@ std::set<string> FileDB::PendingHashes() const {
   return pending_hashes_;
 }
 
-Database::WriteResult FileDB::AssignSequenceNumber(const string &pending_hash,
-                                                   uint64_t sequence_number) {
+Database::WriteResult FileDB::AssignCertificateSequenceNumber(
+    const string &certificate_sha256_hash, uint64_t sequence_number) {
   std::set<string>::iterator pending_it =
-      pending_hashes_.find(pending_hash);
+      pending_hashes_.find(certificate_sha256_hash);
   if (pending_it == pending_hashes_.end()) {
     // Caller should have ensured we don't get here...
-    if (log_storage_->LookupEntry(pending_hash, NULL) == FileStorage::OK)
+    if (cert_storage_->LookupEntry(certificate_sha256_hash, NULL) ==
+        FileStorage::OK)
       return ENTRY_ALREADY_LOGGED;
     return ENTRY_NOT_FOUND;
   }
@@ -71,71 +72,65 @@ Database::WriteResult FileDB::AssignSequenceNumber(const string &pending_hash,
   if (sequence_map_.find(sequence_number) != sequence_map_.end())
     return SEQUENCE_NUMBER_ALREADY_IN_USE;
 
-  string data;
+  string cert_data;
   FileStorage::FileStorageResult result =
-      log_storage_->LookupEntry(pending_hash, &data);
+      cert_storage_->LookupEntry(certificate_sha256_hash, &cert_data);
   assert(result == FileStorage::OK);
 
-  LoggablePB loggable;
-  CHECK(loggable.ParseFromString(data));
-
-  assert(!loggable.has_sequence_number());
-  loggable.set_sequence_number(sequence_number);
-  loggable.SerializeToString(&data);
-  result = log_storage_->UpdateEntry(pending_hash, data);
+  LoggedCertificate logged_cert;
+  bool ret = logged_cert.ParseFromString(cert_data);
+  assert(ret);
+  assert(!logged_cert.has_sequence_number());
+  logged_cert.set_sequence_number(sequence_number);
+  logged_cert.SerializeToString(&cert_data);
+  result = cert_storage_->UpdateEntry(certificate_sha256_hash, cert_data);
   assert(result == FileStorage::OK);
 
   pending_hashes_.erase(pending_it);
   sequence_map_.insert(std::pair<uint64_t, string>(sequence_number,
-                                                   pending_hash));
+                                                    certificate_sha256_hash));
   return OK;
 }
 
-Database::LookupResult FileDB::LookupByHash(const string &hash,
-                                            Loggable *result) const {
-  string data;
+Database::LookupResult FileDB::LookupCertificateByHash(
+    const string &certificate_sha256_hash,
+    LoggedCertificate *result) const {
+  string cert_data;
   FileStorage::FileStorageResult db_result =
-      log_storage_->LookupEntry(hash, &data);
+      cert_storage_->LookupEntry(certificate_sha256_hash, &cert_data);
   if (db_result == FileStorage::NOT_FOUND)
     return NOT_FOUND;
   assert(db_result == FileStorage::OK);
 
-  CHECK(result != NULL);
+  LoggedCertificate logged_cert;
+  bool ret = logged_cert.ParseFromString(cert_data);
+  assert(ret);
 
-  LoggablePB loggable_pb;
-  CHECK(loggable_pb.ParseFromString(data));
-  CHECK_EQ(loggable_pb.hash(), hash);
-
-  CHECK(result->ParseFromString(loggable_pb.data()));
-
-  if (loggable_pb.has_sequence_number())
-    result->set_sequence_number(loggable_pb.sequence_number());
-  result->set_hash(hash);
+  if (result != NULL)
+    result->CopyFrom(logged_cert);
 
   return LOOKUP_OK;
 }
 
-Database::LookupResult FileDB::LookupByIndex(uint64_t sequence_number,
-                                             Loggable *result) const {
+Database::LookupResult FileDB::LookupCertificateByIndex(
+    uint64_t sequence_number, LoggedCertificate *result) const {
   std::map<uint64_t, string>::const_iterator it =
       sequence_map_.find(sequence_number);
   if (it == sequence_map_.end())
     return NOT_FOUND;
 
   if (result != NULL) {
-    string data;
+    string cert_data;
     FileStorage::FileStorageResult db_result =
-        log_storage_->LookupEntry(it->second, &data);
+        cert_storage_->LookupEntry(it->second, &cert_data);
     assert(db_result == FileStorage::OK);
 
-    LoggablePB loggable_pb;
-    CHECK(loggable_pb.ParseFromString(data));
-    CHECK_EQ(loggable_pb.sequence_number(), sequence_number);
+    LoggedCertificate logged_cert;
+    bool ret = logged_cert.ParseFromString(cert_data);
+    assert(ret);
+    assert(logged_cert.sequence_number() == sequence_number);
 
-    CHECK(result->ParseFromString(loggable_pb.data()));
-
-    result->set_sequence_number(sequence_number);
-    result->set_hash(loggable_pb.hash());
+    result->CopyFrom(logged_cert);
   }
 
   return LOOKUP_OK;
@@ -185,7 +180,7 @@ FileDB::LatestTreeHead(SignedTreeHead *result) const {
 }
 
 void FileDB::BuildIndex() {
-  pending_hashes_ = log_storage_->Scan();
+  pending_hashes_ = cert_storage_->Scan();
   if (pending_hashes_.empty())
     return;
   // Now read the entries: remove those that have a sequence number
@@ -194,18 +189,18 @@ void FileDB::BuildIndex() {
   do {
     // Increment before any erase operations.
     std::set<string>::iterator it2 = it++;
-    string data;
+    string cert_data;
     // Read the data; tolerate no errors.
-    FileStorage::FileStorageResult result = log_storage_->LookupEntry(*it2,
-                                                                      &data);
+    FileStorage::FileStorageResult result =
+        cert_storage_->LookupEntry(*it2, &cert_data);
     if (result != FileStorage::OK)
       abort();
-    LoggablePB loggable;
-    if (!loggable.ParseFromString(data))
+    LoggedCertificate logged_cert;
+    if (!logged_cert.ParseFromString(cert_data))
       abort();
-    if (loggable.has_sequence_number()) {
+    if (logged_cert.has_sequence_number()) {
       sequence_map_.insert(
-          std::pair<uint64_t, string>(loggable.sequence_number(), *it2));
+          std::pair<uint64_t, string>(logged_cert.sequence_number(), *it2));
       pending_hashes_.erase(it2);
     }
   } while (it != pending_hashes_.end());

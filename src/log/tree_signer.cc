@@ -3,7 +3,6 @@
 #include <stdint.h>
 
 #include "log/database.h"
-#include "log/frontend_signer.h"
 #include "log/log_signer.h"
 #include "log/tree_signer.h"
 #include "merkletree/merkle_tree.h"
@@ -64,14 +63,15 @@ TreeSigner::UpdateResult TreeSigner::UpdateTree() {
   std::set<string>::const_iterator it;
   for (it = pending_hashes.begin(); it != pending_hashes.end(); ++it) {
     LoggedCertificate logged_cert;
-    CHECK_EQ(Database::LOOKUP_OK, db_->LookupByHash(*it, &logged_cert))
+    CHECK_EQ(Database::LOOKUP_OK,
+             db_->LookupCertificateByHash(*it, &logged_cert))
         << "Failed to look up pending entry with hash " << util::HexString(*it);
 
     CHECK(!logged_cert.has_sequence_number())
         << "Pending entry already has a sequence number; entry is "
         << logged_cert.DebugString();
 
-    CHECK_EQ(logged_cert.hash(), *it);
+    CHECK_EQ(logged_cert.certificate_sha256_hash(), *it);
     if (!AppendCertificate(logged_cert)) {
       LOG(ERROR) << "Assigning sequence number failed";
       return DB_ERROR;
@@ -117,7 +117,7 @@ void TreeSigner::BuildTree() {
   for (size_t i = 0; i < sth.tree_size(); ++i) {
     LoggedCertificate logged_cert;
     CHECK_EQ(Database::LOOKUP_OK,
-             db_->LookupByIndex(i, &logged_cert));
+             db_->LookupCertificateByIndex(i, &logged_cert));
     CHECK_LE(logged_cert.sct().timestamp(), sth.timestamp());
     CHECK_EQ(logged_cert.sequence_number(), i);
 
@@ -136,7 +136,7 @@ void TreeSigner::BuildTree() {
   for (size_t i = sth.tree_size(); ; ++i) {
     LoggedCertificate logged_cert;
     Database::LookupResult db_result =
-        db_->LookupByIndex(i, &logged_cert);
+        db_->LookupCertificateByIndex(i, &logged_cert);
     if (db_result == Database::NOT_FOUND)
       break;
     CHECK_EQ(Database::LOOKUP_OK, db_result);
@@ -147,16 +147,17 @@ void TreeSigner::BuildTree() {
 }
 
 bool
-TreeSigner::AppendCertificate(const Loggable &loggable) {
+TreeSigner::AppendCertificate(const LoggedCertificate &logged_cert) {
   // Serialize for inclusion in the tree.
   string serialized_leaf;
   CHECK_EQ(Serializer::OK, Serializer::SerializeSCTMerkleTreeLeaf(
       logged_cert.sct(), logged_cert.entry(), &serialized_leaf));
 
-  CHECK(logged_cert.has_hash());
+  CHECK(logged_cert.has_certificate_sha256_hash());
   // Commit the sequence number of this certificate.
   Database::WriteResult db_result =
-      db_->AssignSequenceNumber(logged_cert.hash(), cert_tree_.LeafCount());
+      db_->AssignCertificateSequenceNumber(
+          logged_cert.certificate_sha256_hash(), cert_tree_.LeafCount());
 
   if (db_result != Database::OK) {
     CHECK_EQ(Database::SEQUENCE_NUMBER_ALREADY_IN_USE, db_result);

@@ -8,53 +8,6 @@
 
 #include "proto/ct.pb.h"
 
-class Loggable {
- public:
-  Loggable() : sequence_number_set_(false), sequence_number_(0) {}
-  bool has_hash() const {
-    return !hash_.empty();
-  }
-  void set_hash(const std::string &hash) {
-    CHECK(!hash.empty());
-    hash_ = hash;
-  }
-  const std::string &hash() const {
-    return hash_;
-  }
-  bool has_sequence_number() const {
-    return sequence_number_set_;
-  }
-  void clear_sequence_number() {
-    sequence_number_set_ = false;
-    sequence_number_ = 0;
-  }
-  void set_sequence_number(uint64_t number) {
-    sequence_number_ = number;
-    sequence_number_set_ = true;
-  }
-  uint64_t sequence_number() const {
-    return sequence_number_;
-  }
-  void CopyFrom(const Loggable &other) {
-    set_hash(other.hash());
-    if (other.has_sequence_number())
-        set_sequence_number(other.sequence_number());
-    else
-        clear_sequence_number();
-  }
-
-  // This does _not_ need to include the hash and the sequence number.
-  virtual bool SerializeToString(std::string *out) const = 0;
-
-  // This does _not_ restore hash and sequence number
-  virtual bool ParseFromString(const std::string &in) = 0;
-
- private:
-  std::string hash_;
-  bool sequence_number_set_;
-  uint64_t sequence_number_;
-};
-
 // NOTE: This is a database interface for the log server.
 // Monitors/auditors shouldn't assume that log entries are keyed
 // uniquely by certificate hash -- it is an artefact of this
@@ -63,10 +16,10 @@ class Database {
  public:
   enum WriteResult {
     OK,
-    // Create failed, hash is primary key and must exist.
-    MISSING_HASH,
+    // Create failed, certificate hash is primary key and must exist.
+    MISSING_CERTIFICATE_HASH,
     // Create failed, an entry with this hash already exists.
-    DUPLICATE_HASH,
+    DUPLICATE_CERTIFICATE_HASH,
     // Update failed, entry already has a sequence number.
     ENTRY_ALREADY_LOGGED,
     // Update failed, entry does not exist.
@@ -102,15 +55,14 @@ class Database {
   // The entry remains PENDING until a sequence number has been assigned,
   // after which its status changes to LOGGED.
   WriteResult
-  CreatePendingEntry(const Loggable &loggable) {
-    CHECK(!loggable.has_sequence_number());
-    if (!loggable.has_hash())
-      return MISSING_HASH;
-    return CreatePendingEntry_(loggable);
+  CreatePendingCertificateEntry(const ct::LoggedCertificate &logged_cert) {
+    CHECK(!logged_cert.has_sequence_number());
+    if (!logged_cert.has_certificate_sha256_hash())
+      return MISSING_CERTIFICATE_HASH;
+    return CreatePendingCertificateEntry_(logged_cert);
   }
-  // loggable will not have a sequence number when this is called.
   virtual WriteResult
-  CreatePendingEntry_(const Loggable &loggable) = 0;
+  CreatePendingCertificateEntry_(const ct::LoggedCertificate &logged_cert) = 0;
 
   // Attempt to add a sequence number to the LoggedCertificate, thereby
   // removing it from the list of pending entries.
@@ -118,17 +70,19 @@ class Database {
   // or an entry with this sequence number already exists (i.e.,
   // |sequence_number| is a secondary key.
   virtual WriteResult
-  AssignSequenceNumber(const std::string &pending_hash,
-                       uint64_t sequence_number) = 0;
+  AssignCertificateSequenceNumber(const std::string &pending_hash,
+                                  uint64_t sequence_number) = 0;
 
   // Look up certificate by hash. If the entry exists, and result is not NULL,
   // write the result. If the entry is not logged return PENDING.
   virtual LookupResult
-  LookupByHash(const std::string &hash, Loggable *result) const = 0;
+  LookupCertificateByHash(const std::string &certificate_sha256_hash,
+                          ct::LoggedCertificate *result) const = 0;
 
   // Look up certificate by sequence number.
   virtual LookupResult
-  LookupByIndex(uint64_t sequence_number, Loggable *result) const = 0;
+  LookupCertificateByIndex(uint64_t sequence_number,
+                           ct::LoggedCertificate *result) const = 0;
 
   // List the hashes of all pending entries, i.e. all entries without a
   // sequence number.

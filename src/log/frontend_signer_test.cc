@@ -68,7 +68,8 @@ TYPED_TEST(FrontendSignerTest, LogKatTest) {
   string hash =
       Sha256Hasher::Sha256Digest(Serializer::LeafCertificate(default_entry));
 
-  EXPECT_EQ(Database::LOOKUP_OK, this->db()->LookupByHash(hash, &logged_cert));
+  EXPECT_EQ(Database::LOOKUP_OK,
+            this->db()->LookupCertificateByHash(hash, &logged_cert));
 
   TestSigner::TestEqualEntries(default_entry, logged_cert.entry());
 }
@@ -90,9 +91,9 @@ TYPED_TEST(FrontendSignerTest, Log) {
       Sha256Hasher::Sha256Digest(Serializer::LeafCertificate(entry1));
 
   EXPECT_EQ(Database::LOOKUP_OK,
-            this->db()->LookupByHash(hash0, &logged_cert0));
+            this->db()->LookupCertificateByHash(hash0, &logged_cert0));
   EXPECT_EQ(Database::LOOKUP_OK,
-            this->db()->LookupByHash(hash1, &logged_cert1));
+            this->db()->LookupCertificateByHash(hash1, &logged_cert1));
 
   TestSigner::TestEqualEntries(entry0, logged_cert0.entry());
   TestSigner::TestEqualEntries(entry1, logged_cert1.entry());
