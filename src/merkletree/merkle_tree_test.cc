@@ -7,6 +7,7 @@
 #include <time.h>
 #include <vector>
 
+#include "merkletree/compact_merkle_tree.h"
 #include "merkletree/merkle_tree.h"
 #include "merkletree/merkle_verifier.h"
 #include "merkletree/serial_hasher.h"
@@ -143,6 +144,9 @@ class MerkleTreeFuzzTest : public MerkleTreeTest {
   }
 };
 
+class CompactMerkleTreeTest : public MerkleTreeTest {
+};
+
 ////////////////////////////////////////////////////////////////////////////////
 //              FUZZ TESTS AGAINST REFERENCE IMPLEMENTATIONS                  //
 ////////////////////////////////////////////////////////////////////////////////
@@ -161,6 +165,22 @@ TEST_F(MerkleTreeFuzzTest, RootFuzz) {
       EXPECT_EQ(tree.RootAtSnapshot(snapshot),
                 ReferenceMerkleTreeHash(data_.data(), snapshot,
                                         &tree_hasher_));
+    }
+  }
+}
+
+TEST_F(CompactMerkleTreeTest, RootFuzz) {
+  for (size_t tree_size = 1; tree_size <= data_.size(); ++tree_size) {
+    CompactMerkleTree tree(new Sha256Hasher());
+    for (size_t j = 0; j < tree_size; ++j) {
+      tree.AddLeaf(data_[j]);
+      // Since the tree is evaluated lazily, the tree state is significant
+      // when querying the root hash. Flip a coin and decide whether to
+      // query now or later.
+      if (rand() & 1) {
+        EXPECT_EQ(tree.CurrentRoot(), ReferenceMerkleTreeHash(
+            data_.data(), j + 1, &tree_hasher_));
+      }
     }
   }
 }
@@ -287,6 +307,46 @@ TEST_F(MerkleTreeTest, RootTestVectors) {
 
   // The third tree: add nodes in two chunks.
   MerkleTree tree3(new Sha256Hasher());
+  // Add three nodes.
+  for (int i = 0; i < 3; ++i) {
+    tree3.AddLeaf(S(kInputs[i]));
+  }
+  EXPECT_EQ(tree3.LeafCount(), 3U);
+  EXPECT_EQ(tree3.LevelCount(), kLevelCounts[2]);
+  EXPECT_STREQ(H(tree3.CurrentRoot()).c_str(), kSHA256Roots[2].str);
+  // Add the remaining nodes.
+  for (int i = 3; i < 8; ++i) {
+    tree3.AddLeaf(S(kInputs[i]));
+  }
+  EXPECT_EQ(tree3.LeafCount(), 8U);
+  EXPECT_EQ(tree3.LevelCount(), kLevelCounts[7]);
+  EXPECT_STREQ(H(tree3.CurrentRoot()).c_str(), kSHA256Roots[7].str);
+}
+
+TEST_F(CompactMerkleTreeTest, RootTestVectors) {
+  // The first tree: add nodes one by one.
+  CompactMerkleTree tree1(new Sha256Hasher());
+  EXPECT_EQ(tree1.LeafCount(), 0U);
+  EXPECT_EQ(tree1.LevelCount(), 0U);
+  EXPECT_STREQ(H(tree1.CurrentRoot()).c_str(), kSHA256EmptyTreeHash.str);
+  for (size_t i = 0; i < 8; ++i) {
+    tree1.AddLeaf(S(kInputs[i]));
+    EXPECT_EQ(tree1.LeafCount(), i + 1);
+    EXPECT_EQ(tree1.LevelCount(), kLevelCounts[i]);
+    EXPECT_STREQ(H(tree1.CurrentRoot()).c_str(), kSHA256Roots[i].str);
+  }
+
+  // The second tree: add all nodes at once.
+  CompactMerkleTree tree2(new Sha256Hasher());
+  for (int i = 0; i < 8; ++i) {
+    tree2.AddLeaf(S(kInputs[i]));
+  }
+  EXPECT_EQ(tree2.LeafCount(), 8U);
+  EXPECT_EQ(tree2.LevelCount(), kLevelCounts[7]);
+  EXPECT_STREQ(H(tree2.CurrentRoot()).c_str(), kSHA256Roots[7].str);
+
+  // The third tree: add nodes in two chunks.
+  CompactMerkleTree tree3(new Sha256Hasher());
   // Add three nodes.
   for (int i = 0; i < 3; ++i) {
     tree3.AddLeaf(S(kInputs[i]));

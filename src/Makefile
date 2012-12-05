@@ -89,7 +89,9 @@ proto/serializer_test: proto/serializer_test.o proto/libproto.a util/libutil.a
 	$(CXX) -o $@ $^ $(SYS_LIBS)
 
 ### merkletree/ targets
-merkletree/libmerkletree.a: merkletree/merkle_tree.o \
+merkletree/libmerkletree.a: merkletree/compact_merkle_tree.o \
+                            merkletree/merkle_tree.o \
+                            merkletree/merkle_tree_math.o \
                             merkletree/merkle_verifier.o \
                             merkletree/serial_hasher.o merkletree/tree_hasher.o
 	rm -f $@

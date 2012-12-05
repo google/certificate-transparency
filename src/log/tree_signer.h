@@ -3,7 +3,7 @@
 
 #include <stdint.h>
 
-#include "merkletree/merkle_tree.h"
+#include "merkletree/compact_merkle_tree.h"
 #include "proto/ct.pb.h"
 
 class Database;
@@ -46,7 +46,7 @@ class TreeSigner {
   // memory. Implement a compact version of the tree that runs in "restricted"
   // mode, i.e., only remembers O(log n) nodes and cannot answer queries
   // about audit paths or previous snapshots.
-  MerkleTree cert_tree_;
+  CompactMerkleTree cert_tree_;
   ct::SignedTreeHead latest_tree_head_;
 };
 #endif

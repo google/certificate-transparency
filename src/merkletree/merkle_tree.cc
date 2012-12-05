@@ -4,6 +4,7 @@
 #include <vector>
 
 #include "merkletree/merkle_tree.h"
+#include "merkletree/merkle_tree_math.h"
 
 using std::string;
 
@@ -15,31 +16,6 @@ MerkleTree::MerkleTree(SerialHasher *hasher)
       level_count_(0) {}
 
 MerkleTree::~MerkleTree() {}
-
-// Index of the parent node in the parent level of the tree.
-static inline size_t Parent(size_t leaf) {
-  return leaf >> 1;
-}
-
-// True if the node is a right child; false if it is the left (or only) child.
-static inline bool IsRightChild(size_t leaf) {
-  return leaf & 1;
-}
-
-// Index of the node's (left or right) sibling in the same level.
-static inline size_t Sibling(size_t leaf) {
-  return IsRightChild(leaf) ? (leaf - 1) : (leaf + 1);
-}
-
-static inline bool IsPowerOfTwoPlusOne(size_t leaf_count) {
-  if (leaf_count == 0)
-    return false;
-  if (leaf_count == 1)
-    return true;
-  // leaf_count is a power of two plus one if and only if
-  // ((leaf_count -1) & (leaf_count - 2)) has no bits set.
-  return (((leaf_count - 1) & (leaf_count - 2)) == 0);
-}
 
 size_t MerkleTree::AddLeaf(const string &data) {
   return AddLeafHash(treehasher_.HashLeaf(data));
@@ -56,7 +32,7 @@ size_t MerkleTree::AddLeafHash(const string &hash) {
   // Update level count: a k-level tree can hold 2^{k-1} leaves,
   // so increment level count every time we overflow a power of two.
   // Do not update the root; we evaluate the tree lazily.
-  if (IsPowerOfTwoPlusOne(leaf_count))
+  if (MerkleTreeMath::IsPowerOfTwoPlusOne(leaf_count))
     ++level_count_;
   // Return the current leaf count.
   return leaf_count;
@@ -103,8 +79,8 @@ std::vector<string> MerkleTree::SnapshotConsistency(size_t snapshot1,
   size_t node = snapshot1 - 1;
   // Compute the (compressed) path to the root of snapshot2.
   // Everything left of 'node' is equal in both trees; no need to record.
-  while (IsRightChild(node)) {
-    node = Parent(node);
+  while (MerkleTreeMath::IsRightChild(node)) {
+    node = MerkleTreeMath::Parent(node);
     ++level;
   }
 
@@ -146,7 +122,7 @@ string MerkleTree::UpdateToSnapshot(size_t snapshot) {
   while (last_node) {
     if (LazyLevelCount() <= level + 1) {
       AddLevel();
-    } else if (NodeCount(level + 1) == Parent(first_node) + 1) {
+    } else if (NodeCount(level + 1) == MerkleTreeMath::Parent(first_node) + 1) {
       // The leftmost parent at level 'level+1' may already exist,
       // so we need to update it. Nuke the old parent.
       PopBack(level + 1);
@@ -160,11 +136,11 @@ string MerkleTree::UpdateToSnapshot(size_t snapshot) {
     }
     // If the last node at the current level is a left sibling,
     // dummy-propagate it one level up.
-    if (!IsRightChild(last_node))
+    if (!MerkleTreeMath::IsRightChild(last_node))
       PushBack(level + 1, Node(level, last_node));
 
-    first_node = Parent(first_node);
-    last_node = Parent(last_node);
+    first_node = MerkleTreeMath::Parent(first_node);
+    last_node = MerkleTreeMath::Parent(last_node);
     ++level;
   };
 
@@ -195,12 +171,12 @@ string MerkleTree::RecomputePastSnapshot(size_t snapshot,
   CHECK_LT(snapshot, leaves_processed_);
 
   // Recompute nodes on the path of the last leaf.
-  while (IsRightChild(last_node)) {
+  while (MerkleTreeMath::IsRightChild(last_node)) {
     if (node && node_level == level)
       node->assign(Node(level, last_node));
     // Left sibling and parent exist in the snapshot, and are equal to
     // those in the tree; no need to rehash, move one level up.
-    last_node = Parent(last_node);
+    last_node = MerkleTreeMath::Parent(last_node);
     ++level;
   }
 
@@ -212,14 +188,14 @@ string MerkleTree::RecomputePastSnapshot(size_t snapshot,
     node->assign(subtree_root);
 
   while (last_node) {
-    if (IsRightChild(last_node)) {
+    if (MerkleTreeMath::IsRightChild(last_node)) {
       // Recompute the parent of tree_[level][last_node].
       subtree_root = treehasher_.HashChildren(
           Node(level, last_node - 1), subtree_root);
     }
     // Else the parent is a dummy copy of the current node; do nothing.
 
-    last_node = Parent(last_node);
+    last_node = MerkleTreeMath::Parent(last_node);
     ++level;
     if (node && node_level == level)
       node->assign(subtree_root);
@@ -231,7 +207,6 @@ string MerkleTree::RecomputePastSnapshot(size_t snapshot,
 std::vector<string>
 MerkleTree::PathFromNodeToRootAtSnapshot(size_t node, size_t level,
                                          size_t snapshot) {
-
   std::vector<string> path;
   if (snapshot == 0)
     return path;
@@ -247,7 +222,7 @@ MerkleTree::PathFromNodeToRootAtSnapshot(size_t node, size_t level,
 
   // Move up, recording the sibling of the current node at each level.
   while (last_node) {
-    size_t sibling = Sibling(node);
+    size_t sibling = MerkleTreeMath::Sibling(node);
     if (sibling < last_node) {
       // The sibling is not the last node of the level in the snapshot
       // tree, so its value is correct in the tree.
@@ -262,8 +237,8 @@ MerkleTree::PathFromNodeToRootAtSnapshot(size_t node, size_t level,
     // Else sibling > last_node so the sibling does not exist. Do nothing.
     // Continue moving up in the tree, ignoring dummy copies.
 
-    node = Parent(node);
-    last_node = Parent(last_node);
+    node = MerkleTreeMath::Parent(node);
+    last_node = MerkleTreeMath::Parent(last_node);
     ++level;
   };
 

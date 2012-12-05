@@ -5,7 +5,7 @@
 #include "log/database.h"
 #include "log/log_signer.h"
 #include "log/tree_signer.h"
-#include "merkletree/merkle_tree.h"
+#include "merkletree/compact_merkle_tree.h"
 #include "proto/serializer.h"
 #include "util/util.h"
 
