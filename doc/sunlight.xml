@@ -22,16 +22,16 @@
     <date year='2012'></date>
     <abstract>
       <t>
-	The aim of Certificate Transparency is to have every public end-entity and intermediate TLS certificate issued by a known Certificate Authority recorded in one or more certificate logs. In order to detect misissuance of certificates, all logs are publicly auditable. In particular, domain owners or their agents will be able to monitor logs for certificates issued on their own domain.
+	The aim of Certificate Transparency is to have every public end-entity (for example, web servers) and intermediate TLS certificate issued by a known Certificate Authority recorded in one or more certificate logs. In order to detect misissuance of certificates, all logs are publicly auditable. In particular, domain owners or their agents will be able to monitor logs for certificates issued on their own domain.
       </t>
       <t>
-	To protect clients from unlogged misissued certificates, logs sign all recorded certificates, and clients can choose not to trust certificates that are not accompanied by an appropriate log signature. For privacy and performance reasons log signatures are embedded in the TLS handshake via the TLS authorization extension <xref target='RFC5878'/>, in a stapled <xref target ='RFC6066'/> OCSP extension <xref target='RFC2560'/>, or in the certificate itself via an X.509v3 certificate extension <xref target='RFC5280'/>.
+	To protect clients from unlogged misissued certificates, each log signs all certificates it records, and clients can choose not to trust certificates that are not accompanied by an appropriate log signature. For privacy and performance reasons log signatures are embedded in the TLS handshake via the TLS authorization extension, in a stapled OCSP extension, or in the certificate itself via an X.509v3 certificate extension.
       </t>
       <t>
-	To ensure a globally consistent view of the log, logs also provide a global signature over the entire log. Any inconsistency of logs can be detected through cross-checks on the global signature. Consistency between any pair of global signatures, corresponding to snapshots of the log at different times, can be efficiently shown.
+	To ensure a globally consistent view of any particular log, each log also provides a global signature over the entire log. Any inconsistency of logs can be detected through cross-checks on the global signature. Consistency between any pair of global signatures, corresponding to snapshots of a particular log at different times, can be efficiently shown.
       </t>
       <t>
-	Logs are only expected to certify that they have seen a certificate, and thus we do not specify any revocation mechanism for log signatures in this document. Logs are append-only, and log signatures will be valid indefinitely. 
+	Logs are only expected to certify that they have seen a certificate, and thus we do not specify any revocation mechanism for log signatures in this document. Logs are append-only, and log signatures do not expire. 
       </t>
     </abstract>
     <note title="Requirements Language">
@@ -43,25 +43,25 @@
   <middle>
     <section title="Informal introduction">
       <t>
-        Certificate Transparency aims to solve the problem of misissued certificates by providing a publicly auditable, append-only, untrusted log of all issued certificates. The logs are publicly auditable so that it is possible for anyone to verify the correct operation of the log, and to monitor when new certificates added to it. The logs do not themselves prevent misissue, but they ensure that interested parties (particularly those named in certificates) can detect such misissuance. Note that this is a general mechanism, but in this document we only describe its use for public TLS certificates issued by public CAs.
+        Certificate Transparency aims to mitigate the problem of misissued certificates by providing publicly auditable, append-only, untrusted logs of all issued certificates. The logs are publicly auditable so that it is possible for anyone to verify the correct operation of each log, and to monitor when new certificates are added to it. The logs do not themselves prevent misissue, but they ensure that interested parties (particularly those named in certificates) can detect such misissuance. Note that this is a general mechanism, but in this document we only describe its use for public TLS server certificates issued by public CAs.
       </t>
       <t>
-        The log consists of certificate chains, which can be submitted by anyone. It is expected that most public CAs will contribute all their newly-issued certificates to the log; it is also expected that certificate holders will also contribute their own certificate chains. In order to avoid the log being spammed into uselessness, it is required that the chain is rooted in a known CA certificate. When a chain is submitted to the log, a signed timestamp is returned, which can later be used to prove to clients that the chain has been submitted. Clients can thus require that all certificates they see have been logged.
+        Each log consists of certificate chains, which can be submitted by anyone. It is expected that public CAs will contribute all their newly-issued certificates to one or more logs; it is also expected that certificate holders will contribute their own certificate chains. In order to avoid logs being spammed into uselessness, it is required that each chain is rooted in a known CA certificate. When a chain is submitted to a log, a signed timestamp is returned, which can later be used to provide evidence to clients that the chain has been submitted. Clients can thus require that all certificates they see have been logged.
       </t>
       <t>
-        Those who are concerned about misissue can monitor the log, asking it regularly for all new entries, and can thus check whether domains they are responsible for have had certificates issued that they did not expect. What they do with this information, particularly when they find that a misissuance has happened, is beyond the scope of this document, but broadly speaking they can invoke existing business mechanisms for dealing with misissued certificates. Of course, anyone who wants can monitor the log, and if they believe a certificate is incorrectly issued, take action as they see fit.
+        Those who are concerned about misissue can monitor the logs, asking them regularly for all new entries, and can thus check whether domains they are responsible for have had certificates issued that they did not expect. What they do with this information, particularly when they find that a misissuance has happened, is beyond the scope of this document, but broadly speaking they can invoke existing business mechanisms for dealing with misissued certificates. Of course, anyone who wants can monitor the logs, and if they believe a certificate is incorrectly issued, take action as they see fit.
       </t>
       <t>
-        Similarly, those who have seen signed timestamps from the log can later demand a proof of inclusion from the log. If the log is unable to provide this (or, indeed, if the corresponding certificate is absent from monitors' copies of the log), that is evidence of the incorrect operation of the log. This operation is asynchronous to allow TLS connections to proceed without delay, despite network connectivity issues and the vagaries of firewalls.
+        Similarly, those who have seen signed timestamps from a particular log can later demand a proof of inclusion from that log. If the log is unable to provide this (or, indeed, if the corresponding certificate is absent from monitors' copies of that log), that is evidence of the incorrect operation of the log. The checking operation is asynchronous to allow TLS connections to proceed without delay, despite network connectivity issues and the vagaries of firewalls.
       </t>
       <t>
-        The append-only property of a log is technically achieved using Merkle Trees, which can be used to show that any particular version of the log is a superset of any particular previous version. Likewise, Merkle Trees avoid the need to trust the log: if the log attempts to show different things to different people, this can be efficiently detected by comparing tree roots and consistency proofs.
+        The append-only property of each log is technically achieved using Merkle Trees, which can be used to show that any particular version of the log is a superset of any particular previous version. Likewise, Merkle Trees avoid the need to blindly trust logs: if a log attempts to show different things to different people, this can be efficiently detected by comparing tree roots and consistency proofs. Similarly, other misbehaviours of any log (e.g. issuing signed timestamps for certificates they then don't log) can be efficiently detected and proved to the world at large.
       </t>
     </section>
     <section title="Cryptographic components">
       <section title="Merkle Hash Trees">
 	<t>
-	  Logs use a binary Merkle hash tree for efficient auditing. The hashing algorithm is SHA-256. The input to the Merkle tree hash is a list of data entries; these entries will be hashed to form the leaves of the Merkle hash tree. The output is a single 32-byte root hash. Given an ordered list of n inputs, D[n] = {d(0), d(1), ..., d(n-1)}, the Merkle Tree Hash (MTH) is thus defined as follows:
+	  Logs use a binary Merkle hash tree for efficient auditing. The hashing algorithm is SHA-256 (note that this is fixed for this experiment but it is anticipated that each log would be able to specify a hash algorithm). The input to the Merkle tree hash is a list of data entries; these entries will be hashed to form the leaves of the Merkle hash tree. The output is a single 32-byte root hash. Given an ordered list of n inputs, D[n] = {d(0), d(1), ..., d(n-1)}, the Merkle Tree Hash (MTH) is thus defined as follows:
 	</t>
 	<t>
 	  The hash of an empty list is the hash of an empty string:
@@ -70,16 +70,16 @@
 	  <vspace blankLines='1' />
 	  The hash of a list with one entry is:
 	  <vspace blankLines='1' />
-	  MTH({d(0)}) = SHA-256(0 || d(0)).
+	  MTH({d(0)}) = SHA-256(0x00 || d(0)).
 	  <vspace blankLines='1' />
 	  For n &gt; 1, let k be the largest power of two smaller than n. The Merkle Tree Hash of an n-element list D[n] is then defined recursively as
 	  <vspace blankLines='1' />
-	  MTH(D[n]) = SHA-256(1 || MTH(D[0:k]) || MTH(D[k:n])),
+	  MTH(D[n]) = SHA-256(0x01 || MTH(D[0:k]) || MTH(D[k:n])),
 	  <vspace blankLines='1' />
-	  where || is concatenation and D[k1:k2] denotes the length (k2 - k1) list {d(k1), d(k1+1),..., d(k2-1)}.
+	  where || is concatenation and D[k1:k2] denotes the length (k2 - k1) list {d(k1), d(k1+1),..., d(k2-1)}. (Note that the hash calculation for leaves and nodes differ. This domain separation is required to give second preimage resistance.)
 	</t>
 	<t>
-	  Note that we do not require the length of the input list to be a power of two. The resulting Merkle tree may thus not be balanced, however, its shape is uniquely determined by the number of leaves. [This Merkle tree is essentially the same as the <eref target='http://tamperevident.cs.rice.edu/Logging.html/'>history tree</eref> proposal, except our definition omits dummy leaves.]
+	  Note that we do not require the length of the input list to be a power of two. The resulting Merkle tree may thus not be balanced, however, its shape is uniquely determined by the number of leaves. [This Merkle tree is essentially the same as the <eref target='http://tamperevident.cs.rice.edu/Logging.html'>history tree</eref> proposal, except our definition omits dummy leaves.]
 	</t>
       <section title="Merkle audit paths" anchor='merkle_paths'>
 	<t>
@@ -213,7 +213,7 @@ d0 d1   d2 d3           d0 d1   d2 d3  d4 d5
 	</section>
 	<section title="Signatures">
 	  <t>
-	    Various data structures are signed. A log can use either elliptic curve signatures using the NIST P-256 curve (http://csrc.nist.gov/publications/fips/fips186-3/fips_186-3.pdf section D.1.2.3) or RSA signatures using a key of at least 2048 bits.
+	    Various data structures are signed. A log can use either elliptic curve signatures using the NIST P-256 curve (section D.1.2.3 of <xref target="DSS">DSS</xref>) or RSA signatures using a key of at least 2048 bits.
 	  </t>
 	</section>
       </section>
@@ -223,23 +223,35 @@ d0 d1   d2 d3           d0 d1   d2 d3  d4 d5
 	Anyone can submit certificates to certificate logs for public auditing, however, since certificates will not be accepted by clients unless logged, it is expected that certificate owners or their CAs will usually submit them. A log is a single, ever-growing, append-only Merkle Tree of such certificates.
       </t>
       <t>
-	After accepting a certificate submission, the log MUST immediately return a Signed Certificate Timestamp (SCT). The SCT is the log's promise to incorporate the certificate in the Merkle Tree within a fixed amount of time known as the Maximum Merge Delay (MMD). If the log has previously seen the certificate, it MAY return the same SCT as it returned before. Servers MUST present an SCT from one or more logs to the client together with the certificate. Clients MUST reject certificates that do not have a valid SCT for the end-entity certificate.
+	When a valid certificate is submitted to a log, the log MUST immediately return a Signed Certificate Timestamp (SCT). The SCT is the log's promise to incorporate the certificate in the Merkle Tree within a fixed amount of time known as the Maximum Merge Delay (MMD). If the log has previously seen the certificate, it MAY return the same SCT as it returned before. TLS servers MUST present an SCT from one or more logs to the client together with the certificate. TLS clients MUST reject certificates that do not have a valid SCT for the end-entity certificate.
       </t>
       <t>
-	Periodically, the log appends all new entries to the Merkle Tree, and signs the root of the tree. Clients and auditors can thus verify that each certificate for which an SCT has been issued indeed appears in the log. The log MUST incorporate a certificate in its Merkle Tree within the Maximum Merge Delay period after the issuance of the SCT.
+	Periodically, each log appends all its new entries to the Merkle Tree, and signs the root of the tree. Clients and auditors can thus verify that each certificate for which an SCT has been issued indeed appears in the log. The log MUST incorporate a certificate in its Merkle Tree within the Maximum Merge Delay period after the issuance of the SCT.
+      </t>
+      <t>
+	Logs MUST NOT impose any conditions on copying data retrieved from the log.
       </t>
       <section title="Log Entries">
 	<t>
-	  Anyone can submit a certificate to the log. In order to attribute each logged certificate to its issuer, the log shall publish a list of acceptable root certificates (this list should be the union of root certificates trusted by major browser vendors). Each submitted certificate MUST be accompanied by all additional certificates required to verify the certificate chain up to an accepted root certificate. The self-signed root certificate itself MAY be omitted from this list. 
+	  Anyone can submit a certificate to any log. In order to enable attribution of each logged certificate to its issuer, the log SHALL publish a list of acceptable root certificates (this list might usefully be the union of root certificates trusted by major browser vendors). Each submitted certificate MUST be accompanied by all additional certificates required to verify the certificate chain up to an accepted root certificate. The root certificate itself MAY be omitted from this list. 
 	</t>
         <t>
-	  Alternatively, (root as well as intermediate) Certificate Authorities may submit a certificate to the log prior to issuance. To do so, a Certificate Authority constructs a Precertificate by adding a special critical poison extension (OID 1.3.6.1.4.1.11129.2.4.3, ASN.1 NULL data) to the leaf TBSCertificate, and signing the resulting TBSCertificate <xref target='RFC5280'/> with a special-purpose (Extended Key Usage: Certificate Transparency, OID 1.3.6.1.4.1.11129.2.4.4, basicConstraints=critical,CA:FALSE) Precertificate Signing Certificate. The Precertificate Signing Certificate MUST be certified by the CA certificate. As above, the Precertificate submission MUST be accompanied by the Precertificate Signing Certificate and all additional certificates required to verify the chain up to an accepted root certificate. The signature on the TBSCertificate indicates the Certificate Authority's intent to issue a certificate. This intent is considered binding (i.e., misissuance of the Precertificate is considered equal to misissuance of the final certificate). The log verifies the Precertificate signature chain, and issues a Signed Certificate Timestamp on the corresponding TBSCertificate.
-</t>
-	<t>
-	  The log MUST verify that the submitted leaf certificate or Precertificate has a valid signature chain leading back to a trusted root CA certificate, using the chain of intermediate CA certificates provided by the submitter. In case of Precertificates, the log MUST also verify that the Precertificate Signing Certificate has the correct Extended Key Usage extension. The log MAY accept certificates that have expired, are not yet valid, have been revoked or are otherwise not fully valid according to X.509 verification rules. However, the log MUST refuse to publish certificates without a valid chain to a known root CA. If a certificate is accepted and an SCT issued, the log MUST store the chain used for verification including the certificate or Precertificate itself, and MUST present this chain for auditing upon request.
+	  Alternatively, (root as well as intermediate) Certificate Authorities may submit a certificate to logs prior to issuance. To do so, a Certificate Authority constructs a Precertificate by adding a special critical poison extension (OID 1.3.6.1.4.1.11129.2.4.3, ASN.1 NULL data) to the leaf TBSCertificate (this extension is to ensure that the Precertificate cannot be validated by a standard X.509v3 client), and signing the resulting TBSCertificate <xref target='RFC5280'/> with either
+	  <list style="symbols">
+	    <t>
+	      a special-purpose (Extended Key Usage: Certificate Transparency, OID 1.3.6.1.4.1.11129.2.4.4, basicConstraints=critical,CA:FALSE) Precertificate Signing Certificate. The Precertificate Signing Certificate MUST be certified by the CA certificate that will ultimately sign the leaf TBSCertificate (note that the log may relax standard validation rules to allow this, so long as the final signed certificate will be valid),
+	    </t>
+	    <t>
+	      or, the CA certificate that will sign the final certificate.
+	    </t>
+	  </list>
+	  As above, the Precertificate submission MUST be accompanied by the Precertificate Signing Certificate, if used, and all additional certificates required to verify the chain up to an accepted root certificate. The signature on the TBSCertificate indicates the Certificate Authority's intent to issue a certificate. This intent is considered binding (i.e., misissuance of the Precertificate is considered equal to misissuance of the final certificate). Each log verifies the Precertificate signature chain, and issues a Signed Certificate Timestamp on the corresponding TBSCertificate.
 	</t>
 	<t>
-	  Each certificate entry in the log MUST include the following components:
+	  Logs MUST verify that the submitted leaf certificate or Precertificate has a valid signature chain leading back to a trusted root CA certificate, using the chain of intermediate CA certificates provided by the submitter. In case of Precertificates, each log MUST also verify that the Precertificate Signing Certificate has the correct Extended Key Usage extension. Logs MAY accept certificates that have expired, are not yet valid, have been revoked or are otherwise not fully valid according to X.509 verification rules in order to accomodate quirks of CA certificate issuing software. However, logs MUST refuse to publish certificates without a valid chain to a known root CA. If a certificate is accepted and an SCT issued, the accepting log MUST store the chain used for verification including the certificate or Precertificate itself, and MUST present this chain for auditing upon request. This chain is required to prevent a CA avoiding blame by logging a partial or empty chain [Note: this effectively excludes self-signed and DANE-based certificates until some mechanism to control spam for those certificates is found - the authors welcome suggestions].
+	</t>
+	<t>
+	  Each certificate entry in a log MUST include the following components:
 	</t>
 <figure>
   <artwork>
@@ -303,7 +315,7 @@ d0 d1   d2 d3           d0 d1   d2 d3  d4 d5
 	  </artwork>
 	</figure>
 	<t>
-	  <spanx style="verb">key_id</spanx> is the SHA-256 hash of the log's public key [TODO: define how to calculate this].
+	  <spanx style="verb">key_id</spanx> is the SHA-256 hash of the log's public key, calculated over the DER encoding of the key represented as SubjectPublicKeyInfo.
 	</t>
 	<figure>
 	  <artwork>
@@ -359,7 +371,7 @@ d0 d1   d2 d3           d0 d1   d2 d3  d4 d5
 	  At least one SCT MUST be included. Server operators MAY include more than one SCT.
 	</t>
 	<t>
-	  Similarly, the Certificate Authority MAY submit the precertificate to more than one log, and all obtained SCTs can be directly embedded in the final certificate, by encoding the SignedCertificateTimestampList structure as an ASN.1 OCTET STRING and inserting the resulting data in the TBSCertificate as an X.509v3 certificate extension (OID 1.3.6.1.4.1.11129.2.4.2). Upon receiving the certificate, clients can reconstruct the original TBSCertificate to verify the SCT signature.
+	  Similarly, a Certificate Authority MAY submit the precertificate to more than one log, and all obtained SCTs can be directly embedded in the final certificate, by encoding the SignedCertificateTimestampList structure as an ASN.1 OCTET STRING and inserting the resulting data in the TBSCertificate as an X.509v3 certificate extension (OID 1.3.6.1.4.1.11129.2.4.2). Upon receiving the certificate, clients can reconstruct the original TBSCertificate to verify the SCT signature.
 	</t>
 	<t>
 	  The contents of the ASN.1 OCTET STRING embedded in an OCSP extension or X509v3 certificate extension are as follows:
@@ -381,7 +393,7 @@ d0 d1   d2 d3           d0 d1   d2 d3  d4 d5
 	</t>
       </section>
       <section title="Merkle Tree" anchor="tree">
-	<t> A certificate log MUST periodically append all new log entries to the log Merkle Tree. The log MUST sign these entries by constructing a binary Merkle Tree with log entries as consecutive inputs to the tree, signing the corresponding Merkle Tree Hash, and publishing each update to the tree in a Signed Merkle Tree Update. The hashing algorithm for the Merkle Tree Hash is SHA-256.
+	<t> Each certificate log MUST periodically append all its new log entries to the log Merkle Tree. The log MUST sign these entries by constructing a binary Merkle Tree with log entries as consecutive inputs to the tree, signing the corresponding Merkle Tree Hash, and publishing each update to the tree in a Signed Merkle Tree Update. The hashing algorithm for the Merkle Tree Hash is SHA-256.
 	</t>
 	<t>
 	  Structure of the Merkle Tree input:
@@ -431,7 +443,7 @@ d0 d1   d2 d3           d0 d1   d2 d3  d4 d5
       </section>
       <section title="Tree Head Signature">
 	<t>
-        Every time the log appends new entries to the tree, the log MUST sign the corresponding tree hash and tree information (see also the corresponding Signed Tree Head client message in <xref target="fetch_sth"/>). The signature input is structured as follows:
+        Every time a log appends new entries to the tree, the log MUST sign the corresponding tree hash and tree information (see also the corresponding Signed Tree Head client message in <xref target="fetch_sth"/>). The signature input is structured as follows:
 	</t>
 	<t>
 <figure>
@@ -458,7 +470,7 @@ d0 d1   d2 d3           d0 d1   d2 d3  d4 d5
 	<t>
 	  <spanx style="verb">sha256_root_hash</spanx> is the root of the Merkle Hash Tree.
 	</t>
-	<t>The log MUST produce a Tree Head Signature at least as often as the Maximum Merge Delay. In the unlikely event that it receives no new submissions during an MMD period, the log SHALL sign the same Merkle Tree Hash with a fresh timestamp.
+	<t>Each log MUST produce a Tree Head Signature at least as often as the Maximum Merge Delay. In the unlikely event that it receives no new submissions during an MMD period, the log SHALL sign the same Merkle Tree Hash with a fresh timestamp.
 	</t>
       </section>
     </section>
@@ -561,7 +573,7 @@ d0 d1   d2 d3           d0 d1   d2 d3  d4 d5
 	      The tree_size of the second tree, in decimal.
 	    </t>
 	  </list>
-	  Both tree sizes must be from published v1 STHs.
+	  Both tree sizes must be from published v1 STHs (Signed Tree Heads).
 	</t>
 	<t>
 	  Outputs
@@ -682,17 +694,17 @@ d0 d1   d2 d3           d0 d1   d2 d3  d4 d5
     </section>
     <section title="Clients">
       <t>
-	There are various different functions clients of the log might perform. We describe here some typical clients and how they could function. Any inconsistency may be used as evidence that a log has not behaved correctly, and the signatures on the data structures prevent the log from denying that misbehaviour.
+	There are various different functions clients of logs might perform. We describe here some typical clients and how they could function. Any inconsistency may be used as evidence that a log has not behaved correctly, and the signatures on the data structures prevent the log from denying that misbehaviour.
       </t>
       <t>
-	All clients should gossip with each other, exchanging STHs at least: this is all that is required to ensure that they all have a consistent view. The exact mechanism for gossip is TBD, but it is expected there will be a variety.
+	All clients should gossip with each other, exchanging STHs at least: this is all that is required to ensure that they all have a consistent view. The exact mechanism for gossip will be described in an separate document, but it is expected there will be a variety.
       </t>
       <section title="Monitor">
 	<t>
-	  Monitors watch the log and check that it behaves correctly. They also watch for certificates of interest.
+	  Monitors watch logs and check that they behave correctly. They also watch for certificates of interest.
 	</t>
 	<t>
-	  A monitor needs to, at least, inspect every new entry in the log. It may also want to keep a copy of the entire log. In order to do this, it should follow these steps:
+	  A monitor needs to, at least, inspect every new entry in each log it watches. It may also want to keep copies of entire logs. In order to do this, it should follow these steps for each log:
 	  <list style="numbers">
 	    <t>
 	      Fetch the current STH using <xref target="fetch_sth"/>.
@@ -756,15 +768,20 @@ d0 d1   d2 d3           d0 d1   d2 d3  d4 d5
 	</t>
       </section>
     </section>
+    <section title="Allocation of RFC 5878 AuthorizationData Type">
+      <t>
+	IANA is requested to allocate an RFC 5878 AuthorizationData Type for the CST included in an Authorizationn Extension. The value 182 is preferred.
+      </t>
+    </section>
     <section title="Security and Privacy Considerations">
       <section title="Misissued Certificates">
 	<t>
-	  Misissued certificates that have not been publicly logged, and thus do not have a valid SCT, will be rejected by clients. Misissued certificates that do have an SCT from a log will appear in the public log within the Maximum Merge Delay, assuming the log is operating correctly. Thus, the maximum period of time during which a misissued certificate can be used without being available for audit is the MMD. 
+	  Misissued certificates that have not been publicly logged, and thus do not have a valid SCT, will be rejected by clients. Misissued certificates that do have an SCT from a log will appear in that public log within the Maximum Merge Delay, assuming the log is operating correctly. Thus, the maximum period of time during which a misissued certificate can be used without being available for audit is the MMD. 
 	</t>
       </section>
       <section title="Detection of Misissue">
 	<t>
-	  The log does not itself detect misissued certificate, it relies instead on interested parties, such as domain owners, to monitor it and take corrective action when a misissue is detected.
+	  The logs do not themselves detect misissued certificates, they rely instead on interested parties, such as domain owners, to monitor them and take corrective action when a misissue is detected.
 	</t>
       </section>
       <section title="Misbehaving logs">
@@ -775,7 +792,7 @@ d0 d1   d2 d3           d0 d1   d2 d3  d4 d5
 	  Violation of the MMD contract is detected by clients requesting a Merkle audit proof for each observed SCT. These checks can be asynchronous, and need only be done once per each certificate. In order to protect the clients' privacy, these checks need not reveal the exact certificate to the log. Clients can instead request the proof from a trusted auditor (since anyone can compute the audit proofs from the log), or request Merkle proofs for a batch of certificates around the SCT timestamp. 
 	</t>
 	<t>
-	  Violation of the append-only property is detected by global gossiping, i.e., everyone auditing the log comparing their versions of the latest signed tree head. As soon as two conflicting signed tree heads are detected, this is cryptographic proof of the log's misbehaviour.
+	  Violation of the append-only property is detected by global gossiping, i.e., everyone auditing logs comparing their versions of the latest signed tree heads. As soon as two conflicting signed tree heads for the same log are detected, this is cryptographic proof of the that log's misbehaviour.
 	</t>
       </section>
     </section>
@@ -784,7 +801,21 @@ d0 d1   d2 d3           d0 d1   d2 d3  d4 d5
 	The Merkle tree design serves the purpose of keeping communication overhead low.
       </t>
       <t>
-	Auditing the log for integrity does not require third parties to maintain a copy of the entire log. The Signed Tree Head can be updated as new entries become available, without recomputing the entire tree. Third party auditors need only fetch the Merkle consistency proof against an existing STH to efficiently verify the append-only property of an update to the Merkle Tree, without auditing the entire tree.
+	Auditing logs for integrity does not require third parties to maintain a copy of each entire log. The Signed Tree Heads can be updated as new entries become available, without recomputing entire trees. Third party auditors need only fetch the Merkle consistency proofs against a log's existing STH to efficiently verify the append-only property of updates to their Merkle Trees, without auditing the entire tree.
+      </t>
+    </section>
+    <section title="Future Changes">
+      <t>
+	This section lists things we might address in a Standards Track version of this document.
+      </t>
+      <t>
+	Rather than forcing a log operator to create a new log in order to change the log signing key, we may allow some key roll mechanism.
+      </t>
+      <t>
+	We may add hash and signing algorithm agility.
+      </t>
+      <t>
+	We may describe some gossip protocols.
       </t>
     </section>
   </middle>
@@ -987,6 +1018,18 @@ d0 d1   d2 d3           d0 d1   d2 d3  d4 d5
 	</front>
 	<seriesInfo name="RFC" value="6066"/>
 	<format type="TXT" octets="55079" target="http://www.rfc-editor.org/rfc/rfc6066.txt"/>
+      </reference>
+
+      <reference anchor="DSS">
+	<front>
+	  <title>Digital Signature Standard</title>
+	  <author>
+	    <organization abbrev="NIST">National Institute of Standards and Technology, U.S. Department of Commerce</organization>
+	  </author>
+	  <date month="May" year="1994"/>
+	</front>
+	<seriesInfo name="FIPS" value="186-3"/>
+	<format type="PDF" target="http://csrc.nist.gov/publications/fips/fips186-3/fips_186-3.pdf"/>
       </reference>
 
     </references>
