@@ -8,7 +8,7 @@ Expires: June 23, 2013                                 December 20, 2012
 
 
                         Certificate Transparency
-                      draft-laurie-pki-sunlight-04
+                      draft-laurie-pki-sunlight-05
 
 Abstract
 
