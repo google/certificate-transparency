@@ -1,7 +1,7 @@
 <?xml version="1.0"?>
 <?rfc symrefs="yes"?>
 <?rfc toc="yes"?>
-<rfc ipr="trust200902" docName="draft-laurie-pki-sunlight-04">
+<rfc ipr="trust200902" docName="draft-laurie-pki-sunlight-04" category="exp">
   <front>
     <title>Certificate Transparency</title>
     <author initials="B" surname="Laurie" fullname="Ben Laurie">
@@ -236,10 +236,10 @@ d0 d1   d2 d3           d0 d1   d2 d3  d4 d5
 	  Anyone can submit a certificate to any log. In order to enable attribution of each logged certificate to its issuer, the log SHALL publish a list of acceptable root certificates (this list might usefully be the union of root certificates trusted by major browser vendors). Each submitted certificate MUST be accompanied by all additional certificates required to verify the certificate chain up to an accepted root certificate. The root certificate itself MAY be omitted from this list. 
 	</t>
         <t>
-	  Alternatively, (root as well as intermediate) Certificate Authorities may submit a certificate to logs prior to issuance. To do so, a Certificate Authority constructs a Precertificate by adding a special critical poison extension (OID 1.3.6.1.4.1.11129.2.4.3, ASN.1 NULL data) to the leaf TBSCertificate (this extension is to ensure that the Precertificate cannot be validated by a standard X.509v3 client), and signing the resulting TBSCertificate <xref target='RFC5280'/> with either
+	  Alternatively, (root as well as intermediate) Certificate Authorities may submit a certificate to logs prior to issuance. To do so, a Certificate Authority constructs a Precertificate by adding a special critical poison extension (OID 1.3.6.1.4.1.11129.2.4.3, whose extnValue OCTET STRING contains ASN.1 NULL data (0x05 0x00)) to the leaf TBSCertificate (this extension is to ensure that the Precertificate cannot be validated by a standard X.509v3 client), and signing the resulting TBSCertificate <xref target='RFC5280'/> with either
 	  <list style="symbols">
 	    <t>
-	      a special-purpose (Extended Key Usage: Certificate Transparency, OID 1.3.6.1.4.1.11129.2.4.4, basicConstraints=critical,CA:FALSE) Precertificate Signing Certificate. The Precertificate Signing Certificate MUST be certified by the CA certificate that will ultimately sign the leaf TBSCertificate (note that the log may relax standard validation rules to allow this, so long as the final signed certificate will be valid),
+	      a special-purpose (Extended Key Usage: Certificate Transparency, OID 1.3.6.1.4.1.11129.2.4.4) Precertificate Signing Certificate. The Precertificate Signing Certificate MUST be certified by the CA certificate that will ultimately sign the leaf TBSCertificate (note that the log may relax standard validation rules to allow this, so long as the final signed certificate will be valid),
 	    </t>
 	    <t>
 	      or, the CA certificate that will sign the final certificate.
@@ -509,7 +509,7 @@ d0 d1   d2 d3           d0 d1   d2 d3  d4 d5
 	      The SCT timestamp, in decimal.
 	    </t>
 	    <t hangText="extensions">
-	      [TBD]
+	      An opaque type for future expansion. It is likely that not all participants will need to understand data in this field. Logs should set this to the empty string. Clients should decode the base64 encoded data and include it in the SCT.
 	    </t>
 	    <t hangText="signature">
 	      The SCT signature, base64 encoded.
@@ -768,7 +768,7 @@ d0 d1   d2 d3           d0 d1   d2 d3  d4 d5
 	</t>
       </section>
     </section>
-    <section title="Allocation of RFC 5878 AuthorizationData Type">
+    <section title="IANA Considerations">
       <t>
 	IANA is requested to allocate an RFC 5878 AuthorizationData Type for the CST included in an Authorization Extension. The value 182 is preferred.
       </t>
@@ -1026,7 +1026,7 @@ d0 d1   d2 d3           d0 d1   d2 d3  d4 d5
 	  <author>
 	    <organization abbrev="NIST">National Institute of Standards and Technology, U.S. Department of Commerce</organization>
 	  </author>
-	  <date month="May" year="1994"/>
+	  <date month="June" year="2009"/>
 	</front>
 	<seriesInfo name="FIPS" value="186-3"/>
 	<format type="PDF" target="http://csrc.nist.gov/publications/fips/fips186-3/fips_186-3.pdf"/>
