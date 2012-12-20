@@ -770,7 +770,7 @@ d0 d1   d2 d3           d0 d1   d2 d3  d4 d5
     </section>
     <section title="Allocation of RFC 5878 AuthorizationData Type">
       <t>
-	IANA is requested to allocate an RFC 5878 AuthorizationData Type for the CST included in an Authorizationn Extension. The value 182 is preferred.
+	IANA is requested to allocate an RFC 5878 AuthorizationData Type for the CST included in an Authorization Extension. The value 182 is preferred.
       </t>
     </section>
     <section title="Security and Privacy Considerations">
