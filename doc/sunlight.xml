@@ -1,7 +1,7 @@
 <?xml version="1.0"?>
 <?rfc symrefs="yes"?>
 <?rfc toc="yes"?>
-<rfc ipr="trust200902" docName="draft-laurie-pki-sunlight-04" category="exp">
+<rfc ipr="trust200902" docName="draft-laurie-pki-sunlight-05" category="exp">
   <front>
     <title>Certificate Transparency</title>
     <author initials="B" surname="Laurie" fullname="Ben Laurie">
