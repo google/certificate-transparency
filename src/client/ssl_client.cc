@@ -1,6 +1,7 @@
 #include <glog/logging.h>
 #include <openssl/bio.h>
 #include <openssl/ssl.h>
+#include <openssl/tls1.h>
 #include <openssl/x509.h>
 
 #include "client/client.h"

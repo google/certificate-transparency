@@ -4,10 +4,6 @@
 #include <gflags/gflags.h>
 #include <glog/logging.h>
 #include <iostream>
-#include <ldns/ldns.h>
-// FIXME: debug
-#include <ldns/host2str.h>
-#include <ldns/wire2host.h>
 #include <netinet/in.h>
 #include <openssl/evp.h>
 #include <openssl/pem.h>
@@ -40,7 +36,6 @@
 #include "util/util.h"
 
 DEFINE_int32(port, 0, "Server port");
-DEFINE_int32(dnsport, 0, "Server DNS port");
 DEFINE_string(key, "", "PEM-encoded server private key file");
 DEFINE_string(trusted_cert_dir, "",
               "Directory for trusted CA certificates, in OpenSSL hash format");
@@ -80,8 +75,6 @@ static bool ValidatePort(const char *flagname, int port) {
 
 static const bool port_dummy = RegisterFlagValidator(&FLAGS_port,
                                                      &ValidatePort);
-static const bool dnsport_dummy = RegisterFlagValidator(&FLAGS_dnsport,
-                                                        &ValidatePort);
 
 static bool ValidateRead(const char *flagname, const string &path) {
   if (access(path.c_str(), R_OK) != 0) {
@@ -501,114 +494,6 @@ class Server : public FD {
   string wbuffer_;
 };
 
-class UDPServer : public FD {
- public:
-
-  UDPServer(EventLoop *loop, int fd) : FD(loop, fd, NO_DELETE) {}
-
-  bool WantsRead() const { return true; }
-
-  void ReadIsAllowed() {
-    char buf[2048];
-    struct sockaddr_in sa;
-    socklen_t sa_len = sizeof sa;
-
-    ssize_t in = recvfrom(fd(), buf, sizeof buf, 0, (sockaddr *)&sa, &sa_len);
-    CHECK_GE(in, 1);
-    CHECK_EQ(sa_len, sizeof sa);
-    LOG(INFO) << "UDP packet " << util::HexString(std::string(buf, in));
-    PacketRead(sa, buf, in);
-  }
-
-  bool WantsWrite() const {
-    return !write_queue_.empty();
-  }
-
-  void WriteIsAllowed() {
-    CHECK(!write_queue_.empty());
-    WBuffer wbuf = write_queue_.front();
-    write_queue_.pop_front();
-    ssize_t out = sendto(fd(), wbuf.packet.data(), wbuf.packet.length(), 0,
-                         (const sockaddr *)&wbuf.sa, sizeof wbuf.sa);
-    CHECK_NE(out, -1);
-    CHECK_EQ((size_t)out, wbuf.packet.length());
-  }
-
-  // A packet has been read. It will not be re-presented if you do not
-  // process it now.
-  virtual void PacketRead(const sockaddr_in &from, const char *buf, size_t len)
-    = 0;
-
-  // Queue a packet for sending
-  void QueuePacket(const sockaddr_in &to, const char *buf, size_t len) {
-    WBuffer wbuf;
-    wbuf.sa = to;
-    wbuf.packet = string(buf, len);
-    write_queue_.push_back(wbuf);
-  }
-
-private:
-  struct WBuffer {
-    sockaddr_in sa;
-    string packet;
-  };
-  std::deque<WBuffer> write_queue_;
-};
-
-class UDPEchoServer : public UDPServer {
- public:
-
-  UDPEchoServer(EventLoop *loop, int fd) : UDPServer(loop, fd) {}
-
-  virtual void PacketRead(const sockaddr_in &from, const char *buf,
-                          size_t len) {
-    QueuePacket(from, buf, len);
-  }
-};
-
-class CTUDPDNSServer : public UDPServer {
- public:
-
-  CTUDPDNSServer(EventLoop *loop, int fd) : UDPServer(loop, fd) {}
-
-  virtual void PacketRead(const sockaddr_in &from, const char *buf,
-                          size_t len) {
-    ldns_pkt *packet = NULL;
-
-    ldns_status ret = ldns_wire2pkt(&packet, (const uint8_t *)buf, len);
-    if (ret != LDNS_STATUS_OK) {
-      LOG(INFO) << "Bad DNS packet";
-      return;
-    }
- 
-    ldns_pkt_print(stdout, packet);
-
-    if (ldns_pkt_qr(packet) != 0) {
-      LOG(INFO) << "Packet is not a query";
-      return;
-    }
-
-    if (ldns_pkt_get_opcode(packet) != LDNS_PACKET_QUERY) {
-      LOG(INFO) << "Packet has bad opcode";
-      return;
-    }
-
-    ldns_rr_list *questions = ldns_pkt_question(packet);
-    for (size_t n = 0; n < ldns_rr_list_rr_count(questions); ++n) {
-      ldns_rr *question = ldns_rr_list_rr(questions, n);
-
-      if (ldns_rr_get_type(question) != LDNS_RR_TYPE_TXT) {
-        LOG(INFO) << "Question is not TXT";
-        // FIXME(benl): set error response?
-        continue;
-      }
-
-      LOG(INFO) << "Question is TXT";
-    }
-  }
-};
-
-
 class CTLogManager {
  public:
   CTLogManager(Frontend *frontend, TreeSigner *signer, LogLookup *lookup)
@@ -992,9 +877,6 @@ int main(int argc, char **argv) {
   int fd;
   CHECK(InitServer(&fd, FLAGS_port, NULL, SOCK_STREAM));
 
-  int dns_fd;
-  CHECK(InitServer(&dns_fd, FLAGS_dnsport, NULL, SOCK_DGRAM));
-
   EventLoop loop;
 
   CertChecker checker;
@@ -1043,7 +925,6 @@ int main(int argc, char **argv) {
   loop.Add(&frontend_event);
   loop.Add(&tree_event);
   CTServerListener l(&loop, fd, &manager);
-  CTUDPDNSServer dns(&loop, dns_fd);
   LOG(INFO) << "Server listening on port " << FLAGS_port;
   loop.Forever();
 }

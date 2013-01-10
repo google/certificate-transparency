@@ -160,7 +160,7 @@ test_ct_server() {
 
   # Set the tree signing frequency to 0 to ensure we sign as often as possible.
   echo "Starting CT server with trusted certs in $hash_dir"
-  ../server/ct-server --port=8124 --dnsport=8153 --key="$cert_dir/$log_server-key.pem" \
+  ../server/ct-server --port=8124 --key="$cert_dir/$log_server-key.pem" \
     --trusted_cert_dir="$hash_dir" --logtostderr=true \
     --tree_signing_frequency_seconds=1 $flags &
 

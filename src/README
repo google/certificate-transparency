@@ -4,9 +4,8 @@ To find out your system version of OpenSSL:
 
 $ openssl version
 
-If the system version of OpenSSL is appropriate, then you can simply:
-
-$ make
+If the system version of OpenSSL is appropriate, then you can skip
+this step.
 
 Else you have to make a local version. To build a local version on
 Linux, download and unpack OpenSSL source
@@ -29,12 +28,14 @@ tweaking if you do something different.
 Note that if you are on a BSD system "make" will appear to work, but
 you'll get a link error. Use "gmake" instead.
 
+(Tested with gtest-1.6.0)
+
 3. You will also need protobuf, from:
 http://code.google.com/p/protobuf/downloads/list.
 
 (Tested with protobuf-2.4.1)
 
-Again, download, unpack and build.
+Download, unpack, and follow the instructions to build and install.
 
 4. You will also need gflags and glog, from:
 http://code.google.com/p/gflags/
@@ -50,15 +51,15 @@ errors later on.
 5. And you will need a copy of sqlite3 installed on your system.
 
 6. Then, you can build the log server by pointing to your custom OpenSSL
-(if needed), protobuf and gtest:
+(if needed), and local gtest (if not installed):
 
-$ make OPENSSLDIR=<path to openssl> PROTOBUFDIR=<path to protobuf> GTESTDIR=<path to gtest>
+$ make OPENSSLDIR=<path to openssl> GTESTDIR=<path to gtest>
 
 Once more, use gmake on BSD systems.
 
 7. Finally, test:
 
-$ make OPENSSLDIR=<path to openssl> PROTOBUFDIR=<path to protobuf> GTESTDIR=<path to gtest> test
+$ make OPENSSLDIR=<path to openssl> GTESTDIR=<path to gtest> test
 
 8. If you want to test the authz extension in Apache, check out
 OpenSSL 1.0.2 or higher and build that. You'll also need to install it
