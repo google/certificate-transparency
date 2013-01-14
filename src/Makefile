@@ -201,7 +201,7 @@ client/ct: client/ct.o client/client.o client/log_client.o client/ssl_client.o \
 
 # server
 server/ct-server: server/ct-server.o $(LOCAL_LIBS)
-	$(CXX) -o $@ $^ $(SYS_LIBS) -lldns
+	$(CXX) -o $@ $^ $(SYS_LIBS)
 
 test: all
 	proto/serializer_test
