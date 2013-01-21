@@ -57,22 +57,14 @@ $ make OPENSSLDIR=<path to openssl> GTESTDIR=<path to gtest>
 
 Once more, use gmake on BSD systems.
 
-7. Finally, test:
+7. Finally, run unit tests:
 
 $ make OPENSSLDIR=<path to openssl> GTESTDIR=<path to gtest> test
 
-8. If you want to test the authz extension in Apache, check out
-OpenSSL 1.0.2 or higher and build that. You'll also need to install it
-somewhere. Check out the head of Apache, and configure it like:
+-----END-TO-END TESTS-----
 
-$ ./configure --enable-ssl --with-ssl=<path to your install>
-
-9. To test the authz extension:
-
-$ cd test
-$ make APACHEDIR=<path to httpd> local-links
-
-and run tests.
+8. For end-to-end server-client tests, you will need to install Apache
+and point the tests to it. See test/README for how to do so.
 
 -----TESTING AND LOGGING OPTIONS-----
 

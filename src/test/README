@@ -15,41 +15,40 @@ $ sudo apt-get install apache2
 should suffice. On other systems, you may also need to modify the
 Makefile and/or the httpd.conf.
 
+For the following steps you should be in the directory where
+this README resides.
+
 3. Make platform dependent links:
 
 $ make <platform>-links
 
-e.g. "make linux-links"
+Currently, linux-links and freebsd-links are defined.
 
-4. Run the test. If your system's OpenSSL is older than 1.0.0, you
-have to point the test to a more recent local binary
+4. Optionally, you can also test the authz extension. Since this code is only
+in the development versions of OpenSSL and Apache, you'll need to build them
+yourself. Check out OpenSSL 1.0.2 or higher and build that. You'll also need to
+install it somewhere. Check out the head of Apache, and configure it like:
 
-$ MY_OPENSSL=$my_recent_openssl_bin ./sslconnect_test.sh
+$ ./configure --enable-ssl --with-ssl=<path to your install>
 
-This does the following steps:
+$ make APACHEDIR=<path to httpd> local-links
 
-a) Create a CA root certificate and issue a CA ProtoCert signing
-certificate.
+5. Run the test
 
-b) Create a client Certificate Signing Request (CSR).
+$ ./sslconnect_test.sh
 
-c1) Sign the CSR with the CA root certificate. Submit the certificate
-to the log server, retrieve a proof, and embed it in a superfluous
-certificate.
+This first runs client regression tests against existing certificates.
+Secondly, the test generates fresh test certificates and tests
+a) The submission of certificates and precertificates to the log server,
+   and the retrieval of initial Signed Certificate Timestamps;
+b) Serving Signed Certificate Timestamps in a TLS handshake; and
+c) Retrieving audit proofs for those SCTs from the log server.
 
-c2) Sign the CSR with the CA ProtoCert signing key and submit the
-signed request to the log server. Retrieve a proof, embed it in the
-leaf certificate and sign the certificate with the CA root key.
+In the end, the tests should report something like this:
 
-d) Run two Apache VirtualHosts with the resulting client certificates.
+PASSED 35 tests
+FAILED 0 tests
+SKIPPED 0 tests
 
-e) Connect a CT-enabled SSL client to the server and verify the proofs.
-
-The client should report something like this:
-
-Connecting to 127.0.0.1:8125.
-Proof extension found in certificate, verifying...OK
-Log proof verified.
-Connected.
-Cached new checkpoint.
-PASS
+Or, if you did not configure a local Apache, you will see some skipped
+tests.

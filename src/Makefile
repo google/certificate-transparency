@@ -220,7 +220,9 @@ test: all
 	log/frontend_test --test_certs_dir=test/testdata
 	log/tree_signer_test
 	log/log_lookup_test
-# End-to-end test
+
+# Unit tests plus end-to-end tests. Make sure to set up links in test/  first.
+alltests: test
 	cd test && $(MAKE) test
 
 benchmark: merkletree/merkle_tree_large_test log/database_large_test
