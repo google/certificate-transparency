@@ -19,7 +19,7 @@
 	<email>ekasper@google.com</email>
       </address>
     </author>
-    <date year='2012'></date>
+    <date year='2013'></date>
     <abstract>
       <t>
 	The aim of Certificate Transparency is to have every public end-entity (for example, web servers) and intermediate TLS certificate issued by a known Certificate Authority recorded in one or more certificate logs. In order to detect misissuance of certificates, all logs are publicly auditable. In particular, domain owners or their agents will be able to monitor logs for certificates issued on their own domain.
@@ -649,6 +649,15 @@ d0 d1   d2 d3           d0 d1   d2 d3  d4 d5
 	</t>
 	<t>
 	  Note that this message is not signed - the retrieved data can be verified by constructing the root hash corresponding to a retrieved STH. All leaves MUST be v1. However, a compliant v1 client MUST NOT construe an unrecognized MerkleLeafType or LogEntryType value as an error. This means it may be unable to parse some entries, but note that each client can inspect the entries it does recognize, as well as verify the integrity of the data by treating unrecognized leaves as opaque input to the tree.
+        </t>
+	<t>
+          The <spanx style="verb">start</spanx> and <spanx style="verb">end</spanx> parameters SHOULD be within the range 0 &le; x &lt; <spanx style="verb">tree_size</spanx> as returned by <spanx style="verb">get-sth</spanx> in <xref target="fetch_sth"/>.
+	</t>
+	<t>
+          Logs MAY honour requests where 0 &le; <spanx style="verb">start</spanx> &lt; <spanx style="verb">tree_size</spanx>, and <spanx style="verb">end</spanx> &ge; <spanx style="verb">tree_size</spanx> by returning a partial response convering only the valid entries in the specified range. Note that the following restriction may also apply:
+	</t>
+	<t>
+	  Logs MAY restrict the number of entries which can be retrieved per <spanx style="verb">get-entries</spanx> request.  If a client requests more than the permitted number of entries, the log SHALL return the maximum number of entries permissible. These entries SHALL be sequential beginning with the entry specified by <spanx style="verb">start</spanx>.
 	</t>
       </section>
       <section title="Retrieve Entry+Merkle Audit Proof from Log">
@@ -670,19 +679,11 @@ d0 d1   d2 d3           d0 d1   d2 d3  d4 d5
 	<t>
 	  Outputs
 	  <list style="hanging">
-	    <t hangText="entries">
-	      An array of objects, each consisting of
-              <list style="hanging">
-                <t hangText="leaf_input">
-                  The base64-encoded MerkleTreeLeaf structure.
-                </t>
-                <t hangText="auxiliary_data">
-                  The base64-encoded unsigned data, same as in <xref target='fetch_entries'/>.
-                </t>
-	      </list>
+	    <t hangText="leaf_input">
+	      The base64-encoded MerkleTreeLeaf structure.
 	    </t>
-	    <t hangText="timestamp">
-	      The tree's timestamp, in decimal.
+	    <t hangText="extra_data">
+	      The base64-encoded unsigned data, same as in <xref target='fetch_entries'/>.
 	    </t>
 	    <t hangText="audit_path">
 	      An array of base64 encoded Merkle tree nodes proving the inclusion of the chosen certificate.
