@@ -665,6 +665,7 @@ d0 d1   d2 d3           d0 d1   d2 d3  d4 d5
 	<t>
           The <spanx style="verb">start</spanx> and <spanx style="verb">end</spanx> parameters SHOULD be within the range 0 &le; x &lt; <spanx style="verb">tree_size</spanx> as returned by <spanx style="verb">get-sth</spanx> in <xref target="fetch_sth"/>.
 	</t>
+	<t>
           Logs MAY honour requests where 0 &le; <spanx style="verb">start</spanx> &lt; <spanx style="verb">tree_size</spanx>, and <spanx style="verb">end</spanx> &ge; <spanx style="verb">tree_size</spanx> by returning a partial response convering only the valid entries in the specified range. Note that the following restriction may also apply:
 	</t>
 	<t>
