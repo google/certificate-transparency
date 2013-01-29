@@ -373,7 +373,7 @@ d0 d1   d2 d3           d0 d1   d2 d3  d4 d5
 
       <section title="Including the Signed Certificate Timestamp in the TLS Handshake">
 	<t>
-	The SCT data corresponding to the end entity certificate from at least one log must be included in the TLS handshake, either by using an X509v3 certificate extension as described below, by using an Authorization Extension <xref target='RFC5878'/> with type 182, or by using OCSP Stapling (section 8 of <xref target='RFC6066'/>), where the response includes an OCSP extension with OID 1.3.6.1.4.1.11129.2.4.5 (see <xref target='RFC2560'/>) and body:
+	The SCT data corresponding to the end entity certificate from at least one log must be included in the TLS handshake, either by using an X509v3 certificate extension as described below, by using a TLS Extension (section 7.4.1.4 of <xref target='RFC5246'/>) with type [TBD], or by using OCSP Stapling (section 8 of <xref target='RFC6066'/>), where the response includes an OCSP extension with OID 1.3.6.1.4.1.11129.2.4.5 (see <xref target='RFC2560'/>) and body:
 	</t>
 	<figure>
 	  <artwork>
@@ -402,7 +402,7 @@ d0 d1   d2 d3           d0 d1   d2 d3  d4 d5
           Here <spanx style="verb">SerializedSCT</spanx> is an opaque bytestring that contains the serialized TLS structure. This encoding ensures that TLS clients can decode each SCT individually (i.e., if there is a version upgrade, out of date clients can still parse old SCTs while skipping over new SCTs whose version they don't understand).
         </t>
 	<t>
-	  SCTs embedded in the TLS Authorization Extension are each encoded as an individual AuthorizationDataEntry <xref target='RFC5878'/>.
+	  Likewise, SCTs can be embedded in a TLS Extension. See below for details.
 	</t>
 	<t>
 	  TLS clients MUST implement all three mechanisms. Servers MUST implement at least one of the three mechanisms. Note that existing TLS servers can generally use the certificate extension mechanism without modification.
@@ -410,6 +410,20 @@ d0 d1   d2 d3           d0 d1   d2 d3  d4 d5
 	<t>
 	  TLS servers should send SCTs from multiple logs in case one or more logs is not acceptable to the client (for example, if a log has been struck off for misbehaviour or has had a key compromise).
 	</t>
+	<section title="TLS Extension">
+	  <t>
+	    The SCT can be sent during the TLS handshake using a TLS extension, type [TBD].
+	  </t>
+	  <t>
+	    Clients that support the extension SHOULD send a ClientHello extension with the appropriate type and empty <spanx style="verb">extension_data</spanx>.
+	  </t>
+	  <t>
+	    Servers MUST only send SCTs to clients who have indicated support for the extension in the ClientHello, in which case the SCTs are sent by setting the <spanx style="verb">extension_data</spanx> to a <spanx style="verb">SignedCertificateTimestampList</spanx>.
+	  </t>
+	  <t>
+	    Session resumption uses the original session information: clients SHOULD include the extension type in the ClientHello but if the session is resumed, the server is not expected to process it or include the extension in the ServerHello.
+	  </t>
+	</section>
       </section>
       <section title="Merkle Tree" anchor="tree">
 	<t>
@@ -819,7 +833,7 @@ d0 d1   d2 d3           d0 d1   d2 d3  d4 d5
     </section>
     <section title="IANA Considerations">
       <t>
-	IANA is requested to allocate an RFC 5878 AuthorizationData Type for the CTS included in an Authorization Extension. The value 182 is preferred. DTLS-OK is "Y" and Description is "signed_certificate_timestamp".
+	IANA is requested to allocate an RFC 5246 ExtensionType Value for the CTS TLS extension. The Extension name is "signed_certificate_timestamp".
       </t>
     </section>
     <section title="Security Considerations">
@@ -1121,19 +1135,6 @@ d0 d1   d2 d3           d0 d1   d2 d3  d4 d5
 	  <date year='2008' month='May' />
 	</front>
 	<seriesInfo name='RFC' value='5280' />
-      </reference>
-
-      <reference anchor='RFC5878'>
-	<front>
-	  <title>The Transport Layer Security (TLS) Authorization Extensions</title>
-	  <author initials='M.' surname='Brown' fullname='M. Brown'>
-	    <organization >RedPhone Security</organization></author>
-	  <author initials='R.' surname='Housley' fullname='R. Housley'>
-	    <organization>Vigil Security</organization></author>
-	  <date year='2010' month='May' />
-	</front>
-
-	<seriesInfo name='RFC' value='5878' />
       </reference>
 
       <reference anchor="RFC6066">
