@@ -22,31 +22,17 @@
     <date year='2013'></date>
     <abstract>
       <t>
-	The aim of Certificate Transparency is to have every public end-entity (for example, web servers) and intermediate TLS certificate issued by a known Certificate Authority recorded in one or more certificate logs. In order to detect misissuance of certificates, all logs are publicly auditable. In particular, domain owners or their agents will be able to monitor logs for certificates issued on their own domain.
-      </t>
-      <t>
-	To protect TLS clients from unlogged misissued certificates, each log signs all certificates it records, and clients can choose not to trust certificates that are not accompanied by an appropriate log signature. For privacy and performance reasons log signatures are embedded in the TLS handshake via the TLS authorization extension, in a stapled OCSP extension, or in the certificate itself via an X.509v3 certificate extension.
-      </t>
-      <t>
-	To ensure a globally consistent view of any particular log, each log also provides a global signature over the entire log. Any inconsistency of logs can be detected through cross-checks on the global signature. Consistency between any pair of global signatures, corresponding to snapshots of a particular log at different times, can be efficiently shown.
-      </t>
-      <t>
-	Logs are only expected to certify that they have seen a certificate, and thus we do not specify any revocation mechanism for log signatures in this document. Logs are append-only, and log signatures do not expire. 
+	This document describes an experimental protocol for publicly logging the existence of TLS certificates as they are issued or observed, in a manner that allows anyone to audit certificate authority activity and notice the issuance of suspect certificates, as well as to audit the certificate logs themselves. The intent is that eventually clients would refuse to honor certificates which do not appear in a log, effectively forcing CAs to add all issued certificates to the logs.
       </t>
       <t>
 	Logs are network services which implement the protocol operations for submissions and queries that are defined in this document.
       </t>
     </abstract>
-    <note title="Requirements Language">
-      <t>
-	The key words &quot;MUST&quot;, &quot;MUST NOT&quot;, &quot;REQUIRED&quot;, &quot;SHALL&quot;, &quot;SHALL NOT&quot;, &quot;SHOULD&quot;, &quot;SHOULD NOT&quot;, &quot;RECOMMENDED&quot;, &quot;MAY&quot;, and &quot;OPTIONAL&quot; in this document are to be interpreted as described in <xref target="RFC2119">RFC 2119</xref>.
-      </t>
-  </note>
   </front>
   <middle>
     <section title="Informal introduction">
       <t>
-        Certificate Transparency aims to mitigate the problem of misissued certificates by providing publicly auditable, append-only, untrusted logs of all issued certificates. The logs are publicly auditable so that it is possible for anyone to verify the correct operation of each log, and to monitor when new certificates are added to it. The logs do not themselves prevent misissue, but they ensure that interested parties (particularly those named in certificates) can detect such misissuance. Note that this is a general mechanism, but in this document we only describe its use for public TLS server certificates issued by public CAs.
+        Certificate Transparency aims to mitigate the problem of misissued certificates by providing publicly auditable, append-only, untrusted logs of all issued certificates. The logs are publicly auditable so that it is possible for anyone to verify the correctness of each log, and to monitor when new certificates are added to it. The logs do not themselves prevent misissue, but they ensure that interested parties (particularly those named in certificates) can detect such misissuance. Note that this is a general mechanism, but in this document we only describe its use for public TLS server certificates issued by public CAs.
       </t>
       <t>
         Each log consists of certificate chains, which can be submitted by anyone. It is expected that public CAs will contribute all their newly-issued certificates to one or more logs; it is also expected that certificate holders will contribute their own certificate chains. In order to avoid logs being spammed into uselessness, it is required that each chain is rooted in a known CA certificate. When a chain is submitted to a log, a signed timestamp is returned, which can later be used to provide evidence to clients that the chain has been submitted. TLS clients can thus require that all certificates they see have been logged.
@@ -60,11 +46,21 @@
       <t>
         The append-only property of each log is technically achieved using Merkle Trees, which can be used to show that any particular version of the log is a superset of any particular previous version. Likewise, Merkle Trees avoid the need to blindly trust logs: if a log attempts to show different things to different people, this can be efficiently detected by comparing tree roots and consistency proofs. Similarly, other misbehaviours of any log (e.g. issuing signed timestamps for certificates they then don't log) can be efficiently detected and proved to the world at large.
       </t>
+      <section title="Requirements Language">
+	<t>
+	  The key words &quot;MUST&quot;, &quot;MUST NOT&quot;, &quot;REQUIRED&quot;, &quot;SHALL&quot;, &quot;SHALL NOT&quot;, &quot;SHOULD&quot;, &quot;SHOULD NOT&quot;, &quot;RECOMMENDED&quot;, &quot;MAY&quot;, and &quot;OPTIONAL&quot; in this document are to be interpreted as described in <xref target="RFC2119">RFC 2119</xref>.
+	</t>
+      </section>
+      <section title="Data structures">
+	<t>
+	  Data structures are defined according to the conventions laid out in section 4 of <xref target="RFC5246"/>.
+	</t>
+      </section>
     </section>
     <section title="Cryptographic components">
       <section title="Merkle Hash Trees">
 	<t>
-	  Logs use a binary Merkle hash tree for efficient auditing. The hashing algorithm is SHA-256 (note that this is fixed for this experiment but it is anticipated that each log would be able to specify a hash algorithm). The input to the Merkle Tree Hash is a list of data entries; these entries will be hashed to form the leaves of the Merkle hash tree. The output is a single 32-byte Merkle Tree Hash. Given an ordered list of n inputs, D[n] = {d(0), d(1), ..., d(n-1)}, the Merkle Tree Hash (MTH) is thus defined as follows:
+	  Logs use a binary Merkle hash tree for efficient auditing. The hashing algorithm is <xref target="FIPS.180-2.2002">SHA-256</xref> (note that this is fixed for this experiment but it is anticipated that each log would be able to specify a hash algorithm). The input to the Merkle Tree Hash is a list of data entries; these entries will be hashed to form the leaves of the Merkle hash tree. The output is a single 32-byte Merkle Tree Hash. Given an ordered list of n inputs, D[n] = {d(0), d(1), ..., d(n-1)}, the Merkle Tree Hash (MTH) is thus defined as follows:
 	</t>
 	<t>
 	  The hash of an empty list is the hash of an empty string:
@@ -109,9 +105,11 @@
 	<t>
 	  Merkle consistency proofs prove the append-only property of the tree. A Merkle consistency proof for a Merkle Tree Hash MTH(D[n]) and a previously advertised hash MTH(D[0:m]) of the first m leaves, m &lt;= n, is the list of nodes in the Merkle tree required to verify that the first m inputs D[0:m] are equal in both trees. Thus, a consistency proof must contain a set of intermediate nodes (i.e., commitments to inputs) sufficient to verify MTH(D[n]), such that (a subset of) the same nodes can be used to verify MTH(D[0:m]). We define an algorithm that outputs the (unique) minimal consistency proof. 
 	</t>
-	<t> Given an ordered list of n inputs to the tree, D[n] = {d(0), ..., d(n-1)}, the Merkle consistency proof PROOF(m, D[n]) for a previous Merkle Tree Hash MTH(D[0:m]), 0 &lt; m &lt; n, is defined as PROOF(m, D[n]) = SUBPROOF(m, D[n], true):
-	</t>
 	<t>
+	  Given an ordered list of n inputs to the tree, D[n] = {d(0), ..., d(n-1)}, the Merkle consistency proof PROOF(m, D[n]) for a previous Merkle Tree Hash MTH(D[0:m]), 0 &lt; m &lt; n, is defined as:
+	  <vspace blankLines='1' />
+	  PROOF(m, D[n]) = SUBPROOF(m, D[n], true)
+	  <vspace blankLines='1' />
 	  The subproof for m = n is empty if m is the value for which PROOF was originally requested (meaning that the subtree Merkle Tree Hash MTH(D[0:m]) is known):
 	  <vspace blankLines='1' />
 	  SUBPROOF(m, D[m], true) = {}
@@ -216,7 +214,7 @@ d0 d1   d2 d3           d0 d1   d2 d3  d4 d5
 	</section>
 	<section title="Signatures">
 	  <t>
-	    Various data structures are signed. A log MUST use either elliptic curve signatures using the NIST P-256 curve (section D.1.2.3 of <xref target="DSS">DSS</xref>) or RSA signatures using a key of at least 2048 bits.
+	    Various data structures are signed. A log MUST use either elliptic curve signatures using the NIST P-256 curve (section D.1.2.3 of <xref target="DSS">DSS</xref>) or RSA signatures (RSASSA-PKCS1-V1_5 with SHA-256, section 8.2 of <xref target="RFC3447"/>) using a key of at least 2048 bits.
 	  </t>
 	</section>
       </section>
@@ -232,7 +230,7 @@ d0 d1   d2 d3           d0 d1   d2 d3  d4 d5
 	Periodically, each log appends all its new entries to the Merkle Tree, and signs the root of the tree. Auditors can thus verify that each certificate for which an SCT has been issued indeed appears in the log. The log MUST incorporate a certificate in its Merkle Tree within the Maximum Merge Delay period after the issuance of the SCT.
       </t>
       <t>
-	Logs MUST NOT impose any conditions on retrieving or sharing data from the log.
+	Log operators MUST NOT impose any conditions on retrieving or sharing data from the log.
       </t>
       <section title="Log Entries">
 	<t>
@@ -276,8 +274,8 @@ d0 d1   d2 d3           d0 d1   d2 d3  d4 d5
     } X509ChainEntry;
 
     struct {
-        ASN.1Cert tbs_certificate;
-        ASN.1Cert precertificate_chain&lt;1..2^24-1&gt;;
+        ASN.1Cert pre_certificate;
+        ASN.1Cert precertificate_chain&lt;0..2^24-1&gt;;
     } PrecertChainEntry;
   </artwork>
 </figure>
@@ -294,10 +292,10 @@ d0 d1   d2 d3           d0 d1   d2 d3  d4 d5
 	  <spanx style="verb">certificate_chain</spanx> is a chain of additional certificates required to verify the end entity certificate. The first certificate MUST certify the end entity certificate. Each following certificate MUST directly certify the one preceding it. The self-signed root certificate MAY be omitted from the chain.
 	</t>
 	<t>
-	  <spanx style="verb">tbs_certificate</spanx> is the TBSCertificate component of the Precertificate (i.e., the original TBSCertificate, without the Precertificate signature and the SCT extension).
+	  <spanx style="verb">pre_certificate</spanx> is the Precertificate submmited for auditing.
 	</t>
 	<t>
-	  <spanx style="verb">precertificate_chain</spanx> is a chain of certificates required to verify the Precertificate submission. The first certificate MUST be the original Precertificate, with its unsigned part matching the <spanx style="verb">tbs_certificate</spanx>. The second certificate MUST be a valid Precertificate Signing Certificate, and MUST certify the first certificate. Each following certificate MUST directly certify the one preceding it. The self-signed root certificate MAY be omitted from the chain.
+	  <spanx style="verb">precertificate_chain</spanx> is a chain of additional certificates required to verify the Precertificate submission. The first certificate MAY be a valid Precertificate Signing Certificate, and MUST certify the first certificate. Each following certificate MUST directly certify the one preceding it. The self-signed root certificate MAY be omitted from the chain.
 	</t>
       </section>
       <section title="Structure of the Signed Certificate Timestamp">
@@ -313,11 +311,24 @@ d0 d1   d2 d3           d0 d1   d2 d3  d4 d5
           opaque key_id[32];
       } LogID;
 
+      opaque TBSCertificate&lt;1..2^16-1&gt;
+
+      struct {
+        opaque issuer_key_hash[32];
+        TBSCertificate tbs_certificate;
+      } PreCert;
+
       opaque CtExtensions&lt;0..2^16-1&gt;;
 	  </artwork>
 	</figure>
 	<t>
 	  <spanx style="verb">key_id</spanx> is the SHA-256 hash of the log's public key, calculated over the DER encoding of the key represented as SubjectPublicKeyInfo.
+	</t>
+	<t>
+	  <spanx style="verb">issuer_key_hash</spanx> is the SHA-256 hash of the certificate issuer's public key, calculated over the DER encoding of the key represented as SubjectPublicKeyInfo. This is needed to bind the issuer to the final certificate.
+	</t>
+	<t>
+	  <spanx style="verb">tbs_certificate</spanx> is the DER encoded TBSCertificate (see <xref target='RFC5280'/>) component of the Precertificate - that is, without the signature and the poison extension. If the Precertificate is not signed with the CA certificate that will issue the final certificate, then the TBSCertificate also has its issuer changed to that of the CA that will issue the final certificate. Note that it is also possible to reconstruct this TBSCertificate from the final certificate by extracting the TBSCertificate from it and deleting the SCT extension. Also note that since the TBSCertificate contains an AlgorithmIdentifier that must match both the pre-certificate signature algorithm and final certificate signature algorithm, they must be signed with the same algorithm and parameters.
 	</t>
 	<figure>
 	  <artwork>
@@ -333,7 +344,7 @@ d0 d1   d2 d3           d0 d1   d2 d3  d4 d5
             LogEntryType entry_type;
             select(entry_type) {
                 case x509_entry: ASN.1Cert;
-                case precert_entry: ASN.1Cert;
+                case precert_entry: PreCert;
             } signed_entry;
            CtExtensions extensions;
         };
@@ -347,13 +358,13 @@ d0 d1   d2 d3           d0 d1   d2 d3  d4 d5
 	  <spanx style="verb">sct_version</spanx> is the version of the protocol the SCT conforms to. This version is v1.
 	</t>
 	<t>
-	  <spanx style="verb">timestamp</spanx> is the current UTC time since epoch (January 1, 1970, 00:00), in milliseconds.
+	  <spanx style="verb">timestamp</spanx> is the current <xref target="RFC1305">NTP Time</xref>, measured since the epoch (January 1, 1970, 00:00), ignoring leap seconds, in milliseconds.
 	</t>
 	<t>
 	  <spanx style="verb">entry_type</spanx> may be implicit from the context in which the SCT is presented.
 	</t>
 	<t>
-	  <spanx style="verb">signed_entry</spanx> is the <spanx style="verb">leaf_certificate</spanx> (in case of an X509ChainEntry), or <spanx style="verb">tbs_certificate</spanx> (in case of a PrecertChainEntry).
+	  <spanx style="verb">signed_entry</spanx> is the <spanx style="verb">leaf_certificate</spanx> (in case of an X509ChainEntry), or is the PreCert (in case of a PrecertChainEntry), as described above.
 	</t>
         <t>
           <spanx style="verb">extensions</spanx> are future extensions to this protocol version (v1). Currently, no extensions are specified.
@@ -417,7 +428,7 @@ d0 d1   d2 d3           d0 d1   d2 d3  d4 d5
         LogEntryType entry_type;
         select(entry_type) {
             case x509_entry: ASN.1Cert;
-            case precert_entry: ASN.1Cert;
+            case precert_entry: TBSCertificate;
         } signed_entry;
         CtExtensions extensions;
     } TimestampedEntry;
@@ -485,7 +496,7 @@ d0 d1   d2 d3           d0 d1   d2 d3  d4 d5
     </section>
     <section title="Log Client Messages" anchor="client_messages">
       <t>
-	Messages are sent as HTTPS GET or POST requests. Parameters for POSTs and all responses are encoded as <xref target="RFC4627">JSON objects</xref>. Parameters for GETs are encoded as order independent key/value URL parameters, using the "application/x-www-form-urlencoded" format described in the <xref target="HTML401">"HTML 4.01 Specification"</xref>. Binary data is base64 encoded as specified in the individual messages.
+	Messages are sent as HTTPS GET or POST requests. Parameters for POSTs and all responses are encoded as <xref target="RFC4627">JSON objects</xref>. Parameters for GETs are encoded as order independent key/value URL parameters, using the "application/x-www-form-urlencoded" format described in the <xref target="HTML401">"HTML 4.01 Specification"</xref>. Binary data is <xref target="RFC4648">base64 encoded</xref> as specified in the individual messages.
       </t>
       <t>
 	The &lt;log server&gt; prefix can include a path as well as a server name and a port.
@@ -616,11 +627,8 @@ d0 d1   d2 d3           d0 d1   d2 d3  d4 d5
 	<t>
 	  Outputs
 	  <list style="hanging">
-	    <t hangText="timestamp">
-	      The tree's timestamp, in decimal.
-	    </t>
 	    <t hangText="leaf_index">
-	      The index of the end entity corresponding to the <spanx style="verb">hash</spanx> parameter.
+	      The 0-based index of the end entity corresponding to the <spanx style="verb">hash</spanx> parameter.
 	    </t>
 	    <t hangText="audit_path">
 	      An array of base64 encoded Merkle tree nodes proving the inclusion of the chosen certificate.
@@ -636,10 +644,10 @@ d0 d1   d2 d3           d0 d1   d2 d3  d4 d5
 	  Inputs
 	  <list style="hanging">
 	    <t hangText="start">
-	      Index of first entry to retrieve, in decimal.
+	      0-based index of first entry to retrieve, in decimal.
 	    </t>
 	    <t hangText="end">
-	      Index of last entry to retrieve, in decimal.
+	      0-based index of last entry to retrieve, in decimal.
 	    </t>
 	  </list>
 	</t>
@@ -672,9 +680,14 @@ d0 d1   d2 d3           d0 d1   d2 d3  d4 d5
 	  Logs MAY restrict the number of entries which can be retrieved per <spanx style="verb">get-entries</spanx> request.  If a client requests more than the permitted number of entries, the log SHALL return the maximum number of entries permissible. These entries SHALL be sequential beginning with the entry specified by <spanx style="verb">start</spanx>.
 	</t>
       </section>
-      <section title="Retrieve Accepted Roots">
+      <section title="Retrieve Accepted Root Certificates">
 	<t>
-	  [TBD]
+	  Outputs
+	  <list style="hanging">
+	    <t hangText="certificates">
+	      An array of base64 encoded root certificates that are acceptable to the log.
+	    </t>
+	  </list>
 	</t>
       </section>
       <section title="Retrieve Entry+Merkle Audit Proof from Log">
@@ -729,7 +742,10 @@ d0 d1   d2 d3           d0 d1   d2 d3  d4 d5
       </section>
       <section title="TLS Client">
 	<t>
-	  TLS clients are not directly clients of the log, but they receive SCTs alongside or in server certificates. They should validate the SCT by checking that the hash matches the hash of the certificate and that the signature can be verified by the corresponding log's public key. Note that this document does not describe how clients obtain public keys.
+	  TLS clients are not directly clients of the log, but they receive SCTs alongside or in server certificates. In addition to normal validation of the certificate and its chain, they should validate the SCT by computing the signature input from the SCT data as well as the certificate, and verifying the signature, using the corresponding log's public key. Note that this document does not describe how clients obtain the logs' public keys.
+	</t>
+	<t>
+	  TLS clients MUST reject SCTs whose timestamp is in the future.
 	</t>
       </section>
       <section title="Monitor">
@@ -803,10 +819,10 @@ d0 d1   d2 d3           d0 d1   d2 d3  d4 d5
     </section>
     <section title="IANA Considerations">
       <t>
-	IANA is requested to allocate an RFC 5878 AuthorizationData Type for the CST included in an Authorization Extension. The value 182 is preferred.
+	IANA is requested to allocate an RFC 5878 AuthorizationData Type for the CTS included in an Authorization Extension. The value 182 is preferred. DTLS-OK is "Y" and Description is "signed_certificate_timestamp".
       </t>
     </section>
-    <section title="Security and Privacy Considerations">
+    <section title="Security Considerations">
       <section title="Misissued Certificates">
 	<t>
 	  Misissued certificates that have not been publicly logged, and thus do not have a valid SCT, will be rejected by TLS clients. Misissued certificates that do have an SCT from a log will appear in that public log within the Maximum Merge Delay, assuming the log is operating correctly. Thus, the maximum period of time during which a misissued certificate can be used without being available for audit is the MMD. 
@@ -855,8 +871,40 @@ d0 d1   d2 d3           d0 d1   d2 d3  d4 d5
   <back>
     <references>
 
-      <reference anchor='RFC2119'>
+      <reference anchor="RFC1305">
+	<front>
+	  <title>
+	    Network Time Protocol (Version 3) Specification, Implementation
+	  </title>
+	  <author initials="D." surname="Mills" fullname="David L. Mills">
+	    <organization>
+	      University of Delaware, Electrical Engineering Department
+	    </organization>
+	    <address>
+	      <postal>
+		<street/>
+		<city>Newark</city>
+		<region>DE</region>
+		<code>19716</code>
+		<country>US</country>
+	      </postal>
+	      <phone>+1 302 451 8247</phone>
+	      <email>mills@udel.edu</email>
+	    </address>
+	  </author>
+	  <date year="1992" month="March"/>
+	  <abstract>
+	    <t>
+	      This document describes the Network Time Protocol (NTP), specifies its normal structure and summarizes information useful for its implementation. NTP provides the mechanisms to synchronize time and coordinate time distribution in a large, diverse internet operating at rates from mundane to lightwave. It uses a returnable-time design in which a distributed subnet of time servers operating in a self-organizing, hierarchical-master-slave configuration synchronizes local clocks within the subnet and to national time standards via wire or radio. The servers can also redistribute reference time via local routing algorithms and time daemons.
+	    </t>
+	  </abstract>
+	</front>
+	<seriesInfo name="RFC" value="1305"/>
+	<format type="TXT" octets="307085" target="http://www.rfc-editor.org/rfc/rfc1305.txt"/>
+	<format type="PDF" octets="442493" target="http://www.rfc-editor.org/rfc/rfc1305.pdf"/>
+      </reference>
 
+      <reference anchor='RFC2119'>
 	<front>
 	  <title abbrev='RFC Key Words'>Key words for use in RFCs to Indicate Requirement Levels</title>
 	  <author initials='S.' surname='Bradner' fullname='Scott Bradner'>
@@ -983,6 +1031,28 @@ d0 d1   d2 d3           d0 d1   d2 d3  d4 d5
 	<format type="TXT" octets="43243" target="http://www.rfc-editor.org/rfc/rfc2560.txt"/>
       </reference>
 
+      <reference anchor="RFC3447">
+	<front>
+	  <title>
+	    Public-Key Cryptography Standards (PKCS) #1: RSA Cryptography Specifications Version 2.1
+	  </title>
+	  <author initials="J." surname="Jonsson" fullname="J. Jonsson">
+	    <organization/>
+	  </author>
+	  <author initials="B." surname="Kaliski" fullname="B. Kaliski">
+	    <organization/>
+	  </author>
+	  <date year="2003" month="February"/>
+	  <abstract>
+	    <t>
+	      This memo represents a republication of PKCS #1 v2.1 from RSA Laboratories' Public-Key Cryptography Standards (PKCS) series, and change control is retained within the PKCS process. The body of this document is taken directly from the PKCS #1 v2.1 document, with certain corrections made during the publication process. This memo provides information for the Internet community.
+	    </t>
+	  </abstract>
+	</front>
+	<seriesInfo name="RFC" value="3447"/>
+	<format type="TXT" octets="143173" target="http://www.rfc-editor.org/rfc/rfc3447.txt"/>
+      </reference>
+      
       <reference anchor="RFC4627">
 	<front>
 	  <title>
@@ -1002,8 +1072,24 @@ d0 d1   d2 d3           d0 d1   d2 d3  d4 d5
 	<format type="TXT" octets="16319" target="http://www.rfc-editor.org/rfc/rfc4627.txt"/>
       </reference>
 
-      <reference anchor='RFC5246'>
+      <reference anchor="RFC4648">
+	<front>
+	  <title>The Base16, Base32, and Base64 Data Encodings</title>
+	  <author initials="S." surname="Josefsson" fullname="S. Josefsson">
+	    <organization/>
+	  </author>
+	  <date year="2006" month="October"/>
+	  <abstract>
+	    <t>
+	      This document describes the commonly used base 64, base 32, and base 16 encoding schemes. It also discusses the use of line-feeds in encoded data, use of padding in encoded data, use of non-alphabet characters in encoded data, use of different encoding alphabets, and canonical encodings. [STANDARDS-TRACK]
+	    </t>
+	  </abstract>
+	</front>
+	<seriesInfo name="RFC" value="4648"/>
+	<format type="TXT" octets="35491" target="http://www.rfc-editor.org/rfc/rfc4648.txt"/>
+      </reference>
 
+      <reference anchor='RFC5246'>
 	<front>
 	  <title>The Transport Layer Security (TLS) Protocol Version 1.2</title>
 	  <author initials='T.' surname='Dierks' fullname='T. Dierks'>
@@ -1017,7 +1103,6 @@ d0 d1   d2 d3           d0 d1   d2 d3  d4 d5
       </reference>
 
       <reference anchor='RFC5280'>
-
 	<front>
 	  <title>Internet X.509 Public Key Infrastructure Certificate
 	    and Certificate Revocation List (CRL) Profile</title>
@@ -1035,12 +1120,10 @@ d0 d1   d2 d3           d0 d1   d2 d3  d4 d5
 	    <organization>NIST</organization></author>
 	  <date year='2008' month='May' />
 	</front>
-
 	<seriesInfo name='RFC' value='5280' />
       </reference>
 
       <reference anchor='RFC5878'>
-
 	<front>
 	  <title>The Transport Layer Security (TLS) Authorization Extensions</title>
 	  <author initials='M.' surname='Brown' fullname='M. Brown'>
@@ -1114,6 +1197,17 @@ d0 d1   d2 d3           d0 d1   d2 d3  d4 d5
 	</front>
 	<seriesInfo name="World Wide Web Consortium Recommendation" value="REC-html401-19991224"/>
 	<format type="HTML" target="http://www.w3.org/TR/1999/REC-html401-19991224"/>
+      </reference>
+
+      <reference anchor="FIPS.180-2.2002" target="http://csrc.nist.gov/publications/fips/fips180-2/fips180-2.pdf">
+	<front>
+	  <title>Secure Hash Standard</title>
+	  <author>
+	    <organization>National Institute of Standards and Technology</organization>
+	  </author>
+	  <date month="August" year="2002"/>
+	</front>
+	<seriesInfo name="FIPS" value="PUB 180-2"/>
       </reference>
 
     </references>
