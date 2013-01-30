@@ -1,7 +1,7 @@
 <?xml version="1.0"?>
 <?rfc symrefs="yes"?>
 <?rfc toc="yes"?>
-<rfc ipr="trust200902" docName="draft-laurie-pki-sunlight-06" category="exp">
+<rfc ipr="trust200902" docName="draft-laurie-pki-sunlight-07" category="exp">
   <front>
     <title>Certificate Transparency</title>
     <author initials="B" surname="Laurie" fullname="Ben Laurie">
@@ -358,7 +358,7 @@ d0 d1   d2 d3           d0 d1   d2 d3  d4 d5
 	  <spanx style="verb">sct_version</spanx> is the version of the protocol the SCT conforms to. This version is v1.
 	</t>
 	<t>
-	  <spanx style="verb">timestamp</spanx> is the current <xref target="RFC1305">NTP Time</xref>, measured since the epoch (January 1, 1970, 00:00), ignoring leap seconds, in milliseconds.
+	  <spanx style="verb">timestamp</spanx> is the current <xref target="RFC5905">NTP Time</xref>, measured since the epoch (January 1, 1970, 00:00), ignoring leap seconds, in milliseconds.
 	</t>
 	<t>
 	  <spanx style="verb">entry_type</spanx> may be implicit from the context in which the SCT is presented.
@@ -384,7 +384,7 @@ d0 d1   d2 d3           d0 d1   d2 d3  d4 d5
 	  At least one SCT MUST be included. Server operators MAY include more than one SCT.
 	</t>
 	<t>
-	  Similarly, a Certificate Authority MAY submit a precertificate to more than one log, and all obtained SCTs can be directly embedded in the final certificate, by encoding the SignedCertificateTimestampList structure as an ASN.1 OCTET STRING and inserting the resulting data in the TBSCertificate as an X.509v3 certificate extension (OID 1.3.6.1.4.1.11129.2.4.2). Upon receiving the certificate, clients can reconstruct the original TBSCertificate to verify the SCT signature [TBD: how?].
+	  Similarly, a Certificate Authority MAY submit a precertificate to more than one log, and all obtained SCTs can be directly embedded in the final certificate, by encoding the SignedCertificateTimestampList structure as an ASN.1 OCTET STRING and inserting the resulting data in the TBSCertificate as an X.509v3 certificate extension (OID 1.3.6.1.4.1.11129.2.4.2). Upon receiving the certificate, clients can reconstruct the original TBSCertificate to verify the SCT signature.
 	</t>
 	<t>
 	  The contents of the ASN.1 OCTET STRING embedded in an OCSP extension or X509v3 certificate extension are as follows:
@@ -736,11 +736,6 @@ d0 d1   d2 d3           d0 d1   d2 d3  d4 d5
 	  This API is probably only useful for debugging.
 	</t>
       </section>
-      <section title="Examples">
-	<t>
-	  [TBD]
-	</t>
-      </section>
     </section>
     <section title="Clients">
       <t>
@@ -884,39 +879,6 @@ d0 d1   d2 d3           d0 d1   d2 d3  d4 d5
   </middle>
   <back>
     <references>
-
-      <reference anchor="RFC1305">
-	<front>
-	  <title>
-	    Network Time Protocol (Version 3) Specification, Implementation
-	  </title>
-	  <author initials="D." surname="Mills" fullname="David L. Mills">
-	    <organization>
-	      University of Delaware, Electrical Engineering Department
-	    </organization>
-	    <address>
-	      <postal>
-		<street/>
-		<city>Newark</city>
-		<region>DE</region>
-		<code>19716</code>
-		<country>US</country>
-	      </postal>
-	      <phone>+1 302 451 8247</phone>
-	      <email>mills@udel.edu</email>
-	    </address>
-	  </author>
-	  <date year="1992" month="March"/>
-	  <abstract>
-	    <t>
-	      This document describes the Network Time Protocol (NTP), specifies its normal structure and summarizes information useful for its implementation. NTP provides the mechanisms to synchronize time and coordinate time distribution in a large, diverse internet operating at rates from mundane to lightwave. It uses a returnable-time design in which a distributed subnet of time servers operating in a self-organizing, hierarchical-master-slave configuration synchronizes local clocks within the subnet and to national time standards via wire or radio. The servers can also redistribute reference time via local routing algorithms and time daemons.
-	    </t>
-	  </abstract>
-	</front>
-	<seriesInfo name="RFC" value="1305"/>
-	<format type="TXT" octets="307085" target="http://www.rfc-editor.org/rfc/rfc1305.txt"/>
-	<format type="PDF" octets="442493" target="http://www.rfc-editor.org/rfc/rfc1305.pdf"/>
-      </reference>
 
       <reference anchor='RFC2119'>
 	<front>
@@ -1135,6 +1097,34 @@ d0 d1   d2 d3           d0 d1   d2 d3  d4 d5
 	  <date year='2008' month='May' />
 	</front>
 	<seriesInfo name='RFC' value='5280' />
+      </reference>
+
+      <reference anchor="RFC5905">
+	<front>
+	  <title>
+	    Network Time Protocol Version 4: Protocol and Algorithms Specification
+	  </title>
+	  <author initials="D." surname="Mills" fullname="D. Mills">
+	    <organization/>
+	  </author>
+	  <author initials="J." surname="Martin" fullname="J. Martin">
+	    <organization/>
+	  </author>
+	  <author initials="J." surname="Burbank" fullname="J. Burbank">
+	    <organization/>
+	  </author>
+	  <author initials="W." surname="Kasch" fullname="W. Kasch">
+	    <organization/>
+	  </author>
+	  <date year="2010" month="June"/>
+	  <abstract>
+	    <t>
+	      The Network Time Protocol (NTP) is widely used to synchronize computer clocks in the Internet. This document describes NTP version 4 (NTPv4), which is backwards compatible with NTP version 3 (NTPv3), described in RFC 1305, as well as previous versions of the protocol. NTPv4 includes a modified protocol header to accommodate the Internet Protocol version 6 address family. NTPv4 includes fundamental improvements in the mitigation and discipline algorithms that extend the potential accuracy to the tens of microseconds with modern workstations and fast LANs. It includes a dynamic server discovery scheme, so that in many cases, specific server configuration is not required. It corrects certain errors in the NTPv3 design and implementation and includes an optional extension mechanism. [STANDARDS-TRACK]
+	    </t>
+	  </abstract>
+	</front>
+	<seriesInfo name="RFC" value="5905"/>
+	<format type="TXT" octets="241096" target="http://www.rfc-editor.org/rfc/rfc5905.txt"/>
       </reference>
 
       <reference anchor="RFC6066">
