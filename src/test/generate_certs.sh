@@ -186,10 +186,6 @@ make_certs() {
     --certificate_out=$cert_dir/$server-cert-proof.der \
     --logtostderr=true
 
-# Create authz for TLS extension
-  ../client/ct authz --sct_token=$cert_dir/$server-cert.proof \
-    --authz_out=$cert_dir/$server-cert.authz --logtostderr=true
-
   openssl x509 -in $cert_dir/$server-cert-proof.der -inform DER -out \
     $cert_dir/$server-cert-proof.pem
 

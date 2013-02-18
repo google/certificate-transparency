@@ -1,7 +1,6 @@
 #include <glog/logging.h>
 #include <openssl/bio.h>
 #include <openssl/ssl.h>
-#include <openssl/tls1.h>
 #include <openssl/x509.h>
 
 #include "client/client.h"
@@ -40,10 +39,6 @@ SSLClient::SSLClient(const string &server, uint16_t port,
 
   // The verify callback gets called before the audit proof callback.
   SSL_CTX_set_cert_verify_callback(ctx_, &VerifyCallback, &verify_args_);
-#ifdef TLSEXT_AUTHZDATAFORMAT_audit_proof
-    SSL_CTX_set_tlsext_authz_server_audit_proof_cb(ctx_, &SCTTokenCallback);
-    SSL_CTX_set_tlsext_authz_server_audit_proof_cb_arg(ctx_, &verify_args_);
-#endif
 }
 
 SSLClient::~SSLClient() {
@@ -181,65 +176,13 @@ int SSLClient::VerifyCallback(X509_STORE_CTX *ctx, void *arg) {
     }
   }  // end if (!serialized_scts.empty())
 
-#ifndef TLSEXT_AUTHZDATAFORMAT_audit_proof
-  // If we don't support the TLS extension, we fail here. Else we wait to see
-  // if the extension callback finds a valid proof.
   if (!args->sct_verified && args->require_sct) {
     LOG(ERROR) << "No valid SCT found";
     return 0;
   }
-#endif
+
   return 1;
 }
-
-#ifdef TLSEXT_AUTHZDATAFORMAT_audit_proof
-// TODO(ekasper, agl, benl): modify OpenSSL client code so that it returns
-// *all authz data* with the matching format (not just the first hit).
-// static
-int SSLClient::SCTTokenCallback(SSL *s, void *arg) {
-  VerifyCallbackArgs *args = reinterpret_cast<VerifyCallbackArgs*>(arg);
-  CHECK_NOTNULL(args);
-  // If we already received the proof in a superfluous cert, do nothing.
-  if (args->sct_verified)
-    return 1;
-
-  LogVerifier *verifier = args->verifier;
-  CHECK_NOTNULL(verifier);
-
-  SSL_SESSION *sess = SSL_get_session(s);
-  // Get the leaf certificate.
-  X509 *x509 = SSL_SESSION_get0_peer(sess);
-  CHECK_NOTNULL(x509);
-
-  // Get the token.
-  size_t proof_length;
-  unsigned char *proof =
-      SSL_SESSION_get_tlsext_authz_server_audit_proof(sess, &proof_length);
-  if (proof == NULL) {
-    LOG(WARNING) << "No SCT received.";
-    return args->require_sct ? 0 : 1;
-  }
-
-  LOG(INFO) << "Found an SCT token in the TLS extension, verifying...";
-
-  string token(reinterpret_cast<char*>(proof), proof_length);
-  Cert *leaf = new Cert(x509);
-  CertChain chain;
-  chain.AddCert(leaf);
-
-  LogVerifier::VerifyResult result = VerifySCT(token, verifier, &args->ct_data);
-
-  if (result == LogVerifier::VERIFY_OK) {
-    args->sct_verified = true;
-    LOG(INFO) << "Token verified";
-    return 1;
-  } else {
-    LOG(ERROR) << "Verification failed: "
-               << LogVerifier::VerifyResultString(result);
-    return args->require_sct ? 0 : 1;
-  }
-}
-#endif
 
 void SSLClient::ResetVerifyCallbackArgs(bool strict) {
   verify_args_.sct_verified = false;

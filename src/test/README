@@ -24,16 +24,7 @@ $ make <platform>-links
 
 Currently, linux-links and freebsd-links are defined.
 
-4. Optionally, you can also test the authz extension. Since this code is only
-in the development versions of OpenSSL and Apache, you'll need to build them
-yourself. Check out OpenSSL 1.0.2 or higher and build that. You'll also need to
-install it somewhere. Check out the head of Apache, and configure it like:
-
-$ ./configure --enable-ssl --with-ssl=<path to your install>
-
-$ make APACHEDIR=<path to httpd> local-links
-
-5. Run the test
+4. Run the test
 
 $ ./sslconnect_test.sh
 
@@ -46,9 +37,5 @@ c) Retrieving audit proofs for those SCTs from the log server.
 
 In the end, the tests should report something like this:
 
-PASSED 35 tests
+PASSED 28 tests
 FAILED 0 tests
-SKIPPED 0 tests
-
-Or, if you did not configure a local Apache, you will see some skipped
-tests.

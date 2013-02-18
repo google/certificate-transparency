@@ -9,7 +9,6 @@ source generate_certs.sh
 
 PASSED=0
 FAILED=0
-SKIPPED=0
 
 if [ "$OPENSSLDIR" != "" ]; then
   MY_OPENSSL="$OPENSSLDIR/apps/openssl"
@@ -116,27 +115,13 @@ cp testdata/ca-cert.pem ca-hashes/$hash.0
 
 echo "Testing known good/bad certificate configurations" 
 mkdir -p testdata/logs
-if [ -f httpd-new ]; then
-  test_range "8125 8126 8127 8128 8129" testdata ca-hashes ct-server ca \
-    httpd-valid-new.conf false true false ./httpd-new
 
-# First check that connection succeeds if we don't require the SCT,
-# to isolate the error
- test_range "8125 8126 8127 8128 8129" testdata ca-hashes ct-server ca \
-    httpd-invalid-new.conf false false false ./httpd-new
-
-test_range "8125 8126 8127 8128 8129" testdata ca-hashes ct-server ca \
-    httpd-invalid-new.conf true true false ./httpd-new
-else
-  echo "WARNING: Apache development version not specified, skipping some tests"
-  let SKIPPED=$SKIPPED+3
-  test_range "8125 8126 8127 8128" testdata ca-hashes ct-server ca \
-    httpd-valid.conf false true false ./apachectl
-  test_range "8125 8126 8127 8128" testdata ca-hashes ct-server ca \
-    httpd-invalid.conf false false false ./apachectl
-  test_range "8125 8126 8127 8128" testdata ca-hashes ct-server ca \
-    httpd-invalid.conf true true false ./apachectl
-fi
+test_range "8125 8126 8127 8128" testdata ca-hashes ct-server ca \
+  httpd-valid.conf false true false ./apachectl
+test_range "8125 8126 8127 8128" testdata ca-hashes ct-server ca \
+  httpd-invalid.conf false false false ./apachectl
+test_range "8125 8126 8127 8128" testdata ca-hashes ct-server ca \
+  httpd-invalid.conf true true false ./apachectl
 
 rm -rf ca-hashes
 
@@ -179,15 +164,8 @@ test_ct_server() {
 
   echo "Testing valid configurations with new certificates"
   mkdir -p tmp/logs
-  if [ -f httpd-new ]; then
-    test_range "8125 8126 8127 8128 8129" tmp tmp/ca-hashes ct-server ca \
-      httpd-valid-new.conf false true true ./httpd-new
-  else
-    echo "WARNING: Apache development version not specified, skip some tests"
-    let SKIPPED=$SKIPPED+2
-    test_range "8125 8126 8127 8128" tmp tmp/ca-hashes ct-server ca \
-      httpd-valid.conf false true true ./apachectl
-  fi
+  test_range "8125 8126 8127 8128" tmp tmp/ca-hashes ct-server ca \
+    httpd-valid.conf false true true ./apachectl
 
   # Stop the log server
   echo "Stopping CT server"
@@ -207,4 +185,3 @@ if [ $FAILED == 0 ]; then
 fi
 echo "PASSED $PASSED tests"
 echo "FAILED $FAILED tests"
-echo "SKIPPED $SKIPPED tests"

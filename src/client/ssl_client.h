@@ -63,15 +63,6 @@ class SSLClient {
   // other values - cert verification error
   static int VerifyCallback(X509_STORE_CTX *ctx, void *arg);
 
-#ifdef TLSEXT_AUTHZDATAFORMAT_audit_proof
-  // The callback for verifying the proof in a TLS extension. Return values:
-  // Strict mode:
-  // 1 - SCT already verified previously, or a valid SCT found in the extension
-  // 0 - no valid token
-  // Standard mode:
-  // always 1
-  static int SCTTokenCallback(SSL *s, void *arg);
-#endif
  private:
   Client client_;
   SSL_CTX *ctx_;

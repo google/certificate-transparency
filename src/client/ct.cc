@@ -51,7 +51,7 @@ DEFINE_string(ssl_client_ct_data_out, "",
               "as well as all received and validated SCTs.");
 DEFINE_string(certificate_out, "",
               "Output file for the superfluous certificate");
-DEFINE_string(authz_out, "", "Output file for authz data");
+DEFINE_string(tls_extension_data_out, "", "Output file for TLS extension data");
 DEFINE_string(extensions_config_out, "",
               "Output configuration file to append the sct to. Appends the "
               "sct to the end of the file, so the relevant section should be "
@@ -70,7 +70,7 @@ static const char kUsage[] =
     "connect - connect to an SSL server\n"
     "upload - upload a submission to a CT log server\n"
     "certificate - make a superfluous proof certificate\n"
-    "authz - convert an audit proof to authz format\n"
+    "extension_data - convert an audit proof to TLS extension format\n"
     "configure_proof - write the proof in an X509v3 configuration file\n"
     "diagnose_cert - print info about the SCTs the cert carries\n"
     "Use --help to display command-line flag options\n";
@@ -304,14 +304,13 @@ static void WriteProofToConfig() {
   conf_out.close();
 }
 
-// The number currently assigned in OpenSSL for
-// TLSEXT_AUTHDATAFORMAT_audit_proof.
-static const unsigned char kAuditProofFormat = 182;
-
-// Wrap the proof in a server_authz format, so that we can feed it to OpenSSL.
-static void ProofToAuthz() {
+// Wrap the proof in the format expected by the TLS extension,
+// so that we can feed it to OpenSSL.
+// Currently unused: will be needed once we have an extension number,
+// and support in OpenSSL and Apache.
+static void ProofToExtensionData() {
   CHECK(!FLAGS_sct_token.empty()) << google::ProgramUsage();
-  CHECK(!FLAGS_authz_out.empty()) << google::ProgramUsage();
+  CHECK(!FLAGS_tls_extension_data_out.empty()) << google::ProgramUsage();
 
   string serialized_sct;
   PCHECK(util::ReadBinaryFile(FLAGS_sct_token, &serialized_sct))
@@ -320,13 +319,11 @@ static void ProofToAuthz() {
                          std::ios::in | std::ios::binary);
   PCHECK(proof_in.good()) << "Could not read SCT data from " << FLAGS_sct_token;
 
-  std::ofstream authz_out(FLAGS_authz_out.c_str(),
-                          std::ios::out | std::ios::binary);
-  PCHECK(authz_out.good()) << "Could not open authz file " << FLAGS_authz_out
-                           << " for writing";
-
-  // TLSEXT_AUTHDATAFORMAT_audit_proof
-  authz_out << kAuditProofFormat;
+  std::ofstream extension_data_out(FLAGS_tls_extension_data_out.c_str(),
+                                   std::ios::out | std::ios::binary);
+  PCHECK(extension_data_out.good()) << "Could not open extension data file "
+                                    << FLAGS_tls_extension_data_out
+                                    << " for writing";
 
   // Count proof length.
   proof_in.seekg(0, std::ios::end);
@@ -335,19 +332,19 @@ static void ProofToAuthz() {
   proof_in.seekg(0, std::ios::beg);
 
   // Write the length.
-  authz_out << static_cast<unsigned char>(proof_length >> 8)
-            << static_cast<unsigned char>(proof_length);
+  extension_data_out << static_cast<unsigned char>(proof_length >> 8)
+                     << static_cast<unsigned char>(proof_length);
 
   // Now write the proof.
   char *buf = new char[proof_length];
   proof_in.read(buf, proof_length);
   assert(proof_in.gcount() == proof_length);
-  authz_out.write(buf, proof_length);
-  assert(!authz_out.bad());
+  extension_data_out.write(buf, proof_length);
+  CHECK(!extension_data_out.bad());
 
   delete[] buf;
   proof_in.close();
-  authz_out.close();
+  extension_data_out.close();
 }
 
 // Return values upon completion
@@ -564,8 +561,8 @@ int main(int argc, char **argv) {
     ret = Audit();
   } else if (cmd == "certificate") {
     MakeCert();
-  } else if (cmd == "authz") {
-    ProofToAuthz();
+  } else if (cmd == "extension_data") {
+    ProofToExtensionData();
   } else if (cmd == "configure_proof") {
     WriteProofToConfig();
   } else if (cmd == "diagnose_cert") {
