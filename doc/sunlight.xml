@@ -32,7 +32,7 @@
   <middle>
     <section title="Informal introduction">
       <t>
-        Certificate Transparency aims to mitigate the problem of misissued certificates by providing publicly auditable, append-only, untrusted logs of all issued certificates. The logs are publicly auditable so that it is possible for anyone to verify the correctness of each log, and to monitor when new certificates are added to it. The logs do not themselves prevent misissue, but they ensure that interested parties (particularly those named in certificates) can detect such misissuance. Note that this is a general mechanism, but in this document we only describe its use for public TLS server certificates issued by public CAs.
+        Certificate Transparency aims to mitigate the problem of misissued certificates by providing publicly auditable, append-only, untrusted logs of all issued certificates. The logs are publicly auditable so that it is possible for anyone to verify the correctness of each log, and to monitor when new certificates are added to it. The logs do not themselves prevent misissue, but they ensure that interested parties (particularly those named in certificates) can detect such misissuance. Note that this is a general mechanism, but in this document we only describe its use for public TLS server certificates issued by public certificate authorities (CAs).
       </t>
       <t>
         Each log consists of certificate chains, which can be submitted by anyone. It is expected that public CAs will contribute all their newly-issued certificates to one or more logs; it is also expected that certificate holders will contribute their own certificate chains. In order to avoid logs being spammed into uselessness, it is required that each chain is rooted in a known CA certificate. When a chain is submitted to a log, a signed timestamp is returned, which can later be used to provide evidence to clients that the chain has been submitted. TLS clients can thus require that all certificates they see have been logged.
@@ -44,7 +44,7 @@
         Similarly, those who have seen signed timestamps from a particular log can later demand a proof of inclusion from that log. If the log is unable to provide this (or, indeed, if the corresponding certificate is absent from monitors' copies of that log), that is evidence of the incorrect operation of the log. The checking operation is asynchronous to allow TLS connections to proceed without delay, despite network connectivity issues and the vagaries of firewalls.
       </t>
       <t>
-        The append-only property of each log is technically achieved using Merkle Trees, which can be used to show that any particular version of the log is a superset of any particular previous version. Likewise, Merkle Trees avoid the need to blindly trust logs: if a log attempts to show different things to different people, this can be efficiently detected by comparing tree roots and consistency proofs. Similarly, other misbehaviours of any log (e.g. issuing signed timestamps for certificates they then don't log) can be efficiently detected and proved to the world at large.
+        The append-only property of each log is technically achieved using Merkle Trees, which can be used to show that any particular version of the log is a superset of any particular previous version. Likewise, Merkle Trees avoid the need to blindly trust logs: if a log attempts to show different things to different people, this can be efficiently detected by comparing tree roots and consistency proofs. Similarly, other misbehaviours of any log (e.g., issuing signed timestamps for certificates they then don't log) can be efficiently detected and proved to the world at large.
       </t>
       <section title="Requirements Language">
 	<t>
@@ -75,14 +75,14 @@
 	  <vspace blankLines='1' />
 	  MTH(D[n]) = SHA-256(0x01 || MTH(D[0:k]) || MTH(D[k:n])),
 	  <vspace blankLines='1' />
-	  where || is concatenation and D[k1:k2] denotes the length (k2 - k1) list {d(k1), d(k1+1),..., d(k2-1)}. (Note that the hash calculation for leaves and nodes differ. This domain separation is required to give second preimage resistance.)
+	  where || is concatenation and D[k1:k2] denotes the list {d(k1), d(k1+1),..., d(k2-1)} of length (k2 - k1). (Note that the hash calculation for leaves and nodes differ. This domain separation is required to give second preimage resistance.)
 	</t>
 	<t>
 	  Note that we do not require the length of the input list to be a power of two. The resulting Merkle tree may thus not be balanced, however, its shape is uniquely determined by the number of leaves. [This Merkle tree is essentially the same as the <xref target='CrosbyWallach'>history tree</xref> proposal, except our definition handles non-full trees differently.]
 	</t>
       <section title="Merkle audit paths" anchor='merkle_paths'>
 	<t>
-	  A Merkle audit path for a leaf in a Merkle hash tree is the shortest list of additional nodes in the Merkle tree required to compute the Merkle Tree Hash for that tree. Each node in the tree is either a leaf node, or is computed from the two nodes immediately below it (i.e. towards the leaves). At each step up the tree (towards the root), a node from the audit path is combined with the node computed so far. In other words, the audit path consists of the list of missing nodes required to compute the nodes leading from a leaf to the root of the tree. If the root computed from the audit path matches the true root, then the audit path is proof that the leaf exists in the tree.
+	  A Merkle audit path for a leaf in a Merkle hash tree is the shortest list of additional nodes in the Merkle tree required to compute the Merkle Tree Hash for that tree. Each node in the tree is either a leaf node, or is computed from the two nodes immediately below it (i.e., towards the leaves). At each step up the tree (towards the root), a node from the audit path is combined with the node computed so far. In other words, the audit path consists of the list of missing nodes required to compute the nodes leading from a leaf to the root of the tree. If the root computed from the audit path matches the true root, then the audit path is proof that the leaf exists in the tree.
 	</t>
 	<t> Given an ordered list of n inputs to the tree, D[n] = {d(0), ..., d(n-1)}, the Merkle audit path PATH(m, D[n]) for the (m+1)th input d(m), 0 &lt;= m &lt; n, is defined as follows:
 	</t>
@@ -249,7 +249,7 @@ d0 d1   d2 d3           d0 d1   d2 d3  d4 d5
 	  As above, the Precertificate submission MUST be accompanied by the Precertificate Signing Certificate, if used, and all additional certificates required to verify the chain up to an accepted root certificate. The signature on the TBSCertificate indicates the Certificate Authority's intent to issue a certificate. This intent is considered binding (i.e., misissuance of the Precertificate is considered equal to misissuance of the final certificate). Each log verifies the Precertificate signature chain, and issues a Signed Certificate Timestamp on the corresponding TBSCertificate.
 	</t>
 	<t>
-	  Logs MUST verify that the submitted end entity certificate or Precertificate has a valid signature chain leading back to a trusted root CA certificate, using the chain of intermediate CA certificates provided by the submitter. Logs MAY accept certificates that have expired, are not yet valid, have been revoked or are otherwise not fully valid according to X.509 verification rules in order to accomodate quirks of CA certificate issuing software. However, logs MUST refuse to publish certificates without a valid chain to a known root CA. If a certificate is accepted and an SCT issued, the accepting log MUST store the entire chain used for verification including the certificate or Precertificate itself, and including the root certificate used to verify the chain (even if it was omitted from the submission) and MUST present this chain for auditing upon request. This chain is required to prevent a CA avoiding blame by logging a partial or empty chain [Note: this effectively excludes self-signed and DANE-based certificates until some mechanism to control spam for those certificates is found - the authors welcome suggestions].
+	  Logs MUST verify that the submitted end entity certificate or Precertificate has a valid signature chain leading back to a trusted root CA certificate, using the chain of intermediate CA certificates provided by the submitter. Logs MAY accept certificates that have expired, are not yet valid, have been revoked or are otherwise not fully valid according to X.509 verification rules in order to accommodate quirks of CA certificate issuing software. However, logs MUST refuse to publish certificates without a valid chain to a known root CA. If a certificate is accepted and an SCT issued, the accepting log MUST store the entire chain used for verification including the certificate or Precertificate itself, and including the root certificate used to verify the chain (even if it was omitted from the submission) and MUST present this chain for auditing upon request. This chain is required to prevent a CA avoiding blame by logging a partial or empty chain [Note: this effectively excludes self-signed and DANE-based certificates until some mechanism to control spam for those certificates is found - the authors welcome suggestions].
 	</t>
 	<t>
 	  Each certificate entry in a log MUST include the following components:
@@ -292,7 +292,7 @@ d0 d1   d2 d3           d0 d1   d2 d3  d4 d5
 	  <spanx style="verb">certificate_chain</spanx> is a chain of additional certificates required to verify the end entity certificate. The first certificate MUST certify the end entity certificate. Each following certificate MUST directly certify the one preceding it. The final certificate MUST be a root certificate accepted by the log.
 	</t>
 	<t>
-	  <spanx style="verb">pre_certificate</spanx> is the Precertificate submmited for auditing.
+	  <spanx style="verb">pre_certificate</spanx> is the Precertificate submited for auditing.
 	</t>
 	<t>
 	  <spanx style="verb">precertificate_chain</spanx> is a chain of additional certificates required to verify the Precertificate submission. The first certificate MAY be a valid Precertificate Signing Certificate, and MUST certify the first certificate. Each following certificate MUST directly certify the one preceding it. The final certificate MUST be a root certificate accepted by the log.
@@ -311,7 +311,7 @@ d0 d1   d2 d3           d0 d1   d2 d3  d4 d5
           opaque key_id[32];
       } LogID;
 
-      opaque TBSCertificate&lt;1..2^16-1&gt;
+      opaque TBSCertificate&lt;1..2^16-1&gt;;
 
       struct {
         opaque issuer_key_hash[32];
@@ -537,7 +537,7 @@ d0 d1   d2 d3           d0 d1   d2 d3  d4 d5
 	  Outputs
 	  <list style="hanging">
 	    <t hangText="sct_version">
-	      The version of the SignedCertificateTimestamp structure, in decimal. A compliant v1 implementation MUST NOT expect this to be 0 (i.e. v1).
+	      The version of the SignedCertificateTimestamp structure, in decimal. A compliant v1 implementation MUST NOT expect this to be 0 (i.e., v1).
 	    </t>
 	    <t hangText="id">
 	      The log ID, base64 encoded. Since log clients who request an SCT for inclusion in TLS handshakes are not required to verify it, we do not assume they know the ID of the log.
@@ -688,7 +688,7 @@ d0 d1   d2 d3           d0 d1   d2 d3  d4 d5
           The <spanx style="verb">start</spanx> and <spanx style="verb">end</spanx> parameters SHOULD be within the range 0 &le; x &lt; <spanx style="verb">tree_size</spanx> as returned by <spanx style="verb">get-sth</spanx> in <xref target="fetch_sth"/>.
 	</t>
 	<t>
-          Logs MAY honour requests where 0 &le; <spanx style="verb">start</spanx> &lt; <spanx style="verb">tree_size</spanx>, and <spanx style="verb">end</spanx> &ge; <spanx style="verb">tree_size</spanx> by returning a partial response convering only the valid entries in the specified range. Note that the following restriction may also apply:
+          Logs MAY honour requests where 0 &le; <spanx style="verb">start</spanx> &lt; <spanx style="verb">tree_size</spanx>, and <spanx style="verb">end</spanx> &ge; <spanx style="verb">tree_size</spanx> by returning a partial response covering only the valid entries in the specified range. Note that the following restriction may also apply:
 	</t>
 	<t>
 	  Logs MAY restrict the number of entries which can be retrieved per <spanx style="verb">get-entries</spanx> request.  If a client requests more than the permitted number of entries, the log SHALL return the maximum number of entries permissible. These entries SHALL be sequential beginning with the entry specified by <spanx style="verb">start</spanx>.
