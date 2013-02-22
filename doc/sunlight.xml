@@ -234,13 +234,13 @@ d0 d1   d2 d3           d0 d1   d2 d3  d4 d5
       </t>
       <section title="Log Entries">
 	<t>
-	  Anyone can submit a certificate to any log. In order to enable attribution of each logged certificate to its issuer, the log SHALL publish a list of acceptable root certificates (this list might usefully be the union of root certificates trusted by major browser vendors). Each submitted certificate MUST be accompanied by all additional certificates required to verify the certificate chain up to an accepted root certificate. The root certificate itself MAY be omitted from this list. 
+	  Anyone can submit a certificate to any log. In order to enable attribution of each logged certificate to its issuer, the log SHALL publish a list of acceptable root certificates (this list might usefully be the union of root certificates trusted by major browser vendors). Each submitted certificate MUST be accompanied by all additional certificates required to verify the certificate chain up to an accepted root certificate. The root certificate itself MAY be omitted from the chain submitted to the log server.
 	</t>
         <t>
 	  Alternatively, (root as well as intermediate) Certificate Authorities may submit a certificate to logs prior to issuance. To do so, a Certificate Authority constructs a Precertificate by adding a special critical poison extension (OID 1.3.6.1.4.1.11129.2.4.3, whose extnValue OCTET STRING contains ASN.1 NULL data (0x05 0x00)) to the end entity TBSCertificate (this extension is to ensure that the Precertificate cannot be validated by a standard X.509v3 client), and signing the resulting TBSCertificate <xref target='RFC5280'/> with either
 	  <list style="symbols">
 	    <t>
-	      a special-purpose (Extended Key Usage: Certificate Transparency, OID 1.3.6.1.4.1.11129.2.4.4) Precertificate Signing Certificate. The Precertificate Signing Certificate MUST be certified by the CA certificate that will ultimately sign the end entity TBSCertificate yielding the end entity certificate (note that the log may relax standard validation rules to allow this, so long as the issued certificate will be valid),
+	      a special-purpose (CA:true, Extended Key Usage: Certificate Transparency, OID 1.3.6.1.4.1.11129.2.4.4) Precertificate Signing Certificate. The Precertificate Signing Certificate MUST be directly certified by the (root or intermediate) CA certificate that will ultimately sign the end entity TBSCertificate yielding the end entity certificate (note that the log may relax standard validation rules to allow this, so long as the issued certificate will be valid),
 	    </t>
 	    <t>
 	      or, the CA certificate that will sign the final certificate.
@@ -249,7 +249,7 @@ d0 d1   d2 d3           d0 d1   d2 d3  d4 d5
 	  As above, the Precertificate submission MUST be accompanied by the Precertificate Signing Certificate, if used, and all additional certificates required to verify the chain up to an accepted root certificate. The signature on the TBSCertificate indicates the Certificate Authority's intent to issue a certificate. This intent is considered binding (i.e., misissuance of the Precertificate is considered equal to misissuance of the final certificate). Each log verifies the Precertificate signature chain, and issues a Signed Certificate Timestamp on the corresponding TBSCertificate.
 	</t>
 	<t>
-	  Logs MUST verify that the submitted end entity certificate or Precertificate has a valid signature chain leading back to a trusted root CA certificate, using the chain of intermediate CA certificates provided by the submitter. In case of Precertificates, each log MUST also verify that the Precertificate Signing Certificate has the correct Extended Key Usage extension. Logs MAY accept certificates that have expired, are not yet valid, have been revoked or are otherwise not fully valid according to X.509 verification rules in order to accomodate quirks of CA certificate issuing software. However, logs MUST refuse to publish certificates without a valid chain to a known root CA. If a certificate is accepted and an SCT issued, the accepting log MUST store the chain used for verification including the certificate or Precertificate itself, and MUST present this chain for auditing upon request. This chain is required to prevent a CA avoiding blame by logging a partial or empty chain [Note: this effectively excludes self-signed and DANE-based certificates until some mechanism to control spam for those certificates is found - the authors welcome suggestions].
+	  Logs MUST verify that the submitted end entity certificate or Precertificate has a valid signature chain leading back to a trusted root CA certificate, using the chain of intermediate CA certificates provided by the submitter. Logs MAY accept certificates that have expired, are not yet valid, have been revoked or are otherwise not fully valid according to X.509 verification rules in order to accomodate quirks of CA certificate issuing software. However, logs MUST refuse to publish certificates without a valid chain to a known root CA. If a certificate is accepted and an SCT issued, the accepting log MUST store the entire chain used for verification including the certificate or Precertificate itself, and including the root certificate used to verify the chain (even if it was omitted from the submission) and MUST present this chain for auditing upon request. This chain is required to prevent a CA avoiding blame by logging a partial or empty chain [Note: this effectively excludes self-signed and DANE-based certificates until some mechanism to control spam for those certificates is found - the authors welcome suggestions].
 	</t>
 	<t>
 	  Each certificate entry in a log MUST include the following components:
@@ -289,13 +289,13 @@ d0 d1   d2 d3           d0 d1   d2 d3  d4 d5
 	  <spanx style="verb">leaf_certificate</spanx> is the end-entity certificate submitted for auditing.
 	</t>
 	<t>
-	  <spanx style="verb">certificate_chain</spanx> is a chain of additional certificates required to verify the end entity certificate. The first certificate MUST certify the end entity certificate. Each following certificate MUST directly certify the one preceding it. The self-signed root certificate MAY be omitted from the chain.
+	  <spanx style="verb">certificate_chain</spanx> is a chain of additional certificates required to verify the end entity certificate. The first certificate MUST certify the end entity certificate. Each following certificate MUST directly certify the one preceding it. The final certificate MUST be a root certificate accepted by the log.
 	</t>
 	<t>
 	  <spanx style="verb">pre_certificate</spanx> is the Precertificate submmited for auditing.
 	</t>
 	<t>
-	  <spanx style="verb">precertificate_chain</spanx> is a chain of additional certificates required to verify the Precertificate submission. The first certificate MAY be a valid Precertificate Signing Certificate, and MUST certify the first certificate. Each following certificate MUST directly certify the one preceding it. The self-signed root certificate MAY be omitted from the chain.
+	  <spanx style="verb">precertificate_chain</spanx> is a chain of additional certificates required to verify the Precertificate submission. The first certificate MAY be a valid Precertificate Signing Certificate, and MUST certify the first certificate. Each following certificate MUST directly certify the one preceding it. The final certificate MUST be a root certificate accepted by the log.
 	</t>
       </section>
       <section title="Structure of the Signed Certificate Timestamp">
@@ -328,7 +328,7 @@ d0 d1   d2 d3           d0 d1   d2 d3  d4 d5
 	  <spanx style="verb">issuer_key_hash</spanx> is the SHA-256 hash of the certificate issuer's public key, calculated over the DER encoding of the key represented as SubjectPublicKeyInfo. This is needed to bind the issuer to the final certificate.
 	</t>
 	<t>
-	  <spanx style="verb">tbs_certificate</spanx> is the DER encoded TBSCertificate (see <xref target='RFC5280'/>) component of the Precertificate - that is, without the signature and the poison extension. If the Precertificate is not signed with the CA certificate that will issue the final certificate, then the TBSCertificate also has its issuer changed to that of the CA that will issue the final certificate. Note that it is also possible to reconstruct this TBSCertificate from the final certificate by extracting the TBSCertificate from it and deleting the SCT extension. Also note that since the TBSCertificate contains an AlgorithmIdentifier that must match both the pre-certificate signature algorithm and final certificate signature algorithm, they must be signed with the same algorithm and parameters.
+	  <spanx style="verb">tbs_certificate</spanx> is the DER encoded TBSCertificate (see <xref target='RFC5280'/>) component of the Precertificate - that is, without the signature and the poison extension. If the Precertificate is not signed with the CA certificate that will issue the final certificate, then the TBSCertificate also has its issuer changed to that of the CA that will issue the final certificate. Note that it is also possible to reconstruct this TBSCertificate from the final certificate by extracting the TBSCertificate from it and deleting the SCT extension. Also note that since the TBSCertificate contains an AlgorithmIdentifier that must match both the pre-certificate signature algorithm and final certificate signature algorithm, they must be signed with the same algorithm and parameters. If the Precertificate is issued using a Precertificate Signing Certificate, and an Authority Key Identifier extension is present in the TBSCertificate, the corresponding extension must also be present in the Precertificate Signing Certificate - in this case, the TBSCertificate also has its Authority Key Identifier changed to match the final issuer.
 	</t>
 	<figure>
 	  <artwork>
@@ -442,7 +442,7 @@ d0 d1   d2 d3           d0 d1   d2 d3  d4 d5
         LogEntryType entry_type;
         select(entry_type) {
             case x509_entry: ASN.1Cert;
-            case precert_entry: TBSCertificate;
+            case precert_entry: PreCert;
         } signed_entry;
         CtExtensions extensions;
     } TimestampedEntry;
