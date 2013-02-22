@@ -6,7 +6,7 @@
 #include "merkletree/compact_merkle_tree.h"
 #include "proto/ct.pb.h"
 
-class Database;
+template <class Logged> class Database;
 class LogSigner;
 
 // Signer for appending new entries to the log.
@@ -15,10 +15,10 @@ class LogSigner;
 // no other signers during its lifetime -- when it discovers the database has
 // received tree updates it has not written, it does not try to recover,
 // but rather reports an error.
-class TreeSigner {
+template <class Logged> class TreeSigner {
  public:
-  // Takes ownership of the signer.
-  TreeSigner(Database *db, LogSigner *signer);
+  // Takes ownership of |signer|.
+  TreeSigner(Database<Logged> *db, LogSigner *signer);
   ~TreeSigner();
 
   enum UpdateResult {
@@ -35,12 +35,18 @@ class TreeSigner {
   // to the database is consistent with the latest STH.
   UpdateResult UpdateTree();
 
+  // Latest Tree Head (does not build a new tree, just retrieves the
+  // result of the most recent build).
+  const ct::SignedTreeHead &LatestSTH() const {
+    return latest_tree_head_;
+  }
+
  private:
   void BuildTree();
-  bool AppendCertificate(const ct::LoggedCertificate &logged_cert);
-  void AppendCertificateToTree(const ct::LoggedCertificate &logged_cert);
+  bool Append(const Logged &logged);
+  void AppendToTree(const Logged &logged_cert);
   void TimestampAndSign(uint64_t min_timestamp, ct::SignedTreeHead *sth);
-  Database *db_;
+  Database<Logged> *db_;
   LogSigner *signer_;
   // TODO(ekasper): it's a waste for the signer to keep the entire tree in
   // memory. Implement a compact version of the tree that runs in "restricted"

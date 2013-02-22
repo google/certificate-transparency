@@ -6,7 +6,6 @@
 #include <iostream>
 #include <netinet/in.h>
 #include <openssl/evp.h>
-#include <openssl/pem.h>
 #include <openssl/ssl.h>
 #include <sstream>
 #include <stdio.h>
@@ -16,7 +15,6 @@
 #include <sys/socket.h>
 #include <sys/time.h>
 #include <sys/types.h>
-#include <time.h>
 #include <unistd.h>
 
 #include "include/ct.h"
@@ -28,12 +26,15 @@
 #include "log/frontend.h"
 #include "log/log_lookup.h"
 #include "log/log_signer.h"
+#include "log/logged_certificate.h"
 #include "log/sqlite_db.h"
 #include "log/tree_signer.h"
 #include "proto/ct.pb.h"
 #include "proto/serializer.h"
 // FIXME: debug
 #include "util/util.h"
+
+#include "event.h"
 
 DEFINE_int32(port, 0, "Server port");
 DEFINE_string(key, "", "PEM-encoded server private key file");
@@ -61,6 +62,7 @@ DEFINE_int32(tree_signing_frequency_seconds, 600,
              "last signing. Set this well below the MMD to ensure we sign "
              "in a timely manner. Must be greater than 0.");
 
+using ct::LoggedCertificate;
 using google::RegisterFlagValidator;
 using std::string;
 
@@ -140,363 +142,11 @@ using ct::SignedCertificateTimestamp;
 using ct::protocol::kPacketPrefixLength;
 using ct::protocol::kMaxPacketLength;
 
-class EventLoop;
-
-class Services {
- public:
-
-  // because time is expensive, for most tasks we can just use some
-  // time sampled within this event handling loop. So, the main loop
-  // needs to call SetRoughTime() appropriately.
-  static time_t RoughTime() {
-    if (rough_time_ == 0)
-      rough_time_ = time(NULL);
-    return rough_time_;
-  }
-
-  static void SetRoughTime() { rough_time_ = 0; }
-
- private:
-
-  static time_t rough_time_;
-};
-
-time_t Services::rough_time_;
-
-class FD {
- public:
-
-  enum CanDelete {
-    DELETE,
-    NO_DELETE
-  };
-
-  FD(EventLoop *loop, int fd, CanDelete deletable = DELETE);
-
-  virtual ~FD() {}
-
-  virtual bool WantsWrite() const = 0;
-
-  virtual void WriteIsAllowed() = 0;
-
-  virtual bool WantsRead() const = 0;
-
-  virtual void ReadIsAllowed() = 0;
-
-  bool WantsErase() const { return wants_erase_; }
-
-  void Close() {
-    DCHECK_EQ(deletable_, DELETE) << "Can't call Close() on a non-deletable FD";
-    if (wants_erase_) {
-      LOG(INFO) << "Attempting to close an already closed fd " << fd();
-      return;
-    }
-    LOG(INFO) << "Closing fd " << fd() << std::endl;
-    wants_erase_ = true;
-    shutdown(fd(), SHUT_RDWR);
-    close(fd());
-  }
-
-  int fd() const { return fd_; }
-
-  bool CanDrop() const { return deletable_ == DELETE; }
-
-  // Don't forget to call me if anything happens!
-  // FIXME: time() is expensive - just a serial number instead?
-  void Activity() { last_activity_ = Services::RoughTime(); }
-
-  time_t LastActivity() const { return last_activity_; }
-
- protected:
-
-  EventLoop *loop() const { return loop_; }
-
-  bool WillAccept(int fd);
-
- private:
-
-  int fd_;
-  EventLoop *loop_;
-  bool wants_erase_;
-  CanDelete deletable_;
-  time_t last_activity_;
-
-  // Note that while you can set these low for test, they behave a
-  // bit strangely when set low - for example, it is quite easy to
-  // hit the limit even if the window is not 0. I'm guessing 1000
-  // and 100 would be good numbers. Note EventLoop::kIdleTime below,
-  // also.
-  static const int kFDLimit = 1000;
-  static const int kFDLimitWindow = 1;
-};
-
-class Listener : public FD {
- public:
-
-  Listener(EventLoop *loop, int fd) : FD(loop, fd, NO_DELETE) {}
-
-  bool WantsRead() const { return true; }
-
-  void ReadIsAllowed() {
-    int in = accept(fd(), NULL, NULL);
-    CHECK_GE(in, 0);
-    if (!WillAccept(in)) {
-      static char sorry[] = "No free connections.\n";
-
-      // we have to consume the result.
-      ssize_t s = write(in, sorry, sizeof sorry);
-      // but we don't care what it is...
-      s = s;
-      shutdown(in, SHUT_RDWR);
-      close(in);
-      return;
-    }
-    Accepted(in);
-  }
-
-  bool WantsWrite() const { return false; }
-
-  void WriteIsAllowed() {
-    DLOG(FATAL) << "WriteIsAllowed() called on a read-only Listener.";
-  }
-
-  virtual void Accepted(int fd) = 0;
-};
-
-class RepeatedEvent {
- public:
-  RepeatedEvent(time_t repeat_frequency_seconds)
-      : frequency_(repeat_frequency_seconds),
-        last_activity_(Services::RoughTime()) {}
-
- // The time when we should execute next.
-  time_t Trigger() {
-    return last_activity_ + frequency_;
-  }
-
-  virtual string Description() = 0;
-
-  virtual void Execute() = 0;
-
-  void Activity() {
-    last_activity_ = Services::RoughTime();
-  }
- private:
- time_t frequency_;
- time_t last_activity_;
-};
-
-class EventLoop {
- public:
-
-  void Add(FD *fd) { fds_.push_back(fd); }
-
-  void Add(RepeatedEvent *event) { events_.push_back(event); }
-
-  // Returns remaining time until the next alarm.
-  time_t ProcessRepeatedEvents() {
-    if (events_.empty())
-      return INT_MAX;
-    Services::SetRoughTime();
-    time_t now = Services::RoughTime();
-    time_t earliest = INT_MAX;
-    for (std::vector<RepeatedEvent *>::iterator it = events_.begin();
-         it != events_.end(); ++it) {
-      RepeatedEvent *event = *it;
-      time_t trigger = event->Trigger();
-      if (trigger <= now) {
-        event->Execute();
-        LOG(INFO) << "Executed " << event->Description() << " with a delay of "
-                  << difftime(now, trigger) << " seconds";
-        event->Activity();
-        trigger = event->Trigger();
-        CHECK_GT(trigger, now);
-      }
-      earliest = std::min(earliest, trigger);
-    }
-    CHECK_GT(earliest, 0);
-    return earliest - now;
-  }
-  void OneLoop() {
-    time_t select_timeout = ProcessRepeatedEvents();
-    // Do not schedule any repeated events between now and the next
-    // select - they will get ignored until select returns.
-    CHECK_GT(select_timeout, 0);
-
-    fd_set readers, writers;
-    int max = -1;
-
-    memset(&readers, '\0', sizeof readers);
-    memset(&writers, '\0', sizeof writers);
-    for (std::deque<FD *>::const_iterator pfd = fds_.begin();
-         pfd != fds_.end(); ++pfd) {
-      FD *fd = *pfd;
-
-      DCHECK(!fd->WantsErase());
-      if (fd->WantsWrite())
-        Set(fd->fd(), &writers, &max);
-      if (fd->WantsRead())
-        Set(fd->fd(), &readers, &max);
-    }
-
-    CHECK_GE(max, 0);
-
-    struct timeval tv;
-    tv.tv_sec = select_timeout;
-    tv.tv_usec = 0;
-
-    int r = select(max+1, &readers, &writers, NULL, &tv);
-    if (r == 0)
-      return;
-
-    CHECK_GT(r, 0);
-
-    Services::SetRoughTime();
-    int n = 0;
-    for (std::deque<FD *>::iterator pfd = fds_.begin(); pfd != fds_.end(); ) {
-      FD *fd = *pfd;
-
-      if (EraseCheck(&pfd))
-        continue;
-
-      if (FD_ISSET(fd->fd(), &writers)) {
-        DCHECK(fd->WantsWrite());
-        fd->WriteIsAllowed();
-        fd->Activity();
-        ++n;
-      }
-
-      if (EraseCheck(&pfd))
-        continue;
-
-      if (FD_ISSET(fd->fd(), &readers)) {
-        DCHECK(fd->WantsRead());
-        fd->ReadIsAllowed();
-        fd->Activity();
-        ++n;
-      }
-
-      if (EraseCheck(&pfd))
-        continue;
-
-      ++pfd;
-    }
-    CHECK_LE(n, r);
-  }
-
-  void Forever() {
-    for ( ; ; )
-      OneLoop();
-  }
-
-  void MaybeDropOne() {
-    std::deque<FD *>::iterator drop = fds_.end();
-    time_t oldest = Services::RoughTime() - kIdleTime;
-
-    for (std::deque<FD *>::iterator pfd = fds_.begin();
-         pfd != fds_.end(); ++pfd) {
-      FD *fd = *pfd;
-
-      if (fd->CanDrop() && fd->LastActivity() < oldest) {
-        oldest = fd->LastActivity();
-        drop = pfd;
-      }
-    }
-    if (drop != fds_.end())
-      (*drop)->Close();
-  }
-
- private:
-
-  bool EraseCheck(std::deque<FD *>::iterator *pfd) {
-    if ((**pfd)->WantsErase()) {
-      delete **pfd;
-      *pfd = fds_.erase(*pfd);
-      return true;
-    }
-    return false;
-  }
-
-  static void Set(int fd, fd_set *fdset, int *max) {
-    DCHECK_GE(fd, 0);
-    CHECK_LT((unsigned)fd, FD_SETSIZE);
-    FD_SET(fd, fdset);
-    if (fd > *max)
-      *max = fd;
-  }
-
-  std::deque<FD *> fds_;
-  std::vector<RepeatedEvent *> events_;
-  // This should probably be set to 2 for anything but test (or 1 or 0).
-  // 2: everything gets a chance to speak.
-  // 1: sometimes the clock will tick before some get a chance to speak.
-  // 0: maybe no-one ever gets a chance to speak.
-  static const time_t kIdleTime = 20;
-};
-
-FD::FD(EventLoop *loop, int fd, CanDelete deletable)
-    : fd_(fd), loop_(loop), wants_erase_(false), deletable_(deletable) {
-  DCHECK_GE(fd, 0);
-  CHECK_LT((unsigned)fd, FD_SETSIZE);
-  loop->Add(this);
-  Activity();
-}
-
-bool FD::WillAccept(int fd) {
-  if (fd >= kFDLimit - kFDLimitWindow)
-    loop()->MaybeDropOne();
-  return fd < kFDLimit;
-}
-
-class Server : public FD {
- public:
-
-  Server(EventLoop *loop, int fd) : FD(loop, fd) {}
-
-  bool WantsRead() const { return true; }
-
-  void ReadIsAllowed() {
-    char buf[1024];
-
-    ssize_t n = read(fd(), buf, sizeof buf);
-    VLOG(5) << "read " << n << " bytes from " << fd();
-    if (n <= 0) {
-      Close();
-      return;
-    }
-    rbuffer_.append(buf, (size_t)n);
-    BytesRead(&rbuffer_);
-  }
-
-  // There are fresh bytes available in rbuffer.  It is the callee's
-  // responsibility to remove consumed bytes from rbuffer. This will
-  // NOT be called again until more data arrives from the network,
-  // even if there are unconsumed bytes in rbuffer.
-  virtual void BytesRead(string *rbuffer) = 0;
-
-  bool WantsWrite() const { return !wbuffer_.empty(); }
-
-  void WriteIsAllowed() {
-    ssize_t n = write(fd(), wbuffer_.data(), wbuffer_.length());
-    VLOG(5) << "wrote " << n << " bytes to " << fd();
-    if (n <= 0) {
-      Close();
-      return;
-    }
-    wbuffer_.erase(0, n);
-  }
-
-  void Write(string str) { wbuffer_.append(str); }
-
- private:
-
-  string rbuffer_;
-  string wbuffer_;
-};
-
 class CTLogManager {
  public:
-  CTLogManager(Frontend *frontend, TreeSigner *signer, LogLookup *lookup)
+  CTLogManager(Frontend *frontend,
+               TreeSigner<LoggedCertificate> *signer,
+               LogLookup<LoggedCertificate> *lookup)
       : frontend_(frontend),
         signer_(signer),
         lookup_(lookup) {
@@ -568,6 +218,7 @@ class CTLogManager {
         break;
       default:
         error->assign(Frontend::SubmitResultString(submit_result));
+        break;
     }
     return reply;
   }
@@ -575,32 +226,32 @@ class CTLogManager {
   LookupReply QueryAuditProof(const std::string &merkle_leaf_hash,
                               ct::MerkleAuditProof *proof) {
     ct::MerkleAuditProof local_proof;
-    LogLookup::LookupResult res =
-        lookup_->CertificateAuditProof(merkle_leaf_hash, &local_proof);
-    if (res == LogLookup::OK) {
+    LogLookup<LoggedCertificate>::LookupResult res =
+        lookup_->AuditProof(merkle_leaf_hash, &local_proof);
+    if (res == LogLookup<LoggedCertificate>::OK) {
       proof->CopyFrom(local_proof);
       return MERKLE_AUDIT_PROOF;
     }
-    CHECK_EQ(LogLookup::NOT_FOUND, res);
+    CHECK_EQ(LogLookup<LoggedCertificate>::NOT_FOUND, res);
     return NOT_FOUND;
   }
 
   bool SignMerkleTree() {
-    TreeSigner::UpdateResult res = signer_->UpdateTree();
-    if (res != TreeSigner::OK) {
+    TreeSigner<LoggedCertificate>::UpdateResult res = signer_->UpdateTree();
+    if (res != TreeSigner<LoggedCertificate>::OK) {
       LOG(ERROR) << "Tree update failed with return code " << res;
       return false;
     }
     time_t last_update = static_cast<time_t>(signer_->LastUpdateTime() / 1000);
     LOG(INFO) << "Tree successfully updated at " << ctime(&last_update);
-    CHECK_EQ(LogLookup::UPDATE_OK, lookup_->Update());
+    CHECK_EQ(LogLookup<LoggedCertificate>::UPDATE_OK, lookup_->Update());
     return true;
   }
 
  private:
   Frontend *frontend_;
-  TreeSigner *signer_;
-  LogLookup *lookup_;
+  TreeSigner<LoggedCertificate> *signer_;
+  LogLookup<LoggedCertificate> *lookup_;
 };
 
 class FrontendLogEvent : public RepeatedEvent {
@@ -816,66 +467,16 @@ class CTServerListener : public Listener {
   CTLogManager *manager_;
 };
 
-static bool InitServer(int *sock, int port, const char *ip, int type) {
-  bool ret = false;
-  struct sockaddr_in server;
-  int s = -1;
-
-  memset(&server, 0, sizeof(server));
-  server.sin_family = AF_INET;
-  server.sin_port = htons((unsigned short)port);
-  if (ip == NULL)
-    server.sin_addr.s_addr = INADDR_ANY;
-  else
-    memcpy(&server.sin_addr.s_addr, ip, 4);
-
-  if (type == SOCK_STREAM)
-    s = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
-  else /* type == SOCK_DGRAM */
-    s = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
-  if (s == -1)
-    goto err;
-
-  {
-    int j = 1;
-    setsockopt(s, SOL_SOCKET, SO_REUSEADDR, &j, sizeof j);
-  }
-
-  if (bind(s, (struct sockaddr *)&server, sizeof(server)) == -1) {
-    perror("bind");
-    goto err;
-  }
-  /* Make it 128 for linux */
-  if (type == SOCK_STREAM && listen(s, 128) == -1) goto err;
-  *sock = s;
-  ret = true;
-err:
-  if (!ret && s != -1) {
-    shutdown(s, SHUT_RDWR);
-    close(s);
-  }
-  return ret;
-}
-
 int main(int argc, char **argv) {
   google::ParseCommandLineFlags(&argc, &argv, true);
   google::InitGoogleLogging(argv[0]);
   SSL_library_init();
 
   EVP_PKEY *pkey = NULL;
-
-  FILE *fp = fopen(FLAGS_key.c_str(), "r");
-
-  PCHECK(fp != static_cast<FILE*>(NULL)) << "Could not read private key file";
-  // No password.
-  PEM_read_PrivateKey(fp, &pkey, NULL, NULL);
-  CHECK_NE(pkey, static_cast<EVP_PKEY*>(NULL)) <<
-      FLAGS_key << " is not a valid PEM-encoded private key.";
-
-  fclose(fp);
+  CHECK_EQ(Services::ReadPrivateKey(&pkey, FLAGS_key), Services::KEY_OK);
 
   int fd;
-  CHECK(InitServer(&fd, FLAGS_port, NULL, SOCK_STREAM));
+  CHECK(Services::InitServer(&fd, FLAGS_port, NULL, SOCK_STREAM));
 
   EventLoop loop;
 
@@ -892,32 +493,24 @@ int main(int argc, char **argv) {
     exit(1);
   }
 
-  Database *db;
+  Database<LoggedCertificate> *db;
 
   if (FLAGS_sqlite_db != "")
-      db = new SQLiteDB(FLAGS_sqlite_db);
+      db = new SQLiteDB<LoggedCertificate>(FLAGS_sqlite_db);
   else
-      db = new FileDB(new FileStorage(FLAGS_cert_dir, FLAGS_cert_storage_depth),
-                      new FileStorage(FLAGS_tree_dir,
-                                      FLAGS_tree_storage_depth));
+      db = new FileDB<LoggedCertificate>(
+               new FileStorage(FLAGS_cert_dir, FLAGS_cert_storage_depth),
+               new FileStorage(FLAGS_tree_dir, FLAGS_tree_storage_depth));
 
   // Hmm, there is no EVP_PKEY_dup, so let's read the key again...
   EVP_PKEY *pkey2 = NULL;
-  fp = fopen(FLAGS_key.c_str(), "r");
-
-  PCHECK(fp != static_cast<FILE*>(NULL)) << "Could not read private key file";
-  // No password.
-  PEM_read_PrivateKey(fp, &pkey2, NULL, NULL);
-  CHECK_NE(pkey, static_cast<EVP_PKEY*>(NULL)) <<
-      FLAGS_key << " is not a valid PEM-encoded private key.";
-
-  fclose(fp);
+  CHECK_EQ(Services::ReadPrivateKey(&pkey2, FLAGS_key), Services::KEY_OK);
 
   CTLogManager manager(
       new Frontend(new CertSubmissionHandler(&checker),
                    new FrontendSigner(db, new LogSigner(pkey))),
-      new TreeSigner(db, new LogSigner(pkey2)),
-      new LogLookup(db));
+      new TreeSigner<LoggedCertificate>(db, new LogSigner(pkey2)),
+      new LogLookup<LoggedCertificate>(db));
 
   Services::SetRoughTime();
   TreeSigningEvent tree_event(FLAGS_tree_signing_frequency_seconds, &manager);

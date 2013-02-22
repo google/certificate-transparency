@@ -1,3 +1,5 @@
+/* -*- mode: c++; indent-tabs-mode: nil -*- */
+
 #ifndef TEST_DB_H
 #define TEST_DB_H
 
@@ -8,6 +10,7 @@
 #include "log/database.h"
 #include "log/file_db.h"
 #include "log/file_storage.h"
+#include "log/logged_certificate.h"
 #include "log/sqlite_db.h"
 #include "util/util.h"
 
@@ -72,29 +75,34 @@ class TestDB {
   T *db_;
 };
 
-template <> void TestDB<FileDB>::Setup() {
+template <> void TestDB<FileDB<ct::LoggedCertificate> >::Setup() {
   std::string certs_dir = tmp_.TmpStorageDir() + "/certs";
   std::string tree_dir = tmp_.TmpStorageDir() + "/tree";
   CHECK_ERR(mkdir(certs_dir.c_str(), 0700));
   CHECK_ERR(mkdir(tree_dir.c_str(), 0700));
 
-  db_ = new FileDB(new FileStorage(certs_dir, kCertStorageDepth),
-                   new FileStorage(tree_dir, kTreeStorageDepth));
+  db_ = new FileDB<ct::LoggedCertificate>(
+      new FileStorage(certs_dir, kCertStorageDepth),
+      new FileStorage(tree_dir, kTreeStorageDepth));
 }
 
-template <> FileDB *TestDB<FileDB>::SecondDB() const {
+template <> FileDB<ct::LoggedCertificate> *
+TestDB<FileDB<ct::LoggedCertificate> >::SecondDB() const {
   std::string certs_dir = this->tmp_.TmpStorageDir() + "/certs";
   std::string tree_dir = this->tmp_.TmpStorageDir() + "/tree";
-  return new FileDB(new FileStorage(certs_dir, kCertStorageDepth),
-                    new FileStorage(tree_dir, kTreeStorageDepth));
+  return new FileDB<ct::LoggedCertificate>(new FileStorage(certs_dir,
+                                                           kCertStorageDepth),
+                                           new FileStorage(tree_dir,
+                                                           kTreeStorageDepth));
 }
 
-template <> void TestDB<SQLiteDB>::Setup() {
-  db_ = new SQLiteDB(tmp_.TmpStorageDir() + "/sqlite");
+template <> void TestDB<SQLiteDB<ct::LoggedCertificate> >::Setup() {
+  db_ = new SQLiteDB<ct::LoggedCertificate>(tmp_.TmpStorageDir() + "/sqlite");
 }
 
-template <> SQLiteDB *TestDB<SQLiteDB>::SecondDB() const {
-  return new SQLiteDB(tmp_.TmpStorageDir() + "/sqlite");
+template <> SQLiteDB<ct::LoggedCertificate> *
+TestDB<SQLiteDB<ct::LoggedCertificate> >::SecondDB() const {
+  return new SQLiteDB<ct::LoggedCertificate>(tmp_.TmpStorageDir() + "/sqlite");
 }
 
 // Not a Database; we just use the same template for setup.

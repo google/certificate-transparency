@@ -1,3 +1,4 @@
+/* -*- indent-tabs-mode: nil -*- */
 #include <glog/logging.h>
 #include <gtest/gtest.h>
 #include <stdint.h>

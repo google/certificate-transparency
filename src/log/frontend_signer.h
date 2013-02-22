@@ -4,9 +4,9 @@
 #include <stdint.h>
 #include <string>
 
-#include "proto/ct.pb.h"
+#include "logged_certificate.h"
 
-class Database;
+template <class Logged> class Database;
 class LogSigner;
 
 class FrontendSigner {
@@ -17,7 +17,7 @@ class FrontendSigner {
   };
 
   // Takes ownership of |signer|.
-  FrontendSigner(Database *db, LogSigner *signer);
+  FrontendSigner(Database<ct::LoggedCertificate> *db, LogSigner *signer);
 
   ~FrontendSigner();
 
@@ -29,7 +29,7 @@ class FrontendSigner {
                           ct::SignedCertificateTimestamp *sct);
 
  private:
-  Database *db_;
+  Database<ct::LoggedCertificate> *db_;
   LogSigner *signer_;
 
   void TimestampAndSign(const ct::LogEntry &entry,

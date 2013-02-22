@@ -1,3 +1,4 @@
+/* -*- indent-tabs-mode: nil -*- */
 #include <glog/logging.h>
 
 #include "log/cert_submission_handler.h"
@@ -23,9 +24,9 @@ void Frontend::GetStats(Frontend::FrontendStats *stats) const {
   *stats = stats_;
 }
 
-Frontend::SubmitResult Frontend::QueueEntry(ct::LogEntryType type,
-                                            const string &data,
-                                            SignedCertificateTimestamp *sct) {
+Frontend::SubmitResult
+Frontend::QueueEntry(ct::LogEntryType type, const string &data,
+                     SignedCertificateTimestamp *sct) {
   // Step 1. Preprocessing: convert the submission into a CertificateEntry
   // and verify the chain.
   LogEntry entry;

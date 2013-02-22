@@ -5,7 +5,8 @@
 
 #include "log/file_db.h"
 #include "log/frontend_signer.h"
-#include "log_verifier.h"
+#include "log/log_verifier.h"
+#include "log/logged_certificate.h"
 #include "log/sqlite_db.h"
 #include "log/test_db.h"
 #include "log/test_signer.h"
@@ -28,6 +29,9 @@ string H(const string &byte_string) {
   return util::HexString(byte_string);
 }
 
+typedef Database<LoggedCertificate> DB;
+typedef FrontendSigner FS;
+
 template <class T> class FrontendSignerTest : public ::testing::Test {
  protected:
   FrontendSignerTest()
@@ -35,8 +39,7 @@ template <class T> class FrontendSignerTest : public ::testing::Test {
         test_signer_(),
         verifier_(new LogVerifier(TestSigner::DefaultVerifier(),
                                   new MerkleVerifier(new Sha256Hasher()))),
-        frontend_(new FrontendSigner(test_db_.db(),
-                                     TestSigner::DefaultSigner())) {}
+        frontend_(new FS(test_db_.db(), TestSigner::DefaultSigner())) {}
 
   ~FrontendSignerTest() {
     delete verifier_;
@@ -48,10 +51,11 @@ template <class T> class FrontendSignerTest : public ::testing::Test {
   TestDB<T> test_db_;
   TestSigner test_signer_;
   LogVerifier *verifier_;
-  FrontendSigner *frontend_;
+  FS *frontend_;
 };
 
-typedef testing::Types<FileDB, SQLiteDB> Databases;
+typedef testing::Types<FileDB<LoggedCertificate>,
+                       SQLiteDB<LoggedCertificate> > Databases;
 
 TYPED_TEST_CASE(FrontendSignerTest, Databases);
 
@@ -60,16 +64,14 @@ TYPED_TEST(FrontendSignerTest, LogKatTest) {
   this->test_signer_.SetDefaults(&default_entry);
 
   // Log and expect success.
-  EXPECT_EQ(FrontendSigner::NEW,
-            this->frontend_->QueueEntry(default_entry, NULL));
+  EXPECT_EQ(FS::NEW, this->frontend_->QueueEntry(default_entry, NULL));
 
   // Look it up and expect to get the right thing back.
   LoggedCertificate logged_cert;
   string hash =
       Sha256Hasher::Sha256Digest(Serializer::LeafCertificate(default_entry));
 
-  EXPECT_EQ(Database::LOOKUP_OK,
-            this->db()->LookupCertificateByHash(hash, &logged_cert));
+  EXPECT_EQ(DB::LOOKUP_OK, this->db()->LookupByHash(hash, &logged_cert));
 
   TestSigner::TestEqualEntries(default_entry, logged_cert.entry());
 }
@@ -80,8 +82,8 @@ TYPED_TEST(FrontendSignerTest, Log) {
   this->test_signer_.CreateUnique(&entry1);
 
   // Log and expect success.
-  EXPECT_EQ(FrontendSigner::NEW, this->frontend_->QueueEntry(entry0, NULL));
-  EXPECT_EQ(FrontendSigner::NEW, this->frontend_->QueueEntry(entry1, NULL));
+  EXPECT_EQ(FS::NEW, this->frontend_->QueueEntry(entry0, NULL));
+  EXPECT_EQ(FS::NEW, this->frontend_->QueueEntry(entry1, NULL));
 
   // Look it up and expect to get the right thing back.
   LoggedCertificate logged_cert0, logged_cert1;
@@ -90,10 +92,8 @@ TYPED_TEST(FrontendSignerTest, Log) {
   string hash1 =
       Sha256Hasher::Sha256Digest(Serializer::LeafCertificate(entry1));
 
-  EXPECT_EQ(Database::LOOKUP_OK,
-            this->db()->LookupCertificateByHash(hash0, &logged_cert0));
-  EXPECT_EQ(Database::LOOKUP_OK,
-            this->db()->LookupCertificateByHash(hash1, &logged_cert1));
+  EXPECT_EQ(DB::LOOKUP_OK, this->db()->LookupByHash(hash0, &logged_cert0));
+  EXPECT_EQ(DB::LOOKUP_OK, this->db()->LookupByHash(hash1, &logged_cert1));
 
   TestSigner::TestEqualEntries(entry0, logged_cert0.entry());
   TestSigner::TestEqualEntries(entry1, logged_cert1.entry());
@@ -106,11 +106,11 @@ TYPED_TEST(FrontendSignerTest, Time) {
 
   // Log and expect success.
   SignedCertificateTimestamp sct0, sct1;
-  EXPECT_EQ(FrontendSigner::NEW, this->frontend_->QueueEntry(entry0, &sct0));
+  EXPECT_EQ(FS::NEW, this->frontend_->QueueEntry(entry0, &sct0));
   EXPECT_LE(sct0.timestamp(), util::TimeInMilliseconds());
   EXPECT_GT(sct0.timestamp(), 0U);
 
-  EXPECT_EQ(FrontendSigner::NEW, this->frontend_->QueueEntry(entry1, &sct1));
+  EXPECT_EQ(FS::NEW, this->frontend_->QueueEntry(entry1, &sct1));
   EXPECT_LE(sct0.timestamp(), sct1.timestamp());
   EXPECT_LE(sct1.timestamp(), util::TimeInMilliseconds());
 }
@@ -121,12 +121,11 @@ TYPED_TEST(FrontendSignerTest, LogDuplicates) {
 
   SignedCertificateTimestamp sct0, sct1;
   // Log and expect success.
-  EXPECT_EQ(FrontendSigner::NEW, this->frontend_->QueueEntry(entry, &sct0));
+  EXPECT_EQ(FS::NEW, this->frontend_->QueueEntry(entry, &sct0));
   // Wait for time to change.
   usleep(2000);
   // Try to log again.
-  EXPECT_EQ(FrontendSigner::DUPLICATE,
-            this->frontend_->QueueEntry(entry, &sct1));
+  EXPECT_EQ(FS::DUPLICATE, this->frontend_->QueueEntry(entry, &sct1));
 
   // Expect to get the original timestamp.
   EXPECT_EQ(sct0.timestamp(), sct1.timestamp());
@@ -147,12 +146,11 @@ TYPED_TEST(FrontendSignerTest, LogDuplicatesDifferentChain) {
 
   SignedCertificateTimestamp sct0, sct1;
   // Log and expect success.
-  EXPECT_EQ(FrontendSigner::NEW, this->frontend_->QueueEntry(entry0, &sct0));
+  EXPECT_EQ(FS::NEW, this->frontend_->QueueEntry(entry0, &sct0));
   // Wait for time to change.
   usleep(2000);
   // Try to log again.
-  EXPECT_EQ(FrontendSigner::DUPLICATE,
-            this->frontend_->QueueEntry(entry1, &sct1));
+  EXPECT_EQ(FS::DUPLICATE, this->frontend_->QueueEntry(entry1, &sct1));
 
   // Expect to get the original timestamp.
   EXPECT_EQ(sct0.timestamp(), sct1.timestamp());
@@ -165,8 +163,8 @@ TYPED_TEST(FrontendSignerTest, Verify) {
 
   // Log and expect success.
   SignedCertificateTimestamp sct0, sct1;
-  EXPECT_EQ(FrontendSigner::NEW, this->frontend_->QueueEntry(entry0, &sct0));
-  EXPECT_EQ(FrontendSigner::NEW, this->frontend_->QueueEntry(entry1, &sct1));
+  EXPECT_EQ(FS::NEW, this->frontend_->QueueEntry(entry0, &sct0));
+  EXPECT_EQ(FS::NEW, this->frontend_->QueueEntry(entry1, &sct1));
 
   // Verify results.
 
@@ -190,10 +188,10 @@ TYPED_TEST(FrontendSignerTest, TimedVerify) {
 
   // Log and expect success.
   SignedCertificateTimestamp sct0, sct1;
-  EXPECT_EQ(FrontendSigner::NEW, this->frontend_->QueueEntry(entry0, &sct0));
+  EXPECT_EQ(FS::NEW, this->frontend_->QueueEntry(entry0, &sct0));
   // Make sure we get different timestamps.
   usleep(2000);
-  EXPECT_EQ(FrontendSigner::NEW, this->frontend_->QueueEntry(entry1, &sct1));
+  EXPECT_EQ(FS::NEW, this->frontend_->QueueEntry(entry1, &sct1));
 
   EXPECT_GT(sct1.timestamp(), sct0.timestamp());
 

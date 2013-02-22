@@ -1,6 +1,5 @@
 .*~$
 ^doc/draft-laurie-pki-sunlight-..\.html$
-^doc/draft-laurie-pki-sunlight-..\.txt$
 ^doc/draft-laurie-pki-sunlight-..-..-diff\.html$
 .*\.o$
 .*\.so$
@@ -11,6 +10,7 @@
 ^src/merkletree/tree_hasher_test$
 \.depend
 ^src/client/ct$
+^src/server/blob-server$
 ^src/server/ct-server$
 ^src/test/apachectl$
 ^src/test/.*\.bin$
@@ -22,6 +22,7 @@
 ^src/log/cert_checker_test$
 ^src/log/log_lookup_test$
 ^src/log/log_signer_test$
+^src/log/logged_certificate_test$
 ^src/log/cert_submission_handler_test$
 ^src/log/frontend_signer_test$
 ^src/log/frontend_test$

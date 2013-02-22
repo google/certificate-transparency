@@ -8,6 +8,7 @@
 #include <string>
 
 #include "log/log_signer.h"
+#include "log/logged_certificate.h"
 #include "log/test_signer.h"
 #include "merkletree/serial_hasher.h"
 #include "merkletree/tree_hasher.h"
@@ -241,9 +242,6 @@ void TestSigner::SetDefaults(LoggedCertificate *logged_cert) {
   // Some time in September 2012.
   SetDefaults(logged_cert->mutable_sct());
   SetDefaults(logged_cert->mutable_entry());
-  // FIXME(ekasper): don't assume SHA256 in test vectors
-  // (despite the field name).
-  logged_cert->set_certificate_sha256_hash(B(kDefaultDerCertHash));
 }
 
 // static
@@ -411,8 +409,7 @@ void TestSigner::TestEqualLoggedCerts(const LoggedCertificate &c0,
   TestEqualEntries(c0.entry(), c1.entry());
   TestEqualSCTs(c0.sct(), c1.sct());
 
-  EXPECT_EQ(H(c0.certificate_sha256_hash()),
-            H(c1.certificate_sha256_hash()));
+  EXPECT_EQ(H(c0.Hash()), H(c1.Hash()));
   EXPECT_EQ(c0.has_sequence_number(), c1.has_sequence_number());
   // Defaults to 0 if not set.
   EXPECT_EQ(c0.sequence_number(), c1.sequence_number());
@@ -437,7 +434,7 @@ void TestSigner::FillData(LoggedCertificate *logged_cert) {
 
   CreateUnique(logged_cert->mutable_entry());
 
-  logged_cert->set_certificate_sha256_hash(Sha256Hasher::Sha256Digest(
+  CHECK_EQ(logged_cert->Hash(), Sha256Hasher::Sha256Digest(
       Serializer::LeafCertificate(logged_cert->entry())));
   string serialized_leaf;
   CHECK_EQ(Serializer::OK,

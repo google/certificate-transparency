@@ -106,7 +106,7 @@ static SerializeResult SerializeSCTList(
 
   // TODO(ekasper): tests for these!
   template <class T>
-  static std::string SerializeUint(T in, size_t bytes) {
+  static std::string SerializeUint(T in, size_t bytes = sizeof(T)) {
     Serializer serializer;
     serializer.WriteUint(in, bytes);
     return serializer.SerializedString();

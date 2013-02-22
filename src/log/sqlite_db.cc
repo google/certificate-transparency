@@ -8,7 +8,7 @@
 
 using std::string;
 
-SQLiteDB::SQLiteDB(const string &dbfile)
+template <class Logged> SQLiteDB<Logged>::SQLiteDB(const string &dbfile)
     : db_(NULL) {
   int ret = sqlite3_open_v2(dbfile.c_str(), &db_, SQLITE_OPEN_READWRITE, NULL);
   if (ret == SQLITE_OK)
@@ -24,8 +24,7 @@ SQLiteDB::SQLiteDB(const string &dbfile)
                            SQLITE_OPEN_READWRITE | SQLITE_OPEN_CREATE, NULL));
 
   CHECK_EQ(SQLITE_OK, sqlite3_exec(db_, "CREATE TABLE leaves(hash BLOB UNIQUE, "
-                                   "sct BLOB, entry BLOB, "
-                                   "sequence INTEGER UNIQUE)",
+                                   "entry BLOB, sequence INTEGER UNIQUE)",
                                    NULL, NULL, NULL));
 
   CHECK_EQ(SQLITE_OK, sqlite3_exec(db_, "CREATE TABLE trees(sth BLOB UNIQUE, "
@@ -34,15 +33,15 @@ SQLiteDB::SQLiteDB(const string &dbfile)
   LOG(INFO) << "New SQLite database created in " << dbfile;
 }
 
-SQLiteDB::~SQLiteDB() {
+template <class Logged> SQLiteDB<Logged>::~SQLiteDB() {
   CHECK_EQ(SQLITE_OK, sqlite3_close(db_));
 }
 
-void SQLiteDB::BeginTransaction() {
+template <class Logged> void SQLiteDB<Logged>::BeginTransaction() {
   CHECK_EQ(SQLITE_OK, sqlite3_exec(db_, "BEGIN;", NULL, NULL, NULL));
 }
 
-void SQLiteDB::EndTransaction() {
+template <class Logged> void SQLiteDB<Logged>::EndTransaction() {
   CHECK_EQ(SQLITE_OK, sqlite3_exec(db_, "COMMIT;", NULL, NULL, NULL));
 }
 
@@ -94,36 +93,32 @@ class Statement {
   sqlite3_stmt *stmt_;
 };
 
-Database::WriteResult
-SQLiteDB::CreatePendingCertificateEntry_(const ct::LoggedCertificate &cert) {
-  Statement statement(db_, "INSERT INTO leaves(hash, sct, entry) "
-                      "VALUES(?, ?, ?)");
+template <class Logged> typename Database<Logged>::WriteResult
+SQLiteDB<Logged>::CreatePendingEntry_(const Logged &logged) {
+  Statement statement(db_, "INSERT INTO leaves(hash, entry) "
+                      "VALUES(?, ?)");
 
-  statement.BindBlob(0, cert.certificate_sha256_hash());
+  statement.BindBlob(0, logged.Hash());
 
-  string sct_data;
-  CHECK(cert.sct().SerializeToString(&sct_data));
-  statement.BindBlob(1, sct_data);
-
-  string entry_data;
-  CHECK(cert.entry().SerializeToString(&entry_data));
-  statement.BindBlob(2, entry_data);
+  string data;
+  CHECK(logged.SerializeForDatabase(&data));
+  statement.BindBlob(1, data);
 
   int ret = statement.Step();
   if (ret == SQLITE_CONSTRAINT) {
     Statement s2(db_, "SELECT hash FROM leaves WHERE hash = ?");
-    s2.BindBlob(0, cert.certificate_sha256_hash());
+    s2.BindBlob(0, logged.Hash());
     CHECK_EQ(SQLITE_ROW, s2.Step());
-    return DUPLICATE_CERTIFICATE_HASH;
+    return this->DUPLICATE_CERTIFICATE_HASH;
   }
   CHECK_EQ(SQLITE_DONE, ret);
 
-  return OK;
+  return this->OK;
 }
 
-Database::WriteResult
-SQLiteDB::AssignCertificateSequenceNumber(const string &hash,
-                                          uint64_t sequence_number) {
+template <class Logged> typename Database<Logged>::WriteResult
+SQLiteDB<Logged>::AssignSequenceNumber(const string &hash,
+                                       uint64_t sequence_number) {
   Statement statement(db_, "UPDATE leaves SET sequence = ? WHERE hash = ? "
                       "AND sequence IS NULL");
   statement.BindUInt64(0, sequence_number);
@@ -134,7 +129,7 @@ SQLiteDB::AssignCertificateSequenceNumber(const string &hash,
     Statement s2(db_, "SELECT sequence FROM leaves WHERE sequence = ?");
     s2.BindUInt64(0, sequence_number);
     CHECK_EQ(SQLITE_ROW, s2.Step());
-    return SEQUENCE_NUMBER_ALREADY_IN_USE;
+    return this->SEQUENCE_NUMBER_ALREADY_IN_USE;
   }
   CHECK_EQ(SQLITE_DONE, ret);
 
@@ -144,73 +139,79 @@ SQLiteDB::AssignCertificateSequenceNumber(const string &hash,
     s2.BindBlob(0, hash);
     int ret = s2.Step();
     if (ret == SQLITE_ROW)
-      return ENTRY_ALREADY_LOGGED;
-    return ENTRY_NOT_FOUND;
+      return this->ENTRY_ALREADY_LOGGED;
+    return this->ENTRY_NOT_FOUND;
   }
   CHECK_EQ(1, changes);
 
-  return OK;
+  return this->OK;
 }
 
-Database::LookupResult
-SQLiteDB::LookupCertificateByHash(const string &hash,
-                                  ct::LoggedCertificate *result) const {
-  Statement statement(db_, "SELECT sct, entry, sequence FROM leaves "
+template <class Logged> typename Database<Logged>::LookupResult
+SQLiteDB<Logged>::LookupByHash(const string &hash) const {
+  Statement statement(db_, "SELECT hash FROM leaves WHERE hash = ?");
+  statement.BindBlob(0, hash);
+
+  int ret = statement.Step();
+  if (ret == SQLITE_DONE)
+    return this->NOT_FOUND;
+  CHECK_EQ(SQLITE_ROW, ret);
+
+  return this->LOOKUP_OK;
+}
+    
+template <class Logged> typename Database<Logged>::LookupResult
+SQLiteDB<Logged>::LookupByHash(const string &hash, Logged *result) const {
+  CHECK_NOTNULL(result);
+
+  Statement statement(db_, "SELECT entry, sequence FROM leaves "
                       "WHERE hash = ?");
 
   statement.BindBlob(0, hash);
 
   int ret = statement.Step();
   if (ret == SQLITE_DONE)
-    return NOT_FOUND;
+    return this->NOT_FOUND;
   CHECK_EQ(SQLITE_ROW, ret);
 
-  string sct;
-  statement.GetBlob(0, &sct);
-  CHECK(result->mutable_sct()->ParseFromString(sct));
+  string data;
+  statement.GetBlob(0, &data);
+  CHECK(result->ParseFromDatabase(data));
 
-  string entry;
-  statement.GetBlob(1, &entry);
-  CHECK(result->mutable_entry()->ParseFromString(entry));
-
-  if (statement.GetType(2) == SQLITE_NULL)
+  if (statement.GetType(1) == SQLITE_NULL)
     result->clear_sequence_number();
   else
-    result->set_sequence_number(statement.GetUInt64(2));
+    result->set_sequence_number(statement.GetUInt64(1));
 
-  result->set_certificate_sha256_hash(hash);
-
-  return LOOKUP_OK;
+  return this->LOOKUP_OK;
 }
 
-Database::LookupResult
-SQLiteDB::LookupCertificateByIndex(uint64_t sequence_number,
-                                   ct::LoggedCertificate *result) const {
-  Statement statement(db_, "SELECT sct, entry, hash FROM leaves "
+template <class Logged> typename Database<Logged>::LookupResult
+SQLiteDB<Logged>::LookupByIndex(uint64_t sequence_number,
+                                Logged *result) const {
+  Statement statement(db_, "SELECT entry, hash FROM leaves "
                       "WHERE sequence = ?");
   statement.BindUInt64(0, sequence_number);
   int ret = statement.Step();
   if (ret == SQLITE_DONE)
-    return NOT_FOUND;
+    return this->NOT_FOUND;
 
-  string sct;
-  statement.GetBlob(0, &sct);
-  result->mutable_sct()->ParseFromString(sct);
-
-  string entry;
-  statement.GetBlob(1, &entry);
-  CHECK(result->mutable_entry()->ParseFromString(entry));
+  string data;
+  statement.GetBlob(0, &data);
+  CHECK(result->ParseFromDatabase(data));
 
   string hash;
-  statement.GetBlob(2, &hash);
-  result->set_certificate_sha256_hash(hash);
+  statement.GetBlob(1, &hash);
+
+  CHECK_EQ(result->Hash(), hash);
 
   result->set_sequence_number(sequence_number);
 
-  return LOOKUP_OK;
+  return this->LOOKUP_OK;
 }
 
-std::set<string> SQLiteDB::PendingHashes() const {
+template <class Logged> std::set<string>
+SQLiteDB<Logged>::PendingHashes() const {
   std::set<string> hashes;
   Statement statement(db_, "SELECT hash FROM leaves WHERE sequence IS NULL");
 
@@ -225,7 +226,8 @@ std::set<string> SQLiteDB::PendingHashes() const {
   return hashes;
 }
 
-Database::WriteResult SQLiteDB::WriteTreeHead_(const ct::SignedTreeHead &sth) {
+template <class Logged> typename Database<Logged>::WriteResult
+SQLiteDB<Logged>::WriteTreeHead_(const ct::SignedTreeHead &sth) {
   Statement statement(db_, "INSERT INTO trees(timestamp, sth) VALUES(?, ?)");
   statement.BindUInt64(0, sth.timestamp());
 
@@ -238,26 +240,27 @@ Database::WriteResult SQLiteDB::WriteTreeHead_(const ct::SignedTreeHead &sth) {
     Statement s2(db_, "SELECT timestamp FROM trees WHERE timestamp = ?");
     s2.BindUInt64(0, sth.timestamp());
     CHECK_EQ(SQLITE_ROW, s2.Step());
-    return DUPLICATE_TREE_HEAD_TIMESTAMP;
+    return this->DUPLICATE_TREE_HEAD_TIMESTAMP;
   }
   CHECK_EQ(SQLITE_DONE, r2);
 
-  return OK;
+  return this->OK;
 }
 
-Database::LookupResult SQLiteDB::LatestTreeHead(ct::SignedTreeHead *result)
+template <class Logged> typename Database<Logged>::LookupResult
+SQLiteDB<Logged>::LatestTreeHead(ct::SignedTreeHead *result)
     const {
   Statement statement(db_, "SELECT sth FROM trees WHERE timestamp IN "
                       "(SELECT MAX(timestamp) FROM trees)");
 
   int ret = statement.Step();
   if (ret == SQLITE_DONE)
-    return NOT_FOUND;
+    return this->NOT_FOUND;
   CHECK_EQ(SQLITE_ROW, ret);
 
   string sth;
   statement.GetBlob(0, &sth);
   result->ParseFromString(sth);
 
-  return LOOKUP_OK;
+  return this->LOOKUP_OK;
 }

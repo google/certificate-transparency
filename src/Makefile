@@ -23,7 +23,7 @@ SYS_LIBS += -L /usr/local/lib
 
 CXXFLAGS = $(INCLUDE) $(CXXFLAG)
 
-all: $(LOCAL_LIBS) unit_tests client/ct server/ct-server
+all: $(LOCAL_LIBS) unit_tests client/ct server/ct-server server/blob-server
 
 .DELETE_ON_ERROR:
 
@@ -123,13 +123,13 @@ log/libcert.a: log/cert.o log/cert_checker.o log/cert_submission_handler.o
 	rm -f $@
 	ar -rcs $@ $^
 
-log/libdatabase.a: log/file_storage.o log/filesystem_op.o log/file_db.o \
-                   log/sqlite_db.o
+log/libdatabase.a: log/file_storage.o log/filesystem_op.o log/file_db_cert.o \
+                   log/sqlite_db_cert.o
 	rm -f $@
 	ar -rcs $@ $^
 
 log/liblog.a: log/log_signer.o log/frontend.o log/frontend_signer.o \
-              log/log_verifier.o log/tree_signer.o log/log_lookup.o
+              log/log_verifier.o log/tree_signer_cert.o log/log_lookup_cert.o
 	rm -f $@
 	ar -rcs $@ $^
 
@@ -137,7 +137,7 @@ log_tests: log/cert_test log/cert_checker_test \
            log/cert_submission_handler_test log/database_test \
            log/database_large_test log/file_storage_test \
            log/frontend_signer_test log/frontend_test log/log_lookup_test \
-           log/log_signer_test log/tree_signer_test
+           log/log_signer_test log/tree_signer_test log/logged_certificate_test
 
 log/cert_test: log/cert_test.o log/cert.o util/libutil.a
 	$(CXX) -o $@ $^ $(SYS_LIBS)
@@ -163,17 +163,20 @@ log/database_test: log/database_test.o log/libdatabase.a \
 	$(CXX) -o $@ $^ $(SYS_LIBS)
 
 log/file_storage_test: log/file_storage_test.o log/libdatabase.a \
-                       proto/libproto.a util/libutil.a
+                       proto/libproto.a util/libutil.a \
+                       merkletree/libmerkletree.a
 	$(CXX) -o $@ $^ $(SYS_LIBS)
 
-log/frontend_signer_test: log/frontend_signer_test.o log/frontend_signer.o \
+log/frontend_signer_test: log/frontend_signer_test.o \
+                          log/frontend_signer.o \
                           log/log_signer.o log/log_verifier.o \
                           log/test_signer.o log/libcert.a \
                           log/libdatabase.a merkletree/libmerkletree.a \
                           proto/libproto.a util/libutil.a
 	$(CXX) -o $@ $^ $(SYS_LIBS)
 
-log/frontend_test: log/frontend_test.o log/frontend.o log/frontend_signer.o \
+log/frontend_test: log/frontend_test.o log/frontend.o \
+                   log/frontend_signer.o \
                    log/log_signer.o log/log_verifier.o log/test_signer.o \
                    log/libcert.a log/libdatabase.a merkletree/libmerkletree.a \
                    proto/libproto.a util/libutil.a
@@ -189,9 +192,14 @@ log/log_signer_test: log/log_signer_test.o log/log_signer.o log/test_signer.o \
 	$(CXX) -o $@ $^ $(SYS_LIBS)
 
 log/tree_signer_test: log/tree_signer_test.o log/log_signer.o \
-                      log/test_signer.o log/tree_signer.o log/log_verifier.o \
+                      log/test_signer.o log/tree_signer_cert.o \
+                      log/log_verifier.o \
                       log/libdatabase.a merkletree/libmerkletree.a \
                       proto/libproto.a util/libutil.a
+	$(CXX) -o $@ $^ $(SYS_LIBS)
+
+log/logged_certificate_test: log/logged_certificate_test.o proto/libproto.a \
+                             util/libutil.a merkletree/libmerkletree.a
 	$(CXX) -o $@ $^ $(SYS_LIBS)
 
 # client
@@ -200,7 +208,13 @@ client/ct: client/ct.o client/client.o client/log_client.o client/ssl_client.o \
 	$(CXX) -o $@ $^ $(SYS_LIBS)
 
 # server
-server/ct-server: server/ct-server.o $(LOCAL_LIBS)
+server/ct-server: server/ct-server.o server/event.o $(LOCAL_LIBS)
+	$(CXX) -o $@ $^ $(SYS_LIBS)
+
+server/blob-server: server/blob-server.o server/event.o \
+                    server/sqlite_db_blob.o server/tree_signer_blob.o \
+                    server/log_lookup_blob.o \
+                    $(LOCAL_LIBS)
 	$(CXX) -o $@ $^ $(SYS_LIBS)
 
 test: all
@@ -209,6 +223,7 @@ test: all
 	merkletree/tree_hasher_test
 	merkletree/merkle_tree_test
 # Do not run merkletree/merkle_tree_large_test by default
+	log/logged_certificate_test
 	log/cert_test --test_certs_dir=test/testdata
 	log/cert_checker_test --test_certs_dir=test/testdata
 	log/cert_submission_handler_test --test_certs_dir=test/testdata

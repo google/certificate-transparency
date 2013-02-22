@@ -71,7 +71,7 @@
 	  <vspace blankLines='1' />
 	  MTH({d(0)}) = SHA-256(0x00 || d(0)).
 	  <vspace blankLines='1' />
-	  For n &gt; 1, let k be the largest power of two smaller than n. The Merkle Tree Hash of an n-element list D[n] is then defined recursively as
+	  For n &gt; 1, let k be the largest power of two smaller than n (i.e., k &lt; n &le; 2k). The Merkle Tree Hash of an n-element list D[n] is then defined recursively as
 	  <vspace blankLines='1' />
 	  MTH(D[n]) = SHA-256(0x01 || MTH(D[0:k]) || MTH(D[k:n])),
 	  <vspace blankLines='1' />

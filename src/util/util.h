@@ -27,5 +27,9 @@ std::string CreateTemporaryDirectory(const std::string &dir_template);
 
 uint64_t TimeInMilliseconds();
 
+// Return a non-cryptographic random string. Caller needs to ensure
+// srand() is called if needed.
+std::string RandomString(size_t min_length, size_t max_length);
+
 }  // namespace util
 #endif

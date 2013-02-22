@@ -1,3 +1,4 @@
+/* -*- indent-tabs-mode: nil -*- */
 #include <glog/logging.h>
 #include <string.h>
 #include <openssl/asn1.h>
@@ -62,7 +63,8 @@ CertChecker::CheckPreCertChain(PreCertChain *chain) const {
   // precert for its own root certificate.
   if (chain->Length() < 2 || (chain->UsesPrecertSigningCertificate() &&
                               chain->Length() < 3)) {
-    CHECK_GE(1, chain->Length()) << "Empty chain, something is completely bust";
+    CHECK_GE(1U, chain->Length())
+        << "Empty chain, something is completely bust";
     LOG(ERROR) << "CertChecker produced a precert chain with just one "
                << "certificate. Certificate DER string is:\n"
                << util::HexString(chain->LeafCert()->DerEncoding());

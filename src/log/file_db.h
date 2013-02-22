@@ -14,7 +14,7 @@ class FileStorage;
 
 // Database interface that stores certificates and tree head
 // signatures in the filesystem.
-class FileDB : public Database {
+template <class Logged> class FileDB : public Database<Logged> {
  public:
   // Reference implementation: reads the entire database on boot
   // and builds an in-memory index.
@@ -33,27 +33,29 @@ class FileDB : public Database {
   static const size_t kTimestampBytesIndexed;
 
   // Implement abstract functions, see database.h for comments.
-  virtual WriteResult
-  CreatePendingCertificateEntry_(const ct::LoggedCertificate &logged_cert);
+  virtual typename Database<Logged>::WriteResult
+  CreatePendingEntry_(const Logged &logged);
 
-  virtual WriteResult
-  AssignCertificateSequenceNumber(const std::string &certificate_sha256_hash,
-                                 uint64_t sequence_number);
+  virtual typename Database<Logged>::WriteResult
+  AssignSequenceNumber(const std::string &hash,
+                       uint64_t sequence_number);
 
-  virtual LookupResult
-  LookupCertificateByHash(const std::string &certificate_sha256_hash,
-                          ct::LoggedCertificate *result) const;
+  virtual typename Database<Logged>::LookupResult
+  LookupByHash(const std::string &hash) const;
 
-  virtual LookupResult
-  LookupCertificateByIndex(uint64_t sequence_number,
-                           ct::LoggedCertificate *result) const;
+  virtual typename Database<Logged>::LookupResult
+  LookupByHash(const std::string &hash, Logged *result) const;
+
+  virtual typename Database<Logged>::LookupResult
+  LookupByIndex(uint64_t sequence_number, Logged *result) const;
 
   virtual std::set<std::string> PendingHashes() const;
 
+  virtual typename Database<Logged>::WriteResult
+  WriteTreeHead_(const ct::SignedTreeHead &sth);
 
-  virtual WriteResult WriteTreeHead_(const ct::SignedTreeHead &sth);
-
-  virtual LookupResult LatestTreeHead(ct::SignedTreeHead *result) const;
+  virtual typename Database<Logged>::LookupResult
+  LatestTreeHead(ct::SignedTreeHead *result) const;
 
  private:
   void BuildIndex();

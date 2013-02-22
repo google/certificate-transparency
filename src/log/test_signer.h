@@ -7,7 +7,12 @@
 
 #include "log/log_signer.h"
 #include "merkletree/tree_hasher.h"
-#include "proto/ct.pb.h"
+
+namespace ct {
+
+class LoggedCertificate;
+
+}  // namespace ct
 
 // Helper class for database tests that generates test data
 // that roughly resembles real certificate data in shape and size.
@@ -94,10 +99,12 @@ class TestSigner {
   static void TestEqualTreeHeads(const ct::SignedTreeHead &sth1,
                                  const ct::SignedTreeHead &sth2);
 
+
  private:
 
   // Fill everything apart from the signature.
   void FillData(ct::LoggedCertificate *logged_cert);
+
   LogSigner *default_signer_;
   // ct::SignedCertificateTimestamp default_sct_;
   // ct::SignedTreeHead default_sth_;

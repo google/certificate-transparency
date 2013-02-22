@@ -9,6 +9,7 @@
 #include "log/frontend.h"
 #include "log/frontend_signer.h"
 #include "log/log_verifier.h"
+#include "log/logged_certificate.h"
 #include "log/sqlite_db.h"
 #include "log/test_db.h"
 #include "log/test_signer.h"
@@ -47,6 +48,9 @@ using ct::LoggedCertificate;
 using ct::SignedCertificateTimestamp;
 using std::string;
 
+typedef Database<LoggedCertificate> DB;
+typedef Frontend FE;
+
 // A slightly shorter notation for constructing hex strings from binary blobs.
 string H(const string &byte_string) {
   return util::HexString(byte_string);
@@ -60,9 +64,9 @@ template <class T> class FrontendTest : public ::testing::Test {
         verifier_(new LogVerifier(TestSigner::DefaultVerifier(),
                                   new MerkleVerifier(new Sha256Hasher()))),
         checker_(),
-        frontend_(new Frontend(new CertSubmissionHandler(&checker_),
-                               new FrontendSigner(
-                                   db(), TestSigner::DefaultSigner()))) {}
+        frontend_(new FE(new CertSubmissionHandler(&checker_),
+                         new FrontendSigner(db(),
+                                            TestSigner::DefaultSigner()))) {}
 
   void SetUp() {
     cert_dir_ = FLAGS_test_certs_dir;
@@ -84,8 +88,8 @@ template <class T> class FrontendTest : public ::testing::Test {
     CHECK(checker_.LoadTrustedCertificate(cert_dir_ + "/" + kCaCert));
   }
 
-  void CompareStats(const Frontend::FrontendStats &expected) {
-    Frontend::FrontendStats stats;
+  void CompareStats(const FE::FrontendStats &expected) {
+    FE::FrontendStats stats;
     frontend_->GetStats(&stats);
     EXPECT_EQ(expected.x509_accepted, stats.x509_accepted);
     EXPECT_EQ(expected.x509_duplicates, stats.x509_duplicates);
@@ -111,7 +115,7 @@ template <class T> class FrontendTest : public ::testing::Test {
   TestSigner test_signer_;
   LogVerifier *verifier_;
   CertChecker checker_;
-  Frontend *frontend_;
+  FE *frontend_;
   string cert_dir_;
   string leaf_pem_;
   string ca_precert_pem_;
@@ -124,21 +128,21 @@ template <class T> class FrontendTest : public ::testing::Test {
   string ca_pem_;
 };
 
-typedef testing::Types<FileDB, SQLiteDB> Databases;
+typedef testing::Types<FileDB<LoggedCertificate>,
+                       SQLiteDB<LoggedCertificate> > Databases;
 
 TYPED_TEST_CASE(FrontendTest, Databases);
 
 TYPED_TEST(FrontendTest, TestSubmitValid) {
   SignedCertificateTimestamp sct;
-  EXPECT_EQ(Frontend::NEW,
+  EXPECT_EQ(FE::NEW,
             this->frontend_->QueueEntry(ct::X509_ENTRY, this->leaf_pem_, &sct));
 
   // Look it up and expect to get the right thing back.
   LoggedCertificate logged_cert;
   Cert cert(this->leaf_pem_);
-  EXPECT_EQ(Database::LOOKUP_OK,
-            this->db()->LookupCertificateByHash(cert.Sha256Digest(),
-                                                &logged_cert));
+  EXPECT_EQ(DB::LOOKUP_OK, this->db()->LookupByHash(cert.Sha256Digest(),
+                                                    &logged_cert));
 
   EXPECT_EQ(ct::X509_ENTRY, logged_cert.entry().type());
   // Compare the leaf cert.
@@ -151,22 +155,21 @@ TYPED_TEST(FrontendTest, TestSubmitValid) {
             this->verifier_->VerifySignedCertificateTimestamp(
                 logged_cert.entry(), sct));
 
-  Frontend::FrontendStats stats(1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0);
+  FE::FrontendStats stats(1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0);
   this->CompareStats(stats);
 }
 
 TYPED_TEST(FrontendTest, TestSubmitValidWithIntermediate) {
   SignedCertificateTimestamp sct;
   string submission = this->chain_leaf_pem_ + this->intermediate_pem_;
-  EXPECT_EQ(Frontend::NEW,
+  EXPECT_EQ(FE::NEW,
             this->frontend_->QueueEntry(ct::X509_ENTRY, submission, &sct));
 
   // Look it up and expect to get the right thing back.
   LoggedCertificate logged_cert;
   Cert cert(this->chain_leaf_pem_);
-  EXPECT_EQ(Database::LOOKUP_OK,
-            this->db()->LookupCertificateByHash(cert.Sha256Digest(),
-                                                &logged_cert));
+  EXPECT_EQ(DB::LOOKUP_OK, this->db()->LookupByHash(cert.Sha256Digest(),
+                                                    &logged_cert));
 
   EXPECT_EQ(ct::X509_ENTRY, logged_cert.entry().type());
   // Compare the leaf cert.
@@ -184,23 +187,22 @@ TYPED_TEST(FrontendTest, TestSubmitValidWithIntermediate) {
   Cert cert2(this->intermediate_pem_);
   EXPECT_EQ(H(cert2.DerEncoding()),
             H(logged_cert.entry().x509_entry().certificate_chain(0)));
-  Frontend::FrontendStats stats(1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0);
+  FE::FrontendStats stats(1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0);
   this->CompareStats(stats);
 }
 
 TYPED_TEST(FrontendTest, TestSubmitDuplicate) {
   SignedCertificateTimestamp sct;
-  EXPECT_EQ(Frontend::NEW,
+  EXPECT_EQ(FE::NEW,
             this->frontend_->QueueEntry(ct::X509_ENTRY, this->leaf_pem_, NULL));
-  EXPECT_EQ(Frontend::DUPLICATE,
+  EXPECT_EQ(FE::DUPLICATE,
             this->frontend_->QueueEntry(ct::X509_ENTRY, this->leaf_pem_, &sct));
 
   // Look it up and expect to get the right thing back.
   LoggedCertificate logged_cert;
   Cert cert(this->leaf_pem_);
-  EXPECT_EQ(Database::LOOKUP_OK,
-            this->db()->LookupCertificateByHash(cert.Sha256Digest(),
-                                                &logged_cert));
+  EXPECT_EQ(DB::LOOKUP_OK, this->db()->LookupByHash(cert.Sha256Digest(),
+                                                    &logged_cert));
 
   EXPECT_EQ(ct::X509_ENTRY, logged_cert.entry().type());
   // Compare the leaf cert.
@@ -212,18 +214,18 @@ TYPED_TEST(FrontendTest, TestSubmitDuplicate) {
   EXPECT_EQ(LogVerifier::VERIFY_OK,
             this->verifier_->VerifySignedCertificateTimestamp(
                 logged_cert.entry(), sct));
-  Frontend::FrontendStats stats(1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0);
+  FE::FrontendStats stats(1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0);
   this->CompareStats(stats);
 }
 
 TYPED_TEST(FrontendTest, TestSubmitInvalidChain) {
   SignedCertificateTimestamp sct;
   // Missing intermediate.
-  EXPECT_EQ(Frontend::CERTIFICATE_VERIFY_ERROR,
+  EXPECT_EQ(FE::CERTIFICATE_VERIFY_ERROR,
             this->frontend_->QueueEntry(ct::X509_ENTRY,
                                         this->chain_leaf_pem_, &sct));
   EXPECT_FALSE(sct.has_signature());
-  Frontend::FrontendStats stats(0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0);
+  FE::FrontendStats stats(0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0);
   this->CompareStats(stats);
 }
 
@@ -232,17 +234,17 @@ TYPED_TEST(FrontendTest, TestSubmitInvalidPem) {
   string fake_cert("-----BEGIN CERTIFICATE-----\n"
                    "Iamnotavalidcert\n"
                    "-----END CERTIFICATE-----\n");
-  EXPECT_EQ(Frontend::BAD_PEM_FORMAT,
+  EXPECT_EQ(FE::BAD_PEM_FORMAT,
             this->frontend_->QueueEntry(ct::X509_ENTRY, fake_cert, &sct));
   EXPECT_FALSE(sct.has_signature());
-  Frontend::FrontendStats stats(0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0);
+  FE::FrontendStats stats(0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0);
   this->CompareStats(stats);
 }
 
 TYPED_TEST(FrontendTest, TestSubmitPrecert) {
   SignedCertificateTimestamp sct;
   string submission = this->precert_pem_;
-  EXPECT_EQ(Frontend::NEW,
+  EXPECT_EQ(FE::NEW,
             this->frontend_->QueueEntry(ct::PRECERT_ENTRY, submission, &sct));
 
   CertChain chain(this->embedded_pem_ + this->ca_pem_);
@@ -253,8 +255,7 @@ TYPED_TEST(FrontendTest, TestSubmitPrecert) {
   string hash = Sha256Hasher::Sha256Digest(
       entry.precert_entry().pre_cert().tbs_certificate());
   LoggedCertificate logged_cert;
-  EXPECT_EQ(Database::LOOKUP_OK,
-            this->db()->LookupCertificateByHash(hash, &logged_cert));
+  EXPECT_EQ(DB::LOOKUP_OK, this->db()->LookupByHash(hash, &logged_cert));
   Cert pre(this->precert_pem_);
   Cert ca(this->ca_pem_);
 
@@ -288,8 +289,7 @@ TYPED_TEST(FrontendTest, TestSubmitPrecertUsingPreCA) {
   string hash = Sha256Hasher::Sha256Digest(
       entry.precert_entry().pre_cert().tbs_certificate());
   LoggedCertificate logged_cert;
-  EXPECT_EQ(Database::LOOKUP_OK,
-            this->db()->LookupCertificateByHash(hash, &logged_cert));
+  EXPECT_EQ(DB::LOOKUP_OK, this->db()->LookupByHash(hash, &logged_cert));
   Cert pre(this->precert_with_preca_pem_);
   Cert ca_pre(this->ca_precert_pem_);
   Cert ca(this->ca_pem_);
@@ -308,7 +308,7 @@ TYPED_TEST(FrontendTest, TestSubmitPrecertUsingPreCA) {
             H(logged_cert.entry().precert_entry().precertificate_chain(0)));
   EXPECT_EQ(H(ca.DerEncoding()),
             H(logged_cert.entry().precert_entry().precertificate_chain(1)));
-  Frontend::FrontendStats stats(0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0);
+  FE::FrontendStats stats(0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0);
   this->CompareStats(stats);
 }
 

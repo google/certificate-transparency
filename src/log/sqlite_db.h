@@ -8,11 +8,14 @@
 
 class sqlite3;
 
-class SQLiteDB : public Database {
+template <class Logged> class SQLiteDB : public Database<Logged> {
  public:
   explicit SQLiteDB(const std::string &dbfile);
 
   ~SQLiteDB();
+
+  typedef typename Database<Logged>::WriteResult WriteResult;
+  typedef typename Database<Logged>::LookupResult LookupResult;
 
   // Temporary, for benchmarking. If we want to do this for real, then
   // we need to implement rollbacks for errors that occur in the middle
@@ -23,20 +26,18 @@ class SQLiteDB : public Database {
 
   void EndTransaction();
 
-  virtual WriteResult
-  CreatePendingCertificateEntry_(const ct::LoggedCertificate &logged_cert);
+  virtual WriteResult CreatePendingEntry_(const Logged &logged);
 
-  virtual WriteResult
-  AssignCertificateSequenceNumber(const std::string &pending_hash,
-                                  uint64_t sequence_number);
+  virtual WriteResult AssignSequenceNumber(const std::string &pending_hash,
+                                           uint64_t sequence_number);
 
-  virtual LookupResult
-  LookupCertificateByHash(const std::string &certificate_sha256_hash,
-                          ct::LoggedCertificate *result) const;
+  virtual LookupResult LookupByHash(const std::string &hash) const;
 
-  virtual LookupResult
-  LookupCertificateByIndex(uint64_t sequence_number,
-                           ct::LoggedCertificate *result) const;
+  virtual LookupResult LookupByHash(const std::string &hash,
+                                    Logged *result) const;
+
+  virtual LookupResult LookupByIndex(uint64_t sequence_number,
+                                     Logged *result) const;
 
   virtual std::set<std::string> PendingHashes() const;
 
@@ -47,4 +48,5 @@ class SQLiteDB : public Database {
  private:
   sqlite3 *db_;
 };
+
 #endif

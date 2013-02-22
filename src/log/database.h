@@ -8,11 +8,49 @@
 
 #include "proto/ct.pb.h"
 
+// The |Logged| class needs to provide this interface:
+// class Logged {
+//  public:
+//   // construct an empty instance
+//   LoggedBlob();
+//
+//   // The key used for storage/retrieval in the database, calculated
+//   // from the content.
+//   std::string Hash() const;
+//
+//   // The tree signer assigns a sequence number.
+//   void clear_sequence_number();
+//   void set_sequence_number(uint64_t sequence);
+//   bool has_sequence_number() const;
+//   uint64_t sequence_number() const;
+//
+//   // If the data has a timestamp associated with it, return it: any
+//   // STH including this item will have a later timestamp. Return 0 if
+//   // there is no timestamp.
+//   uint64_t timestamp() const;
+//
+//   // Serialization of contents (i.e. excluding sequence number and
+//   // hash) for storage/retrieval from the database
+//   bool SerializeForDatabase(std::string *dst) const;
+//   bool ParseFromDatabase(const std::string &src);
+//
+//   // Serialization for inclusion in the tree (i.e. this is what
+//   // clients would hash over).
+//   bool SerializeForLeaf(std::string *dst) const;
+//
+//   // Debugging.
+//   std::string DebugString() const;
+//
+//   // Fill with random content data for testing (no sequence number).
+//   void RandomForTest();
+// };
+
+
 // NOTE: This is a database interface for the log server.
 // Monitors/auditors shouldn't assume that log entries are keyed
 // uniquely by certificate hash -- it is an artefact of this
 // implementation, not a requirement of the I-D.
-class Database {
+template <class Logged> class Database {
  public:
   enum WriteResult {
     OK,
@@ -50,39 +88,36 @@ class Database {
     DLOG(FATAL) << "Transactions not supported";
   }
 
-  // Attempt to create a new entry. Fail if no certificate hash is given,
-  // or an entry with this hash already exists.
-  // The entry remains PENDING until a sequence number has been assigned,
-  // after which its status changes to LOGGED.
-  WriteResult
-  CreatePendingCertificateEntry(const ct::LoggedCertificate &logged_cert) {
-    CHECK(!logged_cert.has_sequence_number());
-    if (!logged_cert.has_certificate_sha256_hash())
-      return MISSING_CERTIFICATE_HASH;
-    return CreatePendingCertificateEntry_(logged_cert);
+  // Attempt to create a new entry. Fail if an entry with this hash
+  // already exists.  The entry remains PENDING until a sequence
+  // number has been assigned, after which its status changes to
+  // LOGGED.
+  WriteResult CreatePendingEntry(const Logged &logged) {
+    CHECK(!logged.has_sequence_number());
+    return CreatePendingEntry_(logged);
   }
   virtual WriteResult
-  CreatePendingCertificateEntry_(const ct::LoggedCertificate &logged_cert) = 0;
+  CreatePendingEntry_(const Logged &logged) = 0;
 
-  // Attempt to add a sequence number to the LoggedCertificate, thereby
-  // removing it from the list of pending entries.
-  // Fail if the entry does not exist, already has a sequence number,
-  // or an entry with this sequence number already exists (i.e.,
-  // |sequence_number| is a secondary key.
-  virtual WriteResult
-  AssignCertificateSequenceNumber(const std::string &pending_hash,
-                                  uint64_t sequence_number) = 0;
+  // Attempt to add a sequence number to the Logged, thereby removing
+  // it from the list of pending entries.  Fail if the entry does not
+  // exist, already has a sequence number, or an entry with this
+  // sequence number already exists (i.e., |sequence_number| is a
+  // secondary key.
+  virtual WriteResult AssignSequenceNumber(const std::string &pending_hash,
+                                           uint64_t sequence_number) = 0;
 
-  // Look up certificate by hash. If the entry exists, and result is not NULL,
-  // write the result. If the entry is not logged return PENDING.
-  virtual LookupResult
-  LookupCertificateByHash(const std::string &certificate_sha256_hash,
-                          ct::LoggedCertificate *result) const = 0;
+  // Look up by hash.
+  virtual LookupResult LookupByHash(const std::string &hash) const = 0;
 
-  // Look up certificate by sequence number.
-  virtual LookupResult
-  LookupCertificateByIndex(uint64_t sequence_number,
-                           ct::LoggedCertificate *result) const = 0;
+  // Look up by hash. If the entry exists write the result. If the
+  // entry is not logged return NOT_FOUND.
+  virtual LookupResult LookupByHash(const std::string &hash,
+                                    Logged *result) const = 0;
+
+  // Look up by sequence number.
+  virtual LookupResult LookupByIndex(uint64_t sequence_number,
+                                     Logged *result) const = 0;
 
   // List the hashes of all pending entries, i.e. all entries without a
   // sequence number.

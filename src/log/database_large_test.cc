@@ -10,6 +10,7 @@
 #include "log/database.h"
 #include "log/file_db.h"
 #include "log/file_storage.h"
+#include "log/logged_certificate.h"
 #include "log/sqlite_db.h"
 #include "log/test_db.h"
 #include "log/test_signer.h"
@@ -28,6 +29,8 @@ namespace {
 using ct::LoggedCertificate;
 using std::string;
 
+typedef Database<LoggedCertificate> DB;
+
 template <class T> class LargeDBTest : public ::testing::Test {
  protected:
   LargeDBTest() :
@@ -40,8 +43,7 @@ template <class T> class LargeDBTest : public ::testing::Test {
     LoggedCertificate logged_cert;
     for (int i = 0; i < entries; ++i) {
       test_signer_.CreateUniqueFakeSignature(&logged_cert);
-      EXPECT_EQ(Database::OK,
-                db()->CreatePendingCertificateEntry(logged_cert));
+      EXPECT_EQ(DB::OK, db()->CreatePendingEntry(logged_cert));
     }
   }
 
@@ -50,8 +52,7 @@ template <class T> class LargeDBTest : public ::testing::Test {
     std::set<string>::const_iterator it;
     LoggedCertificate lookup_cert;
     for (it = pending_hashes.begin(); it != pending_hashes.end(); ++it) {
-      EXPECT_EQ(Database::LOOKUP_OK,
-                this->db()->LookupCertificateByHash(*it, &lookup_cert));
+      EXPECT_EQ(DB::LOOKUP_OK, this->db()->LookupByHash(*it, &lookup_cert));
     }
     return pending_hashes.size();
   }
@@ -62,7 +63,8 @@ template <class T> class LargeDBTest : public ::testing::Test {
   TestSigner test_signer_;
 };
 
-typedef testing::Types<FileDB, SQLiteDB> Databases;
+typedef testing::Types<FileDB<LoggedCertificate>,
+                       SQLiteDB<LoggedCertificate> > Databases;
 
 TYPED_TEST_CASE(LargeDBTest, Databases);
 
