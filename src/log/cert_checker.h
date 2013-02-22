@@ -40,24 +40,25 @@ class CertChecker {
   // We do not check that the certificates are otherwise valid. In particular,
   // we accept certificates that have expired, are not yet valid, or have
   // critical extensions we do not recognize.
-  CertVerifyResult CheckCertChain(const CertChain &chain) const;
+  // If verification succeeds, add the last self-signed cert to the chain
+  // (or replace with store version) - the resulting chain is guaranteed to
+  // contain at least one certificate. (Having exactly one certificate implies
+  // someone is trying to log a root cert, which is fine though unexciting.)
+  CertVerifyResult CheckCertChain(CertChain *chain) const;
 
   // Check that:
-  // (1) The leaf certificate contains the critical poison extension.
-  // (2) The next certificate in the chain is CA:FALSE and contains
-  //     the Extended Key Usage extension for CT.
-  // (3) The leaf is correctly signed by the second certificate.
-  // (4) The chain starting with the second certificate is valid (precerts are
-  //     coming directly from CAs, so we can safely reject invalid submissions).
-  // (5) The last certificate is issued by a certificate in our trusted store.
-  CertVerifyResult CheckPreCertChain(const PreCertChain &chain) const;
+  // (1) The PreCertChain is well-formed according to I-D rules.
+  // (2) Each certificate is correctly signed by the next one in the chain; and
+  // (3) The last certificate is issued by a certificate in our trusted store.
+  // If verification succeeds, add the last self-signed cert to the chain
+  // (or replace with store version) - the resulting chain is guaranteed to
+  // contain at least two certificates (three if there is a Precert Signing
+  // Certificate);
+  CertVerifyResult CheckPreCertChain(PreCertChain *chain) const;
 
  private:
   // Look issuer up from the trusted store, and verify signature.
-  CertVerifyResult VerifyTrustedCaSignature(const Cert &subject) const;
-  // Verify the certificate chain according to standard rules, except
-  // start verification from the ca_precert.
-  CertVerifyResult VerifyPreCaChain(const PreCertChain &chain) const;
+  CertVerifyResult GetTrustedCa(CertChain *chain) const;
 
   X509_STORE *trusted_;
 };

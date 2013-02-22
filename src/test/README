@@ -37,5 +37,5 @@ c) Retrieving audit proofs for those SCTs from the log server.
 
 In the end, the tests should report something like this:
 
-PASSED 28 tests
+PASSED 38 tests
 FAILED 0 tests

@@ -26,6 +26,10 @@ class TestSigner {
 
   static void SetDefaults(ct::SignedCertificateTimestamp *sct);
 
+  static void SetPrecertDefaults(ct::LogEntry *entry);
+
+  static void SetPrecertDefaults(ct::SignedCertificateTimestamp *sct);
+
   // For KAT tests: a logged cert with a valid hash and signature.
   // TODO(ekasper): add an intermediate for better coverage.
   static void SetDefaults(ct::LoggedCertificate *logged_cert);

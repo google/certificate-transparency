@@ -113,16 +113,22 @@ int SSLClient::VerifyCallback(X509_STORE_CTX *ctx, void *arg) {
   // If verify passed then surely we must have a cert.
   CHECK_NOTNULL(ctx->cert);
 
-  CertChain chain;
-  // ctx->untrusted is the chain of X509s, as passed in.
-  // Let's hope OpenSSL keeps them in the order they were passed in.
-  STACK_OF(X509) *sk = ctx->untrusted;
-  CHECK_NOTNULL(sk);
-  int chain_size = sk_X509_num(sk);
+  CertChain chain, input_chain;
+  // ctx->untrusted is the input chain.
+  // ctx->chain is the chain of X509s that OpenSSL constructed and verified.
+  CHECK_NOTNULL(ctx->chain);
+  int chain_size = sk_X509_num(ctx->chain);
   // Should contain at least the leaf.
   CHECK_GE(chain_size, 1);
   for (int i = 0; i < chain_size; ++i)
-    chain.AddCert(new Cert(sk_X509_value(sk, i)));
+    chain.AddCert(new Cert(sk_X509_value(ctx->chain, i)));
+
+  CHECK_NOTNULL(ctx->untrusted);
+  chain_size = sk_X509_num(ctx->untrusted);
+  // Should contain at least the leaf.
+  CHECK_GE(chain_size, 1);
+  for (int i = 0; i < chain_size; ++i)
+    input_chain.AddCert(new Cert(sk_X509_value(ctx->untrusted, i)));
 
   string serialized_scts;
   // First, see if the cert has an embedded proof.
@@ -135,44 +141,45 @@ int SSLClient::VerifyCallback(X509_STORE_CTX *ctx, void *arg) {
     }
     // Else look for the proof in a superfluous cert.
     // Let's assume the superfluous cert is always last in the chain.
-  } else if (chain.Length() > 1 && chain.LastCert()->HasExtension(
+  } else if (input_chain.Length() > 1 && input_chain.LastCert()->HasExtension(
       Cert::kProofExtensionOID)) {
     LOG(INFO) << "Proof extension found in certificate, verifying...";
-    if(!chain.LastCert()->OctetStringExtensionData(
+    if(!input_chain.LastCert()->OctetStringExtensionData(
            Cert::kProofExtensionOID, &serialized_scts)) {
       LOG(ERROR) << "Could not parse extension data";
     }
-    chain.RemoveCert();
   }
 
-  LogEntry entry;
-  CertSubmissionHandler::X509CertToEntry(*chain.LeafCert(), &entry);
-  args->ct_data.mutable_reconstructed_entry()->CopyFrom(entry);
-  args->ct_data.set_certificate_sha256_hash(
-      Sha256Hasher::Sha256Digest(Serializer::LeafCertificate(entry)));
-
   if (!serialized_scts.empty()) {
-    // Only writes the checkpoint if verification succeeds.
-    // Note: an optimized client could only verify the signature if it's
-    // a certificate it hasn't seen before.
-    SignedCertificateTimestampList sct_list;
-    if (Deserializer::DeserializeSCTList(serialized_scts, &sct_list) !=
-        Deserializer::OK) {
-      LOG(ERROR) << "Failed to parse SCT list.";
+    LogEntry entry;
+    if (!CertSubmissionHandler::X509ChainToEntry(chain, &entry)) {
+      LOG(ERROR) << "Failed to reconstruct log entry input from chain";
     } else {
-      LOG(INFO) << "Received " << sct_list.sct_list_size() << " SCTs";
-      for (int i = 0; i < sct_list.sct_list_size(); ++i) {
-        LogVerifier::VerifyResult result = VerifySCT(sct_list.sct_list(i),
-                                                     verifier, &args->ct_data);
+      args->ct_data.mutable_reconstructed_entry()->CopyFrom(entry);
+      args->ct_data.set_certificate_sha256_hash(
+          Sha256Hasher::Sha256Digest(Serializer::LeafCertificate(entry)));
+      // Only writes the checkpoint if verification succeeds.
+      // Note: an optimized client could only verify the signature if it's
+      // a certificate it hasn't seen before.
+      SignedCertificateTimestampList sct_list;
+      if (Deserializer::DeserializeSCTList(serialized_scts, &sct_list) !=
+          Deserializer::OK) {
+        LOG(ERROR) << "Failed to parse SCT list.";
+      } else {
+        LOG(INFO) << "Received " << sct_list.sct_list_size() << " SCTs";
+        for (int i = 0; i < sct_list.sct_list_size(); ++i) {
+          LogVerifier::VerifyResult result =
+              VerifySCT(sct_list.sct_list(i), verifier, &args->ct_data);
 
-        if (result == LogVerifier::VERIFY_OK) {
-          LOG(INFO) << "SCT number " << i + 1 << " verified";
-          args->sct_verified = true;
-        } else {
-          LOG(ERROR) << "Verification for SCT number " << i + 1 << " failed: "
-                     << LogVerifier::VerifyResultString(result);
-        }
-      }  // end for
+          if (result == LogVerifier::VERIFY_OK) {
+            LOG(INFO) << "SCT number " << i + 1 << " verified";
+            args->sct_verified = true;
+          } else {
+            LOG(ERROR) << "Verification for SCT number " << i + 1 << " failed: "
+                       << LogVerifier::VerifyResultString(result);
+          }
+        } // end for
+      }
     }
   }  // end if (!serialized_scts.empty())
 

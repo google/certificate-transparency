@@ -19,12 +19,14 @@ static const char kCaCert[] = "ca-cert.pem";
 static const char kLeafCert[] = "test-cert.pem";
 // Issued by ca.pem
 static const char kCaPreCert[] = "ca-pre-cert.pem";
+// Issued by ca-cert.pem
+static const char kPreCert[] = "test-embedded-pre-cert.pem";
 // Issued by ca-pre-cert.pem
-static const char kPreCert[] = "test-pre-cert.pem";
+static const char kPreWithPreCaCert[] = "test-embedded-with-preca-pre-cert.pem";
 // Issued by ca-cert.pem
 static const char kIntermediateCert[] = "intermediate-cert.pem";
 // Issued by intermediate-cert.pem
-static const char kChainLeafCert[] = "test2-cert.pem";
+static const char kChainLeafCert[] = "test-intermediate-cert.pem";
 
 namespace {
 
@@ -37,6 +39,7 @@ class CertSubmissionHandlerTest : public ::testing::Test {
   string leaf_;
   string ca_precert_;
   string precert_;
+  string precert_with_preca_;
   string intermediate_;
   string chain_leaf_;
   string cert_dir_;
@@ -56,10 +59,12 @@ class CertSubmissionHandlerTest : public ::testing::Test {
     CHECK(util::ReadBinaryFile(cert_dir_ + "/" + kLeafCert, &leaf_));
     CHECK(util::ReadBinaryFile(cert_dir_ + "/" + kCaPreCert, &ca_precert_));
     CHECK(util::ReadBinaryFile(cert_dir_ + "/" + kPreCert, &precert_));
+    CHECK(util::ReadBinaryFile(cert_dir_ + "/" + kPreWithPreCaCert,
+                               &precert_with_preca_));
     CHECK(util::ReadBinaryFile(cert_dir_ + "/" + kIntermediateCert,
-                                     &intermediate_));
+                               &intermediate_));
     CHECK(util::ReadBinaryFile(cert_dir_ + "/" + kChainLeafCert,
-                                     &chain_leaf_));
+                               &chain_leaf_));
   }
 
   ~CertSubmissionHandlerTest() {
@@ -77,7 +82,8 @@ TEST_F(CertSubmissionHandlerTest, SubmitCert) {
   EXPECT_TRUE(entry.has_x509_entry());
   EXPECT_FALSE(entry.has_precert_entry());
   EXPECT_TRUE(entry.x509_entry().has_leaf_certificate());
-  EXPECT_EQ(0, entry.x509_entry().certificate_chain_size());
+  // Chain should include the root.
+  EXPECT_EQ(1, entry.x509_entry().certificate_chain_size());
 }
 
 TEST_F(CertSubmissionHandlerTest, SubmitEmptyCert) {
@@ -103,7 +109,7 @@ TEST_F(CertSubmissionHandlerTest, SubmitChain) {
   EXPECT_EQ(CertSubmissionHandler::OK,
             handler_->ProcessSubmission(submit, &entry));
   EXPECT_TRUE(entry.x509_entry().has_leaf_certificate());
-  EXPECT_EQ(1, entry.x509_entry().certificate_chain_size());
+  EXPECT_EQ(2, entry.x509_entry().certificate_chain_size());
 }
 
 TEST_F(CertSubmissionHandlerTest, SubmitPartialChain) {
@@ -115,7 +121,7 @@ TEST_F(CertSubmissionHandlerTest, SubmitPartialChain) {
 }
 
 TEST_F(CertSubmissionHandlerTest, SubmitInvalidChain) {
-  string invalid_submit = ca_;
+  string invalid_submit = leaf_;
   invalid_submit.append(leaf_);
   LogEntry entry;
   entry.set_type(ct::X509_ENTRY);
@@ -141,32 +147,42 @@ TEST_F(CertSubmissionHandlerTest, SubmitCertChainAsPreCert) {
 }
 
 TEST_F(CertSubmissionHandlerTest, SubmitPreCertChain) {
-  string submit = precert_ + ca_precert_;
+  string submit = precert_ + ca_;
   LogEntry entry;
   entry.set_type(ct::PRECERT_ENTRY);
   EXPECT_EQ(CertSubmissionHandler::OK,
             handler_->ProcessSubmission(submit, &entry));
   EXPECT_TRUE(entry.has_precert_entry());
   EXPECT_FALSE(entry.has_x509_entry());
-  EXPECT_TRUE(entry.precert_entry().has_tbs_certificate());
-  // |intermediates| is the entire precert chain (excluding root).
+  EXPECT_TRUE(entry.precert_entry().has_pre_certificate());
+  EXPECT_TRUE(entry.precert_entry().pre_cert().has_issuer_key_hash());
+  EXPECT_TRUE(entry.precert_entry().pre_cert().has_tbs_certificate());
+
+  // CA cert
+  EXPECT_EQ(1, entry.precert_entry().precertificate_chain_size());
+}
+
+TEST_F(CertSubmissionHandlerTest, SubmitPreCertChainUsingPreCA) {
+  string submit = precert_with_preca_ + ca_precert_;
+  LogEntry entry;
+  entry.set_type(ct::PRECERT_ENTRY);
+  EXPECT_EQ(CertSubmissionHandler::OK,
+            handler_->ProcessSubmission(submit, &entry));
+  EXPECT_TRUE(entry.has_precert_entry());
+  EXPECT_FALSE(entry.has_x509_entry());
+  EXPECT_TRUE(entry.precert_entry().has_pre_certificate());
+  EXPECT_TRUE(entry.precert_entry().pre_cert().has_issuer_key_hash());
+  EXPECT_TRUE(entry.precert_entry().pre_cert().has_tbs_certificate());
+
+  // Precert Signing Certificate + CA cert
   EXPECT_EQ(2, entry.precert_entry().precertificate_chain_size());
 }
 
 TEST_F(CertSubmissionHandlerTest, SubmitInvalidPreCertChain) {
-  // In wrong order.
-  string submit = ca_precert_ + precert_;
+  // Missing issuer.
+  string submit = precert_with_preca_;
   LogEntry entry;
   entry.set_type(ct::PRECERT_ENTRY);
-  EXPECT_NE(CertSubmissionHandler::OK,
-            handler_->ProcessSubmission(submit, &entry));
-}
-
-TEST_F(CertSubmissionHandlerTest, SubmitPreCertChainAsCertChain) {
-  string submit = precert_ + ca_precert_;
-  LogEntry entry;
-  entry.set_type(ct::X509_ENTRY);
-  // This should fail since ca_precert_ is not a CA cert (CA:false).
   EXPECT_NE(CertSubmissionHandler::OK,
             handler_->ProcessSubmission(submit, &entry));
 }

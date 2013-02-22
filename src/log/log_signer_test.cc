@@ -58,7 +58,7 @@ TEST_F(LogSignerTest, KeyIDKatTest) {
   EXPECT_EQ(verifier_->KeyID(), default_sct.id().key_id());
 }
 
-TEST_F(LogSignerTest, VerifySCTKatTest) {
+TEST_F(LogSignerTest, VerifyCertSCTKatTest) {
   LogEntry default_entry;
   TestSigner::SetDefaults(&default_entry);
 
@@ -70,9 +70,29 @@ TEST_F(LogSignerTest, VerifySCTKatTest) {
 
   CHECK_EQ(default_entry.type(), ct::X509_ENTRY);
   EXPECT_EQ(LogSigVerifier::OK,
-            verifier_->VerifyV1SCTSignature(
-                default_sct.timestamp(), default_entry.type(),
+            verifier_->VerifyV1CertSCTSignature(
+                default_sct.timestamp(),
                 default_entry.x509_entry().leaf_certificate(),
+                default_sct.extension(),
+                SerializedSignature(default_sct.signature())));
+}
+
+TEST_F(LogSignerTest, VerifyPrecertSCTKatTest) {
+  LogEntry default_entry;
+  TestSigner::SetPrecertDefaults(&default_entry);
+
+  SignedCertificateTimestamp default_sct;
+  TestSigner::SetPrecertDefaults(&default_sct);
+
+  EXPECT_EQ(LogSigVerifier::OK,
+            verifier_->VerifySCTSignature(default_entry, default_sct));
+
+  CHECK_EQ(default_entry.type(), ct::PRECERT_ENTRY);
+  EXPECT_EQ(LogSigVerifier::OK,
+            verifier_->VerifyV1PrecertSCTSignature(
+                default_sct.timestamp(),
+                default_entry.precert_entry().pre_cert().issuer_key_hash(),
+                default_entry.precert_entry().pre_cert().tbs_certificate(),
                 default_sct.extension(),
                 SerializedSignature(default_sct.signature())));
 }
@@ -90,7 +110,7 @@ TEST_F(LogSignerTest, VerifySTHKatTest) {
                 SerializedSignature(default_sth.signature())));
 }
 
-TEST_F(LogSignerTest, SignAndVerifySCT) {
+TEST_F(LogSignerTest, SignAndVerifyCertSCT) {
   LogEntry default_entry;
   TestSigner::SetDefaults(&default_entry);
   SignedCertificateTimestamp default_sct, sct;
@@ -118,7 +138,7 @@ TEST_F(LogSignerTest, SignAndVerifySCT) {
   string serialized_sig;
   EXPECT_EQ(LogSigner::OK,
             signer_->SignV1CertificateTimestamp(
-                default_sct.timestamp(), default_entry.type(),
+                default_sct.timestamp(),
                 default_entry.x509_entry().leaf_certificate(),
                 default_sct.extension(),
                 &serialized_sig));
@@ -126,11 +146,56 @@ TEST_F(LogSignerTest, SignAndVerifySCT) {
   string default_serialized_sig = SerializedSignature(default_sct.signature());
   EXPECT_NE(H(default_serialized_sig), H(serialized_sig));
   EXPECT_EQ(LogSigVerifier::OK,
-            verifier_->VerifyV1SCTSignature(
-                default_sct.timestamp(), default_entry.type(),
+            verifier_->VerifyV1CertSCTSignature(
+                default_sct.timestamp(),
                 default_entry.x509_entry().leaf_certificate(),
                 default_sct.extension(),
-                default_serialized_sig));
+                serialized_sig));
+}
+
+TEST_F(LogSignerTest, SignAndVerifyPrecertSCT) {
+  LogEntry default_entry;
+  TestSigner::SetPrecertDefaults(&default_entry);
+  SignedCertificateTimestamp default_sct, sct;
+  TestSigner::SetPrecertDefaults(&default_sct);
+  sct.CopyFrom(default_sct);
+  sct.clear_signature();
+  ASSERT_FALSE(sct.has_signature());
+
+  EXPECT_EQ(LogSigner::OK,
+            signer_->SignCertificateTimestamp(default_entry, &sct));
+  EXPECT_TRUE(sct.has_signature());
+  EXPECT_EQ(default_sct.signature().hash_algorithm(),
+            sct.signature().hash_algorithm());
+  EXPECT_EQ(default_sct.signature().sig_algorithm(),
+            sct.signature().sig_algorithm());
+  // We should get a fresh signature.
+  EXPECT_NE(H(default_sct.signature().signature()),
+            H(sct.signature().signature()));
+  // But it should still be valid.
+  EXPECT_EQ(LogSigVerifier::OK,
+            verifier_->VerifySCTSignature(default_entry, sct));
+
+  // The second version.
+  CHECK_EQ(default_entry.type(), ct::PRECERT_ENTRY);
+  string serialized_sig;
+  EXPECT_EQ(LogSigner::OK,
+            signer_->SignV1PrecertificateTimestamp(
+                default_sct.timestamp(),
+                default_entry.precert_entry().pre_cert().issuer_key_hash(),
+                default_entry.precert_entry().pre_cert().tbs_certificate(),
+                default_sct.extension(),
+                &serialized_sig));
+
+  string default_serialized_sig = SerializedSignature(default_sct.signature());
+  EXPECT_NE(H(default_serialized_sig), H(serialized_sig));
+  EXPECT_EQ(LogSigVerifier::OK,
+            verifier_->VerifyV1PrecertSCTSignature(
+                default_sct.timestamp(),
+                default_entry.precert_entry().pre_cert().issuer_key_hash(),
+                default_entry.precert_entry().pre_cert().tbs_certificate(),
+                default_sct.extension(),
+                serialized_sig));
 }
 
 TEST_F(LogSignerTest, SignAndVerifySTH) {
@@ -167,7 +232,7 @@ TEST_F(LogSignerTest, SignAndVerifySTH) {
                 default_sth.root_hash(), default_serialized_sig));
 }
 
-TEST_F(LogSignerTest, SignAndVerifySCTApiCrossCheck) {
+TEST_F(LogSignerTest, SignAndVerifyCertSCTApiCrossCheck) {
   LogEntry default_entry;
   TestSigner::SetDefaults(&default_entry);
   SignedCertificateTimestamp default_sct, sct;
@@ -186,8 +251,8 @@ TEST_F(LogSignerTest, SignAndVerifySCTApiCrossCheck) {
 
   CHECK_EQ(default_entry.type(), ct::X509_ENTRY);
   EXPECT_EQ(LogSigVerifier::OK,
-            verifier_->VerifyV1SCTSignature(
-                default_sct.timestamp(), default_entry.type(),
+            verifier_->VerifyV1CertSCTSignature(
+                default_sct.timestamp(),
                 default_entry.x509_entry().leaf_certificate(),
                 default_sct.extension(), serialized_sig));
 
@@ -195,8 +260,51 @@ TEST_F(LogSignerTest, SignAndVerifySCTApiCrossCheck) {
   serialized_sig.clear();
   EXPECT_EQ(LogSigner::OK,
             signer_->SignV1CertificateTimestamp(
-                default_sct.timestamp(), default_entry.type(),
+                default_sct.timestamp(),
                 default_entry.x509_entry().leaf_certificate(),
+                default_sct.extension(), &serialized_sig));
+
+  // Deserialize and verify.
+  sct.clear_signature();
+  EXPECT_EQ(Deserializer::OK,
+            Deserializer::DeserializeDigitallySigned(serialized_sig,
+                                                     sct.mutable_signature()));
+  EXPECT_EQ(LogSigVerifier::OK,
+            verifier_->VerifySCTSignature(default_entry, sct));
+}
+
+TEST_F(LogSignerTest, SignAndVerifyPrecertSCTApiCrossCheck) {
+  LogEntry default_entry;
+  TestSigner::SetPrecertDefaults(&default_entry);
+  SignedCertificateTimestamp default_sct, sct;
+  TestSigner::SetPrecertDefaults(&default_sct);
+  sct.CopyFrom(default_sct);
+  sct.clear_signature();
+
+  EXPECT_EQ(LogSigner::OK,
+            signer_->SignCertificateTimestamp(default_entry, &sct));
+
+  // Serialize and verify.
+  string serialized_sig;
+  EXPECT_EQ(Serializer::OK,
+            Serializer::SerializeDigitallySigned(sct.signature(),
+                                                 &serialized_sig));
+
+  CHECK_EQ(default_entry.type(), ct::PRECERT_ENTRY);
+  EXPECT_EQ(LogSigVerifier::OK,
+            verifier_->VerifyV1PrecertSCTSignature(
+                default_sct.timestamp(),
+                default_entry.precert_entry().pre_cert().issuer_key_hash(),
+                default_entry.precert_entry().pre_cert().tbs_certificate(),
+                default_sct.extension(), serialized_sig));
+
+  // The second version.
+  serialized_sig.clear();
+  EXPECT_EQ(LogSigner::OK,
+            signer_->SignV1PrecertificateTimestamp(
+                default_sct.timestamp(),
+                default_entry.precert_entry().pre_cert().issuer_key_hash(),
+                default_entry.precert_entry().pre_cert().tbs_certificate(),
                 default_sct.extension(), &serialized_sig));
 
   // Deserialize and verify.
@@ -255,12 +363,6 @@ TEST_F(LogSignerTest, SignInvalidType) {
   string serialized_sig;
   EXPECT_EQ(LogSigner::INVALID_ENTRY_TYPE, signer_->SignCertificateTimestamp(
       entry, &sct));
-
-  CHECK_EQ(default_entry.type(), ct::X509_ENTRY);
-  EXPECT_EQ(LogSigner::INVALID_ENTRY_TYPE, signer_->SignV1CertificateTimestamp(
-      default_sct.timestamp(), ct::UNKNOWN_ENTRY_TYPE,
-      default_entry.x509_entry().leaf_certificate(),
-      default_sct.extension(), &serialized_sig));
 }
 
 TEST_F(LogSignerTest, SignEmptyCert) {
@@ -284,8 +386,61 @@ TEST_F(LogSignerTest, SignEmptyCert) {
   string empty_cert;
   EXPECT_EQ(LogSigner::EMPTY_CERTIFICATE,
             signer_->SignV1CertificateTimestamp(
-                default_sct.timestamp(), default_entry.type(),
+                default_sct.timestamp(), empty_cert,
+                default_sct.extension(), &serialized_sig));
+}
+
+TEST_F(LogSignerTest, SignEmptyPreCert) {
+  LogEntry default_entry;
+  TestSigner::SetPrecertDefaults(&default_entry);
+
+  CHECK_EQ(ct::PRECERT_ENTRY, default_entry.type());
+  LogEntry entry;
+  entry.CopyFrom(default_entry);
+  entry.mutable_precert_entry()->mutable_pre_cert()->clear_tbs_certificate();
+
+  SignedCertificateTimestamp default_sct, sct;
+  TestSigner::SetPrecertDefaults(&default_sct);
+  sct.CopyFrom(default_sct);
+  sct.clear_signature();
+
+  EXPECT_EQ(LogSigner::EMPTY_CERTIFICATE,
+            signer_->SignCertificateTimestamp(entry, &sct));
+
+  string serialized_sig;
+  string empty_cert;
+  EXPECT_EQ(LogSigner::EMPTY_CERTIFICATE,
+            signer_->SignV1PrecertificateTimestamp(
+                default_sct.timestamp(),
+                default_entry.precert_entry().pre_cert().issuer_key_hash(),
                 empty_cert, default_sct.extension(), &serialized_sig));
+}
+
+TEST_F(LogSignerTest, SignInvalidIssuerKeyHash) {
+  LogEntry default_entry;
+  TestSigner::SetPrecertDefaults(&default_entry);
+
+  CHECK_EQ(ct::PRECERT_ENTRY, default_entry.type());
+  LogEntry entry;
+  entry.CopyFrom(default_entry);
+  entry.mutable_precert_entry()->mutable_pre_cert()->clear_issuer_key_hash();
+
+  SignedCertificateTimestamp default_sct, sct;
+  TestSigner::SetPrecertDefaults(&default_sct);
+  sct.CopyFrom(default_sct);
+  sct.clear_signature();
+
+  EXPECT_EQ(LogSigner::INVALID_HASH_LENGTH,
+            signer_->SignCertificateTimestamp(entry, &sct));
+
+  string serialized_sig;
+  string bad_hash("too short");
+  EXPECT_EQ(LogSigner::INVALID_HASH_LENGTH,
+            signer_->SignV1PrecertificateTimestamp(
+                default_sct.timestamp(),
+                bad_hash,
+                default_entry.precert_entry().pre_cert().tbs_certificate(),
+                default_sct.extension(), &serialized_sig));
 }
 
 TEST_F(LogSignerTest, SignBadRootHash) {
@@ -304,7 +459,7 @@ TEST_F(LogSignerTest, SignBadRootHash) {
                                     &serialized_sig));
 }
 
-TEST_F(LogSignerTest, VerifyChangeSCTTimestamp) {
+TEST_F(LogSignerTest, VerifyChangeCertSCTTimestamp) {
   LogEntry default_entry;
   TestSigner::SetDefaults(&default_entry);
   SignedCertificateTimestamp default_sct, sct;
@@ -321,16 +476,49 @@ TEST_F(LogSignerTest, VerifyChangeSCTTimestamp) {
 
   CHECK_EQ(ct::X509_ENTRY, default_entry.type());
   EXPECT_EQ(LogSigVerifier::OK,
-            verifier_->VerifyV1SCTSignature(
-                default_sct.timestamp(), default_entry.type(),
+            verifier_->VerifyV1CertSCTSignature(
+                default_sct.timestamp(),
                 default_entry.x509_entry().leaf_certificate(),
                 default_sct.extension(),
                 SerializedSignature(default_sct.signature())));
 
   EXPECT_EQ(LogSigVerifier::INVALID_SIGNATURE,
-            verifier_->VerifyV1SCTSignature(
-                new_timestamp, default_entry.type(),
+            verifier_->VerifyV1CertSCTSignature(
+                new_timestamp,
                 default_entry.x509_entry().leaf_certificate(),
+                default_sct.extension(),
+                SerializedSignature(default_sct.signature())));
+}
+
+TEST_F(LogSignerTest, VerifyChangePrecertSCTTimestamp) {
+  LogEntry default_entry;
+  TestSigner::SetPrecertDefaults(&default_entry);
+  SignedCertificateTimestamp default_sct, sct;
+  TestSigner::SetPrecertDefaults(&default_sct);
+  sct.CopyFrom(default_sct);
+  EXPECT_EQ(LogSigVerifier::OK,
+            verifier_->VerifySCTSignature(default_entry, sct));
+
+  uint64_t new_timestamp = default_sct.timestamp() + 1000;
+
+  sct.set_timestamp(new_timestamp);
+  EXPECT_EQ(LogSigVerifier::INVALID_SIGNATURE,
+            verifier_->VerifySCTSignature(default_entry, sct));
+
+  CHECK_EQ(ct::PRECERT_ENTRY, default_entry.type());
+  EXPECT_EQ(LogSigVerifier::OK,
+            verifier_->VerifyV1PrecertSCTSignature(
+                default_sct.timestamp(),
+                default_entry.precert_entry().pre_cert().issuer_key_hash(),
+                default_entry.precert_entry().pre_cert().tbs_certificate(),
+                default_sct.extension(),
+                SerializedSignature(default_sct.signature())));
+
+  EXPECT_EQ(LogSigVerifier::INVALID_SIGNATURE,
+            verifier_->VerifyV1PrecertSCTSignature(
+                new_timestamp,
+                default_entry.precert_entry().pre_cert().issuer_key_hash(),
+                default_entry.precert_entry().pre_cert().tbs_certificate(),
                 default_sct.extension(),
                 SerializedSignature(default_sct.signature())));
 }
@@ -359,40 +547,6 @@ TEST_F(LogSignerTest, VerifyChangeSTHTimestamp) {
                 SerializedSignature(default_sth.signature())));
 }
 
-TEST_F(LogSignerTest, VerifyChangeType) {
-  LogEntry default_entry;
-  TestSigner::SetDefaults(&default_entry);
-  SignedCertificateTimestamp default_sct, sct;
-  TestSigner::SetDefaults(&default_sct);
-  sct.CopyFrom(default_sct);
-  EXPECT_EQ(LogSigVerifier::OK,
-            verifier_->VerifySCTSignature(default_entry, sct));
-
-  CHECK_EQ(ct::X509_ENTRY, default_entry.type());
-
-  LogEntry entry;
-  entry.set_type(ct::PRECERT_ENTRY);
-  entry.mutable_precert_entry()->set_tbs_certificate(
-      default_entry.x509_entry().leaf_certificate());
-  EXPECT_EQ(LogSigVerifier::INVALID_SIGNATURE,
-            verifier_->VerifySCTSignature(entry, sct));
-
-  EXPECT_EQ(LogSigVerifier::OK,
-            verifier_->VerifyV1SCTSignature(
-                default_sct.timestamp(), default_entry.type(),
-                default_entry.x509_entry().leaf_certificate(),
-                default_sct.extension(),
-                SerializedSignature(default_sct.signature())));
-
-
-  EXPECT_EQ(LogSigVerifier::INVALID_SIGNATURE,
-            verifier_->VerifyV1SCTSignature(
-                default_sct.timestamp(), ct::PRECERT_ENTRY,
-                default_entry.x509_entry().leaf_certificate(),
-                default_sct.extension(),
-                SerializedSignature(default_sct.signature())));
-}
-
 TEST_F(LogSignerTest, VerifyChangeCert) {
   LogEntry default_entry;
   TestSigner::SetDefaults(&default_entry);
@@ -418,19 +572,100 @@ TEST_F(LogSignerTest, VerifyChangeCert) {
             verifier_->VerifySCTSignature(entry, sct));
 
   EXPECT_EQ(LogSigVerifier::OK,
-            verifier_->VerifyV1SCTSignature(
-                default_sct.timestamp(), default_entry.type(),
+            verifier_->VerifyV1CertSCTSignature(
+                default_sct.timestamp(),
                 default_entry.x509_entry().leaf_certificate(),
                 default_sct.extension(),
                 SerializedSignature(default_sct.signature())));
   EXPECT_EQ(LogSigVerifier::INVALID_SIGNATURE,
-            verifier_->VerifyV1SCTSignature(
-                default_sct.timestamp(), default_entry.type(),
+            verifier_->VerifyV1CertSCTSignature(
+                default_sct.timestamp(),
                 new_cert, default_sct.extension(),
                 SerializedSignature(default_sct.signature())));
 }
 
-TEST_F(LogSignerTest, VerifyChangeExtensions) {
+TEST_F(LogSignerTest, VerifyChangePrecert) {
+  LogEntry default_entry;
+  TestSigner::SetPrecertDefaults(&default_entry);
+  SignedCertificateTimestamp default_sct, sct, sct2;
+  TestSigner::SetPrecertDefaults(&default_sct);
+  sct.CopyFrom(default_sct);
+  EXPECT_EQ(LogSigVerifier::OK,
+            verifier_->VerifySCTSignature(default_entry, sct));
+
+  CHECK_EQ(ct::PRECERT_ENTRY, default_entry.type());
+  LogEntry entry;
+  entry.CopyFrom(default_entry);
+  string new_cert = test_signer_.UniqueFakeCertBytestring();
+  entry.mutable_precert_entry()->mutable_pre_cert()->
+      set_tbs_certificate(new_cert);
+
+  // Check that we can successfully sign and verify the new sct.
+  sct2.CopyFrom(sct);
+  EXPECT_EQ(LogSigner::OK, signer_->SignCertificateTimestamp(entry, &sct2));
+  EXPECT_EQ(LogSigVerifier::OK, verifier_->VerifySCTSignature(entry, sct2));
+
+  // We should not be able to verify the new cert with the old signature.
+  EXPECT_EQ(LogSigVerifier::INVALID_SIGNATURE,
+            verifier_->VerifySCTSignature(entry, sct));
+
+  EXPECT_EQ(LogSigVerifier::OK,
+            verifier_->VerifyV1PrecertSCTSignature(
+                default_sct.timestamp(),
+                default_entry.precert_entry().pre_cert().issuer_key_hash(),
+                default_entry.precert_entry().pre_cert().tbs_certificate(),
+                default_sct.extension(),
+                SerializedSignature(default_sct.signature())));
+  EXPECT_EQ(LogSigVerifier::INVALID_SIGNATURE,
+            verifier_->VerifyV1PrecertSCTSignature(
+                default_sct.timestamp(),
+                default_entry.precert_entry().pre_cert().issuer_key_hash(),
+                new_cert, default_sct.extension(),
+                SerializedSignature(default_sct.signature())));
+}
+
+TEST_F(LogSignerTest, VerifyChangeIssuerKeyHash) {
+  LogEntry default_entry;
+  TestSigner::SetPrecertDefaults(&default_entry);
+  SignedCertificateTimestamp default_sct, sct, sct2;
+  TestSigner::SetPrecertDefaults(&default_sct);
+  sct.CopyFrom(default_sct);
+  EXPECT_EQ(LogSigVerifier::OK,
+            verifier_->VerifySCTSignature(default_entry, sct));
+
+  CHECK_EQ(ct::PRECERT_ENTRY, default_entry.type());
+  LogEntry entry;
+  entry.CopyFrom(default_entry);
+  string new_hash = test_signer_.UniqueHash();
+  entry.mutable_precert_entry()->mutable_pre_cert()->
+      set_issuer_key_hash(new_hash);
+
+  // Check that we can successfully sign and verify the new sct.
+  sct2.CopyFrom(sct);
+  EXPECT_EQ(LogSigner::OK, signer_->SignCertificateTimestamp(entry, &sct2));
+  EXPECT_EQ(LogSigVerifier::OK, verifier_->VerifySCTSignature(entry, sct2));
+
+  // We should not be able to verify the new cert with the old signature.
+  EXPECT_EQ(LogSigVerifier::INVALID_SIGNATURE,
+            verifier_->VerifySCTSignature(entry, sct));
+
+  EXPECT_EQ(LogSigVerifier::OK,
+            verifier_->VerifyV1PrecertSCTSignature(
+                default_sct.timestamp(),
+                default_entry.precert_entry().pre_cert().issuer_key_hash(),
+                default_entry.precert_entry().pre_cert().tbs_certificate(),
+                default_sct.extension(),
+                SerializedSignature(default_sct.signature())));
+  EXPECT_EQ(LogSigVerifier::INVALID_SIGNATURE,
+            verifier_->VerifyV1PrecertSCTSignature(
+                default_sct.timestamp(),
+                new_hash,
+                default_entry.precert_entry().pre_cert().tbs_certificate(),
+                default_sct.extension(),
+                SerializedSignature(default_sct.signature())));
+}
+
+TEST_F(LogSignerTest, VerifyChangeCertExtensions) {
   LogEntry default_entry;
   TestSigner::SetDefaults(&default_entry);
   SignedCertificateTimestamp default_sct, sct, sct2;
@@ -440,8 +675,8 @@ TEST_F(LogSignerTest, VerifyChangeExtensions) {
             verifier_->VerifySCTSignature(default_entry, sct));
 
   EXPECT_EQ(LogSigVerifier::OK,
-            verifier_->VerifyV1SCTSignature(
-                sct.timestamp(), default_entry.type(),
+            verifier_->VerifyV1CertSCTSignature(
+                sct.timestamp(),
                 default_entry.x509_entry().leaf_certificate(),
                 sct.extension(), SerializedSignature(sct.signature())));
 
@@ -453,8 +688,8 @@ TEST_F(LogSignerTest, VerifyChangeExtensions) {
   EXPECT_EQ(LogSigVerifier::OK,
             verifier_->VerifySCTSignature(default_entry, sct2));
   EXPECT_EQ(LogSigVerifier::OK,
-            verifier_->VerifyV1SCTSignature(
-                sct2.timestamp(), default_entry.type(),
+            verifier_->VerifyV1CertSCTSignature(
+                sct2.timestamp(),
                 default_entry.x509_entry().leaf_certificate(),
                 sct2.extension(), SerializedSignature(sct2.signature())));
 
@@ -463,9 +698,51 @@ TEST_F(LogSignerTest, VerifyChangeExtensions) {
             verifier_->VerifySCTSignature(default_entry, sct));
 
   EXPECT_EQ(LogSigVerifier::INVALID_SIGNATURE,
-            verifier_->VerifyV1SCTSignature(
-                sct.timestamp(), default_entry.type(),
+            verifier_->VerifyV1CertSCTSignature(
+                sct.timestamp(),
                 default_entry.x509_entry().leaf_certificate(),
+                sct.extension(), SerializedSignature(sct.signature())));
+}
+
+TEST_F(LogSignerTest, VerifyChangePrecertExtensions) {
+  LogEntry default_entry;
+  TestSigner::SetPrecertDefaults(&default_entry);
+  SignedCertificateTimestamp default_sct, sct, sct2;
+  TestSigner::SetPrecertDefaults(&default_sct);
+  sct.CopyFrom(default_sct);
+  EXPECT_EQ(LogSigVerifier::OK,
+            verifier_->VerifySCTSignature(default_entry, sct));
+
+  EXPECT_EQ(LogSigVerifier::OK,
+            verifier_->VerifyV1PrecertSCTSignature(
+                sct.timestamp(),
+                default_entry.precert_entry().pre_cert().issuer_key_hash(),
+                default_entry.precert_entry().pre_cert().tbs_certificate(),
+                sct.extension(), SerializedSignature(sct.signature())));
+
+  sct.set_extension("hello");
+  // Check that we can successfully sign and verify the new sct.
+  sct2.CopyFrom(sct);
+  EXPECT_EQ(LogSigner::OK,
+            signer_->SignCertificateTimestamp(default_entry, &sct2));
+  EXPECT_EQ(LogSigVerifier::OK,
+            verifier_->VerifySCTSignature(default_entry, sct2));
+  EXPECT_EQ(LogSigVerifier::OK,
+            verifier_->VerifyV1PrecertSCTSignature(
+                sct2.timestamp(),
+                default_entry.precert_entry().pre_cert().issuer_key_hash(),
+                default_entry.precert_entry().pre_cert().tbs_certificate(),
+                sct2.extension(), SerializedSignature(sct2.signature())));
+
+  // We should not be able to verify the new data with the old signature.
+  EXPECT_EQ(LogSigVerifier::INVALID_SIGNATURE,
+            verifier_->VerifySCTSignature(default_entry, sct));
+
+  EXPECT_EQ(LogSigVerifier::INVALID_SIGNATURE,
+            verifier_->VerifyV1PrecertSCTSignature(
+                sct.timestamp(),
+                default_entry.precert_entry().pre_cert().issuer_key_hash(),
+                default_entry.precert_entry().pre_cert().tbs_certificate(),
                 sct.extension(), SerializedSignature(sct.signature())));
 }
 
@@ -640,23 +917,23 @@ TEST_F(LogSignerTest, VerifyBadSerializedSCTSignature) {
 
   CHECK_EQ(ct::X509_ENTRY, default_entry.type());
   EXPECT_EQ(LogSigVerifier::OK,
-            verifier_->VerifyV1SCTSignature(
-                default_sct.timestamp(), default_entry.type(),
+            verifier_->VerifyV1CertSCTSignature(
+                default_sct.timestamp(),
                 default_entry.x509_entry().leaf_certificate(),
                 default_sct.extension(), serialized_sig));
   // Too short.
   string bad_signature = serialized_sig.substr(0, serialized_sig.size() - 1);
   EXPECT_EQ(LogSigVerifier::SIGNATURE_TOO_SHORT,
-            verifier_->VerifyV1SCTSignature(
-                default_sct.timestamp(), default_entry.type(),
+            verifier_->VerifyV1CertSCTSignature(
+                default_sct.timestamp(),
                 default_entry.x509_entry().leaf_certificate(),
                 default_sct.extension(), bad_signature));
   // Too long.
   bad_signature = serialized_sig;
   bad_signature.push_back(0x42);
   EXPECT_EQ(LogSigVerifier::SIGNATURE_TOO_LONG,
-            verifier_->VerifyV1SCTSignature(
-                default_sct.timestamp(), default_entry.type(),
+            verifier_->VerifyV1CertSCTSignature(
+                default_sct.timestamp(),
                 default_entry.x509_entry().leaf_certificate(),
                 default_sct.extension(), bad_signature));
 
@@ -666,8 +943,8 @@ TEST_F(LogSignerTest, VerifyBadSerializedSCTSignature) {
     bad_signature[i] ^= 0x01;
     // Error codes vary, depending on which byte was flipped.
     EXPECT_NE(LogSigVerifier::OK,
-              verifier_->VerifyV1SCTSignature(
-                  default_sct.timestamp(), default_entry.type(),
+              verifier_->VerifyV1CertSCTSignature(
+                  default_sct.timestamp(),
                   default_entry.x509_entry().leaf_certificate(),
                   default_sct.extension(), bad_signature));
   }

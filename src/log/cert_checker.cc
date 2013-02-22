@@ -1,4 +1,4 @@
-#include <assert.h>
+#include <glog/logging.h>
 #include <string.h>
 #include <openssl/asn1.h>
 #include <openssl/x509.h>
@@ -8,10 +8,11 @@
 
 #include "log/cert.h"
 #include "log/cert_checker.h"
+#include "util/util.h"
 
 CertChecker::CertChecker() : trusted_(NULL) {
   trusted_ = X509_STORE_new();
-  assert(trusted_ != NULL);
+  CHECK_NOTNULL(trusted_);
 }
 
 CertChecker::~CertChecker() {
@@ -29,45 +30,60 @@ bool CertChecker::LoadTrustedCertificateDir(const std::string &cert_dir) {
 }
 
 CertChecker::CertVerifyResult
-CertChecker::CheckCertChain(const CertChain &chain) const {
-  assert(chain.IsLoaded());
-  if (!chain.IsValidCaIssuerChain() || !chain.IsValidSignatureChain())
+CertChecker::CheckCertChain(CertChain *chain) const {
+  CHECK(chain->IsLoaded());
+  chain->RemoveCertsAfterFirstSelfSigned();
+  if (!chain->IsValidCaIssuerChain() || !chain->IsValidSignatureChain())
     return INVALID_CERTIFICATE_CHAIN;
-  return VerifyTrustedCaSignature(*chain.LastCert());
+  return GetTrustedCa(chain);
 }
 
 CertChecker::CertVerifyResult
-CertChecker::CheckPreCertChain(const PreCertChain &chain) const {
-  assert(chain.IsLoaded());
-  if (!chain.IsWellFormed())
+CertChecker::CheckPreCertChain(PreCertChain *chain) const {
+  CHECK(chain->IsLoaded());
+  if (!chain->IsWellFormed())
     return PRECERT_CHAIN_NOT_WELL_FORMED;
 
-  // Check that the chain is valid.
-  // OpenSSL does not enforce an ordering of the chain, so check that the
-  // chain (appears to be) ordered correctly.
-  // Only check the signature on the leaf certificate (full verification would
-  // fail since the leaf contains an unrecognized critical extension).
-  const Cert *pre = chain.PreCert();
-  const Cert *pre_ca = chain.CaPreCert();
-  // IsValidIssuerChain only checks that the issuing order is correct;
-  // CA constraints are handled in VerifyPreCaChain.
-  if (!pre->IsSignedBy(*pre_ca) || !chain.IsValidIssuerChain())
-    return INVALID_CERTIFICATE_CHAIN;
-  return VerifyPreCaChain(chain);
+  // Check the issuer and signature chain.
+  // We do not, at this point, concern ourselves with whether the CA certificate
+  // that issued the precert is a Precertificate Signing Certificate (i.e., has
+  // restricted Extended Key Usage) or not, since this does not influence the
+  // validity of the chain. The purpose of the EKU is effectively to allow CAs
+  // to create an intermediate whose scope can be limited to CT precerts only
+  // (by making this extension critical).
+  // TODO(ekasper): determine (i.e., ask CAs) if CA:false Precertificate Signing
+  // Certificates should be tolerated if they have the necessary EKU set.
+  // Preference is "no".
+  CertVerifyResult res = CheckCertChain(chain);
+  if (res != OK)
+    return res;
+  // We should always have at least two certs in the chain now - if we have
+  // just one, then something truly weird is going on, e.g., a CA has issued a
+  // precert for its own root certificate.
+  if (chain->Length() < 2 || (chain->UsesPrecertSigningCertificate() &&
+                              chain->Length() < 3)) {
+    CHECK_GE(1, chain->Length()) << "Empty chain, something is completely bust";
+    LOG(ERROR) << "CertChecker produced a precert chain with just one "
+               << "certificate. Certificate DER string is:\n"
+               << util::HexString(chain->LeafCert()->DerEncoding());
+    return PRECERT_CHAIN_NOT_WELL_FORMED;
+  }
+  return OK;
 }
 
 CertChecker::CertVerifyResult
-CertChecker::VerifyTrustedCaSignature(const Cert &subject) const {
+CertChecker::GetTrustedCa(CertChain *chain) const {
   // Look up issuer from the trusted store.
   X509_STORE_CTX *ctx = X509_STORE_CTX_new();
   assert(ctx != NULL);
   int ret = X509_STORE_CTX_init(ctx, trusted_, NULL, NULL);
   assert(ret == 1);
   X509_OBJECT obj;
-  // TODO: we may need to do something more clever, in case there is
+  // TODO(ekasper): we may need to do something more clever, in case there is
   // more than one match.
+  const Cert *subject = chain->LastCert();
   ret = X509_STORE_get_by_subject(ctx, X509_LU_X509,
-                                  X509_get_issuer_name(subject.x509_), &obj);
+                                  X509_get_issuer_name(subject->x509_), &obj);
   X509_STORE_CTX_free(ctx);
   if (ret <= 0)
     return ROOT_NOT_IN_LOCAL_STORE;
@@ -77,47 +93,18 @@ CertChecker::VerifyTrustedCaSignature(const Cert &subject) const {
   Cert issuer(obj.data.x509);
   // X509_STORE_get_by_subject increments ref count.
   X509_OBJECT_free_contents(&obj);
-  assert(issuer.IsLoaded());
-  // TODO: do we need to do any other checks on issuer?
-  if (!subject.IsSignedBy(issuer))
+  CHECK(issuer.IsLoaded());
+  // TODO(ekasper): check that the issuing CA cert is temporally valid.
+  // TODO(ekasper): do we need to run any other checks on the issuer?
+  if (!subject->IsSignedBy(issuer))
     return INVALID_CERTIFICATE_CHAIN;
+
+  // Remove the self-signed cert and replace with a local version.
+  if (subject->IsSelfSigned())
+    chain->RemoveCert();
+
+  Cert *store_issuer = issuer.Clone();
+  chain->AddCert(store_issuer);
+
   return OK;
-}
-
-CertChecker::CertVerifyResult
-CertChecker::VerifyPreCaChain(const PreCertChain &chain) const {
-  assert(chain.IsLoaded());
-  X509 *leaf = chain.CaPreCert()->x509_;
-  assert(leaf != NULL);
-  // The remaining certificates.
-  STACK_OF(X509) *intermediates = NULL;
-  if (chain.IntermediateLength() > 0) {
-    intermediates = sk_X509_new_null();
-    assert(intermediates != NULL);
-    for (size_t pos = 0; pos < chain.IntermediateLength(); ++pos)
-      sk_X509_push(intermediates, chain.IntermediateAt(pos)->x509_);
-  }
-
-  X509_STORE_CTX *ctx = X509_STORE_CTX_new();
-  assert(ctx != NULL);
-  int ret = X509_STORE_CTX_init(ctx, trusted_, leaf, intermediates);
-  assert(ret == 1);
-
-  ret = X509_verify_cert(ctx);
-
-  CertVerifyResult result = INVALID_CERTIFICATE_CHAIN;
-  if (ret != 1) {
-    int err = X509_STORE_CTX_get_error(ctx);
-    if (err == X509_V_ERR_UNABLE_TO_GET_ISSUER_CERT_LOCALLY ||
-        err == X509_V_ERR_UNABLE_TO_GET_ISSUER_CERT)
-      result = ROOT_NOT_IN_LOCAL_STORE;
-  } else {
-    result = OK;
-  }
-
-  X509_STORE_CTX_free(ctx);
-  if (intermediates != NULL)
-    sk_X509_free(intermediates);
-
-  return result;
 }

@@ -27,14 +27,18 @@ static const char kCaCert[] = "ca-cert.pem";
 static const char kLeafCert[] = "test-cert.pem";
 // Issued by ca.pem
 static const char kCaPreCert[] = "ca-pre-cert.pem";
+// Issued by ca-cert.pem
+static const char kPreCert[] = "test-embedded-pre-cert.pem";
 // Issued by ca-pre-cert.pem
-static const char kPreCert[] = "test-pre-cert.pem";
-// The resulting embedded cert, issued by ca-cert.pem
+static const char kPreWithPreCaCert[] = "test-embedded-with-preca-pre-cert.pem";
+// The resulting embedded certs, issued by ca-cert.pem
 static const char kEmbeddedCert[] = "test-embedded-cert.pem";
+static const char kEmbeddedWithPreCaCert[] =
+    "test-embedded-with-preca-cert.pem";
 // Issued by ca-cert.pem
 static const char kIntermediateCert[] = "intermediate-cert.pem";
 // Issued by intermediate-cert.pem
-static const char kChainLeafCert[] = "test2-cert.pem";
+static const char kChainLeafCert[] = "test-intermediate-cert.pem";
 
 namespace {
 
@@ -67,12 +71,16 @@ template <class T> class FrontendTest : public ::testing::Test {
         << ". Wrong --test_certs_dir?";
     CHECK(util::ReadTextFile(cert_dir_ + "/" + kCaPreCert, &ca_precert_pem_));
     CHECK(util::ReadTextFile(cert_dir_ + "/" + kPreCert, &precert_pem_));
+    CHECK(util::ReadBinaryFile(cert_dir_ + "/" + kPreWithPreCaCert,
+                               &precert_with_preca_pem_));
     CHECK(util::ReadTextFile(cert_dir_ + "/" + kIntermediateCert,
                              &intermediate_pem_));
     CHECK(util::ReadTextFile(cert_dir_ + "/" + kChainLeafCert,
                              &chain_leaf_pem_));
     CHECK(util::ReadTextFile(cert_dir_ + "/" + kCaCert, &ca_pem_));
     CHECK(util::ReadTextFile(cert_dir_ + "/" + kEmbeddedCert,  &embedded_pem_));
+    CHECK(util::ReadTextFile(cert_dir_ + "/" + kEmbeddedWithPreCaCert,
+                             &embedded_with_preca_pem_));
     CHECK(checker_.LoadTrustedCertificate(cert_dir_ + "/" + kCaCert));
   }
 
@@ -108,9 +116,11 @@ template <class T> class FrontendTest : public ::testing::Test {
   string leaf_pem_;
   string ca_precert_pem_;
   string precert_pem_;
+  string precert_with_preca_pem_;
   string intermediate_pem_;
   string chain_leaf_pem_;
   string embedded_pem_;
+  string embedded_with_preca_pem_;
   string ca_pem_;
 };
 
@@ -231,22 +241,58 @@ TYPED_TEST(FrontendTest, TestSubmitInvalidPem) {
 
 TYPED_TEST(FrontendTest, TestSubmitPrecert) {
   SignedCertificateTimestamp sct;
-  string submission = this->precert_pem_ + this->ca_precert_pem_;
+  string submission = this->precert_pem_;
   EXPECT_EQ(Frontend::NEW,
             this->frontend_->QueueEntry(ct::PRECERT_ENTRY, submission, &sct));
 
-  Cert cert(this->embedded_pem_);
+  CertChain chain(this->embedded_pem_ + this->ca_pem_);
   LogEntry entry;
-  CertSubmissionHandler::X509CertToEntry(cert, &entry);
+  CertSubmissionHandler::X509ChainToEntry(chain, &entry);
 
   // Look it up.
   string hash = Sha256Hasher::Sha256Digest(
-      entry.precert_entry().tbs_certificate());
+      entry.precert_entry().pre_cert().tbs_certificate());
   LoggedCertificate logged_cert;
   EXPECT_EQ(Database::LOOKUP_OK,
             this->db()->LookupCertificateByHash(hash, &logged_cert));
   Cert pre(this->precert_pem_);
+  Cert ca(this->ca_pem_);
+
+  EXPECT_EQ(ct::PRECERT_ENTRY, logged_cert.entry().type());
+  // Verify the signature.
+  EXPECT_EQ(LogVerifier::VERIFY_OK,
+            this->verifier_->VerifySignedCertificateTimestamp(
+                logged_cert.entry(), sct));
+
+  // Expect to have the original certs logged in the chain.
+  ASSERT_EQ(logged_cert.entry().precert_entry().precertificate_chain_size(), 1);
+  EXPECT_EQ(H(pre.DerEncoding()),
+            H(logged_cert.entry().precert_entry().pre_certificate()));
+  EXPECT_EQ(H(ca.DerEncoding()),
+            H(logged_cert.entry().precert_entry().precertificate_chain(0)));
+  Frontend::FrontendStats stats(0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0);
+  this->CompareStats(stats);
+}
+
+TYPED_TEST(FrontendTest, TestSubmitPrecertUsingPreCA) {
+  SignedCertificateTimestamp sct;
+  string submission = this->precert_with_preca_pem_ + this->ca_precert_pem_;
+  EXPECT_EQ(Frontend::NEW,
+            this->frontend_->QueueEntry(ct::PRECERT_ENTRY, submission, &sct));
+
+  CertChain chain(this->embedded_with_preca_pem_ + this->ca_pem_);
+  LogEntry entry;
+  CertSubmissionHandler::X509ChainToEntry(chain, &entry);
+
+  // Look it up.
+  string hash = Sha256Hasher::Sha256Digest(
+      entry.precert_entry().pre_cert().tbs_certificate());
+  LoggedCertificate logged_cert;
+  EXPECT_EQ(Database::LOOKUP_OK,
+            this->db()->LookupCertificateByHash(hash, &logged_cert));
+  Cert pre(this->precert_with_preca_pem_);
   Cert ca_pre(this->ca_precert_pem_);
+  Cert ca(this->ca_pem_);
 
   EXPECT_EQ(ct::PRECERT_ENTRY, logged_cert.entry().type());
   // Verify the signature.
@@ -257,8 +303,10 @@ TYPED_TEST(FrontendTest, TestSubmitPrecert) {
   // Expect to have the original certs logged in the chain.
   ASSERT_GE(logged_cert.entry().precert_entry().precertificate_chain_size(), 2);
   EXPECT_EQ(H(pre.DerEncoding()),
-            H(logged_cert.entry().precert_entry().precertificate_chain(0)));
+            H(logged_cert.entry().precert_entry().pre_certificate()));
   EXPECT_EQ(H(ca_pre.DerEncoding()),
+            H(logged_cert.entry().precert_entry().precertificate_chain(0)));
+  EXPECT_EQ(H(ca.DerEncoding()),
             H(logged_cert.entry().precert_entry().precertificate_chain(1)));
   Frontend::FrontendStats stats(0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0);
   this->CompareStats(stats);

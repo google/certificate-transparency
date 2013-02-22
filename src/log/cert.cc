@@ -18,6 +18,9 @@ const char Cert::kEmbeddedProofExtensionOID[] = "1.3.6.1.4.1.11129.2.4.2";
 const char Cert::kPoisonExtensionOID[] = "1.3.6.1.4.1.11129.2.4.3";
 const char Cert::kCtExtendedKeyUsageOID[] = "1.3.6.1.4.1.11129.2.4.4";
 
+// TODO(ekasper): libify this code - remove most (over-zealous) CHECKs,
+// improve logging, handle OpenSSL weirdness more gently.
+
 // static
 ASN1_OBJECT *Cert::ExtensionObject(const string oid) {
   unsigned char obj_buf[100];
@@ -57,10 +60,11 @@ bool Cert::HasExtension(int extension_nid) const {
 }
 
 bool Cert::IsCriticalExtension(const string &extension_oid) const {
-  X509_EXTENSION *ext = GetExtension(extension_oid);
-  // Always check if the extension exists first.
-  CHECK_NOTNULL(ext);
-  return X509_EXTENSION_get_critical(ext);
+  return IsCriticalExtension(GetExtension(extension_oid));
+}
+
+bool Cert::IsCriticalExtension(int extension_nid) const {
+  return IsCriticalExtension(GetExtension(extension_nid));
 }
 
 bool Cert::OctetStringExtensionData(const string &extension_oid,
@@ -165,6 +169,25 @@ string Cert::Sha256Digest() const {
   return string(reinterpret_cast<char*>(digest), len);
 }
 
+string Cert::DerEncodedTbsCertificate() const {
+  CHECK(IsLoaded());
+  unsigned char *der_buf = NULL;
+  // There appears to be no "clean" way for getting the TBS out.
+  int der_length = i2d_X509_CINF(x509_->cert_info, &der_buf);
+  CHECK_GT(der_length, 0);
+  string ret(reinterpret_cast<char*>(der_buf), der_length);
+  OPENSSL_free(der_buf);
+  return ret;
+}
+
+string Cert::PublicKeySha256Digest() const {
+  CHECK(IsLoaded());
+  unsigned char digest[EVP_MAX_MD_SIZE];
+  unsigned int len;
+  CHECK_EQ(1, X509_pubkey_digest(x509_, EVP_sha256(), digest, &len));
+  return string(reinterpret_cast<char*>(digest), len);
+}
+
 // WARNING WARNING this method modifies the x509_ structure
 // and thus invalidates the cert. Use with care.
 void Cert::DeleteExtension(const string &extension_oid) {
@@ -203,61 +226,39 @@ void Cert::DeleteExtension(int extension_nid) {
 
 // WARNING WARNING this method modifies the x509_ structure
 // and thus invalidates the cert. Use with care.
-void Cert::DeleteSignature() {
-  CHECK(IsLoaded());
-  if (x509_->sig_alg != NULL) {
-    X509_ALGOR_free(x509_->sig_alg);
-    x509_->sig_alg = X509_ALGOR_new();
-  }
-  if (x509_->signature != NULL) {
-    ASN1_BIT_STRING_free(x509_->signature);
-    x509_->signature = ASN1_BIT_STRING_new();
-  }
-
-  x509_->cert_info->enc.modified = 1;
-}
-
-// WARNING WARNING this method modifies the x509_ structure
-// and thus invalidates the cert. Use with care.
-void Cert::CopyIssuerFrom(const Cert &from) {
+bool Cert::CopyIssuerFrom(const Cert &from) {
   CHECK(IsLoaded());
   CHECK(from.IsLoaded());
   X509_NAME *ca_name = X509_get_issuer_name(from.x509_);
   CHECK_NOTNULL(ca_name);
   X509_set_issuer_name(x509_, ca_name);
 
-  // Fix the authority key extension, if it exists.
-  X509_EXTENSION *from_ext = from.GetExtension(NID_authority_key_identifier);
-  // If the source does not have an authority KeyID extension,
-  // also delete it from the destination.
-  if (from_ext == NULL) {
-    DeleteExtension(NID_authority_key_identifier);
-    return;
-  }
-
-  // If the destination does not have an authority KeyID extension,
-  // add it as a last extension to the destination.
   X509_EXTENSION *to_ext = GetExtension(NID_authority_key_identifier);
-  if (to_ext == NULL) {
-    to_ext = X509_EXTENSION_create_by_NID(NULL, NID_authority_key_identifier,
-                                          0, NULL);
-    CHECK_NOTNULL(to_ext);
-    CHECK_EQ(1, X509_add_ext(x509_, to_ext, -1));
 
-    // X509_add_ext makes a copy, so find out its address.
-    X509_EXTENSION_free(to_ext);
-    to_ext = GetExtension(NID_authority_key_identifier);
-  }
+  // If the destination does not have the extension, do nothing.
+  if (to_ext == NULL)
+    return true;
 
-  // Copy the critical bit.
-  CHECK_EQ(1,
-           X509_EXTENSION_set_critical(to_ext,
-                                       X509_EXTENSION_get_critical(from_ext)));
+  X509_EXTENSION *from_ext = from.GetExtension(NID_authority_key_identifier);
+
+  // If the source does not have the extension, we can't copy.
+  if (from_ext == NULL)
+    return false;
+
+  // Both have the extension set.
+  // Technically, this extension should never be critical, but this check is
+  // done elsewhere. Here we just check that the bit matches - else we don't
+  // really know whether we should copy or keep it.
+  if (IsCriticalExtension(from_ext) != IsCriticalExtension(to_ext))
+    return false;
+
   // Copy data.
   CHECK_EQ(1,
            X509_EXTENSION_set_data(to_ext, X509_EXTENSION_get_data(from_ext)));
 
   x509_->cert_info->enc.modified = 1;
+
+  return true;
 }
 
 int Cert::ExtensionIndex(const string &extension_oid) const {
@@ -288,6 +289,12 @@ X509_EXTENSION *Cert::GetExtension(int extension_nid) const {
   if (extension_index == -1)
     return NULL;
   return X509_get_ext(x509_, extension_index);
+}
+
+// static
+bool Cert::IsCriticalExtension(X509_EXTENSION *ext) {
+  CHECK_NOTNULL(ext);
+  return X509_EXTENSION_get_critical(ext);
 }
 
 CertChain::CertChain(const string &pem_string) {
@@ -330,20 +337,28 @@ void CertChain::RemoveCert() {
   chain_.pop_back();
 }
 
-CertChain::~CertChain() {
-  ClearChain();
+void CertChain::RemoveCertsAfterFirstSelfSigned() {
+  CHECK(IsLoaded());
+  int first_self_signed = chain_.size();
+
+  // Fidn the first self-signed certificate.
+  for (size_t i = 0; i < chain_.size(); ++i) {
+    if (chain_[i]->IsSelfSigned()) {
+      first_self_signed = i;
+      break;
+    }
+  }
+
+  // Remove everything after it.
+  int chain_size = chain_.size();
+  for (int i = first_self_signed + 1; i < chain_size; ++i) {
+    chain_.pop_back();
+  }
 }
 
-bool CertChain::IsValidIssuerChain() const {
-  CHECK(IsLoaded());
-  for (std::vector<Cert*>::const_iterator it = chain_.begin();
-       it + 1 < chain_.end(); ++it) {
-    Cert *subject = *it;
-    Cert *issuer = *(it + 1);
-    if (!subject->IsIssuedBy(*issuer))
-      return false;
-  }
-  return true;
+
+CertChain::~CertChain() {
+  ClearChain();
 }
 
 bool CertChain::IsValidCaIssuerChain() const {
@@ -377,35 +392,47 @@ void CertChain::ClearChain() {
   chain_.clear();
 }
 
+bool PreCertChain::UsesPrecertSigningCertificate() const {
+  const Cert *issuer = PrecertIssuingCert();
+  if (issuer == NULL) {
+    // No issuer, so it must be a real root CA from the store.
+    return false;
+  }
+
+  CHECK(issuer->IsLoaded());
+  return issuer->HasExtendedKeyUsage(Cert::kCtExtendedKeyUsageOID);
+}
+
 bool PreCertChain::IsWellFormed() const {
   CHECK(IsLoaded());
-  // We must have at least a leaf certificate and an issuing certificate.
-  if (Length() < 2)
-    return false;
 
   const Cert *pre = PreCert();
   CHECK_NOTNULL(pre);
 
-  // First, check that the leaf contains the critical poison extension.
+  // (1) Check that the leaf contains the critical poison extension.
   if (!pre->HasExtension(Cert::kPoisonExtensionOID) ||
       !pre->IsCriticalExtension(Cert::kPoisonExtensionOID))
     return false;
 
-  // The next cert should be the issuing precert.
-  // Check that it is CA:FALSE, and contains the desired Extended Key Usage.
-  const Cert *pre_ca = CaPreCert();
-  CHECK_NOTNULL(pre_ca);
+  if (!UsesPrecertSigningCertificate()) {
+    // No more checks
+    return true;
+  }
 
-  // Check that pre is issued by pre_ca.
-  if (!pre->IsIssuedBy(*pre_ca))
+  const Cert *issuer = PrecertIssuingCert();
+  // (2) Check that the AKID profiles allow copying of the correct issuer.
+  // If pre has the extension set but the issuer doesn't, error.
+  if (pre->HasExtension(NID_authority_key_identifier) &&
+      !issuer->HasExtension(NID_authority_key_identifier))
     return false;
 
-  if (!pre_ca->HasExtension(NID_basic_constraints) ||
-      pre_ca->HasBasicConstraintCA() ||
-      !pre_ca->HasExtendedKeyUsage(Cert::kCtExtendedKeyUsageOID))
+  // It is an error to set the critical bit for this extension.
+  // We do not generally check that extensions are validly formed but we do
+  // check for this one as we'll be using it to form the TBS entry.
+  if (pre->HasExtension(NID_authority_key_identifier) &&
+      (pre->IsCriticalExtension(NID_authority_key_identifier) ||
+       issuer->IsCriticalExtension(NID_authority_key_identifier)))
     return false;
 
-  // Check that both certs have an Authority KeyID extension.
-  return pre->HasExtension(NID_authority_key_identifier) &&
-      pre_ca->HasExtension(NID_authority_key_identifier);
+  return true;
 }

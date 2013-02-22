@@ -35,7 +35,8 @@ class CertSubmissionHandler {
   // For clients, to reconstruct the bytestring under the signature
   // from the observed chain. Does not check whether the entry
   // has valid format (i.e., does not check length limits).
-  static void X509CertToEntry(const Cert &cert, ct::LogEntry *entry);
+  static bool X509ChainToEntry(const CertChain &chain,
+                               ct::LogEntry *entry);
 
  private:
   SubmitResult ProcessX509Submission(const std::string &submission,

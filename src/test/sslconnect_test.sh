@@ -116,7 +116,7 @@ cp testdata/ca-cert.pem ca-hashes/$hash.0
 echo "Testing known good/bad certificate configurations" 
 mkdir -p testdata/logs
 
-test_range "8125 8126 8127 8128" testdata ca-hashes ct-server ca \
+test_range "8125 8126 8127 8128 8129 8130" testdata ca-hashes ct-server ca \
   httpd-valid.conf false true false ./apachectl
 test_range "8125 8126 8127 8128" testdata ca-hashes ct-server ca \
   httpd-invalid.conf false false false ./apachectl
@@ -153,18 +153,27 @@ test_ct_server() {
   sleep 2
 
   echo "Generating test certificates"
-  make_certs `pwd`/tmp `pwd`/tmp/ca-hashes test ca ct-server 8124 false
+  make_cert `pwd`/tmp `pwd`/tmp/ca-hashes test ca ct-server 8124 false
+  make_embedded_cert `pwd`/tmp `pwd`/tmp/ca-hashes test-embedded ca \
+    ct-server 8124 false false
+  make_embedded_cert `pwd`/tmp `pwd`/tmp/ca-hashes test-embedded-with-preca \
+    ca ct-server 8124 false true
   # Generate a second set of certs that chain through an intermediate
   make_intermediate_ca_certs `pwd`/tmp intermediate ca
-  make_certs `pwd`/tmp `pwd`/tmp/ca-hashes test2 intermediate ct-server 8124 \
-    true
+
+  make_cert `pwd`/tmp `pwd`/tmp/ca-hashes test-intermediate intermediate \
+    ct-server 8124 true
+  make_embedded_cert `pwd`/tmp `pwd`/tmp/ca-hashes \
+    test-embedded-with-intermediate intermediate ct-server 8124 true false
+  make_embedded_cert `pwd`/tmp `pwd`/tmp/ca-hashes \
+    test-embedded-with-intermediate-preca intermediate ct-server 8124 true true
 
   # Wait a bit to ensure the server signs the tree.
   sleep 5
 
   echo "Testing valid configurations with new certificates"
   mkdir -p tmp/logs
-  test_range "8125 8126 8127 8128" tmp tmp/ca-hashes ct-server ca \
+  test_range "8125 8126 8127 8128 8129 8130" tmp tmp/ca-hashes ct-server ca \
     httpd-valid.conf false true true ./apachectl
 
   # Stop the log server

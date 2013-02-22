@@ -41,7 +41,9 @@ class Cert {
 
   bool HasExtension(int nid) const;
 
+  // Caller must always first check that the extension exists.
   bool IsCriticalExtension(const std::string &extension_oid) const;
+  bool IsCriticalExtension(int extension_nid) const;
 
   // If the extension is a valid ASN.1-encoded octet string, writes the
   // (binary) contents (with the ASN.1 wrapping removed) to result and returns
@@ -57,10 +59,17 @@ class Cert {
 
   bool IsSignedBy(const Cert &issuer) const;
 
+  bool IsSelfSigned() const { return IsIssuedBy(*this); }
+
   // returns binary data
   std::string DerEncoding() const;
 
   std::string Sha256Digest() const;
+
+  // The X509_CINF part of the cert.
+  std::string DerEncodedTbsCertificate() const;
+
+  std::string PublicKeySha256Digest() const;
 
   // WARNING WARNING The following methods modify the x509_ structure
   // and thus invalidate the cert.
@@ -75,7 +84,7 @@ class Cert {
   void DeleteSignature();
 
   // Copy the issuer.
-  void CopyIssuerFrom(const Cert &from);
+  bool CopyIssuerFrom(const Cert &from);
 
   // CertChecker needs access to the x509_ structure directly.
   friend class CertChecker;
@@ -86,6 +95,7 @@ class Cert {
   // Returns a pointer to a matching extension, or NULL for 'not found'.
   X509_EXTENSION *GetExtension(const std::string &extension_oid) const;
   X509_EXTENSION *GetExtension(int extension_nid) const;
+  static bool IsCriticalExtension(X509_EXTENSION *ext);
 
   X509 *x509_;
 };
@@ -99,10 +109,15 @@ class CertChain {
   ~CertChain();
 
   // Add a cert to the end of the chain.
+  // Takes ownership of the cert.
   void AddCert(Cert *cert);
 
   // Remove a cert from the end of the chain.
   void RemoveCert();
+
+  // Keep the first self-signed, remove the rest. We keep the first one so that
+  // chains consisting only of a self-signed cert don't become invalid.
+  void RemoveCertsAfterFirstSelfSigned();
 
   // True if the chain loaded correctly, and contains at least one valid cert.
   bool IsLoaded() const { return !chain_.empty(); }
@@ -125,10 +140,6 @@ class CertChain {
     assert(IsLoaded());
     return chain_.back();
   }
-
-  // True if the issuer of each cert is the subject of the next cert.
-  // Does not check the CA bit of issuing certs.
-  bool IsValidIssuerChain() const;
 
   // True if the issuer of each cert is the subject of the next cert,
   // and each issuer has BasicConstraints CA:true.
@@ -155,31 +166,27 @@ class PreCertChain : public CertChain {
     return LeafCert();
   }
 
-  // A pointer to the issuing CA precert.
-  Cert const *CaPreCert() const {
+  // A pointer to the issuing cert, which is either the issuing CA cert,
+  // or a special-purpose Precertificate Signing Certificate issued
+  // directly by the CA cert.
+  // Can be NULL if the precert is issued directly by a root CA.
+  Cert const *PrecertIssuingCert() const {
     return Length() >= 2 ? CertAt(1) : NULL;
   }
 
-  // The chain is precert -- ca_precert -- intermediates
-  size_t IntermediateLength() const {
-    assert(IsLoaded());
-    return Length() < 2 ? 0 : Length() - 2;
-  }
-
-  Cert const *IntermediateAt(size_t position) const {
-    assert(IsLoaded());
-    if (IntermediateLength() <= position)
-      return NULL;
-    return CertAt(position + 2);
-  }
+  bool UsesPrecertSigningCertificate() const;
 
   // True if
-  // (1) The chain contains at least two certificates.
-  // (1) The leaf certificate contains the critical poison extension.
-  // (2) The next certificate in the chain is CA:FALSE and contains
-  //     the Extended Key Usage extension for CT.
-  // (3) The leaf is issued by the second certificate.
-  // (4) Both certs have an Authority KeyID extension.
+  // (1) the leaf certificate contains the critical poison extension;
+  // TODO(ekasper): sync the requirements here with doc changes in
+  // https://codereview.appspot.com/7303098/
+  // (2) if the leaf certificate issuing certificate is present and has the
+  //     CT EKU, and the leaf certificate has an Authority KeyID extension,
+  //     then its issuing certificate also has this extension.
+  //     In this case, also check that both extensions are correctly marked
+  //     as non-critical.
+  // (2) is necessary for the log to be able to "predict" the AKID of the final
+  // TbsCertificate.
   // This method does not verify any signatures, or otherwise check
   // that the chain is valid.
   bool IsWellFormed() const;

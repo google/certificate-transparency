@@ -37,11 +37,33 @@ LogSigner::~LogSigner() {
 }
 
 LogSigner::SignResult LogSigner::SignV1CertificateTimestamp(
-    uint64_t timestamp, LogEntryType type, const string &leaf_certificate,
+    uint64_t timestamp, const string &leaf_certificate,
     const string &extensions, string *result) const {
   string serialized_input;
-  Serializer::SerializeResult res = Serializer::SerializeV1SCTSignatureInput(
-      timestamp, type, leaf_certificate, extensions, &serialized_input);
+  Serializer::SerializeResult res =
+      Serializer::SerializeV1CertSCTSignatureInput(timestamp, leaf_certificate,
+                                                   extensions,
+                                                   &serialized_input);
+
+  if (res != Serializer::OK)
+    return GetSerializeError(res);
+
+  DigitallySigned signature;
+  Sign(serialized_input, &signature);
+  CHECK_EQ(Serializer::OK,
+           Serializer::SerializeDigitallySigned(signature, result));
+  return OK;
+}
+
+LogSigner::SignResult LogSigner::SignV1PrecertificateTimestamp(
+    uint64_t timestamp, const string &issuer_key_hash,
+    const string &tbs_certificate,
+    const string &extensions, string *result) const {
+  string serialized_input;
+  Serializer::SerializeResult res =
+      Serializer::SerializeV1PrecertSCTSignatureInput(
+          timestamp, issuer_key_hash, tbs_certificate,
+          extensions, &serialized_input);
 
   if (res != Serializer::OK)
     return GetSerializeError(res);
@@ -183,8 +205,8 @@ string LogSigVerifier::ComputeKeyID(EVP_PKEY *pkey) {
   return ret;
 }
 
-LogSigVerifier::VerifyResult LogSigVerifier::VerifyV1SCTSignature(
-    uint64_t timestamp, LogEntryType type, const string &leaf_cert,
+LogSigVerifier::VerifyResult LogSigVerifier::VerifyV1CertSCTSignature(
+    uint64_t timestamp, const string &leaf_cert,
     const string &extensions, const string &serialized_sig) const {
   DigitallySigned signature;
   Deserializer::DeserializeResult result =
@@ -194,12 +216,31 @@ LogSigVerifier::VerifyResult LogSigVerifier::VerifyV1SCTSignature(
 
   string serialized_sct;
   Serializer::SerializeResult serialize_result =
-      Serializer::SerializeV1SCTSignatureInput(timestamp, type, leaf_cert,
-                                               extensions, &serialized_sct);
+      Serializer::SerializeV1CertSCTSignatureInput(timestamp, leaf_cert,
+                                                   extensions, &serialized_sct);
   if (serialize_result != Serializer::OK)
     return GetSerializeError(serialize_result);
   return Verify(serialized_sct, signature);
 }
+
+LogSigVerifier::VerifyResult LogSigVerifier::VerifyV1PrecertSCTSignature(
+    uint64_t timestamp, const string &issuer_key_hash, const string &tbs_cert,
+    const string &extensions, const string &serialized_sig) const {
+  DigitallySigned signature;
+  Deserializer::DeserializeResult result =
+      Deserializer::DeserializeDigitallySigned(serialized_sig, &signature);
+  if (result != Deserializer::OK)
+    return GetDeserializeSignatureError(result);
+
+  string serialized_sct;
+  Serializer::SerializeResult serialize_result =
+      Serializer::SerializeV1PrecertSCTSignatureInput(
+          timestamp, issuer_key_hash, tbs_cert, extensions, &serialized_sct);
+  if (serialize_result != Serializer::OK)
+    return GetSerializeError(serialize_result);
+  return Verify(serialized_sct, signature);
+}
+
 
 LogSigVerifier::VerifyResult
 LogSigVerifier::VerifySCTSignature(const LogEntry &entry,

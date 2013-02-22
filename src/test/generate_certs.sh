@@ -121,7 +121,7 @@ make_intermediate_ca_certs() {
 }
 
 # Call make_ca_certs and make_log_server_keys first
-make_certs() {
+make_cert() {
   cert_dir=$1
   hash_dir=$2
   server=$3
@@ -143,9 +143,6 @@ make_certs() {
   openssl x509 -in $cert_dir/$server-cert.pem -out $cert_dir/$server-cert.der \
     -outform DER
 
-  # Sign the CSR with the CA precert key to get a log request
-  issue_cert $cert_dir $ca-pre $server precert.conf pre false $server-pre
-
   # Upload the signed certificate
   # If the CA is an intermediate, then we need to include its certificate, too.
   if [ $ca_is_intermediate == "true" ]; then
@@ -163,24 +160,6 @@ make_certs() {
     --logtostderr=true 
   rm $cert_dir/$server-cert-bundle.pem
 
-  # Upload the precert bundle
-  # If the CA is an intermediate, then we need to include its certificate, too.
-  if [ $ca_is_intermediate == "true" ]; then
-    cat $cert_dir/$server-pre-cert.pem $cert_dir/$ca-pre-cert.pem \
-      $cert_dir/$ca-cert.pem > $cert_dir/$server-precert-bundle.pem
-  else
-    cat $cert_dir/$server-pre-cert.pem $cert_dir/$ca-pre-cert.pem > \
-      $cert_dir/$server-precert-bundle.pem
-  fi
-
-  ../client/ct upload \
-    --ct_server_submission=$cert_dir/$server-precert-bundle.pem \
-    --ct_server="127.0.0.1" --ct_server_port=$log_server_port \
-    --ct_server_public_key=$cert_dir/$log_server-key-public.pem \
-    --ct_server_response_out=$cert_dir/$server-pre-cert.proof \
-    --precert=true --logtostderr=true
-  rm $cert_dir/$server-precert-bundle.pem
-
   # Create a superfluous certificate
   ../client/ct certificate --sct_token=$cert_dir/$server-cert.proof \
     --certificate_out=$cert_dir/$server-cert-proof.der \
@@ -193,7 +172,64 @@ make_certs() {
   if [ $ca_is_intermediate == "true" ]; then
     cat $cert_dir/$ca-cert.pem $cert_dir/$server-cert-proof.pem > \
       $cert_dir/$server-cert-chain.pem
+  else
+    cat $cert_dir/$server-cert-proof.pem > $cert_dir/$server-cert-chain.pem
   fi
+}
+
+# Call make_ca_certs and make_log_server_keys first
+make_embedded_cert() {
+  cert_dir=$1
+  hash_dir=$2
+  server=$3
+  ca=$4
+  log_server=$5
+  log_server_port=$6
+  ca_is_intermediate=$7
+  use_pre_ca=$8
+
+  # Generate a new private key and CSR
+  request_cert $cert_dir $server precert.conf
+
+  openssl rsa -in $cert_dir/$server-key.pem -out $cert_dir/$server-key.pem \
+    -passin pass:password1
+
+  # Sign the CSR to get a log request
+  if [ $use_pre_ca == "true" ]; then
+    issue_cert $cert_dir $ca-pre $server precert.conf pre false $server-pre
+  else
+  # Issue a precert, but since it's not real, do not update the database.
+    cp $cert_dir/$ca-database $cert_dir/$ca-database.bak
+    issue_cert $cert_dir $ca $server precert.conf pre false $server-pre
+    mv $cert_dir/$ca-database.bak $cert_dir/$ca-database
+  fi
+
+  # Upload the precert bundle
+  # If we're using a Precert Signing CA then we need to send it along
+  if [ $use_pre_ca == "true" ]; then
+    cat $cert_dir/$server-pre-cert.pem $cert_dir/$ca-pre-cert.pem > \
+      $cert_dir/$server-precert-tmp.pem
+  else
+    cat $cert_dir/$server-pre-cert.pem > $cert_dir/$server-precert-tmp.pem
+  fi
+
+  # If the CA is an intermediate, then we need to include its certificate, too.
+  if [ $ca_is_intermediate == "true" ]; then
+    cat $cert_dir/$server-precert-tmp.pem $cert_dir/$ca-cert.pem > \
+      $cert_dir/$server-precert-bundle.pem
+  else
+    cat $cert_dir/$server-precert-tmp.pem > \
+      $cert_dir/$server-precert-bundle.pem
+  fi
+
+  ../client/ct upload \
+    --ct_server_submission=$cert_dir/$server-precert-bundle.pem \
+    --ct_server="127.0.0.1" --ct_server_port=$log_server_port \
+    --ct_server_public_key=$cert_dir/$log_server-key-public.pem \
+    --ct_server_response_out=$cert_dir/$server-pre-cert.proof \
+    --precert=true --logtostderr=true
+  rm $cert_dir/$server-precert-tmp.pem
+  rm $cert_dir/$server-precert-bundle.pem
 
   # Create a new extensions config with the embedded proof
   cp precert.conf $cert_dir/$server-extensions.conf
@@ -208,7 +244,7 @@ make_certs() {
     sed 's/serial=//' > $cert_dir/$ca-serial
 
   issue_cert $cert_dir $ca $server $cert_dir/$server-extensions.conf embedded \
-    false $server-embedded
+    false $server
 
   # Restore the serial number
   mv $cert_dir/$ca-serial.bak $cert_dir/$ca-serial

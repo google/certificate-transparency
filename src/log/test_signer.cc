@@ -58,15 +58,62 @@ const char kDefaultDerCert[] =
     "0a11e25f04078df88fc388b61b867a8de46216c0e17c31fc7d8003ecc37be22292f84242ab"
     "87fb08bd4dfa3c1b9ce4d3ee6667da";
 
+const char kDefaultDerPrecert[] =
+    "308202df30820248a003020102020107300d06092a864886f70d01010505003055310b3009"
+    "06035504061302474231243022060355040a131b4365727469666963617465205472616e73"
+    "706172656e6379204341310e300c0603550408130557616c65733110300e06035504071307"
+    "4572772057656e301e170d3132303630313030303030305a170d3232303630313030303030"
+    "305a3052310b30090603550406130247423121301f060355040a1318436572746966696361"
+    "7465205472616e73706172656e6379310e300c0603550408130557616c65733110300e0603"
+    "55040713074572772057656e30819f300d06092a864886f70d010101050003818d00308189"
+    "02818100bed8893cc8f177efc548df4961443f999aeda90471992f818bf8b61d0df19d6eec"
+    "3d596c9b43e60033a501c8cffcc438f49f5edb3662aaaecf180e7c9b59fc4bd465c18c406b"
+    "3b70cdde52d5dec42aaef913c2173592c76130f2399de6ccd6e75e04ccea7d7e4bdf4bacb1"
+    "6b5fe6972974bca8bcb3e8468dec941e945fdf98310203010001a381c13081be301d060355"
+    "1d0e04160414a4998f6b0abefd0e549bd56f221da976d0ce57d6307d0603551d2304763074"
+    "801436331299dbdc389d1cccfe31c08b8932501a8f7ca159a4573055310b30090603550406"
+    "1302474231243022060355040a131b4365727469666963617465205472616e73706172656e"
+    "6379204341310e300c0603550408130557616c65733110300e060355040713074572772057"
+    "656e82010030090603551d13040230003013060a2b06010401d6790204030101ff04020500"
+    "300d06092a864886f70d010105050003818100baccef72c1ae51a83fd1d3f5c76ccd646010"
+    "e8abab447756747049e5213ec54c38f612723cf94abe9b6d7bb9b4021ff39d36612566aba1"
+    "d6ef2a3be66f0a9bb31e8927c97f983a51b1039843dda4399b4ddc309b7c22b5d31eeed18a"
+    "5ae2525a1c3a8be126cf53d54583f684f0882b950cb5fd9362ea2bdf982bc70d273b9085";
+
+const char kDefaultKeyHash[] =
+    "2518ce9dcf869f18562d21cf7d040cbacc75371f019f8bea8cbe2f5f6619472d";
+
+const char kDefaultDerTbsCert[] =
+    "30820233a003020102020107300d06092a864886f70d01010505003055310b300906035504"
+    "061302474231243022060355040a131b4365727469666963617465205472616e7370617265"
+    "6e6379204341310e300c0603550408130557616c65733110300e0603550407130745727720"
+    "57656e301e170d3132303630313030303030305a170d3232303630313030303030305a3052"
+    "310b30090603550406130247423121301f060355040a131843657274696669636174652054"
+    "72616e73706172656e6379310e300c0603550408130557616c65733110300e060355040713"
+    "074572772057656e30819f300d06092a864886f70d010101050003818d0030818902818100"
+    "bed8893cc8f177efc548df4961443f999aeda90471992f818bf8b61d0df19d6eec3d596c9b"
+    "43e60033a501c8cffcc438f49f5edb3662aaaecf180e7c9b59fc4bd465c18c406b3b70cdde"
+    "52d5dec42aaef913c2173592c76130f2399de6ccd6e75e04ccea7d7e4bdf4bacb16b5fe697"
+    "2974bca8bcb3e8468dec941e945fdf98310203010001a381ac3081a9301d0603551d0e0416"
+    "0414a4998f6b0abefd0e549bd56f221da976d0ce57d6307d0603551d230476307480143633"
+    "1299dbdc389d1cccfe31c08b8932501a8f7ca159a4573055310b3009060355040613024742"
+    "31243022060355040a131b4365727469666963617465205472616e73706172656e63792043"
+    "41310e300c0603550408130557616c65733110300e060355040713074572772057656e8201"
+    "0030090603551d1304023000";
+
 const char kDefaultDerCertHash[] =
     "50335d9cd3649871d0c95397648bf7814c297b3bad7020b2c13d2b0aef6e3b49";
 
 // Some time in September 2012.
 const uint64_t kDefaultSCTTimestamp = 1348589665525LL;
 
-const char kDefaultSCTSignature[] =
+const char kDefaultCertSCTSignature[] =
     "3046022100d3f7690e7ee80d9988a54a3821056393e9eb0c686ad67fbae3686c888fb1a3ce"
     "022100f9a51c6065bbba7ad7116a31bea1c31dbed6a921e1df02e4b403757fae3254ae";
+
+const char kDefaultPrecertSCTSignature[] =
+    "304502206f247c7d1abe2b8f6c4530f99474f9ebe90629d21f76616389336f177ed7a7d002"
+    "21009d3a60c2b407ab5a725a692fc79d0d301d6da61baec43175ed07514c535f1120";
 
 // Some time in September 2012.
 const uint64_t kDefaultSTHTimestamp = 1348589667204LL;
@@ -165,7 +212,28 @@ void TestSigner::SetDefaults(SignedCertificateTimestamp *sct) {
   sct->clear_extension();
   sct->mutable_signature()->set_hash_algorithm(DigitallySigned::SHA256);
   sct->mutable_signature()->set_sig_algorithm(DigitallySigned::ECDSA);
-  sct->mutable_signature()->set_signature(B(kDefaultSCTSignature));
+  sct->mutable_signature()->set_signature(B(kDefaultCertSCTSignature));
+}
+
+// static
+void TestSigner::SetPrecertDefaults(LogEntry *entry) {
+  entry->set_type(ct::PRECERT_ENTRY);
+  entry->mutable_precert_entry()->set_pre_certificate(B(kDefaultDerPrecert));
+  entry->mutable_precert_entry()->mutable_pre_cert()->
+      set_issuer_key_hash(B(kDefaultKeyHash));
+  entry->mutable_precert_entry()->mutable_pre_cert()->
+      set_tbs_certificate(B(kDefaultDerTbsCert));
+}
+
+// static
+void TestSigner::SetPrecertDefaults(SignedCertificateTimestamp *sct) {
+  sct->set_version(ct::V1);
+  sct->mutable_id()->set_key_id(B(kKeyID));
+  sct->set_timestamp(kDefaultSCTTimestamp);
+  sct->clear_extension();
+  sct->mutable_signature()->set_hash_algorithm(DigitallySigned::SHA256);
+  sct->mutable_signature()->set_sig_algorithm(DigitallySigned::ECDSA);
+  sct->mutable_signature()->set_signature(B(kDefaultPrecertSCTSignature));
 }
 
 // static
@@ -238,7 +306,11 @@ void TestSigner::CreateUnique(LogEntry *entry) {
       }
     }
   } else {
-    entry->mutable_precert_entry()->set_tbs_certificate(
+    entry->mutable_precert_entry()->set_pre_certificate(
+        UniqueFakeCertBytestring());
+    entry->mutable_precert_entry()->mutable_pre_cert()->set_issuer_key_hash(
+        UniqueHash());
+    entry->mutable_precert_entry()->mutable_pre_cert()->set_tbs_certificate(
         UniqueFakeCertBytestring());
     if (random_bits & 2) {
       entry->mutable_precert_entry()->add_precertificate_chain(
@@ -269,7 +341,7 @@ void TestSigner::CreateUniqueFakeSignature(LoggedCertificate *logged_cert) {
   logged_cert->mutable_sct()->mutable_signature()->set_sig_algorithm(
       DigitallySigned::ECDSA);
   logged_cert->mutable_sct()->mutable_signature()->set_signature(
-      B(kDefaultSCTSignature));
+      B(kDefaultCertSCTSignature));
 }
 
 void TestSigner::CreateUnique(SignedTreeHead *sth) {
@@ -301,12 +373,17 @@ void TestSigner::TestEqualX509Entries(const X509ChainEntry &entry0,
 // static
 void TestSigner::TestEqualPreEntries(const PrecertChainEntry &entry0,
                                      const PrecertChainEntry &entry1) {
-  EXPECT_EQ(H(entry0.tbs_certificate()), H(entry1.tbs_certificate()));
+  EXPECT_EQ(H(entry0.pre_certificate()), H(entry1.pre_certificate()));
   EXPECT_EQ(entry0.precertificate_chain_size(),
             entry1.precertificate_chain_size());
   for (int i = 0; i < entry0.precertificate_chain_size(); ++i)
     EXPECT_EQ(H(entry0.precertificate_chain(i)),
               H(entry1.precertificate_chain(i)));
+
+  EXPECT_EQ(H(entry0.pre_cert().issuer_key_hash()),
+            H(entry1.pre_cert().issuer_key_hash()));
+  EXPECT_EQ(H(entry0.pre_cert().tbs_certificate()),
+            H(entry1.pre_cert().tbs_certificate()));
 }
 
 // static

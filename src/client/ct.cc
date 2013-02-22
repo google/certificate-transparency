@@ -62,7 +62,8 @@ DEFINE_bool(ssl_client_expect_handshake_failure, false,
             "Expect the handshake to fail. If this is set to true, then "
             "the program exits with 0 iff there is a handshake failure. "
             "Used for testing.");
-DEFINE_string(certificate_in, "", "Certificate to analyze, in PEM format");
+DEFINE_string(certificate_chain_in, "", "Certificate chain to analyze, "
+              "in PEM format");
 
 static const char kUsage[] =
     " <command> ...\n"
@@ -72,7 +73,7 @@ static const char kUsage[] =
     "certificate - make a superfluous proof certificate\n"
     "extension_data - convert an audit proof to TLS extension format\n"
     "configure_proof - write the proof in an X509v3 configuration file\n"
-    "diagnose_cert - print info about the SCTs the cert carries\n"
+    "diagnose_chain - print info about the SCTs the cert chain carries\n"
     "Use --help to display command-line flag options\n";
 
 using ct::LogEntry;
@@ -454,18 +455,19 @@ static AuditResult Audit() {
   return audit_result;
 }
 
-static void DiagnoseCert() {
-  string cert_file = FLAGS_certificate_in;
-  CHECK(!cert_file.empty()) << "Please give a certificate with "
+static void DiagnoseCertChain() {
+  string cert_file = FLAGS_certificate_chain_in;
+  CHECK(!cert_file.empty()) << "Please give a certificate chain with "
                                        << "--certificate_in";
-  string pem_cert;
-  PCHECK(util::ReadBinaryFile(cert_file, &pem_cert))
-      << "Could not read certificate from " << cert_file;
-  Cert cert(pem_cert);
-  CHECK(cert.IsLoaded())
-      << cert_file << " is not a valid PEM-encoded certificate";
+  string pem_chain;
+  PCHECK(util::ReadBinaryFile(cert_file, &pem_chain))
+      << "Could not read certificate chain from " << cert_file;
+  CertChain chain(pem_chain);
+  CHECK(chain.IsLoaded())
+      << cert_file << " is not a valid PEM-encoded certificate chain";
 
-  if (!cert.HasExtension(Cert::kEmbeddedProofExtensionOID)) {
+
+  if (!chain.LeafCert()->HasExtension(Cert::kEmbeddedProofExtensionOID)) {
     LOG(ERROR) << "Certificate has no embedded SCTs";
     return;
   }
@@ -478,12 +480,12 @@ static void DiagnoseCert() {
     LOG(WARNING) << "No log server public key given, skipping verification";
   } else {
     verifier = GetLogVerifierFromFlags();
-    CertSubmissionHandler::X509CertToEntry(cert, &entry);
+    CertSubmissionHandler::X509ChainToEntry(chain, &entry);
   }
 
   string serialized_scts;
-  if (!cert.OctetStringExtensionData(Cert::kEmbeddedProofExtensionOID,
-                                     &serialized_scts)) {
+  if (!chain.LeafCert()->OctetStringExtensionData(
+          Cert::kEmbeddedProofExtensionOID, &serialized_scts)) {
     LOG(ERROR) << "SCT extension data is invalid.";
     return;
   }
@@ -565,8 +567,8 @@ int main(int argc, char **argv) {
     ProofToExtensionData();
   } else if (cmd == "configure_proof") {
     WriteProofToConfig();
-  } else if (cmd == "diagnose_cert") {
-    DiagnoseCert();
+  } else if (cmd == "diagnose_chain") {
+    DiagnoseCertChain();
   } else {
     std::cout << google::ProgramUsage();
   }

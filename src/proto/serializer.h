@@ -47,8 +47,11 @@ class Serializer {
   static const size_t kHashAlgorithmLengthInBytes;
   static const size_t kSigAlgorithmLengthInBytes;
   static const size_t kVersionLengthInBytes;
+  // Log Key ID
   static const size_t kKeyIDLengthInBytes;
   static const size_t kMerkleLeafTypeLengthInBytes;
+  // Public key hash from cert
+  static const size_t kKeyHashLengthInBytes;
 
   static size_t PrefixLength(size_t max_length);
 
@@ -60,16 +63,26 @@ class Serializer {
   // Helper method to hide some of the ugly select logic.
   static std::string LeafCertificate(const ct::LogEntry &entry);
 
-  static SerializeResult SerializeV1SCTSignatureInput(
-      uint64_t timestamp, ct::LogEntryType type, const std::string &certificate,
+  static SerializeResult SerializeV1CertSCTSignatureInput(
+      uint64_t timestamp, const std::string &certificate,
+      const std::string &extensions, std::string *result);
+
+  static SerializeResult SerializeV1PrecertSCTSignatureInput(
+      uint64_t timestamp, const std::string &issuer_key_hash,
+      const std::string &tbs_certificate,
       const std::string &extensions, std::string *result);
 
   static SerializeResult SerializeSCTSignatureInput(
       const ct::SignedCertificateTimestamp &sct,
       const ct::LogEntry &entry, std::string *result);
 
-  static SerializeResult SerializeV1SCTMerkleTreeLeaf(
-      uint64_t timestamp, ct::LogEntryType type, const std::string &certificate,
+  static SerializeResult SerializeV1CertSCTMerkleTreeLeaf(
+      uint64_t timestamp, const std::string &certificate,
+      const std::string &extensions, std::string *result);
+
+  static SerializeResult SerializeV1PrecertSCTMerkleTreeLeaf(
+      uint64_t timestamp, const std::string &issuer_key_hash,
+      const std::string &tbs_certificate,
       const std::string &extensions, std::string *result);
 
   static SerializeResult
@@ -130,6 +143,8 @@ static SerializeResult SerializeSCTList(
       size_t max_total_length, std::string *result);
 
   SerializeResult WriteDigitallySigned(const ct::DigitallySigned &sig);
+
+  static SerializeResult CheckKeyHashFormat(const std::string &key_hash);
 
   static SerializeResult CheckSignatureFormat(const ct::DigitallySigned &sig);
 

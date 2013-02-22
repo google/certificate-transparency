@@ -49,12 +49,28 @@ message X509ChainEntry {
   repeated bytes certificate_chain = 2;
 }
 
+// opaque TBSCertificate<1..2^16-1>;
+// struct {
+//   opaque issuer_key_hash[32];
+//   TBSCertificate tbs_certificate;
+// } PreCert;
+// TODO(benl, ekasper): call this something more original in the I-D.
+message PreCert {
+  optional bytes issuer_key_hash = 1;
+  optional bytes tbs_certificate = 2;
+}
+
 message PrecertChainEntry {
-  // <0..2^24-1>
-  optional bytes tbs_certificate = 1;
   // <1..2^24-1>
-  // The full original pre-cert chain, as submitted by the CA.
+  optional bytes pre_certificate = 1;
+  // <0..2^24-1>
+  // The chain certifying the precertificate, as submitted by the CA.
   repeated bytes precertificate_chain = 2;
+
+  // PreCert input to the SCT. Can be computed from the above.
+  // Store it alongside the entry data so that the signers don't have to
+  // parse certificates to recompute it.
+  optional PreCert pre_cert = 3;
 }
 
 message LogEntry {

@@ -53,15 +53,27 @@ CertSubmissionHandler::ProcessSubmission(const string &submission,
 }
 
 // static
-void
-CertSubmissionHandler::X509CertToEntry(const Cert &cert, LogEntry *entry) {
-  CHECK(cert.IsLoaded());
-  if (cert.HasExtension(Cert::kEmbeddedProofExtensionOID)) {
+bool
+CertSubmissionHandler::X509ChainToEntry(const CertChain &chain,
+                                        LogEntry *entry) {
+  CHECK(chain.IsLoaded());
+
+  if (chain.LeafCert()->HasExtension(Cert::kEmbeddedProofExtensionOID)) {
+    if (chain.Length() < 2)
+      // need issuer
+      return false;
+
     entry->set_type(ct::PRECERT_ENTRY);
-    entry->mutable_precert_entry()->set_tbs_certificate(TbsCertificate(cert));
+    entry->mutable_precert_entry()->mutable_pre_cert()->set_issuer_key_hash(
+        chain.CertAt(1)->PublicKeySha256Digest());
+    entry->mutable_precert_entry()->mutable_pre_cert()->
+        set_tbs_certificate(TbsCertificate(*chain.LeafCert()));
+    return true;
   } else {
     entry->set_type(ct::X509_ENTRY);
-    entry->mutable_x509_entry()->set_leaf_certificate(cert.DerEncoding());
+    entry->mutable_x509_entry()->set_leaf_certificate(
+        chain.LeafCert()->DerEncoding());
+    return true;
   }
 }
 
@@ -77,7 +89,7 @@ CertSubmissionHandler::ProcessX509Submission(const string &submission,
   if (!chain.IsLoaded())
     return INVALID_PEM_ENCODED_CHAIN;
 
-  CertChecker::CertVerifyResult result = cert_checker_->CheckCertChain(chain);
+  CertChecker::CertVerifyResult result = cert_checker_->CheckCertChain(&chain);
   if (result != CertChecker::OK)
     return GetVerifyError(result);
 
@@ -100,19 +112,40 @@ CertSubmissionHandler::ProcessPreCertSubmission(const string &submission,
     return INVALID_PEM_ENCODED_CHAIN;
 
   CertChecker::CertVerifyResult result =
-      cert_checker_->CheckPreCertChain(chain);
+      cert_checker_->CheckPreCertChain(&chain);
   if (result != CertChecker::OK)
     return GetVerifyError(result);
 
   // We have a valid chain; make the entry.
-  entry->set_tbs_certificate(TbsCertificate(chain));
-  entry->add_precertificate_chain(chain.PreCert()->DerEncoding());
-  entry->add_precertificate_chain(chain.CaPreCert()->DerEncoding());
-  for (size_t i = 0; i < chain.IntermediateLength(); ++i)
-    entry->add_precertificate_chain(chain.IntermediateAt(i)->DerEncoding());
+  // TODO(ekasper): amend the I-D to require the log to always store and return
+  // the root certificate used to verify the submission, even if the submission
+  // omits it. While this bloats data returned to monitors, it is desirable
+  // as a log's root set may change over time, and if a root cert of a past
+  // submission has been removed, monitors have no other way of retrieving it
+  // for inspection. (sync with https://codereview.appspot.com/7303098/)
+  entry->set_pre_certificate(chain.LeafCert()->DerEncoding());
+  for (size_t i = 1; i < chain.Length(); ++i)
+    entry->add_precertificate_chain(chain.CertAt(i)->DerEncoding());
+
+  // Now populate the bytes that we'll end up signing.
+  // We glue this to the entry here, so we don't have to re-parse the X509
+  // later. It means we'll end up storing the modified TBS as well as the
+  // original leaf cert but oh well.
+  // According to the CertChecker contract, we have at least two certs;
+  // three if there is a Precert Signing Certificate.
+  if (chain.UsesPrecertSigningCertificate()) {
+    entry->mutable_pre_cert()->set_issuer_key_hash(
+        chain.CertAt(2)->PublicKeySha256Digest());
+  } else {
+    entry->mutable_pre_cert()->set_issuer_key_hash(
+        chain.CertAt(1)->PublicKeySha256Digest());
+  }
+  entry->mutable_pre_cert()->set_tbs_certificate(TbsCertificate(chain));
+
   return OK;
 }
 
+// static
 string CertSubmissionHandler::TbsCertificate(const PreCertChain &chain) {
   if (!chain.IsLoaded() || !chain.IsWellFormed())
     return string();
@@ -121,33 +154,36 @@ string CertSubmissionHandler::TbsCertificate(const PreCertChain &chain) {
   CHECK_NOTNULL(tbs);
   CHECK(tbs->IsLoaded());
 
-  // Remove the poison extension and the signature.
+  // Remove the poison extension.
   tbs->DeleteExtension(Cert::kPoisonExtensionOID);
-  tbs->DeleteSignature();
 
-  // Fix the issuer.
-  const Cert *ca_precert = chain.CaPreCert();
-  CHECK_NOTNULL(ca_precert);
-  CHECK(ca_precert->IsLoaded());
-  tbs->CopyIssuerFrom(*ca_precert);
+  // If the issuing cert is the special Precert Signing Certificate,
+  // fix the issuer.
+  if (chain.UsesPrecertSigningCertificate()) {
+    // The issuing cert is not a real cert: replace the issuer with the
+    // one that will sign the final cert.
+    // Should always succeed as we've already verified that the chain
+    // is well-formed.
+    CHECK(tbs->CopyIssuerFrom(*chain.PrecertIssuingCert()));
+  }
 
-  string der_cert = tbs->DerEncoding();
+  string der_tbs = tbs->DerEncodedTbsCertificate();
   delete tbs;
-  return der_cert;
+  return der_tbs;
 }
 
+// static
 string CertSubmissionHandler::TbsCertificate(const Cert &cert) {
   CHECK(cert.IsLoaded());
 
   Cert *tbs = cert.Clone();
 
-  // Delete the signature and the embedded proof.
+  // Delete the embedded proof.
   tbs->DeleteExtension(Cert::kEmbeddedProofExtensionOID);
-  tbs->DeleteSignature();
 
-  string der_cert = tbs->DerEncoding();
+  string der_tbs = tbs->DerEncodedTbsCertificate();
   delete tbs;
-  return der_cert;
+  return der_tbs;
 }
 
 // static

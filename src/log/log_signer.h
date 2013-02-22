@@ -31,9 +31,13 @@ class LogSigner {
   // In accordance with the spec, timestamp should be UTC time,
   // since January 1, 1970, 00:00, in milliseconds.
   SignResult SignV1CertificateTimestamp(
-      uint64_t timestamp, ct::LogEntryType type,
-      const std::string &leaf_certificate, const std::string &extensions,
-      std::string *result) const;
+      uint64_t timestamp, const std::string &leaf_certificate,
+      const std::string &extensions, std::string *result) const;
+
+  SignResult SignV1PrecertificateTimestamp(
+      uint64_t timestamp, const std::string &issuer_key_hash,
+      const std::string &tbs_certificate,
+      const std::string &extensions, std::string *result) const;
 
   // Sign the cert timestamp and write the resulting DigitallySigned
   // signature message into |sct|.
@@ -87,9 +91,14 @@ class LogSigVerifier {
   };
 
   // The protobuf-agnostic library version.
-  VerifyResult VerifyV1SCTSignature(
-      uint64_t timestamp, ct::LogEntryType type, const std::string &leaf_cert,
+  VerifyResult VerifyV1CertSCTSignature(
+      uint64_t timestamp, const std::string &leaf_cert,
       const std::string &extensions, const std::string &signature) const;
+
+  VerifyResult VerifyV1PrecertSCTSignature(
+      uint64_t timestamp, const std::string &issuer_key_hash,
+      const std::string &tbs_cert, const std::string &extensions,
+      const std::string &signature) const;
 
   VerifyResult VerifySCTSignature(
       const ct::LogEntry &entry,
