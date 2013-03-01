@@ -301,10 +301,10 @@ d0 d1   d2 d3           d0 d1   d2 d3  d4 d5
       <section title="Structure of the Signed Certificate Timestamp">
 	<figure>
 	  <artwork>
-    enum { certificate_timestamp(0), tree_hash(1), 255 }
+    enum { certificate_timestamp(0), tree_hash(1), (255) }
       SignatureType;
 
-    enum { v1(0), 255 }
+    enum { v1(0), (255) }
       Version;
 
       struct {
@@ -434,7 +434,7 @@ d0 d1   d2 d3           d0 d1   d2 d3  d4 d5
 	</t>
 <figure>
   <artwork>
-    enum { timestamped_entry(0), 255 }
+    enum { timestamped_entry(0), (255) }
       MerkleLeafType;
 
     struct {
