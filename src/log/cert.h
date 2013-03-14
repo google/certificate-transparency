@@ -2,6 +2,7 @@
 #define CERT_H
 
 #include <assert.h>
+#include <gtest/gtest_prod.h>
 #include <openssl/asn1.h>
 #include <openssl/x509.h>
 #include <string>
@@ -9,20 +10,6 @@
 
 class Cert {
  public:
-  // superfluousCertificateExtension,
-  // the proof extension in a superfluous certificate.
-  static const char kProofExtensionOID[];
-  // sctExtension, the embedded proof extension.
-  static const char kEmbeddedProofExtensionOID[];
-  // poisonExtension, the poison extension in the PreCert (critical).
-  static const char kPoisonExtensionOID[];
-  // precertificateSigning, The Certificate Transparency Extended Key Usage OID
-  // (indicating that a certificate can be used for precert signing
-  // on behalf of the issuing CA).
-  static const char kCtExtendedKeyUsageOID[];
-
-  static ASN1_OBJECT *ExtensionObject(const std::string oid);
-  // Does not take ownership of the X509 object; makes a local copy.
   explicit Cert(X509 *x509);
   // May fail, but we don't want to die on invalid inputs,
   // so caller should check IsLoaded() before doing anything else.
@@ -37,23 +24,20 @@ class Cert {
 
   Cert *Clone() const;
 
-  bool HasExtension(const std::string &extension_oid) const;
-
   bool HasExtension(int nid) const;
 
   // Caller must always first check that the extension exists.
-  bool IsCriticalExtension(const std::string &extension_oid) const;
   bool IsCriticalExtension(int extension_nid) const;
 
   // If the extension is a valid ASN.1-encoded octet string, writes the
   // (binary) contents (with the ASN.1 wrapping removed) to result and returns
   // true. Else returns false and leaves |result| unmodified.
-  bool OctetStringExtensionData(const std::string &extension_oid,
+  bool OctetStringExtensionData(int extension_nid,
                                 std::string *result) const;
 
   bool HasBasicConstraintCA() const;
 
-  bool HasExtendedKeyUsage(const std::string &key_usage_oid) const;
+  bool HasExtendedKeyUsage(int key_usage_nid) const;
 
   bool IsIssuedBy(const Cert &issuer) const;
 
@@ -76,8 +60,6 @@ class Cert {
   // They are mostly needed for processing precerts. Use with care.
 
   // Delete the matching extension, if present.
-  void DeleteExtension(const std::string &extension_oid);
-
   void DeleteExtension(int extension_nid);
 
   // Delete signature, if present.
@@ -88,12 +70,16 @@ class Cert {
 
   // CertChecker needs access to the x509_ structure directly.
   friend class CertChecker;
+  // Allow CtExtensions tests to poke around the private members
+  // for convenience.
+  FRIEND_TEST(CtExtensionsTest, TestSCTExtension);
+  FRIEND_TEST(CtExtensionsTest, TestEmbeddedSCTExtension);
+  FRIEND_TEST(CtExtensionsTest, TestPoisonExtension);
+  FRIEND_TEST(CtExtensionsTest, TestPrecertSigning);
  private:
   // Returns the index of a matching extension, or -1 for 'not found'.
-  int ExtensionIndex(const std::string &extension_oid) const;
   int ExtensionIndex(int extension_nid) const;
   // Returns a pointer to a matching extension, or NULL for 'not found'.
-  X509_EXTENSION *GetExtension(const std::string &extension_oid) const;
   X509_EXTENSION *GetExtension(int extension_nid) const;
   static bool IsCriticalExtension(X509_EXTENSION *ext);
 

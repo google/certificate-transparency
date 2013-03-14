@@ -6,6 +6,7 @@
 
 #include "log/cert.h"
 #include "log/cert_checker.h"
+#include "log/ct_extensions.h"
 #include "util/testing.h"
 #include "util/util.h"
 
@@ -166,5 +167,6 @@ TEST_F(CertCheckerTest, PreCertWithPreCa) {
 int main(int argc, char**argv) {
   ct::test::InitTesting(argv[0], &argc, &argv, true);
   OpenSSL_add_all_algorithms();
+  ct::LoadCtExtensions();
   return RUN_ALL_TESTS();
 }

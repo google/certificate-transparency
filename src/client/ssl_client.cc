@@ -7,6 +7,7 @@
 #include "client/ssl_client.h"
 #include "log/cert.h"
 #include "log/cert_submission_handler.h"
+#include "log/ct_extensions.h"
 #include "log/log_verifier.h"
 #include "merkletree/serial_hasher.h"
 #include "proto/serializer.h"
@@ -132,20 +133,22 @@ int SSLClient::VerifyCallback(X509_STORE_CTX *ctx, void *arg) {
 
   string serialized_scts;
   // First, see if the cert has an embedded proof.
-  if (chain.LeafCert()->HasExtension(Cert::kEmbeddedProofExtensionOID)) {
-    LOG(INFO) << "Embedded proof extension found in certificate, "
-              << "verifying...";
-    if(!chain.LeafCert()->OctetStringExtensionData(
-           Cert::kEmbeddedProofExtensionOID, &serialized_scts)) {
-      LOG(ERROR) << "Could not parse extension data";
-    }
+  if (chain.LeafCert()->HasExtension(
+          ct::NID_ctEmbeddedSignedCertificateTimestampList)) {
+        LOG(INFO) << "Embedded proof extension found in certificate, "
+                  << "verifying...";
+        if(!chain.LeafCert()->OctetStringExtensionData(
+               ct::NID_ctEmbeddedSignedCertificateTimestampList,
+               &serialized_scts)) {
+          LOG(ERROR) << "Could not parse extension data";
+        }
     // Else look for the proof in a superfluous cert.
     // Let's assume the superfluous cert is always last in the chain.
   } else if (input_chain.Length() > 1 && input_chain.LastCert()->HasExtension(
-      Cert::kProofExtensionOID)) {
+      ct::NID_ctSignedCertificateTimestampList)) {
     LOG(INFO) << "Proof extension found in certificate, verifying...";
     if(!input_chain.LastCert()->OctetStringExtensionData(
-           Cert::kProofExtensionOID, &serialized_scts)) {
+           ct::NID_ctSignedCertificateTimestampList, &serialized_scts)) {
       LOG(ERROR) << "Could not parse extension data";
     }
   }

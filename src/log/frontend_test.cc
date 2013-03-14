@@ -5,6 +5,7 @@
 #include <string>
 
 #include "log/cert_submission_handler.h"
+#include "log/ct_extensions.h"
 #include "log/file_db.h"
 #include "log/frontend.h"
 #include "log/frontend_signer.h"
@@ -317,5 +318,6 @@ TYPED_TEST(FrontendTest, TestSubmitPrecertUsingPreCA) {
 int main(int argc, char **argv) {
   ct::test::InitTesting(argv[0], &argc, &argv, true);
   OpenSSL_add_all_algorithms();
+  ct::LoadCtExtensions();
   return RUN_ALL_TESTS();
 }

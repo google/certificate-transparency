@@ -20,6 +20,7 @@
 #include "include/ct.h"
 #include "log/cert_checker.h"
 #include "log/cert_submission_handler.h"
+#include "log/ct_extensions.h"
 #include "log/file_db.h"
 #include "log/file_storage.h"
 #include "log/frontend_signer.h"
@@ -471,6 +472,7 @@ int main(int argc, char **argv) {
   google::ParseCommandLineFlags(&argc, &argv, true);
   google::InitGoogleLogging(argv[0]);
   SSL_library_init();
+  ct::LoadCtExtensions();
 
   EVP_PKEY *pkey = NULL;
   CHECK_EQ(Services::ReadPrivateKey(&pkey, FLAGS_key), Services::KEY_OK);
