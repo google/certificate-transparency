@@ -119,7 +119,8 @@ merkletree/tree_hasher_test: merkletree/tree_hasher_test.o \
 	$(CXX) -o $@ $^ $(SYS_LIBS)
 
 ### log/ targets
-log/libcert.a: log/cert.o log/cert_checker.o log/cert_submission_handler.o
+log/libcert.a: log/cert.o log/cert_checker.o log/cert_submission_handler.o \
+               log/ct_extensions.o
 	rm -f $@
 	ar -rcs $@ $^
 
@@ -139,16 +140,20 @@ log_tests: log/cert_test log/cert_checker_test \
            log/frontend_signer_test log/frontend_test log/log_lookup_test \
            log/log_signer_test log/tree_signer_test log/logged_certificate_test
 
-log/cert_test: log/cert_test.o log/cert.o util/libutil.a
+log/cert_test: log/cert_test.o log/cert.o log/ct_extensions.o util/libutil.a
 	$(CXX) -o $@ $^ $(SYS_LIBS)
 
 log/cert_checker_test: log/cert_checker_test.o log/cert.o log/cert_checker.o \
-                       util/libutil.a
+                       log/ct_extensions.o util/libutil.a
 	$(CXX) -o $@ $^ $(SYS_LIBS)
 
 log/cert_submission_handler_test: log/cert_submission_handler_test.o \
                                   log/libcert.a proto/libproto.a \
                                   util/libutil.a 
+	$(CXX) -o $@ $^ $(SYS_LIBS)
+
+log/ct_extensions_test: log/ct_extensions_test.o log/cert.o \
+                        log/ct_extensions.o util/libutil.a
 	$(CXX) -o $@ $^ $(SYS_LIBS)
 
 log/database_large_test: log/database_large_test.o log/libdatabase.a \
@@ -227,6 +232,7 @@ test: all
 	log/cert_test --test_certs_dir=test/testdata
 	log/cert_checker_test --test_certs_dir=test/testdata
 	log/cert_submission_handler_test --test_certs_dir=test/testdata
+	log/ct_extensions_test --test_certs_dir=test/testdata
 	log/file_storage_test
 	log/database_test
 # Do not run log/database_large_test by default

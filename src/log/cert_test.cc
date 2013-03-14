@@ -5,6 +5,7 @@
 #include <string>
 
 #include "log/cert.h"
+#include "log/ct_extensions.h"
 #include "util/testing.h"
 #include "util/util.h"
 
@@ -74,9 +75,9 @@ TEST_F(CertTest, Cert) {
   EXPECT_TRUE(ca.IsSelfSigned());
 
   // Some more extensions.
-  EXPECT_TRUE(ca_pre.HasExtendedKeyUsage(Cert::kCtExtendedKeyUsageOID));
-  EXPECT_TRUE(pre.HasExtension(Cert::kPoisonExtensionOID));
-  EXPECT_TRUE(pre.IsCriticalExtension(Cert::kPoisonExtensionOID));
+  EXPECT_TRUE(ca_pre.HasExtendedKeyUsage(ct::NID_ctPrecertificateSigning));
+  EXPECT_TRUE(pre.HasExtension(ct::NID_ctPoison));
+  EXPECT_TRUE(pre.IsCriticalExtension(ct::NID_ctPoison));
 
   // Bogus certs.
   Cert invalid("");
@@ -146,5 +147,6 @@ TEST_F(CertTest, PreCertChain) {
 int main(int argc, char**argv) {
   ct::test::InitTesting(argv[0], &argc, &argv, true);
   OpenSSL_add_all_algorithms();
+  ct::LoadCtExtensions();
   return RUN_ALL_TESTS();
 }

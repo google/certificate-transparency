@@ -12,7 +12,7 @@ namespace ct {
 
 class LoggedCertificate : public LoggedCertificatePB {
  public:
-  const std::string Hash() const {
+  std::string Hash() const {
     return Sha256Hasher::Sha256Digest(Serializer::LeafCertificate(entry()));
   }
 

@@ -1,4 +1,3 @@
-/* -*- indent-tabs-mode: nil -*- */
 #include <fcntl.h>
 #include <fstream>
 #include <gflags/gflags.h>
@@ -19,6 +18,7 @@
 #include "client/ssl_client.h"
 #include "log/cert.h"
 #include "log/cert_submission_handler.h"
+#include "log/ct_extensions.h"
 #include "log/log_signer.h"
 #include "log/log_verifier.h"
 #include "merkletree/merkle_verifier.h"
@@ -66,6 +66,7 @@ DEFINE_bool(ssl_client_expect_handshake_failure, false,
 DEFINE_string(certificate_chain_in, "", "Certificate chain to analyze, "
               "in PEM format");
 DEFINE_string(sct_in, "", "SCT to wrap");
+
 
 static const char kUsage[] =
     " <command> ...\n"
@@ -116,16 +117,8 @@ static LogVerifier *GetLogVerifierFromFlags() {
 
 // Adds the data to the cert as an extension, formatted as a single
 // ASN.1 octet string.
-static void AddOctetExtension(X509 *cert, const char *oid,
-                              const unsigned char *data,
+static void AddOctetExtension(X509 *cert, int nid, const unsigned char *data,
                               int data_len, int critical) {
-  ASN1_OBJECT *obj = Cert::ExtensionObject(oid);
-  CHECK_NOTNULL(obj);
-  X509_EXTENSION *ext = X509_EXTENSION_new();
-  CHECK_NOTNULL(ext);
-  CHECK_EQ(1, X509_EXTENSION_set_object(ext, obj));
-  CHECK_EQ(1, X509_EXTENSION_set_critical(ext, critical));
-
   // The extension as a single octet string.
   ASN1_OCTET_STRING *inner = ASN1_OCTET_STRING_new();
   CHECK_NOTNULL(inner);
@@ -142,9 +135,13 @@ static void AddOctetExtension(X509 *cert, const char *oid,
   ASN1_OCTET_STRING *asn1_data = ASN1_OCTET_STRING_new();
   CHECK_NOTNULL(asn1_data);
   CHECK_EQ(1, ASN1_OCTET_STRING_set(asn1_data, buf, buf_len));
-  CHECK_EQ(1, X509_EXTENSION_set_data(ext, asn1_data));
 
+  X509_EXTENSION *ext = X509_EXTENSION_create_by_NID(NULL, nid, critical,
+                                                     asn1_data);
   CHECK_EQ(1, X509_add_ext(cert, ext, -1));
+
+  ASN1_OCTET_STRING_free(inner);
+  ASN1_OCTET_STRING_free(asn1_data);
   delete buf;
 }
 
@@ -205,9 +202,9 @@ static int Upload() {
      didn't include it (might be missing the root certificate, might
      be a pre-cert chain). In the meantime this breaks self-tests.
 
-  SSLClientCTData ct_data;
-  CertChain chain(contents);
-  CHECK(CheckSCT(sct, chain, &ct_data));
+     SSLClientCTData ct_data;
+     CertChain chain(contents);
+     CHECK(CheckSCT(sct, chain, &ct_data));
   */
 
   // TODO(ekasper): Process the |contents| bundle so that we can verify
@@ -299,7 +296,7 @@ static void MakeCert() {
 
   // And finally, the proof in an extension
   string serialized_sct_list = SCTToList(sct);
-  AddOctetExtension(x, Cert::kProofExtensionOID,
+  AddOctetExtension(x, ct::NID_ctSignedCertificateTimestampList,
                     reinterpret_cast<const unsigned char*>(
                         serialized_sct_list.data()),
                     serialized_sct_list.size(), 1);
@@ -337,7 +334,7 @@ static void WriteProofToConfig() {
   PCHECK(conf_out.good()) << "Could not open extensions configuration file "
                           << conf_file << " for writing.";
 
-  conf_out << string(Cert::kEmbeddedProofExtensionOID)
+  conf_out << string(ct::kEmbeddedSCTListOID)
            << "=ASN1:FORMAT:HEX,OCTETSTRING:";
 
   conf_out << util::HexString(serialized_sct_list) << std::endl;
@@ -508,7 +505,9 @@ static void DiagnoseCertChain() {
   CHECK(chain.IsLoaded())
       << cert_file << " is not a valid PEM-encoded certificate chain";
 
-  if (!chain.LeafCert()->HasExtension(Cert::kEmbeddedProofExtensionOID)) {
+
+  if (!chain.LeafCert()->HasExtension(
+          ct::NID_ctEmbeddedSignedCertificateTimestampList)) {
     LOG(ERROR) << "Certificate has no embedded SCTs";
     return;
   }
@@ -526,7 +525,8 @@ static void DiagnoseCertChain() {
 
   string serialized_scts;
   if (!chain.LeafCert()->OctetStringExtensionData(
-          Cert::kEmbeddedProofExtensionOID, &serialized_scts)) {
+          ct::NID_ctEmbeddedSignedCertificateTimestampList,
+          &serialized_scts)) {
     LOG(ERROR) << "SCT extension data is invalid.";
     return;
   }
@@ -614,6 +614,7 @@ int main(int argc, char **argv) {
   }
 
   SSL_library_init();
+  ct::LoadCtExtensions();
 
   const string cmd(argv[1]);
 

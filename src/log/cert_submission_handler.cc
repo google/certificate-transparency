@@ -4,6 +4,7 @@
 #include "log/cert.h"
 #include "log/cert_checker.h"
 #include "log/cert_submission_handler.h"
+#include "log/ct_extensions.h"
 #include "proto/ct.pb.h"
 #include "proto/serializer.h"
 
@@ -58,7 +59,8 @@ CertSubmissionHandler::X509ChainToEntry(const CertChain &chain,
                                         LogEntry *entry) {
   CHECK(chain.IsLoaded());
 
-  if (chain.LeafCert()->HasExtension(Cert::kEmbeddedProofExtensionOID)) {
+  if (chain.LeafCert()->HasExtension(
+          ct::NID_ctEmbeddedSignedCertificateTimestampList)) {
     if (chain.Length() < 2)
       // need issuer
       return false;
@@ -155,7 +157,7 @@ string CertSubmissionHandler::TbsCertificate(const PreCertChain &chain) {
   CHECK(tbs->IsLoaded());
 
   // Remove the poison extension.
-  tbs->DeleteExtension(Cert::kPoisonExtensionOID);
+  tbs->DeleteExtension(ct::NID_ctPoison);
 
   // If the issuing cert is the special Precert Signing Certificate,
   // fix the issuer.
@@ -179,7 +181,7 @@ string CertSubmissionHandler::TbsCertificate(const Cert &cert) {
   Cert *tbs = cert.Clone();
 
   // Delete the embedded proof.
-  tbs->DeleteExtension(Cert::kEmbeddedProofExtensionOID);
+  tbs->DeleteExtension(ct::NID_ctEmbeddedSignedCertificateTimestampList);
 
   string der_tbs = tbs->DerEncodedTbsCertificate();
   delete tbs;

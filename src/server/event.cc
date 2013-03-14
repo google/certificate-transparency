@@ -1,4 +1,5 @@
 /* -*- indent-tabs-mode: nil -*- */
+#include <limits.h>
 #include <openssl/evp.h>
 #include <openssl/pem.h>
 
