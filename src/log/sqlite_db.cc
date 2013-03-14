@@ -97,8 +97,8 @@ template <class Logged> typename Database<Logged>::WriteResult
 SQLiteDB<Logged>::CreatePendingEntry_(const Logged &logged) {
   Statement statement(db_, "INSERT INTO leaves(hash, entry) "
                       "VALUES(?, ?)");
-
-  statement.BindBlob(0, logged.Hash());
+  string hash = logged.Hash();
+  statement.BindBlob(0, hash);
 
   string data;
   CHECK(logged.SerializeForDatabase(&data));
@@ -107,7 +107,8 @@ SQLiteDB<Logged>::CreatePendingEntry_(const Logged &logged) {
   int ret = statement.Step();
   if (ret == SQLITE_CONSTRAINT) {
     Statement s2(db_, "SELECT hash FROM leaves WHERE hash = ?");
-    s2.BindBlob(0, logged.Hash());
+    hash = logged.Hash();
+    s2.BindBlob(0, hash);
     CHECK_EQ(SQLITE_ROW, s2.Step());
     return this->DUPLICATE_CERTIFICATE_HASH;
   }
