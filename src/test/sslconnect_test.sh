@@ -153,7 +153,8 @@ test_ct_server() {
   sleep 2
 
   echo "Generating test certificates"
-  make_cert `pwd`/tmp `pwd`/tmp/ca-hashes test ca ct-server 8124 false
+  make_cert `pwd`/tmp test ca ct-server 8124 false \
+    `pwd`/tmp/ct-server-key-public.pem
   make_embedded_cert `pwd`/tmp `pwd`/tmp/ca-hashes test-embedded ca \
     ct-server 8124 false false
   make_embedded_cert `pwd`/tmp `pwd`/tmp/ca-hashes test-embedded-with-preca \
@@ -161,8 +162,8 @@ test_ct_server() {
   # Generate a second set of certs that chain through an intermediate
   make_intermediate_ca_certs `pwd`/tmp intermediate ca
 
-  make_cert `pwd`/tmp `pwd`/tmp/ca-hashes test-intermediate intermediate \
-    ct-server 8124 true
+  make_cert `pwd`/tmp test-intermediate intermediate \
+    ct-server 8124 true `pwd`/tmp/ct-server-key-public.pem
   make_embedded_cert `pwd`/tmp `pwd`/tmp/ca-hashes \
     test-embedded-with-intermediate intermediate ct-server 8124 true false
   make_embedded_cert `pwd`/tmp `pwd`/tmp/ca-hashes \

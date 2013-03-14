@@ -101,7 +101,7 @@ class Serializer {
   static SerializeResult SerializeSCT(const ct::SignedCertificateTimestamp &sct,
                                       std::string *result);
 
-static SerializeResult SerializeSCTList(
+  static SerializeResult SerializeSCTList(
     const ct::SignedCertificateTimestampList &sct_list, std::string *result);
 
   // TODO(ekasper): tests for these!

@@ -1,3 +1,4 @@
+/* -*- indent-tabs-mode: nil -*- */
 #include <fcntl.h>
 #include <fstream>
 #include <gflags/gflags.h>
@@ -64,6 +65,7 @@ DEFINE_bool(ssl_client_expect_handshake_failure, false,
             "Used for testing.");
 DEFINE_string(certificate_chain_in, "", "Certificate chain to analyze, "
               "in PEM format");
+DEFINE_string(sct_in, "", "SCT to wrap");
 
 static const char kUsage[] =
     " <command> ...\n"
@@ -74,6 +76,8 @@ static const char kUsage[] =
     "extension_data - convert an audit proof to TLS extension format\n"
     "configure_proof - write the proof in an X509v3 configuration file\n"
     "diagnose_chain - print info about the SCTs the cert chain carries\n"
+    "wrap - take an SCT and certificate chain and wrap them as if they were\n"
+    "       retrieved via 'connect'\n"
     "Use --help to display command-line flag options\n";
 
 using ct::LogEntry;
@@ -144,6 +148,32 @@ static void AddOctetExtension(X509 *cert, const char *oid,
   delete buf;
 }
 
+static bool CheckSCT(const SignedCertificateTimestamp &sct,
+                     const CertChain &chain, SSLClientCTData *ct_data) {
+  SSLClientCTData::SCTInfo *sct_info = ct_data->add_attached_sct_info();
+  sct_info->mutable_sct()->CopyFrom(sct);
+  LogEntry entry;
+  if (!CertSubmissionHandler::X509ChainToEntry(chain, &entry)) {
+    LOG(ERROR) << "Failed to reconstruct log entry input from chain";
+  } else {
+    ct_data->mutable_reconstructed_entry()->CopyFrom(entry);
+  }
+
+  LogVerifier *verifier = GetLogVerifierFromFlags();
+  string merkle_leaf;
+  LogVerifier::VerifyResult result =
+      verifier->VerifySignedCertificateTimestamp(ct_data->reconstructed_entry(),
+                                                 sct, &merkle_leaf);
+  if (result != LogVerifier::VERIFY_OK) {
+    LOG(ERROR) << "Verifier returned " << result;
+    return false;
+  }
+
+  sct_info->set_merkle_leaf_hash(merkle_leaf);
+
+  return true;
+}
+
 // Returns true if the server responds with a token; false if
 // it responds with an error.
 // 0 - ok
@@ -170,6 +200,15 @@ static int Upload() {
     LOG(ERROR) << "Submission failed";
     return 1;
   }
+
+  /* Temporarily removed: we need the the final chain if the upload
+     didn't include it (might be missing the root certificate, might
+     be a pre-cert chain). In the meantime this breaks self-tests.
+
+  SSLClientCTData ct_data;
+  CertChain chain(contents);
+  CHECK(CheckSCT(sct, chain, &ct_data));
+  */
 
   // TODO(ekasper): Process the |contents| bundle so that we can verify
   // the token.
@@ -348,6 +387,18 @@ static void ProofToExtensionData() {
   extension_data_out.close();
 }
 
+static void WriteSSLClientCTData(const SSLClientCTData &ct_data,
+                                 const string &ct_data_out_file) {
+  std::ofstream checkpoint_out(ct_data_out_file.c_str(),
+                               std::ios::out | std::ios::binary);
+  PCHECK(checkpoint_out.good()) << "Could not open checkpoint file "
+                                << ct_data_out_file << " for writing";
+  string serialized_data;
+  CHECK(ct_data.SerializeToString(&serialized_data));
+  checkpoint_out << serialized_data;
+  checkpoint_out.close();
+}
+
 // Return values upon completion
 //  0: handshake ok
 //  1: handshake error
@@ -373,17 +424,8 @@ static SSLClient::HandshakeResult Connect() {
       VLOG(5) << "Received SCTs:";
       for (int i = 0; i < ct_data.attached_sct_info_size(); ++i)
         VLOG(5) << ct_data.attached_sct_info(i).DebugString();
-      string ct_data_out_file = FLAGS_ssl_client_ct_data_out;
-      if (!ct_data_out_file.empty()) {
-        std::ofstream checkpoint_out(ct_data_out_file.c_str(),
-                                     std::ios::out | std::ios::binary);
-        PCHECK(checkpoint_out.good()) << "Could not open checkpoint file "
-                                      << ct_data_out_file << " for writing";
-        string serialized_data;
-        CHECK(ct_data.SerializeToString(&serialized_data));
-        checkpoint_out << serialized_data;
-        checkpoint_out.close();
-      }
+      if (!FLAGS_ssl_client_ct_data_out.empty())
+        WriteSSLClientCTData(ct_data, FLAGS_ssl_client_ct_data_out);
     }
   }
   return result;
@@ -458,14 +500,13 @@ static AuditResult Audit() {
 static void DiagnoseCertChain() {
   string cert_file = FLAGS_certificate_chain_in;
   CHECK(!cert_file.empty()) << "Please give a certificate chain with "
-                                       << "--certificate_in";
+                            << "--certificate_chain_in";
   string pem_chain;
   PCHECK(util::ReadBinaryFile(cert_file, &pem_chain))
       << "Could not read certificate chain from " << cert_file;
   CertChain chain(pem_chain);
   CHECK(chain.IsLoaded())
       << cert_file << " is not a valid PEM-encoded certificate chain";
-
 
   if (!chain.LeafCert()->HasExtension(Cert::kEmbeddedProofExtensionOID)) {
     LOG(ERROR) << "Certificate has no embedded SCTs";
@@ -526,6 +567,32 @@ static void DiagnoseCertChain() {
   }
 }
 
+// Wrap an SCT in an SSLClientCTData as if it came from an SSL server.
+void Wrap() {
+  string serialized_data;
+  PCHECK(util::ReadBinaryFile(FLAGS_sct_in, &serialized_data))
+      << "Could not read SCT data from " << FLAGS_sct_in;
+  SignedCertificateTimestamp sct;
+  CHECK_EQ(Deserializer::DeserializeSCT(serialized_data, &sct),
+           Deserializer::OK);
+
+  // FIXME(benl): This code is shared with DiagnoseCertChain().
+  string cert_file = FLAGS_certificate_chain_in;
+  CHECK(!cert_file.empty()) << "Please give a certificate chain with "
+                            << "--certificate_chain_in";
+  string pem_chain;
+  PCHECK(util::ReadBinaryFile(cert_file, &pem_chain))
+      << "Could not read certificate chain from " << cert_file;
+  CertChain chain(pem_chain);
+  CHECK(chain.IsLoaded())
+      << cert_file << " is not a valid PEM-encoded certificate chain";
+
+  SSLClientCTData ct_data;
+  CHECK(CheckSCT(sct, chain, &ct_data));
+
+  WriteSSLClientCTData(ct_data, FLAGS_ssl_client_ct_data_out);
+}
+
 // Exit code upon normal exit:
 // 0: success
 // 1: failure
@@ -569,6 +636,8 @@ int main(int argc, char **argv) {
     WriteProofToConfig();
   } else if (cmd == "diagnose_chain") {
     DiagnoseCertChain();
+  } else if (cmd == "wrap") {
+    Wrap();
   } else {
     std::cout << google::ProgramUsage();
   }
