@@ -8,7 +8,7 @@ Expires: September 15, 2013                               March 14, 2013
 
 
                         Certificate Transparency
-                      draft-laurie-pki-sunlight-07
+                      draft-laurie-pki-sunlight-08
 
 Abstract
 
@@ -1628,7 +1628,7 @@ Internet-Draft          Certificate Transparency              March 2013
 10.  Acknowledgements
 
    The authors would like to thank Stephen Farrell, Brad Hill, ... for
-   thair valuable contributions.
+   their valuable contributions.
 
 
 

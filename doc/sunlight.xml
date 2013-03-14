@@ -1,7 +1,7 @@
 <?xml version="1.0"?>
 <?rfc symrefs="yes"?>
 <?rfc toc="yes"?>
-<rfc ipr="trust200902" docName="draft-laurie-pki-sunlight-07" category="exp">
+<rfc ipr="trust200902" docName="draft-laurie-pki-sunlight-08" category="exp">
   <front>
     <title>Certificate Transparency</title>
     <author initials="B" surname="Laurie" fullname="Ben Laurie">
@@ -878,7 +878,7 @@ d0 d1   d2 d3           d0 d1   d2 d3  d4 d5
     </section>
     <section title="Acknowledgements">
       <t>
-	The authors would like to thank Stephen Farrell, Brad Hill, ... for thair valuable contributions.
+	The authors would like to thank Stephen Farrell, Brad Hill, ... for their valuable contributions.
       </t>
     </section>
   </middle>
