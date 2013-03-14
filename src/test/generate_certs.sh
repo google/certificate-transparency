@@ -123,12 +123,12 @@ make_intermediate_ca_certs() {
 # Call make_ca_certs and make_log_server_keys first
 make_cert() {
   cert_dir=$1
-  hash_dir=$2
-  server=$3
-  ca=$4
-  log_server=$5
-  log_server_port=$6
-  ca_is_intermediate=$7
+  server=$2
+  ca=$3
+  log_server=$4
+  log_server_port=$5
+  ca_is_intermediate=$6
+  local server_public_key=$7
 
   # Generate a new private key and CSR
   request_cert $cert_dir $server precert.conf
@@ -155,9 +155,17 @@ make_cert() {
   ../client/ct upload \
     --ct_server_submission=$cert_dir/$server-cert-bundle.pem \
     --ct_server="127.0.0.1" --ct_server_port=$log_server_port \
-    --ct_server_public_key=$cert_dir/$log_server-key-public.pem \
+    --ct_server_public_key=$server_public_key \
     --ct_server_response_out=$cert_dir/$server-cert.proof \
     --logtostderr=true 
+
+  # Create a wrapped SCT
+  ../client/ct wrap \
+    --sct_in=$cert_dir/$server-cert.proof \
+    --certificate_chain_in=$cert_dir/$server-cert-bundle.pem \
+    --ct_server_public_key=$cert_dir/$log_server-key-public.pem \
+    --ssl_client_ct_data_out=$cert_dir/$server-cert.ctdata
+
   rm $cert_dir/$server-cert-bundle.pem
 
   # Create a superfluous certificate
