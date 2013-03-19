@@ -49,7 +49,7 @@ class CtExtensionsTest : public ::testing::Test {
 TEST_F(CtExtensionsTest, TestSCTExtension) {
   // Sanity check
   Cert simple_cert(simple_cert_);
-  EXPECT_FALSE(simple_cert.HasExtension(
+  EXPECT_EQ(Cert::FALSE, simple_cert.HasExtension(
       ct::NID_ctSignedCertificateTimestampList));
 
   Cert sct_cert(sct_cert_);
@@ -60,7 +60,7 @@ TEST_F(CtExtensionsTest, TestSCTExtension) {
       ct::NID_ctSignedCertificateTimestampList));
 
   string ext_data;
-  EXPECT_TRUE(sct_cert.OctetStringExtensionData(
+  EXPECT_EQ(Cert::TRUE, sct_cert.OctetStringExtensionData(
       ct::NID_ctSignedCertificateTimestampList, &ext_data));
   EXPECT_FALSE(ext_data.empty());
 
@@ -86,7 +86,7 @@ TEST_F(CtExtensionsTest, TestSCTExtension) {
 TEST_F(CtExtensionsTest, TestEmbeddedSCTExtension) {
   // Sanity check
   Cert simple_cert(simple_cert_);
-  EXPECT_FALSE(simple_cert.HasExtension(
+  EXPECT_EQ(Cert::FALSE, simple_cert.HasExtension(
       ct::NID_ctEmbeddedSignedCertificateTimestampList));
 
   Cert embedded_sct_cert(embedded_sct_cert_);
@@ -97,7 +97,7 @@ TEST_F(CtExtensionsTest, TestEmbeddedSCTExtension) {
   ASSERT_TRUE(embedded_sct_cert.HasExtension(
       ct::NID_ctEmbeddedSignedCertificateTimestampList));
   string ext_data;
-  EXPECT_TRUE(embedded_sct_cert.OctetStringExtensionData(
+  EXPECT_EQ(Cert::TRUE, embedded_sct_cert.OctetStringExtensionData(
       ct::NID_ctEmbeddedSignedCertificateTimestampList, &ext_data));
   EXPECT_FALSE(ext_data.empty());
 
@@ -122,7 +122,7 @@ TEST_F(CtExtensionsTest, TestEmbeddedSCTExtension) {
 TEST_F(CtExtensionsTest, TestPoisonExtension) {
   // Sanity check
   Cert simple_cert(simple_cert_);
-  EXPECT_FALSE(simple_cert.HasExtension(ct::NID_ctPoison));
+  EXPECT_EQ(Cert::FALSE, simple_cert.HasExtension(ct::NID_ctPoison));
 
   Cert poison_cert(poison_cert_);
   ASSERT_TRUE(poison_cert.IsLoaded());
@@ -152,7 +152,7 @@ TEST_F(CtExtensionsTest, TestPoisonExtension) {
 TEST_F(CtExtensionsTest, TestPrecertSigning) {
   // Sanity check
   Cert simple_ca_cert(simple_ca_cert_);
-  EXPECT_FALSE(simple_ca_cert.HasExtendedKeyUsage(
+  EXPECT_EQ(Cert::FALSE, simple_ca_cert.HasExtendedKeyUsage(
       ct::NID_ctPrecertificateSigning));
 
   Cert pre_signing_cert(pre_signing_cert_);

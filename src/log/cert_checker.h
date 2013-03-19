@@ -28,10 +28,13 @@ class CertChecker {
     INVALID_CERTIFICATE_CHAIN,
     PRECERT_CHAIN_NOT_WELL_FORMED,
     ROOT_NOT_IN_LOCAL_STORE,
+    INTERNAL_ERROR,
   };
 
-  bool LoadTrustedCertificate(const std::string &trusted_cert_file);
+  // Load a file of concatenated PEM-certs.
+  bool LoadTrustedCertificates(const std::string &trusted_cert_file);
 
+  // Load a directory location.
   bool LoadTrustedCertificateDir(const std::string &trusted_cert_dir);
 
   // Check that:

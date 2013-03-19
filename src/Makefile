@@ -74,7 +74,7 @@ endif
 unit_tests: proto_tests merkletree_tests log_tests
 
 ### util/ targets
-util/libutil.a: util/util.o util/testing.o
+util/libutil.a: util/util.o util/openssl_util.o util/testing.o
 	rm -f $@
 	ar -rcs $@ $^
 

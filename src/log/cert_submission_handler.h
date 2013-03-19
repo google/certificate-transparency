@@ -26,6 +26,7 @@ class CertSubmissionHandler {
     INVALID_CERTIFICATE_CHAIN,
     PRECERT_CHAIN_NOT_WELL_FORMED,
     UNKNOWN_ROOT,
+    INTERNAL_ERROR,
   };
 
   // entry should have the expected type set.
@@ -46,8 +47,8 @@ class CertSubmissionHandler {
   SubmitResult ProcessPreCertSubmission(const std::string &submission,
                                         ct::PrecertChainEntry *entry);
 
-  static std::string TbsCertificate(const Cert &cert);
-  static std::string TbsCertificate(const PreCertChain &chain);
+  static bool TbsCertificate(const Cert &cert, std::string *result);
+  static bool TbsCertificate(const PreCertChain &chain, std::string *result);
 
   CertChecker *cert_checker_;
 

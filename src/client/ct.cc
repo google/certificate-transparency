@@ -6,6 +6,7 @@
 #include <openssl/asn1.h>
 #include <openssl/bio.h>
 #include <openssl/bn.h>
+#include <openssl/err.h>
 #include <openssl/evp.h>
 #include <openssl/pem.h>
 #include <openssl/ssl.h>
@@ -506,8 +507,8 @@ static void DiagnoseCertChain() {
       << cert_file << " is not a valid PEM-encoded certificate chain";
 
 
-  if (!chain.LeafCert()->HasExtension(
-          ct::NID_ctEmbeddedSignedCertificateTimestampList)) {
+  if (chain.LeafCert()->HasExtension(
+          ct::NID_ctEmbeddedSignedCertificateTimestampList) != Cert::TRUE) {
     LOG(ERROR) << "Certificate has no embedded SCTs";
     return;
   }
@@ -524,9 +525,9 @@ static void DiagnoseCertChain() {
   }
 
   string serialized_scts;
-  if (!chain.LeafCert()->OctetStringExtensionData(
+  if (chain.LeafCert()->OctetStringExtensionData(
           ct::NID_ctEmbeddedSignedCertificateTimestampList,
-          &serialized_scts)) {
+          &serialized_scts) != Cert::TRUE) {
     LOG(ERROR) << "SCT extension data is invalid.";
     return;
   }
@@ -614,6 +615,7 @@ int main(int argc, char **argv) {
   }
 
   SSL_library_init();
+  ERR_load_SSL_strings();
   ct::LoadCtExtensions();
 
   const string cmd(argv[1]);
