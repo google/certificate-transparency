@@ -56,7 +56,7 @@ TEST_F(CtExtensionsTest, TestSCTExtension) {
   // Check we can find the extension by its advertised NID.
   // We should really be checking that the OID matches the expected OID but
   // what other extension could this cert be having that the other one doesn't?
-  ASSERT_TRUE(sct_cert.HasExtension(
+  ASSERT_EQ(Cert::TRUE, sct_cert.HasExtension(
       ct::NID_ctSignedCertificateTimestampList));
 
   string ext_data;
@@ -67,8 +67,9 @@ TEST_F(CtExtensionsTest, TestSCTExtension) {
   // Now fish the extension data out using the print methods and check they
   // operate as expected.
   // TODO(ekasper):
-  X509_EXTENSION *ext = sct_cert.GetExtension(
-      ct::NID_ctSignedCertificateTimestampList);
+  X509_EXTENSION *ext;
+  ASSERT_EQ(Cert::TRUE, sct_cert.GetExtension(
+      ct::NID_ctSignedCertificateTimestampList, &ext));
   BIO *buf = BIO_new(BIO_s_mem());
   ASSERT_NE(buf, static_cast<BIO*>(NULL));
 
@@ -94,7 +95,7 @@ TEST_F(CtExtensionsTest, TestEmbeddedSCTExtension) {
   // Check we can find the extension by its advertised NID.
   // We should really be checking that the OID matches the expected OID but
   // what other extension could this cert be having that the other one doesn't?
-  ASSERT_TRUE(embedded_sct_cert.HasExtension(
+  ASSERT_EQ(Cert::TRUE, embedded_sct_cert.HasExtension(
       ct::NID_ctEmbeddedSignedCertificateTimestampList));
   string ext_data;
   EXPECT_EQ(Cert::TRUE, embedded_sct_cert.OctetStringExtensionData(
@@ -103,8 +104,9 @@ TEST_F(CtExtensionsTest, TestEmbeddedSCTExtension) {
 
   // Now fish the extension data out using the print methods and check they
   // operate as expected.
-  X509_EXTENSION *ext = embedded_sct_cert.GetExtension(
-      ct::NID_ctEmbeddedSignedCertificateTimestampList);
+  X509_EXTENSION *ext;
+  ASSERT_EQ(Cert::TRUE, embedded_sct_cert.GetExtension(
+      ct::NID_ctEmbeddedSignedCertificateTimestampList, &ext));
   BIO *buf = BIO_new(BIO_s_mem());
   ASSERT_NE(buf, static_cast<BIO*>(NULL));
 
@@ -129,11 +131,12 @@ TEST_F(CtExtensionsTest, TestPoisonExtension) {
   // Check we can find the extension by its advertised NID.
   // We should really be checking that the OID matches the expected OID but
   // what other extension could this cert be having that the other one doesn't?
-  ASSERT_TRUE(poison_cert.HasExtension(ct::NID_ctPoison()));
+  ASSERT_EQ(Cert::TRUE, poison_cert.HasExtension(ct::NID_ctPoison));
 
   // Now fish the extension data out using the print methods and check they
   // operate as expected.
-  X509_EXTENSION *ext = poison_cert.GetExtension(ct::NID_ctPoison);
+  X509_EXTENSION *ext;
+  ASSERT_EQ(Cert::TRUE, poison_cert.GetExtension(ct::NID_ctPoison, &ext));
 
   BIO *buf = BIO_new(BIO_s_mem());
   ASSERT_NE(buf, static_cast<BIO*>(NULL));
@@ -160,7 +163,7 @@ TEST_F(CtExtensionsTest, TestPrecertSigning) {
   // Check we can find the key usage by its advertised NID.
   // We should really be checking that the OID matches the expected OID but
   // what other key usage could this cert be having that the other one doesn't?
-  ASSERT_TRUE(pre_signing_cert.HasExtendedKeyUsage(
+  ASSERT_EQ(Cert::TRUE, pre_signing_cert.HasExtendedKeyUsage(
       ct::NID_ctPrecertificateSigning));
 }
 

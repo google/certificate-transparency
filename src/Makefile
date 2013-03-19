@@ -138,7 +138,8 @@ log_tests: log/cert_test log/cert_checker_test \
            log/cert_submission_handler_test log/database_test \
            log/database_large_test log/file_storage_test \
            log/frontend_signer_test log/frontend_test log/log_lookup_test \
-           log/log_signer_test log/tree_signer_test log/logged_certificate_test
+           log/log_signer_test log/tree_signer_test \
+           log/logged_certificate_test log/ct_extensions_test
 
 log/cert_test: log/cert_test.o log/cert.o log/ct_extensions.o util/libutil.a
 	$(CXX) -o $@ $^ $(SYS_LIBS)
