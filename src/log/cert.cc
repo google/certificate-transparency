@@ -574,7 +574,7 @@ Cert::Status CertChain::RemoveCertsAfterFirstSelfSigned() {
   // Remove everything after it.
   size_t chain_size = chain_.size();
   for (size_t i = first_self_signed + 1; i < chain_size; ++i) {
-    chain_.pop_back();
+    RemoveCert();
   }
   return Cert::TRUE;
 }
