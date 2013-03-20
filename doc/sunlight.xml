@@ -1,7 +1,7 @@
 <?xml version="1.0"?>
 <?rfc symrefs="yes"?>
 <?rfc toc="yes"?>
-<rfc ipr="trust200902" docName="draft-laurie-pki-sunlight-08" category="exp">
+<rfc ipr="trust200902" docName="draft-laurie-pki-sunlight-09" category="exp">
   <front>
     <title>Certificate Transparency</title>
     <author initials="B" surname="Laurie" fullname="Ben Laurie">
@@ -513,6 +513,9 @@ d0 d1   d2 d3           d0 d1   d2 d3  d4 d5
 	Messages are sent as HTTPS GET or POST requests. Parameters for POSTs and all responses are encoded as <xref target="RFC4627">JSON objects</xref>. Parameters for GETs are encoded as order independent key/value URL parameters, using the "application/x-www-form-urlencoded" format described in the <xref target="HTML401">"HTML 4.01 Specification"</xref>. Binary data is <xref target="RFC4648">base64 encoded</xref> as specified in the individual messages.
       </t>
       <t>
+	Note that JSON objects and URL parameters may contain fields not specified here. These extra fields should be ignored.
+      </t>
+      <t>
 	The &lt;log server&gt; prefix can include a path as well as a server name and a port.
       </t>
       <t>
@@ -878,7 +881,7 @@ d0 d1   d2 d3           d0 d1   d2 d3  d4 d5
     </section>
     <section title="Acknowledgements">
       <t>
-	The authors would like to thank Stephen Farrell, Brad Hill, ... for their valuable contributions.
+	The authors would like to thank Erwann Abelea, Robin Alden, Al Cutter, Francis Dupont, Stephen Farrell, Brad Hill, Jeff Hodges, Paul Hoffman, Jeffrey Hutzelman, SM, Alexey Melnikov, Chris Palmer, Trevor Perrin, Ryan Sleevi, Rob Stradling, Carl Wallace for their valuable contributions.
       </t>
     </section>
   </middle>
