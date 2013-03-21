@@ -84,7 +84,7 @@ CertSubmissionHandler::X509ChainToEntry(const CertChain &chain,
         key_hash);
 
     string tbs;
-    if (!TbsCertificate(*chain.LeafCert(), &tbs))
+    if (!SerializedTbs(*chain.LeafCert(), &tbs))
       return false;
 
     entry->mutable_precert_entry()->mutable_pre_cert()->
@@ -107,7 +107,7 @@ CertSubmissionHandler::SubmitResult
 CertSubmissionHandler::ProcessX509Submission(const string &submission,
                                              X509ChainEntry *entry) {
   string pem_string(reinterpret_cast<const char*>(submission.data()),
-                         submission.size());
+                    submission.size());
   CertChain chain(pem_string);
 
   if (!chain.IsLoaded())
@@ -176,26 +176,26 @@ CertSubmissionHandler::ProcessPreCertSubmission(const string &submission,
   entry->mutable_pre_cert()->set_issuer_key_hash(key_hash);
 
   string tbs;
-  if (!TbsCertificate(chain, &tbs))
-      return INTERNAL_ERROR;
+  if (!SerializedTbs(chain, &tbs))
+    return INTERNAL_ERROR;
   entry->mutable_pre_cert()->set_tbs_certificate(tbs);
 
   return OK;
 }
 
 // static
-bool CertSubmissionHandler::TbsCertificate(const PreCertChain &chain,
-                                           string *result) {
+bool CertSubmissionHandler::SerializedTbs(const PreCertChain &chain,
+                                          string *result) {
   if (!chain.IsLoaded() || chain.IsWellFormed() != Cert::TRUE)
     return false;
 
   // A well-formed chain always has a precert.
-  Cert *tbs = chain.PreCert()->Clone();
-  if (tbs == NULL || !tbs->IsLoaded())
+  TbsCertificate tbs(*chain.PreCert());
+  if (!tbs.IsLoaded())
     return false;
 
   // Remove the poison extension.
-  if (tbs->DeleteExtension(ct::NID_ctPoison) != Cert::TRUE)
+  if (tbs.DeleteExtension(ct::NID_ctPoison) != Cert::TRUE)
     return false;
 
   // If the issuing cert is the special Precert Signing Certificate,
@@ -206,42 +206,41 @@ bool CertSubmissionHandler::TbsCertificate(const PreCertChain &chain,
     // one that will sign the final cert.
     // Should always succeed as we've already verified that the chain
     // is well-formed.
-    if(tbs->CopyIssuerFrom(*chain.PrecertIssuingCert()) != Cert::TRUE)
+    if(tbs.CopyIssuerFrom(*chain.PrecertIssuingCert()) != Cert::TRUE)
       return false;
   }
 
   string der_tbs;
-  if (tbs->DerEncodedTbsCertificate(&der_tbs) != Cert::TRUE)
+  if (tbs.DerEncoding(&der_tbs) != Cert::TRUE)
     return false;
 
-  delete tbs;
   result->assign(der_tbs);
   return true;
 }
 
 // static
-bool CertSubmissionHandler::TbsCertificate(const Cert &cert, string *result) {
+bool CertSubmissionHandler::SerializedTbs(const Cert &cert, string *result) {
   if (!cert.IsLoaded())
     return false;
 
-  Cert *tbs = cert.Clone();
-  if (tbs == NULL || !tbs->IsLoaded())
-    return false;
-
-  // Delete the embedded proof.
-  Cert::Status status = tbs->HasExtension(
+  Cert::Status status = cert.HasExtension(
       ct::NID_ctEmbeddedSignedCertificateTimestampList);
   if (status != Cert::TRUE && status != Cert::FALSE)
     return false;
+
+  // Delete the embedded proof.
+  TbsCertificate tbs(cert);
+  if (!tbs.IsLoaded())
+    return false;
+
   if (status == Cert::TRUE &&
-      tbs->DeleteExtension(ct::NID_ctEmbeddedSignedCertificateTimestampList) !=
+      tbs.DeleteExtension(ct::NID_ctEmbeddedSignedCertificateTimestampList) !=
       Cert::TRUE)
     return false;
 
   string der_tbs;
-  if (tbs->DerEncodedTbsCertificate(&der_tbs) != Cert::TRUE)
+  if (tbs.DerEncoding(&der_tbs) != Cert::TRUE)
     return false;
-  delete tbs;
   result->assign(der_tbs);
   return true;
 }

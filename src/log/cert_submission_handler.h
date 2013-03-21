@@ -47,8 +47,8 @@ class CertSubmissionHandler {
   SubmitResult ProcessPreCertSubmission(const std::string &submission,
                                         ct::PrecertChainEntry *entry);
 
-  static bool TbsCertificate(const Cert &cert, std::string *result);
-  static bool TbsCertificate(const PreCertChain &chain, std::string *result);
+  static bool SerializedTbs(const Cert &cert, std::string *result);
+  static bool SerializedTbs(const PreCertChain &chain, std::string *result);
 
   CertChecker *cert_checker_;
 

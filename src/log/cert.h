@@ -129,31 +129,9 @@ class Cert {
   Status OctetStringExtensionData(int extension_nid,
                                   std::string *result) const;
 
-  // WARNING WARNING The following methods modify the x509_ structure
-  // and thus invalidate the cert.
-  // They are mostly needed for processing precerts. Use with care.
-  // Delete the matching extension, if present.
-  // Returns TRUE if the extension was present and was deleted.
-  // Returns FALSE if the extension was not present or occurred more than once.
-  // If multiple extensions with this NID are present, deletes the first
-  // occurrence but returns FALSE.
-  // Returns ERROR if the cert is not loaded, the NID is not recognised
-  // or deletion failed internally.
-  Status DeleteExtension(int extension_nid);
-
-  // Copy the issuer and Authority KeyID information.
-  // Requires that if Authority KeyID is present in the destination,
-  // it must also be present in the source certificate.
-  // Does not overwrite the critical bit.
-  // Returns TRUE if the operation succeeded.
-  // Returns FALSE if the operation could not be completed successfully.
-  // Returns ERROR if either cert is not loaded.
-  // Caller should not assume the cert was left unmodified upon FALSE as some
-  // fields may have been copied successfully before an error occurred.
-  Status CopyIssuerFrom(const Cert &from);
-
   // CertChecker needs access to the x509_ structure directly.
   friend class CertChecker;
+  friend class TbsCertificate;
   // Allow CtExtensions tests to poke around the private members
   // for convenience.
   FRIEND_TEST(CtExtensionsTest, TestSCTExtension);
@@ -166,6 +144,48 @@ class Cert {
   Status ExtensionStructure(int extension_nid, void **ext_struct) const;
 
   X509 *x509_;
+};
+
+// A wrapper around X509_CINF for chopping at the TBS to CT-sign it or verify
+// a CT signature. We construct a TBS for this rather than chopping at the full
+// cert so that the X509 information OpenSSL caches doesn't get out of sync.
+class TbsCertificate {
+ public:
+  // TODO(ekasper): add construction from PEM and DER as needed.
+  explicit TbsCertificate(const Cert &cert);
+  ~TbsCertificate();
+
+  bool IsLoaded() const { return cert_info_ != NULL; }
+
+  // Sets the DER-encoded TBS structure in |result|.
+  // Returns TRUE if the encoding succeeded.
+  // Returns FALSE if the encoding failed.
+  // Returns ERROR if the cert is not loaded.
+  Cert::Status DerEncoding(std::string *result) const;
+
+  // Delete the matching extension, if present.
+  // Returns TRUE if the extension was present and was deleted.
+  // Returns FALSE if the extension was not present or occurred more than once.
+  // If multiple extensions with this NID are present, deletes the first
+  // occurrence but returns FALSE.
+  // Returns ERROR if the cert is not loaded, the NID is not recognised
+  // or deletion failed internally.
+  Cert::Status DeleteExtension(int extension_nid);
+
+  // Copy the issuer and Authority KeyID information.
+  // Requires that if Authority KeyID is present in the destination,
+  // it must also be present in the source certificate.
+  // Does not overwrite the critical bit.
+  // Returns TRUE if the operation succeeded.
+  // Returns FALSE if the operation could not be completed successfully.
+  // Returns ERROR if either cert is not loaded.
+  // Caller should not assume the cert was left unmodified upon FALSE as some
+  // fields may have been copied successfully before an error occurred.
+  Cert::Status CopyIssuerFrom(const Cert &from);
+ private:
+  bool ExtensionsLoaded() const { return cert_info_->extensions != NULL; }
+  Cert::Status ExtensionIndex(int extension_nid, int *extension_index) const;
+  X509_CINF *cert_info_;
 };
 
 class CertChain {

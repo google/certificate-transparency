@@ -20,6 +20,8 @@ static const char kCaCert[] = "ca-cert.pem";
 // Issued by ca-cert.pem
 static const char kLeafCert[] = "test-cert.pem";
 // Issued by ca-cert.pem
+// Issued by intermediate-cert.pem
+static const char kLeafWithIntermediateCert[] = "test-intermediate-cert.pem";
 static const char kCaPreCert[] = "ca-pre-cert.pem";
 // Issued by ca-cert.pem
 static const char kPreCert[] = "test-embedded-pre-cert.pem";
@@ -35,6 +37,7 @@ class CertTest : public ::testing::Test {
   string ca_pem_;
   string ca_precert_pem_;
   string precert_pem_;
+  string leaf_with_intermediate_pem_;
 
   void SetUp() {
     const string cert_dir = FLAGS_test_certs_dir;
@@ -44,9 +47,13 @@ class CertTest : public ::testing::Test {
     CHECK(util::ReadTextFile(cert_dir + "/" + kCaCert, &ca_pem_));
     CHECK(util::ReadTextFile(cert_dir + "/" + kCaPreCert, &ca_precert_pem_));
     CHECK(util::ReadTextFile(cert_dir + "/" + kPreCert, &precert_pem_));
+    CHECK(util::ReadTextFile(cert_dir + "/" + kLeafWithIntermediateCert,
+                             &leaf_with_intermediate_pem_));
+
   }
 };
 
+class TbsCertificateTest : public CertTest{};
 class CertChainTest : public CertTest{};
 
 // TODO(ekasper): test encoding methods.
@@ -108,6 +115,57 @@ TEST_F(CertTest, Issuers) {
   EXPECT_EQ(Cert::FALSE, leaf.IsSelfSigned());
   EXPECT_EQ(Cert::TRUE, ca.IsSelfSigned());
 }
+
+TEST_F(TbsCertificateTest, DerEncoding) {
+  Cert leaf(leaf_pem_);
+  TbsCertificate tbs(leaf);
+
+  string cert_tbs_der, raw_tbs_der;
+  EXPECT_EQ(Cert::TRUE, leaf.DerEncodedTbsCertificate(&cert_tbs_der));
+  EXPECT_EQ(Cert::TRUE, leaf.DerEncodedTbsCertificate(&raw_tbs_der));
+  EXPECT_EQ(cert_tbs_der, raw_tbs_der);
+}
+
+TEST_F(TbsCertificateTest, DeleteExtension) {
+  Cert leaf(leaf_pem_);
+
+  ASSERT_EQ(Cert::TRUE, leaf.HasExtension(NID_authority_key_identifier));
+
+  TbsCertificate tbs(leaf);
+  string der_before, der_after;
+  EXPECT_EQ(Cert::TRUE, tbs.DerEncoding(&der_before));
+  EXPECT_EQ(Cert::TRUE, tbs.DeleteExtension(NID_authority_key_identifier));
+  EXPECT_EQ(Cert::TRUE, tbs.DerEncoding(&der_after));
+  EXPECT_NE(der_before, der_after);
+
+  ASSERT_EQ(Cert::FALSE, leaf.HasExtension(ct::NID_ctPoison));
+  TbsCertificate tbs2(leaf);
+  string der_before2, der_after2;
+  EXPECT_EQ(Cert::TRUE, tbs2.DerEncoding(&der_before2));
+  EXPECT_EQ(Cert::FALSE, tbs2.DeleteExtension(ct::NID_ctPoison));
+  EXPECT_EQ(Cert::TRUE, tbs2.DerEncoding(&der_after2));
+  EXPECT_EQ(der_before2, der_after2);
+}
+
+TEST_F(TbsCertificateTest, CopyIssuer) {
+  Cert leaf(leaf_pem_);
+  Cert different(leaf_with_intermediate_pem_);
+
+  TbsCertificate tbs(leaf);
+  string der_before, der_after;
+  EXPECT_EQ(Cert::TRUE, tbs.DerEncoding(&der_before));
+  EXPECT_EQ(Cert::TRUE, tbs.CopyIssuerFrom(different));
+  EXPECT_EQ(Cert::TRUE, tbs.DerEncoding(&der_after));
+  EXPECT_NE(der_before, der_after);
+
+  TbsCertificate tbs2(leaf);
+  string der_before2, der_after2;
+  EXPECT_EQ(Cert::TRUE, tbs2.DerEncoding(&der_before2));
+  EXPECT_EQ(Cert::TRUE, tbs2.CopyIssuerFrom(leaf));
+  EXPECT_EQ(Cert::TRUE, tbs2.DerEncoding(&der_after2));
+  EXPECT_EQ(der_before2, der_after2);
+}
+
 
 TEST_F(CertChainTest, LoadValid) {
   // A single certificate.

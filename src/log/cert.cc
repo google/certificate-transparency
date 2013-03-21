@@ -231,7 +231,7 @@ Cert::Status Cert::Sha256Digest(string *result) const {
 }
 
 Cert::Status Cert::DerEncodedTbsCertificate(string *result) const {
-  if (!IsLoaded()) {
+  if (!IsLoaded() || x509_->cert_info == NULL) {
     LOG(ERROR) << "Cert not loaded";
     return ERROR;
   }
@@ -316,121 +316,6 @@ Cert::Status Cert::OctetStringExtensionData(int extension_nid,
   return TRUE;
 }
 
-// WARNING WARNING this method modifies the x509_ structure
-// and thus invalidates the cert. Use with care.
-Cert::Status Cert::DeleteExtension(int extension_nid) {
-  if (!IsLoaded()) {
-    LOG(ERROR) << "Cert not loaded";
-    return ERROR;
-  }
-
-  int extension_index;
-  Status status = ExtensionIndex(extension_nid, &extension_index);
-  if (status != TRUE)
-    return status;
-
-  X509_EXTENSION *ext = X509_delete_ext(x509_, extension_index);
-  if (ext == NULL) {
-    // Truly odd.
-    LOG(ERROR) << "Failed to delete the extension";
-    LOG_OPENSSL_ERRORS(ERROR);
-    return ERROR;
-  }
-
-  // Let OpenSSL know that it needs to re_encode.
-  x509_->cert_info->enc.modified = 1;
-  // X509_delete_ext does not free the extension (GAH!), so we need to
-  // free separately.
-  X509_EXTENSION_free(ext);
-
-  // ExtensionIndex returns the first matching index - if the extension
-  // occurs more than once, just give up.
-  status = HasExtension(extension_nid);
-  if (status == Cert::TRUE) {
-    LOG(WARNING) << "Failed to delete the extension. Does the certificate have "
-                 << "duplicate extensions?";
-    return FALSE;
-  }
-  if (status != Cert::FALSE)
-    return status;
-
-  return TRUE;
-}
-
-// WARNING WARNING this method modifies the x509_ structure
-// and thus invalidates the cert. Use with care.
-Cert::Status Cert::CopyIssuerFrom(const Cert &from) {
-  if (!IsLoaded() || !from.IsLoaded()) {
-    LOG(ERROR) << "Cert not loaded";
-    return ERROR;
-  }
-
-  // This just looks up the relevant pointer so there shouldn't
-  // be any errors to clear.
-  X509_NAME *ca_name = X509_get_issuer_name(from.x509_);
-  if (ca_name == NULL) {
-    LOG(WARNING) << "Issuer certificate has NULL name";
-    return FALSE;
-  }
-
-  if (X509_set_issuer_name(x509_, ca_name) != 1) {
-    LOG(WARNING) << "Failed to set issuer name, Cert has NULL issuer?";
-    LOG_OPENSSL_ERRORS(WARNING);
-    return FALSE;
-  }
-
-  x509_->cert_info->enc.modified = 1;
-
-  // Verify that the Authority KeyID extensions are compatible.
-  int extension_index, from_extension_index;
-  Status status = ExtensionIndex(NID_authority_key_identifier,
-                                 &extension_index);
-  if (status == FALSE) {
-    // No extension found = nothing to copy
-    return TRUE;
-  }
-
-  if (status != TRUE) {
-    LOG(ERROR) << "Failed to check Authority Key Identifier extension";
-    return ERROR;
-  }
-
-  status = from.ExtensionIndex(NID_authority_key_identifier,
-                               &from_extension_index);
-
-  if (status == FALSE) {
-    // No extension found = cannot copy.
-    LOG(WARNING) << "Unable to copy issuer: destination has an Authority "
-                 << "KeyID extension, but the source has none.";
-    return FALSE;
-  }
-
-  if (status != TRUE) {
-    LOG(ERROR) << "Failed to check Authority Key Identifier extension";
-    return ERROR;
-  }
-
-  // Ok, now copy the extension, keeping the critical bit (which should always
-  // be false in a valid cert, mind you).
-  X509_EXTENSION *to_ext = X509_get_ext(x509_, extension_index);
-  X509_EXTENSION *from_ext = X509_get_ext(from.x509_, from_extension_index);
-
-  if (to_ext == NULL || from_ext == NULL) {
-    // Should not happen.
-    LOG(ERROR) << "Failed to retrive extension";
-    LOG_OPENSSL_ERRORS(ERROR);
-    return ERROR;
-  }
-
-  if (X509_EXTENSION_set_data(to_ext, X509_EXTENSION_get_data(from_ext)) != 1) {
-    LOG(ERROR) << "Failed to copy extension data.";
-    LOG_OPENSSL_ERRORS(ERROR);
-    return ERROR;
-  }
-
-  return TRUE;
-}
-
 Cert::Status Cert::ExtensionIndex(int extension_nid,
                                   int *extension_index) const {
   int index = X509_get_ext_by_NID(x509_, extension_nid, -1);
@@ -472,7 +357,7 @@ Cert::Status Cert::ExtensionStructure(int extension_nid,
   // Let's first check if the extension is present. This allows us to
   // distinguish between "NID not recognized" and the more harmless
   // "extension not found, found more than once or corrupt".
-  Status status = HasExtension(extension_nid);
+  Cert::Status status = HasExtension(extension_nid);
   if (status != TRUE)
     return status;
 
@@ -488,6 +373,184 @@ Cert::Status Cert::ExtensionStructure(int extension_nid,
   }
 
   return TRUE;
+}
+
+TbsCertificate::TbsCertificate(const Cert &cert)
+    : cert_info_(NULL) {
+  if (!cert.IsLoaded() || cert.x509_->cert_info == NULL) {
+    LOG(ERROR) << "Cert not loaded";
+    return;
+  }
+
+  cert_info_ = static_cast<X509_CINF*>(
+      ASN1_item_dup(ASN1_ITEM_rptr(X509_CINF),
+                    static_cast<void*>(cert.x509_->cert_info)));
+
+  if (cert_info_ == NULL)
+    LOG_OPENSSL_ERRORS(ERROR);
+}
+
+TbsCertificate::~TbsCertificate() {
+  if (cert_info_ != NULL)
+    X509_CINF_free(cert_info_);
+}
+
+Cert::Status TbsCertificate::DerEncoding(std::string *result) const {
+  if (!IsLoaded()) {
+    LOG(ERROR) << "TBS not loaded";
+    return Cert::ERROR;
+  }
+
+  unsigned char *der_buf = NULL;
+  int der_length = i2d_X509_CINF(cert_info_, &der_buf);
+  if (der_length < 0) {
+    // What does this return value mean? Let's assume it means the cert
+    // is bad until proven otherwise.
+    LOG(WARNING) << "Failed to serialize the TBS component";
+    LOG_OPENSSL_ERRORS(WARNING);
+    return Cert::FALSE;
+  }
+  result->assign(string(reinterpret_cast<char*>(der_buf), der_length));
+  OPENSSL_free(der_buf);
+  return Cert::TRUE;
+}
+
+Cert::Status TbsCertificate::DeleteExtension(int extension_nid) {
+  if (!IsLoaded() || !ExtensionsLoaded()) {
+    LOG(ERROR) << "TBS not loaded";
+    return Cert::ERROR;
+  }
+
+  int extension_index;
+  Cert::Status status = ExtensionIndex(extension_nid, &extension_index);
+  if (status != Cert::TRUE)
+    return status;
+
+  X509_EXTENSION *ext = X509v3_delete_ext(cert_info_->extensions,
+                                          extension_index);
+  if (ext == NULL) {
+    // Truly odd.
+    LOG(ERROR) << "Failed to delete the extension";
+    LOG_OPENSSL_ERRORS(ERROR);
+    return Cert::ERROR;
+  }
+
+  // Let OpenSSL know that it needs to re_encode.
+  cert_info_->enc.modified = 1;
+  // X509_delete_ext does not free the extension (GAH!), so we need to
+  // free separately.
+  X509_EXTENSION_free(ext);
+
+  // ExtensionIndex returns the first matching index - if the extension
+  // occurs more than once, just give up.
+  int ignored;
+  status = ExtensionIndex(extension_nid, &ignored);
+  if (status == Cert::TRUE) {
+    LOG(WARNING) << "Failed to delete the extension. Does the certificate have "
+                 << "duplicate extensions?";
+    return Cert::FALSE;
+  }
+  if (status != Cert::FALSE)
+    return status;
+
+  return Cert::TRUE;
+}
+
+Cert::Status TbsCertificate::CopyIssuerFrom(const Cert &from) {
+  if (!from.IsLoaded()) {
+    LOG(ERROR) << "Cert not loaded";
+    return Cert::ERROR;
+  }
+
+  if (!IsLoaded() || !ExtensionsLoaded()) {
+    LOG(ERROR) << "TBS not loaded";
+    return Cert::ERROR;
+  }
+
+  // This just looks up the relevant pointer so there shouldn't
+  // be any errors to clear.
+  X509_NAME *ca_name = X509_get_issuer_name(from.x509_);
+  if (ca_name == NULL) {
+    LOG(WARNING) << "Issuer certificate has NULL name";
+    return Cert::FALSE;
+  }
+
+  if (X509_NAME_set(&cert_info_->issuer, ca_name) != 1) {
+    LOG(WARNING) << "Failed to set issuer name, Cert has NULL issuer?";
+    LOG_OPENSSL_ERRORS(WARNING);
+    return Cert::FALSE;
+  }
+
+  cert_info_->enc.modified = 1;
+
+  // Verify that the Authority KeyID extensions are compatible.
+  int extension_index, from_extension_index;
+  Cert::Status status = ExtensionIndex(NID_authority_key_identifier,
+                                       &extension_index);
+  if (status == Cert::FALSE) {
+    // No extension found = nothing to copy
+    return Cert::TRUE;
+  }
+
+  if (status != Cert::TRUE) {
+    LOG(ERROR) << "Failed to check Authority Key Identifier extension";
+    return Cert::ERROR;
+  }
+
+  status = from.ExtensionIndex(NID_authority_key_identifier,
+                               &from_extension_index);
+
+  if (status == Cert::FALSE) {
+    // No extension found = cannot copy.
+    LOG(WARNING) << "Unable to copy issuer: destination has an Authority "
+                 << "KeyID extension, but the source has none.";
+    return Cert::FALSE;
+  }
+
+  if (status != Cert::TRUE) {
+    LOG(ERROR) << "Failed to check Authority Key Identifier extension";
+    return Cert::ERROR;
+  }
+
+  // Ok, now copy the extension, keeping the critical bit (which should always
+  // be false in a valid cert, mind you).
+  X509_EXTENSION *to_ext = X509v3_get_ext(cert_info_->extensions,
+                                          extension_index);
+  X509_EXTENSION *from_ext = X509_get_ext(from.x509_, from_extension_index);
+
+  if (to_ext == NULL || from_ext == NULL) {
+    // Should not happen.
+    LOG(ERROR) << "Failed to retrive extension";
+    LOG_OPENSSL_ERRORS(ERROR);
+    return Cert::ERROR;
+  }
+
+  if (X509_EXTENSION_set_data(to_ext, X509_EXTENSION_get_data(from_ext)) != 1) {
+    LOG(ERROR) << "Failed to copy extension data.";
+    LOG_OPENSSL_ERRORS(ERROR);
+    return Cert::ERROR;
+  }
+
+  return Cert::TRUE;
+}
+
+Cert::Status TbsCertificate::ExtensionIndex(int extension_nid,
+                                            int *extension_index) const {
+  int index = X509v3_get_ext_by_NID(cert_info_->extensions,
+                                    extension_nid, -1);
+  if (index < -1) {
+    // The most likely and possibly only cause for a return code
+    // other than -1 is an unrecognized NID.
+    LOG(ERROR) << "OpenSSL X509_get_ext_by_NID returned " << index
+               << " for NID " << extension_nid
+               << ". Is the NID not recognised?";
+    LOG_OPENSSL_ERRORS(ERROR);
+    return Cert::ERROR;
+  }
+  if (index == -1)
+    return Cert::FALSE;
+  *extension_index = index;
+  return Cert::TRUE;
 }
 
 CertChain::CertChain(const string &pem_string) {
