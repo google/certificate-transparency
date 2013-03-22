@@ -123,14 +123,14 @@ int SSLClient::VerifyCallback(X509_STORE_CTX *ctx, void *arg) {
   // Should contain at least the leaf.
   CHECK_GE(chain_size, 1);
   for (int i = 0; i < chain_size; ++i)
-    chain.AddCert(new Cert(sk_X509_value(ctx->chain, i)));
+    chain.AddCert(new Cert(X509_dup(sk_X509_value(ctx->chain, i))));
 
   CHECK_NOTNULL(ctx->untrusted);
   chain_size = sk_X509_num(ctx->untrusted);
   // Should contain at least the leaf.
   CHECK_GE(chain_size, 1);
   for (int i = 0; i < chain_size; ++i)
-    input_chain.AddCert(new Cert(sk_X509_value(ctx->untrusted, i)));
+    input_chain.AddCert(new Cert(X509_dup(sk_X509_value(ctx->untrusted, i))));
 
   string serialized_scts;
   // First, see if the cert has an embedded proof.

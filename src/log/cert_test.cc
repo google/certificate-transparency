@@ -79,6 +79,14 @@ TEST_F(CertTest, LoadInvalid) {
   EXPECT_FALSE(invalid2.IsLoaded());
 }
 
+TEST_F(CertTest, Identical) {
+  Cert leaf(leaf_pem_);
+  Cert ca(ca_pem_);
+  EXPECT_EQ(Cert::TRUE, leaf.IsIdenticalTo(leaf));
+  EXPECT_EQ(Cert::FALSE, leaf.IsIdenticalTo(ca));
+  EXPECT_EQ(Cert::FALSE, ca.IsIdenticalTo(leaf));
+}
+
 TEST_F(CertTest, Extensions) {
   Cert leaf(leaf_pem_);
   Cert ca(ca_pem_);

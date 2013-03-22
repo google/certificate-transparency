@@ -115,6 +115,12 @@ return OK;
 
 CertChecker::CertVerifyResult
 CertChecker::GetTrustedCa(CertChain *chain) const {
+  const Cert *subject = chain->LastCert();
+  if (subject == NULL || !subject->IsLoaded()) {
+    LOG(ERROR) << "Chain has no valid certs";
+    return INTERNAL_ERROR;
+  }
+
   // Look up issuer from the trusted store.
   if (trusted_ == NULL) {
     LOG(WARNING) << "No trusted certificates loaded";
@@ -134,57 +140,63 @@ CertChecker::GetTrustedCa(CertChain *chain) const {
     return INTERNAL_ERROR;
   }
 
-  X509_OBJECT obj;
-  // TODO(ekasper): we may need to do something more clever, in case there is
-  // more than one match.
-  const Cert *subject = chain->LastCert();
-  if (subject == NULL || !subject->IsLoaded()) {
-    LOG(ERROR) << "Chain has no valid certs";
-    X509_STORE_CTX_free(ctx);
+  X509 *issuer_x509 = NULL;
+  // Attempt to find the correct issuer: if multiple issuers with
+  // the same subject but different keys exist in store,
+  // X509_STORE_CTX_get1_issuer should be able to distinguish based on
+  // Authority KeyID.
+  ret = X509_STORE_CTX_get1_issuer(&issuer_x509, ctx, subject->x509_);
+  X509_STORE_CTX_free(ctx);
+  if (ret == 0)
+    return ROOT_NOT_IN_LOCAL_STORE;
+  if (ret < 0) {
+    LOG_OPENSSL_ERRORS(ERROR);
     return INTERNAL_ERROR;
   }
 
-  ret = X509_STORE_get_by_subject(ctx, X509_LU_X509,
-                                  X509_get_issuer_name(subject->x509_), &obj);
-  X509_STORE_CTX_free(ctx);
-  if (ret <= 0)
-    return ROOT_NOT_IN_LOCAL_STORE;
+ // get1 ups the refcount, so this is safe.
+  Cert issuer(issuer_x509);
 
-  // X509_STORE_get_by_subject increments the ref count.
-  // Pass ownership to the cert object.
-  Cert issuer(obj.data.x509);
-  // X509_STORE_get_by_subject increments ref count.
-  X509_OBJECT_free_contents(&obj);
   // TODO(ekasper): check that the issuing CA cert is temporally valid.
   // TODO(ekasper): do we need to run any other checks on the issuer?
-  Cert::Status status = subject->IsSignedBy(issuer);
-  if (status != Cert::TRUE && status != Cert::FALSE) {
-    LOG(ERROR) << "Failed to check signature for trusted root";
+  if (!issuer.IsLoaded()) {
+    LOG(ERROR) << "Failed to load store issuer";
     return INTERNAL_ERROR;
   }
-  if (status != Cert::TRUE)
-    return INVALID_CERTIFICATE_CHAIN;
 
-  // Remove the self-signed cert and replace with a local version.
-  status = subject->IsSelfSigned();
+  // If last cert is self-signed, skip signature check but do check we have an
+  // exact match.
+  Cert::Status status = subject->IsSelfSigned();
   if (status != Cert::TRUE && status != Cert::FALSE) {
     LOG(ERROR) << "Failed to check self-signed status";
     return INTERNAL_ERROR;
   }
+  if (status == Cert::TRUE) {
+    Cert::Status matches = subject->IsIdenticalTo(issuer);
+    if (matches != Cert::TRUE && matches != Cert::FALSE) {
+      LOG(ERROR) << "Cert comparison failed";
+      return INTERNAL_ERROR;
+    }
+    if (matches != Cert::TRUE) {
+      return ROOT_NOT_IN_LOCAL_STORE;
+    }
+  } else {
+    Cert::Status ok = subject->IsSignedBy(issuer);
+    if (ok != Cert::TRUE && status != Cert::FALSE) {
+      LOG(ERROR) << "Failed to check signature for trusted root";
+      return INTERNAL_ERROR;
+    }
+    if (ok != Cert::TRUE) {
+      return ROOT_NOT_IN_LOCAL_STORE;
+    }
 
-  if (status == Cert::TRUE && chain->RemoveCert() != Cert::TRUE) {
-    LOG(ERROR) << "Failed to remove self-signed cert from chain";
-    return INTERNAL_ERROR;
-  }
-
-  Cert *store_issuer = issuer.Clone();
-  if (store_issuer == NULL || !store_issuer->IsLoaded()) {
-    LOG(ERROR) << "Failed to clone store issuer.";
-    return INTERNAL_ERROR;
-  }
-  if (chain->AddCert(store_issuer) != Cert::TRUE) {
-    LOG(ERROR) << "Failed to add trusted root to chain";
-    return INTERNAL_ERROR;
+    // Clone creates a new Cert but AddCert takes ownership even if Clone
+    // failed and the cert can't be added, so we don't have to explicitly
+    // check for IsLoaded here.
+    if (chain->AddCert(issuer.Clone()) != Cert::TRUE) {
+      LOG(ERROR) << "Failed to add trusted root to chain";
+      return INTERNAL_ERROR;
+    }
   }
   return OK;
 }

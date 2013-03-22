@@ -9,7 +9,7 @@
 
 class Cert {
  public:
-  // Makes a local copy of the X509 structure. It's advisable to check
+  // Takes ownership of the X509 structure. It's advisable to check
   // IsLoaded() after construction to verify the copy operation succeeded.
   explicit Cert(X509 *x509);
   // May fail, but we don't want to die on invalid inputs,
@@ -35,8 +35,11 @@ class Cert {
 
   bool IsLoaded() const { return x509_ != NULL; }
 
-  // Check IsLoaded() after Clone to verify the underlying copy succeeded.
+  // Never returns NULL but check IsLoaded() after Clone to verify the
+  // underlying copy succeeded.
   Cert *Clone() const;
+
+  Status IsIdenticalTo(const Cert &other) const;
 
   // Returns TRUE if the extension is present.
   // Returns FALSE if the extension is not present.

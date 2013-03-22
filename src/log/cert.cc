@@ -17,12 +17,7 @@
 using std::string;
 using util::ClearOpenSSLErrors;
 
-Cert::Cert(X509 *x509) : x509_(NULL) {
-  if (x509 != NULL) {
-    x509_ = X509_dup(x509);
-    if (x509_ == NULL)
-      LOG_OPENSSL_ERRORS(ERROR);
-  }
+Cert::Cert(X509 *x509) : x509_(x509) {
 }
 
 Cert::Cert(const std::string &pem_string)
@@ -53,8 +48,18 @@ Cert::~Cert() {
 }
 
 Cert *Cert::Clone() const {
-  Cert *clone = new Cert(x509_);
+  X509 *x509 = NULL;
+  if (x509_ != NULL) {
+    x509 = X509_dup(x509_);
+    if (x509 == NULL)
+      LOG_OPENSSL_ERRORS(ERROR);
+  }
+  Cert *clone = new Cert(x509);
   return clone;
+}
+
+Cert::Status Cert::IsIdenticalTo(const Cert &other) const {
+  return X509_cmp(x509_, other.x509_) == 0 ? TRUE : FALSE;
 }
 
 Cert::Status Cert::HasExtension(int extension_nid) const {
@@ -565,14 +570,6 @@ CertChain::CertChain(const string &pem_string) {
   X509 *x509 = NULL;
   while ((x509 = PEM_read_bio_X509(bio_in, NULL, NULL, NULL)) != NULL) {
     Cert *cert = new Cert(x509);
-    // Cert does not take ownership.
-    X509_free(x509);
-    if (!cert->IsLoaded()) {
-      // X509_dup failed.
-      ClearChain();
-      delete cert;
-      return;
-    }
     chain_.push_back(cert);
   }
 
