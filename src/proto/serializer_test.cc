@@ -13,10 +13,12 @@ namespace {
 using ct::DigitallySigned;
 using ct::LogEntry;
 using ct::LogEntryType;
+using ct::PrecertChainEntry;
 using ct::SignedCertificateTimestamp;
 using ct::SignedCertificateTimestampList;
 using ct::SignedTreeHead;
 using ct::Version;
+using ct::X509ChainEntry;
 using std::string;
 
 // A slightly shorter notation for constructing binary blobs from test vectors.
@@ -644,7 +646,7 @@ TEST_F(SerializerTest, DeserializeSCTUnsupportedVersion) {
 TEST_F(SerializerTest, SerializeEmptySCTList) {
   SignedCertificateTimestampList sct_list;
   string result;
-  EXPECT_EQ(Serializer::EMPTY_SCT_LIST,
+  EXPECT_EQ(Serializer::EMPTY_LIST,
             Serializer::SerializeSCTList(sct_list, &result));
 }
 
@@ -653,7 +655,7 @@ TEST_F(SerializerTest, DeserializeEmptySCTList) {
   string empty_hex = "0000";
   SignedCertificateTimestampList sct_list;
   string result;
-  EXPECT_EQ(Deserializer::EMPTY_SCT_LIST,
+  EXPECT_EQ(Deserializer::EMPTY_LIST,
             Deserializer::DeserializeSCTList(B(empty_hex), &sct_list));
 }
 
@@ -662,7 +664,7 @@ TEST_F(SerializerTest, SerializeSCTListEmptySCTInList) {
   sct_list.add_sct_list(B(kDefaultSCTHexString));
   sct_list.add_sct_list(string());
   string result;
-  EXPECT_EQ(Serializer::EMPTY_SCT_IN_LIST,
+  EXPECT_EQ(Serializer::EMPTY_ELEM_IN_LIST,
             Serializer::SerializeSCTList(sct_list, &result));
 }
 
@@ -671,7 +673,7 @@ TEST_F(SerializerTest, DeserializeSCTListEmptySCTInList) {
   string empty_hex = "00020000";
   SignedCertificateTimestampList sct_list;
   string result;
-  EXPECT_EQ(Deserializer::EMPTY_SCT_IN_LIST,
+  EXPECT_EQ(Deserializer::EMPTY_ELEM_IN_LIST,
             Deserializer::DeserializeSCTList(B(empty_hex), &sct_list));
 }
 
@@ -712,6 +714,87 @@ TEST_F(SerializerTest, DeserializeSCTListInvalidList) {
   SignedCertificateTimestampList read_sct_list;
   EXPECT_EQ(Deserializer::INVALID_LIST_ENCODING,
             Deserializer::DeserializeSCTList(B(invalid_hex), &read_sct_list));
+}
+
+TEST_F(SerializerTest, SerializeDeserializeX509Chain) {
+  X509ChainEntry entry, read_entry;
+  entry.set_leaf_certificate("cert");
+  entry.add_certificate_chain("hello");
+  entry.add_certificate_chain("world");
+  string result;
+  EXPECT_EQ(Serializer::OK,
+            Serializer::SerializeX509Chain(entry, &result));
+  EXPECT_EQ(Deserializer::OK,
+            Deserializer::DeserializeX509Chain(result, &read_entry));
+  // TODO(ekasper): proper KAT tests
+  EXPECT_EQ(2, read_entry.certificate_chain_size());
+  EXPECT_EQ("hello", read_entry.certificate_chain(0));
+  EXPECT_EQ("world", read_entry.certificate_chain(1));
+  // Leaf cert does not get written or read.
+  EXPECT_FALSE(read_entry.has_leaf_certificate());
+}
+
+TEST_F(SerializerTest, SerializeDeserializeX509Chain_EmptyChain) {
+  X509ChainEntry entry, read_entry;
+  string result;
+  EXPECT_EQ(Serializer::OK,
+            Serializer::SerializeX509Chain(entry, &result));
+  EXPECT_EQ(Deserializer::OK,
+            Deserializer::DeserializeX509Chain(result, &read_entry));
+  EXPECT_EQ(0, read_entry.certificate_chain_size());
+}
+
+TEST_F(SerializerTest, SerializeDeserializeX509Chain_EmptyCert) {
+  X509ChainEntry entry, read_entry;
+  entry.add_certificate_chain("");
+
+  string result;
+  EXPECT_EQ(Serializer::EMPTY_ELEM_IN_LIST,
+            Serializer::SerializeX509Chain(entry, &result));
+}
+
+TEST_F(SerializerTest, SerializeDeserializePrecertChainEntry) {
+  PrecertChainEntry entry, read_entry;
+  entry.set_pre_certificate("hello");
+  entry.add_precertificate_chain("world");
+  string result;
+  EXPECT_EQ(Serializer::OK,
+            Serializer::SerializePrecertChainEntry(entry, &result));
+  EXPECT_EQ(Deserializer::OK,
+            Deserializer::DeserializePrecertChainEntry(result, &read_entry));
+  // TODO(ekasper): proper KAT tests
+  EXPECT_EQ(1, read_entry.precertificate_chain_size());
+  EXPECT_EQ("hello", read_entry.pre_certificate());
+  EXPECT_EQ("world", read_entry.precertificate_chain(0));
+}
+
+TEST_F(SerializerTest, SerializeDeserializePrecertChainEntry_EmptyPrecert) {
+  PrecertChainEntry entry, read_entry;
+  entry.add_precertificate_chain("world");
+  string result;
+  EXPECT_EQ(Serializer::EMPTY_CERTIFICATE,
+            Serializer::SerializePrecertChainEntry(entry, &result));
+}
+
+TEST_F(SerializerTest, SerializeDeserializePrecertChainEntry_EmptyChain) {
+  PrecertChainEntry entry, read_entry;
+  entry.set_pre_certificate("hello");
+  string result;
+  EXPECT_EQ(Serializer::OK,
+            Serializer::SerializePrecertChainEntry(entry, &result));
+  EXPECT_EQ(Deserializer::OK,
+            Deserializer::DeserializePrecertChainEntry(result, &read_entry));
+  EXPECT_EQ(0, read_entry.precertificate_chain_size());
+  EXPECT_EQ("hello", read_entry.pre_certificate());
+}
+
+TEST_F(SerializerTest, SerializeDeserializePrecertChainEntry_EmptyChainCert) {
+  PrecertChainEntry entry, read_entry;
+  entry.set_pre_certificate("hello");
+  entry.add_precertificate_chain("");
+  string result;
+  EXPECT_EQ(Serializer::EMPTY_ELEM_IN_LIST,
+            Serializer::SerializePrecertChainEntry(entry, &result));
 }
 
 }  // namespace
