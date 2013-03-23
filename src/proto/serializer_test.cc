@@ -82,6 +82,14 @@ const char kDefaultCertSCTSignedHexString[] =
     "0000";
     // extensions, 0 bytes
 
+const char kDefaultSignedCertEntryWithTypeHexString[] =
+    // entry type, 2 bytes
+    "0000"
+    // leaf certificate length, 3 bytes
+    "00000b"
+    // leaf certificate, 11 bytes
+    "6365727469666963617465";
+
 const char kDefaultPrecertSCTSignedHexString[] =
     // version, 1 byte
     "00"
@@ -95,11 +103,21 @@ const char kDefaultPrecertSCTSignedHexString[] =
     "69616d617075626c69636b657973686174776f66697665736978646967657374"
     // tbs certificate length, 3 bytes
     "000003"
-    // leaf certificate, 3 bytes
+    // tbs certificate, 3 bytes
     "746273"
     // extensions length, 2 bytes
     "0000";
     // extensions, 0 bytes
+
+const char kDefaultSignedPrecertEntryWithTypeHexString[] =
+    // entry type, 2 bytes
+    "0001"
+    // issuer key hash, 32 bytes
+    "69616d617075626c69636b657973686174776f66697665736978646967657374"
+    // tbs certificate length, 3 bytes
+    "000003"
+    // tbs certificate, 3 bytes
+    "746273";
 
 const char kDefaultCertSCTLeafHexString[] =
     // version, 1 byte
@@ -795,6 +813,72 @@ TEST_F(SerializerTest, SerializeDeserializePrecertChainEntry_EmptyChainCert) {
   string result;
   EXPECT_EQ(Serializer::EMPTY_ELEM_IN_LIST,
             Serializer::SerializePrecertChainEntry(entry, &result));
+}
+
+TEST_F(SerializerTest, SerializeSCTSignedEntryWithType_KatTest) {
+  string cert_result, precert_result;
+  EXPECT_EQ(Serializer::OK,
+            Serializer::SerializeV1SignedCertEntryWithType(
+                DefaultCertificate(), &cert_result));
+  EXPECT_EQ(string(kDefaultSignedCertEntryWithTypeHexString),
+            H(cert_result));
+
+  EXPECT_EQ(Serializer::OK,
+            Serializer::SerializeV1SignedPrecertEntryWithType(
+                DefaultIssuerKeyHash(), DefaultTbsCertificate(),
+                &precert_result));
+  EXPECT_EQ(string(kDefaultSignedPrecertEntryWithTypeHexString),
+            H(precert_result));
+
+  cert_result.clear();
+  precert_result.clear();
+
+  EXPECT_EQ(Serializer::OK,
+            Serializer::SerializeV1SignedEntryWithType(DefaultCertEntry(),
+                                                       &cert_result));
+  EXPECT_EQ(string(kDefaultSignedCertEntryWithTypeHexString),
+            H(cert_result));
+
+  EXPECT_EQ(Serializer::OK,
+            Serializer::SerializeV1SignedEntryWithType(
+                DefaultPrecertEntry(), &precert_result));
+  EXPECT_EQ(string(kDefaultSignedPrecertEntryWithTypeHexString),
+            H(precert_result));
+}
+
+TEST_F(SerializerTest, SerializeSCTSignedEntryWithType_EmptyCertificate) {
+  string result;
+  EXPECT_EQ(Serializer::EMPTY_CERTIFICATE,
+            Serializer::SerializeV1SignedCertEntryWithType(string(), &result));
+
+  LogEntry entry(DefaultCertEntry());
+  entry.mutable_x509_entry()->clear_leaf_certificate();
+  EXPECT_EQ(Serializer::EMPTY_CERTIFICATE,
+            Serializer::SerializeV1SignedEntryWithType(entry, &result));
+}
+
+TEST_F(SerializerTest, SerializeSCTSignedEntryWithType_EmptyTbsCertificate) {
+  string result;
+  EXPECT_EQ(Serializer::EMPTY_CERTIFICATE,
+            Serializer::SerializeV1SignedPrecertEntryWithType(
+                DefaultIssuerKeyHash(), string(), &result));
+
+  LogEntry entry(DefaultPrecertEntry());
+  entry.mutable_precert_entry()->mutable_pre_cert()->clear_tbs_certificate();
+  EXPECT_EQ(Serializer::EMPTY_CERTIFICATE,
+            Serializer::SerializeV1SignedEntryWithType(entry, &result));
+}
+
+TEST_F(SerializerTest, SerializeSCTSignedEntryWithType_BadIssuerKeyHash) {
+  string result;
+  EXPECT_EQ(Serializer::INVALID_HASH_LENGTH,
+            Serializer::SerializeV1SignedPrecertEntryWithType(
+                "bad", DefaultTbsCertificate(), &result));
+
+  LogEntry entry(DefaultPrecertEntry());
+  entry.mutable_precert_entry()->mutable_pre_cert()->set_issuer_key_hash("bad");
+  EXPECT_EQ(Serializer::INVALID_HASH_LENGTH,
+            Serializer::SerializeV1SignedEntryWithType(entry, &result));
 }
 
 }  // namespace

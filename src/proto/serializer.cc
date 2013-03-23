@@ -327,6 +327,54 @@ Serializer::SerializeDigitallySigned(const DigitallySigned &sig,
   return OK;
 }
 
+// static
+Serializer::SerializeResult Serializer::SerializeV1SignedEntryWithType(
+    const ct::LogEntry entry, std::string *result) {
+  switch (entry.type()) {
+    case ct::X509_ENTRY:
+      return SerializeV1SignedCertEntryWithType(
+          entry.x509_entry().leaf_certificate(), result);
+    case ct::PRECERT_ENTRY:
+      return SerializeV1SignedPrecertEntryWithType(
+          entry.precert_entry().pre_cert().issuer_key_hash(),
+          entry.precert_entry().pre_cert().tbs_certificate(),
+          result);
+    default:
+      return INVALID_ENTRY_TYPE;
+  }
+}
+
+// static
+Serializer::SerializeResult Serializer::SerializeV1SignedCertEntryWithType(
+    const std::string &leaf_certificate, std::string *result) {
+  SerializeResult res = CheckCertificateFormat(leaf_certificate);
+  if (res != OK)
+    return res;
+  Serializer serializer;
+  serializer.WriteUint(ct::X509_ENTRY, kLogEntryTypeLengthInBytes);
+  serializer.WriteVarBytes(leaf_certificate, kMaxCertificateLength);
+  result->assign(serializer.SerializedString());
+  return OK;
+}
+
+// static
+Serializer::SerializeResult Serializer::SerializeV1SignedPrecertEntryWithType(
+    const std::string &issuer_key_hash, const std::string &tbs_certificate,
+    std::string *result) {
+  SerializeResult res = CheckCertificateFormat(tbs_certificate);
+  if (res != OK)
+    return res;
+  res = CheckKeyHashFormat(issuer_key_hash);
+  if (res != OK)
+    return res;
+  Serializer serializer;
+  serializer.WriteUint(ct::PRECERT_ENTRY, kLogEntryTypeLengthInBytes);
+  serializer.WriteFixedBytes(issuer_key_hash);
+  serializer.WriteVarBytes(tbs_certificate, kMaxCertificateLength);
+  result->assign(serializer.SerializedString());
+  return OK;
+}
+
 void Serializer::WriteFixedBytes(const string &in) {
   output_.append(in);
 }

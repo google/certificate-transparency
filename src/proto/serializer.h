@@ -133,6 +133,19 @@ class Serializer {
   static SerializeResult SerializeDigitallySigned(
       const ct::DigitallySigned &sig, std::string *result);
 
+  // entry_type + the signed_entry component of an SCT, in other words, the
+  // parts under the SCT signature that only depend on user input and not on
+  // fields the log adds (such as a timestamp)
+  static SerializeResult SerializeV1SignedEntryWithType(
+      const ct::LogEntry entry, std::string *result);
+
+  static SerializeResult SerializeV1SignedCertEntryWithType(
+      const std::string &leaf_certificate, std::string *result);
+
+  static SerializeResult SerializeV1SignedPrecertEntryWithType(
+      const std::string &issuer_key_hash, const std::string &tbs_certificate,
+      std::string *result);
+
  private:
   template <class T>
   void WriteUint(T in, size_t bytes) {
