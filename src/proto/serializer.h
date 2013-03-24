@@ -172,7 +172,7 @@ class Serializer {
 
   // Serialize (with length prefix).
   // FIXME(ekasper): for simplicity these reject if the list has empty
-  // empty elements (all our use cases are like this) but they should take in
+  // elements (all our use cases are like this) but they should take in
   // an arbitrary min bound instead.
   static SerializeResult SerializeList(
       const repeated_string &in,
@@ -276,7 +276,7 @@ class Deserializer {
   bool ReadVarBytes(size_t max_length, std::string *result);
 
   // FIXME(ekasper): for simplicity these reject if the list has empty
-  // empty elements (all our use cases are like this) but they should take in
+  // elements (all our use cases are like this) but they should take in
   // an arbitrary min bound instead.
   static DeserializeResult DeserializeList(const std::string &in,
                                            size_t max_total_length,

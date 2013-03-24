@@ -440,7 +440,6 @@ Serializer::SerializeResult Serializer::WriteList(
   return OK;
 }
 
-
 Serializer::SerializeResult
 Serializer::WriteDigitallySigned(const DigitallySigned &sig) {
   SerializeResult res = CheckSignatureFormat(sig);

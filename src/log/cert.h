@@ -16,6 +16,7 @@ class Cert {
   // so caller should check IsLoaded() before doing anything else.
   // All attempts to operate on an unloaded cert will fail with ERROR.
   explicit Cert(const std::string &pem_string);
+  Cert() : x509_(NULL) {}
   ~Cert();
 
   enum Status {
@@ -38,6 +39,13 @@ class Cert {
   // Never returns NULL but check IsLoaded() after Clone to verify the
   // underlying copy succeeded.
   Cert *Clone() const;
+
+  // Frees the old X509 and attempts to load anew.
+  Status LoadFromDerString(const std::string &der_string);
+
+  // These two just return an empty string if an error occurs.
+  std::string PrintIssuerName() const;
+  std::string PrintSubjectName() const;
 
   Status IsIdenticalTo(const Cert &other) const;
 
@@ -145,7 +153,7 @@ class Cert {
   Status ExtensionIndex(int extension_nid, int *extension_index) const;
   Status GetExtension(int extension_nid, X509_EXTENSION **ext) const;
   Status ExtensionStructure(int extension_nid, void **ext_struct) const;
-
+  static std::string PrintName(X509_NAME* name);
   X509 *x509_;
 };
 

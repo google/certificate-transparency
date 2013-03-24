@@ -58,6 +58,73 @@ Cert *Cert::Clone() const {
   return clone;
 }
 
+Cert::Status Cert::LoadFromDerString(const std::string &der_string) {
+  if (x509_ != NULL) {
+    X509_free(x509_);
+    x509_ = NULL;
+  }
+  const unsigned char *start =
+      reinterpret_cast<const unsigned char*>(der_string.data());
+  x509_ = d2i_X509(NULL, &start, der_string.size());
+  if (x509_ == NULL) {
+    LOG(WARNING) << "Input is not a valid DER-encoded certificate";
+    LOG_OPENSSL_ERRORS(WARNING);
+    return Cert::FALSE;
+  }
+  return Cert::TRUE;
+}
+
+string Cert::PrintIssuerName() const {
+  if (!IsLoaded()) {
+    LOG(ERROR) << "Cert not loaded";
+    return string();
+  }
+
+  return PrintName(X509_get_issuer_name(x509_));
+}
+
+string Cert::PrintSubjectName() const {
+  if (!IsLoaded()) {
+    LOG(ERROR) << "Cert not loaded";
+    return string();
+  }
+
+  return PrintName(X509_get_subject_name(x509_));
+}
+
+// static
+string Cert::PrintName(X509_NAME *name) {
+  if (name == NULL)
+    return string();
+  BIO *bio = BIO_new(BIO_s_mem());
+  if (bio == NULL) {
+    LOG_OPENSSL_ERRORS(ERROR);
+    return string();
+  }
+
+  if (X509_NAME_print_ex(bio, name, 0, 0) != 1) {
+    LOG_OPENSSL_ERRORS(ERROR);
+    BIO_free(bio);
+    return string();
+  }
+
+  int size = BIO_pending(bio);
+
+  char *buffer = new char[size];
+  int bytes_read = BIO_read(bio, buffer, size);
+  if (bytes_read != size) {
+    LOG(ERROR) << "Read " << bytes_read << " bytes; expected " << size;
+    delete[] buffer;
+    BIO_free(bio);
+    return string();
+  }
+
+  string ret(buffer, bytes_read);
+  delete[] buffer;
+  BIO_free(bio);
+  return ret;
+}
+
 Cert::Status Cert::IsIdenticalTo(const Cert &other) const {
   return X509_cmp(x509_, other.x509_) == 0 ? TRUE : FALSE;
 }

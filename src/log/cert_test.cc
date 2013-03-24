@@ -79,6 +79,38 @@ TEST_F(CertTest, LoadInvalid) {
   EXPECT_FALSE(invalid2.IsLoaded());
 }
 
+TEST_F(CertTest, LoadValidFromDer) {
+  Cert leaf(leaf_pem_);
+  string der;
+  ASSERT_EQ(Cert::TRUE, leaf.DerEncoding(&der));
+  Cert second;
+  EXPECT_EQ(Cert::TRUE, second.LoadFromDerString(der));
+  EXPECT_TRUE(second.IsLoaded());
+}
+
+TEST_F(CertTest, LoadInvalidFromDer) {
+  Cert leaf(leaf_pem_);
+  // Make it look almost good for extra fun.
+  string der;
+  ASSERT_EQ(Cert::TRUE, leaf.DerEncoding(&der));
+  Cert second;
+  EXPECT_EQ(Cert::FALSE, second.LoadFromDerString(der.substr(2)));
+  EXPECT_FALSE(second.IsLoaded());
+}
+
+TEST_F(CertTest, PrintSubjectName) {
+  Cert leaf(leaf_pem_);
+  EXPECT_EQ("C=GB, O=Certificate Transparency, ST=Wales, L=Erw Wen",
+            leaf.PrintSubjectName());
+}
+
+TEST_F(CertTest, PrintIssuerName) {
+  Cert leaf(leaf_pem_);
+  EXPECT_EQ("C=GB, O=Certificate Transparency CA, ST=Wales, L=Erw Wen",
+            leaf.PrintIssuerName());
+}
+
+
 TEST_F(CertTest, Identical) {
   Cert leaf(leaf_pem_);
   Cert ca(ca_pem_);
