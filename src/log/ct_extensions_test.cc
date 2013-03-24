@@ -11,6 +11,8 @@
 #include "util/testing.h"
 #include "util/util.h"
 
+namespace ct {
+
 using std::string;
 
 DEFINE_string(test_certs_dir, "../test/testdata", "Path to test certificates");
@@ -166,6 +168,8 @@ TEST_F(CtExtensionsTest, TestPrecertSigning) {
   ASSERT_EQ(Cert::TRUE, pre_signing_cert.HasExtendedKeyUsage(
       ct::NID_ctPrecertificateSigning));
 }
+
+}  // namespace ct
 
 int main(int argc, char**argv) {
   ct::test::InitTesting(argv[0], &argc, &argv, true);

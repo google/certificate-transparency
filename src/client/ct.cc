@@ -89,6 +89,9 @@ using ct::SignedCertificateTimestampList;
 using ct::SSLClientCTData;
 using std::string;
 
+using ct::Cert;
+using ct::CertChain;
+
 // SCTs presented to clients have to be encoded as a list.
 // Helper method for encoding a single SCT.
 static string SCTToList(const string &serialized_sct) {

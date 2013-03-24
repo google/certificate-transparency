@@ -11,6 +11,7 @@
 #include "util/testing.h"
 #include "util/util.h"
 
+namespace ct {
 using std::string;
 
 DEFINE_string(test_certs_dir, "../test/testdata", "Path to test certificates");
@@ -165,6 +166,7 @@ TEST_F(CertCheckerTest, PreCertWithPreCa) {
 }
 
 }  // namespace
+}  // namespace ct
 
 int main(int argc, char**argv) {
   ct::test::InitTesting(argv[0], &argc, &argv, true);

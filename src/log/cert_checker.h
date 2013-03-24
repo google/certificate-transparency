@@ -7,6 +7,7 @@
 
 #include "log/cert.h"
 
+namespace ct {
 // A class for doing sanity-checks on log submissions before accepting them.
 // We don't necessarily want to do full certificate verification
 // before accepting them. E.g., we may want to accept submissions of
@@ -65,4 +66,6 @@ class CertChecker {
 
   X509_STORE *trusted_;
 };
+
+}  // namespace ct
 #endif

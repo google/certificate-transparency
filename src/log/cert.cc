@@ -14,6 +14,8 @@
 #include "log/ct_extensions.h"
 #include "util/openssl_util.h"  // For LOG_OPENSSL_ERRORS
 
+namespace ct {
+
 using std::string;
 using util::ClearOpenSSLErrors;
 
@@ -801,3 +803,5 @@ Cert::Status PreCertChain::IsWellFormed() const {
   // Extension present in the leaf: check it's present in the issuer.
   return issuer->HasExtension(NID_authority_key_identifier);
 }
+
+}  // namespace ct

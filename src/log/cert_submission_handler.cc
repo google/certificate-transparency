@@ -13,6 +13,12 @@ using ct::PrecertChainEntry;
 using ct::X509ChainEntry;
 using std::string;
 
+using ct::Cert;
+using ct::CertChain;
+using ct::CertChecker;
+using ct::PreCertChain;
+using ct::TbsCertificate;
+
 // TODO(ekasper): handle Cert errors consistently and log some errors here
 // if they fail.
 CertSubmissionHandler::CertSubmissionHandler(CertChecker *cert_checker)

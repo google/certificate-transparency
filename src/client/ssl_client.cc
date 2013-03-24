@@ -18,6 +18,9 @@ using ct::SSLClientCTData;
 using ct::LogEntry;
 using std::string;
 
+using ct::Cert;
+using ct::CertChain;
+
 // TODO(ekasper): handle Cert::Status errors.
 SSLClient::SSLClient(const string &server, uint16_t port,
                      const string &ca_dir, LogVerifier *verifier)

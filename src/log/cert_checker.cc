@@ -12,6 +12,8 @@
 #include "util/openssl_util.h"  // for LOG_ALL_OPENSSL_ERRORS
 #include "util/util.h"
 
+namespace  ct {
+
 CertChecker::CertChecker() : trusted_(NULL) {
 }
 
@@ -200,3 +202,5 @@ CertChecker::GetTrustedCa(CertChain *chain) const {
   }
   return OK;
 }
+
+}  // namespace ct

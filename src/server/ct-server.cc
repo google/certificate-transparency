@@ -67,6 +67,8 @@ using ct::LoggedCertificate;
 using google::RegisterFlagValidator;
 using std::string;
 
+using ct::CertChecker;
+
 // Basic sanity checks on flag values.
 static bool ValidatePort(const char *flagname, int port) {
   if (port <= 0 || port > 65535) {

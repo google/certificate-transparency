@@ -14,7 +14,7 @@
 class CertSubmissionHandler {
  public:
   // Does not take ownership of the cert_checker.
-  explicit CertSubmissionHandler(CertChecker *cert_checker);
+  explicit CertSubmissionHandler(ct::CertChecker *cert_checker);
   ~CertSubmissionHandler() {}
 
   enum SubmitResult {
@@ -36,7 +36,7 @@ class CertSubmissionHandler {
   // For clients, to reconstruct the bytestring under the signature
   // from the observed chain. Does not check whether the entry
   // has valid format (i.e., does not check length limits).
-  static bool X509ChainToEntry(const CertChain &chain,
+  static bool X509ChainToEntry(const ct::CertChain &chain,
                                ct::LogEntry *entry);
 
  private:
@@ -47,13 +47,13 @@ class CertSubmissionHandler {
   SubmitResult ProcessPreCertSubmission(const std::string &submission,
                                         ct::PrecertChainEntry *entry);
 
-  static bool SerializedTbs(const Cert &cert, std::string *result);
-  static bool SerializedTbs(const PreCertChain &chain, std::string *result);
+  static bool SerializedTbs(const ct::Cert &cert, std::string *result);
+  static bool SerializedTbs(const ct::PreCertChain &chain, std::string *result);
 
-  CertChecker *cert_checker_;
+  ct::CertChecker *cert_checker_;
 
   static SubmitResult GetFormatError(Serializer::SerializeResult result);
 
-  static SubmitResult GetVerifyError(CertChecker::CertVerifyResult result);
+  static SubmitResult GetVerifyError(ct::CertChecker::CertVerifyResult result);
 };
 #endif

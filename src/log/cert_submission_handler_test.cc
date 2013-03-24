@@ -34,6 +34,10 @@ namespace {
 
 using ct::LogEntry;
 using std::string;
+using ct::Cert;
+using ct::CertChain;
+using ct::PreCertChain;
+using ct::CertChecker;
 
 class CertSubmissionHandlerTest : public ::testing::Test {
  protected:

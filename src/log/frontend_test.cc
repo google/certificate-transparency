@@ -50,6 +50,10 @@ using ct::LoggedCertificate;
 using ct::SignedCertificateTimestamp;
 using std::string;
 
+using ct::Cert;
+using ct::CertChain;
+using ct::CertChecker;
+
 typedef Database<LoggedCertificate> DB;
 typedef Frontend FE;
 

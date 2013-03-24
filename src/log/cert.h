@@ -7,6 +7,8 @@
 #include <string>
 #include <vector>
 
+namespace ct {
+
 class Cert {
  public:
   // Takes ownership of the X509 structure. It's advisable to check
@@ -311,4 +313,6 @@ class PreCertChain : public CertChain {
   // that the chain is valid.
   Cert::Status IsWellFormed() const;
 };
+
+}  // namespace ct
 #endif
