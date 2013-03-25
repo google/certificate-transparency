@@ -9,6 +9,7 @@
 #include <openssl/x509.h>
 #include <openssl/x509v3.h>
 #include <string>
+#include <time.h>
 #include <vector>
 
 #include "log/ct_extensions.h"
@@ -105,6 +106,58 @@ string Cert::PrintName(X509_NAME *name) {
   }
 
   if (X509_NAME_print_ex(bio, name, 0, 0) != 1) {
+    LOG_OPENSSL_ERRORS(ERROR);
+    BIO_free(bio);
+    return string();
+  }
+
+  int size = BIO_pending(bio);
+
+  char *buffer = new char[size];
+  int bytes_read = BIO_read(bio, buffer, size);
+  if (bytes_read != size) {
+    LOG(ERROR) << "Read " << bytes_read << " bytes; expected " << size;
+    delete[] buffer;
+    BIO_free(bio);
+    return string();
+  }
+
+  string ret(buffer, bytes_read);
+  delete[] buffer;
+  BIO_free(bio);
+  return ret;
+}
+
+string Cert::PrintNotBefore() const {
+  if (!IsLoaded()) {
+    LOG(ERROR) << "Cert not loaded";
+    return string();
+  }
+
+  return PrintTime(X509_get_notBefore(x509_));
+}
+
+string Cert::PrintNotAfter() const {
+  if (!IsLoaded()) {
+    LOG(ERROR) << "Cert not loaded";
+    return string();
+  }
+
+  return PrintTime(X509_get_notAfter(x509_));
+}
+
+// static
+string Cert::PrintTime(ASN1_TIME* when) {
+  if (when == NULL)
+    return string();
+
+  BIO *bio = BIO_new(BIO_s_mem());
+  if (bio == NULL) {
+    LOG_OPENSSL_ERRORS(ERROR);
+    return string();
+  }
+
+  if (ASN1_TIME_print(bio, when) != 1) {
     LOG_OPENSSL_ERRORS(ERROR);
     BIO_free(bio);
     return string();

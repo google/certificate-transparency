@@ -112,6 +112,15 @@ TEST_F(CertTest, PrintIssuerName) {
             leaf.PrintIssuerName());
 }
 
+TEST_F(CertTest, PrintNotBefore) {
+  Cert leaf(leaf_pem_);
+  EXPECT_EQ("Jun  1 00:00:00 2012 GMT", leaf.PrintNotBefore());
+}
+
+TEST_F(CertTest, PrintNotAfter) {
+  Cert leaf(leaf_pem_);
+  EXPECT_EQ("Jun  1 00:00:00 2022 GMT", leaf.PrintNotAfter());
+}
 
 TEST_F(CertTest, Identical) {
   Cert leaf(leaf_pem_);

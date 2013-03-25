@@ -48,6 +48,8 @@ class Cert {
   // These two just return an empty string if an error occurs.
   std::string PrintIssuerName() const;
   std::string PrintSubjectName() const;
+  std::string PrintNotBefore() const;
+  std::string PrintNotAfter() const;
 
   Status IsIdenticalTo(const Cert &other) const;
 
@@ -156,6 +158,7 @@ class Cert {
   Status GetExtension(int extension_nid, X509_EXTENSION **ext) const;
   Status ExtensionStructure(int extension_nid, void **ext_struct) const;
   static std::string PrintName(X509_NAME* name);
+  static std::string PrintTime(ASN1_TIME* when);
   X509 *x509_;
 };
 
