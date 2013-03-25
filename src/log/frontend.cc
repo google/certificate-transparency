@@ -81,6 +81,9 @@ std::string Frontend::SubmitResultString(SubmitResult result) {
     case PRECERT_CHAIN_NOT_WELL_FORMED:
       result_string = "precert chain not well-formed";
       break;
+    case INTERNAL_ERROR:
+      result_string = "internal error";
+      break;
     default:
       LOG(FATAL) << "Unknown SubmissionHandler return code " << result;
   }
@@ -106,6 +109,9 @@ Frontend::GetSubmitError(CertSubmissionHandler::SubmitResult result) {
       break;
     case CertSubmissionHandler::PRECERT_CHAIN_NOT_WELL_FORMED:
       submit_result = PRECERT_CHAIN_NOT_WELL_FORMED;
+      break;
+    case CertSubmissionHandler::INTERNAL_ERROR:
+      submit_result = INTERNAL_ERROR;
       break;
     default:
       LOG(FATAL) << "Unknown CertSubmissionHandler return code " << result;
@@ -138,6 +144,8 @@ void Frontend::UpdateX509Stats(Frontend::SubmitResult result) {
     case CERTIFICATE_VERIFY_ERROR:
       ++stats_.x509_verify_errors;
       break;
+    case INTERNAL_ERROR:
+      ++stats_.internal_errors;
     default:
       CHECK(false);
   }
@@ -163,6 +171,8 @@ void Frontend::UpdatePrecertStats(Frontend::SubmitResult result) {
     case PRECERT_CHAIN_NOT_WELL_FORMED:
       ++stats_.precert_format_errors;
       break;
+   case INTERNAL_ERROR:
+      ++stats_.internal_errors;
     default:
       CHECK(false);
   }

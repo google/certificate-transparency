@@ -5,8 +5,8 @@
 #include <glog/logging.h>
 #include <iostream>
 #include <netinet/in.h>
+#include <openssl/err.h>
 #include <openssl/evp.h>
-#include <openssl/ssl.h>
 #include <sstream>
 #include <stdio.h>
 #include <stdlib.h>
@@ -66,6 +66,8 @@ DEFINE_int32(tree_signing_frequency_seconds, 600,
 using ct::LoggedCertificate;
 using google::RegisterFlagValidator;
 using std::string;
+
+using ct::CertChecker;
 
 // Basic sanity checks on flag values.
 static bool ValidatePort(const char *flagname, int port) {
@@ -199,6 +201,8 @@ class CTLogManager {
        << stats.precert_verify_errors << std::endl;
     ss << "Badly formatted precertificates: "
        << stats.precert_format_errors << std::endl;
+   ss << "Internal errors: "
+       << stats.internal_errors << std::endl;
     return ss.str();
   }
 
@@ -471,7 +475,8 @@ class CTServerListener : public Listener {
 int main(int argc, char **argv) {
   google::ParseCommandLineFlags(&argc, &argv, true);
   google::InitGoogleLogging(argv[0]);
-  SSL_library_init();
+  OpenSSL_add_all_algorithms();
+  ERR_load_crypto_strings();
   ct::LoadCtExtensions();
 
   EVP_PKEY *pkey = NULL;

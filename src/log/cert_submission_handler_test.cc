@@ -1,6 +1,7 @@
 #include <gflags/gflags.h>
 #include <glog/logging.h>
 #include <gtest/gtest.h>
+#include <openssl/err.h>
 #include <openssl/evp.h>
 #include <string>
 
@@ -33,6 +34,10 @@ namespace {
 
 using ct::LogEntry;
 using std::string;
+using ct::Cert;
+using ct::CertChain;
+using ct::PreCertChain;
+using ct::CertChecker;
 
 class CertSubmissionHandlerTest : public ::testing::Test {
  protected:
@@ -52,7 +57,7 @@ class CertSubmissionHandlerTest : public ::testing::Test {
   void SetUp() {
     cert_dir_ = FLAGS_test_certs_dir;
     checker_ = new CertChecker();
-    checker_->LoadTrustedCertificate(cert_dir_ + "/" + kCaCert);
+    checker_->LoadTrustedCertificates(cert_dir_ + "/" + kCaCert);
     handler_ = new CertSubmissionHandler(checker_);
     CHECK(util::ReadBinaryFile(cert_dir_ + "/" + kCaCert, &ca_))
         << "Could not read test data from " << cert_dir_
@@ -193,6 +198,7 @@ TEST_F(CertSubmissionHandlerTest, SubmitInvalidPreCertChain) {
 int main(int argc, char**argv) {
   ct::test::InitTesting(argv[0], &argc, &argv, true);
   OpenSSL_add_all_algorithms();
+  ERR_load_crypto_strings();
   ct::LoadCtExtensions();
   return RUN_ALL_TESTS();
 }

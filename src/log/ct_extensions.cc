@@ -41,8 +41,7 @@ static const char kASN1NullValue[] = "NULL";
 static char *ASN1NullToString(X509V3_EXT_METHOD *method, ASN1_NULL *asn1_null) {
   if (asn1_null == NULL)
     return NULL;
-  char *buf = new char[sizeof kASN1NullValue];
-  memcpy(buf, kASN1NullValue, sizeof kASN1NullValue);
+  char *buf = strdup(kASN1NullValue);
   return buf;
 }
 

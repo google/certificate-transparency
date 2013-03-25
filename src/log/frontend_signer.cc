@@ -26,8 +26,7 @@ FrontendSigner::SubmitResult
 FrontendSigner::QueueEntry(const LogEntry &entry,
                            SignedCertificateTimestamp *sct) {
   // Check if the entry already exists.
-  // TODO(ekasper): is TBSCertificate the correct primary key for a precert?
-  // Should it be precert + issuer key hash?
+  // TODO(ekasper): switch to using SignedEntryWithType as the DB key.
   string sha256_hash =
       Sha256Hasher::Sha256Digest(Serializer::LeafCertificate(entry));
   assert(!sha256_hash.empty());

@@ -1,6 +1,7 @@
 /* -*- indent-tabs-mode: nil -*- */
 #include <glog/logging.h>
 #include <gtest/gtest.h>
+#include <openssl/err.h>
 #include <openssl/evp.h>
 #include <string>
 
@@ -49,6 +50,10 @@ using ct::LoggedCertificate;
 using ct::SignedCertificateTimestamp;
 using std::string;
 
+using ct::Cert;
+using ct::CertChain;
+using ct::CertChecker;
+
 typedef Database<LoggedCertificate> DB;
 typedef Frontend FE;
 
@@ -86,7 +91,7 @@ template <class T> class FrontendTest : public ::testing::Test {
     CHECK(util::ReadTextFile(cert_dir_ + "/" + kEmbeddedCert,  &embedded_pem_));
     CHECK(util::ReadTextFile(cert_dir_ + "/" + kEmbeddedWithPreCaCert,
                              &embedded_with_preca_pem_));
-    CHECK(checker_.LoadTrustedCertificate(cert_dir_ + "/" + kCaCert));
+    CHECK(checker_.LoadTrustedCertificates(cert_dir_ + "/" + kCaCert));
   }
 
   void CompareStats(const FE::FrontendStats &expected) {
@@ -103,6 +108,7 @@ template <class T> class FrontendTest : public ::testing::Test {
     EXPECT_EQ(expected.precert_too_long_certs, stats.precert_too_long_certs);
     EXPECT_EQ(expected.precert_verify_errors, stats.precert_verify_errors);
     EXPECT_EQ(expected.precert_format_errors, stats.precert_format_errors);
+    EXPECT_EQ(expected.internal_errors, stats.internal_errors);
   }
 
   ~FrontendTest() {
@@ -142,12 +148,16 @@ TYPED_TEST(FrontendTest, TestSubmitValid) {
   // Look it up and expect to get the right thing back.
   LoggedCertificate logged_cert;
   Cert cert(this->leaf_pem_);
-  EXPECT_EQ(DB::LOOKUP_OK, this->db()->LookupByHash(cert.Sha256Digest(),
+
+  string sha256_digest;
+  ASSERT_EQ(Cert::TRUE, cert.Sha256Digest(&sha256_digest));
+  EXPECT_EQ(DB::LOOKUP_OK, this->db()->LookupByHash(sha256_digest,
                                                     &logged_cert));
 
   EXPECT_EQ(ct::X509_ENTRY, logged_cert.entry().type());
   // Compare the leaf cert.
-  string der_string = cert.DerEncoding();
+  string der_string;
+  ASSERT_EQ(Cert::TRUE, cert.DerEncoding(&der_string));
   EXPECT_EQ(H(der_string),
             H(logged_cert.entry().x509_entry().leaf_certificate()));
 
@@ -156,7 +166,7 @@ TYPED_TEST(FrontendTest, TestSubmitValid) {
             this->verifier_->VerifySignedCertificateTimestamp(
                 logged_cert.entry(), sct));
 
-  FE::FrontendStats stats(1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0);
+  FE::FrontendStats stats(1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0);
   this->CompareStats(stats);
 }
 
@@ -169,12 +179,16 @@ TYPED_TEST(FrontendTest, TestSubmitValidWithIntermediate) {
   // Look it up and expect to get the right thing back.
   LoggedCertificate logged_cert;
   Cert cert(this->chain_leaf_pem_);
-  EXPECT_EQ(DB::LOOKUP_OK, this->db()->LookupByHash(cert.Sha256Digest(),
+
+  string sha256_digest;
+  ASSERT_EQ(Cert::TRUE, cert.Sha256Digest(&sha256_digest));
+  EXPECT_EQ(DB::LOOKUP_OK, this->db()->LookupByHash(sha256_digest,
                                                     &logged_cert));
 
   EXPECT_EQ(ct::X509_ENTRY, logged_cert.entry().type());
   // Compare the leaf cert.
-  string der_string = cert.DerEncoding();
+  string der_string;
+  ASSERT_EQ(Cert::TRUE, cert.DerEncoding(&der_string));
   EXPECT_EQ(H(der_string),
             H(logged_cert.entry().x509_entry().leaf_certificate()));
 
@@ -186,9 +200,11 @@ TYPED_TEST(FrontendTest, TestSubmitValidWithIntermediate) {
   // Compare the first intermediate.
   ASSERT_GE(logged_cert.entry().x509_entry().certificate_chain_size(), 1);
   Cert cert2(this->intermediate_pem_);
-  EXPECT_EQ(H(cert2.DerEncoding()),
+
+  ASSERT_EQ(Cert::TRUE, cert2.DerEncoding(&der_string));
+  EXPECT_EQ(H(der_string),
             H(logged_cert.entry().x509_entry().certificate_chain(0)));
-  FE::FrontendStats stats(1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0);
+  FE::FrontendStats stats(1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0);
   this->CompareStats(stats);
 }
 
@@ -202,12 +218,16 @@ TYPED_TEST(FrontendTest, TestSubmitDuplicate) {
   // Look it up and expect to get the right thing back.
   LoggedCertificate logged_cert;
   Cert cert(this->leaf_pem_);
-  EXPECT_EQ(DB::LOOKUP_OK, this->db()->LookupByHash(cert.Sha256Digest(),
+
+  string sha256_digest;
+  ASSERT_EQ(Cert::TRUE, cert.Sha256Digest(&sha256_digest));
+  EXPECT_EQ(DB::LOOKUP_OK, this->db()->LookupByHash(sha256_digest,
                                                     &logged_cert));
 
   EXPECT_EQ(ct::X509_ENTRY, logged_cert.entry().type());
   // Compare the leaf cert.
-  string der_string = cert.DerEncoding();
+  string der_string;
+  ASSERT_EQ(Cert::TRUE, cert.DerEncoding(&der_string));
   EXPECT_EQ(H(der_string),
             H(logged_cert.entry().x509_entry().leaf_certificate()));
 
@@ -215,7 +235,7 @@ TYPED_TEST(FrontendTest, TestSubmitDuplicate) {
   EXPECT_EQ(LogVerifier::VERIFY_OK,
             this->verifier_->VerifySignedCertificateTimestamp(
                 logged_cert.entry(), sct));
-  FE::FrontendStats stats(1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0);
+  FE::FrontendStats stats(1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0);
   this->CompareStats(stats);
 }
 
@@ -226,7 +246,7 @@ TYPED_TEST(FrontendTest, TestSubmitInvalidChain) {
             this->frontend_->QueueEntry(ct::X509_ENTRY,
                                         this->chain_leaf_pem_, &sct));
   EXPECT_FALSE(sct.has_signature());
-  FE::FrontendStats stats(0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0);
+  FE::FrontendStats stats(0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0);
   this->CompareStats(stats);
 }
 
@@ -238,7 +258,7 @@ TYPED_TEST(FrontendTest, TestSubmitInvalidPem) {
   EXPECT_EQ(FE::BAD_PEM_FORMAT,
             this->frontend_->QueueEntry(ct::X509_ENTRY, fake_cert, &sct));
   EXPECT_FALSE(sct.has_signature());
-  FE::FrontendStats stats(0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0);
+  FE::FrontendStats stats(0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0);
   this->CompareStats(stats);
 }
 
@@ -268,11 +288,16 @@ TYPED_TEST(FrontendTest, TestSubmitPrecert) {
 
   // Expect to have the original certs logged in the chain.
   ASSERT_EQ(logged_cert.entry().precert_entry().precertificate_chain_size(), 1);
-  EXPECT_EQ(H(pre.DerEncoding()),
+
+  string pre_der, ca_der;
+  ASSERT_EQ(Cert::TRUE, pre.DerEncoding(&pre_der));
+  ASSERT_EQ(Cert::TRUE, ca.DerEncoding(&ca_der));
+
+  EXPECT_EQ(H(pre_der),
             H(logged_cert.entry().precert_entry().pre_certificate()));
-  EXPECT_EQ(H(ca.DerEncoding()),
+  EXPECT_EQ(H(ca_der),
             H(logged_cert.entry().precert_entry().precertificate_chain(0)));
-  Frontend::FrontendStats stats(0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0);
+  Frontend::FrontendStats stats(0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0);
   this->CompareStats(stats);
 }
 
@@ -303,13 +328,19 @@ TYPED_TEST(FrontendTest, TestSubmitPrecertUsingPreCA) {
 
   // Expect to have the original certs logged in the chain.
   ASSERT_GE(logged_cert.entry().precert_entry().precertificate_chain_size(), 2);
-  EXPECT_EQ(H(pre.DerEncoding()),
+
+  string pre_der, ca_der, ca_pre_der;
+  ASSERT_EQ(Cert::TRUE, pre.DerEncoding(&pre_der));
+  ASSERT_EQ(Cert::TRUE, ca.DerEncoding(&ca_der));
+  ASSERT_EQ(Cert::TRUE, ca_pre.DerEncoding(&ca_pre_der));
+
+  EXPECT_EQ(H(pre_der),
             H(logged_cert.entry().precert_entry().pre_certificate()));
-  EXPECT_EQ(H(ca_pre.DerEncoding()),
+  EXPECT_EQ(H(ca_pre_der),
             H(logged_cert.entry().precert_entry().precertificate_chain(0)));
-  EXPECT_EQ(H(ca.DerEncoding()),
+  EXPECT_EQ(H(ca_der),
             H(logged_cert.entry().precert_entry().precertificate_chain(1)));
-  FE::FrontendStats stats(0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0);
+  FE::FrontendStats stats(0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0);
   this->CompareStats(stats);
 }
 
@@ -318,6 +349,7 @@ TYPED_TEST(FrontendTest, TestSubmitPrecertUsingPreCA) {
 int main(int argc, char **argv) {
   ct::test::InitTesting(argv[0], &argc, &argv, true);
   OpenSSL_add_all_algorithms();
+  ERR_load_crypto_strings();
   ct::LoadCtExtensions();
   return RUN_ALL_TESTS();
 }

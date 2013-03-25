@@ -18,6 +18,10 @@ using ct::SSLClientCTData;
 using ct::LogEntry;
 using std::string;
 
+using ct::Cert;
+using ct::CertChain;
+
+// TODO(ekasper): handle Cert::Status errors.
 SSLClient::SSLClient(const string &server, uint16_t port,
                      const string &ca_dir, LogVerifier *verifier)
     : client_(server, port),
@@ -122,34 +126,40 @@ int SSLClient::VerifyCallback(X509_STORE_CTX *ctx, void *arg) {
   // Should contain at least the leaf.
   CHECK_GE(chain_size, 1);
   for (int i = 0; i < chain_size; ++i)
-    chain.AddCert(new Cert(sk_X509_value(ctx->chain, i)));
+    chain.AddCert(new Cert(X509_dup(sk_X509_value(ctx->chain, i))));
 
   CHECK_NOTNULL(ctx->untrusted);
   chain_size = sk_X509_num(ctx->untrusted);
   // Should contain at least the leaf.
   CHECK_GE(chain_size, 1);
   for (int i = 0; i < chain_size; ++i)
-    input_chain.AddCert(new Cert(sk_X509_value(ctx->untrusted, i)));
+    input_chain.AddCert(new Cert(X509_dup(sk_X509_value(ctx->untrusted, i))));
 
   string serialized_scts;
   // First, see if the cert has an embedded proof.
   if (chain.LeafCert()->HasExtension(
-          ct::NID_ctEmbeddedSignedCertificateTimestampList)) {
+          ct::NID_ctEmbeddedSignedCertificateTimestampList) == Cert::TRUE) {
         LOG(INFO) << "Embedded proof extension found in certificate, "
                   << "verifying...";
-        if(!chain.LeafCert()->OctetStringExtensionData(
+        Cert::Status status = chain.LeafCert()->OctetStringExtensionData(
                ct::NID_ctEmbeddedSignedCertificateTimestampList,
-               &serialized_scts)) {
-          LOG(ERROR) << "Could not parse extension data";
+               &serialized_scts);
+        if (status != Cert::TRUE) {
+          // Any error here is likely OpenSSL acting up, so just die.
+          CHECK_EQ(Cert::FALSE, status);
+          LOG(ERROR) << "Failed to parse extension data: corrupt cert?";
         }
-    // Else look for the proof in a superfluous cert.
-    // Let's assume the superfluous cert is always last in the chain.
+        // Else look for the proof in a superfluous cert.
+        // Let's assume the superfluous cert is always last in the chain.
   } else if (input_chain.Length() > 1 && input_chain.LastCert()->HasExtension(
-      ct::NID_ctSignedCertificateTimestampList)) {
+      ct::NID_ctSignedCertificateTimestampList) == Cert::TRUE) {
     LOG(INFO) << "Proof extension found in certificate, verifying...";
-    if(!input_chain.LastCert()->OctetStringExtensionData(
-           ct::NID_ctSignedCertificateTimestampList, &serialized_scts)) {
-      LOG(ERROR) << "Could not parse extension data";
+    Cert::Status status = input_chain.LastCert()->OctetStringExtensionData(
+        ct::NID_ctSignedCertificateTimestampList, &serialized_scts);
+    if (status != Cert::TRUE) {
+      // Any error here is likely OpenSSL acting up, so just die.
+      CHECK_EQ(Cert::FALSE, status);
+      LOG(ERROR) << "Failed to parse extension data: corrupt cert?";
     }
   }
 

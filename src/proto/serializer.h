@@ -30,8 +30,9 @@ class Serializer {
     UNSUPPORTED_VERSION,
     EXTENSIONS_TOO_LONG,
     INVALID_KEYID_LENGTH,
-    EMPTY_SCT_LIST,
-    EMPTY_SCT_IN_LIST,
+    EMPTY_LIST,
+    EMPTY_ELEM_IN_LIST,
+    LIST_ELEM_TOO_LONG,
     LIST_TOO_LONG,
   };
 
@@ -104,6 +105,23 @@ class Serializer {
   static SerializeResult SerializeSCTList(
     const ct::SignedCertificateTimestampList &sct_list, std::string *result);
 
+  // NB This serializes the certificate_chain component of the X509 chain only.
+  // Needed for the GetEntries flow.
+  static SerializeResult SerializeX509Chain(const ct::X509ChainEntry &entry,
+                                            std::string *result);
+
+  static SerializeResult SerializeX509Chain(
+      const repeated_string& certificate_chain, std::string *result);
+
+  static SerializeResult SerializePrecertChainEntry(
+      const ct::PrecertChainEntry &entry, std::string *result);
+
+  static SerializeResult SerializePrecertChainEntry(
+      const std::string &pre_certificate,
+      const repeated_string& precertificate_chain,
+      std::string *result);
+
+
   // TODO(ekasper): tests for these!
   template <class T>
   static std::string SerializeUint(T in, size_t bytes = sizeof(T)) {
@@ -114,6 +132,19 @@ class Serializer {
 
   static SerializeResult SerializeDigitallySigned(
       const ct::DigitallySigned &sig, std::string *result);
+
+  // entry_type + the signed_entry component of an SCT, in other words, the
+  // parts under the SCT signature that only depend on user input and not on
+  // fields the log adds (such as a timestamp)
+  static SerializeResult SerializeV1SignedEntryWithType(
+      const ct::LogEntry entry, std::string *result);
+
+  static SerializeResult SerializeV1SignedCertEntryWithType(
+      const std::string &leaf_certificate, std::string *result);
+
+  static SerializeResult SerializeV1SignedPrecertEntryWithType(
+      const std::string &issuer_key_hash, const std::string &tbs_certificate,
+      std::string *result);
 
  private:
   template <class T>
@@ -130,6 +161,8 @@ class Serializer {
   void WriteFixedBytes(const std::string &in);
 
   // Variable-length byte array.
+  // Caller is responsible for checking |in| <= max_length
+  // TODO(ekasper): could return a bool instead.
   void WriteVarBytes(const std::string &in, size_t max_length);
 
   // Length of the serialized list (with length prefix).
@@ -138,9 +171,15 @@ class Serializer {
                                      size_t max_total_length);
 
   // Serialize (with length prefix).
+  // FIXME(ekasper): for simplicity these reject if the list has empty
+  // elements (all our use cases are like this) but they should take in
+  // an arbitrary min bound instead.
   static SerializeResult SerializeList(
-      const repeated_string &in, size_t max_elem_length,
-      size_t max_total_length, std::string *result);
+      const repeated_string &in,
+      size_t max_elem_length, size_t max_total_length,
+      std::string *result);
+  SerializeResult WriteList(const repeated_string &in, size_t max_elem_length,
+                            size_t max_total_length);
 
   SerializeResult WriteDigitallySigned(const ct::DigitallySigned &sig);
 
@@ -178,8 +217,8 @@ class Deserializer {
     INPUT_TOO_LONG,
     UNSUPPORTED_VERSION,
     INVALID_LIST_ENCODING,
-    EMPTY_SCT_LIST,
-    EMPTY_SCT_IN_LIST,
+    EMPTY_LIST,
+    EMPTY_ELEM_IN_LIST,
   };
 
   bool ReachedEnd() const { return bytes_remaining_ == 0; }
@@ -192,12 +231,16 @@ class Deserializer {
   static DeserializeResult DeserializeSCTList(
       const std::string &in, ct::SignedCertificateTimestampList *sct_list);
 
-  static DeserializeResult DeserializeList(
-      const std::string &in, size_t max_total_length,
-      size_t max_elem_length, repeated_string *out);
-
   static DeserializeResult
   DeserializeDigitallySigned(const std::string &in, ct::DigitallySigned *sig);
+
+  // Deserialize the certificate_chain component of an X509ChainEntry and plug
+  // it to the entry.
+  static DeserializeResult DeserializeX509Chain(
+      const std::string &in, ct::X509ChainEntry *x509_chain_entry);
+
+  static DeserializeResult DeserializePrecertChainEntry(
+      const std::string &in, ct::PrecertChainEntry *precert_chain_entry);
 
   template<class T>
   static DeserializeResult DeserializeUint(const std::string &in, size_t bytes,
@@ -229,7 +272,19 @@ class Deserializer {
 
   bool ReadFixedBytes(size_t bytes, std::string *result);
 
+  bool ReadLengthPrefix(size_t max_length, size_t *result);
+
   bool ReadVarBytes(size_t max_length, std::string *result);
+
+  // FIXME(ekasper): for simplicity these reject if the list has empty
+  // elements (all our use cases are like this) but they should take in
+  // an arbitrary min bound instead.
+  static DeserializeResult DeserializeList(const std::string &in,
+                                           size_t max_total_length,
+                                           size_t max_elem_length,
+                                           repeated_string *out);
+  DeserializeResult ReadList(size_t max_total_length, size_t max_elem_length,
+                             repeated_string *out);
 
   DeserializeResult ReadDigitallySigned(ct::DigitallySigned *sig);
 

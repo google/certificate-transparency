@@ -20,6 +20,7 @@ class Frontend {
     SUBMISSION_TOO_LONG,
     CERTIFICATE_VERIFY_ERROR,
     PRECERT_CHAIN_NOT_WELL_FORMED,
+    INTERNAL_ERROR,
   };
 
   struct FrontendStats {
@@ -34,7 +35,8 @@ class Frontend {
     precert_bad_pem_certs(0),
     precert_too_long_certs(0),
     precert_verify_errors(0),
-    precert_format_errors(0) {}
+    precert_format_errors(0),
+    internal_errors(0) {}
 
     FrontendStats(int x509_accepted_,
                   int x509_duplicates_,
@@ -46,7 +48,8 @@ class Frontend {
                   int precert_bad_pem_certs_,
                   int precert_too_long_certs_,
                   int precert_verify_errors_,
-                  int precert_format_errors_)
+                  int precert_format_errors_,
+                  int internal_errors_)
         : x509_accepted(x509_accepted_),
           x509_duplicates(x509_duplicates_),
           x509_bad_pem_certs(x509_bad_pem_certs_),
@@ -57,7 +60,8 @@ class Frontend {
           precert_bad_pem_certs(precert_bad_pem_certs_),
           precert_too_long_certs(precert_too_long_certs_),
           precert_verify_errors(precert_verify_errors_),
-          precert_format_errors(precert_format_errors_) {}
+          precert_format_errors(precert_format_errors_),
+          internal_errors(internal_errors_) {}
 
     int x509_accepted;
     int x509_duplicates;
@@ -70,6 +74,7 @@ class Frontend {
     int precert_too_long_certs;
     int precert_verify_errors;
     int precert_format_errors;
+    int internal_errors;
   };
 
   void GetStats(FrontendStats *stats) const;
