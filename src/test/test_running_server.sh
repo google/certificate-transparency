@@ -17,10 +17,9 @@ CT_KEY=$2
 SERVER=${3:-"127.0.0.1"}
 PORT=${4:-8124}
 
-echo $SERVER
+HTTP_LOG=--http_log
 
-# make_cert expects to find the server key in $CERT_DIR
-ln -sf $CT_KEY $CERT_DIR/ct-server-key-public.pem
+echo $SERVER
 
 . generate_certs.sh
 
@@ -30,7 +29,7 @@ then
   ca_setup $CERT_DIR ca false
 fi
 
-make_cert $CERT_DIR test ca ct-server 8124 false $CT_KEY
+make_cert $CERT_DIR test ca ct-server $SERVER $PORT false $CT_KEY
 
 # FIXME(benl): share with sslconnect_test.sh?
 audit() {
@@ -41,13 +40,13 @@ audit() {
   set +e
   ../client/ct audit --ct_server="$SERVER" --ct_server_port=$PORT \
     --ct_server_public_key=$CT_KEY \
-    --ssl_client_ct_data_in=$sct --logtostderr=true
+    --ssl_client_ct_data_in=$sct --logtostderr=true $HTTP_LOG
   retcode=$?
   set -e
 }
 
 T=`date +%s`
-T=`expr $T + 5`
+T=`expr $T + 30`
 
 while true
 do
@@ -65,6 +64,7 @@ do
       break
     fi
   fi
+  sleep 1
 done
 
 echo $PASSED passed

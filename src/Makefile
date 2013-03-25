@@ -3,7 +3,7 @@ INCLUDE = -I.
 LOCAL_LIBS = log/libcert.a log/libdatabase.a log/liblog.a \
              merkletree/libmerkletree.a proto/libproto.a util/libutil.a
 SYS_LIBS = -lpthread -lgflags -lglog -lssl -lcrypto \
-       -lsqlite3 -lprotobuf
+       -lsqlite3 -lprotobuf -lcurlpp -ljson
 # Need OpenSSL >= 1.0.0
 ifneq ($(OPENSSLDIR),)
   INCLUDE += -I $(OPENSSLDIR)/include
@@ -71,7 +71,7 @@ ifneq ($(MAKECMDGOALS),clean)
     include server/.depend
 endif
 
-unit_tests: proto_tests merkletree_tests log_tests
+unit_tests: proto_tests merkletree_tests log_tests client_tests
 
 ### util/ targets
 util/libutil.a: util/util.o util/testing.o
@@ -138,7 +138,8 @@ log_tests: log/cert_test log/cert_checker_test \
            log/cert_submission_handler_test log/database_test \
            log/database_large_test log/file_storage_test \
            log/frontend_signer_test log/frontend_test log/log_lookup_test \
-           log/log_signer_test log/tree_signer_test log/logged_certificate_test
+           log/log_signer_test log/tree_signer_test \
+           log/logged_certificate_test log/ct_extensions_test
 
 log/cert_test: log/cert_test.o log/cert.o log/ct_extensions.o util/libutil.a
 	$(CXX) -o $@ $^ $(SYS_LIBS)
@@ -208,8 +209,13 @@ log/logged_certificate_test: log/logged_certificate_test.o proto/libproto.a \
 	$(CXX) -o $@ $^ $(SYS_LIBS)
 
 # client
+client_tests: client/json_wrapper_test
+
+client/json_wrapper_test: client/json_wrapper_test.o util/libutil.a
+	$(CXX) -o $@ $^ $(SYS_LIBS)
+
 client/ct: client/ct.o client/client.o client/log_client.o client/ssl_client.o \
-           $(LOCAL_LIBS)
+           client/http_log_client.o $(LOCAL_LIBS)
 	$(CXX) -o $@ $^ $(SYS_LIBS)
 
 # server
@@ -223,6 +229,7 @@ server/blob-server: server/blob-server.o server/event.o \
 	$(CXX) -o $@ $^ $(SYS_LIBS)
 
 test: all
+	client/json_wrapper_test
 	proto/serializer_test
 	merkletree/serial_hasher_test
 	merkletree/tree_hasher_test

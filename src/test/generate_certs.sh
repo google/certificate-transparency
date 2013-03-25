@@ -122,13 +122,14 @@ make_intermediate_ca_certs() {
 
 # Call make_ca_certs and make_log_server_keys first
 make_cert() {
-  cert_dir=$1
-  server=$2
-  ca=$3
-  log_server=$4
-  log_server_port=$5
-  ca_is_intermediate=$6
-  local server_public_key=$7
+  local cert_dir=$1
+  local server=$2
+  local ca=$3
+  local log_server_name=$4
+  local log_server=$5
+  local log_server_port=$6
+  local ca_is_intermediate=$7
+  local server_public_key=$8
 
   # Generate a new private key and CSR
   request_cert $cert_dir $server precert.conf
@@ -152,18 +153,24 @@ make_cert() {
     cat $cert_dir/$server-cert.pem > $cert_dir/$server-cert-bundle.pem
   fi
 
-  ../client/ct upload \
+  echo ../client/ct upload \
     --ct_server_submission=$cert_dir/$server-cert-bundle.pem \
-    --ct_server="127.0.0.1" --ct_server_port=$log_server_port \
+    --ct_server=$log_server --ct_server_port=$log_server_port \
     --ct_server_public_key=$server_public_key \
     --ct_server_response_out=$cert_dir/$server-cert.proof \
-    --logtostderr=true 
+    --logtostderr=true $HTTP_LOG
+  ../client/ct upload \
+    --ct_server_submission=$cert_dir/$server-cert-bundle.pem \
+    --ct_server=$log_server --ct_server_port=$log_server_port \
+    --ct_server_public_key=$server_public_key \
+    --ct_server_response_out=$cert_dir/$server-cert.proof \
+    --logtostderr=true $HTTP_LOG
 
   # Create a wrapped SCT
-  ../client/ct wrap \
+  ../client/ct wrap --alsologtostderr \
     --sct_in=$cert_dir/$server-cert.proof \
     --certificate_chain_in=$cert_dir/$server-cert-bundle.pem \
-    --ct_server_public_key=$cert_dir/$log_server-key-public.pem \
+    --ct_server_public_key=$server_public_key \
     --ssl_client_ct_data_out=$cert_dir/$server-cert.ctdata
 
   rm $cert_dir/$server-cert-bundle.pem

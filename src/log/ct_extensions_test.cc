@@ -129,7 +129,7 @@ TEST_F(CtExtensionsTest, TestPoisonExtension) {
   // Check we can find the extension by its advertised NID.
   // We should really be checking that the OID matches the expected OID but
   // what other extension could this cert be having that the other one doesn't?
-  ASSERT_TRUE(poison_cert.HasExtension(ct::NID_ctPoison()));
+  ASSERT_TRUE(poison_cert.HasExtension(ct::NID_ctPoison));
 
   // Now fish the extension data out using the print methods and check they
   // operate as expected.

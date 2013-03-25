@@ -10,6 +10,7 @@
 ^src/merkletree/tree_hasher_test$
 \.depend
 ^src/client/ct$
+^src/client/json_wrapper_test$
 ^src/server/blob-server$
 ^src/server/ct-server$
 ^src/test/apachectl$

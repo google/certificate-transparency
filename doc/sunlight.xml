@@ -1,7 +1,7 @@
 <?xml version="1.0"?>
 <?rfc symrefs="yes"?>
 <?rfc toc="yes"?>
-<rfc ipr="trust200902" docName="draft-laurie-pki-sunlight-09" category="exp">
+<rfc ipr="trust200902" docName="draft-laurie-pki-sunlight-10" category="exp">
   <front>
     <title>Certificate Transparency</title>
     <author initials="B" surname="Laurie" fullname="Ben Laurie">
@@ -678,7 +678,7 @@ d0 d1   d2 d3           d0 d1   d2 d3  d4 d5
                   The base64-encoded MerkleTreeLeaf structure.
                 </t>
                 <t hangText="extra_data">
-                  The base64-encoded unsigned data pertaining to the log entry. In the case of an X509ChainEntry, this is the <spanx style="verb">certificate_chain</spanx>. In the case of a PrecertChainEntry, this is the  <spanx style="verb">precertificate_chain</spanx>.
+                  The base64-encoded unsigned data pertaining to the log entry. In the case of an X509ChainEntry, this is the <spanx style="verb">certificate_chain</spanx>. In the case of a PrecertChainEntry, this is the whole <spanx style="verb">PrecertChainEntry</spanx>.
                 </t>
               </list>
 	    </t>

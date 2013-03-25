@@ -1,3 +1,4 @@
+/* -*- indent-tabs-mode: nil -*- */
 #include <glog/logging.h>
 #include <openssl/evp.h>
 #include <openssl/opensslv.h>
@@ -10,6 +11,7 @@
 #include "merkletree/serial_hasher.h"
 #include "proto/ct.pb.h"
 #include "proto/serializer.h"
+#include "util/util.h"
 
 using ct::LogEntry;
 using ct::LogEntryType;
@@ -211,8 +213,10 @@ LogSigVerifier::VerifyResult LogSigVerifier::VerifyV1CertSCTSignature(
   DigitallySigned signature;
   Deserializer::DeserializeResult result =
       Deserializer::DeserializeDigitallySigned(serialized_sig, &signature);
-  if (result != Deserializer::OK)
+  if (result != Deserializer::OK) {
+    LOG(WARNING) << "DeserializeDigitallySigned returned " << result;
     return GetDeserializeSignatureError(result);
+  }
 
   string serialized_sct;
   Serializer::SerializeResult serialize_result =
@@ -247,8 +251,12 @@ LogSigVerifier::VerifySCTSignature(const LogEntry &entry,
                                    const SignedCertificateTimestamp &sct)
     const {
   // Try to catch key mismatches early.
-  if (sct.id().has_key_id() && sct.id().key_id() != KeyID())
+  if (sct.id().has_key_id() && sct.id().key_id() != KeyID()) {
+    LOG(WARNING) << "Key ID mismatch, got: "
+                 << util::HexString(sct.id().key_id()) << " expected: "
+                 << util::HexString(KeyID());
     return KEY_ID_MISMATCH;
+  }
 
   string serialized_input;
   Serializer::SerializeResult serialize_result =

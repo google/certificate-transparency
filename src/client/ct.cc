@@ -1,3 +1,4 @@
+/* -*- indent-tabs-mode: nil -*- */
 #include <fcntl.h>
 #include <fstream>
 #include <gflags/gflags.h>
@@ -14,6 +15,7 @@
 #include <stdio.h>
 #include <string>
 
+#include "client/http_log_client.h"
 #include "client/log_client.h"
 #include "client/ssl_client.h"
 #include "log/cert.h"
@@ -66,6 +68,10 @@ DEFINE_bool(ssl_client_expect_handshake_failure, false,
 DEFINE_string(certificate_chain_in, "", "Certificate chain to analyze, "
               "in PEM format");
 DEFINE_string(sct_in, "", "SCT to wrap");
+DEFINE_bool(http_log, false, "Use an I-D compliant HTTP log server rather than "
+            "the old protocol buffer format");
+DEFINE_int32(get_first, 0, "First entry to retrieve with the 'get' command");
+DEFINE_int32(get_last, 0, "Last entry to retrieve with the 'get' command");
 
 
 static const char kUsage[] =
@@ -79,6 +85,7 @@ static const char kUsage[] =
     "diagnose_chain - print info about the SCTs the cert chain carries\n"
     "wrap - take an SCT and certificate chain and wrap them as if they were\n"
     "       retrieved via 'connect'\n"
+    "getentries - get entries from the log\n"
     "Use --help to display command-line flag options\n";
 
 using ct::LogEntry;
@@ -186,16 +193,34 @@ static int Upload() {
   LOG(INFO) << "Uploading certificate submission from " << submission_file;
   LOG(INFO) << submission_file << " is " << contents.length() << " bytes.";
 
-  LogClient client(FLAGS_ct_server, FLAGS_ct_server_port);
-  if (!client.Connect()) {
-    LOG(ERROR) << "Unable to connect";
-    return 2;
-  }
-
   SignedCertificateTimestamp sct;
-  if (!client.UploadSubmission(contents, FLAGS_precert, &sct)) {
-    LOG(ERROR) << "Submission failed";
-    return 1;
+
+  if (FLAGS_http_log) {
+    HTTPLogClient client(FLAGS_ct_server, FLAGS_ct_server_port);
+    
+    HTTPLogClient::Status ret = client.UploadSubmission(contents, FLAGS_precert,
+                                                        &sct);
+
+    if (ret == HTTPLogClient::CONNECT_FAILED) {
+      LOG(ERROR) << "Unable to connect";
+      return 2;
+    }
+
+    if (ret != HTTPLogClient::OK) {
+      LOG(ERROR) << "Submission failed, error = " << ret;
+      return 1;
+    }
+  } else {
+    LogClient client(FLAGS_ct_server, FLAGS_ct_server_port);
+    if (!client.Connect()) {
+      LOG(ERROR) << "Unable to connect";
+      return 2;
+    }
+
+    if (!client.UploadSubmission(contents, FLAGS_precert, &sct)) {
+      LOG(ERROR) << "Submission failed";
+      return 1;
+    }
   }
 
   /* Temporarily removed: we need the the final chain if the upload
@@ -451,12 +476,6 @@ static AuditResult Audit() {
   LogVerifier *verifier = GetLogVerifierFromFlags();
   string key_id = verifier->KeyID();
 
-  LogClient client(FLAGS_ct_server, FLAGS_ct_server_port);
-  if (!client.Connect()) {
-    LOG(ERROR) << "Unable to connect";
-    return CT_SERVER_UNAVAILABLE;
-  }
-
   AuditResult audit_result = PROOF_NOT_FOUND;
 
   for (int i = 0; i < ct_data.attached_sct_info_size(); ++i) {
@@ -472,25 +491,55 @@ static AuditResult Audit() {
 
     MerkleAuditProof proof;
 
-    if (!client.QueryAuditProof(ct_data.attached_sct_info(i).merkle_leaf_hash(),
-                                &proof)) {
-      LOG(INFO) << "Failed to retrieve audit proof";
-      continue;
-    } else {
-      LOG(INFO) << "Received proof " << proof.DebugString();
-      LogVerifier::VerifyResult res =
-          verifier->VerifyMerkleAuditProof(ct_data.reconstructed_entry(),
-                                           ct_data.attached_sct_info(i).sct(),
-                                           proof);
-      if (res != LogVerifier::VERIFY_OK) {
-        LOG(ERROR) << "Verify error: " << LogVerifier::VerifyResultString(res);
-        LOG(ERROR) << "Retrieved Merkle proof is invalid.";
+    if (FLAGS_http_log) {
+      HTTPLogClient client(FLAGS_ct_server, FLAGS_ct_server_port);
+      
+      LOG(INFO) << "info = "
+                << ct_data.attached_sct_info(i).DebugString();
+      HTTPLogClient::Status ret = client.QueryAuditProof(
+          ct_data.attached_sct_info(i).merkle_leaf_hash(), &proof);
+
+      // HTTP protocol does not supply this.
+      proof.mutable_id()->set_key_id(sct_id);
+
+      if (ret == HTTPLogClient::CONNECT_FAILED) {
+        LOG(ERROR) << "Unable to connect";
+        delete verifier;
+        return CT_SERVER_UNAVAILABLE;
+      }
+      if (ret != HTTPLogClient::OK) {
+        LOG(ERROR) << "QueryAuditProof failed, error " << ret;
         continue;
       }
-      LOG(INFO) << "Proof verified.";
-      audit_result = PROOF_OK;
+    } else {
+      LogClient client(FLAGS_ct_server, FLAGS_ct_server_port);
+      if (!client.Connect()) {
+        LOG(ERROR) << "Unable to connect";
+        delete verifier;
+        return CT_SERVER_UNAVAILABLE;
+      }
+
+      if (!client.QueryAuditProof(ct_data.attached_sct_info(i)
+                                  .merkle_leaf_hash(), &proof)) {
+        LOG(INFO) << "Failed to retrieve audit proof";
+        continue;
+      }
     }
+
+    LOG(INFO) << "Received proof " << proof.DebugString();
+    LogVerifier::VerifyResult res =
+        verifier->VerifyMerkleAuditProof(ct_data.reconstructed_entry(),
+                                         ct_data.attached_sct_info(i).sct(),
+                                         proof);
+    if (res != LogVerifier::VERIFY_OK) {
+      LOG(ERROR) << "Verify error: " << LogVerifier::VerifyResultString(res);
+      LOG(ERROR) << "Retrieved Merkle proof is invalid.";
+      continue;
+    }
+    LOG(INFO) << "Proof verified.";
+    audit_result = PROOF_OK;
   }
+  delete verifier;
   return audit_result;
 }
 
@@ -593,6 +642,17 @@ void Wrap() {
   WriteSSLClientCTData(ct_data, FLAGS_ssl_client_ct_data_out);
 }
 
+void GetEntries() {
+  CHECK(FLAGS_http_log);
+
+  HTTPLogClient client(FLAGS_ct_server, FLAGS_ct_server_port);
+  std::vector<HTTPLogClient::LogEntry> entries;
+  HTTPLogClient::Status error = client.GetEntries(FLAGS_get_first,
+                                                  FLAGS_get_last,  &entries);
+  CHECK(error == HTTPLogClient::OK);
+}
+
+
 // Exit code upon normal exit:
 // 0: success
 // 1: failure
@@ -639,6 +699,8 @@ int main(int argc, char **argv) {
     DiagnoseCertChain();
   } else if (cmd == "wrap") {
     Wrap();
+  } else if (cmd == "getentries") {
+    GetEntries();
   } else {
     std::cout << google::ProgramUsage();
   }
