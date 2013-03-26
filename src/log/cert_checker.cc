@@ -9,10 +9,13 @@
 
 #include "log/cert.h"
 #include "log/cert_checker.h"
+#include "log/ct_extensions.h"
 #include "util/openssl_util.h"  // for LOG_ALL_OPENSSL_ERRORS
 #include "util/util.h"
 
 namespace  ct {
+
+using std::string;
 
 CertChecker::CertChecker() : trusted_(NULL) {
 }
@@ -56,6 +59,20 @@ CertChecker::CheckCertChain(CertChain *chain) const {
   if (chain == NULL || !chain->IsLoaded())
     return INVALID_CERTIFICATE_CHAIN;
 
+  // Weed out things that should obviously be precert chains instead.
+  Cert::Status status = chain->LeafCert()->HasCriticalExtension(
+      ct::NID_ctPoison);
+  if (status != Cert::TRUE && status != Cert::FALSE) {
+    return CertChecker::INTERNAL_ERROR;
+  }
+  if (status == Cert::TRUE)
+    return PRECERT_EXTENSION_IN_CERT_CHAIN;
+
+  return CheckIssuerChain(chain);
+}
+
+CertChecker::CertVerifyResult
+CertChecker::CheckIssuerChain(CertChain *chain) const {
   if (chain->RemoveCertsAfterFirstSelfSigned() != Cert::TRUE) {
     LOG(ERROR) << "Failed to trim chain";
     return INTERNAL_ERROR;
@@ -79,8 +96,9 @@ CertChecker::CheckCertChain(CertChain *chain) const {
   return GetTrustedCa(chain);
 }
 
-CertChecker::CertVerifyResult
-CertChecker::CheckPreCertChain(PreCertChain *chain) const {
+CertChecker::CertVerifyResult CertChecker::CheckPreCertChain(
+    PreCertChain *chain, string *issuer_key_hash,
+    string *tbs_certificate) const {
   if (chain == NULL || !chain->IsLoaded())
     return INVALID_CERTIFICATE_CHAIN;
   Cert::Status status = chain->IsWellFormed();
@@ -100,19 +118,44 @@ CertChecker::CheckPreCertChain(PreCertChain *chain) const {
   // TODO(ekasper): determine (i.e., ask CAs) if CA:false Precertificate Signing
   // Certificates should be tolerated if they have the necessary EKU set.
   // Preference is "no".
-  CertVerifyResult res = CheckCertChain(chain);
+  CertVerifyResult res = CheckIssuerChain(chain);
   if (res != OK)
     return res;
-  // We should always have at least two certs in the chain now - if we have
-  // just one, then something truly weird is going on, e.g., a CA has issued a
-  // precert for its own root certificate.
-  if (chain->Length() < 2 ||
-      (chain->UsesPrecertSigningCertificate() == Cert::TRUE &&
-       chain->Length() < 3)) {
-    LOG(ERROR) << "CertChecker produced a precert chain that is too short";
+
+  Cert::Status uses_pre_issuer = chain->UsesPrecertSigningCertificate();
+  if (uses_pre_issuer != Cert::TRUE && uses_pre_issuer != Cert::FALSE)
+    return INTERNAL_ERROR;
+
+  string key_hash;
+  if (uses_pre_issuer == Cert::TRUE) {
+    if (chain->Length() < 3 ||
+        chain->CertAt(2)->PublicKeySha256Digest(&key_hash) != Cert::TRUE)
+      return INTERNAL_ERROR;
+  } else if (chain->Length() < 2 ||
+             chain->CertAt(1)->PublicKeySha256Digest(&key_hash) != Cert::TRUE) {
     return INTERNAL_ERROR;
   }
-return OK;
+  // A well-formed chain always has a precert.
+  TbsCertificate tbs(*chain->PreCert());
+  if (!tbs.IsLoaded() || tbs.DeleteExtension(ct::NID_ctPoison) != Cert::TRUE)
+    return INTERNAL_ERROR;
+
+  // If the issuing cert is the special Precert Signing Certificate,
+  // replace the issuer with the one that will sign the final cert.
+  // Should always succeed as we've already verified that the chain
+  // is well-formed.
+  if (uses_pre_issuer == Cert::TRUE &&
+      tbs.CopyIssuerFrom(*chain->PrecertIssuingCert()) != Cert::TRUE)
+    return INTERNAL_ERROR;
+
+
+  string der_tbs;
+  if (tbs.DerEncoding(&der_tbs) != Cert::TRUE)
+    return INTERNAL_ERROR;
+
+  issuer_key_hash->assign(key_hash);
+  tbs_certificate->assign(der_tbs);
+  return OK;
 }
 
 CertChecker::CertVerifyResult
@@ -156,7 +199,7 @@ CertChecker::GetTrustedCa(CertChain *chain) const {
     return INTERNAL_ERROR;
   }
 
- // get1 ups the refcount, so this is safe.
+  // get1 ups the refcount, so this is safe.
   Cert issuer(issuer_x509);
 
   // TODO(ekasper): check that the issuing CA cert is temporally valid.

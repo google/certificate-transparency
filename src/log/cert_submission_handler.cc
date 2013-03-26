@@ -147,8 +147,10 @@ CertSubmissionHandler::ProcessPreCertSubmission(const string &submission,
   if (!chain.IsLoaded())
     return INVALID_PEM_ENCODED_CHAIN;
 
-  CertChecker::CertVerifyResult result =
-      cert_checker_->CheckPreCertChain(&chain);
+  CertChecker::CertVerifyResult result = cert_checker_->CheckPreCertChain(
+      &chain, entry->mutable_pre_cert()->mutable_issuer_key_hash(),
+      entry->mutable_pre_cert()->mutable_tbs_certificate());
+
   if (result != CertChecker::OK)
     return GetVerifyError(result);
 
@@ -164,64 +166,7 @@ CertSubmissionHandler::ProcessPreCertSubmission(const string &submission,
     entry->add_precertificate_chain(der_cert);
   }
 
-  // Now populate the bytes that we'll end up signing.
-  // We glue this to the entry here, so we don't have to re-parse the X509
-  // later. It means we'll end up storing the modified TBS as well as the
-  // original leaf cert but oh well.
-  // According to the CertChecker contract, we have at least two certs;
-  // three if there is a Precert Signing Certificate.
-  string key_hash;
-  // TODO(ekasper): handle Cert::ERROR
-  if (chain.UsesPrecertSigningCertificate() == Cert::TRUE) {
-    if (chain.CertAt(2)->PublicKeySha256Digest(&key_hash) != Cert::TRUE)
-      return INTERNAL_ERROR;
-  } else if (chain.CertAt(1)->PublicKeySha256Digest(&key_hash) != Cert::TRUE) {
-    return INTERNAL_ERROR;
-  }
-
-  entry->mutable_pre_cert()->set_issuer_key_hash(key_hash);
-
-  string tbs;
-  if (!SerializedTbs(chain, &tbs))
-    return INTERNAL_ERROR;
-  entry->mutable_pre_cert()->set_tbs_certificate(tbs);
-
   return OK;
-}
-
-// static
-bool CertSubmissionHandler::SerializedTbs(const PreCertChain &chain,
-                                          string *result) {
-  if (!chain.IsLoaded() || chain.IsWellFormed() != Cert::TRUE)
-    return false;
-
-  // A well-formed chain always has a precert.
-  TbsCertificate tbs(*chain.PreCert());
-  if (!tbs.IsLoaded())
-    return false;
-
-  // Remove the poison extension.
-  if (tbs.DeleteExtension(ct::NID_ctPoison) != Cert::TRUE)
-    return false;
-
-  // If the issuing cert is the special Precert Signing Certificate,
-  // fix the issuer
-  // TODO(ekasper): Handle Cert::ERROR
-  if (chain.UsesPrecertSigningCertificate() == Cert::TRUE) {
-    // The issuing cert is not a real cert: replace the issuer with the
-    // one that will sign the final cert.
-    // Should always succeed as we've already verified that the chain
-    // is well-formed.
-    if(tbs.CopyIssuerFrom(*chain.PrecertIssuingCert()) != Cert::TRUE)
-      return false;
-  }
-
-  string der_tbs;
-  if (tbs.DerEncoding(&der_tbs) != Cert::TRUE)
-    return false;
-
-  result->assign(der_tbs);
-  return true;
 }
 
 // static
@@ -287,6 +232,9 @@ CertSubmissionHandler::GetVerifyError(CertChecker::CertVerifyResult result) {
       break;
     case CertChecker::INTERNAL_ERROR:
       submit_result = INTERNAL_ERROR;
+      break;
+    case CertChecker::PRECERT_EXTENSION_IN_CERT_CHAIN:
+      submit_result = INVALID_CERTIFICATE_CHAIN;
       break;
     default:
       LOG(FATAL) << "Unknown CertChecker error " << result;

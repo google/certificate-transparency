@@ -30,6 +30,7 @@ class CertChecker {
     PRECERT_CHAIN_NOT_WELL_FORMED,
     ROOT_NOT_IN_LOCAL_STORE,
     INTERNAL_ERROR,
+    PRECERT_EXTENSION_IN_CERT_CHAIN,
   };
 
   // Load a file of concatenated PEM-certs.
@@ -58,9 +59,13 @@ class CertChecker {
   // (or replace with store version) - the resulting chain is guaranteed to
   // contain at least two certificates (three if there is a Precert Signing
   // Certificate);
-  CertVerifyResult CheckPreCertChain(PreCertChain *chain) const;
+  // If valid, also fills in the |issuer_key_hash| and |tbs_certificate|.
+  CertVerifyResult CheckPreCertChain(PreCertChain *chain,
+                                     std::string* issuer_key_hash,
+                                     std::string *tbs_certificate) const;
 
  private:
+  CertVerifyResult CheckIssuerChain(CertChain *chain) const;
   // Look issuer up from the trusted store, and verify signature.
   CertVerifyResult GetTrustedCa(CertChain *chain) const;
 

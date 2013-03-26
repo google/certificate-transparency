@@ -5,6 +5,8 @@
 
 #include <glog/logging.h>
 #include <json/json.h>
+#undef TRUE  // json.h pollution
+#undef FALSE  // json.h pollution
 #include <netinet/in.h>  // for resolv.h
 #include <resolv.h>  // for b64_ntop
 

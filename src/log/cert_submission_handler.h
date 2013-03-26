@@ -48,7 +48,6 @@ class CertSubmissionHandler {
                                         ct::PrecertChainEntry *entry);
 
   static bool SerializedTbs(const ct::Cert &cert, std::string *result);
-  static bool SerializedTbs(const ct::PreCertChain &chain, std::string *result);
 
   ct::CertChecker *cert_checker_;
 

@@ -134,12 +134,20 @@ TEST_F(CertCheckerTest, PreCert) {
   EXPECT_EQ(Cert::TRUE, chain.IsWellFormed());
 
   // Fail as we have no CA certs.
+  string issuer_key_hash, tbs;
   EXPECT_EQ(CertChecker::ROOT_NOT_IN_LOCAL_STORE,
-            checker_.CheckPreCertChain(&chain));
+            checker_.CheckPreCertChain(&chain, &issuer_key_hash, &tbs));
 
   // Load CA certs and expect success.
   checker_.LoadTrustedCertificates(cert_dir_ + "/" + kCaCert);
-  EXPECT_EQ(CertChecker::OK, checker_.CheckPreCertChain(&chain));
+  EXPECT_EQ(CertChecker::OK,
+            checker_.CheckPreCertChain(&chain, &issuer_key_hash, &tbs));
+  string expected_key_hash;
+  ASSERT_EQ(Cert::TRUE,
+            chain.CertAt(1)->PublicKeySha256Digest(&expected_key_hash));
+  EXPECT_EQ(expected_key_hash, issuer_key_hash);
+  // TODO(ekasper): proper KAT tests.
+  EXPECT_FALSE(tbs.empty());
 }
 
 TEST_F(CertCheckerTest, PreCertWithPreCa) {
@@ -149,20 +157,46 @@ TEST_F(CertCheckerTest, PreCertWithPreCa) {
   ASSERT_TRUE(chain.IsLoaded());
   EXPECT_EQ(Cert::TRUE, chain.IsWellFormed());
 
+  string issuer_key_hash, tbs;
   // Fail as we have no CA certs.
   EXPECT_EQ(CertChecker::ROOT_NOT_IN_LOCAL_STORE,
-            checker_.CheckPreCertChain(&chain));
+            checker_.CheckPreCertChain(&chain, &issuer_key_hash, &tbs));
 
   // Load CA certs and expect success.
   checker_.LoadTrustedCertificates(cert_dir_ + "/" + kCaCert);
-  EXPECT_EQ(CertChecker::OK, checker_.CheckPreCertChain(&chain));
+  EXPECT_EQ(CertChecker::OK,
+            checker_.CheckPreCertChain(&chain, &issuer_key_hash, &tbs));
+  string expected_key_hash;
+  ASSERT_EQ(Cert::TRUE,
+            chain.CertAt(2)->PublicKeySha256Digest(&expected_key_hash));
+  EXPECT_EQ(expected_key_hash, issuer_key_hash);
+  // TODO(ekasper): proper KAT tests.
+  EXPECT_FALSE(tbs.empty());
 
   // A second, invalid chain, with no CA precert.
   PreCertChain chain2(precert_with_preca_pem_);
   ASSERT_TRUE(chain2.IsLoaded());
   EXPECT_EQ(Cert::TRUE, chain2.IsWellFormed());
   EXPECT_EQ(CertChecker::ROOT_NOT_IN_LOCAL_STORE,
-            checker_.CheckPreCertChain(&chain2));
+            checker_.CheckPreCertChain(&chain2, &issuer_key_hash, &tbs));
+}
+
+TEST_F(CertCheckerTest, CertAsPreCert) {
+  ASSERT_TRUE(checker_.LoadTrustedCertificates(cert_dir_ + "/" + kCaCert));
+
+  PreCertChain chain(leaf_pem_);
+  string issuer_key_hash, tbs;
+  EXPECT_EQ(CertChecker::PRECERT_CHAIN_NOT_WELL_FORMED,
+            checker_.CheckPreCertChain(&chain, &issuer_key_hash, &tbs));
+}
+
+TEST_F(CertCheckerTest, PreCertAsCert) {
+  ASSERT_TRUE(checker_.LoadTrustedCertificates(cert_dir_ + "/" + kCaCert));
+
+  const string chain_pem = precert_pem_ + ca_pem_;
+  PreCertChain chain(chain_pem);
+  EXPECT_EQ(CertChecker::PRECERT_EXTENSION_IN_CERT_CHAIN,
+            checker_.CheckCertChain(&chain));
 }
 
 }  // namespace
