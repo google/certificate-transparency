@@ -15,6 +15,9 @@
 using std::string;
 using std::ostringstream;
 
+using ct::Cert;
+using ct::CertChain;
+
 void HTTPLogClient::BaseUrl(ostringstream *url) {
   *url << "http://" << server_ << ':' << port_ << "/ct/v1/";
 }
@@ -45,7 +48,8 @@ HTTPLogClient::UploadSubmission(const std::string &submission, bool pre,
 
   JsonArray jchain;
   for (size_t n = 0; n < chain.Length(); ++n) {
-    string cert = chain.CertAt(n)->DerEncoding();
+    string cert;
+    CHECK_EQ(Cert::TRUE, chain.CertAt(n)->DerEncoding(&cert));
     jchain.Add(json_object_new_string(ToBase64(cert).c_str()));
   }
   json_object *jsend = json_object_new_object();

@@ -1,6 +1,7 @@
 #ifndef CERT_H
 #define CERT_H
-
+#undef TRUE
+#undef FALSE
 #include <gtest/gtest_prod.h>
 #include <openssl/asn1.h>
 #include <openssl/x509.h>
