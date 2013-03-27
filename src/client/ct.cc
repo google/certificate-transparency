@@ -89,7 +89,9 @@ static const char kUsage[] =
     "diagnose_chain - print info about the SCTs the cert chain carries\n"
     "wrap - take an SCT and certificate chain and wrap them as if they were\n"
     "       retrieved via 'connect'\n"
-    "getentries - get entries from the log\n"
+    "wrap_embedded - take a certificate chain with an embedded SCT and wrap\n"
+    "                them as if they were retrieved via 'connect'\n"
+    "get_entries - get entries from the log\n"
     "Use --help to display command-line flag options\n";
 
 using ct::LogEntry;
@@ -649,6 +651,42 @@ void Wrap() {
   WriteSSLClientCTData(ct_data, FLAGS_ssl_client_ct_data_out);
 }
 
+// Wrap an embedded SCT in an SSLClientCTData as if it came from an SSL server.
+void WrapEmbedded() {
+  // FIXME(benl): This code is shared with DiagnoseCertChain().
+  string cert_file = FLAGS_certificate_chain_in;
+  CHECK(!cert_file.empty()) << "Please give a certificate chain with "
+                            << "--certificate_chain_in";
+  string pem_chain;
+  PCHECK(util::ReadBinaryFile(cert_file, &pem_chain))
+      << "Could not read certificate chain from " << cert_file;
+  CertChain chain(pem_chain);
+  CHECK(chain.IsLoaded())
+      << cert_file << " is not a valid PEM-encoded certificate chain";
+  CHECK_EQ(Cert::TRUE, chain.LeafCert()->HasExtension(
+               ct::NID_ctEmbeddedSignedCertificateTimestampList));
+
+  string serialized_scts;
+  CHECK_EQ(Cert::TRUE, chain.LeafCert()->OctetStringExtensionData(
+               ct::NID_ctEmbeddedSignedCertificateTimestampList,
+               &serialized_scts));
+  SignedCertificateTimestampList sct_list;
+  CHECK_EQ(Deserializer::OK,
+           Deserializer::DeserializeSCTList(serialized_scts, &sct_list));
+
+  // FIXME(benl): handle multiple SCTs!
+  CHECK_EQ(1, sct_list.sct_list().size());
+
+  SignedCertificateTimestamp sct;
+  CHECK_EQ(Deserializer::DeserializeSCT(sct_list.sct_list(0), &sct),
+           Deserializer::OK);
+
+  SSLClientCTData ct_data;
+  CHECK(CheckSCT(sct, chain, &ct_data));
+
+  WriteSSLClientCTData(ct_data, FLAGS_ssl_client_ct_data_out);
+}
+
 static void WriteCertificate(const std::string &cert, int entry,
                              int cert_number) {
  std::ostringstream outname;
@@ -731,7 +769,9 @@ int main(int argc, char **argv) {
     DiagnoseCertChain();
   } else if (cmd == "wrap") {
     Wrap();
-  } else if (cmd == "getentries") {
+  } else if (cmd == "wrap_embedded") {
+    WrapEmbedded();
+  } else if (cmd == "get_entries") {
     GetEntries();
   } else {
     std::cout << google::ProgramUsage();

@@ -194,14 +194,15 @@ make_cert() {
 
 # Call make_ca_certs and make_log_server_keys first
 make_embedded_cert() {
-  cert_dir=$1
-  hash_dir=$2
-  server=$3
-  ca=$4
-  log_server=$5
-  log_server_port=$6
-  ca_is_intermediate=$7
-  use_pre_ca=$8
+  local cert_dir=$1
+  local server=$2
+  local ca=$3
+  local log_server=$4
+  local log_server_name=$5
+  local log_server_port=$6
+  local ca_is_intermediate=$7
+  local use_pre_ca=$8
+  local server_public_key=$9
 
   # Generate a new private key and CSR
   request_cert $cert_dir $server precert.conf
@@ -239,10 +240,10 @@ make_embedded_cert() {
 
   ../client/ct upload \
     --ct_server_submission=$cert_dir/$server-precert-bundle.pem \
-    --ct_server="127.0.0.1" --ct_server_port=$log_server_port \
+    --ct_server=$log_server_name --ct_server_port=$log_server_port \
     --ct_server_public_key=$cert_dir/$log_server-key-public.pem \
     --ct_server_response_out=$cert_dir/$server-pre-cert.proof \
-    --precert=true --logtostderr=true
+    --precert=true --logtostderr=true $HTTP_LOG
   rm $cert_dir/$server-precert-tmp.pem
   rm $cert_dir/$server-precert-bundle.pem
 
@@ -260,6 +261,22 @@ make_embedded_cert() {
 
   issue_cert $cert_dir $ca $server $cert_dir/$server-extensions.conf embedded \
     false $server
+
+  # Create a wrapped SCT
+  cp $cert_dir/$server-cert.pem $cert_dir/$server-cert-bundle.pem
+  # If the CA is an intermediate, then we need to include its
+  # certificate, too.  We also need the CA certificate (kludge alert,
+  # we happen to know which one that is, so hardwire).
+  if [ $ca_is_intermediate == "true" ]; then
+    cat $cert_dir/$ca-cert.pem $cert_dir/ca-cert.pem \
+	>> $cert_dir/$server-cert-bundle.pem
+  else
+    cat $cert_dir/$ca-cert.pem >> $cert_dir/$server-cert-bundle.pem
+  fi
+  ../client/ct wrap_embedded --alsologtostderr \
+    --certificate_chain_in=$cert_dir/$server-cert-bundle.pem \
+    --ct_server_public_key=$server_public_key \
+    --ssl_client_ct_data_out=$cert_dir/$server-cert.ctdata
 
   # Restore the serial number
   mv $cert_dir/$ca-serial.bak $cert_dir/$ca-serial

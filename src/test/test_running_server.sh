@@ -30,8 +30,6 @@ then
   ca_setup $CERT_DIR ca false
 fi
 
-make_cert $CERT_DIR test ca ct-server $SERVER $PORT false $CT_KEY
-
 # FIXME(benl): share with sslconnect_test.sh?
 audit() {
   cert_dir=$1
@@ -46,27 +44,38 @@ audit() {
   set -e
 }
 
-T=`date +%s`
-T=`expr $T + 30`
+do_audit() {
+  ct_data=$1
+  T=`date +%s`
+  T=`expr $T + 30`
 
-while true
-do
-  # test-cert.ctdata is made by make_cert.
-  audit $CERT_DIR ca $CERT_DIR/test-cert.ctdata
-  if [ $retcode -eq 0 ]; then
-    echo "PASS"
-    let PASSED=$PASSED+1
-    break
-  else
-    if [ `date +%s` \> $T ]
-    then
-      echo "FAIL"
-      let FAILED=$FAILED+1
+  while true
+  do
+    audit $CERT_DIR ca $ct_data
+    if [ $retcode -eq 0 ]; then
+      echo "PASS"
+      let PASSED=$PASSED+1
       break
+    else
+      if [ `date +%s` \> $T ]
+      then
+	echo "FAIL"
+	let FAILED=$FAILED+1
+	break
+      fi
     fi
-  fi
-  sleep 1
-done
+    sleep 1
+  done
+}
+
+make_cert $CERT_DIR test ca ct-server $SERVER $PORT false $CT_KEY
+make_embedded_cert $CERT_DIR test-embedded ca ct-server $SERVER $PORT false \
+    false $CT_KEY
+
+# Do the audits together, quicker that way.
+# test-*-cert.ctdata is made by make_cert.
+do_audit $CERT_DIR/test-cert.ctdata
+do_audit $CERT_DIR/test-embedded-cert.ctdata
 
 echo $PASSED passed
 echo $FAILED failed
