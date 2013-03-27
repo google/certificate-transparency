@@ -15,8 +15,7 @@ class SignedCertificateTimestamp;
 
 class HTTPLogClient {
  public:
-  HTTPLogClient(const std::string &server, uint16_t port) : server_(server),
-                                                            port_(port) {}
+  HTTPLogClient(const std::string &server) : server_(server) {}
 
   enum Status {
     OK,
@@ -47,7 +46,6 @@ private:
   void BaseUrl(std::ostringstream *url);
 
   std::string server_;
-  uint16_t port_;
 };
 
 #endif

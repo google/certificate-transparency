@@ -1,3 +1,4 @@
+/* -*- indent-tabs-mode: nil -*- */
 #include <glog/logging.h>
 #include <string>
 
@@ -20,6 +21,7 @@ const size_t Serializer::kVersionLengthInBytes = 1;
 const size_t Serializer::kKeyIDLengthInBytes = 32;
 const size_t Serializer::kMerkleLeafTypeLengthInBytes = 1;
 const size_t Serializer::kKeyHashLengthInBytes = 32;
+const size_t Serializer::kTimestampLengthInBytes = 8;
 
 using ct::LogEntry;
 using ct::LogEntryType_IsValid;
@@ -87,7 +89,7 @@ Serializer::SerializeV1CertSCTSignatureInput(
   Serializer serializer;
   serializer.WriteUint(ct::V1, kVersionLengthInBytes);
   serializer.WriteUint(ct::CERTIFICATE_TIMESTAMP, kSignatureTypeLengthInBytes);
-  serializer.WriteUint(timestamp, 8);
+  serializer.WriteUint(timestamp, kTimestampLengthInBytes);
   serializer.WriteUint(ct::X509_ENTRY, kLogEntryTypeLengthInBytes);
   serializer.WriteVarBytes(certificate, kMaxCertificateLength);
   serializer.WriteVarBytes(extensions, kMaxExtensionsLength);
@@ -112,7 +114,7 @@ Serializer::SerializeV1PrecertSCTSignatureInput(
   Serializer serializer;
   serializer.WriteUint(ct::V1, kVersionLengthInBytes);
   serializer.WriteUint(ct::CERTIFICATE_TIMESTAMP, kSignatureTypeLengthInBytes);
-  serializer.WriteUint(timestamp, 8);
+  serializer.WriteUint(timestamp, kTimestampLengthInBytes);
   serializer.WriteUint(ct::PRECERT_ENTRY, kLogEntryTypeLengthInBytes);
   serializer.WriteFixedBytes(issuer_key_hash);
   serializer.WriteVarBytes(tbs_certificate, kMaxCertificateLength);
@@ -156,7 +158,7 @@ Serializer::SerializeResult Serializer::SerializeV1CertSCTMerkleTreeLeaf(
   Serializer serializer;
   serializer.WriteUint(ct::V1, kVersionLengthInBytes);
   serializer.WriteUint(ct::TIMESTAMPED_ENTRY, kMerkleLeafTypeLengthInBytes);
-  serializer.WriteUint(timestamp, 8);
+  serializer.WriteUint(timestamp, kTimestampLengthInBytes);
   serializer.WriteUint(ct::X509_ENTRY, kLogEntryTypeLengthInBytes);
   serializer.WriteVarBytes(certificate, kMaxCertificateLength);
   serializer.WriteVarBytes(extensions, kMaxExtensionsLength);
@@ -180,7 +182,7 @@ Serializer::SerializeResult Serializer::SerializeV1PrecertSCTMerkleTreeLeaf(
   Serializer serializer;
   serializer.WriteUint(ct::V1, kVersionLengthInBytes);
   serializer.WriteUint(ct::TIMESTAMPED_ENTRY, kMerkleLeafTypeLengthInBytes);
-  serializer.WriteUint(timestamp, 8);
+  serializer.WriteUint(timestamp, kTimestampLengthInBytes);
   serializer.WriteUint(ct::PRECERT_ENTRY, kLogEntryTypeLengthInBytes);
   serializer.WriteFixedBytes(issuer_key_hash);
   serializer.WriteVarBytes(tbs_certificate, kMaxCertificateLength);
@@ -220,7 +222,7 @@ Serializer::SerializeResult Serializer::SerializeV1STHSignatureInput(
   Serializer serializer;
   serializer.WriteUint(ct::V1, kVersionLengthInBytes);
   serializer.WriteUint(ct::TREE_HEAD, kSignatureTypeLengthInBytes);
-  serializer.WriteUint(timestamp, 8);
+  serializer.WriteUint(timestamp, kTimestampLengthInBytes);
   serializer.WriteUint(tree_size, 8);
   serializer.WriteFixedBytes(root_hash);
   result->assign(serializer.SerializedString());
@@ -248,7 +250,7 @@ Serializer::WriteSCT(const SignedCertificateTimestamp &sct) {
     return INVALID_KEYID_LENGTH;
   WriteUint(ct::V1, kVersionLengthInBytes);
   WriteFixedBytes(sct.id().key_id());
-  WriteUint(sct.timestamp(), 8);
+  WriteUint(sct.timestamp(), kTimestampLengthInBytes);
   WriteVarBytes(sct.extension(), kMaxExtensionsLength);
   return WriteDigitallySigned(sct.signature());
 }
@@ -541,7 +543,7 @@ Deserializer::DeserializeResult Deserializer::ReadSCT(
     return INPUT_TOO_SHORT;
   // V1 encoding.
   uint64_t timestamp = 0;
-  if (!ReadUint(8, &timestamp))
+  if (!ReadUint(Serializer::kTimestampLengthInBytes, &timestamp))
     return INPUT_TOO_SHORT;
   sct->set_timestamp(timestamp);
   string extensions;
@@ -703,5 +705,75 @@ Deserializer::ReadDigitallySigned(DigitallySigned *sig) {
   sig->set_sig_algorithm(
       static_cast<DigitallySigned::SignatureAlgorithm>(sig_algo));
   sig->set_signature(sig_string);
+  return OK;
+}
+
+Deserializer::DeserializeResult
+Deserializer::ReadMerkleTreeLeaf(ct::MerkleTreeLeaf *leaf) {
+  int version;
+  if (!ReadUint(Serializer::kVersionLengthInBytes, &version))
+    return INPUT_TOO_SHORT;
+  if (!Version_IsValid(version) || version != ct::V1)
+    return UNSUPPORTED_VERSION;
+  leaf->set_version(ct::V1);
+
+  int type;
+  if (!ReadUint(Serializer::kMerkleLeafTypeLengthInBytes, &type))
+    return INPUT_TOO_SHORT;
+  if (type != ct::TIMESTAMPED_ENTRY)
+    return UNKNOWN_LEAF_TYPE;
+  leaf->set_type(ct::TIMESTAMPED_ENTRY);
+
+  ct::TimestampedEntry *entry = leaf->mutable_timestamped_entry();
+
+  uint64_t timestamp;
+  if (!ReadUint(Serializer::kTimestampLengthInBytes, &timestamp))
+    return INPUT_TOO_SHORT;
+  entry->set_timestamp(timestamp);
+
+  int entry_type;
+  if (!ReadUint(Serializer::kLogEntryTypeLengthInBytes, &entry_type))
+    return INPUT_TOO_SHORT;
+  if (entry_type != ct::X509_ENTRY && entry_type != ct::PRECERT_ENTRY)
+    return UNKNOWN_LOGENTRY_TYPE;
+  entry->set_entry_type(static_cast<ct::LogEntryType>(entry_type));
+
+  if (entry_type == ct::X509_ENTRY) {
+    string x509;
+    if (!ReadVarBytes(Serializer::kMaxCertificateLength, &x509))
+      return INPUT_TOO_SHORT;
+    entry->mutable_signed_entry()->set_x509(x509);
+  } else {
+    string issuer_key_hash;
+    if (!ReadFixedBytes(32, &issuer_key_hash))
+      return INPUT_TOO_SHORT;
+    entry->mutable_signed_entry()->mutable_precert()
+        ->set_issuer_key_hash(issuer_key_hash);
+    string tbs_certificate;
+    if (!ReadVarBytes(Serializer::kMaxCertificateLength, &tbs_certificate))
+      return INPUT_TOO_SHORT;
+    entry->mutable_signed_entry()->mutable_precert()
+        ->set_tbs_certificate(tbs_certificate);
+  }
+
+  string extensions;
+  if (!ReadVarBytes(Serializer::kMaxExtensionsLength, &extensions))
+    return INPUT_TOO_SHORT;
+  entry->set_extensions(extensions);
+
+  return OK;
+}
+
+Deserializer::DeserializeResult
+Deserializer::DeserializeMerkleTreeLeaf(const std::string &in,
+                                        ct::MerkleTreeLeaf *leaf) {
+  Deserializer des(in);
+  DeserializeResult ret = des.ReadMerkleTreeLeaf(leaf);
+  if (ret != OK)
+    return ret;
+
+  if (!des.ReachedEnd())
+    return INPUT_TOO_LONG;
+
   return OK;
 }

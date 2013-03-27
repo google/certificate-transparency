@@ -13,6 +13,7 @@
 #include <openssl/ssl.h>
 #include <openssl/x509.h>
 #include <openssl/x509v3.h>
+#include <sstream>
 #include <stdio.h>
 #include <string>
 
@@ -40,7 +41,7 @@ DEFINE_string(ct_server_submission, "",
               "Certificate chain to submit to a CT log server. "
               "The file must consist of concatenated PEM certificates.");
 DEFINE_string(ct_server, "", "CT log server to connect to");
-DEFINE_int32(ct_server_port, 0, "CT log server port");
+DEFINE_int32(ct_server_port, 0, "CT log server port (not used for HTTP)");
 DEFINE_string(ct_server_response_out, "",
               "Output file for the Signed Certificate Timestamp received from "
               "the CT log server");
@@ -73,6 +74,8 @@ DEFINE_bool(http_log, false, "Use an I-D compliant HTTP log server rather than "
             "the old protocol buffer format");
 DEFINE_int32(get_first, 0, "First entry to retrieve with the 'get' command");
 DEFINE_int32(get_last, 0, "Last entry to retrieve with the 'get' command");
+DEFINE_string(certificate_base, "", "Base name for retrieved certificates - "
+              "files will be <base><entry>.<cert>.der");
 
 
 static const char kUsage[] =
@@ -200,7 +203,7 @@ static int Upload() {
   SignedCertificateTimestamp sct;
 
   if (FLAGS_http_log) {
-    HTTPLogClient client(FLAGS_ct_server, FLAGS_ct_server_port);
+    HTTPLogClient client(FLAGS_ct_server);
     
     HTTPLogClient::Status ret = client.UploadSubmission(contents, FLAGS_precert,
                                                         &sct);
@@ -496,7 +499,7 @@ static AuditResult Audit() {
     MerkleAuditProof proof;
 
     if (FLAGS_http_log) {
-      HTTPLogClient client(FLAGS_ct_server, FLAGS_ct_server_port);
+      HTTPLogClient client(FLAGS_ct_server);
       
       LOG(INFO) << "info = "
                 << ct_data.attached_sct_info(i).DebugString();
@@ -646,16 +649,40 @@ void Wrap() {
   WriteSSLClientCTData(ct_data, FLAGS_ssl_client_ct_data_out);
 }
 
+static void WriteCertificate(const std::string &cert, int entry,
+                             int cert_number) {
+ std::ostringstream outname;
+ outname << FLAGS_certificate_base << entry << '.' << cert_number << ".der";
+ std::ofstream out(outname.str().c_str(),
+                   std::ios::binary | std::ios::trunc);
+ CHECK(out.good());
+ out << cert;
+}
+
 void GetEntries() {
   CHECK(FLAGS_http_log);
 
-  HTTPLogClient client(FLAGS_ct_server, FLAGS_ct_server_port);
+  HTTPLogClient client(FLAGS_ct_server);
   std::vector<HTTPLogClient::LogEntry> entries;
   HTTPLogClient::Status error = client.GetEntries(FLAGS_get_first,
-                                                  FLAGS_get_last,  &entries);
+                                                  FLAGS_get_last, &entries);
   CHECK(error == HTTPLogClient::OK);
-}
 
+  CHECK(!FLAGS_certificate_base.empty());
+
+  int e = FLAGS_get_first;
+  for (std::vector<HTTPLogClient::LogEntry>::const_iterator entry =
+           entries.begin(); entry != entries.end(); ++entry, ++e) {
+    if (entry->leaf.timestamped_entry().entry_type() == ct::X509_ENTRY) {
+      WriteCertificate(entry->leaf.timestamped_entry().signed_entry().x509(),
+                       e, 0);
+      const ct::X509ChainEntry &x509chain = entry->entry.x509_entry();
+      for (int n = 0; n < x509chain.certificate_chain_size(); ++n)
+        WriteCertificate(x509chain.certificate_chain(n), e, n + 1);
+    }
+    // TODO(benl): precerts
+  }
+}
 
 // Exit code upon normal exit:
 // 0: success

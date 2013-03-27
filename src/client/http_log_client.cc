@@ -1,6 +1,8 @@
 /* -*- indent-tabs-mode: nil -*- */
 #include "client/http_log_client.h"
 #include "client/json_wrapper.h"
+#undef TRUE
+#undef FALSE
 #include "log/cert.h"
 #include "proto/ct.pb.h"
 #include "proto/serializer.h"
@@ -19,7 +21,7 @@ using ct::Cert;
 using ct::CertChain;
 
 void HTTPLogClient::BaseUrl(ostringstream *url) {
-  *url << "http://" << server_ << ':' << port_ << "/ct/v1/";
+  *url << "http://" << server_ << "/ct/v1/";
 }
 
 static HTTPLogClient::Status SendRequest(ostringstream *response,
@@ -198,6 +200,47 @@ HTTPLogClient::Status HTTPLogClient::GetEntries(int first, int last,
   LOG(INFO) << "response = " << response.str();
   if (ret != OK)
     return ret;
+
+  JsonObject jresponse(response);
+  if (!jresponse.Ok())
+    return BAD_RESPONSE;
+
+  JsonArray jentries(jresponse, "entries");
+  if (!jentries.Ok())
+    return BAD_RESPONSE;
+
+  for (int n = 0; n < jentries.Length(); ++n) {
+    JsonObject entry(jentries, n);
+    if (!entry.Ok())
+      return BAD_RESPONSE;
+
+    JsonString leaf_input(entry, "leaf_input");
+    if (!leaf_input.Ok())
+      return BAD_RESPONSE;
+
+    LogEntry log_entry;
+    if (Deserializer::DeserializeMerkleTreeLeaf(leaf_input.FromBase64(),
+                                                &log_entry.leaf)
+        != Deserializer::OK)
+      return BAD_RESPONSE;
+
+    JsonString extra_data(entry, "extra_data");
+    if (!extra_data.Ok())
+      return BAD_RESPONSE;
+
+    if (log_entry.leaf.timestamped_entry().entry_type() == ct::X509_ENTRY)
+      Deserializer::DeserializeX509Chain(extra_data.FromBase64(),
+                                         log_entry.entry.mutable_x509_entry());
+    else if (log_entry.leaf.timestamped_entry().entry_type()
+            == ct::PRECERT_ENTRY)
+      Deserializer::DeserializePrecertChainEntry(extra_data.FromBase64(),
+          log_entry.entry.mutable_precert_entry());
+    else
+      LOG(FATAL) << "Don't understand entry type: "
+                 << log_entry.leaf.timestamped_entry().entry_type();
+    
+    entries->push_back(log_entry);
+  }
 
   return OK;
 }

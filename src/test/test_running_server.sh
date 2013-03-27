@@ -15,6 +15,7 @@ fi
 CERT_DIR=$1
 CT_KEY=$2
 SERVER=${3:-"127.0.0.1"}
+# Note: not actually used for HTTP logs...
 PORT=${4:-8124}
 
 HTTP_LOG=--http_log

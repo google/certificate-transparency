@@ -53,6 +53,7 @@ class Serializer {
   static const size_t kMerkleLeafTypeLengthInBytes;
   // Public key hash from cert
   static const size_t kKeyHashLengthInBytes;
+  static const size_t kTimestampLengthInBytes;
 
   static size_t PrefixLength(size_t max_length);
 
@@ -219,6 +220,8 @@ class Deserializer {
     INVALID_LIST_ENCODING,
     EMPTY_LIST,
     EMPTY_ELEM_IN_LIST,
+    UNKNOWN_LEAF_TYPE,
+    UNKNOWN_LOGENTRY_TYPE,
   };
 
   bool ReachedEnd() const { return bytes_remaining_ == 0; }
@@ -241,6 +244,9 @@ class Deserializer {
 
   static DeserializeResult DeserializePrecertChainEntry(
       const std::string &in, ct::PrecertChainEntry *precert_chain_entry);
+
+  static DeserializeResult DeserializeMerkleTreeLeaf(const std::string &in,
+						     ct::MerkleTreeLeaf *leaf);
 
   template<class T>
   static DeserializeResult DeserializeUint(const std::string &in, size_t bytes,
@@ -287,6 +293,8 @@ class Deserializer {
                              repeated_string *out);
 
   DeserializeResult ReadDigitallySigned(ct::DigitallySigned *sig);
+
+  DeserializeResult ReadMerkleTreeLeaf(ct::MerkleTreeLeaf *leaf);
 
   const char *current_pos_;
   size_t bytes_remaining_;

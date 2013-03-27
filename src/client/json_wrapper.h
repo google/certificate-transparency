@@ -30,7 +30,8 @@ class JsonObject {
     obj_ = json_tokener_parse(response.c_str());
   }
 
-  JsonObject(const JsonArray &from, int offset, json_type type);
+  JsonObject(const JsonArray &from, int offset,
+             json_type type = json_type_object);
 
   JsonObject() : obj_(NULL) {}
 

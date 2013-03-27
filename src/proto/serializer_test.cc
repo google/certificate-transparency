@@ -1,3 +1,4 @@
+/* -*- indent-tabs-mode: nil -*- */
 #include <gflags/gflags.h>
 #include <glog/logging.h>
 #include <gtest/gtest.h>
@@ -13,6 +14,7 @@ namespace {
 using ct::DigitallySigned;
 using ct::LogEntry;
 using ct::LogEntryType;
+using ct::MerkleTreeLeaf;
 using ct::PrecertChainEntry;
 using ct::SignedCertificateTimestamp;
 using ct::SignedCertificateTimestampList;
@@ -354,6 +356,34 @@ TEST_F(SerializerTest, SerializeSCTMerkleTreeLeafKatTest) {
             Serializer::SerializeSCTMerkleTreeLeaf(
                 DefaultSCT(), DefaultPrecertEntry(), &precert_result));
   EXPECT_EQ(string(kDefaultPrecertSCTLeafHexString), H(precert_result));
+}
+
+TEST_F(SerializerTest, DeserializeMerkleTreeLeafKAT) {
+  MerkleTreeLeaf leaf;
+  EXPECT_EQ(Deserializer::OK,
+      Deserializer::DeserializeMerkleTreeLeaf(B(kDefaultCertSCTLeafHexString),
+                                              &leaf));
+  EXPECT_EQ(leaf.version(), ct::V1);
+  EXPECT_EQ(leaf.type(), ct::TIMESTAMPED_ENTRY);
+  EXPECT_EQ(leaf.timestamped_entry().timestamp(), DefaultSCTTimestamp());
+  EXPECT_EQ(leaf.timestamped_entry().entry_type(), ct::X509_ENTRY);
+  EXPECT_EQ(leaf.timestamped_entry().signed_entry().x509(),
+            DefaultCertEntry().x509_entry().leaf_certificate());
+  EXPECT_FALSE(leaf.timestamped_entry().signed_entry().has_precert());
+
+  MerkleTreeLeaf leaf2;
+  EXPECT_EQ(Deserializer::OK,
+     Deserializer::DeserializeMerkleTreeLeaf(B(kDefaultPrecertSCTLeafHexString),
+                                             &leaf2));
+  EXPECT_EQ(leaf2.version(), ct::V1);
+  EXPECT_EQ(leaf2.type(), ct::TIMESTAMPED_ENTRY);
+  EXPECT_EQ(leaf2.timestamped_entry().timestamp(), DefaultSCTTimestamp());
+  EXPECT_EQ(leaf2.timestamped_entry().entry_type(), ct::PRECERT_ENTRY);
+  EXPECT_FALSE(leaf2.timestamped_entry().signed_entry().has_x509());
+  EXPECT_EQ(leaf2.timestamped_entry().signed_entry().precert()
+            .issuer_key_hash(), DefaultIssuerKeyHash());
+  EXPECT_EQ(leaf2.timestamped_entry().signed_entry().precert()
+            .tbs_certificate(), DefaultTbsCertificate());
 }
 
 TEST_F(SerializerTest, DeserializeSCTKatTest) {

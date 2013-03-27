@@ -118,11 +118,16 @@ enum MerkleLeafType {
   UNKNOWN_LEAF_TYPE = 256;
 }
 
+message SignedEntry {
+  optional bytes x509 = 1;
+  optional PreCert precert = 2;
+}
+
 message TimestampedEntry {
   optional uint64 timestamp = 1;
   optional LogEntryType entry_type = 2;
-  optional bytes certificate = 3;
-  optional bytes extension = 4;
+  optional SignedEntry signed_entry = 3;
+  optional bytes extensions = 4;
 } 
 
 // Stuff that's hashed into a Merkle leaf.

@@ -54,8 +54,9 @@ errors later on.
 had to edit /usr/local/include/curlpp/config.win32.h to eliminate
 warnings).
 
-5b. And the JSON-C library, at least v0.10
-(https://github.com/json-c/json-c/wiki).
+5b. And the JSON-C library, v0.10.
+(https://github.com/json-c/json-c/wiki - tarball is
+https://github.com/downloads/json-c/json-c/json-c-0.10.tar.gz).
 
 6. Then, you can build the log server by pointing to your custom OpenSSL
 (if needed), and local gtest (if not installed):
