@@ -83,7 +83,7 @@ CertSubmissionHandler::X509ChainToEntry(const CertChain &chain,
 
     entry->set_type(ct::PRECERT_ENTRY);
     string key_hash;
-    if (chain.CertAt(1)->PublicKeySha256Digest(&key_hash) != Cert::TRUE)
+    if (chain.CertAt(1)->SPKISha256Digest(&key_hash) != Cert::TRUE)
       return false;
 
     entry->mutable_precert_entry()->mutable_pre_cert()->set_issuer_key_hash(

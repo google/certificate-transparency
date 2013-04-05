@@ -196,6 +196,8 @@ LogSigVerifier::~LogSigVerifier() {
 
 // static
 string LogSigVerifier::ComputeKeyID(EVP_PKEY *pkey) {
+  // i2d_PUBKEY sets the algorithm and (for ECDSA) named curve parameter and
+  // encodes the key as an X509_PUBKEY (i.e., subjectPublicKeyInfo).
   int buf_len = i2d_PUBKEY(pkey, NULL);
   CHECK_GT(buf_len, 0);
   unsigned char *buf = new unsigned char[buf_len];
