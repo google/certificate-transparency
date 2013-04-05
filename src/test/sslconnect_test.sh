@@ -116,7 +116,11 @@ cp testdata/ca-cert.pem ca-hashes/$hash.0
 echo "Testing known good/bad certificate configurations" 
 mkdir -p testdata/logs
 
-test_range "8125 8126 8127 8128 8129 8130" testdata ca-hashes ct-server ca \
+# Precert regresssion tests temporarily disabled
+# TODO(ekasper): recreate test data for new key hash format and re-enable
+#test_range "8125 8126 8127 8128 8129 8130" testdata ca-hashes ct-server ca \
+#  httpd-valid.conf false true false ./apachectl
+test_range "8125 8126" testdata ca-hashes ct-server ca \
   httpd-valid.conf false true false ./apachectl
 test_range "8125 8126 8127 8128" testdata ca-hashes ct-server ca \
   httpd-invalid.conf false false false ./apachectl

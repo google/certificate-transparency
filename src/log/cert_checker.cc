@@ -129,10 +129,10 @@ CertChecker::CertVerifyResult CertChecker::CheckPreCertChain(
   string key_hash;
   if (uses_pre_issuer == Cert::TRUE) {
     if (chain->Length() < 3 ||
-        chain->CertAt(2)->PublicKeySha256Digest(&key_hash) != Cert::TRUE)
+        chain->CertAt(2)->SPKISha256Digest(&key_hash) != Cert::TRUE)
       return INTERNAL_ERROR;
   } else if (chain->Length() < 2 ||
-             chain->CertAt(1)->PublicKeySha256Digest(&key_hash) != Cert::TRUE) {
+             chain->CertAt(1)->SPKISha256Digest(&key_hash) != Cert::TRUE) {
     return INTERNAL_ERROR;
   }
   // A well-formed chain always has a precert.

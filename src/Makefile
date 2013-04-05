@@ -126,7 +126,7 @@ merkletree/tree_hasher_test: merkletree/tree_hasher_test.o \
 
 ### log/ targets
 log/libcert.a: log/cert.o log/cert_checker.o log/cert_submission_handler.o \
-               log/ct_extensions.o
+               log/ct_extensions.o merkletree/serial_hasher.o
 	rm -f $@
 	ar -rcs $@ $^
 
@@ -147,11 +147,13 @@ log_tests: log/cert_test log/cert_checker_test \
            log/log_signer_test log/tree_signer_test \
            log/logged_certificate_test log/ct_extensions_test
 
-log/cert_test: log/cert_test.o log/cert.o log/ct_extensions.o util/libutil.a
+log/cert_test: log/cert_test.o log/cert.o log/ct_extensions.o util/libutil.a \
+               merkletree/serial_hasher.o
 	$(CXX) -o $@ $^ $(SYS_LIBS)
 
 log/cert_checker_test: log/cert_checker_test.o log/cert.o log/cert_checker.o \
-                       log/ct_extensions.o util/libutil.a
+                       log/ct_extensions.o util/libutil.a \
+                       merkletree/serial_hasher.o
 	$(CXX) -o $@ $^ $(SYS_LIBS)
 
 log/cert_submission_handler_test: log/cert_submission_handler_test.o \
@@ -159,8 +161,7 @@ log/cert_submission_handler_test: log/cert_submission_handler_test.o \
                                   util/libutil.a 
 	$(CXX) -o $@ $^ $(SYS_LIBS)
 
-log/ct_extensions_test: log/ct_extensions_test.o log/cert.o \
-                        log/ct_extensions.o util/libutil.a
+log/ct_extensions_test: log/ct_extensions_test.o log/libcert.a util/libutil.a
 	$(CXX) -o $@ $^ $(SYS_LIBS)
 
 log/database_large_test: log/database_large_test.o log/libdatabase.a \

@@ -124,6 +124,12 @@ class Cert {
   // Returns ERROR if the cert is not loaded.
   Status PublicKeySha256Digest(std::string *result) const;
 
+  // Sets the SHA256 digest of the cert's subjectPublicKeyInfo in |result|.
+  // Returns TRUE if computing the digest succeeded.
+  // Returns FALSE if computing the digest failed.
+  // Returns ERROR if the cert is not loaded.
+  Status SPKISha256Digest(std::string *result) const;
+
   // Fetch data from an extension if encoded as an ASN1_OCTET_STRING.
   // Useful for handling custom extensions registered with X509V3_EXT_add.
   // Returns true if the extension is present and the data could be decoded.

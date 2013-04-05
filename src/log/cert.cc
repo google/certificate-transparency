@@ -13,6 +13,7 @@
 #include <vector>
 
 #include "log/ct_extensions.h"
+#include "merkletree/serial_hasher.h"
 #include "util/openssl_util.h"  // For LOG_OPENSSL_ERRORS
 
 namespace ct {
@@ -394,6 +395,30 @@ Cert::Status Cert::PublicKeySha256Digest(string *result) const {
     return FALSE;
   }
   result->assign(string(reinterpret_cast<char*>(digest), len));
+  return TRUE;
+}
+
+Cert::Status Cert::SPKISha256Digest(string *result) const {
+  if (!IsLoaded()) {
+    LOG(ERROR) << "Cert not loaded";
+    return ERROR;
+  }
+
+  unsigned char *der_buf = NULL;
+  int der_length = i2d_X509_PUBKEY(X509_get_X509_PUBKEY(x509_), &der_buf);
+  if (der_length < 0) {
+    // What does this return value mean? Let's assume it means the cert
+    // is bad until proven otherwise.
+    LOG(WARNING) << "Failed to serialize the Subject Public Key Info";
+    LOG_OPENSSL_ERRORS(WARNING);
+    return FALSE;
+  }
+
+  string sha256_digest = Sha256Hasher::Sha256Digest(
+      string(reinterpret_cast<char*>(der_buf), der_length));
+
+  result->assign(sha256_digest);
+  OPENSSL_free(der_buf);
   return TRUE;
 }
 
