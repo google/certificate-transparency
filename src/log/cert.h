@@ -254,11 +254,13 @@ class CertChain {
     return chain_.back();
   }
 
-  // Returns TRUE if the issuer of each cert is the subject of
-  // the next cert, and each issuer has BasicConstraints CA:true.
+  // Returns TRUE if the issuer of each cert is the subject of the
+  // next cert, and each issuer has BasicConstraints CA:true, except
+  // the root cert which may not have CA:true to support old CA
+  // certificates.
   // Returns FALSE if the above does not hold.
   // Returns ERROR if the chain is not loaded or some error occurred.
-  Cert::Status IsValidCaIssuerChain() const;
+  Cert::Status IsValidCaIssuerChainMaybeLegacyRoot() const;
 
   // Returns TRUE if each cert is signed by the next cert in chain.
   // Returns FALSE if the above does not hold.

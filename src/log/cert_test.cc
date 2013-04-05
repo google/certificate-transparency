@@ -268,23 +268,22 @@ TEST_F(CertChainTest, RemoveCert) {
 TEST_F(CertChainTest, IssuerChains) {
   // A single certificate.
   CertChain chain(leaf_pem_);
-  EXPECT_EQ(Cert::TRUE, chain.IsValidCaIssuerChain());
+  EXPECT_EQ(Cert::TRUE, chain.IsValidCaIssuerChainMaybeLegacyRoot());
   EXPECT_EQ(Cert::TRUE, chain.IsValidSignatureChain());
 
   // Two certs.
   CertChain chain2(leaf_pem_ + ca_pem_);
-  EXPECT_EQ(Cert::TRUE, chain.IsValidCaIssuerChain());
+  EXPECT_EQ(Cert::TRUE, chain.IsValidCaIssuerChainMaybeLegacyRoot());
   EXPECT_EQ(Cert::TRUE, chain.IsValidSignatureChain());
-
 
   // In reverse order.
   CertChain chain3(ca_pem_ + leaf_pem_);
-  EXPECT_EQ(Cert::FALSE, chain3.IsValidCaIssuerChain());
+  EXPECT_EQ(Cert::FALSE, chain3.IsValidCaIssuerChainMaybeLegacyRoot());
   EXPECT_EQ(Cert::FALSE, chain3.IsValidSignatureChain());
 
   // Invalid
   CertChain invalid("");
-  EXPECT_EQ(Cert::ERROR, invalid.IsValidCaIssuerChain());
+  EXPECT_EQ(Cert::ERROR, invalid.IsValidCaIssuerChainMaybeLegacyRoot());
   EXPECT_EQ(Cert::ERROR, invalid.IsValidSignatureChain());
 }
 
@@ -294,7 +293,7 @@ TEST_F(CertChainTest, PreCertChain) {
   PreCertChain pre_chain(pem_bundle);
   ASSERT_TRUE(pre_chain.IsLoaded());
   EXPECT_EQ(pre_chain.Length(), 2U);
-  EXPECT_EQ(Cert::TRUE, pre_chain.IsValidCaIssuerChain());
+  EXPECT_EQ(Cert::TRUE, pre_chain.IsValidCaIssuerChainMaybeLegacyRoot());
   EXPECT_EQ(Cert::TRUE, pre_chain.IsValidSignatureChain());
   EXPECT_EQ(Cert::TRUE, pre_chain.IsWellFormed());
 
@@ -304,7 +303,7 @@ TEST_F(CertChainTest, PreCertChain) {
   PreCertChain pre_chain2(pem_bundle);
   ASSERT_TRUE(pre_chain2.IsLoaded());
   EXPECT_EQ(pre_chain2.Length(), 2U);
-  EXPECT_EQ(Cert::TRUE, pre_chain2.IsValidCaIssuerChain());
+  EXPECT_EQ(Cert::TRUE, pre_chain2.IsValidCaIssuerChainMaybeLegacyRoot());
   EXPECT_EQ(Cert::TRUE, pre_chain2.IsValidSignatureChain());
   EXPECT_EQ(Cert::FALSE, pre_chain2.IsWellFormed());
 }

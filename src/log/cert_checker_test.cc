@@ -31,6 +31,13 @@ static const char kPreWithPreCaCert[] = "test-embedded-with-preca-pre-cert.pem";
 static const char kIntermediateCert[] = "intermediate-cert.pem";
 // Issued by intermediate-cert.pem
 static const char kChainLeafCert[] = "test-intermediate-cert.pem";
+// CA with no basic constraints.
+static const char kCaNoBCCert[] = "test-no-bc-ca-cert.pem";
+// Chain terminating in that CA.
+static const char kNoBCChain[] = "test-no-bc-cert-chain.pem";
+// Chain where a leaf cert issues another cert
+static const char kBadNoBCChain[] = "test-no-ca-cert-chain.pem";
+
 
 namespace {
 
@@ -197,6 +204,31 @@ TEST_F(CertCheckerTest, PreCertAsCert) {
   PreCertChain chain(chain_pem);
   EXPECT_EQ(CertChecker::PRECERT_EXTENSION_IN_CERT_CHAIN,
             checker_.CheckCertChain(&chain));
+}
+
+// Accept if the root cert has no CA:True constraint and is in the trust store
+TEST_F(CertCheckerTest, AcceptNoBasicConstraints) {
+  ASSERT_TRUE(checker_.LoadTrustedCertificates(cert_dir_ + "/" + kCaNoBCCert));
+
+  string chain_pem;
+  ASSERT_TRUE(util::ReadTextFile(cert_dir_ + "/" + kNoBCChain, &chain_pem));
+
+  CertChain chain(chain_pem);
+  ASSERT_TRUE(chain.IsLoaded());
+  EXPECT_EQ(CertChecker::OK, checker_.CheckCertChain(&chain));
+}
+
+// Don't accept if some other cert without CA:True tries to issue.
+TEST_F(CertCheckerTest, DontAcceptNoBasicConstraints) {
+  ASSERT_TRUE(checker_.LoadTrustedCertificates(cert_dir_ + "/" + kCaCert));
+
+  string chain_pem;
+  ASSERT_TRUE(util::ReadTextFile(cert_dir_ + "/" + kBadNoBCChain, &chain_pem));
+
+  CertChain chain(chain_pem);
+  ASSERT_TRUE(chain.IsLoaded());
+  EXPECT_EQ(CertChecker::INVALID_CERTIFICATE_CHAIN,
+	    checker_.CheckCertChain(&chain));
 }
 
 }  // namespace

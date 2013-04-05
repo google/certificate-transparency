@@ -78,7 +78,9 @@ CertChecker::CheckIssuerChain(CertChain *chain) const {
     return INTERNAL_ERROR;
   }
 
-  Cert::Status status = chain->IsValidCaIssuerChain();
+  // Note that it is OK to allow a root cert that is not CA:true
+  // because we will later check that it is trusted.
+  Cert::Status status = chain->IsValidCaIssuerChainMaybeLegacyRoot();
   if (status == Cert::FALSE)
     return INVALID_CERTIFICATE_CHAIN;
   if (status != Cert::TRUE) {

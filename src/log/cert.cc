@@ -1,3 +1,4 @@
+/* -*- indent-tabs-mode: nil -*- */
 #include "log/cert.h"
 
 #include <glog/logging.h>
@@ -766,7 +767,7 @@ CertChain::~CertChain() {
   ClearChain();
 }
 
-Cert::Status CertChain::IsValidCaIssuerChain() const {
+Cert::Status CertChain::IsValidCaIssuerChainMaybeLegacyRoot() const {
   if (!IsLoaded()) {
     LOG(ERROR) << "Chain is not loaded";
     return Cert::ERROR;
@@ -777,9 +778,18 @@ Cert::Status CertChain::IsValidCaIssuerChain() const {
        it + 1 < chain_.end(); ++it) {
     Cert *subject = *it;
     Cert *issuer = *(it + 1);
-    status = issuer->HasBasicConstraintCATrue();
-    if (status != Cert::TRUE)
-      return status;
+
+    // The root cert may not have CA:True
+    status = issuer->IsSelfSigned();
+    if (status == Cert::FALSE) {
+      Cert::Status s2 = issuer->HasBasicConstraintCATrue();
+      if (s2 != Cert::TRUE)
+        return s2;
+    } else if (status != Cert::TRUE) {
+      LOG(ERROR) << "Failed to check self-signed status";
+      return Cert::ERROR;
+    }
+
     status = subject->IsIssuedBy(*issuer);
     if (status != Cert::TRUE)
       return status;
