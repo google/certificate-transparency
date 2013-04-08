@@ -1,3 +1,4 @@
+/* -*- mode: c++; indent-tabs-mode: nil -*- */
 #ifndef SERIALIZER_H
 #define SERIALIZER_H
 
@@ -246,7 +247,7 @@ class Deserializer {
       const std::string &in, ct::PrecertChainEntry *precert_chain_entry);
 
   static DeserializeResult DeserializeMerkleTreeLeaf(const std::string &in,
-						     ct::MerkleTreeLeaf *leaf);
+                                                     ct::MerkleTreeLeaf *leaf);
 
   template<class T>
   static DeserializeResult DeserializeUint(const std::string &in, size_t bytes,
