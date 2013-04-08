@@ -1,3 +1,4 @@
+/* -*- indent-tabs-mode: nil -*- */
 #include <gflags/gflags.h>
 #include <glog/logging.h>
 #include <gtest/gtest.h>
@@ -228,7 +229,7 @@ TEST_F(CertCheckerTest, DontAcceptNoBasicConstraints) {
   CertChain chain(chain_pem);
   ASSERT_TRUE(chain.IsLoaded());
   EXPECT_EQ(CertChecker::INVALID_CERTIFICATE_CHAIN,
-	    checker_.CheckCertChain(&chain));
+            checker_.CheckCertChain(&chain));
 }
 
 }  // namespace
