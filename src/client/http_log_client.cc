@@ -238,7 +238,7 @@ HTTPLogClient::Status HTTPLogClient::GetEntries(int first, int last,
     else
       LOG(FATAL) << "Don't understand entry type: "
                  << log_entry.leaf.timestamped_entry().entry_type();
-    
+
     entries->push_back(log_entry);
   }
 
