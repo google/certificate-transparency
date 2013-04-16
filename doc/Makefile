@@ -1,5 +1,5 @@
-VERSION=11
-PREV=10
+VERSION=12
+PREV=11
 NAME=draft-laurie-pki-sunlight
 BASE=$(NAME)-$(VERSION)
 DIFF=$(NAME)-$(PREV)-$(VERSION)-diff.html
