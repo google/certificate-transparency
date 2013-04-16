@@ -708,6 +708,12 @@ d0 d1   d2 d3           d0 d1   d2 d3  d4 d5
       </section>
       <section title="Retrieve Accepted Root Certificates">
 	<t>
+	  GET https://&lt;log server&gt;/ct/v1/get-roots
+	</t>
+	<t>
+	  No inputs.
+	</t>
+	<t>
 	  Outputs
 	  <list style="hanging">
 	    <t hangText="certificates">
