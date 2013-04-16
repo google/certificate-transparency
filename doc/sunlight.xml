@@ -5,16 +5,25 @@
   <front>
     <title>Certificate Transparency</title>
     <author initials="B" surname="Laurie" fullname="Ben Laurie">
+      <organization abbrev="Google">
+	Google UK Ltd.
+      </organization>
       <address>
 	<email>benl@google.com</email>
       </address>
     </author>
     <author initials="A" surname="Langley" fullname="Adam Langley">
+      <organization abbrev="Google">
+	Google Inc.
+      </organization>
       <address>
 	<email>agl@google.com</email>
       </address>
     </author>
     <author initials="E" surname="Kasper" fullname="Emilia Kasper">
+      <organization abbrev="Google">
+	Google Switzerland GmbH
+      </organization>
       <address>
 	<email>ekasper@google.com</email>
       </address>
@@ -237,7 +246,7 @@ d0 d1   d2 d3           d0 d1   d2 d3  d4 d5
 	  Anyone can submit a certificate to any log. In order to enable attribution of each logged certificate to its issuer, the log SHALL publish a list of acceptable root certificates (this list might usefully be the union of root certificates trusted by major browser vendors). Each submitted certificate MUST be accompanied by all additional certificates required to verify the certificate chain up to an accepted root certificate. The root certificate itself MAY be omitted from the chain submitted to the log server.
 	</t>
         <t>
-	  Alternatively, (root as well as intermediate) Certificate Authorities may submit a certificate to logs prior to issuance. To do so, a Certificate Authority constructs a Precertificate by adding a special critical poison extension (OID 1.3.6.1.4.1.11129.2.4.3, whose extnValue OCTET STRING contains ASN.1 NULL data (0x05 0x00)) to the end entity TBSCertificate (this extension is to ensure that the Precertificate cannot be validated by a standard X.509v3 client), and signing the resulting TBSCertificate <xref target='RFC5280'/> with either
+	  Alternatively, (root as well as intermediate) Certificate Authorities may submit a certificate to logs prior to issuance. To do so, the CA submits a Precertificate that the log can use to create an entry that will be valid against the issued certificate.  The Precertificate is constructed from the certificate to be issued by adding a special critical poison extension (OID 1.3.6.1.4.1.11129.2.4.3, whose extnValue OCTET STRING contains ASN.1 NULL data (0x05 0x00)) to the end entity TBSCertificate (this extension is to ensure that the Precertificate cannot be validated by a standard X.509v3 client), and signing the resulting TBSCertificate <xref target='RFC5280'/> with either
 	  <list style="symbols">
 	    <t>
 	      a special-purpose (CA:true, Extended Key Usage: Certificate Transparency, OID 1.3.6.1.4.1.11129.2.4.4) Precertificate Signing Certificate. The Precertificate Signing Certificate MUST be directly certified by the (root or intermediate) CA certificate that will ultimately sign the end entity TBSCertificate yielding the end entity certificate (note that the log may relax standard validation rules to allow this, so long as the issued certificate will be valid),
@@ -835,6 +844,12 @@ d0 d1   d2 d3           d0 d1   d2 d3  d4 d5
       </t>
     </section>
     <section title="Security Considerations">
+      <t>
+	With CAs, logs, and servers performing the actions described here, TLS clients can use logs and signed timestamps to reduce the likelihood that they will accept misissued certificates.  If a server presents a valid signed timestamp for a certificate, then the client knows that the certificate has been published in a log.  From this, the client knows that the subject of the certificate has had some time to notice the misissue and take some action, such as asking a CA to revoke a misissued certificate.  A signed timestamp is not a guarantee that the certificate is not misissued, since the subject of the certificate might not have checked the logs or the CA might have refused to revoke the certificate.
+      </t>
+      <t>
+	In addition, if TLS clients will not accept unlogged certificates, then site owners will have a greater incentive to submit certificates to logs, possibly with the assistance of their CA, increasing the overall transparency of the system.
+      </t>
       <section title="Misissued Certificates">
 	<t>
 	  Misissued certificates that have not been publicly logged, and thus do not have a valid SCT, will be rejected by TLS clients. Misissued certificates that do have an SCT from a log will appear in that public log within the Maximum Merge Delay, assuming the log is operating correctly. Thus, the maximum period of time during which a misissued certificate can be used without being available for audit is the MMD. 
