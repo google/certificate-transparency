@@ -15,7 +15,7 @@ then
     echo Done
 else
     echo Try getting issuer
-    ./get_issuers.py < $TMP >> $TMP
+    ./get_issuers.py < $TMP | tee -a $TMP
     ./ct --ct_server=ct.googleapis.com/pilot --http_log --logtostderr --ct_server_submission=$TMP upload
 fi
 
