@@ -10,7 +10,14 @@ TMP=`mktemp /tmp/cert.XXXXXX`
 
 openssl s_client -connect $SERVER:443 -showcerts < /dev/null | tee $TMP
 
-./ct --ct_server=ct.googleapis.com/pilot --http_log --logtostderr --ct_server_submission=$TMP upload
+if ./ct --ct_server=ct.googleapis.com/pilot --http_log --logtostderr --ct_server_submission=$TMP upload
+then
+    echo Done
+else
+    echo Try getting issuer
+    ./get_issuers.py < $TMP >> $TMP
+    ./ct --ct_server=ct.googleapis.com/pilot --http_log --logtostderr --ct_server_submission=$TMP upload
+fi
 
 rm $TMP
 
