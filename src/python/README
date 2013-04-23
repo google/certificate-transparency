@@ -1,0 +1,26 @@
+To run the python scripts
+
+1. Install the following additional packages
+gflags
+gviz-api-py
+requests
+
+2. Install mongodb (http://www.mongodb.org) and the pymongo package
+
+3. Install the protoc compiler from https://code.google.com/p/protobuf/
+
+4. Run 'make' in the parent python/ directory to
+generate the Python versions of CT protocol buffers.
+
+5. Ensure the mongodb server is running. If it's running with
+non-default settings then you have to modify command line flags
+accordingly.
+
+6. Make sure the python/ directory is on your Python path
+
+7. Try ct/dashboard/dashboard.py
+This launches a simple web server for displaying log data, and a
+background process for probing the log(s) periodically. The default
+output is at http://127.0.0.1:8000
+
+
