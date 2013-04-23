@@ -39,3 +39,5 @@
 ^src/test/httpd-new
 ^src/test/*.so
 ^src/test/testdata/error.log
+.*\.pyc$
+.*_pb2.py$
