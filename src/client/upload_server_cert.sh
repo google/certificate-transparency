@@ -14,9 +14,11 @@ if ./ct --ct_server=ct.googleapis.com/pilot --http_log --logtostderr --ct_server
 then
     echo Done
 else
-    echo Try getting issuer
-    ./get_issuers.py < $TMP | tee -a $TMP
-    ./ct --ct_server=ct.googleapis.com/pilot --http_log --logtostderr --ct_server_submission=$TMP upload
+    echo Try fixing the chain
+    TMP2=`mktemp /tmp/cert.XXXXXX`
+    ./fix-chain.py < $TMP | tee $TMP2
+    ./ct --ct_server=ct.googleapis.com/pilot --http_log --logtostderr --ct_server_submission=$TMP2 upload
+    rm $TMP2
 fi
 
 rm $TMP

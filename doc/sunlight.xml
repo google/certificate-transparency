@@ -1,7 +1,7 @@
 <?xml version="1.0"?>
 <?rfc symrefs="yes"?>
 <?rfc toc="yes"?>
-<rfc ipr="trust200902" docName="draft-laurie-pki-sunlight-11" category="exp">
+<rfc ipr="trust200902" docName="draft-laurie-pki-sunlight-12" category="exp">
   <front>
     <title>Certificate Transparency</title>
     <author initials="B" surname="Laurie" fullname="Ben Laurie">
@@ -320,7 +320,7 @@ d0 d1   d2 d3           d0 d1   d2 d3  d4 d5
           opaque key_id[32];
       } LogID;
 
-      opaque TBSCertificate&lt;1..2^16-1&gt;;
+      opaque TBSCertificate&lt;1..2^24-1&gt;;
 
       struct {
         opaque issuer_key_hash[32];

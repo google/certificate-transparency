@@ -73,6 +73,10 @@ Once more, use gmake on BSD systems.
 
 $ make OPENSSLDIR=<path to openssl> GTESTDIR=<path to gtest> test
 
+If tests fail because of missing libraries, you may need to set the
+environment variable LD_LIBRARY_PATH to "/usr/local/lib" (or wherever
+your platform installs third-party libraries).
+
 -----END-TO-END TESTS-----
 
 8. For end-to-end server-client tests, you will need to install Apache
