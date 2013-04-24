@@ -3,7 +3,7 @@ INCLUDE = -I.
 LOCAL_LIBS = log/libcert.a log/libdatabase.a log/liblog.a \
              merkletree/libmerkletree.a proto/libproto.a util/libutil.a
 SYS_LIBS = -lpthread -lgflags -lglog -lssl -lcrypto \
-       -lsqlite3 -lprotobuf -lcurlpp -ljson
+       -lsqlite3 -lprotobuf -lcurlpp -ljson -lcurl
 
 PLATFORM = $(shell uname -s)
 ifneq ($(PLATFORM), FreeBSD)

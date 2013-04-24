@@ -21,11 +21,6 @@ using ct::LoggedCertificate;
 using ct::SignedTreeHead;
 using std::string;
 
-// A slightly shorter notation for constructing hex strings from binary blobs.
-string H(const string &byte_string) {
-  return util::HexString(byte_string);
-}
-
 template <class T> class DBTest : public ::testing::Test {
  protected:
   DBTest() :
