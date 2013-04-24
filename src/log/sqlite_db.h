@@ -6,7 +6,7 @@
 
 #include "log/database.h"
 
-class sqlite3;
+struct sqlite3;
 
 template <class Logged> class SQLiteDB : public Database<Logged> {
  public:

@@ -73,9 +73,13 @@ Once more, use gmake on BSD systems.
 
 $ make OPENSSLDIR=<path to openssl> GTESTDIR=<path to gtest> test
 
-If tests fail because of missing libraries, you may need to set the
-environment variable LD_LIBRARY_PATH to "/usr/local/lib" (or wherever
-your platform installs third-party libraries).
+If the build still fails because of missing libraries, you may need to set the
+environment variable LD_LIBRARY_PATH. On Linux, if you did not change the
+default installation path (such as "/usr/local/lib"), running
+$ ldconfig
+or, if needed,
+$ sudo ldconfig
+should resolve the problem.
 
 -----END-TO-END TESTS-----
 
