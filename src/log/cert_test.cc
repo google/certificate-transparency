@@ -173,7 +173,7 @@ TEST_F(TbsCertificateTest, DerEncoding) {
 
   string cert_tbs_der, raw_tbs_der;
   EXPECT_EQ(Cert::TRUE, leaf.DerEncodedTbsCertificate(&cert_tbs_der));
-  EXPECT_EQ(Cert::TRUE, leaf.DerEncodedTbsCertificate(&raw_tbs_der));
+  EXPECT_EQ(Cert::TRUE, tbs.DerEncoding(&raw_tbs_der));
   EXPECT_EQ(cert_tbs_der, raw_tbs_der);
 }
 
