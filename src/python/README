@@ -1,9 +1,10 @@
 To run the python scripts
 
 1. Install the following additional packages
-gflags
-gviz-api-py
+gflags (python_gflags if using easy_install)
+gviz-api-py (easy_install 'https://google-visualization-python.googlecode.com/files/gviz_api_py-1.8.2.tar.gz')
 requests
+protobuf
 
 2. Install mongodb (http://www.mongodb.org) and the pymongo package
 

@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 import gflags
 import os
+import sys
 import time
 
 from ct.dashboard.grapher import GvizGrapher
@@ -99,6 +100,7 @@ class DashboardServer(object):
         httpd.serve_forever()
 
 if __name__ == "__main__":
+    sys.argv = FLAGS(sys.argv)
     mongodb = MongoDB(FLAGS.ct_mongo_db)
     prober = LogProber(FLAGS.ct_server_list, mongodb)
     prober.setDaemon(True)
