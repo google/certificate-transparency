@@ -167,6 +167,30 @@ TEST_F(CertTest, Issuers) {
   EXPECT_EQ(Cert::TRUE, ca.IsSelfSigned());
 }
 
+TEST_F(CertTest, DerEncodedNames) {
+  Cert leaf(leaf_pem_);
+  Cert ca(ca_pem_);
+
+  ASSERT_EQ(Cert::TRUE, leaf.IsIssuedBy(ca));
+ 
+  string leaf_subject, leaf_issuer, ca_subject, ca_issuer;
+  EXPECT_EQ(Cert::TRUE, leaf.DerEncodedSubjectName(&leaf_subject));
+  EXPECT_FALSE(leaf_subject.empty());
+
+  EXPECT_EQ(Cert::TRUE, leaf.DerEncodedIssuerName(&leaf_issuer));
+  EXPECT_FALSE(leaf_issuer.empty());
+
+  EXPECT_EQ(Cert::TRUE, ca.DerEncodedSubjectName(&ca_subject));
+  EXPECT_FALSE(ca_subject.empty());
+
+  EXPECT_EQ(Cert::TRUE, ca.DerEncodedIssuerName(&ca_issuer));
+  EXPECT_FALSE(ca_issuer.empty());
+
+  EXPECT_EQ(leaf_issuer, ca_subject);
+  EXPECT_EQ(ca_subject, ca_issuer);
+  EXPECT_NE(leaf_subject, leaf_issuer);
+}
+
 TEST_F(TbsCertificateTest, DerEncoding) {
   Cert leaf(leaf_pem_);
   TbsCertificate tbs(leaf);

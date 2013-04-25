@@ -2,8 +2,9 @@
 #define CERT_CHECKER_H
 
 #include <openssl/x509.h>
+
+#include <map>
 #include <string>
-#include <vector>
 
 #include "log/cert.h"
 
@@ -34,10 +35,14 @@ class CertChecker {
   };
 
   // Load a file of concatenated PEM-certs.
+  // Returns true if at least one certificate was successfully loaded, and no
+  // errors were encountered. Returns false otherwise (and will not load any
+  // certificates from this file).
   bool LoadTrustedCertificates(const std::string &trusted_cert_file);
 
-  // Load a directory location.
-  bool LoadTrustedCertificateDir(const std::string &trusted_cert_dir);
+  void ClearAllTrustedCertificates();
+
+  size_t NumTrustedCertificates() const { return trusted_.size(); }
 
   // Check that:
   // (1) Each certificate is correctly signed by the next one in the chain; and
@@ -69,7 +74,15 @@ class CertChecker {
   // Look issuer up from the trusted store, and verify signature.
   CertVerifyResult GetTrustedCa(CertChain *chain) const;
 
-  X509_STORE *trusted_;
+  // Returns OK if the cert is trusted, ROOT_NOT_IN_LOCAL_STORE if it's not,
+  // INVALID_CERTIFICATE_CHAIN if something is wrong with the cert, and
+  // INTERNAL_ERROR if something terrible happened.
+  CertVerifyResult IsTrusted(const Cert &cert, std::string *subject_name) const;
+
+  // A map by the DER encoding of the subject name.
+  // All code manipulating this container must ensure contained elements are
+  // deallocated appropriately.
+  std::multimap<std::string, Cert*> trusted_;
 };
 
 }  // namespace ct

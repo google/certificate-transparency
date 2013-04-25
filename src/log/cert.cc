@@ -380,6 +380,38 @@ Cert::Status Cert::DerEncodedTbsCertificate(string *result) const {
   return TRUE;
 }
 
+Cert::Status Cert::DerEncodedSubjectName(string *result) const {
+  if (!IsLoaded()) {
+    LOG(ERROR) << "Cert not loaded";
+    return ERROR;
+  }
+  return DerEncodedName(X509_get_subject_name(x509_), result);
+}
+
+Cert::Status Cert::DerEncodedIssuerName(string *result) const {
+  if (!IsLoaded()) {
+    LOG(ERROR) << "Cert not loaded";
+    return ERROR;
+  }
+  return DerEncodedName(X509_get_issuer_name(x509_), result);
+}
+
+// static
+Cert::Status Cert::DerEncodedName(X509_NAME *name, string *result) {
+  unsigned char *der_buf = NULL;
+  int der_length = i2d_X509_NAME(name, &der_buf);
+  if (der_length < 0) {
+    // What does this return value mean? Let's assume it means the cert
+    // is bad until proven otherwise.
+    LOG(WARNING) << "Failed to serialize the subject name";
+    LOG_OPENSSL_ERRORS(WARNING);
+    return FALSE;
+  }
+  result->assign(string(reinterpret_cast<char*>(der_buf), der_length));
+  OPENSSL_free(der_buf);
+  return TRUE;
+}
+
 Cert::Status Cert::PublicKeySha256Digest(string *result) const {
   if (!IsLoaded()) {
     LOG(ERROR) << "Cert not loaded";

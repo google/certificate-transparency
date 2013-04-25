@@ -132,6 +132,7 @@ mkdir -p tmp/ca-hashes
 
 echo "Generating CA certificates in tmp and hashes in tmp/ca"
 make_ca_certs `pwd`/tmp `pwd`/tmp/ca-hashes ca $MY_OPENSSL
+ca_file="tmp/$ca-cert.pem"
 echo "Generating log server keys in tmp"
 make_log_server_keys `pwd`/tmp ct-server
 
@@ -144,9 +145,9 @@ test_ct_server() {
   flags=$@
 
   # Set the tree signing frequency to 0 to ensure we sign as often as possible.
-  echo "Starting CT server with trusted certs in $hash_dir"
+  echo "Starting CT server with trusted certs in $ca_file"
   ../server/ct-server --port=8124 --key="$cert_dir/$log_server-key.pem" \
-    --trusted_cert_dir="$hash_dir" --logtostderr=true \
+    --trusted_cert_file="$ca_file" --logtostderr=true \
     --tree_signing_frequency_seconds=1 $flags &
 
   server_pid=$!

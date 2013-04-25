@@ -38,6 +38,12 @@ static const char kCaNoBCCert[] = "test-no-bc-ca-cert.pem";
 static const char kNoBCChain[] = "test-no-bc-cert-chain.pem";
 // Chain where a leaf cert issues another cert
 static const char kBadNoBCChain[] = "test-no-ca-cert-chain.pem";
+// Chain that has two matching issuers.
+static const char kCollisionChain[] = "test-issuer-collision-chain.pem";
+// Two CA certs that have identical name and no AKI.
+static const char kCollisionRoot1[] = "test-colliding-root1.pem";
+static const char kCollisionRoot2[] = "test-colliding-root2.pem";
+static const char kCollidingRoots[] = "test-colliding-roots.pem";
 
 
 namespace {
@@ -70,6 +76,37 @@ class CertCheckerTest : public ::testing::Test {
     CHECK(util::ReadTextFile(cert_dir_ + "/" + kCaCert, &ca_pem_));
   }
 };
+
+TEST_F(CertCheckerTest, LoadTrustedCertificates) {
+  EXPECT_EQ(0U, checker_.NumTrustedCertificates());
+
+  EXPECT_TRUE(checker_.LoadTrustedCertificates(cert_dir_ + "/" + kCaCert));
+  EXPECT_EQ(1U, checker_.NumTrustedCertificates());
+
+  EXPECT_TRUE(checker_.LoadTrustedCertificates(
+      cert_dir_ + "/" + kIntermediateCert));
+  EXPECT_EQ(2U, checker_.NumTrustedCertificates());
+
+  checker_.ClearAllTrustedCertificates();
+  EXPECT_EQ(0U, checker_.NumTrustedCertificates());
+}
+
+TEST_F(CertCheckerTest, LoadTrustedCertificatesLoadsAll) {
+  EXPECT_EQ(0U, checker_.NumTrustedCertificates());
+
+  EXPECT_TRUE(checker_.LoadTrustedCertificates(
+      cert_dir_ + "/" + kCollidingRoots));
+  EXPECT_EQ(2U, checker_.NumTrustedCertificates());
+}
+
+TEST_F(CertCheckerTest, LoadTrustedCertificatesIgnoresDuplicates) {
+  EXPECT_EQ(0U, checker_.NumTrustedCertificates());
+
+  EXPECT_TRUE(checker_.LoadTrustedCertificates(cert_dir_ + "/" + kCaCert));
+  EXPECT_EQ(1U, checker_.NumTrustedCertificates());
+  EXPECT_TRUE(checker_.LoadTrustedCertificates(cert_dir_ + "/" + kCaCert));
+  EXPECT_EQ(1U, checker_.NumTrustedCertificates());
+}
 
 TEST_F(CertCheckerTest, Certificate) {
   CertChain chain(leaf_pem_);
@@ -230,6 +267,37 @@ TEST_F(CertCheckerTest, DontAcceptNoBasicConstraints) {
   ASSERT_TRUE(chain.IsLoaded());
   EXPECT_EQ(CertChecker::INVALID_CERTIFICATE_CHAIN,
             checker_.CheckCertChain(&chain));
+}
+
+TEST_F(CertCheckerTest, ResolveIssuerCollisions) {
+  string chain_pem, root1_pem, root2_pem;
+  ASSERT_TRUE(util::ReadTextFile(cert_dir_ + "/" + kCollisionChain,
+                                 &chain_pem));
+
+  ASSERT_TRUE(checker_.LoadTrustedCertificates(cert_dir_ + "/" +
+                                               kCollisionRoot1));
+  ASSERT_TRUE(checker_.LoadTrustedCertificates(cert_dir_ + "/" +
+                                               kCollisionRoot2));
+  CertChain chain(chain_pem);
+  ASSERT_TRUE(chain.IsLoaded());
+  EXPECT_EQ(CertChecker::OK, checker_.CheckCertChain(&chain));
+
+  // The same, but include the root in the submission.
+  ASSERT_TRUE(util::ReadTextFile(cert_dir_ + "/" + kCollisionRoot1,
+                                 &root1_pem));
+  ASSERT_TRUE(util::ReadTextFile(cert_dir_ + "/" + kCollisionRoot2,
+                                 &root2_pem));
+  CertChain chain1(chain_pem);
+  Cert *root1 = new Cert(root1_pem);
+  ASSERT_TRUE(root1->IsLoaded());
+  chain1.AddCert(root1);
+  EXPECT_EQ(CertChecker::OK, checker_.CheckCertChain(&chain1));
+
+  CertChain chain2(chain_pem);
+  Cert *root2 = new Cert(root2_pem);
+  ASSERT_TRUE(root2->IsLoaded());
+  chain2.AddCert(root2);
+  EXPECT_EQ(CertChecker::OK, checker_.CheckCertChain(&chain2));
 }
 
 }  // namespace

@@ -118,6 +118,18 @@ class Cert {
   // Returns ERROR if the cert is not loaded.
   Status DerEncodedTbsCertificate(std::string *result) const;
 
+  // Sets the DER-encoded subject Name component of the cert in |result|.
+  // Returns TRUE if the encoding succeeded.
+  // Returns FALSE if the encoding failed.
+  // Returns ERROR if the cert is not loaded.
+  Status DerEncodedSubjectName(std::string *result) const;
+
+  // Sets the DER-encoded issuer Name component of the cert in |result|.
+  // Returns TRUE if the encoding succeeded.
+  // Returns FALSE if the encoding failed.
+  // Returns ERROR if the cert is not loaded.
+  Status DerEncodedIssuerName(std::string *result) const;
+
   // Sets the SHA256 digest of the cert's public key in |result|.
   // Returns TRUE if computing the digest succeeded.
   // Returns FALSE if computing the digest failed.
@@ -164,6 +176,7 @@ class Cert {
   Status ExtensionStructure(int extension_nid, void **ext_struct) const;
   static std::string PrintName(X509_NAME* name);
   static std::string PrintTime(ASN1_TIME* when);
+  static Status DerEncodedName(X509_NAME *name, std::string *result);
   X509 *x509_;
 };
 

@@ -39,8 +39,8 @@
 
 DEFINE_int32(port, 0, "Server port");
 DEFINE_string(key, "", "PEM-encoded server private key file");
-DEFINE_string(trusted_cert_dir, "",
-              "Directory for trusted CA certificates, in OpenSSL hash format");
+DEFINE_string(trusted_cert_file, "",
+              "File for trusted CA certificates, in concatenated PEM format");
 DEFINE_string(cert_dir, "", "Storage directory for certificates");
 DEFINE_string(tree_dir, "", "Storage directory for trees");
 DEFINE_string(sqlite_db, "", "Database for certificate and tree storage");
@@ -92,7 +92,7 @@ static bool ValidateRead(const char *flagname, const string &path) {
 static const bool key_dummy = RegisterFlagValidator(&FLAGS_key,
                                                     &ValidateRead);
 
-static const bool cert_dummy = RegisterFlagValidator(&FLAGS_trusted_cert_dir,
+static const bool cert_dummy = RegisterFlagValidator(&FLAGS_trusted_cert_file,
                                                      &ValidateRead);
 
 static bool ValidateWrite(const char *flagname, const string &path) {
@@ -488,8 +488,8 @@ int main(int argc, char **argv) {
   EventLoop loop;
 
   CertChecker checker;
-  CHECK(checker.LoadTrustedCertificateDir(FLAGS_trusted_cert_dir))
-      << "Could not load CA certs from " << FLAGS_trusted_cert_dir;
+  CHECK(checker.LoadTrustedCertificates(FLAGS_trusted_cert_file))
+      << "Could not load CA certs from " << FLAGS_trusted_cert_file;
 
   if (FLAGS_sqlite_db == "")
     CHECK_NE(FLAGS_cert_dir, FLAGS_tree_dir)

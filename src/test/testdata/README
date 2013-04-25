@@ -70,4 +70,11 @@ test-no-ca-cert.pem: a cert "issued" by test-cert.pem.
 
 test-no-ca-cert-chain.pem: complete chain for test-no-ca-cert.pem.
 
+test-issuer-collision-chain.pem: a chain for which we have two valid
+issuers (i.e., two trusted root CA certs with identical name and SPKI)
+
+test-colliding-root1.pem: the first matching root for the above chain
+
+test-colliding-root2.pem: the second matching root for the above chain
+
 (*-key.pem is the private key matching *-cert.pem)

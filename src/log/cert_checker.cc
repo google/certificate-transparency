@@ -2,56 +2,115 @@
 #include <glog/logging.h>
 #include <string.h>
 #include <openssl/asn1.h>
+#include <openssl/bio.h>
+#include <openssl/pem.h>
 #include <openssl/x509.h>
 #include <openssl/x509v3.h>
+
 #include <string>
+#include <utility>
 #include <vector>
 
 #include "log/cert.h"
 #include "log/cert_checker.h"
 #include "log/ct_extensions.h"
-#include "util/openssl_util.h"  // for LOG_ALL_OPENSSL_ERRORS
+#include "util/openssl_util.h"  // for LOG_OPENSSL_ERRORS
 #include "util/util.h"
 
 namespace  ct {
 
 using std::string;
+using util::ClearOpenSSLErrors;
 
-CertChecker::CertChecker() : trusted_(NULL) {
+CertChecker::CertChecker() : trusted_() {
 }
 
 CertChecker::~CertChecker() {
-  if (trusted_ != NULL)
-    X509_STORE_free(trusted_);
+  ClearAllTrustedCertificates();
 }
 
 bool CertChecker::LoadTrustedCertificates(const std::string &cert_file) {
-  if (trusted_ == NULL && ((trusted_ = X509_STORE_new()) == NULL)) {
-    LOG(ERROR) << "Failed to initialize trusted cert store";
+  // A read-only BIO.
+  BIO *bio_in = BIO_new(BIO_s_file());
+  if (bio_in == NULL) {
     LOG_OPENSSL_ERRORS(ERROR);
     return false;
   }
 
-  if (X509_STORE_load_locations(trusted_, cert_file.c_str(), NULL) != 1) {
-    LOG(ERROR) << "Failed to load trusted cert file";
+  if (BIO_read_filename(bio_in, cert_file.c_str()) <= 0) {
+    BIO_free(bio_in);
+    LOG(ERROR) << "Failed to open file " << cert_file << " for reading";
     LOG_OPENSSL_ERRORS(ERROR);
     return false;
   }
+
+  std::vector<std::pair<string, Cert*> > certs_to_add;
+  bool error = false;
+  // certs_to_add may be empty if no new certs were added, so keep track of
+  // successfully parsed cert count separately.
+  size_t cert_count = 0;
+
+  while (!error) {
+    X509 *x509 = PEM_read_bio_X509(bio_in, NULL, NULL, NULL);
+    if (x509 != NULL) {
+      // TODO(ekasper): check that the issuing CA cert is temporally valid
+      // and at least warn if it isn't.
+      Cert *cert = new Cert(x509);
+      string subject_name;
+      CertVerifyResult is_trusted = IsTrusted(*cert, &subject_name);
+      if (is_trusted != OK && is_trusted != ROOT_NOT_IN_LOCAL_STORE) {
+        delete cert;
+        error = true;
+        break;
+      }
+
+      ++cert_count;
+      if (is_trusted == OK) {
+        delete cert;
+      } else {
+        certs_to_add.push_back(make_pair(subject_name, cert));
+      } 
+    } else {
+      // See if we reached the end of the file.
+      unsigned long err = ERR_peek_last_error();
+      if (ERR_GET_LIB(err) == ERR_LIB_PEM &&
+          ERR_GET_REASON(err) == PEM_R_NO_START_LINE) {
+        ClearOpenSSLErrors();
+        break;
+      } else {
+        // A real error.
+        LOG(ERROR) << "Badly encoded certificate file.";
+        LOG_OPENSSL_ERRORS(WARNING);
+        error = true;
+        break;
+      }
+    }
+  }
+
+  BIO_free(bio_in);
+
+  if (error || !cert_count) {
+    while (!certs_to_add.empty()) {
+      delete certs_to_add.back().second;
+      certs_to_add.pop_back();
+    }
+    return false;
+  }
+
+  size_t new_certs = certs_to_add.size();
+  while (!certs_to_add.empty()) {
+    trusted_.insert(certs_to_add.back());
+    certs_to_add.pop_back();
+  }
+  LOG(INFO) << "Added " << new_certs << " new certificate(s) to trusted store";
   return true;
 }
 
-bool CertChecker::LoadTrustedCertificateDir(const std::string &cert_dir) {
-  if (trusted_ == NULL && ((trusted_ = X509_STORE_new()) == NULL)) {
-    LOG(ERROR) << "Failed to initialize trusted cert store";
-    LOG_OPENSSL_ERRORS(ERROR);
-    return false;
-  }
-  if (X509_STORE_load_locations(trusted_, NULL, cert_dir.c_str()) != 1) {
-   LOG(ERROR) << "Failed to load trusted cert file";
-    LOG_OPENSSL_ERRORS(ERROR);
-    return false;
-  }
-  return true;
+void CertChecker::ClearAllTrustedCertificates() {
+  std::multimap<string,Cert*>::iterator it = trusted_.begin();
+  for (; it != trusted_.end(); ++it)
+    delete it->second;
+  trusted_.clear();
 }
 
 CertChecker::CertVerifyResult
@@ -169,83 +228,91 @@ CertChecker::GetTrustedCa(CertChain *chain) const {
   }
 
   // Look up issuer from the trusted store.
-  if (trusted_ == NULL) {
+  if (trusted_.empty()) {
     LOG(WARNING) << "No trusted certificates loaded";
     return ROOT_NOT_IN_LOCAL_STORE;
   }
 
-  X509_STORE_CTX *ctx = X509_STORE_CTX_new();
-  if (ctx == NULL) {
-    LOG_OPENSSL_ERRORS(ERROR);
-    return INTERNAL_ERROR;
-  }
+  string subject_name;
+  CertVerifyResult is_trusted = IsTrusted(*subject, &subject_name);
+  // Either an error, or OK, meaning the last cert is in our trusted store.
+  // Note the trusted cert need not necessarily be self-signed.
+  if (is_trusted != ROOT_NOT_IN_LOCAL_STORE)
+    return is_trusted;
 
-  int ret = X509_STORE_CTX_init(ctx, trusted_, NULL, NULL);
-  if (ret != 1) {
-    X509_STORE_CTX_free(ctx);
-    LOG_OPENSSL_ERRORS(ERROR);
+  string issuer_name;
+  Cert::Status status = subject->DerEncodedIssuerName(&issuer_name);
+  if (status == Cert::ERROR)
     return INTERNAL_ERROR;
-  }
+  else if (status != Cert::TRUE)
+    return INVALID_CERTIFICATE_CHAIN;
 
-  X509 *issuer_x509 = NULL;
-  // Attempt to find the correct issuer: if multiple issuers with
-  // the same subject but different keys exist in store,
-  // X509_STORE_CTX_get1_issuer should be able to distinguish based on
-  // Authority KeyID.
-  ret = X509_STORE_CTX_get1_issuer(&issuer_x509, ctx, subject->x509_);
-  X509_STORE_CTX_free(ctx);
-  if (ret == 0)
+  if (subject_name == issuer_name) {
+    // Self-signed: no need to scan again.
     return ROOT_NOT_IN_LOCAL_STORE;
-  if (ret < 0) {
-    LOG_OPENSSL_ERRORS(ERROR);
+  }
+
+  std::pair<std::multimap<string, Cert*>::const_iterator,
+            std::multimap<string, Cert*>::const_iterator> issuer_range =
+    trusted_.equal_range(issuer_name);
+
+  const Cert *issuer = NULL;
+  for (std::multimap<string, Cert*>::const_iterator it = issuer_range.first;
+       it != issuer_range.second; ++it) {
+    const Cert *issuer_cand = it->second;
+ 
+    Cert::Status ok = subject->IsSignedBy(*issuer_cand);
+    if (ok != Cert::TRUE && ok != Cert::FALSE) {
+      LOG(ERROR) << "Failed to check signature for trusted root";
+      return INTERNAL_ERROR;
+    }
+    if (ok == Cert::TRUE) {
+      issuer = issuer_cand;
+      break;
+    }
+  }
+
+  if (issuer == NULL)
+    return ROOT_NOT_IN_LOCAL_STORE;
+
+  // Clone creates a new Cert but AddCert takes ownership even if Clone
+  // failed and the cert can't be added, so we don't have to explicitly
+  // check for IsLoaded here.
+  if (chain->AddCert(issuer->Clone()) != Cert::TRUE) {
+    LOG(ERROR) << "Failed to add trusted root to chain";
     return INTERNAL_ERROR;
   }
 
-  // get1 ups the refcount, so this is safe.
-  Cert issuer(issuer_x509);
+  return OK;
+}
 
-  // TODO(ekasper): check that the issuing CA cert is temporally valid.
-  // TODO(ekasper): do we need to run any other checks on the issuer?
-  if (!issuer.IsLoaded()) {
-    LOG(ERROR) << "Failed to load store issuer";
+CertChecker::CertVerifyResult CertChecker::IsTrusted(
+    const Cert &cert, string *subject_name) const {
+  string cert_name;
+  Cert::Status status = cert.DerEncodedSubjectName(&cert_name);
+  if (status == Cert::ERROR)
     return INTERNAL_ERROR;
-  }
+  else if (status != Cert::TRUE)
+    return INVALID_CERTIFICATE_CHAIN;
 
-  // If last cert is self-signed, skip signature check but do check we have an
-  // exact match.
-  Cert::Status status = subject->IsSelfSigned();
-  if (status != Cert::TRUE && status != Cert::FALSE) {
-    LOG(ERROR) << "Failed to check self-signed status";
-    return INTERNAL_ERROR;
-  }
-  if (status == Cert::TRUE) {
-    Cert::Status matches = subject->IsIdenticalTo(issuer);
+  *subject_name = cert_name;
+
+  std::pair<std::multimap<string, Cert*>::const_iterator,
+            std::multimap<string, Cert*>::const_iterator> cand_range =
+    trusted_.equal_range(cert_name);
+  for (std::multimap<string, Cert*>::const_iterator it = cand_range.first;
+       it != cand_range.second; ++it) {
+    const Cert *cand = it->second;
+    Cert::Status matches = cert.IsIdenticalTo(*cand);
     if (matches != Cert::TRUE && matches != Cert::FALSE) {
       LOG(ERROR) << "Cert comparison failed";
       return INTERNAL_ERROR;
     }
-    if (matches != Cert::TRUE) {
-      return ROOT_NOT_IN_LOCAL_STORE;
-    }
-  } else {
-    Cert::Status ok = subject->IsSignedBy(issuer);
-    if (ok != Cert::TRUE && status != Cert::FALSE) {
-      LOG(ERROR) << "Failed to check signature for trusted root";
-      return INTERNAL_ERROR;
-    }
-    if (ok != Cert::TRUE) {
-      return ROOT_NOT_IN_LOCAL_STORE;
-    }
-
-    // Clone creates a new Cert but AddCert takes ownership even if Clone
-    // failed and the cert can't be added, so we don't have to explicitly
-    // check for IsLoaded here.
-    if (chain->AddCert(issuer.Clone()) != Cert::TRUE) {
-      LOG(ERROR) << "Failed to add trusted root to chain";
-      return INTERNAL_ERROR;
+    if (matches == Cert::TRUE) {
+      return OK;
     }
   }
-  return OK;
+  return ROOT_NOT_IN_LOCAL_STORE;
 }
 
 }  // namespace ct
