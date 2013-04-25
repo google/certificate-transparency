@@ -8,6 +8,11 @@
 
 #include "client/client.h"
 
+#ifdef __MACH__
+// does not exist on MacOS
+# define MSG_NOSIGNAL 0
+#endif
+
 using std::string;
 
 Client::Client(const string &server, uint16_t port)

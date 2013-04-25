@@ -41,8 +41,8 @@ void Listener::ReadIsAllowed() {
 
     // we have to consume the result.
     ssize_t s = write(in, sorry, sizeof sorry);
-    // but we don't care what it is...
-    s = s;
+    if (s != sizeof sorry)
+      LOG(WARNING) << "Failed to write sorry correctly.";
     shutdown(in, SHUT_RDWR);
     close(in);
     return;
