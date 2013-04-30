@@ -16,7 +16,7 @@ then
 else
     echo Try fixing the chain
     TMP2=`mktemp /tmp/cert.XXXXXX`
-    ./fix-chain.py < $TMP | tee $TMP2
+    ./fix-chain.py $TMP | tee $TMP2
     ./ct --ct_server=ct.googleapis.com/pilot --http_log --logtostderr --ct_server_submission=$TMP2 upload
     rm $TMP2
 fi
