@@ -3,7 +3,7 @@ To run the python scripts
 1. Install the following additional packages
 gflags (python_gflags if using easy_install)
 gviz-api-py (easy_install 'https://google-visualization-python.googlecode.com/files/gviz_api_py-1.8.2.tar.gz')
-requests
+requests (at least version 1.0)
 protobuf
 
 2. Install the protoc compiler from https://code.google.com/p/protobuf/
