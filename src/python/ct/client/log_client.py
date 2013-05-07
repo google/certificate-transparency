@@ -16,7 +16,7 @@ class LogClient(object):
     """HTTP client for talking to a CT log."""
 
     get_sth_path = "ct/v1/get-sth"
-    
+
     def __init__(self, uri):
         self.uri = uri
 
@@ -31,7 +31,7 @@ class LogClient(object):
 
     def _get_request(self, path, params={}):
         """GET <logserver>/path?params."""
-        url = self.uri + "/" + path
+        url = "https://" + self.uri + "/" + path
         try:
             response = requests.get(url, params=params, timeout=60)
         except requests.exceptions.RequestException as e:
@@ -52,7 +52,6 @@ class LogClient(object):
             return
         sth_response = SthResponse()
         try:
-            sth_response.log_server = self.uri
             sth_response.timestamp = sth['timestamp']
             sth_response.tree_size = sth['tree_size']
             sth_response.sha256_root_hash = sth[
@@ -90,7 +89,7 @@ class LogProber(threading.Thread):
         for client in self.clients:
             sth_response = client.get_sth()
             if sth_response:
-                self.db.store_sth(sth_response)
+                self.db.store_sth(client.servername(), sth_response)
 
     def run(self):
         while not self.stopped:

@@ -4,4 +4,4 @@ ct/proto/%_pb2.py: ct/proto/%.proto
 	protoc $^ --python_out=.
 
 test:
-	./ct/client/mongo_db_test.py
+	./ct/client/sqlite_db_test.py

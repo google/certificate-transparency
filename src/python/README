@@ -6,22 +6,24 @@ gviz-api-py (easy_install 'https://google-visualization-python.googlecode.com/fi
 requests
 protobuf
 
-2. Install mongodb (http://www.mongodb.org) and the pymongo package
+2. Install the protoc compiler from https://code.google.com/p/protobuf/
 
-3. Install the protoc compiler from https://code.google.com/p/protobuf/
-
-4. Run 'make' in the parent python/ directory to
+3. Run 'make' in the parent python/ directory to
 generate the Python versions of CT protocol buffers.
 
-5. Ensure the mongodb server is running. If it's running with
-non-default settings then you have to modify command line flags
-accordingly.
+4. Make sure the python/ directory is on your Python path
 
-6. Make sure the python/ directory is on your Python path
+5. Run 'make test' in the parent python/ directory to run unit tests.
 
-7. Try ct/dashboard/dashboard.py
-This launches a simple web server for displaying log data, and a
-background process for probing the log(s) periodically. The default
-output is at http://127.0.0.1:8000
+6. Try out the client tools:
+
+ a. Choose a location for your SQLite database. The default location is
+    "/tmp/ct". If you prefer another location then you have to modify
+    command line flags accordingly when launching the scripts.
+
+ b. Launch ct/dashboard/dashboard.py
+    This launches a simple web server for displaying log data, and a
+    background process for probing the log(s) periodically. The default
+    output is at http://127.0.0.1:8000
 
 
