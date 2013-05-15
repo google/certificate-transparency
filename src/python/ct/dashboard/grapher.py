@@ -4,14 +4,21 @@ import gviz_api
 class GvizGrapher(object):
     """A grapher that produces JSON output for the Google Visualizaton
     Datatable.
-    """ 
+    """
 
     def __init__(self):
         pass
 
+    def _get_nested_attr(self, item, attr):
+        attributes = attr.split(".")
+        ret = item
+        for a in attributes:
+            ret = getattr(ret, a)
+        return ret
+
     def _convert_value(self, item, attr):
         """Convert the attribute of an item to a gviz value type."""
-        value = getattr(item, attr[0])
+        value = self._get_nested_attr(item, attr[0])
         if len(attr) > 1 and attr[1] == "timestamp_ms":
             value = datetime.fromtimestamp(value/1000)
         return value
@@ -34,7 +41,8 @@ class GvizGrapher(object):
            (attr [,data_type [,label [,custom_properties]]])
            Types supported by gviz are "string", "number", "boolean", "date",
            "datetime" or "timeofday".
-           Additionally we've added "timestamp_ms" for millisecond since epoch,            which we convert to "datetime".
+           Additionally we've added "timestamp_ms" for millisecond since epoch,
+           which we convert to "datetime".
         Returns:
            A JSON string containing the data
         """

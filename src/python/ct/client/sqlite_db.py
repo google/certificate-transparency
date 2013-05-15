@@ -26,7 +26,8 @@ class SQLiteDB(database.Database):
                          "id INTEGER PRIMARY KEY, log_server TEXT UNIQUE, "
                          "metadata BLOB)")
             conn.execute("CREATE TABLE IF NOT EXISTS sths(log_id INTEGER, "
-                         "timestamp INTEGER, sth_data BLOB, UNIQUE("
+                         "timestamp INTEGER, sth_data BLOB, "
+                         "audit_info BLOB, UNIQUE("
                          "log_id, timestamp, sth_data) ON CONFLICT IGNORE, "
                          "FOREIGN KEY(log_id) REFERENCES logs(id))")
             conn.execute("CREATE INDEX IF NOT EXISTS sth_by_timestamp on sths("
@@ -95,6 +96,15 @@ class SQLiteDB(database.Database):
             except sqlite3.IntegrityError:
                 logging.warning("Ignoring duplicate log server %s", log_server)
 
+    def update_log(self, metadata):
+        log_server, serialized_metadata = self._encode_log_metadata(
+            metadata)
+        with self._connect() as conn:
+            conn.execute("INSERT OR REPLACE INTO logs(id, log_server, "
+                         "metadata) VALUES((SELECT id FROM logs WHERE "
+                         "log_server = ?), ?, ?) ", (log_server, log_server,
+                                                     serialized_metadata))
+
     def logs(self):
         with self._connect() as conn:
             for log_server, metadata in conn.execute(
@@ -110,47 +120,54 @@ class SQLiteDB(database.Database):
             raise database.KeyError("Unknown log server: %s", log_server)
         return log_id[0]
 
-    def _encode_sth(self, sth):
-        timestamp = sth.timestamp
-        local_sth = client_pb2.SthResponse()
-        local_sth.CopyFrom(sth)
-        local_sth.ClearField("timestamp")
-        return timestamp, buffer(local_sth.SerializeToString())
-
-    def _decode_sth(self, timestamp, serialized_sth):
+    def _encode_sth(self, audited_sth):
+        timestamp = audited_sth.sth.timestamp
         sth = client_pb2.SthResponse()
-        sth.ParseFromString(serialized_sth)
-        sth.timestamp = timestamp
-        return sth
+        sth.CopyFrom(audited_sth.sth)
+        sth.ClearField("timestamp")
+        audit = client_pb2.AuditInfo()
+        audit.CopyFrom(audited_sth.audit)
+        return (timestamp, buffer(sth.SerializeToString()),
+                buffer(audit.SerializeToString()))
 
-    def store_sth(self, log_server, sth):
-        timestamp, sth_data = self._encode_sth(sth)
+    def _decode_sth(self, sth_row):
+        _, timestamp, serialized_sth, serialized_audit = sth_row
+        audited_sth = client_pb2.AuditedSth()
+        audited_sth.sth.ParseFromString(serialized_sth)
+        audited_sth.sth.timestamp = timestamp
+        audited_sth.audit.ParseFromString(serialized_audit)
+        return audited_sth
+
+    # This ignores a duplicate STH even if the audit data differs.
+    # TODO(ekasper): add an update method for updating audit data, as needed.
+    def store_sth(self, log_server, audited_sth):
+        timestamp, sth_data, audit_info = self._encode_sth(audited_sth)
         with self._connect() as conn:
             log_id = self._get_log_id(conn, log_server)
-            conn.execute("INSERT INTO sths(log_id, timestamp, sth_data) "
-                         "VALUES(?, ?, ?)", (log_id, timestamp, sth_data))
+            conn.execute("INSERT INTO sths(log_id, timestamp, sth_data, "
+                         "audit_info) VALUES(?, ?, ?, ?)",
+                         (log_id, timestamp, sth_data, audit_info))
 
     def get_latest_sth(self, log_server):
-        timestamp, sth_data = None, None
+        row = None
         with self._connect() as conn:
             log_id = self._get_log_id(conn, log_server)
-            res = conn.execute("SELECT timestamp, sth_data FROM sths "
-                               "WHERE log_id = ? ORDER BY timestamp DESC "
-                               "LIMIT 1", (log_id,))
+            res = conn.execute("SELECT * FROM sths WHERE log_id = ? "
+                               "ORDER BY timestamp DESC LIMIT 1", (log_id,))
             try:
-                timestamp, sth_data = res.next()
+                row = res.next()
             except StopIteration:
                 pass
-        if timestamp is not None:
-            return self._decode_sth(timestamp, sth_data)
+        if row is not None:
+            return self._decode_sth(row)
 
     def scan_latest_sth_range(self, log_server, start=0,
                               end=database.Database.timestamp_max, limit=0):
         sql_limit = -1 if not limit else limit
         with self._connect() as conn:
             log_id = self._get_log_id(conn, log_server)
-            for timestamp, sth_data in conn.execute(
-                "SELECT timestamp, sth_data FROM sths WHERE log_id = ? "
+            for row in conn.execute(
+                "SELECT * FROM sths WHERE log_id = ? "
                 "AND timestamp >= ? AND timestamp <= ? ORDER BY timestamp DESC "
                 "LIMIT ?", (log_id, start, end, sql_limit)):
-                  yield self._decode_sth(timestamp, sth_data)
+                yield self._decode_sth(row)

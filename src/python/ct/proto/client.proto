@@ -2,14 +2,27 @@ syntax = "proto2";
 
 package ct;
 
+message KeyInfo {
+  enum KeyType {
+    ECDSA = 0;
+    RSA = 1;
+  }
+  optional KeyType type = 1;
+  // The serialized public key, PEM-encoded.
+  optional string pem_key = 2; 
+}
+
 message CtLogMetadata {
   // The <log_server> path prefix. Responses are bound to the server
   // by this value.
   optional string log_server = 1;
-  // The id as per the RFC, i.e., the key hash.
-  optional bytes log_id = 2;
-  // Serialized public key, in SPKI format.
-  optional bytes public_key = 3;
+  // The id as per the RFC, i.e., the key hash, base64-encoded.
+  optional string log_id = 2;
+  optional KeyInfo public_key_info = 3;
+}
+
+message CtLogs {
+  repeated CtLogMetadata ctlog = 1;
 }
 
 message SthResponse {
@@ -17,4 +30,23 @@ message SthResponse {
   optional uint64 timestamp = 2;
   optional bytes sha256_root_hash = 3;
   optional bytes tree_head_signature = 4;
+}
+
+enum VerifyStatus {
+  VERIFIED = 0;
+  UNVERIFIED = 1;
+  VERIFY_ERROR = 2;
+}
+
+// Currently just a placeholder proto so that we can add new fields without
+// changing the DB schema.
+message AuditInfo {
+  optional VerifyStatus status = 1;
+}
+
+// The STH with additional auditing information such as signature verification
+// status.
+message AuditedSth {
+  optional SthResponse sth = 1;
+  optional AuditInfo audit = 2;
 }

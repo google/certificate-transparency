@@ -5,6 +5,7 @@ gflags (python_gflags if using easy_install)
 gviz-api-py (easy_install 'https://google-visualization-python.googlecode.com/files/gviz_api_py-1.8.2.tar.gz')
 requests (at least version 1.0)
 protobuf
+ecdsa
 
 2. Install the protoc compiler from https://code.google.com/p/protobuf/
 
@@ -24,6 +25,5 @@ generate the Python versions of CT protocol buffers.
  b. Launch ct/dashboard/dashboard.py
     This launches a simple web server for displaying log data, and a
     background process for probing the log(s) periodically. The default
-    output is at http://127.0.0.1:8000
-
-
+    output is at http://127.0.0.1:8000 and the default configuration
+    file for logs to probe is at config/logs.config

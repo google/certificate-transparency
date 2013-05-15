@@ -1,28 +1,32 @@
 #!/usr/bin/env python
 import gflags
+from google.protobuf import text_format
+import logging
 import os
 import sys
 import time
+from wsgiref import simple_server
 
 from ct.dashboard import grapher
 from ct.client import log_client
 from ct.client import sqlite_db
 from ct.proto import client_pb2
-from wsgiref import simple_server
+
 
 FLAGS = gflags.FLAGS
 
 gflags.DEFINE_string('dashboard_host', "127.0.0.1", "Dashboard server host")
 gflags.DEFINE_integer('dashboard_port', 8000, "Dashboard server port")
-gflags.DEFINE_spaceseplist('ct_server_list', "ct.googleapis.com/pilot",
-                           "List of CT servers to monitor")
+gflags.DEFINE_string('ctlog_config', "../config/logs.config",
+                     "Configuration file for log servers to monitor")
 gflags.DEFINE_string('ct_sqlite_db', "/tmp/ct", "Location of the CT database")
+gflags.DEFINE_string('log_level', "WARNING", "logging level")
 
 class DashboardServer(object):
     template_pages = {"default", "sth"}
 
     """A simple web application for serving status pages."""
-    def __init__(self, host, port, db):
+    def __init__(self, host, port, db, ct_server_list):
         self.host = host
         self.port = port
         self.db = db
@@ -81,11 +85,11 @@ class DashboardServer(object):
 
     def _fill_sth_template(self, varz):
         # TODO(ekasper): graph all logs
-        server_id = FLAGS.ct_server_list[0]
-        varz["log"] = server_id
+        server_id = ct_server_list[0]
+        varz["log"] = server_id.encode('ascii')
         one_week_ago = (time.time() - 7*24*60*60)*1000
-        columns = [("timestamp", "timestamp_ms", "Timestamp"),
-                   ("tree_size", "number", "Tree size")]
+        columns = [("sth.timestamp", "timestamp_ms", "Timestamp"),
+                   ("sth.tree_size", "number", "Tree size")]
         sth_to_show = self.db.scan_latest_sth_range(server_id,
                                                     start=one_week_ago,
                                                     limit=1000)
@@ -100,14 +104,23 @@ class DashboardServer(object):
 
 if __name__ == "__main__":
     sys.argv = FLAGS(sys.argv)
+    logging.basicConfig(level=FLAGS.log_level)
+
     sqlitedb = sqlite_db.SQLiteDB(FLAGS.ct_sqlite_db)
-    for server in FLAGS.ct_server_list:
-      log = client_pb2.CtLogMetadata()
-      log.log_server = server
-      sqlitedb.add_log(log)
-    prober = log_client.LogProber(FLAGS.ct_server_list, sqlitedb)
+
+    ctlogs = client_pb2.CtLogs()
+    with open(FLAGS.ctlog_config, 'r') as config:
+        log_config = config.read()
+    text_format.Merge(log_config, ctlogs)
+
+    ct_server_list = []
+    for log in ctlogs.ctlog:
+        sqlitedb.update_log(log)
+        ct_server_list.append(log.log_server)
+
+    prober = log_client.ProberThread(ctlogs, sqlitedb)
     prober.setDaemon(True)
     prober.start()
     server = DashboardServer(FLAGS.dashboard_host, FLAGS.dashboard_port,
-                             sqlitedb)
+                             sqlitedb, ct_server_list)
     server.run()
