@@ -72,7 +72,7 @@ HTTPLogClient::UploadSubmission(const std::string &submission, bool pre,
   std::ostringstream response;
   Status ret = SendRequest(&response, &request, url);
   LOG(INFO) << "request = " << url.str();
-  LOG(INFO) << "body = " << jsend;
+  LOG(INFO) << "body = " << jsoned;
   LOG(INFO) << "response = " << response.str();
   json_object_put(jsend);
   if (ret != OK)
