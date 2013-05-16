@@ -9,3 +9,4 @@ ct/proto/ct_pb2.py: ../proto/ct.proto
 test: all
 	./ct/client/sqlite_db_test.py
 	./ct/crypto/verify_test.py
+	./ct/crypto/merkle_test.py
