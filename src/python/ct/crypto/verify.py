@@ -4,6 +4,7 @@ import io
 import logging
 import struct
 
+from ct.crypto import merkle
 from ct.proto import client_pb2, ct_pb2
 
 class Error(Exception):
@@ -16,8 +17,9 @@ class UnsupportedAlgorithmError(Error):
     pass
 
 class LogVerifier(object):
-    def __init__(self, key_info):
-        """Initialize from KeyInfo protocol buffer."""
+    def __init__(self, key_info, merkle_verifier=merkle.MerkleVerifier()):
+        """Initialize from KeyInfo protocol buffer and a MerkleVerifier."""
+        self.merkle_verifier = merkle_verifier
         if key_info.type != client_pb2.KeyInfo.ECDSA:
             raise UnsupportedAlgorithmError("Key type %d not supported" %
                                             key_info.type)
@@ -98,3 +100,32 @@ class LogVerifier(object):
                           sth_response)
             return False
         return self._verify(signature_input, signature)
+
+    def verify_sth_consistency(self, old_sth, new_sth, proof):
+        """Verify the temporal consistency and consistency proof for two STH
+        responses. Does not verify STH signatures.
+        Params:
+            old_sth, new_sth: client_pb2.SthResponse() protos. The STH with
+                              +the older timestamp must be supplied first.
+            proof: a list of SHA256 audit nodes
+        Returns:
+            True if the consistency could be verified, False otherwise."""
+
+        if old_sth.timestamp > new_sth.timestamp:
+            logging.error("Older STH has newer timestamp (%d vs %d), did you "
+                          "supply inputs in the wrong order?" %
+                          (old_sth.timestamp, new_sth.timestamp))
+            return False
+        if old_sth.timestamp == new_sth.timestamp:
+            if (old_sth.tree_size == new_sth.tree_size and
+                old_sth.sha256_root_hash == new_sth.sha256_root_hash):
+                logging.info("STHs are identical")
+                return True
+            else:
+                # Issuing two different STHs for the same timestamp is illegal,
+                # even if they are otherwise consistent.
+                logging.error("Different STH trees for the same timestamp")
+                return False
+        return self.merkle_verifier.verify_tree_consistency(
+            old_sth.tree_size, new_sth.tree_size, old_sth.sha256_root_hash,
+            new_sth.sha256_root_hash, proof)

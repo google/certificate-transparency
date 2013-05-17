@@ -1,5 +1,6 @@
 #!/usr/bin/env python
 
+import mock
 import unittest
 
 from ct.crypto import verify
@@ -24,7 +25,6 @@ class LogVerifierTest(unittest.TestCase):
         "-----BEGIN PUBLIC KEY-----\nMFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAES0AfBk"
         "jr7b8b19p5Gk8plSAN16wW\nXZyhYsH6FMCEUK60t7pem/ckoPX8hupuaiJzJS0ZQ0SEoJ"
         "GlFxkUFwft5g==\n-----END PUBLIC KEY-----\n")
-
 
     def test_verify_sth(self):
         verifier = verify.LogVerifier(LogVerifierTest.default_key_info)
@@ -123,6 +123,62 @@ class LogVerifierTest(unittest.TestCase):
             chr(ord(default_sth.tree_head_signature[3]) + 1) +
             default_sth.tree_head_signature[4:]) + "\x01"
         self.assertFalse(verifier.verify_sth(sth))
+
+    def test_verify_sth_consistency(self):
+        old_sth = LogVerifierTest.default_sth
+        new_sth = client_pb2.SthResponse()
+        new_sth.CopyFrom(old_sth)
+        new_sth.tree_size = old_sth.tree_size + 1
+        new_sth.timestamp = old_sth.timestamp + 1
+        new_sth.sha256_root_hash = "a new hash"
+        proof = ["some proof the mock does not care about"]
+
+        mock_merkle_verifier = mock.Mock()
+        mock_merkle_verifier.verify_tree_consistency.return_value = True
+
+        verifier = verify.LogVerifier(LogVerifierTest.default_key_info,
+                                      mock_merkle_verifier)
+        self.assertTrue(verifier.verify_sth_consistency(old_sth, new_sth,
+                                                        proof))
+        mock_merkle_verifier.verify_tree_consistency.assert_called_once_with(
+            old_sth.tree_size, new_sth.tree_size, old_sth.sha256_root_hash,
+            new_sth.sha256_root_hash, proof)
+
+    def test_verify_sth_consistency_equal_timestamps(self):
+        old_sth = LogVerifierTest.default_sth
+        new_sth = client_pb2.SthResponse()
+        new_sth.CopyFrom(old_sth)
+        new_sth.tree_size = old_sth.tree_size + 1
+        new_sth.sha256_root_hash = "a new hash"
+        proof = ["some proof the mock does not care about"]
+
+        mock_merkle_verifier = mock.Mock()
+        mock_merkle_verifier.verify_tree_consistency.return_value = True
+
+        verifier = verify.LogVerifier(LogVerifierTest.default_key_info,
+                                      mock_merkle_verifier)
+        self.assertFalse(verifier.verify_sth_consistency(old_sth, new_sth,
+                                                         proof))
+        # But identical STHs are OK
+        self.assertTrue(verifier.verify_sth_consistency(old_sth, old_sth,
+                                                        proof))
+
+    def test_verify_sth_consistency_invalid_proof(self):
+        old_sth = LogVerifierTest.default_sth
+        new_sth = client_pb2.SthResponse()
+        new_sth.CopyFrom(old_sth)
+        new_sth.tree_size = old_sth.tree_size + 1
+        new_sth.timestamp = old_sth.timestamp + 1
+        new_sth.sha256_root_hash = "a new hash"
+        proof = ["some proof the mock does not care about"]
+
+        mock_merkle_verifier = mock.Mock()
+        mock_merkle_verifier.verify_tree_consistency.return_value = False
+
+        verifier = verify.LogVerifier(LogVerifierTest.default_key_info,
+                                      mock_merkle_verifier)
+        self.assertFalse(verifier.verify_sth_consistency(old_sth, new_sth,
+                                                         proof))
 
 if __name__ == '__main__':
     unittest.main()
