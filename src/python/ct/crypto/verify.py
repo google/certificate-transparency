@@ -4,29 +4,21 @@ import io
 import logging
 import struct
 
-from ct.crypto import merkle
+from ct.crypto import error, merkle
 from ct.proto import client_pb2, ct_pb2
-
-class Error(Exception):
-    pass
-
-class FormatError(Error):
-    pass
-
-class UnsupportedAlgorithmError(Error):
-    pass
 
 class LogVerifier(object):
     def __init__(self, key_info, merkle_verifier=merkle.MerkleVerifier()):
         """Initialize from KeyInfo protocol buffer and a MerkleVerifier."""
         self.merkle_verifier = merkle_verifier
         if key_info.type != client_pb2.KeyInfo.ECDSA:
-            raise UnsupportedAlgorithmError("Key type %d not supported" %
-                                            key_info.type)
+            raise error.UnsupportedAlgorithmError("Key type %d not supported" %
+                                                  key_info.type)
         try:
             self.pubkey = ecdsa.VerifyingKey.from_pem(key_info.pem_key)
+        # TypeError can be caused by invalid base64
         except (ecdsa.der.UnexpectedDER, TypeError) as e:
-            raise FormatError(e)
+            raise error.EncodingError(e)
 
     def __repr__(self):
         return "%r(public key: %r)" % (self.__class__.__name__,
@@ -38,7 +30,8 @@ class LogVerifier(object):
 
     def _encode_sth_input(self, sth_response):
         if len(sth_response.sha256_root_hash) != 32:
-            return None
+            raise error.EncodingError("Wrong hash length: expected 32, got %d" %
+                                      len(sth_response.sha256_root_hash))
         return struct.pack(">BBQQ32s", ct_pb2.V1, ct_pb2.TREE_HEAD,
                            sth_response.timestamp, sth_response.tree_size,
                            sth_response.sha256_root_hash)
@@ -48,28 +41,25 @@ class LogVerifier(object):
 
         sig_prefix = sig_stream.read(2)
         if len(sig_prefix) != 2:
-            logging.debug("Invalid algorithm prefix %s" %
-                          sig_prefix.encode("hex"))
-            return None
+            raise error.EncodingError("Invalid algorithm prefix %s" %
+                                      sig_prefix.encode("hex"))
         hash_algo, sig_algo = struct.unpack(">BB", sig_prefix)
         if (hash_algo != ct_pb2.DigitallySigned.SHA256 or
             sig_algo != ct_pb2.DigitallySigned.ECDSA):
-            logging.debug("Invalid algorithm(s) %d, %d" %
-                          (hash_algo, sig_algo))
-            return None
+            raise error.EncodingError("Invalid algorithm(s) %d, %d" %
+                                      (hash_algo, sig_algo))
 
         length_prefix = sig_stream.read(2)
         if len(length_prefix) != 2:
-            logging.debug("Invalid signature length prefix %s" %
-                          length_prefix.encode("hex"))
-            return None
+            raise error.EncodingError("Invalid signature length prefix %s" %
+                                      length_prefix.encode("hex"))
         sig_length, = struct.unpack(">H", length_prefix)
         remaining = sig_stream.read()
         if len(remaining) != sig_length:
-            logging.debug("Invalid signature length %d for signature %s with "
-                          "length %d" % (sig_length, remaining.encode("hex"),
-                                         len(remaining)))
-            return None
+            raise error.EncodingError("Invalid signature length %d for "
+                                      "signature %s with length %d" %
+                                      (sig_length, remaining.encode("hex"),
+                                       len(remaining)))
         return remaining
 
     def _verify(self, signature_input, signature):
@@ -78,44 +68,43 @@ class LogVerifier(object):
                                       hashfunc=hashlib.sha256,
                                       sigdecode=ecdsa.util.sigdecode_der)
         except ecdsa.der.UnexpectedDER:
-            logging.error("Invalid DER encoding for signature %s",
-                          signature.encode("hex"))
-            return False
+            raise error.EncodingError("Invalid DER encoding for signature %s",
+                                      signature.encode("hex"))
         except ecdsa.keys.BadSignatureError:
-            logging.error("Signature did not verify: %s",
-                          signature.encode("hex"))
-            return False
+            raise error.SignatureError("Signature did not verify: %s",
+                                       signature.encode("hex"))
 
+    @error.returns_true_or_raises
     def verify_sth(self, sth_response):
         """Verify the STH Response.
-        Returns True or False.
+        Returns:
+            True
+        Raises:
+            EncodingError, SignatureError
         The response must have all fields present."""
         signature_input = self._encode_sth_input(sth_response)
-        if signature_input is None:
-            logging.error("Failed to encode STH input from %s", sth_response)
-            return False
         signature = self._decode_signature(sth_response.tree_head_signature)
-        if signature is None:
-            logging.error("Failed to decode STH signature from %s",
-                          sth_response)
-            return False
         return self._verify(signature_input, signature)
 
+    @error.returns_true_or_raises
     def verify_sth_consistency(self, old_sth, new_sth, proof):
         """Verify the temporal consistency and consistency proof for two STH
         responses. Does not verify STH signatures.
         Params:
-            old_sth, new_sth: client_pb2.SthResponse() protos. The STH with
-                              +the older timestamp must be supplied first.
-            proof: a list of SHA256 audit nodes
+        old_sth, new_sth: client_pb2.SthResponse() protos. The STH with
+        +the older timestamp must be supplied first.
+        proof: a list of SHA256 audit nodes
         Returns:
-            True if the consistency could be verified, False otherwise."""
+        True if the consistency could be verified.
+        Raises:
+            ConsistencyError: STHs are inconsistent
+            ProofError: proof is invalid
+            ValueError: "Older" STH is not older."""
 
         if old_sth.timestamp > new_sth.timestamp:
-            logging.error("Older STH has newer timestamp (%d vs %d), did you "
-                          "supply inputs in the wrong order?" %
-                          (old_sth.timestamp, new_sth.timestamp))
-            return False
+            raise ValueError("Older STH has newer timestamp (%d vs %d), did "
+                             "you supply inputs in the wrong order?" %
+                             (old_sth.timestamp, new_sth.timestamp))
         if old_sth.timestamp == new_sth.timestamp:
             if (old_sth.tree_size == new_sth.tree_size and
                 old_sth.sha256_root_hash == new_sth.sha256_root_hash):
@@ -124,8 +113,8 @@ class LogVerifier(object):
             else:
                 # Issuing two different STHs for the same timestamp is illegal,
                 # even if they are otherwise consistent.
-                logging.error("Different STH trees for the same timestamp")
-                return False
+                raise error.ConsistencyError("Different STH trees for the same "
+                                             "timestamp")
         return self.merkle_verifier.verify_tree_consistency(
             old_sth.tree_size, new_sth.tree_size, old_sth.sha256_root_hash,
             new_sth.sha256_root_hash, proof)

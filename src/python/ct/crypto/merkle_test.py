@@ -3,7 +3,7 @@
 import hashlib
 import unittest
 
-from ct.crypto import merkle
+from ct.crypto import error, merkle
 
 class TreeHasherTest(unittest.TestCase):
     sha256_empty_hash = ("e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495"
@@ -103,43 +103,70 @@ class MerkleVerifierTest(unittest.TestCase):
             ))
 
         # Equal tree sizes but different hashes.
-        self.assertFalse(verifier.verify_tree_consistency(
+        self.assertRaises(error.ConsistencyError,
+                          verifier.verify_tree_consistency,
             3, 3,
             "6e340b9cffb37a989ca544e6bb780a2c78901d3fb33738768511a30617afa01e",
             "6e340b9cffb37a989ca544e6bb780a2c78901d3fb33738768511a30617afa01d",
-            []))
+            [])
 
     def test_verify_tree_consistency_newer_tree_is_smaller(self):
         verifier = merkle.MerkleVerifier(HexTreeHasher())
-        self.assertFalse(verifier.verify_tree_consistency(
+        self.assertRaises(error.ConsistencyError,
+                          verifier.verify_tree_consistency,
             5, 2,
             "4e3bbb1f7b478dcfe71fb631631519a3bca12c9aefca1612bfce4c13a86264d4",
             "fac54203e7cc696cf0dfcb42c92a1d9dbaf70ad9e621f4bd8d98662f00e3c125",
             ["5f083f0a1a33ca076a95279832580db3e0ef4584bdff1f54c8a360f50de3031e",
              "bc1a0643b12e4d2d7c77918f44e0f4f79a838b6cf9ec5b5c283e1f4d88599e6b"]
-            ))
+            )
 
     def test_verify_tree_consistency_proof_too_short(self):
         verifier = merkle.MerkleVerifier(HexTreeHasher())
-        self.assertFalse(verifier.verify_tree_consistency(
+        self.assertRaises(error.ProofError, verifier.verify_tree_consistency,
             6, 8,
             "76e67dadbcdf1e10e1b74ddc608abd2f98dfb16fbce75277b5232a127f2087ef",
             "5dc9da79a70659a9ad559cb701ded9a2ab9d823aad2f4960cfe370eff4604328",
             ["0ebc5d3437fbe2db158b9f126a1d118e308181031d0a949f8dededebc558ef6a",
              "ca854ea128ed050b41b35ffc1b87b8eb2bde461e9e3b5596ece6b9d5975a0ae0"]
-            ))
+            )
 
-    def test_verify_tree_consistency_bad_hash(self):
+    def test_verify_tree_consistency_bad_second_hash(self):
         verifier = merkle.MerkleVerifier(HexTreeHasher())
-        # A bit has been flipped in the proof somewhere...
-        self.assertFalse(verifier.verify_tree_consistency(
+        # A bit has been flipped in the second hash.
+        self.assertRaises(error.ProofError, verifier.verify_tree_consistency,
             6, 8,
             "76e67dadbcdf1e10e1b74ddc608abd2f98dfb16fbce75277b5232a127f2087ef",
-            "5dc9da79a70659a9ad559cb701ded9a2ab9d823aad2f4960cfe370eff4604328",
-            ["0ebc5d3437fbe2db158b9f126a1d118e308181031d0a949f8dededebc558ef6b",
+            "5dc9da79a70659a9ad559cb701ded9a2ab9d823aad2f4960cfe370eff4604329",
+            ["0ebc5d3437fbe2db158b9f126a1d118e308181031d0a949f8dededebc558ef6a",
              "ca854ea128ed050b41b35ffc1b87b8eb2bde461e9e3b5596ece6b9d5975a0ae0",
              "d37ee418976dd95753c1c73862b9398fa2a2cf9b4ff0fdfe8b30cd95209614b7"]
-            ))
+            )
+
+    def test_verify_tree_consistency_both_hashes_bad(self):
+        verifier = merkle.MerkleVerifier(HexTreeHasher())
+        # A bit has been flipped in both hashes.
+        self.assertRaises(error.ProofError, verifier.verify_tree_consistency,
+            6, 8,
+            "76e67dadbcdf1e10e1b74ddc608abd2f98dfb16fbce75277b5232a127f2087ee",
+            "5dc9da79a70659a9ad559cb701ded9a2ab9d823aad2f4960cfe370eff4604329",
+            ["0ebc5d3437fbe2db158b9f126a1d118e308181031d0a949f8dededebc558ef6a",
+             "ca854ea128ed050b41b35ffc1b87b8eb2bde461e9e3b5596ece6b9d5975a0ae0",
+             "d37ee418976dd95753c1c73862b9398fa2a2cf9b4ff0fdfe8b30cd95209614b7"]
+            )
+
+    def test_verify_tree_consistency_bad_first_hash(self):
+        verifier = merkle.MerkleVerifier(HexTreeHasher())
+        # A bit has been flipped in the first hash.
+        self.assertRaises(error.ConsistencyError,
+                          verifier.verify_tree_consistency,
+            6, 8,
+            "76e67dadbcdf1e10e1b74ddc608abd2f98dfb16fbce75277b5232a127f2087ee",
+            "5dc9da79a70659a9ad559cb701ded9a2ab9d823aad2f4960cfe370eff4604328",
+            ["0ebc5d3437fbe2db158b9f126a1d118e308181031d0a949f8dededebc558ef6a",
+             "ca854ea128ed050b41b35ffc1b87b8eb2bde461e9e3b5596ece6b9d5975a0ae0",
+             "d37ee418976dd95753c1c73862b9398fa2a2cf9b4ff0fdfe8b30cd95209614b7"]
+            )
 
 if __name__ == '__main__':
     unittest.main()

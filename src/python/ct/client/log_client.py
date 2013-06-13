@@ -5,7 +5,7 @@ import requests
 import threading
 import time
 
-from ct.crypto import verify
+from ct.crypto import error, verify
 from ct.proto import client_pb2
 
 FLAGS = gflags.FLAGS
@@ -104,17 +104,20 @@ class LogProber(object):
             return None
         audited_sth = client_pb2.AuditedSth()
         audited_sth.sth.CopyFrom(sth_response)
+        audited_sth.audit.status = client_pb2.UNVERIFIED
         if self.verifier is None:
-            audited_sth.audit.status = client_pb2.UNVERIFIED
             return sth_response
-        if self.verifier.verify_sth(sth_response):
+
+        try:
+            self.verifier.verify_sth(sth_response)
             logging.debug("STH verified")
-            audited_sth.audit.status = client_pb2.VERIFIED
-        else:
+        except error.VerifyError:
             # TODO(ekasper): export stats about probe failures.
             logging.error("Invalid STH signature for %s" %
                           self.servername)
             audited_sth.audit.status = client_pb2.VERIFY_ERROR
+        else:
+            audited_sth.audit.status = client_pb2.VERIFIED
         return audited_sth
 
 class ProberThread(threading.Thread):

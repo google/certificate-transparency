@@ -1,6 +1,8 @@
 import hashlib
 import logging
 
+from ct.crypto import error
+
 class TreeHasher(object):
     def __init__(self, hashfunc=hashlib.sha256):
         self.hashfunc = hashfunc
@@ -38,37 +40,61 @@ class MerkleVerifier(object):
     def __str__(self):
         return "%s(hasher: %s)" % (self.__class__.__name__, self.hasher)
 
+    @error.returns_true_or_raises
     def verify_tree_consistency(self, old_tree_size, new_tree_size, old_root,
                                 new_root, proof):
         """Verify the consistency between two root hashes, using a supplied
-        consistency proof. old_tree_size must be <= new_tree_size."""
-        if old_tree_size == 0:
+        consistency proof. old_tree_size must be <= new_tree_size.
+
+        Args:
+            old_tree_size:  size of the older tree
+            new_tree_size:  size of the newer_tree
+            old_root:       the root hash of the older tree
+            new_root:       the root hash of the newer tree
+        Returns:
+            True
+        Raises:
+            ConsistencyError: the proof indicates an inconsistency
+                              (this is usually really serious!)
+            ProofError: the proof is invalid
+            ValueError: supplied tree sizes are invalid."""
+
+        old_size = long(old_tree_size)
+        new_size = long(new_tree_size)
+
+        if old_size < 0 or new_size < 0:
+            raise ValueError("Negative tree size")
+
+        if old_size > new_size:
+            raise error.ConsistencyError("Inconsistency: older tree has "
+                                         "bigger size")
+
+        if old_size == new_size:
+            if old_root == new_root:
+                if proof:
+                    logging.warning("Trees are identical, ignoring proof")
+                return True
+            else:
+                raise error.ConsistencyError("Inconsistency: different root "
+                                             "hashes for the same tree size")
+
+        if old_size == 0:
             if proof:
+                # A consistency proof with an empty tree is an empty proof.
                 # Anything is consistent with an empty tree, so ignore whatever
                 # bogus proof was supplied. Note we do not verify here that the
                 # root hash is a valid hash for an empty tree.
                 logging.warning("Ignoring non-empty consistency proof for "
                                 "empty tree.")
             return True
-        if old_tree_size > new_tree_size:
-            logging.error("Inconsistency: older tree has bigger size")
-            return False
-        if old_tree_size == new_tree_size:
-            if old_root == new_root:
-                if proof:
-                    logging.warning("Trees are identical, ignoring proof")
-                return True
-            else:
-                logging.error("Inconsistency: different root hashes for the "
-                              "same tree size %d" % old_tree_size)
-                return False
 
+        # Now 0 < old_size < new_size
         # A consistency proof is essentially an audit proof for the node with
-        # index old_tree_size - 1 in the newer tree. The sole difference is that
+        # index old_size - 1 in the newer tree. The sole difference is that
         # the path is already hashed together into a single hash up until the
         # first audit node that occurs in the newer tree only.
-        node = old_tree_size - 1
-        last_node = new_tree_size - 1
+        node = old_size - 1
+        last_node = new_size - 1
 
         # While we are the right child, everything is in both trees, so move one
         # level up.
@@ -101,22 +127,30 @@ class MerkleVerifier(object):
                 node //= 2
                 last_node //= 2
 
-            if old_hash != old_root:
-                logging.error("Inconsistency: first root hash does not match")
-                return False
-
             # Now old_hash is the hash of the first subtree. If the two trees
             # have different height, continue the path until the new root.
             while last_node:
                 new_hash = self.hasher.hash_children(new_hash, p.next())
                 last_node //= 2
+
+            # If the second hash does not match, the proof is invalid for the
+            # given pair. If, on the other hand, the newer hash matches but the
+            # older one doesn't, then the proof (together with the signatures
+            # on the hashes) is proof of inconsistency.
+            # Continue to find out.
             if new_hash != new_root:
-                logging.error("Inconsistency: second root hash does not match")
-                return False
+                raise error.ProofError("Bad Merkle proof: second root hash "
+                                       "does not match. Expected hash: %s "
+                                       ", computed hash: %s" %
+                                       (new_root, new_hash))
+            elif old_hash != old_root:
+                raise error.ConsistencyError("Inconsistency: first root hash "
+                                             "does not match. Expected hash: %s "
+                                             ", computed hash: %s" %
+                                             (old_root, old_hash))
 
         except StopIteration:
-            logging.error("Inconsistency: proof is too short")
-            return False
+            raise error.ProofError("Merkle proof is too short")
 
         # We've already verified consistency, so accept the proof even if
         # there's garbage left over (but log a warning).

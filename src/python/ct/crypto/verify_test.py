@@ -3,7 +3,7 @@
 import mock
 import unittest
 
-from ct.crypto import verify
+from ct.crypto import error, verify
 from ct.proto import client_pb2
 
 class LogVerifierTest(unittest.TestCase):
@@ -44,7 +44,7 @@ class LogVerifierTest(unittest.TestCase):
                 default_sth.tree_head_signature[:i] +
                 chr(ord(default_sth.tree_head_signature[i]) ^ 1) +
                 default_sth.tree_head_signature[i+1:])
-            self.assertFalse(verifier.verify_sth(sth))
+            self.assertRaises(error.VerifyError, verifier.verify_sth, sth)
 
     def test_verify_sth_for_bad_asn1_length(self):
         verifier = verify.LogVerifier(LogVerifierTest.default_key_info)
@@ -61,7 +61,7 @@ class LogVerifierTest(unittest.TestCase):
             default_sth.tree_head_signature[:i] +
             chr(ord(default_sth.tree_head_signature[i]) - 1) +
             default_sth.tree_head_signature[i+1:])
-        self.assertFalse(verifier.verify_sth(sth))
+        self.assertRaises(error.VerifyError, verifier.verify_sth, sth)
 
         # Increasing the length means there are not enough ASN.1 bytes left to
         # decode the sequence, however the ecdsa module silently slices it.
@@ -84,7 +84,7 @@ class LogVerifierTest(unittest.TestCase):
             default_sth.tree_head_signature[:i] +
             chr(ord(default_sth.tree_head_signature[i]) - 1) +
             default_sth.tree_head_signature[i+1:])
-        self.assertFalse(verifier.verify_sth(sth))
+        self.assertRaises(error.VerifyError, verifier.verify_sth, sth)
 
         sth = client_pb2.SthResponse()
         sth.CopyFrom(default_sth)
@@ -92,7 +92,7 @@ class LogVerifierTest(unittest.TestCase):
             default_sth.tree_head_signature[:i] +
             chr(ord(default_sth.tree_head_signature[i]) + 1) +
             default_sth.tree_head_signature[i+1:])
-        self.assertFalse(verifier.verify_sth(sth))
+        self.assertRaises(error.VerifyError, verifier.verify_sth, sth)
 
         # The byte that encodes the length of the second integer s in the
         # sequence (r, s). Decreasing this length corrupts the integer, however
@@ -104,7 +104,7 @@ class LogVerifierTest(unittest.TestCase):
             default_sth.tree_head_signature[:i] +
             chr(ord(default_sth.tree_head_signature[i]) - 1) +
             default_sth.tree_head_signature[i+1:])
-        self.assertFalse(verifier.verify_sth(sth))
+        self.assertRaises(error.VerifyError, verifier.verify_sth, sth)
 
         sth = client_pb2.SthResponse()
         sth.CopyFrom(default_sth)
@@ -122,7 +122,7 @@ class LogVerifierTest(unittest.TestCase):
             # Correct outer length to include trailing garbage.
             chr(ord(default_sth.tree_head_signature[3]) + 1) +
             default_sth.tree_head_signature[4:]) + "\x01"
-        self.assertFalse(verifier.verify_sth(sth))
+        self.assertRaises(error.VerifyError, verifier.verify_sth, sth)
 
     def test_verify_sth_consistency(self):
         old_sth = LogVerifierTest.default_sth
@@ -157,8 +157,9 @@ class LogVerifierTest(unittest.TestCase):
 
         verifier = verify.LogVerifier(LogVerifierTest.default_key_info,
                                       mock_merkle_verifier)
-        self.assertFalse(verifier.verify_sth_consistency(old_sth, new_sth,
-                                                         proof))
+        self.assertRaises(error.ConsistencyError,
+                          verifier.verify_sth_consistency,
+                          old_sth, new_sth, proof)
         # But identical STHs are OK
         self.assertTrue(verifier.verify_sth_consistency(old_sth, old_sth,
                                                         proof))
@@ -173,12 +174,14 @@ class LogVerifierTest(unittest.TestCase):
         proof = ["some proof the mock does not care about"]
 
         mock_merkle_verifier = mock.Mock()
-        mock_merkle_verifier.verify_tree_consistency.return_value = False
+        mock_merkle_verifier.verify_tree_consistency.side_effect = (
+            error.ConsistencyError("Evil"))
 
         verifier = verify.LogVerifier(LogVerifierTest.default_key_info,
                                       mock_merkle_verifier)
-        self.assertFalse(verifier.verify_sth_consistency(old_sth, new_sth,
-                                                         proof))
+        self.assertRaises(error.ConsistencyError,
+                          verifier.verify_sth_consistency,
+                          old_sth, new_sth, proof)
 
 if __name__ == '__main__':
     unittest.main()
