@@ -6,15 +6,19 @@
 # Based on pyasn1 example code.
 
 from base64 import b64encode
+from pyasn1 import debug
+# Why doesn't this work?
+#from pyasn1.codec.ber import stDumpRawValue
 from pyasn1.codec.der import decoder, encoder
+from pyasn1.error import PyAsn1Error
 from pyasn1.type import namedtype, univ
-from pyasn1_modules import pem, rfc2459
+from pyasn1_modules import pem, rfc2459, rfc2315
 import sys
 from urllib2 import urlopen
 
-if len(sys.argv) != 1:
+if len(sys.argv) != 2:
   print """Usage:
-  $ %s < somecertificates.pem""" % sys.argv[0]
+  $ %s somecertificates.pem""" % sys.argv[0]
   sys.exit(-1)
 
 cStart = '-----BEGIN CERTIFICATE-----'
@@ -49,7 +53,7 @@ id_ad_caIssuers = univ.ObjectIdentifier('1.3.6.1.5.5.7.48.2')
 
 # End of RFC 5280 4.2.2.1
 
-def getIssuerFromAIA(cert):
+def getIssuersFromAIA(cert):
   tbs = cert.getComponentByName('tbsCertificate')
   extensions = tbs.getComponentByName('extensions') or []
 
@@ -68,6 +72,7 @@ def getIssuerFromAIA(cert):
 
     print aia.prettyPrint()
 
+    allIssuers = []
     for ad in aia:
       oid = ad.getComponentByName('accessMethod')
       if oid != id_ad_caIssuers:
@@ -80,7 +85,41 @@ def getIssuerFromAIA(cert):
       print type(loc), loc
 
       certHandle = urlopen(str(loc))
-      return certHandle.read()
+      # RFC 5280 says this should either be 'application/pkix-cert' or
+      # 'application/pkcs7-mime' (in which case the result should be a
+      # "certs-only" PCKS#7 response, as specified in RFC 2797). Of
+      # course, we see other values, so just try both formats.
+      print certHandle.info().gettype()
+      issuer = certHandle.read()
+
+      # Is it a certificate?
+      try:
+        cert, rest = decoder.decode(issuer, asn1Spec=certType)
+        assert rest == ""
+        allIssuers.append(cert)
+        continue
+      except PyAsn1Error as e:
+        # On failure, try the next thing
+        print "Cert decode failed:", e
+        pass
+
+      # If not, it had better be PKCS#7 "certs-only"
+      pkcs7, rest = decoder.decode(issuer, asn1Spec=rfc2315.ContentInfo())
+      assert rest == ""
+      assert pkcs7.getComponentByName('contentType') == rfc2315.signedData
+      signedData = decoder.decode(pkcs7.getComponentByName('content'),
+                                  asn1Spec=rfc2315.SignedData())
+      for signedDatum in signedData:
+        # FIXME: why does this happen? Example is at
+        # http://crt.usertrust.com/AddTrustExternalCARoot.p7c.
+        if signedDatum == '':
+          print "** Skipping strange Any('') in PKCS7 **"
+          continue
+        certs = signedDatum.getComponentByName('certificates')
+        for c in certs:
+          cert = c.getComponentByName('certificate')
+          allIssuers.append(cert)
+  return allIssuers
 
 # Note that this is a non-standard encoding of the DN, but unlike the
 # standard encoding it captures nesting information. That is,
@@ -117,6 +156,8 @@ def DNToString(dn):
           # standard and some certs mark ISO 8859-1 as
           # teletexString. And we should never see this, but we do.
           val = str(val).decode('iso8859-1')
+        elif valt == 'utf8String':
+          val = str(val)
         else:
           print valt
           assert False
@@ -132,8 +173,10 @@ def DNToString(dn):
 certs = {}
 inChain = []
 
+certfile = open(sys.argv[1])
+
 while 1:
-  idx, substrate = pem.readPemBlocksFromFile(sys.stdin, (cStart, cEnd))
+  idx, substrate = pem.readPemBlocksFromFile(certfile, (cStart, cEnd))
   if not substrate:
     break
 
@@ -177,14 +220,32 @@ while True:
   if issuerDNstr in certs:
     issuer = certs[issuerDNstr]
   else:
-    issuer = getIssuerFromAIA(cert)
-    if issuer is None:
+    issuers = getIssuersFromAIA(cert)
+    if len(issuers) == 0:
       print "Can't get issuer, giving up"
       break
+
+    issuer = None
+    for i in issuers:
+      tbs = i.getComponentByName('tbsCertificate')
+      subjectDN = tbs.getComponentByName('subject')
+      print 'issuer subject:', DNToString(subjectDN)
+      if subjectDN == issuerDN:
+        issuer = i
+        break
 
   assert issuer is not None
 
   outChain.append(issuer)
+
+if len(outChain) == 1:
+  tbs = outChain[0].getComponentByName('tbsCertificate')
+
+  subjectDN = tbs.getComponentByName('subject')
+  issuerDN = tbs.getComponentByName('issuer')
+  if subjectDN == issuerDN:
+    print "Chain consists of 1 self-signed certificate"
+    exit(1)
 
 for cert in outChain:
     print cStart
