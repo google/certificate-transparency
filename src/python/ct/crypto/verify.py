@@ -4,29 +4,34 @@ import io
 import logging
 import struct
 
-from ct.crypto import error, merkle
+from ct.crypto import error, merkle, pem
 from ct.proto import client_pb2, ct_pb2
 
 class LogVerifier(object):
+    __ECDSA_MARKERS = ("PUBLIC KEY", "ECDSA PUBLIC KEY")
     def __init__(self, key_info, merkle_verifier=merkle.MerkleVerifier()):
         """Initialize from KeyInfo protocol buffer and a MerkleVerifier."""
-        self.merkle_verifier = merkle_verifier
+        self.__merkle_verifier = merkle_verifier
         if key_info.type != client_pb2.KeyInfo.ECDSA:
             raise error.UnsupportedAlgorithmError("Key type %d not supported" %
                                                   key_info.type)
+
+        # Will raise a PemError on invalid encoding
+        self.__der, _ = pem.from_pem(key_info.pem_key, LogVerifier.__ECDSA_MARKERS)
         try:
-            self.pubkey = ecdsa.VerifyingKey.from_pem(key_info.pem_key)
-        # TypeError can be caused by invalid base64
-        except (ecdsa.der.UnexpectedDER, TypeError) as e:
+            self.__pubkey = ecdsa.VerifyingKey.from_der(self.__der)
+        except ecdsa.der.UnexpectedDER as e:
             raise error.EncodingError(e)
 
     def __repr__(self):
         return "%r(public key: %r)" % (self.__class__.__name__,
-                                       self.pubkey.to_pem())
+                                       pem.to_pem(self.__der,
+                                                  self.__ECDSA_MARKERS))
 
     def __str__(self):
         return "%s(public key: %s)" % (self.__class__.__name__,
-                                       self.pubkey.to_pem())
+                                       pem.to_pem(self.__der,
+                                                  self.__ECDSA_MARKERS))
 
     def _encode_sth_input(self, sth_response):
         if len(sth_response.sha256_root_hash) != 32:
@@ -64,9 +69,9 @@ class LogVerifier(object):
 
     def _verify(self, signature_input, signature):
         try:
-            return self.pubkey.verify(signature, signature_input,
-                                      hashfunc=hashlib.sha256,
-                                      sigdecode=ecdsa.util.sigdecode_der)
+            return self.__pubkey.verify(signature, signature_input,
+                                        hashfunc=hashlib.sha256,
+                                        sigdecode=ecdsa.util.sigdecode_der)
         except ecdsa.der.UnexpectedDER:
             raise error.EncodingError("Invalid DER encoding for signature %s",
                                       signature.encode("hex"))
@@ -115,6 +120,6 @@ class LogVerifier(object):
                 # even if they are otherwise consistent.
                 raise error.ConsistencyError("Different STH trees for the same "
                                              "timestamp")
-        return self.merkle_verifier.verify_tree_consistency(
+        return self.__merkle_verifier.verify_tree_consistency(
             old_sth.tree_size, new_sth.tree_size, old_sth.sha256_root_hash,
             new_sth.sha256_root_hash, proof)
