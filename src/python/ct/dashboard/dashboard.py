@@ -17,7 +17,7 @@ FLAGS = gflags.FLAGS
 
 gflags.DEFINE_string('dashboard_host', "127.0.0.1", "Dashboard server host")
 gflags.DEFINE_integer('dashboard_port', 8000, "Dashboard server port")
-gflags.DEFINE_string('ctlog_config', "../config/logs.config",
+gflags.DEFINE_string('ctlog_config', "ct/config/logs.config",
                      "Configuration file for log servers to monitor")
 gflags.DEFINE_string('ct_sqlite_db', "/tmp/ct", "Location of the CT database")
 gflags.DEFINE_string('log_level', "WARNING", "logging level")
