@@ -7,7 +7,7 @@ ct/proto/ct_pb2.py: ../proto/ct.proto
 	protoc --python_out=ct/proto --proto_path=../proto ../proto/ct.proto
 
 test: all
-	PYTHONPATH=. ./ct/client/sqlite_db_test.py
-	PYTHONPATH=. ./ct/crypto/verify_test.py
-	PYTHONPATH=. ./ct/crypto/merkle_test.py
-	PYTHONPATH=. ./ct/crypto/pem_test.py
+	PYTHONPATH=$(PYTHONPATH):. ./ct/client/sqlite_db_test.py
+	PYTHONPATH=$(PYTHONPATH):. ./ct/crypto/verify_test.py
+	PYTHONPATH=$(PYTHONPATH):. ./ct/crypto/merkle_test.py
+	PYTHONPATH=$(PYTHONPATH):. ./ct/crypto/pem_test.py
