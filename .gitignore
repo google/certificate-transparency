@@ -10,15 +10,16 @@
 /src/merkletree/tree_hasher_test
 .depend
 /src/client/ct
-/src/client/json_wrapper_test
 /src/server/blob-server
 /src/server/ct-server
+/src/server/ct-rfc-server
 /src/test/apachectl
 /src/test/*.bin
 /src/test/*.csr
 /src/test/*.der
 /src/test/*.log
 /src/test/*.srl
+/src/util/json_wrapper_test
 /src/log/cert_test
 /src/log/cert_checker_test
 /src/log/ct_extensions_test

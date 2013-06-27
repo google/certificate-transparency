@@ -19,6 +19,9 @@ std::string DumpOpenSSLErrorStack();
 
 void ClearOpenSSLErrors();
 
+// Returns false on failure (and logs an error).
+bool ReadPrivateKey(EVP_PKEY **pkey, const std::string &file);
+
 }  // namespace util
 
 // Convenience macro to help automatically clear the stack regardless of

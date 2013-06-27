@@ -7,6 +7,8 @@
 #include "proto/ct.pb.h"
 #include "proto/serializer.h"
 
+class ct::CertChain;
+
 // Parse incoming submissions, do preliminary sanity checks and pass them
 // through cert checker.
 // Prepare for signing by parsing the input into an appropriate
@@ -29,6 +31,12 @@ class CertSubmissionHandler {
     INTERNAL_ERROR,
   };
 
+  // These may change |chain|.
+  SubmitResult ProcessX509Submission(ct::CertChain *chain,
+                                     ct::LogEntry *entry);
+  SubmitResult ProcessPreCertSubmission(ct::PreCertChain *chain,
+					ct::LogEntry *entry);
+
   // entry should have the expected type set.
   SubmitResult ProcessSubmission(const std::string &submission,
                                  ct::LogEntry *entry);
@@ -41,11 +49,11 @@ class CertSubmissionHandler {
 
  private:
   SubmitResult ProcessX509Submission(const std::string &submission,
-                                     ct::X509ChainEntry *entry);
+                                     ct::LogEntry *entry);
 
 
   SubmitResult ProcessPreCertSubmission(const std::string &submission,
-                                        ct::PrecertChainEntry *entry);
+                                        ct::LogEntry *entry);
 
   static bool SerializedTbs(const ct::Cert &cert, std::string *result);
 

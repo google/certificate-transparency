@@ -36,12 +36,10 @@ CertSubmissionHandler::ProcessSubmission(const string &submission,
   SubmitResult submit_result = INVALID_TYPE;
   switch (entry->type()) {
     case ct::X509_ENTRY:
-      submit_result = ProcessX509Submission(submission,
-                                            entry->mutable_x509_entry());
+      submit_result = ProcessX509Submission(submission, entry);
       break;
     case ct::PRECERT_ENTRY:
-      submit_result = ProcessPreCertSubmission(submission,
-                                               entry->mutable_precert_entry());
+      submit_result = ProcessPreCertSubmission(submission,  entry);
       break;
     default:
       // We support all types, so we should never get here if the caller sets
@@ -107,11 +105,35 @@ CertSubmissionHandler::X509ChainToEntry(const CertChain &chain,
   }
 }
 
+CertSubmissionHandler::SubmitResult
+CertSubmissionHandler::ProcessX509Submission(CertChain *chain,
+                                             LogEntry *entry) {
+  CertChecker::CertVerifyResult result = cert_checker_->CheckCertChain(chain);
+  if (result != CertChecker::OK)
+    return GetVerifyError(result);
+
+  // We have a valid chain; make the entry.
+  string der_cert;
+  // Nothing should fail anymore as we have validated the chain.
+  if (chain->LeafCert()->DerEncoding(&der_cert) != Cert::TRUE)
+    return INTERNAL_ERROR;
+
+  X509ChainEntry *x509_entry = entry->mutable_x509_entry();
+  x509_entry->set_leaf_certificate(der_cert);
+  for (size_t i = 1; i < chain->Length(); ++i) {
+    if (chain->CertAt(i)->DerEncoding(&der_cert) != Cert::TRUE)
+      return INTERNAL_ERROR;
+    x509_entry->add_certificate_chain(der_cert);
+  }
+  entry->set_type(ct::X509_ENTRY);
+  return OK;
+}
+
 // Inputs must be concatenated PEM entries.
 // Format checking is done in the parent class.
 CertSubmissionHandler::SubmitResult
 CertSubmissionHandler::ProcessX509Submission(const string &submission,
-                                             X509ChainEntry *entry) {
+                                             LogEntry *entry) {
   string pem_string(reinterpret_cast<const char*>(submission.data()),
                     submission.size());
   CertChain chain(pem_string);
@@ -119,37 +141,28 @@ CertSubmissionHandler::ProcessX509Submission(const string &submission,
   if (!chain.IsLoaded())
     return INVALID_PEM_ENCODED_CHAIN;
 
-  CertChecker::CertVerifyResult result = cert_checker_->CheckCertChain(&chain);
-  if (result != CertChecker::OK)
-    return GetVerifyError(result);
-
-  // We have a valid chain; make the entry.
-  string der_cert;
-  // Nothing should fail anymore as we have validated the chain.
-  if (chain.LeafCert()->DerEncoding(&der_cert) != Cert::TRUE)
-    return INTERNAL_ERROR;
-
-  entry->set_leaf_certificate(der_cert);
-  for (size_t i = 1; i < chain.Length(); ++i) {
-    if (chain.CertAt(i)->DerEncoding(&der_cert) != Cert::TRUE)
-      return INTERNAL_ERROR;
-    entry->add_certificate_chain(der_cert);
-  }
-  return OK;
+  return ProcessX509Submission(&chain, entry);
 }
 
 CertSubmissionHandler::SubmitResult
 CertSubmissionHandler::ProcessPreCertSubmission(const string &submission,
-                                                PrecertChainEntry *entry) {
+                                                LogEntry *entry) {
   string pem_string(reinterpret_cast<const char*>(submission.data()),
                     submission.size());
   PreCertChain chain(pem_string);
   if (!chain.IsLoaded())
     return INVALID_PEM_ENCODED_CHAIN;
 
+  return ProcessPreCertSubmission(&chain, entry);
+}
+
+CertSubmissionHandler::SubmitResult
+CertSubmissionHandler::ProcessPreCertSubmission(PreCertChain *chain,
+                                                LogEntry *entry) {
+  PrecertChainEntry *precert_entry = entry->mutable_precert_entry();
   CertChecker::CertVerifyResult result = cert_checker_->CheckPreCertChain(
-      &chain, entry->mutable_pre_cert()->mutable_issuer_key_hash(),
-      entry->mutable_pre_cert()->mutable_tbs_certificate());
+      chain, precert_entry->mutable_pre_cert()->mutable_issuer_key_hash(),
+      precert_entry->mutable_pre_cert()->mutable_tbs_certificate());
 
   if (result != CertChecker::OK)
     return GetVerifyError(result);
@@ -157,13 +170,13 @@ CertSubmissionHandler::ProcessPreCertSubmission(const string &submission,
   // We have a valid chain; make the entry.
   string der_cert;
   // Nothing should fail anymore as we have validated the chain.
-  if (chain.LeafCert()->DerEncoding(&der_cert) != Cert::TRUE)
+  if (chain->LeafCert()->DerEncoding(&der_cert) != Cert::TRUE)
     return INTERNAL_ERROR;
-  entry->set_pre_certificate(der_cert);
-  for (size_t i = 1; i < chain.Length(); ++i) {
-    if (chain.CertAt(i)->DerEncoding(&der_cert) != Cert::TRUE)
+  precert_entry->set_pre_certificate(der_cert);
+  for (size_t i = 1; i < chain->Length(); ++i) {
+    if (chain->CertAt(i)->DerEncoding(&der_cert) != Cert::TRUE)
       return INTERNAL_ERROR;
-    entry->add_precertificate_chain(der_cert);
+    precert_entry->add_precertificate_chain(der_cert);
   }
 
   return OK;

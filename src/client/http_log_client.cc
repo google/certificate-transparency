@@ -1,11 +1,9 @@
 /* -*- indent-tabs-mode: nil -*- */
 #include "client/http_log_client.h"
-#include "client/json_wrapper.h"
-#undef TRUE
-#undef FALSE
 #include "log/cert.h"
 #include "proto/ct.pb.h"
 #include "proto/serializer.h"
+#include "util/json_wrapper.h"
 #include "util/util.h"
 
 #include <curlpp/cURLpp.hpp>

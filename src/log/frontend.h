@@ -6,6 +6,8 @@
 
 class FrontendSigner;
 
+class ct::CertChain;
+
 // Frontend for accepting new submissions.
 class Frontend {
  public:
@@ -83,6 +85,12 @@ class Frontend {
                           const std::string &data,
                           ct::SignedCertificateTimestamp *sct);
 
+  // Note that these might change the |chain|.
+  SubmitResult QueueX509Entry(ct::CertChain *chain,
+			      ct::SignedCertificateTimestamp *sct);
+  SubmitResult QueuePreCertEntry(ct::PreCertChain *chain,
+				 ct::SignedCertificateTimestamp *sct);
+
   static std::string SubmitResultString(SubmitResult result);
 
  private:
@@ -90,6 +98,10 @@ class Frontend {
   FrontendSigner *signer_;
   FrontendStats stats_;
 
+  SubmitResult
+  QueueProcessedEntry(CertSubmissionHandler::SubmitResult pre_result,
+		      const ct::LogEntry &entry,
+		      ct::SignedCertificateTimestamp *sct);
   static SubmitResult
   GetSubmitError(CertSubmissionHandler::SubmitResult result);
   void UpdateStats(ct::LogEntryType type, SubmitResult result);

@@ -5,7 +5,7 @@ INCLUDE = -I.
 LOCAL_LIBS = log/libcert.a log/libdatabase.a log/liblog.a \
              merkletree/libmerkletree.a proto/libproto.a util/libutil.a
 SYS_LIBS = -lpthread -lgflags -lglog -lssl -lcrypto \
-       -lsqlite3 -lprotobuf -lcurlpp -ljson -lcurl
+       -lsqlite3 -lprotobuf -lcurlpp -ljson -lcurl -lboost_system
 
 PLATFORM = $(shell uname -s)
 ifneq ($(PLATFORM), FreeBSD)
@@ -22,7 +22,7 @@ endif
 GTESTDIR ?= /usr/src/gtest
 INCLUDE += -I $(GTESTDIR)/include
 
-INCLUDE += -I /usr/local/include
+INCLUDE += -I /usr/local/include -I $(CPPNETLIBDIR)
 SYS_LIBS += -L /usr/local/lib
 
 CXXFLAGS = $(INCLUDE) $(CXXFLAG)
@@ -39,11 +39,10 @@ LOG_TESTS = log/cert_test log/cert_checker_test \
             log/frontend_signer_test log/frontend_test log/log_lookup_test \
             log/log_signer_test log/tree_signer_test \
             log/logged_certificate_test log/ct_extensions_test
-CLIENT_TESTS = client/json_wrapper_test
-ALL_TESTS = $(PROTO_TESTS) $(MERKLETREE_TESTS) $(LOG_TESTS) \
-             $(CLIENT_TESTS)
+ALL_TESTS = $(PROTO_TESTS) $(MERKLETREE_TESTS) $(LOG_TESTS)
 
-all: $(LOCAL_LIBS) unit_tests client/ct server/ct-server server/blob-server
+all: $(LOCAL_LIBS) unit_tests client/ct server/ct-server server/blob-server \
+     server/ct-rfc-server
 
 .DELETE_ON_ERROR:
 .PHONY: clean all unit_tests test alltests benchmark clean \
@@ -102,12 +101,17 @@ ifneq ($(MAKECMDGOALS),clean)
     include server/.depend
 endif
 
-unit_tests: proto_tests merkletree_tests log_tests client_tests
+unit_tests: proto_tests merkletree_tests log_tests util_tests
+
+util_tests: util/json_wrapper_test
 
 ### util/ targets
 util/libutil.a: util/util.o util/openssl_util.o util/testing.o
 	rm -f $@
 	ar -rcs $@ $^
+
+util/json_wrapper_test: util/json_wrapper_test.o util/libutil.a
+	$(CXX) -o $@ $^ $(SYS_LIBS)
 
 ### proto/ targets
 proto/libproto.a: proto/ct.pb.o proto/serializer.o
@@ -234,17 +238,15 @@ log/logged_certificate_test: log/logged_certificate_test.o proto/libproto.a \
 	$(CXX) -o $@ $^ $(SYS_LIBS)
 
 # client
-client_tests: $(CLIENT_TESTS)
-
-client/json_wrapper_test: client/json_wrapper_test.o util/libutil.a
-	$(CXX) -o $@ $^ $(SYS_LIBS)
-
 client/ct: client/ct.o client/client.o client/log_client.o client/ssl_client.o \
            client/http_log_client.o $(LOCAL_LIBS)
 	$(CXX) -o $@ $^ $(SYS_LIBS)
 
 # server
 server/ct-server: server/ct-server.o server/event.o $(LOCAL_LIBS)
+	$(CXX) -o $@ $^ $(SYS_LIBS)
+
+server/ct-rfc-server: server/ct-rfc-server.o $(LOCAL_LIBS)
 	$(CXX) -o $@ $^ $(SYS_LIBS)
 
 server/blob-server: server/blob-server.o server/event.o \
@@ -254,7 +256,7 @@ server/blob-server: server/blob-server.o server/event.o \
 	$(CXX) -o $@ $^ $(SYS_LIBS)
 
 test: all
-	client/json_wrapper_test
+	util/json_wrapper_test
 	proto/serializer_test
 	merkletree/serial_hasher_test
 	merkletree/tree_hasher_test

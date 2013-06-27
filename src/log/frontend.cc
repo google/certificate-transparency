@@ -1,12 +1,15 @@
 /* -*- indent-tabs-mode: nil -*- */
 #include <glog/logging.h>
 
+#include "log/cert.h"
 #include "log/cert_submission_handler.h"
 #include "log/frontend.h"
 #include "log/frontend_signer.h"
 #include "proto/ct.pb.h"
 
+using ct::CertChain;
 using ct::LogEntry;
+using ct::PreCertChain;
 using ct::SignedCertificateTimestamp;
 using std::string;
 
@@ -24,6 +27,51 @@ void Frontend::GetStats(Frontend::FrontendStats *stats) const {
   *stats = stats_;
 }
 
+Frontend::SubmitResult
+Frontend::QueueProcessedEntry(CertSubmissionHandler::SubmitResult pre_result,
+                              const LogEntry &entry,
+                              SignedCertificateTimestamp *sct) {
+  if (pre_result != CertSubmissionHandler::OK) {
+    SubmitResult result = GetSubmitError(pre_result);
+    UpdateStats(entry.type(), result);
+    return result;
+  }
+
+  // Step 2. Submit to database.
+  FrontendSigner::SubmitResult signer_result = signer_->QueueEntry(entry, sct);
+
+  SubmitResult result;
+  switch (signer_result) {
+    case FrontendSigner::NEW:
+      result = NEW;
+      break;
+    case FrontendSigner::DUPLICATE:
+      result = DUPLICATE;
+      break;
+    default:
+      LOG(FATAL) << "Unknown FrontendSigner return code " << signer_result;
+  }
+
+  UpdateStats(entry.type(), result);
+  return result;
+}
+
+Frontend::SubmitResult
+Frontend::QueueX509Entry(CertChain *chain, SignedCertificateTimestamp *sct) {
+  LogEntry entry;
+  return QueueProcessedEntry(handler_->ProcessX509Submission(chain, &entry),
+                             entry, sct);
+}
+
+Frontend::SubmitResult
+Frontend::QueuePreCertEntry(PreCertChain *chain,
+                            SignedCertificateTimestamp *sct) {
+  LogEntry entry;
+  return QueueProcessedEntry(handler_->ProcessPreCertSubmission(chain, &entry),
+                             entry, sct);
+}
+
+// FIXME(benl): this may be unused once RFC compliant server is in place.
 Frontend::SubmitResult
 Frontend::QueueEntry(ct::LogEntryType type, const string &data,
                      SignedCertificateTimestamp *sct) {
@@ -44,10 +92,10 @@ Frontend::QueueEntry(ct::LogEntryType type, const string &data,
 
   SubmitResult result;
   switch (signer_result) {
-    case NEW:
+    case FrontendSigner::NEW:
       result = NEW;
       break;
-    case DUPLICATE:
+    case FrontendSigner::DUPLICATE:
       result = DUPLICATE;
       break;
     default:

@@ -102,8 +102,11 @@ class JsonString : public JsonObject {
     // Lazy: base 64 encoding is always >= in length to decoded value
     // (equality occurs for zero length).
     u_char buf[length];
-    length = b64_pton(value, buf, length);
-    return std::string((char *)buf, length);
+    int rlength = b64_pton(value, buf, length);
+    // Treat decode errors as empty strings.
+    if (rlength < 0)
+        rlength = 0;
+    return std::string((char *)buf, rlength);
   }
     
 };
