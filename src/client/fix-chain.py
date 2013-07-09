@@ -104,11 +104,18 @@ def getIssuersFromAIA(cert):
         pass
 
       # If not, it had better be PKCS#7 "certs-only"
-      pkcs7, rest = decoder.decode(issuer, asn1Spec=rfc2315.ContentInfo())
-      assert rest == ""
-      assert pkcs7.getComponentByName('contentType') == rfc2315.signedData
-      signedData = decoder.decode(pkcs7.getComponentByName('content'),
-                                  asn1Spec=rfc2315.SignedData())
+      try:
+        pkcs7, rest = decoder.decode(issuer, asn1Spec=rfc2315.ContentInfo())
+        assert rest == ""
+        assert pkcs7.getComponentByName('contentType') == rfc2315.signedData
+        signedData = decoder.decode(pkcs7.getComponentByName('content'),
+                                    asn1Spec=rfc2315.SignedData())
+      except PyAsn1Error as e:
+        # Give up
+        print "PKCS#7 decode also failed:", e
+        print "Skipping issuer URL:", loc
+        continue
+
       for signedDatum in signedData:
         # FIXME: why does this happen? Example is at
         # http://crt.usertrust.com/AddTrustExternalCARoot.p7c.
