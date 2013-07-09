@@ -6,6 +6,7 @@
 # Based on pyasn1 example code.
 
 from base64 import b64encode
+from ct.crypto.pem import PemError, from_pem
 from pyasn1 import debug
 # Why doesn't this work?
 #from pyasn1.codec.ber import stDumpRawValue
@@ -57,6 +58,7 @@ def getIssuersFromAIA(cert):
   tbs = cert.getComponentByName('tbsCertificate')
   extensions = tbs.getComponentByName('extensions') or []
 
+  allIssuers = []
   for extension in extensions:
     oid = extension.getComponentByName('extnID')
     if oid != id_pe_authorityInfoAccess:
@@ -72,7 +74,6 @@ def getIssuersFromAIA(cert):
 
     print aia.prettyPrint()
 
-    allIssuers = []
     for ad in aia:
       oid = ad.getComponentByName('accessMethod')
       if oid != id_ad_caIssuers:
@@ -91,6 +92,14 @@ def getIssuersFromAIA(cert):
       # course, we see other values, so just try both formats.
       print certHandle.info().gettype()
       issuer = certHandle.read()
+
+      # Have we got an (incorrect, but let's fix it) PEM encoded cert?
+      if issuer.startswith('-----'):
+        try:
+          (issuer, _) = from_pem(issuer, ['CERTIFICATE'])
+        except PemError as e:
+          print "PEM decode failed:", e
+          print "For cert:", issuer
 
       # Is it a certificate?
       try:
