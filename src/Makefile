@@ -1,4 +1,6 @@
 CXXFLAG = -Wall -Werror -g -O3
+# sometimes needed for certain libcurlpp-dev installs; technically their bug.
+CXXFLAG += -DHAVE_CONFIG_H
 INCLUDE = -I.
 LOCAL_LIBS = log/libcert.a log/libdatabase.a log/liblog.a \
              merkletree/libmerkletree.a proto/libproto.a util/libutil.a
@@ -17,21 +19,44 @@ ifneq ($(OPENSSLDIR),)
           -Wl,-rpath,$(OPENSSLDIR)/lib
 endif
 
-ifdef GTESTDIR
-  INCLUDE += -I $(GTESTDIR)/include
-  SYS_LIBS += $(GTESTDIR)/make/gtest.a 
-else
-  SYS_LIBS += -lgtest
-endif
+GTESTDIR ?= /usr/src/gtest
+INCLUDE += -I $(GTESTDIR)/include
 
 INCLUDE += -I /usr/local/include
 SYS_LIBS += -L /usr/local/lib
 
 CXXFLAGS = $(INCLUDE) $(CXXFLAG)
 
+# File lists to simplify the rest of the Makefile
+
+PROTO_TESTS = proto/serializer_test
+MERKLETREE_TESTS = merkletree/merkle_tree_test \
+                   merkletree/merkle_tree_large_test \
+                   merkletree/serial_hasher_test merkletree/tree_hasher_test
+LOG_TESTS = log/cert_test log/cert_checker_test \
+            log/cert_submission_handler_test log/database_test \
+            log/database_large_test log/file_storage_test \
+            log/frontend_signer_test log/frontend_test log/log_lookup_test \
+            log/log_signer_test log/tree_signer_test \
+            log/logged_certificate_test log/ct_extensions_test
+CLIENT_TESTS = client/json_wrapper_test
+ALL_TESTS = $(PROTO_TESTS) $(MERKLETREE_TESTS) $(LOG_TESTS) \
+             $(CLIENT_TESTS)
+
 all: $(LOCAL_LIBS) unit_tests client/ct server/ct-server server/blob-server
 
 .DELETE_ON_ERROR:
+.PHONY: clean all unit_tests test alltests benchmark clean \
+        proto_tests merkletree_tests log_tests client_tests
+
+gtest/Makefile: $(GTESTDIR) Makefile
+	mkdir -p gtest && cd gtest && cmake $(GTESTDIR)
+
+gtest/libgtest.a: gtest/Makefile
+	$(MAKE) -C gtest CPPFLAGS="$(CPPFLAGS)" CXXFLAGS="$(CXXFLAGS)" \
+	  LDFLAGS="$(LDFLAGS)" gtest
+
+$(ALL_TESTS): gtest/libgtest.a
 
 proto/.depend: proto/*.cc */*.h
 	$(CXX) $(CXXFLAGS) -MM -MG proto/*.cc > proto/.depend1
@@ -89,7 +114,7 @@ proto/libproto.a: proto/ct.pb.o proto/serializer.o
 	rm -f $@
 	ar -rcs $@ $^
 
-proto_tests: proto/serializer_test
+proto_tests: $(PROTO_TESTS)
 
 proto/serializer_test: proto/serializer_test.o proto/libproto.a util/libutil.a
 	$(CXX) -o $@ $^ $(SYS_LIBS)
@@ -103,9 +128,7 @@ merkletree/libmerkletree.a: merkletree/compact_merkle_tree.o \
 	rm -f $@
 	ar -rcs $@ $^
 
-merkletree_tests: merkletree/merkle_tree_test \
-                  merkletree/merkle_tree_large_test \
-                  merkletree/serial_hasher_test merkletree/tree_hasher_test
+merkletree_tests: $(MERKLETREE_TESTS)
 
 merkletree/merkle_tree_large_test: merkletree/merkle_tree_large_test.o \
                                    merkletree/libmerkletree.a util/libutil.a
@@ -140,12 +163,7 @@ log/liblog.a: log/log_signer.o log/frontend.o log/frontend_signer.o \
 	rm -f $@
 	ar -rcs $@ $^
 
-log_tests: log/cert_test log/cert_checker_test \
-           log/cert_submission_handler_test log/database_test \
-           log/database_large_test log/file_storage_test \
-           log/frontend_signer_test log/frontend_test log/log_lookup_test \
-           log/log_signer_test log/tree_signer_test \
-           log/logged_certificate_test log/ct_extensions_test
+log_tests: $(LOG_TESTS)
 
 log/cert_test: log/cert_test.o log/cert.o log/ct_extensions.o util/libutil.a \
                merkletree/serial_hasher.o
@@ -158,7 +176,7 @@ log/cert_checker_test: log/cert_checker_test.o log/cert.o log/cert_checker.o \
 
 log/cert_submission_handler_test: log/cert_submission_handler_test.o \
                                   log/libcert.a proto/libproto.a \
-                                  util/libutil.a 
+                                  util/libutil.a
 	$(CXX) -o $@ $^ $(SYS_LIBS)
 
 log/ct_extensions_test: log/ct_extensions_test.o log/libcert.a util/libutil.a
@@ -216,7 +234,7 @@ log/logged_certificate_test: log/logged_certificate_test.o proto/libproto.a \
 	$(CXX) -o $@ $^ $(SYS_LIBS)
 
 # client
-client_tests: client/json_wrapper_test
+client_tests: $(CLIENT_TESTS)
 
 client/json_wrapper_test: client/json_wrapper_test.o util/libutil.a
 	$(CXX) -o $@ $^ $(SYS_LIBS)
@@ -271,3 +289,4 @@ clean:
 	find . -name '*.[o|a]' | xargs rm -f
 	find . -name '*_test' | xargs rm -f
 	rm -f proto/*.pb.h proto/*.pb.cc */.depend*
+	rm -rf gtest/*

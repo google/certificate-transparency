@@ -17,16 +17,16 @@ $ make
 2. You also need googletest, which you can get from here:
 http://code.google.com/p/googletest/downloads/list.
 
-Download, unpack and build. On any system this is likely to work on,
-this should work:
+You also need to install cmake, to build gtest:
+http://www.cmake.org/
 
-$ cd make && make && make gtest.a
+Unpack googletest, but don't build it yet. Upstream recommends to build
+a new copy from source for each package to be tested. We follow this
+advice in our Makefile, which builds gtest automatically.
 
-Our Makefiles are configured to work with this method, and may need
-tweaking if you do something different.
-
-Note that if you are on a BSD system "make" will appear to work, but
-you'll get a link error. Use "gmake" instead.
+Some systems make the gtest sources available as a package; on Debian
+this is in the libgtest-dev package and GTESTDIR = /usr/src/gtest. Our
+Makefile looks at this location by default.
 
 (Tested with gtest-1.6.0)
 
@@ -50,9 +50,11 @@ errors later on.
 
 5. And you will need a copy of sqlite3 installed on your system.
 
-5a. And the curlpp library (http://code.google.com/p/curlpp/) (I
-had to edit /usr/local/include/curlpp/config.win32.h to eliminate
-warnings).
+5a. And the curlpp library (http://code.google.com/p/curlpp/). Before
+building and installing, you should apply the patch mentioned here:
+https://code.google.com/p/curlpp/issues/detail?id=25
+
+(Tested with curlpp-0.7.3)
 
 5b. And the JSON-C library, v0.10.
 (https://github.com/json-c/json-c/wiki - tarball is
@@ -63,7 +65,7 @@ the python modules pyasn1 and pyasn1-modules, which can be installed
 with easy_install.
 
 6. Then, you can build the log server by pointing to your custom OpenSSL
-(if needed), and local gtest (if not installed):
+and/or gtest (if needed):
 
 $ make OPENSSLDIR=<path to openssl> GTESTDIR=<path to gtest>
 

@@ -41,3 +41,4 @@
 /src/test/testdata/error.log
 *.pyc
 *_pb2.py
+/src/gtest
