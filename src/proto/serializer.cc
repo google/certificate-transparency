@@ -1,6 +1,7 @@
 /* -*- indent-tabs-mode: nil -*- */
 #include <glog/logging.h>
 #include <string>
+#include <math.h>
 
 #include "include/types.h"
 #include "proto/ct.pb.h"
@@ -36,14 +37,10 @@ using ct::Version_IsValid;
 using std::string;
 
 // static
+// Returns the number of bytes needed to store a value up to max_length.
 size_t Serializer::PrefixLength(size_t max_length) {
   CHECK_GT(max_length, 0U);
-  size_t prefix_length = 0;
-
-  for ( ; max_length > 0; max_length >>= 8)
-    ++prefix_length;
-
-  return prefix_length;
+  return ceil(log2(max_length) / float(8));
 }
 
 // static
