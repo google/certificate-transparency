@@ -7,7 +7,7 @@ from ct.crypto import error, pem
 from ct.crypto.asn1 import oid, x509, x509_name
 
 class Certificate(object):
-    _PEM_MARKERS = ("CERTIFICATE",)
+    PEM_MARKERS = ("CERTIFICATE",)
     _ASN1_SPEC = x509.Certificate()
     def __init__(self, der_string):
         """Initialize from a DER string
@@ -36,9 +36,9 @@ class Certificate(object):
         Returns:
             a Certificate object
         Raises:
-            ct.crypto.pem.PemError, ct.crypto.error.EncodingError: the string
+            ct.crypto.pem.PemError, ct.crypto.error.ASN1Error: the string
             does not contain a valid PEM certificate"""
-        der_cert, _ = pem.from_pem(pem_string, cls._PEM_MARKERS)
+        der_cert, _ = pem.from_pem(pem_string, cls.PEM_MARKERS)
         return cls.from_der(der_cert)
 
     @classmethod
@@ -79,10 +79,10 @@ class Certificate(object):
         Returns:
             a Certificate object
         Raises:
-            ct.crypto.pem.PemError, ct.crypto.EncodingError: the file does not
+            ct.crypto.pem.PemError, ct.crypto.error.ASN1Error: the file does not
             contain a valid PEM certificate
             IOError: the file could not be read"""
-        der_cert, _ = pem.from_pem_file(pem_file, cls._PEM_MARKERS)
+        der_cert, _ = pem.from_pem_file(pem_file, cls.PEM_MARKERS)
         return cls.from_der(der_cert)
 
     @classmethod
@@ -93,7 +93,7 @@ class Certificate(object):
         Returns:
             a Certificate object
         Raises:
-            ct.crypto.EncodingError: the file does not contain a valid DER
+            ct.crypto.error.ASN1Error: the file does not contain a valid DER
             certificate
             IOError: the file could not be read"""
         with open(der_file, 'rb') as f:
@@ -133,3 +133,49 @@ class Certificate(object):
         """Get a human readable string of the issuer name attributes."""
         return (self.__asn1_cert.getComponentByName('tbsCertificate').
                 getComponentByName('issuer').human_readable(wrap=0))
+
+def certs_from_pem(pem_string, skip_invalid_blobs=False):
+    """Read multiple PEM-encoded certificates from a string.
+    Args:
+        pem_string: the certificate string
+        skip_invalid_blobs: if False, invalid PEM blobs cause a PemError.
+                            If True, invalid blobs are skipped. In
+                            non-skip mode, an immediate StopIteration
+                            before any valid blocks are found, also
+                            causes a PemError exception.
+    Yields:
+        Certificate objects
+    Raises:
+        ct.crypto.pem.PemError, ct.crypto.ASN1Error: a block was invalid
+        IOError: the file could not be read"""
+    for der_cert, _ in pem.pem_blocks(pem_string, Certificate.PEM_MARKERS,
+                                      skip_invalid_blobs=skip_invalid_blobs):
+        try:
+            yield Certificate.from_der(der_cert)
+        except error.ASN1Error:
+            if not skip_invalid_blobs:
+                raise
+
+def certs_from_pem_file(pem_file, skip_invalid_blobs=False):
+    """Read multiple PEM-encoded certificates from a file.
+    Args:
+        pem_file: the certificate file
+        skip_invalid_blobs: if False, invalid PEM blobs cause a PemError.
+                            If True, invalid blobs are skipped. In
+                            non-skip mode, an immediate StopIteration
+                            before any valid blocks are found, also
+                            causes a PemError exception.
+    Yields:
+        Certificate objects
+    Raises:
+        ct.crypto.pem.PemError, ct.crypto.error.ASN1Error:
+            a block was invalid
+        IOError: the file could not be read"""
+    for der_cert, _ in pem.pem_blocks_from_file(
+        pem_file, Certificate.PEM_MARKERS,
+        skip_invalid_blobs=skip_invalid_blobs):
+        try:
+            yield Certificate.from_der(der_cert)
+        except error.ASN1Error:
+            if not skip_invalid_blobs:
+                raise

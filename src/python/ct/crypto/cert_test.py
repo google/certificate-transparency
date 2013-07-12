@@ -11,6 +11,12 @@ gflags.DEFINE_string('testdata_dir', "ct/crypto/testdata",
 
 class CertificateTest(unittest.TestCase):
     _PEM_FILE = "google_cert.pem"
+    # Contains 3 certificates
+    # C=US/ST=California/L=Mountain View/O=Google Inc/CN=www.google.com
+    # C=US/O=Google Inc/CN=Google Internet Authority
+    # C=US/O=Equifax/OU=Equifax Secure Certificate Authority
+
+    _PEM_CHAIN_FILE = "google_chain.pem"
     _DER_FILE = "google_cert.der"
 
     @property
@@ -21,14 +27,37 @@ class CertificateTest(unittest.TestCase):
     def der_file(self):
         return FLAGS.testdata_dir + "/" + self._DER_FILE
 
+    @property
+    def chain_file(self):
+        return FLAGS.testdata_dir + "/" + self._PEM_CHAIN_FILE
+
     def test_from_pem_file(self):
         c = cert.Certificate.from_pem_file(self.pem_file)
         self.assertTrue(isinstance(c, cert.Certificate))
 
+    def test_certs_from_pem_file(self):
+        certs = [c for c in cert.certs_from_pem_file(self.chain_file)]
+        self.assertEqual(3, len(certs))
+        self.assertTrue(all(map(lambda x: isinstance(x, cert.Certificate),
+                                certs)))
+        self.assertTrue("google.com" in certs[0].subject_name())
+        self.assertTrue("Google Inc" in certs[1].subject_name())
+        self.assertTrue("Equifax" in certs[2].subject_name())
+
     def test_from_pem(self):
         with open(self.pem_file) as f:
             c = cert.Certificate.from_pem(f.read())
-            self.assertTrue(isinstance(c, cert.Certificate))
+        self.assertTrue(isinstance(c, cert.Certificate))
+
+    def test_all_from_pem(self):
+        with open(self.chain_file) as f:
+            certs = [c for c in cert.certs_from_pem(f.read())]
+        self.assertEqual(3, len(certs))
+        self.assertTrue(all(map(lambda x: isinstance(x, cert.Certificate),
+                                certs)))
+        self.assertTrue("google.com" in certs[0].subject_name())
+        self.assertTrue("Google Inc" in certs[1].subject_name())
+        self.assertTrue("Equifax" in certs[2].subject_name())
 
     def test_from_der_file(self):
         c = cert.Certificate.from_der_file(self.der_file)
@@ -37,7 +66,7 @@ class CertificateTest(unittest.TestCase):
     def test_from_der(self):
         with open(self.der_file, 'rb') as f:
             c = cert.Certificate.from_der(f.read())
-            self.assertTrue(isinstance(c, cert.Certificate))
+        self.assertTrue(isinstance(c, cert.Certificate))
 
     def test_invalid_encoding_raises(self):
         self.assertRaises(error.EncodingError, cert.Certificate.from_der,
@@ -48,8 +77,8 @@ class CertificateTest(unittest.TestCase):
     def test_to_der(self):
         with open(self.der_file, 'rb') as f:
             der_string = f.read()
-            c = cert.Certificate(der_string)
-            self.assertEqual(der_string, c.to_der())
+        c = cert.Certificate(der_string)
+        self.assertEqual(der_string, c.to_der())
 
     def test_subject_name(self):
         c = cert.Certificate.from_der_file(self.der_file)
