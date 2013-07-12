@@ -69,6 +69,14 @@ class EncodingError(VerifyError):
     serialized data cannot be parsed."""
     pass
 
+class ASN1Error(EncodingError):
+    """Raised when an ASN1 object cannot be encoded or decoded."""
+    pass
+
+class UnknownASN1AttributeTypeError(ASN1Error):
+    """Raised when an ASN1 AttributeType OID is not known."""
+    pass
+
 class SignatureError(VerifyError):
     """Raised when a public-key signature does not verify."""
     pass
