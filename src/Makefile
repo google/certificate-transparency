@@ -1,6 +1,12 @@
 CXXFLAG = -Wall -Werror -g -O3
+
+# FIXME(benl): This breaks other installs and should be set locally if
+# needed. It is not _technically_ their bug, it is _actually_ their
+# bug. Commented out for now (as I can't build with it set).
+
 # sometimes needed for certain libcurlpp-dev installs; technically their bug.
-CXXFLAG += -DHAVE_CONFIG_H
+#CXXFLAG += -DHAVE_CONFIG_H
+
 INCLUDE = -I.
 LOCAL_LIBS = log/libcert.a log/libdatabase.a log/liblog.a \
              merkletree/libmerkletree.a proto/libproto.a util/libutil.a
@@ -39,7 +45,8 @@ LOG_TESTS = log/cert_test log/cert_checker_test \
             log/frontend_signer_test log/frontend_test log/log_lookup_test \
             log/log_signer_test log/tree_signer_test \
             log/logged_certificate_test log/ct_extensions_test
-ALL_TESTS = $(PROTO_TESTS) $(MERKLETREE_TESTS) $(LOG_TESTS)
+UTIL_TESTS = util/json_wrapper_test
+ALL_TESTS = $(PROTO_TESTS) $(MERKLETREE_TESTS) $(LOG_TESTS) $(UTIL_TESTS)
 
 all: $(LOCAL_LIBS) unit_tests client/ct server/ct-server server/blob-server \
      server/ct-rfc-server
