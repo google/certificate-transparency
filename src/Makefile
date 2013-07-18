@@ -48,7 +48,7 @@ LOG_TESTS = log/cert_test log/cert_checker_test \
 UTIL_TESTS = util/json_wrapper_test
 ALL_TESTS = $(PROTO_TESTS) $(MERKLETREE_TESTS) $(LOG_TESTS) $(UTIL_TESTS)
 
-all: $(LOCAL_LIBS) unit_tests client/ct server/ct-server server/blob-server \
+all: unit_tests client/ct server/ct-server server/blob-server \
      server/ct-rfc-server
 
 .DELETE_ON_ERROR:
