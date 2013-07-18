@@ -4,7 +4,7 @@
 
 set -e
 
-export PYTHONPATH=$(PYTHONPATH):../python
+export PYTHONPATH=${PYTHONPATH}:../python
 SERVER=$1
 
 TMP=`mktemp /tmp/cert.XXXXXX`
