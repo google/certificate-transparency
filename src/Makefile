@@ -55,7 +55,7 @@ all: unit_tests client/ct server/ct-server server/blob-server \
 .PHONY: clean all unit_tests test alltests benchmark clean \
         proto_tests merkletree_tests log_tests client_tests
 
-gtest/Makefile: $(GTESTDIR) Makefile
+gtest/Makefile: $(GTESTDIR)
 	mkdir -p gtest && cd gtest && cmake $(GTESTDIR)
 
 gtest/libgtest.a: gtest/Makefile
@@ -177,20 +177,29 @@ log/liblog.a: log/log_signer.o log/frontend.o log/frontend_signer.o \
 log_tests: $(LOG_TESTS)
 
 log/cert_test: log/cert_test.o log/cert.o log/ct_extensions.o util/libutil.a \
-               merkletree/serial_hasher.o
+               merkletree/serial_hasher.o log/frontend.o proto/ct.pb.o \
+               log/frontend_signer.o log/cert_submission_handler.o \
+               log/log_signer.o proto/serializer.o log/cert_checker.o
 	$(CXX) -o $@ $^ $(SYS_LIBS)
 
 log/cert_checker_test: log/cert_checker_test.o log/cert.o log/cert_checker.o \
                        log/ct_extensions.o util/libutil.a \
-                       merkletree/serial_hasher.o
+                       merkletree/serial_hasher.o log/frontend.o proto/ct.pb.o \
+                       log/frontend_signer.o log/cert_submission_handler.o \
+                       log/log_signer.o proto/serializer.o log/cert_checker.o
 	$(CXX) -o $@ $^ $(SYS_LIBS)
 
 log/cert_submission_handler_test: log/cert_submission_handler_test.o \
                                   log/libcert.a proto/libproto.a \
-                                  util/libutil.a
+                                  util/libutil.a log/frontend.o \
+                                  log/frontend_signer.o \
+                                  log/log_signer.o
 	$(CXX) -o $@ $^ $(SYS_LIBS)
 
-log/ct_extensions_test: log/ct_extensions_test.o log/libcert.a util/libutil.a
+log/ct_extensions_test: log/ct_extensions_test.o log/libcert.a util/libutil.a \
+                        log/liblog.a proto/ct.pb.o \
+                        log/cert_submission_handler.o proto/serializer.o \
+                        log/cert_checker.o
 	$(CXX) -o $@ $^ $(SYS_LIBS)
 
 log/database_large_test: log/database_large_test.o log/libdatabase.a \
@@ -253,8 +262,9 @@ client/ct: client/ct.o client/client.o client/log_client.o client/ssl_client.o \
 server/ct-server: server/ct-server.o server/event.o $(LOCAL_LIBS)
 	$(CXX) -o $@ $^ $(SYS_LIBS)
 
+# FIXME(benl): unclear why a second copy of liblog is needed.
 server/ct-rfc-server: server/ct-rfc-server.o $(LOCAL_LIBS)
-	$(CXX) -o $@ $^ $(SYS_LIBS)
+	$(CXX) -o $@ $^ $(SYS_LIBS) log/liblog.a
 
 server/blob-server: server/blob-server.o server/event.o \
                     server/sqlite_db_blob.o server/tree_signer_blob.o \

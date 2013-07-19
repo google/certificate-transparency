@@ -1,3 +1,4 @@
+/* -*- mode: c++; indent-tabs-mode: nil -*- */
 #ifndef CERT_CHECKER_H
 #define CERT_CHECKER_H
 
@@ -9,6 +10,11 @@
 #include "log/cert.h"
 
 namespace ct {
+
+class Cert;
+class CertChain;
+class PreCertChain;
+
 // A class for doing sanity-checks on log submissions before accepting them.
 // We don't necessarily want to do full certificate verification
 // before accepting them. E.g., we may want to accept submissions of

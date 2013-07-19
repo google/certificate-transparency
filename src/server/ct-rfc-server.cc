@@ -228,59 +228,15 @@ class CTLogManager {
     return ss.str();
   }
 
-  LogReply SubmitX509Entry(CertChain *chain, SignedCertificateTimestamp *sct,
+  LogReply SubmitEntry(CertChain *chain, SignedCertificateTimestamp *sct,
                            string *error) {
     SignedCertificateTimestamp local_sct;
-    Frontend::SubmitResult submit_result =
-        frontend_->QueueX509Entry(chain, &local_sct);
+    SubmitResult submit_result = chain->Submit(frontend_, &local_sct);
 
     LogReply reply = REJECT;
     switch (submit_result) {
-      case Frontend::NEW:
-      case Frontend::DUPLICATE:
-        sct->CopyFrom(local_sct);
-        reply = SIGNED_CERTIFICATE_TIMESTAMP;
-        break;
-      default:
-        error->assign(Frontend::SubmitResultString(submit_result));
-        break;
-    }
-    return reply;
-  }
-
-  LogReply SubmitPreCertEntry(PreCertChain *chain,
-                              SignedCertificateTimestamp *sct, string *error) {
-    SignedCertificateTimestamp local_sct;
-    Frontend::SubmitResult submit_result =
-        frontend_->QueuePreCertEntry(chain, &local_sct);
-
-    LogReply reply = REJECT;
-    switch (submit_result) {
-      case Frontend::NEW:
-      case Frontend::DUPLICATE:
-        sct->CopyFrom(local_sct);
-        reply = SIGNED_CERTIFICATE_TIMESTAMP;
-        break;
-      default:
-        error->assign(Frontend::SubmitResultString(submit_result));
-        break;
-    }
-    return reply;
-  }
-
-  // Submit an entry and write a token, if the entry is accepted,
-  // or an error otherwise.
-  // FIXME(benl): probably redundant by the time we're done.
-  LogReply SubmitEntry(ct::LogEntryType type, const string &data,
-                       SignedCertificateTimestamp *sct, string *error) {
-    SignedCertificateTimestamp local_sct;
-    Frontend::SubmitResult submit_result =
-        frontend_->QueueEntry(type, data, &local_sct);
-
-    LogReply reply = REJECT;
-    switch (submit_result) {
-      case Frontend::NEW:
-      case Frontend::DUPLICATE:
+      case ADDED:
+      case DUPLICATE:
         sct->CopyFrom(local_sct);
         reply = SIGNED_CERTIFICATE_TIMESTAMP;
         break;
@@ -383,28 +339,22 @@ private:
 
   void AddChain(server::response &response, const std::string &body) {
     CertChain chain;
-
-    if (!ExtractChain(response, &chain, body))
-      return;
-
-    SignedCertificateTimestamp sct;
-    string error;
-    CTLogManager::LogReply result = manager_->SubmitX509Entry(&chain, &sct,
-                                                              &error);
-
-    ProcessChainResult(response, result, error, sct);
+    AddChain(response, body, &chain);
   }
 
   void AddPreChain(server::response &response, const std::string &body) {
     PreCertChain chain;
+    AddChain(response, body, &chain);
+  }
 
-    if (!ExtractChain(response, &chain, body))
+  void AddChain(server::response &response, const std::string &body,
+                CertChain *chain) {
+    if (!ExtractChain(response, chain, body))
       return;
 
     SignedCertificateTimestamp sct;
     string error;
-    CTLogManager::LogReply result = manager_->SubmitPreCertEntry(&chain, &sct,
-                                                                 &error);
+    CTLogManager::LogReply result = manager_->SubmitEntry(chain, &sct, &error);
 
     ProcessChainResult(response, result, error, sct);
   }

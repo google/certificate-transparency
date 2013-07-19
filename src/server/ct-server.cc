@@ -211,13 +211,12 @@ class CTLogManager {
   LogReply SubmitEntry(ct::LogEntryType type, const string &data,
                        SignedCertificateTimestamp *sct, string *error) {
     SignedCertificateTimestamp local_sct;
-    Frontend::SubmitResult submit_result =
-        frontend_->QueueEntry(type, data, &local_sct);
+    SubmitResult submit_result = frontend_->QueueEntry(type, data, &local_sct);
 
     LogReply reply = REJECT;
     switch (submit_result) {
-      case Frontend::NEW:
-      case Frontend::DUPLICATE:
+      case ADDED:
+      case DUPLICATE:
         sct->CopyFrom(local_sct);
         reply = SIGNED_CERTIFICATE_TIMESTAMP;
         break;

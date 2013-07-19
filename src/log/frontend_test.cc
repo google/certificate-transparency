@@ -142,7 +142,7 @@ TYPED_TEST_CASE(FrontendTest, Databases);
 
 TYPED_TEST(FrontendTest, TestSubmitValid) {
   SignedCertificateTimestamp sct;
-  EXPECT_EQ(FE::NEW,
+  EXPECT_EQ(ADDED,
             this->frontend_->QueueEntry(ct::X509_ENTRY, this->leaf_pem_, &sct));
 
   // Look it up and expect to get the right thing back.
@@ -173,7 +173,7 @@ TYPED_TEST(FrontendTest, TestSubmitValid) {
 TYPED_TEST(FrontendTest, TestSubmitValidWithIntermediate) {
   SignedCertificateTimestamp sct;
   string submission = this->chain_leaf_pem_ + this->intermediate_pem_;
-  EXPECT_EQ(FE::NEW,
+  EXPECT_EQ(ADDED,
             this->frontend_->QueueEntry(ct::X509_ENTRY, submission, &sct));
 
   // Look it up and expect to get the right thing back.
@@ -210,9 +210,9 @@ TYPED_TEST(FrontendTest, TestSubmitValidWithIntermediate) {
 
 TYPED_TEST(FrontendTest, TestSubmitDuplicate) {
   SignedCertificateTimestamp sct;
-  EXPECT_EQ(FE::NEW,
+  EXPECT_EQ(ADDED,
             this->frontend_->QueueEntry(ct::X509_ENTRY, this->leaf_pem_, NULL));
-  EXPECT_EQ(FE::DUPLICATE,
+  EXPECT_EQ(DUPLICATE,
             this->frontend_->QueueEntry(ct::X509_ENTRY, this->leaf_pem_, &sct));
 
   // Look it up and expect to get the right thing back.
@@ -242,7 +242,7 @@ TYPED_TEST(FrontendTest, TestSubmitDuplicate) {
 TYPED_TEST(FrontendTest, TestSubmitInvalidChain) {
   SignedCertificateTimestamp sct;
   // Missing intermediate.
-  EXPECT_EQ(FE::CERTIFICATE_VERIFY_ERROR,
+  EXPECT_EQ(CERTIFICATE_VERIFY_ERROR,
             this->frontend_->QueueEntry(ct::X509_ENTRY,
                                         this->chain_leaf_pem_, &sct));
   EXPECT_FALSE(sct.has_signature());
@@ -255,7 +255,7 @@ TYPED_TEST(FrontendTest, TestSubmitInvalidPem) {
   string fake_cert("-----BEGIN CERTIFICATE-----\n"
                    "Iamnotavalidcert\n"
                    "-----END CERTIFICATE-----\n");
-  EXPECT_EQ(FE::BAD_PEM_FORMAT,
+  EXPECT_EQ(BAD_PEM_FORMAT,
             this->frontend_->QueueEntry(ct::X509_ENTRY, fake_cert, &sct));
   EXPECT_FALSE(sct.has_signature());
   FE::FrontendStats stats(0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0);
@@ -265,7 +265,7 @@ TYPED_TEST(FrontendTest, TestSubmitInvalidPem) {
 TYPED_TEST(FrontendTest, TestSubmitPrecert) {
   SignedCertificateTimestamp sct;
   string submission = this->precert_pem_;
-  EXPECT_EQ(FE::NEW,
+  EXPECT_EQ(ADDED,
             this->frontend_->QueueEntry(ct::PRECERT_ENTRY, submission, &sct));
 
   CertChain chain(this->embedded_pem_ + this->ca_pem_);
@@ -304,7 +304,7 @@ TYPED_TEST(FrontendTest, TestSubmitPrecert) {
 TYPED_TEST(FrontendTest, TestSubmitPrecertUsingPreCA) {
   SignedCertificateTimestamp sct;
   string submission = this->precert_with_preca_pem_ + this->ca_precert_pem_;
-  EXPECT_EQ(Frontend::NEW,
+  EXPECT_EQ(ADDED,
             this->frontend_->QueueEntry(ct::PRECERT_ENTRY, submission, &sct));
 
   CertChain chain(this->embedded_with_preca_pem_ + this->ca_pem_);

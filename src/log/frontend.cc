@@ -27,7 +27,7 @@ void Frontend::GetStats(Frontend::FrontendStats *stats) const {
   *stats = stats_;
 }
 
-Frontend::SubmitResult
+SubmitResult
 Frontend::QueueProcessedEntry(CertSubmissionHandler::SubmitResult pre_result,
                               const LogEntry &entry,
                               SignedCertificateTimestamp *sct) {
@@ -43,7 +43,7 @@ Frontend::QueueProcessedEntry(CertSubmissionHandler::SubmitResult pre_result,
   SubmitResult result;
   switch (signer_result) {
     case FrontendSigner::NEW:
-      result = NEW;
+      result = ADDED;
       break;
     case FrontendSigner::DUPLICATE:
       result = DUPLICATE;
@@ -56,14 +56,14 @@ Frontend::QueueProcessedEntry(CertSubmissionHandler::SubmitResult pre_result,
   return result;
 }
 
-Frontend::SubmitResult
+SubmitResult
 Frontend::QueueX509Entry(CertChain *chain, SignedCertificateTimestamp *sct) {
   LogEntry entry;
   return QueueProcessedEntry(handler_->ProcessX509Submission(chain, &entry),
                              entry, sct);
 }
 
-Frontend::SubmitResult
+SubmitResult
 Frontend::QueuePreCertEntry(PreCertChain *chain,
                             SignedCertificateTimestamp *sct) {
   LogEntry entry;
@@ -72,7 +72,7 @@ Frontend::QueuePreCertEntry(PreCertChain *chain,
 }
 
 // FIXME(benl): this may be unused once RFC compliant server is in place.
-Frontend::SubmitResult
+SubmitResult
 Frontend::QueueEntry(ct::LogEntryType type, const string &data,
                      SignedCertificateTimestamp *sct) {
   // Step 1. Preprocessing: convert the submission into a CertificateEntry
@@ -93,7 +93,7 @@ Frontend::QueueEntry(ct::LogEntryType type, const string &data,
   SubmitResult result;
   switch (signer_result) {
     case FrontendSigner::NEW:
-      result = NEW;
+      result = ADDED;
       break;
     case FrontendSigner::DUPLICATE:
       result = DUPLICATE;
@@ -110,7 +110,7 @@ Frontend::QueueEntry(ct::LogEntryType type, const string &data,
 std::string Frontend::SubmitResultString(SubmitResult result) {
   string result_string;
   switch (result) {
-    case NEW:
+    case ADDED:
       result_string = "new submission accepted";
       break;
     case DUPLICATE:
@@ -140,7 +140,7 @@ std::string Frontend::SubmitResultString(SubmitResult result) {
 }
 
 // static
-Frontend::SubmitResult
+SubmitResult
 Frontend::GetSubmitError(CertSubmissionHandler::SubmitResult result) {
   SubmitResult submit_result;
   switch (result) {
@@ -167,17 +167,16 @@ Frontend::GetSubmitError(CertSubmissionHandler::SubmitResult result) {
   return submit_result;
 }
 
-void Frontend::UpdateStats(ct::LogEntryType type,
-                           Frontend::SubmitResult result) {
+void Frontend::UpdateStats(ct::LogEntryType type, SubmitResult result) {
   if (type == ct::X509_ENTRY)
     UpdateX509Stats (result);
   else
     UpdatePrecertStats(result);
 }
 
-void Frontend::UpdateX509Stats(Frontend::SubmitResult result) {
+void Frontend::UpdateX509Stats(SubmitResult result) {
   switch (result) {
-    case NEW:
+    case ADDED:
       ++stats_.x509_accepted;
       break;
     case DUPLICATE:
@@ -199,9 +198,9 @@ void Frontend::UpdateX509Stats(Frontend::SubmitResult result) {
   }
 }
 
-void Frontend::UpdatePrecertStats(Frontend::SubmitResult result) {
+void Frontend::UpdatePrecertStats(SubmitResult result) {
   switch (result) {
-    case NEW:
+    case ADDED:
       ++stats_.precert_accepted;
       break;
     case DUPLICATE:

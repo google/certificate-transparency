@@ -1,3 +1,4 @@
+/* -*- mode: c++; indent-tabs-mode: nil -*- */
 #ifndef CERT_H
 #define CERT_H
 #include <gtest/gtest_prod.h>
@@ -6,7 +7,13 @@
 #include <string>
 #include <vector>
 
+#include "log/submit_result.h"
+
+class Frontend;
+
 namespace ct {
+
+class SignedCertificateTimestamp;
 
 class Cert {
  public:
@@ -232,6 +239,10 @@ class CertChain {
   explicit CertChain(const std::string &pem_string);
   ~CertChain();
 
+  // Submit yourself to a frontend.
+  virtual SubmitResult Submit(Frontend *frontend,
+			      SignedCertificateTimestamp *sct);
+
   // Takes ownership of the cert.
   // If the cert has a valid X509 structure, adds it to the end of the chain
   // and returns TRUE.
@@ -300,6 +311,10 @@ class PreCertChain : public CertChain {
 
   explicit PreCertChain(const std::string &pem_string)
       : CertChain(pem_string) {}
+
+  // Submit yourself to a frontend.
+  virtual SubmitResult Submit(Frontend *frontend,
+			      SignedCertificateTimestamp *sct);
 
   // Some convenient aliases.
   // A pointer to the precert.

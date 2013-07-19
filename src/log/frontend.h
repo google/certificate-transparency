@@ -1,3 +1,4 @@
+/* -*- mode: c++; indent-tabs-mode: nil -*- */
 #ifndef FRONTEND_H
 #define FRONTEND_H
 
@@ -14,16 +15,6 @@ class Frontend {
   // Takes ownership of the handler and signer.
   Frontend(CertSubmissionHandler *handler, FrontendSigner *signer);
   ~Frontend();
-
-  enum SubmitResult {
-    NEW,
-    DUPLICATE,
-    BAD_PEM_FORMAT,
-    SUBMISSION_TOO_LONG,
-    CERTIFICATE_VERIFY_ERROR,
-    PRECERT_CHAIN_NOT_WELL_FORMED,
-    INTERNAL_ERROR,
-  };
 
   struct FrontendStats {
     FrontendStats()
