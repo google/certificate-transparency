@@ -229,7 +229,7 @@ class CTLogManager {
   }
 
   LogReply SubmitEntry(CertChain *chain, SignedCertificateTimestamp *sct,
-                           string *error) {
+                           string *error) const {
     SignedCertificateTimestamp local_sct;
     SubmitResult submit_result = chain->Submit(frontend_, &local_sct);
 
@@ -248,7 +248,7 @@ class CTLogManager {
   }
 
   LookupReply QueryAuditProof(const std::string &merkle_leaf_hash,
-                              ct::MerkleAuditProof *proof) {
+                              ct::MerkleAuditProof *proof) const {
     ct::MerkleAuditProof local_proof;
     LogLookup<LoggedCertificate>::LookupResult res =
         lookup_->AuditProof(merkle_leaf_hash, &local_proof);
@@ -260,7 +260,7 @@ class CTLogManager {
     return NOT_FOUND;
   }
 
-  bool SignMerkleTree() {
+  bool SignMerkleTree() const {
     TreeSigner<LoggedCertificate>::UpdateResult res = signer_->UpdateTree();
     if (res != TreeSigner<LoggedCertificate>::OK) {
       LOG(ERROR) << "Tree update failed with return code " << res;
@@ -270,6 +270,10 @@ class CTLogManager {
     LOG(INFO) << "Tree successfully updated at " << ctime(&last_update);
     CHECK_EQ(LogLookup<LoggedCertificate>::UPDATE_OK, lookup_->Update());
     return true;
+  }
+
+  const ct::SignedTreeHead GetSTH() const {
+    return signer_->LatestSTH();
   }
 
  private:
@@ -333,8 +337,16 @@ class ct_server {
 
 private:
   void GetSTH(server::response &response) {
+    const ct::SignedTreeHead &sth = manager_->GetSTH();
     response.status = server::response::ok;
-    response.content = "This should be an STH";
+
+    JsonObject jsend;
+    jsend.Add("tree_size", sth.tree_size());
+    jsend.Add("timetamp", sth.timestamp());
+    jsend.AddBase64("sha256_root_hash", sth.root_hash());
+    jsend.Add("signature", sth.signature());
+    
+    response.content = jsend.ToString();
   }
 
   void AddChain(server::response &response, const std::string &body) {
@@ -402,33 +414,23 @@ private:
                           const SignedCertificateTimestamp &sct) {
     LOG(INFO) << "Chain added, result = " << result << ", error = " << error;
 
-    json_object *jsend = json_object_new_object();
+    JsonObject jsend;
     if (result == CTLogManager::REJECT) {
-      json_object_object_add(jsend, "success", json_object_new_boolean(false));
-      json_object_object_add(jsend, "reason",
-                             json_object_new_string(error.c_str()));
+      jsend.AddBoolean("success", false);
+      jsend.Add("reason",error);
       response.status = server::response::bad_request;
     } else {
-      json_object_object_add(jsend, "sct_version", json_object_new_int(0));
-      json_object_object_add(jsend, "id",
-                             json_object_new_string(ToBase64(sct.id().key_id())
-                                                    .c_str()));
-      json_object_object_add(jsend, "timestamp",
-                             json_object_new_int64(sct.timestamp()));
-      json_object_object_add(jsend, "extensions", json_object_new_string(""));
-      string signature;
-      CHECK_EQ(Serializer::SerializeDigitallySigned(sct.signature(),
-                                                    &signature),
-               Serializer::OK);
-      json_object_object_add(jsend, "signature",
-                             json_object_new_string(ToBase64(signature)
-                                                    .c_str()));
+      jsend.Add("sct_version", (int64_t)0);
+      jsend.AddBase64("id", sct.id().key_id());
+      jsend.Add("timestamp",sct.timestamp());
+      jsend.Add("extensions", "");
+      jsend.Add("signature", sct.signature());
       response.status = server::response::ok;
     }
-    response.content = json_object_to_json_string(jsend);
+    response.content = jsend.ToString();
   }
 
-  CTLogManager *manager_;
+  const CTLogManager *manager_;
 };
 
 int main(int argc, char * argv[]) {

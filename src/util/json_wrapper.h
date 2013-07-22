@@ -12,7 +12,18 @@
 
 #include <sstream>
 
+#include "proto/serializer.h"
+
 class JsonArray;
+
+std::string ToBase64(const std::string &from) {
+  // base 64 is 4 output bytes for every 3 input bytes (rounded up).
+  size_t length = ((from.size() + 2) / 3) * 4;
+  char buf[length + 1];
+  length = b64_ntop((const u_char *)from.data(), from.length(), buf,
+                    length + 1);
+  return std::string((char *)buf, length);
+}
 
 // It appears that a new object, e.g. from a string, has a reference count
 // of 1, and that any objects "got" from it will get freed when it is freed.
@@ -33,7 +44,7 @@ class JsonObject {
   JsonObject(const JsonArray &from, int offset,
              json_type type = json_type_object);
 
-  JsonObject() : obj_(NULL) {}
+  JsonObject() : obj_(json_object_new_object()) {}
 
   ~JsonObject() {
     if (obj_)
@@ -56,6 +67,33 @@ class JsonObject {
     return json_object_to_json_string(obj_);
   }
 
+  void Add(const char *name, int64_t value) {
+    Add(name, json_object_new_int64(value));
+  }
+
+  void Add(const char *name, const std::string &value) {
+    Add(name, json_object_new_string(value.c_str()));
+  }
+
+  void AddBase64(const char *name, const std::string &value) {
+    Add(name, ToBase64(value));
+  }
+
+  void Add(const char *name, const ct::DigitallySigned &ds) {
+    std::string signature;
+    CHECK_EQ(Serializer::SerializeDigitallySigned(ds, &signature),
+             Serializer::OK);
+    AddBase64(name, signature);
+  }
+
+  void AddBoolean(const char *name, bool b) {
+    Add(name, json_object_new_boolean(b));
+  }
+
+  const char *ToString() const {
+    return json_object_to_json_string(obj_);
+  }
+
  protected:
   JsonObject(const JsonObject &from, const char *field, json_type type) {
     obj_ = json_object_object_get(from.obj_, field);
@@ -75,6 +113,11 @@ class JsonObject {
   }
 
   json_object *obj_;
+
+ private:
+  void Add(const char *name, json_object *obj) {
+    json_object_object_add(obj_, name, obj);
+  }
 
 };
 
@@ -125,7 +168,7 @@ class JsonArray : public JsonObject {
   JsonArray(const JsonObject &from, const char *field)
     : JsonObject(from, field, json_type_array) {}
 
-  JsonArray() {
+  JsonArray() : JsonObject(NULL) {
     obj_ = json_object_new_array();
   }
 
@@ -150,15 +193,6 @@ JsonObject::JsonObject(const JsonArray &from, int offset, json_type type) {
     return;
   }
   json_object_get(obj_);
-}
-
-std::string ToBase64(const std::string &from) {
-  // base 64 is 4 output bytes for every 3 input bytes (rounded up).
-  size_t length = ((from.size() + 2) / 3) * 4;
-  char buf[length + 1];
-  length = b64_ntop((const u_char *)from.data(), from.length(), buf,
-                    length + 1);
-  return std::string((char *)buf, length);
 }
 
 #endif
