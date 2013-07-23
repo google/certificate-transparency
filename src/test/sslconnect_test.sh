@@ -154,22 +154,22 @@ test_ct_server() {
   sleep 2
 
   echo "Generating test certificates"
-  make_cert `pwd`/tmp test ca ct-server 127.0.0.1 8124 false \
+  make_cert `pwd`/tmp test ca 127.0.0.1 8124 false \
     `pwd`/tmp/ct-server-key-public.pem
   make_embedded_cert `pwd`/tmp test-embedded ca \
-    ct-server 127.0.0.1 8124 false false `pwd`/tmp/ct-server-key-public.pem
+    127.0.0.1 8124 false false `pwd`/tmp/ct-server-key-public.pem
   make_embedded_cert `pwd`/tmp test-embedded-with-preca \
-    ca ct-server 127.0.0.1 8124 false true `pwd`/tmp/ct-server-key-public.pem
+    ca 127.0.0.1 8124 false true `pwd`/tmp/ct-server-key-public.pem
   # Generate a second set of certs that chain through an intermediate
   make_intermediate_ca_certs `pwd`/tmp intermediate ca
 
   make_cert `pwd`/tmp test-intermediate intermediate \
-    ct-server 127.0.0.1 8124 true `pwd`/tmp/ct-server-key-public.pem
+    127.0.0.1 8124 true `pwd`/tmp/ct-server-key-public.pem
   make_embedded_cert `pwd`/tmp \
-    test-embedded-with-intermediate intermediate ct-server 127.0.0.1 8124 true \
+    test-embedded-with-intermediate intermediate 127.0.0.1 8124 true \
       false `pwd`/tmp/ct-server-key-public.pem
   make_embedded_cert `pwd`/tmp \
-    test-embedded-with-intermediate-preca intermediate ct-server 127.0.0.1 \
+    test-embedded-with-intermediate-preca intermediate 127.0.0.1 \
       8124 true true `pwd`/tmp/ct-server-key-public.pem
 
   # Wait a bit to ensure the server signs the tree.

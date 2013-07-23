@@ -125,11 +125,10 @@ make_cert() {
   local cert_dir=$1
   local server=$2
   local ca=$3
-  local log_server_name=$4
-  local log_server=$5
-  local log_server_port=$6
-  local ca_is_intermediate=$7
-  local server_public_key=$8
+  local log_server=$4
+  local log_server_port=$5
+  local ca_is_intermediate=$6
+  local server_public_key=$7
 
   # Generate a new private key and CSR
   request_cert $cert_dir $server precert.conf
@@ -198,11 +197,10 @@ make_embedded_cert() {
   local server=$2
   local ca=$3
   local log_server=$4
-  local log_server_name=$5
-  local log_server_port=$6
-  local ca_is_intermediate=$7
-  local use_pre_ca=$8
-  local server_public_key=$9
+  local log_server_port=$5
+  local ca_is_intermediate=$6
+  local use_pre_ca=$7
+  local server_public_key=$8
 
   # Generate a new private key and CSR
   request_cert $cert_dir $server precert.conf
@@ -240,8 +238,8 @@ make_embedded_cert() {
 
   ../client/ct upload \
     --ct_server_submission=$cert_dir/$server-precert-bundle.pem \
-    --ct_server=$log_server_name --ct_server_port=$log_server_port \
-    --ct_server_public_key=$cert_dir/$log_server-key-public.pem \
+    --ct_server=$log_server --ct_server_port=$log_server_port \
+    --ct_server_public_key=$server_public_key \
     --ct_server_response_out=$cert_dir/$server-pre-cert.proof \
     --precert=true --logtostderr=true $HTTP_LOG
   rm $cert_dir/$server-precert-tmp.pem

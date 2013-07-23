@@ -68,8 +68,8 @@ do_audit() {
   done
 }
 
-make_cert $CERT_DIR test ca ct-server $SERVER $PORT false $CT_KEY
-make_embedded_cert $CERT_DIR test-embedded ca ct-server $SERVER $PORT false \
+make_cert $CERT_DIR test ca $SERVER $PORT false $CT_KEY
+make_embedded_cert $CERT_DIR test-embedded ca $SERVER $PORT false \
     false $CT_KEY
 
 # Do the audits together, quicker that way.
