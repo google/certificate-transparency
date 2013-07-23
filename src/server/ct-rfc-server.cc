@@ -342,9 +342,9 @@ private:
 
     JsonObject jsend;
     jsend.Add("tree_size", sth.tree_size());
-    jsend.Add("timetamp", sth.timestamp());
+    jsend.Add("timestamp", sth.timestamp());
     jsend.AddBase64("sha256_root_hash", sth.root_hash());
-    jsend.Add("signature", sth.signature());
+    jsend.Add("tree_head_signature", sth.signature());
     
     response.content = jsend.ToString();
   }

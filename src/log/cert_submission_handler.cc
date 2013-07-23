@@ -178,7 +178,7 @@ CertSubmissionHandler::ProcessPreCertSubmission(PreCertChain *chain,
       return INTERNAL_ERROR;
     precert_entry->add_precertificate_chain(der_cert);
   }
-
+  entry->set_type(ct::PRECERT_ENTRY);
   return OK;
 }
 
