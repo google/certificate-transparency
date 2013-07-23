@@ -39,6 +39,6 @@ fi
 # Set the tree signing frequency to 0 to ensure we sign as often as possible.
 echo "Starting CT server with trusted certs in $HASH_DIR"
 
-../server/ct-server --port=8124 --key=$KEY \
+../server/ct-rfc-server --port=8888 --key=$KEY \
   --trusted_cert_dir=$HASH_DIR --logtostderr=true \
   --tree_signing_frequency_seconds=1 --sqlite_db=$STORAGE
