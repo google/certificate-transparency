@@ -3,6 +3,7 @@
 #include <boost/asio.hpp>
 // Note that this comes from cpp-netlib, not boost.
 #include <boost/network/protocol/http/server.hpp>
+#include <boost/network/uri.hpp>
 #include <gflags/gflags.h>
 #include <glog/logging.h>
 #include <iostream>
@@ -55,11 +56,13 @@ DEFINE_int32(tree_signing_frequency_seconds, 600,
              "in a timely manner. Must be greater than 0.");
 
 namespace http = boost::network::http;
+namespace uri = boost::network::uri;
 
 using ct::Cert;
 using ct::CertChain;
 using ct::CertChecker;
 using ct::LoggedCertificate;
+using ct::MerkleAuditProof;
 using ct::PreCertChain;
 using ct::SignedCertificateTimestamp;
 using google::RegisterFlagValidator;
@@ -313,10 +316,15 @@ class ct_server {
             << " method = " << request.method
             << " status = " << response.status << '\n';
 
-    string &path = request.destination;
+    // This is kinda incredibly dumb, but cpp-netlib can't do any better.
+    uri::uri uri(string("http://x") + request.destination);
+    string path = uri.path();
+
     if (request.method == "GET") {
       if (path == "/ct/v1/get-sth")
         GetSTH(response);
+      else if (path == "/ct/v1/get-proof-by-hash")
+        GetProof(response, uri);
       else
         response = server::response::stock_reply(server::response::not_found,
                                                  "Not found");
@@ -336,6 +344,37 @@ class ct_server {
   }
 
 private:
+  void GetProof(server::response &response, const uri::uri &uri) {
+    std::map<string, string> qmap;
+    uri::query_map(uri, qmap);
+    string b64hash = uri::decoded(qmap["hash"]);
+
+    MerkleAuditProof proof;
+    // FIXME(benl): this is incorrect - it should find the path to the
+    // designated head, not the current root, however, it replicates
+    // the existing incorrect behaviour in ct-server.cc.
+    CTLogManager::LookupReply reply
+        = manager_->QueryAuditProof(util::FromBase64(b64hash.c_str()), &proof);
+    if (reply == CTLogManager::NOT_FOUND) {
+      response.status = server::response::bad_request;
+      response.content = "Couldn't find hash";
+      return;
+    }
+
+    CHECK_EQ(CTLogManager::MERKLE_AUDIT_PROOF, reply);
+
+    JsonArray audit;
+    for (int n = 0; n < proof.path_node_size(); ++n)
+      audit.AddBase64(proof.path_node(n));
+
+    JsonObject jsend;
+    jsend.Add("leaf_index", proof.leaf_index());
+    jsend.Add("audit_path", audit);
+
+    response.status = server::response::ok;
+    response.content = jsend.ToString();
+  }
+
   void GetSTH(server::response &response) {
     const ct::SignedTreeHead &sth = manager_->GetSTH();
     response.status = server::response::ok;
@@ -484,7 +523,7 @@ int main(int argc, char * argv[]) {
         &manager);
     server::options options(handler);
     server server_(options.address(FLAGS_server).port(FLAGS_port)
-                   .io_service(io));
+                   .reuse_address(true).io_service(io));
     server_.run();
   }
   catch (std::exception &e) {

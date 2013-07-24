@@ -1,3 +1,5 @@
+/* -*- mode: c++; indent-tabs-mode: nil -*- */
+
 #ifndef UTIL_H
 #define UTIL_H
 
@@ -31,5 +33,8 @@ uint64_t TimeInMilliseconds();
 // srand() is called if needed.
 std::string RandomString(size_t min_length, size_t max_length);
 
+std::string FromBase64(const char *b64);
+
 }  // namespace util
-#endif
+
+#endif  // ndef UTIL_H

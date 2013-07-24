@@ -2,6 +2,8 @@
 #include <cstring>
 #include <fstream>
 #include <iostream>
+#include <netinet/in.h>  // for resolv.h
+#include <resolv.h>  // for b64_ntop
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -163,6 +165,18 @@ std::string RandomString(size_t min_length, size_t max_length) {
     ret.append(1, rand() & 0xff);
 
   return ret;
+}
+
+std::string FromBase64(const char *b64) {
+  size_t length = strlen(b64);
+  // Lazy: base 64 encoding is always >= in length to decoded value
+  // (equality occurs for zero length).
+  u_char buf[length];
+  int rlength = b64_pton(b64, buf, length);
+  // Treat decode errors as empty strings.
+  if (rlength < 0)
+      rlength = 0;
+  return std::string((char *)buf, rlength);
 }
 
 }  // namespace util

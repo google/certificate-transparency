@@ -13,6 +13,7 @@
 #include <sstream>
 
 #include "proto/serializer.h"
+#include "util/util.h"
 
 class JsonArray;
 
@@ -65,6 +66,10 @@ class JsonObject {
 
   const char *ToJson() const {
     return json_object_to_json_string(obj_);
+  }
+
+  void Add(const char *name, const JsonObject &addand) {
+    Add(name, addand.obj_);
   }
 
   void Add(const char *name, int64_t value) {
@@ -140,16 +145,7 @@ class JsonString : public JsonObject {
   const char *Value() { return json_object_get_string(obj_); }
 
   std::string FromBase64() {
-    const char *value = Value();
-    size_t length = strlen(value);
-    // Lazy: base 64 encoding is always >= in length to decoded value
-    // (equality occurs for zero length).
-    u_char buf[length];
-    int rlength = b64_pton(value, buf, length);
-    // Treat decode errors as empty strings.
-    if (rlength < 0)
-        rlength = 0;
-    return std::string((char *)buf, rlength);
+    return util::FromBase64(Value());
   }
     
 };
@@ -174,6 +170,14 @@ class JsonArray : public JsonObject {
 
   void Add(json_object *addand) {
     json_object_array_add(obj_, addand);
+  }
+
+  void Add(const std::string &addand) {
+    Add(json_object_new_string(addand.c_str()));
+  }
+
+  void AddBase64(const std::string &addand) {
+    Add(ToBase64(addand));
   }
 
   int Length() const { return json_object_array_length(obj_); }
