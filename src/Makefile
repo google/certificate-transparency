@@ -294,6 +294,13 @@ test: all
 	log/tree_signer_test
 	log/log_lookup_test
 
+#Java
+java_build:
+	ant build
+
+java_tests: java_build
+	ant test
+
 # Unit tests plus end-to-end tests. Make sure to set up links in test/  first.
 alltests: test
 	cd test && $(MAKE) test

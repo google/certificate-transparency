@@ -43,3 +43,4 @@
 *.pyc
 *_pb2.py
 /src/gtest
+/src/java/build
