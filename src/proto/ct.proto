@@ -138,7 +138,7 @@ message MerkleTreeLeaf {
   optional TimestampedEntry timestamped_entry = 3;
 }
 
-// TODO(ekasper): implement support for id.
+// FIXME(benl): no longer needed?
 message MerkleAuditProof {
   optional Version version = 1 [ default = UNKNOWN_VERSION ];
   optional LogID id = 2;
@@ -147,6 +147,11 @@ message MerkleAuditProof {
   optional uint64 leaf_index = 5;
   repeated bytes path_node = 6;
   optional DigitallySigned tree_head_signature = 7;
+}
+
+message ShortMerkleAuditProof {
+  required uint64 leaf_index = 1;
+  repeated bytes path_node = 2;
 }
 
 ////////////////////////////////////////////////////////////////////////////////

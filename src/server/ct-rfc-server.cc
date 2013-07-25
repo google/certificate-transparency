@@ -62,8 +62,8 @@ using ct::Cert;
 using ct::CertChain;
 using ct::CertChecker;
 using ct::LoggedCertificate;
-using ct::MerkleAuditProof;
 using ct::PreCertChain;
+using ct::ShortMerkleAuditProof;
 using ct::SignedCertificateTimestamp;
 using google::RegisterFlagValidator;
 using std::string;
@@ -251,10 +251,11 @@ class CTLogManager {
   }
 
   LookupReply QueryAuditProof(const std::string &merkle_leaf_hash,
-                              ct::MerkleAuditProof *proof) const {
-    ct::MerkleAuditProof local_proof;
+                              size_t tree_size,
+                              ct::ShortMerkleAuditProof *proof) const {
+    ct::ShortMerkleAuditProof local_proof;
     LogLookup<LoggedCertificate>::LookupResult res =
-        lookup_->AuditProof(merkle_leaf_hash, &local_proof);
+        lookup_->AuditProof(merkle_leaf_hash, tree_size, &local_proof);
     if (res == LogLookup<LoggedCertificate>::OK) {
       proof->CopyFrom(local_proof);
       return MERKLE_AUDIT_PROOF;
@@ -348,13 +349,19 @@ private:
     std::map<string, string> qmap;
     uri::query_map(uri, qmap);
     string b64hash = uri::decoded(qmap["hash"]);
+    size_t tree_size = atoi(qmap["tree_size"].c_str());
 
-    MerkleAuditProof proof;
-    // FIXME(benl): this is incorrect - it should find the path to the
-    // designated head, not the current root, however, it replicates
-    // the existing incorrect behaviour in ct-server.cc.
+    const ct::SignedTreeHead &sth = manager_->GetSTH();
+    if (tree_size > sth.tree_size()) {
+      response.status = server::response::bad_request;
+      response.content = "Tree is not that big";
+      return;
+    }      
+
+    ShortMerkleAuditProof proof;
     CTLogManager::LookupReply reply
-        = manager_->QueryAuditProof(util::FromBase64(b64hash.c_str()), &proof);
+        = manager_->QueryAuditProof(util::FromBase64(b64hash.c_str()),
+                                    tree_size, &proof);
     if (reply == CTLogManager::NOT_FOUND) {
       response.status = server::response::bad_request;
       response.content = "Couldn't find hash";

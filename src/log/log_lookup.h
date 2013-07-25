@@ -35,6 +35,9 @@ template <class Logged> class LogLookup {
   LookupResult AuditProof(const std::string &merkle_leaf_hash,
                           ct::MerkleAuditProof *proof);
 
+  // Look up by hash of the logged item and tree_size
+  LookupResult AuditProof(const std::string &merkle_leaf_hash,
+                          size_t tree_size, ct::ShortMerkleAuditProof *proof);
  private:
   std::string LeafHash(const Logged &logged);
   // We keep a hash -> index mapping in memory so that we can quickly serve

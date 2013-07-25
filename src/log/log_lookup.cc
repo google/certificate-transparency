@@ -12,6 +12,7 @@
 #include "proto/serializer.h"
 
 using ct::MerkleAuditProof;
+using ct::ShortMerkleAuditProof;
 using ct::SignedCertificateTimestamp;
 using ct::SignedTreeHead;
 using std::string;
@@ -81,7 +82,7 @@ LogLookup<Logged>::Update() {
   return UPDATE_OK;
 }
 
-// Look up by timestamp + SHA256-hash of the certificate.
+// Look up by SHA256-hash of the certificate.
 template <class Logged> typename LogLookup<Logged>::LookupResult
 LogLookup<Logged>::AuditProof(const string &merkle_leaf_hash,
                               MerkleAuditProof *proof) {
@@ -105,6 +106,28 @@ LogLookup<Logged>::AuditProof(const string &merkle_leaf_hash,
 
   proof->mutable_id()->CopyFrom(latest_tree_head_.id());
   proof->mutable_tree_head_signature()->CopyFrom(latest_tree_head_.signature());
+  return OK;
+}
+
+// Look up by SHA256-hash of the certificate and tree size.
+template <class Logged> typename LogLookup<Logged>::LookupResult
+LogLookup<Logged>::AuditProof(const string &merkle_leaf_hash, size_t tree_size,
+                              ShortMerkleAuditProof *proof) {
+  std::map<string, uint64_t>::const_iterator it =
+      leaf_index_.find(merkle_leaf_hash);
+  if (it == leaf_index_.end())
+    return NOT_FOUND;
+
+  uint64_t leaf_index = it->second;
+
+  proof->set_leaf_index(leaf_index);
+
+  proof->clear_path_node();
+  std::vector<string> audit_path =
+      cert_tree_.PathToRootAtSnapshot(leaf_index + 1, tree_size);
+  for (size_t i = 0; i < audit_path.size(); ++i)
+    proof->add_path_node(audit_path[i]);
+
   return OK;
 }
 
