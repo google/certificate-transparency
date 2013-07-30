@@ -135,18 +135,44 @@ class Name(types.Choice):
         rdn_sequence = self.getComponentByName('rdnSequence')
         rdn_sequence.set_decoded_values(decode_fun)
 
+# RFC 5280 states:
+# Note - upper bounds on string types, such as TeletexString, are
+# measured in characters.  Excepting PrintableString or IA5String, a
+# significantly greater number of octets will be required to hold
+# such a value.  As a minimum, 16 octets, or twice the specified
+# upper bound, whichever is the larger, should be allowed for
+# TeletexString.  For UTF8String or UniversalString at least four
+# times the upper bound should be allowed.
+#
+# However pyasn1 ValueSizeConstraint operates on raw byte lengths and thus,
+# fails to accept some legitimate certs. Further, not all CAs abide
+# by these rules in the first place.
+#
+# Since we currently only support parsing, and not issuing or validating
+# certificates, we simply disable those range checks.
+# TODO(ekasper): re-enable in an optional strict validation mode.
+#
+# def _generate_directory_string_spec(minlen, maxlen):
+#     return namedtype.NamedTypes(
+#         namedtype.NamedType('teletexString', types.TeletexString().subtype(
+#             subtypeSpec=constraint.ValueSizeConstraint(minlen, maxlen))),
+#         namedtype.NamedType('printableString', types.PrintableString().subtype(
+#             subtypeSpec=constraint.ValueSizeConstraint(minlen, maxlen))),
+#         namedtype.NamedType('universalString', types.UniversalString().subtype(
+#             subtypeSpec=constraint.ValueSizeConstraint(minlen, maxlen))),
+#         namedtype.NamedType('utf8String', types.UTF8String().subtype(
+#             subtypeSpec=constraint.ValueSizeConstraint(minlen, maxlen))),
+#         namedtype.NamedType('bmpString', types.BMPString().subtype(
+#             subtypeSpec=constraint.ValueSizeConstraint(minlen, maxlen)))
+#         )
+
 def _generate_directory_string_spec(minlen, maxlen):
     return namedtype.NamedTypes(
-        namedtype.NamedType('teletexString', types.TeletexString().subtype(
-            subtypeSpec=constraint.ValueSizeConstraint(minlen, maxlen))),
-        namedtype.NamedType('printableString', types.PrintableString().subtype(
-            subtypeSpec=constraint.ValueSizeConstraint(minlen, maxlen))),
-        namedtype.NamedType('universalString', types.UniversalString().subtype(
-            subtypeSpec=constraint.ValueSizeConstraint(minlen, maxlen))),
-        namedtype.NamedType('utf8String', types.UTF8String().subtype(
-            subtypeSpec=constraint.ValueSizeConstraint(minlen, maxlen))),
-        namedtype.NamedType('bmpString', types.BMPString().subtype(
-            subtypeSpec=constraint.ValueSizeConstraint(minlen, maxlen)))
+        namedtype.NamedType('teletexString', types.TeletexString()),
+        namedtype.NamedType('printableString', types.PrintableString()),
+        namedtype.NamedType('universalString', types.UniversalString()),
+        namedtype.NamedType('utf8String', types.UTF8String()),
+        namedtype.NamedType('bmpString', types.BMPString())
         )
 
 # MAX indicates no upper bound, but pyasn1 doesn't have one-sided
