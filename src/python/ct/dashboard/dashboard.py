@@ -8,8 +8,9 @@ import time
 from wsgiref import simple_server
 
 from ct.dashboard import grapher
+from ct.client import sqlite_connection as sqlitecon
 from ct.client import log_client
-from ct.client import sqlite_db
+from ct.client import sqlite_log_db
 from ct.proto import client_pb2
 
 
@@ -106,7 +107,8 @@ if __name__ == "__main__":
     sys.argv = FLAGS(sys.argv)
     logging.basicConfig(level=FLAGS.log_level)
 
-    sqlitedb = sqlite_db.SQLiteDB(FLAGS.ct_sqlite_db)
+    sqlitedb = sqlite_log_db.SQLiteLogDB(
+        sqlitecon.SQLiteConnectionManager(FLAGS.ct_sqlite_db))
 
     ctlogs = client_pb2.CtLogs()
     with open(FLAGS.ctlog_config, 'r') as config:

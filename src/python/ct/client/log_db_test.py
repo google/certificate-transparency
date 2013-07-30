@@ -1,12 +1,13 @@
 import abc
+from ct.client import log_db
 from ct.client import database
 from ct.proto import client_pb2
 
-# This class provides common tests for all database implementations.
+# This class provides common tests for all CT log database implementations.
 # It only inherits from object so that unittest won't attempt to run the test_*
 # methods on this class. Derived classes should use multiple inheritance
-# from DatabaseTest and unittest.TestCase to get test automation.
-class DatabaseTest(object):
+# from LogDBTest and unittest.TestCase to get test automation.
+class LogDBTest(object):
     """All Database tests should derive from this class as well as
     unittest.TestCase."""
     __metaclass__ = abc.ABCMeta
@@ -25,23 +26,23 @@ class DatabaseTest(object):
 
     @abc.abstractmethod
     def db(self):
-        """Derived classes MUST override to initialize a database."""
-        raise NotImplementedError()
+        """Derived classes must override to initialize a database."""
+        pass
 
     def test_add_log(self):
-        self.db().add_log(DatabaseTest.default_log)
+        self.db().add_log(LogDBTest.default_log)
         generator = self.db().logs()
         metadata = generator.next()
-        self.assertEqual(metadata, DatabaseTest.default_log)
+        self.assertEqual(metadata, LogDBTest.default_log)
         self.assertRaises(StopIteration, generator.next)
 
     def test_update_log(self):
-        self.db().add_log(DatabaseTest.default_log)
-        self.db().store_sth(DatabaseTest.default_log.log_server,
-                            DatabaseTest.default_sth)
+        self.db().add_log(LogDBTest.default_log)
+        self.db().store_sth(LogDBTest.default_log.log_server,
+                            LogDBTest.default_sth)
 
         new_log = client_pb2.CtLogMetadata()
-        new_log.CopyFrom(DatabaseTest.default_log)
+        new_log.CopyFrom(LogDBTest.default_log)
         new_log.public_key_info.pem_key = "newkey"
         self.db().update_log(new_log)
         generator = self.db().logs()
@@ -52,63 +53,63 @@ class DatabaseTest(object):
         # Should still be able to access STHs after updating log metadata
         read_sth = self.db().get_latest_sth(new_log.log_server)
         self.assertTrue(read_sth)
-        self.assertEqual(DatabaseTest.default_sth, read_sth)
+        self.assertEqual(LogDBTest.default_sth, read_sth)
 
     def test_update_log_adds_log(self):
-        self.db().update_log(DatabaseTest.default_log)
+        self.db().update_log(LogDBTest.default_log)
         generator = self.db().logs()
         metadata = generator.next()
-        self.assertEqual(metadata, DatabaseTest.default_log)
+        self.assertEqual(metadata, LogDBTest.default_log)
         self.assertRaises(StopIteration, generator.next)
 
     def test_store_sth(self):
-        self.db().add_log(DatabaseTest.default_log)
-        self.db().store_sth(DatabaseTest.default_log.log_server,
-                            DatabaseTest.default_sth)
-        read_sth = self.db().get_latest_sth(DatabaseTest.default_log.log_server)
+        self.db().add_log(LogDBTest.default_log)
+        self.db().store_sth(LogDBTest.default_log.log_server,
+                            LogDBTest.default_sth)
+        read_sth = self.db().get_latest_sth(LogDBTest.default_log.log_server)
         self.assertTrue(read_sth)
-        self.assertEqual(DatabaseTest.default_sth, read_sth)
+        self.assertEqual(LogDBTest.default_sth, read_sth)
 
     def test_store_sth_ignores_duplicate(self):
-        self.db().add_log(DatabaseTest.default_log)
-        self.db().store_sth(DatabaseTest.default_log.log_server,
-                            DatabaseTest.default_sth)
+        self.db().add_log(LogDBTest.default_log)
+        self.db().store_sth(LogDBTest.default_log.log_server,
+                            LogDBTest.default_sth)
         duplicate_sth = client_pb2.AuditedSth()
         duplicate_sth.audit.status = client_pb2.VERIFY_ERROR
-        self.db().store_sth(DatabaseTest.default_log.log_server, duplicate_sth)
-        read_sth = self.db().get_latest_sth(DatabaseTest.default_log.log_server)
+        self.db().store_sth(LogDBTest.default_log.log_server, duplicate_sth)
+        read_sth = self.db().get_latest_sth(LogDBTest.default_log.log_server)
         self.assertTrue(read_sth)
-        self.assertEqual(DatabaseTest.default_sth, read_sth)
+        self.assertEqual(LogDBTest.default_sth, read_sth)
 
     def test_log_not_found_raises(self):
         self.assertRaises(database.KeyError, self.db().store_sth,
-                          DatabaseTest.default_log.log_server,
-                          DatabaseTest.default_sth)
+                          LogDBTest.default_log.log_server,
+                          LogDBTest.default_sth)
 
     def test_get_latest_sth_returns_latest(self):
-        self.db().add_log(DatabaseTest.default_log)
-        self.db().store_sth(DatabaseTest.default_log.log_server,
-                            DatabaseTest.default_sth)
+        self.db().add_log(LogDBTest.default_log)
+        self.db().store_sth(LogDBTest.default_log.log_server,
+                            LogDBTest.default_sth)
         new_sth = client_pb2.AuditedSth()
-        new_sth.CopyFrom(DatabaseTest.default_sth)
-        new_sth.sth.timestamp = DatabaseTest.default_sth.sth.timestamp - 1
-        self.db().store_sth(DatabaseTest.default_log.log_server, new_sth)
-        read_sth = self.db().get_latest_sth(DatabaseTest.default_log.log_server)
+        new_sth.CopyFrom(LogDBTest.default_sth)
+        new_sth.sth.timestamp = LogDBTest.default_sth.sth.timestamp - 1
+        self.db().store_sth(LogDBTest.default_log.log_server, new_sth)
+        read_sth = self.db().get_latest_sth(LogDBTest.default_log.log_server)
         self.assertIsNotNone(read_sth)
-        self.assertEqual(DatabaseTest.default_sth, read_sth)
+        self.assertEqual(LogDBTest.default_sth, read_sth)
 
     def test_get_latest_sth_returns_none_if_empty(self):
-        self.db().add_log(DatabaseTest.default_log)
+        self.db().add_log(LogDBTest.default_log)
         self.assertIsNone(self.db().get_latest_sth(
-            DatabaseTest.default_log.log_server))
+            LogDBTest.default_log.log_server))
 
     def test_get_latest_sth_honours_log_server(self):
-        self.db().add_log(DatabaseTest.default_log)
-        self.db().store_sth(DatabaseTest.default_log.log_server,
-                            DatabaseTest.default_sth)
+        self.db().add_log(LogDBTest.default_log)
+        self.db().store_sth(LogDBTest.default_log.log_server,
+                            LogDBTest.default_sth)
         new_sth = client_pb2.AuditedSth()
-        new_sth.CopyFrom(DatabaseTest.default_sth)
-        new_sth.sth.timestamp = DatabaseTest.default_sth.sth.timestamp + 1
+        new_sth.CopyFrom(LogDBTest.default_sth)
+        new_sth.sth.timestamp = LogDBTest.default_sth.sth.timestamp + 1
 
         new_log = client_pb2.CtLogMetadata()
         new_log.log_server = "test2"
@@ -116,20 +117,20 @@ class DatabaseTest(object):
 
         new_sth.sth.sha256_root_hash = "hash2"
         self.db().store_sth(new_log.log_server, new_sth)
-        read_sth = self.db().get_latest_sth(DatabaseTest.default_log.log_server)
+        read_sth = self.db().get_latest_sth(LogDBTest.default_log.log_server)
         self.assertIsNotNone(read_sth)
-        self.assertEqual(DatabaseTest.default_sth, read_sth)
+        self.assertEqual(LogDBTest.default_sth, read_sth)
 
     def test_scan_latest_sth_range_finds_all(self):
-        self.db().add_log(DatabaseTest.default_log)
+        self.db().add_log(LogDBTest.default_log)
         for i in range(4):
             sth = client_pb2.AuditedSth()
             sth.sth.timestamp = i
             sth.sth.sha256_root_hash = "hash-%d" % i
-            self.db().store_sth(DatabaseTest.default_log.log_server, sth)
+            self.db().store_sth(LogDBTest.default_log.log_server, sth)
 
         generator = self.db().scan_latest_sth_range(
-            DatabaseTest.default_log.log_server)
+            LogDBTest.default_log.log_server)
         for i in range(3, -1, -1):
             sth = generator.next()
             # Scan runs in descending timestamp order
@@ -156,12 +157,12 @@ class DatabaseTest(object):
             self.assertEqual(sth.sth.sha256_root_hash, "hash-%d" % i)
 
     def test_scan_latest_sth_range_honours_range(self):
-        self.db().add_log(DatabaseTest.default_log)
+        self.db().add_log(LogDBTest.default_log)
         for i in range(4):
             sth = client_pb2.AuditedSth()
             sth.sth.timestamp = i
             sth.sth.sha256_root_hash = "hash-%d" % i
-            self.db().store_sth(DatabaseTest.default_log.log_server, sth)
+            self.db().store_sth(LogDBTest.default_log.log_server, sth)
 
         generator = self.db().scan_latest_sth_range("test", start=1, end=2)
         for i in range(2):
@@ -172,12 +173,12 @@ class DatabaseTest(object):
         self.assertRaises(StopIteration, generator.next)
 
     def test_scan_latest_sth_range_honours_limit(self):
-        self.db().add_log(DatabaseTest.default_log)
+        self.db().add_log(LogDBTest.default_log)
         for i in range(4):
             sth = client_pb2.AuditedSth()
             sth.sth.timestamp = i
             sth.sth.sha256_root_hash = "hash-%d" % i
-            self.db().store_sth(DatabaseTest.default_log.log_server, sth)
+            self.db().store_sth(LogDBTest.default_log.log_server, sth)
 
         generator = self.db().scan_latest_sth_range("test", limit=1)
         sth = generator.next()
