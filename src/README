@@ -53,6 +53,9 @@ errors later on.
 5a. And the curlpp library (http://code.google.com/p/curlpp/). Before
 building and installing, you should apply the patch mentioned here:
 https://code.google.com/p/curlpp/issues/detail?id=25
+curlpp's dependencies are libcurl and boost. On Debian, these packages
+should be installed:
+  libcurl4-openssl-dev libboost-dev
 
 (Tested with curlpp-0.7.3)
 
@@ -62,9 +65,13 @@ https://github.com/downloads/json-c/json-c/json-c-0.10.tar.gz).
 
 5c. And if you want to use client/upload_server_cert.sh you may need
 the python modules pyasn1 and pyasn1-modules, which can be installed
-with easy_install.
+with easy_install or pip. On Debian, this dependency can be satisfied
+by installing the 'python-pyasn1' package directly.
 
-5d. Also, cpp-netlib v0.10.0, available from http://cpp-netlib.org/.
+5d. Also, cpp-netlib v0.10.1, available from http://cpp-netlib.org/.
+cpp-netlib is built using 'cmake . && make' and requires the following Boost packages:
+  libboost-test-dev libboost-system-dev libboost-regex-dev libboost-date-time-dev libboost-thread-dev libboost-filesystem-dev  libboost-program-options-dev libboost-chrono-dev
+In case cpp-netlib cannot be installed using 'make install', use CPPNETLIBDIR (see below).
 
 6. Then, you can build the log server by pointing to your custom OpenSSL
 and/or gtest (if needed):
