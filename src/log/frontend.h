@@ -7,8 +7,6 @@
 
 class FrontendSigner;
 
-class ct::CertChain;
-
 // Frontend for accepting new submissions.
 class Frontend {
  public:

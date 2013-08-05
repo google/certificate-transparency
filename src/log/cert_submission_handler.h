@@ -7,8 +7,6 @@
 #include "proto/ct.pb.h"
 #include "proto/serializer.h"
 
-class ct::CertChain;
-
 // Parse incoming submissions, do preliminary sanity checks and pass them
 // through cert checker.
 // Prepare for signing by parsing the input into an appropriate
