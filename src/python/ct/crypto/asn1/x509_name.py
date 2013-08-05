@@ -172,7 +172,9 @@ def _generate_directory_string_spec(minlen, maxlen):
         namedtype.NamedType('printableString', types.PrintableString()),
         namedtype.NamedType('universalString', types.UniversalString()),
         namedtype.NamedType('utf8String', types.UTF8String()),
-        namedtype.NamedType('bmpString', types.BMPString())
+        namedtype.NamedType('bmpString', types.BMPString()),
+        # Does not officially belong here.
+        namedtype.NamedType('ia5String', types.IA5String())
         )
 
 # MAX indicates no upper bound, but pyasn1 doesn't have one-sided
@@ -206,42 +208,61 @@ class X520OrganizationName(DirectoryString):
 
 _UB_ORGANIZATIONAL_UNIT_NAME = types.Integer(64)
 class X520OrganizationalUnitName(DirectoryString):
-    componentType = _generate_directory_string_spec(1, _UB_ORGANIZATIONAL_UNIT_NAME)
+    componentType = _generate_directory_string_spec(
+        1, _UB_ORGANIZATIONAL_UNIT_NAME)
 
 _UB_TITLE = types.Integer(64)
 class X520Title(DirectoryString):
   componentType = _generate_directory_string_spec(1, _UB_TITLE)
 
+# Some of the following name types have a fixed type in the RFC. However, not
+# all CAs comply with this, so we mark them all as a CHOICE. The correct
+# definition is left as commented-out code for now.
+
 # The capitalization inconsistency hurts my eyes but is taken verbatim
 # from the RFC.
-class X520dnQualifier(types.PrintableString):
+#
+# class X520dnQualifier(types.PrintableString):
+#     # No size constraints are specified
+#     pass
+class X520dnQualifier(DirectoryString):
     # No size constraints are specified
-    pass
+    componentType = _generate_directory_string_spec(0, _MAX)
 
-class X520countryName(types.PrintableString):
-    subtypeSpec = (types.PrintableString.subtypeSpec +
-                   constraint.ValueSizeConstraint(2, 2))
-    pass
+
+# class X520countryName(types.PrintableString):
+#     subtypeSpec = (types.PrintableString.subtypeSpec +
+#                    constraint.ValueSizeConstraint(2, 2))
+#     pass
+class X520countryName(DirectoryString):
+    componentType = _generate_directory_string_spec(2, 2)
 
 _UB_SERIAL_NUMBER = types.Integer(64)
-class X520SerialNumber(types.PrintableString):
-    subtypeSpec = (types.PrintableString.subtypeSpec +
-                   constraint.ValueSizeConstraint(1, _UB_SERIAL_NUMBER))
-    pass
+# class X520SerialNumber(types.PrintableString):
+#     subtypeSpec = (types.PrintableString.subtypeSpec +
+#                    constraint.ValueSizeConstraint(1, _UB_SERIAL_NUMBER))
+#     pass
+class X520SerialNumber(DirectoryString):
+    componentType = _generate_directory_string_spec(1, _UB_SERIAL_NUMBER)
 
 _UB_PSEUDONYM = types.Integer(128)
 class X520Pseudonym(DirectoryString):
     componentType = _generate_directory_string_spec(1, _UB_PSEUDONYM)
 
-class DomainComponent(types.IA5String):
+# class DomainComponent(types.IA5String):
+#     # No size constraints are specified
+#     pass
+class DomainComponent(DirectoryString):
     # No size constraints are specified
-    pass
+    componentType = _generate_directory_string_spec(0, _MAX)
 
 _UB_EMAILADDRESS_LENGTH = types.Integer(255)
-class EmailAddress(types.IA5String):
-    subtypeSpec = (types.IA5String.subtypeSpec +
-                   constraint.ValueSizeConstraint(1, _UB_EMAILADDRESS_LENGTH))
-    pass
+# class EmailAddress(types.IA5String):
+#     subtypeSpec = (types.IA5String.subtypeSpec +
+#                    constraint.ValueSizeConstraint(1, _UB_EMAILADDRESS_LENGTH))
+#     pass
+class EmailAddress(DirectoryString):
+    componentType = _generate_directory_string_spec(1, _UB_EMAILADDRESS_LENGTH)
 
 # Create aliases
 # This means you can do
