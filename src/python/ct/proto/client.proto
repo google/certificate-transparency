@@ -9,7 +9,7 @@ message KeyInfo {
   }
   optional KeyType type = 1;
   // The serialized public key, PEM-encoded.
-  optional string pem_key = 2; 
+  optional string pem_key = 2;
 }
 
 message CtLogMetadata {
@@ -49,4 +49,9 @@ message AuditInfo {
 message AuditedSth {
   optional SthResponse sth = 1;
   optional AuditInfo audit = 2;
+}
+
+message EntryResponse {
+  optional bytes leaf_input = 1;
+  optional bytes extra_data = 2;
 }
