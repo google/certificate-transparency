@@ -49,21 +49,34 @@ class AttributeTypeAndValue(types.Sequence):
         if attr_type is None or attr_value is None:
             raise error.ASN1Error("Attempting to decode an incomplete object %s"
                                   % self.human_readable())
+
+        unknown_error = None
         try:
             value_type = attr_type.value_type()
-        except error.UnknownASN1AttributeTypeError:
-            raise
+        except error.UnknownASN1AttributeTypeError as e:
+            # Save the error but see if the unknown type can be decoded as a
+            # DirectoryString (which is a CHOICE of string types) anyway. If not
+            # then we re-raise this error to indicate we don't know how to
+            # decode the attribute.
+            unknown_error = e
+            value_type = DirectoryString()
         try:
             decoded_value, rest = decode_fun(attr_value,
                                              asn1Spec=value_type)
         except pyasn1_error.PyAsn1Error as e:
-            raise error.ASN1Error("Unable to decode name attribute: %s" % e)
+            if unknown_error:
+                raise unknown_error
+            else:
+                raise error.ASN1Error("Unable to decode name attribute: %s" % e)
         else:
             if rest:
                 # If there are leftover bytes here, then best not to trust the
                 # result at all.
-              raise error.ASN1Error("Invalid encoding of name attribute %s"
-                                    % value_type.human_readable())
+                if unknown_error:
+                    raise unknown_error
+                else:
+                    raise error.ASN1Error("Invalid encoding of name attribute "
+                                          "%s" % value_type.human_readable())
             else:
                 return decoded_value
 
@@ -309,6 +322,11 @@ ID_AT_SERIAL_NUMBER = AttributeType(oid.ID_AT_SERIAL_NUMBER)
 ID_AT_PSEUDONYM = AttributeType(oid.ID_AT_PSEUDONYM)
 ID_DOMAIN_COMPONENT = AttributeType(oid.ID_DOMAIN_COMPONENT)
 ID_EMAIL_ADDRESS = AttributeType(oid.ID_EMAIL_ADDRESS)
+ID_AT_STREET_ADDRESS = AttributeType(oid.ID_AT_STREET_ADDRESS)
+ID_AT_DESCRIPTION = AttributeType(oid.ID_AT_DESCRIPTION)
+ID_AT_BUSINESS_CATEGORY = AttributeType(oid.ID_AT_BUSINESS_CATEGORY)
+ID_AT_POSTAL_CODE = AttributeType(oid.ID_AT_POSTAL_CODE)
+ID_AT_POST_OFFICE_BOX = AttributeType(oid.ID_AT_POST_OFFICE_BOX)
 
 _ATTRIBUTE_VALUE_TYPE_DICT = {
     ID_AT_NAME: X520Name(),
@@ -328,4 +346,11 @@ _ATTRIBUTE_VALUE_TYPE_DICT = {
     ID_AT_PSEUDONYM: X520Pseudonym(),
     ID_DOMAIN_COMPONENT: DomainComponent(),
     ID_EMAIL_ADDRESS: EmailAddress(),
+    # These, too, have upper bounds, but since we're not currently enforcing any
+    # bounds, we mark them simply as DirectoryString().
+    ID_AT_STREET_ADDRESS: DirectoryString(),
+    ID_AT_DESCRIPTION: DirectoryString(),
+    ID_AT_BUSINESS_CATEGORY: DirectoryString(),
+    ID_AT_POSTAL_CODE: DirectoryString(),
+    ID_AT_POST_OFFICE_BOX: DirectoryString(),
 }
