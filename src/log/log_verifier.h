@@ -1,3 +1,4 @@
+/* -*- mode: c++; indent-tabs-mode: nil -*- */
 #ifndef LOG_VERIFIER_H
 #define LOG_VERIFIER_H
 
@@ -98,10 +99,14 @@ class LogVerifier {
                          const ct::SignedCertificateTimestamp &sct,
                          const ct::MerkleAuditProof &merkle_proof) const;
 
+  bool VerifyConsistency(const ct::SignedTreeHead &sth1,
+			 const ct::SignedTreeHead &sth2,
+                         const std::vector<std::string> &proof) const;
+
  private:
   LogSigVerifier *sig_verifier_;
   MerkleVerifier *merkle_verifier_;
 
-  bool IsBetween(uint64_t timestamp, uint64_t earliest, uint64_t latest) const;
+  static bool IsBetween(uint64_t timestamp, uint64_t earliest, uint64_t latest);
 };
 #endif

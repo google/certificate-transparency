@@ -18,7 +18,7 @@ using std::ostringstream;
 using ct::Cert;
 using ct::CertChain;
 
-void HTTPLogClient::BaseUrl(ostringstream *url) {
+void HTTPLogClient::BaseUrl(ostringstream *url) const {
   *url << "http://" << server_ << "/ct/v1/";
 }
 
@@ -39,7 +39,7 @@ static HTTPLogClient::Status SendRequest(ostringstream *response,
 
 HTTPLogClient::Status
 HTTPLogClient::UploadSubmission(const std::string &submission, bool pre,
-                                ct::SignedCertificateTimestamp *sct) {
+                                ct::SignedCertificateTimestamp *sct) const {
 
   CertChain chain(submission);
 
@@ -96,7 +96,7 @@ HTTPLogClient::UploadSubmission(const std::string &submission, bool pre,
   JsonString extensions(jresponse, "extensions");
   if (!extensions.Ok())
     return BAD_RESPONSE;
-  sct->set_extension(extensions.FromBase64());
+  sct->set_extensions(extensions.FromBase64());
 
   JsonString signature(jresponse, "signature");
   if (!signature.Ok())
@@ -111,9 +111,53 @@ HTTPLogClient::UploadSubmission(const std::string &submission, bool pre,
   return OK;
 }
 
+HTTPLogClient::Status HTTPLogClient::GetSTH(ct::SignedTreeHead *sth) const {
+  ostringstream url;
+  BaseUrl(&url);
+  url << "get-sth";
+
+  curlpp::Easy request;
+
+  std::ostringstream response;
+  Status ret = SendRequest(&response, &request, url);
+  LOG(INFO) << "request = " << url.str();
+  LOG(INFO) << "response = " << response.str();
+  if (ret != OK)
+    return ret;
+
+  JsonObject jresponse(response);
+
+  JsonInt tree_size(jresponse, "tree_size");
+  if (!tree_size.Ok())
+    return BAD_RESPONSE;
+  sth->set_tree_size(tree_size.Value());
+
+  JsonInt timestamp(jresponse, "timestamp");
+  if (!timestamp.Ok())
+    return BAD_RESPONSE;
+  sth->set_timestamp(timestamp.Value());
+
+  JsonString root_hash(jresponse, "sha256_root_hash");
+  if (!root_hash.Ok())
+    return BAD_RESPONSE;
+  sth->set_sha256_root_hash(root_hash.FromBase64());
+
+  JsonString signature(jresponse, "tree_head_signature");
+  if (!signature.Ok())
+    return BAD_RESPONSE;
+  if (Deserializer::DeserializeDigitallySigned(signature.FromBase64(),
+                                               sth->mutable_signature())
+      != Deserializer::OK)
+    return BAD_RESPONSE;
+
+  sth->set_version(ct::V1);
+
+  return OK;
+}
+
 HTTPLogClient::Status
 HTTPLogClient::QueryAuditProof(const string &merkle_leaf_hash,
-                               ct::MerkleAuditProof *proof) {
+                               ct::MerkleAuditProof *proof) const {
   ostringstream url;
   BaseUrl(&url);
   url << "get-sth";
@@ -139,11 +183,10 @@ HTTPLogClient::QueryAuditProof(const string &merkle_leaf_hash,
     return BAD_RESPONSE;
   proof->set_timestamp(timestamp.Value());
 
-  JsonString tree_head_signature(jresponse, "tree_head_signature");
-  if (!tree_head_signature.Ok())
+  JsonString signature(jresponse, "tree_head_signature");
+  if (!signature.Ok())
     return BAD_RESPONSE;
-  string decoded = tree_head_signature.FromBase64();
-  if (Deserializer::DeserializeDigitallySigned(decoded,
+  if (Deserializer::DeserializeDigitallySigned(signature.FromBase64(),
           proof->mutable_tree_head_signature()) != Deserializer::OK)
     return BAD_RESPONSE;
 
@@ -183,7 +226,8 @@ HTTPLogClient::QueryAuditProof(const string &merkle_leaf_hash,
 }
 
 HTTPLogClient::Status HTTPLogClient::GetEntries(int first, int last,
-                                               std::vector<LogEntry> *entries) {
+                                               std::vector<LogEntry> *entries)
+    const {
   ostringstream url;
   BaseUrl(&url);
   url << "get-entries?start=" << first << "&end=" << last;
@@ -236,6 +280,41 @@ HTTPLogClient::Status HTTPLogClient::GetEntries(int first, int last,
                  << log_entry.leaf.timestamped_entry().entry_type();
 
     entries->push_back(log_entry);
+  }
+
+  return OK;
+}
+
+HTTPLogClient::Status
+HTTPLogClient::GetSTHConsistency(uint64_t size1, uint64_t size2,
+                                 std::vector<std::string> *proof) const {
+  ostringstream url;
+  BaseUrl(&url);
+  url << "get-sth-consistency?first=" << size1 << "&second=" << size2;
+
+  curlpp::Easy request;
+
+  std::ostringstream response;
+  Status ret = SendRequest(&response, &request, url);
+  LOG(INFO) << "request = " << url.str();
+  LOG(INFO) << "response = " << response.str();
+  if (ret != OK)
+    return ret;
+
+  JsonObject jresponse(response);
+  if (!jresponse.Ok())
+    return BAD_RESPONSE;
+
+  JsonArray jproof(jresponse, "consistency");
+  if (!jproof.Ok())
+    return BAD_RESPONSE;
+
+  for (int n = 0; n < jproof.Length(); ++n) {
+    JsonString entry(jproof, n);
+    if (!entry.Ok())
+      return BAD_RESPONSE;
+
+    proof->push_back(entry.FromBase64());
   }
 
   return OK;

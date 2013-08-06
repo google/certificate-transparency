@@ -3,6 +3,9 @@
 # Test a running server. If the certificate directory does not exist,
 # a new CA will be created in it.
 
+# Fail on any error
+set -e
+
 PASSED=0
 FAILED=0
 
@@ -68,6 +71,25 @@ do_audit() {
   done
 }
 
+get_sth() {
+  local file=$1
+
+  ../client/ct sth --ct_server="$SERVER" --ct_server_port=$PORT \
+    --ct_server_public_key=$CT_KEY --logtostderr=true $HTTP_LOG \
+    --ct_server_response_out=$file
+}
+
+consistency() {
+  local file1=$1
+  local file2=$2
+
+  ../client/ct consistency --ct_server="$SERVER" --ct_server_port=$PORT \
+    --ct_server_public_key=$CT_KEY --logtostderr=true $HTTP_LOG \
+    --sth1=$file1 --sth2=$file2
+}
+
+get_sth $CERT_DIR/sth1
+
 make_cert $CERT_DIR test ca $SERVER $PORT false $CT_KEY
 make_embedded_cert $CERT_DIR test-embedded ca $SERVER $PORT false \
     false $CT_KEY
@@ -76,6 +98,10 @@ make_embedded_cert $CERT_DIR test-embedded ca $SERVER $PORT false \
 # test-*-cert.ctdata is made by make_cert.
 do_audit $CERT_DIR/test-cert.ctdata
 do_audit $CERT_DIR/test-embedded-cert.ctdata
+
+get_sth $CERT_DIR/sth2
+
+consistency $CERT_DIR/sth1 $CERT_DIR/sth2
 
 echo $PASSED passed
 echo $FAILED failed

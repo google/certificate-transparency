@@ -105,7 +105,7 @@ LogVerifier::VerifyMerkleAuditProof(const LogEntry &entry,
   sth.mutable_id()->CopyFrom(merkle_proof.id());
   sth.set_timestamp(merkle_proof.timestamp());
   sth.set_tree_size(merkle_proof.tree_size());
-  sth.set_root_hash(root_hash);
+  sth.set_sha256_root_hash(root_hash);
   sth.mutable_signature()->CopyFrom(merkle_proof.tree_head_signature());
 
   if (sig_verifier_->VerifySTHSignature(sth) != LogSigVerifier::OK)
@@ -113,7 +113,19 @@ LogVerifier::VerifyMerkleAuditProof(const LogEntry &entry,
   return VERIFY_OK;
 }
 
+/* static */
 bool LogVerifier::IsBetween(uint64_t timestamp, uint64_t earliest,
-                            uint64_t latest) const {
+                            uint64_t latest) {
   return timestamp >= earliest && timestamp <= latest;
+}
+
+bool LogVerifier::VerifyConsistency(const ct::SignedTreeHead &sth1,
+				    const ct::SignedTreeHead &sth2,
+				    const std::vector<std::string> &proof)
+  const {
+ return merkle_verifier_->VerifyConsistency(sth1.tree_size(),
+					    sth2.tree_size(),
+					    sth1.sha256_root_hash(),
+					    sth2.sha256_root_hash(),
+					    proof);
 }

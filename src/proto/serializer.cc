@@ -131,12 +131,12 @@ Serializer::SerializeResult Serializer::SerializeSCTSignatureInput(
       return SerializeV1CertSCTSignatureInput(
           sct.timestamp(),
           entry.x509_entry().leaf_certificate(),
-          sct.extension(), result);
+          sct.extensions(), result);
     case ct::PRECERT_ENTRY:
       return SerializeV1PrecertSCTSignatureInput(
           sct.timestamp(), entry.precert_entry().pre_cert().issuer_key_hash(),
           entry.precert_entry().pre_cert().tbs_certificate(),
-          sct.extension(), result);
+          sct.extensions(), result);
     default:
       return INVALID_ENTRY_TYPE;
   }
@@ -199,12 +199,12 @@ Serializer::SerializeResult Serializer::SerializeSCTMerkleTreeLeaf(
       return SerializeV1CertSCTMerkleTreeLeaf(
           sct.timestamp(),
           entry.x509_entry().leaf_certificate(),
-          sct.extension(), result);
+          sct.extensions(), result);
     case ct::PRECERT_ENTRY:
       return SerializeV1PrecertSCTMerkleTreeLeaf(
           sct.timestamp(), entry.precert_entry().pre_cert().issuer_key_hash(),
           entry.precert_entry().pre_cert().tbs_certificate(),
-          sct.extension(), result);
+          sct.extensions(), result);
     default:
       return INVALID_ENTRY_TYPE;
   }
@@ -232,7 +232,7 @@ Serializer::SerializeResult Serializer::SerializeSTHSignatureInput(
   if (sth.version() != ct::V1)
     return UNSUPPORTED_VERSION;
   return SerializeV1STHSignatureInput(sth.timestamp(), sth.tree_size(),
-                                      sth.root_hash(), result);
+                                      sth.sha256_root_hash(), result);
 }
 
 
@@ -240,7 +240,7 @@ Serializer::SerializeResult
 Serializer::WriteSCT(const SignedCertificateTimestamp &sct) {
   if (sct.version() != ct::V1)
     return UNSUPPORTED_VERSION;
-  SerializeResult res = CheckExtensionsFormat(sct.extension());
+  SerializeResult res = CheckExtensionsFormat(sct.extensions());
   if (res != OK)
     return res;
   if (sct.id().key_id().size() != kKeyIDLengthInBytes)
@@ -248,7 +248,7 @@ Serializer::WriteSCT(const SignedCertificateTimestamp &sct) {
   WriteUint(ct::V1, kVersionLengthInBytes);
   WriteFixedBytes(sct.id().key_id());
   WriteUint(sct.timestamp(), kTimestampLengthInBytes);
-  WriteVarBytes(sct.extension(), kMaxExtensionsLength);
+  WriteVarBytes(sct.extensions(), kMaxExtensionsLength);
   return WriteDigitallySigned(sct.signature());
 }
 

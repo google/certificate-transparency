@@ -280,6 +280,10 @@ class CTLogManager {
     return signer_->LatestSTH();
   }
 
+  std::vector<string> GetConsistency(size_t first, size_t second) const {
+    return lookup_->ConsistencyProof(first, second);
+  }
+
  private:
   Frontend *frontend_;
   TreeSigner<LoggedCertificate> *signer_;
@@ -326,6 +330,8 @@ class ct_server {
         GetSTH(response);
       else if (path == "/ct/v1/get-proof-by-hash")
         GetProof(response, uri);
+      else if (path == "/ct/v1/get-sth-consistency")
+        GetConsistency(response, uri);
       else
         response = server::response::stock_reply(server::response::not_found,
                                                  "Not found");
@@ -345,6 +351,26 @@ class ct_server {
   }
 
 private:
+  void GetConsistency(server::response &response, const uri::uri &uri) {
+    std::map<string, string> qmap;
+    uri::query_map(uri, qmap);
+    size_t first = atoi(qmap["first"].c_str());
+    size_t second = atoi(qmap["second"].c_str());
+
+    std::vector<string> consistency = manager_->GetConsistency(first, second);
+
+    JsonArray jcons;
+    for (std::vector<string>::const_iterator i = consistency.begin();
+         i != consistency.end(); ++i)
+      jcons.AddBase64(*i);
+
+    JsonObject jsend;
+    jsend.Add("consistency", jcons);
+
+    response.status = server::response::ok;
+    response.content = jsend.ToString();
+  }    
+    
   void GetProof(server::response &response, const uri::uri &uri) {
     std::map<string, string> qmap;
     uri::query_map(uri, qmap);
@@ -386,12 +412,14 @@ private:
     const ct::SignedTreeHead &sth = manager_->GetSTH();
     response.status = server::response::ok;
 
+    VLOG(5) << "STH is " << sth.DebugString();
+
     JsonObject jsend;
     jsend.Add("tree_size", sth.tree_size());
     jsend.Add("timestamp", sth.timestamp());
-    jsend.AddBase64("sha256_root_hash", sth.root_hash());
+    jsend.AddBase64("sha256_root_hash", sth.sha256_root_hash());
     jsend.Add("tree_head_signature", sth.signature());
-    
+
     response.content = jsend.ToString();
   }
 

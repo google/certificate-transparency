@@ -210,7 +210,7 @@ void TestSigner::SetDefaults(SignedCertificateTimestamp *sct) {
   sct->set_version(ct::V1);
   sct->mutable_id()->set_key_id(B(kKeyID));
   sct->set_timestamp(kDefaultSCTTimestamp);
-  sct->clear_extension();
+  sct->clear_extensions();
   sct->mutable_signature()->set_hash_algorithm(DigitallySigned::SHA256);
   sct->mutable_signature()->set_sig_algorithm(DigitallySigned::ECDSA);
   sct->mutable_signature()->set_signature(B(kDefaultCertSCTSignature));
@@ -231,7 +231,7 @@ void TestSigner::SetPrecertDefaults(SignedCertificateTimestamp *sct) {
   sct->set_version(ct::V1);
   sct->mutable_id()->set_key_id(B(kKeyID));
   sct->set_timestamp(kDefaultSCTTimestamp);
-  sct->clear_extension();
+  sct->clear_extensions();
   sct->mutable_signature()->set_hash_algorithm(DigitallySigned::SHA256);
   sct->mutable_signature()->set_sig_algorithm(DigitallySigned::ECDSA);
   sct->mutable_signature()->set_signature(B(kDefaultPrecertSCTSignature));
@@ -250,7 +250,7 @@ void TestSigner::SetDefaults(SignedTreeHead *tree_head) {
   tree_head->mutable_id()->set_key_id(B(kKeyID));
   tree_head->set_timestamp(kDefaultSTHTimestamp);
   tree_head->set_tree_size(kDefaultTreeSize);
-  tree_head->set_root_hash(B(kDefaultRootHash));
+  tree_head->set_sha256_root_hash(B(kDefaultRootHash));
   tree_head->mutable_signature()->set_hash_algorithm(DigitallySigned::SHA256);
   tree_head->mutable_signature()->set_sig_algorithm(DigitallySigned::ECDSA);
   tree_head->mutable_signature()->set_signature(B(kDefaultSTHSignature));
@@ -346,7 +346,7 @@ void TestSigner::CreateUnique(SignedTreeHead *sth) {
   sth->set_version(ct::V1);
   sth->set_timestamp(util::TimeInMilliseconds());
   sth->set_tree_size(rand());
-  sth->set_root_hash(UniqueHash());
+  sth->set_sha256_root_hash(UniqueHash());
   CHECK_EQ(LogSigner::OK,
            default_signer_->SignTreeHead(sth));
 }
@@ -422,7 +422,7 @@ void TestSigner::TestEqualTreeHeads(const SignedTreeHead &sth0,
   EXPECT_EQ(sth0.id().key_id(), sth1.id().key_id());
   EXPECT_EQ(sth0.tree_size(), sth1.tree_size());
   EXPECT_EQ(sth0.timestamp(), sth1.timestamp());
-  EXPECT_EQ(H(sth0.root_hash()), H(sth1.root_hash()));
+  EXPECT_EQ(H(sth0.sha256_root_hash()), H(sth1.sha256_root_hash()));
   TestEqualDigitallySigned(sth0.signature(), sth1.signature());
 }
 
@@ -430,7 +430,7 @@ void TestSigner::FillData(LoggedCertificate *logged_cert) {
   logged_cert->mutable_sct()->set_version(ct::V1);
   logged_cert->mutable_sct()->mutable_id()->set_key_id(B(kKeyID));
   logged_cert->mutable_sct()->set_timestamp(util::TimeInMilliseconds());
-  logged_cert->mutable_sct()->clear_extension();
+  logged_cert->mutable_sct()->clear_extensions();
 
   CreateUnique(logged_cert->mutable_entry());
 

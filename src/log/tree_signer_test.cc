@@ -125,7 +125,7 @@ TYPED_TEST(TreeSignerTest, ResumeClean) {
 
   EXPECT_EQ(DB::LOOKUP_OK, this->db()->LatestTreeHead(&sth2));
   EXPECT_LT(sth.timestamp(), sth2.timestamp());
-  EXPECT_EQ(sth.root_hash(), sth2.root_hash());
+  EXPECT_EQ(sth.sha256_root_hash(), sth2.sha256_root_hash());
   EXPECT_EQ(sth.tree_size(), sth2.tree_size());
 
   delete signer2;
@@ -153,7 +153,7 @@ TYPED_TEST(TreeSignerTest, ResumePartialSign) {
   // The signer should have picked up the sequence number commit.
   EXPECT_EQ(1U, sth2.tree_size());
   EXPECT_LT(sth.timestamp(), sth2.timestamp());
-  EXPECT_NE(sth.root_hash(), sth2.root_hash());
+  EXPECT_NE(sth.sha256_root_hash(), sth2.sha256_root_hash());
 
   delete signer2;
 }

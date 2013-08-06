@@ -11,12 +11,18 @@ INCLUDE = -I.
 LOCAL_LIBS = log/libcert.a log/libdatabase.a log/liblog.a \
              merkletree/libmerkletree.a proto/libproto.a util/libutil.a
 SYS_LIBS = -lpthread -lgflags -lglog -lssl -lcrypto \
-           -lsqlite3 -lprotobuf -lcurlpp -ljson -lcurl -lboost_system \
+           -lsqlite3 -lprotobuf -lcurlpp -ljson -lcurl \
            -L $(CPPNETLIBDIR)/libs/network/src -lcppnetlib-uri
 
 PLATFORM = $(shell uname -s)
 ifneq ($(PLATFORM), FreeBSD)
   SYS_LIBS += -lresolv
+endif
+
+ifeq ($(PLATFORM), Darwin)
+  SYS_LIBS += -lboost_system-mt
+else
+  SYS_LIBS += -lboost_system
 endif
 
 # Need OpenSSL >= 1.0.0

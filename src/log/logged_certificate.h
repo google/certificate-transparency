@@ -57,7 +57,7 @@ class LoggedCertificate : public LoggedCertificatePB {
     mutable_sct()->set_version(ct::V1);
     mutable_sct()->mutable_id()->set_key_id(util::BinaryString(kKeyID));
     mutable_sct()->set_timestamp(util::TimeInMilliseconds());
-    mutable_sct()->clear_extension();
+    mutable_sct()->clear_extensions();
 
     int random_bits = rand();
     ct::LogEntryType type = random_bits & 1 ?

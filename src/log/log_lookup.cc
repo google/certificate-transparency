@@ -74,7 +74,7 @@ LogLookup<Logged>::Update() {
     leaf_index_.insert(std::pair<string, uint64_t>(leaf_hash,
                                                    sequence_number));
   }
-  CHECK_EQ(cert_tree_.CurrentRoot(), sth.root_hash())
+  CHECK_EQ(cert_tree_.CurrentRoot(), sth.sha256_root_hash())
       << "Computed root hash and stored STH root hash do not match";
   LOG(INFO) << "Found " << sth.tree_size() - latest_tree_head_.tree_size()
             << " new log entries";

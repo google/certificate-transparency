@@ -1,3 +1,4 @@
+/* -*- mode: c++; indent-tabs-mode: nil -*- */
 #ifndef MERKLETREE_H
 #define MERKLETREE_H
 
@@ -103,11 +104,11 @@ class MerkleTree {
 
   // Get the Merkle path from leaf to the root of a previous snapshot.
   //
-  // Returns a vector of node hashes, ordered by levels from leaf to root.
-  // The first element is the sibling of the leaf hash, and the last element
-  // is one below the root.
-  // Returns an empty vector if the leaf index is 0, the snapshot requested is in the
-  // future or the snapshot tree is not large enough.
+  // Returns a vector of node hashes, ordered by levels from leaf to
+  // root.  The first element is the sibling of the leaf hash, and the
+  // last element is one below the root.  Returns an empty vector if
+  // the leaf index is 0, the snapshot requested is in the future or
+  // the snapshot tree is not large enough.
   //
   // @param leaf the index of the leaf the path is for.
   // @param snapshot point in time (= number of leaves at that point)
@@ -120,7 +121,8 @@ class MerkleTree {
   //
   // @param snapshot1 the first point in time
   // @param snapshot2 the second point in time
-  std::vector<std::string> SnapshotConsistency(size_t snapshot1, size_t snapshot2);
+  std::vector<std::string> SnapshotConsistency(size_t snapshot1,
+                                               size_t snapshot2);
 
  private:
   // Update to a given snapshot, return the root.

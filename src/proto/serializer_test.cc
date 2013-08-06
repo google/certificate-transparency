@@ -195,7 +195,7 @@ class SerializerTest : public ::testing::Test {
     sth_.mutable_id()->set_key_id("iamapublickeyshatwofivesixdigest");
     sth_.set_timestamp(2345);
     sth_.set_tree_size(6);
-    sth_.set_root_hash("imustbeexactlythirtytwobyteslong");
+    sth_.set_sha256_root_hash("imustbeexactlythirtytwobyteslong");
     sth_.mutable_signature()->set_hash_algorithm(DigitallySigned::SHA256);
     sth_.mutable_signature()->set_sig_algorithm(DigitallySigned::ECDSA);
     sth_.mutable_signature()->set_signature("tree_signature");
@@ -231,7 +231,7 @@ class SerializerTest : public ::testing::Test {
 
   uint64_t DefaultTreeSize() const { return sth_.tree_size(); }
 
-  string DefaultRootHash() const { return sth_.root_hash(); }
+  string DefaultRootHash() const { return sth_.sha256_root_hash(); }
 
   const SignedTreeHead &DefaultSTH() const { return sth_; }
 
@@ -581,7 +581,7 @@ TEST_F(SerializerTest, SerializeSTHSignatureInputKatTest) {
 
 TEST_F(SerializerTest, SerializeSTHSignatureInputBadHash) {
   SignedTreeHead sth(DefaultSTH());
-  sth.set_root_hash("thisisnotthirtytwobyteslong");
+  sth.set_sha256_root_hash("thisisnotthirtytwobyteslong");
   string result;
   EXPECT_EQ(Serializer::INVALID_HASH_LENGTH,
             Serializer::SerializeSTHSignatureInput(sth, &result));
@@ -589,7 +589,7 @@ TEST_F(SerializerTest, SerializeSTHSignatureInputBadHash) {
 
 TEST_F(SerializerTest, SerializeSCTWithExtensionsTest) {
   SignedCertificateTimestamp sct(DefaultSCT());
-  sct.set_extension("hello");
+  sct.set_extensions("hello");
   string result;
   EXPECT_EQ(Serializer::OK,
             Serializer::SerializeSCT(sct, &result));
@@ -606,7 +606,7 @@ TEST_F(SerializerTest, SerializeSCTSignatureInputWithExtensionsTest) {
 
   result.clear();
   SignedCertificateTimestamp sct(DefaultSCT());
-  sct.set_extension("hello");
+  sct.set_extensions("hello");
   EXPECT_EQ(Serializer::OK,
             Serializer::SerializeSCTSignatureInput(
                 sct, DefaultCertEntry(), &result));
@@ -623,7 +623,7 @@ TEST_F(SerializerTest, SerializeSCTMerkleTreeLeafWithExtensionsTest) {
 
   result.clear();
   SignedCertificateTimestamp sct(DefaultSCT());
-  sct.set_extension("hello");
+  sct.set_extensions("hello");
   EXPECT_EQ(Serializer::OK,
             Serializer::SerializeSCTMerkleTreeLeaf(
                 sct, DefaultCertEntry(), &result));
@@ -632,7 +632,7 @@ TEST_F(SerializerTest, SerializeSCTMerkleTreeLeafWithExtensionsTest) {
 
 TEST_F(SerializerTest, SerializeDeserializeSCTAddExtensions) {
   SignedCertificateTimestamp sct(DefaultSCT());
-  sct.set_extension("hello");
+  sct.set_extensions("hello");
 
   string result;
   EXPECT_EQ(Serializer::OK, Serializer::SerializeSCT(sct, &result));

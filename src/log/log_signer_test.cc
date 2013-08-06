@@ -74,7 +74,7 @@ TEST_F(LogSignerTest, VerifyCertSCTKatTest) {
             verifier_->VerifyV1CertSCTSignature(
                 default_sct.timestamp(),
                 default_entry.x509_entry().leaf_certificate(),
-                default_sct.extension(),
+                default_sct.extensions(),
                 SerializedSignature(default_sct.signature())));
 }
 
@@ -94,7 +94,7 @@ TEST_F(LogSignerTest, VerifyPrecertSCTKatTest) {
                 default_sct.timestamp(),
                 default_entry.precert_entry().pre_cert().issuer_key_hash(),
                 default_entry.precert_entry().pre_cert().tbs_certificate(),
-                default_sct.extension(),
+                default_sct.extensions(),
                 SerializedSignature(default_sct.signature())));
 }
 
@@ -107,7 +107,7 @@ TEST_F(LogSignerTest, VerifySTHKatTest) {
   EXPECT_EQ(LogSigVerifier::OK,
             verifier_->VerifyV1STHSignature(
                 default_sth.timestamp(), default_sth.tree_size(),
-                default_sth.root_hash(),
+                default_sth.sha256_root_hash(),
                 SerializedSignature(default_sth.signature())));
 }
 
@@ -141,7 +141,7 @@ TEST_F(LogSignerTest, SignAndVerifyCertSCT) {
             signer_->SignV1CertificateTimestamp(
                 default_sct.timestamp(),
                 default_entry.x509_entry().leaf_certificate(),
-                default_sct.extension(),
+                default_sct.extensions(),
                 &serialized_sig));
 
   string default_serialized_sig = SerializedSignature(default_sct.signature());
@@ -150,7 +150,7 @@ TEST_F(LogSignerTest, SignAndVerifyCertSCT) {
             verifier_->VerifyV1CertSCTSignature(
                 default_sct.timestamp(),
                 default_entry.x509_entry().leaf_certificate(),
-                default_sct.extension(),
+                default_sct.extensions(),
                 serialized_sig));
 }
 
@@ -185,7 +185,7 @@ TEST_F(LogSignerTest, SignAndVerifyPrecertSCT) {
                 default_sct.timestamp(),
                 default_entry.precert_entry().pre_cert().issuer_key_hash(),
                 default_entry.precert_entry().pre_cert().tbs_certificate(),
-                default_sct.extension(),
+                default_sct.extensions(),
                 &serialized_sig));
 
   string default_serialized_sig = SerializedSignature(default_sct.signature());
@@ -195,7 +195,7 @@ TEST_F(LogSignerTest, SignAndVerifyPrecertSCT) {
                 default_sct.timestamp(),
                 default_entry.precert_entry().pre_cert().issuer_key_hash(),
                 default_entry.precert_entry().pre_cert().tbs_certificate(),
-                default_sct.extension(),
+                default_sct.extensions(),
                 serialized_sig));
 }
 
@@ -223,14 +223,14 @@ TEST_F(LogSignerTest, SignAndVerifySTH) {
   EXPECT_EQ(LogSigner::OK,
             signer_->SignV1TreeHead(
                 default_sth.timestamp(), default_sth.tree_size(),
-                default_sth.root_hash(), &serialized_sig));
+                default_sth.sha256_root_hash(), &serialized_sig));
 
   string default_serialized_sig = SerializedSignature(default_sth.signature());
   EXPECT_NE(H(default_serialized_sig), H(serialized_sig));
   EXPECT_EQ(LogSigVerifier::OK,
             verifier_->VerifyV1STHSignature(
                 default_sth.timestamp(), default_sth.tree_size(),
-                default_sth.root_hash(), default_serialized_sig));
+                default_sth.sha256_root_hash(), default_serialized_sig));
 }
 
 TEST_F(LogSignerTest, SignAndVerifyCertSCTApiCrossCheck) {
@@ -255,7 +255,7 @@ TEST_F(LogSignerTest, SignAndVerifyCertSCTApiCrossCheck) {
             verifier_->VerifyV1CertSCTSignature(
                 default_sct.timestamp(),
                 default_entry.x509_entry().leaf_certificate(),
-                default_sct.extension(), serialized_sig));
+                default_sct.extensions(), serialized_sig));
 
   // The second version.
   serialized_sig.clear();
@@ -263,7 +263,7 @@ TEST_F(LogSignerTest, SignAndVerifyCertSCTApiCrossCheck) {
             signer_->SignV1CertificateTimestamp(
                 default_sct.timestamp(),
                 default_entry.x509_entry().leaf_certificate(),
-                default_sct.extension(), &serialized_sig));
+                default_sct.extensions(), &serialized_sig));
 
   // Deserialize and verify.
   sct.clear_signature();
@@ -297,7 +297,7 @@ TEST_F(LogSignerTest, SignAndVerifyPrecertSCTApiCrossCheck) {
                 default_sct.timestamp(),
                 default_entry.precert_entry().pre_cert().issuer_key_hash(),
                 default_entry.precert_entry().pre_cert().tbs_certificate(),
-                default_sct.extension(), serialized_sig));
+                default_sct.extensions(), serialized_sig));
 
   // The second version.
   serialized_sig.clear();
@@ -306,7 +306,7 @@ TEST_F(LogSignerTest, SignAndVerifyPrecertSCTApiCrossCheck) {
                 default_sct.timestamp(),
                 default_entry.precert_entry().pre_cert().issuer_key_hash(),
                 default_entry.precert_entry().pre_cert().tbs_certificate(),
-                default_sct.extension(), &serialized_sig));
+                default_sct.extensions(), &serialized_sig));
 
   // Deserialize and verify.
   sct.clear_signature();
@@ -333,14 +333,14 @@ TEST_F(LogSignerTest, SignAndVerifySTHApiCrossCheck) {
   EXPECT_EQ(LogSigVerifier::OK,
             verifier_->VerifyV1STHSignature(
                 default_sth.timestamp(), default_sth.tree_size(),
-                default_sth.root_hash(), serialized_sig));
+                default_sth.sha256_root_hash(), serialized_sig));
 
   // The second version.
   serialized_sig.clear();
   EXPECT_EQ(LogSigner::OK,
             signer_->SignV1TreeHead(
                 default_sth.timestamp(), default_sth.tree_size(),
-                default_sth.root_hash(), &serialized_sig));
+                default_sth.sha256_root_hash(), &serialized_sig));
 
   // Deserialize and verify.
   sth.clear_signature();
@@ -388,7 +388,7 @@ TEST_F(LogSignerTest, SignEmptyCert) {
   EXPECT_EQ(LogSigner::EMPTY_CERTIFICATE,
             signer_->SignV1CertificateTimestamp(
                 default_sct.timestamp(), empty_cert,
-                default_sct.extension(), &serialized_sig));
+                default_sct.extensions(), &serialized_sig));
 }
 
 TEST_F(LogSignerTest, SignEmptyPreCert) {
@@ -414,7 +414,7 @@ TEST_F(LogSignerTest, SignEmptyPreCert) {
             signer_->SignV1PrecertificateTimestamp(
                 default_sct.timestamp(),
                 default_entry.precert_entry().pre_cert().issuer_key_hash(),
-                empty_cert, default_sct.extension(), &serialized_sig));
+                empty_cert, default_sct.extensions(), &serialized_sig));
 }
 
 TEST_F(LogSignerTest, SignInvalidIssuerKeyHash) {
@@ -441,7 +441,7 @@ TEST_F(LogSignerTest, SignInvalidIssuerKeyHash) {
                 default_sct.timestamp(),
                 bad_hash,
                 default_entry.precert_entry().pre_cert().tbs_certificate(),
-                default_sct.extension(), &serialized_sig));
+                default_sct.extensions(), &serialized_sig));
 }
 
 TEST_F(LogSignerTest, SignBadRootHash) {
@@ -449,7 +449,7 @@ TEST_F(LogSignerTest, SignBadRootHash) {
   TestSigner::SetDefaults(&default_sth);
   sth.CopyFrom(default_sth);
   sth.clear_signature();
-  sth.set_root_hash("bad");
+  sth.set_sha256_root_hash("bad");
 
   EXPECT_EQ(LogSigner::INVALID_HASH_LENGTH, signer_->SignTreeHead(&sth));
 
@@ -480,14 +480,14 @@ TEST_F(LogSignerTest, VerifyChangeCertSCTTimestamp) {
             verifier_->VerifyV1CertSCTSignature(
                 default_sct.timestamp(),
                 default_entry.x509_entry().leaf_certificate(),
-                default_sct.extension(),
+                default_sct.extensions(),
                 SerializedSignature(default_sct.signature())));
 
   EXPECT_EQ(LogSigVerifier::INVALID_SIGNATURE,
             verifier_->VerifyV1CertSCTSignature(
                 new_timestamp,
                 default_entry.x509_entry().leaf_certificate(),
-                default_sct.extension(),
+                default_sct.extensions(),
                 SerializedSignature(default_sct.signature())));
 }
 
@@ -512,7 +512,7 @@ TEST_F(LogSignerTest, VerifyChangePrecertSCTTimestamp) {
                 default_sct.timestamp(),
                 default_entry.precert_entry().pre_cert().issuer_key_hash(),
                 default_entry.precert_entry().pre_cert().tbs_certificate(),
-                default_sct.extension(),
+                default_sct.extensions(),
                 SerializedSignature(default_sct.signature())));
 
   EXPECT_EQ(LogSigVerifier::INVALID_SIGNATURE,
@@ -520,7 +520,7 @@ TEST_F(LogSignerTest, VerifyChangePrecertSCTTimestamp) {
                 new_timestamp,
                 default_entry.precert_entry().pre_cert().issuer_key_hash(),
                 default_entry.precert_entry().pre_cert().tbs_certificate(),
-                default_sct.extension(),
+                default_sct.extensions(),
                 SerializedSignature(default_sct.signature())));
 }
 
@@ -538,13 +538,13 @@ TEST_F(LogSignerTest, VerifyChangeSTHTimestamp) {
   EXPECT_EQ(LogSigVerifier::OK,
             verifier_->VerifyV1STHSignature(
                 default_sth.timestamp(), default_sth.tree_size(),
-                default_sth.root_hash(),
+                default_sth.sha256_root_hash(),
                 SerializedSignature(default_sth.signature())));
 
   EXPECT_EQ(LogSigVerifier::INVALID_SIGNATURE,
             verifier_->VerifyV1STHSignature(
                 new_timestamp, default_sth.tree_size(),
-                default_sth.root_hash(),
+                default_sth.sha256_root_hash(),
                 SerializedSignature(default_sth.signature())));
 }
 
@@ -576,12 +576,12 @@ TEST_F(LogSignerTest, VerifyChangeCert) {
             verifier_->VerifyV1CertSCTSignature(
                 default_sct.timestamp(),
                 default_entry.x509_entry().leaf_certificate(),
-                default_sct.extension(),
+                default_sct.extensions(),
                 SerializedSignature(default_sct.signature())));
   EXPECT_EQ(LogSigVerifier::INVALID_SIGNATURE,
             verifier_->VerifyV1CertSCTSignature(
                 default_sct.timestamp(),
-                new_cert, default_sct.extension(),
+                new_cert, default_sct.extensions(),
                 SerializedSignature(default_sct.signature())));
 }
 
@@ -615,13 +615,13 @@ TEST_F(LogSignerTest, VerifyChangePrecert) {
                 default_sct.timestamp(),
                 default_entry.precert_entry().pre_cert().issuer_key_hash(),
                 default_entry.precert_entry().pre_cert().tbs_certificate(),
-                default_sct.extension(),
+                default_sct.extensions(),
                 SerializedSignature(default_sct.signature())));
   EXPECT_EQ(LogSigVerifier::INVALID_SIGNATURE,
             verifier_->VerifyV1PrecertSCTSignature(
                 default_sct.timestamp(),
                 default_entry.precert_entry().pre_cert().issuer_key_hash(),
-                new_cert, default_sct.extension(),
+                new_cert, default_sct.extensions(),
                 SerializedSignature(default_sct.signature())));
 }
 
@@ -655,14 +655,14 @@ TEST_F(LogSignerTest, VerifyChangeIssuerKeyHash) {
                 default_sct.timestamp(),
                 default_entry.precert_entry().pre_cert().issuer_key_hash(),
                 default_entry.precert_entry().pre_cert().tbs_certificate(),
-                default_sct.extension(),
+                default_sct.extensions(),
                 SerializedSignature(default_sct.signature())));
   EXPECT_EQ(LogSigVerifier::INVALID_SIGNATURE,
             verifier_->VerifyV1PrecertSCTSignature(
                 default_sct.timestamp(),
                 new_hash,
                 default_entry.precert_entry().pre_cert().tbs_certificate(),
-                default_sct.extension(),
+                default_sct.extensions(),
                 SerializedSignature(default_sct.signature())));
 }
 
@@ -679,9 +679,9 @@ TEST_F(LogSignerTest, VerifyChangeCertExtensions) {
             verifier_->VerifyV1CertSCTSignature(
                 sct.timestamp(),
                 default_entry.x509_entry().leaf_certificate(),
-                sct.extension(), SerializedSignature(sct.signature())));
+                sct.extensions(), SerializedSignature(sct.signature())));
 
-  sct.set_extension("hello");
+  sct.set_extensions("hello");
   // Check that we can successfully sign and verify the new sct.
   sct2.CopyFrom(sct);
   EXPECT_EQ(LogSigner::OK,
@@ -692,7 +692,7 @@ TEST_F(LogSignerTest, VerifyChangeCertExtensions) {
             verifier_->VerifyV1CertSCTSignature(
                 sct2.timestamp(),
                 default_entry.x509_entry().leaf_certificate(),
-                sct2.extension(), SerializedSignature(sct2.signature())));
+                sct2.extensions(), SerializedSignature(sct2.signature())));
 
   // We should not be able to verify the new data with the old signature.
   EXPECT_EQ(LogSigVerifier::INVALID_SIGNATURE,
@@ -702,7 +702,7 @@ TEST_F(LogSignerTest, VerifyChangeCertExtensions) {
             verifier_->VerifyV1CertSCTSignature(
                 sct.timestamp(),
                 default_entry.x509_entry().leaf_certificate(),
-                sct.extension(), SerializedSignature(sct.signature())));
+                sct.extensions(), SerializedSignature(sct.signature())));
 }
 
 TEST_F(LogSignerTest, VerifyChangePrecertExtensions) {
@@ -719,9 +719,9 @@ TEST_F(LogSignerTest, VerifyChangePrecertExtensions) {
                 sct.timestamp(),
                 default_entry.precert_entry().pre_cert().issuer_key_hash(),
                 default_entry.precert_entry().pre_cert().tbs_certificate(),
-                sct.extension(), SerializedSignature(sct.signature())));
+                sct.extensions(), SerializedSignature(sct.signature())));
 
-  sct.set_extension("hello");
+  sct.set_extensions("hello");
   // Check that we can successfully sign and verify the new sct.
   sct2.CopyFrom(sct);
   EXPECT_EQ(LogSigner::OK,
@@ -733,7 +733,7 @@ TEST_F(LogSignerTest, VerifyChangePrecertExtensions) {
                 sct2.timestamp(),
                 default_entry.precert_entry().pre_cert().issuer_key_hash(),
                 default_entry.precert_entry().pre_cert().tbs_certificate(),
-                sct2.extension(), SerializedSignature(sct2.signature())));
+                sct2.extensions(), SerializedSignature(sct2.signature())));
 
   // We should not be able to verify the new data with the old signature.
   EXPECT_EQ(LogSigVerifier::INVALID_SIGNATURE,
@@ -744,7 +744,7 @@ TEST_F(LogSignerTest, VerifyChangePrecertExtensions) {
                 sct.timestamp(),
                 default_entry.precert_entry().pre_cert().issuer_key_hash(),
                 default_entry.precert_entry().pre_cert().tbs_certificate(),
-                sct.extension(), SerializedSignature(sct.signature())));
+                sct.extensions(), SerializedSignature(sct.signature())));
 }
 
 TEST_F(LogSignerTest, VerifyChangeTreeSize) {
@@ -761,13 +761,13 @@ TEST_F(LogSignerTest, VerifyChangeTreeSize) {
   EXPECT_EQ(LogSigVerifier::OK,
             verifier_->VerifyV1STHSignature(
                 default_sth.timestamp(), default_sth.tree_size(),
-                default_sth.root_hash(),
+                default_sth.sha256_root_hash(),
                 SerializedSignature(default_sth.signature())));
 
   EXPECT_EQ(LogSigVerifier::INVALID_SIGNATURE,
             verifier_->VerifyV1STHSignature(
                 default_sth.timestamp(), new_tree_size,
-                default_sth.root_hash(),
+                default_sth.sha256_root_hash(),
                 SerializedSignature(default_sth.signature())));
 }
 
@@ -921,14 +921,14 @@ TEST_F(LogSignerTest, VerifyBadSerializedSCTSignature) {
             verifier_->VerifyV1CertSCTSignature(
                 default_sct.timestamp(),
                 default_entry.x509_entry().leaf_certificate(),
-                default_sct.extension(), serialized_sig));
+                default_sct.extensions(), serialized_sig));
   // Too short.
   string bad_signature = serialized_sig.substr(0, serialized_sig.size() - 1);
   EXPECT_EQ(LogSigVerifier::SIGNATURE_TOO_SHORT,
             verifier_->VerifyV1CertSCTSignature(
                 default_sct.timestamp(),
                 default_entry.x509_entry().leaf_certificate(),
-                default_sct.extension(), bad_signature));
+                default_sct.extensions(), bad_signature));
   // Too long.
   bad_signature = serialized_sig;
   bad_signature.push_back(0x42);
@@ -936,7 +936,7 @@ TEST_F(LogSignerTest, VerifyBadSerializedSCTSignature) {
             verifier_->VerifyV1CertSCTSignature(
                 default_sct.timestamp(),
                 default_entry.x509_entry().leaf_certificate(),
-                default_sct.extension(), bad_signature));
+                default_sct.extensions(), bad_signature));
 
   // Flip the lsb of each byte one by one.
   for (size_t i = 0; i < serialized_sig.size(); ++i) {
@@ -947,7 +947,7 @@ TEST_F(LogSignerTest, VerifyBadSerializedSCTSignature) {
               verifier_->VerifyV1CertSCTSignature(
                   default_sct.timestamp(),
                   default_entry.x509_entry().leaf_certificate(),
-                  default_sct.extension(), bad_signature));
+                  default_sct.extensions(), bad_signature));
   }
 }
 
@@ -958,20 +958,20 @@ TEST_F(LogSignerTest, VerifyBadSerializedSTHSignature) {
   EXPECT_EQ(LogSigVerifier::OK,
             verifier_->VerifyV1STHSignature(
                 default_sth.timestamp(), default_sth.tree_size(),
-                default_sth.root_hash(), serialized_sig));
+                default_sth.sha256_root_hash(), serialized_sig));
   // Too short.
   string bad_signature = serialized_sig.substr(0, serialized_sig.size() - 1);
   EXPECT_EQ(LogSigVerifier::SIGNATURE_TOO_SHORT,
             verifier_->VerifyV1STHSignature(
                 default_sth.timestamp(), default_sth.tree_size(),
-                default_sth.root_hash(), bad_signature));
+                default_sth.sha256_root_hash(), bad_signature));
   // Too long.
   bad_signature = serialized_sig;
   bad_signature.push_back(0x42);
   EXPECT_EQ(LogSigVerifier::SIGNATURE_TOO_LONG,
             verifier_->VerifyV1STHSignature(
                 default_sth.timestamp(), default_sth.tree_size(),
-                default_sth.root_hash(), bad_signature));
+                default_sth.sha256_root_hash(), bad_signature));
 
   // Flip the lsb of each byte one by one.
   for (size_t i = 0; i < serialized_sig.size(); ++i) {
@@ -981,7 +981,7 @@ TEST_F(LogSignerTest, VerifyBadSerializedSTHSignature) {
     EXPECT_NE(LogSigVerifier::OK,
               verifier_->VerifyV1STHSignature(
                   default_sth.timestamp(), default_sth.tree_size(),
-                  default_sth.root_hash(), bad_signature));
+                  default_sth.sha256_root_hash(), bad_signature));
   }
 }
 

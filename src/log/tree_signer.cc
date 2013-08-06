@@ -51,7 +51,7 @@ TreeSigner<Logged>::UpdateTree() {
         << "Latest STH lookup failed";
     if (sth.timestamp() != latest_tree_head_.timestamp() ||
             sth.tree_size() != latest_tree_head_.tree_size() ||
-        sth.root_hash() != latest_tree_head_.root_hash()) {
+        sth.sha256_root_hash() != latest_tree_head_.sha256_root_hash()) {
       LOG(ERROR) << "Database has an STH that does not match ours. "
                  << "Our STH:\n" << latest_tree_head_.DebugString()
                  << "Database STH:\n" << sth.DebugString();
@@ -126,7 +126,7 @@ template <class Logged> void TreeSigner<Logged>::BuildTree() {
   }
 
   // Check the root hash.
-  CHECK_EQ(cert_tree_.CurrentRoot(), sth.root_hash());
+  CHECK_EQ(cert_tree_.CurrentRoot(), sth.sha256_root_hash());
 
   latest_tree_head_.CopyFrom(sth);
 
@@ -183,7 +183,7 @@ template <class Logged> void
 TreeSigner<Logged>::TimestampAndSign(uint64_t min_timestamp,
                                      SignedTreeHead *sth) {
   sth->set_version(ct::V1);
-  sth->set_root_hash(cert_tree_.CurrentRoot());
+  sth->set_sha256_root_hash(cert_tree_.CurrentRoot());
   uint64_t timestamp = util::TimeInMilliseconds();
   if (timestamp < min_timestamp)
     // TODO(ekasper): shouldn't really happen if everyone's clocks are in sync;

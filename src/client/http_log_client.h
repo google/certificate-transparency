@@ -28,10 +28,15 @@ class HTTPLogClient {
   };
 
   Status UploadSubmission(const std::string &submission, bool pre,
-                          ct::SignedCertificateTimestamp *sct);
+                          ct::SignedCertificateTimestamp *sct) const;
+
+  Status GetSTH(ct::SignedTreeHead *sth) const;
 
   Status QueryAuditProof(const std::string &merkle_leaf_hash,
-                         ct::MerkleAuditProof *proof);
+                         ct::MerkleAuditProof *proof) const;
+
+  Status GetSTHConsistency(uint64_t size1, uint64_t size2,
+                           std::vector<std::string> *proof) const;
 
   struct LogEntry {
     ct::MerkleTreeLeaf leaf;
@@ -40,10 +45,10 @@ class HTTPLogClient {
 
   // This does not clear |entries| before appending the retrieved
   // entries.
-  Status GetEntries(int first, int last, std::vector<LogEntry> *entries);
+  Status GetEntries(int first, int last, std::vector<LogEntry> *entries) const;
 
 private:
-  void BaseUrl(std::ostringstream *url);
+  void BaseUrl(std::ostringstream *url) const;
 
   std::string server_;
 };

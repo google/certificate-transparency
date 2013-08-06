@@ -76,6 +76,8 @@ DEFINE_int32(get_first, 0, "First entry to retrieve with the 'get' command");
 DEFINE_int32(get_last, 0, "Last entry to retrieve with the 'get' command");
 DEFINE_string(certificate_base, "", "Base name for retrieved certificates - "
               "files will be <base><entry>.<cert>.der");
+DEFINE_string(sth1, "", "File containing first STH");
+DEFINE_string(sth2, "", "File containing second STH");
 
 
 static const char kUsage[] =
@@ -92,6 +94,8 @@ static const char kUsage[] =
     "wrap_embedded - take a certificate chain with an embedded SCT and wrap\n"
     "                them as if they were retrieved via 'connect'\n"
     "get_entries - get entries from the log\n"
+    "sth - get the current STH from the log\n"
+    "consistency - get and check consistency of two STHs\n"
     "Use --help to display command-line flag options\n";
 
 using ct::LogEntry;
@@ -187,6 +191,20 @@ static bool CheckSCT(const SignedCertificateTimestamp &sct,
   return true;
 }
 
+void WriteFile(const std::string &file, const std::string &contents,
+               const char *name) {
+  if (file.empty()) {
+    LOG(WARNING) << "No response file specified; " << name
+                 << " will not be saved.";
+    return;
+  }
+  std::ofstream out(file.c_str(), std::ios::out | std::ios::binary);
+  PCHECK(out.good()) << "Could not open file " << file << " for writing";
+  out.write(contents.data(), contents.size());
+  out.close();
+  LOG(INFO) << name << " saved in " << file;
+}
+
 // Returns true if the server responds with a token; false if
 // it responds with an error.
 // 0 - ok
@@ -244,25 +262,12 @@ static int Upload() {
   // TODO(ekasper): Process the |contents| bundle so that we can verify
   // the token.
 
-  bool record_response = !FLAGS_ct_server_response_out.empty();
-  if (record_response) {
-    string response_file = FLAGS_ct_server_response_out;
-    std::ofstream token_out(response_file.c_str(),
-                            std::ios::out | std::ios::binary);
-    PCHECK(token_out.good()) << "Could not open response file " << response_file
-                             << " for writing";
-    string proof;
-    if (Serializer::SerializeSCT(sct, &proof) == Serializer::OK) {
-      token_out.write(proof.data(), proof.size());
-      LOG(INFO) << "SCT token saved in " << response_file;
-      token_out.close();
-    } else {
-      LOG(ERROR) << "Failed to serialize the server token";
-      return 1;
-    }
-  } else {
-    LOG(WARNING) << "No response file specified; SCT token will not be saved.";
+  string proof;
+  if (Serializer::SerializeSCT(sct, &proof) != Serializer::OK) {
+    LOG(ERROR) << "Failed to serialize the server token";
+    return 1;
   }
+  WriteFile(FLAGS_ct_server_response_out, proof, "SCT token");
   return 0;
 }
 
@@ -552,6 +557,38 @@ static AuditResult Audit() {
   return audit_result;
 }
 
+static int CheckConsistency() {
+  HTTPLogClient client(FLAGS_ct_server);
+  LogVerifier *verifier = GetLogVerifierFromFlags();
+
+  string sth1_str;
+  PCHECK(util::ReadBinaryFile(FLAGS_sth1, &sth1_str)) << "Can't read STH file "
+                                                      << FLAGS_sth1;
+  ct::SignedTreeHead sth1;
+  CHECK(sth1.ParseFromString(sth1_str));
+  string sth2_str;
+  PCHECK(util::ReadBinaryFile(FLAGS_sth2, &sth2_str)) << "Can't read STH file "
+                                                  << FLAGS_sth2;
+  ct::SignedTreeHead sth2;
+  CHECK(sth2.ParseFromString(sth2_str));
+
+  std::vector<string> proof;
+  CHECK_EQ(HTTPLogClient::OK, client.GetSTHConsistency(sth1.tree_size(),
+                                                       sth2.tree_size(),
+                                                       &proof));
+
+  if (!verifier->VerifyConsistency(sth1, sth2, proof)) {
+    LOG(ERROR) << "Consistency proof does not verify";
+    delete verifier;
+    return 1;
+  }
+
+  LOG(INFO) << "Consistency proof verifies";
+
+  delete verifier;
+  return 0;
+}
+
 static void DiagnoseCertChain() {
   string cert_file = FLAGS_certificate_chain_in;
   CHECK(!cert_file.empty()) << "Please give a certificate chain with "
@@ -722,6 +759,40 @@ void GetEntries() {
   }
 }
 
+int GetSTH() {
+  CHECK(FLAGS_http_log);
+
+  HTTPLogClient client(FLAGS_ct_server);
+
+  ct::SignedTreeHead sth;
+  CHECK_EQ(HTTPLogClient::OK, client.GetSTH(&sth));
+
+  LogVerifier *verifier = GetLogVerifierFromFlags();
+
+  // Allow for 10 seconds of clock skew
+  uint64_t latest = (time(NULL) + 10) * 1000;
+  LogVerifier::VerifyResult result
+      = verifier->VerifySignedTreeHead(sth, 0, latest);
+
+  LOG(INFO) << "STH is " << sth.DebugString();
+
+  if (result != LogVerifier::VERIFY_OK) {
+    if (result == LogVerifier::INVALID_TIMESTAMP)
+      LOG(ERROR) << "STH has bad timestamp (" << sth.timestamp() << ")";
+    else if (result == LogVerifier::INVALID_SIGNATURE)
+      LOG(ERROR) << "STH signature doesn't validate";
+    else
+      LOG(ERROR) << "STH validation failed with unknown error " << result;
+    return 1;
+  }
+
+  string sth_str;
+  CHECK(sth.SerializeToString(&sth_str));
+  WriteFile(FLAGS_ct_server_response_out, sth_str, "STH");
+
+  return 0;
+}
+
 // Exit code upon normal exit:
 // 0: success
 // 1: failure
@@ -759,6 +830,8 @@ int main(int argc, char **argv) {
     ret = Upload();
   } else if (cmd == "audit") {
     ret = Audit();
+  } else if (cmd == "consistency") {
+    ret = CheckConsistency();
   } else if (cmd == "certificate") {
     MakeCert();
   } else if (cmd == "extension_data") {
@@ -773,8 +846,11 @@ int main(int argc, char **argv) {
     WrapEmbedded();
   } else if (cmd == "get_entries") {
     GetEntries();
+  } else if (cmd == "sth") {
+    ret = GetSTH();
   } else {
     std::cout << google::ProgramUsage();
+    ret = 1;
   }
 
   return ret;
