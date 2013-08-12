@@ -78,8 +78,6 @@ HTTPLogClient::UploadSubmission(const std::string &submission, bool pre,
 
   JsonObject jresponse(json_tokener_parse(response.str().c_str()));
 
-  jsoned = jresponse.ToJson();
-
   if (!jresponse.IsType(json_type_object)) {
     LOG(ERROR) << "Expected a JSON object, got: " << response.str();
     return BAD_RESPONSE;
