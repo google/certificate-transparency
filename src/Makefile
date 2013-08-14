@@ -11,7 +11,7 @@ INCLUDE = -I.
 LOCAL_LIBS = log/libcert.a log/libdatabase.a log/liblog.a \
              merkletree/libmerkletree.a proto/libproto.a util/libutil.a
 SYS_LIBS = -lpthread -lgflags -lglog -lssl -lcrypto \
-           -lsqlite3 -lprotobuf -lcurlpp -ljson -lcurl \
+           -lsqlite3 -lprotobuf -lcurlpp -lcurl \
            -L $(CPPNETLIBDIR)/libs/network/src -lcppnetlib-uri
 
 PLATFORM = $(shell uname -s)
@@ -30,6 +30,14 @@ ifneq ($(OPENSSLDIR),)
   INCLUDE += -I $(OPENSSLDIR)/include
   SYS_LIBS += -L $(OPENSSLDIR) -L $(OPENSSLDIR)/lib -Wl,-rpath,$(OPENSSLDIR) \
           -Wl,-rpath,$(OPENSSLDIR)/lib
+endif
+
+# Json library location explicitly specified - link against that.
+ifneq ($(JSONCLIBDIR),)
+	INCLUDE += -I $(JSONCLIBDIR)/include
+	SYS_LIBS += -L $(JSONCLIBDIR)/lib -Wl,-rpath,$(JSONCLIBDIR)/lib -ljson-c
+else
+	SYS_LIBS += -ljson
 endif
 
 GTESTDIR ?= /usr/src/gtest

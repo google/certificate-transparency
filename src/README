@@ -62,11 +62,13 @@ should be installed:
 5b. And the JSON-C library, v0.11.
 (https://github.com/json-c/json-c/wiki - tarball is
 https://github.com/json-c/json-c/archive/json-c-0.11-20130402.tar.gz).
-Note: JSON-C v0.10 would work as well, except the json_object_iterator.h header
-is not properly copied when installing. Copy the header manually or modify
-Makefile.am and add it to libjsoninclude_HEADERS sectior.
-Note 2: json-c v0.11 will install 'libjson.so' in /usr/local/lib which may
-interfere with the system version of libjson. In that case it can be removed.
+NOTE: json-c v0.11 will install 'libjson.so' in /usr/local/lib which may
+interfere with the system version of libjson. If your system has libjson
+below 0.10, it is recommended to install the new libjson version somewhere
+else, then specify this location via the JSONCLIBDIR environment variable.
+NOTE 2: JSON-C v0.10 would work as well, except the json_object_iterator.h
+header is not properly copied when installing. Copy the header manually or
+modify Makefile.am and add it to libjsoninclude_HEADERS sectior.
 
 5c. And if you want to use client/upload_server_cert.sh you may need
 the python modules pyasn1 and pyasn1-modules, which can be installed
