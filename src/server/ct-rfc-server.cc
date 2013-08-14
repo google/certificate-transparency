@@ -315,7 +315,7 @@ class ct_server {
 
   void operator() (server::request const &request,
                    server::response &response) {
-    VLOG(5) << "[" << string(source(request))
+    VLOG(1) << "[" << string(source(request))
             << "]: source = " << request.source
             << " destination = " << request.destination
             << " method = " << request.method
@@ -369,8 +369,8 @@ private:
 
     response.status = server::response::ok;
     response.content = jsend.ToString();
-  }    
-    
+  }
+
   void GetProof(server::response &response, const uri::uri &uri) {
     std::map<string, string> qmap;
     uri::query_map(uri, qmap);
@@ -382,7 +382,7 @@ private:
       response.status = server::response::bad_request;
       response.content = "Tree is not that big";
       return;
-    }      
+    }
 
     ShortMerkleAuditProof proof;
     CTLogManager::LookupReply reply
@@ -412,7 +412,7 @@ private:
     const ct::SignedTreeHead &sth = manager_->GetSTH();
     response.status = server::response::ok;
 
-    VLOG(5) << "STH is " << sth.DebugString();
+    VLOG(1) << "STH is " << sth.DebugString();
 
     JsonObject jsend;
     jsend.Add("tree_size", sth.tree_size());

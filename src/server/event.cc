@@ -189,7 +189,7 @@ void Server::ReadIsAllowed() {
   char buf[1024];
 
   ssize_t n = read(fd(), buf, sizeof buf);
-  VLOG(5) << "read " << n << " bytes from " << fd();
+  VLOG(1) << "read " << n << " bytes from " << fd();
   if (n <= 0) {
     Close();
     return;
@@ -200,7 +200,7 @@ void Server::ReadIsAllowed() {
 
 void Server::WriteIsAllowed() {
   ssize_t n = write(fd(), wbuffer_.data(), wbuffer_.length());
-  VLOG(5) << "wrote " << n << " bytes to " << fd();
+  VLOG(1) << "wrote " << n << " bytes to " << fd();
   if (n <= 0) {
     Close();
     return;

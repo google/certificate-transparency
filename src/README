@@ -76,9 +76,16 @@ with easy_install or pip. On Debian, this dependency can be satisfied
 by installing the 'python-pyasn1' package directly.
 
 5d. Also, cpp-netlib v0.10.1, available from http://cpp-netlib.org/.
-cpp-netlib is built using 'cmake . && make' and requires the following Boost packages:
-  libboost-test-dev libboost-system-dev libboost-regex-dev libboost-date-time-dev libboost-thread-dev libboost-filesystem-dev  libboost-program-options-dev libboost-chrono-dev
-In case cpp-netlib cannot be installed using 'make install', use CPPNETLIBDIR (see below).
+cpp-netlib is built using 'cmake . && make' and requires the following
+Boost packages:
+  libboost-test-dev libboost-system-dev libboost-regex-dev
+  libboost-date-time-dev libboost-thread-dev libboost-filesystem-dev
+  libboost-program-options-dev libboost-chrono-dev
+
+Note you may need libboost-dev >= 1.48 to meet these dependencies.
+
+cpp-netlib cannot be installed using 'make install': use CPPNETLIBDIR
+to point to the local build (see below).
 
 6. Then, you can build the log server by pointing to your custom OpenSSL
 and/or gtest (if needed):

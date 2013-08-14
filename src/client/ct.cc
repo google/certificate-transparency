@@ -457,9 +457,9 @@ static SSLClient::HandshakeResult Connect() {
     client.GetSSLClientCTData(&ct_data);
     if (ct_data.attached_sct_info_size() > 0) {
       LOG(INFO) << "Received " << ct_data.attached_sct_info_size() << " SCTs";
-      VLOG(5) << "Received SCTs:";
+      VLOG(1) << "Received SCTs:";
       for (int i = 0; i < ct_data.attached_sct_info_size(); ++i)
-        VLOG(5) << ct_data.attached_sct_info(i).DebugString();
+        VLOG(1) << ct_data.attached_sct_info(i).DebugString();
       if (!FLAGS_ssl_client_ct_data_out.empty())
         WriteSSLClientCTData(ct_data, FLAGS_ssl_client_ct_data_out);
     }

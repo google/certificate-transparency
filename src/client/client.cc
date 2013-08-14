@@ -72,7 +72,7 @@ bool Client::Write(const string &data) {
 
   CHECK_EQ(data.length(), (unsigned)n);
 
-  VLOG(5) << "wrote " << data.length() << " bytes";
+  VLOG(1) << "wrote " << data.length() << " bytes";
   return true;
 }
 
@@ -92,6 +92,6 @@ bool Client::Read(size_t length, string *result) {
   }
   result->assign(string(buf, length));
   delete[] buf;
-  VLOG(5) << "read " << length << " bytes";
+  VLOG(1) << "read " << length << " bytes";
   return true;
 }
