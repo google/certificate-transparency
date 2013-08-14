@@ -68,7 +68,7 @@ public class LogSignatureVerifier {
     } catch (CertificateEncodingException e) {
       throw new CertificateTransparencyException("Error encoding certificate", e);
     }
-    Serializer.writeVariableLength(bos, sct.getExtension().toByteArray(),
+    Serializer.writeVariableLength(bos, sct.getExtensions().toByteArray(),
         CTConstants.MAX_EXTENSIONS_LENGTH);
 
     return bos.toByteArray();

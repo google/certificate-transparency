@@ -92,7 +92,7 @@ public class HttpLogClient {
     builder.setTimestamp(((Number) parsedResponse.get("timestamp")).longValue());
     String extensions = (String) parsedResponse.get("extensions");
     if (!extensions.isEmpty()) {
-      builder.setExtension(ByteString.copyFrom(Base64.decodeBase64(extensions)));
+      builder.setExtensions(ByteString.copyFrom(Base64.decodeBase64(extensions)));
     }
 
     String base64Signature = (String) parsedResponse.get("signature");

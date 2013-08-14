@@ -33,7 +33,7 @@ public class Deserializer {
     sctBuilder.setTimestamp(timestamp);
 
     byte[] extensions = readVariableLength(inputStream, CTConstants.MAX_EXTENSIONS_LENGTH);
-    sctBuilder.setExtension(ByteString.copyFrom(extensions));
+    sctBuilder.setExtensions(ByteString.copyFrom(extensions));
 
     sctBuilder.setSignature(parseDigitallySignedFromBinary(inputStream));
     return sctBuilder.build();

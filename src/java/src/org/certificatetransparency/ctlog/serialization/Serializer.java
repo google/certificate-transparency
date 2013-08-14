@@ -71,7 +71,7 @@ public class Serializer {
     writeUint(bos, sct.getVersion().getNumber(), CTConstants.VERSION_LENGTH);
     writeFixedBytes(bos, sct.getId().getKeyId().toByteArray());
     writeUint(bos, sct.getTimestamp(), CTConstants.TIMESTAMP_LENGTH);
-    writeVariableLength(bos, sct.getExtension().toByteArray(), CTConstants.MAX_EXTENSIONS_LENGTH);
+    writeVariableLength(bos, sct.getExtensions().toByteArray(), CTConstants.MAX_EXTENSIONS_LENGTH);
     writeUint(bos,
         sct.getSignature().getHashAlgorithm().getNumber(), CTConstants.HASH_ALG_LENGTH);
     writeUint(bos,
