@@ -8,7 +8,8 @@ from ct.crypto import error, merkle, pem
 from ct.proto import client_pb2, ct_pb2
 
 class LogVerifier(object):
-    __ECDSA_MARKERS = ("PUBLIC KEY", "ECDSA PUBLIC KEY")
+    __ECDSA_READ_MARKERS = ("PUBLIC KEY", "ECDSA PUBLIC KEY")
+    __ECDSA_WRITE_MARKER = "ECDSA PUBLIC KEY"
     def __init__(self, key_info, merkle_verifier=merkle.MerkleVerifier()):
         """Initialize from KeyInfo protocol buffer and a MerkleVerifier."""
         self.__merkle_verifier = merkle_verifier
@@ -17,7 +18,8 @@ class LogVerifier(object):
                                                   key_info.type)
 
         # Will raise a PemError on invalid encoding
-        self.__der, _ = pem.from_pem(key_info.pem_key, LogVerifier.__ECDSA_MARKERS)
+        self.__der, _ = pem.from_pem(key_info.pem_key,
+                                     LogVerifier.__ECDSA_READ_MARKERS)
         try:
             self.__pubkey = ecdsa.VerifyingKey.from_der(self.__der)
         except ecdsa.der.UnexpectedDER as e:
@@ -26,12 +28,12 @@ class LogVerifier(object):
     def __repr__(self):
         return "%r(public key: %r)" % (self.__class__.__name__,
                                        pem.to_pem(self.__der,
-                                                  self.__ECDSA_MARKERS))
+                                                  self.__ECDSA_WRITE_MARKER))
 
     def __str__(self):
         return "%s(public key: %s)" % (self.__class__.__name__,
                                        pem.to_pem(self.__der,
-                                                  self.__ECDSA_MARKERS))
+                                                  self.__ECDSA_WRITE_MARKER))
 
     def _encode_sth_input(self, sth_response):
         if len(sth_response.sha256_root_hash) != 32:
