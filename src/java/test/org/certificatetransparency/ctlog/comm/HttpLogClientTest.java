@@ -7,10 +7,9 @@ import static org.mockito.Matchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
-import org.certificatetransparency.ctlog.serialization.CryptoDataLoader;
-import org.certificatetransparency.ctlog.proto.Ct;
-
 import org.apache.commons.codec.binary.Base64;
+import org.certificatetransparency.ctlog.proto.Ct;
+import org.certificatetransparency.ctlog.serialization.CryptoDataLoader;
 import org.json.simple.JSONArray;
 import org.json.simple.JSONObject;
 import org.junit.Assert;

@@ -43,7 +43,6 @@ public class CTLogClient {
   }
 
   public UploadResult uploadCertificatesChain(List<Certificate> chain) {
-    //TODO(eranm): Return SCT as well.
     Ct.SignedCertificateTimestamp sct = httpClient.addCertificate(chain);
     return new UploadResult(sct, signatureVerifier.verifySignature(sct, chain.get(0)));
   }

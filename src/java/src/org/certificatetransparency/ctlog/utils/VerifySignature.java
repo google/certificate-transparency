@@ -44,7 +44,7 @@ public class VerifySignature {
 
     LogInfo logInfo = LogInfo.fromKeyFile(logPublicKeyFile);
     LogSignatureVerifier verifier = new LogSignatureVerifier(logInfo);
-    if (verifier.verifySignature(sct, certs.get(0))) {
+    if (verifier.verifySignature(sct, certs)) {
       System.out.println("Signature verified OK.");
     } else {
       System.out.println("Signature verification FAILURE.");

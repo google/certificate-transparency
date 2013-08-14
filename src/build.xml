@@ -81,6 +81,12 @@
   <path id="library.protobuf">
     <pathelement location="${jarsdir}/protobuf-java-2.4.1.jar"/>
   </path>
+  <path id="library.bouncycastleprovider">
+    <pathelement location="${jarsdir}/bcprov-jdk15on-149.jar"/>
+  </path>
+  <path id="library.bouncycastlepkix">
+    <pathelement location="${jarsdir}/bcpkix-jdk15on-149.jar"/>
+  </path>
 
   <!-- CT Log Client -->
   <dirname property="ctlogclient.basedir" file="${ant.file}"/>
@@ -90,6 +96,7 @@
   <property name="ctlogclient.generated.dir" value="${ctlogclient.build.dir}/generated"/>
   <property name="ctlogclient.testoutput.dir" value="${ctlogclient.build.dir}/test"/>
   <property name="ctlogclient.testlogs.dir" value="${ctlogclient.build.dir}/test_logs"/>
+
   <path id="ctlogclient.bootclasspath">
     <!-- Paths to be included in compilation bootclasspath -->
   </path>
@@ -105,6 +112,8 @@
     <path refid="library.hamcrest"/>
     <path refid="library.junit"/>
     <path refid="library.mockito"/>
+    <path refid="library.bouncycastleprovider"/>
+    <path refid="library.bouncycastlepkix"/>
   </path>
 
   <path id="ctlogclient.test.compilation.classpath">
@@ -119,6 +128,8 @@
     <path refid="library.hamcrest"/>
     <path refid="library.junit"/>
     <path refid="library.mockito"/>
+    <path refid="library.bouncycastleprovider"/>
+    <path refid="library.bouncycastlepkix"/>
   </path>
 
   <path id="ctlogclient.test.runtime.classpath">
@@ -134,6 +145,8 @@
     <path refid="library.hamcrest"/>
     <path refid="library.junit"/>
     <path refid="library.mockito"/>
+    <path refid="library.bouncycastleprovider"/>
+    <path refid="library.bouncycastlepkix"/>
   </path>
 
   <patternset id="excluded.from.compilation.ctlogclient">

@@ -1,11 +1,13 @@
 package org.certificatetransparency.ctlog.comm;
 
+import com.google.common.base.Preconditions;
 import com.google.protobuf.ByteString;
+
+import org.apache.commons.codec.binary.Base64;
+import org.certificatetransparency.ctlog.CertificateInfo;
 import org.certificatetransparency.ctlog.CertificateTransparencyException;
 import org.certificatetransparency.ctlog.proto.Ct;
 import org.certificatetransparency.ctlog.serialization.Deserializer;
-
-import org.apache.commons.codec.binary.Base64;
 import org.json.simple.JSONArray;
 import org.json.simple.JSONObject;
 import org.json.simple.JSONValue;
@@ -108,9 +110,32 @@ public class HttpLogClient {
    * @return SignedCertificateTimestamp if the log added the chain successfully.
    */
   public Ct.SignedCertificateTimestamp addCertificate(List<Certificate> certificatesChain) {
-    String jsonPayload = encodeCertificates(certificatesChain).toJSONString();
+    Preconditions.checkArgument(!certificatesChain.isEmpty(),
+        "Must have at least one certificate to submit.");
 
-    String response = postInvoker.makePostRequest(logUrl + "add-chain", jsonPayload);
+    boolean isPreCertificate = CertificateInfo.isPreCertificate(certificatesChain.get(0));
+    if (isPreCertificate &&
+        CertificateInfo.isPreCertificateSigningCert(certificatesChain.get(1))) {
+      Preconditions.checkArgument(
+          certificatesChain.size() >= 3,
+          "When signing a PreCertificate with a PreCertificate Signing Cert," +
+              " the issuer certificate must follow.");
+    }
+
+    return addCertificate(certificatesChain, isPreCertificate);
+  }
+
+  private Ct.SignedCertificateTimestamp addCertificate(
+      List<Certificate> certificatesChain, boolean isPreCertificate) {
+    String jsonPayload = encodeCertificates(certificatesChain).toJSONString();
+    String methodPath;
+    if (isPreCertificate) {
+      methodPath = "add-pre-chain";
+    } else {
+      methodPath = "add-chain";
+    }
+
+    String response = postInvoker.makePostRequest(logUrl + methodPath, jsonPayload);
     return parseServerResponse(response);
   }
 }

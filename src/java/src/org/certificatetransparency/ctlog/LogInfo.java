@@ -35,6 +35,10 @@ public class LogInfo {
     return logKey;
   }
 
+  public String getSignatureAlgorithm() {
+    return logKey.getAlgorithm();
+  }
+
   public boolean isSameLogId(byte[] idToCheck) {
     return Arrays.equals(getID(), idToCheck);
   }

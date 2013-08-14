@@ -2,9 +2,9 @@ package org.certificatetransparency.ctlog.serialization;
 
 import com.google.common.base.Joiner;
 import com.google.common.io.Files;
-import org.certificatetransparency.ctlog.UnsupportedCryptoPrimitiveException;
 
 import org.apache.commons.codec.binary.Base64;
+import org.certificatetransparency.ctlog.UnsupportedCryptoPrimitiveException;
 
 import java.io.BufferedInputStream;
 import java.io.File;
