@@ -14,7 +14,6 @@
 #include <vector>
 
 #include "log/ct_extensions.h"
-#include "log/frontend.h"
 #include "merkletree/serial_hasher.h"
 #include "util/openssl_util.h"  // For LOG_OPENSSL_ERRORS
 
@@ -777,11 +776,6 @@ CertChain::CertChain(const string &pem_string) {
   }
 }
 
-SubmitResult CertChain::Submit(Frontend *frontend,
-                               SignedCertificateTimestamp *sct) {
-  return frontend->QueueX509Entry(this, sct);
-}
-
 Cert::Status CertChain::AddCert(Cert *cert) {
   if (cert == NULL || !cert->IsLoaded()) {
     LOG(ERROR) << "Attempting to add an invalid cert";
@@ -891,11 +885,6 @@ void CertChain::ClearChain() {
   for (it = chain_.begin(); it < chain_.end(); ++it)
     delete *it;
   chain_.clear();
-}
-
-SubmitResult PreCertChain::Submit(Frontend *frontend,
-                                  SignedCertificateTimestamp *sct) {
-  return frontend->QueuePreCertEntry(this, sct);
 }
 
 Cert::Status PreCertChain::UsesPrecertSigningCertificate() const {

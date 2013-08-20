@@ -3,6 +3,7 @@
 #define FRONTEND_H
 
 #include "log/cert_submission_handler.h"
+#include "log/submit_result.h"
 #include "proto/ct.pb.h"
 
 class FrontendSigner;

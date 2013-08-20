@@ -231,10 +231,15 @@ class CTLogManager {
     return ss.str();
   }
 
-  LogReply SubmitEntry(CertChain *chain, SignedCertificateTimestamp *sct,
-                           string *error) const {
+  LogReply SubmitEntry(CertChain *chain, PreCertChain *prechain,
+                       SignedCertificateTimestamp *sct, string *error) const {
+    CHECK(chain != NULL || prechain != NULL);
+    CHECK(!(chain != NULL && prechain != NULL));
+
     SignedCertificateTimestamp local_sct;
-    SubmitResult submit_result = chain->Submit(frontend_, &local_sct);
+    SubmitResult submit_result = chain != NULL ?
+        frontend_->QueueX509Entry(chain, &local_sct)
+        : frontend_->QueuePreCertEntry(prechain, &local_sct);
 
     LogReply reply = REJECT;
     switch (submit_result) {
@@ -425,22 +430,23 @@ private:
 
   void AddChain(server::response &response, const std::string &body) {
     CertChain chain;
-    AddChain(response, body, &chain);
+    AddChain(response, body, &chain, NULL);
   }
 
   void AddPreChain(server::response &response, const std::string &body) {
     PreCertChain chain;
-    AddChain(response, body, &chain);
+    AddChain(response, body, NULL, &chain);
   }
 
   void AddChain(server::response &response, const std::string &body,
-                CertChain *chain) {
-    if (!ExtractChain(response, chain, body))
+                CertChain *chain, PreCertChain *prechain) {
+    if (!ExtractChain(response, chain != NULL ? chain : prechain, body))
       return;
 
     SignedCertificateTimestamp sct;
     string error;
-    CTLogManager::LogReply result = manager_->SubmitEntry(chain, &sct, &error);
+    CTLogManager::LogReply result = manager_->SubmitEntry(chain, prechain, &sct,
+                                                          &error);
 
     ProcessChainResult(response, result, error, sct);
   }
