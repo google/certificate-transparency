@@ -40,6 +40,11 @@ class Cert {
     // certainty.
     FALSE,
     ERROR,
+    // This can happen when an algorithm is not accepted (e.g. MD2).
+    // We signal UNSUPPORTED_ALGORITHM rather than FALSE on signature
+    // verification to indicate that the certificate signature is
+    // unconditionally not accepted.
+    UNSUPPORTED_ALGORITHM,
   };
 
   bool IsLoaded() const { return x509_ != NULL; }
@@ -51,11 +56,12 @@ class Cert {
   // Frees the old X509 and attempts to load anew.
   Status LoadFromDerString(const std::string &der_string);
 
-  // These two just return an empty string if an error occurs.
+  // These just return an empty string if an error occurs.
   std::string PrintIssuerName() const;
   std::string PrintSubjectName() const;
   std::string PrintNotBefore() const;
   std::string PrintNotAfter() const;
+  std::string PrintSignatureAlgorithm() const;
 
   Status IsIdenticalTo(const Cert &other) const;
 

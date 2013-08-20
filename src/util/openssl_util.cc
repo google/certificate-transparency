@@ -1,5 +1,6 @@
 #include "util/openssl_util.h"
 
+#include <openssl/bio.h>
 #include <openssl/err.h>
 #include <openssl/pem.h>
 
@@ -46,6 +47,21 @@ bool ReadPrivateKey(EVP_PKEY **pkey, const std::string &file) {
   fclose(fp);
 
   return true;
+}
+
+string ReadBIO(BIO *bio) {
+  int size = BIO_pending(bio);
+  char *buffer = new char[size];
+  int bytes_read = BIO_read(bio, buffer, size);
+  if (bytes_read != size) {
+    LOG(ERROR) << "Read " << bytes_read << " bytes; expected " << size;
+    delete[] buffer;
+    return string();
+  }
+
+  string ret(buffer, bytes_read);
+  delete[] buffer;
+  return ret;
 }
 
 }  // namespace util

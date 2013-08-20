@@ -44,7 +44,9 @@ static const char kCollisionChain[] = "test-issuer-collision-chain.pem";
 static const char kCollisionRoot1[] = "test-colliding-root1.pem";
 static const char kCollisionRoot2[] = "test-colliding-root2.pem";
 static const char kCollidingRoots[] = "test-colliding-roots.pem";
-
+// A chain terminating with an MD2 intermediate.
+// Issuer is test-no-bc-ca-cert.pem.
+static const char kMd2Chain[] = "test-md2-chain.pem";
 
 namespace {
 
@@ -244,15 +246,24 @@ TEST_F(CertCheckerTest, PreCertAsCert) {
             checker_.CheckCertChain(&chain));
 }
 
-// Accept if the root cert has no CA:True constraint and is in the trust store
-TEST_F(CertCheckerTest, AcceptNoBasicConstraints) {
+// Accept if the root cert has no CA:True constraint and is in the trust store.
+// Also accept MD2 in root cert.
+TEST_F(CertCheckerTest, AcceptNoBasicConstraintsAndMd2) {
   ASSERT_TRUE(checker_.LoadTrustedCertificates(cert_dir_ + "/" + kCaNoBCCert));
+
+  string ca_pem;
+  ASSERT_TRUE(util::ReadTextFile(cert_dir_ + "/" + kCaNoBCCert, &ca_pem));
+  Cert ca(ca_pem);
+  // Verify testdata properties: CA is legacy root.
+  ASSERT_EQ("md2WithRSAEncryption", ca.PrintSignatureAlgorithm());
+  ASSERT_EQ(Cert::FALSE, ca.HasBasicConstraintCATrue());
 
   string chain_pem;
   ASSERT_TRUE(util::ReadTextFile(cert_dir_ + "/" + kNoBCChain, &chain_pem));
 
   CertChain chain(chain_pem);
   ASSERT_TRUE(chain.IsLoaded());
+
   EXPECT_EQ(CertChecker::OK, checker_.CheckCertChain(&chain));
 }
 
@@ -267,6 +278,30 @@ TEST_F(CertCheckerTest, DontAcceptNoBasicConstraints) {
   ASSERT_TRUE(chain.IsLoaded());
   EXPECT_EQ(CertChecker::INVALID_CERTIFICATE_CHAIN,
             checker_.CheckCertChain(&chain));
+}
+
+// Don't accept if anything else but the trusted root is signed with MD2.
+TEST_F(CertCheckerTest, DontAcceptMD2) {
+  ASSERT_TRUE(checker_.LoadTrustedCertificates(cert_dir_ + "/" + kCaNoBCCert));
+
+  string chain_pem;
+  ASSERT_TRUE(util::ReadTextFile(cert_dir_ + "/" + kMd2Chain, &chain_pem));
+
+  CertChain chain(chain_pem);
+  ASSERT_TRUE(chain.IsLoaded());
+  // Verify testdata properties: chain terminates in an MD2 intermediate.
+  ASSERT_EQ(Cert::FALSE, chain.LastCert()->IsSelfSigned());
+  ASSERT_EQ(Cert::TRUE, chain.LastCert()->HasBasicConstraintCATrue());
+  ASSERT_EQ("md2WithRSAEncryption",
+            chain.LastCert()->PrintSignatureAlgorithm());
+
+#ifdef OPENSSL_NO_MD2
+  EXPECT_EQ(CertChecker::UNSUPPORTED_ALGORITHM_IN_CERT_CHAIN,
+            checker_.CheckCertChain(&chain));
+#else
+  LOG(WARNING)  << "Skipping test: MD2 is enabled! You should configure "
+                << "OpenSSL with -DOPENSSL_NO_MD2 to be safe!";
+#endif
 }
 
 TEST_F(CertCheckerTest, ResolveIssuerCollisions) {

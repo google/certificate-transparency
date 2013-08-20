@@ -114,19 +114,7 @@ string Cert::PrintName(X509_NAME *name) {
     return string();
   }
 
-  int size = BIO_pending(bio);
-
-  char *buffer = new char[size];
-  int bytes_read = BIO_read(bio, buffer, size);
-  if (bytes_read != size) {
-    LOG(ERROR) << "Read " << bytes_read << " bytes; expected " << size;
-    delete[] buffer;
-    BIO_free(bio);
-    return string();
-  }
-
-  string ret(buffer, bytes_read);
-  delete[] buffer;
+  string ret = util::ReadBIO(bio);
   BIO_free(bio);
   return ret;
 }
@@ -149,6 +137,28 @@ string Cert::PrintNotAfter() const {
   return PrintTime(X509_get_notAfter(x509_));
 }
 
+string Cert::PrintSignatureAlgorithm() const {
+  // Have to rely on the ABI.
+  if (x509_->cert_info == NULL || x509_->cert_info->signature == NULL ||
+      x509_->cert_info->signature->algorithm == NULL)
+    return "NULL";
+
+  BIO *bio = BIO_new(BIO_s_mem());
+  if (bio == NULL) {
+    LOG_OPENSSL_ERRORS(ERROR);
+    return string();
+  }
+
+  if (i2a_ASN1_OBJECT(bio, x509_->cert_info->signature->algorithm) <= 0) {
+    BIO_free(bio);
+    return string();
+  }
+
+  string ret = util::ReadBIO(bio);
+  BIO_free(bio);
+  return ret;
+}
+
 // static
 string Cert::PrintTime(ASN1_TIME* when) {
   if (when == NULL)
@@ -166,19 +176,7 @@ string Cert::PrintTime(ASN1_TIME* when) {
     return string();
   }
 
-  int size = BIO_pending(bio);
-
-  char *buffer = new char[size];
-  int bytes_read = BIO_read(bio, buffer, size);
-  if (bytes_read != size) {
-    LOG(ERROR) << "Read " << bytes_read << " bytes; expected " << size;
-    delete[] buffer;
-    BIO_free(bio);
-    return string();
-  }
-
-  string ret(buffer, bytes_read);
-  delete[] buffer;
+  string ret = util::ReadBIO(bio);
   BIO_free(bio);
   return ret;
 }
@@ -311,9 +309,19 @@ Cert::Status Cert::IsSignedBy(const Cert &issuer) const {
   int ret = X509_verify(x509_, issuer_key);
   EVP_PKEY_free(issuer_key);
   if (ret < 0) {
-    LOG(ERROR) << "OpenSSL X509_verify returned error code " << ret;
-    LOG_OPENSSL_ERRORS(ERROR);
-    return ERROR;
+    unsigned long err = ERR_peek_last_error();
+    int reason = ERR_GET_REASON(err);
+    if (ERR_GET_LIB(err) == ERR_LIB_ASN1 &&
+        (reason == ASN1_R_UNKNOWN_MESSAGE_DIGEST_ALGORITHM ||
+         reason == ASN1_R_UNKNOWN_SIGNATURE_ALGORITHM)) {
+      LOG(WARNING) << "Unsupported algorithm: " << PrintSignatureAlgorithm();
+      ClearOpenSSLErrors();
+      return UNSUPPORTED_ALGORITHM;
+    } else {
+      LOG(ERROR) << "OpenSSL X509_verify returned error code " << ret;
+      LOG_OPENSSL_ERRORS(ERROR);
+      return ERROR;
+    }
   }
   return ret > 0 ? TRUE : FALSE;
 }

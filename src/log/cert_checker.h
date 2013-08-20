@@ -38,6 +38,7 @@ class CertChecker {
     ROOT_NOT_IN_LOCAL_STORE,
     INTERNAL_ERROR,
     PRECERT_EXTENSION_IN_CERT_CHAIN,
+    UNSUPPORTED_ALGORITHM_IN_CERT_CHAIN,
   };
 
   // Load a file of concatenated PEM-certs.

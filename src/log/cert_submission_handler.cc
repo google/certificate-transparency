@@ -235,6 +235,8 @@ CertSubmissionHandler::GetVerifyError(CertChecker::CertVerifyResult result) {
   SubmitResult submit_result;
   switch (result) {
     case CertChecker::INVALID_CERTIFICATE_CHAIN:
+    case CertChecker::PRECERT_EXTENSION_IN_CERT_CHAIN:
+    case CertChecker::UNSUPPORTED_ALGORITHM_IN_CERT_CHAIN:
       submit_result = INVALID_CERTIFICATE_CHAIN;
       break;
     case CertChecker::PRECERT_CHAIN_NOT_WELL_FORMED:
@@ -245,9 +247,6 @@ CertSubmissionHandler::GetVerifyError(CertChecker::CertVerifyResult result) {
       break;
     case CertChecker::INTERNAL_ERROR:
       submit_result = INTERNAL_ERROR;
-      break;
-    case CertChecker::PRECERT_EXTENSION_IN_CERT_CHAIN:
-      submit_result = INVALID_CERTIFICATE_CHAIN;
       break;
     default:
       LOG(FATAL) << "Unknown CertChecker error " << result;

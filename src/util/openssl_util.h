@@ -22,6 +22,8 @@ void ClearOpenSSLErrors();
 // Returns false on failure (and logs an error).
 bool ReadPrivateKey(EVP_PKEY **pkey, const std::string &file);
 
+std::string ReadBIO(BIO *bio);
+
 }  // namespace util
 
 // Convenience macro to help automatically clear the stack regardless of
@@ -32,7 +34,5 @@ bool ReadPrivateKey(EVP_PKEY **pkey, const std::string &file);
     LOG(severity) << util::DumpOpenSSLErrorStack();     \
     util::ClearOpenSSLErrors();                         \
   } while (0);
-
-
 
 #endif  // OPENSSL_UTIL_H

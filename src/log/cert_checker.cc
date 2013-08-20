@@ -69,7 +69,7 @@ bool CertChecker::LoadTrustedCertificates(const std::string &cert_file) {
         delete cert;
       } else {
         certs_to_add.push_back(make_pair(subject_name, cert));
-      } 
+      }
     } else {
       // See if we reached the end of the file.
       unsigned long err = ERR_peek_last_error();
@@ -148,8 +148,19 @@ CertChecker::CheckIssuerChain(CertChain *chain) const {
   }
 
   status = chain->IsValidSignatureChain();
+  if (status == Cert::UNSUPPORTED_ALGORITHM) {
+    // UNSUPPORTED_ALGORITHM can happen when a weak algorithm (such as MD2)
+    // is intentionally not accepted in which case it's correct to say that
+    // the chain is invalid.
+    // It can also happen when EVP is not properly initialized, in which case
+    // it's more of an INTERNAL_ERROR. However a bust setup would manifest
+    // itself in many other ways, including failing tests, so we assume the
+    // failure is intentional.
+    return UNSUPPORTED_ALGORITHM_IN_CERT_CHAIN;
+  }
   if (status == Cert::FALSE)
     return INVALID_CERTIFICATE_CHAIN;
+
   if (status != Cert::TRUE) {
     LOG(ERROR) << "Failed to check signature chain";
     return INTERNAL_ERROR;
@@ -260,8 +271,13 @@ CertChecker::GetTrustedCa(CertChain *chain) const {
   for (std::multimap<string, Cert*>::const_iterator it = issuer_range.first;
        it != issuer_range.second; ++it) {
     const Cert *issuer_cand = it->second;
- 
+
     Cert::Status ok = subject->IsSignedBy(*issuer_cand);
+    if (ok == Cert::UNSUPPORTED_ALGORITHM) {
+      // If the cert's algorithm is unsupported, then there's no point
+      // continuing: it's unconditionally invalid.
+      return UNSUPPORTED_ALGORITHM_IN_CERT_CHAIN;
+    }
     if (ok != Cert::TRUE && ok != Cert::FALSE) {
       LOG(ERROR) << "Failed to check signature for trusted root";
       return INTERNAL_ERROR;

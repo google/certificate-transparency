@@ -27,6 +27,8 @@ static const char kLeafWithIntermediateCert[] = "test-intermediate-cert.pem";
 static const char kCaPreCert[] = "ca-pre-cert.pem";
 // Issued by ca-cert.pem
 static const char kPreCert[] = "test-embedded-pre-cert.pem";
+// CA with no basic constraints and an MD2 signature.
+static const char kLegacyCaCert[] = "test-no-bc-ca-cert.pem";
 
 static const char kInvalidCertString[] = "-----BEGIN CERTIFICATE-----\ninvalid"
     "\n-----END CERTIFICATE-----\n";
@@ -40,6 +42,7 @@ class CertTest : public ::testing::Test {
   string ca_precert_pem_;
   string precert_pem_;
   string leaf_with_intermediate_pem_;
+  string legacy_ca_pem_;
 
   void SetUp() {
     const string cert_dir = FLAGS_test_certs_dir;
@@ -51,7 +54,8 @@ class CertTest : public ::testing::Test {
     CHECK(util::ReadTextFile(cert_dir + "/" + kPreCert, &precert_pem_));
     CHECK(util::ReadTextFile(cert_dir + "/" + kLeafWithIntermediateCert,
                              &leaf_with_intermediate_pem_));
-
+    CHECK(util::ReadTextFile(cert_dir + "/" + kLegacyCaCert,
+                             &legacy_ca_pem_));
   }
 };
 
@@ -122,6 +126,25 @@ TEST_F(CertTest, PrintNotAfter) {
   EXPECT_EQ("Jun  1 00:00:00 2022 GMT", leaf.PrintNotAfter());
 }
 
+TEST_F(CertTest, PrintSignatureAlgorithm) {
+  Cert leaf(leaf_pem_);
+  EXPECT_EQ("sha1WithRSAEncryption", leaf.PrintSignatureAlgorithm());
+}
+
+TEST_F(CertTest, TestUnsupportedAlgorithm) {
+  Cert legacy(legacy_ca_pem_);
+  ASSERT_EQ("md2WithRSAEncryption", legacy.PrintSignatureAlgorithm());
+  // MD2 is disabled by default on modern OpenSSL and you should be surprised to
+  // see anything else. Make the test fail if this is not the case to notify the
+  // user that their setup is insecure.
+#ifdef OPENSSL_NO_MD2
+  EXPECT_EQ(Cert::UNSUPPORTED_ALGORITHM, legacy.IsSignedBy(legacy));
+#else
+  LOG(WARNING)  << "Skipping test: MD2 is enabled! You should configure "
+                << "OpenSSL with -DOPENSSL_NO_MD2 to be safe!";
+#endif
+}
+
 TEST_F(CertTest, Identical) {
   Cert leaf(leaf_pem_);
   Cert ca(ca_pem_);
@@ -172,7 +195,7 @@ TEST_F(CertTest, DerEncodedNames) {
   Cert ca(ca_pem_);
 
   ASSERT_EQ(Cert::TRUE, leaf.IsIssuedBy(ca));
- 
+
   string leaf_subject, leaf_issuer, ca_subject, ca_issuer;
   EXPECT_EQ(Cert::TRUE, leaf.DerEncodedSubjectName(&leaf_subject));
   EXPECT_FALSE(leaf_subject.empty());
