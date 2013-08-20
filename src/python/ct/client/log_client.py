@@ -167,7 +167,7 @@ class LogClient(object):
         # If any one of the entries has invalid json format, this raises.
         return map(lambda e: self.__json_entry_to_response(e), entries)
 
-    def get_entries(self, start, end, batch_size=FLAGS.entry_fetch_batch_size):
+    def get_entries(self, start, end, batch_size=0):
         """Retrieve log entries.
         Args:
             start     : index of first entry to retrieve.
@@ -189,6 +189,7 @@ class LogClient(object):
         if start < 0 or end < 0 or start > end:
             raise InvalidRequestError("Invalid range [%d, %d]" % (start, end))
 
+        batch_size = batch_size or FLAGS.entry_fetch_batch_size
         while start <= end:
             # Note that an HTTPError may occur here if the log does not have the
             # requested range of entries available. RFC 6962 says:

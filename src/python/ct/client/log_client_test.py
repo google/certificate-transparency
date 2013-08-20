@@ -150,9 +150,24 @@ class LogClientTest(unittest.TestCase):
                           entries.next)
 
     def test_get_entries_returns_all_in_batches(self):
-        client = log_client.LogClient(self.FakeResponder())
+        mock_responder = mock.Mock()
+        fake_responder = self.FakeResponder()
+        mock_responder.get_json_response.side_effect = (
+            fake_responder.get_json_response)
+
+        client = log_client.LogClient(mock_responder)
         returned_entries = list(client.get_entries(0, 9, batch_size=4))
         self.verify_entries(returned_entries, 0, 9)
+        self.assertEqual(3, len(mock_responder.get_json_response.
+                                call_args_list))
+        
+        # Same as above, but using a flag to control the batch size.
+        mock_responder.reset_mock()
+        FLAGS.entry_fetch_batch_size = 4
+        returned_entries = list(client.get_entries(0, 9))
+        self.verify_entries(returned_entries, 0, 9)
+        self.assertEqual(3, len(mock_responder.get_json_response.
+                                call_args_list))
 
     def test_get_entries_returns_all_for_limiting_server(self):
         client = log_client.LogClient(self.FakeResponder(entry_limit=3))
