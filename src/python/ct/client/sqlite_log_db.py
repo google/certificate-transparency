@@ -30,11 +30,11 @@ class SQLiteLogDB(log_db.LogDB):
         self.__tables = ["logs", "sths"]
 
     def __repr__(self):
-        return "%r(db: %r)" % (self.__class__.__name__, self.__db)
+        return "%r(db: %r)" % (self.__class__.__name__, self.__mgr)
 
     def __str__(self):
-        return "%s(db: %s, tables: %s): " % (self.__class__.__name__, self.__db,
-                                             self.__tables)
+        return "%s(db: %s, tables: %s): " % (self.__class__.__name__,
+                                             self.__mgr, self.__tables)
 
     def __encode_log_metadata(self, metadata):
         log_server = metadata.log_server

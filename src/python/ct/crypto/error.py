@@ -64,7 +64,7 @@ class ProofError(VerifyError):
     proof is insufficient for verifying the desired property."""
 
 # TODO(ekasper): TBD if this hierarchy is appropriate.
-class EncodingError(VerifyError):
+class EncodingError(Error):
     """Encoding/decoding error: raised when inputs cannot be serialized, or
     serialized data cannot be parsed."""
     pass

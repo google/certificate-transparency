@@ -19,3 +19,6 @@ test: all
 	PYTHONPATH=$(PYTHONPATH):. ./ct/client/sqlite_cert_db_test.py
 	PYTHONPATH=$(PYTHONPATH):. ./ct/client/sqlite_connection_test.py
 	PYTHONPATH=$(PYTHONPATH):. ./ct/client/log_client_test.py
+	PYTHONPATH=$(PYTHONPATH):. ./ct/client/sqlite_temp_db_test.py
+	PYTHONPATH=$(PYTHONPATH):. ./ct/client/monitor_test.py
+	PYTHONPATH=$(PYTHONPATH):. ./ct/client/state_test.py

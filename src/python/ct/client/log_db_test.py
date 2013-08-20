@@ -8,7 +8,7 @@ from ct.proto import client_pb2
 # methods on this class. Derived classes should use multiple inheritance
 # from LogDBTest and unittest.TestCase to get test automation.
 class LogDBTest(object):
-    """All Database tests should derive from this class as well as
+    """All LogDB tests should derive from this class as well as
     unittest.TestCase."""
     __metaclass__ = abc.ABCMeta
 

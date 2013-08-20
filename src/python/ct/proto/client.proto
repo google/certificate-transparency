@@ -55,3 +55,8 @@ message EntryResponse {
   optional bytes leaf_input = 1;
   optional bytes extra_data = 2;
 }
+
+message MonitorState {
+  optional SthResponse verified_sth = 1;
+  optional SthResponse pending_sth = 2;
+}

@@ -73,6 +73,10 @@ class SQLiteConnectionManager(object):
         return "%s(db: %s, keepalive: %s): " % (self.__class__.__name__,
                                                 self.__db, self.__keepalive)
 
+    @property
+    def db_name(self):
+        return self.__db
+
     def get_connection(self):
         """In keepalive mode, return the single persistent connection.
         Else return a new connection instance."""

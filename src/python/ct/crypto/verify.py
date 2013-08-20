@@ -85,7 +85,8 @@ class LogVerifier(object):
     def verify_sth(self, sth_response):
         """Verify the STH Response.
         Returns:
-            True
+            True. The return value is enforced by a decorator and need not be
+            checked by the caller.
         Raises:
             EncodingError, SignatureError
         The response must have all fields present."""
@@ -93,35 +94,55 @@ class LogVerifier(object):
         signature = self._decode_signature(sth_response.tree_head_signature)
         return self._verify(signature_input, signature)
 
+    @staticmethod
+    @error.returns_true_or_raises
+    def verify_sth_temporal_consistency(old_sth, new_sth):
+        """Verify the temporal consistency for two STH responses: i.e., that
+        the newer STH has bigger tree size.
+        Does not verify STH signatures or consistency of hashes.
+        Params:
+        old_sth, new_sth: client_pb2.SthResponse() protos. The STH with
+        the older timestamp must be supplied first.
+        Returns:
+            True. The return value is enforced by a decorator and need not be
+            checked by the caller.
+        Raises:
+            ConsistencyError: STHs are inconsistent
+            ValueError: "Older" STH is not older."""
+        if old_sth.timestamp > new_sth.timestamp:
+            raise ValueError("Older STH has newer timestamp (%d vs %d), did "
+                             "you supply inputs in the wrong order?" %
+                             (old_sth.timestamp, new_sth.timestamp))
+
+        if (old_sth.timestamp == new_sth.timestamp and
+            old_sth.tree_size != new_sth.tree_size):
+            # Issuing two different STHs for the same timestamp is illegal,
+            # even if they are otherwise consistent.
+            raise error.ConsistencyError("Inconsistency: different tree sizes "
+                                         "for the same timestamp")
+        if (old_sth.timestamp < new_sth.timestamp and
+            old_sth.tree_size > new_sth.tree_size):
+            raise error.ConsistencyError("Inconsistency: older tree has bigger "
+                                         "size")
+        return True
+
     @error.returns_true_or_raises
     def verify_sth_consistency(self, old_sth, new_sth, proof):
         """Verify the temporal consistency and consistency proof for two STH
         responses. Does not verify STH signatures.
         Params:
         old_sth, new_sth: client_pb2.SthResponse() protos. The STH with
-        +the older timestamp must be supplied first.
+        the older timestamp must be supplied first.
         proof: a list of SHA256 audit nodes
         Returns:
-        True if the consistency could be verified.
+            True. The return value is enforced by a decorator and need not be
+            checked by the caller.
         Raises:
             ConsistencyError: STHs are inconsistent
             ProofError: proof is invalid
             ValueError: "Older" STH is not older."""
-
-        if old_sth.timestamp > new_sth.timestamp:
-            raise ValueError("Older STH has newer timestamp (%d vs %d), did "
-                             "you supply inputs in the wrong order?" %
-                             (old_sth.timestamp, new_sth.timestamp))
-        if old_sth.timestamp == new_sth.timestamp:
-            if (old_sth.tree_size == new_sth.tree_size and
-                old_sth.sha256_root_hash == new_sth.sha256_root_hash):
-                logging.info("STHs are identical")
-                return True
-            else:
-                # Issuing two different STHs for the same timestamp is illegal,
-                # even if they are otherwise consistent.
-                raise error.ConsistencyError("Different STH trees for the same "
-                                             "timestamp")
-        return self.__merkle_verifier.verify_tree_consistency(
+        self.verify_sth_temporal_consistency(old_sth, new_sth)
+        self.__merkle_verifier.verify_tree_consistency(
             old_sth.tree_size, new_sth.tree_size, old_sth.sha256_root_hash,
             new_sth.sha256_root_hash, proof)
+        return True

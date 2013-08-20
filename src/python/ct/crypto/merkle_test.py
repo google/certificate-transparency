@@ -112,7 +112,7 @@ class MerkleVerifierTest(unittest.TestCase):
 
     def test_verify_tree_consistency_newer_tree_is_smaller(self):
         verifier = merkle.MerkleVerifier(HexTreeHasher())
-        self.assertRaises(error.ConsistencyError,
+        self.assertRaises(ValueError,
                           verifier.verify_tree_consistency,
             5, 2,
             "4e3bbb1f7b478dcfe71fb631631519a3bca12c9aefca1612bfce4c13a86264d4",

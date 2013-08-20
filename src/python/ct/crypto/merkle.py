@@ -66,8 +66,9 @@ class MerkleVerifier(object):
             raise ValueError("Negative tree size")
 
         if old_size > new_size:
-            raise error.ConsistencyError("Inconsistency: older tree has "
-                                         "bigger size")
+            raise ValueError("Older tree has bigger size (%d vs %d), did "
+                             "you supply inputs in the wrong order?" %
+                             (old_size, new_size))
 
         if old_size == new_size:
             if old_root == new_root:

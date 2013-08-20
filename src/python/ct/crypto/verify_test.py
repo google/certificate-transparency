@@ -33,6 +33,7 @@ class LogVerifierTest(unittest.TestCase):
     def test_verify_sth_fails_for_bad_signature(self):
         verifier = verify.LogVerifier(LogVerifierTest.default_key_info)
         default_sth = LogVerifierTest.default_sth
+
         for i in range(len(default_sth.tree_head_signature)):
             # Skip the bytes that encode ASN.1 lengths: this is covered in a
             # separate test
@@ -44,7 +45,10 @@ class LogVerifierTest(unittest.TestCase):
                 default_sth.tree_head_signature[:i] +
                 chr(ord(default_sth.tree_head_signature[i]) ^ 1) +
                 default_sth.tree_head_signature[i+1:])
-            self.assertRaises(error.VerifyError, verifier.verify_sth, sth)
+            # Encoding- or SignatureError, depending on whether the modified
+            # byte is a content byte or not.
+            self.assertRaises((error.EncodingError, error.SignatureError),
+                              verifier.verify_sth, sth)
 
     def test_verify_sth_for_bad_asn1_length(self):
         verifier = verify.LogVerifier(LogVerifierTest.default_key_info)
@@ -61,7 +65,7 @@ class LogVerifierTest(unittest.TestCase):
             default_sth.tree_head_signature[:i] +
             chr(ord(default_sth.tree_head_signature[i]) - 1) +
             default_sth.tree_head_signature[i+1:])
-        self.assertRaises(error.VerifyError, verifier.verify_sth, sth)
+        self.assertRaises(error.EncodingError, verifier.verify_sth, sth)
 
         # Increasing the length means there are not enough ASN.1 bytes left to
         # decode the sequence, however the ecdsa module silently slices it.
@@ -84,7 +88,7 @@ class LogVerifierTest(unittest.TestCase):
             default_sth.tree_head_signature[:i] +
             chr(ord(default_sth.tree_head_signature[i]) - 1) +
             default_sth.tree_head_signature[i+1:])
-        self.assertRaises(error.VerifyError, verifier.verify_sth, sth)
+        self.assertRaises(error.EncodingError, verifier.verify_sth, sth)
 
         sth = client_pb2.SthResponse()
         sth.CopyFrom(default_sth)
@@ -92,7 +96,7 @@ class LogVerifierTest(unittest.TestCase):
             default_sth.tree_head_signature[:i] +
             chr(ord(default_sth.tree_head_signature[i]) + 1) +
             default_sth.tree_head_signature[i+1:])
-        self.assertRaises(error.VerifyError, verifier.verify_sth, sth)
+        self.assertRaises(error.EncodingError, verifier.verify_sth, sth)
 
         # The byte that encodes the length of the second integer s in the
         # sequence (r, s). Decreasing this length corrupts the integer, however
@@ -104,7 +108,7 @@ class LogVerifierTest(unittest.TestCase):
             default_sth.tree_head_signature[:i] +
             chr(ord(default_sth.tree_head_signature[i]) - 1) +
             default_sth.tree_head_signature[i+1:])
-        self.assertRaises(error.VerifyError, verifier.verify_sth, sth)
+        self.assertRaises(error.EncodingError, verifier.verify_sth, sth)
 
         sth = client_pb2.SthResponse()
         sth.CopyFrom(default_sth)
@@ -122,7 +126,7 @@ class LogVerifierTest(unittest.TestCase):
             # Correct outer length to include trailing garbage.
             chr(ord(default_sth.tree_head_signature[3]) + 1) +
             default_sth.tree_head_signature[4:]) + "\x01"
-        self.assertRaises(error.VerifyError, verifier.verify_sth, sth)
+        self.assertRaises(error.EncodingError, verifier.verify_sth, sth)
 
     def test_verify_sth_consistency(self):
         old_sth = LogVerifierTest.default_sth
@@ -144,25 +148,73 @@ class LogVerifierTest(unittest.TestCase):
             old_sth.tree_size, new_sth.tree_size, old_sth.sha256_root_hash,
             new_sth.sha256_root_hash, proof)
 
-    def test_verify_sth_consistency_equal_timestamps(self):
+    def test_verify_sth_temporal_consistency(self):
         old_sth = LogVerifierTest.default_sth
         new_sth = client_pb2.SthResponse()
         new_sth.CopyFrom(old_sth)
         new_sth.tree_size = old_sth.tree_size + 1
-        new_sth.sha256_root_hash = "a new hash"
-        proof = ["some proof the mock does not care about"]
+        new_sth.timestamp = old_sth.timestamp + 1
 
-        mock_merkle_verifier = mock.Mock()
-        mock_merkle_verifier.verify_tree_consistency.return_value = True
-
+        # Merkle verifier is never used so simply set to None
         verifier = verify.LogVerifier(LogVerifierTest.default_key_info,
-                                      mock_merkle_verifier)
+                                      None)
+
+        # Note we do not care about root hash inconsistency here.
+        self.assertTrue(verifier.verify_sth_temporal_consistency(
+                old_sth, new_sth))
+
+    def test_verify_sth_temporal_consistency_equal_timestamps(self):
+        old_sth = LogVerifierTest.default_sth
+        new_sth = client_pb2.SthResponse()
+        new_sth.CopyFrom(old_sth)
+        new_sth.tree_size = old_sth.tree_size + 1
+
+        # Merkle verifier is never used so simply set to None
+        verifier = verify.LogVerifier(LogVerifierTest.default_key_info,
+                                      None)
+
         self.assertRaises(error.ConsistencyError,
-                          verifier.verify_sth_consistency,
-                          old_sth, new_sth, proof)
+                          verifier.verify_sth_temporal_consistency,
+                old_sth, new_sth)
+
+        new_sth.tree_size = old_sth.tree_size - 1
+        self.assertRaises(error.ConsistencyError,
+                          verifier.verify_sth_temporal_consistency,
+                old_sth, new_sth)
+
         # But identical STHs are OK
-        self.assertTrue(verifier.verify_sth_consistency(old_sth, old_sth,
-                                                        proof))
+        self.assertTrue(verifier.verify_sth_temporal_consistency(
+                old_sth, old_sth))
+
+    def test_verify_sth_temporal_consistency_reversed_timestamps(self):
+        old_sth = LogVerifierTest.default_sth
+        new_sth = client_pb2.SthResponse()
+        new_sth.CopyFrom(old_sth)
+        new_sth.timestamp = old_sth.timestamp + 1
+        new_sth.tree_size = old_sth.tree_size + 1
+
+        # Merkle verifier is never used so simply set to None
+        verifier = verify.LogVerifier(LogVerifierTest.default_key_info,
+                                      None)
+
+        self.assertRaises(ValueError,
+                          verifier.verify_sth_temporal_consistency,
+                new_sth, old_sth)
+
+    def test_verify_sth_temporal_consistency_newer_tree_is_smaller(self):
+        old_sth = LogVerifierTest.default_sth
+        new_sth = client_pb2.SthResponse()
+        new_sth.CopyFrom(old_sth)
+        new_sth.timestamp = old_sth.timestamp + 1
+        new_sth.tree_size = old_sth.tree_size - 1
+
+        # Merkle verifier is never used so simply set to None
+        verifier = verify.LogVerifier(LogVerifierTest.default_key_info,
+                                      None)
+
+        self.assertRaises(error.ConsistencyError,
+                          verifier.verify_sth_temporal_consistency,
+                old_sth, new_sth)
 
     def test_verify_sth_consistency_invalid_proof(self):
         old_sth = LogVerifierTest.default_sth
