@@ -171,12 +171,14 @@ std::string FromBase64(const char *b64) {
   size_t length = strlen(b64);
   // Lazy: base 64 encoding is always >= in length to decoded value
   // (equality occurs for zero length).
-  u_char buf[length];
+  u_char *buf = new u_char[length];
   int rlength = b64_pton(b64, buf, length);
   // Treat decode errors as empty strings.
   if (rlength < 0)
       rlength = 0;
-  return std::string((char *)buf, rlength);
+  string ret(reinterpret_cast<char*>(buf), rlength);
+  delete[] buf;
+  return ret;
 }
 
 }  // namespace util
