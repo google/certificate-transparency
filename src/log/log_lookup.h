@@ -44,6 +44,13 @@ template <class Logged> class LogLookup {
     return cert_tree_.SnapshotConsistency(first, second);
   }
 
+  // Get the |index|th log entry.
+  LookupResult GetEntry(size_t index, Logged *result) {
+    if (db_->LookupByIndex(index, result) != Database<Logged>::LOOKUP_OK)
+      return NOT_FOUND;
+    return OK;
+  }
+
  private:
   std::string LeafHash(const Logged &logged);
   // We keep a hash -> index mapping in memory so that we can quickly serve

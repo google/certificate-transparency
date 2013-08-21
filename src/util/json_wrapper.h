@@ -176,6 +176,10 @@ class JsonArray : public JsonObject {
     Add(json_object_new_string(addand.c_str()));
   }
 
+  void Add(JsonObject *addand) {
+    Add(addand->Extract());
+  }
+
   void AddBase64(const std::string &addand) {
     Add(ToBase64(addand));
   }

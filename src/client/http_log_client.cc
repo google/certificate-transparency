@@ -204,6 +204,8 @@ HTTPLogClient::QueryAuditProof(const string &merkle_leaf_hash,
     return ret;
 
   JsonObject jresponse2(response2);
+  if (!jresponse2.Ok())
+    return BAD_RESPONSE;
 
   JsonInt leaf_index(jresponse2, "leaf_index");
   if (!leaf_index.Ok())

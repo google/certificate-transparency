@@ -49,6 +49,16 @@ class LoggedCertificate : public LoggedCertificatePB {
         == Serializer::OK;
   }
 
+  bool SerializeExtraData(std::string *dst) const {
+    if (entry().type() == ct::X509_ENTRY)
+      return Serializer::SerializeX509Chain(entry().x509_entry(), dst)
+          == Serializer::OK;
+    else
+      return Serializer::SerializePrecertChainEntry(entry().precert_entry(),
+                                                    dst)
+          == Serializer::OK;
+  }
+
   // FIXME(benl): unify with TestSigner?
   void RandomForTest() {
     const char kKeyID[] =

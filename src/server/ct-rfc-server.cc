@@ -198,6 +198,7 @@ class CTLogManager {
   enum LookupReply {
     MERKLE_AUDIT_PROOF,
     NOT_FOUND,
+    FOUND,
   };
 
   string FrontendStats() const {
@@ -253,6 +254,12 @@ class CTLogManager {
         break;
     }
     return reply;
+  }
+
+  LookupReply GetEntry(size_t index, LoggedCertificate *result) const {
+    if (lookup_->GetEntry(index, result) == LogLookup<LoggedCertificate>::OK)
+      return FOUND;
+    return NOT_FOUND;
   }
 
   LookupReply QueryAuditProof(const std::string &merkle_leaf_hash,
@@ -337,6 +344,8 @@ class ct_server {
         GetProof(response, uri);
       else if (path == "/ct/v1/get-sth-consistency")
         GetConsistency(response, uri);
+      else if (path == "/ct/v1/get-entries")
+        GetEntries(response, uri);
       else
         response = server::response::stock_reply(server::response::not_found,
                                                  "Not found");
@@ -356,9 +365,66 @@ class ct_server {
   }
 
 private:
+  static void BadRequest(server::response &response, const char *msg) {
+    response.status = server::response::bad_request;
+    response.content = msg;
+  }
+
+  void GetEntries(server::response &response, const uri::uri &uri) const {
+    std::map<string, string> qmap;
+    uri::query_map(uri, qmap);
+
+    if (qmap.find("start") == qmap.end() || qmap.find("end") == qmap.end()) {
+      BadRequest(response, "Bad parameters");
+      return;
+    }
+
+    size_t start = atoi(qmap["start"].c_str());
+    size_t end = atoi(qmap["end"].c_str());
+
+    VLOG(0) << "start = " << start << " end = " << end;
+
+    JsonArray entries;
+    for (size_t n = start; n <= end; ++n) {
+      LoggedCertificate cert;
+      manager_->GetEntry(n, &cert);
+
+      string leaf_input;
+      if (!cert.SerializeForLeaf(&leaf_input)) {
+        BadRequest(response, "Serialisation failed");
+        return;
+      }
+      JsonObject jentry;
+      jentry.Add("leaf_input", ToBase64(leaf_input));
+
+      string extra_data;
+      if (!cert.SerializeExtraData(&extra_data)) {
+        BadRequest(response, "Serialisation failed");
+        return;
+      }
+
+      jentry.Add("extra_data", ToBase64(extra_data));
+
+      entries.Add(&jentry);
+    }
+
+    JsonObject jsend;
+    jsend.Add("entries", entries);
+
+    response.status = server::response::ok;
+    response.content = jsend.ToString();
+  }
+
   void GetConsistency(server::response &response, const uri::uri &uri) {
     std::map<string, string> qmap;
     uri::query_map(uri, qmap);
+
+    if (qmap.find("first") == qmap.end() || qmap.find("second") == qmap.end()) {
+      response.status = server::response::bad_request;
+      response.content = "Bad parameters";
+      return;
+    }
+
     size_t first = atoi(qmap["first"].c_str());
     size_t second = atoi(qmap["second"].c_str());
 

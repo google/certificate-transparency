@@ -754,8 +754,15 @@ void GetEntries() {
       const ct::X509ChainEntry &x509chain = entry->entry.x509_entry();
       for (int n = 0; n < x509chain.certificate_chain_size(); ++n)
         WriteCertificate(x509chain.certificate_chain(n), e, n + 1);
+    } else {
+      assert(entry->leaf.timestamped_entry().entry_type()
+             == ct::PRECERT_ENTRY);
+      WriteCertificate(entry->leaf.timestamped_entry().signed_entry()
+                       .precert().tbs_certificate(), e, 0);
+      const ct::PrecertChainEntry &precertchain = entry->entry.precert_entry();
+      for (int n = 0; n < precertchain.precertificate_chain_size(); ++n)
+        WriteCertificate(precertchain.precertificate_chain(n), e, n + 1);
     }
-    // TODO(benl): precerts
   }
 }
 

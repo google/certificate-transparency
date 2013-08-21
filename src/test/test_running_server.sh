@@ -88,6 +88,15 @@ consistency() {
     --sth1=$file1 --sth2=$file2
 }
 
+get_entries() {
+  local first=$1
+  local last=$2
+
+  ../client/ct get_entries --ct_server="$SERVER" --ct_server_port=$PORT \
+    --ct_server_public_key=$CT_KEY --logtostderr=true $HTTP_LOG \
+      --get_first=$first --get_last=$last --certificate_base=$CERT_DIR/cert.
+}
+
 get_sth $CERT_DIR/sth1
 
 make_cert $CERT_DIR test ca $SERVER $PORT false $CT_KEY
@@ -102,6 +111,8 @@ do_audit $CERT_DIR/test-embedded-cert.ctdata
 get_sth $CERT_DIR/sth2
 
 consistency $CERT_DIR/sth1 $CERT_DIR/sth2
+
+get_entries 0 2
 
 echo $PASSED passed
 echo $FAILED failed
