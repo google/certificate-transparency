@@ -19,6 +19,7 @@ import static org.certificatetransparency.ctlog.TestData.TEST_PRE_CERT_SIGNED_BY
 import static org.certificatetransparency.ctlog.TestData.TEST_PRE_SCT;
 import static org.certificatetransparency.ctlog.TestData.loadCertificates;
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 
@@ -199,6 +200,7 @@ public class LogSignatureVerifierTest {
       getVerifier().verifySignature(sct, certsChain);
       fail("Expected verifySignature to throw since the issuer certificate is missing.");
     } catch (IllegalArgumentException expected) {
+      assertNotNull("Exception should have message, but was: " + expected, expected.getMessage());
       assertTrue("Expected exception to warn about missing issuer cert",
           expected.getMessage().contains("must contain issuer"));
     }

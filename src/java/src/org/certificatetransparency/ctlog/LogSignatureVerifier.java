@@ -149,7 +149,8 @@ public class LogSignatureVerifier {
       if (!CertificateInfo.isPreCertificateSigningCert(issuerCert)) {
         issuerInformation = issuerInformationFromCertificateIssuer(issuerCert);
       } else {
-        Preconditions.checkArgument(chain.size() >= 3);
+        Preconditions.checkArgument(chain.size() >= 3,
+            "Chain with PreCertificate signed by PreCertificate Signing Cert must contain issuer.");
         issuerInformation = issuerInformationFromPreCertificateSigningCert(
             issuerCert, getKeyHash(chain.get(2)));
       }
