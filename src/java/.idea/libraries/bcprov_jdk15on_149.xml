@@ -1,0 +1,11 @@
+<component name="libraryTable">
+  <library name="bcprov-jdk15on-149">
+    <CLASSES>
+      <root url="jar://$PROJECT_DIR$/libs/bcprov-jdk15on-149.jar!/" />
+    </CLASSES>
+    <JAVADOC />
+    <SOURCES>
+      <root url="jar://$PROJECT_DIR$/libs/bcprov-jdk15on-149-srcs.jar!/" />
+    </SOURCES>
+  </library>
+</component>
