@@ -19,6 +19,9 @@ public class CTLogClient {
   private final HttpLogClient httpClient;
   private final LogSignatureVerifier signatureVerifier;
 
+  /**
+   * Result of the certificate upload. Contains the SCT and verification result.
+   */
   public static class UploadResult {
     private final Ct.SignedCertificateTimestamp sct;
     private final boolean verified;

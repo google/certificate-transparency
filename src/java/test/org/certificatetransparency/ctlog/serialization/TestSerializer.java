@@ -2,9 +2,9 @@ package org.certificatetransparency.ctlog.serialization;
 
 import com.google.common.io.Files;
 import com.google.protobuf.ByteString;
-import org.certificatetransparency.ctlog.proto.Ct;
 
 import org.apache.commons.codec.binary.Base64;
+import org.certificatetransparency.ctlog.proto.Ct;
 import org.junit.Assert;
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -31,7 +31,8 @@ public class TestSerializer {
         ByteString.copyFrom(Base64.decodeBase64(keyIdBase64))).build());
 
     String signatureBase64 =
-        "MEUCIGBuEK5cLVobCu1J3Ek39I3nGk6XhOnCCN+/6e9TbPfyAiEAvrKcctfQbWHQa9s4oGlGmqhv4S4Yu3zEVomiwBh+9aU=";
+        "MEUCIGBuEK5cLVobCu1J3Ek39I3nGk6XhOnCCN+/6e9TbPfy" +
+        "AiEAvrKcctfQbWHQa9s4oGlGmqhv4S4Yu3zEVomiwBh+9aU=";
 
     Ct.DigitallySigned.Builder signatureBuilder = Ct.DigitallySigned.newBuilder();
     signatureBuilder.setHashAlgorithm(Ct.DigitallySigned.HashAlgorithm.SHA256);
