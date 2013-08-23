@@ -3,6 +3,8 @@ from pyasn1.codec.der import encoder as der_encoder
 from pyasn1 import error as pyasn1_error
 
 import logging
+import time
+
 from ct.crypto import error, pem
 from ct.crypto.asn1 import oid, x509, x509_name
 
@@ -20,6 +22,7 @@ class Certificate(object):
         # contents of the certificate are ever added to this class, they must
         # invalidate the cached encoding.
         self.__cached_der = der_string
+        self.__cache_expiry()
 
     def __repr__(self):
         # This prints the full ASN1 representation. Useful for debugging.
@@ -40,6 +43,17 @@ class Certificate(object):
             does not contain a valid PEM certificate"""
         der_cert, _ = pem.from_pem(pem_string, cls.PEM_MARKERS)
         return cls.from_der(der_cert)
+
+    def __cache_expiry(self):
+        # Let ASN1 errors raise through.
+        self.__not_before = (
+            self.__asn1_cert.getComponentByName("tbsCertificate").
+            getComponentByName("validity").
+            getComponentByName("notBefore").getComponent().gmtime())
+        self.__not_after = (
+            self.__asn1_cert.getComponentByName("tbsCertificate").
+            getComponentByName("validity").
+            getComponentByName("notAfter").getComponent().gmtime())
 
     @classmethod
     def __decode_der(cls, der_string):
@@ -133,6 +147,43 @@ class Certificate(object):
         """Get a human readable string of the issuer name attributes."""
         return (self.__asn1_cert.getComponentByName('tbsCertificate').
                 getComponentByName('issuer').human_readable(wrap=0))
+
+    def not_before(self):
+        """Get a time.struct_time representing the notBefore in UTC time.
+        Returns: a time.struct_time object."""
+        return self.__not_before
+
+    def not_after(self):
+        """Get a time.struct_time representing the notAfter in UTC time.
+        Returns: a time.struct_time object."""
+        return self.__not_after
+
+    def is_temporally_valid_now(self):
+        """Determine whether notBefore <= now <= notAfter.
+        Returns: True or False."""
+        return self.is_temporally_valid_at(time.gmtime())
+
+    def is_expired(self):
+        """Returns True if the certificate notAfter is in the past,
+        False otherwise."""
+        assert self.__not_after is not None
+        now = time.gmtime()
+        return now > self.__not_after
+
+    def is_not_yet_valid(self):
+        """Returns True if the certificate notBefore is in the future,
+        False otherwise."""
+        assert self.__not_before is not None
+        now = time.gmtime()
+        return now < self.__not_before
+
+    def is_temporally_valid_at(self, gmtime):
+        """Returns True if the certificate was/is/will be valid at the
+        given moment, represented as a GMT time struct_time,
+        False otherwise."""
+        assert self.__not_before is not None
+        assert self.__not_after is not None
+        return self.__not_before <= gmtime <= self.__not_after
 
 def certs_from_pem(pem_string, skip_invalid_blobs=False):
     """Read multiple PEM-encoded certificates from a string.

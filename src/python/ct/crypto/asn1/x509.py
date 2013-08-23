@@ -30,8 +30,12 @@ It is partially based on the pyasn1 example module for the precursor RFC 2459.
 """
 
 from ct.crypto import error
-from ct.crypto.asn1 import oid, x509_name, print_util
+from ct.crypto.asn1 import oid
+from ct.crypto.asn1 import print_util
 from ct.crypto.asn1 import types
+from ct.crypto.asn1 import x509_name
+from ct.crypto.asn1 import x509_time
+
 from pyasn1.type import tag,namedtype,namedval,constraint
 from pyasn1 import error as pyasn1_error
 
@@ -76,8 +80,8 @@ class UniqueIdentifier(types.BitString):
 class Time(types.Choice):
     PRINT_LABELS = False
     componentType = namedtype.NamedTypes(
-        namedtype.NamedType('utcTime', types.UTCTime()),
-        namedtype.NamedType('generalTime', types.GeneralizedTime())
+        namedtype.NamedType('utcTime', x509_time.UTCTime()),
+        namedtype.NamedType('generalTime', x509_time.GeneralizedTime())
         )
 
 class Validity(types.Sequence):

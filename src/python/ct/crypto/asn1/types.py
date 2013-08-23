@@ -93,16 +93,20 @@ class SimpleBaseType(base.AbstractSimpleAsn1Item, AbstractBaseType):
            long_string split into lines of at most |wrap| characters each."""
         return print_util.wrap_lines(long_string, wrap)
 
-    def string_value(self):
-        """Get a string representation of the object. Derived classes should
-        override where appropriate.
-        Returns:
-            a human-readable string."""
+    def _str_or_no_value(self):
         try:
             # This *should* always work for value objects.
             return str(self)
         except pyasn1_error.PyAsn1Error:
             return "<no value>"
+
+    def string_value(self):
+        """Get a string representation of the object. Derived classes should
+        override where appropriate.
+        Returns:
+            a human-readable string."""
+        # Default behaviour
+        return self._str_or_no_value()
 
     def human_readable_lines(self, wrap=80, label=""):
         """A pretty human readable representation of the object.
@@ -212,16 +216,6 @@ class OctetString(BaseOctetString):
     pass
 
 class Any(univ.Any, BaseOctetString):
-    pass
-
-# TODO(ekasper): print human readable timestamps.
-class BaseTime(SimpleBaseType):
-    pass
-
-class UTCTime(useful.UTCTime, BaseTime):
-    pass
-
-class GeneralizedTime(useful.GeneralizedTime, BaseTime):
     pass
 
 # From pyasn1 documentation:

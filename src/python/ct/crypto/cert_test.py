@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 
 import gflags
+import time
 import unittest
 import sys
 from ct.crypto import cert, error
@@ -101,6 +102,29 @@ class CertificateTest(unittest.TestCase):
     def test_subject_common_name(self):
         c = cert.Certificate.from_der_file(self.der_file)
         self.assertEqual("*.google.com", c.subject_common_name())
+
+    def test_validity(self):
+        with open(self.chain_file) as f:
+            certs = [c for c in cert.certs_from_pem(f.read())]
+            self.assertEqual(3, len(certs))
+            # notBefore: Sat Aug 22 16:41:51 1998 GMT
+            # notAfter: Wed Aug 22 16:41:51 2018 GMT
+            c = certs[2]
+        # These two will start failing in 2018.
+        self.assertTrue(c.is_temporally_valid_now())
+        self.assertFalse(c.is_expired())
+
+        self.assertFalse(c.is_not_yet_valid())
+
+        # Aug 22 16:41:51 2018
+        self.assertTrue(c.is_temporally_valid_at(time.gmtime(1534956111)))
+        # Aug 22 16:41:52 2018
+        self.assertFalse(c.is_temporally_valid_at(time.gmtime(1534956112)))
+
+        # Aug 22 16:41:50 1998
+        self.assertFalse(c.is_temporally_valid_at(time.gmtime(903804110)))
+        # Aug 22 16:41:51 1998
+        self.assertTrue(c.is_temporally_valid_at(time.gmtime(903804111)))
 
 if __name__ == "__main__":
     sys.argv = FLAGS(sys.argv)
