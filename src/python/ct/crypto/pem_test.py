@@ -5,6 +5,7 @@ from tempfile import mkstemp
 import unittest
 from ct.crypto import pem
 
+
 class PemTest(unittest.TestCase):
     BLOB = "helloworld\x00"
     MARKER = "BLOB"
@@ -30,6 +31,7 @@ aGVsbG93b3JsZAA=
     def tearDown(self):
         for name in self.__tempfiles:
             os.remove(name)
+
 
 class PemReaderTest(PemTest):
     def __assert_default_read_result(self, results):
@@ -180,6 +182,7 @@ class PemReaderTest(PemTest):
         self.assertEqual((self.BLOB, self.MARKER), gen.next())
         self.assertRaises(StopIteration, gen.next)
 
+
 class PemWriterTest(PemTest):
     def test_create_writer_from_file(self):
         name = self.create_temp_file()
@@ -193,7 +196,7 @@ class PemWriterTest(PemTest):
 
     def test_create_writer_from_file_object(self):
         name = self.create_temp_file()
-        with open(name, 'w+') as f:
+        with open(name, "w+") as f:
             writer = pem.PemWriter(f, self.MARKER)
             writer.write(self.BLOB)
             writer.close()
@@ -201,7 +204,7 @@ class PemWriterTest(PemTest):
 
     def test_writer_as_context_manager(self):
         name = self.create_temp_file()
-        f = open(name, 'w+')
+        f = open(name, "w+")
         with pem.PemWriter(f, self.MARKER) as writer:
             writer.write(self.BLOB)
         self.assertTrue(f.closed)
@@ -243,7 +246,7 @@ class PemWriterTest(PemTest):
         writer = pem.PemWriter.from_file(name, self.MARKER, append=True)
         writer.write(self.BLOB)
         writer.close()
-        self.assertEqual(contents + '\n' + self.PEM_BLOB,
+        self.assertEqual(contents + "\n" + self.PEM_BLOB,
                          self.get_file_contents(name))
 
     def test_write_long_blob(self):
@@ -277,5 +280,5 @@ c3BsaXRhY3Jvc3NtdWx0aXBsZWxpbmVz
         self.assertEqual(self.PEM_BLOB + self.PEM_BLOB,
                          self.get_file_contents(name))
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     unittest.main()

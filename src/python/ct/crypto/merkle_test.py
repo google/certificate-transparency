@@ -3,7 +3,9 @@
 import hashlib
 import unittest
 
-from ct.crypto import error, merkle
+from ct.crypto import error
+from ct.crypto import merkle
+
 
 class TreeHasherTest(unittest.TestCase):
     sha256_empty_hash = ("e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495"
@@ -36,16 +38,21 @@ class TreeHasherTest(unittest.TestCase):
             self.assertEqual(hasher.hash_children(
                 left.decode("hex"), right.decode("hex")).encode("hex"), val)
 
+
 class HexTreeHasher(object):
     def __init__(self, hashfunc=hashlib.sha256):
         self.hasher = merkle.TreeHasher(hashfunc)
+
     def hash_empty(self):
         return self.hasher.hash_empty().encode("hex")
+
     def hash_leaf(self, data):
         return self.hasher.hash_leaf(data.decode("hex")).encode("hex")
+
     def hash_children(self, left, right):
         return self.hasher.hash_children(left.decode("hex"),
                                          right.decode("hex")).encode("hex")
+
 
 class MerkleVerifierTest(unittest.TestCase):
     # (old_tree_size, new_tree_size, old_root, new_root, proof)
@@ -103,18 +110,16 @@ class MerkleVerifierTest(unittest.TestCase):
             ))
 
         # Equal tree sizes but different hashes.
-        self.assertRaises(error.ConsistencyError,
-                          verifier.verify_tree_consistency,
-            3, 3,
+        self.assertRaises(
+            error.ConsistencyError, verifier.verify_tree_consistency, 3, 3,
             "6e340b9cffb37a989ca544e6bb780a2c78901d3fb33738768511a30617afa01e",
             "6e340b9cffb37a989ca544e6bb780a2c78901d3fb33738768511a30617afa01d",
             [])
 
     def test_verify_tree_consistency_newer_tree_is_smaller(self):
         verifier = merkle.MerkleVerifier(HexTreeHasher())
-        self.assertRaises(ValueError,
-                          verifier.verify_tree_consistency,
-            5, 2,
+        self.assertRaises(
+            ValueError, verifier.verify_tree_consistency, 5, 2,
             "4e3bbb1f7b478dcfe71fb631631519a3bca12c9aefca1612bfce4c13a86264d4",
             "fac54203e7cc696cf0dfcb42c92a1d9dbaf70ad9e621f4bd8d98662f00e3c125",
             ["5f083f0a1a33ca076a95279832580db3e0ef4584bdff1f54c8a360f50de3031e",
@@ -123,8 +128,8 @@ class MerkleVerifierTest(unittest.TestCase):
 
     def test_verify_tree_consistency_proof_too_short(self):
         verifier = merkle.MerkleVerifier(HexTreeHasher())
-        self.assertRaises(error.ProofError, verifier.verify_tree_consistency,
-            6, 8,
+        self.assertRaises(
+            error.ProofError, verifier.verify_tree_consistency, 6, 8,
             "76e67dadbcdf1e10e1b74ddc608abd2f98dfb16fbce75277b5232a127f2087ef",
             "5dc9da79a70659a9ad559cb701ded9a2ab9d823aad2f4960cfe370eff4604328",
             ["0ebc5d3437fbe2db158b9f126a1d118e308181031d0a949f8dededebc558ef6a",
@@ -134,8 +139,8 @@ class MerkleVerifierTest(unittest.TestCase):
     def test_verify_tree_consistency_bad_second_hash(self):
         verifier = merkle.MerkleVerifier(HexTreeHasher())
         # A bit has been flipped in the second hash.
-        self.assertRaises(error.ProofError, verifier.verify_tree_consistency,
-            6, 8,
+        self.assertRaises(
+            error.ProofError, verifier.verify_tree_consistency, 6, 8,
             "76e67dadbcdf1e10e1b74ddc608abd2f98dfb16fbce75277b5232a127f2087ef",
             "5dc9da79a70659a9ad559cb701ded9a2ab9d823aad2f4960cfe370eff4604329",
             ["0ebc5d3437fbe2db158b9f126a1d118e308181031d0a949f8dededebc558ef6a",
@@ -146,8 +151,8 @@ class MerkleVerifierTest(unittest.TestCase):
     def test_verify_tree_consistency_both_hashes_bad(self):
         verifier = merkle.MerkleVerifier(HexTreeHasher())
         # A bit has been flipped in both hashes.
-        self.assertRaises(error.ProofError, verifier.verify_tree_consistency,
-            6, 8,
+        self.assertRaises(
+            error.ProofError, verifier.verify_tree_consistency, 6, 8,
             "76e67dadbcdf1e10e1b74ddc608abd2f98dfb16fbce75277b5232a127f2087ee",
             "5dc9da79a70659a9ad559cb701ded9a2ab9d823aad2f4960cfe370eff4604329",
             ["0ebc5d3437fbe2db158b9f126a1d118e308181031d0a949f8dededebc558ef6a",
@@ -158,9 +163,8 @@ class MerkleVerifierTest(unittest.TestCase):
     def test_verify_tree_consistency_bad_first_hash(self):
         verifier = merkle.MerkleVerifier(HexTreeHasher())
         # A bit has been flipped in the first hash.
-        self.assertRaises(error.ConsistencyError,
-                          verifier.verify_tree_consistency,
-            6, 8,
+        self.assertRaises(
+            error.ConsistencyError, verifier.verify_tree_consistency, 6, 8,
             "76e67dadbcdf1e10e1b74ddc608abd2f98dfb16fbce75277b5232a127f2087ee",
             "5dc9da79a70659a9ad559cb701ded9a2ab9d823aad2f4960cfe370eff4604328",
             ["0ebc5d3437fbe2db158b9f126a1d118e308181031d0a949f8dededebc558ef6a",
@@ -168,5 +172,5 @@ class MerkleVerifierTest(unittest.TestCase):
              "d37ee418976dd95753c1c73862b9398fa2a2cf9b4ff0fdfe8b30cd95209614b7"]
             )
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     unittest.main()

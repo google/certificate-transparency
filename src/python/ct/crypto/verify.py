@@ -1,15 +1,22 @@
-import ecdsa
+"""Verify CT log statements."""
+
 import hashlib
 import io
-import logging
 import struct
 
-from ct.crypto import error, merkle, pem
-from ct.proto import client_pb2, ct_pb2
+from ct.crypto import error
+from ct.crypto import merkle
+from ct.crypto import pem
+from ct.proto import client_pb2
+from ct.proto import ct_pb2
+import ecdsa
+
 
 class LogVerifier(object):
+    """CT log verifier."""
     __ECDSA_READ_MARKERS = ("PUBLIC KEY", "ECDSA PUBLIC KEY")
     __ECDSA_WRITE_MARKER = "ECDSA PUBLIC KEY"
+
     def __init__(self, key_info, merkle_verifier=merkle.MerkleVerifier()):
         """Initialize from KeyInfo protocol buffer and a MerkleVerifier."""
         self.__merkle_verifier = merkle_verifier
@@ -44,6 +51,18 @@ class LogVerifier(object):
                            sth_response.sha256_root_hash)
 
     def _decode_signature(self, signature):
+        """Decode the TLS-encoded serialized signature.
+
+        Args:
+            signature: TLS-encoded signature.
+
+        Returns:
+            the inner, ASN.1 encoded contents.
+
+        Raises:
+            ct.crypto.error.EncodingError: invalid TLS encoding.
+        """
+
         sig_stream = io.BytesIO(signature)
 
         sig_prefix = sig_stream.read(2)
@@ -84,12 +103,20 @@ class LogVerifier(object):
     @error.returns_true_or_raises
     def verify_sth(self, sth_response):
         """Verify the STH Response.
+
+        Args:
+            sth_response: client_pb2.SthResponse proto. The response must have
+                all fields present.
+
         Returns:
             True. The return value is enforced by a decorator and need not be
-            checked by the caller.
+                checked by the caller.
+
         Raises:
-            EncodingError, SignatureError
-        The response must have all fields present."""
+            ct.crypto.error.EncodingError: failed to encode signature input,
+                or decode the signature.
+            ct.crypto.error.SignatureError: invalid signature.
+        """
         signature_input = self._encode_sth_input(sth_response)
         signature = self._decode_signature(sth_response.tree_head_signature)
         return self._verify(signature_input, signature)
@@ -97,18 +124,24 @@ class LogVerifier(object):
     @staticmethod
     @error.returns_true_or_raises
     def verify_sth_temporal_consistency(old_sth, new_sth):
-        """Verify the temporal consistency for two STH responses: i.e., that
-        the newer STH has bigger tree size.
+        """Verify the temporal consistency for two STH responses.
+
+        For two STHs, verify that the newer STH has bigger tree size.
         Does not verify STH signatures or consistency of hashes.
-        Params:
-        old_sth, new_sth: client_pb2.SthResponse() protos. The STH with
-        the older timestamp must be supplied first.
+
+        Args:
+            old_sth: client_pb2.SthResponse proto. The STH with the older
+                timestamp must be supplied first.
+            new_sth: client_pb2.SthResponse proto.
+
         Returns:
             True. The return value is enforced by a decorator and need not be
-            checked by the caller.
+                checked by the caller.
+
         Raises:
-            ConsistencyError: STHs are inconsistent
-            ValueError: "Older" STH is not older."""
+            ct.crypto.error.ConsistencyError: STHs are inconsistent
+            ValueError: "Older" STH is not older.
+        """
         if old_sth.timestamp > new_sth.timestamp:
             raise ValueError("Older STH has newer timestamp (%d vs %d), did "
                              "you supply inputs in the wrong order?" %
@@ -128,19 +161,26 @@ class LogVerifier(object):
 
     @error.returns_true_or_raises
     def verify_sth_consistency(self, old_sth, new_sth, proof):
-        """Verify the temporal consistency and consistency proof for two STH
+        """Verify consistency of two STHs.
+
+        Verify the temporal consistency and consistency proof for two STH
         responses. Does not verify STH signatures.
-        Params:
-        old_sth, new_sth: client_pb2.SthResponse() protos. The STH with
-        the older timestamp must be supplied first.
-        proof: a list of SHA256 audit nodes
+
+        Args:
+            old_sth: client_pb2.SthResponse() proto. The STH with the older
+                timestamp must be supplied first.
+            new_sth: client_pb2.SthResponse() proto.
+            proof: a list of SHA256 audit nodes.
+
         Returns:
             True. The return value is enforced by a decorator and need not be
-            checked by the caller.
+                checked by the caller.
+
         Raises:
             ConsistencyError: STHs are inconsistent
             ProofError: proof is invalid
-            ValueError: "Older" STH is not older."""
+            ValueError: "Older" STH is not older.
+        """
         self.verify_sth_temporal_consistency(old_sth, new_sth)
         self.__merkle_verifier.verify_tree_consistency(
             old_sth.tree_size, new_sth.tree_size, old_sth.sha256_root_hash,

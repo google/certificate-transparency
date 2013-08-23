@@ -1,9 +1,14 @@
+"""Merkle trees."""
+
 import hashlib
 import logging
 
 from ct.crypto import error
 
+
 class TreeHasher(object):
+    """Merkle hasher with domain separation for leaves and nodes."""
+
     def __init__(self, hashfunc=hashlib.sha256):
         self.hashfunc = hashfunc
 
@@ -21,16 +26,18 @@ class TreeHasher(object):
 
     def hash_leaf(self, data):
         hasher = self.hashfunc()
-        hasher.update('\x00' + data)
+        hasher.update("\x00" + data)
         return hasher.digest()
 
     def hash_children(self, left, right):
         hasher = self.hashfunc()
-        hasher.update('\x01' + left + right)
+        hasher.update("\x01" + left + right)
         return hasher.digest()
+
 
 class MerkleVerifier(object):
     """A utility class for doing Merkle path computations."""
+
     def __init__(self, hasher=TreeHasher()):
         self.hasher = hasher
 
@@ -43,22 +50,27 @@ class MerkleVerifier(object):
     @error.returns_true_or_raises
     def verify_tree_consistency(self, old_tree_size, new_tree_size, old_root,
                                 new_root, proof):
-        """Verify the consistency between two root hashes, using a supplied
-        consistency proof. old_tree_size must be <= new_tree_size.
+        """Verify the consistency between two root hashes.
+
+        old_tree_size must be <= new_tree_size.
 
         Args:
-            old_tree_size:  size of the older tree
-            new_tree_size:  size of the newer_tree
-            old_root:       the root hash of the older tree
-            new_root:       the root hash of the newer tree
+            old_tree_size: size of the older tree.
+            new_tree_size: size of the newer_tree.
+            old_root: the root hash of the older tree.
+            new_root: the root hash of the newer tree.
+            proof: the consistency proof.
+
         Returns:
-            True
+            True. The return value is enforced by a decorator and need not be
+                checked by the caller.
+
         Raises:
             ConsistencyError: the proof indicates an inconsistency
-                              (this is usually really serious!)
-            ProofError: the proof is invalid
-            ValueError: supplied tree sizes are invalid."""
-
+                (this is usually really serious!).
+            ProofError: the proof is invalid.
+            ValueError: supplied tree sizes are invalid.
+        """
         old_size = long(old_tree_size)
         new_size = long(new_tree_size)
 
@@ -146,8 +158,8 @@ class MerkleVerifier(object):
                                        (new_root, new_hash))
             elif old_hash != old_root:
                 raise error.ConsistencyError("Inconsistency: first root hash "
-                                             "does not match. Expected hash: %s "
-                                             ", computed hash: %s" %
+                                             "does not match. Expected hash: "
+                                             "%s, computed hash: %s" %
                                              (old_root, old_hash))
 
         except StopIteration:

@@ -40,50 +40,77 @@ None, or False, or [], or anything else.
 
 import functools
 
+
 class Error(Exception):
     """Exceptions raised by the crypto subpackage."""
     pass
 
+
 class UnsupportedAlgorithmError(Error):
-    """Raised when an algorithm is not implemented or supported."""
+    """An algorithm is not implemented or supported."""
     pass
+
 
 class VerifyError(Error):
-    """Exceptions raised when some expected property of the input either
-    verifiably does not hold, or cannot be conclusively verified.
-    Domain-specific verification errors inherit from this class."""
+    """Some expected property of the input cannot be verified.
+
+    The property either verifiably does not hold, or cannot be conclusively
+    verified. Domain-specific verification errors inherit from this class.
+    """
     pass
+
 
 class ConsistencyError(VerifyError):
-    """Raised when there is a (cryptographic) inconsistency in the data."""
+    """There is a (cryptographic) inconsistency in the data."""
     pass
 
+
 class ProofError(VerifyError):
-    """Raised when a cryptographic proof is not valid. This does not necessarily
-    indicate that the sought property does not hold but rather that the given
-    proof is insufficient for verifying the desired property."""
+    """A cryptographic proof is not valid.
+
+    This error does not necessarily indicate that the sought property does not
+    hold but rather that the given data is insufficient for verifying the
+    desired property.
+    """
+    pass
+
 
 # TODO(ekasper): TBD if this hierarchy is appropriate.
 class EncodingError(Error):
-    """Encoding/decoding error: raised when inputs cannot be serialized, or
-    serialized data cannot be parsed."""
+    """Encoding/decoding error.
+
+    Inputs cannot be serialized, or serialized data cannot be parsed.
+    """
     pass
+
 
 class ASN1Error(EncodingError):
-    """Raised when an ASN1 object cannot be encoded or decoded."""
+    """An ASN1 object cannot be encoded or decoded."""
     pass
+
 
 class UnknownASN1AttributeTypeError(ASN1Error):
-    """Raised when an ASN1 AttributeType OID is not known."""
+    """An ASN1 AttributeType OID is not known."""
     pass
+
 
 class SignatureError(VerifyError):
-    """Raised when a public-key signature does not verify."""
+    """A public-key signature does not verify."""
     pass
 
+
 def returns_true_or_raises(f):
-    """A safety net for functions that are only allowed to return True or raise
-    an exception."""
+    """A safety net.
+
+    Decorator for functions that are only allowed to return True or raise
+    an exception.
+
+    Args:
+        f: A function whose only expected return value is True.
+
+    Returns:
+        A wrapped functions whose guaranteed only return value is True.
+    """
     @functools.wraps(f)
     def wrapped(*args, **kwargs):
         ret = f(*args, **kwargs)

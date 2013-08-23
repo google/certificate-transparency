@@ -1,10 +1,12 @@
 #!/usr/bin/env python
 
-import mock
 import unittest
 
-from ct.crypto import error, verify
+from ct.crypto import error
+from ct.crypto import verify
 from ct.proto import client_pb2
+import mock
+
 
 class LogVerifierTest(unittest.TestCase):
     default_sth = client_pb2.SthResponse()
@@ -161,7 +163,7 @@ class LogVerifierTest(unittest.TestCase):
 
         # Note we do not care about root hash inconsistency here.
         self.assertTrue(verifier.verify_sth_temporal_consistency(
-                old_sth, new_sth))
+            old_sth, new_sth))
 
     def test_verify_sth_temporal_consistency_equal_timestamps(self):
         old_sth = LogVerifierTest.default_sth
@@ -175,16 +177,16 @@ class LogVerifierTest(unittest.TestCase):
 
         self.assertRaises(error.ConsistencyError,
                           verifier.verify_sth_temporal_consistency,
-                old_sth, new_sth)
+                          old_sth, new_sth)
 
         new_sth.tree_size = old_sth.tree_size - 1
         self.assertRaises(error.ConsistencyError,
                           verifier.verify_sth_temporal_consistency,
-                old_sth, new_sth)
+                          old_sth, new_sth)
 
         # But identical STHs are OK
         self.assertTrue(verifier.verify_sth_temporal_consistency(
-                old_sth, old_sth))
+            old_sth, old_sth))
 
     def test_verify_sth_temporal_consistency_reversed_timestamps(self):
         old_sth = LogVerifierTest.default_sth
@@ -199,7 +201,7 @@ class LogVerifierTest(unittest.TestCase):
 
         self.assertRaises(ValueError,
                           verifier.verify_sth_temporal_consistency,
-                new_sth, old_sth)
+                          new_sth, old_sth)
 
     def test_verify_sth_temporal_consistency_newer_tree_is_smaller(self):
         old_sth = LogVerifierTest.default_sth
@@ -214,7 +216,7 @@ class LogVerifierTest(unittest.TestCase):
 
         self.assertRaises(error.ConsistencyError,
                           verifier.verify_sth_temporal_consistency,
-                old_sth, new_sth)
+                          old_sth, new_sth)
 
     def test_verify_sth_consistency_invalid_proof(self):
         old_sth = LogVerifierTest.default_sth
@@ -235,5 +237,5 @@ class LogVerifierTest(unittest.TestCase):
                           verifier.verify_sth_consistency,
                           old_sth, new_sth, proof)
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     unittest.main()
