@@ -89,8 +89,8 @@ class ASN1Error(EncodingError):
     pass
 
 
-class UnknownASN1AttributeTypeError(ASN1Error):
-    """An ASN1 AttributeType OID is not known."""
+class UnknownASN1TypeError(ASN1Error):
+    """An OID does not map to a known ASN.1 type."""
     pass
 
 

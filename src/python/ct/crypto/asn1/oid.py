@@ -1,5 +1,7 @@
 """ASN.1 object identifiers. This module contains a dictionary of known OIDs."""
 
+import abc
+
 from pyasn1.type import univ
 from pyasn1 import error as pyasn1_error
 
@@ -76,6 +78,24 @@ ID_AT_BUSINESS_CATEGORY = ObjectIdentifier("2.5.4.15")
 ID_AT_POSTAL_CODE = ObjectIdentifier("2.5.4.17")
 ID_AT_POST_OFFICE_BOX = ObjectIdentifier("2.5.4.18")
 
+# Standard X509v3 certificate extensions
+ID_CE_AUTHORITY_KEY_IDENTIFIER = ObjectIdentifier("2.5.29.35")
+ID_CE_SUBJECT_KEY_IDENTIFIER = ObjectIdentifier("2.5.29.14")
+ID_CE_KEY_USAGE = ObjectIdentifier("2.5.29.15")
+ID_CE_PRIVATE_KEY_USAGE_PERIOD = ObjectIdentifier("2.5.29.16")
+ID_CE_CERTIFICATE_POLICIES = ObjectIdentifier("2.5.29.32")
+ID_CE_SUBJECT_ALT_NAME = ObjectIdentifier("2.5.29.17")
+ID_CE_ISSUER_ALT_NAME = ObjectIdentifier("2.5.29.18")
+ID_CE_SUBJECT_DIRECTORY_ATTRIBUTES = ObjectIdentifier("2.5.29.9")
+ID_CE_BASIC_CONSTRAINTS = ObjectIdentifier("2.5.29.19")
+ID_CE_NAME_CONSTRAINTS = ObjectIdentifier("2.5.29.30")
+ID_CE_POLICY_CONSTRAINTS = ObjectIdentifier("2.5.29.30")
+ID_CE_EXT_KEY_USAGE = ObjectIdentifier("2.5.29.37")
+ID_CE_CRL_DISTRIBUTION_POINTS = ObjectIdentifier("2.5.29.31")
+ID_CE_INHIBIT_ANY_POLICY = ObjectIdentifier("2.5.29.54")
+ID_PE_AUTHORITY_INFO_ACCESS = ObjectIdentifier("1.3.6.1.5.5.7.1.1")
+ID_PE_SUBJECT_INFO_ACCESS = ObjectIdentifier("1.3.6.1.5.5.7.1.11")
+
 _OID_NAME_DICT = {
     # Object identifier long names taken verbatim from the RFCs.
     # Short names are colloquial.
@@ -113,5 +133,84 @@ _OID_NAME_DICT = {
     ID_AT_DESCRIPTION: ("id-at-description", "description"),
     ID_AT_BUSINESS_CATEGORY: ("id-at-businessCategory", "businessCategory"),
     ID_AT_POSTAL_CODE: ("id-at-postalCode", "postalCode"),
-    ID_AT_POST_OFFICE_BOX: ("id-at-postOfficeBox", "postOfficeBox")
+    ID_AT_POST_OFFICE_BOX: ("id-at-postOfficeBox", "postOfficeBox"),
+    ID_CE_AUTHORITY_KEY_IDENTIFIER: ("id-ce-authorityKeyIdentifier",
+                                     "authorityKeyIdentifier"),
+    ID_CE_SUBJECT_KEY_IDENTIFIER: ("id-ce-subjectKeyIdentifier",
+                                     "subjectKeyIdentifier"),
+    ID_CE_KEY_USAGE: ("id-ce-keyUsage", "keyUsage"),
+    ID_CE_PRIVATE_KEY_USAGE_PERIOD: ("id-ce-privateKeyUsagePeriod",
+                                     "privateKeyUsagePeriod"),
+    ID_CE_CERTIFICATE_POLICIES: ("id-ce-certificatePolicies",
+                                 "certificatePolicies"),
+    ID_CE_SUBJECT_ALT_NAME: ("id-ce-subjectAltName", "subjectAltName"),
+    ID_CE_ISSUER_ALT_NAME: ("id-ce-issuerAltName", "issuerAltName"),
+    ID_CE_SUBJECT_DIRECTORY_ATTRIBUTES: ("id-ce-subjectDirectoryAttributes",
+                                         "subjectDirectoryAttributes"),
+    ID_CE_BASIC_CONSTRAINTS: ("id-ce-basicConstraints", "basicConstraints"),
+    ID_CE_NAME_CONSTRAINTS: ("id-ce-nameConstraints", "nameConstraints"),
+    ID_CE_POLICY_CONSTRAINTS: ("id-ce-policyConstraints", "policyConstraints"),
+    ID_CE_EXT_KEY_USAGE: ("id-ce-extKeyUsage", "extendedKeyUsage"),
+    ID_CE_CRL_DISTRIBUTION_POINTS: ("id-ce-cRLDistributionPoints",
+                                    "CRLDistributionPoints"),
+    ID_CE_INHIBIT_ANY_POLICY: ("id-ce-inhibitAnyPolicy", "inhibitAnyPolicy"),
+    ID_PE_AUTHORITY_INFO_ACCESS: ("id-pe-authorityInfoAccess",
+                                  "authorityInformationAccess"),
+    ID_PE_SUBJECT_INFO_ACCESS: ("id-pe-subjectInfoAccess",
+                                  "subjectInformationAccess")
     }
+
+class ValueTypeIdentifier(ObjectIdentifier):
+    """An OID that identifies an ASN.1 structure."""
+    @abc.abstractmethod
+    def value_type(self):
+        """Return an ASN.1 type corresponding to the OID.
+        Returns: an ASN.1 type.
+        Raises:  ct.crypto.error.UnknownASN1TypeError.
+        """
+        pass
+
+class DecodableAny(types.Any):
+    """An ANY ASN.1 object whose encoding/decoding is determined by a
+    corresponding ValueTypeIdentifier OID."""
+    def get_decoded_value(self, value_type_oid, decode_fun,
+                          default_value_type=None):
+        """Get the decoded ASN.1 object.
+        Args:
+            value_type_oid: the ValueTypeIdentifier object that determines the
+                            ASN.1 type.
+            decode_fun    : the decoding function to use
+            default_value_type: the default type to fall back to in case
+                                value_type_oid does not point to a known type.
+        """
+        unknown_error = None
+        try:
+            value_type = value_type_oid.value_type()
+        except error.UnknownASN1TypeError as e:
+            if default_value_type is None:
+                raise e
+            # Save the error but see if the unknown type can be decoded as the
+            # default value type. If decoding still fails, then we re-raise this
+            # this error to indicate we don't know how to decode the attribute.
+            # decode the attribute.
+            unknown_error = e
+            value_type = default_value_type
+ 
+        try:
+            decoded_value, rest = decode_fun(self, asn1Spec=value_type())
+        except pyasn1_error.PyAsn1Error as e:
+            if unknown_error:
+                raise unknown_error
+            else:
+                raise error.ASN1Error("Unable to decode %s value:\n%s" %
+                                      (value_type, e))
+        else:
+            if rest:
+                # If there are leftover bytes here, then best not to trust the
+                # result at all.
+                if unknown_error:
+                    raise unknown_error
+                else:
+                    raise error.ASN1Error("Invalid encoding of %s" % value_type)
+            else:
+                return decoded_value

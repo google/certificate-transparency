@@ -7,12 +7,11 @@ from ct.crypto.asn1 import x509_name
 class X509NameTest(unittest.TestCase):
     def test_attribute_dictionary(self):
         name = x509_name.ID_AT_NAME
-        self.assertTrue(isinstance(name.value_type(), x509_name.X520Name))
+        self.assertEqual(name.value_type(), x509_name.X520Name)
 
     def test_unknown_attribute_type(self):
         unknown = x509_name.AttributeType("1.2.3.4")
-        self.assertRaises(error.UnknownASN1AttributeTypeError,
-                          unknown.value_type)
+        self.assertRaises(error.UnknownASN1TypeError, unknown.value_type)
 
     # TODO(ekasper): test attribute decoding. This requires generating test
     # vectors with known good encodings of name attributes.

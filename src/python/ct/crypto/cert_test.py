@@ -12,11 +12,11 @@ gflags.DEFINE_string('testdata_dir', "ct/crypto/testdata",
 
 class CertificateTest(unittest.TestCase):
     _PEM_FILE = "google_cert.pem"
+
     # Contains 3 certificates
     # C=US/ST=California/L=Mountain View/O=Google Inc/CN=www.google.com
     # C=US/O=Google Inc/CN=Google Internet Authority
     # C=US/O=Equifax/OU=Equifax Secure Certificate Authority
-
     _PEM_CHAIN_FILE = "google_chain.pem"
     _DER_FILE = "google_cert.der"
 
@@ -125,6 +125,15 @@ class CertificateTest(unittest.TestCase):
         self.assertFalse(c.is_temporally_valid_at(time.gmtime(903804110)))
         # Aug 22 16:41:51 1998
         self.assertTrue(c.is_temporally_valid_at(time.gmtime(903804111)))
+
+    def test_basic_constraints(self):
+        with open(self.chain_file) as f:
+            certs = [c for c in cert.certs_from_pem(f.read())]
+        self.assertFalse(certs[0].basic_constraint_ca())
+        self.assertTrue(certs[1].basic_constraint_ca())
+        self.assertIsNone(certs[0].basic_constraint_path_length())
+        self.assertEqual(0, certs[1].basic_constraint_path_length())
+
 
 if __name__ == "__main__":
     sys.argv = FLAGS(sys.argv)

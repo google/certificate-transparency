@@ -6,17 +6,20 @@ from ct.crypto import error
 from ct.crypto.asn1 import oid
 from ct.crypto.asn1 import types
 
-class AttributeValue(types.Any):
+class AttributeValue(oid.DecodableAny):
     pass
 
-class AttributeType(oid.ObjectIdentifier):
+class AttributeType(oid.ValueTypeIdentifier):
     def value_type(self):
-      """Return an ASN.1 type object corresponding to the attribute type."""
-      try:
-        return _ATTRIBUTE_VALUE_TYPE_DICT[self]
-      except KeyError:
-        raise error.UnknownASN1AttributeTypeError("Unknown attribute type: %s" %
-                                                  self.human_readable())
+        """Return an ASN.1 type object corresponding to the OID.
+        Returns: an ASN.1 type object.
+        Raises:  ct.crypto.error.UnknownASN1TypeError.
+        """
+        try:
+            return _ATTRIBUTE_VALUE_TYPE_DICT[self]
+        except KeyError:
+            raise error.UnknownASN1TypeError("Unknown attribute type: %s" %
+                                             self.human_readable())
 
 class AttributeTypeAndValue(types.Sequence):
     componentType = namedtype.NamedTypes(
@@ -39,8 +42,7 @@ class AttributeTypeAndValue(types.Sequence):
                         the pyasn1 decoder signature.
         Returns: an ASN1 element specified by 'type'.
         Raises:
-            UnknownASN1AttributeTypeError: 'type' does not have a known
-                                            value type
+            UnknownASN1TypeError: 'type' does not have a known value type
             ASN1Error: object is not a proper ASN.1 value object, or 'value' is
                        not a valid encoding of the anticipated type."""
 
@@ -49,36 +51,8 @@ class AttributeTypeAndValue(types.Sequence):
         if attr_type is None or attr_value is None:
             raise error.ASN1Error("Attempting to decode an incomplete object %s"
                                   % self.human_readable())
-
-        unknown_error = None
-        try:
-            value_type = attr_type.value_type()
-        except error.UnknownASN1AttributeTypeError as e:
-            # Save the error but see if the unknown type can be decoded as a
-            # DirectoryString (which is a CHOICE of string types) anyway. If not
-            # then we re-raise this error to indicate we don't know how to
-            # decode the attribute.
-            unknown_error = e
-            value_type = DirectoryString()
-        try:
-            decoded_value, rest = decode_fun(attr_value,
-                                             asn1Spec=value_type)
-        except pyasn1_error.PyAsn1Error as e:
-            if unknown_error:
-                raise unknown_error
-            else:
-                raise error.ASN1Error("Unable to decode name attribute: %s" % e)
-        else:
-            if rest:
-                # If there are leftover bytes here, then best not to trust the
-                # result at all.
-                if unknown_error:
-                    raise unknown_error
-                else:
-                    raise error.ASN1Error("Invalid encoding of name attribute "
-                                          "%s" % value_type.human_readable())
-            else:
-                return decoded_value
+        return attr_value.get_decoded_value(attr_type, decode_fun,
+                                            default_value_type=DirectoryString)
 
     def set_decoded_value(self, decode_fun):
         """Decode the ANY 'value' according to the decoded 'type' component
@@ -92,7 +66,7 @@ class AttributeTypeAndValue(types.Sequence):
         """
         try:
             decoded_value = self.get_decoded_value(decode_fun)
-        except error.UnknownASN1AttributeTypeError as e:
+        except error.UnknownASN1TypeError as e:
         # RFC 5280 does not restrict the set of attribute types, therefore we
         # do not raise here upon encountering an unknown type.
             logging.warning("Unable to decode attribute value: %s" % e)
@@ -329,28 +303,30 @@ ID_AT_POSTAL_CODE = AttributeType(oid.ID_AT_POSTAL_CODE)
 ID_AT_POST_OFFICE_BOX = AttributeType(oid.ID_AT_POST_OFFICE_BOX)
 
 _ATTRIBUTE_VALUE_TYPE_DICT = {
-    ID_AT_NAME: X520Name(),
-    ID_AT_SURNAME: X520Name(),
-    ID_AT_GIVEN_NAME: X520Name(),
-    ID_AT_INITIALS: X520Name(),
-    ID_AT_GENERATION_QUALIFIER: X520Name(),
-    ID_AT_COMMON_NAME: X520CommonName(),
-    ID_AT_LOCALITY_NAME: X520LocalityName(),
-    ID_AT_STATE_OR_PROVINCE_NAME: X520StateOrProvinceName(),
-    ID_AT_ORGANIZATION_NAME: X520OrganizationName(),
-    ID_AT_ORGANIZATIONAL_UNIT_NAME: X520OrganizationalUnitName(),
-    ID_AT_TITLE: X520Title(),
-    ID_AT_DN_QUALIFIER: X520dnQualifier(),
-    ID_AT_COUNTRY_NAME: X520countryName(),
-    ID_AT_SERIAL_NUMBER: X520SerialNumber(),
-    ID_AT_PSEUDONYM: X520Pseudonym(),
-    ID_DOMAIN_COMPONENT: DomainComponent(),
-    ID_EMAIL_ADDRESS: EmailAddress(),
-    # These, too, have upper bounds, but since we're not currently enforcing any
-    # bounds, we mark them simply as DirectoryString().
-    ID_AT_STREET_ADDRESS: DirectoryString(),
-    ID_AT_DESCRIPTION: DirectoryString(),
-    ID_AT_BUSINESS_CATEGORY: DirectoryString(),
-    ID_AT_POSTAL_CODE: DirectoryString(),
-    ID_AT_POST_OFFICE_BOX: DirectoryString(),
+    ID_AT_NAME: X520Name,
+    ID_AT_SURNAME: X520Name,
+    ID_AT_GIVEN_NAME: X520Name,
+    ID_AT_INITIALS: X520Name,
+    ID_AT_GENERATION_QUALIFIER: X520Name,
+    ID_AT_COMMON_NAME: X520CommonName,
+    ID_AT_LOCALITY_NAME: X520LocalityName,
+    ID_AT_STATE_OR_PROVINCE_NAME: X520StateOrProvinceName,
+    ID_AT_ORGANIZATION_NAME: X520OrganizationName,
+    ID_AT_ORGANIZATIONAL_UNIT_NAME: X520OrganizationalUnitName,
+    ID_AT_TITLE: X520Title,
+    ID_AT_DN_QUALIFIER: X520dnQualifier,
+    ID_AT_COUNTRY_NAME: X520countryName,
+    ID_AT_SERIAL_NUMBER: X520SerialNumber,
+    ID_AT_PSEUDONYM: X520Pseudonym,
+    ID_DOMAIN_COMPONENT: DomainComponent,
+    ID_EMAIL_ADDRESS: EmailAddress,
+    # Similarly to other types above, these ASN.1 types also have length upper
+    # bounds. But since these bounds (like the ones commented out above) are
+    # not obeyed in practice, we're currently not enforcing any bounds, and
+    # define them as arbitrary-length DirectoryStrings.
+    ID_AT_STREET_ADDRESS: DirectoryString,
+    ID_AT_DESCRIPTION: DirectoryString,
+    ID_AT_BUSINESS_CATEGORY: DirectoryString,
+    ID_AT_POSTAL_CODE: DirectoryString,
+    ID_AT_POST_OFFICE_BOX: DirectoryString,
 }

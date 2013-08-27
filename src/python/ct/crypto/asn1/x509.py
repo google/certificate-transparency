@@ -33,18 +33,15 @@ from ct.crypto import error
 from ct.crypto.asn1 import oid
 from ct.crypto.asn1 import print_util
 from ct.crypto.asn1 import types
+from ct.crypto.asn1 import x509_extension
 from ct.crypto.asn1 import x509_name
 from ct.crypto.asn1 import x509_time
 
-from pyasn1.type import tag,namedtype,namedval,constraint
+from pyasn1.type import tag,namedtype,namedval
 from pyasn1 import error as pyasn1_error
 
-# Parts of the ASN.1 specification are implemented separately in x509_name.py
-# and (TODO(ekasper)) x509_extensions.py
-
-# In ASN.1, MAX indicates no upper bound, but pyasn1 doesn't have one-sided
-# range constraints, so just make it something really big.
-_MAX = 1 << 64
+# Parts of the ASN.1 specification are implemented separately in x509_name.py,
+# x509_time.py and x509_extension.py.
 
 class AlgorithmIdentifier(types.Sequence):
     componentType = namedtype.NamedTypes(
@@ -52,20 +49,6 @@ class AlgorithmIdentifier(types.Sequence):
         # TODO(ekasper): handle the decoding of parameters in a second pass
         namedtype.OptionalNamedType('parameters', types.Any())
         )
-
-# TODO(ekasper): implement standard extensions.
-class Extension(types.Sequence):
-    PRINT_DELIMITER = ", "
-    componentType = namedtype.NamedTypes(
-        namedtype.NamedType('extnID', oid.ObjectIdentifier()),
-        namedtype.DefaultedNamedType('critical', types.Boolean('False')),
-        namedtype.NamedType('extnValue', types.Any())
-        )
-
-class Extensions(types.SequenceOf):
-    componentType = Extension()
-    sizeSpec = (types.SequenceOf.sizeSpec +
-                constraint.ValueSizeConstraint(1, _MAX))
 
 class SubjectPublicKeyInfo(types.Sequence):
      componentType = namedtype.NamedTypes(
@@ -125,7 +108,8 @@ class TBSCertificate(types.Sequence):
                                     UniqueIdentifier().subtype(
                 implicitTag=tag.Tag(tag.tagClassContext,
                                     tag.tagFormatSimple, 2))),
-        namedtype.OptionalNamedType('extensions', Extensions().subtype(
+        namedtype.OptionalNamedType('extensions',
+                                    x509_extension.Extensions().subtype(
             explicitTag=tag.Tag(tag.tagClassContext, tag.tagFormatSimple, 3)))
         )
 
