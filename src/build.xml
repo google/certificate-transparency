@@ -1,5 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <project name="ctlogclient" default="all">
+  <property file="local.properties"/>
+  <property file="build.properties"/>
   <!-- Compiler options -->
   <property name="compiler.debug" value="on"/>
   <property name="compiler.generate.no.warnings" value="off"/>
@@ -49,43 +51,43 @@
     <include name="**/?*.ftl"/>
   </patternset>
 
-  <property name="jarsdir" value="${basedir}/java/libs"/>
   <!-- Project Libraries -->
+  <!-- jars.* are defined in build.properties -->
   <path id="library.commons-codec">
-    <pathelement location="${jarsdir}/commons-codec-1.8.jar"/>
+    <pathelement location="${jars.commons-codec}"/>
   </path>
   <path id="library.commons-logging">
-    <pathelement location="${jarsdir}/commons-logging-1.1.3.jar"/>
+    <pathelement location="${jars.commons-logging}"/>
   </path>
   <path id="library.guava">
-    <pathelement location="${jarsdir}/guava-14.0.1.jar"/>
+    <pathelement location="${jars.guava}"/>
   </path>
   <path id="library.hamcrest">
-    <pathelement location="${jarsdir}/hamcrest-core-1.3.jar"/>
+    <pathelement location="${jars.hamcrest}"/>
   </path>
   <path id="library.httpclient">
-    <pathelement location="${jarsdir}/httpclient-4.2.5.jar"/>
+    <pathelement location="${jars.httpclient}"/>
   </path>
   <path id="library.httpcore">
-    <pathelement location="${jarsdir}/httpcore-4.2.4.jar"/>
+    <pathelement location="${jars.httpcore}"/>
   </path>
   <path id="library.json-simple">
-    <pathelement location="${jarsdir}/json-simple-1.1.1.jar"/>
+    <pathelement location="${jars.json-simple}"/>
   </path>
   <path id="library.junit">
-    <pathelement location="${jarsdir}/junit-4.11.jar"/>
+    <pathelement location="${jars.junit}"/>
   </path>
   <path id="library.mockito">
-    <pathelement location="${jarsdir}/mockito-all-1.9.5.jar"/>
+    <pathelement location="${jars.mockito}"/>
   </path>
   <path id="library.protobuf">
-    <pathelement location="${jarsdir}/protobuf-java-2.4.1.jar"/>
+    <pathelement location="${jars.protobuf}"/>
   </path>
   <path id="library.bouncycastleprovider">
-    <pathelement location="${jarsdir}/bcprov-jdk15on-149.jar"/>
+    <pathelement location="${jars.bouncycastleprovider}"/>
   </path>
   <path id="library.bouncycastlepkix">
-    <pathelement location="${jarsdir}/bcpkix-jdk15on-149.jar"/>
+    <pathelement location="${jars.bouncycastlepkix}"/>
   </path>
 
   <!-- CT Log Client -->
@@ -193,7 +195,7 @@
       </fileset>
     </copy>
   </target>
-  
+
   <target name="compile.ctlogclient.tests" depends="compile.ctlogclient.production" description="compile ctlogclient test classes" unless="skip.tests">
     <mkdir dir="${ctlogclient.testoutput.dir}"/>
     <javac destdir="${ctlogclient.testoutput.dir}" includeantruntime="false" debug="${compiler.debug}" nowarn="${compiler.generate.no.warnings}" memorymaximumsize="${compiler.max.memory}" fork="true">

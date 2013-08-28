@@ -11,8 +11,7 @@ INCLUDE = -I.
 LOCAL_LIBS = log/libcert.a log/libdatabase.a log/liblog.a \
              merkletree/libmerkletree.a proto/libproto.a util/libutil.a
 SYS_LIBS = -lpthread -lgflags -lglog -lssl -lcrypto \
-           -lsqlite3 -lprotobuf -lcurlpp -lcurl \
-           -L $(CPPNETLIBDIR)/libs/network/src -lcppnetlib-uri
+           -lsqlite3 -lprotobuf -lcurlpp -lcurl -lcppnetlib-uri
 
 PLATFORM = $(shell uname -s)
 ifneq ($(PLATFORM), FreeBSD)
@@ -32,6 +31,13 @@ ifneq ($(OPENSSLDIR),)
           -Wl,-rpath,$(OPENSSLDIR)/lib
 endif
 
+# Need cpp-netlib
+ifneq ($(CPPNETLIBDIR),)
+  INCLUDE += -I $(CPPNETLIBDIR)
+  SYS_LIBS += -L $(CPPNETLIBDIR)/libs/network/src \
+              -Wl,-rpath,$(CPPNETLIBDIR)/libs/network/src
+endif
+
 # Json library location explicitly specified - link against that.
 ifneq ($(JSONCLIBDIR),)
 	INCLUDE += -I $(JSONCLIBDIR)/include
@@ -40,10 +46,12 @@ else
 	SYS_LIBS += -ljson
 endif
 
+# Need gtest
 GTESTDIR ?= /usr/src/gtest
 INCLUDE += -I $(GTESTDIR)/include
 
-INCLUDE += -I /usr/local/include -I $(CPPNETLIBDIR)
+# Allow user-system overrides
+INCLUDE += -I /usr/local/include
 SYS_LIBS += -L /usr/local/lib
 
 CXXFLAGS = $(INCLUDE) $(CXXFLAG)

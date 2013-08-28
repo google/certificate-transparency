@@ -44,8 +44,8 @@
 *_pb2.py
 /src/gtest
 /src/java/build
+/src/local.properties
 # IntelliJ artefacts
 /src/java/out
 /src/java/.idea/workspace.xml
 /src/java/.idea/dictionaries/
-
