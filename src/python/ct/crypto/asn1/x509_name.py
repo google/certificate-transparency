@@ -1,6 +1,6 @@
 import logging
 
-from pyasn1.type import constraint, namedtype
+from pyasn1.type import constraint, namedtype, tag
 from pyasn1 import error as pyasn1_error
 from ct.crypto import error
 from ct.crypto.asn1 import oid
@@ -250,6 +250,72 @@ _UB_EMAILADDRESS_LENGTH = types.Integer(255)
 #     pass
 class EmailAddress(DirectoryString):
     componentType = _generate_directory_string_spec(1, _UB_EMAILADDRESS_LENGTH)
+
+class OtherName(types.Sequence):
+    PRINT_DELIMITER = ", "
+    componentType = namedtype.NamedTypes(
+        namedtype.NamedType("type-id", oid.ObjectIdentifier()),
+        namedtype.NamedType("value", types.Any().subtype(
+            explicitTag=tag.Tag(tag.tagClassContext, tag.tagFormatSimple, 0))),
+        )
+
+class EDIPartyName(types.Sequence):
+    PRINT_DELIMITER = ", "
+    # Definition here: http://tools.ietf.org/html/rfc5280#section-4.2.1.6
+    componentType = namedtype.NamedTypes(
+        namedtype.OptionalNamedType(
+            "nameAssigner",
+            DirectoryString().subtype(
+                implicitTag=tag.Tag(tag.tagClassContext,
+                                    tag.tagFormatSimple, 0))),
+        namedtype.NamedType("partyName", DirectoryString().subtype(
+            implicitTag=tag.Tag(tag.tagClassContext, tag.tagFormatSimple, 1))),
+        )
+
+OTHER_NAME = "otherName"
+RFC822_NAME = "rfc822Name"
+DNS_NAME = "dNSName"
+X400_ADDRESS_NAME = "x400Address"
+DIRECTORY_NAME = "directoryName"
+EDI_PARTY_NAME = "ediPartyName"
+URI_NAME = "uniformResourceIdentifier"
+IP_ADDRESS_NAME = "iPAddress"
+REGISTERED_ID_NAME = "registeredID"
+
+class GeneralName(types.Choice):
+    # Definition here: http://tools.ietf.org/html/rfc5280#section-4.2.1.6
+    componentType = namedtype.NamedTypes(
+        namedtype.NamedType(OTHER_NAME, OtherName().subtype(
+            implicitTag=tag.Tag(
+                tag.tagClassContext, tag.tagFormatSimple, 0))),
+        namedtype.NamedType(RFC822_NAME, types.IA5String().subtype(
+            implicitTag=tag.Tag(
+                tag.tagClassContext, tag.tagFormatSimple, 1))),
+        namedtype.NamedType(DNS_NAME, types.IA5String().subtype(
+            implicitTag=tag.Tag(
+                tag.tagClassContext, tag.tagFormatSimple, 2))),
+        # Not really Any, but have not come across any certs with this.
+        namedtype.NamedType(X400_ADDRESS_NAME, types.Any().subtype(
+            implicitTag=tag.Tag(
+                tag.tagClassContext, tag.tagFormatSimple, 3))),
+        namedtype.NamedType(DIRECTORY_NAME, Name().subtype(
+            implicitTag=tag.Tag(
+                tag.tagClassContext, tag.tagFormatSimple, 4))),
+        namedtype.NamedType(EDI_PARTY_NAME, EDIPartyName().subtype(
+            implicitTag=tag.Tag(
+                tag.tagClassContext, tag.tagFormatSimple, 5))),
+        namedtype.NamedType(URI_NAME, types.IA5String().subtype(
+            implicitTag=tag.Tag(
+                tag.tagClassContext, tag.tagFormatSimple, 6))),
+        namedtype.NamedType(IP_ADDRESS_NAME, types.OctetString().subtype(
+            implicitTag=tag.Tag(
+                tag.tagClassContext, tag.tagFormatSimple, 7))),
+        namedtype.NamedType(REGISTERED_ID_NAME, oid.ObjectIdentifier().subtype(
+            implicitTag=tag.Tag(
+                tag.tagClassContext, tag.tagFormatSimple, 8))),
+        )
+
+
 
 # Create aliases
 # This means you can do

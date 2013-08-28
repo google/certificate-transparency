@@ -2,6 +2,7 @@ import logging
 import time
 
 from ct.crypto import error
+from ct.crypto import name
 from ct.crypto import pem
 from ct.crypto.asn1 import oid
 from ct.crypto.asn1 import x509
@@ -193,6 +194,19 @@ class Certificate(object):
         except KeyError:
             return None
         return bc[1].getComponentByName("cA")
+
+    def subject_alternative_names(self):
+        """Get the Alternative Names extension.
+        Returns: Array of alternative names (name.GeneralName)
+        """
+        try:
+            # First component is the criticality, 2nd component is the
+            # general names
+            general_names = self.__cached_extensions[
+                x509_extension.ID_CE_SUBJECT_ALT_NAME][1]
+            return name.parse_alternative_names(general_names)
+        except KeyError:
+            return []
 
     def basic_constraint_path_length(self):
         """Get the BasicConstraints pathLenConstraint value.

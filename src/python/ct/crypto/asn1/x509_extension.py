@@ -2,6 +2,7 @@
 from ct.crypto import error
 from ct.crypto.asn1 import oid
 from ct.crypto.asn1 import types
+from ct.crypto.asn1 import x509_name
 
 from pyasn1.codec.der import decoder as der_decoder
 from pyasn1.type import constraint
@@ -101,8 +102,14 @@ class BasicConstraints(types.Sequence):
                 subtypeSpec=constraint.ValueRangeConstraint(0, _MAX)))
         )
 
+class SubjectAlternativeNames(types.SequenceOf):
+    PRINT_DELIMITER = ", "
+    componentType = x509_name.GeneralName()
+
 ID_CE_BASIC_CONSTRAINTS = ExtensionID(oid.ID_CE_BASIC_CONSTRAINTS)
+ID_CE_SUBJECT_ALT_NAME = ExtensionID(oid.ID_CE_SUBJECT_ALT_NAME)
 
 _EXTENSION_VALUE_TYPE_DICT = {
     ID_CE_BASIC_CONSTRAINTS: BasicConstraints,
+    ID_CE_SUBJECT_ALT_NAME: SubjectAlternativeNames,
 }

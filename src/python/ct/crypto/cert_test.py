@@ -7,7 +7,7 @@ import sys
 from ct.crypto import cert, error
 
 FLAGS = gflags.FLAGS
-gflags.DEFINE_string('testdata_dir', "ct/crypto/testdata",
+gflags.DEFINE_string("testdata_dir", "ct/crypto/testdata",
                      "Location of test certs")
 
 class CertificateTest(unittest.TestCase):
@@ -71,7 +71,7 @@ class CertificateTest(unittest.TestCase):
         self.assertTrue(isinstance(c, cert.Certificate))
 
     def test_from_der(self):
-        with open(self.der_file, 'rb') as f:
+        with open(self.der_file, "rb") as f:
             c = cert.Certificate.from_der(f.read())
         self.assertTrue(isinstance(c, cert.Certificate))
 
@@ -82,7 +82,7 @@ class CertificateTest(unittest.TestCase):
                           "bogus_pem_string")
 
     def test_to_der(self):
-        with open(self.der_file, 'rb') as f:
+        with open(self.der_file, "rb") as f:
             der_string = f.read()
         c = cert.Certificate(der_string)
         self.assertEqual(der_string, c.to_der())
@@ -146,6 +146,12 @@ class CertificateTest(unittest.TestCase):
         c = cert.Certificate.from_pem_file(self.v1_file)
         self.assertEqual(0, c.version())
         self.assertIsNone(c.basic_constraint_ca())
+
+    def test_alternative_names(self):
+        certs = [c for c in cert.certs_from_pem_file(self.chain_file)]
+        first_name = certs[0].subject_alternative_names()[0]
+        self.assertEquals("dNSName", first_name.type())
+        self.assertEquals("www.google.com", first_name.value())
 
 if __name__ == "__main__":
     sys.argv = FLAGS(sys.argv)

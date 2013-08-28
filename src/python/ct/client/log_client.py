@@ -72,7 +72,7 @@ class Requester(object):
         try:
             return response.json()
         # This can raise a variety of undocumented exceptions...
-        except e:
+        except Exception as e:
             raise InvalidResponseError("Response %s from %s is not valid JSON: "
                                        "%s" % (response, url, e))
 
