@@ -66,6 +66,8 @@ class Certificate(object):
     def __cache_extensions(self):
         extensions = (self.__asn1_cert.getComponentByName("tbsCertificate").
                       getComponentByName("extensions"))
+        if not extensions:
+            return
         for ext in extensions:
             try:
                 extn_value = ext.get_decoded_value()
