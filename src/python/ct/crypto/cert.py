@@ -145,6 +145,14 @@ class Certificate(object):
         # Currently the cached encoding is never invalidated.
         return self.__cached_der
 
+    def version(self):
+        """Get the version.
+        Returns:
+            an integral value of the version (i.e., V1 is 0).
+        """
+        return (self.__asn1_cert.getComponentByName("tbsCertificate").
+                getComponentByName("version"))
+
     def subject_common_name(self):
         """Get the common name of the subject."""
         ret = ""

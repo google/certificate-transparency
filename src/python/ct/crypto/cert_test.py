@@ -19,6 +19,8 @@ class CertificateTest(unittest.TestCase):
     # C=US/O=Equifax/OU=Equifax Secure Certificate Authority
     _PEM_CHAIN_FILE = "google_chain.pem"
     _DER_FILE = "google_cert.der"
+    # An X509v1 certificate
+    _V1_PEM_FILE = "v1_cert.pem"
 
     @property
     def pem_file(self):
@@ -31,6 +33,10 @@ class CertificateTest(unittest.TestCase):
     @property
     def chain_file(self):
         return FLAGS.testdata_dir + "/" + self._PEM_CHAIN_FILE
+
+    @property
+    def v1_file(self):
+        return FLAGS.testdata_dir + "/" + self._V1_PEM_FILE
 
     def test_from_pem_file(self):
         c = cert.Certificate.from_pem_file(self.pem_file)
@@ -104,12 +110,11 @@ class CertificateTest(unittest.TestCase):
         self.assertEqual("*.google.com", c.subject_common_name())
 
     def test_validity(self):
-        with open(self.chain_file) as f:
-            certs = [c for c in cert.certs_from_pem(f.read())]
-            self.assertEqual(3, len(certs))
-            # notBefore: Sat Aug 22 16:41:51 1998 GMT
-            # notAfter: Wed Aug 22 16:41:51 2018 GMT
-            c = certs[2]
+        certs = list(cert.certs_from_pem_file(self.chain_file))
+        self.assertEqual(3, len(certs))
+        # notBefore: Sat Aug 22 16:41:51 1998 GMT
+        # notAfter: Wed Aug 22 16:41:51 2018 GMT
+        c = certs[2]
         # These two will start failing in 2018.
         self.assertTrue(c.is_temporally_valid_now())
         self.assertFalse(c.is_expired())
@@ -127,13 +132,20 @@ class CertificateTest(unittest.TestCase):
         self.assertTrue(c.is_temporally_valid_at(time.gmtime(903804111)))
 
     def test_basic_constraints(self):
-        with open(self.chain_file) as f:
-            certs = [c for c in cert.certs_from_pem(f.read())]
+        certs = list(cert.certs_from_pem_file(self.chain_file))
         self.assertFalse(certs[0].basic_constraint_ca())
         self.assertTrue(certs[1].basic_constraint_ca())
         self.assertIsNone(certs[0].basic_constraint_path_length())
         self.assertEqual(0, certs[1].basic_constraint_path_length())
 
+    def test_version(self):
+        c = cert.Certificate.from_pem_file(self.pem_file)
+        self.assertEqual(2, c.version())
+
+    def test_v1_cert(self):
+        c = cert.Certificate.from_pem_file(self.v1_file)
+        self.assertEqual(0, c.version())
+        self.assertIsNone(c.basic_constraint_ca())
 
 if __name__ == "__main__":
     sys.argv = FLAGS(sys.argv)
