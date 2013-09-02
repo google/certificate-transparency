@@ -4,7 +4,7 @@
 # <storage file> is the sqlite3 database for the log.
 # <certificate hash directory> contains the OpenSSL hashes for the
 # accepted root certs.
-
+set -x
 set -e
 
 if [ "$OPENSSLDIR" != "" ]; then
@@ -17,7 +17,7 @@ if [ ! $MY_OPENSSL ]; then
   MY_OPENSSL=openssl
 fi
 
-if [ $# < 1 ]
+if [ $# \< 1 ]
 then
   echo "$0 <storage file> <CA certificate file>"
   exit 1
