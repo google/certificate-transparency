@@ -1,6 +1,9 @@
 #!/usr/bin/env python
+import gflags
+import logging
 import mock
 import os
+import sys
 import unittest
 
 from ct.client import log_client
@@ -12,6 +15,12 @@ from ct.client import monitor
 from ct.crypto import error
 from ct.crypto import verify
 from ct.proto import client_pb2
+
+FLAGS = gflags.FLAGS
+
+#TODO(ekasper) to make this setup common to all tests
+gflags.DEFINE_bool("verbose_tests", False, "Print test logs")
+
 
 class FakeLogClient(object):
     def __init__(self, sth, servername="log_server"):
@@ -60,6 +69,8 @@ class MonitorTest(unittest.TestCase):
     _OLD_STH.tree_head_signature = "sig3"
 
     def setUp(self):
+        if not FLAGS.verbose_tests:
+          logging.disable(logging.CRITICAL)
         self.db = sqlite_log_db.SQLiteLogDB(
             sqlitecon.SQLiteConnectionManager(":memory:", keepalive=True))
         self.temp_db = sqlite_temp_db.SQLiteTempDB(
@@ -260,4 +271,5 @@ class MonitorTest(unittest.TestCase):
         self.assertFalse(m._update_entries())
 
 if __name__ == "__main__":
+    sys.argv = FLAGS(sys.argv)
     unittest.main()
