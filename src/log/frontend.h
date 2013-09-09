@@ -83,6 +83,10 @@ class Frontend {
 
   static std::string SubmitResultString(SubmitResult result);
 
+  const std::multimap<std::string, const ct::Cert *> &GetRoots() const {
+    return handler_->GetRoots();
+  }
+
  private:
   CertSubmissionHandler *handler_;
   FrontendSigner *signer_;

@@ -49,6 +49,10 @@ class CertChecker {
 
   void ClearAllTrustedCertificates();
 
+  const std::multimap<std::string, const Cert*> &GetTrustedCertificates() const {
+    return trusted_;
+  }
+
   size_t NumTrustedCertificates() const { return trusted_.size(); }
 
   // Check that:
@@ -89,7 +93,7 @@ class CertChecker {
   // A map by the DER encoding of the subject name.
   // All code manipulating this container must ensure contained elements are
   // deallocated appropriately.
-  std::multimap<std::string, Cert*> trusted_;
+  std::multimap<std::string, const Cert *> trusted_;
 };
 
 }  // namespace ct

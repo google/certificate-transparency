@@ -45,6 +45,10 @@ class CertSubmissionHandler {
   static bool X509ChainToEntry(const ct::CertChain &chain,
                                ct::LogEntry *entry);
 
+  const std::multimap<std::string, const ct::Cert *> &GetRoots() const {
+    return cert_checker_->GetTrustedCertificates();
+  }
+
  private:
   SubmitResult ProcessX509Submission(const std::string &submission,
                                      ct::LogEntry *entry);

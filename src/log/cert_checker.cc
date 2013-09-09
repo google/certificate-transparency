@@ -107,7 +107,7 @@ bool CertChecker::LoadTrustedCertificates(const std::string &cert_file) {
 }
 
 void CertChecker::ClearAllTrustedCertificates() {
-  std::multimap<string,Cert*>::iterator it = trusted_.begin();
+  std::multimap<string, const Cert *>::iterator it = trusted_.begin();
   for (; it != trusted_.end(); ++it)
     delete it->second;
   trusted_.clear();
@@ -263,13 +263,13 @@ CertChecker::GetTrustedCa(CertChain *chain) const {
     return ROOT_NOT_IN_LOCAL_STORE;
   }
 
-  std::pair<std::multimap<string, Cert*>::const_iterator,
-            std::multimap<string, Cert*>::const_iterator> issuer_range =
+  std::pair<std::multimap<string, const Cert *>::const_iterator,
+            std::multimap<string, const Cert *>::const_iterator> issuer_range =
     trusted_.equal_range(issuer_name);
 
   const Cert *issuer = NULL;
-  for (std::multimap<string, Cert*>::const_iterator it = issuer_range.first;
-       it != issuer_range.second; ++it) {
+  for (std::multimap<string, const Cert *>::const_iterator it
+           = issuer_range.first; it != issuer_range.second; ++it) {
     const Cert *issuer_cand = it->second;
 
     Cert::Status ok = subject->IsSignedBy(*issuer_cand);
@@ -313,10 +313,10 @@ CertChecker::CertVerifyResult CertChecker::IsTrusted(
 
   *subject_name = cert_name;
 
-  std::pair<std::multimap<string, Cert*>::const_iterator,
-            std::multimap<string, Cert*>::const_iterator> cand_range =
+  std::pair<std::multimap<string, const Cert *>::const_iterator,
+            std::multimap<string, const Cert *>::const_iterator> cand_range =
     trusted_.equal_range(cert_name);
-  for (std::multimap<string, Cert*>::const_iterator it = cand_range.first;
+  for (std::multimap<string, const Cert *>::const_iterator it = cand_range.first;
        it != cand_range.second; ++it) {
     const Cert *cand = it->second;
     Cert::Status matches = cert.IsIdenticalTo(*cand);

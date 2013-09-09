@@ -296,6 +296,10 @@ class CTLogManager {
     return lookup_->ConsistencyProof(first, second);
   }
 
+  const std::multimap<std::string, const Cert *> &GetRoots() const {
+    return frontend_->GetRoots();
+  }
+
  private:
   Frontend *frontend_;
   TreeSigner<LoggedCertificate> *signer_;
@@ -337,15 +341,19 @@ class ct_server {
     uri::uri uri(string("http://x") + request.destination);
     string path = uri.path();
 
+    VLOG(1) << "path = " << path;
+
     if (request.method == "GET") {
-      if (path == "/ct/v1/get-sth")
-        GetSTH(response);
+      if (path == "/ct/v1/get-entries")
+        GetEntries(response, uri);
+      else if (path == "/ct/v1/get-roots")
+        GetRoots(response);
       else if (path == "/ct/v1/get-proof-by-hash")
         GetProof(response, uri);
+      else if (path == "/ct/v1/get-sth")
+        GetSTH(response);
       else if (path == "/ct/v1/get-sth-consistency")
         GetConsistency(response, uri);
-      else if (path == "/ct/v1/get-entries")
-        GetEntries(response, uri);
       else
         response = server::response::stock_reply(server::response::not_found,
                                                  "Not found");
@@ -368,6 +376,28 @@ private:
   static void BadRequest(server::response &response, const char *msg) {
     response.status = server::response::bad_request;
     response.content = msg;
+  }
+
+  void GetRoots(server::response &response) const {
+    std::multimap<string, const Cert *>::const_iterator it
+        = manager_->GetRoots().begin();
+
+    JsonArray roots;
+    for (; it != manager_->GetRoots().end(); ++it) {
+      string cert;
+      if (it->second->DerEncoding(&cert) != Cert::TRUE) {
+        LOG(ERROR) << "Cert encoding failed";
+        BadRequest(response, "Serialisation failed");
+        return;
+      }
+      roots.AddBase64(cert);
+    }
+
+    JsonObject jsend;
+    jsend.Add("certificates", roots);
+    
+    response.status = server::response::ok;
+    response.content = jsend.ToString();
   }
 
   void GetEntries(server::response &response, const uri::uri &uri) const {
