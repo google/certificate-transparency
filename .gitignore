@@ -19,6 +19,7 @@
 /src/test/*.der
 /src/test/*.log
 /src/test/*.srl
+/src/test/httpd-local.conf
 /src/util/json_wrapper_test
 /src/log/cert_test
 /src/log/cert_checker_test

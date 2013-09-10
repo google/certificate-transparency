@@ -12,19 +12,13 @@ systems, running
 
 $ sudo apt-get install apache2
 
-should suffice. On other systems, you may also need to modify the
-Makefile and/or the httpd.conf.
+should suffice. You may also need to modify httpd-local.conf (see
+httpd-common.conf in this directory for tips).
 
 For the following steps you should be in the directory where
 this README resides.
 
-3. Make platform dependent links:
-
-$ make <platform>-links
-
-Currently, linux-links and freebsd-links are defined.
-
-4. Run the test
+3. Run the test
 
 $ ./sslconnect_test.sh
 

@@ -1,11 +1,18 @@
-freebsd-links:
-	ln -sf `which apachectl` apachectl
-	ln -sf /usr/local/libexec/apache22/mod_ssl.so mod_ssl.so
-
-linux-links:
-	ln -sf `which apache2ctl` apachectl
-	ln -sf /usr/lib/apache2/modules/mod_ssl.so mod_ssl.so
-
-test:
+test: apachectl mod_ssl.so
 	cd .. && $(MAKE)
 	OPENSSLDIR=$(OPENSSLDIR) ./sslconnect_test.sh
+
+apachectl:
+	{ which apachectl && ln -s `which apachectl` $@; } || \
+	{ which apache2ctl && ln -s `which apache2ctl` $@; } || \
+	{ test -x /usr/sbin/apachectl && ln -s /usr/sbin/apachectl $@; } || \
+	{ test -x /usr/sbin/apache2ctl && ln -s /usr/sbin/apache2ctl $@; } || \
+	{ echo "could not find $@"; false; }
+
+mod_ssl.so:
+	find \
+	  /usr/lib/apache2/modules \
+	  /usr/local/libexec/apache22 \
+	  -name 'mod_ssl.so' | { read x; \
+	    { test -n "$$x" && ln -s "$$x" $@; } || \
+	    { echo "could not find $@"; false; } }

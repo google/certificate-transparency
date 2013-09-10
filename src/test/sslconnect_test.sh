@@ -88,6 +88,7 @@ test_range() {
   apache=${10}
 
   echo "Starting Apache"
+  export APACHE_ENVVARS=./httpd.envvars # workaround Debian's apachectl
   $apache -d `pwd`/$cert_dir -f `pwd`/$conf -k start
 
   for port in $ports; do
