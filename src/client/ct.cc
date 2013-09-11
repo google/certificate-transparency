@@ -395,11 +395,10 @@ static void ProofToExtensionData() {
                          std::ios::in | std::ios::binary);
   PCHECK(proof_in.good()) << "Could not read SCT data from " << FLAGS_sct_token;
 
-  std::ofstream extension_data_out(FLAGS_tls_extension_data_out.c_str(),
-                                   std::ios::out | std::ios::binary);
-  PCHECK(extension_data_out.good()) << "Could not open extension data file "
-                                    << FLAGS_tls_extension_data_out
-                                    << " for writing";
+  std::ostringstream extension_data_out;
+
+  // Write the extension type (18), MSB first.
+  extension_data_out << '\0' << '\x12';
 
   // Count proof length.
   proof_in.seekg(0, std::ios::end);
@@ -407,7 +406,7 @@ static void ProofToExtensionData() {
   // Rewind.
   proof_in.seekg(0, std::ios::beg);
 
-  // Write the length.
+  // Write the length, MSB first.
   extension_data_out << static_cast<unsigned char>(proof_length >> 8)
                      << static_cast<unsigned char>(proof_length);
 
@@ -420,7 +419,17 @@ static void ProofToExtensionData() {
 
   delete[] buf;
   proof_in.close();
-  extension_data_out.close();
+
+  FILE *out = fopen(FLAGS_tls_extension_data_out.c_str(), "w");
+  PCHECK(out != NULL) << "Could not open extension data file "
+                      << FLAGS_tls_extension_data_out
+                      << " for writing:" << strerror(errno);
+
+  PEM_write(out, "SIGNED CERTIFICATE TIMESTAMP", "",
+      reinterpret_cast<const unsigned char *>(extension_data_out.str().c_str()),
+            extension_data_out.str().length());
+
+  fclose(out);
 }
 
 static void WriteSSLClientCTData(const SSLClientCTData &ct_data,

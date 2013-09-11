@@ -54,7 +54,7 @@ INCLUDE += -I $(GTESTDIR)/include
 INCLUDE += -I /usr/local/include
 SYS_LIBS += -L /usr/local/lib
 
-CXXFLAGS = $(INCLUDE) $(CXXFLAG)
+CXXFLAGS = $(INCLUDE) $(CXXFLAG) $(LOCAL_CXXFLAGS)
 
 # File lists to simplify the rest of the Makefile
 
