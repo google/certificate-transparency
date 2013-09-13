@@ -21,6 +21,36 @@ using std::string;
 using ct::Cert;
 using ct::CertChain;
 
+const uint16_t CT_EXTENSION_TYPE = 18;
+
+//static
+int SSLClient::ExtensionCallback(SSL *s, unsigned short ext_type,
+				 const unsigned char *in, unsigned short inlen, 
+				 int *al, void *arg) {
+  char pem_name[100];
+  unsigned char ext_buf[4 + 65536];
+
+  /* Reconstruct the type/len fields prior to extension data */
+  ext_buf[0] = ext_type >> 8;
+  ext_buf[1] = ext_type & 0xFF;
+  ext_buf[2] = inlen >> 8;
+  ext_buf[3] = inlen & 0xFF;
+  memcpy(ext_buf+4, in, inlen);
+
+  BIO_snprintf(pem_name, sizeof(pem_name), "SERVER_INFO %d", ext_type);
+  PEM_write(stdout, pem_name, "", ext_buf, 4 + inlen);
+
+  CHECK_EQ(ext_type, CT_EXTENSION_TYPE);
+
+  VerifyCallbackArgs *args = reinterpret_cast<VerifyCallbackArgs*>(arg);
+  CHECK_NOTNULL(args);
+
+  CHECK(args->ct_extension.empty());
+  args->ct_extension = string(reinterpret_cast<const char *>(in), inlen);
+
+  return 1;
+}
+
 // TODO(ekasper): handle Cert::Status errors.
 SSLClient::SSLClient(const string &server, uint16_t port,
                      const string &ca_dir, LogVerifier *verifier)
@@ -42,8 +72,10 @@ SSLClient::SSLClient(const string &server, uint16_t port,
     LOG(WARNING) << "No trusted CA certificates given.";
   }
 
-  // The verify callback gets called before the audit proof callback.
   SSL_CTX_set_cert_verify_callback(ctx_, &VerifyCallback, &verify_args_);
+
+  SSL_CTX_set_custom_cli_ext(ctx_, CT_EXTENSION_TYPE, NULL, ExtensionCallback,
+			     &verify_args_);
 }
 
 SSLClient::~SSLClient() {
@@ -162,6 +194,10 @@ int SSLClient::VerifyCallback(X509_STORE_CTX *ctx, void *arg) {
       LOG(ERROR) << "Failed to parse extension data: corrupt cert?";
     }
   }
+
+  // FIXME(benl): we should check all SCTs.
+  if (serialized_scts.empty() && !args->ct_extension.empty())
+    serialized_scts = args->ct_extension;
 
   if (!serialized_scts.empty()) {
     LogEntry entry;

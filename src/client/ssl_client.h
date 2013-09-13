@@ -1,3 +1,4 @@
+/* -*- mode: c++; indent-tabs-mode: nil -*- */
 #ifndef SSL_CLIENT_H
 #define SSL_CLIENT_H
 
@@ -63,6 +64,10 @@ class SSLClient {
   // other values - cert verification error
   static int VerifyCallback(X509_STORE_CTX *ctx, void *arg);
 
+  static int ExtensionCallback(SSL *s, unsigned short ext_type,
+                               const unsigned char *in, unsigned short inlen, 
+                               int *al, void *arg);
+
  private:
   Client client_;
   SSL_CTX *ctx_;
@@ -79,6 +84,7 @@ class SSLClient {
     // SCT verification result.
     bool sct_verified;
     bool require_sct;
+    std::string ct_extension;
     // The resulting (partial) entry - the client reconstructs
     // the signed part of the entry (i.e., type and leaf certificate)
     // and all valid SCTs.

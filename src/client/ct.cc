@@ -382,8 +382,6 @@ static void WriteProofToConfig() {
 
 // Wrap the proof in the format expected by the TLS extension,
 // so that we can feed it to OpenSSL.
-// Currently unused: will be needed once we have an extension number,
-// and support in OpenSSL and Apache.
 static void ProofToExtensionData() {
   CHECK(!FLAGS_sct_token.empty()) << google::ProgramUsage();
   CHECK(!FLAGS_tls_extension_data_out.empty()) << google::ProgramUsage();
@@ -395,29 +393,37 @@ static void ProofToExtensionData() {
                          std::ios::in | std::ios::binary);
   PCHECK(proof_in.good()) << "Could not read SCT data from " << FLAGS_sct_token;
 
-  std::ostringstream extension_data_out;
-
-  // Write the extension type (18), MSB first.
-  extension_data_out << '\0' << '\x12';
-
   // Count proof length.
   proof_in.seekg(0, std::ios::end);
   int proof_length = proof_in.tellg();
   // Rewind.
   proof_in.seekg(0, std::ios::beg);
 
-  // Write the length, MSB first.
-  extension_data_out << static_cast<unsigned char>(proof_length >> 8)
-                     << static_cast<unsigned char>(proof_length);
-
-  // Now write the proof.
+  // Read the proof
   char *buf = new char[proof_length];
   proof_in.read(buf, proof_length);
   assert(proof_in.gcount() == proof_length);
-  extension_data_out.write(buf, proof_length);
+
+  SignedCertificateTimestampList sctlist;
+  sctlist.add_sct_list(buf, proof_length);
+  delete [] buf;
+
+  string sctliststr;
+  CHECK_EQ(Serializer::SerializeSCTList(sctlist, &sctliststr), Serializer::OK);
+
+  std::ostringstream extension_data_out;
+
+  // Write the extension type (18), MSB first.
+  extension_data_out << '\0' << '\x12';
+
+  // Write the length, MSB first.
+  extension_data_out << static_cast<unsigned char>(sctliststr.length() >> 8)
+                     << static_cast<unsigned char>(sctliststr.length());
+
+  // Now write the proof.
+  extension_data_out.write(sctliststr.data(), sctliststr.length());
   CHECK(!extension_data_out.bad());
 
-  delete[] buf;
   proof_in.close();
 
   FILE *out = fopen(FLAGS_tls_extension_data_out.c_str(), "w");
