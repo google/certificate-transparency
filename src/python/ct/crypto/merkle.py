@@ -155,12 +155,14 @@ class MerkleVerifier(object):
                 raise error.ProofError("Bad Merkle proof: second root hash "
                                        "does not match. Expected hash: %s "
                                        ", computed hash: %s" %
-                                       (new_root, new_hash))
+                                       (new_root.encode("base64").strip(),
+                                        new_hash.encode("base64").strip()))
             elif old_hash != old_root:
                 raise error.ConsistencyError("Inconsistency: first root hash "
                                              "does not match. Expected hash: "
                                              "%s, computed hash: %s" %
-                                             (old_root, old_hash))
+                                             (old_root.encode("base64").strip(),
+                                              old_hash.encode("base64").strip()))
 
         except StopIteration:
             raise error.ProofError("Merkle proof is too short")

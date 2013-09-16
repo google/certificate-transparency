@@ -81,6 +81,7 @@ class LogClient(object):
 
     _GET_STH_PATH = "ct/v1/get-sth"
     _GET_ENTRIES_PATH = "ct/v1/get-entries"
+    _GET_STH_CONSISTENCY_PATH = "ct/v1/get-sth-consistency"
 
     def __init__(self, requester):
         self.__req = requester
@@ -209,3 +210,50 @@ class LogClient(object):
             # the log imposed a batch limit or ran out of entries, so we keep
             # trying until we get all entries, or an error response.
             start += len(valid_entries)
+
+    def get_sth_consistency(self, old_size, new_size):
+        """Retrieve a consistency proof.
+        Args:
+            old_size  : size of older tree.
+            new_size  : size of newer tree.
+        Returns:
+            list of raw hashes (bytes) forming the consistency proof
+        Raises:
+            HTTPError, HTTPClientError, HTTPServerError: connection failed,
+                or returned an error. HTTPClientError can happen when
+                (old_size, new_size) are not valid for this log (e.g. greater
+                than the size of the log).
+            InvalidRequestError: invalid request size (irrespective of log).
+            InvalidResponseError: server response is invalid for the given
+                                  request
+        Caller is responsible for ensuring that (old_size, new_size) are valid
+        (by retrieving an STH first), otherwise a HTTPClientError may occur.
+        """
+        if old_size > new_size:
+            raise InvalidRequestError(
+                "old > new: %s >= %s" % (old_size, new_size))
+
+        if old_size < 0 or new_size < 0:
+            raise InvalidRequestError(
+                "both sizes must be >= 0: %s, %s" % (old_size, new_size))
+
+        # don't need to contact remote server for trivial proofs:
+        # - empty tree is consistent with everything
+        # - everything is consistent with itself
+        if old_size == 0 or old_size == new_size:
+            return []
+
+        response = self.__req.get_json_response(
+                self._GET_STH_CONSISTENCY_PATH,
+                params={"first": old_size, "second": new_size})
+
+        try:
+            consistency = map(lambda u: base64.b64decode(u),
+                              response["consistency"])
+        except (TypeError, ValueError, KeyError) as e:
+            raise InvalidResponseError(
+                "%s returned invalid data: expected a base64-encoded "
+                "consistency proof, got %s"
+                "\n%s" % (self.__req.uri, response, e))
+
+        return consistency

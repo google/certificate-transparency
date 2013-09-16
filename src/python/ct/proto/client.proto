@@ -58,5 +58,11 @@ message EntryResponse {
 
 message MonitorState {
   optional SthResponse verified_sth = 1;
+  // An STH whose leaf entries are yet to be retrieved. Its timestamp and
+  // tree_size should both be strictly greater than the one for verified_sth.
+  // If not, then this field should be ignored entirely.
   optional SthResponse pending_sth = 2;
+  // A partial (size/hash-only) STH for the last batch of leaves retrieved that
+  // is provably-consistent with pending_sth.
+  optional SthResponse verified_partial_sth = 3;
 }

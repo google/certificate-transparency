@@ -38,6 +38,13 @@ class LogClientTest(unittest.TestCase):
                     end = min(start + self.__entry_limit - 1, end)
                 return LogClientTest.entries_to_json(
                     LogClientTest.make_entries(start, end))
+            elif path == "ct/v1/get-sth-consistency":
+                old_size = params.get("first", -1)
+                new_size = params.get("second", -1)
+                if not 0 <= old_size <= new_size <= self.__log_size_limit:
+                    raise log_client.HTTPClientError("Bad params")
+                return LogClientTest.consistency_proof_to_json(
+                    LogClientTest._DEFAULT_FAKE_PROOF)
             else:
                 raise log_client.HTTPError("Bad path %s" % path)
 
@@ -46,6 +53,7 @@ class LogClientTest(unittest.TestCase):
     _DEFAULT_STH.tree_size = 1000
     _DEFAULT_STH.sha256_root_hash = "hash\x00"
     _DEFAULT_STH.tree_head_signature = "sig\xff"
+    _DEFAULT_FAKE_PROOF = [(c*32) for c in "abc"]
 
     @staticmethod
     def make_entries(start, end):
@@ -73,6 +81,9 @@ class LogClientTest(unittest.TestCase):
         return {"entries": [{"leaf_input": entry.leaf_input.encode("base64"),
                             "extra_data": entry.extra_data.encode("base64")}
                             for entry in entries]}
+    @staticmethod
+    def consistency_proof_to_json(hashes):
+        return {"consistency": [h.encode("base64") for h in hashes]}
 
     def test_get_sth(self):
         client = log_client.LogClient(self.FakeResponder())
@@ -160,7 +171,7 @@ class LogClientTest(unittest.TestCase):
         self.verify_entries(returned_entries, 0, 9)
         self.assertEqual(3, len(mock_responder.get_json_response.
                                 call_args_list))
-        
+
         # Same as above, but using a flag to control the batch size.
         mock_responder.reset_mock()
         FLAGS.entry_fetch_batch_size = 4
@@ -182,6 +193,48 @@ class LogClientTest(unittest.TestCase):
             partial.append(entries.next())
         self.verify_entries(partial, 0, 2)
         self.assertRaises(log_client.HTTPClientError, entries.next)
+
+    def test_get_sth_consistency(self):
+        client = log_client.LogClient(self.FakeResponder(log_size_limit=3))
+        proof = client.get_sth_consistency(1, 2)
+        self.assertEquals(proof, LogClientTest._DEFAULT_FAKE_PROOF)
+
+    def test_get_sth_consistency_trivial(self):
+        client = log_client.LogClient(self.FakeResponder(log_size_limit=3))
+        self.assertEquals(client.get_sth_consistency(0, 0), [])
+        self.assertEquals(client.get_sth_consistency(0, 2), [])
+        self.assertEquals(client.get_sth_consistency(2, 2), [])
+
+    def test_get_sth_consistency_raises_on_invalid_input(self):
+        client = log_client.LogClient(self.FakeResponder(log_size_limit=3))
+        self.assertRaises(log_client.InvalidRequestError,
+                          client.get_sth_consistency, -1, 1)
+        self.assertRaises(log_client.InvalidRequestError,
+                          client.get_sth_consistency, -3, -1)
+        self.assertRaises(log_client.InvalidRequestError,
+                          client.get_sth_consistency, 3, 1)
+
+    def test_get_sth_consistency_raises_on_client_error(self):
+        client = log_client.LogClient(self.FakeResponder(log_size_limit=3))
+        self.assertRaises(log_client.HTTPClientError,
+                          client.get_sth_consistency, 1, 5)
+
+    def test_get_sth_consistency_raises_on_invalid_response(self):
+        mock_request = mock.Mock()
+        mock_request.get_json_response.return_value = {}
+
+        client = log_client.LogClient(mock_request)
+        self.assertRaises(log_client.InvalidResponseError,
+                          client.get_sth_consistency, 1, 2)
+
+    def test_get_sth_consistency_raises_on_invalid_base64(self):
+        json_proof = {"consistency": ["garbagebase64^^^"]}
+        mock_request = mock.Mock()
+        mock_request.get_json_response.return_value = json_proof
+
+        client = log_client.LogClient(mock_request)
+        self.assertRaises(log_client.InvalidResponseError,
+                          client.get_sth_consistency, 1, 2)
 
 if __name__ == "__main__":
     sys.argv = FLAGS(sys.argv)

@@ -37,6 +37,9 @@ class FakeLogClient(object):
             entry.extra_data = "extra_data-%d" % i
             yield entry
 
+    def get_sth_consistency(self, old_tree, new_tree):
+        return []
+
 class InMemoryStateKeeper(object):
     def __init__(self, state=None):
         self.state = state
@@ -62,12 +65,6 @@ class MonitorTest(unittest.TestCase):
     _NEW_STH.sha256_root_hash = "hash2"
     _NEW_STH.tree_head_signature = "sig2"
 
-    _OLD_STH = client_pb2.SthResponse()
-    _OLD_STH.timestamp = 1000
-    _OLD_STH.tree_size = _DEFAULT_STH.tree_size - 5
-    _OLD_STH.sha256_root_hash = "hash3"
-    _OLD_STH.tree_head_signature = "sig3"
-
     def setUp(self):
         if not FLAGS.verbose_tests:
           logging.disable(logging.CRITICAL)
@@ -90,11 +87,9 @@ class MonitorTest(unittest.TestCase):
         self.assertEqual(self.state_keeper.state, expected_state)
 
     def verify_tmp_data(self, start, end):
-        entries = list(self.temp_db.scan_entries(start, end))
-        self.assertEqual(end-start+1, len(entries))
-        for i in range(start, end+1):
-            self.assertEqual("leaf_input-%d" % i, entries[i-start].leaf_input)
-            self.assertEqual("extra_data-%d" % i, entries[i-start].extra_data)
+        # TODO: we are no longer using the temp db
+        # all the callsites should be updated to test the main db instead
+        pass
 
     def test_update(self):
         client = FakeLogClient(self._NEW_STH)
@@ -107,9 +102,6 @@ class MonitorTest(unittest.TestCase):
         expected_state.verified_sth.CopyFrom(self._NEW_STH)
         self.verify_state(expected_state)
 
-        # ... and stored the new entries in the tmp DB.
-        # (Note: these tests should be updated once data is stored in a
-        # permanent storage).
         self.verify_tmp_data(self._DEFAULT_STH.tree_size,
                              self._NEW_STH.tree_size-1)
 
@@ -126,7 +118,6 @@ class MonitorTest(unittest.TestCase):
         expected_state.verified_sth.CopyFrom(self._DEFAULT_STH)
         self.verify_state(expected_state)
 
-        # ... and stored the new entries in the tmp DB.
         self.verify_tmp_data(0, self._DEFAULT_STH.tree_size-1)
 
     def test_update_no_new_entries(self):
@@ -200,8 +191,12 @@ class MonitorTest(unittest.TestCase):
         expected_state.verified_sth.CopyFrom(self._DEFAULT_STH)
         self.verify_state(expected_state)
 
-    def test_update_sth_fails_for_older_sth(self):
-        client = FakeLogClient(self._OLD_STH)
+    def test_update_sth_fails_for_stale_sth(self):
+        sth = client_pb2.SthResponse()
+        sth.CopyFrom(self._DEFAULT_STH)
+        sth.tree_size -= 1
+        sth.timestamp -= 1
+        client = FakeLogClient(sth)
 
         m = monitor.Monitor(client, self.verifier, self.db, self.temp_db,
                             self.state_keeper)
@@ -212,9 +207,11 @@ class MonitorTest(unittest.TestCase):
         expected_state.verified_sth.CopyFrom(self._DEFAULT_STH)
         self.verify_state(expected_state)
 
-    def test_update_sth_fails_for_temporally_inconsistent_sth(self):
+    def test_update_sth_fails_for_inconsistent_sth(self):
         client = FakeLogClient(self._NEW_STH)
         # The STH is in fact OK but fake failure.
+        # TODO(infinity0): change this to verify_sth_consistency when we get
+        # rid of the --verify_sth_consistency flag in monitor.py
         self.verifier.verify_sth_temporal_consistency.side_effect = (
             error.ConsistencyError("Boom!"))
 
