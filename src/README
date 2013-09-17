@@ -1,4 +1,9 @@
-1. To build the log server, you need OpenSSL >= 1.0.0.
+1. To build the log server, you need OpenSSL >= 1.0.0. To get all
+functionality, in particular, checking of SCTs included in the RFC
+6962 TLS extension, you need OpenSSL >= 1.0.2 (which currently means
+hand building a version from the OpenSSL git repository,
+https://www.openssl.org/source/repos.html. The branch for 1.0.2 is
+OpenSSL_1_0_2-stable).
 
 To find out your system version of OpenSSL:
 
