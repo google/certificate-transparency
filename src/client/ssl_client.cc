@@ -38,7 +38,13 @@ int SSLClient::ExtensionCallback(SSL *s, unsigned short ext_type,
   memcpy(ext_buf+4, in, inlen);
 
   BIO_snprintf(pem_name, sizeof(pem_name), "SERVER_INFO %d", ext_type);
+
+  // Work around broken PEM_write() declaration in older OpenSSL versions.
+#if OPENSSL_VERSION_NUMBER < 0x10002000L
+  PEM_write(stdout, pem_name, const_cast<char *>(""), ext_buf, 4 + inlen);
+#else
   PEM_write(stdout, pem_name, "", ext_buf, 4 + inlen);
+#endif
 
   CHECK_EQ(ext_type, CT_EXTENSION_TYPE);
 
@@ -74,8 +80,13 @@ SSLClient::SSLClient(const string &server, uint16_t port,
 
   SSL_CTX_set_cert_verify_callback(ctx_, &VerifyCallback, &verify_args_);
 
+#if OPENSSL_VERSION_NUMBER >= 0x10002000L
   SSL_CTX_set_custom_cli_ext(ctx_, CT_EXTENSION_TYPE, NULL, ExtensionCallback,
 			     &verify_args_);
+#else
+  LOG(WARNING) << "OpenSSL version is too low to check the Certificate "
+      "Transparency TLS extension";
+#endif
 }
 
 SSLClient::~SSLClient() {

@@ -431,9 +431,22 @@ static void ProofToExtensionData() {
                       << FLAGS_tls_extension_data_out
                       << " for writing:" << strerror(errno);
 
-  PEM_write(out, "SIGNED CERTIFICATE TIMESTAMP", "",
-      reinterpret_cast<const unsigned char *>(extension_data_out.str().c_str()),
+  // Work around broken PEM_write() declaration in older OpenSSL versions.
+#if OPENSSL_VERSION_NUMBER < 0x10002000L
+  PEM_write(out,
+            const_cast<char *>("SIGNED CERTIFICATE TIMESTAMP"),
+            const_cast<char *>(""),
+            const_cast<unsigned char *>(
+                reinterpret_cast<const unsigned char *>(
+                    extension_data_out.str().data())),
             extension_data_out.str().length());
+#else
+  PEM_write(out,
+            "SIGNED CERTIFICATE TIMESTAMP",
+            "",
+      reinterpret_cast<const unsigned char *>(extension_data_out.str().data()),
+            extension_data_out.str().length());
+#endif
 
   fclose(out);
 }
