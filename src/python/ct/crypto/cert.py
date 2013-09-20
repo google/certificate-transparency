@@ -1,5 +1,7 @@
 import logging
 import time
+from collections import defaultdict
+from collections import namedtuple
 
 from ct.crypto import error
 from ct.crypto import name
@@ -14,9 +16,48 @@ from pyasn1.codec.der import encoder as der_encoder
 from pyasn1 import error as pyasn1_error
 
 
+class CertificateError(error.Error):
+    """Certificate has errors."""
+    pass
+
+
 class Certificate(object):
     PEM_MARKERS = ("CERTIFICATE",)
     _ASN1_SPEC = x509.Certificate()
+
+    # Critical: the critical bit. Always present.
+    # decoded_value: decoded value. May be None if decoding failed.
+    # raw_value: raw_value. Always present. (Currently not used but will be
+    # used for debugging and inspection of malformed certificates.)
+    # error: decoding error, or None.
+    CachedExtension = namedtuple("CachedExtension",
+                                 ["critical", "decoded_value", "raw_value",
+                                  "decoding_error"])
+
+    class CachedTime(object):
+        def __init__(self, raw_value):
+            # time: decoded time struct.
+            # raw_value: raw (string) time value. Always present.
+            # error: decoding error, or None.
+            self.__raw_value = raw_value
+            self.__decoded_time = None
+            self.__decoding_error = None
+            try:
+                self.__decoded_time = raw_value.gmtime()
+            except error.ASN1Error as e:
+                # We can't raise here because we don't want to abort __init__,
+                # so we cache the exception and raise when asked for the decoded
+                # time
+               self.__decoding_error = e
+
+        @property
+        def decoded_time(self):
+            if self.__decoded_time is None:
+                raise CertificateError("Corrupt time: %s" %
+                                       self.__decoding_error)
+            return self.__decoded_time
+
+
     def __init__(self, der_string):
         """Initialize from a DER string
         Args:
@@ -28,9 +69,12 @@ class Certificate(object):
         # contents of the certificate are ever added to this class, they must
         # invalidate the cached encoding.
         self.__cached_der = der_string
+
+        self.__not_before = None
+        self.__not_after = None
         self.__cache_expiry()
-        # id -> (critical, decoded_value)
-        self.__cached_extensions = {}
+        # id -> [CachedExtension]
+        self.__cached_extensions = defaultdict(list)
         self.__cache_extensions()
 
     def __repr__(self):
@@ -54,15 +98,15 @@ class Certificate(object):
         return cls.from_der(der_cert)
 
     def __cache_expiry(self):
-        # Let ASN1 errors raise through.
-        self.__not_before = (
+        self.__not_before = self.CachedTime(
             self.__asn1_cert.getComponentByName("tbsCertificate").
             getComponentByName("validity").
-            getComponentByName("notBefore").getComponent().gmtime())
-        self.__not_after = (
+            getComponentByName("notBefore").getComponent())
+
+        self.__not_after = self.CachedTime(
             self.__asn1_cert.getComponentByName("tbsCertificate").
             getComponentByName("validity").
-            getComponentByName("notAfter").getComponent().gmtime())
+            getComponentByName("notAfter").getComponent())
 
     def __cache_extensions(self):
         extensions = (self.__asn1_cert.getComponentByName("tbsCertificate").
@@ -70,18 +114,33 @@ class Certificate(object):
         if not extensions:
             return
         for ext in extensions:
+            decoding_error = None
+            decoded_value = None
+            raw_value = ext.getComponentByName("extnValue")
             try:
-                extn_value = ext.get_decoded_value()
-            except error.UnknownASN1TypeError:
-                extn_value = ext.getComponentByName("extnValue")
+                decoded_value = ext.get_decoded_value()
+            except error.ASN1Error as e:
+                # Either a corrupt extension, or one with an unknown type.
+                decoding_error = e
 
             extn_id = ext.getComponentByName("extnID")
-            if extn_id in self.__cached_extensions:
-                raise error.ASN1Error("Duplicate extension %s: " %
-                                      extn_id.string_value())
+            self.__cached_extensions[extn_id].append(self.CachedExtension(
+                ext.getComponentByName("critical"), decoded_value, raw_value,
+                decoding_error))
 
-            self.__cached_extensions[extn_id] = (
-                (ext.getComponentByName("critical"), extn_value))
+    # TODO(ekasper): add a test for the CertificateError case.
+    def __get_decoded_extension_value(self, extn_id):
+        extn_values = self.__cached_extensions[extn_id]
+        if not extn_values:
+            return None
+        if len(extn_values) > 1:
+            # TODO(ekasper): could refine this to only raise when the multiple
+            # extension values are conflicting.
+            raise CertificateError("Multiple extensions")
+        if extn_values[0].decoded_value is None:
+            raise CertificateError("Corrupt or unrecognized extension: %s"
+                                   % extn_values[0].decoding_error)
+        return extn_values[0].decoded_value
 
     @classmethod
     def __decode_der(cls, der_string):
@@ -151,8 +210,8 @@ class Certificate(object):
         Returns:
             an integral value of the version (i.e., V1 is 0).
         """
-        return (self.__asn1_cert.getComponentByName("tbsCertificate").
-                getComponentByName("version"))
+        return int(self.__asn1_cert.getComponentByName("tbsCertificate").
+                   getComponentByName("version"))
 
     def subject_common_name(self):
         """Get the common name of the subject."""
@@ -186,75 +245,123 @@ class Certificate(object):
 
     def basic_constraint_ca(self):
         """Get the BasicConstraints CA value.
-        Returns: True, False, or None.
+
+        Returns:
+            True, False, or None.
+
+        Raises:
+            CertificateError: corrupt extension, or multiple extensions.
         """
-        try:
-            bc = self.__cached_extensions[
-                x509_extension.ID_CE_BASIC_CONSTRAINTS]
-        except KeyError:
+        # CertificateErrors fall through.
+        bc = self.__get_decoded_extension_value(
+            x509_extension.ID_CE_BASIC_CONSTRAINTS)
+        if bc is None:
             return None
-        return bc[1].getComponentByName("cA")
+
+        bc_ca = bc.getComponentByName("cA")
+        return None if bc_ca is None else bool(bc_ca)
 
     def subject_alternative_names(self):
         """Get the Alternative Names extension.
-        Returns: Array of alternative names (name.GeneralName)
+
+        Returns:
+            Array of alternative names (name.GeneralName)
+
+        Raises:
+            CertificateError: corrupt extension, or multiple extensions.
         """
-        try:
-            # First component is the criticality, 2nd component is the
-            # general names
-            general_names = self.__cached_extensions[
-                x509_extension.ID_CE_SUBJECT_ALT_NAME][1]
-            return name.parse_alternative_names(general_names)
-        except KeyError:
-            return []
+        # CertificateErrors fall through.
+        general_names = self.__get_decoded_extension_value(
+            x509_extension.ID_CE_SUBJECT_ALT_NAME)
+        return name.parse_alternative_names(general_names)
 
     def basic_constraint_path_length(self):
         """Get the BasicConstraints pathLenConstraint value.
-        Returns: an integral value, or None.
+
+        Returns:
+            an integral value, or None.
+
+        Raises:
+            CertificateError: corrupt extension, or multiple extensions.
         """
-        try:
-            bc = self.__cached_extensions[
-                x509_extension.ID_CE_BASIC_CONSTRAINTS]
-        except KeyError:
+        bc = self.__get_decoded_extension_value(
+            x509_extension.ID_CE_BASIC_CONSTRAINTS)
+        if bc is None:
             return None
-        return bc[1].getComponentByName("pathLenConstraint")
+
+        pathlen = bc.getComponentByName("pathLenConstraint")
+        return None if pathlen is None else int(pathlen)
 
     def not_before(self):
         """Get a time.struct_time representing the notBefore in UTC time.
-        Returns: a time.struct_time object."""
-        return self.__not_before
+
+        Returns:
+            a time.struct_time object.
+
+        Raises:
+            CertificateError: corrupt notBefore value.
+        """
+        return self.__not_before.decoded_time
 
     def not_after(self):
         """Get a time.struct_time representing the notAfter in UTC time.
-        Returns: a time.struct_time object."""
-        return self.__not_after
+
+        Returns:
+            a time.struct_time object.
+
+        Raises:
+            CertificateError: corrupt notAfter value.
+        """
+        return self.__not_after.decoded_time
 
     def is_temporally_valid_now(self):
         """Determine whether notBefore <= now <= notAfter.
-        Returns: True or False."""
+
+        Returns:
+            True or False.
+
+        Raises:
+            CertificateError: corrupt time.
+        """
         return self.is_temporally_valid_at(time.gmtime())
 
     def is_expired(self):
-        """Returns True if the certificate notAfter is in the past,
-        False otherwise."""
-        assert self.__not_after is not None
+        """ Is certificate notAfter in the past?
+
+        Returns:
+            True or False.
+
+        Raises:
+            CertificateError: corrupt time.
+        """
         now = time.gmtime()
-        return now > self.__not_after
+        return now > self.not_after()
 
     def is_not_yet_valid(self):
-        """Returns True if the certificate notBefore is in the future,
-        False otherwise."""
-        assert self.__not_before is not None
+        """Is certificate notBefore in the future?
+
+        Returns:
+            True or False.
+
+        Raises:
+            CertificateError: corrupt time.
+        """
         now = time.gmtime()
-        return now < self.__not_before
+        return now < self.not_before()
 
     def is_temporally_valid_at(self, gmtime):
-        """Returns True if the certificate was/is/will be valid at the
-        given moment, represented as a GMT time struct_time,
-        False otherwise."""
-        assert self.__not_before is not None
-        assert self.__not_after is not None
-        return self.__not_before <= gmtime <= self.__not_after
+        """Is certificate valid at the given moment?
+
+        Args:
+            gmtime: a struct_time GMT time.
+
+        Returns:
+            True or False.
+
+        Raises:
+            CertificateError: corrupt time.
+        """
+        return self.not_before() <= gmtime <= self.not_after()
 
 def certs_from_pem(pem_string, skip_invalid_blobs=False):
     """Read multiple PEM-encoded certificates from a string.
