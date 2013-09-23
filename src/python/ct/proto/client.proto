@@ -56,6 +56,16 @@ message EntryResponse {
   optional bytes extra_data = 2;
 }
 
+message ProofByHashResponse {
+  optional uint64 leaf_index = 1;
+  repeated bytes audit_path = 2;
+}
+
+message EntryAndProofResponse {
+  optional EntryResponse entry = 1;
+  repeated bytes audit_path = 2;
+}
+
 message MonitorState {
   optional SthResponse verified_sth = 1;
   // An STH whose leaf entries are yet to be retrieved. Its timestamp and

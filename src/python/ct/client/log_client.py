@@ -1,45 +1,55 @@
+"""RFC 6962 client API."""
 import base64
-import gflags
-import logging
-import requests
-import threading
+
 from ct.proto import client_pb2
+import gflags
+import requests
 
 FLAGS = gflags.FLAGS
 
 gflags.DEFINE_integer("entry_fetch_batch_size", 1000, "Maximum number of "
                       "entries to attempt to fetch in one request")
 
+
 class Error(Exception):
     pass
 
+
 class ClientError(Error):
     pass
+
 
 class HTTPError(Error):
     """Connection failed, or returned an error."""
     pass
 
+
 class HTTPClientError(HTTPError):
     """HTTP 4xx."""
     pass
+
 
 class HTTPServerError(HTTPError):
     """HTTP 5xx."""
     pass
 
+
 class InvalidRequestError(Error):
     """Request does not comply with the CT protocol."""
     pass
+
 
 class InvalidResponseError(Error):
     """Response does not comply with the CT protocol."""
     pass
 
+
 # requests.models.Response is not easily instantiable locally, so as a
 # workaround, encapsulate the entire http logic in the Requester class which we
 # can control/mock out to test response handling.
 class Requester(object):
+    """HTTPS requests."""
+
     def __init__(self, uri):
         self.__uri = uri
 
@@ -53,7 +63,7 @@ class Requester(object):
     def uri(self):
         return self.__uri
 
-    def get_json_response(self, path, params={}):
+    def get_json_response(self, path, params=None):
         """Get the json contents of a request response."""
         url = "https://" + self.__uri + "/" + path
         try:
@@ -62,8 +72,9 @@ class Requester(object):
             raise HTTPError("Connection to %s failed: %s" % (url, e))
         if not response.ok:
             error_msg = ("%s returned http_error %d: %s" %
-                         (url, response.status_code, response.text))
-            if 400 <= response.status_code  < 500:
+                         (url, response.status_code,
+                          response.text.encode("ascii", "ignore")))
+            if 400 <= response.status_code < 500:
                 raise HTTPClientError(error_msg)
             elif 500 <= response.status_code < 600:
                 raise HTTPServerError(error_msg)
@@ -76,12 +87,16 @@ class Requester(object):
             raise InvalidResponseError("Response %s from %s is not valid JSON: "
                                        "%s" % (response, url, e))
 
+
 class LogClient(object):
     """HTTP client for talking to a CT log."""
 
     _GET_STH_PATH = "ct/v1/get-sth"
     _GET_ENTRIES_PATH = "ct/v1/get-entries"
     _GET_STH_CONSISTENCY_PATH = "ct/v1/get-sth-consistency"
+    _GET_PROOF_BY_HASH_PATH = "ct/v1/get-proof-by-hash"
+    _GET_ROOTS_PATH = "ct/v1/get-roots"
+    _GET_ENTRY_AND_PROOF_PATH = "ct/v1/get-entry-and-proof"
 
     def __init__(self, requester):
         self.__req = requester
@@ -98,7 +113,10 @@ class LogClient(object):
 
     def get_sth(self):
         """Get the current Signed Tree Head.
-        Returns: a ct.proto.client_pb2.SthResponse proto
+
+        Returns:
+            a ct.proto.client_pb2.SthResponse proto.
+
         Raises:
             HTTPError, HTTPClientError, HTTPServerError: connection failed.
                 For logs that honour HTTP status codes, HTTPClientError (a 4xx)
@@ -137,8 +155,19 @@ class LogClient(object):
         return entry_response
 
     def __validated_entry_response(self, start, end, response):
-        """Verify the get-entries response format and size. Returns an array
-        of entries."""
+        """Verify the get-entries response format and size.
+
+        Args:
+            start: requested start parameter.
+            end:  requested end parameter.
+            response: response.
+
+        Returns:
+            an array of entries.
+
+        Raises:
+            InvalidResponseError: response not valid.
+        """
         entries = None
         try:
             entries = iter(response["entries"])
@@ -166,16 +195,19 @@ class LogClient(object):
                              response_size))
 
         # If any one of the entries has invalid json format, this raises.
-        return map(lambda e: self.__json_entry_to_response(e), entries)
+        return [self.__json_entry_to_response(e) for e in entries]
 
     def get_entries(self, start, end, batch_size=0):
         """Retrieve log entries.
+
         Args:
             start     : index of first entry to retrieve.
             end       : index of last entry to retrieve.
             batch_size: max number of entries to fetch in one go.
+
         Yields:
             ct.proto.client_pb2.EntryResponse protos.
+
         Raises:
             HTTPError, HTTPClientError, HTTPServerError: connection failed,
                 or returned an error. HTTPClientError can happen when
@@ -213,11 +245,14 @@ class LogClient(object):
 
     def get_sth_consistency(self, old_size, new_size):
         """Retrieve a consistency proof.
+
         Args:
             old_size  : size of older tree.
             new_size  : size of newer tree.
+
         Returns:
             list of raw hashes (bytes) forming the consistency proof
+
         Raises:
             HTTPError, HTTPClientError, HTTPServerError: connection failed,
                 or returned an error. HTTPClientError can happen when
@@ -244,12 +279,11 @@ class LogClient(object):
             return []
 
         response = self.__req.get_json_response(
-                self._GET_STH_CONSISTENCY_PATH,
-                params={"first": old_size, "second": new_size})
+            self._GET_STH_CONSISTENCY_PATH,
+            params={"first": old_size, "second": new_size})
 
         try:
-            consistency = map(lambda u: base64.b64decode(u),
-                              response["consistency"])
+            consistency = [base64.b64decode(u) for u in response["consistency"]]
         except (TypeError, ValueError, KeyError) as e:
             raise InvalidResponseError(
                 "%s returned invalid data: expected a base64-encoded "
@@ -257,3 +291,110 @@ class LogClient(object):
                 "\n%s" % (self.__req.uri, response, e))
 
         return consistency
+
+    def get_proof_by_hash(self, leaf_hash, tree_size):
+        """Retrieve an audit proof by leaf hash.
+
+        Args:
+            leaf_hash: hash of the leaf input (as raw binary string).
+            tree_size: size of the tree on which to base the proof.
+
+        Returns:
+            a client_pb2.ProofByHashResponse containing the leaf index
+            and the Merkle tree audit path nodes (as binary strings).
+
+        Raises:
+            HTTPError, HTTPClientError, HTTPServerError: connection failed,
+            HTTPClientError can happen when leaf_hash is not present in the
+                log tree of the given size.
+            InvalidRequestError: invalid request (irrespective of log).
+            InvalidResponseError: server response is invalid for the given
+                                  request.
+        """
+        if tree_size <= 0:
+            raise InvalidRequestError("Tree size must be positive (got %d)" %
+                                      tree_size)
+
+        leaf_hash = base64.b64encode(leaf_hash)
+        response = self.__req.get_json_response(
+            self._GET_PROOF_BY_HASH_PATH,
+            params={"hash": leaf_hash, "tree_size": tree_size})
+
+        proof_response = client_pb2.ProofByHashResponse()
+        try:
+            proof_response.leaf_index = response["leaf_index"]
+            proof_response.audit_path.extend(
+                [base64.b64decode(u) for u in response["audit_path"]])
+        except (TypeError, ValueError, KeyError) as e:
+            raise InvalidResponseError(
+                "%s returned invalid data: expected a base64-encoded "
+                "audit proof, got %s"
+                "\n%s" % (self.__req.uri, response, e))
+
+        return proof_response
+
+    def get_entry_and_proof(self, leaf_index, tree_size):
+        """Retrieve an entry and its audit proof by index.
+
+        Args:
+            leaf_index: index of the entry.
+            tree_size: size of the tree on which to base the proof.
+
+        Returns:
+            a client_pb2.EntryAndProofResponse containing the entry
+            and the Merkle tree audit path nodes (as binary strings).
+
+        Raises:
+            HTTPError, HTTPClientError, HTTPServerError: connection failed,
+            HTTPClientError can happen when tree_size is not a valid size
+                for this log.
+            InvalidRequestError: invalid request (irrespective of log).
+            InvalidResponseError: server response is invalid for the given
+                                  request.
+        """
+        if tree_size <= 0:
+            raise InvalidRequestError("Tree size must be positive (got %d)" %
+                                      tree_size)
+
+        if leaf_index < 0 or leaf_index >= tree_size:
+            raise InvalidRequestError("Leaf index must be smaller than tree "
+                                      "size (got index %d vs size %d" %
+                                      (leaf_index, tree_size))
+
+        response = self.__req.get_json_response(
+            self._GET_ENTRY_AND_PROOF_PATH,
+            params={"leaf_index": leaf_index, "tree_size": tree_size})
+
+        entry_response = client_pb2.EntryAndProofResponse()
+        try:
+            entry_response.entry.CopyFrom(
+                self.__json_entry_to_response(response))
+            entry_response.audit_path.extend(
+                [base64.b64decode(u) for u in response["audit_path"]])
+        except (TypeError, ValueError, KeyError) as e:
+            raise InvalidResponseError(
+                "%s returned invalid data: expected an entry and proof, got %s"
+                "\n%s" % (self.__req.uri, response, e))
+
+        return entry_response
+
+    def get_roots(self):
+        """Retrieve currently accepted root certificates.
+
+        Returns:
+            a list of certificates (as raw binary strings).
+
+        Raises:
+            HTTPError, HTTPClientError, HTTPServerError: connection failed,
+                or returned an error. For logs that honour HTTP status codes,
+                HTTPClientError (a 4xx) should never happen.
+            InvalidResponseError: server response is invalid for the given
+                                  request.
+        """
+        response = self.__req.get_json_response(self._GET_ROOTS_PATH)
+        try:
+            return [base64.b64decode(u)for u in response["certificates"]]
+        except (TypeError, ValueError, KeyError) as e:
+            raise InvalidResponseError(
+                "%s returned invalid data: expected a list od base64-encoded "
+                "certificates, got %s\n%s" % (self.__req.uri, response, e))
