@@ -5,12 +5,17 @@ ca_setup() {
   ca=$2
   pre=$3
 
+  if [ -z "$ca" ]; then
+    echo "CA name must be provided."
+    return
+  fi
+
   # Create serial and database files.
   serial="$cert_dir/$ca-serial"
   # The PreCA shall share the CA's serial file.
   # However, it needs a separate database, since we want to be able to issue
   # a cert with the same serial twice (once by the PreCA, once by the CA).
-  if [ $pre == "true" ]; then
+  if [ "$pre" == "true" ]; then
     database="$cert_dir/$ca-pre-database"
     conf=$ca-pre
   else
@@ -29,12 +34,19 @@ ca_setup() {
 }
 
 request_cert() {
-  cert_dir=$1
-  subject=$2
-  config=$3
+  cert_dir=$1 # Output directory
+  subject=$2 # Name of output certificate
+  config=$3 # Config file with certificate info.
+  plaintext_key=$4 # Should the generated key be encrypted?
+
+  if [ "$plaintext_key" == "true" ]; then
+    password_options="-nodes"
+  else
+    password_options="-passout pass:password1"
+  fi
 
   openssl req -new -newkey rsa:1024 -keyout $cert_dir/$subject-key.pem \
-    -out $cert_dir/$subject-cert.csr -config $config -passout pass:password1
+    -out $cert_dir/$subject-cert.csr -config $config $password_options
 }
 
 issue_cert() {
@@ -65,7 +77,7 @@ make_ca_certs() {
   ca=$3
   my_openssl=$4
 
-  if [ $my_openssl == "" ]; then
+  if [ "$my_openssl" == "" ]; then
     my_openssl=openssl;
   fi
 
@@ -193,28 +205,42 @@ make_cert() {
 
 # Call make_ca_certs and make_log_server_keys first
 make_embedded_cert() {
-  local cert_dir=$1
-  local server=$2
-  local ca=$3
-  local log_server=$4
-  local log_server_port=$5
-  local ca_is_intermediate=$6
-  local use_pre_ca=$7
-  local server_public_key=$8
+  local cert_dir=$1 # Where CA certificate lives and output certs go
+  local server=$2 # Prefix of the new certificate filename
+  local ca=$3 # Prefix of the CA certificate file.
+  local log_server=$4 # Log address (IP) or IP:port if HTTP_LOG is set.
+  local log_port_or_http_arg=$5 # Log server port. Unused if HTTP_LOG is set.
+  local ca_is_intermediate=$6 # CA cert is intermediate one
+  local use_pre_ca=$7 # Using precertificate signing cert.
+  local server_public_key=$8 # File holding the log's public key
+  local common_name=$9 # Optional commonName value for certificate
 
-  # Generate a new private key and CSR
-  request_cert $cert_dir $server precert.conf
+  local modified_config=${cert_dir}/${server}_precert.conf
+  if [ -z "$common_name" ]; then
+    cp precert.conf $modified_config
+  else
+    echo "Will set the following common name: $common_name"
+    sed -e "/0.organizationName=Certificate/ a commonName=$common_name" precert.conf > $modified_config
+  fi
 
-  openssl rsa -in $cert_dir/$server-key.pem -out $cert_dir/$server-key.pem \
-    -passin pass:password1
+  local log_port_or_http
+  if [ "$log_port_or_http_arg" == "-http_log" ] ||
+      [ "$HTTP_LOG" == "-http_log" ]; then
+    log_port_or_http="-http_log"
+  else
+    log_port_or_http="--ct_server_port=$log_port_or_http_arg"
+  fi
+
+  # Generate a new, unencrypted private key and CSR
+  request_cert $cert_dir $server $modified_config true
 
   # Sign the CSR to get a log request
   if [ $use_pre_ca == "true" ]; then
-    issue_cert $cert_dir $ca-pre $server precert.conf pre false $server-pre
+    issue_cert $cert_dir $ca-pre $server $modified_config pre false $server-pre
   else
   # Issue a precert, but since it's not real, do not update the database.
     cp $cert_dir/$ca-database $cert_dir/$ca-database.bak
-    issue_cert $cert_dir $ca $server precert.conf pre false $server-pre
+    issue_cert $cert_dir $ca $server $modified_config pre false $server-pre
     mv $cert_dir/$ca-database.bak $cert_dir/$ca-database
   fi
 
@@ -238,15 +264,15 @@ make_embedded_cert() {
 
   ../client/ct upload \
     --ct_server_submission=$cert_dir/$server-precert-bundle.pem \
-    --ct_server=$log_server --ct_server_port=$log_server_port \
+    --ct_server=$log_server $log_port_or_http \
     --ct_server_public_key=$server_public_key \
     --ct_server_response_out=$cert_dir/$server-pre-cert.proof \
-    --precert=true --logtostderr=true $HTTP_LOG
+    --precert=true --logtostderr=true
   rm $cert_dir/$server-precert-tmp.pem
   rm $cert_dir/$server-precert-bundle.pem
 
   # Create a new extensions config with the embedded proof
-  cp precert.conf $cert_dir/$server-extensions.conf
+  cp $modified_config $cert_dir/$server-extensions.conf
   ../client/ct configure_proof \
     --extensions_config_out=$cert_dir/$server-extensions.conf \
     --sct_token=$cert_dir/$server-pre-cert.proof --logtostderr=true 
@@ -267,7 +293,7 @@ make_embedded_cert() {
   # we happen to know which one that is, so hardwire).
   if [ $ca_is_intermediate == "true" ]; then
     cat $cert_dir/$ca-cert.pem $cert_dir/ca-cert.pem \
-	>> $cert_dir/$server-cert-bundle.pem
+      >> $cert_dir/$server-cert-bundle.pem
   else
     cat $cert_dir/$ca-cert.pem >> $cert_dir/$server-cert-bundle.pem
   fi
