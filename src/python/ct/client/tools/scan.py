@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 
 import io
+import multiprocessing
 import struct
 import sys
 
@@ -11,6 +12,9 @@ from ct.crypto import cert
 from ct.crypto import error
 
 FLAGS = gflags.FLAGS
+
+gflags.DEFINE_integer("multi", 1, "Number of cert parsing processes to use in "
+                      "addition to the main process and the network process.")
 
 
 class Error(Exception):
@@ -83,35 +87,106 @@ def match(certificate):
     #
     return True
 
-def scan():
+class QueueMessage(object):
+    def __init__(self, msg, wait_for_ack=False):
+        self.msg = msg
+        # Require user interaction to continue.
+        self.wait_for_ack = wait_for_ack
+
+# Special queue messages to stop the subprocesses.
+SCANNER_STOPPED = "SCANNER_STOPPED"
+WORKER_STOPPED = "WORKER_STOPPED"
+STOP_WORKER = "STOP_WORKER"
+
+def process_entries(entry_queue, output_queue):
+    stopped = False
+    while not stopped:
+        count, entry = entry_queue.get()
+        if entry == STOP_WORKER:
+            stopped = True
+            # Each worker signals when they've picked up their
+            # "STOP_WORKER" message.
+            output_queue.put(QueueMessage(WORKER_STOPPED))
+        else:
+            entry_type, der_cert = decode_leaf_input(entry)
+            if entry_type == PRECERT_ENTRY:
+                output_queue.put(QueueMessage(
+                    "Found precert: %s" % der_cert.encode("hex"),
+                    wait_for_ack=True))
+            else:
+                try:
+                    c = cert.Certificate(der_cert)
+                except error.Error as e:
+                    output_queue.put(QueueMessage(
+                        "Error while parsing entry no %d:\n%s" % (scanned, e),
+                        wait_for_ack=True))
+                else:
+                    if match(c):
+                        output_queue.put(QueueMessage(
+                            "Found matching certificate:\n%s" % c,
+                            wait_for_ack=True))
+            if not count % 1000:
+                output_queue.put(QueueMessage("Scanned %d entries" % count))
+
+def scan(entry_queue, output_queue):
     client = log_client.LogClient(log_client.Requester(
             "ct.googleapis.com/pilot"))
     sth = client.get_sth()
-    print "got sth: %s" % sth
-
+    output_queue.put(QueueMessage("Got STH: %s" % sth))
+    # This, too, could be parallelized but currently we're computation-bound
+    # due to slow ASN.1 parsing.
     entries = client.get_entries(0, sth.tree_size - 1)
     scanned = 0
     for entry in entries:
-        entry_type, der_cert = decode_leaf_input(entry.leaf_input)
-        if entry_type == PRECERT_ENTRY:
-            print "Found precert: %s" % der_cert.encode("hex")
-            raw_input("press Enter to continue")
-        else:
-            try:
-                c = cert.Certificate(der_cert)
-            except error.Error as e:
-                print "Error while parsing entry no %d:\n%s" % (scanned, e)
-                print "Raw entry:\n%s" % der_cert.encode("hex")
-                raw_input("press Enter to continue")
-            else:
-                if match(c):
-                    print "Found matching certificate"
-                    print c
-                    raw_input("press Enter to continue")
         scanned += 1
-        if not scanned % 1000:
-            print "Scanned %d entries" % (scanned)
+        # Can't pickle protocol buffers with protobuf module version < 2.5.0
+        # (https://code.google.com/p/protobuf/issues/detail?id=418)
+        # so we just send the leaf input.
+        entry_queue.put((scanned, entry.leaf_input))
+    output_queue.put(QueueMessage(SCANNER_STOPPED))
+
+def run():
+    # (index, entry) tuples
+    entry_queue = multiprocessing.Queue(10000)
+    output_queue = multiprocessing.Queue(10000)
+
+    scan_process = multiprocessing.Process(target=scan,
+                                           args=(entry_queue, output_queue))
+    scan_process.start()
+
+    workers = [multiprocessing.Process(target=process_entries,
+                                       args=(entry_queue, output_queue))
+               for _ in range(FLAGS.multi)]
+    for w in workers:
+        w.start()
+
+    try:
+        workers_done = 0
+        while workers_done < len(workers):
+            msg = output_queue.get()
+            if msg.msg == SCANNER_STOPPED:
+                # Scanner done; signal workers.
+                for _ in range(len(workers)):
+                    entry_queue.put((0, STOP_WORKER))
+            # Worker done.
+            elif msg.msg == WORKER_STOPPED:
+                workers_done += 1
+            else:
+                print msg.msg
+                if msg.wait_for_ack:
+                    raw_input("Press ENTER to continue")
+
+    # Do not hang the interpreter upon ^C.
+    except (KeyboardInterrupt, SystemExit):
+        scan_process.terminate()
+        for w in workers:
+            w.terminate()
+        raise
+
+    scan_process.join()
+    for w in workers:
+        w.join()
 
 if __name__ == "__main__":
     sys.argv = FLAGS(sys.argv)
-    scan()
+    run()
