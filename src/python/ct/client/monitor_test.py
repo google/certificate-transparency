@@ -13,6 +13,7 @@ from ct.client import sqlite_temp_db
 from ct.client import state
 from ct.client import monitor
 from ct.crypto import error
+from ct.crypto import merkle
 from ct.crypto import verify
 from ct.proto import client_pb2
 
@@ -59,11 +60,19 @@ class MonitorTest(unittest.TestCase):
     _DEFAULT_STH.sha256_root_hash = "hash"
     _DEFAULT_STH.tree_head_signature = "sig"
 
+    _PARTIAL_DEFAULT_STH = client_pb2.SthResponse()
+    _PARTIAL_DEFAULT_STH.timestamp = _DEFAULT_STH.timestamp
+    _PARTIAL_DEFAULT_STH.tree_size = _DEFAULT_STH.tree_size
+
     _NEW_STH = client_pb2.SthResponse()
     _NEW_STH.timestamp = 3000
     _NEW_STH.tree_size = _DEFAULT_STH.tree_size + 10
     _NEW_STH.sha256_root_hash = "hash2"
     _NEW_STH.tree_head_signature = "sig2"
+
+    _PARTIAL_NEW_STH = client_pb2.SthResponse()
+    _PARTIAL_NEW_STH.timestamp = _NEW_STH.timestamp
+    _PARTIAL_NEW_STH.tree_size = _NEW_STH.tree_size
 
     def setUp(self):
         if not FLAGS.verbose_tests:
@@ -77,6 +86,7 @@ class MonitorTest(unittest.TestCase):
         default_state.verified_sth.CopyFrom(self._DEFAULT_STH)
         self.state_keeper = InMemoryStateKeeper(default_state)
         self.verifier = mock.Mock()
+        self.hasher = merkle.TreeHasher()
 
         # Make sure the DB knows about the default log server.
         log = client_pb2.CtLogMetadata()
@@ -91,10 +101,16 @@ class MonitorTest(unittest.TestCase):
         # all the callsites should be updated to test the main db instead
         pass
 
+    def create_monitor(self, client):
+        return monitor.Monitor(client, self.verifier, self.hasher, self.db,
+                               self.temp_db, self.state_keeper)
+
     def test_update(self):
         client = FakeLogClient(self._NEW_STH)
-        m = monitor.Monitor(client, self.verifier, self.db, self.temp_db,
-                            self.state_keeper)
+
+        m = self.create_monitor(client)
+        m._compute_projected_sth = mock.Mock(return_value=(
+            self._PARTIAL_NEW_STH, merkle.CompactMerkleTree()))
         self.assertTrue(m.update())
 
         # Check that we wrote the state...
@@ -109,8 +125,9 @@ class MonitorTest(unittest.TestCase):
         client = FakeLogClient(self._DEFAULT_STH)
 
         self.state_keeper.state = None
-        m = monitor.Monitor(client, self.verifier, self.db, self.temp_db,
-                            self.state_keeper)
+        m = self.create_monitor(client)
+        m._compute_projected_sth = mock.Mock(return_value=(
+            self._PARTIAL_DEFAULT_STH, merkle.CompactMerkleTree()))
         self.assertTrue(m.update())
 
         # Check that we wrote the state...
@@ -125,8 +142,7 @@ class MonitorTest(unittest.TestCase):
 
         self.temp_db.store_entries = mock.Mock()
 
-        m = monitor.Monitor(client, self.verifier, self.db, self.temp_db,
-                            self.state_keeper)
+        m = self.create_monitor(client)
         self.assertTrue(m.update())
 
         # Check that we kept the state...
@@ -142,8 +158,7 @@ class MonitorTest(unittest.TestCase):
         # and bails on first error, so we can test each of them separately.
         client = FakeLogClient(self._DEFAULT_STH)
 
-        m = monitor.Monitor(client, self.verifier, self.db, self.temp_db,
-                            self.state_keeper)
+        m = self.create_monitor(client)
         m._update_sth = mock.Mock(return_value=True)
         m._update_entries = mock.Mock(return_value=True)
         self.assertTrue(m.update())
@@ -168,8 +183,7 @@ class MonitorTest(unittest.TestCase):
     def test_update_sth(self):
         client = FakeLogClient(self._NEW_STH)
 
-        m = monitor.Monitor(client, self.verifier, self.db, self.temp_db,
-                            self.state_keeper)
+        m = self.create_monitor(client)
         self.assertTrue(m._update_sth())
 
         # Check that we updated the state.
@@ -182,8 +196,7 @@ class MonitorTest(unittest.TestCase):
         client = FakeLogClient(self._NEW_STH)
         self.verifier.verify_sth.side_effect = error.VerifyError("Boom!")
 
-        m = monitor.Monitor(client, self.verifier, self.db, self.temp_db,
-                            self.state_keeper)
+        m = self.create_monitor(client)
         self.assertFalse(m._update_sth())
 
         # Check that we kept the state.
@@ -198,8 +211,7 @@ class MonitorTest(unittest.TestCase):
         sth.timestamp -= 1
         client = FakeLogClient(sth)
 
-        m = monitor.Monitor(client, self.verifier, self.db, self.temp_db,
-                            self.state_keeper)
+        m = self.create_monitor(client)
         self.assertFalse(m._update_sth())
 
         # Check that we kept the state.
@@ -215,8 +227,7 @@ class MonitorTest(unittest.TestCase):
         self.verifier.verify_sth_temporal_consistency.side_effect = (
             error.ConsistencyError("Boom!"))
 
-        m = monitor.Monitor(client, self.verifier, self.db, self.temp_db,
-                            self.state_keeper)
+        m = self.create_monitor(client)
         self.assertFalse(m._update_sth())
 
         # Check that we kept the state.
@@ -228,8 +239,7 @@ class MonitorTest(unittest.TestCase):
         client = FakeLogClient(self._NEW_STH)
         client.get_sth = mock.Mock(side_effect=log_client.HTTPError("Boom!"))
 
-        m = monitor.Monitor(client, self.verifier, self.db, self.temp_db,
-                            self.state_keeper)
+        m = self.create_monitor(client)
         self.assertFalse(m._update_sth())
 
         # Check that we kept the state.
@@ -243,8 +253,7 @@ class MonitorTest(unittest.TestCase):
         client.get_entries.next.side_effect=log_client.HTTPError("Boom!")
         self.temp_db.store_entries = mock.Mock()
 
-        m = monitor.Monitor(client, self.verifier, self.db, self.temp_db,
-                            self.state_keeper)
+        m = self.create_monitor(client)
         # Get the new STH first.
         self.assertTrue(m._update_sth())
         self.assertFalse(m._update_entries())
@@ -260,8 +269,9 @@ class MonitorTest(unittest.TestCase):
         entry.extra_data = "extra"
         client.get_entries.return_value = iter([entry])
 
-        m = monitor.Monitor(client, self.verifier, self.db, self.temp_db,
-                            self.state_keeper)
+        m = self.create_monitor(client)
+        m._compute_projected_sth = mock.Mock(return_value=(
+            self._PARTIAL_NEW_STH, merkle.CompactMerkleTree()))
         # Get the new STH first.
         self.assertTrue(m._update_sth())
 

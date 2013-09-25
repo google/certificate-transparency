@@ -11,6 +11,7 @@ gflags.DEFINE_integer("probe_frequency_secs", 10*60,
 from ct.client import log_client
 from ct.client import monitor
 from ct.client import state
+from ct.crypto import merkle
 from ct.crypto import verify
 
 class ProberThread(threading.Thread):
@@ -27,11 +28,13 @@ class ProberThread(threading.Thread):
                                    "missing or empty fields: %s" % log)
             client = log_client.LogClient(log_client.Requester(
                     log.log_server))
-            verifier = verify.LogVerifier(log.public_key_info)
+            hasher = merkle.TreeHasher()
+            verifier = verify.LogVerifier(log.public_key_info,
+                                          merkle.MerkleVerifier(hasher))
             state_keeper = state.StateKeeper(FLAGS.monitor_state_dir +
                                              "/" + log.log_id)
             temp_db = temp_db_factory.create_storage(log.log_server)
-            self.__monitors.append(monitor.Monitor(client, verifier, db,
+            self.__monitors.append(monitor.Monitor(client, verifier, hasher, db,
                                                    temp_db, state_keeper))
 
         self.__last_update_start_time = 0

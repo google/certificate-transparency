@@ -7,6 +7,7 @@ from ct.client import log_client
 from ct.client import state
 from ct.client import temp_db
 from ct.crypto import error
+from ct.crypto import merkle
 from ct.proto import client_pb2
 
 FLAGS = gflags.FLAGS
@@ -19,9 +20,10 @@ gflags.DEFINE_bool("verify_sth_consistency", False, "Verify consistency of STH "
                    "effectively be always True thereafter.")
 
 class Monitor(object):
-    def __init__(self, client, verifier, db, temp_db, state_keeper):
+    def __init__(self, client, verifier, hasher, db, temp_db, state_keeper):
         self.__client = client
         self.__verifier = verifier
+        self.__hasher = hasher
         self.__db = db
         self.__state_keeper = state_keeper
 
@@ -40,6 +42,13 @@ class Monitor(object):
           if not self.__state.HasField("verified_sth"):
             logging.warning("No verified monitor state, assuming first run.")
 
+        # TODO(infinity0): load compact merkle tree state from the monitor state
+        # we can actually get rid of the verified_batch_sth totally in favour
+        # of a verified_batch_tree, once we figure out a representation.
+        old_sth = self._get_verified_batch_sth()
+        self.__verified_tree = merkle.CompactMerkleTree(hasher,
+            old_sth.tree_size, old_sth.sha256_root_hash)
+
     def __repr__(self):
         return "%r(%r, %r, %r, %r)" % (self.__class__.__name__, self.__client,
                                        self.__verifier, self.__db,
@@ -52,6 +61,7 @@ class Monitor(object):
 
     def __update_state(self, new_state):
         """Update state and write to disk."""
+        # TODO(infinity0): save the compact merkle tree state too
         self.__state_keeper.write(new_state)
         self.__state = new_state
         logging.info("New state is %s" % new_state)
@@ -189,6 +199,37 @@ class Monitor(object):
         self._set_pending_batch_sth(sth_response)
         return True
 
+    def _compute_projected_sth(self, extra_leaves):
+        """Compute a partial projected STH.
+
+        Useful for when an intermediate STH is not directly available from the
+        server, but you still want to do something with the root hash.
+
+        Args:
+            extra_leaves: Extra leaves present in the tree for the new STH, in
+                the same order as in that tree.
+
+        Returns:
+            (partial_sth, new_tree)
+            partial_sth: A partial STH with timestamp 0 and empty signature.
+            new_tree: New CompactMerkleTree with the extra_leaves integrated.
+        """
+        partial_sth = client_pb2.SthResponse()
+        old_size = self.__verified_tree.tree_size
+        partial_sth.tree_size = old_size + len(extra_leaves)
+        # we only want to check the hash, so just use a dummy timestamp
+        # that looks valid so the temporal verifier doesn't complain
+        partial_sth.timestamp = 0
+        extra_raw_leaves = [leaf.leaf_input for leaf in extra_leaves]
+        if FLAGS.verify_sth_consistency:
+            new_tree = self.__verified_tree.extended(extra_raw_leaves)
+        else:
+            # dummy tree whilst hashing is not yet implemented
+            new_tree = merkle.CompactMerkleTree(
+                self.__hasher, partial_sth.tree_size, "NotImplemented")
+        partial_sth.sha256_root_hash = new_tree.root_hash
+        return partial_sth, new_tree
+
     @staticmethod
     def __estimate_time(num_new_entries):
         if num_new_entries < 1000:
@@ -223,30 +264,19 @@ class Monitor(object):
                               "%d vs retrieved tree size %d" %
                               (end + 1, next_sequence_number))
                 return False
-            numbered_batch = zip(range(next_sequence_number,
-                                       next_sequence_number +
-                                       len(entry_batch)),
-                                 entry_batch)
             logging.info("Fetched %d entries" % len(entry_batch))
 
-            last_verified_sth = self._get_verified_batch_sth()
             # check that the batch is consistent with the eventual pending_sth
             try:
-                # calculate the theoretical STH for the latest fetched cert
-                batch_pending_sth = client_pb2.SthResponse()
-                batch_pending_sth.tree_size = numbered_batch[-1][0] + 1
-                # we only want to check the hash, so just use a dummy timestamp
-                # that looks valid so the verifier doesn't complain
-                batch_pending_sth.timestamp = 0
-                # TODO(ekasper): Compute updated Merkle root hash
-                batch_pending_sth.sha256_root_hash = "NotImplemented"
-                self._verify_consistency(
-                    batch_pending_sth, self.__state.pending_sth)
+                # calculate the hash for the latest fetched certs
+                partial_sth, new_tree = self._compute_projected_sth(entry_batch)
+                self._verify_consistency(partial_sth, self.__state.pending_sth)
             except error.VerifyError:
                 return False
             logging.info("Verified %d entries" % len(entry_batch))
 
-            self._set_verified_batch_sth(batch_pending_sth)
+            self.__verified_tree = new_tree
+            self._set_verified_batch_sth(partial_sth)
             # TODO(ekasper): parse temporary data into permanent storage.
 
             next_sequence_number += len(entry_batch)
@@ -261,7 +291,7 @@ class Monitor(object):
             return True
         # Default is 0, which is what we want.
         wanted_entries = self.__state.pending_sth.tree_size
-        last_verified_size = self._get_verified_batch_sth().tree_size
+        last_verified_size = self.__verified_tree.tree_size
 
         if (wanted_entries > last_verified_size and not
             self.__fetch_entries(last_verified_size, wanted_entries-1)):

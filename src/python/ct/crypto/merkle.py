@@ -1,4 +1,26 @@
-"""Merkle trees."""
+"""Merkle trees.
+
+Benchmark sample code:
+
+>>> import os
+>>> import timeit
+>>> from ct.crypto import merkle
+# generate a few blobs approx the size of a typical cert, takes a few seconds
+>>> leaves = [os.urandom(2048) for i in xrange(65536)]
+>>> hasher = merkle.TreeHasher()
+>>> def timeav(code, n=20):
+>>>     return timeit.timeit(
+...         code, setup="from __main__ import hasher, leaves", number=n)/n
+...
+
+# time taken to hash 65536 certs individually
+>>> print timeav("[hasher.hash_leaf(l) for l in leaves]")
+1.14574944973
+
+# time taken to hash 65536 certs in a full tree
+>>> print timeav("hasher.hash_full_tree(leaves)")
+1.50476324558
+"""
 
 import hashlib
 import logging
@@ -33,6 +55,67 @@ class TreeHasher(object):
         hasher = self.hashfunc()
         hasher.update("\x01" + left + right)
         return hasher.digest()
+
+    def _hash_full(self, leaves, l_idx=0, r_idx=None):
+        width = r_idx - l_idx
+        if width < 0 or l_idx < 0 or r_idx > len(leaves):
+            raise IndexError("%s,%s not a valid range over [0,%s]" % (
+                l_idx, r_idx, len(leaves)))
+        elif width == 0:
+            return self.hash_empty()
+        elif width == 1:
+            return self.hash_leaf(leaves[l_idx])
+        else:
+            next_smallest_2_pow = 2**((width-1).bit_length() - 1)
+            assert next_smallest_2_pow < width <= 2*next_smallest_2_pow
+            left = self._hash_full(leaves, l_idx, l_idx+next_smallest_2_pow)
+            right = self._hash_full(leaves, l_idx+next_smallest_2_pow, r_idx)
+            return self.hash_children(left, right)
+
+    def hash_full_tree(self, leaves):
+        """Hash a set of leaves representing a valid full tree."""
+        return self._hash_full(leaves, 0, len(leaves))
+
+
+class CompactMerkleTree(object):
+    # TODO: decide what format this data structure should be in
+
+    def __init__(self, hasher=TreeHasher(), tree_size=0, root_hash=None):
+        # TODO: can't init tree from root_hash, this API will eventually change
+        # currently just a placeholder to make other components work
+        self.__hasher = hasher
+        self.__tree_size = tree_size
+        self.__root_hash = root_hash or self.__hasher.hash_empty()
+
+    def __copy__(self):
+        if self.__tree_size == 0:
+            return self.__class__(self.__hasher)
+        raise NotImplementedError()
+
+    def __len__(self):
+        return self.__tree_size
+
+    @property
+    def tree_size(self):
+        return self.__tree_size
+
+    @property
+    def root_hash(self):
+        return self.__root_hash
+
+    def extend(self, new_leaves):
+        """Extend this tree with new_leaves on the end."""
+        if self.tree_size == 0:
+            self.__root_hash = self.__hasher.hash_full_tree(new_leaves)
+            self.__tree_size = len(new_leaves)
+            return
+        raise NotImplementedError()
+
+    def extended(self, new_leaves):
+        """Returns a new tree equal to this tree extended with new_leaves."""
+        new_tree = self.__copy__()
+        new_tree.extend(new_leaves)
+        return new_tree
 
 
 class MerkleVerifier(object):

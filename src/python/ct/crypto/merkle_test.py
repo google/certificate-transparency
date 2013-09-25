@@ -21,6 +21,29 @@ class TreeHasherTest(unittest.TestCase):
          "202122232425262728292a2b2c2d2e2f303132333435363738393a3b3c3d3e3f",
          "1a378704c17da31e2d05b6d121c2bb2c7d76f6ee6fa8f983e596c2d034963c57")]
 
+    # array of bytestrings of the following literals in hex
+    test_vector_leaves = ["".join(chr(int(n, 16)) for n in s.split()) for s in [
+        "",
+        "00",
+        "10",
+        "20 21",
+        "30 31",
+        "40 41 42 43",
+        "50 51 52 53 54 55 56 57",
+        "60 61 62 63 64 65 66 67 68 69 6a 6b 6c 6d 6e 6f",
+    ]]
+
+    test_vector_hashes = [
+        "6e340b9cffb37a989ca544e6bb780a2c78901d3fb33738768511a30617afa01d",
+        "fac54203e7cc696cf0dfcb42c92a1d9dbaf70ad9e621f4bd8d98662f00e3c125",
+        "aeb6bcfe274b70a14fb067a5e5578264db0fa9b51af5e0ba159158f329e06e77",
+        "d37ee418976dd95753c1c73862b9398fa2a2cf9b4ff0fdfe8b30cd95209614b7",
+        "4e3bbb1f7b478dcfe71fb631631519a3bca12c9aefca1612bfce4c13a86264d4",
+        "76e67dadbcdf1e10e1b74ddc608abd2f98dfb16fbce75277b5232a127f2087ef",
+        "ddb89be403809e325750d3d263cd78929c2942b7942a34b77e122c9594a74c8c",
+        "5dc9da79a70659a9ad559cb701ded9a2ab9d823aad2f4960cfe370eff4604328",
+    ]
+
     def test_empty_hash(self):
         hasher = merkle.TreeHasher()
         self.assertEqual(hasher.hash_empty().encode("hex"),
@@ -37,6 +60,33 @@ class TreeHasherTest(unittest.TestCase):
         for left, right, val in  TreeHasherTest.sha256_nodes:
             self.assertEqual(hasher.hash_children(
                 left.decode("hex"), right.decode("hex")).encode("hex"), val)
+
+    def test_hash_full_invalid_index(self):
+        hasher = merkle.TreeHasher()
+        self.assertRaises(IndexError, hasher._hash_full, "abcd", -5, -1)
+        self.assertRaises(IndexError, hasher._hash_full, "abcd", -1, 1)
+        self.assertRaises(IndexError, hasher._hash_full, "abcd", 1, 5)
+        self.assertRaises(IndexError, hasher._hash_full, "abcd", 2, 1)
+
+    def test_hash_full_empty(self):
+        hasher = merkle.TreeHasher()
+        for i in xrange(0, 5):
+            self.assertEquals(hasher._hash_full("abcd", i, i).encode("hex"),
+                              TreeHasherTest.sha256_empty_hash)
+
+    def test_hash_full_tree(self):
+        hasher = merkle.TreeHasher()
+        l = iter(hasher.hash_leaf(c) for c in "abcde").next
+        h = hasher.hash_children
+        root_hash = h(h(h(l(), l()), h(l(), l())), l())
+        self.assertEquals(hasher.hash_full_tree("abcde"), root_hash)
+
+    def test_hash_full_tree_test_vector(self):
+        hasher = merkle.TreeHasher()
+        for i in xrange(len(TreeHasherTest.test_vector_leaves)):
+            test_vector = TreeHasherTest.test_vector_leaves[:i+1]
+            expected_hash = TreeHasherTest.test_vector_hashes[i].decode("hex")
+            self.assertEquals(hasher.hash_full_tree(test_vector), expected_hash)
 
 
 class HexTreeHasher(object):
