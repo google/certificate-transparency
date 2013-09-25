@@ -37,7 +37,7 @@ int SSLClient::ExtensionCallback(SSL *s, unsigned short ext_type,
   ext_buf[3] = inlen & 0xFF;
   memcpy(ext_buf+4, in, inlen);
 
-  BIO_snprintf(pem_name, sizeof(pem_name), "SERVER_INFO %d", ext_type);
+  BIO_snprintf(pem_name, sizeof(pem_name), "SERVERINFO FOR EXTENSION %d", ext_type);
 
   // Work around broken PEM_write() declaration in older OpenSSL versions.
 #if OPENSSL_VERSION_NUMBER < 0x10002000L

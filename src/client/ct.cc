@@ -380,6 +380,8 @@ static void WriteProofToConfig() {
   conf_out.close();
 }
 
+static const char kPEMLabel[] = "SERVERINFO FOR SIGNED CERTIFICATE TIMESTAMP";
+
 // Wrap the proof in the format expected by the TLS extension,
 // so that we can feed it to OpenSSL.
 static void ProofToExtensionData() {
@@ -434,7 +436,7 @@ static void ProofToExtensionData() {
   // Work around broken PEM_write() declaration in older OpenSSL versions.
 #if OPENSSL_VERSION_NUMBER < 0x10002000L
   PEM_write(out,
-            const_cast<char *>("SIGNED CERTIFICATE TIMESTAMP"),
+            const_cast<char *>(kPEMLabel),
             const_cast<char *>(""),
             const_cast<unsigned char *>(
                 reinterpret_cast<const unsigned char *>(
@@ -442,7 +444,7 @@ static void ProofToExtensionData() {
             extension_data_out.str().length());
 #else
   PEM_write(out,
-            "SIGNED CERTIFICATE TIMESTAMP",
+            kPEMLabel,
             "",
       reinterpret_cast<const unsigned char *>(extension_data_out.str().data()),
             extension_data_out.str().length());
