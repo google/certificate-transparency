@@ -96,6 +96,18 @@ ID_CE_INHIBIT_ANY_POLICY = ObjectIdentifier("2.5.29.54")
 ID_PE_AUTHORITY_INFO_ACCESS = ObjectIdentifier("1.3.6.1.5.5.7.1.1")
 ID_PE_SUBJECT_INFO_ACCESS = ObjectIdentifier("1.3.6.1.5.5.7.1.11")
 
+# RFC 3280 - Used in ExtendedKeyUsage extension
+ID_KP_SERVER_AUTH = ObjectIdentifier("1.3.6.1.5.5.7.3.1")
+ID_KP_CLIENT_AUTH = ObjectIdentifier("1.3.6.1.5.5.7.3.2")
+ID_KP_CODE_SIGNING = ObjectIdentifier("1.3.6.1.5.5.7.3.3")
+ID_KP_EMAIL_PROTECTION = ObjectIdentifier("1.3.6.1.5.5.7.3.4")
+ID_KP_TIME_STAMPING = ObjectIdentifier("1.3.6.1.5.5.7.3.8")
+ID_KP_OCSP_SIGNING = ObjectIdentifier("1.3.6.1.5.5.7.3.9")
+
+# RFC 3280 - Used in Authority Info Access extension
+ID_OSCP = ObjectIdentifier("1.3.6.1.5.5.7.48.1")
+ID_AD_CA_ISSUERS = ObjectIdentifier("1.3.6.1.5.5.7.48.2")
+
 _OID_NAME_DICT = {
     # Object identifier long names taken verbatim from the RFCs.
     # Short names are colloquial.
@@ -157,7 +169,18 @@ _OID_NAME_DICT = {
     ID_PE_AUTHORITY_INFO_ACCESS: ("id-pe-authorityInfoAccess",
                                   "authorityInformationAccess"),
     ID_PE_SUBJECT_INFO_ACCESS: ("id-pe-subjectInfoAccess",
-                                  "subjectInformationAccess")
+                                  "subjectInformationAccess"),
+
+    ID_KP_SERVER_AUTH: ("id-kp-serverAuth", "serverAuth"),
+    ID_KP_CLIENT_AUTH: ("id-kp-clientAuth", "clientAuth"),
+    ID_KP_CODE_SIGNING: ("id-kp-codeSigning", "codeSigning"),
+    ID_KP_EMAIL_PROTECTION: ("id-kp-emailProtection", "emailProtection"),
+    ID_KP_TIME_STAMPING: ("id-kp-timeStamping", "timeStamping"),
+    ID_KP_OCSP_SIGNING: ("id-kp-OCSPSigning", "OCSPSigning"),
+
+    ID_OSCP: ("id-oscp", "OSCP"),
+    ID_AD_CA_ISSUERS: ("id-ad-caIssuers", "caIssuers")
+
     }
 
 class ValueTypeIdentifier(ObjectIdentifier):
