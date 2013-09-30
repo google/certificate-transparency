@@ -150,8 +150,12 @@ class CertificateTest(unittest.TestCase):
     def test_alternative_names(self):
         certs = [c for c in cert.certs_from_pem_file(self.chain_file)]
         first_name = certs[0].subject_alternative_names()[0]
-        self.assertEquals("dNSName", first_name.type())
-        self.assertEquals("www.google.com", first_name.value())
+        self.assertEqual("dNSName", first_name.type())
+        self.assertEqual("www.google.com", first_name.value())
+
+    def test_no_alternative_names(self):
+        c = cert.Certificate.from_pem_file(self.v1_file)
+        self.assertEqual(0, len(c.subject_alternative_names()))
 
 if __name__ == "__main__":
     sys.argv = FLAGS(sys.argv)

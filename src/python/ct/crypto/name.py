@@ -81,8 +81,7 @@ def parse_alternative_names(asn1_alternative_names_extension):
     Args:
         asn1_alternative_names_extension: The ASN1 component for the extension.
     Returns:
-        A lit of GeneralName instances.
+        A list of GeneralName instances.
     """
 
     return [GeneralName(n) for n in asn1_alternative_names_extension]
-

@@ -273,6 +273,8 @@ class Certificate(object):
         # CertificateErrors fall through.
         general_names = self.__get_decoded_extension_value(
             x509_extension.ID_CE_SUBJECT_ALT_NAME)
+        if general_names is None:
+            return []
         return name.parse_alternative_names(general_names)
 
     def basic_constraint_path_length(self):
