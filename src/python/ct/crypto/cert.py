@@ -243,6 +243,21 @@ class Certificate(object):
         return (self.__asn1_cert.getComponentByName("tbsCertificate").
                 getComponentByName("issuer").human_readable(wrap=0))
 
+    def serial_number(self):
+        """Get the serial number.
+
+        While the serial number is an integer, it could be very large.
+        RFC 5280 specification states is should not be longer than 20 octets,
+        and also states users SHOULD be prepared to gracefully
+        handle non-conforming certificates.
+
+        Returns:
+           integer
+
+        """
+        return int(self.__asn1_cert.getComponentByName("tbsCertificate").
+                   getComponentByName("serialNumber"))
+
     def basic_constraint_ca(self):
         """Get the BasicConstraints CA value.
 

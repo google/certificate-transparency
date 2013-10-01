@@ -142,6 +142,10 @@ class CertificateTest(unittest.TestCase):
         c = cert.Certificate.from_pem_file(self.pem_file)
         self.assertEqual(2, c.version())
 
+    def test_serial_number(self):
+        c = cert.Certificate.from_pem_file(self.pem_file)
+        self.assertEqual(454887626504608315115709, c.serial_number())
+
     def test_v1_cert(self):
         c = cert.Certificate.from_pem_file(self.v1_file)
         self.assertEqual(0, c.version())
