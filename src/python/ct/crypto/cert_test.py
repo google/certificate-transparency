@@ -102,11 +102,10 @@ class CertificateTest(unittest.TestCase):
         As of 2013-10-01, about 0.5% of all SSL sites use an old
         sample certificate from MatrixSSL.org. It appears it's used
         mostly for various home routers.  Unfortunately it uses a
-        slightly different DER encoding for boolean value: the spec
-        says 0xFF for true, but this cert uses 0x01.  This causes
+        non-DER encoding for boolean value: the DER encoding of True
+        is 0xFF but this cert uses a BER encoding of 0x01. This causes
         pure DER parsers to break.  This test makes sure we can parse
         this cert without exceptions or errors.
-
         """
         c = cert.Certificate.from_pem_file(self.matrixssl_file)
         issuer = c.issuer_name()
