@@ -11,7 +11,11 @@ from ct.crypto.asn1 import x509
 from ct.crypto.asn1 import x509_extension
 from ct.crypto.asn1 import x509_name
 
-from pyasn1.codec.der import decoder as der_decoder
+# Temporary hack... we are using the -BER- decoder rather than the
+# -DER- decoder since it has looser rules for decoding ASN boolean
+# types needed for MatrixSSL sample certificates.
+#
+from pyasn1.codec.ber import decoder as ber_decoder
 from pyasn1.codec.der import encoder as der_encoder
 from pyasn1 import error as pyasn1_error
 
@@ -145,7 +149,7 @@ class Certificate(object):
     @classmethod
     def __decode_der(cls, der_string):
         try:
-            asn1cert, rest = der_decoder.decode(
+            asn1cert, rest = ber_decoder.decode(
                 der_string, asn1Spec=cls._ASN1_SPEC)
         except pyasn1_error.PyAsn1Error as e:
             raise error.ASN1Error("Invalid DER encoding: %s" % e)
@@ -154,9 +158,9 @@ class Certificate(object):
 
         # Decode subject and issuer names in-place.
         asn1cert.getComponentByName("tbsCertificate").getComponentByName(
-            "subject").set_decoded_values(der_decoder.decode)
+            "subject").set_decoded_values(ber_decoder.decode)
         asn1cert.getComponentByName("tbsCertificate").getComponentByName(
-            "issuer").set_decoded_values(der_decoder.decode)
+            "issuer").set_decoded_values(ber_decoder.decode)
         return asn1cert
 
     @classmethod

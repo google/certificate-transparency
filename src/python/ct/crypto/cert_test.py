@@ -22,6 +22,11 @@ class CertificateTest(unittest.TestCase):
     # An X509v1 certificate
     _V1_PEM_FILE = "v1_cert.pem"
 
+    # A old but common (0.5% of all certs as of 2013-10-01) SSL
+    # cert that uses a different or older DER format for Boolean
+    # values.
+    _PEM_MATRIXSSL = "matrixssl_sample.pem"
+
     @property
     def pem_file(self):
         return FLAGS.testdata_dir + "/" + self._PEM_FILE
@@ -37,6 +42,10 @@ class CertificateTest(unittest.TestCase):
     @property
     def v1_file(self):
         return FLAGS.testdata_dir + "/" + self._V1_PEM_FILE
+
+    @property
+    def matrixssl_file(self):
+        return FLAGS.testdata_dir + "/" + self._PEM_MATRIXSSL
 
     def test_from_pem_file(self):
         c = cert.Certificate.from_pem_file(self.pem_file)
@@ -86,6 +95,22 @@ class CertificateTest(unittest.TestCase):
             der_string = f.read()
         c = cert.Certificate(der_string)
         self.assertEqual(der_string, c.to_der())
+
+    def test_parse_matrixssl(self):
+        """Test parsing of old MatrixSSL.org sample certificate
+
+        As of 2013-10-01, about 0.5% of all SSL sites use an old
+        sample certificate from MatrixSSL.org. It appears it's used
+        mostly for various home routers.  Unfortunately it uses a
+        slightly different DER encoding for boolean value: the spec
+        says 0xFF for true, but this cert uses 0x01.  This causes
+        pure DER parsers to break.  This test makes sure we can parse
+        this cert without exceptions or errors.
+
+        """
+        c = cert.Certificate.from_pem_file(self.matrixssl_file)
+        issuer = c.issuer_name()
+        self.assertTrue("MatrixSSL Sample Server" in issuer)
 
     def test_subject_name(self):
         c = cert.Certificate.from_der_file(self.der_file)
