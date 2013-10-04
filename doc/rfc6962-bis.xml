@@ -1,9 +1,5 @@
 <?xml version="1.0" encoding="US-ASCII"?>
 
-<!DOCTYPE rfc SYSTEM "rfc2629.dtd" []>
-
-<!--  xml2rfc1 -->
-
 <?rfc symrefs="yes"?>
 <?rfc toc="yes"?>
 <?rfc rfcedstyle="yes"?>
@@ -132,7 +128,7 @@ is thus defined as follows:
           <vspace blankLines='1' />
           MTH({d(0)}) = SHA-256(0x00 || d(0)).
           <vspace blankLines='1' />
-          For n &gt; 1, let k be the largest power of two smaller than n (i.e., k &lt; n &le; 2k). The Merkle Tree Hash of an n-element list D[n] is then defined recursively as
+          For n &gt; 1, let k be the largest power of two smaller than n (i.e., k &lt; n &lt;= 2k). The Merkle Tree Hash of an n-element list D[n] is then defined recursively as
           <vspace blankLines='1' />
           MTH(D[n]) = SHA-256(0x01 || MTH(D[0:k]) || MTH(D[k:n])),
           <vspace blankLines='1' />
@@ -168,7 +164,7 @@ root, then the audit path is proof that the leaf exists in the tree.
           <vspace blankLines='1' />
           PATH(m, D[n]) = PATH(m, D[0:k]) : MTH(D[k:n]) for m &lt; k; and
           <vspace blankLines='1' />
-          PATH(m, D[n]) = PATH(m - k, D[k:n]) : MTH(D[0:k]) for m &ge; k,
+          PATH(m, D[n]) = PATH(m - k, D[k:n]) : MTH(D[0:k]) for m &gt;= k,
           <vspace blankLines='1' />
           where : is concatenation of lists and D[k1:k2] denotes the length (k2 - k1) list {d(k1), d(k1+1),..., d(k2-1)} as before.
         </t>
@@ -193,7 +189,7 @@ root, then the audit path is proof that the leaf exists in the tree.
           <vspace blankLines='1' />    
           For m &lt; n, let k be the largest power of two smaller than n. The subproof is then defined recursively.
           <vspace blankLines='1' />
-If m &le; k, the right subtree entries D[k:n] only exist in the current tree. We prove that the left subtree entries D[0:k] are consistent and add a commitment to D[k:n]:
+If m &lt;= k, the right subtree entries D[k:n] only exist in the current tree. We prove that the left subtree entries D[0:k] are consistent and add a commitment to D[k:n]:
           <vspace blankLines='1' />
           SUBPROOF(m, D[n], b) = SUBPROOF(m, D[0:k], b) : MTH(D[k:n])
           <vspace blankLines='1' />
@@ -276,14 +272,14 @@ d0 d1   d2 d3           d0 d1   d2 d3  d4 d5
 </figure>
           </t>
           <t>
-            The consistency proof between hash0 and hash is PROOF(3, D[7]) = [c, d, g, l]. &nbsp;c, g are used to verify hash0, and d, l are additionally used to show hash is consistent with hash0.
+            The consistency proof between hash0 and hash is PROOF(3, D[7]) = [c, d, g, l]. c, g are used to verify hash0, and d, l are additionally used to show hash is consistent with hash0.
           </t>
           <t>
             The consistency proof between hash1 and hash is PROOF(4, D[7]) =
 [l]. hash can be verified using hash1=k and l.
           </t>
           <t>
-            The consistency proof between hash2 and hash is PROOF(6, D[7]) = [i, j, k]. &nbsp;k, i are used to verify hash2, and j is additionally used to show hash is consistent with hash2.
+            The consistency proof between hash2 and hash is PROOF(6, D[7]) = [i, j, k]. k, i are used to verify hash2, and j is additionally used to show hash is consistent with hash2.
           </t>
         </section>
         <section title="Signatures">
@@ -672,50 +668,39 @@ messages.
         <t>
           Inputs:
 
-       <list>
-          <list style="hanging">
-            <t hangText="chain:">
-              An array of base64-encoded certificates. The first element is the
-end-entity certificate; the second chains to the first and so on to the last,
-which is either the root certificate or a certificate that chains to a known
-root certificate.
-            </t>
-          </list></list>
+	  <list>
+	    <t><list style="hanging">
+	      <t hangText="chain:">
+		An array of base64-encoded certificates. The first element is the end-entity certificate; the second chains to the first and so on to the last, which is either the root certificate or a certificate that chains to a known root certificate.
+	      </t>
+	    </list></t>
+	  </list>
         </t>
 
         <t>
           Outputs:
 
-        <t><list>
-          <list style="hanging">
-            <t hangText="sct_version:">
-              The version of the SignedCertificateTimestamp structure, in decimal. A compliant v1 implementation MUST NOT expect this to be 0 (i.e., v1).
-            </t>
-            <t hangText="id:">
-              The log ID, base64 encoded. Since log clients who request an SCT for inclusion in TLS handshakes are not required to verify it, we do not assume they know the ID of the log.
-            </t>
-            <t hangText="timestamp:">
-              The SCT timestamp, in decimal.
-            </t>
-            <t hangText="extensions:">
-              An opaque type for future expansion. It is likely that not all
-participants will need to understand data in this field. Logs should set this
-to the empty string. Clients should decode the base64-encoded data and include
-it in the SCT.
-            </t>
-            <t hangText="signature:">
-              The SCT signature, base64 encoded.
-            </t>
-          </list>
-      </list></t>
+          <list>
+	    <t><list style="hanging">
+	      <t hangText="sct_version:">
+		The version of the SignedCertificateTimestamp structure, in decimal. A compliant v1 implementation MUST NOT expect this to be 0 (i.e., v1).
+	      </t>
+	      <t hangText="id:">
+		The log ID, base64 encoded. Since log clients who request an SCT for inclusion in TLS handshakes are not required to verify it, we do not assume they know the ID of the log.
+	      </t>
+	      <t hangText="timestamp:">
+		The SCT timestamp, in decimal.
+	      </t>
+	      <t hangText="extensions:">
+		An opaque type for future expansion. It is likely that not all participants will need to understand data in this field. Logs should set this to the empty string. Clients should decode the base64-encoded data and include it in the SCT.
+	      </t>
+	      <t hangText="signature:">
+		The SCT signature, base64 encoded.
+	      </t>
+            </list></t>
+	  </list>
 
-
-
-          If the <spanx style="verb">sct_version</spanx> is not v1, then a v1
-client may be unable to verify the signature. It MUST NOT construe this as an
-error. (Note: Log clients don't need to be able to verify this structure; only
-TLS clients do. If we were to serve the structure as a binary blob, then we could
-completely change it without requiring an upgrade to v1 clients.)
+          If the <spanx style="verb">sct_version</spanx> is not v1, then a v1 client may be unable to verify the signature. It MUST NOT construe this as an error. (Note: Log clients don't need to be able to verify this structure; only TLS clients do. If we were to serve the structure as a binary blob, then we could completely change it without requiring an upgrade to v1 clients.)
 
         </t>
       </section>
@@ -726,16 +711,13 @@ completely change it without requiring an upgrade to v1 clients.)
         <t>
           Inputs:
 
-        <t><list>
-          <list style="hanging">
-            <t hangText="chain:">
-              An array of base64-encoded Precertificates. The first element is
-the end-entity certificate; the second chains to the first and so on to the
-last, which is either the root certificate or a certificate that chains to a
-known root certificate.
-            </t>
+          <list>
+	    <t><list style="hanging">
+              <t hangText="chain:">
+		An array of base64-encoded Precertificates. The first element is the end-entity certificate; the second chains to the first and so on to the last, which is either the root certificate or a certificate that chains to a known root certificate.
+              </t>
+            </list></t>
           </list>
-         </list></t>
         </t>
         <t>
           Outputs are the same as in <xref target="sct"/>.
@@ -752,23 +734,22 @@ known root certificate.
         <t>
           Outputs:
 
-        <t><list>
-          <list style="hanging">
-            <t hangText="tree_size:">
-              The size of the tree, in entries, in decimal.
-            </t>
-            <t hangText="timestamp:">
-              The timestamp, in decimal.
-            </t>
-            <t hangText="sha256_root_hash:">
-              The Merkle Tree Hash of the tree, in base64.
-            </t>
-            <t hangText="tree_head_signature:">
-              A TreeHeadSignature for the above data.
-            </t>
+          <list>
+	    <t><list style="hanging">
+	      <t hangText="tree_size:">
+		The size of the tree, in entries, in decimal.
+	      </t>
+	      <t hangText="timestamp:">
+		The timestamp, in decimal.
+	      </t>
+	      <t hangText="sha256_root_hash:">
+		The Merkle Tree Hash of the tree, in base64.
+	      </t>
+	      <t hangText="tree_head_signature:">
+		A TreeHeadSignature for the above data.
+	      </t>
+            </list></t>
           </list>
-        </list></t>
-
         </t>
       </section>
 
@@ -779,29 +760,29 @@ known root certificate.
         <t>
           Inputs:
 
-        <t><list>
-          <list style="hanging">
-            <t hangText="first:">
-              The tree_size of the first tree, in decimal.
-            </t>
-            <t hangText="second:">
-              The tree_size of the second tree, in decimal.
-            </t>
+          <list>
+	    <t><list style="hanging">
+	      <t hangText="first:">
+		The tree_size of the first tree, in decimal.
+	      </t>
+	      <t hangText="second:">
+		The tree_size of the second tree, in decimal.
+	      </t>
+            </list></t>
           </list>
-        </list></t>
 
           Both tree sizes must be from existing v1 STHs (Signed Tree Heads).
         </t>
         <t>
           Outputs:
 
-        <t><list>
-          <list style="hanging">
+        <list>
+	  <t><list style="hanging">
             <t hangText="consistency:">
-            An array of Merkle Tree nodes, base64 encoded.
+	      An array of Merkle Tree nodes, base64 encoded.
             </t>
-          </list>
-        </list></t>
+          </list></t>
+        </list>
 
           Note that no signature is required on this data, as it is used to verify an STH, which is signed.
         </t>
@@ -814,16 +795,16 @@ known root certificate.
         <t>
           Inputs:
 
-        <t><list>
-          <list style="hanging">
-            <t hangText="hash:">
-              A base64-encoded v1 leaf hash.
-            </t>
-            <t hangText="tree_size:">
-              The tree_size of the tree on which to base the proof, in decimal.
-            </t>
-          </list>
-      </list></t>
+          <list>
+	    <t><list style="hanging">
+	      <t hangText="hash:">
+		A base64-encoded v1 leaf hash.
+	      </t>
+	      <t hangText="tree_size:">
+		The tree_size of the tree on which to base the proof, in decimal.
+	      </t>
+            </list></t>
+	  </list>
 
           The <spanx style="verb">hash</spanx> must be calculated as defined in <xref target="tree"/>. The <spanx style="verb">tree_size</spanx> must designate an existing v1 STH.
         </t>
@@ -831,16 +812,16 @@ known root certificate.
         <t>
           Outputs:
 
-        <t><list>
-          <list style="hanging">
-            <t hangText="leaf_index:">
-              The 0-based index of the end entity corresponding to the <spanx style="verb">hash</spanx> parameter.
-            </t>
-            <t hangText="audit_path:">
-              An array of base64-encoded Merkle Tree nodes proving the inclusion of the chosen certificate.
-            </t>
+          <list>
+	    <t><list style="hanging">
+	      <t hangText="leaf_index:">
+		The 0-based index of the end entity corresponding to the <spanx style="verb">hash</spanx> parameter.
+	      </t>
+	      <t hangText="audit_path:">
+		An array of base64-encoded Merkle Tree nodes proving the inclusion of the chosen certificate.
+	      </t>
+            </list></t>
           </list>
-         </list></t>
         </t>
       </section>
 
@@ -851,39 +832,36 @@ known root certificate.
         <t>
           Inputs:
 
-        <t><list>
-          <list style="hanging">
-            <t hangText="start:">
-              0-based index of first entry to retrieve, in decimal.
-            </t>
-            <t hangText="end:">
-              0-based index of last entry to retrieve, in decimal.
-            </t>
+          <list>
+            <t><list style="hanging">
+              <t hangText="start:">
+		0-based index of first entry to retrieve, in decimal.
+              </t>
+              <t hangText="end:">
+		0-based index of last entry to retrieve, in decimal.
+              </t>
+            </list></t>
           </list>
-         </list></t>
         </t>
 
         <t>
           Outputs:
 
-        <t><list>
-          <list style="hanging">
-            <t hangText="entries:">
-              An array of objects, each consisting of
-              <list style="hanging">
-                <t hangText="leaf_input:">
-                  The base64-encoded MerkleTreeLeaf structure.
-                </t>
-                <t hangText="extra_data:">
-                  The base64-encoded unsigned data pertaining to the log
-entry. In the case of an X509ChainEntry, this is the <spanx
-style="verb">certificate_chain</spanx>. In the case of a PrecertChainEntry,
-this is the whole <spanx style="verb">PrecertChainEntry</spanx>.
-                </t>
-              </list>
-            </t>
-          </list>
-        </list></t>
+          <list>
+            <t><list style="hanging">
+              <t hangText="entries:">
+		An array of objects, each consisting of
+		<list style="hanging">
+                  <t hangText="leaf_input:">
+                    The base64-encoded MerkleTreeLeaf structure.
+                  </t>
+                  <t hangText="extra_data:">
+                    The base64-encoded unsigned data pertaining to the log entry. In the case of an X509ChainEntry, this is the <spanx style="verb">certificate_chain</spanx>. In the case of a PrecertChainEntry, this is the whole <spanx style="verb">PrecertChainEntry</spanx>.
+                  </t>
+		</list>
+	      </t>
+            </list></t>
+        </list>
         </t>
 
         <t>
@@ -896,10 +874,10 @@ entries it does recognize as well as verify the integrity of the data by
 treating unrecognized leaves as opaque input to the tree.
         </t>
         <t>
-          The <spanx style="verb">start</spanx> and <spanx style="verb">end</spanx> parameters SHOULD be within the range 0 &le; x &lt; <spanx style="verb">tree_size</spanx> as returned by <spanx style="verb">get-sth</spanx> in <xref target="fetch_sth"/>.
+          The <spanx style="verb">start</spanx> and <spanx style="verb">end</spanx> parameters SHOULD be within the range 0 &lt;= x &lt; <spanx style="verb">tree_size</spanx> as returned by <spanx style="verb">get-sth</spanx> in <xref target="fetch_sth"/>.
         </t>
         <t>
-          Logs MAY honor requests where 0 &le; <spanx style="verb">start</spanx> &lt; <spanx style="verb">tree_size</spanx> and <spanx style="verb">end</spanx> &ge; <spanx style="verb">tree_size</spanx> by returning a partial response covering only the valid entries in the specified range. Note that the following restriction may also apply:
+          Logs MAY honor requests where 0 &lt;= <spanx style="verb">start</spanx> &lt; <spanx style="verb">tree_size</spanx> and <spanx style="verb">end</spanx> &gt;= <spanx style="verb">tree_size</spanx> by returning a partial response covering only the valid entries in the specified range. Note that the following restriction may also apply:
         </t>
         <t>
           Logs MAY restrict the number of entries that can be retrieved per
@@ -919,13 +897,13 @@ entry specified by <spanx style="verb">start</spanx>.
         <t>
           Outputs:
 
-        <t><list>
-          <list style="hanging">
-            <t hangText="certificates:">
-              An array of base64-encoded root certificates that are acceptable to the log.
-            </t>
+          <list>
+            <t><list style="hanging">
+              <t hangText="certificates:">
+		An array of base64-encoded root certificates that are acceptable to the log.
+              </t>
+            </list></t>
           </list>
-        </list></t>
         </t>
       </section>
 
@@ -936,35 +914,35 @@ entry specified by <spanx style="verb">start</spanx>.
         <t>
           Inputs:
 
-        <t><list>
-          <list style="hanging">
-            <t hangText="leaf_index:">
-              The index of the desired entry.
-            </t>
-            <t hangText="tree_size:">
-              The tree_size of the tree for which the proof is desired.
-            </t>
+          <list>
+            <t><list style="hanging">
+              <t hangText="leaf_index:">
+		The index of the desired entry.
+              </t>
+              <t hangText="tree_size:">
+		The tree_size of the tree for which the proof is desired.
+              </t>
+            </list></t>
           </list>
-        </list></t>
 
           The tree size must designate an existing STH.
         </t>
         <t>
           Outputs:
 
-        <t><list>
-          <list style="hanging">
-            <t hangText="leaf_input:">
-              The base64-encoded MerkleTreeLeaf structure.
-            </t>
-            <t hangText="extra_data:">
-              The base64-encoded unsigned data, same as in <xref target='fetch_entries'/>.
-            </t>
-            <t hangText="audit_path:">
-              An array of base64-encoded Merkle Tree nodes proving the inclusion of the chosen certificate.
-            </t>
+          <list>
+            <t><list style="hanging">
+              <t hangText="leaf_input:">
+		The base64-encoded MerkleTreeLeaf structure.
+              </t>
+              <t hangText="extra_data:">
+		The base64-encoded unsigned data, same as in <xref target='fetch_entries'/>.
+              </t>
+              <t hangText="audit_path:">
+		An array of base64-encoded Merkle Tree nodes proving the inclusion of the chosen certificate.
+              </t>
+            </list></t>
           </list>
-        </list></t>
 
           This API is probably only useful for debugging.
         </t>
