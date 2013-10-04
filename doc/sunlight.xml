@@ -80,7 +80,7 @@
 	  <vspace blankLines='1' />
 	  MTH({d(0)}) = SHA-256(0x00 || d(0)).
 	  <vspace blankLines='1' />
-	  For n &gt; 1, let k be the largest power of two smaller than n (i.e., k &lt; n &le; 2k). The Merkle Tree Hash of an n-element list D[n] is then defined recursively as
+	  For n &gt; 1, let k be the largest power of two smaller than n (i.e., k &lt; n &lt;= 2k). The Merkle Tree Hash of an n-element list D[n] is then defined recursively as
 	  <vspace blankLines='1' />
 	  MTH(D[n]) = SHA-256(0x01 || MTH(D[0:k]) || MTH(D[k:n])),
 	  <vspace blankLines='1' />
@@ -104,7 +104,7 @@
 	  <vspace blankLines='1' />
 	  PATH(m, D[n]) = PATH(m, D[0:k]) : MTH(D[k:n]) for m &lt; k; and
 	  <vspace blankLines='1' />
-	  PATH(m, D[n]) = PATH(m - k, D[k:n]) : MTH(D[0:k]) for m &ge; k,
+	  PATH(m, D[n]) = PATH(m - k, D[k:n]) : MTH(D[0:k]) for m &gt;= k,
 	  <vspace blankLines='1' />
 	  where : is concatenation of lists and D[k1:k2] denotes the length (k2 - k1) list {d(k1), d(k1+1),..., d(k2-1)} as before.
 	</t>
@@ -129,7 +129,7 @@
 	  <vspace blankLines='1' />    
 	  For m &lt; n, let k be the largest power of two smaller than n. The subproof is then defined recursively.
 	  <vspace blankLines='1' />
-If m &le; k, the right subtree entries D[k:n] only exist in the current tree. We prove that the left subtree entries D[0:k] are consistent and add a commitment to D[k:n]:
+If m &lt;= k, the right subtree entries D[k:n] only exist in the current tree. We prove that the left subtree entries D[0:k] are consistent and add a commitment to D[k:n]:
 	  <vspace blankLines='1' />
 	  SUBPROOF(m, D[n], b) = SUBPROOF(m, D[0:k], b) : MTH(D[k:n]).
 	  <vspace blankLines='1' />
@@ -697,10 +697,10 @@ d0 d1   d2 d3           d0 d1   d2 d3  d4 d5
 	  Note that this message is not signed - the retrieved data can be verified by constructing the Merkle Tree Hash corresponding to a retrieved STH. All leaves MUST be v1. However, a compliant v1 client MUST NOT construe an unrecognized MerkleLeafType or LogEntryType value as an error. This means it may be unable to parse some entries, but note that each client can inspect the entries it does recognize, as well as verify the integrity of the data by treating unrecognized leaves as opaque input to the tree.
         </t>
 	<t>
-          The <spanx style="verb">start</spanx> and <spanx style="verb">end</spanx> parameters SHOULD be within the range 0 &le; x &lt; <spanx style="verb">tree_size</spanx> as returned by <spanx style="verb">get-sth</spanx> in <xref target="fetch_sth"/>.
+          The <spanx style="verb">start</spanx> and <spanx style="verb">end</spanx> parameters SHOULD be within the range 0 &lt;= x &lt; <spanx style="verb">tree_size</spanx> as returned by <spanx style="verb">get-sth</spanx> in <xref target="fetch_sth"/>.
 	</t>
 	<t>
-          Logs MAY honour requests where 0 &le; <spanx style="verb">start</spanx> &lt; <spanx style="verb">tree_size</spanx>, and <spanx style="verb">end</spanx> &ge; <spanx style="verb">tree_size</spanx> by returning a partial response covering only the valid entries in the specified range. Note that the following restriction may also apply:
+          Logs MAY honour requests where 0 &lt;= <spanx style="verb">start</spanx> &lt; <spanx style="verb">tree_size</spanx>, and <spanx style="verb">end</spanx> &gt;= <spanx style="verb">tree_size</spanx> by returning a partial response covering only the valid entries in the specified range. Note that the following restriction may also apply:
 	</t>
 	<t>
 	  Logs MAY restrict the number of entries which can be retrieved per <spanx style="verb">get-entries</spanx> request.  If a client requests more than the permitted number of entries, the log SHALL return the maximum number of entries permissible. These entries SHALL be sequential beginning with the entry specified by <spanx style="verb">start</spanx>.
