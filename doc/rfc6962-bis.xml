@@ -7,7 +7,7 @@
 <?rfc subcompact="no"?>
 <?rfc sortrefs="yes" ?>
 
-<rfc number="6962" ipr="trust200902" category="exp" submissionType="IETF" consensus="yes">
+<rfc ipr="trust200902" category="exp" submissionType="IETF" docName="draft-laurie-rfc6962-bis-00">
 
   <front>
     <title>Certificate Transparency</title>
@@ -35,7 +35,7 @@
         <email>ekasper@google.com</email>
       </address>
     </author>
-    <date month="June" year='2013'></date>
+    <date />
 
 
 
