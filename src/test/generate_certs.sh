@@ -21,7 +21,7 @@ ca_setup() {
   else
     database="$cert_dir/$ca-database"
     conf=$ca
-    echo "0000000000000000" > $serial
+    echo "0000000000000001" > $serial
   fi
 
   > $database
