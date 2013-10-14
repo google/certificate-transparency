@@ -1,4 +1,6 @@
 from ct.crypto.asn1 import x509_name
+from pyasn1 import error as pyasn1_error
+
 
 class GeneralName(object):
     """Class to represent a parsed X509 GeneralName"""
