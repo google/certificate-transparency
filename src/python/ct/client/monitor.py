@@ -42,12 +42,9 @@ class Monitor(object):
           if not self.__state.HasField("verified_sth"):
             logging.warning("No verified monitor state, assuming first run.")
 
-        # TODO(infinity0): load compact merkle tree state from the monitor state
-        # we can actually get rid of the verified_batch_sth totally in favour
-        # of a verified_batch_tree, once we figure out a representation.
-        old_sth = self._get_verified_batch_sth()
-        self.__verified_tree = merkle.CompactMerkleTree(hasher,
-            old_sth.tree_size, old_sth.sha256_root_hash)
+        # load compact merkle tree state from the monitor state
+        self.__verified_tree = merkle.CompactMerkleTree(hasher)
+        self.__verified_tree.load(self.__state.verified_tree)
 
     def __repr__(self):
         return "%r(%r, %r, %r, %r)" % (self.__class__.__name__, self.__client,
@@ -61,7 +58,8 @@ class Monitor(object):
 
     def __update_state(self, new_state):
         """Update state and write to disk."""
-        # TODO(infinity0): save the compact merkle tree state too
+        # save compact merkle tree state into the monitor state
+        self.__verified_tree.save(new_state.verified_tree)
         self.__state_keeper.write(new_state)
         self.__state = new_state
         logging.info("New state is %s" % new_state)
@@ -76,16 +74,8 @@ class Monitor(object):
         """
         return self.__state.verified_sth.timestamp
 
-    def _get_verified_batch_sth(self):
-        """Get the verified STH or partial STH of the previous batch."""
-        old_state = self.__state
-        if old_state.verified_partial_sth.tree_size:
-            return old_state.verified_partial_sth
-        else:
-            return old_state.verified_sth
-
-    def _set_pending_batch_sth(self, new_sth):
-        """Set the pending STH if new tree is bigger, else the verified STH."""
+    def _set_pending_sth(self, new_sth):
+        """Set pending_sth from new_sth, or just verified_sth if not bigger."""
         if new_sth.tree_size < self.__state.verified_sth.tree_size:
             raise ValueError("pending size must be >= verified size")
         if new_sth.timestamp <= self.__state.verified_sth.timestamp:
@@ -98,21 +88,20 @@ class Monitor(object):
             new_state.verified_sth.CopyFrom(new_sth)
         self.__update_state(new_state)
 
-    def _set_verified_batch_sth(self, batch_pending_sth):
-        """Set the verified STH or partial STH to the current batch."""
+    def _set_verified_tree(self, new_tree):
+        """Set verified_tree and maybe move pending_sth to verified_sth."""
+        self.__verified_tree = new_tree
         old_state = self.__state
         new_state = client_pb2.MonitorState()
         new_state.CopyFrom(self.__state)
-        if old_state.pending_sth.tree_size == batch_pending_sth.tree_size:
+        assert old_state.pending_sth.tree_size >= new_tree.tree_size
+        if old_state.pending_sth.tree_size == new_tree.tree_size:
             # all pending entries retrieved
             # already did consistency checks so this should always be true
-            #assert (old_state.pending_sth.sha256_root_hash ==
-            #        batch_pending_sth.sha256_root_hash)
+            assert (old_state.pending_sth.sha256_root_hash ==
+                    self.__verified_tree.root_hash())
             new_state.verified_sth.CopyFrom(old_state.pending_sth)
             new_state.ClearField("pending_sth")
-            new_state.ClearField("verified_partial_sth")
-        else:
-            new_state.verified_partial_sth.CopyFrom(batch_pending_sth)
         self.__update_state(new_state)
 
     def _verify_consistency(self, old_sth, new_sth):
@@ -196,7 +185,7 @@ class Monitor(object):
         # be holding on to it until we have downloaded and verified data under
         # its signature.
         logging.info("STH verified, updating state.")
-        self._set_pending_batch_sth(sth_response)
+        self._set_pending_sth(sth_response)
         return True
 
     def _compute_projected_sth(self, extra_leaves):
@@ -226,8 +215,9 @@ class Monitor(object):
         else:
             # dummy tree whilst hashing is not yet implemented
             new_tree = merkle.CompactMerkleTree(
-                self.__hasher, partial_sth.tree_size, "NotImplemented")
-        partial_sth.sha256_root_hash = new_tree.root_hash
+                self.__hasher, partial_sth.tree_size, ["NotImplemented"] *
+                merkle.count_bits_set(partial_sth.tree_size))
+        partial_sth.sha256_root_hash = new_tree.root_hash()
         return partial_sth, new_tree
 
     @staticmethod
@@ -275,8 +265,7 @@ class Monitor(object):
                 return False
             logging.info("Verified %d entries" % len(entry_batch))
 
-            self.__verified_tree = new_tree
-            self._set_verified_batch_sth(partial_sth)
+            self._set_verified_tree(new_tree)
             # TODO(ekasper): parse temporary data into permanent storage.
 
             next_sequence_number += len(entry_batch)

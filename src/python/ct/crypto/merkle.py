@@ -28,6 +28,16 @@ import logging
 from ct.crypto import error
 
 
+def count_bits_set(i):
+    # from https://wiki.python.org/moin/BitManipulation
+    count = 0
+    while i:
+        i &= i - 1
+        count += 1
+    return count
+
+
+
 class TreeHasher(object):
     """Merkle hasher with domain separation for leaves and nodes."""
 
@@ -35,12 +45,10 @@ class TreeHasher(object):
         self.hashfunc = hashfunc
 
     def __repr__(self):
-        return "%r(hash function: %r)" % (self.__class__.__name__,
-                                          self.hashfunc)
+        return "%s(%r)" % (self.__class__.__name__, self.hashfunc)
 
     def __str__(self):
-        return "%s(hash function: %s)" % (self.__class__.__name__,
-                                          self.hashfunc)
+        return repr(self)
 
     def hash_empty(self):
         hasher = self.hashfunc()
@@ -56,41 +64,98 @@ class TreeHasher(object):
         hasher.update("\x01" + left + right)
         return hasher.digest()
 
-    def _hash_full(self, leaves, l_idx=0, r_idx=None):
+    def _hash_full(self, leaves, l_idx, r_idx):
+        """Hash the leaves between (l_idx, r_idx) as a valid entire tree.
+
+        Note that this is only valid for certain combinations of indexes,
+        depending on where the leaves are meant to be located in a parent tree.
+
+        Returns:
+            (root_hash, hashes): where root_hash is that of the entire tree,
+            and hashes are that of the full (i.e. size 2^k) subtrees that form
+            the entire tree, sorted in descending order of size.
+        """
         width = r_idx - l_idx
         if width < 0 or l_idx < 0 or r_idx > len(leaves):
             raise IndexError("%s,%s not a valid range over [0,%s]" % (
                 l_idx, r_idx, len(leaves)))
         elif width == 0:
-            return self.hash_empty()
+            return self.hash_empty(), ()
         elif width == 1:
-            return self.hash_leaf(leaves[l_idx])
+            leaf_hash = self.hash_leaf(leaves[l_idx])
+            return leaf_hash, (leaf_hash,)
         else:
-            next_smallest_2_pow = 2**((width-1).bit_length() - 1)
-            assert next_smallest_2_pow < width <= 2*next_smallest_2_pow
-            left = self._hash_full(leaves, l_idx, l_idx+next_smallest_2_pow)
-            right = self._hash_full(leaves, l_idx+next_smallest_2_pow, r_idx)
-            return self.hash_children(left, right)
+            # next smallest power of 2
+            split_width = 2**((width-1).bit_length() - 1)
+            assert split_width < width <= 2*split_width
+            l_root, l_hashes = self._hash_full(leaves, l_idx, l_idx+split_width)
+            assert len(l_hashes) == 1 # left tree always full
+            r_root, r_hashes = self._hash_full(leaves, l_idx+split_width, r_idx)
+            root_hash = self.hash_children(l_root, r_root)
+            return (root_hash, (root_hash,) if split_width*2 == width else
+                                l_hashes + r_hashes)
 
     def hash_full_tree(self, leaves):
         """Hash a set of leaves representing a valid full tree."""
-        return self._hash_full(leaves, 0, len(leaves))
+        root_hash, hashes = self._hash_full(leaves, 0, len(leaves))
+        assert len(hashes) == count_bits_set(len(leaves))
+        assert (self._hash_fold(hashes) == root_hash if hashes else
+                root_hash == self.hash_empty())
+        return root_hash
+
+    def _hash_fold(self, hashes):
+        rev_hashes = iter(hashes[::-1])
+        accum = next(rev_hashes)
+        for cur in rev_hashes:
+            accum = self.hash_children(cur, accum)
+        return accum
 
 
 class CompactMerkleTree(object):
-    # TODO: decide what format this data structure should be in
+    """Compact representation of a Merkle Tree that permits only extension.
 
-    def __init__(self, hasher=TreeHasher(), tree_size=0, root_hash=None):
-        # TODO: can't init tree from root_hash, this API will eventually change
-        # currently just a placeholder to make other components work
+    Attributes:
+        tree_size: Number of leaves in this tree.
+        hashes: That of the full (i.e. size 2^k) subtrees that form this tree,
+            sorted in descending order of size.
+    """
+
+    def __init__(self, hasher=TreeHasher(), tree_size=0, hashes=()):
         self.__hasher = hasher
+        self._update(tree_size, hashes)
+
+    def _update(self, tree_size, hashes):
+        bits_set = count_bits_set(tree_size)
+        num_hashes = len(hashes)
+        if num_hashes != bits_set:
+            msgfmt = "number of hashes != bits set in tree_size: %s vs %s"
+            raise ValueError(msgfmt % (num_hashes, bits_set))
         self.__tree_size = tree_size
-        self.__root_hash = root_hash or self.__hasher.hash_empty()
+        self.__hashes = tuple(hashes)
+        self.__root_hash = None
+
+    def load(self, other):
+        """Load this tree from a dumb data object for serialisation.
+
+        The object must have attributes tree_size:int and hashes:list.
+        """
+        self._update(other.tree_size, other.hashes)
+
+    def save(self, other):
+        """Save this tree into a dumb data object for serialisation.
+
+        The object must have attributes tree_size:int and hashes:list.
+        """
+        other.tree_size = self.__tree_size
+        other.hashes[:] = self.__hashes
 
     def __copy__(self):
-        if self.__tree_size == 0:
-            return self.__class__(self.__hasher)
-        raise NotImplementedError()
+        return self.__class__(self.__hasher, self.__tree_size, self.__hashes)
+
+    def __repr__(self):
+        return "%s(%r, %r, %r)" % (
+            self.__class__.__name__,
+            self.__hasher, self.__tree_size, self.__hashes)
 
     def __len__(self):
         return self.__tree_size
@@ -100,14 +165,28 @@ class CompactMerkleTree(object):
         return self.__tree_size
 
     @property
+    def hashes(self):
+        return self.__hashes
+
     def root_hash(self):
+        """Returns the root hash of this tree. (Only re-computed on change.)"""
+        if self.__root_hash is None:
+            self.__root_hash = (
+                self.__hasher._hash_fold(self.__hashes)
+                if self.__hashes else self.__hasher.hash_empty())
         return self.__root_hash
+
+    def append(self, new_leaf):
+        """Append a new leaf onto the end of this tree."""
+        raise NotImplementedError()
 
     def extend(self, new_leaves):
         """Extend this tree with new_leaves on the end."""
         if self.tree_size == 0:
-            self.__root_hash = self.__hasher.hash_full_tree(new_leaves)
-            self.__tree_size = len(new_leaves)
+            sz = len(new_leaves)
+            root_hash, hashes = self.__hasher._hash_full(new_leaves, 0, sz)
+            self._update(sz, hashes)
+            assert self.root_hash == root_hash
             return
         raise NotImplementedError()
 

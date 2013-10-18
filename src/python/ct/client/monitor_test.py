@@ -23,6 +23,19 @@ FLAGS = gflags.FLAGS
 gflags.DEFINE_bool("verbose_tests", False, "Print test logs")
 
 
+def dummy_compute_projected_sth(old_sth):
+    sth = client_pb2.SthResponse()
+    sth.timestamp = old_sth.timestamp
+    sth.tree_size = size = old_sth.tree_size
+    tree = merkle.CompactMerkleTree(
+        merkle.TreeHasher(), size, ["a"] * merkle.count_bits_set(size))
+    f = mock.Mock(return_value=(sth, tree))
+    f.dummy_sth = sth
+    f.dummy_tree = tree
+    old_sth.sha256_root_hash = tree.root_hash()
+    return f
+
+
 class FakeLogClient(object):
     def __init__(self, sth, servername="log_server"):
         self.servername = servername
@@ -57,22 +70,14 @@ class MonitorTest(unittest.TestCase):
     _DEFAULT_STH = client_pb2.SthResponse()
     _DEFAULT_STH.timestamp = 2000
     _DEFAULT_STH.tree_size = 10
-    _DEFAULT_STH.sha256_root_hash = "hash"
     _DEFAULT_STH.tree_head_signature = "sig"
-
-    _PARTIAL_DEFAULT_STH = client_pb2.SthResponse()
-    _PARTIAL_DEFAULT_STH.timestamp = _DEFAULT_STH.timestamp
-    _PARTIAL_DEFAULT_STH.tree_size = _DEFAULT_STH.tree_size
+    _DEFAULT_STH_compute_projected = dummy_compute_projected_sth(_DEFAULT_STH)
 
     _NEW_STH = client_pb2.SthResponse()
     _NEW_STH.timestamp = 3000
     _NEW_STH.tree_size = _DEFAULT_STH.tree_size + 10
-    _NEW_STH.sha256_root_hash = "hash2"
     _NEW_STH.tree_head_signature = "sig2"
-
-    _PARTIAL_NEW_STH = client_pb2.SthResponse()
-    _PARTIAL_NEW_STH.timestamp = _NEW_STH.timestamp
-    _PARTIAL_NEW_STH.tree_size = _NEW_STH.tree_size
+    _NEW_STH_compute_projected = dummy_compute_projected_sth(_NEW_STH)
 
     def setUp(self):
         if not FLAGS.verbose_tests:
@@ -94,7 +99,8 @@ class MonitorTest(unittest.TestCase):
         self.db.add_log(log)
 
     def verify_state(self, expected_state):
-        self.assertEqual(self.state_keeper.state, expected_state)
+        self.assertEqual(self.state_keeper.state, expected_state,
+            msg="%s== vs ==\n%s" % (self.state_keeper.state, expected_state))
 
     def verify_tmp_data(self, start, end):
         # TODO: we are no longer using the temp db
@@ -109,13 +115,13 @@ class MonitorTest(unittest.TestCase):
         client = FakeLogClient(self._NEW_STH)
 
         m = self.create_monitor(client)
-        m._compute_projected_sth = mock.Mock(return_value=(
-            self._PARTIAL_NEW_STH, merkle.CompactMerkleTree()))
+        m._compute_projected_sth = self._NEW_STH_compute_projected
         self.assertTrue(m.update())
 
         # Check that we wrote the state...
         expected_state = client_pb2.MonitorState()
         expected_state.verified_sth.CopyFrom(self._NEW_STH)
+        m._compute_projected_sth.dummy_tree.save(expected_state.verified_tree)
         self.verify_state(expected_state)
 
         self.verify_tmp_data(self._DEFAULT_STH.tree_size,
@@ -126,13 +132,13 @@ class MonitorTest(unittest.TestCase):
 
         self.state_keeper.state = None
         m = self.create_monitor(client)
-        m._compute_projected_sth = mock.Mock(return_value=(
-            self._PARTIAL_DEFAULT_STH, merkle.CompactMerkleTree()))
+        m._compute_projected_sth = self._DEFAULT_STH_compute_projected
         self.assertTrue(m.update())
 
         # Check that we wrote the state...
         expected_state = client_pb2.MonitorState()
         expected_state.verified_sth.CopyFrom(self._DEFAULT_STH)
+        m._compute_projected_sth.dummy_tree.save(expected_state.verified_tree)
         self.verify_state(expected_state)
 
         self.verify_tmp_data(0, self._DEFAULT_STH.tree_size-1)
@@ -190,6 +196,7 @@ class MonitorTest(unittest.TestCase):
         expected_state = client_pb2.MonitorState()
         expected_state.verified_sth.CopyFrom(self._DEFAULT_STH)
         expected_state.pending_sth.CopyFrom(self._NEW_STH)
+        merkle.CompactMerkleTree().save(expected_state.verified_tree)
         self.verify_state(expected_state)
 
     def test_update_sth_fails_for_invalid_sth(self):
@@ -222,10 +229,12 @@ class MonitorTest(unittest.TestCase):
     def test_update_sth_fails_for_inconsistent_sth(self):
         client = FakeLogClient(self._NEW_STH)
         # The STH is in fact OK but fake failure.
-        # TODO(infinity0): change this to verify_sth_consistency when we get
-        # rid of the --verify_sth_consistency flag in monitor.py
-        self.verifier.verify_sth_temporal_consistency.side_effect = (
-            error.ConsistencyError("Boom!"))
+        if not monitor.FLAGS.verify_sth_consistency:
+            self.verifier.verify_sth_temporal_consistency.side_effect = (
+                error.ConsistencyError("Boom!"))
+        else:
+            self.verifier.verify_sth_consistency.side_effect = (
+                error.ConsistencyError("Boom!"))
 
         m = self.create_monitor(client)
         self.assertFalse(m._update_sth())
@@ -270,8 +279,7 @@ class MonitorTest(unittest.TestCase):
         client.get_entries.return_value = iter([entry])
 
         m = self.create_monitor(client)
-        m._compute_projected_sth = mock.Mock(return_value=(
-            self._PARTIAL_NEW_STH, merkle.CompactMerkleTree()))
+        m._compute_projected_sth = self._NEW_STH_compute_projected
         # Get the new STH first.
         self.assertTrue(m._update_sth())
 

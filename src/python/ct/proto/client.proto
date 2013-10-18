@@ -12,6 +12,14 @@ message KeyInfo {
   optional string pem_key = 2;
 }
 
+// A merkle tree storing just enough hashes to be able to append new leaves
+// and obtain the new root_hash, but unable to get arbitrary leaves or hashes
+// within the tree.
+message CompactMerkleTree {
+  optional uint64 tree_size = 1;
+  repeated bytes hashes = 2;
+}
+
 message CtLogMetadata {
   // The <log_server> path prefix. Responses are bound to the server
   // by this value.
@@ -72,7 +80,7 @@ message MonitorState {
   // tree_size should both be strictly greater than the one for verified_sth.
   // If not, then this field should be ignored entirely.
   optional SthResponse pending_sth = 2;
-  // A partial (size/hash-only) STH for the last batch of leaves retrieved that
+  // A compact tree representing the last verified batch of leaves that is
   // is provably-consistent with pending_sth.
-  optional SthResponse verified_partial_sth = 3;
+  optional CompactMerkleTree verified_tree = 3;
 }
