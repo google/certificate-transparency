@@ -28,6 +28,15 @@ class UTCTime(useful.UTCTime, BaseTime):
     # YYMMDDHHMMSSZ
     _ASN1_LENGTH = 13
 
+    # YYMMDDHHMMZ
+    _UTC_NO_SECONDS_LENGTH = 11
+
+    # YYMMDDHHMMSS+HHMM
+    _UTC_TZ_OFFSET_LENGTH = 17
+
+    # YYMMDDHHMMSS
+    _UTC_NO_Z_LENGTH = 12
+
     def gmtime(self):
         """GMT time.
 
@@ -51,9 +60,35 @@ class UTCTime(useful.UTCTime, BaseTime):
         # interpreted as 19YY; and
         #
         # Where YY is less than 50, the year SHALL be interpreted as 20YY.
-        if len(string_time) != self._ASN1_LENGTH or string_time[-1] != "Z":
+        #
+        # In addition, there are a number of older certificates
+        # that exclude the seconds, e.g. 0001010000Z and others than use
+        # an alternative timezone format 360526194526+0000
+        if len(string_time) == self._ASN1_LENGTH and string_time[-1] == "Z":
+            format = "%Y%m%d%H%M%S%Z"
+        elif (len(string_time) == self._UTC_NO_SECONDS_LENGTH and
+              string_time[-1] == "Z"):
+            format = "%Y%m%d%H%M%Z"
+        elif (len(string_time) == self._UTC_TZ_OFFSET_LENGTH and
+              string_time[self._UTC_NO_Z_LENGTH] in ('+','-')):
+            # note according to http://docs.python.org/2/library/time.html
+            # "%z" is not supported on all platforms.
+            #
+            # TBD: in next patch, parse this correctly
+            #
+            # Given that it's very infrequent and non-standard,
+            # we'll ignore time zone for now.
+            #
+            # convert the +HHMM to a timedelta and add to timestruct
+            # One could also special case the "+0000" which should be the same
+            # as GMT (without DST).
+            #
+            format = "%Y%m%d%H%M%S%Z"
+            string_time = string_time[0:self._ASN1_LENGTH]
+        else:
             raise error.ASN1Error("Invalid time representation: %s" %
                                   string_time)
+
         try:
             year = int(string_time[:2])
         except ValueError:
@@ -70,8 +105,7 @@ class UTCTime(useful.UTCTime, BaseTime):
 
         try:
             # Adding GMT clears the daylight saving flag.
-            return time.strptime(century + string_time[:-1] + "GMT",
-                                 "%Y%m%d%H%M%S%Z")
+            return time.strptime(century + string_time[:-1] + "GMT", format)
         except ValueError:
             raise error.ASN1Error("Invalid time representation: %s" %
                                   string_time)

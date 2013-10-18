@@ -27,6 +27,21 @@ class CertificateTest(unittest.TestCase):
     # values.
     _PEM_MATRIXSSL = "matrixssl_sample.pem"
 
+    # Self-signed cert by marchnetworks.com for embedded systems
+    # and uses start date in form of "0001010000Z" (no seconds)
+    _PEM_MARCHNETWORKS = "marchnetworks_com.pem"
+
+    # Self-signed cert by subrigo.net for embedded systems
+    # and uses a start date in the form of 121214093107+0000
+    _PEM_SUBRIGONET = "subrigo_net.pem"
+
+    # Self-signed cert by promise.com (as of 2013-10-16) that
+    # is in use by embedded systems.
+    #
+    # * has a start date in the format of 120703092726-1200
+    # * uses a 512-key RSA key
+    _PEM_PROMISECOM = "promise_com.pem"
+
     @property
     def pem_file(self):
         return FLAGS.testdata_dir + "/" + self._PEM_FILE
@@ -46,6 +61,18 @@ class CertificateTest(unittest.TestCase):
     @property
     def matrixssl_file(self):
         return FLAGS.testdata_dir + "/" + self._PEM_MATRIXSSL
+
+    @property
+    def marchnetworks_file(self):
+        return FLAGS.testdata_dir + "/" + self._PEM_MARCHNETWORKS
+
+    @property
+    def subrigonet_file(self):
+        return FLAGS.testdata_dir + "/" + self._PEM_SUBRIGONET
+
+    @property
+    def promisecom_file(self):
+        return FLAGS.testdata_dir + "/" + self._PEM_PROMISECOM
 
     def test_from_pem_file(self):
         c = cert.Certificate.from_pem_file(self.pem_file)
@@ -110,6 +137,65 @@ class CertificateTest(unittest.TestCase):
         c = cert.Certificate.from_pem_file(self.matrixssl_file)
         issuer = c.issuer_name()
         self.assertTrue("MatrixSSL Sample Server" in issuer)
+
+    def test_parse_marchnetworks(self):
+        """Test parsing certificates issued by marchnetworks.com
+        """
+        c = cert.Certificate.from_pem_file(self.marchnetworks_file)
+        issuer = c.issuer_name()
+        self.assertTrue("March Networks" in issuer)
+
+        # 0001010000Z
+        expected = [2000, 1, 1, 0, 0, 0, 5, 1, 0]
+        self.assertEqual(list(c.not_before()), expected)
+
+        # 3001010000Z
+        expected = [2030, 1, 1, 0, 0, 0, 1, 1, 0]
+        self.assertEqual(list(c.not_after()), expected)
+
+    def test_parse_subrigonet(self):
+        """Test parsing certificates issued by subrigo.net
+
+        The certificates issued by subrigo.net (non-root)
+        use an start date with time zone.
+
+            Not Before: Dec 14 09:31:07 2012
+            Not After : Dec 13 09:31:07 2022 GMT
+
+        """
+        c = cert.Certificate.from_pem_file(self.subrigonet_file)
+        issuer = c.issuer_name()
+        self.assertTrue("subrigo.net" in issuer)
+
+        # timezone format -- 121214093107+0000
+        expected = [2012, 12, 14, 9, 31, 7, 4, 349, 0]
+        self.assertEqual(list(c.not_before()), expected)
+
+        # standard format -- 221213093107Z
+        expected = [2022, 12, 13, 9, 31, 7, 1, 347, 0]
+        self.assertEqual(list(c.not_after()), expected)
+
+    def test_parse_promisecom(self):
+        """Test parsing certificates issued by promise.com
+
+        The certificates issued by promise.com (non-root)
+        use an start date with time zone (and are 512-bit)
+
+            Not Before: Jun 29 15:32:48 2011
+            Not After : Jun 26 15:32:48 2021 GMT
+        """
+
+        c = cert.Certificate.from_pem_file(self.promisecom_file)
+        issuer = c.issuer_name()
+        self.assertTrue("Promise Technology Inc." in issuer)
+
+        # 110629153248-1200
+        expected = [2011,6,29,15,32,48,2,180,0]
+        self.assertEqual(list(c.not_before()), expected)
+
+        # 210626153248Z
+        expected = [2021,6,26,15,32,48,5,177,0]
+        self.assertEqual(list(c.not_after()), expected)
 
     def test_subject_name(self):
         c = cert.Certificate.from_der_file(self.der_file)
