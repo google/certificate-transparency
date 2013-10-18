@@ -14,10 +14,6 @@ FLAGS = gflags.FLAGS
 
 gflags.DEFINE_integer("entry_write_batch_size", 1000, "Maximum number of "
                       "entries to batch into one database write")
-gflags.DEFINE_bool("verify_sth_consistency", False, "Verify consistency of STH "
-                   "hashes. This is a temporary flag to keep things working "
-                   "during development; it will eventually be removed and "
-                   "effectively be always True thereafter.")
 
 class Monitor(object):
     def __init__(self, client, verifier, hasher, db, temp_db, state_keeper):
@@ -106,10 +102,6 @@ class Monitor(object):
 
     def _verify_consistency(self, old_sth, new_sth):
         try:
-            if not FLAGS.verify_sth_consistency:
-                return self.__verifier.verify_sth_temporal_consistency(
-                    old_sth, new_sth)
-
             proof = self.__client.get_sth_consistency(
                 old_sth.tree_size, new_sth.tree_size)
             logging.debug("got proof for (%s, %s): %s",
@@ -210,13 +202,7 @@ class Monitor(object):
         # that looks valid so the temporal verifier doesn't complain
         partial_sth.timestamp = 0
         extra_raw_leaves = [leaf.leaf_input for leaf in extra_leaves]
-        if FLAGS.verify_sth_consistency:
-            new_tree = self.__verified_tree.extended(extra_raw_leaves)
-        else:
-            # dummy tree whilst hashing is not yet implemented
-            new_tree = merkle.CompactMerkleTree(
-                self.__hasher, partial_sth.tree_size, ["NotImplemented"] *
-                merkle.count_bits_set(partial_sth.tree_size))
+        new_tree = self.__verified_tree.extended(extra_raw_leaves)
         partial_sth.sha256_root_hash = new_tree.root_hash()
         return partial_sth, new_tree
 

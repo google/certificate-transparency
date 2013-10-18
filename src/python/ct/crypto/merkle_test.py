@@ -90,7 +90,7 @@ class TreeHasherTest(unittest.TestCase):
             self.assertEqual(hasher.hash_full_tree(test_vector), expected_hash)
 
 
-class HexTreeHasher(object):
+class HexTreeHasher(merkle.TreeHasher):
     def __init__(self, hashfunc=hashlib.sha256):
         self.hasher = merkle.TreeHasher(hashfunc)
 
@@ -103,6 +103,43 @@ class HexTreeHasher(object):
     def hash_children(self, left, right):
         return self.hasher.hash_children(left.decode("hex"),
                                          right.decode("hex")).encode("hex")
+
+
+class CompactMerkleTreeTest(unittest.TestCase):
+
+    def setUp(self):
+        self.tree = merkle.CompactMerkleTree(HexTreeHasher())
+
+    def test_extend_from_empty(self):
+        for i in xrange(len(TreeHasherTest.test_vector_leaves)):
+            test_vector = TreeHasherTest.test_vector_leaves[:i+1]
+            expected_hash = TreeHasherTest.test_vector_hashes[i]
+            self.tree = merkle.CompactMerkleTree()
+            self.tree.extend(test_vector)
+            self.assertEqual(self.tree.root_hash().encode("hex"), expected_hash)
+
+    def test_push_subtree_1(self):
+        for i in xrange(len(TreeHasherTest.test_vector_leaves)):
+            test_vector = TreeHasherTest.test_vector_leaves[:i+1]
+            self.tree = merkle.CompactMerkleTree()
+            self.tree.extend(test_vector)
+            self.tree._push_subtree(["test leaf"])
+            self.assertEqual(len(self.tree), len(test_vector) + 1)
+
+    def test_extend_from_partial(self):
+        z = len(TreeHasherTest.test_vector_leaves)
+        for i in xrange(z):
+            self.tree = merkle.CompactMerkleTree()
+            # add up to i
+            test_vector = TreeHasherTest.test_vector_leaves[:i+1]
+            expected_hash = TreeHasherTest.test_vector_hashes[i]
+            self.tree.extend(test_vector)
+            self.assertEqual(self.tree.root_hash().encode("hex"), expected_hash)
+            # add up to z
+            test_vector = TreeHasherTest.test_vector_leaves[i+1:]
+            expected_hash = TreeHasherTest.test_vector_hashes[z-1]
+            self.tree.extend(test_vector)
+            self.assertEqual(self.tree.root_hash().encode("hex"), expected_hash)
 
 
 class MerkleVerifierTest(unittest.TestCase):

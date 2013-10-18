@@ -36,6 +36,15 @@ def count_bits_set(i):
         count += 1
     return count
 
+def lowest_bit_set(i):
+    # from https://wiki.python.org/moin/BitManipulation
+    # but with 1-based indexing like in ffs(3) POSIX
+    low = i & -i
+    lowBit = 0
+    while low:
+        low >>= 1
+        lowBit += 1
+    return lowBit
 
 
 class TreeHasher(object):
@@ -86,7 +95,7 @@ class TreeHasher(object):
             return leaf_hash, (leaf_hash,)
         else:
             # next smallest power of 2
-            split_width = 2**((width-1).bit_length() - 1)
+            split_width = 2**((width - 1).bit_length() - 1)
             assert split_width < width <= 2*split_width
             l_root, l_hashes = self._hash_full(leaves, l_idx, l_idx+split_width)
             assert len(l_hashes) == 1 # left tree always full
@@ -132,6 +141,8 @@ class CompactMerkleTree(object):
             raise ValueError(msgfmt % (num_hashes, bits_set))
         self.__tree_size = tree_size
         self.__hashes = tuple(hashes)
+        # height of the smallest subtree, or 0 if none exists (empty tree)
+        self.__mintree_height = lowest_bit_set(tree_size)
         self.__root_hash = None
 
     def load(self, other):
@@ -176,19 +187,81 @@ class CompactMerkleTree(object):
                 if self.__hashes else self.__hasher.hash_empty())
         return self.__root_hash
 
+    def _push_subtree(self, leaves):
+        """Extend with a full subtree <= the current minimum subtree.
+
+        The leaves must form a full subtree, i.e. of size 2^k for some k. If
+        there is a minimum subtree (i.e. __mintree_height > 0), then the input
+        subtree must be smaller or of equal size to the minimum subtree.
+
+        If the subtree is smaller (or no such minimum exists, in an empty tree),
+        we can simply append its hash to self.hashes, since this maintains the
+        invariant property of being sorted in descending size order.
+
+        If the subtree is of equal size, we are in a similar situation to an
+        addition carry. We handle it by combining the two subtrees into a larger
+        subtree (of size 2^(k+1)), then recursively trying to add this new
+        subtree back into the tree.
+
+        Any collection of leaves larger than the minimum subtree must undergo
+        additional partition to conform with the structure of a merkle tree,
+        which is a more complex operation, performed by extend().
+        """
+        size = len(leaves)
+        if count_bits_set(size) != 1:
+            raise ValueError("invalid subtree with size != 2^k: %s" % size)
+        # in general we want the highest bit, but here it's also the lowest bit
+        # so just reuse that code instead of writing a new highest_bit_set()
+        subtree_h, mintree_h = lowest_bit_set(size), self.__mintree_height
+        if mintree_h > 0 and subtree_h > mintree_h:
+            raise ValueError("subtree %s > current smallest subtree %s" % (
+                subtree_h, mintree_h))
+        root_hash, hashes = self.__hasher._hash_full(leaves, 0, size)
+        assert hashes == (root_hash,)
+        self.__push_subtree_hash(subtree_h, root_hash)
+
+    def __push_subtree_hash(self, subtree_h, sub_hash):
+        size, mintree_h = 1 << (subtree_h - 1), self.__mintree_height
+        if subtree_h < mintree_h or mintree_h == 0:
+            self._update(self.tree_size + size, self.hashes + (sub_hash,))
+        else:
+            assert subtree_h == mintree_h
+            # addition carry - rewind the tree and re-try with bigger subtree
+            prev_hash = self.hashes[-1]
+            self._update(self.tree_size - size, self.hashes[:-1])
+            new_mintree_h = self.__mintree_height
+            assert mintree_h < new_mintree_h or new_mintree_h == 0
+            next_hash = self.__hasher.hash_children(prev_hash, sub_hash)
+            self.__push_subtree_hash(subtree_h + 1, next_hash)
+
     def append(self, new_leaf):
         """Append a new leaf onto the end of this tree."""
-        raise NotImplementedError()
+        self._push_subtree([new_leaf])
 
     def extend(self, new_leaves):
-        """Extend this tree with new_leaves on the end."""
-        if self.tree_size == 0:
-            sz = len(new_leaves)
-            root_hash, hashes = self.__hasher._hash_full(new_leaves, 0, sz)
-            self._update(sz, hashes)
-            assert self.root_hash == root_hash
-            return
-        raise NotImplementedError()
+        """Extend this tree with new_leaves on the end.
+
+        The algorithm works by using _push_subtree() as a primitive, calling
+        it with the maximum number of allowed leaves until we can add the
+        remaining leaves as a valid entire (non-full) subtree in one go.
+        """
+        size = len(new_leaves)
+        final_size = self.tree_size + size
+        idx = 0
+        while True:
+            # keep pushing subtrees until mintree_size > remaining
+            max_h = self.__mintree_height
+            max_size = 1 << (max_h - 1) if max_h > 0 else 0
+            if max_h > 0 and size - idx >= max_size:
+                self._push_subtree(new_leaves[idx:idx+max_size])
+                idx += max_size
+            else:
+                break
+        # fill in rest of tree in one go, now that we can
+        if idx < size:
+            root_hash, hashes = self.__hasher._hash_full(new_leaves, idx, size)
+            self._update(final_size, self.hashes + hashes)
+        assert self.tree_size == final_size
 
     def extended(self, new_leaves):
         """Returns a new tree equal to this tree extended with new_leaves."""

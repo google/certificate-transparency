@@ -229,12 +229,8 @@ class MonitorTest(unittest.TestCase):
     def test_update_sth_fails_for_inconsistent_sth(self):
         client = FakeLogClient(self._NEW_STH)
         # The STH is in fact OK but fake failure.
-        if not monitor.FLAGS.verify_sth_consistency:
-            self.verifier.verify_sth_temporal_consistency.side_effect = (
-                error.ConsistencyError("Boom!"))
-        else:
-            self.verifier.verify_sth_consistency.side_effect = (
-                error.ConsistencyError("Boom!"))
+        self.verifier.verify_sth_consistency.side_effect = (
+            error.ConsistencyError("Boom!"))
 
         m = self.create_monitor(client)
         self.assertFalse(m._update_sth())
