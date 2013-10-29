@@ -34,6 +34,7 @@
 /src/log/database_test
 /src/log/database_large_test
 /src/log/tree_signer_test
+/src/log/signer_verifier_test
 *.pb.h
 *.pb.cc
 /src/proto/serializer_test
