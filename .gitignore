@@ -1,6 +1,8 @@
 *~
 /doc/draft-laurie-pki-sunlight-*.html
 /doc/draft-laurie-pki-sunlight-*-*-diff.html
+/doc/draft-laurie-rfc6962-bis-*.html
+/doc/draft-laurie-rfc6962-bis-*-*-diff.html
 *.o
 *.so
 *.a
