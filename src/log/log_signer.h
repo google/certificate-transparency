@@ -5,15 +5,15 @@
 #include <openssl/x509.h>  // for i2d_PUBKEY
 #include <stdint.h>
 
+#include "log/signer.h"
+#include "log/verifier.h"
 #include "proto/ct.pb.h"
 #include "proto/serializer.h"
 
-class LogSigner {
+class LogSigner : public ct::Signer {
  public:
   explicit LogSigner(EVP_PKEY *pkey);
-  ~LogSigner();
-
-  std::string KeyID() const { return key_id_; }
+  virtual ~LogSigner();
 
   enum SignResult {
     OK,
@@ -52,25 +52,12 @@ class LogSigner {
 
  private:
   static SignResult GetSerializeError(Serializer::SerializeResult result);
-
-  void Sign(const std::string &data, ct::DigitallySigned *result) const;
-
-  std::string RawSign(const std::string &data) const;
-
-  EVP_PKEY *pkey_;
-  ct::DigitallySigned::HashAlgorithm hash_algo_;
-  ct::DigitallySigned::SignatureAlgorithm sig_algo_;
-  std::string key_id_;
 };
 
-class LogSigVerifier {
+class LogSigVerifier : public ct::Verifier {
  public:
   explicit LogSigVerifier(EVP_PKEY *pkey);
-  ~LogSigVerifier();
-
-  std::string KeyID() const { return key_id_; }
-
-  static std::string ComputeKeyID(EVP_PKEY *pkey);
+  virtual ~LogSigVerifier();
 
   enum VerifyResult {
     OK,
@@ -117,15 +104,5 @@ class LogSigVerifier {
 
   static VerifyResult
   GetDeserializeSignatureError(Deserializer::DeserializeResult result);
-
-  VerifyResult Verify(const std::string &input,
-                      const ct::DigitallySigned &signature) const;
-
-  bool RawVerify(const std::string &data, const std::string &sig_string) const;
-
-  EVP_PKEY *pkey_;
-  ct::DigitallySigned::HashAlgorithm hash_algo_;
-  ct::DigitallySigned::SignatureAlgorithm sig_algo_;
-  std::string key_id_;
 };
 #endif

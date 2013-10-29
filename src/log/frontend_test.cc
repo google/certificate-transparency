@@ -67,12 +67,12 @@ template <class T> class FrontendTest : public ::testing::Test {
   FrontendTest()
       : test_db_(),
         test_signer_(),
-        verifier_(new LogVerifier(TestSigner::DefaultVerifier(),
+        verifier_(new LogVerifier(TestSigner::DefaultLogSigVerifier(),
                                   new MerkleVerifier(new Sha256Hasher()))),
         checker_(),
         frontend_(new FE(new CertSubmissionHandler(&checker_),
                          new FrontendSigner(db(),
-                                            TestSigner::DefaultSigner()))) {}
+                                            TestSigner::DefaultLogSigner()))) {}
 
   void SetUp() {
     cert_dir_ = FLAGS_test_certs_dir;

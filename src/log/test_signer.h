@@ -9,9 +9,9 @@
 #include "merkletree/tree_hasher.h"
 
 namespace ct {
-
 class LoggedCertificate;
-
+class Signer;
+class Verifier;
 }  // namespace ct
 
 // Helper class for database tests that generates test data
@@ -21,9 +21,15 @@ class TestSigner {
   TestSigner();
   ~TestSigner();
 
-  static LogSigner *DefaultSigner();
+  static ct::Signer *DefaultSigner();
+  static LogSigner *DefaultLogSigner();
 
-  static LogSigVerifier *DefaultVerifier();
+  static ct::Verifier *DefaultVerifier();
+  static LogSigVerifier *DefaultLogSigVerifier();
+
+  // A string and its signature.
+  static void SetDefaults(std::string* data,
+                          std::string* signature);
 
   // For KAT tests: an SCT with a valid signature.
   // The default type is X509_ENTRY.

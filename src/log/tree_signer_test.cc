@@ -33,13 +33,13 @@ template <class T> class TreeSignerTest : public ::testing::Test {
         tree_signer_(NULL) {}
 
   void SetUp() {
-    verifier_ = new LogVerifier(TestSigner::DefaultVerifier(),
+    verifier_ = new LogVerifier(TestSigner::DefaultLogSigVerifier(),
                                 new MerkleVerifier(new Sha256Hasher()));
-    tree_signer_ = new TS(db(), TestSigner::DefaultSigner());
+    tree_signer_ = new TS(db(), TestSigner::DefaultLogSigner());
   }
 
   TS *GetSimilar() const {
-    return new TS(db(), TestSigner::DefaultSigner());
+    return new TS(db(), TestSigner::DefaultLogSigner());
   }
 
   ~TreeSignerTest() {

@@ -30,8 +30,8 @@ class LogSignerTest : public ::testing::Test {
                     verifier_(NULL) {}
 
   void SetUp() {
-    signer_ = TestSigner::DefaultSigner();
-    verifier_ = TestSigner::DefaultVerifier();
+    signer_ = TestSigner::DefaultLogSigner();
+    verifier_ = TestSigner::DefaultLogSigVerifier();
   }
 
   ~LogSignerTest() {

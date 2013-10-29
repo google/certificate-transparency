@@ -9,7 +9,9 @@
 
 #include "log/log_signer.h"
 #include "log/logged_certificate.h"
+#include "log/signer.h"
 #include "log/test_signer.h"
+#include "log/verifier.h"
 #include "merkletree/serial_hasher.h"
 #include "merkletree/tree_hasher.h"
 #include "proto/ct.pb.h"
@@ -125,6 +127,10 @@ const uint64_t kDefaultTreeSize = 42;
 const char kDefaultRootHash[] =
     "18041bd4665083001fba8c5411d2d748e8abbfdcdfd9218cb02b68a78e7d4c23";
 
+const char kDefaultSTHSerialized[] =
+    "000100000139fe354384000000000000002a18041bd4665083001fba8c5411d2"
+    "d748e8abbfdcdfd9218cb02b68a78e7d4c23";
+
 const char kDefaultSTHSignature[] =
     "3046022100befd8060563763a5e49ba53e6443c13f7624fd6403178113736e16012aca983e"
     "022100f572568dbfe9a86490eb915c4ee16ad5ecd708fed35ed4e5cd1b2c3f087b4130";
@@ -184,7 +190,16 @@ TestSigner::~TestSigner() {
 // Caller owns result.
 // Call as many times as required to get a fresh copy every time.
 // static
-LogSigner *TestSigner::DefaultSigner() {
+ct::Signer *TestSigner::DefaultSigner() {
+  EVP_PKEY *pkey = PrivateKeyFromPem(kEcP256PrivateKey);
+  CHECK_NOTNULL(pkey);
+  return new ct::Signer(pkey);
+}
+
+// Caller owns result.
+// Call as many times as required to get a fresh copy every time.
+// static
+LogSigner *TestSigner::DefaultLogSigner() {
   EVP_PKEY *pkey = PrivateKeyFromPem(kEcP256PrivateKey);
   CHECK_NOTNULL(pkey);
   return new LogSigner(pkey);
@@ -193,10 +208,26 @@ LogSigner *TestSigner::DefaultSigner() {
 // Caller owns result.
 // Call as many times as required to get a fresh copy every time.
 // static
-LogSigVerifier *TestSigner::DefaultVerifier() {
+ct::Verifier *TestSigner::DefaultVerifier() {
+  EVP_PKEY *pubkey = PublicKeyFromPem(kEcP256PublicKey);
+  CHECK_NOTNULL(pubkey);
+  return new ct::Verifier(pubkey);
+}
+
+// Caller owns result.
+// Call as many times as required to get a fresh copy every time.
+// static
+LogSigVerifier *TestSigner::DefaultLogSigVerifier() {
   EVP_PKEY *pubkey = PublicKeyFromPem(kEcP256PublicKey);
   CHECK_NOTNULL(pubkey);
   return new LogSigVerifier(pubkey);
+}
+
+//static
+void TestSigner::SetDefaults(string *data,
+                             string *signature) {
+  *data = B(kDefaultSTHSerialized);
+  *signature = B(kDefaultSTHSignature);
 }
 
 // static

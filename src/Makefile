@@ -66,7 +66,7 @@ LOG_TESTS = log/cert_test log/cert_checker_test \
             log/cert_submission_handler_test log/database_test \
             log/database_large_test log/file_storage_test \
             log/frontend_signer_test log/frontend_test log/log_lookup_test \
-            log/log_signer_test log/tree_signer_test \
+            log/signer_verifier_test log/log_signer_test log/tree_signer_test \
             log/logged_certificate_test log/ct_extensions_test
 UTIL_TESTS = util/json_wrapper_test
 ALL_TESTS = $(PROTO_TESTS) $(MERKLETREE_TESTS) $(LOG_TESTS) $(UTIL_TESTS)
@@ -192,8 +192,9 @@ log/libdatabase.a: log/file_storage.o log/filesystem_op.o log/file_db_cert.o \
 	rm -f $@
 	ar -rcs $@ $^
 
-log/liblog.a: log/log_signer.o log/frontend.o log/frontend_signer.o \
-              log/log_verifier.o log/tree_signer_cert.o log/log_lookup_cert.o
+log/liblog.a: log/log_signer.o log/signer.o log/verifier.o log/frontend.o \
+              log/frontend_signer.o log/log_verifier.o log/tree_signer_cert.o \
+              log/log_lookup_cert.o
 	rm -f $@
 	ar -rcs $@ $^
 
@@ -202,21 +203,23 @@ log_tests: $(LOG_TESTS)
 log/cert_test: log/cert_test.o log/cert.o log/ct_extensions.o util/libutil.a \
                merkletree/serial_hasher.o log/frontend.o proto/ct.pb.o \
                log/frontend_signer.o log/cert_submission_handler.o \
-               log/log_signer.o proto/serializer.o log/cert_checker.o
+               log/log_signer.o log/signer.o log/verifier.o proto/serializer.o \
+               log/cert_checker.o
 	$(CXX) -o $@ $^ $(SYS_LIBS)
 
 log/cert_checker_test: log/cert_checker_test.o log/cert.o log/cert_checker.o \
                        log/ct_extensions.o util/libutil.a \
                        merkletree/serial_hasher.o log/frontend.o proto/ct.pb.o \
                        log/frontend_signer.o log/cert_submission_handler.o \
-                       log/log_signer.o proto/serializer.o log/cert_checker.o
+                       log/log_signer.o log/signer.o log/verifier.o \
+                       proto/serializer.o log/cert_checker.o
 	$(CXX) -o $@ $^ $(SYS_LIBS)
 
 log/cert_submission_handler_test: log/cert_submission_handler_test.o \
                                   log/libcert.a proto/libproto.a \
                                   util/libutil.a log/frontend.o \
                                   log/frontend_signer.o \
-                                  log/log_signer.o
+                                  log/log_signer.o log/signer.o log/verifier.o
 	$(CXX) -o $@ $^ $(SYS_LIBS)
 
 log/ct_extensions_test: log/ct_extensions_test.o log/libcert.a util/libutil.a \
@@ -226,14 +229,15 @@ log/ct_extensions_test: log/ct_extensions_test.o log/libcert.a util/libutil.a \
 	$(CXX) -o $@ $^ $(SYS_LIBS)
 
 log/database_large_test: log/database_large_test.o log/libdatabase.a \
-                         log/log_signer.o log/test_signer.o \
-                         merkletree/libmerkletree.a proto/libproto.a \
-                         util/libutil.a
+                         log/log_signer.o log/signer.o log/verifier.o \
+                         log/test_signer.o merkletree/libmerkletree.a \
+                         proto/libproto.a util/libutil.a
 	$(CXX) -o $@ $^ $(SYS_LIBS)
 
 log/database_test: log/database_test.o log/libdatabase.a \
-                   log/log_signer.o log/test_signer.o \
-                   merkletree/libmerkletree.a proto/libproto.a util/libutil.a
+                   log/log_signer.o log/signer.o log/verifier.o \
+                   log/test_signer.o merkletree/libmerkletree.a \
+                   proto/libproto.a util/libutil.a
 	$(CXX) -o $@ $^ $(SYS_LIBS)
 
 log/file_storage_test: log/file_storage_test.o log/libdatabase.a \
@@ -243,15 +247,16 @@ log/file_storage_test: log/file_storage_test.o log/libdatabase.a \
 
 log/frontend_signer_test: log/frontend_signer_test.o \
                           log/frontend_signer.o \
-                          log/log_signer.o log/log_verifier.o \
-                          log/test_signer.o log/libcert.a \
+                          log/log_signer.o log/signer.o log/verifier.o \
+                          log/log_verifier.o log/test_signer.o log/libcert.a \
                           log/libdatabase.a merkletree/libmerkletree.a \
                           proto/libproto.a util/libutil.a
 	$(CXX) -o $@ $^ $(SYS_LIBS)
 
 log/frontend_test: log/frontend_test.o log/frontend.o \
                    log/frontend_signer.o \
-                   log/log_signer.o log/log_verifier.o log/test_signer.o \
+                   log/log_signer.o log/signer.o log/verifier.o \
+                   log/log_verifier.o log/test_signer.o \
                    log/libcert.a log/libdatabase.a merkletree/libmerkletree.a \
                    proto/libproto.a util/libutil.a
 	$(CXX) -o $@ $^ $(SYS_LIBS)
@@ -261,12 +266,18 @@ log/log_lookup_test: log/log_lookup_test.o log/test_signer.o log/libdatabase.a \
                      util/libutil.a
 	$(CXX) -o $@ $^ $(SYS_LIBS)
 
-log/log_signer_test: log/log_signer_test.o log/log_signer.o log/test_signer.o \
+log/log_signer_test: log/log_signer_test.o log/log_signer.o log/signer.o \
+                     log/verifier.o log/test_signer.o \
                      merkletree/libmerkletree.a proto/libproto.a util/libutil.a
 	$(CXX) -o $@ $^ $(SYS_LIBS)
 
-log/tree_signer_test: log/tree_signer_test.o log/log_signer.o \
-                      log/test_signer.o log/tree_signer_cert.o \
+log/signer_verifier_test: log/signer_verifier_test.o log/log_signer.o \
+                     log/signer.o log/verifier.o log/test_signer.o \
+                     merkletree/libmerkletree.a proto/libproto.a util/libutil.a
+	$(CXX) -o $@ $^ $(SYS_LIBS)
+
+log/tree_signer_test: log/tree_signer_test.o log/log_signer.o log/signer.o \
+                      log/verifier.o log/test_signer.o log/tree_signer_cert.o \
                       log/log_verifier.o \
                       log/libdatabase.a merkletree/libmerkletree.a \
                       proto/libproto.a util/libutil.a

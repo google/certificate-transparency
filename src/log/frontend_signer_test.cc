@@ -32,9 +32,9 @@ template <class T> class FrontendSignerTest : public ::testing::Test {
   FrontendSignerTest()
       : test_db_(),
         test_signer_(),
-        verifier_(new LogVerifier(TestSigner::DefaultVerifier(),
+        verifier_(new LogVerifier(TestSigner::DefaultLogSigVerifier(),
                                   new MerkleVerifier(new Sha256Hasher()))),
-        frontend_(new FS(test_db_.db(), TestSigner::DefaultSigner())) {}
+        frontend_(new FS(test_db_.db(), TestSigner::DefaultLogSigner())) {}
 
   ~FrontendSignerTest() {
     delete verifier_;

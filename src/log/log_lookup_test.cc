@@ -36,9 +36,9 @@ template <class T> class LogLookupTest : public ::testing::Test {
         verifier_(NULL) {}
 
   void SetUp() {
-    verifier_ = new LogVerifier(TestSigner::DefaultVerifier(),
+    verifier_ = new LogVerifier(TestSigner::DefaultLogSigVerifier(),
                                 new MerkleVerifier(new Sha256Hasher()));
-    tree_signer_ = new TS(db(), TestSigner::DefaultSigner());
+    tree_signer_ = new TS(db(), TestSigner::DefaultLogSigner());
     ASSERT_TRUE(verifier_ != NULL);
     ASSERT_TRUE(tree_signer_ != NULL);
   }

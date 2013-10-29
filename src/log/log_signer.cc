@@ -20,23 +20,28 @@ using ct::SignedCertificateTimestamp;
 using ct::SignedTreeHead;
 using std::string;
 
-LogSigner::LogSigner(EVP_PKEY *pkey)
-    : pkey_(pkey) {
-  assert(pkey_ != NULL);
-  switch (pkey_->type) {
-    case EVP_PKEY_EC:
-      hash_algo_ = DigitallySigned::SHA256;
-      sig_algo_ = DigitallySigned::ECDSA;
-      break;
-    default:
-      LOG(FATAL) << "Unsupported key type";
+namespace {
+
+LogSigVerifier::VerifyResult ConvertStatus(const ct::Verifier::Status status) {
+  switch (status) {
+    case ct::Verifier::OK:
+      return LogSigVerifier::OK;
+    case ct::Verifier::HASH_ALGORITHM_MISMATCH:
+      return LogSigVerifier::HASH_ALGORITHM_MISMATCH;
+    case ct::Verifier::SIGNATURE_ALGORITHM_MISMATCH:
+      return LogSigVerifier::SIGNATURE_ALGORITHM_MISMATCH;
+    case ct::Verifier::INVALID_SIGNATURE:
+      return LogSigVerifier::INVALID_SIGNATURE;
   }
-  key_id_ = LogSigVerifier::ComputeKeyID(pkey_);
+  LOG(FATAL) << "Unexpected status " << status;
 }
 
-LogSigner::~LogSigner() {
-  EVP_PKEY_free(pkey_);
-}
+}  // namespace
+
+LogSigner::LogSigner(EVP_PKEY *pkey)
+    : ct::Signer(pkey) {}
+
+LogSigner::~LogSigner() {}
 
 LogSigner::SignResult LogSigner::SignV1CertificateTimestamp(
     uint64_t timestamp, const string &leaf_certificate,
@@ -152,62 +157,10 @@ LogSigner::GetSerializeError(Serializer::SerializeResult result) {
   return sign_result;
 }
 
-void LogSigner::Sign(const string &data, DigitallySigned *result) const {
-  result->set_hash_algorithm(hash_algo_);
-  result->set_sig_algorithm(sig_algo_);
-  result->set_signature(RawSign(data));
-}
-
-string LogSigner::RawSign(const string &data) const {
-  EVP_MD_CTX ctx;
-  EVP_MD_CTX_init(&ctx);
-  // NOTE: this syntax for setting the hash function requires OpenSSL >= 1.0.0.
-  CHECK_EQ(1, EVP_SignInit(&ctx, EVP_sha256()));
-  CHECK_EQ(1, EVP_SignUpdate(&ctx, data.data(), data.size()));
-  unsigned int sig_size = EVP_PKEY_size(pkey_);
-  unsigned char *sig = new unsigned char[sig_size];
-
-  CHECK_EQ(1, EVP_SignFinal(&ctx, sig, &sig_size, pkey_));
-
-  EVP_MD_CTX_cleanup(&ctx);
-  string ret(reinterpret_cast<char*>(sig), sig_size);
-
-  delete[] sig;
-  return ret;
-}
-
 LogSigVerifier::LogSigVerifier(EVP_PKEY *pkey)
-    : pkey_(pkey) {
-  assert(pkey_ != NULL);
-  switch (pkey_->type) {
-    case EVP_PKEY_EC:
-      hash_algo_ = DigitallySigned::SHA256;
-      sig_algo_ = DigitallySigned::ECDSA;
-      break;
-    default:
-      LOG(FATAL) << "Unsupported key type";
-  }
-  key_id_ = ComputeKeyID(pkey_);
-}
+    : ct::Verifier(pkey) {}
 
-LogSigVerifier::~LogSigVerifier() {
-  EVP_PKEY_free(pkey_);
-}
-
-// static
-string LogSigVerifier::ComputeKeyID(EVP_PKEY *pkey) {
-  // i2d_PUBKEY sets the algorithm and (for ECDSA) named curve parameter and
-  // encodes the key as an X509_PUBKEY (i.e., subjectPublicKeyInfo).
-  int buf_len = i2d_PUBKEY(pkey, NULL);
-  CHECK_GT(buf_len, 0);
-  unsigned char *buf = new unsigned char[buf_len];
-  unsigned char *p = buf;
-  CHECK_EQ(i2d_PUBKEY(pkey, &p), buf_len);
-  string keystring(reinterpret_cast<char*>(buf), buf_len);
-  string ret = Sha256Hasher::Sha256Digest(keystring);
-  delete[] buf;
-  return ret;
-}
+LogSigVerifier::~LogSigVerifier() {}
 
 LogSigVerifier::VerifyResult LogSigVerifier::VerifyV1CertSCTSignature(
     uint64_t timestamp, const string &leaf_cert,
@@ -226,7 +179,7 @@ LogSigVerifier::VerifyResult LogSigVerifier::VerifyV1CertSCTSignature(
                                                    extensions, &serialized_sct);
   if (serialize_result != Serializer::OK)
     return GetSerializeError(serialize_result);
-  return Verify(serialized_sct, signature);
+  return ConvertStatus(Verify(serialized_sct, signature));
 }
 
 LogSigVerifier::VerifyResult LogSigVerifier::VerifyV1PrecertSCTSignature(
@@ -244,7 +197,7 @@ LogSigVerifier::VerifyResult LogSigVerifier::VerifyV1PrecertSCTSignature(
           timestamp, issuer_key_hash, tbs_cert, extensions, &serialized_sct);
   if (serialize_result != Serializer::OK)
     return GetSerializeError(serialize_result);
-  return Verify(serialized_sct, signature);
+  return ConvertStatus(Verify(serialized_sct, signature));
 }
 
 
@@ -266,7 +219,7 @@ LogSigVerifier::VerifySCTSignature(const LogEntry &entry,
                                              &serialized_input);
   if (serialize_result != Serializer::OK)
     return GetSerializeError(serialize_result);
-  return Verify(serialized_input, sct.signature());
+  return ConvertStatus(Verify(serialized_input, sct.signature()));
 }
 
 LogSigVerifier::VerifyResult LogSigVerifier::VerifyV1STHSignature(
@@ -284,7 +237,7 @@ LogSigVerifier::VerifyResult LogSigVerifier::VerifyV1STHSignature(
                                                &serialized_sth);
   if (serialize_result != Serializer::OK)
     return GetSerializeError(serialize_result);
-  return Verify(serialized_sth, signature);
+  return ConvertStatus(Verify(serialized_sth, signature));
 }
 
 LogSigVerifier::VerifyResult
@@ -296,7 +249,7 @@ LogSigVerifier::VerifySTHSignature(const SignedTreeHead &sth) const {
       Serializer::SerializeSTHSignatureInput(sth, &serialized_sth);
   if (serialize_result != Serializer::OK)
     return GetSerializeError(serialize_result);
-  return Verify(serialized_sth, sth.signature());
+  return ConvertStatus(Verify(serialized_sth, sth.signature()));
 }
 
 // static
@@ -350,30 +303,4 @@ LogSigVerifier::GetDeserializeSignatureError(
       LOG(FATAL) << "Unexpected Deserializer error code " << result;
   }
   return verify_result;
-}
-
-LogSigVerifier::VerifyResult LogSigVerifier::Verify(
-    const string &input, const DigitallySigned &signature) const {
-  if (signature.hash_algorithm() != hash_algo_)
-    return HASH_ALGORITHM_MISMATCH;
-  if (signature.sig_algorithm() != sig_algo_)
-    return SIGNATURE_ALGORITHM_MISMATCH;
-  if (!RawVerify(input, signature.signature()))
-    return INVALID_SIGNATURE;
-  return OK;
-}
-
-bool LogSigVerifier::RawVerify(const string &data,
-                               const string &sig_string) const {
-  EVP_MD_CTX ctx;
-  EVP_MD_CTX_init(&ctx);
-  // NOTE: this syntax for setting the hash function requires OpenSSL >= 1.0.0.
-  CHECK_EQ(1, EVP_VerifyInit(&ctx, EVP_sha256()));
-  CHECK_EQ(1, EVP_VerifyUpdate(&ctx, data.data(), data.size()));
-  bool ret =
-      (EVP_VerifyFinal(
-          &ctx, reinterpret_cast<const unsigned char*>(sig_string.data()),
-          sig_string.size(), pkey_) == 1);
-  EVP_MD_CTX_cleanup(&ctx);
-  return ret;
 }
