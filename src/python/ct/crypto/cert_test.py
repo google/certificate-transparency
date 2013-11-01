@@ -1,4 +1,5 @@
 #!/usr/bin/env python
+# coding=utf-8
 
 import gflags
 import time
@@ -42,6 +43,23 @@ class CertificateTest(unittest.TestCase):
     # * uses a 512-key RSA key
     _PEM_PROMISECOM = "promise_com.pem"
 
+    # This self-signed cert was used to test proper (or
+    # improper) handling of UTF-8 characters in CN
+    # See  CVE 2009-2408 for more details
+    #
+    # Mozilla bug480509
+    # https://bugzilla.mozilla.org/show_bug.cgi?id=480509
+    # Mozilla bug484111
+    # https://bugzilla.mozilla.org/show_bug.cgi?id=484111
+    # RedHat bug510251
+    # https://bugzilla.redhat.com/show_bug.cgi?id=510251
+    _PEM_CN_UTF8 = "cn_utf8.pem"
+
+    # A self-signed cert with null characters in various names
+    # Misparsing was involved in CVE 2009-2408 (above) and
+    # CVE-2013-4248
+    _PEM_NULL_CHARS = "null_chars.pem"
+
     @property
     def pem_file(self):
         return FLAGS.testdata_dir + "/" + self._PEM_FILE
@@ -73,6 +91,15 @@ class CertificateTest(unittest.TestCase):
     @property
     def promisecom_file(self):
         return FLAGS.testdata_dir + "/" + self._PEM_PROMISECOM
+
+    @property
+    def cnutf8_file(self):
+        return FLAGS.testdata_dir + "/" + self._PEM_CN_UTF8
+
+    @property
+    def nullnames_file(self):
+        return FLAGS.testdata_dir + "/" + self._PEM_NULL_CHARS
+
 
     def test_from_pem_file(self):
         c = cert.Certificate.from_pem_file(self.pem_file)
@@ -139,8 +166,7 @@ class CertificateTest(unittest.TestCase):
         self.assertTrue("MatrixSSL Sample Server" in issuer)
 
     def test_parse_marchnetworks(self):
-        """Test parsing certificates issued by marchnetworks.com
-        """
+        """Test parsing certificates issued by marchnetworks.com."""
         c = cert.Certificate.from_pem_file(self.marchnetworks_file)
         issuer = c.issuer_name()
         self.assertTrue("March Networks" in issuer)
@@ -174,6 +200,47 @@ class CertificateTest(unittest.TestCase):
         # standard format -- 221213093107Z
         expected = [2022, 12, 13, 9, 31, 7, 1, 347, 0]
         self.assertEqual(list(c.not_after()), expected)
+
+    def test_utf8_names(self):
+        c = cert.Certificate.from_pem_file(self.cnutf8_file)
+        nameutf8 = "ñeco ñýáěšžěšžřěčíě+ščýáíéřáíÚ"
+        unicodename = u"ñeco ñýáěšžěšžřěčíě+ščýáíéřáíÚ"
+        # Compare UTF-8 strings directly.
+        self.assertEqual(c.subject_name(), "CN=" + nameutf8)
+        self.assertEqual(c.issuer_name(), "CN=" + nameutf8)
+        self.assertEqual(c.subject_common_name(), nameutf8)
+        # Name comparison is unicode-based so decode and compare unicode names.
+        # TODO(ekasper): implement proper stringprep-based name comparison
+        # and use these test cases there.
+        self.assertEqual(c.subject_name().decode("utf8"), "CN=" + unicodename)
+        self.assertEqual(c.issuer_name().decode("utf8"), "CN=" + unicodename)
+        self.assertEqual(c.subject_common_name().decode("utf8"), unicodename)
+
+    def test_null_chars_in_names(self):
+        """Test handling null chars in subject and subject alternative names."""
+        c = cert.Certificate.from_pem_file(self.nullnames_file)
+        subject_name = c.subject_name()
+        self.assertTrue("null.python.orgexample.org" not in subject_name)
+        self.assertTrue("null.python.org\000example.org" in subject_name)
+
+        alt_names = c.subject_alternative_names()
+        self.assertEquals(len(alt_names), 5)
+        self.assertEquals(alt_names[0].type(), 'dNSName')
+        self.assertEquals(alt_names[0].value(),
+                          'altnull.python.org\000example.com')
+        self.assertEquals(alt_names[1].type(), 'rfc822Name')
+        self.assertEquals(alt_names[1].value(),
+                          'null@python.org\000user@example.org')
+        self.assertEquals(alt_names[2].type(), 'uniformResourceIdentifier')
+        self.assertEquals(alt_names[2].value(),
+                          'http://null.python.org\000http://example.org')
+
+        # the following does not contain nulls.
+        self.assertEquals(alt_names[3].type(), 'iPAddress')
+        self.assertEquals(alt_names[3].value(), (192, 0, 2, 1))
+        self.assertEquals(alt_names[4].type(), 'iPAddress')
+        self.assertEquals(alt_names[4].value(),
+                          (32, 1, 13, 184, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1))
 
     def test_parse_promisecom(self):
         """Test parsing certificates issued by promise.com
