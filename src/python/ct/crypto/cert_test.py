@@ -271,6 +271,16 @@ class CertificateTest(unittest.TestCase):
         c = cert.Certificate.from_pem_file(self.v1_file)
         self.assertEqual(0, len(c.subject_alternative_names()))
 
+    def test_fingerprint(self):
+        c = cert.Certificate.from_der_file(self.der_file)
+        self.assertEqual(c.fingerprint().encode("hex"),
+                         "570fe2e3bfee986ed4a158aed8770f2e21614659")
+        self.assertEqual(c.fingerprint("sha1").encode("hex"),
+                         "570fe2e3bfee986ed4a158aed8770f2e21614659")
+        self.assertEqual(c.fingerprint("sha256").encode("hex"),
+                         "6d4106b4544e9e5e7a0924ee86a577ffefaadae8b8dad73413a7"
+                         "d874747a81d1")
+
 if __name__ == "__main__":
     sys.argv = FLAGS(sys.argv)
     unittest.main()
