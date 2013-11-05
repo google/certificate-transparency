@@ -1,3 +1,4 @@
+import hashlib
 import logging
 import time
 from collections import defaultdict
@@ -383,6 +384,20 @@ class Certificate(object):
             CertificateError: corrupt time.
         """
         return self.not_before() <= gmtime <= self.not_after()
+
+    def fingerprint(self, hashfunc="sha1"):
+        """Get the certificate fingerprint.
+
+        Args:
+            hashfunc: name of a hash function. Algorithms always present are
+                'md5', 'sha1', 'sha224', 'sha256', 'sha384', and 'sha512'.
+        Returns:
+            a (binary) hash digest of the DER encoding.
+        """
+        h = hashlib.new(hashfunc)
+        h.update(self.__cached_der)
+        return h.digest()
+
 
 def certs_from_pem(pem_string, skip_invalid_blobs=False):
     """Read multiple PEM-encoded certificates from a string.

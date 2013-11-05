@@ -22,17 +22,25 @@ Known commands:
   cert_util.py print --debug cert.pem   - print full ASN.1 structure
   cert_util.py print --subject cert.pem - print the subject name
   cert_util.py print --issuer cert.pem  - print the issuer name
+  cert_util.py print --fingerprint cert.pem
+                                        - print the SHA-1 fingerprint
+  cert_util.py print --fingerprint --digest="sha256" cert.pem
+                                        - print the SHA-256 fingerprint
 """
 
 import sys
 from ct.crypto import cert
 from ct.crypto import error
 from ct.crypto import pem
+from ct.crypto.asn1 import print_util
 import gflags
 
 FLAGS = gflags.FLAGS
 gflags.DEFINE_bool("subject", False, "Print option: prints certificate subject")
 gflags.DEFINE_bool("issuer", False, "Print option: prints certificate issuer")
+gflags.DEFINE_bool("fingerprint", False, "Print option: prints certificate "
+                   "fingerprint")
+gflags.DEFINE_string("digest", "sha1", "Print option: fingerprint digest to use")
 gflags.DEFINE_bool("debug", False,
                    "Print option: prints full ASN.1 debug information")
 gflags.DEFINE_string("filetype", "", "Read option: specify an input file "
@@ -44,7 +52,7 @@ gflags.RegisterValidator("filetype", lambda value: not value or
 
 
 def print_cert(certificate):
-    if not FLAGS.subject and not FLAGS.issuer:
+    if not FLAGS.subject and not FLAGS.issuer and not FLAGS.fingerprint:
         if FLAGS.debug:
             print "%r" % certificate
         else:
@@ -54,6 +62,11 @@ def print_cert(certificate):
             print "subject:\n%s" % certificate.subject_name()
         if FLAGS.issuer:
             print "issuer:\n%s" % certificate.issuer_name()
+        if FLAGS.fingerprint:
+            # Print in a format familiar from OpenSSL.
+            print "%s fingerprint: %s\n" % (
+                FLAGS.digest.upper(), print_util.bytes_to_hex(
+                    certificate.fingerprint(hashfunc=FLAGS.digest)))
 
 
 def print_certs(cert_file):
