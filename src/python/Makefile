@@ -25,3 +25,6 @@ test: all
 	PYTHONPATH=$(PYTHONPATH):. ./ct/client/sqlite_temp_db_test.py
 	PYTHONPATH=$(PYTHONPATH):. ./ct/client/monitor_test.py
 	PYTHONPATH=$(PYTHONPATH):. ./ct/client/state_test.py
+	PYTHONPATH=$(PYTHONPATH):. ./ct/crypto/my_asn1/tag_test.py
+	PYTHONPATH=$(PYTHONPATH):. ./ct/crypto/my_asn1/types_test.py
+	PYTHONPATH=$(PYTHONPATH):. ./ct/crypto/my_asn1/oid_test.py
