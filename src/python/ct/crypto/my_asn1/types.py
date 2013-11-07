@@ -22,6 +22,7 @@ import collections
 import functools
 
 from ct.crypto import error
+from ct.crypto.asn1 import print_util
 from ct.crypto.my_asn1 import tag
 
 
@@ -36,6 +37,9 @@ def encode_int(value, signed=True):
         value: an integral value.
         signed: if True, encode in two's complement form. If False, encode as
             an unsigned integer.
+
+    Raises:
+        ValueError: attempt to encode a negative integer as unsigned.
 
     Returns:
         a variable-length string representing the encoded integer.
@@ -137,10 +141,10 @@ def read_length(buf):
 
     Args:
         buf: a string or string buffer.
-        strict: if False, tolerate encoding with a non-minimal number of octets.
 
     Raises:
         ASN1Error.
+
     Returns:
         a (length, rest) tuple consisting of a non-negative integer representing
         the length of an ASN.1 object, and the remaining bytes.
@@ -379,6 +383,10 @@ class Abstract(object):
     def _decode_value(self, buf, strict=True):
         """Decode the initializer value from a buffer.
 
+        Args:
+            buf: a string or string buffer.
+            strict: if False, tolerate some non-fatal decoding errors.
+
         Returns:
            the value of the object.
         """
@@ -495,12 +503,50 @@ class Abstract(object):
     def __ne__(self, other):
         return self.value != other
 
+    @abc.abstractmethod
+    def human_readable_lines(self, wrap=80, label=""):
+        """A pretty human readable representation of the object.
+
+        Args:
+            wrap: maximum number of characters per line. 0 or negative wrap
+                means no limit. Should be chosen long enough to comfortably fit
+                formatted data; otherwise it is simply ignored and output may
+                look funny.
+            label: a label prefix.
+
+        Returns:
+            a list of line strings of at most |wrap| characters each.
+        """
+        pass
+
+    def human_readable(self, wrap=80, label=""):
+        """A pretty human readable representation of the object.
+
+        Args:
+            wrap: maximum number of characters per line. 0 or negative wrap
+               means no limit. Should be chosen long enough to comfortably fit
+               formatted data; otherwise it is simply ignored and output may
+               look funny.
+            label: a label prefix.
+
+        Returns:
+            a multi-line string of at most |wrap| characters per line.
+        """
+        return ("\n").join(self.human_readable_lines(wrap=wrap, label=label))
+
 
 # Boilerplate code for some simple types whose value directly corresponds to a
 # basic immutable type.
 @functools.total_ordering
 class Simple(Abstract):
     """Base class for Boolean, Integer, and string types."""
+    # Pretty-printed character length.
+    # OctetString and BitString use this to nicely format hex bytes.
+    char_wrap = 1
+
+    @property
+    def value(self):
+        return self._value
 
     def __hash__(self):
         return hash(self.value)
@@ -517,16 +563,65 @@ class Simple(Abstract):
     def __nonzero__(self):
         return bool(self.value)
 
+    @classmethod
+    def wrap_lines(cls, long_string, wrap):
+        """Split long lines into multiple chunks according to the wrap limit.
+
+        Derived classes can override char_wrap if they wish to, e.g., not split
+        hex bytes.
+
+        Args:
+            long_string: a string_value() representation of the object
+            wrap: maximum number of characters per line. 0 or negative wrap
+                means no limit. Should be chosen long enough to comfortably fit
+                formatted data; otherwise it is simply ignored and output may
+                look funny.
+
+        Returns:
+           long_string split into lines of at most |wrap| characters each.
+        """
+        wrap -= wrap % cls.char_wrap
+        return print_util.wrap_lines(long_string, wrap)
+
+    def human_readable_lines(self, wrap=80, label=""):
+        """A pretty human readable representation of the object.
+
+        Args:
+            wrap: maximum number of characters per line. 0 or negative wrap
+                means no limit. Should be chosen long enough to comfortably fit
+                formatted data; otherwise it is simply ignored and output may
+                look funny.
+            label: a label prefix.
+
+        Returns:
+            a list of line strings of at most |wrap| characters each.
+        """
+        to_print = str(self)
+        formatted_label = label + ": " if label else ""
+        if (to_print.find("\n") == -1 and
+            (wrap <= 0 or len(to_print) + len(formatted_label) <= wrap)):
+            # Fits on one line, like this:
+            # label: value
+            return [formatted_label + to_print]
+
+        else:
+            # Multiline output:
+            # label:
+            #   firstlongvalueline
+            #   secondvalueline
+            ret = []
+            indent = 2
+            if label:
+                ret += print_util.wrap_lines(label + ":", wrap)
+            return ret + [" " * indent + x for x in
+                          self.wrap_lines(to_print, wrap-indent)]
+
 
 @Universal(1, tag.PRIMITIVE)
 class Boolean(Simple):
     """Boolean."""
     _TRUE = "\xff"
     _FALSE = "\x00"
-
-    @property
-    def value(self):
-        return self._value
 
     def _encode_value(self):
         return self._TRUE if self._value else self._FALSE
@@ -552,10 +647,6 @@ class Boolean(Simple):
 class Integer(Simple):
     """Integer."""
 
-    @property
-    def value(self):
-        return self._value
-
     def _encode_value(self):
         return encode_int(self._value)
 
@@ -570,10 +661,6 @@ class Integer(Simple):
 
 class ASN1String(Simple):
     """Base class for string types."""
-
-    @property
-    def value(self):
-        return self._value
 
     def _encode_value(self):
         return self._value
@@ -645,20 +732,19 @@ class GeneralizedTime(ASN1String):
 @Universal(4, tag.PRIMITIVE)
 class OctetString(ASN1String):
     """Octet string."""
-    pass
+    char_wrap = 3
+
+    def __str__(self):
+        return print_util.bytes_to_hex(self._value)
 
 
 @Universal(3, tag.PRIMITIVE)
-class BitString(Abstract):
+class BitString(Simple):
     """Bit string."""
+    char_wrap = 3
 
-    def __hash__(self):
-        return hash(self._value)
-
-    @property
-    def value(self):
-        """The value of a BitString is a string of '0's and '1's."""
-        return self._value
+    def __str__(self):
+        return print_util.bits_to_hex(self._value)
 
     def _encode_value(self):
         pad = (8 - len(self._value) % 8) % 8
@@ -669,6 +755,7 @@ class BitString(Abstract):
         return str(ret)
 
     def _convert_value(self, value):
+        """The value of a BitString is a string of '0's and '1's."""
         if isinstance(value, BitString):
             return value.value
         elif isinstance(value, str):
@@ -699,16 +786,18 @@ class BitString(Abstract):
         return ret
 
 
-class Any(Abstract):
+class Any(ASN1String):
     """Any.
 
     Any is a container for an arbitrary value. An Any type can be tagged with
     explicit tags like any other type: those tags will be applied to the
     underlying value. Implicit tagging of Any types is not supported.
 
-    Any can hold both decoded and undecoded values. Undecoded values are stored
-    as raw strings.
+    The value of an Any is an undecoded raw string. In addition, Any can hold
+    the decoded value of the object.
     """
+    char_wrap = 3
+
     def __init__(self, value=None, serialized_value=None, strict=True):
         if isinstance(value, str):
             super(Any, self).__init__(value=None, serialized_value=value,
@@ -728,18 +817,25 @@ class Any(Abstract):
     def __str__(self):
         if self._decoded_value is not None:
             return str(self._decoded_value)
-        return self._value
+        return print_util.bytes_to_hex(self._value)
 
-    def __hash__(self):
-        return hash(self._value)
+    def human_readable_lines(self, wrap=80, label=""):
+        """A pretty human readable representation of the object.
 
-    @property
-    def value(self):
-        """The undecoded value."""
-        # Always return the undecoded value for consistency; the
-        # decoded/decoded_value properties can be used to retrieve the
-        # decoded contents.
-        return self._value
+        Args:
+            wrap: maximum number of characters per line. 0 or negative wrap
+                means no limit. Should be chosen long enough to comfortably fit
+                formatted data; otherwise it is simply ignored and output may
+                look funny.
+            label: a label prefix.
+
+        Returns:
+            a list of line strings of at most |wrap| characters each.
+        """
+        if self._decoded_value is not None:
+            return self._decoded_value.human_readable_lines(wrap=wrap,
+                                                            label=label)
+        return super(Any, self).human_readable_lines(wrap=wrap, label=label)
 
     @property
     def decoded(self):
@@ -748,9 +844,6 @@ class Any(Abstract):
     @property
     def decoded_value(self):
         return self._decoded_value
-
-    def _encode_value(self):
-        return self._value
 
     @classmethod
     def _read(cls, buf, strict=True):
@@ -764,6 +857,10 @@ class Any(Abstract):
 
     @classmethod
     def _convert_value(cls, value):
+        """The value of an Any is the undecoded value."""
+        # Always return the undecoded value for consistency; the
+        # decoded/decoded_value properties can be used to retrieve the
+        # decoded contents.
         if isinstance(value, Any):
             # This gets ambiguous real fast (do we keep the original tags or
             # replace with our own tags?) so we ban it.
@@ -772,7 +869,7 @@ class Any(Abstract):
             return value.encode()
         else:
             raise TypeError("Cannot convert %s to %s" % (type(value),
-                            cls.__name__))
+                                                         cls.__name__))
 
     @classmethod
     def _decode_value(cls, buf, strict=True):
@@ -790,6 +887,80 @@ class Any(Abstract):
             RuntimeError: value already decoded.
         """
         self._decoded_value = value_type.decode(self._value, strict=strict)
+
+
+class Constructed(Abstract):
+    """Constructed types."""
+    print_labels = True
+    print_delimiter = "\n"
+
+    def human_readable_lines(self, wrap=80, label=""):
+        """A pretty human readable representation of the object.
+
+        Args:
+            wrap: maximum number of characters per line. 0 or negative wrap
+                means no limit. Should be chosen long enough to comfortably fit
+                formatted data; otherwise it is simply ignored and output may
+                look funny.
+            label: a label prefix.
+
+        Returns:
+            a list of line strings of at most |wrap| characters each.
+        """
+        # A "\n" becomes ["", ""] which magically starts a new line when we call
+        # append_lines() on it. Things like "\n-----\n" work, too.
+        delimiter = (print_util.wrap_lines(self.print_delimiter, wrap=wrap))
+        lines = []
+
+        # Component count. Needed so we can print "<no components>" when none
+        # are found.
+        count = 0
+        # Whether the next component should start on a new line. Set to true
+        # when the previous component was multiline. For example, a mix of short
+        # and long components with a ", " delimiter is thus printed as
+        # short1, short2, short3,
+        # myextremelylongcomponentth
+        # atspansmultiplelines
+        # short4, short5
+        newline = False
+
+        if label:
+            lines += print_util.wrap_lines(label + ":", wrap)
+            # If the delimiter is multiline, then output looks prettier if the
+            # label is also on a separate line.
+            if len(delimiter) > 1:
+                newline = True
+            elif len(lines[-1]) < wrap:
+                # Else add a whitespace so we get "label: value"
+                lines[-1] += " "
+
+        indent = 2
+        for key, value in self.iteritems():
+            if value is None:
+                continue
+            label = str(key) if self.print_labels else ""
+            print_component = value.human_readable_lines(wrap=wrap-indent,
+                                                         label=label)
+            if not print_component:
+                continue
+
+            if count:
+                print_util.append_lines(delimiter, wrap, lines)
+            count += 1
+            # Make multiline components a separate block on a new line, unless
+            # we already are on a new line.
+            if (newline or len(print_component) > 1) and lines and lines[-1]:
+                lines += print_component
+            else:
+                print_util.append_lines(print_component, wrap, lines)
+
+            newline = len(print_component) > 1
+
+        if not count:
+            print_util.append_lines(["<no components>"], wrap, lines)
+
+        # Indent everything apart from the first line.
+        return [lines[0]] + ["  " + x for x in lines[1:]]
 
 
 class MetaChoice(abc.ABCMeta):
@@ -817,9 +988,13 @@ class MetaChoice(abc.ABCMeta):
         return super(MetaChoice, mcs).__new__(mcs, name, bases, dic)
 
 
-class Choice(Abstract, collections.MutableMapping):
+class Choice(Constructed, collections.MutableMapping):
     """Choice."""
     __metaclass__ = MetaChoice
+
+    # There is only ever one component anyway.
+    print_delimiter = ""
+    print_labels = False
 
     def __init__(self, value=None, serialized_value=None,
                  readahead_tag=None, readahead_value=None, strict=True):
@@ -957,7 +1132,7 @@ class Choice(Abstract, collections.MutableMapping):
                                            strict=strict)
 
 
-class Repeated(Abstract, collections.MutableSequence):
+class Repeated(Constructed, collections.MutableSequence):
     """Base class for SetOf and SequenceOf."""
 
     def __getitem__(self, index):
@@ -967,7 +1142,7 @@ class Repeated(Abstract, collections.MutableSequence):
         # We are required to support both single-value as well as slice
         # assignment.
         if isinstance(index, slice):
-            self._value[index] = self._convert_value(v)
+            self._value[index] = self._convert_value(value)
         else:
             self._value[index] = (value if type(value) is self.component
                                   else self.component(value))
@@ -977,6 +1152,9 @@ class Repeated(Abstract, collections.MutableSequence):
 
     def __len__(self):
         return len(self._value)
+
+    def iteritems(self):
+        return enumerate(self._value)
 
     def insert(self, index, value):
         if type(value) is not self.component:
@@ -996,6 +1174,7 @@ class Repeated(Abstract, collections.MutableSequence):
 @Universal(16, tag.CONSTRUCTED)
 class SequenceOf(Repeated):
     """Sequence Of."""
+
     def _encode_value(self):
         ret = [x.encode() for x in self._value]
         return "".join(ret)
@@ -1081,7 +1260,7 @@ class MetaSequence(abc.ABCMeta):
 
 
 @Universal(16, tag.CONSTRUCTED)
-class Sequence(Abstract, collections.MutableMapping):
+class Sequence(Constructed, collections.MutableMapping):
     """Sequence."""
     __metaclass__ = MetaSequence
 

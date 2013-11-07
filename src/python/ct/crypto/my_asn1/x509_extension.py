@@ -7,6 +7,7 @@ from ct.crypto.my_asn1 import x509_name
 
 
 class BasicConstraints(types.Sequence):
+    print_delimiter = ", "
     components = (
         (types.Component("cA", types.Boolean, default=False)),
         (types.Component("pathLenConstraint", types.Integer, optional=True))
@@ -14,6 +15,7 @@ class BasicConstraints(types.Sequence):
 
 
 class SubjectAlternativeNames(types.SequenceOf):
+    print_delimiter = ", "
     component = x509_name.GeneralName
 
 
@@ -33,6 +35,7 @@ _EXTENSION_DICT = {
 
 
 class Extension(types.Sequence):
+    print_delimiter = ", "
     components = (
         (types.Component("extnID", oid.ObjectIdentifier)),
         (types.Component("critical", types.Boolean, default=False)),

@@ -10,11 +10,8 @@ from ct.crypto.my_asn1 import types
 
 
 @types.Universal(6, tag.PRIMITIVE)
-class ObjectIdentifier(types.Abstract):
+class ObjectIdentifier(types.Simple):
     """Object identifier."""
-
-    def __hash__(self):
-        return hash(self._value)
 
     def _name(self, dict_idx):
         try:

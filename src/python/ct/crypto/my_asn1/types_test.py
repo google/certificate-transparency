@@ -71,6 +71,7 @@ class TagDecoratorTest(unittest.TestCase):
 class Dummy(types.Simple):
     # Fake.
     tags = (tag.Tag(1, tag.UNIVERSAL, tag.PRIMITIVE),)
+
     def _convert_value(cls, value):
         if isinstance(value, str):
             return value
@@ -82,16 +83,26 @@ class Dummy(types.Simple):
     def _encode_value(self):
         return self._value
 
-    @property
-    def value(self):
-        return self._value
+    def __str__(self):
+        # Inject a marker to test human_readable().
+        return "dummy!" + str(self._value)
+
+# And a simple sequence to test some properties of constructe objects.
+class DummySequence(types.Sequence):
+    LOOK = {True: types.Integer}
+    components = (
+        types.Component("bool", types.Boolean),
+        types.Component("int", types.Integer, optional=True),
+        types.Component("oct", types.OctetString, default="hi"),
+        types.Component("any", types.Any, defined_by="bool", lookup=LOOK)
+      )
 
 
 class TagLengthValueTest(unittest.TestCase):
     """Test Tag-Length-Value encoding."""
     # A slightly more interesting encoding to test reading from the beginning
     # of a buffer.
-    class TruncatingDummy(types.Abstract):
+    class TruncatingDummy(types.Simple):
         tags = (tag.Tag(1, tag.UNIVERSAL, tag.PRIMITIVE),)
         def _convert_value(cls, value):
             return value[0]
@@ -102,10 +113,6 @@ class TagLengthValueTest(unittest.TestCase):
             return buf[0], buf[1:]
 
         def _encode_value(self):
-            return self._value
-
-        @property
-        def value(self):
             return self._value
 
     def test_encode_decode_int(self):
@@ -522,15 +529,7 @@ class ChoiceTest(type_test_base.TypeTestBase):
 
 
 class SequenceTest(type_test_base.TypeTestBase):
-    class MySequence(types.Sequence):
-        LOOK = {True: types.Integer}
-        components = (
-            types.Component("bool", types.Boolean),
-            types.Component("int", types.Integer, optional=True),
-            types.Component("oct", types.OctetString, default="hi"),
-            types.Component("any", types.Any, defined_by="bool", lookup=LOOK)
-          )
-    asn1_type = MySequence
+    asn1_type = DummySequence
     immutable = False
     repeated = False
     keyed = True
@@ -595,6 +594,73 @@ class SequenceTest(type_test_base.TypeTestBase):
         self.assertRaises(error.ASN1Error, self.asn1_type.decode, enc)
         dec = self.asn1_type.decode(enc, strict=False)
         self.assertFalse(dec["any"].decoded)
+
+
+class PrintTest(unittest.TestCase):
+    def test_simple_human_readable(self):
+        dummy = Dummy("hello")
+        # Ensure there's some content.
+        self.assertTrue(str(dummy))
+        self.assertTrue(str(dummy) in dummy.human_readable(wrap=0))
+
+    def test_simple_human_readable_prints_label(self):
+        s = Dummy("hello").human_readable(label="world")
+        self.assertTrue("world" in s)
+
+    def test_simple_human_readable_lines_wrap(self):
+        dummy = Dummy(value="hello")
+        wrap = 3
+        for line in dummy.human_readable_lines(wrap=wrap):
+            self.assertTrue(len(line) <= wrap)
+
+    def test_string_value_int(self):
+        i = types.Integer(value=123456789)
+        self.assertTrue("123456789" in str(i))
+
+    def test_string_value_bool(self):
+        b = types.Boolean(value=True)
+        self.assertTrue("true" in str(b).lower())
+        b = types.Boolean(value=False)
+        self.assertTrue("false" in str(b).lower())
+
+    def test_string_value_string(self):
+        # Currently all string types are just str, with no encoding.
+        hello = "\x68\x65\x6c\x6c\x6f"
+        opaque = "\xd7\xa9\xd7\x9c\xd7\x95\xd7\x9d"
+        string_types = [types.TeletexString, types.PrintableString,
+                        types.UniversalString, types.UTF8String,
+                        types.BMPString, types.IA5String]
+
+        for t in string_types:
+            s = t(value=hello)
+            self.assertTrue("hello" in str(s))
+            # TODO(ekasper): make this fail for PrintableString and possibly
+            # others according to their character set restrictions.
+            s2 = t(value=opaque)
+            self.assertTrue(opaque in str(s2))
+
+    def test_string_value_bitstring(self):
+        # 0x1ae
+        b = str(types.BitString(value="0110101110"))
+        self.assertTrue("1" in b)
+        self.assertTrue("ae" in b.lower())
+
+    def test_string_value_octetstring(self):
+        b = str(types.OctetString(value="\x42\xac"))
+        self.assertTrue("42" in b)
+        self.assertTrue("ac" in b.lower())
+
+    def test_constructed_human_readable(self):
+        dummy = DummySequence({"bool": True, "int": 3})
+        s = dummy.human_readable(wrap=0)
+        self.assertTrue("bool" in s)
+        self.assertTrue("true" in s.lower())
+        self.assertTrue("int" in s)
+        self.assertTrue("3" in s)
+        # Present since a default is set.
+        self.assertTrue("oct" in s)
+        # Not present and no default.
+        self.assertFalse("any" in s)
 
 
 if __name__ == '__main__':

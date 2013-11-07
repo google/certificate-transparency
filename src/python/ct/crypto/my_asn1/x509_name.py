@@ -54,6 +54,8 @@ _ATTRIBUTE_DICT = {
 
 
 class AttributeTypeAndValue(types.Sequence):
+    print_labels = False
+    print_delimiter = "="
     components = (
         (types.Component("type", AttributeType)),
         (types.Component("value", AttributeValue, defined_by="type",
@@ -62,10 +64,14 @@ class AttributeTypeAndValue(types.Sequence):
 
 
 class RelativeDistinguishedName(types.SetOf):
+    print_labels = False
+    print_delimiter = ", "
     component = AttributeTypeAndValue
 
 
 class RDNSequence(types.SequenceOf):
+    print_labels = False
+    print_delimiter = "/"
     component = RelativeDistinguishedName
 
 
@@ -77,6 +83,7 @@ class Name(RDNSequence):
 
 
 class OtherName(types.Sequence):
+    print_delimiter = ", "
     components = (
         (types.Component("type-id", oid.ObjectIdentifier)),
         (types.Component("value", types.Any.explicit(0)))
@@ -84,6 +91,7 @@ class OtherName(types.Sequence):
 
 
 class EDIPartyName(types.Sequence):
+    print_delimiter = ", "
     components = (
         # Definition here: http://tools.ietf.org/html/rfc5280#section-4.2.1.6
         # Note: this definition suggests that the tagging is implicit.

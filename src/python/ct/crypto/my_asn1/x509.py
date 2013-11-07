@@ -1,5 +1,6 @@
 """ASN.1 X509 specification."""
 
+from ct.crypto.asn1 import print_util
 from ct.crypto.my_asn1 import oid
 from ct.crypto.my_asn1 import types
 from ct.crypto.my_asn1 import x509_extension
@@ -11,7 +12,8 @@ class Version(types.Integer):
 
 
 class CertificateSerialNumber(types.Integer):
-    pass
+    def __str__(self):
+        return print_util.int_to_hex(int(self))
 
 
 class AlgorithmIdentifier(types.Sequence):
@@ -22,6 +24,7 @@ class AlgorithmIdentifier(types.Sequence):
 
 
 class Time(types.Choice):
+    print_labels = False
     components = {"utcTime": types.UTCTime,
                   "generalTime": types.GeneralizedTime}
 
