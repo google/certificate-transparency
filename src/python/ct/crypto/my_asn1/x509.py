@@ -5,6 +5,7 @@ from ct.crypto.my_asn1 import oid
 from ct.crypto.my_asn1 import types
 from ct.crypto.my_asn1 import x509_extension
 from ct.crypto.my_asn1 import x509_name
+from ct.crypto.my_asn1 import x509_time
 
 
 class Version(types.Integer):
@@ -25,8 +26,8 @@ class AlgorithmIdentifier(types.Sequence):
 
 class Time(types.Choice):
     print_labels = False
-    components = {"utcTime": types.UTCTime,
-                  "generalTime": types.GeneralizedTime}
+    components = {"utcTime": x509_time.UTCTime,
+                  "generalTime": x509_time.GeneralizedTime}
 
 
 class Validity(types.Sequence):

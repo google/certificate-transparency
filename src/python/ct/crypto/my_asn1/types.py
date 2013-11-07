@@ -717,18 +717,6 @@ class UniversalString(ASN1String):
     pass
 
 
-@Universal(23, tag.PRIMITIVE)
-class UTCTime(ASN1String):
-    """UTCTime."""
-    pass
-
-
-@Universal(24, tag.PRIMITIVE)
-class GeneralizedTime(ASN1String):
-    """GeneralizedTime."""
-    pass
-
-
 @Universal(4, tag.PRIMITIVE)
 class OctetString(ASN1String):
     """Octet string."""
