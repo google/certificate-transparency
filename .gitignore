@@ -22,6 +22,8 @@
 /src/test/*.log
 /src/test/*.srl
 /src/test/httpd-local.conf
+/src/test/testdata/logs
+/src/test/testdata/test-cert-proof-extension.pem
 /src/util/json_wrapper_test
 /src/log/cert_test
 /src/log/cert_checker_test

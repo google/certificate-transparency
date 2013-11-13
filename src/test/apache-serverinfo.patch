@@ -1,0 +1,228 @@
+Index: CHANGES
+===================================================================
+--- CHANGES	(revision 1541557)
++++ CHANGES	(working copy)
+@@ -2,6 +2,8 @@
+ 
+ Changes with Apache 2.4.7
+ 
++  *) mod_ssl: Add serverinfo support. [Ben Laurie]
++
+   *) event MPM: Fix possible crashes (third party modules accessing c->sbh) 
+      or occasional missed mod_status updates for some keepalive requests 
+      under load. [Eric Covener]
+Index: modules/ssl/mod_ssl.c
+===================================================================
+--- modules/ssl/mod_ssl.c	(revision 1541557)
++++ modules/ssl/mod_ssl.c	(working copy)
+@@ -94,6 +94,15 @@
+     SSL_CMD_SRV(PKCS7CertificateFile, TAKE1,
+                 "PKCS#7 file containing server certificate and chain"
+                 " certificates ('/path/to/file' - PEM encoded)")
++    SSL_CMD_ALL(RSAInfoFile, TAKE1,
++                "Serverinfo file for RSA certificate "
++                "(`/path/to/file')")
++    SSL_CMD_ALL(DSAInfoFile, TAKE1,
++                "Serverinfo file for DSA certificate "
++                "(`/path/to/file')")
++    SSL_CMD_ALL(ECInfoFile, TAKE1,
++                "Serverinfo file for EC certificate "
++                "(`/path/to/file')")
+ #ifdef HAVE_TLS_SESSION_TICKETS
+     SSL_CMD_SRV(SessionTicketKeyFile, TAKE1,
+                 "TLS session ticket encryption/decryption key file (RFC 5077) "
+@@ -293,7 +302,8 @@
+ #if HAVE_ENGINE_LOAD_BUILTIN_ENGINES
+     ENGINE_cleanup();
+ #endif
+-    ERR_remove_state(0);
++    //ERR_remove_state(0);
++    ERR_remove_thread_state(NULL);
+ 
+     /* Don't call ERR_free_strings here; ERR_load_*_strings only
+      * actually load the error strings once per process due to static
+Index: modules/ssl/ssl_engine_config.c
+===================================================================
+--- modules/ssl/ssl_engine_config.c	(revision 1541557)
++++ modules/ssl/ssl_engine_config.c	(working copy)
+@@ -125,6 +125,10 @@
+     mctx->crl_file            = NULL;
+     mctx->crl_check_mode      = SSL_CRLCHECK_UNSET;
+ 
++    mctx->rsa_info_file       = NULL;
++    mctx->dsa_info_file       = NULL;
++    mctx->ec_info_file        = NULL;
++
+     mctx->auth.ca_cert_path   = NULL;
+     mctx->auth.ca_cert_file   = NULL;
+     mctx->auth.cipher_suite   = NULL;
+@@ -258,6 +262,10 @@
+     cfgMerge(crl_file, NULL);
+     cfgMerge(crl_check_mode, SSL_CRLCHECK_UNSET);
+ 
++    cfgMergeString(rsa_info_file);
++    cfgMergeString(dsa_info_file);
++    cfgMergeString(ec_info_file);
++
+     cfgMergeString(auth.ca_cert_path);
+     cfgMergeString(auth.ca_cert_file);
+     cfgMergeString(auth.cipher_suite);
+@@ -842,6 +850,54 @@
+     return NULL;
+ }
+ 
++const char *ssl_cmd_SSLRSAInfoFile(cmd_parms *cmd,
++				   void *dcfg,
++				   const char *arg)
++{
++    SSLSrvConfigRec *sc = mySrvConfig(cmd->server);
++    const char *err;
++
++    if ((err = ssl_cmd_check_file(cmd, &arg))) {
++        return err;
++    }
++
++    sc->server->rsa_info_file = arg;
++
++    return NULL;
++}
++
++const char *ssl_cmd_SSLDSAInfoFile(cmd_parms *cmd,
++				   void *dcfg,
++				   const char *arg)
++{
++    SSLSrvConfigRec *sc = mySrvConfig(cmd->server);
++    const char *err;
++
++    if ((err = ssl_cmd_check_file(cmd, &arg))) {
++        return err;
++    }
++
++    sc->server->dsa_info_file = arg;
++
++    return NULL;
++}
++
++const char *ssl_cmd_SSLECInfoFile(cmd_parms *cmd,
++				  void *dcfg,
++				  const char *arg)
++{
++    SSLSrvConfigRec *sc = mySrvConfig(cmd->server);
++    const char *err;
++
++    if ((err = ssl_cmd_check_file(cmd, &arg))) {
++        return err;
++    }
++
++    sc->server->ec_info_file = arg;
++
++    return NULL;
++}
++
+ #ifdef HAVE_TLS_SESSION_TICKETS
+ const char *ssl_cmd_SSLSessionTicketKeyFile(cmd_parms *cmd,
+                                             void *dcfg,
+Index: modules/ssl/ssl_engine_init.c
+===================================================================
+--- modules/ssl/ssl_engine_init.c	(revision 1541557)
++++ modules/ssl/ssl_engine_init.c	(working copy)
+@@ -997,7 +997,8 @@
+ static int ssl_server_import_cert(server_rec *s,
+                                   modssl_ctx_t *mctx,
+                                   const char *id,
+-                                  int idx)
++                                  int idx,
++                                  const char *info_file)
+ {
+     SSLModConfigRec *mc = myModConfig(s);
+     ssl_asn1_t *asn1;
+@@ -1036,6 +1037,24 @@
+     }
+ #endif
+ 
++    if (info_file) {
++#if !defined(OPENSSL_NO_TLSEXT) && OPENSSL_VERSION_NUMBER >= 0x10002000L
++        if (!SSL_CTX_use_serverinfo_file(mctx->ssl_ctx, info_file)) {
++            ap_log_error(APLOG_MARK, APLOG_ERR, 0, s,
++                         "Unable to initialize TLS authz extension");
++            ssl_log_ssl_error(SSLLOG_MARK, APLOG_ERR, s);
++            ssl_die(s);
++        }
++        ap_log_error(APLOG_MARK, APLOG_WARNING, 0, s, "Set %s info_file to %s",
++                     type, info_file);
++#else
++        ap_log_error(APLOG_MARK, APLOG_ERR, 0, s,
++                     "Unable to initialize serverinfo extension: "
++                     "OpenSSL version too low");
++        ssl_die(s);
++#endif
++    }
++
+     mctx->pks->certs[idx] = cert;
+ 
+     return TRUE;
+@@ -1173,10 +1192,13 @@
+     ecc_id = ssl_asn1_table_keyfmt(ptemp, vhost_id, SSL_AIDX_ECC);
+ #endif
+ 
+-    have_rsa = ssl_server_import_cert(s, mctx, rsa_id, SSL_AIDX_RSA);
+-    have_dsa = ssl_server_import_cert(s, mctx, dsa_id, SSL_AIDX_DSA);
++    have_rsa = ssl_server_import_cert(s, mctx, rsa_id, SSL_AIDX_RSA,
++                                      mctx->rsa_info_file);
++    have_dsa = ssl_server_import_cert(s, mctx, dsa_id, SSL_AIDX_DSA,
++                                      mctx->dsa_info_file);
+ #ifndef OPENSSL_NO_EC
+-    have_ecc = ssl_server_import_cert(s, mctx, ecc_id, SSL_AIDX_ECC);
++    have_ecc = ssl_server_import_cert(s, mctx, ecc_id, SSL_AIDX_ECC,
++                                      mctx->ec_info_file);
+ #endif
+ 
+     if (!(have_rsa || have_dsa
+Index: modules/ssl/ssl_private.h
+===================================================================
+--- modules/ssl/ssl_private.h	(revision 1541557)
++++ modules/ssl/ssl_private.h	(working copy)
+@@ -662,6 +662,11 @@
+     SRP_VBASE  *srp_vbase;
+ #endif
+ 
++    /** Serverinfo extension */
++    const char  *rsa_info_file;
++    const char  *dsa_info_file;
++    const char  *ec_info_file;
++
+     modssl_auth_ctx_t auth;
+ 
+     BOOL ocsp_enabled; /* true if OCSP verification enabled */
+@@ -739,6 +744,9 @@
+ const char  *ssl_cmd_SSLRandomSeed(cmd_parms *, void *, const char *, const char *, const char *);
+ const char  *ssl_cmd_SSLEngine(cmd_parms *, void *, const char *);
+ const char  *ssl_cmd_SSLCipherSuite(cmd_parms *, void *, const char *);
++const char  *ssl_cmd_SSLRSAInfoFile(cmd_parms *, void *, const char *);
++const char  *ssl_cmd_SSLDSAInfoFile(cmd_parms *, void *, const char *);
++const char  *ssl_cmd_SSLECInfoFile(cmd_parms *, void *, const char *);
+ const char  *ssl_cmd_SSLCertificateFile(cmd_parms *, void *, const char *);
+ const char  *ssl_cmd_SSLCertificateKeyFile(cmd_parms *, void *, const char *);
+ const char  *ssl_cmd_SSLCertificateChainFile(cmd_parms *, void *, const char *);
+Index: modules/ssl/ssl_util.c
+===================================================================
+--- modules/ssl/ssl_util.c	(revision 1541557)
++++ modules/ssl/ssl_util.c	(working copy)
+@@ -465,7 +465,7 @@
+ static apr_status_t ssl_util_thread_cleanup(void *data)
+ {
+     CRYPTO_set_locking_callback(NULL);
+-    CRYPTO_set_id_callback(NULL);
++    //    CRYPTO_set_id_callback(NULL);
+ 
+     CRYPTO_set_dynlock_create_callback(NULL);
+     CRYPTO_set_dynlock_lock_callback(NULL);
+@@ -489,7 +489,7 @@
+         apr_thread_mutex_create(&(lock_cs[i]), APR_THREAD_MUTEX_DEFAULT, p);
+     }
+ 
+-    CRYPTO_set_id_callback(ssl_util_thr_id);
++    //    CRYPTO_set_id_callback(ssl_util_thr_id);
+ 
+     CRYPTO_set_locking_callback(ssl_util_thr_lock);
+ 
