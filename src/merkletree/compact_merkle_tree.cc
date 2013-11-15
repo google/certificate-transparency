@@ -11,7 +11,8 @@ using std::string;
 class SerialHasher;
 
 CompactMerkleTree::CompactMerkleTree(SerialHasher *hasher)
-    : treehasher_(hasher),
+    : ct::MerkleTreeInterface(),
+      treehasher_(hasher),
       leaf_count_(0),
       leaves_processed_(0),
       level_count_(0) {

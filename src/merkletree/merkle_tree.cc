@@ -11,7 +11,8 @@ using std::string;
 class SerialHasher;
 
 MerkleTree::MerkleTree(SerialHasher *hasher)
-    : treehasher_(hasher),
+    : ct::MerkleTreeInterface(),
+      treehasher_(hasher),
       leaves_processed_(0),
       level_count_(0) {}
 
