@@ -31,13 +31,16 @@ Index: modules/ssl/mod_ssl.c
  #ifdef HAVE_TLS_SESSION_TICKETS
      SSL_CMD_SRV(SessionTicketKeyFile, TAKE1,
                  "TLS session ticket encryption/decryption key file (RFC 5077) "
-@@ -293,7 +302,8 @@
+@@ -293,7 +302,12 @@
  #if HAVE_ENGINE_LOAD_BUILTIN_ENGINES
      ENGINE_cleanup();
  #endif
--    ERR_remove_state(0);
-+    //ERR_remove_state(0);
++
++#if OPENSSL_VERSION_NUMBER >= 0x10000000L
 +    ERR_remove_thread_state(NULL);
++#else
+     ERR_remove_state(0);
++#endif
  
      /* Don't call ERR_free_strings here; ERR_load_*_strings only
       * actually load the error strings once per process due to static
@@ -208,21 +211,61 @@ Index: modules/ssl/ssl_util.c
 ===================================================================
 --- modules/ssl/ssl_util.c	(revision 1541557)
 +++ modules/ssl/ssl_util.c	(working copy)
-@@ -465,7 +465,7 @@
+@@ -444,6 +444,28 @@
+     apr_pool_destroy(l->pool);
+ }
+ 
++#if OPENSSL_VERSION_NUMBER >= 0x10000000L
++
++static void ssl_util_thr_id(CRYPTO_THREADID *id)
++{
++    /* OpenSSL needs this to return an unsigned long.  On OS/390, the pthread
++     * id is a structure twice that big.  Use the TCB pointer instead as a
++     * unique unsigned long.
++     */
++#ifdef __MVS__
++    struct PSA {
++        char unmapped[540];
++        unsigned long PSATOLD;
++    } *psaptr = 0;
++
++    CRYPTO_THREADID_set_numeric(id, psaptr->PSATOLD);
++#else
++    CRYPTO_THREADID_set_pointer(id, apr_os_thread_current());
++#endif
++}
++
++#else
++
+ static unsigned long ssl_util_thr_id(void)
+ {
+     /* OpenSSL needs this to return an unsigned long.  On OS/390, the pthread
+@@ -462,10 +484,16 @@
+ #endif
+ }
+ 
++#endif
++
  static apr_status_t ssl_util_thread_cleanup(void *data)
  {
      CRYPTO_set_locking_callback(NULL);
--    CRYPTO_set_id_callback(NULL);
-+    //    CRYPTO_set_id_callback(NULL);
++#if OPENSSL_VERSION_NUMBER >= 0x10000000L
++    CRYPTO_THREADID_set_callback(NULL);
++#else
+     CRYPTO_set_id_callback(NULL);
++#endif
  
      CRYPTO_set_dynlock_create_callback(NULL);
      CRYPTO_set_dynlock_lock_callback(NULL);
-@@ -489,7 +489,7 @@
+@@ -489,7 +517,11 @@
          apr_thread_mutex_create(&(lock_cs[i]), APR_THREAD_MUTEX_DEFAULT, p);
      }
  
--    CRYPTO_set_id_callback(ssl_util_thr_id);
-+    //    CRYPTO_set_id_callback(ssl_util_thr_id);
++#if OPENSSL_VERSION_NUMBER >= 0x10000000L
++    CRYPTO_THREADID_set_callback(ssl_util_thr_id);
++#else
+     CRYPTO_set_id_callback(ssl_util_thr_id);
++#endif
  
      CRYPTO_set_locking_callback(ssl_util_thr_lock);
  
