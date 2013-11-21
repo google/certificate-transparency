@@ -288,14 +288,15 @@ class IntegerTest(type_test_base.TypeTestBase):
     bad_encodings = (
         # Empty value.
         ("0200"),
-        # Leading 0-octets.
-        ("02020000"),
-        ("0202007f"),
-        # Leading ff-octets.
-        ("0202ffff"),
-        ("0202ff80")
         )
-    bad_strict_encodings = ()
+    bad_strict_encodings = (
+        # Leading 0-octets.
+        (0, "02020000"),
+        (127, "0202007f"),
+        # Leading ff-octets.
+        (-1, "0202ffff"),
+        (-128, "0202ff80")
+      )
 
 
 class OctetStringTest(type_test_base.TypeTestBase):

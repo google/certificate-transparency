@@ -72,7 +72,7 @@ def encode_int(value, signed=True):
     return str(int_bytes)
 
 
-def decode_int(buf, signed=True):
+def decode_int(buf, signed=True, strict=True):
     """Decode an integer.
 
     Args:
@@ -93,11 +93,11 @@ def decode_int(buf, signed=True):
     int_bytes = bytearray(buf[1:])
 
     if int_bytes:
-      if leading == 0 and int_bytes[0] < 128:
+      if strict and leading == 0 and int_bytes[0] < 128:
         # 0x00 0x42 == 0x42
         raise error.ASN1Error("Extra leading 0-bytes in integer "
                               "encoding")
-      elif signed and leading == 0xff and int_bytes[0] >= 128:
+      elif strict and signed and leading == 0xff and int_bytes[0] >= 128:
         # 0xff 0x82 == 0x82
         raise error.ASN1Error("Extra leading 0xff-bytes in negative "
                               "integer encoding")
@@ -157,7 +157,8 @@ def read_length(buf):
     length &= _MULTIBYTE_LENGTH_MASK
     if len(rest) < length:
         raise error.ASN1Error("Invalid length encoding")
-    return (decode_int(rest[:length], signed=False), rest[length:])
+    # strict=True: let's hope that at least ASN.1 lengths are properly encoded.
+    return (decode_int(rest[:length], signed=False, strict=True), rest[length:])
 
 
 class Universal(object):
@@ -656,7 +657,7 @@ class Integer(Simple):
 
     @classmethod
     def _decode_value(cls, buf, strict=True):
-        return decode_int(buf)
+        return decode_int(buf, strict=strict)
 
 
 class ASN1String(Simple):

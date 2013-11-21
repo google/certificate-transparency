@@ -60,6 +60,10 @@ class CertificateTest(unittest.TestCase):
     # CVE-2013-4248
     _PEM_NULL_CHARS = "null_chars.pem"
 
+    # A certificate with a negative serial number, and, for more fun,
+    # an extra leading ff-octet therein.
+    _PEM_NEGATIVE_SERIAL = "negative_serial.pem"
+
     @property
     def pem_file(self):
         return FLAGS.testdata_dir + "/" + self._PEM_FILE
@@ -100,6 +104,9 @@ class CertificateTest(unittest.TestCase):
     def nullnames_file(self):
         return FLAGS.testdata_dir + "/" + self._PEM_NULL_CHARS
 
+    @property
+    def negative_serial_file(self):
+        return FLAGS.testdata_dir + "/" + self._PEM_NEGATIVE_SERIAL
 
     def test_from_pem_file(self):
         c = cert.Certificate.from_pem_file(self.pem_file)
@@ -325,6 +332,15 @@ class CertificateTest(unittest.TestCase):
     def test_serial_number(self):
         c = cert.Certificate.from_pem_file(self.pem_file)
         self.assertEqual(454887626504608315115709, c.serial_number())
+
+    def test_negative_serial_number(self):
+        # Fails because of the leading ff-octet.
+        self.assertRaises(error.ASN1Error, cert.Certificate.from_pem_file,
+            self.negative_serial_file)
+        c = cert.Certificate.from_pem_file(self.negative_serial_file,
+                                           strict_der=False)
+        self.assertEqual(-218943125988803304701934765446014018,
+                          c.serial_number())
 
     def test_v1_cert(self):
         c = cert.Certificate.from_pem_file(self.v1_file)
