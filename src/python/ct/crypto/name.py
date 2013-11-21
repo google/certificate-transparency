@@ -1,62 +1,68 @@
-from ct.crypto.asn1 import x509_name
-from pyasn1 import error as pyasn1_error
+import copy
+
+from ct.crypto.my_asn1 import x509_name
 
 
+# This class is in a partial refactor state, see also
+# https://code.google.com/p/certificate-transparency/issues/detail?id=13
+# https://code.google.com/p/certificate-transparency/issues/detail?id=12
 class GeneralName(object):
     """Class to represent a parsed X509 GeneralName"""
     def __init__(self, asn1_general_name):
-        self.__asn1_name = asn1_general_name
-        self.__parse_name()
+        self._asn1_name = asn1_general_name
+        self._parse_name()
 
-    def __parse_name(self):
+    def _parse_name(self):
         # Each GeneralName has only one component, being a CHOICE.
-        self.__type = self.__asn1_name.getName()
-        self.__parse_name_value(self.__asn1_name.getComponent())
+        self._type = self._asn1_name.component_key()
+        self._parse_name_value(self._asn1_name.component_value())
 
-    def __parse_name_value(self, name_value):
+    def _parse_name_value(self, name_value):
         # TODO(ekasper) to figure out appropriate encodings for each type.
-        if self.__type in [
-            x509_name.DNS_NAME, x509_name.RFC822_NAME, x509_name.URI_NAME]:
-            try:
-                self.__value = name_value.asOctets()
-            except pyasn1_error.PyAsn1Error:
-                self.__value = ""
-        elif self.__type == x509_name.DIRECTORY_NAME:
-            rdn_sequence = name_value.getComponentByPosition(0)
+        if self._type in [x509_name.DNS_NAME, x509_name.RFC822_NAME,
+                          x509_name.URI_NAME]:
+            self._value = name_value.value
+        elif self._type == x509_name.DIRECTORY_NAME:
+            rdn_sequence = name_value
             values_array = []
             # For directoryName, the value is a list of pairs, each pair
             # containing a part of the RDN and it's value, e.g.:
             # [('O', 'this'), ('OU', 'that')]
-            for (cidx, cvalue) in rdn_sequence.components():
-                type_and_value = cvalue.getComponentByPosition(0)
-                rdn_type = (type_and_value.getComponentByPosition(0)
-                    .string_value())
-                rdn_value = type_and_value.getComponentByPosition(1).asOctets()
+            for (cidx, cvalue) in rdn_sequence.iteritems():
+                # FIXME(ekasper): this appears wrong as it's only considering
+                # the first component of each set.
+                type_and_value = cvalue[0]
+                rdn_type = str(type_and_value["type"])
+                v = type_and_value["value"]
+                # These are ANY DEFINED BY so we may or may not have decoded
+                # them. For all currently recognized types, the decoded value is
+                # a DirectoryString, so .component_value() gives us the
+                # underlying string value.
+                # TODO(ekasper): in order to avoid future breakage, move this to
+                # the Name class.
+                if v.decoded:
+                    rdn_value = v.decoded_value.component_value()
+                else:
+                    rdn_value = v.value
                 values_array.append((rdn_type, rdn_value))
-            self.__value = values_array
-        elif self.__type == x509_name.IP_ADDRESS_NAME:
-            try:
-                self.__value = name_value.asNumbers()
-            except pyasn1_error.PyAsn1Error:
-                self.__value = ()
-        elif self.__type == x509_name.OTHER_NAME:
+            self._value = values_array
+        elif self._type == x509_name.IP_ADDRESS_NAME:
+            self._value = tuple([ord(x) for x in name_value.value])
+        elif self._type == x509_name.OTHER_NAME:
             # for otherName, the value is (oid, oid_octets)
-            try:
-                type_id  = name_value.getComponentByName('type-id').oid()
-                type_value = name_value.getComponentByName('value').asOctets()
-                self.__value = (type_id, type_value)
-            except pyasn1_error.PyAsn1Error:
-                self.__value = (None, None)
+            type_id  = name_value["type-id"].value
+            type_value = name_value["value"].value
+            self._value = (type_id, type_value)
         else:
             # This case covers: x400Address, ediPartyName, registeredID
-            self.__value = None
+            self._value = None
 
     def type(self):
         """Indicates the type of the GeneralName.
         Returns:
             A string representing the type of the name, such as dNSName.
         """
-        return self.__type
+        return self._type
 
     def value(self):
         """Returns the value of this GeneralName.
@@ -68,14 +74,16 @@ class GeneralName(object):
         For otherName that would be a pair of (oid, oid_octets)
         For everything else, it'd be None.
         """
-        return self.__value
+        return self._value
 
     def as_asn1(self):
         """Returns a copy of the ASN1 object representing this GeneralName."""
-        return self.__asn1_name.clone(cloneValueFlag=True)
+        # Temporary hack to keep backwards compatibility. We'll expose the
+        # structure directly (without copying) once the refactor is complete.
+        return copy.deepcopy(self._asn1_name)
 
     def __str__(self):
-        return self.__type + ":" + str(self.__value)
+        return self._type + ":" + str(self._value)
 
 
 def parse_alternative_names(asn1_alternative_names_extension):

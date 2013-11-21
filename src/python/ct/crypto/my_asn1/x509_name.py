@@ -123,17 +123,28 @@ class ORAddress(types.Sequence):
         )
 
 
+OTHER_NAME = "otherName"
+RFC822_NAME = "rfc822Name"
+DNS_NAME = "dNSName"
+X400_ADDRESS_NAME = "x400Address"
+DIRECTORY_NAME = "directoryName"
+EDI_PARTY_NAME = "ediPartyName"
+URI_NAME = "uniformResourceIdentifier"
+IP_ADDRESS_NAME = "iPAddress"
+REGISTERED_ID_NAME = "registeredID"
+
+
 class GeneralName(types.Choice):
     # Definition here: http://tools.ietf.org/html/rfc5280#section-4.2.1.6
     components = {
-        "otherName": OtherName.implicit(0),
-        "rfc822Name": types.IA5String.implicit(1),
-        "dnsName": types.IA5String.implicit(2),
-        "x400Address": ORAddress.implicit(3),
+        OTHER_NAME: OtherName.implicit(0),
+        RFC822_NAME: types.IA5String.implicit(1),
+        DNS_NAME: types.IA5String.implicit(2),
+        X400_ADDRESS_NAME: ORAddress.implicit(3),
         # Implicit CHOICE tag is converted to an explicit one.
-        "directoryName": Name.explicit(4),
-        "ediPartyName": EDIPartyName.implicit(5),
-        "uniformResourceIdentiifer": types.IA5String.implicit(6),
-        "iPAddress": types.OctetString.implicit(7),
-        "registeredID": oid.ObjectIdentifier.implicit(8)
+        DIRECTORY_NAME: Name.explicit(4),
+        EDI_PARTY_NAME: EDIPartyName.implicit(5),
+        URI_NAME: types.IA5String.implicit(6),
+        IP_ADDRESS_NAME: types.OctetString.implicit(7),
+        REGISTERED_ID_NAME: oid.ObjectIdentifier.implicit(8)
         }

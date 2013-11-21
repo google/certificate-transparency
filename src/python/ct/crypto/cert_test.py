@@ -161,7 +161,10 @@ class CertificateTest(unittest.TestCase):
         pure DER parsers to break.  This test makes sure we can parse
         this cert without exceptions or errors.
         """
-        c = cert.Certificate.from_pem_file(self.matrixssl_file)
+        self.assertRaises(error.ASN1Error,
+                          cert.Certificate.from_pem_file, self.matrixssl_file)
+        c = cert.Certificate.from_pem_file(self.matrixssl_file,
+                                           strict_der=False)
         issuer = c.issuer_name()
         self.assertTrue("MatrixSSL Sample Server" in issuer)
 

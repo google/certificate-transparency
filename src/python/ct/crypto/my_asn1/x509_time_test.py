@@ -16,28 +16,32 @@ class TimeTest(unittest.TestCase):
         self.assertEqual(sec, time_struct.tm_sec)
 
     def test_time(self):
-        t = x509_time.UTCTime("130822153902Z").gmtime()
+        t = x509_time.UTCTime(value="130822153902Z").gmtime()
         self.verify_time(t, 2013, 8, 22, 15, 39, 2)
 
-        t = x509_time.GeneralizedTime("20130822153902Z").gmtime()
+        t = x509_time.GeneralizedTime(value="20130822153902Z").gmtime()
         self.verify_time(t, 2013, 8, 22, 15, 39, 2)
 
     def test_utc_time_1900(self):
-        t = x509_time.UTCTime("500822153902Z").gmtime()
+        t = x509_time.UTCTime(value="500822153902Z").gmtime()
         self.verify_time(t, 1950, 8, 22, 15, 39, 2)
 
     def test_time_invalid(self):
-        t = x509_time.UTCTime("131322153902Z")
+        self.assertRaises(error.ASN1Error, x509_time.UTCTime,
+                          value="131322153902Z")
+        self.assertRaises(error.ASN1Error, x509_time.UTCTime,
+                          value="201301322153902Z")
+        t = x509_time.UTCTime(value="131322153902Z", strict=False)
         self.assertRaises(error.ASN1Error, t.gmtime)
-        t = x509_time.UTCTime("201301322153902Z")
+        t = x509_time.UTCTime(value="201301322153902Z", strict=False)
         self.assertRaises(error.ASN1Error, t.gmtime)
 
     def test_time_no_seconds(self):
-        t = x509_time.UTCTime("0001010000Z").gmtime()
+        t = x509_time.UTCTime(value="0001010000Z").gmtime()
         self.verify_time(t, 2000, 1, 1, 0, 0, 0)
 
     def test_time_alt_gmt(self):
-        t = x509_time.UTCTime("121214093107+0000").gmtime()
+        t = x509_time.UTCTime(value="121214093107+0000").gmtime()
         self.verify_time(t, 2012, 12, 14, 9, 31, 7)
 
     def test_time_alt_tz(self):
@@ -45,7 +49,7 @@ class TimeTest(unittest.TestCase):
         Test parsing a timezone with old +HHMM offset format
         Right now, it is ignored.
         """
-        t = x509_time.UTCTime("121214093107+1234").gmtime()
+        t = x509_time.UTCTime(value="121214093107+1234").gmtime()
         self.verify_time(t, 2012, 12, 14, 9, 31, 7)
 
 

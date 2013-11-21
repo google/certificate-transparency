@@ -1046,6 +1046,17 @@ class Choice(Constructed, collections.MutableMapping):
     def value(self):
         return dict(self._value)
 
+    def component_key(self):
+        if not self._value:
+            return None
+        return self._value.keys()[0]
+
+    # A slightly unfortunate overload of the term "value"...
+    def component_value(self):
+        if not self._value:
+            return None
+        return self._value.values()[0]
+
     def _encode_value(self):
         if not self._value:
             raise error.ASN1Error("Choice component not set")

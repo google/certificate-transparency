@@ -50,7 +50,7 @@ class SubjectPublicKeyInfo(types.Sequence):
 
 class TBSCertificate(types.Sequence):
     components = (
-        (types.Component("version", Version.explicit(0))),
+        (types.Component("version", Version.explicit(0), default=0)),
         (types.Component("serialNumber", CertificateSerialNumber)),
         (types.Component("signature", AlgorithmIdentifier)),
         (types.Component("issuer", x509_name.Name)),
