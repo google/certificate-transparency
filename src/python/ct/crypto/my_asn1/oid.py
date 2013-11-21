@@ -157,6 +157,11 @@ ID_DSA = ObjectIdentifier("1.2.840.10040.4.1")
 ID_DSA_WITH_SHA1 = ObjectIdentifier("1.2.840.10040.4.3")
 ID_EC_PUBLICKEY = ObjectIdentifier("1.2.840.10045.2.1")
 ECDSA_WITH_SHA1 = ObjectIdentifier("1.2.840.10045.4.1")
+# http://tools.ietf.org/html/rfc5758
+ECDSA_WITH_SHA224 = ObjectIdentifier("1.2.840.10045.4.3.1")
+ECDSA_WITH_SHA256 = ObjectIdentifier("1.2.840.10045.4.3.2")
+ECDSA_WITH_SHA384 = ObjectIdentifier("1.2.840.10045.4.3.3")
+ECDSA_WITH_SHA512 = ObjectIdentifier("1.2.840.10045.4.3.4")
 # RFC4055
 ID_RSASSA_PSS = ObjectIdentifier("1.2.840.113549.1.1.10")
 # RFC 4491
@@ -230,6 +235,10 @@ _OID_NAME_DICT = {
     ID_DSA_WITH_SHA1: ("id-dsa-with-sha1", "DSA-SHA1"),
     ID_EC_PUBLICKEY: ("id-ecPublicKey", "EC-PUBKEY"),
     ECDSA_WITH_SHA1: ("ecdsa-with-SHA1", "ECDSA-SHA1"),
+    ECDSA_WITH_SHA224: ("ecdsa-with-SHA224", "ECDSA-SHA224"),
+    ECDSA_WITH_SHA256: ("ecdsa-with-SHA256", "ECDSA-SHA256"),
+    ECDSA_WITH_SHA384: ("ecdsa-with-SHA384", "ECDSA-SHA384"),
+    ECDSA_WITH_SHA512: ("ecdsa-with-SHA512", "ECDSA-SHA512"),
     ID_RSASSA_PSS: ("id-RSASSA-PSS", "RSASSA-PSS"),
     ID_GOSTR3411_94_WITH_GOSTR3410_94: ("id-GostR3411-94-with-GostR3410-94",
                                         "GOST94"),

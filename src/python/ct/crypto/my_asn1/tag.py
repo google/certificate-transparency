@@ -96,7 +96,7 @@ class Tag(object):
         """
 
         if not buf:
-            raise error.ASN1Error("Ran out of bytes while decoding")
+            raise error.ASN1TagError("Ran out of bytes while decoding")
         id_byte = ord(buf[0])
         tag_class = id_byte & cls._CLASS_MASK
         encoding = id_byte & cls._ENCODING_MASK

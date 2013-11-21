@@ -64,6 +64,9 @@ class CertificateTest(unittest.TestCase):
     # an extra leading ff-octet therein.
     _PEM_NEGATIVE_SERIAL = "negative_serial.pem"
 
+    # A certificate with an ECDSA key and signature.
+    _PEM_ECDSA = "ecdsa_cert.pem"
+
     @property
     def pem_file(self):
         return FLAGS.testdata_dir + "/" + self._PEM_FILE
@@ -107,6 +110,10 @@ class CertificateTest(unittest.TestCase):
     @property
     def negative_serial_file(self):
         return FLAGS.testdata_dir + "/" + self._PEM_NEGATIVE_SERIAL
+
+    @property
+    def ecdsa_file(self):
+        return FLAGS.testdata_dir + "/" + self._PEM_ECDSA
 
     def test_from_pem_file(self):
         c = cert.Certificate.from_pem_file(self.pem_file)
@@ -273,6 +280,12 @@ class CertificateTest(unittest.TestCase):
         # 210626153248Z
         expected = [2021,6,26,15,32,48,5,177,0]
         self.assertEqual(list(c.not_after()), expected)
+
+    def test_parse_ecdsa_cert(self):
+        # TODO(ekasper): Also test the signature algorithm once it's exposed
+        # in the API.
+        c = cert.Certificate.from_pem_file(self.ecdsa_file)
+        self.assertTrue("kmonos.jp" in c.subject_name())
 
     def test_subject_name(self):
         c = cert.Certificate.from_der_file(self.der_file)
