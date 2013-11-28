@@ -10,6 +10,7 @@ import gflags
 from ct.client import log_client
 from ct.crypto import cert
 from ct.crypto import error
+from ct.proto import client_pb2
 
 FLAGS = gflags.FLAGS
 
@@ -26,15 +27,44 @@ V1 = 0
 TIMESTAMPED_ENTRY = 0
 X509_ENTRY, PRECERT_ENTRY = range(2)
 
+
 # TODO(ekasper): replace with a proper TLS decoder.
-def decode_leaf_input(leaf_input):
-    leaf_bytes = io.BytesIO(leaf_input)
+def read_cert(tls_buffer):
+    cert_length_prefix = tls_buffer.read(3)
+    if len(cert_length_prefix) != 3:
+        raise Error("Input too short")
+    cert_length, = struct.unpack(">I", '\x00' + cert_length_prefix)
+
+    cert = tls_buffer.read(cert_length)
+    if len(cert) < cert_length:
+        raise Error("Input too short")
+    return cert
+
+
+def read_extensions(tls_buffer):
+    extensions_length_prefix = tls_buffer.read(2)
+    if len(extensions_length_prefix) != 2:
+        raise Error("Input too short: expected a 2-byte extension length "
+                    "prefix, read %d bytes" % extensions_length_prefix)
+    extensions_length, = struct.unpack(">H", extensions_length_prefix)
+
+    extensions = tls_buffer.read(extensions_length)
+    if len(extensions) != extensions_length:
+        raise Error("Input too short: expected extensions of length %d, "
+                    "read %d bytes" %
+                    (extensions_length, len(extensions)))
+    return extensions
+
+
+def decode_entry(serialized_entry):
+    entry = client_pb2.EntryResponse()
+    entry.ParseFromString(serialized_entry)
+    leaf_bytes = io.BytesIO(entry.leaf_input)
 
     version = leaf_bytes.read(1)
     if not version:
         raise Error("Input too short")
     version, = struct.unpack(">B", version)
-    # TODO(ekasper): replace with enums
     if version != V1:
         raise Error("Unsupported version %d" % version)
 
@@ -57,34 +87,30 @@ def decode_leaf_input(leaf_input):
     if entry_type != X509_ENTRY and entry_type != PRECERT_ENTRY:
         raise Error("Unsupported entry_type %d" % entry_type)
 
-    cert_length_prefix = leaf_bytes.read(3)
-    if len(cert_length_prefix) != 3:
-        raise Error("Input too short")
-    cert_length, = struct.unpack(">I", '\x00' + cert_length_prefix)
+    if entry_type == X509_ENTRY:
+        cert = read_cert(leaf_bytes)
+        read_extensions(leaf_bytes)
 
-    cert = leaf_bytes.read(cert_length)
-    if len(cert) < cert_length:
-        raise Error("Input too short")
+        if leaf_bytes.read():
+            raise Error("Input too long")
 
-    extensions_length_prefix = leaf_bytes.read(2)
-    if len(extensions_length_prefix) != 2:
-        raise Error("Input too short")
-    extensions_length, = struct.unpack(">H", extensions_length_prefix)
-
-    extensions = leaf_bytes.read(extensions_length)
-    if len(extensions) != extensions_length:
-        raise Error("Input too short")
-
-    if leaf_bytes.read():
-        raise Error("Input too long")
+    else:
+        # Precert entry: extract the full precertificate from extra_data.
+        # This currently does just enough to extract the precert, and doesn't
+        # verify the rest of the leaf input.
+        extra_data = io.BytesIO(entry.extra_data)
+        cert = read_cert(extra_data)
 
     return entry_type, cert
 
-def match(certificate):
+def match(certificate, entry_type):
     # Fill this in with your match criteria, e.g.
     #
     # return "google" in certificate.subject_name().lower()
     #
+    # NB: for precertificates, issuer matching may not work as expected
+    # when the precertificate has been issued by the special-purpose
+    # precertificate signing certificate.
     return True
 
 class QueueMessage(object):
@@ -94,7 +120,6 @@ class QueueMessage(object):
         self.wait_for_ack = wait_for_ack
 
 # Special queue messages to stop the subprocesses.
-SCANNER_STOPPED = "SCANNER_STOPPED"
 WORKER_STOPPED = "WORKER_STOPPED"
 STOP_WORKER = "STOP_WORKER"
 
@@ -108,23 +133,26 @@ def process_entries(entry_queue, output_queue):
             # "STOP_WORKER" message.
             output_queue.put(QueueMessage(WORKER_STOPPED))
         else:
-            entry_type, der_cert = decode_leaf_input(entry)
-            if entry_type == PRECERT_ENTRY:
-                output_queue.put(QueueMessage(
-                    "Found precert: %s" % der_cert.encode("hex"),
-                    wait_for_ack=True))
-            else:
+            # der_cert is either the certificate or the precertificate.
+            entry_type, der_cert = decode_entry(entry)
+            c = None
+            try:
+                c = cert.Certificate(der_cert)
+            except error.Error as e:
                 try:
-                    c = cert.Certificate(der_cert)
+                    c = cert.Certificate(der_cert, strict_der=False)
                 except error.Error as e:
                     output_queue.put(QueueMessage(
-                        "Error while parsing entry no %d:\n%s" % (scanned, e),
-                        wait_for_ack=True))
+                        "Error while parsing entry no %d:\n%s" %
+                        (count, e), wait_for_ack=True))
                 else:
-                    if match(c):
-                        output_queue.put(QueueMessage(
-                            "Found matching certificate:\n%s" % c,
-                            wait_for_ack=True))
+                    output_queue.put(QueueMessage(
+                        "Entry no %d failed strict parsing:\n%s" %
+                        (count, c), wait_for_ack=False))
+            if c and match(c, entry_type):
+                output_queue.put(QueueMessage(
+                    "Found matching certificate:\n%s" % c,
+                    wait_for_ack=True))
             if not count % 1000:
                 output_queue.put(QueueMessage("Scanned %d entries" % count))
 
@@ -141,9 +169,16 @@ def scan(entry_queue, output_queue):
         scanned += 1
         # Can't pickle protocol buffers with protobuf module version < 2.5.0
         # (https://code.google.com/p/protobuf/issues/detail?id=418)
-        # so we just send the leaf input.
-        entry_queue.put((scanned, entry.leaf_input))
-    output_queue.put(QueueMessage(SCANNER_STOPPED))
+        # so send serialized entry.
+        entry_queue.put((scanned, entry.SerializeToString()))
+    # Scanner done; signal workers from the same process.
+    # From http://docs.python.org/2/library/multiprocessing.html :
+    # If multiple processes are enqueuing objects, it is possible for the
+    # objects to be received at the other end out-of-order. However, objects
+    # enqueued by the same process will always be in the expected order with
+    # respect to each other.
+    for _ in range(FLAGS.multi):
+        entry_queue.put((0, STOP_WORKER))
 
 def run():
     # (index, entry) tuples
@@ -164,12 +199,7 @@ def run():
         workers_done = 0
         while workers_done < len(workers):
             msg = output_queue.get()
-            if msg.msg == SCANNER_STOPPED:
-                # Scanner done; signal workers.
-                for _ in range(len(workers)):
-                    entry_queue.put((0, STOP_WORKER))
-            # Worker done.
-            elif msg.msg == WORKER_STOPPED:
+            if msg.msg == WORKER_STOPPED:
                 workers_done += 1
             else:
                 print msg.msg
