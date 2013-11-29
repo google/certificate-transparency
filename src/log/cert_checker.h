@@ -25,9 +25,9 @@ class PreCertChain;
 // (2) we get some spam protection.
 class CertChecker {
  public:
- CertChecker();
+  CertChecker();
 
-  ~CertChecker();
+  virtual ~CertChecker();
 
   enum CertVerifyResult {
     OK,
@@ -45,15 +45,16 @@ class CertChecker {
   // Returns true if at least one certificate was successfully loaded, and no
   // errors were encountered. Returns false otherwise (and will not load any
   // certificates from this file).
-  bool LoadTrustedCertificates(const std::string &trusted_cert_file);
+  virtual bool LoadTrustedCertificates(const std::string &trusted_cert_file);
 
-  void ClearAllTrustedCertificates();
+  virtual void ClearAllTrustedCertificates();
 
-  const std::multimap<std::string, const Cert*> &GetTrustedCertificates() const {
+  virtual const std::multimap<std::string,
+                              const Cert*> &GetTrustedCertificates() const {
     return trusted_;
   }
 
-  size_t NumTrustedCertificates() const { return trusted_.size(); }
+  virtual size_t NumTrustedCertificates() const { return trusted_.size(); }
 
   // Check that:
   // (1) Each certificate is correctly signed by the next one in the chain; and
@@ -65,7 +66,7 @@ class CertChecker {
   // (or replace with store version) - the resulting chain is guaranteed to
   // contain at least one certificate. (Having exactly one certificate implies
   // someone is trying to log a root cert, which is fine though unexciting.)
-  CertVerifyResult CheckCertChain(CertChain *chain) const;
+  virtual CertVerifyResult CheckCertChain(CertChain *chain) const;
 
   // Check that:
   // (1) The PreCertChain is well-formed according to I-D rules.
@@ -76,9 +77,10 @@ class CertChecker {
   // contain at least two certificates (three if there is a Precert Signing
   // Certificate);
   // If valid, also fills in the |issuer_key_hash| and |tbs_certificate|.
-  CertVerifyResult CheckPreCertChain(PreCertChain *chain,
-                                     std::string* issuer_key_hash,
-                                     std::string *tbs_certificate) const;
+  virtual CertVerifyResult CheckPreCertChain(
+      PreCertChain *chain,
+      std::string *issuer_key_hash,
+      std::string *tbs_certificate) const;
 
  private:
   CertVerifyResult CheckIssuerChain(CertChain *chain) const;
