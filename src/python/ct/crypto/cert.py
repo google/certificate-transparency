@@ -8,8 +8,8 @@ import time
 from ct.crypto import error
 from ct.crypto import name
 from ct.crypto import pem
-from ct.crypto.my_asn1 import oid
-from ct.crypto.my_asn1 import x509
+from ct.crypto.asn1 import oid
+from ct.crypto.asn1 import x509
 
 
 class CertificateError(error.Error):

@@ -1,40 +1,151 @@
-"""ASN.1 object identifiers. This module contains a dictionary of known OIDs."""
+"""ASN.1 object identifiers. This module contains a dictionary of known OIDs.
 
-import abc
-
-from pyasn1.type import univ
-from pyasn1 import error as pyasn1_error
+See http://luca.ntop.org/Teaching/Appunti/asn1.html for a good introduction
+to ASN.1.
+"""
 
 from ct.crypto import error
+from ct.crypto.asn1 import tag
 from ct.crypto.asn1 import types
 
-class ObjectIdentifier(univ.ObjectIdentifier, types.SimpleBaseType):
-    def oid(self):
-        """String representation of the numerical OID."""
-        try:
-            return str(self)
-        except pyasn1_error.PyAsn1Error:
-            return "<no value>"
 
-    def short_name(self):
-        """Return the short name representation of an OID, if one exists,
-        or a string representation otherwise."""
+@types.Universal(6, tag.PRIMITIVE)
+class ObjectIdentifier(types.Simple):
+    """Object identifier."""
+
+    def _name(self, dict_idx):
         try:
-            return _OID_NAME_DICT[self][1]
+            return _OID_NAME_DICT[self][dict_idx]
         except KeyError:
             # fall back to OID
-            return self.oid()
+            return ".".join(map(str, self._value))
 
+    @property
+    def short_name(self):
+        """Return the short name representation of an OID."""
+        return self._name(1)
+
+    @property
     def long_name(self):
-        """Return the long name representation of an OID, if one exists,
-        or a string representation otherwise."""
-        try:
-            return _OID_NAME_DICT[self][0]
-        except KeyError:
-            return self.oid()
+        """Return the long name representation of an OID."""
+        return self._name(0)
 
-    def string_value(self):
-        return self.short_name()
+    def __str__(self):
+        return self.short_name
+
+    @property
+    def value(self):
+        """The value of an OID is a tuple of integers."""
+        return self._value
+
+    @staticmethod
+    def _encode_component(value):
+        """Encode an OID component as a bytearray.
+
+        Args:
+            value: an integer component value
+
+        Returns:
+            a bytearray representing the encoded component.
+        """
+        int_bytes = bytearray()
+        # Encode in base-128.
+        # All bytes apart from the lsb have the high bit set.
+        int_bytes.append(value & 0x7f)
+        value >>= 7
+        while value:
+            int_bytes.append(value & 0x7f | 0x80)
+            value >>= 7
+        int_bytes.reverse()
+        return int_bytes
+
+    @classmethod
+    def _read_component(cls, int_bytes):
+        """Parse a single component from a non-empty bytearray.
+
+        Args:
+            int_bytes: a non-empty bytearray.
+
+        Returns:
+            a (component, rest) tuple with the decoded integer and the
+                remaining bytes of the bytearray.
+        """
+        ret = 0
+        i = 0
+        while int_bytes[i] & 0x80:
+            num = int_bytes[i] & 0x7f
+            if not ret and not num:
+                # The component must be encoded with as few digits as possible,
+                # i.e., leading zeroes are not allowed. Since ASN.1 libraries
+                # interpret leading 0x80-octets differently, this may be
+                # indicative of an attempt to trick a browser into accepting a
+                # certificate it shouldn't. See page 7 of
+                # www.cosic.esat.kuleuven.be/publications/article-1432.pdf
+                raise error.ASN1Error("Leading 0x80 octets in the base-128 "
+                                      "encoding of  OID component")
+            ret |= num
+            ret <<= 7
+            i += 1
+
+        ret |= int_bytes[i]
+        return ret, int_bytes[i+1:]
+
+    def _encode_value(self):
+        int_bytes = bytearray()
+        # ASN.1 specifies that the first two components are encoded together
+        # as c0*40 + c1.
+        int_bytes += self._encode_component(self._value[0]*40 + self._value[1])
+        for v in self._value[2:]:
+            int_bytes += self._encode_component(v)
+        return str(int_bytes)
+
+    @classmethod
+    def _convert_value(cls, value):
+        if isinstance(value, ObjectIdentifier):
+            return value.value
+        else:
+            if isinstance(value, str):
+                value = [int(v) for v in value.split(".")]
+            if len(value) < 2:
+                raise ValueError("OID must have at least 2 components")
+            if not all([v >= 0 for v in value]):
+                raise ValueError("OID cannot have negative components")
+            if value[0] > 2:
+                raise ValueError("First OID component must be 0, 1 or 2, "
+                                 "got %d" % value[0])
+            if value[0] <= 1 and value[1] > 39:
+                raise ValueError("Second OID component must be <= 39 if "
+                                 "first component is <= 1; got %d, %d" %
+                                 (value[0], value[1]))
+            return tuple(value)
+
+    @classmethod
+    def _decode_value(cls, buf, strict=True):
+        """Decode from a string or string buffer."""
+        if not buf:
+            raise error.ASN1Error("Invalid encoding")
+        int_bytes = bytearray(buf)
+
+        # Last byte can't have the high bit set.
+        if int_bytes[-1] & 0x80:
+            raise error.ASN1Error("Invalid encoding")
+
+        components = []
+
+        first, int_bytes = cls._read_component(int_bytes)
+        if first < 40:
+            components += [0, first]
+        elif first < 80:
+            components += [1, first - 40]
+        else:
+            components += [2, first - 80]
+
+        while int_bytes:
+            component, int_bytes = cls._read_component(int_bytes)
+            components.append(component)
+
+        return tuple(components)
+
 
 # Signature and public key algorithms
 # RFC 3279
@@ -46,6 +157,11 @@ ID_DSA = ObjectIdentifier("1.2.840.10040.4.1")
 ID_DSA_WITH_SHA1 = ObjectIdentifier("1.2.840.10040.4.3")
 ID_EC_PUBLICKEY = ObjectIdentifier("1.2.840.10045.2.1")
 ECDSA_WITH_SHA1 = ObjectIdentifier("1.2.840.10045.4.1")
+# http://tools.ietf.org/html/rfc5758
+ECDSA_WITH_SHA224 = ObjectIdentifier("1.2.840.10045.4.3.1")
+ECDSA_WITH_SHA256 = ObjectIdentifier("1.2.840.10045.4.3.2")
+ECDSA_WITH_SHA384 = ObjectIdentifier("1.2.840.10045.4.3.3")
+ECDSA_WITH_SHA512 = ObjectIdentifier("1.2.840.10045.4.3.4")
 # RFC4055
 ID_RSASSA_PSS = ObjectIdentifier("1.2.840.113549.1.1.10")
 # RFC 4491
@@ -119,6 +235,10 @@ _OID_NAME_DICT = {
     ID_DSA_WITH_SHA1: ("id-dsa-with-sha1", "DSA-SHA1"),
     ID_EC_PUBLICKEY: ("id-ecPublicKey", "EC-PUBKEY"),
     ECDSA_WITH_SHA1: ("ecdsa-with-SHA1", "ECDSA-SHA1"),
+    ECDSA_WITH_SHA224: ("ecdsa-with-SHA224", "ECDSA-SHA224"),
+    ECDSA_WITH_SHA256: ("ecdsa-with-SHA256", "ECDSA-SHA256"),
+    ECDSA_WITH_SHA384: ("ecdsa-with-SHA384", "ECDSA-SHA384"),
+    ECDSA_WITH_SHA512: ("ecdsa-with-SHA512", "ECDSA-SHA512"),
     ID_RSASSA_PSS: ("id-RSASSA-PSS", "RSASSA-PSS"),
     ID_GOSTR3411_94_WITH_GOSTR3410_94: ("id-GostR3411-94-with-GostR3410-94",
                                         "GOST94"),
@@ -149,7 +269,7 @@ _OID_NAME_DICT = {
     ID_CE_AUTHORITY_KEY_IDENTIFIER: ("id-ce-authorityKeyIdentifier",
                                      "authorityKeyIdentifier"),
     ID_CE_SUBJECT_KEY_IDENTIFIER: ("id-ce-subjectKeyIdentifier",
-                                     "subjectKeyIdentifier"),
+                                   "subjectKeyIdentifier"),
     ID_CE_KEY_USAGE: ("id-ce-keyUsage", "keyUsage"),
     ID_CE_PRIVATE_KEY_USAGE_PERIOD: ("id-ce-privateKeyUsagePeriod",
                                      "privateKeyUsagePeriod"),
@@ -169,7 +289,7 @@ _OID_NAME_DICT = {
     ID_PE_AUTHORITY_INFO_ACCESS: ("id-pe-authorityInfoAccess",
                                   "authorityInformationAccess"),
     ID_PE_SUBJECT_INFO_ACCESS: ("id-pe-subjectInfoAccess",
-                                  "subjectInformationAccess"),
+                                "subjectInformationAccess"),
 
     ID_KP_SERVER_AUTH: ("id-kp-serverAuth", "serverAuth"),
     ID_KP_CLIENT_AUTH: ("id-kp-clientAuth", "clientAuth"),
@@ -182,58 +302,3 @@ _OID_NAME_DICT = {
     ID_AD_CA_ISSUERS: ("id-ad-caIssuers", "caIssuers")
 
     }
-
-class ValueTypeIdentifier(ObjectIdentifier):
-    """An OID that identifies an ASN.1 structure."""
-    @abc.abstractmethod
-    def value_type(self):
-        """Return an ASN.1 type corresponding to the OID.
-        Returns: an ASN.1 type.
-        Raises:  ct.crypto.error.UnknownASN1TypeError.
-        """
-        pass
-
-class DecodableAny(types.Any):
-    """An ANY ASN.1 object whose encoding/decoding is determined by a
-    corresponding ValueTypeIdentifier OID."""
-    def get_decoded_value(self, value_type_oid, decode_fun,
-                          default_value_type=None):
-        """Get the decoded ASN.1 object.
-        Args:
-            value_type_oid: the ValueTypeIdentifier object that determines the
-                            ASN.1 type.
-            decode_fun    : the decoding function to use
-            default_value_type: the default type to fall back to in case
-                                value_type_oid does not point to a known type.
-        """
-        unknown_error = None
-        try:
-            value_type = value_type_oid.value_type()
-        except error.UnknownASN1TypeError as e:
-            if default_value_type is None:
-                raise e
-            # Save the error but see if the unknown type can be decoded as the
-            # default value type. If decoding still fails, then we re-raise this
-            # this error to indicate we don't know how to decode the attribute.
-            # decode the attribute.
-            unknown_error = e
-            value_type = default_value_type
- 
-        try:
-            decoded_value, rest = decode_fun(self, asn1Spec=value_type())
-        except pyasn1_error.PyAsn1Error as e:
-            if unknown_error:
-                raise unknown_error
-            else:
-                raise error.ASN1Error("Unable to decode %s value:\n%s" %
-                                      (value_type, e))
-        else:
-            if rest:
-                # If there are leftover bytes here, then best not to trust the
-                # result at all.
-                if unknown_error:
-                    raise unknown_error
-                else:
-                    raise error.ASN1Error("Invalid encoding of %s" % value_type)
-            else:
-                return decoded_value

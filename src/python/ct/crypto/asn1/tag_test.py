@@ -3,7 +3,7 @@
 import unittest
 
 from ct.crypto import error
-from ct.crypto.my_asn1 import tag
+from ct.crypto.asn1 import tag
 
 
 class TagTest(unittest.TestCase):
