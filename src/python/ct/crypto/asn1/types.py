@@ -374,6 +374,7 @@ class Abstract(object):
             self._value = self._convert_value(value)
         else:
             raise TypeError("Cannot initialize from None")
+        self._serialized_value = serialized_value
 
     @classmethod
     def _convert_value(cls, value):
@@ -431,7 +432,21 @@ class Abstract(object):
         Returns:
             a string representing the encoded object.
         """
-        encoded_value = self._encode_value()
+        # If we have a read-only object that we created from a serialized value
+        # and never modified since, use the original cached value.
+        #
+        # This ensures that objects decoded in non-strict mode will retain their
+        # original encoding. (Note we do not cache tag and length encoding;
+        # non-strict mode only applies to values).
+        if self._serialized_value and not self.modified():
+            encoded_value = self._serialized_value
+        else:
+            # We can only use the cached value if the object has never been
+            # modified after birth. Since mutable objects cannot track when
+            # their recursive subcomponents are modified, the modified flag,
+            # once set, can never be unset.
+            self._serialized_value = None
+            encoded_value = self._encode_value()
         for t in self.tags:
             encoded_length = encode_length(len(encoded_value))
             encoded_value = t.value + encoded_length + encoded_value
@@ -563,6 +578,10 @@ class Simple(Abstract):
 
     def __nonzero__(self):
         return bool(self.value)
+
+    def modified(self):
+        """Returns True if the object has been modified after creation."""
+        return False
 
     @classmethod
     def wrap_lines(cls, long_string, wrap):
@@ -883,6 +902,30 @@ class Constructed(Abstract):
     print_labels = True
     print_delimiter = "\n"
 
+    def __init__(self, value=None, serialized_value=None, strict=True):
+        """Initialize from a value or serialized buffer.
+
+        Args:
+            value: initializing value of an appropriate type. If the
+                serialized_value is not set, the initializing value must be set.
+            serialized_value: serialized inner value (with tags and lengths
+                stripped).
+            strict: if False, tolerate some non-fatal decoding errors.
+
+        Raises:
+            error.ASN1Error: decoding the serialized value failed.
+            TypeError: invalid initializer.
+        """
+        super(Constructed, self).__init__(value=value,
+                                          serialized_value=serialized_value,
+                                          strict=strict)
+        # All methods that mutate the object must set this to True.
+        self._modified = False
+
+    def modified(self):
+        return self._modified or any([v and v.modified()
+                                      for _, v in self.iteritems()])
+
     def human_readable_lines(self, wrap=80, label=""):
         """A pretty human readable representation of the object.
 
@@ -1006,6 +1049,8 @@ class Choice(Constructed, collections.MutableMapping):
             self._value = self._decode_readahead_value(
                 serialized_value, readahead_tag, readahead_value,
                 strict=strict)
+            self._serialized_value = serialized_value
+            self._modified = False
         else:
             super(Choice, self).__init__(value=value,
                                          serialized_value=serialized_value,
@@ -1029,6 +1074,7 @@ class Choice(Constructed, collections.MutableMapping):
         # construct one.
         else:
             self._value = {key: spec(value)}
+        self._modified = True
 
     def __delitem__(self, key):
         if key in self._value:
@@ -1036,6 +1082,7 @@ class Choice(Constructed, collections.MutableMapping):
         # Raise if the key is invalid; else do nothing.
         elif key not in self.components:
             raise KeyError("Invalid key %s" % key)
+        self._modified = True
 
     def __iter__(self):
         return iter(self._value)
@@ -1146,9 +1193,11 @@ class Repeated(Constructed, collections.MutableSequence):
         else:
             self._value[index] = (value if type(value) is self.component
                                   else self.component(value))
+        self._modified = True
 
     def __delitem__(self, index):
         del self._value[index]
+        self._modified = True
 
     def __len__(self):
         return len(self._value)
@@ -1160,6 +1209,7 @@ class Repeated(Constructed, collections.MutableSequence):
         if type(value) is not self.component:
             value = self.component(value)
         self._value.insert(index, value)
+        self._modified = True
 
     @property
     def value(self):
@@ -1270,12 +1320,14 @@ class Sequence(Constructed, collections.MutableMapping):
     def __setitem__(self, key, value):
         component = self.key_map[key]
         value = self._convert_single_value(component, value)
-        self._values[key] = value
+        self._value[key] = value
+        self._modified = True
 
     def __delitem__(self, key):
         if key not in self.key_map:
             raise KeyError("Invalid key %s" % key)
         self[key] = None
+        self._modified = True
 
     def __iter__(self):
         """Iterate component names in order."""

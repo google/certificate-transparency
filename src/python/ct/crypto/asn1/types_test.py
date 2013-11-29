@@ -372,7 +372,33 @@ class BitStringTest(type_test_base.TypeTestBase):
     bad_strict_encodings = ()
 
 
-class SequenceOfTest(type_test_base.TypeTestBase):
+# Mix-in from object so the tests are not run for the base class itself.
+class RepeatedTest(object):
+    def test_modify_repeated(self):
+        d = Dummy(value="world")
+        d2 = Dummy(value="hello")
+        s = self.asn1_type(value=[d])
+        self.assertFalse(s.modified())
+        original_enc = s.encode()
+
+        s[0] = d2
+        self.assertTrue(s.modified())
+        self.assertEqual(s, [d2])
+        self.assertNotEqual(s.encode(), original_enc)
+
+        del s[0]
+        self.assertTrue(s.modified())
+        self.assertFalse(list(s))
+        self.assertNotEqual(s.encode(), original_enc)
+
+        # Back to original; but the modified bit is never cleared.
+        s.append(d)
+        self.assertTrue(s.modified())
+        self.assertEqual(s, [d])
+        self.assertEqual(s.encode(), original_enc)
+
+
+class SequenceOfTest(type_test_base.TypeTestBase, RepeatedTest):
     # Test with a dummy class.
     class SequenceOfDummies(types.SequenceOf):
         component = Dummy
@@ -410,7 +436,7 @@ class SequenceOfTest(type_test_base.TypeTestBase):
         )
 
 
-class SetOfTest(type_test_base.TypeTestBase):
+class SetOfTest(type_test_base.TypeTestBase, RepeatedTest):
     class SetOfDummies(types.SetOf):
         component = Dummy
     asn1_type = SetOfDummies
@@ -528,6 +554,19 @@ class ChoiceTest(type_test_base.TypeTestBase):
     bad_encodings = ()
     bad_strict_encodings = ()
 
+    def test_modify(self):
+        m = self.MyChoice(value={"bool": True})
+        self.assertFalse(m.modified())
+
+        m["bool"] = False
+        self.assertTrue(m.modified())
+        self.assertFalse(m["bool"])
+
+        # Back to original; but the modified bit is never cleared.
+        m["bool"] = True
+        self.assertTrue(m.modified())
+        self.assertTrue(m["bool"])
+
 
 class SequenceTest(type_test_base.TypeTestBase):
     asn1_type = DummySequence
@@ -571,6 +610,21 @@ class SequenceTest(type_test_base.TypeTestBase):
     bad_encodings = ()
     bad_strict_encodings = ()
 
+    def test_modify(self):
+        s = DummySequence(value={"bool": True, "int": 2})
+        self.assertFalse(s.modified())
+
+        s["bool"] = False
+        self.assertTrue(s.modified())
+        self.assertFalse(s["bool"])
+        self.assertEqual(s["int"], 2)
+
+        # Back to original; but the modified bit is never cleared.
+        s["bool"] = True
+        self.assertTrue(s.modified())
+        self.assertTrue(s["bool"])
+        self.assertEqual(s["int"], 2)
+
     def test_decode_any(self):
         seq = self.asn1_type({"bool": True, "int": 3, "oct": "hello",
                               "any": "\x02\x01\x05"})
@@ -595,6 +649,57 @@ class SequenceTest(type_test_base.TypeTestBase):
         self.assertRaises(error.ASN1Error, self.asn1_type.decode, enc)
         dec = self.asn1_type.decode(enc, strict=False)
         self.assertFalse(dec["any"].decoded)
+
+
+# Some attempted test coverage for recursive mutable types.
+class RecursiveTest(type_test_base.TypeTestBase):
+    class SequenceOfSequence(types.SequenceOf):
+        component = DummySequence
+    asn1_type = SequenceOfSequence
+    immutable = False
+    repeated = True
+    keyed = False
+    initializers = (
+        # Fully specified sequence.
+        ([{"bool": True, "int": 3, "oct": "hello", "any": "\x02\x01\x05"}],),
+        # Partially specified sequence.
+        ([{"bool": True, "int": None, "oct": "hi", "any": None}],
+         [{"bool": True}],),
+        # Empty sequence.
+        ([],)
+        )
+    bad_initializers = (
+        # Invalid key in component.
+        ([{"boo": False}], ValueError),
+        # Invalid value in component.
+        ([{"int": "hello"}], ValueError),
+        # Invalid component: not iterable.
+        (types.Boolean(True), TypeError),
+        # Invalid component: iterable but wrong components.
+        ([types.Boolean(True)], TypeError)
+        )
+    encode_test_vectors = (
+        ([{"bool": True, "int": 3, "oct": "hello", "any": "\x02\x01\x05"}],
+         "301230100101ff020103040568656c6c6f020105"),
+        )
+    bad_encodings = ()
+    bad_strict_encodings = ()
+
+    def test_modify_recursively(self):
+        d = DummySequence(value={"bool": True, "int":3, "any": "\x02\x01\x05"})
+        s = self.SequenceOfSequence(value=[d])
+        self.assertFalse(s.modified())
+        original_enc = s.encode()
+
+        # Modify subcomponent.
+        s[0]["bool"] = False
+        self.assertTrue(s.modified())
+        self.assertNotEqual(s.encode(), original_enc)
+
+        # Reset.
+        s[0]["bool"] = True
+        self.assertTrue(s.modified())
+        self.assertEqual(s.encode(), original_enc)
 
 
 class PrintTest(unittest.TestCase):
