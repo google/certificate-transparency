@@ -3,27 +3,49 @@ import abc
 import time
 
 from ct.crypto import error
+from ct.crypto.asn1 import tag
 from ct.crypto.asn1 import types
-from pyasn1.type import useful
 
 
-class BaseTime(types.SimpleBaseType):
-    __metaclass__ = abc.ABCMeta
+class BaseTime(types.ASN1String):
+    """Base class for time types."""
+    def __init__(self, value=None, serialized_value=None, strict=True):
+        super(BaseTime, self).__init__(value=value,
+                                       serialized_value=serialized_value,
+                                       strict=strict)
+        self._gmtime = self._decode_gmtime()
+        # This is a lenient "strict": if we were able to decode the time,
+        # even if it didn't fully conform to the standard, then we'll allow it.
+        # If the time string is garbage then we raise.
+        if strict and self._gmtime is None:
+            raise error.ASN1Error("Corrupt time: %s" % self._value)
+
+    def gmtime(self):
+        """GMT time.
+
+        Returns:
+            a time.struct_time struct.
+
+        Raises:
+            error.ASN1Error: the ASN.1 string does not represent a valid time.
+        """
+        if self._gmtime is None:
+            raise error.ASN1Error("Corrupt time: %s" % self._value)
+        return self._gmtime
 
     @abc.abstractmethod
-    def gmtime(self):
+    def _decode_gmtime(self):
         pass
 
-    def string_value(self):
+    def __str__(self):
         try:
-            gmt = self.gmtime()
+            return time.strftime("%c GMT", self.gmtime())
         except error.ASN1Error:
-            return self._str_or_no_value()
-        else:
-            return time.strftime("%c GMT", gmt)
+            return str(self.value)
 
 
-class UTCTime(useful.UTCTime, BaseTime):
+@types.Universal(23, tag.PRIMITIVE)
+class UTCTime(BaseTime):
     """UTCTime, as understood by RFC 5280."""
     # YYMMDDHHMMSSZ
     _ASN1_LENGTH = 13
@@ -37,19 +59,13 @@ class UTCTime(useful.UTCTime, BaseTime):
     # YYMMDDHHMMSS
     _UTC_NO_Z_LENGTH = 12
 
-    def gmtime(self):
+    def _decode_gmtime(self):
         """GMT time.
 
         Returns:
-            a time.struct_time struct.
-        Raises:
-            error.ASN1Error: the ASN.1 string does not represent a valid time.
+            a time.struct_time struct, or None if the string does not represent
+                a valid time.
         """
-        # This may return "<no value>" or similar; or (since pyasn1 time is
-        # simply a string) arbitrary garbage, in which case we'll bail with
-        # an ASN.1 error.
-        string_time = self._str_or_no_value()
-
         # From RFC 5280:
         # For the purposes of this profile, UTCTime values MUST be expressed in
         # Greenwich Mean Time (Zulu) and MUST include seconds (i.e., times are
@@ -64,6 +80,8 @@ class UTCTime(useful.UTCTime, BaseTime):
         # In addition, there are a number of older certificates
         # that exclude the seconds, e.g. 0001010000Z and others than use
         # an alternative timezone format 360526194526+0000
+        string_time = self.value
+
         if len(string_time) == self._ASN1_LENGTH and string_time[-1] == "Z":
             format = "%Y%m%d%H%M%S%Z"
         elif (len(string_time) == self._UTC_NO_SECONDS_LENGTH and
@@ -86,60 +104,49 @@ class UTCTime(useful.UTCTime, BaseTime):
             format = "%Y%m%d%H%M%S%Z"
             string_time = string_time[0:self._ASN1_LENGTH]
         else:
-            raise error.ASN1Error("Invalid time representation: %s" %
-                                  string_time)
+            return None
 
         try:
             year = int(string_time[:2])
         except ValueError:
-            raise error.ASN1Error("Invalid time representation: %s" %
-                                  string_time)
+            return None
 
         if 0 <= year < 50:
             century = "20"
         elif 50 <= year <= 99:
             century = "19"
         else:
-            raise error.ASN1Error("Invalid time representation: %s" %
-                                  string_time)
+            return None
 
         try:
             # Adding GMT clears the daylight saving flag.
             return time.strptime(century + string_time[:-1] + "GMT", format)
         except ValueError:
-            raise error.ASN1Error("Invalid time representation: %s" %
-                                  string_time)
+            return None
 
 
-class GeneralizedTime(useful.GeneralizedTime, BaseTime):
+@types.Universal(24, tag.PRIMITIVE)
+class GeneralizedTime(BaseTime):
     """Generalized time, as understood by RFC 5280."""
     # YYYYMMDDHHMMSSZ
     _ASN1_LENGTH = 15
 
-    def gmtime(self):
+    def _decode_gmtime(self):
         """GMT time.
 
         Returns:
-            a time.struct_time struct.
-        Raises:
-            error.ASN1Error: the ASN.1 string does not represent a valid time.
+            a time.struct_time struct, or None if the string does not represent
+                a valid time.
         """
-        # This may return "<no value>" or similar; or (since pyasn1 time is
-        # simply a string) arbitrary garbage, in which case we'll bail with
-        # an ASN.1 error.
-        string_time = self._str_or_no_value()
-
         # From RFC 5280:
         # For the purposes of this profile, GeneralizedTime values MUST be
         # expressed in Greenwich Mean Time (Zulu) and MUST include seconds
         # (i.e., times are YYYYMMDDHHMMSSZ), even where the number of seconds
         # is zero.  GeneralizedTime values MUST NOT include fractional seconds.
-        if len(string_time) != self._ASN1_LENGTH or string_time[-1] != "Z":
-            raise error.ASN1Error("Invalid time representation: %s" %
-                                  string_time)
+        if len(self._value) != self._ASN1_LENGTH or self._value[-1] != "Z":
+            return None
         try:
             # Adding GMT clears the daylight saving flag.
-            return time.strptime(string_time[:-1] + "GMT", "%Y%m%d%H%M%S%Z")
+            return time.strptime(self._value[:-1] + "GMT", "%Y%m%d%H%M%S%Z")
         except ValueError:
-            raise error.ASN1Error("Invalid time representation: %s" %
-                                  string_time)
+            return None

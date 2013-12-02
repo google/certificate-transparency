@@ -1,6 +1,6 @@
 import copy
 
-from ct.crypto.my_asn1 import x509_name
+from ct.crypto.asn1 import x509_name
 
 
 # This class is in a partial refactor state, see also

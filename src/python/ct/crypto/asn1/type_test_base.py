@@ -92,5 +92,9 @@ class TypeTestBase(unittest.TestCase):
             o = self.asn1_type(value=value)
             self.assertRaises(error.ASN1Error,
                               self.asn1_type.decode, bad_enc.decode("hex"))
-            self.assertEqual(o, self.asn1_type.decode(bad_enc.decode("hex"),
-                                                      strict=False))
+            o2 = self.asn1_type.decode(bad_enc.decode("hex"), strict=False)
+            self.assertEqual(o, o2)
+            # The object should keep its original encoding...
+            self.assertEqual(bad_enc, o2.encode().encode("hex"))
+            # ... which is not the canonical encoding.
+            self.assertNotEqual(bad_enc, o.encode().encode("hex"))
