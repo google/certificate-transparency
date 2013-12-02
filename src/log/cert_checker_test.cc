@@ -47,6 +47,10 @@ static const char kCollidingRoots[] = "test-colliding-roots.pem";
 // A chain terminating with an MD2 intermediate.
 // Issuer is test-no-bc-ca-cert.pem.
 static const char kMd2Chain[] = "test-md2-chain.pem";
+// A file which doesn't exist.
+static const char kNonexistent[] = "test-nonexistent.pem";
+// A file with corrupted contents (bit flip from ca-cert.pem).
+static const char kCorrupted[] = "test-corrupted.pem";
 
 namespace {
 
@@ -108,6 +112,22 @@ TEST_F(CertCheckerTest, LoadTrustedCertificatesIgnoresDuplicates) {
   EXPECT_EQ(1U, checker_.NumTrustedCertificates());
   EXPECT_TRUE(checker_.LoadTrustedCertificates(cert_dir_ + "/" + kCaCert));
   EXPECT_EQ(1U, checker_.NumTrustedCertificates());
+}
+
+TEST_F(CertCheckerTest, LoadTrustedCertificatesMissingFile) {
+  EXPECT_EQ(0U, checker_.NumTrustedCertificates());
+
+  EXPECT_FALSE(checker_.LoadTrustedCertificates(cert_dir_ + "/" +
+                                                kNonexistent));
+  EXPECT_EQ(0U, checker_.NumTrustedCertificates());
+}
+
+TEST_F(CertCheckerTest, LoadTrustedCertificatesCorruptedFile) {
+  EXPECT_EQ(0U, checker_.NumTrustedCertificates());
+
+  EXPECT_FALSE(checker_.LoadTrustedCertificates(cert_dir_ + "/" +
+                                                kCorrupted));
+  EXPECT_EQ(0U, checker_.NumTrustedCertificates());
 }
 
 TEST_F(CertCheckerTest, Certificate) {
