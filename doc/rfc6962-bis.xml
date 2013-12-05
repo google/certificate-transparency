@@ -491,7 +491,7 @@ with type
 "signed_certificate_timestamp", or by using Online Certificate
 Status Protocol (OCSP) Stapling (also known as the "Certificate
 Status Request" TLS extension; see 
-<xref target='RFC6066'/>), where the response includes an OCSP
+<xref target='RFC6066'/>), where the OCSP response includes an
 extension with OID 1.3.6.1.4.1.11129.2.4.5 (see <xref target='RFC2560'/>) and
 body:
 
@@ -500,6 +500,9 @@ body:
         <figure>
           <artwork>
     SignedCertificateTimestampList ::= OCTET STRING</artwork></figure>
+        <t>
+          in the singleExtensions component of the SingleResponse pertaining to the end-entity certificate.
+        </t>
         <t>
           At least one SCT MUST be included. Server operators MAY include more than one SCT.
         </t>
