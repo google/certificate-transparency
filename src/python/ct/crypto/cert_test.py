@@ -6,6 +6,8 @@ import time
 import unittest
 import sys
 from ct.crypto import cert, error
+from ct.crypto.asn1 import oid
+from ct.crypto.asn1 import x509_extension as x509_ext
 
 FLAGS = gflags.FLAGS
 gflags.DEFINE_string("testdata_dir", "ct/crypto/testdata",
@@ -67,6 +69,9 @@ class CertificateTest(unittest.TestCase):
     # A certificate with an ECDSA key and signature.
     _PEM_ECDSA = "ecdsa_cert.pem"
 
+    # A certificate with multiple EKU extensions.
+    _PEM_MULTIPLE_EKU = "multiple_eku.pem"
+
     @property
     def pem_file(self):
         return FLAGS.testdata_dir + "/" + self._PEM_FILE
@@ -114,6 +119,10 @@ class CertificateTest(unittest.TestCase):
     @property
     def ecdsa_file(self):
         return FLAGS.testdata_dir + "/" + self._PEM_ECDSA
+
+    @property
+    def multiple_eku_file(self):
+        return FLAGS.testdata_dir + "/" + self._PEM_MULTIPLE_EKU
 
     def test_from_pem_file(self):
         c = cert.Certificate.from_pem_file(self.pem_file)
@@ -379,6 +388,50 @@ class CertificateTest(unittest.TestCase):
         self.assertEqual(c.fingerprint("sha256").encode("hex"),
                          "6d4106b4544e9e5e7a0924ee86a577ffefaadae8b8dad73413a7"
                          "d874747a81d1")
+
+    def test_key_usage(self):
+        c = cert.Certificate.from_pem_file(self.pem_file)
+        self.assertTrue(c.key_usage(x509_ext.KeyUsage.DIGITAL_SIGNATURE))
+
+        certs = [c for c in cert.certs_from_pem_file(self.chain_file)]
+        # This leaf cert does not have a KeyUsage extension.
+        self.assertEqual([], certs[0].key_usages())
+        self.assertIsNone(certs[0].key_usage(
+            x509_ext.KeyUsage.DIGITAL_SIGNATURE))
+
+        # The second cert has keyCertSign and cRLSign.
+        self.assertIsNotNone(certs[1].key_usage(
+            x509_ext.KeyUsage.DIGITAL_SIGNATURE))
+        self.assertFalse(certs[1].key_usage(
+            x509_ext.KeyUsage.DIGITAL_SIGNATURE))
+        self.assertTrue(certs[1].key_usage(x509_ext.KeyUsage.KEY_CERT_SIGN))
+        self.assertTrue(certs[1].key_usage(x509_ext.KeyUsage.CRL_SIGN))
+        self.assertItemsEqual([x509_ext.KeyUsage.KEY_CERT_SIGN,
+                               x509_ext.KeyUsage.CRL_SIGN],
+                              certs[1].key_usages())
+
+    def test_extended_key_usage(self):
+        certs = [c for c in cert.certs_from_pem_file(self.chain_file)]
+        self.assertTrue(certs[0].extended_key_usage(oid.ID_KP_SERVER_AUTH))
+        self.assertIsNotNone(
+            certs[0].extended_key_usage(oid.ID_KP_CODE_SIGNING))
+        self.assertFalse(certs[0].extended_key_usage(oid.ID_KP_CODE_SIGNING))
+        self.assertItemsEqual([oid.ID_KP_SERVER_AUTH, oid.ID_KP_CLIENT_AUTH],
+                              certs[0].extended_key_usages())
+
+        # EKU is normally only found in leaf certs.
+        self.assertIsNone(certs[1].extended_key_usage(oid.ID_KP_SERVER_AUTH))
+        self.assertEqual([], certs[1].extended_key_usages())
+
+    def test_multiple_extensions(self):
+        self.assertRaises(error.ASN1Error, cert.Certificate.from_pem_file,
+                          self.multiple_eku_file)
+
+        c = cert.Certificate.from_pem_file(self.multiple_eku_file,
+                                           strict_der=False)
+        self.assertTrue("www.m-budget-mobile-abo.ch" in c.subject_common_name())
+        self.assertRaises(cert.CertificateError, c.extended_key_usages)
+
 
 if __name__ == "__main__":
     sys.argv = FLAGS(sys.argv)

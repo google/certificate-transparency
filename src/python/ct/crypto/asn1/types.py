@@ -793,6 +793,49 @@ class BitString(Simple):
             ret = ret[:-1*pad]
         return ret
 
+class NamedBitList(BitString):
+    """A bit string with named bits."""
+    # To use the NamedBitList ASN.1 construct, set named_bit_list
+    # to a tuple of NamedValue instances, where the name of each NamedValue
+    # corresponds to the identifier and the value to the number of the
+    # distinguished bit, defined by "number" or "DefinedValue" in ASN.1,
+    # see http://www.itu.int/ITU-T/studygroups/com17/languages/X.680-0207.pdf
+    named_bit_list = None
+    char_wrap = 1
+
+    def __str__(self):
+            return ", ".join(["%s" % n.name for n in self.bits_set()])
+
+    def has_bit_set(self, number):
+        """Test if the given bit is set.
+
+        Args:
+            number: the number of the ASN.1 bit. Bit numbering follows ASN.1
+                conventions, i.e., bit number 0 is the "leading bit".
+
+        Returns:
+            True: the bit is 1.
+            False: the bit is 0, or the BitString is not long enough.
+        """
+        # According to
+        # http://www.itu.int/ITU-T/studygroups/com17/languages/X.680-0207.pdf
+        # we must not assume that the presence of named bits constrains the
+        # contents of the bit string:
+        # "21.6 The presence of a "NamedBitList" has no effect on the set of
+        # abstract values of this type. Values containing 1 bits other than the
+        # named bits are permitted.
+        # 21.7 When a "NamedBitList" is used in defining a bitstring type ASN.1
+        # encoding rules are free to add (or remove) arbitrarily any trailing 0
+        # bits to (or from) values that are being encoded or decoded.
+        # Application designers should therefore ensure that different semantics
+        # are not associated with such values which differ only in the number of
+        # trailing 0 bits.
+        return len(self._value) > number and self._value[number] == "1"
+
+    def bits_set(self):
+        """List the named_bit_list elements whose bit is set."""
+        return [n for n in self.named_bit_list if self.has_bit_set(n.value)]
+
 
 class Any(ASN1String):
     """Any.

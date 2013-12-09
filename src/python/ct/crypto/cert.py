@@ -86,7 +86,6 @@ class Certificate(object):
         extn_value_count = collections.Counter([e["extnID"] for e in extns])
         return any([c > 1 for c in extn_value_count.values()])
 
-    # TODO(ekasper): add a test for the CertificateError case.
     def _get_decoded_extension_value(self, extn_id):
         """Get the decoded value of an extension."""
         extns = self._asn1_cert["tbsCertificate"]["extensions"] or []
@@ -345,6 +344,85 @@ class Certificate(object):
         h = hashlib.new(hashfunc)
         h.update(self._cached_der)
         return h.digest()
+
+    def key_usage(self, key_usage):
+        """Whether the certificate has the given key usage asserted.
+
+        Args:
+            key_usage: the usage; one of
+            x509_extension.KeyUsage.DIGITAL_SIGNATURE
+            x509_extension.KeyUsage.NON_REPUDIATION
+            x509_extension.KeyUsage.KEY_ENCIPHERMENT
+            x509_extension.KeyUsage.DATA_ENCIPHERMENT
+            x509_extension.KeyUsage.KEY_AGREEMENT
+            x509_extension.KeyUsage.KEY_CERT_SIGN
+            x509_extension.KeyUsage.CRL_SIGN
+            x509_extension.KeyUsage.ENCIPHER_ONLY
+            x509_extension.KeyUsage.DECIPHER_ONLY
+
+        Returns:
+            True: the key usage is asserted.
+            False: the key usage extension is present but the specified
+                usage is not asserted.
+            None: the key usage extension is not present.
+
+        Raises:
+            CertificateError: corrupt key usage extension, or multiple
+                extension values.
+        """
+        ku = self._get_decoded_extension_value(oid.ID_CE_KEY_USAGE)
+        if ku is None:
+            return None
+        return ku.has_bit_set(key_usage.value)
+
+    def key_usages(self):
+        """List the asserted key usages.
+
+        Returns:
+            A list of key usages asserted in the certificate (or an empty
+                list if the extension is not present).
+
+        Raises:
+            CertificateError: corrupt key usage extension, or multiple
+                extension values.
+        """
+        ku = self._get_decoded_extension_value(oid.ID_CE_KEY_USAGE)
+        return ku.bits_set() if ku else []
+
+    def extended_key_usage(self, ext_key_usage):
+        """Whether the certificate has the given extended key usage asserted.
+
+        Args:
+            ext_key_usage: the object identifier of the usage, e.g.,
+                ct.crypto.asn1.oid.ID_KP_SERVER_AUTH.
+
+        Returns:
+            True: the extended key usage is asserted.
+            False: the extended key usage extension is present but the
+                specified usage is not asserted.
+            None: the extended key usage extension is not present.
+
+        Raises:
+            CertificateError: corrupt key usage extension, or multiple
+                extension values.
+        """
+        eku = self._get_decoded_extension_value(oid.ID_CE_EXT_KEY_USAGE)
+        if eku is None:
+            return None
+        return ext_key_usage in eku
+
+    def extended_key_usages(self):
+        """List the asserted extended key usages.
+
+        Returns:
+            A sequence of extended key usage identifiers asserted in the
+            certificate (or an empty list if the extension is not present).
+
+        Raises:
+            CertificateError: corrupt key usage extension, or multiple
+                extension values.
+        """
+        return self._get_decoded_extension_value(oid.ID_CE_EXT_KEY_USAGE) or []
 
 
 def certs_from_pem(pem_string, skip_invalid_blobs=False, strict_der=True):

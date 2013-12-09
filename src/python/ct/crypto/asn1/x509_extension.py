@@ -1,5 +1,6 @@
 """ASN.1 specification for X509 extensions."""
 
+from ct.crypto.asn1 import named_value
 from ct.crypto.asn1 import oid
 from ct.crypto.asn1 import tag
 from ct.crypto.asn1 import types
@@ -19,6 +20,31 @@ class SubjectAlternativeNames(types.SequenceOf):
     component = x509_name.GeneralName
 
 
+class KeyUsage(types.NamedBitList):
+    DIGITAL_SIGNATURE = named_value.NamedValue("digitalSignature", 0)
+    NON_REPUDIATION = named_value.NamedValue("nonRepudiation", 1)
+    KEY_ENCIPHERMENT = named_value.NamedValue("keyEncipherment", 2)
+    DATA_ENCIPHERMENT = named_value.NamedValue("dataEncipherment", 3)
+    KEY_AGREEMENT = named_value.NamedValue("keyAgreement", 4)
+    KEY_CERT_SIGN = named_value.NamedValue("keyCertSign", 5)
+    CRL_SIGN = named_value.NamedValue("cRLSign", 6)
+    ENCIPHER_ONLY = named_value.NamedValue("encipherOnly", 7)
+    DECIPHER_ONLY = named_value.NamedValue("decipherOnly", 8)
+    named_bit_list = (DIGITAL_SIGNATURE, NON_REPUDIATION, KEY_ENCIPHERMENT,
+                      DATA_ENCIPHERMENT, KEY_AGREEMENT, KEY_CERT_SIGN,
+                      CRL_SIGN, ENCIPHER_ONLY, DECIPHER_ONLY)
+
+
+class KeyPurposeID(oid.ObjectIdentifier):
+    pass
+
+
+class ExtendedKeyUsage(types.SequenceOf):
+    print_delimiter = ", "
+    print_labels = False
+    component = KeyPurposeID
+
+
 # Hack! This is not a valid ASN.1 definition but it works: an extension value
 # value is defined as a DER-encoded value wrapped in an OctetString.
 # This is functionally equivalent to an Any type that is tagged with the
@@ -31,6 +57,8 @@ class ExtensionValue(types.Any):
 _EXTENSION_DICT = {
     oid.ID_CE_BASIC_CONSTRAINTS: BasicConstraints,
     oid.ID_CE_SUBJECT_ALT_NAME: SubjectAlternativeNames,
+    oid.ID_CE_KEY_USAGE: KeyUsage,
+    oid.ID_CE_EXT_KEY_USAGE: ExtendedKeyUsage,
     }
 
 
