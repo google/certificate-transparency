@@ -8,6 +8,7 @@ import sys
 from ct.crypto import cert, error
 from ct.crypto.asn1 import oid
 from ct.crypto.asn1 import x509_extension as x509_ext
+from ct.crypto.asn1 import x509_name
 
 FLAGS = gflags.FLAGS
 gflags.DEFINE_string("testdata_dir", "ct/crypto/testdata",
@@ -72,94 +73,59 @@ class CertificateTest(unittest.TestCase):
     # A certificate with multiple EKU extensions.
     _PEM_MULTIPLE_EKU = "multiple_eku.pem"
 
+    # A certificate with multiple "interesting" SANs.
+    _PEM_MULTIPLE_AN = "multiple_an.pem"
+
     @property
     def pem_file(self):
         return FLAGS.testdata_dir + "/" + self._PEM_FILE
 
-    @property
-    def der_file(self):
-        return FLAGS.testdata_dir + "/" + self._DER_FILE
+    def get_file(self, filename):
+        return FLAGS.testdata_dir + "/" + filename
 
-    @property
-    def chain_file(self):
-        return FLAGS.testdata_dir + "/" + self._PEM_CHAIN_FILE
-
-    @property
-    def v1_file(self):
-        return FLAGS.testdata_dir + "/" + self._V1_PEM_FILE
-
-    @property
-    def matrixssl_file(self):
-        return FLAGS.testdata_dir + "/" + self._PEM_MATRIXSSL
-
-    @property
-    def marchnetworks_file(self):
-        return FLAGS.testdata_dir + "/" + self._PEM_MARCHNETWORKS
-
-    @property
-    def subrigonet_file(self):
-        return FLAGS.testdata_dir + "/" + self._PEM_SUBRIGONET
-
-    @property
-    def promisecom_file(self):
-        return FLAGS.testdata_dir + "/" + self._PEM_PROMISECOM
-
-    @property
-    def cnutf8_file(self):
-        return FLAGS.testdata_dir + "/" + self._PEM_CN_UTF8
-
-    @property
-    def nullnames_file(self):
-        return FLAGS.testdata_dir + "/" + self._PEM_NULL_CHARS
-
-    @property
-    def negative_serial_file(self):
-        return FLAGS.testdata_dir + "/" + self._PEM_NEGATIVE_SERIAL
-
-    @property
-    def ecdsa_file(self):
-        return FLAGS.testdata_dir + "/" + self._PEM_ECDSA
-
-    @property
-    def multiple_eku_file(self):
-        return FLAGS.testdata_dir + "/" + self._PEM_MULTIPLE_EKU
+    def cert_from_pem_file(self, filename, strict=True):
+        return cert.Certificate.from_pem_file(
+            self.get_file(filename), strict_der=strict)
 
     def test_from_pem_file(self):
-        c = cert.Certificate.from_pem_file(self.pem_file)
+        c = self.cert_from_pem_file(self._PEM_FILE)
         self.assertTrue(isinstance(c, cert.Certificate))
 
     def test_certs_from_pem_file(self):
-        certs = [c for c in cert.certs_from_pem_file(self.chain_file)]
+        certs = list(cert.certs_from_pem_file(self.get_file(
+            self._PEM_CHAIN_FILE)))
         self.assertEqual(3, len(certs))
         self.assertTrue(all(map(lambda x: isinstance(x, cert.Certificate),
                                 certs)))
-        self.assertTrue("google.com" in certs[0].subject_name())
-        self.assertTrue("Google Inc" in certs[1].subject_name())
-        self.assertTrue("Equifax" in certs[2].subject_name())
+        self.assertTrue("google.com" in certs[0].print_subject_name())
+        self.assertTrue("Google Inc" in certs[1].print_subject_name())
+        self.assertTrue("Equifax" in certs[2].print_subject_name())
 
     def test_from_pem(self):
-        with open(self.pem_file) as f:
+        with open(self.get_file(self._PEM_FILE)) as f:
             c = cert.Certificate.from_pem(f.read())
         self.assertTrue(isinstance(c, cert.Certificate))
 
     def test_all_from_pem(self):
-        with open(self.chain_file) as f:
-            certs = [c for c in cert.certs_from_pem(f.read())]
+        with open(self.get_file(self._PEM_CHAIN_FILE)) as f:
+            certs = list(cert.certs_from_pem(f.read()))
         self.assertEqual(3, len(certs))
         self.assertTrue(all(map(lambda x: isinstance(x, cert.Certificate),
                                 certs)))
-        self.assertTrue("google.com" in certs[0].subject_name())
-        self.assertTrue("Google Inc" in certs[1].subject_name())
-        self.assertTrue("Equifax" in certs[2].subject_name())
+        self.assertTrue("google.com" in certs[0].print_subject_name())
+        self.assertTrue("Google Inc" in certs[1].print_subject_name())
+        self.assertTrue("Equifax" in certs[2].print_subject_name())
 
     def test_from_der_file(self):
-        c = cert.Certificate.from_der_file(self.der_file)
+        c = cert.Certificate.from_der_file(self.get_file(self._DER_FILE))
         self.assertTrue(isinstance(c, cert.Certificate))
 
     def test_from_der(self):
-        with open(self.der_file, "rb") as f:
-            c = cert.Certificate.from_der(f.read())
+        with open(self.get_file(self._DER_FILE), "rb") as f:
+            cert_der = f.read()
+            c = cert.Certificate.from_der(cert_der)
         self.assertTrue(isinstance(c, cert.Certificate))
+        self.assertEqual(c.to_der(), cert_der)
 
     def test_invalid_encoding_raises(self):
         self.assertRaises(error.EncodingError, cert.Certificate.from_der,
@@ -168,7 +134,7 @@ class CertificateTest(unittest.TestCase):
                           "bogus_pem_string")
 
     def test_to_der(self):
-        with open(self.der_file, "rb") as f:
+        with open(self.get_file(self._DER_FILE), "rb") as f:
             der_string = f.read()
         c = cert.Certificate(der_string)
         self.assertEqual(der_string, c.to_der())
@@ -185,16 +151,15 @@ class CertificateTest(unittest.TestCase):
         this cert without exceptions or errors.
         """
         self.assertRaises(error.ASN1Error,
-                          cert.Certificate.from_pem_file, self.matrixssl_file)
-        c = cert.Certificate.from_pem_file(self.matrixssl_file,
-                                           strict_der=False)
-        issuer = c.issuer_name()
+                          self.cert_from_pem_file, self._PEM_MATRIXSSL)
+        c = self.cert_from_pem_file(self._PEM_MATRIXSSL, strict=False)
+        issuer = c.print_issuer_name()
         self.assertTrue("MatrixSSL Sample Server" in issuer)
 
     def test_parse_marchnetworks(self):
         """Test parsing certificates issued by marchnetworks.com."""
-        c = cert.Certificate.from_pem_file(self.marchnetworks_file)
-        issuer = c.issuer_name()
+        c = self.cert_from_pem_file(self._PEM_MARCHNETWORKS)
+        issuer = c.print_issuer_name()
         self.assertTrue("March Networks" in issuer)
 
         # 0001010000Z
@@ -215,8 +180,8 @@ class CertificateTest(unittest.TestCase):
             Not After : Dec 13 09:31:07 2022 GMT
 
         """
-        c = cert.Certificate.from_pem_file(self.subrigonet_file)
-        issuer = c.issuer_name()
+        c = self.cert_from_pem_file(self._PEM_SUBRIGONET)
+        issuer = c.print_issuer_name()
         self.assertTrue("subrigo.net" in issuer)
 
         # timezone format -- 121214093107+0000
@@ -228,45 +193,48 @@ class CertificateTest(unittest.TestCase):
         self.assertEqual(list(c.not_after()), expected)
 
     def test_utf8_names(self):
-        c = cert.Certificate.from_pem_file(self.cnutf8_file)
+        c = self.cert_from_pem_file(self._PEM_CN_UTF8)
         nameutf8 = "ñeco ñýáěšžěšžřěčíě+ščýáíéřáíÚ"
         unicodename = u"ñeco ñýáěšžěšžřěčíě+ščýáíéřáíÚ"
         # Compare UTF-8 strings directly.
-        self.assertEqual(c.subject_name(), "CN=" + nameutf8)
-        self.assertEqual(c.issuer_name(), "CN=" + nameutf8)
-        self.assertEqual(c.subject_common_name(), nameutf8)
+        self.assertEqual(c.print_subject_name(), "CN=" + nameutf8)
+        self.assertEqual(c.print_issuer_name(), "CN=" + nameutf8)
+        cns = c.subject_common_names()
+        self.assertEqual(1, len(cns))
+        self.assertEqual(cns[0], nameutf8)
         # Name comparison is unicode-based so decode and compare unicode names.
         # TODO(ekasper): implement proper stringprep-based name comparison
         # and use these test cases there.
-        self.assertEqual(c.subject_name().decode("utf8"), "CN=" + unicodename)
-        self.assertEqual(c.issuer_name().decode("utf8"), "CN=" + unicodename)
-        self.assertEqual(c.subject_common_name().decode("utf8"), unicodename)
+        self.assertEqual(cns[0].value.decode("utf8"), unicodename)
 
     def test_null_chars_in_names(self):
         """Test handling null chars in subject and subject alternative names."""
-        c = cert.Certificate.from_pem_file(self.nullnames_file)
-        subject_name = c.subject_name()
-        self.assertTrue("null.python.orgexample.org" not in subject_name)
-        self.assertTrue("null.python.org\000example.org" in subject_name)
+        c = self.cert_from_pem_file(self._PEM_NULL_CHARS)
+        cns = c.subject_common_names()
+        self.assertEqual(1, len(cns))
+        self.assertEqual("null.python.org\000example.org", cns[0])
 
         alt_names = c.subject_alternative_names()
-        self.assertEquals(len(alt_names), 5)
-        self.assertEquals(alt_names[0].type(), 'dNSName')
-        self.assertEquals(alt_names[0].value(),
-                          'altnull.python.org\000example.com')
-        self.assertEquals(alt_names[1].type(), 'rfc822Name')
-        self.assertEquals(alt_names[1].value(),
-                          'null@python.org\000user@example.org')
-        self.assertEquals(alt_names[2].type(), 'uniformResourceIdentifier')
-        self.assertEquals(alt_names[2].value(),
-                          'http://null.python.org\000http://example.org')
+        self.assertEqual(len(alt_names), 5)
+        self.assertEqual(alt_names[0].component_key(), x509_name.DNS_NAME)
+        self.assertEqual(alt_names[0].component_value(),
+                         "altnull.python.org\000example.com")
+        self.assertEqual(alt_names[1].component_key(), x509_name.RFC822_NAME)
+        self.assertEqual(alt_names[1].component_value(),
+                         "null@python.org\000user@example.org")
+        self.assertEqual(alt_names[2].component_key(),x509_name.URI_NAME)
+        self.assertEqual(alt_names[2].component_value(),
+                         "http://null.python.org\000http://example.org")
 
         # the following does not contain nulls.
-        self.assertEquals(alt_names[3].type(), 'iPAddress')
-        self.assertEquals(alt_names[3].value(), (192, 0, 2, 1))
-        self.assertEquals(alt_names[4].type(), 'iPAddress')
-        self.assertEquals(alt_names[4].value(),
-                          (32, 1, 13, 184, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1))
+        self.assertEqual(alt_names[3].component_key(),
+                         x509_name.IP_ADDRESS_NAME)
+        self.assertEqual(alt_names[3].component_value().as_octets(),
+                         (192, 0, 2, 1))
+        self.assertEqual(alt_names[4].component_key(),
+                         x509_name.IP_ADDRESS_NAME)
+        self.assertEqual(alt_names[4].component_value().as_octets(),
+                         (32, 1, 13, 184, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1))
 
     def test_parse_promisecom(self):
         """Test parsing certificates issued by promise.com
@@ -278,8 +246,8 @@ class CertificateTest(unittest.TestCase):
             Not After : Jun 26 15:32:48 2021 GMT
         """
 
-        c = cert.Certificate.from_pem_file(self.promisecom_file)
-        issuer = c.issuer_name()
+        c = self.cert_from_pem_file(self._PEM_PROMISECOM)
+        issuer = c.print_issuer_name()
         self.assertTrue("Promise Technology Inc." in issuer)
 
         # 110629153248-1200
@@ -293,12 +261,12 @@ class CertificateTest(unittest.TestCase):
     def test_parse_ecdsa_cert(self):
         # TODO(ekasper): Also test the signature algorithm once it's exposed
         # in the API.
-        c = cert.Certificate.from_pem_file(self.ecdsa_file)
-        self.assertTrue("kmonos.jp" in c.subject_name())
+        c = self.cert_from_pem_file(self._PEM_ECDSA)
+        self.assertTrue("kmonos.jp" in c.print_subject_name())
 
-    def test_subject_name(self):
-        c = cert.Certificate.from_der_file(self.der_file)
-        subject = c.subject_name()
+    def test_print_subject_name(self):
+        c = self.cert_from_pem_file(self._PEM_FILE)
+        subject = c.print_subject_name()
         # C=US, ST=California, L=Mountain View, O=Google Inc, CN=*.google.com
         self.assertTrue("US" in subject)
         self.assertTrue("California" in subject)
@@ -306,20 +274,60 @@ class CertificateTest(unittest.TestCase):
         self.assertTrue("Google Inc" in subject)
         self.assertTrue("*.google.com" in subject)
 
-    def test_issuer_name(self):
-        c = cert.Certificate.from_der_file(self.der_file)
-        issuer = c.issuer_name()
+    def test_print_issuer_name(self):
+        c = self.cert_from_pem_file(self._PEM_FILE)
+        issuer = c.print_issuer_name()
         # Issuer: C=US, O=Google Inc, CN=Google Internet Authority
         self.assertTrue("US" in issuer)
         self.assertTrue("Google Inc" in issuer)
         self.assertTrue("Google Internet Authority" in issuer)
 
-    def test_subject_common_name(self):
-        c = cert.Certificate.from_der_file(self.der_file)
-        self.assertEqual("*.google.com", c.subject_common_name())
+    def test_subject_common_names(self):
+        c = self.cert_from_pem_file(self._PEM_FILE)
+        cns = c.subject_common_names()
+        self.assertEqual(1, len(cns))
+        self.assertEqual("*.google.com", cns[0])
+
+    def test_subject_dns_names(self):
+        c = self.cert_from_pem_file(self._PEM_FILE)
+        dns_names = c.subject_dns_names()
+        self.assertEqual(44, len(dns_names))
+        self.assertTrue("*.youtube.com" in dns_names)
+
+    def test_subject_ip_addresses(self):
+        c = self.cert_from_pem_file(self._PEM_MULTIPLE_AN)
+        ips = c.subject_ip_addresses()
+        self.assertEqual(1, len(ips))
+        self.assertEqual((129, 48, 105, 104), ips[0].as_octets())
+
+    def test_subject_alternative_names(self):
+        cert = self.cert_from_pem_file(self._PEM_MULTIPLE_AN)
+        sans = cert.subject_alternative_names()
+        self.assertEqual(4, len(sans))
+
+        self.assertEqual(x509_name.DNS_NAME, sans[0].component_key())
+        self.assertEqual("spires.wpafb.af.mil", sans[0].component_value())
+
+        self.assertEqual(x509_name.DIRECTORY_NAME, sans[1].component_key())
+        self.assertTrue(isinstance(sans[1].component_value(), x509_name.Name),
+        sans[1].component_value())
+
+        self.assertEqual(x509_name.IP_ADDRESS_NAME, sans[2].component_key())
+        self.assertEqual((129, 48, 105, 104),
+        sans[2].component_value().as_octets())
+
+        self.assertEqual(x509_name.URI_NAME, sans[3].component_key())
+        self.assertEqual("spires.wpafb.af.mil", sans[3].component_value())
+
+    def test_no_alternative_names(self):
+        c = cert.Certificate.from_pem_file(self.get_file(self._V1_PEM_FILE))
+        self.assertEqual(0, len(c.subject_alternative_names()))
+        self.assertEqual(0, len(c.subject_dns_names()))
+        self.assertEqual(0, len(c.subject_ip_addresses()))
 
     def test_validity(self):
-        certs = list(cert.certs_from_pem_file(self.chain_file))
+        certs = list(cert.certs_from_pem_file(
+            self.get_file(self._PEM_CHAIN_FILE)))
         self.assertEqual(3, len(certs))
         # notBefore: Sat Aug 22 16:41:51 1998 GMT
         # notAfter: Wed Aug 22 16:41:51 2018 GMT
@@ -341,46 +349,37 @@ class CertificateTest(unittest.TestCase):
         self.assertTrue(c.is_temporally_valid_at(time.gmtime(903804111)))
 
     def test_basic_constraints(self):
-        certs = list(cert.certs_from_pem_file(self.chain_file))
+        certs = list(cert.certs_from_pem_file(
+            self.get_file(self._PEM_CHAIN_FILE)))
         self.assertFalse(certs[0].basic_constraint_ca())
         self.assertTrue(certs[1].basic_constraint_ca())
         self.assertIsNone(certs[0].basic_constraint_path_length())
         self.assertEqual(0, certs[1].basic_constraint_path_length())
 
     def test_version(self):
-        c = cert.Certificate.from_pem_file(self.pem_file)
+        c = self.cert_from_pem_file(self._PEM_FILE)
         self.assertEqual(2, c.version())
 
     def test_serial_number(self):
-        c = cert.Certificate.from_pem_file(self.pem_file)
+        c = self.cert_from_pem_file(self._PEM_FILE)
         self.assertEqual(454887626504608315115709, c.serial_number())
 
     def test_negative_serial_number(self):
         # Fails because of the leading ff-octet.
-        self.assertRaises(error.ASN1Error, cert.Certificate.from_pem_file,
-            self.negative_serial_file)
-        c = cert.Certificate.from_pem_file(self.negative_serial_file,
-                                           strict_der=False)
+        self.assertRaises(error.ASN1Error, self.cert_from_pem_file,
+            self._PEM_NEGATIVE_SERIAL)
+        c = self.cert_from_pem_file(self._PEM_NEGATIVE_SERIAL,
+                                    strict=False)
         self.assertEqual(-218943125988803304701934765446014018,
                           c.serial_number())
 
     def test_v1_cert(self):
-        c = cert.Certificate.from_pem_file(self.v1_file)
+        c = self.cert_from_pem_file(self._V1_PEM_FILE)
         self.assertEqual(0, c.version())
         self.assertIsNone(c.basic_constraint_ca())
 
-    def test_alternative_names(self):
-        certs = [c for c in cert.certs_from_pem_file(self.chain_file)]
-        first_name = certs[0].subject_alternative_names()[0]
-        self.assertEqual("dNSName", first_name.type())
-        self.assertEqual("www.google.com", first_name.value())
-
-    def test_no_alternative_names(self):
-        c = cert.Certificate.from_pem_file(self.v1_file)
-        self.assertEqual(0, len(c.subject_alternative_names()))
-
     def test_fingerprint(self):
-        c = cert.Certificate.from_der_file(self.der_file)
+        c = cert.Certificate.from_der_file(self.get_file(self._DER_FILE))
         self.assertEqual(c.fingerprint().encode("hex"),
                          "570fe2e3bfee986ed4a158aed8770f2e21614659")
         self.assertEqual(c.fingerprint("sha1").encode("hex"),
@@ -390,10 +389,11 @@ class CertificateTest(unittest.TestCase):
                          "d874747a81d1")
 
     def test_key_usage(self):
-        c = cert.Certificate.from_pem_file(self.pem_file)
+        c = cert.Certificate.from_pem_file(self.get_file(self._PEM_FILE))
         self.assertTrue(c.key_usage(x509_ext.KeyUsage.DIGITAL_SIGNATURE))
 
-        certs = [c for c in cert.certs_from_pem_file(self.chain_file)]
+        certs = [c for c in cert.certs_from_pem_file(self.get_file(
+            self._PEM_CHAIN_FILE))]
         # This leaf cert does not have a KeyUsage extension.
         self.assertEqual([], certs[0].key_usages())
         self.assertIsNone(certs[0].key_usage(
@@ -411,7 +411,8 @@ class CertificateTest(unittest.TestCase):
                               certs[1].key_usages())
 
     def test_extended_key_usage(self):
-        certs = [c for c in cert.certs_from_pem_file(self.chain_file)]
+        certs = [c for c in cert.certs_from_pem_file(self.get_file(
+            self._PEM_CHAIN_FILE))]
         self.assertTrue(certs[0].extended_key_usage(oid.ID_KP_SERVER_AUTH))
         self.assertIsNotNone(
             certs[0].extended_key_usage(oid.ID_KP_CODE_SIGNING))
@@ -425,11 +426,11 @@ class CertificateTest(unittest.TestCase):
 
     def test_multiple_extensions(self):
         self.assertRaises(error.ASN1Error, cert.Certificate.from_pem_file,
-                          self.multiple_eku_file)
+                          self.get_file(self._PEM_MULTIPLE_EKU))
 
-        c = cert.Certificate.from_pem_file(self.multiple_eku_file,
+        c = cert.Certificate.from_pem_file(self.get_file(self._PEM_MULTIPLE_EKU),
                                            strict_der=False)
-        self.assertTrue("www.m-budget-mobile-abo.ch" in c.subject_common_name())
+        self.assertTrue("www.m-budget-mobile-abo.ch" in c.subject_common_names())
         self.assertRaises(cert.CertificateError, c.extended_key_usages)
 
 

@@ -59,9 +59,9 @@ def print_cert(certificate):
             print certificate
     else:
         if FLAGS.subject:
-            print "subject:\n%s" % certificate.subject_name()
+            print "subject:\n%s" % certificate.print_subject_name()
         if FLAGS.issuer:
-            print "issuer:\n%s" % certificate.issuer_name()
+            print "issuer:\n%s" % certificate.print_issuer_name()
         if FLAGS.fingerprint:
             # Print in a format familiar from OpenSSL.
             print "%s fingerprint: %s\n" % (

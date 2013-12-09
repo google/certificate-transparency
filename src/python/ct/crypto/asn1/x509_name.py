@@ -73,6 +73,15 @@ class RDNSequence(types.SequenceOf):
     print_labels = False
     print_delimiter = "/"
     component = RelativeDistinguishedName
+    # See http://tools.ietf.org/html/rfc6125 for context.
+    def flatten(self):
+        """Get a flat list of AttributeTypeAndValue pairs in an RDNSequence.
+
+        The hierarchical (Relative) information is not used in all contexts,
+        so we provide a way of discarding that information and flattening
+        the structure.
+        """
+        return sum([list(rdn) for rdn in self], [])
 
 
 # Bypass the CHOICE indirection since exactly one option is specified.
@@ -134,6 +143,27 @@ IP_ADDRESS_NAME = "iPAddress"
 REGISTERED_ID_NAME = "registeredID"
 
 
+class IPAddress(types.OctetString):
+    def __init__(self, value=None, serialized_value=None, strict=True):
+        super(IPAddress, self).__init__(value=value,
+                                        serialized_value=serialized_value,
+                                        strict=strict)
+        if strict and len(self._value) != 4 and len(self._value) != 16:
+            raise error.ASN1Error("%s is not a valid IP address",
+                                  self.value.encode("hex"))
+
+    def as_octets(self):
+        return tuple([ord(b) for b  in self._value])
+
+    def __str__(self):
+        if len(self._value) == 4:
+            return ".".join([str(ord(c)) for c in self._value])
+        if len(self._value) == 16:
+            return ":".join([self._value[i:i+2].encode("hex")
+                             for i in range(0, len(self._value), 2)])
+        return self._value
+
+
 class GeneralName(types.Choice):
     # Definition here: http://tools.ietf.org/html/rfc5280#section-4.2.1.6
     components = {
@@ -145,6 +175,6 @@ class GeneralName(types.Choice):
         DIRECTORY_NAME: Name.explicit(4),
         EDI_PARTY_NAME: EDIPartyName.implicit(5),
         URI_NAME: types.IA5String.implicit(6),
-        IP_ADDRESS_NAME: types.OctetString.implicit(7),
+        IP_ADDRESS_NAME: IPAddress.implicit(7),
         REGISTERED_ID_NAME: oid.ObjectIdentifier.implicit(8)
         }

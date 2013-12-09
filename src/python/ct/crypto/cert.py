@@ -6,10 +6,10 @@ import hashlib
 import time
 
 from ct.crypto import error
-from ct.crypto import name
 from ct.crypto import pem
 from ct.crypto.asn1 import oid
 from ct.crypto.asn1 import x509
+from ct.crypto.asn1 import x509_name
 
 
 class CertificateError(error.Error):
@@ -47,14 +47,6 @@ class Certificate(object):
         # encoding. If any public setters or other methods modifying the
         # contents of the certificate are ever added to this class, they must
         # invalidate the cached encoding.
-        # TODO(ekasper): get rid of the cached string: I think we should
-        # (a) offer read-only API calls for common usage; but
-        # (b) be pythonic and allow raw access to the underlying mutable ASN.1
-        # structure for applications that need to inspect it in detail.
-        # Encoding is so fast that we hardly care about performance gain;
-        # we just need to ensure that non-strict certs keep their original
-        # encoding.
-        self._cached_der = der_string
 
     def __repr__(self):
         # This prints the full ASN1 representation. Useful for debugging.
@@ -87,19 +79,48 @@ class Certificate(object):
         return any([c > 1 for c in extn_value_count.values()])
 
     def _get_decoded_extension_value(self, extn_id):
-        """Get the decoded value of an extension."""
-        extns = self._asn1_cert["tbsCertificate"]["extensions"] or []
-        extn_values = [e["extnValue"] for e in extns if e["extnID"] == extn_id]
-        if not extn_values:
+        """Get the decoded value of an extension.
+
+        Args:
+            extn_id: extension OID.
+
+        Returns:
+            the decoded extension value matching an extn_id, or None.
+
+        Raises:
+            CertificateError: corrupt extension, or multiple extensions
+                matching the given OID.
+        """
+        decoded_extn_values = self._get_decoded_extension_values(extn_id)
+        if not decoded_extn_values:
             return None
-        if len(extn_values) > 1:
+        if len(decoded_extn_values) > 1:
             # TODO(ekasper): could refine this to only raise when the multiple
             # extension values are conflicting.
             raise CertificateError("Multiple extension values")
-        if extn_values[0].decoded_value is None:
+        return decoded_extn_values[0]
+
+    def _get_decoded_extension_values(self, extn_id):
+        """Get all decoded values matching an extension ID.
+        Args:
+            extn_id: extension OID.
+
+        Returns:
+            a list of decoded extension values matching an extn_id
+            (i.e., tolerates multiple extensions).
+
+        Raises:
+            CertificateError: corrupt extension.
+        """
+        extns = self._asn1_cert["tbsCertificate"]["extensions"] or []
+        extn_values = [e["extnValue"] for e in extns if e["extnID"] == extn_id]
+        if not extn_values:
+            return []
+        decoded_values = [e.decoded_value for e in extn_values]
+        if any([val is None for val in decoded_values]):
             raise CertificateError("Corrupt or unrecognized extension: %s"
-                                   % extn_values[0].value)
-        return extn_values[0].decoded_value
+                                   % extn_id)
+        return decoded_values
 
     @classmethod
     def from_der(cls, der_string, strict_der=True):
@@ -159,8 +180,7 @@ class Certificate(object):
 
     def to_der(self):
         """Get the DER-encoding of the certificate."""
-        # Currently the cached encoding is never invalidated.
-        return self._cached_der
+        return self._asn1_cert.encode()
 
     def version(self):
         """Get the version.
@@ -168,31 +188,109 @@ class Certificate(object):
         Returns:
             an integral value of the version (i.e., V1 is 0).
         """
-        return int(self._asn1_cert["tbsCertificate"]["version"])
+        return self._asn1_cert["tbsCertificate"]["version"]
 
-    # TODO(ekasper): redo the Name API.
-    # https://code.google.com/p/certificate-transparency/issues/detail?id=13
-    def subject_common_name(self):
-        """Get the common name of the subject."""
-        ret = ""
-        rdn_sequence = self._asn1_cert["tbsCertificate"]["subject"]
-        for r in rdn_sequence:
-            for attr in r:
-                if attr["type"] == oid.ID_AT_COMMON_NAME:
-                    # A certificate should only have one common name.
-                    # If it has multiple CNs, we take the last one to be
-                    # the most specific.
-                    if not attr["value"].decoded:
-                        raise CertificateError("Corrupt name attribute")
-                    ret = attr["value"].decoded_value.component_value().value
+    def subject_common_names(self):
+        """Get the common names of the subject.
+
+        Returns:
+            a list of common name strings ("CN" attribute values in the
+            certificate's "subject" field).
+
+        Raises:
+            CertificateError: corrupt CN attribute.
+        """
+        attrs = self._asn1_cert["tbsCertificate"]["subject"].flatten()
+        # A subject name attribute is always a DirectoryString (a Choice),
+        # so we need to take its value.
+        decoded_values = [attr["value"].decoded_value.component_value()
+                          for attr in attrs
+                          if attr["type"] == oid.ID_AT_COMMON_NAME]
+        if any([val is None for val in decoded_values]):
+            raise CertificateError("Corrupt or unrecognized name attribute")
+        return decoded_values
+
+    def subject_alternative_names(self):
+        """Get a list of subjectAlternativeNames extension values.
+
+        Returns:
+            a list of subject alternative names. Each element in the list
+            is an ASN.1 GeneralName. If multiple SAN extensions are present
+            (non-strict mode), returns a list of all names found (possibly
+            with duplicates).
+
+            Since each GeneralName is a choice, its contents can be inspected
+            as follows:
+
+            sans = cert.subject_alternative_names()
+            for san in sans:
+                # The type of the alternative name; one of
+                # x509_name.OTHER_NAME
+                # x509_name.RFC822_NAME
+                # x509_name.X400_ADDRESS_NAME
+                # x509_name.DIRECTORY_NAME
+                # x509_name.EDI_PARTY_NAME
+                # x509_name.URI_NAME
+                # x509_name.IP_ADDRESS_NAME
+                # x509_name.REGISTERED_ID_NAME
+                san_type = san.component_key()
+
+                # The corresponding ASN.1 value:
+                san_value = san.component_value()
+                ...
+
+        Raises:
+            CertificateError: corrupt extension.
+        """
+        sans = self._get_decoded_extension_values(oid.ID_CE_SUBJECT_ALT_NAME)
+        return sum([list(san) for san in sans], [])
+
+    def _get_subject_alt_names_by_type(self, san_type):
+        # A certificate should only have one SAN extension but we can't rely on
+        # this (in non-strict mode), so we return everything we find.
+        sans = self._get_decoded_extension_values(oid.ID_CE_SUBJECT_ALT_NAME)
+        ret = []
+        for san in sans:
+            ret += [c.component_value() for c in san
+                    if c.component_key() == san_type]
         return ret
 
-    def subject_name(self):
+    # DNS names and IP addresses are relevant to HTTPS server identification.
+    # Other types of alternative names *should* normally be ignored by web
+    # browsers but may be relevant for other services.
+    # See http://tools.ietf.org/html/rfc6125
+    def subject_dns_names(self):
+        """Get the dnsNames in the subjectAlternativeNames extension.
+
+        Returns:
+            a list of DNS names in the subjectAlternativeNames (SAN) extension.
+            If multiple SAN extensions are present (non-strict mode), returns
+            a list of all DNS names found (possibly with duplicates).
+
+        Raises:
+            CertificateError: corrupt extension.
+        """
+        return self._get_subject_alt_names_by_type(x509_name.DNS_NAME)
+
+    def subject_ip_addresses(self):
+        """Get the ipAddresses in the subjectAlternativeNames extension.
+
+        Returns:
+            a list of IPAddress entries in the subjectAlternativeNames (SAN)
+            extension. If multiple SAN extensions are present (non-strict mode),
+            returns a list of all IP addresses found (possibly with duplicates).
+
+        Raises:
+            CertificateError: corrupt extension.
+        """
+        return self._get_subject_alt_names_by_type(x509_name.IP_ADDRESS_NAME)
+
+    def print_subject_name(self):
         """Get a human readable string of the subject name attributes."""
         return (self._asn1_cert["tbsCertificate"]["subject"].
                 human_readable(wrap=0))
 
-    def issuer_name(self):
+    def print_issuer_name(self):
         """Get a human readable string of the issuer name attributes."""
         return (self._asn1_cert["tbsCertificate"]["issuer"].
                 human_readable(wrap=0))
@@ -206,16 +304,16 @@ class Certificate(object):
         handle non-conforming certificates.
 
         Returns:
-           integer
+           An ASN.1 Integer.
 
         """
-        return int(self._asn1_cert["tbsCertificate"]["serialNumber"])
+        return self._asn1_cert["tbsCertificate"]["serialNumber"]
 
     def basic_constraint_ca(self):
         """Get the BasicConstraints CA value.
 
         Returns:
-            True, False, or None.
+            an ASN.1 Boolean, or None.
 
         Raises:
             CertificateError: corrupt extension, or multiple extensions.
@@ -225,29 +323,13 @@ class Certificate(object):
         if bc is None:
             return None
 
-        return None if bc["cA"] is None else bool(bc["cA"])
-
-    def subject_alternative_names(self):
-        """Get the Alternative Names extension.
-
-        Returns:
-            Array of alternative names (name.GeneralName)
-
-        Raises:
-            CertificateError: corrupt extension, or multiple extensions.
-        """
-        # CertificateErrors fall through.
-        general_names = self._get_decoded_extension_value(
-            oid.ID_CE_SUBJECT_ALT_NAME)
-        if general_names is None:
-            return []
-        return name.parse_alternative_names(general_names)
+        return bc["cA"]
 
     def basic_constraint_path_length(self):
         """Get the BasicConstraints pathLenConstraint value.
 
         Returns:
-            an integral value, or None.
+            an ASN.1 Integer, or None.
 
         Raises:
             CertificateError: corrupt extension, or multiple extensions.
@@ -256,8 +338,7 @@ class Certificate(object):
         if bc is None:
             return None
 
-        pathlen = bc["pathLenConstraint"]
-        return None if pathlen is None else int(pathlen)
+        return bc["pathLenConstraint"]
 
     def not_before(self):
         """Get a time.struct_time representing the notBefore in UTC time.
@@ -342,7 +423,7 @@ class Certificate(object):
             a (binary) hash digest of the DER encoding.
         """
         h = hashlib.new(hashfunc)
-        h.update(self._cached_der)
+        h.update(self._asn1_cert.encode())
         return h.digest()
 
     def key_usage(self, key_usage):
