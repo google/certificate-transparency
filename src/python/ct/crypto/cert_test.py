@@ -76,6 +76,9 @@ class CertificateTest(unittest.TestCase):
     # A certificate with multiple "interesting" SANs.
     _PEM_MULTIPLE_AN = "multiple_an.pem"
 
+    # A certificate with multiple CN attributes.
+    _PEM_MULTIPLE_CN = "multiple_cn.pem"
+
     @property
     def pem_file(self):
         return FLAGS.testdata_dir + "/" + self._PEM_FILE
@@ -287,6 +290,13 @@ class CertificateTest(unittest.TestCase):
         cns = c.subject_common_names()
         self.assertEqual(1, len(cns))
         self.assertEqual("*.google.com", cns[0])
+
+    def test_multiple_subject_common_names(self):
+        c = self.cert_from_pem_file(self._PEM_MULTIPLE_CN)
+        cns = c.subject_common_names()
+        self.assertItemsEqual(cns, ["www.rd.io", "rdio.com", "rd.io",
+                                    "api.rdio.com", "api.rd.io",
+                                    "www.rdio.com"])
 
     def test_subject_dns_names(self):
         c = self.cert_from_pem_file(self._PEM_FILE)
