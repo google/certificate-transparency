@@ -122,6 +122,8 @@ class ObjectIdentifier(types.Simple):
     @classmethod
     def _decode_value(cls, buf, strict=True):
         """Decode from a string or string buffer."""
+        if buf in _OID_DECODING_DICT:
+            return _OID_DECODING_DICT[buf]
         if not buf:
             raise error.ASN1Error("Invalid encoding")
         int_bytes = bytearray(buf)
@@ -146,83 +148,89 @@ class ObjectIdentifier(types.Simple):
 
         return tuple(components)
 
+###############################################################################
+#                           Known object identifiers                          #
+#                                                                             #
+# If you add a new OID, make sure to also add its commonly known alias to     #
+# _OID_NAME_DICT.                                                             #
+###############################################################################
 
 # Signature and public key algorithms
 # RFC 3279
-RSA_ENCRYPTION = ObjectIdentifier("1.2.840.113549.1.1.1")
-MD2_WITH_RSA_ENCRYPTION = ObjectIdentifier("1.2.840.113549.1.1.2")
-MD5_WITH_RSA_ENCRYPTION = ObjectIdentifier("1.2.840.113549.1.1.4")
-SHA1_WITH_RSA_ENCRYPTION = ObjectIdentifier("1.2.840.113549.1.1.5")
-ID_DSA = ObjectIdentifier("1.2.840.10040.4.1")
-ID_DSA_WITH_SHA1 = ObjectIdentifier("1.2.840.10040.4.3")
-ID_EC_PUBLICKEY = ObjectIdentifier("1.2.840.10045.2.1")
-ECDSA_WITH_SHA1 = ObjectIdentifier("1.2.840.10045.4.1")
+RSA_ENCRYPTION = ObjectIdentifier(value="1.2.840.113549.1.1.1")
+MD2_WITH_RSA_ENCRYPTION = ObjectIdentifier(value="1.2.840.113549.1.1.2")
+MD5_WITH_RSA_ENCRYPTION = ObjectIdentifier(value="1.2.840.113549.1.1.4")
+SHA1_WITH_RSA_ENCRYPTION = ObjectIdentifier(value="1.2.840.113549.1.1.5")
+ID_DSA = ObjectIdentifier(value="1.2.840.10040.4.1")
+ID_DSA_WITH_SHA1 = ObjectIdentifier(value="1.2.840.10040.4.3")
+ID_EC_PUBLICKEY = ObjectIdentifier(value="1.2.840.10045.2.1")
+ECDSA_WITH_SHA1 = ObjectIdentifier(value="1.2.840.10045.4.1")
 # http://tools.ietf.org/html/rfc5758
-ECDSA_WITH_SHA224 = ObjectIdentifier("1.2.840.10045.4.3.1")
-ECDSA_WITH_SHA256 = ObjectIdentifier("1.2.840.10045.4.3.2")
-ECDSA_WITH_SHA384 = ObjectIdentifier("1.2.840.10045.4.3.3")
-ECDSA_WITH_SHA512 = ObjectIdentifier("1.2.840.10045.4.3.4")
+ECDSA_WITH_SHA224 = ObjectIdentifier(value="1.2.840.10045.4.3.1")
+ECDSA_WITH_SHA256 = ObjectIdentifier(value="1.2.840.10045.4.3.2")
+ECDSA_WITH_SHA384 = ObjectIdentifier(value="1.2.840.10045.4.3.3")
+ECDSA_WITH_SHA512 = ObjectIdentifier(value="1.2.840.10045.4.3.4")
 # RFC4055
-ID_RSASSA_PSS = ObjectIdentifier("1.2.840.113549.1.1.10")
+ID_RSASSA_PSS = ObjectIdentifier(value="1.2.840.113549.1.1.10")
 # RFC 4491
-ID_GOSTR3411_94_WITH_GOSTR3410_94 = ObjectIdentifier("1.2.643.2.2.4")
-ID_GOSTR3411_94_WITH_GOSTR3410_2001 = ObjectIdentifier("1.2.643.2.2.3")
+ID_GOSTR3411_94_WITH_GOSTR3410_94 = ObjectIdentifier(value="1.2.643.2.2.4")
+ID_GOSTR3411_94_WITH_GOSTR3410_2001 = ObjectIdentifier(value="1.2.643.2.2.3")
 
 # Naming attributes (RFC 5280)
-ID_AT_NAME = ObjectIdentifier("2.5.4.41")
-ID_AT_SURNAME = ObjectIdentifier("2.5.4.4")
-ID_AT_GIVEN_NAME = ObjectIdentifier("2.5.4.42")
-ID_AT_INITIALS = ObjectIdentifier("2.5.4.43")
-ID_AT_GENERATION_QUALIFIER = ObjectIdentifier("2.5.4.44")
-ID_AT_COMMON_NAME = ObjectIdentifier("2.5.4.3")
-ID_AT_LOCALITY_NAME = ObjectIdentifier("2.5.4.7")
-ID_AT_STATE_OR_PROVINCE_NAME = ObjectIdentifier("2.5.4.8")
-ID_AT_ORGANIZATION_NAME = ObjectIdentifier("2.5.4.10")
-ID_AT_ORGANIZATIONAL_UNIT_NAME = ObjectIdentifier("2.5.4.11")
-ID_AT_TITLE = ObjectIdentifier("2.5.4.12")
-ID_AT_DN_QUALIFIER = ObjectIdentifier("2.5.4.46")
-ID_AT_COUNTRY_NAME = ObjectIdentifier("2.5.4.6")
-ID_AT_SERIAL_NUMBER = ObjectIdentifier("2.5.4.5")
-ID_AT_PSEUDONYM = ObjectIdentifier("2.5.4.65")
-ID_DOMAIN_COMPONENT = ObjectIdentifier("0.9.2342.19200300.100.1.25")
-ID_EMAIL_ADDRESS = ObjectIdentifier("1.2.840.113549.1.9.1")
+ID_AT_NAME = ObjectIdentifier(value="2.5.4.41")
+ID_AT_SURNAME = ObjectIdentifier(value="2.5.4.4")
+ID_AT_GIVEN_NAME = ObjectIdentifier(value="2.5.4.42")
+ID_AT_INITIALS = ObjectIdentifier(value="2.5.4.43")
+ID_AT_GENERATION_QUALIFIER = ObjectIdentifier(value="2.5.4.44")
+ID_AT_COMMON_NAME = ObjectIdentifier(value="2.5.4.3")
+ID_AT_LOCALITY_NAME = ObjectIdentifier(value="2.5.4.7")
+ID_AT_STATE_OR_PROVINCE_NAME = ObjectIdentifier(value="2.5.4.8")
+ID_AT_ORGANIZATION_NAME = ObjectIdentifier(value="2.5.4.10")
+ID_AT_ORGANIZATIONAL_UNIT_NAME = ObjectIdentifier(value="2.5.4.11")
+ID_AT_TITLE = ObjectIdentifier(value="2.5.4.12")
+ID_AT_DN_QUALIFIER = ObjectIdentifier(value="2.5.4.46")
+ID_AT_COUNTRY_NAME = ObjectIdentifier(value="2.5.4.6")
+ID_AT_SERIAL_NUMBER = ObjectIdentifier(value="2.5.4.5")
+ID_AT_PSEUDONYM = ObjectIdentifier(value="2.5.4.65")
+ID_DOMAIN_COMPONENT = ObjectIdentifier(value="0.9.2342.19200300.100.1.25")
+ID_EMAIL_ADDRESS = ObjectIdentifier(value="1.2.840.113549.1.9.1")
 
 # Other naming attributes commonly found in certs
-ID_AT_STREET_ADDRESS = ObjectIdentifier("2.5.4.9")
-ID_AT_DESCRIPTION = ObjectIdentifier("2.5.4.13")
-ID_AT_BUSINESS_CATEGORY = ObjectIdentifier("2.5.4.15")
-ID_AT_POSTAL_CODE = ObjectIdentifier("2.5.4.17")
-ID_AT_POST_OFFICE_BOX = ObjectIdentifier("2.5.4.18")
+ID_AT_STREET_ADDRESS = ObjectIdentifier(value="2.5.4.9")
+ID_AT_DESCRIPTION = ObjectIdentifier(value="2.5.4.13")
+ID_AT_BUSINESS_CATEGORY = ObjectIdentifier(value="2.5.4.15")
+ID_AT_POSTAL_CODE = ObjectIdentifier(value="2.5.4.17")
+ID_AT_POST_OFFICE_BOX = ObjectIdentifier(value="2.5.4.18")
 
 # Standard X509v3 certificate extensions
-ID_CE_AUTHORITY_KEY_IDENTIFIER = ObjectIdentifier("2.5.29.35")
-ID_CE_SUBJECT_KEY_IDENTIFIER = ObjectIdentifier("2.5.29.14")
-ID_CE_KEY_USAGE = ObjectIdentifier("2.5.29.15")
-ID_CE_PRIVATE_KEY_USAGE_PERIOD = ObjectIdentifier("2.5.29.16")
-ID_CE_CERTIFICATE_POLICIES = ObjectIdentifier("2.5.29.32")
-ID_CE_SUBJECT_ALT_NAME = ObjectIdentifier("2.5.29.17")
-ID_CE_ISSUER_ALT_NAME = ObjectIdentifier("2.5.29.18")
-ID_CE_SUBJECT_DIRECTORY_ATTRIBUTES = ObjectIdentifier("2.5.29.9")
-ID_CE_BASIC_CONSTRAINTS = ObjectIdentifier("2.5.29.19")
-ID_CE_NAME_CONSTRAINTS = ObjectIdentifier("2.5.29.30")
-ID_CE_POLICY_CONSTRAINTS = ObjectIdentifier("2.5.29.30")
-ID_CE_EXT_KEY_USAGE = ObjectIdentifier("2.5.29.37")
-ID_CE_CRL_DISTRIBUTION_POINTS = ObjectIdentifier("2.5.29.31")
-ID_CE_INHIBIT_ANY_POLICY = ObjectIdentifier("2.5.29.54")
-ID_PE_AUTHORITY_INFO_ACCESS = ObjectIdentifier("1.3.6.1.5.5.7.1.1")
-ID_PE_SUBJECT_INFO_ACCESS = ObjectIdentifier("1.3.6.1.5.5.7.1.11")
+ID_CE_AUTHORITY_KEY_IDENTIFIER = ObjectIdentifier(value="2.5.29.35")
+ID_CE_SUBJECT_KEY_IDENTIFIER = ObjectIdentifier(value="2.5.29.14")
+ID_CE_KEY_USAGE = ObjectIdentifier(value="2.5.29.15")
+ID_CE_PRIVATE_KEY_USAGE_PERIOD = ObjectIdentifier(value="2.5.29.16")
+ID_CE_CERTIFICATE_POLICIES = ObjectIdentifier(value="2.5.29.32")
+ID_CE_SUBJECT_ALT_NAME = ObjectIdentifier(value="2.5.29.17")
+ID_CE_ISSUER_ALT_NAME = ObjectIdentifier(value="2.5.29.18")
+ID_CE_SUBJECT_DIRECTORY_ATTRIBUTES = ObjectIdentifier(value="2.5.29.9")
+ID_CE_BASIC_CONSTRAINTS = ObjectIdentifier(value="2.5.29.19")
+ID_CE_NAME_CONSTRAINTS = ObjectIdentifier(value="2.5.29.30")
+ID_CE_POLICY_CONSTRAINTS = ObjectIdentifier(value="2.5.29.30")
+ID_CE_EXT_KEY_USAGE = ObjectIdentifier(value="2.5.29.37")
+ID_CE_CRL_DISTRIBUTION_POINTS = ObjectIdentifier(value="2.5.29.31")
+ID_CE_INHIBIT_ANY_POLICY = ObjectIdentifier(value="2.5.29.54")
+ID_PE_AUTHORITY_INFO_ACCESS = ObjectIdentifier(value="1.3.6.1.5.5.7.1.1")
+ID_PE_SUBJECT_INFO_ACCESS = ObjectIdentifier(value="1.3.6.1.5.5.7.1.11")
 
 # RFC 3280 - Used in ExtendedKeyUsage extension
-ID_KP_SERVER_AUTH = ObjectIdentifier("1.3.6.1.5.5.7.3.1")
-ID_KP_CLIENT_AUTH = ObjectIdentifier("1.3.6.1.5.5.7.3.2")
-ID_KP_CODE_SIGNING = ObjectIdentifier("1.3.6.1.5.5.7.3.3")
-ID_KP_EMAIL_PROTECTION = ObjectIdentifier("1.3.6.1.5.5.7.3.4")
-ID_KP_TIME_STAMPING = ObjectIdentifier("1.3.6.1.5.5.7.3.8")
-ID_KP_OCSP_SIGNING = ObjectIdentifier("1.3.6.1.5.5.7.3.9")
+ID_KP_SERVER_AUTH = ObjectIdentifier(value="1.3.6.1.5.5.7.3.1")
+ID_KP_CLIENT_AUTH = ObjectIdentifier(value="1.3.6.1.5.5.7.3.2")
+ID_KP_CODE_SIGNING = ObjectIdentifier(value="1.3.6.1.5.5.7.3.3")
+ID_KP_EMAIL_PROTECTION = ObjectIdentifier(value="1.3.6.1.5.5.7.3.4")
+ID_KP_TIME_STAMPING = ObjectIdentifier(value="1.3.6.1.5.5.7.3.8")
+ID_KP_OCSP_SIGNING = ObjectIdentifier(value="1.3.6.1.5.5.7.3.9")
 
 # RFC 3280 - Used in Authority Info Access extension
-ID_OSCP = ObjectIdentifier("1.3.6.1.5.5.7.48.1")
-ID_AD_CA_ISSUERS = ObjectIdentifier("1.3.6.1.5.5.7.48.2")
+ID_OSCP = ObjectIdentifier(value="1.3.6.1.5.5.7.48.1")
+ID_AD_CA_ISSUERS = ObjectIdentifier(value="1.3.6.1.5.5.7.48.2")
 
 _OID_NAME_DICT = {
     # Object identifier long names taken verbatim from the RFCs.
@@ -300,5 +308,9 @@ _OID_NAME_DICT = {
 
     ID_OSCP: ("id-oscp", "OSCP"),
     ID_AD_CA_ISSUERS: ("id-ad-caIssuers", "caIssuers")
-
     }
+
+_OID_DECODING_DICT = {}
+
+for oid in _OID_NAME_DICT:
+  _OID_DECODING_DICT[oid._encode_value()] = oid._value
