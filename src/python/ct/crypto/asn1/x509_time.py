@@ -150,3 +150,16 @@ class GeneralizedTime(BaseTime):
             return time.strptime(self._value[:-1] + "GMT", "%Y%m%d%H%M%S%Z")
         except ValueError:
             return None
+
+
+class Time(types.Choice):
+    print_labels = False
+    components = {"utcTime": UTCTime,
+                  "generalTime": GeneralizedTime}
+
+
+class Validity(types.Sequence):
+    components = (
+        (types.Component("notBefore", Time)),
+        (types.Component("notAfter", Time))
+        )

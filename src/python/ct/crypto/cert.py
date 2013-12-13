@@ -9,6 +9,7 @@ from ct.crypto import error
 from ct.crypto import pem
 from ct.crypto.asn1 import oid
 from ct.crypto.asn1 import x509
+from ct.crypto.asn1 import x509_extension as x509_ext
 from ct.crypto.asn1 import x509_name
 
 
@@ -200,15 +201,11 @@ class Certificate(object):
         Raises:
             CertificateError: corrupt CN attribute.
         """
-        attrs = self._asn1_cert["tbsCertificate"]["subject"].flatten()
-        # A subject name attribute is always a DirectoryString (a Choice),
-        # so we need to take its value.
-        decoded_values = [attr["value"].decoded_value.component_value()
-                          for attr in attrs
-                          if attr["type"] == oid.ID_AT_COMMON_NAME]
-        if any([val is None for val in decoded_values]):
-            raise CertificateError("Corrupt or unrecognized name attribute")
-        return decoded_values
+        try:
+            return self._asn1_cert["tbsCertificate"]["subject"].attributes(
+                oid.ID_AT_COMMON_NAME)
+        except error.ASN1Error as e:
+            raise CertificateError("Corrupt common name attribute")
 
     def subject_alternative_names(self):
         """Get a list of subjectAlternativeNames extension values.
@@ -504,6 +501,44 @@ class Certificate(object):
                 extension values.
         """
         return self._get_decoded_extension_value(oid.ID_CE_EXT_KEY_USAGE) or []
+
+    def subject_key_identifier(self):
+      """Get the subject key identifier.
+
+      Returns:
+          An x509_extension.KeyIdentifier (ASN.1 OctetString) holding the value
+              of the subject key identifier, or None if the subject key
+              identifier extension is not present.
+      Raises:
+          CertificateError: corrupt extension, or multiple extension values.
+      """
+      return self._get_decoded_extension_value(oid.ID_CE_SUBJECT_KEY_IDENTIFIER)
+
+    def authority_key_identifier(self, identifier_type=x509_ext.KEY_IDENTIFIER):
+      """Get the authority key identifier of the given type.
+
+      Args:
+          identifier_type: the identifier component to fetch, one of
+              x509_extension.KEY_IDENTIFIER,
+              x509_extension.AUTHORITY_CERT_ISSUER,
+              x509_extension.AUTHORITY_CERT_SERIAL_NUMBER.
+
+      Returns:
+          the identifier component of the appropriate type, or None if the
+          component/extension is not present. The types are
+              x509_extension.KEY_IDENTIFIER: x509_extension.KeyIdentifier
+                  (an OCTET STRING),
+              x509_extension.AUTHORITY_CERT_ISSUER: x509_name.GeneralNames,
+              x509_extension.AUTHORITY_CERT_SERIAL_NUMBER:
+                  x509_common.CertificateSerialNumber.
+
+      Raises:
+          CertificateError: corrupt extension, or multiple extension values.
+      """
+      akid = self._get_decoded_extension_value(
+          oid.ID_CE_AUTHORITY_KEY_IDENTIFIER)
+
+      return akid[identifier_type] if akid else None
 
 
 def certs_from_pem(pem_string, skip_invalid_blobs=False, strict_der=True):

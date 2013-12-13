@@ -4,6 +4,7 @@ from ct.crypto.asn1 import named_value
 from ct.crypto.asn1 import oid
 from ct.crypto.asn1 import tag
 from ct.crypto.asn1 import types
+from ct.crypto.asn1 import x509_common
 from ct.crypto.asn1 import x509_name
 
 
@@ -45,6 +46,30 @@ class ExtendedKeyUsage(types.SequenceOf):
     component = KeyPurposeID
 
 
+class KeyIdentifier(types.OctetString):
+  pass
+
+
+class SubjectKeyIdentifier(KeyIdentifier):
+  pass
+
+
+KEY_IDENTIFIER = "keyIdentifier"
+AUTHORITY_CERT_ISSUER = "authorityCertIssuer"
+AUTHORITY_CERT_SERIAL_NUMBER = "authorityCertSerialNumber"
+
+
+class AuthorityKeyIdentifier(types.Sequence):
+  components = (
+      types.Component(KEY_IDENTIFIER, KeyIdentifier.implicit(0), optional=True),
+      types.Component(AUTHORITY_CERT_ISSUER, x509_name.GeneralNames.implicit(1),
+                      optional=True),
+      types.Component(AUTHORITY_CERT_SERIAL_NUMBER,
+                      x509_common.CertificateSerialNumber.implicit(2),
+                      optional=True)
+      )
+
+
 # Hack! This is not a valid ASN.1 definition but it works: an extension value
 # value is defined as a DER-encoded value wrapped in an OctetString.
 # This is functionally equivalent to an Any type that is tagged with the
@@ -59,6 +84,8 @@ _EXTENSION_DICT = {
     oid.ID_CE_SUBJECT_ALT_NAME: SubjectAlternativeNames,
     oid.ID_CE_KEY_USAGE: KeyUsage,
     oid.ID_CE_EXT_KEY_USAGE: ExtendedKeyUsage,
+    oid.ID_CE_SUBJECT_KEY_IDENTIFIER: SubjectKeyIdentifier,
+    oid.ID_CE_AUTHORITY_KEY_IDENTIFIER: AuthorityKeyIdentifier,
     }
 
 

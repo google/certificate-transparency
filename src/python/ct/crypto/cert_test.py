@@ -79,6 +79,9 @@ class CertificateTest(unittest.TestCase):
     # A certificate with multiple CN attributes.
     _PEM_MULTIPLE_CN = "multiple_cn.pem"
 
+    # A certificate with authority cert issuer and authority cert serial.
+    _PEM_AKID = "authority_keyid.pem"
+
     @property
     def pem_file(self):
         return FLAGS.testdata_dir + "/" + self._PEM_FILE
@@ -442,6 +445,41 @@ class CertificateTest(unittest.TestCase):
                                            strict_der=False)
         self.assertTrue("www.m-budget-mobile-abo.ch" in c.subject_common_names())
         self.assertRaises(cert.CertificateError, c.extended_key_usages)
+
+    def test_key_identifiers(self):
+        certs = [c for c in cert.certs_from_pem_file(self.get_file(
+            self._PEM_CHAIN_FILE))]
+
+        self.assertEqual("\x12\x4a\x06\x24\x28\xc4\x18\xa5\x63\x0b\x41\x6e\x95"
+                         "\xbf\x72\xb5\x3e\x1b\x8e\x8f",
+                         certs[0].subject_key_identifier())
+
+        self.assertEqual("\xbf\xc0\x30\xeb\xf5\x43\x11\x3e\x67\xba\x9e\x91\xfb"
+                         "\xfc\x6a\xda\xe3\x6b\x12\x24",
+                         certs[0].authority_key_identifier())
+
+        self.assertIsNone(certs[0].authority_key_identifier(
+            identifier_type=x509_ext.AUTHORITY_CERT_ISSUER))
+        self.assertIsNone(certs[0].authority_key_identifier(
+            identifier_type=x509_ext.AUTHORITY_CERT_SERIAL_NUMBER))
+
+        self.assertEqual(certs[0].authority_key_identifier(),
+                         certs[1].subject_key_identifier())
+
+        c = self.cert_from_pem_file(self._PEM_AKID)
+
+        cert_issuers = c.authority_key_identifier(
+            identifier_type=x509_ext.AUTHORITY_CERT_ISSUER)
+        self.assertEqual(1, len(cert_issuers))
+
+        # A DirectoryName.
+        cert_issuer = cert_issuers[0]
+        self.assertEqual(x509_name.DIRECTORY_NAME, cert_issuer.component_key())
+        self.assertEqual(["KISA RootCA 1"],
+                         cert_issuer.component_value().attributes(
+                             oid.ID_AT_COMMON_NAME))
+        self.assertEqual(10119, c.authority_key_identifier(
+            identifier_type=x509_ext.AUTHORITY_CERT_SERIAL_NUMBER))
 
 
 if __name__ == "__main__":

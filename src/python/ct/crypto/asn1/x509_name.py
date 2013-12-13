@@ -83,6 +83,24 @@ class RDNSequence(types.SequenceOf):
         """
         return sum([list(rdn) for rdn in self], [])
 
+    def attributes(self, attr_type):
+        """Get a flat list of attribute values of the given type.
+
+        Returns:
+            a list of attributes.
+
+        Raises:
+            error.ASN1Error: corrupt attribute value.
+        """
+        attrs = self.flatten()
+        decoded_values = [attr["value"].decoded_value for attr in attrs
+                          if attr["type"] == attr_type]
+        if any([val is None for val in decoded_values]):
+            raise error.ASN1Error("Corrupt name attribute")
+        # A subject name attribute is always a DirectoryString (a Choice),
+        # so we need to take its value.
+        return [d.component_value() for d in decoded_values]
+
 
 # Bypass the CHOICE indirection since exactly one option is specified.
 # class Name(types.Choice):
@@ -178,3 +196,7 @@ class GeneralName(types.Choice):
         IP_ADDRESS_NAME: IPAddress.implicit(7),
         REGISTERED_ID_NAME: oid.ObjectIdentifier.implicit(8)
         }
+
+
+class GeneralNames(types.SequenceOf):
+  component = GeneralName
