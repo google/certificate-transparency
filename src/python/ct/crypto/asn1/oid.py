@@ -232,6 +232,11 @@ ID_KP_OCSP_SIGNING = ObjectIdentifier(value="1.3.6.1.5.5.7.3.9")
 ID_OSCP = ObjectIdentifier(value="1.3.6.1.5.5.7.48.1")
 ID_AD_CA_ISSUERS = ObjectIdentifier(value="1.3.6.1.5.5.7.48.2")
 
+# Certificate Policy related OIDs
+ID_QT_CPS = ObjectIdentifier(value="1.3.6.1.5.5.7.2.1")
+ID_QT_UNOTICE = ObjectIdentifier(value="1.3.6.1.5.5.7.2.2")
+ANY_POLICY = ObjectIdentifier(value="2.5.29.32.0")
+
 _OID_NAME_DICT = {
     # Object identifier long names taken verbatim from the RFCs.
     # Short names are colloquial.
@@ -307,7 +312,10 @@ _OID_NAME_DICT = {
     ID_KP_OCSP_SIGNING: ("id-kp-OCSPSigning", "OCSPSigning"),
 
     ID_OSCP: ("id-oscp", "OSCP"),
-    ID_AD_CA_ISSUERS: ("id-ad-caIssuers", "caIssuers")
+    ID_AD_CA_ISSUERS: ("id-ad-caIssuers", "caIssuers"),
+    ID_QT_CPS: ("id-qt-cps", "CPS"),
+    ID_QT_UNOTICE: ("id-qt-unotice", "UserNotice"),
+    ANY_POLICY: ("anyPolicy", "anyPolicy")
     }
 
 _OID_DECODING_DICT = {}

@@ -719,6 +719,12 @@ class IA5String(ASN1String):
     pass
 
 
+@Universal(25, tag.PRIMITIVE)
+class VisibleString(ASN1String):
+    """VisibleString (aka ISO646String)."""
+    pass
+
+
 @Universal(30, tag.PRIMITIVE)
 class BMPString(ASN1String):
     """BMPString."""

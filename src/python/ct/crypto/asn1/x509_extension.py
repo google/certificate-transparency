@@ -8,6 +8,7 @@ from ct.crypto.asn1 import x509_common
 from ct.crypto.asn1 import x509_name
 
 
+# Standard extensions from RFC 5280.
 class BasicConstraints(types.Sequence):
     print_delimiter = ", "
     components = (
@@ -70,6 +71,77 @@ class AuthorityKeyIdentifier(types.Sequence):
       )
 
 
+class DisplayText(types.Choice):
+    components = {
+        "ia5String": types.IA5String,
+        "visibleString": types.VisibleString,
+        "bmpString": types.BMPString,
+        "utf8String": types.UTF8String
+        }
+
+
+class NoticeNumbers(types.SequenceOf):
+    component = types.Integer
+
+
+class NoticeReference(types.Sequence):
+    components = (
+        types.Component("organization", DisplayText),
+        types.Component("noticeNumbers", NoticeNumbers)
+        )
+
+
+class UserNotice(types.Sequence):
+    components = (
+        types.Component("noticeRef", NoticeReference, optional=True),
+        types.Component("explicitText", DisplayText, optional=True)
+)
+
+
+
+class CPSuri(types.IA5String):
+    pass
+
+
+_POLICY_QUALIFIER_DICT = {
+    oid.ID_QT_CPS: CPSuri,
+    oid.ID_QT_UNOTICE: UserNotice
+}
+
+
+POLICY_QUALIFIER_ID = "policyQualifierId"
+QUALIFIER = "qualifier"
+
+
+class PolicyQualifierInfo(types.Sequence):
+    print_labels = False
+    print_delimiter = ": "
+    components = (
+        types.Component(POLICY_QUALIFIER_ID, oid.ObjectIdentifier),
+        types.Component(QUALIFIER, types.Any, defined_by="policyQualifierId",
+                        lookup=_POLICY_QUALIFIER_DICT)
+        )
+
+
+class PolicyQualifiers(types.SequenceOf):
+    print_labels = False
+    component = PolicyQualifierInfo
+
+
+POLICY_IDENTIFIER = "policyIdentifier"
+POLICY_QUALIFIERS = "policyQualifiers"
+
+
+class PolicyInformation(types.Sequence):
+    components = (
+        types.Component(POLICY_IDENTIFIER, oid.ObjectIdentifier),
+        types.Component(POLICY_QUALIFIERS, PolicyQualifiers, optional=True)
+)
+
+class CertificatePolicies(types.SequenceOf):
+    component = PolicyInformation
+
+
 # Hack! This is not a valid ASN.1 definition but it works: an extension value
 # value is defined as a DER-encoded value wrapped in an OctetString.
 # This is functionally equivalent to an Any type that is tagged with the
@@ -86,16 +158,17 @@ _EXTENSION_DICT = {
     oid.ID_CE_EXT_KEY_USAGE: ExtendedKeyUsage,
     oid.ID_CE_SUBJECT_KEY_IDENTIFIER: SubjectKeyIdentifier,
     oid.ID_CE_AUTHORITY_KEY_IDENTIFIER: AuthorityKeyIdentifier,
+    oid.ID_CE_CERTIFICATE_POLICIES: CertificatePolicies
     }
 
 
 class Extension(types.Sequence):
     print_delimiter = ", "
     components = (
-        (types.Component("extnID", oid.ObjectIdentifier)),
-        (types.Component("critical", types.Boolean, default=False)),
-        (types.Component("extnValue", ExtensionValue, defined_by="extnID",
-                         lookup=_EXTENSION_DICT))
+        types.Component("extnID", oid.ObjectIdentifier),
+        types.Component("critical", types.Boolean, default=False),
+        types.Component("extnValue", ExtensionValue, defined_by="extnID",
+                         lookup=_EXTENSION_DICT)
         )
 
 

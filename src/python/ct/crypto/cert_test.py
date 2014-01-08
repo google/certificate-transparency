@@ -82,6 +82,13 @@ class CertificateTest(unittest.TestCase):
     # A certificate with authority cert issuer and authority cert serial.
     _PEM_AKID = "authority_keyid.pem"
 
+    # A certificate chain with an EV policy.
+    _PEM_EV_CHAIN = "ev_chain.pem"
+    # EV OID for VeriSign Class 3 Public Primary Certification Authority
+    _EV_POLICY_OID = oid.ObjectIdentifier(value="2.16.840.1.113733.1.7.23.6")
+
+    _PEM_MULTIPLE_POLICIES = "multiple_policies.pem"
+
     @property
     def pem_file(self):
         return FLAGS.testdata_dir + "/" + self._PEM_FILE
@@ -480,6 +487,60 @@ class CertificateTest(unittest.TestCase):
                              oid.ID_AT_COMMON_NAME))
         self.assertEqual(10119, c.authority_key_identifier(
             identifier_type=x509_ext.AUTHORITY_CERT_SERIAL_NUMBER))
+
+    def test_policies(self):
+        certs = [c for c in cert.certs_from_pem_file(self.get_file(
+            self._PEM_EV_CHAIN))]
+        ev_cert = certs[0]
+        policies = ev_cert.policies()
+        self.assertEqual(1, len(policies))
+
+        self.assertTrue(ev_cert.has_policy(self._EV_POLICY_OID))
+        self.assertFalse(ev_cert.has_policy(oid.ANY_POLICY))
+
+        policy = ev_cert.policy(self._EV_POLICY_OID)
+
+        qualifiers = policy[x509_ext.POLICY_QUALIFIERS]
+        self.assertEqual(1, len(qualifiers))
+
+        qualifier = qualifiers[0]
+        self.assertEqual(oid.ID_QT_CPS, qualifier[x509_ext.POLICY_QUALIFIER_ID])
+        # CPS location is an Any(IA5String).
+        self.assertEqual("https://www.verisign.com/cps",
+                         qualifier[x509_ext.QUALIFIER].decoded_value)
+
+        any_cert = certs[1]
+        policies = any_cert.policies()
+        self.assertEqual(1, len(policies))
+
+        self.assertFalse(any_cert.has_policy(self._EV_POLICY_OID))
+        self.assertTrue(any_cert.has_policy(oid.ANY_POLICY))
+
+        policy = ev_cert.policy(self._EV_POLICY_OID)
+
+        qualifiers = policy[x509_ext.POLICY_QUALIFIERS]
+        self.assertEqual(1, len(qualifiers))
+
+        qualifier = qualifiers[0]
+        self.assertEqual(oid.ID_QT_CPS, qualifier[x509_ext.POLICY_QUALIFIER_ID])
+        # CPS location is an IA5String.
+        self.assertEqual("https://www.verisign.com/cps",
+                         qualifier[x509_ext.QUALIFIER].decoded_value)
+
+        no_policy_cert = certs[2]
+        self.assertEqual(0, len(no_policy_cert.policies()))
+        self.assertFalse(no_policy_cert.has_policy(self._EV_POLICY_OID))
+        self.assertFalse(no_policy_cert.has_policy(oid.ANY_POLICY))
+
+    def test_multiple_policies(self):
+        c = self.cert_from_pem_file(self._PEM_MULTIPLE_POLICIES)
+        policies = c.policies()
+        self.assertEqual(2, len(policies))
+        self.assertTrue(c.has_policy(oid.ObjectIdentifier(
+            value="1.3.6.1.4.1.6449.1.2.2.7")))
+        self.assertTrue(c.has_policy(oid.ObjectIdentifier(
+            value="2.23.140.1.2.1")))
+        self.assertFalse(c.has_policy(oid.ANY_POLICY))
 
 
 if __name__ == "__main__":

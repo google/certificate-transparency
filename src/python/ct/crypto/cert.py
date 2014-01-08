@@ -540,6 +540,55 @@ class Certificate(object):
 
       return akid[identifier_type] if akid else None
 
+    def policies(self):
+        """List certificate policies.
+
+        Returns:
+            a list of certificate policies, or an empty list if the extension is
+            not present.
+
+        Raises:
+            CertificateError: corrupt extension, or multiple extension values.
+        """
+        policies = self._get_decoded_extension_value(
+            oid.ID_CE_CERTIFICATE_POLICIES)
+        return policies or []
+
+    def policy(self, policy_oid):
+        """Find a policy with the given OID.
+
+        Returns:
+            The matching policy, or None.
+
+        Raises:
+            CertificateError: corrupt extension, or multiple extension values.
+        """
+        policies = self.policies()
+
+        if not policies:
+            return None
+
+        matching = [p for p in policies
+                    if p[x509_ext.POLICY_IDENTIFIER] == policy_oid]
+        if not matching:
+            return None
+
+        # TODO(ekasper): make this exception fire earlier in strict mode.
+        if len(matching) > 1:
+            raise CertificateError("Policy %s asserted more than once" %
+                                   policy_oid)
+        return matching[0]
+
+    def has_policy(self, policy_oid):
+        """Whether the certificate has a given policy.
+
+        Returns:
+            True if the given policy is asserted, False otherwise.
+
+        Raises:
+            CertificateError: corrupt extension, or multiple extension values.
+        """
+        return self.policy(policy_oid) is not None
 
 def certs_from_pem(pem_string, skip_invalid_blobs=False, strict_der=True):
     """Read multiple PEM-encoded certificates from a string.
