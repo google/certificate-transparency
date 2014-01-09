@@ -91,10 +91,14 @@ class NoticeReference(types.Sequence):
         )
 
 
+NOTICE_REF = "noticeRef"
+EXPLICIT_TEXT = "explicitText"
+
+
 class UserNotice(types.Sequence):
     components = (
-        types.Component("noticeRef", NoticeReference, optional=True),
-        types.Component("explicitText", DisplayText, optional=True)
+        types.Component(NOTICE_REF, NoticeReference, optional=True),
+        types.Component(EXPLICIT_TEXT, DisplayText, optional=True)
 )
 
 

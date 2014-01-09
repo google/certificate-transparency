@@ -89,6 +89,9 @@ class CertificateTest(unittest.TestCase):
 
     _PEM_MULTIPLE_POLICIES = "multiple_policies.pem"
 
+    # A certificate with a UserNotice containing a VisibleString.
+    _PEM_USER_NOTICE = "user_notice.pem"
+
     @property
     def pem_file(self):
         return FLAGS.testdata_dir + "/" + self._PEM_FILE
@@ -541,6 +544,25 @@ class CertificateTest(unittest.TestCase):
         self.assertTrue(c.has_policy(oid.ObjectIdentifier(
             value="2.23.140.1.2.1")))
         self.assertFalse(c.has_policy(oid.ANY_POLICY))
+
+    def test_user_notice(self):
+        c = self.cert_from_pem_file(self._PEM_USER_NOTICE)
+        policies = c.policies()
+        self.assertEqual(1, len(policies))
+
+        qualifiers = policies[0][x509_ext.POLICY_QUALIFIERS]
+        self.assertEqual(2, len(qualifiers))
+
+        qualifier = qualifiers[0]
+        self.assertEqual(oid.ID_QT_UNOTICE,
+                         qualifier[x509_ext.POLICY_QUALIFIER_ID])
+
+        qualifier = qualifier[x509_ext.QUALIFIER].decoded_value
+        self.assertIsNone(qualifier[x509_ext.NOTICE_REF])
+        expected_text = ("For more details, please visit our website "
+                         "https://www.cybertrust.ne.jp .")
+        explicit_text = qualifier[x509_ext.EXPLICIT_TEXT].component_value()
+        self.assertEqual(expected_text, explicit_text)
 
 
 if __name__ == "__main__":

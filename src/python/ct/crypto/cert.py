@@ -590,6 +590,7 @@ class Certificate(object):
         """
         return self.policy(policy_oid) is not None
 
+
 def certs_from_pem(pem_string, skip_invalid_blobs=False, strict_der=True):
     """Read multiple PEM-encoded certificates from a string.
 

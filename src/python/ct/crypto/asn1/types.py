@@ -719,7 +719,7 @@ class IA5String(ASN1String):
     pass
 
 
-@Universal(25, tag.PRIMITIVE)
+@Universal(26, tag.PRIMITIVE)
 class VisibleString(ASN1String):
     """VisibleString (aka ISO646String)."""
     pass
