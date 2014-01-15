@@ -92,6 +92,9 @@ class CertificateTest(unittest.TestCase):
     # A certificate with a UserNotice containing a VisibleString.
     _PEM_USER_NOTICE = "user_notice.pem"
 
+    # A certificate with an invalid (8-byte) IP address in a SAN.
+    _PEM_INVALID_IP = "invalid_ip.pem"
+
     @property
     def pem_file(self):
         return FLAGS.testdata_dir + "/" + self._PEM_FILE
@@ -322,6 +325,14 @@ class CertificateTest(unittest.TestCase):
         ips = c.subject_ip_addresses()
         self.assertEqual(1, len(ips))
         self.assertEqual((129, 48, 105, 104), ips[0].as_octets())
+
+    def test_invalid_ip_addresses(self):
+        self.assertRaises(error.ASN1Error, self.cert_from_pem_file,
+                          self._PEM_INVALID_IP)
+        c = self.cert_from_pem_file(self._PEM_INVALID_IP, strict=False)
+        ips = c.subject_ip_addresses()
+        self.assertEqual(1, len(ips))
+        self.assertEqual((0, 0, 0, 0, 255, 255, 255, 0), ips[0].as_octets())
 
     def test_subject_alternative_names(self):
         cert = self.cert_from_pem_file(self._PEM_MULTIPLE_AN)

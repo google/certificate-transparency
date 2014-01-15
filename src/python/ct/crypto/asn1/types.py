@@ -1208,7 +1208,8 @@ class Choice(Constructed, collections.MutableMapping):
         if len(cls.components[key].tags) == 1:
             # Shortcut: we already know the tag and length, so directly get
             # the value.
-            value = cls.components[key](serialized_value=readahead_value)
+            value = cls.components[key](serialized_value=readahead_value,
+                                        strict=strict)
         else:
             # Component has multiple tags but the readahead only read the
             # outermost tag, so read everything again.

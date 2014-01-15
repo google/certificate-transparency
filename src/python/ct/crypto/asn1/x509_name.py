@@ -1,5 +1,6 @@
 """ASN.1 specification for X509 name types."""
 
+from ct.crypto import error
 from ct.crypto.asn1 import oid
 from ct.crypto.asn1 import types
 
@@ -179,10 +180,11 @@ class IPAddress(types.OctetString):
         if len(self._value) == 16:
             return ":".join([self._value[i:i+2].encode("hex")
                              for i in range(0, len(self._value), 2)])
-        return self._value
+        return super(IPAddress, self).__str__()
 
 
 class GeneralName(types.Choice):
+    print_labels = True  # Print component type.
     # Definition here: http://tools.ietf.org/html/rfc5280#section-4.2.1.6
     components = {
         OTHER_NAME: OtherName.implicit(0),
