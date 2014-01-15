@@ -26,8 +26,7 @@ class ProberThread(threading.Thread):
             if not log.log_server or not log.log_id or not log.public_key_info:
                 raise RuntimeError("Cannot start monitor: log proto has "
                                    "missing or empty fields: %s" % log)
-            client = log_client.LogClient(log_client.Requester(
-                    log.log_server))
+            client = log_client.LogClient(log.log_server)
             hasher = merkle.TreeHasher()
             verifier = verify.LogVerifier(log.public_key_info,
                                           merkle.MerkleVerifier(hasher))

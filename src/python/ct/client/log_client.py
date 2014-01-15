@@ -1,14 +1,28 @@
 """RFC 6962 client API."""
 import base64
+import json
 
 from ct.proto import client_pb2
 import gflags
 import requests
+from twisted.internet import defer
+from twisted.internet import error
+from twisted.internet import protocol
+from twisted.python import failure
+from twisted.web import client
+from twisted.web import http
+
 
 FLAGS = gflags.FLAGS
 
-gflags.DEFINE_integer("entry_fetch_batch_size", 1000, "Maximum number of "
+gflags.DEFINE_integer("entry_fetch_batch_size", 100, "Maximum number of "
                       "entries to attempt to fetch in one request")
+
+gflags.DEFINE_integer("response_buffer_size_bytes", 10 * 1000 * 1000, "Maximum "
+                      "size of a single response buffer. Should be set such "
+                      "that a get_entries response comfortably fits in the "
+                      "the buffer. A typical log entry is expected to be < "
+                      "10kB.")
 
 
 class Error(Exception):
@@ -21,6 +35,16 @@ class ClientError(Error):
 
 class HTTPError(Error):
     """Connection failed, or returned an error."""
+    pass
+
+
+class HTTPConnectionError(HTTPError):
+    """Connection failed."""
+    pass
+
+
+class HTTPResponseSizeExceededError(HTTPError):
+    """HTTP response exceeded maximum permitted size."""
     pass
 
 
@@ -44,72 +68,95 @@ class InvalidResponseError(Error):
     pass
 
 
-# requests.models.Response is not easily instantiable locally, so as a
-# workaround, encapsulate the entire http logic in the Requester class which we
-# can control/mock out to test response handling.
-class Requester(object):
+###############################################################################
+#                    Common utility methods and constants.                    #
+###############################################################################
+
+_GET_STH_PATH = "ct/v1/get-sth"
+_GET_ENTRIES_PATH = "ct/v1/get-entries"
+_GET_STH_CONSISTENCY_PATH = "ct/v1/get-sth-consistency"
+_GET_PROOF_BY_HASH_PATH = "ct/v1/get-proof-by-hash"
+_GET_ROOTS_PATH = "ct/v1/get-roots"
+_GET_ENTRY_AND_PROOF_PATH = "ct/v1/get-entry-and-proof"
+
+
+def _parse_sth(sth_body):
+    """Parse a serialized STH JSON response."""
+    sth_response = client_pb2.SthResponse()
+    try:
+        sth = json.loads(sth_body)
+        sth_response.timestamp = sth["timestamp"]
+        sth_response.tree_size = sth["tree_size"]
+        sth_response.sha256_root_hash = base64.b64decode(sth[
+            "sha256_root_hash"])
+        sth_response.tree_head_signature = base64.b64decode(sth[
+            "tree_head_signature"])
+        # TypeError for base64 decoding, TypeError/ValueError for invalid
+        # JSON field types, KeyError for missing JSON fields.
+    except (TypeError, ValueError, KeyError) as e:
+        raise InvalidResponseError("Invalid STH %s\n%s" % (sth_body, e))
+    return sth_response
+
+
+# A class that we can mock out to generate fake responses.
+class RequestHandler(object):
     """HTTPS requests."""
 
-    def __init__(self, uri):
-        self.__uri = uri
-
     def __repr__(self):
-        return "%r(%r)" % (self.__class__.__name__, self.__uri)
+        return "%r()" % self.__class__.__name__
 
     def __str__(self):
-        return "%r(%r)" % (self.__class__.__name__, self.__uri)
+        return "%r()" % self.__class__.__name__
 
-    @property
-    def uri(self):
-        return self.__uri
-
-    def get_json_response(self, path, params=None):
-        """Get the json contents of a request response."""
-        url = "https://" + self.__uri + "/" + path
+    def get_response(self, uri, params=None):
+        """Get an HTTP response for a GET request."""
         try:
-            response = requests.get(url, params=params, timeout=60)
+            return requests.get(uri, params=params, timeout=60)
         except requests.exceptions.RequestException as e:
-            raise HTTPError("Connection to %s failed: %s" % (url, e))
-        if not response.ok:
-            error_msg = ("%s returned http_error %d: %s" %
-                         (url, response.status_code,
-                          response.text.encode("ascii", "ignore")))
-            if 400 <= response.status_code < 500:
-                raise HTTPClientError(error_msg)
-            elif 500 <= response.status_code < 600:
-                raise HTTPServerError(error_msg)
-            else:
-                raise HTTPError(error_msg)
-        try:
-            return response.json()
-        # This can raise a variety of undocumented exceptions...
-        except Exception as e:
-            raise InvalidResponseError("Response %s from %s is not valid JSON: "
-                                       "%s" % (response, url, e))
+            raise HTTPError("Connection to %s failed: %s" % (uri, e))
+
+    @staticmethod
+    def check_response_status(code, reason):
+        if code == 200:
+            return
+        elif 400 <= code < 500:
+            raise HTTPClientError(reason)
+        elif 500 <= code < 600:
+            raise HTTPServerError(reason)
+        else:
+            raise HTTPError(reason)
+
+    def get_response_body(self, uri, params=None):
+        response = self.get_response(uri, params=params)
+        self.check_response_status(response.status_code, response.reason)
+        return response.content
+
+
+###############################################################################
+#                         The synchronous log client.                         #
+###############################################################################
 
 
 class LogClient(object):
     """HTTP client for talking to a CT log."""
 
-    _GET_STH_PATH = "ct/v1/get-sth"
-    _GET_ENTRIES_PATH = "ct/v1/get-entries"
-    _GET_STH_CONSISTENCY_PATH = "ct/v1/get-sth-consistency"
-    _GET_PROOF_BY_HASH_PATH = "ct/v1/get-proof-by-hash"
-    _GET_ROOTS_PATH = "ct/v1/get-roots"
-    _GET_ENTRY_AND_PROOF_PATH = "ct/v1/get-entry-and-proof"
-
-    def __init__(self, requester):
-        self.__req = requester
+    def __init__(self, uri, handler=RequestHandler()):
+        self._uri = uri
+        self._req = handler
 
     def __repr__(self):
-        return "%r(%r)" % (self.__class__.__name__, self.__req)
+        return "%r(%r)" % (self.__class__.__name__, self._req)
 
     def __str__(self):
-        return "%s(%s)" % (self.__class__.__name__, self.__req.uri)
+        return "%s(%s)" % (self.__class__.__name__, self._req.uri)
 
     @property
     def servername(self):
-        return self.__req.uri
+        return self._uri
+
+    def _req_body(self, path, params=None):
+        return self._req.get_response_body("https://" + self._uri + "/" + path,
+                                           params=params)
 
     def get_sth(self):
         """Get the current Signed Tree Head.
@@ -124,23 +171,10 @@ class LogClient(object):
             InvalidResponseError: server response is invalid for the given
                                   request.
         """
-        sth = self.__req.get_json_response(self._GET_STH_PATH)
-        sth_response = client_pb2.SthResponse()
-        try:
-            sth_response.timestamp = sth["timestamp"]
-            sth_response.tree_size = sth["tree_size"]
-            sth_response.sha256_root_hash = base64.b64decode(sth[
-                "sha256_root_hash"])
-            sth_response.tree_head_signature = base64.b64decode(sth[
-                "tree_head_signature"])
-        # TypeError for base64 decoding, TypeError/ValueError for invalid
-        # JSON field types, KeyError for missing JSON fields.
-        except (TypeError, ValueError, KeyError) as e:
-            raise InvalidResponseError("%s returned an invalid STH %s\n%s" %
-                                       (self.__req.uri, sth, e))
-        return sth_response
+        sth = self._req_body(_GET_STH_PATH)
+        return _parse_sth(sth)
 
-    def __json_entry_to_response(self, json_entry):
+    def _json_entry_to_response(self, json_entry):
         """Convert a json array element to an EntryResponse."""
         entry_response = client_pb2.EntryResponse()
         try:
@@ -151,10 +185,10 @@ class LogClient(object):
         except (TypeError, ValueError, KeyError) as e:
             raise InvalidResponseError(
                 "%s returned invalid data: expected a log entry, got %s"
-                "\n%s" % (self.__req.uri, json_entry, e))
+                "\n%s" % (self.servername, json_entry, e))
         return entry_response
 
-    def __validated_entry_response(self, start, end, response):
+    def _validated_entry_response(self, start, end, response):
         """Verify the get-entries response format and size.
 
         Args:
@@ -170,11 +204,15 @@ class LogClient(object):
         """
         entries = None
         try:
+            response = json.loads(response)
+        except ValueError:
+            raise InvalidResponseError()
+        try:
             entries = iter(response["entries"])
         except (TypeError, KeyError) as e:
             raise InvalidResponseError("%s returned invalid data: expected "
                                        "an array of entries, got %s\n%s)" %
-                                       (self.__req.uri, response, e))
+                                       (self._uri, response, e))
         expected_response_size = end - start + 1
         response_size = len(response["entries"])
         # Logs MAY honor requests where 0 <= "start" < "tree_size" and
@@ -191,11 +229,11 @@ class LogClient(object):
         if not response_size or response_size > expected_response_size:
             raise InvalidResponseError(
                 "%s returned invalid data: requested %d entries, got %d "
-                "entries" % (self.__req.uri, expected_response_size,
+                "entries" % (self.servername, expected_response_size,
                              response_size))
 
         # If any one of the entries has invalid json format, this raises.
-        return [self.__json_entry_to_response(e) for e in entries]
+        return [self._json_entry_to_response(e) for e in entries]
 
     def get_entries(self, start, end, batch_size=0):
         """Retrieve log entries.
@@ -232,10 +270,10 @@ class LogClient(object):
             # errors.
             first = start
             last = min(start + batch_size - 1, end)
-            response = self.__req.get_json_response(
-                self._GET_ENTRIES_PATH, params={"start": first, "end": last})
-            valid_entries = self.__validated_entry_response(first, last,
-                                                            response)
+            response = self._req_body(_GET_ENTRIES_PATH,
+                                      params={"start": first, "end": last})
+            valid_entries = self._validated_entry_response(first, last,
+                                                           response)
             for entry in valid_entries:
                 yield entry
             # If we got less entries than requested, then we don't know whether
@@ -278,17 +316,18 @@ class LogClient(object):
         if old_size == 0 or old_size == new_size:
             return []
 
-        response = self.__req.get_json_response(
-            self._GET_STH_CONSISTENCY_PATH,
-            params={"first": old_size, "second": new_size})
+        response = self._req_body(_GET_STH_CONSISTENCY_PATH,
+                                  params={"first": old_size,
+                                          "second": new_size})
 
         try:
+            response = json.loads(response)
             consistency = [base64.b64decode(u) for u in response["consistency"]]
         except (TypeError, ValueError, KeyError) as e:
             raise InvalidResponseError(
                 "%s returned invalid data: expected a base64-encoded "
                 "consistency proof, got %s"
-                "\n%s" % (self.__req.uri, response, e))
+                "\n%s" % (self.servername, response, e))
 
         return consistency
 
@@ -316,9 +355,10 @@ class LogClient(object):
                                       tree_size)
 
         leaf_hash = base64.b64encode(leaf_hash)
-        response = self.__req.get_json_response(
-            self._GET_PROOF_BY_HASH_PATH,
-            params={"hash": leaf_hash, "tree_size": tree_size})
+        response = self._req_body(_GET_PROOF_BY_HASH_PATH,
+                                  params={"hash": leaf_hash,
+                                          "tree_size": tree_size})
+        response = json.loads(response)
 
         proof_response = client_pb2.ProofByHashResponse()
         try:
@@ -329,7 +369,7 @@ class LogClient(object):
             raise InvalidResponseError(
                 "%s returned invalid data: expected a base64-encoded "
                 "audit proof, got %s"
-                "\n%s" % (self.__req.uri, response, e))
+                "\n%s" % (self.servername, response, e))
 
         return proof_response
 
@@ -361,20 +401,21 @@ class LogClient(object):
                                       "size (got index %d vs size %d" %
                                       (leaf_index, tree_size))
 
-        response = self.__req.get_json_response(
-            self._GET_ENTRY_AND_PROOF_PATH,
-            params={"leaf_index": leaf_index, "tree_size": tree_size})
+        response = self._req_body(_GET_ENTRY_AND_PROOF_PATH,
+                                  params={"leaf_index": leaf_index,
+                                          "tree_size": tree_size})
+        response = json.loads(response)
 
         entry_response = client_pb2.EntryAndProofResponse()
         try:
             entry_response.entry.CopyFrom(
-                self.__json_entry_to_response(response))
+                self._json_entry_to_response(response))
             entry_response.audit_path.extend(
                 [base64.b64decode(u) for u in response["audit_path"]])
         except (TypeError, ValueError, KeyError) as e:
             raise InvalidResponseError(
                 "%s returned invalid data: expected an entry and proof, got %s"
-                "\n%s" % (self.__req.uri, response, e))
+                "\n%s" % (self.servername, response, e))
 
         return entry_response
 
@@ -391,10 +432,108 @@ class LogClient(object):
             InvalidResponseError: server response is invalid for the given
                                   request.
         """
-        response = self.__req.get_json_response(self._GET_ROOTS_PATH)
+        response = self._req_body(_GET_ROOTS_PATH)
+        response = json.loads(response)
         try:
             return [base64.b64decode(u)for u in response["certificates"]]
         except (TypeError, ValueError, KeyError) as e:
             raise InvalidResponseError(
                 "%s returned invalid data: expected a list od base64-encoded "
-                "certificates, got %s\n%s" % (self.__req.uri, response, e))
+                "certificates, got %s\n%s" % (self.servername, response, e))
+
+
+###############################################################################
+#                       The asynchronous twisted log client.                  #
+###############################################################################
+
+
+class ResponseBodyHandler(protocol.Protocol):
+    """Response handler for HTTP requests."""
+    def __init__(self, finished):
+        """Initialize the one-off response handler.
+
+        Args:
+            finished: a deferred that will be fired with the body when the
+                complete response has been received; or with an error when the
+                connection is lost.
+        """
+        self._finished = finished
+
+    def connectionMade(self):
+        self._buffer = []
+        self._len = 0
+        self._overflow = False
+
+    def dataReceived(self, data):
+        self._len += len(data)
+        if self._len > FLAGS.response_buffer_size_bytes:
+            # Note this flag has to be set *before* calling loseConnection()
+            # to ensure connectionLost gets called with the flag set.
+            self._overflow = True
+            self.transport.loseConnection()
+        else:
+            self._buffer.append(data)
+
+    def connectionLost(self, reason):
+        if self._overflow:
+            self._finished.errback(HTTPResponseSizeExceededError(
+                "Connection aborted: response size exceeded %d bytes" %
+                FLAGS.response_buffer_size_bytes))
+        elif not reason.check(*(error.ConnectionDone, client.ResponseDone,
+                                http.PotentialDataLoss)):
+            self._finished.errback(HTTPConnectionError(
+                "Connection lost (received %d bytes)" % self._len))
+        else:
+            body = "".join(self._buffer)
+            self._finished.callback(body)
+
+
+class AsyncLogClient(object):
+    """A twisted log client."""
+    def __init__(self, agent, uri):
+        """Initialize the client.
+
+        Args:
+            agent: a twisted.web.client.Agent.
+            uri: the uri of the log.
+        """
+        self._uri = uri
+        self._agent = agent
+
+    @property
+    def servername(self):
+        return self._uri
+
+    @staticmethod
+    def _response_cb(response):
+        try:
+            RequestHandler.check_response_status(response.code, response.phrase)
+        except HTTPError as e:
+            return failure.Failure(e)
+        finished = defer.Deferred()
+        response.deliverBody(ResponseBodyHandler(finished))
+        return finished
+
+    def get_sth(self):
+        """Get the current Signed Tree Head.
+
+        Returns:
+            a Deferred that fires with a ct.proto.client_pb2.SthResponse proto.
+
+        Raises:
+            HTTPError, HTTPConnectionError, HTTPClientError,
+            HTTPResponseSizeExceededError, HTTPServerError: connection failed.
+                For logs that honour HTTP status codes, HTTPClientError (a 4xx)
+                should never happen.
+            InvalidResponseError: server response is invalid for the given
+                                  request.
+        """
+        deferred_result = self._agent.request(
+            "GET", "https://" + self._uri + "/" + _GET_STH_PATH)
+        deferred_result.addCallback(self._response_cb)
+        # Since _response_cb returns a deferred, the processing of
+        # |deferred_result| will stop until the returned deferred has fired, and
+        # resume with the result, see
+        # http://twistedmatrix.com/documents/current/core/howto/defer.html#auto18
+        deferred_result.addCallback(_parse_sth)
+        return deferred_result

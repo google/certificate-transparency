@@ -23,3 +23,5 @@ test: all
 	PYTHONPATH=$(PYTHONPATH):. ./ct/client/sqlite_temp_db_test.py
 	PYTHONPATH=$(PYTHONPATH):. ./ct/client/monitor_test.py
 	PYTHONPATH=$(PYTHONPATH):. ./ct/client/state_test.py
+# Tests using twisted trial instead of plain unittest.
+	PYTHONPATH=$(PYTHONPATH):. ./ct/client/async_log_client_test.py
