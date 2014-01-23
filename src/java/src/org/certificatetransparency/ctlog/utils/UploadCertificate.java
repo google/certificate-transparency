@@ -33,7 +33,7 @@ public class UploadCertificate {
     List<Certificate> certs = CryptoDataLoader.certificatesFromFile(new File(pemFile));
     System.out.println(String.format("Total number of certificates in chain: %d", certs.size()));
 
-    HttpLogClient client = new HttpLogClient("http://ct.googleapis.com/pilot/ct/v1");
+    HttpLogClient client = new HttpLogClient("http://ct.googleapis.com/pilot/ct/v1/");
 
     Ct.SignedCertificateTimestamp resp = client.addCertificate(certs);
 
