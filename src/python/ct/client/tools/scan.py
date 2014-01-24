@@ -8,6 +8,7 @@ import sys
 import gflags
 
 from ct.client import log_client
+from ct.client import tls_message
 from ct.crypto import cert
 from ct.crypto import error
 from ct.proto import client_pb2
@@ -18,90 +19,21 @@ gflags.DEFINE_integer("multi", 1, "Number of cert parsing processes to use in "
                       "addition to the main process and the network process.")
 
 
-class Error(Exception):
-    pass
-
-# Temporary glue code
-# TODO(ekasper): define the constants properly in the decoder.
-V1 = 0
-TIMESTAMPED_ENTRY = 0
-X509_ENTRY, PRECERT_ENTRY = range(2)
-
-
-# TODO(ekasper): replace with a proper TLS decoder.
-def read_cert(tls_buffer):
-    cert_length_prefix = tls_buffer.read(3)
-    if len(cert_length_prefix) != 3:
-        raise Error("Input too short")
-    cert_length, = struct.unpack(">I", '\x00' + cert_length_prefix)
-
-    cert = tls_buffer.read(cert_length)
-    if len(cert) < cert_length:
-        raise Error("Input too short")
-    return cert
-
-
-def read_extensions(tls_buffer):
-    extensions_length_prefix = tls_buffer.read(2)
-    if len(extensions_length_prefix) != 2:
-        raise Error("Input too short: expected a 2-byte extension length "
-                    "prefix, read %d bytes" % extensions_length_prefix)
-    extensions_length, = struct.unpack(">H", extensions_length_prefix)
-
-    extensions = tls_buffer.read(extensions_length)
-    if len(extensions) != extensions_length:
-        raise Error("Input too short: expected extensions of length %d, "
-                    "read %d bytes" %
-                    (extensions_length, len(extensions)))
-    return extensions
-
-
 def decode_entry(serialized_entry):
     entry = client_pb2.EntryResponse()
     entry.ParseFromString(serialized_entry)
-    leaf_bytes = io.BytesIO(entry.leaf_input)
+    parsed_entry = client_pb2.ParsedEntry()
 
-    version = leaf_bytes.read(1)
-    if not version:
-        raise Error("Input too short")
-    version, = struct.unpack(">B", version)
-    if version != V1:
-        raise Error("Unsupported version %d" % version)
+    leaf_reader = tls_message.TLSReader(entry.leaf_input)
+    leaf_reader.read(parsed_entry.merkle_leaf)
 
-    leaf_type = leaf_bytes.read(1)
-    if not leaf_type:
-        raise Error("Input too short")
-    leaf_type, = struct.unpack(">B", leaf_type)
-    if leaf_type != 0:
-        raise Error("Unsupported leaf_type %d" % leaf_type)
+    parsed_entry.extra_data.entry_type = (parsed_entry.merkle_leaf.
+                                          timestamped_entry.entry_type)
 
-    timestamp = leaf_bytes.read(8)
-    if len(timestamp) < 8:
-        raise Error("Input too short")
-    timestamp, = struct.unpack(">Q", timestamp)
+    extra_data_reader = tls_message.TLSReader(entry.extra_data)
+    extra_data_reader.read(parsed_entry.extra_data)
 
-    entry_type = leaf_bytes.read(2)
-    if len(entry_type) < 2:
-        raise Error("Input too short")
-    entry_type, = struct.unpack(">H", entry_type)
-    if entry_type != X509_ENTRY and entry_type != PRECERT_ENTRY:
-        raise Error("Unsupported entry_type %d" % entry_type)
-
-    if entry_type == X509_ENTRY:
-        cert = read_cert(leaf_bytes)
-        read_extensions(leaf_bytes)
-
-        if leaf_bytes.read():
-            raise Error("Input too long")
-
-    else:
-        # Precert entry: extract the full precertificate from extra_data.
-        # This currently does just enough to extract the precert, and doesn't
-        # verify the rest of the leaf input.
-        extra_data = io.BytesIO(entry.extra_data)
-        cert = read_cert(extra_data)
-
-    return entry_type, cert
+    return parsed_entry
 
 def match(certificate, entry_type):
     # Fill this in with your match criteria, e.g.
@@ -133,9 +65,15 @@ def process_entries(entry_queue, output_queue):
             # "STOP_WORKER" message.
             output_queue.put(QueueMessage(WORKER_STOPPED))
         else:
-            # der_cert is either the certificate or the precertificate.
-            entry_type, der_cert = decode_entry(entry)
+            parsed_entry = decode_entry(entry)
+            ts_entry = parsed_entry.merkle_leaf.timestamped_entry
             c = None
+            if ts_entry.entry_type == client_pb2.X509_ENTRY:
+                der_cert = ts_entry.asn1_cert
+            else:
+                # The original, signed precertificate.
+                der_cert = (parsed_entry.extra_data.precert_chain_entry.
+                            precertificate_chain[0])
             try:
                 c = cert.Certificate(der_cert)
             except error.Error as e:
@@ -149,7 +87,7 @@ def process_entries(entry_queue, output_queue):
                     output_queue.put(QueueMessage(
                         "Entry no %d failed strict parsing:\n%s" %
                         (count, c), wait_for_ack=False))
-            if c and match(c, entry_type):
+            if c and match(c, ts_entry.entry_type):
                 output_queue.put(QueueMessage(
                     "Found matching certificate:\n%s" % c,
                     wait_for_ack=True))

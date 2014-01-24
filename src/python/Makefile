@@ -1,7 +1,8 @@
-all: ct/proto/client_pb2.py ct/proto/ct_pb2.py
+all: ct/proto/client_pb2.py ct/proto/ct_pb2.py ct/proto/tls_options_pb2.py \
+	ct/proto/test_message_pb2.py
 
 ct/proto/%_pb2.py: ct/proto/%.proto
-	protoc $^ --python_out=.
+	protoc $^ -I/usr/include/ -I. --python_out=.
 
 ct/proto/ct_pb2.py: ../proto/ct.proto
 	protoc --python_out=ct/proto --proto_path=../proto ../proto/ct.proto
@@ -23,5 +24,6 @@ test: all
 	PYTHONPATH=$(PYTHONPATH):. ./ct/client/sqlite_temp_db_test.py
 	PYTHONPATH=$(PYTHONPATH):. ./ct/client/monitor_test.py
 	PYTHONPATH=$(PYTHONPATH):. ./ct/client/state_test.py
+	PYTHONPATH=$(PYTHONPATH):. ./ct/client/tls_message_test.py
 # Tests using twisted trial instead of plain unittest.
 	PYTHONPATH=$(PYTHONPATH):. ./ct/client/async_log_client_test.py

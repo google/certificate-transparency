@@ -2,6 +2,8 @@ syntax = "proto2";
 
 package ct;
 
+import "ct/proto/tls_options.proto";
+
 message KeyInfo {
   enum KeyType {
     ECDSA = 0;
@@ -83,4 +85,72 @@ message MonitorState {
   // A compact tree representing the last verified batch of leaves that is
   // is provably-consistent with pending_sth.
   optional CompactMerkleTree verified_tree = 3;
+}
+
+enum Version {
+  option (tls_enum_opts).max_value = 255;
+  V1 = 0;
+}
+
+enum MerkleLeafType {
+  option (tls_enum_opts).max_value = 255;
+  TIMESTAMPED_ENTRY = 0;
+}
+
+enum LogEntryType {
+  option (tls_enum_opts).max_value = 65535;
+  X509_ENTRY = 0;
+  PRECERT_ENTRY = 1;
+}
+
+message PreCert {
+  optional bytes issuer_key_hash = 1 [(tls_opts).fixed_length = 32];
+  optional bytes tbs_certificate = 2 [(tls_opts).min_length = 1,
+                                      (tls_opts).max_length = 0xffffff];
+}
+
+message TimestampedEntry {
+  optional uint64 timestamp = 1;
+  optional LogEntryType entry_type = 2;
+  optional bytes asn1_cert = 3 [(tls_opts).select_field = "entry_type",
+                                (tls_opts).select_value = 0,
+                                (tls_opts).min_length = 1,
+                                (tls_opts).max_length = 0xffffff];
+  optional PreCert pre_cert = 4 [(tls_opts).select_field = "entry_type",
+                                (tls_opts).select_value = 1];
+  optional bytes ct_extensions = 5 [(tls_opts).max_length = 0xffff];
+}
+
+message MerkleTreeLeaf {
+  optional Version version = 1;
+  optional MerkleLeafType leaf_type = 2;
+  optional TimestampedEntry timestamped_entry = 3
+      [(tls_opts).select_field = "leaf_type",
+       (tls_opts).select_value = 0];
+}
+
+message PrecertChainEntry {
+  optional bytes pre_certificate = 1 [(tls_opts).min_length = 1,
+                                      (tls_opts).max_length = 0xffffff];
+  repeated bytes precertificate_chain = 2
+      [(tls_opts).min_length = 1,
+       (tls_opts).max_length = 0xffffff,
+       (tls_opts).max_total_length = 0xffffff];
+}
+
+message ExtraData {
+  optional LogEntryType entry_type = 1 [(tls_opts).skip = true]; // Prefilled.
+  repeated bytes certificate_chain = 2 [(tls_opts).select_field = "entry_type",
+                                        (tls_opts).select_value = 0,
+                                        (tls_opts).min_length = 1,
+                                        (tls_opts).max_length = 0xffffff,
+                                        (tls_opts).max_total_length = 0xffffff];
+  optional PrecertChainEntry precert_chain_entry = 3
+      [(tls_opts).select_field = "entry_type",
+       (tls_opts).select_value = 1];
+}
+
+message ParsedEntry {
+  optional MerkleTreeLeaf merkle_leaf = 1;
+  optional ExtraData extra_data = 2;
 }
