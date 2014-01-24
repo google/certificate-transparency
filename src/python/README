@@ -7,7 +7,6 @@ requests (at least version 1.0)
 protobuf
 ecdsa
 mock
-pyasn1 (0.1.7)
 twisted (at least 12.1; tested with 13.2)
 
 2. Install the protoc compiler from https://code.google.com/p/protobuf/

@@ -99,26 +99,26 @@ class FakeHandlerBase(log_client.RequestHandler):
             return self.get_sth()
 
         elif path == "get-entries":
-            start = params.get("start", -1)
-            end = params.get("end", -1)
+            start = int(params.get("start", -1))
+            end = int(params.get("end", -1))
             return self.get_entries(start, end)
 
         elif path == "get-sth-consistency":
-            old_size = params.get("first", -1)
-            new_size = params.get("second", -1)
+            old_size = int(params.get("first", -1))
+            new_size = int(params.get("second", -1))
             return self.get_sth_consistency(old_size, new_size)
 
         elif path == "get-roots":
             return self.get_roots()
 
         elif path == "get-entry-and-proof":
-            leaf_index = params.get("leaf_index", -1)
-            tree_size = params.get("tree_size", -1)
+            leaf_index = int(params.get("leaf_index", -1))
+            tree_size = int(params.get("tree_size", -1))
             return self.get_entry_and_proof(leaf_index, tree_size)
 
         elif path == "get-proof-by-hash":
             leaf_hash = params.get("hash", "").decode("base64")
-            tree_size = params.get("tree_size", -1)
+            tree_size = int(params.get("tree_size", -1))
             return self.get_proof_by_hash(leaf_hash, tree_size)
 
         else:

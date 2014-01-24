@@ -5,20 +5,25 @@ import json
 from ct.proto import client_pb2
 import gflags
 import requests
+
 from twisted.internet import defer
 from twisted.internet import error
 from twisted.internet import protocol
+from twisted.internet import reactor as ireactor
+from twisted.internet import task
 from twisted.python import failure
 from twisted.web import client
 from twisted.web import http
+from twisted.web import iweb
+from zope.interface import implements
 
 
 FLAGS = gflags.FLAGS
 
-gflags.DEFINE_integer("entry_fetch_batch_size", 100, "Maximum number of "
+gflags.DEFINE_integer("entry_fetch_batch_size", 1000, "Maximum number of "
                       "entries to attempt to fetch in one request")
 
-gflags.DEFINE_integer("response_buffer_size_bytes", 10 * 1000 * 1000, "Maximum "
+gflags.DEFINE_integer("response_buffer_size_bytes", 50 * 1000 * 1000, "Maximum "
                       "size of a single response buffer. Should be set such "
                       "that a get_entries response comfortably fits in the "
                       "the buffer. A typical log entry is expected to be < "
@@ -98,6 +103,63 @@ def _parse_sth(sth_body):
     return sth_response
 
 
+def _parse_entry(json_entry):
+    """Convert a json array element to an EntryResponse."""
+    entry_response = client_pb2.EntryResponse()
+    try:
+        entry_response.leaf_input = base64.b64decode(
+            json_entry["leaf_input"])
+        entry_response.extra_data = base64.b64decode(
+            json_entry["extra_data"])
+    except (TypeError, ValueError, KeyError) as e:
+        raise InvalidResponseError("Invalid entry: %s\n%s" % (json_entry, e))
+    return entry_response
+
+
+def _parse_entries(entries_body, expected_response_size):
+    """Load serialized JSON response.
+
+    Args:
+        entries_body: received entries.
+        expected_response_size: number of entries requested. Used to validate
+            the response.
+
+    Returns:
+        a list of client_pb2.EntryResponse entries.
+
+    Raises:
+        InvalidResponseError: response not valid.
+    """
+    try:
+        response = json.loads(entries_body)
+    except ValueError as e:
+        raise InvalidResponseError("Invalid response %s\n%s" %
+                                   (entries_body, e))
+    try:
+        entries = iter(response["entries"])
+    except (TypeError, KeyError) as e:
+        raise InvalidResponseError("Invalid response: expected "
+                                   "an array of entries, got %s\n%s)" %
+                                   (response, e))
+    # Logs MAY honor requests where 0 <= "start" < "tree_size" and
+    # "end" >= "tree_size" by returning a partial response covering only
+    # the valid entries in the specified range.
+    # Logs MAY restrict the number of entries that can be retrieved per
+    # "get-entries" request.  If a client requests more than the
+    # permitted number of entries, the log SHALL return the maximum
+    # number of entries permissible. (RFC 6962)
+    #
+    # Therefore, we cannot assume we get exactly the expected number of
+    # entries. However if we get none, or get more than expected, then
+    # we discard the response and raise.
+    response_size = len(response["entries"])
+    if not response_size or response_size > expected_response_size:
+        raise InvalidResponseError("Invalid response: requested %d entries,"
+                                   "got %d entries" %
+                                   (expected_response_size, response_size))
+    return [_parse_entry(e) for e in entries]
+
+
 # A class that we can mock out to generate fake responses.
 class RequestHandler(object):
     """HTTPS requests."""
@@ -174,67 +236,6 @@ class LogClient(object):
         sth = self._req_body(_GET_STH_PATH)
         return _parse_sth(sth)
 
-    def _json_entry_to_response(self, json_entry):
-        """Convert a json array element to an EntryResponse."""
-        entry_response = client_pb2.EntryResponse()
-        try:
-            entry_response.leaf_input = base64.b64decode(
-                json_entry["leaf_input"])
-            entry_response.extra_data = base64.b64decode(
-                json_entry["extra_data"])
-        except (TypeError, ValueError, KeyError) as e:
-            raise InvalidResponseError(
-                "%s returned invalid data: expected a log entry, got %s"
-                "\n%s" % (self.servername, json_entry, e))
-        return entry_response
-
-    def _validated_entry_response(self, start, end, response):
-        """Verify the get-entries response format and size.
-
-        Args:
-            start: requested start parameter.
-            end:  requested end parameter.
-            response: response.
-
-        Returns:
-            an array of entries.
-
-        Raises:
-            InvalidResponseError: response not valid.
-        """
-        entries = None
-        try:
-            response = json.loads(response)
-        except ValueError:
-            raise InvalidResponseError()
-        try:
-            entries = iter(response["entries"])
-        except (TypeError, KeyError) as e:
-            raise InvalidResponseError("%s returned invalid data: expected "
-                                       "an array of entries, got %s\n%s)" %
-                                       (self._uri, response, e))
-        expected_response_size = end - start + 1
-        response_size = len(response["entries"])
-        # Logs MAY honor requests where 0 <= "start" < "tree_size" and
-        # "end" >= "tree_size" by returning a partial response covering only
-        # the valid entries in the specified range.
-        # Logs MAY restrict the number of entries that can be retrieved per
-        # "get-entries" request.  If a client requests more than the
-        # permitted number of entries, the log SHALL return the maximum
-        # number of entries permissible. (RFC 6962)
-        #
-        # Therefore, we cannot assume we get exactly the expected number of
-        # entries. However if we get none, or get more than expected, then
-        # we discard the response and raise.
-        if not response_size or response_size > expected_response_size:
-            raise InvalidResponseError(
-                "%s returned invalid data: requested %d entries, got %d "
-                "entries" % (self.servername, expected_response_size,
-                             response_size))
-
-        # If any one of the entries has invalid json format, this raises.
-        return [self._json_entry_to_response(e) for e in entries]
-
     def get_entries(self, start, end, batch_size=0):
         """Retrieve log entries.
 
@@ -272,14 +273,13 @@ class LogClient(object):
             last = min(start + batch_size - 1, end)
             response = self._req_body(_GET_ENTRIES_PATH,
                                       params={"start": first, "end": last})
-            valid_entries = self._validated_entry_response(first, last,
-                                                           response)
-            for entry in valid_entries:
+            entries = _parse_entries(response, last - first + 1)
+            for entry in entries:
                 yield entry
             # If we got less entries than requested, then we don't know whether
             # the log imposed a batch limit or ran out of entries, so we keep
             # trying until we get all entries, or an error response.
-            start += len(valid_entries)
+            start += len(entries)
 
     def get_sth_consistency(self, old_size, new_size):
         """Retrieve a consistency proof.
@@ -408,8 +408,7 @@ class LogClient(object):
 
         entry_response = client_pb2.EntryAndProofResponse()
         try:
-            entry_response.entry.CopyFrom(
-                self._json_entry_to_response(response))
+            entry_response.entry.CopyFrom(_parse_entry(response))
             entry_response.audit_path.extend(
                 [base64.b64decode(u) for u in response["audit_path"]])
         except (TypeError, ValueError, KeyError) as e:
@@ -449,6 +448,7 @@ class LogClient(object):
 
 class ResponseBodyHandler(protocol.Protocol):
     """Response handler for HTTP requests."""
+
     def __init__(self, finished):
         """Initialize the one-off response handler.
 
@@ -488,21 +488,11 @@ class ResponseBodyHandler(protocol.Protocol):
             self._finished.callback(body)
 
 
-class AsyncLogClient(object):
-    """A twisted log client."""
-    def __init__(self, agent, uri):
-        """Initialize the client.
+class AsyncRequestHandler(object):
+    """A helper for asynchronous response body delivery."""
 
-        Args:
-            agent: a twisted.web.client.Agent.
-            uri: the uri of the log.
-        """
-        self._uri = uri
+    def __init__(self, agent):
         self._agent = agent
-
-    @property
-    def servername(self):
-        return self._uri
 
     @staticmethod
     def _response_cb(response):
@@ -513,6 +503,145 @@ class AsyncLogClient(object):
         finished = defer.Deferred()
         response.deliverBody(ResponseBodyHandler(finished))
         return finished
+
+    @staticmethod
+    def _make_request(path, params):
+        if not params:
+            return path
+        return path + "?" + "&".join([key + "=" + value
+                                      for key, value in params.iteritems()])
+
+    def get(self, path, params=None):
+        d = self._agent.request("GET", self._make_request(path, params))
+        d.addCallback(self._response_cb)
+        return d
+
+
+class EntryProducer(object):
+    """A push producer for log entries."""
+    implements(iweb.IBodyProducer)
+
+    def __init__(self, handler, reactor, uri, start, end, batch_size):
+        self._handler = handler
+        self._reactor = reactor
+        self._uri = uri
+        self._consumer = None
+
+        assert 0 <= start <= end
+        self._start = start
+        self._end = end
+        self._current = self._start
+        self._batch_size = batch_size
+        # Required attribute of the interface.
+        self.length = iweb.UNKNOWN_LENGTH
+
+    @property
+    def finished(self):
+        return self._current > self._end
+
+    def _response_eb(self, result):
+        self.stopProducing()
+        self._done.errback(result)
+
+    def _write_pending(self):
+        if self._pending:
+            self._current += len(self._pending)
+            self._consumer.write(self._pending)
+            self._pending = None
+
+    @defer.deferredGenerator
+    def produce(self):
+        """Produce entries."""
+        while not self._paused:
+            self._write_pending()
+
+            if self.finished:
+                self.stopProducing()
+                self._done.callback(self._end - self._start + 1)
+                return
+
+            # Currently, a naive strategy is used where each response determines
+            # the next request. An optimized strategy interleaving two queries
+            # would likely better fill the pipeline.
+            first = self._current
+            last = min(self._current + self._batch_size - 1, self._end)
+
+            deferred_response = self._handler.get(
+                "https://" + self._uri + "/" + _GET_ENTRIES_PATH,
+                params={"start": str(first), "end": str(last)})
+            deferred_response.addCallback(_parse_entries, last - first + 1)
+            deferred_response.addErrback(self._response_eb)
+
+            wfd = defer.waitForDeferred(deferred_response)
+            # Pause here until the body of the response is available.
+            yield wfd
+            # The producer may have been paused while waiting for the response,
+            # or errored out upon receiving it: do not write the entries out
+            # until after the next self._paused check.
+            self._pending = wfd.getResult()
+
+    def startProducing(self, consumer):
+        """Start producing entries.
+
+        The producer writes EntryResponse protos to the consumer in batches,
+        until all entries have been received, or an error occurs.
+
+        Args:
+            consumer: the consumer to write to.
+
+        Returns:
+           a deferred that fires when no more entries will be written.
+           Upon success, this deferred fires with the total number of entries
+           produced. Upon failure, this deferred fires with the appropriate
+           HTTPError.
+
+        Raises:
+            RuntimeError: consumer already registered.
+        """
+        if self._consumer:
+            raise RuntimeError("Producer already has a consumer registered")
+        self._consumer = consumer
+        self._stopped = False
+        self._paused = True
+        self._pending = None
+        self._done = defer.Deferred()
+        # An IBodyProducer should start producing immediately, without waiting
+        # for an explicit resumeProducing() call.
+        task.deferLater(self._reactor, 0, self.resumeProducing)
+        return self._done
+
+    def pauseProducing(self):
+        self._paused = True
+
+    def resumeProducing(self):
+        if self._paused and not self._stopped:
+            self._paused = False
+            self.produce()
+
+    def stopProducing(self):
+        self._paused = True
+        self._stopped = True
+
+
+class AsyncLogClient(object):
+    """A twisted log client."""
+
+    def __init__(self, agent, uri, reactor=ireactor):
+
+        """Initialize the client.
+
+        Args:
+            agent: the agent to use.
+            uri: the uri of the log.
+            reactor: the reactor to use. Default is twisted.internet.reactor.
+        """
+        self._handler = AsyncRequestHandler(agent)
+        self._uri = uri
+        self._reactor = reactor
+
+    @property
+    def servername(self):
+        return self._uri
 
     def get_sth(self):
         """Get the current Signed Tree Head.
@@ -528,12 +657,32 @@ class AsyncLogClient(object):
             InvalidResponseError: server response is invalid for the given
                                   request.
         """
-        deferred_result = self._agent.request(
-            "GET", "https://" + self._uri + "/" + _GET_STH_PATH)
-        deferred_result.addCallback(self._response_cb)
-        # Since _response_cb returns a deferred, the processing of
-        # |deferred_result| will stop until the returned deferred has fired, and
-        # resume with the result, see
-        # http://twistedmatrix.com/documents/current/core/howto/defer.html#auto18
+        deferred_result = self._handler.get("https://" + self._uri + "/" +
+                                            _GET_STH_PATH)
         deferred_result.addCallback(_parse_sth)
         return deferred_result
+
+    def get_entries(self, start, end, batch_size=0):
+        """Retrieve log entries.
+
+        Args:
+            start: index of first entry to retrieve.
+            end: index of last entry to retrieve.
+            batch_size: max number of entries to fetch in one go.
+
+        Returns:
+            an EntryProducer for the given range.
+
+        Raises:
+            InvalidRequestError: invalid request range (irrespective of log).
+
+        Caller is responsible for ensuring that (start, end) is a valid range
+        (by retrieving an STH first), otherwise a HTTPClientError may occur
+        during production.
+        """
+        # Catch obvious mistakes here.
+        if start < 0 or end < 0 or start > end:
+            raise InvalidRequestError("Invalid range [%d, %d]" % (start, end))
+        batch_size = batch_size or FLAGS.entry_fetch_batch_size
+        return EntryProducer(self._handler, self._reactor, self._uri, start,
+                             end, batch_size)
