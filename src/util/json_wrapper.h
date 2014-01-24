@@ -7,8 +7,6 @@
 #include <json/json.h>
 #undef TRUE  // json.h pollution
 #undef FALSE  // json.h pollution
-#include <netinet/in.h>  // for resolv.h
-#include <resolv.h>  // for b64_ntop
 
 #include <sstream>
 
@@ -16,15 +14,6 @@
 #include "util/util.h"
 
 class JsonArray;
-
-std::string ToBase64(const std::string &from) {
-  // base 64 is 4 output bytes for every 3 input bytes (rounded up).
-  size_t length = ((from.size() + 2) / 3) * 4;
-  char buf[length + 1];
-  length = b64_ntop((const u_char *)from.data(), from.length(), buf,
-                    length + 1);
-  return std::string((char *)buf, length);
-}
 
 // It appears that a new object, e.g. from a string, has a reference count
 // of 1, and that any objects "got" from it will get freed when it is freed.
@@ -81,7 +70,7 @@ class JsonObject {
   }
 
   void AddBase64(const char *name, const std::string &value) {
-    Add(name, ToBase64(value));
+    Add(name, util::ToBase64(value));
   }
 
   void Add(const char *name, const ct::DigitallySigned &ds) {
@@ -181,7 +170,7 @@ class JsonArray : public JsonObject {
   }
 
   void AddBase64(const std::string &addand) {
-    Add(ToBase64(addand));
+    Add(util::ToBase64(addand));
   }
 
   int Length() const { return json_object_array_length(obj_); }

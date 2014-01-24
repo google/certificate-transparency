@@ -35,6 +35,8 @@ std::string RandomString(size_t min_length, size_t max_length);
 
 std::string FromBase64(const char *b64);
 
+std::string ToBase64(const std::string &from);
+
 }  // namespace util
 
 #endif  // ndef UTIL_H

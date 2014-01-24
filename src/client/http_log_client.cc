@@ -50,7 +50,7 @@ HTTPLogClient::UploadSubmission(const std::string &submission, bool pre,
   for (size_t n = 0; n < chain.Length(); ++n) {
     string cert;
     CHECK_EQ(Cert::TRUE, chain.CertAt(n)->DerEncoding(&cert));
-    jchain.Add(json_object_new_string(ToBase64(cert).c_str()));
+    jchain.Add(json_object_new_string(util::ToBase64(cert).c_str()));
   }
   json_object *jsend = json_object_new_object();
   json_object_object_add(jsend, "chain", jchain.Extract());
@@ -193,7 +193,7 @@ HTTPLogClient::QueryAuditProof(const string &merkle_leaf_hash,
   ostringstream url2;
   BaseUrl(&url2);
   url2 << "get-proof-by-hash?hash="
-       << curlpp::escape(ToBase64(merkle_leaf_hash))
+       << curlpp::escape(util::ToBase64(merkle_leaf_hash))
        << "&tree_size=" << tree_size.Value();
   curlpp::Easy request2;
   std::ostringstream response2;

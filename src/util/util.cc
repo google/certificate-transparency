@@ -181,4 +181,13 @@ std::string FromBase64(const char *b64) {
   return ret;
 }
 
+std::string ToBase64(const std::string &from) {
+  // base 64 is 4 output bytes for every 3 input bytes (rounded up).
+  size_t length = ((from.size() + 2) / 3) * 4;
+  char buf[length + 1];
+  length = b64_ntop((const u_char *)from.data(), from.length(), buf,
+                    length + 1);
+  return std::string((char *)buf, length);
+}
+
 }  // namespace util

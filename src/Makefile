@@ -69,14 +69,17 @@ LOG_TESTS = log/cert_test log/cert_checker_test \
             log/signer_verifier_test log/log_signer_test log/tree_signer_test \
             log/logged_certificate_test log/ct_extensions_test
 UTIL_TESTS = util/json_wrapper_test
-ALL_TESTS = $(PROTO_TESTS) $(MERKLETREE_TESTS) $(LOG_TESTS) $(UTIL_TESTS)
+MONITOR_TESTS = monitor/database_test
+ALL_TESTS = $(PROTO_TESTS) $(MERKLETREE_TESTS) $(LOG_TESTS) $(UTIL_TESTS) \
+	$(MONITOR_TESTS)
 
 all: unit_tests client/ct server/ct-server server/blob-server \
      server/ct-rfc-server
 
 .DELETE_ON_ERROR:
 .PHONY: clean all unit_tests test alltests benchmark clean \
-        proto_tests merkletree_tests log_tests client_tests
+        proto_tests merkletree_tests log_tests client_tests \
+	monitor_tests
 
 gtest/Makefile: $(GTESTDIR)
 	mkdir -p gtest && cd gtest && cmake $(GTESTDIR)
@@ -108,6 +111,11 @@ util/.depend: util/*.cc */*.h
 	sed 's,\(.*\)\.o,util/\1.o,' > util/.depend < util/.depend1
 	rm util/.depend1
 
+monitor/.depend: monitor/*.cc */*.h
+	$(CXX) $(CXXFLAGS) -MM -MG monitor/*.cc > monitor/.depend1
+	sed 's,\(.*\)\.o,monitor/\1.o,' > monitor/.depend < monitor/.depend1
+	rm monitor/.depend1
+
 client/.depend: client/*.cc */*.h
 	$(CXX) $(CXXFLAGS) -MM -MG client/*.cc > client/.depend1
 	sed 's,\(.*\)\.o,client/\1.o,' > client/.depend < client/.depend1
@@ -127,11 +135,12 @@ ifneq ($(MAKECMDGOALS),clean)
     include merkletree/.depend
     include log/.depend
     include util/.depend
+    include monitor/.depend
     include client/.depend
     include server/.depend
 endif
 
-unit_tests: proto_tests merkletree_tests log_tests util_tests
+unit_tests: proto_tests merkletree_tests log_tests util_tests monitor_tests
 
 util_tests: util/json_wrapper_test
 
@@ -287,9 +296,19 @@ log/logged_certificate_test: log/logged_certificate_test.o proto/libproto.a \
                              util/libutil.a merkletree/libmerkletree.a
 	$(CXX) -o $@ $^ $(SYS_LIBS)
 
+monitor_tests: $(MONITOR_TESTS)
+
+monitor/database_test: monitor/database_test.o monitor/database.o \
+                       monitor/sqlite_db.o util/libutil.a log/test_signer.o \
+                       merkletree/libmerkletree.a log/log_signer.o \
+                       log/signer.o log/verifier.o proto/libproto.a
+	$(CXX) -o $@ $^ $(SYS_LIBS)
+
 # client
 client/ct: client/ct.o client/client.o client/log_client.o client/ssl_client.o \
-           client/http_log_client.o $(LOCAL_LIBS)
+           client/http_log_client.o monitor/sqlite_db.o monitor/database.o \
+           monitor/monitor.o \
+           $(LOCAL_LIBS)
 	$(CXX) -o $@ $^ $(SYS_LIBS)
 
 # server
@@ -326,6 +345,7 @@ test: all
 	log/frontend_test --test_certs_dir=test/testdata
 	log/tree_signer_test
 	log/log_lookup_test
+	monitor/database_test
 
 #Java
 java_build:

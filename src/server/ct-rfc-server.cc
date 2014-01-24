@@ -425,7 +425,7 @@ private:
         return;
       }
       JsonObject jentry;
-      jentry.Add("leaf_input", ToBase64(leaf_input));
+      jentry.Add("leaf_input", util::ToBase64(leaf_input));
 
       string extra_data;
       if (!cert.SerializeExtraData(&extra_data)) {
@@ -433,7 +433,7 @@ private:
         return;
       }
 
-      jentry.Add("extra_data", ToBase64(extra_data));
+      jentry.Add("extra_data", util::ToBase64(extra_data));
 
       entries.Add(&jentry);
     }
