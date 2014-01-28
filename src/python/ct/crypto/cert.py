@@ -183,6 +183,12 @@ class Certificate(object):
         """Get the DER-encoding of the certificate."""
         return self._asn1_cert.encode()
 
+    def to_pem(self):
+      return pem.to_pem(self._asn1_cert.encode(), self.PEM_MARKERS[0])
+
+    def is_identical_to(self, other_cert):
+        return self.to_der() == other_cert.to_der()
+
     def version(self):
         """Get the version.
 

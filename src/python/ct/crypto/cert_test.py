@@ -125,6 +125,16 @@ class CertificateTest(unittest.TestCase):
             c = cert.Certificate.from_pem(f.read())
         self.assertTrue(isinstance(c, cert.Certificate))
 
+    def test_to_pem(self):
+        with open(self.get_file(self._PEM_FILE)) as f:
+            c = cert.Certificate.from_pem(f.read())
+        # PEM files can and do contain arbitrary additional information,
+        # so we can't assert equality with the original contents.
+        # Instead, simply check that we can read the newly constructed PEM.
+        new_pem = c.to_pem()
+        c2 = cert.Certificate.from_pem(new_pem)
+        self.assertTrue(c2.is_identical_to(c))
+
     def test_all_from_pem(self):
         with open(self.get_file(self._PEM_CHAIN_FILE)) as f:
             certs = list(cert.certs_from_pem(f.read()))
@@ -157,6 +167,21 @@ class CertificateTest(unittest.TestCase):
             der_string = f.read()
         c = cert.Certificate(der_string)
         self.assertEqual(der_string, c.to_der())
+
+    def test_identical_to_self(self):
+        c = self.cert_from_pem_file(self._PEM_FILE)
+        self.assertTrue(c.is_identical_to(c))
+
+    def test_identical(self):
+        c = self.cert_from_pem_file(self._PEM_FILE)
+        c2 = self.cert_from_pem_file(self._PEM_FILE)
+        self.assertTrue(c.is_identical_to(c2))
+        self.assertTrue(c2.is_identical_to(c))
+
+    def test_not_identical(self):
+        c = self.cert_from_pem_file(self._PEM_FILE)
+        c2 = self.cert_from_pem_file(self._V1_PEM_FILE)
+        self.assertFalse(c2.is_identical_to(c))
 
     def test_parse_matrixssl(self):
         """Test parsing of old MatrixSSL.org sample certificate
