@@ -53,7 +53,7 @@ class TLSReaderTest(unittest.TestCase):
         serialized = "".join(test_vector).decode("hex")
         message = test_message_pb2.TestMessage()
 
-        tls_message.TLSReader.decode(serialized, message)
+        tls_message.decode(serialized, message)
         self.assertEqual(test_message, message,
                          msg = "%s vs %s" % (test_message, message))
 
@@ -62,8 +62,7 @@ class TLSReaderTest(unittest.TestCase):
         message = test_message_pb2.TestMessage()
 
         self.assertRaises(tls_message.TLSDecodingError,
-                          tls_message.TLSReader.decode,
-                          serialized, message)
+                          tls_message.decode, serialized, message)
 
     def test_decode_valid(self):
         self.verify_decode(serialized_valid_test_message, valid_test_message)
@@ -142,6 +141,73 @@ class TLSReaderTest(unittest.TestCase):
 
         self.assertEqual(valid_test_message, message,
                          msg = "%s vs %s" % (valid_test_message, message))
+        self.assertFalse(reader.finished())
+
+
+class TLSWriterTest(unittest.TestCase):
+    def verify_encode(self, test_message, test_vector):
+        serialized = tls_message.encode(test_message)
+        self.assertEqual("".join(test_vector), serialized.encode("hex"))
+
+    def verify_encode_fails(self, test_message):
+        self.assertRaises(tls_message.TLSEncodingError,
+                          tls_message.encode, test_message)
+
+    def test_encode(self):
+        self.verify_encode(valid_test_message, serialized_valid_test_message)
+
+    def test_encode_ignores_skipped_fields(self):
+        test_message = test_message_pb2.TestMessage()
+        test_message.CopyFrom(valid_test_message)
+        test_message.skip_uint32 = 42
+        self.verify_encode(test_message, serialized_valid_test_message)
+
+    def test_encode_ignores_bad_select(self):
+        test_vector = serialized_valid_test_message[:]
+        test_vector[11] = "0000"
+        test_vector[12] = ""
+
+        test_message = test_message_pb2.TestMessage()
+        test_message.CopyFrom(valid_test_message)
+        test_message.test_enum = test_message_pb2.TestMessage.ENUM_0
+        self.verify_encode(test_message, test_vector)
+
+    def test_encode_too_large_value_fails(self):
+        test_message = test_message_pb2.TestMessage()
+        test_message.CopyFrom(valid_test_message)
+        test_message.uint_8 = 65000
+        self.verify_encode_fails(test_message)
+
+    def test_encode_bad_length_fails(self):
+        test_message = test_message_pb2.TestMessage()
+        test_message.CopyFrom(valid_test_message)
+        test_message.fixed_bytes = "hello"
+        self.verify_encode_fails(test_message)
+
+    def test_encode_too_short_fails(self):
+        test_message = test_message_pb2.TestMessage()
+        test_message.CopyFrom(valid_test_message)
+        test_message.var_bytes2 = "sho"
+        self.verify_encode_fails(test_message)
+
+    def test_encode_too_long_fails(self):
+        test_message = test_message_pb2.TestMessage()
+        test_message.CopyFrom(valid_test_message)
+        test_message.var_bytes = "Iamtoolongformyowngood"
+        self.verify_encode_fails(test_message)
+
+    def test_encode_repeated_too_long_fails(self):
+        test_message = test_message_pb2.TestMessage()
+        test_message.CopyFrom(valid_test_message)
+        test_message.vector_uint32.extend([1, 2, 3, 4])
+        self.verify_encode_fails(test_message)
+
+    def test_encode_repeated_too_short_fails(self):
+        test_message = test_message_pb2.TestMessage()
+        test_message.CopyFrom(valid_test_message)
+        test_message.ClearField("vector_uint32")
+        self.verify_encode_fails(test_message)
+
 
 
 if __name__ == "__main__":

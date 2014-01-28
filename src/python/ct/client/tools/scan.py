@@ -24,14 +24,12 @@ def decode_entry(serialized_entry):
     entry.ParseFromString(serialized_entry)
     parsed_entry = client_pb2.ParsedEntry()
 
-    leaf_reader = tls_message.TLSReader(entry.leaf_input)
-    leaf_reader.read(parsed_entry.merkle_leaf)
+    tls_message.decode(entry.leaf_input, parsed_entry.merkle_leaf)
 
     parsed_entry.extra_data.entry_type = (parsed_entry.merkle_leaf.
                                           timestamped_entry.entry_type)
 
-    extra_data_reader = tls_message.TLSReader(entry.extra_data)
-    extra_data_reader.read(parsed_entry.extra_data)
+    tls_message.decode(entry.extra_data, parsed_entry.extra_data)
 
     return parsed_entry
 
