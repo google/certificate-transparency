@@ -17,6 +17,11 @@
 #include "merkletree/serial_hasher.h"
 #include "util/openssl_util.h"  // For LOG_OPENSSL_ERRORS
 
+#if OPENSSL_VERSION_NUMBER < 0x10002000L
+# define X509_get_cert_info(x509) (x509)->cert_info
+#endif
+
+
 namespace ct {
 
 using std::string;
@@ -535,14 +540,14 @@ Cert::Status Cert::ExtensionStructure(int extension_nid,
 
 TbsCertificate::TbsCertificate(const Cert &cert)
     : cert_info_(NULL) {
-  if (!cert.IsLoaded() || cert.x509_->cert_info == NULL) {
+  if (!cert.IsLoaded() || X509_get_cert_info(cert.x509_) == NULL) {
     LOG(ERROR) << "Cert not loaded";
     return;
   }
 
   cert_info_ = static_cast<X509_CINF*>(
       ASN1_item_dup(ASN1_ITEM_rptr(X509_CINF),
-                    static_cast<void*>(cert.x509_->cert_info)));
+                    static_cast<void*>(X509_get_cert_info(cert.x509_))));
 
   if (cert_info_ == NULL)
     LOG_OPENSSL_ERRORS(ERROR);
