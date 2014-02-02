@@ -19,8 +19,11 @@
 
 #if OPENSSL_VERSION_NUMBER < 0x10002000L
 # define X509_get_cert_info(x509) (x509)->cert_info
+# define X509_CINF_set_modified(c) ((c)->enc.modified = 1)
+# define X509_CINF_get_issuer(c) (&(c)->issuer)
+# define X509_CINF_get_extensions(c) ((c)->extensions)
+# define X509_CINF_get_signature(c) ((c)->signature)
 #endif
-
 
 namespace ct {
 
@@ -142,9 +145,15 @@ string Cert::PrintNotAfter() const {
 }
 
 string Cert::PrintSignatureAlgorithm() const {
-  // Have to rely on the ABI.
-  if (x509_->cert_info == NULL || x509_->cert_info->signature == NULL ||
-      x509_->cert_info->signature->algorithm == NULL)
+  const X509_CINF *cert_info = X509_get_cert_info(x509_);
+  if (cert_info == NULL)
+    return "NULL";
+  /*const*/ X509_ALGOR *algor = X509_CINF_get_signature(cert_info);
+  if (algor == NULL)
+    return "NULL";
+  /*const*/ ASN1_OBJECT *algor_algor;
+  X509_ALGOR_get0(&algor_algor, NULL, NULL, algor);
+  if (algor_algor == NULL)
     return "NULL";
 
   BIO *bio = BIO_new(BIO_s_mem());
@@ -153,7 +162,7 @@ string Cert::PrintSignatureAlgorithm() const {
     return string();
   }
 
-  if (i2a_ASN1_OBJECT(bio, x509_->cert_info->signature->algorithm) <= 0) {
+  if (i2a_ASN1_OBJECT(bio, algor_algor) <= 0) {
     BIO_free(bio);
     return string();
   }
@@ -363,14 +372,14 @@ Cert::Status Cert::Sha256Digest(string *result) const {
 }
 
 Cert::Status Cert::DerEncodedTbsCertificate(string *result) const {
-  if (!IsLoaded() || x509_->cert_info == NULL) {
+  if (!IsLoaded() || X509_get_cert_info(x509_) == NULL) {
     LOG(ERROR) << "Cert not loaded";
     return ERROR;
   }
 
   unsigned char *der_buf = NULL;
   // There appears to be no "clean" way for getting the TBS out.
-  int der_length = i2d_X509_CINF(x509_->cert_info, &der_buf);
+  int der_length = i2d_X509_CINF(X509_get_cert_info(x509_), &der_buf);
   if (der_length < 0) {
     // What does this return value mean? Let's assume it means the cert
     // is bad until proven otherwise.
@@ -589,7 +598,7 @@ Cert::Status TbsCertificate::DeleteExtension(int extension_nid) {
   if (status != Cert::TRUE)
     return status;
 
-  X509_EXTENSION *ext = X509v3_delete_ext(cert_info_->extensions,
+  X509_EXTENSION *ext = X509v3_delete_ext(X509_CINF_get_extensions(cert_info_),
                                           extension_index);
   if (ext == NULL) {
     // Truly odd.
@@ -599,7 +608,7 @@ Cert::Status TbsCertificate::DeleteExtension(int extension_nid) {
   }
 
   // Let OpenSSL know that it needs to re_encode.
-  cert_info_->enc.modified = 1;
+  X509_CINF_set_modified(cert_info_);
   // X509_delete_ext does not free the extension (GAH!), so we need to
   // free separately.
   X509_EXTENSION_free(ext);
@@ -638,7 +647,7 @@ Cert::Status TbsCertificate::CopyIssuerFrom(const Cert &from) {
     return Cert::FALSE;
   }
 
-  if (X509_NAME_set(&cert_info_->issuer, ca_name) != 1) {
+  if (X509_NAME_set(X509_CINF_get_issuer(cert_info_), ca_name) != 1) {
     LOG(WARNING) << "Failed to set issuer name, Cert has NULL issuer?";
     LOG_OPENSSL_ERRORS(WARNING);
     return Cert::FALSE;
@@ -677,7 +686,7 @@ Cert::Status TbsCertificate::CopyIssuerFrom(const Cert &from) {
 
   // Ok, now copy the extension, keeping the critical bit (which should always
   // be false in a valid cert, mind you).
-  X509_EXTENSION *to_ext = X509v3_get_ext(cert_info_->extensions,
+  X509_EXTENSION *to_ext = X509v3_get_ext(X509_CINF_get_extensions(cert_info_),
                                           extension_index);
   X509_EXTENSION *from_ext = X509_get_ext(from.x509_, from_extension_index);
 
@@ -699,7 +708,7 @@ Cert::Status TbsCertificate::CopyIssuerFrom(const Cert &from) {
 
 Cert::Status TbsCertificate::ExtensionIndex(int extension_nid,
                                             int *extension_index) const {
-  int index = X509v3_get_ext_by_NID(cert_info_->extensions,
+  int index = X509v3_get_ext_by_NID(X509_CINF_get_extensions(cert_info_),
                                     extension_nid, -1);
   if (index < -1) {
     // The most likely and possibly only cause for a return code
