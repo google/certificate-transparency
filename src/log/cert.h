@@ -154,15 +154,15 @@ class Cert {
   // Returns true if the extension is present and the data could be decoded.
   // Returns false if the extension is not present or the data is not a valid
   // ASN1_OCTET_STRING.
-  // Caller is responsible for ensuring that the expected type
-  // of the extension contents is an ASN1 OCTET STRING.
-  // Only use if you think you know what you're doing.
+  //
+  // Caller MUST ensure that the registered type of the extension contents is an
+  // ASN1_OCTET_STRING. Only use if you know what you're doing.
+  //
   // Returns TRUE if the extension data could be fetched and decoded.
   // Returns FALSE if the extension is not present, or is present but is not
   // a valid ASN1 OCTET STRING.
-  // Returns ERROR if the cert is not loaded, the extension_nid is not
-  // recognised or the registered type of this extension is not an
-  // ASN1 OCTET STRING.
+  // Returns ERROR if the cert is not loaded or the extension_nid is not
+  // recognised.
   // TODO(ekasper): consider registering known custom NIDS explicitly with the
   // Cert API for safety.
   Status OctetStringExtensionData(int extension_nid,

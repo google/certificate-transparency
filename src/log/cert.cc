@@ -225,13 +225,8 @@ Cert::Status Cert::HasBasicConstraintCATrue() const {
   if (status != TRUE)
     return status;
 
+  // |constraints| is never NULL upon success.
   BASIC_CONSTRAINTS *constraints = static_cast<BASIC_CONSTRAINTS*>(ext_struct);
-  if (constraints == NULL) {
-    // Truly odd.
-    LOG(ERROR) << "Failed to retrieve BASIC_CONSTRAINTS structure";
-    return ERROR;
-  }
-
   bool is_ca = constraints->ca;
   BASIC_CONSTRAINTS_free(constraints);
   return is_ca ? TRUE : FALSE;
@@ -262,13 +257,8 @@ Cert::Status Cert::HasExtendedKeyUsage(int key_usage_nid) const {
   if (status != TRUE)
     return status;
 
+  // |eku| is never NULL upon success.
   EXTENDED_KEY_USAGE *eku = static_cast<EXTENDED_KEY_USAGE*>(ext_struct);
-  if (eku == NULL) {
-    // Truly odd.
-    LOG(ERROR) << "Failed to retrieve EXTENDED_KEY_USAGE structure";
-    return ERROR;
-  }
-
   bool ext_key_usage_found = false;
   for (int i = 0; i < sk_ASN1_OBJECT_num(eku); ++i) {
     if (OBJ_cmp(key_usage_obj, sk_ASN1_OBJECT_value(eku, i)) == 0) {
@@ -475,34 +465,9 @@ Cert::Status Cert::OctetStringExtensionData(int extension_nid,
   if (status != TRUE)
     return status;
 
-  // Ok, we have extension data, but is it an octet string?
+  // |octet| is never NULL upon success. Caller is responsible for the
+  // correctness of this cast.
   ASN1_OCTET_STRING *octet = static_cast<ASN1_OCTET_STRING*>(ext_data);
-  if (octet == NULL) {
-    LOG(ERROR) << "Extension type is not an ASN1 Octet String";
-    // There is an API method for allocating an object based on the NID but
-    // no corresponding method for free()'ing it.
-    // Instead we have to rely on the ABI. Wonderful.
-    const X509V3_EXT_METHOD *ext_method = X509V3_EXT_get_nid(extension_nid);
-    if (ext_method == NULL) {
-      LOG(ERROR) << "Could not determine free() function for extension, "
-                 << "memory leak may occur";
-      LOG_OPENSSL_ERRORS(ERROR);
-      return ERROR;
-    }
-
-    if (ext_method->it != NULL) {
-      ASN1_item_free(reinterpret_cast<ASN1_VALUE*>(ext_data),
-                     ASN1_ITEM_ptr(ext_method->it));
-    } else if (ext_method->ext_free != NULL) {
-      ext_method->ext_free(ext_data);
-    } else {
-      LOG(ERROR) << "Could not determine free() function for extension, "
-                 << "memory leak may occur";
-    }
-
-    return ERROR;
-  }
-
   result->assign(string(reinterpret_cast<const char*>(octet->data),
                         octet->length));
   ASN1_OCTET_STRING_free(octet);
