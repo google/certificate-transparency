@@ -229,7 +229,7 @@ ID_KP_TIME_STAMPING = ObjectIdentifier(value="1.3.6.1.5.5.7.3.8")
 ID_KP_OCSP_SIGNING = ObjectIdentifier(value="1.3.6.1.5.5.7.3.9")
 
 # RFC 3280 - Used in Authority Info Access extension
-ID_OSCP = ObjectIdentifier(value="1.3.6.1.5.5.7.48.1")
+ID_AD_OCSP = ObjectIdentifier(value="1.3.6.1.5.5.7.48.1")
 ID_AD_CA_ISSUERS = ObjectIdentifier(value="1.3.6.1.5.5.7.48.2")
 
 # Certificate Policy related OIDs
@@ -311,7 +311,7 @@ _OID_NAME_DICT = {
     ID_KP_TIME_STAMPING: ("id-kp-timeStamping", "timeStamping"),
     ID_KP_OCSP_SIGNING: ("id-kp-OCSPSigning", "OCSPSigning"),
 
-    ID_OSCP: ("id-oscp", "OSCP"),
+    ID_AD_OCSP: ("id-ad-ocsp", "OCSP"),
     ID_AD_CA_ISSUERS: ("id-ad-caIssuers", "caIssuers"),
     ID_QT_CPS: ("id-qt-cps", "CPS"),
     ID_QT_UNOTICE: ("id-qt-unotice", "UserNotice"),

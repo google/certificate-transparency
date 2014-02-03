@@ -95,6 +95,9 @@ class CertificateTest(unittest.TestCase):
     # A certificate with an invalid (8-byte) IP address in a SAN.
     _PEM_INVALID_IP = "invalid_ip.pem"
 
+    # A certificate with both kinds of AIA information.
+    _PEM_AIA = "aia.pem"
+
     @property
     def pem_file(self):
         return FLAGS.testdata_dir + "/" + self._PEM_FILE
@@ -599,6 +602,47 @@ class CertificateTest(unittest.TestCase):
                          "https://www.cybertrust.ne.jp .")
         explicit_text = qualifier[x509_ext.EXPLICIT_TEXT].component_value()
         self.assertEqual(expected_text, explicit_text)
+
+    def test_crl_distribution_points(self):
+        c = self.cert_from_pem_file(self._PEM_FILE)
+        crls = c.crl_distribution_points()
+        self.assertEqual(1, len(crls))
+        crl = crls[0]
+
+        # Optional components, not present.
+        self.assertIsNone(crl[x509_ext.REASONS])
+        self.assertIsNone(crl[x509_ext.CRL_ISSUER])
+
+        # This is the prevalent form of CRL distribution points.
+        dist_points = crl[x509_ext.DISTRIBUTION_POINT]
+        self.assertEqual(x509_ext.FULL_NAME, dist_points.component_key())
+        self.assertEqual(1, len(dist_points.component_value()))
+
+        # A GeneralName URI.
+        dist_point = dist_points.component_value()[0]
+        self.assertEqual("http://www.gstatic.com/GoogleInternetAuthority/"
+                         "GoogleInternetAuthority.crl",
+                         dist_point[x509_name.URI_NAME])
+
+    def test_aia(self):
+        c = self.cert_from_pem_file(self._PEM_AIA)
+
+        ca_issuers = c.ca_issuers()
+        self.assertEqual(1, len(ca_issuers))
+
+        # A GeneralName URI.
+        self.assertEqual("http://pki.google.com/GIAG2.crt",
+                         ca_issuers[0][x509_name.URI_NAME])
+
+        ocsp = c.ocsp_responders()
+        self.assertEqual(1, len(ocsp))
+
+        self.assertEqual("http://clients1.google.com/ocsp",
+                         ocsp[0][x509_name.URI_NAME])
+
+        # Cert has CA issuers but no OCSP responders.
+        c = self.cert_from_pem_file(self._PEM_FILE)
+        self.assertItemsEqual([], c.ocsp_responders())
 
 
 if __name__ == "__main__":

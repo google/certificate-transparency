@@ -146,6 +146,69 @@ class CertificatePolicies(types.SequenceOf):
     component = PolicyInformation
 
 
+FULL_NAME = "fullName"
+RELATIVE_NAME = "nameRelativetoCRLIssuer"
+
+
+class DistributionPointName(types.Choice):
+    components = {
+        FULL_NAME: x509_name.GeneralNames.implicit(0),
+        RELATIVE_NAME: x509_name.RelativeDistinguishedName.implicit(1)
+        }
+
+
+class ReasonFlags(types.NamedBitList):
+    UNUSED = named_value.NamedValue("unused", 0)
+    KEY_COMPROMISE = named_value.NamedValue("keyCompromise", 1)
+    CA_COMPROMISE = named_value.NamedValue("cACompromise", 2),
+    AFFILIATION_CHANGED = named_value.NamedValue("affiliationChanged", 3)
+    SUPERSEDED = named_value.NamedValue("superseded", 4)
+    CESSATION_OF_OPERATION = named_value.NamedValue("cessationOfOperation", 5)
+    CERTIFICATE_HOLD = named_value.NamedValue("certificateHold", 6)
+    PRIVILEGE_WITHDRAWN = named_value.NamedValue("privilegeWithdrawn", 7)
+    AA_COMPROMISE = named_value.NamedValue("aACompromise", 8)
+    named_bit_list = (UNUSED, KEY_COMPROMISE, CA_COMPROMISE,
+                      AFFILIATION_CHANGED, SUPERSEDED, CESSATION_OF_OPERATION,
+                      CERTIFICATE_HOLD, PRIVILEGE_WITHDRAWN, AA_COMPROMISE)
+
+
+DISTRIBUTION_POINT = "distributionPoint"
+REASONS = "reasons"
+CRL_ISSUER = "cRLIssuer"
+
+
+class DistributionPoint(types.Sequence):
+    components = (
+        types.Component(DISTRIBUTION_POINT, DistributionPointName.explicit(0),
+                        optional=True),
+        types.Component(REASONS, ReasonFlags.implicit(1), optional=True),
+        types.Component(CRL_ISSUER, x509_name.GeneralNames.implicit(2),
+                        optional=True)
+        )
+
+
+class CRLDistributionPoints(types.SequenceOf):
+    component = DistributionPoint
+
+
+ACCESS_METHOD = "accessMethod"
+ACCESS_LOCATION = "accessLocation"
+
+
+class AccessDescription(types.Sequence):
+    print_labels = False
+    print_delimiter = ": "
+    components = (
+        types.Component(ACCESS_METHOD, oid.ObjectIdentifier),
+        types.Component(ACCESS_LOCATION, x509_name.GeneralName)
+)
+
+
+# Called AuthorityInfoAccessSyntax in RFC 5280.
+class AuthorityInfoAccess(types.SequenceOf):
+    component = AccessDescription
+
+
 # Hack! This is not a valid ASN.1 definition but it works: an extension value
 # value is defined as a DER-encoded value wrapped in an OctetString.
 # This is functionally equivalent to an Any type that is tagged with the
@@ -162,7 +225,9 @@ _EXTENSION_DICT = {
     oid.ID_CE_EXT_KEY_USAGE: ExtendedKeyUsage,
     oid.ID_CE_SUBJECT_KEY_IDENTIFIER: SubjectKeyIdentifier,
     oid.ID_CE_AUTHORITY_KEY_IDENTIFIER: AuthorityKeyIdentifier,
-    oid.ID_CE_CERTIFICATE_POLICIES: CertificatePolicies
+    oid.ID_CE_CERTIFICATE_POLICIES: CertificatePolicies,
+    oid.ID_CE_CRL_DISTRIBUTION_POINTS: CRLDistributionPoints,
+    oid.ID_PE_AUTHORITY_INFO_ACCESS: AuthorityInfoAccess
     }
 
 

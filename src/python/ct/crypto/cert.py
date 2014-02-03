@@ -596,6 +596,48 @@ class Certificate(object):
         """
         return self.policy(policy_oid) is not None
 
+    def crl_distribution_points(self):
+        """List CRL distribution points.
+
+        Returns:
+            a list of DistributionPoint entries.
+
+        Raises:
+            CertificateError: corrupt extension, or multiple extension values.
+        """
+        return (self._get_decoded_extension_value(
+            oid.ID_CE_CRL_DISTRIBUTION_POINTS) or [])
+
+    def ca_issuers(self):
+        """List CA issuers from the Authority Information Access extension.
+
+        Returns:
+            a list of CA issuers (as ASN.1 GeneralNames).
+
+        Raises:
+            CertificateError: corrupt extension, or multiple extension values.
+        """
+        aia = self._get_decoded_extension_value(oid.ID_PE_AUTHORITY_INFO_ACCESS)
+        if aia is None:
+            return []
+        return [a[x509_ext.ACCESS_LOCATION] for a in aia
+                if a[x509_ext.ACCESS_METHOD] == oid.ID_AD_CA_ISSUERS]
+
+    def ocsp_responders(self):
+        """List OCSP responders from the Authority Information Access extension.
+
+        Returns:
+            a list of OCSP responders (as ASN.1 GeneralNames).
+
+        Raises:
+            CertificateError: corrupt extension, or multiple extension values.
+        """
+        aia = self._get_decoded_extension_value(oid.ID_PE_AUTHORITY_INFO_ACCESS)
+        if aia is None:
+            return []
+        return [a[x509_ext.ACCESS_LOCATION] for a in aia
+                if a[x509_ext.ACCESS_METHOD] == oid.ID_AD_OCSP]
+
 
 def certs_from_pem(pem_string, skip_invalid_blobs=False, strict_der=True):
     """Read multiple PEM-encoded certificates from a string.
