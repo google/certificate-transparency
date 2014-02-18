@@ -303,7 +303,7 @@ log is a single, ever-growing, append-only Merkle Tree of such certificates.
         When a valid certificate is submitted to a log, the log MUST immediately return a Signed Certificate Timestamp (SCT). The SCT is the log's promise to incorporate the certificate in the Merkle Tree within a fixed amount of time known as the Maximum Merge Delay (MMD). If the log has previously seen the certificate, it MAY return the same SCT as it returned before. TLS servers MUST present an SCT from one or more logs to the TLS client together with the certificate. TLS clients MUST reject certificates that do not have a valid SCT for the end-entity certificate.
       </t>
       <t>
-        Periodically, each log appends all its new entries to the Merkle Tree and signs the root of the tree. Auditors can thus verify that each certificate for which an SCT has been issued indeed appears in the log. The log MUST incorporate a certificate in its Merkle Tree within the Maximum Merge Delay period after the issuance of the SCT.
+        Periodically, each log appends all its new entries to the Merkle Tree and signs the root of the tree. The log MUST incorporate a certificate in its Merkle Tree within the Maximum Merge Delay period after the issuance of the SCT. When encountering an SCT, an Auditor can verify that the certificate was added to the Merkle Tree within that timeframe.
       </t>
       <t>
         Log operators MUST NOT impose any conditions on retrieving or sharing data from the log.
