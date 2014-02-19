@@ -818,7 +818,7 @@ messages.
           <list>
 	    <t><list style="hanging">
 	      <t hangText="leaf_index:">
-		The 0-based index of the end entity corresponding to the <spanx style="verb">hash</spanx> parameter.
+		The 0-based index of the entry corresponding to the <spanx style="verb">hash</spanx> parameter.
 	      </t>
 	      <t hangText="audit_path:">
 		An array of base64-encoded Merkle Tree nodes proving the inclusion of the chosen certificate.
