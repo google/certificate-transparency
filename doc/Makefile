@@ -1,7 +1,7 @@
-VERSION=01
+VERSION=00
 PREV=00
 XML=rfc6962-bis.xml
-NAME=draft-laurie-rfc6962-bis
+NAME=draft-ietf-trans-rfc6962-bis
 BASE=$(NAME)-$(VERSION)
 DIFF=$(NAME)-$(PREV)-$(VERSION)-diff.html
 

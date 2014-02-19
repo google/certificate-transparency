@@ -7,7 +7,7 @@
 <?rfc subcompact="no"?>
 <?rfc sortrefs="yes" ?>
 
-<rfc ipr="trust200902" category="exp" submissionType="IETF" docName="draft-laurie-rfc6962-bis-01">
+<rfc ipr="trust200902" category="std" submissionType="IETF" docName="draft-ietf-trans-rfc6962-bis-00">
 
   <front>
     <title>Certificate Transparency</title>
@@ -35,9 +35,16 @@
         <email>ekasper@google.com</email>
       </address>
     </author>
+    <author initials="R" surname="Stradling" fullname="Rob Stradling">
+      <organization abbrev="Comodo">
+        Comodo CA, Ltd.
+      </organization>
+      <address>
+        <email>rob.stradling@comodo.com</email>
+      </address>
+    </author>
     <date />
-
-
+    <workgroup>Public Notary Transparency Working Group</workgroup>
 
     <abstract>
       <t>
