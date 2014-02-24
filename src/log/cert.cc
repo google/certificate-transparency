@@ -514,7 +514,7 @@ Cert::Status Cert::GetExtension(int extension_nid,
     return status;
 
   *ext = X509_get_ext(x509_, extension_index);
-  if (ext == NULL) {
+  if (*ext == NULL) {
     LOG(ERROR) << "Failed to retrieve extension for NID " <<
         extension_nid << ", at index " << extension_index;
     LOG_OPENSSL_ERRORS(ERROR);
@@ -536,7 +536,7 @@ Cert::Status Cert::ExtensionStructure(int extension_nid,
   int crit;
   *ext_struct = X509_get_ext_d2i(x509_, extension_nid, &crit, NULL);
 
-  if (ext_struct == NULL) {
+  if (*ext_struct == NULL) {
     if (crit != -1) {
       LOG(WARNING) << "Corrupt extension data";
       LOG_OPENSSL_ERRORS(WARNING);
