@@ -737,12 +737,15 @@ protocol to which the MerkleTreeLeaf corresponds. This version is v1.
 
 <figure>
   <artwork>
+    opaque CtSthExtensions&lt;0..2^16-1&gt;;
+
     digitally-signed struct {
         Version version;
         SignatureType signature_type = tree_hash;
         uint64 timestamp;
         uint64 tree_size;
         opaque sha256_root_hash[32];
+        CtSthExtensions extensions;
     } TreeHeadSignature;
   </artwork>
 </figure>
@@ -759,6 +762,9 @@ which the TreeHeadSignature conforms. This version is v1.
         </t>
         <t>
           <spanx style="verb">sha256_root_hash</spanx> is the root of the Merkle Hash Tree.
+        </t>
+        <t>
+          <spanx style="verb">extensions</spanx> are future extensions to this protocol version (v1). Currently, no extensions are specified.
         </t>
         <t>Each log MUST produce on demand a Signed Tree Head that is no older than the Maximum Merge Delay. In the unlikely event that it receives no new submissions during an MMD period, the log SHALL sign the same Merkle Tree Hash with a fresh timestamp.
         </t>
