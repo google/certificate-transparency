@@ -31,6 +31,13 @@ ifneq ($(OPENSSLDIR),)
           -Wl,-rpath,$(OPENSSLDIR)/lib
 endif
 
+# Allow non-system version of curl to be used.
+# Useful if it was built with a custom OpenSSL version.
+ifneq ($(CURLDIR),)
+  INCLUDE += -I $(CURLDIR)/include
+  SYS_LIBS += -L $(CURLDIR)/lib -Wl,-rpath,$(CURLDIR)/lib
+endif
+
 # Need cpp-netlib
 ifneq ($(CPPNETLIBDIR),)
   INCLUDE += -I $(CPPNETLIBDIR)
