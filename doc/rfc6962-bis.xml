@@ -846,7 +846,7 @@ messages.
 		The version of the SignedCertificateTimestamp structure, in decimal. A compliant v1 implementation MUST NOT expect this to be 0 (i.e., v1).
 	      </t>
 	      <t hangText="id:">
-		The log ID, base64 encoded. Since log clients who request an SCT for inclusion in TLS handshakes are not required to verify it, we do not assume they know the ID of the log.
+		The log ID, base64 encoded.
 	      </t>
 	      <t hangText="timestamp:">
 		The SCT timestamp, in decimal.
@@ -860,7 +860,7 @@ messages.
             </list></t>
 	  </list>
 
-          If the <spanx style="verb">sct_version</spanx> is not v1, then a v1 client may be unable to verify the signature. It MUST NOT construe this as an error. (Note: Log clients don't need to be able to verify this structure; only TLS clients do. If we were to serve the structure as a binary blob, then we could completely change it without requiring an upgrade to v1 clients.)
+          If the <spanx style="verb">sct_version</spanx> is not v1, then a v1 client may be unable to verify the signature. It MUST NOT construe this as an error. This is to avoid forcing an upgrade of compliant v1 clients that do not use the returned SCTs.
 
         </t>
       </section>
@@ -1126,10 +1126,10 @@ but it is expected there will be a variety.
       </t>
       <section title="Submitters">
         <t>
-          Submitters submit certificates or Precertificates to the log as described above. They may go on to use the returned SCT to construct a certificate or use it directly in a TLS handshake.
+          Submitters submit certificates or Precertificates to the log as described above. When a Submitter intends to use the returned SCT directly in a TLS handshake or to construct a certificate, they SHOULD validate the SCT as described in <xref target="tls_clients"/> if they understand its format.
         </t>
       </section>
-      <section title="TLS Client">
+      <section title="TLS Client" anchor="tls_clients">
         <t>
           TLS clients receive SCTs alongside or in server certificates. In
 addition to normal validation of the certificate and its chain, TLS clients
