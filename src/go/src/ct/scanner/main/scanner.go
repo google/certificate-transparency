@@ -11,7 +11,7 @@ import (
 
 var logUri = flag.String("log_uri", "http://ct.googleapis.com/aviator", "CT log base URI")
 var matchSubjectRegex = flag.String("match_subject_regex", ".*", "Regex to match CN/SAN")
-var blockSize = flag.Int64("block_size", 1000, "Max number of entries to request at per call to get-entries")
+var blockSize = flag.Int("block_size", 1000, "Max number of entries to request at per call to get-entries")
 var numWorkers = flag.Int("num_workers", 2, "Number of concurrent matchers")
 var parallelFetch = flag.Int("parallel_fetch", 2, "Number of concurrent GetEntries fetches")
 var startIndex = flag.Int64("start_index", 0, "Log index to start scanning at")

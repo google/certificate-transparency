@@ -12,23 +12,36 @@ import (
 	"time"
 )
 
+// Configuration options for the Scanner
 type ScannerOptions struct {
+	// Regexp to match against CN and SANs, defaults to ".*"
 	MatchSubjectRegex *regexp.Regexp
-	BlockSize         int64
-	NumWorkers        int
-	ParallelFetch     int
-	StartIndex        int64
+
+	// Number of entries to request in one batch from the Log
+	BlockSize int
+
+	// Number of concurrent matchers to run
+	NumWorkers int
+
+	// Number of concurrent fethers to run
+	ParallelFetch int
+
+	// Log entry index to start fetching & matching at
+	StartIndex int64
 }
 
+// A tool to scan all the entries in a CT Log.
 type Scanner struct {
 	// Client used to talk to the CT log instance
 	logClient *client.LogClient
 
+	// Configuration options for this Scanner instance
 	opts ScannerOptions
 
 	// Counter of the number of certificates scanned
 	certsProcessed int64
 
+	// Counter of the number of precertificates encountered during the scan.
 	precertsSeen int64
 }
 
@@ -110,12 +123,18 @@ func (s *Scanner) fetcherJob(id int, ranges <-chan fetchRange, entries chan<- ma
 		for !success {
 			leaves, err := s.logClient.GetEntries(r.start, r.end)
 			if err == nil {
-				for index, leaf := range leaves {
-					entries <- matcherJob{leaf, r.start + int64(index)}
+				for _, leaf := range leaves {
+					entries <- matcherJob{leaf, r.start}
+					r.start++
 				}
-				success = true
+				if r.start > r.end {
+					// Only complete if we actually got all the leaves we were
+					// expecting -- Logs MAY return fewer than the number of
+					// leaves requested.
+					success = true
+				}
 			} else {
-				log.Println(err)
+				log.Printf("Problem fetching from log: %s", err.Error())
 			}
 		}
 	}
@@ -161,8 +180,17 @@ func humanTime(seconds int) string {
 	return s
 }
 
+// Performs a scan against the Log.
+// For each x509 certificate found, |foundCert| will be called with the
+// index of the entry and certificate itself as arguments.  For each precert
+// found, |foundPrecert| will be called with the index of the entry and the raw
+// precert string as the arguments.
+//
+// This method blocks until the scan is complete.
 func (s *Scanner) Scan(foundCert func(int64, *x509.Certificate), foundPrecert func(int64, string)) error {
 	log.Printf("Starting up...\n")
+	s.certsProcessed = 0
+	s.precertsSeen = 0
 
 	latestSth, err := s.logClient.GetSTH()
 	if err != nil {
@@ -185,7 +213,7 @@ func (s *Scanner) Scan(foundCert func(int64, *x509.Certificate), foundPrecert fu
 
 	var ranges list.List
 	for start := s.opts.StartIndex; start < int64(latestSth.TreeSize); {
-		end := min(start+s.opts.BlockSize, int64(latestSth.TreeSize)-1)
+		end := min(start+int64(s.opts.BlockSize), int64(latestSth.TreeSize)-1)
 		ranges.PushBack(fetchRange{start, end})
 		start = end + 1
 	}
@@ -218,9 +246,15 @@ func (s *Scanner) Scan(foundCert func(int64, *x509.Certificate), foundPrecert fu
 	return nil
 }
 
+// Creates a new Scanner instance using |client| to talk to the log, and taking
+// configuration options from |opts|.
 func NewScanner(client *client.LogClient, opts ScannerOptions) *Scanner {
 	var scanner Scanner
 	scanner.logClient = client
+	// Set a default match-everything regex if none was provided:
+	if opts.MatchSubjectRegex == nil {
+		opts.MatchSubjectRegex = regexp.MustCompile(".*")
+	}
 	scanner.opts = opts
 	return &scanner
 }
