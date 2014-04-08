@@ -67,4 +67,4 @@ $ ./run_apache_server.sh <path to httpd source> <path to installed openssl>
 
 5. Test with, say:
 
-$ ./test_running_ssl_server.sh 8124
+$ OPENSSLDIR=<path to installed openssl> ./test_running_ssl_server.sh 8124
