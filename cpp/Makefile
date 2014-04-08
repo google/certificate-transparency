@@ -12,7 +12,7 @@ INCLUDE = -I .
 LOCAL_LIBS = log/libcert.a log/libdatabase.a log/liblog.a \
              merkletree/libmerkletree.a \
              proto/libproto.a util/libutil.a
-LDLIBS = -lpthread -lgflags -lglog -lssl -lcrypto \
+LDLIBS = -lpthread -lgflags -lglog -lssl -lcrypto -lldns \
          -lsqlite3 -lprotobuf -lcurl -lcppnetlib-uri
 
 PLATFORM := $(shell uname -s)
@@ -83,16 +83,16 @@ LOG_TESTS = log/cert_test log/cert_checker_test \
 UTIL_TESTS = util/json_wrapper_test
 MONITOR_TESTS = monitor/database_test
 ALL_TESTS = $(PROTO_TESTS) $(MERKLETREE_TESTS) $(LOG_TESTS) $(UTIL_TESTS) \
-	$(MONITOR_TESTS)
+	$(MONITOR_TESTS) dns_tests
 
 all: unit_tests client/ct server/ct-server server/blob-server \
-     server/ct-rfc-server
+     server/ct-rfc-server server/ct-dns-server
 
 .DELETE_ON_ERROR:
 
 .PHONY: clean all unit_tests test alltests benchmark clean \
         proto_tests merkletree_tests log_tests client_tests \
-	monitor_tests
+	monitor_tests dns_tests
 
 gtest/Makefile: $(GTESTDIR)
 	mkdir -p gtest && cd gtest && cmake $(GTESTDIR)
@@ -305,12 +305,16 @@ client/ct: client/ct.o client/client.o client/log_client.o client/ssl_client.o \
 # server
 server/ct-server: server/ct-server.o server/event.o $(LOCAL_LIBS)
 
+server/ct-dns-server: server/ct-dns-server.o server/event.o $(LOCAL_LIBS)
+
 server/ct-rfc-server: server/ct-rfc-server.o $(LOCAL_LIBS)
 
 server/blob-server: server/blob-server.o server/event.o \
                     server/sqlite_db_blob.o server/tree_signer_blob.o \
                     server/log_lookup_blob.o \
                     $(LOCAL_LIBS)
+
+dns_tests: server/ct-dns-server
 
 test: all
 	util/json_wrapper_test
@@ -333,6 +337,7 @@ test: all
 	log/tree_signer_test
 	log/log_lookup_test
 	monitor/database_test
+	python server/ct-dns-server-test.py
 
 # Unit tests plus end-to-end tests. Make sure to set up links in test/  first.
 alltests: test

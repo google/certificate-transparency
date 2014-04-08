@@ -10,7 +10,7 @@ DEFAULT_STH.sha256_root_hash = "hash\x00"
 DEFAULT_STH.tree_head_signature = "sig\xff"
 DEFAULT_FAKE_PROOF = [(_c*32) for _c in "abc"]
 DEFAULT_FAKE_ROOTS = [("cert-%d" % _i) for _i in range(4)]
-DEFAULT_URI = "example.com"
+DEFAULT_URI = "https://example.com"
 
 
 class FakeHandlerBase(log_client.RequestHandler):
@@ -89,7 +89,7 @@ class FakeHandlerBase(log_client.RequestHandler):
         if params is None:
             params = {}
 
-        prefix = "https://" + self._uri + "/ct/v1/"
+        prefix = self._uri + "/ct/v1/"
         if not uri.startswith(prefix):
             return self.make_response(404, "Not Found")
 

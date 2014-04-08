@@ -1,3 +1,5 @@
+/* -*- mode: c++; indent-tabs-mode: nil -*- */
+
 #ifndef SQLITE_STATEMENT_H
 #define SQLITE_STATEMENT_H
 
@@ -11,7 +13,12 @@ namespace sqlite {
 class Statement {
  public:
   Statement(sqlite3 *db, const char *sql) : stmt_(NULL) {
-    CHECK_EQ(SQLITE_OK, sqlite3_prepare_v2(db, sql, -1, &stmt_, NULL));
+    int ret = sqlite3_prepare_v2(db, sql, -1, &stmt_, NULL);
+    if (ret != SQLITE_OK)
+      LOG(ERROR) << "ret = " << ret << ", err = " << sqlite3_errmsg(db)
+                 << ", sql = " << sql << std::endl;
+
+    CHECK_EQ(SQLITE_OK, ret);
   }
 
   ~Statement() {
