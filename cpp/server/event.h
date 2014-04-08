@@ -138,6 +138,7 @@ class RepeatedEvent {
 
 class EventLoop {
  public:
+  EventLoop() : go_(true) {}
 
   void Add(FD *fd) { fds_.push_back(fd); }
 
@@ -152,6 +153,8 @@ class EventLoop {
 
   void MaybeDropOne();
 
+  void Stop();
+
  private:
 
   bool EraseCheck(std::deque<FD *>::iterator *pfd);
@@ -165,6 +168,8 @@ class EventLoop {
   // 1: sometimes the clock will tick before some get a chance to speak.
   // 0: maybe no-one ever gets a chance to speak.
   static const time_t kIdleTime = 20;
+
+  bool go_;
 };
 
 class Server : public FD {
@@ -216,6 +221,10 @@ class UDPServer : public FD {
 
   // Queue a packet for sending
   void QueuePacket(const sockaddr_in &to, const char *buf, size_t len);
+  void QueuePacket(const sockaddr_in &to, const unsigned char *buf,
+                   size_t len) {
+    QueuePacket(to, reinterpret_cast<const char *>(buf), len);
+  }
 
 private:
   struct WBuffer {

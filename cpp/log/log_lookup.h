@@ -11,6 +11,14 @@
 
 template <class Logged> class Database;
 
+namespace ct {
+
+class MerkleAuditProof;
+class ShortMerkleAuditProof;
+class SignedTreeHead;
+
+};
+
 // Lookups into the database. Read-only, so could also be a mirror.
 // Keeps the entire Merkle Tree in memory to serve audit proofs.
 template <class Logged> class LogLookup {
@@ -32,11 +40,17 @@ template <class Logged> class LogLookup {
     NOT_FOUND,
   };
 
+  LookupResult GetIndex(const std::string &merkle_leaf_hash, uint64_t *index);
+
   // Look up by hash of the logged item.
   LookupResult AuditProof(const std::string &merkle_leaf_hash,
                           ct::MerkleAuditProof *proof);
 
-  // Look up by hash of the logged item and tree_size
+  // Look up by index of the logged item and tree_size.
+  LookupResult AuditProof(uint64_t index, size_t tree_size,
+                          ct::ShortMerkleAuditProof *proof);
+
+  // Look up by hash of the logged item and tree_size.
   LookupResult AuditProof(const std::string &merkle_leaf_hash,
                           size_t tree_size, ct::ShortMerkleAuditProof *proof);
 
@@ -50,6 +64,10 @@ template <class Logged> class LogLookup {
     if (db_->LookupByIndex(index, result) != Database<Logged>::LOOKUP_OK)
       return NOT_FOUND;
     return OK;
+  }
+
+  const ct::SignedTreeHead &GetSTH() const {
+    return latest_tree_head_;
   }
 
  private:

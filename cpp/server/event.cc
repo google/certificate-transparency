@@ -145,8 +145,12 @@ void EventLoop::OneLoop() {
   CHECK_LE(n, r);
 }
 
+void EventLoop::Stop() {
+  go_ = false;
+}
+
 void EventLoop::Forever() {
-  for ( ; ; )
+  for ( ; go_ ; )
     OneLoop();
 }
 
