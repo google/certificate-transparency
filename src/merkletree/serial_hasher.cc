@@ -31,6 +31,10 @@ string Sha256Hasher::Final() {
   initialized_ = false;
 }
 
+SerialHasher* Sha256Hasher::Create() const {
+  return new Sha256Hasher;
+}
+
 // static
 string Sha256Hasher::Sha256Digest(const string &data) {
   Sha256Hasher hasher;

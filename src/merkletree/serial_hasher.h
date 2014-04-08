@@ -21,6 +21,9 @@ class SerialHasher {
 
   // Finalize the hash context and return the binary digest blob.
   virtual std::string Final() = 0;
+
+  // A virtual constructor.  The caller gets ownership of the returned object.
+  virtual SerialHasher* Create() const = 0;
 };
 
 class Sha256Hasher : public SerialHasher {
@@ -32,9 +35,11 @@ class Sha256Hasher : public SerialHasher {
   void Reset();
   void Update(const std::string &data);
   std::string Final();
+  SerialHasher* Create() const;
 
   // Create a new hasher and call Reset(), Update(), and Final().
   static std::string Sha256Digest(const std::string &data);
+
 
  private:
   SHA256_CTX ctx_;

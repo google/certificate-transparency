@@ -94,6 +94,20 @@ TYPED_TEST(SerialHasherTest, Update) {
   EXPECT_EQ(H(digest), H(output));
 }
 
+TYPED_TEST(SerialHasherTest, Create) {
+  string input, output, digest;
+
+  for (size_t i = 0; this->test_vectors_[i].input != NULL; ++i) {
+    SerialHasher* new_hasher = this->hasher_->Create();
+    new_hasher->Reset();
+    new_hasher->Update(S(this->test_vectors_[i].input,
+                         this->test_vectors_[i].input_length));
+    digest = new_hasher->Final();
+    EXPECT_STREQ(H(digest).c_str(), this->test_vectors_[i].output);
+    delete new_hasher;
+  }
+}
+
 TEST(Sha256Test, StaticDigest) {
   string input, output, digest;
 
