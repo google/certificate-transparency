@@ -15,7 +15,6 @@ import (
 	"github.com/mreiferson/go-httpclient"
 	"io"
 	"io/ioutil"
-	"log"
 	"net/http"
 	"strconv"
 	"time"
@@ -44,8 +43,13 @@ type LogClient struct {
 	httpClient *http.Client // used to interact with the log via HTTP
 }
 
+//////////////////////////////////////////////////////////////////////////////////
+// JSON structures follow.
+// These represent the structures returned by the CT Log server.
+//////////////////////////////////////////////////////////////////////////////////
+
 // Represents the JSON response to the add-chain CT method.
-// An SCT represents a Log's promise to integrate a [pre-] certificate into the
+// An SCT represents a Log's promise to integrate a [pre-]certificate into the
 // log within a defined period of time.
 type addChainResponse struct {
 	SctVersion Version `json:"sct_version"` // SCT structure version
@@ -96,15 +100,17 @@ type getEntryAndProofResponse struct {
 	AuditPath []string `json:"audit_path"` // the corresponding proof
 }
 
+///////////////////////////////////////////////////////////////////////////////////
 // The following structures represent those outlined in the RFC6962 document:
+///////////////////////////////////////////////////////////////////////////////////
 
 // Represents the LogEntryType enum from section 3.1 of the RFC:
 //   enum { x509_entry(0), precert_entry(1), (65535) } LogEntryType;
 type LogEntryType uint16
 
 const (
-	X509LogEntryType LogEntryType = iota
-	PrecertLogEntryType
+	X509LogEntryType    LogEntryType = 0
+	PrecertLogEntryType              = 1
 )
 
 // Represents the MerkleLeafType enum from section 3.4 of the RFC:
@@ -112,7 +118,7 @@ const (
 type MerkleLeafType uint8
 
 const (
-	TimestampedEntryLeafType MerkleLeafType = iota // Entry type for an SCT
+	TimestampedEntryLeafType MerkleLeafType = 0 // Entry type for an SCT
 )
 
 // The Version enum from section 3.2 of the RFC:
@@ -120,7 +126,7 @@ const (
 type Version uint8
 
 const (
-	V1 Version = iota
+	V1 Version = 0
 )
 
 // Raw DER bytes of an ASN.1 Certificate (section 3.1)
@@ -286,7 +292,6 @@ func NewMerkleTreeLeaf(r io.Reader) (*MerkleTreeLeaf, error) {
 // Returns a pointer to an x509.Certificate or a non-nil error.
 func (m *MerkleTreeLeaf) X509Certificate() (cert *x509.Certificate, err error) {
 	cert, err = x509.ParseCertificate(m.TimestampedEntry.X509Entry)
-	log.Println(cert.Subject.CommonName)
 	return cert, err
 }
 
