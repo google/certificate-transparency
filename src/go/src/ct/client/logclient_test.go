@@ -159,7 +159,7 @@ func TestReadVarBytesShortRead(t *testing.T) {
 	r := make([]byte, 2)
 	r[0] = 2 // but only 1 byte available...
 	_, err := readVarBytes(bytes.NewReader(r), 1)
-	if err == nil || !strings.Contains(err.Error(), "Short read") {
+	if err == nil || !strings.Contains(err.Error(), "short read") {
 		t.Fatal("readVarBytes didn't fail with a short read")
 	}
 }
@@ -250,7 +250,7 @@ func TestNewMerkleTreeLeafForX509Cert(t *testing.T) {
 func TestNewMerkleTreeLeafChecksVersion(t *testing.T) {
 	buffer := []byte{1}
 	_, err := NewMerkleTreeLeaf(bytes.NewReader(buffer))
-	if err == nil || !strings.Contains(err.Error(), "Unknown Version") {
+	if err == nil || !strings.Contains(err.Error(), "unknown Version") {
 		t.Fatal("Failed to check Version - accepted 1")
 	}
 }
@@ -258,7 +258,7 @@ func TestNewMerkleTreeLeafChecksVersion(t *testing.T) {
 func TestNewMerkleTreeLeafChecksLeafType(t *testing.T) {
 	buffer := []byte{0, 0x12, 0x34}
 	_, err := NewMerkleTreeLeaf(bytes.NewReader(buffer))
-	if err == nil || !strings.Contains(err.Error(), "Unknown LeafType") {
+	if err == nil || !strings.Contains(err.Error(), "unknown LeafType") {
 		t.Fatal("Failed to check LeafType - accepted 0x1234")
 	}
 }
@@ -267,7 +267,7 @@ func TestTimestampedEntryParseChecksEntryType(t *testing.T) {
 	buffer := []byte{0, 1, 2, 3, 4, 5, 6, 7, 0x45, 0x45}
 	var tse TimestampedEntry
 	err := tse.parse(bytes.NewReader(buffer))
-	if err == nil || !strings.Contains(err.Error(), "Unknown EntryType") {
+	if err == nil || !strings.Contains(err.Error(), "unknown EntryType") {
 		t.Fatal("Failed to check EntryType - accepted 0x4545")
 	}
 }

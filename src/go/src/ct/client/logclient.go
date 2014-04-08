@@ -12,12 +12,13 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/mreiferson/go-httpclient"
 	"io"
 	"io/ioutil"
 	"net/http"
 	"strconv"
 	"time"
+
+	"github.com/mreiferson/go-httpclient"
 )
 
 // URI paths for CT Log endpoints
@@ -228,7 +229,7 @@ func readVarBytes(r io.Reader, numLenBytes int) ([]byte, error) {
 		return nil, err
 	}
 	if n != int(l) {
-		return nil, errors.New("Short read: expected " + strconv.Itoa(int(l)) + " but got " + strconv.Itoa(n))
+		return nil, errors.New("short read: expected " + strconv.Itoa(int(l)) + " but got " + strconv.Itoa(n))
 	}
 	return data, nil
 }
@@ -258,7 +259,7 @@ func (t *TimestampedEntry) parse(r io.Reader) error {
 			return err
 		}
 	default:
-		return errors.New("Unknown EntryType: " + strconv.Itoa(int(t.EntryType)))
+		return errors.New("unknown EntryType: " + strconv.Itoa(int(t.EntryType)))
 	}
 	t.Extensions, err = readVarBytes(r, ExtensionsLengthBytes)
 	return err
@@ -274,13 +275,13 @@ func NewMerkleTreeLeaf(r io.Reader) (*MerkleTreeLeaf, error) {
 		return nil, err
 	}
 	if m.Version != V1 {
-		return nil, fmt.Errorf("Unknown Version %d", m.Version)
+		return nil, fmt.Errorf("unknown Version %d", m.Version)
 	}
 	if err := binary.Read(r, binary.BigEndian, &m.LeafType); err != nil {
 		return nil, err
 	}
 	if m.LeafType != TimestampedEntryLeafType {
-		return nil, fmt.Errorf("Unknown LeafType %d", m.LeafType)
+		return nil, fmt.Errorf("unknown LeafType %d", m.LeafType)
 	}
 	if err := m.TimestampedEntry.parse(r); err != nil {
 		return nil, err
@@ -338,7 +339,7 @@ func (c *LogClient) GetSTH() (sth *SignedTreeHead, err error) {
 		sth.TreeSize = resp.TreeSize
 		sth.Timestamp = resp.Timestamp
 		if sth.Sha256RootHash, err = base64.StdEncoding.DecodeString(resp.Sha256RootHash); err != nil {
-			return nil, errors.New("Invalid base64 encoding in sha256_root_hash")
+			return nil, errors.New("invalid base64 encoding in sha256_root_hash")
 		}
 		if len(sth.Sha256RootHash) != sha256.Size {
 			return nil, errors.New("sha256_root_hash is invalid length")
