@@ -74,7 +74,7 @@ const (
         "tree_head_signature":"BAMARjBEAiBUYO2tODlUUw4oWGiVPUHqZadRRyXs9T2rSXchA79VsQIgLASkQv3cu4XdPFCZbgFkIUefniNPCpO3LzzHX53l+wg="}`
 	ValidSTHResponse_TreeSize          = 3721782
 	ValidSTHResponse_Timestamp         = 1396609800587
-	ValidSTHResponse_Sha256RootHash    = "SxKOxksguvHPyUaKYKXoZHzXl91Q257+JQ0AUMlFfeo="
+	ValidSTHResponse_SHA256RootHash    = "SxKOxksguvHPyUaKYKXoZHzXl91Q257+JQ0AUMlFfeo="
 	ValidSTHResponse_TreeHeadSignature = "BAMARjBEAiBUYO2tODlUUw4oWGiVPUHqZadRRyXs9T2rSXchA79VsQIgLASkQv3cu4XdPFCZbgFkIUefniNPCpO3LzzHX53l+wg="
 )
 
@@ -161,47 +161,6 @@ func TestReadVarBytesShortRead(t *testing.T) {
 	_, err := readVarBytes(bytes.NewReader(r), 1)
 	if err == nil || !strings.Contains(err.Error(), "short read") {
 		t.Fatal("readVarBytes didn't fail with a short read")
-	}
-}
-
-func TestSignedTreeHeadEquals(t *testing.T) {
-	sth1 := SignedTreeHead{4, 5, []byte("hash"), []byte("sig")}
-	sth2 := SignedTreeHead{4, 5, []byte("hash"), []byte("sig")}
-	if !sth1.Equals(sth2) {
-		t.Fatal("Should be equal")
-	}
-}
-
-func TestSignedTreeHeadAreNotEqual(t *testing.T) {
-	sth1 := SignedTreeHead{4, 5, []byte("hash"), []byte("sig")}
-	sth2 := SignedTreeHead{4, 5, []byte("hash"), []byte("sig")}
-	{
-		sth2.TreeSize++
-		if sth1.Equals(sth2) {
-			t.Fatal("TreeSize are different")
-		}
-		sth2.TreeSize--
-	}
-	{
-		sth2.Timestamp++
-		if sth1.Equals(sth2) {
-			t.Fatal("Timestamp are different")
-		}
-		sth2.Timestamp--
-	}
-	{
-		sth2.Sha256RootHash[2]++
-		if sth1.Equals(sth2) {
-			t.Fatal("Sha256RootHash are different")
-		}
-		sth2.Sha256RootHash[2]--
-	}
-	{
-		sth2.TreeHeadSignature[2]++
-		if sth1.Equals(sth2) {
-			t.Fatal("TreeHeadSignature are different")
-		}
-		sth2.TreeHeadSignature[2]--
 	}
 }
 
@@ -311,7 +270,7 @@ func TestGetSTHWorks(t *testing.T) {
 			t.Fatalf("Incorrect URL path: %s", r.URL.Path)
 		}
 		fmt.Fprintf(w, `{"tree_size": %d, "timestamp": %d, "sha256_root_hash": "%s", "tree_head_signature": "%s"}`,
-			ValidSTHResponse_TreeSize, ValidSTHResponse_Timestamp, ValidSTHResponse_Sha256RootHash,
+			ValidSTHResponse_TreeSize, ValidSTHResponse_Timestamp, ValidSTHResponse_SHA256RootHash,
 			ValidSTHResponse_TreeHeadSignature)
 	}))
 	defer ts.Close()
@@ -327,12 +286,12 @@ func TestGetSTHWorks(t *testing.T) {
 	if sth.Timestamp != ValidSTHResponse_Timestamp {
 		t.Fatal("Invalid Timestamp")
 	}
-	hash, err := base64.StdEncoding.DecodeString(ValidSTHResponse_Sha256RootHash)
+	hash, err := base64.StdEncoding.DecodeString(ValidSTHResponse_SHA256RootHash)
 	if err != nil {
 		t.Fatal("Couldn't b64 decode 'correct' STH root hash!")
 	}
-	if string(sth.Sha256RootHash) != string(hash) {
-		t.Fatal("Invalid Sha256RootHash")
+	if string(sth.SHA256RootHash) != string(hash) {
+		t.Fatal("Invalid SHA256RootHash")
 	}
 	sig, err := base64.StdEncoding.DecodeString(ValidSTHResponse_TreeHeadSignature)
 	if err != nil {

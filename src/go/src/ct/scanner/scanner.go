@@ -12,7 +12,7 @@ import (
 	"time"
 )
 
-// Configuration options for the Scanner
+// ScannerOptions holds configuration options for the Scanner
 type ScannerOptions struct {
 	// Regexp to match against CN and SANs, defaults to ".*"
 	MatchSubjectRegex *regexp.Regexp
@@ -30,7 +30,7 @@ type ScannerOptions struct {
 	StartIndex int64
 }
 
-// A tool to scan all the entries in a CT Log.
+// Scanner is a tool to scan all the entries in a CT Log.
 type Scanner struct {
 	// Client used to talk to the CT log instance
 	logClient *client.LogClient
@@ -45,7 +45,7 @@ type Scanner struct {
 	precertsSeen int64
 }
 
-// Context for an individual matcher job.
+// matcherJob represents the context for an individual matcher job.
 type matcherJob struct {
 	// The raw LeafInput returned by the log server
 	leaf client.LeafInput
@@ -53,7 +53,7 @@ type matcherJob struct {
 	index int64
 }
 
-// Represents a range of certs to fetch from a CT log
+// fetchRange represents a range of certs to fetch from a CT log
 type fetchRange struct {
 	start int64
 	end   int64

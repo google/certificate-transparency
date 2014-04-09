@@ -25,7 +25,7 @@ func logCertInfo(index int64, cert *x509.Certificate) {
 // Prints out a short bit of info about |precert|, found at |index| in the
 // specified log
 func logPrecertInfo(index int64, precert string) {
-	log.Printf("Interesting cert at index %d: CN: '%s'", index, precert)
+	log.Printf("Interesting precert at index %d: CN: '%s'", index, precert)
 }
 
 func main() {
