@@ -146,8 +146,8 @@ type MerkleTreeNode []byte
 // ConsistencyProof represents a CT consistency proof (see sections 2.1.2 and 4.4)
 type ConsistencyProof []MerkleTreeNode
 
-// AuditProof represents a CT inclusion proof (see sections 2.1.1 and 4.5)
-type AuditProof []MerkleTreeNode
+// AuditPath represents a CT inclusion proof (see sections 2.1.1 and 4.5)
+type AuditPath []MerkleTreeNode
 
 // LeafInput represents a serialized MerkleTreeLeaf structure
 type LeafInput []byte
@@ -199,7 +199,7 @@ func readVarBytes(r io.Reader, numLenBytes int) ([]byte, error) {
 	var l uint64
 	switch {
 	case numLenBytes > 8:
-		return nil, errors.New("numLenBytes too large")
+		return nil, fmt.Errorf("numLenBytes too large (%d)", numLenBytes)
 	case numLenBytes == 0:
 		return nil, errors.New("numLenBytes should be > 0")
 	}
@@ -212,7 +212,7 @@ func readVarBytes(r io.Reader, numLenBytes int) ([]byte, error) {
 		}
 		l |= uint64(t)
 	}
-	data := make([]byte, l, l)
+	data := make([]byte, l)
 	n, err := r.Read(data)
 	if err != nil {
 		return nil, err

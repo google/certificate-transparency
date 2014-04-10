@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"log"
 	"regexp"
+    "sync"
 	"sync/atomic"
 	"time"
 )
@@ -102,12 +103,12 @@ func (s *Scanner) processEntry(index int64, leafInput client.LeafInput, foundCer
 // Worker function to match certs.
 // Accepts MatcherJobs over the |entries| channel, and processes them.
 // Returns true over the |done| channel when the |entries| channel is closed.
-func (s *Scanner) matcherJob(id int, entries <-chan matcherJob, foundCert func(int64, *x509.Certificate), foundPrecert func(int64, string), done chan<- bool) {
+func (s *Scanner) matcherJob(id int, entries <-chan matcherJob, foundCert func(int64, *x509.Certificate), foundPrecert func(int64, string), wg sync.WaitGroup) {
 	for e := range entries {
 		s.processEntry(e.index, e.leaf, foundCert, foundPrecert)
 	}
 	log.Printf("Matcher %d finished", id)
-	done <- true
+	wg.Done()
 }
 
 // Worker function for fetcher jobs.
@@ -116,30 +117,30 @@ func (s *Scanner) matcherJob(id int, entries <-chan matcherJob, foundCert func(i
 // |entries| channel for the matchers to chew on.
 // Will retry failed attempts to retrieve ranges indefinitely.
 // Sends true over the |done| channel when the |ranges| channel is closed.
-func (s *Scanner) fetcherJob(id int, ranges <-chan fetchRange, entries chan<- matcherJob, done chan<- bool) {
+func (s *Scanner) fetcherJob(id int, ranges <-chan fetchRange, entries chan<- matcherJob, wg sync.WaitGroup) {
 	for r := range ranges {
 		success := false
 		// TODO(alcutter): give up after a while:
 		for !success {
 			leaves, err := s.logClient.GetEntries(r.start, r.end)
-			if err == nil {
-				for _, leaf := range leaves {
-					entries <- matcherJob{leaf, r.start}
-					r.start++
-				}
-				if r.start > r.end {
-					// Only complete if we actually got all the leaves we were
-					// expecting -- Logs MAY return fewer than the number of
-					// leaves requested.
-					success = true
-				}
-			} else {
+			if err != nil {
 				log.Printf("Problem fetching from log: %s", err.Error())
+                continue
 			}
+            for _, leaf := range leaves {
+                entries <- matcherJob{leaf, r.start}
+                r.start++
+            }
+            if r.start > r.end {
+                // Only complete if we actually got all the leaves we were
+                // expecting -- Logs MAY return fewer than the number of
+                // leaves requested.
+                success = true
+            }
 		}
 	}
 	log.Printf("Fetcher %d finished", id)
-	done <- true
+    wg.Done()
 }
 
 // Returns the smaller of |a| and |b|
@@ -163,10 +164,12 @@ func max(a int64, b int64) int64 {
 // Pretty prints the passed in number of |seconds| into a more human readable
 // string.
 func humanTime(seconds int) string {
-	hours := int(seconds / (60 * 60))
-	seconds %= (60 * 60)
-	minutes := int(seconds / 60)
-	seconds %= 60
+    nanos := time.Duration(seconds) * time.Second
+	hours := int(nanos / (time.Hour))
+	nanos %= time.Hour
+	minutes := int(nanos / time.Minute)
+	nanos %= time.Minute
+    seconds = int(nanos / time.Second)
 	s := ""
 	if hours > 0 {
 		s += fmt.Sprintf("%d hours ", hours)
@@ -217,29 +220,27 @@ func (s *Scanner) Scan(foundCert func(int64, *x509.Certificate), foundPrecert fu
 		ranges.PushBack(fetchRange{start, end})
 		start = end + 1
 	}
-	fetcherDone := make(chan bool)
 	fetches := make(chan fetchRange, 100)
 	jobs := make(chan matcherJob, 5000)
-	workerDone := make(chan bool)
+    var fetcherWG sync.WaitGroup
+    var matcherWG sync.WaitGroup
 	// Start matcher workers
 	for w := 0; w < s.opts.NumWorkers; w++ {
-		go s.matcherJob(w, jobs, foundCert, foundPrecert, workerDone)
+        matcherWG.Add(1)
+		go s.matcherJob(w, jobs, foundCert, foundPrecert, matcherWG)
 	}
 	// Start fetcher workers
 	for w := 0; w < s.opts.ParallelFetch; w++ {
-		go s.fetcherJob(w, fetches, jobs, fetcherDone)
+        fetcherWG.Add(1)
+		go s.fetcherJob(w, fetches, jobs, fetcherWG)
 	}
 	for r := ranges.Front(); r != nil; r = r.Next() {
 		fetches <- r.Value.(fetchRange)
 	}
 	close(fetches)
-	for w := 0; w < s.opts.ParallelFetch; w++ {
-		<-fetcherDone
-	}
+    fetcherWG.Wait()
 	close(jobs)
-	for w := 0; w < s.opts.NumWorkers; w++ {
-		<-workerDone
-	}
+    matcherWG.Wait()
 
 	log.Printf("Completed %d certs in %s", s.certsProcessed, humanTime(int(time.Since(startTime).Seconds())))
 	log.Printf("Saw %d precerts", s.precertsSeen)
