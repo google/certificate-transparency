@@ -248,7 +248,7 @@ func (t *TimestampedEntry) parse(r io.Reader) error {
 			return err
 		}
 	default:
-		return fmt.Errorf("unknown EntryType: %d",  t.EntryType)
+		return fmt.Errorf("unknown EntryType: %d", t.EntryType)
 	}
 	t.Extensions, err = readVarBytes(r, ExtensionsLengthBytes)
 	return err
@@ -305,17 +305,17 @@ func New(uri string) *LogClient {
 // Returns a non-nil |error| if there was a problem.
 func (c *LogClient) fetchAndParse(uri string, res interface{}) error {
 	req, _ := http.NewRequest("GET", uri, nil)
-	resp, err := c.httpClient.Do(req);
-    if err != nil {
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
 		return err
 	}
-    body, err := ioutil.ReadAll(resp.Body)
-    if err != nil {
-      return err
-    }
-    if err = json.Unmarshal(body, &res); err != nil {
-        return err
-    }
+	body, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		return err
+	}
+	if err = json.Unmarshal(body, &res); err != nil {
+		return err
+	}
 	return nil
 }
 
@@ -326,20 +326,20 @@ func (c *LogClient) GetSTH() (sth *SignedTreeHead, err error) {
 	if err = c.fetchAndParse(c.uri+GetSTHPath, &resp); err != nil {
 		return
 	}
-    sth = &SignedTreeHead{
-        TreeSize: resp.TreeSize,
-        Timestamp: resp.Timestamp,
-    }
-    if sth.SHA256RootHash, err = base64.StdEncoding.DecodeString(resp.SHA256RootHash); err != nil {
-        return nil, errors.New("invalid base64 encoding in sha256_root_hash")
-    }
-    if len(sth.SHA256RootHash) != sha256.Size {
-        return nil, errors.New("sha256_root_hash is invalid length")
-    }
-    if sth.TreeHeadSignature, err = base64.StdEncoding.DecodeString(resp.TreeHeadSignature); err != nil {
-        return nil, errors.New("invalid base64 encoding in tree_head_signature")
-    }
-    // TODO(alcutter): Verify signature
+	sth = &SignedTreeHead{
+		TreeSize:  resp.TreeSize,
+		Timestamp: resp.Timestamp,
+	}
+	if sth.SHA256RootHash, err = base64.StdEncoding.DecodeString(resp.SHA256RootHash); err != nil {
+		return nil, errors.New("invalid base64 encoding in sha256_root_hash")
+	}
+	if len(sth.SHA256RootHash) != sha256.Size {
+		return nil, errors.New("sha256_root_hash is invalid length")
+	}
+	if sth.TreeHeadSignature, err = base64.StdEncoding.DecodeString(resp.TreeHeadSignature); err != nil {
+		return nil, errors.New("invalid base64 encoding in tree_head_signature")
+	}
+	// TODO(alcutter): Verify signature
 	return
 }
 

@@ -8,7 +8,7 @@ import (
 	"fmt"
 	"log"
 	"regexp"
-    "sync"
+	"sync"
 	"sync/atomic"
 	"time"
 )
@@ -125,22 +125,22 @@ func (s *Scanner) fetcherJob(id int, ranges <-chan fetchRange, entries chan<- ma
 			leaves, err := s.logClient.GetEntries(r.start, r.end)
 			if err != nil {
 				log.Printf("Problem fetching from log: %s", err.Error())
-                continue
+				continue
 			}
-            for _, leaf := range leaves {
-                entries <- matcherJob{leaf, r.start}
-                r.start++
-            }
-            if r.start > r.end {
-                // Only complete if we actually got all the leaves we were
-                // expecting -- Logs MAY return fewer than the number of
-                // leaves requested.
-                success = true
-            }
+			for _, leaf := range leaves {
+				entries <- matcherJob{leaf, r.start}
+				r.start++
+			}
+			if r.start > r.end {
+				// Only complete if we actually got all the leaves we were
+				// expecting -- Logs MAY return fewer than the number of
+				// leaves requested.
+				success = true
+			}
 		}
 	}
 	log.Printf("Fetcher %d finished", id)
-    wg.Done()
+	wg.Done()
 }
 
 // Returns the smaller of |a| and |b|
@@ -164,12 +164,12 @@ func max(a int64, b int64) int64 {
 // Pretty prints the passed in number of |seconds| into a more human readable
 // string.
 func humanTime(seconds int) string {
-    nanos := time.Duration(seconds) * time.Second
+	nanos := time.Duration(seconds) * time.Second
 	hours := int(nanos / (time.Hour))
 	nanos %= time.Hour
 	minutes := int(nanos / time.Minute)
 	nanos %= time.Minute
-    seconds = int(nanos / time.Second)
+	seconds = int(nanos / time.Second)
 	s := ""
 	if hours > 0 {
 		s += fmt.Sprintf("%d hours ", hours)
@@ -222,25 +222,25 @@ func (s *Scanner) Scan(foundCert func(int64, *x509.Certificate), foundPrecert fu
 	}
 	fetches := make(chan fetchRange, 100)
 	jobs := make(chan matcherJob, 5000)
-    var fetcherWG sync.WaitGroup
-    var matcherWG sync.WaitGroup
+	var fetcherWG sync.WaitGroup
+	var matcherWG sync.WaitGroup
 	// Start matcher workers
 	for w := 0; w < s.opts.NumWorkers; w++ {
-        matcherWG.Add(1)
+		matcherWG.Add(1)
 		go s.matcherJob(w, jobs, foundCert, foundPrecert, matcherWG)
 	}
 	// Start fetcher workers
 	for w := 0; w < s.opts.ParallelFetch; w++ {
-        fetcherWG.Add(1)
+		fetcherWG.Add(1)
 		go s.fetcherJob(w, fetches, jobs, fetcherWG)
 	}
 	for r := ranges.Front(); r != nil; r = r.Next() {
 		fetches <- r.Value.(fetchRange)
 	}
 	close(fetches)
-    fetcherWG.Wait()
+	fetcherWG.Wait()
 	close(jobs)
-    matcherWG.Wait()
+	matcherWG.Wait()
 
 	log.Printf("Completed %d certs in %s", s.certsProcessed, humanTime(int(time.Since(startTime).Seconds())))
 	log.Printf("Saw %d precerts", s.precertsSeen)
