@@ -31,7 +31,13 @@ func logPrecertInfo(index int64, precert string) {
 func main() {
 	flag.Parse()
 	logClient := client.New(*logUri)
-	opts := scanner.ScannerOptions{regexp.MustCompile(*matchSubjectRegex), *blockSize, *numWorkers, *parallelFetch, *startIndex}
+	opts := scanner.ScannerOptions{
+		Matcher:       scanner.MatchSubjectRegex{regexp.MustCompile(*matchSubjectRegex)},
+		BlockSize:     *blockSize,
+		NumWorkers:    *numWorkers,
+		ParallelFetch: *parallelFetch,
+		StartIndex:    *startIndex,
+	}
 	scanner := scanner.NewScanner(logClient, opts)
 	scanner.Scan(logCertInfo, logPrecertInfo)
 }

@@ -13,10 +13,44 @@ import (
 	"time"
 )
 
+// Function prototype for matcher functions:
+type Matcher interface {
+	CertificateMatches(*x509.Certificate) bool
+}
+
+type MatchAll struct{}
+
+func (m MatchAll) CertificateMatches(_ *x509.Certificate) bool {
+	return true
+}
+
+type MatchNone struct{}
+
+func (m MatchNone) CertificateMatches(_ *x509.Certificate) bool {
+	return false
+}
+
+type MatchSubjectRegex struct {
+	SubjectRegex *regexp.Regexp
+}
+
+func (m MatchSubjectRegex) CertificateMatches(c *x509.Certificate) bool {
+	if m.SubjectRegex.FindStringIndex(c.Subject.CommonName) != nil {
+		return true
+	}
+	for _, alt := range c.DNSNames {
+		if m.SubjectRegex.FindStringIndex(alt) != nil {
+			return true
+		}
+	}
+	return false
+}
+
 // ScannerOptions holds configuration options for the Scanner
 type ScannerOptions struct {
-	// Regexp to match against CN and SANs, defaults to ".*"
-	MatchSubjectRegex *regexp.Regexp
+	// Custom matcher for x509 Certificates, functor will be called for each
+	// Certificate found during scanning.
+	Matcher Matcher
 
 	// Number of entries to request in one batch from the Log
 	BlockSize int
@@ -60,24 +94,9 @@ type fetchRange struct {
 	end   int64
 }
 
-// Determines whether |cert| matches the criteria specified by the user.
-// Returns true iff |cert|'s CN or one of its SANs matches the regexp specified
-// in the match_subject_regex flag.
-func (s *Scanner) certMatcher(cert *x509.Certificate) bool {
-	atomic.AddInt64(&s.certsProcessed, 1)
-	if s.opts.MatchSubjectRegex.FindStringIndex(cert.Subject.CommonName) != nil {
-		return true
-	}
-	for _, alt := range cert.DNSNames {
-		if s.opts.MatchSubjectRegex.FindStringIndex(alt) != nil {
-			return true
-		}
-	}
-	return false
-}
-
 // Processes the given |leafInput| found at |index| in the specified log.
 func (s *Scanner) processEntry(index int64, leafInput client.LeafInput, foundCert func(int64, *x509.Certificate), foundPrecert func(int64, string)) {
+	atomic.AddInt64(&s.certsProcessed, 1)
 	leaf, err := client.NewMerkleTreeLeaf(bytes.NewBuffer(leafInput))
 	if err != nil {
 		log.Printf("Failed to parse MerkleTreeLeaf at index %d : %s", index, err.Error())
@@ -90,7 +109,7 @@ func (s *Scanner) processEntry(index int64, leafInput client.LeafInput, foundCer
 			log.Printf("Failed to parse cert at index %d : %s", index, err.Error())
 			return
 		}
-		if s.certMatcher(cert) {
+		if s.opts.Matcher.CertificateMatches(cert) {
 			foundCert(index, cert)
 		}
 	case client.PrecertLogEntryType:
@@ -103,7 +122,7 @@ func (s *Scanner) processEntry(index int64, leafInput client.LeafInput, foundCer
 // Worker function to match certs.
 // Accepts MatcherJobs over the |entries| channel, and processes them.
 // Returns true over the |done| channel when the |entries| channel is closed.
-func (s *Scanner) matcherJob(id int, entries <-chan matcherJob, foundCert func(int64, *x509.Certificate), foundPrecert func(int64, string), wg sync.WaitGroup) {
+func (s *Scanner) matcherJob(id int, entries <-chan matcherJob, foundCert func(int64, *x509.Certificate), foundPrecert func(int64, string), wg *sync.WaitGroup) {
 	for e := range entries {
 		s.processEntry(e.index, e.leaf, foundCert, foundPrecert)
 	}
@@ -117,7 +136,7 @@ func (s *Scanner) matcherJob(id int, entries <-chan matcherJob, foundCert func(i
 // |entries| channel for the matchers to chew on.
 // Will retry failed attempts to retrieve ranges indefinitely.
 // Sends true over the |done| channel when the |ranges| channel is closed.
-func (s *Scanner) fetcherJob(id int, ranges <-chan fetchRange, entries chan<- matcherJob, wg sync.WaitGroup) {
+func (s *Scanner) fetcherJob(id int, ranges <-chan fetchRange, entries chan<- matcherJob, wg *sync.WaitGroup) {
 	for r := range ranges {
 		success := false
 		// TODO(alcutter): give up after a while:
@@ -227,12 +246,12 @@ func (s *Scanner) Scan(foundCert func(int64, *x509.Certificate), foundPrecert fu
 	// Start matcher workers
 	for w := 0; w < s.opts.NumWorkers; w++ {
 		matcherWG.Add(1)
-		go s.matcherJob(w, jobs, foundCert, foundPrecert, matcherWG)
+		go s.matcherJob(w, jobs, foundCert, foundPrecert, &matcherWG)
 	}
 	// Start fetcher workers
 	for w := 0; w < s.opts.ParallelFetch; w++ {
 		fetcherWG.Add(1)
-		go s.fetcherJob(w, fetches, jobs, fetcherWG)
+		go s.fetcherJob(w, fetches, jobs, &fetcherWG)
 	}
 	for r := ranges.Front(); r != nil; r = r.Next() {
 		fetches <- r.Value.(fetchRange)
@@ -253,8 +272,8 @@ func NewScanner(client *client.LogClient, opts ScannerOptions) *Scanner {
 	var scanner Scanner
 	scanner.logClient = client
 	// Set a default match-everything regex if none was provided:
-	if opts.MatchSubjectRegex == nil {
-		opts.MatchSubjectRegex = regexp.MustCompile(".*")
+	if opts.Matcher == nil {
+		opts.Matcher = &MatchAll{}
 	}
 	scanner.opts = opts
 	return &scanner

@@ -11,33 +11,58 @@ import (
 	"testing"
 )
 
-func TestScannerCertMatcherFindsCN(t *testing.T) {
-	const SubjectName = "www.example.com"
-	const SubjectRegEx = ".*example.com"
-	var cert x509.Certificate
-	cert.Subject.CommonName = SubjectName
+func CertMatchesRegex(r *regexp.Regexp, cert *x509.Certificate) bool {
+	if r.FindStringIndex(cert.Subject.CommonName) != nil {
+		return true
+	}
+	for _, alt := range cert.DNSNames {
+		if r.FindStringIndex(alt) != nil {
+			return true
+		}
+	}
+	return false
+}
 
-	opts := ScannerOptions{MatchSubjectRegex: regexp.MustCompile(SubjectRegEx)}
-	scanner := NewScanner(nil, opts)
-	if !scanner.certMatcher(&cert) {
-		t.Fatal("Scanner failed to match on Subject CommonName")
+func TestScannerMatchAll(t *testing.T) {
+	var cert x509.Certificate
+	m := &MatchAll{}
+	if !m.CertificateMatches(&cert) {
+		t.Fatal("MatchAll didn't match!")
+	}
+}
+func TestScannerMatchNone(t *testing.T) {
+	var cert x509.Certificate
+	m := &MatchNone{}
+	if m.CertificateMatches(&cert) {
+		t.Fatal("MatchNone matched!")
 	}
 }
 
-func TestScannerCertMatcherFindsSAN(t *testing.T) {
+func TestScannerMatchSubjectRegexMatchesCommonName(t *testing.T) {
 	const SubjectName = "www.example.com"
 	const SubjectRegEx = ".*example.com"
 	var cert x509.Certificate
 	cert.Subject.CommonName = SubjectName
 
-	opts := ScannerOptions{MatchSubjectRegex: regexp.MustCompile(SubjectRegEx)}
-	scanner := NewScanner(nil, opts)
+	m := MatchSubjectRegex{regexp.MustCompile(SubjectRegEx)}
+	if !m.CertificateMatches(&cert) {
+		t.Fatal("MatchSubjectRegex failed to match on Subject CommonName")
+	}
+}
+
+func TestScannerMatchSubjectRegexMatchesSAN(t *testing.T) {
+	const SubjectName = "www.example.com"
+	const SubjectRegEx = ".*example.com"
+	var cert x509.Certificate
+	cert.Subject.CommonName = SubjectName
+
+	m := MatchSubjectRegex{regexp.MustCompile(SubjectRegEx)}
 	cert.Subject.CommonName = "Wibble"              // Doesn't match
 	cert.DNSNames = append(cert.DNSNames, "Wibble") // Nor this
 	cert.DNSNames = append(cert.DNSNames, SubjectName)
 
-	if !scanner.certMatcher(&cert) {
-		t.Fatal("Scanner failed to match on SubjectAlternativeName")
+	if !m.CertificateMatches(&cert) {
+		t.Fatal("MatchSubjectRegex failed to match on SubjectAlternativeName")
 	}
 }
 
@@ -61,7 +86,13 @@ func TestScannerEndToEnd(t *testing.T) {
 	defer ts.Close()
 
 	client := client.New(ts.URL)
-	opts := ScannerOptions{regexp.MustCompile(".*\\.google\\.com"), 10, 1, 1, 0}
+	opts := ScannerOptions{
+		Matcher:       &MatchSubjectRegex{regexp.MustCompile(".*\\.google\\.com")},
+		BlockSize:     10,
+		NumWorkers:    1,
+		ParallelFetch: 1,
+		StartIndex:    0,
+	}
 	scanner := NewScanner(client, opts)
 
 	var matchedCerts list.List
