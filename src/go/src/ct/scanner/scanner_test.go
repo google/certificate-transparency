@@ -50,6 +50,34 @@ func TestScannerMatchSubjectRegexMatchesCommonName(t *testing.T) {
 	}
 }
 
+func TestScannerMatchSubjectRegexIgnoresDifferentCommonName(t *testing.T) {
+	const SubjectName = "www.google.com"
+	const SubjectRegEx = ".*example.com"
+	var cert x509.Certificate
+	cert.Subject.CommonName = SubjectName
+
+	m := MatchSubjectRegex{regexp.MustCompile(SubjectRegEx)}
+	if m.CertificateMatches(&cert) {
+		t.Fatal("MatchSubjectRegex incorrectly matched on Subject CommonName")
+	}
+}
+
+func TestScannerMatchSubjectRegexIgnoresDifferentSAN(t *testing.T) {
+	const SubjectName = "www.google.com"
+	const SubjectRegEx = ".*example.com"
+	var cert x509.Certificate
+	cert.Subject.CommonName = SubjectName
+
+	m := MatchSubjectRegex{regexp.MustCompile(SubjectRegEx)}
+	cert.Subject.CommonName = "Wibble"              // Doesn't match
+	cert.DNSNames = append(cert.DNSNames, "Wibble") // Nor this
+	cert.DNSNames = append(cert.DNSNames, SubjectName)
+
+	if m.CertificateMatches(&cert) {
+		t.Fatal("MatchSubjectRegex incorrectly matched on SubjectAlternativeName")
+	}
+}
+
 func TestScannerMatchSubjectRegexMatchesSAN(t *testing.T) {
 	const SubjectName = "www.example.com"
 	const SubjectRegEx = ".*example.com"
