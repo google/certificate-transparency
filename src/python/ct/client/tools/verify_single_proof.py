@@ -17,6 +17,8 @@ FLAGS = gflags.FLAGS
 gflags.DEFINE_string("cert", None, "Certificate file (PEM format) to fetch a "
                      "proof for.")
 gflags.DEFINE_string("sct", None, "SCT file (ProtoBuf) of said certificate.")
+gflags.DEFINE_string("timestamp", None,
+                     "Timestamp from SCT of said certificate.")
 gflags.DEFINE_string("log_url", "ct.googleapis.com/pilot",
                      "URL of CT log.")
 
@@ -39,11 +41,15 @@ def run():
     cert_to_lookup = cert.Certificate.from_pem_file(FLAGS.cert)
 
     #TODO(eranm): Attempt fetching the SCT for this chain if none was given.
-    cert_sct = ct_pb2.SignedCertificateTimestamp()
-    cert_sct.ParseFromString(open(FLAGS.sct, 'rb').read())
-    print 'SCT for cert:', cert_sct
+    if FLAGS.sct:
+        cert_sct = ct_pb2.SignedCertificateTimestamp()
+        cert_sct.ParseFromString(open(FLAGS.sct, 'rb').read())
+        sct_timestamp = cert_sct.timestamp
+        print 'SCT for cert:', cert_sct
+    else:
+        sct_timestamp = int(FLAGS.timestamp)
 
-    constructed_leaf = create_leaf(cert_sct.timestamp,
+    constructed_leaf = create_leaf(sct_timestamp,
                                    cert_to_lookup.to_der())
     leaf_hash = merkle.TreeHasher().hash_leaf(constructed_leaf)
     print 'Assembled leaf hash:', leaf_hash.encode('hex')

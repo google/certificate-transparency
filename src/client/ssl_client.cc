@@ -62,6 +62,7 @@ SSLClient::SSLClient(const string &server, uint16_t port,
                      const string &ca_dir, LogVerifier *verifier)
     : client_(server, port),
       ctx_(NULL),
+      ssl_(NULL),
       verify_args_(verifier),
       connected_(false) {
   ctx_ = SSL_CTX_new(TLSv1_client_method());
