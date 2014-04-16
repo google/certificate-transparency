@@ -156,7 +156,7 @@ uint64_t TimeInMilliseconds() {
       static_cast<uint64_t>(tv.tv_usec) / 1000;
 }
 
-std::string RandomString(size_t min_length, size_t max_length) {
+string RandomString(size_t min_length, size_t max_length) {
   size_t length = min_length == max_length ? min_length
       : rand() % (max_length - min_length) + min_length;
 
@@ -167,7 +167,7 @@ std::string RandomString(size_t min_length, size_t max_length) {
   return ret;
 }
 
-std::string FromBase64(const char *b64) {
+string FromBase64(const char *b64) {
   size_t length = strlen(b64);
   // Lazy: base 64 encoding is always >= in length to decoded value
   // (equality occurs for zero length).
@@ -181,13 +181,15 @@ std::string FromBase64(const char *b64) {
   return ret;
 }
 
-std::string ToBase64(const std::string &from) {
+string ToBase64(const string &from) {
   // base 64 is 4 output bytes for every 3 input bytes (rounded up).
   size_t length = ((from.size() + 2) / 3) * 4;
-  char buf[length + 1];
+  char *buf = new char[length + 1];
   length = b64_ntop((const u_char *)from.data(), from.length(), buf,
                     length + 1);
-  return std::string((char *)buf, length);
+  string ret(buf, length);
+  delete[] buf;
+  return ret;
 }
 
 }  // namespace util
