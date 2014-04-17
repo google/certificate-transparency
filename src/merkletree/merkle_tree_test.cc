@@ -147,6 +147,17 @@ class MerkleTreeFuzzTest : public MerkleTreeTest {
 class CompactMerkleTreeTest : public MerkleTreeTest {
 };
 
+class CompactMerkleTreeFuzzTest : public MerkleTreeFuzzTest {
+ protected:
+  string RandomLeaf(size_t len) {
+    string r;
+    for (size_t i = 0; i < len; ++i) {
+      r += uint8_t(rand() % 0xff);
+    }
+    return r;
+  }
+};
+
 ////////////////////////////////////////////////////////////////////////////////
 //              FUZZ TESTS AGAINST REFERENCE IMPLEMENTATIONS                  //
 ////////////////////////////////////////////////////////////////////////////////
@@ -361,6 +372,83 @@ TEST_F(CompactMerkleTreeTest, RootTestVectors) {
   EXPECT_EQ(tree3.LeafCount(), 8U);
   EXPECT_EQ(tree3.LevelCount(), kLevelCounts[7]);
   EXPECT_STREQ(H(tree3.CurrentRoot()).c_str(), kSHA256Roots[7].str);
+}
+
+TEST_F(CompactMerkleTreeTest, TestCopyCtorWithRootTestVectors) {
+  MerkleTree tree1(new Sha256Hasher());
+  CompactMerkleTree refctree1(new Sha256Hasher());
+  EXPECT_EQ(tree1.LeafCount(), 0U);
+  EXPECT_EQ(tree1.LevelCount(), 0U);
+  EXPECT_STREQ(H(tree1.CurrentRoot()).c_str(), kSHA256EmptyTreeHash.str);
+  for (size_t i = 0; i < 8; ++i) {
+    tree1.AddLeaf(S(kInputs[i]));
+    refctree1.AddLeaf(S(kInputs[i]));
+  }
+  EXPECT_EQ(tree1.LeafCount(), 8U);
+  EXPECT_EQ(tree1.LevelCount(), kLevelCounts[7]);
+  EXPECT_STREQ(H(tree1.CurrentRoot()).c_str(), kSHA256Roots[7].str);
+
+  CompactMerkleTree ctree1(tree1, new Sha256Hasher());
+  EXPECT_EQ(tree1.LeafCount(), ctree1.LeafCount());
+  EXPECT_EQ(tree1.LevelCount(), ctree1.LevelCount());
+  EXPECT_EQ(tree1.CurrentRoot(), ctree1.CurrentRoot());
+}
+
+TEST_F(CompactMerkleTreeTest, TestCopyCtorThenAddLeafWithRootTestVectors) {
+  MerkleTree tree(new Sha256Hasher());
+  EXPECT_EQ(tree.LeafCount(), 0U);
+  EXPECT_EQ(tree.LevelCount(), 0U);
+  EXPECT_STREQ(H(tree.CurrentRoot()).c_str(), kSHA256EmptyTreeHash.str);
+  for (size_t i = 0; i < 5; ++i) {
+    tree.AddLeaf(S(kInputs[i]));
+  }
+  EXPECT_EQ(tree.LeafCount(), 5U);
+  EXPECT_EQ(tree.LevelCount(), kLevelCounts[4]);
+  EXPECT_STREQ(H(tree.CurrentRoot()).c_str(), kSHA256Roots[4].str);
+  CompactMerkleTree ctree(tree, new Sha256Hasher());
+  EXPECT_EQ(tree.LeafCount(), ctree.LeafCount());
+  EXPECT_EQ(tree.LevelCount(), ctree.LevelCount());
+  EXPECT_EQ(tree.CurrentRoot(), ctree.CurrentRoot());
+
+  // Add the remaining nodes.
+  for (int i = 5; i < 6; ++i) {
+    tree.AddLeaf(S(kInputs[i]));
+    ctree.AddLeaf(S(kInputs[i]));
+  }
+  EXPECT_EQ(tree.LeafCount(), 6U);
+  EXPECT_EQ(tree.LevelCount(), kLevelCounts[5]);
+  EXPECT_STREQ(H(tree.CurrentRoot()).c_str(), kSHA256Roots[5].str);
+  EXPECT_EQ(tree.LeafCount(), ctree.LeafCount());
+  EXPECT_EQ(tree.LevelCount(), ctree.LevelCount());
+  EXPECT_EQ(tree.CurrentRoot(), ctree.CurrentRoot());
+}
+
+TEST_F(CompactMerkleTreeFuzzTest, CopyCtorForLargerTreesThenAppend) {
+  for (size_t tree_size = 1; tree_size <= 512; ++tree_size) {
+    // Build a tree of |tree_size| from random leaves
+    MerkleTree tree(new Sha256Hasher());
+    for (size_t i = 0; i < tree_size; ++i) {
+      const string l(RandomLeaf(256));
+      tree.AddLeaf(l);
+    }
+    EXPECT_EQ(tree.LeafCount(), tree_size);
+    // Now build a CompactMerkleTree using |tree| as the model
+    CompactMerkleTree ctree(tree, new Sha256Hasher());
+    // And check that the public interface concurs
+    EXPECT_EQ(tree.LeafCount(), ctree.LeafCount());
+    EXPECT_EQ(tree.LevelCount(), ctree.LevelCount());
+    EXPECT_EQ(tree.CurrentRoot(), ctree.CurrentRoot());
+    // Now add a bunch more nodes and check that the compact tree
+    // doesn't diverge from the reference tree:
+    for (size_t i = 0; i < 256; ++i) {
+      const string l(RandomLeaf(256));
+      tree.AddLeaf(l);
+      ctree.AddLeaf(l);
+      EXPECT_EQ(tree.LeafCount(), ctree.LeafCount());
+      EXPECT_EQ(tree.LevelCount(), ctree.LevelCount());
+      EXPECT_EQ(tree.CurrentRoot(), ctree.CurrentRoot());
+    }
+  }
 }
 
 // Some paths for the reference tree.

@@ -6,6 +6,7 @@
 #include <vector>
 
 #include "merkletree/merkle_tree_interface.h"
+#include "merkletree/merkle_tree.h"
 #include "merkletree/tree_hasher.h"
 
 class SerialHasher;
@@ -21,6 +22,12 @@ class CompactMerkleTree : public ct::MerkleTreeInterface {
   // instantiation of the SerialHasher abstract class.
   // Takes ownership of the hasher.
   explicit CompactMerkleTree(SerialHasher *hasher);
+
+  // Creates a new CompactMerkleTree based on the data present in the
+  // (non-compact) MerkleTree |model|.
+  // Takes ownership of |hasher|.
+  CompactMerkleTree(MerkleTree& model, SerialHasher *hasher);
+
   virtual ~CompactMerkleTree();
 
   // Length of a node (i.e., a hash), in bytes.

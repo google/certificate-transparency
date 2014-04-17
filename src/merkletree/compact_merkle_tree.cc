@@ -19,6 +19,79 @@ CompactMerkleTree::CompactMerkleTree(SerialHasher *hasher)
   root_ = treehasher_.HashEmpty();
 }
 
+CompactMerkleTree::CompactMerkleTree(MerkleTree &model,
+                                     SerialHasher *hasher)
+    : ct::MerkleTreeInterface(),
+      tree_(model.LevelCount() - 1),
+      treehasher_(hasher),
+      leaf_count_(model.LeafCount()),
+      leaves_processed_(0),
+      level_count_(model.LevelCount()) {
+  if (model.LeafCount() == 0) {
+    return;
+  }
+  // Get the inclusion proof path to the last entry in the tree, which by
+  // definition must consist purely of left-hand nodes.
+  std::vector<string> path(model.PathToCurrentRoot(model.LeafCount()));
+  if (path.size() > 0) {
+    /* We have to do some juggling here as tree_[] differs from our MerkleTree
+    // structure in that incomplete right-hand subtrees 'fall-through' to lower
+    // levels:
+    //
+    // MerkleTree structure for 3 leaves:
+    //      R
+    //     / \
+    //    /   \
+    //   AB    c
+    //  / \
+    // a   b
+    //
+    // Compact tree represents this as:
+    //      R
+    //     / \
+    //    /   \
+    //   AB    .
+    //         |
+    //         c
+    // or:
+    // tree_[1] = AB
+    // tree_[0] = c  // (c) has "fallen-through" to the lowest level
+    //
+    // The inclusion proof path for the right-most entry effectively
+    // describes the state of the tree immediately before the right-most
+    // entry was added.
+    // Since the inclusion proof path consists exclusively of left-hand
+    // nodes and each entry in the path covers the maximum sub-tree possible,
+    // we can use this to directly construct the Compact respresentation of
+    // the tree before the newest entry was added.
+    */
+
+    // index into tree_, starting at the leaf level:
+    int level(0);
+    std::vector<string>::const_iterator i = path.begin();
+    size_t size_of_previous_tree(model.LeafCount() - 1);
+    for (; size_of_previous_tree != 0; size_of_previous_tree >>= 1) {
+      if ((size_of_previous_tree & 1) != 0) {
+        // if the level'th bit in the previous tree size is set, then we have
+        // a proof path entry for this level (because proof entries cover the
+        // maximum possible sub-tree.)
+        tree_[level] = *i;
+        i++;
+      }
+      level++;
+    }
+    CHECK(i == path.end()) << "Failed to consume all proof nodes";
+  }
+
+  // Now tree_ should contain a representation of the tree state just before
+  // the last entry was added, so we PushBack the final right-hand entry
+  // here, which will perform any recalculations necessary to reach the final tree.
+  PushBack(0, model.LeafHash(model.LeafCount()));
+  CHECK_EQ(model.CurrentRoot(), CurrentRoot());
+  CHECK_EQ(model.LeafCount(), LeafCount());
+  CHECK_EQ(model.LevelCount(), LevelCount());
+}
+
 CompactMerkleTree::~CompactMerkleTree() {}
 
 
