@@ -7,7 +7,7 @@
 <?rfc subcompact="no"?>
 <?rfc sortrefs="yes" ?>
 
-<rfc ipr="trust200902" category="std" submissionType="IETF" docName="draft-ietf-trans-rfc6962-bis-01">
+<rfc ipr="trust200902" category="std" submissionType="IETF" docName="draft-ietf-trans-rfc6962-bis-02">
 
   <front>
     <title>Certificate Transparency</title>
@@ -447,7 +447,7 @@ corresponding Precertificate could contain
           </t>
           <t>
             When a Precertificate contains one or more redacted labels, an
-extension (OID 1.3.6.1.4.1.11129.&lt;TBD&gt;, whose extnValue OCTET STRING
+extension (OID 1.3.6.1.4.1.11129.6, whose extnValue OCTET STRING
 contains an ASN.1 SEQUENCE OF INTEGERs) MUST be added to the corresponding
 certificate: the first INTEGER indicates the number of labels redacted in the
 Precertificate's first DNS-ID; the second INTEGER does the same for the
@@ -467,7 +467,7 @@ MAY be logged in place of end-entity certificates issued by that intermediate
 CA, as long as all of the following conditions are met:
             <list style="symbols">
               <t>
-                there MUST be an extension (OID 1.3.6.1.4.1.11129.&lt;TBD&gt;,
+                there MUST be an extension (OID 1.3.6.1.4.1.11129.7,
 whose extnValue OCTET STRING contains ASN.1 NULL data (0x05 0x00)). This
 extension is an explicit indication that it is acceptable to not log
 certificates issued by this intermediate CA.
