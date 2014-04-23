@@ -1,4 +1,4 @@
-VERSION=00
+VERSION=01
 PREV=00
 XML=rfc6962-bis.xml
 NAME=draft-ietf-trans-rfc6962-bis
