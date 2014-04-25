@@ -1,5 +1,7 @@
 *~
 .*.swp
+/doc/draft-ietf-trans-rfc6962-bis-*.html
+/doc/draft-ietf-trans-rfc6962-bis-*-*-diff.html
 /doc/draft-laurie-pki-sunlight-*.html
 /doc/draft-laurie-pki-sunlight-*-*-diff.html
 /doc/draft-laurie-rfc6962-bis-*.html
