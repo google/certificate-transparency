@@ -493,8 +493,9 @@ SEQUENCE {
     SEQUENCE {
       [0] {
         SEQUENCE {
-          [1] 'example.com'
+          [2] 'example.com'
           }
+        }
       [1] {
         SEQUENCE {
           [7] 00 00 00 00 00 00 00 00
@@ -508,7 +509,6 @@ SEQUENCE {
       }
     }
   }
-}
             </artwork>
           </figure>
         </section>
