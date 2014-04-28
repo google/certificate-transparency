@@ -3,6 +3,12 @@
 // license that can be found in the LICENSE file.
 
 // Package x509 parses X.509-encoded keys and certificates.
+//
+// START CT CHANGES
+// This is a fork of the go library crypto/x509 package, it's more relaxed
+// about certificates that it'll accept, and exports the TBSCertificate
+// structure.
+// END CT CHANGES
 package x509
 
 import (
@@ -13,14 +19,18 @@ import (
 	"crypto/elliptic"
 	"crypto/rsa"
 	"crypto/sha1"
-	"crypto/x509/pkix"
-	"encoding/asn1"
+	// START CT CHANGES
+	"ct/asn1"
+	"ct/x509/pkix"
+	// END CT CHANGES
 	"encoding/pem"
 	"errors"
+	// START CT CHANGES
+	"fmt"
+	// END CT CHANGES
 	"io"
 	"math/big"
 	"net"
-	"strconv"
 	"time"
 )
 
@@ -673,11 +683,16 @@ func (c *Certificate) CheckCRLSignature(crl *pkix.CertificateList) (err error) {
 	return c.CheckSignature(algo, crl.TBSCertList.Raw, crl.SignatureValue.RightAlign())
 }
 
-type UnhandledCriticalExtension struct{}
+// START CT CHANGES
+type UnhandledCriticalExtension struct {
+	ID asn1.ObjectIdentifier
+}
 
 func (h UnhandledCriticalExtension) Error() string {
-	return "x509: unhandled critical extension"
+	return fmt.Sprintf("x509: unhandled critical extension (%v)", h.ID)
 }
+
+// END CT CHANGES
 
 type basicConstraints struct {
 	IsCA       bool `asn1:"optional"`
@@ -790,7 +805,43 @@ func parsePublicKey(algo PublicKeyAlgorithm, keyData *publicKeyInfo) (interface{
 	}
 }
 
+// START CT CHANGES
+
+// NonFatalErrors is an error type which can hold a number of other errors.
+// It's used to collect a range of non-fatal errors which occur while parsing
+// a certificate, that way we can still match on certs which technically are
+// invalid.
+type NonFatalErrors struct {
+	Errors []error
+}
+
+// Adds an error to the list of errors contained by NonFatalErrors.
+func (e *NonFatalErrors) AddError(err error) {
+	e.Errors = append(e.Errors, err)
+}
+
+// Returns a string consisting of the values of Error() from all of the errors
+// contained in |e|
+func (e NonFatalErrors) Error() string {
+	r := "NonFatalErrors: "
+	for _, err := range e.Errors {
+		r += err.Error() + "; "
+	}
+	return r
+}
+
+// Returns true if |e| contains at least one error
+func (e *NonFatalErrors) HasError() bool {
+	return len(e.Errors) > 0
+}
+
+// END CT CHANGES
+
 func parseCertificate(in *certificate) (*Certificate, error) {
+	// START CT CHANGES
+	var nfe NonFatalErrors
+	// END CT CHANGES
+
 	out := new(Certificate)
 	out.Raw = in.Raw
 	out.RawTBSCertificate = in.TBSCertificate.Raw
@@ -811,7 +862,9 @@ func parseCertificate(in *certificate) (*Certificate, error) {
 	}
 
 	if in.TBSCertificate.SerialNumber.Sign() < 0 {
-		return nil, errors.New("x509: negative serial number")
+		// START CT CHANGES
+		nfe.AddError(errors.New("x509: negative serial number"))
+		// END CT CHANGES
 	}
 
 	out.Version = in.TBSCertificate.Version + 1
@@ -909,7 +962,9 @@ func parseCertificate(in *certificate) (*Certificate, error) {
 						case net.IPv4len, net.IPv6len:
 							out.IPAddresses = append(out.IPAddresses, v.Bytes)
 						default:
-							return nil, errors.New("x509: certificate contained IP address of length " + strconv.Itoa(len(v.Bytes)))
+							// START CT CHANGES
+							nfe.AddError(fmt.Errorf("x509: certificate contained IP address of length %d : %v", len(v.Bytes), v.Bytes))
+							// END CT CHANGES
 						}
 					}
 				}
@@ -943,13 +998,17 @@ func parseCertificate(in *certificate) (*Certificate, error) {
 				}
 
 				if len(constraints.Excluded) > 0 && e.Critical {
-					return out, UnhandledCriticalExtension{}
+					// START CT CHANGES
+					nfe.AddError(UnhandledCriticalExtension{e.Id})
+					// END CT CHANGES
 				}
 
 				for _, subtree := range constraints.Permitted {
 					if len(subtree.Name) == 0 {
 						if e.Critical {
-							return out, UnhandledCriticalExtension{}
+							// START CT CHANGES
+							nfe.AddError(UnhandledCriticalExtension{e.Id})
+							// END CT CHANGES
 						}
 						continue
 					}
@@ -1067,12 +1126,38 @@ func parseCertificate(in *certificate) (*Certificate, error) {
 		}
 
 		if e.Critical {
-			return out, UnhandledCriticalExtension{}
+			// START CT CHANGES
+			nfe.AddError(UnhandledCriticalExtension{e.Id})
+			// END CT CHANGES
 		}
 	}
-
+	// START CT CHANGES
+	if nfe.HasError() {
+		return out, nfe
+	}
+	// END CT CHANGES
 	return out, nil
 }
+
+// START CT CHANGES
+
+// ParseTBSCertificate parses a single TBSCertificate from the given ASN.1 DER data.
+// The parsed data is returned in a Certificate struct for ease of access.
+func ParseTBSCertificate(asn1Data []byte) (*Certificate, error) {
+	var tbsCert tbsCertificate
+	rest, err := asn1.Unmarshal(asn1Data, &tbsCert)
+	if err != nil {
+		return nil, err
+	}
+	if len(rest) > 0 {
+		return nil, asn1.SyntaxError{Msg: "trailing data"}
+	}
+	return parseCertificate(&certificate{
+		Raw:            tbsCert.Raw,
+		TBSCertificate: tbsCert})
+}
+
+// END CT CHANGES
 
 // ParseCertificate parses a single certificate from the given ASN.1 DER data.
 func ParseCertificate(asn1Data []byte) (*Certificate, error) {

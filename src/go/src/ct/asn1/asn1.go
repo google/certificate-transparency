@@ -7,6 +7,13 @@
 //
 // See also ``A Layman's Guide to a Subset of ASN.1, BER, and DER,''
 // http://luca.ntop.org/Teaching/Appunti/asn1.html.
+//
+// START CT CHANGES
+// This is a fork of the Go standard library ASN.1 implementation
+// (encoding/asn1).  The main difference is that this version tries to correct
+// for errors (e.g. use of tagPrintableString when the string data is really
+// ISO8859-1 - a common error present in many x509 certificates in the wild.)
+// END CT CHANGES
 package asn1
 
 // ASN.1 is a syntax for specifying abstract objects and BER, DER, PER, XER etc
@@ -20,9 +27,15 @@ package asn1
 // everything by any means.
 
 import (
+	// START CT CHANGES
+	"errors"
 	"fmt"
+	// END CT CHANGES
 	"math/big"
 	"reflect"
+	// START CT CHANGES
+	"strings"
+	// END CT CHANGES
 	"time"
 )
 
@@ -496,6 +509,55 @@ func invalidLength(offset, length, sliceLength int) bool {
 	return offset+length < offset || offset+length > sliceLength
 }
 
+// START CT CHANGES
+
+// Tests whether the data in |bytes| would be a valid ISO8859-1 string.
+// Clearly, a sequence of bytes comprised solely of valid ISO8859-1
+// codepoints does not imply that the encoding MUST be ISO8859-1, rather that
+// you would not encounter an error trying to interpret the data as such.
+func couldBeISO8859_1(bytes []byte) bool {
+	for _, b := range bytes {
+		if b < 0x20 || (b >= 0x7F && b < 0xA0) {
+			return false
+		}
+	}
+	return true
+}
+
+// Checks whether the data in |bytes| would be a valid T.61 string.
+// Clearly, a sequence of bytes comprised solely of valid T.61
+// codepoints does not imply that the encoding MUST be T.61, rather that
+// you would not encounter an error trying to interpret the data as such.
+func couldBeT61(bytes []byte) bool {
+	for _, b := range bytes {
+		switch b {
+		case 0x00:
+			// Since we're guessing at (incorrect) encodings for a
+			// PrintableString, we'll err on the side of caution and disallow
+			// strings with a NUL in them, don't want to re-create a PayPal NUL
+			// situation in monitors.
+			fallthrough
+		case 0x23, 0x24, 0x5C, 0x5E, 0x60, 0x7B, 0x7D, 0x7E, 0xA5, 0xA6, 0xAC, 0xAD, 0xAE, 0xAF,
+			0xB9, 0xBA, 0xC0, 0xC9, 0xD0, 0xD1, 0xD2, 0xD3, 0xD4, 0xD5, 0xD6, 0xD7, 0xD8, 0xD9,
+			0xDA, 0xDB, 0xDC, 0xDE, 0xDF, 0xE5, 0xFF:
+			// These are all invalid code points in T.61, so it can't be a T.61 string.
+			return false
+		}
+	}
+	return true
+}
+
+// Converts the data in |bytes| to the equivalent UTF-8 string.
+func iso8859_1ToUTF8(bytes []byte) string {
+	buf := make([]rune, len(bytes))
+	for i, b := range bytes {
+		buf[i] = rune(b)
+	}
+	return string(buf)
+}
+
+// END CT CHANGES
+
 // parseField is the main parsing function. Given a byte slice and an offset
 // into the array, it will try to parse a suitable ASN.1 value out and store it
 // in the given Value.
@@ -545,6 +607,23 @@ func parseField(v reflect.Value, bytes []byte, initOffset int, params fieldParam
 			switch t.tag {
 			case tagPrintableString:
 				result, err = parsePrintableString(innerBytes)
+				// START CT CHANGES
+				if err != nil && strings.Contains(err.Error(), "PrintableString contains invalid character") {
+					// Probably an ISO8859-1 string stuffed in, check if it
+					// would be valid and assume that's what's happened if so,
+					// otherwise try T.61, failing that give up and just assign
+					// the bytes
+					switch {
+					case couldBeISO8859_1(innerBytes):
+						result, err = iso8859_1ToUTF8(innerBytes), nil
+					case couldBeT61(innerBytes):
+						result, err = parseT61String(innerBytes)
+					default:
+						result = nil
+						err = errors.New("PrintableString contains invalid character, but couldn't determine correct String type.")
+					}
+				}
+				// END CT CHANGES
 			case tagIA5String:
 				result, err = parseIA5String(innerBytes)
 			case tagT61String:

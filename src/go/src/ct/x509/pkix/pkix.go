@@ -7,7 +7,9 @@
 package pkix
 
 import (
-	"encoding/asn1"
+	// START CT CHANGES
+	"ct/asn1"
+	// END CT CHANGES
 	"math/big"
 	"time"
 )

@@ -5,8 +5,10 @@
 package x509
 
 import (
-	"crypto/x509/pkix"
-	"encoding/asn1"
+	// START CT CHANGES
+	"ct/asn1"
+	"ct/x509/pkix"
+	// END CT CHANGES
 	"errors"
 	"fmt"
 )

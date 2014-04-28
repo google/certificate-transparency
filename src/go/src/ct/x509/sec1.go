@@ -7,7 +7,9 @@ package x509
 import (
 	"crypto/ecdsa"
 	"crypto/elliptic"
-	"encoding/asn1"
+	// START CT CHANGES
+	"ct/asn1"
+	// START CT CHANGES
 	"errors"
 	"fmt"
 	"math/big"

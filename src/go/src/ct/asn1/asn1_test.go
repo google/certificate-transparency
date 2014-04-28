@@ -509,6 +509,57 @@ func TestRawStructs(t *testing.T) {
 	}
 }
 
+func TestCouleBeISO8859_1(t *testing.T) {
+	for i := 0; i < 0xff; i++ {
+		b := []byte("StringWithA")
+		b = append(b, byte(i))
+		switch {
+		// These values are disallowed:
+		case i < 0x20, i >= 0x7f && i < 0xa0:
+			if couldBeISO8859_1(b) {
+				t.Fatalf("Allowed invalid value %d", i)
+			}
+
+		// These values are allowed:
+		case i >= 0x20 && i < 0x7f, i >= 0xa0 && i <= 0xff:
+			if !couldBeISO8859_1(b) {
+				t.Fatalf("Disallowed valid value %d", i)
+			}
+
+		default:
+			t.Fatalf("Test logic error - value %d not covered above", i)
+		}
+	}
+}
+
+func TestCouleBeT61(t *testing.T) {
+	for i := 0; i < 255; i++ {
+		b := []byte("StringWithA")
+		b = append(b, byte(i))
+
+		if couldBeT61(b) {
+			switch i {
+			case 0x00:
+				fallthrough
+			case 0x23, 0x24, 0x5C, 0x5E, 0x60, 0x7B, 0x7D, 0x7E, 0xA5, 0xA6, 0xAC, 0xAD, 0xAE, 0xAF,
+				0xB9, 0xBA, 0xC0, 0xC9, 0xD0, 0xD1, 0xD2, 0xD3, 0xD4, 0xD5, 0xD6, 0xD7, 0xD8, 0xD9,
+				0xDA, 0xDB, 0xDC, 0xDE, 0xDF, 0xE5, 0xFF:
+				t.Fatalf("Allowed string with byte %d", i)
+			}
+		}
+	}
+}
+
+func TestISO8859_1ToUTF8(t *testing.T) {
+	b := []byte{'c', 'a', 'f', 0xE9} // 0xE9 == é in ISO8859-1, but is invalid in UTF8
+	if string(b) == "café" {
+		t.Fatal("Sanity failure: that shouldn't have matched")
+	}
+	if iso8859_1ToUTF8(b) != "café" {
+		t.Fatal("Failed to convert properly, got %v", iso8859_1ToUTF8(b))
+	}
+}
+
 var derEncodedSelfSignedCert = Certificate{
 	TBSCertificate: TBSCertificate{
 		Version:            0,

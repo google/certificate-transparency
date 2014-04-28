@@ -5,7 +5,7 @@ package client
 
 import (
 	"crypto/sha256"
-	"crypto/x509"
+	"ct/x509"
 	"encoding/base64"
 	"encoding/binary"
 	"encoding/json"
@@ -107,6 +107,16 @@ type getEntryAndProofResponse struct {
 //   enum { x509_entry(0), precert_entry(1), (65535) } LogEntryType;
 type LogEntryType uint16
 
+func (e LogEntryType) String() string {
+	switch e {
+	case X509LogEntryType:
+		return "X509LogEntryType"
+	case PrecertLogEntryType:
+		return "PrecertLogEntryType"
+	}
+	panic(fmt.Sprintf("No string defined for LogEntryType constant value %d", e))
+}
+
 const (
 	X509LogEntryType    LogEntryType = 0
 	PrecertLogEntryType              = 1
@@ -188,6 +198,17 @@ type MerkleTreeLeaf struct {
 	Version          Version          // the version of the protocol to which the MerkleTreeLeaf corresponds
 	LeafType         MerkleLeafType   // The type of the leaf input, currently only TimestampedEntry can exist
 	TimestampedEntry TimestampedEntry // The entry data itself
+}
+
+// Precertificate represents the parsed CT Precertificate structure.
+type Precertificate struct {
+	// Raw DER bytes of the precert
+	Raw []byte
+	// SHA256 hash of the issuing key
+	IssuerKeyHash [32]byte
+	// Parsed TBSCertificate structure (held in an x509.Certificate for ease of
+	// access.
+	TBSCertificate x509.Certificate
 }
 
 // Reads a variable length array of bytes from |r|. |numLenBytes| specifies the
@@ -295,6 +316,8 @@ func New(uri string) *LogClient {
 		ConnectTimeout:        10 * time.Second,
 		RequestTimeout:        30 * time.Second,
 		ResponseHeaderTimeout: 30 * time.Second,
+		MaxIdleConnsPerHost:   10,
+		DisableKeepAlives:     false,
 	}
 	c.httpClient = &http.Client{Transport: transport}
 	return &c

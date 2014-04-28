@@ -5,7 +5,9 @@
 package x509
 
 import (
-	"crypto/x509/pkix"
+	// START CT CHANGES
+	"ct/x509/pkix"
+	// END CT CHANGES
 	"encoding/pem"
 	"errors"
 	"runtime"

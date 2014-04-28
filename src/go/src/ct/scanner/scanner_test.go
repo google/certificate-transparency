@@ -2,8 +2,8 @@ package scanner
 
 import (
 	"container/list"
-	"crypto/x509"
 	"ct/client"
+	"ct/x509"
 	"log"
 	"net/http"
 	"net/http/httptest"
@@ -38,59 +38,115 @@ func TestScannerMatchNone(t *testing.T) {
 	}
 }
 
-func TestScannerMatchSubjectRegexMatchesCommonName(t *testing.T) {
+func TestScannerMatchSubjectRegexMatchesCertificateCommonName(t *testing.T) {
 	const SubjectName = "www.example.com"
 	const SubjectRegEx = ".*example.com"
 	var cert x509.Certificate
 	cert.Subject.CommonName = SubjectName
 
-	m := MatchSubjectRegex{regexp.MustCompile(SubjectRegEx)}
+	m := MatchSubjectRegex{regexp.MustCompile(SubjectRegEx), nil}
 	if !m.CertificateMatches(&cert) {
-		t.Fatal("MatchSubjectRegex failed to match on Subject CommonName")
+		t.Fatal("MatchSubjectRegex failed to match on Cert Subject CommonName")
 	}
 }
 
-func TestScannerMatchSubjectRegexIgnoresDifferentCommonName(t *testing.T) {
+func TestScannerMatchSubjectRegexIgnoresDifferentCertificateCommonName(t *testing.T) {
 	const SubjectName = "www.google.com"
 	const SubjectRegEx = ".*example.com"
 	var cert x509.Certificate
 	cert.Subject.CommonName = SubjectName
 
-	m := MatchSubjectRegex{regexp.MustCompile(SubjectRegEx)}
+	m := MatchSubjectRegex{regexp.MustCompile(SubjectRegEx), nil}
 	if m.CertificateMatches(&cert) {
-		t.Fatal("MatchSubjectRegex incorrectly matched on Subject CommonName")
+		t.Fatal("MatchSubjectRegex incorrectly matched on Cert Subject CommonName")
 	}
 }
 
-func TestScannerMatchSubjectRegexIgnoresDifferentSAN(t *testing.T) {
+func TestScannerMatchSubjectRegexIgnoresDifferentCertificateSAN(t *testing.T) {
 	const SubjectName = "www.google.com"
 	const SubjectRegEx = ".*example.com"
 	var cert x509.Certificate
 	cert.Subject.CommonName = SubjectName
 
-	m := MatchSubjectRegex{regexp.MustCompile(SubjectRegEx)}
+	m := MatchSubjectRegex{regexp.MustCompile(SubjectRegEx), nil}
 	cert.Subject.CommonName = "Wibble"              // Doesn't match
 	cert.DNSNames = append(cert.DNSNames, "Wibble") // Nor this
 	cert.DNSNames = append(cert.DNSNames, SubjectName)
 
 	if m.CertificateMatches(&cert) {
-		t.Fatal("MatchSubjectRegex incorrectly matched on SubjectAlternativeName")
+		t.Fatal("MatchSubjectRegex incorrectly matched on Cert SubjectAlternativeName")
 	}
 }
 
-func TestScannerMatchSubjectRegexMatchesSAN(t *testing.T) {
+func TestScannerMatchSubjectRegexMatchesCertificateSAN(t *testing.T) {
 	const SubjectName = "www.example.com"
 	const SubjectRegEx = ".*example.com"
 	var cert x509.Certificate
 	cert.Subject.CommonName = SubjectName
 
-	m := MatchSubjectRegex{regexp.MustCompile(SubjectRegEx)}
+	m := MatchSubjectRegex{regexp.MustCompile(SubjectRegEx), nil}
 	cert.Subject.CommonName = "Wibble"              // Doesn't match
 	cert.DNSNames = append(cert.DNSNames, "Wibble") // Nor this
 	cert.DNSNames = append(cert.DNSNames, SubjectName)
 
 	if !m.CertificateMatches(&cert) {
-		t.Fatal("MatchSubjectRegex failed to match on SubjectAlternativeName")
+		t.Fatal("MatchSubjectRegex failed to match on Cert SubjectAlternativeName")
+	}
+}
+
+func TestScannerMatchSubjectRegexMatchesPrecertificateCommonName(t *testing.T) {
+	const SubjectName = "www.example.com"
+	const SubjectRegEx = ".*example.com"
+	var precert client.Precertificate
+	precert.TBSCertificate.Subject.CommonName = SubjectName
+
+	m := MatchSubjectRegex{nil, regexp.MustCompile(SubjectRegEx)}
+	if !m.PrecertificateMatches(&precert) {
+		t.Fatal("MatchSubjectRegex failed to match on Precert Subject CommonName")
+	}
+}
+
+func TestScannerMatchSubjectRegexIgnoresDifferentPrecertificateCommonName(t *testing.T) {
+	const SubjectName = "www.google.com"
+	const SubjectRegEx = ".*example.com"
+	var precert client.Precertificate
+	precert.TBSCertificate.Subject.CommonName = SubjectName
+
+	m := MatchSubjectRegex{nil, regexp.MustCompile(SubjectRegEx)}
+	if m.PrecertificateMatches(&precert) {
+		t.Fatal("MatchSubjectRegex incorrectly matched on Precert Subject CommonName")
+	}
+}
+
+func TestScannerMatchSubjectRegexIgnoresDifferentPrecertificateSAN(t *testing.T) {
+	const SubjectName = "www.google.com"
+	const SubjectRegEx = ".*example.com"
+	var precert client.Precertificate
+	precert.TBSCertificate.Subject.CommonName = SubjectName
+
+	m := MatchSubjectRegex{nil, regexp.MustCompile(SubjectRegEx)}
+	precert.TBSCertificate.Subject.CommonName = "Wibble"                                // Doesn't match
+	precert.TBSCertificate.DNSNames = append(precert.TBSCertificate.DNSNames, "Wibble") // Nor this
+	precert.TBSCertificate.DNSNames = append(precert.TBSCertificate.DNSNames, SubjectName)
+
+	if m.PrecertificateMatches(&precert) {
+		t.Fatal("MatchSubjectRegex incorrectly matched on Precert SubjectAlternativeName")
+	}
+}
+
+func TestScannerMatchSubjectRegexMatchesPrecertificateSAN(t *testing.T) {
+	const SubjectName = "www.example.com"
+	const SubjectRegEx = ".*example.com"
+	var precert client.Precertificate
+	precert.TBSCertificate.Subject.CommonName = SubjectName
+
+	m := MatchSubjectRegex{nil, regexp.MustCompile(SubjectRegEx)}
+	precert.TBSCertificate.Subject.CommonName = "Wibble"                                // Doesn't match
+	precert.TBSCertificate.DNSNames = append(precert.TBSCertificate.DNSNames, "Wibble") // Nor this
+	precert.TBSCertificate.DNSNames = append(precert.TBSCertificate.DNSNames, SubjectName)
+
+	if !m.PrecertificateMatches(&precert) {
+		t.Fatal("MatchSubjectRegex failed to match on Precert SubjectAlternativeName")
 	}
 }
 
@@ -113,15 +169,15 @@ func TestScannerEndToEnd(t *testing.T) {
 	}))
 	defer ts.Close()
 
-	client := client.New(ts.URL)
+	logClient := client.New(ts.URL)
 	opts := ScannerOptions{
-		Matcher:       &MatchSubjectRegex{regexp.MustCompile(".*\\.google\\.com")},
+		Matcher:       &MatchSubjectRegex{regexp.MustCompile(".*\\.google\\.com"), nil},
 		BlockSize:     10,
 		NumWorkers:    1,
 		ParallelFetch: 1,
 		StartIndex:    0,
 	}
-	scanner := NewScanner(client, opts)
+	scanner := NewScanner(logClient, opts)
 
 	var matchedCerts list.List
 	var matchedPrecerts list.List
@@ -130,7 +186,7 @@ func TestScannerEndToEnd(t *testing.T) {
 		// Annoyingly we can't t.Fatal() in here, as this is run in another go
 		// routine
 		matchedCerts.PushBack(*c)
-	}, func(index int64, p string) {
+	}, func(index int64, p *client.Precertificate) {
 		matchedPrecerts.PushBack(p)
 	})
 
@@ -151,5 +207,33 @@ func TestScannerEndToEnd(t *testing.T) {
 		}
 	default:
 		t.Fatal("Found unexpected number of certs")
+	}
+}
+
+func TestDefaultScannerOptions(t *testing.T) {
+	opts := DefaultScannerOptions()
+	switch opts.Matcher.(type) {
+	case *MatchAll:
+		// great
+	default:
+		t.Fatalf("Default Matcher is a %T, expected MatchAll.", opts.Matcher)
+	}
+	if opts.PrecertOnly {
+		t.Fatal("Expected PrecertOnly to be false.")
+	}
+	if opts.BlockSize < 1 {
+		t.Fatal("Insane BlockSize %d", opts.BlockSize)
+	}
+	if opts.NumWorkers < 1 {
+		t.Fatal("Insane NumWorkers %d", opts.NumWorkers)
+	}
+	if opts.ParallelFetch < 1 {
+		t.Fatal("Insane ParallelFetch %d", opts.ParallelFetch)
+	}
+	if opts.StartIndex != 0 {
+		t.Fatal("Expected StartIndex to be 0, but was %d", opts.StartIndex)
+	}
+	if opts.Quiet {
+		t.Fatal("Expected Quiet to be false.")
 	}
 }

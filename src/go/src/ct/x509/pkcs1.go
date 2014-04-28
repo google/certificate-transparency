@@ -6,7 +6,9 @@ package x509
 
 import (
 	"crypto/rsa"
-	"encoding/asn1"
+	// START CT CHANGES
+	"ct/asn1"
+	// END CT CHANGES
 	"errors"
 	"math/big"
 )
