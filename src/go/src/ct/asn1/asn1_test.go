@@ -556,7 +556,7 @@ func TestISO8859_1ToUTF8(t *testing.T) {
 		t.Fatal("Sanity failure: that shouldn't have matched")
 	}
 	if iso8859_1ToUTF8(b) != "café" {
-		t.Fatal("Failed to convert properly, got %v", iso8859_1ToUTF8(b))
+		t.Fatalf("Failed to convert properly, got %v", iso8859_1ToUTF8(b))
 	}
 }
 

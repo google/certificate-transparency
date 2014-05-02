@@ -740,7 +740,7 @@ func TestNonFatalErrors(t *testing.T) {
 	}
 
 	if !strings.Contains(nfe.Error(), "one; two; three") {
-		t.Fatal("Didn't see expected string from Error(), got '%s'", nfe.Error())
+		t.Fatalf("Didn't see expected string from Error(), got '%s'", nfe.Error())
 	}
 }
 

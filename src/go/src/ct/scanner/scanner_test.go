@@ -222,16 +222,16 @@ func TestDefaultScannerOptions(t *testing.T) {
 		t.Fatal("Expected PrecertOnly to be false.")
 	}
 	if opts.BlockSize < 1 {
-		t.Fatal("Insane BlockSize %d", opts.BlockSize)
+		t.Fatalf("Insane BlockSize %d", opts.BlockSize)
 	}
 	if opts.NumWorkers < 1 {
-		t.Fatal("Insane NumWorkers %d", opts.NumWorkers)
+		t.Fatalf("Insane NumWorkers %d", opts.NumWorkers)
 	}
 	if opts.ParallelFetch < 1 {
-		t.Fatal("Insane ParallelFetch %d", opts.ParallelFetch)
+		t.Fatalf("Insane ParallelFetch %d", opts.ParallelFetch)
 	}
 	if opts.StartIndex != 0 {
-		t.Fatal("Expected StartIndex to be 0, but was %d", opts.StartIndex)
+		t.Fatalf("Expected StartIndex to be 0, but was %d", opts.StartIndex)
 	}
 	if opts.Quiet {
 		t.Fatal("Expected Quiet to be false.")
