@@ -1104,15 +1104,15 @@ but it is expected there will be a variety.
       </section>
       <section title="TLS Client">
         <t>
-          TLS clients are not directly clients of the log, but they receive
-SCTs alongside or in server certificates. In addition to normal validation of
-the certificate and its chain, TLS clients SHOULD validate the SCT by computing
-the signature input from the SCT data as well as the certificate and verifying
-the signature, using the corresponding log's public key.
+          TLS clients receive SCTs alongside or in server certificates. In
+addition to normal validation of the certificate and its chain, TLS clients
+SHOULD validate the SCT by computing the signature input from the SCT data as
+well as the certificate and verifying the signature, using the corresponding
+log's public key.
           TLS clients MAY audit the corresponding log by requesting, and
-          verifying, a Merkle audit proof for said certificate.
+verifying, a Merkle audit proof for said certificate.
           Note that this document does not describe how clients obtain the
-          logs' public keys or URLs.
+logs' public keys or URLs.
         </t>
         <t>
           TLS clients MUST reject SCTs whose timestamp is in the future.
