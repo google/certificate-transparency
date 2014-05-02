@@ -179,7 +179,7 @@ func (s *Scanner) handleParseEntryError(err error, entryType client.LogEntryType
 
 // Processes the given |leafInput| found at |index| in the specified log.
 func (s *Scanner) processEntry(index int64, leafInput client.LeafInput, foundCert func(int64, *x509.Certificate), foundPrecert func(int64, *client.Precertificate)) {
-	leaf, err := client.NewMerkleTreeLeaf(bytes.NewBuffer(leafInput))
+	leaf, err := client.ReadMerkleTreeLeaf(bytes.NewBuffer(leafInput))
 	if err != nil {
 		s.Log(fmt.Sprintf("Failed to parse MerkleTreeLeaf at index %d : %s", index, err.Error()))
 		return

@@ -5,13 +5,10 @@ package client
 
 import (
 	"crypto/sha256"
-	"ct/x509"
 	"encoding/base64"
-	"encoding/binary"
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io"
 	"io/ioutil"
 	"net/http"
 	"time"
@@ -23,13 +20,6 @@ import (
 const (
 	GetSTHPath     = "/ct/v1/get-sth"
 	GetEntriesPath = "/ct/v1/get-entries"
-)
-
-// Variable size structure prefix-header byte lengths
-const (
-	CertificateLengthBytes    = 3
-	PreCertificateLengthBytes = 3
-	ExtensionsLengthBytes     = 2
 )
 
 const (
@@ -97,212 +87,6 @@ type getEntryAndProofResponse struct {
 	LeafInput string   `json:"leaf_input"` // the entry itself
 	ExtraData string   `json:"extra_data"` // any chain provided when the entry was added to the log
 	AuditPath []string `json:"audit_path"` // the corresponding proof
-}
-
-///////////////////////////////////////////////////////////////////////////////////
-// The following structures represent those outlined in the RFC6962 document:
-///////////////////////////////////////////////////////////////////////////////////
-
-// LogEntryType represents the LogEntryType enum from section 3.1 of the RFC:
-//   enum { x509_entry(0), precert_entry(1), (65535) } LogEntryType;
-type LogEntryType uint16
-
-func (e LogEntryType) String() string {
-	switch e {
-	case X509LogEntryType:
-		return "X509LogEntryType"
-	case PrecertLogEntryType:
-		return "PrecertLogEntryType"
-	}
-	panic(fmt.Sprintf("No string defined for LogEntryType constant value %d", e))
-}
-
-const (
-	X509LogEntryType    LogEntryType = 0
-	PrecertLogEntryType              = 1
-)
-
-// MerkleLeafType represents the MerkleLeafType enum from section 3.4 of the RFC:
-// enum { timestamped_entry(0), (255) } MerkleLeafType;
-type MerkleLeafType uint8
-
-const (
-	TimestampedEntryLeafType MerkleLeafType = 0 // Entry type for an SCT
-)
-
-// Version represents the Version enum from section 3.2 of the RFC:
-// enum { v1(0), (255) } Version;
-type Version uint8
-
-const (
-	V1 Version = 0
-)
-
-// ASN1Cert type for holding the raw DER bytes of an ASN.1 Certificate (section 3.1)
-type ASN1Cert []byte
-
-// PreCert represents a Precertificate (section 3.2)
-type PreCert struct {
-	IssuerKeyHash  [IssuerKeyHashLength]byte
-	TBSCertificate []byte
-}
-
-// CTExtensions is a representation of the raw bytes of any CtExtension structure (see section 3.2)
-type CTExtensions []byte
-
-// MerkleTreeNode represents an internal node in the CT tree
-type MerkleTreeNode []byte
-
-// ConsistencyProof represents a CT consistency proof (see sections 2.1.2 and 4.4)
-type ConsistencyProof []MerkleTreeNode
-
-// AuditPath represents a CT inclusion proof (see sections 2.1.1 and 4.5)
-type AuditPath []MerkleTreeNode
-
-// LeafInput represents a serialized MerkleTreeLeaf structure
-type LeafInput []byte
-
-// SignedTreeHead represents the structure returned by the get-sth CT method after
-// base64 decoding. See sections 3.5 and 4.3 in the RFC)
-type SignedTreeHead struct {
-	TreeSize          uint64 // The number of entries in the new tree
-	Timestamp         uint64 // The time at which the STH was created
-	SHA256RootHash    []byte // The root hash of the log's Merkle tree
-	TreeHeadSignature []byte // The Log's signature for this STH (see RFC section 3.5)
-}
-
-// SignedCertificateTimestamp represents the structure returned by the add-chain and add-pre-chain methods
-// after base64 decoding.  (see RFC sections 3.2 ,4.1 and 4.2)
-type SignedCertificateTimestamp struct {
-	SCTVersion Version // The version of the protocol to which the SCT conforms
-	LogID      []byte  // the SHA-256 hash of the log's public key, calculated over
-	// the DER encoding of the key represented as SubjectPublicKeyInfo.
-	Timestamp  uint64       // Timestamp (in ms since unix epoc) at which the SCT was issued
-	Extentions CTExtensions // For future extensions to the protocol
-	Signature  []byte       // The Log's signature for this SCT
-}
-
-// TimestampedEntry is part of the MerkleTreeLeaf structure.
-// See RFC section 3.4
-type TimestampedEntry struct {
-	Timestamp    uint64
-	EntryType    LogEntryType
-	X509Entry    ASN1Cert
-	PrecertEntry PreCert
-	Extensions   CTExtensions
-}
-
-// MerkleTreeLeaf represents the deserialized sructure of the hash input for the leaves of a
-// log's Merkle tree. See RFC section 3.4
-type MerkleTreeLeaf struct {
-	Version          Version          // the version of the protocol to which the MerkleTreeLeaf corresponds
-	LeafType         MerkleLeafType   // The type of the leaf input, currently only TimestampedEntry can exist
-	TimestampedEntry TimestampedEntry // The entry data itself
-}
-
-// Precertificate represents the parsed CT Precertificate structure.
-type Precertificate struct {
-	// Raw DER bytes of the precert
-	Raw []byte
-	// SHA256 hash of the issuing key
-	IssuerKeyHash [32]byte
-	// Parsed TBSCertificate structure (held in an x509.Certificate for ease of
-	// access.
-	TBSCertificate x509.Certificate
-}
-
-// Reads a variable length array of bytes from |r|. |numLenBytes| specifies the
-// number of (BigEndian) prefix-bytes which contain the length of the actual
-// array data bytes that follow.
-// Allocates an array to hold the contents and returns a slice view into it if
-// the read was successful, or an error otherwise.
-func readVarBytes(r io.Reader, numLenBytes int) ([]byte, error) {
-	var l uint64
-	switch {
-	case numLenBytes > 8:
-		return nil, fmt.Errorf("numLenBytes too large (%d)", numLenBytes)
-	case numLenBytes == 0:
-		return nil, errors.New("numLenBytes should be > 0")
-	}
-	// Read the length header bytes
-	for i := 0; i < numLenBytes; i++ {
-		l <<= 8
-		var t uint8
-		if err := binary.Read(r, binary.BigEndian, &t); err != nil {
-			return nil, err
-		}
-		l |= uint64(t)
-	}
-	data := make([]byte, l)
-	n, err := r.Read(data)
-	if err != nil {
-		return nil, err
-	}
-	if n != int(l) {
-		return nil, fmt.Errorf("short read: expected %d but got %d", l, n)
-	}
-	return data, nil
-}
-
-// Parses the byte-stream representation of a TimestampedEntry and populates
-// the struct |t| with the data.
-// See RFC section 3.4 for details on the format.
-// Returns a non-nil error if there was a problem.
-func (t *TimestampedEntry) parse(r io.Reader) error {
-	var err error
-	if err = binary.Read(r, binary.BigEndian, &t.Timestamp); err != nil {
-		return err
-	}
-	if err = binary.Read(r, binary.BigEndian, &t.EntryType); err != nil {
-		return err
-	}
-	switch t.EntryType {
-	case X509LogEntryType:
-		if t.X509Entry, err = readVarBytes(r, CertificateLengthBytes); err != nil {
-			return err
-		}
-	case PrecertLogEntryType:
-		if err := binary.Read(r, binary.BigEndian, &t.PrecertEntry.IssuerKeyHash); err != nil {
-			return err
-		}
-		if t.PrecertEntry.TBSCertificate, err = readVarBytes(r, PreCertificateLengthBytes); err != nil {
-			return err
-		}
-	default:
-		return fmt.Errorf("unknown EntryType: %d", t.EntryType)
-	}
-	t.Extensions, err = readVarBytes(r, ExtensionsLengthBytes)
-	return err
-}
-
-// Parses the byte-stream representation of a MerkleTreeLeaf and populated the
-// struct |m| with the data.
-// See RFC section 3.4 for details on the format.
-// Returns a pointer to a new MerkleTreeLeaf or non-nil error if there was a problem
-func NewMerkleTreeLeaf(r io.Reader) (*MerkleTreeLeaf, error) {
-	var m MerkleTreeLeaf
-	if err := binary.Read(r, binary.BigEndian, &m.Version); err != nil {
-		return nil, err
-	}
-	if m.Version != V1 {
-		return nil, fmt.Errorf("unknown Version %d", m.Version)
-	}
-	if err := binary.Read(r, binary.BigEndian, &m.LeafType); err != nil {
-		return nil, err
-	}
-	if m.LeafType != TimestampedEntryLeafType {
-		return nil, fmt.Errorf("unknown LeafType %d", m.LeafType)
-	}
-	if err := m.TimestampedEntry.parse(r); err != nil {
-		return nil, err
-	}
-	return &m, nil
-}
-
-// Returns the X.509 Certificate contained within the MerkleTreeLeaf.
-// Returns a pointer to an x509.Certificate or a non-nil error.
-func (m *MerkleTreeLeaf) X509Certificate() (*x509.Certificate, error) {
-	return x509.ParseCertificate(m.TimestampedEntry.X509Entry)
 }
 
 // Constructs a new LogClient instance.
