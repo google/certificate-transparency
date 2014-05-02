@@ -896,10 +896,10 @@ messages.
           <list>
 	    <t><list style="hanging">
 	      <t hangText="first:">
-		The tree_size of the first tree, in decimal.
+		The tree_size of the older tree, in decimal.
 	      </t>
 	      <t hangText="second:">
-		The tree_size of the second tree, in decimal.
+		The tree_size of the newer tree, in decimal.
 	      </t>
             </list></t>
           </list>
