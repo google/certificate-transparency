@@ -14,5 +14,9 @@ To compile the log scanner run:
 
   go build ct/scanner/main/scanner.go
 
+To compile the LCD log display driver run:
+
+  go build ct/schwag/main/display.go
+
 When sending pull requests, please ensure that everything's been run through
 gofmt beforehand so we can keep everything nice and tidy.
