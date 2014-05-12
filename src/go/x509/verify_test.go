@@ -6,7 +6,7 @@ package x509
 
 import (
 	// START CT CHANGES
-	"ct/x509/pkix"
+	"code.google.com/p/certificate-transparency/src/go/x509/pkix"
 	// END CT CHANGES
 	"encoding/pem"
 	"errors"

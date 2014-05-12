@@ -3,14 +3,15 @@ package scanner
 import (
 	"bytes"
 	"container/list"
-	"ct/client"
-	"ct/x509"
 	"fmt"
 	"log"
 	"regexp"
 	"sync"
 	"sync/atomic"
 	"time"
+
+	"code.google.com/p/certificate-transparency/src/go/client"
+	"code.google.com/p/certificate-transparency/src/go/x509"
 )
 
 // Clients wishing to implement their own Matchers should implement this interface:

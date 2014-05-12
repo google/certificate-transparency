@@ -7,13 +7,13 @@
 package schwag
 
 import (
-	"ct/client"
 	"flag"
 	"fmt"
 	"io"
 	"log"
 	"time"
 
+	"code.google.com/p/certificate-transparency/src/go/client"
 	"github.com/tarm/goserial"
 )
 
@@ -112,8 +112,8 @@ func (l *LCDDisplay) displayUpdater(newSTHs <-chan *client.SignedTreeHead) {
 		select {
 		case l.sth = <-newSTHs:
 			if l.numCerts == 0 {
-				// This is the first STH we see, so don't try 
-				// to count to the number of certs all the way 
+				// This is the first STH we see, so don't try
+				// to count to the number of certs all the way
 				// up from zero
 				l.numCerts = l.sth.TreeSize
 			}

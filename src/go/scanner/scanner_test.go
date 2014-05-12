@@ -2,13 +2,14 @@ package scanner
 
 import (
 	"container/list"
-	"ct/client"
-	"ct/x509"
 	"log"
 	"net/http"
 	"net/http/httptest"
 	"regexp"
 	"testing"
+
+	"code.google.com/p/certificate-transparency/src/go/client"
+	"code.google.com/p/certificate-transparency/src/go/x509"
 )
 
 func CertMatchesRegex(r *regexp.Regexp, cert *x509.Certificate) bool {

@@ -3,20 +3,30 @@ with a Log Scanner tool.
 
 You'll need go v1.1 or higher to compile.
 
-Set GOPATH to the directory you found this README me (or run ". ENV"
-if you're using a sh compatible shell), and then run:
 
-  go get ct/*
+Installation:
 
-to fetch all the dependencies.
+This go code must be imported into your go workspace before you can use it, you
+can do that with:
+
+  go get code.google.com/p/certificate-transparency/src/go/client
+  go get code.google.com/p/certificate-transparency/src/go/scanner
+  go get code.google.com/p/certificate-transparency/src/go/schwag
+  etc.
+
+
+Building the binaries:
 
 To compile the log scanner run:
 
-  go build ct/scanner/main/scanner.go
+  go build code.google.com/p/certificate-transparency/src/go/scanner/main/scanner.go
 
 To compile the LCD log display driver run:
 
-  go build ct/schwag/main/display.go
+  go build code.google.com/p/certificate-transparency/src/go/schwag/main/display.go
+
+
+Contributing:
 
 When sending pull requests, please ensure that everything's been run through
 gofmt beforehand so we can keep everything nice and tidy.

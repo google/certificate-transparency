@@ -1,8 +1,9 @@
 package client
 
 import (
-	"ct/x509"
 	"fmt"
+
+	"code.google.com/p/certificate-transparency/src/go/x509"
 )
 
 ///////////////////////////////////////////////////////////////////////////////////

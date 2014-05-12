@@ -8,7 +8,7 @@ import (
 	"crypto/ecdsa"
 	"crypto/elliptic"
 	// START CT CHANGES
-	"ct/asn1"
+	"code.google.com/p/certificate-transparency/src/go/asn1"
 	// START CT CHANGES
 	"errors"
 	"fmt"
