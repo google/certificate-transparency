@@ -4,14 +4,11 @@ CXXFLAG = -Wall -Werror -g -O3
 # needed. It is not _technically_ their bug, it is _actually_ their
 # bug. Commented out for now (as I can't build with it set).
 
-# sometimes needed for certain libcurlpp-dev installs; technically their bug.
-#CXXFLAG += -DHAVE_CONFIG_H
-
 INCLUDE = -I.
 LOCAL_LIBS = log/libcert.a log/libdatabase.a log/liblog.a \
              merkletree/libmerkletree.a proto/libproto.a util/libutil.a
 SYS_LIBS = -lpthread -lgflags -lglog -lssl -lcrypto \
-           -lsqlite3 -lprotobuf -lcurlpp -lcurl -lcppnetlib-uri
+           -lsqlite3 -lprotobuf -lcurl -lcppnetlib-uri
 
 PLATFORM = $(shell uname -s)
 ifneq ($(PLATFORM), FreeBSD)

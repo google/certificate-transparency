@@ -55,14 +55,12 @@ errors later on.
 
 5. And you will need a copy of sqlite3 installed on your system.
 
-5a. And the curlpp library (http://code.google.com/p/curlpp/). Before
-building and installing, you should apply the patch mentioned here:
-https://code.google.com/p/curlpp/issues/detail?id=25
-curlpp's dependencies are libcurl and boost. On Debian, these packages
-should be installed:
-  libcurl4-openssl-dev libboost-dev
+5a. And the cURL library (http://curl.haxx.se/). There are Debian
+packages for this library (libcurl4-openssl-dev), but you might need
+to build from source, in order to link correctly with a locally built
+OpenSSL.
 
-(Tested with curlpp-0.7.3)
+(Tested with curl-7.36.0)
 
 5b. And the JSON-C library, v0.11.
 (https://github.com/json-c/json-c/wiki - tarball is

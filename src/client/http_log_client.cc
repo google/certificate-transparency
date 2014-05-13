@@ -6,9 +6,7 @@
 #include "util/json_wrapper.h"
 #include "util/util.h"
 
-#include <curlpp/cURLpp.hpp>
-#include <curlpp/Easy.hpp>
-#include <curlpp/Options.hpp>
+#include <curl/curl.h>
 #include <glog/logging.h>
 #include <sstream>
 
@@ -18,23 +16,91 @@ using std::ostringstream;
 using ct::Cert;
 using ct::CertChain;
 
+namespace {
+
+
+class CurlRequest {
+ public:
+  CurlRequest()
+      : handle_(CHECK_NOTNULL(curl_easy_init())) {
+  }
+  ~CurlRequest() {
+    curl_easy_cleanup(handle_);
+  }
+
+  void SetUrl(const std::string& url) {
+    CHECK_EQ(curl_easy_setopt(handle_, CURLOPT_URL, url.c_str()), CURLE_OK);
+  }
+
+  void SetPostFields(const std::string& post_fields) {
+    const long postsize(post_fields.size());
+    CHECK_EQ(curl_easy_setopt(
+        handle_, CURLOPT_POSTFIELDSIZE, postsize), CURLE_OK);
+    CHECK_EQ(curl_easy_setopt(
+        handle_, CURLOPT_COPYPOSTFIELDS, post_fields.data()), CURLE_OK);
+  }
+
+  std::string UrlEscape(const std::string& url) {
+    char* escaped(CHECK_NOTNULL(curl_easy_escape(
+        handle_, url.c_str(), url.size())));
+
+    const std::string retval(escaped);
+    curl_free(escaped);
+
+    return retval;
+  }
+
+  CURLcode Perform(std::ostream* output) {
+    curl_easy_setopt(handle_, CURLOPT_WRITEFUNCTION,
+                     &CurlRequest::write_callback);
+    curl_easy_setopt(handle_, CURLOPT_WRITEDATA, output);
+
+    return curl_easy_perform(handle_);
+  }
+
+ private:
+  CURL* const handle_;
+
+  // Private declarations without definitions, to disallow copying.
+  CurlRequest(const CurlRequest&);
+  CurlRequest& operator=(const CurlRequest&);
+
+  static size_t write_callback(char* buffer, size_t size, size_t nmemb,
+                                    std::ostream* stream) {
+    const size_t sumsize(size * nmemb);
+
+    stream->write(buffer, sumsize);
+    if (!*stream)
+      return 0;
+
+    return sumsize;
+  }
+};
+
+
+}  // namespace
+
 void HTTPLogClient::BaseUrl(ostringstream *url) const {
   *url << "http://" << server_ << "/ct/v1/";
 }
 
 static HTTPLogClient::Status SendRequest(ostringstream *response,
-                                         curlpp::Easy *request,
+                                         CurlRequest *request,
                                          const ostringstream &url) {
-  request->setOpt(new curlpp::options::Url(url.str()));
-  try {
-    *response << *request;
-  } catch(curlpp::LibcurlRuntimeError &e) {
-    if (e.what() == string("couldn't connect to host"))
+  request->SetUrl(url.str());
+
+  const CURLcode code(request->Perform(response));
+  switch (code) {
+    case CURLE_OK:
+      return HTTPLogClient::OK;
+
+    case CURLE_COULDNT_CONNECT:
       return HTTPLogClient::CONNECT_FAILED;
-    LOG(ERROR) << "Caught curlpp::LibcurlRuntimeError: " << e.what();
-    return HTTPLogClient::UNKNOWN_ERROR;
+
+    default:
+      LOG(ERROR) << "curl error: " << curl_easy_strerror(code);
+      return HTTPLogClient::UNKNOWN_ERROR;
   }
-  return HTTPLogClient::OK;
 }
 
 HTTPLogClient::Status
@@ -64,8 +130,8 @@ HTTPLogClient::UploadSubmission(const std::string &submission, bool pre,
     url << "pre-";
   url << "chain";
 
-  curlpp::Easy request;
-  request.setOpt(new curlpp::options::PostFields(jsoned));
+  CurlRequest request;
+  request.SetPostFields(jsoned);
 
   std::ostringstream response;
   Status ret = SendRequest(&response, &request, url);
@@ -116,7 +182,7 @@ HTTPLogClient::Status HTTPLogClient::GetSTH(ct::SignedTreeHead *sth) const {
   BaseUrl(&url);
   url << "get-sth";
 
-  curlpp::Easy request;
+  CurlRequest request;
 
   std::ostringstream response;
   Status ret = SendRequest(&response, &request, url);
@@ -162,7 +228,7 @@ HTTPLogClient::QueryAuditProof(const string &merkle_leaf_hash,
   BaseUrl(&url);
   url << "get-sth";
 
-  curlpp::Easy request;
+  CurlRequest request;
 
   std::ostringstream response;
   Status ret = SendRequest(&response, &request, url);
@@ -191,11 +257,11 @@ HTTPLogClient::QueryAuditProof(const string &merkle_leaf_hash,
     return BAD_RESPONSE;
 
   ostringstream url2;
+  CurlRequest request2;
   BaseUrl(&url2);
   url2 << "get-proof-by-hash?hash="
-       << curlpp::escape(util::ToBase64(merkle_leaf_hash))
+       << request2.UrlEscape(util::ToBase64(merkle_leaf_hash))
        << "&tree_size=" << tree_size.Value();
-  curlpp::Easy request2;
   std::ostringstream response2;
   ret = SendRequest(&response2, &request2, url2);
   LOG(INFO) << "request = " << url2.str();
@@ -234,7 +300,7 @@ HTTPLogClient::Status HTTPLogClient::GetEntries(int first, int last,
   BaseUrl(&url);
   url << "get-entries?start=" << first << "&end=" << last;
 
-  curlpp::Easy request;
+  CurlRequest request;
 
   std::ostringstream response;
   Status ret = SendRequest(&response, &request, url);
@@ -294,7 +360,7 @@ HTTPLogClient::GetSTHConsistency(uint64_t size1, uint64_t size2,
   BaseUrl(&url);
   url << "get-sth-consistency?first=" << size1 << "&second=" << size2;
 
-  curlpp::Easy request;
+  CurlRequest request;
 
   std::ostringstream response;
   Status ret = SendRequest(&response, &request, url);
