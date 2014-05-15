@@ -70,8 +70,9 @@ template <class Logged> class LogLookup {
     return latest_tree_head_;
   }
 
- private:
   std::string LeafHash(const Logged &logged) const;
+
+ private:
   // We keep a hash -> index mapping in memory so that we can quickly serve
   // Merkle proofs without having to query the database at all.
   // Note that 32 bytes is an overkill and we can optimize this to use
