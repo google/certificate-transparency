@@ -440,13 +440,13 @@ class MerkleVerifier(object):
         return calculated_hash
 
     @error.returns_true_or_raises
-    def verify_leaf_inclusion(self, leaf, leaf_index, proof, sth):
+    def verify_leaf_hash_inclusion(self, leaf_hash, leaf_index, proof, sth):
         """Verify a Merkle Audit Path.
 
         See section 2.1.1 of RFC6962 for the exact path description.
 
         Args:
-            leaf: The leaf for which the proof was provided.
+            leaf_hash: The hash of the leaf for which the proof was provided.
             leaf_index: Index of the leaf in the tree.
             proof: A list of SHA-256 hashes representing the  Merkle audit path.
             sth: STH with the same tree size as the one used to fetch the proof.
@@ -471,7 +471,6 @@ class MerkleVerifier(object):
             raise ValueError("Negative tree size or leaf index: "
                                    "Tree size: %d Leaf index: %d" %
                                    (tree_size, leaf_index))
-        leaf_hash = self.hasher.hash_leaf(leaf)
         calculated_root_hash = self._calculate_root_hash_from_audit_path(
                 leaf_hash, leaf_index, proof[:], tree_size)
         if calculated_root_hash == sth.sha256_root_hash:
@@ -481,3 +480,28 @@ class MerkleVerifier(object):
                                "root hash. Constructed: %s Expected: %s" %
                                (calculated_root_hash.encode("base64").strip(),
                                 sth.sha256_root_hash.encode("base64").strip()))
+
+    @error.returns_true_or_raises
+    def verify_leaf_inclusion(self, leaf, leaf_index, proof, sth):
+        """Verify a Merkle Audit Path.
+
+        See section 2.1.1 of RFC6962 for the exact path description.
+
+        Args:
+            leaf: The leaf for which the proof was provided.
+            leaf_index: Index of the leaf in the tree.
+            proof: A list of SHA-256 hashes representing the  Merkle audit path.
+            sth: STH with the same tree size as the one used to fetch the proof.
+            The sha256_root_hash from this STH will be compared against the
+            root hash produced from the proof.
+
+        Returns:
+            True. The return value is enforced by a decorator and need not be
+                checked by the caller.
+
+        Raises:
+            ProofError: the proof is invalid.
+        """
+        leaf_hash = self.hasher.hash_leaf(leaf)
+        return self.verify_leaf_hash_inclusion(leaf_hash, leaf_index, proof,
+                                               sth)
