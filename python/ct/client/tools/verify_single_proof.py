@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 """This utility fetches the proof for a single certificate by its hash."""
 
+import math
 import struct
 import sys
 
