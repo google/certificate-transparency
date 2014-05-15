@@ -132,3 +132,7 @@ By default, unit tests log to stderr, and log only messages with a FATAL level
 You can override the defaults with command-line flags.
 
 End-to-end tests log everything at INFO level and above.
+
+----PYTHON NOTES---
+
+need dnspython (http://www.dnspython.org/). FreeBSD port is dns/py-dnspython.
