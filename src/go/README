@@ -11,7 +11,6 @@ can do that with:
 
   go get code.google.com/p/certificate-transparency/src/go/client
   go get code.google.com/p/certificate-transparency/src/go/scanner
-  go get code.google.com/p/certificate-transparency/src/go/schwag
   etc.
 
 
@@ -20,10 +19,6 @@ Building the binaries:
 To compile the log scanner run:
 
   go build code.google.com/p/certificate-transparency/src/go/scanner/main/scanner.go
-
-To compile the LCD log display driver run:
-
-  go build code.google.com/p/certificate-transparency/src/go/schwag/main/display.go
 
 
 Contributing:
