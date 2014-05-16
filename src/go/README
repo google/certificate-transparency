@@ -16,8 +16,16 @@ can do that with:
 
 Building the binaries:
 
-To compile the log scanner run:
+The go/merkletree package contains a cgo binding onto the C++ MerkleTree
+library, so if you're using this go package (either directly or indirectly!)
+you need to run the following command in the parent directory:
+  make golibs
 
+This will create any necessary .syso files and will place them directly into
+the relevant go package src directories so that they will be automatically
+picked up during cgo compilation.
+
+To compile the log scanner run:
   go build code.google.com/p/certificate-transparency/src/go/scanner/main/scanner.go
 
 
