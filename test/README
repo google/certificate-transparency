@@ -5,7 +5,7 @@ the log proof.
 
 To run sslconnect_test, you will need to do the following:
 
-1. Compile the log server and client, following the instructions in src/README.
+1. Compile the log server and client, following the instructions in README.
 
 2. To run a test SSL server, you will also need Apache. On Debian based
 systems, running

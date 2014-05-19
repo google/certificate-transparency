@@ -1,6 +1,6 @@
 --------------------------------------------------------------------------------
 Testdata in this directory
-See src/test/httpd-valid.conf for the configured final chains in Apache
+See test/httpd-valid.conf for the configured final chains in Apache
 --------------------------------------------------------------------------------
 
 --------------------------------------------------------------------------------

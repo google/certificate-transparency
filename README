@@ -121,7 +121,7 @@ storing temporary testdata is /tmp. You can change
 this by setting TMPDIR=<tmpdir> for make.
 
 End-to-end tests also create temporary certificate and server files in
-src/test/tmp
+test/tmp
 All these files are cleaned up after a successful test run.
 
 For logging options, see
