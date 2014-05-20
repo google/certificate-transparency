@@ -1,8 +1,15 @@
+import base64
 import dns.resolver
 import dns.rdatatype
+import math
 import random
 import shlex
 import subprocess
+import sys
+
+sys.path.append('../python')
+from ct.crypto import merkle
+from ct.proto import ct_pb2
 
 class CTDNSLookup:
     def __init__(self, nameservers, port):
@@ -23,11 +30,15 @@ class CTDNSLookup:
         return txt.strings[0]
 
     def GetSTH(self):
-        return self.GetOne('sth.example.com')
-
-    def GetTreeSize(self):
-        sth = self.GetSTH()
-        return int(str(sth).split('.')[0])
+        sth_str = self.GetOne('sth.example.com')
+        sth = ct_pb2.SignedTreeHead()
+        parts = str(sth_str).split('.')
+        sth.tree_size = int(parts[0])
+        sth.timestamp = int(parts[1])
+        sth.sha256_root_hash = base64.b64decode(parts[2])
+        #FIXME(benl): decompose signature into its parts
+        #sth.signature = base64.b64decode(parts[3])
+        return sth
 
     def GetEntry(self, level, index, size):
         return self.GetOne(str(level) + '.' + str(index) + '.' + str(size)
@@ -46,16 +57,22 @@ runner = DNSServerRunner()
 runner.Run(server_cmd)
 
 lookup = CTDNSLookup(['127.0.0.1'], 1111)
-print "sth =", lookup.GetSTH()
-size = lookup.GetTreeSize()
-print "size =", lookup.GetTreeSize()
+sth = lookup.GetSTH()
+print "sth =", sth
+print "size =", sth.tree_size
 
 # Verify a random entry
-index = random.randint(0, size - 1)
-running_hash = lookup.GetLeafHash(index)
-print "index =", index, " hash =", running_hash
-for level in range(0, 100):
-    print lookup.GetEntry(level, index, size)
+index = random.randint(0, sth.tree_size - 1)
+leaf_hash = lookup.GetLeafHash(index)
+print "index =", index, " hash =", leaf_hash
+audit_path = []
+for level in range(0, int(math.log(sth.tree_size, 2)) + 1):
+    hash = lookup.GetEntry(level, index, sth.tree_size)
+    print hash
+    audit_path.append(base64.b64decode(hash))
+
+verifier = merkle.MerkleVerifier()
+assert verifier.verify_leaf_inclusion(leaf_hash, index - 1, audit_path, sth)
 
 #resolver = dns.resolver.Resolver(configure=False)
 #resolver.nameservers = ['213.129.69.153']
