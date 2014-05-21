@@ -397,7 +397,8 @@ class MerkleVerifier(object):
                                              "does not match. Expected hash: "
                                              "%s, computed hash: %s" %
                                              (old_root.encode("base64").strip(),
-                                              old_hash.encode("base64").strip()))
+                                              old_hash.encode("base64").strip())
+                                             )
 
         except StopIteration:
             raise error.ProofError("Merkle proof is too short")
@@ -411,3 +412,74 @@ class MerkleVerifier(object):
         else:
             logging.warning("Proof has extra nodes")
         return True
+
+    def _calculate_root_hash_from_audit_path(self, leaf_hash, node_index,
+                                             audit_path, tree_size):
+        calculated_hash = leaf_hash
+        last_node = tree_size - 1
+        while last_node > 0:
+            if not audit_path:
+                raise error.ProofError('Proof too short: left with node index '
+                                       '%d' % node_index)
+            if node_index % 2:
+                audit_hash = audit_path.pop(0)
+                calculated_hash = self.hasher.hash_children(
+                    audit_hash, calculated_hash)
+            elif node_index < last_node:
+                audit_hash = audit_path.pop(0)
+                calculated_hash = self.hasher.hash_children(
+                    calculated_hash, audit_hash)
+            # node_index == last_node and node_index is even: A sibling does
+            # not exist. Go further up the tree until node_index is odd so
+            # calculated_hash will be used as the right-hand operand.
+            node_index //= 2
+            last_node //= 2
+        if audit_path:
+            raise error.ProofError('Proof too long: Left with %d hashes.' %
+                                   len(audit_path))
+        return calculated_hash
+
+    @error.returns_true_or_raises
+    def verify_leaf_inclusion(self, leaf, leaf_index, proof, sth):
+        """Verify a Merkle Audit Path.
+
+        See section 2.1.1 of RFC6962 for the exact path description.
+
+        Args:
+            leaf: The leaf for which the proof was provided.
+            leaf_index: Index of the leaf in the tree.
+            proof: A list of SHA-256 hashes representing the  Merkle audit path.
+            sth: STH with the same tree size as the one used to fetch the proof.
+            The sha256_root_hash from this STH will be compared against the
+            root hash produced from the proof.
+
+        Returns:
+            True. The return value is enforced by a decorator and need not be
+                checked by the caller.
+
+        Raises:
+            ProofError: the proof is invalid.
+        """
+        leaf_index = int(leaf_index)
+        tree_size = int(sth.tree_size)
+        #TODO(eranm): Verify signature over STH
+        if tree_size <= leaf_index:
+            raise ValueError("Provided STH is for a tree that is smaller "
+                             "than the leaf index. Tree size: %d Leaf "
+                             "index: %d" % (tree_size, leaf_index))
+        if tree_size < 0 or leaf_index < 0:
+            raise ValueError("Negative tree size or leaf index: "
+                                   "Tree size: %d Leaf index: %d" %
+                                   (tree_size, leaf_index))
+        leaf_hash = self.hasher.hash_leaf(leaf)
+        calculated_root_hash = self._calculate_root_hash_from_audit_path(
+                leaf_hash, leaf_index, proof[:], tree_size)
+        if calculated_root_hash == sth.sha256_root_hash:
+            return True
+
+        raise error.ProofError("Constructed root hash differs from provided "
+                               "root hash. Constructed: %s Expected: %s" %
+                               (calculated_root_hash.encode("base64").strip(),
+                                sth.sha256_root_hash.encode("base64").strip()))
+
+

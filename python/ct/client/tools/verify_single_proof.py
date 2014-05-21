@@ -17,10 +17,11 @@ FLAGS = gflags.FLAGS
 gflags.DEFINE_string("cert", None, "Certificate file (PEM format) to fetch a "
                      "proof for.")
 gflags.DEFINE_string("sct", None, "SCT file (ProtoBuf) of said certificate.")
-gflags.DEFINE_string("timestamp", None,
+gflags.DEFINE_integer("timestamp", None,
                      "Timestamp from SCT of said certificate.")
 gflags.DEFINE_string("log_url", "ct.googleapis.com/pilot",
                      "URL of CT log.")
+gflags.DEFINE_bool("verbose", False, "Verbose output or not.")
 
 
 def create_leaf(timestamp, x509_cert_bytes):
@@ -33,13 +34,30 @@ def create_leaf(timestamp, x509_cert_bytes):
     leaf.timestamped_entry.asn1_cert = x509_cert_bytes
     return tls_message.encode(leaf)
 
+def construct_leaf_from_file(cert_file, cert_sct_timestamp):
+    """Creates a MerkleTreeLeaf from a given PEM certificate file."""
+    cert_to_lookup = cert.Certificate.from_pem_file(cert_file)
+    return create_leaf(cert_sct_timestamp, cert_to_lookup.to_der())
+
+def read_sct_from_file(sct_file):
+    cert_sct = ct_pb2.SignedCertificateTimestamp()
+    cert_sct.ParseFromString(open(sct_file, 'rb').read())
+    return cert_sct
+
+def fetch_single_proof(leaf_hash, log_url):
+    """Fetch the proof for the supplied certificate."""
+    client = log_client.LogClient(log_url)
+    sth = client.get_sth()
+    if FLAGS.verbose:
+      print "The log contains %d certificates." % (sth.tree_size)
+      print "Tree root hash: %s" % (sth.sha256_root_hash.encode("hex"))
+
+    proof_from_hash = client.get_proof_by_hash(
+            leaf_hash, sth.tree_size)
+    return sth, proof_from_hash
+
 def run():
     """Fetch the proof for the supplied certificate."""
-    client = log_client.LogClient(FLAGS.log_url)
-    sth = client.get_sth()
-    print '%d certificates in the log' % (sth.tree_size)
-    cert_to_lookup = cert.Certificate.from_pem_file(FLAGS.cert)
-
     #TODO(eranm): Attempt fetching the SCT for this chain if none was given.
     if FLAGS.sct:
         cert_sct = ct_pb2.SignedCertificateTimestamp()
@@ -47,16 +65,23 @@ def run():
         sct_timestamp = cert_sct.timestamp
         print 'SCT for cert:', cert_sct
     else:
-        sct_timestamp = int(FLAGS.timestamp)
+        sct_timestamp = FLAGS.timestamp
 
-    constructed_leaf = create_leaf(sct_timestamp,
-                                   cert_to_lookup.to_der())
+    constructed_leaf = construct_leaf_from_file(FLAGS.cert, sct_timestamp)
     leaf_hash = merkle.TreeHasher().hash_leaf(constructed_leaf)
-    print 'Assembled leaf hash:', leaf_hash.encode('hex')
-    proof_from_hash = client.get_proof_by_hash(
-            leaf_hash, sth.tree_size)
-    #TODO(eranm): Verify the proof
-    print 'Proof:', proof_from_hash
+    if FLAGS.verbose:
+      print "Leaf hash: %s" % (leaf_hash.encode("hex"))
+
+    (sth, proof) = fetch_single_proof(leaf_hash, FLAGS.log_url);
+    if FLAGS.verbose:
+      print "Leaf index in tree is %d, proof has %d hashes" % (
+          proof.leaf_index, len(proof.audit_path))
+      print "Audit path: %s" % ([t.encode('hex') for t in proof.audit_path])
+
+    verifier = merkle.MerkleVerifier()
+    if verifier.verify_leaf_inclusion(constructed_leaf, proof.leaf_index,
+                                      proof.audit_path, sth):
+      print 'Proof verifies OK.'
 
 if __name__ == '__main__':
     sys.argv = FLAGS(sys.argv)
