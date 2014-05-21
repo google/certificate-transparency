@@ -17,7 +17,7 @@ fi
 # FIXME: should be able to specify "" for port (arg 5, currently == 1)
 make_cert $CERT_DIR test ca $SERVER 1 false $CT_KEY
 
-../client/ct extension_data --sct_token=$CERT_DIR/test-cert.proof \
+../cpp/client/ct extension_data --sct_token=$CERT_DIR/test-cert.proof \
     --tls_extension_data_out=/tmp/xx.pem
 
 $OPENSSLDIR/apps/openssl s_server -serverinfo /tmp/xx.pem -cert /tmp/ct-ca/test-cert.pem -key /tmp/ct-ca/test-key.pem

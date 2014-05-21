@@ -40,7 +40,7 @@ audit() {
   sct=$3
 
   set +e
-  ../client/ct audit --ct_server="$SERVER" --ct_server_port=$PORT \
+  ../cpp/client/ct audit --ct_server="$SERVER" --ct_server_port=$PORT \
     --ct_server_public_key=$CT_KEY \
     --ssl_client_ct_data_in=$sct --logtostderr=true $HTTP_LOG
   retcode=$?
@@ -74,7 +74,7 @@ do_audit() {
 get_sth() {
   local file=$1
 
-  ../client/ct sth --ct_server="$SERVER" --ct_server_port=$PORT \
+  ../cpp/client/ct sth --ct_server="$SERVER" --ct_server_port=$PORT \
     --ct_server_public_key=$CT_KEY --logtostderr=true $HTTP_LOG \
     --ct_server_response_out=$file
 }
@@ -83,7 +83,7 @@ consistency() {
   local file1=$1
   local file2=$2
 
-  ../client/ct consistency --ct_server="$SERVER" --ct_server_port=$PORT \
+  ../cpp/client/ct consistency --ct_server="$SERVER" --ct_server_port=$PORT \
     --ct_server_public_key=$CT_KEY --logtostderr=true $HTTP_LOG \
     --sth1=$file1 --sth2=$file2
 }
@@ -92,7 +92,7 @@ get_entries() {
   local first=$1
   local last=$2
 
-  ../client/ct get_entries --ct_server="$SERVER" --ct_server_port=$PORT \
+  ../cpp/client/ct get_entries --ct_server="$SERVER" --ct_server_port=$PORT \
     --ct_server_public_key=$CT_KEY --logtostderr=true $HTTP_LOG \
       --get_first=$first --get_last=$last --certificate_base=$CERT_DIR/cert.
 }

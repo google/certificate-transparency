@@ -8,7 +8,7 @@ HTTP_LOG=--http_log
 
 . generate_certs.sh
 
-../client/ct extension_data --sct_token=testdata/test-cert.proof \
+../cpp/client/ct extension_data --sct_token=testdata/test-cert.proof \
     --tls_extension_data_out=testdata/test-cert-proof-extension.pem
 
 ln -sf $HTTPD_DIR/modules/ssl/.libs/mod_ssl.so .

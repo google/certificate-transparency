@@ -21,7 +21,7 @@
 #include "util/testing.h"
 #include "util/util.h"
 
-DEFINE_string(test_certs_dir, "test/testdata", "Path to test certificates");
+DEFINE_string(test_certs_dir, "../test/testdata", "Path to test certificates");
 
 //  Valid certificates.
 // Self-signed

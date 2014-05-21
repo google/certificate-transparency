@@ -36,7 +36,7 @@ test_connect() {
 
   # Continue tests on error
   set +e
-  ../client/ct connect --ssl_server="127.0.0.1" --ssl_server_port=$port \
+  ../cpp/client/ct connect --ssl_server="127.0.0.1" --ssl_server_port=$port \
     --ct_server_public_key=$cert_dir/$log_server-key-public.pem \
     --ssl_client_trusted_cert_dir=$hash_dir --logtostderr=true \
     --ssl_client_require_sct=$strict \
@@ -60,7 +60,7 @@ audit() {
   port=$3
 
   set +e
-  ../client/ct audit --ct_server="127.0.0.1" --ct_server_port=8124 \
+  ../cpp/client/ct audit --ct_server="127.0.0.1" --ct_server_port=8124 \
     --ct_server_public_key=$cert_dir/$log_server-key-public.pem \
     --ssl_client_ct_data_in=$cert_dir/$port.sct --logtostderr=true
   local retcode=$?
@@ -147,7 +147,7 @@ test_ct_server() {
 
   # Set the tree signing frequency to 0 to ensure we sign as often as possible.
   echo "Starting CT server with trusted certs in $ca_file"
-  ../server/ct-server --port=8124 --key="$cert_dir/$log_server-key.pem" \
+  ../cpp/server/ct-server --port=8124 --key="$cert_dir/$log_server-key.pem" \
     --trusted_cert_file="$ca_file" --logtostderr=true \
     --tree_signing_frequency_seconds=1 $flags &
 

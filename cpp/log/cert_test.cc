@@ -14,7 +14,7 @@ namespace ct {
 
 using std::string;
 
-DEFINE_string(test_certs_dir, "../test/testdata", "Path to test certificates");
+DEFINE_string(test_certs_dir, "../../test/testdata", "Path to test certificates");
 
 // TODO(ekasper): add test certs with intermediates.
 // Valid certificates.

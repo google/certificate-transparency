@@ -15,7 +15,7 @@ namespace ct {
 
 using std::string;
 
-DEFINE_string(test_certs_dir, "../test/testdata", "Path to test certificates");
+DEFINE_string(test_certs_dir, "../../test/testdata", "Path to test certificates");
 
 static const char kSimpleCert[] = "test-cert.pem";
 static const char kSimpleCaCert[] = "ca-cert.pem";
