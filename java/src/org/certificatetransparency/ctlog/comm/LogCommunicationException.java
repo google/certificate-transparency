@@ -5,6 +5,7 @@ import org.certificatetransparency.ctlog.CertificateTransparencyException;
 /**
  * Indicates the log was unreadable  - HTTP communication with it was not possible or response could not be processed.
  */
+@SuppressWarnings("serial")
 public class LogCommunicationException extends CertificateTransparencyException {
   public LogCommunicationException(String message) {
     super(message);

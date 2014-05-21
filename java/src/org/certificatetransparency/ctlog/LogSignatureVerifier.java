@@ -85,6 +85,7 @@ public class LogSignatureVerifier {
   static IssuerInformation issuerInformationFromPreCertificateSigningCert(
       Certificate certificate, byte[] keyHash) {
     try {
+      @SuppressWarnings("resource")
       ASN1InputStream aIssuerIn = new ASN1InputStream(certificate.getEncoded());
       org.bouncycastle.asn1.x509.Certificate parsedIssuerCert =
           org.bouncycastle.asn1.x509.Certificate.getInstance(aIssuerIn.readObject());
@@ -213,6 +214,7 @@ public class LogSignatureVerifier {
       // parsing discards the order of the extensions. The signature from SCT we're verifying
       // is over the TBSCertificate in its original form, including the order of the extensions.
       // Get the list of extensions, in its original order, minus the poison extension.
+      @SuppressWarnings("resource")
       ASN1InputStream aIn = new ASN1InputStream(preCertificate.getEncoded());
       org.bouncycastle.asn1.x509.Certificate parsedPreCertificate =
           org.bouncycastle.asn1.x509.Certificate.getInstance(aIn.readObject());
@@ -264,6 +266,7 @@ public class LogSignatureVerifier {
   private List<Extension> getExtensionsWithoutPoison(
       Extensions extensions,
       Extension replacementX509authorityKeyIdentifier) {
+    @SuppressWarnings("rawtypes")
     Enumeration extensionsOids = extensions.oids();
     // Order is important, which is why a list is used.
     ArrayList<Extension> outputExtensions = new ArrayList<Extension>();
