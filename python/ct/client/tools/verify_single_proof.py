@@ -1,7 +1,6 @@
 #!/usr/bin/env python
 """This utility fetches the proof for a single certificate by its hash."""
 
-import math
 import struct
 import sys
 
@@ -10,17 +9,18 @@ from ct.client import tls_message
 from ct.crypto import cert
 from ct.crypto import merkle
 from ct.proto import client_pb2
-from ct.proto import ct_pb2
 import gflags
 
 FLAGS = gflags.FLAGS
 
 gflags.DEFINE_string("cert", None, "Certificate file (PEM format) to fetch a "
                      "proof for.")
-gflags.DEFINE_string("sct", None, "SCT file (ProtoBuf) of said certificate.")
+gflags.DEFINE_string("sct", None,
+                     "SCT file (ProtoBuf/binary) of said certificate.")
+gflags.DEFINE_bool("binary_sct", False, "SCT is in binary format")
 gflags.DEFINE_integer("timestamp", None,
                      "Timestamp from SCT of said certificate.")
-gflags.DEFINE_string("log_url", "ct.googleapis.com/pilot",
+gflags.DEFINE_string("log_url", "https://ct.googleapis.com/pilot",
                      "URL of CT log.")
 gflags.DEFINE_bool("verbose", False, "Verbose output or not.")
 
@@ -41,7 +41,7 @@ def construct_leaf_from_file(cert_file, cert_sct_timestamp):
     return create_leaf(cert_sct_timestamp, cert_to_lookup.to_der())
 
 def read_sct_from_file(sct_file):
-    cert_sct = ct_pb2.SignedCertificateTimestamp()
+    cert_sct = client_pb2.SignedCertificateTimestamp()
     cert_sct.ParseFromString(open(sct_file, 'rb').read())
     return cert_sct
 
@@ -61,8 +61,12 @@ def run():
     """Fetch the proof for the supplied certificate."""
     #TODO(eranm): Attempt fetching the SCT for this chain if none was given.
     if FLAGS.sct:
-        cert_sct = ct_pb2.SignedCertificateTimestamp()
-        cert_sct.ParseFromString(open(FLAGS.sct, 'rb').read())
+        cert_sct = client_pb2.SignedCertificateTimestamp()
+        sct_data = open(FLAGS.sct, 'rb').read()
+        if FLAGS.binary_sct:
+            tls_message.decode(sct_data, cert_sct)
+        else:
+            cert_sct.ParseFromString(sct_data)
         sct_timestamp = cert_sct.timestamp
         print 'SCT for cert:', cert_sct
     else:

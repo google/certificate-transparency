@@ -217,7 +217,7 @@ class LogClient(object):
         return self._uri
 
     def _req_body(self, path, params=None):
-        return self._req.get_response_body("https://" + self._uri + "/" + path,
+        return self._req.get_response_body(self._uri + "/" + path,
                                            params=params)
 
     def get_sth(self):
@@ -657,8 +657,7 @@ class AsyncLogClient(object):
             InvalidResponseError: server response is invalid for the given
                                   request.
         """
-        deferred_result = self._handler.get("https://" + self._uri + "/" +
-                                            _GET_STH_PATH)
+        deferred_result = self._handler.get(self._uri + "/" + _GET_STH_PATH)
         deferred_result.addCallback(_parse_sth)
         return deferred_result
 

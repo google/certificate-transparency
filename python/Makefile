@@ -5,7 +5,7 @@ ct/proto/%_pb2.py: ct/proto/%.proto
 	protoc $^ -I/usr/include/ -I/usr/local/include -I. --python_out=.
 
 ct/proto/ct_pb2.py: ../proto/ct.proto
-	protoc --python_out=ct/proto --proto_path=../proto ../proto/ct.proto
+	protoc --python_out=ct/proto -I../proto -I.. ../proto/ct.proto
 
 test: all
 	PYTHONPATH=$(PYTHONPATH):. ./ct/client/sqlite_log_db_test.py

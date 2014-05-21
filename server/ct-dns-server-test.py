@@ -72,7 +72,7 @@ for level in range(0, int(math.log(sth.tree_size, 2)) + 1):
     audit_path.append(base64.b64decode(hash))
 
 verifier = merkle.MerkleVerifier()
-assert verifier.verify_leaf_inclusion(leaf_hash, index - 1, audit_path, sth)
+assert verifier.verify_leaf_inclusion(leaf_hash, index, audit_path, sth)
 
 #resolver = dns.resolver.Resolver(configure=False)
 #resolver.nameservers = ['213.129.69.153']
