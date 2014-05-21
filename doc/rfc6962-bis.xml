@@ -647,7 +647,7 @@ body:
         </figure>
         <t>
           Here, <spanx style="verb">SerializedSCT</spanx> is an opaque
-byte string that contains the serialized TLS structure. This encoding ensures
+byte string that contains the serialized SCT structure. This encoding ensures
 that TLS clients can decode each SCT individually (i.e., if there is a version
 upgrade, out-of-date clients can still parse old SCTs while skipping over new
 SCTs whose versions they don't understand).
