@@ -1,4 +1,4 @@
-package org.certificatetransparency.ctlog;
+package org.certificatetransparency.ctlog.internal;
 
 import java.util.Arrays;
 import java.util.Map;

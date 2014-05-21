@@ -2,6 +2,8 @@ package org.certificatetransparency.ctlog.serialization;
 
 import com.google.common.base.Preconditions;
 import com.google.protobuf.ByteString;
+import com.google.protobuf.CodedInputStream;
+
 import org.certificatetransparency.ctlog.proto.Ct;
 
 import java.io.IOException;
@@ -156,5 +158,16 @@ public class Deserializer {
     } catch (IOException e) {
       throw new SerializationException("IO Error when reading number", e);
     }
+  }
+
+  public static byte[] readVarBytesArray(CodedInputStream is, int numLenBytes) throws IOException {
+    Preconditions.checkArgument(numLenBytes > 0 && numLenBytes <= 4,
+        "The number of length bytes must be between 1 and 4.");
+    long len = 0;
+    for (int i = 0; i < numLenBytes; i++) {
+      len = len << 8 | Byte.toUnsignedLong(is.readRawByte());;
+    }
+  
+    return is.readRawBytes((int) len);
   }
 }

@@ -20,67 +20,69 @@ import com.google.common.collect.Maps;
 import com.google.common.collect.Sets;
 
 public class CertificateDataSet implements Serializable {
-	private static final long serialVersionUID = 1L;
+  private static final long serialVersionUID = 1L;
 
-	private static final Log LOG = LogFactory.getLog(CertificateDataSet.class);
+  private static final Log LOG = LogFactory.getLog(CertificateDataSet.class);
 
-	private static final ConcurrentMap<X509CertificateObject, X509CertificateObject> X509_CERTIFICATES = Maps.newConcurrentMap();
+  private static final ConcurrentMap<X509CertificateObject, X509CertificateObject> X509_CERTIFICATES =
+      Maps.newConcurrentMap();
 
-	private static final ConcurrentMap<List<X509CertificateObject>, List<X509CertificateObject>> X509_CHAINS = Maps.newConcurrentMap();
+  private static final ConcurrentMap<List<X509CertificateObject>, List<X509CertificateObject>> X509_CHAINS =
+      Maps.newConcurrentMap();
 
-	private static final ConcurrentMap<TBSCertificate, TBSCertificate> TBS_CERTIFICATES = Maps.newConcurrentMap();
+  private static final ConcurrentMap<TBSCertificate, TBSCertificate> TBS_CERTIFICATES = Maps
+      .newConcurrentMap();
 
-	private Set<CertificateData> dataSet = Sets.newHashSet();
+  private Set<CertificateData> dataSet = Sets.newHashSet();
 
-	public static int overrideStartIndexLoad = 0;
+  public static X509CertificateObject getSingletonX509Certificate(X509CertificateObject certificate) {
+    return addOrGet(X509_CERTIFICATES, certificate);
+  }
 
-	public static int overrideEndIndexLoad = -1;
+  public static TBSCertificate getSingletonTBSCertificate(TBSCertificate certificate) {
+    return addOrGet(TBS_CERTIFICATES, certificate);
+  }
 
-	public static X509CertificateObject getSingletonX509Certificate(X509CertificateObject certificate) {
-		return addOrGet(X509_CERTIFICATES, certificate);
-	}
+  private List<X509CertificateObject> getSingletonList(List<X509CertificateObject> chain) {
+    return addOrGet(
+        X509_CHAINS,
+        chain.stream().map(v -> getSingletonX509Certificate(v))
+            .collect(Collectors.toCollection(new Supplier<List<X509CertificateObject>>() {
+              @Override
+              public List<X509CertificateObject> get() {
+                return new ArrayList<X509CertificateObject>(chain.size());
+              }
+            })));
+  }
 
-	public static TBSCertificate getSingletonTBSCertificate(TBSCertificate certificate) {
-		return addOrGet(TBS_CERTIFICATES, certificate);
-	}
+  private static <X> X addOrGet(ConcurrentMap<X, X> certMap, X certificate) {
+    return certificate != null ? certMap.computeIfAbsent(certificate, certtificate -> certificate)
+        : null;
+  }
 
-	private List<X509CertificateObject> getSingletonList(List<X509CertificateObject> chain) {
-		return addOrGet(X509_CHAINS, chain.stream().map(v -> getSingletonX509Certificate(v)).collect(Collectors.toCollection(new Supplier<List<X509CertificateObject>>() {
-			@Override public List<X509CertificateObject> get() {
-				return new ArrayList<X509CertificateObject>(chain.size());
-			}
-		})));
-	}
+  public void addAll(Collection<CertificateData> cds) {
+    dataSet.addAll(cds
+        .stream()
+        .map(
+            data -> new CertificateData(data.getType(), getSingletonX509Certificate(data
+                .getCertificate()), getSingletonTBSCertificate(data.getPreCertificate()), data
+                .getExtensions(), getSingletonList(data.getExtraCertificates())))
+        .collect(Collectors.toList()));
+    LOG.info(String.format(
+        "CDS statistics: X509 Certificates: %10d \t X509 Chains: %10d \t TBS Certificates: %10d",
+        X509_CERTIFICATES.size(), X509_CHAINS.size(), TBS_CERTIFICATES.size()));
+  }
 
-	private static <X> X addOrGet(ConcurrentMap<X, X> certMap, X certificate) {
-		return certificate != null ? certMap.computeIfAbsent(certificate, certtificate -> certificate) : null;
-	}
+  /**
+   * Returns a reference to the underlying collection.
+   */
+  public Collection<CertificateData> getDataSet() {
+    return dataSet;
+  }
 
-	public void addAll(Collection<CertificateData> cds) {
-		dataSet.addAll(cds
-				.stream()
-				.map(data -> new CertificateData(data.getType(), getSingletonX509Certificate(data.getCertificate()),
-						getSingletonTBSCertificate(data.getPreCertificate()), data.getExtensions(),
-						getSingletonList(data.getExtraCertificates())))
-				.collect(Collectors.toList()));
-		LOG.info(String.format("CDS statistics: X509 Certificates: %10d \t X509 Chains: %10d \t TBS Certificates: %10d", X509_CERTIFICATES.size(), X509_CHAINS.size(), TBS_CERTIFICATES.size()));
-	}
-
-	public Collection<CertificateData> getDataSet() {
-		return dataSet;
-	}
-
-	private Object readResolve() {
-		CertificateDataSet cds = new CertificateDataSet();
-		cds.addAll(getDataSet());
-		return cds;
-	}
-
-	private void readObject(ObjectInputStream s) {
-
-	}
-
-	private void writeObject(ObjectOutputStream s) {
-
-	}
+  private Object readResolve() {
+    CertificateDataSet cds = new CertificateDataSet();
+    cds.addAll(getDataSet());
+    return cds;
+  }
 }
