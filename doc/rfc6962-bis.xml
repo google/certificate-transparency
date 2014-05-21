@@ -3,7 +3,7 @@
 <?rfc symrefs="yes"?>
 <?rfc toc="yes"?>
 <?rfc rfcedstyle="yes"?>
-<?rfc compact="yes"?>  
+<?rfc compact="yes"?>
 <?rfc subcompact="no"?>
 <?rfc sortrefs="yes" ?>
 
@@ -791,7 +791,34 @@ messages.
         In general, where needed, the <spanx style="verb">version</spanx> is v1 and the <spanx style="verb">id</spanx> is the log id for the log server queried.
       </t>
       <t>
-        Any errors will be returned as HTTP 4xx or 5xx responses, with human-readable error messages.
+        If the log is unable to process a client's request, it MUST return an HTTP response code of 4xx/5xx (see <xref target="RFC2616"/>), and, in place of the responses outlined in the subsections below, the body SHOULD be a JSON structure containing at least the following field:
+        <list style="hanging">
+          <t hangText="error_message:">
+            <list>
+              <t>
+                A human-readable string describing the error which prevented the log from processing the request.
+              </t>
+              <t>
+                In the case of a malformed request, the string SHOULD provide sufficient detail for the error to be rectified.
+              </t>
+            </list>
+          </t>
+        </list>
+      </t>
+      <t>
+        <figure>
+          <preamble>
+            e.g. In response to a request of <spanx style="verb">/ct/v1/get-entries?start=100&amp;end=99</spanx>, the log would return a <spanx style="verb">400 Bad Request</spanx> response code with a body similar to the following:
+          </preamble>
+          <artwork>
+  {
+    "error_message": "'start' cannot be greater than 'end'",
+  }
+          </artwork>
+        </figure>
+      </t>
+      <t>
+        Clients SHOULD treat <spanx style="verb">500 Internal Server Error</spanx> and <spanx style="verb">503 Service Unavailable</spanx> responses as transient failures and MAY retry the same request without modification at a later date.  Note that as per <xref target="RFC2616"/>, in the case of a 503 response the log MAY include a <spanx style="verb">Retry-After:</spanx> header in order to request a minimum time for the client to wait before retrying the request.
       </t>
       <section title="Add Chain to Log" anchor="sct">
         <t>
@@ -1300,14 +1327,16 @@ Carl Wallace for their valuable contributions.
 
 </references>
 
-    <references title="Informative References">
+<references title="Informative References">
+
+    <?rfc include="reference.RFC.2616"?>
 
     <?rfc include="reference.RFC.2560"?>
 
     <?rfc include="reference.RFC.3447"?>
 
     <?rfc include="reference.RFC.4627"?>
-      
+
     <?rfc include="reference.RFC.4648"?>
 
     <?rfc include="reference.RFC.5246"?>
