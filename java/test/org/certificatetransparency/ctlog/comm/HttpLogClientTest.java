@@ -16,7 +16,7 @@ import org.junit.Assert;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
-import org.mockito.Mockito;
+import org.mockito.Matchers;
 
 import java.io.File;
 import java.io.IOException;
@@ -75,7 +75,7 @@ public class HttpLogClientTest {
   @Test
   public void certificateSentToServer() throws IOException, CertificateException {
     HttpPostInvoker mockInvoker = mock(HttpPostInvoker.class);
-    when(mockInvoker.makePostRequest(eq("http://ctlog/add-chain"), Mockito.anyString()))
+    when(mockInvoker.makePostRequest(eq("http://ctlog/add-chain"), Matchers.anyString()))
       .thenReturn(JSON_RESPONSE);
 
     HttpLogClient client = new HttpLogClient("http://ctlog/", mockInvoker);

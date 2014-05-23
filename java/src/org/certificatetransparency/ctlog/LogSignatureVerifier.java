@@ -87,8 +87,7 @@ public class LogSignatureVerifier {
 
   static IssuerInformation issuerInformationFromPreCertificateSigningCert(
       Certificate certificate, byte[] keyHash) {
-    try {
-      ASN1InputStream aIssuerIn = new ASN1InputStream(certificate.getEncoded());
+    try (ASN1InputStream aIssuerIn = new ASN1InputStream(certificate.getEncoded())) {
       org.bouncycastle.asn1.x509.Certificate parsedIssuerCert =
           org.bouncycastle.asn1.x509.Certificate.getInstance(aIssuerIn.readObject());
 
@@ -211,12 +210,11 @@ public class LogSignatureVerifier {
   private TBSCertificate createTbsForVerification(
       X509Certificate preCertificate, IssuerInformation issuerInformation) {
     Preconditions.checkArgument(preCertificate.getVersion() >= 3);
-    try {
-      // We have to use bouncycastle's certificate parsing code because Java's X509 certificate
-      // parsing discards the order of the extensions. The signature from SCT we're verifying
-      // is over the TBSCertificate in its original form, including the order of the extensions.
-      // Get the list of extensions, in its original order, minus the poison extension.
-      ASN1InputStream aIn = new ASN1InputStream(preCertificate.getEncoded());
+    // We have to use bouncycastle's certificate parsing code because Java's X509 certificate
+    // parsing discards the order of the extensions. The signature from SCT we're verifying
+    // is over the TBSCertificate in its original form, including the order of the extensions.
+    // Get the list of extensions, in its original order, minus the poison extension.
+    try (ASN1InputStream aIn = new ASN1InputStream(preCertificate.getEncoded())) {
       org.bouncycastle.asn1.x509.Certificate parsedPreCertificate =
           org.bouncycastle.asn1.x509.Certificate.getInstance(aIn.readObject());
       // Make sure that we have the X509akid of the real issuer if:
