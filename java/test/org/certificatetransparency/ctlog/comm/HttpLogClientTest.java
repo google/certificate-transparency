@@ -55,7 +55,7 @@ public class HttpLogClientTest {
     for (int i = 0; i < inputCerts.size(); i++) {
       assertEquals(
           Base64.encodeBase64String(inputCerts.get(i).getEncoded()),
-          (String) chain.get(i));
+          chain.get(i));
     }
   }
 
@@ -74,7 +74,7 @@ public class HttpLogClientTest {
 
   @Test
   public void certificateSentToServer() throws IOException, CertificateException {
-    HttpPostInvoker mockInvoker = mock(HttpPostInvoker.class);
+    HttpInvoker mockInvoker = mock(HttpInvoker.class);
     when(mockInvoker.makePostRequest(eq("http://ctlog/add-chain"), Mockito.anyString()))
       .thenReturn(JSON_RESPONSE);
 

@@ -3,6 +3,7 @@ package org.certificatetransparency.ctlog;
 /**
  * Base class for CT errors.
  */
+@SuppressWarnings("serial")
 public class CertificateTransparencyException extends RuntimeException {
   public CertificateTransparencyException(String message) {
     super(message);
