@@ -54,3 +54,9 @@
 /java/.idea/workspace.xml
 /java/.idea/dictionaries/
 /monitor/database_test
+# Eclipse artefacts
+/java/bin
+/java/.classpath
+/java/.project
+# zsh ant target cache
+.ant_targets
