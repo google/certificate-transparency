@@ -55,7 +55,7 @@ public class HttpLogClientTest {
     for (int i = 0; i < inputCerts.size(); i++) {
       assertEquals(
           Base64.encodeBase64String(inputCerts.get(i).getEncoded()),
-          (String) chain.get(i));
+          chain.get(i));
     }
   }
 
