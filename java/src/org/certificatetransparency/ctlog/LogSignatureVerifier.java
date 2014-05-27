@@ -31,8 +31,11 @@ import java.security.cert.CertificateEncodingException;
 import java.security.cert.CertificateException;
 import java.security.cert.X509Certificate;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Enumeration;
+import java.util.Iterator;
 import java.util.List;
+import java.util.Vector;
 
 
 /**
@@ -264,11 +267,13 @@ public class LogSignatureVerifier {
   private List<Extension> getExtensionsWithoutPoison(
       Extensions extensions,
       Extension replacementX509authorityKeyIdentifier) {
-    Enumeration extensionsOids = extensions.oids();
+    ASN1ObjectIdentifier[] extensionsOidsArray = extensions.getExtensionOIDs();
+    Iterator<ASN1ObjectIdentifier> extensionsOids = Arrays.asList(extensionsOidsArray).iterator();
+
     // Order is important, which is why a list is used.
     ArrayList<Extension> outputExtensions = new ArrayList<Extension>();
-    while (extensionsOids.hasMoreElements()) {
-      ASN1ObjectIdentifier extn = (ASN1ObjectIdentifier) extensionsOids.nextElement();
+    while (extensionsOids.hasNext()) {
+      ASN1ObjectIdentifier extn = extensionsOids.next();
       String extnId = extn.getId();
       if (extnId.equals(CTConstants.POISON_EXTENSION_OID)) {
         // Do nothing - skip copying this extension
