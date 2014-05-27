@@ -14,32 +14,35 @@
 .depend
 
 # More specific files.
-/client/ct
-/gtest
+/cpp/client/ct
+/cpp/gtest/
+/cpp/log/cert_checker_test
+/cpp/log/cert_submission_handler_test
+/cpp/log/cert_test
+/cpp/log/ct_extensions_test
+/cpp/log/database_large_test
+/cpp/log/database_test
+/cpp/log/file_storage_test
+/cpp/log/frontend_signer_test
+/cpp/log/frontend_test
+/cpp/log/log_lookup_test
+/cpp/log/log_signer_test
+/cpp/log/logged_certificate_test
+/cpp/log/signer_verifier_test
+/cpp/log/tree_signer_test
+/cpp/merkletree/merkle_tree_large_test
+/cpp/merkletree/merkle_tree_test
+/cpp/merkletree/serial_hasher_test
+/cpp/merkletree/tree_hasher_test
+/cpp/monitor/database_test
+/cpp/proto/serializer_test
+/cpp/server/blob-server
+/cpp/server/ct-rfc-server
+/cpp/server/ct-server
+/cpp/util/json_wrapper_test
 /java/build
 /local.properties
-/log/cert_checker_test
-/log/cert_submission_handler_test
-/log/cert_test
-/log/ct_extensions_test
-/log/database_large_test
-/log/database_test
-/log/file_storage_test
-/log/frontend_signer_test
-/log/frontend_test
-/log/log_lookup_test
-/log/log_signer_test
-/log/logged_certificate_test
-/log/signer_verifier_test
-/log/tree_signer_test
-/merkletree/merkle_tree_large_test
-/merkletree/merkle_tree_test
-/merkletree/serial_hasher_test
-/merkletree/tree_hasher_test
-/proto/serializer_test
-/server/blob-server
-/server/ct-rfc-server
-/server/ct-server
+/python/_trial_temp/
 /test/*.bin
 /test/*.csr
 /test/*.der
@@ -52,13 +55,11 @@
 /test/testdata/error.log
 /test/testdata/logs
 /test/testdata/test-cert-proof-extension.pem
-/util/json_wrapper_test
 
 # IntelliJ artefacts
 /java/.idea/dictionaries/
 /java/.idea/workspace.xml
 /java/out
-/monitor/database_test
 
 # Eclipse artefacts
 /java/.classpath
