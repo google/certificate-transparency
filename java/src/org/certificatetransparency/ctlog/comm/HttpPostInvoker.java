@@ -1,10 +1,10 @@
 package org.certificatetransparency.ctlog.comm;
 
-import org.apache.http.client.HttpClient;
 import org.apache.http.client.methods.HttpPost;
 import org.apache.http.entity.StringEntity;
 import org.apache.http.impl.client.BasicResponseHandler;
-import org.apache.http.impl.client.DefaultHttpClient;
+import org.apache.http.impl.client.CloseableHttpClient;
+import org.apache.http.impl.client.HttpClientBuilder;
 
 import java.io.IOException;
 
@@ -19,8 +19,7 @@ public class HttpPostInvoker {
    * @return Server's response body.
    */
   public String makePostRequest(String url, String jsonPayload) {
-    HttpClient httpClient = new DefaultHttpClient();
-    try {
+    try (CloseableHttpClient httpClient = HttpClientBuilder.create().build()) {
       HttpPost post = new HttpPost(url);
       post.setEntity(new StringEntity(jsonPayload, "utf-8"));
       post.addHeader("Content-Type", "application/json; charset=utf-8");
@@ -28,8 +27,6 @@ public class HttpPostInvoker {
       return httpClient.execute(post, new BasicResponseHandler());
     } catch (IOException e) {
       throw new LogCommunicationException("Error making POST request to " + url, e);
-    } finally {
-      httpClient.getConnectionManager().shutdown();
     }
   }
 }
