@@ -89,7 +89,7 @@ class FakeHandlerBase(log_client.RequestHandler):
         if params is None:
             params = {}
 
-        prefix = "https://" + self._uri + "/ct/v1/"
+        prefix = self._uri + "/ct/v1/"
         if not uri.startswith(prefix):
             return self.make_response(404, "Not Found")
 

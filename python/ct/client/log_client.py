@@ -567,7 +567,7 @@ class EntryProducer(object):
             last = min(self._current + self._batch_size - 1, self._end)
 
             deferred_response = self._handler.get(
-                "https://" + self._uri + "/" + _GET_ENTRIES_PATH,
+                self._uri + "/" + _GET_ENTRIES_PATH,
                 params={"start": str(first), "end": str(last)})
             deferred_response.addCallback(_parse_entries, last - first + 1)
             deferred_response.addErrback(self._response_eb)
