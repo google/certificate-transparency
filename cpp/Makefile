@@ -86,7 +86,7 @@ ALL_TESTS = $(PROTO_TESTS) $(MERKLETREE_TESTS) $(LOG_TESTS) $(UTIL_TESTS) \
 	$(MONITOR_TESTS)
 
 all: unit_tests client/ct server/ct-server server/blob-server \
-     server/ct-rfc-server
+     server/ct-rfc-server server/ct-dns-server
 
 .DELETE_ON_ERROR:
 
@@ -163,6 +163,10 @@ util/libutil.a: util/util.o util/openssl_util.o util/testing.o
 	ar -rcs $@ $^
 
 util/json_wrapper_test: util/json_wrapper_test.o util/libutil.a
+<<<<<<< HEAD
+=======
+	$(CXX) $(CXXFLAGS) -o $@ $^ $(SYS_LIBS)
+>>>>>>> Remaining issues after a rebase.
 
 ### proto/ targets
 proto/libproto.a: proto/ct.pb.o proto/serializer.o
@@ -172,6 +176,10 @@ proto/libproto.a: proto/ct.pb.o proto/serializer.o
 proto_tests: $(PROTO_TESTS)
 
 proto/serializer_test: proto/serializer_test.o proto/libproto.a util/libutil.a
+<<<<<<< HEAD
+=======
+	$(CXX) $(CXXFLAGS) -o $@ $^ $(SYS_LIBS)
+>>>>>>> Remaining issues after a rebase.
 
 ### merkletree/ targets
 merkletree/libmerkletree.a: merkletree/compact_merkle_tree.o \
@@ -186,16 +194,32 @@ merkletree_tests: $(MERKLETREE_TESTS)
 
 merkletree/merkle_tree_large_test: merkletree/merkle_tree_large_test.o \
                                    merkletree/libmerkletree.a util/libutil.a
+<<<<<<< HEAD
 
 merkletree/merkle_tree_test: merkletree/merkle_tree_test.o \
                              merkletree/libmerkletree.a util/libutil.a
 
 merkletree/serial_hasher_test: merkletree/serial_hasher_test.o \
                                merkletree/serial_hasher.o util/libutil.a
+=======
+	$(CXX) $(CXXFLAGS) -o $@ $^ $(SYS_LIBS)
+
+merkletree/merkle_tree_test: merkletree/merkle_tree_test.o \
+                             merkletree/libmerkletree.a util/libutil.a
+	$(CXX) $(CXXFLAGS) -o $@ $^ $(SYS_LIBS)
+
+merkletree/serial_hasher_test: merkletree/serial_hasher_test.o \
+                               merkletree/serial_hasher.o util/libutil.a
+	$(CXX) $(CXXFLAGS) -o $@ $^ $(SYS_LIBS)
+>>>>>>> Remaining issues after a rebase.
 
 merkletree/tree_hasher_test: merkletree/tree_hasher_test.o \
                              merkletree/serial_hasher.o \
                              merkletree/tree_hasher.o util/libutil.a
+<<<<<<< HEAD
+=======
+	$(CXX) $(CXXFLAGS) -o $@ $^ $(SYS_LIBS)
+>>>>>>> Remaining issues after a rebase.
 
 ### log/ targets
 log/libcert.a: log/cert.o log/cert_checker.o log/cert_submission_handler.o \
@@ -221,6 +245,10 @@ log/cert_test: log/cert_test.o log/cert.o log/ct_extensions.o util/libutil.a \
                log/frontend_signer.o log/cert_submission_handler.o \
                log/log_signer.o log/signer.o log/verifier.o proto/serializer.o \
                log/cert_checker.o
+<<<<<<< HEAD
+=======
+	$(CXX) $(CXXFLAGS) -o $@ $^ $(SYS_LIBS)
+>>>>>>> Remaining issues after a rebase.
 
 log/cert_checker_test: log/cert_checker_test.o log/cert.o log/cert_checker.o \
                        log/ct_extensions.o util/libutil.a \
@@ -228,31 +256,55 @@ log/cert_checker_test: log/cert_checker_test.o log/cert.o log/cert_checker.o \
                        log/frontend_signer.o log/cert_submission_handler.o \
                        log/log_signer.o log/signer.o log/verifier.o \
                        proto/serializer.o log/cert_checker.o
+<<<<<<< HEAD
+=======
+	$(CXX) $(CXXFLAGS) -o $@ $^ $(SYS_LIBS)
+>>>>>>> Remaining issues after a rebase.
 
 log/cert_submission_handler_test: log/cert_submission_handler_test.o \
                                   log/libcert.a proto/libproto.a \
                                   util/libutil.a log/frontend.o \
                                   log/frontend_signer.o \
                                   log/log_signer.o log/signer.o log/verifier.o
+<<<<<<< HEAD
+=======
+	$(CXX) $(CXXFLAGS) -o $@ $^ $(SYS_LIBS)
+>>>>>>> Remaining issues after a rebase.
 
 log/ct_extensions_test: log/ct_extensions_test.o log/libcert.a util/libutil.a \
                         log/liblog.a proto/ct.pb.o \
                         log/cert_submission_handler.o proto/serializer.o \
                         log/cert_checker.o
+<<<<<<< HEAD
+=======
+	$(CXX) $(CXXFLAGS) -o $@ $^ $(SYS_LIBS)
+>>>>>>> Remaining issues after a rebase.
 
 log/database_large_test: log/database_large_test.o log/libdatabase.a \
                          log/log_signer.o log/signer.o log/verifier.o \
                          log/test_signer.o merkletree/libmerkletree.a \
                          proto/libproto.a util/libutil.a
+<<<<<<< HEAD
+=======
+	$(CXX) $(CXXFLAGS) -o $@ $^ $(SYS_LIBS)
+>>>>>>> Remaining issues after a rebase.
 
 log/database_test: log/database_test.o log/libdatabase.a \
                    log/log_signer.o log/signer.o log/verifier.o \
                    log/test_signer.o merkletree/libmerkletree.a \
                    proto/libproto.a util/libutil.a
+<<<<<<< HEAD
+=======
+	$(CXX) $(CXXFLAGS) -o $@ $^ $(SYS_LIBS)
+>>>>>>> Remaining issues after a rebase.
 
 log/file_storage_test: log/file_storage_test.o log/libdatabase.a \
                        proto/libproto.a util/libutil.a \
                        merkletree/libmerkletree.a
+<<<<<<< HEAD
+=======
+	$(CXX) $(CXXFLAGS) -o $@ $^ $(SYS_LIBS)
+>>>>>>> Remaining issues after a rebase.
 
 log/frontend_signer_test: log/frontend_signer_test.o \
                           log/frontend_signer.o \
@@ -260,6 +312,10 @@ log/frontend_signer_test: log/frontend_signer_test.o \
                           log/log_verifier.o log/test_signer.o log/libcert.a \
                           log/libdatabase.a merkletree/libmerkletree.a \
                           proto/libproto.a util/libutil.a
+<<<<<<< HEAD
+=======
+	$(CXX) $(CXXFLAGS) -o $@ $^ $(SYS_LIBS)
+>>>>>>> Remaining issues after a rebase.
 
 log/frontend_test: log/frontend_test.o log/frontend.o \
                    log/frontend_signer.o \
@@ -267,27 +323,51 @@ log/frontend_test: log/frontend_test.o log/frontend.o \
                    log/log_verifier.o log/test_signer.o \
                    log/libcert.a log/libdatabase.a merkletree/libmerkletree.a \
                    proto/libproto.a util/libutil.a
+<<<<<<< HEAD
+=======
+	$(CXX) $(CXXFLAGS) -o $@ $^ $(SYS_LIBS)
+>>>>>>> Remaining issues after a rebase.
 
 log/log_lookup_test: log/log_lookup_test.o log/test_signer.o log/libdatabase.a \
                      log/liblog.a merkletree/libmerkletree.a proto/libproto.a \
                      util/libutil.a
+<<<<<<< HEAD
+=======
+	$(CXX) $(CXXFLAGS) -o $@ $^ $(SYS_LIBS)
+>>>>>>> Remaining issues after a rebase.
 
 log/log_signer_test: log/log_signer_test.o log/log_signer.o log/signer.o \
                      log/verifier.o log/test_signer.o \
                      merkletree/libmerkletree.a proto/libproto.a util/libutil.a
+<<<<<<< HEAD
+=======
+	$(CXX) $(CXXFLAGS) -o $@ $^ $(SYS_LIBS)
+>>>>>>> Remaining issues after a rebase.
 
 log/signer_verifier_test: log/signer_verifier_test.o log/log_signer.o \
                      log/signer.o log/verifier.o log/test_signer.o \
                      merkletree/libmerkletree.a proto/libproto.a util/libutil.a
+<<<<<<< HEAD
+=======
+	$(CXX) $(CXXFLAGS) -o $@ $^ $(SYS_LIBS)
+>>>>>>> Remaining issues after a rebase.
 
 log/tree_signer_test: log/tree_signer_test.o log/log_signer.o log/signer.o \
                       log/verifier.o log/test_signer.o log/tree_signer_cert.o \
                       log/log_verifier.o \
                       log/libdatabase.a merkletree/libmerkletree.a \
                       proto/libproto.a util/libutil.a
+<<<<<<< HEAD
 
 log/logged_certificate_test: log/logged_certificate_test.o proto/libproto.a \
                              util/libutil.a merkletree/libmerkletree.a
+=======
+	$(CXX) $(CXXFLAGS) -o $@ $^ $(SYS_LIBS)
+
+log/logged_certificate_test: log/logged_certificate_test.o proto/libproto.a \
+                             util/libutil.a merkletree/libmerkletree.a
+	$(CXX) $(CXXFLAGS) -o $@ $^ $(SYS_LIBS)
+>>>>>>> Remaining issues after a rebase.
 
 monitor_tests: $(MONITOR_TESTS)
 
@@ -295,22 +375,45 @@ monitor/database_test: monitor/database_test.o monitor/database.o \
                        monitor/sqlite_db.o util/libutil.a log/test_signer.o \
                        merkletree/libmerkletree.a log/log_signer.o \
                        log/signer.o log/verifier.o proto/libproto.a
+<<<<<<< HEAD
+=======
+	$(CXX) $(CXXFLAGS) -o $@ $^ $(SYS_LIBS)
+>>>>>>> Remaining issues after a rebase.
 
 # client
 client/ct: client/ct.o client/client.o client/log_client.o client/ssl_client.o \
            client/http_log_client.o monitor/sqlite_db.o monitor/database.o \
            monitor/monitor.o \
            $(LOCAL_LIBS)
+<<<<<<< HEAD
 
 # server
 server/ct-server: server/ct-server.o server/event.o $(LOCAL_LIBS)
+=======
+	$(CXX) $(CXXFLAGS) -o $@ $^ $(SYS_LIBS)
+
+# server
+server/ct-server: server/ct-server.o server/event.o $(LOCAL_LIBS)
+	$(CXX) $(CXXFLAGS) -o $@ $^ $(SYS_LIBS)
+
+server/ct-dns-server: server/ct-dns-server.o server/event.o $(LOCAL_LIBS)
+	$(CXX) $(CXXFLAGS) -o $@ $^ $(SYS_LIBS) -lldns
+>>>>>>> Remaining issues after a rebase.
 
 server/ct-rfc-server: server/ct-rfc-server.o $(LOCAL_LIBS)
+<<<<<<< HEAD
+=======
+	$(CXX) $(CXXFLAGS) -o $@ $^ $(SYS_LIBS) log/liblog.a
+>>>>>>> Remaining issues after a rebase.
 
 server/blob-server: server/blob-server.o server/event.o \
                     server/sqlite_db_blob.o server/tree_signer_blob.o \
                     server/log_lookup_blob.o \
                     $(LOCAL_LIBS)
+<<<<<<< HEAD
+=======
+	$(CXX) $(CXXFLAGS) -o $@ $^ $(SYS_LIBS)
+>>>>>>> Remaining issues after a rebase.
 
 test: all
 	util/json_wrapper_test
