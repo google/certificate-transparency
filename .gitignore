@@ -7,7 +7,6 @@
 *.pb.h
 *.pyc
 *.so
-*.syso
 *_pb2.py
 *~
 .*.swp

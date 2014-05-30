@@ -4,7 +4,6 @@ INCLUDE = -I.
 LOCAL_LIBS = log/libcert.a log/libdatabase.a log/liblog.a \
              merkletree/libmerkletree.a \
              proto/libproto.a util/libutil.a
-GO_LIBS = ../go/merkletree/libmerkletree.syso  
 SYS_LIBS = -lpthread -lgflags -lglog -lssl -lcrypto \
            -lsqlite3 -lprotobuf -lcurl -lcppnetlib-uri
 
@@ -76,9 +75,7 @@ ALL_TESTS = $(PROTO_TESTS) $(MERKLETREE_TESTS) $(LOG_TESTS) $(UTIL_TESTS) \
 	$(MONITOR_TESTS)
 
 all: unit_tests client/ct server/ct-server server/blob-server \
-     server/ct-rfc-server golibs
-
-golibs: $(GO_LIBS)
+     server/ct-rfc-server
 
 .DELETE_ON_ERROR:
 .PHONY: clean all unit_tests test alltests benchmark clean \
@@ -350,18 +347,6 @@ test: all
 	log/tree_signer_test
 	log/log_lookup_test
 	monitor/database_test
-
-# Go smoke & mirrors for reusing bits of C++ code within the Go code below.
-# Apparently static linking with cgo is "an area that still needs work", 
-# dumping a relocatable library with a .syso extension in the package dir
-# seems to work around the issue for now.
-../go/merkletree/libmerkletree.syso: merkletree/compact_merkle_tree.o \
-                                  merkletree/merkle_tree.o \
-                                  merkletree/merkle_tree_math.o \
-                                  merkletree/merkle_verifier.o \
-                                  merkletree/serial_hasher.o merkletree/tree_hasher.o
-	rm -f $@
-	ld -r -o $@ $^
 
 # Unit tests plus end-to-end tests. Make sure to set up links in test/  first.
 alltests: test
