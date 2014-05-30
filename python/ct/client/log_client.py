@@ -178,19 +178,20 @@ class RequestHandler(object):
             raise HTTPError("Connection to %s failed: %s" % (uri, e))
 
     @staticmethod
-    def check_response_status(code, reason):
+    def check_response_status(code, reason, content=''):
         if code == 200:
             return
         elif 400 <= code < 500:
-            raise HTTPClientError(reason)
+            raise HTTPClientError(reason + ' (' + content + ')')
         elif 500 <= code < 600:
-            raise HTTPServerError(reason)
+            raise HTTPServerError(reason + ' (' + content + ')')
         else:
-            raise HTTPError(reason)
+            raise HTTPError(reason + ' (' + content + ')')
 
     def get_response_body(self, uri, params=None):
         response = self.get_response(uri, params=params)
-        self.check_response_status(response.status_code, response.reason)
+        self.check_response_status(response.status_code, response.reason,
+                                   response.content)
         return response.content
 
 
