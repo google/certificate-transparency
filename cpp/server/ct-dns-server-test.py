@@ -7,7 +7,7 @@ import shlex
 import subprocess
 import sys
 
-sys.path.append('../python')
+sys.path.append('../../python')
 from ct.crypto import merkle
 from ct.proto import ct_pb2
 
