@@ -1,0 +1,17 @@
+
+language: cpp
+
+before_install:
+ - sudo apt-get update -qq
+ - sudo apt-get install -qq protobuf-compiler libprotobuf-java libprotobuf-dev python-protobuf
+ - sudo ln -s protobuf-java.jar /usr/share/java/protobuf.jar
+ - mkdir -p $GOPATH/src/github.com/google
+ - ln -s $PWD $GOPATH/src/github.com/google
+ - go get -v -d ./...
+ - java -version
+ - javac -version
+
+script:
+ - ant test
+# TODO(pphaneuf): We would like simply ./go/... here, but it doesn't work yet.
+ - go test -v ./go/asn1/... ./go/client/... ./go/scanner/... ./go/x509/...
