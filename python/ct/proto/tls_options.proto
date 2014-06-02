@@ -4,6 +4,7 @@ import "google/protobuf/descriptor.proto";
 
 package ct;
 
+
 // TLS field options specify the wire format for parsing TLS wire messages
 // to protocol buffers, using the custom decoder in tls_message.py.
 // TODO(ekasper): encoder.
@@ -30,7 +31,7 @@ package ct;
 // simply set the protocol buffer options as follows:
 //
 // enum Fruit {
-//   option (tls_max_value) = 255;
+//   option (tls_enum_opts).max_value = 255;
 //   APPLE = 0;
 //   ORANGE = 1;
 // }

@@ -4,6 +4,7 @@ package ct;
 
 import "ct/proto/tls_options.proto";
 
+
 message KeyInfo {
   enum KeyType {
     ECDSA = 0;

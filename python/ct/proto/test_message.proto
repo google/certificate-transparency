@@ -14,7 +14,7 @@ message TestMessage {
     ENUM_0 = 0;
     ENUM_1 = 1;
   }
- 
+
   message EmbeddedMessage {
     optional uint32 uint_32 = 1 [(tls_opts).bytes_in_use = 2];
   }
