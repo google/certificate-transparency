@@ -774,9 +774,10 @@ void WrapEmbedded() {
 }
 
 static void WriteCertificate(const std::string &cert, int entry,
-                             int cert_number) {
+                             int cert_number, const char *type) {
  std::ostringstream outname;
- outname << FLAGS_certificate_base << entry << '.' << cert_number << ".der";
+ outname << FLAGS_certificate_base << entry << '.' << cert_number << '.'
+         << type << ".der";
  std::ofstream out(outname.str().c_str(),
                    std::ios::binary | std::ios::trunc);
  CHECK(out.good());
@@ -799,18 +800,19 @@ void GetEntries() {
            entries.begin(); entry != entries.end(); ++entry, ++e) {
     if (entry->leaf.timestamped_entry().entry_type() == ct::X509_ENTRY) {
       WriteCertificate(entry->leaf.timestamped_entry().signed_entry().x509(),
-                       e, 0);
+                       e, 0, "x509");
       const ct::X509ChainEntry &x509chain = entry->entry.x509_entry();
       for (int n = 0; n < x509chain.certificate_chain_size(); ++n)
-        WriteCertificate(x509chain.certificate_chain(n), e, n + 1);
+          WriteCertificate(x509chain.certificate_chain(n), e, n + 1, "x509");
     } else {
       assert(entry->leaf.timestamped_entry().entry_type()
              == ct::PRECERT_ENTRY);
       WriteCertificate(entry->leaf.timestamped_entry().signed_entry()
-                       .precert().tbs_certificate(), e, 0);
+                       .precert().tbs_certificate(), e, 0, "pre");
       const ct::PrecertChainEntry &precertchain = entry->entry.precert_entry();
       for (int n = 0; n < precertchain.precertificate_chain_size(); ++n)
-        WriteCertificate(precertchain.precertificate_chain(n), e, n + 1);
+        WriteCertificate(precertchain.precertificate_chain(n), e, n + 1,
+                         "x509");
     }
   }
 }
