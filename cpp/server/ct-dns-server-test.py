@@ -65,14 +65,18 @@ print "size =", sth.tree_size
 index = random.randint(0, sth.tree_size - 1)
 leaf_hash = lookup.GetLeafHash(index)
 print "index =", index, " hash =", leaf_hash
+
+verifier = merkle.MerkleVerifier()
 audit_path = []
-for level in range(0, int(math.log(sth.tree_size, 2)) + 1):
+for level in range(0, verifier.audit_path_length(index, sth.tree_size)):
     hash = lookup.GetEntry(level, index, sth.tree_size)
     print hash
     audit_path.append(base64.b64decode(hash))
 
-verifier = merkle.MerkleVerifier()
-assert verifier.verify_leaf_inclusion(leaf_hash, index, audit_path, sth)
+print map(base64.b64encode, audit_path)
+
+assert verifier.verify_leaf_hash_inclusion(base64.b64decode(leaf_hash), index,
+                                           audit_path, sth)
 
 #resolver = dns.resolver.Resolver(configure=False)
 #resolver.nameservers = ['213.129.69.153']

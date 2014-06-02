@@ -439,6 +439,18 @@ class MerkleVerifier(object):
                                    len(audit_path))
         return calculated_hash
 
+    @classmethod
+    def audit_path_length(cls, index, tree_size):
+        length = 0
+        last_node = tree_size - 1
+        while last_node > 0:
+            if index % 2 or index < last_node:
+                length += 1
+            index //= 2
+            last_node //= 2
+
+        return length
+
     @error.returns_true_or_raises
     def verify_leaf_hash_inclusion(self, leaf_hash, leaf_index, proof, sth):
         """Verify a Merkle Audit Path.
