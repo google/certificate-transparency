@@ -1,9 +1,5 @@
 CXXFLAG = -Wall -Werror -g -O3
 
-# FIXME(benl): This breaks other installs and should be set locally if
-# needed. It is not _technically_ their bug, it is _actually_ their
-# bug. Commented out for now (as I can't build with it set).
-
 INCLUDE = -I.
 LOCAL_LIBS = log/libcert.a log/libdatabase.a log/liblog.a \
              merkletree/libmerkletree.a \
