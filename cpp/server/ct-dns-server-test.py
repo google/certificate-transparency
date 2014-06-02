@@ -77,16 +77,3 @@ print map(base64.b64encode, audit_path)
 
 assert verifier.verify_leaf_hash_inclusion(base64.b64decode(leaf_hash), index,
                                            audit_path, sth)
-
-#resolver = dns.resolver.Resolver(configure=False)
-#resolver.nameservers = ['213.129.69.153']
-#resolver.port = 5353
-#answers = resolver.query('google-public-dns-a.google.com', 'TXT')
-
-#resolver.nameservers = ['127.0.0.1']
-#resolver.port = 1111
-
-#answers = resolver.query('sth.example.com', 'TXT')
-
-#for a in answers:
-#    print a
