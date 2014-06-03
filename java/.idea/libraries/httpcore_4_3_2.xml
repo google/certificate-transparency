@@ -1,5 +1,5 @@
 <component name="libraryTable">
-  <library name="httpcore-4.2.4">
+  <library name="httpcore-4.3.2">
     <CLASSES>
       <root url="jar://$PROJECT_DIR$/libs/httpcore-4.3.2.jar!/" />
     </CLASSES>
