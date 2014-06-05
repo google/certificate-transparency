@@ -29,7 +29,7 @@ endif
 # Useful if it was built with a custom OpenSSL version.
 ifneq ($(CURLDIR),)
   INCLUDE += -I $(CURLDIR)/include
-  SYS_LIBS += -L $(CURLDIR)/lib -Wl,-rpath,$(CURLDIR)/lib
+  SYS_LIBS += -L $(CURLDIR)/lib/.libs -Wl,-rpath,$(CURLDIR)/lib/.libs
 endif
 
 # Need cpp-netlib
