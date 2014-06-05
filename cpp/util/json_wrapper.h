@@ -1,10 +1,9 @@
 /* -*- mode: c++; indent-tabs-mode: nil -*- */
-
 #ifndef JSON_WRAPPER_H
 #define JSON_WRAPPER_H
 
 #include <glog/logging.h>
-#include <json/json.h>
+#include <json.h>
 #undef TRUE  // json.h pollution
 #undef FALSE  // json.h pollution
 

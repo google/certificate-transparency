@@ -52,7 +52,9 @@ ifneq ($(JSONCLIBDIR),)
 	INCLUDE += -I $(JSONCLIBDIR)/include
 	LDLIBS += -L $(JSONCLIBDIR)/lib -Wl,-rpath,$(JSONCLIBDIR)/lib -ljson-c
 else
-	LDLIBS += -ljson
+	# TODO(pphaneuf): json-c would like us to use pkg-config...
+	INCLUDE += -I/usr/include/json-c
+	LDLIBS += -ljson-c
 endif
 
 # Need gtest
