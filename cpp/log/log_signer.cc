@@ -1,24 +1,26 @@
 /* -*- indent-tabs-mode: nil -*- */
+#include "log/log_signer.h"
+
 #include <glog/logging.h>
 #include <openssl/evp.h>
 #include <openssl/opensslv.h>
-#if OPENSSL_VERSION_NUMBER < 0x10000000
-# error "Need OpenSSL >= 1.0.0"
-#endif
 #include <stdint.h>
 
-#include "log/log_signer.h"
 #include "merkletree/serial_hasher.h"
 #include "proto/ct.pb.h"
 #include "proto/serializer.h"
 #include "util/util.h"
 
+using ct::DigitallySigned;
 using ct::LogEntry;
 using ct::LogEntryType;
-using ct::DigitallySigned;
 using ct::SignedCertificateTimestamp;
 using ct::SignedTreeHead;
 using std::string;
+
+#if OPENSSL_VERSION_NUMBER < 0x10000000
+# error "Need OpenSSL >= 1.0.0"
+#endif
 
 namespace {
 

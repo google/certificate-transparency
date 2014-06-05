@@ -1,14 +1,13 @@
+#include "merkletree/merkle_tree.h"
+
 #include <glog/logging.h>
 #include <stddef.h>
 #include <string>
 #include <vector>
 
-#include "merkletree/merkle_tree.h"
 #include "merkletree/merkle_tree_math.h"
 
 using std::string;
-
-class SerialHasher;
 
 MerkleTree::MerkleTree(SerialHasher *hasher)
     : ct::MerkleTreeInterface(),

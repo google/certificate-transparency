@@ -1,6 +1,8 @@
 #ifndef FILESYSTEM_OP_H
 #define FILESYSTEM_OP_H
 
+#include <sys/types.h>
+
 // Make filesystem operations virtual so that we can override
 // to simulate filesystem errors.
 class FilesystemOp {

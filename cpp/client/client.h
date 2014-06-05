@@ -2,6 +2,7 @@
 #define CLIENT_H
 
 #include <stdint.h>
+#include <string>
 
 // Socket creation for client connections.
 class Client {

@@ -1,11 +1,12 @@
 /* -*- indent-tabs-mode: nil -*- */
+#include "log/tree_signer.h"
+
 #include <glog/logging.h>
 #include <set>
 #include <stdint.h>
 
 #include "log/database.h"
 #include "log/log_signer.h"
-#include "log/tree_signer.h"
 #include "merkletree/compact_merkle_tree.h"
 #include "proto/serializer.h"
 #include "util/util.h"

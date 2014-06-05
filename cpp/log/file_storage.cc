@@ -1,4 +1,5 @@
 /* -*- indent-tabs-mode: nil -*- */
+#include "log/file_storage.h"
 
 #include <assert.h>
 #include <cstdlib>
@@ -9,7 +10,6 @@
 #include <sys/stat.h>
 #include <unistd.h>
 
-#include "log/file_storage.h"
 #include "log/filesystem_op.h"
 #include "util/util.h"
 

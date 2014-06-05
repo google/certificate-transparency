@@ -1,9 +1,9 @@
+#include "log/filesystem_op.h"
+
 #include <errno.h>
 #include <stdio.h>
 #include <sys/stat.h>
 #include <unistd.h>
-
-#include "log/filesystem_op.h"
 
 BasicFilesystemOp::BasicFilesystemOp() {}
 

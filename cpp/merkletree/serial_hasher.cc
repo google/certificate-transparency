@@ -1,7 +1,7 @@
+#include "merkletree/serial_hasher.h"
+
 #include <openssl/sha.h>
 #include <stddef.h>
-
-#include "merkletree/serial_hasher.h"
 
 using std::string;
 

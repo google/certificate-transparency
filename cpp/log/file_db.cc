@@ -1,4 +1,6 @@
 /* -*- indent-tabs-mode: nil -*- */
+#include "log/file_db.h"
+
 #include <glog/logging.h>
 #include <map>
 #include <set>
@@ -6,7 +8,6 @@
 #include <utility>  // for std::pair
 #include <vector>
 
-#include "log/file_db.h"
 #include "log/file_storage.h"
 #include "proto/ct.pb.h"
 #include "proto/serializer.h"

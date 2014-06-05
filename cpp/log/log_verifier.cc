@@ -1,9 +1,10 @@
+#include "log/log_verifier.h"
+
 #include <glog/logging.h>
 #include <stdint.h>
 
 #include "log/cert_submission_handler.h"
 #include "log/log_signer.h"
-#include "log/log_verifier.h"
 #include "merkletree/merkle_verifier.h"
 #include "proto/ct.pb.h"
 #include "proto/serializer.h"

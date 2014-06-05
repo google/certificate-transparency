@@ -1,3 +1,5 @@
+#include "log/test_signer.h"
+
 #include <glog/logging.h>
 #include <gtest/gtest.h>
 #include <openssl/bio.h>
@@ -10,15 +12,12 @@
 #include "log/log_signer.h"
 #include "log/logged_certificate.h"
 #include "log/signer.h"
-#include "log/test_signer.h"
 #include "log/verifier.h"
 #include "merkletree/serial_hasher.h"
 #include "merkletree/tree_hasher.h"
 #include "proto/ct.pb.h"
 #include "proto/serializer.h"
 #include "util/util.h"
-
-namespace {
 
 using ct::DigitallySigned;
 using ct::LogEntry;
@@ -28,6 +27,8 @@ using ct::SignedCertificateTimestamp;
 using ct::SignedTreeHead;
 using ct::X509ChainEntry;
 using std::string;
+
+namespace {
 
 // A slightly shorter notation for constructing binary blobs from test vectors.
 string B(const char *hexstring) {

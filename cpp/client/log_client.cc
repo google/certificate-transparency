@@ -1,21 +1,22 @@
+#include "client/log_client.h"
+
 #include <glog/logging.h>
 #include <stdint.h>
 
-#include "include/ct.h"
 #include "client/client.h"
-#include "client/log_client.h"
+#include "include/ct.h"
 #include "proto/ct.pb.h"
 #include "proto/serializer.h"
 
-using ct::LogEntry;
 using ct::ClientLookup;
 using ct::ClientMessage;
+using ct::LogEntry;
+using ct::MerkleAuditProof;
 using ct::ServerError;
 using ct::ServerMessage;
-using ct::MerkleAuditProof;
 using ct::SignedCertificateTimestamp;
-using ct::protocol::kPacketPrefixLength;
 using ct::protocol::kMaxPacketLength;
+using ct::protocol::kPacketPrefixLength;
 using std::string;
 
 const ct::protocol::Version LogClient::kProtocolVersion = ct::protocol::V1;

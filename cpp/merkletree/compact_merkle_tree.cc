@@ -1,14 +1,13 @@
+#include "merkletree/compact_merkle_tree.h"
+
 #include <glog/logging.h>
 #include <stddef.h>
 #include <string>
 #include <vector>
 
-#include "merkletree/compact_merkle_tree.h"
 #include "merkletree/merkle_tree_math.h"
 
 using std::string;
-
-class SerialHasher;
 
 CompactMerkleTree::CompactMerkleTree(SerialHasher *hasher)
     : ct::MerkleTreeInterface(),

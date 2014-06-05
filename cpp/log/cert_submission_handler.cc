@@ -1,23 +1,23 @@
+#include "log/cert_submission_handler.h"
+
 #include <glog/logging.h>
 #include <string>
 
 #include "log/cert.h"
 #include "log/cert_checker.h"
-#include "log/cert_submission_handler.h"
 #include "log/ct_extensions.h"
 #include "proto/ct.pb.h"
 #include "proto/serializer.h"
 
-using ct::LogEntry;
-using ct::PrecertChainEntry;
-using ct::X509ChainEntry;
-using std::string;
-
 using ct::Cert;
 using ct::CertChain;
 using ct::CertChecker;
+using ct::LogEntry;
 using ct::PreCertChain;
+using ct::PrecertChainEntry;
 using ct::TbsCertificate;
+using ct::X509ChainEntry;
+using std::string;
 
 // TODO(ekasper): handle Cert errors consistently and log some errors here
 // if they fail.

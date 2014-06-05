@@ -1,8 +1,9 @@
 /* -*- indent-tabs-mode: nil -*- */
+#include "log/frontend_signer.h"
+
 #include <glog/logging.h>
 
 #include "log/database.h"
-#include "log/frontend_signer.h"
 #include "log/log_signer.h"
 #include "merkletree/serial_hasher.h"
 #include "proto/ct.pb.h"

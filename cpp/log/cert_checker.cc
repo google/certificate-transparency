@@ -1,26 +1,26 @@
 /* -*- indent-tabs-mode: nil -*- */
+#include "log/cert_checker.h"
+
 #include <glog/logging.h>
-#include <string.h>
 #include <openssl/asn1.h>
 #include <openssl/bio.h>
 #include <openssl/pem.h>
 #include <openssl/x509.h>
 #include <openssl/x509v3.h>
-
+#include <string.h>
 #include <string>
 #include <utility>
 #include <vector>
 
 #include "log/cert.h"
-#include "log/cert_checker.h"
 #include "log/ct_extensions.h"
 #include "util/openssl_util.h"  // for LOG_OPENSSL_ERRORS
 #include "util/util.h"
 
-namespace  ct {
-
 using std::string;
 using util::ClearOpenSSLErrors;
+
+namespace  ct {
 
 CertChecker::CertChecker() : trusted_() {
 }

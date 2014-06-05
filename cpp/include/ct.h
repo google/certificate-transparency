@@ -1,6 +1,8 @@
 #ifndef CT_H
 #define CT_H
 
+#include <stddef.h>
+
 namespace ct {
 namespace protocol {
 

@@ -1,5 +1,8 @@
 /* -*- mode: c++; indent-tabs-mode: nil -*- */
 
+#include <glog/logging.h>
+#include <stdint.h>
+
 #include "merkletree/serial_hasher.h"
 
 class LoggedBlob {

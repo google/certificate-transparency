@@ -1,20 +1,20 @@
 /* -*- indent-tabs-mode: nil -*- */
 #include "client/http_log_client.h"
+
+#include <curl/curl.h>
+#include <glog/logging.h>
+#include <sstream>
+
 #include "log/cert.h"
 #include "proto/ct.pb.h"
 #include "proto/serializer.h"
 #include "util/json_wrapper.h"
 #include "util/util.h"
 
-#include <curl/curl.h>
-#include <glog/logging.h>
-#include <sstream>
-
-using std::string;
-using std::ostringstream;
-
 using ct::Cert;
 using ct::CertChain;
+using std::ostringstream;
+using std::string;
 
 namespace {
 

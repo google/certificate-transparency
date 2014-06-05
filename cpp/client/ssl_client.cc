@@ -1,10 +1,11 @@
+#include "client/ssl_client.h"
+
 #include <glog/logging.h>
 #include <openssl/bio.h>
 #include <openssl/ssl.h>
 #include <openssl/x509.h>
 
 #include "client/client.h"
-#include "client/ssl_client.h"
 #include "log/cert.h"
 #include "log/cert_submission_handler.h"
 #include "log/ct_extensions.h"
@@ -12,14 +13,13 @@
 #include "merkletree/serial_hasher.h"
 #include "proto/serializer.h"
 
-using ct::SignedCertificateTimestamp;
-using ct::SignedCertificateTimestampList;
-using ct::SSLClientCTData;
-using ct::LogEntry;
-using std::string;
-
 using ct::Cert;
 using ct::CertChain;
+using ct::LogEntry;
+using ct::SSLClientCTData;
+using ct::SignedCertificateTimestamp;
+using ct::SignedCertificateTimestampList;
+using std::string;
 
 const uint16_t CT_EXTENSION_TYPE = 18;
 

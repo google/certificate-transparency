@@ -1,11 +1,24 @@
 /* -*- indent-tabs-mode: nil -*- */
+#include "proto/serializer.h"
+
 #include <glog/logging.h>
-#include <string>
 #include <math.h>
+#include <string>
 
 #include "include/types.h"
 #include "proto/ct.pb.h"
-#include "proto/serializer.h"
+
+using ct::DigitallySigned;
+using ct::DigitallySigned_HashAlgorithm_IsValid;
+using ct::DigitallySigned_SignatureAlgorithm_IsValid;
+using ct::LogEntry;
+using ct::LogEntryType_IsValid;
+using ct::PrecertChainEntry;
+using ct::SignedCertificateTimestamp;
+using ct::SignedCertificateTimestampList;
+using ct::Version_IsValid;
+using ct::X509ChainEntry;
+using std::string;
 
 const size_t Serializer::kMaxCertificateLength = (1 << 24) - 1;
 const size_t Serializer::kMaxCertificateChainLength = (1 << 24) - 1;
@@ -23,18 +36,6 @@ const size_t Serializer::kKeyIDLengthInBytes = 32;
 const size_t Serializer::kMerkleLeafTypeLengthInBytes = 1;
 const size_t Serializer::kKeyHashLengthInBytes = 32;
 const size_t Serializer::kTimestampLengthInBytes = 8;
-
-using ct::LogEntry;
-using ct::LogEntryType_IsValid;
-using ct::DigitallySigned;
-using ct::DigitallySigned_HashAlgorithm_IsValid;
-using ct::DigitallySigned_SignatureAlgorithm_IsValid;
-using ct::SignedCertificateTimestamp;
-using ct::SignedCertificateTimestampList;
-using ct::X509ChainEntry;
-using ct::PrecertChainEntry;
-using ct::Version_IsValid;
-using std::string;
 
 // static
 // Returns the number of bytes needed to store a value up to max_length.

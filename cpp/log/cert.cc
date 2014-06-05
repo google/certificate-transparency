@@ -17,6 +17,9 @@
 #include "merkletree/serial_hasher.h"
 #include "util/openssl_util.h"  // For LOG_OPENSSL_ERRORS
 
+using std::string;
+using util::ClearOpenSSLErrors;
+
 #if OPENSSL_VERSION_NUMBER < 0x10002000L
 # define X509_get_cert_info(x509) (x509)->cert_info
 # define X509_CINF_set_modified(c) ((c)->enc.modified = 1)
@@ -26,9 +29,6 @@
 #endif
 
 namespace ct {
-
-using std::string;
-using util::ClearOpenSSLErrors;
 
 Cert::Cert(X509 *x509) : x509_(x509) {
 }

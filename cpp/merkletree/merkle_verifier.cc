@@ -1,11 +1,9 @@
+#include "merkletree/merkle_verifier.h"
+
 #include <stddef.h>
 #include <vector>
 
-#include "merkletree/merkle_verifier.h"
-
 using std::string;
-
-class SerialHasher;
 
 MerkleVerifier::MerkleVerifier(SerialHasher *hasher) : treehasher_(hasher) {
 }

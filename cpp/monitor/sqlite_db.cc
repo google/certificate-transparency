@@ -5,8 +5,8 @@
 
 #include "log/sqlite_statement.h"
 
-using std::string;
 using sqlite::Statement;
+using std::string;
 
 namespace monitor {
 

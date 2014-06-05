@@ -3,12 +3,11 @@
 #include <openssl/bio.h>
 #include <openssl/err.h>
 #include <openssl/pem.h>
-
 #include <string>
 
-namespace util {
-
 using std::string;
+
+namespace util {
 
 string DumpOpenSSLErrorStack() {
   if (ERR_peek_error() == 0)

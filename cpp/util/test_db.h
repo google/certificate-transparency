@@ -3,6 +3,7 @@
 
 #include <gflags/gflags.h>
 #include <glog/logging.h>
+#include <stdlib.h>
 
 #include "util/util.h"
 

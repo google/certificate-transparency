@@ -1,7 +1,8 @@
 /* -*- mode: c++; indent-tabs-mode: nil -*- */
-
 #ifndef LOG_TEST_DB_H
 #define LOG_TEST_DB_H
+
+#include <sys/stat.h>
 
 #include "util/test_db.h"
 #include "log/database.h"

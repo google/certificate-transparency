@@ -1,9 +1,10 @@
 /* -*- indent-tabs-mode: nil -*- */
+#include "log/frontend.h"
+
 #include <glog/logging.h>
 
 #include "log/cert.h"
 #include "log/cert_submission_handler.h"
-#include "log/frontend.h"
 #include "log/frontend_signer.h"
 #include "proto/ct.pb.h"
 

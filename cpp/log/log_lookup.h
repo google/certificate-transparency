@@ -1,12 +1,13 @@
 /* -*- mode: c++; indent-tabs-mode: nil -*- */
-
 #ifndef LOG_LOOKUP_H
 #define LOG_LOOKUP_H
 
 #include <map>
 #include <stdint.h>
+#include <string>
 
 #include "merkletree/merkle_tree.h"
+#include "proto/ct.pb.h"
 
 template <class Logged> class Database;
 

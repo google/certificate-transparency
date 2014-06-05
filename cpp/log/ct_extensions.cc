@@ -1,11 +1,10 @@
 #include "log/ct_extensions.h"
 
+#include <glog/logging.h>
 #include <openssl/asn1.h>
 #include <openssl/objects.h>
 #include <openssl/x509v3.h>
 #include <string.h>
-
-#include <glog/logging.h>
 
 namespace ct {
 int NID_ctSignedCertificateTimestampList = 0;

@@ -1,11 +1,11 @@
 #ifndef SQLITE_STATEMENT_H
 #define SQLITE_STATEMENT_H
 
+#include <glog/logging.h>
 #include <sqlite3.h>
+#include <string>
 
 namespace sqlite {
-
-using std::string;
 
 // Reduce the ugliness of the sqlite3 API.
 class Statement {
@@ -23,7 +23,7 @@ class Statement {
   // Fields start at 0! |value| must have lifetime that covers its
   // use, which is up until the SQL statement finishes executing
   // (i.e. after the last Step()).
-  void BindBlob(unsigned field, const string &value) {
+  void BindBlob(unsigned field, const std::string &value) {
     CHECK_EQ(SQLITE_OK, sqlite3_bind_blob(stmt_, field + 1, value.data(),
                                           value.length(), NULL));
   }
@@ -32,7 +32,7 @@ class Statement {
     CHECK_EQ(SQLITE_OK, sqlite3_bind_int64(stmt_, field + 1, value));
   }
 
-  void GetBlob(unsigned column, string *value) {
+  void GetBlob(unsigned column, std::string *value) {
     const void *data = sqlite3_column_blob(stmt_, column);
     CHECK_NOTNULL(data);
     value->assign(static_cast<const char *>(data),

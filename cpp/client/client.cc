@@ -1,3 +1,5 @@
+#include "client/client.h"
+
 #include <arpa/inet.h>
 #include <glog/logging.h>
 #include <netinet/in.h>
@@ -5,8 +7,6 @@
 #include <stdint.h>
 #include <sys/socket.h>
 #include <unistd.h>
-
-#include "client/client.h"
 
 #ifdef __MACH__
 // does not exist on MacOS

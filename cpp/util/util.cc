@@ -1,3 +1,5 @@
+#include "util/util.h"
+
 #include <assert.h>
 #include <cstring>
 #include <fstream>
@@ -11,11 +13,9 @@
 #include <sys/time.h>
 #include <unistd.h>
 
-#include "util/util.h"
+using std::string;
 
 namespace util {
-
-using std::string;
 
 namespace {
 const char nibble[] = "0123456789abcdef";

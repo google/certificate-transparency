@@ -1,11 +1,12 @@
 /* -*- indent-tabs-mode: nil -*- */
+#include "log/log_lookup.h"
+
 #include <glog/logging.h>
 #include <map>
 #include <stdint.h>
 #include <stdlib.h>
 
 #include "log/database.h"
-#include "log/log_lookup.h"
 #include "merkletree/merkle_tree.h"
 #include "merkletree/serial_hasher.h"
 #include "proto/ct.pb.h"

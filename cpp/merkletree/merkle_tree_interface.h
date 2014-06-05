@@ -4,6 +4,9 @@
 #ifndef SRC_MERKLETREE_MERKLE_TREE_INTERFACE_H_
 #define SRC_MERKLETREE_MERKLE_TREE_INTERFACE_H_
 
+#include <stddef.h>
+#include <string>
+
 namespace ct {
 
 // An interface for Merkle trees.  See specializations in

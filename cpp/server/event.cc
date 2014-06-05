@@ -1,9 +1,9 @@
 /* -*- indent-tabs-mode: nil -*- */
+#include "event.h"
+
 #include <limits.h>
 #include <openssl/evp.h>
 #include <openssl/pem.h>
-
-#include "event.h"
 
 time_t Services::rough_time_;
 
