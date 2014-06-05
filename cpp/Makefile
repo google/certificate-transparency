@@ -1,3 +1,10 @@
+
+# Make sure this is always first.
+.PHONY: default
+default: all
+
+-include local.mk
+
 CXXFLAG = -Wall -Werror -g -O3
 
 INCLUDE = -I.
