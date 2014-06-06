@@ -481,5 +481,3 @@ class MerkleVerifier(object):
                                "root hash. Constructed: %s Expected: %s" %
                                (calculated_root_hash.encode("base64").strip(),
                                 sth.sha256_root_hash.encode("base64").strip()))
-
-
