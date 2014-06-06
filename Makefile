@@ -3,6 +3,7 @@
 all: cpp java python
 
 .DELETE_ON_ERROR:
+
 .PHONY: clean all alltests clean \
 	java java_test java_clean cpp cpp_test cpp_clean \
 	python python_test	
@@ -17,19 +18,19 @@ java_clean:
 	ant clean
 
 cpp:
-	cd cpp && make
+	@$(MAKE) -C cpp
 
 cpp_test: cpp
-	cd cpp && make test
+	@$(MAKE) -C cpp test
 
 cpp_clean:
-	cd cpp && make clean
+	@$(MAKE) -C cpp clean
 
 python:
-	cd python && make
+	@$(MAKE) -C python
 
 python_test: python
-	cd python && make test
+	@$(MAKE) -C python test
 
 alltests: cpp_test java_test python_test
 

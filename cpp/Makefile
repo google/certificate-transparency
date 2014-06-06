@@ -78,6 +78,7 @@ all: unit_tests client/ct server/ct-server server/blob-server \
      server/ct-rfc-server
 
 .DELETE_ON_ERROR:
+
 .PHONY: clean all unit_tests test alltests benchmark clean \
         proto_tests merkletree_tests log_tests client_tests \
 	monitor_tests
@@ -350,7 +351,7 @@ test: all
 
 # Unit tests plus end-to-end tests. Make sure to set up links in test/  first.
 alltests: test
-	cd test && $(MAKE) test
+	$(MAKE) -C test test
 
 benchmark: merkletree/merkle_tree_large_test log/database_large_test
 	merkletree/merkle_tree_large_test

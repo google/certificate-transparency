@@ -1,5 +1,5 @@
 test: apachectl mod_ssl.so
-	cd .. && $(MAKE)
+	$(MAKE) -C ..
 	OPENSSLDIR=$(OPENSSLDIR) ./sslconnect_test.sh
 
 apachectl:
