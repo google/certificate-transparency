@@ -23,7 +23,7 @@ string TreeHasher::HashEmpty() {
   return emptyhash_;
 }
 
-string TreeHasher::HashLeaf(const string &data) {
+string TreeHasher::HashLeaf(const string &data) const {
   hasher_->Reset();
   hasher_->Update(kLeafPrefix);
   hasher_->Update(data);

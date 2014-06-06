@@ -133,7 +133,7 @@ LogLookup<Logged>::AuditProof(const string &merkle_leaf_hash, size_t tree_size,
 }
 
 template <class Logged> string
-LogLookup<Logged>::LeafHash(const Logged &logged) {
+LogLookup<Logged>::LeafHash(const Logged &logged) const {
   string serialized_leaf;
   CHECK(logged.SerializeForLeaf(&serialized_leaf));
   return cert_tree_.LeafHash(serialized_leaf);

@@ -23,7 +23,7 @@ class MerkleTreeInterface {
   virtual size_t LeafCount() const = 0;
 
   // Returns the leaf hash, but do not append the data to the tree.
-  virtual std::string LeafHash(const std::string &data) = 0;
+  virtual std::string LeafHash(const std::string &data) const = 0;
 
   // Number of levels. An empty tree has 0 levels, a tree with 1 leaf has
   // 1 level, a tree with 2 leaves has 2 levels, and a tree with n leaves has

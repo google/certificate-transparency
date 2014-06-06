@@ -42,7 +42,7 @@ class MerkleTree : public ct::MerkleTreeInterface {
   }
 
   // Return the leaf hash, but do not append the data to the tree.
-  virtual std::string LeafHash(const std::string &data) {
+  virtual std::string LeafHash(const std::string &data) const {
     return treehasher_.HashLeaf(data);
   }
 

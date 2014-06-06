@@ -15,7 +15,7 @@ class TreeHasher {
 
   std::string HashEmpty();
 
-  std::string HashLeaf(const std::string &data);
+  std::string HashLeaf(const std::string &data) const;
 
   // Accepts arbitrary strings as children. When hashing
   // digests, it is the responsibility of the caller to

@@ -46,14 +46,14 @@ template <class Logged> class LogLookup {
   }
 
   // Get the |index|th log entry.
-  LookupResult GetEntry(size_t index, Logged *result) {
+  LookupResult GetEntry(size_t index, Logged *result) const {
     if (db_->LookupByIndex(index, result) != Database<Logged>::LOOKUP_OK)
       return NOT_FOUND;
     return OK;
   }
 
  private:
-  std::string LeafHash(const Logged &logged);
+  std::string LeafHash(const Logged &logged) const;
   // We keep a hash -> index mapping in memory so that we can quickly serve
   // Merkle proofs without having to query the database at all.
   // Note that 32 bytes is an overkill and we can optimize this to use
