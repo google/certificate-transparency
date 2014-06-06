@@ -6,52 +6,53 @@ default: all
 -include local.mk
 
 CXXFLAG = -Wall -Werror -g -O3
+LINK.o = $(LINK.cc)
 
 INCLUDE = -I.
 LOCAL_LIBS = log/libcert.a log/libdatabase.a log/liblog.a \
              merkletree/libmerkletree.a \
              proto/libproto.a util/libutil.a
-SYS_LIBS = -lpthread -lgflags -lglog -lssl -lcrypto \
-           -lsqlite3 -lprotobuf -lcurl -lcppnetlib-uri
+LDLIBS = -lpthread -lgflags -lglog -lssl -lcrypto \
+         -lsqlite3 -lprotobuf -lcurl -lcppnetlib-uri
 
 PLATFORM = $(shell uname -s)
 ifneq ($(PLATFORM), FreeBSD)
-  SYS_LIBS += -lresolv
+  LDLIBS += -lresolv
 endif
 
 ifeq ($(PLATFORM), Darwin)
-  SYS_LIBS += -lboost_system-mt
+  LDLIBS += -lboost_system-mt
 else
-  SYS_LIBS += -lboost_system
+  LDLIBS += -lboost_system
 endif
 
 # Need OpenSSL >= 1.0.0
 ifneq ($(OPENSSLDIR),)
   INCLUDE += -I $(OPENSSLDIR)/include
-  SYS_LIBS += -L $(OPENSSLDIR) -L $(OPENSSLDIR)/lib -Wl,-rpath,$(OPENSSLDIR) \
-          -Wl,-rpath,$(OPENSSLDIR)/lib
+  LDLIBS += -L $(OPENSSLDIR) -L $(OPENSSLDIR)/lib -Wl,-rpath,$(OPENSSLDIR) \
+            -Wl,-rpath,$(OPENSSLDIR)/lib
 endif
 
 # Allow non-system version of curl to be used.
 # Useful if it was built with a custom OpenSSL version.
 ifneq ($(CURLDIR),)
   INCLUDE += -I $(CURLDIR)/include
-  SYS_LIBS += -L $(CURLDIR)/lib/.libs -Wl,-rpath,$(CURLDIR)/lib/.libs
+  LDLIBS += -L $(CURLDIR)/lib/.libs -Wl,-rpath,$(CURLDIR)/lib/.libs
 endif
 
 # Need cpp-netlib
 ifneq ($(CPPNETLIBDIR),)
   INCLUDE += -I $(CPPNETLIBDIR)
-  SYS_LIBS += -L $(CPPNETLIBDIR)/libs/network/src \
-              -Wl,-rpath,$(CPPNETLIBDIR)/libs/network/src
+  LDLIBS += -L $(CPPNETLIBDIR)/libs/network/src \
+            -Wl,-rpath,$(CPPNETLIBDIR)/libs/network/src
 endif
 
 # Json library location explicitly specified - link against that.
 ifneq ($(JSONCLIBDIR),)
 	INCLUDE += -I $(JSONCLIBDIR)/include
-	SYS_LIBS += -L $(JSONCLIBDIR)/lib -Wl,-rpath,$(JSONCLIBDIR)/lib -ljson-c
+	LDLIBS += -L $(JSONCLIBDIR)/lib -Wl,-rpath,$(JSONCLIBDIR)/lib -ljson-c
 else
-	SYS_LIBS += -ljson
+	LDLIBS += -ljson
 endif
 
 # Need gtest
@@ -60,7 +61,7 @@ INCLUDE += -I $(GTESTDIR)/include
 
 # Allow user-system overrides
 INCLUDE += -I /usr/local/include
-SYS_LIBS += -L /usr/local/lib
+LDLIBS += -L /usr/local/lib
 
 CXXFLAGS = $(INCLUDE) $(CXXFLAG) $(LOCAL_CXXFLAGS)
 
@@ -159,7 +160,6 @@ util/libutil.a: util/util.o util/openssl_util.o util/testing.o
 	ar -rcs $@ $^
 
 util/json_wrapper_test: util/json_wrapper_test.o util/libutil.a
-	$(CXX) -o $@ $^ $(SYS_LIBS)
 
 ### proto/ targets
 proto/libproto.a: proto/ct.pb.o proto/serializer.o
@@ -169,7 +169,6 @@ proto/libproto.a: proto/ct.pb.o proto/serializer.o
 proto_tests: $(PROTO_TESTS)
 
 proto/serializer_test: proto/serializer_test.o proto/libproto.a util/libutil.a
-	$(CXX) -o $@ $^ $(SYS_LIBS)
 
 ### merkletree/ targets
 merkletree/libmerkletree.a: merkletree/compact_merkle_tree.o \
@@ -184,20 +183,16 @@ merkletree_tests: $(MERKLETREE_TESTS)
 
 merkletree/merkle_tree_large_test: merkletree/merkle_tree_large_test.o \
                                    merkletree/libmerkletree.a util/libutil.a
-	$(CXX) -o $@ $^ $(SYS_LIBS)
 
 merkletree/merkle_tree_test: merkletree/merkle_tree_test.o \
                              merkletree/libmerkletree.a util/libutil.a
-	$(CXX) -o $@ $^ $(SYS_LIBS)
 
 merkletree/serial_hasher_test: merkletree/serial_hasher_test.o \
                                merkletree/serial_hasher.o util/libutil.a
-	$(CXX) -o $@ $^ $(SYS_LIBS)
 
 merkletree/tree_hasher_test: merkletree/tree_hasher_test.o \
                              merkletree/serial_hasher.o \
                              merkletree/tree_hasher.o util/libutil.a
-	$(CXX) -o $@ $^ $(SYS_LIBS)
 
 ### log/ targets
 log/libcert.a: log/cert.o log/cert_checker.o log/cert_submission_handler.o \
@@ -223,7 +218,6 @@ log/cert_test: log/cert_test.o log/cert.o log/ct_extensions.o util/libutil.a \
                log/frontend_signer.o log/cert_submission_handler.o \
                log/log_signer.o log/signer.o log/verifier.o proto/serializer.o \
                log/cert_checker.o
-	$(CXX) -o $@ $^ $(SYS_LIBS)
 
 log/cert_checker_test: log/cert_checker_test.o log/cert.o log/cert_checker.o \
                        log/ct_extensions.o util/libutil.a \
@@ -231,37 +225,31 @@ log/cert_checker_test: log/cert_checker_test.o log/cert.o log/cert_checker.o \
                        log/frontend_signer.o log/cert_submission_handler.o \
                        log/log_signer.o log/signer.o log/verifier.o \
                        proto/serializer.o log/cert_checker.o
-	$(CXX) -o $@ $^ $(SYS_LIBS)
 
 log/cert_submission_handler_test: log/cert_submission_handler_test.o \
                                   log/libcert.a proto/libproto.a \
                                   util/libutil.a log/frontend.o \
                                   log/frontend_signer.o \
                                   log/log_signer.o log/signer.o log/verifier.o
-	$(CXX) -o $@ $^ $(SYS_LIBS)
 
 log/ct_extensions_test: log/ct_extensions_test.o log/libcert.a util/libutil.a \
                         log/liblog.a proto/ct.pb.o \
                         log/cert_submission_handler.o proto/serializer.o \
                         log/cert_checker.o
-	$(CXX) -o $@ $^ $(SYS_LIBS)
 
 log/database_large_test: log/database_large_test.o log/libdatabase.a \
                          log/log_signer.o log/signer.o log/verifier.o \
                          log/test_signer.o merkletree/libmerkletree.a \
                          proto/libproto.a util/libutil.a
-	$(CXX) -o $@ $^ $(SYS_LIBS)
 
 log/database_test: log/database_test.o log/libdatabase.a \
                    log/log_signer.o log/signer.o log/verifier.o \
                    log/test_signer.o merkletree/libmerkletree.a \
                    proto/libproto.a util/libutil.a
-	$(CXX) -o $@ $^ $(SYS_LIBS)
 
 log/file_storage_test: log/file_storage_test.o log/libdatabase.a \
                        proto/libproto.a util/libutil.a \
                        merkletree/libmerkletree.a
-	$(CXX) -o $@ $^ $(SYS_LIBS)
 
 log/frontend_signer_test: log/frontend_signer_test.o \
                           log/frontend_signer.o \
@@ -269,7 +257,6 @@ log/frontend_signer_test: log/frontend_signer_test.o \
                           log/log_verifier.o log/test_signer.o log/libcert.a \
                           log/libdatabase.a merkletree/libmerkletree.a \
                           proto/libproto.a util/libutil.a
-	$(CXX) -o $@ $^ $(SYS_LIBS)
 
 log/frontend_test: log/frontend_test.o log/frontend.o \
                    log/frontend_signer.o \
@@ -277,33 +264,27 @@ log/frontend_test: log/frontend_test.o log/frontend.o \
                    log/log_verifier.o log/test_signer.o \
                    log/libcert.a log/libdatabase.a merkletree/libmerkletree.a \
                    proto/libproto.a util/libutil.a
-	$(CXX) -o $@ $^ $(SYS_LIBS)
 
 log/log_lookup_test: log/log_lookup_test.o log/test_signer.o log/libdatabase.a \
                      log/liblog.a merkletree/libmerkletree.a proto/libproto.a \
                      util/libutil.a
-	$(CXX) -o $@ $^ $(SYS_LIBS)
 
 log/log_signer_test: log/log_signer_test.o log/log_signer.o log/signer.o \
                      log/verifier.o log/test_signer.o \
                      merkletree/libmerkletree.a proto/libproto.a util/libutil.a
-	$(CXX) -o $@ $^ $(SYS_LIBS)
 
 log/signer_verifier_test: log/signer_verifier_test.o log/log_signer.o \
                      log/signer.o log/verifier.o log/test_signer.o \
                      merkletree/libmerkletree.a proto/libproto.a util/libutil.a
-	$(CXX) -o $@ $^ $(SYS_LIBS)
 
 log/tree_signer_test: log/tree_signer_test.o log/log_signer.o log/signer.o \
                       log/verifier.o log/test_signer.o log/tree_signer_cert.o \
                       log/log_verifier.o \
                       log/libdatabase.a merkletree/libmerkletree.a \
                       proto/libproto.a util/libutil.a
-	$(CXX) -o $@ $^ $(SYS_LIBS)
 
 log/logged_certificate_test: log/logged_certificate_test.o proto/libproto.a \
                              util/libutil.a merkletree/libmerkletree.a
-	$(CXX) -o $@ $^ $(SYS_LIBS)
 
 monitor_tests: $(MONITOR_TESTS)
 
@@ -311,28 +292,22 @@ monitor/database_test: monitor/database_test.o monitor/database.o \
                        monitor/sqlite_db.o util/libutil.a log/test_signer.o \
                        merkletree/libmerkletree.a log/log_signer.o \
                        log/signer.o log/verifier.o proto/libproto.a
-	$(CXX) -o $@ $^ $(SYS_LIBS)
 
 # client
 client/ct: client/ct.o client/client.o client/log_client.o client/ssl_client.o \
            client/http_log_client.o monitor/sqlite_db.o monitor/database.o \
            monitor/monitor.o \
            $(LOCAL_LIBS)
-	$(CXX) -o $@ $^ $(SYS_LIBS)
 
 # server
 server/ct-server: server/ct-server.o server/event.o $(LOCAL_LIBS)
-	$(CXX) -o $@ $^ $(SYS_LIBS)
 
-# FIXME(benl): unclear why a second copy of liblog is needed.
 server/ct-rfc-server: server/ct-rfc-server.o $(LOCAL_LIBS)
-	$(CXX) -o $@ $^ $(SYS_LIBS) log/liblog.a
 
 server/blob-server: server/blob-server.o server/event.o \
                     server/sqlite_db_blob.o server/tree_signer_blob.o \
                     server/log_lookup_blob.o \
                     $(LOCAL_LIBS)
-	$(CXX) -o $@ $^ $(SYS_LIBS)
 
 test: all
 	util/json_wrapper_test
