@@ -114,13 +114,12 @@ SQLiteDB<Logged>::LookupByHash(const string &hash) const {
 
   return this->LOOKUP_OK;
 }
-    
+
 template <class Logged> typename Database<Logged>::LookupResult
 SQLiteDB<Logged>::LookupByHash(const string &hash, Logged *result) const {
   CHECK_NOTNULL(result);
 
-  Statement statement(db_, "SELECT entry, sequence FROM leaves "
-                      "WHERE hash = ?");
+  Statement statement(db_, "SELECT entry, sequence FROM leaves WHERE hash = ?");
 
   statement.BindBlob(0, hash);
 
