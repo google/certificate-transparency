@@ -7,6 +7,14 @@ import static org.mockito.Matchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
+import java.io.File;
+import java.io.IOException;
+import java.lang.reflect.InvocationTargetException;
+import java.lang.reflect.Method;
+import java.security.cert.Certificate;
+import java.security.cert.CertificateException;
+import java.util.List;
+
 import org.apache.commons.codec.binary.Base64;
 import org.certificatetransparency.ctlog.proto.Ct;
 import org.certificatetransparency.ctlog.serialization.CryptoDataLoader;
@@ -18,12 +26,6 @@ import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
 import org.mockito.Matchers;
 
-import java.io.File;
-import java.io.IOException;
-import java.security.cert.Certificate;
-import java.security.cert.CertificateException;
-import java.util.List;
-
 
 /**
  * Test interaction with the Log http server.
@@ -31,7 +33,14 @@ import java.util.List;
 @RunWith(JUnit4.class)
 public class HttpLogClientTest {
   public static final String TEST_DATA_PATH = "test/testdata/test-colliding-roots.pem";
-
+  
+  public static final String STH_RESPONSE = "" 
+      + "{\"timestamp\":1402415255382,"
+      + "\"tree_head_signature\":\"BAMARzBFAiBX9fHXbK3Yi+P+bGM8mlL8XFmwZ7fkbhK2GqlnoJkMkQIhANGoUuD+"
+      + "JvjFTRdESfKO5428e1HAQL412Sa5e16D4E3M\","
+      + "\"sha256_root_hash\":\"jdH9k+\\/lb9abMz3N8rVmwrw8MWU7v55+nSAXej3hqPg=\","
+      + "\"tree_size\":4301837}";
+  
   public static final String JSON_RESPONSE = ""
       + "{\"sct_version\":0,\"id\":\"pLkJkLQYWBSHuxOizGdwCjw1mAT5G9+443fNDsgN3BA=\","
       + "\"timestamp\":1373015623951,\n"
@@ -84,5 +93,24 @@ public class HttpLogClientTest {
     assertNotNull("Should have a meaningful SCT", res);
 
     verifySCTContents(res);
+  }
+  
+  @Test
+  public void parceLogSTH() throws IllegalAccessException, IllegalArgumentException,
+    InvocationTargetException, NoSuchMethodException, SecurityException {
+    Class<?> params[] = new Class[1];
+    params[0] = String.class;
+
+    HttpLogClient client = new HttpLogClient("");
+    Method method = HttpLogClient.class.getDeclaredMethod("parseSTHResponse", params);
+    method.setAccessible(true);
+    Ct.SignedTreeHead sth = (Ct.SignedTreeHead ) method.invoke(client, STH_RESPONSE);
+    
+    Assert.assertNotNull(sth);
+    Assert.assertEquals(1402415255382L, sth.getTimestamp());
+    Assert.assertEquals(4301837, sth.getTreeSize());
+    
+    String rootHash = Base64.encodeBase64String(sth.getSha256RootHash().toByteArray());
+    Assert.assertTrue("jdH9k+/lb9abMz3N8rVmwrw8MWU7v55+nSAXej3hqPg=".equals(rootHash));
   }
 }
