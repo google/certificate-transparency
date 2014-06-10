@@ -1,7 +1,13 @@
 package org.certificatetransparency.ctlog.comm;
 
-import com.google.common.base.Preconditions;
-import com.google.protobuf.ByteString;
+import java.io.ByteArrayInputStream;
+import java.security.cert.Certificate;
+import java.security.cert.CertificateEncodingException;
+import java.security.cert.CertificateException;
+import java.security.cert.CertificateFactory;
+import java.util.ArrayList;
+import java.util.Iterator;
+import java.util.List;
 
 import org.apache.commons.codec.binary.Base64;
 import org.certificatetransparency.ctlog.CertificateInfo;
@@ -12,16 +18,23 @@ import org.json.simple.JSONArray;
 import org.json.simple.JSONObject;
 import org.json.simple.JSONValue;
 
-import java.io.ByteArrayInputStream;
-import java.security.cert.Certificate;
-import java.security.cert.CertificateEncodingException;
-import java.util.List;
+import com.google.common.base.Preconditions;
+import com.google.protobuf.ByteString;
 
 
 /**
  * A CT HTTP client. Abstracts away the json encoding necessary for the server.
  */
 public class HttpLogClient {
+  private static final String ADD_PRE_CHAIN_PATH = "add-pre-chain";
+  private static final String ADD_CHAIN_PATH = "add-chain";
+  private static final String GET_STH_PATH = "get-sth";
+  private static final String GET_ROOTS_PATH = "get-roots";
+  private static final String GET_ENTRIES_PATH = "get-entries";
+  private static final String GET_STH_CONSISTENCY_PATH = "get-sth-consistency";
+  private static final String GET_PROOF_BY_HASH_PATH = "get-proof-by-hash";
+  private static final String GET_ENTRY_AND_PROOF_PATH = "get-entry-and-proof";
+
   private final String logUrl;
   private final HttpPostInvoker postInvoker;
 
@@ -130,12 +143,82 @@ public class HttpLogClient {
     String jsonPayload = encodeCertificates(certificatesChain).toJSONString();
     String methodPath;
     if (isPreCertificate) {
-      methodPath = "add-pre-chain";
+      methodPath = ADD_PRE_CHAIN_PATH;
     } else {
-      methodPath = "add-chain";
+      methodPath = ADD_CHAIN_PATH;
     }
 
     String response = postInvoker.makePostRequest(logUrl + methodPath, jsonPayload);
     return parseServerResponse(response);
+  }
+  
+  /**
+   * Retrieves Latest Signed Tree Head from the log.
+   * @return latest STH
+   */
+  public Ct.SignedTreeHead getSTH() {
+    String response = postInvoker.makeGetRequest(logUrl + GET_STH_PATH, null);
+    return parseSTHResponse(response);
+  }
+  
+  /**
+   * Retrieves accepted Root Certificates.
+   *
+   * @return a list of root certificates.
+   * @throws CertificateException
+   */
+  public List<Certificate> getLogRoots() throws CertificateException {
+    String response = postInvoker.makeGetRequest(logUrl + GET_ROOTS_PATH, null);
+
+    return parseRootCertsResponse(response);
+  }
+  
+  /**
+   * Parses CT log's response for "get-sth" into a proto object.
+   * @param sthResponse
+   * @return a proto object of SignedTreeHead type.
+   */
+  private Ct.SignedTreeHead parseSTHResponse(String sthResponse) {
+    if (sthResponse == null) {
+      return null;
+    }
+
+    JSONObject response = (JSONObject) JSONValue.parse(sthResponse);
+    long treeSize = (Long) response.get("tree_size");
+    long timeStamp = (Long) response.get("timestamp");
+    String base64Signature = (String) response.get("tree_head_signature");
+    String sha256RootHash = (String) response.get("sha256_root_hash");
+
+    Ct.SignedTreeHead.Builder builder =  Ct.SignedTreeHead.newBuilder();
+    builder.setVersion(Ct.Version.V1);
+    builder.setTreeSize(treeSize);
+    builder.setTimestamp(timeStamp);
+    builder.setSha256RootHash(ByteString.copyFrom(Base64.decodeBase64(sha256RootHash)));
+    builder.setSignature(Deserializer.parseDigitallySignedFromBinary(
+      new ByteArrayInputStream(Base64.decodeBase64(base64Signature))));
+
+    return builder.build();
+  }
+
+  /**
+   * Parses the response from "get-roots" GET method.
+   *
+   * @param rootCerts JSONObject with certificates to parse.
+   * @return a list of root certificates. 
+   * @throws CertificateException
+   */
+  private List<Certificate> parseRootCertsResponse(String response) throws CertificateException {
+    List<Certificate> certs = new ArrayList<Certificate>();
+    
+    JSONObject entries = (JSONObject) JSONValue.parse(response);
+    JSONArray entriesArr = (JSONArray) entries.get("certificates");
+    Iterator<?> iter = entriesArr.iterator();
+    while (iter.hasNext()) {
+      byte[] in = Base64.decodeBase64(iter.next().toString());
+      Certificate cert = CertificateFactory.getInstance("X509").generateCertificate(
+        new ByteArrayInputStream(in));
+      certs.add(cert);
+    }
+    return certs;
   }
 }
