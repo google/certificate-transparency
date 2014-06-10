@@ -7,22 +7,29 @@ import static org.mockito.Matchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
+import java.io.File;
+import java.io.FileNotFoundException;
+import java.io.FileReader;
+import java.io.IOException;
+import java.lang.reflect.InvocationTargetException;
+import java.security.cert.Certificate;
+import java.security.cert.CertificateException;
+import java.util.List;
+
 import org.apache.commons.codec.binary.Base64;
+import org.certificatetransparency.ctlog.CertificateTransparencyException;
+import org.certificatetransparency.ctlog.TestData;
 import org.certificatetransparency.ctlog.proto.Ct;
 import org.certificatetransparency.ctlog.serialization.CryptoDataLoader;
 import org.json.simple.JSONArray;
 import org.json.simple.JSONObject;
+import org.json.simple.parser.JSONParser;
+import org.json.simple.parser.ParseException;
 import org.junit.Assert;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
 import org.mockito.Matchers;
-
-import java.io.File;
-import java.io.IOException;
-import java.security.cert.Certificate;
-import java.security.cert.CertificateException;
-import java.util.List;
 
 
 /**
@@ -31,6 +38,27 @@ import java.util.List;
 @RunWith(JUnit4.class)
 public class HttpLogClientTest {
   public static final String TEST_DATA_PATH = "test/testdata/test-colliding-roots.pem";
+
+  public static final String STH_RESPONSE = ""
+      + "{\"timestamp\":1402415255382,"
+      + "\"tree_head_signature\":\"BAMARzBFAiBX9fHXbK3Yi+P+bGM8mlL8XFmwZ7fkbhK2GqlnoJkMkQIhANGoUuD+"
+      + "JvjFTRdESfKO5428e1HAQL412Sa5e16D4E3M\","
+      + "\"sha256_root_hash\":\"jdH9k+\\/lb9abMz3N8rVmwrw8MWU7v55+nSAXej3hqPg=\","
+      + "\"tree_size\":4301837}";
+  
+  public static final String BAD_STH_RESPONSE_INVALID_TIMESTAMP = ""
+      + "{\"timestamp\":-1,"
+      + "\"tree_head_signature\":\"BAMARzBFAiBX9fHXbK3Yi+P+bGM8mlL8XFmwZ7fkbhK2GqlnoJkMkQIhANGoUuD+"
+      + "JvjFTRdESfKO5428e1HAQL412Sa5e16D4E3M\","
+      + "\"sha256_root_hash\":\"jdH9k+\\/lb9abMz3N8rVmwrw8MWU7v55+nSAXej3hqPg=\","
+      + "\"tree_size\":0}";
+  
+  public static final String BAD_STH_RESPONSE_INVALID_ROOT_HASH = ""
+          + "{\"timestamp\":1402415255382,"
+          + "\"tree_head_signature\":\"BAMARzBFAiBX9fHXbK3Yi+P+bGM8mlL8XFmwZ7fkbhK2GqlnoJkMkQIhANGoUuD+"
+          + "JvjFTRdESfKO5428e1HAQL412Sa5e16D4E3M\","
+          + "\"sha256_root_hash\":\"jdH9k+\\/lb9abMz3N8r7v55+nSAXej3hqPg=\","
+          + "\"tree_size\":4301837}";
 
   public static final String JSON_RESPONSE = ""
       + "{\"sct_version\":0,\"id\":\"pLkJkLQYWBSHuxOizGdwCjw1mAT5G9+443fNDsgN3BA=\","
@@ -84,5 +112,65 @@ public class HttpLogClientTest {
     assertNotNull("Should have a meaningful SCT", res);
 
     verifySCTContents(res);
+  }
+  
+  @Test
+  public void getLogSTH() throws IllegalAccessException, IllegalArgumentException,
+    InvocationTargetException, NoSuchMethodException, SecurityException {
+    HttpPostInvoker mockInvoker = mock(HttpPostInvoker.class);
+    when(mockInvoker.makeGetRequest(eq("http://ctlog/get-sth"))).thenReturn(STH_RESPONSE);
+
+    HttpLogClient client = new HttpLogClient("http://ctlog/", mockInvoker);
+    Ct.SignedTreeHead sth = client.getLogSTH();
+
+    Assert.assertNotNull(sth);
+    Assert.assertEquals(1402415255382L, sth.getTimestamp());
+    Assert.assertEquals(4301837, sth.getTreeSize());
+    String rootHash = Base64.encodeBase64String(sth.getSha256RootHash().toByteArray());
+    Assert.assertTrue("jdH9k+/lb9abMz3N8rVmwrw8MWU7v55+nSAXej3hqPg=".equals(rootHash));
+  }
+  
+  @Test
+  public void getLogSTHBadResponseTimestamp() throws IllegalAccessException, IllegalArgumentException,
+    InvocationTargetException, NoSuchMethodException, SecurityException {
+    HttpPostInvoker mockInvoker = mock(HttpPostInvoker.class);
+    when(mockInvoker.makeGetRequest(eq("http://ctlog/get-sth"))).thenReturn(BAD_STH_RESPONSE_INVALID_TIMESTAMP);
+
+    HttpLogClient client = new HttpLogClient("http://ctlog/", mockInvoker);
+    try {
+      client.getLogSTH();
+      Assert.fail();
+    } catch (CertificateTransparencyException e) {
+    }
+  }
+  
+  @Test
+  public void getLogSTHBadResponseRootHash() throws IllegalAccessException, IllegalArgumentException,
+    InvocationTargetException, NoSuchMethodException, SecurityException {
+    HttpPostInvoker mockInvoker = mock(HttpPostInvoker.class);
+    when(mockInvoker.makeGetRequest(eq("http://ctlog/get-sth"))).thenReturn(BAD_STH_RESPONSE_INVALID_ROOT_HASH);
+
+    HttpLogClient client = new HttpLogClient("http://ctlog/", mockInvoker);
+    try {
+      client.getLogSTH();
+      Assert.fail();
+    } catch (CertificateTransparencyException e) {
+    }
+  }
+  
+  @Test
+  public void getRootCerts() throws FileNotFoundException, IOException, ParseException {
+    JSONParser parser = new JSONParser();
+    Object obj = parser.parse(new FileReader(TestData.TEST_ROOT_CERTS));
+    JSONObject response = (JSONObject) obj;
+    
+    HttpPostInvoker mockInvoker = mock(HttpPostInvoker.class);
+    when(mockInvoker.makeGetRequest(eq("http://ctlog/get-roots"))).thenReturn(response.toJSONString());
+
+    HttpLogClient client = new HttpLogClient("http://ctlog/", mockInvoker);
+    List<Certificate> rootCerts = client.getLogRoots();
+
+    Assert.assertNotNull(rootCerts);
+    Assert.assertEquals(2, rootCerts.size());
   }
 }

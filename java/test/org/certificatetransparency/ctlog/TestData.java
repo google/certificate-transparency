@@ -48,6 +48,7 @@ public class TestData {
       DATA_ROOT + "test-embedded-with-intermediate-preca-pre-cert.pem";
   public static final String TEST_PRE_CERT_SIGNED_BY_PRECA_INTERMEDIATE_SCT =
       DATA_ROOT + "test-embedded-with-intermediate-preca-pre-cert.proof";
+  public static final String TEST_ROOT_CERTS = DATA_ROOT + "test-root-certs";
 
   static List<Certificate> loadCertificates(String filename) {
     return CryptoDataLoader.certificatesFromFile(new File(filename));
