@@ -143,9 +143,9 @@ public class HttpLogClient {
     String jsonPayload = encodeCertificates(certificatesChain).toJSONString();
     String methodPath;
     if (isPreCertificate) {
-      methodPath = "add-pre-chain";
+      methodPath = ADD_PRE_CHAIN_PATH;
     } else {
-      methodPath = "add-chain";
+      methodPath = ADD_CHAIN_PATH;
     }
 
     String response = postInvoker.makePostRequest(logUrl + methodPath, jsonPayload);
