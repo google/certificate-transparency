@@ -60,7 +60,17 @@ Monitor::VerifyResult Monitor::VerifySTH(uint64_t timestamp) {
   if (timestamp) {
     CHECK_EQ(db_->LookupSTHByTimestamp(timestamp, &sth), Database::LOOKUP_OK);
   } else {
-    GetSTH();
+    GetResult result = GetSTH();
+    switch(result) {
+      case OK:
+        LOG(INFO) << GetResultString(result);
+        break;
+      case NETWORK_PROBLEM:
+        LOG(WARNING) << GetResultString(result);
+        break;
+      default:
+        LOG(FATAL) << GetResultString(result);
+    }
     CHECK_EQ(db_->LookupLatestWrittenSTH(&sth), Database::LOOKUP_OK);
   }
   return VerifySTHInternal(sth);
@@ -135,7 +145,7 @@ Monitor::VerifyResult Monitor::VerifySTHInternal(
 
     CHECK_EQ(db_->SetVerificationLevel(sth, level), Database::WRITE_OK);
     LOG(INFO) << "New verification level: "
-              << Database::VerificationLevelString(current_level);
+              << Database::VerificationLevelString(level);
   }
   return result;
 }
@@ -296,6 +306,14 @@ Monitor::CheckResult Monitor::CheckSTHSanity(
                                        Database::WRITE_OK);
     return INSANE;
   }
+
+  if (new_sth.timestamp() > old_sth.timestamp() &&
+      new_sth.tree_size() == old_sth.tree_size() &&
+      new_sth.sha256_root_hash().compare(old_sth.sha256_root_hash()) == 0) {
+    LOG(INFO) << " just with a fresh timestamp.";
+    return REFRESHED;
+  }
+
   LOG(INFO) << " sanity checks passed.";
   return SANE;
 }
@@ -327,17 +345,19 @@ void Monitor::Loop() {
 
     CHECK_EQ(db_->LookupLatestWrittenSTH(&new_sth), Database::LOOKUP_OK);
 
-    if (CheckSTHSanity(old_sth, new_sth) != SANE)
-      continue;
+    CheckResult sanity = CheckSTHSanity(old_sth, new_sth);
+    if (sanity == SANE) {
+      if (GetEntries(old_sth.tree_size(), new_sth.tree_size() - 1) != OK) {
+        continue;
+      }
+    }
+    if (sanity == REFRESHED || sanity == SANE) {
+      // Go on even the confirmation fails to continue to monitor the log.
+      // Nevertheless the failure is logged and written to the database.
+      ConfirmTreeInternal();
 
-    if (GetEntries(old_sth.tree_size(), new_sth.tree_size() - 1) != OK)
-      continue;
-
-    // Go on even the confirmation fails to continue to monitor the log.
-    // Nevertheless the failure is logged and written to the database.
-    ConfirmTreeInternal();
-
-    old_sth = new_sth;
+      old_sth = new_sth;
+    }
   }
 }
 
