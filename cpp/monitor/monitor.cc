@@ -344,7 +344,7 @@ void Monitor::Loop() {
 
     CHECK_EQ(db_->LookupLatestWrittenSTH(&new_sth), Database::LOOKUP_OK);
 
-    CheckResult sanity = CheckSTHSanity(old_sth, new_sth);
+    const CheckResult sanity(CheckSTHSanity(old_sth, new_sth));
     if (sanity == SANE) {
       if (GetEntries(old_sth.tree_size(), new_sth.tree_size() - 1) != OK) {
         continue;
