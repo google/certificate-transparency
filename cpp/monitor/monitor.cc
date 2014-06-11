@@ -63,13 +63,12 @@ Monitor::VerifyResult Monitor::VerifySTH(uint64_t timestamp) {
     const GetResult result(GetSTH());
     switch(result) {
       case OK:
-        LOG(INFO) << GetResultString(result);
         break;
       case NETWORK_PROBLEM:
-        LOG(WARNING) << GetResultString(result);
+        LOG(WARNING) << "network problem";
         break;
       default:
-        LOG(FATAL) << GetResultString(result);
+        LOG(FATAL) << "unknown result from Monitor::GetSTH";
     }
     CHECK_EQ(db_->LookupLatestWrittenSTH(&sth), Database::LOOKUP_OK);
   }

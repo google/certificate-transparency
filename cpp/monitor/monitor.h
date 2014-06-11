@@ -50,18 +50,6 @@ class Monitor
 
   void Loop();
 
-  static std::string GetResultString(GetResult result) {
-    switch(result) {
-      case OK:
-        return "OK";
-      case NETWORK_PROBLEM:
-        return "Network problem";
-      default:
-        assert(false);
-        return "Unknown";
-    }
-  }
-
  private:
   enum CheckResult {
     EQUAL = 0,
