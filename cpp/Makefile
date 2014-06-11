@@ -12,7 +12,7 @@ INCLUDE = -I .
 LOCAL_LIBS = log/libcert.a log/libdatabase.a log/liblog.a \
              merkletree/libmerkletree.a \
              proto/libproto.a util/libutil.a
-LDLIBS = -lpthread -lgflags -lglog -lssl -lcrypto -lldns\
+LDLIBS = -lpthread -lgflags -lglog -lssl -lcrypto -lldns \
          -lsqlite3 -lprotobuf -lcurl -lcppnetlib-uri
 
 PLATFORM := $(shell uname -s)
