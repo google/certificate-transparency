@@ -15,8 +15,8 @@ class Statement {
   Statement(sqlite3 *db, const char *sql) : stmt_(NULL) {
     int ret = sqlite3_prepare_v2(db, sql, -1, &stmt_, NULL);
     if (ret != SQLITE_OK)
-      std::cerr << "ret = " << ret << ", err = " << sqlite3_errmsg(db)
-                << ", sql = " << sql << std::endl;
+      LOG(ERROR) << "ret = " << ret << ", err = " << sqlite3_errmsg(db)
+                 << ", sql = " << sql << std::endl;
 
     CHECK_EQ(SQLITE_OK, ret);
   }
