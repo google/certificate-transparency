@@ -68,7 +68,7 @@ Monitor::VerifyResult Monitor::VerifySTH(uint64_t timestamp) {
         LOG(WARNING) << "network problem";
         break;
       default:
-        LOG(FATAL) << "unknown result from Monitor::GetSTH";
+        LOG(FATAL) << "unknown result from Monitor::GetSTH: " << result;
     }
     CHECK_EQ(db_->LookupLatestWrittenSTH(&sth), Database::LOOKUP_OK);
   }
