@@ -154,6 +154,10 @@ def read_length(buf):
     length, rest = ord(buf[0]), buf[1:]
     if length <= 127:
         return length, rest
+    elif length == 128:
+        # ANS1 "indefinite" length encoding, search \x00\x00 (CER??)
+        pos = rest.find("\x00\x00")
+        return (pos+2, rest)
     length &= _MULTIBYTE_LENGTH_MASK
     if len(rest) < length:
         raise error.ASN1Error("Invalid length encoding")
@@ -1442,7 +1446,12 @@ class Sequence(Constructed, collections.MutableMapping):
     @classmethod
     def _decode_value(cls, buf, strict=True):
         ret = dict()
+        length = None
         for component in cls.components:
+            if buf and component.value_type.tags:
+                first_tag_length = len(component.value_type.tags[-1].value)
+                length = ord(buf[first_tag_length:][0])
+
             try:
                 value, buf = component.value_type.read(buf, strict=strict)
             except error.ASN1TagError:
@@ -1462,6 +1471,12 @@ class Sequence(Constructed, collections.MutableMapping):
                     ret[component.name] = component.default
             else:
                 ret[component.name] = value
+
+            # pretty ugly but this makes the indefinite length encoding work
+            # together with normal length encodings (broken ASN1 gets broken fix)
+            if buf.startswith("\x00\x00") and (length == 0x80 or len(buf)==2):
+                buf = buf[2:]
+
         if buf:
             raise error.ASN1Error("Invalid encoding")
 
