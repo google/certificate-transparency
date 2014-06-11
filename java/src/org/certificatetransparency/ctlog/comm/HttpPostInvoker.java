@@ -17,6 +17,7 @@ import com.sun.org.apache.xml.internal.utils.URI;
 /**
  * Simple delegator to HttpClient, so it can be mocked
  */
+// TODO(eranm) rename HttpPostInvoker to HttpInvoker.
 public class HttpPostInvoker {
   /**
    * Make an HTTP POST method call to the given URL with the provided JSON payload.
@@ -34,6 +35,15 @@ public class HttpPostInvoker {
     } catch (IOException e) {
       throw new LogCommunicationException("Error making POST request to " + url, e);
     }
+  }
+  
+  /**
+   * Makes an HTTP GET method call to the given URL with the provides parameters.
+   * @param ctUrl URL for GET method.
+   * @return Server's response body.
+   */
+  public String makeGetRequest(String url) {
+    return makeGetRequest(url, null);
   }
   
   /**

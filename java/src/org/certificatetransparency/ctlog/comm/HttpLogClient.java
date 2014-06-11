@@ -30,10 +30,6 @@ public class HttpLogClient {
   private static final String ADD_CHAIN_PATH = "add-chain";
   private static final String GET_STH_PATH = "get-sth";
   private static final String GET_ROOTS_PATH = "get-roots";
-  private static final String GET_ENTRIES_PATH = "get-entries";
-  private static final String GET_STH_CONSISTENCY_PATH = "get-sth-consistency";
-  private static final String GET_PROOF_BY_HASH_PATH = "get-proof-by-hash";
-  private static final String GET_ENTRY_AND_PROOF_PATH = "get-entry-and-proof";
 
   private final String logUrl;
   private final HttpPostInvoker postInvoker;
@@ -156,19 +152,17 @@ public class HttpLogClient {
    * Retrieves Latest Signed Tree Head from the log.
    * @return latest STH
    */
-  public Ct.SignedTreeHead getSTH() {
-    String response = postInvoker.makeGetRequest(logUrl + GET_STH_PATH, null);
+  public Ct.SignedTreeHead getLogSTH() {
+    String response = postInvoker.makeGetRequest(logUrl + GET_STH_PATH);
     return parseSTHResponse(response);
   }
   
   /**
    * Retrieves accepted Root Certificates.
-   *
    * @return a list of root certificates.
-   * @throws CertificateException
    */
-  public List<Certificate> getLogRoots() throws CertificateException {
-    String response = postInvoker.makeGetRequest(logUrl + GET_ROOTS_PATH, null);
+  public List<Certificate> getLogRoots() {
+    String response = postInvoker.makeGetRequest(logUrl + GET_ROOTS_PATH);
 
     return parseRootCertsResponse(response);
   }
@@ -178,14 +172,16 @@ public class HttpLogClient {
    * @param sthResponse
    * @return a proto object of SignedTreeHead type.
    */
-  private Ct.SignedTreeHead parseSTHResponse(String sthResponse) {
-    if (sthResponse == null) {
-      return null;
-    }
+  Ct.SignedTreeHead parseSTHResponse(String sthResponse) {
+    Preconditions.checkNotNull(sthResponse, "Sign Tree Head response from a CT log should not be null");
 
     JSONObject response = (JSONObject) JSONValue.parse(sthResponse);
     long treeSize = (Long) response.get("tree_size");
     long timeStamp = (Long) response.get("timestamp");
+    if (treeSize < 0 || timeStamp < 0) {
+      throw new CertificateTransparencyException(String.format("Bad response. Size of tree or timespamp"
+        + " cannot be a negative value. Log Tree size: %d Timestamp: %d", treeSize, timeStamp));
+    }
     String base64Signature = (String) response.get("tree_head_signature");
     String sha256RootHash = (String) response.get("sha256_root_hash");
 
@@ -205,9 +201,8 @@ public class HttpLogClient {
    *
    * @param rootCerts JSONObject with certificates to parse.
    * @return a list of root certificates. 
-   * @throws CertificateException
    */
-  private List<Certificate> parseRootCertsResponse(String response) throws CertificateException {
+  List<Certificate> parseRootCertsResponse(String response) {
     List<Certificate> certs = new ArrayList<Certificate>();
     
     JSONObject entries = (JSONObject) JSONValue.parse(response);
@@ -215,8 +210,13 @@ public class HttpLogClient {
     Iterator<?> iter = entriesArr.iterator();
     while (iter.hasNext()) {
       byte[] in = Base64.decodeBase64(iter.next().toString());
-      Certificate cert = CertificateFactory.getInstance("X509").generateCertificate(
-        new ByteArrayInputStream(in));
+      Certificate cert = null;
+      try {
+        cert = CertificateFactory.getInstance("X509").generateCertificate(new ByteArrayInputStream(in));
+      } catch (CertificateException e) {
+        throw new CertificateTransparencyException("Malformed data from a CT log have been received. "
+          + e.getLocalizedMessage(), e);
+      }
       certs.add(cert);
     }
     return certs;
