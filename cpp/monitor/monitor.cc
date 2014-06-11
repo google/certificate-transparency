@@ -60,7 +60,7 @@ Monitor::VerifyResult Monitor::VerifySTH(uint64_t timestamp) {
   if (timestamp) {
     CHECK_EQ(db_->LookupSTHByTimestamp(timestamp, &sth), Database::LOOKUP_OK);
   } else {
-    GetResult result = GetSTH();
+    const GetResult result(GetSTH());
     switch(result) {
       case OK:
         LOG(INFO) << GetResultString(result);
