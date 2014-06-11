@@ -186,6 +186,7 @@ merkletree_tests: $(MERKLETREE_TESTS)
 
 merkletree/merkle_tree_large_test: merkletree/merkle_tree_large_test.o \
                                    merkletree/libmerkletree.a util/libutil.a
+
 merkletree/merkle_tree_test: merkletree/merkle_tree_test.o \
                              merkletree/libmerkletree.a util/libutil.a
 
