@@ -2,9 +2,9 @@
 
 from distutils.core import setup
 
-setup(name='Certificate Transparency',
-      version='1.0',
-      description='Certificate Transparency Python Parser',
+setup(name='Google Certificate Transparency',
+      version='0.9',
+      description='Certificate Transparency python client and monitor library',
       url='https://github.com/google/certificate-transparency',
       packages=['ct'],
      )
