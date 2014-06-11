@@ -11,14 +11,6 @@
 
 template <class Logged> class Database;
 
-namespace ct {
-
-class MerkleAuditProof;
-class ShortMerkleAuditProof;
-class SignedTreeHead;
-
-};
-
 // Lookups into the database. Read-only, so could also be a mirror.
 // Keeps the entire Merkle Tree in memory to serve audit proofs.
 template <class Logged> class LogLookup {
