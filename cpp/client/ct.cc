@@ -803,7 +803,7 @@ void GetEntries() {
                        e, 0, "x509");
       const ct::X509ChainEntry &x509chain = entry->entry.x509_entry();
       for (int n = 0; n < x509chain.certificate_chain_size(); ++n)
-          WriteCertificate(x509chain.certificate_chain(n), e, n + 1, "x509");
+        WriteCertificate(x509chain.certificate_chain(n), e, n + 1, "x509");
     } else {
       assert(entry->leaf.timestamped_entry().entry_type()
              == ct::PRECERT_ENTRY);
