@@ -5,14 +5,14 @@ default: all
 
 -include local.mk
 
-CXXFLAG := -Wall -Werror -g -O3
-LINK.o := $(LINK.cc)
+CXXFLAG = -Wall -Werror -g -O3
+LINK.o = $(LINK.cc)
 
-INCLUDE := -I.
-LOCAL_LIBS := log/libcert.a log/libdatabase.a log/liblog.a \
-              merkletree/libmerkletree.a \
-              proto/libproto.a util/libutil.a
-LDLIBS := -lpthread -lgflags -lglog -lssl -lcrypto \
+INCLUDE = -I .
+LOCAL_LIBS = log/libcert.a log/libdatabase.a log/liblog.a \
+             merkletree/libmerkletree.a \
+             proto/libproto.a util/libutil.a
+LDLIBS = -lpthread -lgflags -lglog -lssl -lcrypto \
          -lsqlite3 -lprotobuf -lcurl -lcppnetlib-uri
 
 PLATFORM := $(shell uname -s)
@@ -52,8 +52,10 @@ ifneq ($(JSONCLIBDIR),)
 	INCLUDE += -I $(JSONCLIBDIR)/include
 	LDLIBS += -L $(JSONCLIBDIR)/lib -Wl,-rpath,$(JSONCLIBDIR)/lib -ljson-c
 else
-	CXXFLAG += $(shell pkg-config --cflags json-c)
-	LDLIBS += $(shell pkg-config --libs json-c)
+	JSON_C_CFLAGS := $(shell pkg-config --cflags json-c)
+	CXXFLAG += $(JSON_C_CFLAGS)
+	JSON_C_LIBS := $(shell pkg-config --libs json-c)
+	LDLIBS += $(JSON_C_LIBS)
 endif
 
 # Need gtest
