@@ -2,12 +2,15 @@ import base64
 import dns.resolver
 import dns.rdatatype
 import math
+import os
 import random
 import shlex
 import subprocess
 import sys
 
-sys.path.append('../../python')
+basepath = os.path.dirname(sys.argv[0])
+
+sys.path.append(os.path.join(basepath, '../../python'))
 from ct.crypto import merkle
 from ct.proto import ct_pb2
 
@@ -52,7 +55,7 @@ class DNSServerRunner:
         args = shlex.split(cmd)
         self.proc = subprocess.Popen(args)
 
-server_cmd = "./ct-dns-server --port=1111 --domain=example.com. --db=/tmp/ct"
+server_cmd = basepath + "/ct-dns-server --port=1111 --domain=example.com. --db=/tmp/ct"
 runner = DNSServerRunner()
 runner.Run(server_cmd)
 
