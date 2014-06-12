@@ -5,14 +5,14 @@ default: all
 
 -include local.mk
 
-CXXFLAG = -Wall -Werror -g -O3
-LINK.o = $(LINK.cc)
+CXXFLAG := -Wall -Werror -g -O3
+LINK.o := $(LINK.cc)
 
-INCLUDE = -I.
-LOCAL_LIBS = log/libcert.a log/libdatabase.a log/liblog.a \
-             merkletree/libmerkletree.a \
-             proto/libproto.a util/libutil.a
-LDLIBS = -lpthread -lgflags -lglog -lssl -lcrypto \
+INCLUDE := -I.
+LOCAL_LIBS := log/libcert.a log/libdatabase.a log/liblog.a \
+              merkletree/libmerkletree.a \
+              proto/libproto.a util/libutil.a
+LDLIBS := -lpthread -lgflags -lglog -lssl -lcrypto \
          -lsqlite3 -lprotobuf -lcurl -lcppnetlib-uri
 
 PLATFORM = $(shell uname -s)
