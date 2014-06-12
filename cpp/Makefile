@@ -15,7 +15,7 @@ LOCAL_LIBS := log/libcert.a log/libdatabase.a log/liblog.a \
 LDLIBS := -lpthread -lgflags -lglog -lssl -lcrypto \
          -lsqlite3 -lprotobuf -lcurl -lcppnetlib-uri
 
-PLATFORM = $(shell uname -s)
+PLATFORM := $(shell uname -s)
 ifneq ($(PLATFORM), FreeBSD)
   LDLIBS += -lresolv
 endif
