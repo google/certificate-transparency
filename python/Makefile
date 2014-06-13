@@ -27,3 +27,7 @@ test: all
 	PYTHONPATH=$(PYTHONPATH):. ./ct/client/tls_message_test.py
 # Tests using twisted trial instead of plain unittest.
 	PYTHONPATH=$(PYTHONPATH):. ./ct/client/async_log_client_test.py
+
+clean:
+	cd ct/proto && rm -f *_pb2.py *.pb.cc *.pb.h
+	find . -name '*.pyc' | xargs rm
