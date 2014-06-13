@@ -32,6 +32,9 @@ python:
 python_test: python
 	@$(MAKE) -C python test
 
+python_clean:
+	@$(MAKE) -C python clean
+
 alltests: cpp_test java_test python_test
 
-clean: cpp_clean java_clean
+clean: cpp_clean java_clean python_clean
