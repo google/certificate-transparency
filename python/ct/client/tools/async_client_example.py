@@ -15,7 +15,7 @@ def stop_callback(ignored):
 
 def get_sth():
     agent = twisted_client.Agent(reactor)
-    client = log_client.AsyncLogClient(agent, "ct.googleapis.com/pilot")
+    client = log_client.AsyncLogClient(agent, "https://ct.googleapis.com/pilot")
     d = client.get_sth()
     # Print the STH on success.
     d.addCallback(sth_callback)

@@ -366,6 +366,9 @@ class ct_server {
         response = server::response::stock_reply(server::response::not_found,
                                                  "Not found");
     }
+
+    VLOG(1) << "Response: status = " << response.status << ", content = "
+            << response.content;
   }
 
   void log(const std::string &err) {

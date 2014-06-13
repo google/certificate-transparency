@@ -93,7 +93,7 @@ def process_entries(entry_queue, output_queue):
                 output_queue.put(QueueMessage("Scanned %d entries" % count))
 
 def scan(entry_queue, output_queue):
-    client = log_client.LogClient("ct.googleapis.com/pilot")
+    client = log_client.LogClient("https://ct.googleapis.com/pilot")
     sth = client.get_sth()
     output_queue.put(QueueMessage("Got STH: %s" % sth))
     # This, too, could be parallelized but currently we're computation-bound

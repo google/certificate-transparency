@@ -1,3 +1,5 @@
+// FIXME: many of these are also in ct.proto.
+
 syntax = "proto2";
 
 package ct;
@@ -91,6 +93,8 @@ message MonitorState {
 enum Version {
   option (tls_enum_opts).max_value = 255;
   V1 = 0;
+  // Not part of the I-D, and outside the valid range.
+  UNKNOWN_VERSION = 256;
 }
 
 enum MerkleLeafType {
@@ -154,4 +158,48 @@ message ExtraData {
 message ParsedEntry {
   optional MerkleTreeLeaf merkle_leaf = 1;
   optional ExtraData extra_data = 2;
+}
+
+// RFC 5246
+message DigitallySigned {
+  enum HashAlgorithm {
+    option (tls_enum_opts).max_value = 255;
+    NONE = 0;
+    MD5 = 1;
+    SHA1 = 2;
+    SHA224 = 3;
+    SHA256 = 4;
+    SHA384 = 5;
+    SHA512 = 6;
+  }
+
+  enum SignatureAlgorithm {
+    option (tls_enum_opts).max_value = 255;
+    ANONYMOUS = 0;
+    RSA = 1;
+    DSA = 2;
+    ECDSA = 3;
+  }
+
+  // 1 byte
+  optional HashAlgorithm hash_algorithm = 1 [ default = NONE ];
+  // 1 byte
+  optional SignatureAlgorithm sig_algorithm = 2 [ default = ANONYMOUS ];
+  // 0..2^16-1 bytes
+  optional bytes signature = 3 [ (tls_opts).min_length = 0,
+                                 (tls_opts).max_length = 0xffff ];
+}
+message LogID {
+  // 32 bytes
+  optional bytes key_id = 1 [ (tls_opts).fixed_length = 32 ];
+}
+
+message SignedCertificateTimestamp {
+  optional Version version = 1 [ default = UNKNOWN_VERSION ];
+  optional LogID id = 2;
+  optional bytes extensions = 5 [ (tls_opts).min_length = 0,
+                                  (tls_opts).max_length = 0xffff ];
+  // UTC time in milliseconds, since January 1, 1970, 00:00.
+  optional uint64 timestamp = 3;
+  optional DigitallySigned signature = 4;
 }

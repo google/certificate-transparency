@@ -178,19 +178,20 @@ class RequestHandler(object):
             raise HTTPError("Connection to %s failed: %s" % (uri, e))
 
     @staticmethod
-    def check_response_status(code, reason):
+    def check_response_status(code, reason, content=''):
         if code == 200:
             return
         elif 400 <= code < 500:
-            raise HTTPClientError(reason)
+            raise HTTPClientError(reason + ' (' + content + ')')
         elif 500 <= code < 600:
-            raise HTTPServerError(reason)
+            raise HTTPServerError(reason + ' (' + content + ')')
         else:
-            raise HTTPError(reason)
+            raise HTTPError(reason + ' (' + content + ')')
 
     def get_response_body(self, uri, params=None):
         response = self.get_response(uri, params=params)
-        self.check_response_status(response.status_code, response.reason)
+        self.check_response_status(response.status_code, response.reason,
+                                   response.content)
         return response.content
 
 
@@ -217,7 +218,7 @@ class LogClient(object):
         return self._uri
 
     def _req_body(self, path, params=None):
-        return self._req.get_response_body("https://" + self._uri + "/" + path,
+        return self._req.get_response_body(self._uri + "/" + path,
                                            params=params)
 
     def get_sth(self):
@@ -567,7 +568,7 @@ class EntryProducer(object):
             last = min(self._current + self._batch_size - 1, self._end)
 
             deferred_response = self._handler.get(
-                "https://" + self._uri + "/" + _GET_ENTRIES_PATH,
+                self._uri + "/" + _GET_ENTRIES_PATH,
                 params={"start": str(first), "end": str(last)})
             deferred_response.addCallback(_parse_entries, last - first + 1)
             deferred_response.addErrback(self._response_eb)
@@ -657,8 +658,7 @@ class AsyncLogClient(object):
             InvalidResponseError: server response is invalid for the given
                                   request.
         """
-        deferred_result = self._handler.get("https://" + self._uri + "/" +
-                                            _GET_STH_PATH)
+        deferred_result = self._handler.get(self._uri + "/" + _GET_STH_PATH)
         deferred_result.addCallback(_parse_sth)
         return deferred_result
 
