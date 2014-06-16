@@ -19,3 +19,7 @@ before_install:
 script:
  - make alltests
  - go test -v ./go/...
+
+notifications:
+  email:
+   - certificate-transparency@googlegroups.com
