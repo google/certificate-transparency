@@ -20,7 +20,9 @@ java_clean:
 cpp:
 	@$(MAKE) -C cpp
 
-cpp_test: cpp
+# TODO(pphaneuf): The dependency on python is a bit excessive, but necessary
+# for now.
+cpp_test: cpp python
 	@$(MAKE) -C cpp test
 
 cpp_clean:
