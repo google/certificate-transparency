@@ -37,6 +37,7 @@
 /cpp/monitor/database_test
 /cpp/proto/serializer_test
 /cpp/server/blob-server
+/cpp/server/ct-dns-server
 /cpp/server/ct-rfc-server
 /cpp/server/ct-server
 /cpp/util/json_wrapper_test
