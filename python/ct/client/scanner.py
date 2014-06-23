@@ -1,11 +1,7 @@
 #!/usr/bin/env python
 
-import io
+import collections
 import multiprocessing
-import struct
-import sys
-
-import gflags
 
 from ct.client import log_client
 from ct.client import tls_message
@@ -13,13 +9,8 @@ from ct.crypto import cert
 from ct.crypto import error
 from ct.proto import client_pb2
 
-FLAGS = gflags.FLAGS
 
-gflags.DEFINE_integer("multi", 1, "Number of cert parsing processes to use in "
-                      "addition to the main process and the network process.")
-
-
-def decode_entry(serialized_entry):
+def _decode_entry(serialized_entry):
     entry = client_pb2.EntryResponse()
     entry.ParseFromString(serialized_entry)
     parsed_entry = client_pb2.ParsedEntry()
@@ -33,38 +24,42 @@ def decode_entry(serialized_entry):
 
     return parsed_entry
 
-def match(certificate, entry_type):
-    # Fill this in with your match criteria, e.g.
-    #
-    # return "google" in certificate.subject_name().lower()
-    #
-    # NB: for precertificates, issuer matching may not work as expected
-    # when the precertificate has been issued by the special-purpose
-    # precertificate signing certificate.
-    return True
+# Messages types:
+# Special queue messages to stop the subprocesses.
+_WORKER_STOPPED = "WORKER_STOPPED"
+_ERROR_PARSING_ENTRY = "ERROR_PARSING_ENTRY"
+_ENTRY_MATCHING = "ENTRY_MATCHING"
+_PROGRESS_REPORT = "PROGRESS_REPORT"
+
 
 class QueueMessage(object):
-    def __init__(self, msg, wait_for_ack=False):
+    def __init__(self, msg_type, msg=None, certificates_scanned=1):
+        self.msg_type = msg_type
         self.msg = msg
-        # Require user interaction to continue.
-        self.wait_for_ack = wait_for_ack
+        # Number of certificates scanned.
+        self.certificates_scanned = certificates_scanned
 
-# Special queue messages to stop the subprocesses.
-WORKER_STOPPED = "WORKER_STOPPED"
-STOP_WORKER = "STOP_WORKER"
 
-def process_entries(entry_queue, output_queue):
+# This is only used on the entries input queue
+_STOP_WORKER = "STOP_WORKER"
+
+
+def process_entries(entry_queue, output_queue, match_callback):
     stopped = False
+    total_processed = 0
     while not stopped:
         count, entry = entry_queue.get()
-        if entry == STOP_WORKER:
+        if entry == _STOP_WORKER:
             stopped = True
             # Each worker signals when they've picked up their
             # "STOP_WORKER" message.
-            output_queue.put(QueueMessage(WORKER_STOPPED))
+            output_queue.put(QueueMessage(
+                _WORKER_STOPPED,
+                certificates_scanned=total_processed))
         else:
-            parsed_entry = decode_entry(entry)
+            parsed_entry = _decode_entry(entry)
             ts_entry = parsed_entry.merkle_leaf.timestamped_entry
+            total_processed += 1
             c = None
             if ts_entry.entry_type == client_pb2.X509_ENTRY:
                 der_cert = ts_entry.asn1_cert
@@ -79,23 +74,27 @@ def process_entries(entry_queue, output_queue):
                     c = cert.Certificate(der_cert, strict_der=False)
                 except error.Error as e:
                     output_queue.put(QueueMessage(
-                        "Error while parsing entry no %d:\n%s" %
-                        (count, e), wait_for_ack=True))
+                        _ERROR_PARSING_ENTRY,
+                        "Error parsing entry %d:\n%s" %
+                        (count, e)))
                 else:
                     output_queue.put(QueueMessage(
-                        "Entry no %d failed strict parsing:\n%s" %
-                        (count, c), wait_for_ack=False))
-            if c and match(c, ts_entry.entry_type):
+                        _ERROR_PARSING_ENTRY,
+                        "Entry %d failed strict parsing:\n%s" %
+                        (count, c)))
+            if c and match_callback(c, ts_entry.entry_type, count):
                 output_queue.put(QueueMessage(
-                    "Found matching certificate:\n%s" % c,
-                    wait_for_ack=True))
+                    _ENTRY_MATCHING,
+                    "Entry %d:\n%s" % (count, c)))
             if not count % 1000:
-                output_queue.put(QueueMessage("Scanned %d entries" % count))
+                output_queue.put(QueueMessage(
+                    _PROGRESS_REPORT,
+                    "Scanned %d entries" % count))
 
-def scan(entry_queue, output_queue):
-    client = log_client.LogClient("https://ct.googleapis.com/pilot")
+def _scan(entry_queue, output_queue, log_url, num_processes):
+    client = log_client.LogClient(log_url)
     sth = client.get_sth()
-    output_queue.put(QueueMessage("Got STH: %s" % sth))
+    output_queue.put(QueueMessage(_PROGRESS_REPORT, "Got STH: %s" % sth))
     # This, too, could be parallelized but currently we're computation-bound
     # due to slow ASN.1 parsing.
     entries = client.get_entries(0, sth.tree_size - 1)
@@ -112,34 +111,47 @@ def scan(entry_queue, output_queue):
     # objects to be received at the other end out-of-order. However, objects
     # enqueued by the same process will always be in the expected order with
     # respect to each other.
-    for _ in range(FLAGS.multi):
-        entry_queue.put((0, STOP_WORKER))
+    for _ in range(num_processes):
+        entry_queue.put((0, _STOP_WORKER))
 
-def run():
+ScanResults = collections.namedtuple(
+    'ScanResults', ['total', 'matches', 'errors'])
+
+def scan_log(match_callback, log_url, num_processes=1):
     # (index, entry) tuples
     entry_queue = multiprocessing.Queue(10000)
     output_queue = multiprocessing.Queue(10000)
 
-    scan_process = multiprocessing.Process(target=scan,
-                                           args=(entry_queue, output_queue))
+    scan_process = multiprocessing.Process(
+        target=_scan,
+        args=(entry_queue, output_queue, log_url, num_processes))
     scan_process.start()
 
-    workers = [multiprocessing.Process(target=process_entries,
-                                       args=(entry_queue, output_queue))
-               for _ in range(FLAGS.multi)]
+    workers = [
+        multiprocessing.Process(
+            target=process_entries,
+            args=(entry_queue, output_queue, match_callback))
+               for _ in range(num_processes)]
     for w in workers:
         w.start()
 
+    total_scanned = 0
+    total_matches = 0
+    total_errors = 0
     try:
         workers_done = 0
         while workers_done < len(workers):
             msg = output_queue.get()
-            if msg.msg == WORKER_STOPPED:
+            if msg.msg_type == _WORKER_STOPPED:
                 workers_done += 1
+                total_scanned += msg.certificates_scanned
             else:
-                print msg.msg
-                if msg.wait_for_ack:
-                    raw_input("Press ENTER to continue")
+                if msg.msg_type == _ERROR_PARSING_ENTRY:
+                    total_errors += 1
+                elif msg.msg_type == _ENTRY_MATCHING:
+                    total_matches += 1
+                else:
+                    print msg.msg
 
     # Do not hang the interpreter upon ^C.
     except (KeyboardInterrupt, SystemExit):
@@ -151,7 +163,5 @@ def run():
     scan_process.join()
     for w in workers:
         w.join()
-
-if __name__ == "__main__":
-    sys.argv = FLAGS(sys.argv)
-    run()
+    return ScanResults(
+        total_scanned, total_matches, total_errors)
