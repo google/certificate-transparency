@@ -12,7 +12,7 @@ gflags.DEFINE_integer("multi", 1, "Number of cert parsing processes to use in "
                       "addition to the main process and the network process.")
 
 
-def match(certificate, entry_type, certificate_index):
+def match(certificate, entry_type, extra_data, certificate_index):
     # Fill this in with your match criteria, e.g.
     #
     # return "google" in certificate.subject_name().lower()

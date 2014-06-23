@@ -1,7 +1,9 @@
 #!/usr/bin/env python
 
 import collections
+import functools
 import multiprocessing
+import Queue
 
 from ct.client import log_client
 from ct.client import tls_message
@@ -43,6 +45,7 @@ class QueueMessage(object):
 # This is only used on the entries input queue
 _STOP_WORKER = "STOP_WORKER"
 
+_BATCH_SIZE = 1000
 
 def process_entries(entry_queue, output_queue, match_callback):
     stopped = False
@@ -82,86 +85,133 @@ def process_entries(entry_queue, output_queue, match_callback):
                         _ERROR_PARSING_ENTRY,
                         "Entry %d failed strict parsing:\n%s" %
                         (count, c)))
-            if c and match_callback(c, ts_entry.entry_type, count):
+            if c and match_callback(c, ts_entry.entry_type, parsed_entry.extra_data, count):
                 output_queue.put(QueueMessage(
                     _ENTRY_MATCHING,
                     "Entry %d:\n%s" % (count, c)))
-            if not count % 1000:
+            if not total_processed % _BATCH_SIZE:
                 output_queue.put(QueueMessage(
                     _PROGRESS_REPORT,
-                    "Scanned %d entries" % count))
+                    "Scanned %d entries" % total_processed,
+                    certificates_scanned=_BATCH_SIZE))
 
-def _scan(entry_queue, output_queue, log_url, num_processes):
+def _scan(entry_queue, log_url, range_description):
+    range_start, range_end = range_description
+    range_end -= 1
     client = log_client.LogClient(log_url)
-    sth = client.get_sth()
-    output_queue.put(QueueMessage(_PROGRESS_REPORT, "Got STH: %s" % sth))
-    # This, too, could be parallelized but currently we're computation-bound
-    # due to slow ASN.1 parsing.
-    entries = client.get_entries(0, sth.tree_size - 1)
-    scanned = 0
+    entries = client.get_entries(range_start, range_end)
+    scanned = range_start
     for entry in entries:
         scanned += 1
         # Can't pickle protocol buffers with protobuf module version < 2.5.0
         # (https://code.google.com/p/protobuf/issues/detail?id=418)
         # so send serialized entry.
         entry_queue.put((scanned, entry.SerializeToString()))
-    # Scanner done; signal workers from the same process.
-    # From http://docs.python.org/2/library/multiprocessing.html :
-    # If multiple processes are enqueuing objects, it is possible for the
-    # objects to be received at the other end out-of-order. However, objects
-    # enqueued by the same process will always be in the expected order with
-    # respect to each other.
-    for _ in range(num_processes):
-        entry_queue.put((0, _STOP_WORKER))
 
 ScanResults = collections.namedtuple(
     'ScanResults', ['total', 'matches', 'errors'])
 
-def scan_log(match_callback, log_url, num_processes=1):
-    # (index, entry) tuples
-    entry_queue = multiprocessing.Queue(10000)
-    output_queue = multiprocessing.Queue(10000)
 
-    scan_process = multiprocessing.Process(
-        target=_scan,
-        args=(entry_queue, output_queue, log_url, num_processes))
-    scan_process.start()
+def _get_tree_size(log_url):
+    client = log_client.LogClient(log_url)
+    sth = client.get_sth()
+    print "Got STH: %s" % sth
+    return sth.tree_size
+
+
+def _send_stop_to_workers(to_queue, num_instances):
+    for _ in range(num_instances):
+        to_queue.put((0, _STOP_WORKER))
+
+
+def _process_worker_messages(
+    workers_input_queue, workers_output_queue, scanners_done, num_workers):
+    total_scanned = 0
+    total_matches = 0
+    total_errors = 0
+    scan_progress = 0
+
+    workers_done = 0
+    stop_sent = False
+    while workers_done < num_workers:
+        try:
+            msg = workers_output_queue.get(block=True, timeout=3)
+            if msg.msg_type == _WORKER_STOPPED:
+                workers_done += 1
+                total_scanned += msg.certificates_scanned
+            elif msg.msg_type == _ERROR_PARSING_ENTRY:
+                total_errors += 1
+            elif msg.msg_type == _ENTRY_MATCHING:
+                total_matches += 1
+            elif (msg.msg_type == _PROGRESS_REPORT and
+                  msg.certificates_scanned > 0):
+                scan_progress += msg.certificates_scanned
+                print msg.msg, " Total: %d" % scan_progress
+            else:
+                print msg.msg
+        except Queue.Empty:
+            are_active = ""
+            if scanners_done.value:
+                are_active = "NOT"
+            print "Scanners are %s active, Workers done: %d" % (
+                are_active, workers_done)
+        # Done handling the message, now let's check if the scanners
+        # are done and if so stop the workers
+        if scanners_done.value and not stop_sent:
+            print "All scanners done, stopping."
+            _send_stop_to_workers(workers_input_queue, num_workers)
+            # To avoid re-sending stop
+            stop_sent = True
+
+    return ScanResults(total_scanned, total_matches, total_errors)
+
+def scan_log(match_callback, log_url, total_processes=2):
+    # (index, entry) tuples
+    m = multiprocessing.Manager()
+    R = 2
+    assert total_processes >= R
+    num_workers = total_processes // R
+    num_scanners = total_processes - num_workers
+    entry_queue = m.Queue(num_scanners * _BATCH_SIZE)
+    output_queue = multiprocessing.Queue(10000)
+    print "Allocating %d fetchers and %d processing workers" % (
+        num_scanners, num_workers)
+
+    tree_size = _get_tree_size(log_url)
+    workers_done = multiprocessing.Value('b', 0)
+    # Must use a flag rather than submitting STOP to the queue directly
+    # since if the queue will be full there'll be a deadlock.
+    def stop_workers_callback(_):
+        workers_done.value = 1
+
+    bound_scan = functools.partial(_scan, entry_queue, log_url)
+
+    scan_start_range = range(0, tree_size, _BATCH_SIZE)
+    scan_range = zip(scan_start_range, scan_start_range[1:] + [tree_size])
+    scanners_pool = multiprocessing.Pool(num_scanners)
+    res = scanners_pool.map_async(bound_scan, scan_range,
+                                  callback=stop_workers_callback)
+    scanners_pool.close()
 
     workers = [
         multiprocessing.Process(
             target=process_entries,
             args=(entry_queue, output_queue, match_callback))
-               for _ in range(num_processes)]
+               for _ in range(num_workers)]
     for w in workers:
         w.start()
 
-    total_scanned = 0
-    total_matches = 0
-    total_errors = 0
     try:
-        workers_done = 0
-        while workers_done < len(workers):
-            msg = output_queue.get()
-            if msg.msg_type == _WORKER_STOPPED:
-                workers_done += 1
-                total_scanned += msg.certificates_scanned
-            else:
-                if msg.msg_type == _ERROR_PARSING_ENTRY:
-                    total_errors += 1
-                elif msg.msg_type == _ENTRY_MATCHING:
-                    total_matches += 1
-                else:
-                    print msg.msg
-
+      res = _process_worker_messages(
+          entry_queue, output_queue, workers_done, num_workers)
     # Do not hang the interpreter upon ^C.
     except (KeyboardInterrupt, SystemExit):
-        scan_process.terminate()
         for w in workers:
             w.terminate()
+        scanners_pool.terminate()
         raise
 
-    scan_process.join()
+    scanners_pool.join()
     for w in workers:
         w.join()
-    return ScanResults(
-        total_scanned, total_matches, total_errors)
+    return res
