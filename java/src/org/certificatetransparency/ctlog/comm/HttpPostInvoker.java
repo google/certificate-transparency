@@ -12,8 +12,6 @@ import org.apache.http.impl.client.BasicResponseHandler;
 import org.apache.http.impl.client.CloseableHttpClient;
 import org.apache.http.impl.client.HttpClientBuilder;
 
-import com.sun.org.apache.xml.internal.utils.URI;
-
 /**
  * Simple delegator to HttpClient, so it can be mocked
  */
@@ -48,17 +46,17 @@ public class HttpPostInvoker {
   
   /**
    * Makes an HTTP GET method call to the given URL with the provides parameters.
-   * @param ctUrl URL for GET method.
+   * @param url URL for GET method.
    * @param params query parameters.
    * @return Server's response body.
    */
   public String makeGetRequest(String url, List<NameValuePair> params) {
     try (CloseableHttpClient httpClient = HttpClientBuilder.create().build()) {
-      URI path = new URI(url);
+      String paramsStr = "";
       if (params != null) {
-        path.setQueryString(URLEncodedUtils.format(params, "utf-8"));
+        paramsStr = "?" + URLEncodedUtils.format(params, "UTF-8");
       }
-      HttpGet get = new HttpGet(path.toString());
+      HttpGet get = new HttpGet(url + paramsStr);
       get.addHeader("Content-Type", "application/json; charset=utf-8");
 
       return httpClient.execute(get, new BasicResponseHandler());

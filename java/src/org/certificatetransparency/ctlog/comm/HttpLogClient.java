@@ -150,6 +150,7 @@ public class HttpLogClient {
   
   /**
    * Retrieves Latest Signed Tree Head from the log.
+   * The signature of the Signed Tree Head component is not verified.
    * @return latest STH
    */
   public Ct.SignedTreeHead getLogSTH() {
@@ -192,7 +193,10 @@ public class HttpLogClient {
     builder.setSha256RootHash(ByteString.copyFrom(Base64.decodeBase64(sha256RootHash)));
     builder.setSignature(Deserializer.parseDigitallySignedFromBinary(
       new ByteArrayInputStream(Base64.decodeBase64(base64Signature))));
-
+    if (builder.getSha256RootHash().size() != 32) {
+       throw new CertificateTransparencyException(String.format("Bad response. The root hash of the Merkle Hash Tree"
+         + " must have a size of 32 bytes. The size of the root hash is %d", builder.getSha256RootHash().size()));
+      }
     return builder.build();
   }
 
