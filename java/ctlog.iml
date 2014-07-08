@@ -16,11 +16,11 @@
     <orderEntry type="library" name="json-simple-1.1.1" level="project" />
     <orderEntry type="library" name="junit-4.11" level="project" />
     <orderEntry type="library" name="mockito-all-1.9.5" level="project" />
-    <orderEntry type="library" name="protobuf-java-2.4.1" level="project" />
     <orderEntry type="library" name="bcpkix-jdk15on-149" level="project" />
     <orderEntry type="library" name="guava-16.0.1" level="project" />
     <orderEntry type="library" name="httpclient-4.3.3" level="project" />
     <orderEntry type="library" name="httpcore-4.3.2" level="project" />
+    <orderEntry type="library" name="protobuf-java-2.4.1" level="application" />
   </component>
 </module>
 

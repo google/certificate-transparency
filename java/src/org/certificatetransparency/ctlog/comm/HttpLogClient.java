@@ -32,22 +32,22 @@ public class HttpLogClient {
   private static final String GET_ROOTS_PATH = "get-roots";
 
   private final String logUrl;
-  private final HttpPostInvoker postInvoker;
+  private final HttpInvoker postInvoker;
 
   /**
    * New HttpLogClient.
    * @param logUrl CT Log's full URL, e.g. "http://ct.googleapis.com/pilot/ct/v1/"
    */
   public HttpLogClient(String logUrl) {
-    this(logUrl, new HttpPostInvoker());
+    this(logUrl, new HttpInvoker());
   }
 
   /**
-   * For testing specify an HttpPostInvoker
+   * For testing specify an HttpInvoker
    * @param logUrl URL of the log.
-   * @param postInvoker HttpPostInvoker instance to use.
+   * @param postInvoker HttpInvoker instance to use.
    */
-  public HttpLogClient(String logUrl, HttpPostInvoker postInvoker) {
+  public HttpLogClient(String logUrl, HttpInvoker postInvoker) {
     this.logUrl = logUrl;
     this.postInvoker = postInvoker;
   }
@@ -170,18 +170,20 @@ public class HttpLogClient {
   
   /**
    * Parses CT log's response for "get-sth" into a proto object.
-   * @param sthResponse
+   * @param sthResponse Log response to parse
    * @return a proto object of SignedTreeHead type.
    */
   Ct.SignedTreeHead parseSTHResponse(String sthResponse) {
-    Preconditions.checkNotNull(sthResponse, "Sign Tree Head response from a CT log should not be null");
+    Preconditions.checkNotNull(
+        sthResponse, "Sign Tree Head response from a CT log should not be null");
 
     JSONObject response = (JSONObject) JSONValue.parse(sthResponse);
     long treeSize = (Long) response.get("tree_size");
     long timeStamp = (Long) response.get("timestamp");
     if (treeSize < 0 || timeStamp < 0) {
-      throw new CertificateTransparencyException(String.format("Bad response. Size of tree or timespamp"
-        + " cannot be a negative value. Log Tree size: %d Timestamp: %d", treeSize, timeStamp));
+      throw new CertificateTransparencyException(
+          String.format("Bad response. Size of tree or timestamp cannot be a negative value. "
+              + "Log Tree size: %d Timestamp: %d", treeSize, timeStamp));
     }
     String base64Signature = (String) response.get("tree_head_signature");
     String sha256RootHash = (String) response.get("sha256_root_hash");
@@ -194,8 +196,9 @@ public class HttpLogClient {
     builder.setSignature(Deserializer.parseDigitallySignedFromBinary(
       new ByteArrayInputStream(Base64.decodeBase64(base64Signature))));
     if (builder.getSha256RootHash().size() != 32) {
-       throw new CertificateTransparencyException(String.format("Bad response. The root hash of the Merkle Hash Tree"
-         + " must have a size of 32 bytes. The size of the root hash is %d", builder.getSha256RootHash().size()));
+       throw new CertificateTransparencyException(
+           String.format("Bad response. The root hash of the Merkle Hash Tree must be 32 bytes. "
+               + "The size of the root hash is %d", builder.getSha256RootHash().size()));
       }
     return builder.build();
   }
@@ -203,25 +206,25 @@ public class HttpLogClient {
   /**
    * Parses the response from "get-roots" GET method.
    *
-   * @param rootCerts JSONObject with certificates to parse.
+   * @param response JSONObject with certificates to parse.
    * @return a list of root certificates. 
    */
   List<Certificate> parseRootCertsResponse(String response) {
-    List<Certificate> certs = new ArrayList<Certificate>();
+    List<Certificate> certs = new ArrayList<>();
     
     JSONObject entries = (JSONObject) JSONValue.parse(response);
-    JSONArray entriesArr = (JSONArray) entries.get("certificates");
-    Iterator<?> iter = entriesArr.iterator();
-    while (iter.hasNext()) {
-      byte[] in = Base64.decodeBase64(iter.next().toString());
-      Certificate cert = null;
+    JSONArray entriesArray = (JSONArray) entries.get("certificates");
+
+    for(Object i: entriesArray) {
+      // We happen to know that JSONArray contains strings.
+      byte[] in = Base64.decodeBase64((String) i);
       try {
-        cert = CertificateFactory.getInstance("X509").generateCertificate(new ByteArrayInputStream(in));
+        certs.add(CertificateFactory.getInstance("X509").generateCertificate(
+            new ByteArrayInputStream(in)));
       } catch (CertificateException e) {
-        throw new CertificateTransparencyException("Malformed data from a CT log have been received. "
-          + e.getLocalizedMessage(), e);
+        throw new CertificateTransparencyException(
+            "Malformed data from a CT log have been received: " + e.getLocalizedMessage(), e);
       }
-      certs.add(cert);
     }
     return certs;
   }

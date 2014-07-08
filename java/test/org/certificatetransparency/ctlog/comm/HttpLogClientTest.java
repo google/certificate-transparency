@@ -55,8 +55,8 @@ public class HttpLogClientTest {
   
   public static final String BAD_STH_RESPONSE_INVALID_ROOT_HASH = ""
           + "{\"timestamp\":1402415255382,"
-          + "\"tree_head_signature\":\"BAMARzBFAiBX9fHXbK3Yi+P+bGM8mlL8XFmwZ7fkbhK2GqlnoJkMkQIhANGoUuD+"
-          + "JvjFTRdESfKO5428e1HAQL412Sa5e16D4E3M\","
+          + "\"tree_head_signature\":\"BAMARzBFAiBX9fHXbK3Yi+P+bGM8mlL8XFmwZ7fkbhK2GqlnoJkMkQIhANGo"
+          + "UuD+JvjFTRdESfKO5428e1HAQL412Sa5e16D4E3M\","
           + "\"sha256_root_hash\":\"jdH9k+\\/lb9abMz3N8r7v55+nSAXej3hqPg=\","
           + "\"tree_size\":4301837}";
 
@@ -102,7 +102,7 @@ public class HttpLogClientTest {
 
   @Test
   public void certificateSentToServer() throws IOException, CertificateException {
-    HttpPostInvoker mockInvoker = mock(HttpPostInvoker.class);
+    HttpInvoker mockInvoker = mock(HttpInvoker.class);
     when(mockInvoker.makePostRequest(eq("http://ctlog/add-chain"), Matchers.anyString()))
       .thenReturn(JSON_RESPONSE);
 
@@ -117,7 +117,7 @@ public class HttpLogClientTest {
   @Test
   public void getLogSTH() throws IllegalAccessException, IllegalArgumentException,
     InvocationTargetException, NoSuchMethodException, SecurityException {
-    HttpPostInvoker mockInvoker = mock(HttpPostInvoker.class);
+    HttpInvoker mockInvoker = mock(HttpInvoker.class);
     when(mockInvoker.makeGetRequest(eq("http://ctlog/get-sth"))).thenReturn(STH_RESPONSE);
 
     HttpLogClient client = new HttpLogClient("http://ctlog/", mockInvoker);
@@ -131,10 +131,10 @@ public class HttpLogClientTest {
   }
   
   @Test
-  public void getLogSTHBadResponseTimestamp() throws IllegalAccessException, IllegalArgumentException,
-    InvocationTargetException, NoSuchMethodException, SecurityException {
-    HttpPostInvoker mockInvoker = mock(HttpPostInvoker.class);
-    when(mockInvoker.makeGetRequest(eq("http://ctlog/get-sth"))).thenReturn(BAD_STH_RESPONSE_INVALID_TIMESTAMP);
+  public void getLogSTHBadResponseTimestamp() {
+    HttpInvoker mockInvoker = mock(HttpInvoker.class);
+    when(mockInvoker.makeGetRequest(eq("http://ctlog/get-sth"))).thenReturn(
+        BAD_STH_RESPONSE_INVALID_TIMESTAMP);
 
     HttpLogClient client = new HttpLogClient("http://ctlog/", mockInvoker);
     try {
@@ -145,10 +145,10 @@ public class HttpLogClientTest {
   }
   
   @Test
-  public void getLogSTHBadResponseRootHash() throws IllegalAccessException, IllegalArgumentException,
-    InvocationTargetException, NoSuchMethodException, SecurityException {
-    HttpPostInvoker mockInvoker = mock(HttpPostInvoker.class);
-    when(mockInvoker.makeGetRequest(eq("http://ctlog/get-sth"))).thenReturn(BAD_STH_RESPONSE_INVALID_ROOT_HASH);
+  public void getLogSTHBadResponseRootHash() {
+    HttpInvoker mockInvoker = mock(HttpInvoker.class);
+    when(mockInvoker.makeGetRequest(eq("http://ctlog/get-sth"))).thenReturn(
+        BAD_STH_RESPONSE_INVALID_ROOT_HASH);
 
     HttpLogClient client = new HttpLogClient("http://ctlog/", mockInvoker);
     try {
@@ -159,13 +159,14 @@ public class HttpLogClientTest {
   }
   
   @Test
-  public void getRootCerts() throws FileNotFoundException, IOException, ParseException {
+  public void getRootCerts() throws IOException, ParseException {
     JSONParser parser = new JSONParser();
     Object obj = parser.parse(new FileReader(TestData.TEST_ROOT_CERTS));
     JSONObject response = (JSONObject) obj;
     
-    HttpPostInvoker mockInvoker = mock(HttpPostInvoker.class);
-    when(mockInvoker.makeGetRequest(eq("http://ctlog/get-roots"))).thenReturn(response.toJSONString());
+    HttpInvoker mockInvoker = mock(HttpInvoker.class);
+    when(mockInvoker.makeGetRequest(eq("http://ctlog/get-roots"))).thenReturn(
+        response.toJSONString());
 
     HttpLogClient client = new HttpLogClient("http://ctlog/", mockInvoker);
     List<Certificate> rootCerts = client.getLogRoots();
