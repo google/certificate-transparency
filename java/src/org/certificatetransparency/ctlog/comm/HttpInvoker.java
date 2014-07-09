@@ -15,8 +15,7 @@ import org.apache.http.impl.client.HttpClientBuilder;
 /**
  * Simple delegator to HttpClient, so it can be mocked
  */
-// TODO(eranm) rename HttpPostInvoker to HttpInvoker.
-public class HttpPostInvoker {
+public class HttpInvoker {
   /**
    * Make an HTTP POST method call to the given URL with the provided JSON payload.
    * @param url URL for POST method
@@ -37,7 +36,7 @@ public class HttpPostInvoker {
   
   /**
    * Makes an HTTP GET method call to the given URL with the provides parameters.
-   * @param ctUrl URL for GET method.
+   * @param url URL for GET method.
    * @return Server's response body.
    */
   public String makeGetRequest(String url) {
