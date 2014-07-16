@@ -35,11 +35,13 @@ _PROGRESS_REPORT = "PROGRESS_REPORT"
 
 
 class QueueMessage(object):
-    def __init__(self, msg_type, msg=None, certificates_scanned=1):
+    def __init__(self, msg_type, msg=None, certificates_scanned=1,
+                 matcher_output=None):
         self.msg_type = msg_type
         self.msg = msg
         # Number of certificates scanned.
         self.certificates_scanned = certificates_scanned
+        self.matcher_output = matcher_output
 
 
 # This is only used on the entries input queue
@@ -85,10 +87,14 @@ def process_entries(entry_queue, output_queue, match_callback):
                         _ERROR_PARSING_ENTRY,
                         "Entry %d failed strict parsing:\n%s" %
                         (count, c)))
-            if c and match_callback(c, ts_entry.entry_type, parsed_entry.extra_data, count):
-                output_queue.put(QueueMessage(
-                    _ENTRY_MATCHING,
-                    "Entry %d:\n%s" % (count, c)))
+            if c:
+                match_result = match_callback(
+                        c, ts_entry.entry_type, parsed_entry.extra_data, count)
+                if match_result:
+                    output_queue.put(QueueMessage(
+                            _ENTRY_MATCHING,
+                            "Entry %d:\n%s" % (count, c),
+                            matcher_output=match_result))
             if not total_processed % _BATCH_SIZE:
                 output_queue.put(QueueMessage(
                     _PROGRESS_REPORT,
@@ -125,7 +131,8 @@ def _send_stop_to_workers(to_queue, num_instances):
 
 
 def _process_worker_messages(
-    workers_input_queue, workers_output_queue, scanners_done, num_workers):
+    workers_input_queue, workers_output_queue, scanners_done, num_workers,
+    matcher_output_handler):
     total_scanned = 0
     total_matches = 0
     total_errors = 0
@@ -143,6 +150,8 @@ def _process_worker_messages(
                 total_errors += 1
             elif msg.msg_type == _ENTRY_MATCHING:
                 total_matches += 1
+                if matcher_output_handler:
+                    matcher_output_handler(msg.matcher_output)
             elif (msg.msg_type == _PROGRESS_REPORT and
                   msg.certificates_scanned > 0):
                 scan_progress += msg.certificates_scanned
@@ -165,7 +174,8 @@ def _process_worker_messages(
 
     return ScanResults(total_scanned, total_matches, total_errors)
 
-def scan_log(match_callback, log_url, total_processes=2):
+def scan_log(match_callback, log_url,total_processes=2,
+             matcher_output_handler=None):
     # (index, entry) tuples
     m = multiprocessing.Manager()
     R = 2
@@ -203,7 +213,8 @@ def scan_log(match_callback, log_url, total_processes=2):
 
     try:
       res = _process_worker_messages(
-          entry_queue, output_queue, workers_done, num_workers)
+          entry_queue, output_queue, workers_done, num_workers,
+          matcher_output_handler)
     # Do not hang the interpreter upon ^C.
     except (KeyboardInterrupt, SystemExit):
         for w in workers:
