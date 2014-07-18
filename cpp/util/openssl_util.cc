@@ -28,26 +28,6 @@ void ClearOpenSSLErrors() {
   ERR_clear_error();
 }
 
-bool ReadPrivateKey(EVP_PKEY **pkey, const std::string &file) {
-  FILE *fp = fopen(file.c_str(), "r");
-
-  if(fp == static_cast<FILE*>(NULL)) {
-    LOG(ERROR) << "No such file: " << file;
-    return false;
-  }
-
-  // No password.
-  PEM_read_PrivateKey(fp, pkey, NULL, NULL);
-  if (*pkey == static_cast<EVP_PKEY*>(NULL)) {
-    LOG(ERROR) << "Bad key: " << file << '\n' << DumpOpenSSLErrorStack();
-    return false;
-  }
-
-  fclose(fp);
-
-  return true;
-}
-
 string ReadBIO(BIO *bio) {
   int size = BIO_pending(bio);
   char *buffer = new char[size];

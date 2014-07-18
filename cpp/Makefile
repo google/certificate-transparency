@@ -307,7 +307,7 @@ server/ct-server: server/ct-server.o server/event.o $(LOCAL_LIBS)
 
 server/ct-dns-server: server/ct-dns-server.o server/event.o $(LOCAL_LIBS)
 
-server/ct-rfc-server: server/ct-rfc-server.o $(LOCAL_LIBS)
+server/ct-rfc-server: server/ct-rfc-server.o server/event.o $(LOCAL_LIBS)
 
 server/blob-server: server/blob-server.o server/event.o \
                     server/sqlite_db_blob.o server/tree_signer_blob.o \

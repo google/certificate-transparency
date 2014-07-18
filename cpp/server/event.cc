@@ -284,7 +284,7 @@ err:
 }
 
 Services::KeyError Services::ReadPrivateKey(EVP_PKEY **pkey,
-                                             const std::string &file) {
+                                            const std::string &file) {
   FILE *fp = fopen(file.c_str(), "r");
 
   if(fp == static_cast<FILE*>(NULL))
@@ -292,10 +292,11 @@ Services::KeyError Services::ReadPrivateKey(EVP_PKEY **pkey,
 
   // No password.
   PEM_read_PrivateKey(fp, pkey, NULL, NULL);
+  Services::KeyError retval(KEY_OK);
   if (*pkey == static_cast<EVP_PKEY*>(NULL))
-    return INVALID_KEY;
+    retval = INVALID_KEY;
 
   fclose(fp);
 
-  return KEY_OK;
+  return retval;
 }

@@ -25,6 +25,7 @@
 #include "log/sqlite_db.h"
 #include "log/tree_signer.h"
 #include "proto/ct.pb.h"
+#include "server/event.h"
 #include "util/json_wrapper.h"
 #include "util/openssl_util.h"
 
@@ -138,10 +139,10 @@ static const bool sign_dummy = RegisterFlagValidator(
 
 // convert a boost single-shot timer (deadline_timer) into a repeat
 // timer.
-class RepeatedEvent {
+class AsioRepeatedEvent {
  public:
-  RepeatedEvent(boost::shared_ptr<boost::asio::io_service> io,
-                boost::posix_time::time_duration frequency)
+  AsioRepeatedEvent(boost::shared_ptr<boost::asio::io_service> io,
+                    boost::posix_time::time_duration frequency)
     : frequency_(frequency), timer_(*io, frequency) {
     Wait();
   }
@@ -151,7 +152,7 @@ protected:
 
  private:
   static void Call(const boost::system::error_code& /*e*/,
-                   RepeatedEvent *event) {
+                   AsioRepeatedEvent *event) {
     event->Go();
   }
 
@@ -306,12 +307,12 @@ class CTLogManager {
   LogLookup<LoggedCertificate> *lookup_;
 };
 
-class TreeSigningEvent : public RepeatedEvent {
+class TreeSigningEvent : public AsioRepeatedEvent {
  public:
   TreeSigningEvent(boost::shared_ptr<boost::asio::io_service> io,
                    boost::posix_time::time_duration frequency,
                    CTLogManager *manager)
-      : RepeatedEvent(io, frequency),
+      : AsioRepeatedEvent(io, frequency),
         manager_(manager) {}
 
   void Execute() {
@@ -620,7 +621,7 @@ int main(int argc, char * argv[]) {
   ct::LoadCtExtensions();
 
   EVP_PKEY *pkey = NULL;
-  CHECK(util::ReadPrivateKey(&pkey, FLAGS_key));
+  CHECK_EQ(Services::ReadPrivateKey(&pkey, FLAGS_key), Services::KEY_OK);
 
   CertChecker checker;
   CHECK(checker.LoadTrustedCertificates(FLAGS_trusted_cert_file))
@@ -646,7 +647,7 @@ int main(int argc, char * argv[]) {
 
   // Hmm, there is no EVP_PKEY_dup, so let's read the key again...
   EVP_PKEY *pkey2 = NULL;
-  CHECK(util::ReadPrivateKey(&pkey2, FLAGS_key));
+  CHECK_EQ(Services::ReadPrivateKey(&pkey2, FLAGS_key), Services::KEY_OK);
 
   CTLogManager manager(
       new Frontend(new CertSubmissionHandler(&checker),
