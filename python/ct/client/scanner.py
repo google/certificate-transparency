@@ -70,8 +70,7 @@ def process_entries(entry_queue, output_queue, match_callback):
                 der_cert = ts_entry.asn1_cert
             else:
                 # The original, signed precertificate.
-                der_cert = (parsed_entry.extra_data.precert_chain_entry.
-                            precertificate_chain[0])
+                der_cert = (parsed_entry.extra_data.precert_chain_entry.pre_certificate)
             try:
                 c = cert.Certificate(der_cert)
             except error.Error as e:
