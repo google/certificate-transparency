@@ -181,7 +181,7 @@ static void AddOctetExtension(X509 *cert, int nid, const unsigned char *data,
 
   ASN1_OCTET_STRING_free(inner);
   ASN1_OCTET_STRING_free(asn1_data);
-  delete buf;
+  delete[] buf;
 }
 
 static bool CheckSCT(const SignedCertificateTimestamp &sct,

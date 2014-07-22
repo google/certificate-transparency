@@ -82,7 +82,7 @@ int main(int argc, char **argv) {
   CHECK(blobf.eof());
 
   std::string blob(buffer, length);
-  delete buffer;
+  delete[] buffer;
 
   LoggedBlob logged_blob(blob);
 
