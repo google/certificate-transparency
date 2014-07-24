@@ -33,7 +33,6 @@ class TypeTestBase(unittest.TestCase):
     # in non-strict mode.
     bad_strict_encodings = None
 
-
     def test_create(self):
         for initializer_set in self.initializers:
             value = initializer_set[0]

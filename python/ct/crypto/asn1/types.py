@@ -142,6 +142,7 @@ def read_length(buf, strict=True):
 
     Args:
         buf: a string or string buffer.
+        strict: if false, accept indefinite length encoding.
 
     Raises:
         ASN1Error.
@@ -489,8 +490,9 @@ class Abstract(object):
             # octet.
             # If we have multiple tags (i.e., explicit tagging is used) and the
             # outer tags use indefinite length, each such encoding adds an EOC
-            # to the end. Therefore, we first read all tags, then the value,
-            # and finally strip the EOC octets of the explicit tags.
+            # to the end (while a regular tag adds nothing). Therefore, we first
+            # read all tags, then the value, and finally strip the EOC octets of
+            # the explicit tags.
             indefinite = 0
             for t in reversed(cls.tags):
                 if buf[:len(t)] != t.value:
@@ -501,11 +503,10 @@ class Abstract(object):
                 # if debug-level logging itself is disabled.
                 # logging.debug("%s: read tag %s", cls.__name__, t)
                 buf = buf[len(t):]
-                decoded_length, buf = read_length(buf, strict=strict)
+                # Only permit indefinite length for constructed types.
+                decoded_length, buf = read_length(buf, strict=(
+                    strict or t.encoding != tag.CONSTRUCTED))
                 if decoded_length == -1:
-                    if t.encoding != tag.CONSTRUCTED:
-                        raise error.ASN1Error("Indefinite length encoding in "
-                                              "primitive type")
                     indefinite += 1
                 # logging.debug("%s: read length %d", cls.__name__,
                 #               decoded_length)
@@ -949,12 +950,10 @@ class Any(ASN1String):
 
     @classmethod
     def _read(cls, buf, strict=True):
-       _, rest = tag.Tag.read(buf)
-       length, rest = read_length(rest, strict=strict)
+       readahead_tag, rest = tag.Tag.read(buf)
+       length, rest = read_length(rest, strict=(
+           strict or readahead_tag.encoding != tag.CONSTRUCTED))
        if length == -1:
-           if t.encoding != tag.CONSTRUCTED:
-               raise error.ASN1Error("Indefinite length encoding in primitive "
-                                     "type")
            # Not sure if this even makes any sense.
            raise NotImplementedError("Indefinite length encoding of ANY types "
                                      "is not supported")
@@ -1215,12 +1214,10 @@ class Choice(Constructed, collections.MutableMapping):
     @classmethod
     def _read(cls, buf, strict=True):
         readahead_tag, rest = tag.Tag.read(buf)
-        length, rest = read_length(rest, strict=strict)
+        length, rest = read_length(rest, strict=(
+            strict or readahead_tag.encoding != tag.CONSTRUCTED))
         if length == -1:
-            if t.encoding != tag.CONSTRUCTED:
-                raise error.ASN1Error("Indefinite length encoding in primitive"
-                                      "type")
-            raise NotImplementedError("Indefinite length encoding of CHOICE"
+            raise NotImplementedError("Indefinite length encoding of CHOICE "
                                       "type is not supported")
         if len(rest) < length:
             raise error.ASN1Error("Invalid length encoding")
@@ -1280,7 +1277,14 @@ class Choice(Constructed, collections.MutableMapping):
     @classmethod
     def _decode_value(cls, buf, strict=True):
         readahead_tag, rest = tag.Tag.read(buf)
-        length, rest = read_length(rest)
+        length, rest = read_length(rest, strict=strict)
+        if length == -1:
+            if readahead_tag.encoding != tag.CONSTRUCTED:
+                raise error.ASN1Error("Indefinite length encoding in primitive "
+                                      "type")
+            raise NotImplementedError("Indefinite length encoding of CHOICE "
+                                      "type is not supported")
+
         if len(rest) != length:
             raise error.ASN1Error("Invalid length encoding")
         return cls._decode_readahead_value(buf, readahead_tag, rest,

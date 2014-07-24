@@ -100,21 +100,6 @@ class DummySequence(types.Sequence):
 
 class TagLengthValueTest(unittest.TestCase):
     """Test Tag-Length-Value encoding."""
-    # A slightly more interesting encoding to test reading from the beginning
-    # of a buffer.
-    class TruncatingDummy(types.Simple):
-        tags = (tag.Tag(1, tag.UNIVERSAL, tag.PRIMITIVE),)
-        def _convert_value(cls, value):
-            return value[0]
-
-        def _decode_value(self, buf, strict=True):
-            if not buf:
-                raise error.ASN1Error("Empty values are not allowed")
-            return buf[0], buf[1:]
-
-        def _encode_value(self):
-            return self._value
-
     def test_encode_decode_int(self):
         signed_integer_encodings = (
             (0, "00"),
@@ -170,6 +155,15 @@ class TagLengthValueTest(unittest.TestCase):
             self.assertRaises(error.ASN1Error,
                               types.read_length, shorter.decode("hex"))
 
+    def test_read_indefinite_length(self):
+        indef_length = "80".decode("hex")
+        self.assertRaises(error.ASN1Error, types.read_length, indef_length)
+        self.assertEqual(types.read_length(indef_length, strict=False),
+                         (-1, ""))
+
+        self.assertEqual(types.read_length(indef_length + "hello", strict=False),
+                         (-1, "hello"))
+
     def test_encode_decode_read(self):
         value = "hello"
         d = Dummy(value=value)
@@ -190,8 +184,8 @@ class TagLengthValueTest(unittest.TestCase):
 
     def test_read_from_beginning(self):
         value = "hello"
-        d = self.TruncatingDummy(value=value)
-        self.assertEqual("h", d.value)
+        d = Dummy(value=value)
+        self.assertEqual("hello", d.value)
         enc = d.encode()
 
         encoded_length = types.encode_length(len(d.value))
@@ -205,7 +199,7 @@ class TagLengthValueTest(unittest.TestCase):
         # ... but we can read from the beginning of the buffer.
         read_dummy, rest = Dummy.read(longer_buffer)
         self.assertTrue(isinstance(read_dummy, Dummy))
-        self.assertEqual("h", read_dummy.value)
+        self.assertEqual("hello", read_dummy.value)
         self.assertEqual("ello", rest)
 
     def test_encode_decode_read_multiple_tags(self):
@@ -232,6 +226,11 @@ class TagLengthValueTest(unittest.TestCase):
         self.assertTrue(isinstance(read_dummy, NewDummy))
         self.assertEqual(read_dummy.value, value)
         self.assertEqual("", rest)
+
+        indef_encoding = "a880010568656c6c6f0000".decode("hex")
+        self.assertRaises(error.ASN1Error, NewDummy.decode, indef_encoding)
+        self.assertEqual(NewDummy.decode(indef_encoding, strict=False),
+                         NewDummy(value="hello"))
 
 
 class BooleanTest(type_test_base.TypeTestBase):
