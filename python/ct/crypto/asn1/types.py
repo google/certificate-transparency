@@ -28,6 +28,7 @@ from ct.crypto.asn1 import tag
 
 _ZERO = "\x00"
 _MINUS_ONE = "\xff"
+_EOC = "\x00\x00"
 
 
 def encode_int(value, signed=True):
@@ -147,13 +148,17 @@ def read_length(buf):
 
     Returns:
         a (length, rest) tuple consisting of a non-negative integer representing
-        the length of an ASN.1 object, and the remaining bytes.
+        the length of an ASN.1 object, and the remaining bytes. For indefinite
+        length, returns (-1, rest).
     """
     if not buf:
         raise error.ASN1Error("Invalid length encoding: empty value")
     length, rest = ord(buf[0]), buf[1:]
     if length <= 127:
         return length, rest
+    if length == 128:
+        # 0x80 == ASN.1 indefinite length
+        return -1, rest
     length &= _MULTIBYTE_LENGTH_MASK
     if len(rest) < length:
         raise error.ASN1Error("Invalid length encoding")
@@ -426,6 +431,16 @@ class Abstract(object):
         """Read the value from the beginning of a string or buffer."""
         raise NotImplementedError
 
+    # Only applicable where indefinite length encoding is possible, i.e., for
+    # simple string types using constructed encoding and structured types
+    # (Sequence, Set, SequenceOf, SetOf) only. Currently, it's only
+    # implemented for structured types; constructed encoding of simple string
+    # types is not supported. Only applicable in non-strict mode.
+    @classmethod
+    def _read_indefinite_value(cls, buf):
+        """Read the inner value from the beginning of a string or buffer."""
+        raise NotImplementedError
+
     def encode(self):
         """Encode oneself.
 
@@ -461,10 +476,17 @@ class Abstract(object):
             strict: if False, tolerate some non-fatal decoding errors.
 
         Returns:
-            an tuple consisting of an instance of the class and the remaining
+            a tuple consisting of an instance of the class and the remaining
             bytes.
         """
         if cls.tags:
+            # Each indefinite length must be closed with the EOC (\x00\x00)
+            # octet.
+            # If we have multiple tags (i.e., explicit tagging is used) and the
+            # outer tags use indefinite length, each such encoding adds an EOC
+            # to the end. Therefore, we first read all tags, then the value,
+            # and finally strip the EOC octets of the explicit tags.
+            indefinite = 0
             for t in reversed(cls.tags):
                 if buf[:len(t)] != t.value:
                     raise error.ASN1TagError(
@@ -475,15 +497,34 @@ class Abstract(object):
                 # logging.debug("%s: read tag %s", cls.__name__, t)
                 buf = buf[len(t):]
                 decoded_length, buf = read_length(buf)
+                if decoded_length == -1:
+                    if strict:
+                        raise error.ASN1Error("Indefinite length encoding in DER")
+                    if t.encoding != tag.CONSTRUCTED:
+                        raise error.ASN1Error("Indefinite length encoding in "
+                                              "primitive type")
+                    indefinite += 1
                 # logging.debug("%s: read length %d", cls.__name__,
                 #               decoded_length)
-                if len(buf) < decoded_length:
+                elif len(buf) < decoded_length:
                     raise error.ASN1Error("Invalid length encoding in %s: "
                                           "read length %d, remaining bytes %d" %
                                           (cls.__name__, decoded_length,
                                            len(buf)))
-            value, rest = (cls(serialized_value=buf[:decoded_length],
-                               strict=strict), buf[decoded_length:])
+
+            # The last tag had definite length.
+            if decoded_length != -1:
+                value, rest = (cls(serialized_value=buf[:decoded_length],
+                                   strict=strict), buf[decoded_length:])
+            else:
+                value, rest = cls._read_indefinite_value(buf)
+                # _read_indefinite_value will strip the inner EOC.
+                indefinite -= 1
+            # Remove EOC octets corresponding to outer explicit tags.
+            if indefinite:
+                if rest[:indefinite*2] != _EOC*indefinite:
+                    raise error.ASN1Error("Missing EOC octets")
+                rest = rest[indefinite*2:]
 
         else:
             # Untagged CHOICE and ANY; no outer tags to determine the length.
@@ -1287,6 +1328,15 @@ class SequenceOf(Repeated):
             ret.append(value)
         return ret
 
+    @classmethod
+    def _read_indefinite_value(cls, buf):
+        ret = []
+        while len(buf) >= 2:
+            if buf[:2] == _EOC:
+                return ret, buf[2:]
+            value, buf = cls.component.read(buf, strict=False)
+            ret.append(value)
+        raise error.ASN1Error("Missing EOC octets")
 
 # We cannot use a real set to represent SetOf because
 # (a) our components are mutable and thus not hashable and
@@ -1310,6 +1360,18 @@ class SetOf(Repeated):
         # TODO(ekasper): reject BER encodings in strict mode, i.e.,
         # verify sort order.
         return ret
+
+    @classmethod
+    def _read_indefinite_value(cls, buf):
+        ret = []
+        while len(buf) >= 2:
+            if buf[:2] == _EOC:
+                # TODO(ekasper): reject BER encodings in strict mode, i.e.,
+                # verify sort order.
+                return ret, buf[2:]
+            value, buf = cls.component.read(buf, strict=False)
+            ret.append(value)
+        raise error.ASN1Error("Missing EOC octets")
 
 
 class Component(object):
@@ -1440,7 +1502,7 @@ class Sequence(Constructed, collections.MutableMapping):
         return ret
 
     @classmethod
-    def _decode_value(cls, buf, strict=True):
+    def _read_value(cls, buf, strict=True):
         ret = dict()
         for component in cls.components:
             try:
@@ -1462,8 +1524,6 @@ class Sequence(Constructed, collections.MutableMapping):
                     ret[component.name] = component.default
             else:
                 ret[component.name] = value
-        if buf:
-            raise error.ASN1Error("Invalid encoding")
 
         # Second pass for decoding ANY.
         for component in cls.components:
@@ -1477,4 +1537,19 @@ class Sequence(Constructed, collections.MutableMapping):
                     except error.ASN1Error:
                         if strict:
                             raise
+        return ret, buf
+
+    @classmethod
+    def _decode_value(cls, buf, strict=True):
+        ret, buf = cls._read_value(buf, strict=strict)
+        if buf:
+            raise error.ASN1Error("Invalid encoding")
         return ret
+
+    @classmethod
+    def _read_indefinite_value(cls, buf):
+        # We must be in strict=False mode by definition.
+        ret, buf = cls._read_value(buf, strict=False)
+        if buf[:2] != _EOC:
+            raise error.ASN1Error("Missing EOC octets")
+        return ret, buf[2:]
