@@ -137,7 +137,7 @@ def encode_length(length):
     return chr(_MULTIBYTE_LENGTH | len(encoded_length)) + encoded_length
 
 
-def read_length(buf):
+def read_length(buf, strict=True):
     """Read an ASN.1 object length from the beginning of the buffer.
 
     Args:
@@ -156,9 +156,12 @@ def read_length(buf):
     length, rest = ord(buf[0]), buf[1:]
     if length <= 127:
         return length, rest
+    # 0x80 == ASN.1 indefinite length
     if length == 128:
-        # 0x80 == ASN.1 indefinite length
+        if strict:
+            raise error.ASN1Error("Indefinite length encoding")
         return -1, rest
+
     length &= _MULTIBYTE_LENGTH_MASK
     if len(rest) < length:
         raise error.ASN1Error("Invalid length encoding")
@@ -451,8 +454,10 @@ class Abstract(object):
         # and never modified since, use the original cached value.
         #
         # This ensures that objects decoded in non-strict mode will retain their
-        # original encoding. (Note we do not cache tag and length encoding;
-        # non-strict mode only applies to values).
+        # original encoding.
+        #
+        # BUG: we do not cache tag and length encoding, so reencoding is broken
+        # for objects that use indefinite length encoding.
         if self._serialized_value and not self.modified():
             encoded_value = self._serialized_value
         else:
@@ -496,10 +501,8 @@ class Abstract(object):
                 # if debug-level logging itself is disabled.
                 # logging.debug("%s: read tag %s", cls.__name__, t)
                 buf = buf[len(t):]
-                decoded_length, buf = read_length(buf)
+                decoded_length, buf = read_length(buf, strict=strict)
                 if decoded_length == -1:
-                    if strict:
-                        raise error.ASN1Error("Indefinite length encoding in DER")
                     if t.encoding != tag.CONSTRUCTED:
                         raise error.ASN1Error("Indefinite length encoding in "
                                               "primitive type")
@@ -517,7 +520,8 @@ class Abstract(object):
                 value, rest = (cls(serialized_value=buf[:decoded_length],
                                    strict=strict), buf[decoded_length:])
             else:
-                value, rest = cls._read_indefinite_value(buf)
+                decoded, rest = cls._read_indefinite_value(buf)
+                value = cls(value=decoded)
                 # _read_indefinite_value will strip the inner EOC.
                 indefinite -= 1
             # Remove EOC octets corresponding to outer explicit tags.
@@ -946,7 +950,14 @@ class Any(ASN1String):
     @classmethod
     def _read(cls, buf, strict=True):
        _, rest = tag.Tag.read(buf)
-       length, rest = read_length(rest)
+       length, rest = read_length(rest, strict=strict)
+       if length == -1:
+           if t.encoding != tag.CONSTRUCTED:
+               raise error.ASN1Error("Indefinite length encoding in primitive "
+                                     "type")
+           # Not sure if this even makes any sense.
+           raise NotImplementedError("Indefinite length encoding of ANY types "
+                                     "is not supported")
        if len(rest) < length:
            raise error.ASN1Error("Invalid length encoding")
        decoded_length = len(buf) - len(rest) + length
@@ -1204,7 +1215,13 @@ class Choice(Constructed, collections.MutableMapping):
     @classmethod
     def _read(cls, buf, strict=True):
         readahead_tag, rest = tag.Tag.read(buf)
-        length, rest = read_length(rest)
+        length, rest = read_length(rest, strict=strict)
+        if length == -1:
+            if t.encoding != tag.CONSTRUCTED:
+                raise error.ASN1Error("Indefinite length encoding in primitive"
+                                      "type")
+            raise NotImplementedError("Indefinite length encoding of CHOICE"
+                                      "type is not supported")
         if len(rest) < length:
             raise error.ASN1Error("Invalid length encoding")
         decoded_length = len(buf) - len(rest) + length

@@ -59,7 +59,9 @@ class ObjectIdentifierTest(type_test_base.TypeTestBase):
         ("06020080"),
         ("06032a86c8"),
         # Leading '80'-octets in component.
-        ("06042a8086c8")
+        ("06042a8086c8"),
+        # Indefinite length.
+        ("06808134030000")
         )
 
     bad_strict_encodings = ()

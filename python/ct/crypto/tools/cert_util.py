@@ -81,7 +81,7 @@ def print_certs(cert_file):
             print "Attempting to read PEM"
 
         try:
-            for c in cert.certs_from_pem_file(cert_file):
+            for c in cert.certs_from_pem_file(cert_file, strict_der=False):
                 print_cert(c)
                 printed = True
         except pem.PemError as e:
@@ -97,7 +97,8 @@ def print_certs(cert_file):
         if not FLAGS.filetype:
             print "Attempting to read raw DER"
         try:
-            print_cert(cert.Certificate.from_der_file(cert_file))
+            print_cert(cert.Certificate.from_der_file(cert_file,
+                                                      strict_der=False))
         except error.ASN1Error as e:
             exit_with_message("Failed to parse DER from %s" % cert_file)
 
