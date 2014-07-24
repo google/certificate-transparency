@@ -100,21 +100,6 @@ class DummySequence(types.Sequence):
 
 class TagLengthValueTest(unittest.TestCase):
     """Test Tag-Length-Value encoding."""
-    # A slightly more interesting encoding to test reading from the beginning
-    # of a buffer.
-    class TruncatingDummy(types.Simple):
-        tags = (tag.Tag(1, tag.UNIVERSAL, tag.PRIMITIVE),)
-        def _convert_value(cls, value):
-            return value[0]
-
-        def _decode_value(self, buf, strict=True):
-            if not buf:
-                raise error.ASN1Error("Empty values are not allowed")
-            return buf[0], buf[1:]
-
-        def _encode_value(self):
-            return self._value
-
     def test_encode_decode_int(self):
         signed_integer_encodings = (
             (0, "00"),
@@ -170,6 +155,15 @@ class TagLengthValueTest(unittest.TestCase):
             self.assertRaises(error.ASN1Error,
                               types.read_length, shorter.decode("hex"))
 
+    def test_read_indefinite_length(self):
+        indef_length = "80".decode("hex")
+        self.assertRaises(error.ASN1Error, types.read_length, indef_length)
+        self.assertEqual(types.read_length(indef_length, strict=False),
+                         (-1, ""))
+
+        self.assertEqual(types.read_length(indef_length + "hello", strict=False),
+                         (-1, "hello"))
+
     def test_encode_decode_read(self):
         value = "hello"
         d = Dummy(value=value)
@@ -190,8 +184,8 @@ class TagLengthValueTest(unittest.TestCase):
 
     def test_read_from_beginning(self):
         value = "hello"
-        d = self.TruncatingDummy(value=value)
-        self.assertEqual("h", d.value)
+        d = Dummy(value=value)
+        self.assertEqual("hello", d.value)
         enc = d.encode()
 
         encoded_length = types.encode_length(len(d.value))
@@ -205,7 +199,7 @@ class TagLengthValueTest(unittest.TestCase):
         # ... but we can read from the beginning of the buffer.
         read_dummy, rest = Dummy.read(longer_buffer)
         self.assertTrue(isinstance(read_dummy, Dummy))
-        self.assertEqual("h", read_dummy.value)
+        self.assertEqual("hello", read_dummy.value)
         self.assertEqual("ello", rest)
 
     def test_encode_decode_read_multiple_tags(self):
@@ -233,6 +227,11 @@ class TagLengthValueTest(unittest.TestCase):
         self.assertEqual(read_dummy.value, value)
         self.assertEqual("", rest)
 
+        indef_encoding = "a880010568656c6c6f0000".decode("hex")
+        self.assertRaises(error.ASN1Error, NewDummy.decode, indef_encoding)
+        self.assertEqual(NewDummy.decode(indef_encoding, strict=False),
+                         NewDummy(value="hello"))
+
 
 class BooleanTest(type_test_base.TypeTestBase):
     asn1_type = types.Boolean
@@ -254,7 +253,9 @@ class BooleanTest(type_test_base.TypeTestBase):
         ("0100"),
         # Longer than 1 byte.
         ("01020000"),
-        ("0102ffff")
+        ("0102ffff"),
+        # Indefinite length
+        ("0180ff0000")
         )
     bad_strict_encodings = (
         # Nonzero byte for True.
@@ -288,6 +289,8 @@ class IntegerTest(type_test_base.TypeTestBase):
     bad_encodings = (
         # Empty value.
         ("0200"),
+        # Indefinite length.
+        ("0280ff0000")
         )
     bad_strict_encodings = (
         # Leading 0-octets.
@@ -316,7 +319,10 @@ class OctetStringTest(type_test_base.TypeTestBase):
         ("hello", "040568656c6c6f"),
         ("\xff\x00", "0402ff00")
         )
-    bad_encodings = ()
+    bad_encodings = (
+      # Indefinite length.
+      ("0480abcdef0000"),
+      )
     bad_strict_encodings = ()
 
 # Skip other string type tests as there's currently no exciting specialization
@@ -367,7 +373,9 @@ class BitStringTest(type_test_base.TypeTestBase):
         # Invalid padding bits.
         ("030201ff"),
         ("030205f0"),
-        ("030207f0")
+        ("030207f0"),
+        # Indefinite length.
+        ("038007800000")
         )
     bad_strict_encodings = ()
 
@@ -430,10 +438,24 @@ class SequenceOfTest(type_test_base.TypeTestBase, RepeatedTest):
         # Bad element length.
         "3003010200",
         # Bad component tag.
-        "30020200"
+        "30020200",
+        # Indef length with no EOC.
+        "3080010568656c0000010200ff",
         )
-    bad_strict_encodings = (
-        )
+
+    bad_strict_encodings = ()
+
+    def test_indefinite_length_encoding(self):
+        # We cannot use bad_strict_encodings because of the re-encoding bug:
+        # indefinite length is not preserved.
+        # For good measure, we add an EOC in the contents.
+        value = self.asn1_type([Dummy(value="hel\x00\x00"),
+                                Dummy(value="\x00\xff")])
+        indef_length_encoding = "3080010568656c0000010200ff0000".decode("hex")
+        self.assertRaises(error.ASN1Error,
+                          self.asn1_type.decode, indef_length_encoding)
+        o = self.asn1_type.decode(indef_length_encoding, strict=False)
+        self.assertEqual(o, value)
 
 
 class SetOfTest(type_test_base.TypeTestBase, RepeatedTest):
@@ -465,7 +487,9 @@ class SetOfTest(type_test_base.TypeTestBase, RepeatedTest):
         # Bad element length.
         "31010200",
         # Bad component tag.
-        "31020200"
+        "31020200",
+        # Indef length with no EOC.
+        "3180010568656c0000010200ff",
         )
     bad_strict_encodings = (
         )
@@ -477,6 +501,18 @@ class SetOfTest(type_test_base.TypeTestBase, RepeatedTest):
         dummies2 = self.asn1_type(elems2)
         # Encodings compare equal even though the sets don't.
         self.assertEqual(dummies.encode(), dummies2.encode())
+
+    def test_indefinite_length_encoding(self):
+        # We cannot use bad_strict_encodings because of the re-encoding bug:
+        # indefinite length is not preserved.
+        # For good measure, we add an EOC in the contents.
+        value = self.asn1_type([Dummy(value="hel\x00\x00"),
+                                Dummy(value="\x00\xff")])
+        indef_length_encoding = "3180010568656c0000010200ff0000".decode("hex")
+        self.assertRaises(error.ASN1Error,
+                          self.asn1_type.decode, indef_length_encoding)
+        o = self.asn1_type.decode(indef_length_encoding, strict=False)
+        self.assertEqual(o, value)
 
 
 class AnyTest(type_test_base.TypeTestBase):
@@ -607,7 +643,10 @@ class SequenceTest(type_test_base.TypeTestBase):
         ({"bool": True, "int": 3, "oct": "hi", "any": "\x02\x01\x05"},
          "30090101ff020103020105"),
         )
-    bad_encodings = ()
+    bad_encodings = (
+        # Indef length with no EOC.
+        "30800101ff020103040568656c0000020105",
+        )
     bad_strict_encodings = ()
 
     def test_modify(self):
@@ -649,6 +688,20 @@ class SequenceTest(type_test_base.TypeTestBase):
         self.assertRaises(error.ASN1Error, self.asn1_type.decode, enc)
         dec = self.asn1_type.decode(enc, strict=False)
         self.assertFalse(dec["any"].decoded)
+
+    def test_indefinite_length_encoding(self):
+        # We cannot use bad_strict_encodings because of the re-encoding bug:
+        # indefinite length is not preserved.
+        # For good measure, we add an EOC in the contents.
+        value = self.asn1_type(value={"bool": True, "int": 3,
+                                      "oct": "hel\x00\x00",
+                                      "any": "\x02\x01\x05"})
+        indef_length_encoding = (
+            "30800101ff020103040568656c00000201050000".decode("hex"))
+        self.assertRaises(error.ASN1Error,
+                          self.asn1_type.decode, indef_length_encoding)
+        o = self.asn1_type.decode(indef_length_encoding, strict=False)
+        self.assertEqual(o, value)
 
 
 # Some attempted test coverage for recursive mutable types.

@@ -85,7 +85,7 @@ class TypeTestBase(unittest.TestCase):
             self.assertRaises(error.ASN1Error, self.asn1_type.decode,
                 bad_enc.decode("hex"))
             self.assertRaises(error.ASN1Error, self.asn1_type.decode,
-                bad_enc.decode("hex"))
+                bad_enc.decode("hex"), strict=False)
 
     def test_strict_decode_fails(self):
         for value, bad_enc in self.bad_strict_encodings:
