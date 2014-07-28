@@ -1,4 +1,6 @@
 /* -*- mode: c++; indent-tabs-mode: nil -*- */
+#ifndef CERT_TRANS_SERVER_LOGGED_BLOB_H_
+#define CERT_TRANS_SERVER_LOGGED_BLOB_H_
 
 #include <glog/logging.h>
 #include <stdint.h>
@@ -60,3 +62,5 @@ class LoggedBlob {
   bool sequence_set_;
   uint64_t sequence_;
 };
+
+#endif  // CERT_TRANS_SERVER_LOGGED_BLOB_H_

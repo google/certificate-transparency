@@ -1,4 +1,6 @@
 /* -*- mode: c++; indent-tabs-mode: nil -*- */
+#ifndef CERT_TRANS_SERVER_EVENT_H_
+#define CERT_TRANS_SERVER_EVENT_H_
 
 #include <deque>
 #include <glog/logging.h>
@@ -233,3 +235,5 @@ class UDPEchoServer : public UDPServer {
     QueuePacket(from, buf, len);
   }
 };
+
+#endif  // CERT_TRANS_SERVER_EVENT_H_
