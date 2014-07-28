@@ -1,4 +1,7 @@
 /* -*- indent-tabs-mode: nil -*- */
+#ifndef CERT_TRANS_LOG_SQLITE_DB_INL_H_
+#define CERT_TRANS_LOG_SQLITE_DB_INL_H_
+
 #include "log/sqlite_db.h"
 
 #include <glog/logging.h>
@@ -218,3 +221,5 @@ SQLiteDB<Logged>::LatestTreeHead(ct::SignedTreeHead *result)
 
   return this->LOOKUP_OK;
 }
+
+#endif  // CERT_TRANS_LOG_SQLITE_DB_INL_H_

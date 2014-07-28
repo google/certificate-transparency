@@ -1,4 +1,7 @@
 /* -*- indent-tabs-mode: nil -*- */
+#ifndef CERT_TRANS_LOG_TREE_SIGNER_INL_H_
+#define CERT_TRANS_LOG_TREE_SIGNER_INL_H_
+
 #include "log/tree_signer.h"
 
 #include <glog/logging.h>
@@ -197,3 +200,5 @@ TreeSigner<Logged>::TimestampAndSign(uint64_t min_timestamp,
     // Make this one a hard fail. There is really no excuse for it.
     abort();
 }
+
+#endif  // CERT_TRANS_LOG_TREE_SIGNER_INL_H_
