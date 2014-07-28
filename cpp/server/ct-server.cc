@@ -23,8 +23,8 @@
 #include "log/ct_extensions.h"
 #include "log/file_db.h"
 #include "log/file_storage.h"
-#include "log/frontend_signer.h"
 #include "log/frontend.h"
+#include "log/frontend_signer.h"
 #include "log/log_lookup.h"
 #include "log/log_signer.h"
 #include "log/logged_certificate.h"
@@ -32,10 +32,8 @@
 #include "log/tree_signer.h"
 #include "proto/ct.pb.h"
 #include "proto/serializer.h"
-// FIXME: debug
-#include "util/util.h"
-
-#include "event.h"
+#include "server/event.h"
+#include "util/util.h"  // FIXME: debug
 
 DEFINE_int32(port, 0, "Server port");
 DEFINE_string(key, "", "PEM-encoded server private key file");

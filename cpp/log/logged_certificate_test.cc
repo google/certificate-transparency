@@ -4,6 +4,4 @@
 
 typedef testing::Types<ct::LoggedCertificate> TestType;
 
-#include "logged_test.cc"
-
-
+#include "log/logged_test-inl.h"

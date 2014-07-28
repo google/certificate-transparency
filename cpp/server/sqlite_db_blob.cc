@@ -1,4 +1,4 @@
-#include "log/sqlite_db.cc"
-#include "logged_blob.h"
+#include "log/sqlite_db-inl.h"
+#include "server/logged_blob.h"
 
 template class SQLiteDB<LoggedBlob>;

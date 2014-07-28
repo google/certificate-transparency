@@ -1,17 +1,17 @@
 /* -*- indent-tabs-mode: nil -*- */
-#include "event.h"
-#include "logged_blob.h"
+
+#include <fstream>
+#include <gflags/gflags.h>
+#include <iostream>
+#include <openssl/ssl.h>
 
 #include "log/database.h"
 #include "log/log_lookup.h"
 #include "log/log_signer.h"
 #include "log/sqlite_db.h"
 #include "log/tree_signer.h"
-
-#include <fstream>
-#include <gflags/gflags.h>
-#include <iostream>
-#include <openssl/ssl.h>
+#include "server/event.h"
+#include "server/logged_blob.h"
 
 // TODO(benl): Make this client/server, make a configurable server
 // (and client?) pipeline which this shares with ct-server.
