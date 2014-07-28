@@ -33,6 +33,7 @@
 #include "proto/ct.pb.h"
 #include "proto/serializer.h"
 #include "server/event.h"
+#include "util/read_private_key.h"
 #include "util/util.h"  // FIXME: debug
 
 DEFINE_int32(port, 0, "Server port");
@@ -61,11 +62,11 @@ DEFINE_int32(tree_signing_frequency_seconds, 600,
              "last signing. Set this well below the MMD to ensure we sign "
              "in a timely manner. Must be greater than 0.");
 
+using cert_trans::util::ReadPrivateKey;
+using ct::CertChecker;
 using ct::LoggedCertificate;
 using google::RegisterFlagValidator;
 using std::string;
-
-using ct::CertChecker;
 
 // Basic sanity checks on flag values.
 static bool ValidatePort(const char *flagname, int port) {
@@ -477,7 +478,7 @@ int main(int argc, char **argv) {
   ct::LoadCtExtensions();
 
   EVP_PKEY *pkey = NULL;
-  CHECK_EQ(Services::ReadPrivateKey(&pkey, FLAGS_key), Services::KEY_OK);
+  CHECK_EQ(ReadPrivateKey(&pkey, FLAGS_key), cert_trans::util::KEY_OK);
 
   int fd;
   CHECK(Services::InitServer(&fd, FLAGS_port, NULL, SOCK_STREAM));
@@ -508,7 +509,7 @@ int main(int argc, char **argv) {
 
   // Hmm, there is no EVP_PKEY_dup, so let's read the key again...
   EVP_PKEY *pkey2 = NULL;
-  CHECK_EQ(Services::ReadPrivateKey(&pkey2, FLAGS_key), Services::KEY_OK);
+  CHECK_EQ(ReadPrivateKey(&pkey2, FLAGS_key), cert_trans::util::KEY_OK);
 
   CTLogManager manager(
       new Frontend(new CertSubmissionHandler(&checker),

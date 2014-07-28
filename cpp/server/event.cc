@@ -282,21 +282,3 @@ err:
   }
   return ret;
 }
-
-Services::KeyError Services::ReadPrivateKey(EVP_PKEY **pkey,
-                                            const std::string &file) {
-  FILE *fp = fopen(file.c_str(), "r");
-
-  if(fp == static_cast<FILE*>(NULL))
-    return NO_SUCH_FILE;
-
-  // No password.
-  PEM_read_PrivateKey(fp, pkey, NULL, NULL);
-  Services::KeyError retval(KEY_OK);
-  if (*pkey == static_cast<EVP_PKEY*>(NULL))
-    retval = INVALID_KEY;
-
-  fclose(fp);
-
-  return retval;
-}

@@ -303,15 +303,17 @@ client/ct: client/ct.o client/client.o client/log_client.o client/ssl_client.o \
            $(LOCAL_LIBS)
 
 # server
-server/ct-server: server/ct-server.o server/event.o $(LOCAL_LIBS)
+server/ct-server: server/ct-server.o server/event.o util/read_private_key.o \
+	$(LOCAL_LIBS)
 
 server/ct-dns-server: server/ct-dns-server.o server/event.o $(LOCAL_LIBS)
 
-server/ct-rfc-server: server/ct-rfc-server.o server/event.o $(LOCAL_LIBS)
+server/ct-rfc-server: server/ct-rfc-server.o util/read_private_key.o \
+	$(LOCAL_LIBS)
 
 server/blob-server: server/blob-server.o server/event.o \
                     server/sqlite_db_blob.o server/tree_signer_blob.o \
-                    server/log_lookup_blob.o \
+                    server/log_lookup_blob.o util/read_private_key.o \
                     $(LOCAL_LIBS)
 
 dns_tests: server/ct-dns-server

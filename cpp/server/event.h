@@ -2,7 +2,6 @@
 
 #include <deque>
 #include <glog/logging.h>
-#include <openssl/evp.h>
 #include <netinet/in.h>
 #include <string>
 #include <sys/socket.h>
@@ -10,9 +9,7 @@
 #include <time.h>
 
 class Services {
- 
  public:
-
   // because time is expensive, for most tasks we can just use some
   // time sampled within this event handling loop. So, the main loop
   // needs to call SetRoughTime() appropriately.
@@ -25,14 +22,6 @@ class Services {
   static void SetRoughTime() { rough_time_ = 0; }
 
   static bool InitServer(int *sock, int port, const char *ip, int type);
-
-  enum KeyError {
-    KEY_OK,
-    NO_SUCH_FILE,
-    INVALID_KEY,
-  };
-
-  static KeyError ReadPrivateKey(EVP_PKEY **pkey, const std::string &file);
 
  private:
 

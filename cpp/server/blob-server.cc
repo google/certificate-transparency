@@ -12,10 +12,12 @@
 #include "log/tree_signer.h"
 #include "server/event.h"
 #include "server/logged_blob.h"
+#include "util/read_private_key.h"
 
 // TODO(benl): Make this client/server, make a configurable server
 // (and client?) pipeline which this shares with ct-server.
 
+using cert_trans::util::ReadPrivateKey;
 using google::RegisterFlagValidator;
 using std::string;
 
@@ -56,7 +58,7 @@ static TreeSigner<LoggedBlob> *GetTreeSigner(Database<LoggedBlob> *db) {
 
   if (tree_signer == NULL) {
     EVP_PKEY *pkey = NULL;
-    CHECK_EQ(Services::ReadPrivateKey(&pkey, FLAGS_key), Services::KEY_OK);
+    CHECK_EQ(ReadPrivateKey(&pkey, FLAGS_key), cert_trans::util::KEY_OK);
     tree_signer = new TreeSigner<LoggedBlob>(db, new LogSigner(pkey));
   }
 

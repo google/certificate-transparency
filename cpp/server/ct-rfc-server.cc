@@ -25,9 +25,9 @@
 #include "log/sqlite_db.h"
 #include "log/tree_signer.h"
 #include "proto/ct.pb.h"
-#include "server/event.h"
 #include "util/json_wrapper.h"
 #include "util/openssl_util.h"
+#include "util/read_private_key.h"
 
 DEFINE_string(server, "localhost", "Server host");
 DEFINE_string(port, "9999", "Server port");
@@ -59,6 +59,7 @@ DEFINE_int32(tree_signing_frequency_seconds, 600,
 namespace http = boost::network::http;
 namespace uri = boost::network::uri;
 
+using cert_trans::util::ReadPrivateKey;
 using ct::Cert;
 using ct::CertChain;
 using ct::CertChecker;
@@ -621,7 +622,7 @@ int main(int argc, char * argv[]) {
   ct::LoadCtExtensions();
 
   EVP_PKEY *pkey = NULL;
-  CHECK_EQ(Services::ReadPrivateKey(&pkey, FLAGS_key), Services::KEY_OK);
+  CHECK_EQ(ReadPrivateKey(&pkey, FLAGS_key), cert_trans::util::KEY_OK);
 
   CertChecker checker;
   CHECK(checker.LoadTrustedCertificates(FLAGS_trusted_cert_file))
@@ -647,7 +648,7 @@ int main(int argc, char * argv[]) {
 
   // Hmm, there is no EVP_PKEY_dup, so let's read the key again...
   EVP_PKEY *pkey2 = NULL;
-  CHECK_EQ(Services::ReadPrivateKey(&pkey2, FLAGS_key), Services::KEY_OK);
+  CHECK_EQ(ReadPrivateKey(&pkey2, FLAGS_key), cert_trans::util::KEY_OK);
 
   CTLogManager manager(
       new Frontend(new CertSubmissionHandler(&checker),
