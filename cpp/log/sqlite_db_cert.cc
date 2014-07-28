@@ -1,6 +1,4 @@
-#include "sqlite_db.cc"
-
 #include "log/logged_certificate.h"
-#include "proto/ct.pb.h"
+#include "log/sqlite_db-inl.h"
 
 template class SQLiteDB<ct::LoggedCertificate>;

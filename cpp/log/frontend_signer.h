@@ -4,7 +4,7 @@
 #include <stdint.h>
 #include <string>
 
-#include "logged_certificate.h"
+#include "log/logged_certificate.h"
 
 template <class Logged> class Database;
 class LogSigner;

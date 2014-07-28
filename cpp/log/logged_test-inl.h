@@ -1,4 +1,7 @@
 /* -*- indent-tabs-mode: nil -*- */
+#ifndef CERT_TRANS_LOG_LOGGED_TEST_INL_H_
+#define CERT_TRANS_LOG_LOGGED_TEST_INL_H_
+
 #include <string>
 
 #include "util/testing.h"
@@ -98,3 +101,5 @@ int main(int argc, char **argv) {
   srand(time(NULL));
   return RUN_ALL_TESTS();
 }
+
+#endif  // CERT_TRANS_LOG_LOGGED_TEST_INL_H_
