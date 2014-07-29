@@ -18,7 +18,6 @@
 #include <string>
 
 #include "client/http_log_client.h"
-#include "client/log_client.h"
 #include "client/ssl_client.h"
 #include "log/cert.h"
 #include "log/cert_submission_handler.h"
@@ -45,7 +44,6 @@ DEFINE_string(ct_server_submission, "",
               "Certificate chain to submit to a CT log server. "
               "The file must consist of concatenated PEM certificates.");
 DEFINE_string(ct_server, "", "CT log server to connect to");
-DEFINE_int32(ct_server_port, 0, "CT log server port (not used for HTTP)");
 DEFINE_string(ct_server_response_out, "",
               "Output file for the Signed Certificate Timestamp received from "
               "the CT log server");
@@ -74,8 +72,6 @@ DEFINE_bool(ssl_client_expect_handshake_failure, false,
 DEFINE_string(certificate_chain_in, "", "Certificate chain to analyze, "
               "in PEM format");
 DEFINE_string(sct_in, "", "SCT to wrap");
-DEFINE_bool(http_log, false, "Use an I-D compliant HTTP log server rather than "
-            "the old protocol buffer format");
 DEFINE_int32(get_first, 0, "First entry to retrieve with the 'get' command");
 DEFINE_int32(get_last, 0, "Last entry to retrieve with the 'get' command");
 DEFINE_string(certificate_base, "", "Base name for retrieved certificates - "
@@ -240,33 +236,18 @@ static int Upload() {
   LOG(INFO) << submission_file << " is " << contents.length() << " bytes.";
 
   SignedCertificateTimestamp sct;
+  HTTPLogClient client(FLAGS_ct_server);
+  HTTPLogClient::Status ret = client.UploadSubmission(contents, FLAGS_precert,
+                                                      &sct);
 
-  if (FLAGS_http_log) {
-    HTTPLogClient client(FLAGS_ct_server);
-    
-    HTTPLogClient::Status ret = client.UploadSubmission(contents, FLAGS_precert,
-                                                        &sct);
+  if (ret == HTTPLogClient::CONNECT_FAILED) {
+    LOG(ERROR) << "Unable to connect";
+    return 2;
+  }
 
-    if (ret == HTTPLogClient::CONNECT_FAILED) {
-      LOG(ERROR) << "Unable to connect";
-      return 2;
-    }
-
-    if (ret != HTTPLogClient::OK) {
-      LOG(ERROR) << "Submission failed, error = " << ret;
-      return 1;
-    }
-  } else {
-    LogClient client(FLAGS_ct_server, FLAGS_ct_server_port);
-    if (!client.Connect()) {
-      LOG(ERROR) << "Unable to connect";
-      return 2;
-    }
-
-    if (!client.UploadSubmission(contents, FLAGS_precert, &sct)) {
-      LOG(ERROR) << "Submission failed";
-      return 1;
-    }
+  if (ret != HTTPLogClient::OK) {
+    LOG(ERROR) << "Submission failed, error = " << ret;
+    return 1;
   }
 
   /* Temporarily removed: we need the the final chain if the upload
@@ -553,40 +534,24 @@ static AuditResult Audit() {
     }
 
     MerkleAuditProof proof;
+    HTTPLogClient client(FLAGS_ct_server);
 
-    if (FLAGS_http_log) {
-      HTTPLogClient client(FLAGS_ct_server);
-      
-      LOG(INFO) << "info = "
-                << ct_data.attached_sct_info(i).DebugString();
-      HTTPLogClient::Status ret = client.QueryAuditProof(
-          ct_data.attached_sct_info(i).merkle_leaf_hash(), &proof);
+    LOG(INFO) << "info = "
+              << ct_data.attached_sct_info(i).DebugString();
+    HTTPLogClient::Status ret = client.QueryAuditProof(
+        ct_data.attached_sct_info(i).merkle_leaf_hash(), &proof);
 
-      // HTTP protocol does not supply this.
-      proof.mutable_id()->set_key_id(sct_id);
+    // HTTP protocol does not supply this.
+    proof.mutable_id()->set_key_id(sct_id);
 
-      if (ret == HTTPLogClient::CONNECT_FAILED) {
-        LOG(ERROR) << "Unable to connect";
-        delete verifier;
-        return CT_SERVER_UNAVAILABLE;
-      }
-      if (ret != HTTPLogClient::OK) {
-        LOG(ERROR) << "QueryAuditProof failed, error " << ret;
-        continue;
-      }
-    } else {
-      LogClient client(FLAGS_ct_server, FLAGS_ct_server_port);
-      if (!client.Connect()) {
-        LOG(ERROR) << "Unable to connect";
-        delete verifier;
-        return CT_SERVER_UNAVAILABLE;
-      }
-
-      if (!client.QueryAuditProof(ct_data.attached_sct_info(i)
-                                  .merkle_leaf_hash(), &proof)) {
-        LOG(INFO) << "Failed to retrieve audit proof";
-        continue;
-      }
+    if (ret == HTTPLogClient::CONNECT_FAILED) {
+      LOG(ERROR) << "Unable to connect";
+      delete verifier;
+      return CT_SERVER_UNAVAILABLE;
+    }
+    if (ret != HTTPLogClient::OK) {
+      LOG(ERROR) << "QueryAuditProof failed, error " << ret;
+      continue;
     }
 
     LOG(INFO) << "Received proof " << proof.DebugString();
@@ -785,8 +750,6 @@ static void WriteCertificate(const std::string &cert, int entry,
 }
 
 void GetEntries() {
-  CHECK(FLAGS_http_log);
-
   HTTPLogClient client(FLAGS_ct_server);
   std::vector<HTTPLogClient::LogEntry> entries;
   HTTPLogClient::Status error = client.GetEntries(FLAGS_get_first,
@@ -818,7 +781,6 @@ void GetEntries() {
 }
 
 int GetSTH() {
-  CHECK(FLAGS_http_log);
   CHECK_NE(FLAGS_ct_server, "");
 
   HTTPLogClient client(FLAGS_ct_server);
@@ -863,7 +825,6 @@ static monitor::Database *GetMonitorDBFromFlags() {
 // See monitor class for the monitor action specific return codes.
 int Monitor() {
   CHECK_NE(FLAGS_monitor_action, "");
-  CHECK(FLAGS_http_log);
   CHECK_NE(FLAGS_ct_server, "");
 
   monitor::Monitor monitor(GetMonitorDBFromFlags(),

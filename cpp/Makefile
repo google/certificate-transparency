@@ -297,7 +297,7 @@ monitor/database_test: monitor/database_test.o monitor/database.o \
                        log/signer.o log/verifier.o proto/libproto.a
 
 # client
-client/ct: client/ct.o client/client.o client/log_client.o client/ssl_client.o \
+client/ct: client/ct.o client/client.o client/ssl_client.o \
            client/http_log_client.o monitor/sqlite_db.o monitor/database.o \
            monitor/monitor.o \
            $(LOCAL_LIBS)

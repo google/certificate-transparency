@@ -60,7 +60,7 @@ audit() {
   port=$3
 
   set +e
-  ../cpp/client/ct audit --ct_server="127.0.0.1:8124" --http_log \
+  ../cpp/client/ct audit --ct_server="127.0.0.1:8124" \
     --ct_server_public_key=$cert_dir/$log_server-key-public.pem \
     --ssl_client_ct_data_in=$cert_dir/$port.sct --logtostderr=true
   local retcode=$?
