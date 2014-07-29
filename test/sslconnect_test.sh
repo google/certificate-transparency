@@ -147,7 +147,7 @@ test_ct_server() {
 
   # Set the tree signing frequency to 0 to ensure we sign as often as possible.
   echo "Starting CT server with trusted certs in $ca_file"
-  ../cpp/server/ct-rfc-server --port=8124 \
+  ../cpp/server/ct-server --port=8124 \
     --key="$cert_dir/$log_server-key.pem" \
     --trusted_cert_file="$ca_file" --logtostderr=true \
     --tree_signing_frequency_seconds=1 $flags &

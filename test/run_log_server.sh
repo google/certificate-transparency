@@ -36,6 +36,6 @@ KEY="testdata/ct-server-key.pem"
 #   ln -s $CERT $HASH_DIR/$hash.0
 # fi
 
-../cpp/server/ct-rfc-server --port=8888 --key=$KEY \
+../cpp/server/ct-server --port=8888 --key=$KEY \
   --trusted_cert_file=$CERT_FILE --logtostderr=true \
   --tree_signing_frequency_seconds=1 --sqlite_db=$STORAGE -v=5

@@ -85,7 +85,7 @@ MONITOR_TESTS = monitor/database_test
 ALL_TESTS = $(PROTO_TESTS) $(MERKLETREE_TESTS) $(LOG_TESTS) $(UTIL_TESTS) \
 	$(MONITOR_TESTS) dns_tests
 
-all: unit_tests client/ct server/blob-server server/ct-rfc-server \
+all: unit_tests client/ct server/blob-server server/ct-server \
 	server/ct-dns-server
 
 .DELETE_ON_ERROR:
@@ -304,7 +304,7 @@ client/ct: client/ct.o client/client.o client/ssl_client.o \
 
 server/ct-dns-server: server/ct-dns-server.o server/event.o $(LOCAL_LIBS)
 
-server/ct-rfc-server: server/ct-rfc-server.o util/read_private_key.o \
+server/ct-server: server/ct-server.o util/read_private_key.o \
 	$(LOCAL_LIBS)
 
 server/blob-server: server/blob-server.o server/event.o \
