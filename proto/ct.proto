@@ -130,7 +130,7 @@ message TimestampedEntry {
   optional LogEntryType entry_type = 2;
   optional SignedEntry signed_entry = 3;
   optional bytes extensions = 4;
-} 
+}
 
 // Stuff that's hashed into a Merkle leaf.
 message MerkleTreeLeaf {
@@ -140,7 +140,13 @@ message MerkleTreeLeaf {
   optional TimestampedEntry timestamped_entry = 3;
 }
 
-// FIXME(benl): no longer needed?
+// TODO(benl): No longer needed?
+//
+// Used by cpp/client/ct: it assembles the one from the I-D JSON
+// protocol.
+//
+// Used by cpp/server/blob-server: it uses one to call a variant of
+// LogLookup::AuditProof.
 message MerkleAuditProof {
   optional Version version = 1 [ default = UNKNOWN_VERSION ];
   optional LogID id = 2;
@@ -154,60 +160,6 @@ message MerkleAuditProof {
 message ShortMerkleAuditProof {
   required uint64 leaf_index = 1;
   repeated bytes path_node = 2;
-}
-
-////////////////////////////////////////////////////////////////////////////////
-// The following are not in the I-D (yet) but should end up there.            //
-// For now they serve as a quick documentation for protocol messages          //
-// we intend to support.                                                      //
-////////////////////////////////////////////////////////////////////////////////
-message ClientLookup {
-  enum Type {
-    MERKLE_AUDIT_PROOF_BY_LEAF_HASH = 1;
-  }
-  required Type type = 1;
-  optional bytes merkle_leaf_hash = 2;
-}
-
-// Server-client messages
-message ClientMessage {
-  enum ClientCommand {
-    // Upload a certificate bundle, and retrieve
-    // a submission token, or an audit proof.
-    SUBMIT_BUNDLE = 1;
-    SUBMIT_CA_BUNDLE = 2;
-    LOOKUP_AUDIT_PROOF = 3;
-  }
-  required ClientCommand command = 1;
-  optional bytes submission_data = 2;
-  optional ClientLookup lookup = 3;
-}
-
-message ServerError {
-  enum ErrorCode {
-    BAD_VERSION = 0;
-    UNSUPPORTED_FORMAT = 1;
-    INVALID_MESSAGE = 2;
-    UNSUPPORTED_COMMAND = 3;
-    REJECTED = 4;
-    NOT_FOUND = 5;
-  }
-  required ErrorCode code = 1;
-  optional string error_message = 2;
-}
-
-message ServerMessage {
-  // The server's response codes.
-  enum ServerResponse {
-    ERROR = 0;
-    SIGNED_CERTIFICATE_TIMESTAMP = 1;
-    MERKLE_AUDIT_PROOF = 2;
-  }
-  required ServerResponse response = 1;
-  // Normally only one of those will be set.
-  optional ServerError error = 2;
-  optional SignedCertificateTimestamp sct = 3;
-  optional MerkleAuditProof merkle_proof = 4;
 }
 
 ////////////////////////////////////////////////////////////////////////////////

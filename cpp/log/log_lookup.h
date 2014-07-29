@@ -35,6 +35,9 @@ template <class Logged> class LogLookup {
   LookupResult GetIndex(const std::string &merkle_leaf_hash, uint64_t *index);
 
   // Look up by hash of the logged item.
+  // TODO(pphaneuf): Looking up an audit proof without a tree size is
+  // unreliable in the case of multiple CT servers (some might be
+  // behind). New code should avoid this variant.
   LookupResult AuditProof(const std::string &merkle_leaf_hash,
                           ct::MerkleAuditProof *proof);
 

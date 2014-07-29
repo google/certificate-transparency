@@ -111,6 +111,10 @@ int main(int argc, char **argv) {
     // FIXME(benl): one of these already exists somewhere - either
     // hoist it or expose it.
     TreeHasher tree_hasher(new Sha256Hasher());
+    // TODO(pphaneuf): This is the only use of this variant of
+    // LogLookup::AuditProof. Doing a lookup without a tree size is
+    // not robust in the presence of distributed CT servers (some
+    // replicas could be out of date).
     LogLookup<LoggedBlob>::LookupResult lu_result
         = lookup.AuditProof(tree_hasher.HashLeaf(serialized_leaf), &proof);
     CHECK_EQ(lu_result, LogLookup<LoggedBlob>::OK);
