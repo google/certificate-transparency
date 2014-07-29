@@ -98,6 +98,9 @@ class CertificateTest(unittest.TestCase):
     # A certificate with both kinds of AIA information.
     _PEM_AIA = "aia.pem"
 
+    # A certificate with the ASN1 "indefinite" length encoding
+    _PEM_INDEFINITE_LENGTH = "asn1_indefinite_length_encoding.pem"
+
     @property
     def pem_file(self):
         return FLAGS.testdata_dir + "/" + self._PEM_FILE
@@ -644,6 +647,8 @@ class CertificateTest(unittest.TestCase):
         c = self.cert_from_pem_file(self._PEM_FILE)
         self.assertItemsEqual([], c.ocsp_responders())
 
+    def test_indefinite_encoding(self):
+        c = self.cert_from_pem_file(self._PEM_AIA)
 
 if __name__ == "__main__":
     sys.argv = FLAGS(sys.argv)
