@@ -30,4 +30,4 @@ test: all
 
 clean:
 	cd ct/proto && rm -f *_pb2.py *.pb.cc *.pb.h
-	find . -name '*.pyc' | xargs -r rm
+	find . -name '*.pyc' | xargs rm -f
