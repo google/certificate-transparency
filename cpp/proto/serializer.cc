@@ -5,7 +5,6 @@
 #include <math.h>
 #include <string>
 
-#include "include/types.h"
 #include "proto/ct.pb.h"
 
 using ct::DigitallySigned;

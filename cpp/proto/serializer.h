@@ -6,12 +6,13 @@
 #include <stdint.h>
 #include <string>
 
-#include "include/types.h"
 #include "proto/ct.pb.h"
 
 // A utility class for writing protocol buffer fields in canonical TLS style.
 class Serializer {
  public:
+  typedef google::protobuf::RepeatedPtrField<std::string> repeated_string;
+
   Serializer() {}
   ~Serializer() {}
 
@@ -206,6 +207,8 @@ class Serializer {
 
 class Deserializer {
  public:
+  typedef Serializer::repeated_string repeated_string;
+
   // We do not make a copy, so input must remain valid.
   // FIXME: and so we should take a string *, not a string &.
   explicit Deserializer(const std::string &input);
