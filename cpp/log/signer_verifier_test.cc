@@ -19,11 +19,6 @@ namespace {
 
 const char kTestString[] = "abc";
 
-// A slightly shorter notation for constructing hex strings from binary blobs.
-string H(const string &byte_string) {
-  return util::HexString(byte_string);
-}
-
 class SignerVerifierTest : public ::testing::Test {
  protected:
   SignerVerifierTest() : signer_(NULL),

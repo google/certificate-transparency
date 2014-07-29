@@ -105,9 +105,6 @@ const char kDefaultDerTbsCert[] =
     "41310e300c0603550408130557616c65733110300e060355040713074572772057656e8201"
     "0030090603551d1304023000";
 
-const char kDefaultDerCertHash[] =
-    "50335d9cd3649871d0c95397648bf7814c297b3bad7020b2c13d2b0aef6e3b49";
-
 // Some time in September 2012.
 const uint64_t kDefaultSCTTimestamp = 1348589665525LL;
 
