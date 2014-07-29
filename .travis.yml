@@ -17,7 +17,7 @@ before_install:
  - go version
 
 script:
- - make alltests
+ - make alltests CC=clang CXX=clang++
  - go test -v ./go/...
 
 notifications:
