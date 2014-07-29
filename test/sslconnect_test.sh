@@ -60,7 +60,7 @@ audit() {
   port=$3
 
   set +e
-  ../cpp/client/ct audit --ct_server="127.0.0.1" --ct_server_port=8124 \
+  ../cpp/client/ct audit --ct_server="127.0.0.1:8124" --http_log \
     --ct_server_public_key=$cert_dir/$log_server-key-public.pem \
     --ssl_client_ct_data_in=$cert_dir/$port.sct --logtostderr=true
   local retcode=$?
@@ -147,7 +147,8 @@ test_ct_server() {
 
   # Set the tree signing frequency to 0 to ensure we sign as often as possible.
   echo "Starting CT server with trusted certs in $ca_file"
-  ../cpp/server/ct-server --port=8124 --key="$cert_dir/$log_server-key.pem" \
+  ../cpp/server/ct-rfc-server --port=8124 \
+    --key="$cert_dir/$log_server-key.pem" \
     --trusted_cert_file="$ca_file" --logtostderr=true \
     --tree_signing_frequency_seconds=1 $flags &
 
@@ -155,23 +156,23 @@ test_ct_server() {
   sleep 2
 
   echo "Generating test certificates"
-  make_cert `pwd`/tmp test ca 127.0.0.1 8124 false \
+  make_cert `pwd`/tmp test ca 127.0.0.1:8124 false \
     `pwd`/tmp/ct-server-key-public.pem
   make_embedded_cert `pwd`/tmp test-embedded ca \
-    127.0.0.1 8124 false false `pwd`/tmp/ct-server-key-public.pem
+    127.0.0.1:8124 false false `pwd`/tmp/ct-server-key-public.pem
   make_embedded_cert `pwd`/tmp test-embedded-with-preca \
-    ca 127.0.0.1 8124 false true `pwd`/tmp/ct-server-key-public.pem
+    ca 127.0.0.1:8124 false true `pwd`/tmp/ct-server-key-public.pem
   # Generate a second set of certs that chain through an intermediate
   make_intermediate_ca_certs `pwd`/tmp intermediate ca
 
   make_cert `pwd`/tmp test-intermediate intermediate \
-    127.0.0.1 8124 true `pwd`/tmp/ct-server-key-public.pem
+    127.0.0.1:8124 true `pwd`/tmp/ct-server-key-public.pem
   make_embedded_cert `pwd`/tmp \
-    test-embedded-with-intermediate intermediate 127.0.0.1 8124 true \
-      false `pwd`/tmp/ct-server-key-public.pem
+    test-embedded-with-intermediate intermediate 127.0.0.1:8124 \
+    true false `pwd`/tmp/ct-server-key-public.pem
   make_embedded_cert `pwd`/tmp \
-    test-embedded-with-intermediate-preca intermediate 127.0.0.1 \
-      8124 true true `pwd`/tmp/ct-server-key-public.pem
+    test-embedded-with-intermediate-preca intermediate 127.0.0.1:8124 \
+    true true `pwd`/tmp/ct-server-key-public.pem
 
   # Wait a bit to ensure the server signs the tree.
   sleep 5

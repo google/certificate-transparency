@@ -138,9 +138,8 @@ make_cert() {
   local server=$2
   local ca=$3
   local log_server=$4
-  local log_server_port=$5
-  local ca_is_intermediate=$6
-  local server_public_key=$7
+  local ca_is_intermediate=$5
+  local server_public_key=$6
 
   # Generate a new private key and CSR
   request_cert $cert_dir $server precert.conf
@@ -166,16 +165,16 @@ make_cert() {
 
   echo ../cpp/client/ct upload \
     --ct_server_submission=$cert_dir/$server-cert-bundle.pem \
-    --ct_server=$log_server --ct_server_port=$log_server_port \
+    --ct_server=$log_server --http_log \
     --ct_server_public_key=$server_public_key \
     --ct_server_response_out=$cert_dir/$server-cert.proof \
-    --logtostderr=true $HTTP_LOG
+    --logtostderr=true
   ../cpp/client/ct upload \
     --ct_server_submission=$cert_dir/$server-cert-bundle.pem \
-    --ct_server=$log_server --ct_server_port=$log_server_port \
+    --ct_server=$log_server --http_log \
     --ct_server_public_key=$server_public_key \
     --ct_server_response_out=$cert_dir/$server-cert.proof \
-    --logtostderr=true $HTTP_LOG
+    --logtostderr=true
 
   # Create a wrapped SCT
   ../cpp/client/ct wrap --alsologtostderr \
@@ -208,12 +207,11 @@ make_embedded_cert() {
   local cert_dir=$1 # Where CA certificate lives and output certs go
   local server=$2 # Prefix of the new certificate filename
   local ca=$3 # Prefix of the CA certificate file.
-  local log_server=$4 # Log address (IP) or IP:port if HTTP_LOG is set.
-  local log_port_or_http_arg=$5 # Log server port. Unused if HTTP_LOG is set.
-  local ca_is_intermediate=$6 # CA cert is intermediate one
-  local use_pre_ca=$7 # Using precertificate signing cert.
-  local server_public_key=$8 # File holding the log's public key
-  local common_name=$9 # Optional commonName value for certificate
+  local log_server=$4 # Log address (IP:port).
+  local ca_is_intermediate=$5 # CA cert is intermediate one
+  local use_pre_ca=$6 # Using precertificate signing cert.
+  local server_public_key=$7 # File holding the log's public key
+  local common_name=$8 # Optional commonName value for certificate
 
   local modified_config=${cert_dir}/${server}_precert.conf
   if [ -z "$common_name" ]; then
@@ -221,14 +219,6 @@ make_embedded_cert() {
   else
     echo "Will set the following common name: $common_name"
     sed -e "/0.organizationName=Certificate/ a commonName=$common_name" precert.conf > $modified_config
-  fi
-
-  local log_port_or_http
-  if [ "$log_port_or_http_arg" == "-http_log" ] ||
-      [ "$HTTP_LOG" == "-http_log" ]; then
-    log_port_or_http="-http_log"
-  else
-    log_port_or_http="--ct_server_port=$log_port_or_http_arg"
   fi
 
   # Generate a new, unencrypted private key and CSR
@@ -264,7 +254,7 @@ make_embedded_cert() {
 
   ../cpp/client/ct upload \
     --ct_server_submission=$cert_dir/$server-precert-bundle.pem \
-    --ct_server=$log_server $log_port_or_http \
+    --ct_server=$log_server --http_log \
     --ct_server_public_key=$server_public_key \
     --ct_server_response_out=$cert_dir/$server-pre-cert.proof \
     --precert=true --logtostderr=true

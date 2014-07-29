@@ -4,8 +4,6 @@ HTTPD_DIR=$1
 OPENSSL_DIR=$2
 SERVER=${2:-"127.0.0.1:8888"}
 
-HTTP_LOG=--http_log
-
 . generate_certs.sh
 
 ../cpp/client/ct extension_data --sct_token=testdata/test-cert.proof \

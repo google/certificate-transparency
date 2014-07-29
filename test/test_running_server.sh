@@ -17,11 +17,7 @@ fi
 
 CERT_DIR=$1
 CT_KEY=$2
-SERVER=${3:-"127.0.0.1"}
-# Note: not actually used for HTTP logs...
-PORT=${4:-8124}
-
-HTTP_LOG=--http_log
+SERVER=${3:-"127.0.0.1:8124"}
 
 echo $SERVER
 
@@ -40,9 +36,9 @@ audit() {
   sct=$3
 
   set +e
-  ../cpp/client/ct audit --ct_server="$SERVER" --ct_server_port=$PORT \
+  ../cpp/client/ct audit --ct_server="$SERVER" --http_log \
     --ct_server_public_key=$CT_KEY \
-    --ssl_client_ct_data_in=$sct --logtostderr=true $HTTP_LOG
+    --ssl_client_ct_data_in=$sct --logtostderr=true
   retcode=$?
   set -e
 }
@@ -74,8 +70,8 @@ do_audit() {
 get_sth() {
   local file=$1
 
-  ../cpp/client/ct sth --ct_server="$SERVER" --ct_server_port=$PORT \
-    --ct_server_public_key=$CT_KEY --logtostderr=true $HTTP_LOG \
+  ../cpp/client/ct sth --ct_server="$SERVER" --http_log \
+    --ct_server_public_key=$CT_KEY --logtostderr=true \
     --ct_server_response_out=$file
 }
 
@@ -83,8 +79,8 @@ consistency() {
   local file1=$1
   local file2=$2
 
-  ../cpp/client/ct consistency --ct_server="$SERVER" --ct_server_port=$PORT \
-    --ct_server_public_key=$CT_KEY --logtostderr=true $HTTP_LOG \
+  ../cpp/client/ct consistency --ct_server="$SERVER" --http_log \
+    --ct_server_public_key=$CT_KEY --logtostderr=true \
     --sth1=$file1 --sth2=$file2
 }
 
@@ -92,16 +88,15 @@ get_entries() {
   local first=$1
   local last=$2
 
-  ../cpp/client/ct get_entries --ct_server="$SERVER" --ct_server_port=$PORT \
-    --ct_server_public_key=$CT_KEY --logtostderr=true $HTTP_LOG \
+  ../cpp/client/ct get_entries --ct_server="$SERVER" --http_log \
+    --ct_server_public_key=$CT_KEY --logtostderr=true \
       --get_first=$first --get_last=$last --certificate_base=$CERT_DIR/cert.
 }
 
 get_sth $CERT_DIR/sth1
 
-make_cert $CERT_DIR test ca $SERVER $PORT false $CT_KEY
-make_embedded_cert $CERT_DIR test-embedded ca $SERVER $PORT false \
-    false $CT_KEY
+make_cert $CERT_DIR test ca $SERVER false $CT_KEY
+make_embedded_cert $CERT_DIR test-embedded ca $SERVER false false $CT_KEY
 
 # Do the audits together, quicker that way.
 # test-*-cert.ctdata is made by make_cert.
