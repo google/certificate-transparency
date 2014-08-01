@@ -2,7 +2,7 @@ syntax = "proto2";
 
 package ct;
 
-import "ct/proto/tls_options.proto";
+import "tls_options.proto";
 
 
 // A message that covers each option at least once.
