@@ -2,10 +2,10 @@ all: ct/proto/client_pb2.py ct/proto/ct_pb2.py ct/proto/tls_options_pb2.py \
 	ct/proto/test_message_pb2.py
 
 ct/proto/%_pb2.py: ct/proto/%.proto
-	protoc $^ -I/usr/include/ -I/usr/local/include -I. --python_out=.
+	protoc $^ -I/usr/include -I/usr/local/include -I. -I.. -I../proto --python_out=.
 
-ct/proto/ct_pb2.py: ../proto/ct.proto
-	protoc --python_out=ct/proto -I../proto ../proto/ct.proto
+ct/proto/%_pb2.py: ../proto/%.proto
+	protoc -I/usr/include --python_out=ct/proto -I.. -I../proto $^
 
 test: all
 	PYTHONPATH=$(PYTHONPATH):. ./ct/client/sqlite_log_db_test.py

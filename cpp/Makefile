@@ -103,7 +103,7 @@ gtest/libgtest.a: gtest/Makefile
 
 $(ALL_TESTS): gtest/libgtest.a
 
-proto/.depend: proto/*.cc */*.h
+proto/.depend: proto/*.cc */*.h proto/tls_options.pb.h proto/ct.pb.h
 	$(CXX) $(CXXFLAGS) -MM -MG proto/*.cc > proto/.depend1
 	sed 's,\(.*\)\.o,proto/\1.o,' > proto/.depend < proto/.depend1
 	rm proto/.depend1
@@ -141,7 +141,7 @@ server/.depend: server/*.cc */*.h
 
 ### proto preprocessing
 proto/%.pb.h proto/%.pb.cc: ../proto/%.proto
-	protoc -I .. $^ --cpp_out=.
+	protoc -I/usr/include -I.. $^ --cpp_out=.
 
 ifneq ($(MAKECMDGOALS),clean)
     include proto/.depend
@@ -165,7 +165,7 @@ util/libutil.a: util/util.o util/openssl_util.o util/testing.o
 util/json_wrapper_test: util/json_wrapper_test.o util/libutil.a
 
 ### proto/ targets
-proto/libproto.a: proto/ct.pb.o proto/serializer.o
+proto/libproto.a: proto/ct.pb.o proto/tls_options.pb.o proto/serializer.o
 	rm -f $@
 	ar -rcs $@ $^
 
@@ -220,14 +220,15 @@ log/cert_test: log/cert_test.o log/cert.o log/ct_extensions.o util/libutil.a \
                merkletree/serial_hasher.o log/frontend.o proto/ct.pb.o \
                log/frontend_signer.o log/cert_submission_handler.o \
                log/log_signer.o log/signer.o log/verifier.o proto/serializer.o \
-               log/cert_checker.o
+               log/cert_checker.o proto/tls_options.pb.o
 
 log/cert_checker_test: log/cert_checker_test.o log/cert.o log/cert_checker.o \
                        log/ct_extensions.o util/libutil.a \
                        merkletree/serial_hasher.o log/frontend.o proto/ct.pb.o \
                        log/frontend_signer.o log/cert_submission_handler.o \
                        log/log_signer.o log/signer.o log/verifier.o \
-                       proto/serializer.o log/cert_checker.o
+                       proto/serializer.o log/cert_checker.o \
+                       proto/tls_options.pb.o
 
 log/cert_submission_handler_test: log/cert_submission_handler_test.o \
                                   log/libcert.a proto/libproto.a \
@@ -238,7 +239,7 @@ log/cert_submission_handler_test: log/cert_submission_handler_test.o \
 log/ct_extensions_test: log/ct_extensions_test.o log/libcert.a util/libutil.a \
                         log/liblog.a proto/ct.pb.o \
                         log/cert_submission_handler.o proto/serializer.o \
-                        log/cert_checker.o
+                        log/cert_checker.o proto/tls_options.pb.o
 
 log/database_large_test: log/database_large_test.o log/libdatabase.a \
                          log/log_signer.o log/signer.o log/verifier.o \

@@ -4,7 +4,8 @@ syntax = "proto2";
 
 package ct;
 
-import "tls_options.proto";
+import "ct.proto";
+import "proto/tls_options.proto";
 
 
 message KeyInfo {
@@ -106,12 +107,6 @@ enum LogEntryType {
   option (tls_enum_opts).max_value = 65535;
   X509_ENTRY = 0;
   PRECERT_ENTRY = 1;
-}
-
-message PreCert {
-  optional bytes issuer_key_hash = 1 [(tls_opts).fixed_length = 32];
-  optional bytes tbs_certificate = 2 [(tls_opts).min_length = 1,
-                                      (tls_opts).max_length = 0xffffff];
 }
 
 message TimestampedEntry {

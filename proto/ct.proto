@@ -1,5 +1,7 @@
 syntax = "proto2";
 
+import "proto/tls_options.proto";
+
 package ct;
 option java_package = "org.certificatetransparency.ctlog.proto";
 
@@ -58,8 +60,9 @@ message X509ChainEntry {
 // } PreCert;
 // TODO(benl, ekasper): call this something more original in the I-D.
 message PreCert {
-  optional bytes issuer_key_hash = 1;
-  optional bytes tbs_certificate = 2;
+  optional bytes issuer_key_hash = 1 [(tls_opts).fixed_length = 32];
+  optional bytes tbs_certificate = 2 [(tls_opts).min_length = 1,
+                                      (tls_opts).max_length = 0xffffff];
 }
 
 message PrecertChainEntry {
