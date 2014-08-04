@@ -28,6 +28,10 @@ class Services {
   static bool InitServer(int *sock, int port, const char *ip, int type);
 
  private:
+  // This class is only used as a namespace, it should never be
+  // instantiated.
+  // TODO(pphaneuf): Make this into normal functions in a namespace.
+  Services();
 
   static time_t rough_time_;
 };

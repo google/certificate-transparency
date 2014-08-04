@@ -14,9 +14,6 @@ class Serializer {
  public:
   typedef google::protobuf::RepeatedPtrField<std::string> repeated_string;
 
-  Serializer() {}
-  ~Serializer() {}
-
   // Serialization methods return OK on success,
   // or the first encountered error on failure.
   enum SerializeResult {
@@ -151,6 +148,11 @@ class Serializer {
       std::string *result);
 
  private:
+  // This class is mostly a namespace for static methods, but a
+  // temporary instance of it is made internally.
+  // TODO(pphaneuf): Make this into normal functions in a namespace.
+  Serializer() {}
+
   template <class T>
   void WriteUint(T in, size_t bytes) {
     assert(bytes <= sizeof in);
