@@ -26,6 +26,7 @@
 #include "log/sqlite_db.h"
 #include "log/tree_signer.h"
 #include "proto/ct.pb.h"
+#include "server/ct_log_manager.h"
 #include "util/json_wrapper.h"
 #include "util/openssl_util.h"
 #include "util/read_private_key.h"
@@ -60,6 +61,7 @@ DEFINE_int32(tree_signing_frequency_seconds, 600,
 namespace http = boost::network::http;
 namespace uri = boost::network::uri;
 
+using cert_trans::CTLogManager;
 using cert_trans::util::ReadPrivateKey;
 using ct::Cert;
 using ct::CertChain;
@@ -171,144 +173,6 @@ protected:
 
   boost::posix_time::time_duration frequency_;
   boost::asio::deadline_timer timer_;
-};
-
-class CTLogManager {
- public:
-  CTLogManager(Frontend *frontend,
-               TreeSigner<LoggedCertificate> *signer,
-               LogLookup<LoggedCertificate> *lookup)
-      : frontend_(frontend),
-        signer_(signer),
-        lookup_(lookup) {
-    LOG(INFO) << "Starting CT log manager";
-    time_t last_update = static_cast<time_t>(signer_->LastUpdateTime() / 1000);
-    if (last_update > 0)
-      LOG(INFO) << "Last tree update was at " << ctime(&last_update);
-}
-
-  ~CTLogManager() {
-    delete frontend_;
-    delete signer_;
-    delete lookup_;
-  }
-
-  enum LogReply {
-    SIGNED_CERTIFICATE_TIMESTAMP,
-    REJECT,
-  };
-
-  enum LookupReply {
-    MERKLE_AUDIT_PROOF,
-    NOT_FOUND,
-    FOUND,
-  };
-
-  string FrontendStats() const {
-    Frontend::FrontendStats stats;
-    frontend_->GetStats(&stats);
-    std::stringstream ss;
-    ss << "Accepted X509 certificates: "
-       << stats.x509_accepted << std::endl;
-    ss << "Duplicate X509 certificates: "
-       << stats.x509_duplicates << std::endl;
-    ss << "Bad PEM X509 certificates: "
-       << stats.x509_bad_pem_certs << std::endl;
-    ss << "Too long X509 certificates: "
-       << stats.x509_too_long_certs << std::endl;
-    ss << "X509 verify errors: "
-       << stats.x509_verify_errors << std::endl;
-    ss << "Accepted precertificates: "
-       << stats.precert_accepted << std::endl;
-    ss << "Duplicate precertificates: "
-       << stats.precert_duplicates << std::endl;
-    ss << "Bad PEM precertificates: "
-       << stats.precert_bad_pem_certs << std::endl;
-    ss << "Too long precertificates: "
-       << stats.precert_too_long_certs << std::endl;
-    ss << "Precertificate verify errors: "
-       << stats.precert_verify_errors << std::endl;
-    ss << "Badly formatted precertificates: "
-       << stats.precert_format_errors << std::endl;
-   ss << "Internal errors: "
-       << stats.internal_errors << std::endl;
-    return ss.str();
-  }
-
-  LogReply SubmitEntry(CertChain *chain, PreCertChain *prechain,
-                       SignedCertificateTimestamp *sct, string *error) const {
-    CHECK(chain != NULL || prechain != NULL);
-    CHECK(!(chain != NULL && prechain != NULL));
-
-    SignedCertificateTimestamp local_sct;
-    SubmitResult submit_result = chain != NULL ?
-        frontend_->QueueX509Entry(chain, &local_sct)
-        : frontend_->QueuePreCertEntry(prechain, &local_sct);
-
-    LogReply reply = REJECT;
-    switch (submit_result) {
-      case ADDED:
-      case DUPLICATE:
-        sct->CopyFrom(local_sct);
-        reply = SIGNED_CERTIFICATE_TIMESTAMP;
-        break;
-      default:
-        error->assign(Frontend::SubmitResultString(submit_result));
-        break;
-    }
-    return reply;
-  }
-
-  LookupReply GetEntry(size_t index, LoggedCertificate *result) const {
-    if (lookup_->GetEntry(index, result) == LogLookup<LoggedCertificate>::OK)
-      return FOUND;
-    return NOT_FOUND;
-  }
-
-  LookupReply QueryAuditProof(const std::string &merkle_leaf_hash,
-                              size_t tree_size,
-                              ct::ShortMerkleAuditProof *proof) const {
-    ct::ShortMerkleAuditProof local_proof;
-    LogLookup<LoggedCertificate>::LookupResult res =
-        lookup_->AuditProof(merkle_leaf_hash, tree_size, &local_proof);
-    if (res == LogLookup<LoggedCertificate>::OK) {
-      proof->CopyFrom(local_proof);
-      return MERKLE_AUDIT_PROOF;
-    }
-    CHECK_EQ(LogLookup<LoggedCertificate>::NOT_FOUND, res);
-    return NOT_FOUND;
-  }
-
-  bool SignMerkleTree() const {
-    TreeSigner<LoggedCertificate>::UpdateResult res = signer_->UpdateTree();
-    if (res != TreeSigner<LoggedCertificate>::OK) {
-      LOG(ERROR) << "Tree update failed with return code " << res;
-      return false;
-    }
-    time_t last_update = static_cast<time_t>(signer_->LastUpdateTime() / 1000);
-    LOG(INFO) << "Tree successfully updated at " << ctime(&last_update);
-    CHECK_EQ(LogLookup<LoggedCertificate>::UPDATE_OK, lookup_->Update());
-    return true;
-  }
-
-  const ct::SignedTreeHead GetSTH() const {
-    return signer_->LatestSTH();
-  }
-
-  std::vector<string> GetConsistency(size_t first, size_t second) const {
-    return lookup_->ConsistencyProof(first, second);
-  }
-
-  const std::multimap<std::string, const Cert *> &GetRoots() const {
-    return frontend_->GetRoots();
-  }
-
- private:
-  Frontend *frontend_;
-  TreeSigner<LoggedCertificate> *signer_;
-  LogLookup<LoggedCertificate> *lookup_;
-
-  DISALLOW_COPY_AND_ASSIGN(CTLogManager);
 };
 
 class TreeSigningEvent : public AsioRepeatedEvent {
