@@ -7,6 +7,7 @@
 #include <openssl/x509.h>  // for i2d_PUBKEY
 #include <stdint.h>
 
+#include "base/macros.h"
 #include "proto/ct.pb.h"
 
 namespace ct {
@@ -31,6 +32,8 @@ class Signer {
   DigitallySigned::HashAlgorithm hash_algo_;
   DigitallySigned::SignatureAlgorithm sig_algo_;
   std::string key_id_;
+
+  DISALLOW_COPY_AND_ASSIGN(Signer);
 };
 
 }  // namespace ct

@@ -3,6 +3,7 @@
 
 #include <string>
 
+#include "base/macros.h"
 #include "log/cert_checker.h"
 #include "proto/ct.pb.h"
 #include "proto/serializer.h"
@@ -64,5 +65,7 @@ class CertSubmissionHandler {
   static SubmitResult GetFormatError(Serializer::SerializeResult result);
 
   static SubmitResult GetVerifyError(ct::CertChecker::CertVerifyResult result);
+
+  DISALLOW_COPY_AND_ASSIGN(CertSubmissionHandler);
 };
 #endif

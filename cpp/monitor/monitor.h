@@ -4,6 +4,7 @@
 #include <stdint.h>
 #include <string>
 
+#include "base/macros.h"
 #include "client/http_log_client.h"
 #include "monitor/sqlite_db.h"
 
@@ -76,6 +77,8 @@ class Monitor
                              const ct::SignedTreeHead &new_sth);
 
   VerifyResult VerifySTHWithInvalidTimestamp(const ct::SignedTreeHead &sth);
+
+  DISALLOW_COPY_AND_ASSIGN(Monitor);
 };
 
 } // namespace monitor

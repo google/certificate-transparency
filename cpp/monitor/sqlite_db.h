@@ -1,10 +1,11 @@
 #ifndef MONITOR_SQLITE_DB_H
 #define MONITOR_SQLITE_DB_H
 
-#include "monitor/database.h"
-
 #include <stdint.h>
 #include <string>
+
+#include "base/macros.h"
+#include "monitor/database.h"
 
 struct sqlite3;
 
@@ -48,6 +49,8 @@ class SQLiteDB : public Database {
                                             VerificationLevel verify_level);
 
   sqlite3 *db_;
+
+  DISALLOW_COPY_AND_ASSIGN(SQLiteDB);
 };
 
 } // namespace monitor

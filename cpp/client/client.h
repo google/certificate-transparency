@@ -4,6 +4,8 @@
 #include <stdint.h>
 #include <string>
 
+#include "base/macros.h"
+
 // Socket creation for client connections.
 class Client {
 public:
@@ -32,5 +34,7 @@ public:
   const std::string server_;
   const uint16_t port_;
   int fd_;
+
+  DISALLOW_COPY_AND_ASSIGN(Client);
 };
 #endif

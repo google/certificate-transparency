@@ -7,6 +7,8 @@
 #include <stddef.h>
 #include <string>
 
+#include "base/macros.h"
+
 namespace ct {
 
 // An interface for Merkle trees.  See specializations in
@@ -54,6 +56,9 @@ class MerkleTreeInterface {
   // Returns the hash of an empty string if the tree has no leaves
   // (and hence, no root).
   virtual std::string CurrentRoot() = 0;
+
+ private:
+  DISALLOW_COPY_AND_ASSIGN(MerkleTreeInterface);
 };
 
 }  // namespace ct

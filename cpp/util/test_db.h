@@ -5,6 +5,7 @@
 #include <glog/logging.h>
 #include <stdlib.h>
 
+#include "base/macros.h"
 #include "util/util.h"
 
 DEFINE_string(database_test_dir, "/tmp",
@@ -63,6 +64,8 @@ class TestDB {
  private:
   TmpStorage tmp_;
   T *db_;
+
+  DISALLOW_COPY_AND_ASSIGN(TestDB);
 };
 
 #endif // UTIL_TEST_DB_H

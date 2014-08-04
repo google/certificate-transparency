@@ -4,6 +4,7 @@
 
 #include <stdint.h>
 
+#include "base/macros.h"
 #include "log/log_signer.h"
 #include "proto/ct.pb.h"
 
@@ -108,5 +109,7 @@ class LogVerifier {
   MerkleVerifier *merkle_verifier_;
 
   static bool IsBetween(uint64_t timestamp, uint64_t earliest, uint64_t latest);
+
+  DISALLOW_COPY_AND_ASSIGN(LogVerifier);
 };
 #endif

@@ -3,6 +3,7 @@
 
 #include <stddef.h>
 
+#include "base/macros.h"
 #include "merkletree/serial_hasher.h"
 
 class TreeHasher {
@@ -29,5 +30,7 @@ class TreeHasher {
   static const std::string kNodePrefix;
   // The dummy hash of an empty tree.
   std::string emptyhash_;
+
+  DISALLOW_COPY_AND_ASSIGN(TreeHasher);
 };
 #endif

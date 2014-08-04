@@ -7,6 +7,8 @@
 #include <sqlite3.h>
 #include <string>
 
+#include "base/macros.h"
+
 namespace sqlite {
 
 // Reduce the ugliness of the sqlite3 API.
@@ -60,6 +62,8 @@ class Statement {
 
  private:
   sqlite3_stmt *stmt_;
+
+  DISALLOW_COPY_AND_ASSIGN(Statement);
 };
 
 } // namespace sqlite

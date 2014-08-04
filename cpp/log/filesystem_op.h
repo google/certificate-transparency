@@ -3,6 +3,8 @@
 
 #include <sys/types.h>
 
+#include "base/macros.h"
+
 // Make filesystem operations virtual so that we can override
 // to simulate filesystem errors.
 class FilesystemOp {
@@ -16,6 +18,12 @@ class FilesystemOp {
   virtual int rename(const char *old_name, const char *new_name) = 0;
 
   virtual int access(const char *path, int amode) = 0;
+
+ protected:
+  FilesystemOp() {}
+
+ private:
+  DISALLOW_COPY_AND_ASSIGN(FilesystemOp);
 };
 
 class BasicFilesystemOp : public FilesystemOp {

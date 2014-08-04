@@ -4,6 +4,7 @@
 #define SQLITE_DB_H
 #include <string>
 
+#include "base/macros.h"
 #include "log/database.h"
 
 struct sqlite3;
@@ -47,6 +48,8 @@ template <class Logged> class SQLiteDB : public Database<Logged> {
 
  private:
   sqlite3 *db_;
+
+  DISALLOW_COPY_AND_ASSIGN(SQLiteDB);
 };
 
 #endif

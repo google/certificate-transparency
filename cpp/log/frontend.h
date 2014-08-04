@@ -2,6 +2,7 @@
 #ifndef FRONTEND_H
 #define FRONTEND_H
 
+#include "base/macros.h"
 #include "log/cert_submission_handler.h"
 #include "log/submit_result.h"
 #include "proto/ct.pb.h"
@@ -101,5 +102,7 @@ class Frontend {
   void UpdateStats(ct::LogEntryType type, SubmitResult result);
   void UpdateX509Stats(SubmitResult result);
   void UpdatePrecertStats(SubmitResult result);
+
+  DISALLOW_COPY_AND_ASSIGN(Frontend);
 };
 #endif

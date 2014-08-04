@@ -7,6 +7,7 @@
 #include <stdint.h>
 #include <vector>
 
+#include "base/macros.h"
 #include "log/database.h"
 #include "proto/ct.pb.h"
 
@@ -68,5 +69,7 @@ template <class Logged> class FileDB : public Database<Logged> {
   uint64_t latest_tree_timestamp_;
   // The same as a string;
   std::string latest_timestamp_key_;
+
+  DISALLOW_COPY_AND_ASSIGN(FileDB);
 };
 #endif

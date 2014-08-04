@@ -12,6 +12,7 @@
 #include <openssl/x509.h>
 #include <string>
 
+#include "base/macros.h"
 #include "log/cert.h"
 #include "log/cert_checker.h"
 #include "log/ct_extensions.h"
@@ -306,6 +307,8 @@ class CTLogManager {
   Frontend *frontend_;
   TreeSigner<LoggedCertificate> *signer_;
   LogLookup<LoggedCertificate> *lookup_;
+
+  DISALLOW_COPY_AND_ASSIGN(CTLogManager);
 };
 
 class TreeSigningEvent : public AsioRepeatedEvent {

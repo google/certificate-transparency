@@ -4,6 +4,7 @@
 #include <glog/logging.h>
 #include <stdint.h>
 
+#include "base/macros.h"
 #include "log/logged_certificate.h"
 
 namespace monitor {
@@ -32,6 +33,7 @@ class Database {
     UNDEFINED, // Let this be last.
   };
 
+  Database() {}
   virtual ~Database() {}
 
   virtual void BeginTransaction() {
@@ -100,6 +102,8 @@ class Database {
 
   virtual WriteResult SetVerificationLevel_(const ct::SignedTreeHead &sth,
                                             VerificationLevel verify_level) = 0;
+
+  DISALLOW_COPY_AND_ASSIGN(Database);
 };
 
 } // namespace monitor

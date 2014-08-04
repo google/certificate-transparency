@@ -9,6 +9,7 @@
 #include "client/ssl_client.h"
 #include "log/log_verifier.h"
 #include "proto/ct.pb.h"
+#include "base/macros.h"
 
 class LogVerifier;
 
@@ -98,5 +99,7 @@ class SSLClient {
   void ResetVerifyCallbackArgs(bool strict);
 
   HandshakeResult SSLConnect(bool strict);
+
+  DISALLOW_COPY_AND_ASSIGN(SSLClient);
 };
 #endif

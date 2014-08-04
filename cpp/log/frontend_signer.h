@@ -4,6 +4,7 @@
 #include <stdint.h>
 #include <string>
 
+#include "base/macros.h"
 #include "log/logged_certificate.h"
 
 template <class Logged> class Database;
@@ -34,5 +35,7 @@ class FrontendSigner {
 
   void TimestampAndSign(const ct::LogEntry &entry,
                         ct::SignedCertificateTimestamp *sct) const;
+
+  DISALLOW_COPY_AND_ASSIGN(FrontendSigner);
 };
 #endif

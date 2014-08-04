@@ -6,6 +6,7 @@
 #include <stdint.h>
 #include <string>
 
+#include "base/macros.h"
 #include "proto/ct.pb.h"
 
 // A utility class for writing protocol buffer fields in canonical TLS style.
@@ -302,5 +303,7 @@ class Deserializer {
 
   const char *current_pos_;
   size_t bytes_remaining_;
+
+  DISALLOW_COPY_AND_ASSIGN(Deserializer);
 };
 #endif

@@ -5,6 +5,8 @@
 #include <stddef.h>
 #include <string>
 
+#include "base/macros.h"
+
 class SerialHasher {
  public:
   SerialHasher() {}
@@ -24,6 +26,9 @@ class SerialHasher {
 
   // A virtual constructor.  The caller gets ownership of the returned object.
   virtual SerialHasher* Create() const = 0;
+
+ private:
+  DISALLOW_COPY_AND_ASSIGN(SerialHasher);
 };
 
 class Sha256Hasher : public SerialHasher {
@@ -45,5 +50,7 @@ class Sha256Hasher : public SerialHasher {
   SHA256_CTX ctx_;
   bool initialized_;
   static const size_t kDigestSize;
+
+  DISALLOW_COPY_AND_ASSIGN(Sha256Hasher);
 };
 #endif

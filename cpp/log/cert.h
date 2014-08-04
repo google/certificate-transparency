@@ -7,6 +7,8 @@
 #include <string>
 #include <vector>
 
+#include "base/macros.h"
+
 namespace ct {
 
 class Cert {
@@ -185,6 +187,8 @@ class Cert {
   static std::string PrintTime(ASN1_TIME* when);
   static Status DerEncodedName(X509_NAME *name, std::string *result);
   X509 *x509_;
+
+  DISALLOW_COPY_AND_ASSIGN(Cert);
 };
 
 // A wrapper around X509_CINF for chopping at the TBS to CT-sign it or verify
@@ -227,6 +231,8 @@ class TbsCertificate {
   bool ExtensionsLoaded() const { return cert_info_->extensions != NULL; }
   Cert::Status ExtensionIndex(int extension_nid, int *extension_index) const;
   X509_CINF *cert_info_;
+
+  DISALLOW_COPY_AND_ASSIGN(TbsCertificate);
 };
 
 class CertChain {
@@ -297,6 +303,8 @@ class CertChain {
  private:
   void ClearChain();
   std::vector<Cert*> chain_;
+
+  DISALLOW_COPY_AND_ASSIGN(CertChain);
 };
 
 // Note: CT extensions must be loaded to use this class. See

@@ -9,6 +9,7 @@
 
 #include <sstream>
 
+#include "base/macros.h"
 #include "proto/serializer.h"
 #include "util/util.h"
 
@@ -112,6 +113,7 @@ class JsonObject {
     json_object_object_add(obj_, name, obj);
   }
 
+  DISALLOW_COPY_AND_ASSIGN(JsonObject);
 };
 
 class JsonBoolean : public JsonObject {

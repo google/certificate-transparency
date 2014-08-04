@@ -7,6 +7,7 @@
 #include <map>
 #include <string>
 
+#include "base/macros.h"
 #include "log/cert.h"
 
 namespace ct {
@@ -96,6 +97,8 @@ class CertChecker {
   // All code manipulating this container must ensure contained elements are
   // deallocated appropriately.
   std::multimap<std::string, const Cert *> trusted_;
+
+  DISALLOW_COPY_AND_ASSIGN(CertChecker);
 };
 
 }  // namespace ct

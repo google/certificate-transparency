@@ -6,6 +6,7 @@
 #include <glog/logging.h>
 #include <set>
 
+#include "base/macros.h"
 #include "proto/ct.pb.h"
 
 // The |Logged| class needs to provide this interface:
@@ -135,6 +136,12 @@ template <class Logged> class Database {
 
   // Return the tree head with the freshest timestamp.
   virtual LookupResult LatestTreeHead(ct::SignedTreeHead *result) const = 0;
+
+ protected:
+  Database() {}
+
+ private:
+  DISALLOW_COPY_AND_ASSIGN(Database);
 };
 
 #endif  // ndef DATABASE_H

@@ -10,6 +10,8 @@
 #include <sys/types.h>
 #include <time.h>
 
+#include "base/macros.h"
+
 class Services {
  public:
   // because time is expensive, for most tasks we can just use some
@@ -86,6 +88,8 @@ class FD {
   // also.
   static const int kFDLimit = 1000;
   static const int kFDLimitWindow = 1;
+
+  DISALLOW_COPY_AND_ASSIGN(FD);
 };
 
 class Listener : public FD {
@@ -123,8 +127,8 @@ class RepeatedEvent {
     last_activity_ = Services::RoughTime();
   }
  private:
- time_t frequency_;
- time_t last_activity_;
+  time_t frequency_;
+  time_t last_activity_;
 };
 
 class EventLoop {
@@ -161,6 +165,8 @@ class EventLoop {
   static const time_t kIdleTime = 20;
 
   bool go_;
+
+  DISALLOW_COPY_AND_ASSIGN(EventLoop);
 };
 
 class Server : public FD {

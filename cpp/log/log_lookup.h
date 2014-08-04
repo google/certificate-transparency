@@ -6,6 +6,7 @@
 #include <stdint.h>
 #include <string>
 
+#include "base/macros.h"
 #include "merkletree/merkle_tree.h"
 #include "proto/ct.pb.h"
 
@@ -77,5 +78,7 @@ template <class Logged> class LogLookup {
   const Database<Logged> *db_;
   MerkleTree cert_tree_;
   ct::SignedTreeHead latest_tree_head_;
+
+  DISALLOW_COPY_AND_ASSIGN(LogLookup);
 };
 #endif

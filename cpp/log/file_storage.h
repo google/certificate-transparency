@@ -5,6 +5,8 @@
 #include <stdint.h>
 #include <string>
 
+#include "base/macros.h"
+
 class FilesystemOp;
 
 // A simple filesystem-based database for (key, data) entries,
@@ -88,5 +90,7 @@ class FileStorage {
   const std::string tmp_file_template_;
   unsigned int storage_depth_;
   FilesystemOp *file_op_;
+
+  DISALLOW_COPY_AND_ASSIGN(FileStorage);
 };
 #endif
