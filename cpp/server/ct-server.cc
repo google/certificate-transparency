@@ -195,6 +195,7 @@ int main(int argc, char * argv[]) {
 
   EVP_PKEY *pkey = NULL;
   CHECK_EQ(ReadPrivateKey(&pkey, FLAGS_key), cert_trans::util::KEY_OK);
+  LogSigner log_signer(pkey);
 
   CertChecker checker;
   CHECK(checker.LoadTrustedCertificates(FLAGS_trusted_cert_file))
@@ -218,14 +219,10 @@ int main(int argc, char * argv[]) {
                new FileStorage(FLAGS_cert_dir, FLAGS_cert_storage_depth),
                new FileStorage(FLAGS_tree_dir, FLAGS_tree_storage_depth));
 
-  // Hmm, there is no EVP_PKEY_dup, so let's read the key again...
-  EVP_PKEY *pkey2 = NULL;
-  CHECK_EQ(ReadPrivateKey(&pkey2, FLAGS_key), cert_trans::util::KEY_OK);
-
   CTLogManager manager(
       new Frontend(new CertSubmissionHandler(&checker),
-                   new FrontendSigner(db, new LogSigner(pkey))),
-      new TreeSigner<LoggedCertificate>(db, new LogSigner(pkey2)),
+                   new FrontendSigner(db, &log_signer)),
+      new TreeSigner<LoggedCertificate>(db, &log_signer),
       new LogLookup<LoggedCertificate>(db));
 
   try {

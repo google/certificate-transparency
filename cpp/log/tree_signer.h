@@ -17,9 +17,8 @@ class LogSigner;
 // but rather reports an error.
 template <class Logged> class TreeSigner {
  public:
-  // Takes ownership of |signer|.
+  // Does not take ownership of |signer|.
   TreeSigner(Database<Logged> *db, LogSigner *signer);
-  ~TreeSigner();
 
   enum UpdateResult {
     OK,
@@ -46,8 +45,9 @@ template <class Logged> class TreeSigner {
   bool Append(const Logged &logged);
   void AppendToTree(const Logged &logged_cert);
   void TimestampAndSign(uint64_t min_timestamp, ct::SignedTreeHead *sth);
-  Database<Logged> *db_;
-  LogSigner *signer_;
+
+  Database<Logged>* const db_;
+  LogSigner* const signer_;
   // TODO(ekasper): it's a waste for the signer to keep the entire tree in
   // memory. Implement a compact version of the tree that runs in "restricted"
   // mode, i.e., only remembers O(log n) nodes and cannot answer queries

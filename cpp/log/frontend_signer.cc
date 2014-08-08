@@ -19,10 +19,6 @@ FrontendSigner::FrontendSigner(Database<ct::LoggedCertificate> *db,
     : db_(db),
       signer_(signer) {}
 
-FrontendSigner::~FrontendSigner() {
-  delete signer_;
-}
-
 FrontendSigner::SubmitResult
 FrontendSigner::QueueEntry(const LogEntry &entry,
                            SignedCertificateTimestamp *sct) {

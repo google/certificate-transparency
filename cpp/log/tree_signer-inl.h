@@ -26,10 +26,6 @@ TreeSigner<Logged>::TreeSigner(Database<Logged> *db, LogSigner *signer)
   BuildTree();
 }
 
-template <class Logged> TreeSigner<Logged>::~TreeSigner() {
-  delete signer_;
-}
-
 template <class Logged> uint64_t TreeSigner<Logged>::LastUpdateTime() const {
   // Returns 0 if we have no update yet (i.e., the field is not set).
   return latest_tree_head_.timestamp();

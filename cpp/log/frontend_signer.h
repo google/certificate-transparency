@@ -17,10 +17,8 @@ class FrontendSigner {
     DUPLICATE,
   };
 
-  // Takes ownership of |signer|.
+  // Does not take ownership of |signer|.
   FrontendSigner(Database<ct::LoggedCertificate> *db, LogSigner *signer);
-
-  ~FrontendSigner();
 
   // Log the entry if it's not already in the database,
   // and return either a new timestamp-signature pair,
@@ -30,11 +28,11 @@ class FrontendSigner {
                           ct::SignedCertificateTimestamp *sct);
 
  private:
-  Database<ct::LoggedCertificate> *db_;
-  LogSigner *signer_;
-
   void TimestampAndSign(const ct::LogEntry &entry,
                         ct::SignedCertificateTimestamp *sct) const;
+
+  Database<ct::LoggedCertificate>* const db_;
+  LogSigner* const signer_;
 
   DISALLOW_COPY_AND_ASSIGN(FrontendSigner);
 };
