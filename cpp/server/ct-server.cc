@@ -1,6 +1,7 @@
 /* -*- indent-tabs-mode: nil -*- */
 
 #include <boost/asio/deadline_timer.hpp>
+#include <boost/asio/signal_set.hpp>
 #include <openssl/err.h>
 #include <string>
 
@@ -174,6 +175,17 @@ class TreeSigningEvent : public AsioRepeatedEvent {
 
 typedef boost::network::http::server<HttpHandler> server;
 
+static void signal_handler(server* server, boost::asio::signal_set* sigset,
+                           const boost::system::error_code& error,
+                           int signal_number) {
+  if (error)
+    return;
+
+  LOG(WARNING) << "received signal: " << strsignal(signal_number);
+  sigset->remove(signal_number);
+  server->stop();
+}
+
 int main(int argc, char * argv[]) {
   google::ParseCommandLineFlags(&argc, &argv, true);
   google::InitGoogleLogging(argv[0]);
@@ -226,6 +238,11 @@ int main(int argc, char * argv[]) {
     server::options options(handler);
     server server_(options.address(FLAGS_server).port(FLAGS_port)
                    .reuse_address(true).io_service(io));
+
+    boost::asio::signal_set signals(*io, SIGINT, SIGTERM);
+    signals.async_wait(boost::bind(
+        &signal_handler, &server_, &signals, _1, _2));
+
     server_.run();
   }
   catch (std::exception &e) {
