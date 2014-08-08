@@ -306,7 +306,7 @@ client/ct: client/ct.o client/client.o client/ssl_client.o \
 server/ct-dns-server: server/ct-dns-server.o server/event.o $(LOCAL_LIBS)
 
 server/ct-server: server/ct-server.o util/read_private_key.o \
-	server/ct_log_manager.o $(LOCAL_LIBS)
+	server/ct_log_manager.o server/handler.o $(LOCAL_LIBS)
 
 server/blob-server: server/blob-server.o server/event.o \
                     server/sqlite_db_blob.o server/tree_signer_blob.o \
