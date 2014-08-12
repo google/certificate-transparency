@@ -173,9 +173,9 @@ class TreeSigningEvent : public AsioRepeatedEvent {
   CTLogManager *manager_;
 };
 
-typedef boost::network::http::server<HttpHandler> server;
+typedef boost::network::http::server<HttpHandler> HttpServer;
 
-static void signal_handler(server* server, boost::asio::signal_set* sigset,
+static void signal_handler(HttpServer* server, boost::asio::signal_set* sigset,
                            const boost::system::error_code& error,
                            int signal_number) {
   if (error)
@@ -235,15 +235,15 @@ int main(int argc, char * argv[]) {
     TreeSigningEvent tree_event(io,
         boost::posix_time::seconds(FLAGS_tree_signing_frequency_seconds),
         &manager);
-    server::options options(handler);
-    server server_(options.address(FLAGS_server).port(FLAGS_port)
-                   .reuse_address(true).io_service(io));
+    HttpServer::options options(handler);
+    HttpServer server(options.address(FLAGS_server).port(FLAGS_port)
+                      .reuse_address(true).io_service(io));
 
     boost::asio::signal_set signals(*io, SIGINT, SIGTERM);
     signals.async_wait(boost::bind(
-        &signal_handler, &server_, &signals, _1, _2));
+        &signal_handler, &server, &signals, _1, _2));
 
-    server_.run();
+    server.run();
   }
   catch (std::exception &e) {
     std::cerr << e.what() << std::endl;
