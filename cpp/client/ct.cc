@@ -791,7 +791,7 @@ int GetSTH() {
   LogVerifier *verifier = GetLogVerifierFromFlags();
 
   // Allow for 10 seconds of clock skew
-  uint64_t latest = (time(NULL) + 10) * 1000;
+  uint64_t latest = ((uint64_t) time(NULL) + 10) * 1000;
   LogVerifier::VerifyResult result
       = verifier->VerifySignedTreeHead(sth, 0, latest);
 
