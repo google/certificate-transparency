@@ -6,19 +6,23 @@ import java.security.cert.CertificateEncodingException;
 import java.security.cert.CertificateException;
 import java.security.cert.CertificateFactory;
 import java.util.ArrayList;
-import java.util.Iterator;
 import java.util.List;
 
 import org.apache.commons.codec.binary.Base64;
+import org.apache.http.NameValuePair;
+import org.apache.http.message.BasicNameValuePair;
 import org.certificatetransparency.ctlog.CertificateInfo;
 import org.certificatetransparency.ctlog.CertificateTransparencyException;
+import org.certificatetransparency.ctlog.ParsedLogEntry;
 import org.certificatetransparency.ctlog.proto.Ct;
 import org.certificatetransparency.ctlog.serialization.Deserializer;
 import org.json.simple.JSONArray;
 import org.json.simple.JSONObject;
 import org.json.simple.JSONValue;
 
+import com.google.common.base.Function;
 import com.google.common.base.Preconditions;
+import com.google.common.collect.Lists;
 import com.google.protobuf.ByteString;
 
 
@@ -30,6 +34,7 @@ public class HttpLogClient {
   private static final String ADD_CHAIN_PATH = "add-chain";
   private static final String GET_STH_PATH = "get-sth";
   private static final String GET_ROOTS_PATH = "get-roots";
+  private static final String GET_ENTRIES = "get-entries";
 
   private final String logUrl;
   private final HttpInvoker postInvoker;
@@ -167,7 +172,51 @@ public class HttpLogClient {
 
     return parseRootCertsResponse(response);
   }
-  
+
+  /**
+   * Retrieve Entries from Log.
+   * @param start 0-based index of first entry to retrieve, in decimal.
+   * @param end 0-based index of last entry to retrieve, in decimal.
+   * @return list of Log's entries.
+   */
+  public List<ParsedLogEntry> getLogEntries(long start, long end) {
+    Preconditions.checkArgument(0 <= start && end >= start);
+
+    List<NameValuePair> params = new ArrayList<NameValuePair>();
+    params.add(new BasicNameValuePair("start", Long.toString(start)));
+    params.add(new BasicNameValuePair("end", Long.toString(end)));
+
+    String response = postInvoker.makeGetRequest(logUrl + GET_ENTRIES, params);
+    return parseLogEntries(response);
+  }
+
+  /**
+   * Parses CT log's response for "get-entries" into a list of {@link ParsedLogEntry} objects.
+   * @param response Log response to pars.
+   * @return list of Log's entries.
+   */
+  @SuppressWarnings("unchecked")
+  private List<ParsedLogEntry> parseLogEntries(String response) {
+    Preconditions.checkNotNull(response, "Log entries response from Log should not be null.");
+
+    JSONObject responseJson = (JSONObject) JSONValue.parse(response);
+    JSONArray arr = (JSONArray) responseJson.get("entries");
+
+    Function<JSONObject, ParsedLogEntry> jsonToLogEntries =
+      new Function<JSONObject, ParsedLogEntry>() {
+      @Override public ParsedLogEntry apply(JSONObject entry) {
+        String leaf = (String) entry.get("leaf_input");
+        String extra = (String) entry.get("extra_data");
+
+        return Deserializer.parseLogEntry(
+          new ByteArrayInputStream(Base64.decodeBase64(leaf)),
+          new ByteArrayInputStream(Base64.decodeBase64(extra)));
+      }
+    };
+
+    return Lists.transform(arr, jsonToLogEntries);
+  }
+
   /**
    * Parses CT log's response for "get-sth" into a proto object.
    * @param sthResponse Log response to parse
@@ -211,7 +260,7 @@ public class HttpLogClient {
    */
   List<Certificate> parseRootCertsResponse(String response) {
     List<Certificate> certs = new ArrayList<>();
-    
+
     JSONObject entries = (JSONObject) JSONValue.parse(response);
     JSONArray entriesArray = (JSONArray) entries.get("certificates");
 

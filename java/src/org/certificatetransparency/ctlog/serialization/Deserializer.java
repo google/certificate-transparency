@@ -2,6 +2,8 @@ package org.certificatetransparency.ctlog.serialization;
 
 import com.google.common.base.Preconditions;
 import com.google.protobuf.ByteString;
+
+import org.certificatetransparency.ctlog.ParsedLogEntry;
 import org.certificatetransparency.ctlog.proto.Ct;
 
 import java.io.IOException;
@@ -69,6 +71,157 @@ public class Deserializer {
     builder.setSignature(ByteString.copyFrom(signature));
 
     return builder.build();
+  }
+
+
+  /**
+   * Parses an entry retrieved from Log.
+   * @param merkleTreeLeaf MerkleTreeLeaf structure, byte stream of binary encoding.
+   * @param extraData extra data,  byte stream of binary encoding.
+   * @return {@link ParsedLogEntry}
+   */
+  public static ParsedLogEntry parseLogEntry(InputStream merkleTreeLeaf, InputStream extraData) {
+    Ct.MerkleTreeLeaf treeLeaf = parseMerkleTreeLeaf(merkleTreeLeaf);
+    Ct.LogEntry.Builder logEntryBuilder = Ct.LogEntry.newBuilder();
+
+    Ct.LogEntryType entryType = treeLeaf.getTimestampedEntry().getEntryType();
+
+    if (entryType == Ct.LogEntryType.X509_ENTRY) {
+      Ct.X509ChainEntry x509EntryChain = parseX509ChainEntry(extraData,
+        treeLeaf.getTimestampedEntry().getSignedEntry().getX509());
+      logEntryBuilder.setX509Entry(x509EntryChain);
+
+    } else if (entryType == Ct.LogEntryType.PRECERT_ENTRY) {
+      Ct.PrecertChainEntry preCertChain = parsePrecerChainEntry(extraData,
+        treeLeaf.getTimestampedEntry().getSignedEntry().getPrecert());
+       logEntryBuilder.setPrecertEntry(preCertChain);
+
+    } else {
+      throw new SerializationException(String.format("Unknown entry type: %d", entryType));
+    }
+    Ct.LogEntry logEntry = logEntryBuilder.build();
+    return new ParsedLogEntry(treeLeaf, logEntry);
+  }
+
+  /**
+   * Parses a {@link Ct.MerkleTreeLeaf} from binary encoding.
+   * @param in byte stream of binary encoding.
+   * @return Built {@link Ct.MerkleTreeLeaf}.
+   * @throws SerializationException if the data stream is too short.
+   */
+  public static Ct.MerkleTreeLeaf parseMerkleTreeLeaf(InputStream in) {
+    Ct.MerkleTreeLeaf.Builder merkleTreeLeafBuilder = Ct.MerkleTreeLeaf.newBuilder();
+
+    int version = (int) readNumber(in, CTConstants.VERSION_LENGTH);
+    if (version != Ct.Version.V1.getNumber()) {
+      throw new SerializationException(String.format("Unknown version: %d", version));
+    }
+    merkleTreeLeafBuilder.setVersion(Ct.Version.valueOf(version));
+
+    int leafType = (int) readNumber(in, 1);
+    if (leafType != Ct.MerkleLeafType.TIMESTAMPED_ENTRY_VALUE) {
+      throw new SerializationException(String.format("Unknown entry type: %d", leafType));
+    }
+    merkleTreeLeafBuilder.setType(Ct.MerkleLeafType.valueOf(leafType));
+    merkleTreeLeafBuilder.setTimestampedEntry((parseTimestampedEntry(in)));
+
+    return merkleTreeLeafBuilder.build();
+  }
+
+  /**
+   * Parses a {@link Ct.TimestampedEntry} from binary encoding.
+   * @param in byte stream of binary encoding.
+   * @return Built {@link Ct.TimestampedEntry}.
+   * @throws SerializationException if the data stream is too short.
+   */
+  public static Ct.TimestampedEntry parseTimestampedEntry(InputStream in) {
+    Ct.TimestampedEntry.Builder timestampedEntry = Ct.TimestampedEntry.newBuilder();
+
+    long timestamp = readNumber(in, CTConstants.TIMESTAMP_LENGTH);
+    timestampedEntry.setTimestamp(timestamp);
+
+    int entryType = (int) readNumber(in, CTConstants.LOG_ENTRY_TYPE_LENGTH);
+    timestampedEntry.setEntryType(Ct.LogEntryType.valueOf(entryType));
+
+    Ct.SignedEntry.Builder signedEntryBuilder = Ct.SignedEntry.newBuilder();
+    if (entryType == Ct.LogEntryType.X509_ENTRY_VALUE) {
+
+      int length = (int) readNumber(in, 3);
+      ByteString x509 = ByteString.copyFrom(readFixedLength(in, length));
+      signedEntryBuilder.setX509(x509);
+
+    } else if (entryType == Ct.LogEntryType.PRECERT_ENTRY_VALUE) {
+      Ct.PreCert.Builder preCertBuilder = Ct.PreCert.newBuilder();
+
+      byte[] arr = readFixedLength(in, 32);
+      preCertBuilder.setIssuerKeyHash(ByteString.copyFrom(arr));
+
+      // set tbs certificate
+      arr = readFixedLength(in, 2);
+      int length = (int) readNumber(in, 2);
+
+      preCertBuilder.setTbsCertificate(ByteString.copyFrom(readFixedLength(in, length)));
+      preCertBuilder.build();
+
+      signedEntryBuilder.setPrecert(preCertBuilder);
+    } else {
+      throw new SerializationException(String.format("Unknown entry type: %d", entryType));
+    }
+    signedEntryBuilder.build();
+    timestampedEntry.setSignedEntry(signedEntryBuilder);
+
+    return timestampedEntry.build();
+  }
+
+  /**
+   * Parses X509ChainEntry structure.
+   * @param in X509ChainEntry structure, byte stream of binary encoding.
+   * @param x509Cert leaf certificate.
+   * @throws SerializationException if an I/O error occurs.
+   * @return {@link Ct.X509ChainEntry} proto object.
+   */
+  public static Ct.X509ChainEntry parseX509ChainEntry(InputStream in, ByteString x509Cert) {
+    Ct.X509ChainEntry.Builder x509EntryChain = Ct.X509ChainEntry.newBuilder();
+    x509EntryChain.setLeafCertificate(x509Cert);
+
+    try {
+      if (readNumber(in, 3) != in.available()) {
+        throw new SerializationException("Extra data corrupted.");
+      }
+      while (in.available() > 0) {
+        int length = (int) readNumber(in, 3);
+        x509EntryChain.addCertificateChain(ByteString.copyFrom(readFixedLength(in, length)));
+      }
+    } catch (IOException e) {
+      throw new SerializationException("Cannot parse xChainEntry. " + e.getLocalizedMessage());
+    }
+
+    return x509EntryChain.build();
+  }
+
+  /**
+   * Parses PrecertChainEntry structure.
+   * @param in PrecertChainEntry structure, byte stream of binary encoding.
+   * @param preCert Precertificate.
+   * @return {@link Ct.PrecertChainEntry} proto object.
+   */
+  public static Ct.PrecertChainEntry parsePrecerChainEntry(InputStream in, Ct.PreCert preCert) {
+    Ct.PrecertChainEntry.Builder preCertChain = Ct.PrecertChainEntry.newBuilder();
+    preCertChain.setPreCert(preCert);
+
+    try {
+      if (readNumber(in, 3) != in.available()) {
+        throw new SerializationException("Extra data corrupted.");
+      }
+      while (in.available() > 0) {
+        int length = (int) readNumber(in, 3);
+        preCertChain.addPrecertificateChain(ByteString.copyFrom(readFixedLength(in, length)));
+      }
+    } catch (IOException e) {
+      throw new SerializationException("Cannot parse PrecertEntryChain."
+        + e.getLocalizedMessage());
+    }
+    return preCertChain.build();
   }
 
   /**

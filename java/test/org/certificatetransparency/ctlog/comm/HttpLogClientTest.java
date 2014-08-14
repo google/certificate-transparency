@@ -7,17 +7,23 @@ import static org.mockito.Matchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
+import java.io.ByteArrayInputStream;
 import java.io.File;
-import java.io.FileNotFoundException;
 import java.io.FileReader;
 import java.io.IOException;
 import java.lang.reflect.InvocationTargetException;
 import java.security.cert.Certificate;
 import java.security.cert.CertificateException;
+import java.security.cert.CertificateFactory;
+import java.security.cert.X509Certificate;
+import java.util.ArrayList;
 import java.util.List;
 
 import org.apache.commons.codec.binary.Base64;
+import org.apache.http.NameValuePair;
+import org.apache.http.message.BasicNameValuePair;
 import org.certificatetransparency.ctlog.CertificateTransparencyException;
+import org.certificatetransparency.ctlog.ParsedLogEntry;
 import org.certificatetransparency.ctlog.TestData;
 import org.certificatetransparency.ctlog.proto.Ct;
 import org.certificatetransparency.ctlog.serialization.CryptoDataLoader;
@@ -66,6 +72,58 @@ public class HttpLogClientTest {
       + "\"extensions\":\"\",\n"
       + "\"signature\":\"BAMARjBEAiAggPtKUMFZ4zmNnPhc7As7VR1Dedsdggs9a8pSEHoyGAIgKGsvIPDZg"
       + "DnxTjGY8fSBwkl15dA0TUqW5ex2HCU7yE8=\"}";
+
+  public static final String LOG_ENTRY = "{ \"entries\": [ { \"leaf_input\": \"AAAAAAFHz32CRgAAAALO"
+      + "MIICyjCCAjOgAwIBAgIBBjANBgkqhkiG9w0BAQUFADBVMQswCQYDVQQGEwJHQjEkMCIGA1UEChMbQ2VydGlmaWNhdG"
+      + "UgVHJhbnNwYXJlbmN5IENBMQ4wDAYDVQQIEwVXYWxlczEQMA4GA1UEBxMHRXJ3IFdlbjAeFw0xMjA2MDEwMDAwMDBa"
+      + "Fw0yMjA2MDEwMDAwMDBaMFIxCzAJBgNVBAYTAkdCMSEwHwYDVQQKExhDZXJ0aWZpY2F0ZSBUcmFuc3BhcmVuY3kxDj"
+      + "AMBgNVBAgTBVdhbGVzMRAwDgYDVQQHEwdFcncgV2VuMIGfMA0GCSqGSIb3DQEBAQUAA4GNADCBiQKBgQCx+jeTYRH4"
+      + "eS2iCBw\\/5BklAIUx3H8sZXvZ4d5HBBYLTJ8Z1UraRHBATBxRNBuPH3U43d0o2aykg2n8VkbdzHYX+BaKrltB1DM"
+      + "x\\/KLa38gE1XIIlJBh+e75AspHzojGROAA8G7uzKvcndL2iiLMsJ3Hbg28c1J3ZbGjeoxnYlPcwQIDAQABo4GsMIG"
+      + "pMB0GA1UdDgQWBBRqDZgqO2LES20u9Om7egGqnLeY4jB9BgNVHSMEdjB0gBRfnYgNyHPmVNT4DdjmsMEktEfDVaFZp"
+      + "FcwVTELMAkGA1UEBhMCR0IxJDAiBgNVBAoTG0NlcnRpZmljYXRlIFRyYW5zcGFyZW5jeSBDQTEOMAwGA1UECBMFV2F"
+      + "sZXMxEDAOBgNVBAcTB0VydyBXZW6CAQAwCQYDVR0TBAIwADANBgkqhkiG9w0BAQUFAAOBgQAXHNhKrEFKmgMPIqrI9"
+      + "oiwgbJwm4SLTlURQGzXB\\/7QKFl6n678Lu4peNYzqqwU7TI1GX2ofg9xuIdfGsnniygXSd3t0Afj7PUGRfjL9mclb"
+      + "NahZHteEyA7uFgt59Zpb2VtHGC5X0Vrf88zhXGQjxxpcn0kxPzNJJKVeVgU0drA5gAA\", "
+      + "\"extra_data\": \"AALXAALUMIIC0DCCAjmgAwIBAgIBADANBgkqhkiG9w0BAQUFADBVMQswCQYDVQQGEwJHQjEk"
+      + "MCIGA1UEChMbQ2VydGlmaWNhdGUgVHJhbnNwYXJlbmN5IENBMQ4wDAYDVQQIEwVXYWxlczEQMA4GA1UEBxMHRXJ3IF"
+      + "dlbjAeFw0xMjA2MDEwMDAwMDBaFw0yMjA2MDEwMDAwMDBaMFUxCzAJBgNVBAYTAkdCMSQwIgYDVQQKExtDZXJ0aWZp"
+      + "Y2F0ZSBUcmFuc3BhcmVuY3kgQ0ExDjAMBgNVBAgTBVdhbGVzMRAwDgYDVQQHEwdFcncgV2VuMIGfMA0GCSqGSIb3DQ"
+      + "EBAQUAA4GNADCBiQKBgQDVimhTYhCicRmTbneDIRgcKkATxtB7jHbrkVfT0PtLO1FuzsvRyY2RxS90P6tjXVUJnNE"
+      + "6uvMa5UFEJFGnTHgW8iQ8+EjPKDHM5nugSlojgZ88ujfmJNnDvbKZuDnd\\/iYx0ss6hPx7srXFL8\\/BT\\/9Ab1z"
+      + "URmnLsvfP34b7arnRsQIDAQABo4GvMIGsMB0GA1UdDgQWBBRfnYgNyHPmVNT4DdjmsMEktEfDVTB9BgNVHSMEdjB0g"
+      + "BRfnYgNyHPmVNT4DdjmsMEktEfDVaFZpFcwVTELMAkGA1UEBhMCR0IxJDAiBgNVBAoTG0NlcnRpZmljYXRlIFRyYW5"
+      + "zcGFyZW5jeSBDQTEOMAwGA1UECBMFV2FsZXMxEDAOBgNVBAcTB0VydyBXZW6CAQAwDAYDVR0TBAUwAwEB\\/zANBgk"
+      + "qhkiG9w0BAQUFAAOBgQAGCMxKbWTyIF4UbASydvkrDvqUpdryOvw4BmBtOZDQoeojPUApV2lGOwRmYef6HReZFSCa6"
+      + "i4Kd1F2QRIn18ADB8dHDmFYT9czQiRyf1HWkLxHqd81TbD26yWVXeGJPE3VICskovPkQNJ0tU4b03YmnKliibduyqQ"
+      + "QkOFPOwqULg==\" } ] }";
+  
+  public static final String LOG_ENTRY_CORRUPTED_ENTRY =
+      "{ \"entries\": [ { \"leaf_input\": \"AAAAAAFHz32CRgAAAALO"
+      + "MIICyjCCAjOgAwIBAgIBBjANBgkqhkiG9w0BAQUFADBVMQswCQYDVQQGEwJHQjEkMCIGA1UEChMbQ2VydGlmaWNhdG"
+      + "UgVHJhbnNwYXJlbmN5IENBMQ4wDAYDVQQIEwVXYWxlczEQMA4GA1UEBxMHRXJ3IFdlbjAeFw0xMjA2MDEwMDAwMDBa"
+      + "Fw0yMjA2MDEwMDAwMDBaMFIxCzAJBgNVBAYTAkdCMSEwHwYDVQQKExhDZXJ0aWZpY2F0ZSBUcmFuc3BhcmVuY3kxDj"
+      + "AMBgNVBAgTBVdhbGVzMRAwDgYDVQQHEwdFcncgV2VuMIGfMA0GCSqGSIb3DQEBAQUAA4GNADCBiQKBgQCx+jeTYRH4"
+      + "eS2iCBw\\/5BklAIUx3H8sZXvZ4d5HBBYLTJ8Z1UraRHBATBxRNBuPH3U43d0o2aykg2n8VkbdzHYX+BaKrltB1DM"
+      + "x\\/KLa38gE1XIIlJBh+e75AspHzojGROAA8G7uzKvcndL2iiLMsJ3Hbg28c1J3ZbGjeoxnYlPcwQIDAQABo4GsMIG"
+      + "FcwVTELMAkGA1UEBhMCR0IxJDAiBgNVBAoTG0NlcnRpZmljYXRlIFRyYW5zcGFyZW5jeSBDQTEOMAwGA1UECBMFV2F"
+      + "sZXMxEDAOBgNVBAcTB0VydyBXZW6CAQAwCQYDVR0TBAIwADANBgkqhkiG9w0BAQUFAAOBgQAXHNhKrEFKmgMPIqrI9"
+      + "oiwgbJwm4SLTlURQGzXB\\/7QKFl6n678Lu4peNYzqqwU7TI1GX2ofg9xuIdfGsnniygXSd3t0Afj7PUGRfjL9mclb"
+      + "NahZHteEyA7uFgt59Zpb2VtHGC5X0Vrf88zhXGQjxxpcn0kxPzNJJKVeVgU0drA5gAA\", "
+      + "\"extra_data\": \"AALXAALUMIIC0DCCAjmgAwIBAgIBADANBgkqhkiG9w0BAQUFADBVMQswCQYDVQQGEwJHQjEk"
+      + "MCIGA1UEChMbQ2VydGlmaWNhdGUgVHJhbnNwYXJlbmN5IENBMQ4wDAYDVQQIEwVXYWxlczEQMA4GA1UEBxMHRXJ3IF"
+      + "dlbjAeFw0xMjA2MDEwMDAwMDBaFw0yMjA2MDEwMDAwMDBaMFUxCzAJBgNVBAYTAkdCMSQwIgYDVQQKExtDZXJ0aWZp"
+      + "Y2F0ZSBUcmFuc3BhcmVuY3kgQ0ExDjAMBgNVBAgTBVdhbGVzMRAwDgYDVQQHEwdFcncgV2VuMIGfMA0GCSqGSIb3DQ"
+      + "EBAQUAA4GNADCBiQKBgQDVimhTYhCicRmTbneDIRgcKkATxtB7jHbrkVfT0PtLO1FuzsvRyY2RxS90P6tjXVUJnNE"
+      + "6uvMa5UFEJFGnTHgW8iQ8+EjPKDHM5nugSlojgZ88ujfmJNnDvbKZuDnd\\/iYx0ss6hPx7srXFL8\\/BT\\/9Ab1z"
+      + "URmnLsvfP34b7arnRsQIDAQABo4GvMIGsMB0GA1UdDgQWBBRfnYgNyHPmVNT4DdjmsMEktEfDVTB9BgNVHSMEdjB0g"
+      + "BRfnYgNyHPmVNT4DdjmsMEktEfDVaFZpFcwVTELMAkGA1UEBhMCR0IxJDAiBgNVBAoTG0NlcnRpZmljYXRlIFRyYW5"
+      + "zcGFyZW5jeSBDQTEOMAwGA1UECBMFV2FsZXMxEDAOBgNVBAcTB0VydyBXZW6CAQAwDAYDVR0TBAUwAwEB\\/zANBgk"
+      + "qhkiG9w0BAQUFAAOBgQAGCMxKbWTyIF4UbASydvkrDvqUpdryOvw4BmBtOZDQoeojPUApV2lGOwRmYef6HReZFSCa6"
+      + "i4Kd1F2QRIn18ADB8dHDmFYT9czQiRyf1HWkLxHqd81TbD26yWVXeGJPE3VICskovPkQNJ0tU4b03YmnKliibduyqQ"
+      + "QkOFPOwqULg==\" } ] }";
+  
+  public static final String LOG_ENTRY_EMPTY = "{ \"entries\": []}";
 
   public static final byte[] LOG_ID =
       Base64.decodeBase64("pLkJkLQYWBSHuxOizGdwCjw1mAT5G9+443fNDsgN3BA=");
@@ -173,5 +231,75 @@ public class HttpLogClientTest {
 
     Assert.assertNotNull(rootCerts);
     Assert.assertEquals(2, rootCerts.size());
+  }
+
+  @Test
+  public void getLogEntries() {
+    HttpInvoker mockInvoker = mock(HttpInvoker.class);
+    List<NameValuePair> params = new ArrayList<NameValuePair>();
+    params.add(new BasicNameValuePair("start", Long.toString(0)));
+    params.add(new BasicNameValuePair("end", Long.toString(0)));
+
+    when(mockInvoker.makeGetRequest(eq("http://ctlog/get-entries"), eq(params)))
+      .thenReturn(LOG_ENTRY);
+
+    HttpLogClient client = new HttpLogClient("http://ctlog/", mockInvoker);
+    X509Certificate testChainCert= (X509Certificate) CryptoDataLoader.certificatesFromFile(
+        new File(TestData.ROOT_CA_CERT)).get(0);
+    X509Certificate testCert= (X509Certificate) CryptoDataLoader.certificatesFromFile(
+        new File(TestData.TEST_CERT)).get(0);
+    List<ParsedLogEntry> entries = client.getLogEntries(0, 0);
+
+    X509Certificate  chainCert = null ;
+    X509Certificate leafCert = null ;
+    try {
+
+      byte[] leafCertBytes = entries.get(0).getLogEntry().getX509Entry().getLeafCertificate()
+        .toByteArray();
+      leafCert = (X509Certificate) CertificateFactory.getInstance("X509").generateCertificate(
+        new ByteArrayInputStream(leafCertBytes));
+
+      byte[] chainCertBytes = entries.get(0).getLogEntry().getX509Entry().getCertificateChain(0)
+        .toByteArray();
+      chainCert = (X509Certificate) CertificateFactory.getInstance("X509").generateCertificate(
+        new ByteArrayInputStream(chainCertBytes));
+  
+    } catch (CertificateException  e) {
+      Assert.fail();
+    }
+    Assert.assertTrue(testCert.equals(leafCert));;
+    Assert.assertTrue(testChainCert.equals(chainCert));;
+  }
+
+  @Test
+  public void getLogEntriesCorruptedEntry() {
+    HttpInvoker mockInvoker = mock(HttpInvoker.class);
+    List<NameValuePair> params = new ArrayList<NameValuePair>();
+    params.add(new BasicNameValuePair("start", Long.toString(0)));
+    params.add(new BasicNameValuePair("end", Long.toString(0)));
+
+    when(mockInvoker.makeGetRequest(eq("http://ctlog/get-entries"), eq(params)))
+      .thenReturn(LOG_ENTRY_CORRUPTED_ENTRY);
+
+    HttpLogClient client = new HttpLogClient("http://ctlog/", mockInvoker);
+    try {
+      client.getLogEntries(0, 0);
+      Assert.fail();
+    } catch (CertificateTransparencyException e) {
+    }
+  }
+
+  @Test
+  public void getLogEntriesEmptyEntry() {
+    HttpInvoker mockInvoker = mock(HttpInvoker.class);
+    List<NameValuePair> params = new ArrayList<NameValuePair>();
+    params.add(new BasicNameValuePair("start", Long.toString(0)));
+    params.add(new BasicNameValuePair("end", Long.toString(0)));
+
+    when(mockInvoker.makeGetRequest(eq("http://ctlog/get-entries"), eq(params)))
+      .thenReturn(LOG_ENTRY_EMPTY);
+
+    HttpLogClient client = new HttpLogClient("http://ctlog/", mockInvoker);
+    Assert.assertTrue(client.getLogEntries(0, 0).isEmpty());
   }
 }
