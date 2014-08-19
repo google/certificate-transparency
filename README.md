@@ -38,6 +38,8 @@ You can specify a JSON-C library in a non-standard location using the ```JSONCLI
 
 This library cannot be installed using ```make install```. Use the ```CPPNETLIBDIR``` environment variable to point to the local build.
 
+ - [ldns](http://www.nlnetlabs.nl/projects/ldns/)
+ - [ant](http://ant.apache.org/)
  - Python libraries:
   - pyasn1 and pyasn1-modules (optional, needed for ```upload_server_cert.sh```)
   - [dnspython](http://www.dnspython.org/)
