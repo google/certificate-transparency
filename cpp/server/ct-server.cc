@@ -3,6 +3,7 @@
 #include <boost/asio/deadline_timer.hpp>
 #include <boost/asio/signal_set.hpp>
 #include <openssl/err.h>
+#include <stdio.h>
 #include <string>
 
 #include "log/cert_checker.h"
@@ -21,7 +22,7 @@
 #include "util/read_private_key.h"
 
 DEFINE_string(server, "localhost", "Server host");
-DEFINE_string(port, "9999", "Server port");
+DEFINE_int32(port, 9999, "Server port");
 DEFINE_string(key, "", "PEM-encoded server private key file");
 DEFINE_string(trusted_cert_file, "",
               "File for trusted CA certificates, in concatenated PEM format");
@@ -56,8 +57,7 @@ using google::RegisterFlagValidator;
 using std::string;
 
 // Basic sanity checks on flag values.
-static bool ValidatePort(const char *flagname, const string &port_str) {
-  int port = atoi(port_str.c_str());
+static bool ValidatePort(const char *flagname, int port) {
   if (port <= 0 || port > 65535) {
     std::cout << "Port value " << port << " is invalid. " << std::endl;
     return false;
@@ -236,7 +236,10 @@ int main(int argc, char * argv[]) {
         boost::posix_time::seconds(FLAGS_tree_signing_frequency_seconds),
         &manager);
     HttpServer::options options(handler);
-    HttpServer server(options.address(FLAGS_server).port(FLAGS_port)
+    char port_str[32];
+    CHECK_LT(snprintf(port_str, sizeof(port_str), "%i", FLAGS_port),
+             sizeof(port_str));
+    HttpServer server(options.address(FLAGS_server).port(port_str)
                       .reuse_address(true).io_service(io));
 
     boost::asio::signal_set signals(*io, SIGINT, SIGTERM);
