@@ -236,7 +236,7 @@ int main(int argc, char * argv[]) {
         boost::posix_time::seconds(FLAGS_tree_signing_frequency_seconds),
         &manager);
     HttpServer::options options(handler);
-    char port_str[32];
+    char port_str[8];
     CHECK_LT(snprintf(port_str, sizeof(port_str), "%i", FLAGS_port),
              sizeof(port_str));
     HttpServer server(options.address(FLAGS_server).port(port_str)
