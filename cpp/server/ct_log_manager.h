@@ -50,7 +50,7 @@ class CTLogManager {
                               size_t tree_size,
                               ct::ShortMerkleAuditProof *proof) const;
 
-  bool SignMerkleTree() const;
+  void SignMerkleTree() const;
 
   LookupReply GetEntry(size_t index, ct::LoggedCertificate *result) const;
 

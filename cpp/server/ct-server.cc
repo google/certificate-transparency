@@ -2,6 +2,7 @@
 
 #include <boost/asio/deadline_timer.hpp>
 #include <boost/asio/signal_set.hpp>
+#include <boost/function.hpp>
 #include <openssl/err.h>
 #include <string>
 
@@ -47,6 +48,7 @@ DEFINE_int32(tree_signing_frequency_seconds, 600,
              "last signing. Set this well below the MMD to ensure we sign "
              "in a timely manner. Must be greater than 0.");
 
+using boost::function;
 using cert_trans::CTLogManager;
 using cert_trans::HttpHandler;
 using cert_trans::util::ReadPrivateKey;
@@ -123,54 +125,34 @@ static const bool stats_dummy = RegisterFlagValidator(
 static const bool sign_dummy = RegisterFlagValidator(
     &FLAGS_tree_signing_frequency_seconds, &ValidateIsPositive);
 
-// convert a boost single-shot timer (deadline_timer) into a repeat
-// timer.
-class AsioRepeatedEvent {
+// Hooks a repeating timer on the event loop to call a callback.
+class RepeatingCallback {
  public:
-  AsioRepeatedEvent(boost::shared_ptr<boost::asio::io_service> io,
-                    boost::posix_time::time_duration frequency)
-    : frequency_(frequency), timer_(*io, frequency) {
+  RepeatingCallback(boost::asio::io_service& io,
+                    boost::posix_time::time_duration frequency,
+                    const function<void()> &callback)
+    : frequency_(frequency),
+      timer_(io, frequency),
+      callback_(callback) {
     Wait();
   }
 
- protected:
-  virtual void Execute() = 0;
-
  private:
-  static void Call(const boost::system::error_code& /*e*/,
-                   AsioRepeatedEvent *event) {
-    event->Go();
-  }
-
   void Wait() {
-    timer_.async_wait(boost::bind(Call, boost::asio::placeholders::error,
-                                  this));
+    timer_.async_wait(boost::bind(&RepeatingCallback::Go, this));
   }
 
   void Go() {
-    Execute();
+    callback_();
     timer_.expires_at(timer_.expires_at() + frequency_);
     Wait();
   }
 
-  boost::posix_time::time_duration frequency_;
+  const boost::posix_time::time_duration frequency_;
   boost::asio::deadline_timer timer_;
-};
+  const function<void()> callback_;
 
-class TreeSigningEvent : public AsioRepeatedEvent {
- public:
-  TreeSigningEvent(boost::shared_ptr<boost::asio::io_service> io,
-                   boost::posix_time::time_duration frequency,
-                   CTLogManager *manager)
-      : AsioRepeatedEvent(io, frequency),
-        manager_(manager) {}
-
-  void Execute() {
-    CHECK(manager_->SignMerkleTree());
-  }
-
- private:
-  CTLogManager *manager_;
+  DISALLOW_COPY_AND_ASSIGN(RepeatingCallback);
 };
 
 typedef boost::network::http::server<HttpHandler> HttpServer;
@@ -229,9 +211,9 @@ int main(int argc, char * argv[]) {
     HttpHandler handler(&manager);
     boost::shared_ptr<boost::asio::io_service> io
         = boost::make_shared<boost::asio::io_service>();
-    TreeSigningEvent tree_event(io,
-        boost::posix_time::seconds(FLAGS_tree_signing_frequency_seconds),
-        &manager);
+    RepeatingCallback tree_event(
+        *io, boost::posix_time::seconds(FLAGS_tree_signing_frequency_seconds),
+        boost::bind(&CTLogManager::SignMerkleTree, &manager));
     HttpServer::options options(handler);
     HttpServer server(options.address(FLAGS_server).port(FLAGS_port)
                       .reuse_address(true).io_service(io));

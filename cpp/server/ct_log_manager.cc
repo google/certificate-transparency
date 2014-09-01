@@ -104,19 +104,14 @@ CTLogManager::LookupReply CTLogManager::QueryAuditProof(
 }
 
 
-bool CTLogManager::SignMerkleTree() const {
-  TreeSigner<ct::LoggedCertificate>::UpdateResult res = signer_->UpdateTree();
-  if (res != TreeSigner<ct::LoggedCertificate>::OK) {
-    LOG(ERROR) << "Tree update failed with return code " << res;
-    return false;
-  }
+void CTLogManager::SignMerkleTree() const {
+  CHECK_EQ(signer_->UpdateTree(), TreeSigner<ct::LoggedCertificate>::OK);
   time_t last_update = static_cast<time_t>(signer_->LastUpdateTime() / 1000);
   {
     char buf[kCtimeBufSize];
     LOG(INFO) << "Tree successfully updated at " << ctime_r(&last_update, buf);
   }
   CHECK_EQ(LogLookup<ct::LoggedCertificate>::UPDATE_OK, lookup_->Update());
-  return true;
 }
 
 
