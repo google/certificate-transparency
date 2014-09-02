@@ -6,7 +6,6 @@
 
 #include "util/testing.h"
 
-using std::string;
 
 template <class Logged> class LoggedTest : public ::testing::Test {
  protected:
@@ -32,7 +31,7 @@ TYPED_TEST(LoggedTest, SequenceIsNotPreserved) {
   l1.set_sequence_number(42);
   EXPECT_EQ(l1.sequence_number(), (uint64_t)42);
 
-  string s1;
+  std::string s1;
   EXPECT_TRUE(l1.SerializeForDatabase(&s1));
 
   TypeParam l2;
@@ -54,7 +53,7 @@ TYPED_TEST(LoggedTest, SerializationPreservesHash) {
   TypeParam l1;
   l1.RandomForTest();
 
-  string s1;
+  std::string s1;
   EXPECT_TRUE(l1.SerializeForDatabase(&s1));
 
   TypeParam l2;
@@ -67,15 +66,15 @@ TYPED_TEST(LoggedTest, SerializationPreservesMerkleSerialization) {
   TypeParam l1;
   l1.RandomForTest();
 
-  string d1;
+  std::string d1;
   EXPECT_TRUE(l1.SerializeForDatabase(&d1));
 
   TypeParam l2;
   EXPECT_TRUE(l2.ParseFromDatabase(d1));
 
-  string s1;
+  std::string s1;
   EXPECT_TRUE(l1.SerializeForLeaf(&s1));
-  string s2;
+  std::string s2;
   EXPECT_TRUE(l2.SerializeForLeaf(&s2));
 
   EXPECT_EQ(s1, s2);
@@ -88,9 +87,9 @@ TYPED_TEST(LoggedTest, DifferentMerkleSerialization) {
   TypeParam l2;
   l2.RandomForTest();
 
-  string s1;
+  std::string s1;
   EXPECT_TRUE(l1.SerializeForLeaf(&s1));
-  string s2;
+  std::string s2;
   EXPECT_TRUE(l2.SerializeForLeaf(&s2));
 
   EXPECT_NE(s1, s2);

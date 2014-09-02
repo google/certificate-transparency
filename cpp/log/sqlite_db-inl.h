@@ -10,10 +10,8 @@
 #include "log/sqlite_statement.h"
 #include "util/util.h"
 
-using std::string;
-using sqlite::Statement;
 
-template <class Logged> SQLiteDB<Logged>::SQLiteDB(const string &dbfile)
+template <class Logged> SQLiteDB<Logged>::SQLiteDB(const std::string &dbfile)
     : db_(NULL) {
   int ret = sqlite3_open_v2(dbfile.c_str(), &db_, SQLITE_OPEN_READWRITE, NULL);
   if (ret == SQLITE_OK)
@@ -52,18 +50,18 @@ template <class Logged> void SQLiteDB<Logged>::EndTransaction() {
 
 template <class Logged> typename Database<Logged>::WriteResult
 SQLiteDB<Logged>::CreatePendingEntry_(const Logged &logged) {
-  Statement statement(db_, "INSERT INTO leaves(hash, entry) "
-                      "VALUES(?, ?)");
-  string hash = logged.Hash();
+  sqlite::Statement statement(db_, "INSERT INTO leaves(hash, entry) "
+                              "VALUES(?, ?)");
+  std::string hash = logged.Hash();
   statement.BindBlob(0, hash);
 
-  string data;
+  std::string data;
   CHECK(logged.SerializeForDatabase(&data));
   statement.BindBlob(1, data);
 
   int ret = statement.Step();
   if (ret == SQLITE_CONSTRAINT) {
-    Statement s2(db_, "SELECT hash FROM leaves WHERE hash = ?");
+    sqlite::Statement s2(db_, "SELECT hash FROM leaves WHERE hash = ?");
     hash = logged.Hash();
     s2.BindBlob(0, hash);
     CHECK_EQ(SQLITE_ROW, s2.Step());
@@ -75,16 +73,16 @@ SQLiteDB<Logged>::CreatePendingEntry_(const Logged &logged) {
 }
 
 template <class Logged> typename Database<Logged>::WriteResult
-SQLiteDB<Logged>::AssignSequenceNumber(const string &hash,
+SQLiteDB<Logged>::AssignSequenceNumber(const std::string &hash,
                                        uint64_t sequence_number) {
-  Statement statement(db_, "UPDATE leaves SET sequence = ? WHERE hash = ? "
-                      "AND sequence IS NULL");
+  sqlite::Statement statement(db_, "UPDATE leaves SET sequence = ? "
+                              "WHERE hash = ? AND sequence IS NULL");
   statement.BindUInt64(0, sequence_number);
   statement.BindBlob(1, hash);
 
   int ret = statement.Step();
   if (ret == SQLITE_CONSTRAINT) {
-    Statement s2(db_, "SELECT sequence FROM leaves WHERE sequence = ?");
+    sqlite::Statement s2(db_, "SELECT sequence FROM leaves WHERE sequence = ?");
     s2.BindUInt64(0, sequence_number);
     CHECK_EQ(SQLITE_ROW, s2.Step());
     return this->SEQUENCE_NUMBER_ALREADY_IN_USE;
@@ -93,7 +91,7 @@ SQLiteDB<Logged>::AssignSequenceNumber(const string &hash,
 
   int changes = sqlite3_changes(db_);
   if (changes == 0) {
-    Statement s2(db_, "SELECT hash FROM leaves WHERE hash = ?");
+    sqlite::Statement s2(db_, "SELECT hash FROM leaves WHERE hash = ?");
     s2.BindBlob(0, hash);
     int ret = s2.Step();
     if (ret == SQLITE_ROW)
@@ -106,8 +104,8 @@ SQLiteDB<Logged>::AssignSequenceNumber(const string &hash,
 }
 
 template <class Logged> typename Database<Logged>::LookupResult
-SQLiteDB<Logged>::LookupByHash(const string &hash) const {
-  Statement statement(db_, "SELECT hash FROM leaves WHERE hash = ?");
+SQLiteDB<Logged>::LookupByHash(const std::string &hash) const {
+  sqlite::Statement statement(db_, "SELECT hash FROM leaves WHERE hash = ?");
   statement.BindBlob(0, hash);
 
   int ret = statement.Step();
@@ -119,10 +117,11 @@ SQLiteDB<Logged>::LookupByHash(const string &hash) const {
 }
 
 template <class Logged> typename Database<Logged>::LookupResult
-SQLiteDB<Logged>::LookupByHash(const string &hash, Logged *result) const {
+SQLiteDB<Logged>::LookupByHash(const std::string &hash, Logged *result) const {
   CHECK_NOTNULL(result);
 
-  Statement statement(db_, "SELECT entry, sequence FROM leaves WHERE hash = ?");
+  sqlite::Statement statement(db_, "SELECT entry, sequence FROM leaves "
+                              "WHERE hash = ?");
 
   statement.BindBlob(0, hash);
 
@@ -131,7 +130,7 @@ SQLiteDB<Logged>::LookupByHash(const string &hash, Logged *result) const {
     return this->NOT_FOUND;
   CHECK_EQ(SQLITE_ROW, ret);
 
-  string data;
+  std::string data;
   statement.GetBlob(0, &data);
   CHECK(result->ParseFromDatabase(data));
 
@@ -146,18 +145,18 @@ SQLiteDB<Logged>::LookupByHash(const string &hash, Logged *result) const {
 template <class Logged> typename Database<Logged>::LookupResult
 SQLiteDB<Logged>::LookupByIndex(uint64_t sequence_number,
                                 Logged *result) const {
-  Statement statement(db_, "SELECT entry, hash FROM leaves "
-                      "WHERE sequence = ?");
+  sqlite::Statement statement(db_, "SELECT entry, hash FROM leaves "
+                              "WHERE sequence = ?");
   statement.BindUInt64(0, sequence_number);
   int ret = statement.Step();
   if (ret == SQLITE_DONE)
     return this->NOT_FOUND;
 
-  string data;
+  std::string data;
   statement.GetBlob(0, &data);
   CHECK(result->ParseFromDatabase(data));
 
-  string hash;
+  std::string hash;
   statement.GetBlob(1, &hash);
 
   CHECK_EQ(result->Hash(), hash);
@@ -167,14 +166,15 @@ SQLiteDB<Logged>::LookupByIndex(uint64_t sequence_number,
   return this->LOOKUP_OK;
 }
 
-template <class Logged> std::set<string>
+template <class Logged> std::set<std::string>
 SQLiteDB<Logged>::PendingHashes() const {
-  std::set<string> hashes;
-  Statement statement(db_, "SELECT hash FROM leaves WHERE sequence IS NULL");
+  std::set<std::string> hashes;
+  sqlite::Statement statement(db_, "SELECT hash FROM leaves "
+                              "WHERE sequence IS NULL");
 
   int ret;
   while ((ret = statement.Step()) == SQLITE_ROW) {
-    string hash;
+    std::string hash;
     statement.GetBlob(0, &hash);
     hashes.insert(hash);
   }
@@ -185,16 +185,18 @@ SQLiteDB<Logged>::PendingHashes() const {
 
 template <class Logged> typename Database<Logged>::WriteResult
 SQLiteDB<Logged>::WriteTreeHead_(const ct::SignedTreeHead &sth) {
-  Statement statement(db_, "INSERT INTO trees(timestamp, sth) VALUES(?, ?)");
+  sqlite::Statement statement(db_, "INSERT INTO trees(timestamp, sth) "
+                              "VALUES(?, ?)");
   statement.BindUInt64(0, sth.timestamp());
 
-  string sth_data;
+  std::string sth_data;
   CHECK(sth.SerializeToString(&sth_data));
   statement.BindBlob(1, sth_data);
 
   int r2 = statement.Step();
   if (r2 == SQLITE_CONSTRAINT) {
-    Statement s2(db_, "SELECT timestamp FROM trees WHERE timestamp = ?");
+    sqlite::Statement s2(db_, "SELECT timestamp FROM trees "
+                         "WHERE timestamp = ?");
     s2.BindUInt64(0, sth.timestamp());
     CHECK_EQ(SQLITE_ROW, s2.Step());
     return this->DUPLICATE_TREE_HEAD_TIMESTAMP;
@@ -207,15 +209,15 @@ SQLiteDB<Logged>::WriteTreeHead_(const ct::SignedTreeHead &sth) {
 template <class Logged> typename Database<Logged>::LookupResult
 SQLiteDB<Logged>::LatestTreeHead(ct::SignedTreeHead *result)
     const {
-  Statement statement(db_, "SELECT sth FROM trees WHERE timestamp IN "
-                      "(SELECT MAX(timestamp) FROM trees)");
+  sqlite::Statement statement(db_, "SELECT sth FROM trees WHERE timestamp IN "
+                              "(SELECT MAX(timestamp) FROM trees)");
 
   int ret = statement.Step();
   if (ret == SQLITE_DONE)
     return this->NOT_FOUND;
   CHECK_EQ(SQLITE_ROW, ret);
 
-  string sth;
+  std::string sth;
   statement.GetBlob(0, &sth);
   result->ParseFromString(sth);
 

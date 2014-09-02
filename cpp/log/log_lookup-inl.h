@@ -8,6 +8,9 @@
 #include <map>
 #include <stdint.h>
 #include <stdlib.h>
+#include <string>
+#include <utility>
+#include <vector>
 
 #include "log/database.h"
 #include "merkletree/merkle_tree.h"
@@ -15,11 +18,6 @@
 #include "proto/ct.pb.h"
 #include "proto/serializer.h"
 
-using ct::MerkleAuditProof;
-using ct::ShortMerkleAuditProof;
-using ct::SignedCertificateTimestamp;
-using ct::SignedTreeHead;
-using std::string;
 
 template <class Logged> LogLookup<Logged>::LogLookup(const Database<Logged> *db)
     : db_(db),
@@ -32,7 +30,7 @@ template <class Logged> LogLookup<Logged>::~LogLookup() {}
 
 template <class Logged> typename LogLookup<Logged>::UpdateResult
 LogLookup<Logged>::Update() {
-  SignedTreeHead sth;
+  ct::SignedTreeHead sth;
 
   typename Database<Logged>::LookupResult db_result = db_->LatestTreeHead(&sth);
   if (db_result == Database<Logged>::NOT_FOUND)
@@ -54,7 +52,7 @@ LogLookup<Logged>::Update() {
   // Record the new hashes: append all of them, die on any error.
   // TODO(ekasper): make tree signer write leaves out to the database,
   // so that we don't have to read the entries in.
-  string leaf_hash;
+  std::string leaf_hash;
   for (uint64_t sequence_number = cert_tree_.LeafCount();
        sequence_number < sth.tree_size(); ++sequence_number) {
     Logged logged;
@@ -75,8 +73,8 @@ LogLookup<Logged>::Update() {
     CHECK_EQ(sequence_number + 1, cert_tree_.AddLeafHash(leaf_hash));
     // Duplicate leaves shouldn't really happen but are not a problem either:
     // we just return the Merkle proof of the first occurrence.
-    leaf_index_.insert(std::pair<string, uint64_t>(leaf_hash,
-                                                   sequence_number));
+    leaf_index_.insert(std::pair<std::string, uint64_t>(leaf_hash,
+                                                        sequence_number));
   }
   CHECK_EQ(cert_tree_.CurrentRoot(), sth.sha256_root_hash())
       << "Computed root hash and stored STH root hash do not match";
@@ -87,8 +85,9 @@ LogLookup<Logged>::Update() {
 }
 
 template <class Logged> typename LogLookup<Logged>::LookupResult
-LogLookup<Logged>::GetIndex(const string &merkle_leaf_hash, uint64_t *index) {
-  std::map<string, uint64_t>::const_iterator it =
+LogLookup<Logged>::GetIndex(const std::string &merkle_leaf_hash,
+                            uint64_t *index) {
+  std::map<std::string, uint64_t>::const_iterator it =
       leaf_index_.find(merkle_leaf_hash);
   if (it == leaf_index_.end())
     return NOT_FOUND;
@@ -96,12 +95,12 @@ LogLookup<Logged>::GetIndex(const string &merkle_leaf_hash, uint64_t *index) {
   *index = it->second;
   return OK;
 }
-  
+
 
 // Look up by SHA256-hash of the certificate.
 template <class Logged> typename LogLookup<Logged>::LookupResult
-LogLookup<Logged>::AuditProof(const string &merkle_leaf_hash,
-                              MerkleAuditProof *proof) {
+LogLookup<Logged>::AuditProof(const std::string &merkle_leaf_hash,
+                              ct::MerkleAuditProof *proof) {
   uint64_t leaf_index;
   if (GetIndex(merkle_leaf_hash, &leaf_index) != OK)
     return NOT_FOUND;
@@ -112,7 +111,7 @@ LogLookup<Logged>::AuditProof(const string &merkle_leaf_hash,
   proof->set_leaf_index(leaf_index);
 
   proof->clear_path_node();
-  std::vector<string> audit_path =
+  std::vector<std::string> audit_path =
       cert_tree_.PathToCurrentRoot(leaf_index + 1);
   for (size_t i = 0; i < audit_path.size(); ++i)
     proof->add_path_node(audit_path[i]);
@@ -124,23 +123,24 @@ LogLookup<Logged>::AuditProof(const string &merkle_leaf_hash,
 
 template <class Logged> typename LogLookup<Logged>::LookupResult
 LogLookup<Logged>::AuditProof(uint64_t leaf_index, size_t tree_size,
-                              ShortMerkleAuditProof *proof) {
+                              ct::ShortMerkleAuditProof *proof) {
   proof->set_leaf_index(leaf_index);
 
   proof->clear_path_node();
-  std::vector<string> audit_path =
+  std::vector<std::string> audit_path =
       cert_tree_.PathToRootAtSnapshot(leaf_index + 1, tree_size);
   for (size_t i = 0; i < audit_path.size(); ++i)
     proof->add_path_node(audit_path[i]);
 
   return OK;
 }
-  
+
 
 // Look up by SHA256-hash of the certificate and tree size.
 template <class Logged> typename LogLookup<Logged>::LookupResult
-LogLookup<Logged>::AuditProof(const string &merkle_leaf_hash, size_t tree_size,
-                              ShortMerkleAuditProof *proof) {
+LogLookup<Logged>::AuditProof(const std::string &merkle_leaf_hash,
+                              size_t tree_size,
+                              ct::ShortMerkleAuditProof *proof) {
   uint64_t leaf_index;
   if (GetIndex(merkle_leaf_hash, &leaf_index) != OK)
     return NOT_FOUND;
@@ -148,9 +148,9 @@ LogLookup<Logged>::AuditProof(const string &merkle_leaf_hash, size_t tree_size,
   return AuditProof(leaf_index, tree_size, proof);
 }
 
-template <class Logged> string
+template <class Logged> std::string
 LogLookup<Logged>::LeafHash(const Logged &logged) const {
-  string serialized_leaf;
+  std::string serialized_leaf;
   CHECK(logged.SerializeForLeaf(&serialized_leaf));
   return cert_tree_.LeafHash(serialized_leaf);
 }

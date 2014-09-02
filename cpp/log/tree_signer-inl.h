@@ -14,8 +14,6 @@
 #include "proto/serializer.h"
 #include "util/util.h"
 
-using ct::SignedTreeHead;
-using std::string;
 
 template <class Logged>
 TreeSigner<Logged>::TreeSigner(Database<Logged> *db, LogSigner *signer)
@@ -37,7 +35,7 @@ template <class Logged> uint64_t TreeSigner<Logged>::LastUpdateTime() const {
 template <class Logged> typename TreeSigner<Logged>::UpdateResult
 TreeSigner<Logged>::UpdateTree() {
   // Check that the latest sth is ours.
-  SignedTreeHead sth;
+  ct::SignedTreeHead sth;
   typename Database<Logged>::LookupResult db_result = db_->LatestTreeHead(&sth);
 
   if (db_result == Database<Logged>::NOT_FOUND) {
@@ -62,8 +60,8 @@ TreeSigner<Logged>::UpdateTree() {
   // Timestamps have to be unique.
   uint64_t min_timestamp = LastUpdateTime() + 1;
 
-  std::set<string> pending_hashes = db_->PendingHashes();
-  std::set<string>::const_iterator it;
+  std::set<std::string> pending_hashes = db_->PendingHashes();
+  std::set<std::string>::const_iterator it;
   for (it = pending_hashes.begin(); it != pending_hashes.end(); ++it) {
     Logged logged;
     CHECK_EQ(Database<Logged>::LOOKUP_OK, db_->LookupByHash(*it, &logged))
@@ -86,7 +84,7 @@ TreeSigner<Logged>::UpdateTree() {
   // Our tree is consistent with the database, i.e., each leaf in the tree has
   // a matching sequence number in the database (at least assuming overwriting
   // the sequence number is not allowed).
-  SignedTreeHead new_sth;
+  ct::SignedTreeHead new_sth;
   TimestampAndSign(min_timestamp, &new_sth);
 
   // TODO(ekasper): if we allow multiple processes to modify the database,
@@ -101,7 +99,7 @@ template <class Logged> void TreeSigner<Logged>::BuildTree() {
   DCHECK_EQ(0U, cert_tree_.LeafCount())
       << "Attempting to build a tree when one already exists";
   // Read the latest sth.
-  SignedTreeHead sth;
+  ct::SignedTreeHead sth;
   typename Database<Logged>::LookupResult db_result = db_->LatestTreeHead(&sth);
 
   if (db_result == Database<Logged>::NOT_FOUND)
@@ -150,7 +148,7 @@ template <class Logged> void TreeSigner<Logged>::BuildTree() {
 template <class Logged> bool
 TreeSigner<Logged>::Append(const Logged &logged) {
   // Serialize for inclusion in the tree.
-  string serialized_leaf;
+  std::string serialized_leaf;
   CHECK(logged.SerializeForLeaf(&serialized_leaf));
 
   // Commit the sequence number of this certificate.
@@ -172,7 +170,7 @@ TreeSigner<Logged>::Append(const Logged &logged) {
 template <class Logged> void
 TreeSigner<Logged>::AppendToTree(const Logged &logged) {
   // Serialize for inclusion in the tree.
-  string serialized_leaf;
+  std::string serialized_leaf;
   CHECK(logged.SerializeForLeaf(&serialized_leaf));
 
   // Update in-memory tree.
@@ -181,7 +179,7 @@ TreeSigner<Logged>::AppendToTree(const Logged &logged) {
 
 template <class Logged> void
 TreeSigner<Logged>::TimestampAndSign(uint64_t min_timestamp,
-                                     SignedTreeHead *sth) {
+                                     ct::SignedTreeHead *sth) {
   sth->set_version(ct::V1);
   sth->set_sha256_root_hash(cert_tree_.CurrentRoot());
   uint64_t timestamp = util::TimeInMilliseconds();
