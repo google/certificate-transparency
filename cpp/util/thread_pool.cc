@@ -104,7 +104,7 @@ ThreadPool::~ThreadPool() {
 }
 
 
-void ThreadPool::Add(const function<void()> & closure) {
+void ThreadPool::Add(const function<void()> &closure) {
   // Empty closures signal a thread to exit, don't allow that (also,
   // it doesn't make sense).
   CHECK(!closure.empty());
