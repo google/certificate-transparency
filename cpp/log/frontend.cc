@@ -60,6 +60,8 @@ Frontend::QueueProcessedEntry(CertSubmissionHandler::SubmitResult pre_result,
 SubmitResult
 Frontend::QueueX509Entry(CertChain *chain, SignedCertificateTimestamp *sct) {
   LogEntry entry;
+  // Make sure the correct statistics get updated in case of error.
+  entry.set_type(ct::X509_ENTRY);
   return QueueProcessedEntry(handler_->ProcessX509Submission(chain, &entry),
                              entry, sct);
 }
@@ -68,43 +70,10 @@ SubmitResult
 Frontend::QueuePreCertEntry(PreCertChain *chain,
                             SignedCertificateTimestamp *sct) {
   LogEntry entry;
+  // Make sure the correct statistics get updated in case of error.
+  entry.set_type(ct::PRECERT_ENTRY);
   return QueueProcessedEntry(handler_->ProcessPreCertSubmission(chain, &entry),
                              entry, sct);
-}
-
-// FIXME(benl): this may be unused once RFC compliant server is in place.
-SubmitResult
-Frontend::QueueEntry(ct::LogEntryType type, const string &data,
-                     SignedCertificateTimestamp *sct) {
-  // Step 1. Preprocessing: convert the submission into a CertificateEntry
-  // and verify the chain.
-  LogEntry entry;
-  entry.set_type(type);
-  CertSubmissionHandler::SubmitResult pre_result =
-      handler_->ProcessSubmission(data, &entry);
-  if (pre_result != CertSubmissionHandler::OK) {
-    SubmitResult result = GetSubmitError(pre_result);
-    UpdateStats(type, result);
-    return result;
-  }
-
-  // Step 2. Submit to database.
-  FrontendSigner::SubmitResult signer_result = signer_->QueueEntry(entry, sct);
-
-  SubmitResult result;
-  switch (signer_result) {
-    case FrontendSigner::NEW:
-      result = ADDED;
-      break;
-    case FrontendSigner::DUPLICATE:
-      result = DUPLICATE;
-      break;
-    default:
-      LOG(FATAL) << "Unknown FrontendSigner return code " << signer_result;
-  }
-
-  UpdateStats(type, result);
-  return result;
 }
 
 // static

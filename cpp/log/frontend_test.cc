@@ -45,14 +45,14 @@ static const char kChainLeafCert[] = "test-intermediate-cert.pem";
 
 namespace {
 
-using ct::LogEntry;
-using ct::LoggedCertificate;
-using ct::SignedCertificateTimestamp;
-using std::string;
-
 using ct::Cert;
 using ct::CertChain;
 using ct::CertChecker;
+using ct::LogEntry;
+using ct::LoggedCertificate;
+using ct::PreCertChain;
+using ct::SignedCertificateTimestamp;
+using std::string;
 
 typedef Database<LoggedCertificate> DB;
 typedef Frontend FE;
@@ -141,9 +141,11 @@ typedef testing::Types<FileDB<LoggedCertificate>,
 TYPED_TEST_CASE(FrontendTest, Databases);
 
 TYPED_TEST(FrontendTest, TestSubmitValid) {
+  CertChain chain(this->leaf_pem_);
+  EXPECT_TRUE(chain.IsLoaded());
+
   SignedCertificateTimestamp sct;
-  EXPECT_EQ(ADDED,
-            this->frontend_->QueueEntry(ct::X509_ENTRY, this->leaf_pem_, &sct));
+  EXPECT_EQ(ADDED, this->frontend_->QueueX509Entry(&chain, &sct));
 
   // Look it up and expect to get the right thing back.
   LoggedCertificate logged_cert;
@@ -171,10 +173,11 @@ TYPED_TEST(FrontendTest, TestSubmitValid) {
 }
 
 TYPED_TEST(FrontendTest, TestSubmitValidWithIntermediate) {
+  CertChain chain(this->chain_leaf_pem_ + this->intermediate_pem_);
+  EXPECT_TRUE(chain.IsLoaded());
+
   SignedCertificateTimestamp sct;
-  string submission = this->chain_leaf_pem_ + this->intermediate_pem_;
-  EXPECT_EQ(ADDED,
-            this->frontend_->QueueEntry(ct::X509_ENTRY, submission, &sct));
+  EXPECT_EQ(ADDED, this->frontend_->QueueX509Entry(&chain, &sct));
 
   // Look it up and expect to get the right thing back.
   LoggedCertificate logged_cert;
@@ -209,11 +212,14 @@ TYPED_TEST(FrontendTest, TestSubmitValidWithIntermediate) {
 }
 
 TYPED_TEST(FrontendTest, TestSubmitDuplicate) {
+  CertChain chain1(this->leaf_pem_);
+  CertChain chain2(this->leaf_pem_);
+  EXPECT_TRUE(chain1.IsLoaded());
+  EXPECT_TRUE(chain2.IsLoaded());
+
   SignedCertificateTimestamp sct;
-  EXPECT_EQ(ADDED,
-            this->frontend_->QueueEntry(ct::X509_ENTRY, this->leaf_pem_, NULL));
-  EXPECT_EQ(DUPLICATE,
-            this->frontend_->QueueEntry(ct::X509_ENTRY, this->leaf_pem_, &sct));
+  EXPECT_EQ(ADDED, this->frontend_->QueueX509Entry(&chain1, NULL));
+  EXPECT_EQ(DUPLICATE, this->frontend_->QueueX509Entry(&chain2, &sct));
 
   // Look it up and expect to get the right thing back.
   LoggedCertificate logged_cert;
@@ -240,33 +246,37 @@ TYPED_TEST(FrontendTest, TestSubmitDuplicate) {
 }
 
 TYPED_TEST(FrontendTest, TestSubmitInvalidChain) {
+  CertChain chain(this->chain_leaf_pem_);
+  EXPECT_TRUE(chain.IsLoaded());
+
   SignedCertificateTimestamp sct;
   // Missing intermediate.
   EXPECT_EQ(CERTIFICATE_VERIFY_ERROR,
-            this->frontend_->QueueEntry(ct::X509_ENTRY,
-                                        this->chain_leaf_pem_, &sct));
+            this->frontend_->QueueX509Entry(&chain, &sct));
   EXPECT_FALSE(sct.has_signature());
   FE::FrontendStats stats(0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0);
   this->CompareStats(stats);
 }
 
 TYPED_TEST(FrontendTest, TestSubmitInvalidPem) {
+  CertChain chain("-----BEGIN CERTIFICATE-----\n"
+                  "Iamnotavalidcert\n"
+                  "-----END CERTIFICATE-----\n");
+  EXPECT_FALSE(chain.IsLoaded());
+
   SignedCertificateTimestamp sct;
-  string fake_cert("-----BEGIN CERTIFICATE-----\n"
-                   "Iamnotavalidcert\n"
-                   "-----END CERTIFICATE-----\n");
-  EXPECT_EQ(BAD_PEM_FORMAT,
-            this->frontend_->QueueEntry(ct::X509_ENTRY, fake_cert, &sct));
+  EXPECT_EQ(BAD_PEM_FORMAT, this->frontend_->QueueX509Entry(&chain, &sct));
   EXPECT_FALSE(sct.has_signature());
   FE::FrontendStats stats(0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0);
   this->CompareStats(stats);
 }
 
 TYPED_TEST(FrontendTest, TestSubmitPrecert) {
+  PreCertChain submission(this->precert_pem_);
+  EXPECT_TRUE(submission.IsLoaded());
+
   SignedCertificateTimestamp sct;
-  string submission = this->precert_pem_;
-  EXPECT_EQ(ADDED,
-            this->frontend_->QueueEntry(ct::PRECERT_ENTRY, submission, &sct));
+  EXPECT_EQ(ADDED, this->frontend_->QueuePreCertEntry(&submission, &sct));
 
   CertChain chain(this->embedded_pem_ + this->ca_pem_);
   LogEntry entry;
@@ -302,10 +312,12 @@ TYPED_TEST(FrontendTest, TestSubmitPrecert) {
 }
 
 TYPED_TEST(FrontendTest, TestSubmitPrecertUsingPreCA) {
+  PreCertChain submission(
+      this->precert_with_preca_pem_ + this->ca_precert_pem_);
+  EXPECT_TRUE(submission.IsLoaded());
+
   SignedCertificateTimestamp sct;
-  string submission = this->precert_with_preca_pem_ + this->ca_precert_pem_;
-  EXPECT_EQ(ADDED,
-            this->frontend_->QueueEntry(ct::PRECERT_ENTRY, submission, &sct));
+  EXPECT_EQ(ADDED, this->frontend_->QueuePreCertEntry(&submission, &sct));
 
   CertChain chain(this->embedded_with_preca_pem_ + this->ca_pem_);
   LogEntry entry;

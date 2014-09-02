@@ -108,6 +108,9 @@ CertSubmissionHandler::X509ChainToEntry(const CertChain &chain,
 CertSubmissionHandler::SubmitResult
 CertSubmissionHandler::ProcessX509Submission(CertChain *chain,
                                              LogEntry *entry) {
+  if (!chain->IsLoaded())
+    return EMPTY_SUBMISSION;
+
   CertChecker::CertVerifyResult result = cert_checker_->CheckCertChain(chain);
   if (result != CertChecker::OK)
     return GetVerifyError(result);

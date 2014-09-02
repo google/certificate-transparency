@@ -72,10 +72,6 @@ class Frontend {
 
   void GetStats(FrontendStats *stats) const;
 
-  SubmitResult QueueEntry(ct::LogEntryType type,
-                          const std::string &data,
-                          ct::SignedCertificateTimestamp *sct);
-
   // Note that these might change the |chain|.
   SubmitResult QueueX509Entry(ct::CertChain *chain,
 			      ct::SignedCertificateTimestamp *sct);
