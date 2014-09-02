@@ -1,6 +1,8 @@
 
 language: cpp
 
+cache: apt
+
 before_install:
  - sudo apt-add-repository -y ppa:prantlf/cpp-netlib
  - sudo apt-add-repository -y ppa:fcitx-team/nightly
