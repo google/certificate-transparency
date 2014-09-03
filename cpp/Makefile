@@ -231,10 +231,10 @@ log/cert_checker_test: log/cert_checker_test.o log/cert.o log/cert_checker.o \
                        proto/serializer.o log/cert_checker.o
 
 log/cert_submission_handler_test: log/cert_submission_handler_test.o \
-                                  log/libcert.a proto/libproto.a \
-                                  util/libutil.a log/frontend.o \
-                                  log/frontend_signer.o \
-                                  log/log_signer.o log/signer.o log/verifier.o
+                                  log/libcert.a util/libutil.a \
+                                  log/frontend.o log/frontend_signer.o \
+                                  proto/libproto.a log/log_signer.o \
+                                  log/signer.o log/verifier.o
 
 log/ct_extensions_test: log/ct_extensions_test.o log/libcert.a util/libutil.a \
                         log/liblog.a proto/ct.pb.o \

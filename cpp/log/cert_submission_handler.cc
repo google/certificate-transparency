@@ -24,41 +24,6 @@ using std::string;
 CertSubmissionHandler::CertSubmissionHandler(CertChecker *cert_checker)
     : cert_checker_(cert_checker) {}
 
-CertSubmissionHandler::SubmitResult
-CertSubmissionHandler::ProcessSubmission(const string &submission,
-                                         LogEntry *entry) {
-  CHECK_NOTNULL(entry);
-  CHECK(entry->has_type());
-
-  if (submission.empty())
-    return EMPTY_SUBMISSION;
-
-  SubmitResult submit_result = INVALID_TYPE;
-  switch (entry->type()) {
-    case ct::X509_ENTRY:
-      submit_result = ProcessX509Submission(submission, entry);
-      break;
-    case ct::PRECERT_ENTRY:
-      submit_result = ProcessPreCertSubmission(submission,  entry);
-      break;
-    default:
-      // We support all types, so we should never get here if the caller sets
-      // a valid type.
-      LOG(FATAL) << "Unknown entry type " << entry->type();
-      break;
-  }
-
-  if (submit_result != OK)
-    return submit_result;
-
-  Serializer::SerializeResult serialize_result =
-      Serializer::CheckLogEntryFormat(*entry);
-  if (serialize_result != Serializer::OK)
-    return GetFormatError(serialize_result);
-
-  return OK;
-}
-
 // static
 bool
 CertSubmissionHandler::X509ChainToEntry(const CertChain &chain,
@@ -132,33 +97,6 @@ CertSubmissionHandler::ProcessX509Submission(CertChain *chain,
   return OK;
 }
 
-// Inputs must be concatenated PEM entries.
-// Format checking is done in the parent class.
-CertSubmissionHandler::SubmitResult
-CertSubmissionHandler::ProcessX509Submission(const string &submission,
-                                             LogEntry *entry) {
-  string pem_string(reinterpret_cast<const char*>(submission.data()),
-                    submission.size());
-  CertChain chain(pem_string);
-
-  if (!chain.IsLoaded())
-    return INVALID_PEM_ENCODED_CHAIN;
-
-  return ProcessX509Submission(&chain, entry);
-}
-
-CertSubmissionHandler::SubmitResult
-CertSubmissionHandler::ProcessPreCertSubmission(const string &submission,
-                                                LogEntry *entry) {
-  string pem_string(reinterpret_cast<const char*>(submission.data()),
-                    submission.size());
-  PreCertChain chain(pem_string);
-  if (!chain.IsLoaded())
-    return INVALID_PEM_ENCODED_CHAIN;
-
-  return ProcessPreCertSubmission(&chain, entry);
-}
-
 CertSubmissionHandler::SubmitResult
 CertSubmissionHandler::ProcessPreCertSubmission(PreCertChain *chain,
                                                 LogEntry *entry) {
@@ -210,26 +148,6 @@ bool CertSubmissionHandler::SerializedTbs(const Cert &cert, string *result) {
     return false;
   result->assign(der_tbs);
   return true;
-}
-
-// static
-CertSubmissionHandler::SubmitResult
-CertSubmissionHandler::GetFormatError(Serializer::SerializeResult result) {
-  SubmitResult submit_result;
-  switch (result) {
-    // Since the submission handler checks that the submission is valid
-    // for a given type, the only error we should be seeing here
-    // is a chain whose canonical encoding is too long.
-    // Anything else (invalid/empty certs) should be caught earlier.
-    case Serializer::CERTIFICATE_TOO_LONG:
-    case Serializer::CERTIFICATE_CHAIN_TOO_LONG:
-      submit_result = SUBMISSION_TOO_LONG;
-      break;
-    default:
-      LOG(FATAL) << "Unknown Serializer error " << result;
-  }
-
-  return submit_result;
 }
 
 // static

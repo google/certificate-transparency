@@ -36,10 +36,6 @@ class CertSubmissionHandler {
   SubmitResult ProcessPreCertSubmission(ct::PreCertChain *chain,
 					ct::LogEntry *entry);
 
-  // entry should have the expected type set.
-  SubmitResult ProcessSubmission(const std::string &submission,
-                                 ct::LogEntry *entry);
-
   // For clients, to reconstruct the bytestring under the signature
   // from the observed chain. Does not check whether the entry
   // has valid format (i.e., does not check length limits).
@@ -51,20 +47,10 @@ class CertSubmissionHandler {
   }
 
  private:
-  SubmitResult ProcessX509Submission(const std::string &submission,
-                                     ct::LogEntry *entry);
-
-
-  SubmitResult ProcessPreCertSubmission(const std::string &submission,
-                                        ct::LogEntry *entry);
-
   static bool SerializedTbs(const ct::Cert &cert, std::string *result);
+  static SubmitResult GetVerifyError(ct::CertChecker::CertVerifyResult result);
 
   ct::CertChecker *cert_checker_;
-
-  static SubmitResult GetFormatError(Serializer::SerializeResult result);
-
-  static SubmitResult GetVerifyError(ct::CertChecker::CertVerifyResult result);
 
   DISALLOW_COPY_AND_ASSIGN(CertSubmissionHandler);
 };
