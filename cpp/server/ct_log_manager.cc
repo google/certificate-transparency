@@ -124,7 +124,7 @@ CTLogManager::LookupReply CTLogManager::GetEntry(
 
 
 const ct::SignedTreeHead CTLogManager::GetSTH() const {
-  return signer_->LatestSTH();
+  return lookup_->GetSTH();
 }
 
 
