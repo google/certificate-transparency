@@ -16,7 +16,7 @@ Unpack googletest, but do not build it. Upstream recommends to build a new copy 
 
 Some systems make the googletest source available as a package; on Debian, this is in the libgtest-dev package, which puts it in ```/usr/src/gtest```. Our ```Makefile``` looks in that location by default, but if your googletest sources are in a different location, set the ```GTESTDIR``` environment variable to point at them.
 
- - [protobuf](https://code.google.com/p/protobuf/) (tested with 2.4.1)
+ - [protobuf](https://github.com/google/protobuf) (tested with 2.4.1)
  - [gflags](https://code.google.com/p/gflags/) (tested with 1.6 and 2.0)
  - [glog](https://code.google.com/p/google-glog/) (tested with 0.3.1)
 
