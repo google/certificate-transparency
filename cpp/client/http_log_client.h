@@ -4,11 +4,13 @@
 
 #include "proto/ct.pb.h"
 
+#include <boost/shared_ptr.hpp>
 #include <stdint.h>
 
 #include <string>
 
 namespace ct {
+class Cert;
 class MerkleAuditProof;
 class SignedCertificateTimestamp;
 };
@@ -31,6 +33,8 @@ class HTTPLogClient {
                           ct::SignedCertificateTimestamp *sct) const;
 
   Status GetSTH(ct::SignedTreeHead *sth) const;
+
+  Status GetRoots(std::vector<boost::shared_ptr<ct::Cert> > *roots) const;
 
   Status QueryAuditProof(const std::string &merkle_leaf_hash,
                          ct::MerkleAuditProof *proof) const;

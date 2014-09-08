@@ -1,6 +1,7 @@
 /* -*- indent-tabs-mode: nil -*- */
 #include "client/http_log_client.h"
 
+#include <boost/make_shared.hpp>
 #include <curl/curl.h>
 #include <glog/logging.h>
 #include <sstream>
@@ -11,10 +12,13 @@
 #include "util/json_wrapper.h"
 #include "util/util.h"
 
+using boost::shared_ptr;
 using ct::Cert;
 using ct::CertChain;
 using std::ostringstream;
 using std::string;
+using std::vector;
+using boost::make_shared;
 
 namespace {
 
@@ -217,6 +221,48 @@ HTTPLogClient::Status HTTPLogClient::GetSTH(ct::SignedTreeHead *sth) const {
     return BAD_RESPONSE;
 
   sth->set_version(ct::V1);
+
+  return OK;
+}
+
+HTTPLogClient::Status HTTPLogClient::GetRoots(
+    vector<shared_ptr<Cert> > *roots) const {
+  ostringstream url;
+  BaseUrl(&url);
+  url << "get-roots";
+
+  CurlRequest request;
+
+  std::ostringstream response;
+  Status ret = SendRequest(&response, &request, url);
+  LOG(INFO) << "request = " << url.str();
+  LOG(INFO) << "response = " << response.str();
+  if (ret != OK)
+    return ret;
+
+  JsonObject jresponse(response);
+  if (!jresponse.Ok())
+    return BAD_RESPONSE;
+
+  JsonArray jroots(jresponse, "certificates");
+  if (!jroots.Ok())
+    return BAD_RESPONSE;
+
+  vector<shared_ptr<Cert> > retval;
+  for (int i = 0; i < jroots.Length(); ++i) {
+    JsonString jcert(jroots, i);
+    if (!jcert.Ok())
+      return BAD_RESPONSE;
+
+    shared_ptr<Cert> cert(make_shared<Cert>());
+    const Cert::Status status(cert->LoadFromDerString(jcert.FromBase64()));
+    if (status != Cert::TRUE)
+      return BAD_RESPONSE;
+
+    retval.push_back(cert);
+  }
+
+  roots->swap(retval);
 
   return OK;
 }

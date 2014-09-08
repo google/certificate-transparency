@@ -106,21 +106,23 @@ static const char kUsage[] =
     "       retrieved via 'connect'\n"
     "wrap_embedded - take a certificate chain with an embedded SCT and wrap\n"
     "                them as if they were retrieved via 'connect'\n"
+    "get_roots - get roots from the log\n"
     "get_entries - get entries from the log\n"
     "sth - get the current STH from the log\n"
     "consistency - get and check consistency of two STHs\n"
     "monitor - use the monitor (see monitor_action flag)\n"
     "Use --help to display command-line flag options\n";
 
-using ct::LogEntry;
-using ct::MerkleAuditProof;
-using ct::SignedCertificateTimestamp;
-using ct::SignedCertificateTimestampList;
-using ct::SSLClientCTData;
-using std::string;
-
+using boost::shared_ptr;
 using ct::Cert;
 using ct::CertChain;
+using ct::LogEntry;
+using ct::MerkleAuditProof;
+using ct::SSLClientCTData;
+using ct::SignedCertificateTimestamp;
+using ct::SignedCertificateTimestampList;
+using std::string;
+using std::vector;
 
 // SCTs presented to clients have to be encoded as a list.
 // Helper method for encoding a single SCT.
@@ -780,6 +782,25 @@ void GetEntries() {
   }
 }
 
+int GetRoots() {
+  HTTPLogClient client(FLAGS_ct_server);
+
+  vector<shared_ptr<Cert> > roots;
+  CHECK_EQ(client.GetRoots(&roots), HTTPLogClient::OK);
+
+  LOG(INFO) << "number of certs: " << roots.size();
+  for (vector<shared_ptr<Cert> >::const_iterator it = roots.begin();
+       it != roots.end(); ++it) {
+    string pem_cert;
+    CHECK_EQ((*it)->PemEncoding(&pem_cert), Cert::TRUE);
+    std::cout << pem_cert;
+  }
+
+  std::cout << std::endl;
+
+  return 0;
+}
+
 int GetSTH() {
   CHECK_NE(FLAGS_ct_server, "");
 
@@ -905,6 +926,8 @@ int main(int argc, char **argv) {
     WrapEmbedded();
   } else if (cmd == "get_entries") {
     GetEntries();
+  } else if (cmd == "get_roots") {
+    ret = GetRoots();
   } else if (cmd == "monitor") {
     ret = Monitor();
   } else if (cmd == "sth") {

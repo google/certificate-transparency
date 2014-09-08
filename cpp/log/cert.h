@@ -115,6 +115,12 @@ class Cert {
   // Returns ERROR if the cert is not loaded.
   Status DerEncoding(std::string *result) const;
 
+  // Sets the PEM encoding of the cert in |result|.
+  // Returns TRUE if the encoding succeeded.
+  // Returns FALSE if the encoding failed.
+  // Returns ERROR if the cert is not loaded.
+  Status PemEncoding(std::string *result) const;
+
   // Sets the SHA256 digest of the cert in |result|.
   // Returns TRUE if computing the digest succeeded.
   // Returns FALSE if computing the digest failed.
