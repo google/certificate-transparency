@@ -1,6 +1,8 @@
 certificate-transparency
 ========================
 
+[![Build Status](https://travis-ci.org/google/certificate-transparency.svg?branch=master)](https://travis-ci.org/google/certificate-transparency)
+
 Auditing for TLS certificates.
 
 ## Dependencies ##
