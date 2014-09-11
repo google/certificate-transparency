@@ -3,8 +3,11 @@ package org.certificatetransparency.ctlog.serialization;
 import com.google.common.base.Preconditions;
 import com.google.protobuf.ByteString;
 
+import org.apache.commons.codec.binary.Base64;
 import org.certificatetransparency.ctlog.ParsedLogEntry;
+import org.certificatetransparency.ctlog.ParsedLogEntryWithProof;
 import org.certificatetransparency.ctlog.proto.Ct;
+import org.json.simple.JSONArray;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -73,6 +76,28 @@ public class Deserializer {
     return builder.build();
   }
 
+  /**
+   * Parses an entry retrieved from Log and it's audit proof.
+   * @param entry ParsedLogEntry instance.
+   * @param proof An array of base64-encoded Merkle Tree nodes proving the inclusion of the
+   * chosen certificate.
+   * @param leafIndex The index of the desired entry.
+   * @param treeSize The tree size of the tree for which the proof is desired.
+   * @return {@link ParsedLogEntryWithProof}
+   */
+  public static ParsedLogEntryWithProof parseLogEntryWithProof(ParsedLogEntry entry,
+    JSONArray proof, long leafIndex, long treeSize) {
+
+    Ct.MerkleAuditProof.Builder proofBuilder = Ct.MerkleAuditProof.newBuilder();
+    proofBuilder.setVersion(Ct.Version.V1);
+    proofBuilder.setLeafIndex(leafIndex);
+    proofBuilder.setTreeSize(treeSize);
+
+    for (Object node: proof) {
+      proofBuilder.addPathNode(ByteString.copyFrom(Base64.decodeBase64((String) node)));
+    }
+    return ParsedLogEntryWithProof.newInstance(entry, proofBuilder.build());
+  }
 
   /**
    * Parses an entry retrieved from Log.
@@ -100,7 +125,7 @@ public class Deserializer {
       throw new SerializationException(String.format("Unknown entry type: %d", entryType));
     }
     Ct.LogEntry logEntry = logEntryBuilder.build();
-    return new ParsedLogEntry(treeLeaf, logEntry);
+    return ParsedLogEntry.newInstance(treeLeaf, logEntry);
   }
 
   /**
