@@ -1,5 +1,6 @@
 #include "monitor/monitor.h"
 
+#include "client/http_log_client.h"
 #include "log/log_verifier.h"
 #include "merkletree/merkle_tree.h"
 #include "monitor/database.h"
@@ -8,19 +9,18 @@ using std::string;
 
 namespace monitor {
 
-Monitor::Monitor(Database *database,
-                 LogVerifier *log_verifier,
-                 const HTTPLogClient &client,
-                 uint64_t sleep_time_sec)
-  : db_(database), verifier_(log_verifier), client_(client),
-    sleep_time_(sleep_time_sec)
-{
+Monitor::Monitor(Database *database, LogVerifier *log_verifier,
+                 HTTPLogClient *client, uint64_t sleep_time_sec)
+    : db_(CHECK_NOTNULL(database)),
+      verifier_(CHECK_NOTNULL(log_verifier)),
+      client_(CHECK_NOTNULL(client)),
+      sleep_time_(sleep_time_sec) {
 }
 
 Monitor::GetResult Monitor::GetSTH() {
   ct::SignedTreeHead new_sth;
 
-  if (client_.GetSTH(&new_sth) != HTTPLogClient::OK)
+  if (client_->GetSTH(&new_sth) != HTTPLogClient::OK)
     return NETWORK_PROBLEM;
 
   ct::SignedTreeHead current_sth;
@@ -158,10 +158,8 @@ Monitor::GetResult Monitor::GetEntries(int get_first, int get_last) {
   do {
     // If the server does not impose a limit, all entries from get_first to
     // get_last will be downloaded at once (could exceed memory).
-    HTTPLogClient::Status error = client_.GetEntries(
-        get_first + dload_count,
-        get_last,
-        &entries);
+    HTTPLogClient::Status error =
+        client_->GetEntries(get_first + dload_count, get_last, &entries);
 
     if (error != HTTPLogClient::OK) {
       LOG(ERROR) << "HTTPLogClient returned with error " << error

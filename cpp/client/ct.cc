@@ -848,10 +848,9 @@ int Monitor() {
   CHECK_NE(FLAGS_monitor_action, "");
   CHECK_NE(FLAGS_ct_server, "");
 
-  monitor::Monitor monitor(GetMonitorDBFromFlags(),
-                           GetLogVerifierFromFlags(),
-                           HTTPLogClient(FLAGS_ct_server),
-                           FLAGS_monitor_sleep_time_secs);
+  HTTPLogClient client(FLAGS_ct_server);
+  monitor::Monitor monitor(GetMonitorDBFromFlags(), GetLogVerifierFromFlags(),
+                           &client, FLAGS_monitor_sleep_time_secs);
 
   int ret = 0;
   if (FLAGS_monitor_action == "get_sth") {

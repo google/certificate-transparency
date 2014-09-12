@@ -2,16 +2,19 @@
 #define MONITOR_H
 
 #include <stdint.h>
-#include <string>
 
 #include "base/macros.h"
-#include "client/http_log_client.h"
-#include "monitor/sqlite_db.h"
 
+class HTTPLogClient;
 class LogVerifier;
-class Database;
+
+namespace ct {
+class SignedTreeHead;
+}
 
 namespace monitor {
+
+class Database;
 
 class Monitor
 {
@@ -36,7 +39,7 @@ class Monitor
 
   Monitor(Database *database,
           LogVerifier *verifier,
-          const HTTPLogClient &client,
+          HTTPLogClient *client,
           uint64_t sleep_time_sec);
 
   GetResult GetSTH();
@@ -59,10 +62,10 @@ class Monitor
     REFRESHED = 3,
   };
 
-  Database *db_;
-  LogVerifier *verifier_;
-  HTTPLogClient client_;
-  uint64_t sleep_time_;
+  Database *const db_;
+  LogVerifier *const verifier_;
+  HTTPLogClient *const client_;
+  const uint64_t sleep_time_;
 
   VerifyResult VerifySTHInternal();
   VerifyResult VerifySTHInternal(const ct::SignedTreeHead &sth);
