@@ -16,7 +16,9 @@ LDLIBS = -lpthread -lgflags -lglog -lssl -lcrypto -lldns -lsqlite3 \
          -lprotobuf -lcurl -levent_core -levent_extra -levent_pthreads
 
 PLATFORM := $(shell uname -s)
-ifneq ($(PLATFORM), FreeBSD)
+ifeq ($(PLATFORM), FreeBSD)
+  LDLIBS += -L/usr/local/lib/event2
+else
   LDLIBS += -lresolv
 endif
 
