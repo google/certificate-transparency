@@ -54,6 +54,8 @@ You can build the log server by pointing to your custom OpenSSL and/or gtest (if
 $ make OPENSSLDIR=<path to openssl> GTESTDIR=<path to gtest> CPPNETLIBDIR=<path to cpp-netlib>
 ```
 
+If you need to set custom options for your compiler, then you can do this by setting LOCAL_CXXFLAGS.
+
 Once more, use gmake on BSD systems.
 
 ## Running Unit Tests ##
