@@ -1,8 +1,11 @@
 /* -*- indent-tabs-mode: nil -*- */
 
-#include <boost/asio/deadline_timer.hpp>
-#include <boost/asio/signal_set.hpp>
+#include <boost/bind.hpp>
 #include <boost/function.hpp>
+#include <boost/make_shared.hpp>
+#include <boost/scoped_ptr.hpp>
+#include <event2/thread.h>
+#include <gflags/gflags.h>
 #include <openssl/err.h>
 #include <string>
 
@@ -19,10 +22,12 @@
 #include "log/tree_signer.h"
 #include "server/ct_log_manager.h"
 #include "server/handler.h"
+#include "util/libevent_wrapper.h"
 #include "util/read_private_key.h"
+#include "util/thread_pool.h"
 
 DEFINE_string(server, "localhost", "Server host");
-DEFINE_string(port, "9999", "Server port");
+DEFINE_int32(port, 9999, "Server port");
 DEFINE_string(key, "", "PEM-encoded server private key file");
 DEFINE_string(trusted_cert_file, "",
               "File for trusted CA certificates, in concatenated PEM format");
@@ -48,9 +53,16 @@ DEFINE_int32(tree_signing_frequency_seconds, 600,
              "last signing. Set this well below the MMD to ensure we sign "
              "in a timely manner. Must be greater than 0.");
 
+namespace libevent = cert_trans::libevent;
+
+using boost::bind;
 using boost::function;
+using boost::make_shared;
+using boost::scoped_ptr;
+using boost::shared_ptr;
 using cert_trans::CTLogManager;
 using cert_trans::HttpHandler;
+using cert_trans::ThreadPool;
 using cert_trans::util::ReadPrivateKey;
 using ct::CertChecker;
 using ct::LoggedCertificate;
@@ -58,8 +70,7 @@ using google::RegisterFlagValidator;
 using std::string;
 
 // Basic sanity checks on flag values.
-static bool ValidatePort(const char *flagname, const string &port_str) {
-  int port = atoi(port_str.c_str());
+static bool ValidatePort(const char *flagname, int port) {
   if (port <= 0 || port > 65535) {
     std::cout << "Port value " << port << " is invalid. " << std::endl;
     return false;
@@ -125,48 +136,34 @@ static const bool stats_dummy = RegisterFlagValidator(
 static const bool sign_dummy = RegisterFlagValidator(
     &FLAGS_tree_signing_frequency_seconds, &ValidateIsPositive);
 
-// Hooks a repeating timer on the event loop to call a callback.
-class RepeatingCallback {
+// Hooks a repeating timer on the event loop to call a callback. It
+// will wait "interval_secs" between calls to "callback" (so this
+// means that if "callback" takes some time, it will run less
+// frequently).
+class PeriodicCallback {
  public:
-  RepeatingCallback(boost::asio::io_service& io,
-                    boost::posix_time::time_duration frequency,
-                    const function<void()> &callback)
-    : frequency_(frequency),
-      timer_(io, frequency),
-      callback_(callback) {
-    Wait();
+  PeriodicCallback(const shared_ptr<libevent::Base> &base, int interval_secs,
+                   const function<void()> &callback)
+      : base_(base),
+        interval_secs_(interval_secs),
+        event_(*base_, -1, 0, bind(&PeriodicCallback::Go, this)),
+        callback_(callback) {
+    base_->Add(event_, interval_secs_);
   }
 
  private:
-  void Wait() {
-    timer_.async_wait(boost::bind(&RepeatingCallback::Go, this));
-  }
-
   void Go() {
     callback_();
-    timer_.expires_at(timer_.expires_at() + frequency_);
-    Wait();
+    base_->Add(event_, interval_secs_);
   }
 
-  const boost::posix_time::time_duration frequency_;
-  boost::asio::deadline_timer timer_;
+  const shared_ptr<libevent::Base> base_;
+  const int interval_secs_;
+  libevent::Event event_;
   const function<void()> callback_;
 
-  DISALLOW_COPY_AND_ASSIGN(RepeatingCallback);
+  DISALLOW_COPY_AND_ASSIGN(PeriodicCallback);
 };
-
-typedef boost::network::http::server<HttpHandler> HttpServer;
-
-static void signal_handler(HttpServer* server, boost::asio::signal_set* sigset,
-                           const boost::system::error_code& error,
-                           int signal_number) {
-  if (error)
-    return;
-
-  LOG(WARNING) << "received signal: " << strsignal(signal_number);
-  sigset->remove(signal_number);
-  server->stop();
-}
 
 int main(int argc, char * argv[]) {
   google::ParseCommandLineFlags(&argc, &argv, true);
@@ -201,33 +198,25 @@ int main(int argc, char * argv[]) {
                new FileStorage(FLAGS_cert_dir, FLAGS_cert_storage_depth),
                new FileStorage(FLAGS_tree_dir, FLAGS_tree_storage_depth));
 
+  evthread_use_pthreads();
+  const shared_ptr<libevent::Base> event_base(make_shared<libevent::Base>());
   CTLogManager manager(
       new Frontend(new CertSubmissionHandler(&checker),
                    new FrontendSigner(db, &log_signer)),
       new TreeSigner<LoggedCertificate>(db, &log_signer),
       new LogLookup<LoggedCertificate>(db));
+  ThreadPool pool;
+  HttpHandler handler(&manager, &pool);
 
-  try {
-    HttpHandler handler(&manager);
-    boost::shared_ptr<boost::asio::io_service> io
-        = boost::make_shared<boost::asio::io_service>();
-    RepeatingCallback tree_event(
-        *io, boost::posix_time::seconds(FLAGS_tree_signing_frequency_seconds),
-        boost::bind(&CTLogManager::SignMerkleTree, &manager));
-    HttpServer::options options(handler);
-    HttpServer server(options.address(FLAGS_server).port(FLAGS_port)
-                      .reuse_address(true).io_service(io));
+  PeriodicCallback tree_event(
+      event_base, FLAGS_tree_signing_frequency_seconds,
+      boost::bind(&CTLogManager::SignMerkleTree, &manager));
 
-    boost::asio::signal_set signals(*io, SIGINT, SIGTERM);
-    signals.async_wait(boost::bind(
-        &signal_handler, &server, &signals, _1, _2));
+  libevent::HttpServer server(event_base.get());
+  handler.Add(&server);
+  server.Bind(NULL, FLAGS_port);
 
-    server.run();
-  }
-  catch (std::exception &e) {
-    std::cerr << e.what() << std::endl;
-    return 1;
-  }
+  event_base->Dispatch();
 
   return 0;
 }

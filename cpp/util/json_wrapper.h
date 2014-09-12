@@ -8,6 +8,7 @@
 #undef FALSE  // json.h pollution
 
 #include <sstream>
+#include <string>
 
 #include "base/macros.h"
 #include "proto/serializer.h"
@@ -86,6 +87,10 @@ class JsonObject {
 
   const char *ToString() const {
     return json_object_to_json_string(obj_);
+  }
+
+  std::string DebugString() const {
+    return json_object_to_json_string_ext(obj_, JSON_C_TO_STRING_PRETTY);
   }
 
  protected:

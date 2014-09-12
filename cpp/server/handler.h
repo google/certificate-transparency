@@ -1,10 +1,10 @@
 #ifndef CERT_TRANS_SERVER_HANDLER_H_
 #define CERT_TRANS_SERVER_HANDLER_H_
 
-#include <boost/network/protocol/http/server.hpp>
 #include <string>
 
 #include "server/ct_log_manager.h"
+#include "util/libevent_wrapper.h"
 
 namespace ct {
 class CertChain;
@@ -15,49 +15,34 @@ class SignedCertificateTimestamp;
 namespace cert_trans {
 
 class CTLogManager;
+class ThreadPool;
 
 
 class HttpHandler {
  public:
-  typedef boost::network::http::server<HttpHandler> server;
+  HttpHandler(CTLogManager *manager, ThreadPool *pool);
 
-  HttpHandler(CTLogManager *manager) : manager_(manager) {}
+  void Add(libevent::HttpServer *server);
 
-  void operator() (server::request const &request,
-                   server::response &response);
+ private:
+  void GetEntries(evhttp_request *req) const;
+  void GetRoots(evhttp_request *req) const;
+  void GetProof(evhttp_request *req) const;
+  void GetSTH(evhttp_request *req) const;
+  void GetConsistency(evhttp_request *req) const;
+  void AddChain(evhttp_request *req);
+  void AddPreChain(evhttp_request *req);
 
-  void log(const std::string &err);
+  void BlockingAddChain(evhttp_request *req,
+                        const boost::shared_ptr<ct::CertChain> &chain) const;
+  void BlockingAddPreChain(
+      evhttp_request *req,
+      const boost::shared_ptr<ct::PreCertChain> &chain) const;
 
-private:
-  static void BadRequest(server::response &response, const char *msg);
+  CTLogManager *const manager_;
+  ThreadPool *const pool_;
 
-  void GetRoots(server::response &response) const;
-
-  void GetEntries(server::response &response,
-                  const boost::network::uri::uri &uri) const;
-
-  void GetConsistency(server::response &response,
-                      const boost::network::uri::uri &uri);
-
-  void GetProof(server::response &response,
-                const boost::network::uri::uri &uri);
-
-  void GetSTH(server::response &response);
-
-  void AddChain(server::response &response, const std::string &body);
-  void AddPreChain(server::response &response, const std::string &body);
-  void AddChain(server::response &response, const std::string &body,
-                ct::CertChain *chain, ct::PreCertChain *prechain);
-
-  static bool ExtractChain(server::response &response, ct::CertChain *chain,
-                           const std::string &body);
-
-  void ProcessChainResult(server::response &response,
-                          CTLogManager::LogReply result,
-                          const std::string &error,
-                          const ct::SignedCertificateTimestamp &sct);
-
-  const CTLogManager* manager_;
+  DISALLOW_COPY_AND_ASSIGN(HttpHandler);
 };
 
 

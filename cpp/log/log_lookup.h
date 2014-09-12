@@ -62,6 +62,9 @@ template <class Logged> class LogLookup {
     return OK;
   }
 
+  // TODO(pphaneuf): If GetSTH and Update were to be called
+  // concurrently, you'd have a race. This class should be made
+  // threadsafe.
   const ct::SignedTreeHead &GetSTH() const {
     return latest_tree_head_;
   }

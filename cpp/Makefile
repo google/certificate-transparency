@@ -12,8 +12,8 @@ INCLUDE = -I .
 LOCAL_LIBS = log/libcert.a log/libdatabase.a log/liblog.a \
              merkletree/libmerkletree.a \
              proto/libproto.a util/libutil.a
-LDLIBS = -lpthread -lgflags -lglog -lssl -lcrypto -lldns \
-         -lsqlite3 -lprotobuf -lcurl -lcppnetlib-uri
+LDLIBS = -lpthread -lgflags -lglog -lssl -lcrypto -lldns -lsqlite3 \
+         -lprotobuf -lcurl -levent_core -levent_extra -levent_pthreads
 
 PLATFORM := $(shell uname -s)
 ifneq ($(PLATFORM), FreeBSD)
@@ -40,11 +40,10 @@ ifneq ($(CURLDIR),)
   LDLIBS += -L $(CURLDIR)/lib/.libs -Wl,-rpath,$(CURLDIR)/lib/.libs
 endif
 
-# Need cpp-netlib
-ifneq ($(CPPNETLIBDIR),)
-  INCLUDE += -I $(CPPNETLIBDIR)
-  LDLIBS += -L $(CPPNETLIBDIR)/libs/network/src \
-            -Wl,-rpath,$(CPPNETLIBDIR)/libs/network/src
+# Need libevent
+ifneq ($(LIBEVENTDIR),)
+  INCLUDE += -I $(LIBEVENTDIR)/include
+  LDLIBS += -L $(LIBEVENTDIR)/.libs  -Wl,-rpath,$(LIBEVENTDIR)/.libs
 endif
 
 # Json library location explicitly specified - link against that.
@@ -158,7 +157,7 @@ util_tests: util/json_wrapper_test
 
 ### util/ targets
 util/libutil.a: util/util.o util/openssl_util.o util/testing.o \
-                util/json_wrapper.o util/thread_pool.o
+                util/json_wrapper.o util/thread_pool.o util/libevent_wrapper.o
 	rm -f $@
 	ar -rcs $@ $^
 

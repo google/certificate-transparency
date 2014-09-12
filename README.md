@@ -36,9 +36,10 @@ To avoid this, either avoid the package that OpenSSL (```libcurl4-openssl-dev```
 
 You can specify a JSON-C library in a non-standard location using the ```JSONCLIBDIR``` environment variable. Version 0.10 would work as well, except the ```json_object_iterator.h``` header is not properly copied when installing. If you can install the missing header manually, it should work.
 
- - [cpp-netlib](http://cpp-netlib.org/) (tested with 0.10.1)
+ - [libevent](http://libevent.org/) (tested with 2.0.21-stable)
 
-This library cannot be installed using ```make install```. Use the ```CPPNETLIBDIR``` environment variable to point to the local build.
+You can specify a non-installed locally built library using the
+```LIBEVENTDIR``` environment variable to point to the local build.
 
  - [ldns](http://www.nlnetlabs.nl/projects/ldns/)
  - [ant](http://ant.apache.org/)
@@ -51,7 +52,7 @@ This library cannot be installed using ```make install```. Use the ```CPPNETLIBD
 You can build the log server by pointing to your custom OpenSSL and/or gtest (if needed):
 
 ```
-$ make OPENSSLDIR=<path to openssl> GTESTDIR=<path to gtest> CPPNETLIBDIR=<path to cpp-netlib>
+$ make OPENSSLDIR=<path to openssl> GTESTDIR=<path to gtest> LIBEVENTDIR=<path to libevent>
 ```
 
 If you need to set custom options for your compiler, then you can do this by setting LOCAL_CXXFLAGS. You can also customise the C++ compile in cpp/local.mk.
