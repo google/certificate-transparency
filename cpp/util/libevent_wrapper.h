@@ -24,12 +24,9 @@ class Base {
   Base();
   ~Base();
 
-  void Add(const Event &ev, double timeout);
   void Dispatch();
-
-  event_base *get() const {
-    return base_;
-  }
+  event *EventNew(evutil_socket_t &sock, short events, Event *event) const;
+  evhttp *HttpNew() const;
 
  private:
   event_base *const base_;
@@ -46,11 +43,11 @@ class Event {
         const Callback &cb);
   ~Event();
 
- private:
-  friend class Base;
-
+  void Add(double timeout) const;
+  // Note that this is only public so |Base| can use it.
   static void Dispatch(evutil_socket_t sock, short events, void *userdata);
 
+ private:
   const Callback cb_;
   event *const ev_;
 
@@ -62,7 +59,7 @@ class HttpServer {
  public:
   typedef boost::function<void(evhttp_request *)> HandlerCallback;
 
-  explicit HttpServer(Base *base);
+  explicit HttpServer(const Base &base);
   ~HttpServer();
 
   void Bind(const char *address, ev_uint16_t port);

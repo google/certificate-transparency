@@ -148,13 +148,13 @@ class PeriodicCallback {
         interval_secs_(interval_secs),
         event_(*base_, -1, 0, bind(&PeriodicCallback::Go, this)),
         callback_(callback) {
-    base_->Add(event_, interval_secs_);
+    event_.Add(interval_secs_);
   }
 
  private:
   void Go() {
     callback_();
-    base_->Add(event_, interval_secs_);
+    event_.Add(interval_secs_);
   }
 
   const shared_ptr<libevent::Base> base_;
@@ -212,7 +212,7 @@ int main(int argc, char * argv[]) {
       event_base, FLAGS_tree_signing_frequency_seconds,
       boost::bind(&CTLogManager::SignMerkleTree, &manager));
 
-  libevent::HttpServer server(event_base.get());
+  libevent::HttpServer server(*event_base.get());
   handler.Add(&server);
   server.Bind(NULL, FLAGS_port);
 
