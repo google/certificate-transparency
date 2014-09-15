@@ -212,7 +212,7 @@ int main(int argc, char * argv[]) {
       event_base, FLAGS_tree_signing_frequency_seconds,
       boost::bind(&CTLogManager::SignMerkleTree, &manager));
 
-  libevent::HttpServer server(*event_base.get());
+  libevent::HttpServer server(*event_base);
   handler.Add(&server);
   server.Bind(NULL, FLAGS_port);
 
