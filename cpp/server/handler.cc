@@ -351,7 +351,8 @@ void HttpHandler::GetProof(evhttp_request *req) const {
   }
 
   const int tree_size(GetIntParam(query, "tree_size"));
-  if (tree_size < 0 || (uint64_t)tree_size > manager_->GetSTH().tree_size()) {
+  if (tree_size < 0
+      || static_cast<uint64_t>(tree_size) > manager_->GetSTH().tree_size()) {
     return SendError(req, HTTP_BADREQUEST,
                      "Missing or invalid \"tree_size\" parameter.");
   }
