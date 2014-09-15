@@ -200,11 +200,16 @@ int main(int argc, char * argv[]) {
 
   evthread_use_pthreads();
   const shared_ptr<libevent::Base> event_base(make_shared<libevent::Base>());
+
   CTLogManager manager(
       new Frontend(new CertSubmissionHandler(&checker),
                    new FrontendSigner(db, &log_signer)),
       new TreeSigner<LoggedCertificate>(db, &log_signer),
       new LogLookup<LoggedCertificate>(db));
+  // This method is called "sign", but it also loads the LogLookup
+  // object from the database as a side-effect.
+  manager.SignMerkleTree();
+
   ThreadPool pool;
   HttpHandler handler(&manager, &pool);
 
