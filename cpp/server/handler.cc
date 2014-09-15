@@ -215,6 +215,8 @@ bool GetParam(const multimap<string, string> &query, const string &param,
 // Returns -1 on error, and on success too if the parameter contains
 // -1 (so it's advised to only use it when expecting unsigned
 // parameters).
+// FIXME: at least some parameters are strictly 64 bit - we should get
+// the right size.
 int GetIntParam(const multimap<string, string> &query, const string &param) {
   int retval(-1);
   string value;
