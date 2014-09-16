@@ -221,12 +221,18 @@ int GetIntParam(const multimap<string, string> &query, const string &param) {
   int retval(-1);
   string value;
   if (GetParam(query, param, &value)) {
+    errno = 0;
     const long num(strtol(value.c_str(), /*endptr*/ NULL, 10));
-    retval = num;
     // Detect strtol() errors or overflow/underflow when casting to
-    // int clipped the value.
-    if (errno || retval != num)
+    // retval's type clips the value. We do the following by doing it,
+    // and checking that they're still equal afterward (this will
+    // still work if we change retval's type later on).
+    retval = num;
+    if (errno || static_cast<long>(retval) != num) {
+      VLOG(1) << "over/underflow getting \"" << param << "\": " << retval
+              << ", " << num << " (" << strerror(errno) << ")";
       retval = -1;
+    }
   }
 
   return retval;
