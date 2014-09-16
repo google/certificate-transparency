@@ -118,9 +118,11 @@ using ct::Cert;
 using ct::CertChain;
 using ct::LogEntry;
 using ct::MerkleAuditProof;
+using ct::PreCertChain;
 using ct::SSLClientCTData;
 using ct::SignedCertificateTimestamp;
 using ct::SignedCertificateTimestampList;
+using ct::TbsCertificate;
 using std::string;
 using std::vector;
 
@@ -182,17 +184,69 @@ static void AddOctetExtension(X509 *cert, int nid, const unsigned char *data,
   delete[] buf;
 }
 
-static bool CheckSCT(const SignedCertificateTimestamp &sct,
-                     const CertChain &chain, SSLClientCTData *ct_data) {
-  SSLClientCTData::SCTInfo *sct_info = ct_data->add_attached_sct_info();
-  sct_info->mutable_sct()->CopyFrom(sct);
-  LogEntry entry;
-  if (!CertSubmissionHandler::X509ChainToEntry(chain, &entry)) {
-    LOG(ERROR) << "Failed to reconstruct log entry input from chain";
-  } else {
-    ct_data->mutable_reconstructed_entry()->CopyFrom(entry);
+// Reconstructs a LogEntry from the given precert chain.
+// Used for verifying a Precert SCT.
+// Returns true iff the LogEntry was correctly populated.
+static bool PrecertChainToEntry(const ct::PreCertChain &chain,
+                                LogEntry *entry) {
+  if (!chain.IsLoaded()) {
+    LOG(ERROR) << "Chain not loaded.";
+    return false;
   }
 
+  Cert::Status status = chain.LeafCert()->HasExtension(ct::NID_ctPoison);
+  if (status != Cert::TRUE && status != Cert::FALSE) {
+    LOG(ERROR) << "Failed to test for poison extension.";
+    return false;
+  }
+
+  if (status == Cert::FALSE) {
+    LOG(ERROR) << "Leaf cert doesn't seem to be a Precertificate (no Poison).";
+    return false;
+  }
+
+  if (chain.Length() < 2) {
+    LOG(ERROR) << "Need issuer.";
+    return false;
+  }
+
+  entry->set_type(ct::PRECERT_ENTRY);
+  string key_hash;
+  if (chain.CertAt(1)->SPKISha256Digest(&key_hash) != Cert::TRUE) {
+    LOG(ERROR) << "Failed to get SPKISha256.";
+    return false;
+  }
+
+  entry->mutable_precert_entry()->mutable_pre_cert()->set_issuer_key_hash(
+      key_hash);
+
+  TbsCertificate tbs(*chain.LeafCert());
+  if (!tbs.IsLoaded()) {
+    LOG(ERROR) << "Failed to get TbsCertificate.";
+    return false;
+  }
+  if (tbs.DeleteExtension(ct::NID_ctPoison) != Cert::TRUE) {
+    LOG(ERROR) << "Failed to delete poison extension.";
+    return false;
+  }
+
+  string tbs_der;
+  if (tbs.DerEncoding(&tbs_der) != Cert::TRUE) {
+    LOG(ERROR) << "Couldn't serialize TbsCertificate to DER.";
+    return false;
+  }
+
+  entry->mutable_precert_entry()->mutable_pre_cert()->
+      set_tbs_certificate(tbs_der);
+  return true;
+}
+
+static bool VerifySCTAndPopulateSSLClientCTData(
+    const SignedCertificateTimestamp &sct,
+    const LogEntry& log_entry,
+    SSLClientCTData* ct_data) {
+  SSLClientCTData::SCTInfo *sct_info = ct_data->add_attached_sct_info();
+  sct_info->mutable_sct()->CopyFrom(sct);
   LogVerifier *verifier = GetLogVerifierFromFlags();
   string merkle_leaf;
   LogVerifier::VerifyResult result =
@@ -206,6 +260,31 @@ static bool CheckSCT(const SignedCertificateTimestamp &sct,
   sct_info->set_merkle_leaf_hash(merkle_leaf);
 
   return true;
+}
+
+// Checks an SCT issued for an X.509 Certificate.
+static bool CheckSCT(const SignedCertificateTimestamp &sct,
+                     const CertChain &chain, SSLClientCTData *ct_data) {
+  LogEntry entry;
+  if (!CertSubmissionHandler::X509ChainToEntry(chain, &entry)) {
+    LOG(ERROR) << "Failed to reconstruct log entry input from chain";
+    return false;
+  }
+  ct_data->mutable_reconstructed_entry()->CopyFrom(entry);
+  return VerifySCTAndPopulateSSLClientCTData(sct, entry, ct_data);
+}
+
+// Checks an SCT issued for a Precert.
+static bool CheckSCT(
+    const SignedCertificateTimestamp &sct,
+    const PreCertChain &chain, SSLClientCTData *ct_data) {
+  LogEntry entry;
+  if (!PrecertChainToEntry(chain, &entry)) {
+    LOG(ERROR) << "Failed to reconstruct log entry input from precert chain";
+    return false;
+  }
+  ct_data->mutable_reconstructed_entry()->CopyFrom(entry);
+  return VerifySCTAndPopulateSSLClientCTData(sct, entry, ct_data);
 }
 
 void WriteFile(const std::string &file, const std::string &contents,
@@ -252,14 +331,26 @@ static int Upload() {
     return 1;
   }
 
-  /* Temporarily removed: we need the the final chain if the upload
-     didn't include it (might be missing the root certificate, might
-     be a pre-cert chain). In the meantime this breaks self-tests.
-
-     SSLClientCTData ct_data;
-     CertChain chain(contents);
-     CHECK(CheckSCT(sct, chain, &ct_data));
-  */
+  // Verify the SCT if we can:
+  if (FLAGS_precert) {
+    SSLClientCTData ct_data;
+    PreCertChain chain(contents);
+    // Need the issuing cert, otherwise we can't calculate its hash...
+    if (chain.Length() > 1) {
+      CHECK(CheckSCT(sct, chain, &ct_data));
+    } else {
+      LOG(WARNING) << "Unable to verify Precert SCT without issuing "
+                   << "certificate in chain.";
+    }
+  } else {
+    // SCT for a vanilla X.509 Cert.
+    SSLClientCTData ct_data;
+    CertChain chain(contents);
+    // FIXME: this'll fail if we're uploading a cert which already has an
+    // embedded SCT in it, and the issuing cert is not included in the chain
+    // since we'll need to create the precert entry under the covers.
+    CHECK(CheckSCT(sct, chain, &ct_data));
+  }
 
   // TODO(ekasper): Process the |contents| bundle so that we can verify
   // the token.

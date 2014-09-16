@@ -46,7 +46,7 @@ audit() {
 do_audit() {
   ct_data=$1
   T=`date +%s`
-  T=`expr $T + 30`
+  T=`expr $T + 90`
 
   while true
   do
@@ -96,7 +96,7 @@ get_entries() {
 get_sth $CERT_DIR/sth1
 
 make_cert $CERT_DIR test ca $SERVER false $CT_KEY
-make_embedded_cert $CERT_DIR test-embedded ca $SERVER false false $CT_KEY
+make_embedded_cert $CERT_DIR test-embedded ca $SERVER true false $CT_KEY
 
 # Do the audits together, quicker that way.
 # test-*-cert.ctdata is made by make_cert.
