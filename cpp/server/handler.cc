@@ -282,11 +282,18 @@ void HttpHandler::GetEntries(evhttp_request *req) const {
                      "Missing or invalid \"start\" parameter.");
   }
 
-  const int end(GetIntParam(query, "end"));
-  if (end < start || end >= tree_size) {
+  int end(GetIntParam(query, "end"));
+  if (end < start) {
     return SendError(req, HTTP_BADREQUEST,
                      "Missing or invalid \"end\" parameter.");
   }
+
+  // If a bigger tree size than what we have has been requested, we'll
+  // send what we have.
+  // TODO(pphaneuf): The "start < 0 || start >= tree_size" test above
+  // catches the case where the tree is empty (and return an error),
+  // we should return an empty result instead.
+  end = std::min(end, tree_size - 1);
 
   JsonArray json_entries;
   for (int i = start; i <= end; ++i) {
