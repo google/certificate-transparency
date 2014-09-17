@@ -1,11 +1,13 @@
 #include "server/handler.h"
 
+#include <algorithm>
 #include <boost/bind.hpp>
 #include <boost/make_shared.hpp>
 #include <boost/scoped_array.hpp>
 #include <event2/buffer.h>
 #include <event2/http.h>
 #include <event2/keyvalq_struct.h>
+#include <gflags/gflags.h>
 #include <glog/logging.h>
 #include <map>
 #include <stdlib.h>
@@ -30,6 +32,9 @@ using std::make_pair;
 using std::multimap;
 using std::string;
 using std::vector;
+
+DEFINE_int32(max_leaf_entries_per_response, 1000, "Maximum number of entries "
+             "to put in the response of a get-entries request.");
 
 namespace {
 
@@ -294,6 +299,9 @@ void HttpHandler::GetEntries(evhttp_request *req) const {
   // catches the case where the tree is empty (and return an error),
   // we should return an empty result instead.
   end = std::min(end, tree_size - 1);
+
+  // Limit the number of entries returned in a single request.
+  end = std::min(end, start + FLAGS_max_leaf_entries_per_response);
 
   JsonArray json_entries;
   for (int i = start; i <= end; ++i) {
