@@ -3,24 +3,29 @@
 
 #include <string>
 
-#include "server/ct_log_manager.h"
 #include "util/libevent_wrapper.h"
+
+template<class T> class LogLookup;
+class Frontend;
 
 namespace ct {
 class CertChain;
+class CertChecker;
+class LoggedCertificate;
 class PreCertChain;
 class SignedCertificateTimestamp;
 }
 
 namespace cert_trans {
 
-class CTLogManager;
 class ThreadPool;
 
 
 class HttpHandler {
  public:
-  HttpHandler(CTLogManager *manager, ThreadPool *pool);
+  HttpHandler(LogLookup<ct::LoggedCertificate> *log_lookup,
+              const ct::CertChecker *cert_checker, Frontend *frontend,
+              ThreadPool *pool);
 
   void Add(libevent::HttpServer *server);
 
@@ -39,7 +44,9 @@ class HttpHandler {
       evhttp_request *req,
       const boost::shared_ptr<ct::PreCertChain> &chain) const;
 
-  CTLogManager *const manager_;
+  LogLookup<ct::LoggedCertificate> *const log_lookup_;
+  const ct::CertChecker *const cert_checker_;
+  Frontend *const frontend_;
   ThreadPool *const pool_;
 
   DISALLOW_COPY_AND_ASSIGN(HttpHandler);

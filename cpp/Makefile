@@ -306,7 +306,7 @@ client/ct: client/ct.o client/client.o client/ssl_client.o \
 server/ct-dns-server: server/ct-dns-server.o server/event.o $(LOCAL_LIBS)
 
 server/ct-server: server/ct-server.o util/read_private_key.o \
-	server/ct_log_manager.o server/handler.o $(LOCAL_LIBS)
+	server/handler.o $(LOCAL_LIBS)
 
 dns_tests: server/ct-dns-server
 

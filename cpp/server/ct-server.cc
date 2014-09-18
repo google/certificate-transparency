@@ -20,7 +20,6 @@
 #include "log/log_signer.h"
 #include "log/sqlite_db.h"
 #include "log/tree_signer.h"
-#include "server/ct_log_manager.h"
 #include "server/handler.h"
 #include "util/libevent_wrapper.h"
 #include "util/read_private_key.h"
@@ -60,7 +59,6 @@ using boost::function;
 using boost::make_shared;
 using boost::scoped_ptr;
 using boost::shared_ptr;
-using cert_trans::CTLogManager;
 using cert_trans::HttpHandler;
 using cert_trans::ThreadPool;
 using cert_trans::util::ReadPrivateKey;
@@ -68,6 +66,8 @@ using ct::CertChecker;
 using ct::LoggedCertificate;
 using google::RegisterFlagValidator;
 using std::string;
+
+static const int kCtimeBufSize = 26;
 
 // Basic sanity checks on flag values.
 static bool ValidatePort(const char *flagname, int port) {
@@ -165,6 +165,17 @@ class PeriodicCallback {
   DISALLOW_COPY_AND_ASSIGN(PeriodicCallback);
 };
 
+void SignMerkleTree(TreeSigner<LoggedCertificate> *tree_signer,
+                    LogLookup<LoggedCertificate> *log_lookup) {
+  CHECK_EQ(tree_signer->UpdateTree(), TreeSigner<LoggedCertificate>::OK);
+  CHECK_EQ(log_lookup->Update(), LogLookup<LoggedCertificate>::UPDATE_OK);
+
+  const time_t last_update(
+      static_cast<time_t>(tree_signer->LastUpdateTime() / 1000));
+  char buf[kCtimeBufSize];
+  LOG(INFO) << "Tree successfully updated at " << ctime_r(&last_update, buf);
+}
+
 int main(int argc, char * argv[]) {
   google::ParseCommandLineFlags(&argc, &argv, true);
   google::InitGoogleLogging(argv[0]);
@@ -201,21 +212,28 @@ int main(int argc, char * argv[]) {
   evthread_use_pthreads();
   const shared_ptr<libevent::Base> event_base(make_shared<libevent::Base>());
 
-  CTLogManager manager(
-      new Frontend(new CertSubmissionHandler(&checker),
-                   new FrontendSigner(db, &log_signer)),
-      new TreeSigner<LoggedCertificate>(db, &log_signer),
-      new LogLookup<LoggedCertificate>(db));
-  // This method is called "sign", but it also loads the LogLookup
+  Frontend frontend(new CertSubmissionHandler(&checker),
+                    new FrontendSigner(db, &log_signer));
+  TreeSigner<LoggedCertificate> tree_signer(db, &log_signer);
+  LogLookup<LoggedCertificate> log_lookup(db);
+
+  // This function is called "sign", but it also loads the LogLookup
   // object from the database as a side-effect.
-  manager.SignMerkleTree();
+  SignMerkleTree(&tree_signer, &log_lookup);
+
+  const time_t last_update(
+      static_cast<time_t>(tree_signer.LastUpdateTime() / 1000));
+  if (last_update > 0) {
+    char buf[kCtimeBufSize];
+    LOG(INFO) << "Last tree update was at " << ctime_r(&last_update, buf);
+  }
 
   ThreadPool pool;
-  HttpHandler handler(&manager, &pool);
+  HttpHandler handler(&log_lookup, &checker, &frontend, &pool);
 
   PeriodicCallback tree_event(
       event_base, FLAGS_tree_signing_frequency_seconds,
-      boost::bind(&CTLogManager::SignMerkleTree, &manager));
+      boost::bind(&SignMerkleTree, &tree_signer, &log_lookup));
 
   libevent::HttpServer server(*event_base);
   handler.Add(&server);

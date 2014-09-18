@@ -15,6 +15,9 @@
 #include <vector>
 
 #include "log/cert.h"
+#include "log/cert_checker.h"
+#include "log/frontend.h"
+#include "log/log_lookup.h"
 #include "log/logged_certificate.h"
 #include "util/json_wrapper.h"
 #include "util/thread_pool.h"
@@ -23,9 +26,9 @@ using boost::bind;
 using boost::make_shared;
 using boost::scoped_array;
 using boost::shared_ptr;
-using cert_trans::CTLogManager;
 using cert_trans::HttpHandler;
 using ct::Cert;
+using ct::CertChecker;
 using ct::LoggedCertificate;
 using ct::ShortMerkleAuditProof;
 using std::make_pair;
@@ -159,10 +162,10 @@ bool ExtractChain(evhttp_request *req, ct::CertChain *chain) {
 }
 
 
-void AddChainReply(evhttp_request *req, CTLogManager::LogReply result,
-                   const ct::SignedCertificateTimestamp &sct,
-                   const string &error) {
-  if (result != CTLogManager::SIGNED_CERTIFICATE_TIMESTAMP) {
+void AddChainReply(evhttp_request *req, SubmitResult result,
+                   const ct::SignedCertificateTimestamp &sct) {
+  if (result != ADDED && result != DUPLICATE) {
+    const string error(Frontend::SubmitResultString(result));
     VLOG(1) << "error adding chain: " << error;
     SendError(req, HTTP_BADREQUEST, error);
     return;
@@ -247,8 +250,12 @@ int GetIntParam(const multimap<string, string> &query, const string &param) {
 }  // namespace
 
 
-HttpHandler::HttpHandler(CTLogManager *manager, ThreadPool *pool)
-    : manager_(CHECK_NOTNULL(manager)),
+HttpHandler::HttpHandler(LogLookup<LoggedCertificate> *log_lookup,
+                         const CertChecker *cert_checker, Frontend *frontend,
+                         ThreadPool *pool)
+    : log_lookup_(CHECK_NOTNULL(log_lookup)),
+      cert_checker_(CHECK_NOTNULL(cert_checker)),
+      frontend_(CHECK_NOTNULL(frontend)),
       pool_(CHECK_NOTNULL(pool)) {
 }
 
@@ -280,7 +287,7 @@ void HttpHandler::GetEntries(evhttp_request *req) const {
 
   const multimap<string, string> query(ParseQuery(req));
 
-  const int tree_size(manager_->GetSTH().tree_size());
+  const int tree_size(log_lookup_->GetSTH().tree_size());
   const int start(GetIntParam(query, "start"));
   if (start < 0 || start >= tree_size) {
     return SendError(req, HTTP_BADREQUEST,
@@ -306,7 +313,8 @@ void HttpHandler::GetEntries(evhttp_request *req) const {
   JsonArray json_entries;
   for (int i = start; i <= end; ++i) {
     LoggedCertificate cert;
-    if (manager_->GetEntry(i, &cert) != CTLogManager::FOUND) {
+
+    if (log_lookup_->GetEntry(i, &cert) != LogLookup<LoggedCertificate>::OK) {
       return SendError(req, HTTP_BADREQUEST, "Entry not found.");
     }
 
@@ -338,7 +346,8 @@ void HttpHandler::GetRoots(evhttp_request *req) const {
 
   JsonArray roots;
   multimap<string, const ct::Cert *>::const_iterator it;
-  for (it = manager_->GetRoots().begin(); it != manager_->GetRoots().end();
+  for (it = cert_checker_->GetTrustedCertificates().begin();
+       it != cert_checker_->GetTrustedCertificates().end();
        ++it) {
     string cert;
     if (it->second->DerEncoding(&cert) != Cert::TRUE) {
@@ -375,14 +384,14 @@ void HttpHandler::GetProof(evhttp_request *req) const {
 
   const int tree_size(GetIntParam(query, "tree_size"));
   if (tree_size < 0
-      || static_cast<uint64_t>(tree_size) > manager_->GetSTH().tree_size()) {
+      || static_cast<uint64_t>(tree_size) > log_lookup_->GetSTH().tree_size()) {
     return SendError(req, HTTP_BADREQUEST,
                      "Missing or invalid \"tree_size\" parameter.");
   }
 
   ShortMerkleAuditProof proof;
-  if (manager_->QueryAuditProof(hash, tree_size, &proof)
-      != CTLogManager::MERKLE_AUDIT_PROOF) {
+  if (log_lookup_->AuditProof(hash, tree_size, &proof)
+      != LogLookup<LoggedCertificate>::OK) {
     return SendError(req, HTTP_BADREQUEST, "Couldn't find hash.");
   }
 
@@ -403,7 +412,7 @@ void HttpHandler::GetSTH(evhttp_request *req) const {
   if (evhttp_request_get_command(req) != EVHTTP_REQ_GET)
     SendError(req, HTTP_BADMETHOD, "Method not allowed.");
 
-  const ct::SignedTreeHead &sth(manager_->GetSTH());
+  const ct::SignedTreeHead &sth(log_lookup_->GetSTH());
 
   VLOG(1) << "SignedTreeHead:\n" << sth.DebugString();
 
@@ -438,7 +447,8 @@ void HttpHandler::GetConsistency(evhttp_request *req) const {
                      "Missing or invalid \"second\" parameter.");
   }
 
-  const vector<string> consistency(manager_->GetConsistency(first, second));
+  const vector<string> consistency(
+      log_lookup_->ConsistencyProof(first, second));
   JsonArray json_cons;
   for (vector<string>::const_iterator it = consistency.begin();
        it != consistency.end(); ++it) {
@@ -475,20 +485,16 @@ void HttpHandler::AddPreChain(evhttp_request *req) {
 void HttpHandler::BlockingAddChain(
     evhttp_request *req, const shared_ptr<ct::CertChain> &chain) const {
   ct::SignedCertificateTimestamp sct;
-  string error;
-  const CTLogManager::LogReply result(
-      manager_->SubmitEntry(chain.get(), /*prechain*/ NULL, &sct, &error));
 
-  AddChainReply(req, result, sct, error);
+  AddChainReply(req, frontend_->QueueX509Entry(
+      CHECK_NOTNULL(chain.get()), &sct), sct);
 }
 
 
 void HttpHandler::BlockingAddPreChain(
     evhttp_request *req, const shared_ptr<ct::PreCertChain> &chain) const {
   ct::SignedCertificateTimestamp sct;
-  string error;
-  const CTLogManager::LogReply result(
-      manager_->SubmitEntry(/*chain*/ NULL, chain.get(), &sct, &error));
 
-  AddChainReply(req, result, sct, error);
+  AddChainReply(req, frontend_->QueuePreCertEntry(
+      CHECK_NOTNULL(chain.get()), &sct), sct);
 }
