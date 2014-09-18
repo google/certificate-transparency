@@ -7,10 +7,9 @@
 #include <string>
 
 #include "base/macros.h"
+#include "log/database.h"
 #include "merkletree/merkle_tree.h"
 #include "proto/ct.pb.h"
-
-template <class Logged> class Database;
 
 // Lookups into the database. Read-only, so could also be a mirror.
 // Keeps the entire Merkle Tree in memory to serve audit proofs.

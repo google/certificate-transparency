@@ -12,7 +12,6 @@
 #include <utility>
 #include <vector>
 
-#include "log/database.h"
 #include "merkletree/merkle_tree.h"
 #include "merkletree/serial_hasher.h"
 #include "proto/ct.pb.h"
