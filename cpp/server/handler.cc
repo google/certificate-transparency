@@ -67,50 +67,43 @@ void SendError(evhttp_request *req, int http_status, const string &error_msg) {
 
 
 json_object *ParseJsonBuffer(evbuffer *const input_buffer) {
-  // Calling evbuffer_peek with a NULL "vec_out" makes it a query for
-  // how many evbuffer_iovec entries you would need.
-  const int num_vec(evbuffer_peek(input_buffer, -1, /*start_at*/ NULL,
-                                  /*vec_out*/ NULL, 0));
-  const scoped_array<evbuffer_iovec> chunks(new evbuffer_iovec[num_vec]);
-  CHECK_EQ(evbuffer_peek(input_buffer, -1, /*start_at*/ NULL, chunks.get(),
-                         num_vec), num_vec);
-
   // TODO(pphaneuf): We just want a deleter, but unique_ptr is not
   // available to us yet (C++11).
   const shared_ptr<json_tokener> tokener(json_tokener_new(),
                                          &json_tokener_free);
   json_object *json(NULL);
-  bool error(false);
-  size_t num_read(0);
-  for (int i = 0; i < num_vec; ++i) {
-    num_read += chunks[i].iov_len;
-    // Only parse if we're still looking for an object and have not
-    // encountered an error.
-    if (!json && !error) {
-      // This function can be called repeatedly with each chunk of
-      // data. It keep its state in "*tokener", and will return a
-      // non-NULL value once it finds a full object. If it returns
-      // NULL and the error is "json_tokener_continue", this simply
-      // means that it hasn't yet found an object, we just need to
-      // keep calling it with more data.
-      json = json_tokener_parse_ex(tokener.get(),
-                                   static_cast<char *>(chunks[i].iov_base),
-                                   chunks[i].iov_len);
+  while (!json) {
+    evbuffer_iovec chunk;
 
-      if (!json &&
-          json_tokener_get_error(tokener.get()) != json_tokener_continue) {
-        VLOG(1) << "json_tokener_parse_ex: " << json_tokener_error_desc(
-            json_tokener_get_error(tokener.get()));
-        // This will prevent further parsing attempts, but we won't
-        // break, so we can get the full amount of data for "num_read"
-        // and drain it all. At this point, "json" is NULL, and since
-        // we won't try to parse any further, it will remain so until
-        // this function returns.
-        error = true;
-      }
+    if (evbuffer_peek(input_buffer, -1, /*start_at*/ NULL, &chunk, 1) < 1) {
+      // No more data.
+      break;
     }
+
+    // This function can be called repeatedly with each chunk of
+    // data. It keep its state in "*tokener", and will return a
+    // non-NULL value once it finds a full object. If it returns NULL
+    // and the error is "json_tokener_continue", this simply means
+    // that it hasn't yet found an object, we just need to keep
+    // calling it with more data.
+    json = json_tokener_parse_ex(tokener.get(),
+                                 static_cast<char *>(chunk.iov_base),
+                                 chunk.iov_len);
+
+    // Check for a parsing error.
+    if (!json &&
+        json_tokener_get_error(tokener.get()) != json_tokener_continue) {
+      VLOG(1) << "json_tokener_parse_ex: " << json_tokener_error_desc(
+          json_tokener_get_error(tokener.get()));
+      break;
+    }
+
+    // Remove the chunk we've read from the front of the buffer.
+    evbuffer_drain(input_buffer, chunk.iov_len);
   }
-  CHECK_EQ(evbuffer_drain(input_buffer, num_read), 0);
+
+  // Drain out anything we haven't read.
+  evbuffer_drain(input_buffer, evbuffer_get_length(input_buffer));
 
   return json;
 }
