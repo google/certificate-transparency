@@ -255,7 +255,7 @@ HttpHandler::HttpHandler(LogLookup<LoggedCertificate> *log_lookup,
                          ThreadPool *pool)
     : log_lookup_(CHECK_NOTNULL(log_lookup)),
       cert_checker_(CHECK_NOTNULL(cert_checker)),
-      frontend_(CHECK_NOTNULL(frontend)),
+      frontend_(frontend),
       pool_(CHECK_NOTNULL(pool)) {
 }
 
@@ -274,10 +274,13 @@ void HttpHandler::Add(libevent::HttpServer *server) {
                            bind(&HttpHandler::GetSTH, this, _1)));
   CHECK(server->AddHandler("/ct/v1/get-sth-consistency",
                            bind(&HttpHandler::GetConsistency, this, _1)));
-  CHECK(server->AddHandler("/ct/v1/add-chain",
-                           bind(&HttpHandler::AddChain, this, _1)));
-  CHECK(server->AddHandler("/ct/v1/add-pre-chain",
-                           bind(&HttpHandler::AddPreChain, this, _1)));
+
+  if (frontend_) {
+    CHECK(server->AddHandler("/ct/v1/add-chain",
+                             bind(&HttpHandler::AddChain, this, _1)));
+    CHECK(server->AddHandler("/ct/v1/add-pre-chain",
+                             bind(&HttpHandler::AddPreChain, this, _1)));
+  }
 }
 
 
@@ -486,7 +489,7 @@ void HttpHandler::BlockingAddChain(
     evhttp_request *req, const shared_ptr<ct::CertChain> &chain) const {
   ct::SignedCertificateTimestamp sct;
 
-  AddChainReply(req, frontend_->QueueX509Entry(
+  AddChainReply(req, CHECK_NOTNULL(frontend_)->QueueX509Entry(
       CHECK_NOTNULL(chain.get()), &sct), sct);
 }
 
@@ -495,6 +498,6 @@ void HttpHandler::BlockingAddPreChain(
     evhttp_request *req, const shared_ptr<ct::PreCertChain> &chain) const {
   ct::SignedCertificateTimestamp sct;
 
-  AddChainReply(req, frontend_->QueuePreCertEntry(
+  AddChainReply(req, CHECK_NOTNULL(frontend_)->QueuePreCertEntry(
       CHECK_NOTNULL(chain.get()), &sct), sct);
 }
