@@ -65,8 +65,8 @@ class SSLClient {
   // other values - cert verification error
   static int VerifyCallback(X509_STORE_CTX *ctx, void *arg);
 
-  static int ExtensionCallback(SSL *s, unsigned short ext_type,
-                               const unsigned char *in, unsigned short inlen, 
+  static int ExtensionCallback(SSL *s, unsigned ext_type,
+                               const unsigned char *in, size_t inlen, 
                                int *al, void *arg);
 
  private:
