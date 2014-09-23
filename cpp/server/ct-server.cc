@@ -229,7 +229,7 @@ int main(int argc, char * argv[]) {
   }
 
   ThreadPool pool;
-  HttpHandler handler(&log_lookup, &checker, &frontend, &pool);
+  HttpHandler handler(&log_lookup, db, &checker, &frontend, &pool);
 
   PeriodicCallback tree_event(
       event_base, FLAGS_tree_signing_frequency_seconds,

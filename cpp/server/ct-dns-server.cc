@@ -43,7 +43,7 @@ class CTUDPDNSServer : public UDPServer {
  public:
   CTUDPDNSServer(const string &domain, Database<LoggedCertificate> *db,
 		 EventLoop *loop, int fd)
-    : UDPServer(loop, fd), domain_(domain), lookup_(db) {}
+    : UDPServer(loop, fd), domain_(domain), lookup_(db), db_(db) {}
 
   virtual void PacketRead(const sockaddr_in &from, const char *buf,
                           size_t len) {
@@ -168,7 +168,7 @@ private:
   string LeafHash(const string &index_str) const {
     int index = atoi(index_str.c_str());
     LoggedCertificate cert;
-    if (lookup_.GetEntry(index, &cert) != lookup_.OK)
+    if (db_->LookupByIndex(index, &cert) != db_->LOOKUP_OK)
       return "No such index";
     return util::ToBase64(lookup_.LeafHash(cert));
   }
@@ -235,6 +235,7 @@ private:
 
   string domain_;
   LogLookup<LoggedCertificate> lookup_;
+  const Database<LoggedCertificate> *const db_;
 };
 
 class Keyboard : public Server {

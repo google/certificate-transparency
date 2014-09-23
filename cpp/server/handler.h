@@ -5,8 +5,9 @@
 
 #include "util/libevent_wrapper.h"
 
-template<class T> class LogLookup;
 class Frontend;
+template<class T> class Database;
+template<class T> class LogLookup;
 
 namespace ct {
 class CertChain;
@@ -24,6 +25,7 @@ class ThreadPool;
 class HttpHandler {
  public:
   HttpHandler(LogLookup<ct::LoggedCertificate> *log_lookup,
+              const Database<ct::LoggedCertificate> *db,
               const ct::CertChecker *cert_checker, Frontend *frontend,
               ThreadPool *pool);
 
@@ -45,6 +47,7 @@ class HttpHandler {
       const boost::shared_ptr<ct::PreCertChain> &chain) const;
 
   LogLookup<ct::LoggedCertificate> *const log_lookup_;
+  const Database<ct::LoggedCertificate> *const db_;
   const ct::CertChecker *const cert_checker_;
   Frontend *const frontend_;
   ThreadPool *const pool_;

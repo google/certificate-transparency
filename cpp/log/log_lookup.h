@@ -54,13 +54,6 @@ template <class Logged> class LogLookup {
     return cert_tree_.SnapshotConsistency(first, second);
   }
 
-  // Get the |index|th log entry.
-  LookupResult GetEntry(size_t index, Logged *result) const {
-    if (db_->LookupByIndex(index, result) != Database<Logged>::LOOKUP_OK)
-      return NOT_FOUND;
-    return OK;
-  }
-
   // TODO(pphaneuf): If GetSTH and Update were to be called
   // concurrently, you'd have a race. This class should be made
   // threadsafe.
