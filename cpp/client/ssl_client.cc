@@ -24,8 +24,8 @@ using std::string;
 const uint16_t CT_EXTENSION_TYPE = 18;
 
 //static
-int SSLClient::ExtensionCallback(SSL *s, unsigned short ext_type,
-				 const unsigned char *in, unsigned short inlen, 
+int SSLClient::ExtensionCallback(SSL *s, unsigned ext_type,
+				 const unsigned char *in, size_t inlen, 
 				 int *al, void *arg) {
   char pem_name[100];
   unsigned char ext_buf[4 + 65536];
@@ -82,8 +82,8 @@ SSLClient::SSLClient(const string &server, uint16_t port,
   SSL_CTX_set_cert_verify_callback(ctx_, &VerifyCallback, &verify_args_);
 
 #if OPENSSL_VERSION_NUMBER >= 0x10002000L
-  SSL_CTX_set_custom_cli_ext(ctx_, CT_EXTENSION_TYPE, NULL, ExtensionCallback,
-			     &verify_args_);
+  SSL_CTX_add_client_custom_ext(ctx_, CT_EXTENSION_TYPE, NULL, NULL, NULL,
+				ExtensionCallback, &verify_args_);
 #else
   LOG(WARNING) << "OpenSSL version is too low to check the Certificate "
       "Transparency TLS extension";
