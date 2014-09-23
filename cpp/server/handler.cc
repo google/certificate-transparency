@@ -308,33 +308,7 @@ void HttpHandler::GetEntries(evhttp_request *req) const {
   // Limit the number of entries returned in a single request.
   end = std::min(end, start + FLAGS_max_leaf_entries_per_response);
 
-  JsonArray json_entries;
-  for (int i = start; i <= end; ++i) {
-    LoggedCertificate cert;
-
-    if (db_->LookupByIndex(i, &cert) !=
-        Database<LoggedCertificate>::LOOKUP_OK) {
-      return SendError(req, HTTP_BADREQUEST, "Entry not found.");
-    }
-
-    string leaf_input;
-    string extra_data;
-    if (!cert.SerializeForLeaf(&leaf_input) ||
-        !cert.SerializeExtraData(&extra_data)) {
-      return SendError(req, HTTP_INTERNAL, "Serialization failed.");
-    }
-
-    JsonObject json_entry;
-    json_entry.AddBase64("leaf_input", leaf_input);
-    json_entry.AddBase64("extra_data", extra_data);
-
-    json_entries.Add(&json_entry);
-  }
-
-  JsonObject json_reply;
-  json_reply.Add("entries", json_entries);
-
-  SendJsonReply(req, HTTP_OK, json_reply);
+  pool_->Add(bind(&HttpHandler::BlockingGetEntries, this, req, start, end));
 }
 
 
@@ -478,6 +452,38 @@ void HttpHandler::AddPreChain(evhttp_request *req) {
   }
 
   pool_->Add(bind(&HttpHandler::BlockingAddPreChain, this, req, chain));
+}
+
+
+void HttpHandler::BlockingGetEntries(evhttp_request *req, int start,
+                                     int end) const {
+  JsonArray json_entries;
+  for (int i = start; i <= end; ++i) {
+    LoggedCertificate cert;
+
+    if (db_->LookupByIndex(i, &cert) !=
+        Database<LoggedCertificate>::LOOKUP_OK) {
+      return SendError(req, HTTP_BADREQUEST, "Entry not found.");
+    }
+
+    string leaf_input;
+    string extra_data;
+    if (!cert.SerializeForLeaf(&leaf_input) ||
+        !cert.SerializeExtraData(&extra_data)) {
+      return SendError(req, HTTP_INTERNAL, "Serialization failed.");
+    }
+
+    JsonObject json_entry;
+    json_entry.AddBase64("leaf_input", leaf_input);
+    json_entry.AddBase64("extra_data", extra_data);
+
+    json_entries.Add(&json_entry);
+  }
+
+  JsonObject json_reply;
+  json_reply.Add("entries", json_entries);
+
+  SendJsonReply(req, HTTP_OK, json_reply);
 }
 
 

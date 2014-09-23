@@ -40,6 +40,7 @@ class HttpHandler {
   void AddChain(evhttp_request *req);
   void AddPreChain(evhttp_request *req);
 
+  void BlockingGetEntries(evhttp_request *req, int start, int end) const;
   void BlockingAddChain(evhttp_request *req,
                         const boost::shared_ptr<ct::CertChain> &chain) const;
   void BlockingAddPreChain(
