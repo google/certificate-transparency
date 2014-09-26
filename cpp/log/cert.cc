@@ -382,7 +382,7 @@ Cert::Status Cert::Sha256Digest(string *result) const {
 }
 
 Cert::Status Cert::DerEncodedTbsCertificate(string *result) const {
-  if (!IsLoaded() || x509_ == NULL) {
+  if (!IsLoaded()) {
     LOG(ERROR) << "Cert not loaded";
     return ERROR;
   }
