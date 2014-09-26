@@ -331,7 +331,7 @@ Cert::Status Cert::DerEncoding(string *result) const {
     return FALSE;
   }
 
-  result->assign(string(reinterpret_cast<char*>(der_buf), der_length));
+  result->assign(reinterpret_cast<char*>(der_buf), der_length);
   OPENSSL_free(der_buf);
   return TRUE;
 }
@@ -377,7 +377,7 @@ Cert::Status Cert::Sha256Digest(string *result) const {
     return FALSE;
   }
 
-  result->assign(string(reinterpret_cast<char*>(digest), len));
+  result->assign(reinterpret_cast<char*>(digest), len);
   return TRUE;
 }
 
@@ -396,7 +396,7 @@ Cert::Status Cert::DerEncodedTbsCertificate(string *result) const {
     LOG_OPENSSL_ERRORS(WARNING);
     return FALSE;
   }
-  result->assign(string(reinterpret_cast<char*>(der_buf), der_length));
+  result->assign(reinterpret_cast<char*>(der_buf), der_length);
   OPENSSL_free(der_buf);
   return TRUE;
 }
@@ -428,7 +428,7 @@ Cert::Status Cert::DerEncodedName(X509_NAME *name, string *result) {
     LOG_OPENSSL_ERRORS(WARNING);
     return FALSE;
   }
-  result->assign(string(reinterpret_cast<char*>(der_buf), der_length));
+  result->assign(reinterpret_cast<char*>(der_buf), der_length);
   OPENSSL_free(der_buf);
   return TRUE;
 }
@@ -448,7 +448,7 @@ Cert::Status Cert::PublicKeySha256Digest(string *result) const {
     LOG_OPENSSL_ERRORS(WARNING);
     return FALSE;
   }
-  result->assign(string(reinterpret_cast<char*>(digest), len));
+  result->assign(reinterpret_cast<char*>(digest), len);
   return TRUE;
 }
 
@@ -491,8 +491,7 @@ Cert::Status Cert::OctetStringExtensionData(int extension_nid,
   // |octet| is never NULL upon success. Caller is responsible for the
   // correctness of this cast.
   ASN1_OCTET_STRING *octet = static_cast<ASN1_OCTET_STRING*>(ext_data);
-  result->assign(string(reinterpret_cast<const char*>(octet->data),
-                        octet->length));
+  result->assign(reinterpret_cast<const char*>(octet->data), octet->length);
   ASN1_OCTET_STRING_free(octet);
   return TRUE;
 }
@@ -589,7 +588,7 @@ Cert::Status TbsCertificate::DerEncoding(std::string *result) const {
     LOG_OPENSSL_ERRORS(WARNING);
     return Cert::FALSE;
   }
-  result->assign(string(reinterpret_cast<char*>(der_buf), der_length));
+  result->assign(reinterpret_cast<char*>(der_buf), der_length);
   OPENSSL_free(der_buf);
   return Cert::TRUE;
 }
