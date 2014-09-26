@@ -206,7 +206,7 @@ class TbsCertificate {
   explicit TbsCertificate(const Cert &cert);
   ~TbsCertificate();
 
-  bool IsLoaded() const { return cert_info_ != NULL; }
+  bool IsLoaded() const { return x509_ != NULL; }
 
   // Sets the DER-encoded TBS structure in |result|.
   // Returns TRUE if the encoding succeeded.
@@ -234,9 +234,10 @@ class TbsCertificate {
   // fields may have been copied successfully before an error occurred.
   Cert::Status CopyIssuerFrom(const Cert &from);
  private:
-  bool ExtensionsLoaded() const { return cert_info_->extensions != NULL; }
   Cert::Status ExtensionIndex(int extension_nid, int *extension_index) const;
-  X509_CINF *cert_info_;
+  // OpenSSL does not expose a TBSCertificate API, so we keep the TBS wrapped
+  // in the X509.
+  X509 *x509_;
 
   DISALLOW_COPY_AND_ASSIGN(TbsCertificate);
 };
