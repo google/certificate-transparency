@@ -42,7 +42,7 @@ Cert::Cert(X509 *x509) : x509_(x509) {
 Cert::Cert(const std::string &pem_string)
     : x509_(NULL) {
   // A read-only bio.
-  BIO *bio_in = BIO_new_mem_buf(const_cast<char*>(pem_string.data()),
+  BIO *bio_in = BIO_new_mem_buf(const_cast<char *>(pem_string.data()),
                                 pem_string.length());
   if (bio_in == NULL) {
     LOG_OPENSSL_ERRORS(ERROR);
@@ -83,7 +83,7 @@ Cert::Status Cert::LoadFromDerString(const std::string &der_string) {
     x509_ = NULL;
   }
   const unsigned char *start =
-      reinterpret_cast<const unsigned char*>(der_string.data());
+      reinterpret_cast<const unsigned char *>(der_string.data());
   x509_ = d2i_X509(NULL, &start, der_string.size());
   if (x509_ == NULL) {
     LOG(WARNING) << "Input is not a valid DER-encoded certificate";
@@ -331,7 +331,7 @@ Cert::Status Cert::DerEncoding(string *result) const {
     return FALSE;
   }
 
-  result->assign(reinterpret_cast<char*>(der_buf), der_length);
+  result->assign(reinterpret_cast<char *>(der_buf), der_length);
   OPENSSL_free(der_buf);
   return TRUE;
 }
@@ -377,7 +377,7 @@ Cert::Status Cert::Sha256Digest(string *result) const {
     return FALSE;
   }
 
-  result->assign(reinterpret_cast<char*>(digest), len);
+  result->assign(reinterpret_cast<char *>(digest), len);
   return TRUE;
 }
 
@@ -396,7 +396,7 @@ Cert::Status Cert::DerEncodedTbsCertificate(string *result) const {
     LOG_OPENSSL_ERRORS(WARNING);
     return FALSE;
   }
-  result->assign(reinterpret_cast<char*>(der_buf), der_length);
+  result->assign(reinterpret_cast<char *>(der_buf), der_length);
   OPENSSL_free(der_buf);
   return TRUE;
 }
@@ -428,7 +428,7 @@ Cert::Status Cert::DerEncodedName(X509_NAME *name, string *result) {
     LOG_OPENSSL_ERRORS(WARNING);
     return FALSE;
   }
-  result->assign(reinterpret_cast<char*>(der_buf), der_length);
+  result->assign(reinterpret_cast<char *>(der_buf), der_length);
   OPENSSL_free(der_buf);
   return TRUE;
 }
@@ -448,7 +448,7 @@ Cert::Status Cert::PublicKeySha256Digest(string *result) const {
     LOG_OPENSSL_ERRORS(WARNING);
     return FALSE;
   }
-  result->assign(reinterpret_cast<char*>(digest), len);
+  result->assign(reinterpret_cast<char *>(digest), len);
   return TRUE;
 }
 
@@ -469,7 +469,7 @@ Cert::Status Cert::SPKISha256Digest(string *result) const {
   }
 
   string sha256_digest = Sha256Hasher::Sha256Digest(
-      string(reinterpret_cast<char*>(der_buf), der_length));
+      string(reinterpret_cast<char *>(der_buf), der_length));
 
   result->assign(sha256_digest);
   OPENSSL_free(der_buf);
@@ -491,7 +491,7 @@ Cert::Status Cert::OctetStringExtensionData(int extension_nid,
   // |octet| is never NULL upon success. Caller is responsible for the
   // correctness of this cast.
   ASN1_OCTET_STRING *octet = static_cast<ASN1_OCTET_STRING*>(ext_data);
-  result->assign(reinterpret_cast<const char*>(octet->data), octet->length);
+  result->assign(reinterpret_cast<const char *>(octet->data), octet->length);
   ASN1_OCTET_STRING_free(octet);
   return TRUE;
 }
@@ -588,7 +588,7 @@ Cert::Status TbsCertificate::DerEncoding(std::string *result) const {
     LOG_OPENSSL_ERRORS(WARNING);
     return Cert::FALSE;
   }
-  result->assign(reinterpret_cast<char*>(der_buf), der_length);
+  result->assign(reinterpret_cast<char *>(der_buf), der_length);
   OPENSSL_free(der_buf);
   return Cert::TRUE;
 }
@@ -727,7 +727,7 @@ Cert::Status TbsCertificate::ExtensionIndex(int extension_nid,
 
 CertChain::CertChain(const string &pem_string) {
   // A read-only BIO.
-  BIO *bio_in = BIO_new_mem_buf(const_cast<char*>(pem_string.data()),
+  BIO *bio_in = BIO_new_mem_buf(const_cast<char *>(pem_string.data()),
                                 pem_string.length());
   if (bio_in == NULL) {
     LOG_OPENSSL_ERRORS(ERROR);
