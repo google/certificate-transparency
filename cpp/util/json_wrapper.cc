@@ -1,5 +1,59 @@
 #include "json_wrapper.h"
 
+#include <boost/shared_ptr.hpp>
+
+using boost::shared_ptr;
+
+
+JsonObject::JsonObject(evbuffer* buffer)
+    : obj_(NULL) {
+  // TODO(pphaneuf): We just want a deleter, but unique_ptr is not
+  // available to us yet (C++11).
+  const shared_ptr<json_tokener> tokener(json_tokener_new(),
+                                         json_tokener_free);
+  int amount_consumed(0);
+  while (!obj_) {
+    evbuffer_iovec chunk;
+
+    if (evbuffer_peek(buffer, -1, /*start_at*/ NULL, &chunk, 1) < 1) {
+      // No more data.
+      break;
+    }
+
+    // This function can be called repeatedly with each chunk of
+    // data. It keeps its state in "*tokener", and will return a
+    // non-NULL value once it finds a full object. If it returns NULL
+    // and the error is "json_tokener_continue", this simply means
+    // that it hasn't yet found an object, we just need to keep
+    // calling it with more data.
+    obj_ = json_tokener_parse_ex(tokener.get(),
+                                 static_cast<char *>(chunk.iov_base),
+                                 chunk.iov_len);
+
+    // Check for a parsing error.
+    if (!obj_ &&
+        json_tokener_get_error(tokener.get()) != json_tokener_continue) {
+      VLOG(1) << "json_tokener_parse_ex: " << json_tokener_error_desc(
+          json_tokener_get_error(tokener.get()));
+      break;
+    }
+
+    if (obj_) {
+      // At the end of the parsing, we might not have consumed all the
+      // bytes in the iovec.
+      amount_consumed += tokener->char_offset;
+    } else {
+      amount_consumed += chunk.iov_len;
+    }
+  }
+
+  // If the parsing was successful, drain the number of bytes
+  // consumed.
+  if (obj_) {
+    evbuffer_drain(buffer, amount_consumed);
+  }
+}
+
 
 JsonObject::JsonObject(const JsonArray &from, int offset, json_type type) {
   obj_ = json_object_array_get_idx(from.obj_, offset);

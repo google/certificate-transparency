@@ -66,49 +66,6 @@ void SendError(evhttp_request *req, int http_status, const string &error_msg) {
 }
 
 
-json_object *ParseJsonBuffer(evbuffer *const input_buffer) {
-  // TODO(pphaneuf): We just want a deleter, but unique_ptr is not
-  // available to us yet (C++11).
-  const shared_ptr<json_tokener> tokener(json_tokener_new(),
-                                         &json_tokener_free);
-  json_object *json(NULL);
-  while (!json) {
-    evbuffer_iovec chunk;
-
-    if (evbuffer_peek(input_buffer, -1, /*start_at*/ NULL, &chunk, 1) < 1) {
-      // No more data.
-      break;
-    }
-
-    // This function can be called repeatedly with each chunk of
-    // data. It keep its state in "*tokener", and will return a
-    // non-NULL value once it finds a full object. If it returns NULL
-    // and the error is "json_tokener_continue", this simply means
-    // that it hasn't yet found an object, we just need to keep
-    // calling it with more data.
-    json = json_tokener_parse_ex(tokener.get(),
-                                 static_cast<char *>(chunk.iov_base),
-                                 chunk.iov_len);
-
-    // Check for a parsing error.
-    if (!json &&
-        json_tokener_get_error(tokener.get()) != json_tokener_continue) {
-      VLOG(1) << "json_tokener_parse_ex: " << json_tokener_error_desc(
-          json_tokener_get_error(tokener.get()));
-      break;
-    }
-
-    // Remove the chunk we've read from the front of the buffer.
-    evbuffer_drain(input_buffer, chunk.iov_len);
-  }
-
-  // Drain out anything we haven't read.
-  evbuffer_drain(input_buffer, evbuffer_get_length(input_buffer));
-
-  return json;
-}
-
-
 bool ExtractChain(evhttp_request *req, ct::CertChain *chain) {
   if (evhttp_request_get_command(req) != EVHTTP_REQ_POST) {
     SendError(req, HTTP_BADMETHOD, "Method not allowed.");
@@ -117,7 +74,7 @@ bool ExtractChain(evhttp_request *req, ct::CertChain *chain) {
 
   // TODO(pphaneuf): Should we check that Content-Type says
   // "application/json", as recommended by RFC4627?
-  JsonObject json_body(ParseJsonBuffer(evhttp_request_get_input_buffer(req)));
+  JsonObject json_body(evhttp_request_get_input_buffer(req));
   if (!json_body.Ok() || !json_body.IsType(json_type_object)) {
     SendError(req, HTTP_BADREQUEST, "Unable to parse provided JSON.");
     return false;

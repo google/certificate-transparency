@@ -7,6 +7,7 @@
 #undef TRUE  // json.h pollution
 #undef FALSE  // json.h pollution
 
+#include <event2/buffer.h>
 #include <sstream>
 #include <string>
 
@@ -31,6 +32,11 @@ class JsonObject {
   explicit JsonObject(const std::string &response) {
     obj_ = json_tokener_parse(response.c_str());
   }
+
+  // This constructor is destructive: if a JSON object is parsed
+  // correctly, it will remove it from the front of the buffer. In
+  // case of an error, the buffer is left unchanged.
+  explicit JsonObject(evbuffer* buffer);
 
   JsonObject(const JsonArray &from, int offset,
              json_type type = json_type_object);
@@ -158,8 +164,8 @@ class JsonArray : public JsonObject {
   JsonArray(const JsonObject &from, const char *field)
     : JsonObject(from, field, json_type_array) {}
 
-  JsonArray() : JsonObject(NULL) {
-    obj_ = json_object_new_array();
+  JsonArray()
+      : JsonObject(json_object_new_array()) {
   }
 
   void Add(json_object *addand) {
