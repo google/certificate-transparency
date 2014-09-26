@@ -23,11 +23,15 @@ using std::string;
 using util::ClearOpenSSLErrors;
 
 #if OPENSSL_VERSION_NUMBER < 0x10002000L
-# define X509_get_cert_info(x509) (x509)->cert_info
-# define X509_CINF_set_modified(c) ((c)->enc.modified = 1)
-# define X509_CINF_get_issuer(c) (&(c)->issuer)
-# define X509_CINF_get_extensions(c) ((c)->extensions)
-# define X509_CINF_get_signature(c) ((c)->signature)
+// Backport from 1.0.2-beta3.
+static int i2d_re_X509_tbs(X509 *x, unsigned char **pp) {
+  x->cert_info->enc.modified = 1;
+  return i2d_X509_CINF(x->cert_info, pp);
+}
+
+static int X509_get_signature_nid(const X509 *x) {
+  return OBJ_obj2nid(x->sig_alg->algorithm);
+}
 #endif
 
 namespace ct {
@@ -147,31 +151,10 @@ string Cert::PrintNotAfter() const {
 }
 
 string Cert::PrintSignatureAlgorithm() const {
-  const X509_CINF *cert_info = X509_get_cert_info(x509_);
-  if (cert_info == NULL)
+  const char *sigalg = OBJ_nid2ln(X509_get_signature_nid(x509_));
+  if (sigalg == NULL)
     return "NULL";
-  /*const*/ X509_ALGOR *algor = X509_CINF_get_signature(cert_info);
-  if (algor == NULL)
-    return "NULL";
-  /*const*/ ASN1_OBJECT *algor_algor;
-  X509_ALGOR_get0(&algor_algor, NULL, NULL, algor);
-  if (algor_algor == NULL)
-    return "NULL";
-
-  BIO *bio = BIO_new(BIO_s_mem());
-  if (bio == NULL) {
-    LOG_OPENSSL_ERRORS(ERROR);
-    return string();
-  }
-
-  if (i2a_ASN1_OBJECT(bio, algor_algor) <= 0) {
-    BIO_free(bio);
-    return string();
-  }
-
-  string ret = util::ReadBIO(bio);
-  BIO_free(bio);
-  return ret;
+  return string(sigalg);
 }
 
 // static
@@ -399,14 +382,13 @@ Cert::Status Cert::Sha256Digest(string *result) const {
 }
 
 Cert::Status Cert::DerEncodedTbsCertificate(string *result) const {
-  if (!IsLoaded() || X509_get_cert_info(x509_) == NULL) {
+  if (!IsLoaded()) {
     LOG(ERROR) << "Cert not loaded";
     return ERROR;
   }
 
   unsigned char *der_buf = NULL;
-  // There appears to be no "clean" way for getting the TBS out.
-  int der_length = i2d_X509_CINF(X509_get_cert_info(x509_), &der_buf);
+  int der_length = i2d_re_X509_tbs(x509_, &der_buf);
   if (der_length < 0) {
     // What does this return value mean? Let's assume it means the cert
     // is bad until proven otherwise.
@@ -575,23 +557,21 @@ Cert::Status Cert::ExtensionStructure(int extension_nid,
 }
 
 TbsCertificate::TbsCertificate(const Cert &cert)
-    : cert_info_(NULL) {
-  if (!cert.IsLoaded() || X509_get_cert_info(cert.x509_) == NULL) {
+    : x509_(NULL) {
+  if (!cert.IsLoaded()) {
     LOG(ERROR) << "Cert not loaded";
     return;
   }
 
-  cert_info_ = static_cast<X509_CINF*>(
-      ASN1_item_dup(ASN1_ITEM_rptr(X509_CINF),
-                    static_cast<void*>(X509_get_cert_info(cert.x509_))));
+  x509_ = X509_dup(cert.x509_);
 
-  if (cert_info_ == NULL)
+  if (x509_ == NULL)
     LOG_OPENSSL_ERRORS(ERROR);
 }
 
 TbsCertificate::~TbsCertificate() {
-  if (cert_info_ != NULL)
-    X509_CINF_free(cert_info_);
+  if (x509_ != NULL)
+    X509_free(x509_);
 }
 
 Cert::Status TbsCertificate::DerEncoding(std::string *result) const {
@@ -601,7 +581,7 @@ Cert::Status TbsCertificate::DerEncoding(std::string *result) const {
   }
 
   unsigned char *der_buf = NULL;
-  int der_length = i2d_X509_CINF(cert_info_, &der_buf);
+  int der_length = i2d_re_X509_tbs(x509_, &der_buf);
   if (der_length < 0) {
     // What does this return value mean? Let's assume it means the cert
     // is bad until proven otherwise.
@@ -615,7 +595,7 @@ Cert::Status TbsCertificate::DerEncoding(std::string *result) const {
 }
 
 Cert::Status TbsCertificate::DeleteExtension(int extension_nid) {
-  if (!IsLoaded() || !ExtensionsLoaded()) {
+  if (!IsLoaded()) {
     LOG(ERROR) << "TBS not loaded";
     return Cert::ERROR;
   }
@@ -625,8 +605,8 @@ Cert::Status TbsCertificate::DeleteExtension(int extension_nid) {
   if (status != Cert::TRUE)
     return status;
 
-  X509_EXTENSION *ext = X509v3_delete_ext(X509_CINF_get_extensions(cert_info_),
-                                          extension_index);
+  X509_EXTENSION *ext = X509_delete_ext(x509_, extension_index);
+
   if (ext == NULL) {
     // Truly odd.
     LOG(ERROR) << "Failed to delete the extension";
@@ -634,8 +614,6 @@ Cert::Status TbsCertificate::DeleteExtension(int extension_nid) {
     return Cert::ERROR;
   }
 
-  // Let OpenSSL know that it needs to re_encode.
-  X509_CINF_set_modified(cert_info_);
   // X509_delete_ext does not free the extension (GAH!), so we need to
   // free separately.
   X509_EXTENSION_free(ext);
@@ -661,7 +639,7 @@ Cert::Status TbsCertificate::CopyIssuerFrom(const Cert &from) {
     return Cert::ERROR;
   }
 
-  if (!IsLoaded() || !ExtensionsLoaded()) {
+  if (!IsLoaded()) {
     LOG(ERROR) << "TBS not loaded";
     return Cert::ERROR;
   }
@@ -674,13 +652,11 @@ Cert::Status TbsCertificate::CopyIssuerFrom(const Cert &from) {
     return Cert::FALSE;
   }
 
-  if (X509_NAME_set(X509_CINF_get_issuer(cert_info_), ca_name) != 1) {
+  if (X509_set_issuer_name(x509_, ca_name) != 1) {
     LOG(WARNING) << "Failed to set issuer name, Cert has NULL issuer?";
     LOG_OPENSSL_ERRORS(WARNING);
     return Cert::FALSE;
   }
-
-  cert_info_->enc.modified = 1;
 
   // Verify that the Authority KeyID extensions are compatible.
   int extension_index, from_extension_index;
@@ -713,8 +689,7 @@ Cert::Status TbsCertificate::CopyIssuerFrom(const Cert &from) {
 
   // Ok, now copy the extension, keeping the critical bit (which should always
   // be false in a valid cert, mind you).
-  X509_EXTENSION *to_ext = X509v3_get_ext(X509_CINF_get_extensions(cert_info_),
-                                          extension_index);
+  X509_EXTENSION *to_ext = X509_get_ext(x509_, extension_index);
   X509_EXTENSION *from_ext = X509_get_ext(from.x509_, from_extension_index);
 
   if (to_ext == NULL || from_ext == NULL) {
@@ -735,8 +710,7 @@ Cert::Status TbsCertificate::CopyIssuerFrom(const Cert &from) {
 
 Cert::Status TbsCertificate::ExtensionIndex(int extension_nid,
                                             int *extension_index) const {
-  int index = X509v3_get_ext_by_NID(X509_CINF_get_extensions(cert_info_),
-                                    extension_nid, -1);
+  int index = X509_get_ext_by_NID(x509_, extension_nid, -1);
   if (index < -1) {
     // The most likely and possibly only cause for a return code
     // other than -1 is an unrecognized NID.
