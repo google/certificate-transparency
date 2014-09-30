@@ -5,17 +5,19 @@
 using boost::shared_ptr;
 
 
-JsonObject::JsonObject(evbuffer* buffer)
+JsonObject::JsonObject(evbuffer *buffer)
     : obj_(NULL) {
   // TODO(pphaneuf): We just want a deleter, but unique_ptr is not
   // available to us yet (C++11).
   const shared_ptr<json_tokener> tokener(json_tokener_new(),
                                          json_tokener_free);
+  evbuffer_ptr ptr;
+  evbuffer_ptr_set(buffer, &ptr, 0, EVBUFFER_PTR_SET);
   int amount_consumed(0);
-  while (!obj_) {
+  while (!obj_ && amount_consumed < evbuffer_get_length(buffer)) {
     evbuffer_iovec chunk;
 
-    if (evbuffer_peek(buffer, -1, /*start_at*/ NULL, &chunk, 1) < 1) {
+    if (evbuffer_peek(buffer, -1, &ptr, &chunk, 1) < 1) {
       // No more data.
       break;
     }
@@ -42,8 +44,10 @@ JsonObject::JsonObject(evbuffer* buffer)
       // At the end of the parsing, we might not have consumed all the
       // bytes in the iovec.
       amount_consumed += tokener->char_offset;
+      // No need to update "ptr" here, we're done.
     } else {
       amount_consumed += chunk.iov_len;
+      evbuffer_ptr_set(buffer, &ptr, chunk.iov_len, EVBUFFER_PTR_ADD);
     }
   }
 
