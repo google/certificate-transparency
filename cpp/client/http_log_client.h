@@ -2,12 +2,13 @@
 #ifndef HTTP_LOG_CLIENT_H
 #define HTTP_LOG_CLIENT_H
 
-#include "proto/ct.pb.h"
-
 #include <boost/shared_ptr.hpp>
 #include <stdint.h>
-
 #include <string>
+
+#include "base/macros.h"
+#include "proto/ct.pb.h"
+#include "util/libevent_wrapper.h"
 
 namespace ct {
 class Cert;
@@ -17,7 +18,8 @@ class SignedCertificateTimestamp;
 
 class HTTPLogClient {
  public:
-  HTTPLogClient(const std::string &server) : server_(server) {}
+  explicit HTTPLogClient(const std::string &server);
+  ~HTTPLogClient();
 
   enum Status {
     OK,
@@ -30,17 +32,17 @@ class HTTPLogClient {
   };
 
   Status UploadSubmission(const std::string &submission, bool pre,
-                          ct::SignedCertificateTimestamp *sct) const;
+                          ct::SignedCertificateTimestamp *sct);
 
-  Status GetSTH(ct::SignedTreeHead *sth) const;
+  Status GetSTH(ct::SignedTreeHead *sth);
 
-  Status GetRoots(std::vector<boost::shared_ptr<ct::Cert> > *roots) const;
+  Status GetRoots(std::vector<boost::shared_ptr<ct::Cert> > *roots);
 
   Status QueryAuditProof(const std::string &merkle_leaf_hash,
-                         ct::MerkleAuditProof *proof) const;
+                         ct::MerkleAuditProof *proof);
 
   Status GetSTHConsistency(uint64_t size1, uint64_t size2,
-                           std::vector<std::string> *proof) const;
+                           std::vector<std::string> *proof);
 
   struct LogEntry {
     ct::MerkleTreeLeaf leaf;
@@ -49,12 +51,14 @@ class HTTPLogClient {
 
   // This does not clear |entries| before appending the retrieved
   // entries.
-  Status GetEntries(int first, int last, std::vector<LogEntry> *entries) const;
+  Status GetEntries(int first, int last, std::vector<LogEntry> *entries);
 
 private:
-  void BaseUrl(std::ostringstream *url) const;
+  evhttp_uri *const server_;
+  const boost::shared_ptr<cert_trans::libevent::Base> base_;
+  cert_trans::libevent::HttpConnection conn_;
 
-  std::string server_;
+  DISALLOW_COPY_AND_ASSIGN(HTTPLogClient);
 };
 
 #endif

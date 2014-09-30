@@ -26,12 +26,6 @@ Make sure to install glog **after** gflags, to avoid linking errors.
 
  - [Boost](http://www.boost.org/), at least 1.48
  - [sqlite3](http://www.sqlite.org/)
- - [cURL](http://curl.haxx.se/) (tested with 7.36.0)
-
-There are multiple Debian packages for this library (```libcurl4-gnutls-dev```, ```libcurl4-nss-dev```, or ```libcurl4-openssl-dev```, for example), any of them should do, but if you compile your own version of OpenSSL, it will conflict with the one cURL uses.
-
-To avoid this, either avoid the package that OpenSSL (```libcurl4-openssl-dev```), or you can build your own cURL that uses the same OpenSSL that you built, instead of the packaged version.
-
  - [JSON-C](https://github.com/json-c/json-c/), at least 0.11
 
 You can specify a JSON-C library in a non-standard location using the ```JSONCLIBDIR``` environment variable. Version 0.10 would work as well, except the ```json_object_iterator.h``` header is not properly copied when installing. If you can install the missing header manually, it should work.

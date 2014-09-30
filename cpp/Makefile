@@ -13,7 +13,7 @@ LOCAL_LIBS = log/libcert.a log/libdatabase.a log/liblog.a \
              merkletree/libmerkletree.a \
              proto/libproto.a util/libutil.a
 LDLIBS = -lpthread -lgflags -lglog -lssl -lcrypto -lldns -lsqlite3 \
-         -lprotobuf -lcurl -levent_core -levent_extra -levent_pthreads
+         -lprotobuf -levent_core -levent_extra -levent_pthreads
 
 PLATFORM := $(shell uname -s)
 ifeq ($(PLATFORM), FreeBSD)
@@ -33,13 +33,6 @@ ifneq ($(OPENSSLDIR),)
   INCLUDE += -I $(OPENSSLDIR)/include
   LDLIBS += -L $(OPENSSLDIR) -L $(OPENSSLDIR)/lib -Wl,-rpath,$(OPENSSLDIR) \
             -Wl,-rpath,$(OPENSSLDIR)/lib
-endif
-
-# Allow non-system version of curl to be used.
-# Useful if it was built with a custom OpenSSL version.
-ifneq ($(CURLDIR),)
-  INCLUDE += -I $(CURLDIR)/include
-  LDLIBS += -L $(CURLDIR)/lib/.libs -Wl,-rpath,$(CURLDIR)/lib/.libs
 endif
 
 # Need libevent

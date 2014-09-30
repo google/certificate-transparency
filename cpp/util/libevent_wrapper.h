@@ -4,6 +4,8 @@
 #include <boost/function.hpp>
 #include <boost/shared_ptr.hpp>
 #include <boost/thread.hpp>
+#include <boost/thread.hpp>
+#include <event2/dns.h>
 #include <event2/event.h>
 #include <event2/http.h>
 #include <vector>
@@ -25,11 +27,20 @@ class Base {
   ~Base();
 
   void Dispatch();
+  void DispatchOnce();
+  void Break();
+
   event *EventNew(evutil_socket_t &sock, short events, Event *event) const;
   evhttp *HttpNew() const;
+  evdns_base *GetDns();
+  evhttp_connection *HttpConnectionNew(const std::string &host,
+                                       unsigned short port);
 
  private:
   event_base *const base_;
+
+  boost::mutex dns_lock_;
+  evdns_base *dns_;
 
   DISALLOW_COPY_AND_ASSIGN(Base);
 };
@@ -79,6 +90,21 @@ class HttpServer {
 
   DISALLOW_COPY_AND_ASSIGN(HttpServer);
 };
+
+
+class HttpConnection {
+ public:
+  HttpConnection(const boost::shared_ptr<Base> &base, const evhttp_uri *uri);
+  ~HttpConnection();
+
+  void MakeRequest(evhttp_request *req, evhttp_cmd_type type, const char *uri);
+
+ private:
+  evhttp_connection *const conn_;
+
+  DISALLOW_COPY_AND_ASSIGN(HttpConnection);
+};
+
 
 
 }  // namespace libevent

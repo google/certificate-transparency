@@ -2,7 +2,7 @@
 #include "client/http_log_client.h"
 
 #include <boost/make_shared.hpp>
-#include <curl/curl.h>
+#include <event2/buffer.h>
 #include <glog/logging.h>
 #include <sstream>
 
@@ -12,104 +12,159 @@
 #include "util/json_wrapper.h"
 #include "util/util.h"
 
+namespace libevent = cert_trans::libevent;
+
+using boost::make_shared;
 using boost::shared_ptr;
 using ct::Cert;
 using ct::CertChain;
+using ct::SignedCertificateTimestamp;
 using std::ostringstream;
 using std::string;
 using std::vector;
-using boost::make_shared;
 
 namespace {
 
 
-class CurlRequest {
+class HttpRequest {
  public:
-  CurlRequest()
-      : handle_(CHECK_NOTNULL(curl_easy_init())) {
-  }
-  ~CurlRequest() {
-    curl_easy_cleanup(handle_);
-  }
+  static string UrlEscape(const string &input) {
+    // TODO(pphaneuf): I just wanted the deleter, so std::unique_ptr
+    // would have worked, but it's not available to us (C++11).
+    const shared_ptr<char> output(
+        evhttp_uriencode(input.data(), input.size(), false), free);
 
-  void SetUrl(const std::string& url) {
-    CHECK_EQ(curl_easy_setopt(handle_, CURLOPT_URL, url.c_str()), CURLE_OK);
+    return output.get();
   }
 
-  void SetPostFields(const std::string& post_fields) {
-    const long postsize(post_fields.size());
-    CHECK_EQ(curl_easy_setopt(
-        handle_, CURLOPT_POSTFIELDSIZE, postsize), CURLE_OK);
-    CHECK_EQ(curl_easy_setopt(
-        handle_, CURLOPT_COPYPOSTFIELDS, post_fields.data()), CURLE_OK);
+  HttpRequest(const shared_ptr<libevent::Base> &base,
+              libevent::HttpConnection *conn, evhttp_uri *server,
+              const string &subpath)
+      : base_(base),
+        conn_(CHECK_NOTNULL(conn)),
+        path_(CHECK_NOTNULL(evhttp_uri_get_path(server)) + subpath),
+        req_(CHECK_NOTNULL(evhttp_request_new(&HttpRequest::Done, this))),
+        request_sent_(false),
+        done_(false),
+        response_code_(-1),
+        response_body_(CHECK_NOTNULL(evbuffer_new()), evbuffer_free) {
+    evhttp_add_header(evhttp_request_get_output_headers(req_), "Host",
+                      evhttp_uri_get_host(server));
   }
 
-  std::string UrlEscape(const std::string& url) {
-    char* escaped(CHECK_NOTNULL(curl_easy_escape(
-        handle_, url.c_str(), url.size())));
-
-    const std::string retval(escaped);
-    curl_free(escaped);
-
-    return retval;
+  ~HttpRequest() {
+    if (!request_sent_) {
+      evhttp_request_free(req_);
+    }
   }
 
-  CURLcode Perform(std::ostream* output) {
-    curl_easy_setopt(handle_, CURLOPT_WRITEFUNCTION,
-                     &CurlRequest::write_callback);
-    curl_easy_setopt(handle_, CURLOPT_WRITEDATA, output);
+  void SetPostBody(const string &post_body) {
+    const shared_ptr<evbuffer> body(
+        CHECK_NOTNULL(evbuffer_new()), evbuffer_free);
 
-    return curl_easy_perform(handle_);
+    CHECK_EQ(evbuffer_add(body.get(), post_body.data(), post_body.size()), 0);
+
+    request_body_ = body;
+  }
+
+  // Returns HTTP response code, or zero if there was an error before
+  // getting the HTTP response.
+  HTTPLogClient::Status Run() {
+    evhttp_cmd_type req_type(EVHTTP_REQ_GET);
+
+    if (request_body_) {
+      evbuffer_add_buffer(
+          CHECK_NOTNULL(evhttp_request_get_output_buffer(req_)),
+          request_body_.get());
+      req_type = EVHTTP_REQ_POST;
+    }
+
+    conn_->MakeRequest(req_, req_type, path_.c_str());
+    request_sent_ = true;
+
+    while (!done_) {
+      base_->DispatchOnce();
+    }
+
+    switch (response_code_) {
+      case HTTP_OK:
+        return HTTPLogClient::OK;
+
+      case 0:
+        return HTTPLogClient::CONNECT_FAILED;
+
+      default:
+        LOG(ERROR) << "unexpected response code: " << response_code_;
+    }
+
+    return HTTPLogClient::UNKNOWN_ERROR;
+  }
+
+  evbuffer *GetResponseBody() {
+    return response_body_.get();
   }
 
  private:
-  CURL* const handle_;
+  static void Done(evhttp_request *req, void *userinfo) {
+    HttpRequest *const self(
+        static_cast<HttpRequest*>(CHECK_NOTNULL(userinfo)));
 
-  // Private declarations without definitions, to disallow copying.
-  CurlRequest(const CurlRequest&);
-  CurlRequest& operator=(const CurlRequest&);
+    if (req) {
+      self->response_code_ = evhttp_request_get_response_code(req);
+      if (evhttp_request_get_input_buffer(req)) {
+        evbuffer_add_buffer(self->response_body_.get(),
+                            evhttp_request_get_input_buffer(req));
+      }
+    }
 
-  static size_t write_callback(char* buffer, size_t size, size_t nmemb,
-                                    std::ostream* stream) {
-    const size_t sumsize(size * nmemb);
-
-    stream->write(buffer, sumsize);
-    if (!*stream)
-      return 0;
-
-    return sumsize;
+    self->done_ = true;
   }
+
+  const shared_ptr<libevent::Base> base_;
+  libevent::HttpConnection *const conn_;
+  const string path_;
+  evhttp_request *const req_;
+  shared_ptr<evbuffer> request_body_;
+  bool request_sent_;
+
+  bool done_;
+  int response_code_;
+  // TODO(pphaneuf): I just wanted the deleter, so std::unique_ptr
+  // would have worked, but it's not available to us (C++11).
+  const shared_ptr<evbuffer> response_body_;
+
+  DISALLOW_COPY_AND_ASSIGN(HttpRequest);
 };
 
 
 }  // namespace
 
-void HTTPLogClient::BaseUrl(ostringstream *url) const {
-  *url << "http://" << server_ << "/ct/v1/";
+HTTPLogClient::HTTPLogClient(const string &server)
+    : server_(CHECK_NOTNULL(evhttp_uri_parse(server.c_str()))),
+      base_(make_shared<libevent::Base>()),
+      conn_(base_, server_) {
+  const char *const path(evhttp_uri_get_path(server_));
+  string newpath;
+
+  if (path)
+    newpath = path;
+
+  if (newpath.empty() || newpath.at(newpath.size() - 1) != '/')
+    newpath.append("/");
+
+  newpath.append("ct/v1/");
+
+  CHECK_EQ(evhttp_uri_set_path(server_, newpath.c_str()), 0);
 }
 
-static HTTPLogClient::Status SendRequest(ostringstream *response,
-                                         CurlRequest *request,
-                                         const ostringstream &url) {
-  request->SetUrl(url.str());
-
-  const CURLcode code(request->Perform(response));
-  switch (code) {
-    case CURLE_OK:
-      return HTTPLogClient::OK;
-
-    case CURLE_COULDNT_CONNECT:
-      return HTTPLogClient::CONNECT_FAILED;
-
-    default:
-      LOG(ERROR) << "curl error: " << curl_easy_strerror(code);
-      return HTTPLogClient::UNKNOWN_ERROR;
-  }
+HTTPLogClient::~HTTPLogClient() {
+  evhttp_uri_free(server_);
 }
+
 
 HTTPLogClient::Status
-HTTPLogClient::UploadSubmission(const std::string &submission, bool pre,
-                                ct::SignedCertificateTimestamp *sct) const {
+HTTPLogClient::UploadSubmission(const string &submission, bool pre,
+                                SignedCertificateTimestamp *sct) {
 
   CertChain chain(submission);
 
@@ -120,36 +175,32 @@ HTTPLogClient::UploadSubmission(const std::string &submission, bool pre,
   for (size_t n = 0; n < chain.Length(); ++n) {
     string cert;
     CHECK_EQ(Cert::TRUE, chain.CertAt(n)->DerEncoding(&cert));
-    jchain.Add(json_object_new_string(util::ToBase64(cert).c_str()));
+    jchain.Add(util::ToBase64(cert));
   }
-  json_object *jsend = json_object_new_object();
-  json_object_object_add(jsend, "chain", jchain.Extract());
 
-  const char *jsoned = json_object_to_json_string(jsend);
+  JsonObject jsend;
+  jsend.Add("chain", jchain);
 
-  ostringstream url;
-  BaseUrl(&url);
-  url << "add-";
-  if (pre)
-    url << "pre-";
-  url << "chain";
+  const string jsoned(jsend.ToString());
 
-  CurlRequest request;
-  request.SetPostFields(jsoned);
+  HttpRequest request(base_, &conn_, server_,
+                      pre ? "add-pre-chain" : "add-chain");
+  request.SetPostBody(jsoned);
 
-  std::ostringstream response;
-  Status ret = SendRequest(&response, &request, url);
-  LOG(INFO) << "request = " << url.str();
-  LOG(INFO) << "body = " << jsoned;
-  LOG(INFO) << "response = " << response.str();
-  json_object_put(jsend);
+  Status ret(request.Run());
   if (ret != OK)
     return ret;
 
-  JsonObject jresponse(json_tokener_parse(response.str().c_str()));
+  JsonObject jresponse(request.GetResponseBody());
+  if (!jresponse.Ok()) {
+    // TODO(pphaneuf): Would be nice if we could easily output the
+    // response here.
+    LOG(ERROR) << "Could not parse response";
+    return BAD_RESPONSE;
+  }
 
   if (!jresponse.IsType(json_type_object)) {
-    LOG(ERROR) << "Expected a JSON object, got: " << response.str();
+    LOG(ERROR) << "Expected a JSON object, got: " << jresponse.ToString();
     return BAD_RESPONSE;
   }
 
@@ -181,21 +232,17 @@ HTTPLogClient::UploadSubmission(const std::string &submission, bool pre,
   return OK;
 }
 
-HTTPLogClient::Status HTTPLogClient::GetSTH(ct::SignedTreeHead *sth) const {
-  ostringstream url;
-  BaseUrl(&url);
-  url << "get-sth";
 
-  CurlRequest request;
+HTTPLogClient::Status HTTPLogClient::GetSTH(ct::SignedTreeHead *sth) {
+  HttpRequest request(base_, &conn_, server_, "get-sth");
 
-  std::ostringstream response;
-  Status ret = SendRequest(&response, &request, url);
-  LOG(INFO) << "request = " << url.str();
-  LOG(INFO) << "response = " << response.str();
+  Status ret(request.Run());
   if (ret != OK)
     return ret;
 
-  JsonObject jresponse(response);
+  JsonObject jresponse(request.GetResponseBody());
+  if (!jresponse.Ok())
+    return BAD_RESPONSE;
 
   JsonInt tree_size(jresponse, "tree_size");
   if (!tree_size.Ok())
@@ -226,21 +273,14 @@ HTTPLogClient::Status HTTPLogClient::GetSTH(ct::SignedTreeHead *sth) const {
 }
 
 HTTPLogClient::Status HTTPLogClient::GetRoots(
-    vector<shared_ptr<Cert> > *roots) const {
-  ostringstream url;
-  BaseUrl(&url);
-  url << "get-roots";
+    vector<shared_ptr<Cert> > *roots) {
+  HttpRequest request(base_, &conn_, server_, "get-roots");
 
-  CurlRequest request;
-
-  std::ostringstream response;
-  Status ret = SendRequest(&response, &request, url);
-  LOG(INFO) << "request = " << url.str();
-  LOG(INFO) << "response = " << response.str();
+  Status ret(request.Run());
   if (ret != OK)
     return ret;
 
-  JsonObject jresponse(response);
+  JsonObject jresponse(request.GetResponseBody());
   if (!jresponse.Ok())
     return BAD_RESPONSE;
 
@@ -269,21 +309,14 @@ HTTPLogClient::Status HTTPLogClient::GetRoots(
 
 HTTPLogClient::Status
 HTTPLogClient::QueryAuditProof(const string &merkle_leaf_hash,
-                               ct::MerkleAuditProof *proof) const {
-  ostringstream url;
-  BaseUrl(&url);
-  url << "get-sth";
+                               ct::MerkleAuditProof *proof) {
+  HttpRequest request(base_, &conn_, server_, "get-sth");
 
-  CurlRequest request;
-
-  std::ostringstream response;
-  Status ret = SendRequest(&response, &request, url);
-  LOG(INFO) << "request = " << url.str();
-  LOG(INFO) << "response = " << response.str();
+  Status ret(request.Run());
   if (ret != OK)
     return ret;
 
-  JsonObject jresponse(response);
+  JsonObject jresponse(request.GetResponseBody());
 
   JsonInt tree_size(jresponse, "tree_size");
   if (!tree_size.Ok())
@@ -302,20 +335,17 @@ HTTPLogClient::QueryAuditProof(const string &merkle_leaf_hash,
           proof->mutable_tree_head_signature()) != Deserializer::OK)
     return BAD_RESPONSE;
 
-  ostringstream url2;
-  CurlRequest request2;
-  BaseUrl(&url2);
-  url2 << "get-proof-by-hash?hash="
-       << request2.UrlEscape(util::ToBase64(merkle_leaf_hash))
+  ostringstream path;
+  path << "get-proof-by-hash?hash="
+       << HttpRequest::UrlEscape(util::ToBase64(merkle_leaf_hash))
        << "&tree_size=" << tree_size.Value();
-  std::ostringstream response2;
-  ret = SendRequest(&response2, &request2, url2);
-  LOG(INFO) << "request = " << url2.str();
-  LOG(INFO) << "response = " << response2.str();
+  HttpRequest request2(base_, &conn_, server_, path.str());
+
+  ret = request2.Run();
   if (ret != OK)
     return ret;
 
-  JsonObject jresponse2(response2);
+  JsonObject jresponse2(request2.GetResponseBody());
   if (!jresponse2.Ok())
     return BAD_RESPONSE;
 
@@ -340,22 +370,16 @@ HTTPLogClient::QueryAuditProof(const string &merkle_leaf_hash,
 }
 
 HTTPLogClient::Status HTTPLogClient::GetEntries(int first, int last,
-                                               std::vector<LogEntry> *entries)
-    const {
-  ostringstream url;
-  BaseUrl(&url);
-  url << "get-entries?start=" << first << "&end=" << last;
+                                                vector<LogEntry> *entries) {
+  ostringstream path;
+  path << "get-entries?start=" << first << "&end=" << last;
+  HttpRequest request(base_, &conn_, server_, path.str());
 
-  CurlRequest request;
-
-  std::ostringstream response;
-  Status ret = SendRequest(&response, &request, url);
-  LOG(INFO) << "request = " << url.str();
-  LOG(INFO) << "response = " << response.str();
+  Status ret(request.Run());
   if (ret != OK)
     return ret;
 
-  JsonObject jresponse(response);
+  JsonObject jresponse(request.GetResponseBody());
   if (!jresponse.Ok())
     return BAD_RESPONSE;
 
@@ -401,21 +425,16 @@ HTTPLogClient::Status HTTPLogClient::GetEntries(int first, int last,
 
 HTTPLogClient::Status
 HTTPLogClient::GetSTHConsistency(uint64_t size1, uint64_t size2,
-                                 std::vector<std::string> *proof) const {
-  ostringstream url;
-  BaseUrl(&url);
-  url << "get-sth-consistency?first=" << size1 << "&second=" << size2;
+                                 vector<string> *proof) {
+  ostringstream path;
+  path << "get-sth-consistency?first=" << size1 << "&second=" << size2;
+  HttpRequest request(base_, &conn_, server_, path.str());
 
-  CurlRequest request;
-
-  std::ostringstream response;
-  Status ret = SendRequest(&response, &request, url);
-  LOG(INFO) << "request = " << url.str();
-  LOG(INFO) << "response = " << response.str();
+  Status ret(request.Run());
   if (ret != OK)
     return ret;
 
-  JsonObject jresponse(response);
+  JsonObject jresponse(request.GetResponseBody());
   if (!jresponse.Ok())
     return BAD_RESPONSE;
 

@@ -12,6 +12,26 @@ using boost::shared_ptr;
 using std::string;
 using std::vector;
 
+namespace {
+
+
+unsigned short GetPortFromUri(const evhttp_uri *uri) {
+  int retval(evhttp_uri_get_port(uri));
+
+  if (retval < 1 || retval > 65535) {
+    retval = 0;
+
+    if (!strcmp("http", evhttp_uri_get_scheme(uri))) {
+      retval = 80;
+    }
+  }
+
+  return retval;
+}
+
+
+}  // namespace
+
 namespace cert_trans {
 namespace libevent {
 
@@ -28,18 +48,27 @@ struct HttpServer::Handler {
 
 
 Base::Base()
-    : base_(event_base_new()) {
+    : base_(event_base_new()),
+      dns_(NULL) {
   evthread_make_base_notifiable(base_);
 }
 
 
 Base::~Base() {
+  if (dns_)
+    evdns_base_free(dns_, true);
+
   event_base_free(base_);
 }
 
 
 void Base::Dispatch() {
   CHECK_EQ(event_base_dispatch(base_), 0);
+}
+
+
+void Base::DispatchOnce() {
+  CHECK_EQ(event_base_loop(base_, EVLOOP_ONCE), 0);
 }
 
 
@@ -50,6 +79,24 @@ event *Base::EventNew(evutil_socket_t &sock, short events, Event *event) const {
 
 evhttp *Base::HttpNew() const {
   return CHECK_NOTNULL(evhttp_new(base_));
+}
+
+
+evdns_base *Base::GetDns() {
+  lock_guard<mutex> lock(dns_lock_);
+
+  if (!dns_) {
+    dns_ = CHECK_NOTNULL(evdns_base_new(base_, 1));
+  }
+
+  return dns_;
+}
+
+
+evhttp_connection *Base::HttpConnectionNew(const string &host,
+                                           unsigned short port) {
+  return CHECK_NOTNULL(evhttp_connection_base_new(
+      base_, GetDns(), host.c_str(), port));
 }
 
 
@@ -113,6 +160,24 @@ bool HttpServer::AddHandler(const string &path, const HandlerCallback &cb) {
 
 void HttpServer::HandleRequest(evhttp_request *req, void *userdata) {
   static_cast<Handler*>(userdata)->cb(req);
+}
+
+
+HttpConnection::HttpConnection(const shared_ptr<Base> &base,
+                               const evhttp_uri *uri)
+    : conn_(base->HttpConnectionNew(evhttp_uri_get_host(uri),
+                                    GetPortFromUri(uri))) {
+}
+
+
+HttpConnection::~HttpConnection() {
+  evhttp_connection_free(conn_);
+}
+
+
+void HttpConnection::MakeRequest(evhttp_request *req, evhttp_cmd_type type,
+                                 const char *uri) {
+  CHECK_EQ(evhttp_make_request(conn_, req, type, uri), 0);
 }
 
 
