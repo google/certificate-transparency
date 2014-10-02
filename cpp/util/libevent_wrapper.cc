@@ -163,6 +163,28 @@ void HttpServer::HandleRequest(evhttp_request *req, void *userdata) {
 }
 
 
+HttpRequest::HttpRequest(const Callback &callback)
+    : callback_(callback),
+      req_(CHECK_NOTNULL(evhttp_request_new(&HttpRequest::Done, this))) {
+  evhttp_request_own(req_);
+}
+
+
+HttpRequest::~HttpRequest() {
+  CHECK(evhttp_request_is_owned(req_));
+  evhttp_request_free(req_);
+}
+
+
+// static
+void HttpRequest::Done(evhttp_request *req, void *userdata) {
+  HttpRequest *const self(static_cast<HttpRequest*>(CHECK_NOTNULL(userdata)));
+  CHECK_EQ(self->req_, CHECK_NOTNULL(req));
+
+  self->callback_(self);
+}
+
+
 HttpConnection::HttpConnection(const shared_ptr<Base> &base,
                                const evhttp_uri *uri)
     : conn_(base->HttpConnectionNew(evhttp_uri_get_host(uri),
@@ -175,9 +197,9 @@ HttpConnection::~HttpConnection() {
 }
 
 
-void HttpConnection::MakeRequest(evhttp_request *req, evhttp_cmd_type type,
+void HttpConnection::MakeRequest(HttpRequest *req, evhttp_cmd_type type,
                                  const char *uri) {
-  CHECK_EQ(evhttp_make_request(conn_, req, type, uri), 0);
+  CHECK_EQ(evhttp_make_request(conn_, req->get(), type, uri), 0);
 }
 
 

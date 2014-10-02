@@ -92,19 +92,39 @@ class HttpServer {
 };
 
 
+class HttpRequest {
+ public:
+  typedef boost::function<void(HttpRequest*)> Callback;
+
+  HttpRequest(const Callback &callback);
+  ~HttpRequest();
+
+  evhttp_request *get() {
+    return req_;
+  }
+
+ private:
+  static void Done(evhttp_request *req, void *userdata);
+
+  const Callback callback_;
+  evhttp_request *const req_;
+
+  DISALLOW_COPY_AND_ASSIGN(HttpRequest);
+};
+
+
 class HttpConnection {
  public:
   HttpConnection(const boost::shared_ptr<Base> &base, const evhttp_uri *uri);
   ~HttpConnection();
 
-  void MakeRequest(evhttp_request *req, evhttp_cmd_type type, const char *uri);
+  void MakeRequest(HttpRequest *req, evhttp_cmd_type type, const char *uri);
 
  private:
   evhttp_connection *const conn_;
 
   DISALLOW_COPY_AND_ASSIGN(HttpConnection);
 };
-
 
 
 }  // namespace libevent

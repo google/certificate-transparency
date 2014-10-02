@@ -1,6 +1,7 @@
 /* -*- indent-tabs-mode: nil -*- */
 #include "client/http_log_client.h"
 
+#include <boost/bind.hpp>
 #include <boost/make_shared.hpp>
 #include <event2/buffer.h>
 #include <glog/logging.h>
@@ -14,6 +15,7 @@
 
 namespace libevent = cert_trans::libevent;
 
+using boost::bind;
 using boost::make_shared;
 using boost::shared_ptr;
 using ct::Cert;
@@ -43,19 +45,13 @@ class HttpRequest {
       : base_(base),
         conn_(CHECK_NOTNULL(conn)),
         path_(CHECK_NOTNULL(evhttp_uri_get_path(server)) + subpath),
-        req_(CHECK_NOTNULL(evhttp_request_new(&HttpRequest::Done, this))),
+        req_(bind(&HttpRequest::Done, this, _1)),
         request_sent_(false),
         done_(false),
         response_code_(-1),
         response_body_(CHECK_NOTNULL(evbuffer_new()), evbuffer_free) {
-    evhttp_add_header(evhttp_request_get_output_headers(req_), "Host",
+    evhttp_add_header(evhttp_request_get_output_headers(req_.get()), "Host",
                       evhttp_uri_get_host(server));
-  }
-
-  ~HttpRequest() {
-    if (!request_sent_) {
-      evhttp_request_free(req_);
-    }
   }
 
   void SetPostBody(const string &post_body) {
@@ -74,12 +70,12 @@ class HttpRequest {
 
     if (request_body_) {
       evbuffer_add_buffer(
-          CHECK_NOTNULL(evhttp_request_get_output_buffer(req_)),
+          CHECK_NOTNULL(evhttp_request_get_output_buffer(req_.get())),
           request_body_.get());
       req_type = EVHTTP_REQ_POST;
     }
 
-    conn_->MakeRequest(req_, req_type, path_.c_str());
+    conn_->MakeRequest(&req_, req_type, path_.c_str());
     request_sent_ = true;
 
     while (!done_) {
@@ -105,25 +101,20 @@ class HttpRequest {
   }
 
  private:
-  static void Done(evhttp_request *req, void *userinfo) {
-    HttpRequest *const self(
-        static_cast<HttpRequest*>(CHECK_NOTNULL(userinfo)));
-
-    if (req) {
-      self->response_code_ = evhttp_request_get_response_code(req);
-      if (evhttp_request_get_input_buffer(req)) {
-        evbuffer_add_buffer(self->response_body_.get(),
-                            evhttp_request_get_input_buffer(req));
-      }
+  void Done(libevent::HttpRequest *req) {
+    response_code_ = evhttp_request_get_response_code(req->get());
+    if (evhttp_request_get_input_buffer(req->get())) {
+      evbuffer_add_buffer(response_body_.get(),
+                          evhttp_request_get_input_buffer(req->get()));
     }
 
-    self->done_ = true;
+    done_ = true;
   }
 
   const shared_ptr<libevent::Base> base_;
   libevent::HttpConnection *const conn_;
   const string path_;
-  evhttp_request *const req_;
+  libevent::HttpRequest req_;
   shared_ptr<evbuffer> request_body_;
   bool request_sent_;
 
