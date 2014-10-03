@@ -45,13 +45,17 @@ class HttpRequest {
       : base_(base),
         conn_(CHECK_NOTNULL(conn)),
         path_(CHECK_NOTNULL(evhttp_uri_get_path(server)) + subpath),
-        req_(bind(&HttpRequest::Done, this, _1)),
-        request_sent_(false),
+        req_(new libevent::HttpRequest(bind(&HttpRequest::Done, this, _1))),
         done_(false),
         response_code_(-1),
         response_body_(CHECK_NOTNULL(evbuffer_new()), evbuffer_free) {
-    evhttp_add_header(evhttp_request_get_output_headers(req_.get()), "Host",
+    evhttp_add_header(evhttp_request_get_output_headers(req_->get()), "Host",
                       evhttp_uri_get_host(server));
+  }
+
+  ~HttpRequest() {
+    // It might be NULL, if we've made the request, but that's ok.
+    delete req_;
   }
 
   void SetPostBody(const string &post_body) {
@@ -70,13 +74,16 @@ class HttpRequest {
 
     if (request_body_) {
       evbuffer_add_buffer(
-          CHECK_NOTNULL(evhttp_request_get_output_buffer(req_.get())),
+          CHECK_NOTNULL(evhttp_request_get_output_buffer(req_->get())),
           request_body_.get());
       req_type = EVHTTP_REQ_POST;
     }
 
-    conn_->MakeRequest(&req_, req_type, path_.c_str());
-    request_sent_ = true;
+    // MakeRequest will take ownership of req_, so null it out, to
+    // avoid unpleasant incidents like dereferencing invalid pointers
+    // or double-free.
+    conn_->MakeRequest(req_, req_type, path_.c_str());
+    req_ = NULL;
 
     while (!done_) {
       base_->DispatchOnce();
@@ -114,9 +121,8 @@ class HttpRequest {
   const shared_ptr<libevent::Base> base_;
   libevent::HttpConnection *const conn_;
   const string path_;
-  libevent::HttpRequest req_;
+  libevent::HttpRequest *req_;
   shared_ptr<evbuffer> request_body_;
-  bool request_sent_;
 
   bool done_;
   int response_code_;

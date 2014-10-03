@@ -96,7 +96,7 @@ class HttpRequest {
  public:
   typedef boost::function<void(HttpRequest*)> Callback;
 
-  HttpRequest(const Callback &callback);
+  explicit HttpRequest(const Callback &callback);
   ~HttpRequest();
 
   evhttp_request *get() {
@@ -107,7 +107,7 @@ class HttpRequest {
   static void Done(evhttp_request *req, void *userdata);
 
   const Callback callback_;
-  evhttp_request *const req_;
+  evhttp_request *req_;
 
   DISALLOW_COPY_AND_ASSIGN(HttpRequest);
 };
@@ -118,6 +118,8 @@ class HttpConnection {
   HttpConnection(const boost::shared_ptr<Base> &base, const evhttp_uri *uri);
   ~HttpConnection();
 
+  // Takes ownership of "req", which will be automatically deleted
+  // after its callback is called.
   void MakeRequest(HttpRequest *req, evhttp_cmd_type type, const char *uri);
 
  private:

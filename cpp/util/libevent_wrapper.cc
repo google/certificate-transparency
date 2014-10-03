@@ -166,13 +166,14 @@ void HttpServer::HandleRequest(evhttp_request *req, void *userdata) {
 HttpRequest::HttpRequest(const Callback &callback)
     : callback_(callback),
       req_(CHECK_NOTNULL(evhttp_request_new(&HttpRequest::Done, this))) {
-  evhttp_request_own(req_);
 }
 
 
 HttpRequest::~HttpRequest() {
-  CHECK(evhttp_request_is_owned(req_));
-  evhttp_request_free(req_);
+  // If HttpRequest::Done has been called, req_ will have been freed
+  // by libevent itself.
+  if (req_)
+    evhttp_request_free(req_);
 }
 
 
@@ -182,6 +183,11 @@ void HttpRequest::Done(evhttp_request *req, void *userdata) {
   CHECK_EQ(self->req_, CHECK_NOTNULL(req));
 
   self->callback_(self);
+
+  // Once we return from this function, libevent will free "req_" for
+  // us, and we should make ourselves disappear as well.
+  self->req_ = NULL;
+  delete self;
 }
 
 
