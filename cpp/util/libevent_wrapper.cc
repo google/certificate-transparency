@@ -204,8 +204,8 @@ HttpConnection::~HttpConnection() {
 
 
 void HttpConnection::MakeRequest(HttpRequest *req, evhttp_cmd_type type,
-                                 const char *uri) {
-  CHECK_EQ(evhttp_make_request(conn_, req->get(), type, uri), 0);
+                                 const string &uri) {
+  CHECK_EQ(evhttp_make_request(conn_, req->get(), type, uri.c_str()), 0);
 }
 
 

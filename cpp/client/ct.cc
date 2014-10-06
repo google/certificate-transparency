@@ -114,6 +114,8 @@ static const char kUsage[] =
     "Use --help to display command-line flag options\n";
 
 using boost::shared_ptr;
+using cert_trans::AsyncLogClient;
+using cert_trans::HTTPLogClient;
 using ct::Cert;
 using ct::CertChain;
 using ct::LogEntry;
@@ -318,15 +320,15 @@ static int Upload() {
 
   SignedCertificateTimestamp sct;
   HTTPLogClient client(FLAGS_ct_server);
-  HTTPLogClient::Status ret = client.UploadSubmission(contents, FLAGS_precert,
-                                                      &sct);
+  AsyncLogClient::Status ret = client.UploadSubmission(contents, FLAGS_precert,
+                                                       &sct);
 
-  if (ret == HTTPLogClient::CONNECT_FAILED) {
+  if (ret == AsyncLogClient::CONNECT_FAILED) {
     LOG(ERROR) << "Unable to connect";
     return 2;
   }
 
-  if (ret != HTTPLogClient::OK) {
+  if (ret != AsyncLogClient::OK) {
     LOG(ERROR) << "Submission failed, error = " << ret;
     return 1;
   }
@@ -631,23 +633,23 @@ static AuditResult Audit() {
 
     LOG(INFO) << "info = "
               << ct_data.attached_sct_info(i).DebugString();
-    HTTPLogClient::Status ret = client.QueryAuditProof(
+    AsyncLogClient::Status ret = client.QueryAuditProof(
         ct_data.attached_sct_info(i).merkle_leaf_hash(), &proof);
 
     // HTTP protocol does not supply this.
     proof.mutable_id()->set_key_id(sct_id);
 
-    if (ret == HTTPLogClient::CONNECT_FAILED) {
+    if (ret == AsyncLogClient::CONNECT_FAILED) {
       LOG(ERROR) << "Unable to connect";
       delete verifier;
       return CT_SERVER_UNAVAILABLE;
     }
-    if (ret != HTTPLogClient::OK) {
+    if (ret != AsyncLogClient::OK) {
       LOG(ERROR) << "QueryAuditProof failed, error " << ret;
       continue;
     }
 
-    LOG(INFO) << "Received proof " << proof.DebugString();
+    LOG(INFO) << "Received proof:\n" << proof.DebugString();
     LogVerifier::VerifyResult res =
         verifier->VerifyMerkleAuditProof(ct_data.reconstructed_entry(),
                                          ct_data.attached_sct_info(i).sct(),
@@ -680,9 +682,8 @@ static int CheckConsistency() {
   CHECK(sth2.ParseFromString(sth2_str));
 
   std::vector<string> proof;
-  CHECK_EQ(HTTPLogClient::OK, client.GetSTHConsistency(sth1.tree_size(),
-                                                       sth2.tree_size(),
-                                                       &proof));
+  CHECK_EQ(AsyncLogClient::OK, client.GetSTHConsistency(
+      sth1.tree_size(), sth2.tree_size(), &proof));
 
   if (!verifier->VerifyConsistency(sth1, sth2, proof)) {
     LOG(ERROR) << "Consistency proof does not verify";
@@ -844,15 +845,15 @@ static void WriteCertificate(const std::string &cert, int entry,
 
 void GetEntries() {
   HTTPLogClient client(FLAGS_ct_server);
-  std::vector<HTTPLogClient::LogEntry> entries;
-  HTTPLogClient::Status error = client.GetEntries(FLAGS_get_first,
-                                                  FLAGS_get_last, &entries);
-  CHECK_EQ(error, HTTPLogClient::OK);
+  std::vector<AsyncLogClient::Entry> entries;
+  AsyncLogClient::Status error = client.GetEntries(FLAGS_get_first,
+                                                   FLAGS_get_last, &entries);
+  CHECK_EQ(error, AsyncLogClient::OK);
 
   CHECK(!FLAGS_certificate_base.empty());
 
   int e = FLAGS_get_first;
-  for (std::vector<HTTPLogClient::LogEntry>::const_iterator entry =
+  for (std::vector<AsyncLogClient::Entry>::const_iterator entry =
            entries.begin(); entry != entries.end(); ++entry, ++e) {
     if (entry->leaf.timestamped_entry().entry_type() == ct::X509_ENTRY) {
       WriteCertificate(entry->leaf.timestamped_entry().signed_entry().x509(),
@@ -877,7 +878,7 @@ int GetRoots() {
   HTTPLogClient client(FLAGS_ct_server);
 
   vector<shared_ptr<Cert> > roots;
-  CHECK_EQ(client.GetRoots(&roots), HTTPLogClient::OK);
+  CHECK_EQ(client.GetRoots(&roots), AsyncLogClient::OK);
 
   LOG(INFO) << "number of certs: " << roots.size();
   for (vector<shared_ptr<Cert> >::const_iterator it = roots.begin();
@@ -898,7 +899,7 @@ int GetSTH() {
   HTTPLogClient client(FLAGS_ct_server);
 
   ct::SignedTreeHead sth;
-  CHECK_EQ(HTTPLogClient::OK, client.GetSTH(&sth));
+  CHECK_EQ(AsyncLogClient::OK, client.GetSTH(&sth));
 
   LogVerifier *verifier = GetLogVerifierFromFlags();
 

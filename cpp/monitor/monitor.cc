@@ -5,6 +5,8 @@
 #include "merkletree/merkle_tree.h"
 #include "monitor/database.h"
 
+using cert_trans::AsyncLogClient;
+using cert_trans::HTTPLogClient;
 using std::string;
 
 namespace monitor {
@@ -20,7 +22,7 @@ Monitor::Monitor(Database *database, LogVerifier *log_verifier,
 Monitor::GetResult Monitor::GetSTH() {
   ct::SignedTreeHead new_sth;
 
-  if (client_->GetSTH(&new_sth) != HTTPLogClient::OK)
+  if (client_->GetSTH(&new_sth) != AsyncLogClient::OK)
     return NETWORK_PROBLEM;
 
   ct::SignedTreeHead current_sth;
@@ -153,15 +155,15 @@ Monitor::GetResult Monitor::GetEntries(int get_first, int get_last) {
   CHECK(get_first >= 0);
   CHECK(get_last >= get_first);
 
-  std::vector<HTTPLogClient::LogEntry> entries;
+  std::vector<AsyncLogClient::Entry> entries;
   int dload_count = 0;
   do {
     // If the server does not impose a limit, all entries from get_first to
     // get_last will be downloaded at once (could exceed memory).
-    HTTPLogClient::Status error =
+    AsyncLogClient::Status error =
         client_->GetEntries(get_first + dload_count, get_last, &entries);
 
-    if (error != HTTPLogClient::OK) {
+    if (error != AsyncLogClient::OK) {
       LOG(ERROR) << "HTTPLogClient returned with error " << error
                  << ". No entries have been written to the database.";
       return NETWORK_PROBLEM;

@@ -5,11 +5,14 @@
 
 #include "base/macros.h"
 
-class HTTPLogClient;
 class LogVerifier;
 
 namespace ct {
 class SignedTreeHead;
+}
+
+namespace cert_trans {
+class HTTPLogClient;
 }
 
 namespace monitor {
@@ -39,7 +42,7 @@ class Monitor
 
   Monitor(Database *database,
           LogVerifier *verifier,
-          HTTPLogClient *client,
+          cert_trans::HTTPLogClient *client,
           uint64_t sleep_time_sec);
 
   GetResult GetSTH();
@@ -64,7 +67,7 @@ class Monitor
 
   Database *const db_;
   LogVerifier *const verifier_;
-  HTTPLogClient *const client_;
+  cert_trans::HTTPLogClient *const client_;
   const uint64_t sleep_time_;
 
   VerifyResult VerifySTHInternal();

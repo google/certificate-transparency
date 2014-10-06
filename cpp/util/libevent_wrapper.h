@@ -120,7 +120,8 @@ class HttpConnection {
 
   // Takes ownership of "req", which will be automatically deleted
   // after its callback is called.
-  void MakeRequest(HttpRequest *req, evhttp_cmd_type type, const char *uri);
+  void MakeRequest(HttpRequest *req, evhttp_cmd_type type,
+                   const std::string &uri);
 
  private:
   evhttp_connection *const conn_;

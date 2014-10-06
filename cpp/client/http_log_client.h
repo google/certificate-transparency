@@ -7,6 +7,7 @@
 #include <string>
 
 #include "base/macros.h"
+#include "client/async_log_client.h"
 #include "proto/ct.pb.h"
 #include "util/libevent_wrapper.h"
 
@@ -16,49 +17,41 @@ class MerkleAuditProof;
 class SignedCertificateTimestamp;
 };
 
+namespace cert_trans {
+
+
 class HTTPLogClient {
  public:
   explicit HTTPLogClient(const std::string &server);
-  ~HTTPLogClient();
 
-  enum Status {
-    OK,
-    CONNECT_FAILED,
-    BAD_RESPONSE,
-    INTERNAL_ERROR,
-    UNKNOWN_ERROR,
-    UPLOAD_FAILED,
-    INVALID_INPUT,
-  };
+  AsyncLogClient::Status UploadSubmission(
+      const std::string &submission, bool pre,
+      ct::SignedCertificateTimestamp *sct);
 
-  Status UploadSubmission(const std::string &submission, bool pre,
-                          ct::SignedCertificateTimestamp *sct);
+  AsyncLogClient::Status GetSTH(ct::SignedTreeHead *sth);
 
-  Status GetSTH(ct::SignedTreeHead *sth);
+  AsyncLogClient::Status GetRoots(
+      std::vector<boost::shared_ptr<ct::Cert> > *roots);
 
-  Status GetRoots(std::vector<boost::shared_ptr<ct::Cert> > *roots);
+  AsyncLogClient::Status QueryAuditProof(
+      const std::string &merkle_leaf_hash, ct::MerkleAuditProof *proof);
 
-  Status QueryAuditProof(const std::string &merkle_leaf_hash,
-                         ct::MerkleAuditProof *proof);
-
-  Status GetSTHConsistency(uint64_t size1, uint64_t size2,
-                           std::vector<std::string> *proof);
-
-  struct LogEntry {
-    ct::MerkleTreeLeaf leaf;
-    ct::LogEntry entry;
-  };
+  AsyncLogClient::Status GetSTHConsistency(
+      uint64_t size1, uint64_t size2, std::vector<std::string> *proof);
 
   // This does not clear |entries| before appending the retrieved
   // entries.
-  Status GetEntries(int first, int last, std::vector<LogEntry> *entries);
+  AsyncLogClient::Status GetEntries(
+      int first, int last, std::vector<AsyncLogClient::Entry> *entries);
 
 private:
-  evhttp_uri *const server_;
   const boost::shared_ptr<cert_trans::libevent::Base> base_;
-  cert_trans::libevent::HttpConnection conn_;
+  AsyncLogClient client_;
 
   DISALLOW_COPY_AND_ASSIGN(HTTPLogClient);
 };
+
+
+}  // namespace cert_trans
 
 #endif
