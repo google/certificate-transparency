@@ -8,9 +8,9 @@
 #include "log/frontend_signer.h"
 #include "proto/ct.pb.h"
 
-using ct::CertChain;
+using cert_trans::CertChain;
+using cert_trans::PreCertChain;
 using ct::LogEntry;
-using ct::PreCertChain;
 using ct::SignedCertificateTimestamp;
 using std::string;
 

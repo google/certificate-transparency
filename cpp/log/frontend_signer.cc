@@ -14,7 +14,7 @@ using ct::LogEntry;
 using ct::SignedCertificateTimestamp;
 using std::string;
 
-FrontendSigner::FrontendSigner(Database<ct::LoggedCertificate> *db,
+FrontendSigner::FrontendSigner(Database<cert_trans::LoggedCertificate> *db,
                                LogSigner *signer)
     : db_(db),
       signer_(signer) {}
@@ -28,32 +28,32 @@ FrontendSigner::QueueEntry(const LogEntry &entry,
       Sha256Hasher::Sha256Digest(Serializer::LeafCertificate(entry));
   assert(!sha256_hash.empty());
 
-  ct::LoggedCertificate logged;
-  Database<ct::LoggedCertificate>::LookupResult db_result =
+  cert_trans::LoggedCertificate logged;
+  Database<cert_trans::LoggedCertificate>::LookupResult db_result =
       db_->LookupByHash(sha256_hash, &logged);
 
-  if (db_result == Database<ct::LoggedCertificate>::LOOKUP_OK) {
+  if (db_result == Database<cert_trans::LoggedCertificate>::LOOKUP_OK) {
     if (sct != NULL)
       sct->CopyFrom(logged.sct());
 
     return DUPLICATE;
   }
 
-  CHECK_EQ(Database<ct::LoggedCertificate>::NOT_FOUND, db_result);
+  CHECK_EQ(Database<cert_trans::LoggedCertificate>::NOT_FOUND, db_result);
 
   SignedCertificateTimestamp local_sct;
   TimestampAndSign(entry, &local_sct);
 
-  ct::LoggedCertificate new_logged;
+  cert_trans::LoggedCertificate new_logged;
   new_logged.mutable_sct()->CopyFrom(local_sct);
   new_logged.mutable_entry()->CopyFrom(entry);
   CHECK_EQ(new_logged.Hash(), sha256_hash);
 
-  Database<ct::LoggedCertificate>::WriteResult write_result =
+  Database<cert_trans::LoggedCertificate>::WriteResult write_result =
       db_->CreatePendingEntry(new_logged);
 
   // Assume for now that nobody interfered while we were busy signing.
-  CHECK_EQ(Database<ct::LoggedCertificate>::OK, write_result);
+  CHECK_EQ(Database<cert_trans::LoggedCertificate>::OK, write_result);
   if (sct != NULL)
     sct->CopyFrom(new_logged.sct());
   return NEW;

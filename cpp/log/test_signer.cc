@@ -19,9 +19,11 @@
 #include "proto/serializer.h"
 #include "util/util.h"
 
+using cert_trans::Signer;
+using cert_trans::LoggedCertificate;
+using cert_trans::Verifier;
 using ct::DigitallySigned;
 using ct::LogEntry;
-using ct::LoggedCertificate;
 using ct::PrecertChainEntry;
 using ct::SignedCertificateTimestamp;
 using ct::SignedTreeHead;
@@ -188,10 +190,10 @@ TestSigner::~TestSigner() {
 // Caller owns result.
 // Call as many times as required to get a fresh copy every time.
 // static
-ct::Signer *TestSigner::DefaultSigner() {
+Signer *TestSigner::DefaultSigner() {
   EVP_PKEY *pkey = PrivateKeyFromPem(kEcP256PrivateKey);
   CHECK_NOTNULL(pkey);
-  return new ct::Signer(pkey);
+  return new Signer(pkey);
 }
 
 // Caller owns result.
@@ -206,10 +208,10 @@ LogSigner *TestSigner::DefaultLogSigner() {
 // Caller owns result.
 // Call as many times as required to get a fresh copy every time.
 // static
-ct::Verifier *TestSigner::DefaultVerifier() {
+Verifier *TestSigner::DefaultVerifier() {
   EVP_PKEY *pubkey = PublicKeyFromPem(kEcP256PublicKey);
   CHECK_NOTNULL(pubkey);
-  return new ct::Verifier(pubkey);
+  return new Verifier(pubkey);
 }
 
 // Caller owns result.

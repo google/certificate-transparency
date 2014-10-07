@@ -12,9 +12,11 @@
 #include "util/testing.h"
 #include "util/util.h"
 
+using cert_trans::Verifier;
+using ct::DigitallySigned;
 using std::string;
 
-namespace ct {
+namespace cert_trans {
 namespace {
 
 const char kTestString[] = "abc";
@@ -143,9 +145,9 @@ TEST_F(SignerVerifierTest, Errors) {
 }
 
 }  // namespace
-}  // namespace ct
+}  // namespace cert_trans
 
 int main(int argc, char **argv) {
-  ct::test::InitTesting(argv[0], &argc, &argv, true);
+  cert_trans::test::InitTesting(argv[0], &argc, &argv, true);
   return RUN_ALL_TESTS();
 }

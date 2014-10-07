@@ -4,7 +4,7 @@
 #include <glog/logging.h>
 #include <gtest/gtest.h>
 
-namespace ct {
+namespace cert_trans {
 namespace test {
 
 void InitTesting(const char *name, int *argc, char ***argv,
@@ -20,4 +20,4 @@ void InitTesting(const char *name, int *argc, char ***argv,
 }
 
 }  // namespace test
-}  // namespace ct
+}  // namespace cert_trans

@@ -65,13 +65,13 @@ class Database {
   }
 
   // Attempt to create a new entry. The caller has to ensure
-  // everything itself (i.e. no UNIQUE constraints).
-  // Do preprocessing here independent from database implementation.
-  // ct::LoggedCertificate is here only for being a container for
-  // SignedCertificateTimestamp and LogEntry built in GetEntries().
-  // The latter two contain all information from the RFC compliant get-entries
-  // response from the log server.
-  WriteResult CreateEntry(const ct::LoggedCertificate &logged);
+  // everything itself (i.e. no UNIQUE constraints).  Do preprocessing
+  // here independent from database implementation.
+  // cert_trans::LoggedCertificate is here only for being a container
+  // for SignedCertificateTimestamp and LogEntry built in
+  // GetEntries().  The latter two contain all information from the
+  // RFC compliant get-entries response from the log server.
+  WriteResult CreateEntry(const cert_trans::LoggedCertificate &logged);
 
   virtual WriteResult WriteSTH(const ct::SignedTreeHead &sth);
 

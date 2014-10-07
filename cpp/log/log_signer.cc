@@ -11,6 +11,7 @@
 #include "proto/serializer.h"
 #include "util/util.h"
 
+using cert_trans::Verifier;
 using ct::DigitallySigned;
 using ct::LogEntry;
 using ct::LogEntryType;
@@ -24,15 +25,15 @@ using std::string;
 
 namespace {
 
-LogSigVerifier::VerifyResult ConvertStatus(const ct::Verifier::Status status) {
+LogSigVerifier::VerifyResult ConvertStatus(const Verifier::Status status) {
   switch (status) {
-    case ct::Verifier::OK:
+    case Verifier::OK:
       return LogSigVerifier::OK;
-    case ct::Verifier::HASH_ALGORITHM_MISMATCH:
+    case Verifier::HASH_ALGORITHM_MISMATCH:
       return LogSigVerifier::HASH_ALGORITHM_MISMATCH;
-    case ct::Verifier::SIGNATURE_ALGORITHM_MISMATCH:
+    case Verifier::SIGNATURE_ALGORITHM_MISMATCH:
       return LogSigVerifier::SIGNATURE_ALGORITHM_MISMATCH;
-    case ct::Verifier::INVALID_SIGNATURE:
+    case Verifier::INVALID_SIGNATURE:
       return LogSigVerifier::INVALID_SIGNATURE;
   }
   LOG(FATAL) << "Unexpected status " << status;
@@ -41,7 +42,7 @@ LogSigVerifier::VerifyResult ConvertStatus(const ct::Verifier::Status status) {
 }  // namespace
 
 LogSigner::LogSigner(EVP_PKEY *pkey)
-    : ct::Signer(pkey) {}
+    : cert_trans::Signer(pkey) {}
 
 LogSigner::~LogSigner() {}
 
@@ -160,7 +161,7 @@ LogSigner::GetSerializeError(Serializer::SerializeResult result) {
 }
 
 LogSigVerifier::LogSigVerifier(EVP_PKEY *pkey)
-    : ct::Verifier(pkey) {}
+    : Verifier(pkey) {}
 
 LogSigVerifier::~LogSigVerifier() {}
 

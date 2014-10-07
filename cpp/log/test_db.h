@@ -14,34 +14,35 @@
 static const unsigned kCertStorageDepth = 3;
 static const unsigned kTreeStorageDepth = 8;
 
-template <> void TestDB<FileDB<ct::LoggedCertificate> >::Setup() {
+template <> void TestDB<FileDB<cert_trans::LoggedCertificate> >::Setup() {
   std::string certs_dir = tmp_.TmpStorageDir() + "/certs";
   std::string tree_dir = tmp_.TmpStorageDir() + "/tree";
   CHECK_ERR(mkdir(certs_dir.c_str(), 0700));
   CHECK_ERR(mkdir(tree_dir.c_str(), 0700));
 
-  db_ = new FileDB<ct::LoggedCertificate>(
+  db_ = new FileDB<cert_trans::LoggedCertificate>(
       new FileStorage(certs_dir, kCertStorageDepth),
       new FileStorage(tree_dir, kTreeStorageDepth));
 }
 
-template <> FileDB<ct::LoggedCertificate> *
-TestDB<FileDB<ct::LoggedCertificate> >::SecondDB() const {
+template <> FileDB<cert_trans::LoggedCertificate> *
+TestDB<FileDB<cert_trans::LoggedCertificate> >::SecondDB() const {
   std::string certs_dir = this->tmp_.TmpStorageDir() + "/certs";
   std::string tree_dir = this->tmp_.TmpStorageDir() + "/tree";
-  return new FileDB<ct::LoggedCertificate>(new FileStorage(certs_dir,
-                                                           kCertStorageDepth),
-                                           new FileStorage(tree_dir,
-                                                           kTreeStorageDepth));
+  return new FileDB<cert_trans::LoggedCertificate>(
+      new FileStorage(certs_dir, kCertStorageDepth),
+      new FileStorage(tree_dir, kTreeStorageDepth));
 }
 
-template <> void TestDB<SQLiteDB<ct::LoggedCertificate> >::Setup() {
-  db_ = new SQLiteDB<ct::LoggedCertificate>(tmp_.TmpStorageDir() + "/sqlite");
+template <> void TestDB<SQLiteDB<cert_trans::LoggedCertificate> >::Setup() {
+  db_ = new SQLiteDB<cert_trans::LoggedCertificate>(
+      tmp_.TmpStorageDir() + "/sqlite");
 }
 
-template <> SQLiteDB<ct::LoggedCertificate> *
-TestDB<SQLiteDB<ct::LoggedCertificate> >::SecondDB() const {
-  return new SQLiteDB<ct::LoggedCertificate>(tmp_.TmpStorageDir() + "/sqlite");
+template <> SQLiteDB<cert_trans::LoggedCertificate> *
+TestDB<SQLiteDB<cert_trans::LoggedCertificate> >::SecondDB() const {
+  return new SQLiteDB<cert_trans::LoggedCertificate>(
+      tmp_.TmpStorageDir() + "/sqlite");
 }
 
 // Not a Database; we just use the same template for setup.

@@ -115,16 +115,16 @@ static const char kUsage[] =
 
 using boost::shared_ptr;
 using cert_trans::AsyncLogClient;
+using cert_trans::Cert;
+using cert_trans::CertChain;
 using cert_trans::HTTPLogClient;
-using ct::Cert;
-using ct::CertChain;
+using cert_trans::PreCertChain;
+using cert_trans::TbsCertificate;
 using ct::LogEntry;
 using ct::MerkleAuditProof;
-using ct::PreCertChain;
 using ct::SSLClientCTData;
 using ct::SignedCertificateTimestamp;
 using ct::SignedCertificateTimestampList;
-using ct::TbsCertificate;
 using std::string;
 using std::vector;
 
@@ -189,14 +189,15 @@ static void AddOctetExtension(X509 *cert, int nid, const unsigned char *data,
 // Reconstructs a LogEntry from the given precert chain.
 // Used for verifying a Precert SCT.
 // Returns true iff the LogEntry was correctly populated.
-static bool PrecertChainToEntry(const ct::PreCertChain &chain,
+static bool PrecertChainToEntry(const cert_trans::PreCertChain &chain,
                                 LogEntry *entry) {
   if (!chain.IsLoaded()) {
     LOG(ERROR) << "Chain not loaded.";
     return false;
   }
 
-  Cert::Status status = chain.LeafCert()->HasExtension(ct::NID_ctPoison);
+  Cert::Status status = chain.LeafCert()->HasExtension(
+      cert_trans::NID_ctPoison);
   if (status != Cert::TRUE && status != Cert::FALSE) {
     LOG(ERROR) << "Failed to test for poison extension.";
     return false;
@@ -227,7 +228,7 @@ static bool PrecertChainToEntry(const ct::PreCertChain &chain,
     LOG(ERROR) << "Failed to get TbsCertificate.";
     return false;
   }
-  if (tbs.DeleteExtension(ct::NID_ctPoison) != Cert::TRUE) {
+  if (tbs.DeleteExtension(cert_trans::NID_ctPoison) != Cert::TRUE) {
     LOG(ERROR) << "Failed to delete poison extension.";
     return false;
   }
@@ -430,7 +431,7 @@ static void MakeCert() {
 
   // And finally, the proof in an extension
   string serialized_sct_list = SCTToList(sct);
-  AddOctetExtension(x, ct::NID_ctSignedCertificateTimestampList,
+  AddOctetExtension(x, cert_trans::NID_ctSignedCertificateTimestampList,
                     reinterpret_cast<const unsigned char*>(
                         serialized_sct_list.data()),
                     serialized_sct_list.size(), 1);
@@ -468,7 +469,7 @@ static void WriteProofToConfig() {
   PCHECK(conf_out.good()) << "Could not open extensions configuration file "
                           << conf_file << " for writing.";
 
-  conf_out << string(ct::kEmbeddedSCTListOID)
+  conf_out << string(cert_trans::kEmbeddedSCTListOID)
            << "=ASN1:FORMAT:HEX,OCTETSTRING:";
 
   conf_out << util::HexString(serialized_sct_list) << std::endl;
@@ -710,7 +711,8 @@ static void DiagnoseCertChain() {
 
 
   if (chain.LeafCert()->HasExtension(
-          ct::NID_ctEmbeddedSignedCertificateTimestampList) != Cert::TRUE) {
+          cert_trans::NID_ctEmbeddedSignedCertificateTimestampList)
+      != Cert::TRUE) {
     LOG(ERROR) << "Certificate has no embedded SCTs";
     return;
   }
@@ -728,7 +730,7 @@ static void DiagnoseCertChain() {
 
   string serialized_scts;
   if (chain.LeafCert()->OctetStringExtensionData(
-          ct::NID_ctEmbeddedSignedCertificateTimestampList,
+          cert_trans::NID_ctEmbeddedSignedCertificateTimestampList,
           &serialized_scts) != Cert::TRUE) {
     LOG(ERROR) << "SCT extension data is invalid.";
     return;
@@ -809,12 +811,12 @@ void WrapEmbedded() {
   CHECK(chain.IsLoaded())
       << cert_file << " is not a valid PEM-encoded certificate chain";
   CHECK_EQ(Cert::TRUE, chain.LeafCert()->HasExtension(
-               ct::NID_ctEmbeddedSignedCertificateTimestampList));
+      cert_trans::NID_ctEmbeddedSignedCertificateTimestampList));
 
   string serialized_scts;
   CHECK_EQ(Cert::TRUE, chain.LeafCert()->OctetStringExtensionData(
-               ct::NID_ctEmbeddedSignedCertificateTimestampList,
-               &serialized_scts));
+      cert_trans::NID_ctEmbeddedSignedCertificateTimestampList,
+      &serialized_scts));
   SignedCertificateTimestampList sct_list;
   CHECK_EQ(Deserializer::OK,
            Deserializer::DeserializeSCTList(serialized_scts, &sct_list));
@@ -986,7 +988,7 @@ int main(int argc, char **argv) {
 
   SSL_library_init();
   ERR_load_SSL_strings();
-  ct::LoadCtExtensions();
+  cert_trans::LoadCtExtensions();
 
   const string cmd(argv[1]);
 

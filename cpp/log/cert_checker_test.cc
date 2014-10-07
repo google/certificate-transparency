@@ -12,7 +12,10 @@
 #include "util/testing.h"
 #include "util/util.h"
 
-namespace ct {
+using cert_trans::Cert;
+using cert_trans::CertChain;
+using cert_trans::CertChecker;
+using cert_trans::PreCertChain;
 using std::string;
 
 DEFINE_string(test_certs_dir, "../../test/testdata", "Path to test certificates");
@@ -356,12 +359,11 @@ TEST_F(CertCheckerTest, ResolveIssuerCollisions) {
 }
 
 }  // namespace
-}  // namespace ct
 
 int main(int argc, char**argv) {
-  ct::test::InitTesting(argv[0], &argc, &argv, true);
+  cert_trans::test::InitTesting(argv[0], &argc, &argv, true);
   OpenSSL_add_all_algorithms();
   ERR_load_crypto_strings();
-  ct::LoadCtExtensions();
+  cert_trans::LoadCtExtensions();
   return RUN_ALL_TESTS();
 }

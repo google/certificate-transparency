@@ -845,6 +845,6 @@ TEST_F(MerkleVerifierTest, VerifyConsistencyProof) {
 } // namespace
 
 int main(int argc, char **argv) {
-  ct::test::InitTesting(argv[0], &argc, &argv, true);
+  cert_trans::test::InitTesting(argv[0], &argc, &argv, true);
   return RUN_ALL_TESTS();
 }

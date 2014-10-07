@@ -14,14 +14,16 @@
 # error "Need OpenSSL >= 1.0.0"
 #endif
 
-namespace ct {
+using cert_trans::Verifier;
+
+namespace cert_trans {
 
 Signer::Signer(EVP_PKEY *pkey)
     : pkey_(CHECK_NOTNULL(pkey)) {
   switch (pkey_->type) {
     case EVP_PKEY_EC:
-      hash_algo_ = DigitallySigned::SHA256;
-      sig_algo_ = DigitallySigned::ECDSA;
+      hash_algo_ = ct::DigitallySigned::SHA256;
+      sig_algo_ = ct::DigitallySigned::ECDSA;
       break;
     default:
       LOG(FATAL) << "Unsupported key type " << pkey_->type;
@@ -46,8 +48,8 @@ void Signer::Sign(const std::string &data,
 
 Signer::Signer()
     : pkey_(NULL),
-      hash_algo_(DigitallySigned::NONE),
-      sig_algo_(DigitallySigned::ANONYMOUS) {}
+      hash_algo_(ct::DigitallySigned::NONE),
+      sig_algo_(ct::DigitallySigned::ANONYMOUS) {}
 
 std::string Signer::RawSign(const std::string &data) const {
   EVP_MD_CTX ctx;
@@ -67,4 +69,4 @@ std::string Signer::RawSign(const std::string &data) const {
   return ret;
 }
 
-}  // namespace ct
+}  // namespace cert_trans

@@ -16,7 +16,7 @@ class SerialHasher;
 // its current root (i.e., it cannot do paths, snapshots or consistency).
 //
 // This class is thread-compatible, but not thread-safe.
-class CompactMerkleTree : public ct::MerkleTreeInterface {
+class CompactMerkleTree : public cert_trans::MerkleTreeInterface {
  public:
   // The constructor takes a pointer to some concrete hash function
   // instantiation of the SerialHasher abstract class.

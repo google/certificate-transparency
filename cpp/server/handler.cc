@@ -26,11 +26,14 @@ using boost::bind;
 using boost::make_shared;
 using boost::scoped_array;
 using boost::shared_ptr;
+using cert_trans::Cert;
+using cert_trans::CertChain;
+using cert_trans::CertChecker;
 using cert_trans::HttpHandler;
-using ct::Cert;
-using ct::CertChecker;
-using ct::LoggedCertificate;
+using cert_trans::LoggedCertificate;
 using ct::ShortMerkleAuditProof;
+using ct::SignedCertificateTimestamp;
+using ct::SignedTreeHead;
 using std::make_pair;
 using std::multimap;
 using std::string;
@@ -66,7 +69,7 @@ void SendError(evhttp_request *req, int http_status, const string &error_msg) {
 }
 
 
-bool ExtractChain(evhttp_request *req, ct::CertChain *chain) {
+bool ExtractChain(evhttp_request *req, CertChain *chain) {
   if (evhttp_request_get_command(req) != EVHTTP_REQ_POST) {
     SendError(req, HTTP_BADMETHOD, "Method not allowed.");
     return false;
@@ -97,7 +100,7 @@ bool ExtractChain(evhttp_request *req, ct::CertChain *chain) {
 
     // TODO(pphaneuf): I would have used unique_ptr here to release
     // the ownership, but we can't use it yet (C++11).
-    ct::Cert *const cert(new Cert);
+    Cert *const cert(new Cert);
     cert->LoadFromDerString(json_cert.FromBase64());
     if (!cert->IsLoaded()) {
       delete cert;
@@ -113,7 +116,7 @@ bool ExtractChain(evhttp_request *req, ct::CertChain *chain) {
 
 
 void AddChainReply(evhttp_request *req, SubmitResult result,
-                   const ct::SignedCertificateTimestamp &sct) {
+                   const SignedCertificateTimestamp &sct) {
   if (result != ADDED && result != DUPLICATE) {
     const string error(Frontend::SubmitResultString(result));
     VLOG(1) << "error adding chain: " << error;
@@ -275,7 +278,7 @@ void HttpHandler::GetRoots(evhttp_request *req) const {
   }
 
   JsonArray roots;
-  multimap<string, const ct::Cert *>::const_iterator it;
+  multimap<string, const Cert *>::const_iterator it;
   for (it = cert_checker_->GetTrustedCertificates().begin();
        it != cert_checker_->GetTrustedCertificates().end();
        ++it) {
@@ -342,7 +345,7 @@ void HttpHandler::GetSTH(evhttp_request *req) const {
   if (evhttp_request_get_command(req) != EVHTTP_REQ_GET)
     SendError(req, HTTP_BADMETHOD, "Method not allowed.");
 
-  const ct::SignedTreeHead &sth(log_lookup_->GetSTH());
+  const SignedTreeHead &sth(log_lookup_->GetSTH());
 
   VLOG(1) << "SignedTreeHead:\n" << sth.DebugString();
 
@@ -393,7 +396,7 @@ void HttpHandler::GetConsistency(evhttp_request *req) const {
 
 
 void HttpHandler::AddChain(evhttp_request *req) {
-  const shared_ptr<ct::CertChain> chain(make_shared<ct::CertChain>());
+  const shared_ptr<CertChain> chain(make_shared<CertChain>());
   if (!ExtractChain(req, chain.get())) {
     return;
   }
@@ -403,7 +406,7 @@ void HttpHandler::AddChain(evhttp_request *req) {
 
 
 void HttpHandler::AddPreChain(evhttp_request *req) {
-  const shared_ptr<ct::PreCertChain> chain(make_shared<ct::PreCertChain>());
+  const shared_ptr<PreCertChain> chain(make_shared<PreCertChain>());
   if (!ExtractChain(req, chain.get())) {
     return;
   }
@@ -445,8 +448,8 @@ void HttpHandler::BlockingGetEntries(evhttp_request *req, int start,
 
 
 void HttpHandler::BlockingAddChain(
-    evhttp_request *req, const shared_ptr<ct::CertChain> &chain) const {
-  ct::SignedCertificateTimestamp sct;
+    evhttp_request *req, const shared_ptr<CertChain> &chain) const {
+  SignedCertificateTimestamp sct;
 
   AddChainReply(req, CHECK_NOTNULL(frontend_)->QueueX509Entry(
       CHECK_NOTNULL(chain.get()), &sct), sct);
@@ -454,8 +457,8 @@ void HttpHandler::BlockingAddChain(
 
 
 void HttpHandler::BlockingAddPreChain(
-    evhttp_request *req, const shared_ptr<ct::PreCertChain> &chain) const {
-  ct::SignedCertificateTimestamp sct;
+    evhttp_request *req, const shared_ptr<PreCertChain> &chain) const {
+  SignedCertificateTimestamp sct;
 
   AddChainReply(req, CHECK_NOTNULL(frontend_)->QueuePreCertEntry(
       CHECK_NOTNULL(chain.get()), &sct), sct);

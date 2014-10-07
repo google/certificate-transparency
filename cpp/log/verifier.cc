@@ -14,7 +14,9 @@
 # error "Need OpenSSL >= 1.0.0"
 #endif
 
-namespace ct {
+using ct::DigitallySigned;
+
+namespace cert_trans {
 
 Verifier::Verifier(EVP_PKEY *pkey)
     : pkey_(CHECK_NOTNULL(pkey)) {
@@ -83,4 +85,4 @@ bool Verifier::RawVerify(const std::string &data,
   return ret;
 }
 
-}  // namespace ct
+}  // namespace cert_trans

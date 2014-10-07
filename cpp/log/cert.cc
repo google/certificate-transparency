@@ -34,7 +34,7 @@ static int X509_get_signature_nid(const X509 *x) {
 }
 #endif
 
-namespace ct {
+namespace cert_trans {
 
 Cert::Cert(X509 *x509) : x509_(x509) {
 }
@@ -873,7 +873,7 @@ Cert::Status PreCertChain::UsesPrecertSigningCertificate() const {
     return Cert::FALSE;
   }
 
-  return issuer->HasExtendedKeyUsage(ct::NID_ctPrecertificateSigning);
+  return issuer->HasExtendedKeyUsage(cert_trans::NID_ctPrecertificateSigning);
 }
 
 Cert::Status PreCertChain::IsWellFormed() const {
@@ -885,7 +885,7 @@ Cert::Status PreCertChain::IsWellFormed() const {
   const Cert *pre = PreCert();
 
   // (1) Check that the leaf contains the critical poison extension.
-  Cert::Status status = pre->HasCriticalExtension(ct::NID_ctPoison);
+  Cert::Status status = pre->HasCriticalExtension(cert_trans::NID_ctPoison);
   if (status != Cert::TRUE)
     return status;
 
@@ -911,4 +911,4 @@ Cert::Status PreCertChain::IsWellFormed() const {
   return issuer->HasExtension(NID_authority_key_identifier);
 }
 
-}  // namespace ct
+}  // namespace cert_trans

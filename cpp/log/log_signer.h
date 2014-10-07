@@ -10,7 +10,7 @@
 #include "proto/ct.pb.h"
 #include "proto/serializer.h"
 
-class LogSigner : public ct::Signer {
+class LogSigner : public cert_trans::Signer {
  public:
   explicit LogSigner(EVP_PKEY *pkey);
   virtual ~LogSigner();
@@ -54,7 +54,7 @@ class LogSigner : public ct::Signer {
   static SignResult GetSerializeError(Serializer::SerializeResult result);
 };
 
-class LogSigVerifier : public ct::Verifier {
+class LogSigVerifier : public cert_trans::Verifier {
  public:
   explicit LogSigVerifier(EVP_PKEY *pkey);
   virtual ~LogSigVerifier();

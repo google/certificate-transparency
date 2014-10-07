@@ -6,7 +6,7 @@
 namespace monitor {
 
 Database::WriteResult Database::CreateEntry(
-    const ct::LoggedCertificate &logged) {
+    const cert_trans::LoggedCertificate &logged) {
 
   std::string leaf;
   if(!logged.SerializeForLeaf(&leaf))

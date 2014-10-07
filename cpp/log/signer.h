@@ -10,7 +10,7 @@
 #include "base/macros.h"
 #include "proto/ct.pb.h"
 
-namespace ct {
+namespace cert_trans {
 
 class Signer {
  public:
@@ -19,7 +19,8 @@ class Signer {
 
   virtual std::string KeyID() const;
 
-  virtual void Sign(const std::string &data, DigitallySigned *signature) const;
+  virtual void Sign(const std::string &data,
+                    ct::DigitallySigned *signature) const;
 
  protected:
   // A constructor for mocking.
@@ -29,13 +30,13 @@ class Signer {
   std::string RawSign(const std::string &data) const;
 
   EVP_PKEY *pkey_;
-  DigitallySigned::HashAlgorithm hash_algo_;
-  DigitallySigned::SignatureAlgorithm sig_algo_;
+  ct::DigitallySigned::HashAlgorithm hash_algo_;
+  ct::DigitallySigned::SignatureAlgorithm sig_algo_;
   std::string key_id_;
 
   DISALLOW_COPY_AND_ASSIGN(Signer);
 };
 
-}  // namespace ct
+}  // namespace cert_trans
 
 #endif  // SRC_LOG_SIGNER_H_

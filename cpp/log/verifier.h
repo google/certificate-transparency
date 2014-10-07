@@ -11,7 +11,7 @@
 #include "base/macros.h"
 #include "proto/ct.pb.h"
 
-namespace ct {
+namespace cert_trans {
 
 class Verifier {
  public:
@@ -40,13 +40,13 @@ class Verifier {
   bool RawVerify(const std::string &data, const std::string &sig_string) const;
 
   EVP_PKEY *pkey_;
-  DigitallySigned::HashAlgorithm hash_algo_;
-  DigitallySigned::SignatureAlgorithm sig_algo_;
+  ct::DigitallySigned::HashAlgorithm hash_algo_;
+  ct::DigitallySigned::SignatureAlgorithm sig_algo_;
   std::string key_id_;
 
   DISALLOW_COPY_AND_ASSIGN(Verifier);
 };
 
-}  // namespace ct
+}  // namespace cert_trans
 
 #endif  // SRC_LOG_VERIFIER_H_

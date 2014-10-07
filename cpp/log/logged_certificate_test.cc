@@ -2,6 +2,6 @@
 
 #include <gtest/gtest.h>
 
-typedef testing::Types<ct::LoggedCertificate> TestType;
+typedef testing::Types<cert_trans::LoggedCertificate> TestType;
 
 #include "log/logged_test-inl.h"

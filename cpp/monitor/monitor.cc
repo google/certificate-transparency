@@ -216,7 +216,7 @@ Monitor::GetResult Monitor::GetEntries(int get_first, int get_last) {
       cont.mutable_sct()->CopyFrom(sct);
       cont.mutable_entry()->CopyFrom(log_entry);
 
-      ct::LoggedCertificate logged;
+      cert_trans::LoggedCertificate logged;
       logged.mutable_contents()->CopyFrom(cont);
 
       CHECK_EQ(db_->CreateEntry(logged), Database::WRITE_OK);

@@ -20,7 +20,7 @@
 using std::string;
 using util::ClearOpenSSLErrors;
 
-namespace  ct {
+namespace cert_trans {
 
 CertChecker::CertChecker() : trusted_() {
 }
@@ -120,7 +120,7 @@ CertChecker::CheckCertChain(CertChain *chain) const {
 
   // Weed out things that should obviously be precert chains instead.
   Cert::Status status = chain->LeafCert()->HasCriticalExtension(
-      ct::NID_ctPoison);
+      cert_trans::NID_ctPoison);
   if (status != Cert::TRUE && status != Cert::FALSE) {
     return CertChecker::INTERNAL_ERROR;
   }
@@ -209,7 +209,8 @@ CertChecker::CertVerifyResult CertChecker::CheckPreCertChain(
   }
   // A well-formed chain always has a precert.
   TbsCertificate tbs(*chain->PreCert());
-  if (!tbs.IsLoaded() || tbs.DeleteExtension(ct::NID_ctPoison) != Cert::TRUE)
+  if (!tbs.IsLoaded() ||
+      tbs.DeleteExtension(cert_trans::NID_ctPoison) != Cert::TRUE)
     return INTERNAL_ERROR;
 
   // If the issuing cert is the special Precert Signing Certificate,
@@ -331,4 +332,4 @@ CertChecker::CertVerifyResult CertChecker::IsTrusted(
   return ROOT_NOT_IN_LOCAL_STORE;
 }
 
-}  // namespace ct
+}  // namespace cert_trans

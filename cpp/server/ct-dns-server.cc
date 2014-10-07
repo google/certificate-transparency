@@ -10,8 +10,8 @@
 #include "proto/ct.pb.h"
 #include "server/event.h"
 
+using cert_trans::LoggedCertificate;
 using ct::SignedTreeHead;
-using ct::LoggedCertificate;
 using google::RegisterFlagValidator;
 using std::string;
 using std::stringstream;
@@ -54,7 +54,7 @@ class CTUDPDNSServer : public UDPServer {
       LOG(INFO) << "Bad DNS packet";
       return;
     }
- 
+
     ldns_pkt_print(stdout, packet);
 
     if (ldns_pkt_qr(packet) != 0) {

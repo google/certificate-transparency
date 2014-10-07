@@ -13,8 +13,8 @@
 #include "merkletree/serial_hasher.h"
 #include "proto/serializer.h"
 
-using ct::Cert;
-using ct::CertChain;
+using cert_trans::Cert;
+using cert_trans::CertChain;
 using ct::LogEntry;
 using ct::SSLClientCTData;
 using ct::SignedCertificateTimestamp;
@@ -25,7 +25,7 @@ const uint16_t CT_EXTENSION_TYPE = 18;
 
 //static
 int SSLClient::ExtensionCallback(SSL *s, unsigned ext_type,
-				 const unsigned char *in, size_t inlen, 
+				 const unsigned char *in, size_t inlen,
 				 int *al, void *arg) {
   char pem_name[100];
   unsigned char ext_buf[4 + 65536];
@@ -182,11 +182,12 @@ int SSLClient::VerifyCallback(X509_STORE_CTX *ctx, void *arg) {
   string serialized_scts;
   // First, see if the cert has an embedded proof.
   if (chain.LeafCert()->HasExtension(
-          ct::NID_ctEmbeddedSignedCertificateTimestampList) == Cert::TRUE) {
+          cert_trans::NID_ctEmbeddedSignedCertificateTimestampList)
+      == Cert::TRUE) {
         LOG(INFO) << "Embedded proof extension found in certificate, "
                   << "verifying...";
         Cert::Status status = chain.LeafCert()->OctetStringExtensionData(
-               ct::NID_ctEmbeddedSignedCertificateTimestampList,
+               cert_trans::NID_ctEmbeddedSignedCertificateTimestampList,
                &serialized_scts);
         if (status != Cert::TRUE) {
           // Any error here is likely OpenSSL acting up, so just die.
@@ -196,10 +197,10 @@ int SSLClient::VerifyCallback(X509_STORE_CTX *ctx, void *arg) {
         // Else look for the proof in a superfluous cert.
         // Let's assume the superfluous cert is always last in the chain.
   } else if (input_chain.Length() > 1 && input_chain.LastCert()->HasExtension(
-      ct::NID_ctSignedCertificateTimestampList) == Cert::TRUE) {
+      cert_trans::NID_ctSignedCertificateTimestampList) == Cert::TRUE) {
     LOG(INFO) << "Proof extension found in certificate, verifying...";
     Cert::Status status = input_chain.LastCert()->OctetStringExtensionData(
-        ct::NID_ctSignedCertificateTimestampList, &serialized_scts);
+        cert_trans::NID_ctSignedCertificateTimestampList, &serialized_scts);
     if (status != Cert::TRUE) {
       // Any error here is likely OpenSSL acting up, so just die.
       CHECK_EQ(Cert::FALSE, status);

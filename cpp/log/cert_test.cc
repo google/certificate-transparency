@@ -10,8 +10,10 @@
 #include "util/testing.h"
 #include "util/util.h"
 
-namespace ct {
-
+using cert_trans::Cert;
+using cert_trans::CertChain;
+using cert_trans::PreCertChain;
+using cert_trans::TbsCertificate;
 using std::string;
 
 DEFINE_string(test_certs_dir, "../../test/testdata", "Path to test certificates");
@@ -165,13 +167,13 @@ TEST_F(CertTest, Extensions) {
   EXPECT_EQ(Cert::FALSE,
             leaf.HasCriticalExtension(NID_authority_key_identifier));
 
-  EXPECT_EQ(Cert::TRUE, pre.HasCriticalExtension(ct::NID_ctPoison));
+  EXPECT_EQ(Cert::TRUE, pre.HasCriticalExtension(cert_trans::NID_ctPoison));
 
   EXPECT_EQ(Cert::FALSE, leaf.HasBasicConstraintCATrue());
   EXPECT_EQ(Cert::TRUE, ca.HasBasicConstraintCATrue());
 
-  EXPECT_EQ(Cert::TRUE,
-            ca_pre.HasExtendedKeyUsage(ct::NID_ctPrecertificateSigning));
+  EXPECT_EQ(Cert::TRUE, ca_pre.HasExtendedKeyUsage(
+      cert_trans::NID_ctPrecertificateSigning));
 }
 
 TEST_F(CertTest, Issuers) {
@@ -236,11 +238,11 @@ TEST_F(TbsCertificateTest, DeleteExtension) {
   EXPECT_EQ(Cert::TRUE, tbs.DerEncoding(&der_after));
   EXPECT_NE(der_before, der_after);
 
-  ASSERT_EQ(Cert::FALSE, leaf.HasExtension(ct::NID_ctPoison));
+  ASSERT_EQ(Cert::FALSE, leaf.HasExtension(cert_trans::NID_ctPoison));
   TbsCertificate tbs2(leaf);
   string der_before2, der_after2;
   EXPECT_EQ(Cert::TRUE, tbs2.DerEncoding(&der_before2));
-  EXPECT_EQ(Cert::FALSE, tbs2.DeleteExtension(ct::NID_ctPoison));
+  EXPECT_EQ(Cert::FALSE, tbs2.DeleteExtension(cert_trans::NID_ctPoison));
   EXPECT_EQ(Cert::TRUE, tbs2.DerEncoding(&der_after2));
   EXPECT_EQ(der_before2, der_after2);
 }
@@ -357,12 +359,10 @@ TEST_F(CertChainTest, PreCertChain) {
 
 }  // namespace
 
-}  // namespace ct
-
 int main(int argc, char**argv) {
-  ct::test::InitTesting(argv[0], &argc, &argv, true);
+  cert_trans::test::InitTesting(argv[0], &argc, &argv, true);
   OpenSSL_add_all_algorithms();
   ERR_load_crypto_strings();
-  ct::LoadCtExtensions();
+  cert_trans::LoadCtExtensions();
   return RUN_ALL_TESTS();
 }

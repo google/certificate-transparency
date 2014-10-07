@@ -8,9 +8,9 @@
 #include "proto/serializer.h"
 #include "util/util.h"
 
-namespace ct {
+namespace cert_trans {
 
-class LoggedCertificate : public LoggedCertificatePB {
+class LoggedCertificate : public ct::LoggedCertificatePB {
  public:
   std::string Hash() const {
     return Sha256Hasher::Sha256Digest(Serializer::LeafCertificate(entry()));
@@ -20,19 +20,19 @@ class LoggedCertificate : public LoggedCertificatePB {
     return sct().timestamp();
   }
 
-  const SignedCertificateTimestamp &sct() const {
+  const ct::SignedCertificateTimestamp &sct() const {
     return contents().sct();
   }
 
-  SignedCertificateTimestamp *mutable_sct() {
+  ct::SignedCertificateTimestamp *mutable_sct() {
     return mutable_contents()->mutable_sct();
   }
 
-  const LogEntry &entry() const {
+  const ct::LogEntry &entry() const {
     return contents().entry();
   }
 
-  LogEntry *mutable_entry() {
+  ct::LogEntry *mutable_entry() {
     return mutable_contents()->mutable_entry();
   }
 
@@ -112,6 +112,6 @@ class LoggedCertificate : public LoggedCertificatePB {
 
 };
 
-}
+}  // namespace cert_trans
 
 #endif

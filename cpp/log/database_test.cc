@@ -17,7 +17,7 @@
 
 namespace {
 
-using ct::LoggedCertificate;
+using cert_trans::LoggedCertificate;
 using ct::SignedTreeHead;
 using std::string;
 
@@ -35,10 +35,10 @@ template <class T> class DBTest : public ::testing::Test {
   TestSigner test_signer_;
 };
 
-typedef testing::Types<FileDB<ct::LoggedCertificate>,
-                       SQLiteDB<ct::LoggedCertificate> > Databases;
+typedef testing::Types<FileDB<cert_trans::LoggedCertificate>,
+                       SQLiteDB<cert_trans::LoggedCertificate> > Databases;
 
-typedef Database<ct::LoggedCertificate> DB;
+typedef Database<cert_trans::LoggedCertificate> DB;
 
 TYPED_TEST_CASE(DBTest, Databases);
 
@@ -231,7 +231,7 @@ TYPED_TEST(DBTest, Resume) {
   EXPECT_EQ(DB::OK, this->db()->WriteTreeHead(sth));
   EXPECT_EQ(DB::OK, this->db()->WriteTreeHead(sth2));
 
-  Database<ct::LoggedCertificate> *db2 = this->test_db_.SecondDB();
+  Database<cert_trans::LoggedCertificate> *db2 = this->test_db_.SecondDB();
 
   EXPECT_EQ(DB::LOOKUP_OK, db2->LookupByHash(logged_cert.Hash(), &lookup_cert));
   EXPECT_EQ(42U, lookup_cert.sequence_number());
@@ -271,6 +271,6 @@ TYPED_TEST(DBTest, ResumeEmpty) {
 }  // namespace
 
 int main(int argc, char **argv) {
-  ct::test::InitTesting(argv[0], &argc, &argv, true);
+  cert_trans::test::InitTesting(argv[0], &argc, &argv, true);
   return RUN_ALL_TESTS();
 }

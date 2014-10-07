@@ -32,12 +32,12 @@ static const char kChainLeafCert[] = "test-intermediate-cert.pem";
 
 namespace {
 
+using cert_trans::Cert;
+using cert_trans::CertChain;
+using cert_trans::CertChecker;
+using cert_trans::PreCertChain;
 using ct::LogEntry;
 using std::string;
-using ct::Cert;
-using ct::CertChain;
-using ct::PreCertChain;
-using ct::CertChecker;
 
 class CertSubmissionHandlerTest : public ::testing::Test {
  protected:
@@ -212,9 +212,9 @@ TEST_F(CertSubmissionHandlerTest, SubmitInvalidPreCertChain) {
 }  // namespace
 
 int main(int argc, char**argv) {
-  ct::test::InitTesting(argv[0], &argc, &argv, true);
+  cert_trans::test::InitTesting(argv[0], &argc, &argv, true);
   OpenSSL_add_all_algorithms();
   ERR_load_crypto_strings();
-  ct::LoadCtExtensions();
+  cert_trans::LoadCtExtensions();
   return RUN_ALL_TESTS();
 }

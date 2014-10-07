@@ -9,7 +9,7 @@
 
 #include "base/macros.h"
 
-namespace ct {
+namespace cert_trans {
 
 class Cert {
  public:
@@ -359,5 +359,5 @@ class PreCertChain : public CertChain {
   Cert::Status IsWellFormed() const;
 };
 
-}  // namespace ct
+}  // namespace cert_trans
 #endif

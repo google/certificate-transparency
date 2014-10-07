@@ -7,10 +7,11 @@
 
 #include "merkletree/merkle_tree_math.h"
 
+using cert_trans::MerkleTreeInterface;
 using std::string;
 
 CompactMerkleTree::CompactMerkleTree(SerialHasher *hasher)
-    : ct::MerkleTreeInterface(),
+    : MerkleTreeInterface(),
       treehasher_(hasher),
       leaf_count_(0),
       leaves_processed_(0),
@@ -20,7 +21,7 @@ CompactMerkleTree::CompactMerkleTree(SerialHasher *hasher)
 
 CompactMerkleTree::CompactMerkleTree(MerkleTree &model,
                                      SerialHasher *hasher)
-    : ct::MerkleTreeInterface(),
+    : MerkleTreeInterface(),
       tree_(model.LevelCount() - 1),
       treehasher_(hasher),
       leaf_count_(model.LeafCount()),

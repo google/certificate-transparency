@@ -8,11 +8,11 @@
 #include "log/log_signer.h"
 #include "merkletree/tree_hasher.h"
 
-namespace ct {
+namespace cert_trans {
 class LoggedCertificate;
 class Signer;
 class Verifier;
-}  // namespace ct
+}
 
 // Helper class for database tests that generates test data
 // that roughly resembles real certificate data in shape and size.
@@ -21,10 +21,10 @@ class TestSigner {
   TestSigner();
   ~TestSigner();
 
-  static ct::Signer *DefaultSigner();
+  static cert_trans::Signer *DefaultSigner();
   static LogSigner *DefaultLogSigner();
 
-  static ct::Verifier *DefaultVerifier();
+  static cert_trans::Verifier *DefaultVerifier();
   static LogSigVerifier *DefaultLogSigVerifier();
 
   // A string and its signature.
@@ -43,7 +43,7 @@ class TestSigner {
 
   // For KAT tests: a logged cert with a valid hash and signature.
   // TODO(ekasper): add an intermediate for better coverage.
-  static void SetDefaults(ct::LoggedCertificate *logged_cert);
+  static void SetDefaults(cert_trans::LoggedCertificate *logged_cert);
 
   // For KAT tests: a tree head with a valid signature.
   // Uses SHA256 for the tree hash.
@@ -69,10 +69,10 @@ class TestSigner {
   // signature - valid signature from the default signer
   // hash - valid sha256 hash of the leaf certificate
   // sequence number - cleared
-  void CreateUnique(ct::LoggedCertificate *logged_cert);
+  void CreateUnique(cert_trans::LoggedCertificate *logged_cert);
 
   // Same as above but set the default signature to avoid overhead from signing.
-  void CreateUniqueFakeSignature(ct::LoggedCertificate *logged_cert);
+  void CreateUniqueFakeSignature(cert_trans::LoggedCertificate *logged_cert);
 
   // Generates a randomized entry as follows:
   // timestamp - current
@@ -99,8 +99,8 @@ class TestSigner {
   static void TestEqualSCTs(const ct::SignedCertificateTimestamp &sct0,
                             const ct::SignedCertificateTimestamp &sct1);
 
-  static void TestEqualLoggedCerts(const ct::LoggedCertificate &c1,
-                                   const ct::LoggedCertificate &c2);
+  static void TestEqualLoggedCerts(const cert_trans::LoggedCertificate &c1,
+                                   const cert_trans::LoggedCertificate &c2);
 
   static void TestEqualTreeHeads(const ct::SignedTreeHead &sth1,
                                  const ct::SignedTreeHead &sth2);
@@ -109,7 +109,7 @@ class TestSigner {
  private:
 
   // Fill everything apart from the signature.
-  void FillData(ct::LoggedCertificate *logged_cert);
+  void FillData(cert_trans::LoggedCertificate *logged_cert);
 
   LogSigner *default_signer_;
   // ct::SignedCertificateTimestamp default_sct_;

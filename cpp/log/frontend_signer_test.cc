@@ -19,8 +19,8 @@
 
 namespace {
 
+using cert_trans::LoggedCertificate;
 using ct::LogEntry;
-using ct::LoggedCertificate;
 using ct::SignedCertificateTimestamp;
 using std::string;
 
@@ -213,6 +213,6 @@ TYPED_TEST(FrontendSignerTest, TimedVerify) {
 }  // namespace
 
 int main(int argc, char**argv) {
-  ct::test::InitTesting(argv[0], &argc, &argv, true);
+  cert_trans::test::InitTesting(argv[0], &argc, &argv, true);
   return RUN_ALL_TESTS();
 }

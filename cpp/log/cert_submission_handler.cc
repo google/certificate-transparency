@@ -9,13 +9,13 @@
 #include "proto/ct.pb.h"
 #include "proto/serializer.h"
 
-using ct::Cert;
-using ct::CertChain;
-using ct::CertChecker;
+using cert_trans::Cert;
+using cert_trans::CertChain;
+using cert_trans::CertChecker;
+using cert_trans::PreCertChain;
+using cert_trans::TbsCertificate;
 using ct::LogEntry;
-using ct::PreCertChain;
 using ct::PrecertChainEntry;
-using ct::TbsCertificate;
 using ct::X509ChainEntry;
 using std::string;
 
@@ -32,7 +32,7 @@ CertSubmissionHandler::X509ChainToEntry(const CertChain &chain,
     return false;
 
   Cert::Status status = chain.LeafCert()->HasExtension(
-      ct::NID_ctEmbeddedSignedCertificateTimestampList);
+      cert_trans::NID_ctEmbeddedSignedCertificateTimestampList);
   if (status != Cert::TRUE && status != Cert::FALSE) {
     LOG(ERROR) << "Failed to check embedded SCT extension.";
     return false;
@@ -129,7 +129,7 @@ bool CertSubmissionHandler::SerializedTbs(const Cert &cert, string *result) {
     return false;
 
   Cert::Status status = cert.HasExtension(
-      ct::NID_ctEmbeddedSignedCertificateTimestampList);
+      cert_trans::NID_ctEmbeddedSignedCertificateTimestampList);
   if (status != Cert::TRUE && status != Cert::FALSE)
     return false;
 
@@ -138,8 +138,8 @@ bool CertSubmissionHandler::SerializedTbs(const Cert &cert, string *result) {
   if (!tbs.IsLoaded())
     return false;
 
-  if (status == Cert::TRUE &&
-      tbs.DeleteExtension(ct::NID_ctEmbeddedSignedCertificateTimestampList) !=
+  if (status == Cert::TRUE && tbs.DeleteExtension(
+          cert_trans::NID_ctEmbeddedSignedCertificateTimestampList) !=
       Cert::TRUE)
     return false;
 

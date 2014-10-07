@@ -73,14 +73,14 @@ class Frontend {
   void GetStats(FrontendStats *stats) const;
 
   // Note that these might change the |chain|.
-  SubmitResult QueueX509Entry(ct::CertChain *chain,
+  SubmitResult QueueX509Entry(cert_trans::CertChain *chain,
 			      ct::SignedCertificateTimestamp *sct);
-  SubmitResult QueuePreCertEntry(ct::PreCertChain *chain,
+  SubmitResult QueuePreCertEntry(cert_trans::PreCertChain *chain,
 				 ct::SignedCertificateTimestamp *sct);
 
   static std::string SubmitResultString(SubmitResult result);
 
-  const std::multimap<std::string, const ct::Cert *> &GetRoots() const {
+  const std::multimap<std::string, const cert_trans::Cert*> &GetRoots() const {
     return handler_->GetRoots();
   }
 

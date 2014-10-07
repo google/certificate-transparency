@@ -9,24 +9,20 @@ class Frontend;
 template<class T> class Database;
 template<class T> class LogLookup;
 
-namespace ct {
+namespace cert_trans {
+
 class CertChain;
 class CertChecker;
 class LoggedCertificate;
 class PreCertChain;
-class SignedCertificateTimestamp;
-}
-
-namespace cert_trans {
-
 class ThreadPool;
 
 
 class HttpHandler {
  public:
-  HttpHandler(LogLookup<ct::LoggedCertificate> *log_lookup,
-              const Database<ct::LoggedCertificate> *db,
-              const ct::CertChecker *cert_checker, Frontend *frontend,
+  HttpHandler(LogLookup<LoggedCertificate> *log_lookup,
+              const Database<LoggedCertificate> *db,
+              const CertChecker *cert_checker, Frontend *frontend,
               ThreadPool *pool);
 
   void Add(libevent::HttpServer *server);
@@ -41,15 +37,14 @@ class HttpHandler {
   void AddPreChain(evhttp_request *req);
 
   void BlockingGetEntries(evhttp_request *req, int start, int end) const;
-  void BlockingAddChain(evhttp_request *req,
-                        const boost::shared_ptr<ct::CertChain> &chain) const;
+  void BlockingAddChain(
+      evhttp_request *req, const boost::shared_ptr<CertChain> &chain) const;
   void BlockingAddPreChain(
-      evhttp_request *req,
-      const boost::shared_ptr<ct::PreCertChain> &chain) const;
+      evhttp_request *req, const boost::shared_ptr<PreCertChain> &chain) const;
 
-  LogLookup<ct::LoggedCertificate> *const log_lookup_;
-  const Database<ct::LoggedCertificate> *const db_;
-  const ct::CertChecker *const cert_checker_;
+  LogLookup<LoggedCertificate> *const log_lookup_;
+  const Database<LoggedCertificate> *const db_;
+  const CertChecker *const cert_checker_;
   Frontend *const frontend_;
   ThreadPool *const pool_;
 

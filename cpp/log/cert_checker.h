@@ -10,7 +10,7 @@
 #include "base/macros.h"
 #include "log/cert.h"
 
-namespace ct {
+namespace cert_trans {
 
 class Cert;
 class CertChain;
@@ -101,5 +101,6 @@ class CertChecker {
   DISALLOW_COPY_AND_ASSIGN(CertChecker);
 };
 
-}  // namespace ct
+}  // namespace cert_trans
+
 #endif

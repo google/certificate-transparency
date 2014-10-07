@@ -20,7 +20,7 @@ class SerialHasher;
 // resistance.
 //
 // This class is thread-compatible, but not thread-safe.
-class MerkleTree : public ct::MerkleTreeInterface {
+class MerkleTree : public cert_trans::MerkleTreeInterface {
  public:
   // The constructor takes a pointer to some concrete hash function
   // instantiation of the SerialHasher abstract class.

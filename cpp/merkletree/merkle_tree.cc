@@ -7,10 +7,11 @@
 
 #include "merkletree/merkle_tree_math.h"
 
+using cert_trans::MerkleTreeInterface;
 using std::string;
 
 MerkleTree::MerkleTree(SerialHasher *hasher)
-    : ct::MerkleTreeInterface(),
+    : MerkleTreeInterface(),
       treehasher_(hasher),
       leaves_processed_(0),
       level_count_(0) {}

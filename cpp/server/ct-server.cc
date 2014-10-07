@@ -59,11 +59,11 @@ using boost::function;
 using boost::make_shared;
 using boost::scoped_ptr;
 using boost::shared_ptr;
+using cert_trans::CertChecker;
 using cert_trans::HttpHandler;
+using cert_trans::LoggedCertificate;
 using cert_trans::ThreadPool;
 using cert_trans::util::ReadPrivateKey;
-using ct::CertChecker;
-using ct::LoggedCertificate;
 using google::RegisterFlagValidator;
 using std::string;
 
@@ -181,7 +181,7 @@ int main(int argc, char * argv[]) {
   google::InitGoogleLogging(argv[0]);
   OpenSSL_add_all_algorithms();
   ERR_load_crypto_strings();
-  ct::LoadCtExtensions();
+  cert_trans::LoadCtExtensions();
 
   EVP_PKEY *pkey = NULL;
   CHECK_EQ(ReadPrivateKey(&pkey, FLAGS_key), cert_trans::util::KEY_OK);

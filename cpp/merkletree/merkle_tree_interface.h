@@ -9,7 +9,7 @@
 
 #include "base/macros.h"
 
-namespace ct {
+namespace cert_trans {
 
 // An interface for Merkle trees.  See specializations in
 // merkletree/merkle_tree.h and merkletree/compact_merkle_tree.h.
@@ -61,6 +61,6 @@ class MerkleTreeInterface {
   DISALLOW_COPY_AND_ASSIGN(MerkleTreeInterface);
 };
 
-}  // namespace ct
+}  // namespace cert_trans
 
 #endif  // SRC_MERKLETREE_MERKLE_TREE_INTERFACE_H_

@@ -1,7 +1,8 @@
 #ifndef CT_EXTENSIONS_H
 #define CT_EXTENSIONS_H
 
-namespace ct {
+namespace cert_trans {
+
 // One-time initializer for loading CT-specific certificate extensions.
 void LoadCtExtensions();
 
@@ -22,5 +23,6 @@ extern const char kPoisonOID[];
 // Extended Key Usage value for Precertificate signing
 extern const char kPrecertificateSigningOID[];
 
-} // namespace ct
+} // namespace cert_trans
+
 #endif  // CT_EXTENSIONS_H

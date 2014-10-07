@@ -6,7 +6,8 @@
 #include <openssl/x509v3.h>
 #include <string.h>
 
-namespace ct {
+namespace cert_trans {
+
 int NID_ctSignedCertificateTimestampList = 0;
 int NID_ctEmbeddedSignedCertificateTimestampList = 0;
 int NID_ctPoison = 0;
@@ -128,4 +129,4 @@ void LoadCtExtensions() {
   NID_ctPrecertificateSigning = precert_signing_nid;
 }
 
-}  // namespace ct
+}  // namespace cert_trans

@@ -26,7 +26,7 @@ DEFINE_int32(batch_size, 1, "Number of writes to batch together "
 
 namespace {
 
-using ct::LoggedCertificate;
+using cert_trans::LoggedCertificate;
 using std::string;
 
 typedef Database<LoggedCertificate> DB;
@@ -122,7 +122,7 @@ TYPED_TEST(LargeDBTest, Benchmark) {
 }  // namespace
 
 int main(int argc, char **argv) {
-  ct::test::InitTesting(argv[0], &argc, &argv, true);
+  cert_trans::test::InitTesting(argv[0], &argc, &argv, true);
   CHECK_GT(FLAGS_database_size, 0) << "Please specify the test database size";
   CHECK_LE(FLAGS_database_size, 1000000)
       << "Database size exceeds allowed maximum";

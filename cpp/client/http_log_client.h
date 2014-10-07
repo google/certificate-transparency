@@ -11,13 +11,9 @@
 #include "proto/ct.pb.h"
 #include "util/libevent_wrapper.h"
 
-namespace ct {
-class Cert;
-class MerkleAuditProof;
-class SignedCertificateTimestamp;
-};
-
 namespace cert_trans {
+
+class Cert;
 
 
 class HTTPLogClient {
@@ -31,7 +27,7 @@ class HTTPLogClient {
   AsyncLogClient::Status GetSTH(ct::SignedTreeHead *sth);
 
   AsyncLogClient::Status GetRoots(
-      std::vector<boost::shared_ptr<ct::Cert> > *roots);
+      std::vector<boost::shared_ptr<Cert> > *roots);
 
   AsyncLogClient::Status QueryAuditProof(
       const std::string &merkle_leaf_hash, ct::MerkleAuditProof *proof);
@@ -45,7 +41,7 @@ class HTTPLogClient {
       int first, int last, std::vector<AsyncLogClient::Entry> *entries);
 
 private:
-  const boost::shared_ptr<cert_trans::libevent::Base> base_;
+  const boost::shared_ptr<libevent::Base> base_;
   AsyncLogClient client_;
 
   DISALLOW_COPY_AND_ASSIGN(HTTPLogClient);

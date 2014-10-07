@@ -11,13 +11,12 @@
 #include "proto/ct.pb.h"
 #include "util/libevent_wrapper.h"
 
-namespace ct {
+namespace cert_trans {
+
+
 class Cert;
 class CertChain;
 class PreCertChain;
-};
-
-namespace cert_trans {
 
 
 class AsyncLogClient {
@@ -39,13 +38,13 @@ class AsyncLogClient {
 
   typedef boost::function<void(Status)> Callback;
 
-  AsyncLogClient(const boost::shared_ptr<cert_trans::libevent::Base> &base,
+  AsyncLogClient(const boost::shared_ptr<libevent::Base> &base,
                  const std::string &server_uri);
 
   void GetSTH(ct::SignedTreeHead *sth, const Callback &done);
 
   // This does not clear "roots" before appending to it.
-  void GetRoots(std::vector<boost::shared_ptr<ct::Cert> > *roots,
+  void GetRoots(std::vector<boost::shared_ptr<Cert> > *roots,
                 const Callback &done);
 
   // This does not clear "entries" before appending the retrieved
@@ -64,22 +63,22 @@ class AsyncLogClient {
 
   // Note: these methods can call "done" inline (before they return),
   // if there is a problem with the (pre-)certificate chain.
-  void AddCertChain(const ct::CertChain &cert_chain,
+  void AddCertChain(const CertChain &cert_chain,
                     ct::SignedCertificateTimestamp *sct, const Callback &done);
-  void AddPreCertChain(const ct::PreCertChain &pre_cert_chain,
+  void AddPreCertChain(const PreCertChain &pre_cert_chain,
                        ct::SignedCertificateTimestamp *sct,
                        const Callback &done);
 
  private:
   std::string GetPath(const std::string &subpath) const;
 
-  void InternalAddChain(const ct::CertChain &cert_chain,
+  void InternalAddChain(const CertChain &cert_chain,
                         ct::SignedCertificateTimestamp *sct, bool pre_cert,
                         const Callback &done);
 
-  const boost::shared_ptr<cert_trans::libevent::Base> base_;
+  const boost::shared_ptr<libevent::Base> base_;
   const boost::shared_ptr<evhttp_uri> server_uri_;
-  cert_trans::libevent::HttpConnection conn_;
+  libevent::HttpConnection conn_;
 
   DISALLOW_COPY_AND_ASSIGN(AsyncLogClient);
 };
