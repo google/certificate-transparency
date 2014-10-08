@@ -24,7 +24,8 @@ static const char kCaPreCert[] = "ca-pre-cert.pem";
 // Issued by ca-cert.pem
 static const char kPreCert[] = "test-embedded-pre-cert.pem";
 // Issued by ca-pre-cert.pem
-static const char kPreWithPreCaCert[] = "test-embedded-with-preca-pre-cert.pem";
+static const char kPreWithPreCaCert[] =
+    "test-embedded-with-preca-pre-cert.pem";
 // Issued by ca-cert.pem
 static const char kIntermediateCert[] = "intermediate-cert.pem";
 // Issued by intermediate-cert.pem
@@ -49,10 +50,11 @@ class CertSubmissionHandlerTest : public ::testing::Test {
   string intermediate_;
   string chain_leaf_;
   string cert_dir_;
-  CertSubmissionHandler *handler_;
-  CertChecker *checker_;
+  CertSubmissionHandler* handler_;
+  CertChecker* checker_;
 
-  CertSubmissionHandlerTest() : handler_(NULL) {}
+  CertSubmissionHandlerTest() : handler_(NULL) {
+  }
 
   void SetUp() {
     cert_dir_ = FLAGS_test_certs_dir;
@@ -69,8 +71,8 @@ class CertSubmissionHandlerTest : public ::testing::Test {
                                &precert_with_preca_));
     CHECK(util::ReadBinaryFile(cert_dir_ + "/" + kIntermediateCert,
                                &intermediate_));
-    CHECK(util::ReadBinaryFile(cert_dir_ + "/" + kChainLeafCert,
-                               &chain_leaf_));
+    CHECK(
+        util::ReadBinaryFile(cert_dir_ + "/" + kChainLeafCert, &chain_leaf_));
   }
 
   ~CertSubmissionHandlerTest() {
@@ -104,9 +106,10 @@ TEST_F(CertSubmissionHandlerTest, SubmitEmptyCert) {
 }
 
 TEST_F(CertSubmissionHandlerTest, SubmitInvalidCert) {
-  CertChain submission("-----BEGIN CERTIFICATE-----\n"
-                       "invalid\n"
-                       "-----END CERTIFICATE-----");
+  CertChain submission(
+      "-----BEGIN CERTIFICATE-----\n"
+      "invalid\n"
+      "-----END CERTIFICATE-----");
   EXPECT_FALSE(submission.IsLoaded());
 
   LogEntry entry;
@@ -211,7 +214,7 @@ TEST_F(CertSubmissionHandlerTest, SubmitInvalidPreCertChain) {
 
 }  // namespace
 
-int main(int argc, char**argv) {
+int main(int argc, char** argv) {
   cert_trans::test::InitTesting(argv[0], &argc, &argv, true);
   OpenSSL_add_all_algorithms();
   ERR_load_crypto_strings();

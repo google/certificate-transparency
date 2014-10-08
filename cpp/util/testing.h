@@ -4,8 +4,7 @@
 namespace cert_trans {
 namespace test {
 
-void InitTesting(const char *name, int *argc, char ***argv,
-                 bool remove_flags);
+void InitTesting(const char* name, int* argc, char*** argv, bool remove_flags);
 
 }  // namespace test
 }  // namespace cert_trans

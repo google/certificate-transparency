@@ -16,10 +16,10 @@ using ct::SignedCertificateTimestamp;
 using ct::SignedTreeHead;
 using std::string;
 
-LogVerifier::LogVerifier(LogSigVerifier *sig_verifier,
-                         MerkleVerifier *merkle_verifier)
-    : sig_verifier_(sig_verifier),
-      merkle_verifier_(merkle_verifier) {}
+LogVerifier::LogVerifier(LogSigVerifier* sig_verifier,
+                         MerkleVerifier* merkle_verifier)
+    : sig_verifier_(sig_verifier), merkle_verifier_(merkle_verifier) {
+}
 
 LogVerifier::~LogVerifier() {
   delete sig_verifier_;
@@ -27,8 +27,8 @@ LogVerifier::~LogVerifier() {
 }
 
 LogVerifier::VerifyResult LogVerifier::VerifySignedCertificateTimestamp(
-    const LogEntry &entry, const SignedCertificateTimestamp &sct,
-    uint64_t begin_range, uint64_t end_range, string *merkle_leaf_hash) const {
+    const LogEntry& entry, const SignedCertificateTimestamp& sct,
+    uint64_t begin_range, uint64_t end_range, string* merkle_leaf_hash) const {
   if (!IsBetween(sct.timestamp(), begin_range, end_range))
     return INVALID_TIMESTAMP;
 
@@ -47,17 +47,17 @@ LogVerifier::VerifyResult LogVerifier::VerifySignedCertificateTimestamp(
 }
 
 LogVerifier::VerifyResult LogVerifier::VerifySignedCertificateTimestamp(
-    const LogEntry &entry, const SignedCertificateTimestamp &sct,
-    string *merkle_leaf_hash) const {
+    const LogEntry& entry, const SignedCertificateTimestamp& sct,
+    string* merkle_leaf_hash) const {
   // Allow a bit of slack, say 1 second into the future.
-  return VerifySignedCertificateTimestamp(
-      entry, sct, 0, util::TimeInMilliseconds() + 1000, merkle_leaf_hash);
+  return VerifySignedCertificateTimestamp(entry, sct, 0,
+                                          util::TimeInMilliseconds() + 1000,
+                                          merkle_leaf_hash);
 }
 
-LogVerifier::VerifyResult
-LogVerifier::VerifySignedTreeHead(const SignedTreeHead &sth,
-                                  uint64_t begin_range,
-                                  uint64_t end_range) const {
+LogVerifier::VerifyResult LogVerifier::VerifySignedTreeHead(
+    const SignedTreeHead& sth, uint64_t begin_range,
+    uint64_t end_range) const {
   if (!IsBetween(sth.timestamp(), begin_range, end_range))
     return INVALID_TIMESTAMP;
 
@@ -67,16 +67,14 @@ LogVerifier::VerifySignedTreeHead(const SignedTreeHead &sth,
 }
 
 LogVerifier::VerifyResult LogVerifier::VerifySignedTreeHead(
-    const SignedTreeHead &sth) const {
+    const SignedTreeHead& sth) const {
   // Allow a bit of slack, say 1 second into the future.
   return VerifySignedTreeHead(sth, 0, util::TimeInMilliseconds() + 1000);
 }
 
-LogVerifier::VerifyResult
-LogVerifier::VerifyMerkleAuditProof(const LogEntry &entry,
-                                    const SignedCertificateTimestamp &sct,
-                                    const MerkleAuditProof &merkle_proof)
-    const {
+LogVerifier::VerifyResult LogVerifier::VerifyMerkleAuditProof(
+    const LogEntry& entry, const SignedCertificateTimestamp& sct,
+    const MerkleAuditProof& merkle_proof) const {
   if (!IsBetween(merkle_proof.timestamp(), sct.timestamp(),
                  util::TimeInMilliseconds() + 1000))
     return INCONSISTENT_TIMESTAMPS;
@@ -120,13 +118,11 @@ bool LogVerifier::IsBetween(uint64_t timestamp, uint64_t earliest,
   return timestamp >= earliest && timestamp <= latest;
 }
 
-bool LogVerifier::VerifyConsistency(const ct::SignedTreeHead &sth1,
-				    const ct::SignedTreeHead &sth2,
-				    const std::vector<std::string> &proof)
-  const {
- return merkle_verifier_->VerifyConsistency(sth1.tree_size(),
-					    sth2.tree_size(),
-					    sth1.sha256_root_hash(),
-					    sth2.sha256_root_hash(),
-					    proof);
+bool LogVerifier::VerifyConsistency(
+    const ct::SignedTreeHead& sth1, const ct::SignedTreeHead& sth2,
+    const std::vector<std::string>& proof) const {
+  return merkle_verifier_->VerifyConsistency(sth1.tree_size(),
+                                             sth2.tree_size(),
+                                             sth1.sha256_root_hash(),
+                                             sth2.sha256_root_hash(), proof);
 }

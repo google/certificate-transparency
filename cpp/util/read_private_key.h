@@ -14,7 +14,7 @@ enum KeyError {
   INVALID_KEY,
 };
 
-KeyError ReadPrivateKey(EVP_PKEY **pkey, const std::string &file);
+KeyError ReadPrivateKey(EVP_PKEY** pkey, const std::string& file);
 
 
 }  // namespace util

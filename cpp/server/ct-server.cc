@@ -41,16 +41,16 @@ DEFINE_int32(tree_storage_depth, 0,
              "Subdirectory depth for tree signatures; if the directory is not "
              "empty, must match the existing depth");
 DEFINE_int32(log_stats_frequency_seconds, 3600,
-             "Interval for logging summary statistics. Approximate: the server "
-             "will log statistics if in the beginning of its select loop, "
-             "at least this period has elapsed since the last log time. "
+             "Interval for logging summary statistics. Approximate: the "
+             "server will log statistics if in the beginning of its select "
+             "loop, at least this period has elapsed since the last log time. "
              "Must be greater than 0.");
 DEFINE_int32(tree_signing_frequency_seconds, 600,
              "How often should we issue a new signed tree head. Approximate: "
              "the signer process will kick off if in the beginning of the "
              "server select loop, at least this period has elapsed since the "
-             "last signing. Set this well below the MMD to ensure we sign "
-             "in a timely manner. Must be greater than 0.");
+             "last signing. Set this well below the MMD to ensure we sign in "
+             "a timely manner. Must be greater than 0.");
 
 namespace libevent = cert_trans::libevent;
 
@@ -70,7 +70,7 @@ using std::string;
 static const int kCtimeBufSize = 26;
 
 // Basic sanity checks on flag values.
-static bool ValidatePort(const char *flagname, int port) {
+static bool ValidatePort(const char* flagname, int port) {
   if (port <= 0 || port > 65535) {
     std::cout << "Port value " << port << " is invalid. " << std::endl;
     return false;
@@ -78,10 +78,10 @@ static bool ValidatePort(const char *flagname, int port) {
   return true;
 }
 
-static const bool port_dummy = RegisterFlagValidator(&FLAGS_port,
-                                                     &ValidatePort);
+static const bool port_dummy =
+    RegisterFlagValidator(&FLAGS_port, &ValidatePort);
 
-static bool ValidateRead(const char *flagname, const string &path) {
+static bool ValidateRead(const char* flagname, const string& path) {
   if (access(path.c_str(), R_OK) != 0) {
     std::cout << "Cannot access " << flagname << " at " << path << std::endl;
     return false;
@@ -89,13 +89,12 @@ static bool ValidateRead(const char *flagname, const string &path) {
   return true;
 }
 
-static const bool key_dummy = RegisterFlagValidator(&FLAGS_key,
-                                                    &ValidateRead);
+static const bool key_dummy = RegisterFlagValidator(&FLAGS_key, &ValidateRead);
 
-static const bool cert_dummy = RegisterFlagValidator(&FLAGS_trusted_cert_file,
-                                                     &ValidateRead);
+static const bool cert_dummy =
+    RegisterFlagValidator(&FLAGS_trusted_cert_file, &ValidateRead);
 
-static bool ValidateWrite(const char *flagname, const string &path) {
+static bool ValidateWrite(const char* flagname, const string& path) {
   if (path != "" && access(path.c_str(), W_OK) != 0) {
     std::cout << "Cannot modify " << flagname << " at " << path << std::endl;
     return false;
@@ -103,13 +102,13 @@ static bool ValidateWrite(const char *flagname, const string &path) {
   return true;
 }
 
-static const bool cert_dir_dummy = RegisterFlagValidator(&FLAGS_cert_dir,
-                                                         &ValidateWrite);
+static const bool cert_dir_dummy =
+    RegisterFlagValidator(&FLAGS_cert_dir, &ValidateWrite);
 
-static const bool tree_dir_dummy = RegisterFlagValidator(&FLAGS_tree_dir,
-                                                         &ValidateWrite);
+static const bool tree_dir_dummy =
+    RegisterFlagValidator(&FLAGS_tree_dir, &ValidateWrite);
 
-static bool ValidateIsNonNegative(const char *flagname, int value) {
+static bool ValidateIsNonNegative(const char* flagname, int value) {
   if (value < 0) {
     std::cout << flagname << " must not be negative" << std::endl;
     return false;
@@ -117,12 +116,12 @@ static bool ValidateIsNonNegative(const char *flagname, int value) {
   return true;
 }
 
-static const bool c_st_dummy = RegisterFlagValidator(&FLAGS_cert_storage_depth,
-                                                     &ValidateIsNonNegative);
-static const bool t_st_dummy = RegisterFlagValidator(&FLAGS_tree_storage_depth,
-                                                     &ValidateIsNonNegative);
+static const bool c_st_dummy =
+    RegisterFlagValidator(&FLAGS_cert_storage_depth, &ValidateIsNonNegative);
+static const bool t_st_dummy =
+    RegisterFlagValidator(&FLAGS_tree_storage_depth, &ValidateIsNonNegative);
 
-static bool ValidateIsPositive(const char *flagname, int value) {
+static bool ValidateIsPositive(const char* flagname, int value) {
   if (value <= 0) {
     std::cout << flagname << " must be greater than 0" << std::endl;
     return false;
@@ -130,11 +129,13 @@ static bool ValidateIsPositive(const char *flagname, int value) {
   return true;
 }
 
-static const bool stats_dummy = RegisterFlagValidator(
-    &FLAGS_log_stats_frequency_seconds, &ValidateIsPositive);
+static const bool stats_dummy =
+    RegisterFlagValidator(&FLAGS_log_stats_frequency_seconds,
+                          &ValidateIsPositive);
 
-static const bool sign_dummy = RegisterFlagValidator(
-    &FLAGS_tree_signing_frequency_seconds, &ValidateIsPositive);
+static const bool sign_dummy =
+    RegisterFlagValidator(&FLAGS_tree_signing_frequency_seconds,
+                          &ValidateIsPositive);
 
 // Hooks a repeating timer on the event loop to call a callback. It
 // will wait "interval_secs" between calls to "callback" (so this
@@ -142,8 +143,8 @@ static const bool sign_dummy = RegisterFlagValidator(
 // frequently).
 class PeriodicCallback {
  public:
-  PeriodicCallback(const shared_ptr<libevent::Base> &base, int interval_secs,
-                   const function<void()> &callback)
+  PeriodicCallback(const shared_ptr<libevent::Base>& base, int interval_secs,
+                   const function<void()>& callback)
       : base_(base),
         interval_secs_(interval_secs),
         event_(*base_, -1, 0, bind(&PeriodicCallback::Go, this)),
@@ -165,8 +166,8 @@ class PeriodicCallback {
   DISALLOW_COPY_AND_ASSIGN(PeriodicCallback);
 };
 
-void SignMerkleTree(TreeSigner<LoggedCertificate> *tree_signer,
-                    LogLookup<LoggedCertificate> *log_lookup) {
+void SignMerkleTree(TreeSigner<LoggedCertificate>* tree_signer,
+                    LogLookup<LoggedCertificate>* log_lookup) {
   CHECK_EQ(tree_signer->UpdateTree(), TreeSigner<LoggedCertificate>::OK);
   CHECK_EQ(log_lookup->Update(), LogLookup<LoggedCertificate>::UPDATE_OK);
 
@@ -176,14 +177,14 @@ void SignMerkleTree(TreeSigner<LoggedCertificate> *tree_signer,
   LOG(INFO) << "Tree successfully updated at " << ctime_r(&last_update, buf);
 }
 
-int main(int argc, char * argv[]) {
+int main(int argc, char* argv[]) {
   google::ParseCommandLineFlags(&argc, &argv, true);
   google::InitGoogleLogging(argv[0]);
   OpenSSL_add_all_algorithms();
   ERR_load_crypto_strings();
   cert_trans::LoadCtExtensions();
 
-  EVP_PKEY *pkey = NULL;
+  EVP_PKEY* pkey = NULL;
   CHECK_EQ(ReadPrivateKey(&pkey, FLAGS_key), cert_trans::util::KEY_OK);
   LogSigner log_signer(pkey);
 
@@ -195,19 +196,21 @@ int main(int argc, char * argv[]) {
     CHECK_NE(FLAGS_cert_dir, FLAGS_tree_dir)
         << "Certificate directory and tree directory must differ";
 
-  if ((FLAGS_cert_dir != "" || FLAGS_tree_dir != "") && FLAGS_sqlite_db != "") {
-    std::cerr << "Choose either file or sqlite database, not both" << std::endl;
+  if ((FLAGS_cert_dir != "" || FLAGS_tree_dir != "") &&
+      FLAGS_sqlite_db != "") {
+    std::cerr << "Choose either file or sqlite database, not both"
+              << std::endl;
     exit(1);
   }
 
-  Database<LoggedCertificate> *db;
+  Database<LoggedCertificate>* db;
 
   if (FLAGS_sqlite_db != "")
-      db = new SQLiteDB<LoggedCertificate>(FLAGS_sqlite_db);
+    db = new SQLiteDB<LoggedCertificate>(FLAGS_sqlite_db);
   else
-      db = new FileDB<LoggedCertificate>(
-               new FileStorage(FLAGS_cert_dir, FLAGS_cert_storage_depth),
-               new FileStorage(FLAGS_tree_dir, FLAGS_tree_storage_depth));
+    db = new FileDB<LoggedCertificate>(
+        new FileStorage(FLAGS_cert_dir, FLAGS_cert_storage_depth),
+        new FileStorage(FLAGS_tree_dir, FLAGS_tree_storage_depth));
 
   evthread_use_pthreads();
   const shared_ptr<libevent::Base> event_base(make_shared<libevent::Base>());
@@ -231,9 +234,9 @@ int main(int argc, char * argv[]) {
   ThreadPool pool;
   HttpHandler handler(&log_lookup, db, &checker, &frontend, &pool);
 
-  PeriodicCallback tree_event(
-      event_base, FLAGS_tree_signing_frequency_seconds,
-      boost::bind(&SignMerkleTree, &tree_signer, &log_lookup));
+  PeriodicCallback tree_event(event_base, FLAGS_tree_signing_frequency_seconds,
+                              boost::bind(&SignMerkleTree, &tree_signer,
+                                          &log_lookup));
 
   libevent::HttpServer server(*event_base);
   handler.Add(&server);

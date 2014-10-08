@@ -14,7 +14,7 @@ class SerialHasher;
 class MerkleVerifier {
  public:
   // Takes ownership of the SerialHasher.
-  MerkleVerifier(SerialHasher *hasher);
+  MerkleVerifier(SerialHasher* hasher);
   ~MerkleVerifier();
 
   // Verify Merkle path. Return true iff the path is a valid proof for
@@ -28,8 +28,8 @@ class MerkleVerifier {
   // @ param root The root hash
   // @ param data The leaf data
   bool VerifyPath(size_t leaf, size_t tree_size,
-                  const std::vector<std::string> &path, const std::string &root,
-                  const std::string &data);
+                  const std::vector<std::string>& path,
+                  const std::string& root, const std::string& data);
 
   // Compute the root corresponding to a Merkle audit path.
   // Returns an empty string if the path is not valid.
@@ -40,18 +40,18 @@ class MerkleVerifier {
   // to root. Does not include the leaf hash or the root.
   // @ param data The leaf data
   std::string RootFromPath(size_t leaf, size_t tree_size,
-                           const std::vector<std::string> &path,
-                           const std::string &data);
+                           const std::vector<std::string>& path,
+                           const std::string& data);
 
   bool VerifyConsistency(size_t snapshot1, size_t snapshot2,
-                         const std::string &root1, const std::string &root2,
-                         const std::vector<std::string> &proof);
+                         const std::string& root1, const std::string& root2,
+                         const std::vector<std::string>& proof);
 
   // Return the leaf hash corresponding to the leaf input.
-  std::string LeafHash(const std::string &data);
+  std::string LeafHash(const std::string& data);
 
  private:
   TreeHasher treehasher_;
 };
 
-# endif
+#endif

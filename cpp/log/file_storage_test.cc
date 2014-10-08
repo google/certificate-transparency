@@ -21,12 +21,14 @@ const unsigned kStorageDepth = 3;
 
 class BasicFileStorageTest : public ::testing::Test {
  protected:
-  BasicFileStorageTest() :
-      test_db_() {}
+  BasicFileStorageTest() : test_db_() {
+  }
 
-  FileStorage *fs() const { return test_db_.db(); }
+  FileStorage* fs() const {
+    return test_db_.db();
+  }
 
-  TestDB<FileStorage>test_db_;
+  TestDB<FileStorage> test_db_;
 };
 
 TEST_F(BasicFileStorageTest, Create) {
@@ -136,7 +138,7 @@ TEST_F(BasicFileStorageTest, Resume) {
   EXPECT_EQ(FileStorage::OK, fs()->CreateEntry(key1, value1));
 
   // A second database.
-  FileStorage *db2 = test_db_.SecondDB();
+  FileStorage* db2 = test_db_.SecondDB();
 
   // Look up and expect to find the entries.
   string lookup_result;
@@ -160,7 +162,7 @@ TEST_F(BasicFileStorageTest, ScanOnResume) {
   EXPECT_EQ(FileStorage::OK, fs()->CreateEntry(key1, value1));
 
   // A second database.
-  FileStorage *db2 = test_db_.SecondDB();
+  FileStorage* db2 = test_db_.SecondDB();
 
   std::set<string> keys;
   keys.insert(key0);
@@ -174,8 +176,8 @@ TEST_F(BasicFileStorageTest, ScanOnResume) {
 class FailingFileStorageDeathTest : public ::testing::Test {
  protected:
   string GetTemporaryDirectory() {
-    return util::CreateTemporaryDirectory(
-        tmp_.TmpStorageDir() + "/ctlogXXXXXX");
+    return util::CreateTemporaryDirectory(tmp_.TmpStorageDir() +
+                                          "/ctlogXXXXXX");
   }
   TmpStorage tmp_;
 };
@@ -197,7 +199,7 @@ TEST(DeathTest, SupportDeath) {
 
 TEST_F(FailingFileStorageDeathTest, DieOnFailedCreate) {
   // Profiling run: count file operations.
-  FailingFilesystemOp *failing_file_op = new FailingFilesystemOp(-1);
+  FailingFilesystemOp* failing_file_op = new FailingFilesystemOp(-1);
   FileStorage db(GetTemporaryDirectory(), kStorageDepth, failing_file_op);
 
   // Count ops for constructor.
@@ -235,7 +237,7 @@ TEST_F(FailingFileStorageDeathTest, DieOnFailedCreate) {
 
 TEST_F(FailingFileStorageDeathTest, DieOnFailedUpdate) {
   // Profiling run: count file operations.
-  FailingFilesystemOp *failing_file_op = new FailingFilesystemOp(-1);
+  FailingFilesystemOp* failing_file_op = new FailingFilesystemOp(-1);
   FileStorage db(GetTemporaryDirectory(), kStorageDepth, failing_file_op);
 
   string key("1234xyzw", 8);
@@ -262,7 +264,7 @@ TEST_F(FailingFileStorageDeathTest, DieOnFailedUpdate) {
 
 TEST_F(FailingFileStorageDeathTest, ResumeOnFailedCreate) {
   // Profiling run: count file operations.
-  FailingFilesystemOp *failing_file_op = new FailingFilesystemOp(-1);
+  FailingFilesystemOp* failing_file_op = new FailingFilesystemOp(-1);
   FileStorage db(GetTemporaryDirectory(), kStorageDepth, failing_file_op);
 
   string key0("1234xyzw", 8);
@@ -317,7 +319,7 @@ TEST_F(FailingFileStorageDeathTest, ResumeOnFailedCreate) {
 
 TEST_F(FailingFileStorageDeathTest, ResumeOnFailedUpdate) {
   // Profiling run: count file operations.
-  FailingFilesystemOp *failing_file_op = new FailingFilesystemOp(-1);
+  FailingFilesystemOp* failing_file_op = new FailingFilesystemOp(-1);
   FileStorage db(GetTemporaryDirectory(), kStorageDepth, failing_file_op);
 
   string key("1234xyzw", 8);
@@ -350,7 +352,7 @@ TEST_F(FailingFileStorageDeathTest, ResumeOnFailedUpdate) {
 
 }  // namespace
 
-int main(int argc, char **argv) {
+int main(int argc, char** argv) {
   cert_trans::test::InitTesting(argv[0], &argc, &argv, true);
   return RUN_ALL_TESTS();
 }

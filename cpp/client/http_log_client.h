@@ -18,29 +18,29 @@ class Cert;
 
 class HTTPLogClient {
  public:
-  explicit HTTPLogClient(const std::string &server);
+  explicit HTTPLogClient(const std::string& server);
 
-  AsyncLogClient::Status UploadSubmission(
-      const std::string &submission, bool pre,
-      ct::SignedCertificateTimestamp *sct);
+  AsyncLogClient::Status UploadSubmission(const std::string& submission,
+                                          bool pre,
+                                          ct::SignedCertificateTimestamp* sct);
 
-  AsyncLogClient::Status GetSTH(ct::SignedTreeHead *sth);
+  AsyncLogClient::Status GetSTH(ct::SignedTreeHead* sth);
 
   AsyncLogClient::Status GetRoots(
-      std::vector<boost::shared_ptr<Cert> > *roots);
+      std::vector<boost::shared_ptr<Cert> >* roots);
 
-  AsyncLogClient::Status QueryAuditProof(
-      const std::string &merkle_leaf_hash, ct::MerkleAuditProof *proof);
+  AsyncLogClient::Status QueryAuditProof(const std::string& merkle_leaf_hash,
+                                         ct::MerkleAuditProof* proof);
 
-  AsyncLogClient::Status GetSTHConsistency(
-      uint64_t size1, uint64_t size2, std::vector<std::string> *proof);
+  AsyncLogClient::Status GetSTHConsistency(uint64_t size1, uint64_t size2,
+                                           std::vector<std::string>* proof);
 
   // This does not clear |entries| before appending the retrieved
   // entries.
   AsyncLogClient::Status GetEntries(
-      int first, int last, std::vector<AsyncLogClient::Entry> *entries);
+      int first, int last, std::vector<AsyncLogClient::Entry>* entries);
 
-private:
+ private:
   const boost::shared_ptr<libevent::Base> base_;
   AsyncLogClient client_;
 

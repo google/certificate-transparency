@@ -12,7 +12,7 @@
 
 class LogSigner : public cert_trans::Signer {
  public:
-  explicit LogSigner(EVP_PKEY *pkey);
+  explicit LogSigner(EVP_PKEY* pkey);
   virtual ~LogSigner();
 
   enum SignResult {
@@ -30,25 +30,27 @@ class LogSigner : public cert_trans::Signer {
   // signature string.
   // In accordance with the spec, timestamp should be UTC time,
   // since January 1, 1970, 00:00, in milliseconds.
-  SignResult SignV1CertificateTimestamp(
-      uint64_t timestamp, const std::string &leaf_certificate,
-      const std::string &extensions, std::string *result) const;
+  SignResult SignV1CertificateTimestamp(uint64_t timestamp,
+                                        const std::string& leaf_certificate,
+                                        const std::string& extensions,
+                                        std::string* result) const;
 
-  SignResult SignV1PrecertificateTimestamp(
-      uint64_t timestamp, const std::string &issuer_key_hash,
-      const std::string &tbs_certificate,
-      const std::string &extensions, std::string *result) const;
+  SignResult SignV1PrecertificateTimestamp(uint64_t timestamp,
+                                           const std::string& issuer_key_hash,
+                                           const std::string& tbs_certificate,
+                                           const std::string& extensions,
+                                           std::string* result) const;
 
   // Sign the cert timestamp and write the resulting DigitallySigned
   // signature message into |sct|.
   SignResult SignCertificateTimestamp(
-      const ct::LogEntry &entry, ct::SignedCertificateTimestamp *sct) const;
+      const ct::LogEntry& entry, ct::SignedCertificateTimestamp* sct) const;
 
   SignResult SignV1TreeHead(uint64_t timestamp, uint64_t tree_size,
-                            const std::string &root_hash,
-                            std::string *result) const;
+                            const std::string& root_hash,
+                            std::string* result) const;
 
-  SignResult SignTreeHead(ct::SignedTreeHead *sth) const;
+  SignResult SignTreeHead(ct::SignedTreeHead* sth) const;
 
  private:
   static SignResult GetSerializeError(Serializer::SerializeResult result);
@@ -56,7 +58,7 @@ class LogSigner : public cert_trans::Signer {
 
 class LogSigVerifier : public cert_trans::Verifier {
  public:
-  explicit LogSigVerifier(EVP_PKEY *pkey);
+  explicit LogSigVerifier(EVP_PKEY* pkey);
   virtual ~LogSigVerifier();
 
   enum VerifyResult {
@@ -78,31 +80,32 @@ class LogSigVerifier : public cert_trans::Verifier {
   };
 
   // The protobuf-agnostic library version.
-  VerifyResult VerifyV1CertSCTSignature(
-      uint64_t timestamp, const std::string &leaf_cert,
-      const std::string &extensions, const std::string &signature) const;
+  VerifyResult VerifyV1CertSCTSignature(uint64_t timestamp,
+                                        const std::string& leaf_cert,
+                                        const std::string& extensions,
+                                        const std::string& signature) const;
 
-  VerifyResult VerifyV1PrecertSCTSignature(
-      uint64_t timestamp, const std::string &issuer_key_hash,
-      const std::string &tbs_cert, const std::string &extensions,
-      const std::string &signature) const;
+  VerifyResult VerifyV1PrecertSCTSignature(uint64_t timestamp,
+                                           const std::string& issuer_key_hash,
+                                           const std::string& tbs_cert,
+                                           const std::string& extensions,
+                                           const std::string& signature) const;
 
   VerifyResult VerifySCTSignature(
-      const ct::LogEntry &entry,
-      const ct::SignedCertificateTimestamp &sct) const;
+      const ct::LogEntry& entry,
+      const ct::SignedCertificateTimestamp& sct) const;
 
   // The protobuf-agnostic library version.
-  VerifyResult VerifyV1STHSignature(
-      uint64_t timestamp, uint64_t tree_size, const std::string &root_hash,
-      const std::string &signature) const;
+  VerifyResult VerifyV1STHSignature(uint64_t timestamp, uint64_t tree_size,
+                                    const std::string& root_hash,
+                                    const std::string& signature) const;
 
-  VerifyResult VerifySTHSignature(const ct::SignedTreeHead &sth) const;
+  VerifyResult VerifySTHSignature(const ct::SignedTreeHead& sth) const;
 
  private:
-  static VerifyResult
-  GetSerializeError(Serializer::SerializeResult result);
+  static VerifyResult GetSerializeError(Serializer::SerializeResult result);
 
-  static VerifyResult
-  GetDeserializeSignatureError(Deserializer::DeserializeResult result);
+  static VerifyResult GetDeserializeSignatureError(
+      Deserializer::DeserializeResult result);
 };
 #endif

@@ -15,8 +15,9 @@
 class CertSubmissionHandler {
  public:
   // Does not take ownership of the cert_checker.
-  explicit CertSubmissionHandler(cert_trans::CertChecker *cert_checker);
-  ~CertSubmissionHandler() {}
+  explicit CertSubmissionHandler(cert_trans::CertChecker* cert_checker);
+  ~CertSubmissionHandler() {
+  }
 
   enum SubmitResult {
     OK,
@@ -31,27 +32,27 @@ class CertSubmissionHandler {
   };
 
   // These may change |chain|.
-  SubmitResult ProcessX509Submission(cert_trans::CertChain *chain,
-                                     ct::LogEntry *entry);
-  SubmitResult ProcessPreCertSubmission(cert_trans::PreCertChain *chain,
-                                        ct::LogEntry *entry);
+  SubmitResult ProcessX509Submission(cert_trans::CertChain* chain,
+                                     ct::LogEntry* entry);
+  SubmitResult ProcessPreCertSubmission(cert_trans::PreCertChain* chain,
+                                        ct::LogEntry* entry);
 
   // For clients, to reconstruct the bytestring under the signature
   // from the observed chain. Does not check whether the entry
   // has valid format (i.e., does not check length limits).
-  static bool X509ChainToEntry(const cert_trans::CertChain &chain,
-                               ct::LogEntry *entry);
+  static bool X509ChainToEntry(const cert_trans::CertChain& chain,
+                               ct::LogEntry* entry);
 
-  const std::multimap<std::string, const cert_trans::Cert*> &GetRoots() const {
+  const std::multimap<std::string, const cert_trans::Cert*>& GetRoots() const {
     return cert_checker_->GetTrustedCertificates();
   }
 
  private:
-  static bool SerializedTbs(const cert_trans::Cert &cert, std::string *result);
+  static bool SerializedTbs(const cert_trans::Cert& cert, std::string* result);
   static SubmitResult GetVerifyError(
       cert_trans::CertChecker::CertVerifyResult result);
 
-  cert_trans::CertChecker *cert_checker_;
+  cert_trans::CertChecker* cert_checker_;
 
   DISALLOW_COPY_AND_ASSIGN(CertSubmissionHandler);
 };

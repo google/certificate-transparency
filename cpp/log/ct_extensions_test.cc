@@ -15,7 +15,8 @@ namespace cert_trans {
 
 using std::string;
 
-DEFINE_string(test_certs_dir, "../../test/testdata", "Path to test certificates");
+DEFINE_string(test_certs_dir, "../../test/testdata",
+              "Path to test certificates");
 
 static const char kSimpleCert[] = "test-cert.pem";
 static const char kSimpleCaCert[] = "ca-cert.pem";
@@ -38,7 +39,8 @@ class CtExtensionsTest : public ::testing::Test {
     CHECK(util::ReadTextFile(cert_dir + "/" + kSimpleCert, &simple_cert_))
         << "Could not read test data from " << cert_dir
         << ". Wrong --test_certs_dir?";
-    CHECK(util::ReadTextFile(cert_dir + "/" + kSimpleCaCert, &simple_ca_cert_));
+    CHECK(
+        util::ReadTextFile(cert_dir + "/" + kSimpleCaCert, &simple_ca_cert_));
     CHECK(util::ReadTextFile(cert_dir + "/" + kFakeCertWithSCT, &sct_cert_));
     CHECK(util::ReadTextFile(cert_dir + "/" + kCertWithPrecertSigning,
                              &pre_signing_cert_));
@@ -51,33 +53,36 @@ class CtExtensionsTest : public ::testing::Test {
 TEST_F(CtExtensionsTest, TestSCTExtension) {
   // Sanity check
   Cert simple_cert(simple_cert_);
-  EXPECT_EQ(Cert::FALSE, simple_cert.HasExtension(
-      cert_trans::NID_ctSignedCertificateTimestampList));
+  EXPECT_EQ(Cert::FALSE,
+            simple_cert.HasExtension(
+                cert_trans::NID_ctSignedCertificateTimestampList));
 
   Cert sct_cert(sct_cert_);
   // Check we can find the extension by its advertised NID.
   // We should really be checking that the OID matches the expected OID but
   // what other extension could this cert be having that the other one doesn't?
   ASSERT_EQ(Cert::TRUE, sct_cert.HasExtension(
-      cert_trans::NID_ctSignedCertificateTimestampList));
+                            cert_trans::NID_ctSignedCertificateTimestampList));
 
   string ext_data;
-  EXPECT_EQ(Cert::TRUE, sct_cert.OctetStringExtensionData(
-      cert_trans::NID_ctSignedCertificateTimestampList, &ext_data));
+  EXPECT_EQ(Cert::TRUE,
+            sct_cert.OctetStringExtensionData(
+                cert_trans::NID_ctSignedCertificateTimestampList, &ext_data));
   EXPECT_FALSE(ext_data.empty());
 
   // Now fish the extension data out using the print methods and check they
   // operate as expected.
   // TODO(ekasper):
-  X509_EXTENSION *ext;
-  ASSERT_EQ(Cert::TRUE, sct_cert.GetExtension(
-      cert_trans::NID_ctSignedCertificateTimestampList, &ext));
-  BIO *buf = BIO_new(BIO_s_mem());
+  X509_EXTENSION* ext;
+  ASSERT_EQ(Cert::TRUE,
+            sct_cert.GetExtension(
+                cert_trans::NID_ctSignedCertificateTimestampList, &ext));
+  BIO* buf = BIO_new(BIO_s_mem());
   ASSERT_NE(buf, static_cast<BIO*>(NULL));
 
   EXPECT_EQ(1, X509V3_EXT_print(buf, ext, 0, 0));
-  CHECK_EQ(1, BIO_write(buf, "", 1)); // NULL-terminate
-  char *result;
+  CHECK_EQ(1, BIO_write(buf, "", 1));  // NULL-terminate
+  char* result;
   BIO_get_mem_data(buf, &result);
 
   // Should be printing the octet string contents in hex.
@@ -89,32 +94,38 @@ TEST_F(CtExtensionsTest, TestSCTExtension) {
 TEST_F(CtExtensionsTest, TestEmbeddedSCTExtension) {
   // Sanity check
   Cert simple_cert(simple_cert_);
-  EXPECT_EQ(Cert::FALSE, simple_cert.HasExtension(
-      cert_trans::NID_ctEmbeddedSignedCertificateTimestampList));
+  EXPECT_EQ(Cert::FALSE,
+            simple_cert.HasExtension(
+                cert_trans::NID_ctEmbeddedSignedCertificateTimestampList));
 
   Cert embedded_sct_cert(embedded_sct_cert_);
   ASSERT_TRUE(embedded_sct_cert.IsLoaded());
   // Check we can find the extension by its advertised NID.
   // We should really be checking that the OID matches the expected OID but
   // what other extension could this cert be having that the other one doesn't?
-  ASSERT_EQ(Cert::TRUE, embedded_sct_cert.HasExtension(
-      cert_trans::NID_ctEmbeddedSignedCertificateTimestampList));
+  ASSERT_EQ(Cert::TRUE,
+            embedded_sct_cert.HasExtension(
+                cert_trans::NID_ctEmbeddedSignedCertificateTimestampList));
   string ext_data;
-  EXPECT_EQ(Cert::TRUE, embedded_sct_cert.OctetStringExtensionData(
-      cert_trans::NID_ctEmbeddedSignedCertificateTimestampList, &ext_data));
+  EXPECT_EQ(Cert::TRUE,
+            embedded_sct_cert.OctetStringExtensionData(
+                cert_trans::NID_ctEmbeddedSignedCertificateTimestampList,
+                &ext_data));
   EXPECT_FALSE(ext_data.empty());
 
   // Now fish the extension data out using the print methods and check they
   // operate as expected.
-  X509_EXTENSION *ext;
-  ASSERT_EQ(Cert::TRUE, embedded_sct_cert.GetExtension(
-      cert_trans::NID_ctEmbeddedSignedCertificateTimestampList, &ext));
-  BIO *buf = BIO_new(BIO_s_mem());
+  X509_EXTENSION* ext;
+  ASSERT_EQ(Cert::TRUE,
+            embedded_sct_cert.GetExtension(
+                cert_trans::NID_ctEmbeddedSignedCertificateTimestampList,
+                &ext));
+  BIO* buf = BIO_new(BIO_s_mem());
   ASSERT_NE(buf, static_cast<BIO*>(NULL));
 
   EXPECT_EQ(1, X509V3_EXT_print(buf, ext, 0, 0));
-  CHECK_EQ(1, BIO_write(buf, "", 1)); // NULL-terminate
-  char *result;
+  CHECK_EQ(1, BIO_write(buf, "", 1));  // NULL-terminate
+  char* result;
   BIO_get_mem_data(buf, &result);
 
   // Should be printing the octet string contents in hex.
@@ -137,16 +148,16 @@ TEST_F(CtExtensionsTest, TestPoisonExtension) {
 
   // Now fish the extension data out using the print methods and check they
   // operate as expected.
-  X509_EXTENSION *ext;
+  X509_EXTENSION* ext;
   ASSERT_EQ(Cert::TRUE,
             poison_cert.GetExtension(cert_trans::NID_ctPoison, &ext));
 
-  BIO *buf = BIO_new(BIO_s_mem());
+  BIO* buf = BIO_new(BIO_s_mem());
   ASSERT_NE(buf, static_cast<BIO*>(NULL));
 
   EXPECT_EQ(1, X509V3_EXT_print(buf, ext, 0, 0));
-  CHECK_EQ(1, BIO_write(buf, "", 1)); // NULL-terminate
-  char *result;
+  CHECK_EQ(1, BIO_write(buf, "", 1));  // NULL-terminate
+  char* result;
   BIO_get_mem_data(buf, &result);
 
   // Should be printing "NULL".
@@ -159,7 +170,7 @@ TEST_F(CtExtensionsTest, TestPrecertSigning) {
   // Sanity check
   Cert simple_ca_cert(simple_ca_cert_);
   EXPECT_EQ(Cert::FALSE, simple_ca_cert.HasExtendedKeyUsage(
-      cert_trans::NID_ctPrecertificateSigning));
+                             cert_trans::NID_ctPrecertificateSigning));
 
   Cert pre_signing_cert(pre_signing_cert_);
   ASSERT_TRUE(pre_signing_cert.IsLoaded());
@@ -167,12 +178,12 @@ TEST_F(CtExtensionsTest, TestPrecertSigning) {
   // We should really be checking that the OID matches the expected OID but
   // what other key usage could this cert be having that the other one doesn't?
   ASSERT_EQ(Cert::TRUE, pre_signing_cert.HasExtendedKeyUsage(
-      cert_trans::NID_ctPrecertificateSigning));
+                            cert_trans::NID_ctPrecertificateSigning));
 }
 
 }  // namespace cert_trans
 
-int main(int argc, char**argv) {
+int main(int argc, char** argv) {
   cert_trans::test::InitTesting(argv[0], &argc, &argv, true);
   OpenSSL_add_all_algorithms();
   cert_trans::LoadCtExtensions();

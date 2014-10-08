@@ -18,8 +18,8 @@ class SSLClient {
   // Takes ownership of the verifier. This client can currently
   // only verify SCTs from a single log at a time.
   // TODO(ekasper): implement a proper multi-log auditor.
-  SSLClient(const std::string &server, uint16_t port,
-            const std::string &ca_dir, LogVerifier *verifier);
+  SSLClient(const std::string& server, uint16_t port,
+            const std::string& ca_dir, LogVerifier* verifier);
 
   ~SSLClient();
 
@@ -42,12 +42,12 @@ class SSLClient {
 
   void Disconnect();
 
-  void GetSSLClientCTData(ct::SSLClientCTData *data) const;
+  void GetSSLClientCTData(ct::SSLClientCTData* data) const;
 
   // Need a static wrapper for the callback.
-  static LogVerifier::VerifyResult
-  VerifySCT(const std::string &token, LogVerifier *verifier,
-            ct::SSLClientCTData *data);
+  static LogVerifier::VerifyResult VerifySCT(const std::string& token,
+                                             LogVerifier* verifier,
+                                             ct::SSLClientCTData* data);
 
   // Custom verification callback for verifying the SCT token
   // in a superfluous certificate. Return values:
@@ -63,25 +63,26 @@ class SSLClient {
   // 1 - cert verified (we record whether an SCT was also verified in the
   //     callback args)
   // other values - cert verification error
-  static int VerifyCallback(X509_STORE_CTX *ctx, void *arg);
+  static int VerifyCallback(X509_STORE_CTX* ctx, void* arg);
 
-  static int ExtensionCallback(SSL *s, unsigned ext_type,
-                               const unsigned char *in, size_t inlen, 
-                               int *al, void *arg);
+  static int ExtensionCallback(SSL* s, unsigned ext_type,
+                               const unsigned char* in, size_t inlen, int* al,
+                               void* arg);
 
  private:
   Client client_;
-  SSL_CTX *ctx_;
-  SSL *ssl_;
+  SSL_CTX* ctx_;
+  SSL* ssl_;
   struct VerifyCallbackArgs {
-    VerifyCallbackArgs(LogVerifier *log_verifier)
+    VerifyCallbackArgs(LogVerifier* log_verifier)
         : verifier(log_verifier),
           sct_verified(false),
           require_sct(false),
-          ct_data() {}
+          ct_data() {
+    }
 
     // The verifier for checking log proofs.
-    LogVerifier *verifier;
+    LogVerifier* verifier;
     // SCT verification result.
     bool sct_verified;
     bool require_sct;

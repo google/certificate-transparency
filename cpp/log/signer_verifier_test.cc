@@ -23,8 +23,8 @@ const char kTestString[] = "abc";
 
 class SignerVerifierTest : public ::testing::Test {
  protected:
-  SignerVerifierTest() : signer_(NULL),
-                         verifier_(NULL) {}
+  SignerVerifierTest() : signer_(NULL), verifier_(NULL) {
+  }
 
   void SetUp() {
     signer_ = TestSigner::DefaultSigner();
@@ -36,16 +36,15 @@ class SignerVerifierTest : public ::testing::Test {
     delete verifier_;
   }
 
-  static string SerializedSignature(const DigitallySigned &signature) {
+  static string SerializedSignature(const DigitallySigned& signature) {
     string serialized_sig;
     CHECK_EQ(Serializer::OK,
-             Serializer::SerializeDigitallySigned(signature,
-                                                  &serialized_sig));
+             Serializer::SerializeDigitallySigned(signature, &serialized_sig));
     return serialized_sig;
   }
 
-  Signer *signer_;
-  Verifier *verifier_;
+  Signer* signer_;
+  Verifier* verifier_;
 };
 
 // Check that the keys of the signer and verifier are consistent.
@@ -68,7 +67,8 @@ TEST_F(SignerVerifierTest, CheckSignature) {
   EXPECT_EQ(Verifier::OK, verifier_->Verify(data, signature));
 }
 
-// Check that a signature on a test string verifies.  Also check that successive
+// Check that a signature on a test string verifies.  Also check that
+// successive
 // signatures of the same data are different.
 TEST_F(SignerVerifierTest, SignAndVerify) {
   // Sign the test string.
@@ -117,7 +117,8 @@ TEST_F(SignerVerifierTest, Errors) {
   // garbage in the end still results in a valid signature.
   signature.set_signature(good_signature);
   signature.mutable_signature()->append(1, 'c');
-  // EXPECT_EQ(Verifier::INVALID_SIGNATURE, verifier_->Verify(data, signature));
+  // EXPECT_EQ(Verifier::INVALID_SIGNATURE, verifier_->Verify(data,
+  // signature));
 
   // Flip the lsb of each byte one by one.
   signature.set_signature(good_signature);
@@ -147,7 +148,7 @@ TEST_F(SignerVerifierTest, Errors) {
 }  // namespace
 }  // namespace cert_trans
 
-int main(int argc, char **argv) {
+int main(int argc, char** argv) {
   cert_trans::test::InitTesting(argv[0], &argc, &argv, true);
   return RUN_ALL_TESTS();
 }

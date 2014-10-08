@@ -27,13 +27,12 @@ typedef Database<LoggedCertificate> DB;
 typedef TreeSigner<LoggedCertificate> TS;
 typedef LogLookup<LoggedCertificate> LL;
 
-template <class T> class LogLookupTest : public ::testing::Test {
+template <class T>
+class LogLookupTest : public ::testing::Test {
  protected:
   LogLookupTest()
-      : test_db_(),
-        test_signer_(),
-        tree_signer_(NULL),
-        verifier_(NULL) {}
+      : test_db_(), test_signer_(), tree_signer_(NULL), verifier_(NULL) {
+  }
 
   void SetUp() {
     verifier_ = new LogVerifier(TestSigner::DefaultLogSigVerifier(),
@@ -48,15 +47,17 @@ template <class T> class LogLookupTest : public ::testing::Test {
     delete verifier_;
   }
 
-  T *db() const { return test_db_.db(); }
+  T* db() const {
+    return test_db_.db();
+  }
   TestDB<T> test_db_;
   TestSigner test_signer_;
-  TS *tree_signer_;
-  LogVerifier *verifier_;
+  TS* tree_signer_;
+  LogVerifier* verifier_;
 };
 
-typedef testing::Types<FileDB<LoggedCertificate>,
-                       SQLiteDB<LoggedCertificate> > Databases;
+typedef testing::Types<FileDB<LoggedCertificate>, SQLiteDB<LoggedCertificate> >
+    Databases;
 
 TYPED_TEST_CASE(LogLookupTest, Databases);
 
@@ -98,8 +99,8 @@ TYPED_TEST(LogLookupTest, Update) {
   EXPECT_EQ(TS::OK, this->tree_signer_->UpdateTree());
 
   // There is an entry but we don't know about it yet.
-  EXPECT_EQ(LL::NOT_FOUND, lookup.AuditProof(logged_cert.merkle_leaf_hash(),
-                                             &proof));
+  EXPECT_EQ(LL::NOT_FOUND,
+            lookup.AuditProof(logged_cert.merkle_leaf_hash(), &proof));
 
   // Update
   EXPECT_EQ(LL::UPDATE_OK, lookup.Update());
@@ -141,18 +142,18 @@ TYPED_TEST(LogLookupTest, VerifyWithPath) {
   MerkleAuditProof proof;
 
   for (int i = 0; i < 13; ++i) {
-    EXPECT_EQ(LL::OK, lookup.AuditProof(logged_certs[i].merkle_leaf_hash(),
-                                        &proof));
+    EXPECT_EQ(LL::OK,
+              lookup.AuditProof(logged_certs[i].merkle_leaf_hash(), &proof));
     EXPECT_EQ(LogVerifier::VERIFY_OK,
-              this->verifier_->VerifyMerkleAuditProof(
-                  logged_certs[i].entry(),
-                  logged_certs[i].sct(), proof));
+              this->verifier_->VerifyMerkleAuditProof(logged_certs[i].entry(),
+                                                      logged_certs[i].sct(),
+                                                      proof));
   }
 }
 
 }  // namespace
 
-int main(int argc, char**argv) {
+int main(int argc, char** argv) {
   cert_trans::test::InitTesting(argv[0], &argc, &argv, true);
   return RUN_ALL_TESTS();
 }

@@ -35,11 +35,12 @@ using std::vector;
 namespace {
 
 
-string UriEncode(const string &input) {
+string UriEncode(const string& input) {
   // TODO(pphaneuf): I just wanted the deleter, so std::unique_ptr
   // would have worked, but it's not available to us (C++11).
-  const shared_ptr<char> output(
-      evhttp_uriencode(input.data(), input.size(), false), free);
+  const shared_ptr<char> output(evhttp_uriencode(input.data(), input.size(),
+                                                 false),
+                                free);
 
   return output.get();
 }
@@ -47,8 +48,8 @@ string UriEncode(const string &input) {
 
 // Do some common checks, calls the callback with the appropriate
 // error if something is wrong.
-bool SanityCheck(libevent::HttpRequest *req,
-                 const AsyncLogClient::Callback &done) {
+bool SanityCheck(libevent::HttpRequest* req,
+                 const AsyncLogClient::Callback& done) {
   if (evhttp_request_get_response_code(req->get()) < 1) {
     done(AsyncLogClient::CONNECT_FAILED);
     return false;
@@ -63,8 +64,8 @@ bool SanityCheck(libevent::HttpRequest *req,
 }
 
 
-void DoneGetSTH(libevent::HttpRequest *req, SignedTreeHead *sth,
-                const AsyncLogClient::Callback &done) {
+void DoneGetSTH(libevent::HttpRequest* req, SignedTreeHead* sth,
+                const AsyncLogClient::Callback& done) {
   if (!SanityCheck(req, done))
     return;
 
@@ -89,8 +90,7 @@ void DoneGetSTH(libevent::HttpRequest *req, SignedTreeHead *sth,
     return done(AsyncLogClient::BAD_RESPONSE);
   DigitallySigned signature;
   if (Deserializer::DeserializeDigitallySigned(jsignature.FromBase64(),
-                                               &signature)
-      != Deserializer::OK)
+                                               &signature) != Deserializer::OK)
     return done(AsyncLogClient::BAD_RESPONSE);
 
   sth->Clear();
@@ -104,8 +104,8 @@ void DoneGetSTH(libevent::HttpRequest *req, SignedTreeHead *sth,
 }
 
 
-void DoneGetRoots(libevent::HttpRequest *req, vector<shared_ptr<Cert> > *roots,
-                  const AsyncLogClient::Callback &done) {
+void DoneGetRoots(libevent::HttpRequest* req, vector<shared_ptr<Cert> >* roots,
+                  const AsyncLogClient::Callback& done) {
   if (!SanityCheck(req, done))
     return;
 
@@ -137,9 +137,9 @@ void DoneGetRoots(libevent::HttpRequest *req, vector<shared_ptr<Cert> > *roots,
 }
 
 
-void DoneGetEntries(libevent::HttpRequest *req,
-                    vector<AsyncLogClient::Entry> *entries,
-                    const AsyncLogClient::Callback &done) {
+void DoneGetEntries(libevent::HttpRequest* req,
+                    vector<AsyncLogClient::Entry>* entries,
+                    const AsyncLogClient::Callback& done) {
   if (!SanityCheck(req, done))
     return;
 
@@ -165,8 +165,8 @@ void DoneGetEntries(libevent::HttpRequest *req,
 
     AsyncLogClient::Entry log_entry;
     if (Deserializer::DeserializeMerkleTreeLeaf(leaf_input.FromBase64(),
-                                                &log_entry.leaf)
-        != Deserializer::OK)
+                                                &log_entry.leaf) !=
+        Deserializer::OK)
       return done(AsyncLogClient::BAD_RESPONSE);
 
     JsonString extra_data(entry, "extra_data");
@@ -176,8 +176,8 @@ void DoneGetEntries(libevent::HttpRequest *req,
     if (log_entry.leaf.timestamped_entry().entry_type() == ct::X509_ENTRY)
       Deserializer::DeserializeX509Chain(extra_data.FromBase64(),
                                          log_entry.entry.mutable_x509_entry());
-    else if (log_entry.leaf.timestamped_entry().entry_type()
-             == ct::PRECERT_ENTRY)
+    else if (log_entry.leaf.timestamped_entry().entry_type() ==
+             ct::PRECERT_ENTRY)
       Deserializer::DeserializePrecertChainEntry(
           extra_data.FromBase64(), log_entry.entry.mutable_precert_entry());
     else
@@ -194,10 +194,10 @@ void DoneGetEntries(libevent::HttpRequest *req,
 }
 
 
-void DoneQueryInclusionProof(libevent::HttpRequest *req,
-                             const SignedTreeHead &sth,
-                             MerkleAuditProof *proof,
-                             const AsyncLogClient::Callback &done) {
+void DoneQueryInclusionProof(libevent::HttpRequest* req,
+                             const SignedTreeHead& sth,
+                             MerkleAuditProof* proof,
+                             const AsyncLogClient::Callback& done) {
   if (!SanityCheck(req, done))
     return;
 
@@ -235,8 +235,8 @@ void DoneQueryInclusionProof(libevent::HttpRequest *req,
 }
 
 
-void DoneGetSTHConsistency(libevent::HttpRequest *req, vector<string> *proof,
-                           const AsyncLogClient::Callback &done) {
+void DoneGetSTHConsistency(libevent::HttpRequest* req, vector<string>* proof,
+                           const AsyncLogClient::Callback& done) {
   if (!SanityCheck(req, done))
     return;
 
@@ -264,9 +264,9 @@ void DoneGetSTHConsistency(libevent::HttpRequest *req, vector<string> *proof,
 }
 
 
-void DoneInternalAddChain(libevent::HttpRequest *req,
-                          SignedCertificateTimestamp *sct,
-                          const AsyncLogClient::Callback &done) {
+void DoneInternalAddChain(libevent::HttpRequest* req,
+                          SignedCertificateTimestamp* sct,
+                          const AsyncLogClient::Callback& done) {
   if (!SanityCheck(req, done))
     return;
 
@@ -295,8 +295,7 @@ void DoneInternalAddChain(libevent::HttpRequest *req,
 
   DigitallySigned signature;
   if (Deserializer::DeserializeDigitallySigned(jsignature.FromBase64(),
-                                               &signature)
-      != Deserializer::OK)
+                                               &signature) != Deserializer::OK)
     return done(AsyncLogClient::BAD_RESPONSE);
 
   sct->Clear();
@@ -315,13 +314,13 @@ void DoneInternalAddChain(libevent::HttpRequest *req,
 namespace cert_trans {
 
 
-AsyncLogClient::AsyncLogClient(const shared_ptr<libevent::Base> &base,
-                               const string &server_uri)
+AsyncLogClient::AsyncLogClient(const shared_ptr<libevent::Base>& base,
+                               const string& server_uri)
     : base_(base),
       server_uri_(CHECK_NOTNULL(evhttp_uri_parse(server_uri.c_str())),
                   evhttp_uri_free),
       conn_(base_, server_uri_.get()) {
-  const char *const path(evhttp_uri_get_path(server_uri_.get()));
+  const char* const path(evhttp_uri_get_path(server_uri_.get()));
   string newpath;
 
   if (path)
@@ -336,10 +335,9 @@ AsyncLogClient::AsyncLogClient(const shared_ptr<libevent::Base> &base,
 }
 
 
-void AsyncLogClient::GetSTH(SignedTreeHead *sth,
-                            const Callback &done) {
-  libevent::HttpRequest *const req(new libevent::HttpRequest(
-      bind(&DoneGetSTH, _1, sth, done)));
+void AsyncLogClient::GetSTH(SignedTreeHead* sth, const Callback& done) {
+  libevent::HttpRequest* const req(
+      new libevent::HttpRequest(bind(&DoneGetSTH, _1, sth, done)));
 
   evhttp_add_header(evhttp_request_get_output_headers(req->get()), "Host",
                     evhttp_uri_get_host(server_uri_.get()));
@@ -348,10 +346,10 @@ void AsyncLogClient::GetSTH(SignedTreeHead *sth,
 }
 
 
-void AsyncLogClient::GetRoots(vector<shared_ptr<Cert> > *roots,
-                              const Callback &done) {
-  libevent::HttpRequest *const req(new libevent::HttpRequest(
-      bind(&DoneGetRoots, _1, roots, done)));
+void AsyncLogClient::GetRoots(vector<shared_ptr<Cert> >* roots,
+                              const Callback& done) {
+  libevent::HttpRequest* const req(
+      new libevent::HttpRequest(bind(&DoneGetRoots, _1, roots, done)));
 
   evhttp_add_header(evhttp_request_get_output_headers(req->get()), "Host",
                     evhttp_uri_get_host(server_uri_.get()));
@@ -361,10 +359,10 @@ void AsyncLogClient::GetRoots(vector<shared_ptr<Cert> > *roots,
 
 
 void AsyncLogClient::GetEntries(int first, int last,
-                                vector<AsyncLogClient::Entry> *entries,
-                                const Callback &done) {
-  libevent::HttpRequest *const req(new libevent::HttpRequest(
-      bind(&DoneGetEntries, _1, entries, done)));
+                                vector<AsyncLogClient::Entry>* entries,
+                                const Callback& done) {
+  libevent::HttpRequest* const req(
+      new libevent::HttpRequest(bind(&DoneGetEntries, _1, entries, done)));
 
   evhttp_add_header(evhttp_request_get_output_headers(req->get()), "Host",
                     evhttp_uri_get_host(server_uri_.get()));
@@ -376,10 +374,11 @@ void AsyncLogClient::GetEntries(int first, int last,
 }
 
 
-void AsyncLogClient::QueryInclusionProof(
-    const SignedTreeHead &sth, const std::string &merkle_leaf_hash,
-    MerkleAuditProof *proof, const Callback &done) {
-  libevent::HttpRequest *const req(new libevent::HttpRequest(
+void AsyncLogClient::QueryInclusionProof(const SignedTreeHead& sth,
+                                         const std::string& merkle_leaf_hash,
+                                         MerkleAuditProof* proof,
+                                         const Callback& done) {
+  libevent::HttpRequest* const req(new libevent::HttpRequest(
       bind(&DoneQueryInclusionProof, _1, sth, proof, done)));
 
   evhttp_add_header(evhttp_request_get_output_headers(req->get()), "Host",
@@ -394,10 +393,10 @@ void AsyncLogClient::QueryInclusionProof(
 }
 
 
-void AsyncLogClient::GetSTHConsistency(
-    uint64_t first, uint64_t second, vector<string> *proof,
-    const Callback &done) {
-  libevent::HttpRequest *const req(new libevent::HttpRequest(
+void AsyncLogClient::GetSTHConsistency(uint64_t first, uint64_t second,
+                                       vector<string>* proof,
+                                       const Callback& done) {
+  libevent::HttpRequest* const req(new libevent::HttpRequest(
       bind(&DoneGetSTHConsistency, _1, proof, done)));
 
   evhttp_add_header(evhttp_request_get_output_headers(req->get()), "Host",
@@ -410,28 +409,28 @@ void AsyncLogClient::GetSTHConsistency(
 }
 
 
-void AsyncLogClient::AddCertChain(
-    const CertChain &cert_chain, SignedCertificateTimestamp *sct,
-    const Callback &done) {
+void AsyncLogClient::AddCertChain(const CertChain& cert_chain,
+                                  SignedCertificateTimestamp* sct,
+                                  const Callback& done) {
   InternalAddChain(cert_chain, sct, false, done);
 }
 
 
-void AsyncLogClient::AddPreCertChain(
-    const PreCertChain &pre_cert_chain, SignedCertificateTimestamp *sct,
-    const Callback &done) {
+void AsyncLogClient::AddPreCertChain(const PreCertChain& pre_cert_chain,
+                                     SignedCertificateTimestamp* sct,
+                                     const Callback& done) {
   InternalAddChain(pre_cert_chain, sct, true, done);
 }
 
 
-string AsyncLogClient::GetPath(const string &subpath) const {
+string AsyncLogClient::GetPath(const string& subpath) const {
   return CHECK_NOTNULL(evhttp_uri_get_path(server_uri_.get())) + subpath;
 }
 
 
-void AsyncLogClient::InternalAddChain(
-    const CertChain &cert_chain, SignedCertificateTimestamp *sct,
-    bool pre_cert, const Callback &done) {
+void AsyncLogClient::InternalAddChain(const CertChain& cert_chain,
+                                      SignedCertificateTimestamp* sct,
+                                      bool pre_cert, const Callback& done) {
   if (!cert_chain.IsLoaded())
     return done(INVALID_INPUT);
 
@@ -445,15 +444,16 @@ void AsyncLogClient::InternalAddChain(
   JsonObject jsend;
   jsend.Add("chain", jchain);
 
-  libevent::HttpRequest *const req(new libevent::HttpRequest(
-      bind(&DoneInternalAddChain, _1, sct, done)));
+  libevent::HttpRequest* const req(
+      new libevent::HttpRequest(bind(&DoneInternalAddChain, _1, sct, done)));
 
   evhttp_add_header(evhttp_request_get_output_headers(req->get()), "Host",
                     evhttp_uri_get_host(server_uri_.get()));
 
   const string json_body(jsend.ToString());
   CHECK_EQ(evbuffer_add(evhttp_request_get_output_buffer(req->get()),
-                        json_body.data(), json_body.size()), 0);
+                        json_body.data(), json_body.size()),
+           0);
 
   conn_.MakeRequest(req, EVHTTP_REQ_POST,
                     GetPath(pre_cert ? "add-pre-chain" : "add-chain"));

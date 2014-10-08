@@ -10,15 +10,14 @@
 
 #ifdef __MACH__
 // does not exist on MacOS
-# define MSG_NOSIGNAL 0
+#define MSG_NOSIGNAL 0
 #endif
 
 using std::string;
 
-Client::Client(const string &server, uint16_t port)
-    : server_(server),
-      port_(port),
-      fd_(-1) {}
+Client::Client(const string& server, uint16_t port)
+    : server_(server), port_(port), fd_(-1) {
+}
 
 Client::~Client() {
   Disconnect();
@@ -35,10 +34,10 @@ bool Client::Connect() {
   server_socket.sin_family = AF_INET;
   server_socket.sin_port = htons(port_);
   CHECK_EQ(1, inet_aton(server_.c_str(), &server_socket.sin_addr))
-           << "Can't parse server address: " << server_;
+      << "Can't parse server address: " << server_;
 
-  int ret = connect(fd_, (struct sockaddr *)&server_socket,
-                    sizeof server_socket);
+  int ret =
+      connect(fd_, (struct sockaddr*)&server_socket, sizeof server_socket);
   if (ret < 0) {
     Disconnect();
     PLOG(ERROR) << "Connection to " << server_ << ":" << port_ << " failed";
@@ -60,7 +59,7 @@ void Client::Disconnect() {
   }
 }
 
-bool Client::Write(const string &data) {
+bool Client::Write(const string& data) {
   CHECK(Connected());
   int n = send(fd_, data.data(), data.length(), MSG_NOSIGNAL);
   if (n <= 0) {
@@ -76,10 +75,10 @@ bool Client::Write(const string &data) {
   return true;
 }
 
-bool Client::Read(size_t length, string *result) {
+bool Client::Read(size_t length, string* result) {
   CHECK(Connected());
-  char *buf = new char[length];
-  for (size_t offset = 0; offset < length; ) {
+  char* buf = new char[length];
+  for (size_t offset = 0; offset < length;) {
     int n = recv(fd_, buf + offset, length - offset, MSG_NOSIGNAL);
     if (n <= 0) {
       PCHECK(errno == EPIPE) << "Read failed";

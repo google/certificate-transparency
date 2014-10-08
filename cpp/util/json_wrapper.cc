@@ -5,8 +5,7 @@
 using boost::shared_ptr;
 
 
-JsonObject::JsonObject(evbuffer *buffer)
-    : obj_(NULL) {
+JsonObject::JsonObject(evbuffer* buffer) : obj_(NULL) {
   // TODO(pphaneuf): We just want a deleter, but unique_ptr is not
   // available to us yet (C++11).
   const shared_ptr<json_tokener> tokener(json_tokener_new(),
@@ -29,14 +28,15 @@ JsonObject::JsonObject(evbuffer *buffer)
     // that it hasn't yet found an object, we just need to keep
     // calling it with more data.
     obj_ = json_tokener_parse_ex(tokener.get(),
-                                 static_cast<char *>(chunk.iov_base),
+                                 static_cast<char*>(chunk.iov_base),
                                  chunk.iov_len);
 
     // Check for a parsing error.
     if (!obj_ &&
         json_tokener_get_error(tokener.get()) != json_tokener_continue) {
-      VLOG(1) << "json_tokener_parse_ex: " << json_tokener_error_desc(
-          json_tokener_get_error(tokener.get()));
+      VLOG(1) << "json_tokener_parse_ex: "
+              << json_tokener_error_desc(
+                     json_tokener_get_error(tokener.get()));
       break;
     }
 
@@ -59,7 +59,7 @@ JsonObject::JsonObject(evbuffer *buffer)
 }
 
 
-JsonObject::JsonObject(const JsonArray &from, int offset, json_type type) {
+JsonObject::JsonObject(const JsonArray& from, int offset, json_type type) {
   obj_ = json_object_array_get_idx(from.obj_, offset);
   if (obj_ != NULL) {
     if (!json_object_is_type(obj_, type)) {

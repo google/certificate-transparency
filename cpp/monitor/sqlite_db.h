@@ -13,7 +13,7 @@ namespace monitor {
 
 class SQLiteDB : public Database {
  public:
-  explicit SQLiteDB(const std::string &dbfile);
+  explicit SQLiteDB(const std::string& dbfile);
 
   ~SQLiteDB();
 
@@ -25,34 +25,35 @@ class SQLiteDB : public Database {
 
   void EndTransaction();
 
-  virtual LookupResult LookupLatestWrittenSTH(ct::SignedTreeHead *result) const;
+  virtual LookupResult LookupLatestWrittenSTH(
+      ct::SignedTreeHead* result) const;
 
   virtual LookupResult LookupHashByIndex(uint64_t sequence_number,
-                                         std::string *result) const;
+                                         std::string* result) const;
 
   virtual LookupResult LookupSTHByTimestamp(uint64_t timestamp,
-                                            ct::SignedTreeHead *result) const;
+                                            ct::SignedTreeHead* result) const;
 
-  virtual LookupResult LookupVerificationLevel(const ct::SignedTreeHead &sth,
-                                               VerificationLevel *result) const;
+  virtual LookupResult LookupVerificationLevel(
+      const ct::SignedTreeHead& sth, VerificationLevel* result) const;
 
  private:
-  virtual WriteResult CreateEntry_(const std::string &leaf,
-                                   const std::string &leaf_hash,
-                                   const std::string &cert,
-                                   const std::string &cert_chain);
+  virtual WriteResult CreateEntry_(const std::string& leaf,
+                                   const std::string& leaf_hash,
+                                   const std::string& cert,
+                                   const std::string& cert_chain);
 
   virtual WriteResult WriteSTH_(uint64_t timestamp, uint64_t tree_size,
-                                const std::string &sth);
+                                const std::string& sth);
 
-  virtual WriteResult SetVerificationLevel_(const ct::SignedTreeHead &sth,
+  virtual WriteResult SetVerificationLevel_(const ct::SignedTreeHead& sth,
                                             VerificationLevel verify_level);
 
-  sqlite3 *db_;
+  sqlite3* db_;
 
   DISALLOW_COPY_AND_ASSIGN(SQLiteDB);
 };
 
-} // namespace monitor
+}  // namespace monitor
 
-#endif // MONITOR_SQLITE_DB_H
+#endif  // MONITOR_SQLITE_DB_H

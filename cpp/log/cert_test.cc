@@ -16,7 +16,8 @@ using cert_trans::PreCertChain;
 using cert_trans::TbsCertificate;
 using std::string;
 
-DEFINE_string(test_certs_dir, "../../test/testdata", "Path to test certificates");
+DEFINE_string(test_certs_dir, "../../test/testdata",
+              "Path to test certificates");
 
 // TODO(ekasper): add test certs with intermediates.
 // Valid certificates.
@@ -32,7 +33,8 @@ static const char kPreCert[] = "test-embedded-pre-cert.pem";
 // CA with no basic constraints and an MD2 signature.
 static const char kLegacyCaCert[] = "test-no-bc-ca-cert.pem";
 
-static const char kInvalidCertString[] = "-----BEGIN CERTIFICATE-----\ninvalid"
+static const char kInvalidCertString[] =
+    "-----BEGIN CERTIFICATE-----\ninvalid"
     "\n-----END CERTIFICATE-----\n";
 
 namespace {
@@ -56,13 +58,12 @@ class CertTest : public ::testing::Test {
     CHECK(util::ReadTextFile(cert_dir + "/" + kPreCert, &precert_pem_));
     CHECK(util::ReadTextFile(cert_dir + "/" + kLeafWithIntermediateCert,
                              &leaf_with_intermediate_pem_));
-    CHECK(util::ReadTextFile(cert_dir + "/" + kLegacyCaCert,
-                             &legacy_ca_pem_));
+    CHECK(util::ReadTextFile(cert_dir + "/" + kLegacyCaCert, &legacy_ca_pem_));
   }
 };
 
-class TbsCertificateTest : public CertTest{};
-class CertChainTest : public CertTest{};
+class TbsCertificateTest : public CertTest {};
+class CertChainTest : public CertTest {};
 
 // TODO(ekasper): test encoding methods.
 TEST_F(CertTest, LoadValid) {
@@ -136,14 +137,14 @@ TEST_F(CertTest, PrintSignatureAlgorithm) {
 TEST_F(CertTest, TestUnsupportedAlgorithm) {
   Cert legacy(legacy_ca_pem_);
   ASSERT_EQ("md2WithRSAEncryption", legacy.PrintSignatureAlgorithm());
-  // MD2 is disabled by default on modern OpenSSL and you should be surprised to
-  // see anything else. Make the test fail if this is not the case to notify the
-  // user that their setup is insecure.
+// MD2 is disabled by default on modern OpenSSL and you should be surprised to
+// see anything else. Make the test fail if this is not the case to notify the
+// user that their setup is insecure.
 #ifdef OPENSSL_NO_MD2
   EXPECT_EQ(Cert::UNSUPPORTED_ALGORITHM, legacy.IsSignedBy(legacy));
 #else
-  LOG(WARNING)  << "Skipping test: MD2 is enabled! You should configure "
-                << "OpenSSL with -DOPENSSL_NO_MD2 to be safe!";
+  LOG(WARNING) << "Skipping test: MD2 is enabled! You should configure "
+               << "OpenSSL with -DOPENSSL_NO_MD2 to be safe!";
 #endif
 }
 
@@ -173,7 +174,7 @@ TEST_F(CertTest, Extensions) {
   EXPECT_EQ(Cert::TRUE, ca.HasBasicConstraintCATrue());
 
   EXPECT_EQ(Cert::TRUE, ca_pre.HasExtendedKeyUsage(
-      cert_trans::NID_ctPrecertificateSigning));
+                            cert_trans::NID_ctPrecertificateSigning));
 }
 
 TEST_F(CertTest, Issuers) {
@@ -359,7 +360,7 @@ TEST_F(CertChainTest, PreCertChain) {
 
 }  // namespace
 
-int main(int argc, char**argv) {
+int main(int argc, char** argv) {
   cert_trans::test::InitTesting(argv[0], &argc, &argv, true);
   OpenSSL_add_all_algorithms();
   ERR_load_crypto_strings();

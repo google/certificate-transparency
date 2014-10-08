@@ -14,22 +14,22 @@ namespace cert_trans {
 
 class Signer {
  public:
-  explicit Signer(EVP_PKEY *pkey);
+  explicit Signer(EVP_PKEY* pkey);
   virtual ~Signer();
 
   virtual std::string KeyID() const;
 
-  virtual void Sign(const std::string &data,
-                    ct::DigitallySigned *signature) const;
+  virtual void Sign(const std::string& data,
+                    ct::DigitallySigned* signature) const;
 
  protected:
   // A constructor for mocking.
   Signer();
 
  private:
-  std::string RawSign(const std::string &data) const;
+  std::string RawSign(const std::string& data) const;
 
-  EVP_PKEY *pkey_;
+  EVP_PKEY* pkey_;
   ct::DigitallySigned::HashAlgorithm hash_algo_;
   ct::DigitallySigned::SignatureAlgorithm sig_algo_;
   std::string key_id_;

@@ -10,7 +10,7 @@
 using cert_trans::MerkleTreeInterface;
 using std::string;
 
-CompactMerkleTree::CompactMerkleTree(SerialHasher *hasher)
+CompactMerkleTree::CompactMerkleTree(SerialHasher* hasher)
     : MerkleTreeInterface(),
       treehasher_(hasher),
       leaf_count_(0),
@@ -19,8 +19,7 @@ CompactMerkleTree::CompactMerkleTree(SerialHasher *hasher)
   root_ = treehasher_.HashEmpty();
 }
 
-CompactMerkleTree::CompactMerkleTree(MerkleTree &model,
-                                     SerialHasher *hasher)
+CompactMerkleTree::CompactMerkleTree(MerkleTree& model, SerialHasher* hasher)
     : MerkleTreeInterface(),
       tree_(model.LevelCount() - 1),
       treehasher_(hasher),
@@ -85,21 +84,23 @@ CompactMerkleTree::CompactMerkleTree(MerkleTree &model,
 
   // Now tree_ should contain a representation of the tree state just before
   // the last entry was added, so we PushBack the final right-hand entry
-  // here, which will perform any recalculations necessary to reach the final tree.
+  // here, which will perform any recalculations necessary to reach the final
+  // tree.
   PushBack(0, model.LeafHash(model.LeafCount()));
   CHECK_EQ(model.CurrentRoot(), CurrentRoot());
   CHECK_EQ(model.LeafCount(), LeafCount());
   CHECK_EQ(model.LevelCount(), LevelCount());
 }
 
-CompactMerkleTree::~CompactMerkleTree() {}
+CompactMerkleTree::~CompactMerkleTree() {
+}
 
 
-size_t CompactMerkleTree::AddLeaf(const string &data) {
+size_t CompactMerkleTree::AddLeaf(const string& data) {
   return AddLeafHash(treehasher_.HashLeaf(data));
 }
 
-size_t CompactMerkleTree::AddLeafHash(const string &hash) {
+size_t CompactMerkleTree::AddLeafHash(const string& hash) {
   PushBack(0, hash);
   // Update level count: a k-level tree can hold 2^{k-1} leaves,
   // so increment level count every time we overflow a power of two.

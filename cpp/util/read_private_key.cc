@@ -6,8 +6,8 @@ namespace cert_trans {
 namespace util {
 
 
-KeyError ReadPrivateKey(EVP_PKEY **pkey, const std::string &file) {
-  FILE *fp = fopen(file.c_str(), "r");
+KeyError ReadPrivateKey(EVP_PKEY** pkey, const std::string& file) {
+  FILE* fp = fopen(file.c_str(), "r");
 
   if (!fp)
     return NO_SUCH_FILE;

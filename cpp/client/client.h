@@ -8,8 +8,8 @@
 
 // Socket creation for client connections.
 class Client {
-public:
-  Client(const std::string &server, uint16_t port);
+ public:
+  Client(const std::string& server, uint16_t port);
 
   ~Client();
 
@@ -17,7 +17,9 @@ public:
   // The Connect()-Disconnect() sequence can be called repeatedly.
   bool Connect();
 
-  int fd() const { return fd_; }
+  int fd() const {
+    return fd_;
+  }
 
   // The remote end may have closed the socket, in which
   // case this will still return true, but the next read/write
@@ -26,9 +28,9 @@ public:
 
   void Disconnect();
 
-  bool Write(const std::string &data);
+  bool Write(const std::string& data);
 
-  bool Read(size_t length, std::string *result);
+  bool Read(size_t length, std::string* result);
 
  private:
   const std::string server_;

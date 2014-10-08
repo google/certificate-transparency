@@ -6,10 +6,9 @@
 namespace monitor {
 
 Database::WriteResult Database::CreateEntry(
-    const cert_trans::LoggedCertificate &logged) {
-
+    const cert_trans::LoggedCertificate& logged) {
   std::string leaf;
-  if(!logged.SerializeForLeaf(&leaf))
+  if (!logged.SerializeForLeaf(&leaf))
     return this->SERIALIZE_FAILED;
 
   TreeHasher hasher(new Sha256Hasher);
@@ -18,28 +17,26 @@ Database::WriteResult Database::CreateEntry(
   std::string cert = Serializer::LeafCertificate(logged.entry());
 
   std::string cert_chain;
-  if(!logged.SerializeExtraData(&cert_chain))
+  if (!logged.SerializeExtraData(&cert_chain))
     return this->SERIALIZE_FAILED;
 
   return CreateEntry_(leaf, leaf_hash, cert, cert_chain);
 }
 
-Database::WriteResult Database::WriteSTH(const ct::SignedTreeHead &sth) {
+Database::WriteResult Database::WriteSTH(const ct::SignedTreeHead& sth) {
   CHECK(sth.has_timestamp());
   CHECK(sth.has_tree_size());
 
   // Serialzing is not TLS (RFC) conform.
-  return WriteSTH_(sth.timestamp(), sth.tree_size(),
-                   sth.SerializeAsString());
+  return WriteSTH_(sth.timestamp(), sth.tree_size(), sth.SerializeAsString());
 }
 
 Database::WriteResult Database::SetVerificationLevel(
-    const ct::SignedTreeHead &sth,
-    VerificationLevel verify_level) {
+    const ct::SignedTreeHead& sth, VerificationLevel verify_level) {
   if (verify_level == this->UNDEFINED)
     return this->NOT_ALLOWED;
 
   return SetVerificationLevel_(sth, verify_level);
 }
 
-} // namespace monitor
+}  // namespace monitor

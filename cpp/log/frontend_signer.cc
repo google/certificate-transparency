@@ -14,14 +14,13 @@ using ct::LogEntry;
 using ct::SignedCertificateTimestamp;
 using std::string;
 
-FrontendSigner::FrontendSigner(Database<cert_trans::LoggedCertificate> *db,
-                               LogSigner *signer)
-    : db_(db),
-      signer_(signer) {}
+FrontendSigner::FrontendSigner(Database<cert_trans::LoggedCertificate>* db,
+                               LogSigner* signer)
+    : db_(db), signer_(signer) {
+}
 
-FrontendSigner::SubmitResult
-FrontendSigner::QueueEntry(const LogEntry &entry,
-                           SignedCertificateTimestamp *sct) {
+FrontendSigner::SubmitResult FrontendSigner::QueueEntry(
+    const LogEntry& entry, SignedCertificateTimestamp* sct) {
   // Check if the entry already exists.
   // TODO(ekasper): switch to using SignedEntryWithType as the DB key.
   string sha256_hash =
@@ -59,8 +58,8 @@ FrontendSigner::QueueEntry(const LogEntry &entry,
   return NEW;
 }
 
-void FrontendSigner::TimestampAndSign(const LogEntry &entry,
-                                      SignedCertificateTimestamp *sct) const {
+void FrontendSigner::TimestampAndSign(const LogEntry& entry,
+                                      SignedCertificateTimestamp* sct) const {
   sct->set_version(ct::V1);
   sct->set_timestamp(util::TimeInMilliseconds());
   sct->clear_extensions();

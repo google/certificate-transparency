@@ -7,7 +7,7 @@
 
 time_t Services::rough_time_;
 
-FD::FD(EventLoop *loop, int fd, CanDelete deletable)
+FD::FD(EventLoop* loop, int fd, CanDelete deletable)
     : fd_(fd), loop_(loop), wants_erase_(false), deletable_(deletable) {
   DCHECK_GE(fd, 0);
   CHECK_LT((unsigned)fd, FD_SETSIZE);
@@ -60,9 +60,9 @@ time_t EventLoop::ProcessRepeatedEvents() {
   Services::SetRoughTime();
   time_t now = Services::RoughTime();
   time_t earliest = INT_MAX;
-  for (std::vector<RepeatedEvent *>::iterator it = events_.begin();
+  for (std::vector<RepeatedEvent*>::iterator it = events_.begin();
        it != events_.end(); ++it) {
-    RepeatedEvent *event = *it;
+    RepeatedEvent* event = *it;
     time_t trigger = event->Trigger();
     if (trigger <= now) {
       event->Execute();
@@ -89,9 +89,9 @@ void EventLoop::OneLoop() {
 
   memset(&readers, '\0', sizeof readers);
   memset(&writers, '\0', sizeof writers);
-  for (std::deque<FD *>::const_iterator pfd = fds_.begin(); pfd != fds_.end();
+  for (std::deque<FD*>::const_iterator pfd = fds_.begin(); pfd != fds_.end();
        ++pfd) {
-    FD *fd = *pfd;
+    FD* fd = *pfd;
 
     DCHECK(!fd->WantsErase());
     if (fd->WantsWrite())
@@ -106,7 +106,7 @@ void EventLoop::OneLoop() {
   tv.tv_sec = select_timeout;
   tv.tv_usec = 0;
 
-  int r = select(max+1, &readers, &writers, NULL, &tv);
+  int r = select(max + 1, &readers, &writers, NULL, &tv);
   if (r == 0)
     return;
 
@@ -114,8 +114,8 @@ void EventLoop::OneLoop() {
 
   Services::SetRoughTime();
   int n = 0;
-  for (std::deque<FD *>::iterator pfd = fds_.begin(); pfd != fds_.end(); ) {
-    FD *fd = *pfd;
+  for (std::deque<FD*>::iterator pfd = fds_.begin(); pfd != fds_.end();) {
+    FD* fd = *pfd;
 
     if (EraseCheck(&pfd))
       continue;
@@ -150,17 +150,16 @@ void EventLoop::Stop() {
 }
 
 void EventLoop::Forever() {
-  for ( ; go_ ; )
-    OneLoop();
+  for (; go_;) OneLoop();
 }
 
 void EventLoop::MaybeDropOne() {
-  std::deque<FD *>::iterator drop = fds_.end();
+  std::deque<FD*>::iterator drop = fds_.end();
   time_t oldest = Services::RoughTime() - kIdleTime;
 
-  for (std::deque<FD *>::iterator pfd = fds_.begin(); pfd != fds_.end();
+  for (std::deque<FD*>::iterator pfd = fds_.begin(); pfd != fds_.end();
        ++pfd) {
-    FD *fd = *pfd;
+    FD* fd = *pfd;
 
     if (fd->CanDrop() && fd->LastActivity() < oldest) {
       oldest = fd->LastActivity();
@@ -171,7 +170,7 @@ void EventLoop::MaybeDropOne() {
     (*drop)->Close();
 }
 
-bool EventLoop::EraseCheck(std::deque<FD *>::iterator *pfd) {
+bool EventLoop::EraseCheck(std::deque<FD*>::iterator* pfd) {
   if ((**pfd)->WantsErase()) {
     delete **pfd;
     *pfd = fds_.erase(*pfd);
@@ -181,7 +180,7 @@ bool EventLoop::EraseCheck(std::deque<FD *>::iterator *pfd) {
 }
 
 // static
-void EventLoop::Set(int fd, fd_set *fdset, int *max) {
+void EventLoop::Set(int fd, fd_set* fdset, int* max) {
   DCHECK_GE(fd, 0);
   CHECK_LT((unsigned)fd, FD_SETSIZE);
   FD_SET(fd, fdset);
@@ -217,10 +216,10 @@ void UDPServer::ReadIsAllowed() {
   struct sockaddr_in sa;
   socklen_t sa_len = sizeof sa;
 
-  ssize_t in = recvfrom(fd(), buf, sizeof buf, 0, (sockaddr *)&sa, &sa_len);
+  ssize_t in = recvfrom(fd(), buf, sizeof buf, 0, (sockaddr*)&sa, &sa_len);
   CHECK_GE(in, 1);
   CHECK_EQ(sa_len, sizeof sa);
-  //LOG(INFO) << "UDP packet " << util::HexString(std::string(buf, in));
+  // LOG(INFO) << "UDP packet " << util::HexString(std::string(buf, in));
   PacketRead(sa, buf, in);
 }
 
@@ -229,12 +228,12 @@ void UDPServer::WriteIsAllowed() {
   WBuffer wbuf = write_queue_.front();
   write_queue_.pop_front();
   ssize_t out = sendto(fd(), wbuf.packet.data(), wbuf.packet.length(), 0,
-                       (const sockaddr *)&wbuf.sa, sizeof wbuf.sa);
+                       (const sockaddr*)&wbuf.sa, sizeof wbuf.sa);
   CHECK_NE(out, -1);
   CHECK_EQ((size_t)out, wbuf.packet.length());
 }
 
-void UDPServer::QueuePacket(const sockaddr_in &to, const char *buf,
+void UDPServer::QueuePacket(const sockaddr_in& to, const char* buf,
                             size_t len) {
   WBuffer wbuf;
   wbuf.sa = to;
@@ -242,7 +241,7 @@ void UDPServer::QueuePacket(const sockaddr_in &to, const char *buf,
   write_queue_.push_back(wbuf);
 }
 
-bool Services::InitServer(int *sock, int port, const char *ip, int type) {
+bool Services::InitServer(int* sock, int port, const char* ip, int type) {
   bool ret = false;
   struct sockaddr_in server;
   int s = -1;
@@ -267,12 +266,13 @@ bool Services::InitServer(int *sock, int port, const char *ip, int type) {
     setsockopt(s, SOL_SOCKET, SO_REUSEADDR, &j, sizeof j);
   }
 
-  if (bind(s, (struct sockaddr *)&server, sizeof(server)) == -1) {
+  if (bind(s, (struct sockaddr*)&server, sizeof(server)) == -1) {
     perror("bind");
     goto err;
   }
   /* Make it 128 for linux */
-  if (type == SOCK_STREAM && listen(s, 128) == -1) goto err;
+  if (type == SOCK_STREAM && listen(s, 128) == -1)
+    goto err;
   *sock = s;
   ret = true;
 err:

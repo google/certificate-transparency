@@ -21,15 +21,18 @@ using cert_trans::LoggedCertificate;
 using ct::SignedTreeHead;
 using std::string;
 
-template <class T> class DBTest : public ::testing::Test {
+template <class T>
+class DBTest : public ::testing::Test {
  protected:
-  DBTest() :
-      test_db_(),
-      test_signer_() { }
+  DBTest() : test_db_(), test_signer_() {
+  }
 
-  ~DBTest() {}
+  ~DBTest() {
+  }
 
-  T *db() const { return test_db_.db(); }
+  T* db() const {
+    return test_db_.db();
+  }
 
   TestDB<T> test_db_;
   TestSigner test_signer_;
@@ -48,15 +51,15 @@ TYPED_TEST(DBTest, CreatePending) {
 
   EXPECT_EQ(DB::OK, this->db()->CreatePendingEntry(logged_cert));
 
-  EXPECT_EQ(DB::LOOKUP_OK,this->db()->LookupByHash(logged_cert.Hash(),
-                                                   &lookup_cert));
+  EXPECT_EQ(DB::LOOKUP_OK,
+            this->db()->LookupByHash(logged_cert.Hash(), &lookup_cert));
   TestSigner::TestEqualLoggedCerts(logged_cert, lookup_cert);
 
   string similar_hash = logged_cert.Hash();
   similar_hash[similar_hash.size() - 1] ^= 1;
 
-  EXPECT_EQ(DB::NOT_FOUND, this->db()->LookupByHash(similar_hash,
-                                                    &lookup_cert));
+  EXPECT_EQ(DB::NOT_FOUND,
+            this->db()->LookupByHash(similar_hash, &lookup_cert));
   EXPECT_EQ(DB::NOT_FOUND,
             this->db()->LookupByHash(this->test_signer_.UniqueHash(),
                                      &lookup_cert));
@@ -83,18 +86,19 @@ TYPED_TEST(DBTest, CreatePendingDuplicate) {
   this->test_signer_.CreateUnique(&logged_cert);
 
   duplicate_cert.CopyFrom(logged_cert);
-  // Change the timestamp so that we can check that we get the right thing back.
-  duplicate_cert.mutable_sct()->set_timestamp(
-      logged_cert.sct().timestamp() + 1000);
+  // Change the timestamp so that we can check that we get the right thing
+  // back.
+  duplicate_cert.mutable_sct()->set_timestamp(logged_cert.sct().timestamp() +
+                                              1000);
 
   EXPECT_EQ(DB::OK, this->db()->CreatePendingEntry(logged_cert));
 
   EXPECT_EQ(DB::DUPLICATE_CERTIFICATE_HASH,
             this->db()->CreatePendingEntry(duplicate_cert));
 
-  EXPECT_EQ(DB::LOOKUP_OK, this->db()->LookupByHash(logged_cert.Hash(),
-                                                    &lookup_cert));
-            // Check that we get the original entry back.
+  EXPECT_EQ(DB::LOOKUP_OK,
+            this->db()->LookupByHash(logged_cert.Hash(), &lookup_cert));
+  // Check that we get the original entry back.
   TestSigner::TestEqualLoggedCerts(logged_cert, lookup_cert);
 }
 
@@ -105,8 +109,8 @@ TYPED_TEST(DBTest, AssignSequenceNumber) {
   EXPECT_EQ(DB::OK, this->db()->CreatePendingEntry(logged_cert));
   EXPECT_EQ(DB::OK, this->db()->AssignSequenceNumber(logged_cert.Hash(), 42));
 
-  EXPECT_EQ(DB::LOOKUP_OK, this->db()->LookupByHash(logged_cert.Hash(),
-                                                    &lookup_cert));
+  EXPECT_EQ(DB::LOOKUP_OK,
+            this->db()->LookupByHash(logged_cert.Hash(), &lookup_cert));
   EXPECT_EQ(42U, lookup_cert.sequence_number());
 
   lookup_cert.clear_sequence_number();
@@ -181,7 +185,8 @@ TYPED_TEST(DBTest, WriteTreeHeadDuplicateTimestamp) {
 
   sth2.CopyFrom(sth);
   sth2.set_tree_size(sth.tree_size() + 1);
-  EXPECT_EQ(DB::DUPLICATE_TREE_HEAD_TIMESTAMP, this->db()->WriteTreeHead(sth2));
+  EXPECT_EQ(DB::DUPLICATE_TREE_HEAD_TIMESTAMP,
+            this->db()->WriteTreeHead(sth2));
 
   EXPECT_EQ(DB::LOOKUP_OK, this->db()->LatestTreeHead(&lookup_sth));
   TestSigner::TestEqualTreeHeads(sth, lookup_sth);
@@ -231,16 +236,17 @@ TYPED_TEST(DBTest, Resume) {
   EXPECT_EQ(DB::OK, this->db()->WriteTreeHead(sth));
   EXPECT_EQ(DB::OK, this->db()->WriteTreeHead(sth2));
 
-  Database<cert_trans::LoggedCertificate> *db2 = this->test_db_.SecondDB();
+  Database<cert_trans::LoggedCertificate>* db2 = this->test_db_.SecondDB();
 
-  EXPECT_EQ(DB::LOOKUP_OK, db2->LookupByHash(logged_cert.Hash(), &lookup_cert));
+  EXPECT_EQ(DB::LOOKUP_OK,
+            db2->LookupByHash(logged_cert.Hash(), &lookup_cert));
   EXPECT_EQ(42U, lookup_cert.sequence_number());
 
   lookup_cert.clear_sequence_number();
   TestSigner::TestEqualLoggedCerts(logged_cert, lookup_cert);
 
-  EXPECT_EQ(DB::LOOKUP_OK, db2->LookupByHash(logged_cert2.Hash(),
-                                             &lookup_cert2));
+  EXPECT_EQ(DB::LOOKUP_OK,
+            db2->LookupByHash(logged_cert2.Hash(), &lookup_cert2));
   TestSigner::TestEqualLoggedCerts(logged_cert2, lookup_cert2);
 
   EXPECT_EQ(DB::LOOKUP_OK, db2->LatestTreeHead(&lookup_sth));
@@ -255,7 +261,7 @@ TYPED_TEST(DBTest, Resume) {
 }
 
 TYPED_TEST(DBTest, ResumeEmpty) {
-  DB *db2 = this->test_db_.SecondDB();
+  DB* db2 = this->test_db_.SecondDB();
 
   LoggedCertificate lookup_cert;
   EXPECT_EQ(DB::NOT_FOUND, db2->LookupByIndex(0, &lookup_cert));
@@ -270,7 +276,7 @@ TYPED_TEST(DBTest, ResumeEmpty) {
 
 }  // namespace
 
-int main(int argc, char **argv) {
+int main(int argc, char** argv) {
   cert_trans::test::InitTesting(argv[0], &argc, &argv, true);
   return RUN_ALL_TESTS();
 }

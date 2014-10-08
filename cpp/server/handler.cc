@@ -39,7 +39,8 @@ using std::multimap;
 using std::string;
 using std::vector;
 
-DEFINE_int32(max_leaf_entries_per_response, 1000, "Maximum number of entries "
+DEFINE_int32(max_leaf_entries_per_response, 1000,
+             "Maximum number of entries "
              "to put in the response of a get-entries request.");
 
 namespace {
@@ -48,19 +49,20 @@ namespace {
 const char kJsonContentType[] = "application/json; charset=ISO-8859-1";
 
 
-void SendJsonReply(evhttp_request *req, int http_status,
-                   const JsonObject &json) {
-  CHECK_EQ(evhttp_add_header(
-      evhttp_request_get_output_headers(req), "Content-Type",
-      kJsonContentType), 0);
-  CHECK_GT(evbuffer_add_printf(evhttp_request_get_output_buffer(req),
-                               "%s", json.ToString()), 0);
+void SendJsonReply(evhttp_request* req, int http_status,
+                   const JsonObject& json) {
+  CHECK_EQ(evhttp_add_header(evhttp_request_get_output_headers(req),
+                             "Content-Type", kJsonContentType),
+           0);
+  CHECK_GT(evbuffer_add_printf(evhttp_request_get_output_buffer(req), "%s",
+                               json.ToString()),
+           0);
 
   evhttp_send_reply(req, http_status, /*reason*/ NULL, /*databuf*/ NULL);
 }
 
 
-void SendError(evhttp_request *req, int http_status, const string &error_msg) {
+void SendError(evhttp_request* req, int http_status, const string& error_msg) {
   JsonObject json_reply;
   json_reply.Add("error_message", error_msg);
   json_reply.AddBoolean("success", false);
@@ -69,7 +71,7 @@ void SendError(evhttp_request *req, int http_status, const string &error_msg) {
 }
 
 
-bool ExtractChain(evhttp_request *req, CertChain *chain) {
+bool ExtractChain(evhttp_request* req, CertChain* chain) {
   if (evhttp_request_get_command(req) != EVHTTP_REQ_POST) {
     SendError(req, HTTP_BADMETHOD, "Method not allowed.");
     return false;
@@ -100,7 +102,7 @@ bool ExtractChain(evhttp_request *req, CertChain *chain) {
 
     // TODO(pphaneuf): I would have used unique_ptr here to release
     // the ownership, but we can't use it yet (C++11).
-    Cert *const cert(new Cert);
+    Cert* const cert(new Cert);
     cert->LoadFromDerString(json_cert.FromBase64());
     if (!cert->IsLoaded()) {
       delete cert;
@@ -115,8 +117,8 @@ bool ExtractChain(evhttp_request *req, CertChain *chain) {
 }
 
 
-void AddChainReply(evhttp_request *req, SubmitResult result,
-                   const SignedCertificateTimestamp &sct) {
+void AddChainReply(evhttp_request* req, SubmitResult result,
+                   const SignedCertificateTimestamp& sct) {
   if (result != ADDED && result != DUPLICATE) {
     const string error(Frontend::SubmitResultString(result));
     VLOG(1) << "error adding chain: " << error;
@@ -135,14 +137,15 @@ void AddChainReply(evhttp_request *req, SubmitResult result,
 }
 
 
-multimap<string, string> ParseQuery(evhttp_request *req) {
+multimap<string, string> ParseQuery(evhttp_request* req) {
   evkeyvalq keyval;
   multimap<string, string> retval;
 
   // We return an empty result in case of a parsing error.
   if (evhttp_parse_query_str(evhttp_uri_get_query(
-          evhttp_request_get_evhttp_uri(req)), &keyval) == 0) {
-    for (evkeyval *i = keyval.tqh_first; i; i = i->next.tqe_next) {
+                                 evhttp_request_get_evhttp_uri(req)),
+                             &keyval) == 0) {
+    for (evkeyval* i = keyval.tqh_first; i; i = i->next.tqe_next) {
       retval.insert(make_pair(i->key, i->value));
     }
   }
@@ -151,8 +154,8 @@ multimap<string, string> ParseQuery(evhttp_request *req) {
 }
 
 
-bool GetParam(const multimap<string, string> &query, const string &param,
-              string *value) {
+bool GetParam(const multimap<string, string>& query, const string& param,
+              string* value) {
   CHECK_NOTNULL(value);
 
   multimap<string, string>::const_iterator it = query.find(param);
@@ -178,7 +181,7 @@ bool GetParam(const multimap<string, string> &query, const string &param,
 // parameters).
 // FIXME: at least some parameters are strictly 64 bit - we should get
 // the right size.
-int GetIntParam(const multimap<string, string> &query, const string &param) {
+int GetIntParam(const multimap<string, string>& query, const string& param) {
   int retval(-1);
   string value;
   if (GetParam(query, param, &value)) {
@@ -203,10 +206,10 @@ int GetIntParam(const multimap<string, string> &query, const string &param) {
 }  // namespace
 
 
-HttpHandler::HttpHandler(LogLookup<LoggedCertificate> *log_lookup,
-                         const Database<LoggedCertificate> *db,
-                         const CertChecker *cert_checker, Frontend *frontend,
-                         ThreadPool *pool)
+HttpHandler::HttpHandler(LogLookup<LoggedCertificate>* log_lookup,
+                         const Database<LoggedCertificate>* db,
+                         const CertChecker* cert_checker, Frontend* frontend,
+                         ThreadPool* pool)
     : log_lookup_(CHECK_NOTNULL(log_lookup)),
       db_(CHECK_NOTNULL(db)),
       cert_checker_(CHECK_NOTNULL(cert_checker)),
@@ -215,7 +218,7 @@ HttpHandler::HttpHandler(LogLookup<LoggedCertificate> *log_lookup,
 }
 
 
-void HttpHandler::Add(libevent::HttpServer *server) {
+void HttpHandler::Add(libevent::HttpServer* server) {
   // TODO(pphaneuf): An optional prefix might be nice?
   // TODO(pphaneuf): Find out which methods are CPU intensive enough
   // that they should be spun off to the thread pool.
@@ -239,7 +242,7 @@ void HttpHandler::Add(libevent::HttpServer *server) {
 }
 
 
-void HttpHandler::GetEntries(evhttp_request *req) const {
+void HttpHandler::GetEntries(evhttp_request* req) const {
   if (evhttp_request_get_command(req) != EVHTTP_REQ_GET)
     return SendError(req, HTTP_BADMETHOD, "Method not allowed.");
 
@@ -272,16 +275,15 @@ void HttpHandler::GetEntries(evhttp_request *req) const {
 }
 
 
-void HttpHandler::GetRoots(evhttp_request *req) const {
+void HttpHandler::GetRoots(evhttp_request* req) const {
   if (evhttp_request_get_command(req) != EVHTTP_REQ_GET) {
     SendError(req, HTTP_BADMETHOD, "Method not allowed.");
   }
 
   JsonArray roots;
-  multimap<string, const Cert *>::const_iterator it;
+  multimap<string, const Cert*>::const_iterator it;
   for (it = cert_checker_->GetTrustedCertificates().begin();
-       it != cert_checker_->GetTrustedCertificates().end();
-       ++it) {
+       it != cert_checker_->GetTrustedCertificates().end(); ++it) {
     string cert;
     if (it->second->DerEncoding(&cert) != Cert::TRUE) {
       LOG(ERROR) << "Cert encoding failed";
@@ -298,7 +300,7 @@ void HttpHandler::GetRoots(evhttp_request *req) const {
 }
 
 
-void HttpHandler::GetProof(evhttp_request *req) const {
+void HttpHandler::GetProof(evhttp_request* req) const {
   if (evhttp_request_get_command(req) != EVHTTP_REQ_GET)
     SendError(req, HTTP_BADMETHOD, "Method not allowed.");
 
@@ -316,15 +318,15 @@ void HttpHandler::GetProof(evhttp_request *req) const {
   }
 
   const int tree_size(GetIntParam(query, "tree_size"));
-  if (tree_size < 0
-      || static_cast<uint64_t>(tree_size) > log_lookup_->GetSTH().tree_size()) {
+  if (tree_size < 0 ||
+      static_cast<uint64_t>(tree_size) > log_lookup_->GetSTH().tree_size()) {
     return SendError(req, HTTP_BADREQUEST,
                      "Missing or invalid \"tree_size\" parameter.");
   }
 
   ShortMerkleAuditProof proof;
-  if (log_lookup_->AuditProof(hash, tree_size, &proof)
-      != LogLookup<LoggedCertificate>::OK) {
+  if (log_lookup_->AuditProof(hash, tree_size, &proof) !=
+      LogLookup<LoggedCertificate>::OK) {
     return SendError(req, HTTP_BADREQUEST, "Couldn't find hash.");
   }
 
@@ -341,11 +343,11 @@ void HttpHandler::GetProof(evhttp_request *req) const {
 }
 
 
-void HttpHandler::GetSTH(evhttp_request *req) const {
+void HttpHandler::GetSTH(evhttp_request* req) const {
   if (evhttp_request_get_command(req) != EVHTTP_REQ_GET)
     SendError(req, HTTP_BADMETHOD, "Method not allowed.");
 
-  const SignedTreeHead &sth(log_lookup_->GetSTH());
+  const SignedTreeHead& sth(log_lookup_->GetSTH());
 
   VLOG(1) << "SignedTreeHead:\n" << sth.DebugString();
 
@@ -361,7 +363,7 @@ void HttpHandler::GetSTH(evhttp_request *req) const {
 }
 
 
-void HttpHandler::GetConsistency(evhttp_request *req) const {
+void HttpHandler::GetConsistency(evhttp_request* req) const {
   if (evhttp_request_get_command(req) != EVHTTP_REQ_GET) {
     SendError(req, HTTP_BADMETHOD, "Method not allowed.");
   }
@@ -395,7 +397,7 @@ void HttpHandler::GetConsistency(evhttp_request *req) const {
 }
 
 
-void HttpHandler::AddChain(evhttp_request *req) {
+void HttpHandler::AddChain(evhttp_request* req) {
   const shared_ptr<CertChain> chain(make_shared<CertChain>());
   if (!ExtractChain(req, chain.get())) {
     return;
@@ -405,7 +407,7 @@ void HttpHandler::AddChain(evhttp_request *req) {
 }
 
 
-void HttpHandler::AddPreChain(evhttp_request *req) {
+void HttpHandler::AddPreChain(evhttp_request* req) {
   const shared_ptr<PreCertChain> chain(make_shared<PreCertChain>());
   if (!ExtractChain(req, chain.get())) {
     return;
@@ -415,7 +417,7 @@ void HttpHandler::AddPreChain(evhttp_request *req) {
 }
 
 
-void HttpHandler::BlockingGetEntries(evhttp_request *req, int start,
+void HttpHandler::BlockingGetEntries(evhttp_request* req, int start,
                                      int end) const {
   JsonArray json_entries;
   for (int i = start; i <= end; ++i) {
@@ -447,19 +449,21 @@ void HttpHandler::BlockingGetEntries(evhttp_request *req, int start,
 }
 
 
-void HttpHandler::BlockingAddChain(
-    evhttp_request *req, const shared_ptr<CertChain> &chain) const {
+void HttpHandler::BlockingAddChain(evhttp_request* req,
+                                   const shared_ptr<CertChain>& chain) const {
   SignedCertificateTimestamp sct;
 
-  AddChainReply(req, CHECK_NOTNULL(frontend_)->QueueX509Entry(
-      CHECK_NOTNULL(chain.get()), &sct), sct);
+  AddChainReply(req, CHECK_NOTNULL(frontend_)
+                         ->QueueX509Entry(CHECK_NOTNULL(chain.get()), &sct),
+                sct);
 }
 
 
 void HttpHandler::BlockingAddPreChain(
-    evhttp_request *req, const shared_ptr<PreCertChain> &chain) const {
+    evhttp_request* req, const shared_ptr<PreCertChain>& chain) const {
   SignedCertificateTimestamp sct;
 
-  AddChainReply(req, CHECK_NOTNULL(frontend_)->QueuePreCertEntry(
-      CHECK_NOTNULL(chain.get()), &sct), sct);
+  AddChainReply(req, CHECK_NOTNULL(frontend_)
+                         ->QueuePreCertEntry(CHECK_NOTNULL(chain.get()), &sct),
+                sct);
 }

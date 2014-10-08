@@ -27,7 +27,7 @@ class ThreadPool::Impl {
   // emplace_back, which is not available to us yet (C++11). I'd also
   // like it to be const, but it required to jump a few more hoops,
   // keeping it simple for now.
-  vector<thread *> threads_;
+  vector<thread*> threads_;
 
   mutex queue_lock_;
   condition_variable queue_cond_var_;
@@ -40,15 +40,14 @@ ThreadPool::Impl::~Impl() {
   // them), to have them exit cleanly.
   {
     lock_guard<mutex> lock(queue_lock_);
-    for (int i = threads_.size(); i > 0; --i)
-      queue_.push(function<void()>());
+    for (int i = threads_.size(); i > 0; --i) queue_.push(function<void()>());
   }
   // Notify all the threads *after* adding all the empty closures, to
   // avoid any races.
   queue_cond_var_.notify_all();
 
   // Wait for the threads to exit.
-  for (vector<thread *>::const_iterator it = threads_.begin();
+  for (vector<thread*>::const_iterator it = threads_.begin();
        it != threads_.end(); ++it) {
     (*it)->join();
     delete *it;
@@ -87,10 +86,9 @@ void ThreadPool::Impl::Worker() {
 }
 
 
-ThreadPool::ThreadPool()
-    : impl_(new Impl) {
-  const int num_threads(thread::hardware_concurrency() > 0
-                        ? thread::hardware_concurrency() : 1);
+ThreadPool::ThreadPool() : impl_(new Impl) {
+  const int num_threads(
+      thread::hardware_concurrency() > 0 ? thread::hardware_concurrency() : 1);
 
   LOG(INFO) << "ThreadPool starting with " << num_threads << " threads";
   for (int i = 0; i < num_threads; ++i)
@@ -104,7 +102,7 @@ ThreadPool::~ThreadPool() {
 }
 
 
-void ThreadPool::Add(const function<void()> &closure) {
+void ThreadPool::Add(const function<void()>& closure) {
   // Empty closures signal a thread to exit, don't allow that (also,
   // it doesn't make sense).
   CHECK(!closure.empty());

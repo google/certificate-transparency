@@ -29,9 +29,9 @@ CertChecker::~CertChecker() {
   ClearAllTrustedCertificates();
 }
 
-bool CertChecker::LoadTrustedCertificates(const std::string &cert_file) {
+bool CertChecker::LoadTrustedCertificates(const std::string& cert_file) {
   // A read-only BIO.
-  BIO *bio_in = BIO_new(BIO_s_file());
+  BIO* bio_in = BIO_new(BIO_s_file());
   if (bio_in == NULL) {
     LOG_OPENSSL_ERRORS(ERROR);
     return false;
@@ -51,11 +51,11 @@ bool CertChecker::LoadTrustedCertificates(const std::string &cert_file) {
   size_t cert_count = 0;
 
   while (!error) {
-    X509 *x509 = PEM_read_bio_X509(bio_in, NULL, NULL, NULL);
+    X509* x509 = PEM_read_bio_X509(bio_in, NULL, NULL, NULL);
     if (x509 != NULL) {
       // TODO(ekasper): check that the issuing CA cert is temporally valid
       // and at least warn if it isn't.
-      Cert *cert = new Cert(x509);
+      Cert* cert = new Cert(x509);
       string subject_name;
       CertVerifyResult is_trusted = IsTrusted(*cert, &subject_name);
       if (is_trusted != OK && is_trusted != ROOT_NOT_IN_LOCAL_STORE) {
@@ -107,20 +107,19 @@ bool CertChecker::LoadTrustedCertificates(const std::string &cert_file) {
 }
 
 void CertChecker::ClearAllTrustedCertificates() {
-  std::multimap<string, const Cert *>::iterator it = trusted_.begin();
-  for (; it != trusted_.end(); ++it)
-    delete it->second;
+  std::multimap<string, const Cert*>::iterator it = trusted_.begin();
+  for (; it != trusted_.end(); ++it) delete it->second;
   trusted_.clear();
 }
 
-CertChecker::CertVerifyResult
-CertChecker::CheckCertChain(CertChain *chain) const {
+CertChecker::CertVerifyResult CertChecker::CheckCertChain(
+    CertChain* chain) const {
   if (chain == NULL || !chain->IsLoaded())
     return INVALID_CERTIFICATE_CHAIN;
 
   // Weed out things that should obviously be precert chains instead.
-  Cert::Status status = chain->LeafCert()->HasCriticalExtension(
-      cert_trans::NID_ctPoison);
+  Cert::Status status =
+      chain->LeafCert()->HasCriticalExtension(cert_trans::NID_ctPoison);
   if (status != Cert::TRUE && status != Cert::FALSE) {
     return CertChecker::INTERNAL_ERROR;
   }
@@ -130,8 +129,8 @@ CertChecker::CheckCertChain(CertChain *chain) const {
   return CheckIssuerChain(chain);
 }
 
-CertChecker::CertVerifyResult
-CertChecker::CheckIssuerChain(CertChain *chain) const {
+CertChecker::CertVerifyResult CertChecker::CheckIssuerChain(
+    CertChain* chain) const {
   if (chain->RemoveCertsAfterFirstSelfSigned() != Cert::TRUE) {
     LOG(ERROR) << "Failed to trim chain";
     return INTERNAL_ERROR;
@@ -169,8 +168,8 @@ CertChecker::CheckIssuerChain(CertChain *chain) const {
 }
 
 CertChecker::CertVerifyResult CertChecker::CheckPreCertChain(
-    PreCertChain *chain, string *issuer_key_hash,
-    string *tbs_certificate) const {
+    PreCertChain* chain, string* issuer_key_hash,
+    string* tbs_certificate) const {
   if (chain == NULL || !chain->IsLoaded())
     return INVALID_CERTIFICATE_CHAIN;
   Cert::Status status = chain->IsWellFormed();
@@ -181,13 +180,15 @@ CertChecker::CertVerifyResult CertChecker::CheckPreCertChain(
     return INTERNAL_ERROR;
   }
   // Check the issuer and signature chain.
-  // We do not, at this point, concern ourselves with whether the CA certificate
+  // We do not, at this point, concern ourselves with whether the CA
+  // certificate
   // that issued the precert is a Precertificate Signing Certificate (i.e., has
   // restricted Extended Key Usage) or not, since this does not influence the
   // validity of the chain. The purpose of the EKU is effectively to allow CAs
   // to create an intermediate whose scope can be limited to CT precerts only
   // (by making this extension critical).
-  // TODO(ekasper): determine (i.e., ask CAs) if CA:false Precertificate Signing
+  // TODO(ekasper): determine (i.e., ask CAs) if CA:false Precertificate
+  // Signing
   // Certificates should be tolerated if they have the necessary EKU set.
   // Preference is "no".
   CertVerifyResult res = CheckIssuerChain(chain);
@@ -231,9 +232,9 @@ CertChecker::CertVerifyResult CertChecker::CheckPreCertChain(
   return OK;
 }
 
-CertChecker::CertVerifyResult
-CertChecker::GetTrustedCa(CertChain *chain) const {
-  const Cert *subject = chain->LastCert();
+CertChecker::CertVerifyResult CertChecker::GetTrustedCa(
+    CertChain* chain) const {
+  const Cert* subject = chain->LastCert();
   if (subject == NULL || !subject->IsLoaded()) {
     LOG(ERROR) << "Chain has no valid certs";
     return INTERNAL_ERROR;
@@ -264,14 +265,15 @@ CertChecker::GetTrustedCa(CertChain *chain) const {
     return ROOT_NOT_IN_LOCAL_STORE;
   }
 
-  std::pair<std::multimap<string, const Cert *>::const_iterator,
-            std::multimap<string, const Cert *>::const_iterator> issuer_range =
-    trusted_.equal_range(issuer_name);
+  std::pair<std::multimap<string, const Cert*>::const_iterator,
+            std::multimap<string, const Cert*>::const_iterator> issuer_range =
+      trusted_.equal_range(issuer_name);
 
-  const Cert *issuer = NULL;
-  for (std::multimap<string, const Cert *>::const_iterator it
-           = issuer_range.first; it != issuer_range.second; ++it) {
-    const Cert *issuer_cand = it->second;
+  const Cert* issuer = NULL;
+  for (std::multimap<string, const Cert*>::const_iterator it =
+           issuer_range.first;
+       it != issuer_range.second; ++it) {
+    const Cert* issuer_cand = it->second;
 
     Cert::Status ok = subject->IsSignedBy(*issuer_cand);
     if (ok == Cert::UNSUPPORTED_ALGORITHM) {
@@ -304,7 +306,7 @@ CertChecker::GetTrustedCa(CertChain *chain) const {
 }
 
 CertChecker::CertVerifyResult CertChecker::IsTrusted(
-    const Cert &cert, string *subject_name) const {
+    const Cert& cert, string* subject_name) const {
   string cert_name;
   Cert::Status status = cert.DerEncodedSubjectName(&cert_name);
   if (status == Cert::ERROR)
@@ -314,12 +316,13 @@ CertChecker::CertVerifyResult CertChecker::IsTrusted(
 
   *subject_name = cert_name;
 
-  std::pair<std::multimap<string, const Cert *>::const_iterator,
-            std::multimap<string, const Cert *>::const_iterator> cand_range =
-    trusted_.equal_range(cert_name);
-  for (std::multimap<string, const Cert *>::const_iterator it = cand_range.first;
+  std::pair<std::multimap<string, const Cert*>::const_iterator,
+            std::multimap<string, const Cert*>::const_iterator> cand_range =
+      trusted_.equal_range(cert_name);
+  for (std::multimap<string, const Cert*>::const_iterator it =
+           cand_range.first;
        it != cand_range.second; ++it) {
-    const Cert *cand = it->second;
+    const Cert* cand = it->second;
     Cert::Status matches = cert.IsIdenticalTo(*cand);
     if (matches != Cert::TRUE && matches != Cert::FALSE) {
       LOG(ERROR) << "Cert comparison failed";

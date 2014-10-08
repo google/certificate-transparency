@@ -47,8 +47,7 @@ DEFINE_string(ct_server, "", "CT log server to connect to");
 DEFINE_string(ct_server_response_out, "",
               "Output file for the Signed Certificate Timestamp received from "
               "the CT log server");
-DEFINE_bool(precert, false,
-            "The submission is a CA precertificate chain");
+DEFINE_bool(precert, false, "The submission is a CA precertificate chain");
 DEFINE_string(sct_token, "",
               "Input file containing the SCT of the certificate");
 DEFINE_string(ssl_client_ct_data_in, "",
@@ -58,25 +57,31 @@ DEFINE_string(ssl_client_ct_data_out, "",
               "as well as all received and validated SCTs.");
 DEFINE_string(certificate_out, "",
               "Output file for the superfluous certificate");
-DEFINE_string(tls_extension_data_out, "", "Output file for TLS extension data");
+DEFINE_string(tls_extension_data_out, "",
+              "Output file for TLS extension data");
 DEFINE_string(extensions_config_out, "",
               "Output configuration file to append the sct to. Appends the "
               "sct to the end of the file, so the relevant section should be "
               "last in the configuration file.");
-DEFINE_bool(ssl_client_require_sct, true, "Fail the SSL handshake if "
+DEFINE_bool(ssl_client_require_sct, true,
+            "Fail the SSL handshake if "
             "the server presents no valid SCT token");
 DEFINE_bool(ssl_client_expect_handshake_failure, false,
             "Expect the handshake to fail. If this is set to true, then "
             "the program exits with 0 iff there is a handshake failure. "
             "Used for testing.");
-DEFINE_string(certificate_chain_in, "", "Certificate chain to analyze, "
+DEFINE_string(certificate_chain_in, "",
+              "Certificate chain to analyze, "
               "in PEM format");
 DEFINE_string(sct_in, "", "SCT to wrap");
 DEFINE_int32(get_first, 0, "First entry to retrieve with the 'get' command");
 DEFINE_int32(get_last, 0, "Last entry to retrieve with the 'get' command");
-DEFINE_string(certificate_base, "", "Base name for retrieved certificates - "
+DEFINE_string(certificate_base, "",
+              "Base name for retrieved certificates - "
               "files will be <base><entry>.<cert>.der");
-DEFINE_string(monitor_action, "loop", "Step the monitor shall do (or loop). "
+DEFINE_string(
+    monitor_action, "loop",
+    "Step the monitor shall do (or loop). "
     "Available actions are:\n"
     "get_sth - put current STH from log into monitor database\n"
     "verify_sth - verify a STH (latest written or for a given timestamp)\n"
@@ -85,11 +90,13 @@ DEFINE_string(monitor_action, "loop", "Step the monitor shall do (or loop). "
     "init - initiate monitor (i.e. database) prior to its first run\n"
     "loop - start the monitor in a loop (default)");
 DEFINE_string(sqlite_db, "", "Database for certificate and tree storage");
-DEFINE_uint64(timestamp, 0, "The timestamp to be used in the monitor actions "
+DEFINE_uint64(timestamp, 0,
+              "The timestamp to be used in the monitor actions "
               "verify_sth and confirm_tree.");
 DEFINE_string(sth1, "", "File containing first STH");
 DEFINE_string(sth2, "", "File containing second STH");
-DEFINE_uint64(monitor_sleep_time_secs, 60, "Amount of time the monitor shall "
+DEFINE_uint64(monitor_sleep_time_secs, 60,
+              "Amount of time the monitor shall "
               "sleep between probing for a new STH.");
 
 
@@ -130,7 +137,7 @@ using std::vector;
 
 // SCTs presented to clients have to be encoded as a list.
 // Helper method for encoding a single SCT.
-static string SCTToList(const string &serialized_sct) {
+static string SCTToList(const string& serialized_sct) {
   SignedCertificateTimestampList sct_list;
   sct_list.add_sct_list(serialized_sct);
   string result;
@@ -138,18 +145,18 @@ static string SCTToList(const string &serialized_sct) {
   return result;
 }
 
-static LogVerifier *GetLogVerifierFromFlags() {
+static LogVerifier* GetLogVerifierFromFlags() {
   CHECK_NE(FLAGS_ct_server_public_key, "");
   string log_server_key = FLAGS_ct_server_public_key;
-  EVP_PKEY *pkey = NULL;
-  FILE *fp = fopen(log_server_key.c_str(), "r");
+  EVP_PKEY* pkey = NULL;
+  FILE* fp = fopen(log_server_key.c_str(), "r");
 
   PCHECK(fp != static_cast<FILE*>(NULL))
       << "Could not read CT server public key file";
   // No password.
   PEM_read_PUBKEY(fp, &pkey, NULL, NULL);
-  CHECK_NE(pkey, static_cast<EVP_PKEY*>(NULL)) <<
-      log_server_key << " is not a valid PEM-encoded public key.";
+  CHECK_NE(pkey, static_cast<EVP_PKEY*>(NULL))
+      << log_server_key << " is not a valid PEM-encoded public key.";
   fclose(fp);
 
   return new LogVerifier(new LogSigVerifier(pkey),
@@ -158,27 +165,27 @@ static LogVerifier *GetLogVerifierFromFlags() {
 
 // Adds the data to the cert as an extension, formatted as a single
 // ASN.1 octet string.
-static void AddOctetExtension(X509 *cert, int nid, const unsigned char *data,
+static void AddOctetExtension(X509* cert, int nid, const unsigned char* data,
                               int data_len, int critical) {
   // The extension as a single octet string.
-  ASN1_OCTET_STRING *inner = ASN1_OCTET_STRING_new();
+  ASN1_OCTET_STRING* inner = ASN1_OCTET_STRING_new();
   CHECK_NOTNULL(inner);
   CHECK_EQ(1, ASN1_OCTET_STRING_set(inner, data, data_len));
   int buf_len = i2d_ASN1_OCTET_STRING(inner, NULL);
   CHECK_GT(buf_len, 0);
 
-  unsigned char *buf = new unsigned char[buf_len];
-  unsigned char *p = buf;
+  unsigned char* buf = new unsigned char[buf_len];
+  unsigned char* p = buf;
 
   CHECK_EQ(buf_len, i2d_ASN1_OCTET_STRING(inner, &p));
 
   // The outer, opaque octet string.
-  ASN1_OCTET_STRING *asn1_data = ASN1_OCTET_STRING_new();
+  ASN1_OCTET_STRING* asn1_data = ASN1_OCTET_STRING_new();
   CHECK_NOTNULL(asn1_data);
   CHECK_EQ(1, ASN1_OCTET_STRING_set(asn1_data, buf, buf_len));
 
-  X509_EXTENSION *ext = X509_EXTENSION_create_by_NID(NULL, nid, critical,
-                                                     asn1_data);
+  X509_EXTENSION* ext =
+      X509_EXTENSION_create_by_NID(NULL, nid, critical, asn1_data);
   CHECK_EQ(1, X509_add_ext(cert, ext, -1));
 
   ASN1_OCTET_STRING_free(inner);
@@ -189,15 +196,15 @@ static void AddOctetExtension(X509 *cert, int nid, const unsigned char *data,
 // Reconstructs a LogEntry from the given precert chain.
 // Used for verifying a Precert SCT.
 // Returns true iff the LogEntry was correctly populated.
-static bool PrecertChainToEntry(const cert_trans::PreCertChain &chain,
-                                LogEntry *entry) {
+static bool PrecertChainToEntry(const cert_trans::PreCertChain& chain,
+                                LogEntry* entry) {
   if (!chain.IsLoaded()) {
     LOG(ERROR) << "Chain not loaded.";
     return false;
   }
 
-  Cert::Status status = chain.LeafCert()->HasExtension(
-      cert_trans::NID_ctPoison);
+  Cert::Status status =
+      chain.LeafCert()->HasExtension(cert_trans::NID_ctPoison);
   if (status != Cert::TRUE && status != Cert::FALSE) {
     LOG(ERROR) << "Failed to test for poison extension.";
     return false;
@@ -239,22 +246,21 @@ static bool PrecertChainToEntry(const cert_trans::PreCertChain &chain,
     return false;
   }
 
-  entry->mutable_precert_entry()->mutable_pre_cert()->
-      set_tbs_certificate(tbs_der);
+  entry->mutable_precert_entry()->mutable_pre_cert()->set_tbs_certificate(
+      tbs_der);
   return true;
 }
 
 static bool VerifySCTAndPopulateSSLClientCTData(
-    const SignedCertificateTimestamp &sct,
-    const LogEntry& log_entry,
+    const SignedCertificateTimestamp& sct, const LogEntry& log_entry,
     SSLClientCTData* ct_data) {
-  SSLClientCTData::SCTInfo *sct_info = ct_data->add_attached_sct_info();
+  SSLClientCTData::SCTInfo* sct_info = ct_data->add_attached_sct_info();
   sct_info->mutable_sct()->CopyFrom(sct);
-  LogVerifier *verifier = GetLogVerifierFromFlags();
+  LogVerifier* verifier = GetLogVerifierFromFlags();
   string merkle_leaf;
   LogVerifier::VerifyResult result =
-      verifier->VerifySignedCertificateTimestamp(ct_data->reconstructed_entry(),
-                                                 sct, &merkle_leaf);
+      verifier->VerifySignedCertificateTimestamp(
+          ct_data->reconstructed_entry(), sct, &merkle_leaf);
   if (result != LogVerifier::VERIFY_OK) {
     LOG(ERROR) << "Verifier returned " << result;
     return false;
@@ -266,8 +272,8 @@ static bool VerifySCTAndPopulateSSLClientCTData(
 }
 
 // Checks an SCT issued for an X.509 Certificate.
-static bool CheckSCT(const SignedCertificateTimestamp &sct,
-                     const CertChain &chain, SSLClientCTData *ct_data) {
+static bool CheckSCT(const SignedCertificateTimestamp& sct,
+                     const CertChain& chain, SSLClientCTData* ct_data) {
   LogEntry entry;
   if (!CertSubmissionHandler::X509ChainToEntry(chain, &entry)) {
     LOG(ERROR) << "Failed to reconstruct log entry input from chain";
@@ -278,9 +284,8 @@ static bool CheckSCT(const SignedCertificateTimestamp &sct,
 }
 
 // Checks an SCT issued for a Precert.
-static bool CheckSCT(
-    const SignedCertificateTimestamp &sct,
-    const PreCertChain &chain, SSLClientCTData *ct_data) {
+static bool CheckSCT(const SignedCertificateTimestamp& sct,
+                     const PreCertChain& chain, SSLClientCTData* ct_data) {
   LogEntry entry;
   if (!PrecertChainToEntry(chain, &entry)) {
     LOG(ERROR) << "Failed to reconstruct log entry input from precert chain";
@@ -290,8 +295,8 @@ static bool CheckSCT(
   return VerifySCTAndPopulateSSLClientCTData(sct, entry, ct_data);
 }
 
-void WriteFile(const std::string &file, const std::string &contents,
-               const char *name) {
+void WriteFile(const std::string& file, const std::string& contents,
+               const char* name) {
   if (file.empty()) {
     LOG(WARNING) << "No response file specified; " << name
                  << " will not be saved.";
@@ -321,8 +326,8 @@ static int Upload() {
 
   SignedCertificateTimestamp sct;
   HTTPLogClient client(FLAGS_ct_server);
-  AsyncLogClient::Status ret = client.UploadSubmission(contents, FLAGS_precert,
-                                                       &sct);
+  AsyncLogClient::Status ret =
+      client.UploadSubmission(contents, FLAGS_precert, &sct);
 
   if (ret == AsyncLogClient::CONNECT_FAILED) {
     LOG(ERROR) << "Unable to connect";
@@ -379,15 +384,15 @@ static void MakeCert() {
   PCHECK(cert_fd > 0) << "Could not open certificate file " << cert_file
                       << " for writing.";
 
-  BIO *out = BIO_new_fd(cert_fd, BIO_CLOSE);
+  BIO* out = BIO_new_fd(cert_fd, BIO_CLOSE);
 
-  X509 *x = X509_new();
+  X509* x = X509_new();
 
   // X509v3 (== 2)
   X509_set_version(x, 2);
 
   // Random 128 bit serial number
-  BIGNUM *serial = BN_new();
+  BIGNUM* serial = BN_new();
   BN_rand(serial, 128, 0, 0);
   BN_to_ASN1_INTEGER(serial, X509_get_serialNumber(x));
   BN_free(serial);
@@ -403,31 +408,31 @@ static void MakeCert() {
   X509_gmtime_adj(X509_get_notAfter(x), 1);
 
   // Create the issuer name
-  X509_NAME *issuer = X509_NAME_new();
-  X509_NAME_add_entry_by_NID(
-      issuer, NID_commonName, V_ASN1_PRINTABLESTRING,
-      const_cast<unsigned char *>(
-          reinterpret_cast<const unsigned char *>("Test")),
-      4, 0, -1);
+  X509_NAME* issuer = X509_NAME_new();
+  X509_NAME_add_entry_by_NID(issuer, NID_commonName, V_ASN1_PRINTABLESTRING,
+                             const_cast<unsigned char*>(
+                                 reinterpret_cast<const unsigned char*>(
+                                     "Test")),
+                             4, 0, -1);
   X509_set_issuer_name(x, issuer);
 
   // Create the subject name
-  X509_NAME *subject = X509_NAME_new();
-  X509_NAME_add_entry_by_NID(
-      subject, NID_commonName, V_ASN1_PRINTABLESTRING,
-      const_cast<unsigned char *>(
-          reinterpret_cast<const unsigned char *>("tseT")),
-      4, 0, -1);
+  X509_NAME* subject = X509_NAME_new();
+  X509_NAME_add_entry_by_NID(subject, NID_commonName, V_ASN1_PRINTABLESTRING,
+                             const_cast<unsigned char*>(
+                                 reinterpret_cast<const unsigned char*>(
+                                     "tseT")),
+                             4, 0, -1);
   X509_set_subject_name(x, subject);
 
   // Public key
-  RSA *rsa = RSA_new();
-  static const unsigned char bits[1] = { 3 };
+  RSA* rsa = RSA_new();
+  static const unsigned char bits[1] = {3};
   rsa->n = BN_bin2bn(bits, 1, NULL);
   rsa->e = BN_bin2bn(bits, 1, NULL);
-  EVP_PKEY *evp_pkey = EVP_PKEY_new();
+  EVP_PKEY* evp_pkey = EVP_PKEY_new();
   EVP_PKEY_assign_RSA(evp_pkey, rsa);
-  X509_PUBKEY_set(&X509_get_X509_PUBKEY(x) , evp_pkey);
+  X509_PUBKEY_set(&X509_get_X509_PUBKEY(x), evp_pkey);
 
   // And finally, the proof in an extension
   string serialized_sct_list = SCTToList(sct);
@@ -489,7 +494,8 @@ static void ProofToExtensionData() {
       << "Could not read SCT data from " << FLAGS_sct_token;
   std::ifstream proof_in(FLAGS_sct_token.c_str(),
                          std::ios::in | std::ios::binary);
-  PCHECK(proof_in.good()) << "Could not read SCT data from " << FLAGS_sct_token;
+  PCHECK(proof_in.good()) << "Could not read SCT data from "
+                          << FLAGS_sct_token;
 
   // Count proof length.
   proof_in.seekg(0, std::ios::end);
@@ -498,13 +504,13 @@ static void ProofToExtensionData() {
   proof_in.seekg(0, std::ios::beg);
 
   // Read the proof
-  char *buf = new char[proof_length];
+  char* buf = new char[proof_length];
   proof_in.read(buf, proof_length);
   assert(proof_in.gcount() == proof_length);
 
   SignedCertificateTimestampList sctlist;
   sctlist.add_sct_list(buf, proof_length);
-  delete [] buf;
+  delete[] buf;
 
   string sctliststr;
   CHECK_EQ(Serializer::SerializeSCTList(sctlist, &sctliststr), Serializer::OK);
@@ -524,33 +530,28 @@ static void ProofToExtensionData() {
 
   proof_in.close();
 
-  FILE *out = fopen(FLAGS_tls_extension_data_out.c_str(), "w");
+  FILE* out = fopen(FLAGS_tls_extension_data_out.c_str(), "w");
   PCHECK(out != NULL) << "Could not open extension data file "
                       << FLAGS_tls_extension_data_out
                       << " for writing:" << strerror(errno);
 
-  // Work around broken PEM_write() declaration in older OpenSSL versions.
+// Work around broken PEM_write() declaration in older OpenSSL versions.
 #if OPENSSL_VERSION_NUMBER < 0x10002000L
-  PEM_write(out,
-            const_cast<char *>(kPEMLabel),
-            const_cast<char *>(""),
-            const_cast<unsigned char *>(
-                reinterpret_cast<const unsigned char *>(
-                    extension_data_out.str().data())),
+  PEM_write(out, const_cast<char*>(kPEMLabel), const_cast<char*>(""),
+            const_cast<unsigned char*>(reinterpret_cast<const unsigned char*>(
+                extension_data_out.str().data())),
             extension_data_out.str().length());
 #else
-  PEM_write(out,
-            kPEMLabel,
-            "",
-      reinterpret_cast<const unsigned char *>(extension_data_out.str().data()),
+  PEM_write(out, kPEMLabel, "", reinterpret_cast<const unsigned char*>(
+                                    extension_data_out.str().data()),
             extension_data_out.str().length());
 #endif
 
   fclose(out);
 }
 
-static void WriteSSLClientCTData(const SSLClientCTData &ct_data,
-                                 const string &ct_data_out_file) {
+static void WriteSSLClientCTData(const SSLClientCTData& ct_data,
+                                 const string& ct_data_out_file) {
   std::ofstream checkpoint_out(ct_data_out_file.c_str(),
                                std::ios::out | std::ios::binary);
   PCHECK(checkpoint_out.good()) << "Could not open checkpoint file "
@@ -566,7 +567,7 @@ static void WriteSSLClientCTData(const SSLClientCTData &ct_data,
 //  1: handshake error
 //  2: connection error
 static SSLClient::HandshakeResult Connect() {
-  LogVerifier *verifier = GetLogVerifierFromFlags();
+  LogVerifier* verifier = GetLogVerifierFromFlags();
 
   SSLClient client(FLAGS_ssl_server, FLAGS_ssl_server_port,
                    FLAGS_ssl_client_trusted_cert_dir, verifier);
@@ -613,7 +614,7 @@ static AuditResult Audit() {
   CHECK(ct_data.has_reconstructed_entry());
   CHECK_GT(ct_data.attached_sct_info_size(), 0);
 
-  LogVerifier *verifier = GetLogVerifierFromFlags();
+  LogVerifier* verifier = GetLogVerifierFromFlags();
   string key_id = verifier->KeyID();
 
   AuditResult audit_result = PROOF_NOT_FOUND;
@@ -632,10 +633,10 @@ static AuditResult Audit() {
     MerkleAuditProof proof;
     HTTPLogClient client(FLAGS_ct_server);
 
-    LOG(INFO) << "info = "
-              << ct_data.attached_sct_info(i).DebugString();
-    AsyncLogClient::Status ret = client.QueryAuditProof(
-        ct_data.attached_sct_info(i).merkle_leaf_hash(), &proof);
+    LOG(INFO) << "info = " << ct_data.attached_sct_info(i).DebugString();
+    AsyncLogClient::Status ret =
+        client.QueryAuditProof(ct_data.attached_sct_info(i).merkle_leaf_hash(),
+                               &proof);
 
     // HTTP protocol does not supply this.
     proof.mutable_id()->set_key_id(sct_id);
@@ -669,7 +670,7 @@ static AuditResult Audit() {
 
 static int CheckConsistency() {
   HTTPLogClient client(FLAGS_ct_server);
-  LogVerifier *verifier = GetLogVerifierFromFlags();
+  LogVerifier* verifier = GetLogVerifierFromFlags();
 
   string sth1_str;
   PCHECK(util::ReadBinaryFile(FLAGS_sth1, &sth1_str)) << "Can't read STH file "
@@ -678,13 +679,14 @@ static int CheckConsistency() {
   CHECK(sth1.ParseFromString(sth1_str));
   string sth2_str;
   PCHECK(util::ReadBinaryFile(FLAGS_sth2, &sth2_str)) << "Can't read STH file "
-                                                  << FLAGS_sth2;
+                                                      << FLAGS_sth2;
   ct::SignedTreeHead sth2;
   CHECK(sth2.ParseFromString(sth2_str));
 
   std::vector<string> proof;
-  CHECK_EQ(AsyncLogClient::OK, client.GetSTHConsistency(
-      sth1.tree_size(), sth2.tree_size(), &proof));
+  CHECK_EQ(AsyncLogClient::OK,
+           client.GetSTHConsistency(sth1.tree_size(), sth2.tree_size(),
+                                    &proof));
 
   if (!verifier->VerifyConsistency(sth1, sth2, proof)) {
     LOG(ERROR) << "Consistency proof does not verify";
@@ -706,20 +708,20 @@ static void DiagnoseCertChain() {
   PCHECK(util::ReadBinaryFile(cert_file, &pem_chain))
       << "Could not read certificate chain from " << cert_file;
   CertChain chain(pem_chain);
-  CHECK(chain.IsLoaded())
-      << cert_file << " is not a valid PEM-encoded certificate chain";
+  CHECK(chain.IsLoaded()) << cert_file
+                          << " is not a valid PEM-encoded certificate chain";
 
 
   if (chain.LeafCert()->HasExtension(
-          cert_trans::NID_ctEmbeddedSignedCertificateTimestampList)
-      != Cert::TRUE) {
+          cert_trans::NID_ctEmbeddedSignedCertificateTimestampList) !=
+      Cert::TRUE) {
     LOG(ERROR) << "Certificate has no embedded SCTs";
     return;
   }
 
   LOG(INFO) << "Embedded proof extension found in certificate";
 
-  LogVerifier *verifier = NULL;
+  LogVerifier* verifier = NULL;
   LogEntry entry;
   if (FLAGS_ct_server_public_key.empty()) {
     LOG(WARNING) << "No log server public key given, skipping verification";
@@ -789,8 +791,8 @@ void Wrap() {
   PCHECK(util::ReadBinaryFile(cert_file, &pem_chain))
       << "Could not read certificate chain from " << cert_file;
   CertChain chain(pem_chain);
-  CHECK(chain.IsLoaded())
-      << cert_file << " is not a valid PEM-encoded certificate chain";
+  CHECK(chain.IsLoaded()) << cert_file
+                          << " is not a valid PEM-encoded certificate chain";
 
   SSLClientCTData ct_data;
   CHECK(CheckSCT(sct, chain, &ct_data));
@@ -808,15 +810,17 @@ void WrapEmbedded() {
   PCHECK(util::ReadBinaryFile(cert_file, &pem_chain))
       << "Could not read certificate chain from " << cert_file;
   CertChain chain(pem_chain);
-  CHECK(chain.IsLoaded())
-      << cert_file << " is not a valid PEM-encoded certificate chain";
-  CHECK_EQ(Cert::TRUE, chain.LeafCert()->HasExtension(
-      cert_trans::NID_ctEmbeddedSignedCertificateTimestampList));
+  CHECK(chain.IsLoaded()) << cert_file
+                          << " is not a valid PEM-encoded certificate chain";
+  CHECK_EQ(Cert::TRUE,
+           chain.LeafCert()->HasExtension(
+               cert_trans::NID_ctEmbeddedSignedCertificateTimestampList));
 
   string serialized_scts;
-  CHECK_EQ(Cert::TRUE, chain.LeafCert()->OctetStringExtensionData(
-      cert_trans::NID_ctEmbeddedSignedCertificateTimestampList,
-      &serialized_scts));
+  CHECK_EQ(Cert::TRUE,
+           chain.LeafCert()->OctetStringExtensionData(
+               cert_trans::NID_ctEmbeddedSignedCertificateTimestampList,
+               &serialized_scts));
   SignedCertificateTimestampList sct_list;
   CHECK_EQ(Deserializer::OK,
            Deserializer::DeserializeSCTList(serialized_scts, &sct_list));
@@ -834,41 +838,44 @@ void WrapEmbedded() {
   WriteSSLClientCTData(ct_data, FLAGS_ssl_client_ct_data_out);
 }
 
-static void WriteCertificate(const std::string &cert, int entry,
-                             int cert_number, const char *type) {
- std::ostringstream outname;
- outname << FLAGS_certificate_base << entry << '.' << cert_number << '.'
-         << type << ".der";
- std::ofstream out(outname.str().c_str(),
-                   std::ios::binary | std::ios::trunc);
- CHECK(out.good());
- out << cert;
+static void WriteCertificate(const std::string& cert, int entry,
+                             int cert_number, const char* type) {
+  std::ostringstream outname;
+  outname << FLAGS_certificate_base << entry << '.' << cert_number << '.'
+          << type << ".der";
+  std::ofstream out(outname.str().c_str(), std::ios::binary | std::ios::trunc);
+  CHECK(out.good());
+  out << cert;
 }
 
 void GetEntries() {
   HTTPLogClient client(FLAGS_ct_server);
   std::vector<AsyncLogClient::Entry> entries;
-  AsyncLogClient::Status error = client.GetEntries(FLAGS_get_first,
-                                                   FLAGS_get_last, &entries);
+  AsyncLogClient::Status error =
+      client.GetEntries(FLAGS_get_first, FLAGS_get_last, &entries);
   CHECK_EQ(error, AsyncLogClient::OK);
 
   CHECK(!FLAGS_certificate_base.empty());
 
   int e = FLAGS_get_first;
-  for (std::vector<AsyncLogClient::Entry>::const_iterator entry =
-           entries.begin(); entry != entries.end(); ++entry, ++e) {
+  for (std::vector<AsyncLogClient::Entry>::const_iterator
+           entry = entries.begin();
+       entry != entries.end(); ++entry, ++e) {
     if (entry->leaf.timestamped_entry().entry_type() == ct::X509_ENTRY) {
       WriteCertificate(entry->leaf.timestamped_entry().signed_entry().x509(),
                        e, 0, "x509");
-      const ct::X509ChainEntry &x509chain = entry->entry.x509_entry();
+      const ct::X509ChainEntry& x509chain = entry->entry.x509_entry();
       for (int n = 0; n < x509chain.certificate_chain_size(); ++n)
         WriteCertificate(x509chain.certificate_chain(n), e, n + 1, "x509");
     } else {
-      assert(entry->leaf.timestamped_entry().entry_type()
-             == ct::PRECERT_ENTRY);
-      WriteCertificate(entry->leaf.timestamped_entry().signed_entry()
-                       .precert().tbs_certificate(), e, 0, "pre");
-      const ct::PrecertChainEntry &precertchain = entry->entry.precert_entry();
+      assert(entry->leaf.timestamped_entry().entry_type() ==
+             ct::PRECERT_ENTRY);
+      WriteCertificate(entry->leaf.timestamped_entry()
+                           .signed_entry()
+                           .precert()
+                           .tbs_certificate(),
+                       e, 0, "pre");
+      const ct::PrecertChainEntry& precertchain = entry->entry.precert_entry();
       for (int n = 0; n < precertchain.precertificate_chain_size(); ++n)
         WriteCertificate(precertchain.precertificate_chain(n), e, n + 1,
                          "x509");
@@ -903,12 +910,12 @@ int GetSTH() {
   ct::SignedTreeHead sth;
   CHECK_EQ(AsyncLogClient::OK, client.GetSTH(&sth));
 
-  LogVerifier *verifier = GetLogVerifierFromFlags();
+  LogVerifier* verifier = GetLogVerifierFromFlags();
 
   // Allow for 10 seconds of clock skew
-  uint64_t latest = ((uint64_t) time(NULL) + 10) * 1000;
-  LogVerifier::VerifyResult result
-      = verifier->VerifySignedTreeHead(sth, 0, latest);
+  uint64_t latest = ((uint64_t)time(NULL) + 10) * 1000;
+  LogVerifier::VerifyResult result =
+      verifier->VerifySignedTreeHead(sth, 0, latest);
 
   LOG(INFO) << "STH is " << sth.DebugString();
 
@@ -929,9 +936,9 @@ int GetSTH() {
   return 0;
 }
 
-static monitor::Database *GetMonitorDBFromFlags() {
+static monitor::Database* GetMonitorDBFromFlags() {
   CHECK_NE(FLAGS_sqlite_db, "");
-  monitor::Database *db;
+  monitor::Database* db;
   db = new monitor::SQLiteDB(FLAGS_sqlite_db);
   return db;
 }
@@ -975,7 +982,7 @@ int Monitor() {
 // 2: initial connection to the (log/ssl) server failed
 // Exit code upon abnormal exit (CHECK failures): != 0
 // (on UNIX, 134 is expected)
-int main(int argc, char **argv) {
+int main(int argc, char** argv) {
   google::SetUsageMessage(argv[0] + string(kUsage));
   google::ParseCommandLineFlags(&argc, &argv, true);
   google::InitGoogleLogging(argv[0]);
@@ -999,7 +1006,7 @@ int main(int argc, char **argv) {
     if ((!want_fail && result != SSLClient::OK) ||
         (want_fail && result != SSLClient::HANDSHAKE_FAILED))
       ret = 1;
-  } else  if (cmd == "upload") {
+  } else if (cmd == "upload") {
     ret = Upload();
   } else if (cmd == "audit") {
     ret = Audit();

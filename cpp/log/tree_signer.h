@@ -6,7 +6,8 @@
 #include "merkletree/compact_merkle_tree.h"
 #include "proto/ct.pb.h"
 
-template <class Logged> class Database;
+template <class Logged>
+class Database;
 class LogSigner;
 
 // Signer for appending new entries to the log.
@@ -15,10 +16,11 @@ class LogSigner;
 // no other signers during its lifetime -- when it discovers the database has
 // received tree updates it has not written, it does not try to recover,
 // but rather reports an error.
-template <class Logged> class TreeSigner {
+template <class Logged>
+class TreeSigner {
  public:
   // Does not take ownership of |signer|.
-  TreeSigner(Database<Logged> *db, LogSigner *signer);
+  TreeSigner(Database<Logged>* db, LogSigner* signer);
 
   enum UpdateResult {
     OK,
@@ -36,15 +38,15 @@ template <class Logged> class TreeSigner {
 
   // Latest Tree Head (does not build a new tree, just retrieves the
   // result of the most recent build).
-  const ct::SignedTreeHead &LatestSTH() const {
+  const ct::SignedTreeHead& LatestSTH() const {
     return latest_tree_head_;
   }
 
  private:
   void BuildTree();
-  bool Append(const Logged &logged);
-  void AppendToTree(const Logged &logged_cert);
-  void TimestampAndSign(uint64_t min_timestamp, ct::SignedTreeHead *sth);
+  bool Append(const Logged& logged);
+  void AppendToTree(const Logged& logged_cert);
+  void TimestampAndSign(uint64_t min_timestamp, ct::SignedTreeHead* sth);
 
   Database<Logged>* const db_;
   LogSigner* const signer_;

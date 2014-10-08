@@ -21,30 +21,36 @@ class CompactMerkleTree : public cert_trans::MerkleTreeInterface {
   // The constructor takes a pointer to some concrete hash function
   // instantiation of the SerialHasher abstract class.
   // Takes ownership of the hasher.
-  explicit CompactMerkleTree(SerialHasher *hasher);
+  explicit CompactMerkleTree(SerialHasher* hasher);
 
   // Creates a new CompactMerkleTree based on the data present in the
   // (non-compact) MerkleTree |model|.
   // Takes ownership of |hasher|.
-  CompactMerkleTree(MerkleTree& model, SerialHasher *hasher);
+  CompactMerkleTree(MerkleTree& model, SerialHasher* hasher);
 
   virtual ~CompactMerkleTree();
 
   // Length of a node (i.e., a hash), in bytes.
-  virtual size_t NodeSize() const { return treehasher_.DigestSize(); };
+  virtual size_t NodeSize() const {
+    return treehasher_.DigestSize();
+  };
 
   // Number of leaves in the tree.
-  virtual size_t LeafCount() const { return leaf_count_; }
+  virtual size_t LeafCount() const {
+    return leaf_count_;
+  }
 
   // Return the leaf hash, but do not append the data to the tree.
-  virtual std::string LeafHash(const std::string &data) const {
+  virtual std::string LeafHash(const std::string& data) const {
     return treehasher_.HashLeaf(data);
   }
 
   // Number of levels. An empty tree has 0 levels, a tree with 1 leaf has
   // 1 level, a tree with 2 leaves has 2 levels, and a tree with n leaves has
   // ceil(log2(n)) + 1 levels.
-  virtual size_t LevelCount() const { return level_count_; }
+  virtual size_t LevelCount() const {
+    return level_count_;
+  }
 
   // Add a new leaf to the hash tree.
   //
@@ -55,7 +61,7 @@ class CompactMerkleTree : public cert_trans::MerkleTreeInterface {
   // so position = number of leaves in the tree after this update.
   //
   // @param data Binary input blob
-  virtual size_t AddLeaf(const std::string &data);
+  virtual size_t AddLeaf(const std::string& data);
 
   // Add a new leaf to the hash tree. It is the caller's responsibility
   // to ensure that the hash is correct.
@@ -67,7 +73,7 @@ class CompactMerkleTree : public cert_trans::MerkleTreeInterface {
   // so position = number of leaves in the tree after this update.
   //
   // @param hash leaf hash
-  virtual size_t AddLeafHash(const std::string &hash);
+  virtual size_t AddLeafHash(const std::string& hash);
 
   // Get the current root of the tree.
   // Update the root to reflect the current shape of the tree,

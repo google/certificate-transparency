@@ -21,13 +21,13 @@ using std::string;
 
 // TODO(ekasper): handle Cert errors consistently and log some errors here
 // if they fail.
-CertSubmissionHandler::CertSubmissionHandler(CertChecker *cert_checker)
-    : cert_checker_(cert_checker) {}
+CertSubmissionHandler::CertSubmissionHandler(CertChecker* cert_checker)
+    : cert_checker_(cert_checker) {
+}
 
 // static
-bool
-CertSubmissionHandler::X509ChainToEntry(const CertChain &chain,
-                                        LogEntry *entry) {
+bool CertSubmissionHandler::X509ChainToEntry(const CertChain& chain,
+                                             LogEntry* entry) {
   if (!chain.IsLoaded())
     return false;
 
@@ -56,8 +56,8 @@ CertSubmissionHandler::X509ChainToEntry(const CertChain &chain,
     if (!SerializedTbs(*chain.LeafCert(), &tbs))
       return false;
 
-    entry->mutable_precert_entry()->mutable_pre_cert()->
-        set_tbs_certificate(tbs);
+    entry->mutable_precert_entry()->mutable_pre_cert()->set_tbs_certificate(
+        tbs);
     return true;
   } else {
     entry->set_type(ct::X509_ENTRY);
@@ -71,8 +71,8 @@ CertSubmissionHandler::X509ChainToEntry(const CertChain &chain,
 }
 
 CertSubmissionHandler::SubmitResult
-CertSubmissionHandler::ProcessX509Submission(CertChain *chain,
-                                             LogEntry *entry) {
+CertSubmissionHandler::ProcessX509Submission(CertChain* chain,
+                                             LogEntry* entry) {
   if (!chain->IsLoaded())
     return EMPTY_SUBMISSION;
 
@@ -86,7 +86,7 @@ CertSubmissionHandler::ProcessX509Submission(CertChain *chain,
   if (chain->LeafCert()->DerEncoding(&der_cert) != Cert::TRUE)
     return INTERNAL_ERROR;
 
-  X509ChainEntry *x509_entry = entry->mutable_x509_entry();
+  X509ChainEntry* x509_entry = entry->mutable_x509_entry();
   x509_entry->set_leaf_certificate(der_cert);
   for (size_t i = 1; i < chain->Length(); ++i) {
     if (chain->CertAt(i)->DerEncoding(&der_cert) != Cert::TRUE)
@@ -98,9 +98,9 @@ CertSubmissionHandler::ProcessX509Submission(CertChain *chain,
 }
 
 CertSubmissionHandler::SubmitResult
-CertSubmissionHandler::ProcessPreCertSubmission(PreCertChain *chain,
-                                                LogEntry *entry) {
-  PrecertChainEntry *precert_entry = entry->mutable_precert_entry();
+CertSubmissionHandler::ProcessPreCertSubmission(PreCertChain* chain,
+                                                LogEntry* entry) {
+  PrecertChainEntry* precert_entry = entry->mutable_precert_entry();
   CertChecker::CertVerifyResult result = cert_checker_->CheckPreCertChain(
       chain, precert_entry->mutable_pre_cert()->mutable_issuer_key_hash(),
       precert_entry->mutable_pre_cert()->mutable_tbs_certificate());
@@ -124,7 +124,7 @@ CertSubmissionHandler::ProcessPreCertSubmission(PreCertChain *chain,
 }
 
 // static
-bool CertSubmissionHandler::SerializedTbs(const Cert &cert, string *result) {
+bool CertSubmissionHandler::SerializedTbs(const Cert& cert, string* result) {
   if (!cert.IsLoaded())
     return false;
 
@@ -138,9 +138,10 @@ bool CertSubmissionHandler::SerializedTbs(const Cert &cert, string *result) {
   if (!tbs.IsLoaded())
     return false;
 
-  if (status == Cert::TRUE && tbs.DeleteExtension(
+  if (status == Cert::TRUE &&
+      tbs.DeleteExtension(
           cert_trans::NID_ctEmbeddedSignedCertificateTimestampList) !=
-      Cert::TRUE)
+          Cert::TRUE)
     return false;
 
   string der_tbs;
@@ -151,8 +152,8 @@ bool CertSubmissionHandler::SerializedTbs(const Cert &cert, string *result) {
 }
 
 // static
-CertSubmissionHandler::SubmitResult
-CertSubmissionHandler::GetVerifyError(CertChecker::CertVerifyResult result) {
+CertSubmissionHandler::SubmitResult CertSubmissionHandler::GetVerifyError(
+    CertChecker::CertVerifyResult result) {
   SubmitResult submit_result;
   switch (result) {
     case CertChecker::INVALID_CERTIFICATE_CHAIN:

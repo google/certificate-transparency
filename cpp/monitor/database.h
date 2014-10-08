@@ -29,12 +29,15 @@ class Database {
     SIGNATURE_VERIFIED,
     TREE_CONFIRMED,
     TREE_CONFIRMATION_FAILED,
-    INCONSISTENT, // Good signature but not sane (e.g. timestamp in the future).
-    UNDEFINED, // Let this be last.
+    INCONSISTENT,  // Good signature but not sane (e.g. timestamp in the
+                   // future).
+    UNDEFINED,     // Let this be last.
   };
 
-  Database() {}
-  virtual ~Database() {}
+  Database() {
+  }
+  virtual ~Database() {
+  }
 
   virtual void BeginTransaction() {
     DLOG(FATAL) << "Transactions not supported";
@@ -71,41 +74,41 @@ class Database {
   // for SignedCertificateTimestamp and LogEntry built in
   // GetEntries().  The latter two contain all information from the
   // RFC compliant get-entries response from the log server.
-  WriteResult CreateEntry(const cert_trans::LoggedCertificate &logged);
+  WriteResult CreateEntry(const cert_trans::LoggedCertificate& logged);
 
-  virtual WriteResult WriteSTH(const ct::SignedTreeHead &sth);
+  virtual WriteResult WriteSTH(const ct::SignedTreeHead& sth);
 
   // Lookup latest *written* STH (i.e. not necessarily latest timestamp).
   virtual LookupResult LookupLatestWrittenSTH(
-      ct::SignedTreeHead *result) const = 0;
+      ct::SignedTreeHead* result) const = 0;
 
   virtual LookupResult LookupHashByIndex(uint64_t sequence_number,
-                                         std::string *result) const = 0;
+                                         std::string* result) const = 0;
 
-  virtual WriteResult SetVerificationLevel(const ct::SignedTreeHead &sth,
+  virtual WriteResult SetVerificationLevel(const ct::SignedTreeHead& sth,
                                            VerificationLevel verify_level);
 
-  virtual LookupResult LookupSTHByTimestamp(uint64_t timestamp,
-      ct::SignedTreeHead *result) const = 0;
+  virtual LookupResult LookupSTHByTimestamp(
+      uint64_t timestamp, ct::SignedTreeHead* result) const = 0;
 
-  virtual LookupResult LookupVerificationLevel(const ct::SignedTreeHead &sth,
-      VerificationLevel *result) const = 0;
+  virtual LookupResult LookupVerificationLevel(
+      const ct::SignedTreeHead& sth, VerificationLevel* result) const = 0;
 
  private:
-  virtual WriteResult CreateEntry_(const std::string &leaf,
-                                   const std::string &leaf_hash,
-                                   const std::string &cert,
-                                   const std::string &cert_chain) = 0;
+  virtual WriteResult CreateEntry_(const std::string& leaf,
+                                   const std::string& leaf_hash,
+                                   const std::string& cert,
+                                   const std::string& cert_chain) = 0;
 
   virtual WriteResult WriteSTH_(uint64_t timestamp, uint64_t tree_size,
-                                const std::string &sth) = 0;
+                                const std::string& sth) = 0;
 
-  virtual WriteResult SetVerificationLevel_(const ct::SignedTreeHead &sth,
-                                            VerificationLevel verify_level) = 0;
+  virtual WriteResult SetVerificationLevel_(
+      const ct::SignedTreeHead& sth, VerificationLevel verify_level) = 0;
 
   DISALLOW_COPY_AND_ASSIGN(Database);
 };
 
-} // namespace monitor
+}  // namespace monitor
 
-#endif // MONITOR_DATABASE_H
+#endif  // MONITOR_DATABASE_H

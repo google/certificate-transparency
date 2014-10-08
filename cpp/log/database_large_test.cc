@@ -17,12 +17,14 @@
 #include "util/testing.h"
 #include "util/util.h"
 
-DEFINE_int32(database_size, 0, "Number of entries to put in the test database. "
-             "Be careful choosing this, as the database will fill up your disk "
-             "(entries are a few kB each). Maximum is limited to 1 000 000. "
-             "Also note that SQLite may be very slow with small batch sizes.");
-DEFINE_int32(batch_size, 1, "Number of writes to batch together "
-             "in one transaction (no effect for FileDB).");
+DEFINE_int32(database_size, 0,
+             "Number of entries to put in the test database. Be careful "
+             "choosing this, as the database will fill up your disk (entries "
+             "are a few kB each). Maximum is limited to 1 000 000. Also note "
+             "that SQLite may be very slow with small batch sizes.");
+DEFINE_int32(batch_size, 1,
+             "Number of writes to batch together in one transaction (no "
+             "effect for FileDB).");
 
 namespace {
 
@@ -31,13 +33,14 @@ using std::string;
 
 typedef Database<LoggedCertificate> DB;
 
-template <class T> class LargeDBTest : public ::testing::Test {
+template <class T>
+class LargeDBTest : public ::testing::Test {
  protected:
-  LargeDBTest() :
-      test_db_(),
-      test_signer_() { }
+  LargeDBTest() : test_db_(), test_signer_() {
+  }
 
-  ~LargeDBTest() {}
+  ~LargeDBTest() {
+  }
 
   void FillDatabase(int entries) {
     LoggedCertificate logged_cert;
@@ -57,14 +60,16 @@ template <class T> class LargeDBTest : public ::testing::Test {
     return pending_hashes.size();
   }
 
-  T *db() const { return test_db_.db(); }
+  T* db() const {
+    return test_db_.db();
+  }
 
   TestDB<T> test_db_;
   TestSigner test_signer_;
 };
 
-typedef testing::Types<FileDB<LoggedCertificate>,
-                       SQLiteDB<LoggedCertificate> > Databases;
+typedef testing::Types<FileDB<LoggedCertificate>, SQLiteDB<LoggedCertificate> >
+    Databases;
 
 TYPED_TEST_CASE(LargeDBTest, Databases);
 
@@ -112,8 +117,8 @@ TYPED_TEST(LargeDBTest, Benchmark) {
 
   FLAGS_minloglevel = 0;
   LOG(INFO) << "Real time spent reading " << FLAGS_database_size
-            << " entries, sorted by key: "
-            << realtime_after - realtime_before << " ms";
+            << " entries, sorted by key: " << realtime_after - realtime_before
+            << " ms";
   LOG(INFO) << "Peak RSS delta (as reported by getrusage()) was "
             << ru_after.ru_maxrss - ru_before.ru_maxrss << " kB";
   FLAGS_minloglevel = original_log_level;
@@ -121,7 +126,7 @@ TYPED_TEST(LargeDBTest, Benchmark) {
 
 }  // namespace
 
-int main(int argc, char **argv) {
+int main(int argc, char** argv) {
   cert_trans::test::InitTesting(argv[0], &argc, &argv, true);
   CHECK_GT(FLAGS_database_size, 0) << "Please specify the test database size";
   CHECK_LE(FLAGS_database_size, 1000000)

@@ -33,7 +33,8 @@ static const char kCaPreCert[] = "ca-pre-cert.pem";
 // Issued by ca-cert.pem
 static const char kPreCert[] = "test-embedded-pre-cert.pem";
 // Issued by ca-pre-cert.pem
-static const char kPreWithPreCaCert[] = "test-embedded-with-preca-pre-cert.pem";
+static const char kPreWithPreCaCert[] =
+    "test-embedded-with-preca-pre-cert.pem";
 // The resulting embedded certs, issued by ca-cert.pem
 static const char kEmbeddedCert[] = "test-embedded-cert.pem";
 static const char kEmbeddedWithPreCaCert[] =
@@ -58,11 +59,12 @@ typedef Database<LoggedCertificate> DB;
 typedef Frontend FE;
 
 // A slightly shorter notation for constructing hex strings from binary blobs.
-string H(const string &byte_string) {
+string H(const string& byte_string) {
   return util::HexString(byte_string);
 }
 
-template <class T> class FrontendTest : public ::testing::Test {
+template <class T>
+class FrontendTest : public ::testing::Test {
  protected:
   FrontendTest()
       : test_db_(),
@@ -70,9 +72,10 @@ template <class T> class FrontendTest : public ::testing::Test {
         verifier_(new LogVerifier(TestSigner::DefaultLogSigVerifier(),
                                   new MerkleVerifier(new Sha256Hasher()))),
         checker_(),
-        frontend_(new FE(new CertSubmissionHandler(&checker_),
-                         new FrontendSigner(db(),
-                                            TestSigner::DefaultLogSigner()))) {}
+        frontend_(
+            new FE(new CertSubmissionHandler(&checker_),
+                   new FrontendSigner(db(), TestSigner::DefaultLogSigner()))) {
+  }
 
   void SetUp() {
     cert_dir_ = FLAGS_test_certs_dir;
@@ -88,13 +91,13 @@ template <class T> class FrontendTest : public ::testing::Test {
     CHECK(util::ReadTextFile(cert_dir_ + "/" + kChainLeafCert,
                              &chain_leaf_pem_));
     CHECK(util::ReadTextFile(cert_dir_ + "/" + kCaCert, &ca_pem_));
-    CHECK(util::ReadTextFile(cert_dir_ + "/" + kEmbeddedCert,  &embedded_pem_));
+    CHECK(util::ReadTextFile(cert_dir_ + "/" + kEmbeddedCert, &embedded_pem_));
     CHECK(util::ReadTextFile(cert_dir_ + "/" + kEmbeddedWithPreCaCert,
                              &embedded_with_preca_pem_));
     CHECK(checker_.LoadTrustedCertificates(cert_dir_ + "/" + kCaCert));
   }
 
-  void CompareStats(const FE::FrontendStats &expected) {
+  void CompareStats(const FE::FrontendStats& expected) {
     FE::FrontendStats stats;
     frontend_->GetStats(&stats);
     EXPECT_EQ(expected.x509_accepted, stats.x509_accepted);
@@ -116,13 +119,15 @@ template <class T> class FrontendTest : public ::testing::Test {
     delete frontend_;
   }
 
-  T *db() const { return test_db_.db(); }
+  T* db() const {
+    return test_db_.db();
+  }
 
   TestDB<T> test_db_;
   TestSigner test_signer_;
-  LogVerifier *verifier_;
+  LogVerifier* verifier_;
   CertChecker checker_;
-  FE *frontend_;
+  FE* frontend_;
   string cert_dir_;
   string leaf_pem_;
   string ca_precert_pem_;
@@ -135,8 +140,8 @@ template <class T> class FrontendTest : public ::testing::Test {
   string ca_pem_;
 };
 
-typedef testing::Types<FileDB<LoggedCertificate>,
-                       SQLiteDB<LoggedCertificate> > Databases;
+typedef testing::Types<FileDB<LoggedCertificate>, SQLiteDB<LoggedCertificate> >
+    Databases;
 
 TYPED_TEST_CASE(FrontendTest, Databases);
 
@@ -153,8 +158,8 @@ TYPED_TEST(FrontendTest, TestSubmitValid) {
 
   string sha256_digest;
   ASSERT_EQ(Cert::TRUE, cert.Sha256Digest(&sha256_digest));
-  EXPECT_EQ(DB::LOOKUP_OK, this->db()->LookupByHash(sha256_digest,
-                                                    &logged_cert));
+  EXPECT_EQ(DB::LOOKUP_OK,
+            this->db()->LookupByHash(sha256_digest, &logged_cert));
 
   EXPECT_EQ(ct::X509_ENTRY, logged_cert.entry().type());
   // Compare the leaf cert.
@@ -185,8 +190,8 @@ TYPED_TEST(FrontendTest, TestSubmitValidWithIntermediate) {
 
   string sha256_digest;
   ASSERT_EQ(Cert::TRUE, cert.Sha256Digest(&sha256_digest));
-  EXPECT_EQ(DB::LOOKUP_OK, this->db()->LookupByHash(sha256_digest,
-                                                    &logged_cert));
+  EXPECT_EQ(DB::LOOKUP_OK,
+            this->db()->LookupByHash(sha256_digest, &logged_cert));
 
   EXPECT_EQ(ct::X509_ENTRY, logged_cert.entry().type());
   // Compare the leaf cert.
@@ -227,8 +232,8 @@ TYPED_TEST(FrontendTest, TestSubmitDuplicate) {
 
   string sha256_digest;
   ASSERT_EQ(Cert::TRUE, cert.Sha256Digest(&sha256_digest));
-  EXPECT_EQ(DB::LOOKUP_OK, this->db()->LookupByHash(sha256_digest,
-                                                    &logged_cert));
+  EXPECT_EQ(DB::LOOKUP_OK,
+            this->db()->LookupByHash(sha256_digest, &logged_cert));
 
   EXPECT_EQ(ct::X509_ENTRY, logged_cert.entry().type());
   // Compare the leaf cert.
@@ -259,9 +264,10 @@ TYPED_TEST(FrontendTest, TestSubmitInvalidChain) {
 }
 
 TYPED_TEST(FrontendTest, TestSubmitInvalidPem) {
-  CertChain chain("-----BEGIN CERTIFICATE-----\n"
-                  "Iamnotavalidcert\n"
-                  "-----END CERTIFICATE-----\n");
+  CertChain chain(
+      "-----BEGIN CERTIFICATE-----\n"
+      "Iamnotavalidcert\n"
+      "-----END CERTIFICATE-----\n");
   EXPECT_FALSE(chain.IsLoaded());
 
   SignedCertificateTimestamp sct;
@@ -297,7 +303,8 @@ TYPED_TEST(FrontendTest, TestSubmitPrecert) {
                 logged_cert.entry(), sct));
 
   // Expect to have the original certs logged in the chain.
-  ASSERT_EQ(logged_cert.entry().precert_entry().precertificate_chain_size(), 1);
+  ASSERT_EQ(logged_cert.entry().precert_entry().precertificate_chain_size(),
+            1);
 
   string pre_der, ca_der;
   ASSERT_EQ(Cert::TRUE, pre.DerEncoding(&pre_der));
@@ -312,8 +319,8 @@ TYPED_TEST(FrontendTest, TestSubmitPrecert) {
 }
 
 TYPED_TEST(FrontendTest, TestSubmitPrecertUsingPreCA) {
-  PreCertChain submission(
-      this->precert_with_preca_pem_ + this->ca_precert_pem_);
+  PreCertChain submission(this->precert_with_preca_pem_ +
+                          this->ca_precert_pem_);
   EXPECT_TRUE(submission.IsLoaded());
 
   SignedCertificateTimestamp sct;
@@ -339,7 +346,8 @@ TYPED_TEST(FrontendTest, TestSubmitPrecertUsingPreCA) {
                 logged_cert.entry(), sct));
 
   // Expect to have the original certs logged in the chain.
-  ASSERT_GE(logged_cert.entry().precert_entry().precertificate_chain_size(), 2);
+  ASSERT_GE(logged_cert.entry().precert_entry().precertificate_chain_size(),
+            2);
 
   string pre_der, ca_der, ca_pre_der;
   ASSERT_EQ(Cert::TRUE, pre.DerEncoding(&pre_der));
@@ -358,7 +366,7 @@ TYPED_TEST(FrontendTest, TestSubmitPrecertUsingPreCA) {
 
 }  // namespace
 
-int main(int argc, char **argv) {
+int main(int argc, char** argv) {
   cert_trans::test::InitTesting(argv[0], &argc, &argv, true);
   OpenSSL_add_all_algorithms();
   ERR_load_crypto_strings();

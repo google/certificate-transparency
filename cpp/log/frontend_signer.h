@@ -7,7 +7,8 @@
 #include "base/macros.h"
 #include "log/logged_certificate.h"
 
-template <class Logged> class Database;
+template <class Logged>
+class Database;
 class LogSigner;
 
 class FrontendSigner {
@@ -18,19 +19,19 @@ class FrontendSigner {
   };
 
   // Does not take ownership of |signer|.
-  FrontendSigner(Database<cert_trans::LoggedCertificate> *db,
-                 LogSigner *signer);
+  FrontendSigner(Database<cert_trans::LoggedCertificate>* db,
+                 LogSigner* signer);
 
   // Log the entry if it's not already in the database,
   // and return either a new timestamp-signature pair,
   // or a previously existing one. (Currently also copies the
   // entry to the sct but you shouldn't rely on this.)
-  SubmitResult QueueEntry(const ct::LogEntry &entry,
-                          ct::SignedCertificateTimestamp *sct);
+  SubmitResult QueueEntry(const ct::LogEntry& entry,
+                          ct::SignedCertificateTimestamp* sct);
 
  private:
-  void TimestampAndSign(const ct::LogEntry &entry,
-                        ct::SignedCertificateTimestamp *sct) const;
+  void TimestampAndSign(const ct::LogEntry& entry,
+                        ct::SignedCertificateTimestamp* sct) const;
 
   Database<cert_trans::LoggedCertificate>* const db_;
   LogSigner* const signer_;

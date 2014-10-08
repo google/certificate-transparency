@@ -24,13 +24,12 @@ using std::string;
 typedef Database<LoggedCertificate> DB;
 typedef TreeSigner<LoggedCertificate> TS;
 
-template <class T> class TreeSignerTest : public ::testing::Test {
+template <class T>
+class TreeSignerTest : public ::testing::Test {
  protected:
   TreeSignerTest()
-      : test_db_(),
-        test_signer_(),
-        verifier_(NULL),
-        tree_signer_(NULL) {}
+      : test_db_(), test_signer_(), verifier_(NULL), tree_signer_(NULL) {
+  }
 
   void SetUp() {
     verifier_ = new LogVerifier(TestSigner::DefaultLogSigVerifier(),
@@ -38,7 +37,7 @@ template <class T> class TreeSignerTest : public ::testing::Test {
     tree_signer_ = new TS(db(), TestSigner::DefaultLogSigner());
   }
 
-  TS *GetSimilar() const {
+  TS* GetSimilar() const {
     return new TS(db(), TestSigner::DefaultLogSigner());
   }
 
@@ -47,15 +46,17 @@ template <class T> class TreeSignerTest : public ::testing::Test {
     delete tree_signer_;
   }
 
-  T *db() const { return test_db_.db(); }
+  T* db() const {
+    return test_db_.db();
+  }
   TestDB<T> test_db_;
   TestSigner test_signer_;
-  LogVerifier *verifier_;
-  TS *tree_signer_;
+  LogVerifier* verifier_;
+  TS* tree_signer_;
 };
 
-typedef testing::Types<FileDB<LoggedCertificate>,
-                       SQLiteDB<LoggedCertificate> > Databases;
+typedef testing::Types<FileDB<LoggedCertificate>, SQLiteDB<LoggedCertificate> >
+    Databases;
 
 TYPED_TEST_CASE(TreeSignerTest, Databases);
 
@@ -103,7 +104,8 @@ TYPED_TEST(TreeSignerTest, Verify) {
 
   SignedTreeHead sth;
   EXPECT_EQ(DB::LOOKUP_OK, this->db()->LatestTreeHead(&sth));
-  EXPECT_EQ(LogVerifier::VERIFY_OK, this->verifier_->VerifySignedTreeHead(sth));
+  EXPECT_EQ(LogVerifier::VERIFY_OK,
+            this->verifier_->VerifySignedTreeHead(sth));
 }
 
 TYPED_TEST(TreeSignerTest, ResumeClean) {
@@ -116,7 +118,7 @@ TYPED_TEST(TreeSignerTest, ResumeClean) {
 
   EXPECT_EQ(DB::LOOKUP_OK, this->db()->LatestTreeHead(&sth));
 
-  TS *signer2 = this->GetSimilar();
+  TS* signer2 = this->GetSimilar();
   EXPECT_EQ(signer2->LastUpdateTime(), sth.timestamp());
 
   // Update
@@ -146,7 +148,7 @@ TYPED_TEST(TreeSignerTest, ResumePartialSign) {
   // before signing.
   EXPECT_EQ(DB::OK, this->db()->AssignSequenceNumber(logged_cert.Hash(), 0));
 
-  TS *signer2 = this->GetSimilar();
+  TS* signer2 = this->GetSimilar();
   EXPECT_EQ(TS::OK, signer2->UpdateTree());
   SignedTreeHead sth2;
   EXPECT_EQ(DB::LOOKUP_OK, this->db()->LatestTreeHead(&sth2));
@@ -170,7 +172,7 @@ TYPED_TEST(TreeSignerTest, SignEmpty) {
 TYPED_TEST(TreeSignerTest, FailInconsistentTreeHead) {
   EXPECT_EQ(TS::OK, this->tree_signer_->UpdateTree());
   // A second signer interferes.
-  TS *signer2 = this->GetSimilar();
+  TS* signer2 = this->GetSimilar();
   EXPECT_EQ(TS::OK, signer2->UpdateTree());
   // The first signer should detect this and refuse to update.
   EXPECT_EQ(TS::DB_ERROR, this->tree_signer_->UpdateTree());
@@ -199,7 +201,7 @@ TYPED_TEST(TreeSignerTest, FailInconsistentSequenceNumbers) {
 
 }  // namespace
 
-int main(int argc, char **argv) {
+int main(int argc, char** argv) {
   cert_trans::test::InitTesting(argv[0], &argc, &argv, true);
   return RUN_ALL_TESTS();
 }

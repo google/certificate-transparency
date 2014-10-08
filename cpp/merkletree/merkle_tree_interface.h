@@ -15,8 +15,10 @@ namespace cert_trans {
 // merkletree/merkle_tree.h and merkletree/compact_merkle_tree.h.
 class MerkleTreeInterface {
  public:
-  MerkleTreeInterface() {}
-  virtual ~MerkleTreeInterface() {}
+  MerkleTreeInterface() {
+  }
+  virtual ~MerkleTreeInterface() {
+  }
 
   // Length of a node (i.e., a hash), in bytes.
   virtual size_t NodeSize() const = 0;
@@ -25,7 +27,7 @@ class MerkleTreeInterface {
   virtual size_t LeafCount() const = 0;
 
   // Returns the leaf hash, but do not append the data to the tree.
-  virtual std::string LeafHash(const std::string &data) const = 0;
+  virtual std::string LeafHash(const std::string& data) const = 0;
 
   // Number of levels. An empty tree has 0 levels, a tree with 1 leaf has
   // 1 level, a tree with 2 leaves has 2 levels, and a tree with n leaves has
@@ -38,7 +40,7 @@ class MerkleTreeInterface {
   // so position = number of leaves in the tree after this update.
   //
   // @param data Binary input blob
-  virtual size_t AddLeaf(const std::string &data) = 0;
+  virtual size_t AddLeaf(const std::string& data) = 0;
 
   // Add a new leaf to the hash tree. It is the caller's responsibility
   // to ensure that the hash is correct.
@@ -47,7 +49,7 @@ class MerkleTreeInterface {
   // so position = number of leaves in the tree after this update.
   //
   // @param hash leaf hash
-  virtual size_t AddLeafHash(const std::string &hash) = 0;
+  virtual size_t AddLeafHash(const std::string& hash) = 0;
 
   // Get the current root of the tree.
   // Update the root to reflect the current shape of the tree,

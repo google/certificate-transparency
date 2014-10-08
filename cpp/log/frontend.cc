@@ -14,24 +14,22 @@ using ct::LogEntry;
 using ct::SignedCertificateTimestamp;
 using std::string;
 
-Frontend::Frontend(CertSubmissionHandler *handler, FrontendSigner *signer)
-    : handler_(handler),
-      signer_(signer),
-      stats_() {}
+Frontend::Frontend(CertSubmissionHandler* handler, FrontendSigner* signer)
+    : handler_(handler), signer_(signer), stats_() {
+}
 
 Frontend::~Frontend() {
   delete signer_;
   delete handler_;
 }
 
-void Frontend::GetStats(Frontend::FrontendStats *stats) const {
+void Frontend::GetStats(Frontend::FrontendStats* stats) const {
   *stats = stats_;
 }
 
-SubmitResult
-Frontend::QueueProcessedEntry(CertSubmissionHandler::SubmitResult pre_result,
-                              const LogEntry &entry,
-                              SignedCertificateTimestamp *sct) {
+SubmitResult Frontend::QueueProcessedEntry(
+    CertSubmissionHandler::SubmitResult pre_result, const LogEntry& entry,
+    SignedCertificateTimestamp* sct) {
   if (pre_result != CertSubmissionHandler::OK) {
     SubmitResult result = GetSubmitError(pre_result);
     UpdateStats(entry.type(), result);
@@ -57,8 +55,8 @@ Frontend::QueueProcessedEntry(CertSubmissionHandler::SubmitResult pre_result,
   return result;
 }
 
-SubmitResult
-Frontend::QueueX509Entry(CertChain *chain, SignedCertificateTimestamp *sct) {
+SubmitResult Frontend::QueueX509Entry(CertChain* chain,
+                                      SignedCertificateTimestamp* sct) {
   LogEntry entry;
   // Make sure the correct statistics get updated in case of error.
   entry.set_type(ct::X509_ENTRY);
@@ -66,9 +64,8 @@ Frontend::QueueX509Entry(CertChain *chain, SignedCertificateTimestamp *sct) {
                              entry, sct);
 }
 
-SubmitResult
-Frontend::QueuePreCertEntry(PreCertChain *chain,
-                            SignedCertificateTimestamp *sct) {
+SubmitResult Frontend::QueuePreCertEntry(PreCertChain* chain,
+                                         SignedCertificateTimestamp* sct) {
   LogEntry entry;
   // Make sure the correct statistics get updated in case of error.
   entry.set_type(ct::PRECERT_ENTRY);
@@ -88,9 +85,10 @@ std::string Frontend::SubmitResultString(SubmitResult result) {
     case BAD_PEM_FORMAT:
       result_string = "not a valid PEM-encoded chain";
       break;
-      // TODO(ekasper): the following two could/should be more precise.
+    // TODO(ekasper): the following two could/should be more precise.
     case SUBMISSION_TOO_LONG:
-      result_string = "DER-encoded certificate chain length "
+      result_string =
+          "DER-encoded certificate chain length "
           "exceeds allowed limit";
       break;
     case CERTIFICATE_VERIFY_ERROR:
@@ -110,8 +108,8 @@ std::string Frontend::SubmitResultString(SubmitResult result) {
 }
 
 // static
-SubmitResult
-Frontend::GetSubmitError(CertSubmissionHandler::SubmitResult result) {
+SubmitResult Frontend::GetSubmitError(
+    CertSubmissionHandler::SubmitResult result) {
   SubmitResult submit_result;
   switch (result) {
     case CertSubmissionHandler::EMPTY_SUBMISSION:
@@ -139,7 +137,7 @@ Frontend::GetSubmitError(CertSubmissionHandler::SubmitResult result) {
 
 void Frontend::UpdateStats(ct::LogEntryType type, SubmitResult result) {
   if (type == ct::X509_ENTRY)
-    UpdateX509Stats (result);
+    UpdateX509Stats(result);
   else
     UpdatePrecertStats(result);
 }
@@ -188,7 +186,7 @@ void Frontend::UpdatePrecertStats(SubmitResult result) {
     case PRECERT_CHAIN_NOT_WELL_FORMED:
       ++stats_.precert_format_errors;
       break;
-   case INTERNAL_ERROR:
+    case INTERNAL_ERROR:
       ++stats_.internal_errors;
     default:
       CHECK(false);

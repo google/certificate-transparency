@@ -5,10 +5,11 @@
 
 using std::string;
 
-MerkleVerifier::MerkleVerifier(SerialHasher *hasher) : treehasher_(hasher) {
+MerkleVerifier::MerkleVerifier(SerialHasher* hasher) : treehasher_(hasher) {
 }
 
-MerkleVerifier::~MerkleVerifier() {}
+MerkleVerifier::~MerkleVerifier() {
+}
 
 static inline size_t Parent(size_t leaf) {
   return leaf >> 1;
@@ -19,8 +20,8 @@ static inline bool IsRightChild(size_t leaf) {
 }
 
 bool MerkleVerifier::VerifyPath(size_t leaf, size_t tree_size,
-                                const std::vector<string> &path,
-                                const string &root, const string &data) {
+                                const std::vector<string>& path,
+                                const string& root, const string& data) {
   string path_root = RootFromPath(leaf, tree_size, path, data);
   if (path_root.empty())
     return false;
@@ -28,14 +29,14 @@ bool MerkleVerifier::VerifyPath(size_t leaf, size_t tree_size,
 }
 
 string MerkleVerifier::RootFromPath(size_t leaf, size_t tree_size,
-                                     const std::vector<string> &path,
-                                     const string &data) {
+                                    const std::vector<string>& path,
+                                    const string& data) {
   if (leaf > tree_size || leaf == 0)
     // No valid path exists.
     return string();
 
   size_t node = leaf - 1;
-  size_t last_node = tree_size  - 1;
+  size_t last_node = tree_size - 1;
 
   string node_hash = LeafHash(data);
   std::vector<string>::const_iterator it = path.begin();
@@ -62,9 +63,9 @@ string MerkleVerifier::RootFromPath(size_t leaf, size_t tree_size,
 }
 
 bool MerkleVerifier::VerifyConsistency(size_t snapshot1, size_t snapshot2,
-                                       const string &root1,
-                                       const string &root2,
-                                       const std::vector<string> &proof) {
+                                       const string& root1,
+                                       const string& root2,
+                                       const std::vector<string>& proof) {
   if (snapshot1 > snapshot2)
     // Can't go back in time.
     return false;
@@ -101,8 +102,7 @@ bool MerkleVerifier::VerifyConsistency(size_t snapshot1, size_t snapshot2,
       node1_hash = treehasher_.HashChildren(*it, node1_hash);
       node2_hash = treehasher_.HashChildren(*it, node2_hash);
       ++it;
-    }
-    else if (node < last_node)
+    } else if (node < last_node)
       // The sibling only exists in the later tree. The parent in the
       // snapshot1 tree is a dummy copy.
       node2_hash = treehasher_.HashChildren(node2_hash, *it++);
@@ -130,6 +130,6 @@ bool MerkleVerifier::VerifyConsistency(size_t snapshot1, size_t snapshot2,
   return node2_hash == root2 && it == proof.end();
 }
 
-string MerkleVerifier::LeafHash(const std::string &data) {
+string MerkleVerifier::LeafHash(const std::string& data) {
   return treehasher_.HashLeaf(data);
 }

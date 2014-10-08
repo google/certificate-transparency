@@ -23,6 +23,6 @@ extern const char kPoisonOID[];
 // Extended Key Usage value for Precertificate signing
 extern const char kPrecertificateSigningOID[];
 
-} // namespace cert_trans
+}  // namespace cert_trans
 
 #endif  // CT_EXTENSIONS_H

@@ -16,23 +16,26 @@
 #include "proto/serializer.h"
 
 
-template <class Logged> const size_t FileDB<Logged>::kTimestampBytesIndexed = 6;
+template <class Logged>
+const size_t FileDB<Logged>::kTimestampBytesIndexed = 6;
 
-template <class Logged> FileDB<Logged>::FileDB(FileStorage *cert_storage,
-                                               FileStorage *tree_storage)
+template <class Logged>
+FileDB<Logged>::FileDB(FileStorage* cert_storage, FileStorage* tree_storage)
     : cert_storage_(cert_storage),
       tree_storage_(tree_storage),
       latest_tree_timestamp_(0) {
   BuildIndex();
 }
 
-template <class Logged> FileDB<Logged>::~FileDB() {
+template <class Logged>
+FileDB<Logged>::~FileDB() {
   delete cert_storage_;
   delete tree_storage_;
 }
 
-template <class Logged> typename Database<Logged>::WriteResult
-FileDB<Logged>::CreatePendingEntry_(const Logged &logged) {
+template <class Logged>
+typename Database<Logged>::WriteResult FileDB<Logged>::CreatePendingEntry_(
+    const Logged& logged) {
   const std::string hash = logged.Hash();
   if (pending_hashes_.find(hash) != pending_hashes_.end())
     return this->DUPLICATE_CERTIFICATE_HASH;
@@ -61,13 +64,11 @@ std::set<std::string> FileDB<Logged>::PendingHashes() const {
 
 template <class Logged>
 typename Database<Logged>::WriteResult FileDB<Logged>::AssignSequenceNumber(
-    const std::string &hash, uint64_t sequence_number) {
-  std::set<std::string>::iterator pending_it =
-      pending_hashes_.find(hash);
+    const std::string& hash, uint64_t sequence_number) {
+  std::set<std::string>::iterator pending_it = pending_hashes_.find(hash);
   if (pending_it == pending_hashes_.end()) {
     // Caller should have ensured we don't get here...
-    if (cert_storage_->LookupEntry(hash, NULL) ==
-        FileStorage::OK)
+    if (cert_storage_->LookupEntry(hash, NULL) == FileStorage::OK)
       return this->ENTRY_ALREADY_LOGGED;
     return this->ENTRY_NOT_FOUND;
   }
@@ -90,18 +91,20 @@ typename Database<Logged>::WriteResult FileDB<Logged>::AssignSequenceNumber(
   assert(result == FileStorage::OK);
 
   pending_hashes_.erase(pending_it);
-  sequence_map_.insert(std::pair<uint64_t, std::string>(sequence_number, hash));
+  sequence_map_.insert(
+      std::pair<uint64_t, std::string>(sequence_number, hash));
   return this->OK;
 }
 
-template <class Logged> typename Database<Logged>::LookupResult
-FileDB<Logged>::LookupByHash(const std::string &hash) const {
- return LookupByHash(hash, NULL);
+template <class Logged>
+typename Database<Logged>::LookupResult FileDB<Logged>::LookupByHash(
+    const std::string& hash) const {
+  return LookupByHash(hash, NULL);
 }
 
-template <class Logged> typename Database<Logged>::LookupResult
-FileDB<Logged>::LookupByHash(const std::string &hash,
-                             Logged *result) const {
+template <class Logged>
+typename Database<Logged>::LookupResult FileDB<Logged>::LookupByHash(
+    const std::string& hash, Logged* result) const {
   std::string cert_data;
   FileStorage::FileStorageResult db_result =
       cert_storage_->LookupEntry(hash, &cert_data);
@@ -119,8 +122,9 @@ FileDB<Logged>::LookupByHash(const std::string &hash,
   return this->LOOKUP_OK;
 }
 
-template <class Logged> typename Database<Logged>::LookupResult
-FileDB<Logged>::LookupByIndex(uint64_t sequence_number, Logged *result) const {
+template <class Logged>
+typename Database<Logged>::LookupResult FileDB<Logged>::LookupByIndex(
+    uint64_t sequence_number, Logged* result) const {
   std::map<uint64_t, std::string>::const_iterator it =
       sequence_map_.find(sequence_number);
   if (it == sequence_map_.end())
@@ -143,8 +147,9 @@ FileDB<Logged>::LookupByIndex(uint64_t sequence_number, Logged *result) const {
   return this->LOOKUP_OK;
 }
 
-template <class Logged> typename Database<Logged>::WriteResult
-FileDB<Logged>::WriteTreeHead_(const ct::SignedTreeHead &sth) {
+template <class Logged>
+typename Database<Logged>::WriteResult FileDB<Logged>::WriteTreeHead_(
+    const ct::SignedTreeHead& sth) {
   // 6 bytes are good enough for some 9000 years.
   std::string timestamp_key =
       Serializer::SerializeUint(sth.timestamp(),
@@ -167,8 +172,9 @@ FileDB<Logged>::WriteTreeHead_(const ct::SignedTreeHead &sth) {
   return this->OK;
 }
 
-template <class Logged> typename Database<Logged>::LookupResult
-FileDB<Logged>::LatestTreeHead(ct::SignedTreeHead *result) const {
+template <class Logged>
+typename Database<Logged>::LookupResult FileDB<Logged>::LatestTreeHead(
+    ct::SignedTreeHead* result) const {
   if (latest_tree_timestamp_ == 0)
     return this->NOT_FOUND;
 
@@ -187,7 +193,8 @@ FileDB<Logged>::LatestTreeHead(ct::SignedTreeHead *result) const {
   return this->LOOKUP_OK;
 }
 
-template <class Logged> void FileDB<Logged>::BuildIndex() {
+template <class Logged>
+void FileDB<Logged>::BuildIndex() {
   pending_hashes_ = cert_storage_->Scan();
   if (pending_hashes_.empty())
     return;

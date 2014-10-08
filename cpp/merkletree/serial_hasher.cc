@@ -7,14 +7,15 @@ using std::string;
 
 const size_t Sha256Hasher::kDigestSize = SHA256_DIGEST_LENGTH;
 
-Sha256Hasher::Sha256Hasher() : initialized_(false) {}
+Sha256Hasher::Sha256Hasher() : initialized_(false) {
+}
 
 void Sha256Hasher::Reset() {
   SHA256_Init(&ctx_);
   initialized_ = true;
 }
 
-void Sha256Hasher::Update(const std::string &data) {
+void Sha256Hasher::Update(const std::string& data) {
   if (!initialized_)
     Reset();
 
@@ -36,7 +37,7 @@ SerialHasher* Sha256Hasher::Create() const {
 }
 
 // static
-string Sha256Hasher::Sha256Digest(const string &data) {
+string Sha256Hasher::Sha256Digest(const string& data) {
   Sha256Hasher hasher;
   hasher.Reset();
   hasher.Update(data);

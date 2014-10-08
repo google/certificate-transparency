@@ -18,7 +18,8 @@ using cert_trans::CertChecker;
 using cert_trans::PreCertChain;
 using std::string;
 
-DEFINE_string(test_certs_dir, "../../test/testdata", "Path to test certificates");
+DEFINE_string(test_certs_dir, "../../test/testdata",
+              "Path to test certificates");
 
 // Valid certificates.
 // Self-signed
@@ -30,7 +31,8 @@ static const char kCaPreCert[] = "ca-pre-cert.pem";
 // Issued by ca-cert.pem
 static const char kPreCert[] = "test-embedded-pre-cert.pem";
 // Issued by ca-pre-cert.pem
-static const char kPreWithPreCaCert[] = "test-embedded-with-preca-pre-cert.pem";
+static const char kPreWithPreCaCert[] =
+    "test-embedded-with-preca-pre-cert.pem";
 // Issued by ca-cert.pem
 static const char kIntermediateCert[] = "intermediate-cert.pem";
 // Issued by intermediate-cert.pem
@@ -92,8 +94,8 @@ TEST_F(CertCheckerTest, LoadTrustedCertificates) {
   EXPECT_TRUE(checker_.LoadTrustedCertificates(cert_dir_ + "/" + kCaCert));
   EXPECT_EQ(1U, checker_.NumTrustedCertificates());
 
-  EXPECT_TRUE(checker_.LoadTrustedCertificates(
-      cert_dir_ + "/" + kIntermediateCert));
+  EXPECT_TRUE(
+      checker_.LoadTrustedCertificates(cert_dir_ + "/" + kIntermediateCert));
   EXPECT_EQ(2U, checker_.NumTrustedCertificates());
 
   checker_.ClearAllTrustedCertificates();
@@ -103,8 +105,8 @@ TEST_F(CertCheckerTest, LoadTrustedCertificates) {
 TEST_F(CertCheckerTest, LoadTrustedCertificatesLoadsAll) {
   EXPECT_EQ(0U, checker_.NumTrustedCertificates());
 
-  EXPECT_TRUE(checker_.LoadTrustedCertificates(
-      cert_dir_ + "/" + kCollidingRoots));
+  EXPECT_TRUE(
+      checker_.LoadTrustedCertificates(cert_dir_ + "/" + kCollidingRoots));
   EXPECT_EQ(2U, checker_.NumTrustedCertificates());
 }
 
@@ -120,16 +122,15 @@ TEST_F(CertCheckerTest, LoadTrustedCertificatesIgnoresDuplicates) {
 TEST_F(CertCheckerTest, LoadTrustedCertificatesMissingFile) {
   EXPECT_EQ(0U, checker_.NumTrustedCertificates());
 
-  EXPECT_FALSE(checker_.LoadTrustedCertificates(cert_dir_ + "/" +
-                                                kNonexistent));
+  EXPECT_FALSE(
+      checker_.LoadTrustedCertificates(cert_dir_ + "/" + kNonexistent));
   EXPECT_EQ(0U, checker_.NumTrustedCertificates());
 }
 
 TEST_F(CertCheckerTest, LoadTrustedCertificatesCorruptedFile) {
   EXPECT_EQ(0U, checker_.NumTrustedCertificates());
 
-  EXPECT_FALSE(checker_.LoadTrustedCertificates(cert_dir_ + "/" +
-                                                kCorrupted));
+  EXPECT_FALSE(checker_.LoadTrustedCertificates(cert_dir_ + "/" + kCorrupted));
   EXPECT_EQ(0U, checker_.NumTrustedCertificates());
 }
 
@@ -213,8 +214,7 @@ TEST_F(CertCheckerTest, PreCert) {
   EXPECT_EQ(CertChecker::OK,
             checker_.CheckPreCertChain(&chain, &issuer_key_hash, &tbs));
   string expected_key_hash;
-  ASSERT_EQ(Cert::TRUE,
-            chain.CertAt(1)->SPKISha256Digest(&expected_key_hash));
+  ASSERT_EQ(Cert::TRUE, chain.CertAt(1)->SPKISha256Digest(&expected_key_hash));
   EXPECT_EQ(expected_key_hash, issuer_key_hash);
   // TODO(ekasper): proper KAT tests.
   EXPECT_FALSE(tbs.empty());
@@ -237,8 +237,7 @@ TEST_F(CertCheckerTest, PreCertWithPreCa) {
   EXPECT_EQ(CertChecker::OK,
             checker_.CheckPreCertChain(&chain, &issuer_key_hash, &tbs));
   string expected_key_hash;
-  ASSERT_EQ(Cert::TRUE,
-            chain.CertAt(2)->SPKISha256Digest(&expected_key_hash));
+  ASSERT_EQ(Cert::TRUE, chain.CertAt(2)->SPKISha256Digest(&expected_key_hash));
   EXPECT_EQ(expected_key_hash, issuer_key_hash);
   // TODO(ekasper): proper KAT tests.
   EXPECT_FALSE(tbs.empty());
@@ -322,37 +321,37 @@ TEST_F(CertCheckerTest, DontAcceptMD2) {
   EXPECT_EQ(CertChecker::UNSUPPORTED_ALGORITHM_IN_CERT_CHAIN,
             checker_.CheckCertChain(&chain));
 #else
-  LOG(WARNING)  << "Skipping test: MD2 is enabled! You should configure "
-                << "OpenSSL with -DOPENSSL_NO_MD2 to be safe!";
+  LOG(WARNING) << "Skipping test: MD2 is enabled! You should configure "
+               << "OpenSSL with -DOPENSSL_NO_MD2 to be safe!";
 #endif
 }
 
 TEST_F(CertCheckerTest, ResolveIssuerCollisions) {
   string chain_pem, root1_pem, root2_pem;
-  ASSERT_TRUE(util::ReadTextFile(cert_dir_ + "/" + kCollisionChain,
-                                 &chain_pem));
+  ASSERT_TRUE(
+      util::ReadTextFile(cert_dir_ + "/" + kCollisionChain, &chain_pem));
 
-  ASSERT_TRUE(checker_.LoadTrustedCertificates(cert_dir_ + "/" +
-                                               kCollisionRoot1));
-  ASSERT_TRUE(checker_.LoadTrustedCertificates(cert_dir_ + "/" +
-                                               kCollisionRoot2));
+  ASSERT_TRUE(
+      checker_.LoadTrustedCertificates(cert_dir_ + "/" + kCollisionRoot1));
+  ASSERT_TRUE(
+      checker_.LoadTrustedCertificates(cert_dir_ + "/" + kCollisionRoot2));
   CertChain chain(chain_pem);
   ASSERT_TRUE(chain.IsLoaded());
   EXPECT_EQ(CertChecker::OK, checker_.CheckCertChain(&chain));
 
   // The same, but include the root in the submission.
-  ASSERT_TRUE(util::ReadTextFile(cert_dir_ + "/" + kCollisionRoot1,
-                                 &root1_pem));
-  ASSERT_TRUE(util::ReadTextFile(cert_dir_ + "/" + kCollisionRoot2,
-                                 &root2_pem));
+  ASSERT_TRUE(
+      util::ReadTextFile(cert_dir_ + "/" + kCollisionRoot1, &root1_pem));
+  ASSERT_TRUE(
+      util::ReadTextFile(cert_dir_ + "/" + kCollisionRoot2, &root2_pem));
   CertChain chain1(chain_pem);
-  Cert *root1 = new Cert(root1_pem);
+  Cert* root1 = new Cert(root1_pem);
   ASSERT_TRUE(root1->IsLoaded());
   chain1.AddCert(root1);
   EXPECT_EQ(CertChecker::OK, checker_.CheckCertChain(&chain1));
 
   CertChain chain2(chain_pem);
-  Cert *root2 = new Cert(root2_pem);
+  Cert* root2 = new Cert(root2_pem);
   ASSERT_TRUE(root2->IsLoaded());
   chain2.AddCert(root2);
   EXPECT_EQ(CertChecker::OK, checker_.CheckCertChain(&chain2));
@@ -360,7 +359,7 @@ TEST_F(CertCheckerTest, ResolveIssuerCollisions) {
 
 }  // namespace
 
-int main(int argc, char**argv) {
+int main(int argc, char** argv) {
   cert_trans::test::InitTesting(argv[0], &argc, &argv, true);
   OpenSSL_add_all_algorithms();
   ERR_load_crypto_strings();

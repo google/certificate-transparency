@@ -19,17 +19,17 @@ std::string DumpOpenSSLErrorStack();
 
 void ClearOpenSSLErrors();
 
-std::string ReadBIO(BIO *bio);
+std::string ReadBIO(BIO* bio);
 
 }  // namespace util
 
 // Convenience macro to help automatically clear the stack regardless of
 // whether the requested logging level is high enough.
 // Defined as macro so that logging happens locally where the error occurred.
-#define LOG_OPENSSL_ERRORS(severity)                    \
-  do {                                                  \
-    LOG(severity) << util::DumpOpenSSLErrorStack();     \
-    util::ClearOpenSSLErrors();                         \
+#define LOG_OPENSSL_ERRORS(severity)                \
+  do {                                              \
+    LOG(severity) << util::DumpOpenSSLErrorStack(); \
+    util::ClearOpenSSLErrors();                     \
   } while (0);
 
 #endif  // OPENSSL_UTIL_H

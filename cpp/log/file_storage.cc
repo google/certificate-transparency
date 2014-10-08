@@ -15,7 +15,7 @@
 
 using std::string;
 
-FileStorage::FileStorage(const string &file_base, unsigned storage_depth)
+FileStorage::FileStorage(const string& file_base, unsigned storage_depth)
     : storage_dir_(file_base + "/storage"),
       tmp_dir_(file_base + "/tmp"),
       tmp_file_template_(tmp_dir_ + "/tmpXXXXXX"),
@@ -26,8 +26,8 @@ FileStorage::FileStorage(const string &file_base, unsigned storage_depth)
   CreateMissingDirectory(tmp_dir_);
 }
 
-FileStorage::FileStorage(const string &file_base, unsigned storage_depth,
-                         FilesystemOp *file_op)
+FileStorage::FileStorage(const string& file_base, unsigned storage_depth,
+                         FilesystemOp* file_op)
     : storage_dir_(file_base + "/storage"),
       tmp_dir_(file_base + "/tmp"),
       tmp_file_template_(tmp_dir_ + "/tmpXXXXXX"),
@@ -48,24 +48,24 @@ std::set<string> FileStorage::Scan() const {
   return storage_keys;
 }
 
-FileStorage::FileStorageResult
-FileStorage::CreateEntry(const string &key, const string &data) {
+FileStorage::FileStorageResult FileStorage::CreateEntry(const string& key,
+                                                        const string& data) {
   if (LookupEntry(key, NULL) == OK)
     return ENTRY_ALREADY_EXISTS;
   WriteStorageEntry(key, data);
   return OK;
 }
 
-FileStorage::FileStorageResult
-FileStorage::UpdateEntry(const string &key, const string &data) {
+FileStorage::FileStorageResult FileStorage::UpdateEntry(const string& key,
+                                                        const string& data) {
   if (LookupEntry(key, NULL) != OK)
     return NOT_FOUND;
   WriteStorageEntry(key, data);
   return OK;
 }
 
-FileStorage::FileStorageResult
-FileStorage::LookupEntry(const string &key, string *result) const {
+FileStorage::FileStorageResult FileStorage::LookupEntry(const string& key,
+                                                        string* result) const {
   string data_file = StoragePath(key);
   if (!FileExists(data_file))
     return NOT_FOUND;
@@ -74,21 +74,20 @@ FileStorage::LookupEntry(const string &key, string *result) const {
   return OK;
 }
 
-string FileStorage::StoragePathBasename(const string &hex) const {
+string FileStorage::StoragePathBasename(const string& hex) const {
   if (hex.length() <= storage_depth_)
     return "-";
   return hex.substr(storage_depth_);
 }
 
-string
-FileStorage::StoragePathComponent(const string &hex, unsigned n) const {
+string FileStorage::StoragePathComponent(const string& hex, unsigned n) const {
   assert(n < storage_depth_);
   if (n >= hex.length())
     return "-";
   return string(1, hex[n]);
 }
 
-string FileStorage::StoragePath(const string &key) const {
+string FileStorage::StoragePath(const string& key) const {
   string hex = util::HexString(key);
   string dirname = storage_dir_ + "/";
   for (unsigned n = 0; n < storage_depth_; ++n)
@@ -96,23 +95,23 @@ string FileStorage::StoragePath(const string &key) const {
   return dirname + StoragePathBasename(hex);
 }
 
-string FileStorage::StorageKey(const string &storage_path) const {
+string FileStorage::StorageKey(const string& storage_path) const {
   assert(storage_path.substr(0, storage_dir_.size()) == storage_dir_);
   string key_path = storage_path.substr(storage_dir_.size() + 1);
   string hex_key;
   for (unsigned n = 0; n < storage_depth_; ++n) {
-    char hex_char = key_path[2*n];
+    char hex_char = key_path[2 * n];
     if (hex_char == '-')
       return util::BinaryString(hex_key);
     hex_key.push_back(hex_char);
   }
-  string basename = key_path.substr(2*storage_depth_);
+  string basename = key_path.substr(2 * storage_depth_);
   if (basename != "-")
     hex_key.append(basename);
   return util::BinaryString(hex_key);
 }
 
-void FileStorage::WriteStorageEntry(const string &key, const string &data) {
+void FileStorage::WriteStorageEntry(const string& key, const string& data) {
   string hex = util::HexString(key);
 
   // Make the intermediate directories, if needed.
@@ -128,12 +127,12 @@ void FileStorage::WriteStorageEntry(const string &key, const string &data) {
   AtomicWriteBinaryFile(filename, data);
 }
 
-void FileStorage::ScanFiles(const string &dir_path,
-                            std::set<string> *keys) const {
-  DIR *dir = opendir(dir_path.c_str());
+void FileStorage::ScanFiles(const string& dir_path,
+                            std::set<string>* keys) const {
+  DIR* dir = opendir(dir_path.c_str());
   if (dir == NULL)
     abort();
-  struct dirent *entry;
+  struct dirent* entry;
   while ((entry = readdir(dir)) != NULL) {
     if (entry->d_name[0] == '.')
       continue;
@@ -142,14 +141,14 @@ void FileStorage::ScanFiles(const string &dir_path,
   closedir(dir);
 }
 
-void FileStorage::ScanDir(const string &dir_path,
-                          unsigned depth, std::set<string> *keys) const {
+void FileStorage::ScanDir(const string& dir_path, unsigned depth,
+                          std::set<string>* keys) const {
   if (depth > 0) {
     // Parse subdirectories. (TODO: make opendir part of filesystemop).
-    DIR *dir = opendir(dir_path.c_str());
+    DIR* dir = opendir(dir_path.c_str());
     if (dir == NULL)
       abort();
-    struct dirent *entry;
+    struct dirent* entry;
     std::set<string> result;
     while ((entry = readdir(dir)) != NULL) {
       if (entry->d_name[0] == '.')
@@ -163,7 +162,7 @@ void FileStorage::ScanDir(const string &dir_path,
   }
 }
 
-bool FileStorage::FileExists(const string &file_path) const {
+bool FileStorage::FileExists(const string& file_path) const {
   if (file_op_->access(file_path.c_str(), F_OK) == 0)
     return true;
   if (errno == ENOENT)
@@ -172,16 +171,15 @@ bool FileStorage::FileExists(const string &file_path) const {
   abort();
 }
 
-void FileStorage::AtomicWriteBinaryFile(const string &file_path,
-                                        const string &data) {
-  string tmp_file =
-      util::WriteTemporaryBinaryFile(tmp_file_template_, data);
+void FileStorage::AtomicWriteBinaryFile(const string& file_path,
+                                        const string& data) {
+  string tmp_file = util::WriteTemporaryBinaryFile(tmp_file_template_, data);
   if (tmp_file.empty() ||
       file_op_->rename(tmp_file.c_str(), file_path.c_str()) != 0)
     abort();
 }
 
-void FileStorage::CreateMissingDirectory(const string &dir_path) {
+void FileStorage::CreateMissingDirectory(const string& dir_path) {
   if (file_op_->mkdir(dir_path.c_str(), 0700) != 0 && errno != EEXIST)
     abort();
 }

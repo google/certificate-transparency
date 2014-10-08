@@ -9,7 +9,8 @@ class MerkleTreeMath {
   // Index of the parent node in the parent level of the tree.
   static size_t Parent(size_t leaf);
 
-  // True if the node is a right child; false if it is the left (or only) child.
+  // True if the node is a right child; false if it is the left (or only)
+  // child.
   static bool IsRightChild(size_t leaf);
 
   // Index of the node's (left or right) sibling in the same level.

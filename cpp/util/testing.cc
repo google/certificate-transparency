@@ -7,7 +7,7 @@
 namespace cert_trans {
 namespace test {
 
-void InitTesting(const char *name, int *argc, char ***argv,
+void InitTesting(const char* name, int* argc, char*** argv,
                  bool remove_flags) {
   // Change the defaults. Can be overridden on command line.
   // Log to stderr instead of log files.

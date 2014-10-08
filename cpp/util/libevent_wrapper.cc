@@ -15,7 +15,7 @@ using std::vector;
 namespace {
 
 
-unsigned short GetPortFromUri(const evhttp_uri *uri) {
+unsigned short GetPortFromUri(const evhttp_uri* uri) {
   int retval(evhttp_uri_get_port(uri));
 
   if (retval < 1 || retval > 65535) {
@@ -37,9 +37,8 @@ namespace libevent {
 
 
 struct HttpServer::Handler {
-  Handler(const string &_path, const HandlerCallback &_cb)
-      : path(_path),
-        cb(_cb) {
+  Handler(const string& _path, const HandlerCallback& _cb)
+      : path(_path), cb(_cb) {
   }
 
   const string path;
@@ -47,9 +46,7 @@ struct HttpServer::Handler {
 };
 
 
-Base::Base()
-    : base_(event_base_new()),
-      dns_(NULL) {
+Base::Base() : base_(event_base_new()), dns_(NULL) {
   evthread_make_base_notifiable(base_);
 }
 
@@ -72,17 +69,19 @@ void Base::DispatchOnce() {
 }
 
 
-event *Base::EventNew(evutil_socket_t &sock, short events, Event *event) const {
-  return CHECK_NOTNULL(event_new(base_, sock, events, &Event::Dispatch, event));
+event* Base::EventNew(evutil_socket_t& sock, short events,
+                      Event* event) const {
+  return CHECK_NOTNULL(
+      event_new(base_, sock, events, &Event::Dispatch, event));
 }
 
 
-evhttp *Base::HttpNew() const {
+evhttp* Base::HttpNew() const {
   return CHECK_NOTNULL(evhttp_new(base_));
 }
 
 
-evdns_base *Base::GetDns() {
+evdns_base* Base::GetDns() {
   lock_guard<mutex> lock(dns_lock_);
 
   if (!dns_) {
@@ -93,17 +92,16 @@ evdns_base *Base::GetDns() {
 }
 
 
-evhttp_connection *Base::HttpConnectionNew(const string &host,
+evhttp_connection* Base::HttpConnectionNew(const string& host,
                                            unsigned short port) {
-  return CHECK_NOTNULL(evhttp_connection_base_new(
-      base_, GetDns(), host.c_str(), port));
+  return CHECK_NOTNULL(
+      evhttp_connection_base_new(base_, GetDns(), host.c_str(), port));
 }
 
 
-Event::Event(const Base &base, evutil_socket_t sock, short events,
-             const Callback &cb)
-    : cb_(cb),
-      ev_(base.EventNew(sock, events, this)) {
+Event::Event(const Base& base, evutil_socket_t sock, short events,
+             const Callback& cb)
+    : cb_(cb), ev_(base.EventNew(sock, events, this)) {
 }
 
 
@@ -114,7 +112,7 @@ Event::~Event() {
 
 void Event::Add(double timeout) const {
   timeval tv;
-  timeval *tvp(NULL);
+  timeval* tvp(NULL);
 
   if (timeout >= 0) {
     tv.tv_sec = trunc(timeout);
@@ -126,13 +124,12 @@ void Event::Add(double timeout) const {
 }
 
 
-void Event::Dispatch(evutil_socket_t sock, short events, void *userdata) {
+void Event::Dispatch(evutil_socket_t sock, short events, void* userdata) {
   static_cast<Event*>(userdata)->cb_(sock, events);
 }
 
 
-HttpServer::HttpServer(const Base &base)
-    : http_(base.HttpNew()) {
+HttpServer::HttpServer(const Base& base) : http_(base.HttpNew()) {
 }
 
 
@@ -145,25 +142,25 @@ HttpServer::~HttpServer() {
 }
 
 
-void HttpServer::Bind(const char *address, ev_uint16_t port) {
+void HttpServer::Bind(const char* address, ev_uint16_t port) {
   CHECK_EQ(evhttp_bind_socket(http_, address, port), 0);
 }
 
 
-bool HttpServer::AddHandler(const string &path, const HandlerCallback &cb) {
-  Handler *handler(new Handler(path, cb));
+bool HttpServer::AddHandler(const string& path, const HandlerCallback& cb) {
+  Handler* handler(new Handler(path, cb));
   handlers_.push_back(handler);
 
   return evhttp_set_cb(http_, path.c_str(), &HandleRequest, handler) == 0;
 }
 
 
-void HttpServer::HandleRequest(evhttp_request *req, void *userdata) {
+void HttpServer::HandleRequest(evhttp_request* req, void* userdata) {
   static_cast<Handler*>(userdata)->cb(req);
 }
 
 
-HttpRequest::HttpRequest(const Callback &callback)
+HttpRequest::HttpRequest(const Callback& callback)
     : callback_(callback),
       req_(CHECK_NOTNULL(evhttp_request_new(&HttpRequest::Done, this))) {
 }
@@ -178,8 +175,8 @@ HttpRequest::~HttpRequest() {
 
 
 // static
-void HttpRequest::Done(evhttp_request *req, void *userdata) {
-  HttpRequest *const self(static_cast<HttpRequest*>(CHECK_NOTNULL(userdata)));
+void HttpRequest::Done(evhttp_request* req, void* userdata) {
+  HttpRequest* const self(static_cast<HttpRequest*>(CHECK_NOTNULL(userdata)));
   CHECK_EQ(self->req_, CHECK_NOTNULL(req));
 
   self->callback_(self);
@@ -191,8 +188,8 @@ void HttpRequest::Done(evhttp_request *req, void *userdata) {
 }
 
 
-HttpConnection::HttpConnection(const shared_ptr<Base> &base,
-                               const evhttp_uri *uri)
+HttpConnection::HttpConnection(const shared_ptr<Base>& base,
+                               const evhttp_uri* uri)
     : conn_(base->HttpConnectionNew(evhttp_uri_get_host(uri),
                                     GetPortFromUri(uri))) {
 }
@@ -203,8 +200,8 @@ HttpConnection::~HttpConnection() {
 }
 
 
-void HttpConnection::MakeRequest(HttpRequest *req, evhttp_cmd_type type,
-                                 const string &uri) {
+void HttpConnection::MakeRequest(HttpRequest* req, evhttp_cmd_type type,
+                                 const string& uri) {
   CHECK_EQ(evhttp_make_request(conn_, req->get(), type, uri.c_str()), 0);
 }
 

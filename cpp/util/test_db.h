@@ -15,24 +15,26 @@ DEFINE_string(database_test_dir, "/tmp",
 
 class TmpStorage {
  public:
-  TmpStorage()
-      : tmp_dir_(FLAGS_database_test_dir) {
+  TmpStorage() : tmp_dir_(FLAGS_database_test_dir) {
     file_base_ = util::CreateTemporaryDirectory(tmp_dir_ + "/ctlogXXXXXX");
     CHECK_EQ(tmp_dir_ + "/ctlog", file_base_.substr(0, tmp_dir_.size() + 6));
     CHECK_EQ(tmp_dir_.size() + 12, file_base_.length());
   }
 
   ~TmpStorage() {
-  // Check again that it is safe to empty file_base_.
+    // Check again that it is safe to empty file_base_.
     CHECK_EQ(tmp_dir_ + "/ctlog", file_base_.substr(0, tmp_dir_.size() + 6));
     CHECK_EQ(tmp_dir_.size() + 12, file_base_.length());
 
     std::string command = "rm -r " + file_base_;
     CHECK_ERR(system(command.c_str()))
-              << "Failed to delete temporary directory in " << file_base_;
+        << "Failed to delete temporary directory in " << file_base_;
   }
 
-  std::string TmpStorageDir() const { return file_base_; }
+  std::string TmpStorageDir() const {
+    return file_base_;
+  }
+
  private:
   std::string tmp_dir_;
   std::string file_base_;
@@ -42,8 +44,7 @@ class TmpStorage {
 template <class T>
 class TestDB {
  public:
-  TestDB()
-      : tmp_() {
+  TestDB() : tmp_() {
     Setup();
   }
 
@@ -54,18 +55,21 @@ class TestDB {
 
   void Setup();
 
-  T *db() const { return db_; }
+  T* db() const {
+    return db_;
+  }
 
   // Build a second database from the current disk state. Caller owns result.
   // Meant to be used for testing resumes from disk.
-  // Concurrent behaviour is undefined (depends on the Database implementation).
-  T *SecondDB() const;
+  // Concurrent behaviour is undefined (depends on the Database
+  // implementation).
+  T* SecondDB() const;
 
  private:
   TmpStorage tmp_;
-  T *db_;
+  T* db_;
 
   DISALLOW_COPY_AND_ASSIGN(TestDB);
 };
 
-#endif // UTIL_TEST_DB_H
+#endif  // UTIL_TEST_DB_H

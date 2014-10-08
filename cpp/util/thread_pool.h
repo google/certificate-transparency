@@ -21,7 +21,7 @@ class ThreadPool {
 
   // Arranges for "closure" to be called in the thread pool. The
   // function must not be empty.
-  void Add(const boost::function<void()> &closure);
+  void Add(const boost::function<void()>& closure);
 
  private:
   class Impl;

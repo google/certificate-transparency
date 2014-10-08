@@ -23,10 +23,10 @@ using std::string;
 
 const uint16_t CT_EXTENSION_TYPE = 18;
 
-//static
-int SSLClient::ExtensionCallback(SSL *s, unsigned ext_type,
-				 const unsigned char *in, size_t inlen,
-				 int *al, void *arg) {
+// static
+int SSLClient::ExtensionCallback(SSL* s, unsigned ext_type,
+                                 const unsigned char* in, size_t inlen,
+                                 int* al, void* arg) {
   char pem_name[100];
   unsigned char ext_buf[4 + 65536];
 
@@ -35,31 +35,32 @@ int SSLClient::ExtensionCallback(SSL *s, unsigned ext_type,
   ext_buf[1] = ext_type & 0xFF;
   ext_buf[2] = inlen >> 8;
   ext_buf[3] = inlen & 0xFF;
-  memcpy(ext_buf+4, in, inlen);
+  memcpy(ext_buf + 4, in, inlen);
 
-  BIO_snprintf(pem_name, sizeof(pem_name), "SERVERINFO FOR EXTENSION %d", ext_type);
+  BIO_snprintf(pem_name, sizeof(pem_name), "SERVERINFO FOR EXTENSION %d",
+               ext_type);
 
-  // Work around broken PEM_write() declaration in older OpenSSL versions.
+// Work around broken PEM_write() declaration in older OpenSSL versions.
 #if OPENSSL_VERSION_NUMBER < 0x10002000L
-  PEM_write(stdout, pem_name, const_cast<char *>(""), ext_buf, 4 + inlen);
+  PEM_write(stdout, pem_name, const_cast<char*>(""), ext_buf, 4 + inlen);
 #else
   PEM_write(stdout, pem_name, "", ext_buf, 4 + inlen);
 #endif
 
   CHECK_EQ(ext_type, CT_EXTENSION_TYPE);
 
-  VerifyCallbackArgs *args = reinterpret_cast<VerifyCallbackArgs*>(arg);
+  VerifyCallbackArgs* args = reinterpret_cast<VerifyCallbackArgs*>(arg);
   CHECK_NOTNULL(args);
 
   CHECK(args->ct_extension.empty());
-  args->ct_extension = string(reinterpret_cast<const char *>(in), inlen);
+  args->ct_extension = string(reinterpret_cast<const char*>(in), inlen);
 
   return 1;
 }
 
 // TODO(ekasper): handle Cert::Status errors.
-SSLClient::SSLClient(const string &server, uint16_t port,
-                     const string &ca_dir, LogVerifier *verifier)
+SSLClient::SSLClient(const string& server, uint16_t port, const string& ca_dir,
+                     LogVerifier* verifier)
     : client_(server, port),
       ctx_(NULL),
       ssl_(NULL),
@@ -83,10 +84,10 @@ SSLClient::SSLClient(const string &server, uint16_t port,
 
 #if OPENSSL_VERSION_NUMBER >= 0x10002000L
   SSL_CTX_add_client_custom_ext(ctx_, CT_EXTENSION_TYPE, NULL, NULL, NULL,
-				ExtensionCallback, &verify_args_);
+                                ExtensionCallback, &verify_args_);
 #else
   LOG(WARNING) << "OpenSSL version is too low to check the Certificate "
-      "Transparency TLS extension";
+                  "Transparency TLS extension";
 #endif
 }
 
@@ -112,7 +113,7 @@ void SSLClient::Disconnect() {
   connected_ = false;
 }
 
-void SSLClient::GetSSLClientCTData(SSLClientCTData *data) const {
+void SSLClient::GetSSLClientCTData(SSLClientCTData* data) const {
   CHECK(Connected());
   data->CopyFrom(verify_args_.ct_data);
 }
@@ -124,12 +125,13 @@ void SSLClient::GetSSLClientCTData(SSLClientCTData *data) const {
 // proof is re-submitted (or submitted to another log) and the server attaches
 // that proof too, but let's not complicate things for now.
 // static
-LogVerifier::VerifyResult
-SSLClient::VerifySCT(const string &token, LogVerifier *verifier,
-                     SSLClientCTData *data) {
+LogVerifier::VerifyResult SSLClient::VerifySCT(const string& token,
+                                               LogVerifier* verifier,
+                                               SSLClientCTData* data) {
   CHECK(data->has_reconstructed_entry());
   SignedCertificateTimestamp local_sct;
-  // Skip over bad SCTs. These could be either badly encoded ones, or SCTs whose
+  // Skip over bad SCTs. These could be either badly encoded ones, or SCTs
+  // whose
   // version we don't understand.
   if (Deserializer::DeserializeSCT(token, &local_sct) != Deserializer::OK)
     return LogVerifier::INVALID_FORMAT;
@@ -140,17 +142,17 @@ SSLClient::VerifySCT(const string &token, LogVerifier *verifier,
                                                  local_sct, &merkle_leaf);
   if (result != LogVerifier::VERIFY_OK)
     return result;
-  SSLClientCTData::SCTInfo *sct_info = data->add_attached_sct_info();
+  SSLClientCTData::SCTInfo* sct_info = data->add_attached_sct_info();
   sct_info->set_merkle_leaf_hash(merkle_leaf);
   sct_info->mutable_sct()->CopyFrom(local_sct);
   return LogVerifier::VERIFY_OK;
 }
 
 // static
-int SSLClient::VerifyCallback(X509_STORE_CTX *ctx, void *arg) {
-  VerifyCallbackArgs *args = reinterpret_cast<VerifyCallbackArgs*>(arg);
+int SSLClient::VerifyCallback(X509_STORE_CTX* ctx, void* arg) {
+  VerifyCallbackArgs* args = reinterpret_cast<VerifyCallbackArgs*>(arg);
   CHECK_NOTNULL(args);
-  LogVerifier *verifier = args->verifier;
+  LogVerifier* verifier = args->verifier;
   CHECK_NOTNULL(verifier);
 
   int vfy = X509_verify_cert(ctx);
@@ -182,22 +184,24 @@ int SSLClient::VerifyCallback(X509_STORE_CTX *ctx, void *arg) {
   string serialized_scts;
   // First, see if the cert has an embedded proof.
   if (chain.LeafCert()->HasExtension(
-          cert_trans::NID_ctEmbeddedSignedCertificateTimestampList)
-      == Cert::TRUE) {
-        LOG(INFO) << "Embedded proof extension found in certificate, "
-                  << "verifying...";
-        Cert::Status status = chain.LeafCert()->OctetStringExtensionData(
-               cert_trans::NID_ctEmbeddedSignedCertificateTimestampList,
-               &serialized_scts);
-        if (status != Cert::TRUE) {
-          // Any error here is likely OpenSSL acting up, so just die.
-          CHECK_EQ(Cert::FALSE, status);
-          LOG(ERROR) << "Failed to parse extension data: corrupt cert?";
-        }
-        // Else look for the proof in a superfluous cert.
-        // Let's assume the superfluous cert is always last in the chain.
-  } else if (input_chain.Length() > 1 && input_chain.LastCert()->HasExtension(
-      cert_trans::NID_ctSignedCertificateTimestampList) == Cert::TRUE) {
+          cert_trans::NID_ctEmbeddedSignedCertificateTimestampList) ==
+      Cert::TRUE) {
+    LOG(INFO) << "Embedded proof extension found in certificate, "
+              << "verifying...";
+    Cert::Status status = chain.LeafCert()->OctetStringExtensionData(
+        cert_trans::NID_ctEmbeddedSignedCertificateTimestampList,
+        &serialized_scts);
+    if (status != Cert::TRUE) {
+      // Any error here is likely OpenSSL acting up, so just die.
+      CHECK_EQ(Cert::FALSE, status);
+      LOG(ERROR) << "Failed to parse extension data: corrupt cert?";
+    }
+    // Else look for the proof in a superfluous cert.
+    // Let's assume the superfluous cert is always last in the chain.
+  } else if (input_chain.Length() > 1 &&
+             input_chain.LastCert()->HasExtension(
+                 cert_trans::NID_ctSignedCertificateTimestampList) ==
+                 Cert::TRUE) {
     LOG(INFO) << "Proof extension found in certificate, verifying...";
     Cert::Status status = input_chain.LastCert()->OctetStringExtensionData(
         cert_trans::NID_ctSignedCertificateTimestampList, &serialized_scts);
@@ -237,10 +241,11 @@ int SSLClient::VerifyCallback(X509_STORE_CTX *ctx, void *arg) {
             LOG(INFO) << "SCT number " << i + 1 << " verified";
             args->sct_verified = true;
           } else {
-            LOG(ERROR) << "Verification for SCT number " << i + 1 << " failed: "
+            LOG(ERROR) << "Verification for SCT number " << i + 1
+                       << " failed: "
                        << LogVerifier::VerifyResultString(result);
           }
-        } // end for
+        }  // end for
       }
     }
   }  // end if (!serialized_scts.empty())
@@ -265,7 +270,7 @@ SSLClient::HandshakeResult SSLClient::SSLConnect(bool strict) {
 
   ssl_ = SSL_new(ctx_);
   CHECK_NOTNULL(ssl_);
-  BIO *bio = BIO_new_socket(client_.fd(), BIO_NOCLOSE);
+  BIO* bio = BIO_new_socket(client_.fd(), BIO_NOCLOSE);
   CHECK_NOTNULL(bio);
   // Takes ownership of bio.
   SSL_set_bio(ssl_, bio, bio);

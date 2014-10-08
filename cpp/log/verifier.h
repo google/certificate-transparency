@@ -22,24 +22,24 @@ class Verifier {
     INVALID_SIGNATURE,
   };
 
-  explicit Verifier(EVP_PKEY *pkey);
+  explicit Verifier(EVP_PKEY* pkey);
   virtual ~Verifier();
 
   virtual std::string KeyID() const;
 
-  virtual Status Verify(const std::string &input,
-                        const ct::DigitallySigned &signature) const;
+  virtual Status Verify(const std::string& input,
+                        const ct::DigitallySigned& signature) const;
 
-  static std::string ComputeKeyID(EVP_PKEY *pkey);
+  static std::string ComputeKeyID(EVP_PKEY* pkey);
 
  protected:
   // A constructor for mocking.
   Verifier();
 
  private:
-  bool RawVerify(const std::string &data, const std::string &sig_string) const;
+  bool RawVerify(const std::string& data, const std::string& sig_string) const;
 
-  EVP_PKEY *pkey_;
+  EVP_PKEY* pkey_;
   ct::DigitallySigned::HashAlgorithm hash_algo_;
   ct::DigitallySigned::SignatureAlgorithm sig_algo_;
   std::string key_id_;

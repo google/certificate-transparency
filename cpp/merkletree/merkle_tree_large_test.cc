@@ -18,7 +18,8 @@ using std::string;
 class MerkleTreeLargeTest : public ::testing::Test {
  protected:
   string data_;
-  MerkleTreeLargeTest() : data_(string(1024, 0x42)) {}
+  MerkleTreeLargeTest() : data_(string(1024, 0x42)) {
+  }
 };
 
 TEST_F(MerkleTreeLargeTest, BuildLargeTree) {
@@ -32,12 +33,11 @@ TEST_F(MerkleTreeLargeTest, BuildLargeTree) {
     struct rusage ru;
     getrusage(RUSAGE_SELF, &ru);
     long max_rss_before = ru.ru_maxrss;
-    MerkleTree *tree = new MerkleTree(new Sha256Hasher());
+    MerkleTree* tree = new MerkleTree(new Sha256Hasher());
     trees.push_back(tree);
     uint64_t time_before = util::TimeInMilliseconds();
 
-    for (size_t i = 0; i < tree_size; ++i)
-      tree->AddLeaf(data_);
+    for (size_t i = 0; i < tree_size; ++i) tree->AddLeaf(data_);
     EXPECT_FALSE(tree->CurrentRoot().empty());
     EXPECT_TRUE(tree->LeafCount() == tree_size);
     getrusage(RUSAGE_SELF, &ru);
@@ -59,7 +59,7 @@ TEST_F(MerkleTreeLargeTest, BuildLargeTree) {
 
 }  // namespace
 
-int main(int argc, char **argv) {
+int main(int argc, char** argv) {
   cert_trans::test::InitTesting(argv[0], &argc, &argv, true);
   return RUN_ALL_TESTS();
 }

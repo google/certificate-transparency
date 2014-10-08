@@ -20,49 +20,48 @@ class LoggedCertificate : public ct::LoggedCertificatePB {
     return sct().timestamp();
   }
 
-  const ct::SignedCertificateTimestamp &sct() const {
+  const ct::SignedCertificateTimestamp& sct() const {
     return contents().sct();
   }
 
-  ct::SignedCertificateTimestamp *mutable_sct() {
+  ct::SignedCertificateTimestamp* mutable_sct() {
     return mutable_contents()->mutable_sct();
   }
 
-  const ct::LogEntry &entry() const {
+  const ct::LogEntry& entry() const {
     return contents().entry();
   }
 
-  ct::LogEntry *mutable_entry() {
+  ct::LogEntry* mutable_entry() {
     return mutable_contents()->mutable_entry();
   }
 
-  bool SerializeForDatabase(std::string *dst) const {
+  bool SerializeForDatabase(std::string* dst) const {
     return contents().SerializeToString(dst);
   }
 
-  bool ParseFromDatabase(const std::string &src) {
+  bool ParseFromDatabase(const std::string& src) {
     return mutable_contents()->ParseFromString(src);
   }
 
-  bool SerializeForLeaf(std::string *dst) const {
-    return Serializer::SerializeSCTMerkleTreeLeaf(sct(), entry(), dst)
-        == Serializer::OK;
+  bool SerializeForLeaf(std::string* dst) const {
+    return Serializer::SerializeSCTMerkleTreeLeaf(sct(), entry(), dst) ==
+           Serializer::OK;
   }
 
-  bool SerializeExtraData(std::string *dst) const {
+  bool SerializeExtraData(std::string* dst) const {
     if (entry().type() == ct::X509_ENTRY)
-      return Serializer::SerializeX509Chain(entry().x509_entry(), dst)
-          == Serializer::OK;
+      return Serializer::SerializeX509Chain(entry().x509_entry(), dst) ==
+             Serializer::OK;
     else
       return Serializer::SerializePrecertChainEntry(entry().precert_entry(),
-                                                    dst)
-          == Serializer::OK;
+                                                    dst) == Serializer::OK;
   }
 
   // FIXME(benl): unify with TestSigner?
   void RandomForTest() {
     const char kKeyID[] =
-	"b69d879e3f2c4402556dcda2f6b2e02ff6b6df4789c53000e14f4b125ae847aa";
+        "b69d879e3f2c4402556dcda2f6b2e02ff6b6df4789c53000e14f4b125ae847aa";
 
     mutable_sct()->set_version(ct::V1);
     mutable_sct()->mutable_id()->set_key_id(util::BinaryString(kKeyID));
@@ -70,10 +69,10 @@ class LoggedCertificate : public ct::LoggedCertificatePB {
     mutable_sct()->clear_extensions();
 
     int random_bits = rand();
-    ct::LogEntryType type = random_bits & 1 ?
-        ct::X509_ENTRY : ct::PRECERT_ENTRY;
+    ct::LogEntryType type =
+        random_bits & 1 ? ct::X509_ENTRY : ct::PRECERT_ENTRY;
 
-    ct::LogEntry *entry = mutable_entry();
+    ct::LogEntry* entry = mutable_entry();
 
     entry->set_type(type);
     entry->clear_x509_entry();
@@ -109,7 +108,6 @@ class LoggedCertificate : public ct::LoggedCertificatePB {
       }
     }
   }
-
 };
 
 }  // namespace cert_trans

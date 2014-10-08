@@ -7,7 +7,8 @@
 #include "util/testing.h"
 
 
-template <class Logged> class LoggedTest : public ::testing::Test {
+template <class Logged>
+class LoggedTest : public ::testing::Test {
  protected:
 };
 
@@ -95,7 +96,7 @@ TYPED_TEST(LoggedTest, DifferentMerkleSerialization) {
   EXPECT_NE(s1, s2);
 }
 
-int main(int argc, char **argv) {
+int main(int argc, char** argv) {
   cert_trans::test::InitTesting(argv[0], &argc, &argv, true);
   srand(time(NULL));
   return RUN_ALL_TESTS();

@@ -23,9 +23,11 @@ class Services {
     return rough_time_;
   }
 
-  static void SetRoughTime() { rough_time_ = 0; }
+  static void SetRoughTime() {
+    rough_time_ = 0;
+  }
 
-  static bool InitServer(int *sock, int port, const char *ip, int type);
+  static bool InitServer(int* sock, int port, const char* ip, int type);
 
  private:
   // This class is only used as a namespace, it should never be
@@ -40,15 +42,12 @@ class EventLoop;
 
 class FD {
  public:
+  enum CanDelete { DELETE, NO_DELETE };
 
-  enum CanDelete {
-    DELETE,
-    NO_DELETE
-  };
+  FD(EventLoop* loop, int fd, CanDelete deletable = DELETE);
 
-  FD(EventLoop *loop, int fd, CanDelete deletable = DELETE);
-
-  virtual ~FD() {}
+  virtual ~FD() {
+  }
 
   virtual bool WantsWrite() const = 0;
 
@@ -58,29 +57,39 @@ class FD {
 
   virtual void ReadIsAllowed() = 0;
 
-  bool WantsErase() const { return wants_erase_; }
+  bool WantsErase() const {
+    return wants_erase_;
+  }
 
   void Close();
 
-  int fd() const { return fd_; }
+  int fd() const {
+    return fd_;
+  }
 
-  bool CanDrop() const { return deletable_ == DELETE; }
+  bool CanDrop() const {
+    return deletable_ == DELETE;
+  }
 
   // Don't forget to call me if anything happens!
-  void Activity() { last_activity_ = Services::RoughTime(); }
+  void Activity() {
+    last_activity_ = Services::RoughTime();
+  }
 
-  time_t LastActivity() const { return last_activity_; }
+  time_t LastActivity() const {
+    return last_activity_;
+  }
 
  protected:
-
-  EventLoop *loop() const { return loop_; }
+  EventLoop* loop() const {
+    return loop_;
+  }
 
   bool WillAccept(int fd);
 
  private:
-
   int fd_;
-  EventLoop *loop_;
+  EventLoop* loop_;
   bool wants_erase_;
   CanDelete deletable_;
   time_t last_activity_;
@@ -98,14 +107,18 @@ class FD {
 
 class Listener : public FD {
  public:
+  Listener(EventLoop* loop, int fd) : FD(loop, fd, NO_DELETE) {
+  }
 
-  Listener(EventLoop *loop, int fd) : FD(loop, fd, NO_DELETE) {}
-
-  bool WantsRead() const { return true; }
+  bool WantsRead() const {
+    return true;
+  }
 
   void ReadIsAllowed();
 
-  bool WantsWrite() const { return false; }
+  bool WantsWrite() const {
+    return false;
+  }
 
   void WriteIsAllowed();
 
@@ -116,9 +129,10 @@ class RepeatedEvent {
  public:
   RepeatedEvent(time_t repeat_frequency_seconds)
       : frequency_(repeat_frequency_seconds),
-        last_activity_(Services::RoughTime()) {}
+        last_activity_(Services::RoughTime()) {
+  }
 
- // The time when we should execute next.
+  // The time when we should execute next.
   time_t Trigger() {
     return last_activity_ + frequency_;
   }
@@ -130,6 +144,7 @@ class RepeatedEvent {
   void Activity() {
     last_activity_ = Services::RoughTime();
   }
+
  private:
   time_t frequency_;
   time_t last_activity_;
@@ -137,11 +152,16 @@ class RepeatedEvent {
 
 class EventLoop {
  public:
-  EventLoop() : go_(true) {}
+  EventLoop() : go_(true) {
+  }
 
-  void Add(FD *fd) { fds_.push_back(fd); }
+  void Add(FD* fd) {
+    fds_.push_back(fd);
+  }
 
-  void Add(RepeatedEvent *event) { events_.push_back(event); }
+  void Add(RepeatedEvent* event) {
+    events_.push_back(event);
+  }
 
   // Returns remaining time until the next alarm.
   time_t ProcessRepeatedEvents();
@@ -155,13 +175,12 @@ class EventLoop {
   void Stop();
 
  private:
+  bool EraseCheck(std::deque<FD*>::iterator* pfd);
 
-  bool EraseCheck(std::deque<FD *>::iterator *pfd);
+  static void Set(int fd, fd_set* fdset, int* max);
 
-  static void Set(int fd, fd_set *fdset, int *max);
-
-  std::deque<FD *> fds_;
-  std::vector<RepeatedEvent *> events_;
+  std::deque<FD*> fds_;
+  std::vector<RepeatedEvent*> events_;
   // This should probably be set to 2 for anything but test (or 1 or 0).
   // 2: everything gets a chance to speak.
   // 1: sometimes the clock will tick before some get a chance to speak.
@@ -175,10 +194,12 @@ class EventLoop {
 
 class Server : public FD {
  public:
+  Server(EventLoop* loop, int fd) : FD(loop, fd) {
+  }
 
-  Server(EventLoop *loop, int fd) : FD(loop, fd) {}
-
-  bool WantsRead() const { return true; }
+  bool WantsRead() const {
+    return true;
+  }
 
   void ReadIsAllowed();
 
@@ -186,26 +207,31 @@ class Server : public FD {
   // responsibility to remove consumed bytes from rbuffer. This will
   // NOT be called again until more data arrives from the network,
   // even if there are unconsumed bytes in rbuffer.
-  virtual void BytesRead(std::string *rbuffer) = 0;
+  virtual void BytesRead(std::string* rbuffer) = 0;
 
-  bool WantsWrite() const { return !wbuffer_.empty(); }
+  bool WantsWrite() const {
+    return !wbuffer_.empty();
+  }
 
   void WriteIsAllowed();
 
-  void Write(std::string str) { wbuffer_.append(str); }
+  void Write(std::string str) {
+    wbuffer_.append(str);
+  }
 
  private:
-
   std::string rbuffer_;
   std::string wbuffer_;
 };
 
 class UDPServer : public FD {
  public:
+  UDPServer(EventLoop* loop, int fd) : FD(loop, fd, NO_DELETE) {
+  }
 
-  UDPServer(EventLoop *loop, int fd) : FD(loop, fd, NO_DELETE) {}
-
-  bool WantsRead() const { return true; }
+  bool WantsRead() const {
+    return true;
+  }
 
   void ReadIsAllowed();
 
@@ -217,17 +243,17 @@ class UDPServer : public FD {
 
   // A packet has been read. It will not be re-presented if you do not
   // process it now.
-  virtual void PacketRead(const sockaddr_in &from, const char *buf, size_t len)
-    = 0;
+  virtual void PacketRead(const sockaddr_in& from, const char* buf,
+                          size_t len) = 0;
 
   // Queue a packet for sending
-  void QueuePacket(const sockaddr_in &to, const char *buf, size_t len);
-  void QueuePacket(const sockaddr_in &to, const unsigned char *buf,
+  void QueuePacket(const sockaddr_in& to, const char* buf, size_t len);
+  void QueuePacket(const sockaddr_in& to, const unsigned char* buf,
                    size_t len) {
-    QueuePacket(to, reinterpret_cast<const char *>(buf), len);
+    QueuePacket(to, reinterpret_cast<const char*>(buf), len);
   }
 
-private:
+ private:
   struct WBuffer {
     sockaddr_in sa;
     std::string packet;
@@ -237,10 +263,10 @@ private:
 
 class UDPEchoServer : public UDPServer {
  public:
+  UDPEchoServer(EventLoop* loop, int fd) : UDPServer(loop, fd) {
+  }
 
-  UDPEchoServer(EventLoop *loop, int fd) : UDPServer(loop, fd) {}
-
-  virtual void PacketRead(const sockaddr_in &from, const char *buf,
+  virtual void PacketRead(const sockaddr_in& from, const char* buf,
                           size_t len) {
     QueuePacket(from, buf, len);
   }

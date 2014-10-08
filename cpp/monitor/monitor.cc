@@ -11,8 +11,8 @@ using std::string;
 
 namespace monitor {
 
-Monitor::Monitor(Database *database, LogVerifier *log_verifier,
-                 HTTPLogClient *client, uint64_t sleep_time_sec)
+Monitor::Monitor(Database* database, LogVerifier* log_verifier,
+                 HTTPLogClient* client, uint64_t sleep_time_sec)
     : db_(CHECK_NOTNULL(database)),
       verifier_(CHECK_NOTNULL(log_verifier)),
       client_(CHECK_NOTNULL(client)),
@@ -29,7 +29,8 @@ Monitor::GetResult Monitor::GetSTH() {
   Database::LookupResult ret;
   ret = db_->LookupLatestWrittenSTH(&current_sth);
 
-  // ct::SignedTreeHead::SerializeAsString() returns an empty string on failure.
+  // ct::SignedTreeHead::SerializeAsString() returns an empty string on
+  // failure.
   // This might lead to unexpected behaviour (i.e. a database write).
   if (ret == Database::NOT_FOUND ||
       current_sth.SerializeAsString() != new_sth.SerializeAsString()) {
@@ -63,7 +64,7 @@ Monitor::VerifyResult Monitor::VerifySTH(uint64_t timestamp) {
     CHECK_EQ(db_->LookupSTHByTimestamp(timestamp, &sth), Database::LOOKUP_OK);
   } else {
     const GetResult result(GetSTH());
-    switch(result) {
+    switch (result) {
       case OK:
         break;
       case NETWORK_PROBLEM:
@@ -82,12 +83,9 @@ Monitor::VerifyResult Monitor::VerifySTHInternal() {
 }
 
 Monitor::VerifyResult Monitor::VerifySTHWithInvalidTimestamp(
-    const ct::SignedTreeHead &sth) {
-
-  LogVerifier::VerifyResult v_result = verifier_->VerifySignedTreeHead(
-                                                      sth,
-                                                      sth.timestamp(),
-                                                      sth.timestamp());
+    const ct::SignedTreeHead& sth) {
+  LogVerifier::VerifyResult v_result =
+      verifier_->VerifySignedTreeHead(sth, sth.timestamp(), sth.timestamp());
 
   if (v_result == LogVerifier::VERIFY_OK) {
     return STH_MALFORMED_WTH_VALID_SIGNATURE;
@@ -102,8 +100,7 @@ Monitor::VerifyResult Monitor::VerifySTHWithInvalidTimestamp(
 }
 
 Monitor::VerifyResult Monitor::VerifySTHInternal(
-    const ct::SignedTreeHead &sth) {
-
+    const ct::SignedTreeHead& sth) {
   LogVerifier::VerifyResult v_result = verifier_->VerifySignedTreeHead(sth);
   std::string v_result_string = LogVerifier::VerifyResultString(v_result);
 
@@ -143,7 +140,6 @@ Monitor::VerifyResult Monitor::VerifySTHInternal(
   // yet verified or the verification failed previously.
   if (current_level == Database::UNDEFINED ||
       current_level == Database::SIGNATURE_VERIFICATION_FAILED) {
-
     CHECK_EQ(db_->SetVerificationLevel(sth, level), Database::WRITE_OK);
     LOG(INFO) << "New verification level: "
               << Database::VerificationLevelString(level);
@@ -186,23 +182,29 @@ Monitor::GetResult Monitor::GetEntries(int get_first, int get_last) {
       sct.set_timestamp(entries.at(i).leaf.timestamped_entry().timestamp());
       sct.set_extensions(entries.at(i).leaf.timestamped_entry().extensions());
 
-      if (entries.at(i).leaf.timestamped_entry().entry_type()
-          == ct::X509_ENTRY) {
+      if (entries.at(i).leaf.timestamped_entry().entry_type() ==
+          ct::X509_ENTRY) {
         x509chain_entry.CopyFrom(entries.at(i).entry.x509_entry());
 
         x509chain_entry.set_leaf_certificate(
-              entries.at(i).leaf.timestamped_entry().signed_entry().x509());
+            entries.at(i).leaf.timestamped_entry().signed_entry().x509());
 
         log_entry.mutable_x509_entry()->CopyFrom(x509chain_entry);
 
-      } else if (entries.at(i).leaf.timestamped_entry().entry_type()
-                 == ct::PRECERT_ENTRY) {
+      } else if (entries.at(i).leaf.timestamped_entry().entry_type() ==
+                 ct::PRECERT_ENTRY) {
         precert_chain_entry.CopyFrom(entries.at(i).entry.precert_entry());
 
-        precert.set_issuer_key_hash(entries.at(i).leaf.
-            timestamped_entry().signed_entry().precert().issuer_key_hash());
-        precert.set_tbs_certificate(entries.at(i).leaf.
-            timestamped_entry().signed_entry().precert().tbs_certificate());
+        precert.set_issuer_key_hash(entries.at(i)
+                                        .leaf.timestamped_entry()
+                                        .signed_entry()
+                                        .precert()
+                                        .issuer_key_hash());
+        precert.set_tbs_certificate(entries.at(i)
+                                        .leaf.timestamped_entry()
+                                        .signed_entry()
+                                        .precert()
+                                        .tbs_certificate());
         precert_chain_entry.mutable_pre_cert()->CopyFrom(precert);
 
         log_entry.mutable_precert_entry()->CopyFrom(precert_chain_entry);
@@ -224,7 +226,7 @@ Monitor::GetResult Monitor::GetEntries(int get_first, int get_last) {
     entries.clear();
     db_->EndTransaction();
 
-  } while(dload_count + get_first <= get_last);
+  } while (dload_count + get_first <= get_last);
   return OK;
 }
 
@@ -244,7 +246,7 @@ Monitor::ConfirmResult Monitor::ConfirmTreeInternal() {
 }
 
 Monitor::ConfirmResult Monitor::ConfirmTreeInternal(
-    const ct::SignedTreeHead &sth) {
+    const ct::SignedTreeHead& sth) {
   MerkleTree mt(new Sha256Hasher);
 
   Database::VerificationLevel lvl;
@@ -283,9 +285,7 @@ Monitor::ConfirmResult Monitor::ConfirmTreeInternal(
 }
 
 Monitor::CheckResult Monitor::CheckSTHSanity(
-    const ct::SignedTreeHead &old_sth,
-    const ct::SignedTreeHead &new_sth) {
-
+    const ct::SignedTreeHead& old_sth, const ct::SignedTreeHead& new_sth) {
   // This serializing returns an empty String on failure which will lead to
   // undefined behaviour.
   if (old_sth.SerializeAsString() == new_sth.SerializeAsString())
@@ -300,9 +300,8 @@ Monitor::CheckResult Monitor::CheckSTHSanity(
     if (new_sth.tree_size() < old_sth.tree_size())
       LOG(ERROR) << "New tree size smaller than old one.";
 
-    CHECK_EQ(db_->SetVerificationLevel(new_sth,
-                                       Database::INCONSISTENT),
-                                       Database::WRITE_OK);
+    CHECK_EQ(db_->SetVerificationLevel(new_sth, Database::INCONSISTENT),
+             Database::WRITE_OK);
     return INSANE;
   }
 
@@ -360,4 +359,4 @@ void Monitor::Loop() {
   }
 }
 
-} // namespace monitor
+}  // namespace monitor

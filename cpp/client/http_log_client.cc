@@ -31,8 +31,8 @@ using std::vector;
 namespace {
 
 
-void DoneRequest(AsyncLogClient::Status status, AsyncLogClient::Status *retval,
-                 bool *done) {
+void DoneRequest(AsyncLogClient::Status status, AsyncLogClient::Status* retval,
+                 bool* done) {
   *retval = status;
   *done = true;
 }
@@ -40,14 +40,12 @@ void DoneRequest(AsyncLogClient::Status status, AsyncLogClient::Status *retval,
 
 }  // namespace
 
-HTTPLogClient::HTTPLogClient(const string &server)
-    : base_(make_shared<libevent::Base>()),
-      client_(base_, server) {
+HTTPLogClient::HTTPLogClient(const string& server)
+    : base_(make_shared<libevent::Base>()), client_(base_, server) {
 }
 
-AsyncLogClient::Status
-HTTPLogClient::UploadSubmission(const string &submission, bool pre,
-                                SignedCertificateTimestamp *sct) {
+AsyncLogClient::Status HTTPLogClient::UploadSubmission(
+    const string& submission, bool pre, SignedCertificateTimestamp* sct) {
   AsyncLogClient::Status retval(AsyncLogClient::UNKNOWN_ERROR);
   bool done(false);
 
@@ -69,7 +67,7 @@ HTTPLogClient::UploadSubmission(const string &submission, bool pre,
 }
 
 
-AsyncLogClient::Status HTTPLogClient::GetSTH(SignedTreeHead *sth) {
+AsyncLogClient::Status HTTPLogClient::GetSTH(SignedTreeHead* sth) {
   AsyncLogClient::Status retval(AsyncLogClient::UNKNOWN_ERROR);
   bool done(false);
 
@@ -82,7 +80,7 @@ AsyncLogClient::Status HTTPLogClient::GetSTH(SignedTreeHead *sth) {
 }
 
 AsyncLogClient::Status HTTPLogClient::GetRoots(
-    vector<shared_ptr<Cert> > *roots) {
+    vector<shared_ptr<Cert> >* roots) {
   AsyncLogClient::Status retval(AsyncLogClient::UNKNOWN_ERROR);
   bool done(false);
 
@@ -94,9 +92,8 @@ AsyncLogClient::Status HTTPLogClient::GetRoots(
   return retval;
 }
 
-AsyncLogClient::Status
-HTTPLogClient::QueryAuditProof(const string &merkle_leaf_hash,
-                               MerkleAuditProof *proof) {
+AsyncLogClient::Status HTTPLogClient::QueryAuditProof(
+    const string& merkle_leaf_hash, MerkleAuditProof* proof) {
   AsyncLogClient::Status retval(AsyncLogClient::UNKNOWN_ERROR);
   bool done(false);
   SignedTreeHead sth;
@@ -122,7 +119,7 @@ HTTPLogClient::QueryAuditProof(const string &merkle_leaf_hash,
 }
 
 AsyncLogClient::Status HTTPLogClient::GetEntries(
-    int first, int last, vector<AsyncLogClient::Entry> *entries) {
+    int first, int last, vector<AsyncLogClient::Entry>* entries) {
   AsyncLogClient::Status retval(AsyncLogClient::UNKNOWN_ERROR);
   bool done(false);
 
@@ -135,9 +132,8 @@ AsyncLogClient::Status HTTPLogClient::GetEntries(
   return retval;
 }
 
-AsyncLogClient::Status
-HTTPLogClient::GetSTHConsistency(uint64_t size1, uint64_t size2,
-                                 vector<string> *proof) {
+AsyncLogClient::Status HTTPLogClient::GetSTHConsistency(
+    uint64_t size1, uint64_t size2, vector<string>* proof) {
   AsyncLogClient::Status retval(AsyncLogClient::UNKNOWN_ERROR);
   bool done(false);
 

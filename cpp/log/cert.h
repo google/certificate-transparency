@@ -15,12 +15,13 @@ class Cert {
  public:
   // Takes ownership of the X509 structure. It's advisable to check
   // IsLoaded() after construction to verify the copy operation succeeded.
-  explicit Cert(X509 *x509);
+  explicit Cert(X509* x509);
   // May fail, but we don't want to die on invalid inputs,
   // so caller should check IsLoaded() before doing anything else.
   // All attempts to operate on an unloaded cert will fail with ERROR.
-  explicit Cert(const std::string &pem_string);
-  Cert() : x509_(NULL) {}
+  explicit Cert(const std::string& pem_string);
+  Cert() : x509_(NULL) {
+  }
   ~Cert();
 
   enum Status {
@@ -43,14 +44,16 @@ class Cert {
     UNSUPPORTED_ALGORITHM,
   };
 
-  bool IsLoaded() const { return x509_ != NULL; }
+  bool IsLoaded() const {
+    return x509_ != NULL;
+  }
 
   // Never returns NULL but check IsLoaded() after Clone to verify the
   // underlying copy succeeded.
-  Cert *Clone() const;
+  Cert* Clone() const;
 
   // Frees the old X509 and attempts to load anew.
-  Status LoadFromDerString(const std::string &der_string);
+  Status LoadFromDerString(const std::string& der_string);
 
   // These just return an empty string if an error occurs.
   std::string PrintIssuerName() const;
@@ -59,7 +62,7 @@ class Cert {
   std::string PrintNotAfter() const;
   std::string PrintSignatureAlgorithm() const;
 
-  Status IsIdenticalTo(const Cert &other) const;
+  Status IsIdenticalTo(const Cert& other) const;
 
   // Returns TRUE if the extension is present.
   // Returns FALSE if the extension is not present.
@@ -98,64 +101,66 @@ class Cert {
   // Returns TRUE if the Cert's issuer matches |issuer|.
   // Returns FALSE if there is no match.
   // Returns ERROR if either cert is not loaded.
-  Status IsIssuedBy(const Cert &issuer) const;
+  Status IsIssuedBy(const Cert& issuer) const;
 
   // Returns TRUE if the cert's signature can be verified by the issuer's
   // public key.
   // Returns FALSE if the signature cannot be verified.
   // Returns ERROR if either cert is not loaded or some other error occurs.
   // Does not check if issuer has CA capabilities.
-  Status IsSignedBy(const Cert &issuer) const;
+  Status IsSignedBy(const Cert& issuer) const;
 
-  Status IsSelfSigned() const { return IsIssuedBy(*this); }
+  Status IsSelfSigned() const {
+    return IsIssuedBy(*this);
+  }
 
   // Sets the DER encoding of the cert in |result|.
   // Returns TRUE if the encoding succeeded.
   // Returns FALSE if the encoding failed.
   // Returns ERROR if the cert is not loaded.
-  Status DerEncoding(std::string *result) const;
+  Status DerEncoding(std::string* result) const;
 
   // Sets the PEM encoding of the cert in |result|.
   // Returns TRUE if the encoding succeeded.
   // Returns FALSE if the encoding failed.
   // Returns ERROR if the cert is not loaded.
-  Status PemEncoding(std::string *result) const;
+  Status PemEncoding(std::string* result) const;
 
   // Sets the SHA256 digest of the cert in |result|.
   // Returns TRUE if computing the digest succeeded.
   // Returns FALSE if computing the digest failed.
   // Returns ERROR if the cert is not loaded.
-  Status Sha256Digest(std::string *result) const;
+  Status Sha256Digest(std::string* result) const;
 
   // Sets the DER-encoded TBS component of the cert in |result|.
   // Returns TRUE if the encoding succeeded.
   // Returns FALSE if the encoding failed.
   // Returns ERROR if the cert is not loaded.
-  Status DerEncodedTbsCertificate(std::string *result) const;
+  Status DerEncodedTbsCertificate(std::string* result) const;
 
   // Sets the DER-encoded subject Name component of the cert in |result|.
   // Returns TRUE if the encoding succeeded.
   // Returns FALSE if the encoding failed.
   // Returns ERROR if the cert is not loaded.
-  Status DerEncodedSubjectName(std::string *result) const;
+  Status DerEncodedSubjectName(std::string* result) const;
 
   // Sets the DER-encoded issuer Name component of the cert in |result|.
   // Returns TRUE if the encoding succeeded.
   // Returns FALSE if the encoding failed.
   // Returns ERROR if the cert is not loaded.
-  Status DerEncodedIssuerName(std::string *result) const;
+  Status DerEncodedIssuerName(std::string* result) const;
 
   // Sets the SHA256 digest of the cert's public key in |result|.
   // Returns TRUE if computing the digest succeeded.
   // Returns FALSE if computing the digest failed.
   // Returns ERROR if the cert is not loaded.
-  Status PublicKeySha256Digest(std::string *result) const;
+  Status PublicKeySha256Digest(std::string* result) const;
 
   // Sets the SHA256 digest of the cert's subjectPublicKeyInfo in |result|.
   // Returns TRUE if computing the digest succeeded.
   // Returns FALSE if computing the digest failed.
   // Returns ERROR if the cert is not loaded.
-  Status SPKISha256Digest(std::string *result) const;
+  Status SPKISha256Digest(std::string* result) const;
 
   // Fetch data from an extension if encoded as an ASN1_OCTET_STRING.
   // Useful for handling custom extensions registered with X509V3_EXT_add.
@@ -163,7 +168,8 @@ class Cert {
   // Returns false if the extension is not present or the data is not a valid
   // ASN1_OCTET_STRING.
   //
-  // Caller MUST ensure that the registered type of the extension contents is an
+  // Caller MUST ensure that the registered type of the extension contents is
+  // an
   // ASN1_OCTET_STRING. Only use if you know what you're doing.
   //
   // Returns TRUE if the extension data could be fetched and decoded.
@@ -174,7 +180,7 @@ class Cert {
   // TODO(ekasper): consider registering known custom NIDS explicitly with the
   // Cert API for safety.
   Status OctetStringExtensionData(int extension_nid,
-                                  std::string *result) const;
+                                  std::string* result) const;
 
   // CertChecker needs access to the x509_ structure directly.
   friend class CertChecker;
@@ -185,14 +191,15 @@ class Cert {
   FRIEND_TEST(CtExtensionsTest, TestEmbeddedSCTExtension);
   FRIEND_TEST(CtExtensionsTest, TestPoisonExtension);
   FRIEND_TEST(CtExtensionsTest, TestPrecertSigning);
+
  private:
-  Status ExtensionIndex(int extension_nid, int *extension_index) const;
-  Status GetExtension(int extension_nid, X509_EXTENSION **ext) const;
-  Status ExtensionStructure(int extension_nid, void **ext_struct) const;
+  Status ExtensionIndex(int extension_nid, int* extension_index) const;
+  Status GetExtension(int extension_nid, X509_EXTENSION** ext) const;
+  Status ExtensionStructure(int extension_nid, void** ext_struct) const;
   static std::string PrintName(X509_NAME* name);
   static std::string PrintTime(ASN1_TIME* when);
-  static Status DerEncodedName(X509_NAME *name, std::string *result);
-  X509 *x509_;
+  static Status DerEncodedName(X509_NAME* name, std::string* result);
+  X509* x509_;
 
   DISALLOW_COPY_AND_ASSIGN(Cert);
 };
@@ -203,16 +210,18 @@ class Cert {
 class TbsCertificate {
  public:
   // TODO(ekasper): add construction from PEM and DER as needed.
-  explicit TbsCertificate(const Cert &cert);
+  explicit TbsCertificate(const Cert& cert);
   ~TbsCertificate();
 
-  bool IsLoaded() const { return x509_ != NULL; }
+  bool IsLoaded() const {
+    return x509_ != NULL;
+  }
 
   // Sets the DER-encoded TBS structure in |result|.
   // Returns TRUE if the encoding succeeded.
   // Returns FALSE if the encoding failed.
   // Returns ERROR if the cert is not loaded.
-  Cert::Status DerEncoding(std::string *result) const;
+  Cert::Status DerEncoding(std::string* result) const;
 
   // Delete the matching extension, if present.
   // Returns TRUE if the extension was present and was deleted.
@@ -232,31 +241,33 @@ class TbsCertificate {
   // Returns ERROR if either cert is not loaded.
   // Caller should not assume the cert was left unmodified upon FALSE as some
   // fields may have been copied successfully before an error occurred.
-  Cert::Status CopyIssuerFrom(const Cert &from);
+  Cert::Status CopyIssuerFrom(const Cert& from);
+
  private:
-  Cert::Status ExtensionIndex(int extension_nid, int *extension_index) const;
+  Cert::Status ExtensionIndex(int extension_nid, int* extension_index) const;
   // OpenSSL does not expose a TBSCertificate API, so we keep the TBS wrapped
   // in the X509.
-  X509 *x509_;
+  X509* x509_;
 
   DISALLOW_COPY_AND_ASSIGN(TbsCertificate);
 };
 
 class CertChain {
  public:
-  CertChain() {}
+  CertChain() {
+  }
   // Loads a chain of PEM-encoded certificates. If any of the PEM-strings
   // in the chain are invalid, clears the entire chain.
   // Caller should check IsLoaded() before doing anything else apart from
   // AddCert().
-  explicit CertChain(const std::string &pem_string);
+  explicit CertChain(const std::string& pem_string);
   ~CertChain();
 
   // Takes ownership of the cert.
   // If the cert has a valid X509 structure, adds it to the end of the chain
   // and returns TRUE.
   // Else returns ERROR.
-  Cert::Status AddCert(Cert *cert);
+  Cert::Status AddCert(Cert* cert);
 
   // Remove a cert from the end of the chain.
   // If successful, returns TRUE.
@@ -271,23 +282,25 @@ class CertChain {
   Cert::Status RemoveCertsAfterFirstSelfSigned();
 
   // True if the chain loaded correctly, and contains at least one valid cert.
-  bool IsLoaded() const { return !chain_.empty(); }
+  bool IsLoaded() const {
+    return !chain_.empty();
+  }
 
   size_t Length() const {
     return chain_.size();
   }
 
-  Cert const *LeafCert() const {
+  Cert const* LeafCert() const {
     if (!IsLoaded())
       return NULL;
     return chain_.front();
   }
 
-  Cert const *CertAt(size_t position) const {
+  Cert const* CertAt(size_t position) const {
     return chain_.size() <= position ? NULL : chain_[position];
   }
 
-  Cert const *LastCert() const {
+  Cert const* LastCert() const {
     if (!IsLoaded())
       return NULL;
     return chain_.back();
@@ -318,14 +331,16 @@ class CertChain {
 // log/ct_extensions.h for LoadCtExtensions().
 class PreCertChain : public CertChain {
  public:
-  PreCertChain() {}
+  PreCertChain() {
+  }
 
-  explicit PreCertChain(const std::string &pem_string)
-      : CertChain(pem_string) {}
+  explicit PreCertChain(const std::string& pem_string)
+      : CertChain(pem_string) {
+  }
 
   // Some convenient aliases.
   // A pointer to the precert.
-  Cert const *PreCert() const {
+  Cert const* PreCert() const {
     return LeafCert();
   }
 
@@ -333,7 +348,7 @@ class PreCertChain : public CertChain {
   // or a special-purpose Precertificate Signing Certificate issued
   // directly by the CA cert.
   // Can be NULL if the precert is issued directly by a root CA.
-  Cert const *PrecertIssuingCert() const {
+  Cert const* PrecertIssuingCert() const {
     return Length() >= 2 ? CertAt(1) : NULL;
   }
 
@@ -341,7 +356,8 @@ class PreCertChain : public CertChain {
   // extendedKeyUsage=precertSigning can be detected in the leaf's issuer.
   // Returns FALSE if the above does not hold.
   // Returns ERROR if the chain is not loaded, CT extensions could not be
-  // detected or some other unknown error occurred while parsing the extensions.
+  // detected or some other unknown error occurred while parsing the
+  // extensions.
   Cert::Status UsesPrecertSigningCertificate() const;
 
   // Returns TRUE if
@@ -353,7 +369,8 @@ class PreCertChain : public CertChain {
   // TbsCertificate.
   // Returns FALSE if the above does not hold.
   // Returns ERROR if the chain is not loaded, CT extensions could not be
-  // detected or some other unknown error occurred while parsing the extensions.
+  // detected or some other unknown error occurred while parsing the
+  // extensions.
   // This method does not verify any signatures, or otherwise check
   // that the chain is valid.
   Cert::Status IsWellFormed() const;

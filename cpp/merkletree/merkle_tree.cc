@@ -10,19 +10,21 @@
 using cert_trans::MerkleTreeInterface;
 using std::string;
 
-MerkleTree::MerkleTree(SerialHasher *hasher)
+MerkleTree::MerkleTree(SerialHasher* hasher)
     : MerkleTreeInterface(),
       treehasher_(hasher),
       leaves_processed_(0),
-      level_count_(0) {}
+      level_count_(0) {
+}
 
-MerkleTree::~MerkleTree() {}
+MerkleTree::~MerkleTree() {
+}
 
-size_t MerkleTree::AddLeaf(const string &data) {
+size_t MerkleTree::AddLeaf(const string& data) {
   return AddLeafHash(treehasher_.HashLeaf(data));
 }
 
-size_t MerkleTree::AddLeafHash(const string &hash) {
+size_t MerkleTree::AddLeafHash(const string& hash) {
   if (LazyLevelCount() == 0) {
     AddLevel();
     // The first leaf hash is also the first root.
@@ -59,8 +61,8 @@ std::vector<string> MerkleTree::PathToCurrentRoot(size_t leaf) {
   return PathToRootAtSnapshot(leaf, LeafCount());
 }
 
-std::vector<string>
-MerkleTree::PathToRootAtSnapshot(size_t leaf, size_t snapshot) {
+std::vector<string> MerkleTree::PathToRootAtSnapshot(size_t leaf,
+                                                     size_t snapshot) {
   std::vector<string> path;
   size_t leaf_count = LeafCount();
   if (leaf > snapshot || snapshot > leaf_count || leaf == 0)
@@ -69,7 +71,7 @@ MerkleTree::PathToRootAtSnapshot(size_t leaf, size_t snapshot) {
 }
 
 std::vector<string> MerkleTree::SnapshotConsistency(size_t snapshot1,
-                                                     size_t snapshot2) {
+                                                    size_t snapshot2) {
   std::vector<string> proof;
   size_t leaf_count = LeafCount();
   if (snapshot1 == 0 || snapshot1 >= snapshot2 || snapshot2 > leaf_count)
@@ -95,8 +97,8 @@ std::vector<string> MerkleTree::SnapshotConsistency(size_t snapshot1,
     proof.push_back(Node(level, node));
 
   // Now record the path from this node to the root of snapshot2.
-  std::vector<string> path = PathFromNodeToRootAtSnapshot(node, level,
-                                                           snapshot2);
+  std::vector<string> path =
+      PathFromNodeToRootAtSnapshot(node, level, snapshot2);
   proof.insert(proof.end(), path.begin(), path.end());
   return proof;
 }
@@ -123,7 +125,8 @@ string MerkleTree::UpdateToSnapshot(size_t snapshot) {
   while (last_node) {
     if (LazyLevelCount() <= level + 1) {
       AddLevel();
-    } else if (NodeCount(level + 1) == MerkleTreeMath::Parent(first_node) + 1) {
+    } else if (NodeCount(level + 1) ==
+               MerkleTreeMath::Parent(first_node) + 1) {
       // The leftmost parent at level 'level+1' may already exist,
       // so we need to update it. Nuke the old parent.
       PopBack(level + 1);
@@ -149,9 +152,8 @@ string MerkleTree::UpdateToSnapshot(size_t snapshot) {
   return Root();
 }
 
-string MerkleTree::RecomputePastSnapshot(size_t snapshot,
-                                          size_t node_level,
-                                          string *node) {
+string MerkleTree::RecomputePastSnapshot(size_t snapshot, size_t node_level,
+                                         string* node) {
   size_t level = 0;
   // Index of the rightmost node at the current level for this snapshot.
   size_t last_node = snapshot - 1;
@@ -191,8 +193,8 @@ string MerkleTree::RecomputePastSnapshot(size_t snapshot,
   while (last_node) {
     if (MerkleTreeMath::IsRightChild(last_node)) {
       // Recompute the parent of tree_[level][last_node].
-      subtree_root = treehasher_.HashChildren(
-          Node(level, last_node - 1), subtree_root);
+      subtree_root =
+          treehasher_.HashChildren(Node(level, last_node - 1), subtree_root);
     }
     // Else the parent is a dummy copy of the current node; do nothing.
 
@@ -205,9 +207,9 @@ string MerkleTree::RecomputePastSnapshot(size_t snapshot,
   return subtree_root;
 }
 
-std::vector<string>
-MerkleTree::PathFromNodeToRootAtSnapshot(size_t node, size_t level,
-                                         size_t snapshot) {
+std::vector<string> MerkleTree::PathFromNodeToRootAtSnapshot(size_t node,
+                                                             size_t level,
+                                                             size_t snapshot) {
   std::vector<string> path;
   if (snapshot == 0)
     return path;

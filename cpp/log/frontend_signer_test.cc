@@ -27,30 +27,34 @@ using std::string;
 typedef Database<LoggedCertificate> DB;
 typedef FrontendSigner FS;
 
-template <class T> class FrontendSignerTest : public ::testing::Test {
+template <class T>
+class FrontendSignerTest : public ::testing::Test {
  protected:
   FrontendSignerTest()
       : test_db_(),
         test_signer_(),
         verifier_(new LogVerifier(TestSigner::DefaultLogSigVerifier(),
                                   new MerkleVerifier(new Sha256Hasher()))),
-        frontend_(new FS(test_db_.db(), TestSigner::DefaultLogSigner())) {}
+        frontend_(new FS(test_db_.db(), TestSigner::DefaultLogSigner())) {
+  }
 
   ~FrontendSignerTest() {
     delete verifier_;
     delete frontend_;
   }
 
-  T *db() const { return test_db_.db(); }
+  T* db() const {
+    return test_db_.db();
+  }
 
   TestDB<T> test_db_;
   TestSigner test_signer_;
-  LogVerifier *verifier_;
-  FS *frontend_;
+  LogVerifier* verifier_;
+  FS* frontend_;
 };
 
-typedef testing::Types<FileDB<LoggedCertificate>,
-                       SQLiteDB<LoggedCertificate> > Databases;
+typedef testing::Types<FileDB<LoggedCertificate>, SQLiteDB<LoggedCertificate> >
+    Databases;
 
 TYPED_TEST_CASE(FrontendSignerTest, Databases);
 
@@ -198,8 +202,8 @@ TYPED_TEST(FrontendSignerTest, TimedVerify) {
 
   // Go back to the past and expect verification to fail (since the sct is
   // from the future).
-  EXPECT_EQ(this->verifier_->
-            VerifySignedCertificateTimestamp(entry0, sct0, 0, past_time),
+  EXPECT_EQ(this->verifier_->VerifySignedCertificateTimestamp(entry0, sct0, 0,
+                                                              past_time),
             LogVerifier::INVALID_TIMESTAMP);
 
   // Swap timestamps and expect failure.
@@ -212,7 +216,7 @@ TYPED_TEST(FrontendSignerTest, TimedVerify) {
 
 }  // namespace
 
-int main(int argc, char**argv) {
+int main(int argc, char** argv) {
   cert_trans::test::InitTesting(argv[0], &argc, &argv, true);
   return RUN_ALL_TESTS();
 }

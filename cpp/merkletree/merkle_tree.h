@@ -25,14 +25,18 @@ class MerkleTree : public cert_trans::MerkleTreeInterface {
   // The constructor takes a pointer to some concrete hash function
   // instantiation of the SerialHasher abstract class.
   // Takes ownership of the hasher.
-  explicit MerkleTree(SerialHasher *hasher);
+  explicit MerkleTree(SerialHasher* hasher);
   virtual ~MerkleTree();
 
   // Length of a node (i.e., a hash), in bytes.
-  virtual size_t NodeSize() const { return treehasher_.DigestSize(); };
+  virtual size_t NodeSize() const {
+    return treehasher_.DigestSize();
+  };
 
   // Number of leaves in the tree.
-  virtual size_t LeafCount() const { return tree_.empty() ? 0 : NodeCount(0); }
+  virtual size_t LeafCount() const {
+    return tree_.empty() ? 0 : NodeCount(0);
+  }
 
   // The |leaf|th leaf hash in the tree. Indexing starts from 1.
   std::string LeafHash(size_t leaf) const {
@@ -42,14 +46,16 @@ class MerkleTree : public cert_trans::MerkleTreeInterface {
   }
 
   // Return the leaf hash, but do not append the data to the tree.
-  virtual std::string LeafHash(const std::string &data) const {
+  virtual std::string LeafHash(const std::string& data) const {
     return treehasher_.HashLeaf(data);
   }
 
   // Number of levels. An empty tree has 0 levels, a tree with 1 leaf has
   // 1 level, a tree with 2 leaves has 2 levels, and a tree with n leaves has
   // ceil(log2(n)) + 1 levels.
-  virtual size_t LevelCount() const { return level_count_; }
+  virtual size_t LevelCount() const {
+    return level_count_;
+  }
 
   // Add a new leaf to the hash tree. Stores the hash of the leaf data in the
   // tree structure, does not store the data itself.
@@ -60,7 +66,7 @@ class MerkleTree : public cert_trans::MerkleTreeInterface {
   // so position = number of leaves in the tree after this update.
   //
   // @param data Binary input blob
-  virtual size_t AddLeaf(const std::string &data);
+  virtual size_t AddLeaf(const std::string& data);
 
   // Add a new leaf to the hash tree. Stores the provided hash in the
   // tree structure.  It is the caller's responsibility to ensure that
@@ -72,7 +78,7 @@ class MerkleTree : public cert_trans::MerkleTreeInterface {
   // so position = number of leaves in the tree after this update.
   //
   // @param hash leaf hash
-  virtual size_t AddLeafHash(const std::string &hash);
+  virtual size_t AddLeafHash(const std::string& hash);
 
   // Get the current root of the tree.
   // Update the root to reflect the current shape of the tree,
@@ -132,12 +138,12 @@ class MerkleTree : public cert_trans::MerkleTreeInterface {
   // If node is not NULL, additionally record the rightmost node
   // for the given snapshot and node_level.
   std::string RecomputePastSnapshot(size_t snapshot, size_t node_level,
-                                    std::string *node);
+                                    std::string* node);
   // Path from a node at a given level (both indexed starting with 0)
   // to the root at a given snapshot.
   std::vector<std::string> PathFromNodeToRootAtSnapshot(size_t node_index,
-                                                    size_t level,
-                                                    size_t snapshot);
+                                                        size_t level,
+                                                        size_t snapshot);
   // Get the |index|-th node at level |level|. Indexing starts at 0;
   // caller is responsible for ensuring tree is sufficiently up to date.
   std::string Node(size_t level, size_t index) const;

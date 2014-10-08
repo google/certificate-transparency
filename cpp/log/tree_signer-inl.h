@@ -16,7 +16,7 @@
 
 
 template <class Logged>
-TreeSigner<Logged>::TreeSigner(Database<Logged> *db, LogSigner *signer)
+TreeSigner<Logged>::TreeSigner(Database<Logged>* db, LogSigner* signer)
     : db_(db),
       signer_(signer),
       cert_tree_(new Sha256Hasher()),
@@ -24,7 +24,8 @@ TreeSigner<Logged>::TreeSigner(Database<Logged> *db, LogSigner *signer)
   BuildTree();
 }
 
-template <class Logged> uint64_t TreeSigner<Logged>::LastUpdateTime() const {
+template <class Logged>
+uint64_t TreeSigner<Logged>::LastUpdateTime() const {
   // Returns 0 if we have no update yet (i.e., the field is not set).
   return latest_tree_head_.timestamp();
 }
@@ -32,23 +33,24 @@ template <class Logged> uint64_t TreeSigner<Logged>::LastUpdateTime() const {
 // DB_ERROR: the database is inconsistent with our inner self.
 // However, if the database itself is giving inconsistent answers, or failing
 // reads/writes, then we die.
-template <class Logged> typename TreeSigner<Logged>::UpdateResult
-TreeSigner<Logged>::UpdateTree() {
+template <class Logged>
+typename TreeSigner<Logged>::UpdateResult TreeSigner<Logged>::UpdateTree() {
   // Check that the latest sth is ours.
   ct::SignedTreeHead sth;
-  typename Database<Logged>::LookupResult db_result = db_->LatestTreeHead(&sth);
+  typename Database<Logged>::LookupResult db_result =
+      db_->LatestTreeHead(&sth);
 
   if (db_result == Database<Logged>::NOT_FOUND) {
     if (LastUpdateTime() != 0) {
       LOG(ERROR) << "Latest STH missing from database, signer has:\n"
-          << latest_tree_head_.DebugString();
+                 << latest_tree_head_.DebugString();
       return DB_ERROR;
     }
   } else {
     CHECK_EQ(db_result, Database<Logged>::LOOKUP_OK)
         << "Latest STH lookup failed";
     if (sth.timestamp() != latest_tree_head_.timestamp() ||
-            sth.tree_size() != latest_tree_head_.tree_size() ||
+        sth.tree_size() != latest_tree_head_.tree_size() ||
         sth.sha256_root_hash() != latest_tree_head_.sha256_root_hash()) {
       LOG(ERROR) << "Database has an STH that does not match ours. "
                  << "Our STH:\n" << latest_tree_head_.DebugString()
@@ -65,7 +67,8 @@ TreeSigner<Logged>::UpdateTree() {
   for (it = pending_hashes.begin(); it != pending_hashes.end(); ++it) {
     Logged logged;
     CHECK_EQ(Database<Logged>::LOOKUP_OK, db_->LookupByHash(*it, &logged))
-        << "Failed to look up pending entry with hash " << util::HexString(*it);
+        << "Failed to look up pending entry with hash "
+        << util::HexString(*it);
 
     CHECK(!logged.has_sequence_number())
         << "Pending entry already has a sequence number; entry is "
@@ -95,12 +98,14 @@ TreeSigner<Logged>::UpdateTree() {
   return OK;
 }
 
-template <class Logged> void TreeSigner<Logged>::BuildTree() {
+template <class Logged>
+void TreeSigner<Logged>::BuildTree() {
   DCHECK_EQ(0U, cert_tree_.LeafCount())
       << "Attempting to build a tree when one already exists";
   // Read the latest sth.
   ct::SignedTreeHead sth;
-  typename Database<Logged>::LookupResult db_result = db_->LatestTreeHead(&sth);
+  typename Database<Logged>::LookupResult db_result =
+      db_->LatestTreeHead(&sth);
 
   if (db_result == Database<Logged>::NOT_FOUND)
     return;
@@ -128,11 +133,12 @@ template <class Logged> void TreeSigner<Logged>::BuildTree() {
 
   latest_tree_head_.CopyFrom(sth);
 
-  // Read the remaining sequenced entries. Note that it is possible to have more
+  // Read the remaining sequenced entries. Note that it is possible to have
+  // more
   // entries with sequence numbers than what the latest sth says. This happens
   // when we assign some sequence numbers but die before we manage to sign the
   // sth. It's not an inconsistency and will be corrected with UpdateTree().
-  for (size_t i = sth.tree_size(); ; ++i) {
+  for (size_t i = sth.tree_size();; ++i) {
     Logged logged;
     typename Database<Logged>::LookupResult db_result =
         db_->LookupByIndex(i, &logged);
@@ -145,8 +151,8 @@ template <class Logged> void TreeSigner<Logged>::BuildTree() {
   }
 }
 
-template <class Logged> bool
-TreeSigner<Logged>::Append(const Logged &logged) {
+template <class Logged>
+bool TreeSigner<Logged>::Append(const Logged& logged) {
   // Serialize for inclusion in the tree.
   std::string serialized_leaf;
   CHECK(logged.SerializeForLeaf(&serialized_leaf));
@@ -167,8 +173,8 @@ TreeSigner<Logged>::Append(const Logged &logged) {
   return true;
 }
 
-template <class Logged> void
-TreeSigner<Logged>::AppendToTree(const Logged &logged) {
+template <class Logged>
+void TreeSigner<Logged>::AppendToTree(const Logged& logged) {
   // Serialize for inclusion in the tree.
   std::string serialized_leaf;
   CHECK(logged.SerializeForLeaf(&serialized_leaf));
@@ -177,9 +183,9 @@ TreeSigner<Logged>::AppendToTree(const Logged &logged) {
   cert_tree_.AddLeaf(serialized_leaf);
 }
 
-template <class Logged> void
-TreeSigner<Logged>::TimestampAndSign(uint64_t min_timestamp,
-                                     ct::SignedTreeHead *sth) {
+template <class Logged>
+void TreeSigner<Logged>::TimestampAndSign(uint64_t min_timestamp,
+                                          ct::SignedTreeHead* sth) {
   sth->set_version(ct::V1);
   sth->set_sha256_root_hash(cert_tree_.CurrentRoot());
   uint64_t timestamp = util::TimeInMilliseconds();

@@ -13,15 +13,18 @@ using cert_trans::LoggedCertificate;
 using ct::SignedTreeHead;
 using std::string;
 
-template <class T> class DBTest : public ::testing::Test {
+template <class T>
+class DBTest : public ::testing::Test {
  protected:
-  DBTest() :
-      test_db_(),
-      test_signer_() { }
+  DBTest() : test_db_(), test_signer_() {
+  }
 
-  ~DBTest() {}
+  ~DBTest() {
+  }
 
-  T *db() const { return test_db_.db(); }
+  T* db() const {
+    return test_db_.db();
+  }
 
   TestDB<T> test_db_;
   TestSigner test_signer_;
@@ -139,7 +142,7 @@ TYPED_TEST(DBTest, DenyUndefinedVerificationLevel) {
 
 }  // namespace
 
-int main(int argc, char **argv) {
+int main(int argc, char** argv) {
   cert_trans::test::InitTesting(argv[0], &argc, &argv, true);
   return RUN_ALL_TESTS();
 }

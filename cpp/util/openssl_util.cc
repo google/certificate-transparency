@@ -28,9 +28,9 @@ void ClearOpenSSLErrors() {
   ERR_clear_error();
 }
 
-string ReadBIO(BIO *bio) {
+string ReadBIO(BIO* bio) {
   int size = BIO_pending(bio);
-  char *buffer = new char[size];
+  char* buffer = new char[size];
   int bytes_read = BIO_read(bio, buffer, size);
   if (bytes_read != size) {
     LOG(ERROR) << "Read " << bytes_read << " bytes; expected " << size;

@@ -38,43 +38,43 @@ class AsyncLogClient {
 
   typedef boost::function<void(Status)> Callback;
 
-  AsyncLogClient(const boost::shared_ptr<libevent::Base> &base,
-                 const std::string &server_uri);
+  AsyncLogClient(const boost::shared_ptr<libevent::Base>& base,
+                 const std::string& server_uri);
 
-  void GetSTH(ct::SignedTreeHead *sth, const Callback &done);
+  void GetSTH(ct::SignedTreeHead* sth, const Callback& done);
 
   // This does not clear "roots" before appending to it.
-  void GetRoots(std::vector<boost::shared_ptr<Cert> > *roots,
-                const Callback &done);
+  void GetRoots(std::vector<boost::shared_ptr<Cert> >* roots,
+                const Callback& done);
 
   // This does not clear "entries" before appending the retrieved
   // entries.
-  void GetEntries(int first, int last, std::vector<Entry> *entries,
-                  const Callback &done);
+  void GetEntries(int first, int last, std::vector<Entry>* entries,
+                  const Callback& done);
 
-  void QueryInclusionProof(const ct::SignedTreeHead &sth,
-                           const std::string &merkle_leaf_hash,
-                           ct::MerkleAuditProof *proof, const Callback &done);
+  void QueryInclusionProof(const ct::SignedTreeHead& sth,
+                           const std::string& merkle_leaf_hash,
+                           ct::MerkleAuditProof* proof, const Callback& done);
 
   // This does not clear "proof" before appending to it.
   void GetSTHConsistency(uint64_t first, uint64_t second,
-                         std::vector<std::string> *proof,
-                         const Callback &done);
+                         std::vector<std::string>* proof,
+                         const Callback& done);
 
   // Note: these methods can call "done" inline (before they return),
   // if there is a problem with the (pre-)certificate chain.
-  void AddCertChain(const CertChain &cert_chain,
-                    ct::SignedCertificateTimestamp *sct, const Callback &done);
-  void AddPreCertChain(const PreCertChain &pre_cert_chain,
-                       ct::SignedCertificateTimestamp *sct,
-                       const Callback &done);
+  void AddCertChain(const CertChain& cert_chain,
+                    ct::SignedCertificateTimestamp* sct, const Callback& done);
+  void AddPreCertChain(const PreCertChain& pre_cert_chain,
+                       ct::SignedCertificateTimestamp* sct,
+                       const Callback& done);
 
  private:
-  std::string GetPath(const std::string &subpath) const;
+  std::string GetPath(const std::string& subpath) const;
 
-  void InternalAddChain(const CertChain &cert_chain,
-                        ct::SignedCertificateTimestamp *sct, bool pre_cert,
-                        const Callback &done);
+  void InternalAddChain(const CertChain& cert_chain,
+                        ct::SignedCertificateTimestamp* sct, bool pre_cert,
+                        const Callback& done);
 
   const boost::shared_ptr<libevent::Base> base_;
   const boost::shared_ptr<evhttp_uri> server_uri_;
