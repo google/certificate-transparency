@@ -37,7 +37,8 @@ TEST_F(MerkleTreeLargeTest, BuildLargeTree) {
     trees.push_back(tree);
     uint64_t time_before = util::TimeInMilliseconds();
 
-    for (size_t i = 0; i < tree_size; ++i) tree->AddLeaf(data_);
+    for (size_t i = 0; i < tree_size; ++i)
+      tree->AddLeaf(data_);
     EXPECT_FALSE(tree->CurrentRoot().empty());
     EXPECT_TRUE(tree->LeafCount() == tree_size);
     getrusage(RUSAGE_SELF, &ru);

@@ -861,7 +861,8 @@ Cert::Status CertChain::IsValidSignatureChain() const {
 
 void CertChain::ClearChain() {
   std::vector<Cert*>::const_iterator it;
-  for (it = chain_.begin(); it < chain_.end(); ++it) delete *it;
+  for (it = chain_.begin(); it < chain_.end(); ++it)
+    delete *it;
   chain_.clear();
 }
 

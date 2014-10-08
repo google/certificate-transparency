@@ -108,7 +108,8 @@ bool CertChecker::LoadTrustedCertificates(const std::string& cert_file) {
 
 void CertChecker::ClearAllTrustedCertificates() {
   std::multimap<string, const Cert*>::iterator it = trusted_.begin();
-  for (; it != trusted_.end(); ++it) delete it->second;
+  for (; it != trusted_.end(); ++it)
+    delete it->second;
   trusted_.clear();
 }
 

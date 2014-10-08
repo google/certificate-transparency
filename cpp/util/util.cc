@@ -161,7 +161,8 @@ string RandomString(size_t min_length, size_t max_length) {
                       : rand() % (max_length - min_length) + min_length;
 
   string ret;
-  for (; length > 0; --length) ret.append(1, rand() & 0xff);
+  for (; length > 0; --length)
+    ret.append(1, rand() & 0xff);
 
   return ret;
 }

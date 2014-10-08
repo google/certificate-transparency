@@ -130,7 +130,8 @@ class MerkleTreeTest : public ::testing::Test {
   TreeHasher tree_hasher_;
   std::vector<string> data_;
   MerkleTreeTest() : tree_hasher_(new Sha256Hasher()) {
-    for (int i = 0; i < 256; ++i) data_.push_back(string(1, i));
+    for (int i = 0; i < 256; ++i)
+      data_.push_back(string(1, i));
   }
 };
 
@@ -164,7 +165,8 @@ class CompactMerkleTreeFuzzTest : public MerkleTreeFuzzTest {
 TEST_F(MerkleTreeFuzzTest, RootFuzz) {
   for (size_t tree_size = 1; tree_size <= data_.size(); ++tree_size) {
     MerkleTree tree(new Sha256Hasher());
-    for (size_t j = 0; j < tree_size; ++j) tree.AddLeaf(data_[j]);
+    for (size_t j = 0; j < tree_size; ++j)
+      tree.AddLeaf(data_[j]);
     // Since the tree is evaluated lazily, the order of queries is significant.
     // Generate a random sequence of 8 queries for each tree.
     for (size_t j = 0; j < 8; ++j) {
@@ -197,7 +199,8 @@ TEST_F(CompactMerkleTreeTest, RootFuzz) {
 TEST_F(MerkleTreeFuzzTest, PathFuzz) {
   for (size_t tree_size = 1; tree_size <= data_.size(); ++tree_size) {
     MerkleTree tree(new Sha256Hasher());
-    for (size_t j = 0; j < tree_size; ++j) tree.AddLeaf(data_[j]);
+    for (size_t j = 0; j < tree_size; ++j)
+      tree.AddLeaf(data_[j]);
 
     // Since the tree is evaluated lazily, the order of queries is significant.
     // Generate a random sequence of 8 queries for each tree.
@@ -217,7 +220,8 @@ TEST_F(MerkleTreeFuzzTest, PathFuzz) {
 TEST_F(MerkleTreeFuzzTest, ConsistencyFuzz) {
   for (size_t tree_size = 1; tree_size <= data_.size(); ++tree_size) {
     MerkleTree tree(new Sha256Hasher());
-    for (size_t j = 0; j < tree_size; ++j) tree.AddLeaf(data_[j]);
+    for (size_t j = 0; j < tree_size; ++j)
+      tree.AddLeaf(data_[j]);
 
     // Since the tree is evaluated lazily, the order of queries is significant.
     // Generate a random sequence of 8 queries for each tree.

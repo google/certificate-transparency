@@ -40,7 +40,8 @@ ThreadPool::Impl::~Impl() {
   // them), to have them exit cleanly.
   {
     lock_guard<mutex> lock(queue_lock_);
-    for (int i = threads_.size(); i > 0; --i) queue_.push(function<void()>());
+    for (int i = threads_.size(); i > 0; --i)
+      queue_.push(function<void()>());
   }
   // Notify all the threads *after* adding all the empty closures, to
   // avoid any races.

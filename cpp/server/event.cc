@@ -150,7 +150,8 @@ void EventLoop::Stop() {
 }
 
 void EventLoop::Forever() {
-  for (; go_;) OneLoop();
+  for (; go_;)
+    OneLoop();
 }
 
 void EventLoop::MaybeDropOne() {
