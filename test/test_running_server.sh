@@ -11,13 +11,13 @@ FAILED=0
 
 if [ $# \< 2 ]
 then
-  echo "$0 <certificate directory> <CT server public key> [<server> [<port>]]"
+  echo "$0 <certificate directory> <CT server public key> [<server-url>]"
   exit 1
 fi
 
 CERT_DIR=$1
 CT_KEY=$2
-SERVER=${3:-"127.0.0.1:8124"}
+SERVER=${3:-"http://127.0.0.1:8124"}
 
 echo $SERVER
 
