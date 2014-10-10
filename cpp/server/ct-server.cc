@@ -67,8 +67,6 @@ using cert_trans::util::ReadPrivateKey;
 using google::RegisterFlagValidator;
 using std::string;
 
-static const int kCtimeBufSize = 26;
-
 // Basic sanity checks on flag values.
 static bool ValidatePort(const char* flagname, int port) {
   if (port <= 0 || port > 65535) {
@@ -169,12 +167,9 @@ class PeriodicCallback {
 void SignMerkleTree(TreeSigner<LoggedCertificate>* tree_signer,
                     LogLookup<LoggedCertificate>* log_lookup) {
   CHECK_EQ(tree_signer->UpdateTree(), TreeSigner<LoggedCertificate>::OK);
+  // There should always be an update here, since we just signed a new
+  // tree head.
   CHECK_EQ(log_lookup->Update(), LogLookup<LoggedCertificate>::UPDATE_OK);
-
-  const time_t last_update(
-      static_cast<time_t>(tree_signer->LastUpdateTime() / 1000));
-  char buf[kCtimeBufSize];
-  LOG(INFO) << "Tree successfully updated at " << ctime_r(&last_update, buf);
 }
 
 int main(int argc, char* argv[]) {
