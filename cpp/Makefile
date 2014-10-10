@@ -79,7 +79,8 @@ MONITOR_TESTS = monitor/database_test
 ALL_TESTS = $(PROTO_TESTS) $(MERKLETREE_TESTS) $(LOG_TESTS) $(UTIL_TESTS) \
 	$(MONITOR_TESTS) dns_tests
 
-all: unit_tests client/ct server/ct-server server/ct-dns-server
+all: unit_tests client/ct server/ct-server server/ct-dns-server \
+     util/bench_etcd
 
 .DELETE_ON_ERROR:
 
@@ -152,7 +153,8 @@ util_tests: util/json_wrapper_test
 
 ### util/ targets
 util/libutil.a: util/util.o util/openssl_util.o util/testing.o \
-                util/json_wrapper.o util/thread_pool.o util/libevent_wrapper.o
+                util/json_wrapper.o util/thread_pool.o util/libevent_wrapper.o \
+                util/etcd.o
 	rm -f $@
 	ar -rcs $@ $^
 
@@ -300,6 +302,9 @@ server/ct-dns-server: server/ct-dns-server.o server/event.o $(LOCAL_LIBS)
 
 server/ct-server: server/ct-server.o util/read_private_key.o \
 	server/handler.o $(LOCAL_LIBS)
+
+util/bench_etcd: util/bench_etcd.o util/etcd.o util/libevent_wrapper.o \
+	util/json_wrapper.o
 
 dns_tests: server/ct-dns-server
 
