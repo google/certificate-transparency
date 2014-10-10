@@ -52,7 +52,8 @@ class EtcdClientImpl : public EtcdClient {
 
  private:
   typedef map<pair<string, uint16_t>, shared_ptr<libevent::HttpConnection> >
-      ConnMap;
+      ConnectionMap;
+
   struct Request {
     Request(EtcdClientImpl* client, evhttp_cmd_type verb, const string& path,
             const string& params, const GenericCallback& cb)
@@ -96,7 +97,7 @@ class EtcdClientImpl : public EtcdClient {
   const shared_ptr<libevent::Base> event_base_;
 
   mutex lock_;
-  ConnMap conns_;
+  ConnectionMap conns_;
   // Last known leader.
   shared_ptr<libevent::HttpConnection> leader_;
 };
@@ -167,7 +168,7 @@ void EtcdClientImpl::RequestDone(libevent::HttpRequest* req,
 shared_ptr<libevent::HttpConnection> EtcdClientImpl::GetConnection(
     const string& host, uint16_t port) {
   const pair<string, uint16_t> host_port(make_pair(host, port));
-  const ConnMap::const_iterator it(conns_.find(host_port));
+  const ConnectionMap::const_iterator it(conns_.find(host_port));
   shared_ptr<libevent::HttpConnection> conn;
 
   if (it == conns_.end()) {
