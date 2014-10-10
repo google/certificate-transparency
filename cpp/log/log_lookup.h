@@ -16,6 +16,7 @@
 template <class Logged>
 class LogLookup {
  public:
+  // The constructor loads the content from the database.
   explicit LogLookup(const Database<Logged>* db);
   ~LogLookup();
 

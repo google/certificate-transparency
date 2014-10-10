@@ -220,8 +220,11 @@ int main(int argc, char* argv[]) {
   TreeSigner<LoggedCertificate> tree_signer(db, &log_signer);
   LogLookup<LoggedCertificate> log_lookup(db);
 
-  // This function is called "sign", but it also loads the LogLookup
-  // object from the database as a side-effect.
+  // Make sure that we have an STH, even if the tree is empty.
+  // TODO(pphaneuf): We should be remaining in an "unhealthy state"
+  // (either not accepting any requests, or returning some internal
+  // server error) until we have an STH to serve. We can sign for now,
+  // but we might not be a signer.
   SignMerkleTree(&tree_signer, &log_lookup);
 
   const time_t last_update(
