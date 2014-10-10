@@ -227,13 +227,6 @@ int main(int argc, char* argv[]) {
   // but we might not be a signer.
   SignMerkleTree(&tree_signer, &log_lookup);
 
-  const time_t last_update(
-      static_cast<time_t>(tree_signer.LastUpdateTime() / 1000));
-  if (last_update > 0) {
-    char buf[kCtimeBufSize];
-    LOG(INFO) << "Last tree update was at " << ctime_r(&last_update, buf);
-  }
-
   ThreadPool pool;
   HttpHandler handler(&log_lookup, db, &checker, &frontend, &pool);
 
