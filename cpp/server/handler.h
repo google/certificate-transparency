@@ -22,6 +22,10 @@ class ThreadPool;
 
 class HttpHandler {
  public:
+  // Does not take ownership of its parameters, which must outlive
+  // this instance. The "frontend" parameter can be NULL, in which
+  // case this server will not accept "add-chain" and "add-pre-chain"
+  // requests.
   HttpHandler(LogLookup<LoggedCertificate>* log_lookup,
               const Database<LoggedCertificate>* db,
               const CertChecker* cert_checker, Frontend* frontend,
