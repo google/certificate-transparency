@@ -137,7 +137,7 @@ make_cert() {
   local cert_dir=$1
   local server=$2
   local ca=$3
-  local log_server=$4
+  local log_server_url=$4
   local ca_is_intermediate=$5
   local server_public_key=$6
 
@@ -165,13 +165,13 @@ make_cert() {
 
   echo ../cpp/client/ct upload \
     --ct_server_submission=$cert_dir/$server-cert-bundle.pem \
-    --ct_server=$log_server \
+    --ct_server=$log_server_url \
     --ct_server_public_key=$server_public_key \
     --ct_server_response_out=$cert_dir/$server-cert.proof \
     --logtostderr=true
   ../cpp/client/ct upload \
     --ct_server_submission=$cert_dir/$server-cert-bundle.pem \
-    --ct_server=$log_server \
+    --ct_server=$log_server_url \
     --ct_server_public_key=$server_public_key \
     --ct_server_response_out=$cert_dir/$server-cert.proof \
     --logtostderr=true
@@ -190,8 +190,10 @@ make_cert() {
     --certificate_out=$cert_dir/$server-cert-proof.der \
     --logtostderr=true
 
-  openssl x509 -in $cert_dir/$server-cert-proof.der -inform DER -out \
-    $cert_dir/$server-cert-proof.pem
+  if ! openssl x509 -in $cert_dir/$server-cert-proof.der -inform DER -out \
+    $cert_dir/$server-cert-proof.pem; then
+    echo "Failed to convert $cert_dir/$server-cert-proof.der to PEM format" 1>&2
+  fi
 
   # If the CA is an intermediate, create a single chain file
   if [ $ca_is_intermediate == "true" ]; then
@@ -207,7 +209,7 @@ make_embedded_cert() {
   local cert_dir=$1 # Where CA certificate lives and output certs go
   local server=$2 # Prefix of the new certificate filename
   local ca=$3 # Prefix of the CA certificate file.
-  local log_server=$4 # Log address (IP:port).
+  local log_server_url=$4 # Log URL
   local ca_is_intermediate=$5 # CA cert is intermediate one
   local use_pre_ca=$6 # Using precertificate signing cert.
   local server_public_key=$7 # File holding the log's public key
@@ -254,7 +256,7 @@ make_embedded_cert() {
 
   ../cpp/client/ct upload \
     --ct_server_submission=$cert_dir/$server-precert-bundle.pem \
-    --ct_server=$log_server \
+    --ct_server=$log_server_url \
     --ct_server_public_key=$server_public_key \
     --ct_server_response_out=$cert_dir/$server-pre-cert.proof \
     --precert=true --logtostderr=true
