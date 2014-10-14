@@ -238,7 +238,7 @@ typename Database<Logged>::LookupResult SQLiteDB<Logged>::LatestTreeHead(
 
   std::string sth;
   statement.GetBlob(0, &sth);
-  result->ParseFromString(sth);
+  CHECK(result->ParseFromString(sth));
 
   return this->LOOKUP_OK;
 }

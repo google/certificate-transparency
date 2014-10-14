@@ -179,17 +179,12 @@ typename Database<Logged>::LookupResult FileDB<Logged>::LatestTreeHead(
     return this->NOT_FOUND;
 
   std::string tree_data;
-  FileStorage::FileStorageResult db_result =
-      tree_storage_->LookupEntry(latest_timestamp_key_, &tree_data);
-  assert(db_result == FileStorage::OK);
+  CHECK_EQ(tree_storage_->LookupEntry(latest_timestamp_key_, &tree_data),
+           FileStorage::OK);
 
-  ct::SignedTreeHead local_sth;
+  CHECK(result->ParseFromString(tree_data));
+  CHECK_EQ(result->timestamp(), latest_tree_timestamp_);
 
-  bool ret = local_sth.ParseFromString(tree_data);
-  assert(ret);
-  assert(local_sth.timestamp() == latest_tree_timestamp_);
-
-  result->CopyFrom(local_sth);
   return this->LOOKUP_OK;
 }
 
