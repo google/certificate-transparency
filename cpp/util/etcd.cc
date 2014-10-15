@@ -1,5 +1,6 @@
 #include "util/etcd.h"
 
+#include <boost/lexical_cast.hpp>
 #include <boost/make_shared.hpp>
 #include <boost/thread.hpp>
 #include <event2/buffer.h>
@@ -12,16 +13,34 @@
 
 namespace libevent = cert_trans::libevent;
 
+using boost::lexical_cast;
 using boost::lock_guard;
 using boost::make_shared;
 using boost::mutex;
 using boost::shared_ptr;
-using cert_trans::EtcdClient;
+using std::list;
+using std::make_pair;
 using std::map;
 using std::pair;
 using std::string;
 
+namespace cert_trans {
+
 namespace {
+
+
+string MessageFromJsonStatus(const shared_ptr<JsonObject>& json) {
+  string message;
+  const JsonString m(*json, "message");
+
+  if (!m.Ok()) {
+    message = json->DebugString();
+  } else {
+    message = m.Value();
+  }
+
+  return message;
+}
 
 
 shared_ptr<evhttp_uri> UriFromHostPort(const string& host, uint16_t port) {
@@ -36,75 +55,225 @@ shared_ptr<evhttp_uri> UriFromHostPort(const string& host, uint16_t port) {
 }
 
 
-class EtcdClientImpl : public EtcdClient {
- public:
-  EtcdClientImpl(const shared_ptr<libevent::Base>& event_base,
-                 const string& host, uint16_t port)
-      : event_base_(event_base), leader_(GetConnection(host, port)) {
-    LOG(INFO) << "EtcdClientImpl: " << this;
-  }
-  ~EtcdClientImpl() {
-    LOG(INFO) << "~EtcdClientImpl: " << this;
-  }
-
-  virtual void Generic(const string& key, const map<string, string>& params,
-                       evhttp_cmd_type verb, const GenericCallback& cb);
-
- private:
-  typedef map<pair<string, uint16_t>, shared_ptr<libevent::HttpConnection> >
-      ConnectionMap;
-
-  struct Request {
-    Request(EtcdClientImpl* client, evhttp_cmd_type verb, const string& path,
-            const string& params, const GenericCallback& cb)
-        : client_(client), verb_(verb), path_(path), params_(params), cb_(cb) {
+void GetRequestDone(EtcdClient::Status status,
+                    const shared_ptr<JsonObject>& json,
+                    const EtcdClient::GetCallback& cb) {
+  if (status.ok()) {
+    const JsonObject node(*json, "node");
+    if (!node.Ok()) {
+      cb(EtcdClient::Status(0, "Invalid JSON: Couldn't find 'node'"), 0, "");
+      return;
     }
+    const JsonInt modifiedIndex(node, "modifiedIndex");
+    if (!modifiedIndex.Ok()) {
+      cb(EtcdClient::Status(0, "Invalid JSON: Couldn't find 'modifiedIndex'"),
+         0, "");
+      return;
+    }
+    const JsonString value(node, "value");
+    if (!value.Ok()) {
+      cb(EtcdClient::Status(0, "Invalid JSON: Couldn't find 'value'"), 0, "");
+      return;
+    }
+    cb(status, modifiedIndex.Value(), value.Value());
+  } else {
+    cb(status, -1, "");
+  }
+}
 
-    void Run(const shared_ptr<libevent::HttpConnection>& conn) {
-      libevent::HttpRequest* const req(new libevent::HttpRequest(
-          bind(&EtcdClientImpl::RequestDone, client_, _1, this)));
 
-      string uri(path_);
-      if (verb_ == EVHTTP_REQ_GET) {
-        uri += "?" + params_;
-      } else {
-        evhttp_add_header(evhttp_request_get_output_headers(req->get()),
-                          "Content-Type", "application/x-www-form-urlencoded");
-        CHECK_EQ(evbuffer_add(evhttp_request_get_output_buffer(req->get()),
-                              params_.data(), params_.size()),
-                 0);
+void GetAllRequestDone(EtcdClient::Status status,
+                       const shared_ptr<JsonObject>& json,
+                       const EtcdClient::GetAllCallback& cb) {
+  if (status.ok()) {
+    const JsonObject node(*json, "node");
+    if (!node.Ok()) {
+      cb(EtcdClient::Status(0, "Invalid JSON: Couldn't find 'node'"),
+         list<pair<string, int> >());
+      return;
+    }
+    const JsonArray value_nodes(node, "nodes");
+    if (!value_nodes.Ok()) {
+      cb(EtcdClient::Status(0, "Invalid JSON: Couldn't find 'nodes'"),
+         list<pair<string, int> >());
+      return;
+    }
+    list<pair<string, int> > values;
+    for (int i = 0; i < value_nodes.Length(); ++i) {
+      const JsonObject entry(value_nodes, i);
+      if (!entry.Ok()) {
+        cb(EtcdClient::Status(
+               0, "Invalid JSON: Couldn't get 'value_nodes' index " +
+                      lexical_cast<string>(i)),
+           list<pair<string, int> >());
+        return;
       }
+      const JsonString value(entry, "value");
+      if (!value.Ok()) {
+        cb(EtcdClient::Status(0, "Invalid JSON: Couldn't find 'value'"),
+           list<pair<string, int> >());
+        return;
+      }
+      const JsonInt modifiedIndex(entry, "modifiedIndex");
+      if (!modifiedIndex.Ok()) {
+        cb(EtcdClient::Status(0,
+                              "Invalid JSON: Coulnd't find 'modifiedIndex'"),
+           list<pair<string, int> >());
+        return;
+      }
+      values.push_back(make_pair(value.Value(), modifiedIndex.Value()));
+    }
+    cb(status, values);
+  } else {
+    cb(status, list<pair<string, int> >());
+  }
+}
 
-      conn->MakeRequest(req, verb_, uri.c_str());
+
+void CreateRequestDone(EtcdClient::Status status,
+                       const shared_ptr<JsonObject>& json,
+                       const EtcdClient::CreateCallback& cb) {
+  if (status.ok()) {
+    const JsonObject node(*json, "node");
+    if (!node.Ok()) {
+      cb(EtcdClient::Status(0, "Invalid JSON: Couldn't find 'node'"), 0);
+      return;
+    }
+    const JsonInt createdIndex(node, "createdIndex");
+    if (!createdIndex.Ok()) {
+      cb(EtcdClient::Status(0, "Invalid JSON: Couldn't find 'createdIndex'"),
+         0);
+      return;
+    }
+    const JsonInt modifiedIndex(node, "modifiedIndex");
+    if (!modifiedIndex.Ok()) {
+      cb(EtcdClient::Status(0, "Invalid JSON: Couldn't find 'modifiedIndex'"),
+         0);
+      return;
+    }
+    CHECK_EQ(createdIndex.Value(), modifiedIndex.Value());
+    cb(status, modifiedIndex.Value());
+  } else {
+    cb(status, -1);
+  }
+}
+
+
+void CreateInQueueRequestDone(EtcdClient::Status status,
+                              const shared_ptr<JsonObject>& json,
+                              const EtcdClient::CreateInQueueCallback& cb) {
+  if (status.ok()) {
+    const JsonObject node(*json, "node");
+    if (!node.Ok()) {
+      cb(EtcdClient::Status(0, "Invalid JSON: Couldn't find 'node'"), "", 0);
+      return;
+    }
+    const JsonInt createdIndex(node, "createdIndex");
+    if (!createdIndex.Ok()) {
+      cb(EtcdClient::Status(0, "Invalid JSON: Couldn't find 'createdIndex'"),
+         "", 0);
+      return;
+    }
+    const JsonInt modifiedIndex(node, "modifiedIndex");
+    if (!modifiedIndex.Ok()) {
+      cb(EtcdClient::Status(0, "Invalid JSON: Couldn't find 'modifiedIndex'"),
+         "", 0);
+      return;
+    }
+    const JsonString key(node, "key");
+    if (!key.Ok()) {
+      cb(EtcdClient::Status(0, "Invalid JSON: Couldn't find 'key'"), "", 0);
+      return;
+    }
+    CHECK_EQ(createdIndex.Value(), modifiedIndex.Value());
+    cb(status, key.Value(), modifiedIndex.Value());
+  } else {
+    cb(status, "", -1);
+  }
+}
+
+
+void UpdateRequestDone(EtcdClient::Status status,
+                       const shared_ptr<JsonObject>& json,
+                       const EtcdClient::UpdateCallback& cb) {
+  if (status.ok()) {
+    const JsonObject node(*json, "node");
+    if (!node.Ok()) {
+      cb(EtcdClient::Status(0, "Invalid JSON: Couldn't find 'node'"), 0);
+      return;
+    }
+    const JsonInt modifiedIndex(node, "modifiedIndex");
+    if (!modifiedIndex.Ok()) {
+      cb(EtcdClient::Status(0, "Invalid JSON: Couldn't find 'modifiedIndex'"),
+         0);
+      return;
+    }
+    cb(status, modifiedIndex.Value());
+  } else {
+    cb(status, -1);
+  }
+}
+
+
+}  // namespace
+
+
+EtcdClient::Status::Status(int status, const shared_ptr<JsonObject>& json)
+    : status_(status),
+      message_(status_ == 201 ? "" : MessageFromJsonStatus(json)) {
+}
+
+
+struct EtcdClient::Request {
+  Request(EtcdClient* client, evhttp_cmd_type verb, const string& path,
+          const string& params, const GenericCallback& cb)
+      : client_(client), verb_(verb), path_(path), params_(params), cb_(cb) {
+  }
+
+  void Run(const shared_ptr<libevent::HttpConnection>& conn) {
+    libevent::HttpRequest* const req(new libevent::HttpRequest(
+        bind(&EtcdClient::RequestDone, client_, _1, this)));
+
+    string uri(path_);
+    if (verb_ == EVHTTP_REQ_GET) {
+      uri += "?" + params_;
+    } else {
+      evhttp_add_header(evhttp_request_get_output_headers(req->get()),
+                        "Content-Type", "application/x-www-form-urlencoded");
+      CHECK_EQ(evbuffer_add(evhttp_request_get_output_buffer(req->get()),
+                            params_.data(), params_.size()),
+               0);
     }
 
-    EtcdClientImpl* const client_;
-    const evhttp_cmd_type verb_;
-    const string path_;
-    const string params_;
-    const GenericCallback cb_;
-  };
+    conn->MakeRequest(req, verb_, uri.c_str());
+  }
 
-  // If MaybeUpdateLeader returns true, the handling of the response
-  // should be aborted, as a new leader was found, and the request has
-  // been retried on the new leader.
-  bool MaybeUpdateLeader(libevent::HttpRequest* req, Request* etcd_req);
-  void RequestDone(libevent::HttpRequest* req, Request* etcd_req);
-
-  shared_ptr<libevent::HttpConnection> GetConnection(const string& host,
-                                                     uint16_t port);
-
-  const shared_ptr<libevent::Base> event_base_;
-
-  mutex lock_;
-  ConnectionMap conns_;
-  // Last known leader.
-  shared_ptr<libevent::HttpConnection> leader_;
+  EtcdClient* const client_;
+  const evhttp_cmd_type verb_;
+  const string path_;
+  const string params_;
+  const GenericCallback cb_;
 };
 
 
-bool EtcdClientImpl::MaybeUpdateLeader(libevent::HttpRequest* req,
-                                       Request* etcd_req) {
+EtcdClient::EtcdClient(const shared_ptr<libevent::Base>& event_base,
+                       const string& host, uint16_t port)
+    : event_base_(event_base), leader_(GetConnection(host, port)) {
+  LOG(INFO) << "EtcdClient: " << this;
+}
+
+
+EtcdClient::EtcdClient() {
+}
+
+
+EtcdClient::~EtcdClient() {
+  LOG(INFO) << "~EtcdClient: " << this;
+}
+
+
+bool EtcdClient::MaybeUpdateLeader(libevent::HttpRequest* req,
+                                   Request* etcd_req) {
   if (evhttp_request_get_response_code(req->get()) != 307) {
     return false;
   }
@@ -135,11 +304,10 @@ bool EtcdClientImpl::MaybeUpdateLeader(libevent::HttpRequest* req,
 }
 
 
-void EtcdClientImpl::RequestDone(libevent::HttpRequest* req,
-                                 Request* etcd_req) {
+void EtcdClient::RequestDone(libevent::HttpRequest* req, Request* etcd_req) {
   if (!req) {
     LOG(ERROR) << "an unknown error occurred";
-    etcd_req->cb_(0, shared_ptr<JsonObject>());
+    etcd_req->cb_(Status(0, "unknown error"), shared_ptr<JsonObject>());
     delete etcd_req;
     return;
   }
@@ -159,13 +327,14 @@ void EtcdClientImpl::RequestDone(libevent::HttpRequest* req,
     }
   }
 
-  etcd_req->cb_(status_code, make_shared<JsonObject>(
-                                 evhttp_request_get_input_buffer(req->get())));
+  shared_ptr<JsonObject> json(
+      make_shared<JsonObject>(evhttp_request_get_input_buffer(req->get())));
+  etcd_req->cb_(Status(status_code, json), json);
   delete etcd_req;
 }
 
 
-shared_ptr<libevent::HttpConnection> EtcdClientImpl::GetConnection(
+shared_ptr<libevent::HttpConnection> EtcdClient::GetConnection(
     const string& host, uint16_t port) {
   const pair<string, uint16_t> host_port(make_pair(host, port));
   const ConnectionMap::const_iterator it(conns_.find(host_port));
@@ -184,9 +353,56 @@ shared_ptr<libevent::HttpConnection> EtcdClientImpl::GetConnection(
 }
 
 
-void EtcdClientImpl::Generic(const string& key,
-                             const map<string, string>& params,
-                             evhttp_cmd_type verb, const GenericCallback& cb) {
+void EtcdClient::Get(const string& key, const GetCallback& cb) {
+  map<string, string> params;
+  Generic(key, params, EVHTTP_REQ_GET, bind(&GetRequestDone, _1, _2, cb));
+}
+
+
+void EtcdClient::GetAll(const string& dir, const GetAllCallback& cb) {
+  map<string, string> params;
+  Generic(dir, params, EVHTTP_REQ_GET, bind(&GetAllRequestDone, _1, _2, cb));
+}
+
+
+void EtcdClient::Create(const string& key, const string& value,
+                        const CreateCallback& cb) {
+  map<string, string> params;
+  params["value"] = value;
+  params["prevExist"] = "false";
+  Generic(key, params, EVHTTP_REQ_PUT, bind(&CreateRequestDone, _1, _2, cb));
+}
+
+
+void EtcdClient::CreateInQueue(const string& dir, const string& value,
+                               const CreateInQueueCallback& cb) {
+  map<string, string> params;
+  params["value"] = value;
+  params["prevExist"] = "false";
+  Generic(dir, params, EVHTTP_REQ_POST,
+          bind(&CreateInQueueRequestDone, _1, _2, cb));
+}
+
+
+void EtcdClient::Update(const string& key, const string& value,
+                        const int previous_index, const UpdateCallback& cb) {
+  map<string, string> params;
+  params["value"] = value;
+  params["prevIndex"] = lexical_cast<string>(previous_index);
+  Generic(key, params, EVHTTP_REQ_PUT, bind(&UpdateRequestDone, _1, _2, cb));
+}
+
+
+void EtcdClient::Delete(const string& key, const int current_index,
+                        const DeleteCallback& cb) {
+  map<string, string> params;
+  params["prevIndex"] = lexical_cast<string>(current_index);
+  Generic(key, params, EVHTTP_REQ_DELETE, bind(cb, _1));
+}
+
+
+void EtcdClient::Generic(const string& key, const map<string, string>& params,
+                         evhttp_cmd_type verb, const GenericCallback& cb) {
   // TODO(pphaneuf): Check that the key starts with a slash.
 
   string params_str;
@@ -214,12 +430,4 @@ void EtcdClientImpl::Generic(const string& key,
 }
 
 
-}  // namespace
-
-
-EtcdClient* EtcdClient::Create(const shared_ptr<libevent::Base>& event_base,
-                               const string& host, uint16_t port) {
-  LOG(INFO) << "EtcdClient::Create";
-  EtcdClientImpl* const retval(new EtcdClientImpl(event_base, host, port));
-  return retval;
-}
+}  // namespace cert_trans

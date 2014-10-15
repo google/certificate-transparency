@@ -12,11 +12,13 @@ Auditing for TLS certificates.
 The checking of SCTs included in the [RFC 6962](http://tools.ietf.org/html/rfc6962) TLS extension is only included in OpenSSL 1.0.2. As of this writing, this version is not yet released, so this means hand building the ```OpenSSL_1_0_2-stable``` branch from the [OpenSSL git repository](https://www.openssl.org/source/repos.html).
 
  - [CMake](http://www.cmake.org/)
- - [googletest](https://code.google.com/p/googletest/) (tested with 1.6.0)
+ - [googlemock](https://code.google.com/p/googlemock/) (tested with 1.6.0)
 
-Unpack googletest, but do not build it. Upstream recommends to build a new copy from source for each package to be tested. We follow this advice in our ```Makefile```, which builds gtest automatically.
+Gmock provides a bundled version of gtest, which will also be used.
 
-Some systems make the googletest source available as a package; on Debian, this is in the libgtest-dev package, which puts it in ```/usr/src/gtest```. Our ```Makefile``` looks in that location by default, but if your googletest sources are in a different location, set the ```GTESTDIR``` environment variable to point at them.
+Unpack googlemock, but do not build it. Upstream recommends to build a new copy from source for each package to be tested. We follow this advice in our ```Makefile```, which builds gmock/gtest automatically.
+
+Some systems make the googlemock source available as a package; on Debian, this is in the google-mock package, which puts it in ```/usr/src/gmock```. Our ```Makefile``` looks in that location by default, but if your googlemock sources are in a different location, set the ```GMOCKDIR``` environment variable to point at them.
 
  - [protobuf](https://github.com/google/protobuf) (tested with 2.4.1)
  - [gflags](https://code.google.com/p/gflags/) (tested with 1.6 and 2.0)

@@ -39,8 +39,8 @@ void make_request(bool* done, EtcdClient* etcd, int* count,
 
 
 void request_done(bool* done, EtcdClient* etcd, int* count, const string& data,
-                  int status, const shared_ptr<JsonObject>& reply) {
-  CHECK_EQ(status, 201);
+                  EtcdClient::Status status, const string& key, int index) {
+  CHECK(status.ok()) << status.message();
   --*count;
   if (*count > 0)
     make_request(done, etcd, count, data);
@@ -51,17 +51,15 @@ void request_done(bool* done, EtcdClient* etcd, int* count, const string& data,
 
 void make_request(bool* done, EtcdClient* etcd, int* count,
                   const string& data) {
-  map<string, string> params;
-  params["value"] = data;
-  etcd->Generic("/testdir", params, EVHTTP_REQ_POST,
-                bind(&request_done, done, etcd, count, data, _1, _2));
+  etcd->CreateInQueue("/testdir", "value", bind(&request_done, done, etcd,
+                                                count, data, _1, _2, _3));
 }
 
 
 void test_etcd() {
   const shared_ptr<libevent::Base> event_base(make_shared<libevent::Base>());
   scoped_ptr<EtcdClient> etcd(
-      EtcdClient::Create(event_base, FLAGS_etcd, FLAGS_etcd_port));
+      new EtcdClient(event_base, FLAGS_etcd, FLAGS_etcd_port));
 
   const string data(FLAGS_bytes_per_request, 'x');
   int count(FLAGS_requests_per_thread);
