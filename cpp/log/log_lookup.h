@@ -72,7 +72,7 @@ class LogLookup {
   // a shorter prefix (possibly with a multimap).
   std::map<std::string, uint64_t> leaf_index_;
 
-  const Database<Logged>* db_;
+  const Database<Logged>* const db_;
   MerkleTree cert_tree_;
   ct::SignedTreeHead latest_tree_head_;
 

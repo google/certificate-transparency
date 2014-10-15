@@ -26,7 +26,9 @@ static const int kCtimeBufSize = 26;
 
 template <class Logged>
 LogLookup<Logged>::LogLookup(const Database<Logged>* db)
-    : db_(db), cert_tree_(new Sha256Hasher()), latest_tree_head_() {
+    : db_(CHECK_NOTNULL(db)),
+      cert_tree_(new Sha256Hasher),
+      latest_tree_head_() {
   Update();
 }
 
