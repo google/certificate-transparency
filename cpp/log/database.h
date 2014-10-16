@@ -81,18 +81,6 @@ class Database {
   virtual ~Database() {
   }
 
-  virtual bool Transactional() const {
-    return false;
-  }
-
-  virtual void BeginTransaction() {
-    DLOG(FATAL) << "Transactions not supported";
-  }
-
-  virtual void EndTransaction() {
-    DLOG(FATAL) << "Transactions not supported";
-  }
-
   // Attempt to create a new entry. Fail if an entry with this hash
   // already exists.  The entry remains PENDING until a sequence
   // number has been assigned, after which its status changes to
@@ -101,7 +89,6 @@ class Database {
     CHECK(!logged.has_sequence_number());
     return CreatePendingEntry_(logged);
   }
-  virtual WriteResult CreatePendingEntry_(const Logged& logged) = 0;
 
   // Attempt to add a sequence number to the Logged, thereby removing
   // it from the list of pending entries.  Fail if the entry does not
@@ -110,9 +97,6 @@ class Database {
   // secondary key.
   virtual WriteResult AssignSequenceNumber(const std::string& pending_hash,
                                            uint64_t sequence_number) = 0;
-
-  // Look up by hash.
-  virtual LookupResult LookupByHash(const std::string& hash) const = 0;
 
   // Look up by hash. If the entry exists write the result. If the
   // entry is not logged return NOT_FOUND.
@@ -128,15 +112,13 @@ class Database {
   virtual std::set<std::string> PendingHashes() const = 0;
 
   // Attempt to write a tree head. Fails only if a tree head with this
-  // timestamp
-  // already exists (i.e., |timestamp| is primary key). Does not check that
-  // the timestamp is newer than previous entries.
+  // timestamp already exists (i.e., |timestamp| is primary key). Does
+  // not check that the timestamp is newer than previous entries.
   WriteResult WriteTreeHead(const ct::SignedTreeHead& sth) {
     if (!sth.has_timestamp())
       return MISSING_TREE_HEAD_TIMESTAMP;
     return WriteTreeHead_(sth);
   }
-  virtual WriteResult WriteTreeHead_(const ct::SignedTreeHead& sth) = 0;
 
   // Return the tree head with the freshest timestamp.
   virtual LookupResult LatestTreeHead(ct::SignedTreeHead* result) const = 0;
@@ -144,6 +126,11 @@ class Database {
  protected:
   Database() {
   }
+
+  // See the inline methods with similar names defined above for more
+  // documentation.
+  virtual WriteResult CreatePendingEntry_(const Logged& logged) = 0;
+  virtual WriteResult WriteTreeHead_(const ct::SignedTreeHead& sth) = 0;
 
  private:
   DISALLOW_COPY_AND_ASSIGN(Database);

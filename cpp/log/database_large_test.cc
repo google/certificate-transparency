@@ -22,9 +22,6 @@ DEFINE_int32(database_size, 0,
              "choosing this, as the database will fill up your disk (entries "
              "are a few kB each). Maximum is limited to 1 000 000. Also note "
              "that SQLite may be very slow with small batch sizes.");
-DEFINE_int32(batch_size, 1,
-             "Number of writes to batch together in one transaction (no "
-             "effect for FileDB).");
 
 namespace {
 
@@ -76,29 +73,13 @@ TYPED_TEST_CASE(LargeDBTest, Databases);
 TYPED_TEST(LargeDBTest, Benchmark) {
   int entries = FLAGS_database_size;
   CHECK_GE(entries, 0);
-  int batch_size = FLAGS_batch_size;
   int original_log_level = FLAGS_minloglevel;
 
   struct rusage ru_before, ru_after;
   getrusage(RUSAGE_SELF, &ru_before);
   uint64_t realtime_before, realtime_after;
   realtime_before = util::TimeInMilliseconds();
-  if (batch_size == 1 || !this->db()->Transactional()) {
-    this->FillDatabase(entries);
-  } else {
-    CHECK_GT(batch_size, 1);
-    while (entries >= batch_size) {
-      this->db()->BeginTransaction();
-      this->FillDatabase(batch_size);
-      this->db()->EndTransaction();
-      entries -= batch_size;
-    }
-    if (entries > 0) {
-      this->db()->BeginTransaction();
-      this->FillDatabase(entries);
-      this->db()->EndTransaction();
-    }
-  }
+  this->FillDatabase(entries);
   realtime_after = util::TimeInMilliseconds();
   getrusage(RUSAGE_SELF, &ru_after);
 

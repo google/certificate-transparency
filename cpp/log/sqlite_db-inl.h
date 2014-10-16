@@ -45,16 +45,6 @@ SQLiteDB<Logged>::~SQLiteDB() {
 }
 
 template <class Logged>
-void SQLiteDB<Logged>::BeginTransaction() {
-  CHECK_EQ(SQLITE_OK, sqlite3_exec(db_, "BEGIN;", NULL, NULL, NULL));
-}
-
-template <class Logged>
-void SQLiteDB<Logged>::EndTransaction() {
-  CHECK_EQ(SQLITE_OK, sqlite3_exec(db_, "COMMIT;", NULL, NULL, NULL));
-}
-
-template <class Logged>
 typename Database<Logged>::WriteResult SQLiteDB<Logged>::CreatePendingEntry_(
     const Logged& logged) {
   sqlite::Statement statement(db_,
@@ -111,20 +101,6 @@ typename Database<Logged>::WriteResult SQLiteDB<Logged>::AssignSequenceNumber(
   CHECK_EQ(1, changes);
 
   return this->OK;
-}
-
-template <class Logged>
-typename Database<Logged>::LookupResult SQLiteDB<Logged>::LookupByHash(
-    const std::string& hash) const {
-  sqlite::Statement statement(db_, "SELECT hash FROM leaves WHERE hash = ?");
-  statement.BindBlob(0, hash);
-
-  int ret = statement.Step();
-  if (ret == SQLITE_DONE)
-    return this->NOT_FOUND;
-  CHECK_EQ(SQLITE_ROW, ret);
-
-  return this->LOOKUP_OK;
 }
 
 template <class Logged>

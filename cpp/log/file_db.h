@@ -42,9 +42,6 @@ class FileDB : public Database<Logged> {
       const std::string& hash, uint64_t sequence_number);
 
   virtual typename Database<Logged>::LookupResult LookupByHash(
-      const std::string& hash) const;
-
-  virtual typename Database<Logged>::LookupResult LookupByHash(
       const std::string& hash, Logged* result) const;
 
   virtual typename Database<Logged>::LookupResult LookupByIndex(

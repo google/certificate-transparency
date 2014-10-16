@@ -19,23 +19,10 @@ class SQLiteDB : public Database<Logged> {
   typedef typename Database<Logged>::WriteResult WriteResult;
   typedef typename Database<Logged>::LookupResult LookupResult;
 
-  // Temporary, for benchmarking. If we want to do this for real, then
-  // we need to implement rollbacks for errors that occur in the middle
-  // of a transaction.
-  virtual bool Transactional() const {
-    return true;
-  }
-
-  void BeginTransaction();
-
-  void EndTransaction();
-
   virtual WriteResult CreatePendingEntry_(const Logged& logged);
 
   virtual WriteResult AssignSequenceNumber(const std::string& pending_hash,
                                            uint64_t sequence_number);
-
-  virtual LookupResult LookupByHash(const std::string& hash) const;
 
   virtual LookupResult LookupByHash(const std::string& hash,
                                     Logged* result) const;

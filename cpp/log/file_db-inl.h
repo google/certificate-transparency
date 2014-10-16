@@ -98,12 +98,6 @@ typename Database<Logged>::WriteResult FileDB<Logged>::AssignSequenceNumber(
 
 template <class Logged>
 typename Database<Logged>::LookupResult FileDB<Logged>::LookupByHash(
-    const std::string& hash) const {
-  return LookupByHash(hash, NULL);
-}
-
-template <class Logged>
-typename Database<Logged>::LookupResult FileDB<Logged>::LookupByHash(
     const std::string& hash, Logged* result) const {
   std::string cert_data;
   FileStorage::FileStorageResult db_result =
