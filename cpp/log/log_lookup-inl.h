@@ -12,15 +12,23 @@
 #include <utility>
 #include <vector>
 
+#include "base/time_support.h"
 #include "merkletree/merkle_tree.h"
 #include "merkletree/serial_hasher.h"
 #include "proto/ct.pb.h"
 #include "proto/serializer.h"
 
+using cert_trans::kNumMillisPerSecond;
+
+
+static const int kCtimeBufSize = 26;
+
 
 template <class Logged>
 LogLookup<Logged>::LogLookup(const Database<Logged>* db)
-    : db_(db), cert_tree_(new Sha256Hasher()), latest_tree_head_() {
+    : db_(CHECK_NOTNULL(db)),
+      cert_tree_(new Sha256Hasher),
+      latest_tree_head_() {
   Update();
 }
 
@@ -82,6 +90,12 @@ typename LogLookup<Logged>::UpdateResult LogLookup<Logged>::Update() {
   LOG(INFO) << "Found " << sth.tree_size() - latest_tree_head_.tree_size()
             << " new log entries";
   latest_tree_head_.CopyFrom(sth);
+
+  const time_t last_update(static_cast<time_t>(latest_tree_head_.timestamp() /
+                                               kNumMillisPerSecond));
+  char buf[kCtimeBufSize];
+  LOG(INFO) << "Tree successfully updated at " << ctime_r(&last_update, buf);
+
   return UPDATE_OK;
 }
 

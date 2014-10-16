@@ -39,6 +39,8 @@
 /cpp/server/blob-server
 /cpp/server/ct-dns-server
 /cpp/server/ct-server
+/cpp/util/bench_etcd
+/cpp/util/etcd_test
 /cpp/util/json_wrapper_test
 /java/build
 /local.properties

@@ -67,8 +67,6 @@ using cert_trans::util::ReadPrivateKey;
 using google::RegisterFlagValidator;
 using std::string;
 
-static const int kCtimeBufSize = 26;
-
 // Basic sanity checks on flag values.
 static bool ValidatePort(const char* flagname, int port) {
   if (port <= 0 || port > 65535) {
@@ -169,12 +167,9 @@ class PeriodicCallback {
 void SignMerkleTree(TreeSigner<LoggedCertificate>* tree_signer,
                     LogLookup<LoggedCertificate>* log_lookup) {
   CHECK_EQ(tree_signer->UpdateTree(), TreeSigner<LoggedCertificate>::OK);
+  // There should always be an update here, since we just signed a new
+  // tree head.
   CHECK_EQ(log_lookup->Update(), LogLookup<LoggedCertificate>::UPDATE_OK);
-
-  const time_t last_update(
-      static_cast<time_t>(tree_signer->LastUpdateTime() / 1000));
-  char buf[kCtimeBufSize];
-  LOG(INFO) << "Tree successfully updated at " << ctime_r(&last_update, buf);
 }
 
 int main(int argc, char* argv[]) {
@@ -220,16 +215,12 @@ int main(int argc, char* argv[]) {
   TreeSigner<LoggedCertificate> tree_signer(db, &log_signer);
   LogLookup<LoggedCertificate> log_lookup(db);
 
-  // This function is called "sign", but it also loads the LogLookup
-  // object from the database as a side-effect.
+  // Make sure that we have an STH, even if the tree is empty.
+  // TODO(pphaneuf): We should be remaining in an "unhealthy state"
+  // (either not accepting any requests, or returning some internal
+  // server error) until we have an STH to serve. We can sign for now,
+  // but we might not be a signer.
   SignMerkleTree(&tree_signer, &log_lookup);
-
-  const time_t last_update(
-      static_cast<time_t>(tree_signer.LastUpdateTime() / 1000));
-  if (last_update > 0) {
-    char buf[kCtimeBufSize];
-    LOG(INFO) << "Last tree update was at " << ctime_r(&last_update, buf);
-  }
 
   ThreadPool pool;
   HttpHandler handler(&log_lookup, db, &checker, &frontend, &pool);

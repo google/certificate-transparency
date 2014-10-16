@@ -52,9 +52,11 @@ else
 	LDLIBS += $(JSON_C_LIBS)
 endif
 
-# Need gtest
-GTESTDIR ?= /usr/src/gtest
-INCLUDE += -I $(GTESTDIR)/include
+# Need gmock
+GMOCKDIR ?= /usr/src/gmock
+INCLUDE += -I $(GMOCKDIR)/include -I $(GMOCKDIR)/gtest/include
+GTESTLIB = gmock/gtest/libgtest.a
+GMOCKLIB = gmock/libgmock.a
 
 # Allow user-system overrides
 INCLUDE += -I /usr/local/include
@@ -79,7 +81,8 @@ MONITOR_TESTS = monitor/database_test
 ALL_TESTS = $(PROTO_TESTS) $(MERKLETREE_TESTS) $(LOG_TESTS) $(UTIL_TESTS) \
 	$(MONITOR_TESTS) dns_tests
 
-all: unit_tests client/ct server/ct-server server/ct-dns-server
+all: unit_tests client/ct server/ct-server server/ct-dns-server \
+     util/bench_etcd
 
 .DELETE_ON_ERROR:
 
@@ -87,14 +90,16 @@ all: unit_tests client/ct server/ct-server server/ct-dns-server
         proto_tests merkletree_tests log_tests client_tests \
 	monitor_tests dns_tests
 
-gtest/Makefile: $(GTESTDIR)
-	mkdir -p gtest && cd gtest && cmake $(GTESTDIR)
+gmock/Makefile: $(GMOCKDIR)
+	mkdir -p gmock && cd gmock && cmake $(GMOCKDIR)
 
-gtest/libgtest.a: gtest/Makefile
-	$(MAKE) -C gtest CPPFLAGS="$(CPPFLAGS)" CXXFLAGS="$(CXXFLAGS)" \
-	  LDFLAGS="$(LDFLAGS)" gtest
+gmock/libgmock.a: gmock/Makefile
+	$(MAKE) -C gmock CPPFLAGS="$(CPPFLAGS)" CXXFLAGS="$(CXXFLAGS)" \
+	  LDFLAGS="$(LDFLAGS)"
 
-$(ALL_TESTS): gtest/libgtest.a
+gmock/gtest/libgtest.a: gmock/libgmock.a
+
+$(ALL_TESTS): gmock/gtest/libgtest.a
 
 proto/.depend: proto/*.cc */*.h
 	$(CXX) $(CXXFLAGS) -MM -MG proto/*.cc > proto/.depend1
@@ -148,15 +153,18 @@ endif
 
 unit_tests: proto_tests merkletree_tests log_tests util_tests monitor_tests
 
-util_tests: util/json_wrapper_test
+util_tests: util/json_wrapper_test util/etcd_test
 
 ### util/ targets
 util/libutil.a: util/util.o util/openssl_util.o util/testing.o \
-                util/json_wrapper.o util/thread_pool.o util/libevent_wrapper.o
+                util/json_wrapper.o util/thread_pool.o util/libevent_wrapper.o \
+                util/etcd.o
 	rm -f $@
 	ar -rcs $@ $^
 
 util/json_wrapper_test: util/json_wrapper_test.o util/libutil.a
+
+util/etcd_test: util/libutil.a util/etcd_test.o $(GMOCKLIB)
 
 ### proto/ targets
 proto/libproto.a: proto/ct.pb.o proto/serializer.o
@@ -301,10 +309,14 @@ server/ct-dns-server: server/ct-dns-server.o server/event.o $(LOCAL_LIBS)
 server/ct-server: server/ct-server.o util/read_private_key.o \
 	server/handler.o $(LOCAL_LIBS)
 
+util/bench_etcd: util/bench_etcd.o util/etcd.o util/libevent_wrapper.o \
+	util/json_wrapper.o
+
 dns_tests: server/ct-dns-server
 
 test: all
 	util/json_wrapper_test
+	util/etcd_test
 	proto/serializer_test
 	merkletree/serial_hasher_test
 	merkletree/tree_hasher_test
@@ -342,4 +354,4 @@ clean:
 	find . -name '*.[o|a]' | xargs rm -f
 	find . -name '*_test' | xargs rm -f
 	rm -f proto/*.pb.h proto/*.pb.cc */.depend*
-	rm -rf gtest/*
+	rm -rf gmock/*
