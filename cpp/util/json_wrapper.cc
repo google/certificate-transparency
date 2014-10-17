@@ -10,9 +10,12 @@ JsonObject::JsonObject(evbuffer* buffer) : obj_(NULL) {
   // available to us yet (C++11).
   const shared_ptr<json_tokener> tokener(json_tokener_new(),
                                          json_tokener_free);
+
   evbuffer_ptr ptr;
   evbuffer_ptr_set(buffer, &ptr, 0, EVBUFFER_PTR_SET);
-  int amount_consumed(0);
+
+  unsigned amount_consumed(0);
+
   while (!obj_ && amount_consumed < evbuffer_get_length(buffer)) {
     evbuffer_iovec chunk;
 
