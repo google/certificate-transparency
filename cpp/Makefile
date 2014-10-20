@@ -52,9 +52,11 @@ else
 	LDLIBS += $(JSON_C_LIBS)
 endif
 
-# Need gtest
-GTESTDIR ?= /usr/src/gtest
-INCLUDE += -I $(GTESTDIR)/include
+# Need gmock
+GMOCKDIR ?= /usr/src/gmock
+INCLUDE += -I $(GMOCKDIR)/include -I $(GMOCKDIR)/gtest/include
+GTESTLIB = gmock/gtest/libgtest.a
+GMOCKLIB = gmock/libgmock.a
 
 # Allow user-system overrides
 INCLUDE += -I /usr/local/include
@@ -87,14 +89,16 @@ all: unit_tests client/ct server/ct-server server/ct-dns-server
         proto_tests merkletree_tests log_tests client_tests \
 	monitor_tests dns_tests
 
-gtest/Makefile: $(GTESTDIR)
-	mkdir -p gtest && cd gtest && cmake $(GTESTDIR)
+gmock/Makefile: $(GMOCKDIR)
+	mkdir -p gmock && cd gmock && cmake $(GMOCKDIR)
 
-gtest/libgtest.a: gtest/Makefile
-	$(MAKE) -C gtest CPPFLAGS="$(CPPFLAGS)" CXXFLAGS="$(CXXFLAGS)" \
-	  LDFLAGS="$(LDFLAGS)" gtest
+gmock/libgmock.a: gmock/Makefile
+	$(MAKE) -C gmock CPPFLAGS="$(CPPFLAGS)" CXXFLAGS="$(CXXFLAGS)" \
+	  LDFLAGS="$(LDFLAGS)"
 
-$(ALL_TESTS): gtest/libgtest.a
+gmock/gtest/libgtest.a: gmock/libgmock.a
+
+$(ALL_TESTS): gmock/gtest/libgtest.a
 
 proto/.depend: proto/*.cc */*.h
 	$(CXX) $(CXXFLAGS) -MM -MG proto/*.cc > proto/.depend1
@@ -342,4 +346,4 @@ clean:
 	find . -name '*.[o|a]' | xargs rm -f
 	find . -name '*_test' | xargs rm -f
 	rm -f proto/*.pb.h proto/*.pb.cc */.depend*
-	rm -rf gtest/*
+	rm -rf gmock/*
