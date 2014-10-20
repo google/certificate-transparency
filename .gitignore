@@ -14,7 +14,7 @@
 
 # More specific files.
 /cpp/client/ct
-/cpp/gtest/
+/cpp/gmock/
 /cpp/local.mk
 /cpp/log/cert_checker_test
 /cpp/log/cert_submission_handler_test
