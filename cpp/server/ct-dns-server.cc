@@ -41,7 +41,7 @@ static const bool domain_dummy =
 
 class CTUDPDNSServer : public UDPServer {
  public:
-  CTUDPDNSServer(const string& domain, Database<LoggedCertificate>* db,
+  CTUDPDNSServer(const string& domain, SQLiteDB<LoggedCertificate>* db,
                  EventLoop* loop, int fd)
       : UDPServer(loop, fd), domain_(domain), lookup_(db), db_(db) {
   }
@@ -174,7 +174,7 @@ class CTUDPDNSServer : public UDPServer {
   }
 
   string Hash(const string& hash) {
-    lookup_.Update();
+    db_->ForceNotifySTH();
 
     // FIXME: decode hash!
     uint64_t index;
@@ -217,7 +217,7 @@ class CTUDPDNSServer : public UDPServer {
   }
 
   string STH() {
-    lookup_.Update();
+    db_->ForceNotifySTH();
 
     const SignedTreeHead& sth = lookup_.GetSTH();
 
@@ -235,7 +235,7 @@ class CTUDPDNSServer : public UDPServer {
 
   string domain_;
   LogLookup<LoggedCertificate> lookup_;
-  const Database<LoggedCertificate>* const db_;
+  SQLiteDB<LoggedCertificate>* const db_;
 };
 
 class Keyboard : public Server {
@@ -271,6 +271,9 @@ int main(int argc, char* argv[]) {
   google::ParseCommandLineFlags(&argc, &argv, true);
   google::InitGoogleLogging(argv[0]);
 
+  // TODO(pphaneuf): This current *has* to be SQLite, because it
+  // depends on sharing the database with a ct-server that will
+  // populate it (which FileDB does not support).
   SQLiteDB<LoggedCertificate> db(FLAGS_db);
 
   EventLoop loop;

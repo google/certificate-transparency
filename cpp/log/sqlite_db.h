@@ -36,8 +36,19 @@ class SQLiteDB : public Database<Logged> {
 
   virtual LookupResult LatestTreeHead(ct::SignedTreeHead* result) const;
 
+  virtual void AddNotifySTHCallback(
+      const typename Database<Logged>::NotifySTHCallback* callback);
+  virtual void RemoveNotifySTHCallback(
+      const typename Database<Logged>::NotifySTHCallback* callback);
+
+  // Force an STH notification. This is needed only for ct-dns-server,
+  // which shares a SQLite database with ct-server, but needs to
+  // refresh itself occasionally.
+  void ForceNotifySTH();
+
  private:
   sqlite3* db_;
+  cert_trans::DatabaseNotifierHelper callbacks_;
 
   DISALLOW_COPY_AND_ASSIGN(SQLiteDB);
 };

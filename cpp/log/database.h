@@ -1,8 +1,8 @@
 /* -*- mode: c++; indent-tabs-mode: nil -*- */
-
 #ifndef DATABASE_H
 #define DATABASE_H
 
+#include <boost/function.hpp>
 #include <glog/logging.h>
 #include <set>
 
@@ -45,14 +45,58 @@
 //   // Fill with random content data for testing (no sequence number).
 //   void RandomForTest();
 // };
-
-
+//
 // NOTE: This is a database interface for the log server.
 // Monitors/auditors shouldn't assume that log entries are keyed
 // uniquely by certificate hash -- it is an artefact of this
 // implementation, not a requirement of the I-D.
+
+
 template <class Logged>
-class Database {
+class ReadOnlyDatabase {
+ public:
+  typedef boost::function<void(const ct::SignedTreeHead&)> NotifySTHCallback;
+
+  enum LookupResult {
+    LOOKUP_OK,
+    NOT_FOUND,
+  };
+
+  // Look up by hash. If the entry exists write the result. If the
+  // entry is not logged return NOT_FOUND.
+  virtual LookupResult LookupByHash(const std::string& hash,
+                                    Logged* result) const = 0;
+
+  // Look up by sequence number.
+  virtual LookupResult LookupByIndex(uint64_t sequence_number,
+                                     Logged* result) const = 0;
+
+  // Return the tree head with the freshest timestamp.
+  virtual LookupResult LatestTreeHead(ct::SignedTreeHead* result) const = 0;
+
+  // Add/remove a callback to be called when a new tree head is
+  // available. The pointer is used as a key, so it should be the same
+  // in matching add/remove calls.
+  //
+  // When adding a callback, if we have a current tree head, it will
+  // be called right away with that tree head.
+  //
+  // As a sanity check, all callbacks must be removed before the
+  // database instance is destroyed.
+  virtual void AddNotifySTHCallback(const NotifySTHCallback* callback) = 0;
+  virtual void RemoveNotifySTHCallback(const NotifySTHCallback* callback) = 0;
+
+ protected:
+  ReadOnlyDatabase() {
+  }
+
+ private:
+  DISALLOW_COPY_AND_ASSIGN(ReadOnlyDatabase);
+};
+
+
+template <class Logged>
+class Database : public ReadOnlyDatabase<Logged> {
  public:
   enum WriteResult {
     OK,
@@ -71,11 +115,6 @@ class Database {
     // Timestamp is primary key, it must exist and be unique,
     DUPLICATE_TREE_HEAD_TIMESTAMP,
     MISSING_TREE_HEAD_TIMESTAMP,
-  };
-
-  enum LookupResult {
-    LOOKUP_OK,
-    NOT_FOUND,
   };
 
   virtual ~Database() {
@@ -98,15 +137,6 @@ class Database {
   virtual WriteResult AssignSequenceNumber(const std::string& pending_hash,
                                            uint64_t sequence_number) = 0;
 
-  // Look up by hash. If the entry exists write the result. If the
-  // entry is not logged return NOT_FOUND.
-  virtual LookupResult LookupByHash(const std::string& hash,
-                                    Logged* result) const = 0;
-
-  // Look up by sequence number.
-  virtual LookupResult LookupByIndex(uint64_t sequence_number,
-                                     Logged* result) const = 0;
-
   // List the hashes of all pending entries, i.e. all entries without a
   // sequence number.
   virtual std::set<std::string> PendingHashes() const = 0;
@@ -120,9 +150,6 @@ class Database {
     return WriteTreeHead_(sth);
   }
 
-  // Return the tree head with the freshest timestamp.
-  virtual LookupResult LatestTreeHead(ct::SignedTreeHead* result) const = 0;
-
  protected:
   Database() {
   }
@@ -135,5 +162,32 @@ class Database {
  private:
   DISALLOW_COPY_AND_ASSIGN(Database);
 };
+
+
+namespace cert_trans {
+
+
+class DatabaseNotifierHelper {
+ public:
+  typedef boost::function<void(const ct::SignedTreeHead&)> NotifySTHCallback;
+
+  DatabaseNotifierHelper() {
+  }
+  ~DatabaseNotifierHelper();
+
+  void Add(const NotifySTHCallback* callback);
+  void Remove(const NotifySTHCallback* callback);
+  void Call(const ct::SignedTreeHead& sth) const;
+
+ private:
+  typedef std::set<const NotifySTHCallback*> Map;
+
+  Map callbacks_;
+
+  DISALLOW_COPY_AND_ASSIGN(DatabaseNotifierHelper);
+};
+
+
+}  // namespace cert_trans
 
 #endif  // ndef DATABASE_H

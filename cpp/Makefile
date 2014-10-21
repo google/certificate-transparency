@@ -206,7 +206,7 @@ log/libcert.a: log/cert.o log/cert_checker.o log/cert_submission_handler.o \
 	ar -rcs $@ $^
 
 log/libdatabase.a: log/file_storage.o log/filesystem_op.o log/file_db_cert.o \
-                   log/sqlite_db_cert.o
+                   log/sqlite_db_cert.o log/database.o
 	rm -f $@
 	ar -rcs $@ $^
 

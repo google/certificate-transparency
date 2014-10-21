@@ -163,6 +163,8 @@ typename Database<Logged>::WriteResult FileDB<Logged>::WriteTreeHead_(
     latest_timestamp_key_ = timestamp_key;
   }
 
+  callbacks_.Call(sth);
+
   return this->OK;
 }
 
@@ -180,6 +182,23 @@ typename Database<Logged>::LookupResult FileDB<Logged>::LatestTreeHead(
   CHECK_EQ(result->timestamp(), latest_tree_timestamp_);
 
   return this->LOOKUP_OK;
+}
+
+template <class Logged>
+void FileDB<Logged>::AddNotifySTHCallback(
+    const typename Database<Logged>::NotifySTHCallback* callback) {
+  callbacks_.Add(callback);
+
+  ct::SignedTreeHead sth;
+  if (LatestTreeHead(&sth) == this->LOOKUP_OK) {
+    (*callback)(sth);
+  }
+}
+
+template <class Logged>
+void FileDB<Logged>::RemoveNotifySTHCallback(
+    const typename Database<Logged>::NotifySTHCallback* callback) {
+  callbacks_.Remove(callback);
 }
 
 template <class Logged>

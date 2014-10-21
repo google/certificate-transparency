@@ -98,12 +98,6 @@ TYPED_TEST(LogLookupTest, Update) {
   MerkleAuditProof proof;
   EXPECT_EQ(TS::OK, this->tree_signer_->UpdateTree());
 
-  // There is an entry but we don't know about it yet.
-  EXPECT_EQ(LL::NOT_FOUND,
-            lookup.AuditProof(logged_cert.merkle_leaf_hash(), &proof));
-
-  // Update
-  EXPECT_EQ(LL::UPDATE_OK, lookup.Update());
   // Look the new entry up.
   EXPECT_EQ(LL::OK, lookup.AuditProof(logged_cert.merkle_leaf_hash(), &proof));
 }

@@ -167,9 +167,6 @@ class PeriodicCallback {
 void SignMerkleTree(TreeSigner<LoggedCertificate>* tree_signer,
                     LogLookup<LoggedCertificate>* log_lookup) {
   CHECK_EQ(tree_signer->UpdateTree(), TreeSigner<LoggedCertificate>::OK);
-  // There should always be an update here, since we just signed a new
-  // tree head.
-  CHECK_EQ(log_lookup->Update(), LogLookup<LoggedCertificate>::UPDATE_OK);
 }
 
 int main(int argc, char* argv[]) {

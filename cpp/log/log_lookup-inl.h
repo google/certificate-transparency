@@ -4,6 +4,7 @@
 
 #include "log/log_lookup.h"
 
+#include <boost/bind.hpp>
 #include <glog/logging.h>
 #include <map>
 #include <stdint.h>
@@ -18,39 +19,32 @@
 #include "proto/ct.pb.h"
 #include "proto/serializer.h"
 
-using cert_trans::kNumMillisPerSecond;
-
 
 static const int kCtimeBufSize = 26;
 
 
 template <class Logged>
-LogLookup<Logged>::LogLookup(const Database<Logged>* db)
+LogLookup<Logged>::LogLookup(ReadOnlyDatabase<Logged>* db)
     : db_(CHECK_NOTNULL(db)),
       cert_tree_(new Sha256Hasher),
-      latest_tree_head_() {
-  Update();
+      latest_tree_head_(),
+      update_from_sth_cb_(
+          boost::bind(&LogLookup<Logged>::UpdateFromSTH, this, _1)) {
+  db_->AddNotifySTHCallback(&update_from_sth_cb_);
 }
 
 template <class Logged>
 LogLookup<Logged>::~LogLookup() {
+  db_->RemoveNotifySTHCallback(&update_from_sth_cb_);
 }
 
 template <class Logged>
-typename LogLookup<Logged>::UpdateResult LogLookup<Logged>::Update() {
-  ct::SignedTreeHead sth;
-
-  typename Database<Logged>::LookupResult db_result =
-      db_->LatestTreeHead(&sth);
-  if (db_result == Database<Logged>::NOT_FOUND)
-    return NO_UPDATES_FOUND;
-
-  CHECK(db_result == Database<Logged>::LOOKUP_OK);
+void LogLookup<Logged>::UpdateFromSTH(const ct::SignedTreeHead& sth) {
   CHECK_EQ(ct::V1, sth.version())
       << "Tree head signed with an unknown version";
 
   if (sth.timestamp() == latest_tree_head_.timestamp())
-    return NO_UPDATES_FOUND;
+    return;
 
   CHECK(sth.timestamp() > latest_tree_head_.timestamp() &&
         sth.tree_size() >= cert_tree_.LeafCount())
@@ -91,12 +85,10 @@ typename LogLookup<Logged>::UpdateResult LogLookup<Logged>::Update() {
             << " new log entries";
   latest_tree_head_.CopyFrom(sth);
 
-  const time_t last_update(static_cast<time_t>(latest_tree_head_.timestamp() /
-                                               kNumMillisPerSecond));
+  const time_t last_update(static_cast<time_t>(
+      latest_tree_head_.timestamp() / cert_trans::kNumMillisPerSecond));
   char buf[kCtimeBufSize];
   LOG(INFO) << "Tree successfully updated at " << ctime_r(&last_update, buf);
-
-  return UPDATE_OK;
 }
 
 template <class Logged>

@@ -55,6 +55,11 @@ class FileDB : public Database<Logged> {
   virtual typename Database<Logged>::LookupResult LatestTreeHead(
       ct::SignedTreeHead* result) const;
 
+  virtual void AddNotifySTHCallback(
+      const typename Database<Logged>::NotifySTHCallback* callback);
+  virtual void RemoveNotifySTHCallback(
+      const typename Database<Logged>::NotifySTHCallback* callback);
+
  private:
   void BuildIndex();
   std::set<std::string> pending_hashes_;
@@ -67,6 +72,7 @@ class FileDB : public Database<Logged> {
   uint64_t latest_tree_timestamp_;
   // The same as a string;
   std::string latest_timestamp_key_;
+  cert_trans::DatabaseNotifierHelper callbacks_;
 
   DISALLOW_COPY_AND_ASSIGN(FileDB);
 };

@@ -17,17 +17,8 @@ template <class Logged>
 class LogLookup {
  public:
   // The constructor loads the content from the database.
-  explicit LogLookup(const Database<Logged>* db);
+  explicit LogLookup(ReadOnlyDatabase<Logged>* db);
   ~LogLookup();
-
-  enum UpdateResult {
-    UPDATE_OK,
-    // Also ok, but we found nothing new.
-    NO_UPDATES_FOUND,
-  };
-
-  // Pick up latest tree changes from the database.
-  UpdateResult Update();
 
   enum LookupResult {
     OK,
@@ -66,15 +57,19 @@ class LogLookup {
   std::string LeafHash(const Logged& logged) const;
 
  private:
+  void UpdateFromSTH(const ct::SignedTreeHead& sth);
+
   // We keep a hash -> index mapping in memory so that we can quickly serve
   // Merkle proofs without having to query the database at all.
   // Note that 32 bytes is an overkill and we can optimize this to use
   // a shorter prefix (possibly with a multimap).
   std::map<std::string, uint64_t> leaf_index_;
 
-  const Database<Logged>* const db_;
+  ReadOnlyDatabase<Logged>* const db_;
   MerkleTree cert_tree_;
   ct::SignedTreeHead latest_tree_head_;
+
+  const typename Database<Logged>::NotifySTHCallback update_from_sth_cb_;
 
   DISALLOW_COPY_AND_ASSIGN(LogLookup);
 };

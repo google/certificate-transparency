@@ -207,7 +207,7 @@ int GetIntParam(const multimap<string, string>& query, const string& param) {
 
 
 HttpHandler::HttpHandler(LogLookup<LoggedCertificate>* log_lookup,
-                         const Database<LoggedCertificate>* db,
+                         const ReadOnlyDatabase<LoggedCertificate>* db,
                          const CertChecker* cert_checker, Frontend* frontend,
                          ThreadPool* pool)
     : log_lookup_(CHECK_NOTNULL(log_lookup)),
@@ -424,7 +424,7 @@ void HttpHandler::BlockingGetEntries(evhttp_request* req, int start,
     LoggedCertificate cert;
 
     if (db_->LookupByIndex(i, &cert) !=
-        Database<LoggedCertificate>::LOOKUP_OK) {
+        ReadOnlyDatabase<LoggedCertificate>::LOOKUP_OK) {
       return SendError(req, HTTP_BADREQUEST, "Entry not found.");
     }
 

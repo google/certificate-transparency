@@ -7,9 +7,9 @@
 
 class Frontend;
 template <class T>
-class Database;
-template <class T>
 class LogLookup;
+template <class T>
+class ReadOnlyDatabase;
 
 namespace cert_trans {
 
@@ -27,7 +27,7 @@ class HttpHandler {
   // case this server will not accept "add-chain" and "add-pre-chain"
   // requests.
   HttpHandler(LogLookup<LoggedCertificate>* log_lookup,
-              const Database<LoggedCertificate>* db,
+              const ReadOnlyDatabase<LoggedCertificate>* db,
               const CertChecker* cert_checker, Frontend* frontend,
               ThreadPool* pool);
 
@@ -49,7 +49,7 @@ class HttpHandler {
                            const boost::shared_ptr<PreCertChain>& chain) const;
 
   LogLookup<LoggedCertificate>* const log_lookup_;
-  const Database<LoggedCertificate>* const db_;
+  const ReadOnlyDatabase<LoggedCertificate>* const db_;
   const CertChecker* const cert_checker_;
   Frontend* const frontend_;
   ThreadPool* const pool_;

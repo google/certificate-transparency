@@ -197,6 +197,8 @@ typename Database<Logged>::WriteResult SQLiteDB<Logged>::WriteTreeHead_(
   }
   CHECK_EQ(SQLITE_DONE, r2);
 
+  callbacks_.Call(sth);
+
   return this->OK;
 }
 
@@ -217,6 +219,37 @@ typename Database<Logged>::LookupResult SQLiteDB<Logged>::LatestTreeHead(
   CHECK(result->ParseFromString(sth));
 
   return this->LOOKUP_OK;
+}
+
+template <class Logged>
+void SQLiteDB<Logged>::AddNotifySTHCallback(
+    const typename Database<Logged>::NotifySTHCallback* callback) {
+  callbacks_.Add(callback);
+
+  ct::SignedTreeHead sth;
+  if (LatestTreeHead(&sth) == this->LOOKUP_OK) {
+    (*callback)(sth);
+  }
+}
+
+template <class Logged>
+void SQLiteDB<Logged>::RemoveNotifySTHCallback(
+    const typename Database<Logged>::NotifySTHCallback* callback) {
+  callbacks_.Remove(callback);
+}
+
+template <class Logged>
+void SQLiteDB<Logged>::ForceNotifySTH() {
+  ct::SignedTreeHead sth;
+
+  const typename Database<Logged>::LookupResult db_result =
+      this->LatestTreeHead(&sth);
+  if (db_result == Database<Logged>::NOT_FOUND)
+    return;
+
+  CHECK(db_result == Database<Logged>::LOOKUP_OK);
+
+  callbacks_.Call(sth);
 }
 
 #endif  // CERT_TRANS_LOG_SQLITE_DB_INL_H_
