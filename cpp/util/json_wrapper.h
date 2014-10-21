@@ -120,7 +120,7 @@ class JsonObject {
   void InitFromChild(const JsonObject& from, const char* field,
                      json_type type) {
     obj_ = json_object_object_get(from.obj_, field);
-    if (obj_ != NULL) {
+    if (json_object_object_get_ex(from.obj_, field, &obj_)) {
       if (!json_object_is_type(obj_, type)) {
         LOG(ERROR) << "Don't understand " << field
                    << " field: " << from.ToJson();

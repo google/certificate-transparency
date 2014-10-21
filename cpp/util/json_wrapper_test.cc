@@ -80,7 +80,7 @@ TEST_F(JsonWrapperTest, FragmentedEvBuffer) {
 
   JsonObject obj(buffer.get());
   EXPECT_TRUE(obj.Ok());
-  EXPECT_EQ(0, evbuffer_get_length(buffer.get()));
+  EXPECT_EQ(0U, evbuffer_get_length(buffer.get()));
 }
 
 int main(int argc, char** argv) {
