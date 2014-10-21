@@ -219,7 +219,11 @@ class MonitorTest(unittest.TestCase):
         client = FakeLogClient(sth)
 
         m = self.create_monitor(client)
+        m._verify_consistency = mock.Mock(return_value=True)
         self.assertFalse(m._update_sth())
+        self.assertTrue(m._verify_consistency.called)
+        args, _ = m._verify_consistency.call_args
+        self.assertTrue(args[0].timestamp < args[1].timestamp)
 
         # Check that we kept the state.
         expected_state = client_pb2.MonitorState()

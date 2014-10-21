@@ -134,9 +134,11 @@ class Monitor(object):
             return False
 
         # If we got the same response as last time, do nothing.
-        # If we got an older response than last time, return False.
-        # (It is not necessarily an inconsistency - the log could be out of
-        # sync - but we should not rewind to older data.)
+        # If we got an older response than last time, make sure that it's
+        # consistent with current verified STH and then return False.
+        # (If older response is consistent then, there is nothing wrong
+        # with the fact that we recieved older timestamp - the log could be 
+        # out of sync - but we should not rewind to older data.)
         #
         # The client should always return an STH but best eliminate the
         # None == None case explicitly by only shortcutting the verification
@@ -147,10 +149,16 @@ class Monitor(object):
                                  sth_response)
                     return True
                 elif (sth_response.timestamp <
-                      self.__state.verified_sth.timestamp):
-                    logging.error("Rejecting received STH: timestamp is older "
-                                  "than current verified STH: %s vs %s " %
-                                  (sth_response, self.__state.verified_sth))
+                        self.__state.verified_sth.timestamp):
+                    try:
+                        self._verify_consistency(sth_response,
+                                                 self.__state.verified_sth)
+                    except error.VerifyError:
+                        logging.error("Received older STH which is inconsistent "
+                                      "with current verified STH!")
+                    logging.warning("Rejecting received STH: timestamp is older "
+                                    "than current verified STH: %s vs %s " %
+                                    (sth_response, self.__state.verified_sth))
                     return False
 
         try:
