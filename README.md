@@ -34,8 +34,7 @@ You can specify a JSON-C library in a non-standard location using the ```JSONCLI
 
  - [libevent](http://libevent.org/) (tested with 2.0.21-stable)
 
-You can specify a non-installed locally built library using the
-```LIBEVENTDIR``` environment variable to point to the local build.
+You can specify a non-installed locally built library using the ```LIBEVENTDIR``` environment variable to point to the local build. Note that the FreeBSD port version 2.0.21_2 does not appear to work correctly (it only listens on IPv6 for the HTTP server) - for that platform we had to build from the source, specifically commit 6dba1694c89119c44cef03528945e5a5978ab43a.
 
  - [ldns](http://www.nlnetlabs.nl/projects/ldns/)
  - [ant](http://ant.apache.org/)
