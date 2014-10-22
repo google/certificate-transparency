@@ -24,6 +24,7 @@ using cert_trans::EtcdClient;
 using std::map;
 using std::string;
 using std::vector;
+using util::Status;
 
 DEFINE_string(etcd, "127.0.0.1", "etcd server address");
 DEFINE_int32(etcd_port, 4001, "etcd server port");
@@ -39,8 +40,8 @@ void make_request(bool* done, EtcdClient* etcd, int* count,
 
 
 void request_done(bool* done, EtcdClient* etcd, int* count, const string& data,
-                  EtcdClient::Status status, const string& key, int index) {
-  CHECK(status.ok()) << status.message();
+                  Status status, const string& key, int index) {
+  CHECK(status.ok()) << status;
   --*count;
   if (*count > 0)
     make_request(done, etcd, count, data);

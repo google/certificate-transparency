@@ -10,6 +10,7 @@
 
 #include "base/macros.h"
 #include "util/libevent_wrapper.h"
+#include "util/status.h"
 
 class JsonObject;
 
@@ -18,42 +19,17 @@ namespace cert_trans {
 
 class EtcdClient {
  public:
-  class Status {
-   public:
-    Status() : status_(201), message_("") {
-    }
-    Status(int status, const std::string& message)
-        : status_(status), message_(message) {
-    }
-    Status(int status, const boost::shared_ptr<JsonObject>& json);
-
-    bool ok() const {
-      return status_ == 201;
-    }
-
-    int status() const {
-      return status_;
-    }
-
-    const std::string& message() const {
-      return message_;
-    }
-
-   private:
-    const int status_;
-    const std::string message_;
-  };
-
-  typedef boost::function<void(Status status, int index,
+  typedef boost::function<void(util::Status status, int index,
                                const std::string& value)> GetCallback;
   typedef boost::function<void(
-      Status status, const std::list<std::pair<std::string, int> >& values)>
-      GetAllCallback;
-  typedef boost::function<void(Status status, int index)> CreateCallback;
-  typedef boost::function<void(Status status, const std::string& key,
+      util::Status status,
+      const std::list<std::pair<std::string, int> >& values)> GetAllCallback;
+  typedef boost::function<void(util::Status status, int index)> CreateCallback;
+  typedef boost::function<void(util::Status status, const std::string& key,
                                int index)> CreateInQueueCallback;
-  typedef boost::function<void(Status status, int new_index)> UpdateCallback;
-  typedef boost::function<void(Status status)> DeleteCallback;
+  typedef boost::function<void(util::Status status, int new_index)>
+      UpdateCallback;
+  typedef boost::function<void(util::Status status)> DeleteCallback;
 
   // TODO(pphaneuf): This should take a set of servers, not just one.
   EtcdClient(const boost::shared_ptr<libevent::Base>& event_base,
@@ -78,8 +54,9 @@ class EtcdClient {
               const DeleteCallback& cb);
 
  protected:
-  typedef boost::function<void(
-      Status status, const boost::shared_ptr<JsonObject>&)> GenericCallback;
+  typedef boost::function<void(util::Status status,
+                               const boost::shared_ptr<JsonObject>&)>
+      GenericCallback;
 
   EtcdClient();  // Testing only
 

@@ -164,7 +164,7 @@ util/libutil.a: util/util.o util/openssl_util.o util/testing.o \
 
 util/json_wrapper_test: util/json_wrapper_test.o util/libutil.a
 
-util/etcd_test: util/libutil.a util/etcd_test.o $(GMOCKLIB)
+util/etcd_test: util/etcd_test.o util/libutil.a $(GMOCKLIB)
 
 ### proto/ targets
 proto/libproto.a: proto/ct.pb.o proto/serializer.o
@@ -309,8 +309,7 @@ server/ct-dns-server: server/ct-dns-server.o server/event.o $(LOCAL_LIBS)
 server/ct-server: server/ct-server.o util/read_private_key.o \
 	server/handler.o $(LOCAL_LIBS)
 
-util/bench_etcd: util/bench_etcd.o util/etcd.o util/libevent_wrapper.o \
-	util/json_wrapper.o
+util/bench_etcd: util/bench_etcd.o util/libutil.a
 
 dns_tests: server/ct-dns-server
 
