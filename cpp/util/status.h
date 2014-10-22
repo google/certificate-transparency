@@ -11,6 +11,11 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
+//
+//
+// This code was unceremoniously lifted from the version at
+// github.com/google/lmctfy with a few minor modifications mainly to reduce the
+// dependencies.
 
 #ifndef UTIL_STATUS_H__
 #define UTIL_STATUS_H__
@@ -22,6 +27,7 @@ namespace util {
 namespace error {
 
 
+// These values match the error codes in the codes.proto file of the original.
 enum Code {
   // Not an error; returned on success
   OK = 0,
