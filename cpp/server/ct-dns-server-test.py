@@ -7,12 +7,17 @@ import random
 import shlex
 import subprocess
 import sys
+import time
+
+NUMBER_OF_CERTS = 100
 
 basepath = os.path.dirname(sys.argv[0])
 
 sys.path.append(os.path.join(basepath, '../../python'))
 from ct.crypto import merkle
 from ct.proto import ct_pb2
+
+tmpdir = sys.argv[1]
 
 class CTDNSLookup:
     def __init__(self, nameservers, port):
@@ -55,28 +60,285 @@ class DNSServerRunner:
         args = shlex.split(cmd)
         self.proc = subprocess.Popen(args)
 
-server_cmd = basepath + "/ct-dns-server --port=1111 --domain=example.com. --db=/tmp/ct"
+def OpenSSL(*params):
+    print "RUN: openssl", params
+    subprocess.check_call(("openssl",) + params)
+
+class CTServer:
+    def __init__(self, cmd, base, ca):
+        self.cmd_ = cmd
+        self.base_ = base
+        self.ca_ = ca
+        self.GenerateKey()
+
+    def __del__(self):
+        self.proc.terminate()
+
+    def PrivateKey(self):
+        return self.base_ + "-ct-server-private-key.pem"
+        
+    def PublicKey(self):
+        return self.base_ + "-ct-server-public-key.pem"
+
+    def Database(self):
+        return self.base_ + "-database.sqlite"
+
+    def GenerateKey(self):
+        OpenSSL("ecparam",
+                "-out", self.PrivateKey(),
+                "-name", "secp256r1",
+                "-genkey")
+        OpenSSL("ec",
+                "-in", self.PrivateKey(),
+                "-pubout",
+                "-out", self.PublicKey())
+
+    def URL(self):
+        return "http://localhost:9999/"
+
+    def Run(self):
+        cmd = (self.cmd_ + " -key " + self.PrivateKey() +
+               " -trusted_cert_file " + self.ca_.RootCertificate() +
+               " -sqlite_db " + self.Database() +
+               " -tree_signing_frequency_seconds 1" +
+               " -logtostderr")
+        print "RUN:", cmd
+        args = shlex.split(cmd)
+        self.proc = subprocess.Popen(args)
+
+RootConfig = """[ req ]
+distinguished_name=req_distinguished_name
+prompt=no
+x509_extensions=v3_ca
+
+[ req_distinguished_name ]
+countryName=GB
+stateOrProvinceName=Wales
+localityName=Erw Wen
+0.organizationName=Certificate Transparency Test CA
+
+[ v3_ca ]
+subjectKeyIdentifier=hash
+authorityKeyIdentifier=keyid:always,issuer:always
+basicConstraints=CA:TRUE
+"""
+
+CAConfig = """[ ca ]
+default_ca = CA_default
+
+[ CA_default ]
+default_startdate = 120601000000Z
+default_enddate   = 220601000000Z
+default_md	  = sha1
+unique_subject	  = no
+email_in_dn	  = no
+policy	          = policy_default
+serial            = {serial}
+database          = {database}
+
+[ policy_default ]
+countryName	    = supplied
+organizationName    = supplied
+stateOrProvinceName = optional
+localityName	    = optional
+commonName          = optional
+"""
+
+RequestConfig = """[ req ]
+distinguished_name=req_distinguished_name
+prompt=no
+
+[ req_distinguished_name ]
+countryName=GB
+stateOrProvinceName=Wales
+localityName=Erw Wen
+0.organizationName={subject}
+
+# For the precert
+[ pre ]
+subjectKeyIdentifier=hash
+authorityKeyIdentifier=keyid:always,issuer:always
+basicConstraints=CA:FALSE
+1.3.6.1.4.1.11129.2.4.3=critical,ASN1:NULL
+
+# For the simple cert, without embedded proof extensions
+[ simple ]
+subjectKeyIdentifier=hash
+authorityKeyIdentifier=keyid:always,issuer:always
+basicConstraints=CA:FALSE
+
+# For the cert with an embedded proof
+[ embedded ]
+subjectKeyIdentifier=hash
+authorityKeyIdentifier=keyid:always,issuer:always
+basicConstraints=CA:FALSE
+"""
+
+def WriteFile(name, content):
+    open(name, "w").write(content)
+
+class CA:
+    def __init__(self, base):
+        self.base_ = base
+
+        os.mkdir(self.Directory())
+        
+        open(self.Database(), "w")
+        WriteFile(self.Serial(), "0000000000000001")
+
+        WriteFile(self.RootConfig(), RootConfig)
+        ca_config = CAConfig.format(database = self.Database(),
+                                    serial = self.Serial())
+        WriteFile(self.CAConfig(), ca_config)
+
+        self.GenerateRootCertificate()
+
+        os.mkdir(self.IssuedCertificates())
+
+    def Directory(self):
+        """Where the CA does house-keeping"""
+        return self.base_ + "-housekeeping"
+
+    def Database(self):
+        return self.Directory() + "/database"
+
+    def Serial(self):
+        return self.Directory() + "/serial"
+
+    def RootConfig(self):
+        return self.base_ + "-root-config"
+
+    def CAConfig(self):
+        return self.base_ + "-ca-config"
+
+    def PrivateKey(self):
+        return self.base_ + "-private-key.pem"
+
+    def RootCertificate(self):
+        return self.base_ + "-cert.pem"
+
+    def TempFile(self, name):
+        return self.base_ + "-temp-" + name
+
+    def RequestConfig(self):
+        return self.TempFile("req-config")
+
+    def IssuedCertificates(self):
+        return self.base_ + "-issued"
+
+    def IssuedFile(self, name, subject):
+        return self.IssuedCertificates() + "/" + name + "-" + subject + ".pem"
+
+    def IssuedPrivateKey(self, subject):
+        return self.IssuedFile("private-key", subject)
+
+    def IssuedCertificate(self, subject):
+        return self.IssuedFile("certificate", subject)
+
+    def GenerateRootCertificate(self):
+        csr = self.TempFile("csr")
+        OpenSSL("req",
+                "-new",
+                "-newkey", "rsa:2048",
+                "-keyout", self.PrivateKey(),
+                "-out", csr,
+                "-config", self.RootConfig(),
+                "-nodes")
+        OpenSSL("ca",
+                "-in", csr,
+                "-selfsign",
+                "-keyfile", self.PrivateKey(),
+                "-config", self.CAConfig(),
+                "-extfile", self.RootConfig(),
+                "-extensions", "v3_ca",
+                "-outdir", self.Directory(),
+                "-out", self.RootCertificate(),
+                "-batch")
+
+    def CreateAndLogCert(self, ct_server, subject):
+        WriteFile(self.RequestConfig(), RequestConfig.format(subject=subject))
+        csr = self.TempFile("csr")
+        OpenSSL("req",
+                "-new",
+                "-newkey", "rsa:1024",
+                "-keyout", self.IssuedPrivateKey(subject),
+                "-out", csr,
+                "-config", self.RequestConfig(),
+                "-nodes")
+        OpenSSL("ca",
+                "-in", csr,
+                "-cert", self.RootCertificate(),
+                "-keyfile", self.PrivateKey(),
+                "-config", self.CAConfig(),
+                "-extfile", self.RequestConfig(),
+                "-extensions", "simple",
+                "-outdir", self.Directory(),
+                "-out", self.IssuedCertificate(subject),
+                "-batch")
+
+        # Reverse the order of these to show the bug
+        certs = (open(self.IssuedCertificate(subject)).read()
+                 + open(self.RootCertificate()).read())
+        chain_file = self.TempFile("chain")
+        WriteFile(chain_file, certs)
+        subprocess.check_call(("client/ct", "upload",
+                               "-ct_server_submission", chain_file,
+                               "-ct_server", ct_server.URL(),
+                               "-ct_server_public_key", ct_server.PublicKey(),
+                               "-ct_server_response_out", self.TempFile("sct"),
+                               "-logtostderr"))
+
+# Set up our test CA
+ca = CA(tmpdir + "/ct-test-ca")
+
+# Run a CT server
+ct_cmd = basepath + "/ct-server"
+ct_server = CTServer(ct_cmd, tmpdir + "/ct-test", ca)
+ct_server.Run()
+# Make sure server is running before we talk to it
+time.sleep(2)
+
+# Add nn certs to the CT server
+for x in range(NUMBER_OF_CERTS):
+    ca.CreateAndLogCert(ct_server, "TestCertificate" + str(x))
+
+# Make sure server has had enough time to assimilate all certs
+time.sleep(2)
+
+# We'll need the DB for the DNS server
+db = ct_server.Database()
+# Kill the CT server (shared database access not currently supported)
+del ct_server
+
+# Now run the DNS server from the same database
+server_cmd = basepath + "/ct-dns-server --port=1111 --domain=example.com. --db=" + db
 runner = DNSServerRunner()
 runner.Run(server_cmd)
 
+# Get the STH
 lookup = CTDNSLookup(['127.0.0.1'], 1111)
+
 sth = lookup.GetSTH()
 print "sth =", sth
 print "size =", sth.tree_size
 
-# Verify a random entry
-index = random.randint(0, sth.tree_size - 1)
-leaf_hash = lookup.GetLeafHash(index)
-print "index =", index, " hash =", leaf_hash
+assert sth.tree_size == NUMBER_OF_CERTS
 
-verifier = merkle.MerkleVerifier()
-audit_path = []
-for level in range(0, verifier.audit_path_length(index, sth.tree_size)):
-    hash = lookup.GetEntry(level, index, sth.tree_size)
-    print hash
-    audit_path.append(base64.b64decode(hash))
+# test a bunch of random lookups
+for x in range(100):
+    # Verify a random entry
+    index = random.randint(0, sth.tree_size - 1)
+    leaf_hash = lookup.GetLeafHash(index)
+    print "index =", index, " hash =", leaf_hash
 
-print map(base64.b64encode, audit_path)
+    verifier = merkle.MerkleVerifier()
+    audit_path = []
+    for level in range(0, verifier.audit_path_length(index, sth.tree_size)):
+        hash = lookup.GetEntry(level, index, sth.tree_size)
+        print hash
+        audit_path.append(base64.b64decode(hash))
 
-assert verifier.verify_leaf_hash_inclusion(base64.b64decode(leaf_hash), index,
-                                           audit_path, sth)
+    print map(base64.b64encode, audit_path)
+
+    assert verifier.verify_leaf_hash_inclusion(base64.b64decode(leaf_hash),
+                                               index, audit_path, sth)
