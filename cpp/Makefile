@@ -158,7 +158,7 @@ util_tests: util/json_wrapper_test util/etcd_test
 ### util/ targets
 util/libutil.a: util/util.o util/openssl_util.o util/testing.o \
                 util/json_wrapper.o util/thread_pool.o util/libevent_wrapper.o \
-                util/etcd.o
+                util/etcd.o util/status.o
 	rm -f $@
 	ar -rcs $@ $^
 
