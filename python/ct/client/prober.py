@@ -13,6 +13,9 @@ from ct.client import monitor
 from ct.client import state
 from ct.crypto import merkle
 from ct.crypto import verify
+from twisted.internet import reactor
+from twisted.internet import defer 
+from twisted.web import client as twisted_client
 
 class ProberThread(threading.Thread):
     """A prober for scheduled updating of the log view."""
@@ -26,7 +29,8 @@ class ProberThread(threading.Thread):
             if not log.log_server or not log.log_id or not log.public_key_info:
                 raise RuntimeError("Cannot start monitor: log proto has "
                                    "missing or empty fields: %s" % log)
-            client = log_client.LogClient(log.log_server)
+            client = log_client.AsyncLogClient(twisted_client.Agent(reactor),
+                                               log.log_server)
             hasher = merkle.TreeHasher()
             verifier = verify.LogVerifier(log.public_key_info,
                                           merkle.MerkleVerifier(hasher))
@@ -44,31 +48,42 @@ class ProberThread(threading.Thread):
     def __str__(self):
        return "%s(%s)" % (self.__class__.__name__, self.__monitors)
 
+    def _log_probed_callback(self, succeded, monitor):
+        if succeded:
+            logging.info("Data for %s updated: latest timestamp is %s" %
+                         (monitor.servername,
+                          time.strftime("%c", time.localtime(
+                            monitor.data_timestamp/1000))))
+        else:
+            logging.error("Failed to update data for %s: latest timestamp "
+                          "is %s" % (monitor.servername,
+                                     time.strftime("%c", time.localtime(
+                            monitor.data_timestamp/1000))))
+        self.__probed += 1
+        if self.__probed == len(self.__monitors):
+            self._all_logs_probed()
+
+    def _all_logs_probed(self):
+        logging.info("Probe loop completed in %d seconds" %
+                     (time.time() - self.__start_time))
+        sleep_time = max(0, self.__start_time +
+                         FLAGS.probe_frequency_secs - time.time())
+        logging.info("Next probe loop in: %d seconds" % sleep_time)
+        reactor.callLater(sleep_time, self.probe_all_logs)
+
+
     def probe_all_logs(self):
         logging.info("Starting probe loop")
-        start_time = time.time()
+        self.__start_time = time.time()
+        self.__probed = 0
         """Loop through all logs in the list and check for updates."""
         for monitor in self.__monitors:
-            if monitor.update():
-                logging.info("Data for %s updated: latest timestamp is %s" %
-                             (monitor.servername,
-                              time.strftime("%c", time.localtime(
-                                monitor.data_timestamp/1000))))
-            else:
-                logging.error("Failed to update data for %s: latest timestamp "
-                              "is %s" % (monitor.servername,
-                                         time.strftime("%c", time.localtime(
-                                monitor.data_timestamp/1000))))
-        logging.info("Probe loop completed in %d seconds" %
-                     (time.time() - start_time))
+            monitor_result = monitor.update()
+            monitor_result.addCallback(self._log_probed_callback, monitor)
 
     def run(self):
-        while not self.__stopped:
-            sleep_time = max(0, self.__last_update_start_time +
-                             FLAGS.probe_frequency_secs - time.time())
-            time.sleep(sleep_time)
-            self.__last_update_start_time = time.time()
-            self.probe_all_logs()
+        reactor.callLater(0, self.probe_all_logs)
+        reactor.run(installSignalHandlers=0)
 
     def stop(self):
-        self.__stopped = True
+        reactor.stop()

@@ -153,7 +153,7 @@ class AsyncLogClientTest(unittest.TestCase):
         def done(self, result):
             self.result = result
 
-        def write(self, entries):
+        def consume(self, entries):
             self.received += entries
 
     # Helper method.
@@ -171,6 +171,11 @@ class AsyncLogClientTest(unittest.TestCase):
         consumer = self.get_entries(client, 0, 9)
         self.assertEqual(10, consumer.result)
         self.assertTrue(test_util.verify_entries(consumer.received, 0, 9))
+
+    def test_get_sth_consistency(self):
+        client = self.default_client()
+        self.assertEqual([],
+                         self.successResultOf(client.get_sth_consistency(0, 9)))
 
     def test_get_entries_raises_on_invalid_response(self):
         json_entries = test_util.entries_to_json(test_util.make_entries(0, 9))
@@ -236,7 +241,7 @@ class AsyncLogClientTest(unittest.TestCase):
         def done(self, result):
             self.result = result
 
-        def write(self, entries):
+        def consume(self, entries):
             self.received += entries
             if (not self.already_paused and
                 len(self.received) >= self.pause_at):

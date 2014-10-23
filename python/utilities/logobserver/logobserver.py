@@ -1,3 +1,4 @@
+#!/usr/bin/env python
 import gflags
 from google.protobuf import text_format
 import logging

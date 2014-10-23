@@ -159,6 +159,16 @@ def _parse_entries(entries_body, expected_response_size):
                                    (expected_response_size, response_size))
     return [_parse_entry(e) for e in entries]
 
+def _parse_consistency_proof(response, servername):
+    try:
+        response = json.loads(response)
+        consistency = [base64.b64decode(u) for u in response["consistency"]]
+    except (TypeError, ValueError, KeyError) as e:
+        raise InvalidResponseError(
+              "%s returned invalid data: expected a base64-encoded "
+              "consistency proof, got %s"
+              "\n%s" % (servername, response, e))
+    return consistency
 
 # A class that we can mock out to generate fake responses.
 class RequestHandler(object):
@@ -321,16 +331,7 @@ class LogClient(object):
                                   params={"first": old_size,
                                           "second": new_size})
 
-        try:
-            response = json.loads(response)
-            consistency = [base64.b64decode(u) for u in response["consistency"]]
-        except (TypeError, ValueError, KeyError) as e:
-            raise InvalidResponseError(
-                "%s returned invalid data: expected a base64-encoded "
-                "consistency proof, got %s"
-                "\n%s" % (self.servername, response, e))
-
-        return consistency
+        return _parse_consistency_proof(response, self.servername)
 
     def get_proof_by_hash(self, leaf_hash, tree_size):
         """Retrieve an audit proof by leaf hash.
@@ -509,7 +510,7 @@ class AsyncRequestHandler(object):
     def _make_request(path, params):
         if not params:
             return path
-        return path + "?" + "&".join([key + "=" + value
+        return path + "?" + "&".join(["%s=%s" % (key, value)
                                       for key, value in params.iteritems()])
 
     def get(self, path, params=None):
@@ -547,7 +548,7 @@ class EntryProducer(object):
     def _write_pending(self):
         if self._pending:
             self._current += len(self._pending)
-            self._consumer.write(self._pending)
+            self._consumer.consume(self._pending)
             self._pending = None
 
     @defer.deferredGenerator
@@ -557,8 +558,7 @@ class EntryProducer(object):
             self._write_pending()
 
             if self.finished:
-                self.stopProducing()
-                self._done.callback(self._end - self._start + 1)
+                self.finishProducing()
                 return
 
             # Currently, a naive strategy is used where each response determines
@@ -566,7 +566,6 @@ class EntryProducer(object):
             # would likely better fill the pipeline.
             first = self._current
             last = min(self._current + self._batch_size - 1, self._end)
-
             deferred_response = self._handler.get(
                 self._uri + "/" + _GET_ENTRIES_PATH,
                 params={"start": str(first), "end": str(last)})
@@ -592,9 +591,9 @@ class EntryProducer(object):
 
         Returns:
            a deferred that fires when no more entries will be written.
-           Upon success, this deferred fires with the total number of entries
-           produced. Upon failure, this deferred fires with the appropriate
-           HTTPError.
+           Upon success, this deferred fires number of produced entries or
+           None if production wasn't successful. Upon failure, this deferred
+           fires with the appropriate HTTPError.
 
         Raises:
             RuntimeError: consumer already registered.
@@ -623,6 +622,13 @@ class EntryProducer(object):
         self._paused = True
         self._stopped = True
 
+    def finishProducing(self, success=True):
+        self.stopProducing()
+        if success:
+          self._done.callback(self._end - self._start + 1)
+        else:
+          self._done.callback(None)
+
 
 class AsyncLogClient(object):
     """A twisted log client."""
@@ -637,7 +643,8 @@ class AsyncLogClient(object):
             reactor: the reactor to use. Default is twisted.internet.reactor.
         """
         self._handler = AsyncRequestHandler(agent)
-        self._uri = uri
+        #twisted expects bytes, so if uri is unicode we have to change encoding
+        self._uri = uri.encode('ascii')
         self._reactor = reactor
 
     @property
@@ -686,3 +693,48 @@ class AsyncLogClient(object):
         batch_size = batch_size or FLAGS.entry_fetch_batch_size
         return EntryProducer(self._handler, self._reactor, self._uri, start,
                              end, batch_size)
+
+    def get_sth_consistency(self, old_size, new_size):
+        """Retrieve a consistency proof.
+
+        Args:
+            old_size  : size of older tree.
+            new_size  : size of newer tree.
+
+        Returns:
+            a Deferred that fires with list of raw hashes (bytes) forming the
+            consistency proof
+
+        Raises:
+            HTTPError, HTTPClientError, HTTPServerError: connection failed,
+                or returned an error. HTTPClientError can happen when
+                (old_size, new_size) are not valid for this log (e.g. greater
+                than the size of the log).
+            InvalidRequestError: invalid request size (irrespective of log).
+            InvalidResponseError: server response is invalid for the given
+                                  request
+        Caller is responsible for ensuring that (old_size, new_size) are valid
+        (by retrieving an STH first), otherwise a HTTPClientError may occur.
+        """
+        if old_size > new_size:
+            raise InvalidRequestError(
+                "old > new: %s >= %s" % (old_size, new_size))
+
+        if old_size < 0 or new_size < 0:
+            raise InvalidRequestError(
+                "both sizes must be >= 0: %s, %s" % (old_size, new_size))
+
+        # don't need to contact remote server for trivial proofs:
+        # - empty tree is consistent with everything
+        # - everything is consistent with itself
+        if old_size == 0 or old_size == new_size:
+            d = defer.Deferred()
+            d.callback([])
+            return d
+
+        deferred_response = self._handler.get(self._uri + "/" +
+                                              _GET_STH_CONSISTENCY_PATH,
+                                              params={"first": old_size,
+                                              "second": new_size})
+        deferred_response.addCallback(_parse_consistency_proof, self.servername)
+        return deferred_response
