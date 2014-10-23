@@ -175,7 +175,8 @@ basicConstraints=CA:FALSE
 """
 
 def WriteFile(name, content):
-    open(name, "w").write(content)
+    with open(name, "w") as f:
+        f.write(content)
 
 class CA:
     def __init__(self, base):
@@ -276,7 +277,9 @@ class CA:
                 "-out", self.IssuedCertificate(subject),
                 "-batch")
 
-        # Reverse the order of these to show the bug
+        # Reverse the order of these to show a bug in ct-server where
+        # it accepts the CA cert even though there's a redundant extra
+        # cert in the chain. At least, I think its a bug.
         certs = (open(self.IssuedCertificate(subject)).read()
                  + open(self.RootCertificate()).read())
         chain_file = self.TempFile("chain")
