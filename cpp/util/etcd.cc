@@ -44,6 +44,35 @@ string MessageFromJsonStatus(const shared_ptr<JsonObject>& json) {
 }
 
 
+util::error::Code ErrorCodeForHttpResponseCode(int response_code) {
+  switch (response_code) {
+    case 200:
+    case 201:
+      return util::error::OK;
+    case 403:
+      return util::error::PERMISSION_DENIED;
+    case 404:
+      return util::error::NOT_FOUND;
+    case 412:
+      return util::error::FAILED_PRECONDITION;
+    case 500:
+      return util::error::UNAVAILABLE;
+    default:
+      return util::error::UNKNOWN;
+  }
+}
+
+
+Status StatusFromResponseCode(const int response_code,
+                              const shared_ptr<JsonObject>& json) {
+  const util::error::Code error_code(
+      ErrorCodeForHttpResponseCode(response_code));
+  const string error_message(
+      error_code == util::error::OK ? "" : MessageFromJsonStatus(json));
+  return Status(error_code, error_message);
+}
+
+
 shared_ptr<evhttp_uri> UriFromHostPort(const string& host, uint16_t port) {
   const shared_ptr<evhttp_uri> retval(CHECK_NOTNULL(evhttp_uri_new()),
                                       evhttp_uri_free);
@@ -316,25 +345,6 @@ bool EtcdClient::MaybeUpdateLeader(libevent::HttpRequest* req,
 }
 
 
-util::error::Code ErrorCodeForHttpResponseCode(int response_code) {
-  switch (response_code) {
-    case 200:
-    case 201:
-      return util::error::OK;
-    case 403:
-      return util::error::PERMISSION_DENIED;
-    case 404:
-      return util::error::NOT_FOUND;
-    case 412:
-      return util::error::FAILED_PRECONDITION;
-    case 500:
-      return util::error::UNAVAILABLE;
-    default:
-      return util::error::UNKNOWN;
-  }
-}
-
-
 void EtcdClient::RequestDone(libevent::HttpRequest* req, Request* etcd_req) {
   if (!req) {
     LOG(ERROR) << "an unknown error occurred";
@@ -348,22 +358,10 @@ void EtcdClient::RequestDone(libevent::HttpRequest* req, Request* etcd_req) {
     return;
   }
 
-  const int status_code(evhttp_request_get_response_code(req->get()));
-  if (status_code != 201) {
-    LOG(ERROR) << "unexpected status code: " << status_code;
-
-    for (const evkeyval* headers =
-             evhttp_request_get_input_headers(req->get())->tqh_first;
-         headers; headers = headers->next.tqe_next) {
-      LOG(ERROR) << headers->key << ": " << headers->value;
-    }
-  }
-
+  const int response_code(evhttp_request_get_response_code(req->get()));
   shared_ptr<JsonObject> json(
       make_shared<JsonObject>(evhttp_request_get_input_buffer(req->get())));
-  etcd_req->cb_(Status(ErrorCodeForHttpResponseCode(status_code),
-                       MessageFromJsonStatus(json)),
-                json);
+  etcd_req->cb_(StatusFromResponseCode(response_code, json), json);
   delete etcd_req;
 }
 
