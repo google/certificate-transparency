@@ -324,10 +324,8 @@ print "size =", sth.tree_size
 
 assert sth.tree_size == NUMBER_OF_CERTS
 
-# test a bunch of random lookups
-for x in range(100):
-    # Verify a random entry
-    index = random.randint(0, sth.tree_size - 1)
+# test all the entries
+for index in range(100):
     leaf_hash = lookup.GetLeafHash(index)
     print "index =", index, " hash =", leaf_hash
 
