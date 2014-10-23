@@ -20,6 +20,8 @@ Unpack googlemock, but do not build it. Upstream recommends to build a new copy 
 
 Some systems make the googlemock source available as a package; on Debian, this is in the google-mock package, which puts it in ```/usr/src/gmock```. Our ```Makefile``` looks in that location by default, but if your googlemock sources are in a different location, set the ```GMOCKDIR``` environment variable to point at them.
 
+If you are on FreeBSD, you may need to apply the patch in gtest.patch to the gtest subdirectory of gmock.
+
  - [protobuf](https://github.com/google/protobuf) (tested with 2.4.1)
  - [gflags](https://code.google.com/p/gflags/) (tested with 1.6 and 2.0)
  - [glog](https://code.google.com/p/google-glog/) (tested with 0.3.1)
