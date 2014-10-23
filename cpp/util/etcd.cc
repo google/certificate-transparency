@@ -318,6 +318,7 @@ bool EtcdClient::MaybeUpdateLeader(libevent::HttpRequest* req,
 
 util::error::Code ErrorCodeForHttpResponseCode(int response_code) {
   switch (response_code) {
+    case 200:
     case 201:
       return util::error::OK;
     case 403:
