@@ -262,13 +262,39 @@ void UpdateRequestDone(Status status, const shared_ptr<JsonObject>& json,
 }
 
 
+string UrlEscapeAndJoinParams(const map<string, string>& params) {
+  string retval;
+
+  bool first(true);
+  for (map<string, string>::const_iterator it = params.begin();
+       it != params.end(); ++it) {
+    if (first)
+      first = false;
+    else
+      retval += "&";
+
+    retval += evhttp_uriencode(it->first.c_str(), it->first.size(), 0);
+    retval += "=";
+    retval += evhttp_uriencode(it->second.c_str(), it->second.size(), 0);
+  }
+
+  return retval;
+}
+
+
 }  // namespace
 
 
 struct EtcdClient::Request {
-  Request(EtcdClient* client, evhttp_cmd_type verb, const string& path,
-          const string& params, const GenericCallback& cb)
-      : client_(client), verb_(verb), path_(path), params_(params), cb_(cb) {
+  Request(EtcdClient* client, evhttp_cmd_type verb, const string& key,
+          const map<string, string>& params, const GenericCallback& cb)
+      : client_(client),
+        verb_(verb),
+        path_("/v2/keys" + key),
+        params_(UrlEscapeAndJoinParams(params)),
+        cb_(cb) {
+    CHECK(!key.empty());
+    CHECK_EQ(key[0], '/');
   }
 
   void Run(const shared_ptr<libevent::HttpConnection>& conn) {
@@ -435,24 +461,7 @@ void EtcdClient::Delete(const string& key, const int current_index,
 
 void EtcdClient::Generic(const string& key, const map<string, string>& params,
                          evhttp_cmd_type verb, const GenericCallback& cb) {
-  // TODO(pphaneuf): Check that the key starts with a slash.
-
-  string params_str;
-  bool first(true);
-  for (map<string, string>::const_iterator it = params.begin();
-       it != params.end(); ++it) {
-    if (first)
-      first = false;
-    else
-      params_str += "&";
-
-    params_str += evhttp_uriencode(it->first.c_str(), it->first.size(), 0);
-    params_str += "=";
-    params_str += evhttp_uriencode(it->second.c_str(), it->second.size(), 0);
-  }
-
-  Request* const etcd_req(
-      new Request(this, verb, "/v2/keys" + key, params_str, cb));
+  Request* const etcd_req(new Request(this, verb, key, params, cb));
   shared_ptr<libevent::HttpConnection> conn;
   {
     lock_guard<mutex> lock(lock_);
