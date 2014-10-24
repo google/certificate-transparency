@@ -28,7 +28,6 @@ class Base {
 
   void Dispatch();
   void DispatchOnce();
-  void Break();
 
   event* EventNew(evutil_socket_t& sock, short events, Event* event) const;
   evhttp* HttpNew() const;
@@ -38,6 +37,7 @@ class Base {
 
  private:
   event_base* const base_;
+  boost::try_mutex dispatch_lock_;
 
   boost::mutex dns_lock_;
   evdns_base* dns_;

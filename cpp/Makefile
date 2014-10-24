@@ -76,7 +76,7 @@ LOG_TESTS = log/cert_test log/cert_checker_test \
             log/frontend_signer_test log/frontend_test log/log_lookup_test \
             log/signer_verifier_test log/log_signer_test log/tree_signer_test \
             log/logged_certificate_test log/ct_extensions_test
-UTIL_TESTS = util/json_wrapper_test util/etcd_test
+UTIL_TESTS = util/json_wrapper_test util/etcd_test util/sync_etcd_test
 MONITOR_TESTS = monitor/database_test
 ALL_TESTS = $(PROTO_TESTS) $(MERKLETREE_TESTS) $(LOG_TESTS) $(UTIL_TESTS) \
 	$(MONITOR_TESTS) dns_tests
@@ -153,18 +153,20 @@ endif
 
 unit_tests: proto_tests merkletree_tests log_tests util_tests monitor_tests
 
-util_tests: util/json_wrapper_test util/etcd_test
+util_tests: util/json_wrapper_test util/etcd_test util/sync_etcd_test
 
 ### util/ targets
 util/libutil.a: util/util.o util/openssl_util.o util/testing.o \
                 util/json_wrapper.o util/thread_pool.o util/libevent_wrapper.o \
-                util/etcd.o util/status.o
+                util/etcd.o util/status.o util/sync_etcd.o
 	rm -f $@
 	ar -rcs $@ $^
 
 util/json_wrapper_test: util/json_wrapper_test.o util/libutil.a
 
 util/etcd_test: util/etcd_test.o util/libutil.a $(GMOCKLIB)
+
+util/sync_etcd_test: util/sync_etcd_test.o util/libutil.a $(GMOCKLIB)
 
 ### proto/ targets
 proto/libproto.a: proto/ct.pb.o proto/serializer.o
@@ -316,6 +318,7 @@ dns_tests: server/ct-dns-server
 test: all
 	util/json_wrapper_test
 	util/etcd_test
+	util/sync_etcd_test
 	proto/serializer_test
 	merkletree/serial_hasher_test
 	merkletree/tree_hasher_test
