@@ -42,6 +42,7 @@
 /cpp/util/bench_etcd
 /cpp/util/etcd_test
 /cpp/util/json_wrapper_test
+/cpp/util/sync_etcd_test
 /java/build
 /local.properties
 /python/_trial_temp/
