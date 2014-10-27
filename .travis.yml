@@ -1,6 +1,9 @@
 
 language: cpp
 
+compiler:
+ - clang
+
 cache: apt
 
 before_install:
@@ -22,7 +25,7 @@ before_install:
  - go version
 
 script:
- - make alltests CC=clang CXX=clang++
+ - make alltests
  - go test -v ./go/...
 
 notifications:
