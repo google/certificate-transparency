@@ -136,7 +136,10 @@ void GetAllRequestDone(Status status, const shared_ptr<JsonObject>& json,
     for (int i = 0; i < value_nodes.Length(); ++i) {
       const JsonObject entry(value_nodes, i);
       if (!entry.Ok()) {
-        cb(Status(util::error::FAILED_PRECONDITION, "Invalid JSON: Couldn't get 'value_nodes' index " + to_string(i)), list<pair<string, int> >());
+        cb(Status(util::error::FAILED_PRECONDITION,
+                  "Invalid JSON: Couldn't get 'value_nodes' index " +
+                      to_string(i)),
+           list<pair<string, int> >());
         return;
       }
       const JsonString value(entry, "value");
@@ -395,8 +398,9 @@ shared_ptr<libevent::HttpConnection> EtcdClient::GetConnection(
   shared_ptr<libevent::HttpConnection> conn;
 
   if (it == conns_.end()) {
-    conn = make_shared<libevent::HttpConnection>(
-        event_base_, UriFromHostPort(host, port).get());
+    conn = make_shared<libevent::HttpConnection>(event_base_,
+                                                 UriFromHostPort(host, port)
+                                                     .get());
     conns_.insert(make_pair(host_port, conn));
   } else {
     conn = it->second;

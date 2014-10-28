@@ -19,11 +19,16 @@ namespace cert_trans {
 
 class EtcdClient {
  public:
-  typedef std::function<void(util::Status status, int index, const std::string& value)> GetCallback;
-  typedef std::function<void(util::Status status, const std::list<std::pair<std::string, int> >& values)> GetAllCallback;
+  typedef std::function<void(util::Status status, int index,
+                             const std::string& value)> GetCallback;
+  typedef std::function<void(
+      util::Status status,
+      const std::list<std::pair<std::string, int> >& values)> GetAllCallback;
   typedef std::function<void(util::Status status, int index)> CreateCallback;
-  typedef std::function<void(util::Status status, const std::string& key, int index)> CreateInQueueCallback;
-  typedef std::function<void(util::Status status, int new_index)> UpdateCallback;
+  typedef std::function<void(util::Status status, const std::string& key,
+                             int index)> CreateInQueueCallback;
+  typedef std::function<void(util::Status status, int new_index)>
+      UpdateCallback;
   typedef std::function<void(util::Status status)> DeleteCallback;
 
   // TODO(pphaneuf): This should take a set of servers, not just one.
@@ -49,7 +54,8 @@ class EtcdClient {
               const DeleteCallback& cb);
 
  protected:
-  typedef std::function<void(util::Status status, const std::shared_ptr<JsonObject>&)>
+  typedef std::function<void(util::Status status,
+                             const std::shared_ptr<JsonObject>&)>
       GenericCallback;
 
   EtcdClient();  // Testing only

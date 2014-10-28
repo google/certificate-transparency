@@ -27,7 +27,8 @@ LogLookup<Logged>::LogLookup(ReadOnlyDatabase<Logged>* db)
     : db_(CHECK_NOTNULL(db)),
       cert_tree_(new Sha256Hasher),
       latest_tree_head_(),
-      update_from_sth_cb_(std::bind(&LogLookup<Logged>::UpdateFromSTH, this, std::placeholders::_1)) {
+      update_from_sth_cb_(std::bind(&LogLookup<Logged>::UpdateFromSTH, this,
+                                    std::placeholders::_1)) {
   db_->AddNotifySTHCallback(&update_from_sth_cb_);
 }
 

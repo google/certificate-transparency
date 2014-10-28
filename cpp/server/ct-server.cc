@@ -220,7 +220,9 @@ int main(int argc, char* argv[]) {
   ThreadPool pool;
   HttpHandler handler(&log_lookup, db, &checker, &frontend, &pool);
 
-  PeriodicCallback tree_event(event_base, FLAGS_tree_signing_frequency_seconds, bind(&SignMerkleTree, &tree_signer, &log_lookup));
+  PeriodicCallback tree_event(event_base, FLAGS_tree_signing_frequency_seconds,
+                              bind(&SignMerkleTree, &tree_signer,
+                                   &log_lookup));
 
   libevent::HttpServer server(*event_base);
   handler.Add(&server);

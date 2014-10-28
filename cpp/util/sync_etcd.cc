@@ -105,8 +105,7 @@ SyncEtcdClient::SyncEtcdClient(const std::string& host, uint16_t port)
 }
 
 SyncEtcdClient::SyncEtcdClient(EtcdClient* client)
-    : base_(std::make_shared<libevent::Base>()),
-      client_(client) {
+    : base_(std::make_shared<libevent::Base>()), client_(client) {
 }
 
 
