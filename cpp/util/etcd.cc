@@ -1,8 +1,5 @@
 #include "util/etcd.h"
 
-#include <boost/lexical_cast.hpp>
-#include <boost/make_shared.hpp>
-#include <boost/thread.hpp>
 #include <event2/buffer.h>
 #include <event2/http.h>
 #include <event2/keyvalq_struct.h>
@@ -13,16 +10,18 @@
 
 namespace libevent = cert_trans::libevent;
 
-using boost::lexical_cast;
-using boost::lock_guard;
-using boost::make_shared;
-using boost::mutex;
-using boost::shared_ptr;
 using std::list;
+using std::lock_guard;
 using std::make_pair;
+using std::make_shared;
 using std::map;
+using std::mutex;
 using std::pair;
+using std::placeholders::_1;
+using std::placeholders::_2;
+using std::shared_ptr;
 using std::string;
+using std::to_string;
 using util::Status;
 
 namespace cert_trans {
@@ -137,10 +136,7 @@ void GetAllRequestDone(Status status, const shared_ptr<JsonObject>& json,
     for (int i = 0; i < value_nodes.Length(); ++i) {
       const JsonObject entry(value_nodes, i);
       if (!entry.Ok()) {
-        cb(Status(util::error::FAILED_PRECONDITION,
-                  "Invalid JSON: Couldn't get 'value_nodes' index " +
-                      lexical_cast<string>(i)),
-           list<pair<string, int> >());
+        cb(Status(util::error::FAILED_PRECONDITION, "Invalid JSON: Couldn't get 'value_nodes' index " + to_string(i)), list<pair<string, int> >());
         return;
       }
       const JsonString value(entry, "value");
@@ -399,9 +395,8 @@ shared_ptr<libevent::HttpConnection> EtcdClient::GetConnection(
   shared_ptr<libevent::HttpConnection> conn;
 
   if (it == conns_.end()) {
-    conn = make_shared<libevent::HttpConnection>(event_base_,
-                                                 UriFromHostPort(host, port)
-                                                     .get());
+    conn = make_shared<libevent::HttpConnection>(
+        event_base_, UriFromHostPort(host, port).get());
     conns_.insert(make_pair(host_port, conn));
   } else {
     conn = it->second;
@@ -446,7 +441,7 @@ void EtcdClient::Update(const string& key, const string& value,
                         const int previous_index, const UpdateCallback& cb) {
   map<string, string> params;
   params["value"] = value;
-  params["prevIndex"] = lexical_cast<string>(previous_index);
+  params["prevIndex"] = to_string(previous_index);
   Generic(key, params, EVHTTP_REQ_PUT, bind(&UpdateRequestDone, _1, _2, cb));
 }
 
@@ -454,7 +449,7 @@ void EtcdClient::Update(const string& key, const string& value,
 void EtcdClient::Delete(const string& key, const int current_index,
                         const DeleteCallback& cb) {
   map<string, string> params;
-  params["prevIndex"] = lexical_cast<string>(current_index);
+  params["prevIndex"] = to_string(current_index);
   Generic(key, params, EVHTTP_REQ_DELETE, bind(cb, _1));
 }
 

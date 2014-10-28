@@ -1,8 +1,7 @@
 #include "client/async_log_client.h"
 
 #include <algorithm>
-#include <boost/make_shared.hpp>
-#include <boost/scoped_ptr.hpp>
+#include <memory>
 #include <glog/logging.h>
 #include <iterator>
 #include <sstream>
@@ -14,10 +13,6 @@
 
 namespace libevent = cert_trans::libevent;
 
-using boost::function;
-using boost::make_shared;
-using boost::scoped_ptr;
-using boost::shared_ptr;
 using cert_trans::AsyncLogClient;
 using cert_trans::Cert;
 using cert_trans::CertChain;
@@ -28,7 +23,11 @@ using ct::SignedCertificateTimestamp;
 using ct::SignedTreeHead;
 using std::back_inserter;
 using std::copy;
+using std::function;
+using std::make_shared;
 using std::ostringstream;
+using std::placeholders::_1;
+using std::shared_ptr;
 using std::string;
 using std::vector;
 

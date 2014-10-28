@@ -1,9 +1,9 @@
 #include "util/sync_etcd.h"
 
-#include <boost/make_shared.hpp>
-#include <gtest/gtest.h>
 #include <gmock/gmock.h>
+#include <gtest/gtest.h>
 #include <map>
+#include <memory>
 #include <string>
 
 #include "util/json_wrapper.h"
@@ -11,17 +11,19 @@
 
 namespace cert_trans {
 
-
 using std::list;
 using std::make_pair;
+using std::make_shared;
 using std::map;
 using std::pair;
+using std::shared_ptr;
 using std::string;
-using testing::_;
+using std::unique_ptr;
 using testing::AllOf;
 using testing::Contains;
 using testing::InvokeArgument;
 using testing::Pair;
+using testing::_;
 using util::Status;
 
 const char kEntryKey[] = "/some/key";
@@ -155,8 +157,8 @@ class MockEtcdClient : public EtcdClient {
 
 class SyncEtcdTest : public ::testing::Test {
  public:
-  boost::shared_ptr<JsonObject> MakeJson(const string& json) {
-    return boost::make_shared<JsonObject>(json);
+  shared_ptr<JsonObject> MakeJson(const string& json) {
+    return make_shared<JsonObject>(json);
   }
 
   void SetUp() {
@@ -165,7 +167,7 @@ class SyncEtcdTest : public ::testing::Test {
   }
 
   MockEtcdClient* mock_client_;
-  boost::scoped_ptr<SyncEtcdClient> sync_client_;
+  unique_ptr<SyncEtcdClient> sync_client_;
   const map<string, string> kEmptyParams;
 };
 

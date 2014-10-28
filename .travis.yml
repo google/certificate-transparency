@@ -10,7 +10,9 @@ before_install:
  - sudo apt-add-repository -y ppa:fcitx-team/nightly
  - sudo apt-add-repository -y ppa:dirk-computer42/c42-edge
  - sudo apt-get update -qq
- - sudo apt-get install -qq protobuf-compiler libprotobuf-java libprotobuf-dev python-protobuf python-mock python-gflags python-requests python-dev libjson-c-dev libboost-dev libboost-system-dev libboost-thread-dev libgoogle-glog-dev libgflags-dev libldns-dev python-dnspython
+
+install:
+ - sudo apt-get install -qq protobuf-compiler libprotobuf-java libprotobuf-dev python-protobuf python-mock python-gflags python-requests python-dev libjson-c-dev libgoogle-glog-dev libgflags-dev libldns-dev python-dnspython libstdc++-4.8-dev
 # Stupid frikkin' google-mock package on Precise is b0rked, so hack it up:
  - wget https://googlemock.googlecode.com/files/gmock-1.6.0.zip -O /tmp/gmock-1.6.0.zip
  - unzip -d /tmp /tmp/gmock-1.6.0.zip

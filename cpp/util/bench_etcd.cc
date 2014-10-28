@@ -1,13 +1,11 @@
-#include <boost/bind.hpp>
-#include <boost/make_shared.hpp>
-#include <boost/scoped_ptr.hpp>
-#include <boost/shared_ptr.hpp>
-#include <boost/thread.hpp>
 #include <event2/thread.h>
+#include <functional>
 #include <gflags/gflags.h>
 #include <glog/logging.h>
 #include <map>
+#include <memory>
 #include <string>
+#include <thread>
 #include <vector>
 
 #include "util/etcd.h"
@@ -15,14 +13,17 @@
 
 namespace libevent = cert_trans::libevent;
 
-using boost::bind;
-using boost::make_shared;
-using boost::scoped_ptr;
-using boost::shared_ptr;
-using boost::thread;
 using cert_trans::EtcdClient;
+using std::bind;
+using std::make_shared;
 using std::map;
+using std::placeholders::_1;
+using std::placeholders::_2;
+using std::placeholders::_3;
+using std::shared_ptr;
 using std::string;
+using std::thread;
+using std::unique_ptr;
 using std::vector;
 using util::Status;
 
@@ -59,13 +60,12 @@ void make_request(bool* done, EtcdClient* etcd, int* count,
 
 void test_etcd() {
   const shared_ptr<libevent::Base> event_base(make_shared<libevent::Base>());
-  scoped_ptr<EtcdClient> etcd(
-      new EtcdClient(event_base, FLAGS_etcd, FLAGS_etcd_port));
+  EtcdClient etcd(event_base, FLAGS_etcd, FLAGS_etcd_port);
 
   const string data(FLAGS_bytes_per_request, 'x');
   int count(FLAGS_requests_per_thread);
   bool done(false);
-  make_request(&done, etcd.get(), &count, data);
+  make_request(&done, &etcd, &count, data);
 
   LOG(INFO) << "calling event_base_dispatch";
   while (!done)

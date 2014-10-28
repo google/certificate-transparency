@@ -6,9 +6,9 @@
 
 #include "base/time_support.h"
 
-using boost::lock_guard;
-using boost::mutex;
-using boost::shared_ptr;
+using std::lock_guard;
+using std::mutex;
+using std::shared_ptr;
 using std::string;
 using std::vector;
 
@@ -60,17 +60,17 @@ Base::~Base() {
 
 
 void Base::Dispatch() {
-  boost::mutex::scoped_try_lock lock(dispatch_lock_);
   // There should /never/ be more than 1 thread trying to call Dispatch(), so
   // we should expect to always own the lock here.
-  CHECK(lock.owns_lock());
+  CHECK(dispatch_lock_.try_lock());
   CHECK_EQ(event_base_dispatch(base_), 0);
+  dispatch_lock_.unlock();
 }
 
 
 void Base::DispatchOnce() {
   // Only one thread can be running a dispatch loop at a time
-  boost::mutex::scoped_lock lock(dispatch_lock_);
+  lock_guard<mutex> lock(dispatch_lock_);
   CHECK_EQ(event_base_loop(base_, EVLOOP_ONCE), 0);
 }
 

@@ -1,9 +1,9 @@
 #include "util/etcd.h"
 
-#include <boost/make_shared.hpp>
-#include <gtest/gtest.h>
 #include <gmock/gmock.h>
+#include <gtest/gtest.h>
 #include <map>
+#include <memory>
 #include <string>
 
 #include "util/json_wrapper.h"
@@ -13,15 +13,21 @@ namespace cert_trans {
 
 using std::list;
 using std::make_pair;
+using std::make_shared;
 using std::map;
 using std::pair;
+using std::placeholders::_1;
+using std::placeholders::_2;
+using std::placeholders::_3;
+using std::shared_ptr;
 using std::string;
-using testing::_;
 using testing::AllOf;
 using testing::Contains;
 using testing::InvokeArgument;
 using testing::Pair;
+using testing::_;
 using util::Status;
+
 
 const char kEntryKey[] = "/some/key";
 const char kDirKey[] = "/some";
@@ -152,8 +158,8 @@ class TestableEtcdClient : public EtcdClient {
 
 class EtcdTest : public ::testing::Test {
  public:
-  boost::shared_ptr<JsonObject> MakeJson(const string& json) {
-    return boost::make_shared<JsonObject>(json);
+  shared_ptr<JsonObject> MakeJson(const string& json) {
+    return make_shared<JsonObject>(json);
   }
 
   void GetCallback(bool expect_success, int expect_index,

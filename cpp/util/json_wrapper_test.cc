@@ -1,12 +1,12 @@
 #include "util/json_wrapper.h"
 
-#include <boost/shared_ptr.hpp>
+#include <memory>
 #include <gtest/gtest.h>
 
 #include "util/testing.h"
 #include "util/util.h"
 
-using boost::shared_ptr;
+using std::shared_ptr;
 using std::string;
 
 class JsonWrapperTest : public ::testing::Test {};

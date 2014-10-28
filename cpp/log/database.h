@@ -2,7 +2,7 @@
 #ifndef DATABASE_H
 #define DATABASE_H
 
-#include <boost/function.hpp>
+#include <functional>
 #include <glog/logging.h>
 #include <set>
 
@@ -55,7 +55,7 @@
 template <class Logged>
 class ReadOnlyDatabase {
  public:
-  typedef boost::function<void(const ct::SignedTreeHead&)> NotifySTHCallback;
+  typedef std::function<void(const ct::SignedTreeHead&)> NotifySTHCallback;
 
   enum LookupResult {
     LOOKUP_OK,
@@ -169,7 +169,7 @@ namespace cert_trans {
 
 class DatabaseNotifierHelper {
  public:
-  typedef boost::function<void(const ct::SignedTreeHead&)> NotifySTHCallback;
+  typedef std::function<void(const ct::SignedTreeHead&)> NotifySTHCallback;
 
   DatabaseNotifierHelper() {
   }
