@@ -1,10 +1,10 @@
 #ifndef CERT_TRANS_UTIL_ETCD_H_
 #define CERT_TRANS_UTIL_ETCD_H_
 
-#include <boost/function.hpp>
-#include <boost/shared_ptr.hpp>
 #include <list>
 #include <map>
+#include <memory>
+#include <mutex>
 #include <stdint.h>
 #include <string>
 
@@ -19,20 +19,15 @@ namespace cert_trans {
 
 class EtcdClient {
  public:
-  typedef boost::function<void(util::Status status, int index,
-                               const std::string& value)> GetCallback;
-  typedef boost::function<void(
-      util::Status status,
-      const std::list<std::pair<std::string, int> >& values)> GetAllCallback;
-  typedef boost::function<void(util::Status status, int index)> CreateCallback;
-  typedef boost::function<void(util::Status status, const std::string& key,
-                               int index)> CreateInQueueCallback;
-  typedef boost::function<void(util::Status status, int new_index)>
-      UpdateCallback;
-  typedef boost::function<void(util::Status status)> DeleteCallback;
+  typedef std::function<void(util::Status status, int index, const std::string& value)> GetCallback;
+  typedef std::function<void(util::Status status, const std::list<std::pair<std::string, int> >& values)> GetAllCallback;
+  typedef std::function<void(util::Status status, int index)> CreateCallback;
+  typedef std::function<void(util::Status status, const std::string& key, int index)> CreateInQueueCallback;
+  typedef std::function<void(util::Status status, int new_index)> UpdateCallback;
+  typedef std::function<void(util::Status status)> DeleteCallback;
 
   // TODO(pphaneuf): This should take a set of servers, not just one.
-  EtcdClient(const boost::shared_ptr<libevent::Base>& event_base,
+  EtcdClient(const std::shared_ptr<libevent::Base>& event_base,
              const std::string& host, uint16_t port);
 
   virtual ~EtcdClient();
@@ -54,8 +49,7 @@ class EtcdClient {
               const DeleteCallback& cb);
 
  protected:
-  typedef boost::function<void(util::Status status,
-                               const boost::shared_ptr<JsonObject>&)>
+  typedef std::function<void(util::Status status, const std::shared_ptr<JsonObject>&)>
       GenericCallback;
 
   EtcdClient();  // Testing only
@@ -66,7 +60,7 @@ class EtcdClient {
 
  private:
   typedef std::map<std::pair<std::string, uint16_t>,
-                   boost::shared_ptr<libevent::HttpConnection> > ConnectionMap;
+                   std::shared_ptr<libevent::HttpConnection> > ConnectionMap;
 
   struct Request;
 
@@ -76,15 +70,15 @@ class EtcdClient {
   bool MaybeUpdateLeader(libevent::HttpRequest* req, Request* etcd_req);
   void RequestDone(libevent::HttpRequest* req, Request* etcd_req);
 
-  boost::shared_ptr<libevent::HttpConnection> GetConnection(
+  std::shared_ptr<libevent::HttpConnection> GetConnection(
       const std::string& host, uint16_t port);
 
-  const boost::shared_ptr<libevent::Base> event_base_;
+  const std::shared_ptr<libevent::Base> event_base_;
 
-  boost::mutex lock_;
+  std::mutex lock_;
   ConnectionMap conns_;
   // Last known leader.
-  boost::shared_ptr<libevent::HttpConnection> leader_;
+  std::shared_ptr<libevent::HttpConnection> leader_;
 
   DISALLOW_COPY_AND_ASSIGN(EtcdClient);
 };

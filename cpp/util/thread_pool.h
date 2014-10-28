@@ -1,8 +1,8 @@
 #ifndef CERT_TRANS_UTIL_THREAD_POOL_H_
 #define CERT_TRANS_UTIL_THREAD_POOL_H_
 
-#include <boost/function.hpp>
-#include <boost/scoped_ptr.hpp>
+#include <functional>
+#include <memory>
 
 #include "base/macros.h"
 
@@ -21,11 +21,11 @@ class ThreadPool {
 
   // Arranges for "closure" to be called in the thread pool. The
   // function must not be empty.
-  void Add(const boost::function<void()>& closure);
+  void Add(const std::function<void()>& closure);
 
  private:
   class Impl;
-  const boost::scoped_ptr<Impl> impl_;
+  const std::unique_ptr<Impl> impl_;
 
   DISALLOW_COPY_AND_ASSIGN(ThreadPool);
 };

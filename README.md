@@ -28,7 +28,6 @@ Some systems make the googlemock source available as a package; on Debian, this 
 
 Make sure to install glog **after** gflags, to avoid linking errors.
 
- - [Boost](http://www.boost.org/), at least 1.48
  - [sqlite3](http://www.sqlite.org/)
  - [JSON-C](https://github.com/json-c/json-c/), at least 0.11
 

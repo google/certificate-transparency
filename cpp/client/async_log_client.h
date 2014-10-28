@@ -1,8 +1,8 @@
 #ifndef CERT_TRANS_CLIENT_ASYNC_LOG_CLIENT_H_
 #define CERT_TRANS_CLIENT_ASYNC_LOG_CLIENT_H_
 
-#include <boost/function.hpp>
-#include <boost/shared_ptr.hpp>
+#include <functional>
+#include <memory>
 #include <stdint.h>
 #include <string>
 #include <vector>
@@ -36,15 +36,15 @@ class AsyncLogClient {
     ct::LogEntry entry;
   };
 
-  typedef boost::function<void(Status)> Callback;
+  typedef std::function<void(Status)> Callback;
 
-  AsyncLogClient(const boost::shared_ptr<libevent::Base>& base,
+  AsyncLogClient(const std::shared_ptr<libevent::Base>& base,
                  const std::string& server_uri);
 
   void GetSTH(ct::SignedTreeHead* sth, const Callback& done);
 
   // This does not clear "roots" before appending to it.
-  void GetRoots(std::vector<boost::shared_ptr<Cert> >* roots,
+  void GetRoots(std::vector<std::shared_ptr<Cert> >* roots,
                 const Callback& done);
 
   // This does not clear "entries" before appending the retrieved
@@ -76,8 +76,8 @@ class AsyncLogClient {
                         ct::SignedCertificateTimestamp* sct, bool pre_cert,
                         const Callback& done);
 
-  const boost::shared_ptr<libevent::Base> base_;
-  const boost::shared_ptr<evhttp_uri> server_uri_;
+  const std::shared_ptr<libevent::Base> base_;
+  const std::shared_ptr<evhttp_uri> server_uri_;
   libevent::HttpConnection conn_;
 
   DISALLOW_COPY_AND_ASSIGN(AsyncLogClient);

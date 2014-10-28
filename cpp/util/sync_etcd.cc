@@ -1,20 +1,22 @@
 #include "util/sync_etcd.h"
 
-#include <boost/bind.hpp>
-#include <boost/make_shared.hpp>
+#include <condition_variable>
 #include <event2/event.h>
+#include <memory>
 
 #include "util/libevent_wrapper.h"
 #include "util/status.h"
 
-using boost::bind;
-using boost::condition_variable;
-using boost::shared_ptr;
+using std::bind;
+using std::condition_variable;
 using std::list;
 using std::pair;
+using std::placeholders::_1;
+using std::placeholders::_2;
+using std::placeholders::_3;
+using std::shared_ptr;
 using std::string;
 using util::Status;
-
 
 namespace cert_trans {
 
@@ -57,7 +59,7 @@ struct DoneFunctor3 {
 
 
 template <class F>
-Status BlockingCall(boost::shared_ptr<libevent::Base> base, F async_method) {
+Status BlockingCall(std::shared_ptr<libevent::Base> base, F async_method) {
   bool done(false);
   Status status;
   async_method(bind(DoneFunctor1(), &done, &status, _1));
@@ -69,7 +71,7 @@ Status BlockingCall(boost::shared_ptr<libevent::Base> base, F async_method) {
 
 
 template <class F, class P1>
-Status BlockingCall(boost::shared_ptr<libevent::Base> base, F async_method,
+Status BlockingCall(std::shared_ptr<libevent::Base> base, F async_method,
                     P1* p1) {
   bool done(false);
   Status status;
@@ -82,7 +84,7 @@ Status BlockingCall(boost::shared_ptr<libevent::Base> base, F async_method,
 
 
 template <class F, class P1, class P2>
-Status BlockingCall(boost::shared_ptr<libevent::Base> base, F async_method,
+Status BlockingCall(std::shared_ptr<libevent::Base> base, F async_method,
                     P1* p1, P2* p2) {
   bool done(false);
   Status status;
@@ -98,12 +100,12 @@ Status BlockingCall(boost::shared_ptr<libevent::Base> base, F async_method,
 
 
 SyncEtcdClient::SyncEtcdClient(const std::string& host, uint16_t port)
-    : base_(boost::make_shared<libevent::Base>()),
+    : base_(std::make_shared<libevent::Base>()),
       client_(new EtcdClient(base_, host, port)) {
 }
 
 SyncEtcdClient::SyncEtcdClient(EtcdClient* client)
-    : base_(boost::make_shared<libevent::Base>()),
+    : base_(std::make_shared<libevent::Base>()),
       client_(client) {
 }
 

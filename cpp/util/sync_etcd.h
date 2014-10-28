@@ -1,10 +1,10 @@
 #ifndef CERT_TRANS_UTIL_SYNC_ETCD_H_
 #define CERT_TRANS_UTIL_SYNC_ETCD_H_
 
-#include <boost/shared_ptr.hpp>
+#include <list>
+#include <memory>
 #include <stdint.h>
 #include <string>
-#include <list>
 
 #include "base/macros.h"
 #include "util/etcd.h"
@@ -46,8 +46,8 @@ class SyncEtcdClient {
   // Takes ownership of |client_|
   SyncEtcdClient(EtcdClient* client_);
 
-  boost::shared_ptr<libevent::Base> base_;
-  boost::scoped_ptr<EtcdClient> client_;
+  std::shared_ptr<libevent::Base> base_;
+  std::unique_ptr<EtcdClient> client_;
 
   friend class SyncEtcdTest;
 

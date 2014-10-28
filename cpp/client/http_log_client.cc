@@ -1,9 +1,8 @@
 /* -*- indent-tabs-mode: nil -*- */
 #include "client/http_log_client.h"
 
-#include <boost/bind.hpp>
-#include <boost/make_shared.hpp>
 #include <event2/buffer.h>
+#include <functional>
 #include <glog/logging.h>
 
 #include "log/cert.h"
@@ -14,9 +13,6 @@
 
 namespace libevent = cert_trans::libevent;
 
-using boost::bind;
-using boost::make_shared;
-using boost::shared_ptr;
 using cert_trans::AsyncLogClient;
 using cert_trans::Cert;
 using cert_trans::CertChain;
@@ -25,6 +21,10 @@ using cert_trans::PreCertChain;
 using ct::MerkleAuditProof;
 using ct::SignedCertificateTimestamp;
 using ct::SignedTreeHead;
+using std::bind;
+using std::make_shared;
+using std::placeholders::_1;
+using std::shared_ptr;
 using std::string;
 using std::vector;
 
