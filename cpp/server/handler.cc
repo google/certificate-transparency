@@ -35,6 +35,7 @@ using std::multimap;
 using std::placeholders::_1;
 using std::shared_ptr;
 using std::string;
+using std::unique_ptr;
 using std::vector;
 
 DEFINE_int32(max_leaf_entries_per_response, 1000,
@@ -98,17 +99,14 @@ bool ExtractChain(evhttp_request* req, CertChain* chain) {
       return false;
     }
 
-    // TODO(pphaneuf): I would have used unique_ptr here to release
-    // the ownership, but we can't use it yet (C++11).
-    Cert* const cert(new Cert);
+    unique_ptr<Cert> cert(new Cert);
     cert->LoadFromDerString(json_cert.FromBase64());
     if (!cert->IsLoaded()) {
-      delete cert;
       SendError(req, HTTP_BADREQUEST, "Unable to parse provided chain.");
       return false;
     }
 
-    chain->AddCert(cert);
+    chain->AddCert(cert.release());
   }
 
   return true;

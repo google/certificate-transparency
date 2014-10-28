@@ -2,14 +2,12 @@
 
 #include <memory>
 
-using std::shared_ptr;
+using std::unique_ptr;
 
 
 JsonObject::JsonObject(evbuffer* buffer) : obj_(NULL) {
-  // TODO(pphaneuf): We just want a deleter, but unique_ptr is not
-  // available to us yet (C++11).
-  const shared_ptr<json_tokener> tokener(json_tokener_new(),
-                                         json_tokener_free);
+  const unique_ptr<json_tokener, void (*)(json_tokener*)> tokener(
+      json_tokener_new(), json_tokener_free);
 
   evbuffer_ptr ptr;
   evbuffer_ptr_set(buffer, &ptr, 0, EVBUFFER_PTR_SET);

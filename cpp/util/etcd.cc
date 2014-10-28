@@ -22,6 +22,7 @@ using std::placeholders::_2;
 using std::shared_ptr;
 using std::string;
 using std::to_string;
+using std::unique_ptr;
 using util::Status;
 
 namespace cert_trans {
@@ -348,10 +349,8 @@ bool EtcdClient::MaybeUpdateLeader(libevent::HttpRequest* req,
       evhttp_find_header(evhttp_request_get_input_headers(req->get()),
                          "location")));
 
-  // TODO(pphaneuf): We only need a deleter, would use unique_ptr, but
-  // we don't have C++11.
-  const shared_ptr<evhttp_uri> uri(evhttp_uri_parse(location),
-                                   &evhttp_uri_free);
+  const unique_ptr<evhttp_uri, void (*)(evhttp_uri*)> uri(
+      evhttp_uri_parse(location), &evhttp_uri_free);
   CHECK(uri);
   LOG(INFO) << "etcd leader: " << evhttp_uri_get_host(uri.get()) << ":"
             << evhttp_uri_get_port(uri.get());

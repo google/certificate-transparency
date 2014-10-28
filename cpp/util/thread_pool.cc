@@ -26,11 +26,9 @@ class ThreadPool::Impl {
 
   void Worker();
 
-  // TODO(pphaneuf): Would have used vector<thread>, but this requires
-  // emplace_back, which is not available to us yet (C++11). I'd also
-  // like it to be const, but it required to jump a few more hoops,
-  // keeping it simple for now.
-  vector<thread*> threads_;
+  // TODO(pphaneuf): I'd like this to be const, but it required
+  // jumping through a few more hoops, keeping it simple for now.
+  vector<thread> threads_;
 
   mutex queue_lock_;
   condition_variable queue_cond_var_;
@@ -51,10 +49,8 @@ ThreadPool::Impl::~Impl() {
   queue_cond_var_.notify_all();
 
   // Wait for the threads to exit.
-  for (vector<thread*>::const_iterator it = threads_.begin();
-       it != threads_.end(); ++it) {
-    (*it)->join();
-    delete *it;
+  for (auto& thread : threads_) {
+    thread.join();
   }
 }
 
@@ -95,7 +91,7 @@ ThreadPool::ThreadPool() : impl_(new Impl) {
 
   LOG(INFO) << "ThreadPool starting with " << num_threads << " threads";
   for (int i = 0; i < num_threads; ++i)
-    impl_->threads_.push_back(new thread(&Impl::Worker, impl_.get()));
+    impl_->threads_.emplace_back(thread(&Impl::Worker, impl_.get()));
 }
 
 
