@@ -14,7 +14,6 @@ from twisted.python import failure
 from twisted.test import proto_helpers
 from twisted.trial import unittest
 
-
 FLAGS = gflags.FLAGS
 
 
@@ -72,6 +71,7 @@ class AsyncLogClientTest(unittest.TestCase):
             def __init__(self, code, reason, json_content=None):
                 self.code = code
                 self.phrase = reason
+                self.headers = AsyncLogClientTest.FakeHandler.FakeHeader()
                 if json_content is not None:
                     self._body = json.dumps(json_content)
                 else:
@@ -87,6 +87,10 @@ class AsyncLogClientTest(unittest.TestCase):
         @classmethod
         def make_response(cls, code, reason, json_content=None):
             return cls.FakeResponse(code, reason, json_content=json_content)
+
+        class FakeHeader(object):
+            def getAllRawHeaders(self):
+                return []
 
     # Twisted doesn't (yet) have an official fake Agent:
     # https://twistedmatrix.com/trac/ticket/4024
@@ -149,9 +153,11 @@ class AsyncLogClientTest(unittest.TestCase):
     class EntryConsumer(object):
         def __init__(self):
             self.received = []
+            self.consumed = defer.Deferred()
 
         def done(self, result):
             self.result = result
+            self.consumed.callback("Done")
 
         def consume(self, entries):
             self.received += entries
@@ -163,8 +169,15 @@ class AsyncLogClientTest(unittest.TestCase):
         d = producer.startProducing(consumer)
         d.addBoth(consumer.done)
         # Ensure the tasks scheduled in the reactor are invoked.
-        self.clock.advance(0)
+        # Since start of get entries is delayed, we have to pump to make up for
+        # that delay. If some test is going to force get_entries to do more than
+        # one fetch, then that test has to take care of additional pumping.
+        self.pump_get_entries()
         return consumer
+
+    def pump_get_entries(self):
+        # Helper method which advances time past get_entries delay
+        self.clock.pump([0, log_client.EntryProducer.MAX_INITIAL_REQUEST_DELAY])
 
     def test_get_entries(self):
         client = self.default_client()
@@ -183,6 +196,7 @@ class AsyncLogClientTest(unittest.TestCase):
 
         client = self.one_shot_client(json_entries)
         consumer = self.get_entries(client, 0, 9)
+        self.pump_get_entries()
 
         self.assertTrue(consumer.result.check(log_client.InvalidResponseError))
         # The entire response should be discarded upon error.
@@ -194,8 +208,17 @@ class AsyncLogClientTest(unittest.TestCase):
 
         client = self.one_shot_client(large_response)
         consumer = self.get_entries(client, 4, 4)
-
         self.assertTrue(consumer.result.check(log_client.InvalidResponseError))
+
+    def test_get_entries_raises_if_query_is_larger_than_tree_size(self):
+        client = log_client.AsyncLogClient(
+            self.FakeAgent(self.FakeHandler(
+                test_util.DEFAULT_URI, tree_size=3)), test_util.DEFAULT_URI,
+            reactor=self.clock)
+        consumer = self.get_entries(client, 0, 9)
+        # also pump error
+        self.pump_get_entries()
+        self.assertTrue(consumer.result.check(log_client.HTTPClientError))
 
     def test_get_entries_returns_all_in_batches(self):
         mock_handler = mock.Mock()
@@ -217,16 +240,10 @@ class AsyncLogClientTest(unittest.TestCase):
                 self.FakeHandler(test_util.DEFAULT_URI, entry_limit=3)),
             test_util.DEFAULT_URI, reactor=self.clock)
         consumer = self.get_entries(client, 0, 9)
+        # 1 pump in get_entries and 3 more so we fetch everything
+        for _ in range(0, 3):
+            self.pump_get_entries()
         self.assertTrue(test_util.verify_entries(consumer.received, 0, 9))
-
-    def test_get_entries_returns_partial_if_log_returns_partial(self):
-        client = log_client.AsyncLogClient(
-            self.FakeAgent(self.FakeHandler(
-                test_util.DEFAULT_URI, tree_size=3)), test_util.DEFAULT_URI,
-            reactor=self.clock)
-        consumer = self.get_entries(client, 0, 9)
-        self.assertTrue(consumer.result.check(log_client.HTTPClientError))
-        self.assertTrue(test_util.verify_entries(consumer.received, 0, 2))
 
     class PausingConsumer(object):
         def __init__(self, pause_at):
@@ -255,14 +272,18 @@ class AsyncLogClientTest(unittest.TestCase):
         consumer.registerProducer(producer)
         d = producer.startProducing(consumer)
         d.addBoth(consumer.done)
-        self.clock.advance(0)
+        initial_delay = log_client.EntryProducer.MAX_INITIAL_REQUEST_DELAY
+        # fire all pending callbacks, and then fire request
+        self.pump_get_entries()
         self.assertTrue(test_util.verify_entries(consumer.received, 0, 3))
         self.assertEqual(4, len(consumer.received))
         self.assertIsNone(consumer.result)
         producer.resumeProducing()
+        # pump next 2 batches
+        for _ in range(0, 2):
+            self.pump_get_entries()
         self.assertEqual(10, consumer.result)
         self.assertTrue(test_util.verify_entries(consumer.received, 0, 9))
-
 
 if __name__ == "__main__":
     sys.argv = FLAGS(sys.argv)

@@ -4,6 +4,8 @@ import json
 
 from ct.proto import client_pb2
 import gflags
+import logging
+import random
 import requests
 
 from twisted.internet import defer
@@ -15,13 +17,24 @@ from twisted.python import failure
 from twisted.web import client
 from twisted.web import http
 from twisted.web import iweb
+from Queue import Queue
 from zope.interface import implements
 
 
 FLAGS = gflags.FLAGS
 
 gflags.DEFINE_integer("entry_fetch_batch_size", 1000, "Maximum number of "
-                      "entries to attempt to fetch in one request")
+                      "entries to attempt to fetch in one request.")
+
+gflags.DEFINE_integer("max_fetchers_in_parallel", 100, "Maximum number of "
+                      "concurrent fetches.")
+
+gflags.DEFINE_integer("get_entries_retry_delay", 5, "Number of seconds after "
+                      "which get-entries will be retried if it encountered "
+                      "an error.")
+
+gflags.DEFINE_integer("get_entries_max_retries", 10, "Number of retries after "
+                      "which get-entries simply fails.")
 
 gflags.DEFINE_integer("response_buffer_size_bytes", 50 * 1000 * 1000, "Maximum "
                       "size of a single response buffer. Should be set such "
@@ -188,20 +201,20 @@ class RequestHandler(object):
             raise HTTPError("Connection to %s failed: %s" % (uri, e))
 
     @staticmethod
-    def check_response_status(code, reason, content=''):
+    def check_response_status(code, reason, content='', headers=''):
         if code == 200:
             return
         elif 400 <= code < 500:
-            raise HTTPClientError(reason + ' (' + content + ')')
+            raise HTTPClientError("%s (%s) %s" % (reason, content, headers))
         elif 500 <= code < 600:
-            raise HTTPServerError(reason + ' (' + content + ')')
+            raise HTTPServerError("%s (%s) %s" % (reason, content, headers))
         else:
-            raise HTTPError(reason + ' (' + content + ')')
+            raise HTTPError("%s (%s) %s" % (reason, content, headers))
 
     def get_response_body(self, uri, params=None):
         response = self.get_response(uri, params=params)
         self.check_response_status(response.status_code, response.reason,
-                                   response.content)
+                                   response.content, response.headers)
         return response.content
 
 
@@ -499,7 +512,8 @@ class AsyncRequestHandler(object):
     @staticmethod
     def _response_cb(response):
         try:
-            RequestHandler.check_response_status(response.code, response.phrase)
+            RequestHandler.check_response_status(response.code, response.phrase,
+                                      list(response.headers.getAllRawHeaders()))
         except HTTPError as e:
             return failure.Failure(e)
         finished = defer.Deferred()
@@ -522,6 +536,7 @@ class AsyncRequestHandler(object):
 class EntryProducer(object):
     """A push producer for log entries."""
     implements(iweb.IBodyProducer)
+    MAX_INITIAL_REQUEST_DELAY = 1
 
     def __init__(self, handler, reactor, uri, start, end, batch_size):
         self._handler = handler
@@ -534,22 +549,95 @@ class EntryProducer(object):
         self._end = end
         self._current = self._start
         self._batch_size = batch_size
+        self._batches = Queue()
+        self._currently_fetching = 0
+        self._last_fetching = self._current
+        self._max_currently_fetching = (FLAGS.max_fetchers_in_parallel *
+                                        self._batch_size)
         # Required attribute of the interface.
         self.length = iweb.UNKNOWN_LENGTH
+        self.min_delay = FLAGS.get_entries_retry_delay
 
     @property
     def finished(self):
         return self._current > self._end
 
-    def _response_eb(self, result):
-        self.stopProducing()
-        self._done.errback(result)
+    def __fail(self, failure):
+        if not self._stopped:
+            self.stopProducing()
+            self._done.errback(failure)
+
+    def __calculate_retry_delay(self, retries):
+        """Calculates delay based on number of retries which already happened.
+
+        Random is there, so we won't attack server lots of requests exactly
+        at the same time, and 1.3 is nice constant for exponential backof."""
+        return (0.4 + random.uniform(0.6, 1.0)) * self.min_delay * 1.3**retries
+
+    def _response_eb(self, failure, first, last, retries):
+        """Error back for HTTP errors"""
+        if not self._paused:
+            # if it's not last retry and failure wasn't our fault we retry
+            if (retries < FLAGS.get_entries_max_retries and
+                not failure.check(HTTPClientError)):
+                logging.info("Retrying get-entries for range <%d, %d> retry: %d"
+                             % (first, last, retries))
+                d = task.deferLater(self._reactor, self.__calculate_retry_delay(retries),
+                                       self._create_request,
+                                       first, last)
+                d.addErrback(self._response_eb, first, last, retries + 1)
+                return d
+            else:
+                self.__fail(failure)
+
+    def _fetch_eb(self, failure):
+        """Error back for errors after getting result of a request
+        (InvalidResponse)"""
+        self.__fail(failure)
 
     def _write_pending(self):
         if self._pending:
             self._current += len(self._pending)
             self._consumer.consume(self._pending)
             self._pending = None
+
+    def _batch_completed(self, result):
+        self._currently_fetching -= len(result)
+        return result
+
+    def _create_request(self, first, last):
+        # it's not the best idea to attack server with many requests exactly at
+        # the same time, so requests are sent after slight delay.
+        return task.deferLater(self._reactor,
+                               random.uniform(0,
+                                EntryProducer.MAX_INITIAL_REQUEST_DELAY),
+                               self._handler.get,
+                               self._uri + "/" + _GET_ENTRIES_PATH,
+                               params={"start": str(first), "end": str(last)})
+
+    def _create_next_request(self, first, last, entries, retries):
+        d = self._create_request(first, last)
+        d.addErrback(self._response_eb, first, last, retries)
+        d.addCallback(_parse_entries, last - first + 1)
+        d.addCallback(lambda result: (entries + result, len(result)))
+        d.addCallback(self._fetch, first, last, retries)
+        return d
+
+    def _fetch(self, result, first, last, retries):
+        entries, last_fetched_entries_count = result
+        next_range_start = first + last_fetched_entries_count
+        if next_range_start > last:
+            return entries
+        return self._create_next_request(next_range_start, last,
+                                         entries, retries)
+
+    def _create_fetch_deferred(self, first, last, retries=0):
+        d = defer.Deferred()
+        d.addCallback(self._fetch, first, last, retries)
+        d.addCallback(self._batch_completed)
+        d.addErrback(self._fetch_eb)
+        d.callback(([], 0))
+        return d
 
     @defer.deferredGenerator
     def produce(self):
@@ -560,19 +648,18 @@ class EntryProducer(object):
             if self.finished:
                 self.finishProducing()
                 return
+            first = self._last_fetching
+            while (self._currently_fetching <= self._max_currently_fetching and
+                   self._last_fetching <= self._end):
+                last = min(self._last_fetching + self._batch_size - 1, self._end,
+                   self._last_fetching + self._max_currently_fetching
+                           - self._currently_fetching + 1)
+                self._batches.put(self._create_fetch_deferred(first, last))
+                self._currently_fetching += last - first + 1
+                first = last + 1
+                self._last_fetching = first
 
-            # Currently, a naive strategy is used where each response determines
-            # the next request. An optimized strategy interleaving two queries
-            # would likely better fill the pipeline.
-            first = self._current
-            last = min(self._current + self._batch_size - 1, self._end)
-            deferred_response = self._handler.get(
-                self._uri + "/" + _GET_ENTRIES_PATH,
-                params={"start": str(first), "end": str(last)})
-            deferred_response.addCallback(_parse_entries, last - first + 1)
-            deferred_response.addErrback(self._response_eb)
-
-            wfd = defer.waitForDeferred(deferred_response)
+            wfd = defer.waitForDeferred(self._batches.get())
             # Pause here until the body of the response is available.
             yield wfd
             # The producer may have been paused while waiting for the response,

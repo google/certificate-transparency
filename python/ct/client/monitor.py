@@ -138,7 +138,6 @@ class Monitor(object):
     def __update_sth_errback(self, failure):
         """Fired if there was network error or log server sent invalid
         response"""
-        failure.trap(log_client.HTTPError, log_client.InvalidResponseError)
         logging.error("get-sth from %s failed: %s" % (self.servername,
                                                      failure.getErrorMessage()))
         return False
@@ -261,10 +260,10 @@ class Monitor(object):
             return "all night"
 
     def __fetch_entries_eb(self, e, consumer):
+        e.trap(log_client.HTTPError, log_client.InvalidResponseError)
         logging.error("get-entries from %s failed: %s" %
                       (self.servername, e))
         consumer.done(None)
-        e.trap(log_client.HTTPError, log_client.InvalidResponseError)
         return True
 
     class EntryConsumer(object):
@@ -284,6 +283,7 @@ class Monitor(object):
             #unverified_tree is tree that will be built during consumption
             self._unverified_tree = verified_tree
             self.consumed = defer.Deferred()
+            self._fetched = 0
 
         def done(self, result):
             if not result:
@@ -320,7 +320,9 @@ class Monitor(object):
             return d
 
         def consume(self, entry_batch):
-            logging.info("Fetched %d entries" % len(entry_batch))
+            self._fetched += len(entry_batch)
+            logging.info("Fetched %d entries (total: %d from %d)" %
+                         (len(entry_batch), self._fetched, self._query_size))
 
             # calculate the hash for the latest fetched certs
             # TODO(ekasper): parse temporary data into permanent storage.
@@ -343,7 +345,7 @@ class Monitor(object):
                                          self.__state.pending_sth,
                                          self.__verified_tree)
         d = producer.startProducing(consumer)
-        d.addCallbacks(consumer.done)
+        d.addCallback(consumer.done)
         d.addErrback(self.__fetch_entries_eb, consumer)
         return consumer.consumed
 

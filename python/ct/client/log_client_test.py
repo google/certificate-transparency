@@ -21,6 +21,7 @@ class LogClientTest(unittest.TestCase):
             def __init__(self, code, reason, json_content=None):
                 self.status_code = code
                 self.reason = reason
+                self.headers = ''
                 if json_content is not None:
                     self.content = json.dumps(json_content)
                 else:

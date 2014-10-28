@@ -1,7 +1,8 @@
+import copy
+
 from ct.client import log_client
 from ct.crypto import merkle
 from ct.proto import client_pb2
-
 
 DEFAULT_STH = client_pb2.SthResponse()
 DEFAULT_STH.timestamp = 1234
@@ -20,7 +21,7 @@ class FakeHandlerBase(log_client.RequestHandler):
         self._uri = uri
         self._entry_limit = entry_limit
 
-        self._sth = DEFAULT_STH
+        self._sth = copy.deepcopy(DEFAULT_STH)
         # Override with custom size
         if tree_size > 0:
             self._sth.tree_size = tree_size
