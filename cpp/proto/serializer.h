@@ -217,8 +217,6 @@ class Deserializer {
   // We do not make a copy, so input must remain valid.
   // FIXME: and so we should take a string *, not a string &.
   explicit Deserializer(const std::string& input);
-  ~Deserializer() {
-  }
 
   enum DeserializeResult {
     OK,

@@ -330,10 +330,6 @@ EtcdClient::EtcdClient(const shared_ptr<libevent::Base>& event_base,
 }
 
 
-EtcdClient::EtcdClient() {
-}
-
-
 EtcdClient::~EtcdClient() {
   LOG(INFO) << "~EtcdClient: " << this;
 }

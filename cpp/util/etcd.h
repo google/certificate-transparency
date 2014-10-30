@@ -58,7 +58,7 @@ class EtcdClient {
                              const std::shared_ptr<JsonObject>&)>
       GenericCallback;
 
-  EtcdClient();  // Testing only
+  EtcdClient() = default;  // Testing only
 
   virtual void Generic(const std::string& key,
                        const std::map<std::string, std::string>& params,

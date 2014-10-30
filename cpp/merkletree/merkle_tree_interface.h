@@ -15,10 +15,8 @@ namespace cert_trans {
 // merkletree/merkle_tree.h and merkletree/compact_merkle_tree.h.
 class MerkleTreeInterface {
  public:
-  MerkleTreeInterface() {
-  }
-  virtual ~MerkleTreeInterface() {
-  }
+  MerkleTreeInterface() = default;
+  virtual ~MerkleTreeInterface() = default;
 
   // Length of a node (i.e., a hash), in bytes.
   virtual size_t NodeSize() const = 0;

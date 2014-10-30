@@ -87,8 +87,7 @@ class ReadOnlyDatabase {
   virtual void RemoveNotifySTHCallback(const NotifySTHCallback* callback) = 0;
 
  protected:
-  ReadOnlyDatabase() {
-  }
+  ReadOnlyDatabase() = default;
 
  private:
   DISALLOW_COPY_AND_ASSIGN(ReadOnlyDatabase);
@@ -117,8 +116,7 @@ class Database : public ReadOnlyDatabase<Logged> {
     MISSING_TREE_HEAD_TIMESTAMP,
   };
 
-  virtual ~Database() {
-  }
+  virtual ~Database() = default;
 
   // Attempt to create a new entry. Fail if an entry with this hash
   // already exists.  The entry remains PENDING until a sequence
@@ -151,8 +149,7 @@ class Database : public ReadOnlyDatabase<Logged> {
   }
 
  protected:
-  Database() {
-  }
+  Database() = default;
 
   // See the inline methods with similar names defined above for more
   // documentation.
@@ -171,8 +168,7 @@ class DatabaseNotifierHelper {
  public:
   typedef std::function<void(const ct::SignedTreeHead&)> NotifySTHCallback;
 
-  DatabaseNotifierHelper() {
-  }
+  DatabaseNotifierHelper() = default;
   ~DatabaseNotifierHelper();
 
   void Add(const NotifySTHCallback* callback);

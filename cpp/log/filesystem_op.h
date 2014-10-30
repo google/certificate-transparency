@@ -9,8 +9,7 @@
 // to simulate filesystem errors.
 class FilesystemOp {
  public:
-  virtual ~FilesystemOp() {
-  }
+  virtual ~FilesystemOp() = default;
 
   virtual int mkdir(const char* path, mode_t mode) = 0;
 
@@ -21,8 +20,7 @@ class FilesystemOp {
   virtual int access(const char* path, int amode) = 0;
 
  protected:
-  FilesystemOp() {
-  }
+  FilesystemOp() = default;
 
  private:
   DISALLOW_COPY_AND_ASSIGN(FilesystemOp);

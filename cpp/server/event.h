@@ -46,8 +46,7 @@ class FD {
 
   FD(EventLoop* loop, int fd, CanDelete deletable = DELETE);
 
-  virtual ~FD() {
-  }
+  virtual ~FD() = default;
 
   virtual bool WantsWrite() const = 0;
 

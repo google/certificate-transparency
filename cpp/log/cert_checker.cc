@@ -22,9 +22,6 @@ using util::ClearOpenSSLErrors;
 
 namespace cert_trans {
 
-CertChecker::CertChecker() : trusted_() {
-}
-
 CertChecker::~CertChecker() {
   ClearAllTrustedCertificates();
 }

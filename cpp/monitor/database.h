@@ -34,10 +34,8 @@ class Database {
     UNDEFINED,     // Let this be last.
   };
 
-  Database() {
-  }
-  virtual ~Database() {
-  }
+  Database() = default;
+  virtual ~Database() = default;
 
   virtual void BeginTransaction() {
     DLOG(FATAL) << "Transactions not supported";
