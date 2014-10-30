@@ -62,6 +62,8 @@ class ReadOnlyDatabase {
     NOT_FOUND,
   };
 
+  virtual ~ReadOnlyDatabase() = default;
+
   // Look up by hash. If the entry exists write the result. If the
   // entry is not logged return NOT_FOUND.
   virtual LookupResult LookupByHash(const std::string& hash,
