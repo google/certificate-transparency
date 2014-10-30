@@ -69,7 +69,8 @@ LOG_TESTS = log/cert_test log/cert_checker_test \
             log/database_large_test log/file_storage_test \
             log/frontend_signer_test log/frontend_test log/log_lookup_test \
             log/signer_verifier_test log/log_signer_test log/tree_signer_test \
-            log/logged_certificate_test log/ct_extensions_test
+            log/logged_certificate_test log/ct_extensions_test \
+            log/etcd_consistent_store_test
 UTIL_TESTS = util/json_wrapper_test util/etcd_test util/sync_etcd_test
 MONITOR_TESTS = monitor/database_test
 ALL_TESTS = $(PROTO_TESTS) $(MERKLETREE_TESTS) $(LOG_TESTS) $(UTIL_TESTS) \
@@ -202,7 +203,8 @@ log/libcert.a: log/cert.o log/cert_checker.o log/cert_submission_handler.o \
 	ar -rcs $@ $^
 
 log/libdatabase.a: log/file_storage.o log/filesystem_op.o log/file_db_cert.o \
-                   log/sqlite_db_cert.o log/database.o
+                   log/sqlite_db_cert.o log/database.o \
+                   log/etcd_consistent_store_cert.o
 	rm -f $@
 	ar -rcs $@ $^
 
@@ -287,6 +289,10 @@ log/tree_signer_test: log/tree_signer_test.o log/log_signer.o log/signer.o \
 log/logged_certificate_test: log/logged_certificate_test.o proto/libproto.a \
                              util/libutil.a merkletree/libmerkletree.a
 
+log/etcd_consistent_store_test: log/etcd_consistent_store_cert.o \
+                                proto/libproto.a util/libutil.a \
+                                merkletree/libmerkletree.a $(GMOCKLIB)
+
 monitor_tests: $(MONITOR_TESTS)
 
 monitor/database_test: monitor/database_test.o monitor/database.o \
@@ -323,6 +329,7 @@ test: all
 	log/cert_checker_test --test_certs_dir=../test/testdata
 	log/cert_submission_handler_test --test_certs_dir=../test/testdata
 	log/ct_extensions_test --test_certs_dir=../test/testdata
+	log/etcd_consistent_store_test
 	log/file_storage_test
 	log/database_test
 # Do not run log/database_large_test by default

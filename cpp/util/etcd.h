@@ -1,12 +1,12 @@
 #ifndef CERT_TRANS_UTIL_ETCD_H_
 #define CERT_TRANS_UTIL_ETCD_H_
 
-#include <list>
 #include <map>
 #include <memory>
 #include <mutex>
 #include <stdint.h>
 #include <string>
+#include <vector>
 
 #include "base/macros.h"
 #include "util/libevent_wrapper.h"
@@ -23,7 +23,7 @@ class EtcdClient {
                              const std::string& value)> GetCallback;
   typedef std::function<void(
       util::Status status,
-      const std::list<std::pair<std::string, int> >& values)> GetAllCallback;
+      const std::vector<std::pair<std::string, int> >& values)> GetAllCallback;
   typedef std::function<void(util::Status status, int index)> CreateCallback;
   typedef std::function<void(util::Status status, const std::string& key,
                              int index)> CreateInQueueCallback;

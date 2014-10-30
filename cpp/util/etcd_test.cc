@@ -11,7 +11,6 @@
 
 namespace cert_trans {
 
-using std::list;
 using std::make_pair;
 using std::make_shared;
 using std::map;
@@ -21,6 +20,7 @@ using std::placeholders::_2;
 using std::placeholders::_3;
 using std::shared_ptr;
 using std::string;
+using std::vector;
 using testing::AllOf;
 using testing::Contains;
 using testing::InvokeArgument;
@@ -173,8 +173,9 @@ class EtcdTest : public ::testing::Test {
   }
 
   void GetAllCallback(bool expect_success,
-                      const list<pair<string, int> >& expect_values,
-                      Status status, const list<pair<string, int> >& values) {
+                      const vector<pair<string, int> >& expect_values,
+                      Status status,
+                      const vector<pair<string, int> >& values) {
     EXPECT_EQ(expect_success, status.ok());
     if (expect_success) {
       EXPECT_EQ(expect_values, values);
@@ -233,7 +234,7 @@ TEST_F(EtcdTest, TestGetForInvalidKey) {
 TEST_F(EtcdTest, TestGetAll) {
   EXPECT_CALL(client_, Generic(kDirKey, kEmptyParams, EVHTTP_REQ_GET, _))
       .WillOnce(InvokeArgument<3>(Status(), MakeJson(kGetAllJson)));
-  list<pair<string, int> > expected_values;
+  vector<pair<string, int> > expected_values;
   expected_values.push_back(make_pair("123", 9));
   expected_values.push_back(make_pair("456", 7));
   client_.GetAll(kDirKey, bind(&EtcdTest::GetAllCallback, this, true,
@@ -244,7 +245,7 @@ TEST_F(EtcdTest, TestGetAllForInvalidKey) {
   EXPECT_CALL(client_, Generic(kDirKey, kEmptyParams, EVHTTP_REQ_GET, _))
       .WillOnce(InvokeArgument<3>(Status(util::error::NOT_FOUND, ""),
                                   MakeJson(kKeyNotFoundJson)));
-  list<pair<string, int> > expected_values;
+  vector<pair<string, int> > expected_values;
   client_.GetAll(kDirKey, bind(&EtcdTest::GetAllCallback, this, false,
                                expected_values, _1, _2));
 }
