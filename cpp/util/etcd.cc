@@ -273,9 +273,14 @@ string UrlEscapeAndJoinParams(const map<string, string>& params) {
     else
       retval += "&";
 
-    retval += evhttp_uriencode(it->first.c_str(), it->first.size(), 0);
+    unique_ptr<char, void (*)(void*)> first(
+        evhttp_uriencode(it->first.c_str(), it->first.size(), 0), &free);
+    unique_ptr<char, void (*)(void*)> second(
+        evhttp_uriencode(it->second.c_str(), it->second.size(), 0), &free);
+
+    retval += first.get();
     retval += "=";
-    retval += evhttp_uriencode(it->second.c_str(), it->second.size(), 0);
+    retval += second.get();
   }
 
   return retval;
