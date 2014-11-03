@@ -32,6 +32,6 @@ class TBSCertificate(types.Sequence):
 class Certificate(types.Sequence):
     components = (
         (types.Component("tbsCertificate", TBSCertificate)),
-        (types.Component("signatureAlgorithm", types.Any)),
+        (types.Component("signatureAlgorithm", x509_common.AlgorithmIdentifier)),
         (types.Component("signatureValue", types.BitString))
         )
