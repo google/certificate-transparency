@@ -310,10 +310,10 @@ struct EtcdClient::Request {
     if (verb_ == EVHTTP_REQ_GET) {
       uri += "?" + params_;
     } else {
-      evhttp_add_header(evhttp_request_get_output_headers(req->get()),
-                        "Content-Type", "application/x-www-form-urlencoded");
-      CHECK_EQ(evbuffer_add(evhttp_request_get_output_buffer(req->get()),
-                            params_.data(), params_.size()),
+      evhttp_add_header(req->GetOutputHeaders(), "Content-Type",
+                        "application/x-www-form-urlencoded");
+      CHECK_EQ(evbuffer_add(req->GetOutputBuffer(), params_.data(),
+                            params_.size()),
                0);
     }
 
@@ -342,12 +342,12 @@ EtcdClient::~EtcdClient() {
 
 bool EtcdClient::MaybeUpdateLeader(libevent::HttpRequest* req,
                                    Request* etcd_req) {
-  if (evhttp_request_get_response_code(req->get()) != 307) {
+  if (req->GetResponseCode() != 307) {
     return false;
   }
 
-  const char* const location(CHECK_NOTNULL(evhttp_find_header(
-      evhttp_request_get_input_headers(req->get()), "location")));
+  const char* const location(
+      CHECK_NOTNULL(evhttp_find_header(req->GetInputHeaders(), "location")));
 
   const unique_ptr<evhttp_uri, void (*)(evhttp_uri*)> uri(
       evhttp_uri_parse(location), &evhttp_uri_free);
@@ -382,9 +382,8 @@ void EtcdClient::RequestDone(libevent::HttpRequest* req, Request* etcd_req) {
     return;
   }
 
-  const int response_code(evhttp_request_get_response_code(req->get()));
-  shared_ptr<JsonObject> json(
-      make_shared<JsonObject>(evhttp_request_get_input_buffer(req->get())));
+  const int response_code(req->GetResponseCode());
+  shared_ptr<JsonObject> json(make_shared<JsonObject>(req->GetInputBuffer()));
   etcd_req->cb_(StatusFromResponseCode(response_code, json), json);
   delete etcd_req;
 }

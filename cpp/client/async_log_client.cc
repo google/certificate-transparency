@@ -47,12 +47,12 @@ string UriEncode(const string& input) {
 // error if something is wrong.
 bool SanityCheck(libevent::HttpRequest* req,
                  const AsyncLogClient::Callback& done) {
-  if (evhttp_request_get_response_code(req->get()) < 1) {
+  if (req->GetResponseCode() < 1) {
     done(AsyncLogClient::CONNECT_FAILED);
     return false;
   }
 
-  if (evhttp_request_get_response_code(req->get()) != HTTP_OK) {
+  if (req->GetResponseCode() != HTTP_OK) {
     done(AsyncLogClient::UNKNOWN_ERROR);
     return false;
   }
@@ -66,7 +66,7 @@ void DoneGetSTH(libevent::HttpRequest* req, SignedTreeHead* sth,
   if (!SanityCheck(req, done))
     return;
 
-  JsonObject jresponse(evhttp_request_get_input_buffer(req->get()));
+  JsonObject jresponse(req->GetInputBuffer());
   if (!jresponse.Ok())
     return done(AsyncLogClient::BAD_RESPONSE);
 
@@ -106,7 +106,7 @@ void DoneGetRoots(libevent::HttpRequest* req, vector<shared_ptr<Cert> >* roots,
   if (!SanityCheck(req, done))
     return;
 
-  JsonObject jresponse(evhttp_request_get_input_buffer(req->get()));
+  JsonObject jresponse(req->GetInputBuffer());
   if (!jresponse.Ok())
     return done(AsyncLogClient::BAD_RESPONSE);
 
@@ -140,7 +140,7 @@ void DoneGetEntries(libevent::HttpRequest* req,
   if (!SanityCheck(req, done))
     return;
 
-  JsonObject jresponse(evhttp_request_get_input_buffer(req->get()));
+  JsonObject jresponse(req->GetInputBuffer());
   if (!jresponse.Ok())
     return done(AsyncLogClient::BAD_RESPONSE);
 
@@ -198,7 +198,7 @@ void DoneQueryInclusionProof(libevent::HttpRequest* req,
   if (!SanityCheck(req, done))
     return;
 
-  JsonObject jresponse(evhttp_request_get_input_buffer(req->get()));
+  JsonObject jresponse(req->GetInputBuffer());
   if (!jresponse.Ok())
     return done(AsyncLogClient::BAD_RESPONSE);
 
@@ -237,7 +237,7 @@ void DoneGetSTHConsistency(libevent::HttpRequest* req, vector<string>* proof,
   if (!SanityCheck(req, done))
     return;
 
-  JsonObject jresponse(evhttp_request_get_input_buffer(req->get()));
+  JsonObject jresponse(req->GetInputBuffer());
   if (!jresponse.Ok())
     return done(AsyncLogClient::BAD_RESPONSE);
 
@@ -267,7 +267,7 @@ void DoneInternalAddChain(libevent::HttpRequest* req,
   if (!SanityCheck(req, done))
     return;
 
-  JsonObject jresponse(evhttp_request_get_input_buffer(req->get()));
+  JsonObject jresponse(req->GetInputBuffer());
   if (!jresponse.Ok())
     return done(AsyncLogClient::BAD_RESPONSE);
 
@@ -336,7 +336,7 @@ void AsyncLogClient::GetSTH(SignedTreeHead* sth, const Callback& done) {
   libevent::HttpRequest* const req(
       new libevent::HttpRequest(bind(&DoneGetSTH, _1, sth, done)));
 
-  evhttp_add_header(evhttp_request_get_output_headers(req->get()), "Host",
+  evhttp_add_header(req->GetOutputHeaders(), "Host",
                     evhttp_uri_get_host(server_uri_.get()));
 
   conn_.MakeRequest(req, EVHTTP_REQ_GET, GetPath("get-sth"));
@@ -348,7 +348,7 @@ void AsyncLogClient::GetRoots(vector<shared_ptr<Cert> >* roots,
   libevent::HttpRequest* const req(
       new libevent::HttpRequest(bind(&DoneGetRoots, _1, roots, done)));
 
-  evhttp_add_header(evhttp_request_get_output_headers(req->get()), "Host",
+  evhttp_add_header(req->GetOutputHeaders(), "Host",
                     evhttp_uri_get_host(server_uri_.get()));
 
   conn_.MakeRequest(req, EVHTTP_REQ_GET, GetPath("get-roots"));
@@ -361,7 +361,7 @@ void AsyncLogClient::GetEntries(int first, int last,
   libevent::HttpRequest* const req(
       new libevent::HttpRequest(bind(&DoneGetEntries, _1, entries, done)));
 
-  evhttp_add_header(evhttp_request_get_output_headers(req->get()), "Host",
+  evhttp_add_header(req->GetOutputHeaders(), "Host",
                     evhttp_uri_get_host(server_uri_.get()));
 
   ostringstream subpath;
@@ -378,7 +378,7 @@ void AsyncLogClient::QueryInclusionProof(const SignedTreeHead& sth,
   libevent::HttpRequest* const req(new libevent::HttpRequest(
       bind(&DoneQueryInclusionProof, _1, sth, proof, done)));
 
-  evhttp_add_header(evhttp_request_get_output_headers(req->get()), "Host",
+  evhttp_add_header(req->GetOutputHeaders(), "Host",
                     evhttp_uri_get_host(server_uri_.get()));
 
   ostringstream subpath;
@@ -396,7 +396,7 @@ void AsyncLogClient::GetSTHConsistency(uint64_t first, uint64_t second,
   libevent::HttpRequest* const req(new libevent::HttpRequest(
       bind(&DoneGetSTHConsistency, _1, proof, done)));
 
-  evhttp_add_header(evhttp_request_get_output_headers(req->get()), "Host",
+  evhttp_add_header(req->GetOutputHeaders(), "Host",
                     evhttp_uri_get_host(server_uri_.get()));
 
   ostringstream subpath;
@@ -444,12 +444,12 @@ void AsyncLogClient::InternalAddChain(const CertChain& cert_chain,
   libevent::HttpRequest* const req(
       new libevent::HttpRequest(bind(&DoneInternalAddChain, _1, sct, done)));
 
-  evhttp_add_header(evhttp_request_get_output_headers(req->get()), "Host",
+  evhttp_add_header(req->GetOutputHeaders(), "Host",
                     evhttp_uri_get_host(server_uri_.get()));
 
   const string json_body(jsend.ToString());
-  CHECK_EQ(evbuffer_add(evhttp_request_get_output_buffer(req->get()),
-                        json_body.data(), json_body.size()),
+  CHECK_EQ(evbuffer_add(req->GetOutputBuffer(), json_body.data(),
+                        json_body.size()),
            0);
 
   conn_.MakeRequest(req, EVHTTP_REQ_POST,

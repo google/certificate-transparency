@@ -97,11 +97,25 @@ class HttpRequest {
   explicit HttpRequest(const Callback& callback);
   ~HttpRequest();
 
-  evhttp_request* get() {
-    return req_;
+  int GetResponseCode() const {
+    return evhttp_request_get_response_code(req_);
+  }
+  evkeyvalq* GetInputHeaders() const {
+    return evhttp_request_get_input_headers(req_);
+  }
+  evbuffer* GetInputBuffer() const {
+    return evhttp_request_get_input_buffer(req_);
+  }
+  evkeyvalq* GetOutputHeaders() const {
+    return evhttp_request_get_output_headers(req_);
+  }
+  evbuffer* GetOutputBuffer() const {
+    return evhttp_request_get_output_buffer(req_);
   }
 
  private:
+  friend class HttpConnection;
+
   static void Done(evhttp_request* req, void* userdata);
 
   const Callback callback_;
