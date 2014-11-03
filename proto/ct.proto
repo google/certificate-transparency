@@ -175,6 +175,8 @@ message LoggedCertificatePB {
     optional LogEntry entry = 2;
   }
   required Contents contents = 3;
+
+  optional uint64 provisional_sequence_number = 4;
 }
 
 message SignedTreeHead {
@@ -201,3 +203,14 @@ message SSLClientCTData {
   }
   repeated SCTInfo attached_sct_info = 3;
 }
+
+message ClusterNodeState {
+  optional string node_id = 1;
+  optional uint64 contiguous_tree_size = 2;
+  optional SignedTreeHead current_serving_sth = 3;
+}
+
+message ClusterControl {
+  optional bool accept_new_entries = 1 [ default = true ];
+}
+

@@ -11,7 +11,6 @@
 
 namespace cert_trans {
 
-using std::list;
 using std::make_pair;
 using std::make_shared;
 using std::map;
@@ -19,6 +18,7 @@ using std::pair;
 using std::shared_ptr;
 using std::string;
 using std::unique_ptr;
+using std::vector;
 using testing::AllOf;
 using testing::Contains;
 using testing::InvokeArgument;
@@ -200,11 +200,11 @@ TEST_F(SyncEtcdTest, TestGetForInvalidKey) {
 TEST_F(SyncEtcdTest, TestGetAll) {
   EXPECT_CALL(*mock_client_, Generic(kDirKey, kEmptyParams, EVHTTP_REQ_GET, _))
       .WillOnce(InvokeArgument<3>(Status(), MakeJson(kGetAllJson)));
-  list<pair<string, int> > expected_values;
+  vector<pair<string, int> > expected_values;
   expected_values.push_back(make_pair("123", 9));
   expected_values.push_back(make_pair("456", 7));
 
-  list<pair<string, int> > values;
+  vector<pair<string, int> > values;
   Status status(sync_client_->GetAll(kDirKey, &values));
   EXPECT_TRUE(status.ok()) << status;
   EXPECT_EQ(expected_values, values);
@@ -215,7 +215,7 @@ TEST_F(SyncEtcdTest, TestGetAllForInvalidKey) {
   EXPECT_CALL(*mock_client_, Generic(kDirKey, kEmptyParams, EVHTTP_REQ_GET, _))
       .WillOnce(InvokeArgument<3>(Status(util::error::NOT_FOUND, ""),
                                   MakeJson(kKeyNotFoundJson)));
-  list<pair<string, int> > values;
+  vector<pair<string, int> > values;
   Status status(sync_client_->GetAll(kDirKey, &values));
   EXPECT_FALSE(status.ok()) << status;
 }

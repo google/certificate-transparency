@@ -9,13 +9,13 @@
 
 using std::bind;
 using std::condition_variable;
-using std::list;
 using std::pair;
 using std::placeholders::_1;
 using std::placeholders::_2;
 using std::placeholders::_3;
 using std::shared_ptr;
 using std::string;
+using std::vector;
 using util::Status;
 
 namespace cert_trans {
@@ -116,7 +116,7 @@ Status SyncEtcdClient::Get(const string& key, int* index, string* value) {
 
 
 Status SyncEtcdClient::GetAll(const string& dir,
-                              list<pair<string, int> >* values) {
+                              vector<pair<string, int> >* values) {
   return BlockingCall(base_, bind(&EtcdClient::GetAll, client_.get(), dir, _1),
                       values);
 }

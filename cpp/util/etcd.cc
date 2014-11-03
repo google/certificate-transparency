@@ -10,7 +10,6 @@
 
 namespace libevent = cert_trans::libevent;
 
-using std::list;
 using std::lock_guard;
 using std::make_pair;
 using std::make_shared;
@@ -23,6 +22,7 @@ using std::shared_ptr;
 using std::string;
 using std::to_string;
 using std::unique_ptr;
+using std::vector;
 using util::Status;
 
 namespace cert_trans {
@@ -123,45 +123,45 @@ void GetAllRequestDone(Status status, const shared_ptr<JsonObject>& json,
     if (!node.Ok()) {
       cb(Status(util::error::FAILED_PRECONDITION,
                 "Invalid JSON: Couldn't find 'node'"),
-         list<pair<string, int> >());
+         vector<pair<string, int>>());
       return;
     }
     const JsonArray value_nodes(node, "nodes");
     if (!value_nodes.Ok()) {
       cb(Status(util::error::FAILED_PRECONDITION,
                 "Invalid JSON: Couldn't find 'nodes'"),
-         list<pair<string, int> >());
+         vector<pair<string, int>>());
       return;
     }
-    list<pair<string, int> > values;
+    vector<pair<string, int>> values;
     for (int i = 0; i < value_nodes.Length(); ++i) {
       const JsonObject entry(value_nodes, i);
       if (!entry.Ok()) {
         cb(Status(util::error::FAILED_PRECONDITION,
                   "Invalid JSON: Couldn't get 'value_nodes' index " +
                       to_string(i)),
-           list<pair<string, int> >());
+           vector<pair<string, int>>());
         return;
       }
       const JsonString value(entry, "value");
       if (!value.Ok()) {
         cb(Status(util::error::FAILED_PRECONDITION,
                   "Invalid JSON: Couldn't find 'value'"),
-           list<pair<string, int> >());
+           vector<pair<string, int>>());
         return;
       }
       const JsonInt modifiedIndex(entry, "modifiedIndex");
       if (!modifiedIndex.Ok()) {
         cb(Status(util::error::FAILED_PRECONDITION,
                   "Invalid JSON: Coulnd't find 'modifiedIndex'"),
-           list<pair<string, int> >());
+           vector<pair<string, int>>());
         return;
       }
       values.push_back(make_pair(value.Value(), modifiedIndex.Value()));
     }
     cb(status, values);
   } else {
-    cb(status, list<pair<string, int> >());
+    cb(status, vector<pair<string, int>>());
   }
 }
 
@@ -346,9 +346,8 @@ bool EtcdClient::MaybeUpdateLeader(libevent::HttpRequest* req,
     return false;
   }
 
-  const char* const location(CHECK_NOTNULL(
-      evhttp_find_header(evhttp_request_get_input_headers(req->get()),
-                         "location")));
+  const char* const location(CHECK_NOTNULL(evhttp_find_header(
+      evhttp_request_get_input_headers(req->get()), "location")));
 
   const unique_ptr<evhttp_uri, void (*)(evhttp_uri*)> uri(
       evhttp_uri_parse(location), &evhttp_uri_free);
