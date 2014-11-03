@@ -1,24 +1,26 @@
-#ifndef CERT_TRANS_LOG_ETCD_CONSISTENT_STORE_H_
-#define CERT_TRANS_LOG_ETCD_CONSISTENT_STORE_H_
+#ifndef CERT_TRANS_LOG_FAKE_CONSISTENT_STORE_H_
+#define CERT_TRANS_LOG_FAKE_CONSISTENT_STORE_H_
 
 #include <memory>
 #include <stdint.h>
+#include <mutex>
 #include <vector>
 
 #include "base/macros.h"
 #include "log/consistent_store.h"
 #include "proto/ct.pb.h"
 #include "util/status.h"
-#include "util/sync_etcd.h"
+
 
 namespace cert_trans {
 
 
 template <class Logged>
-class EtcdConsistentStore : public ConsistentStore<Logged> {
+class FakeConsistentStore : public ConsistentStore<Logged> {
  public:
-  EtcdConsistentStore(SyncEtcdClient* client, const std::string& root,
-                      const std::string& node_id);
+  explicit FakeConsistentStore(const std::string& node_id);
+
+  virtual ~FakeConsistentStore() = default;
 
   uint64_t NextAvailableSequenceNumber() const override;
 
@@ -41,31 +43,21 @@ class EtcdConsistentStore : public ConsistentStore<Logged> {
   util::Status SetClusterNodeState(const ct::ClusterNodeState& state) override;
 
  private:
-  template <class T>
-  util::Status GetEntry(const std::string& path, EntryHandle<T>* entry) const;
+  mutable std::mutex mutex_;
+  std::map<std::string, EntryHandle<Logged>> pending_entries_;
+  std::map<std::string, EntryHandle<Logged>> sequenced_entries_;
+  std::map<std::string, ct::ClusterNodeState> node_states_;
+  std::unique_ptr<ct::SignedTreeHead> tree_head_;
 
-  template <class T>
-  util::Status GetAllEntriesInDir(const std::string& dir,
-                                  std::vector<EntryHandle<T>>* entries) const;
-
-  template <class T>
-  util::Status UpdateEntry(const std::string& path, EntryHandle<T>* entry);
-
-
-  template <class T>
-  util::Status CreateEntry(const std::string& path, EntryHandle<T>* entry);
-
-
-  std::string GetFullPath(const std::string& key) const;
-
-  SyncEtcdClient* const client_;
-  const std::string root_;
   const std::string node_id_;
+  int next_available_sequence_number_;
 
-  DISALLOW_COPY_AND_ASSIGN(EtcdConsistentStore);
+  friend class FakeConsistentStoreTest;
+
+  DISALLOW_COPY_AND_ASSIGN(FakeConsistentStore);
 };
 
 
 }  // namespace cert_trans
 
-#endif  // CERT_TRANS_LOG_ETCD_CONSISTENT_STORE_H_
+#endif  // CERT_TRANS_LOG_FAKE_CONSISTENT_STORE_H_

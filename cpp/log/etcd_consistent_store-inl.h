@@ -19,58 +19,6 @@ const char kNodesDir[] = "/nodes/";
 }  // namespace
 
 
-template <class T>
-EntryHandle<T>::EntryHandle(const T& entry, int handle)
-    : entry_(entry), has_handle_(true), handle_(handle) {
-}
-
-
-template <class T>
-EntryHandle<T>::EntryHandle(const T& entry)
-    : entry_(entry), has_handle_(false) {
-}
-
-
-template <class T>
-const T& EntryHandle<T>::Entry() const {
-  return entry_;
-}
-
-
-template <class T>
-T* EntryHandle<T>::MutableEntry() {
-  return &entry_;
-}
-
-
-template <class T>
-bool EntryHandle<T>::HasHandle() const {
-  return has_handle_;
-}
-
-
-template <class T>
-int EntryHandle<T>::Handle() const {
-  CHECK(has_handle_);
-  return handle_;
-}
-
-
-template <class T>
-void EntryHandle<T>::Set(const T& entry, int handle) {
-  entry_ = entry;
-  handle_ = handle;
-  has_handle_ = true;
-}
-
-
-template <class T>
-void EntryHandle<T>::SetHandle(int new_handle) {
-  handle_ = new_handle;
-  has_handle_ = true;
-}
-
-
 template <class Logged>
 EtcdConsistentStore<Logged>::EtcdConsistentStore(SyncEtcdClient* client,
                                                  const std::string& root,
