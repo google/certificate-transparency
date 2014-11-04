@@ -92,7 +92,7 @@ class HttpServer {
 
 class HttpRequest {
  public:
-  typedef std::function<void(HttpRequest*)> Callback;
+  typedef std::function<void(const std::shared_ptr<HttpRequest>&)> Callback;
 
   explicit HttpRequest(const Callback& callback);
   ~HttpRequest();
@@ -121,6 +121,10 @@ class HttpRequest {
   const Callback callback_;
   evhttp_request* req_;
 
+  // A self-reference to keep the request object alive, as long as
+  // it's running.
+  std::shared_ptr<HttpRequest> self_ref_;
+
   DISALLOW_COPY_AND_ASSIGN(HttpRequest);
 };
 
@@ -132,8 +136,8 @@ class HttpConnection {
 
   // Takes ownership of "req", which will be automatically deleted
   // after its callback is called.
-  void MakeRequest(HttpRequest* req, evhttp_cmd_type type,
-                   const std::string& uri);
+  void MakeRequest(const std::shared_ptr<HttpRequest>& req,
+                   evhttp_cmd_type type, const std::string& uri);
 
  private:
   evhttp_connection* const conn_;

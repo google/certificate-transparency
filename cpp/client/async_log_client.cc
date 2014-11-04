@@ -45,7 +45,7 @@ string UriEncode(const string& input) {
 
 // Do some common checks, calls the callback with the appropriate
 // error if something is wrong.
-bool SanityCheck(libevent::HttpRequest* req,
+bool SanityCheck(const shared_ptr<libevent::HttpRequest>& req,
                  const AsyncLogClient::Callback& done) {
   if (req->GetResponseCode() < 1) {
     done(AsyncLogClient::CONNECT_FAILED);
@@ -61,8 +61,8 @@ bool SanityCheck(libevent::HttpRequest* req,
 }
 
 
-void DoneGetSTH(libevent::HttpRequest* req, SignedTreeHead* sth,
-                const AsyncLogClient::Callback& done) {
+void DoneGetSTH(const shared_ptr<libevent::HttpRequest>& req,
+                SignedTreeHead* sth, const AsyncLogClient::Callback& done) {
   if (!SanityCheck(req, done))
     return;
 
@@ -101,7 +101,8 @@ void DoneGetSTH(libevent::HttpRequest* req, SignedTreeHead* sth,
 }
 
 
-void DoneGetRoots(libevent::HttpRequest* req, vector<shared_ptr<Cert> >* roots,
+void DoneGetRoots(const shared_ptr<libevent::HttpRequest>& req,
+                  vector<shared_ptr<Cert> >* roots,
                   const AsyncLogClient::Callback& done) {
   if (!SanityCheck(req, done))
     return;
@@ -134,7 +135,7 @@ void DoneGetRoots(libevent::HttpRequest* req, vector<shared_ptr<Cert> >* roots,
 }
 
 
-void DoneGetEntries(libevent::HttpRequest* req,
+void DoneGetEntries(const shared_ptr<libevent::HttpRequest>& req,
                     vector<AsyncLogClient::Entry>* entries,
                     const AsyncLogClient::Callback& done) {
   if (!SanityCheck(req, done))
@@ -191,7 +192,7 @@ void DoneGetEntries(libevent::HttpRequest* req,
 }
 
 
-void DoneQueryInclusionProof(libevent::HttpRequest* req,
+void DoneQueryInclusionProof(const shared_ptr<libevent::HttpRequest>& req,
                              const SignedTreeHead& sth,
                              MerkleAuditProof* proof,
                              const AsyncLogClient::Callback& done) {
@@ -232,7 +233,8 @@ void DoneQueryInclusionProof(libevent::HttpRequest* req,
 }
 
 
-void DoneGetSTHConsistency(libevent::HttpRequest* req, vector<string>* proof,
+void DoneGetSTHConsistency(const shared_ptr<libevent::HttpRequest>& req,
+                           vector<string>* proof,
                            const AsyncLogClient::Callback& done) {
   if (!SanityCheck(req, done))
     return;
@@ -261,7 +263,7 @@ void DoneGetSTHConsistency(libevent::HttpRequest* req, vector<string>* proof,
 }
 
 
-void DoneInternalAddChain(libevent::HttpRequest* req,
+void DoneInternalAddChain(const shared_ptr<libevent::HttpRequest>& req,
                           SignedCertificateTimestamp* sct,
                           const AsyncLogClient::Callback& done) {
   if (!SanityCheck(req, done))
@@ -333,8 +335,8 @@ AsyncLogClient::AsyncLogClient(const shared_ptr<libevent::Base>& base,
 
 
 void AsyncLogClient::GetSTH(SignedTreeHead* sth, const Callback& done) {
-  libevent::HttpRequest* const req(
-      new libevent::HttpRequest(bind(&DoneGetSTH, _1, sth, done)));
+  const shared_ptr<libevent::HttpRequest> req(
+      make_shared<libevent::HttpRequest>(bind(&DoneGetSTH, _1, sth, done)));
 
   evhttp_add_header(req->GetOutputHeaders(), "Host",
                     evhttp_uri_get_host(server_uri_.get()));
@@ -345,8 +347,9 @@ void AsyncLogClient::GetSTH(SignedTreeHead* sth, const Callback& done) {
 
 void AsyncLogClient::GetRoots(vector<shared_ptr<Cert> >* roots,
                               const Callback& done) {
-  libevent::HttpRequest* const req(
-      new libevent::HttpRequest(bind(&DoneGetRoots, _1, roots, done)));
+  const shared_ptr<libevent::HttpRequest> req(
+      make_shared<libevent::HttpRequest>(
+          bind(&DoneGetRoots, _1, roots, done)));
 
   evhttp_add_header(req->GetOutputHeaders(), "Host",
                     evhttp_uri_get_host(server_uri_.get()));
@@ -358,8 +361,9 @@ void AsyncLogClient::GetRoots(vector<shared_ptr<Cert> >* roots,
 void AsyncLogClient::GetEntries(int first, int last,
                                 vector<AsyncLogClient::Entry>* entries,
                                 const Callback& done) {
-  libevent::HttpRequest* const req(
-      new libevent::HttpRequest(bind(&DoneGetEntries, _1, entries, done)));
+  const shared_ptr<libevent::HttpRequest> req(
+      make_shared<libevent::HttpRequest>(
+          bind(&DoneGetEntries, _1, entries, done)));
 
   evhttp_add_header(req->GetOutputHeaders(), "Host",
                     evhttp_uri_get_host(server_uri_.get()));
@@ -375,8 +379,9 @@ void AsyncLogClient::QueryInclusionProof(const SignedTreeHead& sth,
                                          const std::string& merkle_leaf_hash,
                                          MerkleAuditProof* proof,
                                          const Callback& done) {
-  libevent::HttpRequest* const req(new libevent::HttpRequest(
-      bind(&DoneQueryInclusionProof, _1, sth, proof, done)));
+  const shared_ptr<libevent::HttpRequest> req(
+      make_shared<libevent::HttpRequest>(
+          bind(&DoneQueryInclusionProof, _1, sth, proof, done)));
 
   evhttp_add_header(req->GetOutputHeaders(), "Host",
                     evhttp_uri_get_host(server_uri_.get()));
@@ -393,8 +398,9 @@ void AsyncLogClient::QueryInclusionProof(const SignedTreeHead& sth,
 void AsyncLogClient::GetSTHConsistency(uint64_t first, uint64_t second,
                                        vector<string>* proof,
                                        const Callback& done) {
-  libevent::HttpRequest* const req(new libevent::HttpRequest(
-      bind(&DoneGetSTHConsistency, _1, proof, done)));
+  const shared_ptr<libevent::HttpRequest> req(
+      make_shared<libevent::HttpRequest>(
+          bind(&DoneGetSTHConsistency, _1, proof, done)));
 
   evhttp_add_header(req->GetOutputHeaders(), "Host",
                     evhttp_uri_get_host(server_uri_.get()));
@@ -441,8 +447,9 @@ void AsyncLogClient::InternalAddChain(const CertChain& cert_chain,
   JsonObject jsend;
   jsend.Add("chain", jchain);
 
-  libevent::HttpRequest* const req(
-      new libevent::HttpRequest(bind(&DoneInternalAddChain, _1, sct, done)));
+  const shared_ptr<libevent::HttpRequest> req(
+      make_shared<libevent::HttpRequest>(
+          bind(&DoneInternalAddChain, _1, sct, done)));
 
   evhttp_add_header(req->GetOutputHeaders(), "Host",
                     evhttp_uri_get_host(server_uri_.get()));

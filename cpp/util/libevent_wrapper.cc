@@ -182,15 +182,20 @@ HttpRequest::~HttpRequest() {
 
 // static
 void HttpRequest::Done(evhttp_request* req, void* userdata) {
-  HttpRequest* const self(static_cast<HttpRequest*>(CHECK_NOTNULL(userdata)));
+  const shared_ptr<HttpRequest> self(
+      static_cast<HttpRequest*>(CHECK_NOTNULL(userdata))->self_ref_);
+
+  // The request is no longer running. The local reference will keep
+  // it alive at least until this function returns.
+  self->self_ref_.reset();
+
   CHECK_EQ(self->req_, CHECK_NOTNULL(req));
 
   self->callback_(self);
 
   // Once we return from this function, libevent will free "req_" for
-  // us, and we should make ourselves disappear as well.
+  // us.
   self->req_ = NULL;
-  delete self;
 }
 
 
@@ -206,8 +211,9 @@ HttpConnection::~HttpConnection() {
 }
 
 
-void HttpConnection::MakeRequest(HttpRequest* req, evhttp_cmd_type type,
-                                 const string& uri) {
+void HttpConnection::MakeRequest(const shared_ptr<HttpRequest>& req,
+                                 evhttp_cmd_type type, const string& uri) {
+  req->self_ref_ = req;
   CHECK_EQ(evhttp_make_request(conn_, req->req_, type, uri.c_str()), 0);
 }
 

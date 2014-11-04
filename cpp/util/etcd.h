@@ -73,8 +73,9 @@ class EtcdClient {
   // If MaybeUpdateLeader returns true, the handling of the response
   // should be aborted, as a new leader was found, and the request has
   // been retried on the new leader.
-  bool MaybeUpdateLeader(libevent::HttpRequest* req, Request* etcd_req);
-  void RequestDone(libevent::HttpRequest* req, Request* etcd_req);
+  bool MaybeUpdateLeader(const libevent::HttpRequest& req, Request* etcd_req);
+  void RequestDone(const std::shared_ptr<libevent::HttpRequest>& req,
+                   Request* etcd_req);
 
   std::shared_ptr<libevent::HttpConnection> GetConnection(
       const std::string& host, uint16_t port);

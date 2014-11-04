@@ -303,8 +303,9 @@ struct EtcdClient::Request {
   }
 
   void Run(const shared_ptr<libevent::HttpConnection>& conn) {
-    libevent::HttpRequest* const req(new libevent::HttpRequest(
-        bind(&EtcdClient::RequestDone, client_, _1, this)));
+    const shared_ptr<libevent::HttpRequest> req(
+        make_shared<libevent::HttpRequest>(
+            bind(&EtcdClient::RequestDone, client_, _1, this)));
 
     string uri(path_);
     if (verb_ == EVHTTP_REQ_GET) {
@@ -340,14 +341,14 @@ EtcdClient::~EtcdClient() {
 }
 
 
-bool EtcdClient::MaybeUpdateLeader(libevent::HttpRequest* req,
+bool EtcdClient::MaybeUpdateLeader(const libevent::HttpRequest& req,
                                    Request* etcd_req) {
-  if (req->GetResponseCode() != 307) {
+  if (req.GetResponseCode() != 307) {
     return false;
   }
 
   const char* const location(
-      CHECK_NOTNULL(evhttp_find_header(req->GetInputHeaders(), "location")));
+      CHECK_NOTNULL(evhttp_find_header(req.GetInputHeaders(), "location")));
 
   const unique_ptr<evhttp_uri, void (*)(evhttp_uri*)> uri(
       evhttp_uri_parse(location), &evhttp_uri_free);
@@ -369,7 +370,8 @@ bool EtcdClient::MaybeUpdateLeader(libevent::HttpRequest* req,
 }
 
 
-void EtcdClient::RequestDone(libevent::HttpRequest* req, Request* etcd_req) {
+void EtcdClient::RequestDone(const shared_ptr<libevent::HttpRequest>& req,
+                             Request* etcd_req) {
   if (!req) {
     LOG(ERROR) << "an unknown error occurred";
     etcd_req->cb_(Status(util::error::UNKNOWN, "unknown error"),
@@ -378,7 +380,7 @@ void EtcdClient::RequestDone(libevent::HttpRequest* req, Request* etcd_req) {
     return;
   }
 
-  if (MaybeUpdateLeader(req, etcd_req)) {
+  if (MaybeUpdateLeader(*req, etcd_req)) {
     return;
   }
 
