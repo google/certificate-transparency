@@ -23,6 +23,7 @@
 /cpp/log/database_large_test
 /cpp/log/database_test
 /cpp/log/etcd_consistent_store_test
+/cpp/log/fake_consistent_store_test
 /cpp/log/file_storage_test
 /cpp/log/frontend_signer_test
 /cpp/log/frontend_test
