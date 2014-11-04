@@ -7,6 +7,7 @@
 
 #include "log/cert_submission_handler.h"
 #include "log/ct_extensions.h"
+#include "log/fake_consistent_store.h"
 #include "log/file_db.h"
 #include "log/frontend.h"
 #include "log/frontend_signer.h"
@@ -49,11 +50,15 @@ namespace {
 using cert_trans::Cert;
 using cert_trans::CertChain;
 using cert_trans::CertChecker;
+using cert_trans::ConsistentStore;
+using cert_trans::EntryHandle;
+using cert_trans::FakeConsistentStore;
 using cert_trans::LoggedCertificate;
 using cert_trans::PreCertChain;
 using ct::LogEntry;
 using ct::SignedCertificateTimestamp;
 using std::string;
+using std::vector;
 
 typedef Database<LoggedCertificate> DB;
 typedef Frontend FE;
@@ -69,12 +74,13 @@ class FrontendTest : public ::testing::Test {
   FrontendTest()
       : test_db_(),
         test_signer_(),
-        verifier_(new LogVerifier(TestSigner::DefaultLogSigVerifier(),
-                                  new MerkleVerifier(new Sha256Hasher()))),
+        verifier_(TestSigner::DefaultLogSigVerifier(),
+                  new MerkleVerifier(new Sha256Hasher())),
         checker_(),
-        frontend_(
-            new FE(new CertSubmissionHandler(&checker_),
-                   new FrontendSigner(db(), TestSigner::DefaultLogSigner()))) {
+        store_("id"),
+        frontend_(new CertSubmissionHandler(&checker_),
+                  new FrontendSigner(db(), &store_,
+                                     TestSigner::DefaultLogSigner())) {
   }
 
   void SetUp() {
@@ -97,9 +103,10 @@ class FrontendTest : public ::testing::Test {
     CHECK(checker_.LoadTrustedCertificates(cert_dir_ + "/" + kCaCert));
   }
 
+
   void CompareStats(const FE::FrontendStats& expected) {
     FE::FrontendStats stats;
-    frontend_->GetStats(&stats);
+    frontend_.GetStats(&stats);
     EXPECT_EQ(expected.x509_accepted, stats.x509_accepted);
     EXPECT_EQ(expected.x509_duplicates, stats.x509_duplicates);
     EXPECT_EQ(expected.x509_bad_pem_certs, stats.x509_bad_pem_certs);
@@ -114,20 +121,16 @@ class FrontendTest : public ::testing::Test {
     EXPECT_EQ(expected.internal_errors, stats.internal_errors);
   }
 
-  ~FrontendTest() {
-    delete verifier_;
-    delete frontend_;
-  }
-
   T* db() const {
     return test_db_.db();
   }
 
   TestDB<T> test_db_;
   TestSigner test_signer_;
-  LogVerifier* verifier_;
+  LogVerifier verifier_;
   CertChecker checker_;
-  FE* frontend_;
+  FakeConsistentStore<LoggedCertificate> store_;
+  FE frontend_;
   string cert_dir_;
   string leaf_pem_;
   string ca_precert_pem_;
@@ -140,7 +143,7 @@ class FrontendTest : public ::testing::Test {
   string ca_pem_;
 };
 
-typedef testing::Types<FileDB<LoggedCertificate>, SQLiteDB<LoggedCertificate> >
+typedef testing::Types<FileDB<LoggedCertificate>, SQLiteDB<LoggedCertificate>>
     Databases;
 
 TYPED_TEST_CASE(FrontendTest, Databases);
@@ -150,16 +153,17 @@ TYPED_TEST(FrontendTest, TestSubmitValid) {
   EXPECT_TRUE(chain.IsLoaded());
 
   SignedCertificateTimestamp sct;
-  EXPECT_EQ(ADDED, this->frontend_->QueueX509Entry(&chain, &sct));
+  EXPECT_EQ(ADDED, this->frontend_.QueueX509Entry(&chain, &sct));
 
   // Look it up and expect to get the right thing back.
-  LoggedCertificate logged_cert;
+  EntryHandle<LoggedCertificate> entry_handle;
   Cert cert(this->leaf_pem_);
 
   string sha256_digest;
   ASSERT_EQ(Cert::TRUE, cert.Sha256Digest(&sha256_digest));
-  EXPECT_EQ(DB::LOOKUP_OK,
-            this->db()->LookupByHash(sha256_digest, &logged_cert));
+  EXPECT_TRUE(
+      this->store_.GetPendingEntryForHash(sha256_digest, &entry_handle).ok());
+  const LoggedCertificate& logged_cert(entry_handle.Entry());
 
   EXPECT_EQ(ct::X509_ENTRY, logged_cert.entry().type());
   // Compare the leaf cert.
@@ -170,7 +174,7 @@ TYPED_TEST(FrontendTest, TestSubmitValid) {
 
   // And verify the signature.
   EXPECT_EQ(LogVerifier::VERIFY_OK,
-            this->verifier_->VerifySignedCertificateTimestamp(
+            this->verifier_.VerifySignedCertificateTimestamp(
                 logged_cert.entry(), sct));
 
   FE::FrontendStats stats(1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0);
@@ -182,16 +186,17 @@ TYPED_TEST(FrontendTest, TestSubmitValidWithIntermediate) {
   EXPECT_TRUE(chain.IsLoaded());
 
   SignedCertificateTimestamp sct;
-  EXPECT_EQ(ADDED, this->frontend_->QueueX509Entry(&chain, &sct));
+  EXPECT_EQ(ADDED, this->frontend_.QueueX509Entry(&chain, &sct));
 
   // Look it up and expect to get the right thing back.
-  LoggedCertificate logged_cert;
   Cert cert(this->chain_leaf_pem_);
 
   string sha256_digest;
   ASSERT_EQ(Cert::TRUE, cert.Sha256Digest(&sha256_digest));
-  EXPECT_EQ(DB::LOOKUP_OK,
-            this->db()->LookupByHash(sha256_digest, &logged_cert));
+  EntryHandle<LoggedCertificate> entry_handle;
+  EXPECT_TRUE(
+      this->store_.GetPendingEntryForHash(sha256_digest, &entry_handle).ok());
+  const LoggedCertificate& logged_cert(entry_handle.Entry());
 
   EXPECT_EQ(ct::X509_ENTRY, logged_cert.entry().type());
   // Compare the leaf cert.
@@ -202,7 +207,7 @@ TYPED_TEST(FrontendTest, TestSubmitValidWithIntermediate) {
 
   // And verify the signature.
   EXPECT_EQ(LogVerifier::VERIFY_OK,
-            this->verifier_->VerifySignedCertificateTimestamp(
+            this->verifier_.VerifySignedCertificateTimestamp(
                 logged_cert.entry(), sct));
 
   // Compare the first intermediate.
@@ -223,17 +228,18 @@ TYPED_TEST(FrontendTest, TestSubmitDuplicate) {
   EXPECT_TRUE(chain2.IsLoaded());
 
   SignedCertificateTimestamp sct;
-  EXPECT_EQ(ADDED, this->frontend_->QueueX509Entry(&chain1, NULL));
-  EXPECT_EQ(DUPLICATE, this->frontend_->QueueX509Entry(&chain2, &sct));
+  EXPECT_EQ(ADDED, this->frontend_.QueueX509Entry(&chain1, NULL));
+  EXPECT_EQ(DUPLICATE, this->frontend_.QueueX509Entry(&chain2, &sct));
 
   // Look it up and expect to get the right thing back.
-  LoggedCertificate logged_cert;
   Cert cert(this->leaf_pem_);
 
   string sha256_digest;
   ASSERT_EQ(Cert::TRUE, cert.Sha256Digest(&sha256_digest));
-  EXPECT_EQ(DB::LOOKUP_OK,
-            this->db()->LookupByHash(sha256_digest, &logged_cert));
+  EntryHandle<LoggedCertificate> entry_handle;
+  EXPECT_TRUE(
+      this->store_.GetPendingEntryForHash(sha256_digest, &entry_handle).ok());
+  const LoggedCertificate& logged_cert(entry_handle.Entry());
 
   EXPECT_EQ(ct::X509_ENTRY, logged_cert.entry().type());
   // Compare the leaf cert.
@@ -244,7 +250,7 @@ TYPED_TEST(FrontendTest, TestSubmitDuplicate) {
 
   // And verify the signature.
   EXPECT_EQ(LogVerifier::VERIFY_OK,
-            this->verifier_->VerifySignedCertificateTimestamp(
+            this->verifier_.VerifySignedCertificateTimestamp(
                 logged_cert.entry(), sct));
   FE::FrontendStats stats(1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0);
   this->CompareStats(stats);
@@ -257,7 +263,7 @@ TYPED_TEST(FrontendTest, TestSubmitInvalidChain) {
   SignedCertificateTimestamp sct;
   // Missing intermediate.
   EXPECT_EQ(CERTIFICATE_VERIFY_ERROR,
-            this->frontend_->QueueX509Entry(&chain, &sct));
+            this->frontend_.QueueX509Entry(&chain, &sct));
   EXPECT_FALSE(sct.has_signature());
   FE::FrontendStats stats(0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0);
   this->CompareStats(stats);
@@ -271,7 +277,7 @@ TYPED_TEST(FrontendTest, TestSubmitInvalidPem) {
   EXPECT_FALSE(chain.IsLoaded());
 
   SignedCertificateTimestamp sct;
-  EXPECT_EQ(BAD_PEM_FORMAT, this->frontend_->QueueX509Entry(&chain, &sct));
+  EXPECT_EQ(BAD_PEM_FORMAT, this->frontend_.QueueX509Entry(&chain, &sct));
   EXPECT_FALSE(sct.has_signature());
   FE::FrontendStats stats(0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0);
   this->CompareStats(stats);
@@ -282,7 +288,7 @@ TYPED_TEST(FrontendTest, TestSubmitPrecert) {
   EXPECT_TRUE(submission.IsLoaded());
 
   SignedCertificateTimestamp sct;
-  EXPECT_EQ(ADDED, this->frontend_->QueuePreCertEntry(&submission, &sct));
+  EXPECT_EQ(ADDED, this->frontend_.QueuePreCertEntry(&submission, &sct));
 
   CertChain chain(this->embedded_pem_ + this->ca_pem_);
   LogEntry entry;
@@ -291,15 +297,16 @@ TYPED_TEST(FrontendTest, TestSubmitPrecert) {
   // Look it up.
   string hash = Sha256Hasher::Sha256Digest(
       entry.precert_entry().pre_cert().tbs_certificate());
-  LoggedCertificate logged_cert;
-  EXPECT_EQ(DB::LOOKUP_OK, this->db()->LookupByHash(hash, &logged_cert));
+  EntryHandle<LoggedCertificate> entry_handle;
+  EXPECT_TRUE(this->store_.GetPendingEntryForHash(hash, &entry_handle).ok());
+  const LoggedCertificate& logged_cert(entry_handle.Entry());
   Cert pre(this->precert_pem_);
   Cert ca(this->ca_pem_);
 
   EXPECT_EQ(ct::PRECERT_ENTRY, logged_cert.entry().type());
   // Verify the signature.
   EXPECT_EQ(LogVerifier::VERIFY_OK,
-            this->verifier_->VerifySignedCertificateTimestamp(
+            this->verifier_.VerifySignedCertificateTimestamp(
                 logged_cert.entry(), sct));
 
   // Expect to have the original certs logged in the chain.
@@ -324,7 +331,7 @@ TYPED_TEST(FrontendTest, TestSubmitPrecertUsingPreCA) {
   EXPECT_TRUE(submission.IsLoaded());
 
   SignedCertificateTimestamp sct;
-  EXPECT_EQ(ADDED, this->frontend_->QueuePreCertEntry(&submission, &sct));
+  EXPECT_EQ(ADDED, this->frontend_.QueuePreCertEntry(&submission, &sct));
 
   CertChain chain(this->embedded_with_preca_pem_ + this->ca_pem_);
   LogEntry entry;
@@ -333,8 +340,9 @@ TYPED_TEST(FrontendTest, TestSubmitPrecertUsingPreCA) {
   // Look it up.
   string hash = Sha256Hasher::Sha256Digest(
       entry.precert_entry().pre_cert().tbs_certificate());
-  LoggedCertificate logged_cert;
-  EXPECT_EQ(DB::LOOKUP_OK, this->db()->LookupByHash(hash, &logged_cert));
+  EntryHandle<LoggedCertificate> entry_handle;
+  EXPECT_TRUE(this->store_.GetPendingEntryForHash(hash, &entry_handle).ok());
+  const LoggedCertificate& logged_cert(entry_handle.Entry());
   Cert pre(this->precert_with_preca_pem_);
   Cert ca_pre(this->ca_precert_pem_);
   Cert ca(this->ca_pem_);
@@ -342,7 +350,7 @@ TYPED_TEST(FrontendTest, TestSubmitPrecertUsingPreCA) {
   EXPECT_EQ(ct::PRECERT_ENTRY, logged_cert.entry().type());
   // Verify the signature.
   EXPECT_EQ(LogVerifier::VERIFY_OK,
-            this->verifier_->VerifySignedCertificateTimestamp(
+            this->verifier_.VerifySignedCertificateTimestamp(
                 logged_cert.entry(), sct));
 
   // Expect to have the original certs logged in the chain.
