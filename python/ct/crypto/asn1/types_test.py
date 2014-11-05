@@ -785,18 +785,33 @@ class PrintTest(unittest.TestCase):
     def test_string_value_string(self):
         # Currently all string types are just str, with no encoding.
         hello = "\x68\x65\x6c\x6c\x6f"
+        invalid_printable_char = "*"
         opaque = "\xd7\xa9\xd7\x9c\xd7\x95\xd7\x9d"
         string_types = [types.TeletexString, types.PrintableString,
                         types.UniversalString, types.UTF8String,
-                        types.BMPString, types.IA5String]
+                        types.BMPString, types.IA5String,
+                        types.VisibleString]
+        
+        should_fail = {
+            hello: [],
+            invalid_printable_char: [types.PrintableString],
+            opaque: [types.PrintableString,
+                     types.IA5String,
+                     types.VisibleString],
+        }
+        strings = [hello, invalid_printable_char, opaque]
 
         for t in string_types:
-            s = t(value=hello)
-            self.assertTrue("hello" in str(s))
-            # TODO(ekasper): make this fail for PrintableString and possibly
-            # others according to their character set restrictions.
-            s2 = t(value=opaque)
-            self.assertTrue(opaque in str(s2))
+            # TODO(laiqu) make this fail for strings other than printable, ia5
+            # and visible (and possibly make more specific character sets for
+            # ia5/visible).
+            for str_ in strings:
+                if t not in should_fail[str_]:
+                    s = t(serialized_value=str_, strict=True)
+                    self.assertTrue(str_ in str(s))
+                else:
+                    self.assertRaises(error.ASN1Error, t,
+                                      serialized_value=str_, strict=True)
 
     def test_string_value_bitstring(self):
         # 0x1ae
