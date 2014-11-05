@@ -62,7 +62,12 @@ typename TreeSigner<Logged>::UpdateResult TreeSigner<Logged>::UpdateTree() {
   // Timestamps have to be unique.
   uint64_t min_timestamp = LastUpdateTime() + 1;
 
-  std::set<std::string> pending_hashes = db_->PendingHashes();
+  std::set<std::string> pending_hashes;  // BROKEN! = db_->PendingHashes();
+  // TODO(alcutter): In the middle of a big change here, we need to switch all
+  // the signer code over to knowing about the consistent store too.  Until
+  // that happens the log is completely broken.
+  LOG(FATAL) << "Al Broke Everything.";
+
   std::set<std::string>::const_iterator it;
   for (it = pending_hashes.begin(); it != pending_hashes.end(); ++it) {
     Logged logged;
@@ -75,7 +80,7 @@ typename TreeSigner<Logged>::UpdateResult TreeSigner<Logged>::UpdateTree() {
         << logged.DebugString();
 
     CHECK_EQ(logged.Hash(), *it);
-    if (!Append(logged)) {
+    if (!Append(&logged)) {
       LOG(ERROR) << "Assigning sequence number failed";
       return DB_ERROR;
     }
@@ -152,14 +157,15 @@ void TreeSigner<Logged>::BuildTree() {
 }
 
 template <class Logged>
-bool TreeSigner<Logged>::Append(const Logged& logged) {
+bool TreeSigner<Logged>::Append(Logged* logged) {
   // Serialize for inclusion in the tree.
   std::string serialized_leaf;
-  CHECK(logged.SerializeForLeaf(&serialized_leaf));
+  CHECK(logged->SerializeForLeaf(&serialized_leaf));
 
+  logged->set_sequence_number(cert_tree_.LeafCount());
   // Commit the sequence number of this certificate.
   typename Database<Logged>::WriteResult db_result =
-      db_->AssignSequenceNumber(logged.Hash(), cert_tree_.LeafCount());
+      db_->CreateSequencedEntry(*logged);
 
   if (db_result != Database<Logged>::OK) {
     CHECK_EQ(Database<Logged>::SEQUENCE_NUMBER_ALREADY_IN_USE, db_result);

@@ -19,29 +19,25 @@ class SQLiteDB : public Database<Logged> {
   typedef typename Database<Logged>::WriteResult WriteResult;
   typedef typename Database<Logged>::LookupResult LookupResult;
 
-  virtual WriteResult CreatePendingEntry_(const Logged& logged);
+  WriteResult CreateSequencedEntry_(const Logged& logged) override;
 
-  virtual WriteResult AssignSequenceNumber(const std::string& pending_hash,
-                                           uint64_t sequence_number);
+  LookupResult LookupByHash(const std::string& hash,
+                            Logged* result) const override;
 
-  virtual LookupResult LookupByHash(const std::string& hash,
-                                    Logged* result) const;
+  LookupResult LookupByIndex(uint64_t sequence_number,
+                             Logged* result) const override;
 
-  virtual LookupResult LookupByIndex(uint64_t sequence_number,
-                                     Logged* result) const;
+  WriteResult WriteTreeHead_(const ct::SignedTreeHead& sth) override;
 
-  virtual std::set<std::string> PendingHashes() const;
+  LookupResult LatestTreeHead(ct::SignedTreeHead* result) const override;
 
-  virtual WriteResult WriteTreeHead_(const ct::SignedTreeHead& sth);
+  int TreeSize() const override;
 
-  virtual LookupResult LatestTreeHead(ct::SignedTreeHead* result) const;
+  void AddNotifySTHCallback(
+      const typename Database<Logged>::NotifySTHCallback* callback) override;
 
-  virtual int TreeSize() const;
-
-  virtual void AddNotifySTHCallback(
-      const typename Database<Logged>::NotifySTHCallback* callback);
-  virtual void RemoveNotifySTHCallback(
-      const typename Database<Logged>::NotifySTHCallback* callback);
+  void RemoveNotifySTHCallback(
+      const typename Database<Logged>::NotifySTHCallback* callback) override;
 
   // Force an STH notification. This is needed only for ct-dns-server,
   // which shares a SQLite database with ct-server, but needs to

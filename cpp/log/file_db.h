@@ -35,36 +35,31 @@ class FileDB : public Database<Logged> {
   static const size_t kTimestampBytesIndexed;
 
   // Implement abstract functions, see database.h for comments.
-  virtual typename Database<Logged>::WriteResult CreatePendingEntry_(
-      const Logged& logged);
+  typename Database<Logged>::WriteResult CreateSequencedEntry_(
+      const Logged& logged) override;
 
-  virtual typename Database<Logged>::WriteResult AssignSequenceNumber(
-      const std::string& hash, uint64_t sequence_number);
+  typename Database<Logged>::LookupResult LookupByHash(
+      const std::string& hash, Logged* result) const override;
 
-  virtual typename Database<Logged>::LookupResult LookupByHash(
-      const std::string& hash, Logged* result) const;
+  typename Database<Logged>::LookupResult LookupByIndex(
+      uint64_t sequence_number, Logged* result) const override;
 
-  virtual typename Database<Logged>::LookupResult LookupByIndex(
-      uint64_t sequence_number, Logged* result) const;
+  typename Database<Logged>::WriteResult WriteTreeHead_(
+      const ct::SignedTreeHead& sth) override;
 
-  virtual std::set<std::string> PendingHashes() const;
+  typename Database<Logged>::LookupResult LatestTreeHead(
+      ct::SignedTreeHead* result) const override;
 
-  virtual typename Database<Logged>::WriteResult WriteTreeHead_(
-      const ct::SignedTreeHead& sth);
+  int TreeSize() const override;
 
-  virtual typename Database<Logged>::LookupResult LatestTreeHead(
-      ct::SignedTreeHead* result) const;
+  void AddNotifySTHCallback(
+      const typename Database<Logged>::NotifySTHCallback* callback) override;
 
-  virtual int TreeSize() const;
-
-  virtual void AddNotifySTHCallback(
-      const typename Database<Logged>::NotifySTHCallback* callback);
-  virtual void RemoveNotifySTHCallback(
-      const typename Database<Logged>::NotifySTHCallback* callback);
+  void RemoveNotifySTHCallback(
+      const typename Database<Logged>::NotifySTHCallback* callback) override;
 
  private:
   void BuildIndex();
-  std::set<std::string> pending_hashes_;
   std::map<uint64_t, std::string> sequence_map_;
   FileStorage* cert_storage_;
   // Store all tree heads, but currently only support looking up the latest

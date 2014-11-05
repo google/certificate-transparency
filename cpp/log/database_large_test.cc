@@ -43,18 +43,18 @@ class LargeDBTest : public ::testing::Test {
     LoggedCertificate logged_cert;
     for (int i = 0; i < entries; ++i) {
       test_signer_.CreateUniqueFakeSignature(&logged_cert);
-      EXPECT_EQ(DB::OK, db()->CreatePendingEntry(logged_cert));
+      logged_cert.set_sequence_number(i);
+      EXPECT_EQ(DB::OK, db()->CreateSequencedEntry(logged_cert));
     }
   }
 
-  int ReadAllPendingEntries() {
-    std::set<string> pending_hashes = db()->PendingHashes();
+  int ReadAllSequencedEntries(int num) {
     std::set<string>::const_iterator it;
     LoggedCertificate lookup_cert;
-    for (it = pending_hashes.begin(); it != pending_hashes.end(); ++it) {
-      EXPECT_EQ(DB::LOOKUP_OK, this->db()->LookupByHash(*it, &lookup_cert));
+    for (int i = 0; i < num; ++i) {
+      EXPECT_EQ(DB::LOOKUP_OK, this->db()->LookupByIndex(i, &lookup_cert));
     }
-    return pending_hashes.size();
+    return num;
   }
 
   T* db() const {
@@ -92,7 +92,8 @@ TYPED_TEST(LargeDBTest, Benchmark) {
 
   getrusage(RUSAGE_SELF, &ru_before);
   realtime_before = util::TimeInMilliseconds();
-  CHECK_EQ(FLAGS_database_size, this->ReadAllPendingEntries());
+  CHECK_EQ(FLAGS_database_size,
+           this->ReadAllSequencedEntries(FLAGS_database_size));
   realtime_after = util::TimeInMilliseconds();
   getrusage(RUSAGE_SELF, &ru_after);
 

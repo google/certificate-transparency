@@ -125,26 +125,12 @@ class Database : public ReadOnlyDatabase<Logged> {
 
   virtual ~Database() = default;
 
-  // Attempt to create a new entry. Fail if an entry with this hash
-  // already exists.  The entry remains PENDING until a sequence
-  // number has been assigned, after which its status changes to
-  // LOGGED.
-  WriteResult CreatePendingEntry(const Logged& logged) {
-    CHECK(!logged.has_sequence_number());
-    return CreatePendingEntry_(logged);
+  // Attempt to create a new entry with the status LOGGED.
+  // Fail if an entry with this hash already exists.
+  WriteResult CreateSequencedEntry(const Logged& logged) {
+    CHECK(logged.has_sequence_number());
+    return CreateSequencedEntry_(logged);
   }
-
-  // Attempt to add a sequence number to the Logged, thereby removing
-  // it from the list of pending entries.  Fail if the entry does not
-  // exist, already has a sequence number, or an entry with this
-  // sequence number already exists (i.e., |sequence_number| is a
-  // secondary key.
-  virtual WriteResult AssignSequenceNumber(const std::string& pending_hash,
-                                           uint64_t sequence_number) = 0;
-
-  // List the hashes of all pending entries, i.e. all entries without a
-  // sequence number.
-  virtual std::set<std::string> PendingHashes() const = 0;
 
   // Attempt to write a tree head. Fails only if a tree head with this
   // timestamp already exists (i.e., |timestamp| is primary key). Does
@@ -160,7 +146,7 @@ class Database : public ReadOnlyDatabase<Logged> {
 
   // See the inline methods with similar names defined above for more
   // documentation.
-  virtual WriteResult CreatePendingEntry_(const Logged& logged) = 0;
+  virtual WriteResult CreateSequencedEntry_(const Logged& logged) = 0;
   virtual WriteResult WriteTreeHead_(const ct::SignedTreeHead& sth) = 0;
 
  private:
@@ -193,4 +179,4 @@ class DatabaseNotifierHelper {
 
 }  // namespace cert_trans
 
-#endif  // ndef DATABASE_H
+#endif  // DATABASE_H

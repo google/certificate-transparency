@@ -44,7 +44,7 @@ class TreeSigner {
 
  private:
   void BuildTree();
-  bool Append(const Logged& logged);
+  bool Append(Logged* logged);
   void AppendToTree(const Logged& logged_cert);
   void TimestampAndSign(uint64_t min_timestamp, ct::SignedTreeHead* sth);
 

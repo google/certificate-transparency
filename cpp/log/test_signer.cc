@@ -354,6 +354,7 @@ void TestSigner::CreateUnique(LogEntry* entry) {
 
 void TestSigner::CreateUnique(LoggedCertificate* logged_cert) {
   FillData(logged_cert);
+  logged_cert->set_sequence_number(rand());
 
   CHECK_EQ(LogSigner::OK,
            default_signer_->SignCertificateTimestamp(
