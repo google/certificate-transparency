@@ -134,8 +134,6 @@ class HttpConnection {
   HttpConnection(const std::shared_ptr<Base>& base, const evhttp_uri* uri);
   ~HttpConnection();
 
-  // Takes ownership of "req", which will be automatically deleted
-  // after its callback is called.
   void MakeRequest(const std::shared_ptr<HttpRequest>& req,
                    evhttp_cmd_type type, const std::string& uri);
 
