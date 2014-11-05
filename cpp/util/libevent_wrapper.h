@@ -145,6 +145,8 @@ class HttpConnection {
   void MakeRequest(const std::shared_ptr<HttpRequest>& req,
                    evhttp_cmd_type type, const std::string& uri);
 
+  void SetTimeout(int timeout_secs);
+
  private:
   evhttp_connection* const conn_;
 

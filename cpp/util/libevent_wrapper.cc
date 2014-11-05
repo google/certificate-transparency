@@ -234,5 +234,10 @@ void HttpConnection::MakeRequest(const shared_ptr<HttpRequest>& req,
 }
 
 
+void HttpConnection::SetTimeout(int timeout_secs) {
+  evhttp_connection_set_timeout(conn_, timeout_secs);
+}
+
+
 }  // namespace libevent
 }  // namespace cert_trans
