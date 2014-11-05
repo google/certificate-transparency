@@ -65,6 +65,18 @@ util::Status EtcdConsistentStore<Logged>::AddPendingEntry(Logged* entry) {
   return status;
 }
 
+template <class Logged>
+util::Status EtcdConsistentStore<Logged>::GetPendingEntryForHash(
+    const std::string& hash, EntryHandle<Logged>* entry) const {
+  util::Status status(
+      GetEntry(GetFullPath(kUnsequencedDir + util::ToBase64(hash)), entry));
+  if (status.ok()) {
+    CHECK(!entry->Entry().has_sequence_number());
+  }
+
+  return status;
+}
+
 
 template <class Logged>
 util::Status EtcdConsistentStore<Logged>::GetPendingEntries(

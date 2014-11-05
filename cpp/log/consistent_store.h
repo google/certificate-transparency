@@ -90,6 +90,9 @@ class ConsistentStore {
 
   virtual util::Status AddPendingEntry(Logged* entry) = 0;
 
+  virtual util::Status GetPendingEntryForHash(
+      const std::string& hash, EntryHandle<Logged>* entry) const = 0;
+
   virtual util::Status GetPendingEntries(
       std::vector<EntryHandle<Logged>>* entries) const = 0;
 
