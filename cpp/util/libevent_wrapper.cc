@@ -180,10 +180,27 @@ HttpRequest::~HttpRequest() {
 }
 
 
+void HttpRequest::Start(const shared_ptr<HttpRequest>& req,
+                        evhttp_connection* conn, evhttp_cmd_type type,
+                        const std::string& uri) {
+  CHECK(req_) << "attempt to reuse an HttpRequest object";
+  CHECK_EQ(this, req.get());
+  CHECK(!self_ref_);
+  self_ref_ = req;
+  CHECK_EQ(evhttp_make_request(conn, req_, type, uri.c_str()), 0);
+}
+
+
 // static
 void HttpRequest::Done(evhttp_request* req, void* userdata) {
+  // Keep ourselves alive at least for the remainder of this method.
   const shared_ptr<HttpRequest> self(
       static_cast<HttpRequest*>(CHECK_NOTNULL(userdata))->self_ref_);
+
+  // We do CHECK_NOTNULL(userdata), but this is different, we're
+  // checking that the self-reference has been set, and thus, that the
+  // request has been started.
+  CHECK(self);
 
   // The request is no longer running. The local reference will keep
   // it alive at least until this function returns.
@@ -213,8 +230,7 @@ HttpConnection::~HttpConnection() {
 
 void HttpConnection::MakeRequest(const shared_ptr<HttpRequest>& req,
                                  evhttp_cmd_type type, const string& uri) {
-  req->self_ref_ = req;
-  CHECK_EQ(evhttp_make_request(conn_, req->req_, type, uri.c_str()), 0);
+  req->Start(req, conn_, type, uri);
 }
 
 

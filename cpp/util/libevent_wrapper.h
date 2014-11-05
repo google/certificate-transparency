@@ -94,6 +94,7 @@ class HttpRequest {
  public:
   typedef std::function<void(const std::shared_ptr<HttpRequest>&)> Callback;
 
+  // Once this callback returns, the object becomes invalid.
   explicit HttpRequest(const Callback& callback);
   ~HttpRequest();
 
@@ -116,9 +117,14 @@ class HttpRequest {
  private:
   friend class HttpConnection;
 
+  // Called by HttpConnection.
+  void Start(const std::shared_ptr<HttpRequest>& req, evhttp_connection* conn,
+             evhttp_cmd_type type, const std::string& uri);
+
   static void Done(evhttp_request* req, void* userdata);
 
   const Callback callback_;
+
   evhttp_request* req_;
 
   // A self-reference to keep the request object alive, as long as
@@ -134,6 +140,8 @@ class HttpConnection {
   HttpConnection(const std::shared_ptr<Base>& base, const evhttp_uri* uri);
   ~HttpConnection();
 
+  // Once you pass an HttpRequest to this method, you shouldn't call
+  // any of its methods, until the callback is called.
   void MakeRequest(const std::shared_ptr<HttpRequest>& req,
                    evhttp_cmd_type type, const std::string& uri);
 
