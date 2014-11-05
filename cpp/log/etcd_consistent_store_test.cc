@@ -148,6 +148,34 @@ TEST_F(EtcdConsistentStoreDeathTest,
 }
 
 
+TEST_F(EtcdConsistentStoreTest, TestGetPendingEntryForHash) {
+  const LoggedCertificate one(MakeCert(123, "one"));
+  const string kPath(string(kRoot) + "/unsequenced/" +
+                     util::ToBase64(one.Hash()));
+  EXPECT_CALL(client_, Get(kPath, _, _))
+      .WillOnce(DoAll(SetArgumentPointee<1>(17),
+                      SetArgumentPointee<2>(Serialize(one)),
+                      Return(util::Status::OK)));
+
+  EntryHandle<LoggedCertificate> handle;
+  util::Status status(store_->GetPendingEntryForHash(one.Hash(), &handle));
+  EXPECT_TRUE(status.ok()) << status;
+  EXPECT_EQ(one, handle.Entry());
+  EXPECT_EQ(17, handle.Handle());
+}
+
+
+TEST_F(EtcdConsistentStoreTest, TestGetPendingEntryForNonExistantHash) {
+  const string kPath(string(kRoot) + "/unsequenced/" + util::ToBase64("Nah"));
+  EXPECT_CALL(client_, Get(kPath, _, _))
+      .WillOnce(Return(util::Status(util::error::NOT_FOUND, "")));
+
+  EntryHandle<LoggedCertificate> handle;
+  util::Status status(store_->GetPendingEntryForHash("Nah", &handle));
+  EXPECT_EQ(util::error::NOT_FOUND, status.CanonicalCode()) << status;
+}
+
+
 TEST_F(EtcdConsistentStoreTest, TestGetPendingEntries) {
   const string kPath(string(kRoot) + "/unsequenced/");
   const LoggedCertificate one(MakeCert(123, "one"));
@@ -160,6 +188,7 @@ TEST_F(EtcdConsistentStoreTest, TestGetPendingEntries) {
 
   vector<EntryHandle<LoggedCertificate>> entries;
   util::Status status(store_->GetPendingEntries(&entries));
+  EXPECT_TRUE(status.ok()) << status;
 }
 
 

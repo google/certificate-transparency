@@ -26,6 +26,9 @@ class EtcdConsistentStore : public ConsistentStore<Logged> {
 
   util::Status AddPendingEntry(Logged* entry) override;
 
+  util::Status GetPendingEntryForHash(
+      const std::string& hash, EntryHandle<Logged>* entry) const override;
+
   util::Status GetPendingEntries(
       std::vector<EntryHandle<Logged>>* entries) const override;
 

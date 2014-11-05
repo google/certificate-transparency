@@ -50,6 +50,22 @@ util::Status FakeConsistentStore<Logged>::AddPendingEntry(Logged* entry) {
 
 
 template <class Logged>
+util::Status FakeConsistentStore<Logged>::GetPendingEntryForHash(
+    const std::string& hash, EntryHandle<Logged>* entry) const {
+  std::unique_lock<std::mutex> lock(mutex_);
+  const std::string path(util::ToBase64(hash));
+  auto it(pending_entries_.find(path));
+  if (it == pending_entries_.end()) {
+    return util::Status(util::error::NOT_FOUND, "");
+  }
+  const EntryHandle<Logged>& pending(it->second);
+  entry->Set(pending.Entry(), pending.Handle());
+  CHECK(!entry->Entry().has_sequence_number());
+  return util::Status::OK;
+}
+
+
+template <class Logged>
 util::Status FakeConsistentStore<Logged>::GetPendingEntries(
     std::vector<EntryHandle<Logged>>* entries) const {
   std::unique_lock<std::mutex> lock(mutex_);

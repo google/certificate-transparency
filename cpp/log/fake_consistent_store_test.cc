@@ -125,6 +125,24 @@ TEST_F(FakeConsistentStoreTest,
 }
 
 
+TEST_F(FakeConsistentStoreTest, TestGetPendingEntryForHash) {
+  LoggedCertificate one(MakeCert(123, "one"));
+  EXPECT_TRUE(store_->AddPendingEntry(&one).ok());
+
+  EntryHandle<LoggedCertificate> entry;
+  util::Status status(store_->GetPendingEntryForHash(one.Hash(), &entry));
+  EXPECT_TRUE(status.ok()) << status;
+  EXPECT_EQ(one, entry.Entry());
+}
+
+
+TEST_F(FakeConsistentStoreTest, TestGetPendingEntryForNonExistentHash) {
+  EntryHandle<LoggedCertificate> entry;
+  util::Status status(store_->GetPendingEntryForHash("Nah", &entry));
+  EXPECT_EQ(util::error::NOT_FOUND, status.CanonicalCode()) << status;
+}
+
+
 TEST_F(FakeConsistentStoreTest, TestGetPendingEntries) {
   LoggedCertificate one(MakeCert(123, "one"));
   LoggedCertificate two(MakeCert(456, "two"));
