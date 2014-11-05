@@ -206,9 +206,14 @@ void HttpRequest::Done(evhttp_request* req, void* userdata) {
   // it alive at least until this function returns.
   self->self_ref_.reset();
 
-  CHECK_EQ(self->req_, CHECK_NOTNULL(req));
-
-  self->callback_(self);
+  // If we have a request, it should be non-NULL. But sometimes we
+  // don't have one...
+  if (req) {
+    CHECK_EQ(self->req_, req);
+    self->callback_(self);
+  } else {
+    self->callback_(nullptr);
+  }
 
   // Once we return from this function, libevent will free "req_" for
   // us.
