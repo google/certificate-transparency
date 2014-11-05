@@ -98,6 +98,10 @@ class HttpRequest {
   explicit HttpRequest(const Callback& callback);
   ~HttpRequest();
 
+  // After calling this, the object becomes invalid, and any reference
+  // to it should be disposed of.
+  void Cancel();
+
   int GetResponseCode() const {
     return evhttp_request_get_response_code(req_);
   }
@@ -122,6 +126,7 @@ class HttpRequest {
              evhttp_cmd_type type, const std::string& uri);
 
   static void Done(evhttp_request* req, void* userdata);
+  static void Cancelled(evutil_socket_t sock, short flag, void* userdata);
 
   const Callback callback_;
 
@@ -130,6 +135,9 @@ class HttpRequest {
   // A self-reference to keep the request object alive, as long as
   // it's running.
   std::shared_ptr<HttpRequest> self_ref_;
+
+  std::mutex cancel_lock_;
+  event* cancel_;
 
   DISALLOW_COPY_AND_ASSIGN(HttpRequest);
 };
@@ -141,7 +149,8 @@ class HttpConnection {
   ~HttpConnection();
 
   // Once you pass an HttpRequest to this method, you shouldn't call
-  // any of its methods, until the callback is called.
+  // any of its methods (except for HttpRequest::Cancel), until the
+  // callback is called.
   void MakeRequest(const std::shared_ptr<HttpRequest>& req,
                    evhttp_cmd_type type, const std::string& uri);
 

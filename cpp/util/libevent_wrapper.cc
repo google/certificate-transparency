@@ -168,15 +168,23 @@ void HttpServer::HandleRequest(evhttp_request* req, void* userdata) {
 
 HttpRequest::HttpRequest(const Callback& callback)
     : callback_(callback),
-      req_(CHECK_NOTNULL(evhttp_request_new(&HttpRequest::Done, this))) {
+      req_(CHECK_NOTNULL(evhttp_request_new(&HttpRequest::Done, this))),
+      cancel_(nullptr) {
 }
 
 
 HttpRequest::~HttpRequest() {
-  // If HttpRequest::Done has been called, req_ will have been freed
-  // by libevent itself.
+  // If HttpRequest::Done or HttpRequest::Cancelled have been called,
+  // req_ will have been freed by libevent itself.
   if (req_)
     evhttp_request_free(req_);
+}
+
+
+void HttpRequest::Cancel() {
+  lock_guard<mutex> lock(cancel_lock_);
+  CHECK(cancel_) << "tried to cancel an unstarted HttpRequest";
+  event_active(cancel_, 42, 0);
 }
 
 
@@ -184,6 +192,10 @@ void HttpRequest::Start(const shared_ptr<HttpRequest>& req,
                         evhttp_connection* conn, evhttp_cmd_type type,
                         const std::string& uri) {
   CHECK(req_) << "attempt to reuse an HttpRequest object";
+  lock_guard<mutex> lock(cancel_lock_);
+  cancel_ = event_new(CHECK_NOTNULL(evhttp_connection_get_base(conn)), -1, 0,
+                      &HttpRequest::Cancelled, this);
+
   CHECK_EQ(this, req.get());
   CHECK(!self_ref_);
   self_ref_ = req;
@@ -218,6 +230,30 @@ void HttpRequest::Done(evhttp_request* req, void* userdata) {
   // Once we return from this function, libevent will free "req_" for
   // us.
   self->req_ = NULL;
+}
+
+
+// static
+void HttpRequest::Cancelled(evutil_socket_t sock, short flag, void* userdata) {
+  CHECK_EQ(flag, 42);
+
+  HttpRequest* self(static_cast<HttpRequest*>(CHECK_NOTNULL(userdata)));
+
+  // The callback has already run, it is too late to cancel.
+  if (!self->req_) {
+    return;
+  }
+
+  // Keep ourselves alive at least for the remainder of this method.
+  const shared_ptr<HttpRequest> ref(self->self_ref_);
+
+  // Check that the request has been started, and that our reference
+  // is valid.
+  CHECK(ref);
+
+  evhttp_cancel_request(self->req_);
+  self->req_ = nullptr;
+  self->self_ref_.reset();
 }
 
 
