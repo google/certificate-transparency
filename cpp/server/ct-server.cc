@@ -11,6 +11,7 @@
 #include "log/cert_checker.h"
 #include "log/cert_submission_handler.h"
 #include "log/ct_extensions.h"
+#include "log/fake_consistent_store.h"
 #include "log/file_db.h"
 #include "log/file_storage.h"
 #include "log/frontend.h"
@@ -54,6 +55,7 @@ DEFINE_int32(tree_signing_frequency_seconds, 600,
 namespace libevent = cert_trans::libevent;
 
 using cert_trans::CertChecker;
+using cert_trans::FakeConsistentStore;
 using cert_trans::HttpHandler;
 using cert_trans::LoggedCertificate;
 using cert_trans::ThreadPool;
@@ -205,8 +207,10 @@ int main(int argc, char* argv[]) {
   evthread_use_pthreads();
   const shared_ptr<libevent::Base> event_base(make_shared<libevent::Base>());
 
-  Frontend frontend(new CertSubmissionHandler(&checker),
-                    new FrontendSigner(db, &log_signer));
+  Frontend frontend(
+      new CertSubmissionHandler(&checker),
+      new FrontendSigner(db, new FakeConsistentStore<LoggedCertificate>("id"),
+                         &log_signer));
   TreeSigner<LoggedCertificate> tree_signer(db, &log_signer);
   LogLookup<LoggedCertificate> log_lookup(db);
 
