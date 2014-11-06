@@ -169,7 +169,8 @@ void HttpServer::HandleRequest(evhttp_request* req, void* userdata) {
 HttpRequest::HttpRequest(const Callback& callback)
     : callback_(callback),
       req_(CHECK_NOTNULL(evhttp_request_new(&HttpRequest::Done, this))),
-      cancel_(nullptr) {
+      cancel_(nullptr),
+      cancelled_(false) {
 }
 
 
@@ -195,6 +196,8 @@ HttpRequest::~HttpRequest() {
 void HttpRequest::Cancel() {
   lock_guard<mutex> lock(cancel_lock_);
   CHECK(cancel_) << "tried to cancel an unstarted HttpRequest";
+  CHECK(!cancelled_) << "tried to cancel an already cancelled HttpRequest";
+  cancelled_ = true;
   event_active(cancel_, 0, 0);
 }
 
@@ -204,6 +207,7 @@ void HttpRequest::Start(const shared_ptr<HttpRequest>& req,
                         const std::string& uri) {
   CHECK(req_) << "attempt to reuse an HttpRequest object";
   lock_guard<mutex> lock(cancel_lock_);
+  CHECK(!cancelled_) << "starting an already cancelled request?!?";
   cancel_ = event_new(CHECK_NOTNULL(evhttp_connection_get_base(conn)), -1, 0,
                       &HttpRequest::Cancelled, this);
 
@@ -229,13 +233,25 @@ void HttpRequest::Done(evhttp_request* req, void* userdata) {
   // it alive at least until this function returns.
   self->self_ref_.reset();
 
-  // If we have a request, it should be non-NULL. But sometimes we
-  // don't have one...
-  if (req) {
-    CHECK_EQ(self->req_, req);
-    self->callback_(self);
-  } else {
-    self->callback_(nullptr);
+
+  // It would be very poor timing (and luck!), but it's possible that
+  // another thread cancelled this request, in which case we should
+  // not call the user callback (it might be pointing at freed
+  // memory).
+  //
+  // If the request has not been cancelled, we'll still hold on to the
+  // lock while the user callback runs, so HttpRequest::Cancel does
+  // not return until it has completed.
+  lock_guard<mutex> lock(self->cancel_lock_);
+  if (!self->cancelled_) {
+    // If we have a request, it should be non-NULL. But sometimes we
+    // don't have one...
+    if (req) {
+      CHECK_EQ(self->req_, req);
+      self->callback_(self);
+    } else {
+      self->callback_(nullptr);
+    }
   }
 
   // Once we return from this function, libevent will free "req_" for

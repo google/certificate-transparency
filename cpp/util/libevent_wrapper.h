@@ -99,7 +99,9 @@ class HttpRequest {
   ~HttpRequest();
 
   // After calling this, the object becomes invalid, and any reference
-  // to it should be disposed of.
+  // to it should be disposed of. If it is too late to cancel and the
+  // callback is still running, this method will block until the
+  // callback has returned.
   void Cancel();
 
   int GetResponseCode() const {
@@ -138,6 +140,7 @@ class HttpRequest {
 
   std::mutex cancel_lock_;
   event* cancel_;
+  bool cancelled_;
 
   DISALLOW_COPY_AND_ASSIGN(HttpRequest);
 };
