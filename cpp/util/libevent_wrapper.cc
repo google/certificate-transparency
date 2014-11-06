@@ -176,8 +176,19 @@ HttpRequest::HttpRequest(const Callback& callback)
 HttpRequest::~HttpRequest() {
   // If HttpRequest::Done or HttpRequest::Cancelled have been called,
   // req_ will have been freed by libevent itself.
-  if (req_)
+  if (req_) {
     evhttp_request_free(req_);
+  }
+
+  // If the HttpRequest object is deleted and cancel_ isn't null, that
+  // means that the self_ref_ has been nulled (so the request
+  // completed), and so should mean that the cancel_ event is no
+  // longer necessary. Calling event_free() also implies event_del(),
+  // so if a call to HttpRequest::Cancelled is scheduled, it will, er,
+  // be cancelled.
+  if (cancel_) {
+    event_free(cancel_);
+  }
 }
 
 
