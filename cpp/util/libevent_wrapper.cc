@@ -184,7 +184,7 @@ HttpRequest::~HttpRequest() {
 void HttpRequest::Cancel() {
   lock_guard<mutex> lock(cancel_lock_);
   CHECK(cancel_) << "tried to cancel an unstarted HttpRequest";
-  event_active(cancel_, 42, 0);
+  event_active(cancel_, 0, 0);
 }
 
 
@@ -235,8 +235,6 @@ void HttpRequest::Done(evhttp_request* req, void* userdata) {
 
 // static
 void HttpRequest::Cancelled(evutil_socket_t sock, short flag, void* userdata) {
-  CHECK_EQ(flag, 42);
-
   HttpRequest* self(static_cast<HttpRequest*>(CHECK_NOTNULL(userdata)));
 
   // The callback has already run, it is too late to cancel.
