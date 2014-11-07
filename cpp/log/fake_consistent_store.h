@@ -56,6 +56,8 @@ class FakeConsistentStore : public ConsistentStore<Logged> {
   int next_available_sequence_number_;
 
   friend class FakeConsistentStoreTest;
+  template <class T>
+  friend class TreeSignerTest;
 
   DISALLOW_COPY_AND_ASSIGN(FakeConsistentStore);
 };

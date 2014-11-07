@@ -107,8 +107,7 @@ typename Database<Logged>::LookupResult SQLiteDB<Logged>::LookupByHash(
 
   if (statement.GetType(1) == SQLITE_NULL) {
     result->clear_sequence_number();
-  }
-  else {
+  } else {
     result->set_sequence_number(statement.GetUInt64(1));
   }
 

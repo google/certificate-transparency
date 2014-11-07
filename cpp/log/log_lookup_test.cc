@@ -1,7 +1,9 @@
 /* -*- indent-tabs-mode: nil -*- */
 #include <gtest/gtest.h>
+#include <memory>
 #include <string>
 
+#include "log/fake_consistent_store.h"
 #include "log/file_db.h"
 #include "log/file_storage.h"
 #include "log/log_lookup.h"
@@ -19,7 +21,9 @@
 
 namespace {
 
+using cert_trans::EntryHandle;
 using cert_trans::LoggedCertificate;
+using cert_trans::TreeSigner;
 using ct::MerkleAuditProof;
 using std::string;
 
@@ -32,29 +36,37 @@ template <class T>
 class LogLookupTest : public ::testing::Test {
  protected:
   LogLookupTest()
-      : test_db_(), test_signer_(), tree_signer_(NULL), verifier_(NULL) {
+      : test_db_(),
+        store_("id"),
+        test_signer_(),
+        tree_signer_(std::chrono::duration<double>(0), db(), &store_,
+                     TestSigner::DefaultLogSigner()),
+        verifier_(TestSigner::DefaultLogSigVerifier(),
+                  new MerkleVerifier(new Sha256Hasher())) {
   }
 
-  void SetUp() {
-    verifier_ = new LogVerifier(TestSigner::DefaultLogSigVerifier(),
-                                new MerkleVerifier(new Sha256Hasher()));
-    tree_signer_ = new TS(db(), TestSigner::DefaultLogSigner());
-    ASSERT_TRUE(verifier_ != NULL);
-    ASSERT_TRUE(tree_signer_ != NULL);
+
+  void CreateSequencedEntry(LoggedCertificate* logged_cert, uint64_t seq) {
+    CHECK_NOTNULL(logged_cert);
+    logged_cert->clear_sequence_number();
+    CHECK(this->store_.AddPendingEntry(logged_cert).ok());
+    EntryHandle<LoggedCertificate> entry;
+    CHECK(
+        this->store_.GetPendingEntryForHash(logged_cert->Hash(), &entry).ok());
+    CHECK(this->store_.AssignSequenceNumber(seq, &entry).ok());
   }
 
-  ~LogLookupTest() {
-    delete tree_signer_;
-    delete verifier_;
-  }
 
   T* db() const {
     return test_db_.db();
   }
+
+
   TestDB<T> test_db_;
+  cert_trans::FakeConsistentStore<LoggedCertificate> store_;
   TestSigner test_signer_;
-  TS* tree_signer_;
-  LogVerifier* verifier_;
+  TS tree_signer_;
+  LogVerifier verifier_;
 };
 
 
@@ -64,18 +76,13 @@ typedef testing::Types<FileDB<LoggedCertificate>, SQLiteDB<LoggedCertificate> >
 TYPED_TEST_CASE(LogLookupTest, Databases);
 
 
-#if 0
-// TODO(alcutter): All these are broken until the Signer update, re-instate
-// afterwards.
-
 TYPED_TEST(LogLookupTest, Lookup) {
   LoggedCertificate logged_cert;
   this->test_signer_.CreateUnique(&logged_cert);
-  logged_cert.set_sequence_number(0);
-  EXPECT_EQ(DB::OK, this->db()->CreateSequencedEntry(logged_cert));
+  this->CreateSequencedEntry(&logged_cert, 0);
 
   MerkleAuditProof proof;
-  EXPECT_EQ(TS::OK, this->tree_signer_->UpdateTree());
+  EXPECT_EQ(TS::OK, this->tree_signer_.UpdateTree());
 
   LL lookup(this->db());
   // Look the new entry up.
@@ -86,11 +93,10 @@ TYPED_TEST(LogLookupTest, Lookup) {
 TYPED_TEST(LogLookupTest, NotFound) {
   LoggedCertificate logged_cert;
   this->test_signer_.CreateUnique(&logged_cert);
-  logged_cert.set_sequence_number(0);
-  EXPECT_EQ(DB::OK, this->db()->CreateSequencedEntry(logged_cert));
+  this->CreateSequencedEntry(&logged_cert, 0);
 
   MerkleAuditProof proof;
-  EXPECT_EQ(TS::OK, this->tree_signer_->UpdateTree());
+  EXPECT_EQ(TS::OK, this->tree_signer_.UpdateTree());
 
   LL lookup(this->db());
 
@@ -104,11 +110,10 @@ TYPED_TEST(LogLookupTest, Update) {
   LL lookup(this->db());
   LoggedCertificate logged_cert;
   this->test_signer_.CreateUnique(&logged_cert);
-  logged_cert.set_sequence_number(0);
-  EXPECT_EQ(DB::OK, this->db()->CreateSequencedEntry(logged_cert));
+  this->CreateSequencedEntry(&logged_cert, 0);
 
   MerkleAuditProof proof;
-  EXPECT_EQ(TS::OK, this->tree_signer_->UpdateTree());
+  EXPECT_EQ(TS::OK, this->tree_signer_.UpdateTree());
 
   // Look the new entry up.
   EXPECT_EQ(LL::OK, lookup.AuditProof(logged_cert.merkle_leaf_hash(), &proof));
@@ -120,18 +125,17 @@ TYPED_TEST(LogLookupTest, Update) {
 TYPED_TEST(LogLookupTest, Verify) {
   LoggedCertificate logged_cert;
   this->test_signer_.CreateUnique(&logged_cert);
-  logged_cert.set_sequence_number(0);
-  EXPECT_EQ(DB::OK, this->db()->CreateSequencedEntry(logged_cert));
+  this->CreateSequencedEntry(&logged_cert, 0);
 
   MerkleAuditProof proof;
-  EXPECT_EQ(TS::OK, this->tree_signer_->UpdateTree());
+  EXPECT_EQ(TS::OK, this->tree_signer_.UpdateTree());
 
   LL lookup(this->db());
   // Look the new entry up.
   EXPECT_EQ(LL::OK, lookup.AuditProof(logged_cert.merkle_leaf_hash(), &proof));
   EXPECT_EQ(LogVerifier::VERIFY_OK,
-            this->verifier_->VerifyMerkleAuditProof(logged_cert.entry(),
-                                                    logged_cert.sct(), proof));
+            this->verifier_.VerifyMerkleAuditProof(logged_cert.entry(),
+                                                   logged_cert.sct(), proof));
 }
 
 
@@ -142,11 +146,10 @@ TYPED_TEST(LogLookupTest, VerifyWithPath) {
   // Make the tree not balanced for extra fun.
   for (int i = 0; i < 13; ++i) {
     this->test_signer_.CreateUnique(&logged_certs[i]);
-    logged_certs[i].set_sequence_number(i);
-    EXPECT_EQ(DB::OK, this->db()->CreateSequencedEntry(logged_certs[i]));
+    this->CreateSequencedEntry(&logged_certs[i], i);
   }
 
-  EXPECT_EQ(TS::OK, this->tree_signer_->UpdateTree());
+  EXPECT_EQ(TS::OK, this->tree_signer_.UpdateTree());
 
   LL lookup(this->db());
   MerkleAuditProof proof;
@@ -155,13 +158,12 @@ TYPED_TEST(LogLookupTest, VerifyWithPath) {
     EXPECT_EQ(LL::OK,
               lookup.AuditProof(logged_certs[i].merkle_leaf_hash(), &proof));
     EXPECT_EQ(LogVerifier::VERIFY_OK,
-              this->verifier_->VerifyMerkleAuditProof(logged_certs[i].entry(),
-                                                      logged_certs[i].sct(),
-                                                      proof));
+              this->verifier_.VerifyMerkleAuditProof(logged_certs[i].entry(),
+                                                     logged_certs[i].sct(),
+                                                     proof));
   }
 }
 
-#endif  // 0
 
 }  // namespace
 

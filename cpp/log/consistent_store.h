@@ -29,6 +29,8 @@ class EntryHandle {
   EntryHandle() = default;
   EntryHandle(EntryHandle&& other) = default;
 
+  EntryHandle& operator=(EntryHandle&& other) = default;
+
   const T& Entry() const {
     return entry_;
   }
