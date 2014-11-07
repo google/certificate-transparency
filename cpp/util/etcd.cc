@@ -343,6 +343,7 @@ EtcdClient::~EtcdClient() {
 
 bool EtcdClient::MaybeUpdateLeader(const libevent::HttpRequest& req,
                                    Request* etcd_req) {
+  // We're talking to the leader, get back to normal processing...
   if (req.GetResponseCode() != 307) {
     return false;
   }
@@ -358,12 +359,10 @@ bool EtcdClient::MaybeUpdateLeader(const libevent::HttpRequest& req,
 
   // Update the last known leader, and retry the request on the new
   // leader.
-  shared_ptr<libevent::HttpConnection> conn;
-  {
-    lock_guard<mutex> lock(lock_);
-    conn = leader_ = GetConnection(evhttp_uri_get_host(uri.get()),
-                                   evhttp_uri_get_port(uri.get()));
-  }
+  shared_ptr<libevent::HttpConnection> conn(
+      UpdateLeader(evhttp_uri_get_host(uri.get()),
+                   evhttp_uri_get_port(uri.get())));
+
   etcd_req->Run(conn);
 
   return true;
@@ -407,6 +406,20 @@ shared_ptr<libevent::HttpConnection> EtcdClient::GetConnection(
   }
 
   return conn;
+}
+
+
+shared_ptr<libevent::HttpConnection> EtcdClient::GetLeader() const {
+  lock_guard<mutex> lock(lock_);
+  return leader_;
+}
+
+
+shared_ptr<libevent::HttpConnection> EtcdClient::UpdateLeader(
+    const string& host, uint16_t port) {
+  lock_guard<mutex> lock(lock_);
+  leader_ = GetConnection(host, port);
+  return leader_;
 }
 
 
@@ -461,12 +474,8 @@ void EtcdClient::Delete(const string& key, const int current_index,
 void EtcdClient::Generic(const string& key, const map<string, string>& params,
                          evhttp_cmd_type verb, const GenericCallback& cb) {
   Request* const etcd_req(new Request(this, verb, key, params, cb));
-  shared_ptr<libevent::HttpConnection> conn;
-  {
-    lock_guard<mutex> lock(lock_);
-    conn = leader_;
-  }
-  etcd_req->Run(conn);
+
+  etcd_req->Run(GetLeader());
 }
 
 

@@ -80,9 +80,13 @@ class EtcdClient {
   std::shared_ptr<libevent::HttpConnection> GetConnection(
       const std::string& host, uint16_t port);
 
+  std::shared_ptr<libevent::HttpConnection> GetLeader() const;
+  std::shared_ptr<libevent::HttpConnection> UpdateLeader(
+      const std::string& host, uint16_t port);
+
   const std::shared_ptr<libevent::Base> event_base_;
 
-  std::mutex lock_;
+  mutable std::mutex lock_;
   ConnectionMap conns_;
   // Last known leader.
   std::shared_ptr<libevent::HttpConnection> leader_;
