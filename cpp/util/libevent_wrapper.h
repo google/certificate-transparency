@@ -151,6 +151,12 @@ class HttpConnection {
   HttpConnection(const std::shared_ptr<Base>& base, const evhttp_uri* uri);
   ~HttpConnection();
 
+  // This method does not simply clone the object, but creates a
+  // separate socket altogether. This can be useful for "hanging
+  // GETs", for example, which would otherwise prevent other requests
+  // from being made on the connection.
+  HttpConnection* Clone() const;
+
   // Once you pass an HttpRequest to this method, you shouldn't call
   // any of its methods (except for HttpRequest::Cancel), until the
   // callback is called.
@@ -160,6 +166,10 @@ class HttpConnection {
   void SetTimeout(int timeout_secs);
 
  private:
+  HttpConnection(const std::shared_ptr<Base>& base, const std::string& host,
+                 unsigned short port);
+
+  const std::shared_ptr<Base> base_;
   evhttp_connection* const conn_;
 
   DISALLOW_COPY_AND_ASSIGN(HttpConnection);

@@ -141,7 +141,7 @@ HttpServer::HttpServer(const Base& base) : http_(base.HttpNew()) {
 
 HttpServer::~HttpServer() {
   evhttp_free(http_);
-  for (std::vector<Handler*>::iterator it = handlers_.begin();
+  for (vector<Handler*>::iterator it = handlers_.begin();
        it != handlers_.end(); ++it) {
     delete *it;
   }
@@ -204,7 +204,7 @@ void HttpRequest::Cancel() {
 
 void HttpRequest::Start(const shared_ptr<HttpRequest>& req,
                         evhttp_connection* conn, evhttp_cmd_type type,
-                        const std::string& uri) {
+                        const string& uri) {
   CHECK(req_) << "attempt to reuse an HttpRequest object";
   lock_guard<mutex> lock(cancel_lock_);
   CHECK(!cancelled_) << "starting an already cancelled request?!?";
@@ -284,13 +284,32 @@ void HttpRequest::Cancelled(evutil_socket_t sock, short flag, void* userdata) {
 
 HttpConnection::HttpConnection(const shared_ptr<Base>& base,
                                const evhttp_uri* uri)
-    : conn_(base->HttpConnectionNew(evhttp_uri_get_host(uri),
+    : base_(base),
+      conn_(base->HttpConnectionNew(evhttp_uri_get_host(CHECK_NOTNULL(uri)),
                                     GetPortFromUri(uri))) {
+}
+
+
+HttpConnection::HttpConnection(const shared_ptr<Base>& base,
+                               const string& host, unsigned short port)
+    : base_(base), conn_(CHECK_NOTNULL(base->HttpConnectionNew(host, port))) {
 }
 
 
 HttpConnection::~HttpConnection() {
   evhttp_connection_free(conn_);
+}
+
+
+HttpConnection* HttpConnection::Clone() const {
+  char* host(nullptr);
+  ev_uint16_t port(0);
+
+  evhttp_connection_get_peer(conn_, &host, &port);
+  CHECK_NOTNULL(host);
+  CHECK_GT(port, 0);
+
+  return new HttpConnection(base_, host, port);
 }
 
 
