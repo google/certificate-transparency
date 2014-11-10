@@ -572,7 +572,7 @@ class EntryProducer(object):
         """Calculates delay based on number of retries which already happened.
 
         Random is there, so we won't attack server lots of requests exactly
-        at the same time, and 1.3 is nice constant for exponential backof."""
+        at the same time, and 1.3 is nice constant for exponential back-off."""
         return ((0.4 + random.uniform(0.6, 1.0)) * FLAGS.get_entries_retry_delay
                 * 1.3**retries)
 
@@ -608,7 +608,7 @@ class EntryProducer(object):
         self._currently_fetching -= len(result)
         return result
 
-    def _create_request(self, first, last):
+    def _fetch_parsed_entries(self, first, last):
         # it's not the best idea to attack server with many requests exactly at
         # the same time, so requests are sent after slight delay.
         request = task.deferLater(self._reactor,
@@ -618,12 +618,12 @@ class EntryProducer(object):
                                   self._uri + "/" + _GET_ENTRIES_PATH,
                                   params={"start": str(first),
                                           "end": str(last)})
+        request.addCallback(_parse_entries, last - first + 1)
         return request
 
     def _create_next_request(self, first, last, entries, retries):
-        d = self._create_request(first, last)
+        d = self._fetch_parsed_entries(first, last)
         d.addErrback(self._response_eb, first, last, retries)
-        d.addCallback(_parse_entries, last - first + 1)
         d.addCallback(lambda result: (entries + result, len(result)))
         d.addCallback(self._fetch, first, last, retries)
         return d

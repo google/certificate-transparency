@@ -176,9 +176,11 @@ class AsyncLogClientTest(unittest.TestCase):
         return consumer
 
     def pump_get_entries(self,
-                    delay=log_client.EntryProducer.MAX_INITIAL_REQUEST_DELAY):
+                     delay=log_client.EntryProducer.MAX_INITIAL_REQUEST_DELAY,
+                     pumps=1):
         # Helper method which advances time past get_entries delay
-        self.clock.pump([0, delay])
+        for _ in range(0, pumps):
+            self.clock.pump([0, delay])
 
     def test_get_entries(self):
         client = self.default_client()
@@ -196,7 +198,15 @@ class AsyncLogClientTest(unittest.TestCase):
         json_entries["entries"][5]["leaf_input"] = "garbagebase64^^^"
 
         client = self.one_shot_client(json_entries)
-        consumer = self.get_entries(client, 0, 9)
+        producer = client.get_entries(0, 9)
+        # remove exponential back-off
+        producer._calculate_retry_delay = lambda _: 1
+        consumer = self.EntryConsumer()
+        d = producer.startProducing(consumer)
+        d.addBoth(consumer.done)
+        # pump through retries (with retries there are 2 delays per request and
+        # and initial delay)
+        self.pump_get_entries(1, FLAGS.get_entries_max_retries * 2 + 1)
         self.assertTrue(consumer.result.check(log_client.InvalidResponseError))
         # The entire response should be discarded upon error.
         self.assertFalse(consumer.received)
@@ -206,8 +216,37 @@ class AsyncLogClientTest(unittest.TestCase):
             test_util.make_entries(4, 5))
 
         client = self.one_shot_client(large_response)
-        consumer = self.get_entries(client, 4, 4)
+        producer = client.get_entries(4, 4)
+        # remove exponential back-off
+        producer._calculate_retry_delay = lambda _: 1
+        consumer = self.EntryConsumer()
+        d = producer.startProducing(consumer)
+        d.addBoth(consumer.done)
+        # pump through retries (with retries there are 2 delays per request and
+        # initial delay)
+        self.pump_get_entries(1, FLAGS.get_entries_max_retries * 2 + 1)
         self.assertTrue(consumer.result.check(log_client.InvalidResponseError))
+
+    def test_get_entries_succedes_after_retry(self):
+        json_entries = test_util.entries_to_json(test_util.make_entries(0, 9))
+        json_entries["entries"][5]["leaf_input"] = "garbagebase64^^^"
+        client = self.one_shot_client(json_entries)
+        producer = client.get_entries(0, 9)
+        # remove exponential back-off
+        producer._calculate_retry_delay = lambda _: 1
+        consumer = self.EntryConsumer()
+        d = producer.startProducing(consumer)
+        d.addBoth(consumer.done)
+        # pump retries halfway through (there are actually two delays before
+        # firing requests, so this loop will go only through half of retries)
+        self.pump_get_entries(1, FLAGS.get_entries_max_retries)
+        self.assertFalse(hasattr(consumer, 'result'))
+        json_entries = test_util.entries_to_json(test_util.make_entries(0, 9))
+        response = self.FakeHandler.make_response(200, "OK",
+                                                  json_content=json_entries)
+        client._handler._agent._responder.get_response.return_value = response
+        self.pump_get_entries(1)
+        self.assertTrue(test_util.verify_entries(consumer.received, 0, 9))
 
     def test_get_entries_raises_if_query_is_larger_than_tree_size(self):
         client = log_client.AsyncLogClient(
@@ -240,8 +279,7 @@ class AsyncLogClientTest(unittest.TestCase):
             test_util.DEFAULT_URI, reactor=self.clock)
         consumer = self.get_entries(client, 0, 9)
         # 1 pump in get_entries and 3 more so we fetch everything
-        for _ in range(0, 3):
-            self.pump_get_entries()
+        self.pump_get_entries(pumps=3)
         self.assertTrue(test_util.verify_entries(consumer.received, 0, 9))
 
     class PausingConsumer(object):
@@ -279,8 +317,7 @@ class AsyncLogClientTest(unittest.TestCase):
         self.assertIsNone(consumer.result)
         producer.resumeProducing()
         # pump next 2 batches
-        for _ in range(0, 2):
-            self.pump_get_entries()
+        self.pump_get_entries(pumps=2)
         self.assertEqual(10, consumer.result)
         self.assertTrue(test_util.verify_entries(consumer.received, 0, 9))
 
