@@ -176,7 +176,7 @@ class AsyncLogClientTest(unittest.TestCase):
         return consumer
 
     def pump_get_entries(self,
-                     delay=log_client.EntryProducer.MAX_INITIAL_REQUEST_DELAY,
+                     delay=FLAGS.get_entries_retry_delay,
                      pumps=1):
         # Helper method which advances time past get_entries delay
         for _ in range(0, pumps):
@@ -309,7 +309,6 @@ class AsyncLogClientTest(unittest.TestCase):
         consumer.registerProducer(producer)
         d = producer.startProducing(consumer)
         d.addBoth(consumer.done)
-        initial_delay = log_client.EntryProducer.MAX_INITIAL_REQUEST_DELAY
         # fire all pending callbacks, and then fire request
         self.pump_get_entries()
         self.assertTrue(test_util.verify_entries(consumer.received, 0, 3))

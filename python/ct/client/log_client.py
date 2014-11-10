@@ -29,7 +29,7 @@ gflags.DEFINE_integer("entry_fetch_batch_size", 1000, "Maximum number of "
 gflags.DEFINE_integer("max_fetchers_in_parallel", 100, "Maximum number of "
                       "concurrent fetches.")
 
-gflags.DEFINE_integer("get_entries_retry_delay", 5, "Number of seconds after "
+gflags.DEFINE_integer("get_entries_retry_delay", 1, "Number of seconds after "
                       "which get-entries will be retried if it encountered "
                       "an error.")
 
@@ -536,7 +536,6 @@ class AsyncRequestHandler(object):
 class EntryProducer(object):
     """A push producer for log entries."""
     implements(iweb.IBodyProducer)
-    MAX_INITIAL_REQUEST_DELAY = 1
 
     def __init__(self, handler, reactor, uri, start, end, batch_size):
         self._handler = handler
@@ -573,8 +572,8 @@ class EntryProducer(object):
 
         Random is there, so we won't attack server lots of requests exactly
         at the same time, and 1.3 is nice constant for exponential back-off."""
-        return ((0.4 + random.uniform(0.6, 1.0)) * FLAGS.get_entries_retry_delay
-                * 1.3**retries)
+        return ((0.4 + random.uniform(0.3, 0.6)) * FLAGS.get_entries_retry_delay
+                * 1.4**retries)
 
     def _response_eb(self, failure, first, last, retries):
         """Error back for HTTP errors"""
@@ -612,8 +611,7 @@ class EntryProducer(object):
         # it's not the best idea to attack server with many requests exactly at
         # the same time, so requests are sent after slight delay.
         request = task.deferLater(self._reactor,
-                                  random.uniform(0,
-                                      self.MAX_INITIAL_REQUEST_DELAY),
+                                  self._calculate_retry_delay(0),
                                   self._handler.get,
                                   self._uri + "/" + _GET_ENTRIES_PATH,
                                   params={"start": str(first),
