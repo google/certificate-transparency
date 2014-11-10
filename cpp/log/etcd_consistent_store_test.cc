@@ -58,6 +58,11 @@ class EtcdConsistentStoreTest : public ::testing::Test {
     return EntryHandle<LoggedCertificate>(cert);
   }
 
+  EntryHandle<LoggedCertificate> HandleForCert(const LoggedCertificate& cert,
+                                               int handle) {
+    return EntryHandle<LoggedCertificate>(cert, handle);
+  }
+
   string Serialize(const LoggedCertificate& cert) {
     string flat;
     cert.SerializeToString(&flat);
@@ -264,10 +269,32 @@ TEST_F(EtcdConsistentStoreDeathTest,
 
 
 TEST_F(EtcdConsistentStoreTest, TestAssignSequenceNumber) {
-  EntryHandle<LoggedCertificate> entry(HandleForCert(DefaultCert()));
-  util::Status status(store_->AssignSequenceNumber(1, &entry));
-  EXPECT_EQ(util::error::UNIMPLEMENTED, status.CanonicalCode());
+  const int kDefaultHandle(23);
+  EntryHandle<LoggedCertificate> entry(
+      HandleForCert(DefaultCert(), kDefaultHandle));
+
+  const string kUnsequencedPath(string(kRoot) + "/unsequenced/" +
+                                util::ToBase64(entry.Entry().Hash()));
+  const string kSequencedPath(string(kRoot) + "/sequenced/1");
+  const int kSeq(1);
+
+
+  LoggedCertificate entry_with_provisional(entry.Entry());
+  entry_with_provisional.set_provisional_sequence_number(kSeq);
+  EXPECT_CALL(client_,
+              Update(kUnsequencedPath, Serialize(entry_with_provisional),
+                     kDefaultHandle, _)).WillOnce(Return(util::Status::OK));
+
+  LoggedCertificate entry_with_seq(entry.Entry());
+  entry_with_seq.set_sequence_number(kSeq);
+  EXPECT_CALL(client_, Create(kSequencedPath, Serialize(entry_with_seq), _))
+      .WillOnce(Return(util::Status::OK));
+
+
+  util::Status status(store_->AssignSequenceNumber(kSeq, &entry));
+  EXPECT_TRUE(status.ok()) << status;
 }
+
 
 TEST_F(EtcdConsistentStoreDeathTest,
        TestAssignSequenceNumberBarfsWithSequencedEntry) {
@@ -275,6 +302,15 @@ TEST_F(EtcdConsistentStoreDeathTest,
       HandleForCert(MakeSequencedCert(123, "hi", 44)));
   EXPECT_DEATH(util::Status status(store_->AssignSequenceNumber(1, &entry));
                , "has_sequence_number");
+}
+
+
+TEST_F(EtcdConsistentStoreDeathTest,
+       TestAssignSequenceNumberBarfsWithMismatchedSequencedEntry) {
+  EntryHandle<LoggedCertificate> entry(HandleForCert(MakeCert(123, "hi")));
+  entry.MutableEntry()->set_provisional_sequence_number(257);
+  EXPECT_DEATH(util::Status status(store_->AssignSequenceNumber(1, &entry));
+               , "sequence_number ==.*provisional.*");
 }
 
 
