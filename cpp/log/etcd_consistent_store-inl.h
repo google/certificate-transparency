@@ -44,8 +44,7 @@ template <class Logged>
 util::Status EtcdConsistentStore<Logged>::AddPendingEntry(Logged* entry) {
   CHECK_NOTNULL(entry);
   CHECK(!entry->has_sequence_number());
-  const std::string full_path(
-      GetFullPath(kUnsequencedDir + util::ToBase64(entry->Hash())));
+  const std::string full_path(GetUnsequencedPath(*entry));
   EntryHandle<Logged> handle(*entry);
   util::Status status(CreateEntry(full_path, &handle));
   if (status.CanonicalCode() == util::error::FAILED_PRECONDITION) {
@@ -68,8 +67,7 @@ util::Status EtcdConsistentStore<Logged>::AddPendingEntry(Logged* entry) {
 template <class Logged>
 util::Status EtcdConsistentStore<Logged>::GetPendingEntryForHash(
     const std::string& hash, EntryHandle<Logged>* entry) const {
-  util::Status status(
-      GetEntry(GetFullPath(kUnsequencedDir + util::ToBase64(hash)), entry));
+  util::Status status(GetEntry(GetUnsequencedPath(hash), entry));
   if (status.ok()) {
     CHECK(!entry->Entry().has_sequence_number());
   }
@@ -108,9 +106,7 @@ util::Status EtcdConsistentStore<Logged>::GetSequencedEntries(
 template <class Logged>
 util::Status EtcdConsistentStore<Logged>::GetSequencedEntry(
     const uint64_t sequence_number, EntryHandle<Logged>* entry) const {
-  util::Status status(
-      GetEntry(GetFullPath(kSequencedDir + std::to_string(sequence_number)),
-               entry));
+  util::Status status(GetEntry(GetSequencedPath(sequence_number), entry));
   if (status.ok()) {
     CHECK(entry->Entry().has_sequence_number());
   }
@@ -123,7 +119,23 @@ template <class Logged>
 util::Status EtcdConsistentStore<Logged>::AssignSequenceNumber(
     const uint64_t sequence_number, EntryHandle<Logged>* entry) {
   CHECK(!entry->Entry().has_sequence_number());
-  return util::Status(util::error::UNIMPLEMENTED, "Not implemented yet.");
+  if (entry->Entry().has_provisional_sequence_number()) {
+    CHECK_EQ(sequence_number, entry->Entry().provisional_sequence_number());
+  } else {
+    entry->MutableEntry()->set_provisional_sequence_number(sequence_number);
+  }
+  // Record provisional sequence number:
+  util::Status status(UpdateEntry(GetUnsequencedPath(entry->Entry()), entry));
+  if (!status.ok()) {
+    return status;
+  }
+  // Now finalise the sequence number assignment.
+  // Create a temporary EntryHandle here to avoid stomping over the version
+  // info held by the unsequenced entry handle passed in:
+  EntryHandle<Logged> seq_entry(entry->Entry());
+  seq_entry.MutableEntry()->clear_provisional_sequence_number();
+  seq_entry.MutableEntry()->set_sequence_number(sequence_number);
+  return CreateEntry(GetSequencedPath(sequence_number), &seq_entry);
 }
 
 
@@ -177,8 +189,10 @@ template <class Logged>
 template <class T>
 util::Status EtcdConsistentStore<Logged>::UpdateEntry(const std::string& path,
                                                       EntryHandle<T>* t) {
+  CHECK_NOTNULL(t);
+  CHECK(t->HasHandle());
   std::string flat_entry;
-  CHECK(t->SerializeToString(&flat_entry));
+  CHECK(t->Entry().SerializeToString(&flat_entry));
   int new_version;
   util::Status status(
       client_->Update(path, flat_entry, t->Handle(), &new_version));
@@ -193,6 +207,8 @@ template <class Logged>
 template <class T>
 util::Status EtcdConsistentStore<Logged>::CreateEntry(const std::string& path,
                                                       EntryHandle<T>* t) {
+  CHECK_NOTNULL(t);
+  CHECK(!t->HasHandle());
   std::string flat_entry;
   CHECK(t->Entry().SerializeToString(&flat_entry));
   int new_version;
@@ -201,6 +217,27 @@ util::Status EtcdConsistentStore<Logged>::CreateEntry(const std::string& path,
     t->SetHandle(new_version);
   }
   return status;
+}
+
+
+template <class Logged>
+std::string EtcdConsistentStore<Logged>::GetUnsequencedPath(
+    const Logged& unseq) const {
+  return GetFullPath(std::string(kUnsequencedDir) +
+                     util::ToBase64(unseq.Hash()));
+}
+
+
+template <class Logged>
+std::string EtcdConsistentStore<Logged>::GetUnsequencedPath(
+    const std::string& hash) const {
+  return GetFullPath(std::string(kUnsequencedDir) + util::ToBase64(hash));
+}
+
+
+template <class Logged>
+std::string EtcdConsistentStore<Logged>::GetSequencedPath(uint64_t seq) const {
+  return GetFullPath(std::string(kSequencedDir) + std::to_string(seq));
 }
 
 

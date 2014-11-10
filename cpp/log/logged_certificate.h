@@ -123,8 +123,7 @@ inline bool operator==(const LoggedCertificate& lhs,
 }
 
 
-inline bool operator==(const ct::LogEntry& lhs,
-                       const ct::LogEntry& rhs) {
+inline bool operator==(const ct::LogEntry& lhs, const ct::LogEntry& rhs) {
   // TODO(alcutter): Do this properly
   std::string l_str, r_str;
   CHECK(lhs.SerializeToString(&l_str));
