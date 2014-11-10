@@ -567,12 +567,14 @@ class EntryProducer(object):
             self.stopProducing()
             self._done.errback(failure)
 
-    def __calculate_retry_delay(self, retries):
+    @staticmethod
+    def _calculate_retry_delay(retries):
         """Calculates delay based on number of retries which already happened.
 
         Random is there, so we won't attack server lots of requests exactly
         at the same time, and 1.3 is nice constant for exponential backof."""
-        return (0.4 + random.uniform(0.6, 1.0)) * self.min_delay * 1.3**retries
+        return ((0.4 + random.uniform(0.6, 1.0)) * FLAGS.get_entries_retry_delay
+                * 1.3**retries)
 
     def _response_eb(self, failure, first, last, retries):
         """Error back for HTTP errors"""
@@ -582,9 +584,10 @@ class EntryProducer(object):
                 not failure.check(HTTPClientError)):
                 logging.info("Retrying get-entries for range <%d, %d> retry: %d"
                              % (first, last, retries))
-                d = task.deferLater(self._reactor, self.__calculate_retry_delay(retries),
-                                       self._create_request,
-                                       first, last)
+                d = task.deferLater(self._reactor,
+                                  self._calculate_retry_delay(retries),
+                                  self._fetch_parsed_entries,
+                                  first, last)
                 d.addErrback(self._response_eb, first, last, retries + 1)
                 return d
             else:
@@ -608,12 +611,14 @@ class EntryProducer(object):
     def _create_request(self, first, last):
         # it's not the best idea to attack server with many requests exactly at
         # the same time, so requests are sent after slight delay.
-        return task.deferLater(self._reactor,
-                               random.uniform(0,
-                                EntryProducer.MAX_INITIAL_REQUEST_DELAY),
-                               self._handler.get,
-                               self._uri + "/" + _GET_ENTRIES_PATH,
-                               params={"start": str(first), "end": str(last)})
+        request = task.deferLater(self._reactor,
+                                  random.uniform(0,
+                                      self.MAX_INITIAL_REQUEST_DELAY),
+                                  self._handler.get,
+                                  self._uri + "/" + _GET_ENTRIES_PATH,
+                                  params={"start": str(first),
+                                          "end": str(last)})
+        return request
 
     def _create_next_request(self, first, last, entries, retries):
         d = self._create_request(first, last)

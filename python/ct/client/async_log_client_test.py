@@ -175,9 +175,10 @@ class AsyncLogClientTest(unittest.TestCase):
         self.pump_get_entries()
         return consumer
 
-    def pump_get_entries(self):
+    def pump_get_entries(self,
+                    delay=log_client.EntryProducer.MAX_INITIAL_REQUEST_DELAY):
         # Helper method which advances time past get_entries delay
-        self.clock.pump([0, log_client.EntryProducer.MAX_INITIAL_REQUEST_DELAY])
+        self.clock.pump([0, delay])
 
     def test_get_entries(self):
         client = self.default_client()
@@ -196,8 +197,6 @@ class AsyncLogClientTest(unittest.TestCase):
 
         client = self.one_shot_client(json_entries)
         consumer = self.get_entries(client, 0, 9)
-        self.pump_get_entries()
-
         self.assertTrue(consumer.result.check(log_client.InvalidResponseError))
         # The entire response should be discarded upon error.
         self.assertFalse(consumer.received)
