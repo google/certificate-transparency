@@ -5,26 +5,12 @@ import functools
 import multiprocessing
 import Queue
 
+from ct.client import entry_decoder
 from ct.client import log_client
-from ct.client import tls_message
 from ct.crypto import cert
 from ct.crypto import error
 from ct.proto import client_pb2
 
-
-def _decode_entry(serialized_entry):
-    entry = client_pb2.EntryResponse()
-    entry.ParseFromString(serialized_entry)
-    parsed_entry = client_pb2.ParsedEntry()
-
-    tls_message.decode(entry.leaf_input, parsed_entry.merkle_leaf)
-
-    parsed_entry.extra_data.entry_type = (parsed_entry.merkle_leaf.
-                                          timestamped_entry.entry_type)
-
-    tls_message.decode(entry.extra_data, parsed_entry.extra_data)
-
-    return parsed_entry
 
 # Messages types:
 # Special queue messages to stop the subprocesses.
@@ -62,7 +48,7 @@ def process_entries(entry_queue, output_queue, match_callback):
                 _WORKER_STOPPED,
                 certificates_scanned=total_processed))
         else:
-            parsed_entry = _decode_entry(entry)
+            parsed_entry = entry_decoder.decode_entry(entry)
             ts_entry = parsed_entry.merkle_leaf.timestamped_entry
             total_processed += 1
             c = None

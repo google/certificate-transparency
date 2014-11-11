@@ -7,6 +7,7 @@ ct/proto/%_pb2.py: ct/proto/%.proto
 ct/proto/ct_pb2.py: ../proto/ct.proto
 	protoc --python_out=ct/proto -I../proto ../proto/ct.proto
 
+# TODO(laiqu) use unittest ability to detect tests
 test: all
 	PYTHONPATH=$(PYTHONPATH):. ./ct/client/sqlite_log_db_test.py
 	PYTHONPATH=$(PYTHONPATH):. ./ct/crypto/verify_test.py
@@ -22,10 +23,17 @@ test: all
 	PYTHONPATH=$(PYTHONPATH):. ./ct/client/sqlite_connection_test.py
 	PYTHONPATH=$(PYTHONPATH):. ./ct/client/log_client_test.py
 	PYTHONPATH=$(PYTHONPATH):. ./ct/client/sqlite_temp_db_test.py
-	PYTHONPATH=$(PYTHONPATH):. ./ct/client/monitor_test.py
+	PYTHONPATH=$(PYTHONPATH):. ./ct/client/reporter_test.py
 	PYTHONPATH=$(PYTHONPATH):. ./ct/client/state_test.py
 	PYTHONPATH=$(PYTHONPATH):. ./ct/client/tls_message_test.py
+	PYTHONPATH=$(PYTHONPATH):. ./ct/cert_analysis/algorithm_test.py
+	PYTHONPATH=$(PYTHONPATH):. ./ct/cert_analysis/ca_field_test.py
+	PYTHONPATH=$(PYTHONPATH):. ./ct/cert_analysis/dnsnames_test.py
+	PYTHONPATH=$(PYTHONPATH):. ./ct/cert_analysis/ip_addresses_test.py
+	PYTHONPATH=$(PYTHONPATH):. ./ct/cert_analysis/serial_number_test.py
+	PYTHONPATH=$(PYTHONPATH):. ./ct/cert_analysis/validity_test.py
 # Tests using twisted trial instead of plain unittest.
+	PYTHONPATH=$(PYTHONPATH):. ./ct/client/monitor_test.py
 	PYTHONPATH=$(PYTHONPATH):. ./ct/client/async_log_client_test.py
 
 clean:
