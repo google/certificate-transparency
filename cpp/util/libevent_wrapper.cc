@@ -202,19 +202,21 @@ void HttpRequest::Cancel() {
 }
 
 
-void HttpRequest::Start(const shared_ptr<HttpRequest>& req,
-                        evhttp_connection* conn, evhttp_cmd_type type,
-                        const string& uri) {
+void HttpRequest::Start(const shared_ptr<HttpConnection>& conn,
+                        evhttp_cmd_type type, const string& uri) {
   CHECK(req_) << "attempt to reuse an HttpRequest object";
   lock_guard<mutex> lock(cancel_lock_);
   CHECK(!cancelled_) << "starting an already cancelled request?!?";
-  cancel_ = event_new(CHECK_NOTNULL(evhttp_connection_get_base(conn)), -1, 0,
-                      &HttpRequest::Cancelled, this);
+  cancel_ = event_new(CHECK_NOTNULL(evhttp_connection_get_base(conn->conn_)),
+                      -1, 0, &HttpRequest::Cancelled, this);
 
-  CHECK_EQ(this, req.get());
   CHECK(!self_ref_);
-  self_ref_ = req;
-  CHECK_EQ(evhttp_make_request(conn, req_, type, uri.c_str()), 0);
+  self_ref_ = shared_from_this();
+
+  CHECK(!conn_);
+  conn_ = conn;
+
+  CHECK_EQ(evhttp_make_request(conn->conn_, req_, type, uri.c_str()), 0);
 }
 
 
@@ -301,7 +303,7 @@ HttpConnection::~HttpConnection() {
 }
 
 
-HttpConnection* HttpConnection::Clone() const {
+shared_ptr<HttpConnection> HttpConnection::Clone() const {
   char* host(nullptr);
   ev_uint16_t port(0);
 
@@ -309,13 +311,13 @@ HttpConnection* HttpConnection::Clone() const {
   CHECK_NOTNULL(host);
   CHECK_GT(port, 0);
 
-  return new HttpConnection(base_, host, port);
+  return shared_ptr<HttpConnection>(new HttpConnection(base_, host, port));
 }
 
 
 void HttpConnection::MakeRequest(const shared_ptr<HttpRequest>& req,
                                  evhttp_cmd_type type, const string& uri) {
-  req->Start(req, conn_, type, uri);
+  req->Start(shared_from_this(), type, uri);
 }
 
 

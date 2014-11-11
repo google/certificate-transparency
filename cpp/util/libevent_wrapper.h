@@ -15,6 +15,7 @@ namespace libevent {
 
 
 class Event;
+class HttpConnection;
 
 
 class Base {
@@ -90,7 +91,7 @@ class HttpServer {
 };
 
 
-class HttpRequest {
+class HttpRequest : public std::enable_shared_from_this<HttpRequest> {
  public:
   typedef std::function<void(const std::shared_ptr<HttpRequest>&)> Callback;
 
@@ -124,8 +125,8 @@ class HttpRequest {
   friend class HttpConnection;
 
   // Called by HttpConnection.
-  void Start(const std::shared_ptr<HttpRequest>& req, evhttp_connection* conn,
-             evhttp_cmd_type type, const std::string& uri);
+  void Start(const std::shared_ptr<HttpConnection>& conn, evhttp_cmd_type type,
+             const std::string& uri);
 
   static void Done(evhttp_request* req, void* userdata);
   static void Cancelled(evutil_socket_t sock, short flag, void* userdata);
@@ -133,6 +134,9 @@ class HttpRequest {
   const Callback callback_;
 
   evhttp_request* req_;
+  // We keep a reference to the HttpConnection as long as this request
+  // is outstanding, to make sure it doesn't disappear from under us.
+  std::shared_ptr<HttpConnection> conn_;
 
   // A self-reference to keep the request object alive, as long as
   // it's running.
@@ -146,7 +150,7 @@ class HttpRequest {
 };
 
 
-class HttpConnection {
+class HttpConnection : public std::enable_shared_from_this<HttpConnection> {
  public:
   HttpConnection(const std::shared_ptr<Base>& base, const evhttp_uri* uri);
   ~HttpConnection();
@@ -155,7 +159,7 @@ class HttpConnection {
   // separate socket altogether. This can be useful for "hanging
   // GETs", for example, which would otherwise prevent other requests
   // from being made on the connection.
-  HttpConnection* Clone() const;
+  std::shared_ptr<HttpConnection> Clone() const;
 
   // Once you pass an HttpRequest to this method, you shouldn't call
   // any of its methods (except for HttpRequest::Cancel), until the
@@ -166,6 +170,8 @@ class HttpConnection {
   void SetTimeout(int timeout_secs);
 
  private:
+  friend class HttpRequest;
+
   HttpConnection(const std::shared_ptr<Base>& base, const std::string& host,
                  unsigned short port);
 
