@@ -318,7 +318,7 @@ AsyncLogClient::AsyncLogClient(const shared_ptr<libevent::Base>& base,
     : base_(base),
       server_uri_(CHECK_NOTNULL(evhttp_uri_parse(server_uri.c_str())),
                   evhttp_uri_free),
-      conn_(base_, server_uri_.get()) {
+      conn_(make_shared<libevent::HttpConnection>(base_, server_uri_.get())) {
   const char* const path(evhttp_uri_get_path(server_uri_.get()));
   string newpath;
 
@@ -341,7 +341,7 @@ void AsyncLogClient::GetSTH(SignedTreeHead* sth, const Callback& done) {
   evhttp_add_header(req->GetOutputHeaders(), "Host",
                     evhttp_uri_get_host(server_uri_.get()));
 
-  conn_.MakeRequest(req, EVHTTP_REQ_GET, GetPath("get-sth"));
+  conn_->MakeRequest(req, EVHTTP_REQ_GET, GetPath("get-sth"));
 }
 
 
@@ -354,7 +354,7 @@ void AsyncLogClient::GetRoots(vector<shared_ptr<Cert> >* roots,
   evhttp_add_header(req->GetOutputHeaders(), "Host",
                     evhttp_uri_get_host(server_uri_.get()));
 
-  conn_.MakeRequest(req, EVHTTP_REQ_GET, GetPath("get-roots"));
+  conn_->MakeRequest(req, EVHTTP_REQ_GET, GetPath("get-roots"));
 }
 
 
@@ -371,7 +371,7 @@ void AsyncLogClient::GetEntries(int first, int last,
   ostringstream subpath;
   subpath << "get-entries?start=" << first << "&end=" << last;
 
-  conn_.MakeRequest(req, EVHTTP_REQ_GET, GetPath(subpath.str()));
+  conn_->MakeRequest(req, EVHTTP_REQ_GET, GetPath(subpath.str()));
 }
 
 
@@ -391,7 +391,7 @@ void AsyncLogClient::QueryInclusionProof(const SignedTreeHead& sth,
           << UriEncode(util::ToBase64(merkle_leaf_hash))
           << "&tree_size=" << sth.tree_size();
 
-  conn_.MakeRequest(req, EVHTTP_REQ_GET, GetPath(subpath.str()));
+  conn_->MakeRequest(req, EVHTTP_REQ_GET, GetPath(subpath.str()));
 }
 
 
@@ -408,7 +408,7 @@ void AsyncLogClient::GetSTHConsistency(uint64_t first, uint64_t second,
   ostringstream subpath;
   subpath << "get-sth-consistency?first=" << first << "&second=" << second;
 
-  conn_.MakeRequest(req, EVHTTP_REQ_GET, GetPath(subpath.str()));
+  conn_->MakeRequest(req, EVHTTP_REQ_GET, GetPath(subpath.str()));
 }
 
 
@@ -459,7 +459,7 @@ void AsyncLogClient::InternalAddChain(const CertChain& cert_chain,
                         json_body.size()),
            0);
 
-  conn_.MakeRequest(req, EVHTTP_REQ_POST,
+  conn_->MakeRequest(req, EVHTTP_REQ_POST,
                     GetPath(pre_cert ? "add-pre-chain" : "add-chain"));
 }
 

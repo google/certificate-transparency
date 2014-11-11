@@ -78,7 +78,7 @@ class AsyncLogClient {
 
   const std::shared_ptr<libevent::Base> base_;
   const std::shared_ptr<evhttp_uri> server_uri_;
-  libevent::HttpConnection conn_;
+  const std::shared_ptr<libevent::HttpConnection> conn_;
 
   DISALLOW_COPY_AND_ASSIGN(AsyncLogClient);
 };
