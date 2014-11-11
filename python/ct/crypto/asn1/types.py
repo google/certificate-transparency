@@ -322,11 +322,29 @@ class Implicit(object):
         return cls
 
 
+def type_unpickle(base, tag_log):
+    unpickled = base
+    for entry in tag_log:
+        if entry.explicit:
+            unpickled = unpickled.explicit(entry.number, entry.tag_class)
+        else:
+            unpickled = unpickled.implicit(entry.number, entry.tag_class)
+    return unpickled.__new__(unpickled)
+
+
+TagEntry = collections.namedtuple('TagEntry',
+                                  ['explicit', 'number', 'tag_class'])
+
+
 class Abstract(object):
     """Abstract base class."""
     __metaclass__ = abc.ABCMeta
 
     tags = ()
+    # Tag log stores all calls of implicit and explicit, so during unpickling
+    # we can rebuild dynamicly created classes. Entries in tag log are stored
+    # as tuple (0 - implicit|1 - explicit, number, tag_class).
+    tag_log = []
 
     @classmethod
     def explicit(cls, number, tag_class=tag.CONTEXT_SPECIFIC):
@@ -346,6 +364,9 @@ class Abstract(object):
         # arguments.
         mcs = cls.__metaclass__
         return_class = mcs(name, (cls,), {})
+        return_class_tag_log = cls.tag_log[:]
+        return_class_tag_log.append(TagEntry(True, number, tag_class))
+        return_class.tag_log = return_class_tag_log
         return Explicit(number, tag_class)(return_class)
 
     @classmethod
@@ -362,7 +383,20 @@ class Abstract(object):
         name = "%s.implicit(%d, %d)" % (cls.__name__, number, tag_class)
         mcs = cls.__metaclass__
         return_class = mcs(name, (cls,), {})
+        return_class_tag_log = cls.tag_log[:]
+        return_class_tag_log.append(TagEntry(False, number, tag_class))
+        return_class.tag_log = return_class_tag_log
         return Implicit(number, tag_class)(return_class)
+
+    def __reduce__(self):
+        base_type = None
+        for klass in type(self).mro():
+            # If there is abc in class name it means it was dynamically created
+            # by abc module.
+            if 'abc' != klass.__module__:
+                base_type = klass
+                break
+        return (type_unpickle, (base_type, self.tag_log), self.__dict__)
 
     def __init__(self, value=None, serialized_value=None, strict=True):
         """Initialize from a value or serialized buffer.
