@@ -22,6 +22,8 @@ Unpack googlemock, but do not build it. Upstream recommends to build a new copy 
 
 Some systems make the googlemock source available as a package; on Debian, this is in the google-mock package, which puts it in ```/usr/src/gmock```. Our ```Makefile``` looks in that location by default, but if your googlemock sources are in a different location, set the ```GMOCKDIR``` environment variable to point at them.
 
+If you are on FreeBSD, you may need to apply the patch in gtest.patch to the gtest subdirectory of gmock.
+
  - [protobuf](https://github.com/google/protobuf) (tested with 2.4.1)
  - [gflags](https://code.google.com/p/gflags/) (tested with 1.6 and 2.0)
  - [glog](https://code.google.com/p/google-glog/) (tested with 0.3.1)
@@ -35,8 +37,7 @@ You can specify a JSON-C library in a non-standard location using the ```JSONCLI
 
  - [libevent](http://libevent.org/) (tested with 2.0.21-stable)
 
-You can specify a non-installed locally built library using the
-```LIBEVENTDIR``` environment variable to point to the local build.
+You can specify a non-installed locally built library using the ```LIBEVENTDIR``` environment variable to point to the local build. Note that the FreeBSD port version 2.0.21_2 does not appear to work correctly (it only listens on IPv6 for the HTTP server) - for that platform we had to build from the source, specifically commit 6dba1694c89119c44cef03528945e5a5978ab43a.
 
  - [ldns](http://www.nlnetlabs.nl/projects/ldns/)
  - [ant](http://ant.apache.org/)

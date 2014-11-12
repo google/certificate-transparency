@@ -309,10 +309,11 @@ class CertificateTest(unittest.TestCase):
         self.assertEqual(list(c.not_after()), expected)
 
     def test_parse_ecdsa_cert(self):
-        # TODO(ekasper): Also test the signature algorithm once it's exposed
-        # in the API.
         c = self.cert_from_pem_file(self._PEM_ECDSA)
         self.assertTrue("kmonos.jp" in c.print_subject_name())
+        self.assertEquals(oid.ECDSA_WITH_SHA256, c.signature()["algorithm"])
+        self.assertEquals(oid.ECDSA_WITH_SHA256,
+                          c.signature_algorithm()["algorithm"])
 
     def test_print_subject_name(self):
         c = self.cert_from_pem_file(self._PEM_FILE)

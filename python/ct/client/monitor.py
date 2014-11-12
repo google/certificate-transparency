@@ -1,14 +1,12 @@
-import itertools
 import gflags
 import logging
-import os
 
 from ct.client import log_client
 from ct.client import state
-from ct.client import temp_db
 from ct.crypto import error
 from ct.crypto import merkle
 from ct.proto import client_pb2
+from twisted.internet import defer
 
 FLAGS = gflags.FLAGS
 
@@ -35,8 +33,8 @@ class Monitor(object):
             logging.warning("Monitor state file not found, assuming first "
                             "run.")
         else:
-          if not self.__state.HasField("verified_sth"):
-            logging.warning("No verified monitor state, assuming first run.")
+            if not self.__state.HasField("verified_sth"):
+                logging.warning("No verified monitor state, assuming first run.")
 
         # load compact merkle tree state from the monitor state
         self.__verified_tree = merkle.CompactMerkleTree(hasher)
@@ -70,8 +68,16 @@ class Monitor(object):
         """
         return self.__state.verified_sth.timestamp
 
+    def __fired_deferred(self, result):
+        """"Create a fired deferred to indicate that the asynchronous operation
+        should proceed immediately, when the result is already available."""
+        fire = defer.Deferred()
+        fire.callback(result)
+        return fire
+
     def _set_pending_sth(self, new_sth):
         """Set pending_sth from new_sth, or just verified_sth if not bigger."""
+        logging.info("STH verified, updating state.")
         if new_sth.tree_size < self.__state.verified_sth.tree_size:
             raise ValueError("pending size must be >= verified size")
         if new_sth.timestamp <= self.__state.verified_sth.timestamp:
@@ -83,6 +89,7 @@ class Monitor(object):
         else:
             new_state.verified_sth.CopyFrom(new_sth)
         self.__update_state(new_state)
+        return True
 
     def _set_verified_tree(self, new_tree):
         """Set verified_tree and maybe move pending_sth to verified_sth."""
@@ -100,10 +107,8 @@ class Monitor(object):
             new_state.ClearField("pending_sth")
         self.__update_state(new_state)
 
-    def _verify_consistency(self, old_sth, new_sth):
+    def __verify_consistency_callback(self, proof, old_sth, new_sth):
         try:
-            proof = self.__client.get_sth_consistency(
-                old_sth.tree_size, new_sth.tree_size)
             logging.debug("got proof for (%s, %s): %s",
                 old_sth.tree_size, new_sth.tree_size,
                 map(lambda b: b[:8].encode("base64")[:-2] + "...", proof))
@@ -118,41 +123,67 @@ class Monitor(object):
                           (old_sth, new_sth, e))
             raise
 
-    def _update_sth(self):
-        """Get a new candidate STH. If update succeeds, stores the new STH as
-        pending. Does nothing if there is already a pending
-        STH.
-        Returns: True if the update succeeded."""
-        if self.__state.HasField("pending_sth"):
-            return True
-        logging.info("Fetching new STH")
-        try:
-            sth_response = self.__client.get_sth()
-            logging.info("Got new STH: %s" % sth_response)
-        except (log_client.HTTPError, log_client.InvalidResponseError) as e:
-            logging.error("get-sth from %s failed: %s" % (self.servername, e))
-            return False
+    def _verify_consistency(self, old_sth, new_sth):
+        """Verifies that old STH is consistent with new STH.
 
+        Returns: Deferred that fires with boolean indicating whether updating
+        succeeded.
+
+        Deferred raises: error.ConsistencyError if STHs were inconsistent"""
+        proof = self.__client.get_sth_consistency(old_sth.tree_size,
+                                                  new_sth.tree_size)
+        proof.addCallback(self.__verify_consistency_callback, old_sth, new_sth)
+        return proof
+
+    def __update_sth_errback(self, failure):
+        """Fired if there was network error or log server sent invalid
+        response"""
+        logging.error("get-sth from %s failed: %s" % (self.servername,
+                                                     failure.getErrorMessage()))
+        return False
+
+    def __update_sth_verify_consistency_before_accepting_eb(self, failure):
+        """Errback for verify_consistency method which is called before setting
+        sth as verified. If STH was invalid appropriate error message is
+        already logged, so we only want to return false as update_sth failed."""
+        failure.trap(error.VerifyError)
+        return False
+
+    def __handle_old_sth_errback(self, failure, sth_response):
+        failure.trap(error.VerifyError)
+        logging.error("Received older STH which is older and inconsistent "
+                      "with current verified STH: %s vs %s. Error: %s" %
+                      (sth_response, self.__state.verified_sth, failure))
+
+    def __handle_old_sth_callback(self, result, sth_response):
+        logging.warning("Rejecting received "
+                        "STH: timestamp is older than current verified "
+                        "STH: %s vs %s " %
+                        (sth_response, self.__state.verified_sth))
+
+    def __update_sth_callback(self, sth_response):
         # If we got the same response as last time, do nothing.
-        # If we got an older response than last time, return False.
-        # (It is not necessarily an inconsistency - the log could be out of
-        # sync - but we should not rewind to older data.)
+        # If we got an older response than last time, make sure that it's
+        # consistent with current verified STH and then return False.
+        # (If older response is consistent then, there is nothing wrong
+        # with the fact that we recieved older timestamp - the log could be
+        # out of sync - but we should not rewind to older data.)
         #
         # The client should always return an STH but best eliminate the
         # None == None case explicitly by only shortcutting the verification
         # if we already have a verified STH.
         if self.__state.HasField("verified_sth"):
-                if sth_response == self.__state.verified_sth:
-                    logging.info("Ignoring already-verified STH: %s" %
-                                 sth_response)
-                    return True
-                elif (sth_response.timestamp <
-                      self.__state.verified_sth.timestamp):
-                    logging.error("Rejecting received STH: timestamp is older "
-                                  "than current verified STH: %s vs %s " %
-                                  (sth_response, self.__state.verified_sth))
-                    return False
-
+            if sth_response == self.__state.verified_sth:
+                logging.info("Ignoring already-verified STH: %s" %
+                             sth_response)
+                return True
+            elif (sth_response.timestamp <
+                    self.__state.verified_sth.timestamp):
+                d = self._verify_consistency(sth_response,
+                                            self.__state.verified_sth)
+                d.addCallback(self.__handle_old_sth_callback, sth_response)
+                d.addErrback(self.__handle_old_sth_errback, sth_response)
+                return False
         try:
             # Given that we now only store verified STHs, the audit info here
             # is not all that useful.
@@ -168,17 +199,38 @@ class Monitor(object):
 
         # Verify consistency to catch the log trying to trick us
         # into rewinding the tree.
-        try:
-            self._verify_consistency(self.__state.verified_sth, sth_response)
-        except error.VerifyError:
-            return False
+        d = self._verify_consistency(self.__state.verified_sth, sth_response)
+        d.addCallback(lambda result: self._set_pending_sth(sth_response))
+        d.addErrback(self.__update_sth_verify_consistency_before_accepting_eb)
+        return d
 
-        # We now have a valid STH that is newer than our current STH: we should
-        # be holding on to it until we have downloaded and verified data under
-        # its signature.
-        logging.info("STH verified, updating state.")
-        self._set_pending_sth(sth_response)
-        return True
+    def _update_sth(self):
+        """Get a new candidate STH. If update succeeds, stores the new STH as
+        pending. Does nothing if there is already a pending
+        STH.
+
+        Returns: Deferred that fires with boolean indicating whether updating
+        succeeded."""
+        if self.__state.HasField("pending_sth"):
+            return self.__fired_deferred(True)
+        logging.info("Fetching new STH")
+        sth_response = self.__client.get_sth()
+        sth_response.addCallback(self.__update_sth_callback)
+        sth_response.addErrback(self.__update_sth_errback)
+        return sth_response
+
+    def _compute_projected_sth_from_tree(self, tree, extra_leaves):
+        partial_sth = client_pb2.SthResponse()
+        old_size = tree.tree_size
+        partial_sth.tree_size = old_size + len(extra_leaves)
+        # we only want to check the hash, so just use a dummy timestamp
+        # that looks valid so the temporal verifier doesn't complain
+        partial_sth.timestamp = 0
+        extra_raw_leaves = [leaf.leaf_input for leaf in extra_leaves]
+        new_tree = tree.extended(extra_raw_leaves)
+        partial_sth.sha256_root_hash = new_tree.root_hash()
+        return partial_sth, new_tree
+
 
     def _compute_projected_sth(self, extra_leaves):
         """Compute a partial projected STH.
@@ -195,16 +247,8 @@ class Monitor(object):
             partial_sth: A partial STH with timestamp 0 and empty signature.
             new_tree: New CompactMerkleTree with the extra_leaves integrated.
         """
-        partial_sth = client_pb2.SthResponse()
-        old_size = self.__verified_tree.tree_size
-        partial_sth.tree_size = old_size + len(extra_leaves)
-        # we only want to check the hash, so just use a dummy timestamp
-        # that looks valid so the temporal verifier doesn't complain
-        partial_sth.timestamp = 0
-        extra_raw_leaves = [leaf.leaf_input for leaf in extra_leaves]
-        new_tree = self.__verified_tree.extended(extra_raw_leaves)
-        partial_sth.sha256_root_hash = new_tree.root_hash()
-        return partial_sth, new_tree
+        return self._compute_projected_sth_from_tree(self.__verified_tree,
+                                                     extra_leaves)
 
     @staticmethod
     def __estimate_time(num_new_entries):
@@ -215,70 +259,124 @@ class Monitor(object):
         else:
             return "all night"
 
+    def __fetch_entries_eb(self, e, consumer):
+        e.trap(log_client.HTTPError, log_client.InvalidResponseError)
+        logging.error("get-entries from %s failed: %s" %
+                      (self.servername, e))
+        consumer.done(None)
+        return True
+
+    class EntryConsumer(object):
+        """Consumer for log_client.EntryProducer.
+
+        When everything is consumed fires a boolean indicating success of
+        consuming.
+        """
+        def __init__(self, producer, monitor, pending_sth, verified_tree):
+            self._producer = producer
+            self._monitor = monitor
+            self._pending_sth = pending_sth
+            self._query_size = self._producer._end - self._producer._start + 1
+            self._end = self._producer._end
+            self._start = self._producer._start
+            self._next_sequence_number = self._start
+            #unverified_tree is tree that will be built during consumption
+            self._unverified_tree = verified_tree
+            self.consumed = defer.Deferred()
+            self._fetched = 0
+
+        def done(self, result):
+            if not result:
+                self.consumed.callback(False)
+                return False
+            self.result = result
+            if result < self._query_size:
+                logging.error("Failed to fetch all entries: expected tree size "
+                              "%d vs retrieved tree size %d" %
+                              (self._end + 1, self._next_sequence_number))
+                self.consumed.callback(False)
+                return False
+            # check that the batch is consistent with the eventual pending_sth
+            d = self._verify(self._partial_sth, self._unverified_tree, result)
+            d.addErrback(self._verify_errback)
+            self.consumed.callback(lambda x: d)
+            return True
+
+        def _verify_errback(self, failure):
+            failure.trap(error.VerifyError)
+            self._producer.finishProducing(False)
+            return False
+
+        def _verify_log(self, result, new_tree, verified_entries):
+            logging.info("Verified %d entries" % verified_entries)
+
+            self._monitor._set_verified_tree(new_tree)
+            return True
+
+        def _verify(self, partial_sth, new_tree, entries_count):
+            d = self._monitor._verify_consistency(partial_sth,
+                                                  self._pending_sth)
+            d.addCallback(self._verify_log, new_tree, entries_count)
+            return d
+
+        def consume(self, entry_batch):
+            self._fetched += len(entry_batch)
+            logging.info("Fetched %d entries (total: %d from %d)" %
+                         (len(entry_batch), self._fetched, self._query_size))
+
+            # calculate the hash for the latest fetched certs
+            # TODO(ekasper): parse temporary data into permanent storage.
+            self._partial_sth, self._unverified_tree = \
+                    self._monitor._compute_projected_sth_from_tree(
+                        self._unverified_tree, entry_batch)
+            self._next_sequence_number += len(entry_batch)
+
     def __fetch_entries(self, start, end):
+        """Fetches entries from the log.
+
+        Returns: Deferred that fires with boolean indicating whether fetching
+        suceeded"""
         num_new_entries = end - start + 1
         logging.info("Fetching %d new entries: this will take %s..." %
                      (num_new_entries,
                       self.__estimate_time(num_new_entries)))
-        new_entries = self.__client.get_entries(start, end)
-        next_sequence_number = start
-
-        # Loop until we a) have all entries b) error out or c) exhaust the
-        # generator.
-        while next_sequence_number < end + 1:
-            try:
-                entry_batch = list(itertools.islice(
-                        new_entries, FLAGS.entry_write_batch_size))
-            except (log_client.HTTPError,
-                    log_client.InvalidResponseError) as e:
-                logging.error("get-entries from %s failed: %s" %
-                              (self.servername, e))
-                return False
-            if not entry_batch:
-                # Generator exhausted prematurey.
-                logging.error("Failed to fetch all entries: expected tree size "
-                              "%d vs retrieved tree size %d" %
-                              (end + 1, next_sequence_number))
-                return False
-            logging.info("Fetched %d entries" % len(entry_batch))
-
-            # check that the batch is consistent with the eventual pending_sth
-            try:
-                # calculate the hash for the latest fetched certs
-                partial_sth, new_tree = self._compute_projected_sth(entry_batch)
-                self._verify_consistency(partial_sth, self.__state.pending_sth)
-            except error.VerifyError:
-                return False
-            logging.info("Verified %d entries" % len(entry_batch))
-
-            self._set_verified_tree(new_tree)
-            # TODO(ekasper): parse temporary data into permanent storage.
-
-            next_sequence_number += len(entry_batch)
-
-        return True
+        producer = self.__client.get_entries(start, end)
+        consumer = Monitor.EntryConsumer(producer, self,
+                                         self.__state.pending_sth,
+                                         self.__verified_tree)
+        d = producer.startProducing(consumer)
+        d.addCallback(consumer.done)
+        d.addErrback(self.__fetch_entries_eb, consumer)
+        return consumer.consumed
 
     def _update_entries(self):
         """Retrieve new entries according to the pending STH.
-        Returns: True if the update succeeded.
+
+        Returns: Deferred that fires with boolean indicating whether updating
+        succeeded.
         """
         if not self.__state.HasField("pending_sth"):
-            return True
+            return self.__fired_deferred(True)
         # Default is 0, which is what we want.
         wanted_entries = self.__state.pending_sth.tree_size
         last_verified_size = self.__verified_tree.tree_size
 
-        if (wanted_entries > last_verified_size and not
-            self.__fetch_entries(last_verified_size, wanted_entries-1)):
-            return False
-        return True
+        if wanted_entries > last_verified_size:
+            return self.__fetch_entries(last_verified_size, wanted_entries-1)
+        else:
+            return self.__fired_deferred(True)
+
+    def _update_result(self, updates_result):
+        if not updates_result:
+            logging.error("Update failed")
+        return updates_result
 
     def update(self):
         """Update log view. Returns True if the update succeeded, False if any
         error occurred."""
         logging.info("Starting update for %s" % self.servername)
-        if not self._update_sth() or not self._update_entries():
-            logging.error("Update failed")
-            return False
-
-        return True
+        d = self._update_sth()
+        d.addCallback(lambda sth_result: self._update_entries() if sth_result
+                      else False)
+        d.addCallback(self._update_result)
+        return d

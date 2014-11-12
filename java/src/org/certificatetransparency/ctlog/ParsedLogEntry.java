@@ -9,9 +9,13 @@ public class ParsedLogEntry {
   private final Ct.LogEntry logEntry;
   private final Ct.MerkleTreeLeaf merkleTreeLeaf;
 
-  public ParsedLogEntry(Ct.MerkleTreeLeaf merkleTreeLeaf, Ct.LogEntry logEntry) {
+  private ParsedLogEntry(Ct.MerkleTreeLeaf merkleTreeLeaf, Ct.LogEntry logEntry) {
     this.merkleTreeLeaf = merkleTreeLeaf;
     this.logEntry = logEntry;
+  }
+
+  public static ParsedLogEntry newInstance(Ct.MerkleTreeLeaf merkleTreeLeaf, Ct.LogEntry logEntry) {
+    return new ParsedLogEntry(merkleTreeLeaf, logEntry);
   }
 
   public Ct.MerkleTreeLeaf getMerkleTreeLeaf() {

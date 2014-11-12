@@ -14,6 +14,7 @@ import org.apache.http.message.BasicNameValuePair;
 import org.certificatetransparency.ctlog.CertificateInfo;
 import org.certificatetransparency.ctlog.CertificateTransparencyException;
 import org.certificatetransparency.ctlog.ParsedLogEntry;
+import org.certificatetransparency.ctlog.ParsedLogEntryWithProof;
 import org.certificatetransparency.ctlog.proto.Ct;
 import org.certificatetransparency.ctlog.serialization.Deserializer;
 import org.json.simple.JSONArray;
@@ -25,7 +26,6 @@ import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
 import com.google.protobuf.ByteString;
 
-
 /**
  * A CT HTTP client. Abstracts away the json encoding necessary for the server.
  */
@@ -35,6 +35,8 @@ public class HttpLogClient {
   private static final String GET_STH_PATH = "get-sth";
   private static final String GET_ROOTS_PATH = "get-roots";
   private static final String GET_ENTRIES = "get-entries";
+  private static final String GET_STH_CONSISTENCY = "get-sth-consistency";
+  private static final String GET_ENTRY_AND_PROOF = "get-entry-and-proof";
 
   private final String logUrl;
   private final HttpInvoker postInvoker;
@@ -162,7 +164,7 @@ public class HttpLogClient {
     String response = postInvoker.makeGetRequest(logUrl + GET_STH_PATH);
     return parseSTHResponse(response);
   }
-  
+
   /**
    * Retrieves accepted Root Certificates.
    * @return a list of root certificates.
@@ -182,12 +184,63 @@ public class HttpLogClient {
   public List<ParsedLogEntry> getLogEntries(long start, long end) {
     Preconditions.checkArgument(0 <= start && end >= start);
 
-    List<NameValuePair> params = new ArrayList<NameValuePair>();
-    params.add(new BasicNameValuePair("start", Long.toString(start)));
-    params.add(new BasicNameValuePair("end", Long.toString(end)));
+    List<NameValuePair> params = createParamsList("start", "end", Long.toString(start),
+      Long.toString(end));
 
     String response = postInvoker.makeGetRequest(logUrl + GET_ENTRIES, params);
     return parseLogEntries(response);
+  }
+
+  /**
+   * Retrieve Merkle Consistency Proof between Two Signed Tree Heads.
+   * @param first The tree_size of the first tree, in decimal.
+   * @param second The tree_size of the second tree, in decimal.
+   * @return A list of base64 decoded Merkle Tree nodes serialized to ByteString objects.
+   */
+  public List<ByteString> getSTHConsistency(long first, long second) {
+    Preconditions.checkArgument(0 <= first && second >= first);
+
+    List<NameValuePair> params = createParamsList("first", "second", Long.toString(first),
+      Long.toString(second));
+
+    String response = postInvoker.makeGetRequest(logUrl + GET_STH_CONSISTENCY, params);
+    return parseConsistencyProof(response);
+  }
+
+  /**
+   * Retrieve Entry+Merkle Audit Proof from Log.
+   * @param leaf_index The index of the desired entry.
+   * @param tree_size The tree_size of the tree for which the proof is desired.
+   * @return ParsedLog entry object with proof.
+   */
+  public ParsedLogEntryWithProof getLogEntryAndProof(long leafindex, long treeSize) {
+    Preconditions.checkArgument(0 <= leafindex && treeSize >= leafindex);
+
+    List<NameValuePair> params = createParamsList("leaf_index", "tree_size",
+      Long.toString(leafindex), Long.toString(treeSize));
+
+    String response = postInvoker.makeGetRequest(logUrl + GET_ENTRY_AND_PROOF, params);
+    JSONObject entry = (JSONObject) JSONValue.parse(response);
+    JSONArray auditPath = (JSONArray) entry.get("audit_path");
+
+    return Deserializer.parseLogEntryWithProof(jsonToLogEntry.apply(entry), auditPath, leafindex,
+      treeSize);
+  }
+
+  /**
+   * Creates a list of NameValuePair objects.
+   * @param firstParamName The first parameter name.
+   * @param firstParamValue The first parameter value.
+   * @param secondParamName The second parameter name.
+   * @param secondParamValue The second parameter value.
+   * @return A list of NameValuePair objects.
+   */
+  private List<NameValuePair> createParamsList(String firstParamName, String secondParamName,
+    String firstParamValue, String secondParamValue) {
+    List<NameValuePair> params = new ArrayList<NameValuePair>();
+    params.add(new BasicNameValuePair(firstParamName, firstParamValue));
+    params.add(new BasicNameValuePair(secondParamName, secondParamValue));
+    return params;
   }
 
   /**
@@ -201,20 +254,37 @@ public class HttpLogClient {
 
     JSONObject responseJson = (JSONObject) JSONValue.parse(response);
     JSONArray arr = (JSONArray) responseJson.get("entries");
+    return Lists.transform(arr, jsonToLogEntry);
+  }
 
-    Function<JSONObject, ParsedLogEntry> jsonToLogEntries =
-      new Function<JSONObject, ParsedLogEntry>() {
-      @Override public ParsedLogEntry apply(JSONObject entry) {
-        String leaf = (String) entry.get("leaf_input");
-        String extra = (String) entry.get("extra_data");
+  private Function<JSONObject, ParsedLogEntry> jsonToLogEntry =
+    new Function<JSONObject, ParsedLogEntry>() {
+    @Override public ParsedLogEntry apply(JSONObject entry) {
+      String leaf = (String) entry.get("leaf_input");
+      String extra = (String) entry.get("extra_data");
 
-        return Deserializer.parseLogEntry(
-          new ByteArrayInputStream(Base64.decodeBase64(leaf)),
-          new ByteArrayInputStream(Base64.decodeBase64(extra)));
+      return Deserializer.parseLogEntry(
+        new ByteArrayInputStream(Base64.decodeBase64(leaf)),
+        new ByteArrayInputStream(Base64.decodeBase64(extra)));
       }
     };
 
-    return Lists.transform(arr, jsonToLogEntries);
+  /**
+   * Parses CT log's response for the "get-sth-consistency" request.
+   * @param response JsonObject containing an array of Merkle Tree nodes.
+   * @return A list of base64 decoded Merkle Tree nodes serialized to ByteString objects.
+   */
+  private List<ByteString> parseConsistencyProof(String response) {
+    Preconditions.checkNotNull(response, "Merkle Consistency response should not be null.");
+
+    JSONObject responseJson = (JSONObject) JSONValue.parse(response);
+    JSONArray arr = (JSONArray) responseJson.get("consistency");
+
+    List<ByteString> proof = new ArrayList<ByteString>();
+    for(Object node: arr) {
+      proof.add(ByteString.copyFrom(Base64.decodeBase64((String) node)));
+    }
+    return proof;
   }
 
   /**
@@ -224,15 +294,15 @@ public class HttpLogClient {
    */
   Ct.SignedTreeHead parseSTHResponse(String sthResponse) {
     Preconditions.checkNotNull(
-        sthResponse, "Sign Tree Head response from a CT log should not be null");
+      sthResponse, "Sign Tree Head response from a CT log should not be null");
 
     JSONObject response = (JSONObject) JSONValue.parse(sthResponse);
     long treeSize = (Long) response.get("tree_size");
     long timeStamp = (Long) response.get("timestamp");
     if (treeSize < 0 || timeStamp < 0) {
       throw new CertificateTransparencyException(
-          String.format("Bad response. Size of tree or timestamp cannot be a negative value. "
-              + "Log Tree size: %d Timestamp: %d", treeSize, timeStamp));
+        String.format("Bad response. Size of tree or timestamp cannot be a negative value. "
+          + "Log Tree size: %d Timestamp: %d", treeSize, timeStamp));
     }
     String base64Signature = (String) response.get("tree_head_signature");
     String sha256RootHash = (String) response.get("sha256_root_hash");
@@ -246,8 +316,8 @@ public class HttpLogClient {
       new ByteArrayInputStream(Base64.decodeBase64(base64Signature))));
     if (builder.getSha256RootHash().size() != 32) {
        throw new CertificateTransparencyException(
-           String.format("Bad response. The root hash of the Merkle Hash Tree must be 32 bytes. "
-               + "The size of the root hash is %d", builder.getSha256RootHash().size()));
+         String.format("Bad response. The root hash of the Merkle Hash Tree must be 32 bytes. "
+           + "The size of the root hash is %d", builder.getSha256RootHash().size()));
       }
     return builder.build();
   }
@@ -269,10 +339,10 @@ public class HttpLogClient {
       byte[] in = Base64.decodeBase64((String) i);
       try {
         certs.add(CertificateFactory.getInstance("X509").generateCertificate(
-            new ByteArrayInputStream(in)));
+          new ByteArrayInputStream(in)));
       } catch (CertificateException e) {
         throw new CertificateTransparencyException(
-            "Malformed data from a CT log have been received: " + e.getLocalizedMessage(), e);
+          "Malformed data from a CT log have been received: " + e.getLocalizedMessage(), e);
       }
     }
     return certs;

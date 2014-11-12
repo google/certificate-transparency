@@ -312,6 +312,22 @@ class Certificate(object):
         """
         return self._asn1_cert["tbsCertificate"]["serialNumber"]
 
+    def signature(self):
+        """Get TBSCertificate signature.
+
+        Returns:
+            an AlgorithmIdentifier.
+        """
+        return self._asn1_cert["tbsCertificate"]["signature"]
+
+    def signature_algorithm(self):
+        """Get Certificate signature algorithm.
+
+        Returns:
+            an AlgorithmIdentifier
+        """
+        return self._asn1_cert["signatureAlgorithm"]
+
     def basic_constraint_ca(self):
         """Get the BasicConstraints CA value.
 
