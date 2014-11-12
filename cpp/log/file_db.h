@@ -55,6 +55,8 @@ class FileDB : public Database<Logged> {
   virtual typename Database<Logged>::LookupResult LatestTreeHead(
       ct::SignedTreeHead* result) const;
 
+  virtual int TreeSize() const;
+
   virtual void AddNotifySTHCallback(
       const typename Database<Logged>::NotifySTHCallback* callback);
   virtual void RemoveNotifySTHCallback(

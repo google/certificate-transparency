@@ -36,6 +36,8 @@ class SQLiteDB : public Database<Logged> {
 
   virtual LookupResult LatestTreeHead(ct::SignedTreeHead* result) const;
 
+  virtual int TreeSize() const;
+
   virtual void AddNotifySTHCallback(
       const typename Database<Logged>::NotifySTHCallback* callback);
   virtual void RemoveNotifySTHCallback(

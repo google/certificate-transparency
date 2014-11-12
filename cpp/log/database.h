@@ -76,6 +76,11 @@ class ReadOnlyDatabase {
   // Return the tree head with the freshest timestamp.
   virtual LookupResult LatestTreeHead(ct::SignedTreeHead* result) const = 0;
 
+  // Return the number of entries of contiguous entries (what could be
+  // put in a signed tree head). This can be greater than the tree
+  // size returned by LatestTreeHead.
+  virtual int TreeSize() const = 0;
+
   // Add/remove a callback to be called when a new tree head is
   // available. The pointer is used as a key, so it should be the same
   // in matching add/remove calls.

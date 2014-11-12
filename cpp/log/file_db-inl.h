@@ -185,6 +185,12 @@ typename Database<Logged>::LookupResult FileDB<Logged>::LatestTreeHead(
 }
 
 template <class Logged>
+int FileDB<Logged>::TreeSize() const {
+  CHECK_EQ(sequence_map_.size(), sequence_map_.rbegin()->first + 1);
+  return sequence_map_.size();
+}
+
+template <class Logged>
 void FileDB<Logged>::AddNotifySTHCallback(
     const typename Database<Logged>::NotifySTHCallback* callback) {
   callbacks_.Add(callback);

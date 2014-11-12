@@ -222,6 +222,20 @@ typename Database<Logged>::LookupResult SQLiteDB<Logged>::LatestTreeHead(
 }
 
 template <class Logged>
+int SQLiteDB<Logged>::TreeSize() const {
+  sqlite::Statement statement(
+      db_, "SELECT sequence FROM leaves ORDER BY sequence DESC LIMIT 1");
+
+  const int ret(statement.Step());
+  if (ret == SQLITE_DONE) {
+    return 0;
+  }
+  CHECK_EQ(SQLITE_ROW, ret);
+
+  return statement.GetUInt64(0) + 1;
+}
+
+template <class Logged>
 void SQLiteDB<Logged>::AddNotifySTHCallback(
     const typename Database<Logged>::NotifySTHCallback* callback) {
   callbacks_.Add(callback);
