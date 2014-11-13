@@ -4,8 +4,8 @@ language: cpp
 cache: apt
 
 before_install:
+ - sudo apt-add-repository -y ppa:sao/backports
  - sudo apt-add-repository -y ppa:fcitx-team/nightly
- - sudo apt-add-repository -y ppa:dirk-computer42/c42-edge
  - sudo apt-get update -qq
  - sudo apt-get install -qq protobuf-compiler libprotobuf-java libprotobuf-dev python-protobuf python-mock python-gflags python-requests python-dev libjson-c-dev libboost-dev libboost-system-dev libboost-thread-dev libgoogle-glog-dev libgflags-dev libldns-dev python-dnspython
 # Stupid frikkin' google-mock package on Precise is b0rked, so hack it up:
