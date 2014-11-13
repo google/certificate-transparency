@@ -7,8 +7,8 @@ compiler:
 cache: apt
 
 before_install:
+ - sudo apt-add-repository -y ppa:sao/backports
  - sudo apt-add-repository -y ppa:fcitx-team/nightly
- - sudo apt-add-repository -y ppa:dirk-computer42/c42-edge
  - sudo apt-get update -qq
 
 install:
@@ -29,7 +29,3 @@ install:
 script:
  - make alltests
  - go test -v ./go/...
-
-notifications:
-  email:
-   - certificate-transparency@googlegroups.com
