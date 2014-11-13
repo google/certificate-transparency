@@ -10,7 +10,7 @@ import subprocess
 import sys
 import time
 
-NUMBER_OF_CERTS = 10
+NUMBER_OF_CERTS = 100
 
 basepath = os.path.dirname(sys.argv[0])
 
