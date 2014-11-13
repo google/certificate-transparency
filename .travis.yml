@@ -8,6 +8,7 @@ cache: apt
 
 before_install:
  - sudo apt-add-repository -y ppa:sao/backports
+ - sudo apt-add-repository -y ppa:ubuntu-toolchain-r/test
  - sudo apt-add-repository -y ppa:fcitx-team/nightly
  - sudo apt-get update -qq
 
