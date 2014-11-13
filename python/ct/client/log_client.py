@@ -36,6 +36,11 @@ gflags.DEFINE_integer("get_entries_retry_delay", 1, "Number of seconds after "
 gflags.DEFINE_integer("get_entries_max_retries", 10, "Number of retries after "
                       "which get-entries simply fails.")
 
+gflags.DEFINE_integer("entries_buffer", 100000, "Size of buffer which stores "
+                      "fetched entries before async log client is able to "
+                      "return them. 100000 entries shouldn't take more "
+                      "than 600 Mb of memory.")
+
 gflags.DEFINE_integer("response_buffer_size_bytes", 50 * 1000 * 1000, "Maximum "
                       "size of a single response buffer. Should be set such "
                       "that a get_entries response comfortably fits in the "
@@ -550,6 +555,7 @@ class EntryProducer(object):
         self._batch_size = batch_size
         self._batches = Queue()
         self._currently_fetching = 0
+        self._currently_stored = 0
         self._last_fetching = self._current
         self._max_currently_fetching = (FLAGS.max_fetchers_in_parallel *
                                         self._batch_size)
@@ -600,11 +606,13 @@ class EntryProducer(object):
     def _write_pending(self):
         if self._pending:
             self._current += len(self._pending)
+            self._currently_stored -= len(self._pending)
             self._consumer.consume(self._pending)
             self._pending = None
 
     def _batch_completed(self, result):
         self._currently_fetching -= len(result)
+        self._currently_stored += len(result)
         return result
 
     def _fetch_parsed_entries(self, first, last):
@@ -653,7 +661,8 @@ class EntryProducer(object):
                 return
             first = self._last_fetching
             while (self._currently_fetching <= self._max_currently_fetching and
-                   self._last_fetching <= self._end):
+                   self._last_fetching <= self._end and
+                   self._currently_stored <= FLAGS.entries_buffer):
                 last = min(self._last_fetching + self._batch_size - 1, self._end,
                    self._last_fetching + self._max_currently_fetching
                            - self._currently_fetching + 1)
