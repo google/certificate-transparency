@@ -24,7 +24,3 @@ before_install:
 script:
  - make alltests CC=clang CXX=clang++
  - go test -v ./go/...
-
-notifications:
-  email:
-   - certificate-transparency@googlegroups.com
