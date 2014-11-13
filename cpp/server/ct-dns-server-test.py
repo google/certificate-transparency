@@ -1,6 +1,7 @@
 import base64
 import dns.resolver
 import dns.rdatatype
+import logging
 import math
 import os
 import random
@@ -9,7 +10,7 @@ import subprocess
 import sys
 import time
 
-NUMBER_OF_CERTS = 100
+NUMBER_OF_CERTS = 10
 
 basepath = os.path.dirname(sys.argv[0])
 
@@ -61,8 +62,9 @@ class DNSServerRunner:
         self.proc = subprocess.Popen(args)
 
 def OpenSSL(*params):
-    print "RUN: openssl", params
-    subprocess.check_call(("openssl",) + params)
+    logging.info("RUN: openssl " + str(params))
+    null = open("/dev/null")
+    subprocess.check_call(("openssl",) + params, stdout=null, stderr=null)
 
 class CTServer:
     def __init__(self, cmd, base, ca):
@@ -103,7 +105,7 @@ class CTServer:
                " -sqlite_db " + self.Database() +
                " -tree_signing_frequency_seconds 1" +
                " -logtostderr")
-        print "RUN:", cmd
+        logging.info("RUN: " + cmd)
         args = shlex.split(cmd)
         self.proc = subprocess.Popen(args)
 
@@ -289,8 +291,9 @@ class CA:
                                "-ct_server_submission", chain_file,
                                "-ct_server", ct_server.URL(),
                                "-ct_server_public_key", ct_server.PublicKey(),
-                               "-ct_server_response_out", self.TempFile("sct"),
-                               "-logtostderr"))
+                               "-ct_server_response_out", self.TempFile("sct")))
+
+logging.basicConfig(level="WARNING")
 
 # Set up our test CA
 ca = CA(tmpdir + "/ct-test-ca")
@@ -323,24 +326,24 @@ runner.Run(server_cmd)
 lookup = CTDNSLookup(['127.0.0.1'], 1111)
 
 sth = lookup.GetSTH()
-print "sth =", sth
-print "size =", sth.tree_size
+logging.info("sth = " + str(sth))
+logging.info("size = " + str(sth.tree_size))
 
 assert sth.tree_size == NUMBER_OF_CERTS
 
 # test all the entries
-for index in range(100):
+for index in range(NUMBER_OF_CERTS):
     leaf_hash = lookup.GetLeafHash(index)
-    print "index =", index, " hash =", leaf_hash
+    logging.info("index = " + str(index) + " hash = " + leaf_hash)
 
     verifier = merkle.MerkleVerifier()
     audit_path = []
     for level in range(0, verifier.audit_path_length(index, sth.tree_size)):
         hash = lookup.GetEntry(level, index, sth.tree_size)
-        print hash
+        logging.info("hash = " + hash)
         audit_path.append(base64.b64decode(hash))
 
-    print map(base64.b64encode, audit_path)
+    logging.info("path = " + str(map(base64.b64encode, audit_path)))
 
     assert verifier.verify_leaf_hash_inclusion(base64.b64decode(leaf_hash),
                                                index, audit_path, sth)
