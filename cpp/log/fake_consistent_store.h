@@ -11,6 +11,8 @@
 #include "proto/ct.pb.h"
 #include "util/status.h"
 
+template <class Logged>
+class ReadOnlyDatabase;
 
 namespace cert_trans {
 
@@ -18,7 +20,12 @@ namespace cert_trans {
 template <class Logged>
 class FakeConsistentStore : public ConsistentStore<Logged> {
  public:
-  explicit FakeConsistentStore(const std::string& node_id);
+  // If a "db" is passed in, it will use the tree size of that
+  // database to pick its next sequence number, which makes it work
+  // across restarts. This still loses unsequenced entries, though,
+  // since the database only receives sequenced entries.
+  FakeConsistentStore(const std::string& node_id,
+                      const ReadOnlyDatabase<Logged>* db = nullptr);
 
   virtual ~FakeConsistentStore() = default;
 
@@ -56,6 +63,8 @@ class FakeConsistentStore : public ConsistentStore<Logged> {
   int next_available_sequence_number_;
 
   friend class FakeConsistentStoreTest;
+  template <class T>
+  friend class TreeSignerTest;
 
   DISALLOW_COPY_AND_ASSIGN(FakeConsistentStore);
 };

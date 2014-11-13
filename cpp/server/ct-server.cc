@@ -52,6 +52,11 @@ DEFINE_int32(tree_signing_frequency_seconds, 600,
              "last signing. Set this well below the MMD to ensure we sign in "
              "a timely manner. Must be greater than 0.");
 
+DEFINE_double(guard_window_seconds, 60,
+              "Unsequenced entries new than this "
+              "number of seconds will not be sequenced.");
+
+
 namespace libevent = cert_trans::libevent;
 
 using cert_trans::CertChecker;
@@ -59,6 +64,7 @@ using cert_trans::FakeConsistentStore;
 using cert_trans::HttpHandler;
 using cert_trans::LoggedCertificate;
 using cert_trans::ThreadPool;
+using cert_trans::TreeSigner;
 using cert_trans::util::ReadPrivateKey;
 using google::RegisterFlagValidator;
 using std::bind;
@@ -207,11 +213,14 @@ int main(int argc, char* argv[]) {
   evthread_use_pthreads();
   const shared_ptr<libevent::Base> event_base(make_shared<libevent::Base>());
 
-  Frontend frontend(
-      new CertSubmissionHandler(&checker),
-      new FrontendSigner(db, new FakeConsistentStore<LoggedCertificate>("id"),
-                         &log_signer));
-  TreeSigner<LoggedCertificate> tree_signer(db, &log_signer);
+  FakeConsistentStore<LoggedCertificate> consistent_store("id", db);
+
+  Frontend frontend(new CertSubmissionHandler(&checker),
+                    new FrontendSigner(db, &consistent_store, &log_signer));
+  TreeSigner<LoggedCertificate> tree_signer(std::chrono::duration<double>(
+                                                FLAGS_guard_window_seconds),
+                                            db, &consistent_store,
+                                            &log_signer);
   LogLookup<LoggedCertificate> log_lookup(db);
 
   // Make sure that we have an STH, even if the tree is empty.

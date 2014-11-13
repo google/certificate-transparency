@@ -132,6 +132,16 @@ inline bool operator==(const ct::LogEntry& lhs, const ct::LogEntry& rhs) {
 }
 
 
+inline bool operator==(const ct::SignedCertificateTimestamp& lhs,
+                       const ct::SignedCertificateTimestamp& rhs) {
+  // TODO(alcutter): Do this properly
+  std::string l_str, r_str;
+  CHECK(lhs.SerializeToString(&l_str));
+  CHECK(rhs.SerializeToString(&r_str));
+  return l_str == r_str;
+}
+
+
 }  // namespace cert_trans
 
 #endif
