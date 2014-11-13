@@ -4,6 +4,7 @@
 
 #include "log/tree_signer.h"
 
+#include <algorithm>
 #include <chrono>
 #include <glog/logging.h>
 #include <set>
@@ -90,51 +91,44 @@ uint64_t TreeSigner<Logged>::LastUpdateTime() const {
 template <class Logged>
 util::Status TreeSigner<Logged>::HandlePreviouslySequencedEntries(
     std::vector<cert_trans::EntryHandle<Logged>>* pending_entries) const {
+  CHECK(std::is_sorted(pending_entries->begin(), pending_entries->end(),
+                       PendingEntriesOrder<Logged>()));
   // Check and handle any previously sequenced entries
   util::Status status;
   auto it(pending_entries->begin());
   while (it != pending_entries->end()) {
-    if (it->Entry().has_provisional_sequence_number()) {
-      cert_trans::EntryHandle<Logged> presequenced;
-      status = consistent_store_->GetSequencedEntry(
-          it->Entry().provisional_sequence_number(), &presequenced);
-      if (status.CanonicalCode() == util::error::NOT_FOUND) {
-        // provisional sequence number set, but entry not actually sequenced:
-        // This is likely the result of a sequencer crash, we'll leave the
-        // provisional sequence number set as a hint to the sequencer.
-        LOG(INFO) << "Unsetting provisional sequence number on:\n"
-                  << it->Entry().DebugString();
-        status = util::Status::OK;
-        continue;
-      } else if (!status.ok()) {
-        // Failed to read.
-        return status;
-      }
-      CHECK(status.ok());
-      if (!(it->Entry().entry() == presequenced.Entry().entry() &&
-            it->Entry().sct() == presequenced.Entry().sct())) {
-        // Whoops, looks like someone's done an unexpected resequencing,
-        // apparently out of the natural ordering of Entries...
-        LOG(WARNING) << "Pending entry with provisional_sequence_number:\n"
-                     << it->Entry().DebugString() << "\n"
-                     << "does not match sequenced entry for that sequence "
-                     << "number:\n" << presequenced.Entry().DebugString()
-                     << "\nclearing provisional_sequence_number to "
-                     << "resequence pending entry";
-        // Clear the provisional sequence number:
-        it->MutableEntry()->clear_provisional_sequence_number();
-        // TODO(alcutter): store it back?
-      } else {
-        // This entry is already sequenced just fine, no need to return it.
-        VLOG(0) << "Entry already sequenced: "
-                << util::ToBase64(it->Entry().Hash()) << " ("
-                << presequenced.Entry().sequence_number()
-                << "), removing from list";
-        it = pending_entries->erase(it);
-        continue;
-      }
+    if (!it->Entry().has_provisional_sequence_number()) {
+      // There can't be any more entries with provisional sequence numbers now
+      // (because of the sort order) so we can early out.
+      break;
     }
-    it++;
+    cert_trans::EntryHandle<Logged> presequenced;
+    status = consistent_store_->GetSequencedEntry(
+        it->Entry().provisional_sequence_number(), &presequenced);
+    if (status.ok()) {
+      CHECK(it->Entry().entry() == presequenced.Entry().entry() &&
+            it->Entry().sct() == presequenced.Entry().sct())
+          << "Pending entry with provisional_sequence_number:\n"
+          << it->Entry().DebugString() << "\n"
+          << "does not match sequenced entry for that sequence "
+          << "number:\n" << presequenced.Entry().DebugString()
+          << "\nclearing provisional_sequence_number to "
+          << "resequence pending entry";
+      // This entry is already sequenced just fine, no need to return it.
+      VLOG(0) << "Entry already sequenced: "
+              << util::ToBase64(it->Entry().Hash()) << " ("
+              << presequenced.Entry().sequence_number()
+              << "), removing from list";
+      it = pending_entries->erase(it);
+      continue;
+    }
+    if (status.CanonicalCode() != util::error::NOT_FOUND) {
+      return status;
+    }
+    // provisional sequence number set, but entry not actually sequenced:
+    // This is likely the result of a sequencer crash, we'll leave the
+    // provisional sequence number set as a hint to the sequencer.
+    ++it;
   }
   return status;
 }
@@ -152,15 +146,14 @@ util::Status TreeSigner<Logged>::SequenceNewEntries() {
   if (!status.ok()) {
     return status;
   }
-  sort(pending_entries.begin(), pending_entries.end(),
-       PendingEntriesOrder<Logged>());
+  std::sort(pending_entries.begin(), pending_entries.end(),
+            PendingEntriesOrder<Logged>());
 
   VLOG(0) << "Sequencing " << pending_entries.size() << " entr"
           << (pending_entries.size() == 1 ? "y" : "ies");
 
   status = HandlePreviouslySequencedEntries(&pending_entries);
   CHECK(status.ok()) << status;
-
 
   int num_sequenced(0);
   for (auto& pending_entry : pending_entries) {
@@ -183,10 +176,10 @@ util::Status TreeSigner<Logged>::SequenceNewEntries() {
             << next_sequence_number;
     status = consistent_store_->AssignSequenceNumber(next_sequence_number,
                                                      &pending_entry);
-    ++num_sequenced;
     if (!status.ok()) {
       return status;
     }
+    ++num_sequenced;
     ++next_sequence_number;
   }
 
@@ -233,15 +226,13 @@ typename TreeSigner<Logged>::UpdateResult TreeSigner<Logged>::UpdateTree() {
 
   EntryHandle<Logged> logged;
   uint64_t next_seq(sth.tree_size());
-  bool finished(false);
   VLOG(0) << "Building tree";
-  while (!finished) {
+  while (true) {
     status = consistent_store_->GetSequencedEntry(next_seq, &logged);
     if (status.CanonicalCode() == util::error::NOT_FOUND) {
       // no more certs to integrate (or a gap in the sequence numbers, but
       // that'd be bad so we should bail anyway.)
-      finished = true;
-      continue;
+      break;
     }
     CHECK(status.ok()) << status;
     // Paranoid much?

@@ -66,7 +66,7 @@ class TreeSigner {
   void AppendToTree(const Logged& logged_cert);
   void TimestampAndSign(uint64_t min_timestamp, ct::SignedTreeHead* sth);
 
-  std::chrono::duration<double> guard_window_;
+  const std::chrono::duration<double> guard_window_;
   Database<Logged>* const db_;
   cert_trans::ConsistentStore<Logged>* const consistent_store_;
   LogSigner* const signer_;
