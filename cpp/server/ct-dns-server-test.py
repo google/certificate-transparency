@@ -73,6 +73,7 @@ class CTServer:
 
     def __del__(self):
         self.proc.terminate()
+        self.proc.wait()
 
     def PrivateKey(self):
         return self.base_ + "-ct-server-private-key.pem"
