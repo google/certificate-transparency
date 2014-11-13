@@ -56,7 +56,7 @@ class CTUDPDNSServer : public UDPServer {
       return;
     }
 
-    ldns_pkt_print(stdout, packet);
+    //ldns_pkt_print(stdout, packet);
 
     if (ldns_pkt_qr(packet) != 0) {
       LOG(INFO) << "Packet is not a query";
@@ -212,7 +212,6 @@ class CTUDPDNSServer : public UDPServer {
       return "Level " + level + " is out of range";
 
     string b64 = util::ToBase64(proof.path_node(l));
-    std::cerr << b64 << std::endl;
     return b64;
   }
 
