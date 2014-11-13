@@ -4,6 +4,7 @@
 #include <glog/logging.h>
 #include <mutex>
 
+#include "log/database.h"
 #include "log/fake_consistent_store.h"
 #include "log/logged_certificate.h"
 #include "util/util.h"
@@ -12,8 +13,10 @@ namespace cert_trans {
 
 
 template <class Logged>
-FakeConsistentStore<Logged>::FakeConsistentStore(const std::string& node_id)
-    : node_id_(node_id), next_available_sequence_number_(0) {
+FakeConsistentStore<Logged>::FakeConsistentStore(
+    const std::string& node_id, const ReadOnlyDatabase<Logged>* db)
+    : node_id_(node_id),
+      next_available_sequence_number_(db ? db->TreeSize() : 0) {
 }
 
 

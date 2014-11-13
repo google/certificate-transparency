@@ -213,7 +213,7 @@ int main(int argc, char* argv[]) {
   evthread_use_pthreads();
   const shared_ptr<libevent::Base> event_base(make_shared<libevent::Base>());
 
-  FakeConsistentStore<LoggedCertificate> consistent_store("id");
+  FakeConsistentStore<LoggedCertificate> consistent_store("id", db);
 
   Frontend frontend(new CertSubmissionHandler(&checker),
                     new FrontendSigner(db, &consistent_store, &log_signer));
