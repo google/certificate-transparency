@@ -272,15 +272,23 @@ class Monitor(object):
         return True
 
 
-    def _scan_entry(self, entry_index, entry):
-        parsed_entry = entry_decoder.decode_entry(entry)
-        ts_entry = parsed_entry.merkle_leaf.timestamped_entry
-        if ts_entry.entry_type == client_pb2.X509_ENTRY:
-            der_cert = ts_entry.asn1_cert
-        else:
-            der_cert = (
-                parsed_entry.extra_data.precert_chain_entry.pre_certificate)
-        self.__report.scan_der_cert(entry_index, der_cert)
+    def _scan_entries(self, entries):
+        """Passes entries to certificate report.
+
+        Args:
+            entries: array of (entry_index, entry_response) tuples.
+        """
+        der_certs = []
+        for entry_index, entry in entries:
+            parsed_entry = entry_decoder.decode_entry(entry)
+            ts_entry = parsed_entry.merkle_leaf.timestamped_entry
+            if ts_entry.entry_type == client_pb2.X509_ENTRY:
+                der_cert = ts_entry.asn1_cert
+            else:
+                der_cert = (
+                    parsed_entry.extra_data.precert_chain_entry.pre_certificate)
+            der_certs.append((entry_index, der_cert))
+        self.__report.scan_der_certs(der_certs)
 
     class EntryConsumer(defer.Deferred):
         """Consumer for log_client.EntryProducer.
@@ -340,9 +348,8 @@ class Monitor(object):
             logging.info("Fetched %d entries (total: %d from %d)" %
                          (len(entry_batch), self._fetched, self._query_size))
 
-            for index, entry in enumerate(entry_batch):
-                self._monitor._scan_entry(self._next_sequence_number + index,
-                                          entry)
+            self._monitor._scan_entries(enumerate(entry_batch,
+                                                  self._next_sequence_number))
             # calculate the hash for the latest fetched certs
             # TODO(ekasper): parse temporary data into permanent storage.
             self._partial_sth, self._unverified_tree = \

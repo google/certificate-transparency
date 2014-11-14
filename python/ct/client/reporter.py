@@ -1,10 +1,40 @@
+import gflags
 import logging
+import multiprocessing
 
 from collections import defaultdict
 from ct.cert_analysis import all_checks
 from ct.cert_analysis import asn1
 from ct.crypto import cert
 from ct.crypto import error
+
+FLAGS = gflags.FLAGS
+
+gflags.DEFINE_integer("report_workers", multiprocessing.cpu_count(), "Number of subprocesses scanning "
+                      "certificates.")
+
+def _scan_der_cert(der_certs, checks):
+    result = []
+    for log_index, der_cert in der_certs:
+        partial_result = []
+        try:
+            certificate = cert.Certificate(der_cert)
+        except error.Error as e:
+            try:
+                certificate = cert.Certificate(der_cert, strict_der=False)
+            except error.Error as e:
+                partial_result.append(asn1.All())
+            else:
+                if isinstance(e, error.ASN1IllegalCharacter):
+                    partial_result.append(asn1.Strict(reason=e.args[0],
+                                                   details=(e.string, e.index)))
+                else:
+                    partial_result.append(asn1.Strict(reason=str(e)))
+        else:
+            for check in checks:
+                partial_result += check.check(certificate) or []
+        result.append((log_index, partial_result))
+    return result
 
 class CertificateReport(object):
     """Stores description of new entries between last verified STH and
@@ -20,6 +50,8 @@ class CertificateReport(object):
 
     def report(self):
         """Report stored changes and reset report"""
+        self._pool.close()
+        self._pool.join()
         logging.info("Report:")
         if self._new_entries_count:
             logging.info("New entries since last verified STH: %s" %
@@ -61,31 +93,23 @@ class CertificateReport(object):
     def reset(self):
         self._new_entries_count = None
         self._observations_by_index = defaultdict(list)
+        self._pool = multiprocessing.Pool(processes=FLAGS.report_workers)
 
-    def _add_certificate_observation(self, log_index, observation):
-        """Adds Issue for certificate identified by index
-        in logs"""
-        self._observations_by_index[log_index].append(observation)
+    def _add_certificate_observations(self, indexed_observations):
+        """Adds Observations for certificates identified by indexes
+        in logs.
 
-    def scan_der_cert(self, log_index, der_cert):
-        """Scans certificate in der form for all supported observations"""
-        try:
-            certificate = cert.Certificate(der_cert)
-        except error.Error as e:
-            try:
-                certificate = cert.Certificate(der_cert, strict_der=False)
-            except error.Error as e:
-                self._add_certificate_observation(log_index,
-                                asn1.All())
-                return
-            else:
-                if isinstance(e, error.ASN1IllegalCharacter):
-                    self._add_certificate_observation(log_index,
-                     asn1.Strict(reason=e.args[0], details=(e.string, e.index)))
-                else:
-                    self._add_certificate_observation(log_index,
-                            asn1.Strict(reason=str(e)))
-        else:
-            for check in self.checks:
-                for obs in check.check(certificate) or []:
-                   self._add_certificate_observation(log_index, obs)
+        Args:
+            indexed_observations: array of (log_index, observations) tuples.
+        """
+        for log_index, observations in indexed_observations:
+            self._observations_by_index[log_index] += observations
+
+    def scan_der_certs(self, der_certs):
+        """Scans certificates in der form for all supported observations.
+
+        Args:
+            der_certs: array of (log_index, observations) tuples.
+        """
+        self._pool.apply_async(_scan_der_cert, [der_certs, self.checks],
+           callback=lambda result: self._add_certificate_observations(result))
