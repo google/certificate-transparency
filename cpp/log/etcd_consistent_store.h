@@ -57,11 +57,16 @@ class EtcdConsistentStore : public ConsistentStore<Logged> {
   template <class T>
   util::Status CreateEntry(const std::string& path, EntryHandle<T>* entry);
 
+  template <class T>
+  util::Status ForceSetEntry(const std::string& path, EntryHandle<T>* entry);
+
   std::string GetUnsequencedPath(const Logged& unseq) const;
 
   std::string GetUnsequencedPath(const std::string& hash) const;
 
   std::string GetSequencedPath(uint64_t seq) const;
+
+  std::string GetNodePath(const std::string& node_id) const;
 
   std::string GetFullPath(const std::string& key) const;
 

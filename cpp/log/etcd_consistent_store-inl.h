@@ -142,8 +142,11 @@ util::Status EtcdConsistentStore<Logged>::AssignSequenceNumber(
 template <class Logged>
 util::Status EtcdConsistentStore<Logged>::SetClusterNodeState(
     const ct::ClusterNodeState& state) {
-  // TODO(alcutter): need a ForceUpdate (i.e. not compare-and-update)
-  return util::Status(util::error::UNIMPLEMENTED, "Not implemented yet.");
+  // TODO(alcutter): consider keeping the handle for this around to check that
+  // nobody else is updating our cluster state.
+  // TODO(alcutter): These files should have an associated TTL.
+  EntryHandle<ct::ClusterNodeState> entry(state);
+  return ForceSetEntry(GetNodePath(node_id_), &entry);
 }
 
 
@@ -221,6 +224,23 @@ util::Status EtcdConsistentStore<Logged>::CreateEntry(const std::string& path,
 
 
 template <class Logged>
+template <class T>
+util::Status EtcdConsistentStore<Logged>::ForceSetEntry(
+    const std::string& path, EntryHandle<T>* t) {
+  CHECK_NOTNULL(t);
+  CHECK(!t->HasHandle());
+  std::string flat_entry;
+  CHECK(t->Entry().SerializeToString(&flat_entry));
+  int new_version;
+  util::Status status(client_->ForceSet(path, flat_entry, &new_version));
+  if (status.ok()) {
+    t->SetHandle(new_version);
+  }
+  return status;
+}
+
+
+template <class Logged>
 std::string EtcdConsistentStore<Logged>::GetUnsequencedPath(
     const Logged& unseq) const {
   return GetFullPath(std::string(kUnsequencedDir) +
@@ -232,6 +252,13 @@ template <class Logged>
 std::string EtcdConsistentStore<Logged>::GetUnsequencedPath(
     const std::string& hash) const {
   return GetFullPath(std::string(kUnsequencedDir) + util::ToBase64(hash));
+}
+
+
+template <class Logged>
+std::string EtcdConsistentStore<Logged>::GetNodePath(
+    const std::string& id) const {
+  return GetFullPath(std::string(kNodesDir) + id);
 }
 
 

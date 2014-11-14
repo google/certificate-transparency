@@ -208,7 +208,8 @@ TEST_F(FakeConsistentStoreTest, TestAssignSequenceNumber) {
 TEST_F(FakeConsistentStoreTest, TestSetClusterNodeState) {
   ct::ClusterNodeState state;
   util::Status status(store_->SetClusterNodeState(state));
-  EXPECT_EQ(util::error::UNIMPLEMENTED, status.CanonicalCode());
+  EXPECT_TRUE(status.ok()) << status;
+  EXPECT_EQ(state.DebugString(), GetClusterNodeState(kNodeId).DebugString());
 }
 
 

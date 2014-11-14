@@ -143,8 +143,8 @@ util::Status FakeConsistentStore<Logged>::AssignSequenceNumber(
 template <class Logged>
 util::Status FakeConsistentStore<Logged>::SetClusterNodeState(
     const ct::ClusterNodeState& state) {
-  // TODO(alcutter): need a ForceUpdate (i.e. not compare-and-update)
-  return util::Status(util::error::UNIMPLEMENTED, "Not implemented yet.");
+  node_states_[node_id_] = state;
+  return util::Status::OK;
 }
 
 

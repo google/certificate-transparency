@@ -63,9 +63,10 @@ class EtcdConsistentStoreTest : public ::testing::Test {
     return EntryHandle<LoggedCertificate>(cert, handle);
   }
 
-  string Serialize(const LoggedCertificate& cert) {
+  template <class T>
+  string Serialize(const T& t) {
     string flat;
-    cert.SerializeToString(&flat);
+    t.SerializeToString(&flat);
     return flat;
   }
 
@@ -315,9 +316,32 @@ TEST_F(EtcdConsistentStoreDeathTest,
 
 
 TEST_F(EtcdConsistentStoreTest, TestSetClusterNodeState) {
+  const string kPath(string(kRoot) + "/nodes/" + kNodeId);
+
   ct::ClusterNodeState state;
+  state.set_node_id("me");
+  state.set_contiguous_tree_size(2342);
+
+  EXPECT_CALL(client_, ForceSet(kPath, Serialize(state), _))
+      .WillOnce(Return(util::Status::OK));
+
   util::Status status(store_->SetClusterNodeState(state));
-  EXPECT_EQ(util::error::UNIMPLEMENTED, status.CanonicalCode());
+  EXPECT_TRUE(status.ok()) << status;
+}
+
+
+TEST_F(EtcdConsistentStoreTest, TestSetClusterNodeStateFails) {
+  const string kPath(string(kRoot) + "/nodes/" + kNodeId);
+
+  ct::ClusterNodeState state;
+  state.set_node_id("me");
+  state.set_contiguous_tree_size(2342);
+
+  EXPECT_CALL(client_, ForceSet(kPath, Serialize(state), _))
+      .WillOnce(Return(util::Status(util::error::UNKNOWN, "?")));
+
+  util::Status status(store_->SetClusterNodeState(state));
+  EXPECT_EQ(util::error::UNKNOWN, status.CanonicalCode()) << status;
 }
 
 
