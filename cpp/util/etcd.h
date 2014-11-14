@@ -18,7 +18,32 @@ namespace cert_trans {
 
 
 class EtcdClient {
+ private:
+  struct Request;
+
  public:
+  class Watcher {
+   public:
+    typedef std::function<void(int index, const std::string& value)>
+        WatchCallback;
+
+    explicit Watcher(EtcdClient* client, const std::string& key,
+                     const WatchCallback& cb);
+    ~Watcher();
+
+   private:
+    class Impl;
+
+    // The use of shared_ptr here is not a mistake. This doesn't only
+    // serve to hide the implementation, but also to have a slightly
+    // longer lifetime than the Watcher object itself, to handle
+    // requests that are still in-flight after the Watcher is
+    // destroyed.
+    const std::shared_ptr<Impl> pimpl_;
+
+    DISALLOW_COPY_AND_ASSIGN(Watcher);
+  };
+
   typedef std::function<void(util::Status status, int index,
                              const std::string& value)> GetCallback;
   typedef std::function<void(
@@ -72,8 +97,6 @@ class EtcdClient {
  private:
   typedef std::map<std::pair<std::string, uint16_t>,
                    std::shared_ptr<libevent::HttpConnection> > ConnectionMap;
-
-  struct Request;
 
   // If MaybeUpdateLeader returns true, the handling of the response
   // should be aborted, as a new leader was found, and the request has

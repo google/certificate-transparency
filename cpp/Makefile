@@ -77,7 +77,7 @@ ALL_TESTS = $(PROTO_TESTS) $(MERKLETREE_TESTS) $(LOG_TESTS) $(UTIL_TESTS) \
 	$(MONITOR_TESTS) dns_tests
 
 all: unit_tests client/ct server/ct-server server/ct-dns-server \
-     util/bench_etcd
+     util/bench_etcd util/etcd_watch
 
 .DELETE_ON_ERROR:
 
@@ -284,6 +284,9 @@ server/ct-server: server/ct-server.o util/read_private_key.o \
 	server/handler.o $(LOCAL_LIBS)
 
 util/bench_etcd: util/bench_etcd.o util/libutil.a
+
+util/etcd_watch: util/etcd_watch.o util/etcd.o util/libevent_wrapper.o \
+	util/json_wrapper.o util/status.o
 
 dns_tests: server/ct-dns-server
 

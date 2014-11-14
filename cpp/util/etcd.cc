@@ -18,6 +18,7 @@ using std::mutex;
 using std::pair;
 using std::placeholders::_1;
 using std::placeholders::_2;
+using std::placeholders::_3;
 using std::shared_ptr;
 using std::string;
 using std::to_string;
@@ -316,17 +317,44 @@ string UrlEscapeAndJoinParams(const map<string, string>& params) {
 
 struct EtcdClient::Request {
   Request(EtcdClient* client, evhttp_cmd_type verb, const string& key,
-          const map<string, string>& params, const GenericCallback& cb)
+          bool separate_conn, const map<string, string>& params,
+          const GenericCallback& cb)
       : client_(client),
         verb_(verb),
         path_("/v2/keys" + key),
+        separate_conn_(separate_conn),
         params_(UrlEscapeAndJoinParams(params)),
         cb_(cb) {
     CHECK(!key.empty());
     CHECK_EQ(key[0], '/');
   }
 
+  void CancelAndDelete() {
+    bool delete_me(false);
+    {
+      lock_guard<mutex> lock(lock_);
+      if (req_) {
+        // The RequestDone callback has not been called yet, do some
+        // cleanup.
+        req_->Cancel();
+        req_.reset();
+        delete_me = true;
+      }
+    }
+
+    if (delete_me) {
+      delete this;
+    }
+  }
+
   void Run(const shared_ptr<libevent::HttpConnection>& conn) {
+    CHECK(!req_) << "running an already running request";
+    CHECK(!conn_);
+
+    conn_ = separate_conn_
+                ? shared_ptr<libevent::HttpConnection>(conn->Clone())
+                : conn;
+
     const shared_ptr<libevent::HttpRequest> req(
         make_shared<libevent::HttpRequest>(
             bind(&EtcdClient::RequestDone, client_, _1, this)));
@@ -342,15 +370,177 @@ struct EtcdClient::Request {
                0);
     }
 
-    conn->MakeRequest(req, verb_, uri.c_str());
+    {
+      lock_guard<mutex> lock(lock_);
+      CHECK(!req_);
+      req_ = req;
+    }
+    conn_->MakeRequest(req, verb_, uri.c_str());
+  }
+
+  void Reset() {
+    lock_guard<mutex> lock(lock_);
+    req_.reset();
   }
 
   EtcdClient* const client_;
   const evhttp_cmd_type verb_;
   const string path_;
+  const bool separate_conn_;
   const string params_;
   const GenericCallback cb_;
+
+  shared_ptr<libevent::HttpConnection> conn_;
+
+  // Only the request is protected, because everything else is
+  // event-driven, and so, there is no concurrency.
+  mutex lock_;
+  shared_ptr<libevent::HttpRequest> req_;
 };
+
+
+// We must go deeper.
+class EtcdClient::Watcher::Impl
+    : public std::enable_shared_from_this<EtcdClient::Watcher::Impl> {
+ public:
+  Impl(EtcdClient* client, const string& key, const WatchCallback& cb);
+
+  void InitialGetDone(Status status, int index, const string& value);
+  void Cancel();
+
+ private:
+  void RequestDone(Status status, const shared_ptr<JsonObject>& json);
+  void StartRequest();
+
+  EtcdClient* const client_;
+  const string key_;
+  const WatchCallback cb_;
+
+  int last_index_seen_;
+
+  mutex lock_;
+  bool cancelled_;
+  EtcdClient::Request* req_;
+};
+
+
+EtcdClient::Watcher::Impl::Impl(EtcdClient* client, const string& key,
+                                const WatchCallback& cb)
+    : client_(CHECK_NOTNULL(client)),
+      key_(key),
+      cb_(cb),
+      last_index_seen_(-1),
+      cancelled_(false),
+      req_(nullptr) {
+}
+
+
+void EtcdClient::Watcher::Impl::InitialGetDone(Status status, int index,
+                                               const string& value) {
+  // TODO(pphaneuf): Need better error handling here. Have to review
+  // what the possible errors are, most of them should probably be
+  // dealt with using retries?
+  CHECK(status.ok()) << "initial get error: " << status;
+
+  last_index_seen_ = index;
+
+  {
+    lock_guard<mutex> lock(lock_);
+    if (!cancelled_) {
+      cb_(index, value);
+    }
+  }
+
+  StartRequest();
+}
+
+
+void EtcdClient::Watcher::Impl::Cancel() {
+  LOG(INFO) << "EtcdClient::~Watcher: " << key_;
+  lock_guard<mutex> lock(lock_);
+  cancelled_ = true;
+  if (req_) {
+    req_->CancelAndDelete();
+  }
+}
+
+
+void EtcdClient::Watcher::Impl::RequestDone(
+    Status status, const shared_ptr<JsonObject>& json) {
+  lock_guard<mutex> lock(lock_);
+  req_ = nullptr;
+
+  // TODO(pphaneuf): This and many other of the callbacks in this file
+  // do very similar validation, we should pull that out in a shared
+  // helper function.
+  {
+    // This is probably due to a timeout, just retry.
+    if (!status.ok()) {
+      goto fail;
+    }
+
+    // TODO(pphaneuf): None of this should ever happen, so I'm not
+    // sure what's the best way to handle it? CHECK-fail? Retry? With
+    // a delay? Retrying for now...
+    const JsonObject node(*json, "node");
+    if (!node.Ok()) {
+      LOG(ERROR) << "Invalid JSON: Couldn't find 'node'";
+      goto fail;
+    }
+
+    const JsonInt modifiedIndex(node, "modifiedIndex");
+    if (!modifiedIndex.Ok()) {
+      LOG(ERROR) << "Invalid JSON: Couldn't find 'modifiedIndex'";
+      goto fail;
+    }
+
+    const JsonString value(node, "value");
+    if (!value.Ok()) {
+      LOG(ERROR) << "Invalid JSON: Couldn't find 'value'";
+      goto fail;
+    }
+
+    CHECK_LT(last_index_seen_, modifiedIndex.Value());
+    last_index_seen_ = modifiedIndex.Value();
+
+    if (!cancelled_) {
+      cb_(modifiedIndex.Value(), value.Value());
+    }
+  }
+
+fail:
+  if (!cancelled_) {
+    StartRequest();
+  }
+}
+
+
+// Must be called with lock_ held.
+void EtcdClient::Watcher::Impl::StartRequest() {
+  map<string, string> params;
+  params["wait"] = "true";
+  params["waitIndex"] = to_string(last_index_seen_ + 1);
+
+  req_ = new Request(client_, EVHTTP_REQ_GET, key_, true, params,
+                     bind(&Impl::RequestDone, shared_from_this(), _1, _2));
+
+  req_->Run(client_->GetLeader());
+}
+
+
+EtcdClient::Watcher::Watcher(EtcdClient* client, const string& key,
+                             const WatchCallback& cb)
+    : pimpl_(new Impl(client, key, cb)) {
+  LOG(INFO) << "EtcdClient::Watcher: " << key;
+  // Binding the shared_ptr ensures that if we disappear, this will
+  // not cause the callback to segfault.
+  client->Get(key, bind(&Impl::InitialGetDone, pimpl_, _1, _2, _3));
+}
+
+
+EtcdClient::Watcher::~Watcher() {
+  pimpl_->Cancel();
+}
 
 
 EtcdClient::EtcdClient(const shared_ptr<libevent::Base>& event_base,
@@ -383,11 +573,8 @@ bool EtcdClient::MaybeUpdateLeader(const libevent::HttpRequest& req,
 
   // Update the last known leader, and retry the request on the new
   // leader.
-  shared_ptr<libevent::HttpConnection> conn(
-      UpdateLeader(evhttp_uri_get_host(uri.get()),
-                   evhttp_uri_get_port(uri.get())));
-
-  etcd_req->Run(conn);
+  etcd_req->Run(UpdateLeader(evhttp_uri_get_host(uri.get()),
+                             evhttp_uri_get_port(uri.get())));
 
   return true;
 }
@@ -395,22 +582,28 @@ bool EtcdClient::MaybeUpdateLeader(const libevent::HttpRequest& req,
 
 void EtcdClient::RequestDone(const shared_ptr<libevent::HttpRequest>& req,
                              Request* etcd_req) {
+  unique_ptr<Request> etcd_req_deleter(etcd_req);
+
+  // The HttpRequest object will be invalid as soon as we return, so
+  // forget about it now. It's too late to cancel, anyway.
+  etcd_req->Reset();
+
+  // This can happen in the case of a timeout (not sure if there are
+  // other reasons).
   if (!req) {
-    LOG(ERROR) << "an unknown error occurred";
     etcd_req->cb_(Status(util::error::UNKNOWN, "unknown error"),
                   shared_ptr<JsonObject>());
-    delete etcd_req;
     return;
   }
 
   if (MaybeUpdateLeader(*req, etcd_req)) {
+    etcd_req_deleter.release();
     return;
   }
 
   const int response_code(req->GetResponseCode());
   shared_ptr<JsonObject> json(make_shared<JsonObject>(req->GetInputBuffer()));
   etcd_req->cb_(StatusFromResponseCode(response_code, json), json);
-  delete etcd_req;
 }
 
 
@@ -505,7 +698,7 @@ void EtcdClient::Delete(const string& key, const int current_index,
 
 void EtcdClient::Generic(const string& key, const map<string, string>& params,
                          evhttp_cmd_type verb, const GenericCallback& cb) {
-  Request* const etcd_req(new Request(this, verb, key, params, cb));
+  Request* const etcd_req(new Request(this, verb, key, false, params, cb));
 
   etcd_req->Run(GetLeader());
 }

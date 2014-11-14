@@ -43,6 +43,7 @@
 /cpp/server/ct-server
 /cpp/util/bench_etcd
 /cpp/util/etcd_test
+/cpp/util/etcd_watch
 /cpp/util/json_wrapper_test
 /cpp/util/sync_etcd_test
 /java/build
