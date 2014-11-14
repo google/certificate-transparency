@@ -29,6 +29,8 @@ class EtcdClient {
                              int index)> CreateInQueueCallback;
   typedef std::function<void(util::Status status, int new_index)>
       UpdateCallback;
+  typedef std::function<void(util::Status status, int new_index)>
+      ForceSetCallback;
   typedef std::function<void(util::Status status)> DeleteCallback;
 
   // TODO(pphaneuf): This should take a set of servers, not just one.
@@ -49,6 +51,9 @@ class EtcdClient {
 
   void Update(const std::string& key, const std::string& value,
               const int previous_index, const UpdateCallback& cb);
+
+  void ForceSet(const std::string& key, const std::string& value,
+                const ForceSetCallback& cb);
 
   void Delete(const std::string& key, const int current_index,
               const DeleteCallback& cb);

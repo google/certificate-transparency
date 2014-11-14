@@ -302,6 +302,26 @@ TEST_F(SyncEtcdTest, TestUpdateFails) {
 }
 
 
+TEST_F(SyncEtcdTest, TestForceSetForPreexistingEntry) {
+  EXPECT_CALL(*mock_client_, Generic(kEntryKey, _, EVHTTP_REQ_PUT, _))
+      .WillOnce(InvokeArgument<3>(Status(), MakeJson(kUpdateJson)));
+  int index;
+  Status status(sync_client_->ForceSet(kEntryKey, "123", &index));
+  EXPECT_TRUE(status.ok()) << status;
+  EXPECT_EQ(6, index);
+}
+
+
+TEST_F(SyncEtcdTest, TestForceSetForNewEntry) {
+  EXPECT_CALL(*mock_client_, Generic(kEntryKey, _, EVHTTP_REQ_PUT, _))
+      .WillOnce(InvokeArgument<3>(Status(), MakeJson(kCreateJson)));
+  int index;
+  Status status(sync_client_->ForceSet(kEntryKey, "123", &index));
+  EXPECT_TRUE(status.ok()) << status;
+  EXPECT_EQ(6, index);
+}
+
+
 TEST_F(SyncEtcdTest, TestDelete) {
   EXPECT_CALL(*mock_client_,
               Generic(kEntryKey, Contains(Pair(kPrevIndexParam, "5")),

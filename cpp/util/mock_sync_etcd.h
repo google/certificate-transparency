@@ -31,6 +31,10 @@ class MockSyncEtcdClient : public SyncEtcdClient {
                util::Status(const std::string& key, const std::string& value,
                             const int previous_index, int* new_index));
 
+  MOCK_METHOD3(ForceSet,
+               util::Status(const std::string& key, const std::string& value,
+                            int* new_index));
+
   MOCK_METHOD2(Delete,
                util::Status(const std::string& key, const int current_index));
 };

@@ -87,178 +87,202 @@ shared_ptr<evhttp_uri> UriFromHostPort(const string& host, uint16_t port) {
 
 void GetRequestDone(Status status, const shared_ptr<JsonObject>& json,
                     const EtcdClient::GetCallback& cb) {
-  if (status.ok()) {
-    const JsonObject node(*json, "node");
-    if (!node.Ok()) {
-      cb(Status(util::error::FAILED_PRECONDITION,
-                "Invalid JSON: Couldn't find 'node'"),
-         0, "");
-      return;
-    }
-    const JsonInt modifiedIndex(node, "modifiedIndex");
-    if (!modifiedIndex.Ok()) {
-      cb(Status(util::error::FAILED_PRECONDITION,
-                "Invalid JSON: Couldn't find 'modifiedIndex'"),
-         0, "");
-      return;
-    }
-    const JsonString value(node, "value");
-    if (!value.Ok()) {
-      cb(Status(util::error::FAILED_PRECONDITION,
-                "Invalid JSON: Couldn't find 'value'"),
-         0, "");
-      return;
-    }
-    cb(status, modifiedIndex.Value(), value.Value());
-  } else {
+  if (!status.ok()) {
     cb(status, -1, "");
+    return;
   }
+  const JsonObject node(*json, "node");
+  if (!node.Ok()) {
+    cb(Status(util::error::FAILED_PRECONDITION,
+              "Invalid JSON: Couldn't find 'node'"),
+       0, "");
+    return;
+  }
+  const JsonInt modifiedIndex(node, "modifiedIndex");
+  if (!modifiedIndex.Ok()) {
+    cb(Status(util::error::FAILED_PRECONDITION,
+              "Invalid JSON: Couldn't find 'modifiedIndex'"),
+       0, "");
+    return;
+  }
+  const JsonString value(node, "value");
+  if (!value.Ok()) {
+    cb(Status(util::error::FAILED_PRECONDITION,
+              "Invalid JSON: Couldn't find 'value'"),
+       0, "");
+    return;
+  }
+  cb(status, modifiedIndex.Value(), value.Value());
 }
 
 
 void GetAllRequestDone(Status status, const shared_ptr<JsonObject>& json,
                        const EtcdClient::GetAllCallback& cb) {
-  if (status.ok()) {
-    const JsonObject node(*json, "node");
-    if (!node.Ok()) {
-      cb(Status(util::error::FAILED_PRECONDITION,
-                "Invalid JSON: Couldn't find 'node'"),
-         vector<pair<string, int>>());
-      return;
-    }
-    const JsonArray value_nodes(node, "nodes");
-    if (!value_nodes.Ok()) {
-      cb(Status(util::error::FAILED_PRECONDITION,
-                "Invalid JSON: Couldn't find 'nodes'"),
-         vector<pair<string, int>>());
-      return;
-    }
-    vector<pair<string, int>> values;
-    for (int i = 0; i < value_nodes.Length(); ++i) {
-      const JsonObject entry(value_nodes, i);
-      if (!entry.Ok()) {
-        cb(Status(util::error::FAILED_PRECONDITION,
-                  "Invalid JSON: Couldn't get 'value_nodes' index " +
-                      to_string(i)),
-           vector<pair<string, int>>());
-        return;
-      }
-      const JsonString value(entry, "value");
-      if (!value.Ok()) {
-        cb(Status(util::error::FAILED_PRECONDITION,
-                  "Invalid JSON: Couldn't find 'value'"),
-           vector<pair<string, int>>());
-        return;
-      }
-      const JsonInt modifiedIndex(entry, "modifiedIndex");
-      if (!modifiedIndex.Ok()) {
-        cb(Status(util::error::FAILED_PRECONDITION,
-                  "Invalid JSON: Coulnd't find 'modifiedIndex'"),
-           vector<pair<string, int>>());
-        return;
-      }
-      values.push_back(make_pair(value.Value(), modifiedIndex.Value()));
-    }
-    cb(status, values);
-  } else {
+  if (!status.ok()) {
     cb(status, vector<pair<string, int>>());
+    return;
   }
+  const JsonObject node(*json, "node");
+  if (!node.Ok()) {
+    cb(Status(util::error::FAILED_PRECONDITION,
+              "Invalid JSON: Couldn't find 'node'"),
+       vector<pair<string, int>>());
+    return;
+  }
+  const JsonArray value_nodes(node, "nodes");
+  if (!value_nodes.Ok()) {
+    cb(Status(util::error::FAILED_PRECONDITION,
+              "Invalid JSON: Couldn't find 'nodes'"),
+       vector<pair<string, int>>());
+    return;
+  }
+  vector<pair<string, int>> values;
+  for (int i = 0; i < value_nodes.Length(); ++i) {
+    const JsonObject entry(value_nodes, i);
+    if (!entry.Ok()) {
+      cb(Status(util::error::FAILED_PRECONDITION,
+                "Invalid JSON: Couldn't get 'value_nodes' index " +
+                    to_string(i)),
+         vector<pair<string, int>>());
+      return;
+    }
+    const JsonString value(entry, "value");
+    if (!value.Ok()) {
+      cb(Status(util::error::FAILED_PRECONDITION,
+                "Invalid JSON: Couldn't find 'value'"),
+         vector<pair<string, int>>());
+      return;
+    }
+    const JsonInt modifiedIndex(entry, "modifiedIndex");
+    if (!modifiedIndex.Ok()) {
+      cb(Status(util::error::FAILED_PRECONDITION,
+                "Invalid JSON: Coulnd't find 'modifiedIndex'"),
+         vector<pair<string, int>>());
+      return;
+    }
+    values.push_back(make_pair(value.Value(), modifiedIndex.Value()));
+  }
+  cb(status, values);
 }
 
 
 void CreateRequestDone(Status status, const shared_ptr<JsonObject>& json,
                        const EtcdClient::CreateCallback& cb) {
-  if (status.ok()) {
-    const JsonObject node(*json, "node");
-    if (!node.Ok()) {
-      cb(Status(util::error::FAILED_PRECONDITION,
-                "Invalid JSON: Couldn't find 'node'"),
-         0);
-      return;
-    }
-    const JsonInt createdIndex(node, "createdIndex");
-    if (!createdIndex.Ok()) {
-      cb(Status(util::error::FAILED_PRECONDITION,
-                "Invalid JSON: Couldn't find 'createdIndex'"),
-         0);
-      return;
-    }
-    const JsonInt modifiedIndex(node, "modifiedIndex");
-    if (!modifiedIndex.Ok()) {
-      cb(Status(util::error::FAILED_PRECONDITION,
-                "Invalid JSON: Couldn't find 'modifiedIndex'"),
-         0);
-      return;
-    }
-    CHECK_EQ(createdIndex.Value(), modifiedIndex.Value());
-    cb(status, modifiedIndex.Value());
-  } else {
+  if (!status.ok()) {
     cb(status, -1);
+    return;
   }
+  const JsonObject node(*json, "node");
+  if (!node.Ok()) {
+    cb(Status(util::error::FAILED_PRECONDITION,
+              "Invalid JSON: Couldn't find 'node'"),
+       0);
+    return;
+  }
+  const JsonInt createdIndex(node, "createdIndex");
+  if (!createdIndex.Ok()) {
+    cb(Status(util::error::FAILED_PRECONDITION,
+              "Invalid JSON: Couldn't find 'createdIndex'"),
+       0);
+    return;
+  }
+  const JsonInt modifiedIndex(node, "modifiedIndex");
+  if (!modifiedIndex.Ok()) {
+    cb(Status(util::error::FAILED_PRECONDITION,
+              "Invalid JSON: Couldn't find 'modifiedIndex'"),
+       0);
+    return;
+  }
+  CHECK_EQ(createdIndex.Value(), modifiedIndex.Value());
+  cb(status, modifiedIndex.Value());
 }
 
 
 void CreateInQueueRequestDone(Status status,
                               const shared_ptr<JsonObject>& json,
                               const EtcdClient::CreateInQueueCallback& cb) {
-  if (status.ok()) {
-    const JsonObject node(*json, "node");
-    if (!node.Ok()) {
-      cb(Status(util::error::FAILED_PRECONDITION,
-                "Invalid JSON: Couldn't find 'node'"),
-         "", 0);
-      return;
-    }
-    const JsonInt createdIndex(node, "createdIndex");
-    if (!createdIndex.Ok()) {
-      cb(Status(util::error::FAILED_PRECONDITION,
-                "Invalid JSON: Couldn't find 'createdIndex'"),
-         "", 0);
-      return;
-    }
-    const JsonInt modifiedIndex(node, "modifiedIndex");
-    if (!modifiedIndex.Ok()) {
-      cb(Status(util::error::FAILED_PRECONDITION,
-                "Invalid JSON: Couldn't find 'modifiedIndex'"),
-         "", 0);
-      return;
-    }
-    const JsonString key(node, "key");
-    if (!key.Ok()) {
-      cb(Status(util::error::FAILED_PRECONDITION,
-                "Invalid JSON: Couldn't find 'key'"),
-         "", 0);
-      return;
-    }
-    CHECK_EQ(createdIndex.Value(), modifiedIndex.Value());
-    cb(status, key.Value(), modifiedIndex.Value());
-  } else {
+  if (!status.ok()) {
     cb(status, "", -1);
+    return;
   }
+  const JsonObject node(*json, "node");
+  if (!node.Ok()) {
+    cb(Status(util::error::FAILED_PRECONDITION,
+              "Invalid JSON: Couldn't find 'node'"),
+       "", 0);
+    return;
+  }
+  const JsonInt createdIndex(node, "createdIndex");
+  if (!createdIndex.Ok()) {
+    cb(Status(util::error::FAILED_PRECONDITION,
+              "Invalid JSON: Couldn't find 'createdIndex'"),
+       "", 0);
+    return;
+  }
+  const JsonInt modifiedIndex(node, "modifiedIndex");
+  if (!modifiedIndex.Ok()) {
+    cb(Status(util::error::FAILED_PRECONDITION,
+              "Invalid JSON: Couldn't find 'modifiedIndex'"),
+       "", 0);
+    return;
+  }
+  const JsonString key(node, "key");
+  if (!key.Ok()) {
+    cb(Status(util::error::FAILED_PRECONDITION,
+              "Invalid JSON: Couldn't find 'key'"),
+       "", 0);
+    return;
+  }
+  CHECK_EQ(createdIndex.Value(), modifiedIndex.Value());
+  cb(status, key.Value(), modifiedIndex.Value());
 }
 
 
 void UpdateRequestDone(Status status, const shared_ptr<JsonObject>& json,
                        const EtcdClient::UpdateCallback& cb) {
-  if (status.ok()) {
-    const JsonObject node(*json, "node");
-    if (!node.Ok()) {
-      cb(Status(util::error::FAILED_PRECONDITION,
-                "Invalid JSON: Couldn't find 'node'"),
-         0);
-      return;
-    }
-    const JsonInt modifiedIndex(node, "modifiedIndex");
-    if (!modifiedIndex.Ok()) {
-      cb(Status(util::error::FAILED_PRECONDITION,
-                "Invalid JSON: Couldn't find 'modifiedIndex'"),
-         0);
-      return;
-    }
-    cb(status, modifiedIndex.Value());
-  } else {
+  if (!status.ok()) {
     cb(status, -1);
+    return;
   }
+  const JsonObject node(*json, "node");
+  if (!node.Ok()) {
+    cb(Status(util::error::FAILED_PRECONDITION,
+              "Invalid JSON: Couldn't find 'node'"),
+       0);
+    return;
+  }
+  const JsonInt modifiedIndex(node, "modifiedIndex");
+  if (!modifiedIndex.Ok()) {
+    cb(Status(util::error::FAILED_PRECONDITION,
+              "Invalid JSON: Couldn't find 'modifiedIndex'"),
+       0);
+    return;
+  }
+  cb(status, modifiedIndex.Value());
+}
+
+
+void ForceSetRequestDone(Status status, const shared_ptr<JsonObject>& json,
+                         const EtcdClient::ForceSetCallback& cb) {
+  if (!status.ok()) {
+    cb(status, -1);
+    return;
+  }
+  const JsonObject node(*json, "node");
+  if (!node.Ok()) {
+    cb(Status(util::error::FAILED_PRECONDITION,
+              "Invalid JSON: Couldn't find 'node'"),
+       0);
+    return;
+  }
+  const JsonInt modifiedIndex(node, "modifiedIndex");
+  if (!modifiedIndex.Ok()) {
+    cb(Status(util::error::FAILED_PRECONDITION,
+              "Invalid JSON: Couldn't find 'modifiedIndex'"),
+       0);
+    return;
+  }
+  cb(status, modifiedIndex.Value());
 }
 
 
@@ -460,6 +484,14 @@ void EtcdClient::Update(const string& key, const string& value,
   params["value"] = value;
   params["prevIndex"] = to_string(previous_index);
   Generic(key, params, EVHTTP_REQ_PUT, bind(&UpdateRequestDone, _1, _2, cb));
+}
+
+
+void EtcdClient::ForceSet(const string& key, const string& value,
+                          const ForceSetCallback& cb) {
+  map<string, string> params;
+  params["value"] = value;
+  Generic(key, params, EVHTTP_REQ_PUT, bind(&ForceSetRequestDone, _1, _2, cb));
 }
 
 
