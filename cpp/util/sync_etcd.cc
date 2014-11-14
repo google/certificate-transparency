@@ -146,6 +146,14 @@ Status SyncEtcdClient::Update(const string& key, const string& value,
 }
 
 
+Status SyncEtcdClient::ForceSet(const string& key, const string& value,
+                                int* new_index) {
+  return BlockingCall(base_, bind(&EtcdClient::ForceSet, client_.get(), key,
+                                  value, _1),
+                      new_index);
+}
+
+
 Status SyncEtcdClient::Delete(const string& key, const int current_index) {
   return BlockingCall(base_, bind(&EtcdClient::Delete, client_.get(), key,
                                   current_index, _1));

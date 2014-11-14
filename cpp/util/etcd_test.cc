@@ -200,6 +200,14 @@ class EtcdTest : public ::testing::Test {
     }
   }
 
+  void ForceSetCallback(bool expect_success, int expect_index, Status status,
+                        int new_index) {
+    EXPECT_EQ(expect_success, status.ok());
+    if (expect_success) {
+      EXPECT_EQ(expect_index, new_index);
+    }
+  }
+
   void UpdateCallback(bool expect_success, int expect_index, Status status,
                       int new_index) {
     EXPECT_EQ(expect_success, status.ok());
@@ -308,6 +316,20 @@ TEST_F(EtcdTest, TestUpdateFails) {
                                   MakeJson(kCompareFailedJson)));
   client_.Update(kEntryKey, "123", 5,
                  bind(&EtcdTest::UpdateCallback, this, false, 0, _1, _2));
+}
+
+TEST_F(EtcdTest, TestForceSetForPreexistingKey) {
+  EXPECT_CALL(client_, Generic(kEntryKey, _, EVHTTP_REQ_PUT, _))
+      .WillOnce(InvokeArgument<3>(Status(), MakeJson(kUpdateJson)));
+  client_.ForceSet(kEntryKey, "123",
+                   bind(&EtcdTest::ForceSetCallback, this, true, 6, _1, _2));
+}
+
+TEST_F(EtcdTest, TestForceSetForNewKey) {
+  EXPECT_CALL(client_, Generic(kEntryKey, _, EVHTTP_REQ_PUT, _))
+      .WillOnce(InvokeArgument<3>(Status(), MakeJson(kCreateJson)));
+  client_.ForceSet(kEntryKey, "123",
+                   bind(&EtcdTest::ForceSetCallback, this, true, 6, _1, _2));
 }
 
 TEST_F(EtcdTest, TestDelete) {

@@ -44,6 +44,9 @@ class SyncEtcdClient {
   virtual util::Status Update(const std::string& key, const std::string& value,
                               const int previous_index, int* new_index);
 
+  virtual util::Status ForceSet(const std::string& key,
+                                const std::string& value, int* new_index);
+
   virtual util::Status Delete(const std::string& key, const int current_index);
 
  private:
