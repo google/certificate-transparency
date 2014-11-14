@@ -171,7 +171,7 @@ class MonitorTest(unittest.TestCase):
         m = monitor.Monitor(client, self.verifier, self.hasher, self.db,
                                self.temp_db, self.state_keeper)
         if m:
-            m._scan_entry = mock.Mock()
+            m._scan_entries = mock.Mock()
         return m
 
     def test_update(self):
