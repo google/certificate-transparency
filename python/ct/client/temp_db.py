@@ -12,8 +12,6 @@ class TempDB(object):
         Args:
             entries: an iterable of (entry_number, client_pb2.EntryResponse)
                      tuples
-        Raises:
-            KeyError: an entry with this sequence number already exists.
        """
 
     @abc.abstractmethod

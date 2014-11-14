@@ -4,7 +4,6 @@ from google.protobuf import text_format
 import logging
 import os
 import sys
-import time
 
 from ct.client import sqlite_connection as sqlitecon
 from ct.client import prober
@@ -33,11 +32,11 @@ if __name__ == '__main__':
     sys.argv = FLAGS(sys.argv)
     logging.basicConfig(level=FLAGS.log_level)
 
-    sqlite_log_db = sqlite_log_db.SQLiteLogDB(
-        sqlitecon.SQLiteConnectionManager(FLAGS.ct_sqlite_db))
-
     create_directory(FLAGS.ct_sqlite_temp_dir)
     create_directory(FLAGS.monitor_state_dir)
+
+    sqlite_log_db = sqlite_log_db.SQLiteLogDB(
+        sqlitecon.SQLiteConnectionManager(FLAGS.ct_sqlite_db))
 
     sqlite_temp_db_factory = sqlite_temp_db.SQLiteTempDBFactory(
         sqlitecon.SQLiteConnectionManager(FLAGS.ct_sqlite_temp_dir + "/meta"),
@@ -53,6 +52,6 @@ if __name__ == '__main__':
         ct_server_list.append(log.log_server)
 
     prober_thread = prober.ProberThread(ctlogs, sqlite_log_db,
-                                      sqlite_temp_db_factory,
-                                      FLAGS.monitor_state_dir)
+                                        sqlite_temp_db_factory,
+                                        FLAGS.monitor_state_dir)
     prober_thread.start()

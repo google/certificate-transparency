@@ -1,5 +1,5 @@
 #!/usr/bin/env trial
-
+import database
 import json
 import sys
 import urlparse
@@ -111,6 +111,13 @@ class AsyncLogClientTest(unittest.TestCase):
             response = self._responder.get_response(path, params=params)
             return defer.succeed(response)
 
+    class FakeDB(object):
+        def scan_entries(self, first, last):
+            raise database.KeyError
+
+        def store_entries(self, entries):
+            self.entries = list(entries)
+
     def setUp(self):
         self.clock = task.Clock()
 
@@ -124,11 +131,12 @@ class AsyncLogClientTest(unittest.TestCase):
                                          test_util.DEFAULT_URI,
                                          reactor=self.clock)
 
-    def default_client(self):
+    def default_client(self, entries_db=None):
         # A client whose responder is configured to answer queries for the
         # correct uri.
         return log_client.AsyncLogClient(self.FakeAgent(
             self.FakeHandler(test_util.DEFAULT_URI)), test_util.DEFAULT_URI,
+                                         entries_db=entries_db,
                                          reactor=self.clock)
 
     def test_get_sth(self):
@@ -319,6 +327,31 @@ class AsyncLogClientTest(unittest.TestCase):
         self.pump_get_entries(pumps=2)
         self.assertEqual(10, consumer.result)
         self.assertTrue(test_util.verify_entries(consumer.received, 0, 9))
+
+    def test_get_entries_use_stored_entries(self):
+        fake_db = self.FakeDB()
+        # if client tries to fetch entries instead of taking them from db, then
+        # he will get 0 - 9 entries. If he uses db then he will get 10 - 19
+        fake_db.scan_entries = mock.Mock(
+                return_value=test_util.make_entries(10, 19))
+        client = self.default_client(entries_db=fake_db)
+        consumer = self.get_entries(client, 0, 9)
+        test_util.verify_entries(consumer.received, 10, 19)
+
+    def test_get_entries_tries_to_fetch_if_not_available_in_db(self):
+        fake_db = self.FakeDB()
+        fake_db.scan_entries = mock.Mock(return_value=None)
+        client = self.default_client(entries_db=fake_db)
+        consumer = self.get_entries(client, 0, 9)
+        test_util.verify_entries(consumer.received, 0, 9)
+
+    def test_get_entries_stores_entries(self):
+        fake_db = self.FakeDB()
+        client = self.default_client(entries_db=fake_db)
+        consumer = self.get_entries(client, 0, 9)
+        test_util.verify_entries(consumer.received, 0, 9)
+        test_util.verify_entries(fake_db.entries, 0, 9)
+
 
 if __name__ == "__main__":
     sys.argv = FLAGS(sys.argv)

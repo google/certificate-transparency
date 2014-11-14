@@ -102,15 +102,13 @@ class SQLiteTempDB(temp_db.TempDB):
         Args:
             entries: an iterable of (entry_number, client_pb2.EntryResponse)
                      tuples
-        Raises:
-            KeyError: an entry with this sequence number already exists.
         """
         with self.__mgr.get_connection() as conn:
             cursor = conn.cursor()
             serialized_entries = map(lambda x: (
                     x[0], sqlite3.Binary(x[1].SerializeToString())), entries)
             try:
-                cursor.executemany("INSERT INTO entries(id, entry) VALUES "
+                cursor.executemany("INSERT OR REPLACE INTO entries(id, entry) VALUES "
                                    "(?, ?)", serialized_entries)
             except sqlite3.IntegrityError as e:
                 raise database.KeyError("Failed to insert entries: an entry "
