@@ -661,6 +661,18 @@ void EtcdClient::Create(const string& key, const string& value,
 }
 
 
+void EtcdClient::CreateWithTTL(const std::string& key,
+                               const std::string& value,
+                               const std::chrono::duration<int>& ttl,
+                               const CreateCallback& cb) {
+  map<string, string> params;
+  params["value"] = value;
+  params["prevExist"] = "false";
+  params["ttl"] = std::to_string(ttl.count());
+  Generic(key, params, EVHTTP_REQ_PUT, bind(&CreateRequestDone, _1, _2, cb));
+}
+
+
 void EtcdClient::CreateInQueue(const string& dir, const string& value,
                                const CreateInQueueCallback& cb) {
   map<string, string> params;
@@ -680,10 +692,32 @@ void EtcdClient::Update(const string& key, const string& value,
 }
 
 
+void EtcdClient::UpdateWithTTL(const string& key, const string& value,
+                               const std::chrono::duration<int>& ttl,
+                               const int previous_index,
+                               const UpdateCallback& cb) {
+  map<string, string> params;
+  params["value"] = value;
+  params["prevIndex"] = to_string(previous_index);
+  params["ttl"] = std::to_string(ttl.count());
+  Generic(key, params, EVHTTP_REQ_PUT, bind(&UpdateRequestDone, _1, _2, cb));
+}
+
+
 void EtcdClient::ForceSet(const string& key, const string& value,
                           const ForceSetCallback& cb) {
   map<string, string> params;
   params["value"] = value;
+  Generic(key, params, EVHTTP_REQ_PUT, bind(&ForceSetRequestDone, _1, _2, cb));
+}
+
+
+void EtcdClient::ForceSetWithTTL(const string& key, const string& value,
+                                 const std::chrono::duration<int>& ttl,
+                                 const ForceSetCallback& cb) {
+  map<string, string> params;
+  params["value"] = value;
+  params["ttl"] = std::to_string(ttl.count());
   Generic(key, params, EVHTTP_REQ_PUT, bind(&ForceSetRequestDone, _1, _2, cb));
 }
 

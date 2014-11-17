@@ -1,6 +1,7 @@
 #ifndef CERT_TRANS_UTIL_ETCD_H_
 #define CERT_TRANS_UTIL_ETCD_H_
 
+#include <chrono>
 #include <map>
 #include <memory>
 #include <mutex>
@@ -71,14 +72,26 @@ class EtcdClient {
   void Create(const std::string& key, const std::string& value,
               const CreateCallback& cb);
 
+  void CreateWithTTL(const std::string& key, const std::string& value,
+                     const std::chrono::duration<int>& ttl,
+                     const CreateCallback& cb);
+
   void CreateInQueue(const std::string& dir, const std::string& value,
                      const CreateInQueueCallback& cb);
 
   void Update(const std::string& key, const std::string& value,
               const int previous_index, const UpdateCallback& cb);
 
+  void UpdateWithTTL(const std::string& key, const std::string& value,
+                     const std::chrono::duration<int>& ttl,
+                     const int previous_index, const UpdateCallback& cb);
+
   void ForceSet(const std::string& key, const std::string& value,
                 const ForceSetCallback& cb);
+
+  void ForceSetWithTTL(const std::string& key, const std::string& value,
+                       const std::chrono::duration<int>& ttl,
+                       const ForceSetCallback& cb);
 
   void Delete(const std::string& key, const int current_index,
               const DeleteCallback& cb);
