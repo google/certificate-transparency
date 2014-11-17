@@ -9,7 +9,6 @@ ct/proto/ct_pb2.py: ../proto/ct.proto
 
 # TODO(laiqu) use unittest ability to detect tests
 test: all
-	PYTHONPATH=$(PYTHONPATH):. ./ct/client/sqlite_log_db_test.py
 	PYTHONPATH=$(PYTHONPATH):. ./ct/crypto/verify_test.py
 	PYTHONPATH=$(PYTHONPATH):. ./ct/crypto/merkle_test.py
 	PYTHONPATH=$(PYTHONPATH):. ./ct/crypto/pem_test.py
@@ -19,10 +18,11 @@ test: all
 	PYTHONPATH=$(PYTHONPATH):. ./ct/crypto/asn1/oid_test.py
 	PYTHONPATH=$(PYTHONPATH):. ./ct/crypto/asn1/x509_time_test.py
 	PYTHONPATH=$(PYTHONPATH):. ./ct/crypto/cert_test.py
+	PYTHONPATH=$(PYTHONPATH):. ./ct/client/sqlite_log_db_test.py
 	PYTHONPATH=$(PYTHONPATH):. ./ct/client/sqlite_cert_db_test.py
+	PYTHONPATH=$(PYTHONPATH):. ./ct/client/sqlite_temp_db_test.py
 	PYTHONPATH=$(PYTHONPATH):. ./ct/client/sqlite_connection_test.py
 	PYTHONPATH=$(PYTHONPATH):. ./ct/client/log_client_test.py
-	PYTHONPATH=$(PYTHONPATH):. ./ct/client/sqlite_temp_db_test.py
 	PYTHONPATH=$(PYTHONPATH):. ./ct/client/reporter_test.py
 	PYTHONPATH=$(PYTHONPATH):. ./ct/client/state_test.py
 	PYTHONPATH=$(PYTHONPATH):. ./ct/client/tls_message_test.py
