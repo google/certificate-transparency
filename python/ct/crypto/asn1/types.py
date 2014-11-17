@@ -20,6 +20,7 @@ and should be checked at application level, where necessary.
 import abc
 import collections
 import functools
+import re
 
 from ct.crypto import error
 from ct.crypto.asn1 import print_util
@@ -734,23 +735,47 @@ class ASN1String(Simple):
     @classmethod
     def _convert_value(cls, value):
         if isinstance(value, str) or isinstance(value, buffer):
-            return str(value)
+            value = str(value)
         elif isinstance(value, ASN1String):
-            return value.value
+            value = value.value
         else:
             raise TypeError("Cannot convert %s to %s" %
                             (type(value), cls.__name__))
+        cls._check_for_illegal_characters(value)
+        return value
+
+    @classmethod
+    def _check_for_illegal_characters(cls, buf):
+        """Raises if there are any illegal characters in string.
+
+        Args:
+            buf: string which will be checked for illegal characters
+
+        Raises:
+            ASN1Error.
+        """
+        pass
 
     @classmethod
     def _decode_value(cls, buf, strict=True):
+        if strict:
+            cls._check_for_illegal_characters(buf)
         return buf
 
 
-# TODO(ekasper): character sets
+# Based on https://www.itu.int/rec/T-REC-X.208-198811-W/en
+# and http://kikaku.itscj.ipsj.or.jp/ISO-IR/overview.htm
 @Universal(19, tag.PRIMITIVE)
 class PrintableString(ASN1String):
     """PrintableString."""
-    pass
+    NOT_ACCEPTABLE = re.compile("[^a-zA-Z0-9 '()+,\-./:=?]")
+    @classmethod
+    def _check_for_illegal_characters(cls, buf):
+        search_result = PrintableString.NOT_ACCEPTABLE.search(buf)
+        if search_result:
+            index = search_result.start()
+            raise error.ASN1Error("Illegal character in PrintableString: %s "
+                "(character: %s index: %d)" % (buf, buf[index], index))
 
 
 @Universal(20, tag.PRIMITIVE)
@@ -762,13 +787,23 @@ class TeletexString(ASN1String):
 @Universal(22, tag.PRIMITIVE)
 class IA5String(ASN1String):
     """IA5String."""
-    pass
+    @classmethod
+    def _check_for_illegal_characters(self, buf):
+        for index, character in enumerate(buf):
+            if ord(character) > 127:
+                raise error.ASN1Error("Illegal character in IA5String: %s "
+                    "(character: %s index: %d" % (buf, character, index))
 
 
 @Universal(26, tag.PRIMITIVE)
 class VisibleString(ASN1String):
     """VisibleString (aka ISO646String)."""
-    pass
+    @classmethod
+    def _check_for_illegal_characters(self, buf):
+        for index, character in enumerate(buf):
+            if ord(character) < 32 or ord(character) > 126:
+                raise error.ASN1Error("Illegal character in VisibleString %s "
+                    "(character: %s index: %d" % (buf, character, index))
 
 
 @Universal(30, tag.PRIMITIVE)
