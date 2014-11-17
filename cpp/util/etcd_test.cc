@@ -34,6 +34,7 @@ const char kDirKey[] = "/some";
 const char kValueParam[] = "value";
 const char kPrevExistParam[] = "prevExist";
 const char kPrevIndexParam[] = "prevIndex";
+const char kTtlParam[] = "ttl";
 const char kFalse[] = "false";
 const char kGetJson[] =
     "{"
@@ -279,6 +280,31 @@ TEST_F(EtcdTest, TestCreateFails) {
                  bind(&EtcdTest::CreateCallback, this, false, 0, _1, _2));
 }
 
+TEST_F(EtcdTest, TestCreateWithTTL) {
+  EXPECT_CALL(client_,
+              Generic(kEntryKey, AllOf(Contains(Pair(kValueParam, "123")),
+                                       Contains(Pair(kPrevExistParam, kFalse)),
+                                       Contains(Pair(kTtlParam, "100"))),
+                      EVHTTP_REQ_PUT, _))
+      .WillOnce(InvokeArgument<3>(Status(), MakeJson(kCreateJson)));
+  client_.CreateWithTTL(kEntryKey, "123", std::chrono::duration<int>(100),
+                        bind(&EtcdTest::CreateCallback, this, true, 6, _1,
+                             _2));
+}
+
+TEST_F(EtcdTest, TestCreateWithTTLFails) {
+  EXPECT_CALL(client_,
+              Generic(kEntryKey, AllOf(Contains(Pair(kValueParam, "123")),
+                                       Contains(Pair(kPrevExistParam, kFalse)),
+                                       Contains(Pair(kTtlParam, "100"))),
+                      EVHTTP_REQ_PUT, _))
+      .WillOnce(InvokeArgument<3>(Status(util::error::FAILED_PRECONDITION, ""),
+                                  MakeJson(kKeyAlreadyExistsJson)));
+  client_.CreateWithTTL(kEntryKey, "123", std::chrono::duration<int>(100),
+                        bind(&EtcdTest::CreateCallback, this, false, 0, _1,
+                             _2));
+}
+
 TEST_F(EtcdTest, TestCreateInQueue) {
   EXPECT_CALL(client_,
               Generic(kDirKey, AllOf(Contains(Pair(kValueParam, "123")),
@@ -318,6 +344,29 @@ TEST_F(EtcdTest, TestUpdateFails) {
                  bind(&EtcdTest::UpdateCallback, this, false, 0, _1, _2));
 }
 
+TEST_F(EtcdTest, TestUpdateWithTTL) {
+  EXPECT_CALL(client_,
+              Generic(kEntryKey, AllOf(Contains(Pair(kPrevIndexParam, "5")),
+                                       Contains(Pair(kTtlParam, "100"))),
+                      EVHTTP_REQ_PUT, _))
+      .WillOnce(InvokeArgument<3>(Status(), MakeJson(kUpdateJson)));
+  client_.UpdateWithTTL(kEntryKey, "123", std::chrono::duration<int>(100), 5,
+                        bind(&EtcdTest::UpdateCallback, this, true, 6, _1,
+                             _2));
+}
+
+TEST_F(EtcdTest, TestUpdateWithTTLFails) {
+  EXPECT_CALL(client_,
+              Generic(kEntryKey, AllOf(Contains(Pair(kPrevIndexParam, "5")),
+                                       Contains(Pair(kTtlParam, "100"))),
+                      EVHTTP_REQ_PUT, _))
+      .WillOnce(InvokeArgument<3>(Status(util::error::FAILED_PRECONDITION, ""),
+                                  MakeJson(kCompareFailedJson)));
+  client_.UpdateWithTTL(kEntryKey, "123", std::chrono::duration<int>(100), 5,
+                        bind(&EtcdTest::UpdateCallback, this, false, 0, _1,
+                             _2));
+}
+
 TEST_F(EtcdTest, TestForceSetForPreexistingKey) {
   EXPECT_CALL(client_, Generic(kEntryKey, _, EVHTTP_REQ_PUT, _))
       .WillOnce(InvokeArgument<3>(Status(), MakeJson(kUpdateJson)));
@@ -330,6 +379,24 @@ TEST_F(EtcdTest, TestForceSetForNewKey) {
       .WillOnce(InvokeArgument<3>(Status(), MakeJson(kCreateJson)));
   client_.ForceSet(kEntryKey, "123",
                    bind(&EtcdTest::ForceSetCallback, this, true, 6, _1, _2));
+}
+
+TEST_F(EtcdTest, TestForceSetWithTTLForPreexistingKey) {
+  EXPECT_CALL(client_, Generic(kEntryKey, Contains(Pair(kTtlParam, "100")),
+                               EVHTTP_REQ_PUT, _))
+      .WillOnce(InvokeArgument<3>(Status(), MakeJson(kUpdateJson)));
+  client_.ForceSetWithTTL(kEntryKey, "123", std::chrono::duration<int>(100),
+                          bind(&EtcdTest::ForceSetCallback, this, true, 6, _1,
+                               _2));
+}
+
+TEST_F(EtcdTest, TestForceSetWithTTLForNewKey) {
+  EXPECT_CALL(client_, Generic(kEntryKey, Contains(Pair(kTtlParam, "100")),
+                               EVHTTP_REQ_PUT, _))
+      .WillOnce(InvokeArgument<3>(Status(), MakeJson(kCreateJson)));
+  client_.ForceSetWithTTL(kEntryKey, "123", std::chrono::duration<int>(100),
+                          bind(&EtcdTest::ForceSetCallback, this, true, 6, _1,
+                               _2));
 }
 
 TEST_F(EtcdTest, TestDelete) {

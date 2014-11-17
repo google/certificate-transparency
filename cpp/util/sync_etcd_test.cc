@@ -31,6 +31,7 @@ const char kDirKey[] = "/some";
 const char kValueParam[] = "value";
 const char kPrevExistParam[] = "prevExist";
 const char kPrevIndexParam[] = "prevIndex";
+const char kTtlParam[] = "ttl";
 const char kFalse[] = "false";
 const char kGetJson[] =
     "{"
@@ -249,6 +250,38 @@ TEST_F(SyncEtcdTest, TestCreateFails) {
 }
 
 
+TEST_F(SyncEtcdTest, TestCreateWithTTL) {
+  EXPECT_CALL(*mock_client_,
+              Generic(kEntryKey, AllOf(Contains(Pair(kValueParam, "123")),
+                                       Contains(Pair(kPrevExistParam, kFalse)),
+                                       Contains(Pair(kTtlParam, "100"))),
+                      EVHTTP_REQ_PUT, _))
+      .WillOnce(InvokeArgument<3>(Status(), MakeJson(kCreateJson)));
+  int index;
+  Status status(sync_client_->CreateWithTTL(kEntryKey, "123",
+                                            std::chrono::duration<int>(100),
+                                            &index));
+  EXPECT_TRUE(status.ok()) << status;
+  EXPECT_EQ(6, index);
+}
+
+
+TEST_F(SyncEtcdTest, TestCreateWithTTLFails) {
+  EXPECT_CALL(*mock_client_,
+              Generic(kEntryKey, AllOf(Contains(Pair(kValueParam, "123")),
+                                       Contains(Pair(kPrevExistParam, kFalse)),
+                                       Contains(Pair(kTtlParam, "100"))),
+                      EVHTTP_REQ_PUT, _))
+      .WillOnce(InvokeArgument<3>(Status(util::error::FAILED_PRECONDITION, ""),
+                                  MakeJson(kKeyAlreadyExistsJson)));
+  int index;
+  Status status(sync_client_->CreateWithTTL(kEntryKey, "123",
+                                            std::chrono::duration<int>(100),
+                                            &index));
+  EXPECT_FALSE(status.ok());
+}
+
+
 TEST_F(SyncEtcdTest, TestCreateInQueue) {
   EXPECT_CALL(*mock_client_,
               Generic(kDirKey, AllOf(Contains(Pair(kValueParam, "123")),
@@ -302,6 +335,36 @@ TEST_F(SyncEtcdTest, TestUpdateFails) {
 }
 
 
+TEST_F(SyncEtcdTest, TestUpdateWithTTL) {
+  EXPECT_CALL(*mock_client_,
+              Generic(kEntryKey, AllOf(Contains(Pair(kPrevIndexParam, "5")),
+                                       Contains(Pair(kTtlParam, "100"))),
+                      EVHTTP_REQ_PUT, _))
+      .WillOnce(InvokeArgument<3>(Status(), MakeJson(kUpdateJson)));
+  int index;
+  Status status(sync_client_->UpdateWithTTL(kEntryKey, "123",
+                                            std::chrono::duration<int>(100), 5,
+                                            &index));
+  EXPECT_TRUE(status.ok()) << status;
+  EXPECT_EQ(6, index);
+}
+
+
+TEST_F(SyncEtcdTest, TestUpdateWithTTLFails) {
+  EXPECT_CALL(*mock_client_,
+              Generic(kEntryKey, AllOf(Contains(Pair(kPrevIndexParam, "5")),
+                                       Contains(Pair(kTtlParam, "100"))),
+                      EVHTTP_REQ_PUT, _))
+      .WillOnce(InvokeArgument<3>(Status(util::error::FAILED_PRECONDITION, ""),
+                                  MakeJson(kCompareFailedJson)));
+  int index;
+  Status status(sync_client_->UpdateWithTTL(kEntryKey, "123",
+                                            std::chrono::duration<int>(100), 5,
+                                            &index));
+  EXPECT_FALSE(status.ok());
+}
+
+
 TEST_F(SyncEtcdTest, TestForceSetForPreexistingEntry) {
   EXPECT_CALL(*mock_client_, Generic(kEntryKey, _, EVHTTP_REQ_PUT, _))
       .WillOnce(InvokeArgument<3>(Status(), MakeJson(kUpdateJson)));
@@ -317,6 +380,34 @@ TEST_F(SyncEtcdTest, TestForceSetForNewEntry) {
       .WillOnce(InvokeArgument<3>(Status(), MakeJson(kCreateJson)));
   int index;
   Status status(sync_client_->ForceSet(kEntryKey, "123", &index));
+  EXPECT_TRUE(status.ok()) << status;
+  EXPECT_EQ(6, index);
+}
+
+
+TEST_F(SyncEtcdTest, TestForceSetWithTTLForPreexistingEntry) {
+  EXPECT_CALL(*mock_client_,
+              Generic(kEntryKey, Contains(Pair(kTtlParam, "100")),
+                      EVHTTP_REQ_PUT, _))
+      .WillOnce(InvokeArgument<3>(Status(), MakeJson(kUpdateJson)));
+  int index;
+  Status status(sync_client_->ForceSetWithTTL(kEntryKey, "123",
+                                              std::chrono::duration<int>(100),
+                                              &index));
+  EXPECT_TRUE(status.ok()) << status;
+  EXPECT_EQ(6, index);
+}
+
+
+TEST_F(SyncEtcdTest, TestForceSetWithTTLForNewEntry) {
+  EXPECT_CALL(*mock_client_,
+              Generic(kEntryKey, Contains(Pair(kTtlParam, "100")),
+                      EVHTTP_REQ_PUT, _))
+      .WillOnce(InvokeArgument<3>(Status(), MakeJson(kCreateJson)));
+  int index;
+  Status status(sync_client_->ForceSetWithTTL(kEntryKey, "123",
+                                              std::chrono::duration<int>(100),
+                                              &index));
   EXPECT_TRUE(status.ok()) << status;
   EXPECT_EQ(6, index);
 }

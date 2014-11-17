@@ -1,10 +1,11 @@
 #ifndef CERT_TRANS_UTIL_SYNC_ETCD_H_
 #define CERT_TRANS_UTIL_SYNC_ETCD_H_
 
-#include <vector>
+#include <chrono>
 #include <memory>
 #include <stdint.h>
 #include <string>
+#include <vector>
 
 #include "base/macros.h"
 #include "util/etcd.h"
@@ -37,6 +38,11 @@ class SyncEtcdClient {
   virtual util::Status Create(const std::string& key, const std::string& value,
                               int* index);
 
+  virtual util::Status CreateWithTTL(const std::string& key,
+                                     const std::string& value,
+                                     const std::chrono::duration<int>& ttl,
+                                     int* index);
+
   virtual util::Status CreateInQueue(const std::string& dir,
                                      const std::string& value,
                                      std::string* key, int* index);
@@ -44,8 +50,18 @@ class SyncEtcdClient {
   virtual util::Status Update(const std::string& key, const std::string& value,
                               const int previous_index, int* new_index);
 
+  virtual util::Status UpdateWithTTL(const std::string& key,
+                                     const std::string& value,
+                                     const std::chrono::duration<int>& ttl,
+                                     const int previous_index, int* new_index);
+
   virtual util::Status ForceSet(const std::string& key,
                                 const std::string& value, int* new_index);
+
+  virtual util::Status ForceSetWithTTL(const std::string& key,
+                                       const std::string& value,
+                                       const std::chrono::duration<int>& ttl,
+                                       int* new_index);
 
   virtual util::Status Delete(const std::string& key, const int current_index);
 
