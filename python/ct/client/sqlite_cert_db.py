@@ -1,11 +1,7 @@
 import sqlite3
-import hashlib
-import logging
-import re
-import contextlib
 
 from ct.client import cert_db
-from ct.client import sqlite_connection as sqlitecon
+from ct.client import cert_desc
 
 class SQLiteCertDB(cert_db.CertDB):
     def __init__(self, connection_manager):
@@ -18,11 +14,13 @@ class SQLiteCertDB(cert_db.CertDB):
             # the |cert| BLOB is also unique but we don't force this as it would
             # create a superfluous index.
             conn.execute("CREATE TABLE IF NOT EXISTS certs("
-                         "id INTEGER PRIMARY KEY, "
-                         "sha256_hash BLOB UNIQUE, cert BLOB)")
+                         "log INTEGER, id INTEGER,"
+                         "sha256_hash BLOB UNIQUE, cert BLOB,"
+                         "PRIMARY KEY(log, id))")
             conn.execute("CREATE TABLE IF NOT EXISTS subject_names("
-                         "cert_id INTEGER, name TEXT, FOREIGN KEY(cert_id)"
-                         "REFERENCES certs(id))")
+                         "log INTEGER, cert_id INTEGER,"
+                         "name TEXT,"
+                         "FOREIGN KEY(log, cert_id) REFERENCES certs(log, id))")
             conn.execute("CREATE INDEX IF NOT EXISTS certs_by_subject "
                          "on subject_names(name)")
         self.__tables = ["certs", "subject_names"]
@@ -34,71 +32,45 @@ class SQLiteCertDB(cert_db.CertDB):
         return "%s(db: %s, tables: %s): " % (self.__class__.__name__, self.__db,
                                              self.__tables)
 
-    @staticmethod
-    # TODO(ekasper): this belongs in x509_name.
-    def __process_name(subject, reverse=True):
-        # RFCs for DNS names: RFC 1034 (sect. 3.5), RFC 1123 (sect. 2.1);
-        # for common names: RFC 5280.
-        # However we probably do not care about full RFC compliance here
-        # (e.g. we ignore that a compliant label cannot begin with a hyphen,
-        # we accept multi-wildcard names, etc.).
-        #
-        # For now, make indexing work for the common case:
-        # allow letter-digit-hyphen, as well as wildcards (RFC 2818).
-        forbidden = re.compile(r"[^a-z\d\-\*]")
-        subject = subject.lower()
-        labels = subject.split(".")
-        valid = all(map(lambda x: len(x) and not forbidden.search(x), labels))
-
-        if valid:
-            # ["com", "example", "*"], ["com", "example", "mail"],
-            # ["localhost"], etc.
-            return list(reversed(labels)) if reverse else labels
-
-        else:
-            # ["john smith"], ["trustworthy certificate authority"],
-            # ["google.com\x00"], etc.
-            # TODO(ekasper): figure out what to do (use stringprep as specified
-            # by RFC 5280?) to properly handle non-letter-digit-hyphen names.
-            return [subject]
 
     @staticmethod
     def __compare_processed_names(prefix, name):
         return prefix == name[:len(prefix)]
 
-    def __store_cert(self, der_cert, subject_names, cursor):
+    def __store_cert(self, cert, index, log_key, cursor):
+        der_cert = cert.der
         try:
-            cursor.execute("INSERT INTO certs(sha256_hash, cert) VALUES(?, ?) ",
-                           (sqlite3.Binary(self.sha256_hash(der_cert)),
+            cursor.execute("INSERT INTO certs(log, id, sha256_hash, cert) "
+                           "VALUES(?, ?, ?, ?) ",
+                           (log_key, index,
+                            sqlite3.Binary(self.sha256_hash(der_cert)),
                             sqlite3.Binary(der_cert)))
         except sqlite3.IntegrityError:
             # cert already exists
             return
-        cid = cursor.lastrowid
-        for subject in subject_names:
-            # ["com", "example"] => "com.example"
-            prefix = ".".join(self.__process_name(subject))
-            cursor.execute("INSERT INTO subject_names(cert_id, name) "
-                           "VALUES(?, ?)", (cid, prefix))
+        for subject in cert.subject_common_names:
+            cursor.execute("INSERT INTO subject_names(log, cert_id, name) "
+                           "VALUES(?, ?, ?)", (log_key, index, subject))
 
-    def store_cert(self, der_cert, subject_names):
-        """Store a certificate, unless it already exists.
-        Args:
-            der_cert:      the DER-encoded certificate
-            subject_names: an iterable of subject names, used to create a search
-                           index."""
-        self.store_certs([(der_cert, subject_names)])
+    def store_certs_desc(self, certs, log_key):
+        """Store certificates using it's descriptions.
 
-    def store_certs(self, certs):
-        """Batch store certificates as a single transaction. Use this for bulk
-        operations, as transactions are expensive.
         Args:
-            certs: an iterable of (der_cert, subject_names) tuples.
-        """
+            certs:         iterable of (CertificateDescription, index) tuples
+            log_key:       log id in LogDB"""
         with self.__mgr.get_connection() as conn:
             cursor = conn.cursor()
             for cert in certs:
-                self.__store_cert(cert[0], cert[1], cursor)
+                self.__store_cert(cert[0], cert[1], log_key, cursor)
+
+    def store_cert_desc(self, cert, index, log_key):
+        """Store certificate using it's description.
+
+        Args:
+            cert:          CertificateDescription
+            index:         position in log
+            log_key:       log id in LogDB"""
+        self.store_certs_desc([(cert, index)], log_key)
 
     def get_cert_by_sha256_hash(self, cert_sha256_hash):
         """Fetch a certificate with a matching SHA256 hash
@@ -156,14 +128,14 @@ class SQLiteCertDB(cert_db.CertDB):
         Yields:
             DER-encoded certificates."""
         sql_limit = -1 if not limit else limit
-        prefix = self.__process_name(subject_name)
+        prefix = cert_desc.process_name(subject_name)
         with self.__mgr.get_connection() as conn:
             for row in conn.execute(
                 "SELECT certs.cert as cert, subject_names.name as name "
                 "FROM certs, subject_names WHERE name >= ? AND certs.id == "
                 "subject_names.cert_id ORDER BY name ASC LIMIT ?",
                 (".".join(prefix), sql_limit)):
-                name = self.__process_name(row["name"], reverse=False)
+                name = cert_desc.process_name(row["name"], reverse=False)
                 if self.__compare_processed_names(prefix, name):
                     yield str(row["cert"])
                 else:

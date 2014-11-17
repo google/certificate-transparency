@@ -7,10 +7,10 @@ import sys
 import requests
 
 from ct.cert_analysis import tld_list
-from ct.client import sqlite_connection as sqlitecon
+from ct.client.db import sqlite_connection as sqlitecon
 from ct.client import prober
-from ct.client import sqlite_log_db
-from ct.client import sqlite_temp_db
+from ct.client.db import sqlite_log_db
+from ct.client.db import sqlite_temp_db
 from ct.proto import client_pb2
 
 FLAGS = gflags.FLAGS

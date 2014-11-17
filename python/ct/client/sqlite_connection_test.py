@@ -3,8 +3,7 @@
 import sqlite3
 import unittest
 
-from ct.client import database
-from  ct.client import sqlite_connection as sqlitecon
+from ct.client import sqlite_connection as sqlitecon
 
 class SQLiteConnectionTest(unittest.TestCase):
     def test_connection_works(self):
