@@ -168,7 +168,7 @@ class IPAddress(types.OctetString):
                                         serialized_value=serialized_value,
                                         strict=strict)
         if strict and len(self._value) != 4 and len(self._value) != 16:
-            raise error.ASN1Error("%s is not a valid IP address",
+            raise error.ASN1Error("%s is not a valid IP address" %
                                   self.value.encode("hex"))
 
     def as_octets(self):
