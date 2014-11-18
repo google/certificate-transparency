@@ -5,6 +5,7 @@ import gflags
 import time
 import unittest
 import sys
+import cPickle
 from ct.crypto import cert, error
 from ct.crypto.asn1 import oid
 from ct.crypto.asn1 import x509_extension as x509_ext
@@ -655,6 +656,14 @@ class CertificateTest(unittest.TestCase):
         issuer = c.print_issuer_name()
         self.assertTrue("VeriSign Class 1 CA" in issuer)
 
+
+class PickleTest(CertificateTest):
+    def cert_from_pem_file(self, filename, strict=True):
+        certificate = cert.Certificate.from_pem_file(
+            self.get_file(filename), strict_der=strict)
+        unpickled = cPickle.loads(cPickle.dumps(certificate))
+        self.assertEquals(certificate.to_der(), unpickled.to_der())
+        return certificate
 
 if __name__ == "__main__":
     sys.argv = FLAGS(sys.argv)
