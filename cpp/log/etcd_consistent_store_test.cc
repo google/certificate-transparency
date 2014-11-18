@@ -70,6 +70,12 @@ class EtcdConsistentStoreTest : public ::testing::Test {
     return flat;
   }
 
+  template <class T>
+  EtcdClient::Node NodeFor(const int index, const std::string& key,
+                           const T& t) {
+    return EtcdClient::Node(index, key, Serialize(t));
+  }
+
   MockSyncEtcdClient client_;
   std::unique_ptr<EtcdConsistentStore<LoggedCertificate>> store_;
 };
@@ -105,12 +111,12 @@ TEST_F(EtcdConsistentStoreTest,
   LoggedCertificate other_cert(DefaultCert());
   other_cert.mutable_sct()->set_timestamp(55555);
 
-  const string kPath(string(kRoot) + "/unsequenced/" +
-                     util::ToBase64(cert.Hash()));
+  const string kKey(util::ToBase64(cert.Hash()));
+  const string kPath(string(kRoot) + "/unsequenced/" + kKey);
   EXPECT_CALL(client_, Create(kPath, _, _))
       .WillOnce(Return(util::Status(util::error::FAILED_PRECONDITION, "")));
-  EXPECT_CALL(client_, Get(kPath, _, _))
-      .WillOnce(DoAll(SetArgumentPointee<2>(Serialize(other_cert)),
+  EXPECT_CALL(client_, Get(kPath, _))
+      .WillOnce(DoAll(SetArgumentPointee<1>(NodeFor(0, kPath, other_cert)),
                       Return(util::Status::OK)));
   util::Status status(store_->AddPendingEntry(&cert));
   EXPECT_EQ(util::error::ALREADY_EXISTS, status.CanonicalCode());
@@ -123,16 +129,16 @@ TEST_F(EtcdConsistentStoreDeathTest,
   LoggedCertificate cert(DefaultCert());
   LoggedCertificate other_cert(MakeCert(2342, "something else"));
 
-  const string kPath(string(kRoot) + "/unsequenced/" +
-                     util::ToBase64(cert.Hash()));
+  const string kKey(util::ToBase64(cert.Hash()));
+  const string kPath(string(kRoot) + "/unsequenced/" + kKey);
   EXPECT_DEATH({
                  EXPECT_CALL(client_, Create(kPath, _, _))
                      .WillOnce(Return(
                          util::Status(util::error::FAILED_PRECONDITION, "")));
-                 EXPECT_CALL(client_, Get(kPath, _, _))
-                     .WillOnce(
-                         DoAll(SetArgumentPointee<2>(Serialize(other_cert)),
-                               Return(util::Status::OK)));
+                 EXPECT_CALL(client_, Get(kPath, _))
+                     .WillOnce(DoAll(SetArgumentPointee<1>(
+                                         NodeFor(0, kPath, other_cert)),
+                                     Return(util::Status::OK)));
                  store_->AddPendingEntry(&cert);
                },
                "preexisting_entry.*==.*entry.*");
@@ -158,9 +164,8 @@ TEST_F(EtcdConsistentStoreTest, TestGetPendingEntryForHash) {
   const LoggedCertificate one(MakeCert(123, "one"));
   const string kPath(string(kRoot) + "/unsequenced/" +
                      util::ToBase64(one.Hash()));
-  EXPECT_CALL(client_, Get(kPath, _, _))
-      .WillOnce(DoAll(SetArgumentPointee<1>(17),
-                      SetArgumentPointee<2>(Serialize(one)),
+  EXPECT_CALL(client_, Get(kPath, _))
+      .WillOnce(DoAll(SetArgumentPointee<1>(NodeFor(17, kPath, one)),
                       Return(util::Status::OK)));
 
   EntryHandle<LoggedCertificate> handle;
@@ -173,7 +178,7 @@ TEST_F(EtcdConsistentStoreTest, TestGetPendingEntryForHash) {
 
 TEST_F(EtcdConsistentStoreTest, TestGetPendingEntryForNonExistantHash) {
   const string kPath(string(kRoot) + "/unsequenced/" + util::ToBase64("Nah"));
-  EXPECT_CALL(client_, Get(kPath, _, _))
+  EXPECT_CALL(client_, Get(kPath, _))
       .WillOnce(Return(util::Status(util::error::NOT_FOUND, "")));
 
   EntryHandle<LoggedCertificate> handle;
@@ -186,11 +191,10 @@ TEST_F(EtcdConsistentStoreTest, TestGetPendingEntries) {
   const string kPath(string(kRoot) + "/unsequenced/");
   const LoggedCertificate one(MakeCert(123, "one"));
   const LoggedCertificate two(MakeCert(456, "two"));
-  const vector<pair<string, int>> flat_entries{
-      std::make_pair(Serialize(one), 1), std::make_pair(Serialize(two), 6)};
+  const vector<EtcdClient::Node> nodes{NodeFor(1, "/unsequenced/one", one),
+                                       NodeFor(6, "/unsequenced/two", two)};
   EXPECT_CALL(client_, GetAll(kPath, _))
-      .WillOnce(DoAll(SetArgumentPointee<1>(flat_entries),
-                      Return(util::Status::OK)));
+      .WillOnce(DoAll(SetArgumentPointee<1>(nodes), Return(util::Status::OK)));
 
   vector<EntryHandle<LoggedCertificate>> entries;
   util::Status status(store_->GetPendingEntries(&entries));
@@ -213,11 +217,10 @@ TEST_F(EtcdConsistentStoreDeathTest,
        TestGetPendingEntriesBarfsWithSequencedEntry) {
   const string kPath(string(kRoot) + "/unsequenced/");
   LoggedCertificate one(MakeSequencedCert(123, "one", 666));
-  const vector<pair<string, int>> flat_entries{
-      std::make_pair(Serialize(one), 1)};
+  const vector<EtcdClient::Node> nodes{NodeFor(1, "/unsequenced/one", one)};
   EXPECT_DEATH({
                  EXPECT_CALL(client_, GetAll(kPath, _))
-                     .WillOnce(DoAll(SetArgumentPointee<1>(flat_entries),
+                     .WillOnce(DoAll(SetArgumentPointee<1>(nodes),
                                      Return(util::Status::OK)));
                  vector<EntryHandle<LoggedCertificate>> entries;
                  util::Status status(store_->GetPendingEntries(&entries));
@@ -230,11 +233,10 @@ TEST_F(EtcdConsistentStoreTest, TestGetSequencedEntries) {
   const string kPath(string(kRoot) + "/sequenced/");
   const LoggedCertificate one(MakeSequencedCert(123, "one", 1));
   const LoggedCertificate two(MakeSequencedCert(456, "two", 2));
-  const vector<pair<string, int>> flat_entries{
-      std::make_pair(Serialize(one), 1), std::make_pair(Serialize(two), 6)};
+  const vector<EtcdClient::Node> nodes{NodeFor(1, "/sequenced/1", one),
+                                       NodeFor(6, "/sequenced/6", two)};
   EXPECT_CALL(client_, GetAll(kPath, _))
-      .WillOnce(DoAll(SetArgumentPointee<1>(flat_entries),
-                      Return(util::Status::OK)));
+      .WillOnce(DoAll(SetArgumentPointee<1>(nodes), Return(util::Status::OK)));
 
   vector<EntryHandle<LoggedCertificate>> entries;
   util::Status status(store_->GetSequencedEntries(&entries));
@@ -256,11 +258,10 @@ TEST_F(EtcdConsistentStoreDeathTest,
        TestGetSequencedEntriesBarfsWitUnsSequencedEntry) {
   const string kPath(string(kRoot) + "/sequenced/");
   LoggedCertificate one(MakeCert(123, "one"));
-  const vector<pair<string, int>> flat_entries{
-      std::make_pair(Serialize(one), 1)};
+  const vector<EtcdClient::Node> nodes{NodeFor(1, "/sequenced/1", one)};
   EXPECT_DEATH({
                  EXPECT_CALL(client_, GetAll(kPath, _))
-                     .WillOnce(DoAll(SetArgumentPointee<1>(flat_entries),
+                     .WillOnce(DoAll(SetArgumentPointee<1>(nodes),
                                      Return(util::Status::OK)));
                  vector<EntryHandle<LoggedCertificate>> entries;
                  util::Status status(store_->GetSequencedEntries(&entries));

@@ -155,15 +155,14 @@ template <class T>
 util::Status EtcdConsistentStore<Logged>::GetEntry(
     const std::string& path, EntryHandle<T>* entry) const {
   CHECK_NOTNULL(entry);
-  std::string flat_entry;
-  int version;
-  util::Status status(client_->Get(path, &version, &flat_entry));
+  EtcdClient::Node node;
+  util::Status status(client_->Get(path, &node));
   if (!status.ok()) {
     return status;
   }
   T t;
-  CHECK(t.ParseFromString(flat_entry));
-  entry->Set(t, version);
+  CHECK(t.ParseFromString(node.value_));
+  entry->Set(t, node.index_);
   return util::Status::OK;
 }
 
@@ -174,15 +173,15 @@ util::Status EtcdConsistentStore<Logged>::GetAllEntriesInDir(
     const std::string& dir, std::vector<EntryHandle<T>>* entries) const {
   CHECK_NOTNULL(entries);
   CHECK_EQ(0, entries->size());
-  std::vector<std::pair<std::string, int>> flat_entries;
-  util::Status status(client_->GetAll(dir, &flat_entries));
+  std::vector<EtcdClient::Node> nodes;
+  util::Status status(client_->GetAll(dir, &nodes));
   if (!status.ok()) {
     return status;
   }
-  for (const auto& flat_entry : flat_entries) {
+  for (const auto& node : nodes) {
     T t;
-    CHECK(t.ParseFromString(flat_entry.first));
-    entries->emplace_back(EntryHandle<Logged>(t, flat_entry.second));
+    CHECK(t.ParseFromString(node.value_));
+    entries->emplace_back(EntryHandle<Logged>(t, node.index_));
   }
   return util::Status::OK;
 }

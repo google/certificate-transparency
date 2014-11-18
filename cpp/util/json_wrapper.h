@@ -128,7 +128,7 @@ class JsonObject {
         return;
       }
     } else {
-      LOG(ERROR) << "No " << field << " field";
+      VLOG(0) << "No " << field << " field";
       return;
     }
     // Increment reference count

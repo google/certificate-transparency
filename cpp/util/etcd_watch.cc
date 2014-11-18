@@ -16,16 +16,23 @@ using std::cout;
 using std::endl;
 using std::make_shared;
 using std::placeholders::_1;
-using std::placeholders::_2;
 using std::shared_ptr;
 using std::string;
 
 DEFINE_string(etcd, "127.0.0.1", "etcd server address");
 DEFINE_int32(etcd_port, 4001, "etcd server port");
+DEFINE_string(key, "/foo", "path to watch");
 
 
-void Notify(const string& key, int index, const string& value) {
-  cout << "key changed: " << key << " (" << index << ") = " << value << endl;
+void Notify(const std::vector<EtcdClient::Watcher::Update>& updates) {
+  for (const auto& update : updates) {
+    if (update.exists_) {
+      cout << "key changed: " << update.node_.key_ << " ("
+           << update.node_.index_ << ") = " << update.node_.value_ << endl;
+    } else {
+      cout << "key deleted: " << update.node_.key_ << endl;
+    }
+  }
 }
 
 
@@ -36,7 +43,7 @@ int main(int argc, char* argv[]) {
 
   const shared_ptr<libevent::Base> event_base(make_shared<libevent::Base>());
   EtcdClient etcd(event_base, FLAGS_etcd, FLAGS_etcd_port);
-  EtcdClient::Watcher watcher(&etcd, "/foo", bind(&Notify, "/foo", _1, _2));
+  EtcdClient::Watcher watcher(&etcd, FLAGS_key, bind(&Notify, _1));
 
   event_base->Dispatch();
 

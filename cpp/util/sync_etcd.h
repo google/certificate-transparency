@@ -28,12 +28,10 @@ class SyncEtcdClient {
 
   // Synchronous analogues to the etcd API below:
 
-  virtual util::Status Get(const std::string& key, int* index,
-                           std::string* value);
+  virtual util::Status Get(const std::string& key, EtcdClient::Node* node);
 
-  virtual util::Status GetAll(
-      const std::string& dir,
-      std::vector<std::pair<std::string, int> >* values);
+  virtual util::Status GetAll(const std::string& dir,
+                              std::vector<EtcdClient::Node>* values);
 
   virtual util::Status Create(const std::string& key, const std::string& value,
                               int* index);

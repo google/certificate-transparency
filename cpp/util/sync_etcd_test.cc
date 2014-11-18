@@ -177,12 +177,11 @@ TEST_F(SyncEtcdTest, TestGet) {
   EXPECT_CALL(*mock_client_,
               Generic(kEntryKey, kEmptyParams, EVHTTP_REQ_GET, _))
       .WillOnce(InvokeArgument<3>(Status(), MakeJson(kGetJson)));
-  int index;
-  string value;
-  Status status(sync_client_->Get(kEntryKey, &index, &value));
+  EtcdClient::Node node;
+  Status status(sync_client_->Get(kEntryKey, &node));
   EXPECT_TRUE(status.ok()) << status;
-  EXPECT_EQ(9, index);
-  EXPECT_EQ("123", value);
+  EXPECT_EQ(9, node.index_);
+  EXPECT_EQ("123", node.value_);
 }
 
 
@@ -191,9 +190,8 @@ TEST_F(SyncEtcdTest, TestGetForInvalidKey) {
               Generic(kEntryKey, kEmptyParams, EVHTTP_REQ_GET, _))
       .WillOnce(InvokeArgument<3>(Status(util::error::NOT_FOUND, ""),
                                   MakeJson(kKeyNotFoundJson)));
-  int index;
-  string value;
-  Status status(sync_client_->Get(kEntryKey, &index, &value));
+  EtcdClient::Node node;
+  Status status(sync_client_->Get(kEntryKey, &node));
   EXPECT_FALSE(status.ok());
 }
 
@@ -205,10 +203,14 @@ TEST_F(SyncEtcdTest, TestGetAll) {
   expected_values.push_back(make_pair("123", 9));
   expected_values.push_back(make_pair("456", 7));
 
-  vector<pair<string, int> > values;
-  Status status(sync_client_->GetAll(kDirKey, &values));
+  vector<EtcdClient::Node> nodes;
+  Status status(sync_client_->GetAll(kDirKey, &nodes));
   EXPECT_TRUE(status.ok()) << status;
-  EXPECT_EQ(expected_values, values);
+  EXPECT_EQ(expected_values.size(), nodes.size());
+  for (int i = 0; i < nodes.size(); ++i) {
+    EXPECT_EQ(expected_values[i].first, nodes[i].value_);
+    EXPECT_EQ(expected_values[i].second, nodes[i].index_);
+  }
 }
 
 
@@ -216,8 +218,8 @@ TEST_F(SyncEtcdTest, TestGetAllForInvalidKey) {
   EXPECT_CALL(*mock_client_, Generic(kDirKey, kEmptyParams, EVHTTP_REQ_GET, _))
       .WillOnce(InvokeArgument<3>(Status(util::error::NOT_FOUND, ""),
                                   MakeJson(kKeyNotFoundJson)));
-  vector<pair<string, int> > values;
-  Status status(sync_client_->GetAll(kDirKey, &values));
+  vector<EtcdClient::Node> nodes;
+  Status status(sync_client_->GetAll(kDirKey, &nodes));
   EXPECT_FALSE(status.ok()) << status;
 }
 
