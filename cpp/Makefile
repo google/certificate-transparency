@@ -101,22 +101,54 @@ gmock/gtest/libgtest.a: gmock/libgmock.a
 
 $(ALL_TESTS): gmock/gtest/libgtest.a
 
-%/.depend: %/*.cc */*.h
-	$(CXX) $(CXXFLAGS) -MM -MG $(filter %.cc,$^) | sed 's,\(.*\)\.o,$(@D)/\1.o,' >$(@).tmp
-	mv $(@).tmp $@
+proto/.depend: proto/*.cc */*.h
+	$(CXX) $(CXXFLAGS) -MM -MG proto/*.cc > proto/.depend1
+	sed 's,\(.*\)\.o,proto/\1.o,' > proto/.depend < proto/.depend1
+	rm proto/.depend1
+
+merkletree/.depend: merkletree/*.cc */*.h
+	$(CXX) $(CXXFLAGS) -MM -MG merkletree/*.cc > merkletree/.depend1
+	sed 's,\(.*\)\.o,merkletree/\1.o,' > merkletree/.depend \
+					   < merkletree/.depend1
+	rm merkletree/.depend1
+
+log/.depend: log/*.cc */*.h
+	$(CXX) $(CXXFLAGS) -MM -MG log/*.cc > log/.depend1
+	sed 's,\(.*\)\.o,log/\1.o,' > log/.depend < log/.depend1
+	rm log/.depend1
+
+util/.depend: util/*.cc */*.h
+	$(CXX) $(CXXFLAGS) -MM -MG util/*.cc > util/.depend1
+	sed 's,\(.*\)\.o,util/\1.o,' > util/.depend < util/.depend1
+	rm util/.depend1
+
+monitor/.depend: monitor/*.cc */*.h
+	$(CXX) $(CXXFLAGS) -MM -MG monitor/*.cc > monitor/.depend1
+	sed 's,\(.*\)\.o,monitor/\1.o,' > monitor/.depend < monitor/.depend1
+	rm monitor/.depend1
+
+client/.depend: client/*.cc */*.h
+	$(CXX) $(CXXFLAGS) -MM -MG client/*.cc > client/.depend1
+	sed 's,\(.*\)\.o,client/\1.o,' > client/.depend < client/.depend1
+	rm client/.depend1
+
+server/.depend: server/*.cc */*.h
+	$(CXX) $(CXXFLAGS) -MM -MG server/*.cc > server/.depend1
+	sed 's,\(.*\)\.o,server/\1.o,' > server/.depend < server/.depend1
+	rm server/.depend1
 
 ### proto preprocessing
 proto/%.pb.h proto/%.pb.cc: ../proto/%.proto
 	protoc -I .. $^ --cpp_out=.
 
 ifneq ($(MAKECMDGOALS),clean)
-    include client/.depend
-    include log/.depend
-    include merkletree/.depend
-    include monitor/.depend
     include proto/.depend
-    include server/.depend
+    include merkletree/.depend
+    include log/.depend
     include util/.depend
+    include monitor/.depend
+    include client/.depend
+    include server/.depend
 endif
 
 unit_tests: proto_tests merkletree_tests log_tests util_tests monitor_tests
