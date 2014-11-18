@@ -15,21 +15,44 @@ class SQLiteCertDB(cert_db.CertDB):
         Args:
             connection: an SQLiteConnectionManager object."""
         self.__mgr = connection_manager
-
+        self.cert_repeated_field_tables = [("subject_names", [("name", "TEXT")]),
+                                    ("alt_subject_names", [("name", "TEXT")]),
+                                    ("ip_addresses", [("ip_address", "TEXT")])]
+        cert_single_field_tables = [("version", "INTEGER"),
+                                    ("serial_number", "TEXT")]
+        self.cert_table_columns = [column for column, _ in cert_single_field_tables]
         with self.__mgr.get_connection() as conn:
             # the |cert| BLOB is also unique but we don't force this as it would
             # create a superfluous index.
             conn.execute("CREATE TABLE IF NOT EXISTS certs("
-                         "log INTEGER, id INTEGER,"
-                         "sha256_hash BLOB UNIQUE, cert BLOB,"
-                         "PRIMARY KEY(log, id))")
-            conn.execute("CREATE TABLE IF NOT EXISTS subject_names("
-                         "log INTEGER, cert_id INTEGER,"
-                         "name TEXT,"
-                         "FOREIGN KEY(log, cert_id) REFERENCES certs(log, id))")
+                         "log INTEGER,"
+                         "id INTEGER,"
+                         "sha256_hash BLOB UNIQUE,"
+                         "cert BLOB," +
+                         ', '.join(['%s %s' % (column, type_) for column, type_
+                                    in cert_single_field_tables]) +
+                         ", PRIMARY KEY(log, id))")
+            for entry in self.cert_repeated_field_tables:
+                self.__create_table_for_field(conn, *entry)
             conn.execute("CREATE INDEX IF NOT EXISTS certs_by_subject "
                          "on subject_names(name)")
-        self.__tables = ["certs", "subject_names"]
+        self.__tables = (["logs", "certs"] +
+                         [column for column, _ in self.cert_repeated_field_tables])
+
+    @staticmethod
+    def __create_table_for_field(conn, table_name, fields):
+        """Helper method that creates table for given certificate field. Each
+        row in that table refers to some certificate in certs table.
+        Args:
+            table_name:   name of the table
+            fields:       iterable of (column_name, type) tuples"""
+        conn.execute("CREATE TABLE IF NOT EXISTS {table_name}("
+                     "log INTEGER, cert_id INTEGER,"
+                     "{fields},"
+                     "FOREIGN KEY(log, cert_id) REFERENCES certs(log, id))"
+                     .format(table_name=table_name,
+                             fields=','.join(
+                                     ["%s %s" % field for field in fields])))
 
     def __repr__(self):
         return "%r(db: %r)" % (self.__class__.__name__, self.__db)
@@ -43,23 +66,40 @@ class SQLiteCertDB(cert_db.CertDB):
     def __compare_processed_names(prefix, name):
         return prefix == name[:len(prefix)]
 
+    @staticmethod
+    def _maybe_iterable(obj):
+        # TODO(laiqu) change CertificateDescription, so we don't need it
+        # using collections.Iterable won't work properly because unicode is also
+        # iterable
+        if isinstance(obj, list):
+            return obj
+        else:
+            return [obj]
+
     def __store_cert(self, cert, index, log_key, cursor):
         der_cert = cert.der
         if not FLAGS.cert_db_sqlite_synchronous_write:
             cursor.execute("PRAGMA synchronous = OFF")
         try:
-            cursor.execute("INSERT INTO certs(log, id, sha256_hash, cert) "
-                           "VALUES(?, ?, ?, ?) ",
-                           (log_key, index,
+            cursor.execute("INSERT INTO certs(log, id, sha256_hash, cert, %s) "
+                           "VALUES(?, ?, ?, ?, %s) " %
+                                    (','.join(self.cert_table_columns),
+                                    ('?,' * len(self.cert_table_columns))[:-1]),
+                           [log_key, index,
                             sqlite3.Binary(self.sha256_hash(der_cert)),
-                            sqlite3.Binary(der_cert)))
+                            sqlite3.Binary(der_cert)] +
+                            [cert[column] for column in self.cert_table_columns])
         except sqlite3.IntegrityError:
             # cert already exists
             return
-        if cert.subject_common_names:
-            for subject in cert.subject_common_names:
-                cursor.execute("INSERT INTO subject_names(log, cert_id, name) "
-                               "VALUES(?, ?, ?)", (log_key, index, subject))
+        for table_name, columns in self.cert_repeated_field_tables:
+            column_names = [column for column, _ in columns]
+            if cert[table_name]:
+                for field in cert[table_name]:
+                    cursor.execute("INSERT INTO %s(log, cert_id, %s) VALUES(?, ?, %s)" %
+                                       (table_name, ','.join(column_names),
+                                        ('?,' * len(column_names))[:-1]),
+                                   [log_key, index] + self._maybe_iterable(field))
 
     def store_certs_desc(self, certs, log_key):
         """Store certificates using it's descriptions.

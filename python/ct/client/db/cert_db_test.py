@@ -3,9 +3,19 @@ import hashlib
 from ct.client.db import cert_desc
 
 SAMPLE_CERT = cert_desc.CertificateDescription.from_values("hello\x00",
-                                                          ["example.com"])
+                                                          ["example.com"],
+                                                           ["alt.com"],
+                                                           "2",
+                                                           "123",
+                                                           ["8.7.6.4"])
 FOUR_CERTS = [(cert_desc.CertificateDescription.from_values("hello-%d" % i,
-                                                        ["domain-%d.com" % i]), i)
+                                                        ["domain-%d.com" % i],
+                                                        ["alt-%d.com" % i],
+                                                        str(i),
+                                                        str(i+i*i),
+                                                        ["%d.%d.%d.%d" % (i, i,
+                                                                          i, i)],
+                                                            ),i)
               for i in range(4)]
 # This class provides common tests for all cert database implementations.
 # It only inherits from object so that unittest won't attempt to run the test_*
