@@ -1,8 +1,9 @@
 /* -*- mode: c++; indent-tabs-mode: nil -*- */
-
 #ifndef CERTIFICATE_DB_H
 #define CERTIFICATE_DB_H
+
 #include <map>
+#include <memory>
 #include <set>
 #include <stdint.h>
 #include <vector>
@@ -60,12 +61,13 @@ class FileDB : public Database<Logged> {
 
  private:
   void BuildIndex();
+
   std::map<uint64_t, std::string> sequence_map_;
-  FileStorage* cert_storage_;
+  const std::unique_ptr<FileStorage> cert_storage_;
   // Store all tree heads, but currently only support looking up the latest
   // one.
   // Other necessary lookup indices (by tree size, by timestamp range?) TBD.
-  FileStorage* tree_storage_;
+  const std::unique_ptr<FileStorage> tree_storage_;
   uint64_t latest_tree_timestamp_;
   // The same as a string;
   std::string latest_timestamp_key_;

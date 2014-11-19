@@ -22,8 +22,8 @@ const size_t FileDB<Logged>::kTimestampBytesIndexed = 6;
 
 template <class Logged>
 FileDB<Logged>::FileDB(FileStorage* cert_storage, FileStorage* tree_storage)
-    : cert_storage_(cert_storage),
-      tree_storage_(tree_storage),
+    : cert_storage_(CHECK_NOTNULL(cert_storage)),
+      tree_storage_(CHECK_NOTNULL(tree_storage)),
       latest_tree_timestamp_(0) {
   BuildIndex();
 }
@@ -31,8 +31,6 @@ FileDB<Logged>::FileDB(FileStorage* cert_storage, FileStorage* tree_storage)
 
 template <class Logged>
 FileDB<Logged>::~FileDB() {
-  delete cert_storage_;
-  delete tree_storage_;
 }
 
 
