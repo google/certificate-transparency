@@ -361,6 +361,11 @@ void AsyncLogClient::GetRoots(vector<shared_ptr<Cert> >* roots,
 void AsyncLogClient::GetEntries(int first, int last,
                                 vector<AsyncLogClient::Entry>* entries,
                                 const Callback& done) {
+  if (last < first) {
+    done(INVALID_INPUT);
+    return;
+  }
+
   const shared_ptr<libevent::HttpRequest> req(
       make_shared<libevent::HttpRequest>(
           bind(&DoneGetEntries, _1, entries, done)));

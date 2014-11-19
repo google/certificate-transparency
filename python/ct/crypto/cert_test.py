@@ -359,8 +359,10 @@ class CertificateTest(unittest.TestCase):
         self.assertEqual((129, 48, 105, 104), ips[0].as_octets())
 
     def test_invalid_ip_addresses(self):
-        self.assertRaises(error.ASN1Error, self.cert_from_pem_file,
-                          self._PEM_INVALID_IP)
+        with self.assertRaises(error.ASN1Error) as fail:
+            self.cert_from_pem_file(self._PEM_INVALID_IP)
+
+        self.assertIn("00000000ffffff00", str(fail.exception))
         c = self.cert_from_pem_file(self._PEM_INVALID_IP, strict=False)
         ips = c.subject_ip_addresses()
         self.assertEqual(1, len(ips))
