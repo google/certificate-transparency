@@ -13,12 +13,11 @@ class MockSyncEtcdClient : public SyncEtcdClient {
   }
   virtual ~MockSyncEtcdClient() = default;
 
-  MOCK_METHOD3(Get, util::Status(const std::string& key, int* index,
-                                 std::string* value));
+  MOCK_METHOD2(Get,
+               util::Status(const std::string& key, EtcdClient::Node* node));
 
-  MOCK_METHOD2(GetAll,
-               util::Status(const std::string& dir,
-                            std::vector<std::pair<std::string, int>>* values));
+  MOCK_METHOD2(GetAll, util::Status(const std::string& dir,
+                                    std::vector<EtcdClient::Node>* nodes));
 
   MOCK_METHOD3(Create, util::Status(const std::string& key,
                                     const std::string& value, int* index));

@@ -164,22 +164,25 @@ class EtcdTest : public ::testing::Test {
   }
 
   void GetCallback(bool expect_success, int expect_index,
-                   const string& expect_value, Status status, int index,
-                   const string& value) {
+                   const string& expect_value, Status status,
+                   const EtcdClient::Node& node) {
     EXPECT_EQ(expect_success, status.ok());
     if (expect_success) {
-      EXPECT_EQ(expect_index, index);
-      EXPECT_EQ(expect_value, value);
+      EXPECT_EQ(expect_index, node.index_);
+      EXPECT_EQ(expect_value, node.value_);
     }
   }
 
   void GetAllCallback(bool expect_success,
                       const vector<pair<string, int> >& expect_values,
-                      Status status,
-                      const vector<pair<string, int> >& values) {
+                      Status status, const vector<EtcdClient::Node>& nodes) {
     EXPECT_EQ(expect_success, status.ok());
     if (expect_success) {
-      EXPECT_EQ(expect_values, values);
+      EXPECT_EQ(expect_values.size(), nodes.size());
+      for (int i = 0; i < nodes.size(); ++i) {
+        EXPECT_EQ(expect_values[i].first, nodes[i].value_);
+        EXPECT_EQ(expect_values[i].second, nodes[i].index_);
+      }
     }
   }
 
@@ -229,7 +232,7 @@ TEST_F(EtcdTest, TestGet) {
   EXPECT_CALL(client_, Generic(kEntryKey, kEmptyParams, EVHTTP_REQ_GET, _))
       .WillOnce(InvokeArgument<3>(Status(), MakeJson(kGetJson)));
   client_.Get(kEntryKey,
-              bind(&EtcdTest::GetCallback, this, true, 9, "123", _1, _2, _3));
+              bind(&EtcdTest::GetCallback, this, true, 9, "123", _1, _2));
 }
 
 TEST_F(EtcdTest, TestGetForInvalidKey) {
@@ -237,7 +240,7 @@ TEST_F(EtcdTest, TestGetForInvalidKey) {
       .WillOnce(InvokeArgument<3>(Status(util::error::NOT_FOUND, ""),
                                   MakeJson(kKeyNotFoundJson)));
   client_.Get(kEntryKey,
-              bind(&EtcdTest::GetCallback, this, false, 0, "", _1, _2, _3));
+              bind(&EtcdTest::GetCallback, this, false, 0, "", _1, _2));
 }
 
 TEST_F(EtcdTest, TestGetAll) {

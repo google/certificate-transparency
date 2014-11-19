@@ -23,13 +23,34 @@ class EtcdClient {
   struct Request;
 
  public:
+  struct Node {
+    Node() = default;
+    Node(int index, const std::string& key, const std::string& value);
+
+    static const Node& InvalidNode();
+
+    int index_;
+    std::string key_;
+    std::string value_;
+  };
+
   class Watcher {
    public:
-    typedef std::function<void(int index, const std::string& value)>
+    struct Update {
+      Update();
+      Update(const Node& node, const bool exists);
+      const Node node_;
+      const bool exists_;
+    };
+
+    typedef std::function<void(const std::vector<Update>& updates)>
         WatchCallback;
 
-    explicit Watcher(EtcdClient* client, const std::string& key,
-                     const WatchCallback& cb);
+    // |key| can be an entry or a directory (with trailing slash),
+    // but currently watching a directory containing a directory is
+    // not supported.
+    Watcher(EtcdClient* client, const std::string& key,
+            const WatchCallback& cb);
     ~Watcher();
 
    private:
@@ -45,11 +66,11 @@ class EtcdClient {
     DISALLOW_COPY_AND_ASSIGN(Watcher);
   };
 
-  typedef std::function<void(util::Status status, int index,
-                             const std::string& value)> GetCallback;
-  typedef std::function<void(
-      util::Status status,
-      const std::vector<std::pair<std::string, int> >& values)> GetAllCallback;
+  typedef std::function<void(util::Status status,
+                             const EtcdClient::Node& node)> GetCallback;
+  typedef std::function<void(util::Status status,
+                             const std::vector<EtcdClient::Node>& values)>
+      GetAllCallback;
   typedef std::function<void(util::Status status, int index)> CreateCallback;
   typedef std::function<void(util::Status status, const std::string& key,
                              int index)> CreateInQueueCallback;
