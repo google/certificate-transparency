@@ -7,12 +7,12 @@ before_install:
  - sudo apt-add-repository -y ppa:sao/backports
  - sudo apt-add-repository -y ppa:fcitx-team/nightly
  - sudo apt-get update -qq
- - sudo apt-get install -qq protobuf-compiler libprotobuf-java libprotobuf-dev python-protobuf python-mock python-gflags python-requests python-dev libjson-c-dev libboost-dev libboost-system-dev libboost-thread-dev libgoogle-glog-dev libgflags-dev libldns-dev python-dnspython
+ - sudo apt-get install -qq protobuf-compiler libprotobuf-java libprotobuf-dev python-dev libjson-c-dev libboost-dev libboost-system-dev libboost-thread-dev libgoogle-glog-dev libgflags-dev libldns-dev
 # Stupid frikkin' google-mock package on Precise is b0rked, so hack it up:
  - wget https://googlemock.googlecode.com/files/gmock-1.6.0.zip -O /tmp/gmock-1.6.0.zip
  - unzip -d /tmp /tmp/gmock-1.6.0.zip
  - sudo mv /tmp/gmock-1.6.0 /usr/src/gmock
- - sudo pip install ecdsa 'Twisted>=12.1'
+ - sudo pip install -r python/requirements.txt
  - sudo ln -s protobuf-java.jar /usr/share/java/protobuf.jar
  - mkdir -p $GOPATH/src/github.com/google
  - ln -s $PWD $GOPATH/src/github.com/google
