@@ -45,10 +45,12 @@
 /cpp/tools/dump_cert
 /cpp/tools/dump_sth
 /cpp/util/bench_etcd
+/cpp/util/etcd_masterelection
 /cpp/util/etcd_test
 /cpp/util/etcd_watch
 /cpp/util/fake_etcd_test
 /cpp/util/json_wrapper_test
+/cpp/util/masterelection_test
 /cpp/util/sync_etcd_test
 /java/build
 /local.properties

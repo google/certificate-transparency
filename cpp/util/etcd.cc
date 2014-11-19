@@ -552,7 +552,7 @@ void EtcdClient::Watcher::Impl::InitialGetAllDone(
 
 
 void EtcdClient::Watcher::Impl::Cancel() {
-  LOG(INFO) << "EtcdClient::~Watcher: " << key_;
+  VLOG(1) << "EtcdClient::~Watcher: " << key_;
   lock_guard<mutex> lock(lock_);
   cancelled_ = true;
   if (req_) {
@@ -677,7 +677,7 @@ void EtcdClient::Watcher::Impl::StartRequest() {
 EtcdClient::Watcher::Watcher(EtcdClient* client, const string& key,
                              const WatchCallback& cb)
     : pimpl_(new Impl(client, key, cb)) {
-  LOG(INFO) << "EtcdClient::Watcher: " << key;
+  VLOG(1) << "EtcdClient::Watcher: " << key;
   // Binding the shared_ptr ensures that if we disappear, this will
   // not cause the callback to segfault.
   if (KeyIsDirectory(key)) {
@@ -733,12 +733,12 @@ bool EtcdClient::Node::HasExpiry() const {
 EtcdClient::EtcdClient(const shared_ptr<libevent::Base>& event_base,
                        const string& host, uint16_t port)
     : event_base_(event_base), leader_(GetConnection(host, port)) {
-  LOG(INFO) << "EtcdClient: " << this;
+  VLOG(1) << "EtcdClient: " << this;
 }
 
 
 EtcdClient::~EtcdClient() {
-  LOG(INFO) << "~EtcdClient: " << this;
+  VLOG(1) << "~EtcdClient: " << this;
 }
 
 

@@ -79,6 +79,7 @@ TESTS = \
 	util/etcd_test \
 	util/fake_etcd_test \
 	util/json_wrapper_test \
+	util/masterelection_test \
 	util/sync_etcd_test
 
 # These tests will be built, but not run.
@@ -98,7 +99,7 @@ EXTRA_TESTS = \
 	log/frontend_test
 
 all: client/ct server/ct-server server/ct-dns-server tools/dump_cert \
-     tools/dump_sth util/bench_etcd util/etcd_watch
+     tools/dump_sth util/bench_etcd util/etcd_masterelection util/etcd_watch
 
 tests: all $(TESTS) $(DISABLED_TESTS) $(EXTRA_TESTS)
 
@@ -140,7 +141,7 @@ base/notification_test: base/notification.cc base/notification_test.o \
 util/libutil.a: util/util.o util/openssl_util.o util/testing.o \
                 util/json_wrapper.o util/thread_pool.o util/libevent_wrapper.o \
                 util/etcd.o util/status.o util/sync_etcd.o util/fake_etcd.o \
-                util/periodic_closure.o
+                util/periodic_closure.o util/masterelection.o
 	rm -f $@
 	ar -rcs $@ $^
 
@@ -153,6 +154,9 @@ util/fake_etcd_test: util/fake_etcd_test.o base/notification.o util/libutil.a \
 
 util/sync_etcd_test: util/sync_etcd_test.o util/libutil.a $(GMOCKLIB) \
                      $(GTESTLIB)
+
+util/masterelection_test: util/masterelection_test.o base/notification.o \
+                          util/libutil.a $(GTESTLIB)
 
 ### proto/ targets
 proto/libproto.a: proto/ct.pb.o proto/serializer.o
@@ -313,6 +317,8 @@ tools/dump_cert: tools/dump_cert.o proto/libproto.a util/libutil.a
 tools/dump_sth: tools/dump_sth.o proto/libproto.a
 
 util/bench_etcd: util/bench_etcd.o util/libutil.a
+
+util/etcd_masterelection: util/etcd_masterelection.o util/libutil.a
 
 util/etcd_watch: util/etcd_watch.o util/etcd.o util/libevent_wrapper.o \
 	util/json_wrapper.o util/status.o
