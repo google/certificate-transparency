@@ -1,5 +1,5 @@
-#ifndef FILESYSTEM_OP_H
-#define FILESYSTEM_OP_H
+#ifndef CERT_TRANS_LOG_FILESYSTEM_OPS_H_
+#define CERT_TRANS_LOG_FILESYSTEM_OPS_H_
 
 #include <string>
 #include <sys/types.h>
@@ -64,4 +64,4 @@ class FailingFilesystemOps : public FilesystemOps {
 
 }  // namespace cert_trans
 
-#endif
+#endif  // CERT_TRANS_LOG_FILESYSTEM_OPS_H_
