@@ -1,5 +1,6 @@
 #include "util/etcd.h"
 
+#include <ctime>
 #include <event2/buffer.h>
 #include <event2/http.h>
 #include <event2/keyvalq_struct.h>
@@ -104,6 +105,13 @@ void GetRequestDone(Status status, const shared_ptr<JsonObject>& json,
        EtcdClient::Node::InvalidNode());
     return;
   }
+  const JsonInt createdIndex(node, "createdIndex");
+  if (!createdIndex.Ok()) {
+    cb(Status(util::error::FAILED_PRECONDITION,
+              "Invalid JSON: Couldn't find 'createdIndex'"),
+       EtcdClient::Node::InvalidNode());
+    return;
+  }
   const JsonInt modifiedIndex(node, "modifiedIndex");
   if (!modifiedIndex.Ok()) {
     cb(Status(util::error::FAILED_PRECONDITION,
@@ -125,8 +133,8 @@ void GetRequestDone(Status status, const shared_ptr<JsonObject>& json,
        EtcdClient::Node::InvalidNode());
     return;
   }
-  cb(status,
-     EtcdClient::Node(modifiedIndex.Value(), key.Value(), value.Value()));
+  cb(status, EtcdClient::Node(createdIndex.Value(), modifiedIndex.Value(),
+                              key.Value(), value.Value()));
 }
 
 
@@ -177,6 +185,13 @@ void GetAllRequestDone(Status status, const shared_ptr<JsonObject>& json,
          vector<EtcdClient::Node>());
       return;
     }
+    const JsonInt createdIndex(entry, "createdIndex");
+    if (!createdIndex.Ok()) {
+      cb(Status(util::error::FAILED_PRECONDITION,
+                "Invalid JSON: Coulnd't find 'createdIndex'"),
+         vector<EtcdClient::Node>());
+      return;
+    }
     const JsonInt modifiedIndex(entry, "modifiedIndex");
     if (!modifiedIndex.Ok()) {
       cb(Status(util::error::FAILED_PRECONDITION,
@@ -191,8 +206,9 @@ void GetAllRequestDone(Status status, const shared_ptr<JsonObject>& json,
          vector<EtcdClient::Node>());
       return;
     }
-    values.emplace_back(
-        EtcdClient::Node(modifiedIndex.Value(), key.Value(), value.Value()));
+    values.emplace_back(EtcdClient::Node(createdIndex.Value(),
+                                         modifiedIndex.Value(), key.Value(),
+                                         value.Value()));
   }
   cb(util::Status::OK, values);
 }
@@ -343,7 +359,7 @@ string UrlEscapeAndJoinParams(const map<string, string>& params) {
 }
 
 
-static const EtcdClient::Node kInvalidNode(-1, "", "");
+static const EtcdClient::Node kInvalidNode(-1, -1, "", "");
 
 
 }  // namespace
@@ -438,7 +454,8 @@ EtcdClient::Watcher::Update::Update(const Node& node, const bool exists)
 }
 
 
-EtcdClient::Watcher::Update::Update() : node_(EtcdClient::Node::InvalidNode()), exists_(false) {
+EtcdClient::Watcher::Update::Update()
+    : node_(EtcdClient::Node::InvalidNode()), exists_(false) {
 }
 
 
@@ -463,7 +480,7 @@ class EtcdClient::Watcher::Impl
   const string key_;
   const WatchCallback cb_;
 
-  int highest_index_seen_;
+  int64_t highest_index_seen_;
 
   mutex lock_;
   bool cancelled_;
@@ -489,7 +506,7 @@ void EtcdClient::Watcher::Impl::InitialGetDone(Status status,
   // dealt with using retries?
   CHECK(status.ok()) << "initial get error: " << status;
 
-  highest_index_seen_ = node.index_;
+  highest_index_seen_ = node.modified_index_;
 
   std::vector<Update> updates{Update(node, true /*exists*/)};
   {
@@ -513,7 +530,7 @@ void EtcdClient::Watcher::Impl::InitialGetAllDone(
   std::vector<Update> updates;
   for (const auto& node : nodes) {
     updates.emplace_back(Update(node, true /*exists*/));
-    highest_index_seen_ = std::max(highest_index_seen_, node.index_);
+    highest_index_seen_ = std::max(highest_index_seen_, node.modified_index_);
   }
 
   {
@@ -539,6 +556,13 @@ void EtcdClient::Watcher::Impl::Cancel() {
 
 util::StatusOr<EtcdClient::Watcher::Update> UpdateForNode(
     const JsonObject& node) {
+  const JsonInt createdIndex(node, "createdIndex");
+  if (!createdIndex.Ok()) {
+    return util::StatusOr<EtcdClient::Watcher::Update>(
+        util::Status(util::error::FAILED_PRECONDITION,
+                     "Invalid JSON: Couldn't find 'createdIndex'"));
+  }
+
   const JsonInt modifiedIndex(node, "modifiedIndex");
   if (!modifiedIndex.Ok()) {
     return util::StatusOr<EtcdClient::Watcher::Update>(
@@ -546,23 +570,24 @@ util::StatusOr<EtcdClient::Watcher::Update> UpdateForNode(
                      "Invalid JSON: Couldn't find 'modifiedIndex'"));
   }
 
-  JsonString key(node, "key");
+  const JsonString key(node, "key");
   if (!key.Ok()) {
     return util::StatusOr<EtcdClient::Watcher::Update>(
         util::Status(util::error::FAILED_PRECONDITION,
                      "Invalid JSON: Couldn't find 'key'"));
   }
 
-  JsonString value(node, "value");
+  const JsonString value(node, "value");
   if (value.Ok()) {
     return util::StatusOr<EtcdClient::Watcher::Update>(
-        EtcdClient::Watcher::Update(EtcdClient::Node(modifiedIndex.Value(),
-                                                     key.Value(),
-                                                     value.Value()),
-                                    true /*exists*/));
+        EtcdClient::Watcher::Update(
+            EtcdClient::Node(createdIndex.Value(), modifiedIndex.Value(),
+                             key.Value(), value.Value()),
+            true /*exists*/));
   } else {
     return util::StatusOr<EtcdClient::Watcher::Update>(
-        EtcdClient::Watcher::Update(EtcdClient::Node(modifiedIndex.Value(),
+        EtcdClient::Watcher::Update(EtcdClient::Node(createdIndex.Value(),
+                                                     modifiedIndex.Value(),
                                                      key.Value(), ""),
                                     false /*exists*/));
   }
@@ -577,9 +602,9 @@ util::Status EtcdClient::Watcher::Impl::HandleSingleValueRequestDone(
   }
   updates->emplace_back(status.ValueOrDie());
 
-  CHECK_LT(highest_index_seen_, updates->back().node_.index_);
+  CHECK_LT(highest_index_seen_, updates->back().node_.modified_index_);
   highest_index_seen_ =
-      std::max(highest_index_seen_, updates->back().node_.index_);
+      std::max(highest_index_seen_, updates->back().node_.modified_index_);
 
   return util::Status::OK;
 }
@@ -657,19 +682,44 @@ EtcdClient::Watcher::Watcher(EtcdClient* client, const string& key,
 
 
 EtcdClient::Watcher::~Watcher() {
-  pimpl_->Cancel();
+  if (pimpl_) {
+    pimpl_->Cancel();
+  }
 }
 
 
-EtcdClient::Node::Node(int index, const std::string& key,
-                       const std::string& value)
-    : index_(index), key_(key), value_(value) {
+EtcdClient::Node::Node(int64_t created_index, int64_t modified_index,
+                       const std::string& key, const std::string& value)
+    : created_index_(created_index),
+      modified_index_(modified_index),
+      key_(key),
+      value_(value),
+      expires_(std::chrono::system_clock::time_point::max()),
+      deleted_(false) {
 }
 
 
 // static
 const EtcdClient::Node& EtcdClient::Node::InvalidNode() {
   return kInvalidNode;
+}
+
+
+std::string EtcdClient::Node::ToString() const {
+  std::ostringstream oss;
+  oss << "[" << key_ << ": '" << value_ << "' c: " << created_index_
+      << " m: " << modified_index_;
+  if (HasExpiry()) {
+    std::time_t time_c = std::chrono::system_clock::to_time_t(expires_);
+    oss << " expires: " << std::ctime(&time_c);
+  }
+  oss << " deleted: " << deleted_ << "]";
+  return oss.str();
+}
+
+
+bool EtcdClient::Node::HasExpiry() const {
+  return expires_ < std::chrono::system_clock::time_point::max();
 }
 
 
@@ -814,7 +864,8 @@ void EtcdClient::CreateInQueue(const string& dir, const string& value,
 
 
 void EtcdClient::Update(const string& key, const string& value,
-                        const int previous_index, const UpdateCallback& cb) {
+                        const int64_t previous_index,
+                        const UpdateCallback& cb) {
   map<string, string> params;
   params["value"] = value;
   params["prevIndex"] = to_string(previous_index);
@@ -824,7 +875,7 @@ void EtcdClient::Update(const string& key, const string& value,
 
 void EtcdClient::UpdateWithTTL(const string& key, const string& value,
                                const std::chrono::duration<int>& ttl,
-                               const int previous_index,
+                               const int64_t previous_index,
                                const UpdateCallback& cb) {
   map<string, string> params;
   params["value"] = value;
@@ -852,11 +903,17 @@ void EtcdClient::ForceSetWithTTL(const string& key, const string& value,
 }
 
 
-void EtcdClient::Delete(const string& key, const int current_index,
+void EtcdClient::Delete(const string& key, const int64_t current_index,
                         const DeleteCallback& cb) {
   map<string, string> params;
   params["prevIndex"] = to_string(current_index);
   Generic(key, params, EVHTTP_REQ_DELETE, bind(cb, _1));
+}
+
+
+EtcdClient::Watcher* EtcdClient::CreateWatcher(
+    const std::string& key, const Watcher::WatchCallback& cb) {
+  return new EtcdClient::Watcher(this, key, cb);
 }
 
 

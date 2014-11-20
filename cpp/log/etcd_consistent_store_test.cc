@@ -73,7 +73,7 @@ class EtcdConsistentStoreTest : public ::testing::Test {
   template <class T>
   EtcdClient::Node NodeFor(const int index, const std::string& key,
                            const T& t) {
-    return EtcdClient::Node(index, key, Serialize(t));
+    return EtcdClient::Node(index, index, key, Serialize(t));
   }
 
   MockSyncEtcdClient client_;
