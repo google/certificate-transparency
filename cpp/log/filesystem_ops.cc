@@ -8,10 +8,6 @@
 namespace cert_trans {
 
 
-BasicFilesystemOps::BasicFilesystemOps() {
-}
-
-
 int BasicFilesystemOps::mkdir(const char* path, mode_t mode) {
   return ::mkdir(path, mode);
 }

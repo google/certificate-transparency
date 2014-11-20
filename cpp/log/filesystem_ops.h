@@ -15,11 +15,8 @@ class FilesystemOps {
   virtual ~FilesystemOps() = default;
 
   virtual int mkdir(const char* path, mode_t mode) = 0;
-
   virtual int remove(const char* path) = 0;
-
   virtual int rename(const char* old_name, const char* new_name) = 0;
-
   virtual int access(const char* path, int amode) = 0;
 
  protected:
@@ -32,15 +29,12 @@ class FilesystemOps {
 
 class BasicFilesystemOps : public FilesystemOps {
  public:
-  BasicFilesystemOps();
+  BasicFilesystemOps() = default;
 
-  int mkdir(const char* path, mode_t mode);
-
-  int remove(const char* path);
-
-  int rename(const char* old_name, const char* new_name);
-
-  int access(const char* path, int amode);
+  int mkdir(const char* path, mode_t mode) override;
+  int remove(const char* path) override;
+  int rename(const char* old_name, const char* new_name) override;
+  int access(const char* path, int amode) override;
 };
 
 
@@ -53,13 +47,10 @@ class FailingFilesystemOps : public FilesystemOps {
     return op_count_;
   }
 
-  int mkdir(const char* path, mode_t mode);
-
-  int remove(const char* path);
-
-  int rename(const char* old_name, const char* new_name);
-
-  int access(const char* path, int amode);
+  int mkdir(const char* path, mode_t mode) override;
+  int remove(const char* path) override;
+  int rename(const char* old_name, const char* new_name) override;
+  int access(const char* path, int amode) override;
 
  private:
   int op_count_;
