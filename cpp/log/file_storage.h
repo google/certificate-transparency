@@ -7,7 +7,9 @@
 
 #include "base/macros.h"
 
+namespace cert_trans {
 class FilesystemOps;
+}
 
 // A simple filesystem-based database for (key, data) entries,
 // structured as follows:
@@ -43,7 +45,7 @@ class FileStorage {
   FileStorage(const std::string& file_base, unsigned storage_depth);
   // Takes ownership of the FilesystemOps.
   FileStorage(const std::string& file_base, unsigned storage_depth,
-              FilesystemOps* file_op);
+              cert_trans::FilesystemOps* file_op);
   ~FileStorage();
 
   enum FileStorageResult {
@@ -92,7 +94,7 @@ class FileStorage {
   const std::string tmp_dir_;
   const std::string tmp_file_template_;
   unsigned int storage_depth_;
-  FilesystemOps* file_op_;
+  cert_trans::FilesystemOps* file_op_;
 
   DISALLOW_COPY_AND_ASSIGN(FileStorage);
 };

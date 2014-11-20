@@ -13,6 +13,8 @@
 #include "util/testing.h"
 #include "util/util.h"
 
+using cert_trans::FailingFilesystemOps;
+
 namespace {
 
 using std::string;

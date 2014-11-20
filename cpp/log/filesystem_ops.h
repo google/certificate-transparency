@@ -5,6 +5,9 @@
 
 #include "base/macros.h"
 
+namespace cert_trans {
+
+
 // Make filesystem operations virtual so that we can override
 // to simulate filesystem errors.
 class FilesystemOps {
@@ -26,6 +29,7 @@ class FilesystemOps {
   DISALLOW_COPY_AND_ASSIGN(FilesystemOps);
 };
 
+
 class BasicFilesystemOps : public FilesystemOps {
  public:
   BasicFilesystemOps();
@@ -38,6 +42,7 @@ class BasicFilesystemOps : public FilesystemOps {
 
   int access(const char* path, int amode);
 };
+
 
 // Fail at an operation with a given op count.
 class FailingFilesystemOps : public FilesystemOps {
@@ -60,4 +65,8 @@ class FailingFilesystemOps : public FilesystemOps {
   int op_count_;
   int fail_point_;
 };
+
+
+}  // namespace cert_trans
+
 #endif

@@ -13,6 +13,8 @@
 #include "log/filesystem_ops.h"
 #include "util/util.h"
 
+using cert_trans::BasicFilesystemOps;
+using cert_trans::FilesystemOps;
 using std::string;
 
 FileStorage::FileStorage(const string& file_base, unsigned storage_depth)
