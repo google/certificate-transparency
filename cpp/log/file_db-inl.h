@@ -39,6 +39,8 @@ typename Database<Logged>::WriteResult FileDB<Logged>::CreateSequencedEntry_(
     const Logged& logged) {
   CHECK(logged.has_sequence_number());
 
+  std::lock_guard<std::mutex> lock(lock_);
+
   // Check we don't already have something for this sequence number
   if (sequence_map_.find(logged.sequence_number()) != sequence_map_.end()) {
     LOG(WARNING) << "Attempting to re-use sequence number "
@@ -67,6 +69,8 @@ typename Database<Logged>::WriteResult FileDB<Logged>::CreateSequencedEntry_(
 template <class Logged>
 typename Database<Logged>::LookupResult FileDB<Logged>::LookupByHash(
     const std::string& hash, Logged* result) const {
+  std::lock_guard<std::mutex> lock(lock_);
+
   std::string cert_data;
   FileStorage::FileStorageResult db_result =
       cert_storage_->LookupEntry(hash, &cert_data);
@@ -90,6 +94,8 @@ typename Database<Logged>::LookupResult FileDB<Logged>::LookupByHash(
 template <class Logged>
 typename Database<Logged>::LookupResult FileDB<Logged>::LookupByIndex(
     uint64_t sequence_number, Logged* result) const {
+  std::lock_guard<std::mutex> lock(lock_);
+
   std::map<uint64_t, std::string>::const_iterator it =
       sequence_map_.find(sequence_number);
   if (it == sequence_map_.end()) {
@@ -117,6 +123,8 @@ typename Database<Logged>::LookupResult FileDB<Logged>::LookupByIndex(
 template <class Logged>
 typename Database<Logged>::WriteResult FileDB<Logged>::WriteTreeHead_(
     const ct::SignedTreeHead& sth) {
+  std::unique_lock<std::mutex> lock(lock_);
+
   // 6 bytes are good enough for some 9000 years.
   std::string timestamp_key =
       Serializer::SerializeUint(sth.timestamp(),
@@ -137,6 +145,7 @@ typename Database<Logged>::WriteResult FileDB<Logged>::WriteTreeHead_(
     latest_timestamp_key_ = timestamp_key;
   }
 
+  lock.unlock();
   callbacks_.Call(sth);
 
   return this->OK;
@@ -146,23 +155,16 @@ typename Database<Logged>::WriteResult FileDB<Logged>::WriteTreeHead_(
 template <class Logged>
 typename Database<Logged>::LookupResult FileDB<Logged>::LatestTreeHead(
     ct::SignedTreeHead* result) const {
-  if (latest_tree_timestamp_ == 0) {
-    return this->NOT_FOUND;
-  }
+  std::lock_guard<std::mutex> lock(lock_);
 
-  std::string tree_data;
-  CHECK_EQ(tree_storage_->LookupEntry(latest_timestamp_key_, &tree_data),
-           FileStorage::OK);
-
-  CHECK(result->ParseFromString(tree_data));
-  CHECK_EQ(result->timestamp(), latest_tree_timestamp_);
-
-  return this->LOOKUP_OK;
+  return LatestTreeHeadNoLock(result);
 }
 
 
 template <class Logged>
 int FileDB<Logged>::TreeSize() const {
+  std::lock_guard<std::mutex> lock(lock_);
+
   CHECK_EQ(sequence_map_.size(), sequence_map_.rbegin()->first + 1);
   return sequence_map_.size();
 }
@@ -171,10 +173,13 @@ int FileDB<Logged>::TreeSize() const {
 template <class Logged>
 void FileDB<Logged>::AddNotifySTHCallback(
     const typename Database<Logged>::NotifySTHCallback* callback) {
+  std::unique_lock<std::mutex> lock(lock_);
+
   callbacks_.Add(callback);
 
   ct::SignedTreeHead sth;
-  if (LatestTreeHead(&sth) == this->LOOKUP_OK) {
+  if (LatestTreeHeadNoLock(&sth) == this->LOOKUP_OK) {
+    lock.unlock();
     (*callback)(sth);
   }
 }
@@ -183,12 +188,16 @@ void FileDB<Logged>::AddNotifySTHCallback(
 template <class Logged>
 void FileDB<Logged>::RemoveNotifySTHCallback(
     const typename Database<Logged>::NotifySTHCallback* callback) {
+  std::lock_guard<std::mutex> lock(lock_);
+
   callbacks_.Remove(callback);
 }
 
 
 template <class Logged>
 void FileDB<Logged>::BuildIndex() {
+  std::lock_guard<std::mutex> lock(lock_);
+
   const std::set<std::string> hashes(cert_storage_->Scan());
   for (const auto& hash : hashes) {
     std::string cert_data;
@@ -218,5 +227,24 @@ void FileDB<Logged>::BuildIndex() {
                  &latest_tree_timestamp_));
   }
 }
+
+
+template <class Logged>
+typename Database<Logged>::LookupResult FileDB<Logged>::LatestTreeHeadNoLock(
+    ct::SignedTreeHead* result) const {
+  if (latest_tree_timestamp_ == 0) {
+    return this->NOT_FOUND;
+  }
+
+  std::string tree_data;
+  CHECK_EQ(tree_storage_->LookupEntry(latest_timestamp_key_, &tree_data),
+           FileStorage::OK);
+
+  CHECK(result->ParseFromString(tree_data));
+  CHECK_EQ(result->timestamp(), latest_tree_timestamp_);
+
+  return this->LOOKUP_OK;
+}
+
 
 #endif  // CERT_TRANS_LOG_FILE_DB_INL_H_

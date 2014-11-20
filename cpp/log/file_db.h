@@ -4,6 +4,7 @@
 
 #include <map>
 #include <memory>
+#include <mutex>
 #include <set>
 #include <stdint.h>
 #include <vector>
@@ -61,7 +62,10 @@ class FileDB : public Database<Logged> {
 
  private:
   void BuildIndex();
+  typename Database<Logged>::LookupResult LatestTreeHeadNoLock(
+      ct::SignedTreeHead* result) const;
 
+  mutable std::mutex lock_;
   std::map<uint64_t, std::string> sequence_map_;
   const std::unique_ptr<FileStorage> cert_storage_;
   // Store all tree heads, but currently only support looking up the latest
