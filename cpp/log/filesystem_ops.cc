@@ -39,7 +39,7 @@ int FailingFilesystemOps::mkdir(const std::string& path, mode_t mode) {
     errno = EIO;
     return -1;
   }
-  return ::mkdir(path.c_str(), mode);
+  return BasicFilesystemOps::mkdir(path, mode);
 }
 
 
@@ -48,7 +48,7 @@ int FailingFilesystemOps::remove(const std::string& path) {
     errno = EIO;
     return -1;
   }
-  return ::remove(path.c_str());
+  return BasicFilesystemOps::remove(path);
 }
 
 
@@ -58,7 +58,7 @@ int FailingFilesystemOps::rename(const std::string& old_name,
     errno = EIO;
     return -1;
   }
-  return ::rename(old_name.c_str(), new_name.c_str());
+  return BasicFilesystemOps::rename(old_name, new_name);
 }
 
 
@@ -67,7 +67,7 @@ int FailingFilesystemOps::access(const std::string& path, int amode) {
     errno = EACCES;
     return -1;
   }
-  return ::access(path.c_str(), amode);
+  return BasicFilesystemOps::access(path, amode);
 }
 
 

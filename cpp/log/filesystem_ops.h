@@ -42,7 +42,7 @@ class BasicFilesystemOps : public FilesystemOps {
 
 
 // Fail at an operation with a given op count.
-class FailingFilesystemOps : public FilesystemOps {
+class FailingFilesystemOps : public BasicFilesystemOps {
  public:
   explicit FailingFilesystemOps(int fail_point);
 
