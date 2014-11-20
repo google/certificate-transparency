@@ -192,9 +192,6 @@ void FileDB<Logged>::RemoveNotifySTHCallback(
 template <class Logged>
 void FileDB<Logged>::BuildIndex() {
   const std::set<std::string> hashes(cert_storage_->Scan());
-  if (hashes.empty()) {
-    return;
-  }
   for (const auto& hash : hashes) {
     std::string cert_data;
     // Read the data; tolerate no errors.
@@ -215,7 +212,6 @@ void FileDB<Logged>::BuildIndex() {
 
   // Now read the STH entries.
   std::set<std::string> sth_timestamps = tree_storage_->Scan();
-
   if (!sth_timestamps.empty()) {
     latest_timestamp_key_ = *sth_timestamps.rbegin();
     CHECK_EQ(Deserializer::OK,
