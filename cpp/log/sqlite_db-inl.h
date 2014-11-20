@@ -10,34 +10,48 @@
 #include "log/sqlite_statement.h"
 #include "util/util.h"
 
+namespace {
 
-template <class Logged>
-SQLiteDB<Logged>::SQLiteDB(const std::string& dbfile)
-    : db_(NULL) {
-  int ret = sqlite3_open_v2(dbfile.c_str(), &db_, SQLITE_OPEN_READWRITE, NULL);
+
+sqlite3* SQLiteOpen(const std::string& dbfile) {
+  sqlite3* retval;
+
+  const int ret(
+      sqlite3_open_v2(dbfile.c_str(), &retval, SQLITE_OPEN_READWRITE, NULL));
   if (ret == SQLITE_OK) {
-    return;
+    return retval;
   }
   CHECK_EQ(SQLITE_CANTOPEN, ret);
 
   // We have to close and reopen to avoid memory leaks.
-  CHECK_EQ(SQLITE_OK, sqlite3_close(db_));
-  db_ = NULL;
+  CHECK_EQ(SQLITE_OK, sqlite3_close(retval));
+  retval = nullptr;
 
   CHECK_EQ(SQLITE_OK,
-           sqlite3_open_v2(dbfile.c_str(), &db_,
-                           SQLITE_OPEN_READWRITE | SQLITE_OPEN_CREATE, NULL));
-
-  CHECK_EQ(SQLITE_OK, sqlite3_exec(db_,
+           sqlite3_open_v2(dbfile.c_str(), &retval,
+                           SQLITE_OPEN_READWRITE | SQLITE_OPEN_CREATE,
+                           nullptr));
+  CHECK_EQ(SQLITE_OK, sqlite3_exec(retval,
                                    "CREATE TABLE leaves(hash BLOB UNIQUE, "
                                    "entry BLOB, sequence INTEGER UNIQUE)",
-                                   NULL, NULL, NULL));
-
-  CHECK_EQ(SQLITE_OK, sqlite3_exec(db_,
-                                   "CREATE TABLE trees(sth BLOB UNIQUE, "
-                                   "timestamp INTEGER UNIQUE)",
-                                   NULL, NULL, NULL));
+                                   nullptr, nullptr, nullptr));
+  CHECK_EQ(SQLITE_OK,
+           sqlite3_exec(
+               retval,
+               "CREATE TABLE trees(sth BLOB UNIQUE, timestamp INTEGER UNIQUE)",
+               nullptr, nullptr, nullptr));
   LOG(INFO) << "New SQLite database created in " << dbfile;
+
+  return retval;
+}
+
+
+}  // namespace
+
+
+template <class Logged>
+SQLiteDB<Logged>::SQLiteDB(const std::string& dbfile)
+    : db_(SQLiteOpen(dbfile)) {
 }
 
 

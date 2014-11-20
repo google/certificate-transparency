@@ -45,7 +45,7 @@ class SQLiteDB : public Database<Logged> {
   void ForceNotifySTH();
 
  private:
-  sqlite3* db_;
+  sqlite3* const db_;
   cert_trans::DatabaseNotifierHelper callbacks_;
 
   DISALLOW_COPY_AND_ASSIGN(SQLiteDB);
