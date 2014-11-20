@@ -98,6 +98,20 @@ class UnknownASN1TypeError(ASN1Error):
     """An OID does not map to a known ASN.1 type."""
     pass
 
+class ASN1IllegalCharacter(ASN1Error):
+    """String contains illegal character."""
+    def __init__(self, message, string, index, *args):
+        self.message = message
+        self.string = string
+        self.index = index
+        super(ASN1Error, self).__init__(message, *args)
+
+    def __str__(self):
+        return "%s (string: %s, character: %s, index: %d)" % (self.message,
+                                                              self.string,
+                                                              self.string[
+                                                                    self.index],
+                                                              self.index)
 
 class SignatureError(VerifyError):
     """A public-key signature does not verify."""

@@ -774,8 +774,8 @@ class PrintableString(ASN1String):
         search_result = PrintableString.NOT_ACCEPTABLE.search(buf)
         if search_result:
             index = search_result.start()
-            raise error.ASN1Error("Illegal character in PrintableString: %s "
-                "(character: %s index: %d)" % (buf, buf[index], index))
+            raise error.ASN1IllegalCharacter(
+                    "Illegal character in PrintableString", buf, index)
 
 
 @Universal(20, tag.PRIMITIVE)
@@ -791,8 +791,8 @@ class IA5String(ASN1String):
     def _check_for_illegal_characters(self, buf):
         for index, character in enumerate(buf):
             if ord(character) > 127:
-                raise error.ASN1Error("Illegal character in IA5String: %s "
-                    "(character: %s index: %d" % (buf, character, index))
+                raise error.ASN1IllegalCharacter(
+                        "Illegal character in IA5String", buf, index)
 
 
 @Universal(26, tag.PRIMITIVE)
@@ -802,8 +802,8 @@ class VisibleString(ASN1String):
     def _check_for_illegal_characters(self, buf):
         for index, character in enumerate(buf):
             if ord(character) < 32 or ord(character) > 126:
-                raise error.ASN1Error("Illegal character in VisibleString %s "
-                    "(character: %s index: %d" % (buf, character, index))
+                raise error.ASN1IllegalCharacter(
+                        "Illegal character in VisibleString", buf, index)
 
 
 @Universal(30, tag.PRIMITIVE)
