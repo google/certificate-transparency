@@ -7,9 +7,9 @@
 
 // Make filesystem operations virtual so that we can override
 // to simulate filesystem errors.
-class FilesystemOp {
+class FilesystemOps {
  public:
-  virtual ~FilesystemOp() = default;
+  virtual ~FilesystemOps() = default;
 
   virtual int mkdir(const char* path, mode_t mode) = 0;
 
@@ -20,15 +20,15 @@ class FilesystemOp {
   virtual int access(const char* path, int amode) = 0;
 
  protected:
-  FilesystemOp() = default;
+  FilesystemOps() = default;
 
  private:
-  DISALLOW_COPY_AND_ASSIGN(FilesystemOp);
+  DISALLOW_COPY_AND_ASSIGN(FilesystemOps);
 };
 
-class BasicFilesystemOp : public FilesystemOp {
+class BasicFilesystemOps : public FilesystemOps {
  public:
-  BasicFilesystemOp();
+  BasicFilesystemOps();
 
   int mkdir(const char* path, mode_t mode);
 
@@ -40,9 +40,9 @@ class BasicFilesystemOp : public FilesystemOp {
 };
 
 // Fail at an operation with a given op count.
-class FailingFilesystemOp : public FilesystemOp {
+class FailingFilesystemOps : public FilesystemOps {
  public:
-  explicit FailingFilesystemOp(int fail_point);
+  explicit FailingFilesystemOps(int fail_point);
 
   int OpCount() const {
     return op_count_;

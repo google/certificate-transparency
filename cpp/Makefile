@@ -170,7 +170,7 @@ log/libcert.a: log/cert.o log/cert_checker.o log/cert_submission_handler.o \
 	rm -f $@
 	ar -rcs $@ $^
 
-log/libdatabase.a: log/file_storage.o log/filesystem_op.o log/file_db_cert.o \
+log/libdatabase.a: log/file_storage.o log/filesystem_ops.o log/file_db_cert.o \
                    log/sqlite_db_cert.o log/database.o \
                    log/etcd_consistent_store_cert.o log/fake_consistent_store_cert.o
 	rm -f $@

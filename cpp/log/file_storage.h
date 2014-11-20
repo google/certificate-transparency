@@ -7,7 +7,7 @@
 
 #include "base/macros.h"
 
-class FilesystemOp;
+class FilesystemOps;
 
 // A simple filesystem-based database for (key, data) entries,
 // structured as follows:
@@ -36,14 +36,14 @@ class FilesystemOp;
 // <root>/tmp     - Temporary storage for atomicity. Must be on the
 //                  same filesystem as <root>/storage.
 
-// FileStorage aborts Upon any FilesystemOp error.
+// FileStorage aborts Upon any FilesystemOps error.
 class FileStorage {
  public:
-  // Default constructor, uses BasicFilesystemOp.
+  // Default constructor, uses BasicFilesystemOps.
   FileStorage(const std::string& file_base, unsigned storage_depth);
-  // Takes ownership of the FilesystemOp.
+  // Takes ownership of the FilesystemOps.
   FileStorage(const std::string& file_base, unsigned storage_depth,
-              FilesystemOp* file_op);
+              FilesystemOps* file_op);
   ~FileStorage();
 
   enum FileStorageResult {
@@ -92,7 +92,7 @@ class FileStorage {
   const std::string tmp_dir_;
   const std::string tmp_file_template_;
   unsigned int storage_depth_;
-  FilesystemOp* file_op_;
+  FilesystemOps* file_op_;
 
   DISALLOW_COPY_AND_ASSIGN(FileStorage);
 };

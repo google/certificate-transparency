@@ -8,7 +8,7 @@
 #include <unistd.h>
 
 #include "log/file_storage.h"
-#include "log/filesystem_op.h"
+#include "log/filesystem_ops.h"
 #include "log/test_db.h"
 #include "util/testing.h"
 #include "util/util.h"
@@ -199,7 +199,7 @@ TEST(DeathTest, SupportDeath) {
 
 TEST_F(FailingFileStorageDeathTest, DieOnFailedCreate) {
   // Profiling run: count file operations.
-  FailingFilesystemOp* failing_file_op = new FailingFilesystemOp(-1);
+  FailingFilesystemOps* failing_file_op = new FailingFilesystemOps(-1);
   FileStorage db(GetTemporaryDirectory(), kStorageDepth, failing_file_op);
 
   // Count ops for constructor.
@@ -223,13 +223,13 @@ TEST_F(FailingFileStorageDeathTest, DieOnFailedCreate) {
   // Real run. Repeat for each file op individually.
   for (int i = op_count_init; i < op_count0; ++i) {
     FileStorage db(GetTemporaryDirectory(), kStorageDepth,
-                   new FailingFilesystemOp(i));
+                   new FailingFilesystemOps(i));
     EXPECT_DEATH_IF_SUPPORTED(db.CreateEntry(key0, value0), "");
   }
 
   for (int i = op_count0; i < op_count1; ++i) {
     FileStorage db(GetTemporaryDirectory(), kStorageDepth,
-                   new FailingFilesystemOp(i));
+                   new FailingFilesystemOps(i));
     EXPECT_EQ(FileStorage::OK, db.CreateEntry(key0, value0));
     EXPECT_DEATH_IF_SUPPORTED(db.CreateEntry(key1, value1), "");
   }
@@ -237,7 +237,7 @@ TEST_F(FailingFileStorageDeathTest, DieOnFailedCreate) {
 
 TEST_F(FailingFileStorageDeathTest, DieOnFailedUpdate) {
   // Profiling run: count file operations.
-  FailingFilesystemOp* failing_file_op = new FailingFilesystemOp(-1);
+  FailingFilesystemOps* failing_file_op = new FailingFilesystemOps(-1);
   FileStorage db(GetTemporaryDirectory(), kStorageDepth, failing_file_op);
 
   string key("1234xyzw", 8);
@@ -256,7 +256,7 @@ TEST_F(FailingFileStorageDeathTest, DieOnFailedUpdate) {
   // Real run. Repeat for each file op individually.
   for (int i = op_count0; i < op_count1; ++i) {
     FileStorage db(GetTemporaryDirectory(), kStorageDepth,
-                   new FailingFilesystemOp(i));
+                   new FailingFilesystemOps(i));
     EXPECT_EQ(FileStorage::OK, db.CreateEntry(key, value));
     EXPECT_DEATH_IF_SUPPORTED(db.UpdateEntry(key, new_value), "");
   }
@@ -264,7 +264,7 @@ TEST_F(FailingFileStorageDeathTest, DieOnFailedUpdate) {
 
 TEST_F(FailingFileStorageDeathTest, ResumeOnFailedCreate) {
   // Profiling run: count file operations.
-  FailingFilesystemOp* failing_file_op = new FailingFilesystemOp(-1);
+  FailingFilesystemOps* failing_file_op = new FailingFilesystemOps(-1);
   FileStorage db(GetTemporaryDirectory(), kStorageDepth, failing_file_op);
 
   string key0("1234xyzw", 8);
@@ -285,7 +285,7 @@ TEST_F(FailingFileStorageDeathTest, ResumeOnFailedCreate) {
   // Real run. Repeat for each file op individually.
   for (int i = op_count_init; i < op_count0; ++i) {
     string db_dir = GetTemporaryDirectory();
-    FileStorage db(db_dir, kStorageDepth, new FailingFilesystemOp(i));
+    FileStorage db(db_dir, kStorageDepth, new FailingFilesystemOps(i));
     EXPECT_DEATH_IF_SUPPORTED(db.CreateEntry(key0, value0), "");
     FileStorage db2(db_dir, kStorageDepth);
     // Entry should not be there, and we should be able to insert it.
@@ -299,7 +299,7 @@ TEST_F(FailingFileStorageDeathTest, ResumeOnFailedCreate) {
 
   for (int i = op_count0; i < op_count1; ++i) {
     string db_dir = GetTemporaryDirectory();
-    FileStorage db(db_dir, kStorageDepth, new FailingFilesystemOp(i));
+    FileStorage db(db_dir, kStorageDepth, new FailingFilesystemOps(i));
     EXPECT_EQ(FileStorage::OK, db.CreateEntry(key0, value0));
     EXPECT_DEATH_IF_SUPPORTED(db.CreateEntry(key1, value1), "");
     FileStorage db2(db_dir, kStorageDepth);
@@ -319,7 +319,7 @@ TEST_F(FailingFileStorageDeathTest, ResumeOnFailedCreate) {
 
 TEST_F(FailingFileStorageDeathTest, ResumeOnFailedUpdate) {
   // Profiling run: count file operations.
-  FailingFilesystemOp* failing_file_op = new FailingFilesystemOp(-1);
+  FailingFilesystemOps* failing_file_op = new FailingFilesystemOps(-1);
   FileStorage db(GetTemporaryDirectory(), kStorageDepth, failing_file_op);
 
   string key("1234xyzw", 8);
@@ -338,7 +338,7 @@ TEST_F(FailingFileStorageDeathTest, ResumeOnFailedUpdate) {
   // Real run. Repeat for each file op individually.
   for (int i = op_count0; i < op_count1; ++i) {
     string db_dir = GetTemporaryDirectory();
-    FileStorage db(db_dir, kStorageDepth, new FailingFilesystemOp(i));
+    FileStorage db(db_dir, kStorageDepth, new FailingFilesystemOps(i));
     EXPECT_EQ(FileStorage::OK, db.CreateEntry(key, value));
     EXPECT_DEATH_IF_SUPPORTED(db.UpdateEntry(key, new_value), "");
     FileStorage db2(db_dir, kStorageDepth);

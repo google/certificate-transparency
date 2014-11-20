@@ -10,7 +10,7 @@
 #include <sys/stat.h>
 #include <unistd.h>
 
-#include "log/filesystem_op.h"
+#include "log/filesystem_ops.h"
 #include "util/util.h"
 
 using std::string;
@@ -20,14 +20,14 @@ FileStorage::FileStorage(const string& file_base, unsigned storage_depth)
       tmp_dir_(file_base + "/tmp"),
       tmp_file_template_(tmp_dir_ + "/tmpXXXXXX"),
       storage_depth_(storage_depth),
-      file_op_(new BasicFilesystemOp()) {
+      file_op_(new BasicFilesystemOps()) {
   assert(storage_depth_ >= 0);
   CreateMissingDirectory(storage_dir_);
   CreateMissingDirectory(tmp_dir_);
 }
 
 FileStorage::FileStorage(const string& file_base, unsigned storage_depth,
-                         FilesystemOp* file_op)
+                         FilesystemOps* file_op)
     : storage_dir_(file_base + "/storage"),
       tmp_dir_(file_base + "/tmp"),
       tmp_file_template_(tmp_dir_ + "/tmpXXXXXX"),
