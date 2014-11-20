@@ -20,10 +20,13 @@ class HttpConnection;
 
 class Base {
  public:
-  typedef std::function<void(evutil_socket_t, short)> Callback;
+  typedef std::function<void()> Closure;
 
   Base();
   ~Base();
+
+  // Arranges to run the closure on the main loop.
+  void Add(const Closure& cb);
 
   void Dispatch();
   void DispatchOnce();
@@ -35,11 +38,17 @@ class Base {
                                        unsigned short port);
 
  private:
+  static void RunClosures(evutil_socket_t sock, short flag, void* userdata);
+
   event_base* const base_;
   std::mutex dispatch_lock_;
 
   std::mutex dns_lock_;
   evdns_base* dns_;
+
+  std::mutex closures_lock_;
+  const std::unique_ptr<event, void (*)(event*)> wake_closures_;
+  std::vector<Closure> closures_;
 
   DISALLOW_COPY_AND_ASSIGN(Base);
 };

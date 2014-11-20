@@ -46,7 +46,11 @@ struct HttpServer::Handler {
 };
 
 
-Base::Base() : base_(event_base_new()), dns_(NULL) {
+Base::Base()
+    : base_(CHECK_NOTNULL(event_base_new())),
+      dns_(nullptr),
+      wake_closures_(event_new(base_, -1, 0, &Base::RunClosures, this),
+                     &event_free) {
   evthread_make_base_notifiable(base_);
 }
 
@@ -56,6 +60,13 @@ Base::~Base() {
     evdns_base_free(dns_, true);
 
   event_base_free(base_);
+}
+
+
+void Base::Add(const Closure& cb) {
+  lock_guard<mutex> lock(closures_lock_);
+  closures_.push_back(cb);
+  event_active(wake_closures_.get(), 0, 0);
 }
 
 
@@ -102,6 +113,21 @@ evhttp_connection* Base::HttpConnectionNew(const string& host,
                                            unsigned short port) {
   return CHECK_NOTNULL(
       evhttp_connection_base_new(base_, GetDns(), host.c_str(), port));
+}
+
+
+void Base::RunClosures(evutil_socket_t sock, short flag, void* userdata) {
+  Base* self(static_cast<Base*>(CHECK_NOTNULL(userdata)));
+
+  vector<Closure> closures;
+  {
+    lock_guard<mutex> lock(self->closures_lock_);
+    closures.swap(self->closures_);
+  }
+
+  for (const auto& closure : closures) {
+    closure();
+  }
 }
 
 
