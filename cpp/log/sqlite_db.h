@@ -1,7 +1,8 @@
 /* -*- mode: c++; indent-tabs-mode: nil -*- */
-
 #ifndef SQLITE_DB_H
 #define SQLITE_DB_H
+
+#include <mutex>
 #include <string>
 
 #include "base/macros.h"
@@ -45,6 +46,9 @@ class SQLiteDB : public Database<Logged> {
   void ForceNotifySTH();
 
  private:
+  LookupResult LatestTreeHeadNoLock(ct::SignedTreeHead* result) const;
+
+  mutable std::mutex lock_;
   sqlite3* const db_;
   cert_trans::DatabaseNotifierHelper callbacks_;
 
