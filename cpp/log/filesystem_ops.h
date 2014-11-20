@@ -1,6 +1,7 @@
 #ifndef FILESYSTEM_OP_H
 #define FILESYSTEM_OP_H
 
+#include <string>
 #include <sys/types.h>
 
 #include "base/macros.h"
@@ -14,10 +15,11 @@ class FilesystemOps {
  public:
   virtual ~FilesystemOps() = default;
 
-  virtual int mkdir(const char* path, mode_t mode) = 0;
-  virtual int remove(const char* path) = 0;
-  virtual int rename(const char* old_name, const char* new_name) = 0;
-  virtual int access(const char* path, int amode) = 0;
+  virtual int mkdir(const std::string& path, mode_t mode) = 0;
+  virtual int remove(const std::string& path) = 0;
+  virtual int rename(const std::string& old_name,
+                     const std::string& new_name) = 0;
+  virtual int access(const std::string& path, int amode) = 0;
 
  protected:
   FilesystemOps() = default;
@@ -31,10 +33,11 @@ class BasicFilesystemOps : public FilesystemOps {
  public:
   BasicFilesystemOps() = default;
 
-  int mkdir(const char* path, mode_t mode) override;
-  int remove(const char* path) override;
-  int rename(const char* old_name, const char* new_name) override;
-  int access(const char* path, int amode) override;
+  int mkdir(const std::string& path, mode_t mode) override;
+  int remove(const std::string& path) override;
+  int rename(const std::string& old_name,
+             const std::string& new_name) override;
+  int access(const std::string& path, int amode) override;
 };
 
 
@@ -47,10 +50,11 @@ class FailingFilesystemOps : public FilesystemOps {
     return op_count_;
   }
 
-  int mkdir(const char* path, mode_t mode) override;
-  int remove(const char* path) override;
-  int rename(const char* old_name, const char* new_name) override;
-  int access(const char* path, int amode) override;
+  int mkdir(const std::string& path, mode_t mode) override;
+  int remove(const std::string& path) override;
+  int rename(const std::string& old_name,
+             const std::string& new_name) override;
+  int access(const std::string& path, int amode) override;
 
  private:
   int op_count_;

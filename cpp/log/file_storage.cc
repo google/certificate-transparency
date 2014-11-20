@@ -165,7 +165,7 @@ void FileStorage::ScanDir(const string& dir_path, unsigned depth,
 }
 
 bool FileStorage::FileExists(const string& file_path) const {
-  if (file_op_->access(file_path.c_str(), F_OK) == 0)
+  if (file_op_->access(file_path, F_OK) == 0)
     return true;
   if (errno == ENOENT)
     return false;
@@ -176,12 +176,11 @@ bool FileStorage::FileExists(const string& file_path) const {
 void FileStorage::AtomicWriteBinaryFile(const string& file_path,
                                         const string& data) {
   string tmp_file = util::WriteTemporaryBinaryFile(tmp_file_template_, data);
-  if (tmp_file.empty() ||
-      file_op_->rename(tmp_file.c_str(), file_path.c_str()) != 0)
+  if (tmp_file.empty() || file_op_->rename(tmp_file, file_path) != 0)
     abort();
 }
 
 void FileStorage::CreateMissingDirectory(const string& dir_path) {
-  if (file_op_->mkdir(dir_path.c_str(), 0700) != 0 && errno != EEXIST)
+  if (file_op_->mkdir(dir_path, 0700) != 0 && errno != EEXIST)
     abort();
 }
