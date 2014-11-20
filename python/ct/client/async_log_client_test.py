@@ -336,7 +336,9 @@ class AsyncLogClientTest(unittest.TestCase):
                 return_value=test_util.make_entries(10, 19))
         client = self.default_client(entries_db=fake_db)
         consumer = self.get_entries(client, 0, 9)
-        test_util.verify_entries(consumer.received, 10, 19)
+        self.assertEqual(len(consumer.received), 10)
+        for i in range(0, 9):
+            self.assertEqual(test_util.make_entry(i + 10), consumer.received[i])
 
     def test_get_entries_tries_to_fetch_if_not_available_in_db(self):
         fake_db = self.FakeDB()

@@ -646,6 +646,10 @@ class EntryProducer(object):
             if self._entries_db and FLAGS.persist_entries:
                 request.addCallback(self._store_batch, first)
             entries = request
+        else:
+            deferred_entries = defer.Deferred()
+            deferred_entries.callback(entries)
+            entries = deferred_entries
         return entries
 
     def _create_next_request(self, first, last, entries, retries):
