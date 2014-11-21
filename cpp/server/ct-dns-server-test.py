@@ -108,8 +108,9 @@ class CTServer:
         logging.info("RUN: " + cmd)
         args = shlex.split(cmd)
         self.proc = subprocess.Popen(args, stdout=subprocess.PIPE)
+        start = time.time()
         while self.proc.stdout.readline() != "READY\n":
-            continue
+            assert time.time() - start < 10
 
 RootConfig = """[ req ]
 distinguished_name=req_distinguished_name
