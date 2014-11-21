@@ -15,7 +15,6 @@ NUMBER_OF_CERTS = 100
 basepath = os.path.dirname(sys.argv[0])
 
 sys.path.append(os.path.join(basepath, '../../python'))
-print sys.path
 from ct.crypto import merkle
 from ct.proto import ct_pb2
 
