@@ -242,6 +242,8 @@ int main(int argc, char* argv[]) {
   handler.Add(&server);
   server.Bind(NULL, FLAGS_port);
 
+  std::cout << "READY" << std::endl;
+
   event_base->Dispatch();
 
   return 0;

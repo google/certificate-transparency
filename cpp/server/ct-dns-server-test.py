@@ -15,6 +15,7 @@ NUMBER_OF_CERTS = 100
 basepath = os.path.dirname(sys.argv[0])
 
 sys.path.append(os.path.join(basepath, '../../python'))
+print sys.path
 from ct.crypto import merkle
 from ct.proto import ct_pb2
 
@@ -107,7 +108,9 @@ class CTServer:
                " -logtostderr")
         logging.info("RUN: " + cmd)
         args = shlex.split(cmd)
-        self.proc = subprocess.Popen(args)
+        self.proc = subprocess.Popen(args, stdout=subprocess.PIPE)
+        while self.proc.stdout.readline() != "READY\n":
+            continue
 
 RootConfig = """[ req ]
 distinguished_name=req_distinguished_name
@@ -302,8 +305,6 @@ ca = CA(tmpdir + "/ct-test-ca")
 ct_cmd = basepath + "/ct-server"
 ct_server = CTServer(ct_cmd, tmpdir + "/ct-test", ca)
 ct_server.Run()
-# Make sure server is running before we talk to it
-time.sleep(2)
 
 # Add nn certs to the CT server
 for x in range(NUMBER_OF_CERTS):
@@ -347,3 +348,5 @@ for index in range(NUMBER_OF_CERTS):
 
     assert verifier.verify_leaf_hash_inclusion(base64.b64decode(leaf_hash),
                                                index, audit_path, sth)
+
+print "DNS Server test passed"
