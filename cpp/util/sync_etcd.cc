@@ -123,7 +123,7 @@ Status SyncEtcdClient::GetAll(const string& dir,
 
 
 Status SyncEtcdClient::Create(const string& key, const string& value,
-                              int* index) {
+                              int64_t* index) {
   return BlockingCall(base_,
                       bind(&EtcdClient::Create, client_.get(), key, value, _1),
                       index);
@@ -132,7 +132,7 @@ Status SyncEtcdClient::Create(const string& key, const string& value,
 
 util::Status SyncEtcdClient::CreateWithTTL(
     const std::string& key, const std::string& value,
-    const std::chrono::duration<int>& ttl, int* index) {
+    const std::chrono::duration<int>& ttl, int64_t* index) {
   return BlockingCall(base_, bind(&EtcdClient::CreateWithTTL, client_.get(),
                                   key, value, ttl, _1),
                       index);
@@ -140,7 +140,7 @@ util::Status SyncEtcdClient::CreateWithTTL(
 
 
 Status SyncEtcdClient::CreateInQueue(const string& dir, const string& value,
-                                     string* key, int* index) {
+                                     string* key, int64_t* index) {
   return BlockingCall(base_, bind(&EtcdClient::CreateInQueue, client_.get(),
                                   dir, value, _1),
                       key, index);
@@ -148,7 +148,8 @@ Status SyncEtcdClient::CreateInQueue(const string& dir, const string& value,
 
 
 Status SyncEtcdClient::Update(const string& key, const string& value,
-                              const int previous_index, int* new_index) {
+                              const int64_t previous_index,
+                              int64_t* new_index) {
   return BlockingCall(base_, bind(&EtcdClient::Update, client_.get(), key,
                                   value, previous_index, _1),
                       new_index);
@@ -157,8 +158,8 @@ Status SyncEtcdClient::Update(const string& key, const string& value,
 
 Status SyncEtcdClient::UpdateWithTTL(const string& key, const string& value,
                                      const std::chrono::duration<int>& ttl,
-                                     const int previous_index,
-                                     int* new_index) {
+                                     const int64_t previous_index,
+                                     int64_t* new_index) {
   return BlockingCall(base_, bind(&EtcdClient::UpdateWithTTL, client_.get(),
                                   key, value, ttl, previous_index, _1),
                       new_index);
@@ -166,7 +167,7 @@ Status SyncEtcdClient::UpdateWithTTL(const string& key, const string& value,
 
 
 Status SyncEtcdClient::ForceSet(const string& key, const string& value,
-                                int* new_index) {
+                                int64_t* new_index) {
   return BlockingCall(base_, bind(&EtcdClient::ForceSet, client_.get(), key,
                                   value, _1),
                       new_index);
@@ -175,14 +176,14 @@ Status SyncEtcdClient::ForceSet(const string& key, const string& value,
 
 Status SyncEtcdClient::ForceSetWithTTL(const string& key, const string& value,
                                        const std::chrono::duration<int>& ttl,
-                                       int* new_index) {
+                                       int64_t* new_index) {
   return BlockingCall(base_, bind(&EtcdClient::ForceSetWithTTL, client_.get(),
                                   key, value, ttl, _1),
                       new_index);
 }
 
 
-Status SyncEtcdClient::Delete(const string& key, const int current_index) {
+Status SyncEtcdClient::Delete(const string& key, const int64_t current_index) {
   return BlockingCall(base_, bind(&EtcdClient::Delete, client_.get(), key,
                                   current_index, _1));
 }

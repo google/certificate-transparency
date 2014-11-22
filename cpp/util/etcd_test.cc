@@ -163,31 +163,31 @@ class EtcdTest : public ::testing::Test {
     return make_shared<JsonObject>(json);
   }
 
-  void GetCallback(bool expect_success, int expect_index,
+  void GetCallback(bool expect_success, int64_t expect_index,
                    const string& expect_value, Status status,
                    const EtcdClient::Node& node) {
     EXPECT_EQ(expect_success, status.ok());
     if (expect_success) {
-      EXPECT_EQ(expect_index, node.index_);
+      EXPECT_EQ(expect_index, node.modified_index_);
       EXPECT_EQ(expect_value, node.value_);
     }
   }
 
   void GetAllCallback(bool expect_success,
-                      const vector<pair<string, int> >& expect_values,
+                      const vector<pair<string, int64_t> >& expect_values,
                       Status status, const vector<EtcdClient::Node>& nodes) {
     EXPECT_EQ(expect_success, status.ok());
     if (expect_success) {
       EXPECT_EQ(expect_values.size(), nodes.size());
       for (int i = 0; i < nodes.size(); ++i) {
         EXPECT_EQ(expect_values[i].first, nodes[i].value_);
-        EXPECT_EQ(expect_values[i].second, nodes[i].index_);
+        EXPECT_EQ(expect_values[i].second, nodes[i].modified_index_);
       }
     }
   }
 
-  void CreateCallback(bool expect_success, int expect_index, Status status,
-                      int created_index) {
+  void CreateCallback(bool expect_success, int64_t expect_index, Status status,
+                      int64_t created_index) {
     EXPECT_EQ(expect_success, status.ok());
     if (expect_success) {
       EXPECT_EQ(expect_index, created_index);
@@ -195,8 +195,8 @@ class EtcdTest : public ::testing::Test {
   }
 
   void CreateInQueueCallback(bool expect_success, const string& expect_key,
-                             int expect_index, Status status,
-                             const string& key, int created_index) {
+                             int64_t expect_index, Status status,
+                             const string& key, int64_t created_index) {
     EXPECT_EQ(expect_success, status.ok());
     if (expect_success) {
       EXPECT_EQ(expect_index, created_index);
@@ -204,16 +204,16 @@ class EtcdTest : public ::testing::Test {
     }
   }
 
-  void ForceSetCallback(bool expect_success, int expect_index, Status status,
-                        int new_index) {
+  void ForceSetCallback(bool expect_success, int64_t expect_index,
+                        Status status, int64_t new_index) {
     EXPECT_EQ(expect_success, status.ok());
     if (expect_success) {
       EXPECT_EQ(expect_index, new_index);
     }
   }
 
-  void UpdateCallback(bool expect_success, int expect_index, Status status,
-                      int new_index) {
+  void UpdateCallback(bool expect_success, int64_t expect_index, Status status,
+                      int64_t new_index) {
     EXPECT_EQ(expect_success, status.ok());
     if (expect_success) {
       EXPECT_EQ(expect_index, new_index);
@@ -246,7 +246,7 @@ TEST_F(EtcdTest, TestGetForInvalidKey) {
 TEST_F(EtcdTest, TestGetAll) {
   EXPECT_CALL(client_, Generic(kDirKey, kEmptyParams, EVHTTP_REQ_GET, _))
       .WillOnce(InvokeArgument<3>(Status(), MakeJson(kGetAllJson)));
-  vector<pair<string, int> > expected_values;
+  vector<pair<string, int64_t> > expected_values;
   expected_values.push_back(make_pair("123", 9));
   expected_values.push_back(make_pair("456", 7));
   client_.GetAll(kDirKey, bind(&EtcdTest::GetAllCallback, this, true,
@@ -257,7 +257,7 @@ TEST_F(EtcdTest, TestGetAllForInvalidKey) {
   EXPECT_CALL(client_, Generic(kDirKey, kEmptyParams, EVHTTP_REQ_GET, _))
       .WillOnce(InvokeArgument<3>(Status(util::error::NOT_FOUND, ""),
                                   MakeJson(kKeyNotFoundJson)));
-  vector<pair<string, int> > expected_values;
+  vector<pair<string, int64_t> > expected_values;
   client_.GetAll(kDirKey, bind(&EtcdTest::GetAllCallback, this, false,
                                expected_values, _1, _2));
 }

@@ -34,34 +34,37 @@ class SyncEtcdClient {
                               std::vector<EtcdClient::Node>* values);
 
   virtual util::Status Create(const std::string& key, const std::string& value,
-                              int* index);
+                              int64_t* index);
 
   virtual util::Status CreateWithTTL(const std::string& key,
                                      const std::string& value,
                                      const std::chrono::duration<int>& ttl,
-                                     int* index);
+                                     int64_t* index);
 
   virtual util::Status CreateInQueue(const std::string& dir,
                                      const std::string& value,
-                                     std::string* key, int* index);
+                                     std::string* key, int64_t* index);
 
   virtual util::Status Update(const std::string& key, const std::string& value,
-                              const int previous_index, int* new_index);
+                              const int64_t previous_index,
+                              int64_t* new_index);
 
   virtual util::Status UpdateWithTTL(const std::string& key,
                                      const std::string& value,
                                      const std::chrono::duration<int>& ttl,
-                                     const int previous_index, int* new_index);
+                                     const int64_t previous_index,
+                                     int64_t* new_index);
 
   virtual util::Status ForceSet(const std::string& key,
-                                const std::string& value, int* new_index);
+                                const std::string& value, int64_t* new_index);
 
   virtual util::Status ForceSetWithTTL(const std::string& key,
                                        const std::string& value,
                                        const std::chrono::duration<int>& ttl,
-                                       int* new_index);
+                                       int64_t* new_index);
 
-  virtual util::Status Delete(const std::string& key, const int current_index);
+  virtual util::Status Delete(const std::string& key,
+                              const int64_t current_index);
 
  private:
   // Testing only

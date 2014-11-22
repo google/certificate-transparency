@@ -24,14 +24,24 @@ class EtcdClient {
 
  public:
   struct Node {
-    Node() = default;
-    Node(int index, const std::string& key, const std::string& value);
-
     static const Node& InvalidNode();
 
-    int index_;
+    Node() : Node(InvalidNode()) {
+    }
+
+    Node(int64_t created_index, int64_t modified_index, const std::string& key,
+         const std::string& value);
+
+    bool HasExpiry() const;
+
+    std::string ToString() const;
+
+    int64_t created_index_;
+    int64_t modified_index_;
     std::string key_;
     std::string value_;
+    std::chrono::system_clock::time_point expires_;
+    bool deleted_;
   };
 
   class Watcher {
@@ -39,6 +49,7 @@ class EtcdClient {
     struct Update {
       Update();
       Update(const Node& node, const bool exists);
+
       const Node node_;
       const bool exists_;
     };
@@ -51,7 +62,11 @@ class EtcdClient {
     // not supported.
     Watcher(EtcdClient* client, const std::string& key,
             const WatchCallback& cb);
-    ~Watcher();
+
+    virtual ~Watcher();
+
+   protected:
+    Watcher() = default;
 
    private:
     class Impl;
@@ -71,12 +86,13 @@ class EtcdClient {
   typedef std::function<void(util::Status status,
                              const std::vector<EtcdClient::Node>& values)>
       GetAllCallback;
-  typedef std::function<void(util::Status status, int index)> CreateCallback;
+  typedef std::function<void(util::Status status, int64_t index)>
+      CreateCallback;
   typedef std::function<void(util::Status status, const std::string& key,
-                             int index)> CreateInQueueCallback;
-  typedef std::function<void(util::Status status, int new_index)>
+                             int64_t index)> CreateInQueueCallback;
+  typedef std::function<void(util::Status status, int64_t new_index)>
       UpdateCallback;
-  typedef std::function<void(util::Status status, int new_index)>
+  typedef std::function<void(util::Status status, int64_t new_index)>
       ForceSetCallback;
   typedef std::function<void(util::Status status)> DeleteCallback;
 
@@ -101,11 +117,11 @@ class EtcdClient {
                      const CreateInQueueCallback& cb);
 
   void Update(const std::string& key, const std::string& value,
-              const int previous_index, const UpdateCallback& cb);
+              const int64_t previous_index, const UpdateCallback& cb);
 
   void UpdateWithTTL(const std::string& key, const std::string& value,
                      const std::chrono::duration<int>& ttl,
-                     const int previous_index, const UpdateCallback& cb);
+                     const int64_t previous_index, const UpdateCallback& cb);
 
   void ForceSet(const std::string& key, const std::string& value,
                 const ForceSetCallback& cb);
@@ -114,8 +130,11 @@ class EtcdClient {
                        const std::chrono::duration<int>& ttl,
                        const ForceSetCallback& cb);
 
-  void Delete(const std::string& key, const int current_index,
+  void Delete(const std::string& key, const int64_t current_index,
               const DeleteCallback& cb);
+
+  virtual Watcher* CreateWatcher(const std::string& key,
+                                 const Watcher::WatchCallback& cb);
 
  protected:
   typedef std::function<void(util::Status status,

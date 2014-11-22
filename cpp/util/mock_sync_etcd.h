@@ -20,22 +20,22 @@ class MockSyncEtcdClient : public SyncEtcdClient {
                                     std::vector<EtcdClient::Node>* nodes));
 
   MOCK_METHOD3(Create, util::Status(const std::string& key,
-                                    const std::string& value, int* index));
+                                    const std::string& value, int64_t* index));
 
   MOCK_METHOD4(CreateInQueue,
                util::Status(const std::string& dir, const std::string& value,
-                            std::string* key, int* index));
+                            std::string* key, int64_t* index));
 
   MOCK_METHOD4(Update,
                util::Status(const std::string& key, const std::string& value,
-                            const int previous_index, int* new_index));
+                            const int64_t previous_index, int64_t* new_index));
 
   MOCK_METHOD3(ForceSet,
                util::Status(const std::string& key, const std::string& value,
-                            int* new_index));
+                            int64_t* new_index));
 
-  MOCK_METHOD2(Delete,
-               util::Status(const std::string& key, const int current_index));
+  MOCK_METHOD2(Delete, util::Status(const std::string& key,
+                                    const int64_t current_index));
 };
 
 
