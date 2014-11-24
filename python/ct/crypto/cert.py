@@ -383,6 +383,23 @@ class Certificate(object):
         return (self._asn1_cert["tbsCertificate"]["validity"]["notAfter"].
                 component_value().gmtime())
 
+    def is_not_after_well_defined(self):
+        """Checks if notAfter field is well defined.
+
+        RFC5280 specifies that to indicate that certificate has no well-defined
+        expiration date notAfter should be set to 99991231235959Z
+        generalized time.
+
+        Returns:
+            True if not after is well defined, False otherwise
+        """
+        not_after = self._asn1_cert["tbsCertificate"]["validity"]["notAfter"]
+        if "generalTime" in not_after.value:
+            not_after = not_after.value["generalTime"]
+            if not_after.value == '99991231235959Z':
+                return False
+        return True
+
     def is_temporally_valid_now(self):
         """Determine whether notBefore <= now <= notAfter.
 

@@ -6,7 +6,6 @@ from ct.cert_analysis import base_check_test
 from ct.cert_analysis import validity
 from ct.crypto import cert
 
-
 class ValidityTest(base_check_test.BaseCheckTest):
     def test_not_before_regular(self):
         certificate = mock.MagicMock()
@@ -37,6 +36,20 @@ class ValidityTest(base_check_test.BaseCheckTest):
         self.assertIn(validity.NotBeforeInFuture(1).description, [obs.description
                                                                   for obs in
                                                                   result])
+
+    def test_validity_not_after_not_well_defined(self):
+        certificate = mock.Mock()
+        certificate.is_not_after_well_defined = mock.Mock(return_value=False)
+        check = validity.CheckIsExpirationDateWellDefined()
+        result = check.check(certificate)
+        self.assertObservationIn(validity.NotAfterNotWellDefined(), result)
+
+    def test_validity_not_after_well_defined(self):
+        certificate = mock.Mock()
+        certificate.is_not_after_well_defined = mock.Mock(return_value=True)
+        check = validity.CheckIsExpirationDateWellDefined()
+        result = check.check(certificate)
+        self.assertIsNone(result)
 
 
 if __name__ == '__main__':

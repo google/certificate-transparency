@@ -10,6 +10,7 @@ from ct.cert_analysis import crl_pointers
 ALL_CHECKS = [serial_number.CheckNegativeSerialNumber(),
               validity.CheckValidityNotBeforeFuture(),
               validity.CheckValidityCorrupt(),
+              validity.CheckIsExpirationDateWellDefined(),
               dnsnames.CheckValidityOfDnsnames(),
               dnsnames.CheckCorruptSANExtension(),
               ip_addresses.CheckPrivateIpAddresses(),

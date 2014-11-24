@@ -101,6 +101,9 @@ class CertificateTest(unittest.TestCase):
     # A certificate with ASN1 indefinite length encoding.
     _PEM_INDEFINITE_LENGTH = "asn1_indefinite_length_encoding.pem"
 
+    # A certificate with 99991231235959Z expiration date
+    _PEM_NOT_WELL_DEFINED_EXPIRATION = "expiration_not_well_defined.pem"
+
     @property
     def pem_file(self):
         return FLAGS.testdata_dir + "/" + self._PEM_FILE
@@ -656,6 +659,13 @@ class CertificateTest(unittest.TestCase):
         c = self.cert_from_pem_file(self._PEM_INDEFINITE_LENGTH, strict=False)
         issuer = c.print_issuer_name()
         self.assertTrue("VeriSign Class 1 CA" in issuer)
+
+    def test_expiration_not_well_defined(self):
+        c = self.cert_from_pem_file(self._PEM_NOT_WELL_DEFINED_EXPIRATION)
+        self.assertFalse(c.is_not_after_well_defined())
+        # Make sure that certificate with regular expiration date return true
+        c = self.cert_from_pem_file(self._PEM_AIA)
+        self.assertTrue(c.is_not_after_well_defined())
 
 
 if __name__ == "__main__":

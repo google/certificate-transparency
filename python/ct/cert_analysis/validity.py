@@ -19,6 +19,11 @@ class NotBeforeInFuture(ValidityObservation):
         return time.strftime("%Y-%m-%dT%H:%M:%S%Z", self.details)
 
 
+class NotAfterNotWellDefined(ValidityObservation):
+    def __init__(self):
+        super(NotAfterNotWellDefined, self).__init__(
+                "not after not well defined")
+
 class NotBeforeCorrupt(ValidityObservation):
     def __init__(self):
         super(NotBeforeCorrupt, self).__init__("notBefore value corrupt")
@@ -68,4 +73,14 @@ class CheckValidityCorrupt(object):
         return ret
 
 
-#TODO(laiqu) check for 99991231235959Z.
+class CheckIsExpirationDateWellDefined(object):
+    @staticmethod
+    def check(certificate):
+        """Checks if notAfter fields is 9999123123595Z GeneralizedTime, which
+        means that expiration time is not well-defined.
+
+        Returns:
+            array containing NotAfterNotWellDefined or None
+        """
+        if not certificate.is_not_after_well_defined():
+            return [NotAfterNotWellDefined()]
