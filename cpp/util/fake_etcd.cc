@@ -38,13 +38,19 @@ FakeEtcdClient::FakeWatcher::FakeWatcher(FakeEtcdClient* client,
                                          const std::string& key,
                                          const WatchCallback& cb)
     : client_(client), key_(key), cb_(cb) {
+  std::lock_guard<std::mutex> lock(client_->mutex_);
   std::vector<Update> initial_updates;
   for (const auto& pair : client_->entries_) {
     if (pair.first.find(key_) == 0) {
       initial_updates.push_back(Update(pair.second, true /*exists*/));
     }
   }
-  client_->ScheduleCallback(std::bind(cb_, initial_updates));
+  // Send the initial update in this thread.
+  // A bit naughty because we'll block the c'tor, but it's the easiest way to
+  // avoid a race.  We could try to be a bit more clever and palm it off onto a
+  // thread, but since this fake doesn't do journaling that opens the
+  // possibility of missing sending updates.
+  cb_(initial_updates);
   client_->watches_[key_].push_back(
       std::make_pair(cb_, static_cast<void*>(this)));
 }
