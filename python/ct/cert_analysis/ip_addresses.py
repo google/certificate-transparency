@@ -38,8 +38,8 @@ class CheckPrivateIpAddresses(object):
             for address in certificate.subject_ip_addresses():
                 octets = address.as_octets()
                 if len(octets) == 16:
-                    #TODO(laiqu) check for private address ranges in IPv6
-                    observations += [IPv6()]
+                    if octets[0] == ord('\xfd'):
+                        observations += [Private(str(address))]
                 else:
                     private = False
                     # check 10.0.0.0 to 10.255.255.255
@@ -52,7 +52,7 @@ class CheckPrivateIpAddresses(object):
                     elif (octets[0] == 192 and octets[1] == 168):
                         private = True
                     if private:
-                        observations += [Private('.'.join(map(str,octets)))]
+                        observations += [Private(str(address))]
         except cert.CertificateError:
             pass
         return observations

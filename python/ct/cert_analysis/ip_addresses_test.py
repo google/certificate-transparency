@@ -48,16 +48,23 @@ class IpAddressesTest(base_check_test.BaseCheckTest):
         result = check.check(certificate)
         self.assertEqual(len(result), 0)
 
-    def test_private_ipv6(self):
-        # TODO(laiqu) after checks for ipv6 are in place test them, for now
-        # check that we recognize ipv6 addresses
+    def test_not_private_ipv6(self):
         certificate = mock.MagicMock()
         certificate.subject_ip_addresses = mock.Mock(return_value=[
                 self.FakeIPAddress(0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13,
                                    14, 15)])
         check = ip_addresses.CheckPrivateIpAddresses()
         result = check.check(certificate)
-        self.assertObservationIn(ip_addresses.IPv6(), result)
+        self.assertEqual(len(result), 0)
+
+    def test_private_ipv6(self):
+        certificate = mock.MagicMock()
+        certificate.subject_ip_addresses = mock.Mock(return_value=[
+                self.FakeIPAddress(253, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12,
+                                   13, 14, 15)])
+        check = ip_addresses.CheckPrivateIpAddresses()
+        result = check.check(certificate)
+        self.assertEqual(len(result), 1)
 
 
 if __name__ == '__main__':
