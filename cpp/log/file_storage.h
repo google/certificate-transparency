@@ -43,9 +43,9 @@ class FilesystemOps;
 class FileStorage {
  public:
   // Default constructor, uses BasicFilesystemOps.
-  FileStorage(const std::string& file_base, unsigned storage_depth);
+  FileStorage(const std::string& file_base, int storage_depth);
   // Takes ownership of the FilesystemOps.
-  FileStorage(const std::string& file_base, unsigned storage_depth,
+  FileStorage(const std::string& file_base, int storage_depth,
               cert_trans::FilesystemOps* file_op);
   ~FileStorage();
 
@@ -63,14 +63,14 @@ class FileStorage {
 
  private:
   std::string StoragePathBasename(const std::string& hex) const;
-  std::string StoragePathComponent(const std::string& hex, unsigned n) const;
+  std::string StoragePathComponent(const std::string& hex, int n) const;
   std::string StoragePath(const std::string& key) const;
   std::string StorageKey(const std::string& storage_path) const;
   // Write or overwrite.
   void WriteStorageEntry(const std::string& key, const std::string& data);
   void ScanFiles(const std::string& dir_path,
                  std::set<std::string>* keys) const;
-  void ScanDir(const std::string& dir_path, unsigned depth,
+  void ScanDir(const std::string& dir_path, int depth,
                std::set<std::string>* keys) const;
 
   // The following methods abort upon any error.
@@ -83,7 +83,7 @@ class FileStorage {
   const std::string storage_dir_;
   const std::string tmp_dir_;
   const std::string tmp_file_template_;
-  unsigned int storage_depth_;
+  int storage_depth_;
   cert_trans::FilesystemOps* file_op_;
 
   DISALLOW_COPY_AND_ASSIGN(FileStorage);

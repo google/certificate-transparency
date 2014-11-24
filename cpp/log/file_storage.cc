@@ -20,7 +20,7 @@ using std::string;
 namespace cert_trans {
 
 
-FileStorage::FileStorage(const string& file_base, unsigned storage_depth)
+FileStorage::FileStorage(const string& file_base, int storage_depth)
     : storage_dir_(file_base + "/storage"),
       tmp_dir_(file_base + "/tmp"),
       tmp_file_template_(tmp_dir_ + "/tmpXXXXXX"),
@@ -32,7 +32,7 @@ FileStorage::FileStorage(const string& file_base, unsigned storage_depth)
 }
 
 
-FileStorage::FileStorage(const string& file_base, unsigned storage_depth,
+FileStorage::FileStorage(const string& file_base, int storage_depth,
                          FilesystemOps* file_op)
     : storage_dir_(file_base + "/storage"),
       tmp_dir_(file_base + "/tmp"),
@@ -97,7 +97,8 @@ string FileStorage::StoragePathBasename(const string& hex) const {
 }
 
 
-string FileStorage::StoragePathComponent(const string& hex, unsigned n) const {
+string FileStorage::StoragePathComponent(const string& hex, int n) const {
+  CHECK_GE(n, 0);
   CHECK_LT(n, storage_depth_);
   if (n >= hex.length())
     return "-";
@@ -108,7 +109,7 @@ string FileStorage::StoragePathComponent(const string& hex, unsigned n) const {
 string FileStorage::StoragePath(const string& key) const {
   string hex = util::HexString(key);
   string dirname = storage_dir_ + "/";
-  for (unsigned n = 0; n < storage_depth_; ++n)
+  for (int n = 0; n < storage_depth_; ++n)
     dirname += StoragePathComponent(hex, n) + "/";
   return dirname + StoragePathBasename(hex);
 }
@@ -118,7 +119,7 @@ string FileStorage::StorageKey(const string& storage_path) const {
   CHECK_EQ(storage_path.substr(0, storage_dir_.size()), storage_dir_);
   string key_path = storage_path.substr(storage_dir_.size() + 1);
   string hex_key;
-  for (unsigned n = 0; n < storage_depth_; ++n) {
+  for (int n = 0; n < storage_depth_; ++n) {
     char hex_char = key_path[2 * n];
     if (hex_char == '-')
       return util::BinaryString(hex_key);
@@ -137,7 +138,7 @@ void FileStorage::WriteStorageEntry(const string& key, const string& data) {
   // Make the intermediate directories, if needed.
   // TODO(ekasper): we can skip this if we know we're updating.
   string dir = storage_dir_;
-  for (unsigned n = 0; n < storage_depth_; ++n) {
+  for (int n = 0; n < storage_depth_; ++n) {
     dir += "/" + StoragePathComponent(hex, n);
     CreateMissingDirectory(dir);
   }
@@ -161,8 +162,9 @@ void FileStorage::ScanFiles(const string& dir_path,
 }
 
 
-void FileStorage::ScanDir(const string& dir_path, unsigned depth,
+void FileStorage::ScanDir(const string& dir_path, int depth,
                           std::set<string>* keys) const {
+  CHECK_GE(depth, 0);
   if (depth > 0) {
     // Parse subdirectories. (TODO: make opendir part of filesystemop).
     DIR* dir = CHECK_NOTNULL(opendir(dir_path.c_str()));
