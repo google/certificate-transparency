@@ -19,15 +19,15 @@ FLAGS = gflags.FLAGS
 gflags.DEFINE_string("log_list", None, "Logs list file to parse and print.")
 gflags.MarkFlagAsRequired("log_list")
 gflags.DEFINE_string("signature", None, "Signature file over the list of logs.")
-gflags.MarkFlagAsRequired("signature")
 gflags.DEFINE_string("signer_key", None, "Public key of the log list signer.")
-gflags.MarkFlagAsRequired("signer_key")
 gflags.DEFINE_string("log_list_schema",
                      os.path.join(os.path.dirname(sys.argv[0]),
                                   "data", "log_list_schema.json"),
                      "JSON schema for the list of logs.")
 gflags.DEFINE_string("header_output", None,
                      "If specifed, generates C++ code for Chromium.")
+gflags.DEFINE_boolean("skip_signature_check", False,
+                     "Skip signature check (only validate schema).")
 
 
 def is_log_list_valid(json_log_list, schema_file):
@@ -137,7 +137,8 @@ def run():
     with open(FLAGS.log_list, "rb") as f:
         json_data = f.read()
 
-    if not is_signature_valid(json_data, FLAGS.signature, FLAGS.signer_key):
+    if (not FLAGS.skip_signature_check) and not is_signature_valid(
+        json_data, FLAGS.signature, FLAGS.signer_key):
         print "ERROR: Signature over list of logs is not valid, not proceeding."
         sys.exit(1)
 
