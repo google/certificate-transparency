@@ -1,6 +1,7 @@
 #ifndef FILE_DB_H
 #define FILE_DB_H
 
+#include <memory>
 #include <set>
 #include <stdint.h>
 #include <string>
@@ -38,8 +39,9 @@ class FilesystemOps;
 //
 // <root>/tmp     - Temporary storage for atomicity. Must be on the
 //                  same filesystem as <root>/storage.
-
-// FileStorage aborts Upon any FilesystemOps error.
+//
+// FileStorage aborts upon any FilesystemOps error. This class is
+// threadsafe.
 class FileStorage {
  public:
   // Default constructor, uses BasicFilesystemOps.
@@ -83,8 +85,8 @@ class FileStorage {
   const std::string storage_dir_;
   const std::string tmp_dir_;
   const std::string tmp_file_template_;
-  int storage_depth_;
-  cert_trans::FilesystemOps* file_op_;
+  const int storage_depth_;
+  const std::unique_ptr<cert_trans::FilesystemOps> file_op_;
 
   DISALLOW_COPY_AND_ASSIGN(FileStorage);
 };

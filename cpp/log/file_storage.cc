@@ -38,7 +38,7 @@ FileStorage::FileStorage(const string& file_base, int storage_depth,
       tmp_dir_(file_base + "/tmp"),
       tmp_file_template_(tmp_dir_ + "/tmpXXXXXX"),
       storage_depth_(storage_depth),
-      file_op_(file_op) {
+      file_op_(CHECK_NOTNULL(file_op)) {
   CHECK_GE(storage_depth_, 0);
   CreateMissingDirectory(storage_dir_);
   CreateMissingDirectory(tmp_dir_);
@@ -46,7 +46,7 @@ FileStorage::FileStorage(const string& file_base, int storage_depth,
 
 
 FileStorage::~FileStorage() {
-  delete file_op_;
+  // Needs to be where FilesystemOps is visible.
 }
 
 
