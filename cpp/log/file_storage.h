@@ -6,6 +6,7 @@
 #include <string>
 
 #include "base/macros.h"
+#include "util/status.h"
 
 namespace cert_trans {
 
@@ -48,28 +49,17 @@ class FileStorage {
               cert_trans::FilesystemOps* file_op);
   ~FileStorage();
 
-  enum FileStorageResult {
-    OK,
-    // Create failed.
-    ENTRY_ALREADY_EXISTS,
-    // Lookup or update failed.
-    NOT_FOUND,
-  };
-
   // Scan the entire database and return the list of keys.
   std::set<std::string> Scan() const;
 
   // Write (key, data) unless an entry matching |key| already exists.
-  FileStorageResult CreateEntry(const std::string& key,
-                                const std::string& data);
+  util::Status CreateEntry(const std::string& key, const std::string& data);
 
   // Update an existing entry; fail if it doesn't already exist.
-  FileStorageResult UpdateEntry(const std::string& key,
-                                const std::string& data);
+  util::Status UpdateEntry(const std::string& key, const std::string& data);
 
   // Lookup entry based on key.
-  FileStorageResult LookupEntry(const std::string& key,
-                                std::string* result) const;
+  util::Status LookupEntry(const std::string& key, std::string* result) const;
 
  private:
   std::string StoragePathBasename(const std::string& hex) const;

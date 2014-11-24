@@ -55,12 +55,11 @@ typename Database<Logged>::WriteResult FileDB<Logged>::CreateSequencedEntry_(
   std::string data;
   CHECK(logged.SerializeToString(&data));
   // Try to create.
-  cert_trans::FileStorage::FileStorageResult result =
-      cert_storage_->CreateEntry(hash, data);
-  if (result == cert_trans::FileStorage::ENTRY_ALREADY_EXISTS) {
+  util::Status status(cert_storage_->CreateEntry(hash, data));
+  if (status.CanonicalCode() == util::error::ALREADY_EXISTS) {
     return this->ENTRY_ALREADY_LOGGED;
   }
-  assert(result == cert_trans::FileStorage::OK);
+  assert(status.ok());
   CHECK(
       sequence_map_.insert(make_pair(logged.sequence_number(), hash)).second);
   return this->OK;
@@ -73,12 +72,11 @@ typename Database<Logged>::LookupResult FileDB<Logged>::LookupByHash(
   std::lock_guard<std::mutex> lock(lock_);
 
   std::string cert_data;
-  cert_trans::FileStorage::FileStorageResult db_result =
-      cert_storage_->LookupEntry(hash, &cert_data);
-  if (db_result == cert_trans::FileStorage::NOT_FOUND) {
+  util::Status status(cert_storage_->LookupEntry(hash, &cert_data));
+  if (status.CanonicalCode() == util::error::NOT_FOUND) {
     return this->NOT_FOUND;
   }
-  assert(db_result == cert_trans::FileStorage::OK);
+  assert(status.ok());
 
   Logged logged;
   bool ret = logged.ParseFromString(cert_data);
@@ -105,9 +103,8 @@ typename Database<Logged>::LookupResult FileDB<Logged>::LookupByIndex(
 
   if (result != nullptr) {
     std::string cert_data;
-    cert_trans::FileStorage::FileStorageResult db_result =
-        cert_storage_->LookupEntry(it->second, &cert_data);
-    assert(db_result == cert_trans::FileStorage::OK);
+    util::Status status(cert_storage_->LookupEntry(it->second, &cert_data));
+    assert(status.ok());
 
     Logged logged;
     bool ret = logged.ParseFromString(cert_data);
@@ -134,12 +131,11 @@ typename Database<Logged>::WriteResult FileDB<Logged>::WriteTreeHead_(
   bool ret = sth.SerializeToString(&data);
   assert(ret);
 
-  cert_trans::FileStorage::FileStorageResult result =
-      tree_storage_->CreateEntry(timestamp_key, data);
-  if (result == cert_trans::FileStorage::ENTRY_ALREADY_EXISTS) {
+  util::Status status(tree_storage_->CreateEntry(timestamp_key, data));
+  if (status.CanonicalCode() == util::error::ALREADY_EXISTS) {
     return this->DUPLICATE_TREE_HEAD_TIMESTAMP;
   }
-  assert(result == cert_trans::FileStorage::OK);
+  assert(status.ok());
 
   if (sth.timestamp() > latest_tree_timestamp_) {
     latest_tree_timestamp_ = sth.timestamp();
@@ -203,10 +199,9 @@ void FileDB<Logged>::BuildIndex() {
   for (const auto& hash : hashes) {
     std::string cert_data;
     // Read the data; tolerate no errors.
-    cert_trans::FileStorage::FileStorageResult result =
-        cert_storage_->LookupEntry(hash, &cert_data);
-    CHECK_EQ(cert_trans::FileStorage::OK, result)
-        << "Failed to read entry with hash " << hash;
+    util::Status status(cert_storage_->LookupEntry(hash, &cert_data));
+    CHECK_EQ(status, util::Status::OK) << "Failed to read entry with hash "
+                                       << hash;
     Logged logged;
     CHECK(logged.ParseFromString(cert_data)) << "Failed to parse entry with "
                                              << "hash " << hash;
@@ -239,7 +234,7 @@ typename Database<Logged>::LookupResult FileDB<Logged>::LatestTreeHeadNoLock(
 
   std::string tree_data;
   CHECK_EQ(tree_storage_->LookupEntry(latest_timestamp_key_, &tree_data),
-           cert_trans::FileStorage::OK);
+           util::Status::OK);
 
   CHECK(result->ParseFromString(tree_data));
   CHECK_EQ(result->timestamp(), latest_tree_timestamp_);

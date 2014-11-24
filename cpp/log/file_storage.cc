@@ -57,32 +57,35 @@ std::set<string> FileStorage::Scan() const {
 }
 
 
-FileStorage::FileStorageResult FileStorage::CreateEntry(const string& key,
-                                                        const string& data) {
-  if (LookupEntry(key, NULL) == OK)
-    return ENTRY_ALREADY_EXISTS;
+util::Status FileStorage::CreateEntry(const string& key, const string& data) {
+  if (LookupEntry(key, NULL).ok()) {
+    return util::Status(util::error::ALREADY_EXISTS,
+                        "entry already exists: " + key);
+  }
   WriteStorageEntry(key, data);
-  return OK;
+  return util::Status::OK;
 }
 
 
-FileStorage::FileStorageResult FileStorage::UpdateEntry(const string& key,
-                                                        const string& data) {
-  if (LookupEntry(key, NULL) != OK)
-    return NOT_FOUND;
+util::Status FileStorage::UpdateEntry(const string& key, const string& data) {
+  if (!LookupEntry(key, NULL).ok()) {
+    return util::Status(util::error::NOT_FOUND,
+                        "tried to update non-existent entry: " + key);
+  }
   WriteStorageEntry(key, data);
-  return OK;
+  return util::Status::OK;
 }
 
 
-FileStorage::FileStorageResult FileStorage::LookupEntry(const string& key,
-                                                        string* result) const {
+util::Status FileStorage::LookupEntry(const string& key,
+                                      string* result) const {
   string data_file = StoragePath(key);
-  if (!FileExists(data_file))
-    return NOT_FOUND;
+  if (!FileExists(data_file)) {
+    return util::Status(util::error::NOT_FOUND, "entry not found: " + key);
+  }
   if (result != NULL && !util::ReadBinaryFile(data_file, result))
     abort();
-  return OK;
+  return util::Status::OK;
 }
 
 
