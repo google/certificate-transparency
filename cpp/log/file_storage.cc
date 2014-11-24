@@ -1,10 +1,10 @@
 /* -*- indent-tabs-mode: nil -*- */
 #include "log/file_storage.h"
 
-#include <assert.h>
 #include <cstdlib>
 #include <dirent.h>
 #include <errno.h>
+#include <glog/logging.h>
 #include <set>
 #include <string>
 #include <sys/stat.h>
@@ -26,7 +26,7 @@ FileStorage::FileStorage(const string& file_base, unsigned storage_depth)
       tmp_file_template_(tmp_dir_ + "/tmpXXXXXX"),
       storage_depth_(storage_depth),
       file_op_(new BasicFilesystemOps()) {
-  assert(storage_depth_ >= 0);
+  CHECK_GE(storage_depth_, 0);
   CreateMissingDirectory(storage_dir_);
   CreateMissingDirectory(tmp_dir_);
 }
@@ -39,7 +39,7 @@ FileStorage::FileStorage(const string& file_base, unsigned storage_depth,
       tmp_file_template_(tmp_dir_ + "/tmpXXXXXX"),
       storage_depth_(storage_depth),
       file_op_(file_op) {
-  assert(storage_depth_ >= 0);
+  CHECK_GE(storage_depth_, 0);
   CreateMissingDirectory(storage_dir_);
   CreateMissingDirectory(tmp_dir_);
 }
@@ -83,8 +83,9 @@ util::Status FileStorage::LookupEntry(const string& key,
   if (!FileExists(data_file)) {
     return util::Status(util::error::NOT_FOUND, "entry not found: " + key);
   }
-  if (result != NULL && !util::ReadBinaryFile(data_file, result))
-    abort();
+  if (result) {
+    CHECK(util::ReadBinaryFile(data_file, result));
+  }
   return util::Status::OK;
 }
 
@@ -97,7 +98,7 @@ string FileStorage::StoragePathBasename(const string& hex) const {
 
 
 string FileStorage::StoragePathComponent(const string& hex, unsigned n) const {
-  assert(n < storage_depth_);
+  CHECK_LT(n, storage_depth_);
   if (n >= hex.length())
     return "-";
   return string(1, hex[n]);
@@ -114,7 +115,7 @@ string FileStorage::StoragePath(const string& key) const {
 
 
 string FileStorage::StorageKey(const string& storage_path) const {
-  assert(storage_path.substr(0, storage_dir_.size()) == storage_dir_);
+  CHECK_EQ(storage_path.substr(0, storage_dir_.size()), storage_dir_);
   string key_path = storage_path.substr(storage_dir_.size() + 1);
   string hex_key;
   for (unsigned n = 0; n < storage_depth_; ++n) {
@@ -149,9 +150,7 @@ void FileStorage::WriteStorageEntry(const string& key, const string& data) {
 
 void FileStorage::ScanFiles(const string& dir_path,
                             std::set<string>* keys) const {
-  DIR* dir = opendir(dir_path.c_str());
-  if (dir == NULL)
-    abort();
+  DIR* dir = CHECK_NOTNULL(opendir(dir_path.c_str()));
   struct dirent* entry;
   while ((entry = readdir(dir)) != NULL) {
     if (entry->d_name[0] == '.')
@@ -166,9 +165,7 @@ void FileStorage::ScanDir(const string& dir_path, unsigned depth,
                           std::set<string>* keys) const {
   if (depth > 0) {
     // Parse subdirectories. (TODO: make opendir part of filesystemop).
-    DIR* dir = opendir(dir_path.c_str());
-    if (dir == NULL)
-      abort();
+    DIR* dir = CHECK_NOTNULL(opendir(dir_path.c_str()));
     struct dirent* entry;
     std::set<string> result;
     while ((entry = readdir(dir)) != NULL) {
@@ -187,24 +184,27 @@ void FileStorage::ScanDir(const string& dir_path, unsigned depth,
 bool FileStorage::FileExists(const string& file_path) const {
   if (file_op_->access(file_path, F_OK) == 0)
     return true;
-  if (errno == ENOENT)
-    return false;
-  // Filesystem error.
-  abort();
+
+  CHECK_EQ(errno, ENOENT);
+
+  return false;
 }
 
 
 void FileStorage::AtomicWriteBinaryFile(const string& file_path,
                                         const string& data) {
-  string tmp_file = util::WriteTemporaryBinaryFile(tmp_file_template_, data);
-  if (tmp_file.empty() || file_op_->rename(tmp_file, file_path) != 0)
-    abort();
+  const string tmp_file(
+      util::WriteTemporaryBinaryFile(tmp_file_template_, data));
+
+  CHECK(!tmp_file.empty());
+  CHECK_EQ(file_op_->rename(tmp_file, file_path), 0);
 }
 
 
 void FileStorage::CreateMissingDirectory(const string& dir_path) {
-  if (file_op_->mkdir(dir_path, 0700) != 0 && errno != EEXIST)
-    abort();
+  if (file_op_->mkdir(dir_path, 0700) != 0) {
+    CHECK_EQ(errno, EEXIST);
+  }
 }
 
 
