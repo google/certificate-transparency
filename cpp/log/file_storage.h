@@ -1,5 +1,5 @@
-#ifndef FILE_DB_H
-#define FILE_DB_H
+#ifndef CERT_TRANS_LOG_FILE_STORAGE_H_
+#define CERT_TRANS_LOG_FILE_STORAGE_H_
 
 #include <memory>
 #include <set>
@@ -94,4 +94,4 @@ class FileStorage {
 
 }  // namespace cert_trans
 
-#endif
+#endif  // CERT_TRANS_LOG_FILE_STORAGE_H_
