@@ -22,8 +22,8 @@ void TestDB<FileDB<cert_trans::LoggedCertificate> >::Setup() {
   CHECK_ERR(mkdir(tree_dir.c_str(), 0700));
 
   db_ = new FileDB<cert_trans::LoggedCertificate>(
-      new FileStorage(certs_dir, kCertStorageDepth),
-      new FileStorage(tree_dir, kTreeStorageDepth));
+      new cert_trans::FileStorage(certs_dir, kCertStorageDepth),
+      new cert_trans::FileStorage(tree_dir, kTreeStorageDepth));
 }
 
 template <>
@@ -32,8 +32,8 @@ TestDB<FileDB<cert_trans::LoggedCertificate> >::SecondDB() const {
   std::string certs_dir = this->tmp_.TmpStorageDir() + "/certs";
   std::string tree_dir = this->tmp_.TmpStorageDir() + "/tree";
   return new FileDB<cert_trans::LoggedCertificate>(
-      new FileStorage(certs_dir, kCertStorageDepth),
-      new FileStorage(tree_dir, kTreeStorageDepth));
+      new cert_trans::FileStorage(certs_dir, kCertStorageDepth),
+      new cert_trans::FileStorage(tree_dir, kTreeStorageDepth));
 }
 
 template <>
@@ -51,12 +51,12 @@ TestDB<SQLiteDB<cert_trans::LoggedCertificate> >::SecondDB() const {
 
 // Not a Database; we just use the same template for setup.
 template <>
-void TestDB<FileStorage>::Setup() {
-  db_ = new FileStorage(tmp_.TmpStorageDir(), kCertStorageDepth);
+void TestDB<cert_trans::FileStorage>::Setup() {
+  db_ = new cert_trans::FileStorage(tmp_.TmpStorageDir(), kCertStorageDepth);
 }
 
 template <>
-FileStorage* TestDB<FileStorage>::SecondDB() const {
-  return new FileStorage(tmp_.TmpStorageDir(), kCertStorageDepth);
+cert_trans::FileStorage* TestDB<cert_trans::FileStorage>::SecondDB() const {
+  return new cert_trans::FileStorage(tmp_.TmpStorageDir(), kCertStorageDepth);
 }
 #endif  // LOG_TEST_DB_H

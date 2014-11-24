@@ -61,6 +61,7 @@ namespace libevent = cert_trans::libevent;
 
 using cert_trans::CertChecker;
 using cert_trans::FakeConsistentStore;
+using cert_trans::FileStorage;
 using cert_trans::HttpHandler;
 using cert_trans::LoggedCertificate;
 using cert_trans::ThreadPool;

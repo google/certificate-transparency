@@ -8,8 +8,8 @@
 #include "base/macros.h"
 
 namespace cert_trans {
+
 class FilesystemOps;
-}
 
 // A simple filesystem-based database for (key, data) entries,
 // structured as follows:
@@ -98,4 +98,8 @@ class FileStorage {
 
   DISALLOW_COPY_AND_ASSIGN(FileStorage);
 };
+
+
+}  // namespace cert_trans
+
 #endif

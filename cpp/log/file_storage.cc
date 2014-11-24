@@ -17,6 +17,9 @@ using cert_trans::BasicFilesystemOps;
 using cert_trans::FilesystemOps;
 using std::string;
 
+namespace cert_trans {
+
+
 FileStorage::FileStorage(const string& file_base, unsigned storage_depth)
     : storage_dir_(file_base + "/storage"),
       tmp_dir_(file_base + "/tmp"),
@@ -27,6 +30,7 @@ FileStorage::FileStorage(const string& file_base, unsigned storage_depth)
   CreateMissingDirectory(storage_dir_);
   CreateMissingDirectory(tmp_dir_);
 }
+
 
 FileStorage::FileStorage(const string& file_base, unsigned storage_depth,
                          FilesystemOps* file_op)
@@ -40,15 +44,18 @@ FileStorage::FileStorage(const string& file_base, unsigned storage_depth,
   CreateMissingDirectory(tmp_dir_);
 }
 
+
 FileStorage::~FileStorage() {
   delete file_op_;
 }
+
 
 std::set<string> FileStorage::Scan() const {
   std::set<string> storage_keys;
   ScanDir(storage_dir_, storage_depth_, &storage_keys);
   return storage_keys;
 }
+
 
 FileStorage::FileStorageResult FileStorage::CreateEntry(const string& key,
                                                         const string& data) {
@@ -58,6 +65,7 @@ FileStorage::FileStorageResult FileStorage::CreateEntry(const string& key,
   return OK;
 }
 
+
 FileStorage::FileStorageResult FileStorage::UpdateEntry(const string& key,
                                                         const string& data) {
   if (LookupEntry(key, NULL) != OK)
@@ -65,6 +73,7 @@ FileStorage::FileStorageResult FileStorage::UpdateEntry(const string& key,
   WriteStorageEntry(key, data);
   return OK;
 }
+
 
 FileStorage::FileStorageResult FileStorage::LookupEntry(const string& key,
                                                         string* result) const {
@@ -76,11 +85,13 @@ FileStorage::FileStorageResult FileStorage::LookupEntry(const string& key,
   return OK;
 }
 
+
 string FileStorage::StoragePathBasename(const string& hex) const {
   if (hex.length() <= storage_depth_)
     return "-";
   return hex.substr(storage_depth_);
 }
+
 
 string FileStorage::StoragePathComponent(const string& hex, unsigned n) const {
   assert(n < storage_depth_);
@@ -89,6 +100,7 @@ string FileStorage::StoragePathComponent(const string& hex, unsigned n) const {
   return string(1, hex[n]);
 }
 
+
 string FileStorage::StoragePath(const string& key) const {
   string hex = util::HexString(key);
   string dirname = storage_dir_ + "/";
@@ -96,6 +108,7 @@ string FileStorage::StoragePath(const string& key) const {
     dirname += StoragePathComponent(hex, n) + "/";
   return dirname + StoragePathBasename(hex);
 }
+
 
 string FileStorage::StorageKey(const string& storage_path) const {
   assert(storage_path.substr(0, storage_dir_.size()) == storage_dir_);
@@ -113,6 +126,7 @@ string FileStorage::StorageKey(const string& storage_path) const {
   return util::BinaryString(hex_key);
 }
 
+
 void FileStorage::WriteStorageEntry(const string& key, const string& data) {
   string hex = util::HexString(key);
 
@@ -129,6 +143,7 @@ void FileStorage::WriteStorageEntry(const string& key, const string& data) {
   AtomicWriteBinaryFile(filename, data);
 }
 
+
 void FileStorage::ScanFiles(const string& dir_path,
                             std::set<string>* keys) const {
   DIR* dir = opendir(dir_path.c_str());
@@ -142,6 +157,7 @@ void FileStorage::ScanFiles(const string& dir_path,
   }
   closedir(dir);
 }
+
 
 void FileStorage::ScanDir(const string& dir_path, unsigned depth,
                           std::set<string>* keys) const {
@@ -164,6 +180,7 @@ void FileStorage::ScanDir(const string& dir_path, unsigned depth,
   }
 }
 
+
 bool FileStorage::FileExists(const string& file_path) const {
   if (file_op_->access(file_path, F_OK) == 0)
     return true;
@@ -173,6 +190,7 @@ bool FileStorage::FileExists(const string& file_path) const {
   abort();
 }
 
+
 void FileStorage::AtomicWriteBinaryFile(const string& file_path,
                                         const string& data) {
   string tmp_file = util::WriteTemporaryBinaryFile(tmp_file_template_, data);
@@ -180,7 +198,11 @@ void FileStorage::AtomicWriteBinaryFile(const string& file_path,
     abort();
 }
 
+
 void FileStorage::CreateMissingDirectory(const string& dir_path) {
   if (file_op_->mkdir(dir_path, 0700) != 0 && errno != EEXIST)
     abort();
 }
+
+
+}  // namespace cert_trans

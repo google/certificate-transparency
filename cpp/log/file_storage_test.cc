@@ -14,10 +14,10 @@
 #include "util/util.h"
 
 using cert_trans::FailingFilesystemOps;
+using cert_trans::FileStorage;
+using std::string;
 
 namespace {
-
-using std::string;
 
 const unsigned kStorageDepth = 3;
 
