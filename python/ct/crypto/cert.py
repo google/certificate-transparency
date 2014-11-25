@@ -189,6 +189,14 @@ class Certificate(object):
     def is_identical_to(self, other_cert):
         return self.to_der() == other_cert.to_der()
 
+    def get_extensions(self):
+        """Get all extensions.
+
+        Returns:
+            a list of extensions.
+        """
+        return self._asn1_cert["tbsCertificate"]["extensions"] or []
+
     def version(self):
         """Get the version.
 

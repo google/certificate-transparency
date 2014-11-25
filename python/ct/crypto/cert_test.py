@@ -695,6 +695,20 @@ class CertificateTest(unittest.TestCase):
         c = self.cert_from_pem_file(self._PEM_FILE)
         self.assertItemsEqual([], c.ocsp_responders())
 
+    def test_get_extensions(self):
+        c = self.cert_from_pem_file(self._PEM_AIA)
+        extensions = c.get_extensions()
+        extensions_oids = [extension['extnID'] for extension in extensions]
+        self.assertItemsEqual((oid.ID_CE_EXT_KEY_USAGE,
+                               oid.ID_CE_SUBJECT_ALT_NAME,
+                               oid.ID_PE_AUTHORITY_INFO_ACCESS,
+                               oid.ID_CE_SUBJECT_KEY_IDENTIFIER,
+                               oid.ID_CE_BASIC_CONSTRAINTS,
+                               oid.ID_CE_AUTHORITY_KEY_IDENTIFIER,
+                               oid.ID_CE_CERTIFICATE_POLICIES,
+                               oid.ID_CE_CRL_DISTRIBUTION_POINTS),
+                              extensions_oids)
+
     def test_indefinite_encoding(self):
         self.assertRaises(error.ASN1Error, self.cert_from_pem_file,
                           self._PEM_INDEFINITE_LENGTH)
