@@ -69,8 +69,6 @@ typename Database<Logged>::WriteResult FileDB<Logged>::CreateSequencedEntry_(
 template <class Logged>
 typename Database<Logged>::LookupResult FileDB<Logged>::LookupByHash(
     const std::string& hash, Logged* result) const {
-  std::lock_guard<std::mutex> lock(lock_);
-
   std::string cert_data;
   util::Status status(cert_storage_->LookupEntry(hash, &cert_data));
   if (status.CanonicalCode() == util::error::NOT_FOUND) {
@@ -93,7 +91,7 @@ typename Database<Logged>::LookupResult FileDB<Logged>::LookupByHash(
 template <class Logged>
 typename Database<Logged>::LookupResult FileDB<Logged>::LookupByIndex(
     uint64_t sequence_number, Logged* result) const {
-  std::lock_guard<std::mutex> lock(lock_);
+  std::unique_lock<std::mutex> lock(lock_);
 
   std::map<uint64_t, std::string>::const_iterator it =
       sequence_map_.find(sequence_number);
@@ -101,9 +99,14 @@ typename Database<Logged>::LookupResult FileDB<Logged>::LookupByIndex(
     return this->NOT_FOUND;
   }
 
+  const std::string hash(it->second);
+  // Now that we know which hash to load (which can never change for a
+  // given sequence number), we can release the lock.
+  lock.unlock();
+
   if (result != nullptr) {
     std::string cert_data;
-    util::Status status(cert_storage_->LookupEntry(it->second, &cert_data));
+    util::Status status(cert_storage_->LookupEntry(hash, &cert_data));
     assert(status.ok());
 
     Logged logged;
@@ -121,7 +124,6 @@ typename Database<Logged>::LookupResult FileDB<Logged>::LookupByIndex(
 template <class Logged>
 typename Database<Logged>::WriteResult FileDB<Logged>::WriteTreeHead_(
     const ct::SignedTreeHead& sth) {
-  std::unique_lock<std::mutex> lock(lock_);
 
   // 6 bytes are good enough for some 9000 years.
   std::string timestamp_key =
@@ -131,6 +133,7 @@ typename Database<Logged>::WriteResult FileDB<Logged>::WriteTreeHead_(
   bool ret = sth.SerializeToString(&data);
   assert(ret);
 
+  std::unique_lock<std::mutex> lock(lock_);
   util::Status status(tree_storage_->CreateEntry(timestamp_key, data));
   if (status.CanonicalCode() == util::error::ALREADY_EXISTS) {
     return this->DUPLICATE_TREE_HEAD_TIMESTAMP;
@@ -193,6 +196,8 @@ void FileDB<Logged>::RemoveNotifySTHCallback(
 
 template <class Logged>
 void FileDB<Logged>::BuildIndex() {
+  // Technically, this should only be called from the constructor, so
+  // this should not be necessarily, but just to be sure...
   std::lock_guard<std::mutex> lock(lock_);
 
   const std::set<std::string> hashes(cert_storage_->Scan());
