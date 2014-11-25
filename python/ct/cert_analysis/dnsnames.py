@@ -1,6 +1,7 @@
 from ct.crypto import cert
 import re
 from ct.cert_analysis.observation import Observation
+from ct.cert_analysis import tld_check
 
 class DNSNamesObservation(Observation):
     def __init__(self, description, *args, **kwargs):
@@ -17,6 +18,39 @@ class InvalidCharacter(DNSNamesObservation):
 class CorruptSANExtension(DNSNamesObservation):
     def __init__(self):
         super(CorruptSANExtension, self).__init__("corrupt extension")
+
+
+
+class TldMatchesBothUnicodeAndIdna(DNSNamesObservation):
+    def __init__(self, *args, **kwargs):
+        super(DNSNamesObservation, self).__init__("unicode and idna encoding"
+              "of address matches different top level domain names", *args,
+                                                  **kwargs)
+
+
+class NoTldMatch(DNSNamesObservation):
+    def __init__(self, *args, **kwargs):
+        super(NoTldMatch, self).__init__("no top level domain matches", *args,
+                                         **kwargs)
+
+
+class NonUnicodeAddress(DNSNamesObservation):
+    def __init__(self, *args, **kwargs):
+        super(NonUnicodeAddress, self).__init__("non unicode address", *args,
+                                                **kwargs)
+
+
+class NotAnAddress(DNSNamesObservation):
+    def __init__(self, *args, **kwargs):
+        super(NotAnAddress, self).__init__("not an address", *args,
+                                           **kwargs)
+
+
+class GenericWildcard(DNSNamesObservation):
+    def __init__(self, *args, **kwargs):
+        super(GenericWildcard, self).__init__(
+                "name wildcard matches top level domain name", *args,
+                **kwargs)
 
 
 class CheckValidityOfDnsnames(object):
@@ -60,6 +94,22 @@ class CheckValidityOfDnsnames(object):
         except cert.CertificateError:
             pass
         return observations
+
+
+class CheckTldMatches(object):
+    """Checks whether dNSNames matches some top level domain name.
+
+    Returns:
+        array containing TldMatchesBothUnicodeAndIdna, NoTldMatch,
+        GenericWildcard or None"""
+    @classmethod
+    def check(cls, certificate):
+        try:
+            return tld_check.CheckTldMatches.check(
+                    certificate.subject_dns_names(),
+                    "dNSNames: ")
+        except cert.CertificateError:
+            pass
 
 class CheckCorruptSANExtension(object):
     """Checks whether SAN extension is corrupt.

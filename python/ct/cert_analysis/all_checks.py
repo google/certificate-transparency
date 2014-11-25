@@ -1,11 +1,12 @@
-from ct.cert_analysis import serial_number
-from ct.cert_analysis import validity
-from ct.cert_analysis import dnsnames
-from ct.cert_analysis import ip_addresses
 from ct.cert_analysis import algorithm
 from ct.cert_analysis import ca_field
-from ct.cert_analysis import ocsp_pointers
+from ct.cert_analysis import common_name
 from ct.cert_analysis import crl_pointers
+from ct.cert_analysis import dnsnames
+from ct.cert_analysis import ip_addresses
+from ct.cert_analysis import ocsp_pointers
+from ct.cert_analysis import serial_number
+from ct.cert_analysis import validity
 
 ALL_CHECKS = [serial_number.CheckNegativeSerialNumber(),
               validity.CheckValidityNotBeforeFuture(),
@@ -13,6 +14,10 @@ ALL_CHECKS = [serial_number.CheckNegativeSerialNumber(),
               validity.CheckIsExpirationDateWellDefined(),
               dnsnames.CheckValidityOfDnsnames(),
               dnsnames.CheckCorruptSANExtension(),
+              dnsnames.CheckTldMatches(),
+              common_name.CheckSCNTldMatches(),
+              common_name.CheckLackOfSubjectCommonName(),
+              common_name.CheckCorruptSubjectCommonName(),
               ip_addresses.CheckPrivateIpAddresses(),
               ip_addresses.CheckCorruptIpAddresses(),
               algorithm.CheckSignatureAlgorithmsMismatch(),
