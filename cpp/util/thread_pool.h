@@ -16,6 +16,9 @@ class ThreadPool {
   // Creates the threads.
   ThreadPool();
 
+  // Creates the threads.
+  ThreadPool(size_t num_threads);
+
   // The destructor will wait for any outstanding closures to finish.
   ~ThreadPool();
 

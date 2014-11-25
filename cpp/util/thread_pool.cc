@@ -85,10 +85,15 @@ void ThreadPool::Impl::Worker() {
 }
 
 
-ThreadPool::ThreadPool() : impl_(new Impl) {
-  const int num_threads(
-      thread::hardware_concurrency() > 0 ? thread::hardware_concurrency() : 1);
+ThreadPool::ThreadPool()
+    : ThreadPool(thread::hardware_concurrency() > 0
+                     ? thread::hardware_concurrency()
+                     : 1) {
+}
 
+
+ThreadPool::ThreadPool(size_t num_threads) : impl_(new Impl) {
+  CHECK_GT(num_threads, 0);
   LOG(INFO) << "ThreadPool starting with " << num_threads << " threads";
   for (int i = 0; i < num_threads; ++i)
     impl_->threads_.emplace_back(thread(&Impl::Worker, impl_.get()));
