@@ -68,13 +68,14 @@ class FileDB : public Database<Logged> {
   typename Database<Logged>::LookupResult LatestTreeHeadNoLock(
       ct::SignedTreeHead* result) const;
 
-  mutable std::mutex lock_;
-  std::map<uint64_t, std::string> sequence_map_;
   const std::unique_ptr<cert_trans::FileStorage> cert_storage_;
   // Store all tree heads, but currently only support looking up the latest
   // one.
   // Other necessary lookup indices (by tree size, by timestamp range?) TBD.
   const std::unique_ptr<cert_trans::FileStorage> tree_storage_;
+
+  mutable std::mutex lock_;
+  std::map<uint64_t, std::string> sequence_map_;
   uint64_t latest_tree_timestamp_;
   // The same as a string;
   std::string latest_timestamp_key_;
