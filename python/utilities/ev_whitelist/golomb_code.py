@@ -10,9 +10,6 @@ import gflags
 
 FLAGS = gflags.FLAGS
 
-gflags.DEFINE_string("input", "all_hashes.bin", "Input hashes file")
-gflags.DEFINE_string("output", "all_hashes_compressed.bin",
-                     "Output, compressed file.")
 gflags.DEFINE_integer("hash_length", 8, "Length of each hash in bytes.")
 gflags.DEFINE_integer("two_power", 47, "Power of 2 for M (M=2**two_power).")
 
@@ -96,9 +93,9 @@ def uncompress_golomb_coding(coded_bytes, hash_length, M):
     return ret_list
 
 
-def main():
+def main(input_file, output_file):
     """Reads and compresses the hashes."""
-    hashes = read_hashes(FLAGS.input, FLAGS.hash_length)
+    hashes = read_hashes(input_file, FLAGS.hash_length)
     hashes.sort()
 
     golomb_coded_bytes = golomb_encode(
@@ -109,7 +106,7 @@ def main():
             len(golomb_coded_bytes),
             len(golomb_coded_bytes) / float(len(hashes) * FLAGS.hash_length))
 
-    with open(FLAGS.output, 'wb') as f:
+    with open(output_file, 'wb') as f:
         f.write(golomb_coded_bytes)
 
     uncompressed_hashes = uncompress_golomb_coding(
@@ -121,4 +118,12 @@ def main():
 
 if __name__ == '__main__':
     sys.argv = FLAGS(sys.argv)
-    main()
+    if len(sys.argv) < 3:
+        sys.stderr.write(
+            "Usage: %s <input hashes file> <compressed output file>\n"
+            "  <input hashes file> Is the truncated, uncompressed hashes "
+            "list.\n"
+            "  <compressed output file> is the output, Golomb-coded file.\n" %
+            sys.argv[0])
+        sys.exit(1)
+    main(sys.argv[1], sys.argv[2])
