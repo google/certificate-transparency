@@ -10,13 +10,14 @@ from ct.crypto import error
 
 FLAGS = gflags.FLAGS
 
-gflags.DEFINE_integer("report_workers", multiprocessing.cpu_count(), "Number of subprocesses scanning "
-                      "certificates.")
+gflags.DEFINE_integer("reporter_workers", multiprocessing.cpu_count(),
+                      "Number of subprocesses scanning certificates.")
 
 def _scan_der_cert(der_certs, checks):
     result = []
     for log_index, der_cert in der_certs:
         partial_result = []
+        strict_failure = False
         try:
             certificate = cert.Certificate(der_cert)
         except error.Error as e:
@@ -24,13 +25,14 @@ def _scan_der_cert(der_certs, checks):
                 certificate = cert.Certificate(der_cert, strict_der=False)
             except error.Error as e:
                 partial_result.append(asn1.All())
+                strict_failure = True
             else:
                 if isinstance(e, error.ASN1IllegalCharacter):
                     partial_result.append(asn1.Strict(reason=e.args[0],
                                                    details=(e.string, e.index)))
                 else:
                     partial_result.append(asn1.Strict(reason=str(e)))
-        else:
+        if not strict_failure:
             for check in checks:
                 partial_result += check.check(certificate) or []
         result.append((log_index, partial_result))
@@ -43,6 +45,7 @@ class CertificateReport(object):
     def __init__(self, checks=all_checks.ALL_CHECKS):
         self.reset()
         self.checks = checks
+        self._pool = multiprocessing.Pool(processes=FLAGS.reporter_workers)
 
     def set_new_entries_count(self, count):
         """Set number of new entries"""
@@ -50,8 +53,8 @@ class CertificateReport(object):
 
     def report(self):
         """Report stored changes and reset report"""
-        self._pool.close()
-        self._pool.join()
+        for job in self._jobs:
+            job.wait()
         logging.info("Report:")
         if self._new_entries_count:
             logging.info("New entries since last verified STH: %s" %
@@ -88,12 +91,14 @@ class CertificateReport(object):
                             "(%s)" % reason if reason else '',
                             count,
                             float(count) / self._new_entries_count * 100.))
+        ret = self._observations_by_index
         self.reset()
+        return ret
 
     def reset(self):
         self._new_entries_count = None
         self._observations_by_index = defaultdict(list)
-        self._pool = multiprocessing.Pool(processes=FLAGS.report_workers)
+        self._jobs = []
 
     def _add_certificate_observations(self, indexed_observations):
         """Adds Observations for certificates identified by indexes
@@ -111,5 +116,6 @@ class CertificateReport(object):
         Args:
             der_certs: array of (log_index, observations) tuples.
         """
-        self._pool.apply_async(_scan_der_cert, [der_certs, self.checks],
-           callback=lambda result: self._add_certificate_observations(result))
+        self._jobs.append(self._pool.apply_async(_scan_der_cert,
+                                                 [der_certs, self.checks],
+           callback=lambda result: self._add_certificate_observations(result)))
