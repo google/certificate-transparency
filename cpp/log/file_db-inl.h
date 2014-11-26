@@ -77,6 +77,7 @@ typename Database<Logged>::LookupResult FileDB<Logged>::LookupByHash(
 
   Logged logged;
   CHECK(logged.ParseFromString(cert_data));
+  CHECK_EQ(logged.Hash(), hash);
 
   if (result) {
     logged.Swap(result);
@@ -108,6 +109,7 @@ typename Database<Logged>::LookupResult FileDB<Logged>::LookupByIndex(
     CHECK_EQ(status, util::Status::OK);
     CHECK(result->ParseFromString(cert_data));
     CHECK_EQ(result->sequence_number(), sequence_number);
+    CHECK_EQ(result->Hash(), hash);
   }
 
   return this->LOOKUP_OK;
@@ -200,10 +202,12 @@ void FileDB<Logged>::BuildIndex() {
     CHECK_EQ(status, util::Status::OK) << "Failed to read entry with hash "
                                        << hash;
     Logged logged;
-    CHECK(logged.ParseFromString(cert_data)) << "Failed to parse entry with "
-                                             << "hash " << hash;
-    CHECK(logged.has_sequence_number()) << "No sequence number for entry with "
-                                        << "hash " << hash;
+    CHECK(logged.ParseFromString(cert_data))
+        << "Failed to parse entry with hash " << hash;
+    CHECK(logged.has_sequence_number())
+        << "No sequence number for entry with hash " << hash;
+    CHECK_EQ(logged.Hash(), hash) << "Incorrect digest for entry with hash "
+                                  << hash;
     CHECK(
         sequence_map_.insert(make_pair(logged.sequence_number(), hash)).second)
         << "Sequence number " << logged.sequence_number() << " already "
