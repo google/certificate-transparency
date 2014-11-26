@@ -8,7 +8,6 @@
 #include <map>
 #include <set>
 #include <stdint.h>
-#include <utility>  // for std::pair
 #include <vector>
 
 #include "log/file_storage.h"
@@ -212,8 +211,8 @@ void FileDB<Logged>::BuildIndex() {
                                              << "hash " << hash;
     CHECK(logged.has_sequence_number()) << "No sequence number for entry with "
                                         << "hash " << hash;
-    CHECK(sequence_map_.insert(std::pair<uint64_t, std::string>(
-                                   logged.sequence_number(), hash)).second)
+    CHECK(
+        sequence_map_.insert(make_pair(logged.sequence_number(), hash)).second)
         << "Sequence number " << logged.sequence_number() << " already "
         << "assigned when inserting hash " << hash;
   }
