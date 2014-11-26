@@ -48,7 +48,9 @@ def process_entries(entry_queue, output_queue, match_callback):
                 _WORKER_STOPPED,
                 certificates_scanned=total_processed))
         else:
-            parsed_entry = entry_decoder.decode_entry(entry)
+            entry_response = client_pb2.EntryResponse()
+            entry_response.ParseFromString(entry)
+            parsed_entry = entry_decoder.decode_entry(entry_response)
             ts_entry = parsed_entry.merkle_leaf.timestamped_entry
             total_processed += 1
             c = None
