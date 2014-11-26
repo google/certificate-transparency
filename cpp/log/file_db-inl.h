@@ -58,7 +58,7 @@ typename Database<Logged>::WriteResult FileDB<Logged>::CreateSequencedEntry_(
   if (status.CanonicalCode() == util::error::ALREADY_EXISTS) {
     return this->ENTRY_ALREADY_LOGGED;
   }
-  assert(status.ok());
+  CHECK_EQ(status, util::Status::OK);
   CHECK(
       sequence_map_.insert(make_pair(logged.sequence_number(), hash)).second);
   return this->OK;
@@ -73,11 +73,10 @@ typename Database<Logged>::LookupResult FileDB<Logged>::LookupByHash(
   if (status.CanonicalCode() == util::error::NOT_FOUND) {
     return this->NOT_FOUND;
   }
-  assert(status.ok());
+  CHECK_EQ(status, util::Status::OK);
 
   Logged logged;
-  bool ret = logged.ParseFromString(cert_data);
-  assert(ret);
+  CHECK(logged.ParseFromString(cert_data));
 
   if (result != nullptr) {
     result->CopyFrom(logged);
@@ -106,12 +105,11 @@ typename Database<Logged>::LookupResult FileDB<Logged>::LookupByIndex(
   if (result != nullptr) {
     std::string cert_data;
     util::Status status(cert_storage_->LookupEntry(hash, &cert_data));
-    assert(status.ok());
+    CHECK_EQ(status, util::Status::OK);
 
     Logged logged;
-    bool ret = logged.ParseFromString(cert_data);
-    assert(ret);
-    assert(logged.sequence_number() == sequence_number);
+    CHECK(logged.ParseFromString(cert_data));
+    CHECK_EQ(logged.sequence_number(), sequence_number);
 
     result->CopyFrom(logged);
   }
@@ -129,15 +127,14 @@ typename Database<Logged>::WriteResult FileDB<Logged>::WriteTreeHead_(
       Serializer::SerializeUint(sth.timestamp(),
                                 FileDB::kTimestampBytesIndexed);
   std::string data;
-  bool ret = sth.SerializeToString(&data);
-  assert(ret);
+  CHECK(sth.SerializeToString(&data));
 
   std::unique_lock<std::mutex> lock(lock_);
   util::Status status(tree_storage_->CreateEntry(timestamp_key, data));
   if (status.CanonicalCode() == util::error::ALREADY_EXISTS) {
     return this->DUPLICATE_TREE_HEAD_TIMESTAMP;
   }
-  assert(status.ok());
+  CHECK_EQ(status, util::Status::OK);
 
   if (sth.timestamp() > latest_tree_timestamp_) {
     latest_tree_timestamp_ = sth.timestamp();
