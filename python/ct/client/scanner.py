@@ -207,9 +207,11 @@ def scan_log(match_callback, log_url,total_processes=2,
         for w in workers:
             w.terminate()
         scanners_pool.terminate()
+        m.shutdown()
         raise
 
     scanners_pool.join()
     for w in workers:
         w.join()
+    m.shutdown()
     return res
