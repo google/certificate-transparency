@@ -179,6 +179,17 @@ class MonitorTest(unittest.TestCase):
             m._scan_entries = mock.Mock()
         return m
 
+    def check_db_state_after_successful_updates(self, number_of_updates):
+        audited_sths = list(self.db.scan_latest_sth_range("log_server"))
+        for index, audited_sth in enumerate(audited_sths):
+            if index % 2 != 0:
+                self.assertEqual(client_pb2.UNVERIFIED,
+                                 audited_sth.audit.status)
+            else:
+                self.assertEqual(client_pb2.VERIFIED,
+                                 audited_sth.audit.status)
+        self.assertEqual(len(audited_sths), number_of_updates * 2)
+
     def test_update(self):
         client = FakeLogClient(self._NEW_STH)
 
@@ -194,6 +205,10 @@ class MonitorTest(unittest.TestCase):
 
             self.verify_tmp_data(self._DEFAULT_STH.tree_size,
                                  self._NEW_STH.tree_size-1)
+            self.check_db_state_after_successful_updates(1)
+            for audited_sth in list(self.db.scan_latest_sth_range("log_server")):
+                self.assertEqual(self._NEW_STH, audited_sth.sth)
+
         return m.update().addCallback(self.assertTrue).addCallback(check_state)
 
     def test_first_update(self):
@@ -211,6 +226,10 @@ class MonitorTest(unittest.TestCase):
             self.verify_state(expected_state)
 
             self.verify_tmp_data(0, self._DEFAULT_STH.tree_size-1)
+            self.check_db_state_after_successful_updates(1)
+            for audited_sth in list(self.db.scan_latest_sth_range("log_server")):
+                self.assertEqual(self._DEFAULT_STH, audited_sth.sth)
+
         d = m.update().addCallback(self.assertTrue
                                    ).addCallback(check_state)
         return d
@@ -232,6 +251,7 @@ class MonitorTest(unittest.TestCase):
 
             # ...and wrote no entries.
             self.assertFalse(self.temp_db.store_entries.called)
+            self.check_db_state_after_successful_updates(0)
         d.addCallback(check_state)
         return d
 
@@ -291,6 +311,10 @@ class MonitorTest(unittest.TestCase):
             expected_state.pending_sth.CopyFrom(self._NEW_STH)
             merkle.CompactMerkleTree().save(expected_state.verified_tree)
             self.verify_state(expected_state)
+            audited_sths = list(self.db.scan_latest_sth_range("log_server"))
+            self.assertEqual(audited_sths[0].audit.status, client_pb2.VERIFIED)
+            self.assertEqual(audited_sths[1].audit.status, client_pb2.UNVERIFIED)
+            self.assertEqual(len(audited_sths), 2)
 
         return m._update_sth().addCallback(self.assertTrue
                                            ).addCallback(check_state)
@@ -305,6 +329,7 @@ class MonitorTest(unittest.TestCase):
             expected_state = client_pb2.MonitorState()
             expected_state.verified_sth.CopyFrom(self._DEFAULT_STH)
             self.verify_state(expected_state)
+            self.check_db_state_after_successful_updates(0)
 
         return m._update_sth().addCallback(self.assertFalse
                                            ).addCallback(check_state)
@@ -345,6 +370,15 @@ class MonitorTest(unittest.TestCase):
             expected_state = client_pb2.MonitorState()
             expected_state.verified_sth.CopyFrom(self._DEFAULT_STH)
             self.verify_state(expected_state)
+            audited_sths = list(self.db.scan_latest_sth_range("log_server"))
+            self.assertEqual(len(audited_sths), 2)
+            self.assertEqual(audited_sths[0].audit.status,
+                             client_pb2.VERIFY_ERROR)
+            self.assertEqual(audited_sths[1].audit.status,
+                             client_pb2.UNVERIFIED)
+            for audited_sth in audited_sths:
+                self.assertEqual(self._DEFAULT_STH.sha256_root_hash,
+                                 audited_sth.sth.sha256_root_hash)
 
         return m._update_sth().addCallback(self.assertFalse
                                            ).addCallback(check_state)
@@ -360,6 +394,7 @@ class MonitorTest(unittest.TestCase):
             expected_state = client_pb2.MonitorState()
             expected_state.verified_sth.CopyFrom(self._DEFAULT_STH)
             self.verify_state(expected_state)
+            self.check_db_state_after_successful_updates(0)
 
         return m._update_sth().addCallback(self.assertFalse
                                            ).addCallback(check_state)

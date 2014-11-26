@@ -117,7 +117,16 @@ class Monitor(object):
         # we just set new verified tree, so we report all changes
         self.__report.report()
 
+    def __get_audited_sth(self, sth, verify_status):
+        audited_sth = client_pb2.AuditedSth()
+        audited_sth.sth.CopyFrom(sth)
+        audited_sth.audit.status = verify_status
+        return audited_sth
+
     def __verify_consistency_callback(self, proof, old_sth, new_sth):
+        self.__db.store_sth(self.servername,
+                            self.__get_audited_sth(new_sth,
+                                                   client_pb2.UNVERIFIED))
         try:
             logging.debug("got proof for (%s, %s): %s",
                 old_sth.tree_size, new_sth.tree_size,
@@ -129,9 +138,16 @@ class Monitor(object):
             # the latter may have innocent causes (e.g. data corruption,
             # software bug) so we could give it a chance to recover before
             # alerting.
+            self.__db.store_sth(self.servername,
+                                self.__get_audited_sth(new_sth,
+                                                       client_pb2.VERIFY_ERROR))
             logging.error("Could not verify STH consistency: %s vs %s!!!\n%s" %
                           (old_sth, new_sth, e))
             raise
+        else:
+            self.__db.store_sth(self.servername,
+                                self.__get_audited_sth(new_sth,
+                                                       client_pb2.VERIFIED))
 
     def _verify_consistency(self, old_sth, new_sth):
         """Verifies that old STH is consistent with new STH.
@@ -195,15 +211,8 @@ class Monitor(object):
                 d.addErrback(self.__handle_old_sth_errback, sth_response)
                 return False
         try:
-            # Given that we now only store verified STHs, the audit info here
-            # is not all that useful.
-            # TODO(ekasper): we should be tracking consistency instead.
             self.__verifier.verify_sth(sth_response)
-            audited_sth = client_pb2.AuditedSth()
-            audited_sth.sth.CopyFrom(sth_response)
-            audited_sth.audit.status = client_pb2.VERIFIED
-            self.__db.store_sth(self.servername, audited_sth)
-        except (error.EncodingError, error.VerifyError) as e:
+        except (error.EncodingError, error.VerifyError):
             logging.error("Invalid STH: %s" % sth_response)
             return False
 
