@@ -78,8 +78,8 @@ typename Database<Logged>::LookupResult FileDB<Logged>::LookupByHash(
   Logged logged;
   CHECK(logged.ParseFromString(cert_data));
 
-  if (result != nullptr) {
-    result->CopyFrom(logged);
+  if (result) {
+    logged.Swap(result);
   }
 
   return this->LOOKUP_OK;
@@ -102,16 +102,12 @@ typename Database<Logged>::LookupResult FileDB<Logged>::LookupByIndex(
   // given sequence number), we can release the lock.
   lock.unlock();
 
-  if (result != nullptr) {
+  if (result) {
     std::string cert_data;
     util::Status status(cert_storage_->LookupEntry(hash, &cert_data));
     CHECK_EQ(status, util::Status::OK);
-
-    Logged logged;
-    CHECK(logged.ParseFromString(cert_data));
-    CHECK_EQ(logged.sequence_number(), sequence_number);
-
-    result->CopyFrom(logged);
+    CHECK(result->ParseFromString(cert_data));
+    CHECK_EQ(result->sequence_number(), sequence_number);
   }
 
   return this->LOOKUP_OK;
