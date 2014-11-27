@@ -81,11 +81,11 @@ class EtcdClient {
     DISALLOW_COPY_AND_ASSIGN(Watcher);
   };
 
+  typedef std::function<void(util::Status status, const EtcdClient::Node& node,
+                             int64_t etcd_index)> GetCallback;
   typedef std::function<void(util::Status status,
-                             const EtcdClient::Node& node)> GetCallback;
-  typedef std::function<void(util::Status status,
-                             const std::vector<EtcdClient::Node>& values)>
-      GetAllCallback;
+                             const std::vector<EtcdClient::Node>& values,
+                             int64_t etcd_index)> GetAllCallback;
   typedef std::function<void(util::Status status, int64_t index)>
       CreateCallback;
   typedef std::function<void(util::Status status, const std::string& key,
@@ -94,7 +94,8 @@ class EtcdClient {
       UpdateCallback;
   typedef std::function<void(util::Status status, int64_t new_index)>
       ForceSetCallback;
-  typedef std::function<void(util::Status status)> DeleteCallback;
+  typedef std::function<void(util::Status status, int64_t etcd_index)>
+      DeleteCallback;
 
   // TODO(pphaneuf): This should take a set of servers, not just one.
   EtcdClient(const std::shared_ptr<libevent::Base>& event_base,
@@ -138,8 +139,8 @@ class EtcdClient {
 
  protected:
   typedef std::function<void(util::Status status,
-                             const std::shared_ptr<JsonObject>&)>
-      GenericCallback;
+                             const std::shared_ptr<JsonObject>&,
+                             int64_t etcd_index)> GenericCallback;
 
   EtcdClient() = default;  // Testing only
 

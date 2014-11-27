@@ -30,6 +30,7 @@ EtcdConsistentStore<Logged>::EtcdConsistentStore(SyncEtcdClient* client,
 template <class Logged>
 uint64_t EtcdConsistentStore<Logged>::NextAvailableSequenceNumber() const {
   CHECK(false) << "Not Implemented";
+  return 0;
 }
 
 

@@ -411,7 +411,6 @@ TEST_F(FakeEtcdTest, TestWatcherForCreate) {
   EXPECT_TRUE(status.ok()) << status;
 
   BlockingCallback block;
-  vector<EtcdClient::Watcher::Update> updates;
   std::unique_ptr<EtcdClient::Watcher> watcher(client_.CreateWatcher(
       kDir, std::bind(&TestWatcherForCreateCallback, block.Callback(), _1)));
 

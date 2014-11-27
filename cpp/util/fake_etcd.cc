@@ -55,7 +55,7 @@ FakeEtcdClient::FakeWatcher::~FakeWatcher() {
 }
 
 
-FakeEtcdClient::FakeEtcdClient() : index_(1) {
+FakeEtcdClient::FakeEtcdClient() : index_(1), pool_(1) {
 }
 
 
@@ -183,11 +183,12 @@ void FakeEtcdClient::GetSingleEntry(const std::string& key,
     const Node& node(entries_.find(key)->second);
     return ScheduleCallback(
         std::bind(cb, util::Status::OK,
-                  std::make_shared<JsonObject>(JsonForEntry(node, "get"))));
+                  std::make_shared<JsonObject>(JsonForEntry(node, "get")),
+                  index_));
   } else {
     return ScheduleCallback(
         std::bind(cb, util::Status(util::error::NOT_FOUND, "not found"),
-                  std::make_shared<JsonObject>()));
+                  std::make_shared<JsonObject>(), index_));
   }
 }
 
@@ -205,8 +206,9 @@ void FakeEtcdClient::GetDirectory(const std::string& key,
   VLOG(1) << "..";
   const std::string json(JsonForDir(nodes, "get"));
   VLOG(1) << "GET DIR " << key << " : " << json;
-  return ScheduleCallback(
-      std::bind(cb, util::Status::OK, std::make_shared<JsonObject>(json)));
+  return ScheduleCallback(std::bind(cb, util::Status::OK,
+                                    std::make_shared<JsonObject>(json),
+                                    index_));
 }
 
 
@@ -289,7 +291,8 @@ void FakeEtcdClient::HandlePost(
   ++index_;
   ScheduleCallback(
       std::bind(cb, util::Status::OK,
-                std::make_shared<JsonObject>(JsonForEntry(node, "create"))));
+                std::make_shared<JsonObject>(JsonForEntry(node, "create")),
+                index_));
   NotifyForPath(path);
 }
 
@@ -306,7 +309,8 @@ void FakeEtcdClient::HandlePut(
   MaybeSetExpiry(params, &node);
   util::Status status(CheckCompareFlags(params, key));
   if (!status.ok()) {
-    ScheduleCallback(std::bind(cb, status, std::make_shared<JsonObject>()));
+    ScheduleCallback(
+        std::bind(cb, status, std::make_shared<JsonObject>(), index_));
     return;
   }
   if (entries_.find(key) != entries_.end()) {
@@ -318,8 +322,8 @@ void FakeEtcdClient::HandlePut(
   ++index_;
   const std::string json(JsonForEntry(node, "set"));
   VLOG(1) << "put(" << key << "):\n" << json;
-  ScheduleCallback(
-      std::bind(cb, util::Status::OK, std::make_shared<JsonObject>(json)));
+  ScheduleCallback(std::bind(cb, util::Status::OK,
+                             std::make_shared<JsonObject>(json), index_));
   NotifyForPath(key);
 }
 
@@ -332,7 +336,8 @@ void FakeEtcdClient::HandleDelete(
   CHECK(key.back() != '/');
   util::Status status(CheckCompareFlags(params, key));
   if (!status.ok()) {
-    ScheduleCallback(std::bind(cb, status, std::make_shared<JsonObject>()));
+    ScheduleCallback(
+        std::bind(cb, status, std::make_shared<JsonObject>(), index_));
     return;
   }
   LOG(INFO) << entries_[key].ToString();
@@ -341,7 +346,8 @@ void FakeEtcdClient::HandleDelete(
   ++index_;
   ScheduleCallback(std::bind(cb, util::Status::OK,
                              std::make_shared<JsonObject>(
-                                 JsonForEntry(entries_[key], "delete"))));
+                                 JsonForEntry(entries_[key], "delete")),
+                             index_));
   NotifyForPath(key);
   entries_.erase(key);
 }
