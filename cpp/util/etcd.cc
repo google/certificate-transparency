@@ -20,6 +20,7 @@ using std::mutex;
 using std::pair;
 using std::placeholders::_1;
 using std::placeholders::_2;
+using std::placeholders::_3;
 using std::shared_ptr;
 using std::string;
 using std::to_string;
@@ -93,78 +94,80 @@ shared_ptr<evhttp_uri> UriFromHostPort(const string& host, uint16_t port) {
 
 
 void GetRequestDone(Status status, const shared_ptr<JsonObject>& json,
-                    const EtcdClient::GetCallback& cb) {
+                    int64_t etcd_index, const EtcdClient::GetCallback& cb) {
   if (!status.ok()) {
-    cb(status, EtcdClient::Node::InvalidNode());
+    cb(status, EtcdClient::Node::InvalidNode(), -1);
     return;
   }
   const JsonObject node(*json, "node");
   if (!node.Ok()) {
     cb(Status(util::error::FAILED_PRECONDITION,
               "Invalid JSON: Couldn't find 'node'"),
-       EtcdClient::Node::InvalidNode());
+       EtcdClient::Node::InvalidNode(), -1);
     return;
   }
   const JsonInt createdIndex(node, "createdIndex");
   if (!createdIndex.Ok()) {
     cb(Status(util::error::FAILED_PRECONDITION,
               "Invalid JSON: Couldn't find 'createdIndex'"),
-       EtcdClient::Node::InvalidNode());
+       EtcdClient::Node::InvalidNode(), -1);
     return;
   }
   const JsonInt modifiedIndex(node, "modifiedIndex");
   if (!modifiedIndex.Ok()) {
     cb(Status(util::error::FAILED_PRECONDITION,
               "Invalid JSON: Couldn't find 'modifiedIndex'"),
-       EtcdClient::Node::InvalidNode());
+       EtcdClient::Node::InvalidNode(), -1);
     return;
   }
   const JsonString key(node, "key");
   if (!key.Ok()) {
     cb(Status(util::error::FAILED_PRECONDITION,
               "Invalid JSON: Couldn't find 'key'"),
-       EtcdClient::Node::InvalidNode());
+       EtcdClient::Node::InvalidNode(), -1);
     return;
   }
   const JsonString value(node, "value");
   if (!value.Ok()) {
     cb(Status(util::error::FAILED_PRECONDITION,
               "Invalid JSON: Couldn't find 'value'"),
-       EtcdClient::Node::InvalidNode());
+       EtcdClient::Node::InvalidNode(), -1);
     return;
   }
   cb(status, EtcdClient::Node(createdIndex.Value(), modifiedIndex.Value(),
-                              key.Value(), value.Value()));
+                              key.Value(), value.Value()),
+     etcd_index);
 }
 
 
 void GetAllRequestDone(Status status, const shared_ptr<JsonObject>& json,
+                       int64_t etcd_index,
                        const EtcdClient::GetAllCallback& cb) {
   if (!status.ok()) {
-    cb(status, vector<EtcdClient::Node>());
+    cb(status, vector<EtcdClient::Node>(), -1);
     return;
   }
   const JsonObject node(*json, "node");
   if (!node.Ok()) {
     cb(Status(util::error::FAILED_PRECONDITION,
               "Invalid JSON: Couldn't find 'node'"),
-       vector<EtcdClient::Node>());
+       vector<EtcdClient::Node>(), -1);
     return;
   }
   const JsonBoolean isDir(node, "dir");
   if (!isDir.Ok()) {
     cb(Status(util::error::FAILED_PRECONDITION,
               "Invalid JSON: Couldn't find 'dir'"),
-       vector<EtcdClient::Node>());
+       vector<EtcdClient::Node>(), -1);
   }
   if (!isDir.Value()) {
     cb(Status(util::error::INVALID_ARGUMENT, "Not a directory"),
-       vector<EtcdClient::Node>());
+       vector<EtcdClient::Node>(), -1);
   }
   const JsonArray value_nodes(node, "nodes");
   if (!value_nodes.Ok()) {
     // Directory is empty.
-    cb(util::Status::OK, vector<EtcdClient::Node>());
+    cb(util::Status::OK, vector<EtcdClient::Node>(), -1);
     return;
   }
 
@@ -175,42 +178,42 @@ void GetAllRequestDone(Status status, const shared_ptr<JsonObject>& json,
       cb(Status(util::error::FAILED_PRECONDITION,
                 "Invalid JSON: Couldn't get 'value_nodes' index " +
                     to_string(i)),
-         vector<EtcdClient::Node>());
+         vector<EtcdClient::Node>(), -1);
       return;
     }
     const JsonString value(entry, "value");
     if (!value.Ok()) {
       cb(Status(util::error::FAILED_PRECONDITION,
                 "Invalid JSON: Couldn't find 'value'"),
-         vector<EtcdClient::Node>());
+         vector<EtcdClient::Node>(), -1);
       return;
     }
     const JsonInt createdIndex(entry, "createdIndex");
     if (!createdIndex.Ok()) {
       cb(Status(util::error::FAILED_PRECONDITION,
                 "Invalid JSON: Coulnd't find 'createdIndex'"),
-         vector<EtcdClient::Node>());
+         vector<EtcdClient::Node>(), -1);
       return;
     }
     const JsonInt modifiedIndex(entry, "modifiedIndex");
     if (!modifiedIndex.Ok()) {
       cb(Status(util::error::FAILED_PRECONDITION,
                 "Invalid JSON: Coulnd't find 'modifiedIndex'"),
-         vector<EtcdClient::Node>());
+         vector<EtcdClient::Node>(), -1);
       return;
     }
     const JsonString key(entry, "key");
     if (!key.Ok()) {
       cb(Status(util::error::FAILED_PRECONDITION,
                 "Invalid JSON: Couldn't find 'key'"),
-         vector<EtcdClient::Node>());
+         vector<EtcdClient::Node>(), -1);
       return;
     }
     values.emplace_back(EtcdClient::Node(createdIndex.Value(),
                                          modifiedIndex.Value(), key.Value(),
                                          value.Value()));
   }
-  cb(util::Status::OK, values);
+  cb(util::Status::OK, values, etcd_index);
 }
 
 
@@ -465,8 +468,9 @@ class EtcdClient::Watcher::Impl
  public:
   Impl(EtcdClient* client, const string& key, const WatchCallback& cb);
 
-  void InitialGetDone(Status status, const Node& node);
-  void InitialGetAllDone(Status status, const std::vector<Node>& nodes);
+  void InitialGetDone(Status status, const Node& node, int64_t etcd_index);
+  void InitialGetAllDone(Status status, const std::vector<Node>& nodes,
+                         int64_t etcd_index);
   void Cancel();
 
  private:
@@ -499,14 +503,14 @@ EtcdClient::Watcher::Impl::Impl(EtcdClient* client, const string& key,
 }
 
 
-void EtcdClient::Watcher::Impl::InitialGetDone(Status status,
-                                               const Node& node) {
+void EtcdClient::Watcher::Impl::InitialGetDone(Status status, const Node& node,
+                                               int64_t etcd_index) {
   // TODO(pphaneuf): Need better error handling here. Have to review
   // what the possible errors are, most of them should probably be
   // dealt with using retries?
   CHECK(status.ok()) << "initial get error: " << status;
 
-  highest_index_seen_ = node.modified_index_;
+  highest_index_seen_ = etcd_index;
 
   std::vector<Update> updates{Update(node, true /*exists*/)};
   {
@@ -521,16 +525,17 @@ void EtcdClient::Watcher::Impl::InitialGetDone(Status status,
 
 
 void EtcdClient::Watcher::Impl::InitialGetAllDone(
-    Status status, const std::vector<Node>& nodes) {
+    Status status, const std::vector<Node>& nodes, int64_t etcd_index) {
   // TODO(pphaneuf): Need better error handling here. Have to review
   // what the possible errors are, most of them should probably be
   // dealt with using retries?
   CHECK(status.ok()) << "initial get error: " << status;
 
+  highest_index_seen_ = etcd_index;
+
   std::vector<Update> updates;
   for (const auto& node : nodes) {
     updates.emplace_back(Update(node, true /*exists*/));
-    highest_index_seen_ = std::max(highest_index_seen_, node.modified_index_);
   }
 
   {
@@ -674,9 +679,9 @@ EtcdClient::Watcher::Watcher(EtcdClient* client, const string& key,
   // Binding the shared_ptr ensures that if we disappear, this will
   // not cause the callback to segfault.
   if (KeyIsDirectory(key)) {
-    client->GetAll(key, bind(&Impl::InitialGetAllDone, pimpl_, _1, _2));
+    client->GetAll(key, bind(&Impl::InitialGetAllDone, pimpl_, _1, _2, _3));
   } else {
-    client->Get(key, bind(&Impl::InitialGetDone, pimpl_, _1, _2));
+    client->Get(key, bind(&Impl::InitialGetDone, pimpl_, _1, _2, _3));
   }
 }
 
@@ -772,7 +777,7 @@ void EtcdClient::RequestDone(const shared_ptr<libevent::HttpRequest>& req,
   // other reasons).
   if (!req) {
     etcd_req->cb_(Status(util::error::UNKNOWN, "unknown error"),
-                  shared_ptr<JsonObject>());
+                  shared_ptr<JsonObject>(), -1);
     return;
   }
 
@@ -783,7 +788,11 @@ void EtcdClient::RequestDone(const shared_ptr<libevent::HttpRequest>& req,
 
   const int response_code(req->GetResponseCode());
   shared_ptr<JsonObject> json(make_shared<JsonObject>(req->GetInputBuffer()));
-  etcd_req->cb_(StatusFromResponseCode(response_code, json), json);
+  const char* const etcd_index(CHECK_NOTNULL(
+      evhttp_find_header(req->GetInputHeaders(), "X-Etcd-Index")));
+
+  etcd_req->cb_(StatusFromResponseCode(response_code, json), json,
+                std::atoll(etcd_index));
 }
 
 
@@ -822,13 +831,14 @@ shared_ptr<libevent::HttpConnection> EtcdClient::UpdateLeader(
 
 void EtcdClient::Get(const string& key, const GetCallback& cb) {
   map<string, string> params;
-  Generic(key, params, EVHTTP_REQ_GET, bind(&GetRequestDone, _1, _2, cb));
+  Generic(key, params, EVHTTP_REQ_GET, bind(&GetRequestDone, _1, _2, _3, cb));
 }
 
 
 void EtcdClient::GetAll(const string& dir, const GetAllCallback& cb) {
   map<string, string> params;
-  Generic(dir, params, EVHTTP_REQ_GET, bind(&GetAllRequestDone, _1, _2, cb));
+  Generic(dir, params, EVHTTP_REQ_GET,
+          bind(&GetAllRequestDone, _1, _2, _3, cb));
 }
 
 
@@ -907,7 +917,7 @@ void EtcdClient::Delete(const string& key, const int64_t current_index,
                         const DeleteCallback& cb) {
   map<string, string> params;
   params["prevIndex"] = to_string(current_index);
-  Generic(key, params, EVHTTP_REQ_DELETE, bind(cb, _1));
+  Generic(key, params, EVHTTP_REQ_DELETE, bind(cb, _1, _3));
 }
 
 
