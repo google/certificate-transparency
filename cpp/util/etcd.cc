@@ -417,7 +417,9 @@ struct EtcdClient::Request {
                             params_.size()),
                0);
     } else {
-      uri += "?" + params_;
+      if (!params_.empty()) {
+        uri += "?" + params_;
+      }
     }
 
     {
