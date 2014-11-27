@@ -410,14 +410,14 @@ struct EtcdClient::Request {
             bind(&EtcdClient::RequestDone, client_, _1, this)));
 
     string uri(path_);
-    if (verb_ == EVHTTP_REQ_GET) {
-      uri += "?" + params_;
-    } else {
+    if (verb_ == EVHTTP_REQ_PUT || verb_ == EVHTTP_REQ_POST) {
       evhttp_add_header(req->GetOutputHeaders(), "Content-Type",
                         "application/x-www-form-urlencoded");
       CHECK_EQ(evbuffer_add(req->GetOutputBuffer(), params_.data(),
                             params_.size()),
                0);
+    } else {
+      uri += "?" + params_;
     }
 
     {
