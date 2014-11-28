@@ -4,8 +4,10 @@
 #include <glog/logging.h>
 #include <math.h>
 
-#include "base/time_support.h"
-
+using std::chrono::duration;
+using std::chrono::duration_cast;
+using std::chrono::microseconds;
+using std::chrono::seconds;
 using std::lock_guard;
 using std::mutex;
 using std::shared_ptr;
@@ -142,16 +144,17 @@ Event::~Event() {
 }
 
 
-void Event::Add(double timeout) const {
+void Event::Add(const duration<double>& timeout) const {
   timeval tv;
   timeval* tvp(NULL);
 
-  if (timeout >= 0) {
-    tv.tv_sec = trunc(timeout);
-    timeout -= tv.tv_sec;
-    tv.tv_usec = timeout * kNumMicrosPerSecond;
+  if (timeout != duration<double>::zero()) {
+    const seconds sec(duration_cast<seconds>(timeout));
+    tv.tv_sec = sec.count();
+    tv.tv_usec = duration_cast<microseconds>(timeout - sec).count();
     tvp = &tv;
   }
+
   CHECK_EQ(event_add(ev_, tvp), 0);
 }
 
@@ -347,8 +350,8 @@ void HttpConnection::MakeRequest(const shared_ptr<HttpRequest>& req,
 }
 
 
-void HttpConnection::SetTimeout(int timeout_secs) {
-  evhttp_connection_set_timeout(conn_, timeout_secs);
+void HttpConnection::SetTimeout(const seconds& timeout) {
+  evhttp_connection_set_timeout(conn_, timeout.count());
 }
 
 

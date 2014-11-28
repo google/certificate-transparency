@@ -69,6 +69,8 @@ using cert_trans::TreeSigner;
 using cert_trans::util::ReadPrivateKey;
 using google::RegisterFlagValidator;
 using std::bind;
+using std::chrono::duration;
+using std::chrono::seconds;
 using std::function;
 using std::make_shared;
 using std::shared_ptr;
@@ -143,28 +145,28 @@ static const bool sign_dummy =
                           &ValidateIsPositive);
 
 // Hooks a repeating timer on the event loop to call a callback. It
-// will wait "interval_secs" between calls to "callback" (so this
-// means that if "callback" takes some time, it will run less
-// frequently).
+// will wait "interval" between calls to "callback" (so this means
+// that if "callback" takes some time, it will run less frequently).
 class PeriodicCallback {
  public:
-  PeriodicCallback(const shared_ptr<libevent::Base>& base, int interval_secs,
+  PeriodicCallback(const shared_ptr<libevent::Base>& base,
+                   const duration<double>& interval,
                    const function<void()>& callback)
       : base_(base),
-        interval_secs_(interval_secs),
+        interval_(interval),
         event_(*base_, -1, 0, bind(&PeriodicCallback::Go, this)),
         callback_(callback) {
-    event_.Add(interval_secs_);
+    event_.Add(interval_);
   }
 
  private:
   void Go() {
     callback_();
-    event_.Add(interval_secs_);
+    event_.Add(interval_);
   }
 
   const shared_ptr<libevent::Base> base_;
-  const int interval_secs_;
+  const duration<double> interval_;
   libevent::Event event_;
   const function<void()> callback_;
 
@@ -234,7 +236,8 @@ int main(int argc, char* argv[]) {
   ThreadPool pool;
   HttpHandler handler(&log_lookup, db, &checker, &frontend, &pool);
 
-  PeriodicCallback tree_event(event_base, FLAGS_tree_signing_frequency_seconds,
+  PeriodicCallback tree_event(event_base,
+                              seconds(FLAGS_tree_signing_frequency_seconds),
                               bind(&SignMerkleTree, &tree_signer,
                                    &log_lookup));
 

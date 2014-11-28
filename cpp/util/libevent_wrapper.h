@@ -1,6 +1,7 @@
 #ifndef CERT_TRANS_UTIL_LIBEVENT_WRAPPER_H_
 #define CERT_TRANS_UTIL_LIBEVENT_WRAPPER_H_
 
+#include <chrono>
 #include <event2/dns.h>
 #include <event2/event.h>
 #include <event2/http.h>
@@ -62,7 +63,7 @@ class Event {
         const Callback& cb);
   ~Event();
 
-  void Add(double timeout) const;
+  void Add(const std::chrono::duration<double>& timeout) const;
   // Note that this is only public so |Base| can use it.
   static void Dispatch(evutil_socket_t sock, short events, void* userdata);
 
@@ -176,7 +177,7 @@ class HttpConnection : public std::enable_shared_from_this<HttpConnection> {
   void MakeRequest(const std::shared_ptr<HttpRequest>& req,
                    evhttp_cmd_type type, const std::string& uri);
 
-  void SetTimeout(int timeout_secs);
+  void SetTimeout(const std::chrono::seconds& timeout);
 
  private:
   friend class HttpRequest;
