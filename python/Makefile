@@ -32,6 +32,8 @@ test: all
 	PYTHONPATH=$(PYTHONPATH):. ./ct/cert_analysis/ip_addresses_test.py
 	PYTHONPATH=$(PYTHONPATH):. ./ct/cert_analysis/serial_number_test.py
 	PYTHONPATH=$(PYTHONPATH):. ./ct/cert_analysis/validity_test.py
+	PYTHONPATH=$(PYTHONPATH):. ./ct/cert_analysis/crl_pointers_test.py
+	PYTHONPATH=$(PYTHONPATH):. ./ct/cert_analysis/ocsp_pointers_test.py
 # Tests using twisted trial instead of plain unittest.
 	PYTHONPATH=$(PYTHONPATH):. ./ct/client/monitor_test.py
 	PYTHONPATH=$(PYTHONPATH):. ./ct/client/async_log_client_test.py
