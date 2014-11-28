@@ -121,7 +121,8 @@ util_tests: util/json_wrapper_test util/etcd_test util/sync_etcd_test util/fake_
 ### util/ targets
 util/libutil.a: util/util.o util/openssl_util.o util/testing.o \
                 util/json_wrapper.o util/thread_pool.o util/libevent_wrapper.o \
-                util/etcd.o util/status.o util/sync_etcd.o util/fake_etcd.o
+                util/etcd.o util/status.o util/sync_etcd.o util/fake_etcd.o \
+                util/periodic_closure.o
 	rm -f $@
 	ar -rcs $@ $^
 

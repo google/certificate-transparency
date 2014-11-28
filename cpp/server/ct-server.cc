@@ -22,6 +22,7 @@
 #include "log/tree_signer.h"
 #include "server/handler.h"
 #include "util/libevent_wrapper.h"
+#include "util/periodic_closure.h"
 #include "util/read_private_key.h"
 #include "util/thread_pool.h"
 
@@ -64,6 +65,7 @@ using cert_trans::FakeConsistentStore;
 using cert_trans::FileStorage;
 using cert_trans::HttpHandler;
 using cert_trans::LoggedCertificate;
+using cert_trans::PeriodicClosure;
 using cert_trans::ThreadPool;
 using cert_trans::TreeSigner;
 using cert_trans::util::ReadPrivateKey;
@@ -144,35 +146,6 @@ static const bool sign_dummy =
     RegisterFlagValidator(&FLAGS_tree_signing_frequency_seconds,
                           &ValidateIsPositive);
 
-// Hooks a repeating timer on the event loop to call a callback. It
-// will wait "interval" between calls to "callback" (so this means
-// that if "callback" takes some time, it will run less frequently).
-class PeriodicCallback {
- public:
-  PeriodicCallback(const shared_ptr<libevent::Base>& base,
-                   const duration<double>& interval,
-                   const function<void()>& callback)
-      : base_(base),
-        interval_(interval),
-        event_(*base_, -1, 0, bind(&PeriodicCallback::Go, this)),
-        callback_(callback) {
-    event_.Add(interval_);
-  }
-
- private:
-  void Go() {
-    callback_();
-    event_.Add(interval_);
-  }
-
-  const shared_ptr<libevent::Base> base_;
-  const duration<double> interval_;
-  libevent::Event event_;
-  const function<void()> callback_;
-
-  DISALLOW_COPY_AND_ASSIGN(PeriodicCallback);
-};
-
 void SignMerkleTree(TreeSigner<LoggedCertificate>* tree_signer,
                     LogLookup<LoggedCertificate>* log_lookup) {
   CHECK_EQ(tree_signer->UpdateTree(), TreeSigner<LoggedCertificate>::OK);
@@ -236,10 +209,9 @@ int main(int argc, char* argv[]) {
   ThreadPool pool;
   HttpHandler handler(&log_lookup, db, &checker, &frontend, &pool);
 
-  PeriodicCallback tree_event(event_base,
-                              seconds(FLAGS_tree_signing_frequency_seconds),
-                              bind(&SignMerkleTree, &tree_signer,
-                                   &log_lookup));
+  PeriodicClosure tree_event(event_base,
+                             seconds(FLAGS_tree_signing_frequency_seconds),
+                             bind(&SignMerkleTree, &tree_signer, &log_lookup));
 
   libevent::HttpServer server(*event_base);
   handler.Add(&server);
