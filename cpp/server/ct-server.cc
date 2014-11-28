@@ -68,7 +68,7 @@ using cert_trans::LoggedCertificate;
 using cert_trans::PeriodicClosure;
 using cert_trans::ThreadPool;
 using cert_trans::TreeSigner;
-using cert_trans::util::ReadPrivateKey;
+using cert_trans::ReadPrivateKey;
 using google::RegisterFlagValidator;
 using std::bind;
 using std::chrono::duration;
@@ -158,9 +158,9 @@ int main(int argc, char* argv[]) {
   ERR_load_crypto_strings();
   cert_trans::LoadCtExtensions();
 
-  EVP_PKEY* pkey = NULL;
-  CHECK_EQ(ReadPrivateKey(&pkey, FLAGS_key), cert_trans::util::KEY_OK);
-  LogSigner log_signer(pkey);
+  util::StatusOr<EVP_PKEY*> pkey(ReadPrivateKey(FLAGS_key));
+  CHECK_EQ(pkey.status(), util::Status::OK);
+  LogSigner log_signer(pkey.ValueOrDie());
 
   CertChecker checker;
   CHECK(checker.LoadTrustedCertificates(FLAGS_trusted_cert_file))
