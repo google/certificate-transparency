@@ -5,13 +5,14 @@
 #include <memory>
 
 #include "base/macros.h"
+#include "util/executor.h"
 
 namespace cert_trans {
 
 
 // Provides a fixed size thread pool to run closures on. The pool is
 // sized according to the number of cores in the system.
-class ThreadPool {
+class ThreadPool : public util::Executor {
  public:
   // Creates the threads.
   ThreadPool();
@@ -24,7 +25,7 @@ class ThreadPool {
 
   // Arranges for "closure" to be called in the thread pool. The
   // function must not be empty.
-  void Add(const std::function<void()>& closure);
+  void Add(const std::function<void()>& closure) override;
 
  private:
   class Impl;

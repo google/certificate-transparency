@@ -10,6 +10,7 @@
 #include <vector>
 
 #include "base/macros.h"
+#include "util/executor.h"
 
 namespace cert_trans {
 namespace libevent {
@@ -19,15 +20,13 @@ class Event;
 class HttpConnection;
 
 
-class Base {
+class Base : public util::Executor {
  public:
-  typedef std::function<void()> Closure;
-
   Base();
   ~Base();
 
   // Arranges to run the closure on the main loop.
-  void Add(const Closure& cb);
+  void Add(const std::function<void()>& cb) override;
 
   void Dispatch();
   void DispatchOnce();
@@ -49,7 +48,7 @@ class Base {
 
   std::mutex closures_lock_;
   const std::unique_ptr<event, void (*)(event*)> wake_closures_;
-  std::vector<Closure> closures_;
+  std::vector<std::function<void()>> closures_;
 
   DISALLOW_COPY_AND_ASSIGN(Base);
 };

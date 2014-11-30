@@ -65,7 +65,7 @@ Base::~Base() {
 }
 
 
-void Base::Add(const Closure& cb) {
+void Base::Add(const std::function<void()>& cb) {
   lock_guard<mutex> lock(closures_lock_);
   closures_.push_back(cb);
   event_active(wake_closures_.get(), 0, 0);
@@ -121,7 +121,7 @@ evhttp_connection* Base::HttpConnectionNew(const string& host,
 void Base::RunClosures(evutil_socket_t sock, short flag, void* userdata) {
   Base* self(static_cast<Base*>(CHECK_NOTNULL(userdata)));
 
-  vector<Closure> closures;
+  vector<std::function<void()>> closures;
   {
     lock_guard<mutex> lock(self->closures_lock_);
     closures.swap(self->closures_);
