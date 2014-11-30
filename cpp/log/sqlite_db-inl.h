@@ -51,7 +51,8 @@ sqlite3* SQLiteOpen(const std::string& dbfile) {
 
 template <class Logged>
 SQLiteDB<Logged>::SQLiteDB(const std::string& dbfile)
-    : db_(SQLiteOpen(dbfile)) {
+    : db_(SQLiteOpen(dbfile)), tree_size_(0) {
+  UpdateTreeSize();
 }
 
 
@@ -95,6 +96,8 @@ typename Database<Logged>::WriteResult SQLiteDB<Logged>::CreateSequencedEntry_(
     return this->ENTRY_ALREADY_LOGGED;
   }
   CHECK_EQ(SQLITE_DONE, ret);
+
+  UpdateTreeSize();
 
   return this->OK;
 }
@@ -209,16 +212,8 @@ template <class Logged>
 int64_t SQLiteDB<Logged>::TreeSize() const {
   std::lock_guard<std::mutex> lock(lock_);
 
-  sqlite::Statement statement(
-      db_, "SELECT sequence FROM leaves ORDER BY sequence DESC LIMIT 1");
-
-  const int ret(statement.Step());
-  if (ret == SQLITE_DONE) {
-    return 0;
-  }
-  CHECK_EQ(SQLITE_ROW, ret);
-
-  return statement.GetUInt64(0) + 1;
+  CHECK_GE(tree_size_, 0);
+  return tree_size_;
 }
 
 
@@ -286,6 +281,31 @@ SQLiteDB<Logged>::LatestTreeHeadNoLock(ct::SignedTreeHead* result) const {
   CHECK(result->ParseFromString(sth));
 
   return this->LOOKUP_OK;
+}
+
+
+// Must be called with "lock_" held.
+template <class Logged>
+void SQLiteDB<Logged>::UpdateTreeSize() {
+  CHECK_GE(tree_size_, 0);
+
+  sqlite::Statement statement(
+      db_,
+      "SELECT sequence FROM leaves WHERE sequence >= ? ORDER BY sequence;");
+  statement.BindUInt64(0, tree_size_);
+
+  int ret(statement.Step());
+  while (ret == SQLITE_ROW) {
+    const sqlite3_uint64 sequence(statement.GetUInt64(0));
+
+    if (sequence != tree_size_) {
+      return;
+    }
+
+    ++tree_size_;
+    ret = statement.Step();
+  }
+  CHECK_EQ(SQLITE_DONE, ret);
 }
 
 
