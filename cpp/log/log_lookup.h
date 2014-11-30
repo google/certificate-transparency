@@ -25,7 +25,7 @@ class LogLookup {
     NOT_FOUND,
   };
 
-  LookupResult GetIndex(const std::string& merkle_leaf_hash, uint64_t* index);
+  LookupResult GetIndex(const std::string& merkle_leaf_hash, int64_t* index);
 
   // Look up by hash of the logged item.
   // TODO(pphaneuf): Looking up an audit proof without a tree size is
@@ -35,7 +35,7 @@ class LogLookup {
                           ct::MerkleAuditProof* proof);
 
   // Look up by index of the logged item and tree_size.
-  LookupResult AuditProof(uint64_t index, size_t tree_size,
+  LookupResult AuditProof(int64_t index, size_t tree_size,
                           ct::ShortMerkleAuditProof* proof);
 
   // Look up by hash of the logged item and tree_size.
@@ -63,7 +63,7 @@ class LogLookup {
   // Merkle proofs without having to query the database at all.
   // Note that 32 bytes is an overkill and we can optimize this to use
   // a shorter prefix (possibly with a multimap).
-  std::map<std::string, uint64_t> leaf_index_;
+  std::map<std::string, int64_t> leaf_index_;
 
   ReadOnlyDatabase<Logged>* const db_;
   MerkleTree cert_tree_;

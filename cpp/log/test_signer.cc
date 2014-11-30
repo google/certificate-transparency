@@ -122,7 +122,7 @@ const char kDefaultPrecertSCTSignature[] =
 // Some time in September 2012.
 const uint64_t kDefaultSTHTimestamp = 1348589667204LL;
 
-const uint64_t kDefaultTreeSize = 42;
+const int64_t kDefaultTreeSize = 42;
 
 // *Some* hash that we pretend is a valid root hash.
 const char kDefaultRootHash[] =

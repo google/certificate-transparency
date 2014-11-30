@@ -71,11 +71,11 @@ void DoneGetSTH(const shared_ptr<libevent::HttpRequest>& req,
     return done(AsyncLogClient::BAD_RESPONSE);
 
   JsonInt tree_size(jresponse, "tree_size");
-  if (!tree_size.Ok())
+  if (!tree_size.Ok() || tree_size.Value() < 0)
     return done(AsyncLogClient::BAD_RESPONSE);
 
   JsonInt timestamp(jresponse, "timestamp");
-  if (!timestamp.Ok())
+  if (!timestamp.Ok() || timestamp.Value() < 0)
     return done(AsyncLogClient::BAD_RESPONSE);
 
   JsonString root_hash(jresponse, "sha256_root_hash");
@@ -204,7 +204,7 @@ void DoneQueryInclusionProof(const shared_ptr<libevent::HttpRequest>& req,
     return done(AsyncLogClient::BAD_RESPONSE);
 
   JsonInt leaf_index(jresponse, "leaf_index");
-  if (!leaf_index.Ok())
+  if (!leaf_index.Ok() || leaf_index.Value() < 0)
     return done(AsyncLogClient::BAD_RESPONSE);
 
   JsonArray audit_path(jresponse, "audit_path");
@@ -281,7 +281,7 @@ void DoneInternalAddChain(const shared_ptr<libevent::HttpRequest>& req,
     return done(AsyncLogClient::BAD_RESPONSE);
 
   JsonInt timestamp(jresponse, "timestamp");
-  if (!timestamp.Ok())
+  if (!timestamp.Ok() || timestamp.Value() < 0)
     return done(AsyncLogClient::BAD_RESPONSE);
 
   JsonString extensions(jresponse, "extensions");
@@ -361,6 +361,9 @@ void AsyncLogClient::GetRoots(vector<shared_ptr<Cert> >* roots,
 void AsyncLogClient::GetEntries(int first, int last,
                                 vector<AsyncLogClient::Entry>* entries,
                                 const Callback& done) {
+  CHECK_GE(first, 0);
+  CHECK_GE(last, 0);
+
   if (last < first) {
     done(INVALID_INPUT);
     return;
@@ -384,6 +387,8 @@ void AsyncLogClient::QueryInclusionProof(const SignedTreeHead& sth,
                                          const std::string& merkle_leaf_hash,
                                          MerkleAuditProof* proof,
                                          const Callback& done) {
+  CHECK_GE(sth.tree_size(), 0);
+
   const shared_ptr<libevent::HttpRequest> req(
       make_shared<libevent::HttpRequest>(
           bind(&DoneQueryInclusionProof, _1, sth, proof, done)));
@@ -400,9 +405,11 @@ void AsyncLogClient::QueryInclusionProof(const SignedTreeHead& sth,
 }
 
 
-void AsyncLogClient::GetSTHConsistency(uint64_t first, uint64_t second,
+void AsyncLogClient::GetSTHConsistency(int64_t first, int64_t second,
                                        vector<string>* proof,
                                        const Callback& done) {
+  CHECK_GE(first, 0);
+  CHECK_GE(second, 0);
   const shared_ptr<libevent::HttpRequest> req(
       make_shared<libevent::HttpRequest>(
           bind(&DoneGetSTHConsistency, _1, proof, done)));

@@ -177,7 +177,7 @@ class CTUDPDNSServer : public UDPServer {
     db_->ForceNotifySTH();
 
     // FIXME: decode hash!
-    uint64_t index;
+    int64_t index;
     if (lookup_.GetIndex(hash, &index) != lookup_.OK)
       return "No such hash";
 

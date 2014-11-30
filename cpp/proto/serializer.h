@@ -94,7 +94,7 @@ class Serializer {
       std::string* result);
 
   static SerializeResult SerializeV1STHSignatureInput(
-      uint64_t timestamp, uint64_t tree_size, const std::string& root_hash,
+      uint64_t timestamp, int64_t tree_size, const std::string& root_hash,
       std::string* result);
 
   static SerializeResult SerializeSTHSignatureInput(

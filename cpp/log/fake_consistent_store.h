@@ -2,7 +2,6 @@
 #define CERT_TRANS_LOG_FAKE_CONSISTENT_STORE_H_
 
 #include <memory>
-#include <stdint.h>
 #include <mutex>
 #include <vector>
 
@@ -29,7 +28,7 @@ class FakeConsistentStore : public ConsistentStore<Logged> {
 
   virtual ~FakeConsistentStore() = default;
 
-  uint64_t NextAvailableSequenceNumber() const override;
+  int64_t NextAvailableSequenceNumber() const override;
 
   util::Status SetServingSTH(const ct::SignedTreeHead& new_sth) override;
 
@@ -44,10 +43,10 @@ class FakeConsistentStore : public ConsistentStore<Logged> {
   util::Status GetSequencedEntries(
       std::vector<EntryHandle<Logged>>* entries) const override;
 
-  util::Status GetSequencedEntry(const uint64_t sequence_number,
+  util::Status GetSequencedEntry(const int64_t sequence_number,
                                  EntryHandle<Logged>* entry) const override;
 
-  util::Status AssignSequenceNumber(const uint64_t sequence_number,
+  util::Status AssignSequenceNumber(const int64_t sequence_number,
                                     EntryHandle<Logged>* entry) override;
 
   util::Status SetClusterNodeState(const ct::ClusterNodeState& state) override;
@@ -60,7 +59,7 @@ class FakeConsistentStore : public ConsistentStore<Logged> {
   std::unique_ptr<ct::SignedTreeHead> tree_head_;
 
   const std::string node_id_;
-  int next_available_sequence_number_;
+  int64_t next_available_sequence_number_;
 
   friend class FakeConsistentStoreTest;
   template <class T>

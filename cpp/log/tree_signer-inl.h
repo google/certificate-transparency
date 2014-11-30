@@ -39,8 +39,10 @@ struct PendingEntriesOrder
     } else if (!x_has_seq && y_has_seq) {
       return false;
     } else if (x_has_seq && y_has_seq) {
-      const uint64_t x_seq(x.Entry().provisional_sequence_number());
-      const uint64_t y_seq(y.Entry().provisional_sequence_number());
+      const int64_t x_seq(x.Entry().provisional_sequence_number());
+      const int64_t y_seq(y.Entry().provisional_sequence_number());
+      CHECK_GE(x_seq, 0);
+      CHECK_GE(y_seq, 0);
       if (x_seq < y_seq) {
         return true;
       } else if (x_seq > y_seq) {
@@ -138,8 +140,9 @@ template <class Logged>
 util::Status TreeSigner<Logged>::SequenceNewEntries() {
   const std::chrono::system_clock::time_point now(
       std::chrono::system_clock::now());
-  uint64_t next_sequence_number(
+  int64_t next_sequence_number(
       consistent_store_->NextAvailableSequenceNumber());
+  CHECK_GE(next_sequence_number, 0);
   VLOG(0) << "Next available sequence number: " << next_sequence_number;
   std::vector<cert_trans::EntryHandle<Logged>> pending_entries;
   util::Status status(consistent_store_->GetPendingEntries(&pending_entries));
@@ -225,7 +228,8 @@ typename TreeSigner<Logged>::UpdateResult TreeSigner<Logged>::UpdateTree() {
   CHECK(status.ok()) << status;
 
   EntryHandle<Logged> logged;
-  uint64_t next_seq(sth.tree_size());
+  int64_t next_seq(sth.tree_size());
+  CHECK_GE(next_seq, 0);
   VLOG(0) << "Building tree";
   while (true) {
     status = consistent_store_->GetSequencedEntry(next_seq, &logged);

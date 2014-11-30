@@ -50,7 +50,7 @@ class TreeSignerTest : public ::testing::Test {
     CHECK(this->store_->AddPendingEntry(logged_cert).ok());
   }
 
-  void AddSequencedEntry(LoggedCertificate* logged_cert, uint64_t seq) const {
+  void AddSequencedEntry(LoggedCertificate* logged_cert, int64_t seq) const {
     logged_cert->clear_sequence_number();
     CHECK(this->store_->AddPendingEntry(logged_cert).ok());
     EntryHandle<LoggedCertificate> entry;
@@ -60,7 +60,7 @@ class TreeSignerTest : public ::testing::Test {
   }
 
   void ForceAddSequencedEntry(LoggedCertificate* logged_cert,
-                              uint64_t seq) const {
+                              int64_t seq) const {
     // Never do this IRL!
     logged_cert->clear_sequence_number();
     logged_cert->set_provisional_sequence_number(seq);

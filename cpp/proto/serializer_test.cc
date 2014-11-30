@@ -244,7 +244,8 @@ class SerializerTest : public ::testing::Test {
     return sth_.timestamp();
   }
 
-  uint64_t DefaultTreeSize() const {
+  int64_t DefaultTreeSize() const {
+    CHECK_GE(sth_.tree_size(), 0);
     return sth_.tree_size();
   }
 

@@ -105,9 +105,10 @@ LogSigner::SignResult LogSigner::SignCertificateTimestamp(
 }
 
 LogSigner::SignResult LogSigner::SignV1TreeHead(uint64_t timestamp,
-                                                uint64_t tree_size,
+                                                int64_t tree_size,
                                                 const string& root_hash,
                                                 string* result) const {
+  CHECK_GE(tree_size, 0);
   string serialized_sth;
   Serializer::SerializeResult res =
       Serializer::SerializeV1STHSignatureInput(timestamp, tree_size, root_hash,
@@ -230,8 +231,9 @@ LogSigVerifier::VerifyResult LogSigVerifier::VerifySCTSignature(
 }
 
 LogSigVerifier::VerifyResult LogSigVerifier::VerifyV1STHSignature(
-    uint64_t timestamp, uint64_t tree_size, const string& root_hash,
+    uint64_t timestamp, int64_t tree_size, const string& root_hash,
     const string& serialized_sig) const {
+  CHECK_GE(tree_size, 0);
   DigitallySigned signature;
   Deserializer::DeserializeResult result =
       Deserializer::DeserializeDigitallySigned(serialized_sig, &signature);

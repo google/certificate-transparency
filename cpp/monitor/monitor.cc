@@ -257,7 +257,7 @@ Monitor::ConfirmResult Monitor::ConfirmTreeInternal(
 
   LOG(INFO) << "Building tree...";
 
-  for (uint64_t current = 1; current <= sth.tree_size(); current++) {
+  for (int64_t current = 1; current <= sth.tree_size(); current++) {
     CHECK_EQ(db_->LookupHashByIndex(current, &hash), Database::LOOKUP_OK);
     mt.AddLeafHash(hash);
   }

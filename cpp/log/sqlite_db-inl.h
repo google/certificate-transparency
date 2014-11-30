@@ -135,7 +135,7 @@ typename Database<Logged>::LookupResult SQLiteDB<Logged>::LookupByHash(
 
 template <class Logged>
 typename Database<Logged>::LookupResult SQLiteDB<Logged>::LookupByIndex(
-    uint64_t sequence_number, Logged* result) const {
+    int64_t sequence_number, Logged* result) const {
   std::lock_guard<std::mutex> lock(lock_);
 
   sqlite::Statement statement(db_,
@@ -206,7 +206,7 @@ typename Database<Logged>::LookupResult SQLiteDB<Logged>::LatestTreeHead(
 
 
 template <class Logged>
-int SQLiteDB<Logged>::TreeSize() const {
+int64_t SQLiteDB<Logged>::TreeSize() const {
   std::lock_guard<std::mutex> lock(lock_);
 
   sqlite::Statement statement(

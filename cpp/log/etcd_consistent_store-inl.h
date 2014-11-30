@@ -28,7 +28,7 @@ EtcdConsistentStore<Logged>::EtcdConsistentStore(SyncEtcdClient* client,
 
 
 template <class Logged>
-uint64_t EtcdConsistentStore<Logged>::NextAvailableSequenceNumber() const {
+int64_t EtcdConsistentStore<Logged>::NextAvailableSequenceNumber() const {
   CHECK(false) << "Not Implemented";
   return 0;
 }
@@ -106,7 +106,8 @@ util::Status EtcdConsistentStore<Logged>::GetSequencedEntries(
 
 template <class Logged>
 util::Status EtcdConsistentStore<Logged>::GetSequencedEntry(
-    const uint64_t sequence_number, EntryHandle<Logged>* entry) const {
+    const int64_t sequence_number, EntryHandle<Logged>* entry) const {
+  CHECK_GE(sequence_number, 0);
   util::Status status(GetEntry(GetSequencedPath(sequence_number), entry));
   if (status.ok()) {
     CHECK(entry->Entry().has_sequence_number());
@@ -118,7 +119,8 @@ util::Status EtcdConsistentStore<Logged>::GetSequencedEntry(
 
 template <class Logged>
 util::Status EtcdConsistentStore<Logged>::AssignSequenceNumber(
-    const uint64_t sequence_number, EntryHandle<Logged>* entry) {
+    const int64_t sequence_number, EntryHandle<Logged>* entry) {
+  CHECK_GE(sequence_number, 0);
   CHECK(!entry->Entry().has_sequence_number());
   if (entry->Entry().has_provisional_sequence_number()) {
     CHECK_EQ(sequence_number, entry->Entry().provisional_sequence_number());
@@ -263,7 +265,8 @@ std::string EtcdConsistentStore<Logged>::GetNodePath(
 
 
 template <class Logged>
-std::string EtcdConsistentStore<Logged>::GetSequencedPath(uint64_t seq) const {
+std::string EtcdConsistentStore<Logged>::GetSequencedPath(int64_t seq) const {
+  CHECK_GE(seq, 0);
   return GetFullPath(std::string(kSequencedDir) + std::to_string(seq));
 }
 

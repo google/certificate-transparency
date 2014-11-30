@@ -20,7 +20,7 @@ class EtcdConsistentStore : public ConsistentStore<Logged> {
   EtcdConsistentStore(SyncEtcdClient* client, const std::string& root,
                       const std::string& node_id);
 
-  uint64_t NextAvailableSequenceNumber() const override;
+  int64_t NextAvailableSequenceNumber() const override;
 
   util::Status SetServingSTH(const ct::SignedTreeHead& new_sth) override;
 
@@ -35,10 +35,10 @@ class EtcdConsistentStore : public ConsistentStore<Logged> {
   util::Status GetSequencedEntries(
       std::vector<EntryHandle<Logged>>* entries) const override;
 
-  util::Status GetSequencedEntry(const uint64_t sequence_number,
+  util::Status GetSequencedEntry(const int64_t sequence_number,
                                  EntryHandle<Logged>* entry) const override;
 
-  util::Status AssignSequenceNumber(const uint64_t sequence_number,
+  util::Status AssignSequenceNumber(const int64_t sequence_number,
                                     EntryHandle<Logged>* entry) override;
 
   util::Status SetClusterNodeState(const ct::ClusterNodeState& state) override;
@@ -64,7 +64,7 @@ class EtcdConsistentStore : public ConsistentStore<Logged> {
 
   std::string GetUnsequencedPath(const std::string& hash) const;
 
-  std::string GetSequencedPath(uint64_t seq) const;
+  std::string GetSequencedPath(int64_t seq) const;
 
   std::string GetNodePath(const std::string& node_id) const;
 

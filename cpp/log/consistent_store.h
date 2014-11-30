@@ -1,6 +1,7 @@
 #ifndef CERT_TRANS_LOG_CONSISTENT_STORE_H_
 #define CERT_TRANS_LOG_CONSISTENT_STORE_H_
 
+#include <stdint.h>
 #include <vector>
 
 #include "base/macros.h"
@@ -86,7 +87,7 @@ class ConsistentStore {
  public:
   ConsistentStore() = default;
 
-  virtual uint64_t NextAvailableSequenceNumber() const = 0;
+  virtual int64_t NextAvailableSequenceNumber() const = 0;
 
   virtual util::Status SetServingSTH(const ct::SignedTreeHead& new_sth) = 0;
 
@@ -101,10 +102,10 @@ class ConsistentStore {
   virtual util::Status GetSequencedEntries(
       std::vector<EntryHandle<Logged>>* entries) const = 0;
 
-  virtual util::Status GetSequencedEntry(const uint64_t sequence_number,
+  virtual util::Status GetSequencedEntry(const int64_t sequence_number,
                                          EntryHandle<Logged>* entry) const = 0;
 
-  virtual util::Status AssignSequenceNumber(const uint64_t sequence_number,
+  virtual util::Status AssignSequenceNumber(const int64_t sequence_number,
                                             EntryHandle<Logged>* entry) = 0;
 
   virtual util::Status SetClusterNodeState(

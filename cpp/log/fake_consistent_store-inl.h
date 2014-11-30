@@ -21,7 +21,7 @@ FakeConsistentStore<Logged>::FakeConsistentStore(
 
 
 template <class Logged>
-uint64_t FakeConsistentStore<Logged>::NextAvailableSequenceNumber() const {
+int64_t FakeConsistentStore<Logged>::NextAvailableSequenceNumber() const {
   std::unique_lock<std::mutex> lock(mutex_);
   return next_available_sequence_number_;
 }
@@ -96,7 +96,8 @@ util::Status FakeConsistentStore<Logged>::GetSequencedEntries(
 
 template <class Logged>
 util::Status FakeConsistentStore<Logged>::GetSequencedEntry(
-    const uint64_t sequence_number, EntryHandle<Logged>* entry) const {
+    const int64_t sequence_number, EntryHandle<Logged>* entry) const {
+  CHECK_GE(sequence_number, 0);
   std::unique_lock<std::mutex> lock(mutex_);
   const std::string path(std::to_string(sequence_number));
   auto it(sequenced_entries_.find(path));
@@ -112,7 +113,8 @@ util::Status FakeConsistentStore<Logged>::GetSequencedEntry(
 
 template <class Logged>
 util::Status FakeConsistentStore<Logged>::AssignSequenceNumber(
-    const uint64_t sequence_number, EntryHandle<Logged>* entry) {
+    const int64_t sequence_number, EntryHandle<Logged>* entry) {
+  CHECK_GE(sequence_number, 0);
   CHECK(!entry->Entry().has_sequence_number());
   CHECK_EQ(sequence_number, next_available_sequence_number_);
   std::unique_lock<std::mutex> lock(mutex_);

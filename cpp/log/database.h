@@ -5,6 +5,7 @@
 #include <functional>
 #include <glog/logging.h>
 #include <set>
+#include <stdint.h>
 
 #include "base/macros.h"
 #include "proto/ct.pb.h"
@@ -21,9 +22,9 @@
 //
 //   // The tree signer assigns a sequence number.
 //   void clear_sequence_number();
-//   void set_sequence_number(uint64_t sequence);
+//   void set_sequence_number(int64_t sequence);
 //   bool has_sequence_number() const;
-//   uint64_t sequence_number() const;
+//   int64_t sequence_number() const;
 //
 //   // If the data has a timestamp associated with it, return it: any
 //   // STH including this item will have a later timestamp. Return 0 if
@@ -70,7 +71,7 @@ class ReadOnlyDatabase {
                                     Logged* result) const = 0;
 
   // Look up by sequence number.
-  virtual LookupResult LookupByIndex(uint64_t sequence_number,
+  virtual LookupResult LookupByIndex(int64_t sequence_number,
                                      Logged* result) const = 0;
 
   // Return the tree head with the freshest timestamp.
@@ -79,7 +80,7 @@ class ReadOnlyDatabase {
   // Return the number of entries of contiguous entries (what could be
   // put in a signed tree head). This can be greater than the tree
   // size returned by LatestTreeHead.
-  virtual int TreeSize() const = 0;
+  virtual int64_t TreeSize() const = 0;
 
   // Add/remove a callback to be called when a new tree head is
   // available. The pointer is used as a key, so it should be the same
@@ -129,6 +130,7 @@ class Database : public ReadOnlyDatabase<Logged> {
   // Fail if an entry with this hash already exists.
   WriteResult CreateSequencedEntry(const Logged& logged) {
     CHECK(logged.has_sequence_number());
+    CHECK_GE(logged.sequence_number(), 0);
     return CreateSequencedEntry_(logged);
   }
 

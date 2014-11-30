@@ -57,7 +57,7 @@ class AsyncLogClient {
                            ct::MerkleAuditProof* proof, const Callback& done);
 
   // This does not clear "proof" before appending to it.
-  void GetSTHConsistency(uint64_t first, uint64_t second,
+  void GetSTHConsistency(int64_t first, int64_t second,
                          std::vector<std::string>* proof,
                          const Callback& done);
 

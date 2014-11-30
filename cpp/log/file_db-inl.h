@@ -38,6 +38,7 @@ template <class Logged>
 typename Database<Logged>::WriteResult FileDB<Logged>::CreateSequencedEntry_(
     const Logged& logged) {
   CHECK(logged.has_sequence_number());
+  CHECK_GE(logged.sequence_number(), 0);
 
   std::lock_guard<std::mutex> lock(lock_);
 
@@ -89,10 +90,11 @@ typename Database<Logged>::LookupResult FileDB<Logged>::LookupByHash(
 
 template <class Logged>
 typename Database<Logged>::LookupResult FileDB<Logged>::LookupByIndex(
-    uint64_t sequence_number, Logged* result) const {
+    int64_t sequence_number, Logged* result) const {
+  CHECK_GE(sequence_number, 0);
   std::unique_lock<std::mutex> lock(lock_);
 
-  std::map<uint64_t, std::string>::const_iterator it =
+  std::map<int64_t, std::string>::const_iterator it =
       sequence_map_.find(sequence_number);
   if (it == sequence_map_.end()) {
     return this->NOT_FOUND;
@@ -119,6 +121,7 @@ typename Database<Logged>::LookupResult FileDB<Logged>::LookupByIndex(
 template <class Logged>
 typename Database<Logged>::WriteResult FileDB<Logged>::WriteTreeHead_(
     const ct::SignedTreeHead& sth) {
+  CHECK_GE(sth.tree_size(), 0);
 
   // 6 bytes are good enough for some 9000 years.
   std::string timestamp_key =
@@ -156,7 +159,7 @@ typename Database<Logged>::LookupResult FileDB<Logged>::LatestTreeHead(
 
 
 template <class Logged>
-int FileDB<Logged>::TreeSize() const {
+int64_t FileDB<Logged>::TreeSize() const {
   std::lock_guard<std::mutex> lock(lock_);
 
   CHECK_EQ(sequence_map_.size(), sequence_map_.rbegin()->first + 1);
@@ -206,6 +209,8 @@ void FileDB<Logged>::BuildIndex() {
         << "Failed to parse entry with hash " << hash;
     CHECK(logged.has_sequence_number())
         << "No sequence number for entry with hash " << hash;
+    CHECK_GE(logged.sequence_number(), 0)
+        << "Entry has a negative sequence number: " << hash;
     CHECK_EQ(logged.Hash(), hash) << "Incorrect digest for entry with hash "
                                   << hash;
     CHECK(

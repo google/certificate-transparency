@@ -133,7 +133,7 @@ AsyncLogClient::Status HTTPLogClient::GetEntries(
 }
 
 AsyncLogClient::Status HTTPLogClient::GetSTHConsistency(
-    uint64_t size1, uint64_t size2, vector<string>* proof) {
+    int64_t size1, int64_t size2, vector<string>* proof) {
   AsyncLogClient::Status retval(AsyncLogClient::UNKNOWN_ERROR);
   bool done(false);
 

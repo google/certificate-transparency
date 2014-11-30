@@ -25,14 +25,14 @@ class SQLiteDB : public Database<Logged> {
   LookupResult LookupByHash(const std::string& hash,
                             Logged* result) const override;
 
-  LookupResult LookupByIndex(uint64_t sequence_number,
+  LookupResult LookupByIndex(int64_t sequence_number,
                              Logged* result) const override;
 
   WriteResult WriteTreeHead_(const ct::SignedTreeHead& sth) override;
 
   LookupResult LatestTreeHead(ct::SignedTreeHead* result) const override;
 
-  int TreeSize() const override;
+  int64_t TreeSize() const override;
 
   void AddNotifySTHCallback(
       const typename Database<Logged>::NotifySTHCallback* callback) override;

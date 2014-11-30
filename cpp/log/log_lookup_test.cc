@@ -46,8 +46,9 @@ class LogLookupTest : public ::testing::Test {
   }
 
 
-  void CreateSequencedEntry(LoggedCertificate* logged_cert, uint64_t seq) {
+  void CreateSequencedEntry(LoggedCertificate* logged_cert, int64_t seq) {
     CHECK_NOTNULL(logged_cert);
+    CHECK_GE(seq, 0);
     logged_cert->clear_sequence_number();
     CHECK(this->store_.AddPendingEntry(logged_cert).ok());
     EntryHandle<LoggedCertificate> entry;
