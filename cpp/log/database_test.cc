@@ -133,6 +133,52 @@ TYPED_TEST(DBTest, CreateSequencedDuplicateSequenceNumber) {
 }
 
 
+TYPED_TEST(DBTest, TreeSize) {
+  LoggedCertificate logged_cert;
+
+  this->test_signer_.CreateUnique(&logged_cert);
+  logged_cert.set_sequence_number(0);
+  EXPECT_EQ(DB::OK, this->db()->CreateSequencedEntry(logged_cert));
+  EXPECT_EQ(1, this->db()->TreeSize());
+
+  this->test_signer_.CreateUnique(&logged_cert);
+  logged_cert.set_sequence_number(1);
+  EXPECT_EQ(DB::OK, this->db()->CreateSequencedEntry(logged_cert));
+  EXPECT_EQ(2, this->db()->TreeSize());
+
+  // Create a gap, this will not increase the tree size.
+  this->test_signer_.CreateUnique(&logged_cert);
+  logged_cert.set_sequence_number(4);
+  EXPECT_EQ(DB::OK, this->db()->CreateSequencedEntry(logged_cert));
+  EXPECT_EQ(2, this->db()->TreeSize());
+
+  // Contiguous with the previous one, but still after the gap, so no
+  // change in tree size.
+  this->test_signer_.CreateUnique(&logged_cert);
+  logged_cert.set_sequence_number(3);
+  EXPECT_EQ(DB::OK, this->db()->CreateSequencedEntry(logged_cert));
+  EXPECT_EQ(2, this->db()->TreeSize());
+
+  // Another gap.
+  this->test_signer_.CreateUnique(&logged_cert);
+  logged_cert.set_sequence_number(6);
+  EXPECT_EQ(DB::OK, this->db()->CreateSequencedEntry(logged_cert));
+  EXPECT_EQ(2, this->db()->TreeSize());
+
+  // This fills the first gap, but not the second.
+  this->test_signer_.CreateUnique(&logged_cert);
+  logged_cert.set_sequence_number(2);
+  EXPECT_EQ(DB::OK, this->db()->CreateSequencedEntry(logged_cert));
+  EXPECT_EQ(5, this->db()->TreeSize());
+
+  // Now all the gaps are filled.
+  this->test_signer_.CreateUnique(&logged_cert);
+  logged_cert.set_sequence_number(5);
+  EXPECT_EQ(DB::OK, this->db()->CreateSequencedEntry(logged_cert));
+  EXPECT_EQ(7, this->db()->TreeSize());
+}
+
+
 TYPED_TEST(DBTest, LookupBySequenceNumber) {
   LoggedCertificate logged_cert, logged_cert2, lookup_cert, lookup_cert2;
   this->test_signer_.CreateUnique(&logged_cert);
