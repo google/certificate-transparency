@@ -47,9 +47,11 @@ class SQLiteDB : public Database<Logged> {
 
  private:
   LookupResult LatestTreeHeadNoLock(ct::SignedTreeHead* result) const;
+  void UpdateTreeSize();
 
   mutable std::mutex lock_;
   sqlite3* const db_;
+  int64_t tree_size_;
   cert_trans::DatabaseNotifierHelper callbacks_;
 
   DISALLOW_COPY_AND_ASSIGN(SQLiteDB);

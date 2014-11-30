@@ -8,6 +8,7 @@
 #include <map>
 #include <set>
 #include <stdint.h>
+#include <string>
 #include <vector>
 
 #include "log/file_storage.h"
@@ -42,8 +43,9 @@ typename Database<Logged>::WriteResult FileDB<Logged>::CreateSequencedEntry_(
 
   std::lock_guard<std::mutex> lock(lock_);
 
-  // Check we don't already have something for this sequence number
-  if (sequence_map_.find(logged.sequence_number()) != sequence_map_.end()) {
+  if (logged.sequence_number() < dense_entries_.size() ||
+      sparse_entries_.find(logged.sequence_number()) !=
+          sparse_entries_.end()) {
     LOG(WARNING) << "Attempting to re-use sequence number "
                  << logged.sequence_number() << " for entry:\n"
                  << logged.DebugString();
@@ -54,14 +56,16 @@ typename Database<Logged>::WriteResult FileDB<Logged>::CreateSequencedEntry_(
 
   std::string data;
   CHECK(logged.SerializeToString(&data));
+
   // Try to create.
   util::Status status(cert_storage_->CreateEntry(hash, data));
   if (status.CanonicalCode() == util::error::ALREADY_EXISTS) {
     return this->ENTRY_ALREADY_LOGGED;
   }
   CHECK_EQ(status, util::Status::OK);
-  CHECK(
-      sequence_map_.insert(make_pair(logged.sequence_number(), hash)).second);
+
+  InsertEntryMapping(logged.sequence_number(), hash);
+
   return this->OK;
 }
 
@@ -92,26 +96,20 @@ template <class Logged>
 typename Database<Logged>::LookupResult FileDB<Logged>::LookupByIndex(
     int64_t sequence_number, Logged* result) const {
   CHECK_GE(sequence_number, 0);
-  std::unique_lock<std::mutex> lock(lock_);
 
-  std::map<int64_t, std::string>::const_iterator it =
-      sequence_map_.find(sequence_number);
-  if (it == sequence_map_.end()) {
+  util::StatusOr<std::string> hash(HashFromIndex(sequence_number));
+  if (!hash.ok()) {
     return this->NOT_FOUND;
   }
 
-  const std::string hash(it->second);
-  // Now that we know which hash to load (which can never change for a
-  // given sequence number), we can release the lock.
-  lock.unlock();
-
   if (result) {
     std::string cert_data;
-    util::Status status(cert_storage_->LookupEntry(hash, &cert_data));
-    CHECK_EQ(status, util::Status::OK);
+    CHECK_EQ(cert_storage_->LookupEntry(hash.ValueOrDie(), &cert_data),
+             util::Status::OK);
+
     CHECK(result->ParseFromString(cert_data));
     CHECK_EQ(result->sequence_number(), sequence_number);
-    CHECK_EQ(result->Hash(), hash);
+    CHECK_EQ(result->Hash(), hash.ValueOrDie());
   }
 
   return this->LOOKUP_OK;
@@ -162,8 +160,7 @@ template <class Logged>
 int64_t FileDB<Logged>::TreeSize() const {
   std::lock_guard<std::mutex> lock(lock_);
 
-  CHECK_EQ(sequence_map_.size(), sequence_map_.rbegin()->first + 1);
-  return sequence_map_.size();
+  return dense_entries_.size();
 }
 
 
@@ -198,12 +195,14 @@ void FileDB<Logged>::BuildIndex() {
   std::lock_guard<std::mutex> lock(lock_);
 
   const std::set<std::string> hashes(cert_storage_->Scan());
+  dense_entries_.reserve(hashes.size());
+
   for (const auto& hash : hashes) {
     std::string cert_data;
     // Read the data; tolerate no errors.
-    util::Status status(cert_storage_->LookupEntry(hash, &cert_data));
-    CHECK_EQ(status, util::Status::OK) << "Failed to read entry with hash "
-                                       << hash;
+    CHECK_EQ(cert_storage_->LookupEntry(hash, &cert_data), util::Status::OK)
+        << "Failed to read entry with hash " << hash;
+
     Logged logged;
     CHECK(logged.ParseFromString(cert_data))
         << "Failed to parse entry with hash " << hash;
@@ -213,10 +212,8 @@ void FileDB<Logged>::BuildIndex() {
         << "Entry has a negative sequence number: " << hash;
     CHECK_EQ(logged.Hash(), hash) << "Incorrect digest for entry with hash "
                                   << hash;
-    CHECK(
-        sequence_map_.insert(make_pair(logged.sequence_number(), hash)).second)
-        << "Sequence number " << logged.sequence_number() << " already "
-        << "assigned when inserting hash " << hash;
+
+    InsertEntryMapping(logged.sequence_number(), hash);
   }
 
   // Now read the STH entries.
@@ -246,6 +243,62 @@ typename Database<Logged>::LookupResult FileDB<Logged>::LatestTreeHeadNoLock(
   CHECK_EQ(result->timestamp(), latest_tree_timestamp_);
 
   return this->LOOKUP_OK;
+}
+
+
+template <class Logged>
+util::StatusOr<std::string> FileDB<Logged>::HashFromIndex(
+    int64_t sequence_number) const {
+  CHECK_GE(sequence_number, 0);
+  std::lock_guard<std::mutex> lock(lock_);
+
+  if (sequence_number < dense_entries_.size()) {
+    return dense_entries_[sequence_number];
+  }
+
+  std::map<int64_t, std::string>::const_iterator it(
+      sparse_entries_.find(sequence_number));
+  if (it != sparse_entries_.end()) {
+    return it->second;
+  }
+
+  return util::Status(util::error::NOT_FOUND,
+                      "no entry found for index " +
+                          std::to_string(sequence_number));
+}
+
+
+// This must be called with "lock_" held.
+template <class Logged>
+void FileDB<Logged>::InsertEntryMapping(int64_t sequence_number,
+                                        const std::string& hash) {
+  CHECK_GE(sequence_number, dense_entries_.size())
+      << "sequence number " << sequence_number
+      << " already assigned when inserting hash " << hash;
+
+  if (sequence_number == dense_entries_.size()) {
+    // We're optimistic!
+    dense_entries_.reserve(dense_entries_.size() + sparse_entries_.size() + 1);
+
+    // It's contiguous, put it back there, and check if we can pull in
+    // sparse entries.
+    dense_entries_.push_back(hash);
+
+    std::map<int64_t, std::string>::const_iterator it(sparse_entries_.begin());
+    while (it != sparse_entries_.end()) {
+      if (it->first != dense_entries_.size()) {
+        break;
+      }
+
+      dense_entries_.emplace_back(it->second);
+      it = sparse_entries_.erase(it);
+    }
+  } else {
+    // It's not contiguous, put it with the other sparse entries.
+    CHECK(sparse_entries_.insert(make_pair(sequence_number, hash)).second)
+        << "sequence number " << sequence_number
+        << " already assigned when inserting hash " << hash;
+  }
 }
 
 
