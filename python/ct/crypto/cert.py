@@ -197,6 +197,36 @@ class Certificate(object):
         """
         return self._asn1_cert["tbsCertificate"]["version"]
 
+    def issuer_common_name(self):
+        """Get the common names of the issuer.
+
+        Returns:
+            an list of common name strings
+
+        Raises:
+            Corrupt issuer common name attribute.
+        """
+        try:
+            return self._asn1_cert["tbsCertificate"]["issuer"].attributes(
+                    oid.ID_AT_COMMON_NAME)
+        except error.ASN1Error:
+            raise CertificateError("Corrupt issuer common name attribute")
+
+    def issuer_country_name(self):
+        """Get issuer country name.
+
+        Returns:
+            an list of issuer country names.
+
+        Raises:
+            Corrupt issuer country name attribute.
+        """
+        try:
+            return self._asn1_cert["tbsCertificate"]["issuer"].attributes(
+                    oid.ID_AT_COUNTRY_NAME)
+        except error.ASN1Error:
+            raise CertificateError("Corrupt issuer country name attribute.")
+
     def subject_common_names(self):
         """Get the common names of the subject.
 
@@ -212,6 +242,98 @@ class Certificate(object):
                 oid.ID_AT_COMMON_NAME)
         except error.ASN1Error as e:
             raise CertificateError("Corrupt common name attribute")
+
+    def subject_organization_name(self):
+        """Get subject organization name.
+
+        Returns:
+            a list of subject organization names.
+
+        Raises:
+            CertificateError: corrupt subject organization name attribute.
+        """
+        try:
+            return self._asn1_cert["tbsCertificate"]["subject"].attributes(
+                    oid.ID_AT_ORGANIZATION_NAME)
+        except error.ASN1Error:
+            raise CertificateError("Corrupt subject organization name attribute.")
+
+    def subject_street_address(self):
+        """Get subject street address.
+
+        Returns:
+            a list of subject street addresses.
+
+        Raises:
+            CertificateError: corrupt subject street adress attribute.
+        """
+        try:
+            return self._asn1_cert["tbsCertificate"]["subject"].attributes(
+                    oid.ID_AT_STREET_ADDRESS)
+        except error.ASN1Error:
+            raise CertificateError("Corrupt subject street address attribute.")
+
+    def subject_locality_name(self):
+        """Get subject locality name.
+
+        Returns:
+            a list of subject locality names.
+
+        Raises:
+            CertificateError: corrupt subject locality names attribute.
+        """
+        try:
+            return self._asn1_cert["tbsCertificate"]["subject"].attributes(
+                    oid.ID_AT_LOCALITY_NAME)
+        except error.ASN1Error:
+            raise CertificateError("Corrupt subject locality name attribute")
+
+    def subject_state_or_province_name(self):
+        """Get subject state or province name.
+
+        Returns:
+            a list of subject state or province names.
+
+        Raises:
+            CertificateError: corrupt subject state or province names attribute.
+        """
+        try:
+            return self._asn1_cert["tbsCertificate"]["subject"].attributes(
+                    oid.ID_AT_STATE_OR_PROVINCE_NAME)
+        except error.ASN1Error:
+            raise CertificateError("Corrupt subject state or province name "
+                                   "attribute.")
+
+    def subject_postal_code(self):
+        """Get subject postal code.
+
+        Returns:
+            a list of subject postal codes.
+
+        Raises:
+            CertificateError: corrupt subject postal code attribute.
+        """
+        try:
+            return self._asn1_cert["tbsCertificate"]["subject"].attributes(
+                    oid.ID_AT_POSTAL_CODE)
+        except error.ASN1Error:
+            raise CertificateError("Corrupt subject postal code attribute.")
+
+    def subject_organizational_unit_name(self):
+        """Get subject organizational unit name.
+
+        Returns:
+            a list of subject organizational unit names.
+
+        Raises:
+            CertificateError: corrupt subject organizational unit name attribute
+        """
+        try:
+            return self._asn1_cert["tbsCertificate"]["subject"].attributes(
+                    oid.ID_AT_ORGANIZATIONAL_UNIT_NAME)
+        except error.ASN1Error:
+            raise CertificateError("Corrupt subject organizational unit name "
+                                   "attribute.")
 
     def subject_alternative_names(self):
         """Get a list of subjectAlternativeNames extension values.
