@@ -1,9 +1,9 @@
 import logging
 import sqlite3
 
-from ct.client import temp_db
-from ct.client import database
-from ct.client import sqlite_connection as sqlitecon
+from ct.client.db import temp_db
+from ct.client.db import database
+from ct.client.db import sqlite_connection as sqlitecon
 from ct.proto import client_pb2
 
 class SQLiteTempDBFactory(object):

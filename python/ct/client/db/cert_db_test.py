@@ -1,6 +1,6 @@
 import abc
 import hashlib
-from ct.client import cert_desc
+from ct.client.db import cert_desc
 
 SAMPLE_CERT = cert_desc.CertificateDescription.from_values("hello\x00",
                                                           ["example.com"])

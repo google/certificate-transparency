@@ -1,7 +1,7 @@
 import contextlib
 import sqlite3
 
-from ct.client import database
+from ct.client.db import database
 
 class SQLiteConnection(object):
     """A thin wrapper around sqlite3 Connection for automatically closing the
