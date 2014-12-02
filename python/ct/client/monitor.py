@@ -3,9 +3,10 @@ import logging
 
 from ct.client import entry_decoder
 from ct.client import state
-from ct.client import reporter
+from ct.client import aggregated_reporter
 from ct.crypto import error
 from ct.crypto import merkle
+from ct.client import text_reporter
 from ct.proto import client_pb2
 from twisted.internet import defer
 
@@ -26,7 +27,8 @@ class Monitor(object):
         # Merkle tree info.
         # Depends on: Merkle trees implemented in Python.
         self.__state = client_pb2.MonitorState()
-        self.__report = reporter.CertificateReport()
+        self.__report = aggregated_reporter.AggregatedCertificateReport(
+                (text_reporter.TextCertificateReport(),))
         try:
             self.__state = self.__state_keeper.read(client_pb2.MonitorState)
         except state.FileNotFoundError:
@@ -95,8 +97,6 @@ class Monitor(object):
 
     def _set_verified_tree(self, new_tree):
         """Set verified_tree and maybe move pending_sth to verified_sth."""
-        self.__report.set_new_entries_count(
-                new_tree.tree_size - self.__verified_tree.tree_size)
         self.__verified_tree = new_tree
         old_state = self.__state
         new_state = client_pb2.MonitorState()

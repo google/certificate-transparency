@@ -1,12 +1,13 @@
+import abc
 import gflags
 import logging
 import multiprocessing
 import sys
 import traceback
 
-from collections import defaultdict
 from ct.cert_analysis import all_checks
 from ct.cert_analysis import asn1
+from ct.client.db import cert_desc
 from ct.crypto import cert
 from ct.crypto import error
 
@@ -44,7 +45,10 @@ def _scan_der_cert(der_certs, checks):
             if not strict_failure:
                 for check in checks:
                     partial_result += check.check(certificate) or []
-            result.append((log_index, partial_result))
+                desc = cert_desc.CertificateDescription.from_cert(certificate)
+            else:
+                desc = cert_desc.CertificateDescription.from_values(der=der_cert)
+            result.append((desc, log_index, partial_result))
         return result
     except Exception:
         # TODO(laiqu) return exact certificate index which caused an exception
@@ -56,21 +60,19 @@ def _scan_der_cert(der_certs, checks):
 
 
 class CertificateReport(object):
-    """Stores description of new entries between last verified STH and
-    current."""
+    """Stores description of new entries between last verified STH and    current."""
+    __metaclass__ = abc.ABCMeta
 
     def __init__(self, checks=all_checks.ALL_CHECKS,
                  pool_size=FLAGS.reporter_workers):
         self.reset()
         self.checks = checks
-        self._pool = multiprocessing.Pool(processes=pool_size)
+        self._jobs = []
+        self._pool = None
 
-    def set_new_entries_count(self, count):
-        """Set number of new entries"""
-        self._new_entries_count = count
-
+    @abc.abstractmethod
     def report(self):
-        """Report stored changes and reset report"""
+        """Report stored changes and reset report."""
         for job in self._jobs:
             try:
                 job.get()
@@ -80,60 +82,15 @@ class CertificateReport(object):
                 logging.critical(ex.args[0])
                 logging.critical("Batch <%d, %d> %s" % (first, last,
                                             "raised an exception during scan"))
-        logging.info("Report:")
-        if self._new_entries_count:
-            logging.info("New entries since last verified STH: %s" %
-                         self._new_entries_count)
-        logging.info("Number of entries with observations: %d" %
-                     len(self._observations_by_index))
-        logging.info("Observations:")
-        for index, cert_observations in sorted(
-                self._observations_by_index.iteritems()):
-            msg = "Cert %d:" % index
-            observations = []
-            for obs in cert_observations:
-                observations.append(str(obs))
-            if observations:
-                logging.info("%s %s", msg, ', '.join(observations))
 
-        stats = defaultdict(int)
-        for observations in self._observations_by_index.itervalues():
-            # here we care only about description and reason, because details
-            # will be probably different for every single observation
-            unique_observations = set((obs.description, obs.reason)
-                                      for obs in observations)
-            for obs in unique_observations:
-                stats[obs] += 1
-        # if number of new entries is unknown then we just count percentages
-        # based on number of certificates with observations
-        if not self._new_entries_count:
-            self._new_entries_count = len(self._observations_by_index)
-        logging.info("Stats:")
-        for description_reason, count in stats.iteritems():
-            description, reason = description_reason
-            logging.info("%s %s: %d (%.5f%%)"
-                         % (description,
-                            "(%s)" % reason if reason else '',
-                            count,
-                            float(count) / self._new_entries_count * 100.))
-        ret = self._observations_by_index
-        self.reset()
-        return ret
+    @abc.abstractmethod
+    def _batch_scanned_callback(self, result):
+        """Callback called after scanning der_certs passed to scan_der_certs."""
 
+    @abc.abstractmethod
     def reset(self):
-        self._new_entries_count = None
-        self._observations_by_index = defaultdict(list)
+        """Clean up report."""
         self._jobs = []
-
-    def _add_certificate_observations(self, indexed_observations):
-        """Adds Observations for certificates identified by indexes
-        in logs.
-
-        Args:
-            indexed_observations: array of (log_index, observations) tuples.
-        """
-        for log_index, observations in indexed_observations:
-            self._observations_by_index[log_index] += observations
 
     def scan_der_certs(self, der_certs):
         """Scans certificates in der form for all supported observations.
@@ -141,6 +98,8 @@ class CertificateReport(object):
         Args:
             der_certs: non empty array of (log_index, observations) tuples.
         """
+        if not self._pool:
+            self._pool = multiprocessing.Pool(processes=FLAGS.reporter_workers)
         self._jobs.append(self._pool.apply_async(_scan_der_cert,
                                                  [der_certs, self.checks],
-           callback=lambda result: self._add_certificate_observations(result)))
+           callback=lambda result: self._batch_scanned_callback(result)))

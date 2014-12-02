@@ -169,7 +169,7 @@ class MonitorTest(unittest.TestCase):
 
     def create_monitor(self, client, skip_scan_entry=True):
         m = monitor.Monitor(client, self.verifier, self.hasher, self.db,
-                               self.temp_db, self.state_keeper)
+                            self.temp_db, self.state_keeper)
         if m:
             m._scan_entries = mock.Mock()
         return m
