@@ -2,7 +2,7 @@
 import base64
 import json
 
-from ct.client import database
+from ct.client.db import database
 from ct.proto import client_pb2
 import gflags
 import logging

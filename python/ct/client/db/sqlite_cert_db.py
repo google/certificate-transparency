@@ -1,7 +1,7 @@
 import sqlite3
 
-from ct.client import cert_db
-from ct.client import cert_desc
+from ct.client.db import cert_db
+from ct.client.db import cert_desc
 
 class SQLiteCertDB(cert_db.CertDB):
     def __init__(self, connection_manager):

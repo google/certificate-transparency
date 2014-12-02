@@ -1,13 +1,13 @@
 #!/usr/bin/env trial
-import database
+import gflags
 import json
+import mock
 import sys
 import urlparse
 
 from ct.client import log_client
 from ct.client import log_client_test_util as test_util
-import gflags
-import mock
+from ct.client.db import database
 from twisted.internet import defer
 from twisted.internet import task
 from twisted.python import failure

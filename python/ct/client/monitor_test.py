@@ -7,9 +7,9 @@ import os
 import sys
 
 from ct.client import log_client
-from ct.client import sqlite_connection as sqlitecon
-from ct.client import sqlite_log_db
-from ct.client import sqlite_temp_db
+from ct.client.db import sqlite_connection as sqlitecon
+from ct.client.db import sqlite_log_db
+from ct.client.db import sqlite_temp_db
 from ct.client import state
 from ct.client import monitor
 from ct.crypto import error

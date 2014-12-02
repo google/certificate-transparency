@@ -1,6 +1,6 @@
 import abc
-from ct.client import log_db
-from ct.client import database
+from ct.client.db import log_db
+from ct.client.db import database
 from ct.proto import client_pb2
 
 # This class provides common tests for all CT log database implementations.
