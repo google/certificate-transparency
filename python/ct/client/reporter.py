@@ -1,6 +1,8 @@
 import gflags
 import logging
 import multiprocessing
+import sys
+import traceback
 
 from collections import defaultdict
 from ct.cert_analysis import all_checks
@@ -13,30 +15,42 @@ FLAGS = gflags.FLAGS
 gflags.DEFINE_integer("reporter_workers", multiprocessing.cpu_count(),
                       "Number of subprocesses scanning certificates.")
 
+class PoolException(Exception):
+    def __init__(self, fail_info):
+        super(PoolException, self).__init__("One of threads in pool encountered"
+                                            " an exception")
+        self.failure = fail_info
+
 def _scan_der_cert(der_certs, checks):
-    result = []
-    for log_index, der_cert in der_certs:
-        partial_result = []
-        strict_failure = False
-        try:
-            certificate = cert.Certificate(der_cert)
-        except error.Error as e:
+    try:
+        result = []
+        for log_index, der_cert in der_certs:
+            partial_result = []
+            strict_failure = False
             try:
-                certificate = cert.Certificate(der_cert, strict_der=False)
+                certificate = cert.Certificate(der_cert)
             except error.Error as e:
-                partial_result.append(asn1.All())
-                strict_failure = True
-            else:
-                if isinstance(e, error.ASN1IllegalCharacter):
-                    partial_result.append(asn1.Strict(reason=e.args[0],
-                                                   details=(e.string, e.index)))
+                try:
+                    certificate = cert.Certificate(der_cert, strict_der=False)
+                except error.Error as e:
+                    partial_result.append(asn1.All())
+                    strict_failure = True
                 else:
-                    partial_result.append(asn1.Strict(reason=str(e)))
-        if not strict_failure:
-            for check in checks:
-                partial_result += check.check(certificate) or []
-        result.append((log_index, partial_result))
-    return result
+                    if isinstance(e, error.ASN1IllegalCharacter):
+                        partial_result.append(asn1.Strict(reason=e.args[0],
+                                                       details=(e.string, e.index)))
+                    else:
+                        partial_result.append(asn1.Strict(reason=str(e)))
+            if not strict_failure:
+                for check in checks:
+                    partial_result += check.check(certificate) or []
+            result.append((log_index, partial_result))
+        return result
+    except:
+        _, ex, ex_tb = sys.exc_info()
+        ex_tb = traceback.format_exc(ex_tb)
+        raise PoolException((ex, ex_tb, der_certs[0][0], der_certs[-1][0]))
+
 
 class CertificateReport(object):
     """Stores description of new entries between last verified STH and
@@ -54,7 +68,14 @@ class CertificateReport(object):
     def report(self):
         """Report stored changes and reset report"""
         for job in self._jobs:
-            job.wait()
+            try:
+                job.get()
+            except PoolException as e:
+                ex, ex_tb, first, last = e.failure
+                logging.critical(ex_tb)
+                logging.critical(ex.args[0])
+                logging.critical("Batch <%d, %d> %s" % (first, last,
+                                            "raised an exception during scan"))
         logging.info("Report:")
         if self._new_entries_count:
             logging.info("New entries since last verified STH: %s" %
@@ -114,7 +135,7 @@ class CertificateReport(object):
         """Scans certificates in der form for all supported observations.
 
         Args:
-            der_certs: array of (log_index, observations) tuples.
+            der_certs: non empty array of (log_index, observations) tuples.
         """
         self._jobs.append(self._pool.apply_async(_scan_der_cert,
                                                  [der_certs, self.checks],
