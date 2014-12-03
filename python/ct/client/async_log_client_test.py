@@ -120,6 +120,11 @@ class AsyncLogClientTest(unittest.TestCase):
 
     def setUp(self):
         self.clock = task.Clock()
+        # Task clock doesn't have callFromThread method. But in this test
+        # everything is single threaded anyway, so we can simply run given
+        # function.
+        self.clock.callFromThread = lambda fun, *args, **kwargs: fun(*args,
+                                                                     **kwargs)
 
     def one_shot_client(self, json_content):
         """Make a one-shot client and give it a mock response."""
