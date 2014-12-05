@@ -142,11 +142,13 @@ util/libutil.a: util/util.o util/openssl_util.o util/testing.o \
 
 util/json_wrapper_test: util/json_wrapper_test.o util/libutil.a $(GTESTLIB)
 
-util/etcd_test: util/etcd_test.o util/libutil.a $(GMOCKLIB)
+util/etcd_test: util/etcd_test.o util/libutil.a $(GMOCKLIB) $(GTESTLIB)
 
-util/fake_etcd_test: util/fake_etcd_test.o util/libutil.a $(GMOCKLIB)
+util/fake_etcd_test: util/fake_etcd_test.o util/libutil.a $(GMOCKLIB) \
+                     $(GTESTLIB)
 
-util/sync_etcd_test: util/sync_etcd_test.o util/libutil.a $(GMOCKLIB)
+util/sync_etcd_test: util/sync_etcd_test.o util/libutil.a $(GMOCKLIB) \
+                     $(GTESTLIB)
 
 ### proto/ targets
 proto/libproto.a: proto/ct.pb.o proto/serializer.o
@@ -278,11 +280,13 @@ log/logged_certificate_test: log/logged_certificate_test.o proto/libproto.a \
 
 log/etcd_consistent_store_test: log/etcd_consistent_store_cert.o \
                                 proto/libproto.a util/libutil.a \
-                                merkletree/libmerkletree.a $(GMOCKLIB)
+                                merkletree/libmerkletree.a $(GMOCKLIB) \
+                                $(GTESTLIB)
 
 log/fake_consistent_store_test: log/fake_consistent_store_cert.o \
                                 proto/libproto.a util/libutil.a \
-                                merkletree/libmerkletree.a $(GMOCKLIB)
+                                merkletree/libmerkletree.a $(GMOCKLIB) \
+                                $(GTESTLIB)
 
 monitor/database_test: monitor/database_test.o monitor/database.o \
                        monitor/sqlite_db.o util/libutil.a log/test_signer.o \
