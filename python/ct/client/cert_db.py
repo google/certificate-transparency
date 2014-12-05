@@ -1,6 +1,7 @@
 import abc
 import hashlib
 
+
 class CertDB(object):
     """Database interface for storing X509 certificate information."""
     __metaclass__ = abc.ABCMeta
@@ -10,18 +11,23 @@ class CertDB(object):
         return hashlib.sha256(der_cert).digest()
 
     @abc.abstractmethod
-    def store_cert(self, der_cert, subject_names):
-        """Store a certificate.
+    def store_cert_desc(self, cert_desc, index, log_key):
+        """Stores a certificate using its description.
+
         Args:
-            der_cert:      the DER-encoded certificate
-            subject_names: an iterable of subject names, used to create a search
-                           index."""
+            cert:          CertificateDescription
+            index:         position in log
+            log_key:       log id in LogDB"""
 
     @abc.abstractmethod
-    def store_certs(self, certs):
-        """Batch store certificates.
+    def store_certs_desc(self, certs, log_key):
+        """Store certificates using its descriptions.
+
+        Batched version of store_cert_desc.
+
         Args:
-            certs:         an iterable of (der_cert, subject_names) tuples."""
+            certs:         iterable of (CertificateDescription, index) tuples
+            log_key:       log id in LogDB"""
 
     @abc.abstractmethod
     def get_cert_by_sha256_hash(self, cert_sha256_hash):
