@@ -3,6 +3,8 @@
 #ifndef LOGGED_CERTIFICATE_H
 #define LOGGED_CERTIFICATE_H
 
+#include <glog/logging.h>
+
 #include "merkletree/serial_hasher.h"
 #include "proto/ct.pb.h"
 #include "proto/serializer.h"
@@ -109,6 +111,36 @@ class LoggedCertificate : public ct::LoggedCertificatePB {
     }
   }
 };
+
+
+inline bool operator==(const LoggedCertificate& lhs,
+                       const LoggedCertificate& rhs) {
+  // TODO(alcutter): Do this properly
+  std::string l_str, r_str;
+  CHECK(lhs.SerializeToString(&l_str));
+  CHECK(rhs.SerializeToString(&r_str));
+  return l_str == r_str;
+}
+
+
+inline bool operator==(const ct::LogEntry& lhs, const ct::LogEntry& rhs) {
+  // TODO(alcutter): Do this properly
+  std::string l_str, r_str;
+  CHECK(lhs.SerializeToString(&l_str));
+  CHECK(rhs.SerializeToString(&r_str));
+  return l_str == r_str;
+}
+
+
+inline bool operator==(const ct::SignedCertificateTimestamp& lhs,
+                       const ct::SignedCertificateTimestamp& rhs) {
+  // TODO(alcutter): Do this properly
+  std::string l_str, r_str;
+  CHECK(lhs.SerializeToString(&l_str));
+  CHECK(rhs.SerializeToString(&r_str));
+  return l_str == r_str;
+}
+
 
 }  // namespace cert_trans
 

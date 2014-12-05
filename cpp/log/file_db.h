@@ -1,8 +1,10 @@
 /* -*- mode: c++; indent-tabs-mode: nil -*- */
-
 #ifndef CERTIFICATE_DB_H
 #define CERTIFICATE_DB_H
+
 #include <map>
+#include <memory>
+#include <mutex>
 #include <set>
 #include <stdint.h>
 #include <vector>
@@ -10,8 +12,11 @@
 #include "base/macros.h"
 #include "log/database.h"
 #include "proto/ct.pb.h"
+#include "util/statusor.h"
 
+namespace cert_trans {
 class FileStorage;
+}
 
 // Database interface that stores certificates and tree head
 // signatures in the filesystem.
@@ -29,47 +34,63 @@ class FileDB : public Database<Logged> {
   // of 8 buckets tree head updates within about 1 minute
   // (timestamps xxxxxxxx0000 - xxxxxxxxFFFF) to the same directory.
   // Takes ownership of |cert_storage| and |tree_storage|.
-  FileDB(FileStorage* cert_storage, FileStorage* tree_storage);
+  FileDB(cert_trans::FileStorage* cert_storage,
+         cert_trans::FileStorage* tree_storage);
   ~FileDB();
 
   static const size_t kTimestampBytesIndexed;
 
   // Implement abstract functions, see database.h for comments.
-  virtual typename Database<Logged>::WriteResult CreatePendingEntry_(
-      const Logged& logged);
+  typename Database<Logged>::WriteResult CreateSequencedEntry_(
+      const Logged& logged) override;
 
-  virtual typename Database<Logged>::WriteResult AssignSequenceNumber(
-      const std::string& hash, uint64_t sequence_number);
+  typename Database<Logged>::LookupResult LookupByHash(
+      const std::string& hash, Logged* result) const override;
 
-  virtual typename Database<Logged>::LookupResult LookupByHash(
-      const std::string& hash) const;
+  typename Database<Logged>::LookupResult LookupByIndex(
+      int64_t sequence_number, Logged* result) const override;
 
-  virtual typename Database<Logged>::LookupResult LookupByHash(
-      const std::string& hash, Logged* result) const;
+  typename Database<Logged>::WriteResult WriteTreeHead_(
+      const ct::SignedTreeHead& sth) override;
 
-  virtual typename Database<Logged>::LookupResult LookupByIndex(
-      uint64_t sequence_number, Logged* result) const;
+  typename Database<Logged>::LookupResult LatestTreeHead(
+      ct::SignedTreeHead* result) const override;
 
-  virtual std::set<std::string> PendingHashes() const;
+  int64_t TreeSize() const override;
 
-  virtual typename Database<Logged>::WriteResult WriteTreeHead_(
-      const ct::SignedTreeHead& sth);
+  void AddNotifySTHCallback(
+      const typename Database<Logged>::NotifySTHCallback* callback) override;
 
-  virtual typename Database<Logged>::LookupResult LatestTreeHead(
-      ct::SignedTreeHead* result) const;
+  void RemoveNotifySTHCallback(
+      const typename Database<Logged>::NotifySTHCallback* callback) override;
 
  private:
   void BuildIndex();
-  std::set<std::string> pending_hashes_;
-  std::map<uint64_t, std::string> sequence_map_;
-  FileStorage* cert_storage_;
+  typename Database<Logged>::LookupResult LatestTreeHeadNoLock(
+      ct::SignedTreeHead* result) const;
+  util::StatusOr<std::string> HashFromIndex(int64_t sequence_number) const;
+  void InsertEntryMapping(int64_t sequence_number, const std::string& hash);
+
+  const std::unique_ptr<cert_trans::FileStorage> cert_storage_;
   // Store all tree heads, but currently only support looking up the latest
   // one.
   // Other necessary lookup indices (by tree size, by timestamp range?) TBD.
-  FileStorage* tree_storage_;
+  const std::unique_ptr<cert_trans::FileStorage> tree_storage_;
+
+  mutable std::mutex lock_;
+  // This is a mapping of the sequence number to entry hashes, for
+  // index lookups. This is also the contiguous part of the log that
+  // we are able to serve.
+  std::vector<std::string> dense_entries_;
+  // This is a mapping of the non-contiguous entries of the log (which
+  // can happen while it is being fetched). When entries here become
+  // contiguous with those in dense_entries_, they are moved there.
+  std::map<int64_t, std::string> sparse_entries_;
+
   uint64_t latest_tree_timestamp_;
   // The same as a string;
   std::string latest_timestamp_key_;
+  cert_trans::DatabaseNotifierHelper callbacks_;
 
   DISALLOW_COPY_AND_ASSIGN(FileDB);
 };

@@ -42,6 +42,10 @@ class JsonObject {
   JsonObject(const JsonArray& from, int offset,
              json_type type = json_type_object);
 
+  JsonObject(const JsonObject& from, const char* field) {
+    InitFromChild(from, field, json_type_object);
+  }
+
   JsonObject() : obj_(json_object_new_object()) {
   }
 
@@ -107,6 +111,15 @@ class JsonObject {
 
  protected:
   JsonObject(const JsonObject& from, const char* field, json_type type) {
+    InitFromChild(from, field, type);
+  }
+
+  json_object* obj_;
+
+ private:
+  void InitFromChild(const JsonObject& from, const char* field,
+                     json_type type) {
+    obj_ = json_object_object_get(from.obj_, field);
     if (json_object_object_get_ex(from.obj_, field, &obj_)) {
       if (!json_object_is_type(obj_, type)) {
         LOG(ERROR) << "Don't understand " << field
@@ -115,16 +128,13 @@ class JsonObject {
         return;
       }
     } else {
-      LOG(ERROR) << "No " << field << " field";
+      VLOG(0) << "No " << field << " field";
       return;
     }
     // Increment reference count
     json_object_get(obj_);
   }
 
-  json_object* obj_;
-
- private:
   void Add(const char* name, json_object* obj) {
     json_object_object_add(obj_, name, obj);
   }
@@ -138,7 +148,7 @@ class JsonBoolean : public JsonObject {
       : JsonObject(from, field, json_type_boolean) {
   }
 
-  bool Value() {
+  bool Value() const {
     return json_object_get_boolean(obj_);
   }
 };
@@ -153,7 +163,7 @@ class JsonString : public JsonObject {
       : JsonObject(from, offset, json_type_string) {
   }
 
-  const char* Value() {
+  const char* Value() const {
     return json_object_get_string(obj_);
   }
 

@@ -7,9 +7,9 @@
 
 class Frontend;
 template <class T>
-class Database;
-template <class T>
 class LogLookup;
+template <class T>
+class ReadOnlyDatabase;
 
 namespace cert_trans {
 
@@ -22,8 +22,12 @@ class ThreadPool;
 
 class HttpHandler {
  public:
+  // Does not take ownership of its parameters, which must outlive
+  // this instance. The "frontend" parameter can be NULL, in which
+  // case this server will not accept "add-chain" and "add-pre-chain"
+  // requests.
   HttpHandler(LogLookup<LoggedCertificate>* log_lookup,
-              const Database<LoggedCertificate>* db,
+              const ReadOnlyDatabase<LoggedCertificate>* db,
               const CertChecker* cert_checker, Frontend* frontend,
               ThreadPool* pool);
 
@@ -40,12 +44,12 @@ class HttpHandler {
 
   void BlockingGetEntries(evhttp_request* req, int start, int end) const;
   void BlockingAddChain(evhttp_request* req,
-                        const boost::shared_ptr<CertChain>& chain) const;
+                        const std::shared_ptr<CertChain>& chain) const;
   void BlockingAddPreChain(evhttp_request* req,
-                           const boost::shared_ptr<PreCertChain>& chain) const;
+                           const std::shared_ptr<PreCertChain>& chain) const;
 
   LogLookup<LoggedCertificate>* const log_lookup_;
-  const Database<LoggedCertificate>* const db_;
+  const ReadOnlyDatabase<LoggedCertificate>* const db_;
   const CertChecker* const cert_checker_;
   Frontend* const frontend_;
   ThreadPool* const pool_;

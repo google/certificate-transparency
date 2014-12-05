@@ -28,7 +28,7 @@ class SQLiteDB : public Database {
   virtual LookupResult LookupLatestWrittenSTH(
       ct::SignedTreeHead* result) const;
 
-  virtual LookupResult LookupHashByIndex(uint64_t sequence_number,
+  virtual LookupResult LookupHashByIndex(int64_t sequence_number,
                                          std::string* result) const;
 
   virtual LookupResult LookupSTHByTimestamp(uint64_t timestamp,
@@ -43,7 +43,7 @@ class SQLiteDB : public Database {
                                    const std::string& cert,
                                    const std::string& cert_chain);
 
-  virtual WriteResult WriteSTH_(uint64_t timestamp, uint64_t tree_size,
+  virtual WriteResult WriteSTH_(uint64_t timestamp, int64_t tree_size,
                                 const std::string& sth);
 
   virtual WriteResult SetVerificationLevel_(const ct::SignedTreeHead& sth,

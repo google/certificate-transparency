@@ -1,7 +1,7 @@
 /* -*- indent-tabs-mode: nil -*- */
 #include "log/cert.h"
 
-#include <boost/shared_ptr.hpp>
+#include <memory>
 #include <glog/logging.h>
 #include <openssl/asn1.h>
 #include <openssl/bio.h>
@@ -18,8 +18,8 @@
 #include "merkletree/serial_hasher.h"
 #include "util/openssl_util.h"  // For LOG_OPENSSL_ERRORS
 
-using boost::shared_ptr;
 using std::string;
+using std::unique_ptr;
 using util::ClearOpenSSLErrors;
 
 #if OPENSSL_VERSION_NUMBER < 0x10002000L
@@ -341,9 +341,7 @@ Cert::Status Cert::PemEncoding(string* result) const {
     return ERROR;
   }
 
-  // TODO(pphaneuf): I would have liked to use std::unique_ptr, but it
-  // is not available to us yet (C++11).
-  shared_ptr<BIO> bp(BIO_new(BIO_s_mem()), BIO_free);
+  unique_ptr<BIO, int (*)(BIO*)> bp(BIO_new(BIO_s_mem()), &BIO_free);
   if (!PEM_write_bio_X509(bp.get(), x509_)) {
     LOG(WARNING) << "Failed to serialize cert";
     LOG_OPENSSL_ERRORS(WARNING);

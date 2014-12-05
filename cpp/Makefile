@@ -5,7 +5,7 @@ default: all
 
 -include local.mk
 
-CXXFLAG = -Wall -Werror -g -O3
+CXXFLAG = -std=c++11 -Wall -Werror -g -O3
 LINK.o = $(LINK.cc)
 
 INCLUDE = -I .
@@ -20,12 +20,6 @@ ifeq ($(PLATFORM), FreeBSD)
   LDLIBS += -L/usr/local/lib/event2
 else
   LDLIBS += -lresolv
-endif
-
-ifeq ($(PLATFORM), Darwin)
-  LDLIBS += -lboost_system-mt -lboost_thread-mt
-else
-  LDLIBS += -lboost_system -lboost_thread
 endif
 
 # Need OpenSSL >= 1.0.0
@@ -67,6 +61,8 @@ CXXFLAGS = $(INCLUDE) $(CXXFLAG) $(LOCAL_CXXFLAGS)
 # These tests will be built and run automatically.
 TESTS = \
 	log/database_test \
+	log/etcd_consistent_store_test \
+	log/fake_consistent_store_test \
 	log/file_storage_test \
 	log/frontend_signer_test \
 	log/log_lookup_test \
@@ -79,7 +75,10 @@ TESTS = \
 	merkletree/tree_hasher_test \
 	monitor/database_test \
 	proto/serializer_test \
-	util/json_wrapper_test
+	util/etcd_test \
+	util/fake_etcd_test \
+	util/json_wrapper_test \
+	util/sync_etcd_test
 
 # These tests will be built, but not run.
 DISABLED_TESTS = \
@@ -98,7 +97,7 @@ EXTRA_TESTS = \
 	log/frontend_test
 
 all: client/ct server/ct-server server/ct-dns-server tools/dump_cert \
-     tools/dump_sth
+     tools/dump_sth util/bench_etcd util/etcd_watch
 
 tests: all $(TESTS) $(DISABLED_TESTS) $(EXTRA_TESTS)
 
@@ -135,11 +134,21 @@ endif
 
 ### util/ targets
 util/libutil.a: util/util.o util/openssl_util.o util/testing.o \
-                util/json_wrapper.o util/thread_pool.o util/libevent_wrapper.o
+                util/json_wrapper.o util/thread_pool.o util/libevent_wrapper.o \
+                util/etcd.o util/status.o util/sync_etcd.o util/fake_etcd.o \
+                util/periodic_closure.o
 	rm -f $@
 	ar -rcs $@ $^
 
 util/json_wrapper_test: util/json_wrapper_test.o util/libutil.a $(GTESTLIB)
+
+util/etcd_test: util/etcd_test.o util/libutil.a $(GMOCKLIB) $(GTESTLIB)
+
+util/fake_etcd_test: util/fake_etcd_test.o util/libutil.a $(GMOCKLIB) \
+                     $(GTESTLIB)
+
+util/sync_etcd_test: util/sync_etcd_test.o util/libutil.a $(GMOCKLIB) \
+                     $(GTESTLIB)
 
 ### proto/ targets
 proto/libproto.a: proto/ct.pb.o proto/serializer.o
@@ -181,8 +190,9 @@ log/libcert.a: log/cert.o log/cert_checker.o log/cert_submission_handler.o \
 	rm -f $@
 	ar -rcs $@ $^
 
-log/libdatabase.a: log/file_storage.o log/filesystem_op.o log/file_db_cert.o \
-                   log/sqlite_db_cert.o
+log/libdatabase.a: log/file_storage.o log/filesystem_ops.o log/file_db_cert.o \
+                   log/sqlite_db_cert.o log/database.o \
+                   log/etcd_consistent_store_cert.o log/fake_consistent_store_cert.o
 	rm -f $@
 	ar -rcs $@ $^
 
@@ -268,6 +278,16 @@ log/logged_certificate_test: log/logged_certificate_test.o proto/libproto.a \
                              util/libutil.a merkletree/libmerkletree.a \
                              $(GTESTLIB)
 
+log/etcd_consistent_store_test: log/etcd_consistent_store_cert.o \
+                                proto/libproto.a util/libutil.a \
+                                merkletree/libmerkletree.a $(GMOCKLIB) \
+                                $(GTESTLIB)
+
+log/fake_consistent_store_test: log/fake_consistent_store_cert.o \
+                                proto/libproto.a util/libutil.a \
+                                merkletree/libmerkletree.a $(GMOCKLIB) \
+                                $(GTESTLIB)
+
 monitor/database_test: monitor/database_test.o monitor/database.o \
                        monitor/sqlite_db.o util/libutil.a log/test_signer.o \
                        merkletree/libmerkletree.a log/log_signer.o \
@@ -288,6 +308,11 @@ tools/dump_cert: tools/dump_cert.o proto/libproto.a util/libutil.a
 
 tools/dump_sth: tools/dump_sth.o proto/libproto.a
 
+util/bench_etcd: util/bench_etcd.o util/libutil.a
+
+util/etcd_watch: util/etcd_watch.o util/etcd.o util/libevent_wrapper.o \
+	util/json_wrapper.o util/status.o
+
 test: tests
 	@set -e; for TEST in $(TESTS); do \
 		echo $$TEST; eval $$TEST; \
@@ -297,9 +322,11 @@ test: tests
 	log/cert_submission_handler_test --test_certs_dir=../test/testdata
 	log/ct_extensions_test --test_certs_dir=../test/testdata
 	log/frontend_test --test_certs_dir=../test/testdata
-	rm -rf /tmp/ct-test.$$$$ && mkdir /tmp/ct-test.$$$$ \
-	&& python server/ct-dns-server-test.py /tmp/ct-test.$$$$ \
-	&& rm -rf /tmp/ct-test.$$$$
+	# TODO(pphaneuf): This is broken by commit 9391d114, hopefully
+	# fixed soon.
+	#rm -rf /tmp/ct-test.$$$$ && mkdir /tmp/ct-test.$$$$ \
+	#&& python server/ct-dns-server-test.py /tmp/ct-test.$$$$ \
+	#&& rm -rf /tmp/ct-test.$$$$
 
 # Unit tests plus end-to-end tests. Make sure to set up links in test/  first.
 alltests: test

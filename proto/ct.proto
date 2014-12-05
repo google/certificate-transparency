@@ -150,15 +150,15 @@ message MerkleTreeLeaf {
 message MerkleAuditProof {
   optional Version version = 1 [ default = UNKNOWN_VERSION ];
   optional LogID id = 2;
-  optional uint64 tree_size = 3;
+  optional int64 tree_size = 3;
   optional uint64 timestamp = 4;
-  optional uint64 leaf_index = 5;
+  optional int64 leaf_index = 5;
   repeated bytes path_node = 6;
   optional DigitallySigned tree_head_signature = 7;
 }
 
 message ShortMerkleAuditProof {
-  required uint64 leaf_index = 1;
+  required int64 leaf_index = 1;
   repeated bytes path_node = 2;
 }
 
@@ -168,13 +168,15 @@ message ShortMerkleAuditProof {
 ////////////////////////////////////////////////////////////////////////////////
 
 message LoggedCertificatePB {
-  optional uint64 sequence_number = 1;
+  optional int64 sequence_number = 1;
   optional bytes merkle_leaf_hash = 2;
   message Contents {
     optional SignedCertificateTimestamp sct = 1;
     optional LogEntry entry = 2;
   }
   required Contents contents = 3;
+
+  optional int64 provisional_sequence_number = 4;
 }
 
 message SignedTreeHead {
@@ -184,7 +186,7 @@ message SignedTreeHead {
   optional Version version = 1 [ default = UNKNOWN_VERSION ];
   optional LogID id = 2;
   optional uint64 timestamp = 3;
-  optional uint64 tree_size = 4;
+  optional int64 tree_size = 4;
   optional bytes sha256_root_hash = 5;
   optional DigitallySigned signature = 6;
 }
@@ -201,3 +203,14 @@ message SSLClientCTData {
   }
   repeated SCTInfo attached_sct_info = 3;
 }
+
+message ClusterNodeState {
+  optional string node_id = 1;
+  optional int64 contiguous_tree_size = 2;
+  optional SignedTreeHead current_serving_sth = 3;
+}
+
+message ClusterControl {
+  optional bool accept_new_entries = 1 [ default = true ];
+}
+

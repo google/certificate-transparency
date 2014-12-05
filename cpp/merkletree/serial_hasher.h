@@ -9,10 +9,8 @@
 
 class SerialHasher {
  public:
-  SerialHasher() {
-  }
-  virtual ~SerialHasher() {
-  }
+  SerialHasher() = default;
+  virtual ~SerialHasher() = default;
 
   virtual size_t DigestSize() const = 0;
 

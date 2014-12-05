@@ -22,6 +22,8 @@
 /cpp/log/ct_extensions_test
 /cpp/log/database_large_test
 /cpp/log/database_test
+/cpp/log/etcd_consistent_store_test
+/cpp/log/fake_consistent_store_test
 /cpp/log/file_storage_test
 /cpp/log/frontend_signer_test
 /cpp/log/frontend_test
@@ -41,7 +43,12 @@
 /cpp/server/ct-server
 /cpp/tools/dump_cert
 /cpp/tools/dump_sth
+/cpp/util/bench_etcd
+/cpp/util/etcd_test
+/cpp/util/etcd_watch
 /cpp/util/json_wrapper_test
+/cpp/util/fake_etcd_test
+/cpp/util/sync_etcd_test
 /java/build
 /local.properties
 /python/_trial_temp/

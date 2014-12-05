@@ -22,9 +22,6 @@ DEFINE_int32(database_size, 0,
              "choosing this, as the database will fill up your disk (entries "
              "are a few kB each). Maximum is limited to 1 000 000. Also note "
              "that SQLite may be very slow with small batch sizes.");
-DEFINE_int32(batch_size, 1,
-             "Number of writes to batch together in one transaction (no "
-             "effect for FileDB).");
 
 namespace {
 
@@ -46,18 +43,18 @@ class LargeDBTest : public ::testing::Test {
     LoggedCertificate logged_cert;
     for (int i = 0; i < entries; ++i) {
       test_signer_.CreateUniqueFakeSignature(&logged_cert);
-      EXPECT_EQ(DB::OK, db()->CreatePendingEntry(logged_cert));
+      logged_cert.set_sequence_number(i);
+      EXPECT_EQ(DB::OK, db()->CreateSequencedEntry(logged_cert));
     }
   }
 
-  int ReadAllPendingEntries() {
-    std::set<string> pending_hashes = db()->PendingHashes();
+  int ReadAllSequencedEntries(int num) {
     std::set<string>::const_iterator it;
     LoggedCertificate lookup_cert;
-    for (it = pending_hashes.begin(); it != pending_hashes.end(); ++it) {
-      EXPECT_EQ(DB::LOOKUP_OK, this->db()->LookupByHash(*it, &lookup_cert));
+    for (int i = 0; i < num; ++i) {
+      EXPECT_EQ(DB::LOOKUP_OK, this->db()->LookupByIndex(i, &lookup_cert));
     }
-    return pending_hashes.size();
+    return num;
   }
 
   T* db() const {
@@ -76,29 +73,13 @@ TYPED_TEST_CASE(LargeDBTest, Databases);
 TYPED_TEST(LargeDBTest, Benchmark) {
   int entries = FLAGS_database_size;
   CHECK_GE(entries, 0);
-  int batch_size = FLAGS_batch_size;
   int original_log_level = FLAGS_minloglevel;
 
   struct rusage ru_before, ru_after;
   getrusage(RUSAGE_SELF, &ru_before);
   uint64_t realtime_before, realtime_after;
   realtime_before = util::TimeInMilliseconds();
-  if (batch_size == 1 || !this->db()->Transactional()) {
-    this->FillDatabase(entries);
-  } else {
-    CHECK_GT(batch_size, 1);
-    while (entries >= batch_size) {
-      this->db()->BeginTransaction();
-      this->FillDatabase(batch_size);
-      this->db()->EndTransaction();
-      entries -= batch_size;
-    }
-    if (entries > 0) {
-      this->db()->BeginTransaction();
-      this->FillDatabase(entries);
-      this->db()->EndTransaction();
-    }
-  }
+  this->FillDatabase(entries);
   realtime_after = util::TimeInMilliseconds();
   getrusage(RUSAGE_SELF, &ru_after);
 
@@ -111,7 +92,8 @@ TYPED_TEST(LargeDBTest, Benchmark) {
 
   getrusage(RUSAGE_SELF, &ru_before);
   realtime_before = util::TimeInMilliseconds();
-  CHECK_EQ(FLAGS_database_size, this->ReadAllPendingEntries());
+  CHECK_EQ(FLAGS_database_size,
+           this->ReadAllSequencedEntries(FLAGS_database_size));
   realtime_after = util::TimeInMilliseconds();
   getrusage(RUSAGE_SELF, &ru_after);
 

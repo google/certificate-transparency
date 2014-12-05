@@ -16,8 +16,6 @@ class CertSubmissionHandler {
  public:
   // Does not take ownership of the cert_checker.
   explicit CertSubmissionHandler(cert_trans::CertChecker* cert_checker);
-  ~CertSubmissionHandler() {
-  }
 
   enum SubmitResult {
     OK,

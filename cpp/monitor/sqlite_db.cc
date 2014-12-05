@@ -81,8 +81,9 @@ SQLiteDB::WriteResult SQLiteDB::CreateEntry_(const std::string& leaf,
 }
 
 SQLiteDB::WriteResult SQLiteDB::WriteSTH_(uint64_t timestamp,
-                                          uint64_t tree_size,
+                                          int64_t tree_size,
                                           const std::string& sth) {
+  CHECK_GE(tree_size, 0);
   Statement statement(db_,
                       "INSERT INTO trees(timestamp, tree_size, sth) "
                       "VALUES(?, ?, ?)");
@@ -123,7 +124,7 @@ SQLiteDB::LookupResult SQLiteDB::LookupLatestWrittenSTH(
   return this->LOOKUP_OK;
 }
 
-SQLiteDB::LookupResult SQLiteDB::LookupHashByIndex(uint64_t sequence_number,
+SQLiteDB::LookupResult SQLiteDB::LookupHashByIndex(int64_t sequence_number,
                                                    std::string* result) const {
   Statement statement(db_, "SELECT leaf_hash FROM leaves WHERE sequence = ?");
 

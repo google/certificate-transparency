@@ -46,7 +46,7 @@ class LogSigner : public cert_trans::Signer {
   SignResult SignCertificateTimestamp(
       const ct::LogEntry& entry, ct::SignedCertificateTimestamp* sct) const;
 
-  SignResult SignV1TreeHead(uint64_t timestamp, uint64_t tree_size,
+  SignResult SignV1TreeHead(uint64_t timestamp, int64_t tree_size,
                             const std::string& root_hash,
                             std::string* result) const;
 
@@ -96,7 +96,7 @@ class LogSigVerifier : public cert_trans::Verifier {
       const ct::SignedCertificateTimestamp& sct) const;
 
   // The protobuf-agnostic library version.
-  VerifyResult VerifyV1STHSignature(uint64_t timestamp, uint64_t tree_size,
+  VerifyResult VerifyV1STHSignature(uint64_t timestamp, int64_t tree_size,
                                     const std::string& root_hash,
                                     const std::string& signature) const;
 

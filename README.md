@@ -7,6 +7,8 @@ Auditing for TLS certificates.
 
 ## Dependencies ##
 
+ - A working C++11 compiler.
+
  - [OpenSSL](https://www.openssl.org/source/), at least 1.0.0, preferably 1.0.2 (and up)
 
 The checking of SCTs included in the [RFC 6962](http://tools.ietf.org/html/rfc6962) TLS extension is only included in OpenSSL 1.0.2. As of this writing, this version is not yet released, so this means hand building the ```OpenSSL_1_0_2-stable``` branch from the [OpenSSL git repository](https://www.openssl.org/source/repos.html).
@@ -28,7 +30,6 @@ If you are on FreeBSD, you may need to apply the patch in gtest.patch to the gte
 
 Make sure to install glog **after** gflags, to avoid linking errors.
 
- - [Boost](http://www.boost.org/), at least 1.48
  - [sqlite3](http://www.sqlite.org/)
  - [JSON-C](https://github.com/json-c/json-c/), at least 0.11
 

@@ -24,13 +24,13 @@ TYPED_TEST(LoggedTest, NonEmptyHash) {
 TYPED_TEST(LoggedTest, SequenceIsPreserved) {
   TypeParam l1;
   l1.set_sequence_number(42);
-  EXPECT_EQ(l1.sequence_number(), (uint64_t)42);
+  EXPECT_EQ(l1.sequence_number(), (int64_t)42);
 }
 
 TYPED_TEST(LoggedTest, SequenceIsNotPreserved) {
   TypeParam l1;
   l1.set_sequence_number(42);
-  EXPECT_EQ(l1.sequence_number(), (uint64_t)42);
+  EXPECT_EQ(l1.sequence_number(), (int64_t)42);
 
   std::string s1;
   EXPECT_TRUE(l1.SerializeForDatabase(&s1));

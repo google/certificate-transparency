@@ -748,7 +748,9 @@ TEST_F(LogSignerTest, VerifyChangeTreeSize) {
   sth.CopyFrom(default_sth);
   EXPECT_EQ(LogSigVerifier::OK, verifier_->VerifySTHSignature(sth));
 
-  uint64_t new_tree_size = default_sth.tree_size() + 1;
+  ASSERT_GE(default_sth.tree_size(), 0);
+  int64_t new_tree_size = default_sth.tree_size() + 1;
+  ASSERT_GE(new_tree_size, 0);
   sth.set_tree_size(new_tree_size);
   EXPECT_EQ(LogSigVerifier::INVALID_SIGNATURE,
             verifier_->VerifySTHSignature(sth));

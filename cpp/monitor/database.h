@@ -34,10 +34,8 @@ class Database {
     UNDEFINED,     // Let this be last.
   };
 
-  Database() {
-  }
-  virtual ~Database() {
-  }
+  Database() = default;
+  virtual ~Database() = default;
 
   virtual void BeginTransaction() {
     DLOG(FATAL) << "Transactions not supported";
@@ -82,7 +80,7 @@ class Database {
   virtual LookupResult LookupLatestWrittenSTH(
       ct::SignedTreeHead* result) const = 0;
 
-  virtual LookupResult LookupHashByIndex(uint64_t sequence_number,
+  virtual LookupResult LookupHashByIndex(int64_t sequence_number,
                                          std::string* result) const = 0;
 
   virtual WriteResult SetVerificationLevel(const ct::SignedTreeHead& sth,
@@ -100,7 +98,7 @@ class Database {
                                    const std::string& cert,
                                    const std::string& cert_chain) = 0;
 
-  virtual WriteResult WriteSTH_(uint64_t timestamp, uint64_t tree_size,
+  virtual WriteResult WriteSTH_(uint64_t timestamp, int64_t tree_size,
                                 const std::string& sth) = 0;
 
   virtual WriteResult SetVerificationLevel_(

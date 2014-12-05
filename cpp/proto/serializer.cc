@@ -208,8 +208,9 @@ Serializer::SerializeResult Serializer::SerializeSCTMerkleTreeLeaf(
 
 // static
 Serializer::SerializeResult Serializer::SerializeV1STHSignatureInput(
-    uint64_t timestamp, uint64_t tree_size, const string& root_hash,
+    uint64_t timestamp, int64_t tree_size, const string& root_hash,
     string* result) {
+  CHECK_GE(tree_size, 0);
   if (root_hash.size() != 32)
     return INVALID_HASH_LENGTH;
   Serializer serializer;

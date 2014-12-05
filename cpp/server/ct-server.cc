@@ -1,17 +1,17 @@
 /* -*- indent-tabs-mode: nil -*- */
 
-#include <boost/bind.hpp>
-#include <boost/function.hpp>
-#include <boost/make_shared.hpp>
-#include <boost/scoped_ptr.hpp>
 #include <event2/thread.h>
+#include <functional>
 #include <gflags/gflags.h>
+#include <iostream>
+#include <memory>
 #include <openssl/err.h>
 #include <string>
 
 #include "log/cert_checker.h"
 #include "log/cert_submission_handler.h"
 #include "log/ct_extensions.h"
+#include "log/fake_consistent_store.h"
 #include "log/file_db.h"
 #include "log/file_storage.h"
 #include "log/frontend.h"
@@ -22,6 +22,7 @@
 #include "log/tree_signer.h"
 #include "server/handler.h"
 #include "util/libevent_wrapper.h"
+#include "util/periodic_closure.h"
 #include "util/read_private_key.h"
 #include "util/thread_pool.h"
 
@@ -52,22 +53,30 @@ DEFINE_int32(tree_signing_frequency_seconds, 600,
              "last signing. Set this well below the MMD to ensure we sign in "
              "a timely manner. Must be greater than 0.");
 
+DEFINE_double(guard_window_seconds, 60,
+              "Unsequenced entries new than this "
+              "number of seconds will not be sequenced.");
+
+
 namespace libevent = cert_trans::libevent;
 
-using boost::bind;
-using boost::function;
-using boost::make_shared;
-using boost::scoped_ptr;
-using boost::shared_ptr;
 using cert_trans::CertChecker;
+using cert_trans::FakeConsistentStore;
+using cert_trans::FileStorage;
 using cert_trans::HttpHandler;
 using cert_trans::LoggedCertificate;
+using cert_trans::PeriodicClosure;
 using cert_trans::ThreadPool;
-using cert_trans::util::ReadPrivateKey;
+using cert_trans::TreeSigner;
+using cert_trans::ReadPrivateKey;
 using google::RegisterFlagValidator;
+using std::bind;
+using std::chrono::duration;
+using std::chrono::seconds;
+using std::function;
+using std::make_shared;
+using std::shared_ptr;
 using std::string;
-
-static const int kCtimeBufSize = 26;
 
 // Basic sanity checks on flag values.
 static bool ValidatePort(const char* flagname, int port) {
@@ -137,44 +146,9 @@ static const bool sign_dummy =
     RegisterFlagValidator(&FLAGS_tree_signing_frequency_seconds,
                           &ValidateIsPositive);
 
-// Hooks a repeating timer on the event loop to call a callback. It
-// will wait "interval_secs" between calls to "callback" (so this
-// means that if "callback" takes some time, it will run less
-// frequently).
-class PeriodicCallback {
- public:
-  PeriodicCallback(const shared_ptr<libevent::Base>& base, int interval_secs,
-                   const function<void()>& callback)
-      : base_(base),
-        interval_secs_(interval_secs),
-        event_(*base_, -1, 0, bind(&PeriodicCallback::Go, this)),
-        callback_(callback) {
-    event_.Add(interval_secs_);
-  }
-
- private:
-  void Go() {
-    callback_();
-    event_.Add(interval_secs_);
-  }
-
-  const shared_ptr<libevent::Base> base_;
-  const int interval_secs_;
-  libevent::Event event_;
-  const function<void()> callback_;
-
-  DISALLOW_COPY_AND_ASSIGN(PeriodicCallback);
-};
-
 void SignMerkleTree(TreeSigner<LoggedCertificate>* tree_signer,
                     LogLookup<LoggedCertificate>* log_lookup) {
   CHECK_EQ(tree_signer->UpdateTree(), TreeSigner<LoggedCertificate>::OK);
-  CHECK_EQ(log_lookup->Update(), LogLookup<LoggedCertificate>::UPDATE_OK);
-
-  const time_t last_update(
-      static_cast<time_t>(tree_signer->LastUpdateTime() / 1000));
-  char buf[kCtimeBufSize];
-  LOG(INFO) << "Tree successfully updated at " << ctime_r(&last_update, buf);
 }
 
 int main(int argc, char* argv[]) {
@@ -184,9 +158,9 @@ int main(int argc, char* argv[]) {
   ERR_load_crypto_strings();
   cert_trans::LoadCtExtensions();
 
-  EVP_PKEY* pkey = NULL;
-  CHECK_EQ(ReadPrivateKey(&pkey, FLAGS_key), cert_trans::util::KEY_OK);
-  LogSigner log_signer(pkey);
+  util::StatusOr<EVP_PKEY*> pkey(ReadPrivateKey(FLAGS_key));
+  CHECK_EQ(pkey.status(), util::Status::OK);
+  LogSigner log_signer(pkey.ValueOrDie());
 
   CertChecker checker;
   CHECK(checker.LoadTrustedCertificates(FLAGS_trusted_cert_file))
@@ -215,28 +189,29 @@ int main(int argc, char* argv[]) {
   evthread_use_pthreads();
   const shared_ptr<libevent::Base> event_base(make_shared<libevent::Base>());
 
+  FakeConsistentStore<LoggedCertificate> consistent_store("id", db);
+
   Frontend frontend(new CertSubmissionHandler(&checker),
-                    new FrontendSigner(db, &log_signer));
-  TreeSigner<LoggedCertificate> tree_signer(db, &log_signer);
+                    new FrontendSigner(db, &consistent_store, &log_signer));
+  TreeSigner<LoggedCertificate> tree_signer(std::chrono::duration<double>(
+                                                FLAGS_guard_window_seconds),
+                                            db, &consistent_store,
+                                            &log_signer);
   LogLookup<LoggedCertificate> log_lookup(db);
 
-  // This function is called "sign", but it also loads the LogLookup
-  // object from the database as a side-effect.
+  // Make sure that we have an STH, even if the tree is empty.
+  // TODO(pphaneuf): We should be remaining in an "unhealthy state"
+  // (either not accepting any requests, or returning some internal
+  // server error) until we have an STH to serve. We can sign for now,
+  // but we might not be a signer.
   SignMerkleTree(&tree_signer, &log_lookup);
-
-  const time_t last_update(
-      static_cast<time_t>(tree_signer.LastUpdateTime() / 1000));
-  if (last_update > 0) {
-    char buf[kCtimeBufSize];
-    LOG(INFO) << "Last tree update was at " << ctime_r(&last_update, buf);
-  }
 
   ThreadPool pool;
   HttpHandler handler(&log_lookup, db, &checker, &frontend, &pool);
 
-  PeriodicCallback tree_event(event_base, FLAGS_tree_signing_frequency_seconds,
-                              boost::bind(&SignMerkleTree, &tree_signer,
-                                          &log_lookup));
+  PeriodicClosure tree_event(event_base,
+                             seconds(FLAGS_tree_signing_frequency_seconds),
+                             bind(&SignMerkleTree, &tree_signer, &log_lookup));
 
   libevent::HttpServer server(*event_base);
   handler.Add(&server);

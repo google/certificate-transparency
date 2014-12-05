@@ -1,9 +1,7 @@
 #include "server/handler.h"
 
 #include <algorithm>
-#include <boost/bind.hpp>
-#include <boost/make_shared.hpp>
-#include <boost/scoped_array.hpp>
+#include <memory>
 #include <event2/buffer.h>
 #include <event2/http.h>
 #include <event2/keyvalq_struct.h>
@@ -22,10 +20,6 @@
 #include "util/json_wrapper.h"
 #include "util/thread_pool.h"
 
-using boost::bind;
-using boost::make_shared;
-using boost::scoped_array;
-using boost::shared_ptr;
 using cert_trans::Cert;
 using cert_trans::CertChain;
 using cert_trans::CertChecker;
@@ -34,9 +28,14 @@ using cert_trans::LoggedCertificate;
 using ct::ShortMerkleAuditProof;
 using ct::SignedCertificateTimestamp;
 using ct::SignedTreeHead;
+using std::bind;
 using std::make_pair;
+using std::make_shared;
 using std::multimap;
+using std::placeholders::_1;
+using std::shared_ptr;
 using std::string;
+using std::unique_ptr;
 using std::vector;
 
 DEFINE_int32(max_leaf_entries_per_response, 1000,
@@ -100,17 +99,14 @@ bool ExtractChain(evhttp_request* req, CertChain* chain) {
       return false;
     }
 
-    // TODO(pphaneuf): I would have used unique_ptr here to release
-    // the ownership, but we can't use it yet (C++11).
-    Cert* const cert(new Cert);
+    unique_ptr<Cert> cert(new Cert);
     cert->LoadFromDerString(json_cert.FromBase64());
     if (!cert->IsLoaded()) {
-      delete cert;
       SendError(req, HTTP_BADREQUEST, "Unable to parse provided chain.");
       return false;
     }
 
-    chain->AddCert(cert);
+    chain->AddCert(cert.release());
   }
 
   return true;
@@ -207,7 +203,7 @@ int GetIntParam(const multimap<string, string>& query, const string& param) {
 
 
 HttpHandler::HttpHandler(LogLookup<LoggedCertificate>* log_lookup,
-                         const Database<LoggedCertificate>* db,
+                         const ReadOnlyDatabase<LoggedCertificate>* db,
                          const CertChecker* cert_checker, Frontend* frontend,
                          ThreadPool* pool)
     : log_lookup_(CHECK_NOTNULL(log_lookup)),
@@ -319,7 +315,7 @@ void HttpHandler::GetProof(evhttp_request* req) const {
 
   const int tree_size(GetIntParam(query, "tree_size"));
   if (tree_size < 0 ||
-      static_cast<uint64_t>(tree_size) > log_lookup_->GetSTH().tree_size()) {
+      static_cast<int64_t>(tree_size) > log_lookup_->GetSTH().tree_size()) {
     return SendError(req, HTTP_BADREQUEST,
                      "Missing or invalid \"tree_size\" parameter.");
   }
@@ -424,7 +420,7 @@ void HttpHandler::BlockingGetEntries(evhttp_request* req, int start,
     LoggedCertificate cert;
 
     if (db_->LookupByIndex(i, &cert) !=
-        Database<LoggedCertificate>::LOOKUP_OK) {
+        ReadOnlyDatabase<LoggedCertificate>::LOOKUP_OK) {
       return SendError(req, HTTP_BADREQUEST, "Entry not found.");
     }
 
