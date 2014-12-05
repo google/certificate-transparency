@@ -64,31 +64,47 @@ LDLIBS += -L /usr/local/lib
 
 CXXFLAGS = $(INCLUDE) $(CXXFLAG) $(LOCAL_CXXFLAGS)
 
-# File lists to simplify the rest of the Makefile
+# These tests will be built and run automatically.
+TESTS = \
+	log/database_test \
+	log/file_storage_test \
+	log/frontend_signer_test \
+	log/log_lookup_test \
+	log/log_signer_test \
+	log/logged_certificate_test \
+	log/signer_verifier_test \
+	log/tree_signer_test \
+	merkletree/merkle_tree_test \
+	merkletree/serial_hasher_test \
+	merkletree/tree_hasher_test \
+	monitor/database_test \
+	proto/serializer_test \
+	util/json_wrapper_test
 
-PROTO_TESTS = proto/serializer_test
-MERKLETREE_TESTS = merkletree/merkle_tree_test \
-                   merkletree/merkle_tree_large_test \
-                   merkletree/serial_hasher_test merkletree/tree_hasher_test
-LOG_TESTS = log/cert_test log/cert_checker_test \
-            log/cert_submission_handler_test log/database_test \
-            log/database_large_test log/file_storage_test \
-            log/frontend_signer_test log/frontend_test log/log_lookup_test \
-            log/signer_verifier_test log/log_signer_test log/tree_signer_test \
-            log/logged_certificate_test log/ct_extensions_test
-UTIL_TESTS = util/json_wrapper_test
-MONITOR_TESTS = monitor/database_test
-ALL_TESTS = $(PROTO_TESTS) $(MERKLETREE_TESTS) $(LOG_TESTS) $(UTIL_TESTS) \
-	$(MONITOR_TESTS) dns_tests
+# These tests will be built, but not run.
+DISABLED_TESTS = \
+	merkletree/merkle_tree_large_test \
+	log/database_large_test \
 
-all: unit_tests client/ct server/ct-server server/ct-dns-server \
-     tools/dump_cert tools/dump_sth
+# These tests are built, but need specific flags, so you should add
+# them to the end of the "test" target commands.
+# TODO(pphaneuf): We should try to make those tests "just work", and
+# move them to TESTS with the others.
+EXTRA_TESTS = \
+	log/cert_checker_test \
+	log/cert_submission_handler_test \
+	log/cert_test \
+	log/ct_extensions_test \
+	log/frontend_test
+
+all: client/ct server/ct-server server/ct-dns-server tools/dump_cert \
+     tools/dump_sth
+
+tests: all $(TESTS) $(DISABLED_TESTS) $(EXTRA_TESTS)
 
 .DELETE_ON_ERROR:
 
-.PHONY: clean all unit_tests test alltests benchmark clean \
-        proto_tests merkletree_tests log_tests client_tests \
-	monitor_tests dns_tests
+.PHONY: clean all test tests alltests benchmark clean
 
 gmock/Makefile: $(GMOCKDIR)
 	mkdir -p gmock && cd gmock && cmake $(GMOCKDIR)
@@ -117,10 +133,6 @@ ifneq ($(MAKECMDGOALS),clean)
     include util/.depend
 endif
 
-unit_tests: proto_tests merkletree_tests log_tests util_tests monitor_tests
-
-util_tests: util/json_wrapper_test
-
 ### util/ targets
 util/libutil.a: util/util.o util/openssl_util.o util/testing.o \
                 util/json_wrapper.o util/thread_pool.o util/libevent_wrapper.o
@@ -134,8 +146,6 @@ proto/libproto.a: proto/ct.pb.o proto/serializer.o
 	rm -f $@
 	ar -rcs $@ $^
 
-proto_tests: $(PROTO_TESTS)
-
 proto/serializer_test: proto/serializer_test.o proto/libproto.a \
                        util/libutil.a $(GTESTLIB)
 
@@ -147,8 +157,6 @@ merkletree/libmerkletree.a: merkletree/compact_merkle_tree.o \
                             merkletree/serial_hasher.o merkletree/tree_hasher.o
 	rm -f $@
 	ar -rcs $@ $^
-
-merkletree_tests: $(MERKLETREE_TESTS)
 
 merkletree/merkle_tree_large_test: merkletree/merkle_tree_large_test.o \
                                    merkletree/libmerkletree.a util/libutil.a \
@@ -183,8 +191,6 @@ log/liblog.a: log/log_signer.o log/signer.o log/verifier.o log/frontend.o \
               log/log_lookup_cert.o
 	rm -f $@
 	ar -rcs $@ $^
-
-log_tests: $(LOG_TESTS)
 
 log/cert_test: log/cert_test.o log/cert.o log/ct_extensions.o util/libutil.a \
                merkletree/serial_hasher.o log/frontend.o proto/ct.pb.o \
@@ -262,8 +268,6 @@ log/logged_certificate_test: log/logged_certificate_test.o proto/libproto.a \
                              util/libutil.a merkletree/libmerkletree.a \
                              $(GTESTLIB)
 
-monitor_tests: $(MONITOR_TESTS)
-
 monitor/database_test: monitor/database_test.o monitor/database.o \
                        monitor/sqlite_db.o util/libutil.a log/test_signer.o \
                        merkletree/libmerkletree.a log/log_signer.o \
@@ -284,29 +288,15 @@ tools/dump_cert: tools/dump_cert.o proto/libproto.a util/libutil.a
 
 tools/dump_sth: tools/dump_sth.o proto/libproto.a
 
-dns_tests: server/ct-dns-server
-
-test: all
-	util/json_wrapper_test
-	proto/serializer_test
-	merkletree/serial_hasher_test
-	merkletree/tree_hasher_test
-	merkletree/merkle_tree_test
-# Do not run merkletree/merkle_tree_large_test by default
-	log/logged_certificate_test
+test: tests
+	@set -e; for TEST in $(TESTS); do \
+		echo $$TEST; eval $$TEST; \
+	done
 	log/cert_test --test_certs_dir=../test/testdata
 	log/cert_checker_test --test_certs_dir=../test/testdata
 	log/cert_submission_handler_test --test_certs_dir=../test/testdata
 	log/ct_extensions_test --test_certs_dir=../test/testdata
-	log/file_storage_test
-	log/database_test
-# Do not run log/database_large_test by default
-	log/log_signer_test
-	log/frontend_signer_test
 	log/frontend_test --test_certs_dir=../test/testdata
-	log/tree_signer_test
-	log/log_lookup_test
-	monitor/database_test
 	rm -rf /tmp/ct-test.$$$$ && mkdir /tmp/ct-test.$$$$ \
 	&& python server/ct-dns-server-test.py /tmp/ct-test.$$$$ \
 	&& rm -rf /tmp/ct-test.$$$$
