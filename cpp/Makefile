@@ -83,8 +83,8 @@ TESTS = \
 
 # These tests will be built, but not run.
 DISABLED_TESTS = \
-	merkletree/merkle_tree_large_test \
 	log/database_large_test \
+	merkletree/merkle_tree_large_test
 
 # These tests are built, but need specific flags, so you should add
 # them to the end of the "test" target commands.
