@@ -9,7 +9,7 @@
 #include <thread>
 #include <vector>
 
-#include "util/blocking_callback.h"
+#include "base/notification.h"
 #include "util/sync_etcd.h"
 #include "util/testing.h"
 
@@ -38,28 +38,28 @@ const char kValue2[] = "value2";
 
 
 template <class A>
-void CopyCallback1(const function<void(void)>& cb, A* out, const A& in) {
+void CopyCallback1(Notification* notifier, A* out, const A& in) {
   *out = in;
-  cb();
+  notifier->Notify();
 }
 
 
 template <class A, class B>
-void CopyCallback2(const function<void(void)>& cb, A* a_out, B* b_out,
-                   const A& a_in, const B& b_in) {
+void CopyCallback2(Notification* notifier, A* a_out, B* b_out, const A& a_in,
+                   const B& b_in) {
   *a_out = a_in;
   *b_out = b_in;
-  cb();
+  notifier->Notify();
 }
 
 
 template <class A, class B, class C>
-void CopyCallback3(const function<void(void)>& cb, A* a_out, B* b_out,
-                   C* c_out, const A& a_in, const B& b_in, const C& c_in) {
+void CopyCallback3(Notification* notifier, A* a_out, B* b_out, C* c_out,
+                   const A& a_in, const B& b_in, const C& c_in) {
   *a_out = a_in;
   *b_out = b_in;
   *c_out = c_in;
-  cb();
+  notifier->Notify();
 }
 
 
@@ -67,58 +67,56 @@ class FakeEtcdTest : public ::testing::Test {
  public:
  protected:
   Status BlockingGet(const string& key, EtcdClient::Node* node) {
-    BlockingCallback block;
+    Notification notifier;
     Status status;
-    client_.Get(key, bind(&CopyCallback2<Status, EtcdClient::Node>,
-                          block.Callback(), &status, node, _1, _2));
-    block.Wait();
+    client_.Get(key, bind(&CopyCallback2<Status, EtcdClient::Node>, &notifier,
+                          &status, node, _1, _2));
+    notifier.WaitForNotification();
     return status;
   }
 
   Status BlockingCreate(const string& key, const string& value,
                         int64_t* created_index) {
-    BlockingCallback block;
+    Notification notifier;
     Status status;
-    client_.Create(key, value,
-                   bind(&CopyCallback2<Status, int64_t>, block.Callback(),
-                        &status, created_index, _1, _2));
-    block.Wait();
+    client_.Create(key, value, bind(&CopyCallback2<Status, int64_t>, &notifier,
+                                    &status, created_index, _1, _2));
+    notifier.WaitForNotification();
     return status;
   }
 
   Status BlockingCreateWithTTL(const string& key, const string& value,
                                const duration<int64_t>& ttl,
                                int64_t* created_index) {
-    BlockingCallback block;
+    Notification notifier;
     Status status;
     client_.CreateWithTTL(key, value, ttl,
-                          bind(&CopyCallback2<Status, int64_t>,
-                               block.Callback(), &status, created_index, _1,
-                               _2));
-    block.Wait();
+                          bind(&CopyCallback2<Status, int64_t>, &notifier,
+                               &status, created_index, _1, _2));
+    notifier.WaitForNotification();
     return status;
   }
 
   Status BlockingCreateInQueue(const string& dir, const string& value,
                                string* created_key, int64_t* created_index) {
-    BlockingCallback block;
+    Notification notifier;
     Status status;
     client_.CreateInQueue(dir, value,
                           bind(&CopyCallback3<Status, string, int64_t>,
-                               block.Callback(), &status, created_key,
-                               created_index, _1, _2, _3));
-    block.Wait();
+                               &notifier, &status, created_key, created_index,
+                               _1, _2, _3));
+    notifier.WaitForNotification();
     return status;
   }
 
   Status BlockingUpdate(const string& key, const string& value,
                         int64_t old_index, int64_t* modified_index) {
-    BlockingCallback block;
+    Notification notifier;
     Status status;
     client_.Update(key, value, old_index,
-                   bind(&CopyCallback2<Status, int64_t>, block.Callback(),
-                        &status, modified_index, _1, _2));
-    block.Wait();
+                   bind(&CopyCallback2<Status, int64_t>, &notifier, &status,
+                        modified_index, _1, _2));
+    notifier.WaitForNotification();
     return status;
   }
 
@@ -126,46 +124,44 @@ class FakeEtcdTest : public ::testing::Test {
                                const duration<int>& ttl,
                                int64_t previous_index,
                                int64_t* modified_index) {
-    BlockingCallback block;
+    Notification notifier;
     Status status;
     client_.UpdateWithTTL(key, value, ttl, previous_index,
-                          bind(&CopyCallback2<Status, int64_t>,
-                               block.Callback(), &status, modified_index, _1,
-                               _2));
-    block.Wait();
+                          bind(&CopyCallback2<Status, int64_t>, &notifier,
+                               &status, modified_index, _1, _2));
+    notifier.WaitForNotification();
     return status;
   }
 
   Status BlockingForceSet(const string& key, const string& value,
                           int64_t* modified_index) {
-    BlockingCallback block;
+    Notification notifier;
     Status status;
     client_.ForceSet(key, value,
-                     bind(&CopyCallback2<Status, int64_t>, block.Callback(),
-                          &status, modified_index, _1, _2));
-    block.Wait();
+                     bind(&CopyCallback2<Status, int64_t>, &notifier, &status,
+                          modified_index, _1, _2));
+    notifier.WaitForNotification();
     return status;
   }
 
   Status BlockingForceSetWithTTL(const string& key, const string& value,
                                  const duration<int>& ttl,
                                  int64_t* modified_index) {
-    BlockingCallback block;
+    Notification notifier;
     Status status;
     client_.ForceSetWithTTL(key, value, ttl,
-                            bind(&CopyCallback2<Status, int64_t>,
-                                 block.Callback(), &status, modified_index, _1,
-                                 _2));
-    block.Wait();
+                            bind(&CopyCallback2<Status, int64_t>, &notifier,
+                                 &status, modified_index, _1, _2));
+    notifier.WaitForNotification();
     return status;
   }
 
   Status BlockingDelete(const string& key, int64_t previous_index) {
-    BlockingCallback block;
+    Notification notifier;
     Status status;
-    client_.Delete(key, previous_index, bind(&CopyCallback1<Status>,
-                                             block.Callback(), &status, _1));
-    block.Wait();
+    client_.Delete(key, previous_index,
+                   bind(&CopyCallback1<Status>, &notifier, &status, _1));
+    notifier.WaitForNotification();
     return status;
   }
 
@@ -376,7 +372,7 @@ TEST_F(FakeEtcdTest, TestDelete) {
 
 
 void TestWatcherForCreateCallback(
-    const function<void(void)>& cb,
+    Notification* notifier,
     const vector<EtcdClient::Watcher::Update>& updates) {
   static int num_calls(0);
   LOG(INFO) << "Update " << num_calls;
@@ -391,7 +387,7 @@ void TestWatcherForCreateCallback(
     EXPECT_EQ(true, updates[0].exists_);
     EXPECT_EQ(kPath2, updates[0].node_.key_);
     EXPECT_EQ(kValue2, updates[0].node_.value_);
-    cb();
+    notifier->Notify();
   }
   ++num_calls;
 }
@@ -402,20 +398,23 @@ TEST_F(FakeEtcdTest, TestWatcherForCreate) {
   Status status(BlockingCreate(kPath1, kValue, &created_index));
   EXPECT_TRUE(status.ok()) << status;
 
-  BlockingCallback block;
+  Notification notifier;
   unique_ptr<EtcdClient::Watcher> watcher(client_.CreateWatcher(
-      kDir, bind(&TestWatcherForCreateCallback, block.Callback(), _1)));
+      kDir, bind(&TestWatcherForCreateCallback, &notifier, _1)));
 
   status = BlockingCreate(kPath2, kValue2, &created_index);
   EXPECT_TRUE(status.ok()) << status;
 
   // Should fall straight through:
-  block.Wait();
+  // TODO(pphaneuf): But it doesn't really? I tried changing it for
+  // EXPECT_TRUE(notifier.HasBeenNotified()), but that fails
+  // sometimes.
+  notifier.WaitForNotification();
 }
 
 
 void TestWatcherForDeleteCallback(
-    const function<void(void)>& cb,
+    Notification* notifier,
     const vector<EtcdClient::Watcher::Update>& updates) {
   static int num_calls(0);
   static mutex mymutex;
@@ -432,7 +431,7 @@ void TestWatcherForDeleteCallback(
     EXPECT_EQ(1, updates.size());
     EXPECT_EQ(false, updates[0].exists_);
     EXPECT_EQ(kPath1, updates[0].node_.key_);
-    cb();
+    notifier->Notify();
   }
   ++num_calls;
 }
@@ -443,16 +442,19 @@ TEST_F(FakeEtcdTest, TestWatcherForDelete) {
   Status status(BlockingCreate(kPath1, kValue, &created_index));
   EXPECT_TRUE(status.ok()) << status;
 
-  BlockingCallback block;
+  Notification notifier;
   vector<EtcdClient::Watcher::Update> updates;
   unique_ptr<EtcdClient::Watcher> watcher(client_.CreateWatcher(
-      kDir, bind(&TestWatcherForDeleteCallback, block.Callback(), _1)));
+      kDir, bind(&TestWatcherForDeleteCallback, &notifier, _1)));
 
   status = BlockingDelete(kPath1, created_index);
   EXPECT_TRUE(status.ok()) << status;
 
   // Should fall straight through:
-  block.Wait();
+  // TODO(pphaneuf): But it doesn't really? I tried changing it for
+  // EXPECT_TRUE(notifier.HasBeenNotified()), but that fails
+  // sometimes.
+  notifier.WaitForNotification();
 }
 
 
