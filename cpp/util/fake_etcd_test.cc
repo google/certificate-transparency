@@ -1,29 +1,32 @@
 #include "util/fake_etcd.h"
 
-#include <gmock/gmock.h>
+#include <functional>
+#include <glog/logging.h>
 #include <gtest/gtest.h>
-#include <map>
 #include <memory>
+#include <mutex>
 #include <string>
 #include <thread>
+#include <vector>
 
 #include "util/blocking_callback.h"
-#include "util/json_wrapper.h"
 #include "util/sync_etcd.h"
 #include "util/testing.h"
 
 namespace cert_trans {
 
+using std::bind;
+using std::chrono::duration;
+using std::function;
+using std::lock_guard;
+using std::mutex;
 using std::placeholders::_1;
 using std::placeholders::_2;
 using std::placeholders::_3;
 using std::string;
+using std::this_thread::sleep_for;
+using std::unique_ptr;
 using std::vector;
-using testing::AllOf;
-using testing::Contains;
-using testing::InvokeArgument;
-using testing::Pair;
-using testing::_;
 using util::Status;
 
 const char kKey[] = "/key";
@@ -35,14 +38,14 @@ const char kValue2[] = "value2";
 
 
 template <class A>
-void CopyCallback1(const std::function<void(void)>& cb, A* out, const A& in) {
+void CopyCallback1(const function<void(void)>& cb, A* out, const A& in) {
   *out = in;
   cb();
 }
 
 
 template <class A, class B>
-void CopyCallback2(const std::function<void(void)>& cb, A* a_out, B* b_out,
+void CopyCallback2(const function<void(void)>& cb, A* a_out, B* b_out,
                    const A& a_in, const B& b_in) {
   *a_out = a_in;
   *b_out = b_in;
@@ -51,7 +54,7 @@ void CopyCallback2(const std::function<void(void)>& cb, A* a_out, B* b_out,
 
 
 template <class A, class B, class C>
-void CopyCallback3(const std::function<void(void)>& cb, A* a_out, B* b_out,
+void CopyCallback3(const function<void(void)>& cb, A* a_out, B* b_out,
                    C* c_out, const A& a_in, const B& b_in, const C& c_in) {
   *a_out = a_in;
   *b_out = b_in;
@@ -63,128 +66,115 @@ void CopyCallback3(const std::function<void(void)>& cb, A* a_out, B* b_out,
 class FakeEtcdTest : public ::testing::Test {
  public:
  protected:
-  util::Status BlockingGet(const string& key, EtcdClient::Node* node) {
+  Status BlockingGet(const string& key, EtcdClient::Node* node) {
     BlockingCallback block;
-    util::Status status;
-    client_.Get(key, std::bind(&CopyCallback2<util::Status, EtcdClient::Node>,
-                               block.Callback(), &status, node, _1, _2));
+    Status status;
+    client_.Get(key, bind(&CopyCallback2<Status, EtcdClient::Node>,
+                          block.Callback(), &status, node, _1, _2));
     block.Wait();
     return status;
   }
 
-
-  util::Status BlockingCreate(const string& key, const string& value,
-                              int64_t* created_index) {
+  Status BlockingCreate(const string& key, const string& value,
+                        int64_t* created_index) {
     BlockingCallback block;
-    util::Status status;
-    client_.Create(key, value, std::bind(&CopyCallback2<util::Status, int64_t>,
-                                         block.Callback(), &status,
-                                         created_index, _1, _2));
+    Status status;
+    client_.Create(key, value,
+                   bind(&CopyCallback2<Status, int64_t>, block.Callback(),
+                        &status, created_index, _1, _2));
     block.Wait();
     return status;
   }
 
-
-  util::Status BlockingCreateWithTTL(const string& key, const string& value,
-                                     const std::chrono::duration<int64_t>& ttl,
-                                     int64_t* created_index) {
+  Status BlockingCreateWithTTL(const string& key, const string& value,
+                               const duration<int64_t>& ttl,
+                               int64_t* created_index) {
     BlockingCallback block;
-    util::Status status;
+    Status status;
     client_.CreateWithTTL(key, value, ttl,
-                          std::bind(&CopyCallback2<util::Status, int64_t>,
-                                    block.Callback(), &status, created_index,
-                                    _1, _2));
+                          bind(&CopyCallback2<Status, int64_t>,
+                               block.Callback(), &status, created_index, _1,
+                               _2));
     block.Wait();
     return status;
   }
 
-
-  util::Status BlockingCreateInQueue(const string& dir, const string& value,
-                                     string* created_key,
-                                     int64_t* created_index) {
+  Status BlockingCreateInQueue(const string& dir, const string& value,
+                               string* created_key, int64_t* created_index) {
     BlockingCallback block;
-    util::Status status;
-    client_.CreateInQueue(
-        dir, value, std::bind(&CopyCallback3<util::Status, string, int64_t>,
-                              block.Callback(), &status, created_key,
-                              created_index, _1, _2, _3));
+    Status status;
+    client_.CreateInQueue(dir, value,
+                          bind(&CopyCallback3<Status, string, int64_t>,
+                               block.Callback(), &status, created_key,
+                               created_index, _1, _2, _3));
     block.Wait();
     return status;
   }
 
-
-  util::Status BlockingUpdate(const string& key, const string& value,
-                              int64_t old_index, int64_t* modified_index) {
+  Status BlockingUpdate(const string& key, const string& value,
+                        int64_t old_index, int64_t* modified_index) {
     BlockingCallback block;
-    util::Status status;
+    Status status;
     client_.Update(key, value, old_index,
-                   std::bind(&CopyCallback2<util::Status, int64_t>,
-                             block.Callback(), &status, modified_index, _1,
-                             _2));
+                   bind(&CopyCallback2<Status, int64_t>, block.Callback(),
+                        &status, modified_index, _1, _2));
     block.Wait();
     return status;
   }
 
-
-  util::Status BlockingUpdateWithTTL(const string& key, const string& value,
-                                     const std::chrono::duration<int>& ttl,
-                                     int64_t previous_index,
-                                     int64_t* modified_index) {
+  Status BlockingUpdateWithTTL(const string& key, const string& value,
+                               const duration<int>& ttl,
+                               int64_t previous_index,
+                               int64_t* modified_index) {
     BlockingCallback block;
-    util::Status status;
+    Status status;
     client_.UpdateWithTTL(key, value, ttl, previous_index,
-                          std::bind(&CopyCallback2<util::Status, int64_t>,
-                                    block.Callback(), &status, modified_index,
-                                    _1, _2));
-    block.Wait();
-    return status;
-  }
-
-
-  util::Status BlockingForceSet(const string& key, const string& value,
-                                int64_t* modified_index) {
-    BlockingCallback block;
-    util::Status status;
-    client_.ForceSet(key, value,
-                     std::bind(&CopyCallback2<util::Status, int64_t>,
+                          bind(&CopyCallback2<Status, int64_t>,
                                block.Callback(), &status, modified_index, _1,
                                _2));
     block.Wait();
     return status;
   }
 
-
-  util::Status BlockingForceSetWithTTL(const string& key, const string& value,
-                                       const std::chrono::duration<int>& ttl,
-                                       int64_t* modified_index) {
+  Status BlockingForceSet(const string& key, const string& value,
+                          int64_t* modified_index) {
     BlockingCallback block;
-    util::Status status;
+    Status status;
+    client_.ForceSet(key, value,
+                     bind(&CopyCallback2<Status, int64_t>, block.Callback(),
+                          &status, modified_index, _1, _2));
+    block.Wait();
+    return status;
+  }
+
+  Status BlockingForceSetWithTTL(const string& key, const string& value,
+                                 const duration<int>& ttl,
+                                 int64_t* modified_index) {
+    BlockingCallback block;
+    Status status;
     client_.ForceSetWithTTL(key, value, ttl,
-                            std::bind(&CopyCallback2<util::Status, int64_t>,
-                                      block.Callback(), &status,
-                                      modified_index, _1, _2));
+                            bind(&CopyCallback2<Status, int64_t>,
+                                 block.Callback(), &status, modified_index, _1,
+                                 _2));
     block.Wait();
     return status;
   }
 
-
-  util::Status BlockingDelete(const string& key, int64_t previous_index) {
+  Status BlockingDelete(const string& key, int64_t previous_index) {
     BlockingCallback block;
-    util::Status status;
-    client_.Delete(key, previous_index,
-                   std::bind(&CopyCallback1<util::Status>, block.Callback(),
-                             &status, _1));
+    Status status;
+    client_.Delete(key, previous_index, bind(&CopyCallback1<Status>,
+                                             block.Callback(), &status, _1));
     block.Wait();
     return status;
   }
-
 
   FakeEtcdClient client_;
 };
 
 
 TEST_F(FakeEtcdTest, TestCreate) {
-  util::Status status;
+  Status status;
   int64_t created_index;
   status = BlockingCreate(kKey, kValue, &created_index);
   EXPECT_TRUE(status.ok()) << status;
@@ -199,7 +189,7 @@ TEST_F(FakeEtcdTest, TestCreate) {
 
 
 TEST_F(FakeEtcdTest, TestCreateFailsIfExists) {
-  util::Status status;
+  Status status;
   int64_t created_index;
   status = BlockingCreate(kKey, kValue, &created_index);
   EXPECT_TRUE(status.ok()) << status;
@@ -211,7 +201,7 @@ TEST_F(FakeEtcdTest, TestCreateFailsIfExists) {
 
 
 TEST_F(FakeEtcdTest, TestCreateInQueue) {
-  util::Status status;
+  Status status;
   int64_t created_index;
   string created_key;
   status = BlockingCreateInQueue(kDir, kValue, &created_key, &created_index);
@@ -227,7 +217,7 @@ TEST_F(FakeEtcdTest, TestCreateInQueue) {
 
 
 TEST_F(FakeEtcdTest, TestUpdate) {
-  util::Status status;
+  Status status;
   int64_t created_index;
   status = BlockingCreate(kKey, kValue, &created_index);
   EXPECT_TRUE(status.ok()) << status;
@@ -247,7 +237,7 @@ TEST_F(FakeEtcdTest, TestUpdate) {
 
 
 TEST_F(FakeEtcdTest, TestUpdateFailsWithIncorrectPreviousIndex) {
-  util::Status status;
+  Status status;
   int64_t created_index;
   status = BlockingCreate(kKey, kValue, &created_index);
   EXPECT_TRUE(status.ok()) << status;
@@ -268,9 +258,9 @@ TEST_F(FakeEtcdTest, TestUpdateFailsWithIncorrectPreviousIndex) {
 
 
 TEST_F(FakeEtcdTest, TestCreateWithTTLExires) {
-  std::chrono::duration<int> kTtl(3);
+  duration<int> kTtl(3);
 
-  util::Status status;
+  Status status;
   int64_t created_index;
   status = BlockingCreateWithTTL(kKey, kValue, kTtl, &created_index);
   EXPECT_TRUE(status.ok()) << status;
@@ -283,7 +273,7 @@ TEST_F(FakeEtcdTest, TestCreateWithTTLExires) {
   EXPECT_EQ(created_index, node.modified_index_);
 
   // Now wait for it to expire
-  std::this_thread::sleep_for(kTtl + std::chrono::duration<int>(1));
+  sleep_for(kTtl + duration<int>(1));
 
   // Vanished, in a puff of digital smoke:
   status = BlockingGet(kKey, &node);
@@ -292,9 +282,9 @@ TEST_F(FakeEtcdTest, TestCreateWithTTLExires) {
 
 
 TEST_F(FakeEtcdTest, TestUpdateWithTTLExpires) {
-  std::chrono::duration<int> kTtl(3);
+  duration<int> kTtl(3);
 
-  util::Status status;
+  Status status;
   int64_t created_index;
   status = BlockingCreate(kKey, kValue, &created_index);
   EXPECT_TRUE(status.ok()) << status;
@@ -313,7 +303,7 @@ TEST_F(FakeEtcdTest, TestUpdateWithTTLExpires) {
   EXPECT_EQ(modified_index, node.modified_index_);
 
   // Now wait for it to expire
-  std::this_thread::sleep_for(kTtl + std::chrono::duration<int>(1));
+  sleep_for(kTtl + duration<int>(1));
 
   // Vanished, in a puff of digital smoke:
   status = BlockingGet(kKey, &node);
@@ -322,7 +312,7 @@ TEST_F(FakeEtcdTest, TestUpdateWithTTLExpires) {
 
 
 TEST_F(FakeEtcdTest, TestForceSet) {
-  util::Status status;
+  Status status;
   int64_t created_index;
   status = BlockingCreate(kKey, kValue, &created_index);
   EXPECT_TRUE(status.ok()) << status;
@@ -342,9 +332,9 @@ TEST_F(FakeEtcdTest, TestForceSet) {
 
 
 TEST_F(FakeEtcdTest, TestForceSetWithTTLExpires) {
-  std::chrono::duration<int> kTtl(3);
+  duration<int> kTtl(3);
 
-  util::Status status;
+  Status status;
   int64_t created_index;
   status = BlockingCreate(kKey, kValue, &created_index);
   EXPECT_TRUE(status.ok()) << status;
@@ -362,7 +352,7 @@ TEST_F(FakeEtcdTest, TestForceSetWithTTLExpires) {
   EXPECT_EQ(modified_index, node.modified_index_);
 
   // Now wait for it to expire
-  std::this_thread::sleep_for(kTtl + std::chrono::duration<int>(1));
+  sleep_for(kTtl + duration<int>(1));
 
   // Vanished, in a puff of digital smoke:
   status = BlockingGet(kKey, &node);
@@ -371,7 +361,7 @@ TEST_F(FakeEtcdTest, TestForceSetWithTTLExpires) {
 
 
 TEST_F(FakeEtcdTest, TestDelete) {
-  util::Status status;
+  Status status;
   int64_t created_index;
   status = BlockingCreate(kKey, kValue, &created_index);
   EXPECT_TRUE(status.ok()) << status;
@@ -384,8 +374,9 @@ TEST_F(FakeEtcdTest, TestDelete) {
   EXPECT_EQ(util::error::NOT_FOUND, status.CanonicalCode()) << status;
 }
 
+
 void TestWatcherForCreateCallback(
-    const std::function<void(void)>& cb,
+    const function<void(void)>& cb,
     const vector<EtcdClient::Watcher::Update>& updates) {
   static int num_calls(0);
   LOG(INFO) << "Update " << num_calls;
@@ -405,14 +396,15 @@ void TestWatcherForCreateCallback(
   ++num_calls;
 }
 
+
 TEST_F(FakeEtcdTest, TestWatcherForCreate) {
   int64_t created_index;
-  util::Status status(BlockingCreate(kPath1, kValue, &created_index));
+  Status status(BlockingCreate(kPath1, kValue, &created_index));
   EXPECT_TRUE(status.ok()) << status;
 
   BlockingCallback block;
-  std::unique_ptr<EtcdClient::Watcher> watcher(client_.CreateWatcher(
-      kDir, std::bind(&TestWatcherForCreateCallback, block.Callback(), _1)));
+  unique_ptr<EtcdClient::Watcher> watcher(client_.CreateWatcher(
+      kDir, bind(&TestWatcherForCreateCallback, block.Callback(), _1)));
 
   status = BlockingCreate(kPath2, kValue2, &created_index);
   EXPECT_TRUE(status.ok()) << status;
@@ -423,12 +415,12 @@ TEST_F(FakeEtcdTest, TestWatcherForCreate) {
 
 
 void TestWatcherForDeleteCallback(
-    const std::function<void(void)>& cb,
+    const function<void(void)>& cb,
     const vector<EtcdClient::Watcher::Update>& updates) {
   static int num_calls(0);
-  static std::mutex mutex;
+  static mutex mymutex;
 
-  std::lock_guard<std::mutex> lock(mutex);
+  lock_guard<mutex> lock(mymutex);
   LOG(INFO) << "Delete " << num_calls;
   if (num_calls == 0) {
     // initial call will all dir entries
@@ -448,13 +440,13 @@ void TestWatcherForDeleteCallback(
 
 TEST_F(FakeEtcdTest, TestWatcherForDelete) {
   int64_t created_index;
-  util::Status status(BlockingCreate(kPath1, kValue, &created_index));
+  Status status(BlockingCreate(kPath1, kValue, &created_index));
   EXPECT_TRUE(status.ok()) << status;
 
   BlockingCallback block;
   vector<EtcdClient::Watcher::Update> updates;
-  std::unique_ptr<EtcdClient::Watcher> watcher(client_.CreateWatcher(
-      kDir, std::bind(&TestWatcherForDeleteCallback, block.Callback(), _1)));
+  unique_ptr<EtcdClient::Watcher> watcher(client_.CreateWatcher(
+      kDir, bind(&TestWatcherForDeleteCallback, block.Callback(), _1)));
 
   status = BlockingDelete(kPath1, created_index);
   EXPECT_TRUE(status.ok()) << status;
@@ -465,6 +457,7 @@ TEST_F(FakeEtcdTest, TestWatcherForDelete) {
 
 
 }  // namespace cert_trans
+
 
 int main(int argc, char** argv) {
   cert_trans::test::InitTesting(argv[0], &argc, &argv, true);

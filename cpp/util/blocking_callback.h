@@ -7,6 +7,7 @@
 
 namespace cert_trans {
 
+
 class BlockingCallback {
  public:
   BlockingCallback()
@@ -18,12 +19,10 @@ class BlockingCallback {
     return notify_cb_;
   }
 
-
   void Wait() {
     std::unique_lock<std::mutex> lock(mutex_);
     cv_.wait(lock, [this]() { return called_; });
   }
-
 
  private:
   void Notify() {
