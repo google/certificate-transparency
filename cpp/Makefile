@@ -99,8 +99,6 @@ gmock/libgmock.a: gmock/Makefile
 
 gmock/gtest/libgtest.a: gmock/libgmock.a
 
-$(ALL_TESTS): gmock/gtest/libgtest.a
-
 %/.depend: %/*.cc */*.h
 	$(CXX) $(CXXFLAGS) -MM -MG $(filter %.cc,$^) | sed 's,\(.*\)\.o,$(@D)/\1.o,' >$(@).tmp
 	mv $(@).tmp $@
@@ -129,7 +127,7 @@ util/libutil.a: util/util.o util/openssl_util.o util/testing.o \
 	rm -f $@
 	ar -rcs $@ $^
 
-util/json_wrapper_test: util/json_wrapper_test.o util/libutil.a
+util/json_wrapper_test: util/json_wrapper_test.o util/libutil.a $(GTESTLIB)
 
 ### proto/ targets
 proto/libproto.a: proto/ct.pb.o proto/serializer.o
@@ -138,7 +136,8 @@ proto/libproto.a: proto/ct.pb.o proto/serializer.o
 
 proto_tests: $(PROTO_TESTS)
 
-proto/serializer_test: proto/serializer_test.o proto/libproto.a util/libutil.a
+proto/serializer_test: proto/serializer_test.o proto/libproto.a \
+                       util/libutil.a $(GTESTLIB)
 
 ### merkletree/ targets
 merkletree/libmerkletree.a: merkletree/compact_merkle_tree.o \
@@ -152,17 +151,21 @@ merkletree/libmerkletree.a: merkletree/compact_merkle_tree.o \
 merkletree_tests: $(MERKLETREE_TESTS)
 
 merkletree/merkle_tree_large_test: merkletree/merkle_tree_large_test.o \
-                                   merkletree/libmerkletree.a util/libutil.a
+                                   merkletree/libmerkletree.a util/libutil.a \
+                                   $(GTESTLIB)
 
 merkletree/merkle_tree_test: merkletree/merkle_tree_test.o \
-                             merkletree/libmerkletree.a util/libutil.a
+                             merkletree/libmerkletree.a util/libutil.a \
+                             $(GTESTLIB)
 
 merkletree/serial_hasher_test: merkletree/serial_hasher_test.o \
-                               merkletree/serial_hasher.o util/libutil.a
+                               merkletree/serial_hasher.o util/libutil.a \
+                               $(GTESTLIB)
 
 merkletree/tree_hasher_test: merkletree/tree_hasher_test.o \
                              merkletree/serial_hasher.o \
-                             merkletree/tree_hasher.o util/libutil.a
+                             merkletree/tree_hasher.o util/libutil.a \
+                             $(GTESTLIB)
 
 ### log/ targets
 log/libcert.a: log/cert.o log/cert_checker.o log/cert_submission_handler.o \
@@ -187,81 +190,84 @@ log/cert_test: log/cert_test.o log/cert.o log/ct_extensions.o util/libutil.a \
                merkletree/serial_hasher.o log/frontend.o proto/ct.pb.o \
                log/frontend_signer.o log/cert_submission_handler.o \
                log/log_signer.o log/signer.o log/verifier.o proto/serializer.o \
-               log/cert_checker.o
+               log/cert_checker.o $(GTESTLIB)
 
 log/cert_checker_test: log/cert_checker_test.o log/cert.o log/cert_checker.o \
                        log/ct_extensions.o util/libutil.a \
                        merkletree/serial_hasher.o log/frontend.o proto/ct.pb.o \
                        log/frontend_signer.o log/cert_submission_handler.o \
                        log/log_signer.o log/signer.o log/verifier.o \
-                       proto/serializer.o log/cert_checker.o
+                       proto/serializer.o log/cert_checker.o $(GTESTLIB)
 
 log/cert_submission_handler_test: log/cert_submission_handler_test.o \
                                   log/libcert.a util/libutil.a \
                                   log/frontend.o log/frontend_signer.o \
                                   proto/libproto.a log/log_signer.o \
-                                  log/signer.o log/verifier.o
+                                  log/signer.o log/verifier.o $(GTESTLIB)
 
 log/ct_extensions_test: log/ct_extensions_test.o log/libcert.a util/libutil.a \
                         log/liblog.a proto/ct.pb.o \
                         log/cert_submission_handler.o proto/serializer.o \
-                        log/cert_checker.o
+                        log/cert_checker.o $(GTESTLIB)
 
 log/database_large_test: log/database_large_test.o log/libdatabase.a \
                          log/log_signer.o log/signer.o log/verifier.o \
                          log/test_signer.o merkletree/libmerkletree.a \
-                         proto/libproto.a util/libutil.a
+                         proto/libproto.a util/libutil.a $(GTESTLIB)
 
 log/database_test: log/database_test.o log/libdatabase.a \
                    log/log_signer.o log/signer.o log/verifier.o \
                    log/test_signer.o merkletree/libmerkletree.a \
-                   proto/libproto.a util/libutil.a
+                   proto/libproto.a util/libutil.a $(GTESTLIB)
 
 log/file_storage_test: log/file_storage_test.o log/libdatabase.a \
                        proto/libproto.a util/libutil.a \
-                       merkletree/libmerkletree.a
+                       merkletree/libmerkletree.a $(GTESTLIB)
 
 log/frontend_signer_test: log/frontend_signer_test.o \
                           log/frontend_signer.o \
                           log/log_signer.o log/signer.o log/verifier.o \
                           log/log_verifier.o log/test_signer.o log/libcert.a \
                           log/libdatabase.a merkletree/libmerkletree.a \
-                          proto/libproto.a util/libutil.a
+                          proto/libproto.a util/libutil.a $(GTESTLIB)
 
 log/frontend_test: log/frontend_test.o log/frontend.o \
                    log/frontend_signer.o \
                    log/log_signer.o log/signer.o log/verifier.o \
                    log/log_verifier.o log/test_signer.o \
                    log/libcert.a log/libdatabase.a merkletree/libmerkletree.a \
-                   proto/libproto.a util/libutil.a
+                   proto/libproto.a util/libutil.a $(GTESTLIB)
 
 log/log_lookup_test: log/log_lookup_test.o log/test_signer.o log/libdatabase.a \
                      log/liblog.a merkletree/libmerkletree.a proto/libproto.a \
-                     util/libutil.a
+                     util/libutil.a $(GTESTLIB)
 
 log/log_signer_test: log/log_signer_test.o log/log_signer.o log/signer.o \
                      log/verifier.o log/test_signer.o \
-                     merkletree/libmerkletree.a proto/libproto.a util/libutil.a
+                     merkletree/libmerkletree.a proto/libproto.a \
+                     util/libutil.a $(GTESTLIB)
 
 log/signer_verifier_test: log/signer_verifier_test.o log/log_signer.o \
                      log/signer.o log/verifier.o log/test_signer.o \
-                     merkletree/libmerkletree.a proto/libproto.a util/libutil.a
+                     merkletree/libmerkletree.a proto/libproto.a \
+                     util/libutil.a $(GTESTLIB)
 
 log/tree_signer_test: log/tree_signer_test.o log/log_signer.o log/signer.o \
                       log/verifier.o log/test_signer.o log/tree_signer_cert.o \
                       log/log_verifier.o \
                       log/libdatabase.a merkletree/libmerkletree.a \
-                      proto/libproto.a util/libutil.a
+                      proto/libproto.a util/libutil.a $(GTESTLIB)
 
 log/logged_certificate_test: log/logged_certificate_test.o proto/libproto.a \
-                             util/libutil.a merkletree/libmerkletree.a
+                             util/libutil.a merkletree/libmerkletree.a \
+                             $(GTESTLIB)
 
 monitor_tests: $(MONITOR_TESTS)
 
 monitor/database_test: monitor/database_test.o monitor/database.o \
                        monitor/sqlite_db.o util/libutil.a log/test_signer.o \
                        merkletree/libmerkletree.a log/log_signer.o \
-                       log/signer.o log/verifier.o proto/libproto.a
+                       log/signer.o log/verifier.o proto/libproto.a $(GTESTLIB)
 
 # client
 client/ct: client/ct.o client/client.o client/ssl_client.o \
