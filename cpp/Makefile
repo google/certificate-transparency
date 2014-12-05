@@ -60,6 +60,7 @@ CXXFLAGS = $(INCLUDE) $(CXXFLAG) $(LOCAL_CXXFLAGS)
 
 # These tests will be built and run automatically.
 TESTS = \
+	base/notification_test \
 	log/database_test \
 	log/etcd_consistent_store_test \
 	log/fake_consistent_store_test \
@@ -131,6 +132,9 @@ ifneq ($(MAKECMDGOALS),clean)
     include server/.depend
     include util/.depend
 endif
+
+base/notification_test: base/notification.cc base/notification_test.o \
+                        util/testing.o $(GTESTLIB)
 
 ### util/ targets
 util/libutil.a: util/util.o util/openssl_util.o util/testing.o \
