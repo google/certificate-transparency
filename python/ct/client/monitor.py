@@ -1,8 +1,9 @@
 import gflags
 import logging
 
-from ct.client import log_client
+from ct.client import entry_decoder
 from ct.client import state
+from ct.client import reporter
 from ct.crypto import error
 from ct.crypto import merkle
 from ct.proto import client_pb2
@@ -25,6 +26,7 @@ class Monitor(object):
         # Merkle tree info.
         # Depends on: Merkle trees implemented in Python.
         self.__state = client_pb2.MonitorState()
+        self.__report = reporter.CertificateReport()
         try:
             self.__state = self.__state_keeper.read(client_pb2.MonitorState)
         except state.FileNotFoundError:
@@ -93,6 +95,8 @@ class Monitor(object):
 
     def _set_verified_tree(self, new_tree):
         """Set verified_tree and maybe move pending_sth to verified_sth."""
+        self.__report.set_new_entries_count(
+                new_tree.tree_size - self.__verified_tree.tree_size)
         self.__verified_tree = new_tree
         old_state = self.__state
         new_state = client_pb2.MonitorState()
@@ -106,6 +110,8 @@ class Monitor(object):
             new_state.verified_sth.CopyFrom(old_state.pending_sth)
             new_state.ClearField("pending_sth")
         self.__update_state(new_state)
+        # we just set new verified tree, so we report all changes
+        self.__report.report()
 
     def __verify_consistency_callback(self, proof, old_sth, new_sth):
         try:
@@ -260,13 +266,23 @@ class Monitor(object):
             return "all night"
 
     def __fetch_entries_eb(self, e, consumer):
-        e.trap(log_client.HTTPError, log_client.InvalidResponseError)
         logging.error("get-entries from %s failed: %s" %
                       (self.servername, e))
         consumer.done(None)
         return True
 
-    class EntryConsumer(object):
+
+    def _scan_entry(self, entry_index, entry):
+        parsed_entry = entry_decoder.decode_entry(entry)
+        ts_entry = parsed_entry.merkle_leaf.timestamped_entry
+        if ts_entry.entry_type == client_pb2.X509_ENTRY:
+            der_cert = ts_entry.asn1_cert
+        else:
+            der_cert = (
+                parsed_entry.extra_data.precert_chain_entry.pre_certificate)
+        self.__report.scan_der_cert(entry_index, der_cert)
+
+    class EntryConsumer(defer.Deferred):
         """Consumer for log_client.EntryProducer.
 
         When everything is consumed fires a boolean indicating success of
@@ -281,6 +297,7 @@ class Monitor(object):
             self._start = self._producer._start
             self._next_sequence_number = self._start
             #unverified_tree is tree that will be built during consumption
+            self._next_sequence_number = self._producer._start
             self._unverified_tree = verified_tree
             self.consumed = defer.Deferred()
             self._fetched = 0
@@ -309,7 +326,6 @@ class Monitor(object):
 
         def _verify_log(self, result, new_tree, verified_entries):
             logging.info("Verified %d entries" % verified_entries)
-
             self._monitor._set_verified_tree(new_tree)
             return True
 
@@ -324,6 +340,9 @@ class Monitor(object):
             logging.info("Fetched %d entries (total: %d from %d)" %
                          (len(entry_batch), self._fetched, self._query_size))
 
+            for index, entry in enumerate(entry_batch):
+                self._monitor._scan_entry(self._next_sequence_number + index,
+                                          entry)
             # calculate the hash for the latest fetched certs
             # TODO(ekasper): parse temporary data into permanent storage.
             self._partial_sth, self._unverified_tree = \
@@ -380,3 +399,5 @@ class Monitor(object):
                       else False)
         d.addCallback(self._update_result)
         return d
+
+

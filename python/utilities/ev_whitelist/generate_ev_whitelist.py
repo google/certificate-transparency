@@ -2,6 +2,7 @@
 """Generates a list of hashes of EV certificates found in a log."""
 
 import hashlib
+import functools
 import pickle
 import os
 import sys
@@ -20,11 +21,6 @@ gflags.DEFINE_integer("hash_trim", 8, "Number of bytes of the SHA-256 digest "
 
 gflags.DEFINE_integer("multi", 2, "Number of cert fetching and parsing "
                       "processes to use, in addition to the main process.")
-
-gflags.DEFINE_string("output", "ev_whitelist.bin",
-                     "Output file containing the list of EV cert hashes. "
-                     "The output is fixed-sized records of hash_trim bytes per "
-                     "hash.")
 
 gflags.DEFINE_string("output_directory", None,
                      "Output directory for individual EV certificates. "
@@ -55,20 +51,22 @@ def does_root_match_policy(policy_oid, cert_chain):
     return root_fingerprint in ev_metadata.EV_POLICIES[policy_oid]
 
 
-def _write_cert_and_chain(certificate, extra_data, certificate_index):
+def _write_cert_and_chain(
+        output_dir, certificate, extra_data, certificate_index):
     """Writes the certificate and its chain to files for later analysis."""
     open(
-        os.path.join(FLAGS.output_directory,
+        os.path.join(output_dir,
                      "cert_%d.der" % certificate_index), "wb"
         ).write(certificate.to_der())
 
     pickle.dump(
         list(extra_data.certificate_chain),
-        open(os.path.join(FLAGS.output_directory,
+        open(os.path.join(output_dir,
                           "cert_%d_extra_data.pickle" % certificate_index),
              "wb"))
 
-def _ev_match(certificate, entry_type, extra_data, certificate_index):
+def _ev_match(
+        output_dir, certificate, entry_type, extra_data, certificate_index):
     """Matcher function for the scanner. Returns the certificate's hash if
     it is a valid EV certificate, None otherwise."""
     # Only generate whitelist for non-precertificates. It is expected that if
@@ -87,34 +85,40 @@ def _ev_match(certificate, entry_type, extra_data, certificate_index):
         return None
 
     # Matching certificate
-    if FLAGS.output_directory:
-        _write_cert_and_chain(certificate, extra_data, certificate_index)
+    if output_dir:
+        _write_cert_and_chain(
+            output_dir, certificate, extra_data, certificate_index)
 
     return calculate_certificate_hash(certificate)
 
 
-def generate_ev_cert_hashes_from_log(log_url):
+def generate_ev_cert_hashes_from_log(
+        log_url, num_processes, output_directory):
     """Scans the given log and generates a list of hashes for all EV
     certificates in it.
 
     Returns a tuple of (scan_results, hashes_list)"""
+    if output_directory and not os.path.exists(output_directory):
+        os.makedirs(output_directory)
+
     ev_hashes = set()
     def add_hash(cert_hash):
         """Store the hash. Always called from the main process, so safe."""
         ev_hashes.add(cert_hash)
-    res = scanner.scan_log(_ev_match, log_url, FLAGS.multi, add_hash)
+    bound_ev_match = functools.partial(_ev_match, output_directory)
+    res = scanner.scan_log(bound_ev_match, log_url, num_processes, add_hash)
     return (res, ev_hashes)
 
-def main():
+def main(output_file):
     """Scan and save results to a file."""
-    if FLAGS.output_directory and not os.path.exists(FLAGS.output_directory):
-        os.mkdir(FLAGS.output_directory)
     res, hashes_set = generate_ev_cert_hashes_from_log(
-        "https://ct.googleapis.com/pilot")
+        "https://ct.googleapis.com/pilot",
+        FLAGS.multi,
+        FLAGS.output_directory)
     print "Scanned %d, %d matched and %d failed strict or partial parsing" % (
         res.total, res.matches, res.errors)
     print "There are %d EV hashes." % (len(hashes_set))
-    with open(FLAGS.output, "wb") as hashes_file:
+    with open(output_file, "wb") as hashes_file:
         hashes_list = list(hashes_set)
         hashes_list.sort()
         for trimmed_hash in hashes_list:
@@ -123,4 +127,9 @@ def main():
 
 if __name__ == "__main__":
     sys.argv = FLAGS(sys.argv)
-    main()
+    if len(sys.argv) < 2:
+        sys.stderr.write(
+            "Usage: %s <output file>\n  <output file> will contain the "
+            "sorted, truncated hashes list.\n" % sys.argv[0])
+        sys.exit(1)
+    main(sys.argv[1])

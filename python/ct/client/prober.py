@@ -14,7 +14,6 @@ from ct.client import state
 from ct.crypto import merkle
 from ct.crypto import verify
 from twisted.internet import reactor
-from twisted.internet import defer 
 from twisted.web import client as twisted_client
 
 class ProberThread(threading.Thread):
@@ -29,17 +28,18 @@ class ProberThread(threading.Thread):
             if not log.log_server or not log.log_id or not log.public_key_info:
                 raise RuntimeError("Cannot start monitor: log proto has "
                                    "missing or empty fields: %s" % log)
+
+            temp_db = temp_db_factory.create_storage(log.log_server)
             client = log_client.AsyncLogClient(twisted_client.Agent(reactor),
-                                               log.log_server)
+                                               log.log_server,
+                                               temp_db)
             hasher = merkle.TreeHasher()
             verifier = verify.LogVerifier(log.public_key_info,
                                           merkle.MerkleVerifier(hasher))
             state_keeper = state.StateKeeper(FLAGS.monitor_state_dir +
                                              "/" + log.log_id)
-            temp_db = temp_db_factory.create_storage(log.log_server)
             self.__monitors.append(monitor.Monitor(client, verifier, hasher, db,
                                                    temp_db, state_keeper))
-
         self.__last_update_start_time = 0
         self.__stopped = False
 

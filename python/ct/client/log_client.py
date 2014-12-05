@@ -2,6 +2,7 @@
 import base64
 import json
 
+from ct.client import database
 from ct.proto import client_pb2
 import gflags
 import logging
@@ -47,6 +48,7 @@ gflags.DEFINE_integer("response_buffer_size_bytes", 50 * 1000 * 1000, "Maximum "
                       "the buffer. A typical log entry is expected to be < "
                       "10kB.")
 
+gflags.DEFINE_bool("persist_entries", True, "Cache entries on disk.")
 
 class Error(Exception):
     pass
@@ -542,10 +544,12 @@ class EntryProducer(object):
     """A push producer for log entries."""
     implements(iweb.IBodyProducer)
 
-    def __init__(self, handler, reactor, uri, start, end, batch_size):
+    def __init__(self, handler, reactor, uri, start, end,
+                 batch_size, entries_db=None):
         self._handler = handler
         self._reactor = reactor
         self._uri = uri
+        self._entries_db = entries_db
         self._consumer = None
 
         assert 0 <= start <= end
@@ -615,17 +619,38 @@ class EntryProducer(object):
         self._currently_stored += len(result)
         return result
 
+    def _store_batch(self, entry_batch, start_index):
+        assert self._entries_db
+        self._entries_db.store_entries(enumerate(entry_batch, start_index))
+        return entry_batch
+
+    def _get_entries_from_db(self, first, last):
+        if FLAGS.persist_entries and self._entries_db:
+            try:
+                return list(self._entries_db.scan_entries(first, last))
+            except database.KeyError:
+                pass
+
     def _fetch_parsed_entries(self, first, last):
+        entries = self._get_entries_from_db(first, last)
         # it's not the best idea to attack server with many requests exactly at
         # the same time, so requests are sent after slight delay.
-        request = task.deferLater(self._reactor,
-                                  self._calculate_retry_delay(0),
-                                  self._handler.get,
-                                  self._uri + "/" + _GET_ENTRIES_PATH,
-                                  params={"start": str(first),
-                                          "end": str(last)})
-        request.addCallback(_parse_entries, last - first + 1)
-        return request
+        if not entries:
+            request = task.deferLater(self._reactor,
+                                      self._calculate_retry_delay(0),
+                                      self._handler.get,
+                                      self._uri + "/" + _GET_ENTRIES_PATH,
+                                      params={"start": str(first),
+                                              "end": str(last)})
+            request.addCallback(_parse_entries, last - first + 1)
+            if self._entries_db and FLAGS.persist_entries:
+                request.addCallback(self._store_batch, first)
+            entries = request
+        else:
+            deferred_entries = defer.Deferred()
+            deferred_entries.callback(entries)
+            entries = deferred_entries
+        return entries
 
     def _create_next_request(self, first, last, entries, retries):
         d = self._fetch_parsed_entries(first, last)
@@ -732,19 +757,24 @@ class EntryProducer(object):
 class AsyncLogClient(object):
     """A twisted log client."""
 
-    def __init__(self, agent, uri, reactor=ireactor):
+    def __init__(self, agent, uri, entries_db=None, reactor=ireactor):
 
         """Initialize the client.
+
+        If entries_db is specified and flag persist_entries is true, get_entries
+        will return stored entries.
 
         Args:
             agent: the agent to use.
             uri: the uri of the log.
+            entries_db: object that conforms TempDB API
             reactor: the reactor to use. Default is twisted.internet.reactor.
         """
         self._handler = AsyncRequestHandler(agent)
         #twisted expects bytes, so if uri is unicode we have to change encoding
         self._uri = uri.encode('ascii')
         self._reactor = reactor
+        self._entries_db = entries_db
 
     @property
     def servername(self):
@@ -790,8 +820,8 @@ class AsyncLogClient(object):
         if start < 0 or end < 0 or start > end:
             raise InvalidRequestError("Invalid range [%d, %d]" % (start, end))
         batch_size = batch_size or FLAGS.entry_fetch_batch_size
-        return EntryProducer(self._handler, self._reactor, self._uri, start,
-                             end, batch_size)
+        return EntryProducer(self._handler, self._reactor, self._uri,
+                             start, end, batch_size, self._entries_db)
 
     def get_sth_consistency(self, old_size, new_size):
         """Retrieve a consistency proof.

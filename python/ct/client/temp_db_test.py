@@ -39,11 +39,12 @@ class TempDBTest(object):
         returned_entries = list(self.db().scan_entries(0, 9))
         self.verify_entries(returned_entries, 0, 9)
 
-    def test_store_twice_fails(self):
+    def test_store_twice_doesnt_raise(self):
         entries = self.make_entries(0, 9)
         self.db().store_entries(entries)
-        self.assertRaises(database.KeyError, self.db().store_entries,
-                          entries)
+        entries = self.make_entries(1, 10)
+        self.db().store_entries(entries)
+        self.verify_entries(list(self.db().scan_entries(0, 10)), 0, 10)
 
     def test_scan_out_of_range_fails(self):
         entries = self.make_entries(0, 9)

@@ -101,6 +101,12 @@ class CertificateTest(unittest.TestCase):
     # A certificate with ASN1 indefinite length encoding.
     _PEM_INDEFINITE_LENGTH = "asn1_indefinite_length_encoding.pem"
 
+    # A certificate with 99991231235959Z expiration date
+    _PEM_NOT_WELL_DEFINED_EXPIRATION = "expiration_not_well_defined.pem"
+
+    # A certificate with street address, postal code etc. provided
+    _PEM_WITH_ADDRESS = "cert_with_address.pem"
+
     @property
     def pem_file(self):
         return FLAGS.testdata_dir + "/" + self._PEM_FILE
@@ -428,6 +434,45 @@ class CertificateTest(unittest.TestCase):
         c = self.cert_from_pem_file(self._PEM_FILE)
         self.assertEqual(2, c.version())
 
+    def test_issuer_common_name(self):
+        c = self.cert_from_pem_file(self._PEM_FILE)
+        icn = c.issuer_common_name()
+        self.assertIn("Google Internet Authority", icn[0].value)
+        self.assertEqual(len(icn), 1)
+
+    def test_issuer_country_name(self):
+        c = self.cert_from_pem_file(self._PEM_FILE)
+        icn = c.issuer_country_name()
+        self.assertIn("US", icn)
+        self.assertEqual(len(icn), 1)
+
+    def test_subject_organization_name(self):
+        c = self.cert_from_pem_file(self._PEM_FILE)
+        icn = c.subject_organization_name()
+        self.assertIn("Google Inc", icn)
+        self.assertEqual(len(icn), 1)
+
+    def test_subject_street_address(self):
+        c = self.cert_from_pem_file(self._PEM_WITH_ADDRESS)
+        address = c.subject_street_address()
+        self.assertIn("CQ Mail Centre", address)
+        self.assertIn("Building 19", address)
+
+    def test_subject_locality_name(self):
+        c = self.cert_from_pem_file(self._PEM_WITH_ADDRESS)
+        locality_name = c.subject_locality_name()
+        self.assertIn("Rockhampton", locality_name)
+
+    def test_subject_state_or_province(self):
+        c = self.cert_from_pem_file(self._PEM_WITH_ADDRESS)
+        state_or_province = c.subject_state_or_province_name()
+        self.assertIn("Queensland", state_or_province)
+
+    def test_subject_postal_code(self):
+        c = self.cert_from_pem_file(self._PEM_WITH_ADDRESS)
+        postal_code = c.subject_postal_code()
+        self.assertIn("4702", postal_code)
+
     def test_serial_number(self):
         c = self.cert_from_pem_file(self._PEM_FILE)
         self.assertEqual(454887626504608315115709, c.serial_number())
@@ -650,12 +695,33 @@ class CertificateTest(unittest.TestCase):
         c = self.cert_from_pem_file(self._PEM_FILE)
         self.assertItemsEqual([], c.ocsp_responders())
 
+    def test_get_extensions(self):
+        c = self.cert_from_pem_file(self._PEM_AIA)
+        extensions = c.get_extensions()
+        extensions_oids = [extension['extnID'] for extension in extensions]
+        self.assertItemsEqual((oid.ID_CE_EXT_KEY_USAGE,
+                               oid.ID_CE_SUBJECT_ALT_NAME,
+                               oid.ID_PE_AUTHORITY_INFO_ACCESS,
+                               oid.ID_CE_SUBJECT_KEY_IDENTIFIER,
+                               oid.ID_CE_BASIC_CONSTRAINTS,
+                               oid.ID_CE_AUTHORITY_KEY_IDENTIFIER,
+                               oid.ID_CE_CERTIFICATE_POLICIES,
+                               oid.ID_CE_CRL_DISTRIBUTION_POINTS),
+                              extensions_oids)
+
     def test_indefinite_encoding(self):
         self.assertRaises(error.ASN1Error, self.cert_from_pem_file,
                           self._PEM_INDEFINITE_LENGTH)
         c = self.cert_from_pem_file(self._PEM_INDEFINITE_LENGTH, strict=False)
         issuer = c.print_issuer_name()
         self.assertTrue("VeriSign Class 1 CA" in issuer)
+
+    def test_expiration_not_well_defined(self):
+        c = self.cert_from_pem_file(self._PEM_NOT_WELL_DEFINED_EXPIRATION)
+        self.assertFalse(c.is_not_after_well_defined())
+        # Make sure that certificate with regular expiration date return true
+        c = self.cert_from_pem_file(self._PEM_AIA)
+        self.assertTrue(c.is_not_after_well_defined())
 
 
 if __name__ == "__main__":

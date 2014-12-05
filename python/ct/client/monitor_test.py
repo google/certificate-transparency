@@ -167,9 +167,12 @@ class MonitorTest(unittest.TestCase):
         # all the callsites should be updated to test the main db instead
         pass
 
-    def create_monitor(self, client):
-        return monitor.Monitor(client, self.verifier, self.hasher, self.db,
+    def create_monitor(self, client, skip_scan_entry=True):
+        m = monitor.Monitor(client, self.verifier, self.hasher, self.db,
                                self.temp_db, self.state_keeper)
+        if m:
+            m._scan_entry = mock.Mock()
+        return m
 
     def test_update(self):
         client = FakeLogClient(self._NEW_STH)
