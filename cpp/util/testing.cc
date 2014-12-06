@@ -1,5 +1,6 @@
 #include "util/testing.h"
 
+#include <event2/thread.h>
 #include <gflags/gflags.h>
 #include <glog/logging.h>
 #include <gtest/gtest.h>
@@ -17,6 +18,7 @@ void InitTesting(const char* name, int* argc, char*** argv,
   ::testing::InitGoogleTest(argc, *argv);
   google::ParseCommandLineFlags(argc, argv, remove_flags);
   google::InitGoogleLogging(name);
+  evthread_use_pthreads();
 }
 
 }  // namespace test
