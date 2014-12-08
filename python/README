@@ -11,7 +11,7 @@ twisted (at least 12.1; tested with 13.2)
 
 If you use pip, simply run `pip install -r requirements.txt`
 
-2. Install the protoc compiler from https://code.google.com/p/protobuf/
+2. Install the protoc compiler from https://github.com/google/protobuf/
 
 3. Run 'make' in the parent python/ directory to
 generate the Python versions of CT protocol buffers.
