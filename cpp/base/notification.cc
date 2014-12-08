@@ -10,9 +10,14 @@ namespace cert_trans {
 
 
 void Notification::Notify() {
-  lock_guard<mutex> lock(lock_);
-  CHECK(!notified_);
-  notified_ = true;
+  {
+    lock_guard<mutex> lock(lock_);
+    CHECK(!notified_);
+    notified_ = true;
+  }
+  // Release the lock before notifying the condition variable, so that
+  // any thread that we wake up is not delayed as it tries to get the
+  // lock.
   cv_.notify_all();
 }
 
