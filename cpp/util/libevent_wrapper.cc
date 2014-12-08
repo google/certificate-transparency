@@ -32,6 +32,13 @@ unsigned short GetPortFromUri(const evhttp_uri* uri) {
 }
 
 
+void FreeEvDns(evdns_base* dns) {
+  if (dns) {
+    evdns_base_free(dns, true);
+  }
+}
+
+
 }  // namespace
 
 namespace cert_trans {
@@ -49,19 +56,15 @@ struct HttpServer::Handler {
 
 
 Base::Base()
-    : base_(CHECK_NOTNULL(event_base_new())),
-      dns_(nullptr),
-      wake_closures_(event_new(base_, -1, 0, &Base::RunClosures, this),
+    : base_(CHECK_NOTNULL(event_base_new()), event_base_free),
+      dns_(nullptr, FreeEvDns),
+      wake_closures_(event_new(base_.get(), -1, 0, &Base::RunClosures, this),
                      &event_free) {
-  evthread_make_base_notifiable(base_);
+  evthread_make_base_notifiable(base_.get());
 }
 
 
 Base::~Base() {
-  if (dns_)
-    evdns_base_free(dns_, true);
-
-  event_base_free(base_);
 }
 
 
@@ -76,7 +79,7 @@ void Base::Dispatch() {
   // There should /never/ be more than 1 thread trying to call Dispatch(), so
   // we should expect to always own the lock here.
   CHECK(dispatch_lock_.try_lock());
-  CHECK_EQ(event_base_dispatch(base_), 0);
+  CHECK_EQ(event_base_dispatch(base_.get()), 0);
   dispatch_lock_.unlock();
 }
 
@@ -84,19 +87,19 @@ void Base::Dispatch() {
 void Base::DispatchOnce() {
   // Only one thread can be running a dispatch loop at a time
   lock_guard<mutex> lock(dispatch_lock_);
-  CHECK_EQ(event_base_loop(base_, EVLOOP_ONCE), 0);
+  CHECK_EQ(event_base_loop(base_.get(), EVLOOP_ONCE), 0);
 }
 
 
 event* Base::EventNew(evutil_socket_t& sock, short events,
                       Event* event) const {
   return CHECK_NOTNULL(
-      event_new(base_, sock, events, &Event::Dispatch, event));
+      event_new(base_.get(), sock, events, &Event::Dispatch, event));
 }
 
 
 evhttp* Base::HttpNew() const {
-  return CHECK_NOTNULL(evhttp_new(base_));
+  return CHECK_NOTNULL(evhttp_new(base_.get()));
 }
 
 
@@ -104,17 +107,17 @@ evdns_base* Base::GetDns() {
   lock_guard<mutex> lock(dns_lock_);
 
   if (!dns_) {
-    dns_ = CHECK_NOTNULL(evdns_base_new(base_, 1));
+    dns_.reset(CHECK_NOTNULL(evdns_base_new(base_.get(), 1)));
   }
 
-  return dns_;
+  return dns_.get();
 }
 
 
 evhttp_connection* Base::HttpConnectionNew(const string& host,
                                            unsigned short port) {
   return CHECK_NOTNULL(
-      evhttp_connection_base_new(base_, GetDns(), host.c_str(), port));
+      evhttp_connection_base_new(base_.get(), GetDns(), host.c_str(), port));
 }
 
 

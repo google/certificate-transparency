@@ -40,13 +40,16 @@ class Base : public util::Executor {
  private:
   static void RunClosures(evutil_socket_t sock, short flag, void* userdata);
 
-  event_base* const base_;
+  const std::unique_ptr<event_base, void (*)(event_base*)> base_;
   std::mutex dispatch_lock_;
 
   std::mutex dns_lock_;
-  evdns_base* dns_;
+  // "dns_" should be after base_, so that it gets destroyed first.
+  std::unique_ptr<evdns_base, void (*)(evdns_base*)> dns_;
 
   std::mutex closures_lock_;
+  // "wake_closures_" should be after base_, so that it gets destroyed
+  // first.
   const std::unique_ptr<event, void (*)(event*)> wake_closures_;
   std::vector<std::function<void()>> closures_;
 
