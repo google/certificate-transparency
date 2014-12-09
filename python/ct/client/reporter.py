@@ -46,20 +46,24 @@ def _scan_der_cert(der_certs, checks):
                     partial_result += check.check(certificate) or []
             result.append((log_index, partial_result))
         return result
-    except:
-        _, ex, ex_tb = sys.exc_info()
-        ex_tb = traceback.format_exc(ex_tb)
-        raise PoolException((ex, ex_tb, der_certs[0][0], der_certs[-1][0]))
+    except Exception:
+        # TODO(laiqu) return exact certificate index which caused an exception
+        # instead of range.
+        _, exception, exception_traceback = sys.exc_info()
+        exception_traceback  = traceback.format_exc(exception_traceback)
+        raise PoolException((exception, exception_traceback,
+                             der_certs[0][0], der_certs[-1][0]))
 
 
 class CertificateReport(object):
     """Stores description of new entries between last verified STH and
     current."""
 
-    def __init__(self, checks=all_checks.ALL_CHECKS):
+    def __init__(self, checks=all_checks.ALL_CHECKS,
+                 pool_size=FLAGS.reporter_workers):
         self.reset()
         self.checks = checks
-        self._pool = multiprocessing.Pool(processes=FLAGS.reporter_workers)
+        self._pool = multiprocessing.Pool(processes=pool_size)
 
     def set_new_entries_count(self, count):
         """Set number of new entries"""
