@@ -53,7 +53,8 @@ FakeEtcdClient::FakeWatcher::FakeWatcher(FakeEtcdClient* client,
                                          const string& key,
                                          const WatchCallback& cb)
     : client_(client), key_(key), cb_(cb) {
-  vector<Update> initial_updates;
+  std::vector<Update> initial_updates;
+  std::lock_guard<std::mutex> lock(client_->mutex_);
   for (const auto& pair : client_->entries_) {
     if (pair.first.find(key_) == 0) {
       initial_updates.push_back(Update(pair.second, true /*exists*/));
@@ -69,7 +70,8 @@ FakeEtcdClient::FakeWatcher::~FakeWatcher() {
 }
 
 
-FakeEtcdClient::FakeEtcdClient() : index_(1), pool_(1) {
+FakeEtcdClient::FakeEtcdClient(const std::shared_ptr<libevent::Base>& base)
+    : base_(base), index_(1) {
 }
 
 
@@ -341,9 +343,7 @@ void FakeEtcdClient::HandleDelete(const string& key,
     ScheduleCallback(bind(cb, status, make_shared<JsonObject>(), index_));
     return;
   }
-  LOG(INFO) << entries_[key].ToString();
   entries_[key].deleted_ = true;
-  LOG(INFO) << entries_[key].ToString();
   ++index_;
   ScheduleCallback(
       bind(cb, Status::OK,
@@ -370,7 +370,7 @@ void FakeEtcdClient::RemoveWatcher(const void* cookie) {
 
 
 void FakeEtcdClient::ScheduleCallback(const function<void()>& cb) {
-  pool_.Add(cb);
+  base_->Add(cb);
 }
 
 

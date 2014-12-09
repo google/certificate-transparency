@@ -1,5 +1,6 @@
 #include "util/fake_etcd.h"
 
+#include <atomic>
 #include <functional>
 #include <glog/logging.h>
 #include <gtest/gtest.h>
@@ -10,6 +11,7 @@
 #include <vector>
 
 #include "base/notification.h"
+#include "util/libevent_wrapper.h"
 #include "util/sync_etcd.h"
 #include "util/testing.h"
 
@@ -62,9 +64,25 @@ void CopyCallback3(Notification* notifier, A* a_out, B* b_out, C* c_out,
   notifier->Notify();
 }
 
+void DoNothing() {
+}
+
 
 class FakeEtcdTest : public ::testing::Test {
  public:
+  FakeEtcdTest()
+      : base_(std::make_shared<libevent::Base>()),
+        running_(true),
+        event_pump_(bind(&FakeEtcdTest::EventPump, this)),
+        client_(base_) {
+  }
+
+  ~FakeEtcdTest() {
+    running_.store(false);
+    base_->Add(bind(&DoNothing));
+    event_pump_.join();
+  }
+
  protected:
   Status BlockingGet(const string& key, EtcdClient::Node* node) {
     Notification notifier;
@@ -165,6 +183,20 @@ class FakeEtcdTest : public ::testing::Test {
     return status;
   }
 
+  void EventPump() {
+    // Prime the pump with a pending event some way out in the future,
+    // otherwise we're racing the main thread to get an event in before calling
+    // DispatchOnce() (which will CHECK fail if there's nothing to do.)
+    libevent::Event event(*base_, -1, 0, std::bind(&DoNothing));
+    event.Add(std::chrono::seconds(60));
+    while (running_.load()) {
+      base_->DispatchOnce();
+    }
+  }
+
+  std::shared_ptr<libevent::Base> base_;
+  std::atomic<bool> running_;
+  std::thread event_pump_;
   FakeEtcdClient client_;
 };
 
@@ -253,7 +285,7 @@ TEST_F(FakeEtcdTest, TestUpdateFailsWithIncorrectPreviousIndex) {
 }
 
 
-TEST_F(FakeEtcdTest, TestCreateWithTTLExires) {
+TEST_F(FakeEtcdTest, TestCreateWithTTLExpires) {
   duration<int> kTtl(3);
 
   Status status;
@@ -443,7 +475,6 @@ TEST_F(FakeEtcdTest, TestWatcherForDelete) {
   EXPECT_TRUE(status.ok()) << status;
 
   Notification notifier;
-  vector<EtcdClient::Watcher::Update> updates;
   unique_ptr<EtcdClient::Watcher> watcher(client_.CreateWatcher(
       kDir, bind(&TestWatcherForDeleteCallback, &notifier, _1)));
 

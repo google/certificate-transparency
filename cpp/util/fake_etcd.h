@@ -13,7 +13,7 @@ namespace cert_trans {
 
 class FakeEtcdClient : public EtcdClient {
  public:
-  FakeEtcdClient();
+  FakeEtcdClient(const std::shared_ptr<libevent::Base>& base);
 
   virtual ~FakeEtcdClient() = default;
 
@@ -63,12 +63,14 @@ class FakeEtcdClient : public EtcdClient {
   // Callbacks should not block.
   void ScheduleCallback(const std::function<void()>& cb);
 
+  const std::shared_ptr<libevent::Base> base_;
   std::mutex mutex_;
   int64_t index_;
   std::map<std::string, Node> entries_;
   std::map<std::string, std::vector<std::pair<Watcher::WatchCallback, void*>>>
       watches_;
-  ThreadPool pool_;
+
+  friend class ElectionTest;
 };
 
 
