@@ -80,7 +80,8 @@ TESTS = \
 	util/fake_etcd_test \
 	util/json_wrapper_test \
 	util/masterelection_test \
-	util/sync_etcd_test
+	util/sync_etcd_test \
+	util/task_test
 
 # These tests will be built, but not run.
 DISABLED_TESTS = \
@@ -141,7 +142,7 @@ base/notification_test: base/notification.cc base/notification_test.o \
 util/libutil.a: util/util.o util/openssl_util.o util/testing.o \
                 util/json_wrapper.o util/thread_pool.o util/libevent_wrapper.o \
                 util/etcd.o util/status.o util/sync_etcd.o util/fake_etcd.o \
-                util/periodic_closure.o util/masterelection.o
+                util/periodic_closure.o util/masterelection.o util/task.o
 	rm -f $@
 	ar -rcs $@ $^
 
@@ -157,6 +158,8 @@ util/sync_etcd_test: util/sync_etcd_test.o util/libutil.a $(GMOCKLIB) \
 
 util/masterelection_test: util/masterelection_test.o base/notification.o \
                           util/libutil.a $(GTESTLIB)
+
+util/task_test: util/task_test.o base/notification.o util/libutil.a $(GTESTLIB)
 
 ### proto/ targets
 proto/libproto.a: proto/ct.pb.o proto/serializer.o
