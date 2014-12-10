@@ -14,7 +14,6 @@ class AggregatedCertificateReport(reporter.CertificateReport):
             report.report()
 
     def reset(self):
-        self._jobs = []
         for report in self._reporters:
             report.reset()
 

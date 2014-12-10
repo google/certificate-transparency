@@ -9,6 +9,7 @@ from ct.crypto import merkle
 from ct.client import text_reporter
 from ct.proto import client_pb2
 from twisted.internet import defer
+from twisted.internet import threads
 
 FLAGS = gflags.FLAGS
 
@@ -290,11 +291,11 @@ class Monitor(object):
             der_certs.append((entry_index, der_cert))
         self.__report.scan_der_certs(der_certs)
 
-    class EntryConsumer(defer.Deferred):
+    class EntryConsumer(object):
         """Consumer for log_client.EntryProducer.
 
-        When everything is consumed fires a boolean indicating success of
-        consuming.
+        When everything is consumed, consumed field fires a boolean indicating
+        success of consuming.
         """
         def __init__(self, producer, monitor, pending_sth, verified_tree):
             self._producer = producer
@@ -348,14 +349,16 @@ class Monitor(object):
             logging.info("Fetched %d entries (total: %d from %d)" %
                          (len(entry_batch), self._fetched, self._query_size))
 
-            self._monitor._scan_entries(enumerate(entry_batch,
-                                                  self._next_sequence_number))
+            scan = threads.deferToThread(
+                    self._monitor._scan_entries,
+                    enumerate(entry_batch, self._next_sequence_number))
             # calculate the hash for the latest fetched certs
             # TODO(ekasper): parse temporary data into permanent storage.
             self._partial_sth, self._unverified_tree = \
                     self._monitor._compute_projected_sth_from_tree(
                         self._unverified_tree, entry_batch)
             self._next_sequence_number += len(entry_batch)
+            return scan
 
     def __fetch_entries(self, start, end):
         """Fetches entries from the log.

@@ -92,6 +92,7 @@ class FakeEntryProducer(object):
     def stopProducing(self):
         self.stop = True
 
+
 class FakeLogClient(object):
     def __init__(self, sth, servername="log_server", batch_size=None,
                  get_entries_throw=None):
