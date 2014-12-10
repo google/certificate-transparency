@@ -22,6 +22,9 @@ class HttpConnection;
 
 class Base : public util::Executor {
  public:
+  static bool OnEventThread();
+  static void CheckNotOnEventThread();
+
   Base();
   ~Base();
 
