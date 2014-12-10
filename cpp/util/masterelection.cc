@@ -76,6 +76,15 @@ void MasterElection::StartElection() {
 
 void MasterElection::StopElection() {
   VLOG(1) << my_proposal_path_ << ": Departing election.";
+
+  // Stop the updates from the watcher. Do this before taking the
+  // lock, because the watcher callback takes that lock. This means
+  // that we'll stop updating our proposal, and maybe delay a master
+  // election, but that's okay, as we're about to delete our proposal
+  // altogether.
+  VLOG(1) << my_proposal_path_ << ": Deleting watcher...";
+  proposal_watcher_.reset();
+
   unique_lock<mutex> lock(mutex_);
   CHECK(running_);
   running_ = false;
@@ -89,11 +98,10 @@ void MasterElection::StopElection() {
     return proposal_state_ == ProposalState::UP_TO_DATE;
   });
 
-  // No more updates from the watcher:
-  VLOG(1) << my_proposal_path_ << ": Deleting watcher...";
-  proposal_watcher_.reset();
-
-  // No more refresh callbacks:
+  // No more refresh callbacks (this is not synchronous, the refresh
+  // callback might be running right now, trying to lock the mutex, so
+  // the callback has to be able to handle itself after we've
+  // stopped):
   proposal_refresh_callback_.reset();
 
   // Delete our proposal so we can't accidentally become master after we've
@@ -299,6 +307,12 @@ void MasterElection::ProposalDeleteDone(util::Status status) {
 void MasterElection::ProposalKeepAliveCallback() {
   unique_lock<mutex> lock(mutex_);
   VLOG(1) << my_proposal_path_ << ": Proposal Keep-Alive fired.";
+  if (!running_) {
+    VLOG(1) << my_proposal_path_
+            << ": But we're not running so bailing on updates.";
+    return;
+  }
+
   MaybeUpdateProposal(lock, backed_proposal_);
 }
 
@@ -344,8 +358,6 @@ void MasterElection::OnProposalUpdate(
   unique_lock<mutex> lock(mutex_);
   CHECK_GE(updates.size(), 1);
   VLOG(1) << my_proposal_path_ << ": Got " << updates.size() << " update(s)";
-  // TODO(alcutter): This can be a CHECK once FakeEtcd is using the new Task
-  // framework.
   if (!running_) {
     VLOG(1) << my_proposal_path_
             << ": But we're not running so bailing on updates.";
