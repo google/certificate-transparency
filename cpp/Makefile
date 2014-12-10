@@ -9,8 +9,8 @@ CXXFLAG = -std=c++11 -Wall -Werror -g -O3
 LINK.o = $(LINK.cc)
 
 INCLUDE = -I .
-LOCAL_LIBS = log/libcert.a log/libdatabase.a log/liblog.a \
-             merkletree/libmerkletree.a \
+LOCAL_LIBS = log/libcert.a log/libcluster.a log/libdatabase.a \
+             log/liblog.a merkletree/libmerkletree.a \
              proto/libproto.a util/libutil.a
 LDLIBS = -lpthread -lgflags -lglog -lssl -lcrypto -lldns -lsqlite3 \
          -lprotobuf -levent_core -levent_extra -levent_pthreads
@@ -61,6 +61,7 @@ CXXFLAGS = $(INCLUDE) $(CXXFLAG) $(LOCAL_CXXFLAGS)
 # These tests will be built and run automatically.
 TESTS = \
 	base/notification_test \
+	log/cluster_state_controller_test \
 	log/database_test \
 	log/etcd_consistent_store_test \
 	log/file_storage_test \
@@ -208,9 +209,13 @@ log/libcert.a: log/cert.o log/cert_checker.o log/cert_submission_handler.o \
 	rm -f $@
 	ar -rcs $@ $^
 
+log/libcluster.a: log/etcd_consistent_store_cert.o \
+                  log/cluster_state_controller_cert.o
+	rm -f $@
+	ar -rcs $@ $^
+
 log/libdatabase.a: log/file_storage.o log/filesystem_ops.o log/file_db_cert.o \
-                   log/sqlite_db_cert.o log/database.o \
-                   log/etcd_consistent_store_cert.o
+                   log/sqlite_db_cert.o log/database.o
 	rm -f $@
 	ar -rcs $@ $^
 
@@ -239,6 +244,13 @@ log/cert_submission_handler_test: log/cert_submission_handler_test.o \
                                   proto/libproto.a log/log_signer.o \
                                   log/signer.o log/verifier.o $(GTESTLIB)
 
+log/cluster_state_controller_test: base/notification.o \
+                                   log/cluster_state_controller_test.o \
+                                   merkletree/serial_hasher.o \
+                                   log/libcert.a log/libcluster.a \
+                                   proto/libproto.a util/libutil.a $(GMOCKLIB) \
+                                   $(GTESTLIB)
+
 log/ct_extensions_test: log/ct_extensions_test.o log/libcert.a util/libutil.a \
                         log/liblog.a proto/ct.pb.o \
                         log/cert_submission_handler.o proto/serializer.o \
@@ -262,7 +274,8 @@ log/frontend_signer_test: log/frontend_signer_test.o \
                           log/frontend_signer.o \
                           log/log_signer.o log/signer.o log/verifier.o \
                           log/log_verifier.o log/test_signer.o log/libcert.a \
-                          log/libdatabase.a merkletree/libmerkletree.a \
+                          log/libcluster.a log/libdatabase.a \
+                          merkletree/libmerkletree.a \
                           proto/libproto.a util/libutil.a base/notification.o \
                           $(GTESTLIB)
 
@@ -270,17 +283,19 @@ log/frontend_test: log/frontend_test.o log/frontend.o \
                    log/frontend_signer.o \
                    log/log_signer.o log/signer.o log/verifier.o \
                    log/log_verifier.o log/test_signer.o \
-                   log/libcert.a log/libdatabase.a merkletree/libmerkletree.a \
+                   log/libcert.a log/libcluster.a log/libdatabase.a \
+                   merkletree/libmerkletree.a \
                    proto/libproto.a util/libutil.a base/notification.o $(GTESTLIB)
 
-log/log_lookup_test: log/log_lookup_test.o log/test_signer.o log/libdatabase.a \
+log/log_lookup_test: log/log_lookup_test.o log/test_signer.o \
+                     log/libcluster.a log/libdatabase.a \
                      log/liblog.a merkletree/libmerkletree.a proto/libproto.a \
                      util/libutil.a base/notification.o $(GTESTLIB)
 
 log/log_signer_test: log/log_signer_test.o log/log_signer.o log/signer.o \
                      log/verifier.o log/test_signer.o \
-                     merkletree/libmerkletree.a proto/libproto.a \
-                     util/libutil.a $(GTESTLIB)
+                     log/libcluster.a merkletree/libmerkletree.a \
+                     proto/libproto.a util/libutil.a $(GTESTLIB)
 
 log/signer_verifier_test: log/signer_verifier_test.o log/log_signer.o \
                      log/signer.o log/verifier.o log/test_signer.o \
@@ -289,7 +304,7 @@ log/signer_verifier_test: log/signer_verifier_test.o log/log_signer.o \
 
 log/tree_signer_test: log/tree_signer_test.o log/log_signer.o log/signer.o \
                       log/verifier.o log/test_signer.o log/tree_signer_cert.o \
-                      log/log_verifier.o \
+                      log/log_verifier.o log/libcluster.a \
                       log/libdatabase.a merkletree/libmerkletree.a \
                       proto/libproto.a util/libutil.a base/notification.o \
                       $(GTESTLIB)

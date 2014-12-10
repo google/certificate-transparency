@@ -207,7 +207,8 @@ message SSLClientCTData {
 message ClusterNodeState {
   optional string node_id = 1;
   optional int64 contiguous_tree_size = 2;
-  optional SignedTreeHead current_serving_sth = 3;
+  optional SignedTreeHead newest_sth = 3;
+  optional SignedTreeHead current_serving_sth = 4;
 }
 
 message ClusterControl {

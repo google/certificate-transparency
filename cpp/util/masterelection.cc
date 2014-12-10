@@ -91,8 +91,14 @@ MasterElection::MasterElection(const shared_ptr<libevent::Base>& base,
 }
 
 
+// Testing only c'tor
+MasterElection::MasterElection()
+    : client_(nullptr), proposal_state_(ProposalState::NONE) {
+}
+
+
 MasterElection::~MasterElection() {
-  VLOG(1) << my_proposal_path_ << ": Joining election";
+  VLOG(1) << my_proposal_path_ << ": Destroying election";
   CHECK_EQ(proposal_state_, ProposalState::NONE);
   VLOG(1) << "~" << my_proposal_path_;
 }
