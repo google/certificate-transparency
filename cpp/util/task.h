@@ -1,5 +1,6 @@
 // This class is used to coordinate asynchronous work. It runs a
-// callback once the work is done, and also supports cancellation.
+// callback once the work is done, and also supports cancellation, as
+// well as memory management.
 //
 // Typically, a function/method that starts an asynchronous operation
 // will take a pointer to a util::Task. The caller keeps ownership of
@@ -7,8 +8,9 @@
 // calls util::Task::Return(), with the status in case of an
 // error.
 //
-// The task object can help with the implementation of the callee, for
-// example notifying it when a cancellation has been requested.
+// The task object can help with the implementation of the callee, by
+// providing memory management, and notifying it when a cancellation
+// has been requested.
 //
 // A task is provided with a util::Executor which it will use to run
 // its callbacks. The executor will not be accessed after the done
@@ -20,6 +22,7 @@
 #ifndef CERT_TRANS_UTIL_TASK_H_
 #define CERT_TRANS_UTIL_TASK_H_
 
+#include <functional>
 #include <memory>
 #include <mutex>
 #include <vector>
@@ -112,6 +115,21 @@ class Task {
   // DONE state further.
   void WhenCancelled(const std::function<void()>& cancel_cb);
 
+  // Functions to call once the task is DONE. This could be called
+  // before, during, or after the done callback, and so cannot rely on
+  // the task itself. An example would be to free the memory that was
+  // used to execute the asynchronous operation.
+  void CleanupWhenDone(const std::function<void()>& cleanup_cb);
+
+  // Arranges to delete the object once the task is DONE. As this
+  // could be run before the done callback, this is meant to be used
+  // by the implementation of the asynchronous operation, rather than
+  // for data used by the caller.
+  template <class T>
+  void DeleteWhenDone(T* obj) {
+    CleanupWhenDone(std::bind(std::default_delete<T>(), obj));
+  }
+
  private:
   enum State {
     ACTIVE = 0,
@@ -121,6 +139,7 @@ class Task {
 
   void TryDoneTransition(std::unique_lock<std::mutex>* lock);
   void RunCancelCallback(const std::function<void()>& cb);
+  void RunCleanupAndDoneCallbacks();
 
   const std::function<void(Task*)> done_callback_;
   Executor* const executor_;
@@ -131,6 +150,7 @@ class Task {
   bool cancelled_;
   int holds_;
   std::vector<std::function<void()>> cancel_callbacks_;
+  std::vector<std::function<void()>> cleanup_callbacks_;
 
   DISALLOW_COPY_AND_ASSIGN(Task);
 };

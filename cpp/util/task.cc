@@ -136,6 +136,14 @@ void Task::WhenCancelled(const std::function<void()>& cancel_cb) {
 }
 
 
+void Task::CleanupWhenDone(const function<void()>& cleanup_cb) {
+  lock_guard<mutex> lock(lock_);
+  CHECK_NE(state_, DONE);
+
+  cleanup_callbacks_.emplace_back(cleanup_cb);
+}
+
+
 // After calling this method, the task object might have become
 // invalid, if the transition to DONE worked, as the done callback is
 // allowed to delete it. So make sure not to use any more member
@@ -158,13 +166,35 @@ void Task::TryDoneTransition(unique_lock<mutex>* lock) {
   lock->unlock();
 
   // Once this is called, the task might get deleted.
-  executor_->Add(bind(done_callback_, this));
+  executor_->Add(bind(&Task::RunCleanupAndDoneCallbacks, this));
 }
 
 
 void Task::RunCancelCallback(const std::function<void()>& cb) {
   cb();
   RemoveHold();
+}
+
+
+void Task::RunCleanupAndDoneCallbacks() {
+  vector<function<void()>> cleanup_callbacks;
+
+  {
+    lock_guard<mutex> lock(lock_);
+    cleanup_callbacks_.swap(cleanup_callbacks);
+  }
+
+  // We call the cleanup callbacks (and thus, any deleters) before
+  // calling the done callback, which adds a little bit of latency,
+  // but it exposes any misuse of CleanupWhenDone/DeleteWhenDone, and
+  // is simpler to implement (no need to make the list of callbacks
+  // last longer than the task object, for example).
+  for (const auto& cb : cleanup_callbacks) {
+    cb();
+  }
+
+  // Once this is called, the task might get deleted.
+  done_callback_(this);
 }
 
 

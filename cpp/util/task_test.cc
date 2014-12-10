@@ -40,6 +40,22 @@ void Delay() {
 }
 
 
+class DeleteMarker {
+ public:
+  explicit DeleteMarker(Notification* notifier)
+      : notifier_(CHECK_NOTNULL(notifier)) {
+  }
+  ~DeleteMarker() {
+    notifier_->Notify();
+  }
+
+ private:
+  Notification* const notifier_;
+
+  DISALLOW_COPY_AND_ASSIGN(DeleteMarker);
+};
+
+
 template <class T>
 class TaskTest : public ::testing::Test {};
 
@@ -151,6 +167,24 @@ TYPED_TEST(TaskTest, StateChanges) {
   EXPECT_TRUE(s.task()->Return());
 
   notifier.WaitForNotification();
+}
+
+
+TYPED_TEST(TaskTest, DeleteWhenDone) {
+  Notification n1;
+  Notification n2;
+  TypeParam s;
+
+  s.task()->DeleteWhenDone(new DeleteMarker(&n1));
+  s.task()->DeleteWhenDone(new DeleteMarker(&n2));
+
+  EXPECT_FALSE(n1.HasBeenNotified());
+  EXPECT_FALSE(n2.HasBeenNotified());
+  s.task()->Return();
+  s.ContinueDone();
+  LOG(INFO) << "waiting for deletions...";
+  n1.WaitForNotification();
+  n2.WaitForNotification();
 }
 
 
