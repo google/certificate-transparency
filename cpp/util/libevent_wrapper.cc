@@ -93,9 +93,9 @@ void Base::Dispatch() {
   // There should /never/ be more than 1 thread trying to call Dispatch(), so
   // we should expect to always own the lock here.
   CHECK(dispatch_lock_.try_lock());
-  LOG_IF(WARNING, on_event_thread,
-         "Huh?, Are you calling Dispatch() from a libevent thread?");
-  const old_on_event_thread(on_event_thread);
+  LOG_IF(WARNING, on_event_thread)
+      << "Huh?, Are you calling Dispatch() from a libevent thread?";
+  const bool old_on_event_thread(on_event_thread);
   on_event_thread = true;
   CHECK_EQ(event_base_dispatch(base_.get()), 0);
   on_event_thread = old_on_event_thread;
@@ -106,9 +106,9 @@ void Base::Dispatch() {
 void Base::DispatchOnce() {
   // Only one thread can be running a dispatch loop at a time
   lock_guard<mutex> lock(dispatch_lock_);
-  LOG_IF(WARNING, on_event_thread,
-         "Huh?, Are you calling Dispatch() from a libevent thread?");
-  const old_on_event_thread(on_event_thread);
+  LOG_IF(WARNING, on_event_thread)
+      << "Huh?, Are you calling Dispatch() from a libevent thread?";
+  const bool old_on_event_thread(on_event_thread);
   on_event_thread = true;
   CHECK_EQ(event_base_loop(base_.get(), EVLOOP_ONCE), 0);
   on_event_thread = old_on_event_thread;
