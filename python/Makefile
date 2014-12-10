@@ -31,6 +31,7 @@ test: all
 	PYTHONPATH=$(PYTHONPATH):. ./ct/cert_analysis/algorithm_test.py
 	PYTHONPATH=$(PYTHONPATH):. ./ct/cert_analysis/ca_field_test.py
 	PYTHONPATH=$(PYTHONPATH):. ./ct/cert_analysis/dnsnames_test.py
+	PYTHONPATH=$(PYTHONPATH):. ./ct/cert_analysis/extensions_test.py
 	PYTHONPATH=$(PYTHONPATH):. ./ct/cert_analysis/common_name_test.py
 	PYTHONPATH=$(PYTHONPATH):. ./ct/cert_analysis/ip_addresses_test.py
 	PYTHONPATH=$(PYTHONPATH):. ./ct/cert_analysis/serial_number_test.py

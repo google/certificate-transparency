@@ -579,6 +579,15 @@ class Certificate(object):
         """
         return self.not_before() <= gmtime <= self.not_after()
 
+    def is_self_signed(self):
+        """Is self signed?
+
+        Returns:
+            True or False.
+        """
+        return (self._asn1_cert["tbsCertificate"]["issuer"] ==
+                self._asn1_cert["tbsCertificate"]["subject"])
+
     def fingerprint(self, hashfunc="sha1"):
         """Get the certificate fingerprint.
 

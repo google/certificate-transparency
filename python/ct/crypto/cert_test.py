@@ -696,6 +696,14 @@ class CertificateTest(unittest.TestCase):
         c = self.cert_from_pem_file(self._PEM_FILE)
         self.assertItemsEqual([], c.ocsp_responders())
 
+    def test_is_self_signed_root(self):
+        c = self.cert_from_pem_file(self._PEM_SUBRIGONET)
+        self.assertTrue(c.is_self_signed())
+
+    def test_is_self_signed_leaf(self):
+        c = self.cert_from_pem_file(self._PEM_AIA)
+        self.assertFalse(c.is_self_signed())
+
     def test_get_extensions(self):
         c = self.cert_from_pem_file(self._PEM_AIA)
         extensions = c.get_extensions()
