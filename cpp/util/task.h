@@ -1,5 +1,5 @@
 // This class is used to coordinate asynchronous work. It runs a
-// callback once the work is done.
+// callback once the work is done, and also supports cancellation.
 //
 // Typically, a function/method that starts an asynchronous operation
 // will take a pointer to a util::Task. The caller keeps ownership of
@@ -7,8 +7,11 @@
 // calls util::Task::Return(), with the status in case of an
 // error.
 //
+// The task object can help with the implementation of the callee, for
+// example notifying it when a cancellation has been requested.
+//
 // A task is provided with a util::Executor which it will use to run
-// its callback. The executor will not be accessed after the done
+// its callbacks. The executor will not be accessed after the done
 // callback has started.
 //
 // Once util::Task::Return() is called, the done callback is run on
@@ -33,10 +36,11 @@ namespace util {
 //
 // A task enters the PREPARED state on the first Return() call.
 //
-// The task changes from PREPARED to DONE when the following condition
-// is met:
+// The task changes from PREPARED to DONE when the following
+// conditions are met:
 //
 //  - there are no remaining holds on the task
+//  - all cancellation callbacks have returned
 //
 class Task {
  public:
@@ -45,6 +49,12 @@ class Task {
   // REQUIRES: task is in DONE state.
   // Tasks can be deleted in their done callback.
   ~Task();
+
+  // Requests that the asynchronous operation be cancelled. There is
+  // no guarantee that the task is PREPARED or DONE by the time this
+  // method returns. Also, the cancellation is merely a request, and
+  // could be completely ignored.
+  void Cancel();
 
   // REQUIRES: Return() has been called, which can be verified by
   // calling IsActive().
@@ -59,7 +69,7 @@ class Task {
   // and false is returned.
   //
   // Note that once Return() is called, the task can reach the DONE
-  // state asynchronously and run the callback for this task, which
+  // state asynchronously and run the callbacks for this task, which
   // might delete the task and state used by the callee. So you must
   // be careful with what is used after calling Return(), including
   // through destructors of locally scoped objects (such as
@@ -76,6 +86,32 @@ class Task {
   bool IsActive() const;
   bool IsDone() const;
 
+  // Returns true once Cancel() is called.
+  bool CancelRequested() const;
+
+  // The "cancel_cb" callback will be called the first time Cancel()
+  // is called. If Cancel() is never called, then it will just be
+  // destroyed without being called. So this function could be called
+  // zero or one time, and should thus not be solely responsible for
+  // memory management.
+  //
+  // It is okay to call WhenCancelled() more than once on the same
+  // task. There is no ordering guarantee, and since they are called
+  // using the executor, they could even be run concurrently.
+  //
+  // If this method is called after the Cancel() has been called, the
+  // callback will be sent to the executor immediately. If the task is
+  // not ACTIVE anymore (in other words, if Return() has already been
+  // called), the callback will not be run.
+  //
+  // All cancellation callbacks will be complete before the task
+  // enters the DONE state. Effectively, each cancellation callback
+  // has a hold on the task while they are running. That hold is
+  // removed once the cancellation callback returns, but the callback
+  // is allowed to take a hold of its own, if it wants to delay the
+  // DONE state further.
+  void WhenCancelled(const std::function<void()>& cancel_cb);
+
  private:
   enum State {
     ACTIVE = 0,
@@ -84,6 +120,7 @@ class Task {
   };
 
   void TryDoneTransition(std::unique_lock<std::mutex>* lock);
+  void RunCancelCallback(const std::function<void()>& cb);
 
   const std::function<void(Task*)> done_callback_;
   Executor* const executor_;
@@ -91,7 +128,9 @@ class Task {
   mutable std::mutex lock_;
   State state_;
   Status status_;  // not protected by lock_
+  bool cancelled_;
   int holds_;
+  std::vector<std::function<void()>> cancel_callbacks_;
 
   DISALLOW_COPY_AND_ASSIGN(Task);
 };

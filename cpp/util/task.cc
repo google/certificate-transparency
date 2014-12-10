@@ -17,12 +17,39 @@ Task::Task(const function<void(Task*)>& done_callback, Executor* executor)
     : done_callback_(done_callback),
       executor_(CHECK_NOTNULL(executor)),
       state_(ACTIVE),
+      cancelled_(false),
       holds_(0) {
 }
 
 
 Task::~Task() {
   CHECK_EQ(state_, DONE);
+  CHECK(cancel_callbacks_.empty());
+}
+
+
+void Task::Cancel() {
+  unique_lock<mutex> lock(lock_);
+
+  if (state_ == DONE || cancelled_) {
+    return;
+  }
+
+  cancelled_ = true;
+
+  vector<function<void()>> cancel_callbacks;
+  cancel_callbacks_.swap(cancel_callbacks);
+
+  // Add a hold for each cancellation callback, so that we do not go
+  // into the DONE state until they all have completed.
+  holds_ += cancel_callbacks.size();
+
+  // Give up the lock, in case the executor is synchronous.
+  lock.unlock();
+
+  for (const auto& cb : cancel_callbacks) {
+    executor_->Add(bind(&Task::RunCancelCallback, this, cb));
+  }
 }
 
 
@@ -42,6 +69,7 @@ bool Task::Return(const Status& status) {
 
   status_ = status;
   state_ = PREPARED;
+  cancel_callbacks_.clear();
 
   // Do not touch any members after this, as the task object might be
   // deleted by the time this method returns.
@@ -83,6 +111,31 @@ bool Task::IsDone() const {
 }
 
 
+bool Task::CancelRequested() const {
+  lock_guard<mutex> lock(lock_);
+  return cancelled_;
+}
+
+
+void Task::WhenCancelled(const std::function<void()>& cancel_cb) {
+  unique_lock<mutex> lock(lock_);
+
+  if (state_ != ACTIVE) {
+    return;
+  }
+
+  if (!cancelled_) {
+    cancel_callbacks_.emplace_back(cancel_cb);
+  } else {
+    ++holds_;
+
+    // Give up the lock, in case the executor is synchronous.
+    lock.unlock();
+    executor_->Add(bind(&Task::RunCancelCallback, this, cancel_cb));
+  }
+}
+
+
 // After calling this method, the task object might have become
 // invalid, if the transition to DONE worked, as the done callback is
 // allowed to delete it. So make sure not to use any more member
@@ -106,6 +159,12 @@ void Task::TryDoneTransition(unique_lock<mutex>* lock) {
 
   // Once this is called, the task might get deleted.
   executor_->Add(bind(done_callback_, this));
+}
+
+
+void Task::RunCancelCallback(const std::function<void()>& cb) {
+  cb();
+  RemoveHold();
 }
 
 
