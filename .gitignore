@@ -52,6 +52,7 @@
 /cpp/util/json_wrapper_test
 /cpp/util/masterelection_test
 /cpp/util/sync_etcd_test
+/cpp/util/sync_task_test
 /cpp/util/task_test
 /java/build
 /local.properties
