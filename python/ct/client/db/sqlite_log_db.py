@@ -83,6 +83,10 @@ class SQLiteLogDB(log_db.LogDB):
             raise database.KeyError("Unknown log server: %s", log_server)
         return log_id[0]
 
+    def get_log_id(self, log_server):
+        with self.__mgr.get_connection() as conn:
+            return self._get_log_id(conn, log_server)
+
     def __encode_sth(self, audited_sth):
         timestamp = audited_sth.sth.timestamp
         sth = client_pb2.SthResponse()

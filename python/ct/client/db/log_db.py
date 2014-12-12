@@ -52,3 +52,7 @@ class LogDB(object):
         Note the scan may be keeping the database connection open until the
         generator is exhausted.
         """
+
+    @abc.abstractmethod
+    def get_log_id(self, log_server):
+        """Get id in database of log_server."""

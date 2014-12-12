@@ -23,6 +23,7 @@ test: all
 	PYTHONPATH=$(PYTHONPATH):. ./ct/client/db/sqlite_temp_db_test.py
 	PYTHONPATH=$(PYTHONPATH):. ./ct/client/db/sqlite_connection_test.py
 	PYTHONPATH=$(PYTHONPATH):. ./ct/client/log_client_test.py
+	PYTHONPATH=$(PYTHONPATH):. ./ct/client/db_reporter_test.py
 	PYTHONPATH=$(PYTHONPATH):. ./ct/client/reporter_test.py
 	PYTHONPATH=$(PYTHONPATH):. ./ct/client/state_test.py
 	PYTHONPATH=$(PYTHONPATH):. ./ct/client/tls_message_test.py

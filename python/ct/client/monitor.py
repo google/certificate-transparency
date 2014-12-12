@@ -6,6 +6,7 @@ from ct.client import state
 from ct.client import aggregated_reporter
 from ct.crypto import error
 from ct.crypto import merkle
+from ct.client import db_reporter
 from ct.client import text_reporter
 from ct.proto import client_pb2
 from twisted.internet import defer
@@ -17,7 +18,8 @@ gflags.DEFINE_integer("entry_write_batch_size", 1000, "Maximum number of "
                       "entries to batch into one database write")
 
 class Monitor(object):
-    def __init__(self, client, verifier, hasher, db, temp_db, state_keeper):
+    def __init__(self, client, verifier, hasher, db, cert_db, log_key,
+                 state_keeper):
         self.__client = client
         self.__verifier = verifier
         self.__hasher = hasher
@@ -29,7 +31,8 @@ class Monitor(object):
         # Depends on: Merkle trees implemented in Python.
         self.__state = client_pb2.MonitorState()
         self.__report = aggregated_reporter.AggregatedCertificateReport(
-                (text_reporter.TextCertificateReport(),))
+                (text_reporter.TextCertificateReport(),
+                 db_reporter.CertDBCertificateReport(cert_db, log_key)))
         try:
             self.__state = self.__state_keeper.read(client_pb2.MonitorState)
         except state.FileNotFoundError:
