@@ -22,7 +22,10 @@ namespace cert_trans {
 class SyncEtcdClient {
  public:
   // Contructs a new synchronous etcd client.
-  SyncEtcdClient(const std::string& host, uint16_t port);
+  // Note that SyncEtcdClient expects that someone is dispatching the event
+  // loop underpinning |client|, but doesn't do that itself.
+  // No change of ownership of |client|.
+  SyncEtcdClient(EtcdClient* client);
 
   virtual ~SyncEtcdClient() = default;
 
@@ -67,12 +70,7 @@ class SyncEtcdClient {
                               const int64_t current_index);
 
  private:
-  // Testing only
-  // Takes ownership of |client_|
-  SyncEtcdClient(EtcdClient* client_);
-
-  std::shared_ptr<libevent::Base> base_;
-  std::unique_ptr<EtcdClient> client_;
+  EtcdClient* const client_;  // Not owned by us
 
   friend class SyncEtcdTest;
 

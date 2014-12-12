@@ -163,18 +163,17 @@ class SyncEtcdTest : public ::testing::Test {
   }
 
   void SetUp() {
-    mock_client_ = new MockEtcdClient;
-    sync_client_.reset(new SyncEtcdClient(mock_client_));
+    sync_client_.reset(new SyncEtcdClient(&mock_client_));
   }
 
-  MockEtcdClient* mock_client_;
+  MockEtcdClient mock_client_;
   unique_ptr<SyncEtcdClient> sync_client_;
   const map<string, string> kEmptyParams;
 };
 
 
 TEST_F(SyncEtcdTest, TestGet) {
-  EXPECT_CALL(*mock_client_,
+  EXPECT_CALL(mock_client_,
               Generic(kEntryKey, kEmptyParams, EVHTTP_REQ_GET, _))
       .WillOnce(InvokeArgument<3>(Status(), MakeJson(kGetJson), 1));
   EtcdClient::Node node;
@@ -186,7 +185,7 @@ TEST_F(SyncEtcdTest, TestGet) {
 
 
 TEST_F(SyncEtcdTest, TestGetForInvalidKey) {
-  EXPECT_CALL(*mock_client_,
+  EXPECT_CALL(mock_client_,
               Generic(kEntryKey, kEmptyParams, EVHTTP_REQ_GET, _))
       .WillOnce(InvokeArgument<3>(Status(util::error::NOT_FOUND, ""),
                                   MakeJson(kKeyNotFoundJson), 1));
@@ -197,7 +196,7 @@ TEST_F(SyncEtcdTest, TestGetForInvalidKey) {
 
 
 TEST_F(SyncEtcdTest, TestGetAll) {
-  EXPECT_CALL(*mock_client_, Generic(kDirKey, kEmptyParams, EVHTTP_REQ_GET, _))
+  EXPECT_CALL(mock_client_, Generic(kDirKey, kEmptyParams, EVHTTP_REQ_GET, _))
       .WillOnce(InvokeArgument<3>(Status(), MakeJson(kGetAllJson), 1));
   vector<pair<string, int> > expected_values;
   expected_values.push_back(make_pair("123", 9));
@@ -215,7 +214,7 @@ TEST_F(SyncEtcdTest, TestGetAll) {
 
 
 TEST_F(SyncEtcdTest, TestGetAllForInvalidKey) {
-  EXPECT_CALL(*mock_client_, Generic(kDirKey, kEmptyParams, EVHTTP_REQ_GET, _))
+  EXPECT_CALL(mock_client_, Generic(kDirKey, kEmptyParams, EVHTTP_REQ_GET, _))
       .WillOnce(InvokeArgument<3>(Status(util::error::NOT_FOUND, ""),
                                   MakeJson(kKeyNotFoundJson), 1));
   vector<EtcdClient::Node> nodes;
@@ -225,7 +224,7 @@ TEST_F(SyncEtcdTest, TestGetAllForInvalidKey) {
 
 
 TEST_F(SyncEtcdTest, TestCreate) {
-  EXPECT_CALL(*mock_client_,
+  EXPECT_CALL(mock_client_,
               Generic(kEntryKey,
                       AllOf(Contains(Pair(kValueParam, "123")),
                             Contains(Pair(kPrevExistParam, kFalse))),
@@ -239,7 +238,7 @@ TEST_F(SyncEtcdTest, TestCreate) {
 
 
 TEST_F(SyncEtcdTest, TestCreateFails) {
-  EXPECT_CALL(*mock_client_,
+  EXPECT_CALL(mock_client_,
               Generic(kEntryKey,
                       AllOf(Contains(Pair(kValueParam, "123")),
                             Contains(Pair(kPrevExistParam, kFalse))),
@@ -253,7 +252,7 @@ TEST_F(SyncEtcdTest, TestCreateFails) {
 
 
 TEST_F(SyncEtcdTest, TestCreateWithTTL) {
-  EXPECT_CALL(*mock_client_,
+  EXPECT_CALL(mock_client_,
               Generic(kEntryKey, AllOf(Contains(Pair(kValueParam, "123")),
                                        Contains(Pair(kPrevExistParam, kFalse)),
                                        Contains(Pair(kTtlParam, "100"))),
@@ -269,7 +268,7 @@ TEST_F(SyncEtcdTest, TestCreateWithTTL) {
 
 
 TEST_F(SyncEtcdTest, TestCreateWithTTLFails) {
-  EXPECT_CALL(*mock_client_,
+  EXPECT_CALL(mock_client_,
               Generic(kEntryKey, AllOf(Contains(Pair(kValueParam, "123")),
                                        Contains(Pair(kPrevExistParam, kFalse)),
                                        Contains(Pair(kTtlParam, "100"))),
@@ -285,7 +284,7 @@ TEST_F(SyncEtcdTest, TestCreateWithTTLFails) {
 
 
 TEST_F(SyncEtcdTest, TestCreateInQueue) {
-  EXPECT_CALL(*mock_client_,
+  EXPECT_CALL(mock_client_,
               Generic(kDirKey, AllOf(Contains(Pair(kValueParam, "123")),
                                      Contains(Pair(kPrevExistParam, kFalse))),
                       EVHTTP_REQ_POST, _))
@@ -300,7 +299,7 @@ TEST_F(SyncEtcdTest, TestCreateInQueue) {
 
 
 TEST_F(SyncEtcdTest, TestCreateInQueueFails) {
-  EXPECT_CALL(*mock_client_,
+  EXPECT_CALL(mock_client_,
               Generic(kDirKey, AllOf(Contains(Pair(kValueParam, "123")),
                                      Contains(Pair(kPrevExistParam, kFalse))),
                       EVHTTP_REQ_POST, _))
@@ -314,7 +313,7 @@ TEST_F(SyncEtcdTest, TestCreateInQueueFails) {
 
 
 TEST_F(SyncEtcdTest, TestUpdate) {
-  EXPECT_CALL(*mock_client_,
+  EXPECT_CALL(mock_client_,
               Generic(kEntryKey, Contains(Pair(kPrevIndexParam, "5")),
                       EVHTTP_REQ_PUT, _))
       .WillOnce(InvokeArgument<3>(Status(), MakeJson(kUpdateJson), 1));
@@ -326,7 +325,7 @@ TEST_F(SyncEtcdTest, TestUpdate) {
 
 
 TEST_F(SyncEtcdTest, TestUpdateFails) {
-  EXPECT_CALL(*mock_client_,
+  EXPECT_CALL(mock_client_,
               Generic(kEntryKey, Contains(Pair(kPrevIndexParam, "5")),
                       EVHTTP_REQ_PUT, _))
       .WillOnce(InvokeArgument<3>(Status(util::error::FAILED_PRECONDITION, ""),
@@ -338,7 +337,7 @@ TEST_F(SyncEtcdTest, TestUpdateFails) {
 
 
 TEST_F(SyncEtcdTest, TestUpdateWithTTL) {
-  EXPECT_CALL(*mock_client_,
+  EXPECT_CALL(mock_client_,
               Generic(kEntryKey, AllOf(Contains(Pair(kPrevIndexParam, "5")),
                                        Contains(Pair(kTtlParam, "100"))),
                       EVHTTP_REQ_PUT, _))
@@ -353,7 +352,7 @@ TEST_F(SyncEtcdTest, TestUpdateWithTTL) {
 
 
 TEST_F(SyncEtcdTest, TestUpdateWithTTLFails) {
-  EXPECT_CALL(*mock_client_,
+  EXPECT_CALL(mock_client_,
               Generic(kEntryKey, AllOf(Contains(Pair(kPrevIndexParam, "5")),
                                        Contains(Pair(kTtlParam, "100"))),
                       EVHTTP_REQ_PUT, _))
@@ -368,7 +367,7 @@ TEST_F(SyncEtcdTest, TestUpdateWithTTLFails) {
 
 
 TEST_F(SyncEtcdTest, TestForceSetForPreexistingEntry) {
-  EXPECT_CALL(*mock_client_, Generic(kEntryKey, _, EVHTTP_REQ_PUT, _))
+  EXPECT_CALL(mock_client_, Generic(kEntryKey, _, EVHTTP_REQ_PUT, _))
       .WillOnce(InvokeArgument<3>(Status(), MakeJson(kUpdateJson), 1));
   int64_t index;
   Status status(sync_client_->ForceSet(kEntryKey, "123", &index));
@@ -378,7 +377,7 @@ TEST_F(SyncEtcdTest, TestForceSetForPreexistingEntry) {
 
 
 TEST_F(SyncEtcdTest, TestForceSetForNewEntry) {
-  EXPECT_CALL(*mock_client_, Generic(kEntryKey, _, EVHTTP_REQ_PUT, _))
+  EXPECT_CALL(mock_client_, Generic(kEntryKey, _, EVHTTP_REQ_PUT, _))
       .WillOnce(InvokeArgument<3>(Status(), MakeJson(kCreateJson), 1));
   int64_t index;
   Status status(sync_client_->ForceSet(kEntryKey, "123", &index));
@@ -388,7 +387,7 @@ TEST_F(SyncEtcdTest, TestForceSetForNewEntry) {
 
 
 TEST_F(SyncEtcdTest, TestForceSetWithTTLForPreexistingEntry) {
-  EXPECT_CALL(*mock_client_,
+  EXPECT_CALL(mock_client_,
               Generic(kEntryKey, Contains(Pair(kTtlParam, "100")),
                       EVHTTP_REQ_PUT, _))
       .WillOnce(InvokeArgument<3>(Status(), MakeJson(kUpdateJson), 1));
@@ -402,7 +401,7 @@ TEST_F(SyncEtcdTest, TestForceSetWithTTLForPreexistingEntry) {
 
 
 TEST_F(SyncEtcdTest, TestForceSetWithTTLForNewEntry) {
-  EXPECT_CALL(*mock_client_,
+  EXPECT_CALL(mock_client_,
               Generic(kEntryKey, Contains(Pair(kTtlParam, "100")),
                       EVHTTP_REQ_PUT, _))
       .WillOnce(InvokeArgument<3>(Status(), MakeJson(kCreateJson), 1));
@@ -416,7 +415,7 @@ TEST_F(SyncEtcdTest, TestForceSetWithTTLForNewEntry) {
 
 
 TEST_F(SyncEtcdTest, TestDelete) {
-  EXPECT_CALL(*mock_client_,
+  EXPECT_CALL(mock_client_,
               Generic(kEntryKey, Contains(Pair(kPrevIndexParam, "5")),
                       EVHTTP_REQ_DELETE, _))
       .WillOnce(InvokeArgument<3>(Status(), MakeJson(kDeleteJson), 1));
@@ -426,7 +425,7 @@ TEST_F(SyncEtcdTest, TestDelete) {
 
 
 TEST_F(SyncEtcdTest, TestDeleteFails) {
-  EXPECT_CALL(*mock_client_,
+  EXPECT_CALL(mock_client_,
               Generic(kEntryKey, Contains(Pair(kPrevIndexParam, "5")),
                       EVHTTP_REQ_DELETE, _))
       .WillOnce(InvokeArgument<3>(Status(util::error::FAILED_PRECONDITION, ""),
