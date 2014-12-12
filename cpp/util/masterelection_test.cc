@@ -121,7 +121,7 @@ struct Participant {
         VLOG(1) << id_ << " finished round " << round;
         // Restarting an existing MasterElection and creating a new
         // one should both work, so test both cases on various rounds.
-        if (round % 2) {
+        if ((round % 2) == 0) {
           election_.reset(new MasterElection(base_, client_, dir_, id_));
         }
       }
