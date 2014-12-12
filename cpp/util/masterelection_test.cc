@@ -19,11 +19,19 @@
 namespace cert_trans {
 
 using cert_trans::Notification;
+using std::atomic;
+using std::bind;
+using std::chrono::seconds;
+using std::function;
+using std::make_shared;
 using std::map;
 using std::placeholders::_1;
 using std::placeholders::_2;
+using std::shared_ptr;
 using std::string;
+using std::thread;
 using std::to_string;
+using std::unique_ptr;
 using std::vector;
 using testing::AllOf;
 using testing::Contains;
@@ -35,6 +43,8 @@ using util::Status;
 
 const char kProposalDir[] = "/master/";
 
+DEFINE_string(etcd, "", "etcd server address");
+DEFINE_int32(etcd_port, 4001, "etcd server port");
 DECLARE_int32(master_keepalive_interval_seconds);
 
 
@@ -49,12 +59,10 @@ struct Participant {
   // Constructs a new MasterElection object, and immediately starts
   // participating in the election.
   Participant(const string& dir, const string& id,
-              const std::shared_ptr<libevent::Base>& base,
-              FakeEtcdClient& client)
+              const shared_ptr<libevent::Base>& base, EtcdClient* client)
       : base_(base),
-        // client_(base_, "localhost", 4001),
-        client_(client),
-        election_(new MasterElection(base_, &client_, dir, id)),
+        client_(CHECK_NOTNULL(client)),
+        election_(new MasterElection(base_, client_, dir, id)),
         dir_(dir),
         id_(id),
         mastership_count_(0) {
@@ -76,17 +84,13 @@ struct Participant {
 
 
   // Wait to become the boss!
-  void ElectLikeABoss(
-      const std::function<void(void)>& done = std::function<void(void)>()) {
+  void ElectLikeABoss() {
     StartElection();
     VLOG(1) << id_ << " about to WaitToBecomeMaster().";
     election_->WaitToBecomeMaster();
     EXPECT_TRUE(election_->IsMaster()) << id_;
     ++mastership_count_;
     VLOG(1) << id_ << " completed WaitToBecomeMaster().";
-    if (done) {
-      done();
-    }
   }
 
 
@@ -95,34 +99,35 @@ struct Participant {
   }
 
 
-  void ElectionMania(
-      int num_rounds,
-      const vector<std::unique_ptr<Participant>>* all_participants) {
+  void ElectionMania(int num_rounds,
+                     const vector<unique_ptr<Participant>>* all_participants) {
     notification_.reset(new Notification);
-    mania_thread_.reset(
-        new std::thread([this, num_rounds, all_participants]() {
-          for (int round(0); round < num_rounds; ++round) {
-            VLOG(1) << id_ << " starting round " << round;
-            ElectLikeABoss();
+    mania_thread_.reset(new thread([this, num_rounds, all_participants]() {
+      for (int round(0); round < num_rounds; ++round) {
+        VLOG(1) << id_ << " starting round " << round;
+        ElectLikeABoss();
 
-            int num_masters(0);
-            for (const std::unique_ptr<Participant>& participant :
-                 *all_participants) {
-              if (participant->election_->IsMaster()) {
-                ++num_masters;
-              }
-            }
-            // There /could/ be no masters if an update happened after we came
-            // out of WaitToBecomeMaster, it's unlikely but possible.
-            // There definitely shouldn't be > 1 master EVER, though.
-            CHECK_LE(num_masters, 1) << "From the PoV of " << id_;
-            StopElection();
-            VLOG(1) << id_ << " finished round " << round;
-            // election_.reset(new MasterElection(base_, &client_, dir_, id_));
+        int num_masters(0);
+        for (const auto& participant : *all_participants) {
+          if (participant->election_->IsMaster()) {
+            ++num_masters;
           }
-          VLOG(1) << id_ << " Mania over!";
-          notification_->Notify();
-        }));
+        }
+        // There /could/ be no masters if an update happened after we came
+        // out of WaitToBecomeMaster, it's unlikely but possible.
+        // There definitely shouldn't be > 1 master EVER, though.
+        CHECK_LE(num_masters, 1) << "From the PoV of " << id_;
+        StopElection();
+        VLOG(1) << id_ << " finished round " << round;
+        // Restarting an existing MasterElection and creating a new
+        // one should both work, so test both cases on various rounds.
+        if (round % 2) {
+          election_.reset(new MasterElection(base_, client_, dir_, id_));
+        }
+      }
+      VLOG(1) << id_ << " Mania over!";
+      notification_->Notify();
+    }));
   }
 
 
@@ -134,37 +139,37 @@ struct Participant {
   }
 
 
-  const std::shared_ptr<libevent::Base>& base_;
-  // EtcdClient client_;
-  FakeEtcdClient& client_;
-  std::unique_ptr<MasterElection> election_;
-  std::unique_ptr<Notification> notification_;
-  std::unique_ptr<std::thread> mania_thread_;
+  const shared_ptr<libevent::Base>& base_;
+  EtcdClient* const client_;
+  unique_ptr<MasterElection> election_;
+  unique_ptr<Notification> notification_;
+  unique_ptr<thread> mania_thread_;
   const string dir_;
   const string id_;
-  std::atomic<int> mastership_count_;
+  atomic<int> mastership_count_;
 };
 
 
 class ElectionTest : public ::testing::Test {
  public:
   ElectionTest()
-      : base_(std::make_shared<libevent::Base>()),
+      : base_(make_shared<libevent::Base>()),
         running_(false),
-        client_(base_) {
+        client_(FLAGS_etcd.empty()
+                    ? new FakeEtcdClient(base_)
+                    : new EtcdClient(base_, FLAGS_etcd, FLAGS_etcd_port)) {
   }
 
 
   void SetUp() {
     running_.store(true);
-    event_pump_.reset(
-        new std::thread(std::bind(&ElectionTest::EventPump, this)));
+    event_pump_.reset(new thread(bind(&ElectionTest::EventPump, this)));
   }
 
 
   void TearDown() {
     running_.store(false);
-    base_->Add(std::bind(&DoNothing));
+    base_->Add(bind(&DoNothing));
     event_pump_->join();
     event_pump_.reset();
   }
@@ -175,8 +180,8 @@ class ElectionTest : public ::testing::Test {
     // Prime the pump with a pending event some way out in the future,
     // otherwise we're racing the main thread to get an event in before calling
     // DispatchOnce() (which will CHECK fail if there's nothing to do.)
-    libevent::Event event(*base_, -1, 0, std::bind(&DoNothing));
-    event.Add(std::chrono::seconds(60));
+    libevent::Event event(*base_, -1, 0, bind(&DoNothing));
+    event.Add(seconds(60));
     while (running_.load()) {
       base_->DispatchOnce();
     }
@@ -188,10 +193,10 @@ class ElectionTest : public ::testing::Test {
   }
 
 
-  std::shared_ptr<libevent::Base> base_;
-  std::atomic<bool> running_;
-  FakeEtcdClient client_;
-  std::unique_ptr<std::thread> event_pump_;
+  shared_ptr<libevent::Base> base_;
+  atomic<bool> running_;
+  const unique_ptr<EtcdClient> client_;
+  unique_ptr<thread> event_pump_;
 };
 
 
@@ -199,7 +204,7 @@ typedef class ElectionTest ElectionDeathTest;
 
 
 TEST_F(ElectionTest, SingleInstanceBecomesMaster) {
-  Participant one(kProposalDir, "1", base_, client_);
+  Participant one(kProposalDir, "1", base_, client_.get());
   EXPECT_FALSE(one.IsMaster());
 
   one.ElectLikeABoss();
@@ -211,16 +216,16 @@ TEST_F(ElectionTest, SingleInstanceBecomesMaster) {
 
 
 TEST_F(ElectionTest, MultiInstanceElection) {
-  Participant one(kProposalDir, "1", base_, client_);
+  Participant one(kProposalDir, "1", base_, client_.get());
   one.ElectLikeABoss();
   EXPECT_TRUE(one.IsMaster());
 
-  Participant two(kProposalDir, "2", base_, client_);
+  Participant two(kProposalDir, "2", base_, client_.get());
   two.StartElection();
   sleep(1);
   EXPECT_FALSE(two.IsMaster());
 
-  Participant three(kProposalDir, "3", base_, client_);
+  Participant three(kProposalDir, "3", base_, client_.get());
   three.StartElection();
   sleep(1);
   EXPECT_FALSE(three.IsMaster());
@@ -254,7 +259,7 @@ TEST_F(ElectionTest, MultiInstanceElection) {
 
 
 TEST_F(ElectionTest, RejoinElection) {
-  Participant one(kProposalDir, "1", base_, client_);
+  Participant one(kProposalDir, "1", base_, client_.get());
   EXPECT_FALSE(one.IsMaster());
 
   one.ElectLikeABoss();
@@ -275,11 +280,11 @@ TEST_F(ElectionTest, RejoinElection) {
 TEST_F(ElectionTest, ElectionMania) {
   const int kNumRounds(20);
   const int kNumParticipants(20);
-  std::vector<std::unique_ptr<Participant>> participants;
+  vector<unique_ptr<Participant>> participants;
   participants.reserve(kNumParticipants);
   for (int i = 0; i < kNumParticipants; ++i) {
     participants.emplace_back(
-        new Participant(kProposalDir, to_string(i), base_, client_));
+        new Participant(kProposalDir, to_string(i), base_, client_.get()));
   };
 
   for (int i = 0; i < kNumParticipants; ++i) {
