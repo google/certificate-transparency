@@ -23,6 +23,7 @@ using std::atomic;
 using std::bind;
 using std::make_shared;
 using std::pair;
+using std::placeholders::_1;
 using std::shared_ptr;
 using std::string;
 using std::thread;
@@ -46,15 +47,17 @@ class EtcdConsistentStoreTest : public ::testing::Test {
  public:
   EtcdConsistentStoreTest()
       : base_(make_shared<libevent::Base>()),
+        executor_(1),
+        event_pump_(base_),
         client_(base_),
-        sync_client_(&client_),
-        event_pump_(base_) {
+        sync_client_(&client_) {
   }
 
  protected:
   void SetUp() override {
-    store_.reset(
-        new EtcdConsistentStore<LoggedCertificate>(&client_, kRoot, kNodeId));
+    store_.reset(new EtcdConsistentStore<LoggedCertificate>(&executor_,
+                                                            &client_, kRoot,
+                                                            kNodeId));
   }
 
   LoggedCertificate DefaultCert() {
@@ -119,11 +122,16 @@ class EtcdConsistentStoreTest : public ::testing::Test {
     return EtcdClient::Node(index, index, key, Serialize(t));
   }
 
+  ct::SignedTreeHead ServingSTH() {
+    return store_->serving_sth_->Entry();
+  }
+
   shared_ptr<libevent::Base> base_;
+  ThreadPool executor_;
+  libevent::EventPumpThread event_pump_;
   FakeEtcdClient client_;
   SyncEtcdClient sync_client_;
   unique_ptr<EtcdConsistentStore<LoggedCertificate>> store_;
-  libevent::EventPumpThread event_pump_;
 };
 
 
@@ -148,8 +156,50 @@ TEST_F(EtcdConsistentStoreTest,
 
 TEST_F(EtcdConsistentStoreTest, TestSetServingSTH) {
   ct::SignedTreeHead sth;
-  EXPECT_EQ(util::error::UNIMPLEMENTED,
-            store_->SetServingSTH(sth).CanonicalCode());
+  util::Status status(store_->SetServingSTH(sth));
+  EXPECT_TRUE(status.ok()) << status;
+}
+
+
+TEST_F(EtcdConsistentStoreTest, TestSetServingSTHOverwrites) {
+  ct::SignedTreeHead sth;
+  sth.set_timestamp(234);
+  util::Status status(store_->SetServingSTH(sth));
+  EXPECT_TRUE(status.ok()) << status;
+
+  ct::SignedTreeHead sth2;
+  sth2.set_timestamp(sth.timestamp() + 1);
+  status = store_->SetServingSTH(sth2);
+  EXPECT_TRUE(status.ok()) << status;
+}
+
+
+TEST_F(EtcdConsistentStoreTest, TestSetServingSTHWontOverwriteWithOlder) {
+  ct::SignedTreeHead sth;
+  sth.set_timestamp(234);
+  util::Status status(store_->SetServingSTH(sth));
+  EXPECT_TRUE(status.ok()) << status;
+
+  ct::SignedTreeHead sth2;
+  sth2.set_timestamp(sth.timestamp() - 1);
+  status = store_->SetServingSTH(sth2);
+  EXPECT_EQ(util::error::OUT_OF_RANGE, status.CanonicalCode()) << status;
+}
+
+
+TEST_F(EtcdConsistentStoreDeathTest, TestSetServingSTHChecksInconsistentSize) {
+  ct::SignedTreeHead sth;
+  sth.set_timestamp(234);
+  sth.set_tree_size(10);
+  util::Status status(store_->SetServingSTH(sth));
+  EXPECT_TRUE(status.ok()) << status;
+
+  ct::SignedTreeHead sth2;
+  // newer STH...
+  sth2.set_timestamp(sth.timestamp() + 1);
+  // but. curiously, a smaller tree...
+  sth2.set_tree_size(sth.tree_size() - 1);
+  EXPECT_DEATH(store_->SetServingSTH(sth2), "tree_size");
 }
 
 
@@ -337,6 +387,52 @@ TEST_F(EtcdConsistentStoreTest, TestSetClusterNodeState) {
   PeekEntry(kPath, &set_state);
   EXPECT_EQ(state.node_id(), set_state.node_id());
   EXPECT_EQ(state.contiguous_tree_size(), set_state.contiguous_tree_size());
+}
+
+
+TEST_F(EtcdConsistentStoreTest, WatchServingSTH) {
+  Notification notify;
+
+  const string kPath(string(kRoot) + "/serving_sth");
+
+  ct::SignedTreeHead sth;
+  sth.set_timestamp(234234);
+
+  store_->WatchServingSTH(
+      [&sth, &notify](const Update<ct::SignedTreeHead>& update) {
+        EXPECT_TRUE(update.exists_);
+        EXPECT_EQ(update.handle_.Entry().DebugString(), sth.DebugString());
+        notify.Notify();
+      });
+  util::Status status(store_->SetServingSTH(sth));
+  EXPECT_TRUE(status.ok()) << status;
+  notify.WaitForNotification();
+  EXPECT_EQ(ServingSTH().DebugString(), sth.DebugString());
+}
+
+
+TEST_F(EtcdConsistentStoreTest, WatchClusterNodeStates) {
+  Notification notify;
+
+  const string kPath(string(kRoot) + "/nodes/" + kNodeId);
+
+  ct::ClusterNodeState state;
+  state.set_node_id(kNodeId);
+  state.set_contiguous_tree_size(2342);
+
+  store_->WatchClusterNodeStates([&state, &notify](
+      const vector<Update<ct::ClusterNodeState>>& updates) {
+    if (updates.empty()) {
+      VLOG(1) << "Ignoring initial empty update.";
+      return;
+    }
+    EXPECT_TRUE(updates[0].exists_);
+    EXPECT_EQ(updates[0].handle_.Entry().DebugString(), state.DebugString());
+    notify.Notify();
+  });
+  util::Status status(store_->SetClusterNodeState(state));
+  EXPECT_TRUE(status.ok()) << status;
+  notify.WaitForNotification();
 }
 
 

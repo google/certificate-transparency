@@ -58,6 +58,7 @@ using cert_trans::FakeEtcdClient;
 using cert_trans::EntryHandle;
 using cert_trans::LoggedCertificate;
 using cert_trans::PreCertChain;
+using cert_trans::ThreadPool;
 using ct::LogEntry;
 using ct::SignedCertificateTimestamp;
 using std::make_shared;
@@ -83,9 +84,10 @@ class FrontendTest : public ::testing::Test {
                   new MerkleVerifier(new Sha256Hasher())),
         checker_(),
         base_(make_shared<libevent::Base>()),
-        etcd_client_(base_),
-        store_(&etcd_client_, "/root", "id"),
         event_pump_(base_),
+        etcd_client_(base_),
+        pool_(2),
+        store_(&pool_, &etcd_client_, "/root", "id"),
         frontend_(new CertSubmissionHandler(&checker_),
                   new FrontendSigner(db(), &store_,
                                      TestSigner::DefaultLogSigner())) {
@@ -138,9 +140,10 @@ class FrontendTest : public ::testing::Test {
   LogVerifier verifier_;
   CertChecker checker_;
   shared_ptr<libevent::Base> base_;
-  FakeEtcdClient etcd_client_;
-  EtcdConsistentStore<LoggedCertificate> store_;
   libevent::EventPumpThread event_pump_;
+  FakeEtcdClient etcd_client_;
+  ThreadPool pool_;
+  EtcdConsistentStore<LoggedCertificate> store_;
   FE frontend_;
   string cert_dir_;
   string leaf_pem_;
