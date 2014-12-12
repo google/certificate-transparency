@@ -75,7 +75,7 @@ class JsonObject {
   }
 
   void Add(const char* name, const JsonObject& addand) {
-    Add(name, addand.obj_);
+    Add(name, json_object_get(addand.obj_));
   }
 
   void Add(const char* name, int64_t value) {

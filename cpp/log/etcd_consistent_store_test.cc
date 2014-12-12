@@ -1,23 +1,37 @@
 #include "log/etcd_consistent_store-inl.h"
 
+#include <atomic>
+#include <functional>
 #include <gmock/gmock.h>
 #include <gtest/gtest.h>
 #include <map>
 #include <memory>
 #include <string>
+#include <thread>
 
 #include "log/logged_certificate.h"
 #include "proto/ct.pb.h"
-#include "util/mock_sync_etcd.h"
+#include "util/fake_etcd.h"
+#include "util/libevent_wrapper.h"
 #include "util/testing.h"
+#include "util/util.h"
 
 namespace cert_trans {
 
 
-using std::vector;
+using std::atomic;
+using std::bind;
+using std::make_shared;
 using std::pair;
+using std::shared_ptr;
 using std::string;
+using std::thread;
+using std::unique_ptr;
+using std::vector;
 using testing::_;
+using testing::AllOf;
+using testing::Contains;
+using testing::Pair;
 using testing::Return;
 using testing::SetArgumentPointee;
 using util::Status;
@@ -28,7 +42,35 @@ const char kNodeId[] = "node_id";
 const int kTimestamp = 9000;
 
 
+void DoNothing() {
+}
+
+
 class EtcdConsistentStoreTest : public ::testing::Test {
+ public:
+  EtcdConsistentStoreTest()
+      : base_(make_shared<libevent::Base>()),
+        client_(base_),
+        sync_client_(&client_),
+        running_(true) {
+    event_pump_.reset(
+        new thread(bind(&EtcdConsistentStoreTest::EventPump, this)));
+  }
+
+  ~EtcdConsistentStoreTest() {
+    running_.store(false);
+    base_->Add(bind(&DoNothing));
+    event_pump_->join();
+  }
+
+  void EventPump() {
+    libevent::Event event(*base_, -1, 0, std::bind(&DoNothing));
+    event.Add(std::chrono::seconds(60));
+    while (running_) {
+      base_->DispatchOnce();
+    }
+  }
+
  protected:
   void SetUp() override {
     store_.reset(
@@ -64,10 +106,31 @@ class EtcdConsistentStoreTest : public ::testing::Test {
   }
 
   template <class T>
+  void InsertEntry(const string& key, const T& thing) {
+    // Set up scenario:
+    int64_t index;
+    Status status(sync_client_.Create(key, Serialize(thing), &index));
+    ASSERT_TRUE(status.ok()) << status;
+  }
+
+  template <class T>
+  void PeekEntry(const string& key, T* thing) {
+    EtcdClient::Node node;
+    Status status(sync_client_.Get(key, &node));
+    ASSERT_TRUE(status.ok()) << status;
+    Deserialize(node.value_, thing);
+  }
+
+  template <class T>
   string Serialize(const T& t) {
     string flat;
     t.SerializeToString(&flat);
-    return flat;
+    return util::ToBase64(flat);
+  }
+
+  template <class T>
+  void Deserialize(const string& flat, T* t) {
+    ASSERT_TRUE(t->ParseFromString(util::FromBase64(flat.c_str())));
   }
 
   template <class T>
@@ -76,8 +139,12 @@ class EtcdConsistentStoreTest : public ::testing::Test {
     return EtcdClient::Node(index, index, key, Serialize(t));
   }
 
-  MockSyncEtcdClient client_;
-  std::unique_ptr<EtcdConsistentStore<LoggedCertificate>> store_;
+  shared_ptr<libevent::Base> base_;
+  FakeEtcdClient client_;
+  SyncEtcdClient sync_client_;
+  atomic<bool> running_;
+  unique_ptr<thread> event_pump_;
+  unique_ptr<EtcdConsistentStore<LoggedCertificate>> store_;
 };
 
 
@@ -97,11 +164,14 @@ TEST_F(EtcdConsistentStoreTest, TestSetServingSTH) {
 
 TEST_F(EtcdConsistentStoreTest, TestAddPendingEntryWorks) {
   LoggedCertificate cert(DefaultCert());
-  EXPECT_CALL(client_, Create(string(kRoot) + "/unsequenced/" +
-                                  util::ToBase64(cert.Hash()),
-                              _, _)).WillOnce(Return(util::Status::OK));
   util::Status status(store_->AddPendingEntry(&cert));
+  ASSERT_TRUE(status.ok()) << status;
+  EtcdClient::Node node;
+  status = sync_client_.Get(string(kRoot) + "/unsequenced/" +
+                                util::ToBase64(cert.Hash()),
+                            &node);
   EXPECT_TRUE(status.ok()) << status;
+  EXPECT_EQ(Serialize(cert), node.value_);
 }
 
 
@@ -113,11 +183,9 @@ TEST_F(EtcdConsistentStoreTest,
 
   const string kKey(util::ToBase64(cert.Hash()));
   const string kPath(string(kRoot) + "/unsequenced/" + kKey);
-  EXPECT_CALL(client_, Create(kPath, _, _))
-      .WillOnce(Return(util::Status(util::error::FAILED_PRECONDITION, "")));
-  EXPECT_CALL(client_, Get(kPath, _))
-      .WillOnce(DoAll(SetArgumentPointee<1>(NodeFor(0, kPath, other_cert)),
-                      Return(util::Status::OK)));
+  // Set up scenario:
+  InsertEntry(kPath, other_cert);
+
   util::Status status(store_->AddPendingEntry(&cert));
   EXPECT_EQ(util::error::ALREADY_EXISTS, status.CanonicalCode());
   EXPECT_EQ(other_cert.timestamp(), cert.timestamp());
@@ -131,16 +199,10 @@ TEST_F(EtcdConsistentStoreDeathTest,
 
   const string kKey(util::ToBase64(cert.Hash()));
   const string kPath(string(kRoot) + "/unsequenced/" + kKey);
-  EXPECT_DEATH({
-                 EXPECT_CALL(client_, Create(kPath, _, _))
-                     .WillOnce(Return(
-                         util::Status(util::error::FAILED_PRECONDITION, "")));
-                 EXPECT_CALL(client_, Get(kPath, _))
-                     .WillOnce(DoAll(SetArgumentPointee<1>(
-                                         NodeFor(0, kPath, other_cert)),
-                                     Return(util::Status::OK)));
-                 store_->AddPendingEntry(&cert);
-               },
+  // Set up scenario:
+  InsertEntry(kPath, other_cert);
+
+  EXPECT_DEATH(store_->AddPendingEntry(&cert),
                "preexisting_entry.*==.*entry.*");
 }
 
@@ -149,13 +211,7 @@ TEST_F(EtcdConsistentStoreDeathTest,
        TestAddPendingEntryDoesNotAcceptSequencedEntry) {
   LoggedCertificate cert(DefaultCert());
   cert.set_sequence_number(76);
-  EXPECT_DEATH({
-                 EXPECT_CALL(client_, Create(string(kRoot) + "/unsequenced/" +
-                                                 util::ToBase64(cert.Hash()),
-                                             _, _))
-                     .WillOnce(Return(util::Status::OK));
-                 store_->AddPendingEntry(&cert);
-               },
+  EXPECT_DEATH(store_->AddPendingEntry(&cert),
                "!entry\\->has_sequence_number");
 }
 
@@ -164,23 +220,18 @@ TEST_F(EtcdConsistentStoreTest, TestGetPendingEntryForHash) {
   const LoggedCertificate one(MakeCert(123, "one"));
   const string kPath(string(kRoot) + "/unsequenced/" +
                      util::ToBase64(one.Hash()));
-  EXPECT_CALL(client_, Get(kPath, _))
-      .WillOnce(DoAll(SetArgumentPointee<1>(NodeFor(17, kPath, one)),
-                      Return(util::Status::OK)));
+  InsertEntry(kPath, one);
 
   EntryHandle<LoggedCertificate> handle;
   util::Status status(store_->GetPendingEntryForHash(one.Hash(), &handle));
   EXPECT_TRUE(status.ok()) << status;
   EXPECT_EQ(one, handle.Entry());
-  EXPECT_EQ(17, handle.Handle());
+  EXPECT_EQ(1, handle.Handle());
 }
 
 
 TEST_F(EtcdConsistentStoreTest, TestGetPendingEntryForNonExistantHash) {
   const string kPath(string(kRoot) + "/unsequenced/" + util::ToBase64("Nah"));
-  EXPECT_CALL(client_, Get(kPath, _))
-      .WillOnce(Return(util::Status(util::error::NOT_FOUND, "")));
-
   EntryHandle<LoggedCertificate> handle;
   util::Status status(store_->GetPendingEntryForHash("Nah", &handle));
   EXPECT_EQ(util::error::NOT_FOUND, status.CanonicalCode()) << status;
@@ -191,25 +242,18 @@ TEST_F(EtcdConsistentStoreTest, TestGetPendingEntries) {
   const string kPath(string(kRoot) + "/unsequenced/");
   const LoggedCertificate one(MakeCert(123, "one"));
   const LoggedCertificate two(MakeCert(456, "two"));
-  const vector<EtcdClient::Node> nodes{NodeFor(1, "/unsequenced/one", one),
-                                       NodeFor(6, "/unsequenced/two", two)};
-  EXPECT_CALL(client_, GetAll(kPath, _))
-      .WillOnce(DoAll(SetArgumentPointee<1>(nodes), Return(util::Status::OK)));
+  InsertEntry(kPath + "one", one);
+  InsertEntry(kPath + "two", two);
 
   vector<EntryHandle<LoggedCertificate>> entries;
   util::Status status(store_->GetPendingEntries(&entries));
   EXPECT_TRUE(status.ok()) << status;
-}
-
-
-TEST_F(EtcdConsistentStoreTest, TestGetPendingEntriesFails) {
-  EXPECT_CALL(client_, GetAll(_, _))
-      .WillOnce(Return(util::Status(util::error::UNKNOWN, "")));
-
-  vector<EntryHandle<LoggedCertificate>> entries;
-  util::Status status(store_->GetPendingEntries(&entries));
-
-  EXPECT_EQ(util::error::UNKNOWN, status.CanonicalCode()) << status;
+  EXPECT_EQ(2, entries.size());
+  vector<LoggedCertificate> certs;
+  for (const auto& e : entries) {
+    certs.push_back(e.Entry());
+  }
+  EXPECT_THAT(certs, AllOf(Contains(one), Contains(two)));
 }
 
 
@@ -217,15 +261,9 @@ TEST_F(EtcdConsistentStoreDeathTest,
        TestGetPendingEntriesBarfsWithSequencedEntry) {
   const string kPath(string(kRoot) + "/unsequenced/");
   LoggedCertificate one(MakeSequencedCert(123, "one", 666));
-  const vector<EtcdClient::Node> nodes{NodeFor(1, "/unsequenced/one", one)};
-  EXPECT_DEATH({
-                 EXPECT_CALL(client_, GetAll(kPath, _))
-                     .WillOnce(DoAll(SetArgumentPointee<1>(nodes),
-                                     Return(util::Status::OK)));
-                 vector<EntryHandle<LoggedCertificate>> entries;
-                 util::Status status(store_->GetPendingEntries(&entries));
-               },
-               "has_sequence_number");
+  InsertEntry(kPath + "one", one);
+  vector<EntryHandle<LoggedCertificate>> entries;
+  EXPECT_DEATH(store_->GetPendingEntries(&entries), "has_sequence_number");
 }
 
 
@@ -233,24 +271,16 @@ TEST_F(EtcdConsistentStoreTest, TestGetSequencedEntries) {
   const string kPath(string(kRoot) + "/sequenced/");
   const LoggedCertificate one(MakeSequencedCert(123, "one", 1));
   const LoggedCertificate two(MakeSequencedCert(456, "two", 2));
-  const vector<EtcdClient::Node> nodes{NodeFor(1, "/sequenced/1", one),
-                                       NodeFor(6, "/sequenced/6", two)};
-  EXPECT_CALL(client_, GetAll(kPath, _))
-      .WillOnce(DoAll(SetArgumentPointee<1>(nodes), Return(util::Status::OK)));
-
+  InsertEntry(kPath + "one", one);
+  InsertEntry(kPath + "two", two);
   vector<EntryHandle<LoggedCertificate>> entries;
   util::Status status(store_->GetSequencedEntries(&entries));
-}
-
-
-TEST_F(EtcdConsistentStoreTest, TestGetSequencedEntriesFails) {
-  EXPECT_CALL(client_, GetAll(_, _))
-      .WillOnce(Return(util::Status(util::error::UNKNOWN, "")));
-
-  vector<EntryHandle<LoggedCertificate>> entries;
-  util::Status status(store_->GetSequencedEntries(&entries));
-
-  EXPECT_EQ(util::error::UNKNOWN, status.CanonicalCode()) << status;
+  EXPECT_EQ(2, entries.size());
+  vector<LoggedCertificate> certs;
+  for (const auto& e : entries) {
+    certs.push_back(e.Entry());
+  }
+  EXPECT_THAT(certs, AllOf(Contains(one), Contains(two)));
 }
 
 
@@ -258,20 +288,14 @@ TEST_F(EtcdConsistentStoreDeathTest,
        TestGetSequencedEntriesBarfsWitUnsSequencedEntry) {
   const string kPath(string(kRoot) + "/sequenced/");
   LoggedCertificate one(MakeCert(123, "one"));
-  const vector<EtcdClient::Node> nodes{NodeFor(1, "/sequenced/1", one)};
-  EXPECT_DEATH({
-                 EXPECT_CALL(client_, GetAll(kPath, _))
-                     .WillOnce(DoAll(SetArgumentPointee<1>(nodes),
-                                     Return(util::Status::OK)));
-                 vector<EntryHandle<LoggedCertificate>> entries;
-                 util::Status status(store_->GetSequencedEntries(&entries));
-               },
-               "has_sequence_number");
+  InsertEntry(kPath + "one", one);
+  vector<EntryHandle<LoggedCertificate>> entries;
+  EXPECT_DEATH(store_->GetSequencedEntries(&entries), "has_sequence_number");
 }
 
 
 TEST_F(EtcdConsistentStoreTest, TestAssignSequenceNumber) {
-  const int kDefaultHandle(23);
+  const int kDefaultHandle(1);
   EntryHandle<LoggedCertificate> entry(
       HandleForCert(DefaultCert(), kDefaultHandle));
 
@@ -283,15 +307,7 @@ TEST_F(EtcdConsistentStoreTest, TestAssignSequenceNumber) {
 
   LoggedCertificate entry_with_provisional(entry.Entry());
   entry_with_provisional.set_provisional_sequence_number(kSeq);
-  EXPECT_CALL(client_,
-              Update(kUnsequencedPath, Serialize(entry_with_provisional),
-                     kDefaultHandle, _)).WillOnce(Return(util::Status::OK));
-
-  LoggedCertificate entry_with_seq(entry.Entry());
-  entry_with_seq.set_sequence_number(kSeq);
-  EXPECT_CALL(client_, Create(kSequencedPath, Serialize(entry_with_seq), _))
-      .WillOnce(Return(util::Status::OK));
-
+  InsertEntry(kUnsequencedPath, entry_with_provisional);
 
   util::Status status(store_->AssignSequenceNumber(kSeq, &entry));
   EXPECT_TRUE(status.ok()) << status;
@@ -320,29 +336,16 @@ TEST_F(EtcdConsistentStoreTest, TestSetClusterNodeState) {
   const string kPath(string(kRoot) + "/nodes/" + kNodeId);
 
   ct::ClusterNodeState state;
-  state.set_node_id("me");
+  state.set_node_id(kNodeId);
   state.set_contiguous_tree_size(2342);
-
-  EXPECT_CALL(client_, ForceSet(kPath, Serialize(state), _))
-      .WillOnce(Return(util::Status::OK));
 
   util::Status status(store_->SetClusterNodeState(state));
   EXPECT_TRUE(status.ok()) << status;
-}
 
-
-TEST_F(EtcdConsistentStoreTest, TestSetClusterNodeStateFails) {
-  const string kPath(string(kRoot) + "/nodes/" + kNodeId);
-
-  ct::ClusterNodeState state;
-  state.set_node_id("me");
-  state.set_contiguous_tree_size(2342);
-
-  EXPECT_CALL(client_, ForceSet(kPath, Serialize(state), _))
-      .WillOnce(Return(util::Status(util::error::UNKNOWN, "?")));
-
-  util::Status status(store_->SetClusterNodeState(state));
-  EXPECT_EQ(util::error::UNKNOWN, status.CanonicalCode()) << status;
+  ct::ClusterNodeState set_state;
+  PeekEntry(kPath, &set_state);
+  EXPECT_EQ(state.node_id(), set_state.node_id());
+  EXPECT_EQ(state.contiguous_tree_size(), set_state.contiguous_tree_size());
 }
 
 
@@ -350,5 +353,6 @@ TEST_F(EtcdConsistentStoreTest, TestSetClusterNodeStateFails) {
 
 int main(int argc, char** argv) {
   cert_trans::test::InitTesting(argv[0], &argc, &argv, true);
+  ::testing::FLAGS_gtest_death_test_style = "threadsafe";
   return RUN_ALL_TESTS();
 }

@@ -96,13 +96,13 @@ SyncEtcdClient::SyncEtcdClient(EtcdClient* client) : client_(client) {
 }
 
 
-Status SyncEtcdClient::Get(const string& key, EtcdClient::Node* node) {
+Status SyncEtcdClient::Get(const string& key, EtcdClient::Node* node) const {
   return BlockingCall(bind(&EtcdClient::Get, client_, key, _1), node);
 }
 
 
 Status SyncEtcdClient::GetAll(const string& dir,
-                              vector<EtcdClient::Node>* values) {
+                              vector<EtcdClient::Node>* values) const {
   return BlockingCall(bind(&EtcdClient::GetAll, client_, dir, _1), values);
 }
 
