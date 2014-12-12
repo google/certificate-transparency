@@ -9,7 +9,7 @@ namespace cert_trans {
 
 class MockSyncEtcdClient : public SyncEtcdClient {
  public:
-  MockSyncEtcdClient() : SyncEtcdClient("host", 80) {
+  MockSyncEtcdClient() : SyncEtcdClient(nullptr) {
   }
   virtual ~MockSyncEtcdClient() = default;
 

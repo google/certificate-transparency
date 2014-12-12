@@ -158,8 +158,8 @@ util/etcd_test: util/etcd_test.o util/libutil.a $(GMOCKLIB) $(GTESTLIB)
 util/fake_etcd_test: util/fake_etcd_test.o base/notification.o util/libutil.a \
                      $(GMOCKLIB) $(GTESTLIB)
 
-util/sync_etcd_test: util/sync_etcd_test.o util/libutil.a $(GMOCKLIB) \
-                     $(GTESTLIB)
+util/sync_etcd_test: util/sync_etcd_test.o util/libutil.a base/notification.o \
+                     $(GMOCKLIB) $(GTESTLIB)
 
 util/masterelection_test: util/masterelection_test.o base/notification.o \
                           util/libutil.a $(GTESTLIB)
@@ -297,7 +297,8 @@ log/logged_certificate_test: log/logged_certificate_test.o proto/libproto.a \
                              util/libutil.a merkletree/libmerkletree.a \
                              $(GTESTLIB)
 
-log/etcd_consistent_store_test: log/etcd_consistent_store_cert.o \
+log/etcd_consistent_store_test: base/notification.o \
+                                log/etcd_consistent_store_cert.o \
                                 proto/libproto.a util/libutil.a \
                                 merkletree/libmerkletree.a $(GMOCKLIB) \
                                 $(GTESTLIB)
