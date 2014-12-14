@@ -157,7 +157,12 @@ class HttpRequest : public std::enable_shared_from_this<HttpRequest> {
   // it's running.
   std::shared_ptr<HttpRequest> self_ref_;
 
-  std::mutex cancel_lock_;
+  // This must be a recursive mutex, because libevent sometimes calls
+  // the completion callback synchronously, in some error cases. With
+  // an std::mutex, the Start() method would deadlock the Done()
+  // method, when really, we mainly want to protect against other
+  // threads concurrently accessing the object.
+  std::recursive_mutex cancel_lock_;
   event* cancel_;
   bool cancelled_;
 

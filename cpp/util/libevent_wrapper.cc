@@ -10,6 +10,7 @@ using std::chrono::microseconds;
 using std::chrono::seconds;
 using std::lock_guard;
 using std::mutex;
+using std::recursive_mutex;
 using std::shared_ptr;
 using std::string;
 using std::vector;
@@ -250,7 +251,7 @@ HttpRequest::~HttpRequest() {
 
 
 void HttpRequest::Cancel() {
-  lock_guard<mutex> lock(cancel_lock_);
+  lock_guard<recursive_mutex> lock(cancel_lock_);
   CHECK(cancel_) << "tried to cancel an unstarted HttpRequest";
   CHECK(!cancelled_) << "tried to cancel an already cancelled HttpRequest";
   cancelled_ = true;
@@ -261,7 +262,7 @@ void HttpRequest::Cancel() {
 void HttpRequest::Start(const shared_ptr<HttpConnection>& conn,
                         evhttp_cmd_type type, const string& uri) {
   CHECK(req_) << "attempt to reuse an HttpRequest object";
-  lock_guard<mutex> lock(cancel_lock_);
+  lock_guard<recursive_mutex> lock(cancel_lock_);
   CHECK(!cancelled_) << "starting an already cancelled request?!?";
   cancel_ = event_new(CHECK_NOTNULL(evhttp_connection_get_base(conn->conn_)),
                       -1, 0, &HttpRequest::Cancelled, this);
@@ -300,7 +301,7 @@ void HttpRequest::Done(evhttp_request* req, void* userdata) {
   // If the request has not been cancelled, we'll still hold on to the
   // lock while the user callback runs, so HttpRequest::Cancel does
   // not return until it has completed.
-  lock_guard<mutex> lock(self->cancel_lock_);
+  lock_guard<recursive_mutex> lock(self->cancel_lock_);
   if (!self->cancelled_) {
     // If we have a request, it should be non-NULL. But sometimes we
     // don't have one...
