@@ -670,7 +670,11 @@ void EtcdClient::Watcher::Impl::StartRequest() {
   req_ = new Request(client_, EVHTTP_REQ_GET, key_, true, params,
                      bind(&Impl::RequestDone, shared_from_this(), _1, _2));
 
-  req_->Run(client_->GetLeader());
+  // Issue the new request from the libevent dispatch loop. This is
+  // not usually necessary, but in error cases, libevent can call us
+  // back synchronously, and we want to avoid overflowing the stack in
+  // case of repeated errors.
+  client_->event_base_->Add(bind(&Request::Run, req_, client_->GetLeader()));
 }
 
 
