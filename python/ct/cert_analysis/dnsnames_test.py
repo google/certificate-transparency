@@ -4,6 +4,8 @@ import unittest
 import mock
 from ct.cert_analysis import base_check_test
 from ct.cert_analysis import dnsnames
+from ct.cert_analysis import tld_list
+from ct.cert_analysis import tld_check
 
 def gen_dns_name(name):
     dns_name = mock.Mock()
@@ -15,14 +17,25 @@ def cert_with_urls(*args):
     certificate.subject_dns_names = mock.Mock(return_value=list(args))
     return certificate
 
+tlds = tld_list.TLDList(tld_dir="ct/cert_analysis/test_data/",
+                        tld_file_name="test_tld_list")
+
 EXAMPLE = gen_dns_name("example.com")
 EXAMPLE_WILDCARD = gen_dns_name("*.example.com")
 UTF8_URL = gen_dns_name("ćęrtifićątętrąńśpąręńćy.com")
 NON_UTF8_URL = gen_dns_name("\xff.com")
 URL_INVALID_CHARACTERS_5 = gen_dns_name("[][]].com")
 EMAIL_ADDRESS = gen_dns_name("example@example.com")
+NOT_TLD = gen_dns_name("asdf.asdf")
+WILDCARD_TLD = gen_dns_name("*.com")
+NON_UNICODE_TLD = gen_dns_name("\xff\x00.com")
 
 class DnsnamesTest(base_check_test.BaseCheckTest):
+    def setUp(self):
+        tld_check.CheckTldMatches.TLD_LIST = tld_list.TLDList(
+                tld_dir="ct/cert_analysis/test_data/",
+                tld_file_name="test_tld_list")
+
     def test_dnsnames_valid(self):
         certificate = cert_with_urls(EXAMPLE)
         check = dnsnames.CheckValidityOfDnsnames()
@@ -71,6 +84,34 @@ class DnsnamesTest(base_check_test.BaseCheckTest):
         result = check.check(certificate)
         # 1 from NON_UTF8, 5 from INVALID_CHARACTERS_5
         self.assertEqual(len(result), 6)
+
+    def test_dnsnames_tld_match(self):
+        certificate = cert_with_urls(EXAMPLE)
+        check = dnsnames.CheckTldMatches()
+        result = check.check(certificate)
+        self.assertEqual(len(result), 0)
+
+    def test_dnsnames_no_tld_match(self):
+        certificate = cert_with_urls(NOT_TLD)
+        check = dnsnames.CheckTldMatches()
+        result = check.check(certificate)
+        self.assertIn(dnsnames.NoTldMatch().description, ''.join([
+                obs.description for obs in result]))
+
+    def test_dnsnames_wildcard_tld_match(self):
+        certificate = cert_with_urls(WILDCARD_TLD)
+        check = dnsnames.CheckTldMatches()
+        result = check.check(certificate)
+        self.assertIn(dnsnames.GenericWildcard().description, ''.join([
+                obs.description for obs in result]))
+
+    def test_dnsnames_non_unicode_match(self):
+        certificate = cert_with_urls(NON_UNICODE_TLD)
+        check = dnsnames.CheckTldMatches()
+        result = check.check(certificate)
+        self.assertIn(dnsnames.NonUnicodeAddress().description, ''.join([
+                obs.description for obs in result]))
+        self.assertEqual(len(result), 1)
 
 
 if __name__ == '__main__':

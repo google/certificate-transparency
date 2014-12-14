@@ -27,4 +27,4 @@ class Observation(object):
         """Conveience method, so it's easy to override how details have to be
         printed without overriding whole __str__.
         """
-        return str(self.details)
+        return self.details

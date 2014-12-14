@@ -1,13 +1,13 @@
 #!/usr/bin/env trial
-import database
+import gflags
 import json
+import mock
 import sys
 import urlparse
 
 from ct.client import log_client
 from ct.client import log_client_test_util as test_util
-import gflags
-import mock
+from ct.client.db import database
 from twisted.internet import defer
 from twisted.internet import task
 from twisted.python import failure
@@ -169,6 +169,9 @@ class AsyncLogClientTest(unittest.TestCase):
 
         def consume(self, entries):
             self.received += entries
+            d = defer.Deferred()
+            d.callback(None)
+            return d
 
     # Helper method.
     def get_entries(self, client, start, end, batch_size=0):
@@ -309,6 +312,9 @@ class AsyncLogClientTest(unittest.TestCase):
                 len(self.received) >= self.pause_at):
                 self.producer.pauseProducing()
                 self.already_paused = True
+            d = defer.Deferred()
+            d.callback(None)
+            return d
 
     def test_get_entries_pause_resume(self):
         client = self.default_client()

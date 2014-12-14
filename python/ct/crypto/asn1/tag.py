@@ -20,6 +20,8 @@ class Tag(object):
     _ENCODING_MASK = 0x20
     _NUMBER_MASK = 0x1f
     _HIGH = 0x1f
+    _FULL_SUB_OCTET = 0x7f
+    _LAST_OCTET = 0x80
 
     def __init__(self, number, tag_class, encoding):
         """ASN.1 tag.
@@ -39,14 +41,23 @@ class Tag(object):
             raise ValueError("Invalid tag class %s" % tag_class)
         if encoding not in (PRIMITIVE, CONSTRUCTED):
             raise ValueError("Invalid encoding %s" % encoding)
-        if number >= 31:
-            raise NotImplementedError("High tags not implemented")
 
         # Public just for lightweight access. Do not modify directly.
         self.number = number
         self.tag_class = tag_class
         self.encoding = encoding
-        self.value = chr(tag_class | encoding | number)
+        if number <= 30:
+            self.value = chr(tag_class | encoding | number)
+        else:
+            res = [tag_class | encoding | self._HIGH]
+            tmp = []
+            while number > 0:
+                tmp.append((number & self._FULL_SUB_OCTET) | self._LAST_OCTET)
+                number >>= 7
+            tmp[0] -= self._LAST_OCTET
+            tmp.reverse()
+            res += tmp
+            self.value = ''.join([chr(byte) for byte in res])
 
     def __repr__(self):
         return ("%s(%r, %r, %r)" % (self.__class__.__name__, self.number,
@@ -97,11 +108,27 @@ class Tag(object):
 
         if not buf:
             raise error.ASN1TagError("Ran out of bytes while decoding")
-        id_byte = ord(buf[0])
+        tag_bytes = 0
+        id_byte = ord(buf[tag_bytes])
         tag_class = id_byte & cls._CLASS_MASK
         encoding = id_byte & cls._ENCODING_MASK
         number = id_byte & cls._NUMBER_MASK
         if number == cls._HIGH:
-            raise NotImplementedError("High tags not implemented")
+            number = 0
+            tag_bytes += 1
+            success = False
+            for i in range(1, len(buf)):
+                number <<= 7
+                id_byte = ord(buf[i])
+                number |= (id_byte & cls._FULL_SUB_OCTET)
+                tag_bytes += 1
+                if id_byte & cls._LAST_OCTET == 0:
+                    success = True
+                    break
+            if not success:
+                raise error.ASN1TagError("Ran out of bytes while decoding")
+            if tag_bytes - 1 > 5:
+                raise error.ASN1TagError("Base 128 integer too large")
+            tag_bytes -= 1
         tag = cls(number, tag_class, encoding)
-        return tag, buf[1:]
+        return tag, buf[tag_bytes + 1:]

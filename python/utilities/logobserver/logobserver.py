@@ -11,6 +11,7 @@ from ct.client.db import sqlite_connection as sqlitecon
 from ct.client import prober
 from ct.client.db import sqlite_log_db
 from ct.client.db import sqlite_temp_db
+from ct.client.db import sqlite_cert_db
 from ct.proto import client_pb2
 
 FLAGS = gflags.FLAGS
@@ -20,6 +21,8 @@ gflags.DEFINE_string("log_level", "WARNING", "logging level")
 gflags.DEFINE_string("ct_sqlite_db", "/tmp/ct", "Location of the CT database")
 gflags.DEFINE_string("ct_sqlite_temp_dir", "/tmp/ct_tmp", "Directory for "
                      "temporary CT data.")
+gflags.DEFINE_string("ct_sqlite_cert_db", "/tmp/ct_cert", "Location of "
+                     "certificate database.")
 gflags.DEFINE_string("monitor_state_dir", "/tmp/ct_monitor",
                      "Filename prefix for monitor state. State for a given log "
                      "will be stored in a monitor_state_dir/log_id file")
@@ -51,6 +54,10 @@ if __name__ == '__main__':
     sqlite_temp_db_factory = sqlite_temp_db.SQLiteTempDBFactory(
         sqlitecon.SQLiteConnectionManager(FLAGS.ct_sqlite_temp_dir + "/meta"),
                                           FLAGS.ct_sqlite_temp_dir)
+
+    sqlite_cert_db = sqlite_cert_db.SQLiteCertDB(
+            sqlitecon.SQLiteConnectionManager(FLAGS.ct_sqlite_cert_db))
+
     ctlogs = client_pb2.CtLogs()
     with open(FLAGS.ctlog_config, "r") as config:
         log_config = config.read()
@@ -62,6 +69,7 @@ if __name__ == '__main__':
         ct_server_list.append(log.log_server)
 
     prober_thread = prober.ProberThread(ctlogs, sqlite_log_db,
+                                        sqlite_cert_db,
                                         sqlite_temp_db_factory,
                                         FLAGS.monitor_state_dir)
     prober_thread.start()

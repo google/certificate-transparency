@@ -2,9 +2,9 @@
 
 import unittest
 
-from ct.client import sqlite_connection as sqlitecon
-from ct.client import sqlite_log_db
-from ct.client import log_db_test
+from ct.client.db import sqlite_connection as sqlitecon
+from ct.client.db import sqlite_log_db
+from ct.client.db import log_db_test
 
 class SQLiteLogDBTest(unittest.TestCase, log_db_test.LogDBTest):
     def setUp(self):

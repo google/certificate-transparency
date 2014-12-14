@@ -2,7 +2,7 @@
 import base64
 import json
 
-from ct.client import database
+from ct.client.db import database
 from ct.proto import client_pb2
 import gflags
 import logging
@@ -608,11 +608,14 @@ class EntryProducer(object):
         self.__fail(failure)
 
     def _write_pending(self):
+        d = defer.Deferred()
+        d.callback(None)
         if self._pending:
             self._current += len(self._pending)
             self._currently_stored -= len(self._pending)
-            self._consumer.consume(self._pending)
+            d = self._consumer.consume(self._pending)
             self._pending = None
+        return d
 
     def _batch_completed(self, result):
         self._currently_fetching -= len(result)
@@ -679,7 +682,9 @@ class EntryProducer(object):
     def produce(self):
         """Produce entries."""
         while not self._paused:
-            self._write_pending()
+            wfd = defer.waitForDeferred(self._write_pending())
+            yield wfd
+            wfd.getResult()
 
             if self.finished:
                 self.finishProducing()

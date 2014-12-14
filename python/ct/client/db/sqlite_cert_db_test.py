@@ -2,9 +2,9 @@
 
 import unittest
 
-from ct.client import sqlite_connection as sqlitecon
-from ct.client import sqlite_cert_db
-from ct.client import cert_db_test
+from ct.client.db import sqlite_connection as sqlitecon
+from ct.client.db import sqlite_cert_db
+from ct.client.db import cert_db_test
 
 class SQLiteCertDBTest(unittest.TestCase, cert_db_test.CertDBTest):
     def setUp(self):

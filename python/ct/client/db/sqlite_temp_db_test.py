@@ -4,9 +4,9 @@ import os
 import tempfile
 import unittest
 
-from ct.client import sqlite_connection as sqlitecon
-from ct.client import sqlite_temp_db
-from ct.client import temp_db_test
+from ct.client.db import sqlite_connection as sqlitecon
+from ct.client.db import sqlite_temp_db
+from ct.client.db import temp_db_test
 
 class SQLiteTempDBTest(unittest.TestCase, temp_db_test.TempDBTest):
     def setUp(self):

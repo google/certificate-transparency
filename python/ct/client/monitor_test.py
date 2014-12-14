@@ -7,9 +7,10 @@ import os
 import sys
 
 from ct.client import log_client
-from ct.client import sqlite_connection as sqlitecon
-from ct.client import sqlite_log_db
-from ct.client import sqlite_temp_db
+from ct.client.db import sqlite_connection as sqlitecon
+from ct.client.db import sqlite_log_db
+from ct.client.db import sqlite_temp_db
+from ct.client.db import sqlite_cert_db
 from ct.client import state
 from ct.client import monitor
 from ct.crypto import error
@@ -92,6 +93,7 @@ class FakeEntryProducer(object):
     def stopProducing(self):
         self.stop = True
 
+
 class FakeLogClient(object):
     def __init__(self, sth, servername="log_server", batch_size=None,
                  get_entries_throw=None):
@@ -146,6 +148,9 @@ class MonitorTest(unittest.TestCase):
             sqlitecon.SQLiteConnectionManager(":memory:", keepalive=True))
         self.temp_db = sqlite_temp_db.SQLiteTempDB(
             sqlitecon.SQLiteConnectionManager(":memory:", keepalive=True))
+        # We can't simply use DB in memory with keepalive True, because different
+        # thread is writing to the database which results in an sqlite exception.
+        self.cert_db = mock.MagicMock()
 
         default_state = client_pb2.MonitorState()
         default_state.verified_sth.CopyFrom(self._DEFAULT_STH)
@@ -169,9 +174,9 @@ class MonitorTest(unittest.TestCase):
 
     def create_monitor(self, client, skip_scan_entry=True):
         m = monitor.Monitor(client, self.verifier, self.hasher, self.db,
-                               self.temp_db, self.state_keeper)
+                            self.cert_db, 7, self.state_keeper)
         if m:
-            m._scan_entry = mock.Mock()
+            m._scan_entries = mock.Mock()
         return m
 
     def test_update(self):

@@ -1,9 +1,9 @@
 import logging
 import sqlite3
 
-from ct.client import log_db
-from ct.client import database
-from ct.client import sqlite_connection as sqlitecon
+from ct.client.db import log_db
+from ct.client.db import database
+from ct.client.db import sqlite_connection as sqlitecon
 from ct.proto import client_pb2
 
 class SQLiteLogDB(log_db.LogDB):
@@ -82,6 +82,10 @@ class SQLiteLogDB(log_db.LogDB):
         except StopIteration:
             raise database.KeyError("Unknown log server: %s", log_server)
         return log_id[0]
+
+    def get_log_id(self, log_server):
+        with self.__mgr.get_connection() as conn:
+            return self._get_log_id(conn, log_server)
 
     def __encode_sth(self, audited_sth):
         timestamp = audited_sth.sth.timestamp

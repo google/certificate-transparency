@@ -1,7 +1,7 @@
 import sqlite3
 
-from ct.client import cert_db
-from ct.client import cert_desc
+from ct.client.db import cert_db
+from ct.client.db import cert_desc
 
 class SQLiteCertDB(cert_db.CertDB):
     def __init__(self, connection_manager):
@@ -48,9 +48,10 @@ class SQLiteCertDB(cert_db.CertDB):
         except sqlite3.IntegrityError:
             # cert already exists
             return
-        for subject in cert.subject_common_names:
-            cursor.execute("INSERT INTO subject_names(log, cert_id, name) "
-                           "VALUES(?, ?, ?)", (log_key, index, subject))
+        if cert.subject_common_names:
+            for subject in cert.subject_common_names:
+                cursor.execute("INSERT INTO subject_names(log, cert_id, name) "
+                               "VALUES(?, ?, ?)", (log_key, index, subject))
 
     def store_certs_desc(self, certs, log_key):
         """Store certificates using it's descriptions.

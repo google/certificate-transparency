@@ -3,11 +3,14 @@ import logging
 
 from ct.client import entry_decoder
 from ct.client import state
-from ct.client import reporter
+from ct.client import aggregated_reporter
 from ct.crypto import error
 from ct.crypto import merkle
+from ct.client import db_reporter
+from ct.client import text_reporter
 from ct.proto import client_pb2
 from twisted.internet import defer
+from twisted.internet import threads
 
 FLAGS = gflags.FLAGS
 
@@ -15,7 +18,8 @@ gflags.DEFINE_integer("entry_write_batch_size", 1000, "Maximum number of "
                       "entries to batch into one database write")
 
 class Monitor(object):
-    def __init__(self, client, verifier, hasher, db, temp_db, state_keeper):
+    def __init__(self, client, verifier, hasher, db, cert_db, log_key,
+                 state_keeper):
         self.__client = client
         self.__verifier = verifier
         self.__hasher = hasher
@@ -26,7 +30,9 @@ class Monitor(object):
         # Merkle tree info.
         # Depends on: Merkle trees implemented in Python.
         self.__state = client_pb2.MonitorState()
-        self.__report = reporter.CertificateReport()
+        self.__report = aggregated_reporter.AggregatedCertificateReport(
+                (text_reporter.TextCertificateReport(),
+                 db_reporter.CertDBCertificateReport(cert_db, log_key)))
         try:
             self.__state = self.__state_keeper.read(client_pb2.MonitorState)
         except state.FileNotFoundError:
@@ -95,8 +101,6 @@ class Monitor(object):
 
     def _set_verified_tree(self, new_tree):
         """Set verified_tree and maybe move pending_sth to verified_sth."""
-        self.__report.set_new_entries_count(
-                new_tree.tree_size - self.__verified_tree.tree_size)
         self.__verified_tree = new_tree
         old_state = self.__state
         new_state = client_pb2.MonitorState()
@@ -272,21 +276,29 @@ class Monitor(object):
         return True
 
 
-    def _scan_entry(self, entry_index, entry):
-        parsed_entry = entry_decoder.decode_entry(entry)
-        ts_entry = parsed_entry.merkle_leaf.timestamped_entry
-        if ts_entry.entry_type == client_pb2.X509_ENTRY:
-            der_cert = ts_entry.asn1_cert
-        else:
-            der_cert = (
-                parsed_entry.extra_data.precert_chain_entry.pre_certificate)
-        self.__report.scan_der_cert(entry_index, der_cert)
+    def _scan_entries(self, entries):
+        """Passes entries to certificate report.
 
-    class EntryConsumer(defer.Deferred):
+        Args:
+            entries: array of (entry_index, entry_response) tuples.
+        """
+        der_certs = []
+        for entry_index, entry in entries:
+            parsed_entry = entry_decoder.decode_entry(entry)
+            ts_entry = parsed_entry.merkle_leaf.timestamped_entry
+            if ts_entry.entry_type == client_pb2.X509_ENTRY:
+                der_cert = ts_entry.asn1_cert
+            else:
+                der_cert = (
+                    parsed_entry.extra_data.precert_chain_entry.pre_certificate)
+            der_certs.append((entry_index, der_cert))
+        self.__report.scan_der_certs(der_certs)
+
+    class EntryConsumer(object):
         """Consumer for log_client.EntryProducer.
 
-        When everything is consumed fires a boolean indicating success of
-        consuming.
+        When everything is consumed, consumed field fires a boolean indicating
+        success of consuming.
         """
         def __init__(self, producer, monitor, pending_sth, verified_tree):
             self._producer = producer
@@ -340,15 +352,16 @@ class Monitor(object):
             logging.info("Fetched %d entries (total: %d from %d)" %
                          (len(entry_batch), self._fetched, self._query_size))
 
-            for index, entry in enumerate(entry_batch):
-                self._monitor._scan_entry(self._next_sequence_number + index,
-                                          entry)
+            scan = threads.deferToThread(
+                    self._monitor._scan_entries,
+                    enumerate(entry_batch, self._next_sequence_number))
             # calculate the hash for the latest fetched certs
             # TODO(ekasper): parse temporary data into permanent storage.
             self._partial_sth, self._unverified_tree = \
                     self._monitor._compute_projected_sth_from_tree(
                         self._unverified_tree, entry_batch)
             self._next_sequence_number += len(entry_batch)
+            return scan
 
     def __fetch_entries(self, start, end):
         """Fetches entries from the log.

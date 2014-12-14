@@ -2,7 +2,6 @@
 
 import unittest
 
-from ct.crypto import error
 from ct.crypto.asn1 import tag
 
 
@@ -14,20 +13,28 @@ class TagTest(unittest.TestCase):
             # (initializers, encoding)
             ((0, tag.UNIVERSAL, tag.PRIMITIVE), "\x00"),
             ((1, tag.UNIVERSAL, tag.PRIMITIVE), "\x01"),
+            ((16256, tag.UNIVERSAL, tag.PRIMITIVE), "\x1f\xff\x00"),
             ((16, tag.UNIVERSAL, tag.CONSTRUCTED), "\x30"),
             ((17, tag.UNIVERSAL, tag.CONSTRUCTED), "\x31"),
+            ((16256, tag.UNIVERSAL, tag.CONSTRUCTED), "\x3f\xff\x00"),
             ((0, tag.APPLICATION, tag.PRIMITIVE), "\x40"),
             ((1, tag.APPLICATION, tag.PRIMITIVE), "\x41"),
+            ((16256, tag.APPLICATION, tag.PRIMITIVE), "\x5f\xff\x00"),
             ((0, tag.APPLICATION, tag.CONSTRUCTED), "\x60"),
             ((1, tag.APPLICATION, tag.CONSTRUCTED), "\x61"),
+            ((16256, tag.APPLICATION, tag.CONSTRUCTED), "\x7f\xff\x00"),
             ((0, tag.CONTEXT_SPECIFIC, tag.PRIMITIVE), "\x80"),
             ((1, tag.CONTEXT_SPECIFIC, tag.PRIMITIVE), "\x81"),
+            ((16256, tag.CONTEXT_SPECIFIC, tag.PRIMITIVE), "\x9f\xff\x00"),
             ((0, tag.CONTEXT_SPECIFIC, tag.CONSTRUCTED), "\xa0"),
             ((1, tag.CONTEXT_SPECIFIC, tag.CONSTRUCTED), "\xa1"),
+            ((16256, tag.CONTEXT_SPECIFIC, tag.CONSTRUCTED), "\xbf\xff\x00"),
             ((0, tag.PRIVATE, tag.PRIMITIVE), "\xc0"),
             ((1, tag.PRIVATE, tag.PRIMITIVE), "\xc1"),
+            ((16256, tag.PRIVATE, tag.PRIMITIVE), "\xdf\xff\x00"),
             ((0, tag.PRIVATE, tag.CONSTRUCTED), "\xe0"),
             ((1, tag.PRIVATE, tag.CONSTRUCTED), "\xe1"),
+            ((16256, tag.PRIVATE, tag.CONSTRUCTED), "\xff\xff\x00"),
             )
 
         for init, enc in valid_tags:
@@ -44,12 +51,6 @@ class TagTest(unittest.TestCase):
             for j in range(i+1, len(valid_tags)):
                 self.assertNotEqual(tag.Tag(*valid_tags[i][0]),
                                     tag.Tag(*valid_tags[j][0]))
-
-    def test_read_invalid(self):
-        self.assertRaises(error.ASN1Error, tag.Tag.read, "")
-        # Not invalid but we don't support it yet.
-        self.assertRaises(NotImplementedError, tag.Tag.read, "\x1f")
-        self.assertRaises(NotImplementedError, tag.Tag.read, "\xff")
 
 
 if __name__ == '__main__':

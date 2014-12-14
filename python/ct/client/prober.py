@@ -18,7 +18,7 @@ from twisted.web import client as twisted_client
 
 class ProberThread(threading.Thread):
     """A prober for scheduled updating of the log view."""
-    def __init__(self, ct_logs, db, temp_db_factory, monitor_state_dir):
+    def __init__(self, ct_logs, db, cert_db, temp_db_factory, monitor_state_dir):
         """Initialize from a CtLogs proto."""
         threading.Thread.__init__(self)
 
@@ -38,8 +38,10 @@ class ProberThread(threading.Thread):
                                           merkle.MerkleVerifier(hasher))
             state_keeper = state.StateKeeper(FLAGS.monitor_state_dir +
                                              "/" + log.log_id)
+            log_key = db.get_log_id(log.log_server)
             self.__monitors.append(monitor.Monitor(client, verifier, hasher, db,
-                                                   temp_db, state_keeper))
+                                                   cert_db, log_key,
+                                                   state_keeper))
         self.__last_update_start_time = 0
         self.__stopped = False
 
