@@ -9,11 +9,15 @@
 
 namespace cert_trans {
 
+using std::bind;
+using std::chrono::seconds;
 using std::mutex;
 using std::placeholders::_1;
 using std::placeholders::_2;
+using std::shared_ptr;
 using std::string;
 using std::unique_lock;
+using std::vector;
 
 DEFINE_int32(master_keepalive_interval_seconds, 60,
              "Interval between refreshing mastership proposal.");
@@ -39,7 +43,7 @@ string EnsureEndsWithSlash(const string& s) {
 }  // namespace
 
 
-MasterElection::MasterElection(const std::shared_ptr<libevent::Base>& base,
+MasterElection::MasterElection(const shared_ptr<libevent::Base>& base,
                                EtcdClient* client, const string& proposal_dir,
                                const string& node_id)
     : base_(base),
@@ -70,7 +74,7 @@ void MasterElection::StartElection() {
 
     Transition(lock, ProposalState::AWAITING_CREATION);
   }
-  base_->Add(std::bind(&MasterElection::CreateProposal, this));
+  base_->Add(bind(&MasterElection::CreateProposal, this));
 }
 
 
@@ -107,7 +111,7 @@ void MasterElection::StopElection() {
   // Delete our proposal so we can't accidentally become master after we've
   // left:
   Transition(lock, ProposalState::AWAITING_DELETE);
-  base_->Add(std::bind(&MasterElection::DeleteProposal, this));
+  base_->Add(bind(&MasterElection::DeleteProposal, this));
   // Wait for the proposal to actually be deleted before we return.
   VLOG(1) << my_proposal_path_ << ": Waiting for delete to complete.";
   proposal_state_cv_.wait(lock, [this]() {
@@ -189,10 +193,10 @@ void MasterElection::CreateProposal() {
   // avoid disrupting an existing settled election.
   // Technically this could already exist if we had mastership before, crashed,
   // and then restarted before the TTL expired.
-  client_->CreateWithTTL(
-      my_proposal_path_, kNoBacking,
-      std::chrono::seconds(FLAGS_master_keepalive_interval_seconds * 2),
-      std::bind(&MasterElection::ProposalCreateDone, this, _1, _2));
+  client_->CreateWithTTL(my_proposal_path_, kNoBacking,
+                         seconds(FLAGS_master_keepalive_interval_seconds * 2),
+                         bind(&MasterElection::ProposalCreateDone, this, _1,
+                              _2));
 }
 
 
@@ -213,17 +217,15 @@ void MasterElection::ProposalCreateDone(util::Status status, int64_t index) {
   CHECK(!proposal_refresh_callback_);
   VLOG(1) << my_proposal_path_ << ": Creating refresh Callback";
   proposal_refresh_callback_.reset(new PeriodicClosure(
-      base_, std::chrono::seconds(FLAGS_master_keepalive_interval_seconds),
-      std::bind(&MasterElection::ProposalKeepAliveCallback, this)));
+      base_, seconds(FLAGS_master_keepalive_interval_seconds),
+      bind(&MasterElection::ProposalKeepAliveCallback, this)));
 
   // Create a watcher on the proposal directory so we're aware of other
   // proposals coming and going
   VLOG(1) << my_proposal_path_ << ": Creating proposal watcher";
   CHECK(!proposal_watcher_);
-  proposal_watcher_.reset(
-      client_->CreateWatcher(proposal_dir_,
-                             std::bind(&MasterElection::OnProposalUpdate, this,
-                                       std::placeholders::_1)));
+  proposal_watcher_.reset(client_->CreateWatcher(
+      proposal_dir_, bind(&MasterElection::OnProposalUpdate, this, _1)));
   VLOG(1) << my_proposal_path_ << ": Joined election";
 }
 
@@ -244,7 +246,7 @@ bool MasterElection::MaybeUpdateProposal(const unique_lock<mutex>& lock,
     return false;
   }
   Transition(lock, ProposalState::AWAITING_UPDATE);
-  base_->Add(std::bind(&MasterElection::UpdateProposal, this, backed));
+  base_->Add(bind(&MasterElection::UpdateProposal, this, backed));
   return true;
 }
 
@@ -256,11 +258,11 @@ void MasterElection::UpdateProposal(const string& backed) {
   VLOG(1) << my_proposal_path_ << ": Updating proposal backing " << backed;
 
   // TODO(alcutter): Set the HTTP timeout inside here to something sensible.
-  client_->UpdateWithTTL(
-      my_proposal_path_, backed,
-      std::chrono::seconds(FLAGS_master_keepalive_interval_seconds * 2),
-      my_proposal_modified_index_,
-      std::bind(&MasterElection::ProposalUpdateDone, this, _1, backed, _2));
+  client_->UpdateWithTTL(my_proposal_path_, backed,
+                         seconds(FLAGS_master_keepalive_interval_seconds * 2),
+                         my_proposal_modified_index_,
+                         bind(&MasterElection::ProposalUpdateDone, this, _1,
+                              backed, _2));
 }
 
 
@@ -318,7 +320,7 @@ void MasterElection::ProposalKeepAliveCallback() {
 
 
 void MasterElection::UpdateProposalView(
-    const std::vector<EtcdClient::Watcher::Update>& updates) {
+    const vector<EtcdClient::Watcher::Update>& updates) {
   for (const auto& update : updates) {
     if (update.exists_) {
       VLOG(1) << my_proposal_path_
@@ -354,7 +356,7 @@ bool MasterElection::DetermineApparentMaster(
 
 
 void MasterElection::OnProposalUpdate(
-    const std::vector<EtcdClient::Watcher::Update>& updates) {
+    const vector<EtcdClient::Watcher::Update>& updates) {
   unique_lock<mutex> lock(mutex_);
   CHECK_GE(updates.size(), 1);
   VLOG(1) << my_proposal_path_ << ": Got " << updates.size() << " update(s)";
