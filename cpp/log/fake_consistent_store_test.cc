@@ -90,7 +90,7 @@ class FakeConsistentStoreTest : public ::testing::Test {
 
 
 TEST_F(FakeConsistentStoreTest, TestNextAvailableSequenceNumber) {
-  EXPECT_EQ(0, store_->NextAvailableSequenceNumber());
+  EXPECT_EQ(0, store_->NextAvailableSequenceNumber().ValueOrDie());
 }
 
 
@@ -194,10 +194,10 @@ TEST_F(FakeConsistentStoreTest, TestAssignSequenceNumber) {
 
   int i(0);
   for (auto& e : entries) {
-    EXPECT_EQ(i, store_->NextAvailableSequenceNumber());
+    EXPECT_EQ(i, store_->NextAvailableSequenceNumber().ValueOrDie());
     status = store_->AssignSequenceNumber(i++, &e);
     EXPECT_TRUE(status.ok()) << status;
-    EXPECT_EQ(i, store_->NextAvailableSequenceNumber());
+    EXPECT_EQ(i, store_->NextAvailableSequenceNumber().ValueOrDie());
   }
 
   EXPECT_EQ(entries[0].Entry(), GetSequencedEntry(0).Entry());

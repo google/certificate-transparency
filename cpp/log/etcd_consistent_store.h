@@ -22,7 +22,7 @@ class EtcdConsistentStore : public ConsistentStore<Logged> {
   EtcdConsistentStore(EtcdClient* client, const std::string& root,
                       const std::string& node_id);
 
-  int64_t NextAvailableSequenceNumber() const override;
+  util::StatusOr<int64_t> NextAvailableSequenceNumber() const override;
 
   util::Status SetServingSTH(const ct::SignedTreeHead& new_sth) override;
 

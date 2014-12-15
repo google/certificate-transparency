@@ -6,6 +6,7 @@
 
 #include "base/macros.h"
 #include "util/status.h"
+#include "util/statusor.h"
 
 namespace ct {
 
@@ -87,7 +88,7 @@ class ConsistentStore {
  public:
   ConsistentStore() = default;
 
-  virtual int64_t NextAvailableSequenceNumber() const = 0;
+  virtual util::StatusOr<int64_t> NextAvailableSequenceNumber() const = 0;
 
   virtual util::Status SetServingSTH(const ct::SignedTreeHead& new_sth) = 0;
 

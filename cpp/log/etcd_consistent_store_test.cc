@@ -129,8 +129,20 @@ class EtcdConsistentStoreTest : public ::testing::Test {
 
 typedef class EtcdConsistentStoreTest EtcdConsistentStoreDeathTest;
 
+
 TEST_F(EtcdConsistentStoreDeathTest, TestNextAvailableSequenceNumber) {
-  EXPECT_DEATH(store_->NextAvailableSequenceNumber(), "Not Implemented");
+  EXPECT_EQ(0, store_->NextAvailableSequenceNumber().ValueOrDie());
+}
+
+
+TEST_F(EtcdConsistentStoreTest,
+       TestNextAvailableSequenceNumberWhenSequencedEntriesExist) {
+  const LoggedCertificate one(MakeSequencedCert(0, "one", 1));
+  const LoggedCertificate two(MakeSequencedCert(1, "two", 1));
+  InsertEntry(string(kRoot) + "/sequenced/0", one);
+  InsertEntry(string(kRoot) + "/sequenced/1", two);
+
+  EXPECT_EQ(2, store_->NextAvailableSequenceNumber().ValueOrDie());
 }
 
 

@@ -28,8 +28,21 @@ EtcdConsistentStore<Logged>::EtcdConsistentStore(EtcdClient* client,
 
 
 template <class Logged>
-int64_t EtcdConsistentStore<Logged>::NextAvailableSequenceNumber() const {
-  CHECK(false) << "Not Implemented";
+util::StatusOr<int64_t>
+EtcdConsistentStore<Logged>::NextAvailableSequenceNumber() const {
+  std::vector<EntryHandle<Logged>> sequenced_entries;
+  util::Status status(GetSequencedEntries(&sequenced_entries));
+  if (!status.ok()) {
+    return status;
+  }
+  if (!sequenced_entries.empty()) {
+    CHECK(sequenced_entries.back().Entry().has_sequence_number());
+    return sequenced_entries.back().Entry().sequence_number() + 1;
+  }
+
+  // TODO(alcutter): Implement the rest of the logic around /serving_sth too
+  // once there are methods to inspect that.
+  LOG(WARNING) << "NextAvailableSequenceNumber() not checking /serving_sth.";
   return 0;
 }
 
