@@ -42,33 +42,13 @@ const char kNodeId[] = "node_id";
 const int kTimestamp = 9000;
 
 
-void DoNothing() {
-}
-
-
 class EtcdConsistentStoreTest : public ::testing::Test {
  public:
   EtcdConsistentStoreTest()
       : base_(make_shared<libevent::Base>()),
         client_(base_),
         sync_client_(&client_),
-        running_(true) {
-    event_pump_.reset(
-        new thread(bind(&EtcdConsistentStoreTest::EventPump, this)));
-  }
-
-  ~EtcdConsistentStoreTest() {
-    running_.store(false);
-    base_->Add(bind(&DoNothing));
-    event_pump_->join();
-  }
-
-  void EventPump() {
-    libevent::Event event(*base_, -1, 0, std::bind(&DoNothing));
-    event.Add(std::chrono::seconds(60));
-    while (running_) {
-      base_->DispatchOnce();
-    }
+        event_pump_(base_) {
   }
 
  protected:
@@ -142,9 +122,8 @@ class EtcdConsistentStoreTest : public ::testing::Test {
   shared_ptr<libevent::Base> base_;
   FakeEtcdClient client_;
   SyncEtcdClient sync_client_;
-  atomic<bool> running_;
-  unique_ptr<thread> event_pump_;
   unique_ptr<EtcdConsistentStore<LoggedCertificate>> store_;
+  libevent::EventPumpThread event_pump_;
 };
 
 

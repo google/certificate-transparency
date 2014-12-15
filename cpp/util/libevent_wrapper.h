@@ -1,12 +1,14 @@
 #ifndef CERT_TRANS_UTIL_LIBEVENT_WRAPPER_H_
 #define CERT_TRANS_UTIL_LIBEVENT_WRAPPER_H_
 
+#include <atomic>
 #include <chrono>
 #include <event2/dns.h>
 #include <event2/event.h>
 #include <event2/http.h>
 #include <memory>
 #include <mutex>
+#include <thread>
 #include <vector>
 
 #include "base/macros.h"
@@ -202,6 +204,22 @@ class HttpConnection : public std::enable_shared_from_this<HttpConnection> {
   evhttp_connection* const conn_;
 
   DISALLOW_COPY_AND_ASSIGN(HttpConnection);
+};
+
+
+class EventPumpThread {
+ public:
+  EventPumpThread(const std::shared_ptr<Base>& base);
+  ~EventPumpThread();
+
+ private:
+  void Pump();
+
+  const std::shared_ptr<Base> base_;
+  std::atomic<bool> running_;
+  std::thread pump_thread_;
+
+  DISALLOW_COPY_AND_ASSIGN(EventPumpThread);
 };
 
 
