@@ -6,7 +6,16 @@ from ct.crypto.asn1 import types
 
 
 class Version(types.Integer):
-    pass
+    def _encode_value(self):
+        return types.encode_int(self._value - 1)
+
+    @classmethod
+    def _convert_value(cls, value):
+        return int(value) + 1
+
+    @classmethod
+    def _decode_value(cls, buf, strict=True):
+        return types.decode_int(buf, strict=strict) + 1
 
 
 class CertificateSerialNumber(types.Integer):

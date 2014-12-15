@@ -432,7 +432,7 @@ class CertificateTest(unittest.TestCase):
 
     def test_version(self):
         c = self.cert_from_pem_file(self._PEM_FILE)
-        self.assertEqual(2, c.version())
+        self.assertEqual(3, c.version())
 
     def test_issuer_common_name(self):
         c = self.cert_from_pem_file(self._PEM_FILE)
@@ -488,7 +488,7 @@ class CertificateTest(unittest.TestCase):
 
     def test_v1_cert(self):
         c = self.cert_from_pem_file(self._V1_PEM_FILE)
-        self.assertEqual(0, c.version())
+        self.assertEqual(1, c.version())
         self.assertIsNone(c.basic_constraint_ca())
 
     def test_fingerprint(self):
