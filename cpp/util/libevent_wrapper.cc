@@ -1,5 +1,6 @@
 #include "util/libevent_wrapper.h"
 
+#include <climits>
 #include <event2/thread.h>
 #include <glog/logging.h>
 #include <math.h>
@@ -51,6 +52,10 @@ void DelayCancel(event* timer, util::Task* task) {
 
 void DelayDispatch(evutil_socket_t sock, short events, void* userdata) {
   static_cast<util::Task*>(CHECK_NOTNULL(userdata))->Return();
+}
+
+
+void DoNothing() {
 }
 
 
@@ -428,6 +433,32 @@ void HttpConnection::MakeRequest(const shared_ptr<HttpRequest>& req,
 
 void HttpConnection::SetTimeout(const seconds& timeout) {
   evhttp_connection_set_timeout(conn_, timeout.count());
+}
+
+
+EventPumpThread::EventPumpThread(const shared_ptr<Base>& base)
+    : base_(base),
+      running_(true),
+      pump_thread_(bind(&EventPumpThread::Pump, this)) {
+}
+
+
+EventPumpThread::~EventPumpThread() {
+  running_.store(false);
+  base_->Add(bind(&DoNothing));
+  pump_thread_.join();
+}
+
+
+void EventPumpThread::Pump() {
+  // Prime the pump with a pending event some way out in the future,
+  // otherwise we're racing the main thread to get an event in before calling
+  // DispatchOnce() (which will CHECK fail if there's nothing to do.)
+  libevent::Event event(*base_, -1, 0, std::bind(&DoNothing));
+  event.Add(std::chrono::seconds(INT_MAX));
+  while (running_.load()) {
+    base_->DispatchOnce();
+  }
 }
 
 

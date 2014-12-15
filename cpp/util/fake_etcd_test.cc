@@ -72,15 +72,8 @@ class FakeEtcdTest : public ::testing::Test {
  public:
   FakeEtcdTest()
       : base_(std::make_shared<libevent::Base>()),
-        running_(true),
-        event_pump_(bind(&FakeEtcdTest::EventPump, this)),
+        event_pump_(base_),
         client_(base_) {
-  }
-
-  ~FakeEtcdTest() {
-    running_.store(false);
-    base_->Add(bind(&DoNothing));
-    event_pump_.join();
   }
 
  protected:
@@ -183,20 +176,8 @@ class FakeEtcdTest : public ::testing::Test {
     return status;
   }
 
-  void EventPump() {
-    // Prime the pump with a pending event some way out in the future,
-    // otherwise we're racing the main thread to get an event in before calling
-    // DispatchOnce() (which will CHECK fail if there's nothing to do.)
-    libevent::Event event(*base_, -1, 0, std::bind(&DoNothing));
-    event.Add(std::chrono::seconds(60));
-    while (running_.load()) {
-      base_->DispatchOnce();
-    }
-  }
-
   std::shared_ptr<libevent::Base> base_;
-  std::atomic<bool> running_;
-  std::thread event_pump_;
+  libevent::EventPumpThread event_pump_;
   FakeEtcdClient client_;
 };
 

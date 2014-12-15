@@ -48,11 +48,6 @@ DEFINE_int32(etcd_port, 4001, "etcd server port");
 DECLARE_int32(master_keepalive_interval_seconds);
 
 
-// Target for kicking events.
-void DoNothing() {
-}
-
-
 // Simple helper class, represents a thread of interest in participating in
 // an election.
 struct Participant {
@@ -151,40 +146,14 @@ class ElectionTest : public ::testing::Test {
  public:
   ElectionTest()
       : base_(make_shared<libevent::Base>()),
-        running_(false),
         client_(FLAGS_etcd.empty()
                     ? new FakeEtcdClient(base_)
-                    : new EtcdClient(base_, FLAGS_etcd, FLAGS_etcd_port)) {
-  }
-
-
-  void SetUp() {
-    running_.store(true);
-    event_pump_.reset(new thread(bind(&ElectionTest::EventPump, this)));
-  }
-
-
-  void TearDown() {
-    running_.store(false);
-    base_->Add(bind(&DoNothing));
-    event_pump_->join();
-    event_pump_.reset();
+                    : new EtcdClient(base_, FLAGS_etcd, FLAGS_etcd_port)),
+        event_pump_(base_) {
   }
 
 
  protected:
-  void EventPump() {
-    // Prime the pump with a pending event some way out in the future,
-    // otherwise we're racing the main thread to get an event in before calling
-    // DispatchOnce() (which will CHECK fail if there's nothing to do.)
-    libevent::Event event(*base_, -1, 0, bind(&DoNothing));
-    event.Add(seconds(60));
-    while (running_.load()) {
-      base_->DispatchOnce();
-    }
-  }
-
-
   void KillProposalRefresh(Participant* p) {
     p->election_->proposal_refresh_callback_.reset();
   }
@@ -193,7 +162,7 @@ class ElectionTest : public ::testing::Test {
   shared_ptr<libevent::Base> base_;
   atomic<bool> running_;
   const unique_ptr<EtcdClient> client_;
-  unique_ptr<thread> event_pump_;
+  libevent::EventPumpThread event_pump_;
 };
 
 
