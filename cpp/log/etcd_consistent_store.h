@@ -8,6 +8,7 @@
 #include "base/macros.h"
 #include "log/consistent_store.h"
 #include "proto/ct.pb.h"
+#include "util/etcd.h"
 #include "util/status.h"
 #include "util/sync_etcd.h"
 
@@ -17,7 +18,8 @@ namespace cert_trans {
 template <class Logged>
 class EtcdConsistentStore : public ConsistentStore<Logged> {
  public:
-  EtcdConsistentStore(SyncEtcdClient* client, const std::string& root,
+  // No change of ownership for |client|
+  EtcdConsistentStore(EtcdClient* client, const std::string& root,
                       const std::string& node_id);
 
   int64_t NextAvailableSequenceNumber() const override;
@@ -70,7 +72,8 @@ class EtcdConsistentStore : public ConsistentStore<Logged> {
 
   std::string GetFullPath(const std::string& key) const;
 
-  SyncEtcdClient* const client_;
+  EtcdClient* const client_;  // We don't own this.
+  SyncEtcdClient sync_client_;
   const std::string root_;
   const std::string node_id_;
 

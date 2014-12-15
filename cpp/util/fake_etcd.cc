@@ -13,6 +13,7 @@ using std::make_shared;
 using std::map;
 using std::mutex;
 using std::ostringstream;
+using std::shared_ptr;
 using std::stoi;
 using std::string;
 using std::to_string;
@@ -112,48 +113,42 @@ void FakeEtcdClient::Generic(const string& key,
 }
 
 
-// TODO(alcutter): replace these with building a JsonObject directly.
-string JsonForNode(const EtcdClient::Node& node) {
-  ostringstream oss;
-  oss << "{\n"
-      << "  \"modifiedIndex\" : " << to_string(node.modified_index_) << ",\n"
-      << "  \"createdIndex\" : " << to_string(node.created_index_) << ",\n"
-      << "  \"key\": \"" << node.key_ << "\",\n";
+void FillJsonForNode(const EtcdClient::Node& node, JsonObject* json) {
+  json->Add("modifiedIndex", node.modified_index_);
+  json->Add("createdIndex", node.created_index_);
+  json->Add("key", node.key_);
   if (!node.deleted_) {
-    oss << "  \"value\" : \"" << node.value_ << "\"\n";
+    json->Add("value", node.value_);
   }
-  oss << "}\n";
-  return oss.str();
 }
 
 
-string JsonForEntry(const EtcdClient::Node& node, const string& action) {
-  ostringstream oss;
-  oss << "{ \"node\" : " << JsonForNode(node) << ",\n"
-      << "  \"action\" : \"" << action << "\"\n"
-      << "}";
-  return oss.str();
+void FillJsonForEntry(const EtcdClient::Node& node, const string& action,
+                      JsonObject* json) {
+  JsonObject json_node;
+  FillJsonForNode(node, &json_node);
+  json->Add("action", action);
+  json->Add("node", json_node);
 }
 
 
-string JsonForDir(const vector<EtcdClient::Node>& nodes,
-                  const string& action) {
-  ostringstream oss;
-  oss << "{\n\"node\" : \n{"
-      << "  \"createdIndex\" : 1,\n"
-      << "  \"modifiedIndex\" : 1,\n"
-      << "  \"dir\" : true,\n";
+void FillJsonForDir(const vector<EtcdClient::Node>& nodes,
+                    const string& action, JsonObject* json) {
+  JsonObject node;
+  node.Add("modifiedIndex", 1);
+  node.Add("createdIndex", 1);
+  node.AddBoolean("dir", true);
   if (nodes.size() > 0) {
-    oss << "  \"nodes\" : [\n";
+    JsonArray json_nodes;
     for (const auto& node : nodes) {
-      oss << JsonForNode(node) << ", ";
+      JsonObject json_node;
+      FillJsonForNode(node, &json_node);
+      json_nodes.Add(&json_node);
     }
-    oss << "  ]\n";
+    node.Add("nodes", json_nodes);
   }
-  oss << "  \"action\" : \"" << action << "\",\n"
-      << "  }\n"
-      << "}";
-  return oss.str();
+  node.Add("action", action);
+  json->Add("node", node);
 }
 
 
@@ -193,9 +188,9 @@ void FakeEtcdClient::GetSingleEntry(const string& key,
                                     const GenericCallback& cb) {
   if (entries_.find(key) != entries_.end()) {
     const Node& node(entries_.find(key)->second);
-    return ScheduleCallback(
-        bind(cb, Status::OK,
-             make_shared<JsonObject>(JsonForEntry(node, "get")), index_));
+    shared_ptr<JsonObject> json(make_shared<JsonObject>());
+    FillJsonForEntry(node, "get", json.get());
+    return ScheduleCallback(bind(cb, Status::OK, json, index_));
   } else {
     return ScheduleCallback(bind(cb,
                                  Status(util::error::NOT_FOUND, "not found"),
@@ -214,11 +209,10 @@ void FakeEtcdClient::GetDirectory(const string& key,
       nodes.push_back(pair.second);
     }
   }
-  VLOG(1) << "..";
-  const string json(JsonForDir(nodes, "get"));
-  VLOG(1) << "GET DIR " << key << " : " << json;
-  return ScheduleCallback(
-      bind(cb, Status::OK, make_shared<JsonObject>(json), index_));
+  shared_ptr<JsonObject> json(make_shared<JsonObject>());
+  FillJsonForDir(nodes, "get", json.get());
+  VLOG(1) << json->ToString();
+  return ScheduleCallback(bind(cb, Status::OK, json, index_));
 }
 
 
@@ -295,9 +289,9 @@ void FakeEtcdClient::HandlePost(const string& key,
   entries_[path] = node;
 
   ++index_;
-  ScheduleCallback(bind(cb, Status::OK,
-                        make_shared<JsonObject>(JsonForEntry(node, "create")),
-                        index_));
+  shared_ptr<JsonObject> json(make_shared<JsonObject>());
+  FillJsonForEntry(node, "create", json.get());
+  ScheduleCallback(bind(cb, Status::OK, json, index_));
   NotifyForPath(path);
 }
 
@@ -324,10 +318,9 @@ void FakeEtcdClient::HandlePut(const string& key,
 
   entries_[key] = node;
   ++index_;
-  const string json(JsonForEntry(node, "set"));
-  VLOG(1) << "put(" << key << "):\n" << json;
-  ScheduleCallback(
-      bind(cb, Status::OK, make_shared<JsonObject>(json), index_));
+  shared_ptr<JsonObject> json(make_shared<JsonObject>());
+  FillJsonForEntry(node, "set", json.get());
+  ScheduleCallback(bind(cb, Status::OK, json, index_));
   NotifyForPath(key);
 }
 
@@ -345,10 +338,9 @@ void FakeEtcdClient::HandleDelete(const string& key,
   }
   entries_[key].deleted_ = true;
   ++index_;
-  ScheduleCallback(
-      bind(cb, Status::OK,
-           make_shared<JsonObject>(JsonForEntry(entries_[key], "delete")),
-           index_));
+  shared_ptr<JsonObject> json(make_shared<JsonObject>());
+  FillJsonForEntry(entries_[key], "delete", json.get());
+  ScheduleCallback(bind(cb, Status::OK, json, index_));
   NotifyForPath(key);
   entries_.erase(key);
 }

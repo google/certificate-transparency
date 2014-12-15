@@ -20,10 +20,10 @@ const char kNodesDir[] = "/nodes/";
 
 
 template <class Logged>
-EtcdConsistentStore<Logged>::EtcdConsistentStore(SyncEtcdClient* client,
+EtcdConsistentStore<Logged>::EtcdConsistentStore(EtcdClient* client,
                                                  const std::string& root,
                                                  const std::string& node_id)
-    : client_(client), root_(root), node_id_(node_id) {
+    : client_(client), sync_client_(client), root_(root), node_id_(node_id) {
 }
 
 
@@ -159,12 +159,12 @@ util::Status EtcdConsistentStore<Logged>::GetEntry(
     const std::string& path, EntryHandle<T>* entry) const {
   CHECK_NOTNULL(entry);
   EtcdClient::Node node;
-  util::Status status(client_->Get(path, &node));
+  util::Status status(sync_client_.Get(path, &node));
   if (!status.ok()) {
     return status;
   }
   T t;
-  CHECK(t.ParseFromString(node.value_));
+  CHECK(t.ParseFromString(util::FromBase64(node.value_.c_str())));
   entry->Set(t, node.modified_index_);
   return util::Status::OK;
 }
@@ -177,13 +177,13 @@ util::Status EtcdConsistentStore<Logged>::GetAllEntriesInDir(
   CHECK_NOTNULL(entries);
   CHECK_EQ(0, entries->size());
   std::vector<EtcdClient::Node> nodes;
-  util::Status status(client_->GetAll(dir, &nodes));
+  util::Status status(sync_client_.GetAll(dir, &nodes));
   if (!status.ok()) {
     return status;
   }
   for (const auto& node : nodes) {
     T t;
-    CHECK(t.ParseFromString(node.value_));
+    CHECK(t.ParseFromString(util::FromBase64(node.value_.c_str())));
     entries->emplace_back(EntryHandle<Logged>(t, node.modified_index_));
   }
   return util::Status::OK;
@@ -199,8 +199,8 @@ util::Status EtcdConsistentStore<Logged>::UpdateEntry(const std::string& path,
   std::string flat_entry;
   CHECK(t->Entry().SerializeToString(&flat_entry));
   int64_t new_version;
-  util::Status status(
-      client_->Update(path, flat_entry, t->Handle(), &new_version));
+  util::Status status(sync_client_.Update(path, util::ToBase64(flat_entry),
+                                          t->Handle(), &new_version));
   if (status.ok()) {
     t->SetHandle(new_version);
   }
@@ -217,7 +217,8 @@ util::Status EtcdConsistentStore<Logged>::CreateEntry(const std::string& path,
   std::string flat_entry;
   CHECK(t->Entry().SerializeToString(&flat_entry));
   int64_t new_version;
-  util::Status status(client_->Create(path, flat_entry, &new_version));
+  util::Status status(
+      sync_client_.Create(path, util::ToBase64(flat_entry), &new_version));
   if (status.ok()) {
     t->SetHandle(new_version);
   }
@@ -234,7 +235,8 @@ util::Status EtcdConsistentStore<Logged>::ForceSetEntry(
   std::string flat_entry;
   CHECK(t->Entry().SerializeToString(&flat_entry));
   int64_t new_version;
-  util::Status status(client_->ForceSet(path, flat_entry, &new_version));
+  util::Status status(
+      sync_client_.ForceSet(path, util::ToBase64(flat_entry), &new_version));
   if (status.ok()) {
     t->SetHandle(new_version);
   }
