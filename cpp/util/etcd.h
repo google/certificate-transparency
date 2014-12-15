@@ -82,7 +82,7 @@ class EtcdClient {
               const CreateCallback& cb);
 
   void CreateWithTTL(const std::string& key, const std::string& value,
-                     const std::chrono::duration<int>& ttl,
+                     const std::chrono::seconds& ttl,
                      const CreateCallback& cb);
 
   void CreateInQueue(const std::string& dir, const std::string& value,
@@ -92,14 +92,14 @@ class EtcdClient {
               const int64_t previous_index, const UpdateCallback& cb);
 
   void UpdateWithTTL(const std::string& key, const std::string& value,
-                     const std::chrono::duration<int>& ttl,
+                     const std::chrono::seconds& ttl,
                      const int64_t previous_index, const UpdateCallback& cb);
 
   void ForceSet(const std::string& key, const std::string& value,
                 const ForceSetCallback& cb);
 
   void ForceSetWithTTL(const std::string& key, const std::string& value,
-                       const std::chrono::duration<int>& ttl,
+                       const std::chrono::seconds& ttl,
                        const ForceSetCallback& cb);
 
   void Delete(const std::string& key, const int64_t current_index,

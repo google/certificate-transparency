@@ -12,21 +12,31 @@
 
 namespace libevent = cert_trans::libevent;
 
+using std::atoll;
+using std::bind;
+using std::chrono::seconds;
+using std::chrono::system_clock;
+using std::ctime;
 using std::lock_guard;
 using std::make_pair;
 using std::make_shared;
 using std::map;
+using std::max;
 using std::mutex;
+using std::ostringstream;
 using std::pair;
 using std::placeholders::_1;
 using std::placeholders::_2;
 using std::placeholders::_3;
 using std::shared_ptr;
 using std::string;
+using std::time_t;
 using std::to_string;
 using std::unique_ptr;
 using std::vector;
 using util::Status;
+using util::StatusOr;
+using util::Task;
 using util::TaskHold;
 
 namespace cert_trans {
@@ -67,7 +77,7 @@ util::error::Code ErrorCodeForHttpResponseCode(int response_code) {
 }
 
 
-bool KeyIsDirectory(const std::string& key) {
+bool KeyIsDirectory(const string& key) {
   return key.size() > 0 && key.back() == '/';
 }
 
@@ -168,7 +178,7 @@ void GetAllRequestDone(Status status, const shared_ptr<JsonObject>& json,
   const JsonArray value_nodes(node, "nodes");
   if (!value_nodes.Ok()) {
     // Directory is empty.
-    cb(util::Status::OK, vector<EtcdClient::Node>(), -1);
+    cb(Status::OK, vector<EtcdClient::Node>(), -1);
     return;
   }
 
@@ -214,7 +224,7 @@ void GetAllRequestDone(Status status, const shared_ptr<JsonObject>& json,
                                          modifiedIndex.Value(), key.Value(),
                                          value.Value()));
   }
-  cb(util::Status::OK, values, etcd_index);
+  cb(Status::OK, values, etcd_index);
 }
 
 
@@ -457,21 +467,21 @@ struct EtcdClient::Request {
 
 struct EtcdClient::WatchState {
   WatchState(EtcdClient* client, const string& key, const WatchCallback& cb,
-             util::Task* task);
+             Task* task);
   ~WatchState();
 
   void InitialGetDone(Status status, const Node& node, int64_t etcd_index);
-  void InitialGetAllDone(Status status, const std::vector<Node>& nodes,
+  void InitialGetAllDone(Status status, const vector<Node>& nodes,
                          int64_t etcd_index);
   void RequestDone(Status status, const shared_ptr<JsonObject>& json);
   void StartRequest();
-  util::Status HandleSingleValueRequestDone(const JsonObject& node,
-                                            std::vector<WatchUpdate>* updates);
+  Status HandleSingleValueRequestDone(const JsonObject& node,
+                                      vector<WatchUpdate>* updates);
 
   EtcdClient* const client_;
   const string key_;
   const WatchCallback cb_;
-  util::Task* const task_;
+  Task* const task_;
 
   int64_t highest_index_seen_;
   EtcdClient::Request* req_;
@@ -479,7 +489,7 @@ struct EtcdClient::WatchState {
 
 
 EtcdClient::WatchState::WatchState(EtcdClient* client, const string& key,
-                                   const WatchCallback& cb, util::Task* task)
+                                   const WatchCallback& cb, Task* task)
     : client_(CHECK_NOTNULL(client)),
       key_(key),
       cb_(cb),
@@ -542,36 +552,36 @@ void EtcdClient::WatchState::InitialGetAllDone(Status status,
 }
 
 
-util::StatusOr<EtcdClient::WatchUpdate> UpdateForNode(const JsonObject& node) {
+StatusOr<EtcdClient::WatchUpdate> UpdateForNode(const JsonObject& node) {
   const JsonInt createdIndex(node, "createdIndex");
   if (!createdIndex.Ok()) {
-    return util::StatusOr<EtcdClient::WatchUpdate>(
+    return StatusOr<EtcdClient::WatchUpdate>(
         Status(util::error::FAILED_PRECONDITION,
                "Invalid JSON: Couldn't find 'createdIndex'"));
   }
 
   const JsonInt modifiedIndex(node, "modifiedIndex");
   if (!modifiedIndex.Ok()) {
-    return util::StatusOr<EtcdClient::WatchUpdate>(
+    return StatusOr<EtcdClient::WatchUpdate>(
         Status(util::error::FAILED_PRECONDITION,
                "Invalid JSON: Couldn't find 'modifiedIndex'"));
   }
 
   const JsonString key(node, "key");
   if (!key.Ok()) {
-    return util::StatusOr<EtcdClient::WatchUpdate>(
+    return StatusOr<EtcdClient::WatchUpdate>(
         Status(util::error::FAILED_PRECONDITION,
                "Invalid JSON: Couldn't find 'key'"));
   }
 
   const JsonString value(node, "value");
   if (value.Ok()) {
-    return util::StatusOr<EtcdClient::WatchUpdate>(EtcdClient::WatchUpdate(
+    return StatusOr<EtcdClient::WatchUpdate>(EtcdClient::WatchUpdate(
         EtcdClient::Node(createdIndex.Value(), modifiedIndex.Value(),
                          key.Value(), value.Value()),
         true /*exists*/));
   } else {
-    return util::StatusOr<EtcdClient::WatchUpdate>(EtcdClient::WatchUpdate(
+    return StatusOr<EtcdClient::WatchUpdate>(EtcdClient::WatchUpdate(
         EtcdClient::Node(createdIndex.Value(), modifiedIndex.Value(),
                          key.Value(), ""),
         false /*exists*/));
@@ -581,7 +591,7 @@ util::StatusOr<EtcdClient::WatchUpdate> UpdateForNode(const JsonObject& node) {
 
 Status EtcdClient::WatchState::HandleSingleValueRequestDone(
     const JsonObject& node, vector<WatchUpdate>* updates) {
-  util::StatusOr<WatchUpdate> status(UpdateForNode(node));
+  StatusOr<WatchUpdate> status(UpdateForNode(node));
   if (!status.ok()) {
     return status.status();
   }
@@ -589,9 +599,9 @@ Status EtcdClient::WatchState::HandleSingleValueRequestDone(
 
   CHECK_LT(highest_index_seen_, updates->back().node_.modified_index_);
   highest_index_seen_ =
-      std::max(highest_index_seen_, updates->back().node_.modified_index_);
+      max(highest_index_seen_, updates->back().node_.modified_index_);
 
-  return util::Status::OK;
+  return Status::OK;
 }
 
 
@@ -621,7 +631,7 @@ void EtcdClient::WatchState::RequestDone(Status status,
     }
 
     vector<WatchUpdate> updates;
-    util::Status status(HandleSingleValueRequestDone(node, &updates));
+    Status status(HandleSingleValueRequestDone(node, &updates));
 
     if (status.ok()) {
       cb_(updates);
@@ -658,12 +668,12 @@ void EtcdClient::WatchState::StartRequest() {
 
 
 EtcdClient::Node::Node(int64_t created_index, int64_t modified_index,
-                       const std::string& key, const std::string& value)
+                       const string& key, const string& value)
     : created_index_(created_index),
       modified_index_(modified_index),
       key_(key),
       value_(value),
-      expires_(std::chrono::system_clock::time_point::max()),
+      expires_(system_clock::time_point::max()),
       deleted_(false) {
 }
 
@@ -674,13 +684,13 @@ const EtcdClient::Node& EtcdClient::Node::InvalidNode() {
 }
 
 
-std::string EtcdClient::Node::ToString() const {
-  std::ostringstream oss;
+string EtcdClient::Node::ToString() const {
+  ostringstream oss;
   oss << "[" << key_ << ": '" << value_ << "' c: " << created_index_
       << " m: " << modified_index_;
   if (HasExpiry()) {
-    std::time_t time_c = std::chrono::system_clock::to_time_t(expires_);
-    oss << " expires: " << std::ctime(&time_c);
+    time_t time_c = system_clock::to_time_t(expires_);
+    oss << " expires: " << ctime(&time_c);
   }
   oss << " deleted: " << deleted_ << "]";
   return oss.str();
@@ -688,7 +698,7 @@ std::string EtcdClient::Node::ToString() const {
 
 
 bool EtcdClient::Node::HasExpiry() const {
-  return expires_ < std::chrono::system_clock::time_point::max();
+  return expires_ < system_clock::time_point::max();
 }
 
 
@@ -756,7 +766,7 @@ void EtcdClient::RequestDone(const shared_ptr<libevent::HttpRequest>& req,
       evhttp_find_header(req->GetInputHeaders(), "X-Etcd-Index"));
 
   etcd_req->cb_(StatusFromResponseCode(response_code, json), json,
-                etcd_index ? std::atoll(etcd_index) : -1);
+                etcd_index ? atoll(etcd_index) : -1);
 }
 
 
@@ -815,14 +825,12 @@ void EtcdClient::Create(const string& key, const string& value,
 }
 
 
-void EtcdClient::CreateWithTTL(const std::string& key,
-                               const std::string& value,
-                               const std::chrono::duration<int>& ttl,
-                               const CreateCallback& cb) {
+void EtcdClient::CreateWithTTL(const string& key, const string& value,
+                               const seconds& ttl, const CreateCallback& cb) {
   map<string, string> params;
   params["value"] = value;
   params["prevExist"] = "false";
-  params["ttl"] = std::to_string(ttl.count());
+  params["ttl"] = to_string(ttl.count());
   Generic(key, params, EVHTTP_REQ_PUT, bind(&CreateRequestDone, _1, _2, cb));
 }
 
@@ -848,13 +856,13 @@ void EtcdClient::Update(const string& key, const string& value,
 
 
 void EtcdClient::UpdateWithTTL(const string& key, const string& value,
-                               const std::chrono::duration<int>& ttl,
+                               const seconds& ttl,
                                const int64_t previous_index,
                                const UpdateCallback& cb) {
   map<string, string> params;
   params["value"] = value;
   params["prevIndex"] = to_string(previous_index);
-  params["ttl"] = std::to_string(ttl.count());
+  params["ttl"] = to_string(ttl.count());
   Generic(key, params, EVHTTP_REQ_PUT, bind(&UpdateRequestDone, _1, _2, cb));
 }
 
@@ -868,11 +876,11 @@ void EtcdClient::ForceSet(const string& key, const string& value,
 
 
 void EtcdClient::ForceSetWithTTL(const string& key, const string& value,
-                                 const std::chrono::duration<int>& ttl,
+                                 const seconds& ttl,
                                  const ForceSetCallback& cb) {
   map<string, string> params;
   params["value"] = value;
-  params["ttl"] = std::to_string(ttl.count());
+  params["ttl"] = to_string(ttl.count());
   Generic(key, params, EVHTTP_REQ_PUT, bind(&ForceSetRequestDone, _1, _2, cb));
 }
 
@@ -886,7 +894,7 @@ void EtcdClient::Delete(const string& key, const int64_t current_index,
 
 
 void EtcdClient::Watch(const string& key, const WatchCallback& cb,
-                       util::Task* task) {
+                       Task* task) {
   VLOG(1) << "EtcdClient::Watch: " << key;
 
   // Hold the task at least until we add "state" to DeleteWhenDone.
