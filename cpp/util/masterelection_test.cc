@@ -69,11 +69,9 @@ struct Participant {
     EXPECT_FALSE(election_->IsMaster()) << id_;
   }
 
-
   void StartElection() {
     election_->StartElection();
   }
-
 
   void StopElection() {
     VLOG(1) << id_ << " about to StopElection().";
@@ -81,7 +79,6 @@ struct Participant {
     VLOG(1) << id_ << " completed StopElection().";
     EXPECT_FALSE(election_->IsMaster()) << id_;
   }
-
 
   // Wait to become the boss!
   void ElectLikeABoss() {
@@ -93,11 +90,13 @@ struct Participant {
     VLOG(1) << id_ << " completed WaitToBecomeMaster().";
   }
 
+  bool WaitToBecomeMaster() {
+    return election_->WaitToBecomeMaster();
+  }
 
   bool IsMaster() {
     return election_->IsMaster();
   }
-
 
   void ElectionMania(int num_rounds,
                      const vector<unique_ptr<Participant>>* all_participants) {
@@ -130,14 +129,12 @@ struct Participant {
     }));
   }
 
-
   void WaitForManiaToEnd() {
     CHECK(notification_);
     notification_->WaitForNotification();
     mania_thread_->join();
     mania_thread_.reset();
   }
-
 
   const shared_ptr<libevent::Base>& base_;
   EtcdClient* const client_;
@@ -235,7 +232,7 @@ TEST_F(ElectionTest, MultiInstanceElection) {
   one.StopElection();
   EXPECT_FALSE(one.IsMaster());
 
-  sleep(2);
+  EXPECT_TRUE(two.WaitToBecomeMaster());
   EXPECT_FALSE(one.IsMaster());
   EXPECT_TRUE(two.IsMaster());
   EXPECT_FALSE(three.IsMaster());
@@ -243,7 +240,7 @@ TEST_F(ElectionTest, MultiInstanceElection) {
   two.StopElection();
   EXPECT_FALSE(two.IsMaster());
 
-  sleep(2);
+  EXPECT_TRUE(three.WaitToBecomeMaster());
   EXPECT_FALSE(one.IsMaster());
   EXPECT_FALSE(two.IsMaster());
   EXPECT_TRUE(three.IsMaster());
