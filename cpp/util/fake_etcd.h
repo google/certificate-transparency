@@ -6,6 +6,7 @@
 #include <string>
 
 #include "util/etcd.h"
+#include "util/task.h"
 #include "util/thread_pool.h"
 
 
@@ -19,8 +20,8 @@ class FakeEtcdClient : public EtcdClient {
 
   void DumpEntries();
 
-  Watcher* CreateWatcher(const std::string& key,
-                         const Watcher::WatchCallback& cb) override;
+  void Watch(const std::string& key, const WatchCallback& cb,
+             util::Task* task) override;
 
  protected:
   void Generic(const std::string& key,
@@ -28,8 +29,6 @@ class FakeEtcdClient : public EtcdClient {
                evhttp_cmd_type verb, const GenericCallback& cb) override;
 
  private:
-  class FakeWatcher;
-
   void PurgeExpiredEntries();
 
   void NotifyForPath(const std::string& path);
@@ -57,7 +56,7 @@ class FakeEtcdClient : public EtcdClient {
                     const std::map<std::string, std::string>& params,
                     const GenericCallback& cb);
 
-  void RemoveWatcher(const void* cookie);
+  void CancelWatch(util::Task* task);
 
   // Schedules a callback to be run.
   // Callbacks should not block.
@@ -67,7 +66,7 @@ class FakeEtcdClient : public EtcdClient {
   std::mutex mutex_;
   int64_t index_;
   std::map<std::string, Node> entries_;
-  std::map<std::string, std::vector<std::pair<Watcher::WatchCallback, void*>>>
+  std::map<std::string, std::vector<std::pair<WatchCallback, util::Task*>>>
       watches_;
 
   friend class ElectionTest;

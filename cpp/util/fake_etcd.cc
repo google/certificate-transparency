@@ -36,41 +36,6 @@ string EnsureEndsWithSlash(const string& s) {
 }  // namespace
 
 
-class FakeEtcdClient::FakeWatcher : public EtcdClient::Watcher {
- public:
-  FakeWatcher(FakeEtcdClient* client, const string& key,
-              const WatchCallback& cb);
-
-  virtual ~FakeWatcher();
-
- private:
-  FakeEtcdClient* const client_;
-  const string key_;
-  const WatchCallback cb_;
-};
-
-
-FakeEtcdClient::FakeWatcher::FakeWatcher(FakeEtcdClient* client,
-                                         const string& key,
-                                         const WatchCallback& cb)
-    : client_(client), key_(key), cb_(cb) {
-  std::vector<Update> initial_updates;
-  std::lock_guard<std::mutex> lock(client_->mutex_);
-  for (const auto& pair : client_->entries_) {
-    if (pair.first.find(key_) == 0) {
-      initial_updates.push_back(Update(pair.second, true /*exists*/));
-    }
-  }
-  client_->ScheduleCallback(bind(cb_, initial_updates));
-  client_->watches_[key_].push_back(make_pair(cb_, static_cast<void*>(this)));
-}
-
-
-FakeEtcdClient::FakeWatcher::~FakeWatcher() {
-  client_->RemoveWatcher(static_cast<void*>(this));
-}
-
-
 FakeEtcdClient::FakeEtcdClient(const std::shared_ptr<libevent::Base>& base)
     : base_(base), index_(1) {
 }
@@ -83,9 +48,18 @@ void FakeEtcdClient::DumpEntries() {
 }
 
 
-EtcdClient::Watcher* FakeEtcdClient::CreateWatcher(
-    const string& key, const Watcher::WatchCallback& cb) {
-  return new FakeWatcher(this, key, cb);
+void FakeEtcdClient::Watch(const string& key, const WatchCallback& cb,
+                           util::Task* task) {
+  lock_guard<mutex> lock(mutex_);
+  vector<WatchUpdate> initial_updates;
+  for (const auto& pair : entries_) {
+    if (pair.first.find(key) == 0) {
+      initial_updates.emplace_back(WatchUpdate(pair.second, true /*exists*/));
+    }
+  }
+  ScheduleCallback(bind(cb, initial_updates));
+  watches_[key].push_back(make_pair(cb, task));
+  task->WhenCancelled(bind(&FakeEtcdClient::CancelWatch, this, task));
 }
 
 
@@ -176,8 +150,8 @@ void FakeEtcdClient::NotifyForPath(const string& path) {
     if (path.find(pair.first) == 0) {
       for (const auto& cb_cookie : pair.second) {
         ScheduleCallback(
-            bind(cb_cookie.first, vector<Watcher::Update>{
-                                      Watcher::Update(node, !node.deleted_)}));
+            bind(cb_cookie.first,
+                 vector<WatchUpdate>{WatchUpdate(node, !node.deleted_)}));
       }
     }
   }
@@ -346,12 +320,16 @@ void FakeEtcdClient::HandleDelete(const string& key,
 }
 
 
-void FakeEtcdClient::RemoveWatcher(const void* cookie) {
+void FakeEtcdClient::CancelWatch(util::Task* task) {
   lock_guard<mutex> lock(mutex_);
+  bool found(false);
   for (auto& pair : watches_) {
     for (auto it(pair.second.begin()); it != pair.second.end();) {
-      if (it->second == cookie) {
+      if (it->second == task) {
+        CHECK(!found);
+        found = true;
         VLOG(1) << "Removing watcher " << it->second << " on " << pair.first;
+        task->Return(Status::CANCELLED);
         it = pair.second.erase(it);
       } else {
         ++it;

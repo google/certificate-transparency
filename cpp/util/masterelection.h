@@ -10,6 +10,7 @@
 #include <vector>
 
 #include "util/etcd.h"
+#include "util/sync_task.h"
 
 
 namespace cert_trans {
@@ -116,17 +117,15 @@ class MasterElection {
   void ProposalKeepAliveCallback();
 
   // Updates our local view of the election proposals.
-  void UpdateProposalView(
-      const std::vector<EtcdClient::Watcher::Update>& updates);
+  void UpdateProposalView(const std::vector<EtcdClient::WatchUpdate>& updates);
 
   // Works out which proposal /should/ be master based on created_index_.
   // Returns true iff there was an apparent master, false otherwise.
   bool DetermineApparentMaster(EtcdClient::Node* apparent_master) const;
 
-  // Called by the Watcher whenever there's been a change in one or more of the
-  // proposal files.
-  void OnProposalUpdate(
-      const std::vector<EtcdClient::Watcher::Update>& updates);
+  // Called by the EtcdClient whenever there's been a change in one or
+  // more of the proposal files.
+  void OnProposalUpdate(const std::vector<EtcdClient::WatchUpdate>& updates);
 
   // Internal non-locking accessor for is_master_
   bool IsMaster(const std::unique_lock<std::mutex>& lock) const;
@@ -145,7 +144,7 @@ class MasterElection {
   bool running_;
 
   std::unique_ptr<PeriodicClosure> proposal_refresh_callback_;
-  std::unique_ptr<EtcdClient::Watcher> proposal_watcher_;
+  std::unique_ptr<util::SyncTask> proposal_watch_;
 
   // Our local copy of the proposals
   std::map<std::string, EtcdClient::Node> proposals_;

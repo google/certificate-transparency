@@ -27,6 +27,7 @@ using std::to_string;
 using std::unique_ptr;
 using std::vector;
 using util::Status;
+using util::TaskHold;
 
 namespace cert_trans {
 
@@ -454,80 +455,75 @@ struct EtcdClient::Request {
 };
 
 
-EtcdClient::Watcher::Update::Update(const Node& node, const bool exists)
-    : node_(node), exists_(exists) {
-}
-
-
-EtcdClient::Watcher::Update::Update()
-    : node_(EtcdClient::Node::InvalidNode()), exists_(false) {
-}
-
-
-// We must go deeper.
-class EtcdClient::Watcher::Impl
-    : public std::enable_shared_from_this<EtcdClient::Watcher::Impl> {
- public:
-  Impl(EtcdClient* client, const string& key, const WatchCallback& cb);
+struct EtcdClient::WatchState {
+  WatchState(EtcdClient* client, const string& key, const WatchCallback& cb,
+             util::Task* task);
+  ~WatchState();
 
   void InitialGetDone(Status status, const Node& node, int64_t etcd_index);
   void InitialGetAllDone(Status status, const std::vector<Node>& nodes,
                          int64_t etcd_index);
-  void Cancel();
-
- private:
-  util::Status HandleSingleValueRequestDone(const JsonObject& node,
-                                            std::vector<Update>* updates);
-
   void RequestDone(Status status, const shared_ptr<JsonObject>& json);
   void StartRequest();
+  util::Status HandleSingleValueRequestDone(const JsonObject& node,
+                                            std::vector<WatchUpdate>* updates);
 
   EtcdClient* const client_;
   const string key_;
   const WatchCallback cb_;
+  util::Task* const task_;
 
   int64_t highest_index_seen_;
-
-  mutex lock_;
-  bool cancelled_;
   EtcdClient::Request* req_;
 };
 
 
-EtcdClient::Watcher::Impl::Impl(EtcdClient* client, const string& key,
-                                const WatchCallback& cb)
+EtcdClient::WatchState::WatchState(EtcdClient* client, const string& key,
+                                   const WatchCallback& cb, util::Task* task)
     : client_(CHECK_NOTNULL(client)),
       key_(key),
       cb_(cb),
+      task_(CHECK_NOTNULL(task)),
       highest_index_seen_(-1),
-      cancelled_(false),
       req_(nullptr) {
+  if (KeyIsDirectory(key_)) {
+    client_->GetAll(key,
+                    bind(&WatchState::InitialGetAllDone, this, _1, _2, _3));
+  } else {
+    client_->Get(key, bind(&WatchState::InitialGetDone, this, _1, _2, _3));
+  }
 }
 
 
-void EtcdClient::Watcher::Impl::InitialGetDone(Status status, const Node& node,
+EtcdClient::WatchState::~WatchState() {
+  VLOG(1) << "EtcdClient::Watch: no longer watching " << key_;
+}
+
+
+EtcdClient::WatchUpdate::WatchUpdate(const Node& node, const bool exists)
+    : node_(node), exists_(exists) {
+}
+
+
+EtcdClient::WatchUpdate::WatchUpdate()
+    : node_(EtcdClient::Node::InvalidNode()), exists_(false) {
+}
+
+
+void EtcdClient::WatchState::InitialGetDone(Status status, const Node& node,
+                                            int64_t etcd_index) {
+  InitialGetAllDone(status, {node}, etcd_index);
+}
+
+
+void EtcdClient::WatchState::InitialGetAllDone(Status status,
+                                               const vector<Node>& nodes,
                                                int64_t etcd_index) {
-  // TODO(pphaneuf): Need better error handling here. Have to review
-  // what the possible errors are, most of them should probably be
-  // dealt with using retries?
-  CHECK(status.ok()) << "initial get error: " << status;
-
-  highest_index_seen_ = etcd_index;
-
-  std::vector<Update> updates{Update(node, true /*exists*/)};
-  {
-    lock_guard<mutex> lock(lock_);
-    if (!cancelled_) {
-      cb_(updates);
-    }
+  if (task_->CancelRequested()) {
+    task_->Return(Status::CANCELLED);
+    return;
   }
 
-  StartRequest();
-}
-
-
-void EtcdClient::Watcher::Impl::InitialGetAllDone(
-    Status status, const std::vector<Node>& nodes, int64_t etcd_index) {
   // TODO(pphaneuf): Need better error handling here. Have to review
   // what the possible errors are, most of them should probably be
   // dealt with using retries?
@@ -535,75 +531,57 @@ void EtcdClient::Watcher::Impl::InitialGetAllDone(
 
   highest_index_seen_ = etcd_index;
 
-  std::vector<Update> updates;
+  vector<WatchUpdate> updates;
   for (const auto& node : nodes) {
-    updates.emplace_back(Update(node, true /*exists*/));
+    updates.emplace_back(WatchUpdate(node, true /*exists*/));
   }
 
-  {
-    lock_guard<mutex> lock(lock_);
-    if (!cancelled_) {
-      cb_(updates);
-    }
-  }
+  cb_(updates);
 
   StartRequest();
 }
 
 
-void EtcdClient::Watcher::Impl::Cancel() {
-  VLOG(1) << "EtcdClient::~Watcher: " << key_;
-  lock_guard<mutex> lock(lock_);
-  cancelled_ = true;
-  if (req_) {
-    req_->CancelAndDelete();
-  }
-}
-
-
-util::StatusOr<EtcdClient::Watcher::Update> UpdateForNode(
-    const JsonObject& node) {
+util::StatusOr<EtcdClient::WatchUpdate> UpdateForNode(const JsonObject& node) {
   const JsonInt createdIndex(node, "createdIndex");
   if (!createdIndex.Ok()) {
-    return util::StatusOr<EtcdClient::Watcher::Update>(
-        util::Status(util::error::FAILED_PRECONDITION,
-                     "Invalid JSON: Couldn't find 'createdIndex'"));
+    return util::StatusOr<EtcdClient::WatchUpdate>(
+        Status(util::error::FAILED_PRECONDITION,
+               "Invalid JSON: Couldn't find 'createdIndex'"));
   }
 
   const JsonInt modifiedIndex(node, "modifiedIndex");
   if (!modifiedIndex.Ok()) {
-    return util::StatusOr<EtcdClient::Watcher::Update>(
-        util::Status(util::error::FAILED_PRECONDITION,
-                     "Invalid JSON: Couldn't find 'modifiedIndex'"));
+    return util::StatusOr<EtcdClient::WatchUpdate>(
+        Status(util::error::FAILED_PRECONDITION,
+               "Invalid JSON: Couldn't find 'modifiedIndex'"));
   }
 
   const JsonString key(node, "key");
   if (!key.Ok()) {
-    return util::StatusOr<EtcdClient::Watcher::Update>(
-        util::Status(util::error::FAILED_PRECONDITION,
-                     "Invalid JSON: Couldn't find 'key'"));
+    return util::StatusOr<EtcdClient::WatchUpdate>(
+        Status(util::error::FAILED_PRECONDITION,
+               "Invalid JSON: Couldn't find 'key'"));
   }
 
   const JsonString value(node, "value");
   if (value.Ok()) {
-    return util::StatusOr<EtcdClient::Watcher::Update>(
-        EtcdClient::Watcher::Update(
-            EtcdClient::Node(createdIndex.Value(), modifiedIndex.Value(),
-                             key.Value(), value.Value()),
-            true /*exists*/));
+    return util::StatusOr<EtcdClient::WatchUpdate>(EtcdClient::WatchUpdate(
+        EtcdClient::Node(createdIndex.Value(), modifiedIndex.Value(),
+                         key.Value(), value.Value()),
+        true /*exists*/));
   } else {
-    return util::StatusOr<EtcdClient::Watcher::Update>(
-        EtcdClient::Watcher::Update(EtcdClient::Node(createdIndex.Value(),
-                                                     modifiedIndex.Value(),
-                                                     key.Value(), ""),
-                                    false /*exists*/));
+    return util::StatusOr<EtcdClient::WatchUpdate>(EtcdClient::WatchUpdate(
+        EtcdClient::Node(createdIndex.Value(), modifiedIndex.Value(),
+                         key.Value(), ""),
+        false /*exists*/));
   }
 }
 
 
-util::Status EtcdClient::Watcher::Impl::HandleSingleValueRequestDone(
-    const JsonObject& node, std::vector<Update>* updates) {
-  util::StatusOr<Update> status(UpdateForNode(node));
+Status EtcdClient::WatchState::HandleSingleValueRequestDone(
+    const JsonObject& node, vector<WatchUpdate>* updates) {
+  util::StatusOr<WatchUpdate> status(UpdateForNode(node));
   if (!status.ok()) {
     return status.status();
   }
@@ -617,10 +595,12 @@ util::Status EtcdClient::Watcher::Impl::HandleSingleValueRequestDone(
 }
 
 
-void EtcdClient::Watcher::Impl::RequestDone(
-    Status status, const shared_ptr<JsonObject>& json) {
-  lock_guard<mutex> lock(lock_);
-  req_ = nullptr;
+void EtcdClient::WatchState::RequestDone(Status status,
+                                         const shared_ptr<JsonObject>& json) {
+  if (task_->CancelRequested()) {
+    task_->Return(Status::CANCELLED);
+    return;
+  }
 
   // TODO(pphaneuf): This and many other of the callbacks in this file
   // do very similar validation, we should pull that out in a shared
@@ -640,62 +620,40 @@ void EtcdClient::Watcher::Impl::RequestDone(
       goto fail;
     }
 
-    vector<Update> updates;
+    vector<WatchUpdate> updates;
     util::Status status(HandleSingleValueRequestDone(node, &updates));
 
-    if (!status.ok()) {
-      LOG(ERROR) << status;
-      goto fail;
-    }
-
-    if (!cancelled_) {
+    if (status.ok()) {
       cb_(updates);
+    } else {
+      LOG(ERROR) << status;
     }
   }
 
 fail:
-  if (!cancelled_) {
-    StartRequest();
-  }
+  StartRequest();
 }
 
 
-// Must be called with lock_ held.
-void EtcdClient::Watcher::Impl::StartRequest() {
+void EtcdClient::WatchState::StartRequest() {
+  if (task_->CancelRequested()) {
+    task_->Return(Status::CANCELLED);
+    return;
+  }
+
   map<string, string> params;
   params["wait"] = "true";
   params["waitIndex"] = to_string(highest_index_seen_ + 1);
   params["recursive"] = "true";
 
   req_ = new Request(client_, EVHTTP_REQ_GET, key_, true, params,
-                     bind(&Impl::RequestDone, shared_from_this(), _1, _2));
+                     bind(&WatchState::RequestDone, this, _1, _2));
 
   // Issue the new request from the libevent dispatch loop. This is
   // not usually necessary, but in error cases, libevent can call us
   // back synchronously, and we want to avoid overflowing the stack in
   // case of repeated errors.
   client_->event_base_->Add(bind(&Request::Run, req_, client_->GetLeader()));
-}
-
-
-EtcdClient::Watcher::Watcher(EtcdClient* client, const string& key,
-                             const WatchCallback& cb)
-    : pimpl_(new Impl(client, key, cb)) {
-  VLOG(1) << "EtcdClient::Watcher: " << key;
-  // Binding the shared_ptr ensures that if we disappear, this will
-  // not cause the callback to segfault.
-  if (KeyIsDirectory(key)) {
-    client->GetAll(key, bind(&Impl::InitialGetAllDone, pimpl_, _1, _2, _3));
-  } else {
-    client->Get(key, bind(&Impl::InitialGetDone, pimpl_, _1, _2, _3));
-  }
-}
-
-
-EtcdClient::Watcher::~Watcher() {
-  if (pimpl_) {
-    pimpl_->Cancel();
-  }
 }
 
 
@@ -927,9 +885,14 @@ void EtcdClient::Delete(const string& key, const int64_t current_index,
 }
 
 
-EtcdClient::Watcher* EtcdClient::CreateWatcher(
-    const std::string& key, const Watcher::WatchCallback& cb) {
-  return new EtcdClient::Watcher(this, key, cb);
+void EtcdClient::Watch(const string& key, const WatchCallback& cb,
+                       util::Task* task) {
+  VLOG(1) << "EtcdClient::Watch: " << key;
+
+  // Hold the task at least until we add "state" to DeleteWhenDone.
+  TaskHold hold(task);
+  unique_ptr<WatchState> state(new WatchState(this, key, cb, task));
+  task->DeleteWhenDone(state.release());
 }
 
 

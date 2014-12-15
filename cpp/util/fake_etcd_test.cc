@@ -404,8 +404,7 @@ TEST_F(FakeEtcdTest, TestDelete) {
 
 
 void TestWatcherForCreateCallback(
-    Notification* notifier,
-    const vector<EtcdClient::Watcher::Update>& updates) {
+    Notification* notifier, const vector<EtcdClient::WatchUpdate>& updates) {
   static int num_calls(0);
   LOG(INFO) << "Update " << num_calls;
   if (num_calls == 0) {
@@ -426,13 +425,15 @@ void TestWatcherForCreateCallback(
 
 
 TEST_F(FakeEtcdTest, TestWatcherForCreate) {
+  ThreadPool pool(2);
   int64_t created_index;
   Status status(BlockingCreate(kPath1, kValue, &created_index));
   EXPECT_TRUE(status.ok()) << status;
 
-  Notification notifier;
-  unique_ptr<EtcdClient::Watcher> watcher(client_.CreateWatcher(
-      kDir, bind(&TestWatcherForCreateCallback, &notifier, _1)));
+  Notification watch;
+  Notification done;
+  util::Task task(bind(&Notification::Notify, &done), &pool);
+  client_.Watch(kDir, bind(&TestWatcherForCreateCallback, &watch, _1), &task);
 
   status = BlockingCreate(kPath2, kValue2, &created_index);
   EXPECT_TRUE(status.ok()) << status;
@@ -441,13 +442,16 @@ TEST_F(FakeEtcdTest, TestWatcherForCreate) {
   // TODO(pphaneuf): But it doesn't really? I tried changing it for
   // EXPECT_TRUE(notifier.HasBeenNotified()), but that fails
   // sometimes.
-  notifier.WaitForNotification();
+  watch.WaitForNotification();
+
+  task.Cancel();
+  done.WaitForNotification();
+  EXPECT_EQ(Status::CANCELLED, task.status());
 }
 
 
 void TestWatcherForDeleteCallback(
-    Notification* notifier,
-    const vector<EtcdClient::Watcher::Update>& updates) {
+    Notification* notifier, const vector<EtcdClient::WatchUpdate>& updates) {
   static int num_calls(0);
   static mutex mymutex;
 
@@ -470,22 +474,28 @@ void TestWatcherForDeleteCallback(
 
 
 TEST_F(FakeEtcdTest, TestWatcherForDelete) {
+  ThreadPool pool(2);
   int64_t created_index;
   Status status(BlockingCreate(kPath1, kValue, &created_index));
   EXPECT_TRUE(status.ok()) << status;
 
-  Notification notifier;
-  unique_ptr<EtcdClient::Watcher> watcher(client_.CreateWatcher(
-      kDir, bind(&TestWatcherForDeleteCallback, &notifier, _1)));
+  Notification watch;
+  Notification done;
+  util::Task task(bind(&Notification::Notify, &done), &pool);
+  client_.Watch(kDir, bind(&TestWatcherForDeleteCallback, &watch, _1), &task);
 
   status = BlockingDelete(kPath1, created_index);
   EXPECT_TRUE(status.ok()) << status;
 
   // Should fall straight through:
   // TODO(pphaneuf): But it doesn't really? I tried changing it for
-  // EXPECT_TRUE(notifier.HasBeenNotified()), but that fails
+  // EXPECT_TRUE(watch.HasBeenNotified()), but that fails
   // sometimes.
-  notifier.WaitForNotification();
+  watch.WaitForNotification();
+
+  task.Cancel();
+  done.WaitForNotification();
+  EXPECT_EQ(Status::CANCELLED, task.status());
 }
 
 

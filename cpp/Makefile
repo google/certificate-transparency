@@ -330,10 +330,12 @@ tools/dump_sth: tools/dump_sth.o proto/libproto.a
 
 util/bench_etcd: util/bench_etcd.o util/libutil.a
 
-util/etcd_masterelection: util/etcd_masterelection.o util/libutil.a
+util/etcd_masterelection: util/etcd_masterelection.o base/notification.o \
+                          util/libutil.a
 
 util/etcd_watch: util/etcd_watch.o util/etcd.o util/libevent_wrapper.o \
-	util/json_wrapper.o util/status.o util/task.o
+	util/json_wrapper.o util/status.o util/task.o util/sync_task.o \
+	base/notification.o
 
 test: tests
 	@set -e; for TEST in $(TESTS); do \

@@ -12,6 +12,7 @@
 #include "base/macros.h"
 #include "util/libevent_wrapper.h"
 #include "util/status.h"
+#include "util/task.h"
 
 class JsonObject;
 
@@ -19,9 +20,6 @@ namespace cert_trans {
 
 
 class EtcdClient {
- private:
-  struct Request;
-
  public:
   struct Node {
     static const Node& InvalidNode();
@@ -44,41 +42,12 @@ class EtcdClient {
     bool deleted_;
   };
 
-  class Watcher {
-   public:
-    struct Update {
-      Update();
-      Update(const Node& node, const bool exists);
+  struct WatchUpdate {
+    WatchUpdate();
+    WatchUpdate(const Node& node, const bool exists);
 
-      const Node node_;
-      const bool exists_;
-    };
-
-    typedef std::function<void(const std::vector<Update>& updates)>
-        WatchCallback;
-
-    // |key| can be an entry or a directory (with trailing slash),
-    // but currently watching a directory containing a directory is
-    // not supported.
-    Watcher(EtcdClient* client, const std::string& key,
-            const WatchCallback& cb);
-
-    virtual ~Watcher();
-
-   protected:
-    Watcher() = default;
-
-   private:
-    class Impl;
-
-    // The use of shared_ptr here is not a mistake. This doesn't only
-    // serve to hide the implementation, but also to have a slightly
-    // longer lifetime than the Watcher object itself, to handle
-    // requests that are still in-flight after the Watcher is
-    // destroyed.
-    const std::shared_ptr<Impl> pimpl_;
-
-    DISALLOW_COPY_AND_ASSIGN(Watcher);
+    const Node node_;
+    const bool exists_;
   };
 
   typedef std::function<void(util::Status status, const EtcdClient::Node& node,
@@ -96,6 +65,8 @@ class EtcdClient {
       ForceSetCallback;
   typedef std::function<void(util::Status status, int64_t etcd_index)>
       DeleteCallback;
+  typedef std::function<void(const std::vector<WatchUpdate>& updates)>
+      WatchCallback;
 
   // TODO(pphaneuf): This should take a set of servers, not just one.
   EtcdClient(const std::shared_ptr<libevent::Base>& event_base,
@@ -134,8 +105,8 @@ class EtcdClient {
   void Delete(const std::string& key, const int64_t current_index,
               const DeleteCallback& cb);
 
-  virtual Watcher* CreateWatcher(const std::string& key,
-                                 const Watcher::WatchCallback& cb);
+  virtual void Watch(const std::string& key, const WatchCallback& cb,
+                     util::Task* task);
 
  protected:
   typedef std::function<void(util::Status status,
@@ -149,6 +120,9 @@ class EtcdClient {
                        evhttp_cmd_type verb, const GenericCallback& cb);
 
  private:
+  struct Request;
+  struct WatchState;
+
   typedef std::map<std::pair<std::string, uint16_t>,
                    std::shared_ptr<libevent::HttpConnection> > ConnectionMap;
 

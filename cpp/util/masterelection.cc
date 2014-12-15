@@ -81,13 +81,15 @@ void MasterElection::StartElection() {
 void MasterElection::StopElection() {
   VLOG(1) << my_proposal_path_ << ": Departing election.";
 
-  // Stop the updates from the watcher. Do this before taking the
-  // lock, because the watcher callback takes that lock. This means
-  // that we'll stop updating our proposal, and maybe delay a master
-  // election, but that's okay, as we're about to delete our proposal
+  // Stop the updates from the watch. Do this before taking the lock,
+  // because the watch callback takes that lock. This means that we'll
+  // stop updating our proposal, and maybe delay a master election,
+  // but that's okay, as we're about to delete our proposal
   // altogether.
-  VLOG(1) << my_proposal_path_ << ": Deleting watcher...";
-  proposal_watcher_.reset();
+  VLOG(1) << my_proposal_path_ << ": Cancelling watch...";
+  proposal_watch_->Cancel();
+  proposal_watch_->Wait();
+  proposal_watch_.reset();
 
   unique_lock<mutex> lock(mutex_);
   CHECK(running_);
@@ -220,12 +222,14 @@ void MasterElection::ProposalCreateDone(util::Status status, int64_t index) {
       base_, seconds(FLAGS_master_keepalive_interval_seconds),
       bind(&MasterElection::ProposalKeepAliveCallback, this)));
 
-  // Create a watcher on the proposal directory so we're aware of other
-  // proposals coming and going
-  VLOG(1) << my_proposal_path_ << ": Creating proposal watcher";
-  CHECK(!proposal_watcher_);
-  proposal_watcher_.reset(client_->CreateWatcher(
-      proposal_dir_, bind(&MasterElection::OnProposalUpdate, this, _1)));
+  // Watch the proposal directory so we're aware of other proposals
+  // coming and going
+  VLOG(1) << my_proposal_path_ << ": Watching proposals";
+  CHECK(!proposal_watch_);
+  proposal_watch_.reset(new util::SyncTask(base_.get()));
+  client_->Watch(proposal_dir_,
+                 bind(&MasterElection::OnProposalUpdate, this, _1),
+                 proposal_watch_->task());
   VLOG(1) << my_proposal_path_ << ": Joined election";
 }
 
@@ -235,11 +239,11 @@ bool MasterElection::MaybeUpdateProposal(const unique_lock<mutex>& lock,
   CHECK(lock.owns_lock());
   if (proposal_state_ == ProposalState::UPDATING ||
       proposal_state_ == ProposalState::AWAITING_UPDATE) {
-    // Don't want to have more than one proposal update happening at the same
-    // time so we'll just bail this one.  It's ok, though, because the
-    // currently in-flight update will cause a call to ProposalUpdate() via the
-    // watcher which should propmt another update attempt if it turns out to
-    // still be necessary.
+    // Don't want to have more than one proposal update happening at
+    // the same time so we'll just bail this one.  It's ok, though,
+    // because the currently in-flight update will cause a call to
+    // ProposalUpdate() via the watch which should prompt another
+    // update attempt if it turns out to still be necessary.
     VLOG(1) << my_proposal_path_ << ": Dropping proposal update backing "
             << backed << " because already have a proposal update in "
             << "flight.";
@@ -320,7 +324,7 @@ void MasterElection::ProposalKeepAliveCallback() {
 
 
 void MasterElection::UpdateProposalView(
-    const vector<EtcdClient::Watcher::Update>& updates) {
+    const vector<EtcdClient::WatchUpdate>& updates) {
   for (const auto& update : updates) {
     if (update.exists_) {
       VLOG(1) << my_proposal_path_
@@ -356,7 +360,7 @@ bool MasterElection::DetermineApparentMaster(
 
 
 void MasterElection::OnProposalUpdate(
-    const vector<EtcdClient::Watcher::Update>& updates) {
+    const vector<EtcdClient::WatchUpdate>& updates) {
   unique_lock<mutex> lock(mutex_);
   CHECK_GE(updates.size(), 1);
   VLOG(1) << my_proposal_path_ << ": Got " << updates.size() << " update(s)";
