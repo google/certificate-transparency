@@ -11,6 +11,7 @@
 
 #include "base/macros.h"
 #include "util/executor.h"
+#include "util/task.h"
 
 namespace cert_trans {
 namespace libevent {
@@ -30,6 +31,8 @@ class Base : public util::Executor {
 
   // Arranges to run the closure on the main loop.
   void Add(const std::function<void()>& cb) override;
+
+  void Delay(const std::chrono::duration<double>& delay, util::Task* task);
 
   void Dispatch();
   void DispatchOnce();

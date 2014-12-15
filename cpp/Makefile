@@ -333,7 +333,7 @@ util/bench_etcd: util/bench_etcd.o util/libutil.a
 util/etcd_masterelection: util/etcd_masterelection.o util/libutil.a
 
 util/etcd_watch: util/etcd_watch.o util/etcd.o util/libevent_wrapper.o \
-	util/json_wrapper.o util/status.o
+	util/json_wrapper.o util/status.o util/task.o
 
 test: tests
 	@set -e; for TEST in $(TESTS); do \

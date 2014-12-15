@@ -4,16 +4,19 @@
 #include <glog/logging.h>
 #include <math.h>
 
+using std::bind;
 using std::chrono::duration;
 using std::chrono::duration_cast;
 using std::chrono::microseconds;
 using std::chrono::seconds;
+using std::function;
 using std::lock_guard;
 using std::mutex;
 using std::recursive_mutex;
 using std::shared_ptr;
 using std::string;
 using std::vector;
+using util::TaskHold;
 
 namespace {
 
@@ -38,6 +41,18 @@ void FreeEvDns(evdns_base* dns) {
     evdns_base_free(dns, true);
   }
 }
+
+
+void DelayCancel(event* timer, util::Task* task) {
+  event_del(timer);
+  task->Return(util::Status::CANCELLED);
+}
+
+
+void DelayDispatch(evutil_socket_t sock, short events, void* userdata) {
+  static_cast<util::Task*>(CHECK_NOTNULL(userdata))->Return();
+}
+
 
 thread_local bool on_event_thread = false;
 
@@ -83,10 +98,43 @@ void Base::CheckNotOnEventThread() {
 }
 
 
-void Base::Add(const std::function<void()>& cb) {
+void Base::Add(const function<void()>& cb) {
   lock_guard<mutex> lock(closures_lock_);
   closures_.push_back(cb);
   event_active(wake_closures_.get(), 0, 0);
+}
+
+
+void Base::Delay(const duration<double>& delay, util::Task* task) {
+  // If the delay is zero, what the heck, we're done!
+  if (delay == duration<double>::zero()) {
+    task->Return();
+    return;
+  }
+
+  // Make sure nothing "bad" happens while we're still setting up our
+  // callbacks.
+  TaskHold hold(task);
+
+  event* timer(CHECK_NOTNULL(evtimer_new(base_.get(), &DelayDispatch, task)));
+
+  // Ensure that the cancellation callback is run on this libevent::Base, to
+  // avoid races during cancellation.
+  const function<void()> cancel_cb(bind(DelayCancel, timer, task));
+  if (task->executor() == this) {
+    task->WhenCancelled(cancel_cb);
+  } else {
+    task->WhenCancelled(bind(&Base::Add, this, cancel_cb));
+  }
+
+  task->CleanupWhenDone(bind(event_free, timer));
+
+  timeval tv;
+  const seconds sec(duration_cast<seconds>(delay));
+  tv.tv_sec = sec.count();
+  tv.tv_usec = duration_cast<microseconds>(delay - sec).count();
+
+  CHECK_EQ(evtimer_add(timer, &tv), 0);
 }
 
 
@@ -149,7 +197,7 @@ evhttp_connection* Base::HttpConnectionNew(const string& host,
 void Base::RunClosures(evutil_socket_t sock, short flag, void* userdata) {
   Base* self(static_cast<Base*>(CHECK_NOTNULL(userdata)));
 
-  vector<std::function<void()>> closures;
+  vector<function<void()>> closures;
   {
     lock_guard<mutex> lock(self->closures_lock_);
     closures.swap(self->closures_);

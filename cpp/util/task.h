@@ -53,6 +53,12 @@ class Task {
   // Tasks can be deleted in their done callback.
   ~Task();
 
+  // Returns the executor passed into the constructor, which will be used for
+  // callbacks.
+  Executor* executor() const {
+    return executor_;
+  }
+
   // Requests that the asynchronous operation be cancelled. There is
   // no guarantee that the task is PREPARED or DONE by the time this
   // method returns. Also, the cancellation is merely a request, and
