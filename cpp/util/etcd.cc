@@ -794,11 +794,11 @@ void EtcdClient::RequestDone(const shared_ptr<libevent::HttpRequest>& req,
 
   const int response_code(req->GetResponseCode());
   shared_ptr<JsonObject> json(make_shared<JsonObject>(req->GetInputBuffer()));
-  const char* const etcd_index(CHECK_NOTNULL(
-      evhttp_find_header(req->GetInputHeaders(), "X-Etcd-Index")));
+  const char* const etcd_index(
+      evhttp_find_header(req->GetInputHeaders(), "X-Etcd-Index"));
 
   etcd_req->cb_(StatusFromResponseCode(response_code, json), json,
-                std::atoll(etcd_index));
+                etcd_index ? std::atoll(etcd_index) : -1);
 }
 
 
