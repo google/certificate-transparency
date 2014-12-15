@@ -4,7 +4,7 @@
 #include <stdint.h>
 #include <string>
 
-#include "log/fake_consistent_store.h"
+#include "log/etcd_consistent_store.h"
 #include "log/file_db.h"
 #include "log/log_signer.h"
 #include "log/log_verifier.h"
@@ -15,6 +15,7 @@
 #include "log/tree_signer-inl.h"
 #include "merkletree/merkle_verifier.h"
 #include "proto/ct.pb.h"
+#include "util/fake_etcd.h"
 #include "util/testing.h"
 #include "util/util.h"
 
@@ -23,6 +24,8 @@ namespace cert_trans {
 using cert_trans::EntryHandle;
 using cert_trans::LoggedCertificate;
 using ct::SignedTreeHead;
+using std::make_shared;
+using std::shared_ptr;
 using std::string;
 
 typedef Database<LoggedCertificate> DB;
@@ -33,14 +36,22 @@ typedef TreeSigner<LoggedCertificate> TS;
 template <class T>
 class TreeSignerTest : public ::testing::Test {
  protected:
-  TreeSignerTest() : test_db_(), test_signer_(), verifier_(), tree_signer_() {
+  TreeSignerTest()
+      : test_db_(),
+        base_(make_shared<libevent::Base>()),
+        etcd_client_(base_),
+        event_pump_(base_),
+        test_signer_(),
+        verifier_(),
+        tree_signer_() {
   }
 
   void SetUp() {
     test_db_.reset(new TestDB<T>);
     verifier_.reset(new LogVerifier(TestSigner::DefaultLogSigVerifier(),
                                     new MerkleVerifier(new Sha256Hasher())));
-    store_.reset(new cert_trans::FakeConsistentStore<LoggedCertificate>("id"));
+    store_.reset(new EtcdConsistentStore<LoggedCertificate>(&etcd_client_,
+                                                            "/root", "id"));
     tree_signer_.reset(new TS(std::chrono::duration<double>(0), db(),
                               store_.get(), TestSigner::DefaultLogSigner()));
   }
@@ -82,7 +93,10 @@ class TreeSignerTest : public ::testing::Test {
     return test_db_->db();
   }
   std::unique_ptr<TestDB<T>> test_db_;
-  std::unique_ptr<cert_trans::FakeConsistentStore<LoggedCertificate>> store_;
+  shared_ptr<libevent::Base> base_;
+  FakeEtcdClient etcd_client_;
+  std::unique_ptr<EtcdConsistentStore<LoggedCertificate>> store_;
+  libevent::EventPumpThread event_pump_;
   TestSigner test_signer_;
   std::unique_ptr<LogVerifier> verifier_;
   std::unique_ptr<TS> tree_signer_;

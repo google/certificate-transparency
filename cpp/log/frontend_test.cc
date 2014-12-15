@@ -7,7 +7,7 @@
 
 #include "log/cert_submission_handler.h"
 #include "log/ct_extensions.h"
-#include "log/fake_consistent_store.h"
+#include "log/etcd_consistent_store.h"
 #include "log/file_db.h"
 #include "log/frontend.h"
 #include "log/frontend_signer.h"
@@ -19,6 +19,7 @@
 #include "merkletree/merkle_verifier.h"
 #include "merkletree/serial_hasher.h"
 #include "proto/ct.pb.h"
+#include "util/fake_etcd.h"
 #include "util/testing.h"
 #include "util/util.h"
 
@@ -47,16 +48,20 @@ static const char kChainLeafCert[] = "test-intermediate-cert.pem";
 
 namespace {
 
+namespace libevent = cert_trans::libevent;
+
 using cert_trans::Cert;
 using cert_trans::CertChain;
 using cert_trans::CertChecker;
-using cert_trans::ConsistentStore;
+using cert_trans::EtcdConsistentStore;
+using cert_trans::FakeEtcdClient;
 using cert_trans::EntryHandle;
-using cert_trans::FakeConsistentStore;
 using cert_trans::LoggedCertificate;
 using cert_trans::PreCertChain;
 using ct::LogEntry;
 using ct::SignedCertificateTimestamp;
+using std::make_shared;
+using std::shared_ptr;
 using std::string;
 using std::vector;
 
@@ -77,7 +82,10 @@ class FrontendTest : public ::testing::Test {
         verifier_(TestSigner::DefaultLogSigVerifier(),
                   new MerkleVerifier(new Sha256Hasher())),
         checker_(),
-        store_("id"),
+        base_(make_shared<libevent::Base>()),
+        etcd_client_(base_),
+        store_(&etcd_client_, "/root", "id"),
+        event_pump_(base_),
         frontend_(new CertSubmissionHandler(&checker_),
                   new FrontendSigner(db(), &store_,
                                      TestSigner::DefaultLogSigner())) {
@@ -129,7 +137,10 @@ class FrontendTest : public ::testing::Test {
   TestSigner test_signer_;
   LogVerifier verifier_;
   CertChecker checker_;
-  FakeConsistentStore<LoggedCertificate> store_;
+  shared_ptr<libevent::Base> base_;
+  FakeEtcdClient etcd_client_;
+  EtcdConsistentStore<LoggedCertificate> store_;
+  libevent::EventPumpThread event_pump_;
   FE frontend_;
   string cert_dir_;
   string leaf_pem_;

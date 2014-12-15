@@ -264,18 +264,19 @@ log/frontend_signer_test: log/frontend_signer_test.o \
                           log/log_signer.o log/signer.o log/verifier.o \
                           log/log_verifier.o log/test_signer.o log/libcert.a \
                           log/libdatabase.a merkletree/libmerkletree.a \
-                          proto/libproto.a util/libutil.a $(GTESTLIB)
+                          proto/libproto.a util/libutil.a base/notification.o \
+                          $(GTESTLIB)
 
 log/frontend_test: log/frontend_test.o log/frontend.o \
                    log/frontend_signer.o \
                    log/log_signer.o log/signer.o log/verifier.o \
                    log/log_verifier.o log/test_signer.o \
                    log/libcert.a log/libdatabase.a merkletree/libmerkletree.a \
-                   proto/libproto.a util/libutil.a $(GTESTLIB)
+                   proto/libproto.a util/libutil.a base/notification.o $(GTESTLIB)
 
 log/log_lookup_test: log/log_lookup_test.o log/test_signer.o log/libdatabase.a \
                      log/liblog.a merkletree/libmerkletree.a proto/libproto.a \
-                     util/libutil.a $(GTESTLIB)
+                     util/libutil.a base/notification.o $(GTESTLIB)
 
 log/log_signer_test: log/log_signer_test.o log/log_signer.o log/signer.o \
                      log/verifier.o log/test_signer.o \
@@ -291,7 +292,8 @@ log/tree_signer_test: log/tree_signer_test.o log/log_signer.o log/signer.o \
                       log/verifier.o log/test_signer.o log/tree_signer_cert.o \
                       log/log_verifier.o \
                       log/libdatabase.a merkletree/libmerkletree.a \
-                      proto/libproto.a util/libutil.a $(GTESTLIB)
+                      proto/libproto.a util/libutil.a base/notification.o \
+                      $(GTESTLIB)
 
 log/logged_certificate_test: log/logged_certificate_test.o proto/libproto.a \
                              util/libutil.a merkletree/libmerkletree.a \
@@ -322,7 +324,7 @@ client/ct: client/ct.o client/client.o client/ssl_client.o \
 server/ct-dns-server: server/ct-dns-server.o server/event.o $(LOCAL_LIBS)
 
 server/ct-server: server/ct-server.o util/read_private_key.o \
-	server/handler.o $(LOCAL_LIBS)
+	server/handler.o base/notification.o $(LOCAL_LIBS)
 
 tools/dump_cert: tools/dump_cert.o proto/libproto.a util/libutil.a
 

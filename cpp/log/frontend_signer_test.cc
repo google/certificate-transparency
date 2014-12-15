@@ -3,8 +3,8 @@
 #include <gtest/gtest.h>
 #include <string>
 
+#include "log/etcd_consistent_store.h"
 #include "log/file_db.h"
-#include "log/fake_consistent_store.h"
 #include "log/frontend_signer.h"
 #include "log/log_verifier.h"
 #include "log/logged_certificate.h"
@@ -15,18 +15,25 @@
 #include "merkletree/serial_hasher.h"
 #include "proto/ct.pb.h"
 #include "proto/serializer.h"
+#include "util/fake_etcd.h"
+#include "util/libevent_wrapper.h"
 #include "util/testing.h"
 #include "util/status.h"
 #include "util/util.h"
 
 namespace {
 
+namespace libevent = cert_trans::libevent;
+
 using cert_trans::ConsistentStore;
 using cert_trans::EntryHandle;
-using cert_trans::FakeConsistentStore;
+using cert_trans::EtcdConsistentStore;
+using cert_trans::FakeEtcdClient;
 using cert_trans::LoggedCertificate;
 using ct::LogEntry;
 using ct::SignedCertificateTimestamp;
+using std::make_shared;
+using std::shared_ptr;
 using std::string;
 using std::vector;
 
@@ -41,7 +48,10 @@ class FrontendSignerTest : public ::testing::Test {
         test_signer_(),
         verifier_(TestSigner::DefaultLogSigVerifier(),
                   new MerkleVerifier(new Sha256Hasher())),
-        store_("id"),
+        base_(make_shared<libevent::Base>()),
+        etcd_client_(base_),
+        store_(&etcd_client_, "/root", "id"),
+        event_pump_(base_),
         frontend_(db(), &store_, TestSigner::DefaultLogSigner()) {
   }
 
@@ -52,7 +62,11 @@ class FrontendSignerTest : public ::testing::Test {
   TestDB<T> test_db_;
   TestSigner test_signer_;
   LogVerifier verifier_;
-  FakeConsistentStore<LoggedCertificate> store_;
+
+  shared_ptr<libevent::Base> base_;
+  FakeEtcdClient etcd_client_;
+  EtcdConsistentStore<LoggedCertificate> store_;
+  libevent::EventPumpThread event_pump_;
   FS frontend_;
 };
 
