@@ -28,7 +28,7 @@ class FakeConsistentStore : public ConsistentStore<Logged> {
 
   virtual ~FakeConsistentStore() = default;
 
-  int64_t NextAvailableSequenceNumber() const override;
+  util::StatusOr<int64_t> NextAvailableSequenceNumber() const override;
 
   util::Status SetServingSTH(const ct::SignedTreeHead& new_sth) override;
 

@@ -21,7 +21,8 @@ FakeConsistentStore<Logged>::FakeConsistentStore(
 
 
 template <class Logged>
-int64_t FakeConsistentStore<Logged>::NextAvailableSequenceNumber() const {
+util::StatusOr<int64_t>
+FakeConsistentStore<Logged>::NextAvailableSequenceNumber() const {
   std::unique_lock<std::mutex> lock(mutex_);
   return next_available_sequence_number_;
 }

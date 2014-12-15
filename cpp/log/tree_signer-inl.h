@@ -140,10 +140,14 @@ template <class Logged>
 util::Status TreeSigner<Logged>::SequenceNewEntries() {
   const std::chrono::system_clock::time_point now(
       std::chrono::system_clock::now());
-  int64_t next_sequence_number(
+  util::StatusOr<int64_t> status_or_sequence_number(
       consistent_store_->NextAvailableSequenceNumber());
+  if (!status_or_sequence_number.ok()) {
+    return status_or_sequence_number.status();
+  }
+  int64_t next_sequence_number(status_or_sequence_number.ValueOrDie());
   CHECK_GE(next_sequence_number, 0);
-  VLOG(0) << "Next available sequence number: " << next_sequence_number;
+  VLOG(1) << "Next available sequence number: " << next_sequence_number;
   std::vector<cert_trans::EntryHandle<Logged>> pending_entries;
   util::Status status(consistent_store_->GetPendingEntries(&pending_entries));
   if (!status.ok()) {
@@ -152,7 +156,7 @@ util::Status TreeSigner<Logged>::SequenceNewEntries() {
   std::sort(pending_entries.begin(), pending_entries.end(),
             PendingEntriesOrder<Logged>());
 
-  VLOG(0) << "Sequencing " << pending_entries.size() << " entr"
+  VLOG(1) << "Sequencing " << pending_entries.size() << " entr"
           << (pending_entries.size() == 1 ? "y" : "ies");
 
   status = HandlePreviouslySequencedEntries(&pending_entries);
@@ -163,7 +167,7 @@ util::Status TreeSigner<Logged>::SequenceNewEntries() {
     const std::chrono::system_clock::time_point cert_time(
         std::chrono::milliseconds(pending_entry.Entry().timestamp()));
     if (now - cert_time < guard_window_) {
-      VLOG(0) << "Entry too recent: "
+      VLOG(1) << "Entry too recent: "
               << util::ToBase64(pending_entry.Entry().Hash());
       continue;
     }
@@ -186,7 +190,7 @@ util::Status TreeSigner<Logged>::SequenceNewEntries() {
     ++next_sequence_number;
   }
 
-  VLOG(0) << "Sequenced " << num_sequenced << " entries.";
+  VLOG(1) << "Sequenced " << num_sequenced << " entries.";
 
   return util::Status::OK;
 }
@@ -201,6 +205,7 @@ typename TreeSigner<Logged>::UpdateResult TreeSigner<Logged>::UpdateTree() {
   ct::SignedTreeHead sth;
   typename Database<Logged>::LookupResult db_result =
       db_->LatestTreeHead(&sth);
+
 
   if (db_result == Database<Logged>::NOT_FOUND) {
     if (LastUpdateTime() != 0) {
@@ -230,7 +235,7 @@ typename TreeSigner<Logged>::UpdateResult TreeSigner<Logged>::UpdateTree() {
   EntryHandle<Logged> logged;
   int64_t next_seq(sth.tree_size());
   CHECK_GE(next_seq, 0);
-  VLOG(0) << "Building tree";
+  VLOG(1) << "Building tree";
   while (true) {
     status = consistent_store_->GetSequencedEntry(next_seq, &logged);
     if (status.CanonicalCode() == util::error::NOT_FOUND) {
