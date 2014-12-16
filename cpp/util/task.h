@@ -44,6 +44,7 @@ namespace util {
 //
 //  - there are no remaining holds on the task
 //  - all cancellation callbacks have returned
+//  - all child task done callbacks have returned
 //
 class Task {
  public:
@@ -53,16 +54,17 @@ class Task {
   // Tasks can be deleted in their done callback.
   ~Task();
 
-  // Returns the executor passed into the constructor, which will be used for
-  // callbacks.
+  // Returns the executor passed into the constructor, which will be
+  // used for callbacks.
   Executor* executor() const {
     return executor_;
   }
 
-  // Requests that the asynchronous operation be cancelled. There is
-  // no guarantee that the task is PREPARED or DONE by the time this
-  // method returns. Also, the cancellation is merely a request, and
-  // could be completely ignored.
+  // Requests that the asynchronous operation (and all its
+  // descendants) be cancelled. There is no guarantee that the task is
+  // PREPARED or DONE by the time this method returns. Also, the
+  // cancellation is merely a request, and could be completely
+  // ignored.
   void Cancel();
 
   // REQUIRES: Return() has been called, which can be verified by
@@ -121,6 +123,23 @@ class Task {
   // DONE state further.
   void WhenCancelled(const std::function<void()>& cancel_cb);
 
+  // Child tasks are owned by this task (the child task will be
+  // deleted automatically after their done callback has run). All
+  // child tasks will be cancelled automatically if this task is
+  // cancelled or enters the PREPARED state (when Return() is
+  // called). Each child task has a hold on this task that is released
+  // once the child's done callback returns, so the parent task will
+  // not reach the DONE state until all of its child tasks have
+  // finished running. The executor of the child task is the same as
+  // that of the parent.
+  Task* AddChild(const std::function<void(Task*)>& done_callback) {
+    return AddChildWithExecutor(done_callback, executor_);
+  }
+
+  // Variant of AddChild() that allows setting a different executor.
+  Task* AddChildWithExecutor(const std::function<void(Task*)>& done_callback,
+                             Executor* executor);
+
   // Functions to call once the task is DONE. This could be called
   // before, during, or after the done callback, and so cannot rely on
   // the task itself. An example would be to free the memory that was
@@ -146,6 +165,8 @@ class Task {
   void TryDoneTransition(std::unique_lock<std::mutex>* lock);
   void RunCancelCallback(const std::function<void()>& cb);
   void RunCleanupAndDoneCallbacks();
+  void RunChildDoneCallback(const std::function<void(Task*)>& done_callback,
+                            Task* child_task);
 
   const std::function<void(Task*)> done_callback_;
   Executor* const executor_;
@@ -155,6 +176,9 @@ class Task {
   Status status_;  // not protected by lock_
   bool cancelled_;
   int holds_;
+  // References to child tasks are kept as shared pointers to avoid
+  // some races.
+  std::vector<std::shared_ptr<Task>> child_tasks_;
   std::vector<std::function<void()>> cancel_callbacks_;
   std::vector<std::function<void()>> cleanup_callbacks_;
 

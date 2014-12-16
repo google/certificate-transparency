@@ -402,6 +402,54 @@ TYPED_TEST(TaskTest, MultiCancel) {
 }
 
 
+TYPED_TEST(TaskTest, ChildBlocksDone) {
+  TypeParam s;
+
+  util::Task* const child_task(s.task()->AddChild(DoNothing));
+  EXPECT_FALSE(s.task()->CancelRequested());
+  EXPECT_TRUE(s.task()->IsActive());
+  EXPECT_FALSE(s.task()->IsDone());
+  EXPECT_FALSE(child_task->IsDone());
+
+  s.task()->Return();
+  EXPECT_FALSE(s.task()->IsActive());
+  EXPECT_FALSE(s.task()->IsDone());
+
+  child_task->Return();
+}
+
+
+TYPED_TEST(TaskTest, ChildCancel) {
+  TypeParam s;
+
+  util::Task* const child_task(s.task()->AddChild(DoNothing));
+  EXPECT_FALSE(s.task()->CancelRequested());
+  EXPECT_FALSE(child_task->CancelRequested());
+
+  s.task()->Cancel();
+  EXPECT_TRUE(s.task()->CancelRequested());
+  EXPECT_TRUE(child_task->CancelRequested());
+
+  child_task->Return();
+  s.task()->Return();
+}
+
+
+TYPED_TEST(TaskTest, ChildReturn) {
+  TypeParam s;
+
+  util::Task* const child_task(s.task()->AddChild(DoNothing));
+  EXPECT_FALSE(s.task()->CancelRequested());
+  EXPECT_FALSE(child_task->CancelRequested());
+
+  s.task()->Return();
+  EXPECT_FALSE(s.task()->CancelRequested());
+  EXPECT_TRUE(child_task->CancelRequested());
+
+  child_task->Return();
+}
+
+
 }  // namespace
 
 

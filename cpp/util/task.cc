@@ -5,8 +5,11 @@
 using std::bind;
 using std::function;
 using std::lock_guard;
+using std::make_shared;
 using std::mutex;
 using std::ostream;
+using std::placeholders::_1;
+using std::shared_ptr;
 using std::unique_lock;
 using std::vector;
 
@@ -44,8 +47,19 @@ void Task::Cancel() {
   // into the DONE state until they all have completed.
   holds_ += cancel_callbacks.size();
 
+  // Take a copy of the child tasks before giving back the lock. Since
+  // these are shared_ptrs, having a copy will protect us in case some
+  // of them complete and get removed (which will free them). Any
+  // child tasks created after giving back the lock will be already
+  // cancelled, so no need to cancel them here.
+  const vector<shared_ptr<Task>> child_tasks(child_tasks_);
+
   // Give up the lock, in case the executor is synchronous.
   lock.unlock();
+
+  for (const auto& child_task : child_tasks) {
+    child_task->Cancel();
+  }
 
   for (const auto& cb : cancel_callbacks) {
     executor_->Add(bind(&Task::RunCancelCallback, this, cb));
@@ -71,9 +85,24 @@ bool Task::Return(const Status& status) {
   state_ = PREPARED;
   cancel_callbacks_.clear();
 
+  // Take a copy of the child tasks, so we can still access it after
+  // calling TryDoneTransition(). See Task::Cancel() for more
+  // explanation.
+  const vector<shared_ptr<Task>> child_tasks(child_tasks_);
+
   // Do not touch any members after this, as the task object might be
   // deleted by the time this method returns.
   TryDoneTransition(&lock);
+
+  // If we still have the lock (we are not in the DONE state yet),
+  // give it up.
+  if (lock.owns_lock()) {
+    lock.unlock();
+  }
+
+  for (const auto& child_task : child_tasks) {
+    child_task->Cancel();
+  }
 
   return true;
 }
@@ -136,6 +165,31 @@ void Task::WhenCancelled(const std::function<void()>& cancel_cb) {
 }
 
 
+Task* Task::AddChildWithExecutor(const function<void(Task*)>& done_callback,
+                                 Executor* executor) {
+  const shared_ptr<Task> child_task(make_shared<Task>(
+      bind(&Task::RunChildDoneCallback, this, done_callback, _1),
+      CHECK_NOTNULL(executor)));
+  bool cancel;
+
+  {
+    lock_guard<mutex> lock(lock_);
+    CHECK_NE(state_, DONE);
+
+    child_tasks_.emplace_back(child_task);
+    ++holds_;
+
+    cancel = state_ != ACTIVE || cancelled_;
+  }
+
+  if (cancel) {
+    child_task->Cancel();
+  }
+
+  return child_task.get();
+}
+
+
 void Task::CleanupWhenDone(const function<void()>& cleanup_cb) {
   lock_guard<mutex> lock(lock_);
   CHECK_NE(state_, DONE);
@@ -195,6 +249,31 @@ void Task::RunCleanupAndDoneCallbacks() {
 
   // Once this is called, the task might get deleted.
   done_callback_(this);
+}
+
+
+void Task::RunChildDoneCallback(const function<void(Task*)>& done_callback,
+                                Task* child_task) {
+  done_callback(child_task);
+
+  unique_lock<mutex> lock(lock_);
+  vector<shared_ptr<Task>>::iterator it;
+  for (it = child_tasks_.begin(); it != child_tasks_.end(); ++it) {
+    if (it->get() == child_task) {
+      break;
+    }
+  }
+
+  CHECK(it != child_tasks_.end());
+  CHECK_GT(holds_, 0);
+  CHECK_NE(state_, DONE);
+
+  child_tasks_.erase(it);
+  --holds_;
+
+  // Do not touch any members after this, as the task object might be
+  // deleted by the time this method returns.
+  TryDoneTransition(&lock);
 }
 
 
