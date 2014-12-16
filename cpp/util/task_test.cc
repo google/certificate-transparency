@@ -75,11 +75,13 @@ class TaskTester {
   }
 
   ~TaskTester() {
-    done_started_.WaitForNotification();
+    EXPECT_TRUE(done_started_.WaitForNotificationWithTimeout(
+        milliseconds(FLAGS_task_test_jiffy_ms)));
     if (!done_continue_.HasBeenNotified()) {
       done_continue_.Notify();
     }
-    done_finished_.WaitForNotification();
+    EXPECT_TRUE(done_finished_.WaitForNotificationWithTimeout(
+        milliseconds(FLAGS_task_test_jiffy_ms)));
   }
 
   util::Task* task() {
@@ -87,7 +89,8 @@ class TaskTester {
   }
 
   void WaitForDoneToStart() {
-    done_started_.WaitForNotification();
+    EXPECT_TRUE(done_started_.WaitForNotificationWithTimeout(
+        milliseconds(FLAGS_task_test_jiffy_ms)));
   }
 
   bool HasDoneStarted() {
@@ -101,7 +104,8 @@ class TaskTester {
   }
 
   void WaitForDoneToFinish() {
-    done_finished_.WaitForNotification();
+    EXPECT_TRUE(done_finished_.WaitForNotificationWithTimeout(
+        milliseconds(FLAGS_task_test_jiffy_ms)));
   }
 
  private:
@@ -109,7 +113,8 @@ class TaskTester {
     CHECK(!task->IsActive());
     CHECK(task->IsDone());
     done_started_.Notify();
-    done_continue_.WaitForNotification();
+    EXPECT_TRUE(done_continue_.WaitForNotificationWithTimeout(
+        milliseconds(FLAGS_task_test_jiffy_ms)));
     done_finished_.Notify();
   }
 
@@ -137,8 +142,6 @@ TEST_F(TaskDeathTest, DestroyIncompleteTask) {
 
   EXPECT_DEATH(util::Task(DoNothing, &executor),
                "Check failed: state_ == DONE");
-
-  LOG(INFO) << "calling Return";
 }
 
 
@@ -166,7 +169,8 @@ TYPED_TEST(TaskTest, StateChanges) {
   pool.Add(bind(&WaitForReturnCallback<TypeParam>, &s, &notifier));
   EXPECT_TRUE(s.task()->Return());
 
-  notifier.WaitForNotification();
+  EXPECT_TRUE(notifier.WaitForNotificationWithTimeout(
+      milliseconds(FLAGS_task_test_jiffy_ms)));
 }
 
 
@@ -182,9 +186,10 @@ TYPED_TEST(TaskTest, DeleteWhenDone) {
   EXPECT_FALSE(n2.HasBeenNotified());
   s.task()->Return();
   s.ContinueDone();
-  LOG(INFO) << "waiting for deletions...";
-  n1.WaitForNotification();
-  n2.WaitForNotification();
+  EXPECT_TRUE(n1.WaitForNotificationWithTimeout(
+      milliseconds(FLAGS_task_test_jiffy_ms)));
+  EXPECT_TRUE(n2.WaitForNotificationWithTimeout(
+      milliseconds(FLAGS_task_test_jiffy_ms)));
 }
 
 
@@ -272,7 +277,8 @@ TYPED_TEST(TaskTest, CancelCallback) {
   EXPECT_FALSE(notifier.HasBeenNotified());
 
   s.task()->Cancel();
-  notifier.WaitForNotification();
+  EXPECT_TRUE(notifier.WaitForNotificationWithTimeout(
+      milliseconds(FLAGS_task_test_jiffy_ms)));
   EXPECT_TRUE(notifier.HasBeenNotified());
 
   s.task()->Return();
@@ -281,14 +287,18 @@ TYPED_TEST(TaskTest, CancelCallback) {
 
 void NotifyAndWait(Notification* cancelled, Notification* finish_cancel) {
   cancelled->Notify();
-  finish_cancel->WaitForNotification();
+  // Wait for up to two jiffies, because there's a delay of one jiffy
+  // in WaitForCancelAndReturn().
+  EXPECT_TRUE(finish_cancel->WaitForNotificationWithTimeout(
+      milliseconds(FLAGS_task_test_jiffy_ms) * 2));
 }
 
 
 template <class TypeParam>
 void WaitForCancelAndReturn(TypeParam* s, Notification* cancelled,
                             Notification* finish_cancel) {
-  cancelled->WaitForNotification();
+  EXPECT_TRUE(cancelled->WaitForNotificationWithTimeout(
+      milliseconds(FLAGS_task_test_jiffy_ms)));
   s->task()->Return();
   Delay();
   EXPECT_FALSE(s->task()->IsDone());
@@ -311,6 +321,9 @@ TYPED_TEST(TaskTest, CancelCallbackBlocksDone) {
   pool.Add(
       bind(WaitForCancelAndReturn<TypeParam>, &s, &cancelled, &finish_cancel));
   s.task()->Cancel();
+
+  // Make sure everything is completed.
+  Delay();
 }
 
 
@@ -350,7 +363,8 @@ TYPED_TEST(TaskTest, CancelCallbackAfterCancel) {
   Delay();
   s.task()->Return();
 
-  notifier.WaitForNotification();
+  EXPECT_TRUE(notifier.WaitForNotificationWithTimeout(
+      milliseconds(FLAGS_task_test_jiffy_ms)));
 }
 
 
@@ -362,7 +376,8 @@ TYPED_TEST(TaskTest, ReturnStillRunsCancelCallbacks) {
   s.task()->WhenCancelled(bind(&Notification::Notify, &notifier));
   s.task()->Return();
 
-  notifier.WaitForNotification();
+  EXPECT_TRUE(notifier.WaitForNotificationWithTimeout(
+      milliseconds(FLAGS_task_test_jiffy_ms)));
 }
 
 
