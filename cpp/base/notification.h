@@ -1,6 +1,7 @@
 #ifndef CERT_TRANS_BASE_NOTIFICATION_H_
 #define CERT_TRANS_BASE_NOTIFICATION_H_
 
+#include <chrono>
 #include <condition_variable>
 #include <mutex>
 
@@ -19,6 +20,11 @@ class Notification {
   bool HasBeenNotified() const;
 
   void WaitForNotification() const;
+
+  // Returns true if Notify() has been called, or false if the timeout
+  // expired.
+  bool WaitForNotificationWithTimeout(
+      const std::chrono::milliseconds& timeout) const;
 
  private:
   mutable std::mutex lock_;

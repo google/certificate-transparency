@@ -2,6 +2,7 @@
 
 #include <glog/logging.h>
 
+using std::chrono::milliseconds;
 using std::lock_guard;
 using std::mutex;
 using std::unique_lock;
@@ -31,6 +32,14 @@ bool Notification::HasBeenNotified() const {
 void Notification::WaitForNotification() const {
   unique_lock<mutex> lock(lock_);
   cv_.wait(lock, [this]() { return notified_; });
+}
+
+
+bool Notification::WaitForNotificationWithTimeout(
+    const milliseconds& timeout) const {
+  unique_lock<mutex> lock(lock_);
+  cv_.wait_for(lock, timeout, [this]() { return notified_; });
+  return notified_;
 }
 
 

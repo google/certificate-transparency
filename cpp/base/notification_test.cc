@@ -3,6 +3,8 @@
 #include "base/notification.h"
 #include "util/testing.h"
 
+using std::chrono::milliseconds;
+
 namespace {
 
 
@@ -10,8 +12,12 @@ TEST(NotificationTest, BasicTests) {
   cert_trans::Notification notifier;
 
   ASSERT_FALSE(notifier.HasBeenNotified());
+  EXPECT_FALSE(notifier.WaitForNotificationWithTimeout(milliseconds(0)));
+  EXPECT_FALSE(notifier.WaitForNotificationWithTimeout(milliseconds(10)));
   notifier.Notify();
   notifier.WaitForNotification();
+  EXPECT_TRUE(notifier.WaitForNotificationWithTimeout(milliseconds(0)));
+  EXPECT_TRUE(notifier.WaitForNotificationWithTimeout(milliseconds(10)));
   ASSERT_TRUE(notifier.HasBeenNotified());
 }
 
