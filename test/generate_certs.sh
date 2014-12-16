@@ -50,21 +50,21 @@ request_cert() {
 }
 
 issue_cert() {
-cert_dir=$1
-issuer=$2
-subject=$3
-extfile=$4
-extensions=$5
-selfsign=$6
-out=$7
+  cert_dir=$1
+  issuer=$2
+  subject=$3
+  extfile=$4
+  extensions=$5
+  selfsign=$6
+  out=$7
 
-if [ $selfsign == "true" ]; then
-  cert_args="-selfsign"
-else
-  cert_args="-cert $cert_dir/$issuer-cert.pem"
-fi
+  if [ $selfsign == "true" ]; then
+    cert_args="-selfsign"
+  else
+    cert_args="-cert $cert_dir/$issuer-cert.pem"
+  fi
 
- echo -e "y\ny\n" | \
+  echo -e "y\ny\n" | \
     openssl ca -in $cert_dir/$subject-cert.csr $cert_args \
     -keyfile $cert_dir/$issuer-key.pem -config $cert_dir/$issuer.conf \
     -extfile $extfile -extensions $extensions -passin pass:password1 \
