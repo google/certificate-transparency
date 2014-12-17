@@ -3,6 +3,7 @@
 import collections
 import functools
 import multiprocessing
+import traceback
 import Queue
 
 from ct.client import entry_decoder
@@ -74,6 +75,14 @@ def process_entries(entry_queue, output_queue, match_callback):
                         _ERROR_PARSING_ENTRY,
                         "Entry %d failed strict parsing:\n%s" %
                         (count, c)))
+            except Exception as e:
+                print "Unknown parsing failure for entry %d:\n%s" % (
+                    count, e)
+                traceback.print_exc()
+                output_queue.put(QueueMessage(
+                    _ERROR_PARSING_ENTRY,
+                    "Entry %d failed parsing with an unknown error:\n%s" %
+                    (count, e)))
             if c:
                 match_result = match_callback(
                         c, ts_entry.entry_type, parsed_entry.extra_data, count)
@@ -92,14 +101,19 @@ def _scan(entry_queue, log_url, range_description):
     range_start, range_end = range_description
     range_end -= 1
     client = log_client.LogClient(log_url)
-    entries = client.get_entries(range_start, range_end)
-    scanned = range_start
-    for entry in entries:
-        scanned += 1
-        # Can't pickle protocol buffers with protobuf module version < 2.5.0
-        # (https://code.google.com/p/protobuf/issues/detail?id=418)
-        # so send serialized entry.
-        entry_queue.put((scanned, entry.SerializeToString()))
+    try:
+        entries = client.get_entries(range_start, range_end)
+        scanned = range_start
+        for entry in entries:
+            scanned += 1
+            # Can't pickle protocol buffers with protobuf module version < 2.5.0
+            # (https://code.google.com/p/protobuf/issues/detail?id=418)
+            # so send serialized entry.
+            entry_queue.put((scanned, entry.SerializeToString()))
+    except Exception as e:
+        print "Exception when fetching range %d to %d:\n%s" % (
+            range_start, range_end, e)
+        traceback.print_exc()
 
 ScanResults = collections.namedtuple(
     'ScanResults', ['total', 'matches', 'errors'])
