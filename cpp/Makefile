@@ -63,7 +63,6 @@ TESTS = \
 	base/notification_test \
 	log/database_test \
 	log/etcd_consistent_store_test \
-	log/fake_consistent_store_test \
 	log/file_storage_test \
 	log/frontend_signer_test \
 	log/log_lookup_test \
@@ -211,7 +210,7 @@ log/libcert.a: log/cert.o log/cert_checker.o log/cert_submission_handler.o \
 
 log/libdatabase.a: log/file_storage.o log/filesystem_ops.o log/file_db_cert.o \
                    log/sqlite_db_cert.o log/database.o \
-                   log/etcd_consistent_store_cert.o log/fake_consistent_store_cert.o
+                   log/etcd_consistent_store_cert.o
 	rm -f $@
 	ar -rcs $@ $^
 
@@ -301,11 +300,6 @@ log/logged_certificate_test: log/logged_certificate_test.o proto/libproto.a \
 
 log/etcd_consistent_store_test: base/notification.o \
                                 log/etcd_consistent_store_cert.o \
-                                proto/libproto.a util/libutil.a \
-                                merkletree/libmerkletree.a $(GMOCKLIB) \
-                                $(GTESTLIB)
-
-log/fake_consistent_store_test: log/fake_consistent_store_cert.o \
                                 proto/libproto.a util/libutil.a \
                                 merkletree/libmerkletree.a $(GMOCKLIB) \
                                 $(GTESTLIB)
