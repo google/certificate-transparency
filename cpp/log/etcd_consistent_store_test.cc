@@ -194,7 +194,7 @@ TEST_F(EtcdConsistentStoreDeathTest,
   InsertEntry(kPath, other_cert);
 
   EXPECT_DEATH(store_->AddPendingEntry(&cert),
-               "preexisting_entry.*==.*entry.*");
+               "Check failed: LeafEntriesMatch");
 }
 
 

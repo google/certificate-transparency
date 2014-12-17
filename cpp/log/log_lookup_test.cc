@@ -3,7 +3,7 @@
 #include <memory>
 #include <string>
 
-#include "log/fake_consistent_store.h"
+#include "log/etcd_consistent_store.h"
 #include "log/file_db.h"
 #include "log/file_storage.h"
 #include "log/log_lookup.h"
@@ -16,16 +16,22 @@
 #include "log/tree_signer.h"
 #include "merkletree/merkle_verifier.h"
 #include "merkletree/serial_hasher.h"
+#include "util/fake_etcd.h"
 #include "util/testing.h"
 #include "util/util.h"
 
 namespace {
 
+namespace libevent = cert_trans::libevent;
+
 using cert_trans::EntryHandle;
+using cert_trans::FakeEtcdClient;
 using cert_trans::LoggedCertificate;
 using cert_trans::TreeSigner;
 using ct::MerkleAuditProof;
+using std::make_shared;
 using std::string;
+using std::shared_ptr;
 
 typedef Database<LoggedCertificate> DB;
 typedef TreeSigner<LoggedCertificate> TS;
@@ -37,7 +43,10 @@ class LogLookupTest : public ::testing::Test {
  protected:
   LogLookupTest()
       : test_db_(),
-        store_("id"),
+        base_(make_shared<libevent::Base>()),
+        etcd_client_(base_),
+        store_(&etcd_client_, "/root", "id"),
+        event_pump_(base_),
         test_signer_(),
         tree_signer_(std::chrono::duration<double>(0), db(), &store_,
                      TestSigner::DefaultLogSigner()),
@@ -64,7 +73,10 @@ class LogLookupTest : public ::testing::Test {
 
 
   TestDB<T> test_db_;
-  cert_trans::FakeConsistentStore<LoggedCertificate> store_;
+  shared_ptr<libevent::Base> base_;
+  FakeEtcdClient etcd_client_;
+  cert_trans::EtcdConsistentStore<LoggedCertificate> store_;
+  libevent::EventPumpThread event_pump_;
   TestSigner test_signer_;
   TS tree_signer_;
   LogVerifier verifier_;

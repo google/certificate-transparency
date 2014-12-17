@@ -55,6 +55,23 @@ util::Status EtcdConsistentStore<Logged>::SetServingSTH(
 
 
 template <class Logged>
+bool LeafEntriesMatch(const Logged& a, const Logged& b) {
+  CHECK_EQ(a.entry().type(), b.entry().type());
+  switch (a.entry().type()) {
+    case ct::X509_ENTRY:
+      return a.entry().x509_entry().leaf_certificate() ==
+             b.entry().x509_entry().leaf_certificate();
+    case ct::PRECERT_ENTRY:
+      return a.entry().precert_entry().pre_certificate() ==
+             b.entry().precert_entry().pre_certificate();
+    case ct::UNKNOWN_ENTRY_TYPE:
+      LOG(FATAL) << "Encountered UNKNOWN_ENTRY_TYPE:\n"
+                 << a.entry().DebugString();
+  }
+}
+
+
+template <class Logged>
 util::Status EtcdConsistentStore<Logged>::AddPendingEntry(Logged* entry) {
   CHECK_NOTNULL(entry);
   CHECK(!entry->has_sequence_number());
@@ -70,7 +87,10 @@ util::Status EtcdConsistentStore<Logged>::AddPendingEntry(Logged* entry) {
                  << status;
       return status;
     }
-    CHECK(preexisting_entry.Entry().entry() == entry->entry());
+
+    // Check the leaf certs are the same (we might be seeing the same cert
+    // submitted with a different chain.)
+    CHECK(LeafEntriesMatch(preexisting_entry.Entry(), *entry));
     *entry->mutable_sct() = preexisting_entry.Entry().sct();
     return util::Status(util::error::ALREADY_EXISTS,
                         "Pending entry already exists.");
