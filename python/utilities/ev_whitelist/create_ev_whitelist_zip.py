@@ -24,7 +24,6 @@ NUM_FETCHING_PROCESSES = 40
 LOGS_LIST = [
     "https://ct.googleapis.com/pilot",
     "https://ct.googleapis.com/aviator",
-    "https://alpha.ctlogs.org"
 ]
 
 FLAGS = gflags.FLAGS
