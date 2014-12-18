@@ -66,16 +66,6 @@ class SQLiteCertDB(cert_db.CertDB):
     def __compare_processed_names(prefix, name):
         return prefix == name[:len(prefix)]
 
-    @staticmethod
-    def _maybe_iterable(obj):
-        # TODO(laiqu) change CertificateDescription, so we don't need it
-        # using collections.Iterable won't work properly because unicode is also
-        # iterable
-        if isinstance(obj, list):
-            return obj
-        else:
-            return [obj]
-
     def __store_cert(self, cert, index, log_key, cursor):
         der_cert = cert.der
         if not FLAGS.cert_db_sqlite_synchronous_write:
@@ -99,7 +89,7 @@ class SQLiteCertDB(cert_db.CertDB):
                     cursor.execute("INSERT INTO %s(log, cert_id, %s) VALUES(?, ?, %s)" %
                                        (table_name, ','.join(column_names),
                                         ('?,' * len(column_names))[:-1]),
-                                   [log_key, index] + self._maybe_iterable(field))
+                                   [log_key, index] + field)
 
     def store_certs_desc(self, certs, log_key):
         """Store certificates using it's descriptions.
