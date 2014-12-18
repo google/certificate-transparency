@@ -849,6 +849,7 @@ static void WriteCertificate(const std::string& cert, int entry,
 }
 
 void GetEntries() {
+  CHECK_NE(FLAGS_ct_server, "");
   HTTPLogClient client(FLAGS_ct_server);
   std::vector<AsyncLogClient::Entry> entries;
   AsyncLogClient::Status error =

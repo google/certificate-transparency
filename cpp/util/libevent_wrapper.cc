@@ -21,7 +21,7 @@ unsigned short GetPortFromUri(const evhttp_uri* uri) {
   if (retval < 1 || retval > 65535) {
     retval = 0;
 
-    if (!strcmp("http", evhttp_uri_get_scheme(uri))) {
+    if (!strcmp("http", CHECK_NOTNULL(evhttp_uri_get_scheme(uri)))) {
       retval = 80;
     }
   }
