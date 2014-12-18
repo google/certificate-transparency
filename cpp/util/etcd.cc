@@ -39,6 +39,9 @@ using util::StatusOr;
 using util::Task;
 using util::TaskHold;
 
+DEFINE_int32(etcd_watch_error_retry_delay_secs, 5,
+             "delay between retrying etcd watch requests");
+
 namespace cert_trans {
 
 namespace {
@@ -640,8 +643,13 @@ void EtcdClient::WatchState::RequestDone(Status status,
     }
   }
 
+  return StartRequest();
+
 fail:
-  StartRequest();
+  client_->event_base_->Delay(
+      seconds(FLAGS_etcd_watch_error_retry_delay_secs),
+      task_->AddChildWithExecutor(bind(&WatchState::StartRequest, this),
+                                  client_->event_base_.get()));
 }
 
 
