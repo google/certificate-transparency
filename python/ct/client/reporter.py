@@ -29,9 +29,11 @@ class PoolException(Exception):
         self.failure = fail_info
 
 def _scan_der_cert(der_certs, checks):
+    current = -1
     try:
         result = []
         for log_index, der_cert in der_certs:
+            current = log_index
             partial_result = []
             strict_failure = False
             try:
@@ -57,12 +59,10 @@ def _scan_der_cert(der_certs, checks):
             result.append((desc, log_index, partial_result))
         return result
     except Exception:
-        # TODO(laiqu) return exact certificate index which caused an exception
-        # instead of range.
         _, exception, exception_traceback = sys.exc_info()
         exception_traceback  = traceback.format_exc(exception_traceback)
         raise PoolException((exception, exception_traceback,
-                             der_certs[0][0], der_certs[-1][0]))
+                             der_certs[0][0], der_certs[-1][0], current))
 
 
 class CertificateReport(object):
@@ -120,11 +120,11 @@ def handle_writing(queue, report):
         try:
             result = result.get()
         except PoolException as e:
-            ex, ex_tb, first, last = e.failure
+            ex, ex_tb, first, last, bad_one = e.failure
             logging.critical(ex_tb)
             logging.critical(ex.args[0])
-            logging.critical("Batch <%d, %d> %s" % (first, last,
-                                        "raised an exception during scan"))
+            logging.critical("Entry %d in batch <%d, %d> %s" % (bad_one,
+                             first, last, "raised an exception during scan"))
         else:
             report._batch_scanned_callback(result)
         queue.task_done()

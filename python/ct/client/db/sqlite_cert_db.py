@@ -1,7 +1,13 @@
 import sqlite3
+import gflags
 
 from ct.client.db import cert_db
 from ct.client.db import cert_desc
+
+FLAGS = gflags.FLAGS
+
+gflags.DEFINE_bool("cert_db_sqlite_synchronous_write", True, "If set to true, "
+                   "sqlite will use synchronous write.")
 
 class SQLiteCertDB(cert_db.CertDB):
     def __init__(self, connection_manager):
@@ -39,6 +45,8 @@ class SQLiteCertDB(cert_db.CertDB):
 
     def __store_cert(self, cert, index, log_key, cursor):
         der_cert = cert.der
+        if not FLAGS.cert_db_sqlite_synchronous_write:
+            cursor.execute("PRAGMA synchronous = OFF")
         try:
             cursor.execute("INSERT INTO certs(log, id, sha256_hash, cert) "
                            "VALUES(?, ?, ?, ?) ",
