@@ -1,0 +1,33 @@
+syntax = "proto2";
+
+package ct;
+
+message Validity {
+  optional uint64 not_before = 1;
+  optional uint64 not_after = 2;
+}
+
+message SignatureAlgorithm {
+  optional string algorithm_id = 1;
+  optional bytes parameters = 2;
+}
+
+message X509Description {
+  optional string version = 1;
+
+  // hex, lowercase, separated by colons
+  optional string serial_number = 2;
+
+  // tbs and cert signatures should be the same
+  optional SignatureAlgorithm tbs_signature = 3;
+
+  optional SignatureAlgorithm cert_signature = 4;
+
+  optional Validity validity = 5;
+
+  repeated string subject_names = 6;
+
+  repeated string alt_subject_names = 7;
+
+  repeated string ip_addresses = 8;
+}

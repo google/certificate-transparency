@@ -1,5 +1,5 @@
 all: ct/proto/client_pb2.py ct/proto/ct_pb2.py ct/proto/tls_options_pb2.py \
-	ct/proto/test_message_pb2.py
+	ct/proto/test_message_pb2.py ct/proto/certificate_pb2.py
 
 ct/proto/%_pb2.py: ct/proto/%.proto
 	protoc $^ -I/usr/include/ -I/usr/local/include -I. --python_out=.

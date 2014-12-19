@@ -1,25 +1,12 @@
 import re
 from ct.crypto import cert
+from ct.proto import certificate_pb2
 
 class CertificateDescription(object):
     """Container for fields in certificate that CertDB is supposed to store."""
     def __init__(self):
-        """Returns empty object with all fields set to None/empty array"""
-        # everything here is an unicode string unless stated otherwise
-        self.der = None # bytes
-        self.subject_names = [] # array of unicodes
-        self.alt_subject_names = [] # array of unicodes
-        self.version = None # number as an unicode
-        self.serial_number = None
-        self.tbs_signature = None # tuple (oid, parameter/None if no parameter)
-        self.cert_signature = None # same as tbs_signature
-        self.issuer = None
-        self.validity = None # tuple with two dates
-        self.ip_addresses = [] # array of unicodes
-        self.subject_public_key = None
-        self.signature_value = None
-        self.crls = [] # array of unicodes
-        self.ocsps = [] # array of unicodes
+        self.der = None
+        self.proto = certificate_pb2.X509Description()
 
     @classmethod
     def from_cert(cls, certificate):
@@ -40,7 +27,7 @@ class CertificateDescription(object):
             alt_subject_names = []
 
         try:
-            version = str(certificate.version().value)
+            version = str(certificate.version().human_readable())
         except cert.CertificateError:
             version = None
 
@@ -73,21 +60,26 @@ class CertificateDescription(object):
         if der:
             desc.der = der
         if subject_names:
-            desc.subject_names = [to_unicode(".".join(process_name(sub)))
-                                         for sub in subject_names]
+            desc.proto.subject_names.extend([to_unicode(
+                                             ".".join(process_name(sub)))
+                                            for sub in subject_names])
         if alt_subject_names:
-            desc.alt_subject_names = [to_unicode(".".join(process_name(alt)))
-                                         for alt in alt_subject_names]
+            desc.proto.alt_subject_names.extend([to_unicode(
+                                                 ".".join(process_name(alt)))
+                                                 for alt in alt_subject_names])
         if version:
-            desc.version = to_unicode(version)
+            desc.proto.version = to_unicode(version)
         if serial_number:
-            desc.serial_number = to_unicode(serial_number)
+            desc.proto.serial_number = to_unicode(serial_number)
         if ip_addresses:
-            desc.ip_addresses = [to_unicode(ip) for ip in ip_addresses]
+            desc.proto.ip_addresses.extend([to_unicode(ip)
+                                            for ip in ip_addresses])
         return desc
 
     def __getitem__(self, name):
-        return self.__dict__[name]
+        if name in [field[0].name for field in self.proto.ListFields()]:
+            return getattr(self.proto, name)
+
 
 def to_unicode(str_):
     return unicode(str_, 'utf-8', 'replace')
