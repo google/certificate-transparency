@@ -24,12 +24,13 @@ NUM_FETCHING_PROCESSES = 40
 LOGS_LIST = [
     "https://ct.googleapis.com/pilot",
     "https://ct.googleapis.com/aviator",
+    "https://ct1.digicert-ct.com/log",
 ]
 
 FLAGS = gflags.FLAGS
 
 gflags.DEFINE_string(
-    "output_crx", "chrome_ev_whitelist_%d.zip",
+    "output_crx", "chrome_ev_whitelist_%d",
     "Output Chrome extension. "
     "This zip file should be uploaded to the Chrome web store.")
 
