@@ -159,7 +159,6 @@ class Serializer {
   void WriteUint(T in, size_t bytes) {
     assert(bytes <= sizeof in);
     assert(bytes == sizeof in || in >> (bytes * 8) == 0);
-    std::string result;
     for (; bytes > 0; --bytes)
       output_.push_back(((in & (static_cast<T>(0xff) << ((bytes - 1) * 8))) >>
                          ((bytes - 1) * 8)));

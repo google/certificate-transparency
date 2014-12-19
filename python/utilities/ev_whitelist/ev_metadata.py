@@ -569,6 +569,38 @@ _EV_ROOTS = (
     (
         "b80186d1eb9c86a54104cf3054f34c52b7e558c6",
         ("2.16.840.1.114404.1.1.2.4.1",),
+        ),
+
+    # Pending inclusion in Chrome
+    # Swisscom Root EV CA 2
+    (
+        "e7a19029d3d552dc0d0fc692d3ea880d152e1a6b",
+        ("2.16.756.1.83.21.0",),
+        ),
+    # Buypass Class 3 Root CA
+    (
+        "dafaf7fa6684ec068f1450bdc7c281a5bca96457",
+        ("2.16.578.1.26.1.3.3",),
+        ),
+    # Autoridad de Certificacion Firmaprofesional CIF A62634068
+    (
+        "aec5fb3fc8e1bfc4e54f03075a9ae800b7f7b6fa",
+        ("1.3.6.1.4.1.13177.10.1.3.10",),
+        ),
+    # TURKTRUST Elektronik Sertifika Hizmet Saglayicisi
+    (
+        "f17f6fb631dc99e3a3c87ffe1cf1811088d96033",
+        ("2.16.792.3.0.3.1.1.5",),
+        ),
+    # Actalis Authentication Root CA
+    (
+        "f373b387065a28848af2f34ace192bddc78e9cac",
+        ("1.3.159.1.17.1",),
+        ),
+    # QuoVadis Root CA 2 G3
+    (
+        "093c61f38b8bdc7d55df7538020500e125f5c836",
+        ("1.3.6.1.4.1.8024.0.2.100.1.2",),
         )
 )
 ####### Added #######
@@ -583,6 +615,12 @@ _EV_ROOTS = (
 ## Certum CA - Certum Trusted Network CA
 ## Valicert Class 1 - SECOM
 ## Baltimore Cybertrust Root - Cybertrust Global Root, DigiCert
+## Swisscom Root EV CA 2
+## Buypass Class 3 Root CA
+## Autoridad de Certificacion Firmaprofesional CIF A62634068
+## TURKTRUST Elektronik Sertifika Hizmet Saglayicisi
+## Actalis Authentication Root CA
+## QuoVadis Root CA 2 G3
 
 EV_POLICIES = defaultdict(set)
 EV_ROOTS = defaultdict(set)

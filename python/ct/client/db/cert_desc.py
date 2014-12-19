@@ -4,9 +4,22 @@ from ct.crypto import cert
 class CertificateDescription(object):
     """Container for fields in certificate that CertDB is supposed to store."""
     def __init__(self):
-        """Returns empty object with all fields set to None"""
-        self.der = None
-        self.subject_common_names = None
+        """Returns empty object with all fields set to None/empty array"""
+        # everything here is an unicode string unless stated otherwise
+        self.der = None # bytes
+        self.subject_names = [] # array of unicodes
+        self.alt_subject_names = [] # array of unicodes
+        self.version = None # number as an unicode
+        self.serial_number = None
+        self.tbs_signature = None # tuple (oid, parameter/None if no parameter)
+        self.cert_signature = None # same as tbs_signature
+        self.issuer = None
+        self.validity = None # tuple with two dates
+        self.ip_addresses = [] # array of unicodes
+        self.subject_public_key = None
+        self.signature_value = None
+        self.crls = [] # array of unicodes
+        self.ocsps = [] # array of unicodes
 
     @classmethod
     def from_cert(cls, certificate):
@@ -14,17 +27,43 @@ class CertificateDescription(object):
         be similar in every database implementation."""
         der = certificate.to_der()
         try:
-            subject_common_names = [sub.value
-                                    for sub in
+            subject_names = [sub.value for sub in
                                     certificate.subject_common_names()]
         except cert.CertificateError:
-            subject_common_names = []
+            subject_names = []
+
+        try:
+            alt_subject_names = [sub.value
+                                 for sub in
+                                 certificate.subject_dns_names()]
+        except cert.CertificateError:
+            alt_subject_names = []
+
+        try:
+            version = str(certificate.version().value)
+        except cert.CertificateError:
+            version = None
+
+        try:
+            serial_number = str(certificate.serial_number().value)
+        except cert.CertificateError:
+            serial_number = None
+
+        try:
+            ip_addresses = [str(ip) for ip in certificate.subject_ip_addresses()]
+        except cert.CertificateError:
+            ip_addresses = []
 
         return cls.from_values(der,
-                               subject_common_names)
+                               subject_names,
+                               alt_subject_names,
+                               version,
+                               serial_number,
+                               ip_addresses)
 
     @staticmethod
-    def from_values(der=None, subject_common_names=None):
+    def from_values(der=None, subject_names=None, alt_subject_names=None,
+                    version=None, serial_number=None, ip_addresses=None):
         """Creates CertificateDescription from provided fields.
 
         Without this method there is no easy way of creating description for
@@ -33,11 +72,25 @@ class CertificateDescription(object):
         desc = CertificateDescription()
         if der:
             desc.der = der
-        if subject_common_names:
-            desc.subject_common_names = [u".".join(process_name(
-                                            unicode(sub, 'utf-8', 'replace')))
-                                         for sub in subject_common_names]
+        if subject_names:
+            desc.subject_names = [to_unicode(".".join(process_name(sub)))
+                                         for sub in subject_names]
+        if alt_subject_names:
+            desc.alt_subject_names = [to_unicode(".".join(process_name(alt)))
+                                         for alt in alt_subject_names]
+        if version:
+            desc.version = to_unicode(version)
+        if serial_number:
+            desc.serial_number = to_unicode(serial_number)
+        if ip_addresses:
+            desc.ip_addresses = [to_unicode(ip) for ip in ip_addresses]
         return desc
+
+    def __getitem__(self, name):
+        return self.__dict__[name]
+
+def to_unicode(str_):
+    return unicode(str_, 'utf-8', 'replace')
 
 def process_name(subject, reverse=True):
     # RFCs for DNS names: RFC 1034 (sect. 3.5), RFC 1123 (sect. 2.1);
