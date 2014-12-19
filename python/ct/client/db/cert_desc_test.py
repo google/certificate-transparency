@@ -8,10 +8,10 @@ class CertificateDescriptionTest(unittest.TestCase):
         desc = cert_desc.CertificateDescription.from_cert(CERT)
         self.assertEqual(desc.der, CERT.to_der())
         self.assertEqual(desc.subject_names,
-                         ['.'.join(cert_desc.process_name(sub.value))
+                         [['.'.join(cert_desc.process_name(sub.value))]
                           for sub in CERT.subject_common_names()])
         self.assertEqual(desc.alt_subject_names,
-                         ['.'.join(cert_desc.process_name(sub.value))
+                         [['.'.join(cert_desc.process_name(sub.value))]
                           for sub in CERT.subject_dns_names()])
         self.assertEqual(desc.version, str(CERT.version().value))
         self.assertEqual(desc.serial_number, str(CERT.serial_number().value))

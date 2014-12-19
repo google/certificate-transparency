@@ -73,17 +73,17 @@ class CertificateDescription(object):
         if der:
             desc.der = der
         if subject_names:
-            desc.subject_names = [to_unicode(".".join(process_name(sub)))
+            desc.subject_names = [[to_unicode(".".join(process_name(sub)))]
                                          for sub in subject_names]
         if alt_subject_names:
-            desc.alt_subject_names = [to_unicode(".".join(process_name(alt)))
+            desc.alt_subject_names = [[to_unicode(".".join(process_name(alt)))]
                                          for alt in alt_subject_names]
         if version:
             desc.version = to_unicode(version)
         if serial_number:
             desc.serial_number = to_unicode(serial_number)
         if ip_addresses:
-            desc.ip_addresses = [to_unicode(ip) for ip in ip_addresses]
+            desc.ip_addresses = [[to_unicode(ip)] for ip in ip_addresses]
         return desc
 
     def __getitem__(self, name):
