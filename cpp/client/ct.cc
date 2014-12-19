@@ -32,6 +32,7 @@
 #include "monitor/sqlite_db.h"
 #include "proto/ct.pb.h"
 #include "proto/serializer.h"
+#include "util/read_key.h"
 #include "util/util.h"
 
 DEFINE_string(ssl_client_trusted_cert_dir, "",
@@ -125,6 +126,7 @@ using cert_trans::Cert;
 using cert_trans::CertChain;
 using cert_trans::HTTPLogClient;
 using cert_trans::PreCertChain;
+using cert_trans::ReadPublicKey;
 using cert_trans::TbsCertificate;
 using ct::LogEntry;
 using ct::MerkleAuditProof;
@@ -134,6 +136,7 @@ using ct::SignedCertificateTimestampList;
 using std::shared_ptr;
 using std::string;
 using std::vector;
+using util::StatusOr;
 
 // SCTs presented to clients have to be encoded as a list.
 // Helper method for encoding a single SCT.
@@ -146,20 +149,13 @@ static string SCTToList(const string& serialized_sct) {
 }
 
 static LogVerifier* GetLogVerifierFromFlags() {
-  CHECK_NE(FLAGS_ct_server_public_key, "");
-  string log_server_key = FLAGS_ct_server_public_key;
-  EVP_PKEY* pkey = NULL;
-  FILE* fp = fopen(log_server_key.c_str(), "r");
+  CHECK(!FLAGS_ct_server_public_key.empty());
 
-  PCHECK(fp != static_cast<FILE*>(NULL))
-      << "Could not read CT server public key file";
-  // No password.
-  PEM_read_PUBKEY(fp, &pkey, NULL, NULL);
-  CHECK_NE(pkey, static_cast<EVP_PKEY*>(NULL))
-      << log_server_key << " is not a valid PEM-encoded public key.";
-  fclose(fp);
+  StatusOr<EVP_PKEY*> pkey(ReadPublicKey(FLAGS_ct_server_public_key));
+  CHECK(pkey.ok()) << "could not read CT server public key file: "
+                   << pkey.status();
 
-  return new LogVerifier(new LogSigVerifier(pkey),
+  return new LogVerifier(new LogSigVerifier(pkey.ValueOrDie()),
                          new MerkleVerifier(new Sha256Hasher()));
 }
 

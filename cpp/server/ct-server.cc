@@ -24,7 +24,7 @@
 #include "util/fake_etcd.h"
 #include "util/libevent_wrapper.h"
 #include "util/periodic_closure.h"
-#include "util/read_private_key.h"
+#include "util/read_key.h"
 #include "util/thread_pool.h"
 
 DEFINE_string(server, "localhost", "Server host");

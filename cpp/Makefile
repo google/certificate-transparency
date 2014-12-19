@@ -312,13 +312,13 @@ monitor/database_test: monitor/database_test.o monitor/database.o \
 # client
 client/ct: client/ct.o client/client.o client/ssl_client.o \
            client/http_log_client.o monitor/sqlite_db.o monitor/database.o \
-           monitor/monitor.o client/async_log_client.o \
+           monitor/monitor.o client/async_log_client.o util/read_key.o \
            $(LOCAL_LIBS)
 
 server/ct-dns-server: server/ct-dns-server.o server/event.o $(LOCAL_LIBS)
 
-server/ct-server: server/ct-server.o util/read_private_key.o \
-	server/handler.o base/notification.o $(LOCAL_LIBS)
+server/ct-server: server/ct-server.o util/read_key.o server/handler.o \
+	base/notification.o $(LOCAL_LIBS)
 
 tools/dump_cert: tools/dump_cert.o proto/libproto.a util/libutil.a
 
