@@ -25,6 +25,8 @@ LOGS_LIST = [
     "https://ct.googleapis.com/pilot",
     "https://ct.googleapis.com/aviator",
     "https://ct1.digicert-ct.com/log",
+    "https://log.certly.io",
+    "https://ct.izenpe.com",
 ]
 
 FLAGS = gflags.FLAGS
