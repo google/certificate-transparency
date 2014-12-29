@@ -68,8 +68,7 @@ TEST_F(SignerVerifierTest, CheckSignature) {
 }
 
 // Check that a signature on a test string verifies.  Also check that
-// successive
-// signatures of the same data are different.
+// successive signatures of the same data are different.
 TEST_F(SignerVerifierTest, SignAndVerify) {
   // Sign the test string.
   DigitallySigned signature1;

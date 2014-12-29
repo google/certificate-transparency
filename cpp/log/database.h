@@ -128,9 +128,8 @@ class Database {
   virtual std::set<std::string> PendingHashes() const = 0;
 
   // Attempt to write a tree head. Fails only if a tree head with this
-  // timestamp
-  // already exists (i.e., |timestamp| is primary key). Does not check that
-  // the timestamp is newer than previous entries.
+  // timestamp already exists (i.e., |timestamp| is primary key). Does
+  // not check that the timestamp is newer than previous entries.
   WriteResult WriteTreeHead(const ct::SignedTreeHead& sth) {
     if (!sth.has_timestamp())
       return MISSING_TREE_HEAD_TIMESTAMP;

@@ -32,9 +32,8 @@ class CertChecker {
 
   enum CertVerifyResult {
     OK,
-    // Until we know what the precise cert chain policy is, bag all chain
-    // errors
-    // into INVALID_CERTIFICATE_CHAIN.
+    // Until we know what the precise cert chain policy is, bag all
+    // chain errors into INVALID_CERTIFICATE_CHAIN.
     INVALID_CERTIFICATE_CHAIN,
     PRECERT_CHAIN_NOT_WELL_FORMED,
     ROOT_NOT_IN_LOCAL_STORE,

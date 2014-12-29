@@ -182,15 +182,15 @@ CertChecker::CertVerifyResult CertChecker::CheckPreCertChain(
   }
   // Check the issuer and signature chain.
   // We do not, at this point, concern ourselves with whether the CA
-  // certificate
-  // that issued the precert is a Precertificate Signing Certificate (i.e., has
-  // restricted Extended Key Usage) or not, since this does not influence the
-  // validity of the chain. The purpose of the EKU is effectively to allow CAs
-  // to create an intermediate whose scope can be limited to CT precerts only
-  // (by making this extension critical).
-  // TODO(ekasper): determine (i.e., ask CAs) if CA:false Precertificate
-  // Signing
-  // Certificates should be tolerated if they have the necessary EKU set.
+  // certificate that issued the precert is a Precertificate Signing
+  // Certificate (i.e., has restricted Extended Key Usage) or not,
+  // since this does not influence the validity of the chain. The
+  // purpose of the EKU is effectively to allow CAs to create an
+  // intermediate whose scope can be limited to CT precerts only (by
+  // making this extension critical).
+  // TODO(ekasper): determine (i.e., ask CAs) if CA:false
+  // Precertificate Signing Certificates should be tolerated if they
+  // have the necessary EKU set.
   // Preference is "no".
   CertVerifyResult res = CheckIssuerChain(chain);
   if (res != OK)
