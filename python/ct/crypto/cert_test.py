@@ -5,7 +5,8 @@ import gflags
 import time
 import unittest
 import sys
-from ct.crypto import cert, error
+from ct.crypto import cert
+from ct.crypto import error
 from ct.crypto.asn1 import oid
 from ct.crypto.asn1 import x509_extension as x509_ext
 from ct.crypto.asn1 import x509_name
