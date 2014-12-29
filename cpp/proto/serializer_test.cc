@@ -65,8 +65,7 @@ const char kDefaultSCTListHexString[] =
     "0038"
     // the SCT
     "0069616d617075626c69636b657973686174776f666976657369786469676573740000000"
-    "0"
-    "000004d20000040300097369676e6174757265";
+    "0000004d20000040300097369676e6174757265";
 
 const char kDefaultCertSCTSignedHexString[] =
     // version, 1 byte

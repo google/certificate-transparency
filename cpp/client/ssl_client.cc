@@ -130,9 +130,8 @@ LogVerifier::VerifyResult SSLClient::VerifySCT(const string& token,
                                                SSLClientCTData* data) {
   CHECK(data->has_reconstructed_entry());
   SignedCertificateTimestamp local_sct;
-  // Skip over bad SCTs. These could be either badly encoded ones, or SCTs
-  // whose
-  // version we don't understand.
+  // Skip over bad SCTs. These could be either badly encoded ones, or
+  // SCTs whose version we don't understand.
   if (Deserializer::DeserializeSCT(token, &local_sct) != Deserializer::OK)
     return LogVerifier::INVALID_FORMAT;
 
