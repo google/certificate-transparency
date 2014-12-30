@@ -24,6 +24,10 @@ Verifier::Verifier(EVP_PKEY* pkey) : pkey_(CHECK_NOTNULL(pkey)) {
       hash_algo_ = DigitallySigned::SHA256;
       sig_algo_ = DigitallySigned::ECDSA;
       break;
+    case EVP_PKEY_RSA:
+      hash_algo_ = DigitallySigned::SHA256;
+      sig_algo_ = DigitallySigned::RSA;
+      break;
     default:
       LOG(FATAL) << "Unsupported key type " << pkey_->type;
   }

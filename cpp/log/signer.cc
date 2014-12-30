@@ -24,6 +24,10 @@ Signer::Signer(EVP_PKEY* pkey) : pkey_(CHECK_NOTNULL(pkey)) {
       hash_algo_ = ct::DigitallySigned::SHA256;
       sig_algo_ = ct::DigitallySigned::ECDSA;
       break;
+    case EVP_PKEY_RSA:
+      hash_algo_ = ct::DigitallySigned::SHA256;
+      sig_algo_ = ct::DigitallySigned::RSA;
+      break;
     default:
       LOG(FATAL) << "Unsupported key type " << pkey_->type;
   }
