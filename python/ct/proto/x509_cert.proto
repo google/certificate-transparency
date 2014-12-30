@@ -1,0 +1,111 @@
+syntax = "proto2";
+
+package ct;
+
+import "ct/proto/x509_extensions.proto";
+
+
+// X509 certificate validity specification.
+// Time is saved in seconds since epoch.
+message X509Validity {
+  // Certificate is not valid before timestamp.
+  required uint64 not_before = 1;
+  // Certificate is not valid after timestamp.
+  required uint64 not_after = 2;
+}
+
+// X509 directory style distinguished name split into attributes
+// Attributes usually look like: CN=*.sme.sk
+// and are transfered into type=CN value=*.sme.sk .
+// The order of attributes should be kept same.
+// Most common types are: C ST L O OU CN, list of standard common names can be
+// found here: http://tools.ietf.org/html/rfc5280#page-20
+message X509DistinguishedName {
+  message DNAttribute {
+    // type of attribute
+    required string type = 1;
+    // attribute's value
+    required string value = 2;
+  }
+  // Ordered list of all attributes.
+  repeated DNAttribute attribute = 1;
+
+  // CommonName (CN) attribute(s), usually being the most significant.
+  repeated string common_name = 2;
+}
+
+// X509 certificate public key information.
+message X509PublicKeyInfo {
+  // Identifier of the algorithm for which the key is intended.
+  optional string algorithm_id = 1;
+
+  optional string public_key_text = 3;
+}
+
+
+// X509 certificate signature algorithm specification.
+message X509SignatureAlgorithm {
+  // Algorithm identifier.
+  required string algorithm_id = 1;
+
+  // Parameters for the signature algorithms.
+  repeated bytes parameter = 2;
+}
+
+// X509 certificate data according to rfc5280
+// Structure for storing X509 certificate data - jointly "TBSCertificate" and
+// "signatureAlgorithm" and "signatureValue". (TBS = to be signed)
+// with optional extra fields: der_cert, ca_certificate_hash, info
+message X509Certificate {
+  // X509 version number currently 0-2
+  enum X509Version {
+    V1 = 0;
+    V2 = 1;
+    V3 = 2;
+  }
+  optional X509Version version = 1 [default = V1];
+
+  // Serial number of the certificate, stored in hex, lower case, no colons.
+  //  rfc: CA *must* ensure it is non-negative integer unique for a given CA.
+  optional bytes serial_number = 2;
+
+  // Signature algorithm identifier.
+  // rfc: *must* be same as signature_algorithm.algorithm_id
+  optional string signature_algorithm_id = 3;
+
+  // Issuer's identification in 'directory' format.
+  optional X509DistinguishedName issuer = 4;
+
+  // Validity dates.
+  optional X509Validity validity = 5;
+
+  // Subject's identifier in 'directory' format.
+  optional X509DistinguishedName subject = 6;
+
+  // Information about subject's public key.
+  optional X509PublicKeyInfo public_key_info = 7;
+
+  // X509 v3 extensions for SSL certificates.
+  optional X509Extensions extensions = 10;
+
+  // Signature algorithm specification.
+  optional X509SignatureAlgorithm signature_algorithm = 11;
+
+  // Signature of the certificate.
+  // All certificate fields, except SignatureAlgorithm and Signature are
+  // encoded in DER format and signed with the specified algorithm by the
+  // certificate authority.
+  optional bytes signature_value = 12;
+
+  // Extra fields: (not based on X509)
+
+  // This certificates SHA256 hash.
+  required bytes cert_sha256_hash = 13;
+
+  // Repeated field of Certificate Authority(CA) certificates from issuing CA
+  // all the way to root obtained from certificate chain provided by host.
+  repeated X509Certificate issuer_cert = 14;
+
+  // Certificate in original DER format.
+  optional bytes der_cert = 16;
+}

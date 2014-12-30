@@ -1,0 +1,157 @@
+syntax = "proto2";
+
+package ct;
+
+// For storage of bytes extensions: (repeated) value, critical flag, Object ID
+// (OID) if needed.
+message X509Extension {
+  repeated bytes value = 1;
+  optional bool critical = 2 [default = false];
+  optional bytes object_id = 3;
+}
+// For storage of int extensions:
+message X509IntExtension {
+  required int32 value = 1;
+  optional bool critical = 2 [default = false];
+  optional bytes object_id = 3;
+}
+
+
+// X509 certificate v3 extension fields.
+// Each extension can be either critical or non-critical. Critical extensions
+// must be recognized or the cert. is rejected. Non-critical can be ignored if
+// they are not recognized.
+message X509Extensions {
+  // Key identifier of the cert. authority. Can be either keyid (from CAs cert)
+  // or issuer name and serial number.
+  // Can be omitted for self-signed certs. MUST be marked non-critical.
+  optional X509Extension authority_key_id = 1;
+
+  // Key identifier of the subject. SHOULD be either derived from key as 160bit
+  // SHA1 hash of subjectPublicKey (see rfc:p28 for more) OR 0100 followed by
+  // least significant 60 bits of SHA1 hash of subjectPublicKey. (Other methods
+  // are acceptable)
+  optional X509Extension subject_key_id = 2;
+
+  // Key usage specification for subject's public key.
+  message KeyUsage {
+    optional bool digital_signature = 1;
+    // recent editions of X.509 have renamed nonRepudiation bit to
+    //contentCommitment
+    optional bool non_repudiation = 2;
+    optional bool key_encipherment = 3;
+    optional bool data_encipherment = 4;
+    optional bool key_agreement = 5;
+    optional bool key_cert_sign = 6;
+    optional bool crl_sign = 7;
+    optional bool encipher_only = 8;
+    optional bool decipher_only = 9;
+    // Extension marked as critical:
+    optional bool critical = 10;
+  }
+  optional KeyUsage key_usage = 3;
+
+  // List of policies, each is identified by OID and has some qualifiers.
+  // Two standard ones can be Certificate Practice Statement (CPS) uri, and
+  // User notice.
+  optional X509Extension certificate_policies = 4;
+
+  // Policy mappings used in CA certs. List of pairs of OIDs with each
+  // containing issuerDomainPolicy and subjectDomainPolicy, this "transfers" the
+  // policy to subject. When present should be critical.
+  // Each value contains 2 OIDs .
+  optional X509Extension policy_mappings = 5;
+
+  // Alternative (domain) names for the certificate.
+  // Possible format options: otherName, rfc822Name, dNSName, x400Address,
+  // directoryName, ediPartyName, URI, iPAddress, registeredID
+  optional X509Extension subject_alternative_name = 6;
+
+  // Alternative name for the issuer. Similar content as for
+  // subject_alternative_name.
+  optional X509Extension issuer_alternative_name = 7;
+
+  // Additional subject directory attributes, as in DistinguishedName
+  message DNAttribute {
+    // type of attribute
+    required string type = 1;
+    // attribute's value
+    required string value = 2;
+  }
+  // Ordered list of all additional attributes.
+  repeated DNAttribute subject_directory_attribute = 8;
+  // This field should be marked non-critical, but let us see what CA say about
+  // that:
+  optional bool subject_directory_attributes_critical = 9;
+
+  // Basic Constraints - flag that specifies whether the certificate belongs to
+  // CA.
+  message BasicConstraints {
+    // main flag value
+    optional bool ca_flag = 1;
+    // maximum number of non-self-issued certificates between this CA and leaf
+    // certificate
+    optional uint32 path_len_constraint = 2;
+    // critical flag (this should be always marked as critical
+    optional bool critical = 3;
+  }
+  optional BasicConstraints basic_constraints = 10;
+
+  // Name constraints  (only in CA), constraints names space for subject names
+  // and alternative subject names of subsequent certificates.
+  // Structure consists of permitedSubtrees and excludedSubtrees, but is not
+  // parsed at the moment and is kept as single string.
+  optional X509Extension name_constraints = 11;
+
+  // Constraints on policy mappings, when present should be marked as critical.
+  // Structure consists of requireExplicitPolicy and inhibitPolicyMapping, but
+  // is not parsed at the moment and is kept as single string.
+  optional X509Extension policy_constraints = 12;
+
+  // More key usages for certificate's public key.
+  // Contains list of strings (keyPurposeId - should be compliant with ITU_T
+  // X.660) of additional key usages.
+  optional X509Extension extended_key_usage = 13;
+
+  // Distribution points for Certificate Revocation List (CRL)
+  // Each point contains details (either URI or relative path) and reasons of
+  // issuer fields.
+  message CRLDistributionPoint {
+    message DistributionPointName {
+      repeated bytes full_name = 1;
+      // Name relative to issuers address.
+      optional bytes issuer_relative_name = 2;
+    }
+    required DistributionPointName distribution_point = 1;
+    // CRL reasons provided as bit string (for details see rfc5280:p48).
+    optional int32 reasons = 2;
+    // Issuer's details.
+    optional bytes crl_issuer = 3;
+    optional bool critical = 4;
+  }
+  repeated CRLDistributionPoint crl_distribution_point = 14;
+
+  // Number of CAs after which "anyPolicy" is not permitted.
+  optional X509IntExtension inhibit_any_policy = 15;
+
+  // Details about delta CRL information.
+  optional CRLDistributionPoint freshest_crl = 16;
+
+  // Private Key Extensions:
+  // Details about accessing information and services for the issuer of the
+  // certificate (e.g. on-line validation service, CA policy data).
+  // Stored as list of values(bytes), each value contains accessMethod and
+  // accessLocation.
+  optional X509Extension authority_info_access = 17;
+
+  // Details about accessing information and services for the subject (e.g.
+  // on-line validation service(for CAs), type of service offered).
+  // Stored as list of values(bytes), each value contains accessMethod and
+  // accessLocation.
+  optional X509Extension subject_info_access = 18;
+
+  // All other extensions are stored as bytes.
+  repeated X509Extension other_extension = 19;
+}
+
+

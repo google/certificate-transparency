@@ -1,16 +1,18 @@
 import abc
 import gflags
+import hashlib
 import logging
 import multiprocessing
 import sys
-import traceback
 import threading
+import traceback
 
 from ct.cert_analysis import all_checks
 from ct.cert_analysis import asn1
 from ct.client.db import cert_desc
 from ct.crypto import cert
 from ct.crypto import error
+from ct.proto import x509_cert_pb2
 from Queue import Queue
 
 FLAGS = gflags.FLAGS
@@ -53,9 +55,11 @@ def _scan_der_cert(der_certs, checks):
             if not strict_failure:
                 for check in checks:
                     partial_result += check.check(certificate) or []
-                desc = cert_desc.CertificateDescription.from_cert(certificate)
+                desc = cert_desc.from_cert(certificate)
             else:
-                desc = cert_desc.CertificateDescription.from_values(der=der_cert)
+                desc = x509_cert_pb2.X509Certificate()
+                desc.der_cert = der_cert
+                desc.cert_sha256_hash = hashlib.sha256(der_cert).digest()
             result.append((desc, log_index, partial_result))
         return result
     except Exception:

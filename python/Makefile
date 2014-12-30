@@ -1,5 +1,5 @@
 all: ct/proto/client_pb2.py ct/proto/ct_pb2.py ct/proto/tls_options_pb2.py \
-	ct/proto/test_message_pb2.py ct/proto/certificate_pb2.py
+ct/proto/test_message_pb2.py ct/proto/x509_cert_pb2.py ct/proto/x509_extensions_pb2.py
 
 ct/proto/%_pb2.py: ct/proto/%.proto
 	protoc $^ -I/usr/include/ -I/usr/local/include -I. --python_out=.
@@ -22,7 +22,6 @@ test: all
 	PYTHONPATH=$(PYTHONPATH):. ./ct/client/db/sqlite_cert_db_test.py
 	PYTHONPATH=$(PYTHONPATH):. ./ct/client/db/sqlite_temp_db_test.py
 	PYTHONPATH=$(PYTHONPATH):. ./ct/client/db/sqlite_connection_test.py
-	PYTHONPATH=$(PYTHONPATH):. ./ct/client/db/cert_desc_test.py
 	PYTHONPATH=$(PYTHONPATH):. ./ct/client/log_client_test.py
 	PYTHONPATH=$(PYTHONPATH):. ./ct/client/db_reporter_test.py
 	PYTHONPATH=$(PYTHONPATH):. ./ct/client/reporter_test.py

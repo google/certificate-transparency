@@ -66,18 +66,8 @@ class SQLiteCertDB(cert_db.CertDB):
     def __compare_processed_names(prefix, name):
         return prefix == name[:len(prefix)]
 
-    @staticmethod
-    def _maybe_iterable(obj):
-        # TODO(laiqu) change CertificateDescription, so we don't need it
-        # using collections.Iterable won't work properly because unicode is also
-        # iterable
-        if isinstance(obj, list):
-            return obj
-        else:
-            return [obj]
-
     def __store_cert(self, cert, index, log_key, cursor):
-        der_cert = cert.der
+        der_cert = cert.der_cert
         if not FLAGS.cert_db_sqlite_synchronous_write:
             cursor.execute("PRAGMA synchronous = OFF")
         try:
@@ -87,19 +77,19 @@ class SQLiteCertDB(cert_db.CertDB):
                                     ('?,' * len(self.cert_table_columns))[:-1]),
                            [log_key, index,
                             sqlite3.Binary(self.sha256_hash(der_cert)),
-                            sqlite3.Binary(der_cert)] +
-                            [cert[column] for column in self.cert_table_columns])
+                            sqlite3.Binary(der_cert),
+                            str(cert.version + 1),
+                            cert.serial_number])
         except sqlite3.IntegrityError:
             # cert already exists
             return
-        for table_name, columns in self.cert_repeated_field_tables:
-            column_names = [column for column, _ in columns]
-            if cert[table_name]:
-                for field in cert[table_name]:
-                    cursor.execute("INSERT INTO %s(log, cert_id, %s) VALUES(?, ?, %s)" %
-                                       (table_name, ','.join(column_names),
-                                        ('?,' * len(column_names))[:-1]),
-                                   [log_key, index] + self._maybe_iterable(field))
+        if cert.subject:
+            for name in cert.subject.common_name:
+                cursor.execute("INSERT INTO subject_names(log, cert_id, name)"
+                               " VALUES(?, ?, ?)", (log_key, index, name))
+        # TODO(laiqu) fill alternative names when those are more available in
+        # protobuf
+
 
     def store_certs_desc(self, certs, log_key):
         """Store certificates using it's descriptions.
