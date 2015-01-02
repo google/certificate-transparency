@@ -138,7 +138,7 @@ def from_cert(certificate):
     populate_x509_extension(proto.extensions.authority_info_access,
                          ext_dict.get(oid.ID_PE_AUTHORITY_INFO_ACCESS, None))
 
-    if ext_dict.get(oid.ID_CE_EXT_KEY_USAGE):
+    if ext_dict.get(oid.ID_CE_KEY_USAGE):
         try:
             proto.extensions.key_usage.digital_signature = certificate.key_usage(
                     x509_extension.KeyUsage.DIGITAL_SIGNATURE)
@@ -245,7 +245,7 @@ def to_unicode(str_):
 
 
 def bit_string_to_hex(str_):
-    return str_.human_readable().replace('\n', '').replace('  ', '')
+    return str_.human_readable_lines(wrap=len(str_.value))[0]
 
 def oid_to_string(oid_):
     return '.'.join([str(val) for val in oid_.value])
