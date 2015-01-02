@@ -12,21 +12,21 @@ class CertDB(object):
 
     @abc.abstractmethod
     def store_cert_desc(self, cert_desc, index, log_key):
-        """Stores a certificate using its description.
+        """Stores a certificate.
 
         Args:
-            cert:          CertificateDescription
+            cert:          x509_cert_pb2.X509Certificate
             index:         position in log
             log_key:       log id in LogDB"""
 
     @abc.abstractmethod
     def store_certs_desc(self, certs, log_key):
-        """Store certificates using its descriptions.
+        """Store certificates.
 
         Batched version of store_cert_desc.
 
         Args:
-            certs:         iterable of (CertificateDescription, index) tuples
+            certs:         iterable of (x509_cert_pb2.X509Certificate, index) tuples
             log_key:       log id in LogDB"""
 
     @abc.abstractmethod

@@ -15,7 +15,7 @@ class SQLiteCertDB(cert_db.CertDB):
         Args:
             connection: an SQLiteConnectionManager object."""
         self.__mgr = connection_manager
-        self.cert_repeated_field_tables = [("subject_names", [("name", "TEXT")]),
+        cert_repeated_field_tables = [("subject_names", [("name", "TEXT")]),
                                     ("alt_subject_names", [("name", "TEXT")]),
                                     ("ip_addresses", [("ip_address", "TEXT")])]
         cert_single_field_tables = [("version", "INTEGER"),
@@ -32,12 +32,12 @@ class SQLiteCertDB(cert_db.CertDB):
                          ', '.join(['%s %s' % (column, type_) for column, type_
                                     in cert_single_field_tables]) +
                          ", PRIMARY KEY(log, id))")
-            for entry in self.cert_repeated_field_tables:
+            for entry in cert_repeated_field_tables:
                 self.__create_table_for_field(conn, *entry)
             conn.execute("CREATE INDEX IF NOT EXISTS certs_by_subject "
                          "on subject_names(name)")
         self.__tables = (["logs", "certs"] +
-                         [column for column, _ in self.cert_repeated_field_tables])
+                         [column for column, _ in cert_repeated_field_tables])
 
     @staticmethod
     def __create_table_for_field(conn, table_name, fields):
@@ -67,19 +67,17 @@ class SQLiteCertDB(cert_db.CertDB):
         return prefix == name[:len(prefix)]
 
     def __store_cert(self, cert, index, log_key, cursor):
-        der_cert = cert.der_cert
         if not FLAGS.cert_db_sqlite_synchronous_write:
             cursor.execute("PRAGMA synchronous = OFF")
         try:
-            cursor.execute("INSERT INTO certs(log, id, sha256_hash, cert, %s) "
-                           "VALUES(?, ?, ?, ?, %s) " %
-                                    (','.join(self.cert_table_columns),
-                                    ('?,' * len(self.cert_table_columns))[:-1]),
-                           [log_key, index,
-                            sqlite3.Binary(self.sha256_hash(der_cert)),
-                            sqlite3.Binary(der_cert),
+            cursor.execute("INSERT INTO certs(log, id, sha256_hash, cert, "
+                           "version, serial_number) "
+                           "VALUES(?, ?, ?, ?, ?, ?) ",
+                           (log_key, index,
+                            sqlite3.Binary(self.sha256_hash(cert.der_cert)),
+                            sqlite3.Binary(cert.der_cert),
                             str(cert.version + 1),
-                            cert.serial_number])
+                            cert.serial_number))
         except sqlite3.IntegrityError:
             # cert already exists
             return
@@ -92,10 +90,10 @@ class SQLiteCertDB(cert_db.CertDB):
 
 
     def store_certs_desc(self, certs, log_key):
-        """Store certificates using it's descriptions.
+        """Store certificates.
 
         Args:
-            certs:         iterable of (CertificateDescription, index) tuples
+            certs:         iterable of (x509_cert_pb2.X509Certificate, index) tuples
             log_key:       log id in LogDB"""
         with self.__mgr.get_connection() as conn:
             cursor = conn.cursor()
@@ -106,7 +104,7 @@ class SQLiteCertDB(cert_db.CertDB):
         """Store certificate using it's description.
 
         Args:
-            cert:          CertificateDescription
+            cert:          x509_cert_pb2.X509Certificate
             index:         position in log
             log_key:       log id in LogDB"""
         self.store_certs_desc([(cert, index)], log_key)
