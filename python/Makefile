@@ -18,6 +18,7 @@ test: all
 	PYTHONPATH=$(PYTHONPATH):. ./ct/crypto/asn1/oid_test.py
 	PYTHONPATH=$(PYTHONPATH):. ./ct/crypto/asn1/x509_time_test.py
 	PYTHONPATH=$(PYTHONPATH):. ./ct/crypto/cert_test.py
+	PYTHONPATH=$(PYTHONPATH):. ./ct/client/db/cert_desc_test.py
 	PYTHONPATH=$(PYTHONPATH):. ./ct/client/db/sqlite_log_db_test.py
 	PYTHONPATH=$(PYTHONPATH):. ./ct/client/db/sqlite_cert_db_test.py
 	PYTHONPATH=$(PYTHONPATH):. ./ct/client/db/sqlite_temp_db_test.py
