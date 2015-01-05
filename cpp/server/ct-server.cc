@@ -26,7 +26,8 @@
 
 DEFINE_string(server, "localhost", "Server host");
 DEFINE_int32(port, 9999, "Server port");
-DEFINE_string(key, "", "PEM-encoded server private key file");
+DEFINE_string(key, "", "Server private key ID (engine) or PEM-encoded file");
+DEFINE_string(engine, "", "OpenSSL engine to initialize and use");
 DEFINE_string(trusted_cert_file, "",
               "File for trusted CA certificates, in concatenated PEM format");
 DEFINE_string(cert_dir, "", "Storage directory for certificates");
@@ -58,6 +59,7 @@ using cert_trans::HttpHandler;
 using cert_trans::LoggedCertificate;
 using cert_trans::ThreadPool;
 using cert_trans::util::ReadPrivateKey;
+using cert_trans::util::LoadEnginePrivateKey;
 using google::RegisterFlagValidator;
 using std::bind;
 using std::function;
@@ -87,7 +89,18 @@ static bool ValidateRead(const char* flagname, const string& path) {
   return true;
 }
 
-static const bool key_dummy = RegisterFlagValidator(&FLAGS_key, &ValidateRead);
+static bool ValidateKey(const char* flagname, const string& key) {
+  if (key == "")
+    return false;
+
+  // Defer validation of engine keys until after we've initialized the engine.
+  if (FLAGS_engine != "")
+    return true;
+
+  return ValidateRead(flagname, key);
+}
+
+static const bool key_dummy = RegisterFlagValidator(&FLAGS_key, &ValidateKey);
 
 static const bool cert_dummy =
     RegisterFlagValidator(&FLAGS_trusted_cert_file, &ValidateRead);
@@ -184,7 +197,12 @@ int main(int argc, char* argv[]) {
   cert_trans::LoadCtExtensions();
 
   EVP_PKEY* pkey = NULL;
-  CHECK_EQ(ReadPrivateKey(&pkey, FLAGS_key), cert_trans::util::KEY_OK);
+  if (FLAGS_engine != "")
+    CHECK_EQ(
+        LoadEnginePrivateKey(&pkey, FLAGS_engine, FLAGS_key),
+        cert_trans::util::KEY_OK);
+  else
+    CHECK_EQ(ReadPrivateKey(&pkey, FLAGS_key), cert_trans::util::KEY_OK);
   LogSigner log_signer(pkey);
 
   CertChecker checker;
