@@ -105,6 +105,7 @@ class EtcdClient {
   void Delete(const std::string& key, const int64_t current_index,
               const DeleteCallback& cb);
 
+  // The "cb" will be called on the "task" executor.
   virtual void Watch(const std::string& key, const WatchCallback& cb,
                      util::Task* task);
 

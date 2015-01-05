@@ -19,6 +19,7 @@ namespace cert_trans {
 
 using std::bind;
 using std::chrono::duration;
+using std::deque;
 using std::function;
 using std::lock_guard;
 using std::mutex;
@@ -381,6 +382,77 @@ TEST_F(FakeEtcdTest, TestDelete) {
   EtcdClient::Node node;
   status = BlockingGet(kKey, &node);
   EXPECT_EQ(util::error::NOT_FOUND, status.CanonicalCode()) << status;
+}
+
+
+class CheckingExecutor : public util::Executor {
+ public:
+  CheckingExecutor(util::Executor* inner, const deque<Notification*>& expected) : inner_(CHECK_NOTNULL(inner)), expected_(expected) {
+  }
+
+  void Add(const std::function<void()>& closure) override {
+    inner_->Add(bind(&CheckingExecutor::Check, this, closure));
+  }
+
+ private:
+  void Check(const std::function<void()>& closure) {
+    Notification* const notification(GetNext());
+    if (notification) {
+      EXPECT_FALSE(notification->HasBeenNotified());
+      closure();
+      EXPECT_TRUE(notification->HasBeenNotified());
+    } else {
+      closure();
+    }
+  }
+
+  Notification* GetNext() {
+    lock_guard<mutex> lock(lock_);
+    Notification* const notification(expected_.front());
+    expected_.pop_front();
+    return notification;
+  }
+
+  util::Executor* const inner_;
+  mutex lock_;
+  deque<Notification*> expected_;
+};
+
+
+void TestWatcherForExecutor(Notification* notifier, const vector<EtcdClient::WatchUpdate>& updates) {
+  static bool been_called(false);
+  if (been_called) {
+    notifier->Notify();
+  }
+  been_called = true;
+}
+
+
+TEST_F(FakeEtcdTest, TestWatcherForExecutor) {
+  ThreadPool pool(2);
+
+  Notification watch;
+  Notification done;
+
+  // First time is the initial watch state, second time is the create
+  // notification, then the cancellation callback, and finally the
+  // done callback.
+  CheckingExecutor checking_executor(&pool, {nullptr, &watch, nullptr, &done});
+  util::Task task(bind(&Notification::Notify, &done), &checking_executor);
+  client_.Watch(kDir, bind(&TestWatcherForExecutor, &watch, _1), &task);
+
+  int64_t created_index;
+  EXPECT_EQ(util::Status::OK, BlockingCreate(kPath1, kValue, &created_index));
+
+  // Should fall straight through:
+  // TODO(pphaneuf): But it doesn't really? I tried changing it for
+  // EXPECT_TRUE(notifier.HasBeenNotified()), but that fails
+  // sometimes.
+  watch.WaitForNotification();
+
+  task.Cancel();
+  done.WaitForNotification();
+  EXPECT_EQ(Status::CANCELLED, task.status());
 }
 
 

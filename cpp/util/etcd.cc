@@ -22,6 +22,7 @@ using std::make_pair;
 using std::make_shared;
 using std::map;
 using std::max;
+using std::move;
 using std::mutex;
 using std::ostringstream;
 using std::pair;
@@ -549,7 +550,7 @@ void EtcdClient::WatchState::InitialGetAllDone(Status status,
     updates.emplace_back(WatchUpdate(node, true /*exists*/));
   }
 
-  cb_(updates);
+  task_->executor()->Add(bind(cb_, move(updates)));
 
   StartRequest();
 }
@@ -637,7 +638,7 @@ void EtcdClient::WatchState::RequestDone(Status status,
     Status status(HandleSingleValueRequestDone(node, &updates));
 
     if (status.ok()) {
-      cb_(updates);
+      task_->executor()->Add(bind(cb_, move(updates)));
     } else {
       LOG(ERROR) << status;
     }
