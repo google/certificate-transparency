@@ -1,22 +1,16 @@
 import abc
 import hashlib
-from ct.client.db import cert_desc
+from ct.proto import x509_cert_pb2
 
-SAMPLE_CERT = cert_desc.CertificateDescription.from_values("hello\x00",
-                                                          ["example.com"],
-                                                           ["alt.com"],
-                                                           "2",
-                                                           "123",
-                                                           ["8.7.6.4"])
-FOUR_CERTS = [(cert_desc.CertificateDescription.from_values("hello-%d" % i,
-                                                        ["domain-%d.com" % i],
-                                                        ["alt-%d.com" % i],
-                                                        str(i),
-                                                        str(i+i*i),
-                                                        ["%d.%d.%d.%d" % (i, i,
-                                                                          i, i)],
-                                                            ),i)
-              for i in range(4)]
+SAMPLE_CERT = x509_cert_pb2.X509Certificate()
+SAMPLE_CERT.der_cert = "hello\x00"
+SAMPLE_CERT.subject.common_name.extend(["com.example"])
+FOUR_CERTS = []
+for i in range(0, 4):
+    tmp = x509_cert_pb2.X509Certificate()
+    tmp.der_cert = "hello-%d" % i
+    tmp.subject.common_name.extend(["com.domain-%d" % i])
+    FOUR_CERTS.append((tmp, i))
 # This class provides common tests for all cert database implementations.
 # It only inherits from object so that unittest won't attempt to run the test_*
 # methods on this class. Derived classes should use multiple inheritance
@@ -35,7 +29,7 @@ class CertDBTest(object):
         self.db().store_cert_desc(SAMPLE_CERT, 0, 0)
         sha256_hash = hashlib.sha256("hello\x00").digest()
         cert = self.db().get_cert_by_sha256_hash(sha256_hash)
-        self.assertEqual(SAMPLE_CERT.der, cert)
+        self.assertEqual(SAMPLE_CERT.der_cert, cert)
 
     def test_lookup_returns_none_if_no_match(self):
         self.db().store_cert_desc(SAMPLE_CERT, 0, 0)
@@ -49,12 +43,13 @@ class CertDBTest(object):
         self.assertEqual("hello\x00", cert)
 
         # Store again
-        hello2 = cert_desc.CertificateDescription.from_values(
-                SAMPLE_CERT.der, ["example2.com"])
+        hello2 = x509_cert_pb2.X509Certificate()
+        hello2.der_cert = SAMPLE_CERT.der_cert
+        hello2.subject.common_name.extend(["com.example2"])
         self.db().store_cert_desc(hello2, 1, 0)
         certs = [c for c in self.db().scan_certs_by_subject("example.com")]
         self.assertEqual(1, len(certs))
-        self.assertEqual(SAMPLE_CERT.der, certs[0])
+        self.assertEqual(SAMPLE_CERT.der_cert, certs[0])
         certs = [c for c in self.db().scan_certs_by_subject("example2.com")]
         self.assertEqual(0, len(certs))
 
@@ -91,9 +86,10 @@ class CertDBTest(object):
 
     def test_scan_certs_by_subject_honours_limit(self):
         for i in range(0, 4):
-            self.db().store_cert_desc(
-                    cert_desc.CertificateDescription.from_values("hello-%d" % i,
-                                                       ["domain.com"]), i, 0)
+            cert = x509_cert_pb2.X509Certificate()
+            cert.der_cert = "hello-%d" % i
+            cert.subject.common_name.extend(["com.domain"])
+            self.db().store_cert_desc(cert, i, 0)
 
         matches = {c for c in self.db().scan_certs_by_subject("domain.com",
                                                               limit=2)}
@@ -101,9 +97,10 @@ class CertDBTest(object):
 
     def test_scan_certs_by_subject_finds_by_common_name(self):
         for i in range(4):
-            self.db().store_cert_desc(
-                    cert_desc.CertificateDescription.from_values("hello-%d" % i,
-                                                    ["Trusty CA %d" % i]), i, 0)
+            cert = x509_cert_pb2.X509Certificate()
+            cert.der_cert = "hello-%d" % i
+            cert.subject.common_name.extend(["trusty ca %d" % i])
+            self.db().store_cert_desc(cert, i, 0)
 
         for i in range(4):
             matches = [c for c in self.db().scan_certs_by_subject(
@@ -112,21 +109,22 @@ class CertDBTest(object):
             self.assertEqual("hello-%d" % i, matches[0])
 
     def test_scan_certs_by_subject_finds_by_all_names(self):
-        self.db().store_cert_desc(
-                        cert_desc.CertificateDescription.from_values("hello",
-                                      ["%d.com" % i for i in range(4)]), i, 0)
+        cert = x509_cert_pb2.X509Certificate()
+        cert.der_cert = "hello"
+        cert.subject.common_name.extend(["com.%d" % i for i in range(4)])
+        self.db().store_cert_desc(cert, 0, 0)
 
         for i in range(4):
-            matches = [c for c in self.db().scan_certs_by_subject(
-                    "%d.com" % i)]
+            matches = [c for c in self.db().scan_certs_by_subject("%d.com" % i)]
             self.assertEqual(1, len(matches))
             self.assertEqual("hello", matches[0])
 
     def test_scan_certs_by_subject_finds_by_prefix(self):
         for i in range(4):
-            self.db().store_cert_desc(
-                    cert_desc.CertificateDescription.from_values("hello-%d" % i,
-                                          [("%d." % i)*i + "example.com" ]), i, 0)
+            cert = x509_cert_pb2.X509Certificate()
+            cert.der_cert = "hello-%d" % i
+            cert.subject.common_name.extend(["com.example" + (".%d" % i)*i])
+            self.db().store_cert_desc(cert, i, 0)
 
         matches = {c for c in self.db().scan_certs_by_subject("example.com")}
         self.assertEqual(4, len(matches))
@@ -134,23 +132,24 @@ class CertDBTest(object):
             self.assertTrue("hello-%d" % i in matches)
 
     def test_scan_certs_by_subject_ignores_longer(self):
-        self.db().store_cert_desc(
-                cert_desc.CertificateDescription.from_values("hello",
-                                                             ["example.com"]),
-                                  i, 0)
+        cert = x509_cert_pb2.X509Certificate()
+        cert.der_cert = "hello"
+        cert.subject.common_name.extend(["example.com"])
+        self.db().store_cert_desc(cert, 0, 0)
 
         matches = {c for c in self.db().scan_certs_by_subject(
                 "mail.example.com")}
         self.assertEqual(0, len(matches))
 
     def test_scan_certs_by_subject_finds_by_literal_wildcard(self):
-        self.db().store_cert_desc(
-                cert_desc.CertificateDescription.from_values("hello-wild",
-                                                ["*.example.com"]), 0, 0)
-        self.db().store_cert_desc(
-                cert_desc.CertificateDescription.from_values("hello",
-                                                         ["www.example.com"]),
-                                  1, 0)
+        cert = x509_cert_pb2.X509Certificate()
+        cert.der_cert = "hello-wild"
+        cert.subject.common_name.extend(["com.example.*"])
+        self.db().store_cert_desc(cert, 0, 0)
+        cert2 = x509_cert_pb2.X509Certificate()
+        cert2.der_cert = "hello"
+        cert2.subject.common_name.extend(["com.example.www"])
+        self.db().store_cert_desc(cert2, 1, 0)
 
         matches = [c for c in self.db().scan_certs_by_subject(
                 "*.example.com")]
@@ -159,12 +158,14 @@ class CertDBTest(object):
 
     def test_scan_certs_by_subject_ignores_wildcard_cert(self):
         for i in range(4):
-            self.db().store_cert_desc(
-                    cert_desc.CertificateDescription.from_values("hello-%d" % i,
-                                      ["%d.example.com" % i]), i, 0)
-        self.db().store_cert_desc(
-                cert_desc.CertificateDescription.from_values("hello-wild",
-                                                ["*.example.com"]), 0, 0)
+            cert = x509_cert_pb2.X509Certificate()
+            cert.der_cert = "hello-%d" % i
+            cert.subject.common_name.extend(["com.example.%d" % i])
+            self.db().store_cert_desc(cert, i, 0)
+        cert = x509_cert_pb2.X509Certificate()
+        cert.der_cert = "hello-wild"
+        cert.subject.common_name.extend(["com.example.*"])
+        self.db().store_cert_desc(cert, 0, 0)
 
         matches = {c for c in self.db().scan_certs_by_subject(
                 "2.example.com")}

@@ -208,6 +208,7 @@ ID_CE_SUBJECT_KEY_IDENTIFIER = ObjectIdentifier(value="2.5.29.14")
 ID_CE_KEY_USAGE = ObjectIdentifier(value="2.5.29.15")
 ID_CE_PRIVATE_KEY_USAGE_PERIOD = ObjectIdentifier(value="2.5.29.16")
 ID_CE_CERTIFICATE_POLICIES = ObjectIdentifier(value="2.5.29.32")
+ID_CE_POLICY_MAPPINGS = ObjectIdentifier(value="2.5.29.33")
 ID_CE_SUBJECT_ALT_NAME = ObjectIdentifier(value="2.5.29.17")
 ID_CE_ISSUER_ALT_NAME = ObjectIdentifier(value="2.5.29.18")
 ID_CE_SUBJECT_DIRECTORY_ATTRIBUTES = ObjectIdentifier(value="2.5.29.9")
@@ -288,6 +289,8 @@ _OID_NAME_DICT = {
                                      "privateKeyUsagePeriod"),
     ID_CE_CERTIFICATE_POLICIES: ("id-ce-certificatePolicies",
                                  "certificatePolicies"),
+    ID_CE_POLICY_MAPPINGS: ("id-ce-policyMappings",
+                            "policyMappings"),
     ID_CE_SUBJECT_ALT_NAME: ("id-ce-subjectAltName", "subjectAltName"),
     ID_CE_ISSUER_ALT_NAME: ("id-ce-issuerAltName", "issuerAltName"),
     ID_CE_SUBJECT_DIRECTORY_ATTRIBUTES: ("id-ce-subjectDirectoryAttributes",
