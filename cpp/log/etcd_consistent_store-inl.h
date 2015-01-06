@@ -3,8 +3,11 @@
 
 #include <glog/logging.h>
 
+#include "base/notification.h"
+#include "log/consistent_store-inl.h"
 #include "log/etcd_consistent_store.h"
 #include "log/logged_certificate.h"
+#include "util/executor.h"
 #include "util/util.h"
 
 namespace cert_trans {
@@ -20,10 +23,48 @@ const char kNodesDir[] = "/nodes/";
 
 
 template <class Logged>
-EtcdConsistentStore<Logged>::EtcdConsistentStore(EtcdClient* client,
+EtcdConsistentStore<Logged>::EtcdConsistentStore(util::Executor* executor,
+                                                 EtcdClient* client,
                                                  const std::string& root,
                                                  const std::string& node_id)
-    : client_(client), sync_client_(client), root_(root), node_id_(node_id) {
+    : client_(CHECK_NOTNULL(client)),
+      sync_client_(client),
+      root_(root),
+      node_id_(node_id),
+      serving_sth_watch_task_(CHECK_NOTNULL(executor)),
+      cluster_node_states_watch_task_(CHECK_NOTNULL(executor)),
+      received_initial_sth_(false) {
+  // Set up watches on things we're interested in...
+  client_->Watch(
+      GetFullPath(kServingSthFile),
+      std::bind(&EtcdConsistentStore<Logged>::OnEtcdServingSTHUpdated, this,
+                std::placeholders::_1),
+      serving_sth_watch_task_.task());
+
+  client_->Watch(
+      GetFullPath(kNodesDir),
+      std::bind(&EtcdConsistentStore<Logged>::OnEtcdClusterNodeStatesUpdated,
+                this, std::placeholders::_1),
+      cluster_node_states_watch_task_.task());
+
+  // And wait for the initial updates to come back so that we've got a
+  // view on the current state before proceding...
+  {
+    std::unique_lock<std::mutex> lock(mutex_);
+    serving_sth_cv_.wait(lock, [this]() { return received_initial_sth_; });
+  }
+  initial_cluster_notify_.WaitForNotification();
+}
+
+
+template <class Logged>
+EtcdConsistentStore<Logged>::~EtcdConsistentStore() {
+  VLOG(1) << "Cancelling watch tasks.";
+  serving_sth_watch_task_.Cancel();
+  cluster_node_states_watch_task_.Cancel();
+  VLOG(1) << "Waiting for watch tasks to return.";
+  serving_sth_watch_task_.Wait();
+  cluster_node_states_watch_task_.Wait();
 }
 
 
@@ -48,9 +89,53 @@ EtcdConsistentStore<Logged>::NextAvailableSequenceNumber() const {
 
 
 template <class Logged>
+void EtcdConsistentStore<Logged>::WaitForServingSTHVersion(
+    std::unique_lock<std::mutex>* lock, const int version) {
+  serving_sth_cv_.wait(*lock, [this, version]() {
+    return serving_sth_.get() != nullptr && serving_sth_->Handle() >= version;
+  });
+}
+
+
+template <class Logged>
 util::Status EtcdConsistentStore<Logged>::SetServingSTH(
     const ct::SignedTreeHead& new_sth) {
-  return util::Status(util::error::UNIMPLEMENTED, "Not implemented yet.");
+  const std::string full_path(GetFullPath(kServingSthFile));
+  std::unique_lock<std::mutex> lock(mutex_);
+
+  // The watcher should have already populated serving_sth_ if etcd had one.
+  if (!serving_sth_) {
+    // Looks like we're creating the first ever serving_sth!
+    LOG(WARNING) << "Creating new " << full_path;
+    // There's no current serving STH, so we can try to create one.
+    EntryHandle<ct::SignedTreeHead> sth_handle(new_sth);
+    util::Status status(CreateEntry(full_path, &sth_handle));
+    if (!status.ok()) {
+      return status;
+    }
+    WaitForServingSTHVersion(&lock, sth_handle.Handle());
+    return util::Status::OK;
+  }
+
+  // Looks like we're updating an existing serving_sth.
+  // First check that we're not trying to overwrite it with itself or an older
+  // one:
+  if (serving_sth_->Entry().timestamp() >= new_sth.timestamp()) {
+    return util::Status(util::error::OUT_OF_RANGE,
+                        "Tree head is not newer than existing head");
+  }
+
+  // Ensure that nothing weird is going on with the tree size:
+  CHECK_LE(serving_sth_->Entry().tree_size(), new_sth.tree_size());
+
+  VLOG(1) << "Updating existing " << full_path;
+  EntryHandle<ct::SignedTreeHead> sth_to_etcd(new_sth, serving_sth_->Handle());
+  util::Status status(UpdateEntry(full_path, &sth_to_etcd));
+  if (!status.ok()) {
+    return status;
+  }
+  WaitForServingSTHVersion(&lock, sth_to_etcd.Handle());
+  return util::Status::OK;
 }
 
 
@@ -313,6 +398,70 @@ std::string EtcdConsistentStore<Logged>::GetFullPath(
   CHECK_EQ('/', key[0]);
   return root_ + key;
 }
+
+
+// static
+template <class Logged>
+template <class T>
+Update<T> EtcdConsistentStore<Logged>::TypedUpdateFromWatchUpdate(
+    const EtcdClient::WatchUpdate& update) {
+  const std::string raw_value(util::FromBase64(update.node_.value_.c_str()));
+  T thing;
+  CHECK(thing.ParseFromString(raw_value)) << raw_value;
+  EntryHandle<T> handle(thing);
+  if (update.exists_) {
+    handle.SetHandle(update.node_.modified_index_);
+  }
+  return Update<T>(handle, update.exists_);
+}
+
+
+template <class Logged>
+void EtcdConsistentStore<Logged>::UpdateLocalServingSTH(
+    const std::unique_lock<std::mutex>& lock,
+    const EntryHandle<ct::SignedTreeHead>& handle) {
+  CHECK(lock.owns_lock());
+  CHECK(!serving_sth_ ||
+        serving_sth_->Entry().timestamp() < handle.Entry().timestamp());
+
+  VLOG(1) << "Updating serving_sth_ to: " << handle.Entry().DebugString();
+  serving_sth_.reset(new EntryHandle<ct::SignedTreeHead>(handle));
+}
+
+
+template <class Logged>
+void EtcdConsistentStore<Logged>::OnEtcdServingSTHUpdated(
+    const std::vector<EtcdClient::WatchUpdate>& updates) {
+  CHECK_LE(updates.size(), 1);
+  std::unique_lock<std::mutex> lock(mutex_);
+  if (!updates.empty()) {
+    const Update<ct::SignedTreeHead> update(
+        TypedUpdateFromWatchUpdate<ct::SignedTreeHead>(updates[0]));
+    UpdateLocalServingSTH(lock, update.handle_);
+    this->OnServingSTHUpdate(update);
+  }
+  received_initial_sth_ = true;
+  lock.unlock();
+  serving_sth_cv_.notify_all();
+}
+
+
+template <class Logged>
+void EtcdConsistentStore<Logged>::OnEtcdClusterNodeStatesUpdated(
+    const std::vector<EtcdClient::WatchUpdate>& watch_updates) {
+  std::vector<Update<ct::ClusterNodeState>> updates;
+  for (const auto& u : watch_updates) {
+    updates.emplace_back(TypedUpdateFromWatchUpdate<ct::ClusterNodeState>(u));
+  }
+  this->OnClusterNodeStatesUpdate(updates);
+  {
+    std::lock_guard<std::mutex> lock(mutex_);
+    if (!initial_cluster_notify_.HasBeenNotified()) {
+      initial_cluster_notify_.Notify();
+    }
+  }
+}
+
 
 }  // namespace cert_trans
 

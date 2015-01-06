@@ -2,6 +2,7 @@
 #define CERT_TRANS_LOG_CONSISTENT_STORE_H_
 
 #include <stdint.h>
+#include <mutex>
 #include <vector>
 
 #include "base/macros.h"
@@ -29,9 +30,6 @@ template <class T>
 class EntryHandle {
  public:
   EntryHandle() = default;
-  EntryHandle(EntryHandle&& other) = default;
-
-  EntryHandle& operator=(EntryHandle&& other) = default;
 
   const T& Entry() const {
     return entry_;
@@ -75,17 +73,31 @@ class EntryHandle {
   template <class Logged>
   friend class EtcdConsistentStore;
   friend class EtcdConsistentStoreTest;
-  template <class Logged>
-  friend class FakeConsistentStore;
-  friend class FakeConsistentStoreTest;
+};
 
-  DISALLOW_COPY_AND_ASSIGN(EntryHandle);
+
+template <class T>
+struct Update {
+  Update(const EntryHandle<T>& handle, bool exists)
+      : handle_(handle), exists_(exists) {
+  }
+
+  Update(const Update& other) = default;
+
+  const EntryHandle<T> handle_;
+  const bool exists_;
 };
 
 
 template <class Logged>
 class ConsistentStore {
  public:
+  typedef std::function<void(const Update<ct::SignedTreeHead>& update)>
+      ServingSTHCallback;
+  typedef std::function<void(const std::vector<Update<ct::ClusterNodeState>>&
+                                 updates)> ClusterNodeStateCallback;
+
+
   ConsistentStore() = default;
 
   virtual util::StatusOr<int64_t> NextAvailableSequenceNumber() const = 0;
@@ -112,7 +124,21 @@ class ConsistentStore {
   virtual util::Status SetClusterNodeState(
       const ct::ClusterNodeState& state) = 0;
 
+  void WatchServingSTH(const ServingSTHCallback& cb);
+
+  void WatchClusterNodeStates(const ClusterNodeStateCallback& cb);
+
+ protected:
+  void OnServingSTHUpdate(const Update<ct::SignedTreeHead>& update);
+
+  void OnClusterNodeStatesUpdate(
+      const std::vector<Update<ct::ClusterNodeState>>& updates);
+
  private:
+  std::mutex watcher_mutex_;
+  std::vector<ServingSTHCallback> sth_watchers_;
+  std::vector<ClusterNodeStateCallback> cluster_node_watchers_;
+
   DISALLOW_COPY_AND_ASSIGN(ConsistentStore);
 };
 

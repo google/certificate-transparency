@@ -195,7 +195,13 @@ int main(int argc, char* argv[]) {
   // log server when there's data in the log.  It's a temporary thing though,
   // so fear ye not.
   FakeEtcdClient etcd_client(event_base);
-  EtcdConsistentStore<LoggedCertificate> consistent_store(&etcd_client,
+
+  // For now, run with a dedicated thread pool as the executor for our
+  // consistent store to avoid the possibility of DoS through thread starvation
+  // via HTTP.
+  ThreadPool etcd_pool(2);
+  EtcdConsistentStore<LoggedCertificate> consistent_store(&etcd_pool,
+                                                          &etcd_client,
                                                           "/root", "id");
 
   Frontend frontend(new CertSubmissionHandler(&checker),
@@ -212,7 +218,6 @@ int main(int argc, char* argv[]) {
   // server error) until we have an STH to serve. We can sign for now,
   // but we might not be a signer.
   SignMerkleTree(&tree_signer, &log_lookup);
-
   ThreadPool pool;
   HttpHandler handler(&log_lookup, db, &checker, &frontend, &pool);
 

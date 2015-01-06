@@ -39,8 +39,9 @@ class TreeSignerTest : public ::testing::Test {
   TreeSignerTest()
       : test_db_(),
         base_(make_shared<libevent::Base>()),
-        etcd_client_(base_),
         event_pump_(base_),
+        etcd_client_(base_),
+        pool_(2),
         test_signer_(),
         verifier_(),
         tree_signer_() {
@@ -50,7 +51,8 @@ class TreeSignerTest : public ::testing::Test {
     test_db_.reset(new TestDB<T>);
     verifier_.reset(new LogVerifier(TestSigner::DefaultLogSigVerifier(),
                                     new MerkleVerifier(new Sha256Hasher())));
-    store_.reset(new EtcdConsistentStore<LoggedCertificate>(&etcd_client_,
+    store_.reset(new EtcdConsistentStore<LoggedCertificate>(&pool_,
+                                                            &etcd_client_,
                                                             "/root", "id"));
     tree_signer_.reset(new TS(std::chrono::duration<double>(0), db(),
                               store_.get(), TestSigner::DefaultLogSigner()));
@@ -94,9 +96,10 @@ class TreeSignerTest : public ::testing::Test {
   }
   std::unique_ptr<TestDB<T>> test_db_;
   shared_ptr<libevent::Base> base_;
-  FakeEtcdClient etcd_client_;
-  std::unique_ptr<EtcdConsistentStore<LoggedCertificate>> store_;
   libevent::EventPumpThread event_pump_;
+  FakeEtcdClient etcd_client_;
+  ThreadPool pool_;
+  std::unique_ptr<EtcdConsistentStore<LoggedCertificate>> store_;
   TestSigner test_signer_;
   std::unique_ptr<LogVerifier> verifier_;
   std::unique_ptr<TS> tree_signer_;

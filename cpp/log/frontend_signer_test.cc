@@ -30,6 +30,7 @@ using cert_trans::EntryHandle;
 using cert_trans::EtcdConsistentStore;
 using cert_trans::FakeEtcdClient;
 using cert_trans::LoggedCertificate;
+using cert_trans::ThreadPool;
 using ct::LogEntry;
 using ct::SignedCertificateTimestamp;
 using std::make_shared;
@@ -49,9 +50,10 @@ class FrontendSignerTest : public ::testing::Test {
         verifier_(TestSigner::DefaultLogSigVerifier(),
                   new MerkleVerifier(new Sha256Hasher())),
         base_(make_shared<libevent::Base>()),
-        etcd_client_(base_),
-        store_(&etcd_client_, "/root", "id"),
         event_pump_(base_),
+        etcd_client_(base_),
+        pool_(2),
+        store_(&pool_, &etcd_client_, "/root", "id"),
         frontend_(db(), &store_, TestSigner::DefaultLogSigner()) {
   }
 
@@ -64,9 +66,10 @@ class FrontendSignerTest : public ::testing::Test {
   LogVerifier verifier_;
 
   shared_ptr<libevent::Base> base_;
-  FakeEtcdClient etcd_client_;
-  EtcdConsistentStore<LoggedCertificate> store_;
   libevent::EventPumpThread event_pump_;
+  FakeEtcdClient etcd_client_;
+  ThreadPool pool_;
+  EtcdConsistentStore<LoggedCertificate> store_;
   FS frontend_;
 };
 
