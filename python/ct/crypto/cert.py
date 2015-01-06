@@ -378,6 +378,22 @@ class Certificate(object):
         sans = self._get_decoded_extension_values(oid.ID_CE_SUBJECT_ALT_NAME)
         return sum([list(san) for san in sans], [])
 
+    def subject(self):
+        """Returns list of subject field values in fashion similar to
+        subject_alternative_names fashion.
+        """
+        subject = self._asn1_cert["tbsCertificate"]["subject"]
+        return [(sub['type'],  sub['value'])
+                for sub in subject.flatten()]
+
+    def issuer(self):
+        """Returns list of issuer field values in fashion similar to
+        subject method fashion.
+        """
+        issuer = self._asn1_cert["tbsCertificate"]["issuer"]
+        return [(iss['type'],  iss['value'])
+                for iss in issuer.flatten()]
+
     def _get_subject_alt_names_by_type(self, san_type):
         # A certificate should only have one SAN extension but we can't rely on
         # this (in non-strict mode), so we return everything we find.
