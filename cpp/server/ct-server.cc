@@ -28,6 +28,10 @@ DEFINE_string(server, "localhost", "Server host");
 DEFINE_int32(port, 9999, "Server port");
 DEFINE_string(key, "", "Server private key ID (engine) or PEM-encoded file");
 DEFINE_string(engine, "", "OpenSSL engine to initialize and use");
+DEFINE_string(engine_pre_cmds, "",
+              "Engine pre-initialization control command(s)");
+DEFINE_string(engine_post_cmds, "",
+              "Engine post-initialization control command(s)");
 DEFINE_string(trusted_cert_file, "",
               "File for trusted CA certificates, in concatenated PEM format");
 DEFINE_string(cert_dir, "", "Storage directory for certificates");
@@ -199,7 +203,8 @@ int main(int argc, char* argv[]) {
   EVP_PKEY* pkey = NULL;
   if (FLAGS_engine != "")
     CHECK_EQ(
-        LoadEnginePrivateKey(&pkey, FLAGS_engine, FLAGS_key),
+        LoadEnginePrivateKey(&pkey, FLAGS_engine, FLAGS_engine_pre_cmds,
+                             FLAGS_engine_post_cmds, FLAGS_key),
         cert_trans::util::KEY_OK);
   else
     CHECK_EQ(ReadPrivateKey(&pkey, FLAGS_key), cert_trans::util::KEY_OK);

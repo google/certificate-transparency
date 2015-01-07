@@ -13,12 +13,15 @@ enum KeyError {
   NO_SUCH_FILE,
   INVALID_KEY,
   NO_SUCH_ENGINE,
+  ENGINE_CTRL_FAILED,
   ENGINE_INIT_FAILED,
 };
 
 KeyError ReadPrivateKey(EVP_PKEY** pkey, const std::string& file);
 
 KeyError LoadEnginePrivateKey(EVP_PKEY** pkey, const std::string& engine_name,
+                              const std::string& engine_pre_cmds,
+                              const std::string& engine_post_cmds,
                               const std::string& key_id);
 
 
