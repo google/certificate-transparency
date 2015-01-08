@@ -33,7 +33,7 @@ class TextCertificateReport(reporter.CertificateReport):
             msg = "Cert %d:" % index
             observations = []
             for obs in cert_observations:
-                observations.append(str(obs))
+                observations.append(unicode(obs))
             if observations:
                 logging.info("%s %s", msg, ', '.join(observations))
 
