@@ -10,6 +10,7 @@ from ct.client import log_client_test_util as test_util
 from ct.client.db import database
 from twisted.internet import defer
 from twisted.internet import task
+from twisted.internet import reactor
 from twisted.python import failure
 from twisted.test import proto_helpers
 from twisted.trial import unittest
@@ -113,7 +114,7 @@ class AsyncLogClientTest(unittest.TestCase):
 
     class FakeDB(object):
         def scan_entries(self, first, last):
-            raise database.KeyError
+            raise database.KeyError("boom!")
 
         def store_entries(self, entries):
             self.entries = list(entries)
@@ -131,13 +132,15 @@ class AsyncLogClientTest(unittest.TestCase):
                                          test_util.DEFAULT_URI,
                                          reactor=self.clock)
 
-    def default_client(self, entries_db=None):
+    def default_client(self, entries_db=None, reactor_=None):
         # A client whose responder is configured to answer queries for the
         # correct uri.
+        if reactor_ is None:
+            reactor_ = self.clock
         return log_client.AsyncLogClient(self.FakeAgent(
             self.FakeHandler(test_util.DEFAULT_URI)), test_util.DEFAULT_URI,
                                          entries_db=entries_db,
-                                         reactor=self.clock)
+                                         reactor=reactor_)
 
     def test_get_sth(self):
         client = self.default_client()
@@ -340,11 +343,13 @@ class AsyncLogClientTest(unittest.TestCase):
         # he will get 0 - 9 entries. If he uses db then he will get 10 - 19
         fake_db.scan_entries = mock.Mock(
                 return_value=test_util.make_entries(10, 19))
-        client = self.default_client(entries_db=fake_db)
+        client = self.default_client(entries_db=fake_db, reactor_=reactor)
         consumer = self.get_entries(client, 0, 9)
-        self.assertEqual(len(consumer.received), 10)
-        for i in range(0, 9):
-            self.assertEqual(test_util.make_entry(i + 10), consumer.received[i])
+        consumer.consumed.addCallback(lambda _:
+                                  self.assertEqual(len(consumer.received), 10))
+        consumer.consumed.addCallback(lambda _:
+            [self.assertEqual(test_util.make_entry(i + 10), consumer.received[i])
+             for i in range(0, 9)])
 
     def test_get_entries_tries_to_fetch_if_not_available_in_db(self):
         fake_db = self.FakeDB()
@@ -355,10 +360,13 @@ class AsyncLogClientTest(unittest.TestCase):
 
     def test_get_entries_stores_entries(self):
         fake_db = self.FakeDB()
-        client = self.default_client(entries_db=fake_db)
+        client = self.default_client(entries_db=fake_db, reactor_=reactor)
         consumer = self.get_entries(client, 0, 9)
-        test_util.verify_entries(consumer.received, 0, 9)
-        test_util.verify_entries(fake_db.entries, 0, 9)
+        consumer.consumed.addCallback(lambda _:
+                            test_util.verify_entries(consumer.received, 0, 9))
+        consumer.consumed.addCallback(lambda _:
+                            test_util.verify_entries(fake_db.entries, 0, 9))
+        return consumer.consumed
 
 
 if __name__ == "__main__":
