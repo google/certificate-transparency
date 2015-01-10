@@ -570,7 +570,7 @@ class EntryProducer(object):
 
     @property
     def finished(self):
-        return self._current > self._end
+        return self._current > self._end and self._batches.empty()
 
     def __fail(self, failure):
         if not self._stopped:
@@ -757,7 +757,7 @@ class EntryProducer(object):
     def resumeProducing(self):
         if self._paused and not self._stopped:
             self._paused = False
-            self.produce()
+            self._reactor.callFromThread(self.produce)
 
     def stopProducing(self):
         self._paused = True
