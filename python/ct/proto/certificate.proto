@@ -20,6 +20,14 @@ message DNAttribute {
   optional string value = 2;
 }
 
+message Observation {
+  optional string description = 1;
+
+  optional string reason = 2;
+
+  optional bytes details = 3;
+}
+
 message X509Description {
   optional string version = 1;
 
@@ -44,4 +52,6 @@ message X509Description {
 
   // SHA256 hash from DER form.
   optional bytes sha256_hash = 10;
+
+  repeated Observation observations = 11;
 }

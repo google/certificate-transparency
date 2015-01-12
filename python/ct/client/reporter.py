@@ -55,7 +55,7 @@ def _scan_der_cert(der_certs, checks):
             if not strict_failure:
                 for check in checks:
                     partial_result += check.check(certificate) or []
-                desc = cert_desc.from_cert(certificate)
+                desc = cert_desc.from_cert(certificate, partial_result)
             else:
                 desc = certificate_pb2.X509Description()
                 desc.der = der_cert

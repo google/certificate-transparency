@@ -26,7 +26,7 @@ class Observation(object):
         return ret
 
     def _format_details(self):
-        """Conveience method, so it's easy to override how details have to be
+        """Convenience method, so it's easy to override how details have to be
         printed without overriding whole __str__.
         """
         try:
@@ -37,3 +37,11 @@ class Observation(object):
         except Exception as e:
             logging.warning("Unprintable observation %r" % self.details)
             return "UNPRINTABLE " + str(e)
+
+    def details_to_proto(self):
+        """Specifies how details should be written to protobuf."""
+        if self.details:
+            return self._format_details().encode('utf-8')
+        else:
+            return ''
+

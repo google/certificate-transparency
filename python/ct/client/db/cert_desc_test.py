@@ -1,13 +1,21 @@
 #!/usr/bin/env python
+# coding=utf-8
 import unittest
 from ct.client.db import cert_desc
 from ct.crypto import cert
+from ct.cert_analysis import all_checks
+from ct.cert_analysis import observation
 
 CERT = cert.Certificate.from_der_file("ct/crypto/testdata/google_cert.der")
 
 class CertificateDescriptionTest(unittest.TestCase):
     def test_from_cert(self):
-        proto = cert_desc.from_cert(CERT)
+        observations = []
+        for check in all_checks.ALL_CHECKS:
+            observations += check.check(CERT) or []
+        observations.append(observation.Observation(
+            "AE", u'ćę©ß→æ→ćąßę-ß©ąńśþa©ęńć←', (u'əę”ąłęµ', u'…łą↓ð→↓ś→ę')))
+        proto = cert_desc.from_cert(CERT, observations)
         self.assertEqual(proto.der, CERT.to_der())
 
         subject = [(att.type, att.value) for att in proto.subject]
@@ -38,6 +46,13 @@ class CertificateDescriptionTest(unittest.TestCase):
         self.assertEqual(proto.serial_number,
                          str(CERT.serial_number().human_readable()
                              .upper().replace(':', '')))
+        observations_tuples = [(unicode(obs.description),
+                                unicode(obs.reason) if obs.reason else u'',
+                                obs.details_to_proto())
+                               for obs in observations]
+        proto_obs = [(obs.description, obs.reason, obs.details)
+                     for obs in proto.observations]
+        self.assertItemsEqual(proto_obs, observations_tuples)
 
 
 if __name__ == "__main__":

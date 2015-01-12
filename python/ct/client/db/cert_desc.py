@@ -3,7 +3,7 @@ import hashlib
 from ct.crypto import cert
 from ct.proto import certificate_pb2
 
-def from_cert(certificate):
+def from_cert(certificate, observations=[]):
     """Pulls out interesting fields from certificate, so format of data will
     be similar in every database implementation."""
     proto = certificate_pb2.X509Description()
@@ -47,6 +47,14 @@ def from_cert(certificate):
         pass
 
     proto.sha256_hash = hashlib.sha256(proto.der).digest()
+
+    for observation in observations:
+        proto_obs = proto.observations.add()
+        if observation.description:
+            proto_obs.description = observation.description
+        if observation.reason:
+            proto_obs.reason = observation.reason
+        proto_obs.details = observation.details_to_proto()
 
     return proto
 

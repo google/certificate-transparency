@@ -22,7 +22,10 @@ class SQLiteCertDB(cert_db.CertDB):
                                            ("name", "TEXT"),]),
             # subject common names and dnsnames for easy lookup of given
             # domain name
-            ("subject_names", [("name", "TEXT")])]
+            ("subject_names", [("name", "TEXT")]),
+            ("observations", [("description", "TEXT"),
+                              ("reason", "TEXT"),
+                              ("details", "BLOB")])]
         cert_single_field_tables = [("version", "INTEGER"),
                                     ("serial_number", "TEXT")]
         with self.__mgr.get_connection() as conn:
@@ -106,6 +109,12 @@ class SQLiteCertDB(cert_db.CertDB):
             cursor.execute("INSERT INTO issuer(log, cert_id, type, name)"
                            "VALUES(?, ?, ?, ?)",
                            (log_key, index, iss.type, iss.value))
+
+        for obs in cert.observations:
+            cursor.execute("INSERT INTO observations(log, cert_id, description, "
+                           "reason, details) VALUES(?, ?, ?, ?, ?)",
+                           (log_key, index, obs.description, obs.reason,
+                            sqlite3.Binary(obs.details)))
 
     def store_certs_desc(self, certs, log_key):
         """Store certificates using it's descriptions.
