@@ -3,6 +3,7 @@ import base64
 import json
 
 from ct.client.db import database
+from ct.crypto import verify
 from ct.proto import client_pb2
 import gflags
 import logging
@@ -104,6 +105,7 @@ _GET_STH_CONSISTENCY_PATH = "ct/v1/get-sth-consistency"
 _GET_PROOF_BY_HASH_PATH = "ct/v1/get-proof-by-hash"
 _GET_ROOTS_PATH = "ct/v1/get-roots"
 _GET_ENTRY_AND_PROOF_PATH = "ct/v1/get-entry-and-proof"
+_ADD_CHAIN = "ct/v1/add-chain"
 
 
 def _parse_sth(sth_body):
@@ -208,6 +210,12 @@ class RequestHandler(object):
         except requests.exceptions.RequestException as e:
             raise HTTPError("Connection to %s failed: %s" % (uri, e))
 
+    def post_response(self, uri, post_data):
+        try:
+            return requests.post(uri, data=json.dumps(post_data), timeout=60)
+        except requests.exceptions.RequestException as e:
+            raise HTTPError("POST to %s failed: %s" % (uri, e))
+
     @staticmethod
     def check_response_status(code, reason, content='', headers=''):
         if code == 200:
@@ -221,6 +229,12 @@ class RequestHandler(object):
 
     def get_response_body(self, uri, params=None):
         response = self.get_response(uri, params=params)
+        self.check_response_status(response.status_code, response.reason,
+                                   response.content, response.headers)
+        return response.content
+
+    def post_response_body(self, uri, post_data=None):
+        response = self.post_response(uri, post_data=post_data)
         self.check_response_status(response.status_code, response.reason,
                                    response.content, response.headers)
         return response.content
@@ -251,6 +265,30 @@ class LogClient(object):
     def _req_body(self, path, params=None):
         return self._req.get_response_body(self._uri + "/" + path,
                                            params=params)
+
+    def _post_req_body(self, path, post_data=None):
+        return self._req.post_response_body(
+            self._uri + "/" + path, post_data=post_data)
+
+    def _parse_sct(self, sct_response):
+        sct_data = json.loads(sct_response)
+        try:
+            sct = client_pb2.SignedCertificateTimestamp()
+            sct_version = sct_data["sct_version"]
+            if sct_version != 0:
+                raise InvalidResponseError(
+                    "Unknown SCT version: %d" % sct_version)
+            sct.version = client_pb2.V1
+            sct.id.key_id = base64.b64decode(sct_data["id"])
+            sct.timestamp = sct_data["timestamp"]
+            hash_algorithm, sig_algorithm, sig_data = verify.decode_signature(
+                base64.b64decode(sct_data["signature"]))
+            sct.signature.hash_algorithm = hash_algorithm
+            sct.signature.sig_algorithm = sig_algorithm
+            sct.signature.signature = sig_data
+            return sct
+        except KeyError as e:
+            raise InvalidResponseError("SCT Missing field: %s" % e)
 
     def get_sth(self):
         """Get the current Signed Tree Head.
@@ -462,6 +500,28 @@ class LogClient(object):
             raise InvalidResponseError(
                 "%s returned invalid data: expected a list od base64-encoded "
                 "certificates, got %s\n%s" % (self.servername, response, e))
+
+    def add_chain(self, certs_list):
+        """Adds the given chain of certificates.
+
+        Args:
+            certs_list: A list of DER-encoded certificates to add.
+
+        Returns:
+            The SCT for the certificate.
+
+        Raises:
+            HTTPError, HTTPClientError, HTTPServerError: connection failed.
+                For logs that honour HTTP status codes, HTTPClientError (a 4xx)
+                should never happen.
+            InvalidResponseError: server response is invalid for the given
+                                  request.
+        """
+        sct_data = self._post_req_body(
+            _ADD_CHAIN,
+            [base64.b64encode(certificate) for certificate in certs_list])
+        return self._parse_sct(sct_data)
+
 
 
 ###############################################################################

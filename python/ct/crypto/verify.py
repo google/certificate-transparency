@@ -11,6 +11,44 @@ from ct.proto import client_pb2
 from ct.proto import ct_pb2
 import ecdsa
 
+def decode_signature(signature):
+    """Decode the TLS-encoded serialized signature.
+
+    Args:
+        signature: TLS-encoded signature.
+
+    Returns:
+        a tuple of (hash algorithm, signature algorithm, signature data)
+
+    Raises:
+        ct.crypto.error.EncodingError: invalid TLS encoding.
+    """
+
+    sig_stream = io.BytesIO(signature)
+
+    sig_prefix = sig_stream.read(2)
+    if len(sig_prefix) != 2:
+        raise error.EncodingError("Invalid algorithm prefix %s" %
+                                      sig_prefix.encode("hex"))
+    hash_algo, sig_algo = struct.unpack(">BB", sig_prefix)
+    if (hash_algo != ct_pb2.DigitallySigned.SHA256 or
+        sig_algo != ct_pb2.DigitallySigned.ECDSA):
+        raise error.EncodingError("Invalid algorithm(s) %d, %d" %
+                                  (hash_algo, sig_algo))
+
+    length_prefix = sig_stream.read(2)
+    if len(length_prefix) != 2:
+        raise error.EncodingError("Invalid signature length prefix %s" %
+                                  length_prefix.encode("hex"))
+    sig_length, = struct.unpack(">H", length_prefix)
+    remaining = sig_stream.read()
+    if len(remaining) != sig_length:
+        raise error.EncodingError("Invalid signature length %d for "
+                                  "signature %s with length %d" %
+                                  (sig_length, remaining.encode("hex"),
+                                   len(remaining)))
+    return (hash_algo, sig_algo, remaining)
+
 
 class LogVerifier(object):
     """CT log verifier."""
@@ -50,44 +88,6 @@ class LogVerifier(object):
                            sth_response.timestamp, sth_response.tree_size,
                            sth_response.sha256_root_hash)
 
-    def _decode_signature(self, signature):
-        """Decode the TLS-encoded serialized signature.
-
-        Args:
-            signature: TLS-encoded signature.
-
-        Returns:
-            the inner, ASN.1 encoded contents.
-
-        Raises:
-            ct.crypto.error.EncodingError: invalid TLS encoding.
-        """
-
-        sig_stream = io.BytesIO(signature)
-
-        sig_prefix = sig_stream.read(2)
-        if len(sig_prefix) != 2:
-            raise error.EncodingError("Invalid algorithm prefix %s" %
-                                      sig_prefix.encode("hex"))
-        hash_algo, sig_algo = struct.unpack(">BB", sig_prefix)
-        if (hash_algo != ct_pb2.DigitallySigned.SHA256 or
-            sig_algo != ct_pb2.DigitallySigned.ECDSA):
-            raise error.EncodingError("Invalid algorithm(s) %d, %d" %
-                                      (hash_algo, sig_algo))
-
-        length_prefix = sig_stream.read(2)
-        if len(length_prefix) != 2:
-            raise error.EncodingError("Invalid signature length prefix %s" %
-                                      length_prefix.encode("hex"))
-        sig_length, = struct.unpack(">H", length_prefix)
-        remaining = sig_stream.read()
-        if len(remaining) != sig_length:
-            raise error.EncodingError("Invalid signature length %d for "
-                                      "signature %s with length %d" %
-                                      (sig_length, remaining.encode("hex"),
-                                       len(remaining)))
-        return remaining
-
     def _verify(self, signature_input, signature):
         try:
             return self.__pubkey.verify(signature, signature_input,
@@ -118,7 +118,9 @@ class LogVerifier(object):
             ct.crypto.error.SignatureError: invalid signature.
         """
         signature_input = self._encode_sth_input(sth_response)
-        signature = self._decode_signature(sth_response.tree_head_signature)
+        #TODO(eranm): Pass the actual hash and signature algorithms to the
+        # verify method.
+        (_, _, signature) = decode_signature(sth_response.tree_head_signature)
         return self._verify(signature_input, signature)
 
     @staticmethod

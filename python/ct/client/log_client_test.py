@@ -1,5 +1,6 @@
 #!/usr/bin/env python
 
+import base64
 import json
 import sys
 import unittest
@@ -7,6 +8,7 @@ import unittest
 from ct.client import log_client
 from ct.client import log_client_test_util as test_util
 from ct.crypto import merkle
+from ct.proto import client_pb2
 import gflags
 import mock
 
@@ -280,6 +282,60 @@ class LogClientTest(unittest.TestCase):
         client = self.one_shot_client(json_response)
         self.assertRaises(log_client.InvalidResponseError,
                           client.get_proof_by_hash, "hash", 2)
+
+    def _verify_sct_contents(self, sct):
+        LOG_ID = base64.b64decode(
+            'pLkJkLQYWBSHuxOizGdwCjw1mAT5G9+443fNDsgN3BA=')
+        self.assertEqual(client_pb2.V1, sct.version)
+        self.assertEqual(LOG_ID, sct.id.key_id)
+        self.assertEqual(1373015623951L, sct.timestamp)
+        self.assertEqual(client_pb2.DigitallySigned.SHA256,
+                         sct.signature.hash_algorithm)
+        self.assertEqual(client_pb2.DigitallySigned.ECDSA,
+                         sct.signature.sig_algorithm)
+        RAW_SIGNATURE = ('304402202080fb4a50c159e3398d9cf85cec0b3b551d4379db1d'
+                         '820b3d6bca52107a32180220286b2f20f0d98039f14e3198f1f4'
+                         '81c24975e5d0344d4a96e5ec761c253bc84f').decode('hex')
+        self.assertEqual(RAW_SIGNATURE, sct.signature.signature)
+
+    def test_add_valid_chain(self):
+        certs_chain = ["one", "two", "three"]
+        json_sct_response = (
+            '{"sct_version":0,"id":"pLkJkLQYWBSHuxOizGdwCjw1m'
+            'AT5G9+443fNDsgN3BA=","timestamp":1373015623951,\n'
+            '"extensions":"",\n'
+            '"signature":"BAMARjBEAiAggPtKUMFZ4zmNnPhc7As7VR1Dedsdggs9a8pSEHoy'
+            'GAIgKGsvIPDZgDnxTjGY8fSBwkl15dA0TUqW5ex2HCU7yE8="}')
+        mock_handler = mock.Mock()
+        mock_handler.post_response_body.return_value = json_sct_response
+        client = log_client.LogClient("http://ctlog", handler=mock_handler)
+        received_sct = client.add_chain(certs_chain)
+        mock_handler.post_response_body.assert_called_once_with(
+            "http://ctlog/ct/v1/add-chain",
+            post_data=[base64.b64encode(t) for t in certs_chain])
+        self._verify_sct_contents(received_sct)
+
+    def test_fails_parsing_sct_invalid_version(self):
+        json_sct_response = (
+            '{"sct_version":2,"id":"pLkJkLQYWBSHuxOizGdwCjw1m'
+            'AT5G9+443fNDsgN3BA=","timestamp":1373015623951,\n'
+            '"extensions":"",\n'
+            '"signature":"BAMARjBEAiAggPtKUMFZ4zmNnPhc7As7VR1Dedsdggs9a8pSEHoy'
+            'GAIgKGsvIPDZgDnxTjGY8fSBwkl15dA0TUqW5ex2HCU7yE8="}')
+        client = self.default_client()
+        self.assertRaises(log_client.InvalidResponseError,
+                          client._parse_sct, json_sct_response)
+
+    def test_fails_parsing_sct_missing_contents(self):
+        json_sct_response = (
+            '{"sct_version":0,"id":"pLkJkLQYWBSHuxOizGdwCjw1m'
+            'AT5G9+443fNDsgN3BA=",\n'
+            '"extensions":"",\n'
+            '"signature":"BAMARjBEAiAggPtKUMFZ4zmNnPhc7As7VR1Dedsdggs9a8pSEHoy'
+            'GAIgKGsvIPDZgDnxTjGY8fSBwkl15dA0TUqW5ex2HCU7yE8="}')
+        client = self.default_client()
+        self.assertRaises(log_client.InvalidResponseError,
+                          client._parse_sct, json_sct_response)
 
 
 if __name__ == "__main__":
