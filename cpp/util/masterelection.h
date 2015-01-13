@@ -158,6 +158,7 @@ class MasterElection {
   EtcdClient::Node current_master_;
 
   friend class ElectionTest;
+  friend std::ostream& operator<<(std::ostream& output, ProposalState state);
 };
 
 

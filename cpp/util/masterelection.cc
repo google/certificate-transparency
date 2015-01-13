@@ -43,6 +43,39 @@ string EnsureEndsWithSlash(const string& s) {
 }  // namespace
 
 
+std::ostream& operator<<(std::ostream& output,
+                         MasterElection::ProposalState state) {
+  switch (state) {
+    case MasterElection::ProposalState::NONE:
+      output << "NONE";
+      break;
+    case MasterElection::ProposalState::AWAITING_CREATION:
+      output << "AWAITING_CREATION";
+      break;
+    case MasterElection::ProposalState::CREATING:
+      output << "CREATING";
+      break;
+    case MasterElection::ProposalState::UP_TO_DATE:
+      output << "UP_TO_DATE";
+      break;
+    case MasterElection::ProposalState::AWAITING_UPDATE:
+      output << "AWAITING_UPDATE";
+      break;
+    case MasterElection::ProposalState::UPDATING:
+      output << "UPDATING";
+      break;
+    case MasterElection::ProposalState::AWAITING_DELETE:
+      output << "AWAITING_DELETE";
+      break;
+    case MasterElection::ProposalState::DELETING:
+      output << "DELETING";
+      break;
+  }
+
+  return output;
+}
+
+
 MasterElection::MasterElection(const shared_ptr<libevent::Base>& base,
                                EtcdClient* client, const string& proposal_dir,
                                const string& node_id)
@@ -60,7 +93,7 @@ MasterElection::MasterElection(const shared_ptr<libevent::Base>& base,
 
 MasterElection::~MasterElection() {
   VLOG(1) << my_proposal_path_ << ": Joining election";
-  CHECK(proposal_state_ == ProposalState::NONE);
+  CHECK_EQ(proposal_state_, ProposalState::NONE);
   VLOG(1) << "~" << my_proposal_path_;
 }
 
@@ -148,39 +181,37 @@ bool MasterElection::IsMaster(const unique_lock<mutex>& lock) const {
 void MasterElection::Transition(const unique_lock<mutex>& lock,
                                 const ProposalState to) {
   CHECK(lock.owns_lock());
-  VLOG(1) << my_proposal_path_ << ": Transition "
-          << static_cast<int>(proposal_state_) << " -> "
-          << static_cast<int>(to);
+  VLOG(1) << my_proposal_path_ << ": Transition " << proposal_state_ << " -> "
+          << to;
   switch (proposal_state_) {
     case ProposalState::NONE:
-      CHECK(to == ProposalState::AWAITING_CREATION);
+      CHECK_EQ(to, ProposalState::AWAITING_CREATION);
       break;
     case ProposalState::AWAITING_CREATION:
-      CHECK(to == ProposalState::CREATING);
+      CHECK_EQ(to, ProposalState::CREATING);
       break;
     case ProposalState::CREATING:
-      CHECK(to == ProposalState::UP_TO_DATE);
+      CHECK_EQ(to, ProposalState::UP_TO_DATE);
       break;
     case ProposalState::UP_TO_DATE:
       CHECK(to == ProposalState::AWAITING_UPDATE ||
             to == ProposalState::AWAITING_DELETE)
-          << "proposal_state_: " << static_cast<int>(proposal_state_)
-          << " to: " << static_cast<int>(to);
+          << "proposal_state_: " << proposal_state_ << " to: " << to;
       break;
     case ProposalState::AWAITING_UPDATE:
-      CHECK(to == ProposalState::UPDATING);
+      CHECK_EQ(to, ProposalState::UPDATING);
       break;
     case ProposalState::UPDATING:
-      CHECK(to == ProposalState::UP_TO_DATE);
+      CHECK_EQ(to, ProposalState::UP_TO_DATE);
       break;
     case ProposalState::AWAITING_DELETE:
-      CHECK(to == ProposalState::DELETING);
+      CHECK_EQ(to, ProposalState::DELETING);
       break;
     case ProposalState::DELETING:
-      CHECK(to == ProposalState::NONE);
+      CHECK_EQ(to, ProposalState::NONE);
       break;
     default:
-      CHECK(false) << "Unknown state: " << static_cast<int>(proposal_state_);
+      CHECK(false) << "Unknown state: " << proposal_state_;
   }
   proposal_state_ = to;
   proposal_state_cv_.notify_all();
