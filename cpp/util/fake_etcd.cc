@@ -11,12 +11,14 @@ using std::function;
 using std::lock_guard;
 using std::make_shared;
 using std::map;
+using std::move;
 using std::mutex;
 using std::ostringstream;
 using std::shared_ptr;
 using std::stoi;
 using std::string;
 using std::to_string;
+using std::unique_lock;
 using std::vector;
 using util::Status;
 
@@ -50,14 +52,14 @@ void FakeEtcdClient::DumpEntries() {
 
 void FakeEtcdClient::Watch(const string& key, const WatchCallback& cb,
                            util::Task* task) {
-  lock_guard<mutex> lock(mutex_);
+  unique_lock<mutex> lock(mutex_);
   vector<WatchUpdate> initial_updates;
   for (const auto& pair : entries_) {
     if (pair.first.find(key) == 0) {
       initial_updates.emplace_back(WatchUpdate(pair.second, true /*exists*/));
     }
   }
-  task->executor()->Add(bind(cb, move(initial_updates)));
+  ScheduleWatchCallback(lock, task, bind(cb, move(initial_updates)));
   watches_[key].push_back(make_pair(cb, task));
   task->WhenCancelled(bind(&FakeEtcdClient::CancelWatch, this, task));
 }
@@ -127,12 +129,12 @@ void FillJsonForDir(const vector<EtcdClient::Node>& nodes,
 
 
 void FakeEtcdClient::PurgeExpiredEntries() {
-  lock_guard<mutex> lock(mutex_);
+  unique_lock<mutex> lock(mutex_);
   for (auto it = entries_.begin(); it != entries_.end();) {
     if (it->second.expires_ < system_clock::now()) {
       VLOG(1) << "Deleting expired entry " << it->first;
       it->second.deleted_ = true;
-      NotifyForPath(it->first);
+      NotifyForPath(lock, it->first);
       it = entries_.erase(it);
     } else {
       ++it;
@@ -141,7 +143,9 @@ void FakeEtcdClient::PurgeExpiredEntries() {
 }
 
 
-void FakeEtcdClient::NotifyForPath(const string& path) {
+void FakeEtcdClient::NotifyForPath(const unique_lock<mutex>& lock,
+                                   const string& path) {
+  CHECK(lock.owns_lock());
   VLOG(1) << "notifying " << path;
   const bool exists(entries_.find(path) != entries_.end());
   CHECK(exists);
@@ -149,9 +153,10 @@ void FakeEtcdClient::NotifyForPath(const string& path) {
   for (const auto& pair : watches_) {
     if (path.find(pair.first) == 0) {
       for (const auto& cb_cookie : pair.second) {
-        cb_cookie.second->executor()->Add(
-            bind(cb_cookie.first,
-                 vector<WatchUpdate>{WatchUpdate(node, !node.deleted_)}));
+        ScheduleWatchCallback(lock, cb_cookie.second,
+                              bind(cb_cookie.first,
+                                   vector<WatchUpdate>{
+                                       WatchUpdate(node, !node.deleted_)}));
       }
     }
   }
@@ -254,7 +259,7 @@ void FakeEtcdClient::HandlePost(const string& key,
                                 const map<string, string>& params,
                                 const GenericCallback& cb) {
   VLOG(1) << "POST " << key;
-  lock_guard<mutex> lock(mutex_);
+  unique_lock<mutex> lock(mutex_);
   const string path(EnsureEndsWithSlash(key) + to_string(index_));
   CHECK(params.find("value") != params.end());
   const string& value(params.find("value")->second);
@@ -266,7 +271,7 @@ void FakeEtcdClient::HandlePost(const string& key,
   shared_ptr<JsonObject> json(make_shared<JsonObject>());
   FillJsonForEntry(node, "create", json.get());
   ScheduleCallback(bind(cb, Status::OK, json, index_));
-  NotifyForPath(path);
+  NotifyForPath(lock, path);
 }
 
 
@@ -274,7 +279,7 @@ void FakeEtcdClient::HandlePut(const string& key,
                                const map<string, string>& params,
                                const GenericCallback& cb) {
   VLOG(1) << "PUT " << key;
-  lock_guard<mutex> lock(mutex_);
+  unique_lock<mutex> lock(mutex_);
   CHECK(key.back() != '/');
   CHECK(params.find("value") != params.end());
   const string& value(params.find("value")->second);
@@ -295,7 +300,7 @@ void FakeEtcdClient::HandlePut(const string& key,
   shared_ptr<JsonObject> json(make_shared<JsonObject>());
   FillJsonForEntry(node, "set", json.get());
   ScheduleCallback(bind(cb, Status::OK, json, index_));
-  NotifyForPath(key);
+  NotifyForPath(lock, key);
 }
 
 
@@ -303,7 +308,7 @@ void FakeEtcdClient::HandleDelete(const string& key,
                                   const map<string, string>& params,
                                   const GenericCallback& cb) {
   VLOG(1) << "DELETE " << key;
-  lock_guard<mutex> lock(mutex_);
+  unique_lock<mutex> lock(mutex_);
   CHECK(key.back() != '/');
   Status status(CheckCompareFlags(params, key));
   if (!status.ok()) {
@@ -315,7 +320,7 @@ void FakeEtcdClient::HandleDelete(const string& key,
   shared_ptr<JsonObject> json(make_shared<JsonObject>());
   FillJsonForEntry(entries_[key], "delete", json.get());
   ScheduleCallback(bind(cb, Status::OK, json, index_));
-  NotifyForPath(key);
+  NotifyForPath(lock, key);
   entries_.erase(key);
 }
 
@@ -329,6 +334,9 @@ void FakeEtcdClient::CancelWatch(util::Task* task) {
         CHECK(!found);
         found = true;
         VLOG(1) << "Removing watcher " << it->second << " on " << pair.first;
+        // Outstanding notifications have a hold on this task, so they
+        // will all go through before the task actually completes. But
+        // we won't be sending new notifications.
         task->Return(Status::CANCELLED);
         it = pair.second.erase(it);
       } else {
@@ -341,6 +349,52 @@ void FakeEtcdClient::CancelWatch(util::Task* task) {
 
 void FakeEtcdClient::ScheduleCallback(const function<void()>& cb) {
   base_->Add(cb);
+}
+
+
+void FakeEtcdClient::ScheduleWatchCallback(
+    const unique_lock<mutex>& lock, util::Task* task,
+    const std::function<void()>& callback) {
+  CHECK(lock.owns_lock());
+  const bool already_running(!watches_callbacks_.empty());
+
+  task->AddHold();
+  watches_callbacks_.emplace_back(make_pair(task, move(callback)));
+
+  // TODO(pphaneuf): This might fare poorly if the executor is
+  // synchronous.
+  if (!already_running) {
+    watches_callbacks_.front().first->executor()->Add(
+        bind(&FakeEtcdClient::RunWatchCallback, this));
+  }
+}
+
+
+void FakeEtcdClient::RunWatchCallback() {
+  util::Task* current(nullptr);
+  util::Task* next(nullptr);
+  function<void()> callback;
+
+  {
+    lock_guard<mutex> lock(mutex_);
+
+    CHECK(!watches_callbacks_.empty());
+    current = move(watches_callbacks_.front().first);
+    callback = move(watches_callbacks_.front().second);
+    watches_callbacks_.pop_front();
+
+    if (!watches_callbacks_.empty()) {
+      next = CHECK_NOTNULL(watches_callbacks_.front().first);
+    }
+  }
+
+  callback();
+  current->RemoveHold();
+
+  // If we have a next executor, schedule ourselves on it.
+  if (next) {
+    next->executor()->Add(bind(&FakeEtcdClient::RunWatchCallback, this));
+  }
 }
 
 

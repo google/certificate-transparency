@@ -478,6 +478,7 @@ struct EtcdClient::WatchState {
   void InitialGetAllDone(Status status, const vector<Node>& nodes,
                          int64_t etcd_index);
   void RequestDone(Status status, const shared_ptr<JsonObject>& json);
+  void SendUpdates(const vector<WatchUpdate>& updates);
   void StartRequest();
   Status HandleSingleValueRequestDone(const JsonObject& node,
                                       vector<WatchUpdate>* updates);
@@ -636,21 +637,29 @@ void EtcdClient::WatchState::RequestDone(Status status,
 
     vector<WatchUpdate> updates;
     Status status(HandleSingleValueRequestDone(node, &updates));
-
-    if (status.ok()) {
-      task_->executor()->Add(bind(cb_, move(updates)));
-    } else {
+    if (!status.ok()) {
       LOG(ERROR) << status;
+      goto fail;
     }
-  }
 
-  return StartRequest();
+    return task_->executor()->Add(
+        bind(&WatchState::SendUpdates, this, move(updates)));
+  }
 
 fail:
   client_->event_base_->Delay(
       seconds(FLAGS_etcd_watch_error_retry_delay_secs),
       task_->AddChildWithExecutor(bind(&WatchState::StartRequest, this),
                                   client_->event_base_.get()));
+}
+
+
+void EtcdClient::WatchState::SendUpdates(const vector<WatchUpdate>& updates) {
+  cb_(updates);
+
+  // Only start the next request once the callback has return, to make
+  // sure they are always delivered in order.
+  StartRequest();
 }
 
 
