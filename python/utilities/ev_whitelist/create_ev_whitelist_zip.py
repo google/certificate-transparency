@@ -17,7 +17,7 @@ import golomb_code
 import gflags
 
 CRX_URL = (
-    "https://clients2.googleusercontent.com/crx/blobs/QgAAAC6zw0qH2DJtnXe8Z7rUJP3DCIAaZyHxsk_kMfbij2DZlYi07qKK5K2pnang1t710oEk_r0X2kan6URPBZyL0mZfimAgxdy3Awu1aoRah0JGAMZSmuUEsfuk2YGUHtqSL6Bt0omrn-zRiw/oafdbfcohdcjandcenmccfopbeklnicp_main.platform.all.crx")
+    "https://clients2.googleusercontent.com/crx/blobs/QgAAAC6zw0qH2DJtnXe8Z7rUJP3gszY0B2FmNnbJa7CCi6Nx1HJCcIhGUhU4ejYyq6S5fBBIVJ1Amlh8I4ihdy5PD2khylH-MKyRnb_wjad-BSsrAMZSmuU4E8LUNSehqcmAXZkGETVkjdbMag/oafdbfcohdcjandcenmccfopbeklnicplive_main.platform.all.crx")
 TRUNCATED_HASH_LENGTH = 8
 GOLOMB_M_PARAMETER = 2 ** 47
 NUM_FETCHING_PROCESSES = 40
@@ -25,6 +25,8 @@ LOGS_LIST = [
     "https://ct.googleapis.com/pilot",
     "https://ct.googleapis.com/aviator",
     "https://ct1.digicert-ct.com/log",
+    "https://log.certly.io",
+    "https://ct.izenpe.com",
 ]
 
 FLAGS = gflags.FLAGS

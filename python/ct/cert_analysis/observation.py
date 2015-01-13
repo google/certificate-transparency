@@ -1,3 +1,5 @@
+import logging
+
 class Observation(object):
     """Describes certificate observation."""
     def __init__(self, description, reason=None, details=None):
@@ -24,7 +26,22 @@ class Observation(object):
         return ret
 
     def _format_details(self):
-        """Conveience method, so it's easy to override how details have to be
+        """Convenience method, so it's easy to override how details have to be
         printed without overriding whole __str__.
         """
-        return self.details
+        try:
+            if isinstance(self.details, str):
+                return unicode(self.details, 'utf-8')
+            else:
+                return unicode(self.details)
+        except Exception as e:
+            logging.warning("Unprintable observation %r" % self.details)
+            return "UNPRINTABLE " + str(e)
+
+    def details_to_proto(self):
+        """Specifies how details should be written to protobuf."""
+        if self.details:
+            return self._format_details().encode('utf-8')
+        else:
+            return ''
+

@@ -1,4 +1,3 @@
-import contextlib
 import sqlite3
 
 from ct.client.db import database
@@ -20,7 +19,7 @@ class SQLiteConnection(object):
         # The default timeout is 5 seconds.
         # TODO(ekasper): tweak this as needed
         try:
-            self.__conn = sqlite3.connect(db)
+            self.__conn = sqlite3.connect(db, timeout=600)
         # Note: The sqlite3 module does not document its error conditions so
         # it'll probably take a few iterations to get the exceptions right.
         except sqlite3.OperationalError as e:

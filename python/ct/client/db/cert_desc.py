@@ -1,88 +1,67 @@
 import re
+import hashlib
 from ct.crypto import cert
 from ct.proto import certificate_pb2
 
-class CertificateDescription(object):
-    """Container for fields in certificate that CertDB is supposed to store."""
-    def __init__(self):
-        self.der = None
-        self.proto = certificate_pb2.X509Description()
+def from_cert(certificate, observations=[]):
+    """Pulls out interesting fields from certificate, so format of data will
+    be similar in every database implementation."""
+    proto = certificate_pb2.X509Description()
+    proto.der = certificate.to_der()
+    try:
+        for sub in [(type_.short_name,
+                     to_unicode('.'.join(process_name(value.human_readable()))))
+                    for type_, value in certificate.subject()]:
+            proto_sub = proto.subject.add()
+            proto_sub.type, proto_sub.value = sub
+    except cert.CertificateError:
+        pass
 
-    @classmethod
-    def from_cert(cls, certificate):
-        """Pulls out interesting fields from certificate, so format of data will
-        be similar in every database implementation."""
-        der = certificate.to_der()
-        try:
-            subject_names = [sub.value for sub in
-                                    certificate.subject_common_names()]
-        except cert.CertificateError:
-            subject_names = []
+    try:
+        for iss in [(type_.short_name,
+                     to_unicode('.'.join(process_name(value.human_readable()))))
+                    for type_, value in certificate.issuer()]:
+            proto_iss = proto.issuer.add()
+            proto_iss.type, proto_iss.value = iss
+    except cert.CertificateError:
+        pass
 
-        try:
-            alt_subject_names = [sub.value
-                                 for sub in
-                                 certificate.subject_dns_names()]
-        except cert.CertificateError:
-            alt_subject_names = []
+    try:
+        for alt in certificate.subject_alternative_names():
+            proto_alt = proto.subject_alternative_names.add()
+            proto_alt.type, proto_alt.value = (alt.component_key(),
+                                               to_unicode('.'.join(process_name(
+                                      alt.component_value().human_readable()))))
+    except cert.CertificateError:
+        pass
 
-        try:
-            version = str(certificate.version().human_readable())
-        except cert.CertificateError:
-            version = None
+    try:
+        proto.version = str(certificate.version())
+    except cert.CertificateError:
+        pass
 
-        try:
-            serial_number = str(certificate.serial_number().value)
-        except cert.CertificateError:
-            serial_number = None
+    try:
+        proto.serial_number = str(certificate.serial_number().human_readable()
+                                  .upper().replace(':', ''))
+    except cert.CertificateError:
+        pass
 
-        try:
-            ip_addresses = [str(ip) for ip in certificate.subject_ip_addresses()]
-        except cert.CertificateError:
-            ip_addresses = []
+    proto.sha256_hash = hashlib.sha256(proto.der).digest()
 
-        return cls.from_values(der,
-                               subject_names,
-                               alt_subject_names,
-                               version,
-                               serial_number,
-                               ip_addresses)
+    for observation in observations:
+        proto_obs = proto.observations.add()
+        if observation.description:
+            proto_obs.description = observation.description
+        if observation.reason:
+            proto_obs.reason = observation.reason
+        proto_obs.details = observation.details_to_proto()
 
-    @staticmethod
-    def from_values(der=None, subject_names=None, alt_subject_names=None,
-                    version=None, serial_number=None, ip_addresses=None):
-        """Creates CertificateDescription from provided fields.
-
-        Without this method there is no easy way of creating description for
-        unparsable certificate. Values provided are still processed like they
-        would be if pulled from certificate."""
-        desc = CertificateDescription()
-        if der:
-            desc.der = der
-        if subject_names:
-            desc.proto.subject_names.extend([to_unicode(
-                                             ".".join(process_name(sub)))
-                                            for sub in subject_names])
-        if alt_subject_names:
-            desc.proto.alt_subject_names.extend([to_unicode(
-                                                 ".".join(process_name(alt)))
-                                                 for alt in alt_subject_names])
-        if version:
-            desc.proto.version = to_unicode(version)
-        if serial_number:
-            desc.proto.serial_number = to_unicode(serial_number)
-        if ip_addresses:
-            desc.proto.ip_addresses.extend([to_unicode(ip)
-                                            for ip in ip_addresses])
-        return desc
-
-    def __getitem__(self, name):
-        if name in [field[0].name for field in self.proto.ListFields()]:
-            return getattr(self.proto, name)
+    return proto
 
 
 def to_unicode(str_):
     return unicode(str_, 'utf-8', 'replace')
+
 
 def process_name(subject, reverse=True):
     # RFCs for DNS names: RFC 1034 (sect. 3.5), RFC 1123 (sect. 2.1);

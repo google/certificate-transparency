@@ -3,6 +3,7 @@ from ct.cert_analysis import ca_field
 from ct.cert_analysis import common_name
 from ct.cert_analysis import crl_pointers
 from ct.cert_analysis import dnsnames
+from ct.cert_analysis import extensions
 from ct.cert_analysis import ip_addresses
 from ct.cert_analysis import ocsp_pointers
 from ct.cert_analysis import serial_number
@@ -18,6 +19,7 @@ ALL_CHECKS = [serial_number.CheckNegativeSerialNumber(),
               common_name.CheckSCNTldMatches(),
               common_name.CheckLackOfSubjectCommonName(),
               common_name.CheckCorruptSubjectCommonName(),
+              extensions.CheckCorrectExtensions(),
               ip_addresses.CheckPrivateIpAddresses(),
               ip_addresses.CheckCorruptIpAddresses(),
               algorithm.CheckSignatureAlgorithmsMismatch(),

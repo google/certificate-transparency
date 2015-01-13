@@ -1,9 +1,9 @@
 import logging
 import sqlite3
+import time
 
 from ct.client.db import log_db
 from ct.client.db import database
-from ct.client.db import sqlite_connection as sqlitecon
 from ct.proto import client_pb2
 
 class SQLiteLogDB(log_db.LogDB):
@@ -21,9 +21,11 @@ class SQLiteLogDB(log_db.LogDB):
                          "id INTEGER PRIMARY KEY, log_server TEXT UNIQUE, "
                          "metadata BLOB)")
             conn.execute("CREATE TABLE IF NOT EXISTS sths(log_id INTEGER, "
+                         "fetch_timestamp INTEGER,"
                          "timestamp INTEGER, sth_data BLOB, "
-                         "audit_info BLOB, UNIQUE("
-                         "log_id, timestamp, sth_data) ON CONFLICT IGNORE, "
+                         "audit_info BLOB,"
+                         "UNIQUE(log_id, timestamp, sth_data, audit_info) ON "
+                         "CONFLICT IGNORE,"
                          "FOREIGN KEY(log_id) REFERENCES logs(id))")
             conn.execute("CREATE INDEX IF NOT EXISTS sth_by_timestamp on sths("
                          "log_id, timestamp)")
@@ -98,7 +100,7 @@ class SQLiteLogDB(log_db.LogDB):
                 sqlite3.Binary(audit.SerializeToString()))
 
     def __decode_sth(self, sth_row):
-        _, timestamp, serialized_sth, serialized_audit = sth_row
+        _, _, timestamp, serialized_sth, serialized_audit = sth_row
         audited_sth = client_pb2.AuditedSth()
         audited_sth.sth.ParseFromString(serialized_sth)
         audited_sth.sth.timestamp = timestamp
@@ -108,12 +110,21 @@ class SQLiteLogDB(log_db.LogDB):
     # This ignores a duplicate STH even if the audit data differs.
     # TODO(ekasper): add an update method for updating audit data, as needed.
     def store_sth(self, log_server, audited_sth):
+        """Store the STH in the database.
+        Will store the STH with a unique ID unless an exact copy already exists.
+        Note: the fetch_timestamp is time of calling this function, not actual
+        fetching timestamp.
+
+        Args:
+            log_server: the server name, i.e., the <log_server> path prefix
+            audited_sth: a client_pb2.AuditedSth proto
+        """
         timestamp, sth_data, audit_info = self.__encode_sth(audited_sth)
         with self.__mgr.get_connection() as conn:
             log_id = self._get_log_id(conn, log_server)
-            conn.execute("INSERT INTO sths(log_id, timestamp, sth_data, "
-                         "audit_info) VALUES(?, ?, ?, ?)",
-                         (log_id, timestamp, sth_data, audit_info))
+            conn.execute("INSERT INTO sths(log_id, fetch_timestamp, timestamp, "
+                         "sth_data, audit_info) VALUES(?, ?, ?, ?, ?)",
+                         (log_id, int(time.time()), timestamp, sth_data, audit_info))
 
     def get_latest_sth(self, log_server):
         row = None

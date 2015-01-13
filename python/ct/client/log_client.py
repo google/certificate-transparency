@@ -14,6 +14,7 @@ from twisted.internet import error
 from twisted.internet import protocol
 from twisted.internet import reactor as ireactor
 from twisted.internet import task
+from twisted.internet import threads
 from twisted.python import failure
 from twisted.web import client
 from twisted.web import http
@@ -624,18 +625,29 @@ class EntryProducer(object):
 
     def _store_batch(self, entry_batch, start_index):
         assert self._entries_db
-        self._entries_db.store_entries(enumerate(entry_batch, start_index))
-        return entry_batch
+        d = threads.deferToThread(self._entries_db.store_entries,
+                                  enumerate(entry_batch, start_index))
+        d.addCallback(lambda _: entry_batch)
+        return d
 
     def _get_entries_from_db(self, first, last):
         if FLAGS.persist_entries and self._entries_db:
-            try:
-                return list(self._entries_db.scan_entries(first, last))
-            except database.KeyError:
-                pass
+            d = threads.deferToThread(self._entries_db.scan_entries, first, last)
+            d.addCallbacks(lambda entries: list(entries))
+            d.addErrback(lambda fail: fail.trap(database.KeyError) and None)
+            return d
+        else:
+            d = defer.Deferred()
+            d.callback(None)
+            return d
 
     def _fetch_parsed_entries(self, first, last):
-        entries = self._get_entries_from_db(first, last)
+        # first check in database
+        d = self._get_entries_from_db(first, last)
+        d.addCallback(self._sub_fetch_parsed_entries, first, last)
+        return d
+
+    def _sub_fetch_parsed_entries(self, entries, first, last):
         # it's not the best idea to attack server with many requests exactly at
         # the same time, so requests are sent after slight delay.
         if not entries:
