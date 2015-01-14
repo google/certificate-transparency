@@ -342,7 +342,6 @@ class Monitor(object):
 
         def _verify_errback(self, failure):
             failure.trap(error.VerifyError)
-            self._producer.finishProducing(False)
             return False
 
         def _verify_log(self, result, new_tree, verified_entries):
