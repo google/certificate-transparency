@@ -19,7 +19,7 @@ from twisted.web import client as twisted_client
 class ProberThread(threading.Thread):
     """A prober for scheduled updating of the log view."""
     def __init__(self, ct_logs, db, cert_db, temp_db_factory, monitor_state_dir,
-                 agent=None):
+                 agent=None, state_keeper_class=None):
         """Initialize from a CtLogs proto."""
         threading.Thread.__init__(self)
 
@@ -27,6 +27,9 @@ class ProberThread(threading.Thread):
         self.__db = db
         if not agent:
             agent = twisted_client.Agent(reactor)
+        if not state_keeper_class:
+            state_keeper_class = state.StateKeeper
+
         for log in ct_logs.ctlog:
             if not log.log_server or not log.log_id or not log.public_key_info:
                 raise RuntimeError("Cannot start monitor: log proto has "
@@ -39,7 +42,7 @@ class ProberThread(threading.Thread):
             hasher = merkle.TreeHasher()
             verifier = verify.LogVerifier(log.public_key_info,
                                           merkle.MerkleVerifier(hasher))
-            state_keeper = state.StateKeeper(FLAGS.monitor_state_dir +
+            state_keeper = state_keeper_class(FLAGS.monitor_state_dir +
                                              "/" + log.log_id)
             log_key = db.get_log_id(log.log_server)
             self.__monitors.append(monitor.Monitor(client, verifier, hasher, db,
