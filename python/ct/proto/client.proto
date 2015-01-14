@@ -86,8 +86,10 @@ message MonitorState {
   // If not, then this field should be ignored entirely.
   optional SthResponse pending_sth = 2;
   // A compact tree representing the last verified batch of leaves that is
-  // is provably-consistent with pending_sth.
+  // is provably-consistent with verified_sth.
   optional CompactMerkleTree verified_tree = 3;
+  // A compact tree representing the last unverified batch of leaves.
+  optional CompactMerkleTree unverified_tree = 4;
 }
 
 enum Version {

@@ -201,6 +201,8 @@ class MonitorTest(unittest.TestCase):
             expected_state.verified_sth.CopyFrom(self._NEW_STH)
             m._compute_projected_sth_from_tree.dummy_tree.save(
                     expected_state.verified_tree)
+            m._compute_projected_sth_from_tree.dummy_tree.save(
+                    expected_state.unverified_tree)
             self.verify_state(expected_state)
 
             self.verify_tmp_data(self._DEFAULT_STH.tree_size,
@@ -223,6 +225,8 @@ class MonitorTest(unittest.TestCase):
             expected_state.verified_sth.CopyFrom(self._DEFAULT_STH)
             m._compute_projected_sth_from_tree.dummy_tree.save(
                                                    expected_state.verified_tree)
+            m._compute_projected_sth_from_tree.dummy_tree.save(
+                                               expected_state.unverified_tree)
             self.verify_state(expected_state)
 
             self.verify_tmp_data(0, self._DEFAULT_STH.tree_size-1)
@@ -310,6 +314,7 @@ class MonitorTest(unittest.TestCase):
             expected_state.verified_sth.CopyFrom(self._DEFAULT_STH)
             expected_state.pending_sth.CopyFrom(self._NEW_STH)
             merkle.CompactMerkleTree().save(expected_state.verified_tree)
+            merkle.CompactMerkleTree().save(expected_state.unverified_tree)
             self.verify_state(expected_state)
             audited_sths = list(self.db.scan_latest_sth_range("log_server"))
             self.assertEqual(audited_sths[0].audit.status, client_pb2.VERIFIED)
@@ -431,6 +436,25 @@ class MonitorTest(unittest.TestCase):
         # Get the new STH first.
         return m._update_sth().addCallback(self.assertTrue).addCallback(
                 lambda x: m._update_entries().addCallback(self.assertFalse))
+
+    def test_update_entries_fails_in_the_middle(self):
+        client = FakeLogClient(self._NEW_STH)
+        faker_fake_entry_producer = FakeEntryProducer(0,
+                                                      self._NEW_STH.tree_size)
+        faker_fake_entry_producer.change_range_after_start(0, 5)
+        client.get_entries = mock.Mock(return_value=faker_fake_entry_producer)
+
+        m = self.create_monitor(client)
+        m._compute_projected_sth = self._NEW_STH_compute_projected
+        fake_fetch = mock.MagicMock()
+        def try_again_with_all_entries(_):
+            m._fetch_entries = fake_fetch
+            return m._update_entries()
+        # Get the new STH first.
+        return m._update_sth().addCallback(self.assertTrue).addCallback(
+                lambda _: m._update_entries().addCallback(self.assertFalse)
+                ).addCallback(try_again_with_all_entries).addCallback(lambda _:
+                    fake_fetch.assert_called_once_with(5, 19))
 
 if __name__ == "__main__":
     sys.argv = FLAGS(sys.argv)
