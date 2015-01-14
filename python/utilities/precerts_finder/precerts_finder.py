@@ -17,6 +17,8 @@ gflags.DEFINE_integer("multi", 2, "Number of cert fetching and parsing "
 gflags.DEFINE_string("output_directory", None,
                      "Output directory for individual Precertificates.")
 
+gflags.DEFINE_integer("start_entry", 0, "Log entry to start from.")
+
 
 
 def _precert_matches(certificate, entry_type, extra_data, certificate_index):
@@ -39,7 +41,8 @@ def run():
 
     res = scanner.scan_log(
         _precert_matches, "https://ct.googleapis.com/pilot", FLAGS.multi,
-        write_matched_certificate)
+        write_matched_certificate,
+        start_entry=FLAGS.start_entry)
 
     print "Scanned %d, %d matched and %d failed strict or partial parsing" % (
         res.total, res.matches, res.errors)
