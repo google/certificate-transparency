@@ -176,7 +176,7 @@ def _process_worker_messages(
     return ScanResults(total_scanned, total_matches, total_errors)
 
 def scan_log(match_callback, log_url,total_processes=2,
-             matcher_output_handler=None):
+             matcher_output_handler=None, start_entry=0):
     # (index, entry) tuples
     m = multiprocessing.Manager()
     R = 2
@@ -197,7 +197,7 @@ def scan_log(match_callback, log_url,total_processes=2,
 
     bound_scan = functools.partial(_scan, entry_queue, log_url)
 
-    scan_start_range = range(0, tree_size, _BATCH_SIZE)
+    scan_start_range = range(start_entry, tree_size, _BATCH_SIZE)
     scan_range = zip(scan_start_range, scan_start_range[1:] + [tree_size])
     scanners_pool = multiprocessing.Pool(num_scanners)
     res = scanners_pool.map_async(bound_scan, scan_range,

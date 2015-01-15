@@ -45,8 +45,10 @@ class Monitor(object):
                 logging.warning("No verified monitor state, assuming first run.")
 
         # load compact merkle tree state from the monitor state
-        self.__verified_tree = merkle.CompactMerkleTree(hasher)
-        self.__verified_tree.load(self.__state.verified_tree)
+        self._verified_tree = merkle.CompactMerkleTree(hasher)
+        self._unverified_tree = merkle.CompactMerkleTree(hasher)
+        self._verified_tree.load(self.__state.verified_tree)
+        self._unverified_tree.load(self.__state.unverified_tree)
 
     def __repr__(self):
         return "%r(%r, %r, %r, %r)" % (self.__class__.__name__, self.__client,
@@ -61,7 +63,8 @@ class Monitor(object):
     def __update_state(self, new_state):
         """Update state and write to disk."""
         # save compact merkle tree state into the monitor state
-        self.__verified_tree.save(new_state.verified_tree)
+        self._verified_tree.save(new_state.verified_tree)
+        self._unverified_tree.save(new_state.unverified_tree)
         self.__state_keeper.write(new_state)
         self.__state = new_state
         logging.info("New state is %s" % new_state)
@@ -101,7 +104,7 @@ class Monitor(object):
 
     def _set_verified_tree(self, new_tree):
         """Set verified_tree and maybe move pending_sth to verified_sth."""
-        self.__verified_tree = new_tree
+        self._verified_tree = new_tree
         old_state = self.__state
         new_state = client_pb2.MonitorState()
         new_state.CopyFrom(self.__state)
@@ -110,12 +113,18 @@ class Monitor(object):
             # all pending entries retrieved
             # already did consistency checks so this should always be true
             assert (old_state.pending_sth.sha256_root_hash ==
-                    self.__verified_tree.root_hash())
+                    self._verified_tree.root_hash())
             new_state.verified_sth.CopyFrom(old_state.pending_sth)
             new_state.ClearField("pending_sth")
         self.__update_state(new_state)
         # we just set new verified tree, so we report all changes
         self.__report.report()
+
+    def _update_unverified_data(self, unverified_tree):
+        self._unverified_tree = unverified_tree
+        new_state = client_pb2.MonitorState()
+        new_state.CopyFrom(self.__state)
+        self.__update_state(new_state)
 
     def __get_audited_sth(self, sth, verify_status):
         audited_sth = client_pb2.AuditedSth()
@@ -266,7 +275,7 @@ class Monitor(object):
             partial_sth: A partial STH with timestamp 0 and empty signature.
             new_tree: New CompactMerkleTree with the extra_leaves integrated.
         """
-        return self._compute_projected_sth_from_tree(self.__verified_tree,
+        return self._compute_projected_sth_from_tree(self._verified_tree,
                                                      extra_leaves)
 
     @staticmethod
@@ -278,7 +287,7 @@ class Monitor(object):
         else:
             return "all night"
 
-    def __fetch_entries_eb(self, e, consumer):
+    def _fetch_entries_eb(self, e, consumer):
         logging.error("get-entries from %s failed: %s" %
                       (self.servername, e))
         consumer.done(None)
@@ -342,7 +351,7 @@ class Monitor(object):
 
         def _verify_errback(self, failure):
             failure.trap(error.VerifyError)
-            self._producer.finishProducing(False)
+            self._monitor._update_unverified_data(self._monitor._verified_tree)
             return False
 
         def _verify_log(self, result, new_tree, verified_entries):
@@ -370,9 +379,10 @@ class Monitor(object):
                     self._monitor._compute_projected_sth_from_tree(
                         self._unverified_tree, entry_batch)
             self._next_sequence_number += len(entry_batch)
+            self._monitor._update_unverified_data(self._unverified_tree)
             return scan
 
-    def __fetch_entries(self, start, end):
+    def _fetch_entries(self, start, end):
         """Fetches entries from the log.
 
         Returns: Deferred that fires with boolean indicating whether fetching
@@ -384,10 +394,10 @@ class Monitor(object):
         producer = self.__client.get_entries(start, end)
         consumer = Monitor.EntryConsumer(producer, self,
                                          self.__state.pending_sth,
-                                         self.__verified_tree)
+                                         self._unverified_tree)
         d = producer.startProducing(consumer)
         d.addCallback(consumer.done)
-        d.addErrback(self.__fetch_entries_eb, consumer)
+        d.addErrback(self._fetch_entries_eb, consumer)
         return consumer.consumed
 
     def _update_entries(self):
@@ -400,10 +410,10 @@ class Monitor(object):
             return self.__fired_deferred(True)
         # Default is 0, which is what we want.
         wanted_entries = self.__state.pending_sth.tree_size
-        last_verified_size = self.__verified_tree.tree_size
+        last_parsed_size = self._unverified_tree.tree_size
 
-        if wanted_entries > last_verified_size:
-            return self.__fetch_entries(last_verified_size, wanted_entries-1)
+        if wanted_entries > last_parsed_size:
+            return self._fetch_entries(last_parsed_size, wanted_entries-1)
         else:
             return self.__fired_deferred(True)
 

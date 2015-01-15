@@ -48,16 +48,52 @@ namespace {
 const char kJsonContentType[] = "application/json; charset=ISO-8859-1";
 
 
+void LogRequest(evhttp_request* req, int http_status, int resp_body_length) {
+  evhttp_connection* conn = evhttp_request_get_connection(req);
+  char* peer_addr;
+  ev_uint16_t peer_port;
+  evhttp_connection_get_peer(conn, &peer_addr, &peer_port);
+
+  string http_verb;
+  switch (evhttp_request_get_command(req)) {
+    case EVHTTP_REQ_DELETE:
+      http_verb = "DELETE";
+      break;
+    case EVHTTP_REQ_GET:
+      http_verb = "GET";
+      break;
+    case EVHTTP_REQ_HEAD:
+      http_verb = "HEAD";
+      break;
+    case EVHTTP_REQ_POST:
+      http_verb = "POST";
+      break;
+    case EVHTTP_REQ_PUT:
+      http_verb = "PUT";
+      break;
+    default:
+      http_verb = "UNKNOWN";
+      break;
+  }
+
+  const string uri(evhttp_request_get_uri(req));
+  LOG(INFO) << string(peer_addr) << " \"" << http_verb << " " << uri << "\" "
+            << http_status << " " << resp_body_length;
+}
+
+
 void SendJsonReply(evhttp_request* req, int http_status,
                    const JsonObject& json) {
   CHECK_EQ(evhttp_add_header(evhttp_request_get_output_headers(req),
                              "Content-Type", kJsonContentType),
            0);
+  const string resp_body(json.ToString());
   CHECK_GT(evbuffer_add_printf(evhttp_request_get_output_buffer(req), "%s",
-                               json.ToString()),
+                               resp_body.c_str()),
            0);
 
   evhttp_send_reply(req, http_status, /*reason*/ NULL, /*databuf*/ NULL);
+  LogRequest(req, http_status, resp_body.size());
 }
 
 
@@ -118,8 +154,7 @@ void AddChainReply(evhttp_request* req, SubmitResult result,
   if (result != ADDED && result != DUPLICATE) {
     const string error(Frontend::SubmitResultString(result));
     VLOG(1) << "error adding chain: " << error;
-    SendError(req, HTTP_BADREQUEST, error);
-    return;
+    return SendError(req, HTTP_BADREQUEST, error);
   }
 
   JsonObject json_reply;
@@ -239,8 +274,9 @@ void HttpHandler::Add(libevent::HttpServer* server) {
 
 
 void HttpHandler::GetEntries(evhttp_request* req) const {
-  if (evhttp_request_get_command(req) != EVHTTP_REQ_GET)
+  if (evhttp_request_get_command(req) != EVHTTP_REQ_GET) {
     return SendError(req, HTTP_BADMETHOD, "Method not allowed.");
+  }
 
   const multimap<string, string> query(ParseQuery(req));
 
@@ -273,7 +309,7 @@ void HttpHandler::GetEntries(evhttp_request* req) const {
 
 void HttpHandler::GetRoots(evhttp_request* req) const {
   if (evhttp_request_get_command(req) != EVHTTP_REQ_GET) {
-    SendError(req, HTTP_BADMETHOD, "Method not allowed.");
+    return SendError(req, HTTP_BADMETHOD, "Method not allowed.");
   }
 
   JsonArray roots;
@@ -283,8 +319,7 @@ void HttpHandler::GetRoots(evhttp_request* req) const {
     string cert;
     if (it->second->DerEncoding(&cert) != Cert::TRUE) {
       LOG(ERROR) << "Cert encoding failed";
-      SendError(req, HTTP_INTERNAL, "Serialisation failed.");
-      return;
+      return SendError(req, HTTP_INTERNAL, "Serialisation failed.");
     }
     roots.AddBase64(cert);
   }
@@ -297,8 +332,9 @@ void HttpHandler::GetRoots(evhttp_request* req) const {
 
 
 void HttpHandler::GetProof(evhttp_request* req) const {
-  if (evhttp_request_get_command(req) != EVHTTP_REQ_GET)
-    SendError(req, HTTP_BADMETHOD, "Method not allowed.");
+  if (evhttp_request_get_command(req) != EVHTTP_REQ_GET) {
+    return SendError(req, HTTP_BADMETHOD, "Method not allowed.");
+  }
 
   const multimap<string, string> query(ParseQuery(req));
 
@@ -340,8 +376,9 @@ void HttpHandler::GetProof(evhttp_request* req) const {
 
 
 void HttpHandler::GetSTH(evhttp_request* req) const {
-  if (evhttp_request_get_command(req) != EVHTTP_REQ_GET)
-    SendError(req, HTTP_BADMETHOD, "Method not allowed.");
+  if (evhttp_request_get_command(req) != EVHTTP_REQ_GET) {
+    return SendError(req, HTTP_BADMETHOD, "Method not allowed.");
+  }
 
   const SignedTreeHead& sth(log_lookup_->GetSTH());
 
@@ -361,7 +398,7 @@ void HttpHandler::GetSTH(evhttp_request* req) const {
 
 void HttpHandler::GetConsistency(evhttp_request* req) const {
   if (evhttp_request_get_command(req) != EVHTTP_REQ_GET) {
-    SendError(req, HTTP_BADMETHOD, "Method not allowed.");
+    return SendError(req, HTTP_BADMETHOD, "Method not allowed.");
   }
 
   const multimap<string, string> query(ParseQuery(req));
