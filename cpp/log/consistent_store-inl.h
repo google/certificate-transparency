@@ -1,3 +1,6 @@
+#ifndef CERT_TRANS_LOG_CONSISTENT_STORE_INL_H_
+#define CERT_TRANS_LOG_CONSISTENT_STORE_INL_H_
+
 #include "log/consistent_store.h"
 
 using ct::ClusterNodeState;
@@ -44,3 +47,5 @@ void ConsistentStore<Logged>::OnClusterNodeStatesUpdate(
 
 
 }  // namespace cert_trans
+
+#endif  // CERT_TRANS_LOG_CONSISTENT_STORE_INL_H_
