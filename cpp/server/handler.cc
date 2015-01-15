@@ -158,8 +158,7 @@ void AddChainReply(evhttp_request* req, SubmitResult result,
   if (result != ADDED && result != DUPLICATE) {
     const string error(Frontend::SubmitResultString(result));
     VLOG(1) << "error adding chain: " << error;
-    SendError(req, HTTP_BADREQUEST, error);
-    return;
+    return SendError(req, HTTP_BADREQUEST, error);
   }
 
   JsonObject json_reply;
@@ -314,7 +313,7 @@ void HttpHandler::GetEntries(evhttp_request* req) const {
 
 void HttpHandler::GetRoots(evhttp_request* req) const {
   if (evhttp_request_get_command(req) != EVHTTP_REQ_GET) {
-    SendError(req, HTTP_BADMETHOD, "Method not allowed.");
+    return SendError(req, HTTP_BADMETHOD, "Method not allowed.");
   }
 
   JsonArray roots;
@@ -324,8 +323,7 @@ void HttpHandler::GetRoots(evhttp_request* req) const {
     string cert;
     if (it->second->DerEncoding(&cert) != Cert::TRUE) {
       LOG(ERROR) << "Cert encoding failed";
-      SendError(req, HTTP_INTERNAL, "Serialisation failed.");
-      return;
+      return SendError(req, HTTP_INTERNAL, "Serialisation failed.");
     }
     roots.AddBase64(cert);
   }
@@ -339,7 +337,7 @@ void HttpHandler::GetRoots(evhttp_request* req) const {
 
 void HttpHandler::GetProof(evhttp_request* req) const {
   if (evhttp_request_get_command(req) != EVHTTP_REQ_GET) {
-    SendError(req, HTTP_BADMETHOD, "Method not allowed.");
+    return SendError(req, HTTP_BADMETHOD, "Method not allowed.");
   }
 
   const multimap<string, string> query(ParseQuery(req));
@@ -383,7 +381,7 @@ void HttpHandler::GetProof(evhttp_request* req) const {
 
 void HttpHandler::GetSTH(evhttp_request* req) const {
   if (evhttp_request_get_command(req) != EVHTTP_REQ_GET) {
-    SendError(req, HTTP_BADMETHOD, "Method not allowed.");
+    return SendError(req, HTTP_BADMETHOD, "Method not allowed.");
   }
 
   const SignedTreeHead& sth(log_lookup_->GetSTH());
@@ -404,7 +402,7 @@ void HttpHandler::GetSTH(evhttp_request* req) const {
 
 void HttpHandler::GetConsistency(evhttp_request* req) const {
   if (evhttp_request_get_command(req) != EVHTTP_REQ_GET) {
-    SendError(req, HTTP_BADMETHOD, "Method not allowed.");
+    return SendError(req, HTTP_BADMETHOD, "Method not allowed.");
   }
 
   const multimap<string, string> query(ParseQuery(req));
