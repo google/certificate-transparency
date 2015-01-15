@@ -59,6 +59,11 @@ class EtcdConsistentStore : public ConsistentStore<Logged> {
       const typename ConsistentStore<Logged>::ClusterNodeStateCallback& cb,
       util::Task* task) override;
 
+  void WatchClusterConfig(
+      const typename ConsistentStore<Logged>::ClusterConfigCallback& cb,
+      util::Task* task) override;
+
+  util::Status SetClusterConfig(const ct::ClusterConfig& config) override;
 
  private:
   void WaitForServingSTHVersion(std::unique_lock<std::mutex>* lock,

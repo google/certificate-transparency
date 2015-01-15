@@ -14,29 +14,30 @@ namespace cert_trans {
 template <class Logged>
 ClusterStateController<Logged>::ClusterStateController(
     util::Executor* executor, ConsistentStore<Logged>* store,
-    const MasterElection* election, const int min_serving_nodes,
-    const double min_serving_fraction)
+    const MasterElection* election)
     : store_(CHECK_NOTNULL(store)),
       election_(CHECK_NOTNULL(election)),
-      min_serving_nodes_(min_serving_nodes),
-      min_serving_fraction_(min_serving_fraction),
-      watch_node_states_task_(executor),
+      watch_config_task_(CHECK_NOTNULL(executor)),
+      watch_node_states_task_(CHECK_NOTNULL(executor)),
       exiting_(false),
       update_required_(false),
       cluster_serving_sth_update_thread_(
           std::bind(&ClusterStateController<Logged>::ClusterServingSTHUpdater,
                     this)) {
-  CHECK_LE(1, min_serving_nodes_);
-  CHECK_LT(0, min_serving_fraction_);
   store_->WatchClusterNodeStates(
       std::bind(&ClusterStateController::OnClusterStateUpdated, this,
                 std::placeholders::_1),
       watch_node_states_task_.task());
+  store_->WatchClusterConfig(
+      std::bind(&ClusterStateController::OnClusterConfigUpdated, this,
+                std::placeholders::_1),
+      watch_config_task_.task());
 }
 
 
 template <class Logged>
 ClusterStateController<Logged>::~ClusterStateController() {
+  watch_config_task_.Cancel();
   watch_node_states_task_.Cancel();
   {
     std::lock_guard<std::mutex> lock(mutex_);
@@ -44,6 +45,7 @@ ClusterStateController<Logged>::~ClusterStateController() {
   }
   update_required_cv_.notify_all();
   cluster_serving_sth_update_thread_.join();
+  watch_config_task_.Wait();
   watch_node_states_task_.Wait();
 }
 
@@ -107,16 +109,29 @@ void ClusterStateController<Logged>::OnClusterStateUpdated(
     }
   }
 
-  if (CalculateServingSTH(lock) && election_->IsMaster()) {
-    update_required_ = true;
-    lock.unlock();
-    update_required_cv_.notify_all();
-  }
+  CalculateServingSTH(lock);
 }
 
 
 template <class Logged>
-bool ClusterStateController<Logged>::CalculateServingSTH(
+void ClusterStateController<Logged>::OnClusterConfigUpdated(
+    const Update<ct::ClusterConfig>& update) {
+  std::unique_lock<std::mutex> lock(mutex_);
+  if (!update.exists_) {
+    LOG(WARNING) << "No ClusterConfig exists.";
+    return;
+  }
+
+  cluster_config_ = update.handle_.Entry();
+
+  // May need to re-calculate the servingSTH since the ClusterConfig has
+  // changed:
+  CalculateServingSTH(lock);
+}
+
+
+template <class Logged>
+void ClusterStateController<Logged>::CalculateServingSTH(
     const std::unique_lock<std::mutex>& lock) {
   VLOG(1) << "Calculating new ServingSTH...";
   CHECK(lock.owns_lock());
@@ -140,8 +155,8 @@ bool ClusterStateController<Logged>::CalculateServingSTH(
 
   // Next calculate the newest STH we've seen which satisfies the following
   // criteria:
-  //   - at least min_serving_nodes_ have an STH at least as large
-  //   - at least min_serving_fraction_ have an STH at least as large
+  //   - at least minimum_serving_nodes have an STH at least as large
+  //   - at least minimum_serving_fraction have an STH at least as large
   //   - not smaller than the current serving STH
   int num_nodes_seen(0);
   const int current_tree_size(
@@ -160,19 +175,23 @@ bool ClusterStateController<Logged>::CalculateServingSTH(
     num_nodes_seen += it->second;
     const double serving_fraction(static_cast<double>(num_nodes_seen) /
                                   all_node_states_.size());
-    if (serving_fraction >= min_serving_fraction_ &&
-        num_nodes_seen >= min_serving_nodes_) {
+    if (serving_fraction >= cluster_config_.minimum_serving_fraction() &&
+        num_nodes_seen >= cluster_config_.minimum_serving_nodes()) {
       LOG(INFO) << "Can serve @" << it->first << " with " << num_nodes_seen
                 << " nodes (" << (serving_fraction * 100) << "% of cluster)";
       calculated_serving_sth_.reset(
           new ct::SignedTreeHead(sth_by_size[it->first]));
-      return true;
+      // Push this STH out to the cluster if we're master:
+      if (election_->IsMaster()) {
+        update_required_ = true;
+        update_required_cv_.notify_all();
+      }
+      return;
     }
   }
   // TODO(alcutter): Add a mechanism to take the cluster off-line until we have
   // sufficient nodes able to serve.
   LOG(WARNING) << "Failed to determine suitable serving STH.";
-  return false;
 }
 
 

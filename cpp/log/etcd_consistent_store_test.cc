@@ -23,6 +23,7 @@ namespace cert_trans {
 
 using std::atomic;
 using std::bind;
+using std::chrono::milliseconds;
 using std::make_shared;
 using std::pair;
 using std::placeholders::_1;
@@ -477,6 +478,35 @@ TEST_F(EtcdConsistentStoreTest, WatchClusterNodeStates) {
       task.task());
   util::Status status(store_->SetClusterNodeState(state));
   EXPECT_TRUE(status.ok()) << status;
+  task.Cancel();
+  task.Wait();
+}
+
+
+TEST_F(EtcdConsistentStoreTest, WatchClusterConfig) {
+  const string kPath(string(kRoot) + "/cluster_config");
+
+  ct::ClusterConfig config;
+  config.set_minimum_serving_nodes(1);
+  config.set_minimum_serving_fraction(0.6);
+  Notification notification;
+
+  SyncTask task(&executor_);
+  store_->WatchClusterConfig(
+      [&config, &notification](const Update<ct::ClusterConfig>& update) {
+        if (!update.exists_) {
+          VLOG(1) << "Ignoring initial empty update.";
+          return;
+        }
+        EXPECT_TRUE(update.exists_);
+        EXPECT_EQ(update.handle_.Entry().DebugString(), config.DebugString());
+        notification.Notify();
+      },
+      task.task());
+  util::Status status(store_->SetClusterConfig(config));
+  EXPECT_TRUE(status.ok()) << status;
+  // Make sure we got called from the watcher:
+  EXPECT_TRUE(notification.WaitForNotificationWithTimeout(milliseconds(5000)));
   task.Cancel();
   task.Wait();
 }

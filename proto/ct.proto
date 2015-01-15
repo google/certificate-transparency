@@ -215,3 +215,7 @@ message ClusterControl {
   optional bool accept_new_entries = 1 [ default = true ];
 }
 
+message ClusterConfig {
+  optional int32 minimum_serving_nodes = 1 [default = 1];
+  optional double minimum_serving_fraction = 2 [default = 0.75];
+}

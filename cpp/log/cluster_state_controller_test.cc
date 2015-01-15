@@ -14,6 +14,7 @@
 #include "util/testing.h"
 #include "util/util.h"
 
+using ct::ClusterConfig;
 using ct::ClusterNodeState;
 using ct::SignedTreeHead;
 using std::make_shared;
@@ -21,13 +22,13 @@ using std::shared_ptr;
 using std::string;
 using testing::Return;
 using testing::NiceMock;
+using util::StatusOr;
 
 namespace cert_trans {
 
 const char kNodeId1[] = "node1";
 const char kNodeId2[] = "node2";
 const char kNodeId3[] = "node3";
-
 
 class ClusterStateControllerTest : public ::testing::Test {
  public:
@@ -42,7 +43,7 @@ class ClusterStateControllerTest : public ::testing::Test {
                                                            kNodeId2)),
         store3_(new EtcdConsistentStore<LoggedCertificate>(&pool_, &etcd_, "",
                                                            kNodeId3)),
-        controller_(&pool_, store_.get(), &election_, 1, 1) {
+        controller_(&pool_, store_.get(), &election_) {
     // Set up some handy STHs
     sth100_.set_tree_size(100);
     sth100_.set_timestamp(100);
@@ -67,6 +68,16 @@ class ClusterStateControllerTest : public ::testing::Test {
     CHECK(it != controller_.all_node_states_.end());
     return it->second;
   }
+
+  static void SetClusterConfig(ConsistentStore<LoggedCertificate>* store,
+                               const int min_nodes,
+                               const double min_fraction) {
+    ClusterConfig config;
+    config.set_minimum_serving_nodes(min_nodes);
+    config.set_minimum_serving_fraction(min_fraction);
+    CHECK(store->SetClusterConfig(config).ok());
+  }
+
 
   SignedTreeHead sth100_, sth200_, sth300_;
   ClusterNodeState cns100_, cns200_, cns300_;
@@ -105,8 +116,9 @@ TEST_F(ClusterStateControllerTest, TestCalculateServingSTHAt50Percent) {
   MockMasterElection election_is_master;
   EXPECT_CALL(election_is_master, IsMaster()).WillRepeatedly(Return(true));
   ClusterStateController<LoggedCertificate> controller50(&pool_, store_.get(),
-                                                         &election_is_master,
-                                                         1, 0.5);
+                                                         &election_is_master);
+  SetClusterConfig(store_.get(), 1 /* nodes */, 0.5 /* fraction */);
+
   store_->SetClusterNodeState(cns100_);
   sleep(1);
   util::StatusOr<SignedTreeHead> sth(controller50.GetCalculatedServingSTH());
@@ -132,8 +144,8 @@ TEST_F(ClusterStateControllerTest, TestCalculateServingSTHAt70Percent) {
   MockMasterElection election_is_master;
   EXPECT_CALL(election_is_master, IsMaster()).WillRepeatedly(Return(true));
   ClusterStateController<LoggedCertificate> controller70(&pool_, store_.get(),
-                                                         &election_is_master,
-                                                         1, 0.7);
+                                                         &election_is_master);
+  SetClusterConfig(store_.get(), 1 /* nodes */, 0.7 /* fraction */);
   store_->SetClusterNodeState(cns100_);
   sleep(1);
   util::StatusOr<SignedTreeHead> sth(controller70.GetCalculatedServingSTH());
@@ -159,8 +171,8 @@ TEST_F(ClusterStateControllerTest,
   MockMasterElection election_is_master;
   EXPECT_CALL(election_is_master, IsMaster()).WillRepeatedly(Return(true));
   ClusterStateController<LoggedCertificate> controller60(&pool_, store_.get(),
-                                                         &election_is_master,
-                                                         2, 0.6);
+                                                         &election_is_master);
+  SetClusterConfig(store_.get(), 2 /* nodes */, 0.6 /* fraction */);
   store_->SetClusterNodeState(cns100_);
   sleep(1);
   util::StatusOr<SignedTreeHead> sth(controller60.GetCalculatedServingSTH());
@@ -185,8 +197,8 @@ TEST_F(ClusterStateControllerTest, TestCalculateServingSTHAsClusterMoves) {
   MockMasterElection election_is_master;
   EXPECT_CALL(election_is_master, IsMaster()).WillRepeatedly(Return(true));
   ClusterStateController<LoggedCertificate> controller50(&pool_, store_.get(),
-                                                         &election_is_master,
-                                                         1, 0.5);
+                                                         &election_is_master);
+  SetClusterConfig(store_.get(), 1 /* nodes */, 0.5 /* fraction */);
   store_->SetClusterNodeState(cns100_);
   store2_->SetClusterNodeState(cns100_);
   store3_->SetClusterNodeState(cns100_);
@@ -241,8 +253,8 @@ TEST_F(ClusterStateControllerTest, TestCannotSelectSmallerSTH) {
   MockMasterElection election_is_master;
   EXPECT_CALL(election_is_master, IsMaster()).WillRepeatedly(Return(true));
   ClusterStateController<LoggedCertificate> controller50(&pool_, store_.get(),
-                                                         &election_is_master,
-                                                         1, 0.5);
+                                                         &election_is_master);
+  SetClusterConfig(store_.get(), 1 /* nodes */, 0.5 /* fraction */);
   store_->SetClusterNodeState(cns200_);
   store2_->SetClusterNodeState(cns200_);
   store3_->SetClusterNodeState(cns200_);
@@ -272,6 +284,34 @@ TEST_F(ClusterStateControllerTest, TestCannotSelectSmallerSTH) {
   // Still have to serve at sth200
   sth = controller50.GetCalculatedServingSTH();
   EXPECT_EQ(sth200_.tree_size(), sth.ValueOrDie().tree_size());
+}
+
+
+TEST_F(ClusterStateControllerTest,
+       TestConfigChangesCauseServingSTHToBeRecalculated) {
+  MockMasterElection election_is_master;
+  EXPECT_CALL(election_is_master, IsMaster()).WillRepeatedly(Return(true));
+  ClusterStateController<LoggedCertificate> controller(&pool_, store_.get(),
+                                                       &election_is_master);
+  SetClusterConfig(store_.get(), 0 /* nodes */, 0.5 /* fraction */);
+  store_->SetClusterNodeState(cns100_);
+  store2_->SetClusterNodeState(cns200_);
+  store3_->SetClusterNodeState(cns300_);
+  sleep(1);
+  StatusOr<SignedTreeHead> sth(controller.GetCalculatedServingSTH());
+  EXPECT_EQ(sth200_.tree_size(), sth.ValueOrDie().tree_size());
+
+  SetClusterConfig(store_.get(), 0 /* nodes */, 0.9 /* fraction */);
+  sleep(1);
+  sth = controller.GetCalculatedServingSTH();
+  // You might expect sth100 here, but we shouldn't move to a smaller STH
+  EXPECT_EQ(sth200_.tree_size(), sth.ValueOrDie().tree_size());
+
+  SetClusterConfig(store_.get(), 0 /* nodes */, 0.3 /* fraction */);
+  sleep(1);
+  sth = controller.GetCalculatedServingSTH();
+  // Should be able to move to sth300 now.
+  EXPECT_EQ(sth300_.tree_size(), sth.ValueOrDie().tree_size());
 }
 
 
