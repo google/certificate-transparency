@@ -1,4 +1,4 @@
-#include "log/etcd_consistent_store-inl.h"
+#include "log/etcd_consistent_store.h"
 
 #include <atomic>
 #include <functional>
@@ -9,12 +9,15 @@
 #include <string>
 #include <thread>
 
+#include "log/consistent_store-inl.h"
 #include "log/logged_certificate.h"
 #include "proto/ct.pb.h"
 #include "util/fake_etcd.h"
 #include "util/libevent_wrapper.h"
 #include "util/testing.h"
 #include "util/util.h"
+
+DECLARE_int32(node_state_ttl_seconds);
 
 namespace cert_trans {
 
@@ -387,6 +390,30 @@ TEST_F(EtcdConsistentStoreTest, TestSetClusterNodeState) {
   PeekEntry(kPath, &set_state);
   EXPECT_EQ(state.node_id(), set_state.node_id());
   EXPECT_EQ(state.contiguous_tree_size(), set_state.contiguous_tree_size());
+}
+
+
+TEST_F(EtcdConsistentStoreTest, TestSetClusterNodeStateHasTTL) {
+  FLAGS_node_state_ttl_seconds = 1;
+  const string kPath(string(kRoot) + "/nodes/" + kNodeId);
+
+  ct::ClusterNodeState state;
+  state.set_node_id(kNodeId);
+  state.set_contiguous_tree_size(2342);
+
+  util::Status status(store_->SetClusterNodeState(state));
+  EXPECT_TRUE(status.ok()) << status;
+
+  ct::ClusterNodeState set_state;
+  PeekEntry(kPath, &set_state);
+  EXPECT_EQ(state.node_id(), set_state.node_id());
+  EXPECT_EQ(state.contiguous_tree_size(), set_state.contiguous_tree_size());
+
+  sleep(2);
+
+  EtcdClient::Node node;
+  status = sync_client_.Get(kPath, &node);
+  EXPECT_EQ(util::error::NOT_FOUND, status.CanonicalCode());
 }
 
 

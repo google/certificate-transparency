@@ -10,6 +10,9 @@
 #include "util/executor.h"
 #include "util/util.h"
 
+DEFINE_int32(node_state_ttl_seconds, 60,
+             "TTL in seconds on the node state files.");
+
 namespace cert_trans {
 namespace {
 
@@ -265,9 +268,9 @@ util::Status EtcdConsistentStore<Logged>::SetClusterNodeState(
     const ct::ClusterNodeState& state) {
   // TODO(alcutter): consider keeping the handle for this around to check that
   // nobody else is updating our cluster state.
-  // TODO(alcutter): These files should have an associated TTL.
   EntryHandle<ct::ClusterNodeState> entry(state);
-  return ForceSetEntry(GetNodePath(node_id_), &entry);
+  const std::chrono::seconds ttl(FLAGS_node_state_ttl_seconds);
+  return ForceSetEntryWithTTL(GetNodePath(node_id_), ttl, &entry);
 }
 
 
@@ -355,6 +358,27 @@ util::Status EtcdConsistentStore<Logged>::ForceSetEntry(
   int64_t new_version;
   util::Status status(
       sync_client_.ForceSet(path, util::ToBase64(flat_entry), &new_version));
+  if (status.ok()) {
+    t->SetHandle(new_version);
+  }
+  return status;
+}
+
+
+template <class Logged>
+template <class T>
+util::Status EtcdConsistentStore<Logged>::ForceSetEntryWithTTL(
+    const std::string& path, const std::chrono::seconds& ttl,
+    EntryHandle<T>* t) {
+  CHECK_NOTNULL(t);
+  CHECK(!t->HasHandle());
+  CHECK_LE(0, ttl.count());
+  std::string flat_entry;
+  CHECK(t->Entry().SerializeToString(&flat_entry));
+  int64_t new_version;
+  util::Status status(sync_client_.ForceSetWithTTL(path,
+                                                   util::ToBase64(flat_entry),
+                                                   ttl, &new_version));
   if (status.ok()) {
     t->SetHandle(new_version);
   }
