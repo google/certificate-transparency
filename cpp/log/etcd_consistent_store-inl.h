@@ -4,7 +4,6 @@
 #include <glog/logging.h>
 
 #include "base/notification.h"
-#include "log/consistent_store-inl.h"
 #include "log/etcd_consistent_store.h"
 #include "log/logged_certificate.h"
 #include "util/executor.h"
@@ -34,20 +33,12 @@ EtcdConsistentStore<Logged>::EtcdConsistentStore(util::Executor* executor,
       root_(root),
       node_id_(node_id),
       serving_sth_watch_task_(CHECK_NOTNULL(executor)),
-      cluster_node_states_watch_task_(CHECK_NOTNULL(executor)),
       received_initial_sth_(false) {
   // Set up watches on things we're interested in...
-  client_->Watch(
-      GetFullPath(kServingSthFile),
+  WatchServingSTH(
       std::bind(&EtcdConsistentStore<Logged>::OnEtcdServingSTHUpdated, this,
                 std::placeholders::_1),
       serving_sth_watch_task_.task());
-
-  client_->Watch(
-      GetFullPath(kNodesDir),
-      std::bind(&EtcdConsistentStore<Logged>::OnEtcdClusterNodeStatesUpdated,
-                this, std::placeholders::_1),
-      cluster_node_states_watch_task_.task());
 
   // And wait for the initial updates to come back so that we've got a
   // view on the current state before proceding...
@@ -55,7 +46,6 @@ EtcdConsistentStore<Logged>::EtcdConsistentStore(util::Executor* executor,
     std::unique_lock<std::mutex> lock(mutex_);
     serving_sth_cv_.wait(lock, [this]() { return received_initial_sth_; });
   }
-  initial_cluster_notify_.WaitForNotification();
 }
 
 
@@ -63,10 +53,8 @@ template <class Logged>
 EtcdConsistentStore<Logged>::~EtcdConsistentStore() {
   VLOG(1) << "Cancelling watch tasks.";
   serving_sth_watch_task_.Cancel();
-  cluster_node_states_watch_task_.Cancel();
   VLOG(1) << "Waiting for watch tasks to return.";
   serving_sth_watch_task_.Wait();
-  cluster_node_states_watch_task_.Wait();
 }
 
 
@@ -276,6 +264,63 @@ util::Status EtcdConsistentStore<Logged>::SetClusterNodeState(
 }
 
 
+// static
+template <class Logged>
+template <class T, class CB>
+void EtcdConsistentStore<Logged>::ConvertSingleUpdate(
+    const CB& callback, const std::vector<EtcdClient::WatchUpdate>& updates) {
+  CHECK_LE(0, updates.size());
+  if (updates.empty()) {
+    callback(Update<T>(EntryHandle<T>(), false /* exists */));
+  } else {
+    callback(TypedUpdateFromWatchUpdate<T>(updates[0]));
+  }
+}
+
+
+// static
+template <class Logged>
+template <class T, class CB>
+void EtcdConsistentStore<Logged>::ConvertMultipleUpdate(
+    const CB& callback,
+    const std::vector<EtcdClient::WatchUpdate>& watch_updates) {
+  std::vector<Update<T>> updates;
+  for (auto& w : watch_updates) {
+    updates.emplace_back(TypedUpdateFromWatchUpdate<T>(w));
+  }
+  callback(updates);
+}
+
+
+template <class Logged>
+void EtcdConsistentStore<Logged>::WatchServingSTH(
+    const typename ConsistentStore<Logged>::ServingSTHCallback& cb,
+    util::Task* task) {
+  client_->Watch(
+      GetFullPath(kServingSthFile),
+      std::bind(&ConvertSingleUpdate<
+                    ct::SignedTreeHead,
+                    typename ConsistentStore<Logged>::ServingSTHCallback>,
+                cb, std::placeholders::_1),
+      task);
+}
+
+
+template <class Logged>
+void EtcdConsistentStore<Logged>::WatchClusterNodeStates(
+    const typename ConsistentStore<Logged>::ClusterNodeStateCallback& cb,
+    util::Task* task) {
+  client_->Watch(
+      GetFullPath(kNodesDir),
+      std::bind(
+          &ConvertMultipleUpdate<
+              ct::ClusterNodeState,
+              typename ConsistentStore<Logged>::ClusterNodeStateCallback>,
+          cb, std::placeholders::_1),
+      task);
+}
+
+
 template <class Logged>
 template <class T>
 util::Status EtcdConsistentStore<Logged>::GetEntry(
@@ -457,38 +502,22 @@ void EtcdConsistentStore<Logged>::UpdateLocalServingSTH(
 
 template <class Logged>
 void EtcdConsistentStore<Logged>::OnEtcdServingSTHUpdated(
-    const std::vector<EtcdClient::WatchUpdate>& updates) {
-  CHECK_LE(updates.size(), 1);
+    const Update<ct::SignedTreeHead>& update) {
+  VLOG(1) << "Got ServingSTH version " << update.handle_.Handle() << ": "
+          << update.handle_.Entry().DebugString();
   std::unique_lock<std::mutex> lock(mutex_);
-  if (!updates.empty()) {
-    const Update<ct::SignedTreeHead> update(
-        TypedUpdateFromWatchUpdate<ct::SignedTreeHead>(updates[0]));
-    VLOG(1) << "Got ServingSTH version " << update.handle_.Handle();
+
+  if (update.exists_) {
     UpdateLocalServingSTH(lock, update.handle_);
-    this->OnServingSTHUpdate(update);
+  } else {
+    LOG(WARNING) << "ServingSTH non-existent/deleted.";
+    // TODO(alcutter): What to do here?
+    serving_sth_.reset();
   }
   received_initial_sth_ = true;
   lock.unlock();
   serving_sth_cv_.notify_all();
 }
-
-
-template <class Logged>
-void EtcdConsistentStore<Logged>::OnEtcdClusterNodeStatesUpdated(
-    const std::vector<EtcdClient::WatchUpdate>& watch_updates) {
-  std::vector<Update<ct::ClusterNodeState>> updates;
-  for (const auto& u : watch_updates) {
-    updates.emplace_back(TypedUpdateFromWatchUpdate<ct::ClusterNodeState>(u));
-  }
-  this->OnClusterNodeStatesUpdate(updates);
-  {
-    std::lock_guard<std::mutex> lock(mutex_);
-    if (!initial_cluster_notify_.HasBeenNotified()) {
-      initial_cluster_notify_.Notify();
-    }
-  }
-}
-
 
 }  // namespace cert_trans
 

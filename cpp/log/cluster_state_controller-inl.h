@@ -13,12 +13,14 @@ namespace cert_trans {
 
 template <class Logged>
 ClusterStateController<Logged>::ClusterStateController(
-    ConsistentStore<Logged>* store, const MasterElection* election,
-    const int min_serving_nodes, const double min_serving_fraction)
+    util::Executor* executor, ConsistentStore<Logged>* store,
+    const MasterElection* election, const int min_serving_nodes,
+    const double min_serving_fraction)
     : store_(CHECK_NOTNULL(store)),
       election_(CHECK_NOTNULL(election)),
       min_serving_nodes_(min_serving_nodes),
       min_serving_fraction_(min_serving_fraction),
+      watch_node_states_task_(executor),
       exiting_(false),
       update_required_(false),
       cluster_serving_sth_update_thread_(
@@ -28,18 +30,21 @@ ClusterStateController<Logged>::ClusterStateController(
   CHECK_LT(0, min_serving_fraction_);
   store_->WatchClusterNodeStates(
       std::bind(&ClusterStateController::OnClusterStateUpdated, this,
-                std::placeholders::_1));
+                std::placeholders::_1),
+      watch_node_states_task_.task());
 }
 
 
 template <class Logged>
 ClusterStateController<Logged>::~ClusterStateController() {
+  watch_node_states_task_.Cancel();
   {
     std::lock_guard<std::mutex> lock(mutex_);
     exiting_ = true;
   }
   update_required_cv_.notify_all();
   cluster_serving_sth_update_thread_.join();
+  watch_node_states_task_.Wait();
 }
 
 

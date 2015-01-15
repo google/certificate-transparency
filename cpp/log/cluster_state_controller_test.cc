@@ -42,7 +42,7 @@ class ClusterStateControllerTest : public ::testing::Test {
                                                            kNodeId2)),
         store3_(new EtcdConsistentStore<LoggedCertificate>(&pool_, &etcd_, "",
                                                            kNodeId3)),
-        controller_(store_.get(), &election_, 1, 1) {
+        controller_(&pool_, store_.get(), &election_, 1, 1) {
     // Set up some handy STHs
     sth100_.set_tree_size(100);
     sth100_.set_timestamp(100);
@@ -104,7 +104,7 @@ TEST_F(ClusterStateControllerTest, TestContiguousTreeSizeUpdated) {
 TEST_F(ClusterStateControllerTest, TestCalculateServingSTHAt50Percent) {
   MockMasterElection election_is_master;
   EXPECT_CALL(election_is_master, IsMaster()).WillRepeatedly(Return(true));
-  ClusterStateController<LoggedCertificate> controller50(store_.get(),
+  ClusterStateController<LoggedCertificate> controller50(&pool_, store_.get(),
                                                          &election_is_master,
                                                          1, 0.5);
   store_->SetClusterNodeState(cns100_);
@@ -131,7 +131,7 @@ TEST_F(ClusterStateControllerTest, TestCalculateServingSTHAt50Percent) {
 TEST_F(ClusterStateControllerTest, TestCalculateServingSTHAt70Percent) {
   MockMasterElection election_is_master;
   EXPECT_CALL(election_is_master, IsMaster()).WillRepeatedly(Return(true));
-  ClusterStateController<LoggedCertificate> controller70(store_.get(),
+  ClusterStateController<LoggedCertificate> controller70(&pool_, store_.get(),
                                                          &election_is_master,
                                                          1, 0.7);
   store_->SetClusterNodeState(cns100_);
@@ -158,7 +158,7 @@ TEST_F(ClusterStateControllerTest,
        TestCalculateServingSTHAt60PercentTwoNodeMin) {
   MockMasterElection election_is_master;
   EXPECT_CALL(election_is_master, IsMaster()).WillRepeatedly(Return(true));
-  ClusterStateController<LoggedCertificate> controller60(store_.get(),
+  ClusterStateController<LoggedCertificate> controller60(&pool_, store_.get(),
                                                          &election_is_master,
                                                          2, 0.6);
   store_->SetClusterNodeState(cns100_);
@@ -184,7 +184,7 @@ TEST_F(ClusterStateControllerTest,
 TEST_F(ClusterStateControllerTest, TestCalculateServingSTHAsClusterMoves) {
   MockMasterElection election_is_master;
   EXPECT_CALL(election_is_master, IsMaster()).WillRepeatedly(Return(true));
-  ClusterStateController<LoggedCertificate> controller50(store_.get(),
+  ClusterStateController<LoggedCertificate> controller50(&pool_, store_.get(),
                                                          &election_is_master,
                                                          1, 0.5);
   store_->SetClusterNodeState(cns100_);
@@ -240,7 +240,7 @@ TEST_F(ClusterStateControllerTest, TestKeepsNewerSTH) {
 TEST_F(ClusterStateControllerTest, TestCannotSelectSmallerSTH) {
   MockMasterElection election_is_master;
   EXPECT_CALL(election_is_master, IsMaster()).WillRepeatedly(Return(true));
-  ClusterStateController<LoggedCertificate> controller50(store_.get(),
+  ClusterStateController<LoggedCertificate> controller50(&pool_, store_.get(),
                                                          &election_is_master,
                                                          1, 0.5);
   store_->SetClusterNodeState(cns200_);

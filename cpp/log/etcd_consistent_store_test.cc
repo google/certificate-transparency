@@ -9,7 +9,6 @@
 #include <string>
 #include <thread>
 
-#include "log/consistent_store-inl.h"
 #include "log/logged_certificate.h"
 #include "proto/ct.pb.h"
 #include "util/fake_etcd.h"
@@ -39,6 +38,7 @@ using testing::Pair;
 using testing::Return;
 using testing::SetArgumentPointee;
 using util::Status;
+using util::SyncTask;
 
 
 const char kRoot[] = "/root";
@@ -425,41 +425,60 @@ TEST_F(EtcdConsistentStoreTest, WatchServingSTH) {
   ct::SignedTreeHead sth;
   sth.set_timestamp(234234);
 
+  SyncTask task(&executor_);
   store_->WatchServingSTH(
       [&sth, &notify](const Update<ct::SignedTreeHead>& update) {
-        EXPECT_TRUE(update.exists_);
-        EXPECT_EQ(update.handle_.Entry().DebugString(), sth.DebugString());
-        notify.Notify();
-      });
+        static int call_count(0);
+        switch (call_count) {
+          case 0:
+            // initial empty state
+            EXPECT_FALSE(update.exists_);
+            break;
+          case 1:
+            // notification of update
+            EXPECT_TRUE(update.exists_);
+            EXPECT_EQ(sth.DebugString(), update.handle_.Entry().DebugString());
+            notify.Notify();
+            break;
+          default:
+            CHECK(false);
+        }
+        ++call_count;
+      },
+      task.task());
+
   util::Status status(store_->SetServingSTH(sth));
   EXPECT_TRUE(status.ok()) << status;
   notify.WaitForNotification();
   EXPECT_EQ(ServingSTH().DebugString(), sth.DebugString());
+  task.Cancel();
+  task.Wait();
 }
 
 
 TEST_F(EtcdConsistentStoreTest, WatchClusterNodeStates) {
-  Notification notify;
-
   const string kPath(string(kRoot) + "/nodes/" + kNodeId);
 
   ct::ClusterNodeState state;
   state.set_node_id(kNodeId);
   state.set_contiguous_tree_size(2342);
 
-  store_->WatchClusterNodeStates([&state, &notify](
-      const vector<Update<ct::ClusterNodeState>>& updates) {
-    if (updates.empty()) {
-      VLOG(1) << "Ignoring initial empty update.";
-      return;
-    }
-    EXPECT_TRUE(updates[0].exists_);
-    EXPECT_EQ(updates[0].handle_.Entry().DebugString(), state.DebugString());
-    notify.Notify();
-  });
+  SyncTask task(&executor_);
+  store_->WatchClusterNodeStates(
+      [&state](const vector<Update<ct::ClusterNodeState>>& updates) {
+        if (updates.empty()) {
+          VLOG(1) << "Ignoring initial empty update.";
+          return;
+        }
+        EXPECT_TRUE(updates[0].exists_);
+        EXPECT_EQ(updates[0].handle_.Entry().DebugString(),
+                  state.DebugString());
+      },
+      task.task());
   util::Status status(store_->SetClusterNodeState(state));
   EXPECT_TRUE(status.ok()) << status;
-  notify.WaitForNotification();
+  task.Cancel();
+  task.Wait();
 }
 
 
