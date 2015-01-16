@@ -306,10 +306,15 @@ class Monitor(object):
             ts_entry = parsed_entry.merkle_leaf.timestamped_entry
             if ts_entry.entry_type == client_pb2.X509_ENTRY:
                 der_cert = ts_entry.asn1_cert
+                der_chain = parsed_entry.extra_data.certificate_chain
             else:
                 der_cert = (
                     parsed_entry.extra_data.precert_chain_entry.pre_certificate)
-            der_certs.append((entry_index, der_cert))
+                der_chain = (
+                    parsed_entry.extra_data.
+                    precert_chain_entry.precertificate_chain)
+            der_chain = der_chain[:]
+            der_certs.append((entry_index, der_cert, der_chain))
         self.__report.scan_der_certs(der_certs)
 
     class EntryConsumer(object):

@@ -34,7 +34,7 @@ def _scan_der_cert(der_certs, checks):
     current = -1
     try:
         result = []
-        for log_index, der_cert in der_certs:
+        for log_index, der_cert, der_chain in der_certs:
             current = log_index
             partial_result = []
             strict_failure = False
@@ -60,6 +60,16 @@ def _scan_der_cert(der_certs, checks):
                 desc = certificate_pb2.X509Description()
                 desc.der = der_cert
                 desc.sha256_hash = hashlib.sha256(der_cert).digest()
+            try:
+                root = cert.Certificate(der_chain[-1], strict_der=False)
+            except error.Error:
+                pass
+            else:
+                for iss in [(type_.short_name, cert_desc.to_unicode(
+                        '.'.join(cert_desc.process_name(value.human_readable()))))
+                            for type_, value in root.issuer()]:
+                    proto_iss = desc.root_issuer.add()
+                    proto_iss.type, proto_iss.value = iss
             result.append((desc, log_index, partial_result))
         return result
     except Exception:
@@ -103,7 +113,7 @@ class CertificateReport(object):
         """Scans certificates in der form for all supported observations.
 
         Args:
-            der_certs: non empty array of (log_index, observations) tuples.
+            der_certs: non empty array of (log_index, der_cert, der_chain) tuples.
         """
         if not self._pool:
             self._pool = multiprocessing.Pool(processes=FLAGS.reporter_workers)

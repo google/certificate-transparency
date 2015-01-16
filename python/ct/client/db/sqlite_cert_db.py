@@ -23,6 +23,7 @@ class SQLiteCertDB(cert_db.CertDB):
             # subject common names and dnsnames for easy lookup of given
             # domain name
             ("subject_names", [("name", "TEXT")]),
+            ("root_issuer", [("type", "TEXT"), ("name", "TEXT")]),
             ("observations", [("description", "TEXT"),
                               ("reason", "TEXT"),
                               ("details", "BLOB")])]
@@ -107,6 +108,11 @@ class SQLiteCertDB(cert_db.CertDB):
 
         for iss in cert.issuer:
             cursor.execute("INSERT INTO issuer(log, cert_id, type, name)"
+                           "VALUES(?, ?, ?, ?)",
+                           (log_key, index, iss.type, iss.value))
+
+        for iss in cert.root_issuer:
+            cursor.execute("INSERT INTO root_issuer(log, cert_id, type, name)"
                            "VALUES(?, ?, ?, ?)",
                            (log_key, index, iss.type, iss.value))
 
