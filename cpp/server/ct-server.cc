@@ -26,14 +26,17 @@
 #include "util/periodic_closure.h"
 #include "util/read_key.h"
 #include "util/thread_pool.h"
+#include "util/uuid.h"
 
 DEFINE_string(server, "localhost", "Server host");
 DEFINE_int32(port, 9999, "Server port");
 DEFINE_string(key, "", "PEM-encoded server private key file");
 DEFINE_string(trusted_cert_file, "",
               "File for trusted CA certificates, in concatenated PEM format");
+// TODO(alcutter): Just specify a root dir with a single flag.
 DEFINE_string(cert_dir, "", "Storage directory for certificates");
 DEFINE_string(tree_dir, "", "Storage directory for trees");
+DEFINE_string(meta_dir, "", "Storage directory for meta info");
 DEFINE_string(sqlite_db, "", "Database for certificate and tree storage");
 // TODO(ekasper): sanity-check these against the directory structure.
 DEFINE_int32(cert_storage_depth, 0,
@@ -186,7 +189,15 @@ int main(int argc, char* argv[]) {
   else
     db = new FileDB<LoggedCertificate>(
         new FileStorage(FLAGS_cert_dir, FLAGS_cert_storage_depth),
-        new FileStorage(FLAGS_tree_dir, FLAGS_tree_storage_depth));
+        new FileStorage(FLAGS_tree_dir, FLAGS_tree_storage_depth),
+        new FileStorage(FLAGS_meta_dir, 0));
+
+  std::string node_id;
+  if (db->NodeId(&node_id) != Database<LoggedCertificate>::LOOKUP_OK) {
+    node_id = cert_trans::UUID4();
+    LOG(INFO) << "Initializing Node DB with UUID: " << node_id;
+    db->InitializeNode(node_id);
+  }
 
   evthread_use_pthreads();
   const shared_ptr<libevent::Base> event_base(make_shared<libevent::Base>());
@@ -202,7 +213,7 @@ int main(int argc, char* argv[]) {
   ThreadPool etcd_pool(2);
   EtcdConsistentStore<LoggedCertificate> consistent_store(&etcd_pool,
                                                           &etcd_client,
-                                                          "/root", "id");
+                                                          "/root", node_id);
 
   Frontend frontend(new CertSubmissionHandler(&checker),
                     new FrontendSigner(db, &consistent_store, &log_signer));

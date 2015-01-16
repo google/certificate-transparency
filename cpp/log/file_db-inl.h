@@ -15,6 +15,7 @@
 #include "proto/ct.pb.h"
 #include "proto/serializer.h"
 
+const char kMetaNodeIdKey[] = "node_id";
 
 template <class Logged>
 const size_t FileDB<Logged>::kTimestampBytesIndexed = 6;
@@ -22,9 +23,11 @@ const size_t FileDB<Logged>::kTimestampBytesIndexed = 6;
 
 template <class Logged>
 FileDB<Logged>::FileDB(cert_trans::FileStorage* cert_storage,
-                       cert_trans::FileStorage* tree_storage)
+                       cert_trans::FileStorage* tree_storage,
+                       cert_trans::FileStorage* meta_storage)
     : cert_storage_(CHECK_NOTNULL(cert_storage)),
       tree_storage_(CHECK_NOTNULL(tree_storage)),
+      meta_storage_(CHECK_NOTNULL(meta_storage)),
       latest_tree_timestamp_(0) {
   BuildIndex();
 }
@@ -185,6 +188,30 @@ void FileDB<Logged>::RemoveNotifySTHCallback(
   std::lock_guard<std::mutex> lock(lock_);
 
   callbacks_.Remove(callback);
+}
+
+
+template <class Logged>
+void FileDB<Logged>::InitializeNode(const std::string& node_id) {
+  CHECK(!node_id.empty());
+  std::unique_lock<std::mutex> lock(lock_);
+  std::string existing_id;
+  if (NodeId(&existing_id) != this->NOT_FOUND) {
+    LOG(FATAL) << "Attempting to initialze DB belonging to node with node_id: "
+               << existing_id;
+  }
+  CHECK(meta_storage_->CreateEntry(kMetaNodeIdKey, node_id).ok());
+}
+
+
+template <class Logged>
+typename Database<Logged>::LookupResult FileDB<Logged>::NodeId(
+    std::string* node_id) {
+  CHECK_NOTNULL(node_id);
+  if (!meta_storage_->LookupEntry(kMetaNodeIdKey, node_id).ok()) {
+    return this->NOT_FOUND;
+  }
+  return this->LOOKUP_OK;
 }
 
 

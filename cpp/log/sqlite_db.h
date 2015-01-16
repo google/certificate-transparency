@@ -40,6 +40,9 @@ class SQLiteDB : public Database<Logged> {
   void RemoveNotifySTHCallback(
       const typename Database<Logged>::NotifySTHCallback* callback) override;
 
+  void InitializeNode(const std::string& node_id) override;
+  LookupResult NodeId(std::string* node_id) override;
+
   // Force an STH notification. This is needed only for ct-dns-server,
   // which shares a SQLite database with ct-server, but needs to
   // refresh itself occasionally.
@@ -48,6 +51,8 @@ class SQLiteDB : public Database<Logged> {
  private:
   LookupResult LatestTreeHeadNoLock(ct::SignedTreeHead* result) const;
   void UpdateTreeSize();
+  LookupResult NodeId(const std::unique_lock<std::mutex>& lock,
+                      std::string* node_id);
 
   mutable std::mutex lock_;
   sqlite3* const db_;
