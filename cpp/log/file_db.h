@@ -33,9 +33,10 @@ class FileDB : public Database<Logged> {
   // the FileDB should be set up accordingly. For example, a storage depth
   // of 8 buckets tree head updates within about 1 minute
   // (timestamps xxxxxxxx0000 - xxxxxxxxFFFF) to the same directory.
-  // Takes ownership of |cert_storage| and |tree_storage|.
+  // Takes ownership of |cert_storage|, |tree_storage|, and |meta_storage|.
   FileDB(cert_trans::FileStorage* cert_storage,
-         cert_trans::FileStorage* tree_storage);
+         cert_trans::FileStorage* tree_storage,
+         cert_trans::FileStorage* meta_storage);
   ~FileDB();
 
   static const size_t kTimestampBytesIndexed;
@@ -64,6 +65,11 @@ class FileDB : public Database<Logged> {
   void RemoveNotifySTHCallback(
       const typename Database<Logged>::NotifySTHCallback* callback) override;
 
+  void InitializeNode(const std::string& node_id) override;
+
+  typename Database<Logged>::LookupResult NodeId(
+      std::string* node_id) override;
+
  private:
   void BuildIndex();
   typename Database<Logged>::LookupResult LatestTreeHeadNoLock(
@@ -76,6 +82,8 @@ class FileDB : public Database<Logged> {
   // one.
   // Other necessary lookup indices (by tree size, by timestamp range?) TBD.
   const std::unique_ptr<cert_trans::FileStorage> tree_storage_;
+
+  const std::unique_ptr<cert_trans::FileStorage> meta_storage_;
 
   mutable std::mutex lock_;
   // This is a mapping of the sequence number to entry hashes, for

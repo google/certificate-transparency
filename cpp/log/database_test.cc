@@ -311,10 +311,38 @@ TYPED_TEST(DBTest, ResumeEmpty) {
 }
 
 
+TYPED_TEST(DBTest, NodeId) {
+  const string kNodeId("node_id");
+  this->db()->InitializeNode(kNodeId);
+  std::string id_from_db;
+  EXPECT_EQ(DB::LOOKUP_OK, this->db()->NodeId(&id_from_db));
+  EXPECT_EQ(kNodeId, id_from_db);
+}
+
+
+TYPED_TEST(DBTest, NoNodeIdSet) {
+  std::string id_from_db;
+  EXPECT_EQ(DB::NOT_FOUND, this->db()->NodeId(&id_from_db));
+}
+
+
+TYPED_TEST(DBTest, CannotOverwriteNodeId) {
+  const string kNodeId("some_node_id");
+  this->db()->InitializeNode(kNodeId);
+  EXPECT_DEATH(this->db()->InitializeNode("something_else"), kNodeId);
+}
+
+
+TYPED_TEST(DBTest, CannotHaveEmptyNodeId) {
+  EXPECT_DEATH(this->db()->InitializeNode(""), "empty");
+}
+
+
 }  // namespace
 
 
 int main(int argc, char** argv) {
   cert_trans::test::InitTesting(argv[0], &argc, &argv, true);
+  ::testing::FLAGS_gtest_death_test_style = "threadsafe";
   return RUN_ALL_TESTS();
 }

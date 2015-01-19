@@ -94,6 +94,9 @@ class ReadOnlyDatabase {
   virtual void AddNotifySTHCallback(const NotifySTHCallback* callback) = 0;
   virtual void RemoveNotifySTHCallback(const NotifySTHCallback* callback) = 0;
 
+  virtual void InitializeNode(const std::string& node_id) = 0;
+  virtual LookupResult NodeId(std::string* node_id) = 0;
+
  protected:
   ReadOnlyDatabase() = default;
 

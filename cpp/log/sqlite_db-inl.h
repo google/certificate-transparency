@@ -40,6 +40,11 @@ sqlite3* SQLiteOpen(const std::string& dbfile) {
                retval,
                "CREATE TABLE trees(sth BLOB UNIQUE, timestamp INTEGER UNIQUE)",
                nullptr, nullptr, nullptr));
+
+  CHECK_EQ(SQLITE_OK,
+           sqlite3_exec(retval, "CREATE TABLE node(node_id BLOB UNIQUE)",
+                        nullptr, nullptr, nullptr));
+
   LOG(INFO) << "New SQLite database created in " << dbfile;
 
   return retval;
@@ -240,6 +245,51 @@ void SQLiteDB<Logged>::RemoveNotifySTHCallback(
   std::lock_guard<std::mutex> lock(lock_);
 
   callbacks_.Remove(callback);
+}
+
+
+template <class Logged>
+void SQLiteDB<Logged>::InitializeNode(const std::string& node_id) {
+  CHECK(!node_id.empty());
+  std::unique_lock<std::mutex> lock(lock_);
+  std::string existing_id;
+  if (NodeId(lock, &existing_id) != this->NOT_FOUND) {
+    LOG(FATAL) << "Attempting to initialize DB beloging to node with node_id: "
+               << existing_id;
+  }
+  sqlite::Statement statement(db_, "INSERT INTO node(node_id) VALUES(?)");
+  statement.BindBlob(0, node_id);
+
+  const int result(statement.Step());
+  CHECK_EQ(SQLITE_DONE, result);
+}
+
+
+template <class Logged>
+typename Database<Logged>::LookupResult SQLiteDB<Logged>::NodeId(
+    std::string* node_id) {
+  std::unique_lock<std::mutex> lock(lock_);
+  return NodeId(lock, CHECK_NOTNULL(node_id));
+}
+
+
+template <class Logged>
+typename Database<Logged>::LookupResult SQLiteDB<Logged>::NodeId(
+    const std::unique_lock<std::mutex>& lock, std::string* node_id) {
+  CHECK(lock.owns_lock());
+  CHECK_NOTNULL(node_id);
+  sqlite::Statement statement(db_, "SELECT node_id FROM node");
+
+  int result(statement.Step());
+  if (result == SQLITE_DONE) {
+    return this->NOT_FOUND;
+  }
+  CHECK_EQ(SQLITE_ROW, result);
+
+  statement.GetBlob(0, node_id);
+  result = statement.Step();
+  CHECK_EQ(SQLITE_DONE, result);  // There can only be one!
+  return this->LOOKUP_OK;
 }
 
 
