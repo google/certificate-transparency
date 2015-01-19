@@ -199,9 +199,9 @@ message LogID {
 message SignedCertificateTimestamp {
   optional Version version = 1 [ default = UNKNOWN_VERSION ];
   optional LogID id = 2;
-  optional bytes extensions = 5 [ (tls_opts).min_length = 0,
-                                  (tls_opts).max_length = 0xffff ];
   // UTC time in milliseconds, since January 1, 1970, 00:00.
   optional uint64 timestamp = 3;
-  optional DigitallySigned signature = 4;
+  optional bytes extensions = 4 [ (tls_opts).min_length = 0,
+                                  (tls_opts).max_length = 0xffff ];
+  optional DigitallySigned signature = 5;
 }

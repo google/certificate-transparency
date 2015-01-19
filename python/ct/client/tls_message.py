@@ -127,7 +127,9 @@ class TLSReader(object):
         """Read from the buffer into the protocol buffer message."""
         # TODO(ekasper): probably better not to modify the
         # original message until we're guaranteed to succeed?
-        for field in message.DESCRIPTOR.fields:
+        fields = message.DESCRIPTOR.fields_by_number
+        for i in sorted(fields):
+            field = fields[i]
             opts = field.GetOptions().Extensions[options.tls_opts]
             if opts.skip:
                 continue
@@ -257,7 +259,9 @@ class TLSWriter(object):
 
     def write(self, message):
         """Append a serialized message to the writer's buffer."""
-        for field in message.DESCRIPTOR.fields:
+        fields = message.DESCRIPTOR.fields_by_number
+        for i in sorted(fields):
+            field = fields[i]
             opts = field.GetOptions().Extensions[options.tls_opts]
             if opts.skip:
                 continue

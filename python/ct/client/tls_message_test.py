@@ -3,7 +3,7 @@
 import unittest
 
 from ct.client import tls_message
-from ct.proto import test_message_pb2
+from ct.proto import client_pb2, test_message_pb2
 
 
 valid_test_message = test_message_pb2.TestMessage()
@@ -209,6 +209,28 @@ class TLSWriterTest(unittest.TestCase):
         self.verify_encode_fails(test_message)
 
 
+class SCTEncodingTest(unittest.TestCase):
+    def test_correctly_encodes_sct(self):
+        sct_proto = client_pb2.SignedCertificateTimestamp()
+        sct_proto.version = client_pb2.V1
+        sct_proto.id.key_id = (
+            "a4b90990b418581487bb13a2cc67700a3c359804f91bdfb8e377cd0ec80ddc10"
+            ).decode('hex')
+
+        sct_proto.timestamp = 1365427532443
+        sct_proto.signature.hash_algorithm = client_pb2.DigitallySigned.SHA256
+        sct_proto.signature.sig_algorithm = client_pb2.DigitallySigned.ECDSA
+        sct_proto.signature.signature = (
+            "304502210089de897f603e590b1aa0d7c4236c2f697e90602795f7a469215fda5e"
+            "460123fc022065ab501ce3dbaf49bd563d1c9ff0ac76120bc11f65a44122b3cd8b"
+            "89fc77a48c").decode("hex")
+        sct = tls_message.encode(sct_proto)
+        expected_sct = ("00a4b90990b418581487bb13a2cc67700a3c359804f91bdfb8e377"
+                        "cd0ec80ddc100000013de9d2b29b000004030047304502210089de"
+                        "897f603e590b1aa0d7c4236c2f697e90602795f7a469215fda5e46"
+                        "0123fc022065ab501ce3dbaf49bd563d1c9ff0ac76120bc11f65a4"
+                        "4122b3cd8b89fc77a48c").decode("hex")
+        self.assertEqual(sct, expected_sct)
 
 if __name__ == "__main__":
     unittest.main()
