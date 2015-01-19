@@ -10,8 +10,7 @@
 #include "util/executor.h"
 #include "util/util.h"
 
-DEFINE_int32(node_state_ttl_seconds, 60,
-             "TTL in seconds on the node state files.");
+DECLARE_int32(node_state_ttl_seconds);
 
 namespace cert_trans {
 namespace {
@@ -94,6 +93,7 @@ EtcdConsistentStore<Logged>::NextAvailableSequenceNumber() const {
 template <class Logged>
 void EtcdConsistentStore<Logged>::WaitForServingSTHVersion(
     std::unique_lock<std::mutex>* lock, const int version) {
+  VLOG(1) << "Waiting for ServingSTH version " << version;
   serving_sth_cv_.wait(*lock, [this, version]() {
     return serving_sth_.get() != nullptr && serving_sth_->Handle() >= version;
   });
@@ -268,7 +268,9 @@ util::Status EtcdConsistentStore<Logged>::SetClusterNodeState(
     const ct::ClusterNodeState& state) {
   // TODO(alcutter): consider keeping the handle for this around to check that
   // nobody else is updating our cluster state.
-  EntryHandle<ct::ClusterNodeState> entry(state);
+  ct::ClusterNodeState local_state(state);
+  local_state.set_node_id(node_id_);
+  EntryHandle<ct::ClusterNodeState> entry(local_state);
   const std::chrono::seconds ttl(FLAGS_node_state_ttl_seconds);
   return ForceSetEntryWithTTL(GetNodePath(node_id_), ttl, &entry);
 }
@@ -461,6 +463,7 @@ void EtcdConsistentStore<Logged>::OnEtcdServingSTHUpdated(
   if (!updates.empty()) {
     const Update<ct::SignedTreeHead> update(
         TypedUpdateFromWatchUpdate<ct::SignedTreeHead>(updates[0]));
+    VLOG(1) << "Got ServingSTH version " << update.handle_.Handle();
     UpdateLocalServingSTH(lock, update.handle_);
     this->OnServingSTHUpdate(update);
   }

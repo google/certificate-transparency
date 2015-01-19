@@ -65,6 +65,9 @@ class MasterElection {
   // call.
   virtual bool IsMaster() const;
 
+ protected:
+  MasterElection();
+
  private:
   // The states that the proposal can be in:
   enum class ProposalState {
