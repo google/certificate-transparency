@@ -23,7 +23,6 @@
 #include "server/handler.h"
 #include "util/fake_etcd.h"
 #include "util/libevent_wrapper.h"
-#include "util/periodic_closure.h"
 #include "util/read_key.h"
 #include "util/thread_pool.h"
 #include "util/uuid.h"
@@ -70,18 +69,20 @@ using cert_trans::FakeEtcdClient;
 using cert_trans::FileStorage;
 using cert_trans::HttpHandler;
 using cert_trans::LoggedCertificate;
-using cert_trans::PeriodicClosure;
+using cert_trans::ReadPrivateKey;
 using cert_trans::ThreadPool;
 using cert_trans::TreeSigner;
-using cert_trans::ReadPrivateKey;
 using google::RegisterFlagValidator;
 using std::bind;
 using std::chrono::duration;
+using std::chrono::duration_cast;
 using std::chrono::seconds;
+using std::chrono::steady_clock;
 using std::function;
 using std::make_shared;
 using std::shared_ptr;
 using std::string;
+using std::thread;
 
 // Basic sanity checks on flag values.
 static bool ValidatePort(const char* flagname, int port) {
@@ -151,9 +152,20 @@ static const bool sign_dummy =
     RegisterFlagValidator(&FLAGS_tree_signing_frequency_seconds,
                           &ValidateIsPositive);
 
-void SignMerkleTree(TreeSigner<LoggedCertificate>* tree_signer,
-                    LogLookup<LoggedCertificate>* log_lookup) {
-  CHECK_EQ(tree_signer->UpdateTree(), TreeSigner<LoggedCertificate>::OK);
+void SignMerkleTree(TreeSigner<LoggedCertificate>* tree_signer) {
+  const steady_clock::duration period((seconds(FLAGS_tree_signing_frequency_seconds)));
+  steady_clock::time_point target_run_time(steady_clock::now());
+
+  while (true) {
+    CHECK_EQ(tree_signer->UpdateTree(), TreeSigner<LoggedCertificate>::OK);
+
+    const steady_clock::time_point now(steady_clock::now());
+    while (target_run_time <= now) {
+      target_run_time += period;
+    }
+
+    sleep(duration_cast<seconds>(target_run_time - now).count());
+  }
 }
 
 int main(int argc, char* argv[]) {
@@ -223,18 +235,13 @@ int main(int argc, char* argv[]) {
                                             &log_signer);
   LogLookup<LoggedCertificate> log_lookup(db);
 
-  // Make sure that we have an STH, even if the tree is empty.
   // TODO(pphaneuf): We should be remaining in an "unhealthy state"
   // (either not accepting any requests, or returning some internal
   // server error) until we have an STH to serve. We can sign for now,
   // but we might not be a signer.
-  SignMerkleTree(&tree_signer, &log_lookup);
+  thread signer(&SignMerkleTree, &tree_signer);
   ThreadPool pool;
   HttpHandler handler(&log_lookup, db, &checker, &frontend, &pool);
-
-  PeriodicClosure tree_event(event_base,
-                             seconds(FLAGS_tree_signing_frequency_seconds),
-                             bind(&SignMerkleTree, &tree_signer, &log_lookup));
 
   libevent::HttpServer server(*event_base);
   handler.Add(&server);
