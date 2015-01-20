@@ -20,7 +20,16 @@ before_install:
  - java -version
  - javac -version
  - go version
+# Need a recent version of openssl
+ - wget https://www.openssl.org/source/openssl-1.0.1l.tar.gz -O /tmp/openssl-1.0.1l.tar.gz
+ - tar -zxf /tmp/openssl-1.0.1l.tar.gz
+ - cd openssl-1.0.1l
+ - ./config --prefix=/usr/local --openssldir=/usr/local/openssl
+ - make
+ - sudo make install
+ - cd ..
+
 
 script:
- - make alltests CC=clang CXX=clang++
+ - make alltests CC=clang CXX=clang++ OPENSSLDIR=/usr/local/openssl
  - go test -v ./go/...
