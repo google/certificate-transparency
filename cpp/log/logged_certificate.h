@@ -5,6 +5,7 @@
 
 #include <glog/logging.h>
 
+#include "client/async_log_client.h"
 #include "merkletree/serial_hasher.h"
 #include "proto/ct.pb.h"
 #include "proto/serializer.h"
@@ -59,6 +60,9 @@ class LoggedCertificate : public ct::LoggedCertificatePB {
       return Serializer::SerializePrecertChainEntry(entry().precert_entry(),
                                                     dst) == Serializer::OK;
   }
+
+  // Note that this method will not fully populate the SCT.
+  bool CopyFromClientLogEntry(const AsyncLogClient::Entry& entry);
 
   // FIXME(benl): unify with TestSigner?
   void RandomForTest() {

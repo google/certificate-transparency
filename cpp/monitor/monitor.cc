@@ -171,56 +171,8 @@ Monitor::GetResult Monitor::GetEntries(int get_first, int get_last) {
 
     db_->BeginTransaction();
     for (size_t i = 0; i < entries.size(); i++) {
-      ct::SignedCertificateTimestamp sct;
-      ct::LogEntry log_entry;
-      ct::LoggedCertificatePB_Contents cont;
-      ct::PreCert precert;
-      ct::X509ChainEntry x509chain_entry;
-      ct::PrecertChainEntry precert_chain_entry;
-
-      sct.set_version(ct::V1);
-      sct.set_timestamp(entries.at(i).leaf.timestamped_entry().timestamp());
-      sct.set_extensions(entries.at(i).leaf.timestamped_entry().extensions());
-
-      if (entries.at(i).leaf.timestamped_entry().entry_type() ==
-          ct::X509_ENTRY) {
-        x509chain_entry.CopyFrom(entries.at(i).entry.x509_entry());
-
-        x509chain_entry.set_leaf_certificate(
-            entries.at(i).leaf.timestamped_entry().signed_entry().x509());
-
-        log_entry.mutable_x509_entry()->CopyFrom(x509chain_entry);
-
-      } else if (entries.at(i).leaf.timestamped_entry().entry_type() ==
-                 ct::PRECERT_ENTRY) {
-        precert_chain_entry.CopyFrom(entries.at(i).entry.precert_entry());
-
-        precert.set_issuer_key_hash(entries.at(i)
-                                        .leaf.timestamped_entry()
-                                        .signed_entry()
-                                        .precert()
-                                        .issuer_key_hash());
-        precert.set_tbs_certificate(entries.at(i)
-                                        .leaf.timestamped_entry()
-                                        .signed_entry()
-                                        .precert()
-                                        .tbs_certificate());
-        precert_chain_entry.mutable_pre_cert()->CopyFrom(precert);
-
-        log_entry.mutable_precert_entry()->CopyFrom(precert_chain_entry);
-      } else {
-        LOG(FATAL) << "Unsupported ENTRY_TYPE: "
-                   << entries.at(i).leaf.timestamped_entry().entry_type();
-      }
-
-      log_entry.set_type(entries.at(i).leaf.timestamped_entry().entry_type());
-
-      cont.mutable_sct()->CopyFrom(sct);
-      cont.mutable_entry()->CopyFrom(log_entry);
-
       cert_trans::LoggedCertificate logged;
-      logged.mutable_contents()->CopyFrom(cont);
-
+      CHECK(logged.CopyFromClientLogEntry(entries.at(i)));
       CHECK_EQ(db_->CreateEntry(logged), Database::WRITE_OK);
     }
     entries.clear();
