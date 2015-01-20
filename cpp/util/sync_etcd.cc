@@ -60,30 +60,33 @@ struct DoneFunctor3 {
 
 
 template <class F>
-Status BlockingCall(F async_method) {
+Status BlockingCall(const F& async_method) {
   Notification done;
   Status status;
-  async_method(bind(DoneFunctor1(), &done, &status, _1));
+  DoneFunctor1 functor;
+  async_method(bind(functor, &done, &status, _1));
   done.WaitForNotification();
   return status;
 }
 
 
 template <class F, class P1>
-Status BlockingCall(F async_method, P1* p1) {
+Status BlockingCall(const F& async_method, P1* p1) {
   Notification done;
   Status status;
-  async_method(bind(DoneFunctor2(), &done, &status, p1, _1, _2));
+  DoneFunctor2 functor;
+  async_method(bind(functor, &done, &status, p1, _1, _2));
   done.WaitForNotification();
   return status;
 }
 
 
 template <class F, class P1, class P2>
-Status BlockingCall(F async_method, P1* p1, P2* p2) {
+Status BlockingCall(const F& async_method, P1* p1, P2* p2) {
   Notification done;
   Status status;
-  async_method(bind(DoneFunctor3(), &done, &status, p1, p2, _1, _2, _3));
+  DoneFunctor3 functor;
+  async_method(bind(functor, &done, &status, p1, p2, _1, _2, _3));
   done.WaitForNotification();
   return status;
 }
