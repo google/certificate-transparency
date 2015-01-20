@@ -18,6 +18,7 @@
 #include "util/util.h"
 
 using std::string;
+using std::vector;
 using util::ClearOpenSSLErrors;
 
 namespace cert_trans {
@@ -29,7 +30,7 @@ CertChecker::~CertChecker() {
   ClearAllTrustedCertificates();
 }
 
-bool CertChecker::LoadTrustedCertificates(const std::string& cert_file) {
+bool CertChecker::LoadTrustedCertificates(const string& cert_file) {
   // A read-only BIO.
   BIO* bio_in = BIO_new(BIO_s_file());
   if (bio_in == NULL) {
@@ -44,6 +45,29 @@ bool CertChecker::LoadTrustedCertificates(const std::string& cert_file) {
     return false;
   }
 
+  return LoadTrustedCertificatesFromBIO(bio_in);
+}
+
+bool CertChecker::LoadTrustedCertificates(const vector<string>& trusted_certs) {
+  string concat_certs;
+  for (vector<string>::const_iterator it = trusted_certs.begin();
+       it != trusted_certs.end(); ++it) {
+    concat_certs.append(*it);
+  }
+  // A read-only memory BIO.
+  BIO* bio_in = BIO_new_mem_buf(
+      const_cast<void*>(reinterpret_cast<const void*>(concat_certs.c_str())),
+      -1  /* no length, since null-terminated */);
+  if (bio_in == NULL) {
+    LOG_OPENSSL_ERRORS(ERROR);
+    return false;
+  }
+
+  return LoadTrustedCertificatesFromBIO(bio_in);
+}
+
+bool CertChecker::LoadTrustedCertificatesFromBIO(BIO* bio_in) {
+  CHECK(bio_in != NULL);
   std::vector<std::pair<string, Cert*> > certs_to_add;
   bool error = false;
   // certs_to_add may be empty if no new certs were added, so keep track of
