@@ -51,6 +51,15 @@ class EtcdConsistentStore : public ConsistentStore<Logged> {
 
   util::Status SetClusterNodeState(const ct::ClusterNodeState& state) override;
 
+  void WatchServingSTH(
+      const typename ConsistentStore<Logged>::ServingSTHCallback& cb,
+      util::Task* task) override;
+
+  void WatchClusterNodeStates(
+      const typename ConsistentStore<Logged>::ClusterNodeStateCallback& cb,
+      util::Task* task) override;
+
+
  private:
   void WaitForServingSTHVersion(std::unique_lock<std::mutex>* lock,
                                 const int version);
@@ -86,8 +95,24 @@ class EtcdConsistentStore : public ConsistentStore<Logged> {
 
   std::string GetFullPath(const std::string& key) const;
 
-  // Static member just so that it has friend access to the private
-  // c'tor/setters of Update<>
+
+  // The following 3 methods are static just so that they have friend access to
+  // the private c'tor/setters of Update<>
+
+  // Converts a single WatchUpdate to an Update<T> (using
+  // TypedUpdateFromWatchUpdate() below), and calls |callback| with it.
+  template <class T, class CB>
+  static void ConvertSingleUpdate(
+      const CB& callback, const std::vector<EtcdClient::WatchUpdate>& updates);
+
+  // Converts a vector of WatchUpdates to a vector<Update<T>> (using
+  // TypedUpdateFromWatchUpdate() below), and calls |callback| with it.
+  template <class T, class CB>
+  static void ConvertMultipleUpdate(
+      const CB& callback, const std::vector<EtcdClient::WatchUpdate>& updates);
+
+  // Converts a generic WatchUpdate to an Update<T>.
+  // T must implement ParseFromString().
   template <class T>
   static Update<T> TypedUpdateFromWatchUpdate(
       const EtcdClient::WatchUpdate& update);
@@ -95,20 +120,14 @@ class EtcdConsistentStore : public ConsistentStore<Logged> {
   void UpdateLocalServingSTH(const std::unique_lock<std::mutex>& lock,
                              const EntryHandle<ct::SignedTreeHead>& handle);
 
-  void OnEtcdServingSTHUpdated(
-      const std::vector<EtcdClient::WatchUpdate>& updates);
-
-  void OnEtcdClusterNodeStatesUpdated(
-      const std::vector<EtcdClient::WatchUpdate>& updates);
+  void OnEtcdServingSTHUpdated(const Update<ct::SignedTreeHead>& update);
 
   EtcdClient* const client_;  // We don't own this.
   SyncEtcdClient sync_client_;
   const std::string root_;
   const std::string node_id_;
   std::condition_variable serving_sth_cv_;
-  Notification initial_cluster_notify_;
   util::SyncTask serving_sth_watch_task_;
-  util::SyncTask cluster_node_states_watch_task_;
 
   std::mutex mutex_;
   bool received_initial_sth_;

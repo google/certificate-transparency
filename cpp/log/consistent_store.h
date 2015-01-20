@@ -8,6 +8,7 @@
 #include "base/macros.h"
 #include "util/status.h"
 #include "util/statusor.h"
+#include "util/task.h"
 
 namespace ct {
 
@@ -97,7 +98,6 @@ class ConsistentStore {
   typedef std::function<void(const std::vector<Update<ct::ClusterNodeState>>&
                                  updates)> ClusterNodeStateCallback;
 
-
   ConsistentStore() = default;
 
   virtual util::StatusOr<int64_t> NextAvailableSequenceNumber() const = 0;
@@ -124,21 +124,13 @@ class ConsistentStore {
   virtual util::Status SetClusterNodeState(
       const ct::ClusterNodeState& state) = 0;
 
-  void WatchServingSTH(const ServingSTHCallback& cb);
+  virtual void WatchServingSTH(const ServingSTHCallback& cb,
+                               util::Task* task) = 0;
 
-  void WatchClusterNodeStates(const ClusterNodeStateCallback& cb);
-
- protected:
-  void OnServingSTHUpdate(const Update<ct::SignedTreeHead>& update);
-
-  void OnClusterNodeStatesUpdate(
-      const std::vector<Update<ct::ClusterNodeState>>& updates);
+  virtual void WatchClusterNodeStates(const ClusterNodeStateCallback& cb,
+                                      util::Task* task) = 0;
 
  private:
-  std::mutex watcher_mutex_;
-  std::vector<ServingSTHCallback> sth_watchers_;
-  std::vector<ClusterNodeStateCallback> cluster_node_watchers_;
-
   DISALLOW_COPY_AND_ASSIGN(ConsistentStore);
 };
 

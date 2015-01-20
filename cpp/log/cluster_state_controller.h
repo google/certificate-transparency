@@ -23,7 +23,8 @@ namespace cert_trans {
 template <class Logged>
 class ClusterStateController {
  public:
-  ClusterStateController(ConsistentStore<Logged>* store,
+  ClusterStateController(util::Executor* executor,
+                         ConsistentStore<Logged>* store,
                          const MasterElection* election,
                          const int min_serving_nodes,
                          const double min_serving_fraction);
@@ -69,6 +70,7 @@ class ClusterStateController {
   const MasterElection* const election_;
   const int min_serving_nodes_;
   const double min_serving_fraction_;
+  util::SyncTask watch_node_states_task_;
 
   mutable std::mutex mutex_;  // covers the members below:
   ct::ClusterNodeState local_node_state_;
