@@ -129,6 +129,7 @@ proto/%.pb.h proto/%.pb.cc: ../proto/%.proto
 
 ifneq ($(MAKECMDGOALS),clean)
     include client/.depend
+    include fetcher/.depend
     include log/.depend
     include merkletree/.depend
     include monitor/.depend
@@ -333,7 +334,9 @@ client/ct: client/ct.o client/client.o client/ssl_client.o \
 server/ct-dns-server: server/ct-dns-server.o server/event.o $(LOCAL_LIBS)
 
 server/ct-server: server/ct-server.o util/read_key.o server/handler.o \
-	base/notification.o $(LOCAL_LIBS)
+	base/notification.o log/logged_certificate.o fetcher/fetcher.o \
+        fetcher/peer.o fetcher/remote_peer.o client/async_log_client.o \
+        $(LOCAL_LIBS)
 
 tools/dump_cert: tools/dump_cert.o proto/libproto.a util/libutil.a
 
