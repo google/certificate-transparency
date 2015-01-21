@@ -164,7 +164,7 @@ void SignMerkleTree(TreeSigner<LoggedCertificate>* tree_signer) {
       target_run_time += period;
     }
 
-    sleep(duration_cast<seconds>(target_run_time - now).count());
+    std::this_thread::sleep_for(target_run_time - now);
   }
 }
 
