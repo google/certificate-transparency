@@ -3,7 +3,8 @@
 import unittest
 
 from ct.client import tls_message
-from ct.proto import client_pb2, test_message_pb2
+from ct.proto import client_pb2
+from ct.proto import test_message_pb2
 
 
 valid_test_message = test_message_pb2.TestMessage()
