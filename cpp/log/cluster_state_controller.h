@@ -25,9 +25,7 @@ class ClusterStateController {
  public:
   ClusterStateController(util::Executor* executor,
                          ConsistentStore<Logged>* store,
-                         const MasterElection* election,
-                         const int min_serving_nodes,
-                         const double min_serving_fraction);
+                         const MasterElection* election);
 
   ~ClusterStateController();
 
@@ -58,19 +56,24 @@ class ClusterStateController {
   void OnClusterStateUpdated(
       const std::vector<Update<ct::ClusterNodeState>>& updates);
 
+  // Entry point for the config watcher callback.
+  // Called whenever the ClusterConfig is changed.
+  void OnClusterConfigUpdated(const Update<ct::ClusterConfig>& update);
+
   // Calculates the STH which should be served by the cluster, given the
   // current state of the nodes.
-  // Returns true iff there currently is a suitable STH.
-  bool CalculateServingSTH(const std::unique_lock<std::mutex>& lock);
+  // If this node is the cluster master then the calculated serving STH is
+  // pushed out to the consistent store.
+  void CalculateServingSTH(const std::unique_lock<std::mutex>& lock);
 
   // Thread entry point for ServingSTH updater thread.
   void ClusterServingSTHUpdater();
 
   ConsistentStore<Logged>* const store_;  // Not owned by us
   const MasterElection* const election_;
-  const int min_serving_nodes_;
-  const double min_serving_fraction_;
+  util::SyncTask watch_config_task_;
   util::SyncTask watch_node_states_task_;
+  ct::ClusterConfig cluster_config_;
 
   mutable std::mutex mutex_;  // covers the members below:
   ct::ClusterNodeState local_node_state_;

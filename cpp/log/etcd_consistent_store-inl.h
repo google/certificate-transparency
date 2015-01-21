@@ -15,6 +15,7 @@ namespace cert_trans {
 namespace {
 
 // etcd path constants.
+const char kClusterConfigFile[] = "/cluster_config";
 const char kUnsequencedDir[] = "/unsequenced/";
 const char kSequencedDir[] = "/sequenced/";
 const char kServingSthFile[] = "/serving_sth";
@@ -318,6 +319,28 @@ void EtcdConsistentStore<Logged>::WatchClusterNodeStates(
               typename ConsistentStore<Logged>::ClusterNodeStateCallback>,
           cb, std::placeholders::_1),
       task);
+}
+
+
+template <class Logged>
+void EtcdConsistentStore<Logged>::WatchClusterConfig(
+    const typename ConsistentStore<Logged>::ClusterConfigCallback& cb,
+    util::Task* task) {
+  client_->Watch(
+      GetFullPath(kClusterConfigFile),
+      std::bind(&ConvertSingleUpdate<
+                    ct::ClusterConfig,
+                    typename ConsistentStore<Logged>::ClusterConfigCallback>,
+                cb, std::placeholders::_1),
+      task);
+}
+
+
+template <class Logged>
+util::Status EtcdConsistentStore<Logged>::SetClusterConfig(
+    const ct::ClusterConfig& config) {
+  EntryHandle<ct::ClusterConfig> entry(config);
+  return ForceSetEntry(GetFullPath(kClusterConfigFile), &entry);
 }
 
 

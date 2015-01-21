@@ -12,6 +12,7 @@
 
 namespace ct {
 
+class ClusterConfig;
 class ClusterNodeState;
 class SignedTreeHead;
 
@@ -97,6 +98,8 @@ class ConsistentStore {
       ServingSTHCallback;
   typedef std::function<void(const std::vector<Update<ct::ClusterNodeState>>&
                                  updates)> ClusterNodeStateCallback;
+  typedef std::function<void(const Update<ct::ClusterConfig>& update)>
+      ClusterConfigCallback;
 
   ConsistentStore() = default;
 
@@ -129,6 +132,11 @@ class ConsistentStore {
 
   virtual void WatchClusterNodeStates(const ClusterNodeStateCallback& cb,
                                       util::Task* task) = 0;
+
+  virtual void WatchClusterConfig(const ClusterConfigCallback& cb,
+                                  util::Task* task) = 0;
+
+  virtual util::Status SetClusterConfig(const ct::ClusterConfig& config) = 0;
 
  private:
   DISALLOW_COPY_AND_ASSIGN(ConsistentStore);
