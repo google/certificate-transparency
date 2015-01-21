@@ -205,3 +205,9 @@ message SignedCertificateTimestamp {
                                   (tls_opts).max_length = 0xffff ];
   optional DigitallySigned signature = 5;
 }
+
+message SignedCertificateTimestampList {
+  repeated bytes sct_list = 1 [ (tls_opts).min_length = 1,
+                                (tls_opts).max_length = 0xffff,
+                                (tls_opts).max_total_length = 0xffff ];
+}

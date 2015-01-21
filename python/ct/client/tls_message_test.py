@@ -211,7 +211,7 @@ class TLSWriterTest(unittest.TestCase):
 
 
 class SCTEncodingTest(unittest.TestCase):
-    def test_correctly_encodes_sct(self):
+    def setUp(self):
         sct_proto = client_pb2.SignedCertificateTimestamp()
         sct_proto.version = client_pb2.V1
         sct_proto.id.key_id = (
@@ -225,13 +225,53 @@ class SCTEncodingTest(unittest.TestCase):
             "304502210089de897f603e590b1aa0d7c4236c2f697e90602795f7a469215fda5e"
             "460123fc022065ab501ce3dbaf49bd563d1c9ff0ac76120bc11f65a44122b3cd8b"
             "89fc77a48c").decode("hex")
-        sct = tls_message.encode(sct_proto)
+        self._sct_proto = sct_proto
+
+    def test_correctly_encodes_sct(self):
+        sct = tls_message.encode(self._sct_proto)
         expected_sct = ("00a4b90990b418581487bb13a2cc67700a3c359804f91bdfb8e377"
                         "cd0ec80ddc100000013de9d2b29b000004030047304502210089de"
                         "897f603e590b1aa0d7c4236c2f697e90602795f7a469215fda5e46"
                         "0123fc022065ab501ce3dbaf49bd563d1c9ff0ac76120bc11f65a4"
                         "4122b3cd8b89fc77a48c").decode("hex")
         self.assertEqual(sct, expected_sct)
+
+    def test_correctly_encodes_sct_list_one_sct(self):
+        # Taken from the C++ serializer test, to ensure this encoder
+        # produces results compatible with the C++ one.
+        single_sct = ("0069616d617075626c69636b657973686174776f6669766573697864"
+                      "696765737400000000000004d20000040300097369676e6174757265"
+                      ).decode("hex")
+        sct_list = client_pb2.SignedCertificateTimestampList()
+        sct_list.sct_list.append(single_sct)
+        encoded_sct_list = tls_message.encode(sct_list)
+        self.assertEqual(encoded_sct_list[:4],
+                         "003a0038".decode("hex"))
+        self.assertEqual(encoded_sct_list[4:], single_sct)
+
+    def test_correctly_encodes_sct_list_multiple_scts(self):
+        first_sct = tls_message.encode(self._sct_proto)
+        sct_proto_2 = client_pb2.SignedCertificateTimestamp()
+        sct_proto_2.CopyFrom(self._sct_proto)
+        sct_proto_2.timestamp = 1365427530000
+        second_sct = tls_message.encode(sct_proto_2)
+
+        sct_list = client_pb2.SignedCertificateTimestampList()
+        sct_list.sct_list.extend([first_sct, second_sct])
+        encoded_sct_list = tls_message.encode(sct_list)
+        # First 2 bytes are list length prefix - 240 bytes in total
+        # Next 2 bytes are the length of the first SCT: 118
+        self.assertEqual(encoded_sct_list[:4],
+                         "00f00076".decode("hex"))
+        first_sct_end = len(first_sct) + 4
+        # The actual SCT
+        self.assertEqual(encoded_sct_list[4:first_sct_end], first_sct)
+        # Next 2 bytes are the length of the second SCT (118 again)
+        self.assertEqual(encoded_sct_list[first_sct_end:first_sct_end+2],
+                         "0076".decode("hex"))
+        # The 2nd SCT
+        self.assertEqual(encoded_sct_list[first_sct_end+2:], second_sct)
+
 
 if __name__ == "__main__":
     unittest.main()
