@@ -9,16 +9,20 @@ using std::unique_lock;
 
 namespace cert_trans {
 
+Notification::~Notification() {
+  // Ensure nobody is inside Notify() when we're destructing.
+  lock_guard<mutex> lock(lock_);
+}
+
 
 void Notification::Notify() {
-  {
-    lock_guard<mutex> lock(lock_);
-    CHECK(!notified_);
-    notified_ = true;
-  }
-  // Release the lock before notifying the condition variable, so that
-  // any thread that we wake up is not delayed as it tries to get the
-  // lock.
+  lock_guard<mutex> lock(lock_);
+  CHECK(!notified_);
+  notified_ = true;
+  // *Do* notify this under lock, because otherwise someone can delete this
+  // Notification while the thread calling into Notify() is still here.
+  // (This removes the TSAN "noise" about the pthread_cond_broadcast /
+  // pthread_cond_destroy race.)
   cv_.notify_all();
 }
 

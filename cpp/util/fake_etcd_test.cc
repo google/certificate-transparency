@@ -13,6 +13,7 @@
 #include "base/notification.h"
 #include "util/libevent_wrapper.h"
 #include "util/sync_etcd.h"
+#include "util/sync_task.h"
 #include "util/testing.h"
 
 namespace cert_trans {
@@ -94,6 +95,7 @@ class FakeEtcdTest : public ::testing::Test {
     client_.Create(key, value, bind(&CopyCallback2<Status, int64_t>, &notifier,
                                     &status, created_index, _1, _2));
     notifier.WaitForNotification();
+    CHECK(notifier.HasBeenNotified());
     return status;
   }
 
@@ -419,12 +421,12 @@ class CheckingExecutor : public util::Executor {
 };
 
 
-void TestWatcherForExecutor(Notification* notifier, const vector<EtcdClient::WatchUpdate>& updates) {
-  static bool been_called(false);
-  if (been_called) {
+void TestWatcherForExecutor(Notification* notifier, bool* been_called,
+                            const vector<EtcdClient::WatchUpdate>& updates) {
+  if (*been_called) {
     notifier->Notify();
   }
-  been_called = true;
+  *been_called = true;
 }
 
 
@@ -439,7 +441,9 @@ TEST_F(FakeEtcdTest, TestWatcherForExecutor) {
   // done callback.
   CheckingExecutor checking_executor(&pool, {nullptr, &watch, nullptr, &done});
   util::Task task(bind(&Notification::Notify, &done), &checking_executor);
-  client_.Watch(kDir, bind(&TestWatcherForExecutor, &watch, _1), &task);
+  bool been_called(false);
+  client_.Watch(kDir, bind(&TestWatcherForExecutor, &watch, &been_called, _1),
+                &task);
 
   int64_t created_index;
   EXPECT_EQ(util::Status::OK, BlockingCreate(kPath1, kValue, &created_index));
@@ -484,9 +488,9 @@ TEST_F(FakeEtcdTest, TestWatcherForCreate) {
   EXPECT_TRUE(status.ok()) << status;
 
   Notification watch;
-  Notification done;
-  util::Task task(bind(&Notification::Notify, &done), &pool);
-  client_.Watch(kDir, bind(&TestWatcherForCreateCallback, &watch, _1), &task);
+  util::SyncTask watch_task(&pool);
+  client_.Watch(kDir, bind(&TestWatcherForCreateCallback, &watch, _1),
+                watch_task.task());
 
   status = BlockingCreate(kPath2, kValue2, &created_index);
   EXPECT_TRUE(status.ok()) << status;
@@ -497,20 +501,19 @@ TEST_F(FakeEtcdTest, TestWatcherForCreate) {
   // sometimes.
   watch.WaitForNotification();
 
-  task.Cancel();
-  done.WaitForNotification();
-  EXPECT_EQ(Status::CANCELLED, task.status());
+  watch_task.Cancel();
+  watch_task.Wait();
 }
 
 
 void TestWatcherForDeleteCallback(
-    Notification* notifier, const vector<EtcdClient::WatchUpdate>& updates) {
-  static int num_calls(0);
+    Notification* notifier, int* num_calls,
+    const vector<EtcdClient::WatchUpdate>& updates) {
   static mutex mymutex;
 
   lock_guard<mutex> lock(mymutex);
   LOG(INFO) << "Delete " << num_calls;
-  if (num_calls == 0) {
+  if (*num_calls == 0) {
     // initial call will all dir entries
     EXPECT_EQ(1, updates.size());
     EXPECT_EQ(true, updates[0].exists_);
@@ -522,7 +525,7 @@ void TestWatcherForDeleteCallback(
     EXPECT_EQ(kPath1, updates[0].node_.key_);
     notifier->Notify();
   }
-  ++num_calls;
+  ++(*num_calls);
 }
 
 
@@ -533,9 +536,11 @@ TEST_F(FakeEtcdTest, TestWatcherForDelete) {
   EXPECT_TRUE(status.ok()) << status;
 
   Notification watch;
-  Notification done;
-  util::Task task(bind(&Notification::Notify, &done), &pool);
-  client_.Watch(kDir, bind(&TestWatcherForDeleteCallback, &watch, _1), &task);
+  util::SyncTask watch_task(&pool);
+  int num_calls(0);
+  client_.Watch(kDir,
+                bind(&TestWatcherForDeleteCallback, &watch, &num_calls, _1),
+                watch_task.task());
 
   status = BlockingDelete(kPath1, created_index);
   EXPECT_TRUE(status.ok()) << status;
@@ -546,9 +551,8 @@ TEST_F(FakeEtcdTest, TestWatcherForDelete) {
   // sometimes.
   watch.WaitForNotification();
 
-  task.Cancel();
-  done.WaitForNotification();
-  EXPECT_EQ(Status::CANCELLED, task.status());
+  watch_task.Cancel();
+  watch_task.Wait();
 }
 
 
