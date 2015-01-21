@@ -320,9 +320,10 @@ public class HttpLogClientTest {
 
     HttpLogClient client = new HttpLogClient("http://ctlog/", mockInvoker);
     try {
-      client.getLogEntries(0, 0);
+      // Must get an actual entry as the list of entries is lazily transformed.
+      client.getLogEntries(0, 0).get(0);
       Assert.fail();
-    } catch (CertificateTransparencyException e) {
+    } catch (CertificateTransparencyException expected) {
     }
   }
 
