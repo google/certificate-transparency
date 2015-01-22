@@ -206,7 +206,6 @@ typename TreeSigner<Logged>::UpdateResult TreeSigner<Logged>::UpdateTree() {
   typename Database<Logged>::LookupResult db_result =
       db_->LatestTreeHead(&sth);
 
-
   if (db_result == Database<Logged>::NOT_FOUND) {
     if (LastUpdateTime() != 0) {
       LOG(ERROR) << "Latest STH missing from database, signer has:\n"

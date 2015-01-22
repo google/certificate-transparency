@@ -75,7 +75,7 @@ typename Database<Logged>::WriteResult SQLiteDB<Logged>::CreateSequencedEntry_(
   sqlite::Statement statement(db_,
                               "INSERT INTO leaves(hash, entry, sequence) "
                               "VALUES(?, ?, ?)");
-  std::string hash = logged.Hash();
+  const std::string hash(logged.Hash());
   statement.BindBlob(0, hash);
 
   std::string data;
@@ -95,7 +95,6 @@ typename Database<Logged>::WriteResult SQLiteDB<Logged>::CreateSequencedEntry_(
     }
 
     sqlite::Statement s3(db_, "SELECT hash FROM leaves WHERE hash = ?");
-    hash = logged.Hash();
     s3.BindBlob(0, hash);
     CHECK_EQ(SQLITE_ROW, s3.Step());
     return this->ENTRY_ALREADY_LOGGED;
