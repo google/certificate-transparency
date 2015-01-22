@@ -4,11 +4,19 @@
 
 #include "log/sqlite_db.h"
 
+#include <gflags/gflags.h>
 #include <glog/logging.h>
 #include <sqlite3.h>
 
 #include "log/sqlite_statement.h"
 #include "util/util.h"
+
+// TODO(pphaneuf): For now, just a flag, but ideally, when adding a
+// new node, it would do an initial load of its local database with
+// "synchronous" set to OFF, then put it back before starting normal
+// operation.
+DEFINE_bool(sqlite_synchronous_off, false,
+            "whether to set SQLite's \"synchronous\" to OFF");
 
 namespace {
 
@@ -57,6 +65,12 @@ sqlite3* SQLiteOpen(const std::string& dbfile) {
 template <class Logged>
 SQLiteDB<Logged>::SQLiteDB(const std::string& dbfile)
     : db_(SQLiteOpen(dbfile)), tree_size_(0) {
+  if (FLAGS_sqlite_synchronous_off) {
+    sqlite::Statement statement(db_, "PRAGMA synchronous = OFF");
+    CHECK_EQ(SQLITE_DONE, statement.Step());
+    LOG(WARNING) << "SQLite \"synchronous\" pragma set to OFF";
+  }
+
   UpdateTreeSize();
 }
 
