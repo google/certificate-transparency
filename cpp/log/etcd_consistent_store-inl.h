@@ -72,10 +72,12 @@ EtcdConsistentStore<Logged>::NextAvailableSequenceNumber() const {
     return sequenced_entries.back().Entry().sequence_number() + 1;
   }
 
-  // TODO(alcutter): Implement the rest of the logic around /serving_sth too
-  // once there are methods to inspect that.
-  LOG(WARNING) << "NextAvailableSequenceNumber() not checking /serving_sth.";
-  return 0;
+  if (!serving_sth_) {
+    LOG(WARNING) << "Log has no Serving STH [new log?], returning 0";
+    return 0;
+  }
+
+  return serving_sth_->Entry().tree_size();
 }
 
 

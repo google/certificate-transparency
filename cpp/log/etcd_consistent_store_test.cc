@@ -142,7 +142,9 @@ class EtcdConsistentStoreTest : public ::testing::Test {
 typedef class EtcdConsistentStoreTest EtcdConsistentStoreDeathTest;
 
 
-TEST_F(EtcdConsistentStoreDeathTest, TestNextAvailableSequenceNumber) {
+TEST_F(
+    EtcdConsistentStoreDeathTest,
+    TestNextAvailableSequenceNumberWhenNoSequencedEntriesOrServingSTHExist) {
   EXPECT_EQ(0, store_->NextAvailableSequenceNumber().ValueOrDie());
 }
 
@@ -155,6 +157,18 @@ TEST_F(EtcdConsistentStoreTest,
   InsertEntry(string(kRoot) + "/sequenced/1", two);
 
   EXPECT_EQ(2, store_->NextAvailableSequenceNumber().ValueOrDie());
+}
+
+
+TEST_F(EtcdConsistentStoreTest,
+       TestNextAvailableSequenceNumberWhenNoSequencedEntriesExistButHaveSTH) {
+  ct::SignedTreeHead serving_sth;
+  serving_sth.set_timestamp(123);
+  serving_sth.set_tree_size(600);
+  EXPECT_TRUE(store_->SetServingSTH(serving_sth).ok());
+
+  EXPECT_EQ(serving_sth.tree_size(),
+            store_->NextAvailableSequenceNumber().ValueOrDie());
 }
 
 
