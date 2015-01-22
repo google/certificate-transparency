@@ -128,7 +128,8 @@ void FetchState::WalkEntries() {
         break;
 
       case Range::FETCHING:
-        VLOG(1) << "at offset " << index << ", fetching " << current->size_ << " entries";
+        VLOG(2) << "at offset " << index << ", fetching " << current->size_
+                << " entries";
         ++num_fetch;
         break;
 
