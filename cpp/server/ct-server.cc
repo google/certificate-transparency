@@ -64,6 +64,7 @@ DEFINE_double(guard_window_seconds, 60,
 
 namespace libevent = cert_trans::libevent;
 
+using ct::SignedTreeHead;
 using cert_trans::CertChecker;
 using cert_trans::ClusterStateController;
 using cert_trans::EtcdConsistentStore;
@@ -255,6 +256,12 @@ int main(int argc, char* argv[]) {
 
   ClusterStateController<LoggedCertificate> cluster_controller(
       &internal_pool, &consistent_store, &election_);
+
+  const Database<LoggedCertificate>::NotifySTHCallback notify_sth_callback(
+      [&cluster_controller](const SignedTreeHead& sth) {
+        cluster_controller.NewTreeHead(sth);
+      });
+  db->AddNotifySTHCallback(&notify_sth_callback);
 
   Frontend frontend(new CertSubmissionHandler(&checker),
                     new FrontendSigner(db, &consistent_store, &log_signer));
