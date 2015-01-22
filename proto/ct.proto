@@ -216,6 +216,32 @@ message ClusterControl {
 }
 
 message ClusterConfig {
-  optional int32 minimum_serving_nodes = 1 [default = 1];
-  optional double minimum_serving_fraction = 2 [default = 0.75];
+  /////////////////////////////////
+  // This section of the config affects the selection of the cluster's current
+  // serving STH.
+  // The cluster will always attempt to determine the newest (and
+  // largest) possible STH which meets the constraints defined below from the
+  // set of STHs available at the individual cluster nodes.
+  // (Note that nodes with newer/larger STHs can, of course, serve
+  // earlier/smaller STHs.)
+
+
+  // The minimum number of nodes which must be able to serve a given STH.
+  // This setting allows you to configure the level of cluster resiliency
+  // against data (in the form of node/node database) loss.
+  // i.e.: Once an STH has been created, it must have been replicated to
+  // at least this many nodes before being considered as a candidate for
+  // the overall cluster serving STH.
+  optional int32 minimum_serving_nodes = 1;
+
+  // The minimum fraction of nodes which must be able to serve a given STH.
+  // This setting allows you to configure the serving capacity redundancy of
+  // your cluster.
+  // e.g. you determine you need 3 nodes to serve your expected peak traffic
+  // levels, but want to be over-provisioned by 25% to ensure the cluster will
+  // continue to be able to handle the traffic in the case of a single node
+  // failure, you might set this to 0.75 to ensure that any cluster-wide
+  // serving STH candidate must be servable from at least 3 of your 4 nodes.
+  optional double minimum_serving_fraction = 2;
+  /////////////////////////////////
 }

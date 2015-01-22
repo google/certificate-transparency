@@ -30,6 +30,7 @@ const char kNodeId1[] = "node1";
 const char kNodeId2[] = "node2";
 const char kNodeId3[] = "node3";
 
+
 class ClusterStateControllerTest : public ::testing::Test {
  public:
   ClusterStateControllerTest()
@@ -44,6 +45,12 @@ class ClusterStateControllerTest : public ::testing::Test {
         store3_(new EtcdConsistentStore<LoggedCertificate>(&pool_, &etcd_, "",
                                                            kNodeId3)),
         controller_(&pool_, store_.get(), &election_) {
+    // Set default cluster config:
+    ct::ClusterConfig default_config;
+    default_config.set_minimum_serving_nodes(1);
+    default_config.set_minimum_serving_fraction(1);
+    store_->SetClusterConfig(default_config);
+
     // Set up some handy STHs
     sth100_.set_tree_size(100);
     sth100_.set_timestamp(100);

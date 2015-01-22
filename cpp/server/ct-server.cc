@@ -10,6 +10,7 @@
 
 #include "log/cert_checker.h"
 #include "log/cert_submission_handler.h"
+#include "log/cluster_state_controller.h"
 #include "log/ct_extensions.h"
 #include "log/etcd_consistent_store.h"
 #include "log/file_db.h"
@@ -23,6 +24,7 @@
 #include "server/handler.h"
 #include "util/fake_etcd.h"
 #include "util/libevent_wrapper.h"
+#include "util/masterelection.h"
 #include "util/read_key.h"
 #include "util/thread_pool.h"
 #include "util/uuid.h"
@@ -60,16 +62,17 @@ DEFINE_double(guard_window_seconds, 60,
               "Unsequenced entries new than this "
               "number of seconds will not be sequenced.");
 
-
 namespace libevent = cert_trans::libevent;
 
 using cert_trans::CertChecker;
+using cert_trans::ClusterStateController;
 using cert_trans::EtcdConsistentStore;
 using cert_trans::FakeEtcdClient;
 using cert_trans::FileStorage;
 using cert_trans::HttpHandler;
 using cert_trans::LoggedCertificate;
 using cert_trans::ReadPrivateKey;
+using cert_trans::MasterElection;
 using cert_trans::ThreadPool;
 using cert_trans::TreeSigner;
 using google::RegisterFlagValidator;
@@ -209,10 +212,16 @@ int main(int argc, char* argv[]) {
     node_id = cert_trans::UUID4();
     LOG(INFO) << "Initializing Node DB with UUID: " << node_id;
     db->InitializeNode(node_id);
+  } else {
+    LOG(INFO) << "Found DB with Node UUID: " << node_id;
   }
 
   evthread_use_pthreads();
   const shared_ptr<libevent::Base> event_base(make_shared<libevent::Base>());
+  // Temporary event pump for while we're setting things up and haven't yet
+  // entered the event loop at the bottom:
+  std::unique_ptr<libevent::EventPumpThread> pump(
+      new libevent::EventPumpThread(event_base));
 
   // TODO(alcutter): Note that we're currently broken wrt to restarting the
   // log server when there's data in the log.  It's a temporary thing though,
@@ -222,10 +231,30 @@ int main(int argc, char* argv[]) {
   // For now, run with a dedicated thread pool as the executor for our
   // consistent store to avoid the possibility of DoS through thread starvation
   // via HTTP.
-  ThreadPool etcd_pool(2);
-  EtcdConsistentStore<LoggedCertificate> consistent_store(&etcd_pool,
+  ThreadPool internal_pool(4);
+  EtcdConsistentStore<LoggedCertificate> consistent_store(&internal_pool,
                                                           &etcd_client,
                                                           "/root", node_id);
+  // Put a sensible single-node config into FakeEtcd. For a real clustered log
+  // we'd expect a ClusterConfig already to be present within etcd as part of
+  // the provisioning of the log.
+  {
+    ct::ClusterConfig config;
+    config.set_minimum_serving_nodes(1);
+    config.set_minimum_serving_fraction(1);
+    LOG(INFO) << "Setting default single-node ClusterConfig:\n"
+              << config.DebugString();
+    consistent_store.SetClusterConfig(config);
+  }
+
+  // No real reason to let this be configurable per node; you can really
+  // shoot yourself in the foot that way by effectively running multiple
+  // distinct elections.
+  const string kLockDir("/election");
+  MasterElection election_(event_base, &etcd_client, kLockDir, node_id);
+
+  ClusterStateController<LoggedCertificate> cluster_controller(
+      &internal_pool, &consistent_store, &election_);
 
   Frontend frontend(new CertSubmissionHandler(&checker),
                     new FrontendSigner(db, &consistent_store, &log_signer));
@@ -247,8 +276,12 @@ int main(int argc, char* argv[]) {
   handler.Add(&server);
   server.Bind(NULL, FLAGS_port);
 
+  election_.StartElection();
+
   std::cout << "READY" << std::endl;
 
+  // Ding the temporary event pump because we're about to enter the event loop
+  pump.reset();
   event_base->Dispatch();
 
   return 0;

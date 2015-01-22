@@ -123,6 +123,8 @@ void ClusterStateController<Logged>::OnClusterConfigUpdated(
   }
 
   cluster_config_ = update.handle_.Entry();
+  LOG(INFO) << "Received new ClusterConfig:\n"
+            << cluster_config_.DebugString();
 
   // May need to re-calculate the servingSTH since the ClusterConfig has
   // changed:
