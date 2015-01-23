@@ -9,11 +9,6 @@ using std::unique_lock;
 
 namespace cert_trans {
 
-Notification::~Notification() {
-  // Ensure nobody is inside Notify() when we're destructing.
-  lock_guard<mutex> lock(lock_);
-}
-
 
 void Notification::Notify() {
   lock_guard<mutex> lock(lock_);

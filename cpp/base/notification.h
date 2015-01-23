@@ -15,8 +15,6 @@ class Notification {
   Notification() : notified_(false) {
   }
 
-  ~Notification();
-
   void Notify();
 
   bool HasBeenNotified() const;
