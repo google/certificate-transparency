@@ -190,33 +190,32 @@ void FetchState::BlockingSingleFetchDone(int64_t index, Range* range,
   TaskHold hold(task_);
   task_->RemoveHold();
 
+  if (status != AsyncLogClient::OK) {
+    LOG(INFO) << "error fetching entries at index " << index << ": " << status;
+    lock_guard<mutex> lock(range->lock_);
+    range->state_ = Range::WANT;
+    return;
+  }
+
+  VLOG(1) << "received " << retval->size() << " entries at offset " << index;
+  int64_t processed(0);
+  for (const auto& entry : *retval) {
+    LoggedCertificate cert;
+    if (!cert.CopyFromClientLogEntry(entry)) {
+      LOG(WARNING) << "could not convert entry to a LoggedCertificate";
+      break;
+    }
+    cert.set_sequence_number(index++);
+    if (db_->CreateSequencedEntry(cert) == Database<LoggedCertificate>::OK) {
+      ++processed;
+    } else {
+      LOG(WARNING) << "could not insert entry into the database";
+      break;
+    }
+  }
+
   {
     lock_guard<mutex> lock(range->lock_);
-
-    if (status != AsyncLogClient::OK) {
-      LOG(INFO) << "error fetching entries at index " << index << ": "
-                << status;
-      range->state_ = Range::WANT;
-      return;
-    }
-
-    VLOG(1) << "received " << retval->size() << " entries at offset " << index;
-    int64_t processed(0);
-    for (const auto& entry : *retval) {
-      LoggedCertificate cert;
-      if (!cert.CopyFromClientLogEntry(entry)) {
-        LOG(WARNING) << "could not convert entry to a LoggedCertificate";
-        break;
-      }
-      cert.set_sequence_number(index++);
-      if (db_->CreateSequencedEntry(cert) == Database<LoggedCertificate>::OK) {
-        ++processed;
-      } else {
-        LOG(WARNING) << "could not insert entry into the database";
-        break;
-      }
-    }
-
     // TODO(pphaneuf): If we have problems fetching entries, to what
     // point should we retry? Or should we just return on the task
     // with an error?
