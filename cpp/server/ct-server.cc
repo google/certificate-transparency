@@ -67,6 +67,7 @@ DEFINE_int32(etcd_port, 0, "Port of the etcd server.");
 namespace libevent = cert_trans::libevent;
 
 using ct::SignedTreeHead;
+using ct::ClusterNodeState;
 using cert_trans::CertChecker;
 using cert_trans::ClusterStateController;
 using cert_trans::EtcdClient;
@@ -79,6 +80,7 @@ using cert_trans::ReadPrivateKey;
 using cert_trans::MasterElection;
 using cert_trans::ThreadPool;
 using cert_trans::TreeSigner;
+using cert_trans::Update;
 using google::RegisterFlagValidator;
 using std::bind;
 using std::chrono::duration;
@@ -159,12 +161,17 @@ static const bool sign_dummy =
     RegisterFlagValidator(&FLAGS_tree_signing_frequency_seconds,
                           &ValidateIsPositive);
 
-void SignMerkleTree(TreeSigner<LoggedCertificate>* tree_signer) {
+void SignMerkleTree(TreeSigner<LoggedCertificate>* tree_signer,
+                    const MasterElection* election) {
   const steady_clock::duration period((seconds(FLAGS_tree_signing_frequency_seconds)));
   steady_clock::time_point target_run_time(steady_clock::now());
 
   while (true) {
-    CHECK_EQ(tree_signer->UpdateTree(), TreeSigner<LoggedCertificate>::OK);
+    if (election->IsMaster()) {
+      CHECK_EQ(tree_signer->UpdateTree(), TreeSigner<LoggedCertificate>::OK);
+    } else {
+      VLOG(1) << "Not starting signing run since we're not the master.";
+    }
 
     const steady_clock::time_point now(steady_clock::now());
     while (target_run_time <= now) {
@@ -277,10 +284,37 @@ int main(int argc, char* argv[]) {
   // shoot yourself in the foot that way by effectively running multiple
   // distinct elections.
   const string kLockDir("/election");
-  MasterElection election_(event_base, etcd_client.get(), kLockDir, node_id);
+  MasterElection election(event_base, etcd_client.get(), kLockDir, node_id);
 
   ClusterStateController<LoggedCertificate> cluster_controller(
-      &internal_pool, &consistent_store, &election_);
+      &internal_pool, &consistent_store, &election);
+
+  // Ensure we can only be the master if we've got sufficient local
+  // replication.
+  // TODO(alcutter): Re-join the election once we're able.
+  util::SyncTask sth_watch_task(&internal_pool);
+  consistent_store.WatchServingSTH(
+      [&election, &cluster_controller](const Update<SignedTreeHead>& sth) {
+        if (!sth.exists_) {
+          LOG(WARNING) << "Cluster has no Serving STH - leaving election.";
+          election.StopElection();
+          return;
+        }
+
+        ClusterNodeState local_state;
+        cluster_controller.GetLocalNodeState(&local_state);
+        if (sth.handle_.Entry().tree_size() >
+            local_state.contiguous_tree_size()) {
+          LOG(INFO) << "Serving STH tree_size ("
+                    << sth.handle_.Entry().tree_size()
+                    << " < Local contiguous_tree_size ("
+                    << local_state.contiguous_tree_size() << ")";
+          LOG(INFO) << "Local replication too far behind to be master - "
+                       "leaving election.";
+          election.StopElection();
+        }
+      },
+      sth_watch_task.task());
 
   const Database<LoggedCertificate>::NotifySTHCallback notify_sth_callback(
       [&cluster_controller](const SignedTreeHead& sth) {
@@ -296,7 +330,7 @@ int main(int argc, char* argv[]) {
   // (either not accepting any requests, or returning some internal
   // server error) until we have an STH to serve. We can sign for now,
   // but we might not be a signer.
-  thread signer(&SignMerkleTree, &tree_signer);
+  thread signer(&SignMerkleTree, &tree_signer, &election);
   ThreadPool pool;
   HttpHandler handler(&log_lookup, db, &checker, &frontend, &pool);
 
@@ -304,7 +338,7 @@ int main(int argc, char* argv[]) {
   handler.Add(&server);
   server.Bind(NULL, FLAGS_port);
 
-  election_.StartElection();
+  election.StartElection();
 
   std::cout << "READY" << std::endl;
 

@@ -47,6 +47,8 @@ class ClusterStateController {
   // Really only intended for testing.
   util::StatusOr<ct::SignedTreeHead> GetCalculatedServingSTH() const;
 
+  void GetLocalNodeState(ct::ClusterNodeState* state) const;
+
  private:
   // Updates the representation of *this* node's state in the consistent store.
   void PushLocalNodeState(const std::unique_lock<std::mutex>& lock);
