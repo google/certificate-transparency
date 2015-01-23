@@ -105,10 +105,12 @@ MasterElection::~MasterElection() {
 
 
 void MasterElection::StartElection() {
-  VLOG(1) << my_proposal_path_ << ": Joining election";
   {
     unique_lock<mutex> lock(mutex_);
-    CHECK(!running_);
+    if (running_) {
+      return;
+    }
+    VLOG(1) << my_proposal_path_ << ": Joining election";
     running_ = true;
 
     Transition(lock, ProposalState::AWAITING_CREATION);
@@ -118,21 +120,25 @@ void MasterElection::StartElection() {
 
 
 void MasterElection::StopElection() {
+  unique_lock<mutex> lock(mutex_);
+  if (!running_) {
+    return;
+  }
   VLOG(1) << my_proposal_path_ << ": Departing election.";
+  running_ = false;
 
-  // Stop the updates from the watch. Do this before taking the lock,
+  // Stop the updates from the watch. Do this without holding the lock
   // because the watch callback takes that lock. This means that we'll
   // stop updating our proposal, and maybe delay a master election,
   // but that's okay, as we're about to delete our proposal
   // altogether.
+  lock.unlock();
   VLOG(1) << my_proposal_path_ << ": Cancelling watch...";
   proposal_watch_->Cancel();
   proposal_watch_->Wait();
   proposal_watch_.reset();
 
-  unique_lock<mutex> lock(mutex_);
-  CHECK(running_);
-  running_ = false;
+  lock.lock();
   is_master_ = false;
   is_master_cv_.notify_all();
 
