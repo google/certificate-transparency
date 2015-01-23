@@ -6,6 +6,7 @@
 
 #include <map>
 #include <string>
+#include <vector>
 
 #include "base/macros.h"
 #include "log/cert.h"
@@ -47,6 +48,11 @@ class CertChecker {
   // errors were encountered. Returns false otherwise (and will not load any
   // certificates from this file).
   virtual bool LoadTrustedCertificates(const std::string& trusted_cert_file);
+
+  // Load directly from |trusted_certs|, a vector of PEM-certs.
+  // Returns true if at least one of the supplied certs was loaded successfully.
+  virtual bool LoadTrustedCertificates(
+      const std::vector<std::string>& trusted_certs);
 
   virtual void ClearAllTrustedCertificates();
 
@@ -99,6 +105,10 @@ class CertChecker {
   // All code manipulating this container must ensure contained elements are
   // deallocated appropriately.
   std::multimap<std::string, const Cert*> trusted_;
+
+  // Helper for LoadTrustedCertificates, whether reading from file or memory.
+  // Takes ownership of bio_in and frees it.
+  bool LoadTrustedCertificatesFromBIO(BIO* bio_in);
 
   DISALLOW_COPY_AND_ASSIGN(CertChecker);
 };

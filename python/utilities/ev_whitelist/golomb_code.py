@@ -4,7 +4,9 @@
 import math
 import sys
 
-from bitstring import BitArray, Bits, BitStream
+from bitstring import BitArray
+from bitstring import Bits
+from bitstring import BitStream
 
 import gflags
 

@@ -8,9 +8,12 @@
 # Based on pyasn1 example code.
 
 from base64 import b64encode
-from pyasn1.codec.der import decoder, encoder
-from pyasn1.type import namedtype, univ
-from pyasn1_modules import pem, rfc2459
+from pyasn1.codec.der import decoder
+from pyasn1.codec.der import encoder
+from pyasn1.type import namedtype
+from pyasn1.type import univ
+from pyasn1_modules import pem
+from pyasn1_modules import rfc2459
 import sys
 from urllib2 import urlopen
 

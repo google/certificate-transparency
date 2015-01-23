@@ -51,6 +51,9 @@ package ct;
 //                             (tls_opts).select_value = 0];
 //   optional Orange orange = 3 [(tls_opts).select_field = "fruit_type",
 //                               (tls_opts).select_value = 1];
+//
+// Note that the numbering of the fields in the message determines their order
+// appearance in the TLS encoding.
 
 message TLSOptions {
   // Applies to uint32 and uint64, allowing to restrict the field

@@ -54,4 +54,6 @@ message X509Description {
   optional bytes sha256_hash = 10;
 
   repeated Observation observations = 11;
+
+  repeated DNAttribute root_issuer = 12;
 }

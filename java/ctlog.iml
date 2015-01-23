@@ -20,7 +20,7 @@
     <orderEntry type="library" name="guava-16.0.1" level="project" />
     <orderEntry type="library" name="httpclient-4.3.3" level="project" />
     <orderEntry type="library" name="httpcore-4.3.2" level="project" />
-    <orderEntry type="library" name="protobuf-java-2.4.1" level="application" />
+    <orderEntry type="library" name="protobuf" level="project" />
   </component>
 </module>
 

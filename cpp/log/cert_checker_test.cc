@@ -17,6 +17,7 @@ using cert_trans::CertChain;
 using cert_trans::CertChecker;
 using cert_trans::PreCertChain;
 using std::string;
+using std::vector;
 
 DEFINE_string(test_certs_dir, "../../test/testdata",
               "Path to test certificates");
@@ -56,6 +57,47 @@ static const char kMd2Chain[] = "test-md2-chain.pem";
 static const char kNonexistent[] = "test-nonexistent.pem";
 // A file with corrupted contents (bit flip from ca-cert.pem).
 static const char kCorrupted[] = "test-corrupted.pem";
+
+// Corresponds to kCaCert.
+static const char kCaCertPem[] =
+    "-----BEGIN CERTIFICATE-----\n"
+    "MIIC0DCCAjmgAwIBAgIBADANBgkqhkiG9w0BAQUFADBVMQswCQYDVQQGEwJHQjEk\n"
+    "MCIGA1UEChMbQ2VydGlmaWNhdGUgVHJhbnNwYXJlbmN5IENBMQ4wDAYDVQQIEwVX\n"
+    "YWxlczEQMA4GA1UEBxMHRXJ3IFdlbjAeFw0xMjA2MDEwMDAwMDBaFw0yMjA2MDEw\n"
+    "MDAwMDBaMFUxCzAJBgNVBAYTAkdCMSQwIgYDVQQKExtDZXJ0aWZpY2F0ZSBUcmFu\n"
+    "c3BhcmVuY3kgQ0ExDjAMBgNVBAgTBVdhbGVzMRAwDgYDVQQHEwdFcncgV2VuMIGf\n"
+    "MA0GCSqGSIb3DQEBAQUAA4GNADCBiQKBgQDVimhTYhCicRmTbneDIRgcKkATxtB7\n"
+    "jHbrkVfT0PtLO1FuzsvRyY2RxS90P6tjXVUJnNE6uvMa5UFEJFGnTHgW8iQ8+EjP\n"
+    "KDHM5nugSlojgZ88ujfmJNnDvbKZuDnd/iYx0ss6hPx7srXFL8/BT/9Ab1zURmnL\n"
+    "svfP34b7arnRsQIDAQABo4GvMIGsMB0GA1UdDgQWBBRfnYgNyHPmVNT4DdjmsMEk\n"
+    "tEfDVTB9BgNVHSMEdjB0gBRfnYgNyHPmVNT4DdjmsMEktEfDVaFZpFcwVTELMAkG\n"
+    "A1UEBhMCR0IxJDAiBgNVBAoTG0NlcnRpZmljYXRlIFRyYW5zcGFyZW5jeSBDQTEO\n"
+    "MAwGA1UECBMFV2FsZXMxEDAOBgNVBAcTB0VydyBXZW6CAQAwDAYDVR0TBAUwAwEB\n"
+    "/zANBgkqhkiG9w0BAQUFAAOBgQAGCMxKbWTyIF4UbASydvkrDvqUpdryOvw4BmBt\n"
+    "OZDQoeojPUApV2lGOwRmYef6HReZFSCa6i4Kd1F2QRIn18ADB8dHDmFYT9czQiRy\n"
+    "f1HWkLxHqd81TbD26yWVXeGJPE3VICskovPkQNJ0tU4b03YmnKliibduyqQQkOFP\n"
+    "OwqULg==\n"
+    "-----END CERTIFICATE-----\n";
+// Corresponds to kIntermediateCert.
+static const char kIntermediateCertPem[] =
+    "-----BEGIN CERTIFICATE-----\n"
+    "MIIC3TCCAkagAwIBAgIBCTANBgkqhkiG9w0BAQUFADBVMQswCQYDVQQGEwJHQjEk\n"
+    "MCIGA1UEChMbQ2VydGlmaWNhdGUgVHJhbnNwYXJlbmN5IENBMQ4wDAYDVQQIEwVX\n"
+    "YWxlczEQMA4GA1UEBxMHRXJ3IFdlbjAeFw0xMjA2MDEwMDAwMDBaFw0yMjA2MDEw\n"
+    "MDAwMDBaMGIxCzAJBgNVBAYTAkdCMTEwLwYDVQQKEyhDZXJ0aWZpY2F0ZSBUcmFu\n"
+    "c3BhcmVuY3kgSW50ZXJtZWRpYXRlIENBMQ4wDAYDVQQIEwVXYWxlczEQMA4GA1UE\n"
+    "BxMHRXJ3IFdlbjCBnzANBgkqhkiG9w0BAQEFAAOBjQAwgYkCgYEA12pnjRFvUi5V\n"
+    "/4IckGQlCLcHSxTXcRWQZPeSfv3tuHE1oTZe594Yy9XOhl+GDHj0M7TQ09NAdwLn\n"
+    "o+9UKx3+m7qnzflNxZdfxyn4bxBfOBskNTXPnIAPXKeAwdPIRADuZdFu6c9S24rf\n"
+    "/lD1xJM1CyGQv1DVvDbzysWo2q6SzYsCAwEAAaOBrzCBrDAdBgNVHQ4EFgQUllUI\n"
+    "BQJ4R56Hc3ZBMbwUOkfiKaswfQYDVR0jBHYwdIAUX52IDchz5lTU+A3Y5rDBJLRH\n"
+    "w1WhWaRXMFUxCzAJBgNVBAYTAkdCMSQwIgYDVQQKExtDZXJ0aWZpY2F0ZSBUcmFu\n"
+    "c3BhcmVuY3kgQ0ExDjAMBgNVBAgTBVdhbGVzMRAwDgYDVQQHEwdFcncgV2VuggEA\n"
+    "MAwGA1UdEwQFMAMBAf8wDQYJKoZIhvcNAQEFBQADgYEAIgbascZrcdzglcP2qi73\n"
+    "LPd2G+er1/w5wxpM/hvZbWc0yoLyLd5aDIu73YJde28+dhKtjbMAp+IRaYhgIyYi\n"
+    "hMOqXSGR79oQv5I103s6KjQNWUGblKSFZvP6w82LU9Wk6YJw6tKXsHIQ+c5KITix\n"
+    "iBEUO5P6TnqH3TfhOF8sKQg=\n"
+    "-----END CERTIFICATE-----\n";
 
 namespace {
 
@@ -102,11 +144,28 @@ TEST_F(CertCheckerTest, LoadTrustedCertificates) {
   EXPECT_EQ(0U, checker_.NumTrustedCertificates());
 }
 
+TEST_F(CertCheckerTest, LoadTrustedCertificatesFromMemory) {
+  vector<string> certs;
+  certs.push_back(string(kCaCertPem));
+
+  EXPECT_TRUE(checker_.LoadTrustedCertificates(certs));
+  EXPECT_EQ(1U, checker_.NumTrustedCertificates());
+}
+
 TEST_F(CertCheckerTest, LoadTrustedCertificatesLoadsAll) {
   EXPECT_EQ(0U, checker_.NumTrustedCertificates());
 
   EXPECT_TRUE(
       checker_.LoadTrustedCertificates(cert_dir_ + "/" + kCollidingRoots));
+  EXPECT_EQ(2U, checker_.NumTrustedCertificates());
+}
+
+TEST_F(CertCheckerTest, LoadTrustedCertificatesFromMemoryLoadsAll) {
+  vector<string> certs;
+  certs.push_back(string(kCaCertPem));
+  certs.push_back(string(kIntermediateCertPem));
+
+  EXPECT_TRUE(checker_.LoadTrustedCertificates(certs));
   EXPECT_EQ(2U, checker_.NumTrustedCertificates());
 }
 

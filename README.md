@@ -9,7 +9,7 @@ Auditing for TLS certificates.
 
  - A working C++11 compiler.
 
- - [OpenSSL](https://www.openssl.org/source/), at least 1.0.0, preferably 1.0.2 (and up)
+ - [OpenSSL](https://www.openssl.org/source/), at least 1.0.0q, preferably 1.0.1l or 1.0.2 (and up)
 
 The checking of SCTs included in the [RFC 6962](http://tools.ietf.org/html/rfc6962) TLS extension is only included in OpenSSL 1.0.2. As of this writing, this version is not yet released, so this means hand building the ```OpenSSL_1_0_2-stable``` branch from the [OpenSSL git repository](https://www.openssl.org/source/repos.html).
 
