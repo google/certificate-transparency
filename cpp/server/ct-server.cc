@@ -22,6 +22,7 @@
 #include "log/sqlite_db.h"
 #include "log/tree_signer.h"
 #include "server/handler.h"
+#include "util/etcd.h"
 #include "util/fake_etcd.h"
 #include "util/libevent_wrapper.h"
 #include "util/masterelection.h"
@@ -57,16 +58,18 @@ DEFINE_int32(tree_signing_frequency_seconds, 600,
              "server select loop, at least this period has elapsed since the "
              "last signing. Set this well below the MMD to ensure we sign in "
              "a timely manner. Must be greater than 0.");
-
 DEFINE_double(guard_window_seconds, 60,
               "Unsequenced entries new than this "
               "number of seconds will not be sequenced.");
+DEFINE_string(etcd_host, "", "Hostname of the etcd server");
+DEFINE_int32(etcd_port, 0, "Port of the etcd server.");
 
 namespace libevent = cert_trans::libevent;
 
 using ct::SignedTreeHead;
 using cert_trans::CertChecker;
 using cert_trans::ClusterStateController;
+using cert_trans::EtcdClient;
 using cert_trans::EtcdConsistentStore;
 using cert_trans::FakeEtcdClient;
 using cert_trans::FileStorage;
@@ -224,35 +227,57 @@ int main(int argc, char* argv[]) {
   std::unique_ptr<libevent::EventPumpThread> pump(
       new libevent::EventPumpThread(event_base));
 
-  // TODO(alcutter): Note that we're currently broken wrt to restarting the
-  // log server when there's data in the log.  It's a temporary thing though,
-  // so fear ye not.
-  FakeEtcdClient etcd_client(event_base);
+  const bool stand_alone_mode(FLAGS_etcd_host.empty());
+
+  LOG(INFO) << "Running in "
+            << (stand_alone_mode ? "STAND-ALONE" : "CLUSTERED") << " mode.";
+
+  std::unique_ptr<EtcdClient> etcd_client(
+      stand_alone_mode
+          ? new FakeEtcdClient(event_base)
+          : new EtcdClient(event_base, FLAGS_etcd_host, FLAGS_etcd_port));
 
   // For now, run with a dedicated thread pool as the executor for our
   // consistent store to avoid the possibility of DoS through thread starvation
   // via HTTP.
   ThreadPool internal_pool(4);
   EtcdConsistentStore<LoggedCertificate> consistent_store(&internal_pool,
-                                                          &etcd_client,
+                                                          etcd_client.get(),
                                                           "/root", node_id);
-  // Put a sensible single-node config into FakeEtcd. For a real clustered log
-  // we'd expect a ClusterConfig already to be present within etcd as part of
-  // the provisioning of the log.
-  {
+
+  TreeSigner<LoggedCertificate> tree_signer(std::chrono::duration<double>(
+                                                FLAGS_guard_window_seconds),
+                                            db, &consistent_store,
+                                            &log_signer);
+
+  if (stand_alone_mode) {
+    // Set up a simple single-node environment.
+    //
+    // Put a sensible single-node config into FakeEtcd. For a real clustered
+    // log
+    // we'd expect a ClusterConfig already to be present within etcd as part of
+    // the provisioning of the log.
+    //
+    // TODO(alcutter): Note that we're currently broken wrt to restarting the
+    // log server when there's data in the log.  It's a temporary thing though,
+    // so fear ye not.
     ct::ClusterConfig config;
     config.set_minimum_serving_nodes(1);
     config.set_minimum_serving_fraction(1);
     LOG(INFO) << "Setting default single-node ClusterConfig:\n"
               << config.DebugString();
     consistent_store.SetClusterConfig(config);
+
+    // Do an initial signing run to get the initial STH, again this is
+    // temporary until we re-populate FakeEtcd from the DB:
+    CHECK_EQ(tree_signer.UpdateTree(), TreeSigner<LoggedCertificate>::OK);
   }
 
   // No real reason to let this be configurable per node; you can really
   // shoot yourself in the foot that way by effectively running multiple
   // distinct elections.
   const string kLockDir("/election");
-  MasterElection election_(event_base, &etcd_client, kLockDir, node_id);
+  MasterElection election_(event_base, etcd_client.get(), kLockDir, node_id);
 
   ClusterStateController<LoggedCertificate> cluster_controller(
       &internal_pool, &consistent_store, &election_);
@@ -265,10 +290,6 @@ int main(int argc, char* argv[]) {
 
   Frontend frontend(new CertSubmissionHandler(&checker),
                     new FrontendSigner(db, &consistent_store, &log_signer));
-  TreeSigner<LoggedCertificate> tree_signer(std::chrono::duration<double>(
-                                                FLAGS_guard_window_seconds),
-                                            db, &consistent_store,
-                                            &log_signer);
   LogLookup<LoggedCertificate> log_lookup(db);
 
   // TODO(pphaneuf): We should be remaining in an "unhealthy state"
