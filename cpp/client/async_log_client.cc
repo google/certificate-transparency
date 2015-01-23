@@ -47,6 +47,11 @@ string UriEncode(const string& input) {
 // error if something is wrong.
 bool SanityCheck(const shared_ptr<libevent::HttpRequest>& req,
                  const AsyncLogClient::Callback& done) {
+  if (!req) {
+    done(AsyncLogClient::UNKNOWN_ERROR);
+    return false;
+  }
+
   if (req->GetResponseCode() < 1) {
     done(AsyncLogClient::CONNECT_FAILED);
     return false;
