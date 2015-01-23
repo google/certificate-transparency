@@ -243,6 +243,21 @@ TEST_F(ElectionTest, RejoinElection) {
 }
 
 
+TEST_F(ElectionTest, OkToCallStartAndStopElectionMultipleTimes) {
+  Participant one(kProposalDir, "1", base_, client_.get());
+  one.StartElection();
+  one.WaitToBecomeMaster();
+  EXPECT_TRUE(one.IsMaster());
+  one.StartElection();
+  EXPECT_TRUE(one.IsMaster());
+
+  one.StopElection();
+  EXPECT_FALSE(one.IsMaster());
+  one.StopElection();
+  EXPECT_FALSE(one.IsMaster());
+}
+
+
 TEST_F(ElectionTest, ElectionMania) {
   const int kNumRounds(20);
   const int kNumParticipants(20);
