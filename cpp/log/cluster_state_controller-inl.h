@@ -86,6 +86,15 @@ ClusterStateController<Logged>::GetCalculatedServingSTH() const {
 
 
 template <class Logged>
+void ClusterStateController<Logged>::GetLocalNodeState(
+    ct::ClusterNodeState* state) const {
+  CHECK_NOTNULL(state);
+  std::lock_guard<std::mutex> lock(mutex_);
+  *state = local_node_state_;
+}
+
+
+template <class Logged>
 void ClusterStateController<Logged>::PushLocalNodeState(
     const std::unique_lock<std::mutex>& lock) {
   CHECK(lock.owns_lock());

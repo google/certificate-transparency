@@ -322,6 +322,21 @@ TEST_F(ClusterStateControllerTest,
 }
 
 
+TEST_F(ClusterStateControllerTest, TestGetLocalNodeState) {
+  const int kContiguousSize(2345);
+  SignedTreeHead sth;
+  sth.set_timestamp(10000);
+  sth.set_tree_size(2344);
+  controller_.NewTreeHead(sth);
+  controller_.ContiguousTreeSizeUpdated(kContiguousSize);
+
+  ClusterNodeState state;
+  controller_.GetLocalNodeState(&state);
+  EXPECT_EQ(kContiguousSize, state.contiguous_tree_size());
+  EXPECT_EQ(sth.DebugString(), state.newest_sth().DebugString());
+}
+
+
 }  // namespace cert_trans
 
 
