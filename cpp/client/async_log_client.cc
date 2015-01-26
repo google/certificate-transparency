@@ -50,6 +50,11 @@ string UriEncode(const string& input) {
 // error if something is wrong.
 bool SanityCheck(libevent::HttpRequest* req,
                  const AsyncLogClient::Callback& done) {
+  if (!req) {
+    done(AsyncLogClient::UNKNOWN_ERROR);
+    return false;
+  }
+
   if (evhttp_request_get_response_code(req->get()) < 1) {
     done(AsyncLogClient::CONNECT_FAILED);
     return false;
