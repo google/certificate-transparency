@@ -74,7 +74,8 @@ class FileDB : public Database<Logged> {
   void BuildIndex();
   typename Database<Logged>::LookupResult LatestTreeHeadNoLock(
       ct::SignedTreeHead* result) const;
-  util::StatusOr<std::string> HashFromIndex(int64_t sequence_number) const;
+  util::StatusOr<std::string> HashFromIndex(
+      const std::unique_lock<std::mutex>& lock, int64_t sequence_number) const;
   void InsertEntryMapping(int64_t sequence_number, const std::string& hash);
 
   const std::unique_ptr<cert_trans::FileStorage> cert_storage_;

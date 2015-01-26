@@ -44,30 +44,31 @@ typename Database<Logged>::WriteResult FileDB<Logged>::CreateSequencedEntry_(
   CHECK(logged.has_sequence_number());
   CHECK_GE(logged.sequence_number(), 0);
 
-  std::lock_guard<std::mutex> lock(lock_);
+  std::unique_lock<std::mutex> lock(lock_);
+  util::StatusOr<std::string> old_hash(
+      HashFromIndex(lock, logged.sequence_number()));
+  const std::string new_hash(logged.Hash());
 
-  if (logged.sequence_number() < dense_entries_.size() ||
-      sparse_entries_.find(logged.sequence_number()) !=
-          sparse_entries_.end()) {
+  if (old_hash.ok()) {
     LOG(WARNING) << "Attempting to re-use sequence number "
-                 << logged.sequence_number() << " for entry:\n"
+                 << logged.sequence_number() << " for entry: " << new_hash
+                 << " (existing: (" << old_hash.ValueOrDie() << "):\n"
                  << logged.DebugString();
+
     return this->SEQUENCE_NUMBER_ALREADY_IN_USE;
   }
-
-  const std::string hash(logged.Hash());
 
   std::string data;
   CHECK(logged.SerializeToString(&data));
 
   // Try to create.
-  util::Status status(cert_storage_->CreateEntry(hash, data));
+  util::Status status(cert_storage_->CreateEntry(new_hash, data));
   if (status.CanonicalCode() == util::error::ALREADY_EXISTS) {
     return this->ENTRY_ALREADY_LOGGED;
   }
   CHECK_EQ(status, util::Status::OK);
 
-  InsertEntryMapping(logged.sequence_number(), hash);
+  InsertEntryMapping(logged.sequence_number(), new_hash);
 
   return this->OK;
 }
@@ -100,7 +101,8 @@ typename Database<Logged>::LookupResult FileDB<Logged>::LookupByIndex(
     int64_t sequence_number, Logged* result) const {
   CHECK_GE(sequence_number, 0);
 
-  util::StatusOr<std::string> hash(HashFromIndex(sequence_number));
+  util::StatusOr<std::string> hash(
+      HashFromIndex(std::unique_lock<std::mutex>(lock_), sequence_number));
   if (!hash.ok()) {
     return this->NOT_FOUND;
   }
@@ -275,9 +277,9 @@ typename Database<Logged>::LookupResult FileDB<Logged>::LatestTreeHeadNoLock(
 
 template <class Logged>
 util::StatusOr<std::string> FileDB<Logged>::HashFromIndex(
-    int64_t sequence_number) const {
+    const std::unique_lock<std::mutex>& lock, int64_t sequence_number) const {
+  CHECK(lock.owns_lock());
   CHECK_GE(sequence_number, 0);
-  std::lock_guard<std::mutex> lock(lock_);
 
   if (sequence_number < dense_entries_.size()) {
     return dense_entries_[sequence_number];
