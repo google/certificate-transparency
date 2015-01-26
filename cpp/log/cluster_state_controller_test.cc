@@ -337,6 +337,52 @@ TEST_F(ClusterStateControllerTest, TestGetLocalNodeState) {
 }
 
 
+TEST_F(ClusterStateControllerTest, TestLeavesElectionIfDoesNotHaveLocalData) {
+  const int kContiguousSize(2345);
+  const int kTreeSizeSmaller(kContiguousSize - 1);
+  const int kTreeSizeLarger(kContiguousSize + 1);
+
+  controller_.ContiguousTreeSizeUpdated(kContiguousSize);
+  sleep(1);
+
+  SignedTreeHead sth;
+  {
+    EXPECT_CALL(election_, StartElection()).Times(1);
+    sth.set_timestamp(10000);
+    sth.set_tree_size(kTreeSizeSmaller);
+    store_->SetServingSTH(sth);
+    sleep(1);
+  }
+
+  {
+    EXPECT_CALL(election_, StopElection()).Times(1);
+    sth.set_timestamp(sth.timestamp() + 1);
+    sth.set_tree_size(kTreeSizeLarger);
+    store_->SetServingSTH(sth);
+    sleep(1);
+  }
+}
+
+
+TEST_F(ClusterStateControllerTest, TestJoinsElectionIfHasLocalData) {
+  const int kContiguousSizeSmaller(2345);
+  const int kTreeSize(kContiguousSizeSmaller + 1);
+  const int kContiguousSizeLarger(kTreeSize + 1);
+
+  controller_.ContiguousTreeSizeUpdated(kContiguousSizeSmaller);
+  SignedTreeHead sth;
+  sth.set_timestamp(10000);
+  sth.set_tree_size(kTreeSize);
+  store_->SetServingSTH(sth);
+  sleep(1);
+
+  {
+    EXPECT_CALL(election_, StartElection()).Times(1);
+    controller_.ContiguousTreeSizeUpdated(kContiguousSizeLarger);
+    sleep(1);
+  }
+}
+
 }  // namespace cert_trans
 
 
