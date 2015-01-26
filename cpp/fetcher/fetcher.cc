@@ -19,8 +19,10 @@ using std::vector;
 using util::Task;
 using util::TaskHold;
 
-DEFINE_int32(fetcher_concurrent_fetches, 100, "number of concurrent fetch requests");
-DEFINE_int32(fetcher_batch_size, 1000, "maximum number of entries to fetch per request");
+DEFINE_int32(fetcher_concurrent_fetches, 100,
+             "number of concurrent fetch requests");
+DEFINE_int32(fetcher_batch_size, 1000,
+             "maximum number of entries to fetch per request");
 
 namespace {
 
@@ -139,7 +141,9 @@ void FetchState::WalkEntries() {
 
         // If the range is bigger than the maximum batch size, split it.
         if (current->size_ > FLAGS_fetcher_batch_size) {
-          current->next_.reset(new Range(Range::WANT, current->size_ - FLAGS_fetcher_batch_size, move(current->next_)));
+          current->next_.reset(
+              new Range(Range::WANT, current->size_ - FLAGS_fetcher_batch_size,
+                        move(current->next_)));
           current->size_ = FLAGS_fetcher_batch_size;
         }
 
