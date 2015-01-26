@@ -33,6 +33,7 @@
 /cpp/log/log_signer_test
 /cpp/log/logged_certificate_test
 /cpp/log/signer_verifier_test
+/cpp/log/strict_consistent_store_test
 /cpp/log/tree_signer_test
 /cpp/merkletree/merkle_tree_large_test
 /cpp/merkletree/merkle_tree_test

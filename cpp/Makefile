@@ -70,6 +70,7 @@ TESTS = \
 	log/log_signer_test \
 	log/logged_certificate_test \
 	log/signer_verifier_test \
+	log/strict_consistent_store_test \
 	log/tree_signer_test \
 	merkletree/merkle_tree_test \
 	merkletree/serial_hasher_test \
@@ -211,7 +212,8 @@ log/libcert.a: log/cert.o log/cert_checker.o log/cert_submission_handler.o \
 	ar -rcs $@ $^
 
 log/libcluster.a: log/etcd_consistent_store_cert.o \
-                  log/cluster_state_controller_cert.o
+                  log/cluster_state_controller_cert.o \
+                  log/strict_consistent_store_cert.o
 	rm -f $@
 	ar -rcs $@ $^
 
@@ -319,6 +321,11 @@ log/etcd_consistent_store_test: base/notification.o \
                                 proto/libproto.a util/libutil.a \
                                 merkletree/libmerkletree.a $(GMOCKLIB) \
                                 $(GTESTLIB)
+
+log/strict_consistent_store_test: base/notification.o \
+                                  log/strict_consistent_store_cert.o \
+                                  proto/libproto.a util/libutil.a \
+                                  $(GMOCKLIB) $(GTESTLIB)
 
 monitor/database_test: monitor/database_test.o monitor/database.o \
                        monitor/sqlite_db.o util/libutil.a log/test_signer.o \
