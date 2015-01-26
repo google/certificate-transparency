@@ -50,6 +50,11 @@ typename Database<Logged>::WriteResult FileDB<Logged>::CreateSequencedEntry_(
   const std::string new_hash(logged.Hash());
 
   if (old_hash.ok()) {
+    // Same log entry resubmitted, this is fine.
+    if (new_hash == old_hash.ValueOrDie()) {
+      return this->OK;
+    }
+
     LOG(WARNING) << "Attempting to re-use sequence number "
                  << logged.sequence_number() << " for entry: " << new_hash
                  << " (existing: (" << old_hash.ValueOrDie() << "):\n"

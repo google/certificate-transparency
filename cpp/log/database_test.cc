@@ -75,6 +75,30 @@ TYPED_TEST(DBTest, CreateSequenced) {
 
 
 TYPED_TEST(DBTest, CreateSequencedDuplicateEntry) {
+  LoggedCertificate logged_cert;
+  this->test_signer_.CreateUnique(&logged_cert);
+
+  EXPECT_EQ(DB::OK, this->db()->CreateSequencedEntry(logged_cert));
+
+  LoggedCertificate duplicate_cert;
+  duplicate_cert.CopyFrom(logged_cert);
+  EXPECT_EQ(DB::OK, this->db()->CreateSequencedEntry(duplicate_cert));
+
+  LoggedCertificate lookup_cert;
+  EXPECT_EQ(DB::LOOKUP_OK,
+            this->db()->LookupByHash(logged_cert.Hash(), &lookup_cert));
+  // Check that we get the original entry back.
+  TestSigner::TestEqualLoggedCerts(logged_cert, lookup_cert);
+
+  lookup_cert.Clear();
+  EXPECT_EQ(DB::LOOKUP_OK,
+            this->db()->LookupByIndex(logged_cert.sequence_number(),
+                                      &lookup_cert));
+  TestSigner::TestEqualLoggedCerts(logged_cert, lookup_cert);
+}
+
+
+TYPED_TEST(DBTest, CreateSequencedDuplicateEntryNewSequenceNumber) {
   LoggedCertificate logged_cert, duplicate_cert, lookup_cert;
   this->test_signer_.CreateUnique(&logged_cert);
 

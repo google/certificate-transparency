@@ -101,10 +101,17 @@ typename Database<Logged>::WriteResult SQLiteDB<Logged>::CreateSequencedEntry_(
 
   int ret = statement.Step();
   if (ret == SQLITE_CONSTRAINT) {
-    sqlite::Statement s2(db_,
-                         "SELECT sequence FROM leaves WHERE sequence = ?");
+    sqlite::Statement s2(
+        db_, "SELECT sequence, hash FROM leaves WHERE sequence = ?");
     s2.BindUInt64(0, logged.sequence_number());
     if (s2.Step() == SQLITE_ROW) {
+      std::string existing_hash;
+      s2.GetBlob(1, &existing_hash);
+
+      if (hash == existing_hash) {
+        return this->OK;
+      }
+
       return this->SEQUENCE_NUMBER_ALREADY_IN_USE;
     }
 
