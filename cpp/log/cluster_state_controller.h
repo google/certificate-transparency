@@ -18,14 +18,16 @@ namespace cert_trans {
 // member nodes, and uses this information to determine the overall serving
 // state of the cluster.
 //
-// In particular, this class calculates the optimal STH for the cluster to
-// serve at any given time.
+// In particular, this class:
+//  - calculates the optimal STH for the cluster to serve at any given time.
+//  - determines whether this node is eligible to participare in the election,
+//    and leaves/joins the election as appropriate.
 template <class Logged>
 class ClusterStateController {
  public:
   ClusterStateController(util::Executor* executor,
                          ConsistentStore<Logged>* store,
-                         const MasterElection* election);
+                         MasterElection* election);
 
   ~ClusterStateController();
 
@@ -62,25 +64,36 @@ class ClusterStateController {
   // Called whenever the ClusterConfig is changed.
   void OnClusterConfigUpdated(const Update<ct::ClusterConfig>& update);
 
+  // Entry point for the config watcher callback.
+  // Called whenever the ClusterConfig is changed.
+  void OnServingSthUpdated(const Update<ct::SignedTreeHead>& update);
+
   // Calculates the STH which should be served by the cluster, given the
   // current state of the nodes.
   // If this node is the cluster master then the calculated serving STH is
   // pushed out to the consistent store.
   void CalculateServingSTH(const std::unique_lock<std::mutex>& lock);
 
+  // Determines whether this node should be participating in the election based
+  // on the current node's state.
+  void DetermineElectionParticipation(
+      const std::unique_lock<std::mutex>& lock);
+
   // Thread entry point for ServingSTH updater thread.
   void ClusterServingSTHUpdater();
 
   ConsistentStore<Logged>* const store_;  // Not owned by us
-  const MasterElection* const election_;
+  MasterElection* const election_;        // Not owned by us
   util::SyncTask watch_config_task_;
   util::SyncTask watch_node_states_task_;
+  util::SyncTask watch_serving_sth_task_;
   ct::ClusterConfig cluster_config_;
 
   mutable std::mutex mutex_;  // covers the members below:
   ct::ClusterNodeState local_node_state_;
   std::map<std::string, ct::ClusterNodeState> all_node_states_;
   std::unique_ptr<ct::SignedTreeHead> calculated_serving_sth_;
+  std::unique_ptr<ct::SignedTreeHead> actual_serving_sth_;
   bool exiting_;
   bool update_required_;
   std::condition_variable update_required_cv_;

@@ -278,6 +278,11 @@ int main(int argc, char* argv[]) {
     // Do an initial signing run to get the initial STH, again this is
     // temporary until we re-populate FakeEtcd from the DB:
     CHECK_EQ(tree_signer.UpdateTree(), TreeSigner<LoggedCertificate>::OK);
+
+    // Need to boot-strap the Serving STH too because we consider it an error
+    // if it's not set, which in turn causes us to not attempt to become
+    // master:
+    consistent_store.SetServingSTH(tree_signer.LatestSTH());
   }
 
   // No real reason to let this be configurable per node; you can really
@@ -288,33 +293,6 @@ int main(int argc, char* argv[]) {
 
   ClusterStateController<LoggedCertificate> cluster_controller(
       &internal_pool, &consistent_store, &election);
-
-  // Ensure we can only be the master if we've got sufficient local
-  // replication.
-  // TODO(alcutter): Re-join the election once we're able.
-  util::SyncTask sth_watch_task(&internal_pool);
-  consistent_store.WatchServingSTH(
-      [&election, &cluster_controller](const Update<SignedTreeHead>& sth) {
-        if (!sth.exists_) {
-          LOG(WARNING) << "Cluster has no Serving STH - leaving election.";
-          election.StopElection();
-          return;
-        }
-
-        ClusterNodeState local_state;
-        cluster_controller.GetLocalNodeState(&local_state);
-        if (sth.handle_.Entry().tree_size() >
-            local_state.contiguous_tree_size()) {
-          LOG(INFO) << "Serving STH tree_size ("
-                    << sth.handle_.Entry().tree_size()
-                    << " < Local contiguous_tree_size ("
-                    << local_state.contiguous_tree_size() << ")";
-          LOG(INFO) << "Local replication too far behind to be master - "
-                       "leaving election.";
-          election.StopElection();
-        }
-      },
-      sth_watch_task.task());
 
   const Database<LoggedCertificate>::NotifySTHCallback notify_sth_callback(
       [&cluster_controller](const SignedTreeHead& sth) {
@@ -337,8 +315,6 @@ int main(int argc, char* argv[]) {
   libevent::HttpServer server(*event_base);
   handler.Add(&server);
   server.Bind(NULL, FLAGS_port);
-
-  election.StartElection();
 
   std::cout << "READY" << std::endl;
 

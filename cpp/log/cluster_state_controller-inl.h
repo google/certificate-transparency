@@ -14,11 +14,12 @@ namespace cert_trans {
 template <class Logged>
 ClusterStateController<Logged>::ClusterStateController(
     util::Executor* executor, ConsistentStore<Logged>* store,
-    const MasterElection* election)
+    MasterElection* election)
     : store_(CHECK_NOTNULL(store)),
       election_(CHECK_NOTNULL(election)),
       watch_config_task_(CHECK_NOTNULL(executor)),
       watch_node_states_task_(CHECK_NOTNULL(executor)),
+      watch_serving_sth_task_(CHECK_NOTNULL(executor)),
       exiting_(false),
       update_required_(false),
       cluster_serving_sth_update_thread_(
@@ -32,6 +33,10 @@ ClusterStateController<Logged>::ClusterStateController(
       std::bind(&ClusterStateController::OnClusterConfigUpdated, this,
                 std::placeholders::_1),
       watch_config_task_.task());
+  store_->WatchServingSTH(
+      std::bind(&ClusterStateController::OnServingSthUpdated, this,
+                std::placeholders::_1),
+      watch_serving_sth_task_.task());
 }
 
 
@@ -39,6 +44,7 @@ template <class Logged>
 ClusterStateController<Logged>::~ClusterStateController() {
   watch_config_task_.Cancel();
   watch_node_states_task_.Cancel();
+  watch_serving_sth_task_.Cancel();
   {
     std::lock_guard<std::mutex> lock(mutex_);
     exiting_ = true;
@@ -47,6 +53,7 @@ ClusterStateController<Logged>::~ClusterStateController() {
   cluster_serving_sth_update_thread_.join();
   watch_config_task_.Wait();
   watch_node_states_task_.Wait();
+  watch_serving_sth_task_.Wait();
 }
 
 
@@ -98,6 +105,10 @@ template <class Logged>
 void ClusterStateController<Logged>::PushLocalNodeState(
     const std::unique_lock<std::mutex>& lock) {
   CHECK(lock.owns_lock());
+  // Our new node state may affect our ability to become master (e.g. perhaps
+  // we've caught up on our replication), so check and join if appropriate:
+  DetermineElectionParticipation(lock);
+
   const util::Status status(store_->SetClusterNodeState(local_node_state_));
   if (!status.ok()) {
     LOG(WARNING) << status;
@@ -138,6 +149,25 @@ void ClusterStateController<Logged>::OnClusterConfigUpdated(
   // May need to re-calculate the servingSTH since the ClusterConfig has
   // changed:
   CalculateServingSTH(lock);
+}
+
+
+template <class Logged>
+void ClusterStateController<Logged>::OnServingSthUpdated(
+    const Update<ct::SignedTreeHead>& update) {
+  std::unique_lock<std::mutex> lock(mutex_);
+  if (!update.exists_) {
+    LOG(WARNING) << "Cluster has no Serving STH!";
+    actual_serving_sth_.reset();
+  } else {
+    actual_serving_sth_.reset(new ct::SignedTreeHead(update.handle_.Entry()));
+    LOG(INFO) << "Received new Serving STH:\n"
+              << actual_serving_sth_->DebugString();
+  }
+
+  // This could affect our ability to produce new STHs, so better check
+  // whether we should leave the election for now:
+  DetermineElectionParticipation(lock);
 }
 
 
@@ -203,6 +233,35 @@ void ClusterStateController<Logged>::CalculateServingSTH(
   // TODO(alcutter): Add a mechanism to take the cluster off-line until we have
   // sufficient nodes able to serve.
   LOG(WARNING) << "Failed to determine suitable serving STH.";
+}
+
+
+template <class Logged>
+void ClusterStateController<Logged>::DetermineElectionParticipation(
+    const std::unique_lock<std::mutex>& lock) {
+  CHECK(lock.owns_lock());
+  // Can't be in the election if the cluster isn't properly initialised
+  if (!actual_serving_sth_) {
+    LOG(WARNING) << "Cluster has no Serving STH - leaving election.";
+    election_->StopElection();
+    return;
+  }
+
+  // Don't want to be the master if we don't yet have the data to be able to
+  // issue new STHs
+  if (actual_serving_sth_->tree_size() >
+      local_node_state_.contiguous_tree_size()) {
+    LOG(INFO) << "Serving STH tree_size (" << actual_serving_sth_->tree_size()
+              << " < Local contiguous_tree_size ("
+              << local_node_state_.contiguous_tree_size() << ")";
+    LOG(INFO) << "Local replication too far behind to be master - "
+                 "leaving election.";
+    election_->StopElection();
+    return;
+  }
+
+  // Otherwise, make sure we're joining in the election.
+  election_->StartElection();
 }
 
 
