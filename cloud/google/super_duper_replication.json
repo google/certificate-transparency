@@ -1,0 +1,67 @@
+{
+  "id": "super_duper_replication",
+  "kind": "ReplicationController",
+  "apiVersion": "v1beta1",
+  "desiredState": {
+    "replicas": 3,
+    "replicaSelector": {"name": "log-node"},
+    "podTemplate": {
+      "desiredState": {
+        "manifest": {
+          "version": "v1beta1",
+          "id": "super-duper-controller",
+          "containers": [{
+            "name": "registry",
+            "image": "google/docker-registry",
+            "ports": [{
+              "name": "registry",
+              "containerPort": 5000,
+              "hostPort": 5000
+            }],
+            "env": [{
+              "name": "GCS_BUCKET",
+              "value": "ctlog_images"
+            }]
+          }, {
+            "name": "super-duper",
+            "image": "localhost:5000/alcutter/super_duper:test",
+            "ports": [{
+              "name": "super-duper",
+              "containerPort": 6962,
+              "hostPort": 6962
+            }],
+            "volumeMounts": [{
+              "name": "log-data",
+              "mountPath": "/mnt/ctlog"
+            }]
+          }, {
+            "name": "etcd",
+            "image": "localhost:5000/alcutter/etcd:test",
+            "ports": [{
+              "name": "client",
+              "containerPort": 4001,
+              "hostPort": 4001
+            }, {
+              "name": "peer",
+              "containerPort": 7001,
+              "hostPort": 7001
+            }],
+            "env": [{
+              "name": "DISCOVERY",
+              Get a fresh discovery URL from https://discovery.etcd.io/new
+              and put it in here - you'll need a fresh one EACH TIME you start
+              up a cluster - don't re-use them!
+              "value": "YOUR_DISCOVERY_URL_HERE"
+            }]
+          }],
+          "volumes": [{
+            "name": "log-data"
+          }]
+        }
+      },
+      "labels": {"name": "log-node"}
+    }
+  },
+  "labels": {"name": "log-node"}
+}
+
