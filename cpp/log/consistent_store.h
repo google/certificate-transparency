@@ -103,6 +103,8 @@ class ConsistentStore {
 
   ConsistentStore() = default;
 
+  virtual ~ConsistentStore() = default;
+
   virtual util::StatusOr<int64_t> NextAvailableSequenceNumber() const = 0;
 
   virtual util::Status SetServingSTH(const ct::SignedTreeHead& new_sth) = 0;

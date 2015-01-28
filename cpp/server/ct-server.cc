@@ -20,6 +20,7 @@
 #include "log/log_lookup.h"
 #include "log/log_signer.h"
 #include "log/sqlite_db.h"
+#include "log/strict_consistent_store.h"
 #include "log/tree_signer.h"
 #include "server/handler.h"
 #include "util/etcd.h"
@@ -78,6 +79,7 @@ using cert_trans::HttpHandler;
 using cert_trans::LoggedCertificate;
 using cert_trans::ReadPrivateKey;
 using cert_trans::MasterElection;
+using cert_trans::StrictConsistentStore;
 using cert_trans::ThreadPool;
 using cert_trans::TreeSigner;
 using cert_trans::Update;
@@ -244,13 +246,20 @@ int main(int argc, char* argv[]) {
           ? new FakeEtcdClient(event_base)
           : new EtcdClient(event_base, FLAGS_etcd_host, FLAGS_etcd_port));
 
+  // No real reason to let this be configurable per node; you can really
+  // shoot yourself in the foot that way by effectively running multiple
+  // distinct elections.
+  const string kLockDir("/election");
+  MasterElection election(event_base, etcd_client.get(), kLockDir, node_id);
+
   // For now, run with a dedicated thread pool as the executor for our
   // consistent store to avoid the possibility of DoS through thread starvation
   // via HTTP.
   ThreadPool internal_pool(4);
-  EtcdConsistentStore<LoggedCertificate> consistent_store(&internal_pool,
-                                                          etcd_client.get(),
-                                                          "/root", node_id);
+  StrictConsistentStore<LoggedCertificate> consistent_store(
+      &election, new EtcdConsistentStore<LoggedCertificate>(&internal_pool,
+                                                            etcd_client.get(),
+                                                            "/root", node_id));
 
   TreeSigner<LoggedCertificate> tree_signer(std::chrono::duration<double>(
                                                 FLAGS_guard_window_seconds),
@@ -275,6 +284,12 @@ int main(int argc, char* argv[]) {
               << config.DebugString();
     consistent_store.SetClusterConfig(config);
 
+    // Since we're a single node cluster, we'll settle that we're the
+    // master here, so that we can populate the initial STH
+    // (StrictConsistentStore won't allow us to do so unless we're master.)
+    election.StartElection();
+    election.WaitToBecomeMaster();
+
     // Do an initial signing run to get the initial STH, again this is
     // temporary until we re-populate FakeEtcd from the DB:
     CHECK_EQ(tree_signer.UpdateTree(), TreeSigner<LoggedCertificate>::OK);
@@ -284,12 +299,6 @@ int main(int argc, char* argv[]) {
     // master:
     consistent_store.SetServingSTH(tree_signer.LatestSTH());
   }
-
-  // No real reason to let this be configurable per node; you can really
-  // shoot yourself in the foot that way by effectively running multiple
-  // distinct elections.
-  const string kLockDir("/election");
-  MasterElection election(event_base, etcd_client.get(), kLockDir, node_id);
 
   ClusterStateController<LoggedCertificate> cluster_controller(
       &internal_pool, &consistent_store, &election);
