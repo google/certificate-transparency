@@ -67,8 +67,6 @@ DEFINE_int32(etcd_port, 0, "Port of the etcd server.");
 
 namespace libevent = cert_trans::libevent;
 
-using ct::SignedTreeHead;
-using ct::ClusterNodeState;
 using cert_trans::CertChecker;
 using cert_trans::ClusterStateController;
 using cert_trans::EtcdClient;
@@ -77,12 +75,14 @@ using cert_trans::FakeEtcdClient;
 using cert_trans::FileStorage;
 using cert_trans::HttpHandler;
 using cert_trans::LoggedCertificate;
-using cert_trans::ReadPrivateKey;
 using cert_trans::MasterElection;
+using cert_trans::ReadPrivateKey;
 using cert_trans::StrictConsistentStore;
 using cert_trans::ThreadPool;
 using cert_trans::TreeSigner;
 using cert_trans::Update;
+using ct::ClusterNodeState;
+using ct::SignedTreeHead;
 using google::RegisterFlagValidator;
 using std::bind;
 using std::chrono::duration;

@@ -1,8 +1,8 @@
 /* -*- indent-tabs-mode: nil -*- */
 #include "log/cert.h"
 
-#include <memory>
 #include <glog/logging.h>
+#include <memory>
 #include <openssl/asn1.h>
 #include <openssl/bio.h>
 #include <openssl/err.h>

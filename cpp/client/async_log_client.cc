@@ -1,9 +1,9 @@
 #include "client/async_log_client.h"
 
 #include <algorithm>
-#include <memory>
 #include <glog/logging.h>
 #include <iterator>
+#include <memory>
 #include <sstream>
 
 #include "log/cert.h"
@@ -22,6 +22,7 @@ using ct::MerkleAuditProof;
 using ct::SignedCertificateTimestamp;
 using ct::SignedTreeHead;
 using std::back_inserter;
+using std::bind;
 using std::copy;
 using std::function;
 using std::make_shared;

@@ -4,6 +4,7 @@
 #include <event2/buffer.h>
 #include <functional>
 #include <glog/logging.h>
+#include <memory>
 
 #include "log/cert.h"
 #include "proto/ct.pb.h"

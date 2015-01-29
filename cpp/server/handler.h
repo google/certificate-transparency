@@ -1,6 +1,7 @@
 #ifndef CERT_TRANS_SERVER_HANDLER_H_
 #define CERT_TRANS_SERVER_HANDLER_H_
 
+#include <memory>
 #include <string>
 
 #include "util/libevent_wrapper.h"

@@ -6,6 +6,7 @@
 #include <event2/dns.h>
 #include <event2/event.h>
 #include <event2/http.h>
+#include <functional>
 #include <memory>
 #include <mutex>
 #include <thread>

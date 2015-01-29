@@ -1,7 +1,7 @@
 #include "util/json_wrapper.h"
 
-#include <memory>
 #include <gtest/gtest.h>
+#include <memory>
 
 #include "util/testing.h"
 #include "util/util.h"

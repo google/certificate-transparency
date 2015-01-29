@@ -196,6 +196,8 @@ def _parse_consistency_proof(response, servername):
 # A class that we can mock out to generate fake responses.
 class RequestHandler(object):
     """HTTPS requests."""
+    def __init__(self, connection_timeout=60):
+      self._timeout = connection_timeout
 
     def __repr__(self):
         return "%r()" % self.__class__.__name__
@@ -206,7 +208,7 @@ class RequestHandler(object):
     def get_response(self, uri, params=None):
         """Get an HTTP response for a GET request."""
         try:
-            return requests.get(uri, params=params, timeout=60)
+            return requests.get(uri, params=params, timeout=self._timeout)
         except requests.exceptions.RequestException as e:
             raise HTTPError("Connection to %s failed: %s" % (uri, e))
 
@@ -248,9 +250,12 @@ class RequestHandler(object):
 class LogClient(object):
     """HTTP client for talking to a CT log."""
 
-    def __init__(self, uri, handler=RequestHandler()):
+    def __init__(self, uri, handler=None, connection_timeout=60):
         self._uri = uri
-        self._req = handler
+        if handler:
+          self._req = handler
+        else:
+          self._req = RequestHandler(connection_timeout)
 
     def __repr__(self):
         return "%r(%r)" % (self.__class__.__name__, self._req)

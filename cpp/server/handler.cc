@@ -1,13 +1,14 @@
 #include "server/handler.h"
 
 #include <algorithm>
-#include <memory>
 #include <event2/buffer.h>
 #include <event2/http.h>
 #include <event2/keyvalq_struct.h>
+#include <functional>
 #include <gflags/gflags.h>
 #include <glog/logging.h>
 #include <map>
+#include <memory>
 #include <stdlib.h>
 #include <utility>
 #include <vector>

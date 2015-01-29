@@ -1,6 +1,5 @@
 #include "util/thread_pool.h"
 
-#include <chrono>
 #include <condition_variable>
 #include <glog/logging.h>
 #include <mutex>
