@@ -10,12 +10,14 @@
 using cert_trans::AsyncLogClient;
 using cert_trans::LoggedCertificate;
 using cert_trans::Peer;
+using std::bind;
 using std::lock_guard;
 using std::move;
 using std::mutex;
 using std::placeholders::_1;
 using std::unique_ptr;
 using std::vector;
+using util::Status;
 using util::Task;
 using util::TaskHold;
 
@@ -51,13 +53,13 @@ struct FetchState {
   FetchState(Database<LoggedCertificate>* db, Peer* peer, Task* task);
 
   void WalkEntries();
-  void StartSingleFetch(Range* current, int64_t index);
-  void SingleFetchDone(int64_t index, Range* range,
-                       vector<AsyncLogClient::Entry>* retval,
-                       AsyncLogClient::Status status);
-  void BlockingSingleFetchDone(int64_t index, Range* range,
-                               vector<AsyncLogClient::Entry>* retval,
-                               AsyncLogClient::Status status);
+  void FetchRange(Range* current, int64_t index, Task* child_task);
+  void GetEntriesDone(int64_t index, Range* range,
+                      const vector<AsyncLogClient::Entry>* retval,
+                      AsyncLogClient::Status status, Task* child_task);
+  void WriteToDatabase(int64_t index, Range* range,
+                       const vector<AsyncLogClient::Entry>* retval,
+                       AsyncLogClient::Status fetch_status, Task* child_task);
 
   Database<LoggedCertificate>* const db_;
   Peer* const peer_;
@@ -104,6 +106,7 @@ void FetchState::WalkEntries() {
     entries_ = move(entries_->next_);
   }
 
+  // Are we done?
   if (!entries_) {
     task_->Return();
     return;
@@ -147,7 +150,8 @@ void FetchState::WalkEntries() {
           current->size_ = FLAGS_fetcher_batch_size;
         }
 
-        StartSingleFetch(current, index);
+        FetchRange(current, index,
+                   task_->AddChild(bind(&FetchState::WalkEntries, this)));
         ++num_fetch;
 
         break;
@@ -160,44 +164,49 @@ void FetchState::WalkEntries() {
 }
 
 
-void FetchState::StartSingleFetch(Range* current, int64_t index) {
+void FetchState::FetchRange(Range* current, int64_t index, Task* child_task) {
   const int64_t end_index(index + current->size_ - 1);
   VLOG(1) << "fetching from offset " << index << " to " << end_index;
 
-  // In-flight fetches should prevent our task from completing.
-  task_->AddHold();
-
   vector<AsyncLogClient::Entry>* const retval(
       new vector<AsyncLogClient::Entry>);
+  child_task->DeleteWhenDone(retval);
+
   peer_->client().GetEntries(index, end_index, retval,
-                             bind(&FetchState::SingleFetchDone, this, index,
-                                  current, retval, _1));
+                             bind(&FetchState::GetEntriesDone, this, index,
+                                  current, retval, _1, child_task));
 
   current->state_ = Range::FETCHING;
 }
 
 
-void FetchState::SingleFetchDone(int64_t index, Range* range,
-                                 vector<AsyncLogClient::Entry>* retval,
-                                 AsyncLogClient::Status status) {
-  task_->executor()->Add(bind(&FetchState::BlockingSingleFetchDone, this,
-                              index, range, retval, status));
+void FetchState::GetEntriesDone(int64_t index, Range* range,
+                                const vector<AsyncLogClient::Entry>* retval,
+                                AsyncLogClient::Status status,
+                                Task* child_task) {
+  // Writing to the database is a blocking operation, but we are
+  // currently on some "unknown" thread (and realistically, probably
+  // the libevent thread, which should not block!), so move us back to
+  // a known thread where blocking is allowed.
+  task_->executor()->Add(bind(&FetchState::WriteToDatabase, this, index, range,
+                              retval, status, child_task));
 }
 
 
-void FetchState::BlockingSingleFetchDone(int64_t index, Range* range,
-                                         vector<AsyncLogClient::Entry>* retval,
-                                         AsyncLogClient::Status status) {
+void FetchState::WriteToDatabase(int64_t index, Range* range,
+                                 const vector<AsyncLogClient::Entry>* retval,
+                                 AsyncLogClient::Status fetch_status,
+                                 Task* child_task) {
   CHECK_GT(retval->size(), 0);
 
-  unique_ptr<vector<AsyncLogClient::Entry>> retval_deleter(retval);
-  TaskHold hold(task_);
-  task_->RemoveHold();
-
-  if (status != AsyncLogClient::OK) {
-    LOG(INFO) << "error fetching entries at index " << index << ": " << status;
+  if (fetch_status != AsyncLogClient::OK) {
+    LOG(INFO) << "error fetching entries at index " << index << ": "
+              << fetch_status;
     lock_guard<mutex> lock(range->lock_);
     range->state_ = Range::WANT;
+    // TODO(pphaneuf): If AsyncLogClient used util::Status, we'd just
+    // pass that back here.
+    child_task->Return(Status(util::error::UNKNOWN, "AsyncLogClient error"));
     return;
   }
 
@@ -213,7 +222,8 @@ void FetchState::BlockingSingleFetchDone(int64_t index, Range* range,
     if (db_->CreateSequencedEntry(cert) == Database<LoggedCertificate>::OK) {
       ++processed;
     } else {
-      LOG(WARNING) << "could not insert entry into the database";
+      LOG(WARNING) << "could not insert entry into the database:\n"
+                   << cert.DebugString();
       break;
     }
   }
@@ -237,7 +247,13 @@ void FetchState::BlockingSingleFetchDone(int64_t index, Range* range,
     }
   }
 
-  WalkEntries();
+  Status status;
+  if (processed < retval->size()) {
+    status = Status(util::error::INTERNAL,
+                    "could not write some entries to the database");
+  }
+
+  child_task->Return(status);
 }
 
 
