@@ -1,8 +1,8 @@
 /* -*- indent-tabs-mode: nil -*- */
 #include "log/cert.h"
 
-#include <boost/shared_ptr.hpp>
 #include <glog/logging.h>
+#include <memory>
 #include <openssl/asn1.h>
 #include <openssl/bio.h>
 #include <openssl/err.h>
@@ -18,7 +18,7 @@
 #include "merkletree/serial_hasher.h"
 #include "util/openssl_util.h"  // For LOG_OPENSSL_ERRORS
 
-using boost::shared_ptr;
+using std::shared_ptr;
 using std::string;
 using util::ClearOpenSSLErrors;
 

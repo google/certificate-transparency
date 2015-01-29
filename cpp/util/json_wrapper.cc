@@ -1,8 +1,8 @@
 #include "json_wrapper.h"
 
-#include <boost/shared_ptr.hpp>
+#include <memory>
 
-using boost::shared_ptr;
+using std::shared_ptr;
 
 
 JsonObject::JsonObject(evbuffer* buffer) : obj_(NULL) {

@@ -2,7 +2,7 @@
 #ifndef HTTP_LOG_CLIENT_H
 #define HTTP_LOG_CLIENT_H
 
-#include <boost/shared_ptr.hpp>
+#include <memory>
 #include <stdint.h>
 #include <string>
 
@@ -26,8 +26,7 @@ class HTTPLogClient {
 
   AsyncLogClient::Status GetSTH(ct::SignedTreeHead* sth);
 
-  AsyncLogClient::Status GetRoots(
-      std::vector<boost::shared_ptr<Cert> >* roots);
+  AsyncLogClient::Status GetRoots(std::vector<std::shared_ptr<Cert> >* roots);
 
   AsyncLogClient::Status QueryAuditProof(const std::string& merkle_leaf_hash,
                                          ct::MerkleAuditProof* proof);
@@ -41,7 +40,7 @@ class HTTPLogClient {
       int first, int last, std::vector<AsyncLogClient::Entry>* entries);
 
  private:
-  const boost::shared_ptr<libevent::Base> base_;
+  const std::shared_ptr<libevent::Base> base_;
   AsyncLogClient client_;
 
   DISALLOW_COPY_AND_ASSIGN(HTTPLogClient);

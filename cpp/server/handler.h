@@ -1,6 +1,7 @@
 #ifndef CERT_TRANS_SERVER_HANDLER_H_
 #define CERT_TRANS_SERVER_HANDLER_H_
 
+#include <memory>
 #include <string>
 
 #include "util/libevent_wrapper.h"
@@ -40,9 +41,9 @@ class HttpHandler {
 
   void BlockingGetEntries(evhttp_request* req, int start, int end) const;
   void BlockingAddChain(evhttp_request* req,
-                        const boost::shared_ptr<CertChain>& chain) const;
+                        const std::shared_ptr<CertChain>& chain) const;
   void BlockingAddPreChain(evhttp_request* req,
-                           const boost::shared_ptr<PreCertChain>& chain) const;
+                           const std::shared_ptr<PreCertChain>& chain) const;
 
   LogLookup<LoggedCertificate>* const log_lookup_;
   const Database<LoggedCertificate>* const db_;

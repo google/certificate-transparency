@@ -22,12 +22,6 @@ else
   LDLIBS += -lresolv
 endif
 
-ifeq ($(PLATFORM), Darwin)
-  LDLIBS += -lboost_system-mt -lboost_thread-mt
-else
-  LDLIBS += -lboost_system -lboost_thread
-endif
-
 # Need OpenSSL >= 1.0.0
 ifneq ($(OPENSSLDIR),)
   INCLUDE += -I $(OPENSSLDIR)/include

@@ -1,17 +1,19 @@
 #include "util/thread_pool.h"
 
-#include <boost/thread.hpp>
+#include <condition_variable>
 #include <glog/logging.h>
+#include <mutex>
 #include <queue>
+#include <thread>
 #include <vector>
 
-using boost::condition_variable;
-using boost::function;
-using boost::lock_guard;
-using boost::mutex;
-using boost::thread;
-using boost::unique_lock;
+using std::condition_variable;
+using std::function;
+using std::lock_guard;
+using std::mutex;
 using std::queue;
+using std::thread;
+using std::unique_lock;
 using std::vector;
 
 namespace cert_trans {
@@ -57,9 +59,8 @@ ThreadPool::Impl::~Impl() {
 
 
 void ThreadPool::Impl::Worker() {
-  function<void()> closure;
   while (true) {
-    closure.clear();
+    function<void()> closure;
 
     {
       unique_lock<mutex> lock(queue_lock_);
@@ -74,7 +75,7 @@ void ThreadPool::Impl::Worker() {
       }
 
       // If we received an empty closure, exit cleanly.
-      if (queue_.front().empty())
+      if (!queue_.front())
         break;
 
       closure = queue_.front();
@@ -106,7 +107,7 @@ ThreadPool::~ThreadPool() {
 void ThreadPool::Add(const function<void()>& closure) {
   // Empty closures signal a thread to exit, don't allow that (also,
   // it doesn't make sense).
-  CHECK(!closure.empty());
+  CHECK(closure);
 
   {
     lock_guard<mutex> lock(impl_->queue_lock_);

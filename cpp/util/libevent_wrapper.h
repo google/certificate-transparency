@@ -1,13 +1,12 @@
 #ifndef CERT_TRANS_UTIL_LIBEVENT_WRAPPER_H_
 #define CERT_TRANS_UTIL_LIBEVENT_WRAPPER_H_
 
-#include <boost/function.hpp>
-#include <boost/shared_ptr.hpp>
-#include <boost/thread.hpp>
-#include <boost/thread.hpp>
 #include <event2/dns.h>
 #include <event2/event.h>
 #include <event2/http.h>
+#include <functional>
+#include <memory>
+#include <mutex>
 #include <vector>
 
 #include "base/macros.h"
@@ -21,7 +20,7 @@ class Event;
 
 class Base {
  public:
-  typedef boost::function<void(evutil_socket_t, short)> Callback;
+  typedef std::function<void(evutil_socket_t, short)> Callback;
 
   Base();
   ~Base();
@@ -39,7 +38,7 @@ class Base {
  private:
   event_base* const base_;
 
-  boost::mutex dns_lock_;
+  std::mutex dns_lock_;
   evdns_base* dns_;
 
   DISALLOW_COPY_AND_ASSIGN(Base);
@@ -48,7 +47,7 @@ class Base {
 
 class Event {
  public:
-  typedef boost::function<void(evutil_socket_t, short)> Callback;
+  typedef std::function<void(evutil_socket_t, short)> Callback;
 
   Event(const Base& base, evutil_socket_t sock, short events,
         const Callback& cb);
@@ -68,7 +67,7 @@ class Event {
 
 class HttpServer {
  public:
-  typedef boost::function<void(evhttp_request*)> HandlerCallback;
+  typedef std::function<void(evhttp_request*)> HandlerCallback;
 
   explicit HttpServer(const Base& base);
   ~HttpServer();
@@ -94,7 +93,7 @@ class HttpServer {
 
 class HttpRequest {
  public:
-  typedef boost::function<void(HttpRequest*)> Callback;
+  typedef std::function<void(HttpRequest*)> Callback;
 
   explicit HttpRequest(const Callback& callback);
   ~HttpRequest();
@@ -115,7 +114,7 @@ class HttpRequest {
 
 class HttpConnection {
  public:
-  HttpConnection(const boost::shared_ptr<Base>& base, const evhttp_uri* uri);
+  HttpConnection(const std::shared_ptr<Base>& base, const evhttp_uri* uri);
   ~HttpConnection();
 
   // Takes ownership of "req", which will be automatically deleted

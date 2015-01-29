@@ -1,15 +1,14 @@
 #include "server/handler.h"
 
 #include <algorithm>
-#include <boost/bind.hpp>
-#include <boost/make_shared.hpp>
-#include <boost/scoped_array.hpp>
 #include <event2/buffer.h>
 #include <event2/http.h>
 #include <event2/keyvalq_struct.h>
+#include <functional>
 #include <gflags/gflags.h>
 #include <glog/logging.h>
 #include <map>
+#include <memory>
 #include <stdlib.h>
 #include <utility>
 #include <vector>
@@ -22,10 +21,6 @@
 #include "util/json_wrapper.h"
 #include "util/thread_pool.h"
 
-using boost::bind;
-using boost::make_shared;
-using boost::scoped_array;
-using boost::shared_ptr;
 using cert_trans::Cert;
 using cert_trans::CertChain;
 using cert_trans::CertChecker;
@@ -34,8 +29,12 @@ using cert_trans::LoggedCertificate;
 using ct::ShortMerkleAuditProof;
 using ct::SignedCertificateTimestamp;
 using ct::SignedTreeHead;
+using std::bind;
 using std::make_pair;
+using std::make_shared;
 using std::multimap;
+using std::placeholders::_1;
+using std::shared_ptr;
 using std::string;
 using std::vector;
 
