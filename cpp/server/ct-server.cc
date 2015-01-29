@@ -1,11 +1,10 @@
 /* -*- indent-tabs-mode: nil -*- */
 
-#include <boost/bind.hpp>
-#include <boost/function.hpp>
-#include <boost/make_shared.hpp>
-#include <boost/scoped_ptr.hpp>
 #include <event2/thread.h>
+#include <functional>
 #include <gflags/gflags.h>
+#include <iostream>
+#include <memory>
 #include <openssl/err.h>
 #include <string>
 
@@ -54,17 +53,16 @@ DEFINE_int32(tree_signing_frequency_seconds, 600,
 
 namespace libevent = cert_trans::libevent;
 
-using boost::bind;
-using boost::function;
-using boost::make_shared;
-using boost::scoped_ptr;
-using boost::shared_ptr;
 using cert_trans::CertChecker;
 using cert_trans::HttpHandler;
 using cert_trans::LoggedCertificate;
 using cert_trans::ThreadPool;
 using cert_trans::util::ReadPrivateKey;
 using google::RegisterFlagValidator;
+using std::bind;
+using std::function;
+using std::make_shared;
+using std::shared_ptr;
 using std::string;
 
 static const int kCtimeBufSize = 26;
@@ -235,8 +233,8 @@ int main(int argc, char* argv[]) {
   HttpHandler handler(&log_lookup, db, &checker, &frontend, &pool);
 
   PeriodicCallback tree_event(event_base, FLAGS_tree_signing_frequency_seconds,
-                              boost::bind(&SignMerkleTree, &tree_signer,
-                                          &log_lookup));
+                              bind(&SignMerkleTree, &tree_signer,
+                                   &log_lookup));
 
   libevent::HttpServer server(*event_base);
   handler.Add(&server);

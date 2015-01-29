@@ -120,7 +120,7 @@ static const char kUsage[] =
     "monitor - use the monitor (see monitor_action flag)\n"
     "Use --help to display command-line flag options\n";
 
-using boost::shared_ptr;
+using std::shared_ptr;
 using cert_trans::AsyncLogClient;
 using cert_trans::Cert;
 using cert_trans::CertChain;

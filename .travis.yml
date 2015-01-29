@@ -1,13 +1,17 @@
 
 language: cpp
 
+compiler:
+ - clang
+
 cache: apt
 
 before_install:
  - sudo apt-add-repository -y ppa:sao/backports
+ - sudo apt-add-repository -y ppa:ubuntu-toolchain-r/test
  - sudo apt-add-repository -y ppa:fcitx-team/nightly
  - sudo apt-get update -qq
- - sudo apt-get install -qq protobuf-compiler libprotobuf-java libprotobuf-dev python-dev libjson-c-dev libboost-dev libboost-system-dev libboost-thread-dev libgoogle-glog-dev libgflags-dev libldns-dev
+ - sudo apt-get install -qq protobuf-compiler libprotobuf-java libprotobuf-dev python-dev libjson-c-dev libgoogle-glog-dev libgflags-dev libldns-dev libstdc++-4.8-dev
 # Stupid frikkin' google-mock package on Precise is b0rked, so hack it up:
  - wget https://googlemock.googlecode.com/files/gmock-1.6.0.zip -O /tmp/gmock-1.6.0.zip
  - unzip -d /tmp /tmp/gmock-1.6.0.zip
@@ -31,5 +35,5 @@ before_install:
 
 
 script:
- - make alltests CC=clang CXX=clang++ OPENSSLDIR=/usr/local/openssl
+ - make alltests OPENSSLDIR=/usr/local/openssl
  - go test -v ./go/...

@@ -6,9 +6,9 @@
 
 #include "base/time_support.h"
 
-using boost::lock_guard;
-using boost::mutex;
-using boost::shared_ptr;
+using std::lock_guard;
+using std::mutex;
+using std::shared_ptr;
 using std::string;
 using std::vector;
 

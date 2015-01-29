@@ -5,7 +5,7 @@ default: all
 
 -include local.mk
 
-CXXFLAG = -Wall -Werror -g -O3
+CXXFLAG = -std=c++11 -Wall -Werror -g -O3
 LINK.o = $(LINK.cc)
 
 INCLUDE = -I .
@@ -20,12 +20,6 @@ ifeq ($(PLATFORM), FreeBSD)
   LDLIBS += -L/usr/local/lib/event2
 else
   LDLIBS += -lresolv
-endif
-
-ifeq ($(PLATFORM), Darwin)
-  LDLIBS += -lboost_system-mt -lboost_thread-mt
-else
-  LDLIBS += -lboost_system -lboost_thread
 endif
 
 # Need OpenSSL >= 1.0.0
