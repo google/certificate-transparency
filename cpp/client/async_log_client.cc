@@ -37,11 +37,8 @@ namespace {
 
 
 string UriEncode(const string& input) {
-  // TODO(pphaneuf): I just wanted the deleter, so std::unique_ptr
-  // would have worked, but it's not available to us (C++11).
-  const shared_ptr<char> output(evhttp_uriencode(input.data(), input.size(),
-                                                 false),
-                                free);
+  const unique_ptr<char, void (*)(void*)> output(
+      evhttp_uriencode(input.data(), input.size(), false), &free);
 
   return output.get();
 }
