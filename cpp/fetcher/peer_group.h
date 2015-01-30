@@ -1,6 +1,7 @@
 #ifndef CERT_TRANS_FETCHER_PEER_GROUP_H_
 #define CERT_TRANS_FETCHER_PEER_GROUP_H_
 
+#include <memory>
 #include <mutex>
 #include <set>
 #include <stdint.h>
@@ -18,14 +19,13 @@ namespace cert_trans {
 // a slightly higher level abstraction for fetching entries. Fetch
 // errors will be retried, and unhealthy peers will be dropped (so the
 // available tree size can get smaller).
+// TODO(pphaneuf): Make that last sentence true!
 class PeerGroup {
  public:
   PeerGroup() = default;
 
-  // Adding a peer twice is not allowed. Ownership is not taken, but
-  // peers should remain valid at least for the rest of the lifetime
-  // of this object.
-  void Add(Peer* peer);
+  // Adding a peer twice is not allowed.
+  void Add(const std::shared_ptr<Peer>& peer);
 
   // Returns the highest tree size of the peer group.
   int64_t TreeSize() const;
@@ -40,10 +40,10 @@ class PeerGroup {
     // unhealthy peers.
   };
 
-  Peer* PickPeer(const int64_t needed_size) const;
+  std::shared_ptr<Peer> PickPeer(const int64_t needed_size) const;
 
   mutable std::mutex lock_;
-  std::map<Peer*, PeerState> peers_;
+  std::map<std::shared_ptr<Peer>, PeerState> peers_;
 
   DISALLOW_COPY_AND_ASSIGN(PeerGroup);
 };

@@ -6,6 +6,7 @@ using std::lock_guard;
 using std::max;
 using std::mutex;
 using std::placeholders::_1;
+using std::shared_ptr;
 using std::vector;
 using util::Status;
 using util::Task;
@@ -42,7 +43,7 @@ void GetEntriesDone(AsyncLogClient::Status client_status,
 }  // namespace
 
 
-void PeerGroup::Add(Peer* peer) {
+void PeerGroup::Add(const shared_ptr<Peer>& peer) {
   lock_guard<mutex> lock(lock_);
 
   CHECK(peers_.emplace(peer, PeerState()).second);
@@ -67,8 +68,8 @@ void PeerGroup::FetchEntries(int64_t start_index, int64_t end_index,
   CHECK_GE(start_index, 0);
   CHECK_GE(end_index, start_index);
 
-  Peer* const peer(PickPeer(end_index + 1));
-  CHECK_NOTNULL(peer);
+  const shared_ptr<Peer> peer(PickPeer(end_index + 1));
+  CHECK(peer);
 
   // TODO(pphaneuf): Handle the case where we have no peer more cleanly.
   peer->client().GetEntries(start_index, end_index, CHECK_NOTNULL(entries),
@@ -76,7 +77,7 @@ void PeerGroup::FetchEntries(int64_t start_index, int64_t end_index,
 }
 
 
-Peer* PeerGroup::PickPeer(const int64_t needed_size) const {
+shared_ptr<Peer> PeerGroup::PickPeer(const int64_t needed_size) const {
   lock_guard<mutex> lock(lock_);
 
   // TODO(pphaneuf): We should pick peers a bit more cleverly, to
