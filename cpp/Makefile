@@ -342,8 +342,8 @@ server/ct-dns-server: server/ct-dns-server.o server/event.o $(LOCAL_LIBS)
 
 server/ct-server: server/ct-server.o util/read_key.o server/handler.o \
 	base/notification.o log/logged_certificate.o fetcher/fetcher.o \
-        fetcher/peer.o fetcher/remote_peer.o client/async_log_client.o \
-        $(LOCAL_LIBS)
+        fetcher/peer.o fetcher/peer_group.o fetcher/remote_peer.o \
+        client/async_log_client.o $(LOCAL_LIBS)
 
 tools/dump_cert: tools/dump_cert.o proto/libproto.a util/libutil.a
 
