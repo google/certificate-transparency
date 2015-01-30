@@ -38,11 +38,11 @@
             "name": "etcd",
             "image": "localhost:5000/alcutter/etcd:test",
             "ports": [{
-              "name": "client",
+              "name": "etcd-client",
               "containerPort": 4001,
               "hostPort": 4001
             }, {
-              "name": "peer",
+              "name": "etcd-peer",
               "containerPort": 7001,
               "hostPort": 7001
             }],

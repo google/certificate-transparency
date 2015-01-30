@@ -5,7 +5,7 @@
   "selector": {
     "name": "log-node"
   },
-  "containerPort": "etcd",
+  "containerPort": "etcd-client",
   "protocol": "TCP",
   "port": 14001
 }

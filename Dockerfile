@@ -33,5 +33,7 @@ CMD cd /mnt/ctlog/ && \
         --log_dir=/mnt/ctlog/logs \
         --tree_signing_frequency_seconds=60 \
         --sqlite_db=/mnt/ctlog/sqlite.db \
+        --etcd_host=${ETCD_SERVICE_SERVICE_HOST} \
+        --etcd_port=${ETCD_SERVICE_SERVICE_PORT} \
         --v=1
 EXPOSE 6962
