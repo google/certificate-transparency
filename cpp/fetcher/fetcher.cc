@@ -105,6 +105,11 @@ void FetchState::WalkEntries() {
     return;
   }
 
+  if (task_->CancelRequested()) {
+    task_->Return(Status::CANCELLED);
+    return;
+  }
+
   lock_guard<mutex> lock(lock_);
 
   // Prune fetched sequences at the beginning.
