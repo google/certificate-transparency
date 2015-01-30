@@ -99,6 +99,12 @@ FetchState::FetchState(Database<LoggedCertificate>* db, Peer* peer, Task* task)
 // a range completed. In that both cases, there's a hold on our task,
 // so it shouldn't go away from under us.
 void FetchState::WalkEntries() {
+  if (!task_->IsActive()) {
+    // We've already stopped, for one reason or another, no point
+    // getting anything started.
+    return;
+  }
+
   lock_guard<mutex> lock(lock_);
 
   // Prune fetched sequences at the beginning.
@@ -249,13 +255,15 @@ void FetchState::WriteToDatabase(int64_t index, Range* range,
     }
   }
 
-  Status status;
   if (processed < retval->size()) {
-    status = Status(util::error::INTERNAL,
-                    "could not write some entries to the database");
+    // We couldn't insert everything that we received into the
+    // database, this is fairly serious, return an error for the
+    // overall operation and let the higher level deal with it.
+    task_->Return(Status(util::error::INTERNAL,
+                         "could not write some entries to the database"));
   }
 
-  child_task->Return(status);
+  child_task->Return();
 }
 
 
