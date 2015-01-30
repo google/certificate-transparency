@@ -451,6 +451,7 @@ struct EtcdClient::Request {
   void Reset() {
     lock_guard<mutex> lock(lock_);
     req_.reset();
+    conn_.reset();
   }
 
   EtcdClient* const client_;
