@@ -77,25 +77,27 @@ struct FetchState {
 FetchState::FetchState(Database<LoggedCertificate>* db, Peer* peer, Task* task)
     : db_(CHECK_NOTNULL(db)),
       peer_(CHECK_NOTNULL(peer)),
-      task_(CHECK_NOTNULL(task)) {
-  const int64_t local_tree_size(db_->TreeSize());
-
-  const int64_t remote_tree_size(peer->TreeSize());
-  CHECK_GE(local_tree_size, 0);
+      task_(CHECK_NOTNULL(task)),
+      start_(db_->TreeSize()) {
+  // TODO(pphaneuf): Might be better to get that as a parameter?
+  const int64_t remote_tree_size(peer_->TreeSize());
+  CHECK_GE(start_, 0);
 
   // Nothing to do...
-  if (remote_tree_size <= local_tree_size) {
+  if (remote_tree_size <= start_) {
     task_->Return();
     return;
   }
 
-  start_ = local_tree_size;
-  entries_.reset(new Range(Range::WANT, remote_tree_size - local_tree_size));
+  entries_.reset(new Range(Range::WANT, remote_tree_size - start_));
 
   WalkEntries();
 }
 
 
+// This is called either when starting the fetching, or when fetching
+// a range completed. In that both cases, there's a hold on our task,
+// so it shouldn't go away from under us.
 void FetchState::WalkEntries() {
   lock_guard<mutex> lock(lock_);
 
