@@ -25,8 +25,11 @@ COPY test/testdata/ct-server-key.pem /usr/local/etc/
 VOLUME /mnt/ctlog
 CMD cd /mnt/ctlog/ && \
     if [ ! -d logs ]; then mkdir logs; fi && \
+    MY_IP=$(awk "/${HOSTNAME}/ {print \$1}" < /etc/hosts) && \
+    echo "My IP: ${MY_IP}" && \
     /usr/local/bin/ct-server \
         --port=6962 \
+        --server=${MY_IP} \
         --key=/usr/local/etc/ct-server-key.pem \
         --trusted_cert_file=/usr/local/etc/ctlog_ca_roots.pem \
         --stderrthreshold=0 \

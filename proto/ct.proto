@@ -209,6 +209,14 @@ message ClusterNodeState {
   optional int64 contiguous_tree_size = 2;
   optional SignedTreeHead newest_sth = 3;
   optional SignedTreeHead current_serving_sth = 4;
+
+  // The following host_name/log_port pair are used to allow a log node to
+  // contact other nodes in the cluster, primarily for the purposes of
+  // replication.
+  // hostname/ip which can be used to contact [just] this log node
+  optional string hostname = 5;
+  // port on which this log node is listening.
+  optional int32 log_port = 6;
 }
 
 message ClusterControl {

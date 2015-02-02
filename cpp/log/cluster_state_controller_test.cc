@@ -383,6 +383,19 @@ TEST_F(ClusterStateControllerTest, TestJoinsElectionIfHasLocalData) {
   }
 }
 
+
+TEST_F(ClusterStateControllerTest, TestNodeHostPort) {
+  const string kHost("my_host");
+  const int kPort(9999);
+  controller_.SetNodeHostPort(kHost, kPort);
+  sleep(1);
+
+  const ClusterNodeState node_state(GetNodeStateView(kNodeId1));
+  EXPECT_EQ(kHost, node_state.hostname());
+  EXPECT_EQ(kPort, node_state.log_port());
+}
+
+
 }  // namespace cert_trans
 
 
