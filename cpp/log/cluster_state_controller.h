@@ -51,6 +51,10 @@ class ClusterStateController {
 
   void GetLocalNodeState(ct::ClusterNodeState* state) const;
 
+  // Publishes this node's listening address in its ClusterNodeState, so that
+  // other nodes can request entries from its database.
+  void SetNodeHostPort(const std::string& host, const uint16_t port);
+
  private:
   // Updates the representation of *this* node's state in the consistent store.
   void PushLocalNodeState(const std::unique_lock<std::mutex>& lock);

@@ -298,10 +298,15 @@ int main(int argc, char* argv[]) {
     // if it's not set, which in turn causes us to not attempt to become
     // master:
     consistent_store.SetServingSTH(tree_signer.LatestSTH());
+  } else {
+    CHECK(!FLAGS_server.empty());
+    CHECK_NE(FLAGS_server, "localhost");
   }
 
   ClusterStateController<LoggedCertificate> cluster_controller(
       &internal_pool, &consistent_store, &election);
+  // Publish this node's hostname:port info
+  cluster_controller.SetNodeHostPort(FLAGS_server, FLAGS_port);
 
   const Database<LoggedCertificate>::NotifySTHCallback notify_sth_callback(
       [&cluster_controller](const SignedTreeHead& sth) {
