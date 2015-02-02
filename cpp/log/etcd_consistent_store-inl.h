@@ -7,6 +7,7 @@
 #include "log/etcd_consistent_store.h"
 #include "log/logged_certificate.h"
 #include "util/executor.h"
+#include "util/masterelection.h"
 #include "util/util.h"
 
 DECLARE_int32(node_state_ttl_seconds);
@@ -25,16 +26,18 @@ const char kNodesDir[] = "/nodes/";
 
 
 template <class Logged>
-EtcdConsistentStore<Logged>::EtcdConsistentStore(util::Executor* executor,
-                                                 EtcdClient* client,
-                                                 const std::string& root,
-                                                 const std::string& node_id)
+EtcdConsistentStore<Logged>::EtcdConsistentStore(
+    util::Executor* executor, EtcdClient* client,
+    const MasterElection* election, const std::string& root,
+    const std::string& node_id)
     : client_(CHECK_NOTNULL(client)),
+      election_(CHECK_NOTNULL(election)),
       sync_client_(client),
       root_(root),
       node_id_(node_id),
       serving_sth_watch_task_(CHECK_NOTNULL(executor)),
-      received_initial_sth_(false) {
+      received_initial_sth_(false),
+      exiting_(false) {
   // Set up watches on things we're interested in...
   WatchServingSTH(
       std::bind(&EtcdConsistentStore<Logged>::OnEtcdServingSTHUpdated, this,
@@ -47,6 +50,9 @@ EtcdConsistentStore<Logged>::EtcdConsistentStore(util::Executor* executor,
     std::unique_lock<std::mutex> lock(mutex_);
     serving_sth_cv_.wait(lock, [this]() { return received_initial_sth_; });
   }
+  // Now we can start a clean up thread.
+  clean_up_thread_.reset(new std::thread(
+      std::bind(&EtcdConsistentStore<Logged>::CleanUpEntriesThread, this)));
 }
 
 
@@ -56,6 +62,15 @@ EtcdConsistentStore<Logged>::~EtcdConsistentStore() {
   serving_sth_watch_task_.Cancel();
   VLOG(1) << "Waiting for watch tasks to return.";
   serving_sth_watch_task_.Wait();
+  VLOG(1) << "Joining cleanup thread";
+  {
+    std::lock_guard<std::mutex> lock(mutex_);
+    exiting_ = true;
+  }
+  serving_sth_cv_.notify_all();
+  clean_up_thread_->join();
+  clean_up_thread_.reset();
+  VLOG(1) << "Cleanup thread joined.";
 }
 
 
@@ -459,6 +474,16 @@ util::Status EtcdConsistentStore<Logged>::ForceSetEntryWithTTL(
 
 
 template <class Logged>
+template <class T>
+util::Status EtcdConsistentStore<Logged>::DeleteEntry(const std::string& path,
+                                                      EntryHandle<T>* entry) {
+  CHECK_NOTNULL(entry);
+  CHECK(entry->HasHandle());
+  return sync_client_.Delete(path, entry->Handle());
+}
+
+
+template <class Logged>
 std::string EtcdConsistentStore<Logged>::GetUnsequencedPath(
     const Logged& unseq) const {
   return GetFullPath(std::string(kUnsequencedDir) +
@@ -543,6 +568,105 @@ void EtcdConsistentStore<Logged>::OnEtcdServingSTHUpdated(
   lock.unlock();
   serving_sth_cv_.notify_all();
 }
+
+
+template <class Logged>
+util::Status EtcdConsistentStore<Logged>::RunOneCleanUpIteration(
+    const int64_t clean_up_to_sequence_number) {
+  CHECK_LE(0, clean_up_to_sequence_number);
+  if (!election_->IsMaster()) {
+    return util::Status(util::error::PERMISSION_DENIED,
+                        "Non-master node cannot run cleanups.");
+  }
+
+  std::vector<EntryHandle<Logged>> sequenced_entries;
+  util::Status status(GetSequencedEntries(&sequenced_entries));
+  if (!status.ok()) {
+    LOG(WARNING) << "Couldn't get sequenced entries: " << status;
+    return status;
+  }
+
+  for (auto& entry : sequenced_entries) {
+    const uint64_t sequence_number(entry.Entry().sequence_number());
+
+    // return if we've hit the limit
+    if (entry.Entry().sequence_number() > clean_up_to_sequence_number) {
+      return util::Status::OK;
+    }
+
+    // Otherwise, first we delete the corresponding unsequenced entry
+    EntryHandle<LoggedCertificate> unseq_entry;
+    const std::string hash(entry.Entry().Hash());
+    status = GetPendingEntryForHash(hash, &unseq_entry);
+    if (!status.ok()) {
+      // Log a warning here, but don't bail on the clean up as we could just be
+      // recovering from a crash halfway through a previous clean up.
+      LOG(WARNING) << "Cleanup couldn't get unsequenced entry (" << hash
+                   << ") corresponding to sequenced entry #" << sequence_number
+                   << " : " << status;
+    } else {
+      status =
+          DeleteEntry(GetUnsequencedPath(unseq_entry.Entry()), &unseq_entry);
+      if (!status.ok()) {
+        LOG(WARNING) << "Cleanup couldn't delete unsequenced entry (" << hash
+                     << ") corresponding to sequenced entry #"
+                     << sequence_number << " : " << status;
+        return status;
+      }
+    }
+    VLOG(1) << "Cleanup deleted unsequenced entry (" << hash << ") "
+            << "corresponding to sequenced entry #" << sequence_number;
+
+    // Now delete the sequenced entry:
+    status =
+        DeleteEntry(GetSequencedPath(sequence_number), &entry);
+    if (!status.ok()) {
+      LOG(WARNING) << "Cleanup couldn't delete sequenced entry #"
+                   << sequence_number << " (but corresponding unsequenced "
+                   << "entry was successfully deleted) : " << status;
+      return status;
+    }
+    VLOG(1) << "Cleanup deleted sequenced entry #" << sequence_number;
+  }
+  return util::Status::OK;
+}
+
+
+template <class Logged>
+void EtcdConsistentStore<Logged>::CleanUpEntriesThread() {
+  int64_t clean_up_to_sequence_number(-1);
+  while (true) {
+    {
+      // Wait for a new STH to arrive (or for the signal that we're exiting.
+      std::unique_lock<std::mutex> lock(mutex_);
+      serving_sth_cv_.wait(lock, [this, clean_up_to_sequence_number]() {
+        const bool sth_increased(serving_sth_ &&
+                                 (serving_sth_->Entry().tree_size() >
+                                  clean_up_to_sequence_number + 1));
+        return exiting_ || (sth_increased && election_->IsMaster());
+      });
+      // Exit if need be.
+      if (exiting_) {
+        return;
+      }
+      // Otherwise, we've got some work to do; start by getting our new clean
+      // up watermark.
+      clean_up_to_sequence_number = serving_sth_->Entry().tree_size() - 1;
+      // The Serving STH must only have been updated once sufficient
+      // replication has occured, so we're fine to clean up any certs covered
+      // by that STH.
+      LOG(INFO) << "Will clean up etcd at sequence number "
+                << clean_up_to_sequence_number << " and below.";
+    }  // lock scope
+
+    util::Status status(RunOneCleanUpIteration(clean_up_to_sequence_number));
+    if (!status.ok()) {
+      LOG(WARNING) << "Clean up run failed: " << status;
+    }
+    VLOG(1) << "Clean up run finished.";
+  }
+}
+
 
 }  // namespace cert_trans
 

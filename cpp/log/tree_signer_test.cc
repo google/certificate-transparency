@@ -16,6 +16,7 @@
 #include "merkletree/merkle_verifier.h"
 #include "proto/ct.pb.h"
 #include "util/fake_etcd.h"
+#include "util/mock_masterelection.h"
 #include "util/testing.h"
 #include "util/util.h"
 
@@ -23,10 +24,12 @@ namespace cert_trans {
 
 using cert_trans::EntryHandle;
 using cert_trans::LoggedCertificate;
+using cert_trans::MockMasterElection;
 using ct::SignedTreeHead;
 using std::make_shared;
 using std::shared_ptr;
 using std::string;
+using testing::NiceMock;
 
 typedef Database<LoggedCertificate> DB;
 typedef TreeSigner<LoggedCertificate> TS;
@@ -51,9 +54,9 @@ class TreeSignerTest : public ::testing::Test {
     test_db_.reset(new TestDB<T>);
     verifier_.reset(new LogVerifier(TestSigner::DefaultLogSigVerifier(),
                                     new MerkleVerifier(new Sha256Hasher())));
-    store_.reset(new EtcdConsistentStore<LoggedCertificate>(&pool_,
-                                                            &etcd_client_,
-                                                            "/root", "id"));
+    store_.reset(
+        new EtcdConsistentStore<LoggedCertificate>(&pool_, &etcd_client_,
+                                                   &election_, "/root", "id"));
     tree_signer_.reset(new TS(std::chrono::duration<double>(0), db(),
                               store_.get(), TestSigner::DefaultLogSigner()));
   }
@@ -99,6 +102,7 @@ class TreeSignerTest : public ::testing::Test {
   libevent::EventPumpThread event_pump_;
   FakeEtcdClient etcd_client_;
   ThreadPool pool_;
+  NiceMock<MockMasterElection> election_;
   std::unique_ptr<EtcdConsistentStore<LoggedCertificate>> store_;
   TestSigner test_signer_;
   std::unique_ptr<LogVerifier> verifier_;

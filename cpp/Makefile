@@ -280,7 +280,7 @@ log/frontend_signer_test: log/frontend_signer_test.o \
                           log/libcluster.a log/libdatabase.a \
                           merkletree/libmerkletree.a \
                           proto/libproto.a util/libutil.a base/notification.o \
-                          $(GTESTLIB)
+                          $(GTESTLIB) $(GMOCKLIB)
 
 log/frontend_test: log/frontend_test.o log/frontend.o \
                    log/frontend_signer.o \
@@ -288,12 +288,13 @@ log/frontend_test: log/frontend_test.o log/frontend.o \
                    log/log_verifier.o log/test_signer.o \
                    log/libcert.a log/libcluster.a log/libdatabase.a \
                    merkletree/libmerkletree.a \
-                   proto/libproto.a util/libutil.a base/notification.o $(GTESTLIB)
+                   proto/libproto.a util/libutil.a base/notification.o \
+                   $(GTESTLIB) $(GMOCKLIB)
 
 log/log_lookup_test: log/log_lookup_test.o log/test_signer.o \
                      log/libcluster.a log/libdatabase.a \
                      log/liblog.a merkletree/libmerkletree.a proto/libproto.a \
-                     util/libutil.a base/notification.o $(GTESTLIB)
+                     util/libutil.a base/notification.o $(GTESTLIB) $(GMOCKLIB)
 
 log/log_signer_test: log/log_signer_test.o log/log_signer.o log/signer.o \
                      log/verifier.o log/test_signer.o \
@@ -310,7 +311,7 @@ log/tree_signer_test: log/tree_signer_test.o log/log_signer.o log/signer.o \
                       log/log_verifier.o log/libcluster.a \
                       log/libdatabase.a merkletree/libmerkletree.a \
                       proto/libproto.a util/libutil.a base/notification.o \
-                      $(GTESTLIB)
+                      $(GTESTLIB) $(GMOCKLIB)
 
 log/logged_certificate_test: log/logged_certificate_test.o proto/libproto.a \
                              util/libutil.a merkletree/libmerkletree.a \

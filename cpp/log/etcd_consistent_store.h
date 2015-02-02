@@ -16,6 +16,8 @@
 
 namespace cert_trans {
 
+class MasterElection;
+
 
 template <class Logged>
 class EtcdConsistentStore : public ConsistentStore<Logged> {
@@ -24,7 +26,8 @@ class EtcdConsistentStore : public ConsistentStore<Logged> {
   // at least as long as this object is, and should not be the libevent::Base
   // used by |client|.
   EtcdConsistentStore(util::Executor* executor, EtcdClient* client,
-                      const std::string& root, const std::string& node_id);
+                      const MasterElection* election, const std::string& root,
+                      const std::string& node_id);
 
   virtual ~EtcdConsistentStore();
 
@@ -90,6 +93,9 @@ class EtcdConsistentStore : public ConsistentStore<Logged> {
                                     const std::chrono::seconds& ttl,
                                     EntryHandle<T>* entry);
 
+  template <class T>
+  util::Status DeleteEntry(const std::string& path, EntryHandle<T>* entry);
+
   std::string GetUnsequencedPath(const Logged& unseq) const;
 
   std::string GetUnsequencedPath(const std::string& hash) const;
@@ -127,16 +133,28 @@ class EtcdConsistentStore : public ConsistentStore<Logged> {
 
   void OnEtcdServingSTHUpdated(const Update<ct::SignedTreeHead>& update);
 
+  // Removes entries in /sequenced (and their corresponding entries in
+  // /unsequened) with sequence numbers up to and including
+  // |clean_up_to_sequence_number|.
+  util::Status RunOneCleanUpIteration(
+      const int64_t clean_up_to_sequence_number);
+
+  // Entry point for the clean_up_thread_;
+  void CleanUpEntriesThread();
+
   EtcdClient* const client_;  // We don't own this.
+  const MasterElection* const election_;  // We don't own this.
   SyncEtcdClient sync_client_;
   const std::string root_;
   const std::string node_id_;
   std::condition_variable serving_sth_cv_;
   util::SyncTask serving_sth_watch_task_;
+  std::unique_ptr<std::thread> clean_up_thread_;
 
   std::mutex mutex_;
   bool received_initial_sth_;
   std::unique_ptr<EntryHandle<ct::SignedTreeHead>> serving_sth_;
+  bool exiting_;
 
   friend class EtcdConsistentStoreTest;
 
