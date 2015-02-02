@@ -17,6 +17,7 @@
 #include "proto/serializer.h"
 #include "util/fake_etcd.h"
 #include "util/libevent_wrapper.h"
+#include "util/mock_masterelection.h"
 #include "util/testing.h"
 #include "util/status.h"
 #include "util/util.h"
@@ -30,6 +31,7 @@ using cert_trans::EntryHandle;
 using cert_trans::EtcdConsistentStore;
 using cert_trans::FakeEtcdClient;
 using cert_trans::LoggedCertificate;
+using cert_trans::MockMasterElection;
 using cert_trans::ThreadPool;
 using ct::LogEntry;
 using ct::SignedCertificateTimestamp;
@@ -37,6 +39,7 @@ using std::make_shared;
 using std::shared_ptr;
 using std::string;
 using std::vector;
+using testing::NiceMock;
 
 typedef Database<LoggedCertificate> DB;
 typedef FrontendSigner FS;
@@ -53,7 +56,7 @@ class FrontendSignerTest : public ::testing::Test {
         event_pump_(base_),
         etcd_client_(base_),
         pool_(2),
-        store_(&pool_, &etcd_client_, "/root", "id"),
+        store_(&pool_, &etcd_client_, &election_, "/root", "id"),
         frontend_(db(), &store_, TestSigner::DefaultLogSigner()) {
   }
 
@@ -69,6 +72,7 @@ class FrontendSignerTest : public ::testing::Test {
   libevent::EventPumpThread event_pump_;
   FakeEtcdClient etcd_client_;
   ThreadPool pool_;
+  NiceMock<MockMasterElection> election_;
   EtcdConsistentStore<LoggedCertificate> store_;
   FS frontend_;
 };

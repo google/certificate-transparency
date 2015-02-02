@@ -17,6 +17,7 @@
 #include "merkletree/merkle_verifier.h"
 #include "merkletree/serial_hasher.h"
 #include "util/fake_etcd.h"
+#include "util/mock_masterelection.h"
 #include "util/testing.h"
 #include "util/util.h"
 
@@ -27,12 +28,14 @@ namespace libevent = cert_trans::libevent;
 using cert_trans::EntryHandle;
 using cert_trans::FakeEtcdClient;
 using cert_trans::LoggedCertificate;
+using cert_trans::MockMasterElection;
 using cert_trans::ThreadPool;
 using cert_trans::TreeSigner;
 using ct::MerkleAuditProof;
 using std::make_shared;
 using std::string;
 using std::shared_ptr;
+using testing::NiceMock;
 
 typedef Database<LoggedCertificate> DB;
 typedef TreeSigner<LoggedCertificate> TS;
@@ -48,7 +51,7 @@ class LogLookupTest : public ::testing::Test {
         event_pump_(base_),
         etcd_client_(base_),
         pool_(2),
-        store_(&pool_, &etcd_client_, "/root", "id"),
+        store_(&pool_, &etcd_client_, &election_, "/root", "id"),
         test_signer_(),
         tree_signer_(std::chrono::duration<double>(0), db(), &store_,
                      TestSigner::DefaultLogSigner()),
@@ -79,6 +82,7 @@ class LogLookupTest : public ::testing::Test {
   libevent::EventPumpThread event_pump_;
   FakeEtcdClient etcd_client_;
   ThreadPool pool_;
+  NiceMock<MockMasterElection> election_;
   cert_trans::EtcdConsistentStore<LoggedCertificate> store_;
   TestSigner test_signer_;
   TS tree_signer_;

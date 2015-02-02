@@ -13,6 +13,7 @@
 #include "proto/ct.pb.h"
 #include "util/fake_etcd.h"
 #include "util/libevent_wrapper.h"
+#include "util/mock_masterelection.h"
 #include "util/testing.h"
 #include "util/util.h"
 
@@ -21,6 +22,7 @@ DECLARE_int32(node_state_ttl_seconds);
 namespace cert_trans {
 
 
+using ct::SignedTreeHead;
 using std::atomic;
 using std::bind;
 using std::chrono::milliseconds;
@@ -34,6 +36,7 @@ using std::unique_ptr;
 using std::vector;
 using testing::_;
 using testing::AllOf;
+using testing::ContainerEq;
 using testing::Contains;
 using testing::Pair;
 using testing::Return;
@@ -59,9 +62,8 @@ class EtcdConsistentStoreTest : public ::testing::Test {
 
  protected:
   void SetUp() override {
-    store_.reset(new EtcdConsistentStore<LoggedCertificate>(&executor_,
-                                                            &client_, kRoot,
-                                                            kNodeId));
+    store_.reset(new EtcdConsistentStore<LoggedCertificate>(
+        &executor_, &client_, &election_, kRoot, kNodeId));
   }
 
   LoggedCertificate DefaultCert() {
@@ -90,6 +92,30 @@ class EtcdConsistentStoreTest : public ::testing::Test {
   EntryHandle<LoggedCertificate> HandleForCert(const LoggedCertificate& cert,
                                                int handle) {
     return EntryHandle<LoggedCertificate>(cert, handle);
+  }
+
+  void PopulateForCleanupTests(int num_seq, int num_unseq, int starting_seq) {
+    int timestamp(345345);
+    int seq(starting_seq);
+    for (int i = 0; i < num_seq; ++i) {
+      std::ostringstream ss;
+      ss << "sequenced body " << i;
+      LoggedCertificate lc(MakeCert(timestamp++, ss.str()));
+      CHECK(store_->AddPendingEntry(&lc).ok());
+      EntryHandle<LoggedCertificate> handle;
+      CHECK(store_->GetPendingEntryForHash(lc.Hash(), &handle).ok());
+      CHECK(store_->AssignSequenceNumber(seq++, &handle).ok());
+    }
+    for (int i = 0; i < num_unseq; ++i) {
+      std::ostringstream ss;
+      ss << "unsequenced body " << i;
+      LoggedCertificate lc(MakeCert(timestamp++, ss.str()));
+      CHECK(store_->AddPendingEntry(&lc).ok());
+    }
+  }
+
+  util::Status RunOneCleanUpIteration(int clean_up_to_seq) {
+    return store_->RunOneCleanUpIteration(clean_up_to_seq);
   }
 
   template <class T>
@@ -135,6 +161,7 @@ class EtcdConsistentStoreTest : public ::testing::Test {
   libevent::EventPumpThread event_pump_;
   FakeEtcdClient client_;
   SyncEtcdClient sync_client_;
+  MockMasterElection election_;
   unique_ptr<EtcdConsistentStore<LoggedCertificate>> store_;
 };
 
@@ -523,6 +550,77 @@ TEST_F(EtcdConsistentStoreTest, WatchClusterConfig) {
   EXPECT_TRUE(notification.WaitForNotificationWithTimeout(milliseconds(5000)));
   task.Cancel();
   task.Wait();
+}
+
+
+TEST_F(EtcdConsistentStoreTest, TestDoesNotCleanUpIfNotMaster) {
+  EXPECT_CALL(election_, IsMaster()).WillRepeatedly(Return(false));
+  EXPECT_EQ(util::error::PERMISSION_DENIED,
+            RunOneCleanUpIteration(234).CanonicalCode());
+}
+
+
+TEST_F(EtcdConsistentStoreTest, TestCleansUpOnNewSTH) {
+  PopulateForCleanupTests(5, 4, 100);
+
+  // Be sure about our starting state of sequenced entries so we can compare
+  // later on
+  vector<EntryHandle<LoggedCertificate>> seq_entries;
+  CHECK(store_->GetSequencedEntries(&seq_entries).ok());
+  EXPECT_EQ(5, seq_entries.size());
+
+  // Do the same for the unsequenced entries
+  vector<EntryHandle<LoggedCertificate>> unseq_entries_pre;
+  CHECK(store_->GetPendingEntries(&unseq_entries_pre).ok());
+  // Prune out any "unsequenced" entries which have counterparts in the
+  // "sequenced" set:
+  auto it(unseq_entries_pre.begin());
+  while (it != unseq_entries_pre.end()) {
+    if (it->Entry().has_provisional_sequence_number()) {
+      it = unseq_entries_pre.erase(it);
+    } else {
+      ++it;
+    }
+  }
+  EXPECT_EQ(4, unseq_entries_pre.size());
+
+  EXPECT_CALL(election_, IsMaster()).WillRepeatedly(Return(true));
+
+  // Set ServingSTH to something which will cause entries 100, 101, and 102 to
+  // be cleaned up:
+  SignedTreeHead sth;
+  sth.set_timestamp(345345);
+  sth.set_tree_size(103);
+  CHECK(store_->SetServingSTH(sth).ok());
+  sleep(1);
+
+  // Check that they were cleaned up:
+  seq_entries.clear();
+  CHECK(store_->GetSequencedEntries(&seq_entries).ok());
+  // 103 & 104 remaining:
+  EXPECT_EQ(2, seq_entries.size());
+  EXPECT_EQ(103, seq_entries[0].Entry().sequence_number());
+  EXPECT_EQ(104, seq_entries[1].Entry().sequence_number());
+
+  // Now update ServingSTH so that all sequenced entries should be cleaned up:
+  sth.set_timestamp(sth.timestamp() + 1);
+  sth.set_tree_size(105);
+  CHECK(store_->SetServingSTH(sth).ok());
+  sleep(1);
+
+  // Ensure they were:
+  seq_entries.clear();
+  CHECK(store_->GetSequencedEntries(&seq_entries).ok());
+  EXPECT_EQ(0, seq_entries.size());
+
+  // Check we've not touched the unseqenced entries:
+  vector<EntryHandle<LoggedCertificate>> unseq_entries_post;
+  CHECK(store_->GetPendingEntries(&unseq_entries_post).ok());
+  EXPECT_EQ(unseq_entries_pre.size(), unseq_entries_post.size());
+  for (int i = 0; i < unseq_entries_pre.size(); ++i) {
+    EXPECT_EQ(unseq_entries_pre[i].Handle(), unseq_entries_post[i].Handle());
+    EXPECT_EQ(unseq_entries_pre[i].Entry(), unseq_entries_post[i].Entry());
+  }
 }
 
 

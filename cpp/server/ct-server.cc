@@ -257,9 +257,10 @@ int main(int argc, char* argv[]) {
   // via HTTP.
   ThreadPool internal_pool(4);
   StrictConsistentStore<LoggedCertificate> consistent_store(
-      &election, new EtcdConsistentStore<LoggedCertificate>(&internal_pool,
-                                                            etcd_client.get(),
-                                                            "/root", node_id));
+      &election,
+      new EtcdConsistentStore<LoggedCertificate>(&internal_pool,
+                                                 etcd_client.get(), &election,
+                                                 "/root", node_id));
 
   TreeSigner<LoggedCertificate> tree_signer(std::chrono::duration<double>(
                                                 FLAGS_guard_window_seconds),
