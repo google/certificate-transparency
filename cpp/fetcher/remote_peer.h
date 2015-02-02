@@ -10,10 +10,10 @@ namespace cert_trans {
 
 class RemotePeer : public Peer {
  public:
-  // Takes ownership of "client" and "verifier". The "task" will
-  // return when the object is fully destroyed (destroying this object
-  // starts the asynchronous destruction).
-  RemotePeer(AsyncLogClient* client, LogVerifier* verifier, util::Task* task);
+  // The "task" will return when the object is fully destroyed
+  // (destroying this object starts the asynchronous destruction).
+  RemotePeer(std::unique_ptr<AsyncLogClient>&& client,
+             std::unique_ptr<LogVerifier>&& verifier, util::Task* task);
   ~RemotePeer() override;
 
   int64_t TreeSize() const override;

@@ -2,10 +2,13 @@
 
 #include <glog/logging.h>
 
+using std::unique_ptr;
+
 namespace cert_trans {
 
 
-Peer::Peer(AsyncLogClient* client) : client_(CHECK_NOTNULL(client)) {
+Peer::Peer(unique_ptr<AsyncLogClient>&& client) : client_(move(client)) {
+  CHECK(client_);
 }
 
 

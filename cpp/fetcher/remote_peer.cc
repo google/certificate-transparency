@@ -7,17 +7,20 @@
 using ct::SignedTreeHead;
 using std::lock_guard;
 using std::make_shared;
+using std::move;
 using std::mutex;
 using std::placeholders::_1;
 using std::shared_ptr;
+using std::unique_ptr;
 using util::TaskHold;
 
 namespace cert_trans {
 
 
 struct RemotePeer::Impl {
-  Impl(LogVerifier* verifier, util::Task* task)
-      : verifier_(CHECK_NOTNULL(verifier)), task_(CHECK_NOTNULL(task)) {
+  Impl(unique_ptr<LogVerifier>&& verifier, util::Task* task)
+      : verifier_(move(verifier)), task_(CHECK_NOTNULL(task)) {
+    CHECK(verifier_);
   }
 
   const std::unique_ptr<LogVerifier> verifier_;
@@ -58,9 +61,9 @@ void RemotePeer::Impl::DoneGetSTH(
 }
 
 
-RemotePeer::RemotePeer(AsyncLogClient* client, LogVerifier* verifier,
-                       util::Task* task)
-    : Peer(client), impl_(new Impl(verifier, task)) {
+RemotePeer::RemotePeer(unique_ptr<AsyncLogClient>&& client,
+                       unique_ptr<LogVerifier>&& verifier, util::Task* task)
+    : Peer(move(client)), impl_(new Impl(move(verifier), task)) {
   TaskHold hold(task);
   task->DeleteWhenDone(impl_);
 

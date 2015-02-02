@@ -11,8 +11,7 @@ namespace cert_trans {
 
 class Peer {
  public:
-  // Takes ownership of "client".
-  Peer(AsyncLogClient* client);
+  Peer(std::unique_ptr<AsyncLogClient>&& client);
   virtual ~Peer() {
   }
 
