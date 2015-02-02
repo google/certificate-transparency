@@ -27,6 +27,7 @@
 #include "util/fake_etcd.h"
 #include "util/libevent_wrapper.h"
 #include "util/masterelection.h"
+#include "util/periodic_closure.h"
 #include "util/read_key.h"
 #include "util/thread_pool.h"
 #include "util/uuid.h"
@@ -64,6 +65,8 @@ DEFINE_double(guard_window_seconds, 60,
               "number of seconds will not be sequenced.");
 DEFINE_string(etcd_host, "", "Hostname of the etcd server");
 DEFINE_int32(etcd_port, 0, "Port of the etcd server.");
+DEFINE_int32(node_state_refresh_seconds, 10,
+             "How often to refresh the ClusterNodeState entry for this node.");
 
 namespace libevent = cert_trans::libevent;
 
@@ -76,6 +79,7 @@ using cert_trans::FileStorage;
 using cert_trans::HttpHandler;
 using cert_trans::LoggedCertificate;
 using cert_trans::MasterElection;
+using cert_trans::PeriodicClosure;
 using cert_trans::ReadPrivateKey;
 using cert_trans::StrictConsistentStore;
 using cert_trans::ThreadPool;
@@ -314,6 +318,20 @@ int main(int argc, char* argv[]) {
         cluster_controller.NewTreeHead(sth);
       });
   db->AddNotifySTHCallback(&notify_sth_callback);
+
+  // Periodically refresh our contiguous tree size so that other nodes get a
+  // good view of the data we have locally and can use us for replication.
+  // This has the side effect of refreshing the TTL on our ClusterNodeState
+  // entry.
+  PeriodicClosure node_state_refresh(
+      event_base, std::chrono::seconds(FLAGS_node_state_refresh_seconds),
+      [&db, &cluster_controller, &internal_pool]() {
+        // Actually run this on the thread pool, since this periodic closure is
+        // calling back on the eventloop thread.
+        internal_pool.Add([&db, &cluster_controller]() {
+          cluster_controller.ContiguousTreeSizeUpdated(db->TreeSize());
+        });
+      });
 
   Frontend frontend(new CertSubmissionHandler(&checker),
                     new FrontendSigner(db, &consistent_store, &log_signer));
