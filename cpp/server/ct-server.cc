@@ -29,6 +29,7 @@
 #include "util/masterelection.h"
 #include "util/periodic_closure.h"
 #include "util/read_key.h"
+#include "util/status.h"
 #include "util/thread_pool.h"
 #include "util/uuid.h"
 
@@ -174,10 +175,12 @@ void SignMerkleTree(TreeSigner<LoggedCertificate>* tree_signer,
 
   while (true) {
     if (election->IsMaster()) {
-      CHECK_EQ(tree_signer->UpdateTree(), TreeSigner<LoggedCertificate>::OK);
-    } else {
-      VLOG(1) << "Not starting signing run since we're not the master.";
+      // TODO(alcutter): Probably don't need to blow up here
+      CHECK_EQ(util::Status::OK, tree_signer->SequenceNewEntries())
+          << "Problem sequencing new entries";
     }
+
+    CHECK_EQ(tree_signer->UpdateTree(), TreeSigner<LoggedCertificate>::OK);
 
     const steady_clock::time_point now(steady_clock::now());
     while (target_run_time <= now) {

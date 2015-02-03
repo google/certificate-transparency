@@ -171,6 +171,7 @@ TYPED_TEST(TreeSignerTest, Sign) {
   this->test_signer_.CreateUnique(&logged_cert);
   this->AddPendingEntry(&logged_cert);
   // this->AddSequencedEntry(&logged_cert, 0);
+  EXPECT_EQ(util::Status::OK, this->tree_signer_->SequenceNewEntries());
   EXPECT_EQ(TS::OK, this->tree_signer_->UpdateTree());
 
   SignedTreeHead sth;
