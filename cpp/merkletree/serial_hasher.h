@@ -16,8 +16,10 @@ class SerialHasher {
 
   virtual size_t DigestSize() const = 0;
 
-  // Reset the context. Must be called before the first
-  // Update() call (and again after each Final() call).
+  // Reset the context. Must be called before the first Update() call.
+  // Optionally it can be called after each Final() call; however
+  // doing so is a no-op since Final() will leave the hasher in a
+  // reset state.
   virtual void Reset() = 0;
 
   // Update the hash context with (binary) data.
