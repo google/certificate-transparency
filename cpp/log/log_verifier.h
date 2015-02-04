@@ -44,6 +44,8 @@ class LogVerifier {
         return "Inconsistent timestamps.";
       case INVALID_SIGNATURE:
         return "Invalid signature.";
+      case INVALID_MERKLE_PATH:
+        return "Invalid Merkle path.";
       default:
         assert(false);
         return "";
