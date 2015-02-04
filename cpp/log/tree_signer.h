@@ -4,6 +4,7 @@
 #include <chrono>
 #include <stdint.h>
 
+#include "log/cluster_state_controller.h"
 #include "log/consistent_store.h"
 #include "merkletree/compact_merkle_tree.h"
 #include "proto/ct.pb.h"
@@ -40,6 +41,8 @@ class TreeSigner {
     OK,
     // The database is inconsistent with our view.
     DB_ERROR,
+    // We don't have fresh enough data locally to sign.
+    INSUFFICIENT_DATA,
   };
 
   // Latest Tree Head timestamp;

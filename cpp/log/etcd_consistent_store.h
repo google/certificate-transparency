@@ -35,6 +35,8 @@ class EtcdConsistentStore : public ConsistentStore<Logged> {
 
   util::Status SetServingSTH(const ct::SignedTreeHead& new_sth) override;
 
+  util::StatusOr<ct::SignedTreeHead> GetServingSTH() const override;
+
   util::Status AddPendingEntry(Logged* entry) override;
 
   util::Status GetPendingEntryForHash(
@@ -151,7 +153,7 @@ class EtcdConsistentStore : public ConsistentStore<Logged> {
   util::SyncTask serving_sth_watch_task_;
   std::unique_ptr<std::thread> clean_up_thread_;
 
-  std::mutex mutex_;
+  mutable std::mutex mutex_;
   bool received_initial_sth_;
   std::unique_ptr<EntryHandle<ct::SignedTreeHead>> serving_sth_;
   bool exiting_;

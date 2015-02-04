@@ -57,6 +57,8 @@ class LogLookupTest : public ::testing::Test {
                      TestSigner::DefaultLogSigner()),
         verifier_(TestSigner::DefaultLogSigVerifier(),
                   new MerkleVerifier(new Sha256Hasher())) {
+    // Set some noddy STH so that we can call UpdateTree on the Tree Signer.
+    store_.SetServingSTH(ct::SignedTreeHead());
   }
 
 
@@ -71,6 +73,10 @@ class LogLookupTest : public ::testing::Test {
     CHECK(this->store_.AssignSequenceNumber(seq, &entry).ok());
   }
 
+  void UpdateTree() {
+    EXPECT_EQ(TS::OK, this->tree_signer_.UpdateTree());
+    this->db()->WriteTreeHead(this->tree_signer_.LatestSTH());
+  }
 
   T* db() const {
     return test_db_.db();
@@ -102,7 +108,7 @@ TYPED_TEST(LogLookupTest, Lookup) {
   this->CreateSequencedEntry(&logged_cert, 0);
 
   MerkleAuditProof proof;
-  EXPECT_EQ(TS::OK, this->tree_signer_.UpdateTree());
+  this->UpdateTree();
 
   LL lookup(this->db());
   // Look the new entry up.
@@ -116,7 +122,7 @@ TYPED_TEST(LogLookupTest, NotFound) {
   this->CreateSequencedEntry(&logged_cert, 0);
 
   MerkleAuditProof proof;
-  EXPECT_EQ(TS::OK, this->tree_signer_.UpdateTree());
+  this->UpdateTree();
 
   LL lookup(this->db());
 
@@ -133,7 +139,7 @@ TYPED_TEST(LogLookupTest, Update) {
   this->CreateSequencedEntry(&logged_cert, 0);
 
   MerkleAuditProof proof;
-  EXPECT_EQ(TS::OK, this->tree_signer_.UpdateTree());
+  this->UpdateTree();
 
   // Look the new entry up.
   EXPECT_EQ(LL::OK, lookup.AuditProof(logged_cert.merkle_leaf_hash(), &proof));
@@ -148,7 +154,7 @@ TYPED_TEST(LogLookupTest, Verify) {
   this->CreateSequencedEntry(&logged_cert, 0);
 
   MerkleAuditProof proof;
-  EXPECT_EQ(TS::OK, this->tree_signer_.UpdateTree());
+  this->UpdateTree();
 
   LL lookup(this->db());
   // Look the new entry up.
@@ -169,7 +175,7 @@ TYPED_TEST(LogLookupTest, VerifyWithPath) {
     this->CreateSequencedEntry(&logged_certs[i], i);
   }
 
-  EXPECT_EQ(TS::OK, this->tree_signer_.UpdateTree());
+  this->UpdateTree();
 
   LL lookup(this->db());
   MerkleAuditProof proof;

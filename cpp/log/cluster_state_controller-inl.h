@@ -5,17 +5,20 @@
 
 #include <functional>
 
+#include "log/database.h"
 #include "log/etcd_consistent_store-inl.h"
 #include "proto/ct.pb.h"
 
 namespace cert_trans {
 
-
+// TODO(alcutter): Need a better system for hanging tasks onto events, Pierre's
+//                 task-a-palooza idea perhaps?
 template <class Logged>
 ClusterStateController<Logged>::ClusterStateController(
-    util::Executor* executor, ConsistentStore<Logged>* store,
-    MasterElection* election)
-    : store_(CHECK_NOTNULL(store)),
+    util::Executor* executor, Database<Logged>* database,
+    ConsistentStore<Logged>* store, MasterElection* election)
+    : database_(CHECK_NOTNULL(database)),
+      store_(CHECK_NOTNULL(store)),
       election_(CHECK_NOTNULL(election)),
       watch_config_task_(CHECK_NOTNULL(executor)),
       watch_node_states_task_(CHECK_NOTNULL(executor)),
@@ -65,6 +68,11 @@ void ClusterStateController<Logged>::NewTreeHead(
     CHECK_GE(sth.timestamp(), local_node_state_.newest_sth().timestamp());
   }
   local_node_state_.mutable_newest_sth()->CopyFrom(sth);
+  // We must, by definition, have a contiguous tree size of at least what's
+  // covered by the new STH:
+  if (sth.tree_size() > local_node_state_.contiguous_tree_size()) {
+    local_node_state_.set_contiguous_tree_size(sth.tree_size());
+  }
   PushLocalNodeState(lock);
 }
 
@@ -120,9 +128,7 @@ void ClusterStateController<Logged>::PushLocalNodeState(
   DetermineElectionParticipation(lock);
 
   const util::Status status(store_->SetClusterNodeState(local_node_state_));
-  if (!status.ok()) {
-    LOG(WARNING) << status;
-  }
+  LOG_IF(WARNING, !status.ok()) << "Couldn't set ClusterNodeState: " << status;
 }
 
 
@@ -133,8 +139,10 @@ void ClusterStateController<Logged>::OnClusterStateUpdated(
   for (const auto& update : updates) {
     const std::string& node_id(update.handle_.Entry().node_id());
     if (update.exists_) {
+      VLOG(1) << "Node joined: " << node_id;
       all_node_states_[node_id] = update.handle_.Entry();
     } else {
+      VLOG(1) << "Node left: " << node_id;
       CHECK_EQ(1, all_node_states_.erase(node_id));
     }
   }
@@ -170,10 +178,60 @@ void ClusterStateController<Logged>::OnServingSthUpdated(
     LOG(WARNING) << "Cluster has no Serving STH!";
     actual_serving_sth_.reset();
   } else {
+    // TODO(alcutter): Validate STH and verify consistency with whatever we've
+    // already got locally.
+    if (update.handle_.Entry().timestamp() == 0) {
+      LOG(WARNING) << "Ignoring invalid Serving STH update.";
+      return;
+    }
+
     actual_serving_sth_.reset(new ct::SignedTreeHead(update.handle_.Entry()));
     LOG(INFO) << "Received new Serving STH:\n"
               << actual_serving_sth_->DebugString();
+
+    // Double check this STH is newer than, or idential to, what we have in
+    // the database. (It definitely should be!)
+    ct::SignedTreeHead db_sth;
+    bool write_sth(true);
+    const typename Database<Logged>::LookupResult lookup_result(
+        database_->LatestTreeHead(&db_sth));
+    switch (lookup_result) {
+      case Database<Logged>::OK:
+        VLOG(1) << "Local latest STH:\n" << db_sth.DebugString();
+        // Check it's for the same log:
+        CHECK_EQ(actual_serving_sth_->id().key_id(), db_sth.id().key_id());
+        CHECK_EQ(actual_serving_sth_->version(), db_sth.version());
+
+        if (db_sth.timestamp() == actual_serving_sth_->timestamp()) {
+          // Either this STH is *identical* to the latest one we have in the DB
+          CHECK_EQ(actual_serving_sth_->tree_size(), db_sth.tree_size());
+          CHECK_EQ(actual_serving_sth_->sha256_root_hash(),
+                   db_sth.sha256_root_hash());
+          // In which case there's no need to write this to the DB because we
+          // already have it.
+          write_sth = false;
+        } else {
+          // Or it's strictly newer:
+          CHECK_GT(actual_serving_sth_->timestamp(), db_sth.timestamp());
+          CHECK_GE(actual_serving_sth_->tree_size(), db_sth.tree_size());
+        }
+        break;
+      case Database<Logged>::NOT_FOUND:
+        LOG(WARNING) << "Local DB doesn't have any STH, new node?";
+        break;
+      default:
+        LOG(FATAL) << "Problem looking up local DB's latest STH.";
+    }
+
+    if (write_sth) {
+      // All good, write this STH to our local DB:
+      CHECK_EQ(Database<Logged>::OK,
+               database_->WriteTreeHead(*actual_serving_sth_));
+    }
   }
+
+  // TODO(alcutter): Determine whether we should be serving given the current
+  // STH and our local database contents.
 
   // This could affect our ability to produce new STHs, so better check
   // whether we should leave the election for now:
@@ -195,7 +253,11 @@ void ClusterStateController<Logged>::CalculateServingSTH(
     if (node.second.has_newest_sth()) {
       const int64_t tree_size(node.second.newest_sth().tree_size());
       CHECK_LE(0, tree_size);
+      const int64_t timestamp(node.second.newest_sth().timestamp());
+      CHECK_LE(0, timestamp);
+
       num_nodes_by_sth_size[tree_size]++;
+
       // Default timestamp (first call in here) will be 0
       if (node.second.newest_sth().timestamp() >
           sth_by_size[tree_size].timestamp()) {
@@ -209,6 +271,7 @@ void ClusterStateController<Logged>::CalculateServingSTH(
   //   - at least minimum_serving_nodes have an STH at least as large
   //   - at least minimum_serving_fraction have an STH at least as large
   //   - not smaller than the current serving STH
+  //   - has a timestamp higher than the current serving STH
   int num_nodes_seen(0);
   const int current_tree_size(
       calculated_serving_sth_ ? calculated_serving_sth_->tree_size() : 0);
@@ -228,6 +291,18 @@ void ClusterStateController<Logged>::CalculateServingSTH(
                                   all_node_states_.size());
     if (serving_fraction >= cluster_config_.minimum_serving_fraction() &&
         num_nodes_seen >= cluster_config_.minimum_serving_nodes()) {
+      const ct::SignedTreeHead& candidate_sth(sth_by_size[it->first]);
+
+      // This STH isn't a viable candidate unless its timestamp is strictly
+      // newer than any current serving STH:
+      if (actual_serving_sth_ &&
+          candidate_sth.timestamp() <= actual_serving_sth_->timestamp()) {
+        VLOG(1) << "Discarding candidate STH:\n" << candidate_sth.DebugString()
+                << "\nbecause its timestamp is <= current serving STH "
+                << "timestamp (" << actual_serving_sth_->timestamp() << ")";
+        continue;
+      }
+
       LOG(INFO) << "Can serve @" << it->first << " with " << num_nodes_seen
                 << " nodes (" << (serving_fraction * 100) << "% of cluster)";
       calculated_serving_sth_.reset(
@@ -253,7 +328,6 @@ void ClusterStateController<Logged>::DetermineElectionParticipation(
   // Can't be in the election if the cluster isn't properly initialised
   if (!actual_serving_sth_) {
     LOG(WARNING) << "Cluster has no Serving STH - leaving election.";
-    election_->StopElection();
     return;
   }
 
@@ -262,7 +336,7 @@ void ClusterStateController<Logged>::DetermineElectionParticipation(
   if (actual_serving_sth_->tree_size() >
       local_node_state_.contiguous_tree_size()) {
     LOG(INFO) << "Serving STH tree_size (" << actual_serving_sth_->tree_size()
-              << " < Local contiguous_tree_size ("
+              << " > Local contiguous_tree_size ("
               << local_node_state_.contiguous_tree_size() << ")";
     LOG(INFO) << "Local replication too far behind to be master - "
                  "leaving election.";

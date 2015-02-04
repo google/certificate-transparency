@@ -11,6 +11,9 @@
 #include "util/masterelection.h"
 #include "util/statusor.h"
 
+template <class Logged>
+class Database;
+
 namespace cert_trans {
 
 
@@ -25,7 +28,7 @@ namespace cert_trans {
 template <class Logged>
 class ClusterStateController {
  public:
-  ClusterStateController(util::Executor* executor,
+  ClusterStateController(util::Executor* executor, Database<Logged>* database,
                          ConsistentStore<Logged>* store,
                          MasterElection* election);
 
@@ -86,6 +89,7 @@ class ClusterStateController {
   // Thread entry point for ServingSTH updater thread.
   void ClusterServingSTHUpdater();
 
+  Database<Logged>* const database_;      // Not owned by us
   ConsistentStore<Logged>* const store_;  // Not owned by us
   MasterElection* const election_;        // Not owned by us
   util::SyncTask watch_config_task_;

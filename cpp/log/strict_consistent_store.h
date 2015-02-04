@@ -36,6 +36,10 @@ class StrictConsistentStore : public ConsistentStore<Logged> {
 
   // Other methods:
 
+  util::StatusOr<ct::SignedTreeHead> GetServingSTH() const override {
+    return peer_->GetServingSTH();
+  }
+
   util::Status AddPendingEntry(Logged* entry) {
     return peer_->AddPendingEntry(entry);
   }

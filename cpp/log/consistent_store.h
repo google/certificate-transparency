@@ -6,17 +6,10 @@
 #include <vector>
 
 #include "base/macros.h"
+#include "proto/ct.pb.h"
 #include "util/status.h"
 #include "util/statusor.h"
 #include "util/task.h"
-
-namespace ct {
-
-class ClusterConfig;
-class ClusterNodeState;
-class SignedTreeHead;
-
-}  // namespace ct;
 
 
 namespace cert_trans {
@@ -108,6 +101,8 @@ class ConsistentStore {
   virtual util::StatusOr<int64_t> NextAvailableSequenceNumber() const = 0;
 
   virtual util::Status SetServingSTH(const ct::SignedTreeHead& new_sth) = 0;
+
+  virtual util::StatusOr<ct::SignedTreeHead> GetServingSTH() const = 0;
 
   virtual util::Status AddPendingEntry(Logged* entry) = 0;
 

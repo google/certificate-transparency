@@ -38,4 +38,5 @@ KEY="testdata/ct-server-key.pem"
 
 ../cpp/server/ct-server --port=8888 --key=$KEY \
   --trusted_cert_file=$CERT_FILE --logtostderr=true \
-  --tree_signing_frequency_seconds=1 --sqlite_db=$STORAGE -v=5
+  --guard_window_seconds=5 \
+  --tree_signing_frequency_seconds=10 --sqlite_db=$STORAGE

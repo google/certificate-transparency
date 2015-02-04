@@ -250,6 +250,7 @@ log/cert_submission_handler_test: log/cert_submission_handler_test.o \
 
 log/cluster_state_controller_test: base/notification.o \
                                    log/cluster_state_controller_test.o \
+                                   log/libdatabase.a \
                                    merkletree/serial_hasher.o \
                                    log/libcert.a log/libcluster.a \
                                    proto/libproto.a util/libutil.a $(GMOCKLIB) \

@@ -14,6 +14,8 @@ class MockConsistentStore : public ConsistentStore<Logged> {
 
   MOCK_METHOD1_T(SetServingSTH, util::Status(const ct::SignedTreeHead&));
 
+  MOCK_CONST_METHOD0_T(GetServingSTH, util::StatusOr<ct::SignedTreeHead>());
+
   MOCK_METHOD1_T(AddPendingEntry, util::Status(Logged* entry));
 
   MOCK_CONST_METHOD2_T(GetPendingEntryForHash,
