@@ -27,7 +27,7 @@ class PreCertChain;
 // (2) we get some spam protection.
 class CertChecker {
  public:
-  CertChecker();
+  CertChecker() = default;
 
   virtual ~CertChecker();
 

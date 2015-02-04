@@ -254,8 +254,8 @@ class TbsCertificate {
 
 class CertChain {
  public:
-  CertChain() {
-  }
+  CertChain() = default;
+
   // Loads a chain of PEM-encoded certificates. If any of the PEM-strings
   // in the chain are invalid, clears the entire chain.
   // Caller should check IsLoaded() before doing anything else apart from
@@ -331,8 +331,7 @@ class CertChain {
 // log/ct_extensions.h for LoadCtExtensions().
 class PreCertChain : public CertChain {
  public:
-  PreCertChain() {
-  }
+  PreCertChain() = default;
 
   explicit PreCertChain(const std::string& pem_string)
       : CertChain(pem_string) {
