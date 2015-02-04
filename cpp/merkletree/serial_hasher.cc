@@ -28,8 +28,8 @@ string Sha256Hasher::Final() {
 
   unsigned char hash[SHA256_DIGEST_LENGTH];
   SHA256_Final(hash, &ctx_);
-  return string(reinterpret_cast<char*>(hash), SHA256_DIGEST_LENGTH);
   initialized_ = false;
+  return string(reinterpret_cast<char*>(hash), SHA256_DIGEST_LENGTH);
 }
 
 SerialHasher* Sha256Hasher::Create() const {
