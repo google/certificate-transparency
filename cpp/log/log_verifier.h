@@ -2,6 +2,7 @@
 #ifndef LOG_VERIFIER_H
 #define LOG_VERIFIER_H
 
+#include <glog/logging.h>
 #include <stdint.h>
 
 #include "base/macros.h"
@@ -47,8 +48,7 @@ class LogVerifier {
       case INVALID_MERKLE_PATH:
         return "Invalid Merkle path.";
       default:
-        assert(false);
-        return "";
+        LOG(FATAL) << "unknown value for VerifyResult enum: " << result;
     }
   }
 

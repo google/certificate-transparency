@@ -52,7 +52,7 @@ typename Database<Logged>::WriteResult FileDB<Logged>::CreatePendingEntry_(
       cert_storage_->CreateEntry(hash, data);
   if (result == FileStorage::ENTRY_ALREADY_EXISTS)
     return this->DUPLICATE_CERTIFICATE_HASH;
-  assert(result == FileStorage::OK);
+  CHECK_EQ(result, FileStorage::OK);
   pending_hashes_.insert(hash);
   return this->OK;
 }
@@ -77,18 +77,14 @@ typename Database<Logged>::WriteResult FileDB<Logged>::AssignSequenceNumber(
     return this->SEQUENCE_NUMBER_ALREADY_IN_USE;
 
   std::string cert_data;
-  FileStorage::FileStorageResult result =
-      cert_storage_->LookupEntry(hash, &cert_data);
-  assert(result == FileStorage::OK);
+  CHECK_EQ(cert_storage_->LookupEntry(hash, &cert_data), FileStorage::OK);
 
   Logged logged;
-  bool ret = logged.ParseFromString(cert_data);
-  assert(ret);
-  assert(!logged.has_sequence_number());
+  CHECK(logged.ParseFromString(cert_data));
+  CHECK(!logged.has_sequence_number());
   logged.set_sequence_number(sequence_number);
   logged.SerializeToString(&cert_data);
-  result = cert_storage_->UpdateEntry(hash, cert_data);
-  assert(result == FileStorage::OK);
+  CHECK_EQ(cert_storage_->UpdateEntry(hash, cert_data), FileStorage::OK);
 
   pending_hashes_.erase(pending_it);
   sequence_map_.insert(
@@ -110,11 +106,10 @@ typename Database<Logged>::LookupResult FileDB<Logged>::LookupByHash(
       cert_storage_->LookupEntry(hash, &cert_data);
   if (db_result == FileStorage::NOT_FOUND)
     return this->NOT_FOUND;
-  assert(db_result == FileStorage::OK);
+  CHECK_EQ(db_result, FileStorage::OK);
 
   Logged logged;
-  bool ret = logged.ParseFromString(cert_data);
-  assert(ret);
+  CHECK(logged.ParseFromString(cert_data));
 
   if (result != NULL)
     result->CopyFrom(logged);
@@ -134,12 +129,11 @@ typename Database<Logged>::LookupResult FileDB<Logged>::LookupByIndex(
     std::string cert_data;
     FileStorage::FileStorageResult db_result =
         cert_storage_->LookupEntry(it->second, &cert_data);
-    assert(db_result == FileStorage::OK);
+    CHECK_EQ(db_result, FileStorage::OK);
 
     Logged logged;
-    bool ret = logged.ParseFromString(cert_data);
-    assert(ret);
-    assert(logged.sequence_number() == sequence_number);
+    CHECK(logged.ParseFromString(cert_data));
+    CHECK_EQ(logged.sequence_number(), sequence_number);
 
     result->CopyFrom(logged);
   }
@@ -155,14 +149,13 @@ typename Database<Logged>::WriteResult FileDB<Logged>::WriteTreeHead_(
       Serializer::SerializeUint(sth.timestamp(),
                                 FileDB::kTimestampBytesIndexed);
   std::string data;
-  bool ret = sth.SerializeToString(&data);
-  assert(ret);
+  CHECK(sth.SerializeToString(&data));
 
   FileStorage::FileStorageResult result =
       tree_storage_->CreateEntry(timestamp_key, data);
   if (result == FileStorage::ENTRY_ALREADY_EXISTS)
     return this->DUPLICATE_TREE_HEAD_TIMESTAMP;
-  assert(result == FileStorage::OK);
+  CHECK_EQ(result, FileStorage::OK);
 
   if (sth.timestamp() > latest_tree_timestamp_) {
     latest_tree_timestamp_ = sth.timestamp();
@@ -181,13 +174,11 @@ typename Database<Logged>::LookupResult FileDB<Logged>::LatestTreeHead(
   std::string tree_data;
   FileStorage::FileStorageResult db_result =
       tree_storage_->LookupEntry(latest_timestamp_key_, &tree_data);
-  assert(db_result == FileStorage::OK);
+  CHECK_EQ(db_result, FileStorage::OK);
 
   ct::SignedTreeHead local_sth;
-
-  bool ret = local_sth.ParseFromString(tree_data);
-  assert(ret);
-  assert(local_sth.timestamp() == latest_tree_timestamp_);
+  CHECK(local_sth.ParseFromString(tree_data));
+  CHECK_EQ(local_sth.timestamp(), latest_tree_timestamp_);
 
   result->CopyFrom(local_sth);
   return this->LOOKUP_OK;

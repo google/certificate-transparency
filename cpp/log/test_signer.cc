@@ -157,7 +157,7 @@ EVP_PKEY* PrivateKeyFromPem(const string& pemkey) {
   // BIO_new_mem_buf is read-only.
   BIO* bio = BIO_new_mem_buf(const_cast<char*>(pemkey.data()), pemkey.size());
   EVP_PKEY* pkey = PEM_read_bio_PrivateKey(bio, NULL, NULL, NULL);
-  assert(pkey != NULL);
+  CHECK_NOTNULL(pkey);
   BIO_free(bio);
   return pkey;
 }
@@ -165,7 +165,7 @@ EVP_PKEY* PrivateKeyFromPem(const string& pemkey) {
 EVP_PKEY* PublicKeyFromPem(const string& pemkey) {
   BIO* bio = BIO_new_mem_buf(const_cast<char*>(pemkey.data()), pemkey.size());
   EVP_PKEY* pkey = PEM_read_bio_PUBKEY(bio, NULL, NULL, NULL);
-  assert(pkey != NULL);
+  CHECK_NOTNULL(pkey);
   BIO_free(bio);
   return pkey;
 }

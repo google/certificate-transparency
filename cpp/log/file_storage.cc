@@ -1,10 +1,10 @@
 /* -*- indent-tabs-mode: nil -*- */
 #include "log/file_storage.h"
 
-#include <assert.h>
 #include <cstdlib>
 #include <dirent.h>
 #include <errno.h>
+#include <glog/logging.h>
 #include <set>
 #include <string>
 #include <sys/stat.h>
@@ -21,7 +21,7 @@ FileStorage::FileStorage(const string& file_base, unsigned storage_depth)
       tmp_file_template_(tmp_dir_ + "/tmpXXXXXX"),
       storage_depth_(storage_depth),
       file_op_(new BasicFilesystemOp()) {
-  assert(storage_depth_ >= 0);
+  CHECK_GE(storage_depth_, 0);
   CreateMissingDirectory(storage_dir_);
   CreateMissingDirectory(tmp_dir_);
 }
@@ -33,7 +33,7 @@ FileStorage::FileStorage(const string& file_base, unsigned storage_depth,
       tmp_file_template_(tmp_dir_ + "/tmpXXXXXX"),
       storage_depth_(storage_depth),
       file_op_(file_op) {
-  assert(storage_depth_ >= 0);
+  CHECK_GE(storage_depth_, 0);
   CreateMissingDirectory(storage_dir_);
   CreateMissingDirectory(tmp_dir_);
 }
@@ -81,7 +81,7 @@ string FileStorage::StoragePathBasename(const string& hex) const {
 }
 
 string FileStorage::StoragePathComponent(const string& hex, unsigned n) const {
-  assert(n < storage_depth_);
+  CHECK_LT(n, storage_depth_);
   if (n >= hex.length())
     return "-";
   return string(1, hex[n]);
@@ -96,7 +96,7 @@ string FileStorage::StoragePath(const string& key) const {
 }
 
 string FileStorage::StorageKey(const string& storage_path) const {
-  assert(storage_path.substr(0, storage_dir_.size()) == storage_dir_);
+  CHECK_EQ(storage_path.substr(0, storage_dir_.size()), storage_dir_);
   string key_path = storage_path.substr(storage_dir_.size() + 1);
   string hex_key;
   for (unsigned n = 0; n < storage_depth_; ++n) {

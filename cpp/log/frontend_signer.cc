@@ -25,7 +25,7 @@ FrontendSigner::SubmitResult FrontendSigner::QueueEntry(
   // TODO(ekasper): switch to using SignedEntryWithType as the DB key.
   string sha256_hash =
       Sha256Hasher::Sha256Digest(Serializer::LeafCertificate(entry));
-  assert(!sha256_hash.empty());
+  CHECK(!sha256_hash.empty());
 
   cert_trans::LoggedCertificate logged;
   Database<cert_trans::LoggedCertificate>::LookupResult db_result =

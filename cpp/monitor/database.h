@@ -62,7 +62,7 @@ class Database {
       case UNDEFINED:
         return "STH not yet verified.";
       default:
-        assert(false);
+        LOG(FATAL) << "unknown VerificationLevel enum value: " << result;
         return "";
     }
   }
