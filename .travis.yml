@@ -4,6 +4,9 @@ language: cpp
 compiler:
  - clang
 
+env:
+ - GOPATH=${TRAVIS_BUILD_DIR}/go
+
 cache: apt
 
 before_install:
