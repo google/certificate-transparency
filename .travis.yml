@@ -4,6 +4,9 @@ language: cpp
 compiler:
  - clang
 
+env:
+ - GOPATH=${TRAVIS_BUILD_DIR}/go
+
 cache: apt
 
 before_install:
@@ -32,7 +35,6 @@ before_install:
  - make
  - sudo make install
  - cd ..
-
 
 script:
  - make alltests OPENSSLDIR=/usr/local/openssl
