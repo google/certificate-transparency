@@ -228,15 +228,13 @@ typename TreeSigner<Logged>::UpdateResult TreeSigner<Logged>::UpdateTree() {
   // Timestamps have to be unique.
   uint64_t min_timestamp = LastUpdateTime() + 1;
 
-  util::Status status(SequenceNewEntries());
-  CHECK(status.ok()) << status;
-
   EntryHandle<Logged> logged;
   int64_t next_seq(sth.tree_size());
   CHECK_GE(next_seq, 0);
   VLOG(1) << "Building tree";
   while (true) {
-    status = consistent_store_->GetSequencedEntry(next_seq, &logged);
+    util::Status status(
+        consistent_store_->GetSequencedEntry(next_seq, &logged));
     if (status.CanonicalCode() == util::error::NOT_FOUND) {
       // no more certs to integrate (or a gap in the sequence numbers, but
       // that'd be bad so we should bail anyway.)
