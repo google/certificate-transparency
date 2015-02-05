@@ -36,7 +36,6 @@ before_install:
  - sudo make install
  - cd ..
 
-
 script:
  - make alltests OPENSSLDIR=/usr/local/openssl
  - go test -v ./go/...
