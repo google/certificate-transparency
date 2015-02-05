@@ -2,7 +2,7 @@
 #ifndef SERIALIZER_H
 #define SERIALIZER_H
 
-#include <assert.h>
+#include <glog/logging.h>
 #include <stdint.h>
 #include <string>
 
@@ -157,8 +157,8 @@ class Serializer {
 
   template <class T>
   void WriteUint(T in, size_t bytes) {
-    assert(bytes <= sizeof in);
-    assert(bytes == sizeof in || in >> (bytes * 8) == 0);
+    CHECK_LE(bytes, sizeof(in));
+    CHECK(bytes == sizeof(in) || in >> (bytes * 8) == 0);
     for (; bytes > 0; --bytes)
       output_.push_back(((in & (static_cast<T>(0xff) << ((bytes - 1) * 8))) >>
                          ((bytes - 1) * 8)));

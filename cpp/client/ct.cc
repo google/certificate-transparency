@@ -502,7 +502,7 @@ static void ProofToExtensionData() {
   // Read the proof
   char* buf = new char[proof_length];
   proof_in.read(buf, proof_length);
-  assert(proof_in.gcount() == proof_length);
+  CHECK_EQ(proof_in.gcount(), proof_length);
 
   SignedCertificateTimestampList sctlist;
   sctlist.add_sct_list(buf, proof_length);
@@ -865,8 +865,8 @@ void GetEntries() {
       for (int n = 0; n < x509chain.certificate_chain_size(); ++n)
         WriteCertificate(x509chain.certificate_chain(n), e, n + 1, "x509");
     } else {
-      assert(entry->leaf.timestamped_entry().entry_type() ==
-             ct::PRECERT_ENTRY);
+      CHECK_EQ(entry->leaf.timestamped_entry().entry_type(),
+               ct::PRECERT_ENTRY);
       WriteCertificate(entry->leaf.timestamped_entry()
                            .signed_entry()
                            .precert()

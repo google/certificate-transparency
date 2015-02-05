@@ -30,7 +30,7 @@ FrontendSigner::SubmitResult FrontendSigner::QueueEntry(
     const LogEntry& entry, SignedCertificateTimestamp* sct) {
   const string sha256_hash(
       Sha256Hasher::Sha256Digest(Serializer::LeafCertificate(entry)));
-  assert(!sha256_hash.empty());
+  CHECK(!sha256_hash.empty());
 
   // Check if the entry already exists in the local DB (i.e. it's been
   // integrated into the tree.)

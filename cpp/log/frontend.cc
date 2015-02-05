@@ -110,6 +110,8 @@ std::string Frontend::SubmitResultString(SubmitResult result) {
 // static
 SubmitResult Frontend::GetSubmitError(
     CertSubmissionHandler::SubmitResult result) {
+  CHECK_NE(result, CertSubmissionHandler::OK);
+
   SubmitResult submit_result;
   switch (result) {
     case CertSubmissionHandler::EMPTY_SUBMISSION:
@@ -161,8 +163,11 @@ void Frontend::UpdateX509Stats(SubmitResult result) {
       break;
     case INTERNAL_ERROR:
       ++stats_.internal_errors;
+      break;
+    case PRECERT_CHAIN_NOT_WELL_FORMED:
+      LOG(FATAL) << "invalid PRECERT_CHAIN_NOT_WELL_FORMED on an X509 certificate";
     default:
-      CHECK(false);
+      LOG(FATAL) << "unknown SubmitResult enum value: " << result;
   }
 }
 
@@ -188,7 +193,8 @@ void Frontend::UpdatePrecertStats(SubmitResult result) {
       break;
     case INTERNAL_ERROR:
       ++stats_.internal_errors;
+      break;
     default:
-      CHECK(false);
+      LOG(FATAL) << "unknown SubmitResult enum value: " << result;
   }
 }

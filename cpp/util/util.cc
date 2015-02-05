@@ -1,8 +1,8 @@
 #include "util/util.h"
 
-#include <assert.h>
 #include <cstring>
 #include <fstream>
+#include <glog/logging.h>
 #include <iostream>
 #include <netinet/in.h>  // for resolv.h
 #include <resolv.h>      // for b64_ntop
@@ -21,8 +21,7 @@ namespace {
 const char nibble[] = "0123456789abcdef";
 
 char ByteValue(char high, char low) {
-  assert(('0' <= high && high <= '9') || ('a' <= high && high <= 'f'));
-  assert(('0' <= high && high <= '9') || ('a' <= high && high <= 'f'));
+  CHECK(('0' <= high && high <= '9') || ('a' <= high && high <= 'f'));
   char ret;
   if (high <= '9')
     ret = (high - '0') << 4;
@@ -61,14 +60,14 @@ string HexString(const string& data, char byte_delimiter) {
 
 string BinaryString(const string& hex_string) {
   string ret;
-  assert(!(hex_string.size() % 2));
+  CHECK(!(hex_string.size() % 2));
   for (size_t i = 0; i < hex_string.size(); i += 2)
     ret.push_back(ByteValue(hex_string[i], hex_string[i + 1]));
   return ret;
 }
 
 static char* ReadFileStreamToBuffer(std::ifstream& in, int* length) {
-  assert(in.good());
+  CHECK(in.good());
 
   in.seekg(0, std::ios::end);
   int file_length = in.tellg();
@@ -78,8 +77,8 @@ static char* ReadFileStreamToBuffer(std::ifstream& in, int* length) {
   // Now write the proof.
   char* buf = new char[file_length];
   in.read(buf, file_length);
-  assert(!in.bad());
-  assert(in.gcount() == file_length);
+  CHECK(!in.bad());
+  CHECK_EQ(in.gcount(), file_length);
   in.close();
 
   *length = file_length;
