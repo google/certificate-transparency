@@ -149,6 +149,18 @@ util::Status EtcdConsistentStore<Logged>::SetServingSTH(
 
 
 template <class Logged>
+util::StatusOr<ct::SignedTreeHead> EtcdConsistentStore<Logged>::GetServingSTH()
+    const {
+  std::lock_guard<std::mutex> lock(mutex_);
+  if (serving_sth_) {
+    return serving_sth_->Entry();
+  } else {
+    return util::Status(util::error::NOT_FOUND, "No current Serving STH.");
+  }
+}
+
+
+template <class Logged>
 bool LeafEntriesMatch(const Logged& a, const Logged& b) {
   CHECK_EQ(a.entry().type(), b.entry().type());
   switch (a.entry().type()) {

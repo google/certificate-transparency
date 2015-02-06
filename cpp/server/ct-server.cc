@@ -169,6 +169,7 @@ static const bool sign_dummy =
                           &ValidateIsPositive);
 
 void SignMerkleTree(TreeSigner<LoggedCertificate>* tree_signer,
+                    ClusterStateController<LoggedCertificate>* controller,
                     const MasterElection* election) {
   const steady_clock::duration period((seconds(FLAGS_tree_signing_frequency_seconds)));
   steady_clock::time_point target_run_time(steady_clock::now());
@@ -181,6 +182,7 @@ void SignMerkleTree(TreeSigner<LoggedCertificate>* tree_signer,
     }
 
     CHECK_EQ(tree_signer->UpdateTree(), TreeSigner<LoggedCertificate>::OK);
+    controller->NewTreeHead(tree_signer->LatestSTH());
 
     const steady_clock::time_point now(steady_clock::now());
     while (target_run_time <= now) {
@@ -299,7 +301,7 @@ int main(int argc, char* argv[]) {
     election.WaitToBecomeMaster();
 
     // Do an initial signing run to get the initial STH, again this is
-    // temporary until we re-populate FakeEtcd from the DB:
+    // temporary until we re-populate FakeEtcd from the DB.
     CHECK_EQ(tree_signer.UpdateTree(), TreeSigner<LoggedCertificate>::OK);
 
     // Need to boot-strap the Serving STH too because we consider it an error
@@ -308,19 +310,12 @@ int main(int argc, char* argv[]) {
     consistent_store.SetServingSTH(tree_signer.LatestSTH());
   } else {
     CHECK(!FLAGS_server.empty());
-    CHECK_NE(FLAGS_server, "localhost");
   }
 
   ClusterStateController<LoggedCertificate> cluster_controller(
-      &internal_pool, &consistent_store, &election);
+      &internal_pool, db, &consistent_store, &election);
   // Publish this node's hostname:port info
   cluster_controller.SetNodeHostPort(FLAGS_server, FLAGS_port);
-
-  const Database<LoggedCertificate>::NotifySTHCallback notify_sth_callback(
-      [&cluster_controller](const SignedTreeHead& sth) {
-        cluster_controller.NewTreeHead(sth);
-      });
-  db->AddNotifySTHCallback(&notify_sth_callback);
 
   // Periodically refresh our contiguous tree size so that other nodes get a
   // good view of the data we have locally and can use us for replication.
@@ -342,9 +337,8 @@ int main(int argc, char* argv[]) {
 
   // TODO(pphaneuf): We should be remaining in an "unhealthy state"
   // (either not accepting any requests, or returning some internal
-  // server error) until we have an STH to serve. We can sign for now,
-  // but we might not be a signer.
-  thread signer(&SignMerkleTree, &tree_signer, &election);
+  // server error) until we have an STH to serve.
+  thread signer(&SignMerkleTree, &tree_signer, &cluster_controller, &election);
   ThreadPool pool;
   HttpHandler handler(&log_lookup, db, &checker, &frontend, &pool);
 

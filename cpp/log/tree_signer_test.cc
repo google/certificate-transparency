@@ -22,6 +22,7 @@
 
 namespace cert_trans {
 
+using cert_trans::ClusterStateController;
 using cert_trans::EntryHandle;
 using cert_trans::LoggedCertificate;
 using cert_trans::MockMasterElection;
@@ -59,6 +60,8 @@ class TreeSignerTest : public ::testing::Test {
                                                    &election_, "/root", "id"));
     tree_signer_.reset(new TS(std::chrono::duration<double>(0), db(),
                               store_.get(), TestSigner::DefaultLogSigner()));
+    // Set a default empty STH so that we can call UpdateTree() on the signer.
+    store_->SetServingSTH(SignedTreeHead());
   }
 
   void AddPendingEntry(LoggedCertificate* logged_cert) const {
@@ -174,8 +177,7 @@ TYPED_TEST(TreeSignerTest, Sign) {
   EXPECT_EQ(util::Status::OK, this->tree_signer_->SequenceNewEntries());
   EXPECT_EQ(TS::OK, this->tree_signer_->UpdateTree());
 
-  SignedTreeHead sth;
-  EXPECT_EQ(DB::LOOKUP_OK, this->db()->LatestTreeHead(&sth));
+  const SignedTreeHead sth(this->tree_signer_->LatestSTH());
   EXPECT_EQ(1U, sth.tree_size());
   EXPECT_EQ(sth.timestamp(), this->tree_signer_->LastUpdateTime());
 }
@@ -210,8 +212,7 @@ TYPED_TEST(TreeSignerTest, Verify) {
 
   EXPECT_EQ(TS::OK, this->tree_signer_->UpdateTree());
 
-  SignedTreeHead sth;
-  EXPECT_EQ(DB::LOOKUP_OK, this->db()->LatestTreeHead(&sth));
+  const SignedTreeHead sth(this->tree_signer_->LatestSTH());
   EXPECT_EQ(LogVerifier::VERIFY_OK,
             this->verifier_->VerifySignedTreeHead(sth));
 }
@@ -223,19 +224,16 @@ TYPED_TEST(TreeSignerTest, ResumeClean) {
   this->AddSequencedEntry(&logged_cert, 0);
 
   EXPECT_EQ(TS::OK, this->tree_signer_->UpdateTree());
-  SignedTreeHead sth;
 
-  EXPECT_EQ(DB::LOOKUP_OK, this->db()->LatestTreeHead(&sth));
+  const SignedTreeHead sth(this->tree_signer_->LatestSTH());
 
   TS* signer2 = this->GetSimilar();
-  EXPECT_EQ(signer2->LastUpdateTime(), sth.timestamp());
 
   // Update
   EXPECT_EQ(TS::OK, signer2->UpdateTree());
-  SignedTreeHead sth2;
 
-  EXPECT_EQ(DB::LOOKUP_OK, this->db()->LatestTreeHead(&sth2));
-  EXPECT_LT(sth.timestamp(), sth2.timestamp());
+  const SignedTreeHead sth2(signer2->LatestSTH());
+  EXPECT_LE(sth.timestamp(), sth2.timestamp());
   EXPECT_EQ(sth.sha256_root_hash(), sth2.sha256_root_hash());
   EXPECT_EQ(sth.tree_size(), sth2.tree_size());
 
@@ -247,8 +245,7 @@ TYPED_TEST(TreeSignerTest, ResumeClean) {
 // sequence number commits.
 TYPED_TEST(TreeSignerTest, ResumePartialSign) {
   EXPECT_EQ(TS::OK, this->tree_signer_->UpdateTree());
-  SignedTreeHead sth;
-  EXPECT_EQ(DB::LOOKUP_OK, this->db()->LatestTreeHead(&sth));
+  const SignedTreeHead sth(this->tree_signer_->LatestSTH());
 
   LoggedCertificate logged_cert;
   this->test_signer_.CreateUnique(&logged_cert);
@@ -256,8 +253,7 @@ TYPED_TEST(TreeSignerTest, ResumePartialSign) {
 
   TS* signer2 = this->GetSimilar();
   EXPECT_EQ(TS::OK, signer2->UpdateTree());
-  SignedTreeHead sth2;
-  EXPECT_EQ(DB::LOOKUP_OK, this->db()->LatestTreeHead(&sth2));
+  const SignedTreeHead sth2(signer2->LatestSTH());
   // The signer should have picked up the sequence number commit.
   EXPECT_EQ(1U, sth2.tree_size());
   EXPECT_LT(sth.timestamp(), sth2.timestamp());
@@ -269,24 +265,29 @@ TYPED_TEST(TreeSignerTest, ResumePartialSign) {
 
 TYPED_TEST(TreeSignerTest, SignEmpty) {
   EXPECT_EQ(TS::OK, this->tree_signer_->UpdateTree());
-  SignedTreeHead sth;
 
-  EXPECT_EQ(DB::LOOKUP_OK, this->db()->LatestTreeHead(&sth));
+  const SignedTreeHead sth(this->tree_signer_->LatestSTH());
   EXPECT_GT(sth.timestamp(), 0U);
   EXPECT_EQ(sth.tree_size(), 0U);
 }
 
 
-TYPED_TEST(TreeSignerTest, FailInconsistentTreeHead) {
-  EXPECT_EQ(TS::OK, this->tree_signer_->UpdateTree());
-  // A second signer interferes.
-  TS* signer2 = this->GetSimilar();
-  EXPECT_EQ(TS::OK, signer2->UpdateTree());
-  // The first signer should detect this and refuse to update.
-  EXPECT_EQ(TS::DB_ERROR, this->tree_signer_->UpdateTree());
+TYPED_TEST(TreeSignerTest, SignerFallenBehindInReplication) {
+  SignedTreeHead sth;
+  sth.set_tree_size(13);
+  sth.set_timestamp(1000);
+  this->store_->SetServingSTH(sth);
 
-  delete signer2;
+  for (int i = sth.tree_size(); i < sth.tree_size() + 3; ++i) {
+    LoggedCertificate logged_cert;
+    this->test_signer_.CreateUnique(&logged_cert);
+    this->AddSequencedEntry(&logged_cert, i);
+  }
+
+  EXPECT_EQ(0, this->db()->TreeSize());
+  EXPECT_EQ(TS::INSUFFICIENT_DATA, this->tree_signer_->UpdateTree());
 }
+
 
 #if 0
 TYPED_TEST(TreeSignerTest, FailInconsistentSequenceNumbers) {

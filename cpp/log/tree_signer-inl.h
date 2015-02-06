@@ -11,9 +11,7 @@
 #include <stdint.h>
 
 #include "log/database.h"
-#include "log/consistent_store.h"
 #include "log/log_signer.h"
-#include "merkletree/compact_merkle_tree.h"
 #include "proto/serializer.h"
 #include "util/status.h"
 #include "util/util.h"
@@ -117,7 +115,7 @@ util::Status TreeSigner<Logged>::HandlePreviouslySequencedEntries(
           << "\nclearing provisional_sequence_number to "
           << "resequence pending entry";
       // This entry is already sequenced just fine, no need to return it.
-      VLOG(0) << "Entry already sequenced: "
+      VLOG(1) << "Entry already sequenced: "
               << util::ToBase64(it->Entry().Hash()) << " ("
               << presequenced.Entry().sequence_number()
               << "), removing from list";
@@ -201,46 +199,55 @@ util::Status TreeSigner<Logged>::SequenceNewEntries() {
 // reads/writes, then we die.
 template <class Logged>
 typename TreeSigner<Logged>::UpdateResult TreeSigner<Logged>::UpdateTree() {
-  // Check that the latest sth is ours.
-  ct::SignedTreeHead sth;
-  typename Database<Logged>::LookupResult db_result =
-      db_->LatestTreeHead(&sth);
-
-  if (db_result == Database<Logged>::NOT_FOUND) {
-    if (LastUpdateTime() != 0) {
-      LOG(ERROR) << "Latest STH missing from database, signer has:\n"
-                 << latest_tree_head_.DebugString();
-      return DB_ERROR;
-    }
-  } else {
-    CHECK_EQ(db_result, Database<Logged>::LOOKUP_OK)
-        << "Latest STH lookup failed";
-    if (sth.timestamp() != latest_tree_head_.timestamp() ||
-        sth.tree_size() != latest_tree_head_.tree_size() ||
-        sth.sha256_root_hash() != latest_tree_head_.sha256_root_hash()) {
-      LOG(ERROR) << "Database has an STH that does not match ours. "
-                 << "Our STH:\n" << latest_tree_head_.DebugString()
-                 << "Database STH:\n" << sth.DebugString();
-      return DB_ERROR;
-    }
-  }
-
-  // Timestamps have to be unique.
+  // Try to make local timestamps unique, but there's always a chance that
+  // multiple nodes in the cluster may make STHs with the same timestamp.
+  // That'll get handled by the Serving STH selection code.
   uint64_t min_timestamp = LastUpdateTime() + 1;
 
-  EntryHandle<Logged> logged;
-  int64_t next_seq(sth.tree_size());
+  // Make sure we've got all the sequenced entries from our local DB:
+  for (int i(cert_tree_.LeafCount()); i < db_->TreeSize(); ++i) {
+    Logged logged;
+    CHECK_EQ(Database<Logged>::LOOKUP_OK, db_->LookupByIndex(i, &logged));
+    CHECK_EQ(logged.sequence_number(), i);
+
+    AppendToTree(logged);
+  }
+
+  int64_t next_seq(cert_tree_.LeafCount());
   CHECK_GE(next_seq, 0);
-  VLOG(1) << "Building tree";
+
+  // Ensure we're in a position to be able to fetch entries from etcd.
+  const util::StatusOr<ct::SignedTreeHead> serving_sth(
+      consistent_store_->GetServingSTH());
+  if (!serving_sth.ok()) {
+    // TODO(alcutter): Should we allow this?
+    //                 Is this really a log provisioning failure or corrupted
+    //                 consistent store?
+    LOG(WARNING) << "Couldn't get current serving STH: "
+                 << serving_sth.status();
+  } else if (serving_sth.ValueOrDie().tree_size() > next_seq) {
+    // Uh oh, it's likely that the entries we need to fetch from etcd will have
+    // been cleaned up since the ServingSTH has advanced past them.
+    // We'll have to bail and wait for those entries to replicate in.
+    LOG(INFO) << "Insufficient local replication, unable to sign.";
+    return INSUFFICIENT_DATA;
+  }
+
+  VLOG(1) << "Building tree starting from " << next_seq;
   while (true) {
+    EntryHandle<Logged> logged;
     util::Status status(
         consistent_store_->GetSequencedEntry(next_seq, &logged));
     if (status.CanonicalCode() == util::error::NOT_FOUND) {
       // no more certs to integrate (or a gap in the sequence numbers, but
       // that'd be bad so we should bail anyway.)
       break;
+    } else if (!status.ok()) {
+      LOG(WARNING) << "problem getting sequenced entry " << next_seq << ": "
+                   << status;
+      return DB_ERROR;
     }
-    CHECK(status.ok()) << status;
+
     // Paranoid much?
     CHECK(logged.Entry().has_sequence_number());
     CHECK_EQ(next_seq, logged.Entry().sequence_number());
@@ -262,10 +269,10 @@ typename TreeSigner<Logged>::UpdateResult TreeSigner<Logged>::UpdateTree() {
   ct::SignedTreeHead new_sth;
   TimestampAndSign(min_timestamp, &new_sth);
 
-  // TODO(ekasper): if we allow multiple processes to modify the database,
-  // then we should lock the database file here and check again that we still
-  // own the latest STH.
-  CHECK_EQ(Database<Logged>::OK, db_->WriteTreeHead(new_sth));
+  // We don't actually store this STH anywhere durable yet, but rather let the
+  // caller decide what to do with it.  (In practice, this will mean that it's
+  // pushed out to this node's ClusterNodeState so that it becomes a candidate
+  // for the cluster-wide Serving STH.)
   latest_tree_head_.CopyFrom(new_sth);
   return OK;
 }
