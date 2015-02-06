@@ -42,15 +42,29 @@ class EntryHandle {
     return handle_;
   }
 
+  bool HasKey() const {
+    return !key_.empty();
+  }
+
+  const std::string& Key() const {
+    return key_;
+  }
+
  private:
   EntryHandle(const T& entry, int handle)
       : entry_(entry), has_handle_(true), handle_(handle) {
   }
 
-  explicit EntryHandle(const T& entry) : entry_(entry), has_handle_(false) {
+  EntryHandle(const std::string& key, const T& entry, int handle)
+      : key_(key), entry_(entry), has_handle_(true), handle_(handle) {
   }
 
-  void Set(const T& entry, int handle) {
+  explicit EntryHandle(const std::string& key, const T& entry)
+      : key_(key), entry_(entry), has_handle_(false) {
+  }
+
+  void Set(const std::string& key, const T& entry, int handle) {
+    key_ = key;
     entry_ = entry;
     handle_ = handle;
     has_handle_ = true;
@@ -61,6 +75,11 @@ class EntryHandle {
     has_handle_ = true;
   }
 
+  void SetKey(const std::string& key) {
+    key_ = key;
+  }
+
+  std::string key_;
   T entry_;
   bool has_handle_;
   int handle_;

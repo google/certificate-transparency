@@ -117,8 +117,8 @@ util::Status EtcdConsistentStore<Logged>::SetServingSTH(
     // Looks like we're creating the first ever serving_sth!
     LOG(WARNING) << "Creating new " << full_path;
     // There's no current serving STH, so we can try to create one.
-    EntryHandle<ct::SignedTreeHead> sth_handle(new_sth);
-    util::Status status(CreateEntry(full_path, &sth_handle));
+    EntryHandle<ct::SignedTreeHead> sth_handle(full_path, new_sth);
+    util::Status status(CreateEntry(&sth_handle));
     if (!status.ok()) {
       return status;
     }
@@ -138,8 +138,9 @@ util::Status EtcdConsistentStore<Logged>::SetServingSTH(
   CHECK_LE(serving_sth_->Entry().tree_size(), new_sth.tree_size());
 
   VLOG(1) << "Updating existing " << full_path;
-  EntryHandle<ct::SignedTreeHead> sth_to_etcd(new_sth, serving_sth_->Handle());
-  util::Status status(UpdateEntry(full_path, &sth_to_etcd));
+  EntryHandle<ct::SignedTreeHead> sth_to_etcd(full_path, new_sth,
+                                              serving_sth_->Handle());
+  util::Status status(UpdateEntry(&sth_to_etcd));
   if (!status.ok()) {
     return status;
   }
@@ -182,8 +183,8 @@ util::Status EtcdConsistentStore<Logged>::AddPendingEntry(Logged* entry) {
   CHECK_NOTNULL(entry);
   CHECK(!entry->has_sequence_number());
   const std::string full_path(GetUnsequencedPath(*entry));
-  EntryHandle<Logged> handle(*entry);
-  util::Status status(CreateEntry(full_path, &handle));
+  EntryHandle<Logged> handle(full_path, *entry);
+  util::Status status(CreateEntry(&handle));
   if (status.CanonicalCode() == util::error::FAILED_PRECONDITION) {
     // Entry with that hash already exists.
     EntryHandle<Logged> preexisting_entry;
@@ -267,17 +268,18 @@ util::Status EtcdConsistentStore<Logged>::AssignSequenceNumber(
     entry->MutableEntry()->set_provisional_sequence_number(sequence_number);
   }
   // Record provisional sequence number:
-  util::Status status(UpdateEntry(GetUnsequencedPath(entry->Entry()), entry));
+  util::Status status(UpdateEntry(entry));
   if (!status.ok()) {
     return status;
   }
   // Now finalise the sequence number assignment.
   // Create a temporary EntryHandle here to avoid stomping over the version
   // info held by the unsequenced entry handle passed in:
-  EntryHandle<Logged> seq_entry(entry->Entry());
+  EntryHandle<Logged> seq_entry(GetSequencedPath(sequence_number),
+                                entry->Entry());
   seq_entry.MutableEntry()->clear_provisional_sequence_number();
   seq_entry.MutableEntry()->set_sequence_number(sequence_number);
-  return CreateEntry(GetSequencedPath(sequence_number), &seq_entry);
+  return CreateEntry(&seq_entry);
 }
 
 
@@ -288,9 +290,9 @@ util::Status EtcdConsistentStore<Logged>::SetClusterNodeState(
   // nobody else is updating our cluster state.
   ct::ClusterNodeState local_state(state);
   local_state.set_node_id(node_id_);
-  EntryHandle<ct::ClusterNodeState> entry(local_state);
+  EntryHandle<ct::ClusterNodeState> entry(GetNodePath(node_id_), local_state);
   const std::chrono::seconds ttl(FLAGS_node_state_ttl_seconds);
-  return ForceSetEntryWithTTL(GetNodePath(node_id_), ttl, &entry);
+  return ForceSetEntryWithTTL(ttl, &entry);
 }
 
 
@@ -298,10 +300,13 @@ util::Status EtcdConsistentStore<Logged>::SetClusterNodeState(
 template <class Logged>
 template <class T, class CB>
 void EtcdConsistentStore<Logged>::ConvertSingleUpdate(
-    const CB& callback, const std::vector<EtcdClient::WatchUpdate>& updates) {
+    const std::string& full_path, const CB& callback,
+    const std::vector<EtcdClient::WatchUpdate>& updates) {
   CHECK_LE(0, updates.size());
   if (updates.empty()) {
-    callback(Update<T>(EntryHandle<T>(), false /* exists */));
+    EntryHandle<T> handle;
+    handle.SetKey(full_path);
+    callback(Update<T>(handle, false /* exists */));
   } else {
     callback(TypedUpdateFromWatchUpdate<T>(updates[0]));
   }
@@ -326,12 +331,13 @@ template <class Logged>
 void EtcdConsistentStore<Logged>::WatchServingSTH(
     const typename ConsistentStore<Logged>::ServingSTHCallback& cb,
     util::Task* task) {
+  const std::string full_path(GetFullPath(kServingSthFile));
   client_->Watch(
-      GetFullPath(kServingSthFile),
+      full_path,
       std::bind(&ConvertSingleUpdate<
                     ct::SignedTreeHead,
                     typename ConsistentStore<Logged>::ServingSTHCallback>,
-                cb, std::placeholders::_1),
+                full_path, cb, std::placeholders::_1),
       task);
 }
 
@@ -355,12 +361,13 @@ template <class Logged>
 void EtcdConsistentStore<Logged>::WatchClusterConfig(
     const typename ConsistentStore<Logged>::ClusterConfigCallback& cb,
     util::Task* task) {
+  const std::string full_path(GetFullPath(kClusterConfigFile));
   client_->Watch(
-      GetFullPath(kClusterConfigFile),
+      full_path,
       std::bind(&ConvertSingleUpdate<
                     ct::ClusterConfig,
                     typename ConsistentStore<Logged>::ClusterConfigCallback>,
-                cb, std::placeholders::_1),
+                full_path, cb, std::placeholders::_1),
       task);
 }
 
@@ -368,8 +375,9 @@ void EtcdConsistentStore<Logged>::WatchClusterConfig(
 template <class Logged>
 util::Status EtcdConsistentStore<Logged>::SetClusterConfig(
     const ct::ClusterConfig& config) {
-  EntryHandle<ct::ClusterConfig> entry(config);
-  return ForceSetEntry(GetFullPath(kClusterConfigFile), &entry);
+  EntryHandle<ct::ClusterConfig> entry(GetFullPath(kClusterConfigFile),
+                                       config);
+  return ForceSetEntry(&entry);
 }
 
 
@@ -385,7 +393,7 @@ util::Status EtcdConsistentStore<Logged>::GetEntry(
   }
   T t;
   CHECK(t.ParseFromString(util::FromBase64(node.value_.c_str())));
-  entry->Set(t, node.modified_index_);
+  entry->Set(path, t, node.modified_index_);
   return util::Status::OK;
 }
 
@@ -404,7 +412,8 @@ util::Status EtcdConsistentStore<Logged>::GetAllEntriesInDir(
   for (const auto& node : nodes) {
     T t;
     CHECK(t.ParseFromString(util::FromBase64(node.value_.c_str())));
-    entries->emplace_back(EntryHandle<Logged>(t, node.modified_index_));
+    entries->emplace_back(
+        EntryHandle<Logged>(node.key_, t, node.modified_index_));
   }
   return util::Status::OK;
 }
@@ -412,14 +421,14 @@ util::Status EtcdConsistentStore<Logged>::GetAllEntriesInDir(
 
 template <class Logged>
 template <class T>
-util::Status EtcdConsistentStore<Logged>::UpdateEntry(const std::string& path,
-                                                      EntryHandle<T>* t) {
+util::Status EtcdConsistentStore<Logged>::UpdateEntry(EntryHandle<T>* t) {
   CHECK_NOTNULL(t);
   CHECK(t->HasHandle());
+  CHECK(t->HasKey());
   std::string flat_entry;
   CHECK(t->Entry().SerializeToString(&flat_entry));
   int64_t new_version;
-  util::Status status(sync_client_.Update(path, util::ToBase64(flat_entry),
+  util::Status status(sync_client_.Update(t->Key(), util::ToBase64(flat_entry),
                                           t->Handle(), &new_version));
   if (status.ok()) {
     t->SetHandle(new_version);
@@ -430,15 +439,15 @@ util::Status EtcdConsistentStore<Logged>::UpdateEntry(const std::string& path,
 
 template <class Logged>
 template <class T>
-util::Status EtcdConsistentStore<Logged>::CreateEntry(const std::string& path,
-                                                      EntryHandle<T>* t) {
+util::Status EtcdConsistentStore<Logged>::CreateEntry(EntryHandle<T>* t) {
   CHECK_NOTNULL(t);
   CHECK(!t->HasHandle());
+  CHECK(t->HasKey());
   std::string flat_entry;
   CHECK(t->Entry().SerializeToString(&flat_entry));
   int64_t new_version;
   util::Status status(
-      sync_client_.Create(path, util::ToBase64(flat_entry), &new_version));
+      sync_client_.Create(t->Key(), util::ToBase64(flat_entry), &new_version));
   if (status.ok()) {
     t->SetHandle(new_version);
   }
@@ -448,15 +457,20 @@ util::Status EtcdConsistentStore<Logged>::CreateEntry(const std::string& path,
 
 template <class Logged>
 template <class T>
-util::Status EtcdConsistentStore<Logged>::ForceSetEntry(
-    const std::string& path, EntryHandle<T>* t) {
+util::Status EtcdConsistentStore<Logged>::ForceSetEntry(EntryHandle<T>* t) {
   CHECK_NOTNULL(t);
+  CHECK(t->HasKey());
+  // For now we check that |t| wasn't fetched from the etcd store (i.e. it's a
+  // new EntryHandle.  The reason is that if it had been fetched, then the
+  // calling code should be doing an UpdateEntry() here since they have the
+  // handle.
   CHECK(!t->HasHandle());
   std::string flat_entry;
   CHECK(t->Entry().SerializeToString(&flat_entry));
   int64_t new_version;
-  util::Status status(
-      sync_client_.ForceSet(path, util::ToBase64(flat_entry), &new_version));
+  util::Status status(sync_client_.ForceSet(t->Key(),
+                                            util::ToBase64(flat_entry),
+                                            &new_version));
   if (status.ok()) {
     t->SetHandle(new_version);
   }
@@ -467,15 +481,19 @@ util::Status EtcdConsistentStore<Logged>::ForceSetEntry(
 template <class Logged>
 template <class T>
 util::Status EtcdConsistentStore<Logged>::ForceSetEntryWithTTL(
-    const std::string& path, const std::chrono::seconds& ttl,
-    EntryHandle<T>* t) {
+    const std::chrono::seconds& ttl, EntryHandle<T>* t) {
   CHECK_NOTNULL(t);
+  CHECK(t->HasKey());
+  // For now we check that |t| wasn't fetched from the etcd store (i.e. it's a
+  // new EntryHandle.  The reason is that if it had been fetched, then the
+  // calling code should be doing an UpdateEntryWithTTL() here since they have
+  // the handle.
   CHECK(!t->HasHandle());
   CHECK_LE(0, ttl.count());
   std::string flat_entry;
   CHECK(t->Entry().SerializeToString(&flat_entry));
   int64_t new_version;
-  util::Status status(sync_client_.ForceSetWithTTL(path,
+  util::Status status(sync_client_.ForceSetWithTTL(t->Key(),
                                                    util::ToBase64(flat_entry),
                                                    ttl, &new_version));
   if (status.ok()) {
@@ -487,11 +505,11 @@ util::Status EtcdConsistentStore<Logged>::ForceSetEntryWithTTL(
 
 template <class Logged>
 template <class T>
-util::Status EtcdConsistentStore<Logged>::DeleteEntry(const std::string& path,
-                                                      EntryHandle<T>* entry) {
+util::Status EtcdConsistentStore<Logged>::DeleteEntry(EntryHandle<T>* entry) {
   CHECK_NOTNULL(entry);
   CHECK(entry->HasHandle());
-  return sync_client_.Delete(path, entry->Handle());
+  CHECK(entry->HasKey());
+  return sync_client_.Delete(entry->Key(), entry->Handle());
 }
 
 
@@ -541,7 +559,7 @@ Update<T> EtcdConsistentStore<Logged>::TypedUpdateFromWatchUpdate(
   const std::string raw_value(util::FromBase64(update.node_.value_.c_str()));
   T thing;
   CHECK(thing.ParseFromString(raw_value)) << raw_value;
-  EntryHandle<T> handle(thing);
+  EntryHandle<T> handle(update.node_.key_, thing);
   if (update.exists_) {
     handle.SetHandle(update.node_.modified_index_);
   }
@@ -617,8 +635,7 @@ util::Status EtcdConsistentStore<Logged>::RunOneCleanUpIteration(
                    << ") corresponding to sequenced entry #" << sequence_number
                    << " : " << status;
     } else {
-      status =
-          DeleteEntry(GetUnsequencedPath(unseq_entry.Entry()), &unseq_entry);
+      status = DeleteEntry(&unseq_entry);
       if (!status.ok()) {
         LOG(WARNING) << "Cleanup couldn't delete unsequenced entry (" << hash
                      << ") corresponding to sequenced entry #"
@@ -630,8 +647,7 @@ util::Status EtcdConsistentStore<Logged>::RunOneCleanUpIteration(
             << "corresponding to sequenced entry #" << sequence_number;
 
     // Now delete the sequenced entry:
-    status =
-        DeleteEntry(GetSequencedPath(sequence_number), &entry);
+    status = DeleteEntry(&entry);
     if (!status.ok()) {
       LOG(WARNING) << "Cleanup couldn't delete sequenced entry #"
                    << sequence_number << " (but corresponding unsequenced "

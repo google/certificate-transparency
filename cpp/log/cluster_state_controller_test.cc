@@ -83,7 +83,7 @@ class ClusterStateControllerTest : public ::testing::Test {
   }
 
   ct::ClusterNodeState GetNodeStateView(const string& node_id) {
-    auto it(controller_.all_peers_.find(node_id));
+    auto it(controller_.all_peers_.find("/nodes/" + node_id));
     CHECK(it != controller_.all_peers_.end());
     return it->second->state();
   }
