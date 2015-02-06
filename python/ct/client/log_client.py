@@ -214,7 +214,7 @@ class RequestHandler(object):
 
     def post_response(self, uri, post_data):
         try:
-            return requests.post(uri, data=json.dumps(post_data), timeout=60)
+            return requests.post(uri, data=json.dumps(post_data), timeout=self._timeout)
         except requests.exceptions.RequestException as e:
             raise HTTPError("POST to %s failed: %s" % (uri, e))
 
