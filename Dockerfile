@@ -22,6 +22,7 @@ RUN groupadd -r ctlog && useradd -r -g ctlog ctlog
 RUN mkdir /mnt/ctlog
 COPY cpp/server/ct-server /usr/local/bin/
 COPY test/testdata/ct-server-key.pem /usr/local/etc/
+COPY cpp/tools/ct-clustertool /usr/local/bin/
 VOLUME /mnt/ctlog
 CMD cd /mnt/ctlog/ && \
     if [ ! -d logs ]; then mkdir logs; fi && \

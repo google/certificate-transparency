@@ -102,8 +102,9 @@ EXTRA_TESTS = \
 	log/ct_extensions_test \
 	log/frontend_test
 
-all: client/ct server/ct-server server/ct-dns-server tools/dump_cert \
-     tools/dump_sth util/bench_etcd util/etcd_masterelection util/etcd_watch
+all: client/ct server/ct-server server/ct-dns-server tools/ct-clustertool \
+     tools/dump_cert tools/dump_sth util/bench_etcd util/etcd_masterelection \
+     util/etcd_watch
 
 tests: all $(TESTS) $(DISABLED_TESTS) $(EXTRA_TESTS)
 
@@ -345,6 +346,13 @@ server/ct-server: server/ct-server.o util/read_key.o server/handler.o \
 	base/notification.o log/logged_certificate.o fetcher/fetcher.o \
         fetcher/peer.o fetcher/peer_group.o fetcher/remote_peer.o \
         client/async_log_client.o $(LOCAL_LIBS)
+
+tools/ct-clustertool: tools/clustertool_main.o \
+                      merkletree/libmerkletree.a util/read_key.o \
+                      base/notification.o merkletree/serial_hasher.o \
+                      log/libcluster.a log/libdatabase.a \
+                      log/liblog.a util/libutil.a proto/libproto.a
+	$(CXX) -o $@ $(LDLIBS) $^
 
 tools/dump_cert: tools/dump_cert.o proto/libproto.a util/libutil.a
 

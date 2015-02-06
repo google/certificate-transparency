@@ -44,6 +44,7 @@
 /cpp/server/blob-server
 /cpp/server/ct-dns-server
 /cpp/server/ct-server
+/cpp/tools/clustertool
 /cpp/tools/dump_cert
 /cpp/tools/dump_sth
 /cpp/util/bench_etcd
