@@ -524,7 +524,7 @@ class LogClient(object):
         """
         sct_data = self._post_req_body(
             _ADD_CHAIN,
-            [base64.b64encode(certificate) for certificate in certs_list])
+            {'chain': [base64.b64encode(certificate) for certificate in certs_list]})
         return self._parse_sct(sct_data)
 
 
