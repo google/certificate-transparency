@@ -41,10 +41,6 @@ class ClusterStateController {
   // Updates *this* node's ClusterNodeState to reflect the new STH available.
   void NewTreeHead(const ct::SignedTreeHead& sth);
 
-  // Updates *this* node's ClusterNodeState to reflect the new tree data
-  // available.
-  void ContiguousTreeSizeUpdated(const int64_t new_contiguous_tree_size);
-
   // Gets the current (if any) calculated serving STH for the cluster.
   // If there is such an STH then return true and |sth| is populated, returns
   // false otherwise.

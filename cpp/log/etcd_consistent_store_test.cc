@@ -423,7 +423,6 @@ TEST_F(EtcdConsistentStoreTest, TestSetClusterNodeState) {
 
   ct::ClusterNodeState state;
   state.set_node_id(kNodeId);
-  state.set_contiguous_tree_size(2342);
 
   util::Status status(store_->SetClusterNodeState(state));
   EXPECT_TRUE(status.ok()) << status;
@@ -431,7 +430,6 @@ TEST_F(EtcdConsistentStoreTest, TestSetClusterNodeState) {
   ct::ClusterNodeState set_state;
   PeekEntry(kPath, &set_state);
   EXPECT_EQ(state.node_id(), set_state.node_id());
-  EXPECT_EQ(state.contiguous_tree_size(), set_state.contiguous_tree_size());
 }
 
 
@@ -441,7 +439,6 @@ TEST_F(EtcdConsistentStoreTest, TestSetClusterNodeStateHasTTL) {
 
   ct::ClusterNodeState state;
   state.set_node_id(kNodeId);
-  state.set_contiguous_tree_size(2342);
 
   util::Status status(store_->SetClusterNodeState(state));
   EXPECT_TRUE(status.ok()) << status;
@@ -449,7 +446,6 @@ TEST_F(EtcdConsistentStoreTest, TestSetClusterNodeStateHasTTL) {
   ct::ClusterNodeState set_state;
   PeekEntry(kPath, &set_state);
   EXPECT_EQ(state.node_id(), set_state.node_id());
-  EXPECT_EQ(state.contiguous_tree_size(), set_state.contiguous_tree_size());
 
   sleep(2);
 
@@ -503,7 +499,6 @@ TEST_F(EtcdConsistentStoreTest, WatchClusterNodeStates) {
 
   ct::ClusterNodeState state;
   state.set_node_id(kNodeId);
-  state.set_contiguous_tree_size(2342);
 
   SyncTask task(&executor_);
   store_->WatchClusterNodeStates(
