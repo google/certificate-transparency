@@ -196,8 +196,9 @@ def _parse_consistency_proof(response, servername):
 # A class that we can mock out to generate fake responses.
 class RequestHandler(object):
     """HTTPS requests."""
-    def __init__(self, connection_timeout=60):
+    def __init__(self, connection_timeout=60, ca_bundle=True):
       self._timeout = connection_timeout
+      self._ca_bundle = ca_bundle
 
     def __repr__(self):
         return "%r()" % self.__class__.__name__
@@ -208,13 +209,15 @@ class RequestHandler(object):
     def get_response(self, uri, params=None):
         """Get an HTTP response for a GET request."""
         try:
-            return requests.get(uri, params=params, timeout=self._timeout)
+            return requests.get(uri, params=params, timeout=self._timeout,
+                                verify=self._ca_bundle)
         except requests.exceptions.RequestException as e:
             raise HTTPError("Connection to %s failed: %s" % (uri, e))
 
     def post_response(self, uri, post_data):
         try:
-            return requests.post(uri, data=json.dumps(post_data), timeout=self._timeout)
+            return requests.post(uri, data=json.dumps(post_data),
+                                 timeout=self._timeout, verify=self._ca_bundle)
         except requests.exceptions.RequestException as e:
             raise HTTPError("POST to %s failed: %s" % (uri, e))
 
@@ -250,12 +253,13 @@ class RequestHandler(object):
 class LogClient(object):
     """HTTP client for talking to a CT log."""
 
-    def __init__(self, uri, handler=None, connection_timeout=60):
+    def __init__(self, uri, handler=None, connection_timeout=60,
+                 ca_bundle=True):
         self._uri = uri
         if handler:
           self._req = handler
         else:
-          self._req = RequestHandler(connection_timeout)
+          self._req = RequestHandler(connection_timeout, ca_bundle)
 
     def __repr__(self):
         return "%r(%r)" % (self.__class__.__name__, self._req)
