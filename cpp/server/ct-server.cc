@@ -313,7 +313,7 @@ int main(int argc, char* argv[]) {
   }
 
   ClusterStateController<LoggedCertificate> cluster_controller(
-      &internal_pool, db, &consistent_store, &election);
+      &internal_pool, event_base, db, &consistent_store, &election);
   // Publish this node's hostname:port info
   cluster_controller.SetNodeHostPort(FLAGS_server, FLAGS_port);
 

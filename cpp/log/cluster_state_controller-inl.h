@@ -4,20 +4,84 @@
 #include "log/cluster_state_controller.h"
 
 #include <functional>
+#include <stdint.h>
 
+#include "fetcher/peer.h"
 #include "log/database.h"
 #include "log/etcd_consistent_store-inl.h"
 #include "proto/ct.pb.h"
 
 namespace cert_trans {
 
-// TODO(alcutter): Need a better system for hanging tasks onto events, Pierre's
-//                 task-a-palooza idea perhaps?
+namespace {
+
+
+std::unique_ptr<AsyncLogClient> BuildAsyncLogClient(
+    const std::shared_ptr<libevent::Base>& base,
+    const ct::ClusterNodeState& state) {
+  CHECK(!state.hostname().empty());
+  CHECK_GT(state.log_port(), 0);
+  CHECK_LE(state.log_port(), UINT16_MAX);
+
+  // TODO(pphaneuf): We'd like to support HTTPS at some point.
+  return std::unique_ptr<AsyncLogClient>(
+      new AsyncLogClient(base, "http://" + state.hostname() + ":" +
+                                   std::to_string(state.log_port())));
+}
+
+
+}  // namespace
+
+
+template <class Logged>
+class ClusterStateController<Logged>::ClusterPeer : Peer {
+ public:
+  ClusterPeer(const std::shared_ptr<libevent::Base>& base,
+              const ct::ClusterNodeState& state)
+      : Peer(BuildAsyncLogClient(base, state)), state_(state) {
+  }
+
+  int64_t TreeSize() const override {
+    std::lock_guard<std::mutex> lock(lock_);
+    return state_.newest_sth().tree_size();
+  }
+
+  void UpdateClusterNodeState(const ct::ClusterNodeState& new_state) {
+    std::lock_guard<std::mutex> lock(lock_);
+    // TODO(pphaneuf): We have no way of changing the AsyncLogClient
+    // in our parent, maybe we should?
+    CHECK_EQ(state_.hostname(), new_state.hostname());
+    CHECK_EQ(state_.log_port(), new_state.log_port());
+    state_ = new_state;
+  }
+
+  ct::ClusterNodeState state() const {
+    std::lock_guard<std::mutex> lock(lock_);
+    return state_;
+  }
+
+  std::pair<std::string, int> GetHostPort() const {
+    std::lock_guard<std::mutex> lock(lock_);
+    return std::make_pair(state_.hostname(), state_.log_port());
+  }
+
+ private:
+  mutable std::mutex lock_;
+  ct::ClusterNodeState state_;
+
+  DISALLOW_COPY_AND_ASSIGN(ClusterPeer);
+};
+
+
+// TODO(alcutter): Need a better system for hanging tasks onto events,
+// Pierre's task-a-palooza idea perhaps?
 template <class Logged>
 ClusterStateController<Logged>::ClusterStateController(
-    util::Executor* executor, Database<Logged>* database,
-    ConsistentStore<Logged>* store, MasterElection* election)
-    : database_(CHECK_NOTNULL(database)),
+    util::Executor* executor, const std::shared_ptr<libevent::Base>& base,
+    Database<Logged>* database, ConsistentStore<Logged>* store,
+    MasterElection* election)
+    : base_(base),
+      database_(CHECK_NOTNULL(database)),
       store_(CHECK_NOTNULL(store)),
       election_(CHECK_NOTNULL(election)),
       watch_config_task_(CHECK_NOTNULL(executor)),
@@ -28,6 +92,7 @@ ClusterStateController<Logged>::ClusterStateController(
       cluster_serving_sth_update_thread_(
           std::bind(&ClusterStateController<Logged>::ClusterServingSTHUpdater,
                     this)) {
+  CHECK_NOTNULL(base_.get());
   store_->WatchClusterNodeStates(
       std::bind(&ClusterStateController::OnClusterStateUpdated, this,
                 std::placeholders::_1),
@@ -140,10 +205,27 @@ void ClusterStateController<Logged>::OnClusterStateUpdated(
     const std::string& node_id(update.handle_.Entry().node_id());
     if (update.exists_) {
       VLOG(1) << "Node joined: " << node_id;
-      all_node_states_[node_id] = update.handle_.Entry();
+      auto it(all_peers_.find(node_id));
+
+      // If the host or port change, remove the ClusterPeer, so that
+      // we re-create it.
+      if (it != all_peers_.end() &&
+          it->second->GetHostPort() !=
+              std::make_pair(update.handle_.Entry().hostname(),
+                             update.handle_.Entry().log_port())) {
+        all_peers_.erase(it);
+        it = all_peers_.end();
+      }
+
+      if (it != all_peers_.end()) {
+        it->second->UpdateClusterNodeState(update.handle_.Entry());
+      } else {
+        all_peers_.emplace(node_id, std::make_shared<ClusterPeer>(
+                                        base_, update.handle_.Entry()));
+      }
     } else {
       VLOG(1) << "Node left: " << node_id;
-      CHECK_EQ(1, all_node_states_.erase(node_id));
+      CHECK_EQ(1, all_peers_.erase(node_id));
     }
   }
 
@@ -249,19 +331,20 @@ void ClusterStateController<Logged>::CalculateServingSTH(
   // a mapping of the newst STH for any given size:
   std::map<int64_t, ct::SignedTreeHead> sth_by_size;
   std::map<int64_t, int> num_nodes_by_sth_size;
-  for (const auto& node : all_node_states_) {
-    if (node.second.has_newest_sth()) {
-      const int64_t tree_size(node.second.newest_sth().tree_size());
+  for (const auto& node : all_peers_) {
+    const ct::ClusterNodeState node_state(node.second->state());
+    if (node_state.has_newest_sth()) {
+      const int64_t tree_size(node_state.newest_sth().tree_size());
       CHECK_LE(0, tree_size);
-      const int64_t timestamp(node.second.newest_sth().timestamp());
+      const int64_t timestamp(node_state.newest_sth().timestamp());
       CHECK_LE(0, timestamp);
 
       num_nodes_by_sth_size[tree_size]++;
 
       // Default timestamp (first call in here) will be 0
-      if (node.second.newest_sth().timestamp() >
+      if (node_state.newest_sth().timestamp() >
           sth_by_size[tree_size].timestamp()) {
-        sth_by_size[tree_size] = node.second.newest_sth();
+        sth_by_size[tree_size] = node_state.newest_sth();
       }
     }
   }
@@ -288,7 +371,7 @@ void ClusterStateController<Logged>::CalculateServingSTH(
     // able to serve this [and smaller] STHs.)
     num_nodes_seen += it->second;
     const double serving_fraction(static_cast<double>(num_nodes_seen) /
-                                  all_node_states_.size());
+                                  all_peers_.size());
     if (serving_fraction >= cluster_config_.minimum_serving_fraction() &&
         num_nodes_seen >= cluster_config_.minimum_serving_nodes()) {
       const ct::SignedTreeHead& candidate_sth(sth_by_size[it->first]);

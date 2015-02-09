@@ -248,8 +248,9 @@ log/cert_submission_handler_test: log/cert_submission_handler_test.o \
                                   proto/libproto.a log/log_signer.o \
                                   log/signer.o log/verifier.o $(GTESTLIB)
 
-log/cluster_state_controller_test: base/notification.o \
+log/cluster_state_controller_test: base/notification.o fetcher/peer.o \
                                    log/cluster_state_controller_test.o \
+                                   client/async_log_client.o \
                                    log/libdatabase.a \
                                    merkletree/serial_hasher.o \
                                    log/libcert.a log/libcluster.a \

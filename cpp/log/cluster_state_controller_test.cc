@@ -1,11 +1,10 @@
-#include "log/cluster_state_controller.h"
-
 #include <gtest/gtest.h>
 #include <map>
 #include <memory>
 #include <string>
 #include <thread>
 
+#include "log/cluster_state_controller-inl.h"
 #include "log/logged_certificate.h"
 #include "log/test_db.h"
 #include "proto/ct.pb.h"
@@ -48,12 +47,14 @@ class ClusterStateControllerTest : public ::testing::Test {
         store3_(new EtcdConsistentStore<LoggedCertificate>(&pool_, &etcd_,
                                                            &election3_, "",
                                                            kNodeId3)),
-        controller_(&pool_, test_db_.db(), store1_.get(), &election1_) {
+        controller_(&pool_, base_, test_db_.db(), store1_.get(), &election1_) {
     // Set default cluster config:
     ct::ClusterConfig default_config;
     default_config.set_minimum_serving_nodes(1);
     default_config.set_minimum_serving_fraction(1);
     store1_->SetClusterConfig(default_config);
+
+    controller_.SetNodeHostPort(kNodeId1, 9001);
 
     // Set up some handy STHs
     sth100_.set_tree_size(100);
@@ -62,8 +63,17 @@ class ClusterStateControllerTest : public ::testing::Test {
     sth200_.set_timestamp(200);
     sth300_.set_tree_size(300);
     sth300_.set_timestamp(300);
+
+    cns100_.set_hostname(kNodeId1);
+    cns100_.set_log_port(9001);
     cns100_.mutable_newest_sth()->CopyFrom(sth100_);
+
+    cns200_.set_hostname(kNodeId2);
+    cns200_.set_log_port(9001);
     cns200_.mutable_newest_sth()->CopyFrom(sth200_);
+
+    cns300_.set_hostname(kNodeId3);
+    cns300_.set_log_port(9001);
     cns300_.mutable_newest_sth()->CopyFrom(sth300_);
   }
 
@@ -73,9 +83,9 @@ class ClusterStateControllerTest : public ::testing::Test {
   }
 
   ct::ClusterNodeState GetNodeStateView(const string& node_id) {
-    auto it(controller_.all_node_states_.find(node_id));
-    CHECK(it != controller_.all_node_states_.end());
-    return it->second;
+    auto it(controller_.all_peers_.find(node_id));
+    CHECK(it != controller_.all_peers_.end());
+    return it->second->state();
   }
 
   static void SetClusterConfig(ConsistentStore<LoggedCertificate>* store,
@@ -127,9 +137,8 @@ TEST_F(ClusterStateControllerTest, TestContiguousTreeSizeUpdated) {
 TEST_F(ClusterStateControllerTest, TestCalculateServingSTHAt50Percent) {
   NiceMock<MockMasterElection> election_is_master;
   EXPECT_CALL(election_is_master, IsMaster()).WillRepeatedly(Return(true));
-  ClusterStateController<LoggedCertificate> controller50(&pool_, test_db_.db(),
-                                                         store1_.get(),
-                                                         &election_is_master);
+  ClusterStateController<LoggedCertificate> controller50(
+      &pool_, base_, test_db_.db(), store1_.get(), &election_is_master);
   SetClusterConfig(store1_.get(), 1 /* nodes */, 0.5 /* fraction */);
 
   store1_->SetClusterNodeState(cns100_);
@@ -156,9 +165,8 @@ TEST_F(ClusterStateControllerTest, TestCalculateServingSTHAt50Percent) {
 TEST_F(ClusterStateControllerTest, TestCalculateServingSTHAt70Percent) {
   NiceMock<MockMasterElection> election_is_master;
   EXPECT_CALL(election_is_master, IsMaster()).WillRepeatedly(Return(true));
-  ClusterStateController<LoggedCertificate> controller70(&pool_, test_db_.db(),
-                                                         store1_.get(),
-                                                         &election_is_master);
+  ClusterStateController<LoggedCertificate> controller70(
+      &pool_, base_, test_db_.db(), store1_.get(), &election_is_master);
   SetClusterConfig(store1_.get(), 1 /* nodes */, 0.7 /* fraction */);
   store1_->SetClusterNodeState(cns100_);
   sleep(1);
@@ -184,9 +192,8 @@ TEST_F(ClusterStateControllerTest,
        TestCalculateServingSTHAt60PercentTwoNodeMin) {
   NiceMock<MockMasterElection> election_is_master;
   EXPECT_CALL(election_is_master, IsMaster()).WillRepeatedly(Return(true));
-  ClusterStateController<LoggedCertificate> controller60(&pool_, test_db_.db(),
-                                                         store1_.get(),
-                                                         &election_is_master);
+  ClusterStateController<LoggedCertificate> controller60(
+      &pool_, base_, test_db_.db(), store1_.get(), &election_is_master);
   SetClusterConfig(store1_.get(), 2 /* nodes */, 0.6 /* fraction */);
   store1_->SetClusterNodeState(cns100_);
   sleep(1);
@@ -211,18 +218,22 @@ TEST_F(ClusterStateControllerTest,
 TEST_F(ClusterStateControllerTest, TestCalculateServingSTHAsClusterMoves) {
   NiceMock<MockMasterElection> election_is_master;
   EXPECT_CALL(election_is_master, IsMaster()).WillRepeatedly(Return(true));
-  ClusterStateController<LoggedCertificate> controller50(&pool_, test_db_.db(),
-                                                         store1_.get(),
-                                                         &election_is_master);
+  ClusterStateController<LoggedCertificate> controller50(
+      &pool_, base_, test_db_.db(), store1_.get(), &election_is_master);
   SetClusterConfig(store1_.get(), 1 /* nodes */, 0.5 /* fraction */);
-  store1_->SetClusterNodeState(cns100_);
-  store2_->SetClusterNodeState(cns100_);
-  store3_->SetClusterNodeState(cns100_);
+  ct::ClusterNodeState node_state(cns100_);
+  store1_->SetClusterNodeState(node_state);
+  node_state.set_hostname(kNodeId2);
+  store2_->SetClusterNodeState(node_state);
+  node_state.set_hostname(kNodeId3);
+  store3_->SetClusterNodeState(node_state);
   sleep(1);
   util::StatusOr<SignedTreeHead> sth(controller50.GetCalculatedServingSTH());
   EXPECT_EQ(sth100_.tree_size(), sth.ValueOrDie().tree_size());
 
-  store1_->SetClusterNodeState(cns200_);
+  node_state = cns200_;
+  node_state.set_hostname(kNodeId1);
+  store1_->SetClusterNodeState(node_state);
   sleep(1);
   // Node1@200
   // Node2 and Node3 @100:
@@ -230,7 +241,8 @@ TEST_F(ClusterStateControllerTest, TestCalculateServingSTHAsClusterMoves) {
   sth = controller50.GetCalculatedServingSTH();
   EXPECT_EQ(sth100_.tree_size(), sth.ValueOrDie().tree_size());
 
-  store3_->SetClusterNodeState(cns200_);
+  node_state.set_hostname(kNodeId3);
+  store3_->SetClusterNodeState(node_state);
   sleep(1);
   // Node1 and Node3 @200
   // Node2 @100:
@@ -238,7 +250,9 @@ TEST_F(ClusterStateControllerTest, TestCalculateServingSTHAsClusterMoves) {
   sth = controller50.GetCalculatedServingSTH();
   EXPECT_EQ(sth200_.tree_size(), sth.ValueOrDie().tree_size());
 
-  store2_->SetClusterNodeState(cns300_);
+  node_state = cns300_;
+  node_state.set_hostname(kNodeId2);
+  store2_->SetClusterNodeState(node_state);
   sleep(1);
   // Node1 and Node3 @200
   // Node2 @300:
@@ -255,6 +269,8 @@ TEST_F(ClusterStateControllerTest, TestKeepsNewerSTH) {
   SignedTreeHead newer_sth(sth100_);
   newer_sth.set_timestamp(newer_sth.timestamp() + 1);
   ClusterNodeState newer_cns;
+  newer_cns.set_hostname("somenode.example.net");
+  newer_cns.set_log_port(9001);
   *newer_cns.mutable_newest_sth() = newer_sth;
   store2_->SetClusterNodeState(newer_cns);
   sleep(1);
@@ -268,18 +284,24 @@ TEST_F(ClusterStateControllerTest, TestKeepsNewerSTH) {
 TEST_F(ClusterStateControllerTest, TestCannotSelectSmallerSTH) {
   NiceMock<MockMasterElection> election_is_master;
   EXPECT_CALL(election_is_master, IsMaster()).WillRepeatedly(Return(true));
-  ClusterStateController<LoggedCertificate> controller50(&pool_, test_db_.db(),
-                                                         store1_.get(),
-                                                         &election_is_master);
+  ClusterStateController<LoggedCertificate> controller50(
+      &pool_, base_, test_db_.db(), store1_.get(), &election_is_master);
   SetClusterConfig(store1_.get(), 1 /* nodes */, 0.5 /* fraction */);
-  store1_->SetClusterNodeState(cns200_);
-  store2_->SetClusterNodeState(cns200_);
-  store3_->SetClusterNodeState(cns200_);
+
+  ct::ClusterNodeState node_state(cns200_);
+  node_state.set_hostname(kNodeId1);
+  store1_->SetClusterNodeState(node_state);
+  node_state.set_hostname(kNodeId2);
+  store2_->SetClusterNodeState(node_state);
+  node_state.set_hostname(kNodeId3);
+  store3_->SetClusterNodeState(node_state);
   sleep(1);
   util::StatusOr<SignedTreeHead> sth(controller50.GetCalculatedServingSTH());
   EXPECT_EQ(sth200_.tree_size(), sth.ValueOrDie().tree_size());
 
-  store1_->SetClusterNodeState(cns100_);
+  node_state = cns100_;
+  node_state.set_hostname(kNodeId1);
+  store1_->SetClusterNodeState(node_state);
   sleep(1);
   // Node1@100
   // Node2 and Node3 @200:
@@ -287,7 +309,8 @@ TEST_F(ClusterStateControllerTest, TestCannotSelectSmallerSTH) {
   sth = controller50.GetCalculatedServingSTH();
   EXPECT_EQ(sth200_.tree_size(), sth.ValueOrDie().tree_size());
 
-  store3_->SetClusterNodeState(cns100_);
+  node_state.set_hostname(kNodeId3);
+  store3_->SetClusterNodeState(node_state);
   sleep(1);
   // Node1 and Node3 @100
   // Node2 @200
@@ -296,7 +319,8 @@ TEST_F(ClusterStateControllerTest, TestCannotSelectSmallerSTH) {
   sth = controller50.GetCalculatedServingSTH();
   EXPECT_EQ(sth200_.tree_size(), sth.ValueOrDie().tree_size());
 
-  store2_->SetClusterNodeState(cns100_);
+  node_state.set_hostname(kNodeId2);
+  store2_->SetClusterNodeState(node_state);
   sleep(1);
   // Still have to serve at sth200
   sth = controller50.GetCalculatedServingSTH();
@@ -307,22 +331,27 @@ TEST_F(ClusterStateControllerTest, TestCannotSelectSmallerSTH) {
 TEST_F(ClusterStateControllerTest, TestUsesLargestSTHWithIdenticalTimestamp) {
   NiceMock<MockMasterElection> election_is_master;
   EXPECT_CALL(election_is_master, IsMaster()).WillRepeatedly(Return(true));
-  ClusterStateController<LoggedCertificate> controller50(&pool_, test_db_.db(),
-                                                         store1_.get(),
-                                                         &election_is_master);
+  ClusterStateController<LoggedCertificate> controller50(
+      &pool_, base_, test_db_.db(), store1_.get(), &election_is_master);
   SetClusterConfig(store1_.get(), 1 /* nodes */, 0.5 /* fraction */);
 
   ClusterNodeState cns1;
+  cns1.set_hostname(kNodeId1);
+  cns1.set_log_port(9001);
   cns1.mutable_newest_sth()->set_timestamp(1000);
   cns1.mutable_newest_sth()->set_tree_size(1000);
   store1_->SetClusterNodeState(cns1);
 
   ClusterNodeState cns2(cns1);
+  cns2.set_hostname(kNodeId2);
+  cns2.set_log_port(9001);
   cns2.mutable_newest_sth()->set_timestamp(1000);
   cns2.mutable_newest_sth()->set_tree_size(1001);
   store2_->SetClusterNodeState(cns2);
 
   ClusterNodeState cns3;
+  cns3.set_hostname(kNodeId3);
+  cns3.set_log_port(9001);
   cns3.mutable_newest_sth()->set_timestamp(1004);
   cns3.mutable_newest_sth()->set_tree_size(999);
   store3_->SetClusterNodeState(cns3);
@@ -337,22 +366,27 @@ TEST_F(ClusterStateControllerTest, TestUsesLargestSTHWithIdenticalTimestamp) {
 TEST_F(ClusterStateControllerTest, TestDoesNotReuseSTHTimestamp) {
   NiceMock<MockMasterElection> election_is_master;
   EXPECT_CALL(election_is_master, IsMaster()).WillRepeatedly(Return(true));
-  ClusterStateController<LoggedCertificate> controller50(&pool_, test_db_.db(),
-                                                         store1_.get(),
-                                                         &election_is_master);
+  ClusterStateController<LoggedCertificate> controller50(
+      &pool_, base_, test_db_.db(), store1_.get(), &election_is_master);
   SetClusterConfig(store1_.get(), 3 /* nodes */, 1 /* fraction */);
 
   ClusterNodeState cns1;
+  cns1.set_hostname(kNodeId1);
+  cns1.set_log_port(9001);
   cns1.mutable_newest_sth()->set_timestamp(1002);
   cns1.mutable_newest_sth()->set_tree_size(10);
   store1_->SetClusterNodeState(cns1);
 
   ClusterNodeState cns2(cns1);
+  cns2.set_hostname(kNodeId2);
+  cns2.set_log_port(9001);
   cns2.mutable_newest_sth()->set_timestamp(1000);
   cns2.mutable_newest_sth()->set_tree_size(11);
   store2_->SetClusterNodeState(cns2);
 
   ClusterNodeState cns3;
+  cns3.set_hostname(kNodeId3);
+  cns3.set_log_port(9001);
   cns3.mutable_newest_sth()->set_timestamp(1002);
   cns3.mutable_newest_sth()->set_tree_size(9);
   store3_->SetClusterNodeState(cns3);
@@ -410,9 +444,8 @@ TEST_F(ClusterStateControllerTest,
        TestConfigChangesCauseServingSTHToBeRecalculated) {
   NiceMock<MockMasterElection> election_is_master;
   EXPECT_CALL(election_is_master, IsMaster()).WillRepeatedly(Return(true));
-  ClusterStateController<LoggedCertificate> controller(&pool_, test_db_.db(),
-                                                       store1_.get(),
-                                                       &election_is_master);
+  ClusterStateController<LoggedCertificate> controller(
+      &pool_, base_, test_db_.db(), store1_.get(), &election_is_master);
   SetClusterConfig(store1_.get(), 0 /* nodes */, 0.5 /* fraction */);
   store1_->SetClusterNodeState(cns100_);
   store2_->SetClusterNodeState(cns200_);
@@ -498,7 +531,7 @@ TEST_F(ClusterStateControllerTest, TestJoinsElectionIfHasLocalData) {
 
 
 TEST_F(ClusterStateControllerTest, TestNodeHostPort) {
-  const string kHost("my_host");
+  const string kHost("myhostname");
   const int kPort(9999);
   controller_.SetNodeHostPort(kHost, kPort);
   sleep(1);

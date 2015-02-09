@@ -4,10 +4,12 @@
 #include <condition_variable>
 #include <functional>
 #include <map>
+#include <memory>
 #include <string>
 
 #include "log/etcd_consistent_store.h"
 #include "proto/ct.pb.h"
+#include "util/libevent_wrapper.h"
 #include "util/masterelection.h"
 #include "util/statusor.h"
 
@@ -28,7 +30,9 @@ namespace cert_trans {
 template <class Logged>
 class ClusterStateController {
  public:
-  ClusterStateController(util::Executor* executor, Database<Logged>* database,
+  ClusterStateController(util::Executor* executor,
+                         const std::shared_ptr<libevent::Base>& base,
+                         Database<Logged>* database,
                          ConsistentStore<Logged>* store,
                          MasterElection* election);
 
@@ -59,6 +63,8 @@ class ClusterStateController {
   void SetNodeHostPort(const std::string& host, const uint16_t port);
 
  private:
+  class ClusterPeer;
+
   // Updates the representation of *this* node's state in the consistent store.
   void PushLocalNodeState(const std::unique_lock<std::mutex>& lock);
 
@@ -89,6 +95,7 @@ class ClusterStateController {
   // Thread entry point for ServingSTH updater thread.
   void ClusterServingSTHUpdater();
 
+  const std::shared_ptr<libevent::Base> base_;
   Database<Logged>* const database_;      // Not owned by us
   ConsistentStore<Logged>* const store_;  // Not owned by us
   MasterElection* const election_;        // Not owned by us
@@ -99,7 +106,7 @@ class ClusterStateController {
 
   mutable std::mutex mutex_;  // covers the members below:
   ct::ClusterNodeState local_node_state_;
-  std::map<std::string, ct::ClusterNodeState> all_node_states_;
+  std::map<std::string, const std::shared_ptr<ClusterPeer>> all_peers_;
   std::unique_ptr<ct::SignedTreeHead> calculated_serving_sth_;
   std::unique_ptr<ct::SignedTreeHead> actual_serving_sth_;
   bool exiting_;
