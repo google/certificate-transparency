@@ -3,7 +3,6 @@
 #include <event2/thread.h>
 #include <gflags/gflags.h>
 #include <glog/logging.h>
-#include <google/protobuf/text_format.h>
 #include <memory>
 #include <openssl/err.h>
 #include <string>
@@ -22,19 +21,14 @@
 #include "util/status.h"
 #include "util/thread_pool.h"
 
+
 namespace cert_trans {
 
-// TODO(alcutter): have a way of passing in other configs
-const char kDefaultClusterConfig[] =
-    "minimum_serving_nodes: 2\n"
-    "minimum_serving_fraction: 0.75\n";
 
-
-// static
 template <class Logged>
-util::Status ClusterTool<Logged>::InitLog(
-    TreeSigner<Logged>* tree_signer,
-    ConsistentStore<Logged>* consistent_store) {
+util::Status InitLog(const ct::ClusterConfig& cluster_config,
+                     TreeSigner<Logged>* tree_signer,
+                     ConsistentStore<Logged>* consistent_store) {
   if (tree_signer->UpdateTree() != TreeSigner<LoggedCertificate>::OK) {
     return util::Status(util::error::UNKNOWN, "Failed to Update Tree");
   }
@@ -45,14 +39,14 @@ util::Status ClusterTool<Logged>::InitLog(
     return status;
   }
 
-  ct::ClusterConfig config;
-  if (!google::protobuf::TextFormat::ParseFromString(kDefaultClusterConfig,
-                                                     &config)) {
-    return util::Status(util::error::INVALID_ARGUMENT,
-                        "Couldn't parse ClusterConfig");
-  }
-  status = consistent_store->SetClusterConfig(config);
-  return status;
+  return SetClusterConfig(cluster_config, consistent_store);
+}
+
+
+template <class Logged>
+util::Status SetClusterConfig(const ct::ClusterConfig& cluster_config,
+                              ConsistentStore<Logged>* consistent_store) {
+  return consistent_store->SetClusterConfig(cluster_config);
 }
 
 
