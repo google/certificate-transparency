@@ -20,5 +20,9 @@ CMD MY_IP=$(awk "/${HOSTNAME}/ {print \$1}" < /etc/hosts) && \
           --addr=${MY_IP}:4001 \
           --peer-addr=${MY_IP}:7001 \
           --data-dir=/opt/etcd/data \
+          --peer-heartbeat-interval=400 \
+          --peer-election-timeout=6000 \
+          --max-retry-attempts=100 \
+          --retry-interval=1
 EXPOSE 4001 7001
 

@@ -1,15 +1,15 @@
 {
-  "id": "superduper-replication",
+  "id": "etcd-replication",
   "kind": "ReplicationController",
   "apiVersion": "v1beta1",
   "desiredState": {
     "replicas": 3,
-    "replicaSelector": {"name": "log-node"},
+    "replicaSelector": {"name": "etcd-node"},
     "podTemplate": {
       "desiredState": {
         "manifest": {
           "version": "v1beta1",
-          "id": "super-duper-controller",
+          "id": "etcd-controller",
           "containers": [{
             "name": "registry",
             "image": "google/docker-registry",
@@ -23,26 +23,27 @@
               "value": "ctlog_images"
             }]
           }, {
-            "name": "super-duper",
-            "image": "localhost:5000/alcutter/super_duper:test",
+            "name": "etcd",
+            "image": "localhost:5000/alcutter/etcd:test",
             "ports": [{
-              "name": "super-duper",
-              "containerPort": 6962,
-              "hostPort": 6962
+              "name": "etcd-client",
+              "containerPort": 4001,
+              "hostPort": 4001
+            }, {
+              "name": "etcd-peer",
+              "containerPort": 7001,
+              "hostPort": 7001
             }],
-            "volumeMounts": [{
-              "name": "log-data",
-              "mountPath": "/mnt/ctlog"
+            "env": [{
+              "name": "DISCOVERY",
+              "value": "https://discovery.etcd.io/05652d609c99581041e78c3be0b8ad13"
             }]
-          }],
-          "volumes": [{
-            "name": "log-data"
           }]
         }
       },
-      "labels": {"name": "log-node"}
+      "labels": {"name": "etcd-node"}
     }
   },
-  "labels": {"name": "log-node"}
+  "labels": {"name": "etcd-node"}
 }
 

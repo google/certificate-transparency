@@ -3,7 +3,7 @@
   "apiVersion": "v1beta1",
   "kind": "Service",
   "selector": {
-    "name": "log-node"
+    "name": "etcd-node"
   },
   "containerPort": "etcd-client",
   "protocol": "TCP",
