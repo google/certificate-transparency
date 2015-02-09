@@ -253,9 +253,23 @@ class RequestHandler(object):
 class LogClient(object):
     """HTTP client for talking to a CT log."""
 
+    """Create a new log client.
+
+    Args:
+        uri: The CT Log URI to communicate with.
+        handler: A custom RequestHandler to use. If not specified, a new one
+        will be created.
+        connection_timeout: Timeout (in seconds) for all GET and POST requests.
+        ca_bundle: True or a file path containing a set of CA roots. See
+        Requests documentation for more information:
+        http://docs.python-requests.org/en/latest/user/advanced/#ssl-cert-verification
+        Note that a false-y value is not allowed.
+    """
     def __init__(self, uri, handler=None, connection_timeout=60,
                  ca_bundle=True):
         self._uri = uri
+        if not ca_bundle:
+          raise ClientError("Refusing to turn off SSL certificate checking.")
         if handler:
           self._req = handler
         else:
