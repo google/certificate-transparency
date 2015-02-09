@@ -133,22 +133,6 @@ void ClusterStateController<Logged>::NewTreeHead(
     CHECK_GE(sth.timestamp(), local_node_state_.newest_sth().timestamp());
   }
   local_node_state_.mutable_newest_sth()->CopyFrom(sth);
-  // We must, by definition, have a contiguous tree size of at least what's
-  // covered by the new STH:
-  if (sth.tree_size() > local_node_state_.contiguous_tree_size()) {
-    local_node_state_.set_contiguous_tree_size(sth.tree_size());
-  }
-  PushLocalNodeState(lock);
-}
-
-
-template <class Logged>
-void ClusterStateController<Logged>::ContiguousTreeSizeUpdated(
-    const int64_t new_contiguous_tree_size) {
-  CHECK_GE(new_contiguous_tree_size, 0);
-  std::unique_lock<std::mutex> lock(mutex_);
-  CHECK_GE(new_contiguous_tree_size, local_node_state_.contiguous_tree_size());
-  local_node_state_.set_contiguous_tree_size(new_contiguous_tree_size);
   PushLocalNodeState(lock);
 }
 
@@ -416,11 +400,15 @@ void ClusterStateController<Logged>::DetermineElectionParticipation(
 
   // Don't want to be the master if we don't yet have the data to be able to
   // issue new STHs
-  if (actual_serving_sth_->tree_size() >
-      local_node_state_.contiguous_tree_size()) {
+  if (!local_node_state_.has_newest_sth()) {
+    LOG(INFO) << "No local STH, leaving election.";
+    election_->StopElection();
+    return;
+  } else if (actual_serving_sth_->tree_size() >
+             local_node_state_.newest_sth().tree_size()) {
     LOG(INFO) << "Serving STH tree_size (" << actual_serving_sth_->tree_size()
-              << " > Local contiguous_tree_size ("
-              << local_node_state_.contiguous_tree_size() << ")";
+              << " > Local newest_sth tree size ("
+              << local_node_state_.newest_sth().tree_size() << ")";
     LOG(INFO) << "Local replication too far behind to be master - "
                  "leaving election.";
     election_->StopElection();

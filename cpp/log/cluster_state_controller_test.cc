@@ -127,13 +127,6 @@ TEST_F(ClusterStateControllerTest, TestNewTreeHead) {
 }
 
 
-TEST_F(ClusterStateControllerTest, TestContiguousTreeSizeUpdated) {
-  const int kNewTreeSize(2345);
-  controller_.ContiguousTreeSizeUpdated(kNewTreeSize);
-  EXPECT_EQ(kNewTreeSize, GetLocalState().contiguous_tree_size());
-}
-
-
 TEST_F(ClusterStateControllerTest, TestCalculateServingSTHAt50Percent) {
   NiceMock<MockMasterElection> election_is_master;
   EXPECT_CALL(election_is_master, IsMaster()).WillRepeatedly(Return(true));
@@ -469,27 +462,29 @@ TEST_F(ClusterStateControllerTest,
 
 
 TEST_F(ClusterStateControllerTest, TestGetLocalNodeState) {
-  const int kContiguousSize(2345);
   SignedTreeHead sth;
   sth.set_timestamp(10000);
   sth.set_tree_size(2344);
   controller_.NewTreeHead(sth);
-  controller_.ContiguousTreeSizeUpdated(kContiguousSize);
 
   ClusterNodeState state;
   controller_.GetLocalNodeState(&state);
-  EXPECT_EQ(kContiguousSize, state.contiguous_tree_size());
   EXPECT_EQ(sth.DebugString(), state.newest_sth().DebugString());
 }
 
 
 TEST_F(ClusterStateControllerTest, TestLeavesElectionIfDoesNotHaveLocalData) {
-  const int kContiguousSize(2345);
-  const int kTreeSizeSmaller(kContiguousSize - 1);
-  const int kTreeSizeLarger(kContiguousSize + 1);
+  const int kTreeSize(2345);
+  const int kTreeSizeSmaller(kTreeSize - 1);
+  const int kTreeSizeLarger(kTreeSize + 1);
 
-  controller_.ContiguousTreeSizeUpdated(kContiguousSize);
-  sleep(1);
+  {
+    SignedTreeHead local_sth;
+    local_sth.set_timestamp(10000);
+    local_sth.set_tree_size(kTreeSizeSmaller);
+    controller_.NewTreeHead(local_sth);
+    sleep(1);
+  }
 
   SignedTreeHead sth;
   {
@@ -511,20 +506,28 @@ TEST_F(ClusterStateControllerTest, TestLeavesElectionIfDoesNotHaveLocalData) {
 
 
 TEST_F(ClusterStateControllerTest, TestJoinsElectionIfHasLocalData) {
-  const int kContiguousSizeSmaller(2345);
-  const int kTreeSize(kContiguousSizeSmaller + 1);
-  const int kContiguousSizeLarger(kTreeSize + 1);
+  const int kTreeSizeSmaller(2345);
+  const int kTreeSizeLarger(kTreeSizeSmaller + 1);
 
-  controller_.ContiguousTreeSizeUpdated(kContiguousSizeSmaller);
+  {
+    SignedTreeHead local_sth;
+    local_sth.set_timestamp(10000);
+    local_sth.set_tree_size(kTreeSizeSmaller);
+    controller_.NewTreeHead(local_sth);
+    sleep(1);
+  }
+
   SignedTreeHead sth;
   sth.set_timestamp(10000);
-  sth.set_tree_size(kTreeSize);
+  sth.set_tree_size(kTreeSizeSmaller - 10);
   store1_->SetServingSTH(sth);
   sleep(1);
 
   {
     EXPECT_CALL(election1_, StartElection()).Times(1);
-    controller_.ContiguousTreeSizeUpdated(kContiguousSizeLarger);
+    sth.set_timestamp(sth.timestamp() + 1);
+    sth.set_tree_size(kTreeSizeLarger);
+    controller_.NewTreeHead(sth);
     sleep(1);
   }
 }

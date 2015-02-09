@@ -317,17 +317,21 @@ int main(int argc, char* argv[]) {
   // Publish this node's hostname:port info
   cluster_controller.SetNodeHostPort(FLAGS_server, FLAGS_port);
 
-  // Periodically refresh our contiguous tree size so that other nodes get a
-  // good view of the data we have locally and can use us for replication.
-  // This has the side effect of refreshing the TTL on our ClusterNodeState
-  // entry.
+  // Just separate this out from the lambda below to try to be clear that this
+  // is the *only* interaction with TreeSigner that we're allowing there.
+  const function<SignedTreeHead(void)> get_latest_sth(
+      bind(&TreeSigner<LoggedCertificate>::LatestSTH, &tree_signer));
+  // Periodically refresh our ClusterNodeState entry so it doesn't get deleted.
+  // TODO(alcutter): Figure out if we actually need this here now, the signer
+  // thread above will refresh the entry, but potentially not frequently
+  // enough.
   PeriodicClosure node_state_refresh(
       event_base, std::chrono::seconds(FLAGS_node_state_refresh_seconds),
-      [&db, &cluster_controller, &internal_pool]() {
+      [&db, &cluster_controller, &internal_pool, &get_latest_sth]() {
         // Actually run this on the thread pool, since this periodic closure is
         // calling back on the eventloop thread.
-        internal_pool.Add([&db, &cluster_controller]() {
-          cluster_controller.ContiguousTreeSizeUpdated(db->TreeSize());
+        internal_pool.Add([&db, &cluster_controller, &get_latest_sth]() {
+          cluster_controller.NewTreeHead(get_latest_sth());
         });
       });
 
