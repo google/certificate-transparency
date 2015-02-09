@@ -42,6 +42,10 @@ using util::TaskHold;
 
 DEFINE_int32(etcd_watch_error_retry_delay_secs, 5,
              "delay between retrying etcd watch requests");
+DEFINE_bool(etcd_consistent, true, "Add consistent=true param to all requests. "
+            "Do not turn this off unless you *know* what you're doing.");
+DEFINE_bool(etcd_quorum, true, "Add quorum=true param to all requests. "
+            "Do not turn this off unless you *know* what you're doing.");
 
 namespace cert_trans {
 
@@ -925,7 +929,20 @@ void EtcdClient::Watch(const string& key, const WatchCallback& cb,
 
 void EtcdClient::Generic(const string& key, const map<string, string>& params,
                          evhttp_cmd_type verb, const GenericCallback& cb) {
-  Request* const etcd_req(new Request(this, verb, key, false, params, cb));
+  map<string, string> modified_params(params);
+  if (FLAGS_etcd_consistent) {
+    modified_params["consistent"] = "true";
+  } else {
+    LOG_EVERY_N(WARNING, 100) << "Sending request without 'consistent=true'";
+  }
+  if (FLAGS_etcd_quorum) {
+    modified_params["quorum"] = "true";
+  } else {
+    LOG_EVERY_N(WARNING, 100) << "Sending request without 'quorum=true'";
+  }
+
+  Request* const etcd_req(
+      new Request(this, verb, key, false, modified_params, cb));
 
   etcd_req->Run(GetLeader());
 }
