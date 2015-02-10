@@ -196,8 +196,9 @@ def _parse_consistency_proof(response, servername):
 # A class that we can mock out to generate fake responses.
 class RequestHandler(object):
     """HTTPS requests."""
-    def __init__(self, connection_timeout=60):
+    def __init__(self, connection_timeout=60, ca_bundle=True):
       self._timeout = connection_timeout
+      self._ca_bundle = ca_bundle
 
     def __repr__(self):
         return "%r()" % self.__class__.__name__
@@ -208,13 +209,15 @@ class RequestHandler(object):
     def get_response(self, uri, params=None):
         """Get an HTTP response for a GET request."""
         try:
-            return requests.get(uri, params=params, timeout=self._timeout)
+            return requests.get(uri, params=params, timeout=self._timeout,
+                                verify=self._ca_bundle)
         except requests.exceptions.RequestException as e:
             raise HTTPError("Connection to %s failed: %s" % (uri, e))
 
     def post_response(self, uri, post_data):
         try:
-            return requests.post(uri, data=json.dumps(post_data), timeout=60)
+            return requests.post(uri, data=json.dumps(post_data),
+                                 timeout=self._timeout, verify=self._ca_bundle)
         except requests.exceptions.RequestException as e:
             raise HTTPError("POST to %s failed: %s" % (uri, e))
 
@@ -250,12 +253,27 @@ class RequestHandler(object):
 class LogClient(object):
     """HTTP client for talking to a CT log."""
 
-    def __init__(self, uri, handler=None, connection_timeout=60):
+    """Create a new log client.
+
+    Args:
+        uri: The CT Log URI to communicate with.
+        handler: A custom RequestHandler to use. If not specified, a new one
+        will be created.
+        connection_timeout: Timeout (in seconds) for all GET and POST requests.
+        ca_bundle: True or a file path containing a set of CA roots. See
+        Requests documentation for more information:
+        http://docs.python-requests.org/en/latest/user/advanced/#ssl-cert-verification
+        Note that a false-y value is not allowed.
+    """
+    def __init__(self, uri, handler=None, connection_timeout=60,
+                 ca_bundle=True):
         self._uri = uri
+        if not ca_bundle:
+          raise ClientError("Refusing to turn off SSL certificate checking.")
         if handler:
           self._req = handler
         else:
-          self._req = RequestHandler(connection_timeout)
+          self._req = RequestHandler(connection_timeout, ca_bundle)
 
     def __repr__(self):
         return "%r(%r)" % (self.__class__.__name__, self._req)
@@ -524,7 +542,7 @@ class LogClient(object):
         """
         sct_data = self._post_req_body(
             _ADD_CHAIN,
-            [base64.b64encode(certificate) for certificate in certs_list])
+            {'chain': [base64.b64encode(certificate) for certificate in certs_list]})
         return self._parse_sct(sct_data)
 
 

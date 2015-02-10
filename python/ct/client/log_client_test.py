@@ -312,7 +312,7 @@ class LogClientTest(unittest.TestCase):
         received_sct = client.add_chain(certs_chain)
         mock_handler.post_response_body.assert_called_once_with(
             "http://ctlog/ct/v1/add-chain",
-            post_data=[base64.b64encode(t) for t in certs_chain])
+            post_data={'chain': [base64.b64encode(t) for t in certs_chain]})
         self._verify_sct_contents(received_sct)
 
     def test_fails_parsing_sct_invalid_version(self):
