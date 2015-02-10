@@ -82,21 +82,20 @@ class EtcdConsistentStore : public ConsistentStore<Logged> {
                                   std::vector<EntryHandle<T>>* entries) const;
 
   template <class T>
-  util::Status UpdateEntry(const std::string& path, EntryHandle<T>* entry);
+  util::Status UpdateEntry(EntryHandle<T>* entry);
 
   template <class T>
-  util::Status CreateEntry(const std::string& path, EntryHandle<T>* entry);
+  util::Status CreateEntry(EntryHandle<T>* entry);
 
   template <class T>
-  util::Status ForceSetEntry(const std::string& path, EntryHandle<T>* entry);
+  util::Status ForceSetEntry(EntryHandle<T>* entry);
 
   template <class T>
-  util::Status ForceSetEntryWithTTL(const std::string& path,
-                                    const std::chrono::seconds& ttl,
+  util::Status ForceSetEntryWithTTL(const std::chrono::seconds& ttl,
                                     EntryHandle<T>* entry);
 
   template <class T>
-  util::Status DeleteEntry(const std::string& path, EntryHandle<T>* entry);
+  util::Status DeleteEntry(EntryHandle<T>* entry);
 
   std::string GetUnsequencedPath(const Logged& unseq) const;
 
@@ -116,7 +115,8 @@ class EtcdConsistentStore : public ConsistentStore<Logged> {
   // TypedUpdateFromWatchUpdate() below), and calls |callback| with it.
   template <class T, class CB>
   static void ConvertSingleUpdate(
-      const CB& callback, const std::vector<EtcdClient::WatchUpdate>& updates);
+      const std::string& full_path, const CB& callback,
+      const std::vector<EtcdClient::WatchUpdate>& updates);
 
   // Converts a vector of WatchUpdates to a vector<Update<T>> (using
   // TypedUpdateFromWatchUpdate() below), and calls |callback| with it.

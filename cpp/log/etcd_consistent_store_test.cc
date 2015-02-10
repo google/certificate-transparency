@@ -27,6 +27,7 @@ using std::atomic;
 using std::bind;
 using std::chrono::milliseconds;
 using std::make_shared;
+using std::ostringstream;
 using std::pair;
 using std::placeholders::_1;
 using std::shared_ptr;
@@ -85,13 +86,24 @@ class EtcdConsistentStoreTest : public ::testing::Test {
     return cert;
   }
 
+  string CertPath(const LoggedCertificate& cert) {
+    ostringstream oss;
+    oss << kRoot << "/";
+    if (!cert.has_sequence_number()) {
+      oss << "unsequenced/" << util::ToBase64(cert.Hash());
+    } else {
+      oss << "sequenced/" << cert.sequence_number();
+    }
+    return oss.str();
+  }
+
   EntryHandle<LoggedCertificate> HandleForCert(const LoggedCertificate& cert) {
-    return EntryHandle<LoggedCertificate>(cert);
+    return EntryHandle<LoggedCertificate>(CertPath(cert), cert);
   }
 
   EntryHandle<LoggedCertificate> HandleForCert(const LoggedCertificate& cert,
                                                int handle) {
-    return EntryHandle<LoggedCertificate>(cert, handle);
+    return EntryHandle<LoggedCertificate>(CertPath(cert), cert, handle);
   }
 
   void PopulateForCleanupTests(int num_seq, int num_unseq, int starting_seq) {

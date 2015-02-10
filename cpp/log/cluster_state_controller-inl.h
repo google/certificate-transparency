@@ -186,7 +186,7 @@ void ClusterStateController<Logged>::OnClusterStateUpdated(
     const std::vector<Update<ct::ClusterNodeState>>& updates) {
   std::unique_lock<std::mutex> lock(mutex_);
   for (const auto& update : updates) {
-    const std::string& node_id(update.handle_.Entry().node_id());
+    const std::string& node_id(update.handle_.Key());
     if (update.exists_) {
       VLOG(1) << "Node joined: " << node_id;
       auto it(all_peers_.find(node_id));
