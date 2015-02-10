@@ -34,7 +34,7 @@ std::unique_ptr<AsyncLogClient> BuildAsyncLogClient(
 
 
 template <class Logged>
-class ClusterStateController<Logged>::ClusterPeer : Peer {
+class ClusterStateController<Logged>::ClusterPeer : public Peer {
  public:
   ClusterPeer(const std::shared_ptr<libevent::Base>& base,
               const ct::ClusterNodeState& state)

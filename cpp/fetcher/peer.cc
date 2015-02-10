@@ -8,7 +8,7 @@ namespace cert_trans {
 
 
 Peer::Peer(unique_ptr<AsyncLogClient>&& client) : client_(move(client)) {
-  CHECK(client_);
+  CHECK_NOTNULL(client_.get());
 }
 
 
