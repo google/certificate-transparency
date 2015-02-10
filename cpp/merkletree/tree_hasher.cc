@@ -10,8 +10,8 @@ using std::string;
 
 namespace {
 
-const string kLeafPrefix(1, '\x00');
-const string kNodePrefix(1, '\x01');
+const char kLeafPrefix('\x00');
+const char kNodePrefix('\x01');
 
 std::string EmptyHash(SerialHasher* hasher) {
   hasher->Reset();
@@ -27,7 +27,7 @@ TreeHasher::TreeHasher(SerialHasher* hasher)
 string TreeHasher::HashLeaf(const string& data) const {
   lock_guard<mutex> lock(lock_);
   hasher_->Reset();
-  hasher_->Update(kLeafPrefix);
+  hasher_->Update(string(1, kLeafPrefix));
   hasher_->Update(data);
   return hasher_->Final();
 }
@@ -36,7 +36,7 @@ string TreeHasher::HashChildren(const string& left_child,
                                 const string& right_child) const {
   lock_guard<mutex> lock(lock_);
   hasher_->Reset();
-  hasher_->Update(kNodePrefix);
+  hasher_->Update(string(1, kNodePrefix));
   hasher_->Update(left_child);
   hasher_->Update(right_child);
   return hasher_->Final();
