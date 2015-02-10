@@ -32,13 +32,17 @@ LogLookup<Logged>::LogLookup(ReadOnlyDatabase<Logged>* db)
   db_->AddNotifySTHCallback(&update_from_sth_cb_);
 }
 
+
 template <class Logged>
 LogLookup<Logged>::~LogLookup() {
   db_->RemoveNotifySTHCallback(&update_from_sth_cb_);
 }
 
+
 template <class Logged>
 void LogLookup<Logged>::UpdateFromSTH(const ct::SignedTreeHead& sth) {
+  std::lock_guard<std::mutex> lock(lock_);
+
   CHECK_EQ(ct::V1, sth.version())
       << "Tree head signed with an unknown version";
 
@@ -90,17 +94,19 @@ void LogLookup<Logged>::UpdateFromSTH(const ct::SignedTreeHead& sth) {
   LOG(INFO) << "Tree successfully updated at " << ctime_r(&last_update, buf);
 }
 
+
 template <class Logged>
 typename LogLookup<Logged>::LookupResult LogLookup<Logged>::GetIndex(
     const std::string& merkle_leaf_hash, int64_t* index) {
-  std::map<std::string, int64_t>::const_iterator it =
-      leaf_index_.find(merkle_leaf_hash);
-  if (it == leaf_index_.end())
-    return NOT_FOUND;
+  std::unique_lock<std::mutex> lock(lock_);
+  const int64_t myindex(GetIndexInternal(lock, merkle_leaf_hash));
 
-  CHECK_GE(it->second, 0);
-  *index = it->second;
-  return OK;
+  if (myindex < 0) {
+    return NOT_FOUND;
+  } else {
+    *index = myindex;
+    return OK;
+  }
 }
 
 
@@ -108,9 +114,12 @@ typename LogLookup<Logged>::LookupResult LogLookup<Logged>::GetIndex(
 template <class Logged>
 typename LogLookup<Logged>::LookupResult LogLookup<Logged>::AuditProof(
     const std::string& merkle_leaf_hash, ct::MerkleAuditProof* proof) {
-  int64_t leaf_index;
-  if (GetIndex(merkle_leaf_hash, &leaf_index) != OK)
+  std::unique_lock<std::mutex> lock(lock_);
+
+  const int64_t leaf_index(GetIndexInternal(lock, merkle_leaf_hash));
+  if (leaf_index < 0) {
     return NOT_FOUND;
+  }
 
   CHECK_GE(leaf_index, 0);
   proof->set_version(ct::V1);
@@ -130,9 +139,12 @@ typename LogLookup<Logged>::LookupResult LogLookup<Logged>::AuditProof(
   return OK;
 }
 
+
 template <class Logged>
 typename LogLookup<Logged>::LookupResult LogLookup<Logged>::AuditProof(
     int64_t leaf_index, size_t tree_size, ct::ShortMerkleAuditProof* proof) {
+  std::lock_guard<std::mutex> lock(lock_);
+
   proof->set_leaf_index(leaf_index);
 
   proof->clear_path_node();
@@ -162,7 +174,27 @@ template <class Logged>
 std::string LogLookup<Logged>::LeafHash(const Logged& logged) const {
   std::string serialized_leaf;
   CHECK(logged.SerializeForLeaf(&serialized_leaf));
+  // We do not need to take the lock for this call into cert_tree_, as
+  // this is merely a const forwarder (to another const, thread-safe
+  // method).
   return cert_tree_.LeafHash(serialized_leaf);
 }
+
+
+template <class Logged>
+int64_t LogLookup<Logged>::GetIndexInternal(
+    const std::unique_lock<std::mutex>& lock,
+    const std::string& merkle_leaf_hash) const {
+  CHECK(lock.owns_lock());
+
+  const std::map<std::string, int64_t>::const_iterator it(
+      leaf_index_.find(merkle_leaf_hash));
+  if (it == leaf_index_.end())
+    return -1;
+
+  CHECK_GE(it->second, 0);
+  return it->second;
+}
+
 
 #endif  // CERT_TRANS_LOG_LOG_LOOKUP_INL_H_

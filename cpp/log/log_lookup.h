@@ -3,6 +3,7 @@
 #define LOG_LOOKUP_H
 
 #include <map>
+#include <mutex>
 #include <stdint.h>
 #include <string>
 
@@ -44,13 +45,12 @@ class LogLookup {
 
   // Get a consitency proof between two tree heads
   std::vector<std::string> ConsistencyProof(size_t first, size_t second) {
+    std::lock_guard<std::mutex> lock(lock_);
     return cert_tree_.SnapshotConsistency(first, second);
   }
 
-  // TODO(pphaneuf): If GetSTH and Update were to be called
-  // concurrently, you'd have a race. This class should be made
-  // threadsafe.
   const ct::SignedTreeHead& GetSTH() const {
+    std::lock_guard<std::mutex> lock(lock_);
     return latest_tree_head_;
   }
 
@@ -58,7 +58,10 @@ class LogLookup {
 
  private:
   void UpdateFromSTH(const ct::SignedTreeHead& sth);
+  int64_t GetIndexInternal(const std::unique_lock<std::mutex>& lock,
+                           const std::string& merkle_leaf_hash) const;
 
+  mutable std::mutex lock_;
   // We keep a hash -> index mapping in memory so that we can quickly serve
   // Merkle proofs without having to query the database at all.
   // Note that 32 bytes is an overkill and we can optimize this to use
