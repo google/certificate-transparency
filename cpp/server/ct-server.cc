@@ -73,6 +73,7 @@ namespace libevent = cert_trans::libevent;
 
 using cert_trans::CertChecker;
 using cert_trans::ClusterStateController;
+using cert_trans::ContinuousFetcher;
 using cert_trans::EtcdClient;
 using cert_trans::EtcdConsistentStore;
 using cert_trans::FakeEtcdClient;
@@ -99,6 +100,7 @@ using std::make_shared;
 using std::shared_ptr;
 using std::string;
 using std::thread;
+using std::unique_ptr;
 
 // Basic sanity checks on flag values.
 static bool ValidatePort(const char* flagname, int port) {
@@ -312,8 +314,11 @@ int main(int argc, char* argv[]) {
     CHECK(!FLAGS_server.empty());
   }
 
+  const unique_ptr<ContinuousFetcher> fetcher(
+      ContinuousFetcher::New(event_base.get(), db));
   ClusterStateController<LoggedCertificate> cluster_controller(
-      &internal_pool, event_base, db, &consistent_store, &election);
+      &internal_pool, event_base, db, &consistent_store, &election,
+      fetcher.get());
   // Publish this node's hostname:port info
   cluster_controller.SetNodeHostPort(FLAGS_server, FLAGS_port);
 

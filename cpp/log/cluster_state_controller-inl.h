@@ -79,11 +79,12 @@ template <class Logged>
 ClusterStateController<Logged>::ClusterStateController(
     util::Executor* executor, const std::shared_ptr<libevent::Base>& base,
     Database<Logged>* database, ConsistentStore<Logged>* store,
-    MasterElection* election)
+    MasterElection* election, ContinuousFetcher* fetcher)
     : base_(base),
       database_(CHECK_NOTNULL(database)),
       store_(CHECK_NOTNULL(store)),
       election_(CHECK_NOTNULL(election)),
+      fetcher_(CHECK_NOTNULL(fetcher)),
       watch_config_task_(CHECK_NOTNULL(executor)),
       watch_node_states_task_(CHECK_NOTNULL(executor)),
       watch_serving_sth_task_(CHECK_NOTNULL(executor)),
@@ -204,12 +205,19 @@ void ClusterStateController<Logged>::OnClusterStateUpdated(
       if (it != all_peers_.end()) {
         it->second->UpdateClusterNodeState(update.handle_.Entry());
       } else {
-        all_peers_.emplace(node_id, std::make_shared<ClusterPeer>(
-                                        base_, update.handle_.Entry()));
+        const std::shared_ptr<ClusterPeer> peer(
+            std::make_shared<ClusterPeer>(base_, update.handle_.Entry()));
+        // TODO(pphaneuf): all_peers_ and fetcher_ both maintain a
+        // list of cluster members, this should be split off into its
+        // own class, and share an instance between the interested
+        // parties.
+        all_peers_.emplace(node_id, peer);
+        fetcher_->AddPeer(node_id, peer);
       }
     } else {
       VLOG(1) << "Node left: " << node_id;
       CHECK_EQ(1, all_peers_.erase(node_id));
+      fetcher_->RemovePeer(node_id);
     }
   }
 

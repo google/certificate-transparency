@@ -347,7 +347,7 @@ server/ct-dns-server: server/ct-dns-server.o server/event.o $(LOCAL_LIBS)
 server/ct-server: server/ct-server.o util/read_key.o server/handler.o \
 	base/notification.o log/logged_certificate.o fetcher/fetcher.o \
         fetcher/peer.o fetcher/peer_group.o fetcher/remote_peer.o \
-        client/async_log_client.o $(LOCAL_LIBS)
+        client/async_log_client.o fetcher/continuous_fetcher.o $(LOCAL_LIBS)
 
 tools/ct-clustertool: tools/clustertool_main.o \
                       merkletree/libmerkletree.a util/read_key.o \

@@ -4,6 +4,7 @@
 #include <string>
 #include <thread>
 
+#include "fetcher/mock_continuous_fetcher.h"
 #include "log/cluster_state_controller-inl.h"
 #include "log/logged_certificate.h"
 #include "log/test_db.h"
@@ -20,8 +21,10 @@ using ct::SignedTreeHead;
 using std::make_shared;
 using std::shared_ptr;
 using std::string;
-using testing::Return;
 using testing::NiceMock;
+using testing::Return;
+using testing::StrictMock;
+using testing::_;
 using util::StatusOr;
 
 namespace cert_trans {
@@ -47,7 +50,8 @@ class ClusterStateControllerTest : public ::testing::Test {
         store3_(new EtcdConsistentStore<LoggedCertificate>(&pool_, &etcd_,
                                                            &election3_, "",
                                                            kNodeId3)),
-        controller_(&pool_, base_, test_db_.db(), store1_.get(), &election1_) {
+        controller_(&pool_, base_, test_db_.db(), store1_.get(), &election1_,
+                    &fetcher_) {
     // Set default cluster config:
     ct::ClusterConfig default_config;
     default_config.set_minimum_serving_nodes(1);
@@ -103,6 +107,7 @@ class ClusterStateControllerTest : public ::testing::Test {
 
   ThreadPool pool_;
   shared_ptr<libevent::Base> base_;
+  StrictMock<MockContinuousFetcher> fetcher_;
   libevent::EventPumpThread pump_;
   FakeEtcdClient etcd_;
   TestDB<FileDB<LoggedCertificate>> test_db_;
@@ -122,6 +127,7 @@ typedef class EtcdConsistentStoreTest EtcdConsistentStoreDeathTest;
 TEST_F(ClusterStateControllerTest, TestNewTreeHead) {
   ct::SignedTreeHead sth;
   sth.set_tree_size(234);
+  EXPECT_CALL(fetcher_, AddPeer(string("/nodes/") + kNodeId1, _)).Times(1);
   controller_.NewTreeHead(sth);
   EXPECT_EQ(sth.DebugString(), GetLocalState().newest_sth().DebugString());
 }
@@ -130,8 +136,16 @@ TEST_F(ClusterStateControllerTest, TestNewTreeHead) {
 TEST_F(ClusterStateControllerTest, TestCalculateServingSTHAt50Percent) {
   NiceMock<MockMasterElection> election_is_master;
   EXPECT_CALL(election_is_master, IsMaster()).WillRepeatedly(Return(true));
-  ClusterStateController<LoggedCertificate> controller50(
-      &pool_, base_, test_db_.db(), store1_.get(), &election_is_master);
+  // Calls to the continuous fetcher are duplicated, because there are
+  // two ClusterStateController instances in this test.
+  EXPECT_CALL(fetcher_, AddPeer(string("/nodes/") + kNodeId1, _)).Times(2);
+  EXPECT_CALL(fetcher_, AddPeer(string("/nodes/") + kNodeId2, _)).Times(2);
+  EXPECT_CALL(fetcher_, AddPeer(string("/nodes/") + kNodeId3, _)).Times(2);
+  ClusterStateController<LoggedCertificate> controller50(&pool_, base_,
+                                                         test_db_.db(),
+                                                         store1_.get(),
+                                                         &election_is_master,
+                                                         &fetcher_);
   SetClusterConfig(store1_.get(), 1 /* nodes */, 0.5 /* fraction */);
 
   store1_->SetClusterNodeState(cns100_);
@@ -158,8 +172,16 @@ TEST_F(ClusterStateControllerTest, TestCalculateServingSTHAt50Percent) {
 TEST_F(ClusterStateControllerTest, TestCalculateServingSTHAt70Percent) {
   NiceMock<MockMasterElection> election_is_master;
   EXPECT_CALL(election_is_master, IsMaster()).WillRepeatedly(Return(true));
-  ClusterStateController<LoggedCertificate> controller70(
-      &pool_, base_, test_db_.db(), store1_.get(), &election_is_master);
+  // Calls to the continuous fetcher are duplicated, because there are
+  // two ClusterStateController instances in this test.
+  EXPECT_CALL(fetcher_, AddPeer(string("/nodes/") + kNodeId1, _)).Times(2);
+  EXPECT_CALL(fetcher_, AddPeer(string("/nodes/") + kNodeId2, _)).Times(2);
+  EXPECT_CALL(fetcher_, AddPeer(string("/nodes/") + kNodeId3, _)).Times(2);
+  ClusterStateController<LoggedCertificate> controller70(&pool_, base_,
+                                                         test_db_.db(),
+                                                         store1_.get(),
+                                                         &election_is_master,
+                                                         &fetcher_);
   SetClusterConfig(store1_.get(), 1 /* nodes */, 0.7 /* fraction */);
   store1_->SetClusterNodeState(cns100_);
   sleep(1);
@@ -185,8 +207,16 @@ TEST_F(ClusterStateControllerTest,
        TestCalculateServingSTHAt60PercentTwoNodeMin) {
   NiceMock<MockMasterElection> election_is_master;
   EXPECT_CALL(election_is_master, IsMaster()).WillRepeatedly(Return(true));
-  ClusterStateController<LoggedCertificate> controller60(
-      &pool_, base_, test_db_.db(), store1_.get(), &election_is_master);
+  // Calls to the continuous fetcher are duplicated, because there are
+  // two ClusterStateController instances in this test.
+  EXPECT_CALL(fetcher_, AddPeer(string("/nodes/") + kNodeId1, _)).Times(2);
+  EXPECT_CALL(fetcher_, AddPeer(string("/nodes/") + kNodeId2, _)).Times(2);
+  EXPECT_CALL(fetcher_, AddPeer(string("/nodes/") + kNodeId3, _)).Times(2);
+  ClusterStateController<LoggedCertificate> controller60(&pool_, base_,
+                                                         test_db_.db(),
+                                                         store1_.get(),
+                                                         &election_is_master,
+                                                         &fetcher_);
   SetClusterConfig(store1_.get(), 2 /* nodes */, 0.6 /* fraction */);
   store1_->SetClusterNodeState(cns100_);
   sleep(1);
@@ -211,8 +241,16 @@ TEST_F(ClusterStateControllerTest,
 TEST_F(ClusterStateControllerTest, TestCalculateServingSTHAsClusterMoves) {
   NiceMock<MockMasterElection> election_is_master;
   EXPECT_CALL(election_is_master, IsMaster()).WillRepeatedly(Return(true));
-  ClusterStateController<LoggedCertificate> controller50(
-      &pool_, base_, test_db_.db(), store1_.get(), &election_is_master);
+  // Calls to the continuous fetcher are duplicated, because there are
+  // two ClusterStateController instances in this test.
+  EXPECT_CALL(fetcher_, AddPeer(string("/nodes/") + kNodeId1, _)).Times(2);
+  EXPECT_CALL(fetcher_, AddPeer(string("/nodes/") + kNodeId2, _)).Times(2);
+  EXPECT_CALL(fetcher_, AddPeer(string("/nodes/") + kNodeId3, _)).Times(2);
+  ClusterStateController<LoggedCertificate> controller50(&pool_, base_,
+                                                         test_db_.db(),
+                                                         store1_.get(),
+                                                         &election_is_master,
+                                                         &fetcher_);
   SetClusterConfig(store1_.get(), 1 /* nodes */, 0.5 /* fraction */);
   ct::ClusterNodeState node_state(cns100_);
   store1_->SetClusterNodeState(node_state);
@@ -256,6 +294,9 @@ TEST_F(ClusterStateControllerTest, TestCalculateServingSTHAsClusterMoves) {
 
 
 TEST_F(ClusterStateControllerTest, TestKeepsNewerSTH) {
+  EXPECT_CALL(fetcher_, AddPeer(string("/nodes/") + kNodeId1, _)).Times(1);
+  EXPECT_CALL(fetcher_, AddPeer(string("/nodes/") + kNodeId2, _)).Times(1);
+
   store1_->SetClusterNodeState(cns100_);
 
   // Create a node with an identically sized but newer STH:
@@ -277,8 +318,16 @@ TEST_F(ClusterStateControllerTest, TestKeepsNewerSTH) {
 TEST_F(ClusterStateControllerTest, TestCannotSelectSmallerSTH) {
   NiceMock<MockMasterElection> election_is_master;
   EXPECT_CALL(election_is_master, IsMaster()).WillRepeatedly(Return(true));
-  ClusterStateController<LoggedCertificate> controller50(
-      &pool_, base_, test_db_.db(), store1_.get(), &election_is_master);
+  // Calls to the continuous fetcher are duplicated, because there are
+  // two ClusterStateController instances in this test.
+  EXPECT_CALL(fetcher_, AddPeer(string("/nodes/") + kNodeId1, _)).Times(2);
+  EXPECT_CALL(fetcher_, AddPeer(string("/nodes/") + kNodeId2, _)).Times(2);
+  EXPECT_CALL(fetcher_, AddPeer(string("/nodes/") + kNodeId3, _)).Times(2);
+  ClusterStateController<LoggedCertificate> controller50(&pool_, base_,
+                                                         test_db_.db(),
+                                                         store1_.get(),
+                                                         &election_is_master,
+                                                         &fetcher_);
   SetClusterConfig(store1_.get(), 1 /* nodes */, 0.5 /* fraction */);
 
   ct::ClusterNodeState node_state(cns200_);
@@ -324,8 +373,16 @@ TEST_F(ClusterStateControllerTest, TestCannotSelectSmallerSTH) {
 TEST_F(ClusterStateControllerTest, TestUsesLargestSTHWithIdenticalTimestamp) {
   NiceMock<MockMasterElection> election_is_master;
   EXPECT_CALL(election_is_master, IsMaster()).WillRepeatedly(Return(true));
-  ClusterStateController<LoggedCertificate> controller50(
-      &pool_, base_, test_db_.db(), store1_.get(), &election_is_master);
+  // Calls to the continuous fetcher are duplicated, because there are
+  // two ClusterStateController instances in this test.
+  EXPECT_CALL(fetcher_, AddPeer(string("/nodes/") + kNodeId1, _)).Times(2);
+  EXPECT_CALL(fetcher_, AddPeer(string("/nodes/") + kNodeId2, _)).Times(2);
+  EXPECT_CALL(fetcher_, AddPeer(string("/nodes/") + kNodeId3, _)).Times(2);
+  ClusterStateController<LoggedCertificate> controller50(&pool_, base_,
+                                                         test_db_.db(),
+                                                         store1_.get(),
+                                                         &election_is_master,
+                                                         &fetcher_);
   SetClusterConfig(store1_.get(), 1 /* nodes */, 0.5 /* fraction */);
 
   ClusterNodeState cns1;
@@ -359,8 +416,16 @@ TEST_F(ClusterStateControllerTest, TestUsesLargestSTHWithIdenticalTimestamp) {
 TEST_F(ClusterStateControllerTest, TestDoesNotReuseSTHTimestamp) {
   NiceMock<MockMasterElection> election_is_master;
   EXPECT_CALL(election_is_master, IsMaster()).WillRepeatedly(Return(true));
-  ClusterStateController<LoggedCertificate> controller50(
-      &pool_, base_, test_db_.db(), store1_.get(), &election_is_master);
+  // Calls to the continuous fetcher are duplicated, because there are
+  // two ClusterStateController instances in this test.
+  EXPECT_CALL(fetcher_, AddPeer(string("/nodes/") + kNodeId1, _)).Times(2);
+  EXPECT_CALL(fetcher_, AddPeer(string("/nodes/") + kNodeId2, _)).Times(2);
+  EXPECT_CALL(fetcher_, AddPeer(string("/nodes/") + kNodeId3, _)).Times(2);
+  ClusterStateController<LoggedCertificate> controller50(&pool_, base_,
+                                                         test_db_.db(),
+                                                         store1_.get(),
+                                                         &election_is_master,
+                                                         &fetcher_);
   SetClusterConfig(store1_.get(), 3 /* nodes */, 1 /* fraction */);
 
   ClusterNodeState cns1;
@@ -437,8 +502,16 @@ TEST_F(ClusterStateControllerTest,
        TestConfigChangesCauseServingSTHToBeRecalculated) {
   NiceMock<MockMasterElection> election_is_master;
   EXPECT_CALL(election_is_master, IsMaster()).WillRepeatedly(Return(true));
-  ClusterStateController<LoggedCertificate> controller(
-      &pool_, base_, test_db_.db(), store1_.get(), &election_is_master);
+  // Calls to the continuous fetcher are duplicated, because there are
+  // two ClusterStateController instances in this test.
+  EXPECT_CALL(fetcher_, AddPeer(string("/nodes/") + kNodeId1, _)).Times(2);
+  EXPECT_CALL(fetcher_, AddPeer(string("/nodes/") + kNodeId2, _)).Times(2);
+  EXPECT_CALL(fetcher_, AddPeer(string("/nodes/") + kNodeId3, _)).Times(2);
+  ClusterStateController<LoggedCertificate> controller(&pool_, base_,
+                                                       test_db_.db(),
+                                                       store1_.get(),
+                                                       &election_is_master,
+                                                       &fetcher_);
   SetClusterConfig(store1_.get(), 0 /* nodes */, 0.5 /* fraction */);
   store1_->SetClusterNodeState(cns100_);
   store2_->SetClusterNodeState(cns200_);
@@ -465,6 +538,7 @@ TEST_F(ClusterStateControllerTest, TestGetLocalNodeState) {
   SignedTreeHead sth;
   sth.set_timestamp(10000);
   sth.set_tree_size(2344);
+  EXPECT_CALL(fetcher_, AddPeer(string("/nodes/") + kNodeId1, _)).Times(1);
   controller_.NewTreeHead(sth);
 
   ClusterNodeState state;
@@ -477,6 +551,8 @@ TEST_F(ClusterStateControllerTest, TestLeavesElectionIfDoesNotHaveLocalData) {
   const int kTreeSize(2345);
   const int kTreeSizeSmaller(kTreeSize - 1);
   const int kTreeSizeLarger(kTreeSize + 1);
+
+  EXPECT_CALL(fetcher_, AddPeer(string("/nodes/") + kNodeId1, _)).Times(1);
 
   {
     SignedTreeHead local_sth;
@@ -509,6 +585,8 @@ TEST_F(ClusterStateControllerTest, TestJoinsElectionIfHasLocalData) {
   const int kTreeSizeSmaller(2345);
   const int kTreeSizeLarger(kTreeSizeSmaller + 1);
 
+  EXPECT_CALL(fetcher_, AddPeer(string("/nodes/") + kNodeId1, _)).Times(1);
+
   {
     SignedTreeHead local_sth;
     local_sth.set_timestamp(10000);
@@ -536,6 +614,11 @@ TEST_F(ClusterStateControllerTest, TestJoinsElectionIfHasLocalData) {
 TEST_F(ClusterStateControllerTest, TestNodeHostPort) {
   const string kHost("myhostname");
   const int kPort(9999);
+
+  // Calls to the continuous fetcher are duplicated, because there are
+  // two ClusterStateController instances in this test.
+  EXPECT_CALL(fetcher_, AddPeer(string("/nodes/") + kNodeId1, _)).Times(2);
+
   controller_.SetNodeHostPort(kHost, kPort);
   sleep(1);
 
@@ -546,6 +629,8 @@ TEST_F(ClusterStateControllerTest, TestNodeHostPort) {
 
 
 TEST_F(ClusterStateControllerTest, TestStoresServingSthInDatabase) {
+  EXPECT_CALL(fetcher_, AddPeer(string("/nodes/") + kNodeId1, _)).Times(1);
+
   SignedTreeHead sth;
   sth.set_timestamp(10000);
   sth.set_tree_size(2000);

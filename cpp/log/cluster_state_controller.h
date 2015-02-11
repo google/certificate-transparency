@@ -7,6 +7,7 @@
 #include <memory>
 #include <string>
 
+#include "fetcher/continuous_fetcher.h"
 #include "log/etcd_consistent_store.h"
 #include "proto/ct.pb.h"
 #include "util/libevent_wrapper.h"
@@ -34,7 +35,7 @@ class ClusterStateController {
                          const std::shared_ptr<libevent::Base>& base,
                          Database<Logged>* database,
                          ConsistentStore<Logged>* store,
-                         MasterElection* election);
+                         MasterElection* election, ContinuousFetcher* fetcher);
 
   ~ClusterStateController();
 
@@ -95,6 +96,7 @@ class ClusterStateController {
   Database<Logged>* const database_;      // Not owned by us
   ConsistentStore<Logged>* const store_;  // Not owned by us
   MasterElection* const election_;        // Not owned by us
+  ContinuousFetcher* const fetcher_;      // Not owned by us
   util::SyncTask watch_config_task_;
   util::SyncTask watch_node_states_task_;
   util::SyncTask watch_serving_sth_task_;
