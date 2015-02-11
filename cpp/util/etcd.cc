@@ -40,12 +40,14 @@ using util::StatusOr;
 using util::Task;
 using util::TaskHold;
 
-DEFINE_int32(etcd_watch_error_retry_delay_secs, 5,
+DEFINE_int32(etcd_watch_error_retry_delay_seconds, 5,
              "delay between retrying etcd watch requests");
 DEFINE_bool(etcd_consistent, true, "Add consistent=true param to all requests. "
             "Do not turn this off unless you *know* what you're doing.");
 DEFINE_bool(etcd_quorum, true, "Add quorum=true param to all requests. "
             "Do not turn this off unless you *know* what you're doing.");
+DEFINE_int32(etcd_connection_timeout_seconds, 10,
+             "Number of seconds after which to timeout etcd connections.");
 
 namespace cert_trans {
 
@@ -426,6 +428,7 @@ struct EtcdClient::Request {
     conn_ = separate_conn_
                 ? shared_ptr<libevent::HttpConnection>(conn->Clone())
                 : conn;
+    conn_->SetTimeout(seconds(FLAGS_etcd_connection_timeout_seconds));
 
     const shared_ptr<libevent::HttpRequest> req(
         make_shared<libevent::HttpRequest>(
@@ -482,7 +485,8 @@ struct EtcdClient::WatchState {
   void InitialGetDone(Status status, const Node& node, int64_t etcd_index);
   void InitialGetAllDone(Status status, const vector<Node>& nodes,
                          int64_t etcd_index);
-  void RequestDone(Status status, const shared_ptr<JsonObject>& json);
+  void RequestDone(Status status, const shared_ptr<JsonObject>& json,
+                   int64_t etcd_index);
   void SendUpdates(const vector<WatchUpdate>& updates);
   void StartRequest();
   Status HandleSingleValueRequestDone(const JsonObject& node,
@@ -607,16 +611,23 @@ Status EtcdClient::WatchState::HandleSingleValueRequestDone(
   }
   updates->emplace_back(status.ValueOrDie());
 
-  CHECK_LT(highest_index_seen_, updates->back().node_.modified_index_);
-  highest_index_seen_ =
-      max(highest_index_seen_, updates->back().node_.modified_index_);
-
   return Status::OK;
 }
 
 
 void EtcdClient::WatchState::RequestDone(Status status,
-                                         const shared_ptr<JsonObject>& json) {
+                                         const shared_ptr<JsonObject>& json,
+                                         int64_t etcd_index) {
+  // TODO(alcutter): doing this here works around some etcd 401 errors, but in
+  // the case of sustained high qps we could miss updates entirely (e.g. if
+  // this new index is already past the 1000 entry horizon by the time we make
+  // the new watch request.)  One way to address this might be to have the
+  // watcher re-do an "initial" get on the target, and, in the case of
+  // directory watches, maintain a set of known keys so that it can synthesise
+  // 'delete' updates.
+  CHECK_LE(highest_index_seen_, etcd_index);
+  highest_index_seen_ = etcd_index;
+
   if (task_->CancelRequested()) {
     task_->Return(Status::CANCELLED);
     return;
@@ -628,6 +639,7 @@ void EtcdClient::WatchState::RequestDone(Status status,
   {
     // This is probably due to a timeout, just retry.
     if (!status.ok()) {
+      LOG(INFO) << "Watch request failed: " << status;
       goto fail;
     }
 
@@ -636,14 +648,14 @@ void EtcdClient::WatchState::RequestDone(Status status,
     // a delay? Retrying for now...
     const JsonObject node(*json, "node");
     if (!node.Ok()) {
-      LOG(ERROR) << "Invalid JSON: Couldn't find 'node'";
+      LOG(INFO) << "Invalid JSON: Couldn't find 'node'";
       goto fail;
     }
 
     vector<WatchUpdate> updates;
     Status status(HandleSingleValueRequestDone(node, &updates));
     if (!status.ok()) {
-      LOG(ERROR) << status;
+      LOG(INFO) << "HandleSingleValueRequestDone failed: " << status;
       goto fail;
     }
 
@@ -653,7 +665,7 @@ void EtcdClient::WatchState::RequestDone(Status status,
 
 fail:
   client_->event_base_->Delay(
-      seconds(FLAGS_etcd_watch_error_retry_delay_secs),
+      seconds(FLAGS_etcd_watch_error_retry_delay_seconds),
       task_->AddChildWithExecutor(bind(&WatchState::StartRequest, this),
                                   client_->event_base_.get()));
 }
@@ -680,7 +692,7 @@ void EtcdClient::WatchState::StartRequest() {
   params["recursive"] = "true";
 
   req_ = new Request(client_, EVHTTP_REQ_GET, key_, true, params,
-                     bind(&WatchState::RequestDone, this, _1, _2));
+                     bind(&WatchState::RequestDone, this, _1, _2, _3));
 
   // Issue the new request from the libevent dispatch loop. This is
   // not usually necessary, but in error cases, libevent can call us
@@ -803,6 +815,7 @@ shared_ptr<libevent::HttpConnection> EtcdClient::GetConnection(
     conn = make_shared<libevent::HttpConnection>(event_base_,
                                                  UriFromHostPort(host, port)
                                                      .get());
+    conn->SetTimeout(seconds(FLAGS_etcd_connection_timeout_seconds));
     conns_.insert(make_pair(host_port, conn));
   } else {
     conn = it->second;
