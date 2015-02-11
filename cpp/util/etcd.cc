@@ -785,7 +785,8 @@ void EtcdClient::RequestDone(const shared_ptr<libevent::HttpRequest>& req,
   // This can happen in the case of a timeout (not sure if there are
   // other reasons).
   if (!req) {
-    etcd_req->cb_(Status(util::error::UNKNOWN, "unknown error"),
+    etcd_req->cb_(Status(util::error::UNKNOWN,
+                         "evhttp request callback returned a null"),
                   shared_ptr<JsonObject>(), -1);
     return;
   }
