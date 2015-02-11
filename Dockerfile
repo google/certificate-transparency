@@ -28,6 +28,7 @@ CMD cd /mnt/ctlog/ && \
     if [ ! -d logs ]; then mkdir logs; fi && \
     MY_IP=$(awk "/${HOSTNAME}/ {print \$1}" < /etc/hosts) && \
     echo "My IP: ${MY_IP}" && \
+    echo "Etcd: ${ETCD_SERVICE_SERVICE_HOST}:${ETCD_SERVICE_SERVICE_PORT}" && \
     /usr/local/bin/ct-server \
         --port=6962 \
         --server=${MY_IP} \
