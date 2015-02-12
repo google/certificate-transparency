@@ -178,6 +178,7 @@ void SignMerkleTree(TreeSigner<LoggedCertificate>* tree_signer,
 int main(int argc, char* argv[]) {
   google::ParseCommandLineFlags(&argc, &argv, true);
   google::InitGoogleLogging(argv[0]);
+  google::InstallFailureSignalHandler();
   OpenSSL_add_all_algorithms();
   ERR_load_crypto_strings();
   cert_trans::LoadCtExtensions();
