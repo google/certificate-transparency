@@ -40,7 +40,8 @@ class HTTPLogClient {
       int first, int last, std::vector<AsyncLogClient::Entry>* entries);
 
  private:
-  const std::shared_ptr<libevent::Base> base_;
+  const std::unique_ptr<libevent::Base> base_;
+  UrlFetcher fetcher_;
   AsyncLogClient client_;
 
   DISALLOW_COPY_AND_ASSIGN(HTTPLogClient);

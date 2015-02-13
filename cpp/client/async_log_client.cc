@@ -1,22 +1,20 @@
 #include "client/async_log_client.h"
 
 #include <algorithm>
+#include <event2/http.h>
 #include <glog/logging.h>
 #include <iterator>
 #include <memory>
-#include <sstream>
 
 #include "log/cert.h"
 #include "proto/serializer.h"
 #include "util/json_wrapper.h"
-#include "util/libevent_wrapper.h"
-
-namespace libevent = cert_trans::libevent;
 
 using cert_trans::AsyncLogClient;
 using cert_trans::Cert;
 using cert_trans::CertChain;
 using cert_trans::PreCertChain;
+using cert_trans::UrlFetcher;
 using ct::DigitallySigned;
 using ct::MerkleAuditProof;
 using ct::SignedCertificateTimestamp;
@@ -24,12 +22,11 @@ using ct::SignedTreeHead;
 using std::back_inserter;
 using std::bind;
 using std::copy;
-using std::function;
 using std::make_shared;
-using std::ostringstream;
 using std::placeholders::_1;
 using std::shared_ptr;
 using std::string;
+using std::to_string;
 using std::unique_ptr;
 using std::vector;
 
@@ -46,19 +43,12 @@ string UriEncode(const string& input) {
 
 // Do some common checks, calls the callback with the appropriate
 // error if something is wrong.
-bool SanityCheck(const shared_ptr<libevent::HttpRequest>& req,
-                 const AsyncLogClient::Callback& done) {
-  if (!req) {
-    done(AsyncLogClient::UNKNOWN_ERROR);
-    return false;
-  }
-
-  if (req->GetResponseCode() < 1) {
-    done(AsyncLogClient::CONNECT_FAILED);
-    return false;
-  }
-
-  if (req->GetResponseCode() != HTTP_OK) {
+bool SanityCheck(UrlFetcher::Response* resp,
+                 const AsyncLogClient::Callback& done, util::Task* task) {
+  // TODO(pphaneuf): We should report errors better. The easiest way
+  // would be for this to use util::Task as well, so it could simply
+  // pass on the status.
+  if (!task->status().ok() || resp->status_code != HTTP_OK) {
     done(AsyncLogClient::UNKNOWN_ERROR);
     return false;
   }
@@ -67,12 +57,18 @@ bool SanityCheck(const shared_ptr<libevent::HttpRequest>& req,
 }
 
 
-void DoneGetSTH(const shared_ptr<libevent::HttpRequest>& req,
-                SignedTreeHead* sth, const AsyncLogClient::Callback& done) {
-  if (!SanityCheck(req, done))
-    return;
+void DoneGetSTH(UrlFetcher::Response* resp, SignedTreeHead* sth,
+                const AsyncLogClient::Callback& done, util::Task* task) {
+  unique_ptr<UrlFetcher::Response> resp_deleter(CHECK_NOTNULL(resp));
+  unique_ptr<util::Task> task_deleter(CHECK_NOTNULL(task));
 
-  JsonObject jresponse(req->GetInputBuffer());
+  LOG_IF(INFO, !task->status().ok()) << "DoneGetSTH: " << task->status();
+
+  if (!SanityCheck(resp, done, task)) {
+    return;
+  }
+
+  JsonObject jresponse(resp->body);
   if (!jresponse.Ok())
     return done(AsyncLogClient::BAD_RESPONSE);
 
@@ -107,13 +103,16 @@ void DoneGetSTH(const shared_ptr<libevent::HttpRequest>& req,
 }
 
 
-void DoneGetRoots(const shared_ptr<libevent::HttpRequest>& req,
-                  vector<shared_ptr<Cert> >* roots,
-                  const AsyncLogClient::Callback& done) {
-  if (!SanityCheck(req, done))
-    return;
+void DoneGetRoots(UrlFetcher::Response* resp, vector<shared_ptr<Cert> >* roots,
+                  const AsyncLogClient::Callback& done, util::Task* task) {
+  unique_ptr<UrlFetcher::Response> resp_deleter(CHECK_NOTNULL(resp));
+  unique_ptr<util::Task> task_deleter(CHECK_NOTNULL(task));
 
-  JsonObject jresponse(req->GetInputBuffer());
+  if (!SanityCheck(resp, done, task)) {
+    return;
+  }
+
+  JsonObject jresponse(resp->body);
   if (!jresponse.Ok())
     return done(AsyncLogClient::BAD_RESPONSE);
 
@@ -141,13 +140,17 @@ void DoneGetRoots(const shared_ptr<libevent::HttpRequest>& req,
 }
 
 
-void DoneGetEntries(const shared_ptr<libevent::HttpRequest>& req,
+void DoneGetEntries(UrlFetcher::Response* resp,
                     vector<AsyncLogClient::Entry>* entries,
-                    const AsyncLogClient::Callback& done) {
-  if (!SanityCheck(req, done))
-    return;
+                    const AsyncLogClient::Callback& done, util::Task* task) {
+  unique_ptr<UrlFetcher::Response> resp_deleter(CHECK_NOTNULL(resp));
+  unique_ptr<util::Task> task_deleter(CHECK_NOTNULL(task));
 
-  JsonObject jresponse(req->GetInputBuffer());
+  if (!SanityCheck(resp, done, task)) {
+    return;
+  }
+
+  JsonObject jresponse(resp->body);
   if (!jresponse.Ok())
     return done(AsyncLogClient::BAD_RESPONSE);
 
@@ -198,14 +201,19 @@ void DoneGetEntries(const shared_ptr<libevent::HttpRequest>& req,
 }
 
 
-void DoneQueryInclusionProof(const shared_ptr<libevent::HttpRequest>& req,
+void DoneQueryInclusionProof(UrlFetcher::Response* resp,
                              const SignedTreeHead& sth,
                              MerkleAuditProof* proof,
-                             const AsyncLogClient::Callback& done) {
-  if (!SanityCheck(req, done))
-    return;
+                             const AsyncLogClient::Callback& done,
+                             util::Task* task) {
+  unique_ptr<UrlFetcher::Response> resp_deleter(CHECK_NOTNULL(resp));
+  unique_ptr<util::Task> task_deleter(CHECK_NOTNULL(task));
 
-  JsonObject jresponse(req->GetInputBuffer());
+  if (!SanityCheck(resp, done, task)) {
+    return;
+  }
+
+  JsonObject jresponse(resp->body);
   if (!jresponse.Ok())
     return done(AsyncLogClient::BAD_RESPONSE);
 
@@ -239,13 +247,17 @@ void DoneQueryInclusionProof(const shared_ptr<libevent::HttpRequest>& req,
 }
 
 
-void DoneGetSTHConsistency(const shared_ptr<libevent::HttpRequest>& req,
-                           vector<string>* proof,
-                           const AsyncLogClient::Callback& done) {
-  if (!SanityCheck(req, done))
-    return;
+void DoneGetSTHConsistency(UrlFetcher::Response* resp, vector<string>* proof,
+                           const AsyncLogClient::Callback& done,
+                           util::Task* task) {
+  unique_ptr<UrlFetcher::Response> resp_deleter(CHECK_NOTNULL(resp));
+  unique_ptr<util::Task> task_deleter(CHECK_NOTNULL(task));
 
-  JsonObject jresponse(req->GetInputBuffer());
+  if (!SanityCheck(resp, done, task)) {
+    return;
+  }
+
+  JsonObject jresponse(resp->body);
   if (!jresponse.Ok())
     return done(AsyncLogClient::BAD_RESPONSE);
 
@@ -269,13 +281,18 @@ void DoneGetSTHConsistency(const shared_ptr<libevent::HttpRequest>& req,
 }
 
 
-void DoneInternalAddChain(const shared_ptr<libevent::HttpRequest>& req,
+void DoneInternalAddChain(UrlFetcher::Response* resp,
                           SignedCertificateTimestamp* sct,
-                          const AsyncLogClient::Callback& done) {
-  if (!SanityCheck(req, done))
-    return;
+                          const AsyncLogClient::Callback& done,
+                          util::Task* task) {
+  unique_ptr<UrlFetcher::Response> resp_deleter(CHECK_NOTNULL(resp));
+  unique_ptr<util::Task> task_deleter(CHECK_NOTNULL(task));
 
-  JsonObject jresponse(req->GetInputBuffer());
+  if (!SanityCheck(resp, done, task)) {
+    return;
+  }
+
+  JsonObject jresponse(resp->body);
   if (!jresponse.Ok())
     return done(AsyncLogClient::BAD_RESPONSE);
 
@@ -319,48 +336,37 @@ void DoneInternalAddChain(const shared_ptr<libevent::HttpRequest>& req,
 namespace cert_trans {
 
 
-AsyncLogClient::AsyncLogClient(const shared_ptr<libevent::Base>& base,
-                               const string& server_uri)
-    : base_(base),
-      server_uri_(CHECK_NOTNULL(evhttp_uri_parse(server_uri.c_str())),
-                  evhttp_uri_free),
-      conn_(make_shared<libevent::HttpConnection>(base_, server_uri_.get())) {
-  const char* const path(evhttp_uri_get_path(server_uri_.get()));
-  string newpath;
+AsyncLogClient::AsyncLogClient(util::Executor* const executor,
+                               UrlFetcher* fetcher, const string& server_uri)
+    : executor_(CHECK_NOTNULL(executor)),
+      fetcher_(CHECK_NOTNULL(fetcher)),
+      server_url_(server_uri) {
+  string newpath(server_url_.Path());
 
-  if (path)
-    newpath.assign(path);
-
-  if (newpath.empty() || newpath.at(newpath.size() - 1) != '/')
+  if (newpath.empty() || newpath.back() != '/')
     newpath.append("/");
 
   newpath.append("ct/v1/");
 
-  CHECK_EQ(evhttp_uri_set_path(server_uri_.get(), newpath.c_str()), 0);
+  server_url_.SetPath(newpath);
 }
 
 
 void AsyncLogClient::GetSTH(SignedTreeHead* sth, const Callback& done) {
-  const shared_ptr<libevent::HttpRequest> req(
-      make_shared<libevent::HttpRequest>(bind(&DoneGetSTH, _1, sth, done)));
-
-  evhttp_add_header(req->GetOutputHeaders(), "Host",
-                    evhttp_uri_get_host(server_uri_.get()));
-
-  conn_->MakeRequest(req, EVHTTP_REQ_GET, GetPath("get-sth"));
+  UrlFetcher::Response* const resp(new UrlFetcher::Response);
+  fetcher_->Get(GetURL("get-sth"), resp,
+                new util::Task(bind(DoneGetSTH, resp, sth, done, _1),
+                               executor_));
 }
 
 
 void AsyncLogClient::GetRoots(vector<shared_ptr<Cert> >* roots,
                               const Callback& done) {
-  const shared_ptr<libevent::HttpRequest> req(
-      make_shared<libevent::HttpRequest>(
-          bind(&DoneGetRoots, _1, roots, done)));
+  UrlFetcher::Response* const resp(new UrlFetcher::Response);
 
-  evhttp_add_header(req->GetOutputHeaders(), "Host",
-                    evhttp_uri_get_host(server_uri_.get()));
-
-  conn_->MakeRequest(req, EVHTTP_REQ_GET, GetPath("get-roots"));
+  fetcher_->Get(GetURL("get-roots"), resp,
+                new util::Task(bind(DoneGetRoots, resp, roots, done, _1),
+                               executor_));
 }
 
 
@@ -375,17 +381,13 @@ void AsyncLogClient::GetEntries(int first, int last,
     return;
   }
 
-  const shared_ptr<libevent::HttpRequest> req(
-      make_shared<libevent::HttpRequest>(
-          bind(&DoneGetEntries, _1, entries, done)));
+  URL url(GetURL("get-entries"));
+  url.SetQuery("start=" + to_string(first) + "&end=" + to_string(last));
 
-  evhttp_add_header(req->GetOutputHeaders(), "Host",
-                    evhttp_uri_get_host(server_uri_.get()));
-
-  ostringstream subpath;
-  subpath << "get-entries?start=" << first << "&end=" << last;
-
-  conn_->MakeRequest(req, EVHTTP_REQ_GET, GetPath(subpath.str()));
+  UrlFetcher::Response* const resp(new UrlFetcher::Response);
+  fetcher_->Get(url, resp,
+                new util::Task(bind(DoneGetEntries, resp, entries, done, _1),
+                               executor_));
 }
 
 
@@ -395,19 +397,14 @@ void AsyncLogClient::QueryInclusionProof(const SignedTreeHead& sth,
                                          const Callback& done) {
   CHECK_GE(sth.tree_size(), 0);
 
-  const shared_ptr<libevent::HttpRequest> req(
-      make_shared<libevent::HttpRequest>(
-          bind(&DoneQueryInclusionProof, _1, sth, proof, done)));
+  URL url(GetURL("get-proof-by-hash"));
+  url.SetQuery("hash=" + UriEncode(util::ToBase64(merkle_leaf_hash)) +
+               "&tree_size=" + to_string(sth.tree_size()));
 
-  evhttp_add_header(req->GetOutputHeaders(), "Host",
-                    evhttp_uri_get_host(server_uri_.get()));
-
-  ostringstream subpath;
-  subpath << "get-proof-by-hash?hash="
-          << UriEncode(util::ToBase64(merkle_leaf_hash))
-          << "&tree_size=" << sth.tree_size();
-
-  conn_->MakeRequest(req, EVHTTP_REQ_GET, GetPath(subpath.str()));
+  UrlFetcher::Response* const resp(new UrlFetcher::Response);
+  fetcher_->Get(url, resp, new util::Task(bind(DoneQueryInclusionProof, resp,
+                                               sth, proof, done, _1),
+                                          executor_));
 }
 
 
@@ -416,17 +413,14 @@ void AsyncLogClient::GetSTHConsistency(int64_t first, int64_t second,
                                        const Callback& done) {
   CHECK_GE(first, 0);
   CHECK_GE(second, 0);
-  const shared_ptr<libevent::HttpRequest> req(
-      make_shared<libevent::HttpRequest>(
-          bind(&DoneGetSTHConsistency, _1, proof, done)));
 
-  evhttp_add_header(req->GetOutputHeaders(), "Host",
-                    evhttp_uri_get_host(server_uri_.get()));
+  URL url(GetURL("get-sth-consistency"));
+  url.SetQuery("first=" + to_string(first) + "&second=" + to_string(second));
 
-  ostringstream subpath;
-  subpath << "get-sth-consistency?first=" << first << "&second=" << second;
-
-  conn_->MakeRequest(req, EVHTTP_REQ_GET, GetPath(subpath.str()));
+  UrlFetcher::Response* const resp(new UrlFetcher::Response);
+  fetcher_->Get(url, resp, new util::Task(bind(DoneGetSTHConsistency, resp,
+                                               proof, done, _1),
+                                          executor_));
 }
 
 
@@ -444,8 +438,12 @@ void AsyncLogClient::AddPreCertChain(const PreCertChain& pre_cert_chain,
 }
 
 
-string AsyncLogClient::GetPath(const string& subpath) const {
-  return CHECK_NOTNULL(evhttp_uri_get_path(server_uri_.get())) + subpath;
+URL AsyncLogClient::GetURL(const std::string& subpath) const {
+  URL retval(server_url_);
+  CHECK(!retval.Path().empty());
+  CHECK_EQ(retval.Path().back(), '/');
+  retval.SetPath(retval.Path() + subpath);
+  return retval;
 }
 
 
@@ -465,20 +463,13 @@ void AsyncLogClient::InternalAddChain(const CertChain& cert_chain,
   JsonObject jsend;
   jsend.Add("chain", jchain);
 
-  const shared_ptr<libevent::HttpRequest> req(
-      make_shared<libevent::HttpRequest>(
-          bind(&DoneInternalAddChain, _1, sct, done)));
+  UrlFetcher::Request req(GetURL(pre_cert ? "add-pre-chain" : "add-chain"));
+  req.body = jsend.ToString();
 
-  evhttp_add_header(req->GetOutputHeaders(), "Host",
-                    evhttp_uri_get_host(server_uri_.get()));
-
-  const string json_body(jsend.ToString());
-  CHECK_EQ(evbuffer_add(req->GetOutputBuffer(), json_body.data(),
-                        json_body.size()),
-           0);
-
-  conn_->MakeRequest(req, EVHTTP_REQ_POST,
-                    GetPath(pre_cert ? "add-pre-chain" : "add-chain"));
+  UrlFetcher::Response* const resp(new UrlFetcher::Response);
+  fetcher_->Post(req, resp, new util::Task(bind(DoneInternalAddChain, resp,
+                                                sct, done, _1),
+                                           executor_));
 }
 
 

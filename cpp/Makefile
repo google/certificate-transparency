@@ -135,6 +135,7 @@ ifneq ($(MAKECMDGOALS),clean)
     include log/.depend
     include merkletree/.depend
     include monitor/.depend
+    include net/.depend
     include proto/.depend
     include server/.depend
     include util/.depend
@@ -250,7 +251,8 @@ log/cert_submission_handler_test: log/cert_submission_handler_test.o \
 
 log/cluster_state_controller_test: base/notification.o fetcher/peer.o \
                                    log/cluster_state_controller_test.o \
-                                   client/async_log_client.o \
+                                   client/async_log_client.o net/url.o \
+                                   net/url_fetcher.o net/connection_pool.o \
                                    log/libdatabase.a \
                                    merkletree/serial_hasher.o \
                                    log/libcert.a log/libcluster.a \
@@ -340,14 +342,16 @@ monitor/database_test: monitor/database_test.o monitor/database.o \
 client/ct: client/ct.o client/client.o client/ssl_client.o \
            client/http_log_client.o log/logged_certificate.o \
            monitor/sqlite_db.o monitor/database.o monitor/monitor.o \
-           client/async_log_client.o util/read_key.o $(LOCAL_LIBS)
+           client/async_log_client.o util/read_key.o net/url.o \
+           net/url_fetcher.o net/connection_pool.o $(LOCAL_LIBS)
 
 server/ct-dns-server: server/ct-dns-server.o server/event.o $(LOCAL_LIBS)
 
 server/ct-server: server/ct-server.o util/read_key.o server/handler.o \
 	base/notification.o log/logged_certificate.o fetcher/fetcher.o \
         fetcher/peer.o fetcher/peer_group.o fetcher/remote_peer.o \
-        client/async_log_client.o fetcher/continuous_fetcher.o $(LOCAL_LIBS)
+        client/async_log_client.o fetcher/continuous_fetcher.o net/url.o \
+        net/url_fetcher.o net/connection_pool.o $(LOCAL_LIBS)
 
 tools/ct-clustertool: tools/clustertool_main.o \
                       merkletree/libmerkletree.a util/read_key.o \

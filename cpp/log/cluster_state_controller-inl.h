@@ -17,16 +17,16 @@ namespace {
 
 
 std::unique_ptr<AsyncLogClient> BuildAsyncLogClient(
-    const std::shared_ptr<libevent::Base>& base,
+    const std::shared_ptr<libevent::Base>& base, UrlFetcher* fetcher,
     const ct::ClusterNodeState& state) {
   CHECK(!state.hostname().empty());
   CHECK_GT(state.log_port(), 0);
   CHECK_LE(state.log_port(), UINT16_MAX);
 
   // TODO(pphaneuf): We'd like to support HTTPS at some point.
-  return std::unique_ptr<AsyncLogClient>(
-      new AsyncLogClient(base, "http://" + state.hostname() + ":" +
-                                   std::to_string(state.log_port())));
+  return std::unique_ptr<AsyncLogClient>(new AsyncLogClient(
+      base.get(), fetcher,
+      "http://" + state.hostname() + ":" + std::to_string(state.log_port())));
 }
 
 
@@ -36,9 +36,9 @@ std::unique_ptr<AsyncLogClient> BuildAsyncLogClient(
 template <class Logged>
 class ClusterStateController<Logged>::ClusterPeer : public Peer {
  public:
-  ClusterPeer(const std::shared_ptr<libevent::Base>& base,
+  ClusterPeer(const std::shared_ptr<libevent::Base>& base, UrlFetcher* fetcher,
               const ct::ClusterNodeState& state)
-      : Peer(BuildAsyncLogClient(base, state)), state_(state) {
+      : Peer(BuildAsyncLogClient(base, fetcher, state)), state_(state) {
   }
 
   int64_t TreeSize() const override {
@@ -78,9 +78,11 @@ class ClusterStateController<Logged>::ClusterPeer : public Peer {
 template <class Logged>
 ClusterStateController<Logged>::ClusterStateController(
     util::Executor* executor, const std::shared_ptr<libevent::Base>& base,
-    Database<Logged>* database, ConsistentStore<Logged>* store,
-    MasterElection* election, ContinuousFetcher* fetcher)
+    UrlFetcher* url_fetcher, Database<Logged>* database,
+    ConsistentStore<Logged>* store, MasterElection* election,
+    ContinuousFetcher* fetcher)
     : base_(base),
+      url_fetcher_(CHECK_NOTNULL(url_fetcher)),
       database_(CHECK_NOTNULL(database)),
       store_(CHECK_NOTNULL(store)),
       election_(CHECK_NOTNULL(election)),
@@ -206,7 +208,8 @@ void ClusterStateController<Logged>::OnClusterStateUpdated(
         it->second->UpdateClusterNodeState(update.handle_.Entry());
       } else {
         const std::shared_ptr<ClusterPeer> peer(
-            std::make_shared<ClusterPeer>(base_, update.handle_.Entry()));
+            std::make_shared<ClusterPeer>(base_, url_fetcher_,
+                                          update.handle_.Entry()));
         // TODO(pphaneuf): all_peers_ and fetcher_ both maintain a
         // list of cluster members, this should be split off into its
         // own class, and share an instance between the interested

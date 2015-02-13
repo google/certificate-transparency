@@ -42,7 +42,9 @@ void DoneRequest(AsyncLogClient::Status status, AsyncLogClient::Status* retval,
 }  // namespace
 
 HTTPLogClient::HTTPLogClient(const string& server)
-    : base_(make_shared<libevent::Base>()), client_(base_, server) {
+    : base_(new libevent::Base()),
+      fetcher_(base_.get()),
+      client_(base_.get(), &fetcher_, server) {
 }
 
 AsyncLogClient::Status HTTPLogClient::UploadSubmission(

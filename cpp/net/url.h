@@ -40,6 +40,10 @@ class URL {
     path_ = path;
   }
 
+  void SetQuery(const std::string& query) {
+    query_ = query;
+  }
+
  private:
   std::string protocol_;
   std::string host_;

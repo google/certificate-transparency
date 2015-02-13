@@ -8,8 +8,8 @@
 #include <vector>
 
 #include "base/macros.h"
+#include "net/url_fetcher.h"
 #include "proto/ct.pb.h"
-#include "util/libevent_wrapper.h"
 
 namespace cert_trans {
 
@@ -38,7 +38,12 @@ class AsyncLogClient {
 
   typedef std::function<void(Status)> Callback;
 
-  AsyncLogClient(const std::shared_ptr<libevent::Base>& base,
+  // The "executor" will be used to run callbacks.
+  // TODO(pphaneuf): The executor would not be necessary if we
+  // converted this API to use util::Task.
+  // TODO(pphaneuf): Might also want to take a URL object directly,
+  // instead of a string?
+  AsyncLogClient(util::Executor* const executor, UrlFetcher* fetcher,
                  const std::string& server_uri);
 
   void GetSTH(ct::SignedTreeHead* sth, const Callback& done);
@@ -70,15 +75,15 @@ class AsyncLogClient {
                        const Callback& done);
 
  private:
-  std::string GetPath(const std::string& subpath) const;
+  URL GetURL(const std::string& subpath) const;
 
   void InternalAddChain(const CertChain& cert_chain,
                         ct::SignedCertificateTimestamp* sct, bool pre_cert,
                         const Callback& done);
 
-  const std::shared_ptr<libevent::Base> base_;
-  const std::shared_ptr<evhttp_uri> server_uri_;
-  const std::shared_ptr<libevent::HttpConnection> conn_;
+  util::Executor* const executor_;
+  UrlFetcher* const fetcher_;
+  URL server_url_;
 
   DISALLOW_COPY_AND_ASSIGN(AsyncLogClient);
 };

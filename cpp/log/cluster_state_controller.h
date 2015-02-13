@@ -33,7 +33,7 @@ class ClusterStateController {
  public:
   ClusterStateController(util::Executor* executor,
                          const std::shared_ptr<libevent::Base>& base,
-                         Database<Logged>* database,
+                         UrlFetcher* url_fetcher, Database<Logged>* database,
                          ConsistentStore<Logged>* store,
                          MasterElection* election, ContinuousFetcher* fetcher);
 
@@ -93,6 +93,7 @@ class ClusterStateController {
   void ClusterServingSTHUpdater();
 
   const std::shared_ptr<libevent::Base> base_;
+  UrlFetcher* const url_fetcher_;         // Not owned by us
   Database<Logged>* const database_;      // Not owned by us
   ConsistentStore<Logged>* const store_;  // Not owned by us
   MasterElection* const election_;        // Not owned by us

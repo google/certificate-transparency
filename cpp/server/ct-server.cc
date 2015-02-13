@@ -87,6 +87,7 @@ using cert_trans::StrictConsistentStore;
 using cert_trans::ThreadPool;
 using cert_trans::TreeSigner;
 using cert_trans::Update;
+using cert_trans::UrlFetcher;
 using ct::ClusterNodeState;
 using ct::SignedTreeHead;
 using google::RegisterFlagValidator;
@@ -315,11 +316,12 @@ int main(int argc, char* argv[]) {
     CHECK(!FLAGS_server.empty());
   }
 
+  UrlFetcher url_fetcher(event_base.get());
   const unique_ptr<ContinuousFetcher> fetcher(
       ContinuousFetcher::New(event_base.get(), db));
   ClusterStateController<LoggedCertificate> cluster_controller(
-      &internal_pool, event_base, db, &consistent_store, &election,
-      fetcher.get());
+      &internal_pool, event_base, &url_fetcher, db, &consistent_store,
+      &election, fetcher.get());
   // Publish this node's hostname:port info
   cluster_controller.SetNodeHostPort(FLAGS_server, FLAGS_port);
 
