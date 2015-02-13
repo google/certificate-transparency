@@ -432,7 +432,8 @@ void HttpConnection::MakeRequest(const shared_ptr<HttpRequest>& req,
 
 
 void HttpConnection::SetTimeout(const seconds& timeout) {
-  evhttp_connection_set_timeout(conn_, timeout.count());
+  LOG(WARNING) << "Not setting any timeout because it b0rks libevent.";
+  //evhttp_connection_set_timeout(conn_, timeout.count());
 }
 
 
