@@ -1,12 +1,23 @@
 #!/usr/bin/env python
 
+import gflags
+import os
 import unittest
 
+from ct.crypto import cert
 from ct.crypto import error
 from ct.crypto import verify
 from ct.proto import client_pb2
+from ct.serialization import tls_message
 import mock
 
+FLAGS = gflags.FLAGS
+gflags.DEFINE_string("testdata_dir", "../test/testdata",
+                     "Location of test certs")
+
+def read_testdata_file(test_file):
+    with open(os.path.join(FLAGS.testdata_dir, test_file), 'rb') as f:
+        return f.read()
 
 class LogVerifierTest(unittest.TestCase):
     default_sth = client_pb2.SthResponse()
@@ -236,6 +247,34 @@ class LogVerifierTest(unittest.TestCase):
         self.assertRaises(error.ConsistencyError,
                           verifier.verify_sth_consistency,
                           old_sth, new_sth, proof)
+
+    def test_verify_sct_valid_signature(self):
+        test_cert = cert.Certificate.from_pem_file(
+            os.path.join(FLAGS.testdata_dir, 'test-cert.pem'))
+        sct = client_pb2.SignedCertificateTimestamp()
+        tls_message.decode(read_testdata_file('test-cert.proof'), sct)
+
+        key_info = client_pb2.KeyInfo()
+        key_info.type = client_pb2.KeyInfo.ECDSA
+        key_info.pem_key = read_testdata_file('ct-server-key-public.pem')
+
+        verifier = verify.LogVerifier(key_info)
+        self.assertTrue(verifier.verify_sct(sct, test_cert))
+
+    def test_verify_sct_invalid_signature(self):
+        test_cert = cert.Certificate.from_pem_file(
+            os.path.join(FLAGS.testdata_dir, 'test-cert.pem'))
+        sct = client_pb2.SignedCertificateTimestamp()
+        tls_message.decode(read_testdata_file('test-cert.proof'), sct)
+        sct.timestamp = 1234567
+
+        key_info = client_pb2.KeyInfo()
+        key_info.type = client_pb2.KeyInfo.ECDSA
+        key_info.pem_key = read_testdata_file('ct-server-key-public.pem')
+
+        verifier = verify.LogVerifier(key_info)
+        self.assertRaises(error.SignatureError,
+                          verifier.verify_sct, sct, test_cert)
 
 if __name__ == "__main__":
     unittest.main()

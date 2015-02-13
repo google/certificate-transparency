@@ -110,6 +110,12 @@ enum LogEntryType {
   PRECERT_ENTRY = 1;
 }
 
+enum SignatureType {
+  option (tls_enum_opts).max_value = 255;
+  CERTIFICATE_TIMESTAMP = 0;
+  TREE_HASH = 1;
+}
+
 message PreCert {
   optional bytes issuer_key_hash = 1 [(tls_opts).fixed_length = 32];
   optional bytes tbs_certificate = 2 [(tls_opts).min_length = 1,
@@ -126,6 +132,22 @@ message TimestampedEntry {
   optional PreCert pre_cert = 4 [(tls_opts).select_field = "entry_type",
                                 (tls_opts).select_value = 1];
   optional bytes ct_extensions = 5 [(tls_opts).max_length = 0xffff];
+}
+
+
+message DigitallySignedTimestampedEntry {
+  optional Version sct_version = 1;
+  optional SignatureType signature_type = 2 [default = CERTIFICATE_TIMESTAMP];
+  optional uint64 timestamp = 3;
+  optional LogEntryType entry_type = 4;
+  optional bytes asn1_cert = 5 [(tls_opts).select_field = "entry_type",
+                                (tls_opts).select_value = 0,
+                                (tls_opts).min_length = 1,
+                                (tls_opts).max_length = 0xffffff];
+  optional PreCert pre_cert = 6 [(tls_opts).select_field = "entry_type",
+                                (tls_opts).select_value = 1];
+  optional bytes ct_extensions = 7 [(tls_opts).min_length = 0,
+                                    (tls_opts).max_length = 0xffff];
 }
 
 message MerkleTreeLeaf {
