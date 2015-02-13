@@ -77,13 +77,23 @@ TreeSigner<Logged>::TreeSigner(
       signer_(signer),
       cert_tree_(new Sha256Hasher()),
       latest_tree_head_() {
+  // Try to get any STH previously published by this node.
+  const util::StatusOr<ct::ClusterNodeState> node_state(
+      consistent_store_->GetClusterNodeState());
+  CHECK(node_state.ok() ||
+        node_state.status().CanonicalCode() == util::error::NOT_FOUND)
+      << "Problem fetching this node's previous state: "
+      << node_state.status();
+  if (node_state.ok()) {
+    latest_tree_head_ = node_state.ValueOrDie().newest_sth();
+  }
+
   BuildTree();
 }
 
 
 template <class Logged>
 uint64_t TreeSigner<Logged>::LastUpdateTime() const {
-  // Returns 0 if we have no update yet (i.e., the field is not set).
   return latest_tree_head_.timestamp();
 }
 

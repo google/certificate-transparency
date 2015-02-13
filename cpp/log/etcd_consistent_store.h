@@ -54,6 +54,8 @@ class EtcdConsistentStore : public ConsistentStore<Logged> {
   util::Status AssignSequenceNumber(const int64_t sequence_number,
                                     EntryHandle<Logged>* entry) override;
 
+  util::StatusOr<ct::ClusterNodeState> GetClusterNodeState() const override;
+
   util::Status SetClusterNodeState(const ct::ClusterNodeState& state) override;
 
   void WatchServingSTH(
