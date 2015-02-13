@@ -5,6 +5,7 @@
 #include <map>
 #include <memory>
 #include <string>
+#include <ostream>
 
 #include "base/macros.h"
 #include "net/url.h"
@@ -56,6 +57,10 @@ class UrlFetcher {
 
   DISALLOW_COPY_AND_ASSIGN(UrlFetcher);
 };
+
+
+std::ostream& operator<<(std::ostream& output,
+                         const UrlFetcher::Response& resp);
 
 
 }  // namespace cert_trans

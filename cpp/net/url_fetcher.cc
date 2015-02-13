@@ -8,16 +8,11 @@
 
 using cert_trans::internal::ConnectionPool;
 using cert_trans::internal::evhttp_connection_unique_ptr;
-using std::chrono::seconds;
-using std::chrono::steady_clock;
-using std::lock_guard;
+using std::endl;
 using std::make_pair;
-using std::map;
 using std::move;
-using std::mutex;
-using std::pair;
+using std::ostream;
 using std::string;
-using std::unique_ptr;
 using util::Status;
 using util::Task;
 using util::TaskHold;
@@ -185,6 +180,20 @@ void UrlFetcher::Post(const Request& req, Response* resp, Task* task) {
   State* const state(
       new State(&impl_->pool_, EVHTTP_REQ_GET, req, resp, task));
   task->DeleteWhenDone(state);
+}
+
+
+ostream& operator<<(ostream& output, const UrlFetcher::Response& resp) {
+  output << "status_code: " << resp.status_code << endl
+         << "headers {" << endl;
+  for (const auto& header : resp.headers) {
+    output << "  " << header.first << ": " << header.second << endl;
+  }
+  output << "}" << endl
+         << "body: <<EOF" << endl
+         << resp.body << "EOF" << endl;
+
+  return output;
 }
 
 
