@@ -140,6 +140,9 @@ class ConsistentStore {
   virtual util::Status AssignSequenceNumber(const int64_t sequence_number,
                                             EntryHandle<Logged>* entry) = 0;
 
+  virtual util::Status GetClusterNodeState(
+      ct::ClusterNodeState* state) const = 0;
+
   virtual util::Status SetClusterNodeState(
       const ct::ClusterNodeState& state) = 0;
 

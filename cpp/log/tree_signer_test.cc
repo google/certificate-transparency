@@ -22,10 +22,10 @@
 
 namespace cert_trans {
 
-using cert_trans::ClusterStateController;
 using cert_trans::EntryHandle;
 using cert_trans::LoggedCertificate;
 using cert_trans::MockMasterElection;
+using ct::ClusterNodeState;
 using ct::SignedTreeHead;
 using std::make_shared;
 using std::shared_ptr;
@@ -224,8 +224,14 @@ TYPED_TEST(TreeSignerTest, ResumeClean) {
   this->AddSequencedEntry(&logged_cert, 0);
 
   EXPECT_EQ(TS::OK, this->tree_signer_->UpdateTree());
-
   const SignedTreeHead sth(this->tree_signer_->LatestSTH());
+  {
+    // Simulate the caller of UpdateTree() pushing this new tree out to the
+    // cluster.
+    ClusterNodeState node_state;
+    *node_state.mutable_newest_sth() = sth;
+    CHECK_EQ(util::Status::OK, this->store_->SetClusterNodeState(node_state));
+  }
 
   TS* signer2 = this->GetSimilar();
 
@@ -233,7 +239,7 @@ TYPED_TEST(TreeSignerTest, ResumeClean) {
   EXPECT_EQ(TS::OK, signer2->UpdateTree());
 
   const SignedTreeHead sth2(signer2->LatestSTH());
-  EXPECT_LE(sth.timestamp(), sth2.timestamp());
+  EXPECT_LT(sth.timestamp(), sth2.timestamp());
   EXPECT_EQ(sth.sha256_root_hash(), sth2.sha256_root_hash());
   EXPECT_EQ(sth.tree_size(), sth2.tree_size());
 
@@ -246,6 +252,13 @@ TYPED_TEST(TreeSignerTest, ResumeClean) {
 TYPED_TEST(TreeSignerTest, ResumePartialSign) {
   EXPECT_EQ(TS::OK, this->tree_signer_->UpdateTree());
   const SignedTreeHead sth(this->tree_signer_->LatestSTH());
+  {
+    // Simulate the caller of UpdateTree() pushing this new tree out to the
+    // cluster.
+    ClusterNodeState node_state;
+    *node_state.mutable_newest_sth() = sth;
+    CHECK_EQ(util::Status::OK, this->store_->SetClusterNodeState(node_state));
+  }
 
   LoggedCertificate logged_cert;
   this->test_signer_.CreateUnique(&logged_cert);

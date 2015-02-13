@@ -38,6 +38,9 @@ class MockConsistentStore : public ConsistentStore<Logged> {
                  util::Status(const int64_t sequence_number,
                               EntryHandle<Logged>*));
 
+  MOCK_CONST_METHOD1_T(GetClusterNodeState,
+                       util::Status(ct::ClusterNodeState* state));
+
   MOCK_METHOD1_T(SetClusterNodeState,
                  util::Status(const ct::ClusterNodeState& state));
 
