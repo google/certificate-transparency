@@ -78,12 +78,15 @@ TreeSigner<Logged>::TreeSigner(
       cert_tree_(new Sha256Hasher()),
       latest_tree_head_() {
   // Try to get any STH previously published by this node.
-  ct::ClusterNodeState local_node_state;
-  const util::Status status(
-      consistent_store_->GetClusterNodeState(&local_node_state));
-  CHECK(status.ok() || status.CanonicalCode() == util::error::NOT_FOUND)
-      << "Problem fetching this node's previous state: " << status;
-  latest_tree_head_ = local_node_state.newest_sth();
+  const util::StatusOr<ct::ClusterNodeState> node_state(
+      consistent_store_->GetClusterNodeState());
+  CHECK(node_state.ok() ||
+        node_state.status().CanonicalCode() == util::error::NOT_FOUND)
+      << "Problem fetching this node's previous state: "
+      << node_state.status();
+  if (node_state.ok()) {
+    latest_tree_head_ = node_state.ValueOrDie().newest_sth();
+  }
 
   BuildTree();
 }

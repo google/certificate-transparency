@@ -284,16 +284,14 @@ util::Status EtcdConsistentStore<Logged>::AssignSequenceNumber(
 
 
 template <class Logged>
-util::Status EtcdConsistentStore<Logged>::GetClusterNodeState(
-    ct::ClusterNodeState* state) const {
-  CHECK_NOTNULL(state);
+util::StatusOr<ct::ClusterNodeState>
+EtcdConsistentStore<Logged>::GetClusterNodeState() const {
   EntryHandle<ct::ClusterNodeState> handle;
   util::Status status(GetEntry(GetNodePath(node_id_), &handle));
   if (!status.ok()) {
     return status;
   }
-  *state = handle.Entry();
-  return util::Status::OK;
+  return handle.Entry();
 }
 
 

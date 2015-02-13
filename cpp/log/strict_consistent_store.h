@@ -64,8 +64,8 @@ class StrictConsistentStore : public ConsistentStore<Logged> {
     return peer_->GetSequencedEntry(sequence_number, entry);
   }
 
-  util::Status GetClusterNodeState(ct::ClusterNodeState* state) const {
-    return peer_->GetClusterNodeState(state);
+  util::StatusOr<ct::ClusterNodeState> GetClusterNodeState() const {
+    return peer_->GetClusterNodeState();
   }
 
   util::Status SetClusterNodeState(const ct::ClusterNodeState& state) {
