@@ -13,6 +13,7 @@ void InitTesting(const char* name, int* argc, char*** argv,
   ::testing::InitGoogleTest(argc, *argv);
   google::ParseCommandLineFlags(argc, argv, remove_flags);
   google::InitGoogleLogging(name);
+  google::InstallFailureSignalHandler();
   evthread_use_pthreads();
 }
 
