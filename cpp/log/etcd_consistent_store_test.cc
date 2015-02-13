@@ -90,7 +90,7 @@ class EtcdConsistentStoreTest : public ::testing::Test {
     ostringstream oss;
     oss << kRoot << "/";
     if (!cert.has_sequence_number()) {
-      oss << "unsequenced/" << util::ToBase64(cert.Hash());
+      oss << "unsequenced/" << util::HexString(cert.Hash());
     } else {
       oss << "sequenced/" << cert.sequence_number();
     }
@@ -266,7 +266,7 @@ TEST_F(EtcdConsistentStoreTest, TestAddPendingEntryWorks) {
   ASSERT_TRUE(status.ok()) << status;
   EtcdClient::Node node;
   status = sync_client_.Get(string(kRoot) + "/unsequenced/" +
-                                util::ToBase64(cert.Hash()),
+                                util::HexString(cert.Hash()),
                             &node);
   EXPECT_TRUE(status.ok()) << status;
   EXPECT_EQ(Serialize(cert), node.value_);
@@ -279,7 +279,7 @@ TEST_F(EtcdConsistentStoreTest,
   LoggedCertificate other_cert(DefaultCert());
   other_cert.mutable_sct()->set_timestamp(55555);
 
-  const string kKey(util::ToBase64(cert.Hash()));
+  const string kKey(util::HexString(cert.Hash()));
   const string kPath(string(kRoot) + "/unsequenced/" + kKey);
   // Set up scenario:
   InsertEntry(kPath, other_cert);
@@ -295,7 +295,7 @@ TEST_F(EtcdConsistentStoreDeathTest,
   LoggedCertificate cert(DefaultCert());
   LoggedCertificate other_cert(MakeCert(2342, "something else"));
 
-  const string kKey(util::ToBase64(cert.Hash()));
+  const string kKey(util::HexString(cert.Hash()));
   const string kPath(string(kRoot) + "/unsequenced/" + kKey);
   // Set up scenario:
   InsertEntry(kPath, other_cert);
@@ -317,7 +317,7 @@ TEST_F(EtcdConsistentStoreDeathTest,
 TEST_F(EtcdConsistentStoreTest, TestGetPendingEntryForHash) {
   const LoggedCertificate one(MakeCert(123, "one"));
   const string kPath(string(kRoot) + "/unsequenced/" +
-                     util::ToBase64(one.Hash()));
+                     util::HexString(one.Hash()));
   InsertEntry(kPath, one);
 
   EntryHandle<LoggedCertificate> handle;
@@ -329,7 +329,7 @@ TEST_F(EtcdConsistentStoreTest, TestGetPendingEntryForHash) {
 
 
 TEST_F(EtcdConsistentStoreTest, TestGetPendingEntryForNonExistantHash) {
-  const string kPath(string(kRoot) + "/unsequenced/" + util::ToBase64("Nah"));
+  const string kPath(string(kRoot) + "/unsequenced/" + util::HexString("Nah"));
   EntryHandle<LoggedCertificate> handle;
   util::Status status(store_->GetPendingEntryForHash("Nah", &handle));
   EXPECT_EQ(util::error::NOT_FOUND, status.CanonicalCode()) << status;
@@ -398,7 +398,7 @@ TEST_F(EtcdConsistentStoreTest, TestAssignSequenceNumber) {
       HandleForCert(DefaultCert(), kDefaultHandle));
 
   const string kUnsequencedPath(string(kRoot) + "/unsequenced/" +
-                                util::ToBase64(entry.Entry().Hash()));
+                                util::HexString(entry.Entry().Hash()));
   const string kSequencedPath(string(kRoot) + "/sequenced/1");
   const int kSeq(1);
 

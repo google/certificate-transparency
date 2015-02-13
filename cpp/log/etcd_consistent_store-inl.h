@@ -516,15 +516,14 @@ util::Status EtcdConsistentStore<Logged>::DeleteEntry(EntryHandle<T>* entry) {
 template <class Logged>
 std::string EtcdConsistentStore<Logged>::GetUnsequencedPath(
     const Logged& unseq) const {
-  return GetFullPath(std::string(kUnsequencedDir) +
-                     util::ToBase64(unseq.Hash()));
+  return GetUnsequencedPath(unseq.Hash());
 }
 
 
 template <class Logged>
 std::string EtcdConsistentStore<Logged>::GetUnsequencedPath(
     const std::string& hash) const {
-  return GetFullPath(std::string(kUnsequencedDir) + util::ToBase64(hash));
+  return GetFullPath(std::string(kUnsequencedDir) + util::HexString(hash));
 }
 
 
