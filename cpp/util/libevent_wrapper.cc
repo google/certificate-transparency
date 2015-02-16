@@ -111,8 +111,8 @@ void Base::Add(const function<void()>& cb) {
 
 
 void Base::Delay(const duration<double>& delay, util::Task* task) {
-  // If the delay is zero, what the heck, we're done!
-  if (delay == duration<double>::zero()) {
+  // If the delay is zero (or less?), what the heck, we're done!
+  if (delay <= delay.zero()) {
     task->Return();
     return;
   }
@@ -125,12 +125,12 @@ void Base::Delay(const duration<double>& delay, util::Task* task) {
 
   // Ensure that the cancellation callback is run on this libevent::Base, to
   // avoid races during cancellation.
-  const function<void()> cancel_cb(bind(DelayCancel, timer, task));
-  if (task->executor() == this) {
-    task->WhenCancelled(cancel_cb);
-  } else {
-    task->WhenCancelled(bind(&Base::Add, this, cancel_cb));
-  }
+
+  // Cancellation callbacks are always called before the task enters
+  // the DONE state (and "timer" is freed), and "event_del" is
+  // thread-safe, so it does not matter on which thread "DelayCancel"
+  // is called on.
+  task->WhenCancelled(bind(DelayCancel, timer, task));
 
   task->CleanupWhenDone(bind(event_free, timer));
 
