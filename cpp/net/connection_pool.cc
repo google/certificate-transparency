@@ -26,7 +26,7 @@ evhttp_connection_unique_ptr ConnectionPool::Get(const URL& url) {
   lock_guard<mutex> lock(lock_);
 
   auto it(conns_.find(key));
-  if (it == conns_.end()) {
+  if (it == conns_.end() || it->second.empty()) {
     return evhttp_connection_unique_ptr(
         base_->HttpConnectionNew(key.first, key.second));
   }
