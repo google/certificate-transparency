@@ -316,6 +316,8 @@ void TreeSigner<Logged>::BuildTree() {
     CHECK_EQ(logged.sequence_number(), i);
 
     AppendToTree(logged);
+    VLOG_IF(1, ((i % 100000) == 0)) << "added entry index " << i
+                                    << " to the tree signer";
   }
 
   // Check the root hash.

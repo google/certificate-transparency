@@ -27,10 +27,12 @@ evhttp_connection_unique_ptr ConnectionPool::Get(const URL& url) {
 
   auto it(conns_.find(key));
   if (it == conns_.end() || it->second.empty()) {
+    VLOG(1) << "new evhttp_connection for " << key.first << ":" << key.second;
     return evhttp_connection_unique_ptr(
         base_->HttpConnectionNew(key.first, key.second));
   }
 
+  VLOG(1) << "cached evhttp_connection for " << key.first << ":" << key.second;
   evhttp_connection_unique_ptr retval(move(it->second.back()));
   it->second.pop_back();
 
@@ -40,6 +42,7 @@ evhttp_connection_unique_ptr ConnectionPool::Get(const URL& url) {
 
 void ConnectionPool::Put(evhttp_connection_unique_ptr&& conn) {
   if (!conn) {
+    VLOG(1) << "returned null evhttp_connection";
     return;
   }
 
@@ -48,6 +51,8 @@ void ConnectionPool::Put(evhttp_connection_unique_ptr&& conn) {
   evhttp_connection_get_peer(conn.get(), &host, &port);
   const HostPortPair key(host, port);
 
+  VLOG(1) << "returned evhttp_connection for " << key.first << ":"
+          << key.second;
   lock_guard<mutex> lock(lock_);
   auto& entry(conns_[key]);
 

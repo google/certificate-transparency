@@ -138,6 +138,8 @@ State::State(ConnectionPool* pool, evhttp_cmd_type verb,
     }
   }
 
+  VLOG(1) << "evhttp_make_request(" << conn_.get() << ", " << http_req_ << ", "
+          << verb << ", \"" << request_.url.PathQuery() << "\")";
   if (evhttp_make_request(conn_.get(), http_req_, verb,
                           request_.url.PathQuery().c_str()) != 0) {
     VLOG(1) << "evhttp_make_request error";

@@ -84,6 +84,8 @@ FetchState::FetchState(Database<LoggedCertificate>* db,
 
   // Nothing to do...
   if (remote_tree_size <= start_) {
+    VLOG(1) << "nothing to do: we have " << start_ << " entries, remote has "
+            << remote_tree_size;
     task_->Return();
     return;
   }
