@@ -37,16 +37,17 @@ struct State {
         Task* task);
 
   ~State() {
-    pool_->Put(move(conn_));
+    CHECK(!conn_) << "request state object still had a connection at cleanup?";
   }
 
   void RequestDone(evhttp_request* req);
 
   ConnectionPool* const pool_;
-  evhttp_connection_unique_ptr conn_;
   const UrlFetcher::Request request_;
   UrlFetcher::Response* const response_;
   Task* const task_;
+
+  evhttp_connection_unique_ptr conn_;
 };
 
 
@@ -68,12 +69,9 @@ State::State(ConnectionPool* pool, evhttp_cmd_type verb,
              const UrlFetcher::Request& request,
              UrlFetcher::Response* response, Task* task)
     : pool_(CHECK_NOTNULL(pool)),
-      conn_(pool_->Get(request.url)),
       request_(NormaliseRequest(request)),
       response_(CHECK_NOTNULL(response)),
       task_(CHECK_NOTNULL(task)) {
-  CHECK_NOTNULL(conn_.get());
-
   if (request_.url.Protocol() != "http") {
     VLOG(1) << "unsupported protocol: " << request_.url.Protocol();
     task_->Return(Status(util::error::INVALID_ARGUMENT,
@@ -92,24 +90,32 @@ State::State(ConnectionPool* pool, evhttp_cmd_type verb,
                                request_.body.data(), request_.body.size(),
                                nullptr, nullptr) != 0) {
       VLOG(1) << "error when adding the request body";
-      task->Return(
+      task_->Return(
           Status(util::error::INTERNAL, "could not set the request body"));
       return;
     }
   }
+
+  conn_ = pool_->Get(request_.url);
 
   VLOG(1) << "evhttp_make_request(" << conn_.get() << ", " << http_req << ", "
           << verb << ", \"" << request_.url.PathQuery() << "\")";
   if (evhttp_make_request(conn_.get(), http_req, verb,
                           request_.url.PathQuery().c_str()) != 0) {
     VLOG(1) << "evhttp_make_request error";
-    task->Return(Status(util::error::INTERNAL, "evhttp_make_request error"));
+    // Put back the connection, RequestDone is not going to get
+    // called.
+    pool_->Put(move(conn_));
+    task_->Return(Status(util::error::INTERNAL, "evhttp_make_request error"));
     return;
   }
 }
 
 
 void State::RequestDone(evhttp_request* req) {
+  CHECK(conn_);
+  pool_->Put(move(conn_));
+
   if (!req) {
     // TODO(pphaneuf): The dreaded null request... These are fairly
     // fatal things, like protocol parse errors, but could also be a
