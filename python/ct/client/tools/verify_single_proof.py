@@ -5,10 +5,10 @@ import struct
 import sys
 
 from ct.client import log_client
-from ct.client import tls_message
 from ct.crypto import cert
 from ct.crypto import merkle
 from ct.proto import client_pb2
+from ct.serialization import tls_message
 import gflags
 
 FLAGS = gflags.FLAGS
