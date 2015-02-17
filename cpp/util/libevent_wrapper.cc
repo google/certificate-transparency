@@ -55,10 +55,6 @@ void DelayDispatch(evutil_socket_t sock, short events, void* userdata) {
 }
 
 
-void DoNothing() {
-}
-
-
 thread_local bool on_event_thread = false;
 
 
@@ -166,6 +162,11 @@ void Base::DispatchOnce() {
   on_event_thread = true;
   CHECK_EQ(event_base_loop(base_.get(), EVLOOP_ONCE), 0);
   on_event_thread = old_on_event_thread;
+}
+
+
+void Base::LoopExit() {
+  event_base_loopexit(base_.get(), nullptr);
 }
 
 
@@ -439,27 +440,21 @@ void HttpConnection::SetTimeout(const seconds& timeout) {
 
 EventPumpThread::EventPumpThread(const shared_ptr<Base>& base)
     : base_(base),
-      running_(true),
       pump_thread_(bind(&EventPumpThread::Pump, this)) {
 }
 
 
 EventPumpThread::~EventPumpThread() {
-  running_.store(false);
-  base_->Add(bind(&DoNothing));
+  base_->LoopExit();
   pump_thread_.join();
 }
 
 
 void EventPumpThread::Pump() {
-  // Prime the pump with a pending event some way out in the future,
-  // otherwise we're racing the main thread to get an event in before calling
-  // DispatchOnce() (which will CHECK fail if there's nothing to do.)
-  libevent::Event event(*base_, -1, 0, std::bind(&DoNothing));
-  event.Add(std::chrono::seconds(INT_MAX));
-  while (running_.load()) {
-    base_->DispatchOnce();
-  }
+  // Make sure there's at least the evdns listener, so that Dispatch()
+  // doesn't return immediately with nothing to do.
+  base_->GetDns();
+  base_->Dispatch();
 }
 
 

@@ -39,6 +39,7 @@ class Base : public util::Executor {
 
   void Dispatch();
   void DispatchOnce();
+  void LoopExit();
 
   event* EventNew(evutil_socket_t& sock, short events, Event* event) const;
   evhttp* HttpNew() const;
@@ -217,7 +218,6 @@ class EventPumpThread {
   void Pump();
 
   const std::shared_ptr<Base> base_;
-  std::atomic<bool> running_;
   std::thread pump_thread_;
 
   DISALLOW_COPY_AND_ASSIGN(EventPumpThread);
