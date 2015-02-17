@@ -33,7 +33,7 @@ namespace {
 
 struct State {
   State(ConnectionPool* pool, evhttp_cmd_type verb,
-        const UrlFetcher::Request& req, UrlFetcher::Response* resp,
+        const UrlFetcher::Request& request, UrlFetcher::Response* response,
         Task* task);
 
   ~State() {
@@ -47,8 +47,6 @@ struct State {
   const UrlFetcher::Request request_;
   UrlFetcher::Response* const response_;
   Task* const task_;
-
-  evhttp_request* const http_req_;
 };
 
 
@@ -67,29 +65,30 @@ UrlFetcher::Request NormaliseRequest(UrlFetcher::Request req) {
 
 
 State::State(ConnectionPool* pool, evhttp_cmd_type verb,
-             const UrlFetcher::Request& req, UrlFetcher::Response* resp,
-             Task* task)
+             const UrlFetcher::Request& request,
+             UrlFetcher::Response* response, Task* task)
     : pool_(CHECK_NOTNULL(pool)),
-      conn_(pool_->Get(req.url)),
-      request_(NormaliseRequest(req)),
-      response_(CHECK_NOTNULL(resp)),
-      task_(CHECK_NOTNULL(task)),
-      http_req_(CHECK_NOTNULL(evhttp_request_new(&RequestCallback, this))) {
+      conn_(pool_->Get(request.url)),
+      request_(NormaliseRequest(request)),
+      response_(CHECK_NOTNULL(response)),
+      task_(CHECK_NOTNULL(task)) {
   CHECK_NOTNULL(conn_.get());
 
   if (request_.url.Protocol() != "http") {
     VLOG(1) << "unsupported protocol: " << request_.url.Protocol();
-    task->Return(Status(util::error::INVALID_ARGUMENT,
-                        "UrlFetcher: unsupported protocol: " +
-                            request_.url.Protocol()));
+    task_->Return(Status(util::error::INVALID_ARGUMENT,
+                         "UrlFetcher: unsupported protocol: " +
+                             request_.url.Protocol()));
     return;
   }
 
-  evhttp_add_header(evhttp_request_get_output_headers(http_req_), "Host",
+  evhttp_request* const http_req(
+      CHECK_NOTNULL(evhttp_request_new(&RequestCallback, this)));
+  evhttp_add_header(evhttp_request_get_output_headers(http_req), "Host",
                     request_.url.Host().c_str());
 
   if (!request_.body.empty()) {
-    if (evbuffer_add_reference(evhttp_request_get_output_buffer(http_req_),
+    if (evbuffer_add_reference(evhttp_request_get_output_buffer(http_req),
                                request_.body.data(), request_.body.size(),
                                nullptr, nullptr) != 0) {
       VLOG(1) << "error when adding the request body";
@@ -99,9 +98,9 @@ State::State(ConnectionPool* pool, evhttp_cmd_type verb,
     }
   }
 
-  VLOG(1) << "evhttp_make_request(" << conn_.get() << ", " << http_req_ << ", "
+  VLOG(1) << "evhttp_make_request(" << conn_.get() << ", " << http_req << ", "
           << verb << ", \"" << request_.url.PathQuery() << "\")";
-  if (evhttp_make_request(conn_.get(), http_req_, verb,
+  if (evhttp_make_request(conn_.get(), http_req, verb,
                           request_.url.PathQuery().c_str()) != 0) {
     VLOG(1) << "evhttp_make_request error";
     task->Return(Status(util::error::INTERNAL, "evhttp_make_request error"));
