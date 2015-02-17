@@ -58,9 +58,6 @@ void RequestCallback(evhttp_request* req, void* userdata) {
 
 
 UrlFetcher::Request NormaliseRequest(UrlFetcher::Request req) {
-  // Strip the body out to save space.
-  req.body.clear();
-
   if (req.url.Path().empty()) {
     req.url.SetPath("/");
   }
@@ -82,23 +79,22 @@ State::State(ConnectionPool* pool, evhttp_cmd_type verb,
 
   if (request_.url.Protocol() != "http") {
     VLOG(1) << "unsupported protocol: " << request_.url.Protocol();
-    task->Return(
-        Status(util::error::INVALID_ARGUMENT,
-               "UrlFetcher: unsupported protocol: " + req.url.Protocol()));
+    task->Return(Status(util::error::INVALID_ARGUMENT,
+                        "UrlFetcher: unsupported protocol: " +
+                            request_.url.Protocol()));
     return;
   }
 
   evhttp_add_header(evhttp_request_get_output_headers(http_req_), "Host",
                     request_.url.Host().c_str());
 
-  // Remember to use the parameter here, because the copy we keep in
-  // request_ has the body stripped out to save space.
-  if (!req.body.empty()) {
-    if (evbuffer_add(evhttp_request_get_output_buffer(http_req_),
-                     req.body.data(), req.body.size()) != 0) {
+  if (!request_.body.empty()) {
+    if (evbuffer_add_reference(evhttp_request_get_output_buffer(http_req_),
+                               request_.body.data(), request_.body.size(),
+                               nullptr, nullptr) != 0) {
       VLOG(1) << "error when adding the request body";
       task->Return(
-          Status(util::error::INTERNAL, "could not copy the request body"));
+          Status(util::error::INTERNAL, "could not set the request body"));
       return;
     }
   }
