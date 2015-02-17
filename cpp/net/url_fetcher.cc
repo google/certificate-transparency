@@ -40,6 +40,8 @@ struct State {
     pool_->Put(move(conn_));
   }
 
+  void RequestDone(evhttp_request* req);
+
   ConnectionPool* const pool_;
   evhttp_connection_unique_ptr conn_;
   const UrlFetcher::Request request_;
@@ -51,44 +53,7 @@ struct State {
 
 
 void RequestCallback(evhttp_request* req, void* userdata) {
-  State* const state(static_cast<State*>(CHECK_NOTNULL(userdata)));
-
-  if (!req) {
-    // TODO(pphaneuf): The dreaded null request... These are fairly
-    // fatal things, like protocol parse errors, but could also be a
-    // connection timeout. I think we should do retries in this case,
-    // with a deadline of our own? At least, then, it would be easier
-    // to distinguish between an obscure error, or a more common
-    // timeout.
-    VLOG(1) << "RequestCallback received a null request";
-    state->task_->Return(Status::UNKNOWN);
-    return;
-  }
-
-  state->response_->status_code = evhttp_request_get_response_code(req);
-  if (state->response_->status_code < 100) {
-    // TODO(pphaneuf): According to my reading of libevent, this is
-    // most likely to be a connection refused?
-    VLOG(1) << "request has a status code lower than 100: "
-            << state->response_->status_code;
-    state->task_->Return(
-        Status(util::error::FAILED_PRECONDITION, "connection refused"));
-    return;
-  }
-
-  for (evkeyval* ptr = evhttp_request_get_input_headers(req)->tqh_first; ptr;
-       ptr = ptr->next.tqe_next) {
-    state->response_->headers.insert(make_pair(ptr->key, ptr->value));
-  }
-
-  const size_t body_length(
-      evbuffer_get_length(evhttp_request_get_input_buffer(req)));
-  string body(reinterpret_cast<const char*>(evbuffer_pullup(
-                  evhttp_request_get_input_buffer(req), body_length)),
-              body_length);
-  state->response_->body.swap(body);
-
-  state->task_->Return();
+  static_cast<State*>(CHECK_NOTNULL(userdata))->RequestDone(req);
 }
 
 
@@ -146,6 +111,46 @@ State::State(ConnectionPool* pool, evhttp_cmd_type verb,
     task->Return(Status(util::error::INTERNAL, "evhttp_make_request error"));
     return;
   }
+}
+
+
+void State::RequestDone(evhttp_request* req) {
+  if (!req) {
+    // TODO(pphaneuf): The dreaded null request... These are fairly
+    // fatal things, like protocol parse errors, but could also be a
+    // connection timeout. I think we should do retries in this case,
+    // with a deadline of our own? At least, then, it would be easier
+    // to distinguish between an obscure error, or a more common
+    // timeout.
+    VLOG(1) << "RequestCallback received a null request";
+    task_->Return(Status::UNKNOWN);
+    return;
+  }
+
+  response_->status_code = evhttp_request_get_response_code(req);
+  if (response_->status_code < 100) {
+    // TODO(pphaneuf): According to my reading of libevent, this is
+    // most likely to be a connection refused?
+    VLOG(1) << "request has a status code lower than 100: "
+            << response_->status_code;
+    task_->Return(
+        Status(util::error::FAILED_PRECONDITION, "connection refused"));
+    return;
+  }
+
+  for (evkeyval* ptr = evhttp_request_get_input_headers(req)->tqh_first; ptr;
+       ptr = ptr->next.tqe_next) {
+    response_->headers.insert(make_pair(ptr->key, ptr->value));
+  }
+
+  const size_t body_length(
+      evbuffer_get_length(evhttp_request_get_input_buffer(req)));
+  string body(reinterpret_cast<const char*>(evbuffer_pullup(
+                  evhttp_request_get_input_buffer(req), body_length)),
+              body_length);
+  response_->body.swap(body);
+
+  task_->Return();
 }
 
 
