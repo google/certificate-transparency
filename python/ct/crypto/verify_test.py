@@ -2,6 +2,7 @@
 
 import gflags
 import os
+import sys
 import unittest
 
 from ct.crypto import cert
@@ -277,4 +278,5 @@ class LogVerifierTest(unittest.TestCase):
                           verifier.verify_sct, sct, test_cert)
 
 if __name__ == "__main__":
+    sys.argv = FLAGS(sys.argv)
     unittest.main()
