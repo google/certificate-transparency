@@ -6,11 +6,14 @@
 #include <memory>
 #include <string>
 
+#include "base/notification.h"
 #include "util/json_wrapper.h"
 #include "util/testing.h"
 
 namespace cert_trans {
 
+using std::bind;
+using std::chrono::seconds;
 using std::make_pair;
 using std::make_shared;
 using std::map;
@@ -25,6 +28,7 @@ using testing::AllOf;
 using testing::Contains;
 using testing::ElementsAre;
 using testing::Field;
+using testing::Invoke;
 using testing::InvokeArgument;
 using testing::Pair;
 using testing::StrictMock;
@@ -154,6 +158,8 @@ const char kCompareFailedJson[] =
     "   \"index\": 8"
     "}";
 
+const seconds kTimeout(1);
+
 class MockEtcdClient : public EtcdClient {
  public:
   MOCK_METHOD4(Generic,
@@ -191,27 +197,34 @@ class EtcdTest : public ::testing::Test {
 };
 
 TEST_F(EtcdTest, TestGet) {
+  Notification done;
   EXPECT_CALL(client_, Generic(kEntryKey, kEmptyParams, EVHTTP_REQ_GET, _))
       .WillOnce(InvokeArgument<3>(Status(), MakeJson(kGetJson), 1));
   EXPECT_CALL(callbacks_,
               GetCallback(Status::OK,
                           AllOf(Field(&EtcdClient::Node::modified_index_, 9),
-                                Field(&EtcdClient::Node::value_, "123"))));
+                                Field(&EtcdClient::Node::value_, "123"))))
+      .WillOnce(Invoke(bind(&Notification::Notify, &done)));
   client_.Get(kEntryKey,
               bind(&MockCallbacks::GetCallback, &callbacks_, _1, _2));
+  EXPECT_TRUE(done.WaitForNotificationWithTimeout(kTimeout));
 }
 
 TEST_F(EtcdTest, TestGetForInvalidKey) {
+  Notification done;
   const Status status(util::error::NOT_FOUND, "");
   EXPECT_CALL(client_, Generic(kEntryKey, kEmptyParams, EVHTTP_REQ_GET, _))
       .WillOnce(InvokeArgument<3>(status, MakeJson(kKeyNotFoundJson), -1));
-  EXPECT_CALL(callbacks_, GetCallback(status, _));
+  EXPECT_CALL(callbacks_, GetCallback(status, _))
+      .WillOnce(Invoke(bind(&Notification::Notify, &done)));
   client_.Get(kEntryKey,
               bind(&MockCallbacks::GetCallback, &callbacks_, _1, _2));
+  EXPECT_TRUE(done.WaitForNotificationWithTimeout(kTimeout));
 }
 
 
 TEST_F(EtcdTest, TestGetAll) {
+  Notification done;
   EXPECT_CALL(client_, Generic(kDirKey, kEmptyParams, EVHTTP_REQ_GET, _))
       .WillOnce(InvokeArgument<3>(Status::OK, MakeJson(kGetAllJson), 1));
   EXPECT_CALL(
@@ -221,32 +234,41 @@ TEST_F(EtcdTest, TestGetAll) {
           ElementsAre(AllOf(Field(&EtcdClient::Node::modified_index_, 9),
                             Field(&EtcdClient::Node::value_, "123")),
                       AllOf(Field(&EtcdClient::Node::modified_index_, 7),
-                            Field(&EtcdClient::Node::value_, "456")))));
+                            Field(&EtcdClient::Node::value_, "456")))))
+      .WillOnce(Invoke(bind(&Notification::Notify, &done)));
   client_.GetAll(kDirKey,
                  bind(&MockCallbacks::GetAllCallback, &callbacks_, _1, _2));
+  EXPECT_TRUE(done.WaitForNotificationWithTimeout(kTimeout));
 }
 
 TEST_F(EtcdTest, TestGetAllForInvalidKey) {
+  Notification done;
   const Status status(util::error::NOT_FOUND, "");
   EXPECT_CALL(client_, Generic(kDirKey, kEmptyParams, EVHTTP_REQ_GET, _))
       .WillOnce(InvokeArgument<3>(status, MakeJson(kKeyNotFoundJson), -1));
-  EXPECT_CALL(callbacks_, GetAllCallback(status, _));
+  EXPECT_CALL(callbacks_, GetAllCallback(status, _))
+      .WillOnce(Invoke(bind(&Notification::Notify, &done)));
   client_.GetAll(kDirKey,
                  bind(&MockCallbacks::GetAllCallback, &callbacks_, _1, _2));
+  EXPECT_TRUE(done.WaitForNotificationWithTimeout(kTimeout));
 }
 
 TEST_F(EtcdTest, TestCreate) {
+  Notification done;
   EXPECT_CALL(client_, Generic(kEntryKey,
                                AllOf(Contains(Pair(kValueParam, "123")),
                                      Contains(Pair(kPrevExistParam, kFalse))),
                                EVHTTP_REQ_PUT, _))
       .WillOnce(InvokeArgument<3>(Status(), MakeJson(kCreateJson), 1));
-  EXPECT_CALL(callbacks_, CreateCallback(Status::OK, 6));
+  EXPECT_CALL(callbacks_, CreateCallback(Status::OK, 6))
+      .WillOnce(Invoke(bind(&Notification::Notify, &done)));
   client_.Create(kEntryKey, "123",
                  bind(&MockCallbacks::CreateCallback, &callbacks_, _1, _2));
+  EXPECT_TRUE(done.WaitForNotificationWithTimeout(kTimeout));
 }
 
 TEST_F(EtcdTest, TestCreateFails) {
+  Notification done;
   const Status status(util::error::FAILED_PRECONDITION, "");
   EXPECT_CALL(client_, Generic(kEntryKey,
                                AllOf(Contains(Pair(kValueParam, "123")),
@@ -254,25 +276,31 @@ TEST_F(EtcdTest, TestCreateFails) {
                                EVHTTP_REQ_PUT, _))
       .WillOnce(
           InvokeArgument<3>(status, MakeJson(kKeyAlreadyExistsJson), -1));
-  EXPECT_CALL(callbacks_, CreateCallback(status, _));
+  EXPECT_CALL(callbacks_, CreateCallback(status, _))
+      .WillOnce(Invoke(bind(&Notification::Notify, &done)));
   client_.Create(kEntryKey, "123",
                  bind(&MockCallbacks::CreateCallback, &callbacks_, _1, _2));
+  EXPECT_TRUE(done.WaitForNotificationWithTimeout(kTimeout));
 }
 
 TEST_F(EtcdTest, TestCreateWithTTL) {
+  Notification done;
   EXPECT_CALL(client_,
               Generic(kEntryKey, AllOf(Contains(Pair(kValueParam, "123")),
                                        Contains(Pair(kPrevExistParam, kFalse)),
                                        Contains(Pair(kTtlParam, "100"))),
                       EVHTTP_REQ_PUT, _))
       .WillOnce(InvokeArgument<3>(Status(), MakeJson(kCreateJson), 1));
-  EXPECT_CALL(callbacks_, CreateCallback(Status::OK, 6));
+  EXPECT_CALL(callbacks_, CreateCallback(Status::OK, 6))
+      .WillOnce(Invoke(bind(&Notification::Notify, &done)));
   client_.CreateWithTTL(kEntryKey, "123", std::chrono::duration<int>(100),
                         bind(&MockCallbacks::CreateCallback, &callbacks_, _1,
                              _2));
+  EXPECT_TRUE(done.WaitForNotificationWithTimeout(kTimeout));
 }
 
 TEST_F(EtcdTest, TestCreateWithTTLFails) {
+  Notification done;
   const Status status(util::error::FAILED_PRECONDITION, "");
   EXPECT_CALL(client_,
               Generic(kEntryKey, AllOf(Contains(Pair(kValueParam, "123")),
@@ -280,25 +308,31 @@ TEST_F(EtcdTest, TestCreateWithTTLFails) {
                                        Contains(Pair(kTtlParam, "100"))),
                       EVHTTP_REQ_PUT, _))
       .WillOnce(InvokeArgument<3>(status, MakeJson(kKeyAlreadyExistsJson), 1));
-  EXPECT_CALL(callbacks_, CreateCallback(status, _));
+  EXPECT_CALL(callbacks_, CreateCallback(status, _))
+      .WillOnce(Invoke(bind(&Notification::Notify, &done)));
   client_.CreateWithTTL(kEntryKey, "123", std::chrono::duration<int>(100),
                         bind(&MockCallbacks::CreateCallback, &callbacks_, _1,
                              _2));
+  EXPECT_TRUE(done.WaitForNotificationWithTimeout(kTimeout));
 }
 
 TEST_F(EtcdTest, TestCreateInQueue) {
+  Notification done;
   EXPECT_CALL(client_,
               Generic(kDirKey, AllOf(Contains(Pair(kValueParam, "123")),
                                      Contains(Pair(kPrevExistParam, kFalse))),
                       EVHTTP_REQ_POST, _))
       .WillOnce(InvokeArgument<3>(Status(), MakeJson(kCreateInQueueJson), 1));
-  EXPECT_CALL(callbacks_, CreateInQueueCallback(Status::OK, "/some/6", 6));
+  EXPECT_CALL(callbacks_, CreateInQueueCallback(Status::OK, "/some/6", 6))
+      .WillOnce(Invoke(bind(&Notification::Notify, &done)));
   client_.CreateInQueue(kDirKey, "123",
                         bind(&MockCallbacks::CreateInQueueCallback,
                              &callbacks_, _1, _2, _3));
+  EXPECT_TRUE(done.WaitForNotificationWithTimeout(kTimeout));
 }
 
 TEST_F(EtcdTest, TestCreateInQueueFails) {
+  Notification done;
   const Status status(util::error::FAILED_PRECONDITION, "");
   EXPECT_CALL(client_,
               Generic(kDirKey, AllOf(Contains(Pair(kValueParam, "123")),
@@ -306,109 +340,141 @@ TEST_F(EtcdTest, TestCreateInQueueFails) {
                       EVHTTP_REQ_POST, _))
       .WillOnce(
           InvokeArgument<3>(status, MakeJson(kKeyAlreadyExistsJson), -1));
-  EXPECT_CALL(callbacks_, CreateInQueueCallback(status, _, _));
+  EXPECT_CALL(callbacks_, CreateInQueueCallback(status, _, _))
+      .WillOnce(Invoke(bind(&Notification::Notify, &done)));
   client_.CreateInQueue(kDirKey, "123",
                         bind(&MockCallbacks::CreateInQueueCallback,
                              &callbacks_, _1, _2, _3));
+  EXPECT_TRUE(done.WaitForNotificationWithTimeout(kTimeout));
 }
 
 TEST_F(EtcdTest, TestUpdate) {
+  Notification done;
   EXPECT_CALL(client_, Generic(kEntryKey, Contains(Pair(kPrevIndexParam, "5")),
                                EVHTTP_REQ_PUT, _))
       .WillOnce(InvokeArgument<3>(Status(), MakeJson(kUpdateJson), 1));
-  EXPECT_CALL(callbacks_, UpdateCallback(Status::OK, 6));
+  EXPECT_CALL(callbacks_, UpdateCallback(Status::OK, 6))
+      .WillOnce(Invoke(bind(&Notification::Notify, &done)));
   client_.Update(kEntryKey, "123", 5,
                  bind(&MockCallbacks::UpdateCallback, &callbacks_, _1, _2));
+  EXPECT_TRUE(done.WaitForNotificationWithTimeout(kTimeout));
 }
 
 TEST_F(EtcdTest, TestUpdateFails) {
+  Notification done;
   const Status status(util::error::FAILED_PRECONDITION, "");
   EXPECT_CALL(client_, Generic(kEntryKey, Contains(Pair(kPrevIndexParam, "5")),
                                EVHTTP_REQ_PUT, _))
       .WillOnce(InvokeArgument<3>(status, MakeJson(kCompareFailedJson), -1));
-  EXPECT_CALL(callbacks_, UpdateCallback(status, _));
+  EXPECT_CALL(callbacks_, UpdateCallback(status, _))
+      .WillOnce(Invoke(bind(&Notification::Notify, &done)));
   client_.Update(kEntryKey, "123", 5,
                  bind(&MockCallbacks::UpdateCallback, &callbacks_, _1, _2));
+  EXPECT_TRUE(done.WaitForNotificationWithTimeout(kTimeout));
 }
 
 TEST_F(EtcdTest, TestUpdateWithTTL) {
+  Notification done;
   EXPECT_CALL(client_,
               Generic(kEntryKey, AllOf(Contains(Pair(kPrevIndexParam, "5")),
                                        Contains(Pair(kTtlParam, "100"))),
                       EVHTTP_REQ_PUT, _))
       .WillOnce(InvokeArgument<3>(Status(), MakeJson(kUpdateJson), 1));
-  EXPECT_CALL(callbacks_, UpdateCallback(Status::OK, 6));
+  EXPECT_CALL(callbacks_, UpdateCallback(Status::OK, 6))
+      .WillOnce(Invoke(bind(&Notification::Notify, &done)));
   client_.UpdateWithTTL(kEntryKey, "123", std::chrono::duration<int>(100), 5,
                         bind(&MockCallbacks::UpdateCallback, &callbacks_, _1,
                              _2));
+  EXPECT_TRUE(done.WaitForNotificationWithTimeout(kTimeout));
 }
 
 TEST_F(EtcdTest, TestUpdateWithTTLFails) {
+  Notification done;
   const Status status(util::error::FAILED_PRECONDITION, "");
   EXPECT_CALL(client_,
               Generic(kEntryKey, AllOf(Contains(Pair(kPrevIndexParam, "5")),
                                        Contains(Pair(kTtlParam, "100"))),
                       EVHTTP_REQ_PUT, _))
       .WillOnce(InvokeArgument<3>(status, MakeJson(kCompareFailedJson), -1));
-  EXPECT_CALL(callbacks_, UpdateCallback(status, _));
+  EXPECT_CALL(callbacks_, UpdateCallback(status, _))
+      .WillOnce(Invoke(bind(&Notification::Notify, &done)));
   client_.UpdateWithTTL(kEntryKey, "123", std::chrono::duration<int>(100), 5,
                         bind(&MockCallbacks::UpdateCallback, &callbacks_, _1,
                              _2));
+  EXPECT_TRUE(done.WaitForNotificationWithTimeout(kTimeout));
 }
 
 TEST_F(EtcdTest, TestForceSetForPreexistingKey) {
+  Notification done;
   EXPECT_CALL(client_, Generic(kEntryKey, _, EVHTTP_REQ_PUT, _))
       .WillOnce(InvokeArgument<3>(Status(), MakeJson(kUpdateJson), 1));
-  EXPECT_CALL(callbacks_, ForceSetCallback(Status::OK, 6));
+  EXPECT_CALL(callbacks_, ForceSetCallback(Status::OK, 6))
+      .WillOnce(Invoke(bind(&Notification::Notify, &done)));
   client_.ForceSet(kEntryKey, "123", bind(&MockCallbacks::ForceSetCallback,
                                           &callbacks_, _1, _2));
+  EXPECT_TRUE(done.WaitForNotificationWithTimeout(kTimeout));
 }
 
 TEST_F(EtcdTest, TestForceSetForNewKey) {
+  Notification done;
   EXPECT_CALL(client_, Generic(kEntryKey, _, EVHTTP_REQ_PUT, _))
       .WillOnce(InvokeArgument<3>(Status(), MakeJson(kCreateJson), 1));
-  EXPECT_CALL(callbacks_, ForceSetCallback(Status::OK, 6));
+  EXPECT_CALL(callbacks_, ForceSetCallback(Status::OK, 6))
+      .WillOnce(Invoke(bind(&Notification::Notify, &done)));
   client_.ForceSet(kEntryKey, "123", bind(&MockCallbacks::ForceSetCallback,
                                           &callbacks_, _1, _2));
+  EXPECT_TRUE(done.WaitForNotificationWithTimeout(kTimeout));
 }
 
 TEST_F(EtcdTest, TestForceSetWithTTLForPreexistingKey) {
+  Notification done;
   EXPECT_CALL(client_, Generic(kEntryKey, Contains(Pair(kTtlParam, "100")),
                                EVHTTP_REQ_PUT, _))
       .WillOnce(InvokeArgument<3>(Status(), MakeJson(kUpdateJson), 1));
-  EXPECT_CALL(callbacks_, ForceSetCallback(Status::OK, 6));
+  EXPECT_CALL(callbacks_, ForceSetCallback(Status::OK, 6))
+      .WillOnce(Invoke(bind(&Notification::Notify, &done)));
   client_.ForceSetWithTTL(kEntryKey, "123", std::chrono::duration<int>(100),
                           bind(&MockCallbacks::ForceSetCallback, &callbacks_,
                                _1, _2));
+  EXPECT_TRUE(done.WaitForNotificationWithTimeout(kTimeout));
 }
 
 TEST_F(EtcdTest, TestForceSetWithTTLForNewKey) {
+  Notification done;
   EXPECT_CALL(client_, Generic(kEntryKey, Contains(Pair(kTtlParam, "100")),
                                EVHTTP_REQ_PUT, _))
       .WillOnce(InvokeArgument<3>(Status(), MakeJson(kCreateJson), 1));
-  EXPECT_CALL(callbacks_, ForceSetCallback(Status::OK, 6));
+  EXPECT_CALL(callbacks_, ForceSetCallback(Status::OK, 6))
+      .WillOnce(Invoke(bind(&Notification::Notify, &done)));
   client_.ForceSetWithTTL(kEntryKey, "123", std::chrono::duration<int>(100),
                           bind(&MockCallbacks::ForceSetCallback, &callbacks_,
                                _1, _2));
+  EXPECT_TRUE(done.WaitForNotificationWithTimeout(kTimeout));
 }
 
 TEST_F(EtcdTest, TestDelete) {
+  Notification done;
   EXPECT_CALL(client_, Generic(kEntryKey, Contains(Pair(kPrevIndexParam, "5")),
                                EVHTTP_REQ_DELETE, _))
       .WillOnce(InvokeArgument<3>(Status(), MakeJson(kDeleteJson), 1));
-  EXPECT_CALL(callbacks_, DeleteCallback(Status::OK));
+  EXPECT_CALL(callbacks_, DeleteCallback(Status::OK))
+      .WillOnce(Invoke(bind(&Notification::Notify, &done)));
   client_.Delete(kEntryKey, 5,
                  bind(&MockCallbacks::DeleteCallback, &callbacks_, _1));
+  EXPECT_TRUE(done.WaitForNotificationWithTimeout(kTimeout));
 }
 
 TEST_F(EtcdTest, TestDeleteFails) {
+  Notification done;
   const Status status(util::error::FAILED_PRECONDITION, "");
   EXPECT_CALL(client_, Generic(kEntryKey, Contains(Pair(kPrevIndexParam, "5")),
                                EVHTTP_REQ_DELETE, _))
       .WillOnce(InvokeArgument<3>(status, MakeJson(kCompareFailedJson), -1));
-  EXPECT_CALL(callbacks_, DeleteCallback(status));
+  EXPECT_CALL(callbacks_, DeleteCallback(status))
+      .WillOnce(Invoke(bind(&Notification::Notify, &done)));
   client_.Delete(kEntryKey, 5,
                  bind(&MockCallbacks::DeleteCallback, &callbacks_, _1));
+  EXPECT_TRUE(done.WaitForNotificationWithTimeout(kTimeout));
 }
 
 }  // namespace

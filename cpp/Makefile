@@ -157,7 +157,8 @@ util/json_wrapper_test: util/json_wrapper_test.o util/libutil.a $(GTESTLIB)
 
 util/libevent_wrapper_test: util/libevent_wrapper_test.o util/libutil.a $(GTESTLIB)
 
-util/etcd_test: util/etcd_test.o util/libutil.a $(GMOCKLIB) $(GTESTLIB)
+util/etcd_test: util/etcd_test.o base/notification.o util/libutil.a \
+                $(GMOCKLIB) $(GTESTLIB)
 
 util/fake_etcd_test: util/fake_etcd_test.o base/notification.o util/libutil.a \
                      $(GMOCKLIB) $(GTESTLIB)
