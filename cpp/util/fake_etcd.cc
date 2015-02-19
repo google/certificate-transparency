@@ -21,6 +21,7 @@ using std::to_string;
 using std::unique_lock;
 using std::vector;
 using util::Status;
+using util::Task;
 
 namespace cert_trans {
 namespace {
@@ -39,7 +40,7 @@ string EnsureEndsWithSlash(const string& s) {
 
 
 FakeEtcdClient::FakeEtcdClient(const std::shared_ptr<libevent::Base>& base)
-    : base_(base), index_(1) {
+    : EtcdClient(base), base_(base), index_(1) {
 }
 
 
@@ -65,22 +66,23 @@ void FakeEtcdClient::Watch(const string& key, const WatchCallback& cb,
 }
 
 
-void FakeEtcdClient::Generic(const string& key,
-                             const map<string, string>& params,
-                             evhttp_cmd_type verb, const GenericCallback& cb) {
+void FakeEtcdClient::Generic(const std::string& key,
+                             const std::map<std::string, std::string>& params,
+                             evhttp_cmd_type verb, GenericResponse* resp,
+                             util::Task* task) {
   PurgeExpiredEntries();
   switch (verb) {
     case EVHTTP_REQ_GET:
-      HandleGet(key, params, cb);
+      HandleGet(key, params, resp, task);
       break;
     case EVHTTP_REQ_POST:
-      HandlePost(key, params, cb);
+      HandlePost(key, params, resp, task);
       break;
     case EVHTTP_REQ_PUT:
-      HandlePut(key, params, cb);
+      HandlePut(key, params, resp, task);
       break;
     case EVHTTP_REQ_DELETE:
-      HandleDelete(key, params, cb);
+      HandleDelete(key, params, resp, task);
       break;
     default:
       CHECK(false) << "Unsupported verb " << verb;
@@ -100,7 +102,7 @@ void FillJsonForNode(const EtcdClient::Node& node, JsonObject* json) {
 
 
 void FillJsonForEntry(const EtcdClient::Node& node, const string& action,
-                      JsonObject* json) {
+                      const shared_ptr<JsonObject>& json) {
   JsonObject json_node;
   FillJsonForNode(node, &json_node);
   json->Add("action", action);
@@ -109,7 +111,7 @@ void FillJsonForEntry(const EtcdClient::Node& node, const string& action,
 
 
 void FillJsonForDir(const vector<EtcdClient::Node>& nodes,
-                    const string& action, JsonObject* json) {
+                    const string& action, const shared_ptr<JsonObject>& json) {
   JsonObject node;
   node.Add("modifiedIndex", 1);
   node.Add("createdIndex", 1);
@@ -163,23 +165,23 @@ void FakeEtcdClient::NotifyForPath(const unique_lock<mutex>& lock,
 }
 
 
-void FakeEtcdClient::GetSingleEntry(const string& key,
-                                    const GenericCallback& cb) {
+void FakeEtcdClient::GetSingleEntry(const string& key, GenericResponse* resp,
+                                    Task* task) {
+  resp->etcd_index = index_;
   if (entries_.find(key) != entries_.end()) {
     const Node& node(entries_.find(key)->second);
-    shared_ptr<JsonObject> json(make_shared<JsonObject>());
-    FillJsonForEntry(node, "get", json.get());
-    return ScheduleCallback(bind(cb, Status::OK, json, index_));
+    resp->json_body = make_shared<JsonObject>();
+    FillJsonForEntry(node, "get", resp->json_body);
+    task->Return();
   } else {
-    return ScheduleCallback(bind(cb,
-                                 Status(util::error::NOT_FOUND, "not found"),
-                                 make_shared<JsonObject>(), index_));
+    resp->json_body = make_shared<JsonObject>();
+    task->Return(Status(util::error::NOT_FOUND, "not found"));
   }
 }
 
 
-void FakeEtcdClient::GetDirectory(const string& key,
-                                  const GenericCallback& cb) {
+void FakeEtcdClient::GetDirectory(const string& key, GenericResponse* resp,
+                                  Task* task) {
   VLOG(1) << "GET DIR";
   CHECK(key.back() == '/');
   vector<Node> nodes;
@@ -188,22 +190,23 @@ void FakeEtcdClient::GetDirectory(const string& key,
       nodes.push_back(pair.second);
     }
   }
-  shared_ptr<JsonObject> json(make_shared<JsonObject>());
-  FillJsonForDir(nodes, "get", json.get());
-  VLOG(1) << json->ToString();
-  return ScheduleCallback(bind(cb, Status::OK, json, index_));
+  resp->etcd_index = index_;
+  resp->json_body = make_shared<JsonObject>();
+  FillJsonForDir(nodes, "get", resp->json_body);
+  VLOG(1) << resp->json_body->ToString();
+  task->Return();
 }
 
 
 void FakeEtcdClient::HandleGet(const string& key,
                                const map<string, string>& params,
-                               const GenericCallback& cb) {
+                               GenericResponse* resp, Task* task) {
   VLOG(1) << "GET " << key;
   lock_guard<mutex> lock(mutex_);
   if (key.back() == '/') {
-    return GetDirectory(key, cb);
+    return GetDirectory(key, resp, task);
   } else {
-    return GetSingleEntry(key, cb);
+    return GetSingleEntry(key, resp, task);
   }
 }
 
@@ -257,7 +260,7 @@ Status FakeEtcdClient::CheckCompareFlags(const map<string, string> params,
 
 void FakeEtcdClient::HandlePost(const string& key,
                                 const map<string, string>& params,
-                                const GenericCallback& cb) {
+                                GenericResponse* resp, Task* task) {
   VLOG(1) << "POST " << key;
   unique_lock<mutex> lock(mutex_);
   const string path(EnsureEndsWithSlash(key) + to_string(index_));
@@ -267,17 +270,17 @@ void FakeEtcdClient::HandlePost(const string& key,
   MaybeSetExpiry(params, &node);
   entries_[path] = node;
 
-  ++index_;
-  shared_ptr<JsonObject> json(make_shared<JsonObject>());
-  FillJsonForEntry(node, "create", json.get());
-  ScheduleCallback(bind(cb, Status::OK, json, index_));
+  resp->etcd_index = ++index_;
+  resp->json_body = make_shared<JsonObject>();
+  FillJsonForEntry(node, "create", resp->json_body);
+  task->Return();
   NotifyForPath(lock, path);
 }
 
 
 void FakeEtcdClient::HandlePut(const string& key,
                                const map<string, string>& params,
-                               const GenericCallback& cb) {
+                               GenericResponse* resp, Task* task) {
   VLOG(1) << "PUT " << key;
   unique_lock<mutex> lock(mutex_);
   CHECK(key.back() != '/');
@@ -287,7 +290,9 @@ void FakeEtcdClient::HandlePut(const string& key,
   MaybeSetExpiry(params, &node);
   Status status(CheckCompareFlags(params, key));
   if (!status.ok()) {
-    ScheduleCallback(bind(cb, status, make_shared<JsonObject>(), index_));
+    resp->etcd_index = index_;
+    resp->json_body = make_shared<JsonObject>();
+    task->Return(status);
     return;
   }
   if (entries_.find(key) != entries_.end()) {
@@ -296,30 +301,32 @@ void FakeEtcdClient::HandlePut(const string& key,
   }
 
   entries_[key] = node;
-  ++index_;
-  shared_ptr<JsonObject> json(make_shared<JsonObject>());
-  FillJsonForEntry(node, "set", json.get());
-  ScheduleCallback(bind(cb, Status::OK, json, index_));
+  resp->etcd_index = ++index_;
+  resp->json_body = make_shared<JsonObject>();
+  FillJsonForEntry(node, "set", resp->json_body);
+  task->Return();
   NotifyForPath(lock, key);
 }
 
 
 void FakeEtcdClient::HandleDelete(const string& key,
                                   const map<string, string>& params,
-                                  const GenericCallback& cb) {
+                                  GenericResponse* resp, Task* task) {
   VLOG(1) << "DELETE " << key;
   unique_lock<mutex> lock(mutex_);
   CHECK(key.back() != '/');
   Status status(CheckCompareFlags(params, key));
   if (!status.ok()) {
-    ScheduleCallback(bind(cb, status, make_shared<JsonObject>(), index_));
+    resp->etcd_index = index_;
+    resp->json_body = make_shared<JsonObject>();
+    task->Return(status);
     return;
   }
   entries_[key].deleted_ = true;
-  ++index_;
-  shared_ptr<JsonObject> json(make_shared<JsonObject>());
-  FillJsonForEntry(entries_[key], "delete", json.get());
-  ScheduleCallback(bind(cb, Status::OK, json, index_));
+  resp->etcd_index = ++index_;
+  resp->json_body = make_shared<JsonObject>();
+  FillJsonForEntry(entries_[key], "delete", resp->json_body);
+  task->Return();
   NotifyForPath(lock, key);
   entries_.erase(key);
 }

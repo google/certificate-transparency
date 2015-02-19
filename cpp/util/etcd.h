@@ -52,6 +52,12 @@ class EtcdClient {
 
   typedef std::function<void(util::Status status, const EtcdClient::Node& node,
                              int64_t etcd_index)> GetCallback;
+
+  struct GenericResponse {
+    int64_t etcd_index;
+    std::shared_ptr<JsonObject> json_body;
+  };
+
   typedef std::function<void(util::Status status,
                              const std::vector<EtcdClient::Node>& values,
                              int64_t etcd_index)> GetAllCallback;
@@ -117,11 +123,13 @@ class EtcdClient {
                              const std::shared_ptr<JsonObject>&,
                              int64_t etcd_index)> GenericCallback;
 
-  EtcdClient() = default;  // Testing only
+  // Testing only
+  EtcdClient(const std::shared_ptr<libevent::Base>& event_base);
 
   virtual void Generic(const std::string& key,
                        const std::map<std::string, std::string>& params,
-                       evhttp_cmd_type verb, const GenericCallback& cb);
+                       evhttp_cmd_type verb, GenericResponse* resp,
+                       util::Task* task);
 
  private:
   struct Request;

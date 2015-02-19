@@ -114,19 +114,24 @@ shared_ptr<evhttp_uri> UriFromHostPort(const string& host, uint16_t port) {
 }
 
 
-void GetRequestDone(Status status, const shared_ptr<JsonObject>& json,
-                    int64_t etcd_index, const EtcdClient::GetCallback& cb) {
-  if (!status.ok()) {
-    cb(status, EtcdClient::Node::InvalidNode(), -1);
+void GetRequestDone(EtcdClient::GenericResponse* gen_resp,
+                    const EtcdClient::GetCallback& cb, Task* task) {
+  const unique_ptr<EtcdClient::GenericResponse> gen_resp_deleter(gen_resp);
+  const unique_ptr<Task> task_deleter(task);
+
+  if (!task->status().ok()) {
+    cb(task->status(), EtcdClient::Node::InvalidNode(), -1);
     return;
   }
-  const JsonObject node(*json, "node");
+
+  const JsonObject node(*gen_resp->json_body, "node");
   if (!node.Ok()) {
     cb(Status(util::error::FAILED_PRECONDITION,
               "Invalid JSON: Couldn't find 'node'"),
        EtcdClient::Node::InvalidNode(), -1);
     return;
   }
+
   const JsonInt createdIndex(node, "createdIndex");
   if (!createdIndex.Ok()) {
     cb(Status(util::error::FAILED_PRECONDITION,
@@ -134,6 +139,7 @@ void GetRequestDone(Status status, const shared_ptr<JsonObject>& json,
        EtcdClient::Node::InvalidNode(), -1);
     return;
   }
+
   const JsonInt modifiedIndex(node, "modifiedIndex");
   if (!modifiedIndex.Ok()) {
     cb(Status(util::error::FAILED_PRECONDITION,
@@ -141,6 +147,7 @@ void GetRequestDone(Status status, const shared_ptr<JsonObject>& json,
        EtcdClient::Node::InvalidNode(), -1);
     return;
   }
+
   const JsonString key(node, "key");
   if (!key.Ok()) {
     cb(Status(util::error::FAILED_PRECONDITION,
@@ -148,6 +155,7 @@ void GetRequestDone(Status status, const shared_ptr<JsonObject>& json,
        EtcdClient::Node::InvalidNode(), -1);
     return;
   }
+
   const JsonString value(node, "value");
   if (!value.Ok()) {
     cb(Status(util::error::FAILED_PRECONDITION,
@@ -155,36 +163,43 @@ void GetRequestDone(Status status, const shared_ptr<JsonObject>& json,
        EtcdClient::Node::InvalidNode(), -1);
     return;
   }
-  cb(status, EtcdClient::Node(createdIndex.Value(), modifiedIndex.Value(),
-                              key.Value(), value.Value()),
-     etcd_index);
+
+  cb(Status::OK, EtcdClient::Node(createdIndex.Value(), modifiedIndex.Value(),
+                                  key.Value(), value.Value()),
+     gen_resp->etcd_index);
 }
 
 
-void GetAllRequestDone(Status status, const shared_ptr<JsonObject>& json,
-                       int64_t etcd_index,
-                       const EtcdClient::GetAllCallback& cb) {
-  if (!status.ok()) {
-    cb(status, vector<EtcdClient::Node>(), -1);
+void GetAllRequestDone(EtcdClient::GenericResponse* gen_resp,
+                       const EtcdClient::GetAllCallback& cb, Task* task) {
+  const unique_ptr<EtcdClient::GenericResponse> gen_resp_deleter(gen_resp);
+  const unique_ptr<Task> task_deleter(task);
+
+  if (!task->status().ok()) {
+    cb(task->status(), vector<EtcdClient::Node>(), -1);
     return;
   }
-  const JsonObject node(*json, "node");
+
+  const JsonObject node(*gen_resp->json_body, "node");
   if (!node.Ok()) {
     cb(Status(util::error::FAILED_PRECONDITION,
               "Invalid JSON: Couldn't find 'node'"),
        vector<EtcdClient::Node>(), -1);
     return;
   }
+
   const JsonBoolean isDir(node, "dir");
   if (!isDir.Ok()) {
     cb(Status(util::error::FAILED_PRECONDITION,
               "Invalid JSON: Couldn't find 'dir'"),
        vector<EtcdClient::Node>(), -1);
   }
+
   if (!isDir.Value()) {
     cb(Status(util::error::INVALID_ARGUMENT, "Not a directory"),
        vector<EtcdClient::Node>(), -1);
   }
+
   const JsonArray value_nodes(node, "nodes");
   if (!value_nodes.Ok()) {
     // Directory is empty.
@@ -202,6 +217,7 @@ void GetAllRequestDone(Status status, const shared_ptr<JsonObject>& json,
          vector<EtcdClient::Node>(), -1);
       return;
     }
+
     const JsonString value(entry, "value");
     if (!value.Ok()) {
       cb(Status(util::error::FAILED_PRECONDITION,
@@ -209,6 +225,7 @@ void GetAllRequestDone(Status status, const shared_ptr<JsonObject>& json,
          vector<EtcdClient::Node>(), -1);
       return;
     }
+
     const JsonInt createdIndex(entry, "createdIndex");
     if (!createdIndex.Ok()) {
       cb(Status(util::error::FAILED_PRECONDITION,
@@ -216,6 +233,7 @@ void GetAllRequestDone(Status status, const shared_ptr<JsonObject>& json,
          vector<EtcdClient::Node>(), -1);
       return;
     }
+
     const JsonInt modifiedIndex(entry, "modifiedIndex");
     if (!modifiedIndex.Ok()) {
       cb(Status(util::error::FAILED_PRECONDITION,
@@ -223,6 +241,7 @@ void GetAllRequestDone(Status status, const shared_ptr<JsonObject>& json,
          vector<EtcdClient::Node>(), -1);
       return;
     }
+
     const JsonString key(entry, "key");
     if (!key.Ok()) {
       cb(Status(util::error::FAILED_PRECONDITION,
@@ -230,27 +249,34 @@ void GetAllRequestDone(Status status, const shared_ptr<JsonObject>& json,
          vector<EtcdClient::Node>(), -1);
       return;
     }
+
     values.emplace_back(EtcdClient::Node(createdIndex.Value(),
                                          modifiedIndex.Value(), key.Value(),
                                          value.Value()));
   }
-  cb(Status::OK, values, etcd_index);
+
+  cb(Status::OK, values, gen_resp->etcd_index);
 }
 
 
-void CreateRequestDone(Status status, const shared_ptr<JsonObject>& json,
-                       const EtcdClient::CreateCallback& cb) {
-  if (!status.ok()) {
-    cb(status, -1);
+void CreateRequestDone(EtcdClient::GenericResponse* gen_resp,
+                       const EtcdClient::CreateCallback& cb, Task* task) {
+  const unique_ptr<EtcdClient::GenericResponse> gen_resp_deleter(gen_resp);
+  const unique_ptr<Task> task_deleter(task);
+
+  if (!task->status().ok()) {
+    cb(task->status(), -1);
     return;
   }
-  const JsonObject node(*json, "node");
+
+  const JsonObject node(*gen_resp->json_body, "node");
   if (!node.Ok()) {
     cb(Status(util::error::FAILED_PRECONDITION,
               "Invalid JSON: Couldn't find 'node'"),
        0);
     return;
   }
+
   const JsonInt createdIndex(node, "createdIndex");
   if (!createdIndex.Ok()) {
     cb(Status(util::error::FAILED_PRECONDITION,
@@ -258,6 +284,7 @@ void CreateRequestDone(Status status, const shared_ptr<JsonObject>& json,
        0);
     return;
   }
+
   const JsonInt modifiedIndex(node, "modifiedIndex");
   if (!modifiedIndex.Ok()) {
     cb(Status(util::error::FAILED_PRECONDITION,
@@ -265,25 +292,31 @@ void CreateRequestDone(Status status, const shared_ptr<JsonObject>& json,
        0);
     return;
   }
+
   CHECK_EQ(createdIndex.Value(), modifiedIndex.Value());
-  cb(status, modifiedIndex.Value());
+  cb(Status::OK, modifiedIndex.Value());
 }
 
 
-void CreateInQueueRequestDone(Status status,
-                              const shared_ptr<JsonObject>& json,
-                              const EtcdClient::CreateInQueueCallback& cb) {
-  if (!status.ok()) {
-    cb(status, "", -1);
+void CreateInQueueRequestDone(EtcdClient::GenericResponse* gen_resp,
+                              const EtcdClient::CreateInQueueCallback& cb,
+                              Task* task) {
+  const unique_ptr<EtcdClient::GenericResponse> gen_resp_deleter(gen_resp);
+  const unique_ptr<Task> task_deleter(task);
+
+  if (!task->status().ok()) {
+    cb(task->status(), "", -1);
     return;
   }
-  const JsonObject node(*json, "node");
+
+  const JsonObject node(*gen_resp->json_body, "node");
   if (!node.Ok()) {
     cb(Status(util::error::FAILED_PRECONDITION,
               "Invalid JSON: Couldn't find 'node'"),
        "", 0);
     return;
   }
+
   const JsonInt createdIndex(node, "createdIndex");
   if (!createdIndex.Ok()) {
     cb(Status(util::error::FAILED_PRECONDITION,
@@ -291,6 +324,7 @@ void CreateInQueueRequestDone(Status status,
        "", 0);
     return;
   }
+
   const JsonInt modifiedIndex(node, "modifiedIndex");
   if (!modifiedIndex.Ok()) {
     cb(Status(util::error::FAILED_PRECONDITION,
@@ -298,6 +332,7 @@ void CreateInQueueRequestDone(Status status,
        "", 0);
     return;
   }
+
   const JsonString key(node, "key");
   if (!key.Ok()) {
     cb(Status(util::error::FAILED_PRECONDITION,
@@ -305,24 +340,30 @@ void CreateInQueueRequestDone(Status status,
        "", 0);
     return;
   }
+
   CHECK_EQ(createdIndex.Value(), modifiedIndex.Value());
-  cb(status, key.Value(), modifiedIndex.Value());
+  cb(Status::OK, key.Value(), modifiedIndex.Value());
 }
 
 
-void UpdateRequestDone(Status status, const shared_ptr<JsonObject>& json,
-                       const EtcdClient::UpdateCallback& cb) {
-  if (!status.ok()) {
-    cb(status, -1);
+void UpdateRequestDone(EtcdClient::GenericResponse* gen_resp,
+                       const EtcdClient::UpdateCallback& cb, Task* task) {
+  const unique_ptr<EtcdClient::GenericResponse> gen_resp_deleter(gen_resp);
+  const unique_ptr<Task> task_deleter(task);
+
+  if (!task->status().ok()) {
+    cb(task->status(), -1);
     return;
   }
-  const JsonObject node(*json, "node");
+
+  const JsonObject node(*gen_resp->json_body, "node");
   if (!node.Ok()) {
     cb(Status(util::error::FAILED_PRECONDITION,
               "Invalid JSON: Couldn't find 'node'"),
        0);
     return;
   }
+
   const JsonInt modifiedIndex(node, "modifiedIndex");
   if (!modifiedIndex.Ok()) {
     cb(Status(util::error::FAILED_PRECONDITION,
@@ -330,23 +371,29 @@ void UpdateRequestDone(Status status, const shared_ptr<JsonObject>& json,
        0);
     return;
   }
-  cb(status, modifiedIndex.Value());
+
+  cb(Status::OK, modifiedIndex.Value());
 }
 
 
-void ForceSetRequestDone(Status status, const shared_ptr<JsonObject>& json,
-                         const EtcdClient::ForceSetCallback& cb) {
-  if (!status.ok()) {
-    cb(status, -1);
+void ForceSetRequestDone(EtcdClient::GenericResponse* gen_resp,
+                         const EtcdClient::ForceSetCallback& cb, Task* task) {
+  const unique_ptr<EtcdClient::GenericResponse> gen_resp_deleter(gen_resp);
+  const unique_ptr<Task> task_deleter(task);
+
+  if (!task->status().ok()) {
+    cb(task->status(), -1);
     return;
   }
-  const JsonObject node(*json, "node");
+
+  const JsonObject node(*gen_resp->json_body, "node");
   if (!node.Ok()) {
     cb(Status(util::error::FAILED_PRECONDITION,
               "Invalid JSON: Couldn't find 'node'"),
        0);
     return;
   }
+
   const JsonInt modifiedIndex(node, "modifiedIndex");
   if (!modifiedIndex.Ok()) {
     cb(Status(util::error::FAILED_PRECONDITION,
@@ -354,7 +401,22 @@ void ForceSetRequestDone(Status status, const shared_ptr<JsonObject>& json,
        0);
     return;
   }
-  cb(status, modifiedIndex.Value());
+
+  cb(Status::OK, modifiedIndex.Value());
+}
+
+
+void DeleteRequestDone(EtcdClient::GenericResponse* gen_resp,
+                       const EtcdClient::DeleteCallback& cb, Task* task) {
+  const unique_ptr<EtcdClient::GenericResponse> gen_resp_deleter(gen_resp);
+  const unique_ptr<Task> task_deleter(task);
+
+  if (!task->status().ok()) {
+    cb(task->status(), -1);
+    return;
+  }
+
+  cb(Status::OK, gen_resp->etcd_index);
 }
 
 
@@ -740,7 +802,14 @@ bool EtcdClient::Node::HasExpiry() const {
 EtcdClient::EtcdClient(const shared_ptr<libevent::Base>& event_base,
                        const string& host, uint16_t port)
     : event_base_(event_base), leader_(GetConnection(host, port)) {
+  CHECK_NOTNULL(event_base_.get());
   VLOG(1) << "EtcdClient: " << this;
+}
+
+
+EtcdClient::EtcdClient(const shared_ptr<libevent::Base>& event_base)
+    : event_base_(event_base) {
+  CHECK_NOTNULL(event_base_.get());
 }
 
 
@@ -842,14 +911,19 @@ shared_ptr<libevent::HttpConnection> EtcdClient::UpdateLeader(
 
 void EtcdClient::Get(const string& key, const GetCallback& cb) {
   map<string, string> params;
-  Generic(key, params, EVHTTP_REQ_GET, bind(&GetRequestDone, _1, _2, _3, cb));
+  GenericResponse* const gen_resp(new GenericResponse);
+  Generic(key, params, EVHTTP_REQ_GET, gen_resp,
+          new Task(bind(&GetRequestDone, gen_resp, cb, _1),
+                   event_base_.get()));
 }
 
 
 void EtcdClient::GetAll(const string& dir, const GetAllCallback& cb) {
   map<string, string> params;
-  Generic(dir, params, EVHTTP_REQ_GET,
-          bind(&GetAllRequestDone, _1, _2, _3, cb));
+  GenericResponse* const gen_resp(new GenericResponse);
+  Generic(dir, params, EVHTTP_REQ_GET, gen_resp,
+          new Task(bind(&GetAllRequestDone, gen_resp, cb, _1),
+                   event_base_.get()));
 }
 
 
@@ -858,7 +932,10 @@ void EtcdClient::Create(const string& key, const string& value,
   map<string, string> params;
   params["value"] = value;
   params["prevExist"] = "false";
-  Generic(key, params, EVHTTP_REQ_PUT, bind(&CreateRequestDone, _1, _2, cb));
+  GenericResponse* const gen_resp(new GenericResponse);
+  Generic(key, params, EVHTTP_REQ_PUT, gen_resp,
+          new Task(bind(&CreateRequestDone, gen_resp, cb, _1),
+                   event_base_.get()));
 }
 
 
@@ -868,7 +945,10 @@ void EtcdClient::CreateWithTTL(const string& key, const string& value,
   params["value"] = value;
   params["prevExist"] = "false";
   params["ttl"] = to_string(ttl.count());
-  Generic(key, params, EVHTTP_REQ_PUT, bind(&CreateRequestDone, _1, _2, cb));
+  GenericResponse* const gen_resp(new GenericResponse);
+  Generic(key, params, EVHTTP_REQ_PUT, gen_resp,
+          new Task(bind(&CreateRequestDone, gen_resp, cb, _1),
+                   event_base_.get()));
 }
 
 
@@ -877,8 +957,10 @@ void EtcdClient::CreateInQueue(const string& dir, const string& value,
   map<string, string> params;
   params["value"] = value;
   params["prevExist"] = "false";
-  Generic(dir, params, EVHTTP_REQ_POST,
-          bind(&CreateInQueueRequestDone, _1, _2, cb));
+  GenericResponse* const gen_resp(new GenericResponse);
+  Generic(dir, params, EVHTTP_REQ_POST, gen_resp,
+          new Task(bind(&CreateInQueueRequestDone, gen_resp, cb, _1),
+                   event_base_.get()));
 }
 
 
@@ -888,7 +970,10 @@ void EtcdClient::Update(const string& key, const string& value,
   map<string, string> params;
   params["value"] = value;
   params["prevIndex"] = to_string(previous_index);
-  Generic(key, params, EVHTTP_REQ_PUT, bind(&UpdateRequestDone, _1, _2, cb));
+  GenericResponse* const gen_resp(new GenericResponse);
+  Generic(key, params, EVHTTP_REQ_PUT, gen_resp,
+          new Task(bind(&UpdateRequestDone, gen_resp, cb, _1),
+                   event_base_.get()));
 }
 
 
@@ -900,7 +985,10 @@ void EtcdClient::UpdateWithTTL(const string& key, const string& value,
   params["value"] = value;
   params["prevIndex"] = to_string(previous_index);
   params["ttl"] = to_string(ttl.count());
-  Generic(key, params, EVHTTP_REQ_PUT, bind(&UpdateRequestDone, _1, _2, cb));
+  GenericResponse* const gen_resp(new GenericResponse);
+  Generic(key, params, EVHTTP_REQ_PUT, gen_resp,
+          new Task(bind(&UpdateRequestDone, gen_resp, cb, _1),
+                   event_base_.get()));
 }
 
 
@@ -908,7 +996,10 @@ void EtcdClient::ForceSet(const string& key, const string& value,
                           const ForceSetCallback& cb) {
   map<string, string> params;
   params["value"] = value;
-  Generic(key, params, EVHTTP_REQ_PUT, bind(&ForceSetRequestDone, _1, _2, cb));
+  GenericResponse* const gen_resp(new GenericResponse);
+  Generic(key, params, EVHTTP_REQ_PUT, gen_resp,
+          new Task(bind(&ForceSetRequestDone, gen_resp, cb, _1),
+                   event_base_.get()));
 }
 
 
@@ -918,7 +1009,10 @@ void EtcdClient::ForceSetWithTTL(const string& key, const string& value,
   map<string, string> params;
   params["value"] = value;
   params["ttl"] = to_string(ttl.count());
-  Generic(key, params, EVHTTP_REQ_PUT, bind(&ForceSetRequestDone, _1, _2, cb));
+  GenericResponse* const gen_resp(new GenericResponse);
+  Generic(key, params, EVHTTP_REQ_PUT, gen_resp,
+          new Task(bind(&ForceSetRequestDone, gen_resp, cb, _1),
+                   event_base_.get()));
 }
 
 
@@ -926,7 +1020,10 @@ void EtcdClient::Delete(const string& key, const int64_t current_index,
                         const DeleteCallback& cb) {
   map<string, string> params;
   params["prevIndex"] = to_string(current_index);
-  Generic(key, params, EVHTTP_REQ_DELETE, bind(cb, _1, _3));
+  GenericResponse* const gen_resp(new GenericResponse);
+  Generic(key, params, EVHTTP_REQ_DELETE, gen_resp,
+          new Task(bind(&DeleteRequestDone, gen_resp, cb, _1),
+                   event_base_.get()));
 }
 
 
@@ -941,8 +1038,19 @@ void EtcdClient::Watch(const string& key, const WatchCallback& cb,
 }
 
 
+static void GenericAdapter(util::Status status,
+                           const std::shared_ptr<JsonObject>& json_body,
+                           int64_t etcd_index,
+                           EtcdClient::GenericResponse* resp, Task* task) {
+  resp->etcd_index = etcd_index;
+  resp->json_body = json_body;
+  task->Return(status);
+}
+
+
 void EtcdClient::Generic(const string& key, const map<string, string>& params,
-                         evhttp_cmd_type verb, const GenericCallback& cb) {
+                         evhttp_cmd_type verb, GenericResponse* resp,
+                         Task* task) {
   map<string, string> modified_params(params);
   if (FLAGS_etcd_consistent) {
     modified_params["consistent"] = "true";
@@ -956,7 +1064,8 @@ void EtcdClient::Generic(const string& key, const map<string, string>& params,
   }
 
   Request* const etcd_req(
-      new Request(this, verb, key, false, modified_params, cb));
+      new Request(this, verb, key, false, modified_params,
+                  bind(&GenericAdapter, _1, _2, _3, resp, task)));
 
   etcd_req->Run(GetLeader());
 }

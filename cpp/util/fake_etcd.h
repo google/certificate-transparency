@@ -30,7 +30,8 @@ class FakeEtcdClient : public EtcdClient {
  protected:
   void Generic(const std::string& key,
                const std::map<std::string, std::string>& params,
-               evhttp_cmd_type verb, const GenericCallback& cb) override;
+               evhttp_cmd_type verb, GenericResponse* resp,
+               util::Task* task) override;
 
  private:
   void PurgeExpiredEntries();
@@ -38,28 +39,30 @@ class FakeEtcdClient : public EtcdClient {
   void NotifyForPath(const std::unique_lock<std::mutex>& lock,
                      const std::string& path);
 
-  void GetSingleEntry(const std::string& key, const GenericCallback& cb);
+  void GetSingleEntry(const std::string& key, GenericResponse* resp,
+                      util::Task* task);
 
-  void GetDirectory(const std::string& key, const GenericCallback& cb);
+  void GetDirectory(const std::string& key, GenericResponse* resp,
+                    util::Task* task);
 
   void HandleGet(const std::string& key,
                  const std::map<std::string, std::string>& params,
-                 const GenericCallback& cb);
+                 GenericResponse* resp, util::Task* task);
 
   util::Status CheckCompareFlags(
       const std::map<std::string, std::string> params, const std::string& key);
 
   void HandlePost(const std::string& key,
                   const std::map<std::string, std::string>& params,
-                  const GenericCallback& cb);
+                  GenericResponse* resp, util::Task* task);
 
   void HandlePut(const std::string& key,
                  const std::map<std::string, std::string>& params,
-                 const GenericCallback& cb);
+                 GenericResponse* resp, util::Task* task);
 
   void HandleDelete(const std::string& key,
                     const std::map<std::string, std::string>& params,
-                    const GenericCallback& cb);
+                    GenericResponse* resp, util::Task* task);
 
   void CancelWatch(util::Task* task);
 
