@@ -36,12 +36,29 @@ class URL {
 
   std::string PathQuery() const;
 
+  void SetProtocol(const std::string& protocol) {
+    protocol_ = protocol;
+  }
+
+  void SetHost(const std::string& host) {
+    host_ = host;
+  }
+
+  void SetPort(uint16_t port) {
+    port_ = port;
+  }
+
   void SetPath(const std::string& path) {
     path_ = path;
   }
 
   void SetQuery(const std::string& query) {
     query_ = query;
+  }
+
+  bool operator<(const URL& rhs) const {
+    return protocol_ < rhs.protocol_ && host_ < rhs.host_ &&
+           port_ < rhs.port_ && path_ < rhs.path_ && query_ < rhs.query_;
   }
 
  private:

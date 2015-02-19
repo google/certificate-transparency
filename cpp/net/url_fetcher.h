@@ -21,6 +21,9 @@ class Base;
 
 class UrlFetcher {
  public:
+  typedef std::multimap<std::string, std::string, ci_less<std::string>>
+      Headers;
+
   struct Request {
     Request(const URL& input_url) : url(input_url) {
     }
@@ -34,7 +37,7 @@ class UrlFetcher {
     }
 
     int status_code;
-    std::multimap<std::string, std::string, ci_less<std::string>> headers;
+    Headers headers;
     std::string body;
   };
 
