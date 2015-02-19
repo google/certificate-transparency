@@ -13,6 +13,7 @@ before_install:
  - sudo apt-add-repository -y ppa:sao/backports
  - sudo apt-add-repository -y ppa:ubuntu-toolchain-r/test
  - sudo apt-add-repository -y ppa:fcitx-team/nightly
+ - sudo apt-add-repository -y ppa:chris-lea/protobuf
  - sudo apt-get update -qq
  - sudo apt-get install -qq protobuf-compiler libprotobuf-java libprotobuf-dev python-dev libjson-c-dev libgoogle-glog-dev libgflags-dev libldns-dev libstdc++-4.8-dev
 # Stupid frikkin' google-mock package on Precise is b0rked, so hack it up:

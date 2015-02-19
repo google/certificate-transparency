@@ -76,6 +76,8 @@ TESTS = \
 	merkletree/serial_hasher_test \
 	merkletree/tree_hasher_test \
 	monitor/database_test \
+	monitoring/prometheus/counter_test \
+	monitoring/prometheus/gauge_test \
 	proto/serializer_test \
 	util/etcd_test \
 	util/fake_etcd_test \
@@ -129,12 +131,16 @@ gmock/gtest/libgtest.a: gmock/libgmock.a
 proto/%.pb.h proto/%.pb.cc: ../proto/%.proto
 	protoc -I .. $^ --cpp_out=.
 
+monitoring/prometheus/%.pb.h monitoring/prometheus/%.pb.cc: monitoring/prometheus/%.proto
+	protoc $^ --cpp_out=.
+
 ifneq ($(MAKECMDGOALS),clean)
     include client/.depend
     include fetcher/.depend
     include log/.depend
     include merkletree/.depend
     include monitor/.depend
+    include monitoring/prometheus/.depend
     include net/.depend
     include proto/.depend
     include server/.depend
@@ -338,6 +344,14 @@ monitor/database_test: monitor/database_test.o monitor/database.o \
                        monitor/sqlite_db.o util/libutil.a log/test_signer.o \
                        merkletree/libmerkletree.a log/log_signer.o \
                        log/signer.o log/verifier.o proto/libproto.a $(GTESTLIB)
+
+monitoring/prometheus/counter_test: monitoring/prometheus/counter_test.o \
+                                    monitoring/prometheus/metrics.pb.o \
+                                    util/testing.o $(GTESTLIB) $(GMOCKLIB)
+
+monitoring/prometheus/gauge_test: monitoring/prometheus/gauge_test.o \
+                                  monitoring/prometheus/metrics.pb.o \
+                                  util/testing.o $(GTESTLIB) $(GMOCKLIB)
 
 # client
 client/ct: client/ct.o client/client.o client/ssl_client.o \

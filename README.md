@@ -24,7 +24,7 @@ Some systems make the googlemock source available as a package; on Debian, this 
 
 If you are on FreeBSD, you may need to apply the patch in gtest.patch to the gtest subdirectory of gmock.
 
- - [protobuf](https://github.com/google/protobuf) (tested with 2.4.1)
+ - [protobuf](https://github.com/google/protobuf) (tested with 2.5.0)
  - [gflags](https://code.google.com/p/gflags/) (tested with 1.6 and 2.0)
  - [glog](https://code.google.com/p/google-glog/) (tested with 0.3.1)
 
