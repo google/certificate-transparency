@@ -118,6 +118,11 @@ class SignatureError(VerifyError):
     pass
 
 
+class UnsupportedVersionError(Error):
+    """The version of the data structure is unknown."""
+    pass
+
+
 def returns_true_or_raises(f):
     """A safety net.
 

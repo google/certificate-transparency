@@ -1,4 +1,4 @@
-from ct.client import tls_message
+from ct.serialization import tls_message
 from ct.proto import client_pb2
 
 def decode_entry(entry):

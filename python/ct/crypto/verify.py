@@ -9,6 +9,7 @@ from ct.crypto import merkle
 from ct.crypto import pem
 from ct.proto import client_pb2
 from ct.proto import ct_pb2
+from ct.serialization import tls_message
 import ecdsa
 
 def decode_signature(signature):
@@ -188,3 +189,40 @@ class LogVerifier(object):
             old_sth.tree_size, new_sth.tree_size, old_sth.sha256_root_hash,
             new_sth.sha256_root_hash, proof)
         return True
+
+
+    @error.returns_true_or_raises
+    def verify_sct(self, sct, certificate):
+        """Verify the SCT over the X.509 certificate provided
+
+        Not suitable for Precertificates.
+
+        Args:
+            sct: client_pb2.SignedCertificateTimestamp proto. Must have
+                all fields present.
+            certificate: cert.Certificate instance.
+
+        Returns:
+            True. The return value is enforced by a decorator and need not be
+                checked by the caller.
+
+        Raises:
+            ct.crypto.error.EncodingError: failed to encode signature input,
+                or decode the signature.
+            ct.crypto.error.SignatureError: invalid signature.
+        """
+
+        if sct.version != ct_pb2.V1:
+            raise error.UnsupportedVersionError("Cannot handle version: %s" %
+                                                sct.version)
+        dsentry = client_pb2.DigitallySignedTimestampedEntry()
+        dsentry.sct_version = ct_pb2.V1
+        dsentry.signature_type = client_pb2.CERTIFICATE_TIMESTAMP
+        dsentry.timestamp = sct.timestamp
+        dsentry.entry_type = client_pb2.X509_ENTRY
+        dsentry.asn1_cert = certificate.to_der()
+        dsentry.ct_extensions = sct.extensions
+
+        signature_input = tls_message.encode(dsentry)
+
+        return self._verify(signature_input, sct.signature.signature)
