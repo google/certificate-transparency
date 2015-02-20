@@ -24,7 +24,7 @@
 #include "log/sqlite_db.h"
 #include "log/strict_consistent_store.h"
 #include "log/tree_signer.h"
-#include "monitoring/prometheus/prometheus.h"
+#include "monitoring/monitoring.h"
 #include "monitoring/registry.h"
 #include "server/handler.h"
 #include "server/metrics.h"
@@ -80,6 +80,7 @@ using cert_trans::CertChecker;
 using cert_trans::ClusterStateController;
 using cert_trans::ContinuousFetcher;
 using cert_trans::Counter;
+using cert_trans::Gauge;
 using cert_trans::EtcdClient;
 using cert_trans::EtcdConsistentStore;
 using cert_trans::FakeEtcdClient;
@@ -109,6 +110,11 @@ using std::shared_ptr;
 using std::string;
 using std::thread;
 using std::unique_ptr;
+
+
+Gauge<>* latest_local_tree_size_gauge =
+    Gauge<>::New("latest_local_tree_size",
+                 "Size of latest locally generated STH.");
 
 
 // Basic sanity checks on flag values.
@@ -193,7 +199,9 @@ void SignMerkleTree(TreeSigner<LoggedCertificate>* tree_signer,
     }
 
     CHECK_EQ(tree_signer->UpdateTree(), TreeSigner<LoggedCertificate>::OK);
-    controller->NewTreeHead(tree_signer->LatestSTH());
+    const SignedTreeHead latest_sth(tree_signer->LatestSTH());
+    latest_local_tree_size_gauge->Set(latest_sth.tree_size());
+    controller->NewTreeHead(latest_sth);
 
     const steady_clock::time_point now(steady_clock::now());
     while (target_run_time <= now) {

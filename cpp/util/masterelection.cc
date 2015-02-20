@@ -5,10 +5,12 @@
 #include <gflags/gflags.h>
 #include <glog/logging.h>
 
+#include "monitoring/monitoring.h"
 #include "util/periodic_closure.h"
 
 namespace cert_trans {
 
+using cert_trans::Gauge;
 using std::bind;
 using std::chrono::seconds;
 using std::mutex;
@@ -24,6 +26,15 @@ DEFINE_int32(master_keepalive_interval_seconds, 60,
 
 
 namespace {
+
+static Gauge<>* is_master_gauge(
+    Gauge<>::New("master", "Non-zero if this node is currently the master."));
+
+
+static Gauge<>* participating_in_election_gauge(
+    Gauge<>::New("participating_in_election",
+                 "Non-zero if this node is currently participating in the "
+                 "masterelection."));
 
 
 // Special backing string which indicates that we're not backing any proposal.
@@ -88,6 +99,8 @@ MasterElection::MasterElection(const shared_ptr<libevent::Base>& base,
       backed_proposal_(kNoBacking),
       is_master_(false) {
   CHECK_NE(kNoBacking, node_id);
+  is_master_gauge->Set(0);
+  participating_in_election_gauge->Set(0);
 }
 
 
@@ -112,6 +125,7 @@ void MasterElection::StartElection() {
     }
     VLOG(1) << my_proposal_path_ << ": Joining election";
     running_ = true;
+    participating_in_election_gauge->Set(1);
 
     Transition(lock, ProposalState::AWAITING_CREATION);
   }
@@ -126,6 +140,7 @@ void MasterElection::StopElection() {
   }
   VLOG(1) << my_proposal_path_ << ": Departing election.";
   running_ = false;
+  participating_in_election_gauge->Set(0);
 
   // Stop the updates from the watch. Do this without holding the lock
   // because the watch callback takes that lock. This means that we'll
@@ -427,6 +442,7 @@ void MasterElection::OnProposalUpdate(
             << ": No proposals to consider; no master currently";
     // Since nobody is a master, that includes us:
     is_master_ = false;
+    is_master_gauge->Set(0);
     return;
   }
 
@@ -451,6 +467,7 @@ void MasterElection::OnProposalUpdate(
     // we could short circuit and set this true here, but there's no really
     // anything to be gained from that other than more complex code.
     is_master_ = false;
+    is_master_gauge->Set(0);
     return;
   }
 
@@ -483,6 +500,7 @@ void MasterElection::OnProposalUpdate(
       found_master = false;
       // No master, so we can't be master
       is_master_ = false;
+      is_master_gauge->Set(0);
       return;
     }
   }
@@ -500,6 +518,7 @@ void MasterElection::OnProposalUpdate(
                 apparent_master.created_index_ == my_proposal_create_index_);
   if (is_master_) {
     LOG(INFO) << my_proposal_path_ << ": Became master";
+    is_master_gauge->Set(1);
     is_master_cv_.notify_all();
   }
 }

@@ -8,6 +8,7 @@
 
 namespace cert_trans {
 
+
 // A metric which can only increase (e.g. total_requests_served).
 template <class... Labels>
 class Counter : public Metric {
@@ -34,6 +35,8 @@ class Counter : public Metric {
   DISALLOW_COPY_AND_ASSIGN(Counter);
 };
 
+
 }  // namespace cert_trans
+
 
 #endif  // CERT_TRANS_MONITORING_COUNTER_H_

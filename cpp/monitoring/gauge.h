@@ -6,6 +6,7 @@
 #include "base/macros.h"
 #include "monitoring/metric.h"
 
+
 namespace cert_trans {
 
 // A metric whose values can go down as well as up (e.g. memory usage.)
@@ -32,6 +33,8 @@ class Gauge : public Metric {
   DISALLOW_COPY_AND_ASSIGN(Gauge);
 };
 
+
 }  // namespace cert_trans
+
 
 #endif  // CERT_TRANS_MONITORING_GAUGE_H_
