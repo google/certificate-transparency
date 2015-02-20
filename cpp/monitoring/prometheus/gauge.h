@@ -20,6 +20,10 @@ class PrometheusGauge : public Gauge<LabelTypes...> {
       const typename NameType<LabelTypes>::name&... labels,
       const std::string& help);
 
+  void Export(std::ostream* os) const override;
+
+  void ExportText(std::ostream* os) const override;
+
   double Get(const LabelTypes&...) const override;
 
   void Set(const LabelTypes&... labels, double value) override;
@@ -29,6 +33,7 @@ class PrometheusGauge : public Gauge<LabelTypes...> {
                   const typename NameType<LabelTypes>::name&... labels,
                   const std::string& help);
 
+  mutable std::mutex mutex_;
   ::io::prometheus::client::MetricFamily family_;
   internal::LabelledValues<::io::prometheus::client::Gauge, LabelTypes...>
       values_;

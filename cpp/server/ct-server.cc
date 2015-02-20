@@ -1,5 +1,7 @@
 /* -*- indent-tabs-mode: nil -*- */
 
+#include <cstring>
+#include <event2/buffer.h>
 #include <event2/thread.h>
 #include <functional>
 #include <gflags/gflags.h>
@@ -22,7 +24,10 @@
 #include "log/sqlite_db.h"
 #include "log/strict_consistent_store.h"
 #include "log/tree_signer.h"
+#include "monitoring/prometheus/prometheus.h"
+#include "monitoring/registry.h"
 #include "server/handler.h"
+#include "server/metrics.h"
 #include "util/etcd.h"
 #include "util/fake_etcd.h"
 #include "util/libevent_wrapper.h"
@@ -74,6 +79,7 @@ namespace libevent = cert_trans::libevent;
 using cert_trans::CertChecker;
 using cert_trans::ClusterStateController;
 using cert_trans::ContinuousFetcher;
+using cert_trans::Counter;
 using cert_trans::EtcdClient;
 using cert_trans::EtcdConsistentStore;
 using cert_trans::FakeEtcdClient;
@@ -98,10 +104,12 @@ using std::chrono::seconds;
 using std::chrono::steady_clock;
 using std::function;
 using std::make_shared;
+using std::placeholders::_1;
 using std::shared_ptr;
 using std::string;
 using std::thread;
 using std::unique_ptr;
+
 
 // Basic sanity checks on flag values.
 static bool ValidatePort(const char* flagname, int port) {
@@ -356,6 +364,8 @@ int main(int argc, char* argv[]) {
 
   libevent::HttpServer server(*event_base);
   handler.Add(&server);
+  server.AddHandler("/metrics",
+                    bind(&cert_trans::ExportPrometheusMetrics, _1));
   server.Bind(NULL, FLAGS_port);
 
   std::cout << "READY" << std::endl;

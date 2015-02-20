@@ -10,7 +10,7 @@ namespace cert_trans {
 
 // A metric whose values can go down as well as up (e.g. memory usage.)
 template <class... LabelTypes>
-class Gauge : public Metric<LabelTypes...> {
+class Gauge : public Metric {
  public:
   static Gauge<LabelTypes...>* New(
       const std::string& name,
@@ -25,7 +25,7 @@ class Gauge : public Metric<LabelTypes...> {
   Gauge(const std::string& name,
         const typename NameType<LabelTypes>::name&... label_names,
         const std::string& help)
-      : Metric<LabelTypes...>(name, label_names..., help) {
+      : Metric(name, {label_names...}, help) {
   }
 
  private:

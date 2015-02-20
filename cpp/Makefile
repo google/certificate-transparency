@@ -76,6 +76,7 @@ TESTS = \
 	merkletree/serial_hasher_test \
 	merkletree/tree_hasher_test \
 	monitor/database_test \
+	monitoring/registry_test \
 	monitoring/prometheus/counter_test \
 	monitoring/prometheus/gauge_test \
 	proto/serializer_test \
@@ -140,6 +141,7 @@ ifneq ($(MAKECMDGOALS),clean)
     include log/.depend
     include merkletree/.depend
     include monitor/.depend
+    include monitoring/.depend
     include monitoring/prometheus/.depend
     include net/.depend
     include proto/.depend
@@ -155,7 +157,7 @@ util/libutil.a: util/util.o util/openssl_util.o util/testing.o \
                 util/json_wrapper.o util/thread_pool.o util/libevent_wrapper.o \
                 util/etcd.o util/status.o util/sync_etcd.o util/fake_etcd.o \
                 util/periodic_closure.o util/masterelection.o util/task.o \
-                util/sync_task.o util/uuid.o
+                util/protobuf_util.o util/sync_task.o util/uuid.o
 	rm -f $@
 	ar -rcs $@ $^
 
@@ -345,13 +347,22 @@ monitor/database_test: monitor/database_test.o monitor/database.o \
                        merkletree/libmerkletree.a log/log_signer.o \
                        log/signer.o log/verifier.o proto/libproto.a $(GTESTLIB)
 
+monitoring/registry_test: monitoring/registry_test.o monitoring/registry.o \
+                          monitoring/prometheus/metrics.pb.o \
+                          util/protobuf_util.o util/testing.o \
+                          $(GTESTLIB) $(GMOCKLIB)
+
 monitoring/prometheus/counter_test: monitoring/prometheus/counter_test.o \
                                     monitoring/prometheus/metrics.pb.o \
-                                    util/testing.o $(GTESTLIB) $(GMOCKLIB)
+                                    monitoring/registry.o \
+                                    util/protobuf_util.o util/testing.o \
+                                    $(GTESTLIB) $(GMOCKLIB)
 
 monitoring/prometheus/gauge_test: monitoring/prometheus/gauge_test.o \
                                   monitoring/prometheus/metrics.pb.o \
-                                  util/testing.o $(GTESTLIB) $(GMOCKLIB)
+                                  monitoring/registry.o util/protobuf_util.o \
+                                  util/testing.o \
+                                  $(GTESTLIB) $(GMOCKLIB)
 
 # client
 client/ct: client/ct.o client/client.o client/ssl_client.o \
@@ -363,10 +374,12 @@ client/ct: client/ct.o client/client.o client/ssl_client.o \
 server/ct-dns-server: server/ct-dns-server.o server/event.o $(LOCAL_LIBS)
 
 server/ct-server: server/ct-server.o util/read_key.o server/handler.o \
-	base/notification.o log/logged_certificate.o fetcher/fetcher.o \
-        fetcher/peer.o fetcher/peer_group.o fetcher/remote_peer.o \
-        client/async_log_client.o fetcher/continuous_fetcher.o net/url.o \
-        net/url_fetcher.o net/connection_pool.o $(LOCAL_LIBS)
+        server/metrics.o base/notification.o log/logged_certificate.o \
+        fetcher/fetcher.o fetcher/peer.o fetcher/peer_group.o \
+        fetcher/remote_peer.o  client/async_log_client.o \
+        fetcher/continuous_fetcher.o monitoring/registry.o \
+        monitoring/prometheus/metrics.pb.o net/url.o net/url_fetcher.o \
+        net/connection_pool.o util/protobuf_util.o $(LOCAL_LIBS)
 
 tools/ct-clustertool: tools/clustertool_main.o \
                       merkletree/libmerkletree.a util/read_key.o \

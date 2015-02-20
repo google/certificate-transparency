@@ -20,6 +20,10 @@ class PrometheusCounter : public Counter<LabelTypes...> {
       const typename NameType<LabelTypes>::name&... labels,
       const std::string& help);
 
+  void Export(std::ostream* os) const override;
+
+  void ExportText(std::ostream* os) const override;
+
   double Get(const LabelTypes&...) const override;
 
   void Increment(const LabelTypes&... labels) override;
