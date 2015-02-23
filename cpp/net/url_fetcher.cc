@@ -151,6 +151,7 @@ void State::RequestDone(evhttp_request* req) {
     return;
   }
 
+  response_->headers.clear();
   for (evkeyval* ptr = evhttp_request_get_input_headers(req)->tqh_first; ptr;
        ptr = ptr->next.tqe_next) {
     response_->headers.insert(make_pair(ptr->key, ptr->value));
