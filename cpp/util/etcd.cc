@@ -454,33 +454,16 @@ static const EtcdClient::Node kInvalidNode(-1, -1, "", "");
 struct EtcdClient::Request {
   Request(EtcdClient* client, evhttp_cmd_type verb, const string& key,
           bool separate_conn, const map<string, string>& params,
-          const GenericCallback& cb)
+          GenericResponse* gen_resp, Task* task)
       : client_(client),
         verb_(verb),
         path_("/v2/keys" + key),
         separate_conn_(separate_conn),
         params_(UrlEscapeAndJoinParams(params)),
-        cb_(cb) {
+        gen_resp_(CHECK_NOTNULL(gen_resp)),
+        task_(CHECK_NOTNULL(task)) {
     CHECK(!key.empty());
     CHECK_EQ(key[0], '/');
-  }
-
-  void CancelAndDelete() {
-    bool delete_me(false);
-    {
-      lock_guard<mutex> lock(lock_);
-      if (req_) {
-        // The RequestDone callback has not been called yet, do some
-        // cleanup.
-        req_->Cancel();
-        req_.reset();
-        delete_me = true;
-      }
-    }
-
-    if (delete_me) {
-      delete this;
-    }
   }
 
   void Run(const shared_ptr<libevent::HttpConnection>& conn) {
@@ -528,7 +511,8 @@ struct EtcdClient::Request {
   const string path_;
   const bool separate_conn_;
   const string params_;
-  const GenericCallback cb_;
+  GenericResponse* const gen_resp_;
+  Task* const task_;
 
   shared_ptr<libevent::HttpConnection> conn_;
 
@@ -547,8 +531,7 @@ struct EtcdClient::WatchState {
   void InitialGetDone(Status status, const Node& node, int64_t etcd_index);
   void InitialGetAllDone(Status status, const vector<Node>& nodes,
                          int64_t etcd_index);
-  void RequestDone(Status status, const shared_ptr<JsonObject>& json,
-                   int64_t etcd_index);
+  void RequestDone(GenericResponse* gen_resp, Task* task);
   void SendUpdates(const vector<WatchUpdate>& updates);
   void StartRequest();
   Status HandleSingleValueRequestDone(const JsonObject& node,
@@ -677,9 +660,15 @@ Status EtcdClient::WatchState::HandleSingleValueRequestDone(
 }
 
 
-void EtcdClient::WatchState::RequestDone(Status status,
-                                         const shared_ptr<JsonObject>& json,
-                                         int64_t etcd_index) {
+void EtcdClient::WatchState::RequestDone(GenericResponse* gen_resp,
+                                         Task* task) {
+  // We clean up this way instead of using util::Task::DeleteWhenDone,
+  // because our task is long-lived, and we do not want to accumulate
+  // these objects.
+  unique_ptr<GenericResponse> gen_resp_deleter(gen_resp);
+
+  VLOG(2) << "etcd_index: " << gen_resp->etcd_index;
+
   // TODO(alcutter): doing this here works around some etcd 401 errors, but in
   // the case of sustained high qps we could miss updates entirely (e.g. if
   // this new index is already past the 1000 entry horizon by the time we make
@@ -687,8 +676,8 @@ void EtcdClient::WatchState::RequestDone(Status status,
   // watcher re-do an "initial" get on the target, and, in the case of
   // directory watches, maintain a set of known keys so that it can synthesise
   // 'delete' updates.
-  CHECK_LE(highest_index_seen_, etcd_index);
-  highest_index_seen_ = etcd_index;
+  CHECK_LE(highest_index_seen_, gen_resp->etcd_index);
+  highest_index_seen_ = gen_resp->etcd_index;
 
   if (task_->CancelRequested()) {
     task_->Return(Status::CANCELLED);
@@ -700,15 +689,15 @@ void EtcdClient::WatchState::RequestDone(Status status,
   // helper function.
   {
     // This is probably due to a timeout, just retry.
-    if (!status.ok()) {
-      LOG(INFO) << "Watch request failed: " << status;
+    if (!task->status().ok()) {
+      LOG(INFO) << "Watch request failed: " << task->status();
       goto fail;
     }
 
     // TODO(pphaneuf): None of this should ever happen, so I'm not
     // sure what's the best way to handle it? CHECK-fail? Retry? With
     // a delay? Retrying for now...
-    const JsonObject node(*json, "node");
+    const JsonObject node(*gen_resp->json_body, "node");
     if (!node.Ok()) {
       LOG(INFO) << "Invalid JSON: Couldn't find 'node'";
       goto fail;
@@ -753,14 +742,10 @@ void EtcdClient::WatchState::StartRequest() {
   params["waitIndex"] = to_string(highest_index_seen_ + 1);
   params["recursive"] = "true";
 
-  req_ = new Request(client_, EVHTTP_REQ_GET, key_, true, params,
-                     bind(&WatchState::RequestDone, this, _1, _2, _3));
-
-  // Issue the new request from the libevent dispatch loop. This is
-  // not usually necessary, but in error cases, libevent can call us
-  // back synchronously, and we want to avoid overflowing the stack in
-  // case of repeated errors.
-  client_->event_base_->Add(bind(&Request::Run, req_, client_->GetLeader()));
+  GenericResponse* const gen_resp(new GenericResponse);
+  client_->Generic(key_, params, EVHTTP_REQ_GET, true, gen_resp,
+                   task_->AddChild(
+                       bind(&WatchState::RequestDone, this, gen_resp, _1)));
 }
 
 
@@ -845,8 +830,6 @@ bool EtcdClient::MaybeUpdateLeader(const libevent::HttpRequest& req,
 
 void EtcdClient::RequestDone(const shared_ptr<libevent::HttpRequest>& req,
                              Request* etcd_req) {
-  unique_ptr<Request> etcd_req_deleter(etcd_req);
-
   // The HttpRequest object will be invalid as soon as we return, so
   // forget about it now. It's too late to cancel, anyway.
   etcd_req->Reset();
@@ -854,24 +837,26 @@ void EtcdClient::RequestDone(const shared_ptr<libevent::HttpRequest>& req,
   // This can happen in the case of a timeout (not sure if there are
   // other reasons).
   if (!req) {
-    etcd_req->cb_(Status(util::error::UNKNOWN,
-                         "evhttp request callback returned a null"),
-                  shared_ptr<JsonObject>(), -1);
+    etcd_req->gen_resp_->etcd_index = -1;
+    etcd_req->gen_resp_->json_body = nullptr;
+    etcd_req->task_->Return(Status(util::error::UNKNOWN,
+                                   "evhttp request callback returned a null"));
     return;
   }
 
   if (MaybeUpdateLeader(*req, etcd_req)) {
-    etcd_req_deleter.release();
     return;
   }
 
-  const int response_code(req->GetResponseCode());
-  shared_ptr<JsonObject> json(make_shared<JsonObject>(req->GetInputBuffer()));
   const char* const etcd_index(
       evhttp_find_header(req->GetInputHeaders(), "X-Etcd-Index"));
+  etcd_req->gen_resp_->json_body =
+      make_shared<JsonObject>(req->GetInputBuffer());
+  etcd_req->gen_resp_->etcd_index = etcd_index ? atoll(etcd_index) : -1;
 
-  etcd_req->cb_(StatusFromResponseCode(response_code, json), json,
-                etcd_index ? atoll(etcd_index) : -1);
+  etcd_req->task_->Return(
+      StatusFromResponseCode(req->GetResponseCode(),
+                             etcd_req->gen_resp_->json_body));
 }
 
 
@@ -912,7 +897,7 @@ shared_ptr<libevent::HttpConnection> EtcdClient::UpdateLeader(
 void EtcdClient::Get(const string& key, const GetCallback& cb) {
   map<string, string> params;
   GenericResponse* const gen_resp(new GenericResponse);
-  Generic(key, params, EVHTTP_REQ_GET, gen_resp,
+  Generic(key, params, EVHTTP_REQ_GET, false, gen_resp,
           new Task(bind(&GetRequestDone, gen_resp, cb, _1),
                    event_base_.get()));
 }
@@ -921,7 +906,7 @@ void EtcdClient::Get(const string& key, const GetCallback& cb) {
 void EtcdClient::GetAll(const string& dir, const GetAllCallback& cb) {
   map<string, string> params;
   GenericResponse* const gen_resp(new GenericResponse);
-  Generic(dir, params, EVHTTP_REQ_GET, gen_resp,
+  Generic(dir, params, EVHTTP_REQ_GET, false, gen_resp,
           new Task(bind(&GetAllRequestDone, gen_resp, cb, _1),
                    event_base_.get()));
 }
@@ -933,7 +918,7 @@ void EtcdClient::Create(const string& key, const string& value,
   params["value"] = value;
   params["prevExist"] = "false";
   GenericResponse* const gen_resp(new GenericResponse);
-  Generic(key, params, EVHTTP_REQ_PUT, gen_resp,
+  Generic(key, params, EVHTTP_REQ_PUT, false, gen_resp,
           new Task(bind(&CreateRequestDone, gen_resp, cb, _1),
                    event_base_.get()));
 }
@@ -946,7 +931,7 @@ void EtcdClient::CreateWithTTL(const string& key, const string& value,
   params["prevExist"] = "false";
   params["ttl"] = to_string(ttl.count());
   GenericResponse* const gen_resp(new GenericResponse);
-  Generic(key, params, EVHTTP_REQ_PUT, gen_resp,
+  Generic(key, params, EVHTTP_REQ_PUT, false, gen_resp,
           new Task(bind(&CreateRequestDone, gen_resp, cb, _1),
                    event_base_.get()));
 }
@@ -958,7 +943,7 @@ void EtcdClient::CreateInQueue(const string& dir, const string& value,
   params["value"] = value;
   params["prevExist"] = "false";
   GenericResponse* const gen_resp(new GenericResponse);
-  Generic(dir, params, EVHTTP_REQ_POST, gen_resp,
+  Generic(dir, params, EVHTTP_REQ_POST, false, gen_resp,
           new Task(bind(&CreateInQueueRequestDone, gen_resp, cb, _1),
                    event_base_.get()));
 }
@@ -971,7 +956,7 @@ void EtcdClient::Update(const string& key, const string& value,
   params["value"] = value;
   params["prevIndex"] = to_string(previous_index);
   GenericResponse* const gen_resp(new GenericResponse);
-  Generic(key, params, EVHTTP_REQ_PUT, gen_resp,
+  Generic(key, params, EVHTTP_REQ_PUT, false, gen_resp,
           new Task(bind(&UpdateRequestDone, gen_resp, cb, _1),
                    event_base_.get()));
 }
@@ -986,7 +971,7 @@ void EtcdClient::UpdateWithTTL(const string& key, const string& value,
   params["prevIndex"] = to_string(previous_index);
   params["ttl"] = to_string(ttl.count());
   GenericResponse* const gen_resp(new GenericResponse);
-  Generic(key, params, EVHTTP_REQ_PUT, gen_resp,
+  Generic(key, params, EVHTTP_REQ_PUT, false, gen_resp,
           new Task(bind(&UpdateRequestDone, gen_resp, cb, _1),
                    event_base_.get()));
 }
@@ -997,7 +982,7 @@ void EtcdClient::ForceSet(const string& key, const string& value,
   map<string, string> params;
   params["value"] = value;
   GenericResponse* const gen_resp(new GenericResponse);
-  Generic(key, params, EVHTTP_REQ_PUT, gen_resp,
+  Generic(key, params, EVHTTP_REQ_PUT, false, gen_resp,
           new Task(bind(&ForceSetRequestDone, gen_resp, cb, _1),
                    event_base_.get()));
 }
@@ -1010,7 +995,7 @@ void EtcdClient::ForceSetWithTTL(const string& key, const string& value,
   params["value"] = value;
   params["ttl"] = to_string(ttl.count());
   GenericResponse* const gen_resp(new GenericResponse);
-  Generic(key, params, EVHTTP_REQ_PUT, gen_resp,
+  Generic(key, params, EVHTTP_REQ_PUT, false, gen_resp,
           new Task(bind(&ForceSetRequestDone, gen_resp, cb, _1),
                    event_base_.get()));
 }
@@ -1021,7 +1006,7 @@ void EtcdClient::Delete(const string& key, const int64_t current_index,
   map<string, string> params;
   params["prevIndex"] = to_string(current_index);
   GenericResponse* const gen_resp(new GenericResponse);
-  Generic(key, params, EVHTTP_REQ_DELETE, gen_resp,
+  Generic(key, params, EVHTTP_REQ_DELETE, false, gen_resp,
           new Task(bind(&DeleteRequestDone, gen_resp, cb, _1),
                    event_base_.get()));
 }
@@ -1038,19 +1023,9 @@ void EtcdClient::Watch(const string& key, const WatchCallback& cb,
 }
 
 
-static void GenericAdapter(util::Status status,
-                           const std::shared_ptr<JsonObject>& json_body,
-                           int64_t etcd_index,
-                           EtcdClient::GenericResponse* resp, Task* task) {
-  resp->etcd_index = etcd_index;
-  resp->json_body = json_body;
-  task->Return(status);
-}
-
-
 void EtcdClient::Generic(const string& key, const map<string, string>& params,
-                         evhttp_cmd_type verb, GenericResponse* resp,
-                         Task* task) {
+                         evhttp_cmd_type verb, bool separate_conn,
+                         GenericResponse* resp, Task* task) {
   map<string, string> modified_params(params);
   if (FLAGS_etcd_consistent) {
     modified_params["consistent"] = "true";
@@ -1058,16 +1033,23 @@ void EtcdClient::Generic(const string& key, const map<string, string>& params,
     LOG_EVERY_N(WARNING, 100) << "Sending request without 'consistent=true'";
   }
   if (FLAGS_etcd_quorum) {
-    modified_params["quorum"] = "true";
+    // "wait" and "quorum" appear to be incompatible.
+    if (modified_params.find("wait") == modified_params.end()) {
+      modified_params["quorum"] = "true";
+    }
   } else {
     LOG_EVERY_N(WARNING, 100) << "Sending request without 'quorum=true'";
   }
 
-  Request* const etcd_req(
-      new Request(this, verb, key, false, modified_params,
-                  bind(&GenericAdapter, _1, _2, _3, resp, task)));
+  Request* const etcd_req(new Request(this, verb, key, separate_conn,
+                                      modified_params, resp, task));
+  task->DeleteWhenDone(etcd_req);
 
-  etcd_req->Run(GetLeader());
+  // Issue the new request from the libevent dispatch loop. This is
+  // not usually necessary, but in error cases, libevent can call us
+  // back synchronously, and we want to avoid overflowing the stack in
+  // case of repeated errors.
+  event_base_->Add(bind(&Request::Run, etcd_req, GetLeader()));
 }
 
 

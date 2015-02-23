@@ -128,8 +128,8 @@ class EtcdClient {
 
   virtual void Generic(const std::string& key,
                        const std::map<std::string, std::string>& params,
-                       evhttp_cmd_type verb, GenericResponse* resp,
-                       util::Task* task);
+                       evhttp_cmd_type verb, bool separate_conn,
+                       GenericResponse* resp, util::Task* task);
 
  private:
   struct Request;
