@@ -40,6 +40,8 @@
 /cpp/merkletree/serial_hasher_test
 /cpp/merkletree/tree_hasher_test
 /cpp/monitor/database_test
+/cpp/monitoring/prometheus/counter_test
+/cpp/monitoring/prometheus/gauge_test
 /cpp/proto/serializer_test
 /cpp/server/blob-server
 /cpp/server/ct-dns-server
