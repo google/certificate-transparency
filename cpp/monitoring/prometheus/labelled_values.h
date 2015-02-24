@@ -57,13 +57,18 @@ namespace internal {
 template <class MetricType, class... LabelTypes>
 class LabelledValues {
  public:
-  typedef std::function<MetricType*(io::prometheus::client::Metric*)>
-      MutableMetricFunc;
+  typedef std::function<MetricType*(::io::prometheus::client::Metric*)>
+      GetMutableMetricFunc;
+  typedef std::function<const MetricType&(
+      const ::io::prometheus::client::Metric&)> GetConstMetricFunc;
 
 
   LabelledValues(io::prometheus::client::MetricFamily* family,
-                 const MutableMetricFunc& get_mutable_value)
-      : family_(family), get_mutable_value_(get_mutable_value) {
+                 const GetMutableMetricFunc& get_mutable_metric,
+                 const GetConstMetricFunc& get_const_metric)
+      : family_(family),
+        get_mutable_metric_(get_mutable_metric),
+        get_const_metric_(get_const_metric) {
   }
 
 
@@ -75,7 +80,7 @@ class LabelledValues {
       return 0;
     }
 
-    return it->second->counter().value();
+    return get_const_metric_(*(it->second)).value();
   }
 
 
@@ -93,7 +98,7 @@ class LabelledValues {
     } else {
       metric = it->second;
     }
-    metric->mutable_counter()->set_value(amount);
+    get_mutable_metric_(metric)->set_value(amount);
     const auto duration_since_epoch(
         std::chrono::system_clock().now().time_since_epoch());
     metric->set_timestamp_ms(
@@ -105,7 +110,8 @@ class LabelledValues {
  private:
   mutable std::mutex mutex_;
   io::prometheus::client::MetricFamily* family_;
-  const MutableMetricFunc get_mutable_value_;
+  const GetMutableMetricFunc get_mutable_metric_;
+  const GetConstMetricFunc get_const_metric_;
   // cache of known Metrics by label:
   std::map<std::tuple<LabelTypes...>, io::prometheus::client::Metric*>
       metrics_;

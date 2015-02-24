@@ -16,17 +16,17 @@ using testing::ElementsAre;
 class CounterTest : public ::testing::Test {
  protected:
   template <class... LabelTypes>
-  const string& GetName(const Metric<LabelTypes...>& m) {
+  const string& GetName(const Metric& m) {
     return m.Name();
   }
 
   template <class... LabelTypes>
-  const vector<string>& GetLabelNames(const Metric<LabelTypes...>& m) {
+  const vector<string>& GetLabelNames(const Metric& m) {
     return m.LabelNames();
   }
 
   template <class... LabelTypes>
-  const string& GetHelp(const Metric<LabelTypes...>& m) {
+  const string& GetHelp(const Metric& m) {
     return m.Help();
   }
 };

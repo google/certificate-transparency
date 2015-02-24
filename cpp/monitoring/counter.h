@@ -10,7 +10,7 @@ namespace cert_trans {
 
 // A metric which can only increase (e.g. total_requests_served).
 template <class... Labels>
-class Counter : public Metric<Labels...> {
+class Counter : public Metric {
  public:
   static Counter<Labels...>* New(
       const std::string& name,
@@ -27,7 +27,7 @@ class Counter : public Metric<Labels...> {
   Counter(const std::string& name,
           const typename NameType<Labels>::name&... label_names,
           const std::string& help)
-      : Metric<Labels...>(name, label_names..., help) {
+      : Metric(name, {label_names...}, help) {
   }
 
  private:

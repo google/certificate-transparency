@@ -1,10 +1,12 @@
 #ifndef CERT_TRANS_MONITORING_METRIC_H_
 #define CERT_TRANS_MONITORING_METRIC_H_
 
+#include <ostream>
 #include <string>
 #include <vector>
 
 #include "base/macros.h"
+#include "monitoring/registry.h"
 
 namespace cert_trans {
 
@@ -18,13 +20,17 @@ struct NameType {
 
 
 // Base class for all metric types
-template <class... LabelTypes>
 class Metric {
+ public:
+  virtual void Export(std::ostream* os) const = 0;
+
+  virtual void ExportText(std::ostream* os) const = 0;
+
  protected:
-  Metric(const std::string& name,
-         const typename NameType<LabelTypes>::name&... label_names,
+  Metric(const std::string& name, const std::vector<std::string>& label_names,
          const std::string& help)
-      : name_(name), label_names_{label_names...}, help_(help) {
+      : name_(name), label_names_(label_names), help_(help) {
+    Registry::Instance()->AddMetric(this);
   }
 
   virtual ~Metric() = default;
@@ -48,6 +54,10 @@ class Metric {
   // Returns the help string associated with this metric.
   const std::string& Help() const {
     return help_;
+  }
+
+  bool operator<(const Metric& rhs) const {
+    return name_ < rhs.name_;
   }
 
  private:

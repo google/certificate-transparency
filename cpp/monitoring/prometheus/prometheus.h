@@ -11,7 +11,7 @@ Gauge<LabelTypes...>* Gauge<LabelTypes...>::New(
     const std::string& name,
     const typename NameType<LabelTypes>::name&... label_names,
     const std::string& help) {
-  return new PrometheusGauge<LabelTypes...>(name, label_names..., help);
+  return PrometheusGauge<LabelTypes...>::New(name, label_names..., help);
 }
 
 template <class... LabelTypes>
@@ -19,7 +19,7 @@ Counter<LabelTypes...>* Counter<LabelTypes...>::New(
     const std::string& name,
     const typename NameType<LabelTypes>::name&... label_names,
     const std::string& help) {
-  return new PrometheusCounter<LabelTypes...>(name, label_names..., help);
+  return PrometheusCounter<LabelTypes...>::New(name, label_names..., help);
 }
 
 }  // namespace cert_trans
