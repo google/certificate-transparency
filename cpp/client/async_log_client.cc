@@ -354,9 +354,9 @@ AsyncLogClient::AsyncLogClient(util::Executor* const executor,
 
 void AsyncLogClient::GetSTH(SignedTreeHead* sth, const Callback& done) {
   UrlFetcher::Response* const resp(new UrlFetcher::Response);
-  fetcher_->Get(GetURL("get-sth"), resp,
-                new util::Task(bind(DoneGetSTH, resp, sth, done, _1),
-                               executor_));
+  fetcher_->Fetch(GetURL("get-sth"), resp,
+                  new util::Task(bind(DoneGetSTH, resp, sth, done, _1),
+                                 executor_));
 }
 
 
@@ -364,9 +364,9 @@ void AsyncLogClient::GetRoots(vector<shared_ptr<Cert> >* roots,
                               const Callback& done) {
   UrlFetcher::Response* const resp(new UrlFetcher::Response);
 
-  fetcher_->Get(GetURL("get-roots"), resp,
-                new util::Task(bind(DoneGetRoots, resp, roots, done, _1),
-                               executor_));
+  fetcher_->Fetch(GetURL("get-roots"), resp,
+                  new util::Task(bind(DoneGetRoots, resp, roots, done, _1),
+                                 executor_));
 }
 
 
@@ -385,9 +385,9 @@ void AsyncLogClient::GetEntries(int first, int last,
   url.SetQuery("start=" + to_string(first) + "&end=" + to_string(last));
 
   UrlFetcher::Response* const resp(new UrlFetcher::Response);
-  fetcher_->Get(url, resp,
-                new util::Task(bind(DoneGetEntries, resp, entries, done, _1),
-                               executor_));
+  fetcher_->Fetch(url, resp,
+                  new util::Task(bind(DoneGetEntries, resp, entries, done, _1),
+                                 executor_));
 }
 
 
@@ -402,9 +402,9 @@ void AsyncLogClient::QueryInclusionProof(const SignedTreeHead& sth,
                "&tree_size=" + to_string(sth.tree_size()));
 
   UrlFetcher::Response* const resp(new UrlFetcher::Response);
-  fetcher_->Get(url, resp, new util::Task(bind(DoneQueryInclusionProof, resp,
-                                               sth, proof, done, _1),
-                                          executor_));
+  fetcher_->Fetch(url, resp, new util::Task(bind(DoneQueryInclusionProof, resp,
+                                                 sth, proof, done, _1),
+                                            executor_));
 }
 
 
@@ -418,9 +418,9 @@ void AsyncLogClient::GetSTHConsistency(int64_t first, int64_t second,
   url.SetQuery("first=" + to_string(first) + "&second=" + to_string(second));
 
   UrlFetcher::Response* const resp(new UrlFetcher::Response);
-  fetcher_->Get(url, resp, new util::Task(bind(DoneGetSTHConsistency, resp,
-                                               proof, done, _1),
-                                          executor_));
+  fetcher_->Fetch(url, resp, new util::Task(bind(DoneGetSTHConsistency, resp,
+                                                 proof, done, _1),
+                                            executor_));
 }
 
 
@@ -464,12 +464,13 @@ void AsyncLogClient::InternalAddChain(const CertChain& cert_chain,
   jsend.Add("chain", jchain);
 
   UrlFetcher::Request req(GetURL(pre_cert ? "add-pre-chain" : "add-chain"));
+  req.verb = UrlFetcher::Verb::POST;
   req.body = jsend.ToString();
 
   UrlFetcher::Response* const resp(new UrlFetcher::Response);
-  fetcher_->Post(req, resp, new util::Task(bind(DoneInternalAddChain, resp,
-                                                sct, done, _1),
-                                           executor_));
+  fetcher_->Fetch(req, resp, new util::Task(bind(DoneInternalAddChain, resp,
+                                                 sct, done, _1),
+                                            executor_));
 }
 
 

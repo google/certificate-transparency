@@ -33,10 +33,26 @@ struct UrlFetcher::Impl {
 namespace {
 
 
+evhttp_cmd_type VerbToCmdType(UrlFetcher::Verb verb) {
+  switch (verb) {
+    case UrlFetcher::Verb::GET:
+      return EVHTTP_REQ_GET;
+
+    case UrlFetcher::Verb::POST:
+      return EVHTTP_REQ_POST;
+
+    case UrlFetcher::Verb::PUT:
+      return EVHTTP_REQ_PUT;
+
+    case UrlFetcher::Verb::DELETE:
+      return EVHTTP_REQ_DELETE;
+  }
+}
+
+
 struct State {
-  State(ConnectionPool* pool, evhttp_cmd_type verb,
-        const UrlFetcher::Request& request, UrlFetcher::Response* response,
-        Task* task);
+  State(ConnectionPool* pool, const UrlFetcher::Request& request,
+        UrlFetcher::Response* response, Task* task);
 
   ~State() {
     CHECK(!conn_) << "request state object still had a connection at cleanup?";
@@ -48,7 +64,6 @@ struct State {
   void RequestDone(evhttp_request* req);
 
   ConnectionPool* const pool_;
-  const evhttp_cmd_type verb_;
   const UrlFetcher::Request request_;
   UrlFetcher::Response* const response_;
   Task* const task_;
@@ -71,11 +86,9 @@ UrlFetcher::Request NormaliseRequest(UrlFetcher::Request req) {
 }
 
 
-State::State(ConnectionPool* pool, evhttp_cmd_type verb,
-             const UrlFetcher::Request& request,
+State::State(ConnectionPool* pool, const UrlFetcher::Request& request,
              UrlFetcher::Response* response, Task* task)
     : pool_(CHECK_NOTNULL(pool)),
-      verb_(verb),
       request_(NormaliseRequest(request)),
       response_(CHECK_NOTNULL(response)),
       task_(CHECK_NOTNULL(task)) {
@@ -109,9 +122,10 @@ void State::MakeRequest() {
 
   conn_ = pool_->Get(request_.url);
 
+  const evhttp_cmd_type verb(VerbToCmdType(request_.verb));
   VLOG(1) << "evhttp_make_request(" << conn_.get() << ", " << http_req << ", "
-          << verb_ << ", \"" << request_.url.PathQuery() << "\")";
-  if (evhttp_make_request(conn_.get(), http_req, verb_,
+          << verb << ", \"" << request_.url.PathQuery() << "\")";
+  if (evhttp_make_request(conn_.get(), http_req, verb,
                           request_.url.PathQuery().c_str()) != 0) {
     VLOG(1) << "evhttp_make_request error";
     // Put back the connection, RequestDone is not going to get
@@ -186,22 +200,10 @@ UrlFetcher::~UrlFetcher() {
 }
 
 
-void UrlFetcher::Get(const Request& req, Response* resp, Task* task) {
+void UrlFetcher::Fetch(const Request& req, Response* resp, Task* task) {
   TaskHold hold(task);
 
-  State* const state(
-      new State(&impl_->pool_, EVHTTP_REQ_GET, req, resp, task));
-  task->DeleteWhenDone(state);
-
-  impl_->base_->Add(bind(&State::MakeRequest, state));
-}
-
-
-void UrlFetcher::Post(const Request& req, Response* resp, Task* task) {
-  TaskHold hold(task);
-
-  State* const state(
-      new State(&impl_->pool_, EVHTTP_REQ_POST, req, resp, task));
+  State* const state(new State(&impl_->pool_, req, resp, task));
   task->DeleteWhenDone(state);
 
   impl_->base_->Add(bind(&State::MakeRequest, state));

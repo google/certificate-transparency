@@ -24,10 +24,20 @@ class UrlFetcher {
   typedef std::multimap<std::string, std::string, ci_less<std::string>>
       Headers;
 
+  enum class Verb {
+    GET,
+    POST,
+    PUT,
+    DELETE,
+  };
+
   struct Request {
-    Request(const URL& input_url) : url(input_url) {
+    Request() : verb(Verb::GET) {
+    }
+    Request(const URL& input_url) : verb(Verb::GET), url(input_url) {
     }
 
+    Verb verb;
     URL url;
     std::string body;
   };
@@ -44,12 +54,11 @@ class UrlFetcher {
   UrlFetcher(libevent::Base* base);
   virtual ~UrlFetcher();
 
-  // With the following methods, if the status on the task is not OK,
-  // the response will be in an undefined state. If it is OK, it only
-  // means that the transaction with the remote server went correctly,
-  // you should still check Response::status_code.
-  virtual void Get(const Request& req, Response* resp, util::Task* task);
-  virtual void Post(const Request& req, Response* resp, util::Task* task);
+  // If the status on the task is not OK, the response will be in an
+  // undefined state. If it is OK, it only means that the transaction
+  // with the remote server went correctly, you should still check
+  // Response::status_code.
+  virtual void Fetch(const Request& req, Response* resp, util::Task* task);
 
  protected:
   UrlFetcher();
