@@ -82,6 +82,10 @@ UrlFetcher::Request NormaliseRequest(UrlFetcher::Request req) {
     req.url.SetPath("/");
   }
 
+  if (req.headers.find("Host") == req.headers.end()) {
+    req.headers.insert(make_pair("Host", req.url.Host()));
+  }
+
   return req;
 }
 
@@ -106,8 +110,10 @@ void State::MakeRequest() {
   CHECK(libevent::Base::OnEventThread());
   evhttp_request* const http_req(
       CHECK_NOTNULL(evhttp_request_new(&RequestCallback, this)));
-  evhttp_add_header(evhttp_request_get_output_headers(http_req), "Host",
-                    request_.url.Host().c_str());
+  for (const auto& header : request_.headers) {
+    evhttp_add_header(evhttp_request_get_output_headers(http_req),
+                      header.first.c_str(), header.second.c_str());
+  }
 
   if (!request_.body.empty()) {
     if (evbuffer_add_reference(evhttp_request_get_output_buffer(http_req),

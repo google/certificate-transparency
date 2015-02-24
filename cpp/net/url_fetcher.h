@@ -39,6 +39,7 @@ class UrlFetcher {
 
     Verb verb;
     URL url;
+    Headers headers;
     std::string body;
   };
 
