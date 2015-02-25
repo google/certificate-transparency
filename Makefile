@@ -6,7 +6,7 @@ all: cpp java python
 
 .PHONY: clean all alltests clean \
 	java java_test java_clean cpp cpp_test cpp_clean \
-	python python_test	
+	python python_test
 
 java:
 	ant build
