@@ -264,6 +264,7 @@ int main(int argc, char* argv[]) {
   // entered the event loop at the bottom:
   std::unique_ptr<libevent::EventPumpThread> pump(
       new libevent::EventPumpThread(event_base));
+  UrlFetcher url_fetcher(event_base.get());
 
   const bool stand_alone_mode(FLAGS_etcd_host.empty());
 
@@ -271,9 +272,9 @@ int main(int argc, char* argv[]) {
             << (stand_alone_mode ? "STAND-ALONE" : "CLUSTERED") << " mode.";
 
   std::unique_ptr<EtcdClient> etcd_client(
-      stand_alone_mode
-          ? new FakeEtcdClient(event_base)
-          : new EtcdClient(event_base, FLAGS_etcd_host, FLAGS_etcd_port));
+      stand_alone_mode ? new FakeEtcdClient(event_base)
+                       : new EtcdClient(event_base, &url_fetcher,
+                                        FLAGS_etcd_host, FLAGS_etcd_port));
 
   // No real reason to let this be configurable per node; you can really
   // shoot yourself in the foot that way by effectively running multiple
@@ -332,7 +333,6 @@ int main(int argc, char* argv[]) {
     CHECK(!FLAGS_server.empty());
   }
 
-  UrlFetcher url_fetcher(event_base.get());
   const unique_ptr<ContinuousFetcher> fetcher(
       ContinuousFetcher::New(event_base.get(), db));
   ClusterStateController<LoggedCertificate> cluster_controller(

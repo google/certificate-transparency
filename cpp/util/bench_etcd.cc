@@ -14,6 +14,7 @@
 namespace libevent = cert_trans::libevent;
 
 using cert_trans::EtcdClient;
+using cert_trans::UrlFetcher;
 using std::bind;
 using std::make_shared;
 using std::map;
@@ -60,7 +61,8 @@ void make_request(bool* done, EtcdClient* etcd, int* count,
 
 void test_etcd() {
   const shared_ptr<libevent::Base> event_base(make_shared<libevent::Base>());
-  EtcdClient etcd(event_base, FLAGS_etcd, FLAGS_etcd_port);
+  UrlFetcher fetcher(event_base.get());
+  EtcdClient etcd(event_base, &fetcher, FLAGS_etcd, FLAGS_etcd_port);
 
   const string data(FLAGS_bytes_per_request, 'x');
   int count(FLAGS_requests_per_thread);

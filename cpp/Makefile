@@ -166,16 +166,20 @@ util/json_wrapper_test: util/json_wrapper_test.o util/libutil.a $(GTESTLIB)
 util/libevent_wrapper_test: util/libevent_wrapper_test.o util/libutil.a \
                             monitoring/libmonitoring.a $(GTESTLIB)
 
-util/etcd_test: util/etcd_test.o base/notification.o util/libutil.a \
+util/etcd_test: util/etcd_test.o base/notification.o net/url.o \
+                net/url_fetcher.o net/connection_pool.o util/libutil.a \
                 monitoring/libmonitoring.a $(GMOCKLIB) $(GTESTLIB)
 
-util/fake_etcd_test: util/fake_etcd_test.o base/notification.o util/libutil.a \
+util/fake_etcd_test: util/fake_etcd_test.o base/notification.o net/url.o \
+                     net/url_fetcher.o net/connection_pool.o util/libutil.a \
                      monitoring/libmonitoring.a $(GMOCKLIB) $(GTESTLIB)
 
-util/sync_etcd_test: util/sync_etcd_test.o util/libutil.a base/notification.o \
+util/sync_etcd_test: util/sync_etcd_test.o base/notification.o net/url.o \
+                     net/url_fetcher.o net/connection_pool.o util/libutil.a \
                      monitoring/libmonitoring.a $(GMOCKLIB) $(GTESTLIB)
 
 util/masterelection_test: util/masterelection_test.o base/notification.o \
+                          net/url.o net/url_fetcher.o net/connection_pool.o \
                           util/libutil.a monitoring/libmonitoring.a $(GTESTLIB)
 
 util/sync_task_test: util/sync_task_test.o base/notification.o util/libutil.a \
@@ -294,28 +298,28 @@ log/file_storage_test: log/file_storage_test.o log/libdatabase.a \
                        proto/libproto.a util/libutil.a \
                        merkletree/libmerkletree.a $(GTESTLIB)
 
-log/frontend_signer_test: log/frontend_signer_test.o \
-                          log/frontend_signer.o \
+log/frontend_signer_test: log/frontend_signer_test.o log/frontend_signer.o \
                           log/log_signer.o log/signer.o log/verifier.o \
-                          log/log_verifier.o log/test_signer.o log/libcert.a \
-                          log/libcluster.a log/libdatabase.a \
-                          merkletree/libmerkletree.a \
-                          proto/libproto.a util/libutil.a base/notification.o \
+                          log/log_verifier.o log/test_signer.o net/url.o \
+                          net/url_fetcher.o net/connection_pool.o \
+                          log/libcert.a log/libcluster.a log/libdatabase.a \
+                          merkletree/libmerkletree.a proto/libproto.a \
+                          util/libutil.a base/notification.o \
                           monitoring/libmonitoring.a $(GTESTLIB) $(GMOCKLIB)
 
-log/frontend_test: log/frontend_test.o log/frontend.o \
-                   log/frontend_signer.o \
+log/frontend_test: log/frontend_test.o log/frontend.o log/frontend_signer.o \
                    log/log_signer.o log/signer.o log/verifier.o \
-                   log/log_verifier.o log/test_signer.o \
-                   log/libcert.a log/libcluster.a log/libdatabase.a \
-                   merkletree/libmerkletree.a \
-                   proto/libproto.a util/libutil.a base/notification.o \
-                   monitoring/libmonitoring.a $(GTESTLIB) $(GMOCKLIB)
+                   log/log_verifier.o log/test_signer.o net/url.o \
+                   net/url_fetcher.o net/connection_pool.o log/libcert.a \
+                   log/libcluster.a log/libdatabase.a \
+                   merkletree/libmerkletree.a proto/libproto.a util/libutil.a \
+                   base/notification.o monitoring/libmonitoring.a $(GTESTLIB) \
+                   $(GMOCKLIB)
 
-log/log_lookup_test: log/log_lookup_test.o log/test_signer.o \
-                     log/libcluster.a log/libdatabase.a \
-                     log/liblog.a merkletree/libmerkletree.a proto/libproto.a \
-                     util/libutil.a base/notification.o \
+log/log_lookup_test: log/log_lookup_test.o log/test_signer.o net/url.o \
+                     net/url_fetcher.o net/connection_pool.o log/libcluster.a \
+                     log/libdatabase.a log/liblog.a merkletree/libmerkletree.a \
+                     proto/libproto.a util/libutil.a base/notification.o \
                      monitoring/libmonitoring.a $(GTESTLIB) $(GMOCKLIB)
 
 log/log_signer_test: log/log_signer_test.o log/log_signer.o log/signer.o \
@@ -330,9 +334,10 @@ log/signer_verifier_test: log/signer_verifier_test.o log/log_signer.o \
 
 log/tree_signer_test: log/tree_signer_test.o log/log_signer.o log/signer.o \
                       log/verifier.o log/test_signer.o log/tree_signer_cert.o \
-                      log/log_verifier.o log/libcluster.a \
-                      log/libdatabase.a merkletree/libmerkletree.a \
-                      proto/libproto.a util/libutil.a base/notification.o \
+                      log/log_verifier.o net/url.o net/url_fetcher.o \
+                      net/connection_pool.o log/libcluster.a log/libdatabase.a \
+                      merkletree/libmerkletree.a proto/libproto.a \
+                      util/libutil.a base/notification.o \
                       monitoring/libmonitoring.a $(GTESTLIB) $(GMOCKLIB)
 
 log/logged_certificate_test: log/logged_certificate_test.o proto/libproto.a \
@@ -340,14 +345,16 @@ log/logged_certificate_test: log/logged_certificate_test.o proto/libproto.a \
                              $(GTESTLIB)
 
 log/etcd_consistent_store_test: base/notification.o \
-                                log/etcd_consistent_store_cert.o \
+                                log/etcd_consistent_store_cert.o net/url.o \
+                                net/url_fetcher.o net/connection_pool.o \
                                 proto/libproto.a util/libutil.a \
                                 merkletree/libmerkletree.a \
                                 monitoring/libmonitoring.a $(GMOCKLIB) \
                                 $(GTESTLIB)
 
 log/strict_consistent_store_test: base/notification.o \
-                                  log/strict_consistent_store_cert.o \
+                                  log/strict_consistent_store_cert.o net/url.o \
+                                  net/url_fetcher.o net/connection_pool.o \
                                   proto/libproto.a util/libutil.a \
                                   monitoring/libmonitoring.a \
                                   $(GMOCKLIB) $(GTESTLIB)
@@ -393,6 +400,7 @@ server/ct-server: server/ct-server.o util/read_key.o server/handler.o \
 tools/ct-clustertool: tools/clustertool_main.o \
                       merkletree/libmerkletree.a util/read_key.o \
                       base/notification.o merkletree/serial_hasher.o \
+                      net/url.o net/url_fetcher.o net/connection_pool.o \
                       log/libcluster.a log/libdatabase.a \
                       log/liblog.a util/libutil.a proto/libproto.a \
                       monitoring/libmonitoring.a
@@ -402,13 +410,16 @@ tools/dump_cert: tools/dump_cert.o proto/libproto.a util/libutil.a
 
 tools/dump_sth: tools/dump_sth.o proto/libproto.a
 
-util/bench_etcd: util/bench_etcd.o util/libutil.a monitoring/libmonitoring.a
+util/bench_etcd: util/bench_etcd.o net/url.o net/url_fetcher.o \
+                 net/connection_pool.o util/libutil.a monitoring/libmonitoring.a
 
 util/etcd_masterelection: util/etcd_masterelection.o base/notification.o \
+                          net/url.o net/url_fetcher.o net/connection_pool.o \
                           util/libutil.a monitoring/libmonitoring.a
 
-util/etcd_watch: util/etcd_watch.o util/libutil.a monitoring/libmonitoring.a \
-                 base/notification.o
+util/etcd_watch: util/etcd_watch.o base/notification.o net/url.o \
+                 net/url_fetcher.o net/connection_pool.o util/libutil.a \
+                 monitoring/libmonitoring.a
 
 test: tests
 	@set -e; for TEST in $(TESTS); do \

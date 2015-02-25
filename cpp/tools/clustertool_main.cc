@@ -32,6 +32,7 @@ using cert_trans::ReadPrivateKey;
 using cert_trans::StrictConsistentStore;
 using cert_trans::ThreadPool;
 using cert_trans::TreeSigner;
+using cert_trans::UrlFetcher;
 using ct::ClusterConfig;
 using ct::SignedTreeHead;
 using google::protobuf::TextFormat;
@@ -145,8 +146,10 @@ int main(int argc, char* argv[]) {
   const shared_ptr<libevent::Base> event_base(make_shared<libevent::Base>());
   std::unique_ptr<libevent::EventPumpThread> pump(
       new libevent::EventPumpThread(event_base));
+  UrlFetcher fetcher(event_base.get());
 
-  EtcdClient etcd_client(event_base, FLAGS_etcd_host, FLAGS_etcd_port);
+  EtcdClient etcd_client(event_base, &fetcher, FLAGS_etcd_host,
+                         FLAGS_etcd_port);
 
   const string node_id("clustertool");
   unique_ptr<MasterElection> election(

@@ -1,5 +1,4 @@
 #include <event2/thread.h>
-#include <functional>
 #include <gflags/gflags.h>
 #include <glog/logging.h>
 #include <iostream>
@@ -12,17 +11,20 @@
 namespace libevent = cert_trans::libevent;
 
 using cert_trans::EtcdClient;
+using cert_trans::UrlFetcher;
 using std::cout;
 using std::endl;
 using std::make_shared;
 using std::shared_ptr;
+using std::vector;
+using util::SyncTask;
 
 DEFINE_string(etcd, "127.0.0.1", "etcd server address");
 DEFINE_int32(etcd_port, 4001, "etcd server port");
 DEFINE_string(key, "/foo", "path to watch");
 
 
-void Notify(const std::vector<EtcdClient::WatchUpdate>& updates) {
+void Notify(const vector<EtcdClient::WatchUpdate>& updates) {
   for (const auto& update : updates) {
     if (update.exists_) {
       cout << "key changed: " << update.node_.ToString() << endl;
@@ -39,9 +41,10 @@ int main(int argc, char* argv[]) {
   evthread_use_pthreads();
 
   const shared_ptr<libevent::Base> event_base(make_shared<libevent::Base>());
-  EtcdClient etcd(event_base, FLAGS_etcd, FLAGS_etcd_port);
+  UrlFetcher fetcher(event_base.get());
+  EtcdClient etcd(event_base, &fetcher, FLAGS_etcd, FLAGS_etcd_port);
 
-  util::SyncTask task(event_base.get());
+  SyncTask task(event_base.get());
   etcd.Watch(FLAGS_key, Notify, task.task());
 
   event_base->Dispatch();

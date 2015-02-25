@@ -10,6 +10,7 @@
 #include <vector>
 
 #include "base/macros.h"
+#include "net/url_fetcher.h"
 #include "util/libevent_wrapper.h"
 #include "util/status.h"
 #include "util/task.h"
@@ -76,7 +77,7 @@ class EtcdClient {
 
   // TODO(pphaneuf): This should take a set of servers, not just one.
   EtcdClient(const std::shared_ptr<libevent::Base>& event_base,
-             const std::string& host, uint16_t port);
+             UrlFetcher* fetcher, const std::string& host, uint16_t port);
 
   virtual ~EtcdClient();
 
@@ -128,36 +129,35 @@ class EtcdClient {
 
   virtual void Generic(const std::string& key,
                        const std::map<std::string, std::string>& params,
-                       evhttp_cmd_type verb, bool separate_conn,
-                       GenericResponse* resp, util::Task* task);
+                       UrlFetcher::Verb verb, GenericResponse* resp,
+                       util::Task* task);
 
  private:
+  typedef std::pair<std::string, uint16_t> HostPortPair;
+
   struct Request;
   struct WatchState;
 
-  typedef std::map<std::pair<std::string, uint16_t>,
-                   std::shared_ptr<libevent::HttpConnection> > ConnectionMap;
+  HostPortPair GetEndpoint() const;
+  HostPortPair UpdateEndpoint(const std::string& host, uint16_t port);
+  void FetchDone(Request* etcd_req, util::Task* task);
 
-  // If MaybeUpdateLeader returns true, the handling of the response
-  // should be aborted, as a new leader was found, and the request has
-  // been retried on the new leader.
-  bool MaybeUpdateLeader(const libevent::HttpRequest& req, Request* etcd_req);
-  void RequestDone(const std::shared_ptr<libevent::HttpRequest>& req,
-                   Request* etcd_req);
-
-  std::shared_ptr<libevent::HttpConnection> GetConnection(
-      const std::string& host, uint16_t port);
-
-  std::shared_ptr<libevent::HttpConnection> GetLeader() const;
-  std::shared_ptr<libevent::HttpConnection> UpdateLeader(
-      const std::string& host, uint16_t port);
+  void WatchInitialGetDone(WatchState* state, util::Status status,
+                           const Node& node, int64_t etcd_index);
+  void WatchInitialGetAllDone(WatchState* state, util::Status status,
+                              const std::vector<Node>& nodes,
+                              int64_t etcd_index);
+  void SendWatchUpdates(WatchState* state,
+                        const std::vector<WatchUpdate>& updates);
+  void StartWatchRequest(WatchState* state);
+  void WatchRequestDone(WatchState* state, GenericResponse* gen_resp,
+                        util::Task* child_task);
 
   const std::shared_ptr<libevent::Base> event_base_;
+  UrlFetcher* const fetcher_;
 
   mutable std::mutex lock_;
-  ConnectionMap conns_;
-  // Last known leader.
-  std::shared_ptr<libevent::HttpConnection> leader_;
+  HostPortPair endpoint_;
 
   DISALLOW_COPY_AND_ASSIGN(EtcdClient);
 };

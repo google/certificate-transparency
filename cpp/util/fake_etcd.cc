@@ -68,24 +68,24 @@ void FakeEtcdClient::Watch(const string& key, const WatchCallback& cb,
 
 void FakeEtcdClient::Generic(const std::string& key,
                              const std::map<std::string, std::string>& params,
-                             evhttp_cmd_type verb, bool separate_conn,
-                             GenericResponse* resp, util::Task* task) {
+                             UrlFetcher::Verb verb, GenericResponse* resp,
+                             util::Task* task) {
   PurgeExpiredEntries();
   switch (verb) {
-    case EVHTTP_REQ_GET:
+    case UrlFetcher::Verb::GET:
       HandleGet(key, params, resp, task);
       break;
-    case EVHTTP_REQ_POST:
+    case UrlFetcher::Verb::POST:
       HandlePost(key, params, resp, task);
       break;
-    case EVHTTP_REQ_PUT:
+    case UrlFetcher::Verb::PUT:
       HandlePut(key, params, resp, task);
       break;
-    case EVHTTP_REQ_DELETE:
+    case UrlFetcher::Verb::DELETE:
       HandleDelete(key, params, resp, task);
       break;
     default:
-      CHECK(false) << "Unsupported verb " << verb;
+      LOG(FATAL) << "Unsupported verb " << static_cast<int>(verb);
   }
   DumpEntries();
 }

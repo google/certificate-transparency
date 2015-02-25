@@ -10,6 +10,7 @@ namespace libevent = cert_trans::libevent;
 
 using cert_trans::EtcdClient;
 using cert_trans::MasterElection;
+using cert_trans::UrlFetcher;
 using std::make_shared;
 using std::shared_ptr;
 
@@ -42,8 +43,9 @@ int main(int argc, char* argv[]) {
 
   running_.store(true);
   const shared_ptr<libevent::Base> event_base(make_shared<libevent::Base>());
+  UrlFetcher fetcher(event_base.get());
 
-  EtcdClient etcd(event_base, FLAGS_etcd, FLAGS_etcd_port);
+  EtcdClient etcd(event_base, &fetcher, FLAGS_etcd, FLAGS_etcd_port);
   MasterElection election(event_base, &etcd, FLAGS_proposal_dir,
                           FLAGS_node_id);
   election.StartElection();
