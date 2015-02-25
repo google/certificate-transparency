@@ -1,0 +1,70 @@
+{
+  "id": "prometheus-replication",
+  "kind": "ReplicationController",
+  "apiVersion": "v1beta1",
+  "desiredState": {
+    "replicas": 1,
+    "replicaSelector": {"name": "prometheus-node"},
+    "podTemplate": {
+      "desiredState": {
+        "manifest": {
+          "version": "v1beta1",
+          "id": "prometheus-controller",
+          "containers": [{
+            "name": "registry",
+            "image": "google/docker-registry",
+            "ports": [{
+              "name": "registry",
+              "containerPort": 5000,
+              "hostPort": 5001
+            }],
+            "env": [{
+              "name": "GCS_BUCKET",
+              "value": "ctlog_images"
+            }]
+          }, {
+             "name": "prometheus",
+            "image": "localhost:5001/alcutter/prometheus:test",
+            "env": [{
+              "name": "PROMETHEUS_CONFIG",
+              "value": "/mnt/prometheus/config/prometheus.conf"
+            }, {
+              "name": "PROMETHEUS_STORAGE",
+              "value": "/mnt/prometheus/db"
+            }],
+            "ports": [{
+              "name": "prometheus",
+              "containerPort": 9090,
+              "hostPort": 9090
+            }],
+            "volumeMounts": [{
+              "name": "prometheus-config",
+              "mountPath": "/mnt/prometheus/config"
+            }, {
+              "name": "prometheus-db",
+              "mountPath": "/mnt/prometheus/db"
+            }]
+          }],
+          "volumes": [{
+            "name": "prometheus-config",
+            "source": {
+              "hostDir": {
+                "path": "/tmp/prometheus-config"
+              }
+            }
+           }, {
+            "name": "prometheus-db",
+            "source": {
+              "hostDir": {
+                "path": "/tmp/prometheus-db"
+              }
+            }
+          }]
+        }
+      },
+      "labels": {"name": "prometheus-node"}
+    }
+  },
+  "labels": {"name": "prometheus-node"}
+}
+

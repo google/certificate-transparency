@@ -36,9 +36,9 @@ function PopulateEtcd() {
       --logtostderr --v=2"
 }
 
-export PROJECT=${PROJECT:your-gce-project}
-export CLUSTER=${CLUSTER:${USER}-superduper-test}
-export ZONE=${ZONE:europe-west1-b}
+export PROJECT=${PROJECT:-your-gce-project}
+export CLUSTER=${CLUSTER:-${USER}-superduper-test}
+export ZONE=${ZONE:-europe-west1-b}
 export NUM_ETCD_REPLICAS=3
 export NUM_LOGSERVER_REPLICAS=3
 export TOTAL_REPLICAS=$(expr ${NUM_ETCD_REPLICAS} + \
@@ -86,7 +86,12 @@ WaitForEtcd
 
 echo "============================================================="
 echo "Populating etcd with default entries..."
-#PopulateEtcd
+PopulateEtcd
+
+echo "============================================================="
+echo "Starting prometheus..."
+${DIR}/start_prometheus.sh
+${DIR}/update_prometheus_config.sh
 
 echo "============================================================="
 echo "Creating superduper instances..."
