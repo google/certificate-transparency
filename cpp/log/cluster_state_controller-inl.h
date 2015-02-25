@@ -9,11 +9,20 @@
 #include "fetcher/peer.h"
 #include "log/database.h"
 #include "log/etcd_consistent_store-inl.h"
+#include "monitoring/monitoring.h"
 #include "proto/ct.pb.h"
+
 
 namespace cert_trans {
 
 namespace {
+
+Gauge<>* serving_tree_size =
+    Gauge<>::New("serving_tree_size", "Size of the current serving STH");
+
+Gauge<>* serving_tree_timestamp =
+    Gauge<>::New("serving_tree_timestamp",
+                 "Timestamp of the current serving STH");
 
 
 std::unique_ptr<AsyncLogClient> BuildAsyncLogClient(
@@ -265,6 +274,8 @@ void ClusterStateController<Logged>::OnServingSthUpdated(
     actual_serving_sth_.reset(new ct::SignedTreeHead(update.handle_.Entry()));
     LOG(INFO) << "Received new Serving STH:\n"
               << actual_serving_sth_->DebugString();
+    serving_tree_size->Set(actual_serving_sth_->tree_size());
+    serving_tree_timestamp->Set(actual_serving_sth_->timestamp());
 
     // Double check this STH is newer than, or idential to, what we have in
     // the database. (It definitely should be!)

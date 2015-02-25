@@ -11,7 +11,7 @@ LINK.o = $(LINK.cc)
 INCLUDE = -I .
 LOCAL_LIBS = log/libcert.a log/libcluster.a log/libdatabase.a \
              log/liblog.a merkletree/libmerkletree.a \
-             proto/libproto.a util/libutil.a
+             proto/libproto.a util/libutil.a monitoring/libmonitoring.a
 LDLIBS = -lpthread -lgflags -lglog -lssl -lcrypto -lldns -lsqlite3 \
          -lprotobuf -levent_core -levent_extra -levent_pthreads
 
@@ -163,19 +163,20 @@ util/libutil.a: util/util.o util/openssl_util.o util/testing.o \
 
 util/json_wrapper_test: util/json_wrapper_test.o util/libutil.a $(GTESTLIB)
 
-util/libevent_wrapper_test: util/libevent_wrapper_test.o util/libutil.a $(GTESTLIB)
+util/libevent_wrapper_test: util/libevent_wrapper_test.o util/libutil.a \
+                            monitoring/libmonitoring.a $(GTESTLIB)
 
 util/etcd_test: util/etcd_test.o base/notification.o util/libutil.a \
-                $(GMOCKLIB) $(GTESTLIB)
+                monitoring/libmonitoring.a $(GMOCKLIB) $(GTESTLIB)
 
 util/fake_etcd_test: util/fake_etcd_test.o base/notification.o util/libutil.a \
-                     $(GMOCKLIB) $(GTESTLIB)
+                     monitoring/libmonitoring.a $(GMOCKLIB) $(GTESTLIB)
 
 util/sync_etcd_test: util/sync_etcd_test.o util/libutil.a base/notification.o \
-                     $(GMOCKLIB) $(GTESTLIB)
+                     monitoring/libmonitoring.a $(GMOCKLIB) $(GTESTLIB)
 
 util/masterelection_test: util/masterelection_test.o base/notification.o \
-                          util/libutil.a $(GTESTLIB)
+                          util/libutil.a monitoring/libmonitoring.a $(GTESTLIB)
 
 util/sync_task_test: util/sync_task_test.o base/notification.o util/libutil.a \
                      $(GTESTLIB)
@@ -239,6 +240,11 @@ log/liblog.a: log/log_signer.o log/signer.o log/verifier.o log/frontend.o \
 	rm -f $@
 	ar -rcs $@ $^
 
+monitoring/libmonitoring.a: monitoring/registry.o \
+                            monitoring/prometheus/metrics.pb.o
+	rm -f $@
+	ar -rcs $@ $^
+
 log/cert_test: log/cert_test.o log/cert.o log/ct_extensions.o util/libutil.a \
                merkletree/serial_hasher.o log/frontend.o proto/ct.pb.o \
                log/frontend_signer.o log/cert_submission_handler.o \
@@ -265,7 +271,8 @@ log/cluster_state_controller_test: base/notification.o fetcher/peer.o \
                                    log/libdatabase.a \
                                    merkletree/serial_hasher.o \
                                    log/libcert.a log/libcluster.a \
-                                   proto/libproto.a util/libutil.a $(GMOCKLIB) \
+                                   proto/libproto.a util/libutil.a \
+                                   monitoring/libmonitoring.a $(GMOCKLIB) \
                                    $(GTESTLIB)
 
 log/ct_extensions_test: log/ct_extensions_test.o log/libcert.a util/libutil.a \
@@ -294,7 +301,7 @@ log/frontend_signer_test: log/frontend_signer_test.o \
                           log/libcluster.a log/libdatabase.a \
                           merkletree/libmerkletree.a \
                           proto/libproto.a util/libutil.a base/notification.o \
-                          $(GTESTLIB) $(GMOCKLIB)
+                          monitoring/libmonitoring.a $(GTESTLIB) $(GMOCKLIB)
 
 log/frontend_test: log/frontend_test.o log/frontend.o \
                    log/frontend_signer.o \
@@ -303,12 +310,13 @@ log/frontend_test: log/frontend_test.o log/frontend.o \
                    log/libcert.a log/libcluster.a log/libdatabase.a \
                    merkletree/libmerkletree.a \
                    proto/libproto.a util/libutil.a base/notification.o \
-                   $(GTESTLIB) $(GMOCKLIB)
+                   monitoring/libmonitoring.a $(GTESTLIB) $(GMOCKLIB)
 
 log/log_lookup_test: log/log_lookup_test.o log/test_signer.o \
                      log/libcluster.a log/libdatabase.a \
                      log/liblog.a merkletree/libmerkletree.a proto/libproto.a \
-                     util/libutil.a base/notification.o $(GTESTLIB) $(GMOCKLIB)
+                     util/libutil.a base/notification.o \
+                     monitoring/libmonitoring.a $(GTESTLIB) $(GMOCKLIB)
 
 log/log_signer_test: log/log_signer_test.o log/log_signer.o log/signer.o \
                      log/verifier.o log/test_signer.o \
@@ -325,7 +333,7 @@ log/tree_signer_test: log/tree_signer_test.o log/log_signer.o log/signer.o \
                       log/log_verifier.o log/libcluster.a \
                       log/libdatabase.a merkletree/libmerkletree.a \
                       proto/libproto.a util/libutil.a base/notification.o \
-                      $(GTESTLIB) $(GMOCKLIB)
+                      monitoring/libmonitoring.a $(GTESTLIB) $(GMOCKLIB)
 
 log/logged_certificate_test: log/logged_certificate_test.o proto/libproto.a \
                              util/libutil.a merkletree/libmerkletree.a \
@@ -334,12 +342,14 @@ log/logged_certificate_test: log/logged_certificate_test.o proto/libproto.a \
 log/etcd_consistent_store_test: base/notification.o \
                                 log/etcd_consistent_store_cert.o \
                                 proto/libproto.a util/libutil.a \
-                                merkletree/libmerkletree.a $(GMOCKLIB) \
+                                merkletree/libmerkletree.a \
+                                monitoring/libmonitoring.a $(GMOCKLIB) \
                                 $(GTESTLIB)
 
 log/strict_consistent_store_test: base/notification.o \
                                   log/strict_consistent_store_cert.o \
                                   proto/libproto.a util/libutil.a \
+                                  monitoring/libmonitoring.a \
                                   $(GMOCKLIB) $(GTESTLIB)
 
 monitor/database_test: monitor/database_test.o monitor/database.o \
@@ -347,21 +357,19 @@ monitor/database_test: monitor/database_test.o monitor/database.o \
                        merkletree/libmerkletree.a log/log_signer.o \
                        log/signer.o log/verifier.o proto/libproto.a $(GTESTLIB)
 
-monitoring/registry_test: monitoring/registry_test.o monitoring/registry.o \
-                          monitoring/prometheus/metrics.pb.o \
+monitoring/registry_test: monitoring/registry_test.o \
+                          monitoring/libmonitoring.a \
                           util/protobuf_util.o util/testing.o \
                           $(GTESTLIB) $(GMOCKLIB)
 
 monitoring/prometheus/counter_test: monitoring/prometheus/counter_test.o \
-                                    monitoring/prometheus/metrics.pb.o \
-                                    monitoring/registry.o \
+                                    monitoring/libmonitoring.a \
                                     util/protobuf_util.o util/testing.o \
                                     $(GTESTLIB) $(GMOCKLIB)
 
 monitoring/prometheus/gauge_test: monitoring/prometheus/gauge_test.o \
-                                  monitoring/prometheus/metrics.pb.o \
-                                  monitoring/registry.o util/protobuf_util.o \
-                                  util/testing.o \
+                                  monitoring/libmonitoring.a \
+                                  util/protobuf_util.o util/testing.o \
                                   $(GTESTLIB) $(GMOCKLIB)
 
 # client
@@ -369,7 +377,8 @@ client/ct: client/ct.o client/client.o client/ssl_client.o \
            client/http_log_client.o log/logged_certificate.o \
            monitor/sqlite_db.o monitor/database.o monitor/monitor.o \
            client/async_log_client.o util/read_key.o net/url.o \
-           net/url_fetcher.o net/connection_pool.o $(LOCAL_LIBS)
+           net/url_fetcher.o net/connection_pool.o \
+           $(LOCAL_LIBS)
 
 server/ct-dns-server: server/ct-dns-server.o server/event.o $(LOCAL_LIBS)
 
@@ -385,21 +394,21 @@ tools/ct-clustertool: tools/clustertool_main.o \
                       merkletree/libmerkletree.a util/read_key.o \
                       base/notification.o merkletree/serial_hasher.o \
                       log/libcluster.a log/libdatabase.a \
-                      log/liblog.a util/libutil.a proto/libproto.a
+                      log/liblog.a util/libutil.a proto/libproto.a \
+                      monitoring/libmonitoring.a
 	$(CXX) -o $@ $(LDLIBS) $^
 
 tools/dump_cert: tools/dump_cert.o proto/libproto.a util/libutil.a
 
 tools/dump_sth: tools/dump_sth.o proto/libproto.a
 
-util/bench_etcd: util/bench_etcd.o util/libutil.a
+util/bench_etcd: util/bench_etcd.o util/libutil.a monitoring/libmonitoring.a
 
 util/etcd_masterelection: util/etcd_masterelection.o base/notification.o \
-                          util/libutil.a
+                          util/libutil.a monitoring/libmonitoring.a
 
-util/etcd_watch: util/etcd_watch.o util/etcd.o util/libevent_wrapper.o \
-	util/json_wrapper.o util/status.o util/task.o util/sync_task.o \
-	base/notification.o
+util/etcd_watch: util/etcd_watch.o util/libutil.a monitoring/libmonitoring.a \
+                 base/notification.o
 
 test: tests
 	@set -e; for TEST in $(TESTS); do \
