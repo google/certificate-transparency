@@ -37,12 +37,15 @@ class ConnectionPool {
  private:
   typedef std::pair<std::string, uint16_t> HostPortPair;
 
+  void Cleanup();
+
   libevent::Base* const base_;
 
   std::mutex lock_;
   // We get and put connections from the back of the deque, and when
   // there are too many, we prune them from the front (LIFO).
   std::map<HostPortPair, std::deque<evhttp_connection_unique_ptr>> conns_;
+  bool cleanup_scheduled_;
 
   DISALLOW_COPY_AND_ASSIGN(ConnectionPool);
 };

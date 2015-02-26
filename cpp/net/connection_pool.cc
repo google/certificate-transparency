@@ -2,6 +2,7 @@
 
 #include <glog/logging.h>
 
+using std::bind;
 using std::lock_guard;
 using std::move;
 using std::mutex;
@@ -15,7 +16,7 @@ namespace cert_trans {
 namespace internal {
 
 ConnectionPool::ConnectionPool(libevent::Base* base)
-    : base_(CHECK_NOTNULL(base)) {
+    : base_(CHECK_NOTNULL(base)), cleanup_scheduled_(false) {
 }
 
 
@@ -57,9 +58,25 @@ void ConnectionPool::Put(evhttp_connection_unique_ptr&& conn) {
   auto& entry(conns_[key]);
 
   entry.emplace_back(move(conn));
-  while (entry.size() > FLAGS_url_fetcher_max_conn_per_host_port) {
-    entry.pop_front();
+  if (entry.size() > FLAGS_url_fetcher_max_conn_per_host_port &&
+      !cleanup_scheduled_) {
+    cleanup_scheduled_ = true;
+    base_->Add(bind(&ConnectionPool::Cleanup, this));
   }
+}
+
+
+void ConnectionPool::Cleanup() {
+  lock_guard<mutex> lock(lock_);
+  cleanup_scheduled_ = false;
+
+  // std::map<HostPortPair, std::deque<evhttp_connection_unique_ptr>> conns_;
+  for (auto& entry : conns_) {
+    while (entry.second.size() > FLAGS_url_fetcher_max_conn_per_host_port) {
+      entry.second.pop_front();
+    }
+  }
+
 }
 
 
