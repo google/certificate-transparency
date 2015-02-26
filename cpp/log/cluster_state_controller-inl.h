@@ -284,7 +284,7 @@ void ClusterStateController<Logged>::OnServingSthUpdated(
     const typename Database<Logged>::LookupResult lookup_result(
         database_->LatestTreeHead(&db_sth));
     switch (lookup_result) {
-      case Database<Logged>::OK:
+      case Database<Logged>::LOOKUP_OK:
         VLOG(1) << "Local latest STH:\n" << db_sth.DebugString();
         // Check it's for the same log:
         CHECK_EQ(actual_serving_sth_->id().key_id(), db_sth.id().key_id());

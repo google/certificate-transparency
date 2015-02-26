@@ -340,6 +340,13 @@ int main(int argc, char* argv[]) {
       &election, fetcher.get());
   // Publish this node's hostname:port info
   cluster_controller.SetNodeHostPort(FLAGS_server, FLAGS_port);
+  {
+    ct::SignedTreeHead db_sth;
+    if (db->LatestTreeHead(&db_sth) ==
+        Database<LoggedCertificate>::LOOKUP_OK) {
+      cluster_controller.NewTreeHead(db_sth);
+    }
+  }
 
   // Just separate this out from the lambda below to try to be clear that this
   // is the *only* interaction with TreeSigner that we're allowing there.
