@@ -76,9 +76,9 @@ TESTS = \
 	merkletree/serial_hasher_test \
 	merkletree/tree_hasher_test \
 	monitor/database_test \
-	monitoring/registry_test \
 	monitoring/prometheus/counter_test \
 	monitoring/prometheus/gauge_test \
+	monitoring/registry_test \
 	proto/serializer_test \
 	util/etcd_test \
 	util/fake_etcd_test \
