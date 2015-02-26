@@ -70,6 +70,8 @@ util::error::Code ErrorCodeForHttpResponseCode(int response_code) {
     case 200:
     case 201:
       return util::error::OK;
+    case 400:
+      return util::error::ABORTED;
     case 403:
       return util::error::PERMISSION_DENIED;
     case 404:
@@ -505,6 +507,7 @@ struct EtcdClient::WatchState {
   Task* const task_;
 
   int64_t highest_index_seen_;
+  map<string, int64_t> known_keys_;
 };
 
 
@@ -537,16 +540,40 @@ void EtcdClient::WatchInitialGetAllDone(WatchState* state, util::Status status,
   // dealt with using retries?
   CHECK(status.ok()) << "initial get error: " << status;
 
-  state->highest_index_seen_ = etcd_index;
+  state->highest_index_seen_ = max(state->highest_index_seen_, etcd_index);
 
   vector<WatchUpdate> updates;
+  map<string, int64_t> new_known_keys;
   for (const auto& node : nodes) {
+    // This simply shouldn't happen, but since I think it shouldn't
+    // prevent us from continuing processing, CHECKing on this would
+    // just be mean...
     LOG_IF(WARNING, etcd_index < node.modified_index_)
         << "X-Etcd-Index (" << etcd_index
         << ") smaller than node modifiedIndex (" << node.modified_index_
         << ") for key \"" << node.key_ << "\"";
-    updates.emplace_back(WatchUpdate(node, true /*exists*/));
+
+    map<string, int64_t>::iterator it(state->known_keys_.find(node.key_));
+    if (it == state->known_keys_.end() || it->second < node.modified_index_) {
+      updates.emplace_back(WatchUpdate(node, true /*exists*/));
+    }
+
+    new_known_keys[node.key_] = node.modified_index_;
+    if (it != state->known_keys_.end()) {
+      state->known_keys_.erase(it);
+    }
   }
+
+  // The keys still in known_keys_ at this point have been deleted.
+  for (const auto& key : state->known_keys_) {
+    // TODO(pphaneuf): Passing in -1 for the created and modified
+    // indices, is that a problem? We do have a "last known" modified
+    // index in key.second...
+    updates.emplace_back(WatchUpdate(EtcdClient::Node(-1, -1, key.first, ""),
+                                     false /*exists*/));
+  }
+
+  state->known_keys_.swap(new_known_keys);
 
   state->task_->executor()->Add(
       bind(&EtcdClient::SendWatchUpdates, this, state, move(updates)));
@@ -597,22 +624,39 @@ void EtcdClient::WatchRequestDone(WatchState* state, GenericResponse* gen_resp,
   // these objects.
   unique_ptr<GenericResponse> gen_resp_deleter(gen_resp);
 
-  // TODO(alcutter): doing this here works around some etcd 401 errors, but in
-  // the case of sustained high qps we could miss updates entirely (e.g. if
-  // this new index is already past the 1000 entry horizon by the time we make
-  // the new watch request.)  One way to address this might be to have the
-  // watcher re-do an "initial" get on the target, and, in the case of
-  // directory watches, maintain a set of known keys so that it can synthesise
-  // 'delete' updates.
-  if (child_task->status().ok()) {
-    VLOG(2) << "etcd_index: " << gen_resp->etcd_index;
-    CHECK_LE(state->highest_index_seen_, gen_resp->etcd_index);
-    state->highest_index_seen_ = gen_resp->etcd_index;
-  }
-
   if (state->task_->CancelRequested()) {
     state->task_->Return(Status::CANCELLED);
     return;
+  }
+
+  // Handle when the request index is too old, we have to restart the
+  // watch logic.
+  if (child_task->status().CanonicalCode() == util::error::ABORTED &&
+      gen_resp->etcd_index >= 0) {
+    VLOG(1) << "etcd index: " << gen_resp->etcd_index;
+    state->highest_index_seen_ =
+        max(state->highest_index_seen_, gen_resp->etcd_index);
+
+    if (KeyIsDirectory(state->key_)) {
+      GetAll(state->key_, bind(&EtcdClient::WatchInitialGetAllDone, this,
+                               state, _1, _2, _3));
+    } else {
+      Get(state->key_,
+          bind(&EtcdClient::WatchInitialGetDone, this, state, _1, _2, _3));
+    }
+
+    return;
+  }
+
+  if (child_task->status().ok()) {
+    VLOG(2) << "X-Etcd-Index: " << gen_resp->etcd_index;
+    if (state->highest_index_seen_ <= gen_resp->etcd_index) {
+      state->highest_index_seen_ = gen_resp->etcd_index;
+    } else {
+      LOG(WARNING) << "X-Etcd-Index went backwards, last seen is "
+                   << state->highest_index_seen_ << ", just got "
+                   << gen_resp->etcd_index;
+    }
   }
 
   // TODO(pphaneuf): This and many other of the callbacks in this file
@@ -645,6 +689,14 @@ void EtcdClient::WatchRequestDone(WatchState* state, GenericResponse* gen_resp,
         max(state->highest_index_seen_,
             status.ValueOrDie().node_.modified_index_);
     updates.emplace_back(status.ValueOrDie());
+
+    if (status.ValueOrDie().exists_) {
+      state->known_keys_[status.ValueOrDie().node_.key_] =
+          status.ValueOrDie().node_.modified_index_;
+    } else {
+      LOG(INFO) << "erased key: " << status.ValueOrDie().node_.key_;
+      state->known_keys_.erase(status.ValueOrDie().node_.key_);
+    }
 
     return state->task_->executor()->Add(
         bind(&EtcdClient::SendWatchUpdates, this, state, move(updates)));
