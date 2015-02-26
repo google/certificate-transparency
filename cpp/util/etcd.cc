@@ -541,6 +541,10 @@ void EtcdClient::WatchInitialGetAllDone(WatchState* state, util::Status status,
 
   vector<WatchUpdate> updates;
   for (const auto& node : nodes) {
+    LOG_IF(WARNING, etcd_index < node.modified_index_)
+        << "X-Etcd-Index (" << etcd_index
+        << ") smaller than node modifiedIndex (" << node.modified_index_
+        << ") for key \"" << node.key_ << "\"";
     updates.emplace_back(WatchUpdate(node, true /*exists*/));
   }
 
@@ -637,6 +641,9 @@ void EtcdClient::WatchRequestDone(WatchState* state, GenericResponse* gen_resp,
       LOG(INFO) << "UpdateForNode failed: " << status.status();
       goto fail;
     }
+    state->highest_index_seen_ =
+        max(state->highest_index_seen_,
+            status.ValueOrDie().node_.modified_index_);
     updates.emplace_back(status.ValueOrDie());
 
     return state->task_->executor()->Add(
