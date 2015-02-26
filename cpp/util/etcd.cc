@@ -648,17 +648,6 @@ void EtcdClient::WatchRequestDone(WatchState* state, GenericResponse* gen_resp,
     return;
   }
 
-  if (child_task->status().ok()) {
-    VLOG(2) << "X-Etcd-Index: " << gen_resp->etcd_index;
-    if (state->highest_index_seen_ <= gen_resp->etcd_index) {
-      state->highest_index_seen_ = gen_resp->etcd_index;
-    } else {
-      LOG(WARNING) << "X-Etcd-Index went backwards, last seen is "
-                   << state->highest_index_seen_ << ", just got "
-                   << gen_resp->etcd_index;
-    }
-  }
-
   // TODO(pphaneuf): This and many other of the callbacks in this file
   // do very similar validation, we should pull that out in a shared
   // helper function.
