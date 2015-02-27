@@ -69,7 +69,11 @@ void PeerGroup::FetchEntries(int64_t start_index, int64_t end_index,
   CHECK_GE(end_index, start_index);
 
   const shared_ptr<Peer> peer(PickPeer(end_index + 1));
-  CHECK(peer);
+  if (!peer) {
+    task->Return(Status(util::error::UNAVAILABLE,
+                        "requested entries not available in the peer group"));
+    return;
+  }
 
   // TODO(pphaneuf): Handle the case where we have no peer more cleanly.
   peer->client().GetEntries(start_index, end_index, CHECK_NOTNULL(entries),
@@ -82,11 +86,18 @@ shared_ptr<Peer> PeerGroup::PickPeer(const int64_t needed_size) const {
 
   // TODO(pphaneuf): We should pick peers a bit more cleverly, to
   // spread the load somewhat.
+  int64_t group_tree_size(-1);
   for (const auto& peer : peers_) {
-    if (peer.first->TreeSize() >= needed_size) {
+    const int64_t tree_size(peer.first->TreeSize());
+    group_tree_size = max(group_tree_size, tree_size);
+    if (tree_size >= needed_size) {
       return peer.first;
     }
   }
+
+  LOG(INFO) << "requested a peer with " << needed_size
+            << " entries but the peer group only has " << group_tree_size
+            << " entries";
 
   return nullptr;
 }
