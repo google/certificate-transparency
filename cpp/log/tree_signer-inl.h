@@ -138,6 +138,7 @@ util::Status TreeSigner<Logged>::HandlePreviouslySequencedEntries(
     // provisional sequence number set, but entry not actually sequenced:
     // This is likely the result of a sequencer crash, we'll leave the
     // provisional sequence number set as a hint to the sequencer.
+    status = util::Status::OK;
     ++it;
   }
   return status;
