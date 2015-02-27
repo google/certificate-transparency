@@ -114,7 +114,7 @@ class MasterElection {
 
   // Called once our proposal file has been deleted from the proposal
   // directory.
-  void ProposalDeleteDone(util::Status status);
+  void ProposalDeleteDone(util::Task* task);
 
   // Thread entry point for the periodic callback to refresh the proposal TTL.
   void ProposalKeepAliveCallback();

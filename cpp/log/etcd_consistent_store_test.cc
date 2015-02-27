@@ -58,7 +58,7 @@ class EtcdConsistentStoreTest : public ::testing::Test {
         executor_(1),
         event_pump_(base_),
         client_(base_),
-        sync_client_(&client_) {
+        sync_client_(&client_, base_.get()) {
   }
 
  protected:

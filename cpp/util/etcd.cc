@@ -399,20 +399,6 @@ void ForceSetRequestDone(EtcdClient::GenericResponse* gen_resp,
 }
 
 
-void DeleteRequestDone(EtcdClient::GenericResponse* gen_resp,
-                       const EtcdClient::DeleteCallback& cb, Task* task) {
-  const unique_ptr<EtcdClient::GenericResponse> gen_resp_deleter(gen_resp);
-  const unique_ptr<Task> task_deleter(task);
-
-  if (!task->status().ok()) {
-    cb(task->status(), -1);
-    return;
-  }
-
-  cb(Status::OK, gen_resp->etcd_index);
-}
-
-
 string UrlEscapeAndJoinParams(const map<string, string>& params) {
   string retval;
 
@@ -972,13 +958,13 @@ void EtcdClient::ForceSetWithTTL(const string& key, const string& value,
 
 
 void EtcdClient::Delete(const string& key, const int64_t current_index,
-                        const DeleteCallback& cb) {
+                        Task* task) {
   map<string, string> params;
   params["prevIndex"] = to_string(current_index);
   GenericResponse* const gen_resp(new GenericResponse);
-  Generic(key, params, UrlFetcher::Verb::DELETE, gen_resp,
-          new Task(bind(&DeleteRequestDone, gen_resp, cb, _1),
-                   event_base_.get()));
+  task->DeleteWhenDone(gen_resp);
+
+  Generic(key, params, UrlFetcher::Verb::DELETE, gen_resp, task);
 }
 
 

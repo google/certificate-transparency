@@ -32,6 +32,7 @@ using std::this_thread::sleep_for;
 using std::unique_ptr;
 using std::vector;
 using util::Status;
+using util::SyncTask;
 
 const char kKey[] = "/key";
 const char kDir[] = "/dir/";
@@ -171,12 +172,10 @@ class FakeEtcdTest : public ::testing::Test {
   }
 
   Status BlockingDelete(const string& key, int64_t previous_index) {
-    Notification notifier;
-    Status status;
-    client_.Delete(key, previous_index,
-                   bind(&CopyCallback1<Status>, &notifier, &status, _1));
-    notifier.WaitForNotification();
-    return status;
+    SyncTask task(base_.get());
+    client_.Delete(key, previous_index, task.task());
+    task.Wait();
+    return task.status();
   }
 
   std::shared_ptr<libevent::Base> base_;

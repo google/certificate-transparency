@@ -32,7 +32,7 @@ EtcdConsistentStore<Logged>::EtcdConsistentStore(
     const std::string& node_id)
     : client_(CHECK_NOTNULL(client)),
       election_(CHECK_NOTNULL(election)),
-      sync_client_(client),
+      sync_client_(client, executor),
       root_(root),
       node_id_(node_id),
       serving_sth_watch_task_(CHECK_NOTNULL(executor)),

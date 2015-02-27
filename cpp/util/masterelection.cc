@@ -20,6 +20,7 @@ using std::shared_ptr;
 using std::string;
 using std::unique_lock;
 using std::vector;
+using util::Task;
 
 DEFINE_int32(master_keepalive_interval_seconds, 60,
              "Interval between refreshing mastership proposal.");
@@ -349,14 +350,15 @@ void MasterElection::DeleteProposal() {
 
   VLOG(1) << my_proposal_path_ << ": Deleting proposal";
   client_->Delete(my_proposal_path_, my_proposal_modified_index_,
-                  bind(&MasterElection::ProposalDeleteDone, this, _1));
+                  new Task(bind(&MasterElection::ProposalDeleteDone, this, _1),
+                           base_.get()));
 }
 
 
-void MasterElection::ProposalDeleteDone(util::Status status) {
+void MasterElection::ProposalDeleteDone(Task* task) {
   unique_lock<mutex> lock(mutex_);
-  if (!status.ok()) {
-    LOG(WARNING) << status;
+  if (!task->status().ok()) {
+    LOG(WARNING) << "error deleting proposal: " << task->status();
   }
 
   VLOG(1) << my_proposal_path_ << ": Delete done.";

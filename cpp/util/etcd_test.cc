@@ -8,6 +8,7 @@
 
 #include "base/notification.h"
 #include "util/json_wrapper.h"
+#include "util/sync_task.h"
 #include "util/testing.h"
 
 namespace cert_trans {
@@ -35,6 +36,7 @@ using testing::Pair;
 using testing::StrictMock;
 using testing::_;
 using util::Status;
+using util::SyncTask;
 using util::Task;
 
 namespace {
@@ -184,7 +186,6 @@ class MockCallbacks {
                void(Status status, const string& key, int64_t created_index));
   MOCK_METHOD2(ForceSetCallback, void(Status status, int64_t new_index));
   MOCK_METHOD2(UpdateCallback, void(Status status, int64_t new_index));
-  MOCK_METHOD1(DeleteCallback, void(Status status));
 
  private:
   DISALLOW_COPY_AND_ASSIGN(MockCallbacks);
@@ -503,30 +504,26 @@ TEST_F(EtcdTest, TestForceSetWithTTLForNewKey) {
 }
 
 TEST_F(EtcdTest, TestDelete) {
-  Notification done;
   EXPECT_CALL(client_, Generic(kEntryKey, Contains(Pair(kPrevIndexParam, "5")),
                                UrlFetcher::Verb::DELETE, _, _))
       .WillOnce(Invoke(
           bind(&GenericReturn, Status::OK, MakeJson(kDeleteJson), 1, _4, _5)));
-  EXPECT_CALL(callbacks_, DeleteCallback(Status::OK))
-      .WillOnce(Invoke(bind(&Notification::Notify, &done)));
-  client_.Delete(kEntryKey, 5,
-                 bind(&MockCallbacks::DeleteCallback, &callbacks_, _1));
-  EXPECT_TRUE(done.WaitForNotificationWithTimeout(kTimeout));
+  SyncTask task(base_.get());
+  client_.Delete(kEntryKey, 5, task.task());
+  task.Wait();
+  EXPECT_EQ(Status::OK, task.status());
 }
 
 TEST_F(EtcdTest, TestDeleteFails) {
-  Notification done;
   const Status status(util::error::FAILED_PRECONDITION, "");
   EXPECT_CALL(client_, Generic(kEntryKey, Contains(Pair(kPrevIndexParam, "5")),
                                UrlFetcher::Verb::DELETE, _, _))
       .WillOnce(Invoke(bind(&GenericReturn, status,
                             MakeJson(kCompareFailedJson), -1, _4, _5)));
-  EXPECT_CALL(callbacks_, DeleteCallback(status))
-      .WillOnce(Invoke(bind(&Notification::Notify, &done)));
-  client_.Delete(kEntryKey, 5,
-                 bind(&MockCallbacks::DeleteCallback, &callbacks_, _1));
-  EXPECT_TRUE(done.WaitForNotificationWithTimeout(kTimeout));
+  SyncTask task(base_.get());
+  client_.Delete(kEntryKey, 5, task.task());
+  task.Wait();
+  EXPECT_EQ(status, task.status());
 }
 
 }  // namespace

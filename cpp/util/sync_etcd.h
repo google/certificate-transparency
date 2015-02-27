@@ -24,8 +24,8 @@ class SyncEtcdClient {
   // Contructs a new synchronous etcd client.
   // Note that SyncEtcdClient expects that someone is dispatching the event
   // loop underpinning |client|, but doesn't do that itself.
-  // No change of ownership of |client|.
-  SyncEtcdClient(EtcdClient* client);
+  // No change of ownership of |client| or |executor|.
+  SyncEtcdClient(EtcdClient* client, util::Executor* executor);
 
   virtual ~SyncEtcdClient() = default;
 
@@ -72,6 +72,7 @@ class SyncEtcdClient {
 
  private:
   EtcdClient* const client_;  // Not owned by us
+  util::Executor* const executor_;  // Not owned by us
 
   friend class SyncEtcdTest;
 

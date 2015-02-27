@@ -178,7 +178,7 @@ class SyncEtcdTest : public ::testing::Test {
   }
 
   void SetUp() {
-    sync_client_.reset(new SyncEtcdClient(&mock_client_));
+    sync_client_.reset(new SyncEtcdClient(&mock_client_, base_.get()));
   }
 
   const shared_ptr<libevent::Base> base_;

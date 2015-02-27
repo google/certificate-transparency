@@ -54,8 +54,11 @@ class EtcdClient {
   typedef std::function<void(util::Status status, const EtcdClient::Node& node,
                              int64_t etcd_index)> GetCallback;
 
-  struct GenericResponse {
+  struct Response {
     int64_t etcd_index;
+  };
+
+  struct GenericResponse : public Response {
     std::shared_ptr<JsonObject> json_body;
   };
 
@@ -70,8 +73,6 @@ class EtcdClient {
       UpdateCallback;
   typedef std::function<void(util::Status status, int64_t new_index)>
       ForceSetCallback;
-  typedef std::function<void(util::Status status, int64_t etcd_index)>
-      DeleteCallback;
   typedef std::function<void(const std::vector<WatchUpdate>& updates)>
       WatchCallback;
 
@@ -110,7 +111,7 @@ class EtcdClient {
                        const ForceSetCallback& cb);
 
   void Delete(const std::string& key, const int64_t current_index,
-              const DeleteCallback& cb);
+              util::Task* task);
 
   // The "cb" will be called on the "task" executor. Also, only one
   // will be sent to the executor at a time (for a given call to this

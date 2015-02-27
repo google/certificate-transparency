@@ -2,11 +2,13 @@
 
 #include <condition_variable>
 #include <event2/event.h>
+#include <glog/logging.h>
 #include <memory>
 
 #include "base/notification.h"
 #include "util/libevent_wrapper.h"
 #include "util/status.h"
+#include "util/sync_task.h"
 
 using std::bind;
 using std::condition_variable;
@@ -18,6 +20,7 @@ using std::shared_ptr;
 using std::string;
 using std::vector;
 using util::Status;
+using util::SyncTask;
 
 namespace cert_trans {
 
@@ -95,7 +98,8 @@ Status BlockingCall(const F& async_method, P1* p1, P2* p2) {
 }  // namespace
 
 
-SyncEtcdClient::SyncEtcdClient(EtcdClient* client) : client_(client) {
+SyncEtcdClient::SyncEtcdClient(EtcdClient* client, util::Executor* executor)
+    : client_(client), executor_(CHECK_NOTNULL(executor)) {
 }
 
 
@@ -170,8 +174,10 @@ Status SyncEtcdClient::ForceSetWithTTL(const string& key, const string& value,
 
 
 Status SyncEtcdClient::Delete(const string& key, const int64_t current_index) {
-  return BlockingCall(
-      bind(&EtcdClient::Delete, client_, key, current_index, _1));
+  SyncTask task(executor_);
+  client_->Delete(key, current_index, task.task());
+  task.Wait();
+  return task.status();
 }
 
 
