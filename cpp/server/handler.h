@@ -2,6 +2,7 @@
 #define CERT_TRANS_SERVER_HANDLER_H_
 
 #include <memory>
+#include <stdint.h>
 #include <string>
 
 #include "util/libevent_wrapper.h"
@@ -43,7 +44,8 @@ class HttpHandler {
   void AddChain(evhttp_request* req);
   void AddPreChain(evhttp_request* req);
 
-  void BlockingGetEntries(evhttp_request* req, int start, int end) const;
+  void BlockingGetEntries(evhttp_request* req, int64_t start,
+                          int64_t end) const;
   void BlockingAddChain(evhttp_request* req,
                         const std::shared_ptr<CertChain>& chain) const;
   void BlockingAddPreChain(evhttp_request* req,

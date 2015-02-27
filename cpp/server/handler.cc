@@ -211,9 +211,8 @@ bool GetParam(const multimap<string, string>& query, const string& param,
 // Returns -1 on error, and on success too if the parameter contains
 // -1 (so it's advised to only use it when expecting unsigned
 // parameters).
-// FIXME: at least some parameters are strictly 64 bit - we should get
-// the right size.
-int GetIntParam(const multimap<string, string>& query, const string& param) {
+int64_t GetIntParam(const multimap<string, string>& query,
+                    const string& param) {
   int retval(-1);
   string value;
   if (GetParam(query, param, &value)) {
@@ -281,14 +280,14 @@ void HttpHandler::GetEntries(evhttp_request* req) const {
 
   const multimap<string, string> query(ParseQuery(req));
 
-  const int tree_size(log_lookup_->GetSTH().tree_size());
-  const int start(GetIntParam(query, "start"));
+  const int64_t tree_size(db_->TreeSize());
+  const int64_t start(GetIntParam(query, "start"));
   if (start < 0 || start >= tree_size) {
     return SendError(req, HTTP_BADREQUEST,
                      "Missing or invalid \"start\" parameter.");
   }
 
-  int end(GetIntParam(query, "end"));
+  int64_t end(GetIntParam(query, "end"));
   if (end < start) {
     return SendError(req, HTTP_BADREQUEST,
                      "Missing or invalid \"end\" parameter.");
@@ -350,7 +349,7 @@ void HttpHandler::GetProof(evhttp_request* req) const {
     return SendError(req, HTTP_BADREQUEST, "Invalid \"hash\" parameter.");
   }
 
-  const int tree_size(GetIntParam(query, "tree_size"));
+  const int64_t tree_size(GetIntParam(query, "tree_size"));
   if (tree_size < 0 ||
       static_cast<int64_t>(tree_size) > log_lookup_->GetSTH().tree_size()) {
     return SendError(req, HTTP_BADREQUEST,
@@ -404,13 +403,13 @@ void HttpHandler::GetConsistency(evhttp_request* req) const {
 
   const multimap<string, string> query(ParseQuery(req));
 
-  const int first(GetIntParam(query, "first"));
+  const int64_t first(GetIntParam(query, "first"));
   if (first < 0) {
     return SendError(req, HTTP_BADREQUEST,
                      "Missing or invalid \"first\" parameter.");
   }
 
-  const int second(GetIntParam(query, "second"));
+  const int64_t second(GetIntParam(query, "second"));
   if (second < first) {
     return SendError(req, HTTP_BADREQUEST,
                      "Missing or invalid \"second\" parameter.");
@@ -451,10 +450,10 @@ void HttpHandler::AddPreChain(evhttp_request* req) {
 }
 
 
-void HttpHandler::BlockingGetEntries(evhttp_request* req, int start,
-                                     int end) const {
+void HttpHandler::BlockingGetEntries(evhttp_request* req, int64_t start,
+                                     int64_t end) const {
   JsonArray json_entries;
-  for (int i = start; i <= end; ++i) {
+  for (int64_t i = start; i <= end; ++i) {
     LoggedCertificate cert;
 
     if (db_->LookupByIndex(i, &cert) !=
