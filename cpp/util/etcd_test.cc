@@ -238,7 +238,10 @@ TEST_F(EtcdTest, TestGetForInvalidKey) {
               Generic(kEntryKey, kEmptyParams, UrlFetcher::Verb::GET, _, _))
       .WillOnce(Invoke(bind(&GenericReturn, status, MakeJson(kKeyNotFoundJson),
                             -1, _4, _5)));
-  EXPECT_CALL(callbacks_, GetCallback(status, _))
+  EXPECT_CALL(callbacks_, GetCallback(Status(status.CanonicalCode(),
+                                             status.error_message() + " (" +
+                                                 kEntryKey + ")"),
+                                      _))
       .WillOnce(Invoke(bind(&Notification::Notify, &done)));
   client_.Get(kEntryKey,
               bind(&MockCallbacks::GetCallback, &callbacks_, _1, _2));
@@ -273,7 +276,10 @@ TEST_F(EtcdTest, TestGetAllForInvalidKey) {
               Generic(kDirKey, kEmptyParams, UrlFetcher::Verb::GET, _, _))
       .WillOnce(Invoke(bind(&GenericReturn, Status(util::error::NOT_FOUND, ""),
                             MakeJson(kKeyNotFoundJson), -1, _4, _5)));
-  EXPECT_CALL(callbacks_, GetAllCallback(status, _))
+  EXPECT_CALL(callbacks_, GetAllCallback(Status(status.CanonicalCode(),
+                                                status.error_message() + " (" +
+                                                    kDirKey + ")"),
+                                         _))
       .WillOnce(Invoke(bind(&Notification::Notify, &done)));
   client_.GetAll(kDirKey,
                  bind(&MockCallbacks::GetAllCallback, &callbacks_, _1, _2));

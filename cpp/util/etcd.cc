@@ -101,13 +101,16 @@ Status StatusFromResponseCode(const int response_code,
 }
 
 
-void GetRequestDone(EtcdClient::GenericResponse* gen_resp,
+void GetRequestDone(const string& keyname,
+                    EtcdClient::GenericResponse* gen_resp,
                     const EtcdClient::GetCallback& cb, Task* task) {
   const unique_ptr<EtcdClient::GenericResponse> gen_resp_deleter(gen_resp);
   const unique_ptr<Task> task_deleter(task);
 
   if (!task->status().ok()) {
-    cb(task->status(), EtcdClient::Node::InvalidNode(), -1);
+    cb(Status(task->status().CanonicalCode(),
+              task->status().error_message() + " (" + keyname + ")"),
+       EtcdClient::Node::InvalidNode(), -1);
     return;
   }
 
@@ -157,13 +160,16 @@ void GetRequestDone(EtcdClient::GenericResponse* gen_resp,
 }
 
 
-void GetAllRequestDone(EtcdClient::GenericResponse* gen_resp,
+void GetAllRequestDone(const string& dir,
+                       EtcdClient::GenericResponse* gen_resp,
                        const EtcdClient::GetAllCallback& cb, Task* task) {
   const unique_ptr<EtcdClient::GenericResponse> gen_resp_deleter(gen_resp);
   const unique_ptr<Task> task_deleter(task);
 
   if (!task->status().ok()) {
-    cb(task->status(), vector<EtcdClient::Node>(), -1);
+    cb(Status(task->status().CanonicalCode(),
+              task->status().error_message() + " (" + dir + ")"),
+       vector<EtcdClient::Node>(), -1);
     return;
   }
 
@@ -862,7 +868,7 @@ void EtcdClient::Get(const string& key, const GetCallback& cb) {
   map<string, string> params;
   GenericResponse* const gen_resp(new GenericResponse);
   Generic(key, params, UrlFetcher::Verb::GET, gen_resp,
-          new Task(bind(&GetRequestDone, gen_resp, cb, _1),
+          new Task(bind(&GetRequestDone, key, gen_resp, cb, _1),
                    event_base_.get()));
 }
 
@@ -871,7 +877,7 @@ void EtcdClient::GetAll(const string& dir, const GetAllCallback& cb) {
   map<string, string> params;
   GenericResponse* const gen_resp(new GenericResponse);
   Generic(dir, params, UrlFetcher::Verb::GET, gen_resp,
-          new Task(bind(&GetAllRequestDone, gen_resp, cb, _1),
+          new Task(bind(&GetAllRequestDone, dir, gen_resp, cb, _1),
                    event_base_.get()));
 }
 

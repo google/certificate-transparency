@@ -168,7 +168,7 @@ util::Status TreeSigner<Logged>::SequenceNewEntries() {
           << (pending_entries.size() == 1 ? "y" : "ies");
 
   status = HandlePreviouslySequencedEntries(&pending_entries);
-  CHECK(status.ok()) << status;
+  CHECK(status.ok()) << "HandlePreviouslySequencedEntries: " << status;
 
   int num_sequenced(0);
   for (auto& pending_entry : pending_entries) {
