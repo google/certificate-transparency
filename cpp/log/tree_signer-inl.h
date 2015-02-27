@@ -104,7 +104,6 @@ util::Status TreeSigner<Logged>::HandlePreviouslySequencedEntries(
   CHECK(std::is_sorted(pending_entries->begin(), pending_entries->end(),
                        PendingEntriesOrder<Logged>()));
   // Check and handle any previously sequenced entries
-  util::Status status;
   auto it(pending_entries->begin());
   while (it != pending_entries->end()) {
     if (!it->Entry().has_provisional_sequence_number()) {
@@ -113,8 +112,8 @@ util::Status TreeSigner<Logged>::HandlePreviouslySequencedEntries(
       break;
     }
     cert_trans::EntryHandle<Logged> presequenced;
-    status = consistent_store_->GetSequencedEntry(
-        it->Entry().provisional_sequence_number(), &presequenced);
+    util::Status status(consistent_store_->GetSequencedEntry(
+        it->Entry().provisional_sequence_number(), &presequenced));
     if (status.ok()) {
       CHECK(it->Entry().entry() == presequenced.Entry().entry() &&
             it->Entry().sct() == presequenced.Entry().sct())
@@ -135,13 +134,12 @@ util::Status TreeSigner<Logged>::HandlePreviouslySequencedEntries(
     if (status.CanonicalCode() != util::error::NOT_FOUND) {
       return status;
     }
-    // provisional sequence number set, but entry not actually sequenced:
+    // Provisional sequence number set, but entry not actually sequenced:
     // This is likely the result of a sequencer crash, we'll leave the
     // provisional sequence number set as a hint to the sequencer.
-    status = util::Status::OK;
     ++it;
   }
-  return status;
+  return util::Status::OK;
 }
 
 
