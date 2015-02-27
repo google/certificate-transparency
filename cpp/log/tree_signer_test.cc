@@ -276,6 +276,24 @@ TYPED_TEST(TreeSignerTest, ResumePartialSign) {
 }
 
 
+TYPED_TEST(TreeSignerTest, RecoverWithPendingSequenceNumber) {
+  LoggedCertificate sequenced_cert;
+  this->test_signer_.CreateUnique(&sequenced_cert);
+  this->AddSequencedEntry(&sequenced_cert, 0);
+
+  LoggedCertificate provisionally_sequenced_cert;
+  this->test_signer_.CreateUnique(&provisionally_sequenced_cert);
+  provisionally_sequenced_cert.set_provisional_sequence_number(1);
+  this->AddPendingEntry(&provisionally_sequenced_cert);
+
+  EXPECT_EQ(util::Status::OK, this->tree_signer_->SequenceNewEntries());
+  EXPECT_EQ(TS::OK, this->tree_signer_->UpdateTree());
+
+  const SignedTreeHead sth(this->tree_signer_->LatestSTH());
+  EXPECT_EQ(2U, sth.tree_size());
+}
+
+
 TYPED_TEST(TreeSignerTest, SignEmpty) {
   EXPECT_EQ(TS::OK, this->tree_signer_->UpdateTree());
 
