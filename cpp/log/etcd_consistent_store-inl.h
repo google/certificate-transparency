@@ -232,9 +232,19 @@ util::Status EtcdConsistentStore<Logged>::GetPendingEntries(
 
 
 template <class Logged>
+bool LessBySequenceNumber(const EntryHandle<Logged>& lhs,
+                          const EntryHandle<Logged>& rhs) {
+  CHECK(lhs.Entry().has_sequence_number());
+  CHECK(rhs.Entry().has_sequence_number());
+  return lhs.Entry().sequence_number() < rhs.Entry().sequence_number();
+}
+
+
+template <class Logged>
 util::Status EtcdConsistentStore<Logged>::GetSequencedEntries(
     std::vector<EntryHandle<Logged>>* entries) const {
   util::Status status(GetAllEntriesInDir(GetFullPath(kSequencedDir), entries));
+  sort(entries->begin(), entries->end(), LessBySequenceNumber<Logged>);
   if (status.ok()) {
     for (const auto& entry : *entries) {
       CHECK(entry.Entry().has_sequence_number());
