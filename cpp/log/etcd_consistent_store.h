@@ -72,6 +72,10 @@ class EtcdConsistentStore : public ConsistentStore<Logged> {
 
   util::Status SetClusterConfig(const ct::ClusterConfig& config) override;
 
+  // Removes entries in /sequenced (and their corresponding entries in
+  // /unsequened) with sequence numbers covered by the current serving STH.
+  util::Status CleanupOldEntries() override;
+
  private:
   void WaitForServingSTHVersion(std::unique_lock<std::mutex>* lock,
                                 const int version);
@@ -137,15 +141,6 @@ class EtcdConsistentStore : public ConsistentStore<Logged> {
 
   void OnEtcdServingSTHUpdated(const Update<ct::SignedTreeHead>& update);
 
-  // Removes entries in /sequenced (and their corresponding entries in
-  // /unsequened) with sequence numbers up to and including
-  // |clean_up_to_sequence_number|.
-  util::Status RunOneCleanUpIteration(
-      const int64_t clean_up_to_sequence_number);
-
-  // Entry point for the clean_up_thread_;
-  void CleanUpEntriesThread();
-
   EtcdClient* const client_;  // We don't own this.
   const MasterElection* const election_;  // We don't own this.
   SyncEtcdClient sync_client_;
@@ -153,7 +148,6 @@ class EtcdConsistentStore : public ConsistentStore<Logged> {
   const std::string node_id_;
   std::condition_variable serving_sth_cv_;
   util::SyncTask serving_sth_watch_task_;
-  std::unique_ptr<std::thread> clean_up_thread_;
 
   mutable std::mutex mutex_;
   bool received_initial_sth_;

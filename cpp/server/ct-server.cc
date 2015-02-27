@@ -78,6 +78,7 @@ namespace libevent = cert_trans::libevent;
 
 using cert_trans::CertChecker;
 using cert_trans::ClusterStateController;
+using cert_trans::ConsistentStore;
 using cert_trans::ContinuousFetcher;
 using cert_trans::Counter;
 using cert_trans::Gauge;
@@ -186,6 +187,7 @@ static const bool sign_dummy =
                           &ValidateIsPositive);
 
 void SignMerkleTree(TreeSigner<LoggedCertificate>* tree_signer,
+                    ConsistentStore<LoggedCertificate>* store,
                     ClusterStateController<LoggedCertificate>* controller,
                     const MasterElection* election) {
   const steady_clock::duration period((seconds(FLAGS_tree_signing_frequency_seconds)));
@@ -193,12 +195,17 @@ void SignMerkleTree(TreeSigner<LoggedCertificate>* tree_signer,
 
   while (true) {
     if (election->IsMaster()) {
+      // Remove entries which are already covered by the current cluster
+      // serving STH:
+      store->CleanupOldEntries();
+
       // TODO(alcutter): Probably don't need to blow up here
       CHECK_EQ(util::Status::OK, tree_signer->SequenceNewEntries())
           << "Problem sequencing new entries";
     }
 
     CHECK_EQ(tree_signer->UpdateTree(), TreeSigner<LoggedCertificate>::OK);
+
     const SignedTreeHead latest_sth(tree_signer->LatestSTH());
     latest_local_tree_size_gauge->Set(latest_sth.tree_size());
     controller->NewTreeHead(latest_sth);
@@ -389,7 +396,8 @@ int main(int argc, char* argv[]) {
   // TODO(pphaneuf): We should be remaining in an "unhealthy state"
   // (either not accepting any requests, or returning some internal
   // server error) until we have an STH to serve.
-  thread signer(&SignMerkleTree, &tree_signer, &cluster_controller, &election);
+  thread signer(&SignMerkleTree, &tree_signer, &consistent_store,
+                &cluster_controller, &election);
   ThreadPool pool;
   HttpHandler handler(&log_lookup, db, &checker, &frontend, &pool);
 
