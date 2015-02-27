@@ -292,6 +292,37 @@ int main(int argc, char* argv[]) {
                                                  etcd_client.get(), &election,
                                                  "/root", node_id));
 
+  const unique_ptr<ContinuousFetcher> fetcher(
+      ContinuousFetcher::New(event_base.get(), db));
+
+  ClusterStateController<LoggedCertificate> cluster_controller(
+      &internal_pool, event_base, &url_fetcher, db, &consistent_store,
+      &election, fetcher.get());
+
+  // Publish this node's hostname:port info
+  cluster_controller.SetNodeHostPort(FLAGS_server, FLAGS_port);
+  {
+    ct::SignedTreeHead db_sth;
+    if (db->LatestTreeHead(&db_sth) ==
+        Database<LoggedCertificate>::LOOKUP_OK) {
+      cluster_controller.NewTreeHead(db_sth);
+    }
+  }
+
+  // If we're joining an existing cluster, this node needs to get its database
+  // up-to-date with the serving_sth before we can do anything, so we'll wait
+  // here for that:
+  util::StatusOr<ct::SignedTreeHead> serving_sth(
+      consistent_store.GetServingSTH());
+  if (serving_sth.ok()) {
+    while (db->TreeSize() < serving_sth.ValueOrDie().tree_size()) {
+      LOG(WARNING) << "Waiting for local database to catch up to serving_sth ("
+                   << db->TreeSize() << " of "
+                   << serving_sth.ValueOrDie().tree_size() << ")";
+      sleep(1);
+    }
+  }
+
   TreeSigner<LoggedCertificate> tree_signer(std::chrono::duration<double>(
                                                 FLAGS_guard_window_seconds),
                                             db, &consistent_store,
@@ -331,21 +362,6 @@ int main(int argc, char* argv[]) {
     consistent_store.SetServingSTH(tree_signer.LatestSTH());
   } else {
     CHECK(!FLAGS_server.empty());
-  }
-
-  const unique_ptr<ContinuousFetcher> fetcher(
-      ContinuousFetcher::New(event_base.get(), db));
-  ClusterStateController<LoggedCertificate> cluster_controller(
-      &internal_pool, event_base, &url_fetcher, db, &consistent_store,
-      &election, fetcher.get());
-  // Publish this node's hostname:port info
-  cluster_controller.SetNodeHostPort(FLAGS_server, FLAGS_port);
-  {
-    ct::SignedTreeHead db_sth;
-    if (db->LatestTreeHead(&db_sth) ==
-        Database<LoggedCertificate>::LOOKUP_OK) {
-      cluster_controller.NewTreeHead(db_sth);
-    }
   }
 
   // Just separate this out from the lambda below to try to be clear that this
