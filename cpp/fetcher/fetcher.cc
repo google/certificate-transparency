@@ -21,7 +21,7 @@ using util::Status;
 using util::Task;
 using util::TaskHold;
 
-DEFINE_int32(fetcher_concurrent_fetches, 100,
+DEFINE_int32(fetcher_concurrent_fetches, 2,
              "number of concurrent fetch requests");
 DEFINE_int32(fetcher_batch_size, 1000,
              "maximum number of entries to fetch per request");
