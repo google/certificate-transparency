@@ -531,6 +531,7 @@ void EtcdClient::WatchInitialGetAllDone(WatchState* state, util::Status status,
 
   vector<WatchUpdate> updates;
   map<string, int64_t> new_known_keys;
+  VLOG(1) << "WatchGet " << state << " : num updates = " << nodes.size();
   for (const auto& node : nodes) {
     // This simply shouldn't happen, but since I think it shouldn't
     // prevent us from continuing processing, CHECKing on this would
@@ -542,11 +543,15 @@ void EtcdClient::WatchInitialGetAllDone(WatchState* state, util::Status status,
 
     map<string, int64_t>::iterator it(state->known_keys_.find(node.key_));
     if (it == state->known_keys_.end() || it->second < node.modified_index_) {
+      VLOG(1) << "WatchGet " << state << " : updated node " << node.key_
+              << " @ " << node.modified_index_;
       updates.emplace_back(WatchUpdate(node, true /*exists*/));
     }
 
     new_known_keys[node.key_] = node.modified_index_;
     if (it != state->known_keys_.end()) {
+      VLOG(1) << "WatchGet " << state << " : stale update " << node.key_
+              << " @ " << node.modified_index_;
       state->known_keys_.erase(it);
     }
   }
@@ -689,7 +694,9 @@ fail:
 // state->task_.
 void EtcdClient::SendWatchUpdates(WatchState* state,
                                   const vector<WatchUpdate>& updates) {
-  state->cb_(updates);
+  if (!updates.empty() || state->highest_index_seen_ == -1) {
+    state->cb_(updates);
+  }
 
   // Only start the next request once the callback has return, to make
   // sure they are always delivered in order.
