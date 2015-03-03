@@ -60,6 +60,9 @@ DEFINE_int32(log_stats_frequency_seconds, 3600,
              "server will log statistics if in the beginning of its select "
              "loop, at least this period has elapsed since the last log time. "
              "Must be greater than 0.");
+DEFINE_int32(sequencing_frequency_seconds, 10,
+             "How often should new entries be sequenced. The sequencing runs "
+             "in parallel with the tree signing.");
 DEFINE_int32(tree_signing_frequency_seconds, 600,
              "How often should we issue a new signed tree head. Approximate: "
              "the signer process will kick off if in the beginning of the "
@@ -186,17 +189,15 @@ static const bool sign_dummy =
     RegisterFlagValidator(&FLAGS_tree_signing_frequency_seconds,
                           &ValidateIsPositive);
 
-void SignMerkleTree(TreeSigner<LoggedCertificate>* tree_signer,
-                    ConsistentStore<LoggedCertificate>* store,
-                    ClusterStateController<LoggedCertificate>* controller,
-                    const MasterElection* election) {
-  const steady_clock::duration period((seconds(FLAGS_tree_signing_frequency_seconds)));
+void SequenceEntries(TreeSigner<LoggedCertificate>* tree_signer,
+                     ConsistentStore<LoggedCertificate>* store,
+                     const MasterElection* election) {
+  const steady_clock::duration period(
+      (seconds(FLAGS_sequencing_frequency_seconds)));
   steady_clock::time_point target_run_time(steady_clock::now());
 
   while (true) {
     if (election->IsMaster()) {
-      // Remove entries which are already covered by the current cluster
-      // serving STH:
       store->CleanupOldEntries();
 
       // TODO(alcutter): Probably don't need to blow up here
@@ -204,6 +205,24 @@ void SignMerkleTree(TreeSigner<LoggedCertificate>* tree_signer,
           << "Problem sequencing new entries";
     }
 
+    const steady_clock::time_point now(steady_clock::now());
+    while (target_run_time <= now) {
+      target_run_time += period;
+    }
+
+    std::this_thread::sleep_for(target_run_time - now);
+  }
+}
+
+void SignMerkleTree(TreeSigner<LoggedCertificate>* tree_signer,
+                    ConsistentStore<LoggedCertificate>* store,
+                    ClusterStateController<LoggedCertificate>* controller,
+                    const MasterElection* election) {
+  const steady_clock::duration period(
+      (seconds(FLAGS_tree_signing_frequency_seconds)));
+  steady_clock::time_point target_run_time(steady_clock::now());
+
+  while (true) {
     CHECK_EQ(tree_signer->UpdateTree(), TreeSigner<LoggedCertificate>::OK);
 
     const SignedTreeHead latest_sth(tree_signer->LatestSTH());
@@ -396,6 +415,8 @@ int main(int argc, char* argv[]) {
   // TODO(pphaneuf): We should be remaining in an "unhealthy state"
   // (either not accepting any requests, or returning some internal
   // server error) until we have an STH to serve.
+  thread sequencer(&SequenceEntries, &tree_signer, &consistent_store,
+                   &election);
   thread signer(&SignMerkleTree, &tree_signer, &consistent_store,
                 &cluster_controller, &election);
   ThreadPool pool;
