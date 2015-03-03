@@ -55,7 +55,7 @@ class EtcdConsistentStoreTest : public ::testing::Test {
  public:
   EtcdConsistentStoreTest()
       : base_(make_shared<libevent::Base>()),
-        executor_(1),
+        executor_(2),
         event_pump_(base_),
         client_(base_),
         sync_client_(&client_, base_.get()) {

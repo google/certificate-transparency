@@ -91,25 +91,23 @@ class FakeEtcdTest : public ::testing::Test {
 
   Status BlockingCreate(const string& key, const string& value,
                         int64_t* created_index) {
-    Notification notifier;
-    Status status;
-    client_.Create(key, value, bind(&CopyCallback2<Status, int64_t>, &notifier,
-                                    &status, created_index, _1, _2));
-    notifier.WaitForNotification();
-    CHECK(notifier.HasBeenNotified());
-    return status;
+    SyncTask task(base_.get());
+    EtcdClient::Response resp;
+    client_.Create(key, value, &resp, task.task());
+    task.Wait();
+    *created_index = resp.etcd_index;
+    return task.status();
   }
 
   Status BlockingCreateWithTTL(const string& key, const string& value,
                                const duration<int64_t>& ttl,
                                int64_t* created_index) {
-    Notification notifier;
-    Status status;
-    client_.CreateWithTTL(key, value, ttl,
-                          bind(&CopyCallback2<Status, int64_t>, &notifier,
-                               &status, created_index, _1, _2));
-    notifier.WaitForNotification();
-    return status;
+    SyncTask task(base_.get());
+    EtcdClient::Response resp;
+    client_.CreateWithTTL(key, value, ttl, &resp, task.task());
+    task.Wait();
+    *created_index = resp.etcd_index;
+    return task.status();
   }
 
   Status BlockingCreateInQueue(const string& dir, const string& value,

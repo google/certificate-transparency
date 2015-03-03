@@ -19,6 +19,7 @@ using std::placeholders::_2;
 using std::shared_ptr;
 using std::string;
 using std::unique_lock;
+using std::unique_ptr;
 using std::vector;
 using util::Task;
 
@@ -254,25 +255,31 @@ void MasterElection::CreateProposal() {
   // avoid disrupting an existing settled election.
   // Technically this could already exist if we had mastership before, crashed,
   // and then restarted before the TTL expired.
-  client_->CreateWithTTL(my_proposal_path_, kNoBacking,
-                         seconds(FLAGS_master_keepalive_interval_seconds * 2),
-                         bind(&MasterElection::ProposalCreateDone, this, _1,
-                              _2));
+  EtcdClient::Response* const resp(new EtcdClient::Response);
+  client_->CreateWithTTL(
+      my_proposal_path_, kNoBacking,
+      seconds(FLAGS_master_keepalive_interval_seconds * 2), resp,
+      new Task(bind(&MasterElection::ProposalCreateDone, this, resp, _1),
+               base_.get()));
 }
 
 
-void MasterElection::ProposalCreateDone(util::Status status, int64_t index) {
+void MasterElection::ProposalCreateDone(EtcdClient::Response* resp,
+                                        Task* task) {
+  unique_ptr<EtcdClient::Response> resp_deleter(resp);
+  unique_ptr<Task> task_deleter(task);
   unique_lock<mutex> lock(mutex_);
   // TODO(alcutter): recover gracefully if we're restarting and found an old
   // proposal from this node
-  CHECK(status.ok()) << my_proposal_path_
-                     << ": Problem creating proposal: " << status;
+  CHECK(task->status().ok())
+      << my_proposal_path_
+      << ": Problem creating proposal: " << task->status();
   Transition(lock, ProposalState::UP_TO_DATE);
 
   VLOG(1) << my_proposal_path_ << ": Mastership proposal created at index "
-          << index;
+          << resp->etcd_index;
 
-  my_proposal_modified_index_ = my_proposal_create_index_ = index;
+  my_proposal_modified_index_ = my_proposal_create_index_ = resp->etcd_index;
   // Start a periodic callback to keep our proposal from being garbage
   // collected
   CHECK(!proposal_refresh_callback_);

@@ -167,8 +167,11 @@ util/libevent_wrapper_test: util/libevent_wrapper_test.o util/libutil.a \
                             monitoring/libmonitoring.a $(GTESTLIB)
 
 util/etcd_test: util/etcd_test.o base/notification.o net/url.o \
-                net/url_fetcher.o net/connection_pool.o util/libutil.a \
-                monitoring/libmonitoring.a $(GMOCKLIB) $(GTESTLIB)
+                net/url_fetcher.o net/connection_pool.o util/etcd.o \
+                util/status.o util/task.o util/libevent_wrapper.o \
+                util/sync_task.o util/testing.o util/json_wrapper.o \
+                util/protobuf_util.o monitoring/libmonitoring.a $(GMOCKLIB) \
+                $(GTESTLIB)
 
 util/fake_etcd_test: util/fake_etcd_test.o base/notification.o net/url.o \
                      net/url_fetcher.o net/connection_pool.o util/libutil.a \

@@ -55,6 +55,9 @@ class EtcdClient {
                              int64_t etcd_index)> GetCallback;
 
   struct Response {
+    Response() : etcd_index(-1) {
+    }
+
     int64_t etcd_index;
   };
 
@@ -65,8 +68,6 @@ class EtcdClient {
   typedef std::function<void(util::Status status,
                              const std::vector<EtcdClient::Node>& values,
                              int64_t etcd_index)> GetAllCallback;
-  typedef std::function<void(util::Status status, int64_t index)>
-      CreateCallback;
   typedef std::function<void(util::Status status, const std::string& key,
                              int64_t index)> CreateInQueueCallback;
   typedef std::function<void(util::Status status, int64_t new_index)>
@@ -86,12 +87,12 @@ class EtcdClient {
 
   void GetAll(const std::string& dir, const GetAllCallback& cb);
 
-  void Create(const std::string& key, const std::string& value,
-              const CreateCallback& cb);
+  void Create(const std::string& key, const std::string& value, Response* resp,
+              util::Task* task);
 
   void CreateWithTTL(const std::string& key, const std::string& value,
-                     const std::chrono::seconds& ttl,
-                     const CreateCallback& cb);
+                     const std::chrono::seconds& ttl, Response* resp,
+                     util::Task* task);
 
   void CreateInQueue(const std::string& dir, const std::string& value,
                      const CreateInQueueCallback& cb);

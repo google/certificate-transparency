@@ -116,17 +116,24 @@ Status SyncEtcdClient::GetAll(const string& dir,
 
 Status SyncEtcdClient::Create(const string& key, const string& value,
                               int64_t* index) {
-  return BlockingCall(bind(&EtcdClient::Create, client_, key, value, _1),
-                      index);
+  SyncTask task(executor_);
+  EtcdClient::Response resp;
+  client_->Create(key, value, &resp, task.task());
+  task.Wait();
+  *index = resp.etcd_index;
+  return task.status();
 }
 
 
 util::Status SyncEtcdClient::CreateWithTTL(
     const std::string& key, const std::string& value,
     const std::chrono::duration<int>& ttl, int64_t* index) {
-  return BlockingCall(bind(&EtcdClient::CreateWithTTL, client_, key, value,
-                           ttl, _1),
-                      index);
+  SyncTask task(executor_);
+  EtcdClient::Response resp;
+  client_->CreateWithTTL(key, value, ttl, &resp, task.task());
+  task.Wait();
+  *index = resp.etcd_index;
+  return task.status();
 }
 
 

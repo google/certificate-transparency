@@ -91,7 +91,7 @@ class MasterElection {
   void CreateProposal();
 
   // Called once our proposal file has been created.
-  void ProposalCreateDone(util::Status status, int64_t index);
+  void ProposalCreateDone(EtcdClient::Response* resp, util::Task* task);
 
   // Will call UpdateProposal iff there is currently no other proposal update
   // in-flight.  |backed| should contain the id of the proposal this node is

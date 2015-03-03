@@ -288,22 +288,21 @@ TEST_F(EtcdTest, TestGetAllForInvalidKey) {
 }
 
 TEST_F(EtcdTest, TestCreate) {
-  Notification done;
   EXPECT_CALL(client_, Generic(kEntryKey,
                                AllOf(Contains(Pair(kValueParam, "123")),
                                      Contains(Pair(kPrevExistParam, kFalse))),
                                UrlFetcher::Verb::PUT, _, _))
       .WillOnce(Invoke(
           bind(&GenericReturn, Status::OK, MakeJson(kCreateJson), 1, _4, _5)));
-  EXPECT_CALL(callbacks_, CreateCallback(Status::OK, 6))
-      .WillOnce(Invoke(bind(&Notification::Notify, &done)));
-  client_.Create(kEntryKey, "123",
-                 bind(&MockCallbacks::CreateCallback, &callbacks_, _1, _2));
-  EXPECT_TRUE(done.WaitForNotificationWithTimeout(kTimeout));
+  SyncTask task(base_.get());
+  EtcdClient::Response resp;
+  client_.Create(kEntryKey, "123", &resp, task.task());
+  task.Wait();
+  EXPECT_EQ(Status::OK, task.status());
+  EXPECT_EQ(6, resp.etcd_index);
 }
 
 TEST_F(EtcdTest, TestCreateFails) {
-  Notification done;
   const Status status(util::error::FAILED_PRECONDITION, "");
   EXPECT_CALL(client_, Generic(kEntryKey,
                                AllOf(Contains(Pair(kValueParam, "123")),
@@ -312,15 +311,14 @@ TEST_F(EtcdTest, TestCreateFails) {
       .WillOnce(Invoke(bind(&GenericReturn,
                             Status(util::error::FAILED_PRECONDITION, ""),
                             MakeJson(kKeyAlreadyExistsJson), -1, _4, _5)));
-  EXPECT_CALL(callbacks_, CreateCallback(status, _))
-      .WillOnce(Invoke(bind(&Notification::Notify, &done)));
-  client_.Create(kEntryKey, "123",
-                 bind(&MockCallbacks::CreateCallback, &callbacks_, _1, _2));
-  EXPECT_TRUE(done.WaitForNotificationWithTimeout(kTimeout));
+  SyncTask task(base_.get());
+  EtcdClient::Response resp;
+  client_.Create(kEntryKey, "123", &resp, task.task());
+  task.Wait();
+  EXPECT_EQ(status, task.status());
 }
 
 TEST_F(EtcdTest, TestCreateWithTTL) {
-  Notification done;
   EXPECT_CALL(client_,
               Generic(kEntryKey, AllOf(Contains(Pair(kValueParam, "123")),
                                        Contains(Pair(kPrevExistParam, kFalse)),
@@ -328,16 +326,16 @@ TEST_F(EtcdTest, TestCreateWithTTL) {
                       UrlFetcher::Verb::PUT, _, _))
       .WillOnce(Invoke(
           bind(&GenericReturn, Status::OK, MakeJson(kCreateJson), 1, _4, _5)));
-  EXPECT_CALL(callbacks_, CreateCallback(Status::OK, 6))
-      .WillOnce(Invoke(bind(&Notification::Notify, &done)));
+  SyncTask task(base_.get());
+  EtcdClient::Response resp;
   client_.CreateWithTTL(kEntryKey, "123", std::chrono::duration<int>(100),
-                        bind(&MockCallbacks::CreateCallback, &callbacks_, _1,
-                             _2));
-  EXPECT_TRUE(done.WaitForNotificationWithTimeout(kTimeout));
+                        &resp, task.task());
+  task.Wait();
+  EXPECT_EQ(Status::OK, task.status());
+  EXPECT_EQ(6, resp.etcd_index);
 }
 
 TEST_F(EtcdTest, TestCreateWithTTLFails) {
-  Notification done;
   const Status status(util::error::FAILED_PRECONDITION, "");
   EXPECT_CALL(client_,
               Generic(kEntryKey, AllOf(Contains(Pair(kValueParam, "123")),
@@ -347,12 +345,12 @@ TEST_F(EtcdTest, TestCreateWithTTLFails) {
       .WillOnce(Invoke(bind(&GenericReturn,
                             Status(util::error::FAILED_PRECONDITION, ""),
                             MakeJson(kKeyAlreadyExistsJson), 1, _4, _5)));
-  EXPECT_CALL(callbacks_, CreateCallback(status, _))
-      .WillOnce(Invoke(bind(&Notification::Notify, &done)));
+  SyncTask task(base_.get());
+  EtcdClient::Response resp;
   client_.CreateWithTTL(kEntryKey, "123", std::chrono::duration<int>(100),
-                        bind(&MockCallbacks::CreateCallback, &callbacks_, _1,
-                             _2));
-  EXPECT_TRUE(done.WaitForNotificationWithTimeout(kTimeout));
+                        &resp, task.task());
+  task.Wait();
+  EXPECT_EQ(status, task.status());
 }
 
 TEST_F(EtcdTest, TestCreateInQueue) {
