@@ -122,10 +122,6 @@ class EtcdClient {
                      util::Task* task);
 
  protected:
-  typedef std::function<void(util::Status status,
-                             const std::shared_ptr<JsonObject>&,
-                             int64_t etcd_index)> GenericCallback;
-
   // Testing only
   EtcdClient(const std::shared_ptr<libevent::Base>& event_base);
 
