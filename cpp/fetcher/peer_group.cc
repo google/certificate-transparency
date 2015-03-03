@@ -87,12 +87,17 @@ shared_ptr<Peer> PeerGroup::PickPeer(const int64_t needed_size) const {
   // TODO(pphaneuf): We should pick peers a bit more cleverly, to
   // spread the load somewhat.
   int64_t group_tree_size(-1);
+  vector<shared_ptr<Peer>> capable_peers;
   for (const auto& peer : peers_) {
     const int64_t tree_size(peer.first->TreeSize());
     group_tree_size = max(group_tree_size, tree_size);
     if (tree_size >= needed_size) {
-      return peer.first;
+      capable_peers.push_back(peer.first);
     }
+  }
+
+  if (!capable_peers.empty()) {
+    return capable_peers[std::rand() % capable_peers.size()];
   }
 
   LOG(INFO) << "requested a peer with " << needed_size

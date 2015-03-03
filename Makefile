@@ -8,7 +8,7 @@ all: cpp java python
 	java java_test java_clean cpp cpp_test cpp_clean \
 	python python_test
 
-docker: cpp cpp_test
+docker: cpp 
 	sudo docker build -t certificate_transparency/super_duper:test .
 	cd cloud/etcd && sudo docker build -t certificate_transparency/etcd:test .
 
