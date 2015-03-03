@@ -36,8 +36,6 @@ CMD cd /mnt/ctlog/ && \
         --trusted_cert_file=/usr/local/etc/ctlog_ca_roots.pem \
         --stderrthreshold=0 \
         --log_dir=/mnt/ctlog/logs \
-        --tree_signing_frequency_seconds=30 \
-        --guard_window_seconds=10 \
         --sqlite_db=/mnt/ctlog/sqlite.db \
         --etcd_host=${ETCD_SERVICE_SERVICE_HOST} \
         --etcd_port=${ETCD_SERVICE_SERVICE_PORT} \
