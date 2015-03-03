@@ -101,7 +101,10 @@ void EtcdConsistentStore<Logged>::WaitForServingSTHVersion(
     std::unique_lock<std::mutex>* lock, const int version) {
   VLOG(1) << "Waiting for ServingSTH version " << version;
   serving_sth_cv_.wait(*lock, [this, version]() {
-    return serving_sth_.get() != nullptr && serving_sth_->Handle() >= version;
+    VLOG(1) << "Want version " << version << ", have: "
+            << (serving_sth_ ? std::to_string(serving_sth_->Handle())
+                             : "none");
+    return serving_sth_ && serving_sth_->Handle() >= version;
   });
 }
 

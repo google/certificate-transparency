@@ -398,8 +398,11 @@ void ClusterStateController<Logged>::CalculateServingSTH(
           new ct::SignedTreeHead(sth_by_size[it->first]));
       // Push this STH out to the cluster if we're master:
       if (election_->IsMaster()) {
+        LOG(INFO) << "Pushing new STH out to cluster";
         update_required_ = true;
         update_required_cv_.notify_all();
+      } else {
+        VLOG(1) << "Not pushing new STH to cluster since we're not the master";
       }
       return;
     }
@@ -446,11 +449,14 @@ void ClusterStateController<Logged>::DetermineElectionParticipation(
 template <class Logged>
 void ClusterStateController<Logged>::ClusterServingSTHUpdater() {
   while (true) {
+    VLOG(1) << "ClusterServingSTHUpdater going again.";
     std::unique_lock<std::mutex> lock(mutex_);
     update_required_cv_.wait(lock, [this]() {
       return update_required_ || exiting_;
     });
+    VLOG(1) << "ClusterServingSTHUpdater got ping.";
     if (exiting_) {
+      VLOG(1) << "ClusterServingSTHUpdater thread returning.";
       return;
     }
     CHECK(update_required_);
@@ -465,7 +471,14 @@ void ClusterStateController<Logged>::ClusterServingSTHUpdater() {
     lock.unlock();
 
     if (election_->IsMaster()) {
-      store_->SetServingSTH(local_sth);
+      LOG(INFO) << "Setting cluster serving STH @ " << local_sth.timestamp();
+      util::Status status(store_->SetServingSTH(local_sth));
+      if (!status.ok()) {
+        LOG(WARNING) << "SetServingSTH @ " << local_sth.timestamp()
+                     << " failed: " << status;
+      }
+    } else {
+      LOG(INFO) << "Not setting cluster serving STH because no-longer master.";
     }
   }
 }
