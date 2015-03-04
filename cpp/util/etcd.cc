@@ -619,12 +619,17 @@ void EtcdClient::WatchRequestDone(WatchState* state, GenericResponse* gen_resp,
   }
 
   // Handle when the request index is too old, we have to restart the
-  // watch logic.
-  if (child_task->status().CanonicalCode() == util::error::ABORTED &&
-      gen_resp->etcd_index >= 0) {
-    VLOG(1) << "etcd index: " << gen_resp->etcd_index;
-    state->highest_index_seen_ =
-        max(state->highest_index_seen_, gen_resp->etcd_index);
+  // watch logic (or start the watch logic the first time).
+  if (!child_task ||
+      (child_task->status().CanonicalCode() == util::error::ABORTED &&
+       gen_resp->etcd_index >= 0)) {
+    // On the first time here, we don't actually have a gen_resp, we
+    // just want to start the watch logic.
+    if (gen_resp) {
+      VLOG(1) << "etcd index: " << gen_resp->etcd_index;
+      state->highest_index_seen_ =
+          max(state->highest_index_seen_, gen_resp->etcd_index);
+    }
 
     if (KeyIsDirectory(state->key_)) {
       GetAll(state->key_, bind(&EtcdClient::WatchInitialGetAllDone, this,
@@ -975,12 +980,8 @@ void EtcdClient::Watch(const string& key, const WatchCallback& cb,
   WatchState* const state(new WatchState(key, cb, task));
   task->DeleteWhenDone(state);
 
-  if (KeyIsDirectory(key)) {
-    GetAll(key,
-           bind(&EtcdClient::WatchInitialGetAllDone, this, state, _1, _2, _3));
-  } else {
-    Get(key, bind(&EtcdClient::WatchInitialGetDone, this, state, _1, _2, _3));
-  }
+  // This will kick off the watch logic, with an initial get request.
+  WatchRequestDone(state, nullptr, nullptr);
 }
 
 
