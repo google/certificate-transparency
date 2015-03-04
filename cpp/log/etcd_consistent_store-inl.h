@@ -625,11 +625,18 @@ util::Status EtcdConsistentStore<Logged>::CleanupOldEntries() {
                         "Non-master node cannot run cleanups.");
   }
 
+  // Figure out where we're cleaning up to...
+  std::unique_lock<std::mutex> lock(mutex_);
   if (!serving_sth_) {
     LOG(INFO) << "No current serving_sth, nothing to do.";
     return util::Status::OK;
   }
+  const int64_t clean_up_to_sequence_number(
+      serving_sth_->Entry().tree_size() - 1);
+  lock.unlock();
 
+  LOG(INFO) << "Cleaning old entries up to and including sequence number: "
+            << clean_up_to_sequence_number;
 
   std::vector<EntryHandle<Logged>> sequenced_entries;
   util::Status status(GetSequencedEntries(&sequenced_entries));
@@ -637,11 +644,6 @@ util::Status EtcdConsistentStore<Logged>::CleanupOldEntries() {
     LOG(WARNING) << "Couldn't get sequenced entries: " << status;
     return status;
   }
-
-  const int64_t clean_up_to_sequence_number(serving_sth_->Entry().tree_size() -
-                                            1);
-  LOG(INFO) << "Cleaning old entries up to and including sequence number: "
-            << clean_up_to_sequence_number;
 
   for (auto& entry : sequenced_entries) {
     const uint64_t sequence_number(entry.Entry().sequence_number());
