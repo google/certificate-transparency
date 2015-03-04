@@ -328,26 +328,30 @@ void MasterElection::UpdateProposal(const string& backed) {
   VLOG(1) << my_proposal_path_ << ": Updating proposal backing " << backed;
 
   // TODO(alcutter): Set the HTTP timeout inside here to something sensible.
+  EtcdClient::Response* const resp(new EtcdClient::Response);
   client_->UpdateWithTTL(my_proposal_path_, backed,
                          seconds(FLAGS_master_keepalive_interval_seconds * 2),
-                         my_proposal_modified_index_,
-                         bind(&MasterElection::ProposalUpdateDone, this, _1,
-                              backed, _2));
+                         my_proposal_modified_index_, resp,
+                         new Task(bind(&MasterElection::ProposalUpdateDone,
+                                       this, backed, resp, _1),
+                                  base_.get()));
 }
 
 
-void MasterElection::ProposalUpdateDone(util::Status status,
-                                        const string& backed,
-                                        int64_t new_index) {
+void MasterElection::ProposalUpdateDone(const string& backed,
+                                        EtcdClient::Response* resp,
+                                        Task* task) {
+  unique_ptr<EtcdClient::Response> resp_deleter(resp);
   unique_lock<mutex> lock(mutex_);
   // TODO(alcutter): Handle this
-  CHECK(status.ok()) << my_proposal_path_ << ": " << status;
+  CHECK(task->status().ok()) << my_proposal_path_ << ": " << task->status();
   Transition(lock, ProposalState::UP_TO_DATE);
 
   // Keep a note of the current modification index of our proposal since
   // we'll need it in order to update or delete the proposal
-  my_proposal_modified_index_ = new_index;
-  VLOG(1) << my_proposal_path_ << ": Proposal refreshed @ " << new_index;
+  my_proposal_modified_index_ = resp->etcd_index;
+  VLOG(1) << my_proposal_path_ << ": Proposal refreshed @ "
+          << resp->etcd_index;
 }
 
 

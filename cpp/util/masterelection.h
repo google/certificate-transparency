@@ -105,8 +105,8 @@ class MasterElection {
   void UpdateProposal(const std::string& backed);
 
   // Called when our proposal file has been refreshed by the KeepAlive thread.
-  void ProposalUpdateDone(util::Status status, const std::string& backed,
-                          int64_t new_index);
+  void ProposalUpdateDone(const std::string& backed,
+                          EtcdClient::Response* resp, util::Task* task);
 
   // Deletes this node's proposal.
   // This should only be called on the base_ event thread.

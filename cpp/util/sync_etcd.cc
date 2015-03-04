@@ -148,9 +148,12 @@ Status SyncEtcdClient::CreateInQueue(const string& dir, const string& value,
 Status SyncEtcdClient::Update(const string& key, const string& value,
                               const int64_t previous_index,
                               int64_t* new_index) {
-  return BlockingCall(bind(&EtcdClient::Update, client_, key, value,
-                           previous_index, _1),
-                      new_index);
+  SyncTask task(executor_);
+  EtcdClient::Response resp;
+  client_->Update(key, value, previous_index, &resp, task.task());
+  task.Wait();
+  *new_index = resp.etcd_index;
+  return task.status();
 }
 
 
@@ -158,9 +161,12 @@ Status SyncEtcdClient::UpdateWithTTL(const string& key, const string& value,
                                      const std::chrono::duration<int>& ttl,
                                      const int64_t previous_index,
                                      int64_t* new_index) {
-  return BlockingCall(bind(&EtcdClient::UpdateWithTTL, client_, key, value,
-                           ttl, previous_index, _1),
-                      new_index);
+  SyncTask task(executor_);
+  EtcdClient::Response resp;
+  client_->UpdateWithTTL(key, value, ttl, previous_index, &resp, task.task());
+  task.Wait();
+  *new_index = resp.etcd_index;
+  return task.status();
 }
 
 

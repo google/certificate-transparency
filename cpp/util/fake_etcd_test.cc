@@ -124,26 +124,24 @@ class FakeEtcdTest : public ::testing::Test {
 
   Status BlockingUpdate(const string& key, const string& value,
                         int64_t old_index, int64_t* modified_index) {
-    Notification notifier;
-    Status status;
-    client_.Update(key, value, old_index,
-                   bind(&CopyCallback2<Status, int64_t>, &notifier, &status,
-                        modified_index, _1, _2));
-    notifier.WaitForNotification();
-    return status;
+    SyncTask task(base_.get());
+    EtcdClient::Response resp;
+    client_.Update(key, value, old_index, &resp, task.task());
+    task.Wait();
+    *modified_index = resp.etcd_index;
+    return task.status();
   }
 
   Status BlockingUpdateWithTTL(const string& key, const string& value,
                                const duration<int>& ttl,
                                int64_t previous_index,
                                int64_t* modified_index) {
-    Notification notifier;
-    Status status;
-    client_.UpdateWithTTL(key, value, ttl, previous_index,
-                          bind(&CopyCallback2<Status, int64_t>, &notifier,
-                               &status, modified_index, _1, _2));
-    notifier.WaitForNotification();
-    return status;
+    SyncTask task(base_.get());
+    EtcdClient::Response resp;
+    client_.UpdateWithTTL(key, value, ttl, previous_index, &resp, task.task());
+    task.Wait();
+    *modified_index = resp.etcd_index;
+    return task.status();
   }
 
   Status BlockingForceSet(const string& key, const string& value,

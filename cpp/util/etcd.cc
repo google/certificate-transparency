@@ -334,33 +334,30 @@ void CreateInQueueRequestDone(EtcdClient::GenericResponse* gen_resp,
 }
 
 
-void UpdateRequestDone(EtcdClient::GenericResponse* gen_resp,
-                       const EtcdClient::UpdateCallback& cb, Task* task) {
-  const unique_ptr<EtcdClient::GenericResponse> gen_resp_deleter(gen_resp);
-  const unique_ptr<Task> task_deleter(task);
-
+void UpdateRequestDone(EtcdClient::Response* resp, Task* parent_task,
+                       EtcdClient::GenericResponse* gen_resp, Task* task) {
+  *resp = EtcdClient::Response();
   if (!task->status().ok()) {
-    cb(task->status(), -1);
+    parent_task->Return(task->status());
     return;
   }
 
   const JsonObject node(*gen_resp->json_body, "node");
   if (!node.Ok()) {
-    cb(Status(util::error::FAILED_PRECONDITION,
-              "Invalid JSON: Couldn't find 'node'"),
-       0);
+    parent_task->Return(Status(util::error::FAILED_PRECONDITION,
+                               "Invalid JSON: Couldn't find 'node'"));
     return;
   }
 
   const JsonInt modifiedIndex(node, "modifiedIndex");
   if (!modifiedIndex.Ok()) {
-    cb(Status(util::error::FAILED_PRECONDITION,
-              "Invalid JSON: Couldn't find 'modifiedIndex'"),
-       0);
+    parent_task->Return(Status(util::error::FAILED_PRECONDITION,
+                               "Invalid JSON: Couldn't find 'modifiedIndex'"));
     return;
   }
 
-  cb(Status::OK, modifiedIndex.Value());
+  resp->etcd_index = modifiedIndex.Value();
+  parent_task->Return();
 }
 
 
@@ -909,30 +906,30 @@ void EtcdClient::CreateInQueue(const string& dir, const string& value,
 
 
 void EtcdClient::Update(const string& key, const string& value,
-                        const int64_t previous_index,
-                        const UpdateCallback& cb) {
+                        const int64_t previous_index, Response* resp,
+                        util::Task* task) {
   map<string, string> params;
   params["value"] = value;
   params["prevIndex"] = to_string(previous_index);
   GenericResponse* const gen_resp(new GenericResponse);
+  task->DeleteWhenDone(gen_resp);
   Generic(key, params, UrlFetcher::Verb::PUT, gen_resp,
-          new Task(bind(&UpdateRequestDone, gen_resp, cb, _1),
-                   event_base_.get()));
+          task->AddChild(bind(&UpdateRequestDone, resp, task, gen_resp, _1)));
 }
 
 
 void EtcdClient::UpdateWithTTL(const string& key, const string& value,
                                const seconds& ttl,
-                               const int64_t previous_index,
-                               const UpdateCallback& cb) {
+                               const int64_t previous_index, Response* resp,
+                               util::Task* task) {
   map<string, string> params;
   params["value"] = value;
   params["prevIndex"] = to_string(previous_index);
   params["ttl"] = to_string(ttl.count());
   GenericResponse* const gen_resp(new GenericResponse);
+  task->DeleteWhenDone(gen_resp);
   Generic(key, params, UrlFetcher::Verb::PUT, gen_resp,
-          new Task(bind(&UpdateRequestDone, gen_resp, cb, _1),
-                   event_base_.get()));
+          task->AddChild(bind(&UpdateRequestDone, resp, task, gen_resp, _1)));
 }
 
 
