@@ -212,6 +212,41 @@ void ClusterStateController<Logged>::RefreshNodeState() {
 
 
 template <class Logged>
+bool ClusterStateController<Logged>::NodeIsStale() const {
+  std::lock_guard<std::mutex> lock(mutex_);
+  if (!actual_serving_sth_) {
+    return true;
+  }
+  return database_->TreeSize() < actual_serving_sth_->tree_size();
+}
+
+
+template <class Logged>
+std::vector<ct::ClusterNodeState>
+ClusterStateController<Logged>::GetFreshNodes() const {
+  std::lock_guard<std::mutex> lock(mutex_);
+  if (!actual_serving_sth_) {
+    LOG(WARNING) << "Cluster has no ServingSTH, all nodes are stale.";
+    return {};
+  }
+  std::vector<ct::ClusterNodeState> fresh;  // for 1983.
+  // Here we go:
+  for (const auto& node : all_peers_) {
+    const bool is_self(
+        node.second->state().hostname() == local_node_state_.hostname() &&
+        node.second->state().log_port() == local_node_state_.log_port());
+    if (!is_self && node.second->state().has_newest_sth() &&
+        node.second->state().newest_sth().tree_size() >=
+            actual_serving_sth_->tree_size()) {
+      VLOG(1) << "Node is fresh: " << node.second->state().node_id();
+      fresh.push_back(node.second->state());
+    }
+  }
+  return fresh;
+}
+
+
+template <class Logged>
 void ClusterStateController<Logged>::PushLocalNodeState(
     const std::unique_lock<std::mutex>& lock) {
   CHECK(lock.owns_lock());

@@ -17,8 +17,12 @@ namespace cert_trans {
 
 class CertChain;
 class CertChecker;
+template <class T>
+class ClusterStateController;
+class JsonOutput;
 class LoggedCertificate;
 class PreCertChain;
+class Proxy;
 class ThreadPool;
 
 
@@ -28,14 +32,24 @@ class HttpHandler {
   // this instance. The "frontend" parameter can be NULL, in which
   // case this server will not accept "add-chain" and "add-pre-chain"
   // requests.
-  HttpHandler(LogLookup<LoggedCertificate>* log_lookup,
+  HttpHandler(JsonOutput* json_output,
+              LogLookup<LoggedCertificate>* log_lookup,
               const ReadOnlyDatabase<LoggedCertificate>* db,
+              const ClusterStateController<LoggedCertificate>* controller,
               const CertChecker* cert_checker, Frontend* frontend,
-              ThreadPool* pool, libevent::Base* event_base);
+              Proxy* proxy, ThreadPool* pool, libevent::Base* event_base);
 
   void Add(libevent::HttpServer* server);
 
  private:
+  void ProxyInterceptor(
+      const libevent::HttpServer::HandlerCallback& next_handler,
+      evhttp_request* request);
+
+  void AddProxyWrappedHandler(
+      libevent::HttpServer* server, const std::string& path,
+      const libevent::HttpServer::HandlerCallback& local_handler);
+
   void GetEntries(evhttp_request* req) const;
   void GetRoots(evhttp_request* req) const;
   void GetProof(evhttp_request* req) const;
@@ -51,10 +65,13 @@ class HttpHandler {
   void BlockingAddPreChain(evhttp_request* req,
                            const std::shared_ptr<PreCertChain>& chain) const;
 
+  JsonOutput* const output_;
   LogLookup<LoggedCertificate>* const log_lookup_;
   const ReadOnlyDatabase<LoggedCertificate>* const db_;
+  const ClusterStateController<LoggedCertificate>* const controller_;
   const CertChecker* const cert_checker_;
   Frontend* const frontend_;
+  Proxy* const proxy_;
   ThreadPool* const pool_;
   libevent::Base* const event_base_;
 

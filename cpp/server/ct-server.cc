@@ -29,7 +29,9 @@
 #include "monitoring/monitoring.h"
 #include "monitoring/registry.h"
 #include "server/handler.h"
+#include "server/json_output.h"
 #include "server/metrics.h"
+#include "server/proxy.h"
 #include "util/etcd.h"
 #include "util/fake_etcd.h"
 #include "util/libevent_wrapper.h"
@@ -94,9 +96,11 @@ using cert_trans::EtcdConsistentStore;
 using cert_trans::FakeEtcdClient;
 using cert_trans::FileStorage;
 using cert_trans::HttpHandler;
+using cert_trans::JsonOutput;
 using cert_trans::LoggedCertificate;
 using cert_trans::MasterElection;
 using cert_trans::PeriodicClosure;
+using cert_trans::Proxy;
 using cert_trans::ReadPrivateKey;
 using cert_trans::StrictConsistentStore;
 using cert_trans::ThreadPool;
@@ -449,8 +453,13 @@ int main(int argc, char* argv[]) {
   thread node_refresh(&RefreshNodeState, &cluster_controller);
 
   ThreadPool pool;
-  HttpHandler handler(&log_lookup, db, &checker, &frontend, &pool,
-                      event_base.get());
+  JsonOutput output(event_base.get());
+  Proxy proxy(event_base.get(), &output,
+              bind(&ClusterStateController<LoggedCertificate>::GetFreshNodes,
+                   &cluster_controller),
+              &url_fetcher, &pool);
+  HttpHandler handler(&output, &log_lookup, db, &cluster_controller, &checker,
+                      &frontend, &proxy, &pool, event_base.get());
 
   libevent::HttpServer server(*event_base);
   handler.Add(&server);

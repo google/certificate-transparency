@@ -22,6 +22,7 @@ using ct::SignedTreeHead;
 using std::make_shared;
 using std::shared_ptr;
 using std::string;
+using std::vector;
 using testing::AnyNumber;
 using testing::NiceMock;
 using testing::Return;
@@ -629,6 +630,86 @@ TEST_F(ClusterStateControllerTest, TestWaitsToStoreSTHInDatabaseWhenStale) {
     EXPECT_EQ(Database<LoggedCertificate>::LOOKUP_OK,
               test_db_.db()->LatestTreeHead(&db_sth));
     EXPECT_EQ(sth2.DebugString(), db_sth.DebugString());
+  }
+}
+
+
+TEST_F(ClusterStateControllerTest, TestNodeIsStale) {
+  EXPECT_TRUE(controller_.NodeIsStale());  // no STH yet.
+
+  {
+    SignedTreeHead sth;
+    sth.set_timestamp(10000);
+    sth.set_tree_size(0);
+    store1_->SetServingSTH(sth);
+    sleep(1);
+  }
+
+  EXPECT_FALSE(controller_.NodeIsStale());  // Have an STH we can serve.
+
+  {
+    SignedTreeHead sth;
+    sth.set_timestamp(10001);
+    sth.set_tree_size(1);
+    store1_->SetServingSTH(sth);
+    sleep(1);
+  }
+
+  EXPECT_TRUE(controller_.NodeIsStale());  // DB doesn't have the leaf
+
+  {
+    LoggedCertificate cert;
+    cert.RandomForTest();
+    cert.set_sequence_number(0);
+    EXPECT_EQ(test_db_.db()->CreateSequencedEntry(cert),
+              Database<LoggedCertificate>::OK);
+  }
+
+  EXPECT_FALSE(controller_.NodeIsStale());
+}
+
+
+TEST_F(ClusterStateControllerTest, TestGetFreshNodes) {
+  ClusterStateController<LoggedCertificate> c2(&pool_, base_, &url_fetcher_,
+                                               test_db_.db(), store2_.get(),
+                                               &election2_, &fetcher_);
+  ClusterStateController<LoggedCertificate> c3(&pool_, base_, &url_fetcher_,
+                                               test_db_.db(), store3_.get(),
+                                               &election3_, &fetcher_);
+  store1_->SetClusterNodeState(cns100_);
+  store2_->SetClusterNodeState(cns200_);
+  store3_->SetClusterNodeState(cns300_);
+
+  {
+    vector<ClusterNodeState> fresh(controller_.GetFreshNodes());
+    EXPECT_EQ(0, fresh.size());  // no STH yet - everyone is stale.
+  }
+
+  // The 3 nodes have states which claim to have 100, 200, and 300 certs in
+  // their DBs, iterate around setting the ServingSTH higher and higher to see
+  // that they all go stale at the appropriate time.
+  // This should knock out nodes based on store1_, store2_, store3_ in that
+  // same order.
+  const vector<vector<string>> kExpectedFreshNodes{
+      {kNodeId2, kNodeId3},  // not including ourself (kNodeId1)
+      {kNodeId2, kNodeId3},  // kNodeId1 is stale this time, so no change.
+      {kNodeId3},
+      {}};
+  for (int i = 0; i < 4; ++i) {
+    LOG(INFO) << "Iteration " << i;
+    SignedTreeHead sth;
+    sth.set_timestamp(i * 100 + 1);
+    sth.set_tree_size(i * 100 + 1);
+    store1_->SetServingSTH(sth);
+    store2_->SetServingSTH(sth);
+    store3_->SetServingSTH(sth);
+    sleep(1);
+
+    vector<string> ids;
+    for (const auto& n : controller_.GetFreshNodes()) {
+      ids.push_back(n.node_id());
+    }
+    EXPECT_EQ(ids, kExpectedFreshNodes[i]);
   }
 }
 
