@@ -56,6 +56,16 @@ util::Status StrictConsistentStore<Logged>::SetClusterConfig(
 }
 
 
+template <class Logged>
+util::Status StrictConsistentStore<Logged>::CleanupOldEntries() {
+  if (!election_->IsMaster()) {
+    return util::Status(util::error::PERMISSION_DENIED,
+                        "Not currently master.");
+  }
+  return peer_->CleanupOldEntries();
+}
+
+
 }  // namespace cert_trans
 
 

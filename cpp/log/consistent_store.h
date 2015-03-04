@@ -156,6 +156,8 @@ class ConsistentStore {
 
   virtual util::Status SetClusterConfig(const ct::ClusterConfig& config) = 0;
 
+  virtual util::Status CleanupOldEntries() = 0;
+
  private:
   DISALLOW_COPY_AND_ASSIGN(ConsistentStore);
 };

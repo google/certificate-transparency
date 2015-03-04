@@ -126,8 +126,8 @@ class EtcdConsistentStoreTest : public ::testing::Test {
     }
   }
 
-  util::Status RunOneCleanUpIteration(int clean_up_to_seq) {
-    return store_->RunOneCleanUpIteration(clean_up_to_seq);
+  util::Status CleanupOldEntries() {
+    return store_->CleanupOldEntries();
   }
 
   template <class T>
@@ -563,11 +563,11 @@ TEST_F(EtcdConsistentStoreTest, WatchClusterConfig) {
 TEST_F(EtcdConsistentStoreTest, TestDoesNotCleanUpIfNotMaster) {
   EXPECT_CALL(election_, IsMaster()).WillRepeatedly(Return(false));
   EXPECT_EQ(util::error::PERMISSION_DENIED,
-            RunOneCleanUpIteration(234).CanonicalCode());
+            CleanupOldEntries().CanonicalCode());
 }
 
 
-TEST_F(EtcdConsistentStoreTest, TestCleansUpOnNewSTH) {
+TEST_F(EtcdConsistentStoreTest, TestCleansUpToNewSTH) {
   PopulateForCleanupTests(5, 4, 100);
 
   // Be sure about our starting state of sequenced entries so we can compare
@@ -599,7 +599,7 @@ TEST_F(EtcdConsistentStoreTest, TestCleansUpOnNewSTH) {
   sth.set_timestamp(345345);
   sth.set_tree_size(103);
   CHECK(store_->SetServingSTH(sth).ok());
-  sleep(1);
+  CHECK_EQ(util::Status::OK, CleanupOldEntries());
 
   // Check that they were cleaned up:
   seq_entries.clear();
@@ -613,7 +613,7 @@ TEST_F(EtcdConsistentStoreTest, TestCleansUpOnNewSTH) {
   sth.set_timestamp(sth.timestamp() + 1);
   sth.set_tree_size(105);
   CHECK(store_->SetServingSTH(sth).ok());
-  sleep(1);
+  CHECK_EQ(util::Status::OK, CleanupOldEntries());
 
   // Ensure they were:
   seq_entries.clear();
