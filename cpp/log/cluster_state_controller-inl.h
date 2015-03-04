@@ -141,11 +141,35 @@ template <class Logged>
 void ClusterStateController<Logged>::NewTreeHead(
     const ct::SignedTreeHead& sth) {
   std::unique_lock<std::mutex> lock(mutex_);
+  ct::SignedTreeHead db_sth;
+  const typename Database<Logged>::LookupResult result(
+      database_->LatestTreeHead(&db_sth));
+
+  const bool serving_sth_newer_than_db_sth(
+      actual_serving_sth_ &&
+      ((result == Database<Logged>::LOOKUP_OK &&
+        db_sth.tree_size() <= actual_serving_sth_->tree_size() &&
+        db_sth.timestamp() < actual_serving_sth_->timestamp()) ||
+       (result == Database<Logged>::NOT_FOUND)));
+
+  // Check whether this updated tree head would enable us to start serving the
+  // current cluster serving STH. If so, we'll store it to the local DB below.
+  const bool write_sth(serving_sth_newer_than_db_sth &&
+                       sth.tree_size() >= actual_serving_sth_->tree_size());
+
   if (local_node_state_.has_newest_sth()) {
     CHECK_GE(sth.timestamp(), local_node_state_.newest_sth().timestamp());
   }
   local_node_state_.mutable_newest_sth()->CopyFrom(sth);
   PushLocalNodeState(lock);
+
+  if (write_sth) {
+    // TODO(alcutter): Perhaps we need to know about updates to the contiguous
+    // tree size in the DB again, so that we can write this out as soon as
+    // we're able to serve it.
+    CHECK_EQ(Database<Logged>::OK,
+             database_->WriteTreeHead(*actual_serving_sth_));
+  }
 }
 
 
@@ -309,6 +333,12 @@ void ClusterStateController<Logged>::OnServingSthUpdated(
         break;
       default:
         LOG(FATAL) << "Problem looking up local DB's latest STH.";
+    }
+
+    if (database_->TreeSize() < actual_serving_sth_->tree_size()) {
+      LOG(INFO) << "Local node doesn't yet have all entries for "
+                << "serving STH, not writing to DB.";
+      write_sth = false;
     }
 
     if (write_sth) {
