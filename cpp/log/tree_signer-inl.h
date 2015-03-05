@@ -242,32 +242,36 @@ typename TreeSigner<Logged>::UpdateResult TreeSigner<Logged>::UpdateTree() {
     return INSUFFICIENT_DATA;
   }
 
+  // TODO(alcutter): We probably should just be appending the entries we have
+  // locally and allow the followers to fetch the latest entries via the master
+  // node.
+  std::vector<EntryHandle<Logged>> sequenced_entries;
+  util::Status status(
+      consistent_store_->GetSequencedEntries(&sequenced_entries));
+  if (!status.ok()) {
+    LOG(WARNING) << "Failed to GetSequencedEntries: " << status;
+    return DB_ERROR;
+  }
+  typename std::vector<EntryHandle<Logged>>::const_iterator it(
+      sequenced_entries.begin());
+  while (it != sequenced_entries.end() &&
+         it->Entry().sequence_number() < next_seq) {
+    ++it;
+  }
+
   VLOG(1) << "Building tree starting from " << next_seq;
-  while (true) {
-    EntryHandle<Logged> logged;
-    util::Status status(
-        consistent_store_->GetSequencedEntry(next_seq, &logged));
-    if (status.CanonicalCode() == util::error::NOT_FOUND) {
-      // no more certs to integrate (or a gap in the sequence numbers, but
-      // that'd be bad so we should bail anyway.)
-      break;
-    } else if (!status.ok()) {
-      LOG(WARNING) << "problem getting sequenced entry " << next_seq << ": "
-                   << status;
-      return DB_ERROR;
-    }
-
+  for (; it != sequenced_entries.end(); ++it) {
     // Paranoid much?
-    CHECK(logged.Entry().has_sequence_number());
-    CHECK_EQ(next_seq, logged.Entry().sequence_number());
+    CHECK(it->Entry().has_sequence_number());
+    CHECK_EQ(next_seq, it->Entry().sequence_number());
 
-    if (!Append(logged.Entry())) {
-      LOG(ERROR) << "Assigning sequence number failed";
+    if (!Append(it->Entry())) {
+      LOG(ERROR) << "Appending entry failed";
       return DB_ERROR;
     }
 
-    if (logged.Entry().timestamp() > min_timestamp) {
-      min_timestamp = logged.Entry().timestamp();
+    if (it->Entry().timestamp() > min_timestamp) {
+      min_timestamp = it->Entry().timestamp();
     }
     ++next_seq;
   }
