@@ -30,12 +30,12 @@ type NewMerkleTreeDataInterface interface {
 	// the tree, and returns the contents of the leaf.  For a given
 	// |index| in a given tree, the value returned **MUST NOT** ever
 	// change, or the whole point of a merkle tree is defeated.
-	EntryAt func (index uint64) []byte
+	EntryAt(index uint64) []byte
 
 	// Size returns the number of entries currently in the tree.  The
 	// value returned by this function must never decrease between
 	// calls; it is OK for the value to increase over time.
-	Size func () uint64
+	Size() uint64
 }
 
 // NewMerkleTreeCacheInterface provides a means for a merkle tree to cache
@@ -43,8 +43,8 @@ type NewMerkleTreeDataInterface interface {
 // on the fly, it is far more efficient to be able to cache recently-used
 // values, to avoid needing to rehash everything.
 type NewMerkleTreeCacheInterface interface {
-	GetNode func ([]byte) Hash
-	SetNode func ([]byte, Hash)
+	GetNode([]byte) Hash
+	SetNode([]byte, Hash)
 }
 
 type NewMerkleTree struct {
@@ -55,7 +55,7 @@ type NewMerkleTree struct {
 	dao   *NewMerkleTreeDataInterface
 	cache *NewMerkleTreeCacheInterface
 
-	hasher func ([]byte) []byte
+	hasher func([]byte) []byte
 }
 
 // New creates a new merkle hash tree.  The number of "leaves" of the tree,
@@ -63,5 +63,5 @@ type NewMerkleTree struct {
 // have acceptable performance on non-trivial tree sizes, you'll want to
 // provide |cache| (otherwise, pass `nil`).  The hash function used for all
 // nodes in the tree is specified by |hasher|.
-func New(dao *NewMerkleTreeDataInterface, cache *NewMerkleTreeCacheInterface, hasher func ([]byte) []byte) *NewMerkleTree {
+func New(dao *NewMerkleTreeDataInterface, cache *NewMerkleTreeCacheInterface, hasher func([]byte) []byte) *NewMerkleTree {
 }
