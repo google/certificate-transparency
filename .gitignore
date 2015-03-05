@@ -9,7 +9,7 @@
 *.so
 *_pb2.py
 *~
-.*.swp
+.*.sw[lmnop]
 .depend
 
 # More specific files.
