@@ -497,8 +497,8 @@ struct EtcdClient::WatchState {
 };
 
 
-EtcdClient::WatchUpdate::WatchUpdate(const Node& node, const bool exists)
-    : node_(node), exists_(exists) {
+EtcdClient::WatchUpdate::WatchUpdate(const Node& node)
+    : node_(node), exists_(!node_.deleted_) {
 }
 
 
@@ -544,7 +544,9 @@ void EtcdClient::WatchInitialGetAllDone(WatchState* state, util::Status status,
     if (it == state->known_keys_.end() || it->second < node.modified_index_) {
       VLOG(1) << "WatchGet " << state << " : updated node " << node.key_
               << " @ " << node.modified_index_;
-      updates.emplace_back(WatchUpdate(node, true /*exists*/));
+      // Nodes received in an initial get should *always* exist!
+      CHECK(!node.deleted_);
+      updates.emplace_back(WatchUpdate(node));
     }
 
     new_known_keys[node.key_] = node.modified_index_;
@@ -560,8 +562,9 @@ void EtcdClient::WatchInitialGetAllDone(WatchState* state, util::Status status,
     // TODO(pphaneuf): Passing in -1 for the created and modified
     // indices, is that a problem? We do have a "last known" modified
     // index in key.second...
-    updates.emplace_back(WatchUpdate(EtcdClient::Node(-1, -1, key.first, ""),
-                                     false /*exists*/));
+    Node node(-1, -1, key.first, "");
+    node.deleted_ = true;
+    updates.emplace_back(WatchUpdate(node));
   }
 
   state->known_keys_.swap(new_known_keys);
@@ -597,13 +600,12 @@ StatusOr<EtcdClient::WatchUpdate> UpdateForNode(const JsonObject& node) {
   if (value.Ok()) {
     return StatusOr<EtcdClient::WatchUpdate>(EtcdClient::WatchUpdate(
         EtcdClient::Node(createdIndex.Value(), modifiedIndex.Value(),
-                         key.Value(), value.Value()),
-        true /*exists*/));
+                         key.Value(), value.Value())));
   } else {
-    return StatusOr<EtcdClient::WatchUpdate>(EtcdClient::WatchUpdate(
-        EtcdClient::Node(createdIndex.Value(), modifiedIndex.Value(),
-                         key.Value(), ""),
-        false /*exists*/));
+    EtcdClient::Node node(createdIndex.Value(), modifiedIndex.Value(),
+                          key.Value(), "");
+    node.deleted_ = true;
+    return StatusOr<EtcdClient::WatchUpdate>(EtcdClient::WatchUpdate(node));
   }
 }
 

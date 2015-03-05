@@ -45,7 +45,7 @@ class EtcdClient {
 
   struct WatchUpdate {
     WatchUpdate();
-    WatchUpdate(const Node& node, const bool exists);
+    WatchUpdate(const Node& node);
 
     const Node node_;
     const bool exists_;
