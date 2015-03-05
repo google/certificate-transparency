@@ -1,7 +1,7 @@
 #!/bin/bash
 set -e
 DIR=$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )
-CLOUD="gcloud preview"
+KUBECTL="gcloud preview container kubectl"
 
-${CLOUD} container replicationcontrollers create --config-file=${DIR}/super_duper_replication.json
-${CLOUD} container services create --config-file=${DIR}/super_duper_service.json
+${KUBECTL} create --filename=${DIR}/super_duper_replication.json
+${KUBECTL} create --filename=${DIR}/super_duper_service.json

@@ -89,13 +89,13 @@ echo "Populating etcd with default entries..."
 PopulateEtcd
 
 echo "============================================================="
+echo "Creating superduper instances..."
+${DIR}/start_log.sh
+
+echo "============================================================="
 echo "Starting prometheus..."
 ${DIR}/start_prometheus.sh
 ${DIR}/update_prometheus_config.sh
-
-echo "============================================================="
-echo "Creating superduper instances..."
-${DIR}/start_log.sh
 
 echo "============================================================="
 echo "Creating forwarding rules..."
