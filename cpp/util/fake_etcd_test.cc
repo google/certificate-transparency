@@ -42,13 +42,6 @@ const char kValue[] = "value";
 const char kValue2[] = "value2";
 
 
-template <class A>
-void CopyCallback1(Notification* notifier, A* out, const A& in) {
-  *out = in;
-  notifier->Notify();
-}
-
-
 template <class A, class B>
 void CopyCallback2(Notification* notifier, A* a_out, B* b_out, const A& a_in,
                    const B& b_in) {
@@ -146,25 +139,23 @@ class FakeEtcdTest : public ::testing::Test {
 
   Status BlockingForceSet(const string& key, const string& value,
                           int64_t* modified_index) {
-    Notification notifier;
-    Status status;
-    client_.ForceSet(key, value,
-                     bind(&CopyCallback2<Status, int64_t>, &notifier, &status,
-                          modified_index, _1, _2));
-    notifier.WaitForNotification();
-    return status;
+    SyncTask task(base_.get());
+    EtcdClient::Response resp;
+    client_.ForceSet(key, value, &resp, task.task());
+    task.Wait();
+    *modified_index = resp.etcd_index;
+    return task.status();
   }
 
   Status BlockingForceSetWithTTL(const string& key, const string& value,
                                  const duration<int>& ttl,
                                  int64_t* modified_index) {
-    Notification notifier;
-    Status status;
-    client_.ForceSetWithTTL(key, value, ttl,
-                            bind(&CopyCallback2<Status, int64_t>, &notifier,
-                                 &status, modified_index, _1, _2));
-    notifier.WaitForNotification();
-    return status;
+    SyncTask task(base_.get());
+    EtcdClient::Response resp;
+    client_.ForceSetWithTTL(key, value, ttl, &resp, task.task());
+    task.Wait();
+    *modified_index = resp.etcd_index;
+    return task.status();
   }
 
   Status BlockingDelete(const string& key, int64_t previous_index) {

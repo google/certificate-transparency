@@ -183,7 +183,6 @@ class MockCallbacks {
                void(Status status, const vector<EtcdClient::Node>& nodes));
   MOCK_METHOD3(CreateInQueueCallback,
                void(Status status, const string& key, int64_t created_index));
-  MOCK_METHOD2(ForceSetCallback, void(Status status, int64_t new_index));
 
  private:
   DISALLOW_COPY_AND_ASSIGN(MockCallbacks);
@@ -444,55 +443,55 @@ TEST_F(EtcdTest, TestUpdateWithTTLFails) {
 }
 
 TEST_F(EtcdTest, TestForceSetForPreexistingKey) {
-  Notification done;
   EXPECT_CALL(client_, Generic(kEntryKey, _, UrlFetcher::Verb::PUT, _, _))
       .WillOnce(Invoke(
           bind(&GenericReturn, Status::OK, MakeJson(kUpdateJson), 1, _4, _5)));
-  EXPECT_CALL(callbacks_, ForceSetCallback(Status::OK, 6))
-      .WillOnce(Invoke(bind(&Notification::Notify, &done)));
-  client_.ForceSet(kEntryKey, "123", bind(&MockCallbacks::ForceSetCallback,
-                                          &callbacks_, _1, _2));
-  EXPECT_TRUE(done.WaitForNotificationWithTimeout(kTimeout));
+  SyncTask task(base_.get());
+  EtcdClient::Response resp;
+  client_.ForceSet(kEntryKey, "123", &resp, task.task());
+  task.Wait();
+  EXPECT_EQ(Status::OK, task.status());
+  EXPECT_EQ(6, resp.etcd_index);
 }
 
 TEST_F(EtcdTest, TestForceSetForNewKey) {
-  Notification done;
   EXPECT_CALL(client_, Generic(kEntryKey, _, UrlFetcher::Verb::PUT, _, _))
       .WillOnce(Invoke(
           bind(&GenericReturn, Status::OK, MakeJson(kCreateJson), 1, _4, _5)));
-  EXPECT_CALL(callbacks_, ForceSetCallback(Status::OK, 6))
-      .WillOnce(Invoke(bind(&Notification::Notify, &done)));
-  client_.ForceSet(kEntryKey, "123", bind(&MockCallbacks::ForceSetCallback,
-                                          &callbacks_, _1, _2));
-  EXPECT_TRUE(done.WaitForNotificationWithTimeout(kTimeout));
+  SyncTask task(base_.get());
+  EtcdClient::Response resp;
+  client_.ForceSet(kEntryKey, "123", &resp, task.task());
+  task.Wait();
+  EXPECT_EQ(Status::OK, task.status());
+  EXPECT_EQ(6, resp.etcd_index);
 }
 
 TEST_F(EtcdTest, TestForceSetWithTTLForPreexistingKey) {
-  Notification done;
   EXPECT_CALL(client_, Generic(kEntryKey, Contains(Pair(kTtlParam, "100")),
                                UrlFetcher::Verb::PUT, _, _))
       .WillOnce(Invoke(
           bind(&GenericReturn, Status::OK, MakeJson(kUpdateJson), 1, _4, _5)));
-  EXPECT_CALL(callbacks_, ForceSetCallback(Status::OK, 6))
-      .WillOnce(Invoke(bind(&Notification::Notify, &done)));
+  SyncTask task(base_.get());
+  EtcdClient::Response resp;
   client_.ForceSetWithTTL(kEntryKey, "123", std::chrono::duration<int>(100),
-                          bind(&MockCallbacks::ForceSetCallback, &callbacks_,
-                               _1, _2));
-  EXPECT_TRUE(done.WaitForNotificationWithTimeout(kTimeout));
+                          &resp, task.task());
+  task.Wait();
+  EXPECT_EQ(Status::OK, task.status());
+  EXPECT_EQ(6, resp.etcd_index);
 }
 
 TEST_F(EtcdTest, TestForceSetWithTTLForNewKey) {
-  Notification done;
   EXPECT_CALL(client_, Generic(kEntryKey, Contains(Pair(kTtlParam, "100")),
                                UrlFetcher::Verb::PUT, _, _))
       .WillOnce(Invoke(
           bind(&GenericReturn, Status::OK, MakeJson(kCreateJson), 1, _4, _5)));
-  EXPECT_CALL(callbacks_, ForceSetCallback(Status::OK, 6))
-      .WillOnce(Invoke(bind(&Notification::Notify, &done)));
+  SyncTask task(base_.get());
+  EtcdClient::Response resp;
   client_.ForceSetWithTTL(kEntryKey, "123", std::chrono::duration<int>(100),
-                          bind(&MockCallbacks::ForceSetCallback, &callbacks_,
-                               _1, _2));
-  EXPECT_TRUE(done.WaitForNotificationWithTimeout(kTimeout));
+                          &resp, task.task());
+  task.Wait();
+  EXPECT_EQ(Status::OK, task.status());
+  EXPECT_EQ(6, resp.etcd_index);
 }
 
 TEST_F(EtcdTest, TestDelete) {

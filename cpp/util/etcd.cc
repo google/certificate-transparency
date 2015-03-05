@@ -22,7 +22,6 @@ using std::max;
 using std::move;
 using std::mutex;
 using std::ostringstream;
-using std::pair;
 using std::placeholders::_1;
 using std::placeholders::_2;
 using std::placeholders::_3;
@@ -35,7 +34,6 @@ using std::vector;
 using util::Status;
 using util::StatusOr;
 using util::Task;
-using util::TaskHold;
 
 DEFINE_int32(etcd_watch_error_retry_delay_seconds, 5,
              "delay between retrying etcd watch requests");
@@ -363,33 +361,30 @@ void UpdateRequestDone(EtcdClient::Response* resp, Task* parent_task,
 }
 
 
-void ForceSetRequestDone(EtcdClient::GenericResponse* gen_resp,
-                         const EtcdClient::ForceSetCallback& cb, Task* task) {
-  const unique_ptr<EtcdClient::GenericResponse> gen_resp_deleter(gen_resp);
-  const unique_ptr<Task> task_deleter(task);
-
+void ForceSetRequestDone(EtcdClient::Response* resp, Task* parent_task,
+                         EtcdClient::GenericResponse* gen_resp, Task* task) {
+  *resp = EtcdClient::Response();
   if (!task->status().ok()) {
-    cb(task->status(), -1);
+    parent_task->Return(task->status());
     return;
   }
 
   const JsonObject node(*gen_resp->json_body, "node");
   if (!node.Ok()) {
-    cb(Status(util::error::FAILED_PRECONDITION,
-              "Invalid JSON: Couldn't find 'node'"),
-       0);
+    parent_task->Return(Status(util::error::FAILED_PRECONDITION,
+                               "Invalid JSON: Couldn't find 'node'"));
     return;
   }
 
   const JsonInt modifiedIndex(node, "modifiedIndex");
   if (!modifiedIndex.Ok()) {
-    cb(Status(util::error::FAILED_PRECONDITION,
-              "Invalid JSON: Couldn't find 'modifiedIndex'"),
-       0);
+    parent_task->Return(Status(util::error::FAILED_PRECONDITION,
+                               "Invalid JSON: Couldn't find 'modifiedIndex'"));
     return;
   }
 
-  cb(Status::OK, modifiedIndex.Value());
+  resp->etcd_index = modifiedIndex.Value();
+  parent_task->Return();
 }
 
 
@@ -943,26 +938,28 @@ void EtcdClient::UpdateWithTTL(const string& key, const string& value,
 
 
 void EtcdClient::ForceSet(const string& key, const string& value,
-                          const ForceSetCallback& cb) {
+                          Response* resp, util::Task* task) {
   map<string, string> params;
   params["value"] = value;
   GenericResponse* const gen_resp(new GenericResponse);
+  task->DeleteWhenDone(gen_resp);
   Generic(key, params, UrlFetcher::Verb::PUT, gen_resp,
-          new Task(bind(&ForceSetRequestDone, gen_resp, cb, _1),
-                   event_base_.get()));
+          task->AddChild(
+              bind(&ForceSetRequestDone, resp, task, gen_resp, _1)));
 }
 
 
 void EtcdClient::ForceSetWithTTL(const string& key, const string& value,
-                                 const seconds& ttl,
-                                 const ForceSetCallback& cb) {
+                                 const seconds& ttl, Response* resp,
+                                 util::Task* task) {
   map<string, string> params;
   params["value"] = value;
   params["ttl"] = to_string(ttl.count());
   GenericResponse* const gen_resp(new GenericResponse);
+  task->DeleteWhenDone(gen_resp);
   Generic(key, params, UrlFetcher::Verb::PUT, gen_resp,
-          new Task(bind(&ForceSetRequestDone, gen_resp, cb, _1),
-                   event_base_.get()));
+          task->AddChild(
+              bind(&ForceSetRequestDone, resp, task, gen_resp, _1)));
 }
 
 

@@ -70,8 +70,6 @@ class EtcdClient {
                              int64_t etcd_index)> GetAllCallback;
   typedef std::function<void(util::Status status, const std::string& key,
                              int64_t index)> CreateInQueueCallback;
-  typedef std::function<void(util::Status status, int64_t new_index)>
-      ForceSetCallback;
   typedef std::function<void(const std::vector<WatchUpdate>& updates)>
       WatchCallback;
 
@@ -104,11 +102,11 @@ class EtcdClient {
                      util::Task* task);
 
   void ForceSet(const std::string& key, const std::string& value,
-                const ForceSetCallback& cb);
+                Response* resp, util::Task* task);
 
   void ForceSetWithTTL(const std::string& key, const std::string& value,
-                       const std::chrono::seconds& ttl,
-                       const ForceSetCallback& cb);
+                       const std::chrono::seconds& ttl, Response* resp,
+                       util::Task* task);
 
   void Delete(const std::string& key, const int64_t current_index,
               util::Task* task);

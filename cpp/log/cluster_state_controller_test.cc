@@ -37,8 +37,13 @@ const char kNodeId3[] = "node3";
 
 class ClusterStateControllerTest : public ::testing::Test {
  public:
+  // TODO(pphaneuf): The size of the thread pool is a bit of a magic
+  // number... We have some callbacks that block, so it has to be "at
+  // least this" (so we're setting it explicitly, in case your machine
+  // doesn't have enough cores). We should hunt down those blocking
+  // callbacks.
   ClusterStateControllerTest()
-      : pool_(2),
+      : pool_(3),
         base_(make_shared<libevent::Base>()),
         pump_(base_),
         etcd_(base_),

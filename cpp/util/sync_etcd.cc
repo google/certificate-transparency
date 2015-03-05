@@ -172,17 +172,24 @@ Status SyncEtcdClient::UpdateWithTTL(const string& key, const string& value,
 
 Status SyncEtcdClient::ForceSet(const string& key, const string& value,
                                 int64_t* new_index) {
-  return BlockingCall(bind(&EtcdClient::ForceSet, client_, key, value, _1),
-                      new_index);
+  SyncTask task(executor_);
+  EtcdClient::Response resp;
+  client_->ForceSet(key, value, &resp, task.task());
+  task.Wait();
+  *new_index = resp.etcd_index;
+  return task.status();
 }
 
 
 Status SyncEtcdClient::ForceSetWithTTL(const string& key, const string& value,
                                        const std::chrono::duration<int>& ttl,
                                        int64_t* new_index) {
-  return BlockingCall(bind(&EtcdClient::ForceSetWithTTL, client_, key, value,
-                           ttl, _1),
-                      new_index);
+  SyncTask task(executor_);
+  EtcdClient::Response resp;
+  client_->ForceSetWithTTL(key, value, ttl, &resp, task.task());
+  task.Wait();
+  *new_index = resp.etcd_index;
+  return task.status();
 }
 
 
