@@ -1,10 +1,12 @@
 #!/bin/bash
+DIR=$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )
+source ${DIR}/util.sh
+
 set -e
 DIR=$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )
 CLOUD="gcloud"
 KUBECTL="gcloud preview container kubectl"
 TMP_CONFIG="/tmp/prometheus.conf"
-
 PROMETHEUS_VM_HOST=$(${KUBECTL} get pods -l name=prometheus-node | awk -- '
   /prometheus-replication/ { split($5, a, "."); print a[1]}')
 
@@ -19,17 +21,24 @@ LOG_HOSTS=$(${KUBECTL} get pods -l name=log-node | awk -- '
   }
 ')
 
+
 sed -- "s^@@TARGETS@@^${LOG_HOSTS}^g" < ${DIR}/../prometheus/prometheus.conf > ${TMP_CONFIG}
+
+WaitForPod "prometheus-node"
 
 ${CLOUD} compute copy-files \
   ${TMP_CONFIG} ${PROMETHEUS_VM_HOST}:.
 ${CLOUD} compute ssh ${PROMETHEUS_VM_HOST} --command "
+  ls -l /tmp &&
+  ls -l /tmp/prometheus-config &&
   sudo mv prometheus.conf /tmp/prometheus-config/prometheus.conf &&
   sudo chmod 644 /tmp/prometheus-config/prometheus.conf"
 ${CLOUD} compute ssh ${PROMETHEUS_VM_HOST} --command '
-  CONTAINER=$(sudo docker ps | grep k8s_prometheus | awk -- "{print \$1}" ) &&
-  echo "Restarting prometheus container ${CONTAINER}..." &&
-  sudo docker restart ${CONTAINER}'
-
-
+  CONTAINER=$(sudo docker ps | grep k8s_prometheus | awk -- "{print \$1}" )
+  if [ "${CONTAINER}" != "" ]; then
+    echo "Restarting prometheus container ${CONTAINER}..."
+    sudo docker restart ${CONTAINER}
+  else
+    echo "Prometheus container not yet running."
+  fi'
 

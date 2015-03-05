@@ -5,3 +5,4 @@ KUBECTL="gcloud preview container kubectl"
 REPLICATION="prometheus-replication"
 
 ${KUBECTL} stop rc ${REPLICATION}
+${KUBECTL} delete service prometheus-service

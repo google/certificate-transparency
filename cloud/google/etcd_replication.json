@@ -36,9 +36,7 @@
             }],
             "env": [{
               "name": "DISCOVERY",
-              POPULATE "value" WITH A NEW URL FROM https://discovery.etcd.io/new
-              EACH TIME YOU TURN AN ETCD REPLICATION UP!
-              "value": "your discovery url here"
+              "value": "@@DISCOVERY@@"
             }]
           }]
         }
