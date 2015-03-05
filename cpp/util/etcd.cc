@@ -186,17 +186,19 @@ void GetAllRequestDone(const string& dir,
     cb(Status(util::error::FAILED_PRECONDITION,
               "Invalid JSON: Couldn't find 'dir'"),
        vector<EtcdClient::Node>(), -1);
+    return;
   }
 
   if (!isDir.Value()) {
     cb(Status(util::error::INVALID_ARGUMENT, "Not a directory"),
        vector<EtcdClient::Node>(), -1);
+    return;
   }
 
   const JsonArray value_nodes(node, "nodes");
   if (!value_nodes.Ok()) {
     // Directory is empty.
-    cb(Status::OK, vector<EtcdClient::Node>(), -1);
+    cb(Status::OK, vector<EtcdClient::Node>(), gen_resp->etcd_index);
     return;
   }
 
