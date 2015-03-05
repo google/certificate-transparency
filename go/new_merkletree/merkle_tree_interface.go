@@ -1,11 +1,11 @@
-package merkletree
+package new_merkletree
 
 type Hash []byte
 
-// MerkleTreeInterface is the set of methods which are required to
+// NewMerkleTreeInterface is the set of methods which are required to
 // manipulate the contents of a Merkle Hash Tree (that is, add new entries),
 // and to query the tree for inclusion and transparency proofs.
-type MerkleTreeInterface interface {
+type NewMerkleTreeInterface interface {
 	// CurrentRootHash returns the hash of the entire current tree.
 	CurrentRootHash() (Hash, error)
 
@@ -22,10 +22,10 @@ type MerkleTreeInterface interface {
 	ConsistencyProof(tree1 uint64, tree2 uint64) ([]Hash, error)
 }
 
-// MerkleTreeDataInterface defines the means by which a merkle hash tree can
+// NewMerkleTreeDataInterface defines the means by which a merkle hash tree can
 // retrieve data from an arbitrary data store, without tying the tree
 // implementation to any particular backend storage technology.
-type MerkleTreeDataInterface interface {
+type NewMerkleTreeDataInterface interface {
 	// EntryAt takes a (0-based) |index| into the list of leaf entries in
 	// the tree, and returns the contents of the leaf.  For a given
 	// |index| in a given tree, the value returned **MUST NOT** ever
@@ -38,22 +38,22 @@ type MerkleTreeDataInterface interface {
 	Size func () uint64
 }
 
-// MerkleTreeCacheInterface provides a means for a merkle tree to cache
+// NewMerkleTreeCacheInterface provides a means for a merkle tree to cache
 // hash values in the tree.  Whilst all hash values *can* be recalculated
 // on the fly, it is far more efficient to be able to cache recently-used
 // values, to avoid needing to rehash everything.
-type MerkleTreeCacheInterface interface {
+type NewMerkleTreeCacheInterface interface {
 	GetNode func ([]byte) Hash
 	SetNode func ([]byte, Hash)
 }
 
-type MerkleTree struct {
+type NewMerkleTree struct {
 	// If a merkle tree you wish to be, you must implement these
 	// functions three.
-	MerkleTreeInterface
+	NewMerkleTreeInterface
 
-	dao   *MerkleTreeDataInterface
-	cache *MerkleTreeCacheInterface
+	dao   *NewMerkleTreeDataInterface
+	cache *NewMerkleTreeCacheInterface
 
 	hasher func ([]byte) []byte
 }
@@ -63,5 +63,5 @@ type MerkleTree struct {
 // have acceptable performance on non-trivial tree sizes, you'll want to
 // provide |cache| (otherwise, pass `nil`).  The hash function used for all
 // nodes in the tree is specified by |hasher|.
-func New(dao *MerkleTreeDataInterface, cache *MerkleTreeCacheInterface, hasher func ([]byte) []byte) *MerkleTree {
+func New(dao *NewMerkleTreeDataInterface, cache *NewMerkleTreeCacheInterface, hasher func ([]byte) []byte) *NewMerkleTree {
 }
