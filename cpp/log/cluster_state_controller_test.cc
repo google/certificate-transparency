@@ -569,7 +569,7 @@ TEST_F(ClusterStateControllerTest, TestNodeHostPort) {
 TEST_F(ClusterStateControllerTest, TestStoresServingSthInDatabase) {
   SignedTreeHead sth;
   sth.set_timestamp(10000);
-  sth.set_tree_size(2000);
+  sth.set_tree_size(0);
   store1_->SetServingSTH(sth);
   sleep(1);
 
@@ -578,6 +578,52 @@ TEST_F(ClusterStateControllerTest, TestStoresServingSthInDatabase) {
     EXPECT_EQ(Database<LoggedCertificate>::LOOKUP_OK,
               test_db_.db()->LatestTreeHead(&db_sth));
     EXPECT_EQ(sth.DebugString(), db_sth.DebugString());
+  }
+}
+
+
+TEST_F(ClusterStateControllerTest, TestWaitsToStoreSTHInDatabaseWhenStale) {
+  SignedTreeHead sth1;
+  sth1.set_timestamp(10000);
+  sth1.set_tree_size(0);
+  store1_->SetServingSTH(sth1);
+  sleep(1);
+
+  {
+    SignedTreeHead db_sth;
+    EXPECT_EQ(Database<LoggedCertificate>::LOOKUP_OK,
+              test_db_.db()->LatestTreeHead(&db_sth));
+    EXPECT_EQ(sth1.DebugString(), db_sth.DebugString());
+  }
+
+  SignedTreeHead sth2;
+  sth2.set_timestamp(10001);
+  sth2.set_tree_size(1);
+  store1_->SetServingSTH(sth2);
+  sleep(1);
+
+  {
+    // Should still show the first STH in sth1, because the local DB
+    // doesn't have the entries under sth2 yet.
+    SignedTreeHead db_sth;
+    EXPECT_EQ(Database<LoggedCertificate>::LOOKUP_OK,
+              test_db_.db()->LatestTreeHead(&db_sth));
+    EXPECT_EQ(sth1.DebugString(), db_sth.DebugString());
+  }
+
+  // Now pretend the local fetcher has got lots of new entries from another
+  // node, and the local signer has integrated them into our local tree:
+  SignedTreeHead new_local_sth;
+  new_local_sth.set_timestamp(10005);
+  new_local_sth.set_tree_size(100);
+  controller_.NewTreeHead(new_local_sth);
+
+  {
+    // Should now see the updated serving sth2
+    SignedTreeHead db_sth;
+    EXPECT_EQ(Database<LoggedCertificate>::LOOKUP_OK,
+              test_db_.db()->LatestTreeHead(&db_sth));
+    EXPECT_EQ(sth2.DebugString(), db_sth.DebugString());
   }
 }
 

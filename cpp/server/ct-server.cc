@@ -223,17 +223,27 @@ void SignMerkleTree(TreeSigner<LoggedCertificate>* tree_signer,
   steady_clock::time_point target_run_time(steady_clock::now());
 
   while (true) {
-    CHECK_EQ(tree_signer->UpdateTree(), TreeSigner<LoggedCertificate>::OK);
-
-    const SignedTreeHead latest_sth(tree_signer->LatestSTH());
-    latest_local_tree_size_gauge->Set(latest_sth.tree_size());
-    controller->NewTreeHead(latest_sth);
+    const TreeSigner<LoggedCertificate>::UpdateResult result(
+        tree_signer->UpdateTree());
+    switch (result) {
+      case TreeSigner<LoggedCertificate>::OK: {
+        const SignedTreeHead latest_sth(tree_signer->LatestSTH());
+        latest_local_tree_size_gauge->Set(latest_sth.tree_size());
+        controller->NewTreeHead(latest_sth);
+        break;
+      }
+      case TreeSigner<LoggedCertificate>::INSUFFICIENT_DATA:
+        LOG(INFO) << "Can't update tree because we don't have all the entries "
+                  << "locally, will try again later.";
+        break;
+      default:
+        LOG(FATAL) << "Error updating tree: " << result;
+    }
 
     const steady_clock::time_point now(steady_clock::now());
     while (target_run_time <= now) {
       target_run_time += period;
     }
-
     std::this_thread::sleep_for(target_run_time - now);
   }
 }
