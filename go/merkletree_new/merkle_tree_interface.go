@@ -1,23 +1,25 @@
 package merkletree
 
-// MerkleTreeInterface is the methods which are required to manipulate the
-// contents of a Merkle Hash Tree (that is, add new entries), and to query
-// the tree for inclusion and transparency proofs.
+type Hash []byte
+
+// MerkleTreeInterface is the set of methods which are required to
+// manipulate the contents of a Merkle Hash Tree (that is, add new entries),
+// and to query the tree for inclusion and transparency proofs.
 type MerkleTreeInterface interface {
 	// CurrentRootHash returns the hash of the entire current tree.
-	CurrentRootHash func () ([]byte, error)
+	CurrentRootHash() (Hash, error)
 
 	// InclusionProof returns a list of the hashes of the "sibling"
 	// nodes to the leaf entry located at the (0-based) index specified.
 	// The returned list is presented in order, starting from the
 	// sibling to the item itself, and ending with a hash that is an
 	// immediate child of the root.
-	InclusionProof func (entry uint64) ([]byte, error)
+	InclusionProof(entry uint64) ([]Hash, error)
 
 	// ConsistencyProof returns a list of the hashes that make up the
 	// consistency proof between the hash trees with size |tree1| and
 	// |tree2|.
-	ConsistencyProof func (sz uint64) ([]byte, error)
+	ConsistencyProof(tree1 uint64, tree2 uint64) ([]Hash, error)
 }
 
 // MerkleTreeDataInterface defines the means by which a merkle hash tree can
@@ -41,8 +43,8 @@ type MerkleTreeDataInterface interface {
 // on the fly, it is far more efficient to be able to cache recently-used
 // values, to avoid needing to rehash everything.
 type MerkleTreeCacheInterface interface {
-	GetNode func ([]byte) []byte
-	SetNode func ([]byte) []byte
+	GetNode func ([]byte) Hash
+	SetNode func ([]byte, Hash)
 }
 
 type MerkleTree struct {
