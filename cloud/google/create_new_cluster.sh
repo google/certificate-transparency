@@ -1,6 +1,12 @@
 #!/bin/bash
 set -e
 DIR=$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )
+KUBECTL="gcloud preview container kubectl"
+
+if [ ! -x ${DIR}/../../cpp/tools/ct-clustertool ]; then
+  echo "Please ensure that cpp/tools/ct-clustertool is built."
+  exit 1
+fi
 
 function WaitForEtcd() {
  gcloud compute ssh k8s-${CLUSTER}-node-1 --command "\
@@ -11,7 +17,7 @@ function WaitForEtcd() {
 }
 
 function PopulateEtcd() {
-  export ETCD=$(gcloud preview container services list | \
+  export ETCD=$(${KUBECTL} get services | \
       grep etcd-service | awk '{print $4":"$5}')
   export ETCD_HOST=${ETCD%%:*}
   export ETCD_PORT=${ETCD##*:}
@@ -22,9 +28,6 @@ function PopulateEtcd() {
     ${PUT} ${ETCD}/v2/keys/root/sequenced/ -d dir=true && \
     ${PUT} ${ETCD}/v2/keys/root/unsequenced/ -d dir=true && \
     ${PUT} ${ETCD}/v2/keys/root/nodes/ -d dir=true"
-  pushd ${DIR}/../../cpp
-  make -j24 tools/ct-clustertool
-  popd
   gcloud compute copy-files ${DIR}/../../cpp/tools/ct-clustertool \
     k8s-${CLUSTER}-node-1:.
   gcloud compute ssh k8s-${CLUSTER}-node-1 --command "\
@@ -33,7 +36,7 @@ function PopulateEtcd() {
       --key=/usr/local/etc/ct-server-key.pem \
       --etcd_host=${ETCD_HOST} \
       --etcd_port=${ETCD_PORT} \
-      --logtostderr --v=2"
+      --logtostderr"
 }
 
 export PROJECT=${PROJECT:-your-gce-project}
@@ -73,7 +76,7 @@ echo "============================================================="
 echo "Creating etcd instances..."
 ${DIR}/start_etcd.sh
 
-export ETCD=$(gcloud preview container services list | \
+export ETCD=$(${KUBECTL} get services | \
     grep etcd-service | awk '{print $4":"$5}')
 export ETCD_HOST=${ETCD%%:*}
 export ETCD_PORT=${ETCD##*:}
@@ -89,13 +92,13 @@ echo "Populating etcd with default entries..."
 PopulateEtcd
 
 echo "============================================================="
+echo "Creating superduper instances..."
+${DIR}/start_log.sh
+
+echo "============================================================="
 echo "Starting prometheus..."
 ${DIR}/start_prometheus.sh
 ${DIR}/update_prometheus_config.sh
-
-echo "============================================================="
-echo "Creating superduper instances..."
-${DIR}/start_log.sh
 
 echo "============================================================="
 echo "Creating forwarding rules..."
@@ -103,16 +106,17 @@ gcloud compute firewall-rules create log-node-80 \
     --allow tcp:80 \
     --target-tags k8s-${CLUSTER}-node
 
+
 echo
 echo "============================================================="
 echo "Services:"
-${CLOUD} container services list
+${KUBECTL} get services
 echo "============================================================="
 echo "Pods:"
-${CLOUD} container pods list
+${KUBECTL} get pods
 echo "============================================================="
 echo "External IPs:"
-${CLOUD} compute forwarding-rules list
+gcloud compute forwarding-rules list
 echo "============================================================="
 
 echo "Job done!"

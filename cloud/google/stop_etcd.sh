@@ -1,10 +1,7 @@
 #!/bin/bash
 set -e
-CLOUD="gcloud preview"
+KUBECTL="gcloud preview container kubectl"
 REPLICATION="etcd-replication"
 
-${CLOUD} container replicationcontrollers delete ${REPLICATION}
-for i in $(${CLOUD} container pods list | grep ${REPLICATION} | cut -f 1 -d' '); do
-  ${CLOUD} container pods delete $i;
-done;
-${CLOUD} container services delete etcd-service
+${KUBECTL} stop rc ${REPLICATION}
+${KUBECTL} delete service etcd-service

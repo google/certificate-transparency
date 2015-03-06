@@ -1,11 +1,12 @@
 #!/bin/bash
-set -e
 DIR=$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )
-CLOUD="gcloud preview"
+source ${DIR}/util.sh
+
+set -e
+KUBECTL="gcloud preview container kubectl"
 REPLICATION="prometheus-replication"
 
-${CLOUD} container replicationcontrollers create \
-  --config-file=${DIR}/prometheus_replication.json
+${KUBECTL} create --filename=${DIR}/prometheus_replication.json
+${KUBECTL} create --filename=${DIR}/prometheus_service.json
 
-${CLOUD} container pods list | awk -- "
-  /${REPLICATION}/ { split(\$5, a, \".\"); print a[1]}"
+WaitForPod "prometheus-node"
