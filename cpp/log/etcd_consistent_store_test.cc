@@ -184,7 +184,10 @@ typedef class EtcdConsistentStoreTest EtcdConsistentStoreDeathTest;
 TEST_F(
     EtcdConsistentStoreDeathTest,
     TestNextAvailableSequenceNumberWhenNoSequencedEntriesOrServingSTHExist) {
-  EXPECT_EQ(0, store_->NextAvailableSequenceNumber().ValueOrDie());
+  util::StatusOr<int64_t> sequence_number(
+      store_->NextAvailableSequenceNumber());
+  ASSERT_EQ(Status::OK, sequence_number.status());
+  EXPECT_EQ(0, sequence_number.ValueOrDie());
 }
 
 
@@ -195,7 +198,10 @@ TEST_F(EtcdConsistentStoreTest,
   InsertEntry(string(kRoot) + "/sequenced/0", one);
   InsertEntry(string(kRoot) + "/sequenced/1", two);
 
-  EXPECT_EQ(2, store_->NextAvailableSequenceNumber().ValueOrDie());
+  util::StatusOr<int64_t> sequence_number(
+      store_->NextAvailableSequenceNumber());
+  ASSERT_EQ(Status::OK, sequence_number.status());
+  EXPECT_EQ(2, sequence_number.ValueOrDie());
 }
 
 
@@ -206,8 +212,10 @@ TEST_F(EtcdConsistentStoreTest,
   serving_sth.set_tree_size(600);
   EXPECT_TRUE(store_->SetServingSTH(serving_sth).ok());
 
-  EXPECT_EQ(serving_sth.tree_size(),
-            store_->NextAvailableSequenceNumber().ValueOrDie());
+  util::StatusOr<int64_t> sequence_number(
+      store_->NextAvailableSequenceNumber());
+  ASSERT_EQ(Status::OK, sequence_number.status());
+  EXPECT_EQ(serving_sth.tree_size(), sequence_number.ValueOrDie());
 }
 
 
@@ -573,7 +581,7 @@ TEST_F(EtcdConsistentStoreTest, TestCleansUpToNewSTH) {
   // Be sure about our starting state of sequenced entries so we can compare
   // later on
   vector<EntryHandle<LoggedCertificate>> seq_entries;
-  CHECK(store_->GetSequencedEntries(&seq_entries).ok());
+  ASSERT_EQ(Status::OK, store_->GetSequencedEntries(&seq_entries));
   EXPECT_EQ(5, seq_entries.size());
 
   // Do the same for the unsequenced entries
