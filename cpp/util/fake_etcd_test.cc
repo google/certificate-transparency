@@ -105,14 +105,13 @@ class FakeEtcdTest : public ::testing::Test {
 
   Status BlockingCreateInQueue(const string& dir, const string& value,
                                string* created_key, int64_t* created_index) {
-    Notification notifier;
-    Status status;
-    client_.CreateInQueue(dir, value,
-                          bind(&CopyCallback3<Status, string, int64_t>,
-                               &notifier, &status, created_key, created_index,
-                               _1, _2, _3));
-    notifier.WaitForNotification();
-    return status;
+    SyncTask task(base_.get());
+    EtcdClient::CreateInQueueResponse resp;
+    client_.CreateInQueue(dir, value, &resp, task.task());
+    task.Wait();
+    *created_index = resp.etcd_index;
+    *created_key = resp.key;
+    return task.status();
   }
 
   Status BlockingUpdate(const string& key, const string& value,

@@ -286,51 +286,48 @@ void CreateRequestDone(EtcdClient::Response* resp, Task* parent_task,
 }
 
 
-void CreateInQueueRequestDone(EtcdClient::GenericResponse* gen_resp,
-                              const EtcdClient::CreateInQueueCallback& cb,
+void CreateInQueueRequestDone(EtcdClient::CreateInQueueResponse* resp,
+                              Task* parent_task,
+                              EtcdClient::GenericResponse* gen_resp,
                               Task* task) {
-  const unique_ptr<EtcdClient::GenericResponse> gen_resp_deleter(gen_resp);
-  const unique_ptr<Task> task_deleter(task);
-
+  *resp = EtcdClient::CreateInQueueResponse();
   if (!task->status().ok()) {
-    cb(task->status(), "", -1);
+    parent_task->Return(task->status());
     return;
   }
 
   const JsonObject node(*gen_resp->json_body, "node");
   if (!node.Ok()) {
-    cb(Status(util::error::FAILED_PRECONDITION,
-              "Invalid JSON: Couldn't find 'node'"),
-       "", 0);
+    parent_task->Return(Status(util::error::FAILED_PRECONDITION,
+                               "Invalid JSON: Couldn't find 'node'"));
     return;
   }
 
   const JsonInt createdIndex(node, "createdIndex");
   if (!createdIndex.Ok()) {
-    cb(Status(util::error::FAILED_PRECONDITION,
-              "Invalid JSON: Couldn't find 'createdIndex'"),
-       "", 0);
+    parent_task->Return(Status(util::error::FAILED_PRECONDITION,
+                               "Invalid JSON: Couldn't find 'createdIndex'"));
     return;
   }
 
   const JsonInt modifiedIndex(node, "modifiedIndex");
   if (!modifiedIndex.Ok()) {
-    cb(Status(util::error::FAILED_PRECONDITION,
-              "Invalid JSON: Couldn't find 'modifiedIndex'"),
-       "", 0);
+    parent_task->Return(Status(util::error::FAILED_PRECONDITION,
+                               "Invalid JSON: Couldn't find 'modifiedIndex'"));
     return;
   }
 
   const JsonString key(node, "key");
   if (!key.Ok()) {
-    cb(Status(util::error::FAILED_PRECONDITION,
-              "Invalid JSON: Couldn't find 'key'"),
-       "", 0);
+    parent_task->Return(Status(util::error::FAILED_PRECONDITION,
+                               "Invalid JSON: Couldn't find 'key'"));
     return;
   }
 
   CHECK_EQ(createdIndex.Value(), modifiedIndex.Value());
-  cb(Status::OK, key.Value(), modifiedIndex.Value());
+  resp->etcd_index = modifiedIndex.Value();
+  resp->key = key.Value();
+  parent_task->Return();
 }
 
 
@@ -898,14 +895,15 @@ void EtcdClient::CreateWithTTL(const string& key, const string& value,
 
 
 void EtcdClient::CreateInQueue(const string& dir, const string& value,
-                               const CreateInQueueCallback& cb) {
+                               CreateInQueueResponse* resp, Task* task) {
   map<string, string> params;
   params["value"] = value;
   params["prevExist"] = "false";
   GenericResponse* const gen_resp(new GenericResponse);
+  task->DeleteWhenDone(gen_resp);
   Generic(dir, params, UrlFetcher::Verb::POST, gen_resp,
-          new Task(bind(&CreateInQueueRequestDone, gen_resp, cb, _1),
-                   event_base_.get()));
+          task->AddChild(
+              bind(&CreateInQueueRequestDone, resp, task, gen_resp, _1)));
 }
 
 

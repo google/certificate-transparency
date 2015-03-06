@@ -26,7 +26,7 @@ using std::string;
 using std::thread;
 using std::unique_ptr;
 using std::vector;
-using util::Status;
+using util::Task;
 
 DEFINE_string(etcd, "127.0.0.1", "etcd server address");
 DEFINE_int32(etcd_port, 4001, "etcd server port");
@@ -37,25 +37,30 @@ DEFINE_int32(num_threads, 1, "number of threads");
 namespace {
 
 
-void make_request(bool* done, EtcdClient* etcd, int* count,
-                  const string& data);
+void make_request(bool* done, EtcdClient* etcd, int* count, const string& data,
+                  libevent::Base* base);
 
 
 void request_done(bool* done, EtcdClient* etcd, int* count, const string& data,
-                  Status status, const string& key, int index) {
-  CHECK(status.ok()) << status;
+                  libevent::Base* base,
+                  EtcdClient::CreateInQueueResponse* resp, Task* task) {
+  CHECK(task->status().ok()) << task->status();
   --*count;
   if (*count > 0)
-    make_request(done, etcd, count, data);
+    make_request(done, etcd, count, data, base);
   else
     *done = true;
 }
 
 
-void make_request(bool* done, EtcdClient* etcd, int* count,
-                  const string& data) {
-  etcd->CreateInQueue("/testdir", "value", bind(&request_done, done, etcd,
-                                                count, data, _1, _2, _3));
+void make_request(bool* done, EtcdClient* etcd, int* count, const string& data,
+                  libevent::Base* base) {
+  EtcdClient::CreateInQueueResponse* const resp(
+      new EtcdClient::CreateInQueueResponse);
+  etcd->CreateInQueue("/testdir", "value", resp,
+                      new Task(bind(&request_done, done, etcd, count, data,
+                                    base, resp, _1),
+                               base));
 }
 
 
@@ -67,7 +72,7 @@ void test_etcd() {
   const string data(FLAGS_bytes_per_request, 'x');
   int count(FLAGS_requests_per_thread);
   bool done(false);
-  make_request(&done, &etcd, &count, data);
+  make_request(&done, &etcd, &count, data, event_base.get());
 
   LOG(INFO) << "calling event_base_dispatch";
   while (!done)

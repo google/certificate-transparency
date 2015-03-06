@@ -181,8 +181,6 @@ class MockCallbacks {
   MOCK_METHOD2(GetCallback, void(Status status, const EtcdClient::Node& node));
   MOCK_METHOD2(GetAllCallback,
                void(Status status, const vector<EtcdClient::Node>& nodes));
-  MOCK_METHOD3(CreateInQueueCallback,
-               void(Status status, const string& key, int64_t created_index));
 
  private:
   DISALLOW_COPY_AND_ASSIGN(MockCallbacks);
@@ -351,37 +349,34 @@ TEST_F(EtcdTest, TestCreateWithTTLFails) {
 }
 
 TEST_F(EtcdTest, TestCreateInQueue) {
-  Notification done;
   EXPECT_CALL(client_,
               Generic(kDirKey, AllOf(Contains(Pair(kValueParam, "123")),
                                      Contains(Pair(kPrevExistParam, kFalse))),
                       UrlFetcher::Verb::POST, _, _))
       .WillOnce(Invoke(bind(&GenericReturn, Status::OK,
                             MakeJson(kCreateInQueueJson), 1, _4, _5)));
-  EXPECT_CALL(callbacks_, CreateInQueueCallback(Status::OK, "/some/6", 6))
-      .WillOnce(Invoke(bind(&Notification::Notify, &done)));
-  client_.CreateInQueue(kDirKey, "123",
-                        bind(&MockCallbacks::CreateInQueueCallback,
-                             &callbacks_, _1, _2, _3));
-  EXPECT_TRUE(done.WaitForNotificationWithTimeout(kTimeout));
+  SyncTask task(base_.get());
+  EtcdClient::CreateInQueueResponse resp;
+  client_.CreateInQueue(kDirKey, "123", &resp, task.task());
+  task.Wait();
+  EXPECT_EQ(Status::OK, task.status());
+  EXPECT_EQ(6, resp.etcd_index);
+  EXPECT_EQ("/some/6", resp.key);
 }
 
 TEST_F(EtcdTest, TestCreateInQueueFails) {
-  Notification done;
   const Status status(util::error::FAILED_PRECONDITION, "");
   EXPECT_CALL(client_,
               Generic(kDirKey, AllOf(Contains(Pair(kValueParam, "123")),
                                      Contains(Pair(kPrevExistParam, kFalse))),
                       UrlFetcher::Verb::POST, _, _))
-      .WillOnce(Invoke(bind(&GenericReturn,
-                            Status(util::error::FAILED_PRECONDITION, ""),
+      .WillOnce(Invoke(bind(&GenericReturn, status,
                             MakeJson(kKeyAlreadyExistsJson), -1, _4, _5)));
-  EXPECT_CALL(callbacks_, CreateInQueueCallback(status, _, _))
-      .WillOnce(Invoke(bind(&Notification::Notify, &done)));
-  client_.CreateInQueue(kDirKey, "123",
-                        bind(&MockCallbacks::CreateInQueueCallback,
-                             &callbacks_, _1, _2, _3));
-  EXPECT_TRUE(done.WaitForNotificationWithTimeout(kTimeout));
+  SyncTask task(base_.get());
+  EtcdClient::CreateInQueueResponse resp;
+  client_.CreateInQueue(kDirKey, "123", &resp, task.task());
+  task.Wait();
+  EXPECT_EQ(status, task.status());
 }
 
 TEST_F(EtcdTest, TestUpdate) {

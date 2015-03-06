@@ -61,6 +61,10 @@ class EtcdClient {
     int64_t etcd_index;
   };
 
+  struct CreateInQueueResponse : public Response {
+    std::string key;
+  };
+
   struct GenericResponse : public Response {
     std::shared_ptr<JsonObject> json_body;
   };
@@ -68,8 +72,6 @@ class EtcdClient {
   typedef std::function<void(util::Status status,
                              const std::vector<EtcdClient::Node>& values,
                              int64_t etcd_index)> GetAllCallback;
-  typedef std::function<void(util::Status status, const std::string& key,
-                             int64_t index)> CreateInQueueCallback;
   typedef std::function<void(const std::vector<WatchUpdate>& updates)>
       WatchCallback;
 
@@ -91,7 +93,7 @@ class EtcdClient {
                      util::Task* task);
 
   void CreateInQueue(const std::string& dir, const std::string& value,
-                     const CreateInQueueCallback& cb);
+                     CreateInQueueResponse* resp, util::Task* task);
 
   void Update(const std::string& key, const std::string& value,
               const int64_t previous_index, Response* resp, util::Task* task);

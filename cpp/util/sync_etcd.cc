@@ -139,9 +139,13 @@ util::Status SyncEtcdClient::CreateWithTTL(
 
 Status SyncEtcdClient::CreateInQueue(const string& dir, const string& value,
                                      string* key, int64_t* index) {
-  return BlockingCall(bind(&EtcdClient::CreateInQueue, client_, dir, value,
-                           _1),
-                      key, index);
+  SyncTask task(executor_);
+  EtcdClient::CreateInQueueResponse resp;
+  client_->CreateInQueue(dir, value, &resp, task.task());
+  task.Wait();
+  *index = resp.etcd_index;
+  *key = resp.key;
+  return task.status();
 }
 
 
