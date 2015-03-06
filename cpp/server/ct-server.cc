@@ -74,7 +74,7 @@ DEFINE_int32(tree_signing_frequency_seconds, 600,
              "last signing. Set this well below the MMD to ensure we sign in "
              "a timely manner. Must be greater than 0.");
 DEFINE_double(guard_window_seconds, 60,
-              "Unsequenced entries new than this "
+              "Unsequenced entries newer than this "
               "number of seconds will not be sequenced.");
 DEFINE_string(etcd_host, "", "Hostname of the etcd server");
 DEFINE_int32(etcd_port, 0, "Port of the etcd server.");
@@ -206,11 +206,14 @@ void SequenceEntries(TreeSigner<LoggedCertificate>* tree_signer,
 
   while (true) {
     if (election->IsMaster()) {
-      store->CleanupOldEntries();
-
-      // TODO(alcutter): Probably don't need to blow up here
-      CHECK_EQ(util::Status::OK, tree_signer->SequenceNewEntries())
-          << "Problem sequencing new entries";
+      util::Status status(store->CleanupOldEntries());
+      if (!status.ok()) {
+        LOG(WARNING) << "Problem cleaning up old entries: " << status;
+      }
+      status = tree_signer->SequenceNewEntries();
+      if (!status.ok()) {
+        LOG(WARNING) << "Problem sequencing new entries: " << status;
+      }
     }
 
     const steady_clock::time_point now(steady_clock::now());
@@ -426,6 +429,14 @@ int main(int argc, char* argv[]) {
     // (StrictConsistentStore won't allow us to do so unless we're master.)
     election.StartElection();
     election.WaitToBecomeMaster();
+
+    {
+      EtcdClient::Response resp;
+      util::SyncTask task(&internal_pool);
+      etcd_client->Create("/root/sequence_mapping", "", &resp, task.task());
+      task.Wait();
+      CHECK_EQ(util::Status::OK, task.status());
+    }
 
     // Do an initial signing run to get the initial STH, again this is
     // temporary until we re-populate FakeEtcd from the DB.

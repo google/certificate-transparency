@@ -27,16 +27,11 @@ class MockConsistentStore : public ConsistentStore<Logged> {
       util::Status(std::vector<EntryHandle<Logged>>* entries));
 
   MOCK_CONST_METHOD1_T(
-      GetSequencedEntries,
-      util::Status(std::vector<EntryHandle<Logged>>* entries));
+      GetSequenceMapping,
+      util::Status(EntryHandle<ct::SequenceMapping>* mapping));
 
-  MOCK_CONST_METHOD2_T(GetSequencedEntry,
-                       util::Status(const int64_t sequence_number,
-                                    EntryHandle<Logged>* entry));
-
-  MOCK_METHOD2_T(AssignSequenceNumber,
-                 util::Status(const int64_t sequence_number,
-                              EntryHandle<Logged>*));
+  MOCK_METHOD1_T(UpdateSequenceMapping,
+                 util::Status(EntryHandle<ct::SequenceMapping>* mapping));
 
   MOCK_CONST_METHOD0_T(GetClusterNodeState,
                        util::StatusOr<ct::ClusterNodeState>());

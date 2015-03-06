@@ -9,6 +9,7 @@
 #include <glog/logging.h>
 #include <set>
 #include <stdint.h>
+#include <unordered_map>
 
 #include "log/database.h"
 #include "log/log_signer.h"
@@ -20,37 +21,13 @@
 namespace cert_trans {
 
 // Comparator for ordering pending hashes.
-// We want provisionally sequenced entries before unsequenced ones, sorted by
-// sequence number.  Remaining entries should be sorted by their timestamps,
-// then hashes.
+// Order by timestamp then hash.
 template <class Logged>
 struct PendingEntriesOrder
     : std::binary_function<const cert_trans::EntryHandle<Logged>&,
                            const cert_trans::EntryHandle<Logged>&, bool> {
   bool operator()(const cert_trans::EntryHandle<Logged>& x,
                   const cert_trans::EntryHandle<Logged>& y) const {
-    // Test provisional sequence number first
-    const bool x_has_seq(x.Entry().has_provisional_sequence_number());
-    const bool y_has_seq(y.Entry().has_provisional_sequence_number());
-    if (x_has_seq && !y_has_seq) {
-      return true;
-    } else if (!x_has_seq && y_has_seq) {
-      return false;
-    } else if (x_has_seq && y_has_seq) {
-      const int64_t x_seq(x.Entry().provisional_sequence_number());
-      const int64_t y_seq(y.Entry().provisional_sequence_number());
-      CHECK_GE(x_seq, 0);
-      CHECK_GE(y_seq, 0);
-      if (x_seq < y_seq) {
-        return true;
-      } else if (x_seq > y_seq) {
-        return false;
-      }
-    }
-
-    // If we're still here, then either x and y don't have sequence numbers, or
-    // they're equal, so fallback to timestamps (which both x and y MUST
-    // have.):
     CHECK(x.Entry().contents().sct().has_timestamp());
     CHECK(y.Entry().contents().sct().has_timestamp());
     const uint64_t x_time(x.Entry().contents().sct().timestamp());
@@ -99,51 +76,6 @@ uint64_t TreeSigner<Logged>::LastUpdateTime() const {
 
 
 template <class Logged>
-util::Status TreeSigner<Logged>::HandlePreviouslySequencedEntries(
-    std::vector<cert_trans::EntryHandle<Logged>>* pending_entries) const {
-  CHECK(std::is_sorted(pending_entries->begin(), pending_entries->end(),
-                       PendingEntriesOrder<Logged>()));
-  // Check and handle any previously sequenced entries
-  auto it(pending_entries->begin());
-  while (it != pending_entries->end()) {
-    if (!it->Entry().has_provisional_sequence_number()) {
-      // There can't be any more entries with provisional sequence numbers now
-      // (because of the sort order) so we can early out.
-      break;
-    }
-    cert_trans::EntryHandle<Logged> presequenced;
-    util::Status status(consistent_store_->GetSequencedEntry(
-        it->Entry().provisional_sequence_number(), &presequenced));
-    if (status.ok()) {
-      CHECK(it->Entry().entry() == presequenced.Entry().entry() &&
-            it->Entry().sct() == presequenced.Entry().sct())
-          << "Pending entry with provisional_sequence_number:\n"
-          << it->Entry().DebugString() << "\n"
-          << "does not match sequenced entry for that sequence "
-          << "number:\n" << presequenced.Entry().DebugString()
-          << "\nclearing provisional_sequence_number to "
-          << "resequence pending entry";
-      // This entry is already sequenced just fine, no need to return it.
-      VLOG(1) << "Entry already sequenced: "
-              << util::ToBase64(it->Entry().Hash()) << " ("
-              << presequenced.Entry().sequence_number()
-              << "), removing from list";
-      it = pending_entries->erase(it);
-      continue;
-    }
-    if (status.CanonicalCode() != util::error::NOT_FOUND) {
-      return status;
-    }
-    // Provisional sequence number set, but entry not actually sequenced:
-    // This is likely the result of a sequencer crash, we'll leave the
-    // provisional sequence number set as a hint to the sequencer.
-    ++it;
-  }
-  return util::Status::OK;
-}
-
-
-template <class Logged>
 util::Status TreeSigner<Logged>::SequenceNewEntries() {
   const std::chrono::system_clock::time_point now(
       std::chrono::system_clock::now());
@@ -155,8 +87,22 @@ util::Status TreeSigner<Logged>::SequenceNewEntries() {
   int64_t next_sequence_number(status_or_sequence_number.ValueOrDie());
   CHECK_GE(next_sequence_number, 0);
   VLOG(1) << "Next available sequence number: " << next_sequence_number;
+
+  EntryHandle<ct::SequenceMapping> mapping;
+  util::Status status(consistent_store_->GetSequenceMapping(&mapping));
+  if (!status.ok()) {
+    return status;
+  }
+
+  // Hashes which are already sequenced.
+  std::unordered_map<std::string, int64_t> sequenced_hashes;
+  for (auto& m : mapping.Entry().mapping()) {
+    CHECK(sequenced_hashes.insert(std::make_pair(m.entry_hash(),
+                                                 m.sequence_number())).second);
+  }
+
   std::vector<cert_trans::EntryHandle<Logged>> pending_entries;
-  util::Status status(consistent_store_->GetPendingEntries(&pending_entries));
+  status = consistent_store_->GetPendingEntries(&pending_entries);
   if (!status.ok()) {
     return status;
   }
@@ -166,11 +112,10 @@ util::Status TreeSigner<Logged>::SequenceNewEntries() {
   VLOG(1) << "Sequencing " << pending_entries.size() << " entr"
           << (pending_entries.size() == 1 ? "y" : "ies");
 
-  status = HandlePreviouslySequencedEntries(&pending_entries);
-  CHECK(status.ok()) << "HandlePreviouslySequencedEntries: " << status;
-
+  std::map<int64_t, const Logged*> seq_to_entry;
   int num_sequenced(0);
   for (auto& pending_entry : pending_entries) {
+    const std::string& pending_hash(pending_entry.Entry().Hash());
     const std::chrono::system_clock::time_point cert_time(
         std::chrono::milliseconds(pending_entry.Entry().timestamp()));
     if (now - cert_time < guard_window_) {
@@ -178,23 +123,41 @@ util::Status TreeSigner<Logged>::SequenceNewEntries() {
               << util::ToBase64(pending_entry.Entry().Hash());
       continue;
     }
+    const auto seq_it(sequenced_hashes.find(pending_hash));
+    if (seq_it == sequenced_hashes.end()) {
+      // Need to sequence this one.
+      VLOG(1) << util::ToBase64(pending_hash) << " = " << next_sequence_number;
 
-    if (pending_entry.Entry().has_provisional_sequence_number()) {
-      // This is a recovery from a crashed sequencer run.
-      // Since the sequencing order is deterministic the assigned provisional
-      // sequence number should match our expectation:
-      CHECK_EQ(next_sequence_number,
-               pending_entry.Entry().provisional_sequence_number());
+      // Record the sequence -> hash mapping
+      ct::SequenceMapping::Mapping* m(mapping.MutableEntry()->add_mapping());
+      m->set_sequence_number(next_sequence_number);
+      m->set_entry_hash(pending_entry.Entry().Hash());
+      pending_entry.MutableEntry()->set_sequence_number(next_sequence_number);
+      ++num_sequenced;
+      ++next_sequence_number;
+    } else {
+      VLOG(1) << "Previously sequenced " << util::ToBase64(pending_hash)
+              << " = " << next_sequence_number;
+      pending_entry.MutableEntry()->set_sequence_number(seq_it->second);
     }
-    VLOG(0) << util::ToBase64(pending_entry.Entry().Hash()) << " = "
-            << next_sequence_number;
-    status = consistent_store_->AssignSequenceNumber(next_sequence_number,
-                                                     &pending_entry);
-    if (!status.ok()) {
-      return status;
-    }
-    ++num_sequenced;
-    ++next_sequence_number;
+    CHECK(seq_to_entry.insert(std::make_pair(
+                                  pending_entry.Entry().sequence_number(),
+                                  pending_entry.MutableEntry())).second);
+  }
+
+  // Store updated sequence->hash mappings in the consistent store
+  status = consistent_store_->UpdateSequenceMapping(&mapping);
+  if (!status.ok()) {
+    return status;
+  }
+
+  // Now add the sequenced entries to our local DB so that the local signer can
+  // incorporate them.
+  for (auto it(seq_to_entry.find(db_->TreeSize())); it != seq_to_entry.end();
+       ++it) {
+    VLOG(1) << "Adding to local DB: " << it->first;
+    CHECK_EQ(it->first, it->second->sequence_number());
+    CHECK_EQ(Database<Logged>::OK, db_->CreateSequencedEntry(*(it->second)));
   }
 
   VLOG(1) << "Sequenced " << num_sequenced << " entries.";
@@ -223,63 +186,11 @@ typename TreeSigner<Logged>::UpdateResult TreeSigner<Logged>::UpdateTree() {
     }
     CHECK_EQ(Database<Logged>::LOOKUP_OK, result);
     CHECK_EQ(logged.sequence_number(), i);
-
     AppendToTree(logged);
+    min_timestamp = std::max(min_timestamp, logged.sct().timestamp());
   }
-
   int64_t next_seq(cert_tree_.LeafCount());
   CHECK_GE(next_seq, 0);
-
-  // Ensure we're in a position to be able to fetch entries from etcd.
-  const util::StatusOr<ct::SignedTreeHead> serving_sth(
-      consistent_store_->GetServingSTH());
-  if (!serving_sth.ok()) {
-    // TODO(alcutter): Should we allow this?
-    //                 Is this really a log provisioning failure or corrupted
-    //                 consistent store?
-    LOG(WARNING) << "Couldn't get current serving STH: "
-                 << serving_sth.status();
-  } else if (serving_sth.ValueOrDie().tree_size() > next_seq) {
-    // Uh oh, it's likely that the entries we need to fetch from etcd will have
-    // been cleaned up since the ServingSTH has advanced past them.
-    // We'll have to bail and wait for those entries to replicate in.
-    LOG(INFO) << "Insufficient local replication, unable to sign.";
-    return INSUFFICIENT_DATA;
-  }
-
-  // TODO(alcutter): We probably should just be appending the entries we have
-  // locally and allow the followers to fetch the latest entries via the master
-  // node.
-  std::vector<EntryHandle<Logged>> sequenced_entries;
-  util::Status status(
-      consistent_store_->GetSequencedEntries(&sequenced_entries));
-  if (!status.ok()) {
-    LOG(WARNING) << "Failed to GetSequencedEntries: " << status;
-    return DB_ERROR;
-  }
-  typename std::vector<EntryHandle<Logged>>::const_iterator it(
-      sequenced_entries.begin());
-  while (it != sequenced_entries.end() &&
-         it->Entry().sequence_number() < next_seq) {
-    ++it;
-  }
-
-  VLOG(1) << "Building tree starting from " << next_seq;
-  for (; it != sequenced_entries.end(); ++it) {
-    // Paranoid much?
-    CHECK(it->Entry().has_sequence_number());
-    CHECK_EQ(next_seq, it->Entry().sequence_number());
-
-    if (!Append(it->Entry())) {
-      LOG(ERROR) << "Appending entry failed";
-      return DB_ERROR;
-    }
-
-    if (it->Entry().timestamp() > min_timestamp) {
-      min_timestamp = it->Entry().timestamp();
-    }
-    ++next_seq;
-  }
 
   // Our tree is consistent with the database, i.e., each leaf in the tree has
   // a matching sequence number in the database (at least assuming overwriting

@@ -35,13 +35,13 @@ util::Status StrictConsistentStore<Logged>::SetServingSTH(
 
 
 template <class Logged>
-util::Status StrictConsistentStore<Logged>::AssignSequenceNumber(
-    const int64_t sequence_number, EntryHandle<Logged>* entry) {
+util::Status StrictConsistentStore<Logged>::UpdateSequenceMapping(
+    EntryHandle<ct::SequenceMapping>* entry) {
   if (!election_->IsMaster()) {
     return util::Status(util::error::PERMISSION_DENIED,
                         "Not currently master.");
   }
-  return peer_->AssignSequenceNumber(sequence_number, entry);
+  return peer_->UpdateSequenceMapping(entry);
 }
 
 

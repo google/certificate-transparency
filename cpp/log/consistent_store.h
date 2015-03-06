@@ -131,14 +131,11 @@ class ConsistentStore {
   virtual util::Status GetPendingEntries(
       std::vector<EntryHandle<Logged>>* entries) const = 0;
 
-  virtual util::Status GetSequencedEntries(
-      std::vector<EntryHandle<Logged>>* entries) const = 0;
+  virtual util::Status GetSequenceMapping(
+      EntryHandle<ct::SequenceMapping>* entry) const = 0;
 
-  virtual util::Status GetSequencedEntry(const int64_t sequence_number,
-                                         EntryHandle<Logged>* entry) const = 0;
-
-  virtual util::Status AssignSequenceNumber(const int64_t sequence_number,
-                                            EntryHandle<Logged>* entry) = 0;
+  virtual util::Status UpdateSequenceMapping(
+      EntryHandle<ct::SequenceMapping>* entry) = 0;
 
   virtual util::StatusOr<ct::ClusterNodeState> GetClusterNodeState() const = 0;
 

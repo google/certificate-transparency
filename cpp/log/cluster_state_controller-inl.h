@@ -8,7 +8,7 @@
 
 #include "fetcher/peer.h"
 #include "log/database.h"
-#include "log/etcd_consistent_store-inl.h"
+#include "log/etcd_consistent_store.h"
 #include "monitoring/monitoring.h"
 #include "proto/ct.pb.h"
 

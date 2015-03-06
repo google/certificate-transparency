@@ -25,8 +25,8 @@ function PopulateEtcd() {
   gcloud compute ssh k8s-${CLUSTER}-node-1 --command "\
     ${PUT} ${ETCD}/v2/keys/root/serving_sth && \
     ${PUT} ${ETCD}/v2/keys/root/cluster_config && \
-    ${PUT} ${ETCD}/v2/keys/root/sequenced/ -d dir=true && \
-    ${PUT} ${ETCD}/v2/keys/root/unsequenced/ -d dir=true && \
+    ${PUT} ${ETCD}/v2/keys/root/sequence_mapping && \
+    ${PUT} ${ETCD}/v2/keys/root/entries/ -d dir=true && \
     ${PUT} ${ETCD}/v2/keys/root/nodes/ -d dir=true"
   gcloud compute copy-files ${DIR}/../../cpp/tools/ct-clustertool \
     k8s-${CLUSTER}-node-1:.

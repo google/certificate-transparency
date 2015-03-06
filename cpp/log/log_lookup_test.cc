@@ -18,6 +18,7 @@
 #include "merkletree/serial_hasher.h"
 #include "util/fake_etcd.h"
 #include "util/mock_masterelection.h"
+#include "util/sync_task.h"
 #include "util/testing.h"
 #include "util/util.h"
 
@@ -26,12 +27,14 @@ namespace {
 namespace libevent = cert_trans::libevent;
 
 using cert_trans::EntryHandle;
+using cert_trans::EtcdClient;
 using cert_trans::FakeEtcdClient;
 using cert_trans::LoggedCertificate;
 using cert_trans::MockMasterElection;
 using cert_trans::ThreadPool;
 using cert_trans::TreeSigner;
 using ct::MerkleAuditProof;
+using ct::SequenceMapping;
 using std::make_shared;
 using std::string;
 using std::shared_ptr;
@@ -59,6 +62,13 @@ class LogLookupTest : public ::testing::Test {
                   new MerkleVerifier(new Sha256Hasher())) {
     // Set some noddy STH so that we can call UpdateTree on the Tree Signer.
     store_.SetServingSTH(ct::SignedTreeHead());
+    // Force an empty sequence mapping file:
+    {
+      util::SyncTask task(&pool_);
+      EtcdClient::Response r;
+      etcd_client_.ForceSet("/root/sequence_mapping", "", &r, task.task());
+      task.Wait();
+    }
   }
 
 
@@ -66,14 +76,32 @@ class LogLookupTest : public ::testing::Test {
     CHECK_NOTNULL(logged_cert);
     CHECK_GE(seq, 0);
     logged_cert->clear_sequence_number();
+
     CHECK(this->store_.AddPendingEntry(logged_cert).ok());
-    EntryHandle<LoggedCertificate> entry;
-    CHECK(
-        this->store_.GetPendingEntryForHash(logged_cert->Hash(), &entry).ok());
-    CHECK(this->store_.AssignSequenceNumber(seq, &entry).ok());
+
+    EntryHandle<SequenceMapping> mapping;
+    CHECK(this->store_.GetSequenceMapping(&mapping).ok());
+    SequenceMapping::Mapping* m(mapping.MutableEntry()->add_mapping());
+    m->set_sequence_number(seq);
+    m->set_entry_hash(logged_cert->Hash());
+    CHECK(this->store_.UpdateSequenceMapping(&mapping).ok());
   }
 
   void UpdateTree() {
+    // first need to populate the local DB with the sequenced entries in etcd:
+    EntryHandle<SequenceMapping> mapping;
+    CHECK(this->store_.GetSequenceMapping(&mapping).ok());
+
+    for (const auto& m : mapping.Entry().mapping()) {
+      EntryHandle<LoggedCertificate> entry;
+      CHECK_EQ(util::Status::OK,
+               this->store_.GetPendingEntryForHash(m.entry_hash(), &entry));
+      entry.MutableEntry()->set_sequence_number(m.sequence_number());
+      CHECK_EQ(this->db()->OK,
+               this->db()->CreateSequencedEntry(entry.Entry()));
+    }
+
+    // then do the actual update.
     EXPECT_EQ(TS::OK, this->tree_signer_.UpdateTree());
     this->db()->WriteTreeHead(this->tree_signer_.LatestSTH());
   }

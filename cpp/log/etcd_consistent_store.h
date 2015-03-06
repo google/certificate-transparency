@@ -44,14 +44,11 @@ class EtcdConsistentStore : public ConsistentStore<Logged> {
   util::Status GetPendingEntries(
       std::vector<EntryHandle<Logged>>* entries) const override;
 
-  util::Status GetSequencedEntries(
-      std::vector<EntryHandle<Logged>>* entries) const override;
+  util::Status GetSequenceMapping(
+      EntryHandle<ct::SequenceMapping>* entry) const override;
 
-  util::Status GetSequencedEntry(const int64_t sequence_number,
-                                 EntryHandle<Logged>* entry) const override;
-
-  util::Status AssignSequenceNumber(const int64_t sequence_number,
-                                    EntryHandle<Logged>* entry) override;
+  util::Status UpdateSequenceMapping(
+      EntryHandle<ct::SequenceMapping>* entry) override;
 
   util::StatusOr<ct::ClusterNodeState> GetClusterNodeState() const override;
 
@@ -71,8 +68,8 @@ class EtcdConsistentStore : public ConsistentStore<Logged> {
 
   util::Status SetClusterConfig(const ct::ClusterConfig& config) override;
 
-  // Removes entries in /sequenced (and their corresponding entries in
-  // /unsequened) with sequence numbers covered by the current serving STH.
+  // Removes sequenced entries with sequence numbers covered by the current
+  // serving STH.
   util::Status CleanupOldEntries() override;
 
  private:
@@ -102,15 +99,16 @@ class EtcdConsistentStore : public ConsistentStore<Logged> {
   template <class T>
   util::Status DeleteEntry(EntryHandle<T>* entry);
 
-  std::string GetUnsequencedPath(const Logged& unseq) const;
+  std::string GetEntryPath(const Logged& entry) const;
 
-  std::string GetUnsequencedPath(const std::string& hash) const;
-
-  std::string GetSequencedPath(int64_t seq) const;
+  std::string GetEntryPath(const std::string& hash) const;
 
   std::string GetNodePath(const std::string& node_id) const;
 
   std::string GetFullPath(const std::string& key) const;
+
+  void CheckMappingIsContiguousWithServingTree(
+      const ct::SequenceMapping& mapping) const;
 
 
   // The following 3 methods are static just so that they have friend access to

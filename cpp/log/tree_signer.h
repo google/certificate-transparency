@@ -62,8 +62,6 @@ class TreeSigner {
   }
 
  private:
-  util::Status HandlePreviouslySequencedEntries(
-      std::vector<cert_trans::EntryHandle<Logged>>* pending_entries) const;
   void BuildTree();
   bool Append(const Logged& logged);
   void AppendToTree(const Logged& logged_cert);

@@ -17,10 +17,24 @@ namespace {
 
 // etcd path constants.
 const char kClusterConfigFile[] = "/cluster_config";
-const char kUnsequencedDir[] = "/unsequenced/";
-const char kSequencedDir[] = "/sequenced/";
+const char kEntriesDir[] = "/entries/";
+const char kSequenceFile[] = "/sequence_mapping";
 const char kServingSthFile[] = "/serving_sth";
 const char kNodesDir[] = "/nodes/";
+
+
+void CheckMappingIsOrdered(const ct::SequenceMapping& mapping) {
+  if (mapping.mapping_size() < 2) {
+    return;
+  }
+  int64_t seq(mapping.mapping(0).sequence_number());
+  for (int64_t i = 1; i < mapping.mapping_size(); ++i) {
+    const int64_t entry_seq(mapping.mapping(i).sequence_number());
+    CHECK_EQ(entry_seq, seq + 1);
+    seq = entry_seq;
+  }
+}
+
 
 }  // namespace
 
@@ -71,14 +85,16 @@ EtcdConsistentStore<Logged>::~EtcdConsistentStore() {
 template <class Logged>
 util::StatusOr<int64_t>
 EtcdConsistentStore<Logged>::NextAvailableSequenceNumber() const {
-  std::vector<EntryHandle<Logged>> sequenced_entries;
-  util::Status status(GetSequencedEntries(&sequenced_entries));
+  EntryHandle<ct::SequenceMapping> sequence_mapping;
+  util::Status status(GetSequenceMapping(&sequence_mapping));
   if (!status.ok()) {
     return status;
   }
-  if (!sequenced_entries.empty()) {
-    CHECK(sequenced_entries.back().Entry().has_sequence_number());
-    return sequenced_entries.back().Entry().sequence_number() + 1;
+  if (sequence_mapping.Entry().mapping_size() > 0) {
+    return sequence_mapping.Entry()
+               .mapping(sequence_mapping.Entry().mapping_size() - 1)
+               .sequence_number() +
+           1;
   }
 
   if (!serving_sth_) {
@@ -179,7 +195,7 @@ template <class Logged>
 util::Status EtcdConsistentStore<Logged>::AddPendingEntry(Logged* entry) {
   CHECK_NOTNULL(entry);
   CHECK(!entry->has_sequence_number());
-  const std::string full_path(GetUnsequencedPath(*entry));
+  const std::string full_path(GetEntryPath(*entry));
   EntryHandle<Logged> handle(full_path, *entry);
   util::Status status(CreateEntry(&handle));
   if (status.CanonicalCode() == util::error::FAILED_PRECONDITION) {
@@ -205,7 +221,7 @@ util::Status EtcdConsistentStore<Logged>::AddPendingEntry(Logged* entry) {
 template <class Logged>
 util::Status EtcdConsistentStore<Logged>::GetPendingEntryForHash(
     const std::string& hash, EntryHandle<Logged>* entry) const {
-  util::Status status(GetEntry(GetUnsequencedPath(hash), entry));
+  util::Status status(GetEntry(GetEntryPath(hash), entry));
   if (status.ok()) {
     CHECK(!entry->Entry().has_sequence_number());
   }
@@ -217,8 +233,7 @@ util::Status EtcdConsistentStore<Logged>::GetPendingEntryForHash(
 template <class Logged>
 util::Status EtcdConsistentStore<Logged>::GetPendingEntries(
     std::vector<EntryHandle<Logged>>* entries) const {
-  util::Status status(
-      GetAllEntriesInDir(GetFullPath(kUnsequencedDir), entries));
+  util::Status status(GetAllEntriesInDir(GetFullPath(kEntriesDir), entries));
   if (status.ok()) {
     for (const auto& entry : *entries) {
       CHECK(!entry.Entry().has_sequence_number());
@@ -238,55 +253,25 @@ bool LessBySequenceNumber(const EntryHandle<Logged>& lhs,
 
 
 template <class Logged>
-util::Status EtcdConsistentStore<Logged>::GetSequencedEntries(
-    std::vector<EntryHandle<Logged>>* entries) const {
-  util::Status status(GetAllEntriesInDir(GetFullPath(kSequencedDir), entries));
-  sort(entries->begin(), entries->end(), LessBySequenceNumber<Logged>);
-  if (status.ok()) {
-    for (const auto& entry : *entries) {
-      CHECK(entry.Entry().has_sequence_number());
-    }
-  }
-  return status;
-}
-
-
-template <class Logged>
-util::Status EtcdConsistentStore<Logged>::GetSequencedEntry(
-    const int64_t sequence_number, EntryHandle<Logged>* entry) const {
-  CHECK_GE(sequence_number, 0);
-  util::Status status(GetEntry(GetSequencedPath(sequence_number), entry));
-  if (status.ok()) {
-    CHECK(entry->Entry().has_sequence_number());
-  }
-
-  return status;
-}
-
-
-template <class Logged>
-util::Status EtcdConsistentStore<Logged>::AssignSequenceNumber(
-    const int64_t sequence_number, EntryHandle<Logged>* entry) {
-  CHECK_GE(sequence_number, 0);
-  CHECK(!entry->Entry().has_sequence_number());
-  if (entry->Entry().has_provisional_sequence_number()) {
-    CHECK_EQ(sequence_number, entry->Entry().provisional_sequence_number());
-  } else {
-    entry->MutableEntry()->set_provisional_sequence_number(sequence_number);
-  }
-  // Record provisional sequence number:
-  util::Status status(UpdateEntry(entry));
+util::Status EtcdConsistentStore<Logged>::GetSequenceMapping(
+    EntryHandle<ct::SequenceMapping>* sequence_mapping) const {
+  util::Status status(GetEntry(GetFullPath(kSequenceFile), sequence_mapping));
   if (!status.ok()) {
     return status;
   }
-  // Now finalise the sequence number assignment.
-  // Create a temporary EntryHandle here to avoid stomping over the version
-  // info held by the unsequenced entry handle passed in:
-  EntryHandle<Logged> seq_entry(GetSequencedPath(sequence_number),
-                                entry->Entry());
-  seq_entry.MutableEntry()->clear_provisional_sequence_number();
-  seq_entry.MutableEntry()->set_sequence_number(sequence_number);
-  return CreateEntry(&seq_entry);
+  CheckMappingIsOrdered(sequence_mapping->Entry());
+  CheckMappingIsContiguousWithServingTree(sequence_mapping->Entry());
+  return util::Status::OK;
+}
+
+
+template <class Logged>
+util::Status EtcdConsistentStore<Logged>::UpdateSequenceMapping(
+    EntryHandle<ct::SequenceMapping>* entry) {
+  CHECK(entry->HasHandle());
+  CheckMappingIsOrdered(entry->Entry());
+  CheckMappingIsContiguousWithServingTree(entry->Entry());
+  return UpdateEntry(entry);
 }
 
 
@@ -543,16 +528,16 @@ util::Status EtcdConsistentStore<Logged>::DeleteEntry(EntryHandle<T>* entry) {
 
 
 template <class Logged>
-std::string EtcdConsistentStore<Logged>::GetUnsequencedPath(
-    const Logged& unseq) const {
-  return GetUnsequencedPath(unseq.Hash());
+std::string EtcdConsistentStore<Logged>::GetEntryPath(
+    const Logged& entry) const {
+  return GetEntryPath(entry.Hash());
 }
 
 
 template <class Logged>
-std::string EtcdConsistentStore<Logged>::GetUnsequencedPath(
+std::string EtcdConsistentStore<Logged>::GetEntryPath(
     const std::string& hash) const {
-  return GetFullPath(std::string(kUnsequencedDir) + util::HexString(hash));
+  return GetFullPath(std::string(kEntriesDir) + util::HexString(hash));
 }
 
 
@@ -564,18 +549,22 @@ std::string EtcdConsistentStore<Logged>::GetNodePath(
 
 
 template <class Logged>
-std::string EtcdConsistentStore<Logged>::GetSequencedPath(int64_t seq) const {
-  CHECK_GE(seq, 0);
-  return GetFullPath(std::string(kSequencedDir) + std::to_string(seq));
-}
-
-
-template <class Logged>
 std::string EtcdConsistentStore<Logged>::GetFullPath(
     const std::string& key) const {
   CHECK(key.size() > 0);
   CHECK_EQ('/', key[0]);
   return root_ + key;
+}
+
+
+template <class Logged>
+void EtcdConsistentStore<Logged>::CheckMappingIsContiguousWithServingTree(
+    const ct::SequenceMapping& mapping) const {
+  std::lock_guard<std::mutex> lock(mutex_);
+  if (serving_sth_ && mapping.mapping_size() > 0) {
+    CHECK_LE(mapping.mapping(0).sequence_number(),
+             serving_sth_->Entry().tree_size());
+  }
 }
 
 
@@ -648,56 +637,58 @@ util::Status EtcdConsistentStore<Logged>::CleanupOldEntries() {
   LOG(INFO) << "Cleaning old entries up to and including sequence number: "
             << clean_up_to_sequence_number;
 
-  std::vector<EntryHandle<Logged>> sequenced_entries;
-  util::Status status(GetSequencedEntries(&sequenced_entries));
+  EntryHandle<ct::SequenceMapping> sequence_mapping;
+  util::Status status(GetSequenceMapping(&sequence_mapping));
   if (!status.ok()) {
-    LOG(WARNING) << "Couldn't get sequenced entries: " << status;
+    LOG(WARNING) << "Couldn't get sequence mapping: " << status;
     return status;
   }
 
-  for (auto& entry : sequenced_entries) {
-    const uint64_t sequence_number(entry.Entry().sequence_number());
+  int mapping_index;
+  // On exiting this loop mapping_index will contain the number of entries we
+  // want to delete from the start of sequence_mappping.mapping.
+  for (mapping_index = 0;
+       mapping_index < sequence_mapping.Entry().mapping_size() &&
+           sequence_mapping.Entry().mapping(mapping_index).sequence_number() <=
+               clean_up_to_sequence_number;
+       ++mapping_index) {
+    const uint64_t sequence_number(
+        sequence_mapping.Entry().mapping(mapping_index).sequence_number());
 
-    // return if we've hit the limit
-    if (entry.Entry().sequence_number() > clean_up_to_sequence_number) {
-      return util::Status::OK;
-    }
-
-    // Otherwise, first we delete the corresponding unsequenced entry
-    EntryHandle<LoggedCertificate> unseq_entry;
-    const std::string hash(entry.Entry().Hash());
-    status = GetPendingEntryForHash(hash, &unseq_entry);
+    // First we delete the corresponding entry from /entries
+    EntryHandle<LoggedCertificate> entry;
+    const std::string hash(
+        sequence_mapping.Entry().mapping(mapping_index).entry_hash());
+    status = GetPendingEntryForHash(hash, &entry);
     if (!status.ok()) {
-      // Log a warning here, but don't bail on the clean up as we could just be
-      // recovering from a crash halfway through a previous clean up.
-      LOG(WARNING) << "Cleanup couldn't get unsequenced entry ("
-                   << util::ToBase64(hash)
-                   << ") corresponding to sequenced entry #" << sequence_number
-                   << " : " << status;
+      if (status.CanonicalCode() == util::error::NOT_FOUND) {
+        // Log a warning here, but don't bail on the clean up as we could just
+        // be recovering from a crash halfway through a previous clean up.
+        LOG(WARNING) << "Cleanup couldn't get entry (" << util::ToBase64(hash)
+                     << ") corresponding to sequenced entry #"
+                     << sequence_number << " : " << status;
+      } else {
+        // Looks like it's more serious, so we'll bail.
+        return status;
+      }
     } else {
-      status = DeleteEntry(&unseq_entry);
+      status = DeleteEntry(&entry);
       if (!status.ok()) {
-        LOG(WARNING) << "Cleanup couldn't delete unsequenced entry ("
+        LOG(WARNING) << "Cleanup couldn't delete entry ("
                      << util::ToBase64(hash)
                      << ") corresponding to sequenced entry #"
                      << sequence_number << " : " << status;
         return status;
       }
     }
-    VLOG(1) << "Cleanup deleted unsequenced entry (" << util::ToBase64(hash)
-            << ") corresponding to sequenced entry #" << sequence_number;
-
-    // Now delete the sequenced entry:
-    status = DeleteEntry(&entry);
-    if (!status.ok()) {
-      LOG(WARNING) << "Cleanup couldn't delete sequenced entry #"
-                   << sequence_number << " (but corresponding unsequenced "
-                   << "entry was successfully deleted) : " << status;
-      return status;
-    }
-    VLOG(1) << "Cleanup deleted sequenced entry #" << sequence_number;
+    VLOG(1) << "Cleanup deleted entry (" << util::ToBase64(hash)
+            << ") corresponding to sequence number " << sequence_number;
   }
-  return util::Status::OK;
+
+  sequence_mapping.MutableEntry()->mutable_mapping()->DeleteSubrange(
+      0, mapping_index /*num to delete*/);
+
+  return UpdateSequenceMapping(&sequence_mapping);
 }
 
 

@@ -175,8 +175,6 @@ message LoggedCertificatePB {
     optional LogEntry entry = 2;
   }
   required Contents contents = 3;
-
-  optional int64 provisional_sequence_number = 4;
 }
 
 message SignedTreeHead {
@@ -252,4 +250,13 @@ message ClusterConfig {
   // serving STH candidate must be servable from at least 3 of your 4 nodes.
   optional double minimum_serving_fraction = 2;
   /////////////////////////////////
+}
+
+message SequenceMapping {
+  message Mapping {
+    optional bytes entry_hash = 1;
+    optional int64 sequence_number = 2;
+  }
+
+  repeated Mapping mapping = 1;
 }

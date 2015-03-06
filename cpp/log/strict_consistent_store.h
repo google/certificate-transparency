@@ -29,8 +29,8 @@ class StrictConsistentStore : public ConsistentStore<Logged> {
 
   util::Status SetServingSTH(const ct::SignedTreeHead& new_sth) override;
 
-  util::Status AssignSequenceNumber(const int64_t sequence_number,
-                                    EntryHandle<Logged>* entry) override;
+  util::Status UpdateSequenceMapping(
+      EntryHandle<ct::SequenceMapping>* entry) override;
 
   util::Status SetClusterConfig(const ct::ClusterConfig& config) override;
 
@@ -42,53 +42,49 @@ class StrictConsistentStore : public ConsistentStore<Logged> {
     return peer_->GetServingSTH();
   }
 
-  util::Status AddPendingEntry(Logged* entry) {
+  util::Status AddPendingEntry(Logged* entry) override {
     return peer_->AddPendingEntry(entry);
   }
 
-  util::Status GetPendingEntryForHash(const std::string& hash,
-                                      EntryHandle<Logged>* entry) const {
+  util::Status GetPendingEntryForHash(
+      const std::string& hash, EntryHandle<Logged>* entry) const override {
     return peer_->GetPendingEntryForHash(hash, entry);
   }
 
   util::Status GetPendingEntries(
-      std::vector<EntryHandle<Logged>>* entries) const {
+      std::vector<EntryHandle<Logged>>* entries) const override {
     return peer_->GetPendingEntries(entries);
   }
 
-  util::Status GetSequencedEntries(
-      std::vector<EntryHandle<Logged>>* entries) const {
-    return peer_->GetSequencedEntries(entries);
+  util::Status GetSequenceMapping(
+      EntryHandle<ct::SequenceMapping>* entry) const override {
+    return peer_->GetSequenceMapping(entry);
   }
 
-  util::Status GetSequencedEntry(const int64_t sequence_number,
-                                 EntryHandle<Logged>* entry) const {
-    return peer_->GetSequencedEntry(sequence_number, entry);
-  }
-
-  util::StatusOr<ct::ClusterNodeState> GetClusterNodeState() const {
+  util::StatusOr<ct::ClusterNodeState> GetClusterNodeState() const override {
     return peer_->GetClusterNodeState();
   }
 
-  util::Status SetClusterNodeState(const ct::ClusterNodeState& state) {
+  util::Status SetClusterNodeState(
+      const ct::ClusterNodeState& state) override {
     return peer_->SetClusterNodeState(state);
   }
 
   void WatchServingSTH(
       const typename ConsistentStore<Logged>::ServingSTHCallback& cb,
-      util::Task* task) {
+      util::Task* task) override {
     return peer_->WatchServingSTH(cb, task);
   }
 
   void WatchClusterNodeStates(
       const typename ConsistentStore<Logged>::ClusterNodeStateCallback& cb,
-      util::Task* task) {
+      util::Task* task) override {
     return peer_->WatchClusterNodeStates(cb, task);
   }
 
   void WatchClusterConfig(
       const typename ConsistentStore<Logged>::ClusterConfigCallback& cb,
-      util::Task* task) {
+      util::Task* task) override {
     return peer_->WatchClusterConfig(cb, task);
   }
 

@@ -8,6 +8,7 @@
 #include <memory>
 #include <string>
 #include <thread>
+#include <unordered_set>
 
 #include "log/logged_certificate.h"
 #include "proto/ct.pb.h"
@@ -22,6 +23,7 @@ DECLARE_int32(node_state_ttl_seconds);
 namespace cert_trans {
 
 
+using ct::SequenceMapping;
 using ct::SignedTreeHead;
 using std::atomic;
 using std::bind;
@@ -34,6 +36,7 @@ using std::shared_ptr;
 using std::string;
 using std::thread;
 using std::unique_ptr;
+using std::unordered_set;
 using std::vector;
 using testing::_;
 using testing::AllOf;
@@ -64,6 +67,7 @@ class EtcdConsistentStoreTest : public ::testing::Test {
   void SetUp() override {
     store_.reset(new EtcdConsistentStore<LoggedCertificate>(
         &executor_, &client_, &election_, kRoot, kNodeId));
+    InsertEntry("/root/sequence_mapping", SequenceMapping());
   }
 
   LoggedCertificate DefaultCert() {
@@ -85,15 +89,8 @@ class EtcdConsistentStoreTest : public ::testing::Test {
     return cert;
   }
 
-  string CertPath(const LoggedCertificate& cert) {
-    ostringstream oss;
-    oss << kRoot << "/";
-    if (!cert.has_sequence_number()) {
-      oss << "unsequenced/" << util::HexString(cert.Hash());
-    } else {
-      oss << "sequenced/" << cert.sequence_number();
-    }
-    return oss.str();
+  string CertPath(const LoggedCertificate& cert) const {
+    return string(kRoot) + "/entries/ " + util::HexString(cert.Hash());
   }
 
   EntryHandle<LoggedCertificate> HandleForCert(const LoggedCertificate& cert) {
@@ -105,21 +102,26 @@ class EtcdConsistentStoreTest : public ::testing::Test {
     return EntryHandle<LoggedCertificate>(CertPath(cert), cert, handle);
   }
 
-  void PopulateForCleanupTests(int num_seq, int num_unseq, int starting_seq) {
+  void PopulateForCleanupTests(int num_seq, int num_pending,
+                               int starting_seq) {
     int timestamp(345345);
     int seq(starting_seq);
+    EntryHandle<SequenceMapping> mapping;
+    Status status(store_->GetSequenceMapping(&mapping));
+    CHECK_EQ(Status::OK, status);
     for (int i = 0; i < num_seq; ++i) {
       std::ostringstream ss;
       ss << "sequenced body " << i;
       LoggedCertificate lc(MakeCert(timestamp++, ss.str()));
       CHECK(store_->AddPendingEntry(&lc).ok());
-      EntryHandle<LoggedCertificate> handle;
-      CHECK(store_->GetPendingEntryForHash(lc.Hash(), &handle).ok());
-      CHECK(store_->AssignSequenceNumber(seq++, &handle).ok());
+      SequenceMapping::Mapping* m(mapping.MutableEntry()->add_mapping());
+      m->set_entry_hash(lc.Hash());
+      m->set_sequence_number(seq++);
     }
-    for (int i = 0; i < num_unseq; ++i) {
+    CHECK_EQ(Status::OK, store_->UpdateSequenceMapping(&mapping));
+    for (int i = 0; i < num_pending; ++i) {
       std::ostringstream ss;
-      ss << "unsequenced body " << i;
+      ss << "pending body " << i;
       LoggedCertificate lc(MakeCert(timestamp++, ss.str()));
       CHECK(store_->AddPendingEntry(&lc).ok());
     }
@@ -128,6 +130,28 @@ class EtcdConsistentStoreTest : public ::testing::Test {
   util::Status CleanupOldEntries() {
     return store_->CleanupOldEntries();
   }
+
+  void AddSequenceMapping(int64_t seq, const string& hash) {
+    EntryHandle<SequenceMapping> mapping;
+    Status status(store_->GetSequenceMapping(&mapping));
+    CHECK_EQ(Status::OK, status);
+    SequenceMapping::Mapping* m(mapping.MutableEntry()->add_mapping());
+    m->set_sequence_number(seq);
+    m->set_entry_hash(hash);
+    CHECK_EQ(Status::OK, store_->UpdateSequenceMapping(&mapping));
+  }
+
+
+  template <class T>
+  void ForceSetEntry(const string& key, const T& thing) {
+    // Set up scenario:
+    SyncTask task(base_.get());
+    EtcdClient::Response resp;
+    client_.ForceSet(key, Serialize(thing), &resp, task.task());
+    task.Wait();
+    ASSERT_EQ(Status::OK, task.status());
+  }
+
 
   template <class T>
   void InsertEntry(const string& key, const T& thing) {
@@ -195,11 +219,8 @@ TEST_F(
 
 TEST_F(EtcdConsistentStoreTest,
        TestNextAvailableSequenceNumberWhenSequencedEntriesExist) {
-  const LoggedCertificate one(MakeSequencedCert(0, "one", 1));
-  const LoggedCertificate two(MakeSequencedCert(1, "two", 1));
-  InsertEntry(string(kRoot) + "/sequenced/0", one);
-  InsertEntry(string(kRoot) + "/sequenced/1", two);
-
+  AddSequenceMapping(0, "zero");
+  AddSequenceMapping(1, "one");
   util::StatusOr<int64_t> sequence_number(
       store_->NextAvailableSequenceNumber());
   ASSERT_EQ(Status::OK, sequence_number.status());
@@ -276,7 +297,7 @@ TEST_F(EtcdConsistentStoreTest, TestAddPendingEntryWorks) {
   ASSERT_EQ(Status::OK, status);
   EtcdClient::GetResponse resp;
   SyncTask task(base_.get());
-  client_.Get(string(kRoot) + "/unsequenced/" + util::HexString(cert.Hash()),
+  client_.Get(string(kRoot) + "/entries/" + util::HexString(cert.Hash()),
               &resp, task.task());
   task.Wait();
   EXPECT_EQ(Status::OK, task.status());
@@ -291,7 +312,7 @@ TEST_F(EtcdConsistentStoreTest,
   other_cert.mutable_sct()->set_timestamp(55555);
 
   const string kKey(util::HexString(cert.Hash()));
-  const string kPath(string(kRoot) + "/unsequenced/" + kKey);
+  const string kPath(string(kRoot) + "/entries/" + kKey);
   // Set up scenario:
   InsertEntry(kPath, other_cert);
 
@@ -307,7 +328,7 @@ TEST_F(EtcdConsistentStoreDeathTest,
   LoggedCertificate other_cert(MakeCert(2342, "something else"));
 
   const string kKey(util::HexString(cert.Hash()));
-  const string kPath(string(kRoot) + "/unsequenced/" + kKey);
+  const string kPath(string(kRoot) + "/entries/" + kKey);
   // Set up scenario:
   InsertEntry(kPath, other_cert);
 
@@ -327,7 +348,7 @@ TEST_F(EtcdConsistentStoreDeathTest,
 
 TEST_F(EtcdConsistentStoreTest, TestGetPendingEntryForHash) {
   const LoggedCertificate one(MakeCert(123, "one"));
-  const string kPath(string(kRoot) + "/unsequenced/" +
+  const string kPath(string(kRoot) + "/entries/" +
                      util::HexString(one.Hash()));
   InsertEntry(kPath, one);
 
@@ -335,12 +356,11 @@ TEST_F(EtcdConsistentStoreTest, TestGetPendingEntryForHash) {
   util::Status status(store_->GetPendingEntryForHash(one.Hash(), &handle));
   EXPECT_TRUE(status.ok()) << status;
   EXPECT_EQ(one, handle.Entry());
-  EXPECT_EQ(1, handle.Handle());
 }
 
 
 TEST_F(EtcdConsistentStoreTest, TestGetPendingEntryForNonExistantHash) {
-  const string kPath(string(kRoot) + "/unsequenced/" + util::HexString("Nah"));
+  const string kPath(string(kRoot) + "/entries/" + util::HexString("Nah"));
   EntryHandle<LoggedCertificate> handle;
   util::Status status(store_->GetPendingEntryForHash("Nah", &handle));
   EXPECT_EQ(util::error::NOT_FOUND, status.CanonicalCode()) << status;
@@ -348,7 +368,7 @@ TEST_F(EtcdConsistentStoreTest, TestGetPendingEntryForNonExistantHash) {
 
 
 TEST_F(EtcdConsistentStoreTest, TestGetPendingEntries) {
-  const string kPath(string(kRoot) + "/unsequenced/");
+  const string kPath(string(kRoot) + "/entries/");
   const LoggedCertificate one(MakeCert(123, "one"));
   const LoggedCertificate two(MakeCert(456, "two"));
   InsertEntry(kPath + "one", one);
@@ -368,7 +388,7 @@ TEST_F(EtcdConsistentStoreTest, TestGetPendingEntries) {
 
 TEST_F(EtcdConsistentStoreDeathTest,
        TestGetPendingEntriesBarfsWithSequencedEntry) {
-  const string kPath(string(kRoot) + "/unsequenced/");
+  const string kPath(string(kRoot) + "/entries/");
   LoggedCertificate one(MakeSequencedCert(123, "one", 666));
   InsertEntry(kPath + "one", one);
   vector<EntryHandle<LoggedCertificate>> entries;
@@ -376,68 +396,90 @@ TEST_F(EtcdConsistentStoreDeathTest,
 }
 
 
-TEST_F(EtcdConsistentStoreTest, TestGetSequencedEntries) {
-  const string kPath(string(kRoot) + "/sequenced/");
-  const LoggedCertificate one(MakeSequencedCert(123, "one", 1));
-  const LoggedCertificate two(MakeSequencedCert(456, "two", 2));
-  InsertEntry(kPath + "one", one);
-  InsertEntry(kPath + "two", two);
-  vector<EntryHandle<LoggedCertificate>> entries;
-  util::Status status(store_->GetSequencedEntries(&entries));
-  EXPECT_EQ(2, entries.size());
-  vector<LoggedCertificate> certs;
-  for (const auto& e : entries) {
-    certs.push_back(e.Entry());
-  }
-  EXPECT_THAT(certs, AllOf(Contains(one), Contains(two)));
+TEST_F(EtcdConsistentStoreTest, TestGetSequenceMapping) {
+  AddSequenceMapping(0, "zero");
+  AddSequenceMapping(1, "one");
+  EntryHandle<SequenceMapping> mapping;
+  util::Status status(store_->GetSequenceMapping(&mapping));
+  CHECK_EQ(util::Status::OK, status);
+
+  EXPECT_EQ(2, mapping.Entry().mapping_size());
+  EXPECT_EQ(0, mapping.Entry().mapping(0).sequence_number());
+  EXPECT_EQ("zero", mapping.Entry().mapping(0).entry_hash());
+  EXPECT_EQ(1, mapping.Entry().mapping(1).sequence_number());
+  EXPECT_EQ("one", mapping.Entry().mapping(1).entry_hash());
 }
 
 
 TEST_F(EtcdConsistentStoreDeathTest,
-       TestGetSequencedEntriesBarfsWitUnsSequencedEntry) {
-  const string kPath(string(kRoot) + "/sequenced/");
-  LoggedCertificate one(MakeCert(123, "one"));
-  InsertEntry(kPath + "one", one);
-  vector<EntryHandle<LoggedCertificate>> entries;
-  EXPECT_DEATH(store_->GetSequencedEntries(&entries), "has_sequence_number");
+       TestGetSequenceMappingBarfsOnCorruptMapping) {
+  SequenceMapping mapping;
+  mapping.add_mapping()->set_sequence_number(0);
+  mapping.add_mapping()->set_sequence_number(2);
+  ForceSetEntry("/root/sequence_mapping", mapping);
+  EntryHandle<SequenceMapping> entry;
+  EXPECT_DEATH(store_->GetSequenceMapping(&entry), "entry_seq == seq \\+ 1");
 }
 
 
-TEST_F(EtcdConsistentStoreTest, TestAssignSequenceNumber) {
-  const int kDefaultHandle(1);
-  EntryHandle<LoggedCertificate> entry(
-      HandleForCert(DefaultCert(), kDefaultHandle));
+TEST_F(EtcdConsistentStoreTest, TestUpdateSequenceMapping) {
+  EntryHandle<SequenceMapping> mapping;
+  Status status(store_->GetSequenceMapping(&mapping));
+  EXPECT_EQ(Status::OK, status);
 
-  const string kUnsequencedPath(string(kRoot) + "/unsequenced/" +
-                                util::HexString(entry.Entry().Hash()));
-  const string kSequencedPath(string(kRoot) + "/sequenced/1");
-  const int kSeq(1);
+  const SequenceMapping original(mapping.Entry());
 
+  SequenceMapping::Mapping* m(mapping.MutableEntry()->add_mapping());
+  m->set_sequence_number(0);
+  m->set_entry_hash("zero");
+  EXPECT_EQ(Status::OK, store_->UpdateSequenceMapping(&mapping));
 
-  LoggedCertificate entry_with_provisional(entry.Entry());
-  entry_with_provisional.set_provisional_sequence_number(kSeq);
-  InsertEntry(kUnsequencedPath, entry_with_provisional);
+  status = store_->GetSequenceMapping(&mapping);
+  EXPECT_EQ(Status::OK, status);
 
-  util::Status status(store_->AssignSequenceNumber(kSeq, &entry));
-  EXPECT_TRUE(status.ok()) << status;
+  EXPECT_EQ(mapping.Entry().mapping_size(), original.mapping_size() + 1);
+  EXPECT_EQ(0, mapping.Entry()
+                   .mapping(mapping.Entry().mapping_size() - 1)
+                   .sequence_number());
+  EXPECT_EQ("zero", mapping.Entry()
+                        .mapping(mapping.Entry().mapping_size() - 1)
+                        .entry_hash());
 }
 
 
 TEST_F(EtcdConsistentStoreDeathTest,
-       TestAssignSequenceNumberBarfsWithSequencedEntry) {
-  EntryHandle<LoggedCertificate> entry(
-      HandleForCert(MakeSequencedCert(123, "hi", 44)));
-  EXPECT_DEATH(util::Status status(store_->AssignSequenceNumber(1, &entry));
-               , "has_sequence_number");
+       TestUpdateSequenceMappingBarfsWithOutOfOrderSequenceNumber) {
+  EntryHandle<SequenceMapping> mapping;
+  Status status(store_->GetSequenceMapping(&mapping));
+  EXPECT_EQ(Status::OK, status);
+
+  SequenceMapping::Mapping* m1(mapping.MutableEntry()->add_mapping());
+  m1->set_sequence_number(0);
+  m1->set_entry_hash("zero");
+  SequenceMapping::Mapping* m2(mapping.MutableEntry()->add_mapping());
+  m2->set_sequence_number(2);
+  m2->set_entry_hash("two");
+  EXPECT_DEATH(store_->UpdateSequenceMapping(&mapping),
+               "entry_seq == seq \\+ 1");
 }
 
 
 TEST_F(EtcdConsistentStoreDeathTest,
-       TestAssignSequenceNumberBarfsWithMismatchedSequencedEntry) {
-  EntryHandle<LoggedCertificate> entry(HandleForCert(MakeCert(123, "hi")));
-  entry.MutableEntry()->set_provisional_sequence_number(257);
-  EXPECT_DEATH(util::Status status(store_->AssignSequenceNumber(1, &entry));
-               , "sequence_number ==.*provisional.*");
+       TestUpdateSequenceMappingBarfsWithMappingNonContiguousToServingTree) {
+  SignedTreeHead sth;
+  sth.set_timestamp(123);
+  sth.set_tree_size(1000);
+  CHECK_EQ(Status::OK, store_->SetServingSTH(sth));
+
+  EntryHandle<SequenceMapping> mapping;
+  Status status(store_->GetSequenceMapping(&mapping));
+  EXPECT_EQ(Status::OK, status);
+
+  SequenceMapping::Mapping* m1(mapping.MutableEntry()->add_mapping());
+  m1->set_sequence_number(sth.tree_size() + 1);
+  m1->set_entry_hash("zero");
+  EXPECT_DEATH(store_->UpdateSequenceMapping(&mapping),
+               "sequence_number\\(\\) <= serving_sth_");
 }
 
 
@@ -585,24 +627,30 @@ TEST_F(EtcdConsistentStoreTest, TestCleansUpToNewSTH) {
 
   // Be sure about our starting state of sequenced entries so we can compare
   // later on
-  vector<EntryHandle<LoggedCertificate>> seq_entries;
-  ASSERT_EQ(Status::OK, store_->GetSequencedEntries(&seq_entries));
-  EXPECT_EQ(5, seq_entries.size());
+  EntryHandle<SequenceMapping> seq_mapping;
+  ASSERT_EQ(Status::OK, store_->GetSequenceMapping(&seq_mapping));
+  EXPECT_EQ(5, seq_mapping.Entry().mapping_size());
 
-  // Do the same for the unsequenced entries
-  vector<EntryHandle<LoggedCertificate>> unseq_entries_pre;
-  CHECK(store_->GetPendingEntries(&unseq_entries_pre).ok());
-  // Prune out any "unsequenced" entries which have counterparts in the
+  // Do the same for the pending entries
+  vector<EntryHandle<LoggedCertificate>> pending_entries_pre;
+  CHECK(store_->GetPendingEntries(&pending_entries_pre).ok());
+  // Prune out any "pending" entries which have counterparts in the
   // "sequenced" set:
-  auto it(unseq_entries_pre.begin());
-  while (it != unseq_entries_pre.end()) {
-    if (it->Entry().has_provisional_sequence_number()) {
-      it = unseq_entries_pre.erase(it);
-    } else {
-      ++it;
+  {
+    unordered_set<string> seq_hashes;
+    for (auto& m : seq_mapping.Entry().mapping()) {
+      seq_hashes.insert(m.entry_hash());
+    }
+    auto it(pending_entries_pre.begin());
+    while (it != pending_entries_pre.end()) {
+      if (seq_hashes.find(it->Entry().Hash()) != seq_hashes.end()) {
+        it = pending_entries_pre.erase(it);
+      } else {
+        ++it;
+      }
     }
   }
-  EXPECT_EQ(4, unseq_entries_pre.size());
+  EXPECT_EQ(4, pending_entries_pre.size());
 
   EXPECT_CALL(election_, IsMaster()).WillRepeatedly(Return(true));
 
@@ -615,12 +663,11 @@ TEST_F(EtcdConsistentStoreTest, TestCleansUpToNewSTH) {
   CHECK_EQ(util::Status::OK, CleanupOldEntries());
 
   // Check that they were cleaned up:
-  seq_entries.clear();
-  CHECK(store_->GetSequencedEntries(&seq_entries).ok());
+  CHECK(store_->GetSequenceMapping(&seq_mapping).ok());
   // 103 & 104 remaining:
-  EXPECT_EQ(2, seq_entries.size());
-  EXPECT_EQ(103, seq_entries[0].Entry().sequence_number());
-  EXPECT_EQ(104, seq_entries[1].Entry().sequence_number());
+  EXPECT_EQ(2, seq_mapping.Entry().mapping_size());
+  EXPECT_EQ(103, seq_mapping.Entry().mapping(0).sequence_number());
+  EXPECT_EQ(104, seq_mapping.Entry().mapping(1).sequence_number());
 
   // Now update ServingSTH so that all sequenced entries should be cleaned up:
   sth.set_timestamp(sth.timestamp() + 1);
@@ -629,17 +676,17 @@ TEST_F(EtcdConsistentStoreTest, TestCleansUpToNewSTH) {
   CHECK_EQ(util::Status::OK, CleanupOldEntries());
 
   // Ensure they were:
-  seq_entries.clear();
-  CHECK(store_->GetSequencedEntries(&seq_entries).ok());
-  EXPECT_EQ(0, seq_entries.size());
+  CHECK(store_->GetSequenceMapping(&seq_mapping).ok());
+  EXPECT_EQ(0, seq_mapping.Entry().mapping_size());
 
-  // Check we've not touched the unseqenced entries:
-  vector<EntryHandle<LoggedCertificate>> unseq_entries_post;
-  CHECK(store_->GetPendingEntries(&unseq_entries_post).ok());
-  EXPECT_EQ(unseq_entries_pre.size(), unseq_entries_post.size());
-  for (int i = 0; i < unseq_entries_pre.size(); ++i) {
-    EXPECT_EQ(unseq_entries_pre[i].Handle(), unseq_entries_post[i].Handle());
-    EXPECT_EQ(unseq_entries_pre[i].Entry(), unseq_entries_post[i].Entry());
+  // Check we've not touched the pending entries:
+  vector<EntryHandle<LoggedCertificate>> pending_entries_post;
+  CHECK(store_->GetPendingEntries(&pending_entries_post).ok());
+  EXPECT_EQ(pending_entries_pre.size(), pending_entries_post.size());
+  for (int i = 0; i < pending_entries_pre.size(); ++i) {
+    EXPECT_EQ(pending_entries_pre[i].Handle(),
+              pending_entries_post[i].Handle());
+    EXPECT_EQ(pending_entries_pre[i].Entry(), pending_entries_post[i].Entry());
   }
 }
 

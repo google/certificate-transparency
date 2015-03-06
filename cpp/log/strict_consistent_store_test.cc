@@ -15,6 +15,7 @@ DECLARE_int32(node_state_ttl_seconds);
 
 namespace cert_trans {
 
+using ct::SequenceMapping;
 using testing::_;
 using testing::NiceMock;
 using testing::Return;
@@ -80,16 +81,16 @@ TEST_P(StrictConsistentStoreTest, TestSetServingSTH) {
 }
 
 
-TEST_P(StrictConsistentStoreTest, TestAssignSequenceNumber) {
+TEST_P(StrictConsistentStoreTest, TestUpdateSequenceMapping) {
   if (IsMaster()) {
-    EXPECT_CALL(*peer_, AssignSequenceNumber(_, _))
+    EXPECT_CALL(*peer_, UpdateSequenceMapping(_))
         .WillOnce(Return(util::Status::OK));
   } else {
-    EXPECT_CALL(*peer_, AssignSequenceNumber(_, _)).Times(0);
+    EXPECT_CALL(*peer_, UpdateSequenceMapping(_)).Times(0);
   }
 
-  EntryHandle<LoggedCertificate> cert;
-  util::Status status(strict_store_.AssignSequenceNumber(7, &cert));
+  EntryHandle<SequenceMapping> mapping;
+  util::Status status(strict_store_.UpdateSequenceMapping(&mapping));
 
   if (IsMaster()) {
     EXPECT_TRUE(status.ok());

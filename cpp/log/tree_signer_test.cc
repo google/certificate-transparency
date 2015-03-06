@@ -17,6 +17,7 @@
 #include "proto/ct.pb.h"
 #include "util/fake_etcd.h"
 #include "util/mock_masterelection.h"
+#include "util/sync_task.h"
 #include "util/testing.h"
 #include "util/util.h"
 
@@ -26,6 +27,7 @@ using cert_trans::EntryHandle;
 using cert_trans::LoggedCertificate;
 using cert_trans::MockMasterElection;
 using ct::ClusterNodeState;
+using ct::SequenceMapping;
 using ct::SignedTreeHead;
 using std::make_shared;
 using std::shared_ptr;
@@ -62,6 +64,13 @@ class TreeSignerTest : public ::testing::Test {
                               store_.get(), TestSigner::DefaultLogSigner()));
     // Set a default empty STH so that we can call UpdateTree() on the signer.
     store_->SetServingSTH(SignedTreeHead());
+    // Force an empty sequence mapping file:
+    {
+      util::SyncTask task(&pool_);
+      EtcdClient::Response r;
+      etcd_client_.ForceSet("/root/sequence_mapping", "", &r, task.task());
+      task.Wait();
+    }
   }
 
   void AddPendingEntry(LoggedCertificate* logged_cert) const {
@@ -72,24 +81,18 @@ class TreeSignerTest : public ::testing::Test {
   void AddSequencedEntry(LoggedCertificate* logged_cert, int64_t seq) const {
     logged_cert->clear_sequence_number();
     CHECK(this->store_->AddPendingEntry(logged_cert).ok());
-    EntryHandle<LoggedCertificate> entry;
-    CHECK(this->store_->GetPendingEntryForHash(logged_cert->Hash(), &entry)
-              .ok());
-    CHECK(this->store_->AssignSequenceNumber(seq, &entry).ok());
-  }
 
-  void ForceAddSequencedEntry(LoggedCertificate* logged_cert,
-                              int64_t seq) const {
-    // Never do this IRL!
-    logged_cert->clear_sequence_number();
-    logged_cert->set_provisional_sequence_number(seq);
-    this->store_->pending_entries_[util::ToBase64(logged_cert->Hash())]
-        .MutableEntry()
-        ->CopyFrom(*logged_cert);
+    // This below would normally be done by TreeSigner::SequenceNewEntries()
+    EntryHandle<LoggedCertificate> entry;
+    EntryHandle<SequenceMapping> mapping;
+    CHECK(this->store_->GetSequenceMapping(&mapping).ok());
+    SequenceMapping::Mapping* m(mapping.MutableEntry()->add_mapping());
+    m->set_sequence_number(seq);
+    m->set_entry_hash(logged_cert->Hash());
+    CHECK(this->store_->UpdateSequenceMapping(&mapping).ok());
     logged_cert->set_sequence_number(seq);
-    this->store_->sequenced_entries_[std::to_string(seq)]
-        .MutableEntry()
-        ->CopyFrom(*logged_cert);
+    CHECK_EQ(Database<LoggedCertificate>::OK,
+             this->db()->CreateSequencedEntry(*logged_cert));
   }
 
   TS* GetSimilar() {
@@ -129,42 +132,24 @@ TYPED_TEST(TreeSignerTest, PendingEntriesOrder) {
   PendingEntriesOrder<LoggedCertificate> ordering;
   LoggedCertificate lowest;
   this->test_signer_.CreateUnique(&lowest);
-  lowest.set_provisional_sequence_number(1);
 
   // Can't be lower than itself!
   EXPECT_FALSE(ordering(H(lowest), H(lowest)));
 
-  LoggedCertificate higher_seq(lowest);
-  higher_seq.set_provisional_sequence_number(
-      lowest.provisional_sequence_number() + 1);
-  // lower timestamp should be ignored because of higher sequence number:
-  higher_seq.mutable_sct()->set_timestamp(lowest.sct().timestamp() - 1);
-  EXPECT_TRUE(ordering(H(lowest), H(higher_seq)));
-  EXPECT_FALSE(ordering(H(higher_seq), H(lowest)));
-
-  LoggedCertificate no_seq(lowest);
-  no_seq.clear_provisional_sequence_number();
-  // sequence number < no sequence number
-  EXPECT_TRUE(ordering(H(lowest), H(no_seq)));
-  EXPECT_FALSE(ordering(H(no_seq), H(lowest)));
-
-  // check timestamp fallback:
-  LoggedCertificate no_seq_higher_timestamp(no_seq);
-  no_seq_higher_timestamp.mutable_sct()->set_timestamp(
-      no_seq.sct().timestamp() + 1);
-  EXPECT_TRUE(ordering(H(no_seq), H(no_seq_higher_timestamp)));
-  EXPECT_FALSE(ordering(H(no_seq_higher_timestamp), H(no_seq)));
+  // check timestamp:
+  LoggedCertificate higher_timestamp(lowest);
+  higher_timestamp.mutable_sct()->set_timestamp(lowest.timestamp() + 1);
+  EXPECT_TRUE(ordering(H(lowest), H(higher_timestamp)));
+  EXPECT_FALSE(ordering(H(higher_timestamp), H(lowest)));
 
   // check hash fallback:
-  LoggedCertificate no_seq_higher_hash(no_seq);
-  while (no_seq_higher_hash.Hash() <= no_seq.Hash()) {
-    this->test_signer_.CreateUnique(&no_seq_higher_hash);
-    no_seq_higher_hash.clear_provisional_sequence_number();
-    no_seq_higher_hash.mutable_sct()->set_timestamp(
-        no_seq_higher_hash.timestamp());
+  LoggedCertificate higher_hash(lowest);
+  while (higher_hash.Hash() <= lowest.Hash()) {
+    this->test_signer_.CreateUnique(&higher_hash);
+    higher_hash.mutable_sct()->set_timestamp(lowest.timestamp());
   }
-  EXPECT_TRUE(ordering(H(no_seq), H(no_seq_higher_hash)));
-  EXPECT_FALSE(ordering(H(no_seq_higher_hash), H(no_seq)));
+  EXPECT_TRUE(ordering(H(lowest), H(higher_hash)));
+  EXPECT_FALSE(ordering(H(higher_hash), H(lowest)));
 }
 
 
@@ -276,24 +261,6 @@ TYPED_TEST(TreeSignerTest, ResumePartialSign) {
 }
 
 
-TYPED_TEST(TreeSignerTest, RecoverWithPendingSequenceNumber) {
-  LoggedCertificate sequenced_cert;
-  this->test_signer_.CreateUnique(&sequenced_cert);
-  this->AddSequencedEntry(&sequenced_cert, 0);
-
-  LoggedCertificate provisionally_sequenced_cert;
-  this->test_signer_.CreateUnique(&provisionally_sequenced_cert);
-  provisionally_sequenced_cert.set_provisional_sequence_number(1);
-  this->AddPendingEntry(&provisionally_sequenced_cert);
-
-  EXPECT_EQ(util::Status::OK, this->tree_signer_->SequenceNewEntries());
-  EXPECT_EQ(TS::OK, this->tree_signer_->UpdateTree());
-
-  const SignedTreeHead sth(this->tree_signer_->LatestSTH());
-  EXPECT_EQ(2U, sth.tree_size());
-}
-
-
 TYPED_TEST(TreeSignerTest, SignEmpty) {
   EXPECT_EQ(TS::OK, this->tree_signer_->UpdateTree());
 
@@ -301,42 +268,6 @@ TYPED_TEST(TreeSignerTest, SignEmpty) {
   EXPECT_GT(sth.timestamp(), 0U);
   EXPECT_EQ(sth.tree_size(), 0U);
 }
-
-
-TYPED_TEST(TreeSignerTest, SignerFallenBehindInReplication) {
-  SignedTreeHead sth;
-  sth.set_tree_size(13);
-  sth.set_timestamp(1000);
-  this->store_->SetServingSTH(sth);
-
-  for (int i = sth.tree_size(); i < sth.tree_size() + 3; ++i) {
-    LoggedCertificate logged_cert;
-    this->test_signer_.CreateUnique(&logged_cert);
-    this->AddSequencedEntry(&logged_cert, i);
-  }
-
-  EXPECT_EQ(0, this->db()->TreeSize());
-  EXPECT_EQ(TS::INSUFFICIENT_DATA, this->tree_signer_->UpdateTree());
-}
-
-
-#if 0
-TYPED_TEST(TreeSignerTest, FailInconsistentSequenceNumbers) {
-  EXPECT_EQ(TS::OK, this->tree_signer_->UpdateTree());
-
-  LoggedCertificate logged_cert;
-  this->test_signer_.CreateUnique(&logged_cert);
-  this->AddSequencedEntry(&logged_cert, 0);
-
-  // Create another entry with a gap in sequence numbers:
-  LoggedCertificate logged_cert2;
-  this->test_signer_.CreateUnique(&logged_cert2);
-  this->ForceAddSequencedEntry(&logged_cert2, 2);
-
-  // Update should fail because we don't have sequential numbers
-  EXPECT_EQ(TS::DB_ERROR, this->tree_signer_->UpdateTree());
-}
-#endif
 
 
 }  // namespace cert_trans
