@@ -51,9 +51,6 @@ class EtcdClient {
     const bool exists_;
   };
 
-  typedef std::function<void(util::Status status, const EtcdClient::Node& node,
-                             int64_t etcd_index)> GetCallback;
-
   struct Response {
     Response() : etcd_index(-1) {
     }
@@ -63,6 +60,10 @@ class EtcdClient {
 
   struct CreateInQueueResponse : public Response {
     std::string key;
+  };
+
+  struct GetResponse : public Response {
+    Node node;
   };
 
   struct GenericResponse : public Response {
@@ -81,7 +82,7 @@ class EtcdClient {
 
   virtual ~EtcdClient();
 
-  void Get(const std::string& key, const GetCallback& cb);
+  void Get(const std::string& key, GetResponse* resp, util::Task* task);
 
   void GetAll(const std::string& dir, const GetAllCallback& cb);
 
@@ -139,8 +140,8 @@ class EtcdClient {
   HostPortPair UpdateEndpoint(const std::string& host, uint16_t port);
   void FetchDone(Request* etcd_req, util::Task* task);
 
-  void WatchInitialGetDone(WatchState* state, util::Status status,
-                           const Node& node, int64_t etcd_index);
+  void WatchInitialGetDone(WatchState* state, GetResponse* resp,
+                           util::Task* task);
   void WatchInitialGetAllDone(WatchState* state, util::Status status,
                               const std::vector<Node>& nodes,
                               int64_t etcd_index);

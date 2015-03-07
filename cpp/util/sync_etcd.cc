@@ -104,7 +104,12 @@ SyncEtcdClient::SyncEtcdClient(EtcdClient* client, util::Executor* executor)
 
 
 Status SyncEtcdClient::Get(const string& key, EtcdClient::Node* node) const {
-  return BlockingCall(bind(&EtcdClient::Get, client_, key, _1), node);
+  SyncTask task(executor_);
+  EtcdClient::GetResponse resp;
+  client_->Get(key, &resp, task.task());
+  task.Wait();
+  *node = resp.node;
+  return task.status();
 }
 
 

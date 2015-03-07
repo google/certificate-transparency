@@ -74,12 +74,12 @@ class FakeEtcdTest : public ::testing::Test {
 
  protected:
   Status BlockingGet(const string& key, EtcdClient::Node* node) {
-    Notification notifier;
-    Status status;
-    client_.Get(key, bind(&CopyCallback2<Status, EtcdClient::Node>, &notifier,
-                          &status, node, _1, _2));
-    notifier.WaitForNotification();
-    return status;
+    SyncTask task(base_.get());
+    EtcdClient::GetResponse resp;
+    client_.Get(key, &resp, task.task());
+    task.Wait();
+    *node = resp.node;
+    return task.status();
   }
 
   Status BlockingCreate(const string& key, const string& value,

@@ -178,7 +178,6 @@ class MockCallbacks {
  public:
   MockCallbacks() = default;
 
-  MOCK_METHOD2(GetCallback, void(Status status, const EtcdClient::Node& node));
   MOCK_METHOD2(GetAllCallback,
                void(Status status, const vector<EtcdClient::Node>& nodes));
 
@@ -212,38 +211,33 @@ void GenericReturn(Status status, const shared_ptr<JsonObject>& json_body,
 }
 
 TEST_F(EtcdTest, TestGet) {
-  Notification done;
   EXPECT_CALL(client_,
               Generic(kEntryKey, kEmptyParams, UrlFetcher::Verb::GET, _, _))
       .WillOnce(Invoke(
           bind(&GenericReturn, Status::OK, MakeJson(kGetJson), 1, _4, _5)));
-  EXPECT_CALL(callbacks_,
-              GetCallback(Status::OK,
-                          AllOf(Field(&EtcdClient::Node::modified_index_, 9),
-                                Field(&EtcdClient::Node::value_, "123"))))
-      .WillOnce(Invoke(bind(&Notification::Notify, &done)));
-  client_.Get(kEntryKey,
-              bind(&MockCallbacks::GetCallback, &callbacks_, _1, _2));
-  EXPECT_TRUE(done.WaitForNotificationWithTimeout(kTimeout));
+  SyncTask task(base_.get());
+  EtcdClient::GetResponse resp;
+  client_.Get(kEntryKey, &resp, task.task());
+  task.Wait();
+  EXPECT_EQ(Status::OK, task.status());
+  EXPECT_EQ(9, resp.node.modified_index_);
+  EXPECT_EQ("123", resp.node.value_);
 }
 
 TEST_F(EtcdTest, TestGetForInvalidKey) {
-  Notification done;
   const Status status(util::error::NOT_FOUND, "");
   EXPECT_CALL(client_,
               Generic(kEntryKey, kEmptyParams, UrlFetcher::Verb::GET, _, _))
       .WillOnce(Invoke(bind(&GenericReturn, status, MakeJson(kKeyNotFoundJson),
                             -1, _4, _5)));
-  EXPECT_CALL(callbacks_, GetCallback(Status(status.CanonicalCode(),
-                                             status.error_message() + " (" +
-                                                 kEntryKey + ")"),
-                                      _))
-      .WillOnce(Invoke(bind(&Notification::Notify, &done)));
-  client_.Get(kEntryKey,
-              bind(&MockCallbacks::GetCallback, &callbacks_, _1, _2));
-  EXPECT_TRUE(done.WaitForNotificationWithTimeout(kTimeout));
+  SyncTask task(base_.get());
+  EtcdClient::GetResponse resp;
+  client_.Get(kEntryKey, &resp, task.task());
+  task.Wait();
+  EXPECT_EQ(Status(status.CanonicalCode(),
+                   status.error_message() + " (" + kEntryKey + ")"),
+            task.status());
 }
-
 
 TEST_F(EtcdTest, TestGetAll) {
   Notification done;

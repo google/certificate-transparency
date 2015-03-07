@@ -99,62 +99,56 @@ Status StatusFromResponseCode(const int response_code,
 }
 
 
-void GetRequestDone(const string& keyname,
-                    EtcdClient::GenericResponse* gen_resp,
-                    const EtcdClient::GetCallback& cb, Task* task) {
-  const unique_ptr<EtcdClient::GenericResponse> gen_resp_deleter(gen_resp);
-  const unique_ptr<Task> task_deleter(task);
-
+void GetRequestDone(const string& keyname, EtcdClient::GetResponse* resp,
+                    Task* parent_task, EtcdClient::GenericResponse* gen_resp,
+                    Task* task) {
+  *resp = EtcdClient::GetResponse();
   if (!task->status().ok()) {
-    cb(Status(task->status().CanonicalCode(),
-              task->status().error_message() + " (" + keyname + ")"),
-       EtcdClient::Node::InvalidNode(), -1);
+    parent_task->Return(
+        Status(task->status().CanonicalCode(),
+               task->status().error_message() + " (" + keyname + ")"));
     return;
   }
 
   const JsonObject node(*gen_resp->json_body, "node");
   if (!node.Ok()) {
-    cb(Status(util::error::FAILED_PRECONDITION,
-              "Invalid JSON: Couldn't find 'node'"),
-       EtcdClient::Node::InvalidNode(), -1);
+    parent_task->Return(Status(util::error::FAILED_PRECONDITION,
+                               "Invalid JSON: Couldn't find 'node'"));
     return;
   }
 
   const JsonInt createdIndex(node, "createdIndex");
   if (!createdIndex.Ok()) {
-    cb(Status(util::error::FAILED_PRECONDITION,
-              "Invalid JSON: Couldn't find 'createdIndex'"),
-       EtcdClient::Node::InvalidNode(), -1);
+    parent_task->Return(Status(util::error::FAILED_PRECONDITION,
+                               "Invalid JSON: Couldn't find 'createdIndex'"));
     return;
   }
 
   const JsonInt modifiedIndex(node, "modifiedIndex");
   if (!modifiedIndex.Ok()) {
-    cb(Status(util::error::FAILED_PRECONDITION,
-              "Invalid JSON: Couldn't find 'modifiedIndex'"),
-       EtcdClient::Node::InvalidNode(), -1);
+    parent_task->Return(Status(util::error::FAILED_PRECONDITION,
+                               "Invalid JSON: Couldn't find 'modifiedIndex'"));
     return;
   }
 
   const JsonString key(node, "key");
   if (!key.Ok()) {
-    cb(Status(util::error::FAILED_PRECONDITION,
-              "Invalid JSON: Couldn't find 'key'"),
-       EtcdClient::Node::InvalidNode(), -1);
+    parent_task->Return(Status(util::error::FAILED_PRECONDITION,
+                               "Invalid JSON: Couldn't find 'key'"));
     return;
   }
 
   const JsonString value(node, "value");
   if (!value.Ok()) {
-    cb(Status(util::error::FAILED_PRECONDITION,
-              "Invalid JSON: Couldn't find 'value'"),
-       EtcdClient::Node::InvalidNode(), -1);
+    parent_task->Return(Status(util::error::FAILED_PRECONDITION,
+                               "Invalid JSON: Couldn't find 'value'"));
     return;
   }
 
-  cb(Status::OK, EtcdClient::Node(createdIndex.Value(), modifiedIndex.Value(),
-                                  key.Value(), value.Value()),
-     gen_resp->etcd_index);
+  resp->etcd_index = gen_resp->etcd_index;
+  resp->node = EtcdClient::Node(createdIndex.Value(), modifiedIndex.Value(),
+                                key.Value(), value.Value());
+  parent_task->Return();
 }
 
 
@@ -499,9 +493,11 @@ EtcdClient::WatchUpdate::WatchUpdate()
 }
 
 
-void EtcdClient::WatchInitialGetDone(WatchState* state, util::Status status,
-                                     const Node& node, int64_t etcd_index) {
-  WatchInitialGetAllDone(state, status, {node}, etcd_index);
+void EtcdClient::WatchInitialGetDone(WatchState* state, GetResponse* resp,
+                                     Task* task) {
+  unique_ptr<GetResponse> resp_deleter(resp);
+  WatchInitialGetAllDone(state, task->status(), {resp->node},
+                         resp->etcd_index);
 }
 
 
@@ -631,8 +627,10 @@ void EtcdClient::WatchRequestDone(WatchState* state, GenericResponse* gen_resp,
       GetAll(state->key_, bind(&EtcdClient::WatchInitialGetAllDone, this,
                                state, _1, _2, _3));
     } else {
-      Get(state->key_,
-          bind(&EtcdClient::WatchInitialGetDone, this, state, _1, _2, _3));
+      GetResponse* const resp(new GetResponse);
+      Get(state->key_, resp,
+          state->task_->AddChild(
+              bind(&EtcdClient::WatchInitialGetDone, this, state, resp, _1)));
     }
 
     return;
@@ -850,12 +848,13 @@ EtcdClient::HostPortPair EtcdClient::UpdateEndpoint(const string& host,
 }
 
 
-void EtcdClient::Get(const string& key, const GetCallback& cb) {
+void EtcdClient::Get(const string& key, GetResponse* resp, Task* task) {
   map<string, string> params;
   GenericResponse* const gen_resp(new GenericResponse);
+  task->DeleteWhenDone(gen_resp);
   Generic(key, params, UrlFetcher::Verb::GET, gen_resp,
-          new Task(bind(&GetRequestDone, key, gen_resp, cb, _1),
-                   event_base_.get()));
+          task->AddChild(
+              bind(&GetRequestDone, key, resp, task, gen_resp, _1)));
 }
 
 
