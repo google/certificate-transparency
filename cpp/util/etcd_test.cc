@@ -33,7 +33,6 @@ using testing::ElementsAre;
 using testing::Field;
 using testing::Invoke;
 using testing::Pair;
-using testing::StrictMock;
 using testing::_;
 using util::Status;
 using util::SyncTask;
@@ -174,17 +173,6 @@ class MockEtcdClient : public EtcdClient {
                     UrlFetcher::Verb verb, GenericResponse* resp, Task* task));
 };
 
-class MockCallbacks {
- public:
-  MockCallbacks() = default;
-
-  MOCK_METHOD2(GetAllCallback,
-               void(Status status, const vector<EtcdClient::Node>& nodes));
-
- private:
-  DISALLOW_COPY_AND_ASSIGN(MockCallbacks);
-};
-
 class EtcdTest : public ::testing::Test {
  public:
   EtcdTest()
@@ -197,7 +185,6 @@ class EtcdTest : public ::testing::Test {
 
   const shared_ptr<libevent::Base> base_;
   libevent::EventPumpThread pump_;
-  StrictMock<MockCallbacks> callbacks_;
   MockEtcdClient client_;
   const map<string, string> kEmptyParams;
 };
@@ -240,40 +227,34 @@ TEST_F(EtcdTest, TestGetForInvalidKey) {
 }
 
 TEST_F(EtcdTest, TestGetAll) {
-  Notification done;
   EXPECT_CALL(client_,
               Generic(kDirKey, kEmptyParams, UrlFetcher::Verb::GET, _, _))
       .WillOnce(Invoke(
           bind(&GenericReturn, Status::OK, MakeJson(kGetAllJson), 1, _4, _5)));
-  EXPECT_CALL(
-      callbacks_,
-      GetAllCallback(
-          Status::OK,
-          ElementsAre(AllOf(Field(&EtcdClient::Node::modified_index_, 9),
-                            Field(&EtcdClient::Node::value_, "123")),
-                      AllOf(Field(&EtcdClient::Node::modified_index_, 7),
-                            Field(&EtcdClient::Node::value_, "456")))))
-      .WillOnce(Invoke(bind(&Notification::Notify, &done)));
-  client_.GetAll(kDirKey,
-                 bind(&MockCallbacks::GetAllCallback, &callbacks_, _1, _2));
-  EXPECT_TRUE(done.WaitForNotificationWithTimeout(kTimeout));
+  SyncTask task(base_.get());
+  EtcdClient::GetAllResponse resp;
+  client_.GetAll(kDirKey, &resp, task.task());
+  task.Wait();
+  EXPECT_EQ(Status::OK, task.status());
+  EXPECT_EQ(9, resp.nodes[0].modified_index_);
+  EXPECT_EQ("123", resp.nodes[0].value_);
+  EXPECT_EQ(7, resp.nodes[1].modified_index_);
+  EXPECT_EQ("456", resp.nodes[1].value_);
 }
 
 TEST_F(EtcdTest, TestGetAllForInvalidKey) {
-  Notification done;
   const Status status(util::error::NOT_FOUND, "");
   EXPECT_CALL(client_,
               Generic(kDirKey, kEmptyParams, UrlFetcher::Verb::GET, _, _))
       .WillOnce(Invoke(bind(&GenericReturn, Status(util::error::NOT_FOUND, ""),
                             MakeJson(kKeyNotFoundJson), -1, _4, _5)));
-  EXPECT_CALL(callbacks_, GetAllCallback(Status(status.CanonicalCode(),
-                                                status.error_message() + " (" +
-                                                    kDirKey + ")"),
-                                         _))
-      .WillOnce(Invoke(bind(&Notification::Notify, &done)));
-  client_.GetAll(kDirKey,
-                 bind(&MockCallbacks::GetAllCallback, &callbacks_, _1, _2));
-  EXPECT_TRUE(done.WaitForNotificationWithTimeout(kTimeout));
+  SyncTask task(base_.get());
+  EtcdClient::GetAllResponse resp;
+  client_.GetAll(kDirKey, &resp, task.task());
+  task.Wait();
+  EXPECT_EQ(Status(status.CanonicalCode(),
+                   status.error_message() + " (" + kDirKey + ")"),
+            task.status());
 }
 
 TEST_F(EtcdTest, TestCreate) {

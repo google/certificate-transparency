@@ -66,13 +66,14 @@ class EtcdClient {
     Node node;
   };
 
+  struct GetAllResponse : public Response {
+    std::vector<Node> nodes;
+  };
+
   struct GenericResponse : public Response {
     std::shared_ptr<JsonObject> json_body;
   };
 
-  typedef std::function<void(util::Status status,
-                             const std::vector<EtcdClient::Node>& values,
-                             int64_t etcd_index)> GetAllCallback;
   typedef std::function<void(const std::vector<WatchUpdate>& updates)>
       WatchCallback;
 
@@ -84,7 +85,7 @@ class EtcdClient {
 
   void Get(const std::string& key, GetResponse* resp, util::Task* task);
 
-  void GetAll(const std::string& dir, const GetAllCallback& cb);
+  void GetAll(const std::string& dir, GetAllResponse* resp, util::Task* task);
 
   void Create(const std::string& key, const std::string& value, Response* resp,
               util::Task* task);
@@ -142,9 +143,8 @@ class EtcdClient {
 
   void WatchInitialGetDone(WatchState* state, GetResponse* resp,
                            util::Task* task);
-  void WatchInitialGetAllDone(WatchState* state, util::Status status,
-                              const std::vector<Node>& nodes,
-                              int64_t etcd_index);
+  void WatchInitialGetAllDone(WatchState* state, GetAllResponse* resp,
+                              util::Task* task);
   void SendWatchUpdates(WatchState* state,
                         const std::vector<WatchUpdate>& updates);
   void StartWatchRequest(WatchState* state);

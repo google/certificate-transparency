@@ -12,6 +12,7 @@
 
 using std::bind;
 using std::condition_variable;
+using std::move;
 using std::pair;
 using std::placeholders::_1;
 using std::placeholders::_2;
@@ -115,7 +116,12 @@ Status SyncEtcdClient::Get(const string& key, EtcdClient::Node* node) const {
 
 Status SyncEtcdClient::GetAll(const string& dir,
                               vector<EtcdClient::Node>* values) const {
-  return BlockingCall(bind(&EtcdClient::GetAll, client_, dir, _1), values);
+  SyncTask task(executor_);
+  EtcdClient::GetAllResponse resp;
+  client_->GetAll(dir, &resp, task.task());
+  task.Wait();
+  *values = move(resp.nodes);
+  return task.status();
 }
 
 
