@@ -57,8 +57,7 @@ class EtcdConsistentStoreTest : public ::testing::Test {
       : base_(make_shared<libevent::Base>()),
         executor_(2),
         event_pump_(base_),
-        client_(base_),
-        sync_client_(&client_, base_.get()) {
+        client_(base_) {
   }
 
  protected:
@@ -133,17 +132,21 @@ class EtcdConsistentStoreTest : public ::testing::Test {
   template <class T>
   void InsertEntry(const string& key, const T& thing) {
     // Set up scenario:
-    int64_t index;
-    Status status(sync_client_.Create(key, Serialize(thing), &index));
-    ASSERT_TRUE(status.ok()) << status;
+    SyncTask task(base_.get());
+    EtcdClient::Response resp;
+    client_.Create(key, Serialize(thing), &resp, task.task());
+    task.Wait();
+    ASSERT_EQ(Status::OK, task.status());
   }
 
   template <class T>
   void PeekEntry(const string& key, T* thing) {
-    EtcdClient::Node node;
-    Status status(sync_client_.Get(key, &node));
-    ASSERT_TRUE(status.ok()) << status;
-    Deserialize(node.value_, thing);
+    EtcdClient::GetResponse resp;
+    SyncTask task(base_.get());
+    client_.Get(key, &resp, task.task());
+    task.Wait();
+    ASSERT_EQ(Status::OK, task.status());
+    Deserialize(resp.node.value_, thing);
   }
 
   template <class T>
@@ -172,7 +175,6 @@ class EtcdConsistentStoreTest : public ::testing::Test {
   ThreadPool executor_;
   libevent::EventPumpThread event_pump_;
   FakeEtcdClient client_;
-  SyncEtcdClient sync_client_;
   MockMasterElection election_;
   unique_ptr<EtcdConsistentStore<LoggedCertificate>> store_;
 };
@@ -271,13 +273,14 @@ TEST_F(EtcdConsistentStoreDeathTest, TestSetServingSTHChecksInconsistentSize) {
 TEST_F(EtcdConsistentStoreTest, TestAddPendingEntryWorks) {
   LoggedCertificate cert(DefaultCert());
   util::Status status(store_->AddPendingEntry(&cert));
-  ASSERT_TRUE(status.ok()) << status;
-  EtcdClient::Node node;
-  status = sync_client_.Get(string(kRoot) + "/unsequenced/" +
-                                util::HexString(cert.Hash()),
-                            &node);
-  EXPECT_TRUE(status.ok()) << status;
-  EXPECT_EQ(Serialize(cert), node.value_);
+  ASSERT_EQ(Status::OK, status);
+  EtcdClient::GetResponse resp;
+  SyncTask task(base_.get());
+  client_.Get(string(kRoot) + "/unsequenced/" + util::HexString(cert.Hash()),
+              &resp, task.task());
+  task.Wait();
+  EXPECT_EQ(Status::OK, task.status());
+  EXPECT_EQ(Serialize(cert), resp.node.value_);
 }
 
 
@@ -469,9 +472,11 @@ TEST_F(EtcdConsistentStoreTest, TestSetClusterNodeStateHasTTL) {
 
   sleep(2);
 
-  EtcdClient::Node node;
-  status = sync_client_.Get(kPath, &node);
-  EXPECT_EQ(util::error::NOT_FOUND, status.CanonicalCode());
+  EtcdClient::GetResponse resp;
+  SyncTask task(base_.get());
+  client_.Get(kPath, &resp, task.task());
+  task.Wait();
+  EXPECT_EQ(util::error::NOT_FOUND, task.status().CanonicalCode());
 }
 
 

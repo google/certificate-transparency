@@ -12,7 +12,6 @@
 
 #include "base/notification.h"
 #include "util/libevent_wrapper.h"
-#include "util/sync_etcd.h"
 #include "util/sync_task.h"
 #include "util/testing.h"
 

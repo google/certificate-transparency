@@ -11,7 +11,6 @@
 #include "proto/ct.pb.h"
 #include "util/etcd.h"
 #include "util/status.h"
-#include "util/sync_etcd.h"
 #include "util/sync_task.h"
 
 namespace cert_trans {
@@ -142,8 +141,8 @@ class EtcdConsistentStore : public ConsistentStore<Logged> {
   void OnEtcdServingSTHUpdated(const Update<ct::SignedTreeHead>& update);
 
   EtcdClient* const client_;  // We don't own this.
+  util::Executor* const executor_;        // We don't own this.
   const MasterElection* const election_;  // We don't own this.
-  SyncEtcdClient sync_client_;
   const std::string root_;
   const std::string node_id_;
   std::condition_variable serving_sth_cv_;
