@@ -414,7 +414,7 @@ void MasterElection::UpdateProposalView(
 
 bool MasterElection::DetermineApparentMaster(
     EtcdClient::Node* apparent_master) const {
-  EtcdClient::Node tmp_master(INT_MAX, INT_MAX, "", "");
+  EtcdClient::Node tmp_master(INT_MAX, INT_MAX, "", "", true);
   bool found(false);
   for (const auto& pair : proposals_) {
     CHECK_EQ(pair.first, pair.second.key_);

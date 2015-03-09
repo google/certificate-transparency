@@ -29,7 +29,7 @@ class EtcdClient {
     }
 
     Node(int64_t created_index, int64_t modified_index, const std::string& key,
-         const std::string& value);
+         const std::string& value, bool deleted);
 
     bool HasExpiry() const;
 

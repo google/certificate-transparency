@@ -145,7 +145,7 @@ void GetRequestDone(const string& keyname, EtcdClient::GetResponse* resp,
 
   resp->etcd_index = gen_resp->etcd_index;
   resp->node = EtcdClient::Node(createdIndex.Value(), modifiedIndex.Value(),
-                                key.Value(), value.Value());
+                                key.Value(), value.Value(), false);
   parent_task->Return();
 }
 
@@ -231,7 +231,7 @@ void GetAllRequestDone(const string& dir, EtcdClient::GetAllResponse* resp,
 
     values.emplace_back(EtcdClient::Node(createdIndex.Value(),
                                          modifiedIndex.Value(), key.Value(),
-                                         value.Value()));
+                                         value.Value(), false));
   }
 
   resp->etcd_index = gen_resp->etcd_index;
@@ -398,7 +398,7 @@ string UrlEscapeAndJoinParams(const map<string, string>& params) {
 }
 
 
-static const EtcdClient::Node kInvalidNode(-1, -1, "", "");
+static const EtcdClient::Node kInvalidNode(-1, -1, "", "", true);
 
 
 }  // namespace
@@ -549,9 +549,7 @@ void EtcdClient::WatchInitialGetAllDone(WatchState* state,
     // TODO(pphaneuf): Passing in -1 for the created and modified
     // indices, is that a problem? We do have a "last known" modified
     // index in key.second...
-    Node node(-1, -1, key.first, "");
-    node.deleted_ = true;
-    updates.emplace_back(WatchUpdate(node));
+    updates.emplace_back(WatchUpdate(Node(-1, -1, key.first, "", true)));
   }
 
   state->known_keys_.swap(new_known_keys);
@@ -587,12 +585,11 @@ StatusOr<EtcdClient::WatchUpdate> UpdateForNode(const JsonObject& node) {
   if (value.Ok()) {
     return StatusOr<EtcdClient::WatchUpdate>(EtcdClient::WatchUpdate(
         EtcdClient::Node(createdIndex.Value(), modifiedIndex.Value(),
-                         key.Value(), value.Value())));
+                         key.Value(), value.Value(), false)));
   } else {
-    EtcdClient::Node node(createdIndex.Value(), modifiedIndex.Value(),
-                          key.Value(), "");
-    node.deleted_ = true;
-    return StatusOr<EtcdClient::WatchUpdate>(EtcdClient::WatchUpdate(node));
+    return StatusOr<EtcdClient::WatchUpdate>(EtcdClient::WatchUpdate(
+        EtcdClient::Node(createdIndex.Value(), modifiedIndex.Value(),
+                         key.Value(), "", true)));
   }
 }
 
@@ -721,13 +718,13 @@ void EtcdClient::StartWatchRequest(WatchState* state) {
 
 
 EtcdClient::Node::Node(int64_t created_index, int64_t modified_index,
-                       const string& key, const string& value)
+                       const string& key, const string& value, bool deleted)
     : created_index_(created_index),
       modified_index_(modified_index),
       key_(key),
       value_(value),
       expires_(system_clock::time_point::max()),
-      deleted_(false) {
+      deleted_(deleted) {
 }
 
 
