@@ -478,12 +478,12 @@ struct EtcdClient::WatchState {
 
 
 EtcdClient::WatchUpdate::WatchUpdate(const Node& node)
-    : node_(node), exists_(!node_.deleted_) {
+    : node_(node) {
 }
 
 
 EtcdClient::WatchUpdate::WatchUpdate()
-    : node_(EtcdClient::Node::InvalidNode()), exists_(false) {
+    : node_(EtcdClient::Node::InvalidNode()) {
 }
 
 
@@ -665,7 +665,7 @@ void EtcdClient::WatchRequestDone(WatchState* state, GenericResponse* gen_resp,
             status.ValueOrDie().node_.modified_index_);
     updates.emplace_back(status.ValueOrDie());
 
-    if (status.ValueOrDie().exists_) {
+    if (!status.ValueOrDie().node_.deleted_) {
       state->known_keys_[status.ValueOrDie().node_.key_] =
           status.ValueOrDie().node_.modified_index_;
     } else {

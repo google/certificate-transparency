@@ -429,12 +429,12 @@ void TestWatcherForCreateCallback(
   if (num_calls == 0) {
     // initial call will all dir entries
     EXPECT_EQ(1, updates.size());
-    EXPECT_EQ(true, updates[0].exists_);
+    EXPECT_EQ(false, updates[0].node_.deleted_);
     EXPECT_EQ(kPath1, updates[0].node_.key_);
     EXPECT_EQ(kValue, updates[0].node_.value_);
   } else {
     EXPECT_EQ(1, updates.size());
-    EXPECT_EQ(true, updates[0].exists_);
+    EXPECT_EQ(false, updates[0].node_.deleted_);
     EXPECT_EQ(kPath2, updates[0].node_.key_);
     EXPECT_EQ(kValue2, updates[0].node_.value_);
     notifier->Notify();
@@ -478,12 +478,12 @@ void TestWatcherForDeleteCallback(
   if (*num_calls == 0) {
     // initial call will all dir entries
     EXPECT_EQ(1, updates.size());
-    EXPECT_EQ(true, updates[0].exists_);
+    EXPECT_EQ(false, updates[0].node_.deleted_);
     EXPECT_EQ(kPath1, updates[0].node_.key_);
     EXPECT_EQ(kValue, updates[0].node_.value_);
   } else {
     EXPECT_EQ(1, updates.size());
-    EXPECT_EQ(false, updates[0].exists_);
+    EXPECT_EQ(true, updates[0].node_.deleted_);
     EXPECT_EQ(kPath1, updates[0].node_.key_);
     notifier->Notify();
   }

@@ -397,7 +397,7 @@ void MasterElection::ProposalKeepAliveCallback() {
 void MasterElection::UpdateProposalView(
     const vector<EtcdClient::WatchUpdate>& updates) {
   for (const auto& update : updates) {
-    if (update.exists_) {
+    if (!update.node_.deleted_) {
       VLOG(1) << my_proposal_path_
               << ": Proposal updated: " << update.node_.ToString();
       proposals_[update.node_.key_] = update.node_;

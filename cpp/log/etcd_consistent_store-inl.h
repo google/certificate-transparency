@@ -589,10 +589,10 @@ Update<T> EtcdConsistentStore<Logged>::TypedUpdateFromWatchUpdate(
   T thing;
   CHECK(thing.ParseFromString(raw_value)) << raw_value;
   EntryHandle<T> handle(update.node_.key_, thing);
-  if (update.exists_) {
+  if (!update.node_.deleted_) {
     handle.SetHandle(update.node_.modified_index_);
   }
-  return Update<T>(handle, update.exists_);
+  return Update<T>(handle, !update.node_.deleted_);
 }
 
 

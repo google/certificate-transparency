@@ -26,7 +26,7 @@ DEFINE_string(key, "/foo", "path to watch");
 
 void Notify(const vector<EtcdClient::WatchUpdate>& updates) {
   for (const auto& update : updates) {
-    if (update.exists_) {
+    if (!update.node_.deleted_) {
       cout << "key changed: " << update.node_.ToString() << endl;
     } else {
       cout << "key deleted: " << update.node_.ToString() << endl;
