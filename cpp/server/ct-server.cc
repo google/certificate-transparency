@@ -449,7 +449,8 @@ int main(int argc, char* argv[]) {
   thread node_refresh(&RefreshNodeState, &cluster_controller);
 
   ThreadPool pool;
-  HttpHandler handler(&log_lookup, db, &checker, &frontend, &pool);
+  HttpHandler handler(&log_lookup, db, &checker, &frontend, &pool,
+                      event_base.get());
 
   libevent::HttpServer server(*event_base);
   handler.Add(&server);

@@ -21,6 +21,8 @@
 #include "util/json_wrapper.h"
 #include "util/thread_pool.h"
 
+namespace libevent = cert_trans::libevent;
+
 using cert_trans::Cert;
 using cert_trans::CertChain;
 using cert_trans::CertChecker;
@@ -101,6 +103,12 @@ void SendJsonReply(evhttp_request* req, int http_status,
 }
 
 
+void SendJsonRefReply(evhttp_request* req, int http_status,
+                      const shared_ptr<JsonObject>& json) {
+  SendJsonReply(req, http_status, *json);
+}
+
+
 void SendError(evhttp_request* req, int http_status, const string& error_msg) {
   JsonObject json_reply;
   json_reply.Add("error_message", error_msg);
@@ -153,7 +161,8 @@ bool ExtractChain(evhttp_request* req, CertChain* chain) {
 }
 
 
-void AddChainReply(evhttp_request* req, SubmitResult result,
+void AddChainReply(libevent::Base* event_base, evhttp_request* req,
+                   SubmitResult result,
                    const SignedCertificateTimestamp& sct) {
   if (result != ADDED && result != DUPLICATE) {
     const string error(Frontend::SubmitResultString(result));
@@ -161,14 +170,14 @@ void AddChainReply(evhttp_request* req, SubmitResult result,
     return SendError(req, HTTP_BADREQUEST, error);
   }
 
-  JsonObject json_reply;
-  json_reply.Add("sct_version", static_cast<int64_t>(0));
-  json_reply.AddBase64("id", sct.id().key_id());
-  json_reply.Add("timestamp", sct.timestamp());
-  json_reply.Add("extensions", "");
-  json_reply.Add("signature", sct.signature());
+  shared_ptr<JsonObject> json_reply(make_shared<JsonObject>());
+  json_reply->Add("sct_version", static_cast<int64_t>(0));
+  json_reply->AddBase64("id", sct.id().key_id());
+  json_reply->Add("timestamp", sct.timestamp());
+  json_reply->Add("extensions", "");
+  json_reply->Add("signature", sct.signature());
 
-  SendJsonReply(req, HTTP_OK, json_reply);
+  event_base->Add(bind(SendJsonRefReply, req, HTTP_OK, json_reply));
 }
 
 
@@ -243,12 +252,13 @@ int64_t GetIntParam(const multimap<string, string>& query,
 HttpHandler::HttpHandler(LogLookup<LoggedCertificate>* log_lookup,
                          const ReadOnlyDatabase<LoggedCertificate>* db,
                          const CertChecker* cert_checker, Frontend* frontend,
-                         ThreadPool* pool)
+                         ThreadPool* pool, libevent::Base* event_base)
     : log_lookup_(CHECK_NOTNULL(log_lookup)),
       db_(CHECK_NOTNULL(db)),
       cert_checker_(CHECK_NOTNULL(cert_checker)),
       frontend_(frontend),
-      pool_(CHECK_NOTNULL(pool)) {
+      pool_(CHECK_NOTNULL(pool)),
+      event_base_(CHECK_NOTNULL(event_base)) {
 }
 
 
@@ -478,10 +488,10 @@ void HttpHandler::BlockingGetEntries(evhttp_request* req, int64_t start,
     json_entries.Add(&json_entry);
   }
 
-  JsonObject json_reply;
-  json_reply.Add("entries", json_entries);
+  shared_ptr<JsonObject> json_reply(make_shared<JsonObject>());
+  json_reply->Add("entries", json_entries);
 
-  SendJsonReply(req, HTTP_OK, json_reply);
+  event_base_->Add(bind(SendJsonRefReply, req, HTTP_OK, json_reply));
 }
 
 
@@ -489,8 +499,9 @@ void HttpHandler::BlockingAddChain(evhttp_request* req,
                                    const shared_ptr<CertChain>& chain) const {
   SignedCertificateTimestamp sct;
 
-  AddChainReply(req, CHECK_NOTNULL(frontend_)
-                         ->QueueX509Entry(CHECK_NOTNULL(chain.get()), &sct),
+  AddChainReply(event_base_, req,
+                CHECK_NOTNULL(frontend_)
+                    ->QueueX509Entry(CHECK_NOTNULL(chain.get()), &sct),
                 sct);
 }
 
@@ -499,7 +510,8 @@ void HttpHandler::BlockingAddPreChain(
     evhttp_request* req, const shared_ptr<PreCertChain>& chain) const {
   SignedCertificateTimestamp sct;
 
-  AddChainReply(req, CHECK_NOTNULL(frontend_)
-                         ->QueuePreCertEntry(CHECK_NOTNULL(chain.get()), &sct),
+  AddChainReply(event_base_, req,
+                CHECK_NOTNULL(frontend_)
+                    ->QueuePreCertEntry(CHECK_NOTNULL(chain.get()), &sct),
                 sct);
 }

@@ -31,7 +31,7 @@ class HttpHandler {
   HttpHandler(LogLookup<LoggedCertificate>* log_lookup,
               const ReadOnlyDatabase<LoggedCertificate>* db,
               const CertChecker* cert_checker, Frontend* frontend,
-              ThreadPool* pool);
+              ThreadPool* pool, libevent::Base* event_base);
 
   void Add(libevent::HttpServer* server);
 
@@ -56,6 +56,7 @@ class HttpHandler {
   const CertChecker* const cert_checker_;
   Frontend* const frontend_;
   ThreadPool* const pool_;
+  libevent::Base* const event_base_;
 
   DISALLOW_COPY_AND_ASSIGN(HttpHandler);
 };
