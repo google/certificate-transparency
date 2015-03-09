@@ -26,6 +26,7 @@ fi
 STORAGE=$1
 CERT_FILE=${2:-"testdata/ca-cert.pem"}
 KEY="testdata/ct-server-key.pem"
+shift 2
 
 # if [ ! -e $HASH_DIR ]
 # then
@@ -36,7 +37,10 @@ KEY="testdata/ct-server-key.pem"
 #   ln -s $CERT $HASH_DIR/$hash.0
 # fi
 
+export TSAN_OPTIONS=${TSAN_OPTIONS:-log_file=tsan_log suppressions=../cpp/tsan_suppressions}
+
 ../cpp/server/ct-server --port=8888 --key=$KEY \
   --trusted_cert_file=$CERT_FILE --logtostderr=true \
   --guard_window_seconds=5 \
-  --tree_signing_frequency_seconds=10 --sqlite_db=$STORAGE
+  --tree_signing_frequency_seconds=10 --sqlite_db=$STORAGE \
+  $*

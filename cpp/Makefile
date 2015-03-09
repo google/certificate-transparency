@@ -5,14 +5,14 @@ default: all
 
 -include local.mk
 
-CXXFLAG = -std=c++11 -fno-exceptions -Wall -Werror -g -O3
+CXXFLAG = -std=c++11 -fno-exceptions -Wall -Werror -g -O3 --stdlib=libstdc++
 LINK.o = $(LINK.cc)
 
 INCLUDE = -I .
 LOCAL_LIBS = log/libcert.a log/libcluster.a log/libdatabase.a \
              log/liblog.a merkletree/libmerkletree.a \
              proto/libproto.a util/libutil.a monitoring/libmonitoring.a
-LDLIBS = -lpthread -lgflags -lglog -lssl -lcrypto -lldns -lsqlite3 \
+LDLIBS = $(LOCAL_LDFLAGS) -lstdc++ -lpthread -lgflags -lglog -lssl -lcrypto -lldns -lsqlite3 \
          -lprotobuf -levent_core -levent_extra -levent_pthreads
 
 PLATFORM := $(shell uname -s)
@@ -109,6 +109,32 @@ all: client/ct server/ct-server server/ct-dns-server tools/ct-clustertool \
      util/etcd_watch
 
 tests: all $(TESTS) $(DISABLED_TESTS) $(EXTRA_TESTS)
+
+TSAN_CMAKE_FLAGS=-fPIC -fPIE -fsanitize=thread
+TSAN_CXXFLAGS=-fPIC -fPIE -fsanitize=thread
+TSAN_LDFLAGS=-fsanitize=thread -pie
+
+tsan_enabled: clean
+	$(MAKE) gmock/libgmock.a
+	sed -i -e 's/^CMAKE_CXX_FLAGS:STRING=\(.*\)$$/CMAKE_CXX_FLAGS:STRING=$(TSAN_CMAKE_FLAGS) \1/' gmock/CMakeCache.txt
+	touch local.mk
+	if [ -s local.mk ]; then \
+		sed -i -e 's/^LOCAL_CXXFLAGS=\(.*\)$$/LOCAL_CXXFLAGS=$(TSAN_CXXFLAGS)/' local.mk; \
+		sed -i -e 's/^LOCAL_LDFLAGS=\(.*\)$$/LOCAL_LDFLAGS=$(TSAN_LDFLAGS)/' local.mk; \
+	else \
+		echo "LOCAL_CXXFLAGS=$(TSAN_CXXFLAGS)" > local.mk; \
+		echo "LOCAL_LDFLAGS=$(TSAN_LDFLAGS)" >> local.mk; \
+	fi
+	$(MAKE) -C gmock
+
+tsan_disabled: clean
+	$(MAKE) gmock/libgmock.a
+	sed -i -e 's/^CMAKE_CXX_FLAGS:STRING=\(.*\)$(TSAN_CMAKE_FLAGS)\(.*\)$$/CMAKE_CXX_FLAGS:STRING=\1 \2/' gmock/CMakeCache.txt
+	touch local.mk
+	sed -i -e 's/^LOCAL_CXXFLAGS=\(.*\)$(TSAN_CXXFLAGS)\(.*\)$$/LOCAL_CXXFLAGS=\1\2/' local.mk
+	sed -i -e 's/^LOCAL_LDFLAGS=\(.*\)$(TSAN_LDFLAGS)\(.*\)$$/LOCAL_LDFLAGS=\1\2/' local.mk
+	$(MAKE) -C gmock
+
 
 .DELETE_ON_ERROR:
 
@@ -402,7 +428,7 @@ tools/ct-clustertool: tools/clustertool_main.o \
                       log/libcluster.a log/libdatabase.a \
                       log/liblog.a util/libutil.a proto/libproto.a \
                       monitoring/libmonitoring.a
-	$(CXX) -o $@ $(LDLIBS) $^
+	$(LINK.cc) $(LDLIBS) -o $@ $^
 
 tools/dump_cert: tools/dump_cert.o proto/libproto.a util/libutil.a
 
