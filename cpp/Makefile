@@ -85,7 +85,6 @@ TESTS = \
 	util/json_wrapper_test \
 	util/libevent_wrapper_test \
 	util/masterelection_test \
-	util/sync_etcd_test \
 	util/sync_task_test \
 	util/task_test
 
@@ -155,7 +154,7 @@ base/notification_test: base/notification.cc base/notification_test.o \
 ### util/ targets
 util/libutil.a: util/util.o util/openssl_util.o util/testing.o \
                 util/json_wrapper.o util/thread_pool.o util/libevent_wrapper.o \
-                util/etcd.o util/status.o util/sync_etcd.o util/fake_etcd.o \
+                util/etcd.o util/status.o util/fake_etcd.o \
                 util/periodic_closure.o util/masterelection.o util/task.o \
                 util/protobuf_util.o util/sync_task.o util/uuid.o
 	rm -f $@
@@ -174,10 +173,6 @@ util/etcd_test: util/etcd_test.o base/notification.o net/url.o \
                 $(GTESTLIB)
 
 util/fake_etcd_test: util/fake_etcd_test.o base/notification.o net/url.o \
-                     net/url_fetcher.o net/connection_pool.o util/libutil.a \
-                     monitoring/libmonitoring.a $(GMOCKLIB) $(GTESTLIB)
-
-util/sync_etcd_test: util/sync_etcd_test.o base/notification.o net/url.o \
                      net/url_fetcher.o net/connection_pool.o util/libutil.a \
                      monitoring/libmonitoring.a $(GMOCKLIB) $(GTESTLIB)
 

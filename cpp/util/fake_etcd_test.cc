@@ -12,7 +12,6 @@
 
 #include "base/notification.h"
 #include "util/libevent_wrapper.h"
-#include "util/sync_etcd.h"
 #include "util/sync_task.h"
 #include "util/testing.h"
 
@@ -42,28 +41,6 @@ const char kValue[] = "value";
 const char kValue2[] = "value2";
 
 
-template <class A, class B>
-void CopyCallback2(Notification* notifier, A* a_out, B* b_out, const A& a_in,
-                   const B& b_in) {
-  *a_out = a_in;
-  *b_out = b_in;
-  notifier->Notify();
-}
-
-
-template <class A, class B, class C>
-void CopyCallback3(Notification* notifier, A* a_out, B* b_out, C* c_out,
-                   const A& a_in, const B& b_in, const C& c_in) {
-  *a_out = a_in;
-  *b_out = b_in;
-  *c_out = c_in;
-  notifier->Notify();
-}
-
-void DoNothing() {
-}
-
-
 class FakeEtcdTest : public ::testing::Test {
  public:
   FakeEtcdTest()
@@ -74,12 +51,12 @@ class FakeEtcdTest : public ::testing::Test {
 
  protected:
   Status BlockingGet(const string& key, EtcdClient::Node* node) {
-    Notification notifier;
-    Status status;
-    client_.Get(key, bind(&CopyCallback2<Status, EtcdClient::Node>, &notifier,
-                          &status, node, _1, _2));
-    notifier.WaitForNotification();
-    return status;
+    SyncTask task(base_.get());
+    EtcdClient::GetResponse resp;
+    client_.Get(key, &resp, task.task());
+    task.Wait();
+    *node = resp.node;
+    return task.status();
   }
 
   Status BlockingCreate(const string& key, const string& value,
