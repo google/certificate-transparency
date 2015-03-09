@@ -59,6 +59,8 @@ class ClusterStateController {
   // other nodes can request entries from its database.
   void SetNodeHostPort(const std::string& host, const uint16_t port);
 
+  void RefreshNodeState();
+
  private:
   class ClusterPeer;
 

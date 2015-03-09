@@ -1,5 +1,6 @@
 /* -*- indent-tabs-mode: nil -*- */
 
+#include <csignal>
 #include <cstring>
 #include <event2/buffer.h>
 #include <event2/thread.h>
@@ -9,6 +10,7 @@
 #include <memory>
 #include <openssl/err.h>
 #include <string>
+#include <unistd.h>
 
 #include "log/cert_checker.h"
 #include "log/cert_submission_handler.h"
@@ -76,6 +78,8 @@ DEFINE_string(etcd_host, "", "Hostname of the etcd server");
 DEFINE_int32(etcd_port, 0, "Port of the etcd server.");
 DEFINE_int32(node_state_refresh_seconds, 10,
              "How often to refresh the ClusterNodeState entry for this node.");
+DEFINE_bool(watchdog_timeout_is_fatal, true,
+            "Exit if the watchdog timer fires.");
 
 namespace libevent = cert_trans::libevent;
 
@@ -248,6 +252,35 @@ void SignMerkleTree(TreeSigner<LoggedCertificate>* tree_signer,
   }
 }
 
+void RefreshNodeState(ClusterStateController<LoggedCertificate>* controller) {
+  const steady_clock::duration period(
+      (seconds(FLAGS_node_state_refresh_seconds)));
+  steady_clock::time_point target_run_time(steady_clock::now());
+
+  while (true) {
+    // If we haven't managed to refresh our state file in a timely fashion,
+    // then send us a SIGALRM:
+    alarm(FLAGS_node_state_refresh_seconds * 4);
+
+    controller->RefreshNodeState();
+
+    const steady_clock::time_point now(steady_clock::now());
+    while (target_run_time <= now) {
+      target_run_time += period;
+    }
+    std::this_thread::sleep_for(target_run_time - now);
+  }
+}
+
+void WatchdogTimeout(int sig) {
+  if (FLAGS_watchdog_timeout_is_fatal) {
+    LOG(INFO) << "Watchdog timed out, killing process.";
+    exit(-2);
+  } else {
+    LOG(INFO) << "Watchdog timeout out, ignoring.";
+  }
+}
+
 int main(int argc, char* argv[]) {
   google::ParseCommandLineFlags(&argc, &argv, true);
   google::InitGoogleLogging(argv[0]);
@@ -255,6 +288,8 @@ int main(int argc, char* argv[]) {
   OpenSSL_add_all_algorithms();
   ERR_load_crypto_strings();
   cert_trans::LoadCtExtensions();
+
+  CHECK_NE(SIG_ERR, std::signal(SIGALRM, &WatchdogTimeout));
 
   util::StatusOr<EVP_PKEY*> pkey(ReadPrivateKey(FLAGS_key));
   CHECK_EQ(pkey.status(), util::Status::OK);
@@ -400,24 +435,6 @@ int main(int argc, char* argv[]) {
     CHECK(!FLAGS_server.empty());
   }
 
-  // Just separate this out from the lambda below to try to be clear that this
-  // is the *only* interaction with TreeSigner that we're allowing there.
-  const function<SignedTreeHead(void)> get_latest_sth(
-      bind(&TreeSigner<LoggedCertificate>::LatestSTH, &tree_signer));
-  // Periodically refresh our ClusterNodeState entry so it doesn't get deleted.
-  // TODO(alcutter): Figure out if we actually need this here now, the signer
-  // thread above will refresh the entry, but potentially not frequently
-  // enough.
-  PeriodicClosure node_state_refresh(
-      event_base, std::chrono::seconds(FLAGS_node_state_refresh_seconds),
-      [&db, &cluster_controller, &internal_pool, &get_latest_sth]() {
-        // Actually run this on the thread pool, since this periodic closure is
-        // calling back on the eventloop thread.
-        internal_pool.Add([&db, &cluster_controller, &get_latest_sth]() {
-          cluster_controller.NewTreeHead(get_latest_sth());
-        });
-      });
-
   Frontend frontend(new CertSubmissionHandler(&checker),
                     new FrontendSigner(db, &consistent_store, &log_signer));
   LogLookup<LoggedCertificate> log_lookup(db);
@@ -429,6 +446,8 @@ int main(int argc, char* argv[]) {
                    &election);
   thread signer(&SignMerkleTree, &tree_signer, &consistent_store,
                 &cluster_controller, &election);
+  thread node_refresh(&RefreshNodeState, &cluster_controller);
+
   ThreadPool pool;
   HttpHandler handler(&log_lookup, db, &checker, &frontend, &pool);
 

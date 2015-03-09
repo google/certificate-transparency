@@ -205,6 +205,13 @@ void ClusterStateController<Logged>::SetNodeHostPort(const std::string& host,
 
 
 template <class Logged>
+void ClusterStateController<Logged>::RefreshNodeState() {
+  std::unique_lock<std::mutex> lock(mutex_);
+  PushLocalNodeState(lock);
+}
+
+
+template <class Logged>
 void ClusterStateController<Logged>::PushLocalNodeState(
     const std::unique_lock<std::mutex>& lock) {
   CHECK(lock.owns_lock());
