@@ -36,6 +36,7 @@ using std::multimap;
 using std::placeholders::_1;
 using std::shared_ptr;
 using std::string;
+using std::to_string;
 using std::unique_ptr;
 using std::vector;
 
@@ -49,7 +50,7 @@ namespace {
 const char kJsonContentType[] = "application/json; charset=ISO-8859-1";
 
 
-void LogRequest(evhttp_request* req, int http_status, int resp_body_length) {
+string LogRequest(evhttp_request* req, int http_status, int resp_body_length) {
   evhttp_connection* conn = evhttp_request_get_connection(req);
   char* peer_addr;
   ev_uint16_t peer_port;
@@ -78,8 +79,9 @@ void LogRequest(evhttp_request* req, int http_status, int resp_body_length) {
   }
 
   const string uri(evhttp_request_get_uri(req));
-  LOG(INFO) << string(peer_addr) << " \"" << http_verb << " " << uri << "\" "
-            << http_status << " " << resp_body_length;
+  return string(peer_addr ? peer_addr : "<unknown>") + " \"" + http_verb +
+         " " + uri + "\" " + to_string(http_status) + " " +
+         to_string(resp_body_length);
 }
 
 
@@ -93,8 +95,9 @@ void SendJsonReply(evhttp_request* req, int http_status,
                                resp_body.c_str()),
            0);
 
+  const string logstr(LogRequest(req, http_status, resp_body.size()));
   evhttp_send_reply(req, http_status, /*reason*/ NULL, /*databuf*/ NULL);
-  LogRequest(req, http_status, resp_body.size());
+  LOG(INFO) << logstr;
 }
 
 
