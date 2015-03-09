@@ -24,12 +24,12 @@ DEFINE_int32(etcd_port, 4001, "etcd server port");
 DEFINE_string(key, "/foo", "path to watch");
 
 
-void Notify(const vector<EtcdClient::WatchUpdate>& updates) {
+void Notify(const vector<EtcdClient::Node>& updates) {
   for (const auto& update : updates) {
-    if (!update.node_.deleted_) {
-      cout << "key changed: " << update.node_.ToString() << endl;
+    if (!update.deleted_) {
+      cout << "key changed: " << update.ToString() << endl;
     } else {
-      cout << "key deleted: " << update.node_.ToString() << endl;
+      cout << "key deleted: " << update.ToString() << endl;
     }
   }
 }

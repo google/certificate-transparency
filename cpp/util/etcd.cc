@@ -477,16 +477,6 @@ struct EtcdClient::WatchState {
 };
 
 
-EtcdClient::WatchUpdate::WatchUpdate(const Node& node)
-    : node_(node) {
-}
-
-
-EtcdClient::WatchUpdate::WatchUpdate()
-    : node_(EtcdClient::Node::InvalidNode()) {
-}
-
-
 void EtcdClient::WatchInitialGetDone(WatchState* state, GetResponse* resp,
                                      Task* task) {
   unique_ptr<GetResponse> resp_deleter(resp);
@@ -515,7 +505,7 @@ void EtcdClient::WatchInitialGetAllDone(WatchState* state,
   state->highest_index_seen_ =
       max(state->highest_index_seen_, resp->etcd_index);
 
-  vector<WatchUpdate> updates;
+  vector<Node> updates;
   map<string, int64_t> new_known_keys;
   VLOG(1) << "WatchGet " << state << " : num updates = " << resp->nodes.size();
   for (const auto& node : resp->nodes) {
@@ -533,7 +523,7 @@ void EtcdClient::WatchInitialGetAllDone(WatchState* state,
               << " @ " << node.modified_index_;
       // Nodes received in an initial get should *always* exist!
       CHECK(!node.deleted_);
-      updates.emplace_back(WatchUpdate(node));
+      updates.emplace_back(node);
     }
 
     new_known_keys[node.key_] = node.modified_index_;
@@ -549,7 +539,7 @@ void EtcdClient::WatchInitialGetAllDone(WatchState* state,
     // TODO(pphaneuf): Passing in -1 for the created and modified
     // indices, is that a problem? We do have a "last known" modified
     // index in key.second...
-    updates.emplace_back(WatchUpdate(Node(-1, -1, key.first, "", true)));
+    updates.emplace_back(Node(-1, -1, key.first, "", true));
   }
 
   state->known_keys_.swap(new_known_keys);
@@ -559,37 +549,32 @@ void EtcdClient::WatchInitialGetAllDone(WatchState* state,
 }
 
 
-StatusOr<EtcdClient::WatchUpdate> UpdateForNode(const JsonObject& node) {
+StatusOr<EtcdClient::Node> UpdateForNode(const JsonObject& node) {
   const JsonInt createdIndex(node, "createdIndex");
   if (!createdIndex.Ok()) {
-    return StatusOr<EtcdClient::WatchUpdate>(
-        Status(util::error::FAILED_PRECONDITION,
-               "Invalid JSON: Couldn't find 'createdIndex'"));
+    return Status(util::error::FAILED_PRECONDITION,
+                  "Invalid JSON: Couldn't find 'createdIndex'");
   }
 
   const JsonInt modifiedIndex(node, "modifiedIndex");
   if (!modifiedIndex.Ok()) {
-    return StatusOr<EtcdClient::WatchUpdate>(
-        Status(util::error::FAILED_PRECONDITION,
-               "Invalid JSON: Couldn't find 'modifiedIndex'"));
+    return Status(util::error::FAILED_PRECONDITION,
+                  "Invalid JSON: Couldn't find 'modifiedIndex'");
   }
 
   const JsonString key(node, "key");
   if (!key.Ok()) {
-    return StatusOr<EtcdClient::WatchUpdate>(
-        Status(util::error::FAILED_PRECONDITION,
-               "Invalid JSON: Couldn't find 'key'"));
+    return Status(util::error::FAILED_PRECONDITION,
+                  "Invalid JSON: Couldn't find 'key'");
   }
 
   const JsonString value(node, "value");
   if (value.Ok()) {
-    return StatusOr<EtcdClient::WatchUpdate>(EtcdClient::WatchUpdate(
-        EtcdClient::Node(createdIndex.Value(), modifiedIndex.Value(),
-                         key.Value(), value.Value(), false)));
+    return EtcdClient::Node(createdIndex.Value(), modifiedIndex.Value(),
+                            key.Value(), value.Value(), false);
   } else {
-    return StatusOr<EtcdClient::WatchUpdate>(EtcdClient::WatchUpdate(
-        EtcdClient::Node(createdIndex.Value(), modifiedIndex.Value(),
-                         key.Value(), "", true)));
+    return EtcdClient::Node(createdIndex.Value(), modifiedIndex.Value(),
+                            key.Value(), "", true);
   }
 }
 
@@ -654,23 +639,22 @@ void EtcdClient::WatchRequestDone(WatchState* state, GenericResponse* gen_resp,
       goto fail;
     }
 
-    vector<WatchUpdate> updates;
-    StatusOr<WatchUpdate> status(UpdateForNode(node));
+    vector<Node> updates;
+    StatusOr<Node> status(UpdateForNode(node));
     if (!status.ok()) {
       LOG(INFO) << "UpdateForNode failed: " << status.status();
       goto fail;
     }
     state->highest_index_seen_ =
-        max(state->highest_index_seen_,
-            status.ValueOrDie().node_.modified_index_);
+        max(state->highest_index_seen_, status.ValueOrDie().modified_index_);
     updates.emplace_back(status.ValueOrDie());
 
-    if (!status.ValueOrDie().node_.deleted_) {
-      state->known_keys_[status.ValueOrDie().node_.key_] =
-          status.ValueOrDie().node_.modified_index_;
+    if (!status.ValueOrDie().deleted_) {
+      state->known_keys_[status.ValueOrDie().key_] =
+          status.ValueOrDie().modified_index_;
     } else {
-      LOG(INFO) << "erased key: " << status.ValueOrDie().node_.key_;
-      state->known_keys_.erase(status.ValueOrDie().node_.key_);
+      LOG(INFO) << "erased key: " << status.ValueOrDie().key_;
+      state->known_keys_.erase(status.ValueOrDie().key_);
     }
 
     return state->task_->executor()->Add(
@@ -687,7 +671,7 @@ fail:
 // This method should always be called on the executor of
 // state->task_.
 void EtcdClient::SendWatchUpdates(WatchState* state,
-                                  const vector<WatchUpdate>& updates) {
+                                  const vector<Node>& updates) {
   if (!updates.empty() || state->highest_index_seen_ == -1) {
     state->cb_(updates);
   }

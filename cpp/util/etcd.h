@@ -43,13 +43,6 @@ class EtcdClient {
     bool deleted_;
   };
 
-  struct WatchUpdate {
-    WatchUpdate();
-    WatchUpdate(const Node& node);
-
-    const Node node_;
-  };
-
   struct Response {
     Response() : etcd_index(-1) {
     }
@@ -73,8 +66,7 @@ class EtcdClient {
     std::shared_ptr<JsonObject> json_body;
   };
 
-  typedef std::function<void(const std::vector<WatchUpdate>& updates)>
-      WatchCallback;
+  typedef std::function<void(const std::vector<Node>& updates)> WatchCallback;
 
   // TODO(pphaneuf): This should take a set of servers, not just one.
   EtcdClient(const std::shared_ptr<libevent::Base>& event_base,
@@ -144,8 +136,7 @@ class EtcdClient {
                            util::Task* task);
   void WatchInitialGetAllDone(WatchState* state, GetAllResponse* resp,
                               util::Task* task);
-  void SendWatchUpdates(WatchState* state,
-                        const std::vector<WatchUpdate>& updates);
+  void SendWatchUpdates(WatchState* state, const std::vector<Node>& updates);
   void StartWatchRequest(WatchState* state);
   void WatchRequestDone(WatchState* state, GenericResponse* gen_resp,
                         util::Task* child_task);

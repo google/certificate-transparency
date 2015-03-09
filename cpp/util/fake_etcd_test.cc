@@ -383,8 +383,7 @@ class CheckingExecutor : public util::Executor {
 };
 
 
-void TestWatcherForExecutor(Notification* notifier, bool* been_called,
-                            const vector<EtcdClient::WatchUpdate>& updates) {
+void TestWatcherForExecutor(Notification* notifier, bool* been_called) {
   if (*been_called) {
     notifier->Notify();
   }
@@ -404,7 +403,7 @@ TEST_F(FakeEtcdTest, TestWatcherForExecutor) {
   CheckingExecutor checking_executor(&pool, {nullptr, &watch, nullptr, &done});
   util::Task task(bind(&Notification::Notify, &done), &checking_executor);
   bool been_called(false);
-  client_.Watch(kDir, bind(&TestWatcherForExecutor, &watch, &been_called, _1),
+  client_.Watch(kDir, bind(&TestWatcherForExecutor, &watch, &been_called),
                 &task);
 
   int64_t created_index;
@@ -422,21 +421,21 @@ TEST_F(FakeEtcdTest, TestWatcherForExecutor) {
 }
 
 
-void TestWatcherForCreateCallback(
-    Notification* notifier, const vector<EtcdClient::WatchUpdate>& updates) {
+void TestWatcherForCreateCallback(Notification* notifier,
+                                  const vector<EtcdClient::Node>& updates) {
   static int num_calls(0);
   LOG(INFO) << "Update " << num_calls;
   if (num_calls == 0) {
     // initial call will all dir entries
     EXPECT_EQ(1, updates.size());
-    EXPECT_EQ(false, updates[0].node_.deleted_);
-    EXPECT_EQ(kPath1, updates[0].node_.key_);
-    EXPECT_EQ(kValue, updates[0].node_.value_);
+    EXPECT_EQ(false, updates[0].deleted_);
+    EXPECT_EQ(kPath1, updates[0].key_);
+    EXPECT_EQ(kValue, updates[0].value_);
   } else {
     EXPECT_EQ(1, updates.size());
-    EXPECT_EQ(false, updates[0].node_.deleted_);
-    EXPECT_EQ(kPath2, updates[0].node_.key_);
-    EXPECT_EQ(kValue2, updates[0].node_.value_);
+    EXPECT_EQ(false, updates[0].deleted_);
+    EXPECT_EQ(kPath2, updates[0].key_);
+    EXPECT_EQ(kValue2, updates[0].value_);
     notifier->Notify();
   }
   ++num_calls;
@@ -468,9 +467,8 @@ TEST_F(FakeEtcdTest, TestWatcherForCreate) {
 }
 
 
-void TestWatcherForDeleteCallback(
-    Notification* notifier, int* num_calls,
-    const vector<EtcdClient::WatchUpdate>& updates) {
+void TestWatcherForDeleteCallback(Notification* notifier, int* num_calls,
+                                  const vector<EtcdClient::Node>& updates) {
   static mutex mymutex;
 
   lock_guard<mutex> lock(mymutex);
@@ -478,13 +476,13 @@ void TestWatcherForDeleteCallback(
   if (*num_calls == 0) {
     // initial call will all dir entries
     EXPECT_EQ(1, updates.size());
-    EXPECT_EQ(false, updates[0].node_.deleted_);
-    EXPECT_EQ(kPath1, updates[0].node_.key_);
-    EXPECT_EQ(kValue, updates[0].node_.value_);
+    EXPECT_EQ(false, updates[0].deleted_);
+    EXPECT_EQ(kPath1, updates[0].key_);
+    EXPECT_EQ(kValue, updates[0].value_);
   } else {
     EXPECT_EQ(1, updates.size());
-    EXPECT_EQ(true, updates[0].node_.deleted_);
-    EXPECT_EQ(kPath1, updates[0].node_.key_);
+    EXPECT_EQ(true, updates[0].deleted_);
+    EXPECT_EQ(kPath1, updates[0].key_);
     notifier->Notify();
   }
   ++(*num_calls);

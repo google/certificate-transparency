@@ -54,11 +54,11 @@ void FakeEtcdClient::DumpEntries() {
 void FakeEtcdClient::Watch(const string& key, const WatchCallback& cb,
                            util::Task* task) {
   unique_lock<mutex> lock(mutex_);
-  vector<WatchUpdate> initial_updates;
+  vector<Node> initial_updates;
   for (const auto& pair : entries_) {
     if (pair.first.find(key) == 0) {
       CHECK(!pair.second.deleted_);
-      initial_updates.emplace_back(WatchUpdate(pair.second));
+      initial_updates.emplace_back(pair.second);
     }
   }
   ScheduleWatchCallback(lock, task, bind(cb, move(initial_updates)));
@@ -157,8 +157,7 @@ void FakeEtcdClient::NotifyForPath(const unique_lock<mutex>& lock,
     if (path.find(pair.first) == 0) {
       for (const auto& cb_cookie : pair.second) {
         ScheduleWatchCallback(lock, cb_cookie.second,
-                              bind(cb_cookie.first,
-                                   vector<WatchUpdate>{WatchUpdate(node)}));
+                              bind(cb_cookie.first, vector<Node>{node}));
       }
     }
   }

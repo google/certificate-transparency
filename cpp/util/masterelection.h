@@ -120,7 +120,7 @@ class MasterElection {
   void ProposalKeepAliveCallback();
 
   // Updates our local view of the election proposals.
-  void UpdateProposalView(const std::vector<EtcdClient::WatchUpdate>& updates);
+  void UpdateProposalView(const std::vector<EtcdClient::Node>& updates);
 
   // Works out which proposal /should/ be master based on created_index_.
   // Returns true iff there was an apparent master, false otherwise.
@@ -128,7 +128,7 @@ class MasterElection {
 
   // Called by the EtcdClient whenever there's been a change in one or
   // more of the proposal files.
-  void OnProposalUpdate(const std::vector<EtcdClient::WatchUpdate>& updates);
+  void OnProposalUpdate(const std::vector<EtcdClient::Node>& updates);
 
   // Internal non-locking accessor for is_master_
   bool IsMaster(const std::unique_lock<std::mutex>& lock) const;

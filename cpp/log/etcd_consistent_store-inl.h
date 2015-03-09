@@ -320,14 +320,14 @@ template <class Logged>
 template <class T, class CB>
 void EtcdConsistentStore<Logged>::ConvertSingleUpdate(
     const std::string& full_path, const CB& callback,
-    const std::vector<EtcdClient::WatchUpdate>& updates) {
+    const std::vector<EtcdClient::Node>& updates) {
   CHECK_LE(0, updates.size());
   if (updates.empty()) {
     EntryHandle<T> handle;
     handle.SetKey(full_path);
     callback(Update<T>(handle, false /* exists */));
   } else {
-    callback(TypedUpdateFromWatchUpdate<T>(updates[0]));
+    callback(TypedUpdateFromNode<T>(updates[0]));
   }
 }
 
@@ -336,11 +336,10 @@ void EtcdConsistentStore<Logged>::ConvertSingleUpdate(
 template <class Logged>
 template <class T, class CB>
 void EtcdConsistentStore<Logged>::ConvertMultipleUpdate(
-    const CB& callback,
-    const std::vector<EtcdClient::WatchUpdate>& watch_updates) {
+    const CB& callback, const std::vector<EtcdClient::Node>& watch_updates) {
   std::vector<Update<T>> updates;
   for (auto& w : watch_updates) {
-    updates.emplace_back(TypedUpdateFromWatchUpdate<T>(w));
+    updates.emplace_back(TypedUpdateFromNode<T>(w));
   }
   callback(updates);
 }
@@ -583,16 +582,16 @@ std::string EtcdConsistentStore<Logged>::GetFullPath(
 // static
 template <class Logged>
 template <class T>
-Update<T> EtcdConsistentStore<Logged>::TypedUpdateFromWatchUpdate(
-    const EtcdClient::WatchUpdate& update) {
-  const std::string raw_value(util::FromBase64(update.node_.value_.c_str()));
+Update<T> EtcdConsistentStore<Logged>::TypedUpdateFromNode(
+    const EtcdClient::Node& node) {
+  const std::string raw_value(util::FromBase64(node.value_.c_str()));
   T thing;
   CHECK(thing.ParseFromString(raw_value)) << raw_value;
-  EntryHandle<T> handle(update.node_.key_, thing);
-  if (!update.node_.deleted_) {
-    handle.SetHandle(update.node_.modified_index_);
+  EntryHandle<T> handle(node.key_, thing);
+  if (!node.deleted_) {
+    handle.SetHandle(node.modified_index_);
   }
-  return Update<T>(handle, !update.node_.deleted_);
+  return Update<T>(handle, !node.deleted_);
 }
 
 

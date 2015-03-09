@@ -116,24 +116,23 @@ class EtcdConsistentStore : public ConsistentStore<Logged> {
   // The following 3 methods are static just so that they have friend access to
   // the private c'tor/setters of Update<>
 
-  // Converts a single WatchUpdate to an Update<T> (using
-  // TypedUpdateFromWatchUpdate() below), and calls |callback| with it.
+  // Converts a single Node to an Update<T> (using
+  // TypedUpdateFromNode() below), and calls |callback| with it.
   template <class T, class CB>
   static void ConvertSingleUpdate(
       const std::string& full_path, const CB& callback,
-      const std::vector<EtcdClient::WatchUpdate>& updates);
+      const std::vector<EtcdClient::Node>& updates);
 
-  // Converts a vector of WatchUpdates to a vector<Update<T>> (using
-  // TypedUpdateFromWatchUpdate() below), and calls |callback| with it.
+  // Converts a vector of Nodes to a vector<Update<T>> (using
+  // TypedUpdateFromNode() below), and calls |callback| with it.
   template <class T, class CB>
   static void ConvertMultipleUpdate(
-      const CB& callback, const std::vector<EtcdClient::WatchUpdate>& updates);
+      const CB& callback, const std::vector<EtcdClient::Node>& updates);
 
-  // Converts a generic WatchUpdate to an Update<T>.
+  // Converts a generic Node to an Update<T>.
   // T must implement ParseFromString().
   template <class T>
-  static Update<T> TypedUpdateFromWatchUpdate(
-      const EtcdClient::WatchUpdate& update);
+  static Update<T> TypedUpdateFromNode(const EtcdClient::Node& node);
 
   void UpdateLocalServingSTH(const std::unique_lock<std::mutex>& lock,
                              const EntryHandle<ct::SignedTreeHead>& handle);
