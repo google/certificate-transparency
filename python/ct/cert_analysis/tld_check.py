@@ -38,7 +38,13 @@ class GenericWildcard(TldCheckObservation):
 
 
 class CheckTldMatches(object):
-    TLD_LIST = tld_list.TLDList()
+    TLD_LIST_ = None
+    @classmethod
+    def get_tld_list(cls):
+        if not cls.TLD_LIST_:
+            cls.TLD_LIST_ = tld_list.TLDList()
+        return cls.TLD_LIST_
+
     @classmethod
     def check(cls, names, prefix=None):
         # This check is different from others, because it's supposed to be used
@@ -53,7 +59,7 @@ class CheckTldMatches(object):
             name = name.value
             try:
                 tld_match, idna_match, unicode_fail = (
-                        cls.TLD_LIST.match_certificate_name(name))
+                        cls.get_tld_list().match_certificate_name(name))
             except ValueError:
                 observations += [NotAnAddress(details=name, prefix=prefix)]
                 continue
@@ -68,8 +74,8 @@ class CheckTldMatches(object):
             # Check for generic wildcard
             if name.startswith('*.'):
                 name_without_wildcard = name[2:]
-                tld_match, idna_match, _ = cls.TLD_LIST.match_certificate_name(
-                        name_without_wildcard)
+                tld_match, idna_match, _ = cls.get_tld_list().match_certificate_name(
+                                               name_without_wildcard)
                 if (tld_match == name_without_wildcard or
                     idna_match == name_without_wildcard):
                     observations += [GenericWildcard(details=(name,

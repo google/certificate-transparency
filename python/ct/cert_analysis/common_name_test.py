@@ -29,7 +29,7 @@ NON_UNICODE_TLD = gen_common_name("\xff\x00.com")
 
 class CommonNameTest(base_check_test.BaseCheckTest):
     def setUp(self):
-        tld_check.CheckTldMatches.TLD_LIST = tld_list.TLDList(
+        tld_check.CheckTldMatches.TLD_LIST_ = tld_list.TLDList(
                 tld_dir="ct/cert_analysis/test_data/",
                 tld_file_name="test_tld_list")
 

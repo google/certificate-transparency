@@ -37,6 +37,7 @@ test: all
 	PYTHONPATH=$(PYTHONPATH):. ./ct/cert_analysis/validity_test.py
 	PYTHONPATH=$(PYTHONPATH):. ./ct/cert_analysis/crl_pointers_test.py
 	PYTHONPATH=$(PYTHONPATH):. ./ct/cert_analysis/ocsp_pointers_test.py
+	PYTHONPATH=$(PYTHONPATH):. ./ct/cert_analysis/tld_check_test.py
 	PYTHONPATH=$(PYTHONPATH):. ./ct/cert_analysis/tld_list_test.py
 	PYTHONPATH=$(PYTHONPATH):. ./ct/serialization/tls_message_test.py
 # Tests using twisted trial instead of plain unittest.
