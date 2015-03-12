@@ -61,6 +61,13 @@ class ClusterStateController {
 
   void RefreshNodeState();
 
+  bool NodeIsStale() const;
+
+  // Returns a vector of the other nodes in the cluster which are able to serve
+  // the cluster's current ServingSTH. Does not include this node in the
+  // returned list regardless of its freshness.
+  std::vector<ct::ClusterNodeState> GetFreshNodes() const;
+
  private:
   class ClusterPeer;
 

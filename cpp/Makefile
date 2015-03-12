@@ -80,6 +80,7 @@ TESTS = \
 	monitoring/prometheus/gauge_test \
 	monitoring/registry_test \
 	proto/serializer_test \
+	server/proxy_test \
 	util/etcd_test \
 	util/fake_etcd_test \
 	util/json_wrapper_test \
@@ -413,13 +414,19 @@ client/ct: client/ct.o client/client.o client/ssl_client.o \
 
 server/ct-dns-server: server/ct-dns-server.o server/event.o $(LOCAL_LIBS)
 
-server/ct-server: server/ct-server.o util/read_key.o server/handler.o \
-        server/metrics.o base/notification.o log/logged_certificate.o \
-        fetcher/fetcher.o fetcher/peer.o fetcher/peer_group.o \
-        fetcher/remote_peer.o  client/async_log_client.o \
+server/ct-server: server/ct-server.o server/json_output.o util/read_key.o \
+        server/handler.o server/metrics.o server/proxy.o base/notification.o \
+        log/logged_certificate.o fetcher/fetcher.o fetcher/peer.o \
+        fetcher/peer_group.o fetcher/remote_peer.o  client/async_log_client.o \
         fetcher/continuous_fetcher.o monitoring/registry.o \
         monitoring/prometheus/metrics.pb.o net/url.o net/url_fetcher.o \
         net/connection_pool.o util/protobuf_util.o $(LOCAL_LIBS)
+
+server/proxy_test: server/proxy_test.o server/proxy.o server/json_output.o \
+                   util/testing.o util/protobuf_util.o util/libevent_wrapper.o \
+                   util/status.o util/task.o net/url.o net/url_fetcher.o \
+                   net/connection_pool.o monitoring/libmonitoring.a \
+                   $(GTESTLIB)
 
 tools/ct-clustertool: tools/clustertool_main.o \
                       merkletree/libmerkletree.a util/read_key.o \
