@@ -213,10 +213,15 @@ typename TreeSigner<Logged>::UpdateResult TreeSigner<Logged>::UpdateTree() {
   // That'll get handled by the Serving STH selection code.
   uint64_t min_timestamp = LastUpdateTime() + 1;
 
-  // Make sure we've got all the sequenced entries from our local DB:
-  for (int i(cert_tree_.LeafCount()); i < db_->TreeSize(); ++i) {
+  // Sequence any new sequenced entries from our local DB.
+  for (int64_t i(cert_tree_.LeafCount());; ++i) {
     Logged logged;
-    CHECK_EQ(Database<Logged>::LOOKUP_OK, db_->LookupByIndex(i, &logged));
+    typename Database<Logged>::LookupResult result(
+        db_->LookupByIndex(i, &logged));
+    if (result == Database<Logged>::NOT_FOUND) {
+      break;
+    }
+    CHECK_EQ(Database<Logged>::LOOKUP_OK, result);
     CHECK_EQ(logged.sequence_number(), i);
 
     AppendToTree(logged);
