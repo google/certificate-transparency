@@ -111,11 +111,12 @@ void FillJsonForEntry(const EtcdClient::Node& node, const string& action,
 }
 
 
-void FillJsonForDir(const vector<EtcdClient::Node>& nodes,
+void FillJsonForDir(const string& key, const vector<EtcdClient::Node>& nodes,
                     const string& action, const shared_ptr<JsonObject>& json) {
   JsonObject node;
   node.Add("modifiedIndex", 1);
   node.Add("createdIndex", 1);
+  node.Add("key", key);
   node.AddBoolean("dir", true);
   if (nodes.size() > 0) {
     JsonArray json_nodes;
@@ -191,7 +192,7 @@ void FakeEtcdClient::GetDirectory(const string& key, GenericResponse* resp,
   }
   resp->etcd_index = index_;
   resp->json_body = make_shared<JsonObject>();
-  FillJsonForDir(nodes, "get", resp->json_body);
+  FillJsonForDir(key, nodes, "get", resp->json_body);
   VLOG(1) << resp->json_body->ToString();
   task->Return();
 }

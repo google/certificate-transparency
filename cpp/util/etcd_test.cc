@@ -236,6 +236,7 @@ TEST_F(EtcdTest, TestGetAll) {
   client_.GetAll(kDirKey, &resp, task.task());
   task.Wait();
   EXPECT_EQ(Status::OK, task.status());
+  ASSERT_EQ(2, resp.nodes.size());
   EXPECT_EQ(9, resp.nodes[0].modified_index_);
   EXPECT_EQ("123", resp.nodes[0].value_);
   EXPECT_EQ(7, resp.nodes[1].modified_index_);

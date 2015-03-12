@@ -97,6 +97,37 @@ Status StatusFromResponseCode(const int response_code,
 }
 
 
+StatusOr<EtcdClient::Node> ParseNodeFromJson(const JsonObject& json_node) {
+  const JsonInt createdIndex(json_node, "createdIndex");
+  if (!createdIndex.Ok()) {
+    return Status(util::error::FAILED_PRECONDITION,
+                  "Invalid JSON: Couldn't find 'createdIndex'");
+  }
+
+  const JsonInt modifiedIndex(json_node, "modifiedIndex");
+  if (!modifiedIndex.Ok()) {
+    return Status(util::error::FAILED_PRECONDITION,
+                  "Invalid JSON: Couldn't find 'modifiedIndex'");
+  }
+
+  const JsonString key(json_node, "key");
+  if (!key.Ok()) {
+    return Status(util::error::FAILED_PRECONDITION,
+                  "Invalid JSON: Couldn't find 'key'");
+  }
+
+  const JsonString value(json_node, "value");
+  const JsonBoolean isDir(json_node, "dir");
+  // TODO(pphaneuf): The Node class should support directories.
+  const bool is_dir(isDir.Ok() && isDir.Value());
+  const bool deleted(!value.Ok() && !is_dir);
+
+  return EtcdClient::Node(createdIndex.Value(), modifiedIndex.Value(),
+                          key.Value(),
+                          (deleted || is_dir) ? "" : value.Value(), deleted);
+}
+
+
 void GetRequestDone(const string& keyname, EtcdClient::GetResponse* resp,
                     Task* parent_task, EtcdClient::GenericResponse* gen_resp,
                     Task* task) {
@@ -108,44 +139,28 @@ void GetRequestDone(const string& keyname, EtcdClient::GetResponse* resp,
     return;
   }
 
-  const JsonObject node(*gen_resp->json_body, "node");
-  if (!node.Ok()) {
+  const JsonObject json_node(*gen_resp->json_body, "node");
+  if (!json_node.Ok()) {
     parent_task->Return(Status(util::error::FAILED_PRECONDITION,
                                "Invalid JSON: Couldn't find 'node'"));
     return;
   }
 
-  const JsonInt createdIndex(node, "createdIndex");
-  if (!createdIndex.Ok()) {
-    parent_task->Return(Status(util::error::FAILED_PRECONDITION,
-                               "Invalid JSON: Couldn't find 'createdIndex'"));
+  StatusOr<EtcdClient::Node> node(ParseNodeFromJson(json_node));
+  if (!node.status().ok()) {
+    parent_task->Return(node.status());
     return;
   }
 
-  const JsonInt modifiedIndex(node, "modifiedIndex");
-  if (!modifiedIndex.Ok()) {
-    parent_task->Return(Status(util::error::FAILED_PRECONDITION,
-                               "Invalid JSON: Couldn't find 'modifiedIndex'"));
-    return;
-  }
-
-  const JsonString key(node, "key");
-  if (!key.Ok()) {
-    parent_task->Return(Status(util::error::FAILED_PRECONDITION,
-                               "Invalid JSON: Couldn't find 'key'"));
-    return;
-  }
-
-  const JsonString value(node, "value");
-  if (!value.Ok()) {
-    parent_task->Return(Status(util::error::FAILED_PRECONDITION,
-                               "Invalid JSON: Couldn't find 'value'"));
+  if (node.ValueOrDie().deleted_) {
+    parent_task->Return(
+        Status(util::error::FAILED_PRECONDITION,
+               "GET request received a deleted node from etcd"));
     return;
   }
 
   resp->etcd_index = gen_resp->etcd_index;
-  resp->node = EtcdClient::Node(createdIndex.Value(), modifiedIndex.Value(),
-                                key.Value(), value.Value(), false);
+  resp->node = node.ValueOrDie();
   parent_task->Return();
 }
 
@@ -161,14 +176,22 @@ void GetAllRequestDone(const string& dir, EtcdClient::GetAllResponse* resp,
     return;
   }
 
-  const JsonObject node(*gen_resp->json_body, "node");
-  if (!node.Ok()) {
+  const JsonObject json_node(*gen_resp->json_body, "node");
+  if (!json_node.Ok()) {
     parent_task->Return(Status(util::error::FAILED_PRECONDITION,
                                "Invalid JSON: Couldn't find 'node'"));
     return;
   }
 
-  const JsonBoolean isDir(node, "dir");
+  // TODO(pphaneuf): The Node class should support directory nodes
+  // directly.
+  StatusOr<EtcdClient::Node> node(ParseNodeFromJson(json_node));
+  if (!node.status().ok()) {
+    parent_task->Return(node.status());
+    return;
+  }
+
+  const JsonBoolean isDir(json_node, "dir");
   if (!isDir.Ok()) {
     parent_task->Return(Status(util::error::FAILED_PRECONDITION,
                                "Invalid JSON: Couldn't find 'dir'"));
@@ -181,7 +204,7 @@ void GetAllRequestDone(const string& dir, EtcdClient::GetAllResponse* resp,
     return;
   }
 
-  const JsonArray value_nodes(node, "nodes");
+  const JsonArray value_nodes(json_node, "nodes");
   if (!value_nodes.Ok()) {
     // Directory is empty.
     resp->etcd_index = gen_resp->etcd_index;
@@ -191,47 +214,28 @@ void GetAllRequestDone(const string& dir, EtcdClient::GetAllResponse* resp,
 
   vector<EtcdClient::Node> values;
   for (int i = 0; i < value_nodes.Length(); ++i) {
-    const JsonObject entry(value_nodes, i);
-    if (!entry.Ok()) {
-      parent_task->Return(Status(
-          util::error::FAILED_PRECONDITION,
-          "Invalid JSON: Couldn't get 'value_nodes' index " + to_string(i)));
-      return;
-    }
-
-    const JsonString value(entry, "value");
-    if (!value.Ok()) {
-      parent_task->Return(Status(util::error::FAILED_PRECONDITION,
-                                 "Invalid JSON: Couldn't find 'value'"));
-      return;
-    }
-
-    const JsonInt createdIndex(entry, "createdIndex");
-    if (!createdIndex.Ok()) {
+    const JsonObject json_entry(value_nodes, i);
+    if (!json_entry.Ok()) {
       parent_task->Return(
           Status(util::error::FAILED_PRECONDITION,
-                 "Invalid JSON: Coulnd't find 'createdIndex'"));
+                 "Invalid JSON: Couldn't get 'nodes' index " + to_string(i)));
       return;
     }
 
-    const JsonInt modifiedIndex(entry, "modifiedIndex");
-    if (!modifiedIndex.Ok()) {
+    StatusOr<EtcdClient::Node> entry(ParseNodeFromJson(json_entry));
+    if (!entry.status().ok()) {
+      parent_task->Return(entry.status());
+      return;
+    }
+
+    if (entry.ValueOrDie().deleted_) {
       parent_task->Return(
           Status(util::error::FAILED_PRECONDITION,
-                 "Invalid JSON: Coulnd't find 'modifiedIndex'"));
+                 "GET request received a deleted node from etcd"));
       return;
     }
 
-    const JsonString key(entry, "key");
-    if (!key.Ok()) {
-      parent_task->Return(Status(util::error::FAILED_PRECONDITION,
-                                 "Invalid JSON: Couldn't find 'key'"));
-      return;
-    }
-
-    values.emplace_back(EtcdClient::Node(createdIndex.Value(),
-                                         modifiedIndex.Value(), key.Value(),
-                                         value.Value(), false));
+    values.emplace_back(entry.ValueOrDie());
   }
 
   resp->etcd_index = gen_resp->etcd_index;
@@ -247,29 +251,22 @@ void CreateRequestDone(EtcdClient::Response* resp, Task* parent_task,
     return;
   }
 
-  const JsonObject node(*gen_resp->json_body, "node");
-  if (!node.Ok()) {
+  const JsonObject json_node(*gen_resp->json_body, "node");
+  if (!json_node.Ok()) {
     parent_task->Return(Status(util::error::FAILED_PRECONDITION,
                                "Invalid JSON: Couldn't find 'node'"));
     return;
   }
 
-  const JsonInt createdIndex(node, "createdIndex");
-  if (!createdIndex.Ok()) {
-    parent_task->Return(Status(util::error::FAILED_PRECONDITION,
-                               "Invalid JSON: Couldn't find 'createdIndex'"));
+  StatusOr<EtcdClient::Node> node(ParseNodeFromJson(json_node));
+  if (!node.status().ok()) {
+    parent_task->Return(node.status());
     return;
   }
 
-  const JsonInt modifiedIndex(node, "modifiedIndex");
-  if (!modifiedIndex.Ok()) {
-    parent_task->Return(Status(util::error::FAILED_PRECONDITION,
-                               "Invalid JSON: Couldn't find 'modifiedIndex'"));
-    return;
-  }
-
-  CHECK_EQ(createdIndex.Value(), modifiedIndex.Value());
-  resp->etcd_index = modifiedIndex.Value();
+  CHECK_EQ(node.ValueOrDie().created_index_,
+           node.ValueOrDie().modified_index_);
+  resp->etcd_index = node.ValueOrDie().modified_index_;
   parent_task->Return();
 }
 
@@ -284,37 +281,23 @@ void CreateInQueueRequestDone(EtcdClient::CreateInQueueResponse* resp,
     return;
   }
 
-  const JsonObject node(*gen_resp->json_body, "node");
-  if (!node.Ok()) {
+  const JsonObject json_node(*gen_resp->json_body, "node");
+  if (!json_node.Ok()) {
     parent_task->Return(Status(util::error::FAILED_PRECONDITION,
                                "Invalid JSON: Couldn't find 'node'"));
     return;
   }
 
-  const JsonInt createdIndex(node, "createdIndex");
-  if (!createdIndex.Ok()) {
-    parent_task->Return(Status(util::error::FAILED_PRECONDITION,
-                               "Invalid JSON: Couldn't find 'createdIndex'"));
+  StatusOr<EtcdClient::Node> node(ParseNodeFromJson(json_node));
+  if (!node.status().ok()) {
+    parent_task->Return(node.status());
     return;
   }
 
-  const JsonInt modifiedIndex(node, "modifiedIndex");
-  if (!modifiedIndex.Ok()) {
-    parent_task->Return(Status(util::error::FAILED_PRECONDITION,
-                               "Invalid JSON: Couldn't find 'modifiedIndex'"));
-    return;
-  }
-
-  const JsonString key(node, "key");
-  if (!key.Ok()) {
-    parent_task->Return(Status(util::error::FAILED_PRECONDITION,
-                               "Invalid JSON: Couldn't find 'key'"));
-    return;
-  }
-
-  CHECK_EQ(createdIndex.Value(), modifiedIndex.Value());
-  resp->etcd_index = modifiedIndex.Value();
-  resp->key = key.Value();
+  CHECK_EQ(node.ValueOrDie().created_index_,
+           node.ValueOrDie().modified_index_);
+  resp->etcd_index = node.ValueOrDie().modified_index_;
+  resp->key = node.ValueOrDie().key_;
   parent_task->Return();
 }
 
@@ -327,21 +310,20 @@ void UpdateRequestDone(EtcdClient::Response* resp, Task* parent_task,
     return;
   }
 
-  const JsonObject node(*gen_resp->json_body, "node");
-  if (!node.Ok()) {
+  const JsonObject json_node(*gen_resp->json_body, "node");
+  if (!json_node.Ok()) {
     parent_task->Return(Status(util::error::FAILED_PRECONDITION,
                                "Invalid JSON: Couldn't find 'node'"));
     return;
   }
 
-  const JsonInt modifiedIndex(node, "modifiedIndex");
-  if (!modifiedIndex.Ok()) {
-    parent_task->Return(Status(util::error::FAILED_PRECONDITION,
-                               "Invalid JSON: Couldn't find 'modifiedIndex'"));
+  StatusOr<EtcdClient::Node> node(ParseNodeFromJson(json_node));
+  if (!node.status().ok()) {
+    parent_task->Return(node.status());
     return;
   }
 
-  resp->etcd_index = modifiedIndex.Value();
+  resp->etcd_index = node.ValueOrDie().modified_index_;
   parent_task->Return();
 }
 
@@ -354,21 +336,20 @@ void ForceSetRequestDone(EtcdClient::Response* resp, Task* parent_task,
     return;
   }
 
-  const JsonObject node(*gen_resp->json_body, "node");
-  if (!node.Ok()) {
+  const JsonObject json_node(*gen_resp->json_body, "node");
+  if (!json_node.Ok()) {
     parent_task->Return(Status(util::error::FAILED_PRECONDITION,
                                "Invalid JSON: Couldn't find 'node'"));
     return;
   }
 
-  const JsonInt modifiedIndex(node, "modifiedIndex");
-  if (!modifiedIndex.Ok()) {
-    parent_task->Return(Status(util::error::FAILED_PRECONDITION,
-                               "Invalid JSON: Couldn't find 'modifiedIndex'"));
+  StatusOr<EtcdClient::Node> node(ParseNodeFromJson(json_node));
+  if (!node.status().ok()) {
+    parent_task->Return(node.status());
     return;
   }
 
-  resp->etcd_index = modifiedIndex.Value();
+  resp->etcd_index = node.ValueOrDie().modified_index_;
   parent_task->Return();
 }
 
@@ -549,36 +530,6 @@ void EtcdClient::WatchInitialGetAllDone(WatchState* state,
 }
 
 
-StatusOr<EtcdClient::Node> UpdateForNode(const JsonObject& node) {
-  const JsonInt createdIndex(node, "createdIndex");
-  if (!createdIndex.Ok()) {
-    return Status(util::error::FAILED_PRECONDITION,
-                  "Invalid JSON: Couldn't find 'createdIndex'");
-  }
-
-  const JsonInt modifiedIndex(node, "modifiedIndex");
-  if (!modifiedIndex.Ok()) {
-    return Status(util::error::FAILED_PRECONDITION,
-                  "Invalid JSON: Couldn't find 'modifiedIndex'");
-  }
-
-  const JsonString key(node, "key");
-  if (!key.Ok()) {
-    return Status(util::error::FAILED_PRECONDITION,
-                  "Invalid JSON: Couldn't find 'key'");
-  }
-
-  const JsonString value(node, "value");
-  if (value.Ok()) {
-    return EtcdClient::Node(createdIndex.Value(), modifiedIndex.Value(),
-                            key.Value(), value.Value(), false);
-  } else {
-    return EtcdClient::Node(createdIndex.Value(), modifiedIndex.Value(),
-                            key.Value(), "", true);
-  }
-}
-
-
 void EtcdClient::WatchRequestDone(WatchState* state, GenericResponse* gen_resp,
                                   Task* child_task) {
   // We clean up this way instead of using util::Task::DeleteWhenDone,
@@ -633,28 +584,28 @@ void EtcdClient::WatchRequestDone(WatchState* state, GenericResponse* gen_resp,
     // TODO(pphaneuf): None of this should ever happen, so I'm not
     // sure what's the best way to handle it? CHECK-fail? Retry? With
     // a delay? Retrying for now...
-    const JsonObject node(*gen_resp->json_body, "node");
-    if (!node.Ok()) {
+    const JsonObject json_node(*gen_resp->json_body, "node");
+    if (!json_node.Ok()) {
       LOG(INFO) << "Invalid JSON: Couldn't find 'node'";
       goto fail;
     }
 
     vector<Node> updates;
-    StatusOr<Node> status(UpdateForNode(node));
-    if (!status.ok()) {
-      LOG(INFO) << "UpdateForNode failed: " << status.status();
+    StatusOr<Node> node(ParseNodeFromJson(json_node));
+    if (!node.ok()) {
+      LOG(INFO) << "parsing node failed: " << node.status();
       goto fail;
     }
     state->highest_index_seen_ =
-        max(state->highest_index_seen_, status.ValueOrDie().modified_index_);
-    updates.emplace_back(status.ValueOrDie());
+        max(state->highest_index_seen_, node.ValueOrDie().modified_index_);
+    updates.emplace_back(node.ValueOrDie());
 
-    if (!status.ValueOrDie().deleted_) {
-      state->known_keys_[status.ValueOrDie().key_] =
-          status.ValueOrDie().modified_index_;
+    if (!node.ValueOrDie().deleted_) {
+      state->known_keys_[node.ValueOrDie().key_] =
+          node.ValueOrDie().modified_index_;
     } else {
-      LOG(INFO) << "erased key: " << status.ValueOrDie().key_;
-      state->known_keys_.erase(status.ValueOrDie().key_);
+      LOG(INFO) << "erased key: " << node.ValueOrDie().key_;
+      state->known_keys_.erase(node.ValueOrDie().key_);
     }
 
     return state->task_->executor()->Add(
@@ -709,6 +660,7 @@ EtcdClient::Node::Node(int64_t created_index, int64_t modified_index,
       value_(value),
       expires_(system_clock::time_point::max()),
       deleted_(deleted) {
+  CHECK(!deleted_ || value_.empty());
 }
 
 
