@@ -37,7 +37,7 @@ shift 2
 #   ln -s $CERT $HASH_DIR/$hash.0
 # fi
 
-export TSAN_OPTIONS=${TSAN_OPTIONS:-log_file=tsan_log suppressions=../cpp/tsan_suppressions}
+export TSAN_OPTIONS=${TSAN_OPTIONS:-log_path=tsan_log suppressions=../cpp/tsan_suppressions external_symbolizer_path=/usr/bin/llvm-symbolizer-3.4}
 
 ../cpp/server/ct-server --port=8888 --key=$KEY \
   --trusted_cert_file=$CERT_FILE --logtostderr=true \

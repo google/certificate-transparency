@@ -8,6 +8,8 @@
 #include <gflags/gflags.h>
 #include <iostream>
 #include <memory>
+#include <mutex>
+#include <openssl/crypto.h>
 #include <openssl/err.h>
 #include <string>
 #include <unistd.h>
@@ -117,6 +119,7 @@ using std::chrono::seconds;
 using std::chrono::steady_clock;
 using std::function;
 using std::make_shared;
+using std::mutex;
 using std::placeholders::_1;
 using std::shared_ptr;
 using std::string;
@@ -288,10 +291,39 @@ void WatchdogTimeout(int sig) {
   }
 }
 
+
+// Functions to handle locking for OpenSSL when used in a multithreaded env in
+// here:
+namespace {
+
+
+void locking_function(int mode, int n, const char* file, int line) {
+  static mutex* openssl_locks = new mutex[CRYPTO_num_locks()];
+  if (mode & CRYPTO_LOCK) {
+    openssl_locks[n].lock();
+  } else {
+    openssl_locks[n].unlock();
+  }
+}
+
+
+void threadid_function(CRYPTO_THREADID* id) {
+  CRYPTO_THREADID_set_numeric(id, pthread_self());
+}
+
+
+}  // namespace
+
+
 int main(int argc, char* argv[]) {
   google::ParseCommandLineFlags(&argc, &argv, true);
   google::InitGoogleLogging(argv[0]);
   google::InstallFailureSignalHandler();
+
+  // Set-up OpenSSL for multithreaded use:
+  CRYPTO_THREADID_set_callback(threadid_function);
+  CRYPTO_set_locking_callback(locking_function);
+
   OpenSSL_add_all_algorithms();
   ERR_load_crypto_strings();
   cert_trans::LoadCtExtensions();

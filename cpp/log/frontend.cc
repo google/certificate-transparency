@@ -13,6 +13,8 @@ using cert_trans::PreCertChain;
 using ct::LogEntry;
 using ct::SignedCertificateTimestamp;
 using std::string;
+using std::lock_guard;
+using std::mutex;
 
 Frontend::Frontend(CertSubmissionHandler* handler, FrontendSigner* signer)
     : handler_(handler), signer_(signer), stats_() {
@@ -24,6 +26,7 @@ Frontend::~Frontend() {
 }
 
 void Frontend::GetStats(Frontend::FrontendStats* stats) const {
+  lock_guard<mutex> lock(stats_mutex_);
   *stats = stats_;
 }
 
@@ -145,6 +148,7 @@ void Frontend::UpdateStats(ct::LogEntryType type, SubmitResult result) {
 }
 
 void Frontend::UpdateX509Stats(SubmitResult result) {
+  lock_guard<mutex> lock(stats_mutex_);
   switch (result) {
     case ADDED:
       ++stats_.x509_accepted;
@@ -172,6 +176,7 @@ void Frontend::UpdateX509Stats(SubmitResult result) {
 }
 
 void Frontend::UpdatePrecertStats(SubmitResult result) {
+  lock_guard<mutex> lock(stats_mutex_);
   switch (result) {
     case ADDED:
       ++stats_.precert_accepted;
