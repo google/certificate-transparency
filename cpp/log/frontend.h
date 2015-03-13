@@ -2,6 +2,8 @@
 #ifndef FRONTEND_H
 #define FRONTEND_H
 
+#include <mutex>
+
 #include "base/macros.h"
 #include "log/cert_submission_handler.h"
 #include "log/submit_result.h"
@@ -83,6 +85,7 @@ class Frontend {
  private:
   CertSubmissionHandler* handler_;
   FrontendSigner* signer_;
+  mutable std::mutex stats_mutex_;
   FrontendStats stats_;
 
   SubmitResult QueueProcessedEntry(

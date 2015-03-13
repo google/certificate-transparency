@@ -6,6 +6,7 @@ default: all
 -include local.mk
 
 CXXFLAG = -std=c++11 -fno-exceptions -Wall -Werror -g -O3 --stdlib=libstdc++
+LINK.cc = $(CXX) $(LDFLAGS) $(TARGET_ARCH)
 LINK.o = $(LINK.cc)
 
 INCLUDE = -I .
@@ -112,7 +113,7 @@ all: client/ct server/ct-server server/ct-dns-server tools/ct-clustertool \
 tests: all $(TESTS) $(DISABLED_TESTS) $(EXTRA_TESTS)
 
 TSAN_CMAKE_FLAGS=-fPIC -fPIE -fsanitize=thread
-TSAN_CXXFLAGS=-fPIC -fPIE -fsanitize=thread
+TSAN_CXXFLAGS=-fPIC -fPIE -fsanitize=thread -gcolumn-info
 TSAN_LDFLAGS=-fsanitize=thread -pie
 
 tsan_enabled: clean
@@ -175,7 +176,7 @@ ifneq ($(MAKECMDGOALS),clean)
     include util/.depend
 endif
 
-base/notification_test: base/notification.cc base/notification_test.o \
+base/notification_test: base/notification_test.o base/notification.o \
                         util/testing.o $(GTESTLIB)
 
 ### util/ targets
