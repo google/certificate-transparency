@@ -6,6 +6,7 @@
 #include <iostream>
 #include <memory>
 #include <openssl/err.h>
+#include <signal.h>
 #include <string>
 
 #include "log/cert_checker.h"
@@ -176,6 +177,11 @@ void SignMerkleTree(TreeSigner<LoggedCertificate>* tree_signer,
 }
 
 int main(int argc, char* argv[]) {
+  // Ignore various signals whilst we start up.
+  signal(SIGHUP, SIG_IGN);
+  signal(SIGINT, SIG_IGN);
+  signal(SIGTERM, SIG_IGN);
+
   google::ParseCommandLineFlags(&argc, &argv, true);
   google::InitGoogleLogging(argv[0]);
   google::InstallFailureSignalHandler();
