@@ -118,13 +118,39 @@ StatusOr<EtcdClient::Node> ParseNodeFromJson(const JsonObject& json_node) {
 
   const JsonString value(json_node, "value");
   const JsonBoolean isDir(json_node, "dir");
-  // TODO(pphaneuf): The Node class should support directories.
   const bool is_dir(isDir.Ok() && isDir.Value());
   const bool deleted(!value.Ok() && !is_dir);
+  vector<EtcdClient::Node> nodes;
+  if (is_dir && !deleted) {
+    const JsonArray json_nodes(json_node, "nodes");
+    if (json_nodes.Ok()) {
+      for (int i = 0; i < json_nodes.Length(); ++i) {
+        const JsonObject json_entry(json_nodes, i);
+        if (!json_entry.Ok()) {
+          return Status(util::error::FAILED_PRECONDITION,
+                        "Invalid JSON: Couldn't get 'nodes' index " +
+                            to_string(i));
+        }
+
+        StatusOr<EtcdClient::Node> entry(ParseNodeFromJson(json_entry));
+        if (!entry.status().ok()) {
+          return entry.status();
+        }
+
+        if (entry.ValueOrDie().deleted_) {
+          return Status(util::error::FAILED_PRECONDITION,
+                        "Deleted sub-node " + string(key.Value()));
+        }
+
+        nodes.emplace_back(entry.ValueOrDie());
+      }
+    }
+  }
 
   return EtcdClient::Node(createdIndex.Value(), modifiedIndex.Value(),
-                          key.Value(),
-                          (deleted || is_dir) ? "" : value.Value(), deleted);
+                          key.Value(), is_dir,
+                          (deleted || is_dir) ? "" : value.Value(),
+                          move(nodes), deleted);
 }
 
 
@@ -191,55 +217,14 @@ void GetAllRequestDone(const string& dir, EtcdClient::GetAllResponse* resp,
     return;
   }
 
-  const JsonBoolean isDir(json_node, "dir");
-  if (!isDir.Ok()) {
-    parent_task->Return(Status(util::error::FAILED_PRECONDITION,
-                               "Invalid JSON: Couldn't find 'dir'"));
-    return;
-  }
-
-  if (!isDir.Value()) {
+  if (!node.ValueOrDie().is_dir_) {
     parent_task->Return(
         Status(util::error::INVALID_ARGUMENT, "Not a directory"));
     return;
   }
 
-  const JsonArray value_nodes(json_node, "nodes");
-  if (!value_nodes.Ok()) {
-    // Directory is empty.
-    resp->etcd_index = gen_resp->etcd_index;
-    parent_task->Return();
-    return;
-  }
-
-  vector<EtcdClient::Node> values;
-  for (int i = 0; i < value_nodes.Length(); ++i) {
-    const JsonObject json_entry(value_nodes, i);
-    if (!json_entry.Ok()) {
-      parent_task->Return(
-          Status(util::error::FAILED_PRECONDITION,
-                 "Invalid JSON: Couldn't get 'nodes' index " + to_string(i)));
-      return;
-    }
-
-    StatusOr<EtcdClient::Node> entry(ParseNodeFromJson(json_entry));
-    if (!entry.status().ok()) {
-      parent_task->Return(entry.status());
-      return;
-    }
-
-    if (entry.ValueOrDie().deleted_) {
-      parent_task->Return(
-          Status(util::error::FAILED_PRECONDITION,
-                 "GET request received a deleted node from etcd"));
-      return;
-    }
-
-    values.emplace_back(entry.ValueOrDie());
-  }
-
   resp->etcd_index = gen_resp->etcd_index;
-  resp->nodes = move(values);
+  resp->nodes = move(node.ValueOrDie().nodes_);
   parent_task->Return();
 }
 
@@ -379,7 +364,7 @@ string UrlEscapeAndJoinParams(const map<string, string>& params) {
 }
 
 
-static const EtcdClient::Node kInvalidNode(-1, -1, "", "", true);
+static const EtcdClient::Node kInvalidNode(-1, -1, "", false, "", {}, true);
 
 
 }  // namespace
@@ -520,7 +505,7 @@ void EtcdClient::WatchInitialGetAllDone(WatchState* state,
     // TODO(pphaneuf): Passing in -1 for the created and modified
     // indices, is that a problem? We do have a "last known" modified
     // index in key.second...
-    updates.emplace_back(Node(-1, -1, key.first, "", true));
+    updates.emplace_back(Node(-1, -1, key.first, false, "", {}, true));
   }
 
   state->known_keys_.swap(new_known_keys);
@@ -653,14 +638,20 @@ void EtcdClient::StartWatchRequest(WatchState* state) {
 
 
 EtcdClient::Node::Node(int64_t created_index, int64_t modified_index,
-                       const string& key, const string& value, bool deleted)
+                       const string& key, bool is_dir, const string& value,
+                       vector<Node>&& nodes, bool deleted)
     : created_index_(created_index),
       modified_index_(modified_index),
       key_(key),
+      is_dir_(is_dir),
       value_(value),
+      nodes_(move(nodes)),
       expires_(system_clock::time_point::max()),
       deleted_(deleted) {
   CHECK(!deleted_ || value_.empty());
+  CHECK(!deleted_ || nodes_.empty());
+  CHECK(!is_dir_ || value_.empty());
+  CHECK(is_dir_ || nodes_.empty());
 }
 
 

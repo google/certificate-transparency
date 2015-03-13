@@ -266,7 +266,7 @@ void FakeEtcdClient::HandlePost(const string& key,
   const string path(EnsureEndsWithSlash(key) + to_string(index_));
   CHECK(params.find("value") != params.end());
   const string& value(params.find("value")->second);
-  Node node(index_, index_, path, value, false);
+  Node node(index_, index_, path, false, value, {}, false);
   MaybeSetExpiry(params, &node);
   entries_[path] = node;
 
@@ -286,7 +286,7 @@ void FakeEtcdClient::HandlePut(const string& key,
   CHECK(key.back() != '/');
   CHECK(params.find("value") != params.end());
   const string& value(params.find("value")->second);
-  Node node(index_, index_, key, value, false);
+  Node node(index_, index_, key, false, value, {}, false);
   MaybeSetExpiry(params, &node);
   Status status(CheckCompareFlags(params, key));
   if (!status.ok()) {

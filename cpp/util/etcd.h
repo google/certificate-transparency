@@ -29,7 +29,8 @@ class EtcdClient {
     }
 
     Node(int64_t created_index, int64_t modified_index, const std::string& key,
-         const std::string& value, bool deleted);
+         bool is_dir, const std::string& value, std::vector<Node>&& nodes,
+         bool deleted);
 
     bool HasExpiry() const;
 
@@ -38,7 +39,9 @@ class EtcdClient {
     int64_t created_index_;
     int64_t modified_index_;
     std::string key_;
+    bool is_dir_;
     std::string value_;
+    std::vector<Node> nodes_;
     std::chrono::system_clock::time_point expires_;
     bool deleted_;
   };
