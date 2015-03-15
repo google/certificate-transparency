@@ -410,13 +410,17 @@ util::Status EtcdConsistentStore<Logged>::GetAllEntriesInDir(
   CHECK_NOTNULL(entries);
   CHECK_EQ(0, entries->size());
   util::SyncTask task(executor_);
-  EtcdClient::GetAllResponse resp;
-  client_->GetAll(dir, &resp, task.task());
+  EtcdClient::GetResponse resp;
+  client_->Get(dir, &resp, task.task());
   task.Wait();
   if (!task.status().ok()) {
     return task.status();
   }
-  for (const auto& node : resp.nodes) {
+  if (!resp.node.is_dir_) {
+    return util::Status(util::error::FAILED_PRECONDITION,
+                        "node is not a directory: " + dir);
+  }
+  for (const auto& node : resp.node.nodes_) {
     T t;
     CHECK(t.ParseFromString(util::FromBase64(node.value_.c_str())));
     entries->emplace_back(

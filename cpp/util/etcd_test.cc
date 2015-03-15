@@ -232,30 +232,16 @@ TEST_F(EtcdTest, TestGetAll) {
       .WillOnce(Invoke(
           bind(&GenericReturn, Status::OK, MakeJson(kGetAllJson), 1, _4, _5)));
   SyncTask task(base_.get());
-  EtcdClient::GetAllResponse resp;
-  client_.GetAll(kDirKey, &resp, task.task());
+  EtcdClient::GetResponse resp;
+  client_.Get(kDirKey, &resp, task.task());
   task.Wait();
-  EXPECT_EQ(Status::OK, task.status());
-  ASSERT_EQ(2, resp.nodes.size());
-  EXPECT_EQ(9, resp.nodes[0].modified_index_);
-  EXPECT_EQ("123", resp.nodes[0].value_);
-  EXPECT_EQ(7, resp.nodes[1].modified_index_);
-  EXPECT_EQ("456", resp.nodes[1].value_);
-}
-
-TEST_F(EtcdTest, TestGetAllForInvalidKey) {
-  const Status status(util::error::NOT_FOUND, "");
-  EXPECT_CALL(client_,
-              Generic(kDirKey, kEmptyParams, UrlFetcher::Verb::GET, _, _))
-      .WillOnce(Invoke(bind(&GenericReturn, Status(util::error::NOT_FOUND, ""),
-                            MakeJson(kKeyNotFoundJson), -1, _4, _5)));
-  SyncTask task(base_.get());
-  EtcdClient::GetAllResponse resp;
-  client_.GetAll(kDirKey, &resp, task.task());
-  task.Wait();
-  EXPECT_EQ(Status(status.CanonicalCode(),
-                   status.error_message() + " (" + kDirKey + ")"),
-            task.status());
+  ASSERT_EQ(Status::OK, task.status());
+  EXPECT_TRUE(resp.node.is_dir_);
+  ASSERT_EQ(2, resp.node.nodes_.size());
+  EXPECT_EQ(9, resp.node.nodes_[0].modified_index_);
+  EXPECT_EQ("123", resp.node.nodes_[0].value_);
+  EXPECT_EQ(7, resp.node.nodes_[1].modified_index_);
+  EXPECT_EQ("456", resp.node.nodes_[1].value_);
 }
 
 TEST_F(EtcdTest, TestCreate) {

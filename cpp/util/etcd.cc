@@ -82,11 +82,6 @@ util::error::Code ErrorCodeForHttpResponseCode(int response_code) {
 }
 
 
-bool KeyIsDirectory(const string& key) {
-  return key.size() > 0 && key.back() == '/';
-}
-
-
 Status StatusFromResponseCode(const int response_code,
                               const shared_ptr<JsonObject>& json) {
   const util::error::Code error_code(
@@ -187,44 +182,6 @@ void GetRequestDone(const string& keyname, EtcdClient::GetResponse* resp,
 
   resp->etcd_index = gen_resp->etcd_index;
   resp->node = node.ValueOrDie();
-  parent_task->Return();
-}
-
-
-void GetAllRequestDone(const string& dir, EtcdClient::GetAllResponse* resp,
-                       Task* parent_task,
-                       EtcdClient::GenericResponse* gen_resp, Task* task) {
-  *resp = EtcdClient::GetAllResponse();
-  if (!task->status().ok()) {
-    parent_task->Return(
-        Status(task->status().CanonicalCode(),
-               task->status().error_message() + " (" + dir + ")"));
-    return;
-  }
-
-  const JsonObject json_node(*gen_resp->json_body, "node");
-  if (!json_node.Ok()) {
-    parent_task->Return(Status(util::error::FAILED_PRECONDITION,
-                               "Invalid JSON: Couldn't find 'node'"));
-    return;
-  }
-
-  // TODO(pphaneuf): The Node class should support directory nodes
-  // directly.
-  StatusOr<EtcdClient::Node> node(ParseNodeFromJson(json_node));
-  if (!node.status().ok()) {
-    parent_task->Return(node.status());
-    return;
-  }
-
-  if (!node.ValueOrDie().is_dir_) {
-    parent_task->Return(
-        Status(util::error::INVALID_ARGUMENT, "Not a directory"));
-    return;
-  }
-
-  resp->etcd_index = gen_resp->etcd_index;
-  resp->nodes = move(node.ValueOrDie().nodes_);
   parent_task->Return();
 }
 
@@ -446,18 +403,6 @@ struct EtcdClient::WatchState {
 void EtcdClient::WatchInitialGetDone(WatchState* state, GetResponse* resp,
                                      Task* task) {
   unique_ptr<GetResponse> resp_deleter(resp);
-  GetAllResponse* const all_resp(new GetAllResponse);
-  all_resp->etcd_index = resp->etcd_index;
-  if (task->status().ok()) {
-    all_resp->nodes = {resp->node};
-  }
-  WatchInitialGetAllDone(state, all_resp, task);
-}
-
-
-void EtcdClient::WatchInitialGetAllDone(WatchState* state,
-                                        GetAllResponse* resp, Task* task) {
-  unique_ptr<GetAllResponse> resp_deleter(resp);
   if (state->task_->CancelRequested()) {
     state->task_->Return(Status::CANCELLED);
     return;
@@ -471,10 +416,17 @@ void EtcdClient::WatchInitialGetAllDone(WatchState* state,
   state->highest_index_seen_ =
       max(state->highest_index_seen_, resp->etcd_index);
 
+  vector<Node> nodes;
+  if (resp->node.is_dir_) {
+    nodes = move(resp->node.nodes_);
+  } else {
+    nodes.push_back(resp->node);
+  }
+
   vector<Node> updates;
   map<string, int64_t> new_known_keys;
-  VLOG(1) << "WatchGet " << state << " : num updates = " << resp->nodes.size();
-  for (const auto& node : resp->nodes) {
+  VLOG(1) << "WatchGet " << state << " : num updates = " << nodes.size();
+  for (const auto& node : nodes) {
     // This simply shouldn't happen, but since I think it shouldn't
     // prevent us from continuing processing, CHECKing on this would
     // just be mean...
@@ -540,17 +492,10 @@ void EtcdClient::WatchRequestDone(WatchState* state, GenericResponse* gen_resp,
           max(state->highest_index_seen_, gen_resp->etcd_index);
     }
 
-    if (KeyIsDirectory(state->key_)) {
-      GetAllResponse* const resp(new GetAllResponse);
-      GetAll(state->key_, resp,
-             state->task_->AddChild(bind(&EtcdClient::WatchInitialGetAllDone,
-                                         this, state, resp, _1)));
-    } else {
-      GetResponse* const resp(new GetResponse);
-      Get(state->key_, resp,
-          state->task_->AddChild(
-              bind(&EtcdClient::WatchInitialGetDone, this, state, resp, _1)));
-    }
+    GetResponse* const resp(new GetResponse);
+    Get(state->key_, resp,
+        state->task_->AddChild(
+            bind(&EtcdClient::WatchInitialGetDone, this, state, resp, _1)));
 
     return;
   }
@@ -780,16 +725,6 @@ void EtcdClient::Get(const string& key, GetResponse* resp, Task* task) {
   Generic(key, params, UrlFetcher::Verb::GET, gen_resp,
           task->AddChild(
               bind(&GetRequestDone, key, resp, task, gen_resp, _1)));
-}
-
-
-void EtcdClient::GetAll(const string& dir, GetAllResponse* resp, Task* task) {
-  map<string, string> params;
-  GenericResponse* const gen_resp(new GenericResponse);
-  task->DeleteWhenDone(gen_resp);
-  Generic(dir, params, UrlFetcher::Verb::GET, gen_resp,
-          task->AddChild(
-              bind(&GetAllRequestDone, dir, resp, task, gen_resp, _1)));
 }
 
 
