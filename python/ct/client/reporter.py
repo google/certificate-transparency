@@ -135,10 +135,10 @@ def handle_writing(queue, report):
             result = result.get()
         except PoolException as e:
             ex, ex_tb, first, last, bad_one = e.failure
-            logging.critical(ex_tb)
-            logging.critical(ex.args[0])
-            logging.critical("Entry %d in batch <%d, %d> %s" % (bad_one,
-                             first, last, "raised an exception during scan"))
+            logging.error(ex_tb)
+            logging.error(ex.args[0])
+            logging.error("Entry %d in batch <%d, %d> %s" % (bad_one,
+                          first, last, "raised an exception during scan"))
         else:
             report._batch_scanned_callback(result)
         queue.task_done()
