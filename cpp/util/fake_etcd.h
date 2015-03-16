@@ -66,10 +66,6 @@ class FakeEtcdClient : public EtcdClient {
 
   void CancelWatch(util::Task* task);
 
-  // Schedules a callback to be run.
-  // Callbacks should not block.
-  void ScheduleCallback(const std::function<void()>& cb);
-
   // Arranges for the watch callbacks to be called in order. Should be
   // called with mutex_ held.
   void ScheduleWatchCallback(const std::unique_lock<std::mutex>& lock,

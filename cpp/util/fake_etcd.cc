@@ -354,11 +354,6 @@ void FakeEtcdClient::CancelWatch(util::Task* task) {
 }
 
 
-void FakeEtcdClient::ScheduleCallback(const function<void()>& cb) {
-  base_->Add(cb);
-}
-
-
 void FakeEtcdClient::ScheduleWatchCallback(
     const unique_lock<mutex>& lock, util::Task* task,
     const std::function<void()>& callback) {
