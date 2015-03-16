@@ -107,7 +107,7 @@ EXTRA_TESTS = \
 
 all: client/ct server/ct-server server/ct-dns-server tools/ct-clustertool \
      tools/dump_cert tools/dump_sth util/bench_etcd util/etcd_masterelection \
-     util/etcd_watch
+     tools/etcd_watch
 
 tests: all $(TESTS) $(DISABLED_TESTS) $(EXTRA_TESTS)
 
@@ -448,9 +448,9 @@ util/etcd_masterelection: util/etcd_masterelection.o base/notification.o \
                           net/url.o net/url_fetcher.o net/connection_pool.o \
                           util/libutil.a monitoring/libmonitoring.a
 
-util/etcd_watch: util/etcd_watch.o base/notification.o net/url.o \
-                 net/url_fetcher.o net/connection_pool.o util/libutil.a \
-                 monitoring/libmonitoring.a
+tools/etcd_watch: tools/etcd_watch.o base/notification.o net/url.o \
+                  net/url_fetcher.o net/connection_pool.o util/libutil.a \
+                  monitoring/libmonitoring.a
 
 test: tests
 	@set -e; for TEST in $(TESTS); do \
