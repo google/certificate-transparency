@@ -50,4 +50,14 @@ string URL::PathQuery() const {
 }
 
 
+std::ostream& operator<<(std::ostream& out, const URL& url) {
+  out << url.Protocol() << "://" << url.Host();
+  if (url.Port() > 0) {
+    out << ":" << url.Port();
+  }
+  out << url.PathQuery();
+  return out;
+}
+
+
 }  // namespace cert_trans

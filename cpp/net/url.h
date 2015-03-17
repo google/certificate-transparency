@@ -1,6 +1,7 @@
 #ifndef CERT_TRANS_NET_URL_H_
 #define CERT_TRANS_NET_URL_H_
 
+#include <ostream>
 #include <stdint.h>
 #include <string>
 
@@ -61,6 +62,11 @@ class URL {
            port_ < rhs.port_ && path_ < rhs.path_ && query_ < rhs.query_;
   }
 
+  bool operator==(const URL& rhs) const {
+    return protocol_ == rhs.protocol_ && host_ == rhs.host_ &&
+           port_ == rhs.port_ && path_ == rhs.path_ && query_ == rhs.query_;
+  }
+
  private:
   std::string protocol_;
   std::string host_;
@@ -68,6 +74,10 @@ class URL {
   std::string path_;
   std::string query_;
 };
+
+
+// For testing and debugging.
+std::ostream& operator<<(std::ostream& out, const URL& url);
 
 
 }  // namespace cert_trans
