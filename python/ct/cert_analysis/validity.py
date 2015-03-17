@@ -47,7 +47,7 @@ class CheckValidityNotBeforeFuture(object):
             now = datetime.datetime.utcnow()
             # time.mktime assumes localtime, but because both dates are in utc
             # comparision will be valid
-            if time.mktime(not_before) - time.mktime(now.timetuple()) > 0:
+            if time.mktime(not_before) - time.mktime(now.utctimetuple()) > 0:
                 return [NotBeforeInFuture(details=not_before)]
         except cert.CertificateError:
             pass
