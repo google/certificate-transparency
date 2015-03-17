@@ -363,7 +363,7 @@ int main(int argc, char* argv[]) {
   // For now, run with a dedicated thread pool as the executor for our
   // consistent store to avoid the possibility of DoS through thread starvation
   // via HTTP.
-  ThreadPool internal_pool(4);
+  ThreadPool internal_pool(8);
   StrictConsistentStore<LoggedCertificate> consistent_store(
       &election,
       new EtcdConsistentStore<LoggedCertificate>(&internal_pool,
@@ -463,7 +463,7 @@ int main(int argc, char* argv[]) {
                 &cluster_controller, &election);
   thread node_refresh(&RefreshNodeState, &cluster_controller);
 
-  ThreadPool pool;
+  ThreadPool pool(16);
   JsonOutput output(event_base.get());
   Proxy proxy(event_base.get(), &output,
               bind(&ClusterStateController<LoggedCertificate>::GetFreshNodes,
