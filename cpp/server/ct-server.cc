@@ -1,5 +1,6 @@
 /* -*- indent-tabs-mode: nil -*- */
 
+#include <chrono>
 #include <csignal>
 #include <cstring>
 #include <event2/buffer.h>
@@ -31,6 +32,7 @@
 #include "log/tree_signer.h"
 #include "monitoring/monitoring.h"
 #include "monitoring/registry.h"
+#include "monitoring/latency.h"
 #include "server/handler.h"
 #include "server/json_output.h"
 #include "server/metrics.h"
@@ -100,12 +102,14 @@ using cert_trans::FakeEtcdClient;
 using cert_trans::FileStorage;
 using cert_trans::HttpHandler;
 using cert_trans::JsonOutput;
+using cert_trans::Latency;
 using cert_trans::LoggedCertificate;
 using cert_trans::MasterElection;
 using cert_trans::PeriodicClosure;
 using cert_trans::Proxy;
 using cert_trans::ReadPrivateKey;
 using cert_trans::StrictConsistentStore;
+using cert_trans::ScopedLatency;
 using cert_trans::ThreadPool;
 using cert_trans::TreeSigner;
 using cert_trans::Update;
@@ -116,6 +120,7 @@ using google::RegisterFlagValidator;
 using std::bind;
 using std::chrono::duration;
 using std::chrono::duration_cast;
+using std::chrono::milliseconds;
 using std::chrono::seconds;
 using std::chrono::steady_clock;
 using std::function;
@@ -131,6 +136,24 @@ using std::unique_ptr;
 Gauge<>* latest_local_tree_size_gauge =
     Gauge<>::New("latest_local_tree_size",
                  "Size of latest locally generated STH.");
+
+Counter<bool>* sequencer_total_runs = Counter<bool>::New(
+    "sequencer_total_runs", "successful",
+    "Total number of sequencer runs broken out by success.");
+Latency<milliseconds> sequencer_run_latency_ms("sequencer_run_latency_ms",
+                                               "Total runtime of sequencer");
+Latency<milliseconds> sequencer_delete_latency_ms(
+    "sequencer_delete_latency_ms",
+    "Total time spent deleting entries by sequencer");
+Latency<milliseconds> sequencer_sequence_latency_ms(
+    "sequencer_sequence_latency_ms",
+    "Total time spent sequencing entries by sequencer");
+
+Counter<bool>* signer_total_runs =
+    Counter<bool>::New("signer_total_runs", "successful",
+                       "Total number of signer runs broken out by success.");
+Latency<milliseconds> signer_run_latency_ms("signer_run_latency_ms",
+                                            "Total runtime of signer");
 
 
 // Basic sanity checks on flag values.
@@ -210,13 +233,24 @@ void SequenceEntries(TreeSigner<LoggedCertificate>* tree_signer,
 
   while (true) {
     if (election->IsMaster()) {
-      util::Status status(store->CleanupOldEntries());
-      if (!status.ok()) {
-        LOG(WARNING) << "Problem cleaning up old entries: " << status;
+      const ScopedLatency sequence_run_latency(
+          sequencer_run_latency_ms.ScopedLatency());
+      {
+        const ScopedLatency sequencer_delete_latency(
+            sequencer_delete_latency_ms.ScopedLatency());
+        util::Status status(store->CleanupOldEntries());
+        if (!status.ok()) {
+          LOG(WARNING) << "Problem cleaning up old entries: " << status;
+        }
       }
-      status = tree_signer->SequenceNewEntries();
-      if (!status.ok()) {
-        LOG(WARNING) << "Problem sequencing new entries: " << status;
+      {
+        const ScopedLatency sequencer_sequence_latency(
+            sequencer_sequence_latency_ms.ScopedLatency());
+        util::Status status(tree_signer->SequenceNewEntries());
+        if (!status.ok()) {
+          LOG(WARNING) << "Problem sequencing new entries: " << status;
+        }
+        sequencer_total_runs->Increment(status.ok());
       }
     }
 
@@ -238,21 +272,26 @@ void SignMerkleTree(TreeSigner<LoggedCertificate>* tree_signer,
   steady_clock::time_point target_run_time(steady_clock::now());
 
   while (true) {
-    const TreeSigner<LoggedCertificate>::UpdateResult result(
-        tree_signer->UpdateTree());
-    switch (result) {
-      case TreeSigner<LoggedCertificate>::OK: {
-        const SignedTreeHead latest_sth(tree_signer->LatestSTH());
-        latest_local_tree_size_gauge->Set(latest_sth.tree_size());
-        controller->NewTreeHead(latest_sth);
-        break;
+    {
+      ScopedLatency signer_run_latency(signer_run_latency_ms.ScopedLatency());
+      const TreeSigner<LoggedCertificate>::UpdateResult result(
+          tree_signer->UpdateTree());
+      switch (result) {
+        case TreeSigner<LoggedCertificate>::OK: {
+          const SignedTreeHead latest_sth(tree_signer->LatestSTH());
+          latest_local_tree_size_gauge->Set(latest_sth.tree_size());
+          controller->NewTreeHead(latest_sth);
+          signer_total_runs->Increment(true /* successful */);
+          break;
+        }
+        case TreeSigner<LoggedCertificate>::INSUFFICIENT_DATA:
+          LOG(INFO) << "Can't update tree because we don't have all the "
+                    << "entries locally, will try again later.";
+          signer_total_runs->Increment(false /* successful */);
+          break;
+        default:
+          LOG(FATAL) << "Error updating tree: " << result;
       }
-      case TreeSigner<LoggedCertificate>::INSUFFICIENT_DATA:
-        LOG(INFO) << "Can't update tree because we don't have all the entries "
-                  << "locally, will try again later.";
-        break;
-      default:
-        LOG(FATAL) << "Error updating tree: " << result;
     }
 
     const steady_clock::time_point now(steady_clock::now());

@@ -9,6 +9,8 @@
 #include <sqlite3.h>
 
 #include "log/sqlite_statement.h"
+#include "monitoring/monitoring.h"
+#include "monitoring/latency.h"
 #include "util/util.h"
 
 // TODO(pphaneuf): For now, just a flag, but ideally, when adding a
@@ -21,7 +23,14 @@ DEFINE_bool(sqlite_synchronous_off, false,
 namespace {
 
 
+static cert_trans::Latency<std::chrono::milliseconds, std::string>
+    latency_by_op_ms("sqlitedb_latency_by_operation_ms", "operation",
+                     "Database latency in ms broken out by operation");
+
+
 sqlite3* SQLiteOpen(const std::string& dbfile) {
+  cert_trans::ScopedLatency scoped_latency(
+      latency_by_op_ms.ScopedLatency("open"));
   sqlite3* retval;
 
   const int ret(
@@ -84,6 +93,8 @@ SQLiteDB<Logged>::~SQLiteDB() {
 template <class Logged>
 typename Database<Logged>::WriteResult SQLiteDB<Logged>::CreateSequencedEntry_(
     const Logged& logged) {
+  cert_trans::ScopedLatency latency(
+      latency_by_op_ms.ScopedLatency("create_sequenced_entry"));
   std::lock_guard<std::mutex> lock(lock_);
 
   sqlite::Statement statement(db_,
@@ -132,6 +143,8 @@ template <class Logged>
 typename Database<Logged>::LookupResult SQLiteDB<Logged>::LookupByHash(
     const std::string& hash, Logged* result) const {
   CHECK_NOTNULL(result);
+  cert_trans::ScopedLatency latency(
+      latency_by_op_ms.ScopedLatency("lookup_by_hash"));
 
   std::lock_guard<std::mutex> lock(lock_);
 
@@ -164,6 +177,8 @@ typename Database<Logged>::LookupResult SQLiteDB<Logged>::LookupByHash(
 template <class Logged>
 typename Database<Logged>::LookupResult SQLiteDB<Logged>::LookupByIndex(
     int64_t sequence_number, Logged* result) const {
+  cert_trans::ScopedLatency latency(
+      latency_by_op_ms.ScopedLatency("lookup_by_index"));
   std::lock_guard<std::mutex> lock(lock_);
 
   sqlite::Statement statement(db_,
@@ -193,6 +208,8 @@ typename Database<Logged>::LookupResult SQLiteDB<Logged>::LookupByIndex(
 template <class Logged>
 typename Database<Logged>::WriteResult SQLiteDB<Logged>::WriteTreeHead_(
     const ct::SignedTreeHead& sth) {
+  cert_trans::ScopedLatency latency(
+      latency_by_op_ms.ScopedLatency("write_tree_head"));
   std::unique_lock<std::mutex> lock(lock_);
 
   sqlite::Statement statement(db_,
@@ -227,6 +244,8 @@ typename Database<Logged>::WriteResult SQLiteDB<Logged>::WriteTreeHead_(
 template <class Logged>
 typename Database<Logged>::LookupResult SQLiteDB<Logged>::LatestTreeHead(
     ct::SignedTreeHead* result) const {
+  cert_trans::ScopedLatency latency(
+      latency_by_op_ms.ScopedLatency("latest_tree_head"));
   std::lock_guard<std::mutex> lock(lock_);
 
   return LatestTreeHeadNoLock(result);
@@ -235,6 +254,8 @@ typename Database<Logged>::LookupResult SQLiteDB<Logged>::LatestTreeHead(
 
 template <class Logged>
 int64_t SQLiteDB<Logged>::TreeSize() const {
+  cert_trans::ScopedLatency latency(
+      latency_by_op_ms.ScopedLatency("tree_size"));
   std::lock_guard<std::mutex> lock(lock_);
 
   CHECK_GE(tree_size_, 0);
@@ -270,6 +291,8 @@ void SQLiteDB<Logged>::RemoveNotifySTHCallback(
 
 template <class Logged>
 void SQLiteDB<Logged>::InitializeNode(const std::string& node_id) {
+  cert_trans::ScopedLatency latency(
+      latency_by_op_ms.ScopedLatency("initialize_node"));
   CHECK(!node_id.empty());
   std::unique_lock<std::mutex> lock(lock_);
   std::string existing_id;
@@ -296,6 +319,8 @@ typename Database<Logged>::LookupResult SQLiteDB<Logged>::NodeId(
 template <class Logged>
 typename Database<Logged>::LookupResult SQLiteDB<Logged>::NodeId(
     const std::unique_lock<std::mutex>& lock, std::string* node_id) {
+  cert_trans::ScopedLatency latency(
+      latency_by_op_ms.ScopedLatency("set_node_id"));
   CHECK(lock.owns_lock());
   CHECK_NOTNULL(node_id);
   sqlite::Statement statement(db_, "SELECT node_id FROM node");

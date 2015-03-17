@@ -1,11 +1,14 @@
 #ifndef CERT_TRANS_LOG_ETCD_CONSISTENT_STORE_INL_H_
 #define CERT_TRANS_LOG_ETCD_CONSISTENT_STORE_INL_H_
 
+#include <chrono>
 #include <glog/logging.h>
 
 #include "base/notification.h"
 #include "log/etcd_consistent_store.h"
 #include "log/logged_certificate.h"
+#include "monitoring/monitoring.h"
+#include "monitoring/latency.h"
 #include "util/executor.h"
 #include "util/masterelection.h"
 #include "util/util.h"
@@ -21,6 +24,15 @@ const char kEntriesDir[] = "/entries/";
 const char kSequenceFile[] = "/sequence_mapping";
 const char kServingSthFile[] = "/serving_sth";
 const char kNodesDir[] = "/nodes/";
+
+
+static Gauge<std::string>* etcd_total_entries =
+    Gauge<std::string>::New("etcd_total_entries", "type",
+                            "Total number of entries in etcd by type.");
+
+static Latency<std::chrono::milliseconds, std::string> etcd_latency_by_op_ms(
+    "etcd_latency_by_op_ms", "operation",
+    "Etcd latency in ms broken down by operation.");
 
 
 void CheckMappingIsOrdered(const ct::SequenceMapping& mapping) {
@@ -85,11 +97,16 @@ EtcdConsistentStore<Logged>::~EtcdConsistentStore() {
 template <class Logged>
 util::StatusOr<int64_t>
 EtcdConsistentStore<Logged>::NextAvailableSequenceNumber() const {
+  ScopedLatency scoped_latency(
+      etcd_latency_by_op_ms.ScopedLatency("next_available_sequence_number"));
+
   EntryHandle<ct::SequenceMapping> sequence_mapping;
   util::Status status(GetSequenceMapping(&sequence_mapping));
   if (!status.ok()) {
     return status;
   }
+  etcd_total_entries->Set("sequenced",
+                          sequence_mapping.Entry().mapping_size());
   if (sequence_mapping.Entry().mapping_size() > 0) {
     return sequence_mapping.Entry()
                .mapping(sequence_mapping.Entry().mapping_size() - 1)
@@ -122,6 +139,9 @@ void EtcdConsistentStore<Logged>::WaitForServingSTHVersion(
 template <class Logged>
 util::Status EtcdConsistentStore<Logged>::SetServingSTH(
     const ct::SignedTreeHead& new_sth) {
+  ScopedLatency scoped_latency(
+      etcd_latency_by_op_ms.ScopedLatency("set_serving_sth"));
+
   const std::string full_path(GetFullPath(kServingSthFile));
   std::unique_lock<std::mutex> lock(mutex_);
 
@@ -193,6 +213,9 @@ bool LeafEntriesMatch(const Logged& a, const Logged& b) {
 
 template <class Logged>
 util::Status EtcdConsistentStore<Logged>::AddPendingEntry(Logged* entry) {
+  ScopedLatency scoped_latency(
+      etcd_latency_by_op_ms.ScopedLatency("add_pending_entry"));
+
   CHECK_NOTNULL(entry);
   CHECK(!entry->has_sequence_number());
   const std::string full_path(GetEntryPath(*entry));
@@ -221,6 +244,9 @@ util::Status EtcdConsistentStore<Logged>::AddPendingEntry(Logged* entry) {
 template <class Logged>
 util::Status EtcdConsistentStore<Logged>::GetPendingEntryForHash(
     const std::string& hash, EntryHandle<Logged>* entry) const {
+  ScopedLatency scoped_latency(
+      etcd_latency_by_op_ms.ScopedLatency("get_pending_entry_for_hash"));
+
   util::Status status(GetEntry(GetEntryPath(hash), entry));
   if (status.ok()) {
     CHECK(!entry->Entry().has_sequence_number());
@@ -233,12 +259,16 @@ util::Status EtcdConsistentStore<Logged>::GetPendingEntryForHash(
 template <class Logged>
 util::Status EtcdConsistentStore<Logged>::GetPendingEntries(
     std::vector<EntryHandle<Logged>>* entries) const {
+  ScopedLatency scoped_latency(
+      etcd_latency_by_op_ms.ScopedLatency("get_pending_entries"));
+
   util::Status status(GetAllEntriesInDir(GetFullPath(kEntriesDir), entries));
   if (status.ok()) {
     for (const auto& entry : *entries) {
       CHECK(!entry.Entry().has_sequence_number());
     }
   }
+  etcd_total_entries->Set("pending", entries->size());
   return status;
 }
 
@@ -255,12 +285,17 @@ bool LessBySequenceNumber(const EntryHandle<Logged>& lhs,
 template <class Logged>
 util::Status EtcdConsistentStore<Logged>::GetSequenceMapping(
     EntryHandle<ct::SequenceMapping>* sequence_mapping) const {
+  ScopedLatency scoped_latency(
+      etcd_latency_by_op_ms.ScopedLatency("get_sequence_mapping"));
+
   util::Status status(GetEntry(GetFullPath(kSequenceFile), sequence_mapping));
   if (!status.ok()) {
     return status;
   }
   CheckMappingIsOrdered(sequence_mapping->Entry());
   CheckMappingIsContiguousWithServingTree(sequence_mapping->Entry());
+  etcd_total_entries->Set("sequenced",
+                          sequence_mapping->Entry().mapping_size());
   return util::Status::OK;
 }
 
@@ -268,6 +303,9 @@ util::Status EtcdConsistentStore<Logged>::GetSequenceMapping(
 template <class Logged>
 util::Status EtcdConsistentStore<Logged>::UpdateSequenceMapping(
     EntryHandle<ct::SequenceMapping>* entry) {
+  ScopedLatency scoped_latency(
+      etcd_latency_by_op_ms.ScopedLatency("update_sequence_mapping"));
+
   CHECK(entry->HasHandle());
   CheckMappingIsOrdered(entry->Entry());
   CheckMappingIsContiguousWithServingTree(entry->Entry());
@@ -278,6 +316,9 @@ util::Status EtcdConsistentStore<Logged>::UpdateSequenceMapping(
 template <class Logged>
 util::StatusOr<ct::ClusterNodeState>
 EtcdConsistentStore<Logged>::GetClusterNodeState() const {
+  ScopedLatency scoped_latency(
+      etcd_latency_by_op_ms.ScopedLatency("get_cluster_node_state"));
+
   EntryHandle<ct::ClusterNodeState> handle;
   util::Status status(GetEntry(GetNodePath(node_id_), &handle));
   if (!status.ok()) {
@@ -290,6 +331,9 @@ EtcdConsistentStore<Logged>::GetClusterNodeState() const {
 template <class Logged>
 util::Status EtcdConsistentStore<Logged>::SetClusterNodeState(
     const ct::ClusterNodeState& state) {
+  ScopedLatency scoped_latency(
+      etcd_latency_by_op_ms.ScopedLatency("set_cluster_node_state"));
+
   // TODO(alcutter): consider keeping the handle for this around to check that
   // nobody else is updating our cluster state.
   ct::ClusterNodeState local_state(state);
@@ -378,6 +422,9 @@ void EtcdConsistentStore<Logged>::WatchClusterConfig(
 template <class Logged>
 util::Status EtcdConsistentStore<Logged>::SetClusterConfig(
     const ct::ClusterConfig& config) {
+  ScopedLatency scoped_latency(
+      etcd_latency_by_op_ms.ScopedLatency("set_cluster_config"));
+
   EntryHandle<ct::ClusterConfig> entry(GetFullPath(kClusterConfigFile),
                                        config);
   return ForceSetEntry(&entry);
@@ -388,6 +435,9 @@ template <class Logged>
 template <class T>
 util::Status EtcdConsistentStore<Logged>::GetEntry(
     const std::string& path, EntryHandle<T>* entry) const {
+  ScopedLatency scoped_latency(
+      etcd_latency_by_op_ms.ScopedLatency("get_entry"));
+
   CHECK_NOTNULL(entry);
   util::SyncTask task(executor_);
   EtcdClient::GetResponse resp;
@@ -407,6 +457,9 @@ template <class Logged>
 template <class T>
 util::Status EtcdConsistentStore<Logged>::GetAllEntriesInDir(
     const std::string& dir, std::vector<EntryHandle<T>>* entries) const {
+  ScopedLatency scoped_latency(
+      etcd_latency_by_op_ms.ScopedLatency("get_all_entries_in_dir"));
+
   CHECK_NOTNULL(entries);
   CHECK_EQ(0, entries->size());
   util::SyncTask task(executor_);
@@ -433,6 +486,9 @@ util::Status EtcdConsistentStore<Logged>::GetAllEntriesInDir(
 template <class Logged>
 template <class T>
 util::Status EtcdConsistentStore<Logged>::UpdateEntry(EntryHandle<T>* t) {
+  ScopedLatency scoped_latency(
+      etcd_latency_by_op_ms.ScopedLatency("update_entry"));
+
   CHECK_NOTNULL(t);
   CHECK(t->HasHandle());
   CHECK(t->HasKey());
@@ -453,6 +509,9 @@ util::Status EtcdConsistentStore<Logged>::UpdateEntry(EntryHandle<T>* t) {
 template <class Logged>
 template <class T>
 util::Status EtcdConsistentStore<Logged>::CreateEntry(EntryHandle<T>* t) {
+  ScopedLatency scoped_latency(
+      etcd_latency_by_op_ms.ScopedLatency("create_entry"));
+
   CHECK_NOTNULL(t);
   CHECK(!t->HasHandle());
   CHECK(t->HasKey());
@@ -472,6 +531,9 @@ util::Status EtcdConsistentStore<Logged>::CreateEntry(EntryHandle<T>* t) {
 template <class Logged>
 template <class T>
 util::Status EtcdConsistentStore<Logged>::ForceSetEntry(EntryHandle<T>* t) {
+  ScopedLatency scoped_latency(
+      etcd_latency_by_op_ms.ScopedLatency("force_set_entry"));
+
   CHECK_NOTNULL(t);
   CHECK(t->HasKey());
   // For now we check that |t| wasn't fetched from the etcd store (i.e. it's a
@@ -496,6 +558,9 @@ template <class Logged>
 template <class T>
 util::Status EtcdConsistentStore<Logged>::ForceSetEntryWithTTL(
     const std::chrono::seconds& ttl, EntryHandle<T>* t) {
+  ScopedLatency scoped_latency(
+      etcd_latency_by_op_ms.ScopedLatency("force_set_entry_with_ttl"));
+
   CHECK_NOTNULL(t);
   CHECK(t->HasKey());
   // For now we check that |t| wasn't fetched from the etcd store (i.e. it's a
@@ -521,6 +586,9 @@ util::Status EtcdConsistentStore<Logged>::ForceSetEntryWithTTL(
 template <class Logged>
 template <class T>
 util::Status EtcdConsistentStore<Logged>::DeleteEntry(EntryHandle<T>* entry) {
+  ScopedLatency scoped_latency(
+      etcd_latency_by_op_ms.ScopedLatency("delete_entry"));
+
   CHECK_NOTNULL(entry);
   CHECK(entry->HasHandle());
   CHECK(entry->HasKey());
@@ -623,6 +691,9 @@ void EtcdConsistentStore<Logged>::OnEtcdServingSTHUpdated(
 
 template <class Logged>
 util::Status EtcdConsistentStore<Logged>::CleanupOldEntries() {
+  ScopedLatency scoped_latency(
+      etcd_latency_by_op_ms.ScopedLatency("cleanup_old_entries"));
+
   if (!election_->IsMaster()) {
     return util::Status(util::error::PERMISSION_DENIED,
                         "Non-master node cannot run cleanups.");

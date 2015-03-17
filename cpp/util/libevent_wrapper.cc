@@ -7,9 +7,7 @@
 #include <math.h>
 #include <signal.h>
 
-#include "monitoring/monitoring.h"
 
-using cert_trans::Counter;
 using std::bind;
 using std::chrono::duration;
 using std::chrono::duration_cast;
@@ -28,20 +26,6 @@ using std::vector;
 using util::TaskHold;
 
 namespace {
-
-static Counter<string>* total_http_server_requests(
-    Counter<string>::New("total_http_server_requests", "path",
-                         "Total number of HTTP requests received for a given "
-                         "path."));
-static Counter<string, int>* total_http_server_response_codes(
-    Counter<string, int>::New("total_http_server_response_codes", "path",
-                              "response_code",
-                              "Total number of responses sent with a given "
-                              "HTTP response code for a given path."));
-static Counter<string>* total_http_server_request_latency_ms(
-    Counter<string>::New("total_http_server_request_latency_ms", "path",
-                         "Total request latency in ms broken down by path"));
-
 
 void FreeEvDns(evdns_base* dns) {
   if (dns) {
@@ -287,24 +271,8 @@ void HttpServer::Bind(const char* address, ev_uint16_t port) {
 }
 
 
-void StatsHandlerInterceptor(evhttp_request* req,
-                             const HttpServer::HandlerCallback& cb) {
-  const auto start(system_clock::now());
-  cb(req);
-  const auto duration(system_clock::now() - start);
-
-  const char* path_c(evhttp_uri_get_path(evhttp_request_get_evhttp_uri(req)));
-  const string path(path_c ? path_c : "");
-
-  total_http_server_request_latency_ms->IncrementBy(
-      path, duration_cast<milliseconds>(duration).count());
-  total_http_server_requests->Increment(path);
-  total_http_server_response_codes->Increment(path, req->response_code);
-}
-
-
 bool HttpServer::AddHandler(const string& path, const HandlerCallback& cb) {
-  Handler* handler(new Handler(path, bind(&StatsHandlerInterceptor, _1, cb)));
+  Handler* handler(new Handler(path, cb));
   handlers_.push_back(handler);
 
   return evhttp_set_cb(http_, path.c_str(), &HandleRequest, handler) == 0;

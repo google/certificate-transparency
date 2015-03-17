@@ -14,8 +14,22 @@
 #include "log/file_storage.h"
 #include "proto/ct.pb.h"
 #include "proto/serializer.h"
+#include "monitoring/monitoring.h"
+#include "monitoring/latency.h"
+
+
+namespace {
+
+
+static cert_trans::Latency<std::chrono::milliseconds, std::string>
+    latency_by_op_ms("filedb_latency_by_operation_ms", "operation",
+                     "Database latency in ms broken out by operation.");
+
 
 const char kMetaNodeIdKey[] = "node_id";
+
+
+}  // namespace
 
 template <class Logged>
 const size_t FileDB<Logged>::kTimestampBytesIndexed = 6;
@@ -29,6 +43,7 @@ FileDB<Logged>::FileDB(cert_trans::FileStorage* cert_storage,
       tree_storage_(CHECK_NOTNULL(tree_storage)),
       meta_storage_(CHECK_NOTNULL(meta_storage)),
       latest_tree_timestamp_(0) {
+  cert_trans::ScopedLatency latency(latency_by_op_ms.ScopedLatency("open"));
   BuildIndex();
 }
 
@@ -43,6 +58,8 @@ typename Database<Logged>::WriteResult FileDB<Logged>::CreateSequencedEntry_(
     const Logged& logged) {
   CHECK(logged.has_sequence_number());
   CHECK_GE(logged.sequence_number(), 0);
+  cert_trans::ScopedLatency latency(
+      latency_by_op_ms.ScopedLatency("create_sequenced_entry"));
 
   std::unique_lock<std::mutex> lock(lock_);
   util::StatusOr<std::string> old_hash(
@@ -82,6 +99,8 @@ typename Database<Logged>::WriteResult FileDB<Logged>::CreateSequencedEntry_(
 template <class Logged>
 typename Database<Logged>::LookupResult FileDB<Logged>::LookupByHash(
     const std::string& hash, Logged* result) const {
+  cert_trans::ScopedLatency latency(
+      latency_by_op_ms.ScopedLatency("lookup_by_hash"));
   std::string cert_data;
   util::Status status(cert_storage_->LookupEntry(hash, &cert_data));
   if (status.CanonicalCode() == util::error::NOT_FOUND) {
@@ -105,6 +124,8 @@ template <class Logged>
 typename Database<Logged>::LookupResult FileDB<Logged>::LookupByIndex(
     int64_t sequence_number, Logged* result) const {
   CHECK_GE(sequence_number, 0);
+  cert_trans::ScopedLatency latency(
+      latency_by_op_ms.ScopedLatency("lookup_by_index"));
 
   util::StatusOr<std::string> hash(
       HashFromIndex(std::unique_lock<std::mutex>(lock_), sequence_number));
@@ -130,6 +151,8 @@ template <class Logged>
 typename Database<Logged>::WriteResult FileDB<Logged>::WriteTreeHead_(
     const ct::SignedTreeHead& sth) {
   CHECK_GE(sth.tree_size(), 0);
+  cert_trans::ScopedLatency latency(
+      latency_by_op_ms.ScopedLatency("write_tree_head"));
 
   // 6 bytes are good enough for some 9000 years.
   std::string timestamp_key =
@@ -160,6 +183,8 @@ typename Database<Logged>::WriteResult FileDB<Logged>::WriteTreeHead_(
 template <class Logged>
 typename Database<Logged>::LookupResult FileDB<Logged>::LatestTreeHead(
     ct::SignedTreeHead* result) const {
+  cert_trans::ScopedLatency latency(
+      latency_by_op_ms.ScopedLatency("latest_tree_head"));
   std::lock_guard<std::mutex> lock(lock_);
 
   return LatestTreeHeadNoLock(result);
@@ -168,6 +193,8 @@ typename Database<Logged>::LookupResult FileDB<Logged>::LatestTreeHead(
 
 template <class Logged>
 int64_t FileDB<Logged>::TreeSize() const {
+  cert_trans::ScopedLatency latency(
+      latency_by_op_ms.ScopedLatency("tree_size"));
   std::lock_guard<std::mutex> lock(lock_);
 
   return dense_entries_.size();
@@ -201,6 +228,8 @@ void FileDB<Logged>::RemoveNotifySTHCallback(
 template <class Logged>
 void FileDB<Logged>::InitializeNode(const std::string& node_id) {
   CHECK(!node_id.empty());
+  cert_trans::ScopedLatency latency(
+      latency_by_op_ms.ScopedLatency("initialize_node"));
   std::unique_lock<std::mutex> lock(lock_);
   std::string existing_id;
   if (NodeId(&existing_id) != this->NOT_FOUND) {
@@ -224,6 +253,8 @@ typename Database<Logged>::LookupResult FileDB<Logged>::NodeId(
 
 template <class Logged>
 void FileDB<Logged>::BuildIndex() {
+  cert_trans::ScopedLatency latency(
+      latency_by_op_ms.ScopedLatency("build_index"));
   // Technically, this should only be called from the constructor, so
   // this should not be necessarily, but just to be sure...
   std::lock_guard<std::mutex> lock(lock_);
