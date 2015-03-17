@@ -52,7 +52,7 @@ void FakeEtcdClient::DumpEntries() {
 
 
 void FakeEtcdClient::Watch(const string& key, const WatchCallback& cb,
-                           util::Task* task) {
+                           Task* task) {
   unique_lock<mutex> lock(mutex_);
   vector<Node> initial_updates;
   for (const auto& pair : entries_) {
@@ -70,7 +70,7 @@ void FakeEtcdClient::Watch(const string& key, const WatchCallback& cb,
 void FakeEtcdClient::Generic(const std::string& key,
                              const std::map<std::string, std::string>& params,
                              UrlFetcher::Verb verb, GenericResponse* resp,
-                             util::Task* task) {
+                             Task* task) {
   PurgeExpiredEntries();
   switch (verb) {
     case UrlFetcher::Verb::GET:
@@ -332,7 +332,7 @@ void FakeEtcdClient::HandleDelete(const string& key,
 }
 
 
-void FakeEtcdClient::CancelWatch(util::Task* task) {
+void FakeEtcdClient::CancelWatch(Task* task) {
   lock_guard<mutex> lock(mutex_);
   bool found(false);
   for (auto& pair : watches_) {
@@ -355,7 +355,7 @@ void FakeEtcdClient::CancelWatch(util::Task* task) {
 
 
 void FakeEtcdClient::ScheduleWatchCallback(
-    const unique_lock<mutex>& lock, util::Task* task,
+    const unique_lock<mutex>& lock, Task* task,
     const std::function<void()>& callback) {
   CHECK(lock.owns_lock());
   const bool already_running(!watches_callbacks_.empty());
@@ -373,8 +373,8 @@ void FakeEtcdClient::ScheduleWatchCallback(
 
 
 void FakeEtcdClient::RunWatchCallback() {
-  util::Task* current(nullptr);
-  util::Task* next(nullptr);
+  Task* current(nullptr);
+  Task* next(nullptr);
   function<void()> callback;
 
   {

@@ -647,7 +647,7 @@ EtcdClient::~EtcdClient() {
 }
 
 
-void EtcdClient::FetchDone(Request* etcd_req, util::Task* task) {
+void EtcdClient::FetchDone(Request* etcd_req, Task* task) {
   VLOG(2) << "EtcdClient::FetchDone: " << task->status();
 
   if (!task->status().ok()) {
@@ -729,7 +729,7 @@ void EtcdClient::Get(const string& key, GetResponse* resp, Task* task) {
 
 
 void EtcdClient::Create(const string& key, const string& value, Response* resp,
-                        util::Task* task) {
+                        Task* task) {
   map<string, string> params;
   params["value"] = value;
   params["prevExist"] = "false";
@@ -742,7 +742,7 @@ void EtcdClient::Create(const string& key, const string& value, Response* resp,
 
 void EtcdClient::CreateWithTTL(const string& key, const string& value,
                                const seconds& ttl, Response* resp,
-                               util::Task* task) {
+                               Task* task) {
   map<string, string> params;
   params["value"] = value;
   params["prevExist"] = "false";
@@ -769,7 +769,7 @@ void EtcdClient::CreateInQueue(const string& dir, const string& value,
 
 void EtcdClient::Update(const string& key, const string& value,
                         const int64_t previous_index, Response* resp,
-                        util::Task* task) {
+                        Task* task) {
   map<string, string> params;
   params["value"] = value;
   params["prevIndex"] = to_string(previous_index);
@@ -783,7 +783,7 @@ void EtcdClient::Update(const string& key, const string& value,
 void EtcdClient::UpdateWithTTL(const string& key, const string& value,
                                const seconds& ttl,
                                const int64_t previous_index, Response* resp,
-                               util::Task* task) {
+                               Task* task) {
   map<string, string> params;
   params["value"] = value;
   params["prevIndex"] = to_string(previous_index);
@@ -796,7 +796,7 @@ void EtcdClient::UpdateWithTTL(const string& key, const string& value,
 
 
 void EtcdClient::ForceSet(const string& key, const string& value,
-                          Response* resp, util::Task* task) {
+                          Response* resp, Task* task) {
   map<string, string> params;
   params["value"] = value;
   GenericResponse* const gen_resp(new GenericResponse);
@@ -809,7 +809,7 @@ void EtcdClient::ForceSet(const string& key, const string& value,
 
 void EtcdClient::ForceSetWithTTL(const string& key, const string& value,
                                  const seconds& ttl, Response* resp,
-                                 util::Task* task) {
+                                 Task* task) {
   map<string, string> params;
   params["value"] = value;
   params["ttl"] = to_string(ttl.count());
