@@ -3,6 +3,7 @@
 #include <event2/thread.h>
 #include <glog/logging.h>
 #include <math.h>
+#include <signal.h>
 
 #include "base/time_support.h"
 
@@ -13,6 +14,18 @@ using std::string;
 using std::vector;
 
 namespace {
+
+
+static void Handler_ExitLoop(evutil_socket_t sig, short events, void* base) {
+  event_base_loopexit((event_base*)base, NULL);
+}
+
+void SetExitLoopHandler(event_base* base, int signum) {
+  struct event* signal_event;
+  signal_event = evsignal_new(base, signum, Handler_ExitLoop, base);
+  CHECK_NOTNULL(signal_event);
+  CHECK_GE(event_add(signal_event, NULL), 0);
+}
 
 
 unsigned short GetPortFromUri(const evhttp_uri* uri) {
@@ -60,6 +73,10 @@ Base::~Base() {
 
 
 void Base::Dispatch() {
+  SetExitLoopHandler(base_, SIGHUP);
+  SetExitLoopHandler(base_, SIGINT);
+  SetExitLoopHandler(base_, SIGTERM);
+
   CHECK_EQ(event_base_dispatch(base_), 0);
 }
 
