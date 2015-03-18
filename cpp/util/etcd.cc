@@ -720,13 +720,16 @@ EtcdClient::HostPortPair EtcdClient::UpdateEndpoint(const string& host,
 }
 
 
-void EtcdClient::Get(const string& key, GetResponse* resp, Task* task) {
+void EtcdClient::Get(const Request& req, GetResponse* resp, Task* task) {
   map<string, string> params;
+  if (req.recursive) {
+    params["recursive"] = "true";
+  }
   GenericResponse* const gen_resp(new GenericResponse);
   task->DeleteWhenDone(gen_resp);
-  Generic(key, params, UrlFetcher::Verb::GET, gen_resp,
+  Generic(req.key, params, UrlFetcher::Verb::GET, gen_resp,
           task->AddChild(
-              bind(&GetRequestDone, key, resp, task, gen_resp, _1)));
+              bind(&GetRequestDone, req.key, resp, task, gen_resp, _1)));
 }
 
 

@@ -204,7 +204,32 @@ TEST_F(EtcdTest, TestGet) {
 
   SyncTask task(base_.get());
   EtcdClient::GetResponse resp;
-  client_.Get(kEntryKey, &resp, task.task());
+  client_.Get(string(kEntryKey), &resp, task.task());
+  task.Wait();
+  EXPECT_EQ(Status::OK, task.status());
+  EXPECT_EQ(11, resp.etcd_index);
+  EXPECT_EQ(9, resp.node.modified_index_);
+  EXPECT_EQ("123", resp.node.value_);
+}
+
+TEST_F(EtcdTest, TestGetRecursive) {
+  EXPECT_CALL(url_fetcher_,
+              Fetch(IsUrlFetchRequest(
+                        UrlFetcher::Verb::GET,
+                        URL(GetEtcdUrl(kEntryKey) +
+                            "?consistent=true&quorum=true&recursive=true"),
+                        IsEmpty(), ""),
+                    _, _))
+      .WillOnce(
+          Invoke(bind(HandleFetch, Status::OK, 200,
+                      UrlFetcher::Headers{make_pair("x-etcd-index", "11")},
+                      kGetJson, _1, _2, _3)));
+
+  SyncTask task(base_.get());
+  EtcdClient::Request req(kEntryKey);
+  req.recursive = true;
+  EtcdClient::GetResponse resp;
+  client_.Get(req, &resp, task.task());
   task.Wait();
   EXPECT_EQ(Status::OK, task.status());
   EXPECT_EQ(11, resp.etcd_index);
@@ -225,7 +250,7 @@ TEST_F(EtcdTest, TestGetForInvalidKey) {
                       kKeyNotFoundJson, _1, _2, _3)));
   SyncTask task(base_.get());
   EtcdClient::GetResponse resp;
-  client_.Get(kEntryKey, &resp, task.task());
+  client_.Get(string(kEntryKey), &resp, task.task());
   task.Wait();
   EXPECT_EQ(Status(util::error::NOT_FOUND,
                    "Key not found (" + string(kEntryKey) + ")"),
@@ -245,7 +270,7 @@ TEST_F(EtcdTest, TestGetAll) {
                       kGetAllJson, _1, _2, _3)));
   SyncTask task(base_.get());
   EtcdClient::GetResponse resp;
-  client_.Get(kDirKey, &resp, task.task());
+  client_.Get(string(kDirKey), &resp, task.task());
   task.Wait();
   ASSERT_EQ(Status::OK, task.status());
   EXPECT_TRUE(resp.node.is_dir_);

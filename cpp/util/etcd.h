@@ -46,6 +46,14 @@ class EtcdClient {
     bool deleted_;
   };
 
+  struct Request {
+    Request(const std::string& thekey) : key(thekey), recursive(false) {
+    }
+
+    std::string key;
+    bool recursive;
+  };
+
   struct Response {
     Response() : etcd_index(-1) {
     }
@@ -73,7 +81,7 @@ class EtcdClient {
 
   virtual ~EtcdClient();
 
-  void Get(const std::string& key, GetResponse* resp, util::Task* task);
+  void Get(const Request& req, GetResponse* resp, util::Task* task);
 
   void Create(const std::string& key, const std::string& value, Response* resp,
               util::Task* task);
