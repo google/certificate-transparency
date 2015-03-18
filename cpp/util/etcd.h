@@ -122,12 +122,12 @@ class EtcdClient {
  private:
   typedef std::pair<std::string, uint16_t> HostPortPair;
 
-  struct Request;
+  struct RequestState;
   struct WatchState;
 
   HostPortPair GetEndpoint() const;
   HostPortPair UpdateEndpoint(const std::string& host, uint16_t port);
-  void FetchDone(Request* etcd_req, util::Task* task);
+  void FetchDone(RequestState* etcd_req, util::Task* task);
 
   void WatchInitialGetDone(WatchState* state, GetResponse* resp,
                            util::Task* task);

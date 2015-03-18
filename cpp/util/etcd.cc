@@ -327,10 +327,12 @@ static const EtcdClient::Node kInvalidNode(-1, -1, "", false, "", {}, true);
 }  // namespace
 
 
-struct EtcdClient::Request {
-  Request(UrlFetcher::Verb verb, const string& key, map<string, string> params,
-          const HostPortPair& host_port, GenericResponse* gen_resp, Task* task)
-      : gen_resp_(CHECK_NOTNULL(gen_resp)), task_(CHECK_NOTNULL(task)) {
+struct EtcdClient::RequestState {
+  RequestState(UrlFetcher::Verb verb, const string& key,
+               map<string, string> params, const HostPortPair& host_port,
+               GenericResponse* gen_resp, Task* parent_task)
+      : gen_resp_(CHECK_NOTNULL(gen_resp)),
+        parent_task_(CHECK_NOTNULL(parent_task)) {
     CHECK(!key.empty());
     CHECK_EQ(key[0], '/');
 
@@ -372,7 +374,7 @@ struct EtcdClient::Request {
   }
 
   GenericResponse* const gen_resp_;
-  Task* const task_;
+  Task* const parent_task_;
 
   UrlFetcher::Request req_;
   UrlFetcher::Response resp_;
@@ -647,13 +649,13 @@ EtcdClient::~EtcdClient() {
 }
 
 
-void EtcdClient::FetchDone(Request* etcd_req, Task* task) {
+void EtcdClient::FetchDone(RequestState* etcd_req, Task* task) {
   VLOG(2) << "EtcdClient::FetchDone: " << task->status();
 
   if (!task->status().ok()) {
     // TODO(pphaneuf): If there is a connection problem, we should re-do the
     // request on another node.
-    etcd_req->task_->Return(task->status());
+    etcd_req->parent_task_->Return(task->status());
     return;
   } else {
     VLOG(2) << "response:\n" << etcd_req->resp_;
@@ -664,7 +666,7 @@ void EtcdClient::FetchDone(Request* etcd_req, Task* task) {
         etcd_req->resp_.headers.find("location"));
 
     if (it == etcd_req->resp_.headers.end()) {
-      etcd_req->task_->Return(
+      etcd_req->parent_task_->Return(
           Status(util::error::INTERNAL,
                  "etcd returned a redirect without a Location header?"));
       return;
@@ -672,7 +674,7 @@ void EtcdClient::FetchDone(Request* etcd_req, Task* task) {
 
     const URL url(it->second);
     if (url.Host().empty() || url.Port() == 0) {
-      etcd_req->task_->Return(
+      etcd_req->parent_task_->Return(
           Status(util::error::INTERNAL,
                  "could not parse Location header from etcd: " + it->second));
       return;
@@ -681,7 +683,7 @@ void EtcdClient::FetchDone(Request* etcd_req, Task* task) {
     etcd_req->SetHostPort(UpdateEndpoint(url.Host(), url.Port()));
 
     fetcher_->Fetch(etcd_req->req_, &etcd_req->resp_,
-                    etcd_req->task_->AddChild(
+                    etcd_req->parent_task_->AddChild(
                         bind(&EtcdClient::FetchDone, this, etcd_req, _1)));
     return;
   }
@@ -696,7 +698,7 @@ void EtcdClient::FetchDone(Request* etcd_req, Task* task) {
     etcd_req->gen_resp_->etcd_index = atoll(it->second.c_str());
   }
 
-  etcd_req->task_->Return(
+  etcd_req->parent_task_->Return(
       StatusFromResponseCode(etcd_req->resp_.status_code,
                              etcd_req->gen_resp_->json_body));
 }
@@ -847,12 +849,12 @@ void EtcdClient::Watch(const string& key, const WatchCallback& cb,
 void EtcdClient::Generic(const string& key, const map<string, string>& params,
                          UrlFetcher::Verb verb, GenericResponse* resp,
                          Task* task) {
-  Request* const etcd_req(
-      new Request(verb, key, params, GetEndpoint(), resp, task));
+  RequestState* const etcd_req(
+      new RequestState(verb, key, params, GetEndpoint(), resp, task));
   task->DeleteWhenDone(etcd_req);
 
   fetcher_->Fetch(etcd_req->req_, &etcd_req->resp_,
-                  etcd_req->task_->AddChild(
+                  etcd_req->parent_task_->AddChild(
                       bind(&EtcdClient::FetchDone, this, etcd_req, _1)));
 }
 
