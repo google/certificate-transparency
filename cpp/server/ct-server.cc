@@ -371,7 +371,7 @@ int main(int argc, char* argv[]) {
                                                  "/root", node_id));
 
   const unique_ptr<ContinuousFetcher> fetcher(
-      ContinuousFetcher::New(event_base.get(), db));
+      ContinuousFetcher::New(event_base.get(), &internal_pool, db));
 
   ClusterStateController<LoggedCertificate> cluster_controller(
       &internal_pool, event_base, &url_fetcher, db, &consistent_store,

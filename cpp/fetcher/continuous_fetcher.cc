@@ -17,6 +17,7 @@ using std::shared_ptr;
 using std::string;
 using std::unique_lock;
 using std::unique_ptr;
+using util::Executor;
 using util::Task;
 
 DEFINE_int32(delay_between_fetches_seconds, 30, "delay between fetches");
@@ -28,7 +29,8 @@ namespace {
 
 class ContinuousFetcherImpl : public ContinuousFetcher {
  public:
-  ContinuousFetcherImpl(libevent::Base* base, Database<LoggedCertificate>* db);
+  ContinuousFetcherImpl(libevent::Base* base, Executor* executor,
+                        Database<LoggedCertificate>* db);
 
   void AddPeer(const string& node_id, const shared_ptr<Peer>& peer) override;
   void RemovePeer(const string& node_id);
@@ -39,6 +41,7 @@ class ContinuousFetcherImpl : public ContinuousFetcher {
   void FetchDelayDone(Task* task);
 
   libevent::Base* const base_;
+  Executor* const executor_;
   Database<LoggedCertificate>* const db_;
 
   mutex lock_;
@@ -52,8 +55,10 @@ class ContinuousFetcherImpl : public ContinuousFetcher {
 
 
 ContinuousFetcherImpl::ContinuousFetcherImpl(libevent::Base* base,
+                                             Executor* executor,
                                              Database<LoggedCertificate>* db)
     : base_(CHECK_NOTNULL(base)),
+      executor_(CHECK_NOTNULL(executor)),
       db_(CHECK_NOTNULL(db)),
       restart_fetch_(false) {
 }
@@ -107,7 +112,7 @@ void ContinuousFetcherImpl::StartFetch(const unique_lock<mutex>& lock) {
   }
 
   fetch_task_.reset(
-      new Task(bind(&ContinuousFetcherImpl::FetchDone, this, _1), base_));
+      new Task(bind(&ContinuousFetcherImpl::FetchDone, this, _1), executor_));
 
   VLOG(1) << "starting fetch with tree size: " << peer_group->TreeSize();
   FetchLogEntries(db_, move(peer_group), fetch_task_.get());
@@ -152,8 +157,10 @@ void ContinuousFetcherImpl::FetchDelayDone(Task* task) {
 
 // static
 unique_ptr<ContinuousFetcher> ContinuousFetcher::New(
-    libevent::Base* base, Database<LoggedCertificate>* db) {
-  return unique_ptr<ContinuousFetcher>(new ContinuousFetcherImpl(base, db));
+    libevent::Base* base, Executor* executor,
+    Database<LoggedCertificate>* db) {
+  return unique_ptr<ContinuousFetcher>(
+      new ContinuousFetcherImpl(base, executor, db));
 }
 
 

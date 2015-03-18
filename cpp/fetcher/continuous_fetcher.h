@@ -11,6 +11,7 @@
 #include "fetcher/peer.h"
 #include "log/database.h"
 #include "log/logged_certificate.h"
+#include "util/executor.h"
 #include "util/libevent_wrapper.h"
 #include "util/task.h"
 
@@ -20,7 +21,8 @@ namespace cert_trans {
 class ContinuousFetcher {
  public:
   static std::unique_ptr<ContinuousFetcher> New(
-      libevent::Base* base, Database<LoggedCertificate>* db);
+      libevent::Base* base, util::Executor* executor,
+      Database<LoggedCertificate>* db);
 
   virtual ~ContinuousFetcher() = default;
 
