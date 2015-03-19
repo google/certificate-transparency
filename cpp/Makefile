@@ -124,6 +124,7 @@ ifneq ($(MAKECMDGOALS),clean)
     include monitor/.depend
     include proto/.depend
     include server/.depend
+    include tools/.depend
     include util/.depend
 endif
 
