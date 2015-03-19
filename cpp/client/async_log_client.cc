@@ -21,8 +21,8 @@ using ct::SignedCertificateTimestamp;
 using ct::SignedTreeHead;
 using std::back_inserter;
 using std::bind;
-using std::copy;
 using std::make_shared;
+using std::move;
 using std::placeholders::_1;
 using std::shared_ptr;
 using std::string;
@@ -163,39 +163,57 @@ void DoneGetEntries(UrlFetcher::Response* resp,
 
   for (int n = 0; n < jentries.Length(); ++n) {
     JsonObject entry(jentries, n);
-    if (!entry.Ok())
+    if (!entry.Ok()) {
       return done(AsyncLogClient::BAD_RESPONSE);
+    }
 
     JsonString leaf_input(entry, "leaf_input");
-    if (!leaf_input.Ok())
+    if (!leaf_input.Ok()) {
       return done(AsyncLogClient::BAD_RESPONSE);
+    }
 
     AsyncLogClient::Entry log_entry;
     if (Deserializer::DeserializeMerkleTreeLeaf(leaf_input.FromBase64(),
                                                 &log_entry.leaf) !=
-        Deserializer::OK)
+        Deserializer::OK) {
       return done(AsyncLogClient::BAD_RESPONSE);
+    }
 
     JsonString extra_data(entry, "extra_data");
-    if (!extra_data.Ok())
+    if (!extra_data.Ok()) {
       return done(AsyncLogClient::BAD_RESPONSE);
+    }
 
-    if (log_entry.leaf.timestamped_entry().entry_type() == ct::X509_ENTRY)
+    // This is an optional non-standard extension, used only by the log
+    // internally when running in clustered mode.
+    JsonString sct_data(entry, "sct");
+    if (sct_data.Ok()) {
+      unique_ptr<SignedCertificateTimestamp> sct(
+          new SignedCertificateTimestamp);
+      if (Deserializer::DeserializeSCT(sct_data.FromBase64(), sct.get()) !=
+          Deserializer::OK) {
+        return done(AsyncLogClient::BAD_RESPONSE);
+      }
+      log_entry.sct.reset(sct.release());
+    }
+
+    if (log_entry.leaf.timestamped_entry().entry_type() == ct::X509_ENTRY) {
       Deserializer::DeserializeX509Chain(extra_data.FromBase64(),
                                          log_entry.entry.mutable_x509_entry());
-    else if (log_entry.leaf.timestamped_entry().entry_type() ==
-             ct::PRECERT_ENTRY)
+    } else if (log_entry.leaf.timestamped_entry().entry_type() ==
+               ct::PRECERT_ENTRY) {
       Deserializer::DeserializePrecertChainEntry(
           extra_data.FromBase64(), log_entry.entry.mutable_precert_entry());
-    else
+    } else {
       LOG(FATAL) << "Don't understand entry type: "
                  << log_entry.leaf.timestamped_entry().entry_type();
+    }
 
-    new_entries.push_back(log_entry);
+    new_entries.emplace_back(move(log_entry));
   }
 
   entries->reserve(entries->size() + new_entries.size());
-  copy(new_entries.begin(), new_entries.end(), back_inserter(*entries));
+  move(new_entries.begin(), new_entries.end(), back_inserter(*entries));
 
   return done(AsyncLogClient::OK);
 }
@@ -275,7 +293,7 @@ void DoneGetSTHConsistency(UrlFetcher::Response* resp, vector<string>* proof,
   }
 
   proof->reserve(proof->size() + entries.size());
-  copy(entries.begin(), entries.end(), back_inserter(*proof));
+  move(entries.begin(), entries.end(), back_inserter(*proof));
 
   return done(AsyncLogClient::OK);
 }
@@ -370,9 +388,25 @@ void AsyncLogClient::GetRoots(vector<shared_ptr<Cert> >* roots,
 }
 
 
-void AsyncLogClient::GetEntries(int first, int last,
-                                vector<AsyncLogClient::Entry>* entries,
+void AsyncLogClient::GetEntries(int first, int last, vector<Entry>* entries,
                                 const Callback& done) {
+  return InternalGetEntries(first, last, entries, false /* request_scts */,
+                            done);
+}
+
+
+void AsyncLogClient::GetEntriesAndSCTs(int first, int last,
+                                       vector<Entry>* entries,
+                                       const Callback& done) {
+  return InternalGetEntries(first, last, entries, true /* request_scts */,
+                            done);
+}
+
+
+void AsyncLogClient::InternalGetEntries(int first, int last,
+                                        vector<Entry>* entries,
+                                        bool request_scts,
+                                        const Callback& done) {
   CHECK_GE(first, 0);
   CHECK_GE(last, 0);
 
@@ -382,7 +416,8 @@ void AsyncLogClient::GetEntries(int first, int last,
   }
 
   URL url(GetURL("get-entries"));
-  url.SetQuery("start=" + to_string(first) + "&end=" + to_string(last));
+  url.SetQuery("start=" + to_string(first) + "&end=" + to_string(last) +
+               (request_scts ? "&include_scts=true" : ""));
 
   UrlFetcher::Response* const resp(new UrlFetcher::Response);
   fetcher_->Fetch(url, resp,

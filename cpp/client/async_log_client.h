@@ -34,6 +34,7 @@ class AsyncLogClient {
   struct Entry {
     ct::MerkleTreeLeaf leaf;
     ct::LogEntry entry;
+    std::unique_ptr<ct::SignedCertificateTimestamp> sct;
   };
 
   typedef std::function<void(Status)> Callback;
@@ -57,6 +58,13 @@ class AsyncLogClient {
   void GetEntries(int first, int last, std::vector<Entry>* entries,
                   const Callback& done);
 
+  // This is NON-standard, and only works with SuperDuper logs.
+  // It's intended for internal use when running in a clustered configuration.
+  // This does not clear "entries" before appending the retrieved
+  // entries.
+  void GetEntriesAndSCTs(int first, int last, std::vector<Entry>* entries,
+                         const Callback& done);
+
   void QueryInclusionProof(const ct::SignedTreeHead& sth,
                            const std::string& merkle_leaf_hash,
                            ct::MerkleAuditProof* proof, const Callback& done);
@@ -76,6 +84,9 @@ class AsyncLogClient {
 
  private:
   URL GetURL(const std::string& subpath) const;
+
+  void InternalGetEntries(int first, int last, std::vector<Entry>* entries,
+                          bool request_scts, const Callback& done);
 
   void InternalAddChain(const CertChain& cert_chain,
                         ct::SignedCertificateTimestamp* sct, bool pre_cert,
