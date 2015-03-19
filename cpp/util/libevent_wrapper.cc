@@ -159,9 +159,9 @@ void Base::Delay(const duration<double>& delay, util::Task* task) {
 
 
 void Base::Dispatch() {
-  SetExitLoopHandler(base_, SIGHUP);
-  SetExitLoopHandler(base_, SIGINT);
-  SetExitLoopHandler(base_, SIGTERM);
+  SetExitLoopHandler(base_.get(), SIGHUP);
+  SetExitLoopHandler(base_.get(), SIGINT);
+  SetExitLoopHandler(base_.get(), SIGTERM);
 
   // There should /never/ be more than 1 thread trying to call Dispatch(), so
   // we should expect to always own the lock here.
