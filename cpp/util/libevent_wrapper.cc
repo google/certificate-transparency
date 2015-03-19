@@ -5,6 +5,7 @@
 #include <event2/thread.h>
 #include <glog/logging.h>
 #include <math.h>
+#include <signal.h>
 
 #include "monitoring/monitoring.h"
 
@@ -46,6 +47,19 @@ void FreeEvDns(evdns_base* dns) {
   if (dns) {
     evdns_base_free(dns, true);
   }
+}
+
+
+static void Handler_ExitLoop(evutil_socket_t sig, short events, void* base) {
+  event_base_loopexit((event_base*)base, NULL);
+}
+
+
+void SetExitLoopHandler(event_base* base, int signum) {
+  struct event* signal_event;
+  signal_event = evsignal_new(base, signum, Handler_ExitLoop, base);
+  CHECK_NOTNULL(signal_event);
+  CHECK_GE(event_add(signal_event, NULL), 0);
 }
 
 
@@ -145,6 +159,10 @@ void Base::Delay(const duration<double>& delay, util::Task* task) {
 
 
 void Base::Dispatch() {
+  SetExitLoopHandler(base_, SIGHUP);
+  SetExitLoopHandler(base_, SIGINT);
+  SetExitLoopHandler(base_, SIGTERM);
+
   // There should /never/ be more than 1 thread trying to call Dispatch(), so
   // we should expect to always own the lock here.
   CHECK(dispatch_lock_.try_lock());

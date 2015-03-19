@@ -173,6 +173,7 @@ ifneq ($(MAKECMDGOALS),clean)
     include net/.depend
     include proto/.depend
     include server/.depend
+    include tools/.depend
     include util/.depend
 endif
 

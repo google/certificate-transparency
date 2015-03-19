@@ -11,6 +11,7 @@
 #include <mutex>
 #include <openssl/crypto.h>
 #include <openssl/err.h>
+#include <signal.h>
 #include <string>
 #include <unistd.h>
 
@@ -316,6 +317,11 @@ void threadid_function(CRYPTO_THREADID* id) {
 
 
 int main(int argc, char* argv[]) {
+  // Ignore various signals whilst we start up.
+  signal(SIGHUP, SIG_IGN);
+  signal(SIGINT, SIG_IGN);
+  signal(SIGTERM, SIG_IGN);
+
   google::ParseCommandLineFlags(&argc, &argv, true);
   google::InitGoogleLogging(argv[0]);
   google::InstallFailureSignalHandler();
