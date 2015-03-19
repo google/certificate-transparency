@@ -17,20 +17,23 @@ function WaitForEtcd() {
 }
 
 function PopulateEtcd() {
+  export ETCD_POD=$(${KUBECTL} get pods -l name=etcd-node --output=yaml |
+      awk -- '/host: k8s-/  { split($2, a, "."); print a[1]; exit; }')
+  echo "Using etcd pod: ${ETCD_POD}"
   export ETCD=$(${KUBECTL} get services | \
       grep etcd-service | awk '{print $4":"$5}')
   export ETCD_HOST=${ETCD%%:*}
   export ETCD_PORT=${ETCD##*:}
   export PUT="curl -s -L -X PUT"
-  gcloud compute ssh k8s-${CLUSTER}-node-1 --command "\
+  gcloud compute ssh ${ETCD_POD} --command "\
     ${PUT} ${ETCD}/v2/keys/root/serving_sth && \
     ${PUT} ${ETCD}/v2/keys/root/cluster_config && \
     ${PUT} ${ETCD}/v2/keys/root/sequence_mapping && \
     ${PUT} ${ETCD}/v2/keys/root/entries/ -d dir=true && \
     ${PUT} ${ETCD}/v2/keys/root/nodes/ -d dir=true"
   gcloud compute copy-files ${DIR}/../../cpp/tools/ct-clustertool \
-    k8s-${CLUSTER}-node-1:.
-  gcloud compute ssh k8s-${CLUSTER}-node-1 --command "\
+    ${ETCD_POD}:.
+  gcloud compute ssh ${ETCD_POD} --command "\
     sudo docker run localhost:5000/alcutter/super_duper:test \
       /usr/local/bin/ct-clustertool initlog \
       --key=/usr/local/etc/ct-server-key.pem \
