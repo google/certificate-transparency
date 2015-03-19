@@ -1,5 +1,7 @@
 package new_merkletree
 
+import "hash"
+
 type Hash []byte
 
 // NewMerkleTreeInterface is the set of methods which are required to
@@ -30,7 +32,7 @@ type NewMerkleTreeDataInterface interface {
 	// the tree, and returns the contents of the leaf.  For a given
 	// |index| in a given tree, the value returned **MUST NOT** ever
 	// change, or the whole point of a merkle tree is defeated.
-	EntryAt(index uint64) []byte
+	EntryAt(index uint64) ([]byte, error)
 
 	// Size returns the number of entries currently in the tree.  The
 	// value returned by this function must never decrease between
@@ -52,16 +54,8 @@ type NewMerkleTree struct {
 	// functions three.
 	NewMerkleTreeInterface
 
-	dao   *NewMerkleTreeDataInterface
-	cache *NewMerkleTreeCacheInterface
+	dao   NewMerkleTreeDataInterface
+	cache NewMerkleTreeCacheInterface
 
-	hasher func([]byte) []byte
-}
-
-// New creates a new merkle hash tree.  The number of "leaves" of the tree,
-// as well as their contents, are retrieved through |dao|.  If you wish to
-// have acceptable performance on non-trivial tree sizes, you'll want to
-// provide |cache| (otherwise, pass `nil`).  The hash function used for all
-// nodes in the tree is specified by |hasher|.
-func New(dao *NewMerkleTreeDataInterface, cache *NewMerkleTreeCacheInterface, hasher func([]byte) []byte) *NewMerkleTree {
+	hasher hash.Hash
 }
