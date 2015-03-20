@@ -185,6 +185,16 @@ int64_t GetIntParam(const multimap<string, string>& query,
 }
 
 
+bool GetBoolParam(const multimap<string, string>& query, const string& param) {
+  string value;
+  if (GetParam(query, param, &value)) {
+    return (value == "true");
+  } else {
+    return false;
+  }
+}
+
+
 }  // namespace
 
 
@@ -295,7 +305,12 @@ void HttpHandler::GetEntries(evhttp_request* req) const {
   // Limit the number of entries returned in a single request.
   end = std::min(end, start + FLAGS_max_leaf_entries_per_response);
 
-  BlockingGetEntries(req, start, end);
+  // Sekrit parameter to indicate that SCTs should be included too.
+  // This is non-standard, and is only used internally by other log nodes when
+  // "following" nodes with more data.
+  const bool include_scts(GetBoolParam(query, "include_scts"));
+
+  BlockingGetEntries(req, start, end, include_scts);
 }
 
 
@@ -444,7 +459,7 @@ void HttpHandler::AddPreChain(evhttp_request* req) {
 
 
 void HttpHandler::BlockingGetEntries(evhttp_request* req, int64_t start,
-                                     int64_t end) const {
+                                     int64_t end, bool include_scts) const {
   JsonArray json_entries;
   for (int64_t i = start; i <= end; ++i) {
     LoggedCertificate cert;
@@ -456,14 +471,23 @@ void HttpHandler::BlockingGetEntries(evhttp_request* req, int64_t start,
 
     string leaf_input;
     string extra_data;
+    string sct_data;
     if (!cert.SerializeForLeaf(&leaf_input) ||
-        !cert.SerializeExtraData(&extra_data)) {
+        !cert.SerializeExtraData(&extra_data) ||
+        (include_scts &&
+         Serializer::SerializeSCT(cert.sct(), &sct_data) != Serializer::OK)) {
       return output_->SendError(req, HTTP_INTERNAL, "Serialization failed.");
     }
 
     JsonObject json_entry;
     json_entry.AddBase64("leaf_input", leaf_input);
     json_entry.AddBase64("extra_data", extra_data);
+
+    if (include_scts) {
+      // This is non-standard, and currently only used by other SuperDuper log
+      // nodes when "following" to fetch data from each other:
+      json_entry.AddBase64("sct", sct_data);
+    }
 
     json_entries.Add(&json_entry);
   }

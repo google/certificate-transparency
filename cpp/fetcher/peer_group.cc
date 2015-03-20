@@ -76,8 +76,9 @@ void PeerGroup::FetchEntries(int64_t start_index, int64_t end_index,
   }
 
   // TODO(pphaneuf): Handle the case where we have no peer more cleanly.
-  peer->client().GetEntries(start_index, end_index, CHECK_NOTNULL(entries),
-                            bind(GetEntriesDone, _1, entries, task));
+  peer->client().GetEntriesAndSCTs(start_index, end_index,
+                                   CHECK_NOTNULL(entries),
+                                   bind(GetEntriesDone, _1, entries, task));
 }
 
 

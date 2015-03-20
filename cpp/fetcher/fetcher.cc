@@ -217,6 +217,9 @@ void FetchState::WriteToDatabase(int64_t index, Range* range,
       LOG(WARNING) << "could not convert entry to a LoggedCertificate";
       break;
     }
+    if (entry.sct) {
+      *cert.mutable_sct() = *entry.sct;
+    }
     cert.set_sequence_number(index++);
     if (db_->CreateSequencedEntry(cert) == Database<LoggedCertificate>::OK) {
       ++processed;
