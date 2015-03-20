@@ -173,13 +173,6 @@ void GetRequestDone(const string& keyname, EtcdClient::GetResponse* resp,
     return;
   }
 
-  if (node.ValueOrDie().deleted_) {
-    parent_task->Return(
-        Status(util::error::FAILED_PRECONDITION,
-               "GET request received a deleted node from etcd"));
-    return;
-  }
-
   resp->etcd_index = gen_resp->etcd_index;
   resp->node = node.ValueOrDie();
   parent_task->Return();
@@ -724,6 +717,15 @@ void EtcdClient::Get(const Request& req, GetResponse* resp, Task* task) {
   map<string, string> params;
   if (req.recursive) {
     params["recursive"] = "true";
+  }
+  if (req.wait_index > 0) {
+    params["wait"] = "true";
+    params["waitIndex"] = to_string(req.wait_index);
+    // TODO(pphaneuf): This is a hack, as "wait" is not incompatible
+    // with "quorum=true". It should be left to the caller, though
+    // (and I'm not sure defaulting to "quorum=true" is that good an
+    // idea, even).
+    params["quorum"] = "false";
   }
   GenericResponse* const gen_resp(new GenericResponse);
   task->DeleteWhenDone(gen_resp);

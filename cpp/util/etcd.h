@@ -47,11 +47,13 @@ class EtcdClient {
   };
 
   struct Request {
-    Request(const std::string& thekey) : key(thekey), recursive(false) {
+    Request(const std::string& thekey)
+        : key(thekey), recursive(false), wait_index(0) {
     }
 
     std::string key;
     bool recursive;
+    int64_t wait_index;
   };
 
   struct Response {
