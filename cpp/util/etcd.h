@@ -143,7 +143,7 @@ class EtcdClient {
                            util::Task* task);
   void SendWatchUpdates(WatchState* state, const std::vector<Node>& updates);
   void StartWatchRequest(WatchState* state);
-  void WatchRequestDone(WatchState* state, GenericResponse* gen_resp,
+  void WatchRequestDone(WatchState* state, GetResponse* gen_resp,
                         util::Task* child_task);
 
   const std::shared_ptr<libevent::Base> event_base_;

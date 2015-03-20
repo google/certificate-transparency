@@ -462,12 +462,12 @@ void EtcdClient::WatchInitialGetDone(WatchState* state, GetResponse* resp,
 }
 
 
-void EtcdClient::WatchRequestDone(WatchState* state, GenericResponse* gen_resp,
+void EtcdClient::WatchRequestDone(WatchState* state, GetResponse* get_resp,
                                   Task* child_task) {
   // We clean up this way instead of using util::Task::DeleteWhenDone,
   // because our task is long-lived, and we do not want to accumulate
   // these objects.
-  unique_ptr<GenericResponse> gen_resp_deleter(gen_resp);
+  unique_ptr<GetResponse> get_resp_deleter(get_resp);
 
   if (state->task_->CancelRequested()) {
     state->task_->Return(Status::CANCELLED);
@@ -478,13 +478,13 @@ void EtcdClient::WatchRequestDone(WatchState* state, GenericResponse* gen_resp,
   // watch logic (or start the watch logic the first time).
   if (!child_task ||
       (child_task->status().CanonicalCode() == util::error::ABORTED &&
-       gen_resp->etcd_index >= 0)) {
+       get_resp->etcd_index >= 0)) {
     // On the first time here, we don't actually have a gen_resp, we
     // just want to start the watch logic.
-    if (gen_resp) {
-      VLOG(1) << "etcd index: " << gen_resp->etcd_index;
+    if (get_resp) {
+      VLOG(1) << "etcd index: " << get_resp->etcd_index;
       state->highest_index_seen_ =
-          max(state->highest_index_seen_, gen_resp->etcd_index);
+          max(state->highest_index_seen_, get_resp->etcd_index);
     }
 
     GetResponse* const resp(new GetResponse);
@@ -506,31 +506,16 @@ void EtcdClient::WatchRequestDone(WatchState* state, GenericResponse* gen_resp,
       goto fail;
     }
 
-    // TODO(pphaneuf): None of this should ever happen, so I'm not
-    // sure what's the best way to handle it? CHECK-fail? Retry? With
-    // a delay? Retrying for now...
-    const JsonObject json_node(*gen_resp->json_body, "node");
-    if (!json_node.Ok()) {
-      LOG(INFO) << "Invalid JSON: Couldn't find 'node'";
-      goto fail;
-    }
-
     vector<Node> updates;
-    StatusOr<Node> node(ParseNodeFromJson(json_node));
-    if (!node.ok()) {
-      LOG(INFO) << "parsing node failed: " << node.status();
-      goto fail;
-    }
     state->highest_index_seen_ =
-        max(state->highest_index_seen_, node.ValueOrDie().modified_index_);
-    updates.emplace_back(node.ValueOrDie());
+        max(state->highest_index_seen_, get_resp->node.modified_index_);
+    updates.emplace_back(get_resp->node);
 
-    if (!node.ValueOrDie().deleted_) {
-      state->known_keys_[node.ValueOrDie().key_] =
-          node.ValueOrDie().modified_index_;
+    if (!get_resp->node.deleted_) {
+      state->known_keys_[get_resp->node.key_] = get_resp->node.modified_index_;
     } else {
-      LOG(INFO) << "erased key: " << node.ValueOrDie().key_;
-      state->known_keys_.erase(node.ValueOrDie().key_);
+      LOG(INFO) << "erased key: " << get_resp->node.key_;
+      state->known_keys_.erase(get_resp->node.key_);
     }
 
     return state->task_->executor()->Add(
@@ -564,16 +549,13 @@ void EtcdClient::StartWatchRequest(WatchState* state) {
     return;
   }
 
-  map<string, string> params;
-  params["wait"] = "true";
-  params["quorum"] = "false";
-  params["waitIndex"] = to_string(state->highest_index_seen_ + 1);
-  params["recursive"] = "true";
+  Request req(state->key_);
+  req.recursive = true;
+  req.wait_index = state->highest_index_seen_ + 1;
 
-  GenericResponse* const gen_resp(new GenericResponse);
-  Generic(state->key_, params, UrlFetcher::Verb::GET, gen_resp,
-          state->task_->AddChild(
-              bind(&EtcdClient::WatchRequestDone, this, state, gen_resp, _1)));
+  GetResponse* const get_resp(new GetResponse);
+  Get(req, get_resp, state->task_->AddChild(bind(&EtcdClient::WatchRequestDone,
+                                                 this, state, get_resp, _1)));
 }
 
 
