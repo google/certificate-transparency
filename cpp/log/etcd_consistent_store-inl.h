@@ -2,6 +2,8 @@
 #define CERT_TRANS_LOG_ETCD_CONSISTENT_STORE_INL_H_
 
 #include <glog/logging.h>
+#include <vector>
+#include <unordered_map>
 
 #include "base/notification.h"
 #include "log/etcd_consistent_store.h"
@@ -648,6 +650,19 @@ util::Status EtcdConsistentStore<Logged>::CleanupOldEntries() {
     return status;
   }
 
+  std::vector<EntryHandle<LoggedCertificate>> pending_entries;
+  status = GetPendingEntries(&pending_entries);
+  if (!status.ok()) {
+    LOG(WARNING) << "Failed to get pending entries for cleanup: " << status;
+    return status;
+  }
+  std::unordered_map<std::string, EntryHandle<LoggedCertificate>*>
+      pending_by_hash;
+  for (auto it(pending_entries.begin()); it != pending_entries.end(); ++it) {
+    CHECK(pending_by_hash.insert(std::make_pair(it->Entry().Hash(), &(*it)))
+              .second);
+  }
+
   int mapping_index;
   // On exiting this loop mapping_index will contain the number of entries we
   // want to delete from the start of sequence_mappping.mapping.
@@ -660,30 +675,23 @@ util::Status EtcdConsistentStore<Logged>::CleanupOldEntries() {
         sequence_mapping.Entry().mapping(mapping_index).sequence_number());
 
     // First we delete the corresponding entry from /entries
-    EntryHandle<LoggedCertificate> entry;
     const std::string hash(
         sequence_mapping.Entry().mapping(mapping_index).entry_hash());
-    status = GetPendingEntryForHash(hash, &entry);
+    auto it(pending_by_hash.find(hash));
+    if (it == pending_by_hash.end()) {
+      // Log a warning here, but don't bail on the clean up as we could just
+      // be recovering from a crash halfway through a previous clean up.
+      LOG(WARNING) << "Cleanup couldn't get entry (" << util::ToBase64(hash)
+                   << ") corresponding to sequenced entry #" << sequence_number
+                   << " : " << status;
+      continue;
+    }
+    status = DeleteEntry(it->second);
     if (!status.ok()) {
-      if (status.CanonicalCode() == util::error::NOT_FOUND) {
-        // Log a warning here, but don't bail on the clean up as we could just
-        // be recovering from a crash halfway through a previous clean up.
-        LOG(WARNING) << "Cleanup couldn't get entry (" << util::ToBase64(hash)
-                     << ") corresponding to sequenced entry #"
-                     << sequence_number << " : " << status;
-      } else {
-        // Looks like it's more serious, so we'll bail.
-        return status;
-      }
-    } else {
-      status = DeleteEntry(&entry);
-      if (!status.ok()) {
-        LOG(WARNING) << "Cleanup couldn't delete entry ("
-                     << util::ToBase64(hash)
-                     << ") corresponding to sequenced entry #"
-                     << sequence_number << " : " << status;
-        return status;
-      }
+      LOG(WARNING) << "Cleanup couldn't delete entry (" << util::ToBase64(hash)
+                   << ") corresponding to sequenced entry #" << sequence_number
+                   << " : " << status;
+      return status;
     }
     VLOG(1) << "Cleanup deleted entry (" << util::ToBase64(hash)
             << ") corresponding to sequence number " << sequence_number;
