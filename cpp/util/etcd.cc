@@ -514,7 +514,7 @@ void EtcdClient::WatchRequestDone(WatchState* state, GetResponse* get_resp,
     if (!get_resp->node.deleted_) {
       state->known_keys_[get_resp->node.key_] = get_resp->node.modified_index_;
     } else {
-      LOG(INFO) << "erased key: " << get_resp->node.key_;
+      VLOG(1) << "erased key: " << get_resp->node.key_;
       state->known_keys_.erase(get_resp->node.key_);
     }
 
