@@ -22,6 +22,7 @@
 #include "util/fake_etcd.h"
 #include "util/mock_masterelection.h"
 #include "util/testing.h"
+#include "util/thread_pool.h"
 #include "util/util.h"
 
 DEFINE_string(test_certs_dir, "../test/testdata", "Path to test certificates");

@@ -14,6 +14,7 @@
 #include "util/libevent_wrapper.h"
 #include "util/mock_masterelection.h"
 #include "util/testing.h"
+#include "util/thread_pool.h"
 #include "util/util.h"
 
 using ct::ClusterConfig;

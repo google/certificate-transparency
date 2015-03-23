@@ -20,6 +20,7 @@
 #include "util/mock_masterelection.h"
 #include "util/sync_task.h"
 #include "util/testing.h"
+#include "util/thread_pool.h"
 #include "util/util.h"
 
 namespace {

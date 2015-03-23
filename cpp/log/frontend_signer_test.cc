@@ -18,8 +18,9 @@
 #include "util/fake_etcd.h"
 #include "util/libevent_wrapper.h"
 #include "util/mock_masterelection.h"
-#include "util/testing.h"
 #include "util/status.h"
+#include "util/testing.h"
+#include "util/thread_pool.h"
 #include "util/util.h"
 
 namespace {

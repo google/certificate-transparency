@@ -16,6 +16,7 @@
 #include "util/libevent_wrapper.h"
 #include "util/mock_masterelection.h"
 #include "util/testing.h"
+#include "util/thread_pool.h"
 #include "util/util.h"
 
 DECLARE_int32(node_state_ttl_seconds);

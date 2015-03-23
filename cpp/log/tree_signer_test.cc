@@ -11,14 +11,15 @@
 #include "log/sqlite_db.h"
 #include "log/test_db.h"
 #include "log/test_signer.h"
-#include "log/tree_signer.h"
 #include "log/tree_signer-inl.h"
+#include "log/tree_signer.h"
 #include "merkletree/merkle_verifier.h"
 #include "proto/ct.pb.h"
 #include "util/fake_etcd.h"
 #include "util/mock_masterelection.h"
 #include "util/sync_task.h"
 #include "util/testing.h"
+#include "util/thread_pool.h"
 #include "util/util.h"
 
 namespace cert_trans {

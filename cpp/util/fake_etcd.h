@@ -8,7 +8,6 @@
 
 #include "util/etcd.h"
 #include "util/task.h"
-#include "util/thread_pool.h"
 
 
 namespace cert_trans {

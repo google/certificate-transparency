@@ -14,6 +14,7 @@
 #include "util/libevent_wrapper.h"
 #include "util/sync_task.h"
 #include "util/testing.h"
+#include "util/thread_pool.h"
 
 namespace cert_trans {
 
