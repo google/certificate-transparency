@@ -285,8 +285,7 @@ void RefreshNodeState(ClusterStateController<LoggedCertificate>* controller) {
 
 void WatchdogTimeout(int sig) {
   if (FLAGS_watchdog_timeout_is_fatal) {
-    LOG(INFO) << "Watchdog timed out, killing process.";
-    exit(-2);
+    LOG(FATAL) << "Watchdog timed out, killing process.";
   } else {
     LOG(INFO) << "Watchdog timeout out, ignoring.";
   }
