@@ -28,10 +28,12 @@ CMD cd /mnt/ctlog/ && \
     if [ ! -d logs ]; then mkdir logs; fi && \
     MY_IP=$(awk "/${HOSTNAME}/ {print \$1}" < /etc/hosts) && \
     echo "My IP: ${MY_IP}" && \
-    echo "Etcd: ${ETCD_SERVICE_SERVICE_HOST}:${ETCD_SERVICE_SERVICE_PORT}" && \
+    echo "Container: ${CONTAINER_HOST}" && \
+    echo "Etcd: ${ETCD_HOST}:${ETCD_PORT}" && \
+    ulimit -c unlimited && \
     /usr/local/bin/ct-server \
-        --port=6962 \
-        --server=${MY_IP} \
+        --port=80 \
+        --server=${CONTAINER_HOST} \
         --key=/usr/local/etc/ct-server-key.pem \
         --trusted_cert_file=/usr/local/etc/ctlog_ca_roots.pem \
         --stderrthreshold=0 \
@@ -39,7 +41,7 @@ CMD cd /mnt/ctlog/ && \
         --tree_signing_frequency_seconds=30 \
         --guard_window_seconds=10 \
         --sqlite_db=/mnt/ctlog/sqlite.db \
-        --etcd_host=${ETCD_SERVICE_SERVICE_HOST} \
-        --etcd_port=${ETCD_SERVICE_SERVICE_PORT} \
+        --etcd_host=${ETCD_HOST} \
+        --etcd_port=${ETCD_PORT} \
         --v=1
-EXPOSE 6962
+EXPOSE 80

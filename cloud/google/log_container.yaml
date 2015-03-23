@@ -1,0 +1,33 @@
+version: v1beta2
+containers:
+  - name: registry
+    image: google/docker-registry
+    ports:
+      - name: registry
+        containerPort: 5000
+        hostPort: 5000
+    env:
+      - name: GCS_BUCKET
+        value: ctlog_images
+  - name: super-duper
+    image: localhost:5000/certificate_transparency/super_duper:test
+    ports:
+      - name: super-duper
+        containerPort: 80
+        hostPort: 80
+    env:
+      - name: ETCD_HOST
+        value: @@ETCD_HOST@@
+      - name: ETCD_PORT
+        value: @@ETCD_PORT@@
+      - name: CONTAINER_HOST
+        value: @@CONTAINER_HOST@@
+    volumeMounts:
+      - name: log-data
+        mountPath: /mnt/ctlog
+volumes:
+  - name: log-data
+    source:
+      hostDir:
+        path: /data/ctlog
+

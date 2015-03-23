@@ -1,8 +1,25 @@
 #!/bin/bash
-set -e
 DIR=$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )
-KUBECTL="gcloud preview container kubectl"
-REPLICATION="prometheus-replication"
+source ${DIR}/util.sh
+source ${DIR}/config.sh
 
-${KUBECTL} stop rc ${REPLICATION}
-${KUBECTL} delete service prometheus-service
+GCLOUD="gcloud"
+
+Header "Deleting prometheus instances..."
+for i in ${PROMETHEUS_MACHINES[@]}; do
+  echo "Deleting instance ${i}..."
+  set +e
+  ${GCLOUD} compute instances delete -q --delete-disks all ${i} &
+  set -e
+done
+wait
+
+for i in ${PROMETHEUS_DISKS[@]}; do
+  echo "Deleting disk ${i}..."
+  set +e
+  ${GCLOUD} compute disks delete -q ${i} > /dev/null &
+  set -e
+done
+wait
+
+

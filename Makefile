@@ -9,8 +9,8 @@ all: cpp java python
 	python python_test
 
 docker: cpp 
-	sudo docker build -t certificate_transparency/super_duper:test .
-	cd cloud/etcd && sudo docker build -t certificate_transparency/etcd:test .
+	sudo docker build -t localhost:5000/certificate_transparency/super_duper:test .
+	cd cloud/etcd && sudo docker build -t localhost:5000/certificate_transparency/etcd:test .
 
 java:
 	ant build

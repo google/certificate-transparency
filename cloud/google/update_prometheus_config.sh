@@ -1,44 +1,31 @@
 #!/bin/bash
 DIR=$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )
+source ${DIR}/config.sh
 source ${DIR}/util.sh
 
 set -e
-DIR=$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )
-CLOUD="gcloud"
-KUBECTL="gcloud preview container kubectl"
-TMP_CONFIG="/tmp/prometheus.conf"
-PROMETHEUS_VM_HOST=$(${KUBECTL} get pods -l name=prometheus-node | awk -- '
-  /prometheus-replication/ { split($5, a, "."); print a[1]}')
+GCLOUD="gcloud"
 
-echo "Prometheus running on ${PROMETHEUS_VM_HOST}"
+LOG_HOSTS=$(for i in ${LOG_MACHINES[@]};
+  do echo -n "target: \"http://${i}:80/metrics\"\n"; done)
 
-LOG_HOSTS=$(${KUBECTL} get pods -l name=log-node | awk -- '
-  BEGIN {
-    ORS="\\n"
-  }
-  /superduper-replication/ {
-    print "target: \"http://" $2 ":6962/metrics\""
-  }
-')
+export TMP_CONFIG=/tmp/prometheus.conf
+sed -- "s%@@TARGETS@@%${LOG_HOSTS}%g" < ${DIR}/../prometheus/prometheus.conf > ${TMP_CONFIG}
 
 
-sed -- "s^@@TARGETS@@^${LOG_HOSTS}^g" < ${DIR}/../prometheus/prometheus.conf > ${TMP_CONFIG}
-
-WaitForPod "prometheus-node"
-
-${CLOUD} compute copy-files \
-  ${TMP_CONFIG} ${PROMETHEUS_VM_HOST}:.
-${CLOUD} compute ssh ${PROMETHEUS_VM_HOST} --command "
-  ls -l /tmp &&
-  ls -l /tmp/prometheus-config &&
-  sudo mv prometheus.conf /tmp/prometheus-config/prometheus.conf &&
-  sudo chmod 644 /tmp/prometheus-config/prometheus.conf"
-${CLOUD} compute ssh ${PROMETHEUS_VM_HOST} --command '
-  CONTAINER=$(sudo docker ps | grep k8s_prometheus | awk -- "{print \$1}" )
-  if [ "${CONTAINER}" != "" ]; then
-    echo "Restarting prometheus container ${CONTAINER}..."
-    sudo docker restart ${CONTAINER}
-  else
-    echo "Prometheus container not yet running."
-  fi'
-
+for i in ${PROMETHEUS_MACHINES[@]}; do
+  ${GCLOUD} compute copy-files \
+    ${TMP_CONFIG} ${i}:.
+  ${GCLOUD} compute ssh ${i} --command "
+    sudo mkdir -p /data/prometheus/config &&
+    sudo mv prometheus.conf /data/prometheus/config/prometheus.conf &&
+    sudo chmod 644 /data/prometheus/config/prometheus.conf"
+  ${GCLOUD} compute ssh ${i} --command '
+    CONTAINER=$(sudo docker ps | grep prometheus | awk -- "{print \$1}" )
+    if [ "${CONTAINER}" != "" ]; then
+      echo "Restarting prometheus container ${CONTAINER}..."
+      sudo docker restart ${CONTAINER}
+    else
+      echo "Prometheus container not yet running."
+    fi'
+done
