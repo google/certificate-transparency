@@ -19,6 +19,8 @@
 #include "log/frontend.h"
 #include "log/log_lookup.h"
 #include "log/logged_certificate.h"
+#include "monitoring/monitoring.h"
+#include "monitoring/latency.h"
 #include "server/json_output.h"
 #include "server/proxy.h"
 #include "util/json_wrapper.h"
@@ -29,14 +31,18 @@ namespace libevent = cert_trans::libevent;
 using cert_trans::Cert;
 using cert_trans::CertChain;
 using cert_trans::CertChecker;
+using cert_trans::Counter;
 using cert_trans::HttpHandler;
 using cert_trans::JsonOutput;
+using cert_trans::Latency;
 using cert_trans::LoggedCertificate;
 using cert_trans::Proxy;
+using cert_trans::ScopedLatency;
 using ct::ShortMerkleAuditProof;
 using ct::SignedCertificateTimestamp;
 using ct::SignedTreeHead;
 using std::bind;
+using std::chrono::milliseconds;
 using std::function;
 using std::make_pair;
 using std::make_shared;
@@ -53,6 +59,20 @@ DEFINE_int32(max_leaf_entries_per_response, 1000,
              "to put in the response of a get-entries request.");
 
 namespace {
+
+
+static Counter<string>* total_http_server_requests(
+    Counter<string>::New("total_http_server_requests", "path",
+                         "Total number of HTTP requests received for a given "
+                         "path."));
+static Counter<string, int>* total_http_server_response_codes(
+    Counter<string, int>::New("total_http_server_response_codes", "path",
+                              "response_code",
+                              "Total number of responses sent with a given "
+                              "HTTP response code for a given path."));
+static Latency<milliseconds, string> http_server_request_latency_ms(
+    "total_http_server_request_latency_ms", "path",
+    "Total request latency in ms broken down by path");
 
 
 bool ExtractChain(JsonOutput* output, evhttp_request* req, CertChain* chain) {
@@ -216,6 +236,19 @@ HttpHandler::HttpHandler(
 }
 
 
+void StatsHandlerInterceptor(const string& path,
+                             const libevent::HttpServer::HandlerCallback& cb,
+                             evhttp_request* req) {
+  ScopedLatency total_http_server_request_latency(
+      http_server_request_latency_ms.ScopedLatency(path));
+
+  cb(req);
+
+  total_http_server_requests->Increment(path);
+  total_http_server_response_codes->Increment(path, req->response_code);
+}
+
+
 void HttpHandler::ProxyInterceptor(
     const libevent::HttpServer::HandlerCallback& local_handler,
     evhttp_request* request) {
@@ -237,10 +270,12 @@ void HttpHandler::ProxyInterceptor(
 
 
 void HttpHandler::AddProxyWrappedHandler(
-    libevent::HttpServer* server, const std::string& path,
+    libevent::HttpServer* server, const string& path,
     const libevent::HttpServer::HandlerCallback& local_handler) {
+  const libevent::HttpServer::HandlerCallback stats_handler(
+      bind(&StatsHandlerInterceptor, path, local_handler, _1));
   CHECK(server->AddHandler(path, bind(&HttpHandler::ProxyInterceptor, this,
-                                      local_handler, _1)));
+                                      stats_handler, _1)));
 }
 
 

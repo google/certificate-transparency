@@ -314,16 +314,19 @@ log/ct_extensions_test: log/ct_extensions_test.o log/libcert.a util/libutil.a \
 log/database_large_test: log/database_large_test.o log/libdatabase.a \
                          log/log_signer.o log/signer.o log/verifier.o \
                          log/test_signer.o merkletree/libmerkletree.a \
-                         proto/libproto.a util/libutil.a $(GTESTLIB)
+                         monitoring/libmonitoring.a proto/libproto.a \
+                         util/libutil.a $(GTESTLIB)
 
 log/database_test: log/database_test.o log/libdatabase.a \
                    log/log_signer.o log/signer.o log/verifier.o \
                    log/test_signer.o merkletree/libmerkletree.a \
-                   proto/libproto.a util/libutil.a $(GTESTLIB)
+                   monitoring/libmonitoring.a proto/libproto.a util/libutil.a \
+                   $(GTESTLIB)
 
 log/file_storage_test: log/file_storage_test.o log/libdatabase.a \
                        proto/libproto.a util/libutil.a \
-                       merkletree/libmerkletree.a $(GTESTLIB)
+                       monitoring/libmonitoring.a merkletree/libmerkletree.a \
+                       $(GTESTLIB)
 
 log/frontend_signer_test: log/frontend_signer_test.o log/frontend_signer.o \
                           log/log_signer.o log/signer.o log/verifier.o \
