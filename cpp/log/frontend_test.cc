@@ -20,6 +20,7 @@
 #include "merkletree/serial_hasher.h"
 #include "proto/ct.pb.h"
 #include "util/fake_etcd.h"
+#include "util/libevent_wrapper.h"
 #include "util/mock_masterelection.h"
 #include "util/testing.h"
 #include "util/thread_pool.h"

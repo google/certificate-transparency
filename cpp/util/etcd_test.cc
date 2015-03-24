@@ -7,6 +7,7 @@
 
 #include "net/mock_url_fetcher.h"
 #include "util/json_wrapper.h"
+#include "util/libevent_wrapper.h"
 #include "util/sync_task.h"
 #include "util/testing.h"
 
