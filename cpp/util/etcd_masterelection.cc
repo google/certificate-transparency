@@ -4,6 +4,7 @@
 #include <glog/logging.h>
 
 #include "util/etcd.h"
+#include "util/libevent_wrapper.h"
 #include "util/masterelection.h"
 
 namespace libevent = cert_trans::libevent;
@@ -20,28 +21,12 @@ DEFINE_string(proposal_dir, "/master", "path to watch");
 DEFINE_string(node_id, "", "unique node id.");
 
 
-std::atomic<bool> running_;
-
-
-void EventPump(const shared_ptr<libevent::Base>& event_base) {
-  while (true) {
-    {
-      if (!running_.load()) {
-        return;
-      }
-    }
-    event_base->DispatchOnce();
-  }
-}
-
-
 int main(int argc, char* argv[]) {
   google::ParseCommandLineFlags(&argc, &argv, true);
   google::InitGoogleLogging(argv[0]);
   evthread_use_pthreads();
   CHECK(!FLAGS_node_id.empty()) << "Must set --node_id";
 
-  running_.store(true);
   const shared_ptr<libevent::Base> event_base(make_shared<libevent::Base>());
   UrlFetcher fetcher(event_base.get());
 
@@ -50,7 +35,7 @@ int main(int argc, char* argv[]) {
                           FLAGS_node_id);
   election.StartElection();
 
-  std::thread pump(EventPump, event_base);
+  libevent::EventPumpThread pump(event_base);
 
   LOG(INFO) << "Waiting to become master...";
   election.WaitToBecomeMaster();
@@ -61,9 +46,6 @@ int main(int argc, char* argv[]) {
   LOG(INFO) << "Giving it all up and going fishing instead...";
   election.StopElection();
   LOG(INFO) << "Gone fishin'.";
-
-  running_.store(false);
-  pump.join();
 
   return 0;
 }
