@@ -28,7 +28,7 @@ for i in `seq ${LOG_NUM_REPLICAS}`; do
 
   sed --e "s^@@ETCD_HOST@@^${ETCD_MACHINES[1]}^
            s^@@ETCD_PORT@@^4001^
-           s^@@CONTAINER_HOST@@^${LOG_MACHINES[1]}^" \
+           s^@@CONTAINER_HOST@@^${LOG_MACHINES[$i]}^" \
           < ${DIR}/log_container.yaml  > ${MANIFEST}.${i}
 
   ${GCLOUD} compute instances create -q ${LOG_MACHINES[${i}]} \
