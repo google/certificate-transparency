@@ -14,11 +14,12 @@ WORKDIR /opt/etcd
 VOLUME ["/opt/etcd/data"]
 CMD MY_IP=$(awk "/${HOSTNAME}/ {print \$1}" < /etc/hosts) && \
     echo "My IP: ${MY_IP}" && \
+    echo "Container host: ${CONTAINER_HOST}" && \
     echo "My Discovery: ${DISCOVERY}" && \
     /opt/etcd/bin/etcd --discovery="${DISCOVERY}" \
-          --name=${HOSTNAME} \
-          --addr=${MY_IP}:4001 \
-          --peer-addr=${MY_IP}:7001 \
+          --name=${ETCD_NAME} \
+          --addr=${CONTAINER_HOST}:4001 \
+          --peer-addr=${CONTAINER_HOST}:7001 \
           --data-dir=/opt/etcd/data \
           --peer-heartbeat-interval=400 \
           --peer-election-timeout=6000 \

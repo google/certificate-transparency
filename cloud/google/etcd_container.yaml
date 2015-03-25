@@ -1,0 +1,38 @@
+version: v1beta2
+containers:
+  - name: registry
+    image: google/docker-registry
+    ports:
+      - name: registry
+        containerPort: 5000
+        hostPort: 5000
+    env:
+      - name: GCS_BUCKET
+        value: ctlog_images
+  - name: etcd
+    image: localhost:5000/certificate_transparency/etcd:test
+    ports:
+      - name: etcd-client
+        containerPort: 4001
+        hostPort: 4001
+      - name: etcd-peer
+        containerPort: 7001
+        hostPort: 7001
+    env:
+      - name: DISCOVERY
+        value: @@DISCOVERY@@
+      - name: ETCD_NAME
+        value: "@@ETCD_NAME@@"
+      - name: CONTAINER_HOST
+        value: "@@CONTAINER_HOST@@"
+    volumeMounts:
+      - name: etcd-data
+        path: /opt/etcd/data
+        readOnly: false
+volumes:
+  - name: etcd-data
+    source:
+      hostDir:
+        path: "/data/etcd"
+
+
