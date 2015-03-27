@@ -20,6 +20,21 @@
 
 namespace cert_trans {
 
+
+namespace {
+
+
+bool LessThanBySequence(const ct::SequenceMapping::Mapping& lhs,
+                        const ct::SequenceMapping::Mapping& rhs) {
+  CHECK(lhs.has_sequence_number());
+  CHECK(rhs.has_sequence_number());
+  return lhs.sequence_number() < rhs.sequence_number();
+}
+
+
+}  // namespace
+
+
 // Comparator for ordering pending hashes.
 // Order by timestamp then hash.
 template <class Logged>
@@ -95,10 +110,15 @@ util::Status TreeSigner<Logged>::SequenceNewEntries() {
   }
 
   // Hashes which are already sequenced.
-  std::unordered_map<std::string, int64_t> sequenced_hashes;
-  for (auto& m : mapping.Entry().mapping()) {
-    CHECK(sequenced_hashes.insert(std::make_pair(m.entry_hash(),
-                                                 m.sequence_number())).second);
+  std::unordered_map<std::string, std::pair<int64_t, bool /*present*/>>
+      sequenced_hashes;
+  for (const auto& m : mapping.Entry().mapping()) {
+    // Go home clang-format, you're drunk.
+    CHECK(
+        sequenced_hashes.insert(
+                             std::make_pair(m.entry_hash(),
+                                            std::make_pair(m.sequence_number(),
+                                                           false))).second);
   }
 
   std::vector<cert_trans::EntryHandle<Logged>> pending_entries;
@@ -112,6 +132,14 @@ util::Status TreeSigner<Logged>::SequenceNewEntries() {
   VLOG(1) << "Sequencing " << pending_entries.size() << " entr"
           << (pending_entries.size() == 1 ? "y" : "ies");
 
+  // We're going to update the sequence mapping based on the following rules:
+  // 1) existing sequence mappings whose corresponding PendingEntry still
+  //    exists will remain in the mappings file.
+  // 2) PendingEntries which do not have a corresponding sequence mapping will
+  //    gain one.
+  // 3) mappings whose corresponding PendingEntry no longer exists will be
+  //    removed from the sequence mapping file.
+  google::protobuf::RepeatedPtrField<ct::SequenceMapping_Mapping> new_mapping;
   std::map<int64_t, const Logged*> seq_to_entry;
   int num_sequenced(0);
   for (auto& pending_entry : pending_entries) {
@@ -124,26 +152,58 @@ util::Status TreeSigner<Logged>::SequenceNewEntries() {
       continue;
     }
     const auto seq_it(sequenced_hashes.find(pending_hash));
+    ct::SequenceMapping::Mapping* const seq_mapping(new_mapping.Add());
+
     if (seq_it == sequenced_hashes.end()) {
       // Need to sequence this one.
       VLOG(1) << util::ToBase64(pending_hash) << " = " << next_sequence_number;
 
       // Record the sequence -> hash mapping
-      ct::SequenceMapping::Mapping* m(mapping.MutableEntry()->add_mapping());
-      m->set_sequence_number(next_sequence_number);
-      m->set_entry_hash(pending_entry.Entry().Hash());
+      seq_mapping->set_sequence_number(next_sequence_number);
+      seq_mapping->set_entry_hash(pending_entry.Entry().Hash());
       pending_entry.MutableEntry()->set_sequence_number(next_sequence_number);
       ++num_sequenced;
       ++next_sequence_number;
     } else {
       VLOG(1) << "Previously sequenced " << util::ToBase64(pending_hash)
-              << " = " << next_sequence_number;
-      pending_entry.MutableEntry()->set_sequence_number(seq_it->second);
+              << " = " << seq_it->second.first;
+      CHECK(!seq_it->second.second /*present*/)
+          << "Saw same sequenced cert twice.";
+      CHECK(!pending_entry.Entry().has_sequence_number());
+      seq_it->second.second = true;  // present
+
+      seq_mapping->set_entry_hash(seq_it->first);
+      seq_mapping->set_sequence_number(seq_it->second.first);
+      pending_entry.MutableEntry()->set_sequence_number(seq_it->second.first);
     }
     CHECK(seq_to_entry.insert(std::make_pair(
                                   pending_entry.Entry().sequence_number(),
                                   pending_entry.MutableEntry())).second);
   }
+
+  const util::StatusOr<ct::SignedTreeHead> serving_sth(
+      consistent_store_->GetServingSTH());
+  if (!serving_sth.ok()) {
+    LOG(WARNING) << "Failed to get ServingSTH: " << serving_sth.status();
+    return serving_sth.status();
+  }
+
+  // Sanity check: make sure no hashes above the serving_sth level vanished:
+  const uint64_t serving_tree_size(serving_sth.ValueOrDie().tree_size());
+  for (const auto& s : sequenced_hashes) {
+    if (!s.second.second /*present*/) {
+      // if it disappeared, check it's underwater:
+      CHECK_LT(s.second.first, serving_tree_size);
+    }
+  }
+
+  if (new_mapping.size() > 0) {
+    sort(new_mapping.begin(), new_mapping.end(), LessThanBySequence);
+    CHECK_LE(new_mapping.Get(0).sequence_number(), serving_tree_size);
+  }
+
+  // Update the mapping proto with our new mappings
+  mapping.MutableEntry()->mutable_mapping()->Swap(&new_mapping);
 
   // Store updated sequence->hash mappings in the consistent store
   status = consistent_store_->UpdateSequenceMapping(&mapping);

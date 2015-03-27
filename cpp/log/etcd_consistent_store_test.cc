@@ -8,6 +8,7 @@
 #include <memory>
 #include <string>
 #include <thread>
+#include <unordered_map>
 #include <unordered_set>
 
 #include "log/logged_certificate.h"
@@ -29,6 +30,7 @@ using ct::SignedTreeHead;
 using std::atomic;
 using std::bind;
 using std::chrono::milliseconds;
+using std::make_pair;
 using std::make_shared;
 using std::ostringstream;
 using std::pair;
@@ -37,6 +39,7 @@ using std::shared_ptr;
 using std::string;
 using std::thread;
 using std::unique_ptr;
+using std::unordered_map;
 using std::unordered_set;
 using std::vector;
 using testing::_;
@@ -411,14 +414,33 @@ TEST_F(EtcdConsistentStoreTest, TestGetSequenceMapping) {
 }
 
 
-TEST_F(EtcdConsistentStoreDeathTest,
-       TestGetSequenceMappingBarfsOnCorruptMapping) {
+TEST_F(EtcdConsistentStoreTest,
+       TestGetSequenceMappingAllowsGapsBelowTreeSize) {
+  SignedTreeHead sth;
+  sth.set_tree_size(3);
+  store_->SetServingSTH(sth);
+
   SequenceMapping mapping;
   mapping.add_mapping()->set_sequence_number(0);
   mapping.add_mapping()->set_sequence_number(2);
   ForceSetEntry("/root/sequence_mapping", mapping);
   EntryHandle<SequenceMapping> entry;
-  EXPECT_DEATH(store_->GetSequenceMapping(&entry), "entry_seq == seq \\+ 1");
+  EXPECT_EQ(util::Status::OK, store_->GetSequenceMapping(&entry));
+}
+
+
+TEST_F(EtcdConsistentStoreDeathTest,
+       TestGetSequenceMappingBarfsOnGapsAboveTreeSize) {
+  SignedTreeHead sth;
+  sth.set_tree_size(0);
+  store_->SetServingSTH(sth);
+
+  SequenceMapping mapping;
+  mapping.add_mapping()->set_sequence_number(0);
+  mapping.add_mapping()->set_sequence_number(2);
+  ForceSetEntry("/root/sequence_mapping", mapping);
+  EntryHandle<SequenceMapping> entry;
+  EXPECT_DEATH(store_->GetSequenceMapping(&entry), "mapped_seq \\+ 1");
 }
 
 
@@ -454,13 +476,13 @@ TEST_F(EtcdConsistentStoreDeathTest,
   EXPECT_EQ(Status::OK, status);
 
   SequenceMapping::Mapping* m1(mapping.MutableEntry()->add_mapping());
-  m1->set_sequence_number(0);
-  m1->set_entry_hash("zero");
+  m1->set_sequence_number(2);
+  m1->set_entry_hash("two");
   SequenceMapping::Mapping* m2(mapping.MutableEntry()->add_mapping());
-  m2->set_sequence_number(2);
-  m2->set_entry_hash("two");
+  m2->set_sequence_number(0);
+  m2->set_entry_hash("zero");
   EXPECT_DEATH(store_->UpdateSequenceMapping(&mapping),
-               "entry_seq == seq \\+ 1");
+               "sequence_number\\(\\) < mapping");
 }
 
 
@@ -479,7 +501,7 @@ TEST_F(EtcdConsistentStoreDeathTest,
   m1->set_sequence_number(sth.tree_size() + 1);
   m1->set_entry_hash("zero");
   EXPECT_DEATH(store_->UpdateSequenceMapping(&mapping),
-               "sequence_number\\(\\) <= serving_sth_");
+               "lowest_sequence_number <= tree_size");
 }
 
 
@@ -627,19 +649,21 @@ TEST_F(EtcdConsistentStoreTest, TestCleansUpToNewSTH) {
 
   // Be sure about our starting state of sequenced entries so we can compare
   // later on
-  EntryHandle<SequenceMapping> seq_mapping;
-  ASSERT_EQ(Status::OK, store_->GetSequenceMapping(&seq_mapping));
-  EXPECT_EQ(5, seq_mapping.Entry().mapping_size());
+  EntryHandle<SequenceMapping> orig_seq_mapping;
+  ASSERT_EQ(Status::OK, store_->GetSequenceMapping(&orig_seq_mapping));
+  EXPECT_EQ(5, orig_seq_mapping.Entry().mapping_size());
 
   // Do the same for the pending entries
   vector<EntryHandle<LoggedCertificate>> pending_entries_pre;
   CHECK(store_->GetPendingEntries(&pending_entries_pre).ok());
   // Prune out any "pending" entries which have counterparts in the
   // "sequenced" set:
+  unordered_map<int64_t, string> seq_to_hash;
   {
     unordered_set<string> seq_hashes;
-    for (auto& m : seq_mapping.Entry().mapping()) {
+    for (auto& m : orig_seq_mapping.Entry().mapping()) {
       seq_hashes.insert(m.entry_hash());
+      seq_to_hash.insert(make_pair(m.sequence_number(), m.entry_hash()));
     }
     auto it(pending_entries_pre.begin());
     while (it != pending_entries_pre.end()) {
@@ -662,12 +686,25 @@ TEST_F(EtcdConsistentStoreTest, TestCleansUpToNewSTH) {
   CHECK(store_->SetServingSTH(sth).ok());
   CHECK_EQ(util::Status::OK, CleanupOldEntries());
 
-  // Check that they were cleaned up:
+  EntryHandle<LoggedCertificate> unused;
+  EXPECT_EQ(util::error::NOT_FOUND,
+            store_->GetPendingEntryForHash(seq_to_hash[100], &unused)
+                .CanonicalCode());
+  EXPECT_EQ(util::error::NOT_FOUND,
+            store_->GetPendingEntryForHash(seq_to_hash[101], &unused)
+                .CanonicalCode());
+  EXPECT_EQ(util::error::NOT_FOUND,
+            store_->GetPendingEntryForHash(seq_to_hash[102], &unused)
+                .CanonicalCode());
+  EXPECT_EQ(Status::OK,
+            store_->GetPendingEntryForHash(seq_to_hash[103], &unused));
+
+  // Check that we didn't modify the sequence mapping:
+  EntryHandle<SequenceMapping> seq_mapping;
   CHECK(store_->GetSequenceMapping(&seq_mapping).ok());
-  // 103 & 104 remaining:
-  EXPECT_EQ(2, seq_mapping.Entry().mapping_size());
-  EXPECT_EQ(103, seq_mapping.Entry().mapping(0).sequence_number());
-  EXPECT_EQ(104, seq_mapping.Entry().mapping(1).sequence_number());
+  EXPECT_EQ(orig_seq_mapping.Entry().DebugString(),
+            seq_mapping.Entry().DebugString());
+
 
   // Now update ServingSTH so that all sequenced entries should be cleaned up:
   sth.set_timestamp(sth.timestamp() + 1);
@@ -676,8 +713,17 @@ TEST_F(EtcdConsistentStoreTest, TestCleansUpToNewSTH) {
   CHECK_EQ(util::Status::OK, CleanupOldEntries());
 
   // Ensure they were:
+  EXPECT_EQ(util::error::NOT_FOUND,
+            store_->GetPendingEntryForHash(seq_to_hash[103], &unused)
+                .CanonicalCode());
+  EXPECT_EQ(util::error::NOT_FOUND,
+            store_->GetPendingEntryForHash(seq_to_hash[104], &unused)
+                .CanonicalCode());
+
+  // Check that we didn't modify the sequence mapping:
   CHECK(store_->GetSequenceMapping(&seq_mapping).ok());
-  EXPECT_EQ(0, seq_mapping.Entry().mapping_size());
+  EXPECT_EQ(orig_seq_mapping.Entry().DebugString(),
+            seq_mapping.Entry().DebugString());
 
   // Check we've not touched the pending entries:
   vector<EntryHandle<LoggedCertificate>> pending_entries_post;

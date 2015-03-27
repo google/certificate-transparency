@@ -43,5 +43,6 @@ CMD cd /mnt/ctlog/ && \
         --sqlite_db=/mnt/ctlog/sqlite.db \
         --etcd_host=${ETCD_HOST} \
         --etcd_port=${ETCD_PORT} \
+        --etcd_delete_concurrency=100 \
         --v=1
 EXPOSE 80

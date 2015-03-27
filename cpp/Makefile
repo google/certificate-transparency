@@ -185,7 +185,8 @@ util/libutil.a: util/util.o util/openssl_util.o util/testing.o \
                 util/json_wrapper.o util/thread_pool.o util/libevent_wrapper.o \
                 util/etcd.o util/status.o util/fake_etcd.o \
                 util/periodic_closure.o util/masterelection.o util/task.o \
-                util/protobuf_util.o util/sync_task.o util/uuid.o
+                util/protobuf_util.o util/sync_task.o util/uuid.o \
+                util/etcd_delete.o
 	rm -f $@
 	ar -rcs $@ $^
 

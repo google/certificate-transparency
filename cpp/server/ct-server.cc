@@ -71,7 +71,10 @@ DEFINE_int32(log_stats_frequency_seconds, 3600,
              "Must be greater than 0.");
 DEFINE_int32(sequencing_frequency_seconds, 10,
              "How often should new entries be sequenced. The sequencing runs "
-             "in parallel with the tree signing.");
+             "in parallel with the tree signing and cleanup.");
+DEFINE_int32(cleanup_frequency_seconds, 10,
+             "How often should new entries be cleanedup. The cleanup runs in "
+             "in parallel with the tree signing and sequencing.");
 DEFINE_int32(tree_signing_frequency_seconds, 600,
              "How often should we issue a new signed tree head. Approximate: "
              "the signer process will kick off if in the beginning of the "
@@ -140,8 +143,6 @@ Gauge<>* latest_local_tree_size_gauge =
 Counter<bool>* sequencer_total_runs = Counter<bool>::New(
     "sequencer_total_runs", "successful",
     "Total number of sequencer runs broken out by success.");
-Latency<milliseconds> sequencer_run_latency_ms("sequencer_run_latency_ms",
-                                               "Total runtime of sequencer");
 Latency<milliseconds> sequencer_delete_latency_ms(
     "sequencer_delete_latency_ms",
     "Total time spent deleting entries by sequencer");
@@ -224,34 +225,50 @@ static const bool sign_dummy =
     RegisterFlagValidator(&FLAGS_tree_signing_frequency_seconds,
                           &ValidateIsPositive);
 
+void CleanUpEntries(ConsistentStore<LoggedCertificate>* store,
+                    const MasterElection* election) {
+  CHECK_NOTNULL(store);
+  CHECK_NOTNULL(election);
+  const steady_clock::duration period(
+      (seconds(FLAGS_cleanup_frequency_seconds)));
+  steady_clock::time_point target_run_time(steady_clock::now());
+
+  while (true) {
+    if (election->IsMaster()) {
+      const ScopedLatency sequencer_delete_latency(
+          sequencer_delete_latency_ms.ScopedLatency());
+      util::Status status(store->CleanupOldEntries());
+      if (!status.ok()) {
+        LOG(WARNING) << "Problem cleaning up old entries: " << status;
+      }
+    }
+
+    const steady_clock::time_point now(steady_clock::now());
+    while (target_run_time <= now) {
+      target_run_time += period;
+    }
+
+    std::this_thread::sleep_for(target_run_time - now);
+  }
+}
+
 void SequenceEntries(TreeSigner<LoggedCertificate>* tree_signer,
-                     ConsistentStore<LoggedCertificate>* store,
                      const MasterElection* election) {
+  CHECK_NOTNULL(tree_signer);
+  CHECK_NOTNULL(election);
   const steady_clock::duration period(
       (seconds(FLAGS_sequencing_frequency_seconds)));
   steady_clock::time_point target_run_time(steady_clock::now());
 
   while (true) {
     if (election->IsMaster()) {
-      const ScopedLatency sequence_run_latency(
-          sequencer_run_latency_ms.ScopedLatency());
-      {
-        const ScopedLatency sequencer_delete_latency(
-            sequencer_delete_latency_ms.ScopedLatency());
-        util::Status status(store->CleanupOldEntries());
-        if (!status.ok()) {
-          LOG(WARNING) << "Problem cleaning up old entries: " << status;
-        }
+      const ScopedLatency sequencer_sequence_latency(
+          sequencer_sequence_latency_ms.ScopedLatency());
+      util::Status status(tree_signer->SequenceNewEntries());
+      if (!status.ok()) {
+        LOG(WARNING) << "Problem sequencing new entries: " << status;
       }
-      {
-        const ScopedLatency sequencer_sequence_latency(
-            sequencer_sequence_latency_ms.ScopedLatency());
-        util::Status status(tree_signer->SequenceNewEntries());
-        if (!status.ok()) {
-          LOG(WARNING) << "Problem sequencing new entries: " << status;
-        }
-        sequencer_total_runs->Increment(status.ok());
-      }
+      sequencer_total_runs->Increment(status.ok());
     }
 
     const steady_clock::time_point now(steady_clock::now());
@@ -267,6 +284,10 @@ void SignMerkleTree(TreeSigner<LoggedCertificate>* tree_signer,
                     ConsistentStore<LoggedCertificate>* store,
                     ClusterStateController<LoggedCertificate>* controller,
                     const MasterElection* election) {
+  CHECK_NOTNULL(tree_signer);
+  CHECK_NOTNULL(store);
+  CHECK_NOTNULL(controller);
+  CHECK_NOTNULL(election);
   const steady_clock::duration period(
       (seconds(FLAGS_tree_signing_frequency_seconds)));
   steady_clock::time_point target_run_time(steady_clock::now());
@@ -535,8 +556,8 @@ int main(int argc, char* argv[]) {
   // TODO(pphaneuf): We should be remaining in an "unhealthy state"
   // (either not accepting any requests, or returning some internal
   // server error) until we have an STH to serve.
-  thread sequencer(&SequenceEntries, &tree_signer, &consistent_store,
-                   &election);
+  thread sequencer(&SequenceEntries, &tree_signer, &election);
+  thread cleanup(&CleanUpEntries, &consistent_store, &election);
   thread signer(&SignMerkleTree, &tree_signer, &consistent_store,
                 &cluster_controller, &election);
   thread node_refresh(&RefreshNodeState, &cluster_controller);
