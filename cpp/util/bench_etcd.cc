@@ -2,7 +2,6 @@
 #include <functional>
 #include <gflags/gflags.h>
 #include <glog/logging.h>
-#include <map>
 #include <memory>
 #include <string>
 #include <thread>
@@ -10,6 +9,7 @@
 
 #include "util/etcd.h"
 #include "util/libevent_wrapper.h"
+#include "util/sync_task.h"
 
 namespace libevent = cert_trans::libevent;
 
@@ -17,15 +17,14 @@ using cert_trans::EtcdClient;
 using cert_trans::UrlFetcher;
 using std::bind;
 using std::make_shared;
-using std::map;
 using std::placeholders::_1;
-using std::placeholders::_2;
-using std::placeholders::_3;
 using std::shared_ptr;
 using std::string;
 using std::thread;
-using std::unique_ptr;
+using std::to_string;
 using std::vector;
+using util::Status;
+using util::SyncTask;
 using util::Task;
 
 DEFINE_string(etcd, "127.0.0.1", "etcd server address");
@@ -33,51 +32,69 @@ DEFINE_int32(etcd_port, 4001, "etcd server port");
 DEFINE_int32(requests_per_thread, 10, "number of requests per thread");
 DEFINE_int32(bytes_per_request, 10, "number of bytes per requests");
 DEFINE_int32(num_threads, 1, "number of threads");
+DEFINE_string(test_key, "/bench_etcd", "base etcd key for testing");
 
 namespace {
 
 
-void make_request(bool* done, EtcdClient* etcd, int* count, const string& data,
-                  libevent::Base* base);
+struct State {
+  State(EtcdClient* etcd, int thread_num, Task* task)
+      : etcd_(CHECK_NOTNULL(etcd)),
+        key_prefix_(FLAGS_test_key + "/" + to_string(thread_num) + "/"),
+        task_(CHECK_NOTNULL(task)),
+        data_(FLAGS_bytes_per_request, 'x'),
+        next_key_(0),
+        num_left_(FLAGS_requests_per_thread) {
+    CHECK_GT(num_left_, 0);
+  }
+
+  void MakeRequest();
+  void RequestDone(Task* child_task);
+
+  EtcdClient* const etcd_;
+  const string key_prefix_;
+  Task* const task_;
+  const string data_;
+
+  int64_t next_key_;
+  EtcdClient::Response resp_;
+  int num_left_;
+};
 
 
-void request_done(bool* done, EtcdClient* etcd, int* count, const string& data,
-                  libevent::Base* base,
-                  EtcdClient::CreateInQueueResponse* resp, Task* task) {
-  CHECK(task->status().ok()) << task->status();
-  --*count;
-  if (*count > 0)
-    make_request(done, etcd, count, data, base);
-  else
-    *done = true;
+void State::MakeRequest() {
+  etcd_->Create(key_prefix_ + to_string(next_key_), "value", &resp_,
+                task_->AddChild(bind(&State::RequestDone, this, _1)));
 }
 
 
-void make_request(bool* done, EtcdClient* etcd, int* count, const string& data,
-                  libevent::Base* base) {
-  EtcdClient::CreateInQueueResponse* const resp(
-      new EtcdClient::CreateInQueueResponse);
-  etcd->CreateInQueue("/testdir", "value", resp,
-                      new Task(bind(&request_done, done, etcd, count, data,
-                                    base, resp, _1),
-                               base));
+void State::RequestDone(Task* child_task) {
+  CHECK_EQ(Status::OK, child_task->status());
+  --num_left_;
+  next_key_ = resp_.etcd_index;
+
+  if (num_left_ > 0) {
+    MakeRequest();
+  } else {
+    task_->Return();
+  }
 }
 
 
-void test_etcd() {
+void test_etcd(int thread_num) {
   const shared_ptr<libevent::Base> event_base(make_shared<libevent::Base>());
+  libevent::EventPumpThread pump(event_base);
   UrlFetcher fetcher(event_base.get());
   EtcdClient etcd(event_base, &fetcher, FLAGS_etcd, FLAGS_etcd_port);
+  SyncTask task(event_base.get());
+  State state(&etcd, thread_num, task.task());
 
-  const string data(FLAGS_bytes_per_request, 'x');
-  int count(FLAGS_requests_per_thread);
-  bool done(false);
-  make_request(&done, &etcd, &count, data, event_base.get());
+  // Get the ball rolling...
+  state.MakeRequest();
 
-  LOG(INFO) << "calling event_base_dispatch";
-  while (!done)
-    event_base->DispatchOnce();
-  LOG(INFO) << "event_base_dispatch done";
+  LOG(INFO) << "waiting for test completion";
+  task.Wait();
+  LOG(INFO) << "test complete";
 }
 
 
@@ -93,14 +110,14 @@ int main(int argc, char* argv[]) {
   CHECK_GE(FLAGS_bytes_per_request, 0);
   CHECK_GT(FLAGS_num_threads, 0);
 
-  vector<thread*> threads;
-  for (int i = FLAGS_num_threads; i > 0; --i)
-    threads.push_back(new thread(&test_etcd));
+  vector<thread> threads;
+  for (int i = 0; i < FLAGS_num_threads; ++i) {
+    threads.emplace_back(bind(test_etcd, i));
+  }
 
-  for (vector<thread*>::const_iterator it = threads.begin();
-       it != threads.end(); ++it) {
-    (*it)->join();
-    delete *it;
+  for (vector<thread>::iterator it = threads.begin(); it != threads.end();
+       ++it) {
+    it->join();
   }
 
   return 0;

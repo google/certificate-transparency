@@ -447,7 +447,8 @@ tools/dump_cert: tools/dump_cert.o proto/libproto.a util/libutil.a
 tools/dump_sth: tools/dump_sth.o proto/libproto.a
 
 util/bench_etcd: util/bench_etcd.o net/url.o net/url_fetcher.o \
-                 net/connection_pool.o util/libutil.a monitoring/libmonitoring.a
+                 net/connection_pool.o util/libutil.a base/notification.o \
+                 monitoring/libmonitoring.a
 
 util/etcd_masterelection: util/etcd_masterelection.o base/notification.o \
                           net/url.o net/url_fetcher.o net/connection_pool.o \
