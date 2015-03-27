@@ -13,12 +13,32 @@
 #include "monitoring/latency.h"
 #include "util/util.h"
 
+// Several of these flags pass their value directly through to SQLite PRAGMA
+// statements, see the SQLite documentation
+// (https://www.sqlite.org/pragma.html) for a description of the various
+// values available and the implications they have.
+
 // TODO(pphaneuf): For now, just a flag, but ideally, when adding a
 // new node, it would do an initial load of its local database with
 // "synchronous" set to OFF, then put it back before starting normal
 // operation.
-DEFINE_bool(sqlite_synchronous_off, false,
-            "whether to set SQLite's \"synchronous\" to OFF");
+DEFINE_string(sqlite_synchronous_mode, "FULL",
+              "Which SQLite synchronous option to use, see SQLite pragma "
+              "documentation for details.");
+
+DEFINE_string(sqlite_journal_mode, "WAL",
+              "Which SQLite journal_mode option to use, see SQLite pragma "
+              "documentation for defails.");
+
+DEFINE_int32(sqlite_cache_size, 100000,
+             "Number of 1KB btree pages to keep in memory.");
+
+DEFINE_bool(sqlite_batch_into_transactions, true,
+            "Whether to batch operations into transactions behind the "
+            "scenes.");
+DEFINE_int32(sqlite_transaction_batch_size, 400,
+             "Max number of operations to batch into one transaction.");
+
 
 namespace {
 
@@ -73,13 +93,43 @@ sqlite3* SQLiteOpen(const std::string& dbfile) {
 
 template <class Logged>
 SQLiteDB<Logged>::SQLiteDB(const std::string& dbfile)
-    : db_(SQLiteOpen(dbfile)), tree_size_(0) {
-  if (FLAGS_sqlite_synchronous_off) {
-    sqlite::Statement statement(db_, "PRAGMA synchronous = OFF");
+    : db_(SQLiteOpen(dbfile)),
+      tree_size_(0),
+      transaction_size_(0),
+      in_transaction_(false) {
+  std::unique_lock<std::mutex> lock(lock_);
+  {
+    std::ostringstream oss;
+    oss << "PRAGMA synchronous = " << FLAGS_sqlite_synchronous_mode;
+    sqlite::Statement statement(db_, oss.str().c_str());
     CHECK_EQ(SQLITE_DONE, statement.Step());
-    LOG(WARNING) << "SQLite \"synchronous\" pragma set to OFF";
+    LOG(WARNING) << "SQLite \"synchronous\" pragma set to "
+                 << FLAGS_sqlite_synchronous_mode;
+    if (FLAGS_sqlite_batch_into_transactions) {
+      LOG(WARNING) << "SQLite running with batched transactions, you should "
+                   << "set sqlite_synchronous_mode = FULL !";
+    }
   }
 
+  {
+    std::ostringstream oss;
+    oss << "PRAGMA journal_mode = " << FLAGS_sqlite_journal_mode;
+    sqlite::Statement statement(db_, oss.str().c_str());
+    CHECK_EQ(SQLITE_ROW, statement.Step());
+    std::string mode;
+    statement.GetBlob(0, &mode);
+    CHECK_STRCASEEQ(mode.c_str(), FLAGS_sqlite_journal_mode.c_str());
+    CHECK_EQ(SQLITE_DONE, statement.Step());
+  }
+
+  {
+    std::ostringstream oss;
+    oss << "PRAGMA cache_size = " << FLAGS_sqlite_cache_size;
+    sqlite::Statement statement(db_, oss.str().c_str());
+    CHECK_EQ(SQLITE_DONE, statement.Step());
+  }
+
+  BeginTransaction(lock);
   UpdateTreeSize();
 }
 
@@ -95,7 +145,9 @@ typename Database<Logged>::WriteResult SQLiteDB<Logged>::CreateSequencedEntry_(
     const Logged& logged) {
   cert_trans::ScopedLatency latency(
       latency_by_op_ms.ScopedLatency("create_sequenced_entry"));
-  std::lock_guard<std::mutex> lock(lock_);
+  std::unique_lock<std::mutex> lock(lock_);
+
+  MaybeStartNewTransaction(lock);
 
   sqlite::Statement statement(db_,
                               "INSERT INTO leaves(hash, entry, sequence) "
@@ -232,6 +284,9 @@ typename Database<Logged>::WriteResult SQLiteDB<Logged>::WriteTreeHead_(
   }
   CHECK_EQ(SQLITE_DONE, r2);
 
+  EndTransaction(lock);
+  BeginTransaction(lock);
+
   // Do not call the callbacks while holding the lock, as they might
   // want to perform some lookups.
   lock.unlock();
@@ -335,6 +390,58 @@ typename Database<Logged>::LookupResult SQLiteDB<Logged>::NodeId(
   result = statement.Step();
   CHECK_EQ(SQLITE_DONE, result);  // There can only be one!
   return this->LOOKUP_OK;
+}
+
+
+template <class Logged>
+void SQLiteDB<Logged>::BeginTransaction(
+    const std::unique_lock<std::mutex>& lock) {
+  CHECK(lock.owns_lock());
+  if (FLAGS_sqlite_batch_into_transactions) {
+    CHECK_EQ(0, transaction_size_);
+    CHECK(!in_transaction_);
+    VLOG(1) << "Beginning new transaction.";
+    sqlite::Statement s(db_, "BEGIN TRANSACTION");
+    CHECK_EQ(SQLITE_DONE, s.Step());
+    in_transaction_ = true;
+  }
+}
+
+
+template <class Logged>
+void SQLiteDB<Logged>::EndTransaction(
+    const std::unique_lock<std::mutex>& lock) {
+  CHECK(lock.owns_lock());
+  if (FLAGS_sqlite_batch_into_transactions) {
+    CHECK(in_transaction_);
+    VLOG(1) << "Committing transaction.";
+    {
+      sqlite::Statement s(db_, "END TRANSACTION");
+      CHECK_EQ(SQLITE_DONE, s.Step());
+    }
+    {
+      sqlite::Statement s(db_, "PRAGMA wal_checkpoint(TRUNCATE)");
+      CHECK_EQ(SQLITE_ROW, s.Step());
+      CHECK_EQ(SQLITE_DONE, s.Step());
+    }
+
+    transaction_size_ = 0;
+    in_transaction_ = false;
+  }
+}
+
+
+template <class Logged>
+void SQLiteDB<Logged>::MaybeStartNewTransaction(
+    const std::unique_lock<std::mutex>& lock) {
+  CHECK(lock.owns_lock());
+  if (FLAGS_sqlite_batch_into_transactions &&
+      transaction_size_ >= FLAGS_sqlite_transaction_batch_size) {
+    VLOG(1) << "Rolling over into new transaction.";
+    EndTransaction(lock);
+    BeginTransaction(lock);
+  }
+  ++transaction_size_;
 }
 
 

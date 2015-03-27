@@ -54,10 +54,18 @@ class SQLiteDB : public Database<Logged> {
   LookupResult NodeId(const std::unique_lock<std::mutex>& lock,
                       std::string* node_id);
 
+  void BeginTransaction(const std::unique_lock<std::mutex>& lock);
+
+  void EndTransaction(const std::unique_lock<std::mutex>& lock);
+
+  void MaybeStartNewTransaction(const std::unique_lock<std::mutex>& lock);
+
   mutable std::mutex lock_;
   sqlite3* const db_;
   int64_t tree_size_;
   cert_trans::DatabaseNotifierHelper callbacks_;
+  int64_t transaction_size_;
+  bool in_transaction_;
 
   DISALLOW_COPY_AND_ASSIGN(SQLiteDB);
 };

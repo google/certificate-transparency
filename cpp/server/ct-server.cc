@@ -382,12 +382,13 @@ int main(int argc, char* argv[]) {
   CHECK(checker.LoadTrustedCertificates(FLAGS_trusted_cert_file))
       << "Could not load CA certs from " << FLAGS_trusted_cert_file;
 
-  if (FLAGS_sqlite_db == "")
+  if (FLAGS_sqlite_db.empty()) {
     CHECK_NE(FLAGS_cert_dir, FLAGS_tree_dir)
         << "Certificate directory and tree directory must differ";
+  }
 
-  if ((FLAGS_cert_dir != "" || FLAGS_tree_dir != "") &&
-      FLAGS_sqlite_db != "") {
+  if ((!FLAGS_cert_dir.empty() || !FLAGS_tree_dir.empty()) &&
+      !FLAGS_sqlite_db.empty()) {
     std::cerr << "Choose either file or sqlite database, not both"
               << std::endl;
     exit(1);
@@ -395,13 +396,14 @@ int main(int argc, char* argv[]) {
 
   Database<LoggedCertificate>* db;
 
-  if (FLAGS_sqlite_db != "")
+  if (!FLAGS_sqlite_db.empty()) {
     db = new SQLiteDB<LoggedCertificate>(FLAGS_sqlite_db);
-  else
+  } else {
     db = new FileDB<LoggedCertificate>(
         new FileStorage(FLAGS_cert_dir, FLAGS_cert_storage_depth),
         new FileStorage(FLAGS_tree_dir, FLAGS_tree_storage_depth),
         new FileStorage(FLAGS_meta_dir, 0));
+  }
 
   std::string node_id;
   if (db->NodeId(&node_id) != Database<LoggedCertificate>::LOOKUP_OK) {
