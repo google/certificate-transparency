@@ -36,6 +36,65 @@ string EnsureEndsWithSlash(const string& s) {
 }
 
 
+void FillJsonForNode(const EtcdClient::Node& node, JsonObject* json) {
+  json->Add("modifiedIndex", node.modified_index_);
+  json->Add("createdIndex", node.created_index_);
+  json->Add("key", node.key_);
+  if (!node.deleted_) {
+    json->Add("value", node.value_);
+  }
+}
+
+
+void FillJsonForEntry(const EtcdClient::Node& node, const string& action,
+                      const shared_ptr<JsonObject>& json) {
+  JsonObject json_node;
+  FillJsonForNode(node, &json_node);
+  json->Add("action", action);
+  json->Add("node", json_node);
+}
+
+
+void FillJsonForDir(const string& key, const vector<EtcdClient::Node>& nodes,
+                    const string& action, const shared_ptr<JsonObject>& json) {
+  JsonObject node;
+  node.Add("modifiedIndex", 1);
+  node.Add("createdIndex", 1);
+  node.Add("key", key);
+  node.AddBoolean("dir", true);
+  if (nodes.size() > 0) {
+    JsonArray json_nodes;
+    for (const auto& node : nodes) {
+      JsonObject json_node;
+      FillJsonForNode(node, &json_node);
+      json_nodes.Add(&json_node);
+    }
+    node.Add("nodes", json_nodes);
+  }
+  node.Add("action", action);
+  json->Add("node", node);
+}
+
+
+void MaybeSetExpiry(const map<string, string>& params,
+                    EtcdClient::Node* node) {
+  if (params.find("ttl") != params.end()) {
+    const string& ttl(params.find("ttl")->second);
+    node->expires_ = system_clock::now() + seconds(stoi(ttl));
+  }
+}
+
+
+bool GetParam(const map<string, string>& params, const string& name,
+              string* out) {
+  if (params.find(name) == params.end()) {
+    return false;
+  }
+  *out = params.find(name)->second;
+  return true;
+}
+
+
 }  // namespace
 
 
@@ -89,46 +148,6 @@ void FakeEtcdClient::Generic(const std::string& key,
       LOG(FATAL) << "Unsupported verb " << static_cast<int>(verb);
   }
   DumpEntries();
-}
-
-
-void FillJsonForNode(const EtcdClient::Node& node, JsonObject* json) {
-  json->Add("modifiedIndex", node.modified_index_);
-  json->Add("createdIndex", node.created_index_);
-  json->Add("key", node.key_);
-  if (!node.deleted_) {
-    json->Add("value", node.value_);
-  }
-}
-
-
-void FillJsonForEntry(const EtcdClient::Node& node, const string& action,
-                      const shared_ptr<JsonObject>& json) {
-  JsonObject json_node;
-  FillJsonForNode(node, &json_node);
-  json->Add("action", action);
-  json->Add("node", json_node);
-}
-
-
-void FillJsonForDir(const string& key, const vector<EtcdClient::Node>& nodes,
-                    const string& action, const shared_ptr<JsonObject>& json) {
-  JsonObject node;
-  node.Add("modifiedIndex", 1);
-  node.Add("createdIndex", 1);
-  node.Add("key", key);
-  node.AddBoolean("dir", true);
-  if (nodes.size() > 0) {
-    JsonArray json_nodes;
-    for (const auto& node : nodes) {
-      JsonObject json_node;
-      FillJsonForNode(node, &json_node);
-      json_nodes.Add(&json_node);
-    }
-    node.Add("nodes", json_nodes);
-  }
-  node.Add("action", action);
-  json->Add("node", node);
 }
 
 
@@ -208,25 +227,6 @@ void FakeEtcdClient::HandleGet(const string& key,
   } else {
     return GetSingleEntry(key, resp, task);
   }
-}
-
-
-void MaybeSetExpiry(const map<string, string>& params,
-                    EtcdClient::Node* node) {
-  if (params.find("ttl") != params.end()) {
-    const string& ttl(params.find("ttl")->second);
-    node->expires_ = system_clock::now() + seconds(stoi(ttl));
-  }
-}
-
-
-bool GetParam(const map<string, string>& params, const string& name,
-              string* out) {
-  if (params.find(name) == params.end()) {
-    return false;
-  }
-  *out = params.find(name)->second;
-  return true;
 }
 
 
