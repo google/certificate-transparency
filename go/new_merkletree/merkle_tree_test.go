@@ -68,17 +68,17 @@ func (h *NullHash) BlockSize() int {
 // Real testing methods start here.
 
 func TestNew(t *testing.T) {
+	// The explicit type declaration here is deliberate, to make absolutely
+	// sure that `New` is returning a `NewMerkleTree`.
 	var tree *NewMerkleTree
-	tree = New(nil, nil, sha256.New())
-	if tree == nil {
+	if tree = New(nil, nil, sha256.New()); tree == nil {
 		t.Fail()
 	}
 }
 
 func TestEmptyTree(t *testing.T) {
-	var tree *NewMerkleTree
 	// Let's use sha256 for this one, just to show we can
-	tree = New(NewDummyDAO(0), nil, sha256.New())
+	tree := New(NewDummyDAO(0), nil, sha256.New())
 
 	actual, err := tree.CurrentRoot()
 	expect, _ := hex.DecodeString("e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855")
@@ -112,8 +112,8 @@ func rootForTestLeaves(numLeaves int) Hash {
 		return []byte("\x01\x01\x01\x00A\x00B\x01\x00C\x00D\x01\x01\x00E\x00F\x00G")
 	default:
 		log.Fatalf("Unexpected numLeaves: %v", numLeaves)
+		return nil
 	}
-	return nil
 }
 
 func TestAddLeaf(t *testing.T) {
@@ -188,7 +188,7 @@ func TestInclusionProofOfInvalidLeaf(t *testing.T) {
 
 	_, err := m.InclusionProof(2)
 
-	checkError(t, err, "NewMerkleTree: Invalid leaf entry ID: 2")
+	checkError(t, err, "NewMerkleTree: Invalid leaf index: 2")
 }
 
 func checkConsistency(t *testing.T, m *NewMerkleTree, from, to uint64, expectedProof []Hash) {
