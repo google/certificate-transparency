@@ -153,6 +153,7 @@ void GetRequestDone(const string& keyname, EtcdClient::GetResponse* resp,
                     Task* parent_task, EtcdClient::GenericResponse* gen_resp,
                     Task* task) {
   *resp = EtcdClient::GetResponse();
+  resp->etcd_index = gen_resp->etcd_index;
   if (!task->status().ok()) {
     parent_task->Return(
         Status(task->status().CanonicalCode(),
@@ -173,7 +174,6 @@ void GetRequestDone(const string& keyname, EtcdClient::GetResponse* resp,
     return;
   }
 
-  resp->etcd_index = gen_resp->etcd_index;
   resp->node = node.ValueOrDie();
   parent_task->Return();
 }

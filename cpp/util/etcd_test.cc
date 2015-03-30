@@ -191,7 +191,7 @@ void HandleFetch(Status status, int status_code,
   task->Return(status);
 }
 
-TEST_F(EtcdTest, TestGet) {
+TEST_F(EtcdTest, Get) {
   EXPECT_CALL(url_fetcher_,
               Fetch(IsUrlFetchRequest(UrlFetcher::Verb::GET,
                                       URL(GetEtcdUrl(kEntryKey) +
@@ -213,7 +213,7 @@ TEST_F(EtcdTest, TestGet) {
   EXPECT_EQ("123", resp.node.value_);
 }
 
-TEST_F(EtcdTest, TestGetRecursive) {
+TEST_F(EtcdTest, GetRecursive) {
   EXPECT_CALL(url_fetcher_,
               Fetch(IsUrlFetchRequest(
                         UrlFetcher::Verb::GET,
@@ -238,7 +238,7 @@ TEST_F(EtcdTest, TestGetRecursive) {
   EXPECT_EQ("123", resp.node.value_);
 }
 
-TEST_F(EtcdTest, TestGetForInvalidKey) {
+TEST_F(EtcdTest, GetForInvalidKey) {
   EXPECT_CALL(url_fetcher_,
               Fetch(IsUrlFetchRequest(UrlFetcher::Verb::GET,
                                       URL(GetEtcdUrl(kEntryKey) +
@@ -258,7 +258,7 @@ TEST_F(EtcdTest, TestGetForInvalidKey) {
             task.status());
 }
 
-TEST_F(EtcdTest, TestGetAll) {
+TEST_F(EtcdTest, GetAll) {
   EXPECT_CALL(url_fetcher_,
               Fetch(IsUrlFetchRequest(UrlFetcher::Verb::GET,
                                       URL(GetEtcdUrl(kDirKey) +
@@ -282,7 +282,36 @@ TEST_F(EtcdTest, TestGetAll) {
   EXPECT_EQ("456", resp.node.nodes_[1].value_);
 }
 
-TEST_F(EtcdTest, TestCreate) {
+TEST_F(EtcdTest, GetWaitTooOld) {
+  const int kOldIndex(42);
+  const int kNewIndex(2015);
+  EXPECT_CALL(url_fetcher_,
+              Fetch(IsUrlFetchRequest(UrlFetcher::Verb::GET,
+                                      URL(GetEtcdUrl(kEntryKey) +
+                                          "?consistent=true&quorum=false&"
+                                          "recursive=true&wait=true&"
+                                          "waitIndex=" +
+                                          to_string(kOldIndex)),
+                                      IsEmpty(), ""),
+                    _, _))
+      .WillOnce(Invoke(bind(
+          HandleFetch, Status::OK, 404,
+          UrlFetcher::Headers{make_pair("x-etcd-index", to_string(kNewIndex))},
+          kKeyNotFoundJson, _1, _2, _3)));
+  SyncTask task(base_.get());
+  EtcdClient::Request req(kEntryKey);
+  req.recursive = true;
+  req.wait_index = kOldIndex;
+  EtcdClient::GetResponse resp;
+  client_.Get(req, &resp, task.task());
+  task.Wait();
+  EXPECT_EQ(Status(util::error::NOT_FOUND,
+                   "Key not found (" + string(kEntryKey) + ")"),
+            task.status());
+  EXPECT_EQ(kNewIndex, resp.etcd_index);
+}
+
+TEST_F(EtcdTest, Create) {
   EXPECT_CALL(
       url_fetcher_,
       Fetch(IsUrlFetchRequest(
@@ -303,7 +332,7 @@ TEST_F(EtcdTest, TestCreate) {
   EXPECT_EQ(7, resp.etcd_index);
 }
 
-TEST_F(EtcdTest, TestCreateFails) {
+TEST_F(EtcdTest, CreateFails) {
   EXPECT_CALL(
       url_fetcher_,
       Fetch(IsUrlFetchRequest(
@@ -324,7 +353,7 @@ TEST_F(EtcdTest, TestCreateFails) {
             task.status());
 }
 
-TEST_F(EtcdTest, TestCreateWithTTL) {
+TEST_F(EtcdTest, CreateWithTTL) {
   EXPECT_CALL(
       url_fetcher_,
       Fetch(
@@ -347,7 +376,7 @@ TEST_F(EtcdTest, TestCreateWithTTL) {
   EXPECT_EQ(7, resp.etcd_index);
 }
 
-TEST_F(EtcdTest, TestCreateWithTTLFails) {
+TEST_F(EtcdTest, CreateWithTTLFails) {
   EXPECT_CALL(
       url_fetcher_,
       Fetch(
@@ -370,7 +399,7 @@ TEST_F(EtcdTest, TestCreateWithTTLFails) {
             task.status());
 }
 
-TEST_F(EtcdTest, TestCreateInQueue) {
+TEST_F(EtcdTest, CreateInQueue) {
   EXPECT_CALL(
       url_fetcher_,
       Fetch(IsUrlFetchRequest(
@@ -392,7 +421,7 @@ TEST_F(EtcdTest, TestCreateInQueue) {
   EXPECT_EQ("/some/6", resp.key);
 }
 
-TEST_F(EtcdTest, TestCreateInQueueFails) {
+TEST_F(EtcdTest, CreateInQueueFails) {
   EXPECT_CALL(
       url_fetcher_,
       Fetch(IsUrlFetchRequest(
@@ -413,7 +442,7 @@ TEST_F(EtcdTest, TestCreateInQueueFails) {
             task.status());
 }
 
-TEST_F(EtcdTest, TestUpdate) {
+TEST_F(EtcdTest, Update) {
   EXPECT_CALL(url_fetcher_,
               Fetch(IsUrlFetchRequest(
                         UrlFetcher::Verb::PUT, URL(GetEtcdUrl(kEntryKey)),
@@ -433,7 +462,7 @@ TEST_F(EtcdTest, TestUpdate) {
   EXPECT_EQ(6, resp.etcd_index);
 }
 
-TEST_F(EtcdTest, TestUpdateFails) {
+TEST_F(EtcdTest, UpdateFails) {
   EXPECT_CALL(url_fetcher_,
               Fetch(IsUrlFetchRequest(
                         UrlFetcher::Verb::PUT, URL(GetEtcdUrl(kEntryKey)),
@@ -453,7 +482,7 @@ TEST_F(EtcdTest, TestUpdateFails) {
             task.status());
 }
 
-TEST_F(EtcdTest, TestUpdateWithTTL) {
+TEST_F(EtcdTest, UpdateWithTTL) {
   EXPECT_CALL(
       url_fetcher_,
       Fetch(IsUrlFetchRequest(
@@ -475,7 +504,7 @@ TEST_F(EtcdTest, TestUpdateWithTTL) {
   EXPECT_EQ(6, resp.etcd_index);
 }
 
-TEST_F(EtcdTest, TestUpdateWithTTLFails) {
+TEST_F(EtcdTest, UpdateWithTTLFails) {
   EXPECT_CALL(
       url_fetcher_,
       Fetch(IsUrlFetchRequest(
@@ -497,7 +526,7 @@ TEST_F(EtcdTest, TestUpdateWithTTLFails) {
             task.status());
 }
 
-TEST_F(EtcdTest, TestForceSetForPreexistingKey) {
+TEST_F(EtcdTest, ForceSetForPreexistingKey) {
   EXPECT_CALL(url_fetcher_,
               Fetch(IsUrlFetchRequest(
                         UrlFetcher::Verb::PUT, URL(GetEtcdUrl(kEntryKey)),
@@ -517,7 +546,7 @@ TEST_F(EtcdTest, TestForceSetForPreexistingKey) {
   EXPECT_EQ(6, resp.etcd_index);
 }
 
-TEST_F(EtcdTest, TestForceSetForNewKey) {
+TEST_F(EtcdTest, ForceSetForNewKey) {
   EXPECT_CALL(url_fetcher_,
               Fetch(IsUrlFetchRequest(
                         UrlFetcher::Verb::PUT, URL(GetEtcdUrl(kEntryKey)),
@@ -537,7 +566,7 @@ TEST_F(EtcdTest, TestForceSetForNewKey) {
   EXPECT_EQ(7, resp.etcd_index);
 }
 
-TEST_F(EtcdTest, TestForceSetWithTTLForPreexistingKey) {
+TEST_F(EtcdTest, ForceSetWithTTLForPreexistingKey) {
   EXPECT_CALL(url_fetcher_,
               Fetch(IsUrlFetchRequest(
                         UrlFetcher::Verb::PUT, URL(GetEtcdUrl(kEntryKey)),
@@ -558,7 +587,7 @@ TEST_F(EtcdTest, TestForceSetWithTTLForPreexistingKey) {
   EXPECT_EQ(6, resp.etcd_index);
 }
 
-TEST_F(EtcdTest, TestForceSetWithTTLForNewKey) {
+TEST_F(EtcdTest, ForceSetWithTTLForNewKey) {
   EXPECT_CALL(url_fetcher_,
               Fetch(IsUrlFetchRequest(
                         UrlFetcher::Verb::PUT, URL(GetEtcdUrl(kEntryKey)),
@@ -579,7 +608,7 @@ TEST_F(EtcdTest, TestForceSetWithTTLForNewKey) {
   EXPECT_EQ(7, resp.etcd_index);
 }
 
-TEST_F(EtcdTest, TestDelete) {
+TEST_F(EtcdTest, Delete) {
   EXPECT_CALL(
       url_fetcher_,
       Fetch(IsUrlFetchRequest(UrlFetcher::Verb::DELETE,
@@ -597,7 +626,7 @@ TEST_F(EtcdTest, TestDelete) {
   EXPECT_EQ(Status::OK, task.status());
 }
 
-TEST_F(EtcdTest, TestDeleteFails) {
+TEST_F(EtcdTest, DeleteFails) {
   EXPECT_CALL(
       url_fetcher_,
       Fetch(IsUrlFetchRequest(UrlFetcher::Verb::DELETE,
