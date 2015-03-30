@@ -14,6 +14,7 @@ using cert_trans::AsyncLogClient;
 using cert_trans::Cert;
 using cert_trans::CertChain;
 using cert_trans::PreCertChain;
+using cert_trans::URL;
 using cert_trans::UrlFetcher;
 using ct::DigitallySigned;
 using ct::MerkleAuditProof;
@@ -349,24 +350,31 @@ void DoneInternalAddChain(UrlFetcher::Response* resp,
 }
 
 
-}  // namespace
-
-namespace cert_trans {
-
-
-AsyncLogClient::AsyncLogClient(util::Executor* const executor,
-                               UrlFetcher* fetcher, const string& server_uri)
-    : executor_(CHECK_NOTNULL(executor)),
-      fetcher_(CHECK_NOTNULL(fetcher)),
-      server_url_(server_uri) {
-  string newpath(server_url_.Path());
+URL NormalizeURL(const string& server_url) {
+  URL retval(server_url);
+  string newpath(retval.Path());
 
   if (newpath.empty() || newpath.back() != '/')
     newpath.append("/");
 
   newpath.append("ct/v1/");
 
-  server_url_.SetPath(newpath);
+  retval.SetPath(newpath);
+
+  return retval;
+}
+
+
+}  // namespace
+
+namespace cert_trans {
+
+
+AsyncLogClient::AsyncLogClient(util::Executor* const executor,
+                               UrlFetcher* fetcher, const string& server_url)
+    : executor_(CHECK_NOTNULL(executor)),
+      fetcher_(CHECK_NOTNULL(fetcher)),
+      server_url_(NormalizeURL(server_url)) {
 }
 
 

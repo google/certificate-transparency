@@ -94,7 +94,7 @@ class AsyncLogClient {
 
   util::Executor* const executor_;
   UrlFetcher* const fetcher_;
-  URL server_url_;
+  const URL server_url_;
 
   DISALLOW_COPY_AND_ASSIGN(AsyncLogClient);
 };
