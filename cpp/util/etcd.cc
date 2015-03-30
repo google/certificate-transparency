@@ -457,8 +457,7 @@ void EtcdClient::WatchInitialGetDone(WatchState* state, GetResponse* resp,
 
   state->known_keys_.swap(new_known_keys);
 
-  state->task_->executor()->Add(
-      bind(&EtcdClient::SendWatchUpdates, this, state, move(updates)));
+  SendWatchUpdates(state, move(updates));
 }
 
 
@@ -495,37 +494,26 @@ void EtcdClient::WatchRequestDone(WatchState* state, GetResponse* get_resp,
     return;
   }
 
-  // TODO(pphaneuf): This and many other of the callbacks in this file
-  // do very similar validation, we should pull that out in a shared
-  // helper function.
-  {
-    // This is probably due to a timeout, just retry.
-    if (!child_task->status().ok()) {
-      LOG_EVERY_N(INFO, 10)
-          << "Watch request failed: " << child_task->status();
-      goto fail;
-    }
-
-    vector<Node> updates;
-    state->highest_index_seen_ =
-        max(state->highest_index_seen_, get_resp->node.modified_index_);
-    updates.emplace_back(get_resp->node);
-
-    if (!get_resp->node.deleted_) {
-      state->known_keys_[get_resp->node.key_] = get_resp->node.modified_index_;
-    } else {
-      VLOG(1) << "erased key: " << get_resp->node.key_;
-      state->known_keys_.erase(get_resp->node.key_);
-    }
-
-    return state->task_->executor()->Add(
-        bind(&EtcdClient::SendWatchUpdates, this, state, move(updates)));
+  // This is probably due to a timeout, just retry.
+  if (!child_task->status().ok()) {
+    LOG_EVERY_N(INFO, 10) << "Watch request failed: " << child_task->status();
+    StartWatchRequest(state);
+    return;
   }
 
-fail:
-  event_base_->Delay(seconds(FLAGS_etcd_watch_error_retry_delay_seconds),
-                     state->task_->AddChild(
-                         bind(&EtcdClient::StartWatchRequest, this, state)));
+  vector<Node> updates;
+  state->highest_index_seen_ =
+      max(state->highest_index_seen_, get_resp->node.modified_index_);
+  updates.emplace_back(get_resp->node);
+
+  if (!get_resp->node.deleted_) {
+    state->known_keys_[get_resp->node.key_] = get_resp->node.modified_index_;
+  } else {
+    VLOG(1) << "erased key: " << get_resp->node.key_;
+    state->known_keys_.erase(get_resp->node.key_);
+  }
+
+  SendWatchUpdates(state, move(updates));
 }
 
 
