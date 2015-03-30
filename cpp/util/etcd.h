@@ -108,8 +108,8 @@ class EtcdClient {
                        const std::chrono::seconds& ttl, Response* resp,
                        util::Task* task);
 
-  void Delete(const std::string& key, const int64_t current_index,
-              util::Task* task);
+  virtual void Delete(const std::string& key, const int64_t current_index,
+                      util::Task* task);
 
   // The "cb" will be called on the "task" executor. Also, only one
   // will be sent to the executor at a time (for a given call to this

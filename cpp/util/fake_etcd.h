@@ -20,6 +20,9 @@ class FakeEtcdClient : public EtcdClient {
 
   void DumpEntries();
 
+  void Delete(const std::string& key, const int64_t current_index,
+              util::Task* task) override;
+
   // The callbacks for *all* watches will be called one at a time, in
   // order, which is a stronger guarantee than the one
   // EtcdClient::Watch has.

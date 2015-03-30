@@ -146,7 +146,7 @@ class FakeEtcdTest : public ::testing::Test {
 };
 
 
-TEST_F(FakeEtcdTest, TestCreate) {
+TEST_F(FakeEtcdTest, Create) {
   Status status;
   int64_t created_index;
   status = BlockingCreate(kKey, kValue, &created_index);
@@ -161,7 +161,7 @@ TEST_F(FakeEtcdTest, TestCreate) {
 }
 
 
-TEST_F(FakeEtcdTest, TestCreateFailsIfExists) {
+TEST_F(FakeEtcdTest, CreateFailsIfExists) {
   Status status;
   int64_t created_index;
   status = BlockingCreate(kKey, kValue, &created_index);
@@ -173,7 +173,7 @@ TEST_F(FakeEtcdTest, TestCreateFailsIfExists) {
 }
 
 
-TEST_F(FakeEtcdTest, TestCreateInQueue) {
+TEST_F(FakeEtcdTest, CreateInQueue) {
   Status status;
   int64_t created_index;
   string created_key;
@@ -189,7 +189,7 @@ TEST_F(FakeEtcdTest, TestCreateInQueue) {
 }
 
 
-TEST_F(FakeEtcdTest, TestUpdate) {
+TEST_F(FakeEtcdTest, Update) {
   Status status;
   int64_t created_index;
   status = BlockingCreate(kKey, kValue, &created_index);
@@ -209,7 +209,7 @@ TEST_F(FakeEtcdTest, TestUpdate) {
 }
 
 
-TEST_F(FakeEtcdTest, TestUpdateFailsWithIncorrectPreviousIndex) {
+TEST_F(FakeEtcdTest, UpdateFailsWithIncorrectPreviousIndex) {
   Status status;
   int64_t created_index;
   status = BlockingCreate(kKey, kValue, &created_index);
@@ -230,7 +230,7 @@ TEST_F(FakeEtcdTest, TestUpdateFailsWithIncorrectPreviousIndex) {
 }
 
 
-TEST_F(FakeEtcdTest, TestCreateWithTTLExpires) {
+TEST_F(FakeEtcdTest, CreateWithTTLExpires) {
   duration<int> kTtl(3);
 
   Status status;
@@ -254,7 +254,7 @@ TEST_F(FakeEtcdTest, TestCreateWithTTLExpires) {
 }
 
 
-TEST_F(FakeEtcdTest, TestUpdateWithTTLExpires) {
+TEST_F(FakeEtcdTest, UpdateWithTTLExpires) {
   duration<int> kTtl(3);
 
   Status status;
@@ -284,7 +284,7 @@ TEST_F(FakeEtcdTest, TestUpdateWithTTLExpires) {
 }
 
 
-TEST_F(FakeEtcdTest, TestForceSet) {
+TEST_F(FakeEtcdTest, ForceSet) {
   Status status;
   int64_t created_index;
   status = BlockingCreate(kKey, kValue, &created_index);
@@ -304,7 +304,7 @@ TEST_F(FakeEtcdTest, TestForceSet) {
 }
 
 
-TEST_F(FakeEtcdTest, TestForceSetWithTTLExpires) {
+TEST_F(FakeEtcdTest, ForceSetWithTTLExpires) {
   duration<int> kTtl(3);
 
   Status status;
@@ -333,17 +333,42 @@ TEST_F(FakeEtcdTest, TestForceSetWithTTLExpires) {
 }
 
 
-TEST_F(FakeEtcdTest, TestDelete) {
-  Status status;
-  int64_t created_index;
-  status = BlockingCreate(kKey, kValue, &created_index);
-  EXPECT_TRUE(status.ok()) << status;
+TEST_F(FakeEtcdTest, DeleteNonExistent) {
+  Status status(BlockingDelete("/potato", 42));
+  EXPECT_EQ(util::error::NOT_FOUND, status.CanonicalCode()) << status;
+}
 
-  status = BlockingDelete(kKey, created_index);
-  EXPECT_TRUE(status.ok()) << status;
+
+TEST_F(FakeEtcdTest, DeleteIncorrectIndex) {
+  int64_t created_index;
+  EXPECT_EQ(Status::OK, BlockingCreate(kKey, kValue, &created_index));
 
   EtcdClient::Node node;
-  status = BlockingGet(kKey, &node);
+  EXPECT_EQ(Status::OK, BlockingGet(kKey, &node));
+  EXPECT_EQ(created_index, node.created_index_);
+  EXPECT_EQ(created_index, node.modified_index_);
+
+  Status status(BlockingDelete(kKey, created_index + 1));
+  EXPECT_EQ(util::error::FAILED_PRECONDITION, status.CanonicalCode()) << status;
+
+  EXPECT_EQ(Status::OK, BlockingGet(kKey, &node));
+  EXPECT_EQ(created_index, node.created_index_);
+  EXPECT_EQ(created_index, node.modified_index_);
+}
+
+
+TEST_F(FakeEtcdTest, Delete) {
+  int64_t created_index;
+  EXPECT_EQ(Status::OK, BlockingCreate(kKey, kValue, &created_index));
+
+  EtcdClient::Node node;
+  EXPECT_EQ(Status::OK, BlockingGet(kKey, &node));
+  EXPECT_EQ(created_index, node.created_index_);
+  EXPECT_EQ(created_index, node.modified_index_);
+
+  EXPECT_EQ(Status::OK, BlockingDelete(kKey, created_index));
+
+  Status status(BlockingGet(kKey, &node));
   EXPECT_EQ(util::error::NOT_FOUND, status.CanonicalCode()) << status;
 }
 
@@ -390,7 +415,7 @@ void TestWatcherForExecutor(Notification* notifier, bool* been_called) {
 }
 
 
-TEST_F(FakeEtcdTest, TestWatcherForExecutor) {
+TEST_F(FakeEtcdTest, WatcherForExecutor) {
   ThreadPool pool(2);
 
   Notification watch;
@@ -441,7 +466,7 @@ void TestWatcherForCreateCallback(Notification* notifier,
 }
 
 
-TEST_F(FakeEtcdTest, TestWatcherForCreate) {
+TEST_F(FakeEtcdTest, WatcherForCreate) {
   ThreadPool pool(2);
   int64_t created_index;
   Status status(BlockingCreate(kPath1, kValue, &created_index));
@@ -488,7 +513,7 @@ void TestWatcherForDeleteCallback(Notification* notifier, int* num_calls,
 }
 
 
-TEST_F(FakeEtcdTest, TestWatcherForDelete) {
+TEST_F(FakeEtcdTest, WatcherForDelete) {
   ThreadPool pool(2);
   int64_t created_index;
   Status status(BlockingCreate(kPath1, kValue, &created_index));

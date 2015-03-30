@@ -141,8 +141,6 @@ void FakeEtcdClient::Generic(const std::string& key,
       HandlePut(key, params, resp, task);
       break;
     case UrlFetcher::Verb::DELETE:
-      HandleDelete(key, params, resp, task);
-      break;
     default:
       LOG(FATAL) << "Unsupported verb " << static_cast<int>(verb);
   }
@@ -308,26 +306,31 @@ void FakeEtcdClient::HandlePut(const string& key,
 }
 
 
-void FakeEtcdClient::HandleDelete(const string& key,
-                                  const map<string, string>& params,
-                                  GenericResponse* resp, Task* task) {
+void FakeEtcdClient::Delete(const string& key, const int64_t current_index,
+                            Task* task) {
   VLOG(1) << "DELETE " << key;
   unique_lock<mutex> lock(mutex_);
+  CHECK(!key.empty());
   CHECK(key.back() != '/');
-  Status status(CheckCompareFlags(params, key));
-  if (!status.ok()) {
-    resp->etcd_index = index_;
-    resp->json_body = make_shared<JsonObject>();
-    task->Return(status);
+
+  const map<string, Node>::iterator entry(entries_.find(key));
+  if (entry == entries_.end()) {
+    task->Return(Status(util::error::NOT_FOUND, "Node doesn't exist: " + key));
     return;
   }
-  entries_[key].deleted_ = true;
-  resp->etcd_index = ++index_;
-  resp->json_body = make_shared<JsonObject>();
-  FillJsonForEntry(entries_[key], "delete", resp->json_body);
+  if (entry->second.modified_index_ != current_index) {
+    task->Return(Status(util::error::FAILED_PRECONDITION,
+                        "Incorrect index:  prevIndex=" +
+                            to_string(current_index) +
+                            " but modified_index_=" +
+                            to_string(entry->second.modified_index_)));
+    return;
+  }
+  entry->second.deleted_ = true;
+  ++index_;
   task->Return();
   NotifyForPath(lock, key);
-  entries_.erase(key);
+  entries_.erase(entry);
 }
 
 
