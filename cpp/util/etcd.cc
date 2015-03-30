@@ -5,6 +5,7 @@
 #include <utility>
 
 #include "util/json_wrapper.h"
+#include "util/libevent_wrapper.h"
 #include "util/statusor.h"
 
 namespace libevent = cert_trans::libevent;
@@ -589,21 +590,15 @@ bool EtcdClient::Node::HasExpiry() const {
 }
 
 
-EtcdClient::EtcdClient(const shared_ptr<libevent::Base>& event_base,
-                       UrlFetcher* fetcher, const string& host, uint16_t port)
-    : event_base_(event_base),
-      fetcher_(CHECK_NOTNULL(fetcher)),
-      endpoint_(host, port) {
-  CHECK_NOTNULL(event_base_.get());
+EtcdClient::EtcdClient(UrlFetcher* fetcher, const string& host, uint16_t port)
+    : fetcher_(CHECK_NOTNULL(fetcher)), endpoint_(host, port) {
   CHECK(!endpoint_.first.empty());
   CHECK_GT(endpoint_.second, 0);
   VLOG(1) << "EtcdClient: " << this;
 }
 
 
-EtcdClient::EtcdClient(const shared_ptr<libevent::Base>& event_base)
-    : event_base_(event_base), fetcher_(nullptr) {
-  CHECK_NOTNULL(event_base_.get());
+EtcdClient::EtcdClient() : fetcher_(nullptr) {
 }
 
 

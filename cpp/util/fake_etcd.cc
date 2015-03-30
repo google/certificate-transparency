@@ -98,8 +98,7 @@ bool GetParam(const map<string, string>& params, const string& name,
 }  // namespace
 
 
-FakeEtcdClient::FakeEtcdClient(const std::shared_ptr<libevent::Base>& base)
-    : EtcdClient(base), base_(base), index_(1) {
+FakeEtcdClient::FakeEtcdClient() : index_(1) {
 }
 
 

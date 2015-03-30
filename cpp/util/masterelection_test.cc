@@ -147,10 +147,9 @@ class ElectionTest : public ::testing::Test {
   ElectionTest()
       : base_(make_shared<libevent::Base>()),
         url_fetcher_(base_.get()),
-        client_(FLAGS_etcd.empty()
-                    ? new FakeEtcdClient(base_)
-                    : new EtcdClient(base_, &url_fetcher_, FLAGS_etcd,
-                                     FLAGS_etcd_port)),
+        client_(FLAGS_etcd.empty() ? new FakeEtcdClient
+                                   : new EtcdClient(&url_fetcher_, FLAGS_etcd,
+                                                    FLAGS_etcd_port)),
         event_pump_(base_) {
   }
 

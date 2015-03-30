@@ -45,9 +45,7 @@ const char kValue2[] = "value2";
 class FakeEtcdTest : public ::testing::Test {
  public:
   FakeEtcdTest()
-      : base_(std::make_shared<libevent::Base>()),
-        event_pump_(base_),
-        client_(base_) {
+      : base_(std::make_shared<libevent::Base>()), event_pump_(base_) {
   }
 
  protected:

@@ -14,7 +14,7 @@ namespace cert_trans {
 
 class FakeEtcdClient : public EtcdClient {
  public:
-  FakeEtcdClient(const std::shared_ptr<libevent::Base>& base);
+  FakeEtcdClient();
 
   virtual ~FakeEtcdClient() = default;
 
@@ -72,7 +72,6 @@ class FakeEtcdClient : public EtcdClient {
                              const std::function<void()>& callback);
   void RunWatchCallback();
 
-  const std::shared_ptr<libevent::Base> base_;
   std::mutex mutex_;
   int64_t index_;
   std::map<std::string, Node> entries_;

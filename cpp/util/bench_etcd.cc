@@ -85,7 +85,7 @@ void test_etcd(int thread_num) {
   const shared_ptr<libevent::Base> event_base(make_shared<libevent::Base>());
   libevent::EventPumpThread pump(event_base);
   UrlFetcher fetcher(event_base.get());
-  EtcdClient etcd(event_base, &fetcher, FLAGS_etcd, FLAGS_etcd_port);
+  EtcdClient etcd(&fetcher, FLAGS_etcd, FLAGS_etcd_port);
   SyncTask task(event_base.get());
   State state(&etcd, thread_num, task.task());
 

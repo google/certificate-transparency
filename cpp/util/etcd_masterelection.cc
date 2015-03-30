@@ -30,7 +30,7 @@ int main(int argc, char* argv[]) {
   const shared_ptr<libevent::Base> event_base(make_shared<libevent::Base>());
   UrlFetcher fetcher(event_base.get());
 
-  EtcdClient etcd(event_base, &fetcher, FLAGS_etcd, FLAGS_etcd_port);
+  EtcdClient etcd(&fetcher, FLAGS_etcd, FLAGS_etcd_port);
   MasterElection election(event_base, &etcd, FLAGS_proposal_dir,
                           FLAGS_node_id);
   election.StartElection();

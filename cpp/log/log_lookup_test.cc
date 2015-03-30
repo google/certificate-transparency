@@ -53,7 +53,6 @@ class LogLookupTest : public ::testing::Test {
       : test_db_(),
         base_(make_shared<libevent::Base>()),
         event_pump_(base_),
-        etcd_client_(base_),
         pool_(2),
         store_(&pool_, &etcd_client_, &election_, "/root", "id"),
         test_signer_(),

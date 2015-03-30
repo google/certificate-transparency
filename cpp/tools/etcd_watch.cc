@@ -2,7 +2,6 @@
 #include <gflags/gflags.h>
 #include <glog/logging.h>
 #include <iostream>
-#include <memory>
 
 #include "util/etcd.h"
 #include "util/libevent_wrapper.h"
@@ -14,8 +13,6 @@ using cert_trans::EtcdClient;
 using cert_trans::UrlFetcher;
 using std::cout;
 using std::endl;
-using std::make_shared;
-using std::shared_ptr;
 using std::vector;
 using util::SyncTask;
 
@@ -40,14 +37,14 @@ int main(int argc, char* argv[]) {
   google::InitGoogleLogging(argv[0]);
   evthread_use_pthreads();
 
-  const shared_ptr<libevent::Base> event_base(make_shared<libevent::Base>());
-  UrlFetcher fetcher(event_base.get());
-  EtcdClient etcd(event_base, &fetcher, FLAGS_etcd, FLAGS_etcd_port);
+  libevent::Base event_base;
+  UrlFetcher fetcher(&event_base);
+  EtcdClient etcd(&fetcher, FLAGS_etcd, FLAGS_etcd_port);
 
-  SyncTask task(event_base.get());
+  SyncTask task(&event_base);
   etcd.Watch(FLAGS_key, Notify, task.task());
 
-  event_base->Dispatch();
+  event_base.Dispatch();
 
   // This shouldn't really happen.
   task.Wait();

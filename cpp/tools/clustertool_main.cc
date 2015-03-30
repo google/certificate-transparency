@@ -148,8 +148,7 @@ int main(int argc, char* argv[]) {
       new libevent::EventPumpThread(event_base));
   UrlFetcher fetcher(event_base.get());
 
-  EtcdClient etcd_client(event_base, &fetcher, FLAGS_etcd_host,
-                         FLAGS_etcd_port);
+  EtcdClient etcd_client(&fetcher, FLAGS_etcd_host, FLAGS_etcd_port);
 
   const string node_id("clustertool");
   unique_ptr<MasterElection> election(

@@ -162,7 +162,7 @@ class EtcdTest : public ::testing::Test {
   EtcdTest()
       : base_(make_shared<libevent::Base>()),
         pump_(base_),
-        client_(base_, &url_fetcher_, kEtcdHost, kEtcdPort) {
+        client_(&url_fetcher_, kEtcdHost, kEtcdPort) {
   }
 
   shared_ptr<JsonObject> MakeJson(const string& json) {

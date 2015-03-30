@@ -428,9 +428,9 @@ int main(int argc, char* argv[]) {
             << (stand_alone_mode ? "STAND-ALONE" : "CLUSTERED") << " mode.";
 
   std::unique_ptr<EtcdClient> etcd_client(
-      stand_alone_mode ? new FakeEtcdClient(event_base)
-                       : new EtcdClient(event_base, &url_fetcher,
-                                        FLAGS_etcd_host, FLAGS_etcd_port));
+      stand_alone_mode
+          ? new FakeEtcdClient
+          : new EtcdClient(&url_fetcher, FLAGS_etcd_host, FLAGS_etcd_port));
 
   // No real reason to let this be configurable per node; you can really
   // shoot yourself in the foot that way by effectively running multiple

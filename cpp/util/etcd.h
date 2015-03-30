@@ -11,7 +11,6 @@
 
 #include "base/macros.h"
 #include "net/url_fetcher.h"
-#include "util/libevent_wrapper.h"
 #include "util/status.h"
 #include "util/task.h"
 
@@ -78,8 +77,7 @@ class EtcdClient {
   typedef std::function<void(const std::vector<Node>& updates)> WatchCallback;
 
   // TODO(pphaneuf): This should take a set of servers, not just one.
-  EtcdClient(const std::shared_ptr<libevent::Base>& event_base,
-             UrlFetcher* fetcher, const std::string& host, uint16_t port);
+  EtcdClient(UrlFetcher* fetcher, const std::string& host, uint16_t port);
 
   virtual ~EtcdClient();
 
@@ -122,7 +120,7 @@ class EtcdClient {
 
  protected:
   // Testing only
-  EtcdClient(const std::shared_ptr<libevent::Base>& event_base);
+  EtcdClient();
 
   virtual void Generic(const std::string& key,
                        const std::map<std::string, std::string>& params,
@@ -146,7 +144,6 @@ class EtcdClient {
   void WatchRequestDone(WatchState* state, GetResponse* gen_resp,
                         util::Task* child_task);
 
-  const std::shared_ptr<libevent::Base> event_base_;
   UrlFetcher* const fetcher_;
 
   mutable std::mutex lock_;
