@@ -79,17 +79,6 @@ class FakeEtcdTest : public ::testing::Test {
     return task.status();
   }
 
-  Status BlockingCreateInQueue(const string& dir, const string& value,
-                               string* created_key, int64_t* created_index) {
-    SyncTask task(base_.get());
-    EtcdClient::CreateInQueueResponse resp;
-    client_.CreateInQueue(dir, value, &resp, task.task());
-    task.Wait();
-    *created_index = resp.etcd_index;
-    *created_key = resp.key;
-    return task.status();
-  }
-
   Status BlockingUpdate(const string& key, const string& value,
                         int64_t old_index, int64_t* modified_index) {
     SyncTask task(base_.get());
@@ -170,22 +159,6 @@ TEST_F(FakeEtcdTest, CreateFailsIfExists) {
   status = BlockingCreate(kKey, kValue, &created_index);
   EXPECT_EQ(util::error::FAILED_PRECONDITION, status.CanonicalCode())
       << status;
-}
-
-
-TEST_F(FakeEtcdTest, CreateInQueue) {
-  Status status;
-  int64_t created_index;
-  string created_key;
-  status = BlockingCreateInQueue(kDir, kValue, &created_key, &created_index);
-  EXPECT_TRUE(status.ok()) << status;
-
-  EtcdClient::Node node;
-  status = BlockingGet(created_key, &node);
-  EXPECT_TRUE(status.ok()) << status;
-  EXPECT_EQ(kValue, node.value_);
-  EXPECT_EQ(created_index, node.created_index_);
-  EXPECT_EQ(created_index, node.modified_index_);
 }
 
 
@@ -349,7 +322,8 @@ TEST_F(FakeEtcdTest, DeleteIncorrectIndex) {
   EXPECT_EQ(created_index, node.modified_index_);
 
   Status status(BlockingDelete(kKey, created_index + 1));
-  EXPECT_EQ(util::error::FAILED_PRECONDITION, status.CanonicalCode()) << status;
+  EXPECT_EQ(util::error::FAILED_PRECONDITION, status.CanonicalCode())
+      << status;
 
   EXPECT_EQ(Status::OK, BlockingGet(kKey, &node));
   EXPECT_EQ(created_index, node.created_index_);

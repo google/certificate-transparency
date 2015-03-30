@@ -207,37 +207,6 @@ void CreateRequestDone(EtcdClient::Response* resp, Task* parent_task,
 }
 
 
-void CreateInQueueRequestDone(EtcdClient::CreateInQueueResponse* resp,
-                              Task* parent_task,
-                              EtcdClient::GenericResponse* gen_resp,
-                              Task* task) {
-  *resp = EtcdClient::CreateInQueueResponse();
-  if (!task->status().ok()) {
-    parent_task->Return(task->status());
-    return;
-  }
-
-  const JsonObject json_node(*gen_resp->json_body, "node");
-  if (!json_node.Ok()) {
-    parent_task->Return(Status(util::error::FAILED_PRECONDITION,
-                               "Invalid JSON: Couldn't find 'node'"));
-    return;
-  }
-
-  StatusOr<EtcdClient::Node> node(ParseNodeFromJson(json_node));
-  if (!node.status().ok()) {
-    parent_task->Return(node.status());
-    return;
-  }
-
-  CHECK_EQ(node.ValueOrDie().created_index_,
-           node.ValueOrDie().modified_index_);
-  resp->etcd_index = node.ValueOrDie().modified_index_;
-  resp->key = node.ValueOrDie().key_;
-  parent_task->Return();
-}
-
-
 void UpdateRequestDone(EtcdClient::Response* resp, Task* parent_task,
                        EtcdClient::GenericResponse* gen_resp, Task* task) {
   *resp = EtcdClient::Response();
@@ -723,19 +692,6 @@ void EtcdClient::CreateWithTTL(const string& key, const string& value,
   task->DeleteWhenDone(gen_resp);
   Generic(key, params, UrlFetcher::Verb::PUT, gen_resp,
           task->AddChild(bind(&CreateRequestDone, resp, task, gen_resp, _1)));
-}
-
-
-void EtcdClient::CreateInQueue(const string& dir, const string& value,
-                               CreateInQueueResponse* resp, Task* task) {
-  map<string, string> params;
-  params["value"] = value;
-  params["prevExist"] = "false";
-  GenericResponse* const gen_resp(new GenericResponse);
-  task->DeleteWhenDone(gen_resp);
-  Generic(dir, params, UrlFetcher::Verb::POST, gen_resp,
-          task->AddChild(
-              bind(&CreateInQueueRequestDone, resp, task, gen_resp, _1)));
 }
 
 

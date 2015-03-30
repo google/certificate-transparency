@@ -62,10 +62,6 @@ class EtcdClient {
     int64_t etcd_index;
   };
 
-  struct CreateInQueueResponse : public Response {
-    std::string key;
-  };
-
   struct GetResponse : public Response {
     Node node;
   };
@@ -89,9 +85,6 @@ class EtcdClient {
   void CreateWithTTL(const std::string& key, const std::string& value,
                      const std::chrono::seconds& ttl, Response* resp,
                      util::Task* task);
-
-  void CreateInQueue(const std::string& dir, const std::string& value,
-                     CreateInQueueResponse* resp, util::Task* task);
 
   void Update(const std::string& key, const std::string& value,
               const int64_t previous_index, Response* resp, util::Task* task);

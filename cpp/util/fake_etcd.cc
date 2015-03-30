@@ -27,15 +27,6 @@ namespace cert_trans {
 namespace {
 
 
-string EnsureEndsWithSlash(const string& s) {
-  if (s.empty() || s.back() != '/') {
-    return s + '/';
-  } else {
-    return s;
-  }
-}
-
-
 void FillJsonForNode(const EtcdClient::Node& node, JsonObject* json) {
   json->Add("modifiedIndex", node.modified_index_);
   json->Add("createdIndex", node.created_index_);
@@ -134,12 +125,10 @@ void FakeEtcdClient::Generic(const std::string& key,
     case UrlFetcher::Verb::GET:
       HandleGet(key, params, resp, task);
       break;
-    case UrlFetcher::Verb::POST:
-      HandlePost(key, params, resp, task);
-      break;
     case UrlFetcher::Verb::PUT:
       HandlePut(key, params, resp, task);
       break;
+    case UrlFetcher::Verb::POST:
     case UrlFetcher::Verb::DELETE:
     default:
       LOG(FATAL) << "Unsupported verb " << static_cast<int>(verb);
@@ -252,26 +241,6 @@ Status FakeEtcdClient::CheckCompareFlags(const map<string, string> params,
     }
   }
   return Status::OK;
-}
-
-
-void FakeEtcdClient::HandlePost(const string& key,
-                                const map<string, string>& params,
-                                GenericResponse* resp, Task* task) {
-  VLOG(1) << "POST " << key;
-  unique_lock<mutex> lock(mutex_);
-  const string path(EnsureEndsWithSlash(key) + to_string(index_));
-  CHECK(params.find("value") != params.end());
-  const string& value(params.find("value")->second);
-  Node node(index_, index_, path, false, value, {}, false);
-  MaybeSetExpiry(params, &node);
-  entries_[path] = node;
-
-  resp->etcd_index = ++index_;
-  resp->json_body = make_shared<JsonObject>();
-  FillJsonForEntry(node, "create", resp->json_body);
-  task->Return();
-  NotifyForPath(lock, path);
 }
 
 

@@ -88,17 +88,6 @@ const char kCreateJson[] =
     "  }"
     "}";
 
-const char kCreateInQueueJson[] =
-    "{"
-    "  \"action\": \"set\","
-    "  \"node\": {"
-    "    \"createdIndex\": 6,"
-    "    \"key\": \"/some/6\","
-    "    \"modifiedIndex\": 6,"
-    "    \"value\": \"123\""
-    "  }"
-    "}";
-
 const char kUpdateJson[] =
     "{"
     "  \"action\": \"set\","
@@ -396,49 +385,6 @@ TEST_F(EtcdTest, CreateWithTTLFails) {
   EtcdClient::Response resp;
   client_.CreateWithTTL(kEntryKey, "123", std::chrono::duration<int>(100),
                         &resp, task.task());
-  task.Wait();
-  EXPECT_THAT(task.status(), StatusIs(util::error::FAILED_PRECONDITION,
-                                      "Key already exists"));
-}
-
-TEST_F(EtcdTest, CreateInQueue) {
-  EXPECT_CALL(
-      url_fetcher_,
-      Fetch(IsUrlFetchRequest(
-                UrlFetcher::Verb::POST, URL(GetEtcdUrl(kDirKey)),
-                ElementsAre(Pair(StrCaseEq("content-type"),
-                                 "application/x-www-form-urlencoded")),
-                "consistent=true&prevExist=false&quorum=true&value=123"),
-            _, _))
-      .WillOnce(
-          Invoke(bind(HandleFetch, Status::OK, 200,
-                      UrlFetcher::Headers{make_pair("x-etcd-index", "1")},
-                      kCreateInQueueJson, _1, _2, _3)));
-  SyncTask task(base_.get());
-  EtcdClient::CreateInQueueResponse resp;
-  client_.CreateInQueue(kDirKey, "123", &resp, task.task());
-  task.Wait();
-  EXPECT_OK(task);
-  EXPECT_EQ(6, resp.etcd_index);
-  EXPECT_EQ("/some/6", resp.key);
-}
-
-TEST_F(EtcdTest, CreateInQueueFails) {
-  EXPECT_CALL(
-      url_fetcher_,
-      Fetch(IsUrlFetchRequest(
-                UrlFetcher::Verb::POST, URL(GetEtcdUrl(kDirKey)),
-                ElementsAre(Pair(StrCaseEq("content-type"),
-                                 "application/x-www-form-urlencoded")),
-                "consistent=true&prevExist=false&quorum=true&value=123"),
-            _, _))
-      .WillOnce(
-          Invoke(bind(HandleFetch, Status::OK, 412,
-                      UrlFetcher::Headers{make_pair("x-etcd-index", "1")},
-                      kKeyAlreadyExistsJson, _1, _2, _3)));
-  SyncTask task(base_.get());
-  EtcdClient::CreateInQueueResponse resp;
-  client_.CreateInQueue(kDirKey, "123", &resp, task.task());
   task.Wait();
   EXPECT_THAT(task.status(), StatusIs(util::error::FAILED_PRECONDITION,
                                       "Key already exists"));
