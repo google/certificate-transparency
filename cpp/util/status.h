@@ -175,6 +175,8 @@ inline bool Status::operator!=(const Status& other) const {
   return !(*this == other);
 }
 
+extern ::std::ostream& operator<<(::std::ostream& os,
+                                  ::util::error::Code code);
 extern ::std::ostream& operator<<(::std::ostream& os, const Status& other);
 
 

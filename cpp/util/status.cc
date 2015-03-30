@@ -77,6 +77,63 @@ string Status::ToString() const {
   return oss.str();
 }
 
+extern ostream& operator<<(ostream& os, util::error::Code code) {
+  switch (code) {
+    case util::error::OK:
+      os << "OK";
+      break;
+    case util::error::CANCELLED:
+      os << "CANCELLED";
+      break;
+    case util::error::UNKNOWN:
+      os << "UNKNOWN";
+      return os;
+    case util::error::INVALID_ARGUMENT:
+      os << "INVALID_ARGUMENT";
+      return os;
+    case util::error::DEADLINE_EXCEEDED:
+      os << "DEADLINE_EXCEEDED";
+      return os;
+    case util::error::NOT_FOUND:
+      os << "NOT_FOUND";
+      return os;
+    case util::error::ALREADY_EXISTS:
+      os << "ALREADY_EXISTS";
+      return os;
+    case util::error::PERMISSION_DENIED:
+      os << "PERMISSION_DENIED";
+      return os;
+    case util::error::RESOURCE_EXHAUSTED:
+      os << "RESOURCE_EXHAUSTED";
+      return os;
+    case util::error::FAILED_PRECONDITION:
+      os << "FAILED_PRECONDITION";
+      return os;
+    case util::error::ABORTED:
+      os << "ABORTED";
+      return os;
+    case util::error::OUT_OF_RANGE:
+      os << "OUT_OF_RANGE";
+      return os;
+    case util::error::UNIMPLEMENTED:
+      os << "UNIMPLEMENTED";
+      return os;
+    case util::error::INTERNAL:
+      os << "INTERNAL";
+      return os;
+    case util::error::UNAVAILABLE:
+      os << "UNAVAILABLE";
+      return os;
+    case util::error::DATA_LOSS:
+      os << "DATA_LOSS";
+      return os;
+  }
+  // Avoid using a "default" in the switch, so that the compiler can
+  // give us a warning, but still provide a fallback here.
+  os << static_cast<int>(code);
+  return os;
+}
+
 extern ostream& operator<<(ostream& os, const Status& other) {
   os << other.ToString();
   return os;
