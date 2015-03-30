@@ -8,6 +8,7 @@
 #include "net/mock_url_fetcher.h"
 #include "util/json_wrapper.h"
 #include "util/libevent_wrapper.h"
+#include "util/status_test_util.h"
 #include "util/sync_task.h"
 #include "util/testing.h"
 
@@ -33,6 +34,7 @@ using testing::_;
 using util::Status;
 using util::SyncTask;
 using util::Task;
+using util::testing::StatusIs;
 
 namespace {
 
@@ -207,7 +209,7 @@ TEST_F(EtcdTest, Get) {
   EtcdClient::GetResponse resp;
   client_.Get(string(kEntryKey), &resp, task.task());
   task.Wait();
-  EXPECT_EQ(Status::OK, task.status());
+  EXPECT_OK(task);
   EXPECT_EQ(11, resp.etcd_index);
   EXPECT_EQ(9, resp.node.modified_index_);
   EXPECT_EQ("123", resp.node.value_);
@@ -232,7 +234,7 @@ TEST_F(EtcdTest, GetRecursive) {
   EtcdClient::GetResponse resp;
   client_.Get(req, &resp, task.task());
   task.Wait();
-  EXPECT_EQ(Status::OK, task.status());
+  EXPECT_OK(task);
   EXPECT_EQ(11, resp.etcd_index);
   EXPECT_EQ(9, resp.node.modified_index_);
   EXPECT_EQ("123", resp.node.value_);
@@ -253,9 +255,9 @@ TEST_F(EtcdTest, GetForInvalidKey) {
   EtcdClient::GetResponse resp;
   client_.Get(string(kEntryKey), &resp, task.task());
   task.Wait();
-  EXPECT_EQ(Status(util::error::NOT_FOUND,
-                   "Key not found (" + string(kEntryKey) + ")"),
-            task.status());
+  EXPECT_THAT(task.status(),
+              StatusIs(util::error::NOT_FOUND,
+                       "Key not found (" + string(kEntryKey) + ")"));
 }
 
 TEST_F(EtcdTest, GetAll) {
@@ -273,7 +275,7 @@ TEST_F(EtcdTest, GetAll) {
   EtcdClient::GetResponse resp;
   client_.Get(string(kDirKey), &resp, task.task());
   task.Wait();
-  ASSERT_EQ(Status::OK, task.status());
+  ASSERT_OK(task);
   EXPECT_TRUE(resp.node.is_dir_);
   ASSERT_EQ(2, resp.node.nodes_.size());
   EXPECT_EQ(9, resp.node.nodes_[0].modified_index_);
@@ -328,7 +330,7 @@ TEST_F(EtcdTest, Create) {
   EtcdClient::Response resp;
   client_.Create(kEntryKey, "123", &resp, task.task());
   task.Wait();
-  EXPECT_EQ(Status::OK, task.status());
+  EXPECT_OK(task);
   EXPECT_EQ(7, resp.etcd_index);
 }
 
@@ -349,8 +351,8 @@ TEST_F(EtcdTest, CreateFails) {
   EtcdClient::Response resp;
   client_.Create(kEntryKey, "123", &resp, task.task());
   task.Wait();
-  EXPECT_EQ(Status(util::error::FAILED_PRECONDITION, "Key already exists"),
-            task.status());
+  EXPECT_THAT(task.status(), StatusIs(util::error::FAILED_PRECONDITION,
+                                      "Key already exists"));
 }
 
 TEST_F(EtcdTest, CreateWithTTL) {
@@ -372,7 +374,7 @@ TEST_F(EtcdTest, CreateWithTTL) {
   client_.CreateWithTTL(kEntryKey, "123", std::chrono::duration<int>(100),
                         &resp, task.task());
   task.Wait();
-  EXPECT_EQ(Status::OK, task.status());
+  EXPECT_OK(task);
   EXPECT_EQ(7, resp.etcd_index);
 }
 
@@ -395,8 +397,8 @@ TEST_F(EtcdTest, CreateWithTTLFails) {
   client_.CreateWithTTL(kEntryKey, "123", std::chrono::duration<int>(100),
                         &resp, task.task());
   task.Wait();
-  EXPECT_EQ(Status(util::error::FAILED_PRECONDITION, "Key already exists"),
-            task.status());
+  EXPECT_THAT(task.status(), StatusIs(util::error::FAILED_PRECONDITION,
+                                      "Key already exists"));
 }
 
 TEST_F(EtcdTest, CreateInQueue) {
@@ -416,7 +418,7 @@ TEST_F(EtcdTest, CreateInQueue) {
   EtcdClient::CreateInQueueResponse resp;
   client_.CreateInQueue(kDirKey, "123", &resp, task.task());
   task.Wait();
-  EXPECT_EQ(Status::OK, task.status());
+  EXPECT_OK(task);
   EXPECT_EQ(6, resp.etcd_index);
   EXPECT_EQ("/some/6", resp.key);
 }
@@ -438,8 +440,8 @@ TEST_F(EtcdTest, CreateInQueueFails) {
   EtcdClient::CreateInQueueResponse resp;
   client_.CreateInQueue(kDirKey, "123", &resp, task.task());
   task.Wait();
-  EXPECT_EQ(Status(util::error::FAILED_PRECONDITION, "Key already exists"),
-            task.status());
+  EXPECT_THAT(task.status(), StatusIs(util::error::FAILED_PRECONDITION,
+                                      "Key already exists"));
 }
 
 TEST_F(EtcdTest, Update) {
@@ -458,7 +460,7 @@ TEST_F(EtcdTest, Update) {
   EtcdClient::Response resp;
   client_.Update(kEntryKey, "123", 5, &resp, task.task());
   task.Wait();
-  EXPECT_EQ(Status::OK, task.status());
+  EXPECT_OK(task);
   EXPECT_EQ(6, resp.etcd_index);
 }
 
@@ -478,8 +480,8 @@ TEST_F(EtcdTest, UpdateFails) {
   EtcdClient::Response resp;
   client_.Update(kEntryKey, "123", 5, &resp, task.task());
   task.Wait();
-  EXPECT_EQ(Status(util::error::FAILED_PRECONDITION, "Compare failed"),
-            task.status());
+  EXPECT_THAT(task.status(),
+              StatusIs(util::error::FAILED_PRECONDITION, "Compare failed"));
 }
 
 TEST_F(EtcdTest, UpdateWithTTL) {
@@ -500,7 +502,7 @@ TEST_F(EtcdTest, UpdateWithTTL) {
   client_.UpdateWithTTL(kEntryKey, "123", std::chrono::duration<int>(100), 5,
                         &resp, task.task());
   task.Wait();
-  EXPECT_EQ(Status::OK, task.status());
+  EXPECT_OK(task);
   EXPECT_EQ(6, resp.etcd_index);
 }
 
@@ -522,8 +524,8 @@ TEST_F(EtcdTest, UpdateWithTTLFails) {
   client_.UpdateWithTTL(kEntryKey, "123", std::chrono::duration<int>(100), 5,
                         &resp, task.task());
   task.Wait();
-  EXPECT_EQ(Status(util::error::FAILED_PRECONDITION, "Compare failed"),
-            task.status());
+  EXPECT_THAT(task.status(),
+              StatusIs(util::error::FAILED_PRECONDITION, "Compare failed"));
 }
 
 TEST_F(EtcdTest, ForceSetForPreexistingKey) {
@@ -542,7 +544,7 @@ TEST_F(EtcdTest, ForceSetForPreexistingKey) {
   EtcdClient::Response resp;
   client_.ForceSet(kEntryKey, "123", &resp, task.task());
   task.Wait();
-  EXPECT_EQ(Status::OK, task.status());
+  EXPECT_OK(task);
   EXPECT_EQ(6, resp.etcd_index);
 }
 
@@ -562,7 +564,7 @@ TEST_F(EtcdTest, ForceSetForNewKey) {
   EtcdClient::Response resp;
   client_.ForceSet(kEntryKey, "123", &resp, task.task());
   task.Wait();
-  EXPECT_EQ(Status::OK, task.status());
+  EXPECT_OK(task);
   EXPECT_EQ(7, resp.etcd_index);
 }
 
@@ -583,7 +585,7 @@ TEST_F(EtcdTest, ForceSetWithTTLForPreexistingKey) {
   client_.ForceSetWithTTL(kEntryKey, "123", std::chrono::duration<int>(100),
                           &resp, task.task());
   task.Wait();
-  EXPECT_EQ(Status::OK, task.status());
+  EXPECT_OK(task);
   EXPECT_EQ(6, resp.etcd_index);
 }
 
@@ -604,7 +606,7 @@ TEST_F(EtcdTest, ForceSetWithTTLForNewKey) {
   client_.ForceSetWithTTL(kEntryKey, "123", std::chrono::duration<int>(100),
                           &resp, task.task());
   task.Wait();
-  EXPECT_EQ(Status::OK, task.status());
+  EXPECT_OK(task);
   EXPECT_EQ(7, resp.etcd_index);
 }
 
@@ -623,7 +625,7 @@ TEST_F(EtcdTest, Delete) {
   SyncTask task(base_.get());
   client_.Delete(kEntryKey, 5, task.task());
   task.Wait();
-  EXPECT_EQ(Status::OK, task.status());
+  EXPECT_OK(task);
 }
 
 TEST_F(EtcdTest, DeleteFails) {
@@ -641,8 +643,8 @@ TEST_F(EtcdTest, DeleteFails) {
   SyncTask task(base_.get());
   client_.Delete(kEntryKey, 5, task.task());
   task.Wait();
-  EXPECT_EQ(Status(util::error::FAILED_PRECONDITION, "Compare failed"),
-            task.status());
+  EXPECT_THAT(task.status(),
+              StatusIs(util::error::FAILED_PRECONDITION, "Compare failed"));
 }
 
 }  // namespace
