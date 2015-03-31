@@ -4,7 +4,7 @@
 #include <stdint.h>
 #include <string>
 
-#include "log/etcd_consistent_store.h"
+#include "log/etcd_consistent_store-inl.h"
 #include "log/file_db.h"
 #include "log/log_signer.h"
 #include "log/log_verifier.h"
@@ -31,9 +31,13 @@ using ct::ClusterNodeState;
 using ct::SequenceMapping;
 using ct::SignedTreeHead;
 using std::make_shared;
+using std::move;
 using std::shared_ptr;
 using std::string;
+using std::unordered_map;
+using std::vector;
 using testing::NiceMock;
+using util::Status;
 
 typedef Database<LoggedCertificate> DB;
 typedef TreeSigner<LoggedCertificate> TS;
@@ -76,6 +80,13 @@ class TreeSignerTest : public ::testing::Test {
   void AddPendingEntry(LoggedCertificate* logged_cert) const {
     logged_cert->clear_sequence_number();
     CHECK(this->store_->AddPendingEntry(logged_cert).ok());
+  }
+
+  void DeletePendingEntry(const LoggedCertificate& logged_cert) const {
+    EntryHandle<LoggedCertificate> e;
+    CHECK_EQ(Status::OK,
+             this->store_->GetPendingEntryForHash(logged_cert.Hash(), &e));
+    CHECK_EQ(Status::OK, this->store_->DeleteEntry(&e));
   }
 
   void AddSequencedEntry(LoggedCertificate* logged_cert, int64_t seq) const {
@@ -267,6 +278,46 @@ TYPED_TEST(TreeSignerTest, SignEmpty) {
   const SignedTreeHead sth(this->tree_signer_->LatestSTH());
   EXPECT_GT(sth.timestamp(), 0U);
   EXPECT_EQ(sth.tree_size(), 0U);
+}
+
+
+TYPED_TEST(TreeSignerTest, SequenceNewEntriesCleansUpOldSequenceMappings) {
+  LoggedCertificate logged_cert;
+  this->test_signer_.CreateUnique(&logged_cert);
+  this->AddPendingEntry(&logged_cert);
+  EXPECT_EQ(util::Status::OK, this->tree_signer_->SequenceNewEntries());
+  EXPECT_EQ(TS::OK, this->tree_signer_->UpdateTree());
+  EXPECT_EQ(Status::OK,
+            this->store_->SetServingSTH(this->tree_signer_->LatestSTH()));
+  sleep(1);
+
+  {
+    EntryHandle<SequenceMapping> mapping;
+    CHECK_EQ(Status::OK, this->store_->GetSequenceMapping(&mapping));
+    EXPECT_EQ(1, mapping.Entry().mapping_size());
+    EXPECT_EQ(logged_cert.Hash(), mapping.Entry().mapping(0).entry_hash());
+  }
+
+  unordered_map<string, LoggedCertificate> new_logged_certs;
+  for (int i(0); i < 2; ++i) {
+    LoggedCertificate c;
+    this->test_signer_.CreateUnique(&c);
+    this->AddPendingEntry(&c);
+    new_logged_certs.insert(make_pair(c.Hash(), c));
+  }
+  this->DeletePendingEntry(logged_cert);
+  LOG(INFO) << "2";
+  EXPECT_EQ(util::Status::OK, this->tree_signer_->SequenceNewEntries());
+
+  {
+    EntryHandle<SequenceMapping> mapping;
+    CHECK_EQ(Status::OK, this->store_->GetSequenceMapping(&mapping));
+    EXPECT_EQ(new_logged_certs.size(), mapping.Entry().mapping_size());
+    for (int i(0); i < mapping.Entry().mapping_size(); ++i) {
+      const auto& m(mapping.Entry().mapping(i));
+      EXPECT_NE(new_logged_certs.end(), new_logged_certs.find(m.entry_hash()));
+    }
+  }
 }
 
 

@@ -151,6 +151,8 @@ class EtcdConsistentStore : public ConsistentStore<Logged> {
   bool exiting_;
 
   friend class EtcdConsistentStoreTest;
+  template <class T>
+  friend class TreeSignerTest;
 
   DISALLOW_COPY_AND_ASSIGN(EtcdConsistentStore);
 };

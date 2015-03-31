@@ -11,6 +11,7 @@
 #include "log/logged_certificate.h"
 #include "monitoring/monitoring.h"
 #include "monitoring/latency.h"
+#include "util/etcd_delete.h"
 #include "util/executor.h"
 #include "util/masterelection.h"
 #include "util/util.h"
@@ -41,11 +42,9 @@ void CheckMappingIsOrdered(const ct::SequenceMapping& mapping) {
   if (mapping.mapping_size() < 2) {
     return;
   }
-  int64_t seq(mapping.mapping(0).sequence_number());
-  for (int64_t i = 1; i < mapping.mapping_size(); ++i) {
-    const int64_t entry_seq(mapping.mapping(i).sequence_number());
-    CHECK_EQ(entry_seq, seq + 1);
-    seq = entry_seq;
+  for (int64_t i = 0; i < mapping.mapping_size() - 1; ++i) {
+    CHECK_LT(mapping.mapping(i).sequence_number(),
+             mapping.mapping(i + 1).sequence_number());
   }
 }
 
@@ -270,7 +269,7 @@ util::Status EtcdConsistentStore<Logged>::GetPendingEntries(
       CHECK(!entry.Entry().has_sequence_number());
     }
   }
-  etcd_total_entries->Set("pending", entries->size());
+  etcd_total_entries->Set("entries", entries->size());
   return status;
 }
 
@@ -636,8 +635,25 @@ void EtcdConsistentStore<Logged>::CheckMappingIsContiguousWithServingTree(
     const ct::SequenceMapping& mapping) const {
   std::lock_guard<std::mutex> lock(mutex_);
   if (serving_sth_ && mapping.mapping_size() > 0) {
-    CHECK_LE(mapping.mapping(0).sequence_number(),
-             serving_sth_->Entry().tree_size());
+    const uint64_t tree_size(serving_sth_->Entry().tree_size());
+    // The mapping must not have a gap between its lowest mapping and the
+    // serving tree
+    const uint64_t lowest_sequence_number(
+        mapping.mapping(0).sequence_number());
+    CHECK_LE(lowest_sequence_number, tree_size);
+    // It must also be contiguous for all entries not yet included in the
+    // serving tree. (Note that entries below that may not be contiguous
+    // because the clean-up operation may not remove them in order.)
+    bool above_sth(false);
+    for (int i(0); i < mapping.mapping_size() - 1; ++i) {
+      const uint64_t mapped_seq(mapping.mapping(i).sequence_number());
+      if (mapped_seq >= tree_size) {
+        CHECK_EQ(mapped_seq + 1, mapping.mapping(i + 1).sequence_number());
+        above_sth = true;
+      } else {
+        CHECK(!above_sth);
+      }
+    }
   }
 }
 
@@ -735,8 +751,7 @@ util::Status EtcdConsistentStore<Logged>::CleanupOldEntries() {
   }
 
   int mapping_index;
-  // On exiting this loop mapping_index will contain the number of entries we
-  // want to delete from the start of sequence_mappping.mapping.
+  std::vector<std::pair<std::string, int64_t>> keys_to_delete;
   for (mapping_index = 0;
        mapping_index < sequence_mapping.Entry().mapping_size() &&
            sequence_mapping.Entry().mapping(mapping_index).sequence_number() <=
@@ -757,21 +772,19 @@ util::Status EtcdConsistentStore<Logged>::CleanupOldEntries() {
                    << " : " << status;
       continue;
     }
-    status = DeleteEntry(it->second);
-    if (!status.ok()) {
-      LOG(WARNING) << "Cleanup couldn't delete entry (" << util::ToBase64(hash)
-                   << ") corresponding to sequenced entry #" << sequence_number
-                   << " : " << status;
-      return status;
-    }
-    VLOG(1) << "Cleanup deleted entry (" << util::ToBase64(hash)
+    keys_to_delete.emplace_back(
+        std::make_pair(it->second->Key(), it->second->Handle()));
+    VLOG(1) << "Cleanup will delete entry (" << util::ToBase64(hash)
             << ") corresponding to sequence number " << sequence_number;
   }
-
-  sequence_mapping.MutableEntry()->mutable_mapping()->DeleteSubrange(
-      0, mapping_index /*num to delete*/);
-
-  return UpdateSequenceMapping(&sequence_mapping);
+  util::SyncTask task(executor_);
+  EtcdDeleteKeys(client_, std::move(keys_to_delete), task.task());
+  task.Wait();
+  status = task.status();
+  if (!status.ok()) {
+    LOG(WARNING) << "EtcdDeleteKeys failed: " << task.status();
+  }
+  return status;
 }
 
 
