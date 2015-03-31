@@ -10,6 +10,7 @@ from wsgiref import simple_server
 from ct.dashboard import grapher
 from ct.client.db import sqlite_connection as sqlitecon
 from ct.client import prober
+from ct.client.db import sqlite_cert_db
 from ct.client.db import sqlite_log_db
 from ct.client.db import sqlite_temp_db
 from ct.proto import client_pb2
@@ -23,6 +24,8 @@ gflags.DEFINE_string("ctlog_config", "ct/config/logs.config",
                      "Configuration file for log servers to monitor")
 # TODO(ekasper): clean up storage configuration so there's one base directory.
 gflags.DEFINE_string("ct_sqlite_db", "/tmp/ct", "Location of the CT database")
+gflags.DEFINE_string("ct_sqlite_cert_db", "/tmp/ct_cert", "Location of "
+                     "certificate database.")
 gflags.DEFINE_string("ct_sqlite_temp_dir", "/tmp/ct_tmp", "Directory for "
                      "temporary CT data.")
 gflags.DEFINE_string("monitor_state_dir", "/tmp/ct_monitor",
@@ -117,6 +120,9 @@ if __name__ == "__main__":
     sqlite_log_db = sqlite_log_db.SQLiteLogDB(
         sqlitecon.SQLiteConnectionManager(FLAGS.ct_sqlite_db))
 
+    sqlite_cert_db = sqlite_cert_db.SQLiteCertDB(
+        sqlitecon.SQLiteConnectionManager(FLAGS.ct_sqlite_cert_db))
+
     if not os.path.exists(FLAGS.ct_sqlite_temp_dir):
         logging.info("Creating directory for temporary data at %s" %
                      FLAGS.ct_sqlite_temp_dir)
@@ -141,7 +147,9 @@ if __name__ == "__main__":
         sqlite_log_db.update_log(log)
         ct_server_list.append(log.log_server)
 
-    prober_thread = prober.ProberThread(ctlogs, sqlite_log_db,
+    prober_thread = prober.ProberThread(ctlogs,
+                                        sqlite_log_db,
+                                        sqlite_cert_db,
                                         sqlite_temp_db_factory,
                                         FLAGS.monitor_state_dir)
     prober_thread.daemon = True
