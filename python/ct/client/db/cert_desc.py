@@ -1,5 +1,6 @@
 import re
 import hashlib
+import time
 from ct.crypto import cert
 from ct.proto import certificate_pb2
 
@@ -43,6 +44,13 @@ def from_cert(certificate, observations=[]):
     try:
         proto.serial_number = str(certificate.serial_number().human_readable()
                                   .upper().replace(':', ''))
+    except cert.CertificateError:
+        pass
+
+    try:
+        proto.validity.not_before, proto.validity.not_after = (
+            1000 * int(time.mktime(certificate.not_before())),
+            1000 * int(time.mktime(certificate.not_after())))
     except cert.CertificateError:
         pass
 
