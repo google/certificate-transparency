@@ -93,8 +93,7 @@ void DeleteState::StartNextRequest(unique_lock<mutex>&& lock) {
     return;
   }
 
-  while (outstanding_ < FLAGS_etcd_delete_concurrency &&
-         it_ != keys_.end()) {
+  while (outstanding_ < FLAGS_etcd_delete_concurrency && it_ != keys_.end()) {
     CHECK(lock.owns_lock());
     const pair<string, int64_t>& key(*it_);
     ++it_;
