@@ -61,15 +61,16 @@ class DeleteState {
 
 
 void DeleteState::RequestDone(Task* child_task) {
+  unique_lock<mutex> lock(mutex_);
+  --outstanding_;
+
   // If a child task has an error, return that error, and do not start
   // any more requests.
   if (!child_task->status().ok()) {
+    lock.unlock();
     task_->Return(child_task->status());
     return;
   }
-
-  unique_lock<mutex> lock(mutex_);
-  --outstanding_;
 
   if (it_ != keys_.end()) {
     StartNextRequest(move(lock));
