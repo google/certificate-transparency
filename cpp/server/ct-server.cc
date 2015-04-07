@@ -90,6 +90,8 @@ DEFINE_int32(node_state_refresh_seconds, 10,
              "How often to refresh the ClusterNodeState entry for this node.");
 DEFINE_bool(watchdog_timeout_is_fatal, true,
             "Exit if the watchdog timer fires.");
+DEFINE_int32(num_http_server_threads, 16,
+             "Number of threads for servicing the incoming HTTP requests.");
 
 namespace libevent = cert_trans::libevent;
 
@@ -562,7 +564,7 @@ int main(int argc, char* argv[]) {
                 &cluster_controller, &election);
   thread node_refresh(&RefreshNodeState, &cluster_controller);
 
-  ThreadPool pool(16);
+  ThreadPool pool(FLAGS_num_http_server_threads);
   JsonOutput output(event_base.get());
   Proxy proxy(event_base.get(), &output,
               bind(&ClusterStateController<LoggedCertificate>::GetFreshNodes,
