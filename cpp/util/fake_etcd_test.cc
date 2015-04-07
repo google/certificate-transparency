@@ -2,6 +2,7 @@
 
 #include <atomic>
 #include <functional>
+#include <gflags/gflags.h>
 #include <glog/logging.h>
 #include <gtest/gtest.h>
 #include <memory>
@@ -12,6 +13,7 @@
 
 #include "base/notification.h"
 #include "util/libevent_wrapper.h"
+#include "util/status_test_util.h"
 #include "util/sync_task.h"
 #include "util/testing.h"
 #include "util/thread_pool.h"
@@ -33,11 +35,24 @@ using std::unique_ptr;
 using std::vector;
 using util::Status;
 using util::SyncTask;
+using util::testing::StatusIs;
 
-const char kKey[] = "/key";
-const char kDir[] = "/dir/";
-const char kPath1[] = "/dir/1";
-const char kPath2[] = "/dir/2";
+DEFINE_string(etcd, "", "etcd server address");
+DEFINE_int32(etcd_port, 4001, "etcd server port");
+
+const char kKeyCreateTtl[] = "/fake_etcd_test/create_ttl_key";
+const char kKeyCreate[] = "/fake_etcd_test/create_key";
+const char kKeyDeleteIndex[] = "/fake_etcd_test/delete_index_key";
+const char kKeyDelete[] = "/fake_etcd_test/delete_key";
+const char kKeyExist[] = "/fake_etcd_test/existing_key";
+const char kKeyForceSetTtl[] = "/fake_etcd_test/force_set_ttl_key";
+const char kKeyForceSet[] = "/fake_etcd_test/force_set_key";
+const char kKeyUpdateIndex[] = "/fake_etcd_test/update_index_key";
+const char kKeyUpdateTtl[] = "/fake_etcd_test/update_ttl_key";
+const char kKeyUpdate[] = "/fake_etcd_test/update_key";
+const char kDir[] = "/fake_etcd_test/dir/";
+const char kPath1[] = "/fake_etcd_test/dir/1";
+const char kPath2[] = "/fake_etcd_test/dir/2";
 const char kValue[] = "value";
 const char kValue2[] = "value2";
 
@@ -45,14 +60,19 @@ const char kValue2[] = "value2";
 class FakeEtcdTest : public ::testing::Test {
  public:
   FakeEtcdTest()
-      : base_(std::make_shared<libevent::Base>()), event_pump_(base_) {
+      : base_(std::make_shared<libevent::Base>()),
+        event_pump_(base_),
+        fetcher_(base_.get()),
+        client_(FLAGS_etcd.empty()
+                    ? new FakeEtcdClient
+                    : new EtcdClient(&fetcher_, FLAGS_etcd, FLAGS_etcd_port)) {
   }
 
  protected:
   Status BlockingGet(const string& key, EtcdClient::Node* node) {
     SyncTask task(base_.get());
     EtcdClient::GetResponse resp;
-    client_.Get(key, &resp, task.task());
+    client_->Get(key, &resp, task.task());
     task.Wait();
     *node = resp.node;
     return task.status();
@@ -62,7 +82,7 @@ class FakeEtcdTest : public ::testing::Test {
                         int64_t* created_index) {
     SyncTask task(base_.get());
     EtcdClient::Response resp;
-    client_.Create(key, value, &resp, task.task());
+    client_->Create(key, value, &resp, task.task());
     task.Wait();
     *created_index = resp.etcd_index;
     return task.status();
@@ -73,7 +93,7 @@ class FakeEtcdTest : public ::testing::Test {
                                int64_t* created_index) {
     SyncTask task(base_.get());
     EtcdClient::Response resp;
-    client_.CreateWithTTL(key, value, ttl, &resp, task.task());
+    client_->CreateWithTTL(key, value, ttl, &resp, task.task());
     task.Wait();
     *created_index = resp.etcd_index;
     return task.status();
@@ -83,7 +103,7 @@ class FakeEtcdTest : public ::testing::Test {
                         int64_t old_index, int64_t* modified_index) {
     SyncTask task(base_.get());
     EtcdClient::Response resp;
-    client_.Update(key, value, old_index, &resp, task.task());
+    client_->Update(key, value, old_index, &resp, task.task());
     task.Wait();
     *modified_index = resp.etcd_index;
     return task.status();
@@ -95,7 +115,8 @@ class FakeEtcdTest : public ::testing::Test {
                                int64_t* modified_index) {
     SyncTask task(base_.get());
     EtcdClient::Response resp;
-    client_.UpdateWithTTL(key, value, ttl, previous_index, &resp, task.task());
+    client_->UpdateWithTTL(key, value, ttl, previous_index, &resp,
+                           task.task());
     task.Wait();
     *modified_index = resp.etcd_index;
     return task.status();
@@ -105,7 +126,7 @@ class FakeEtcdTest : public ::testing::Test {
                           int64_t* modified_index) {
     SyncTask task(base_.get());
     EtcdClient::Response resp;
-    client_.ForceSet(key, value, &resp, task.task());
+    client_->ForceSet(key, value, &resp, task.task());
     task.Wait();
     *modified_index = resp.etcd_index;
     return task.status();
@@ -116,7 +137,7 @@ class FakeEtcdTest : public ::testing::Test {
                                  int64_t* modified_index) {
     SyncTask task(base_.get());
     EtcdClient::Response resp;
-    client_.ForceSetWithTTL(key, value, ttl, &resp, task.task());
+    client_->ForceSetWithTTL(key, value, ttl, &resp, task.task());
     task.Wait();
     *modified_index = resp.etcd_index;
     return task.status();
@@ -124,26 +145,24 @@ class FakeEtcdTest : public ::testing::Test {
 
   Status BlockingDelete(const string& key, int64_t previous_index) {
     SyncTask task(base_.get());
-    client_.Delete(key, previous_index, task.task());
+    client_->Delete(key, previous_index, task.task());
     task.Wait();
     return task.status();
   }
 
   std::shared_ptr<libevent::Base> base_;
   libevent::EventPumpThread event_pump_;
-  FakeEtcdClient client_;
+  UrlFetcher fetcher_;
+  const unique_ptr<EtcdClient> client_;
 };
 
 
 TEST_F(FakeEtcdTest, Create) {
-  Status status;
   int64_t created_index;
-  status = BlockingCreate(kKey, kValue, &created_index);
-  EXPECT_TRUE(status.ok()) << status;
+  EXPECT_OK(BlockingCreate(kKeyCreate, kValue, &created_index));
 
   EtcdClient::Node node;
-  status = BlockingGet(kKey, &node);
-  EXPECT_TRUE(status.ok()) << status;
+  EXPECT_OK(BlockingGet(kKeyCreate, &node));
   EXPECT_EQ(kValue, node.value_);
   EXPECT_EQ(created_index, node.created_index_);
   EXPECT_EQ(created_index, node.modified_index_);
@@ -151,30 +170,23 @@ TEST_F(FakeEtcdTest, Create) {
 
 
 TEST_F(FakeEtcdTest, CreateFailsIfExists) {
-  Status status;
   int64_t created_index;
-  status = BlockingCreate(kKey, kValue, &created_index);
-  EXPECT_TRUE(status.ok()) << status;
-
-  status = BlockingCreate(kKey, kValue, &created_index);
-  EXPECT_EQ(util::error::FAILED_PRECONDITION, status.CanonicalCode())
-      << status;
+  EXPECT_OK(BlockingCreate(kKeyExist, kValue, &created_index));
+  EXPECT_THAT(BlockingCreate(kKeyExist, kValue, &created_index),
+              StatusIs(util::error::FAILED_PRECONDITION));
 }
 
 
 TEST_F(FakeEtcdTest, Update) {
-  Status status;
   int64_t created_index;
-  status = BlockingCreate(kKey, kValue, &created_index);
-  EXPECT_TRUE(status.ok()) << status;
+  EXPECT_OK(BlockingCreate(kKeyUpdate, kValue, &created_index));
 
   int64_t modified_index;
-  status = BlockingUpdate(kKey, kValue2, created_index, &modified_index);
-  EXPECT_TRUE(status.ok()) << status;
+  EXPECT_OK(
+      BlockingUpdate(kKeyUpdate, kValue2, created_index, &modified_index));
 
   EtcdClient::Node node;
-  status = BlockingGet(kKey, &node);
-  EXPECT_TRUE(status.ok()) << status;
+  EXPECT_OK(BlockingGet(kKeyUpdate, &node));
   EXPECT_EQ(kValue2, node.value_);
   EXPECT_EQ(created_index, node.created_index_);
   EXPECT_EQ(modified_index, node.modified_index_);
@@ -183,20 +195,17 @@ TEST_F(FakeEtcdTest, Update) {
 
 
 TEST_F(FakeEtcdTest, UpdateFailsWithIncorrectPreviousIndex) {
-  Status status;
   int64_t created_index;
-  status = BlockingCreate(kKey, kValue, &created_index);
-  EXPECT_TRUE(status.ok()) << status;
+  EXPECT_OK(BlockingCreate(kKeyUpdateIndex, kValue, &created_index));
 
   int64_t modified_index(-1);
-  status = BlockingUpdate(kKey, kValue2, created_index - 1, &modified_index);
-  EXPECT_EQ(util::error::FAILED_PRECONDITION, status.CanonicalCode())
-      << status;
+  EXPECT_THAT(BlockingUpdate(kKeyUpdateIndex, kValue2, created_index - 1,
+                             &modified_index),
+              StatusIs(util::error::FAILED_PRECONDITION));
   EXPECT_EQ(-1, modified_index);
 
   EtcdClient::Node node;
-  status = BlockingGet(kKey, &node);
-  EXPECT_TRUE(status.ok()) << status;
+  EXPECT_OK(BlockingGet(kKeyUpdateIndex, &node));
   EXPECT_EQ(kValue, node.value_);  // Not updated!
   EXPECT_EQ(created_index, node.created_index_);
   EXPECT_EQ(created_index, node.modified_index_);
@@ -206,14 +215,12 @@ TEST_F(FakeEtcdTest, UpdateFailsWithIncorrectPreviousIndex) {
 TEST_F(FakeEtcdTest, CreateWithTTLExpires) {
   duration<int> kTtl(3);
 
-  Status status;
   int64_t created_index;
-  status = BlockingCreateWithTTL(kKey, kValue, kTtl, &created_index);
-  EXPECT_TRUE(status.ok()) << status;
+  EXPECT_OK(
+      BlockingCreateWithTTL(kKeyCreateTtl, kValue, kTtl, &created_index));
 
   EtcdClient::Node node;
-  status = BlockingGet(kKey, &node);
-  EXPECT_TRUE(status.ok()) << status;
+  EXPECT_OK(BlockingGet(kKeyCreateTtl, &node));
   EXPECT_EQ(kValue, node.value_);
   EXPECT_EQ(created_index, node.created_index_);
   EXPECT_EQ(created_index, node.modified_index_);
@@ -222,28 +229,24 @@ TEST_F(FakeEtcdTest, CreateWithTTLExpires) {
   sleep_for(kTtl + duration<int>(1));
 
   // Vanished, in a puff of digital smoke:
-  status = BlockingGet(kKey, &node);
-  EXPECT_EQ(util::error::NOT_FOUND, status.CanonicalCode()) << status;
+  EXPECT_THAT(BlockingGet(kKeyCreateTtl, &node),
+              StatusIs(util::error::NOT_FOUND));
 }
 
 
 TEST_F(FakeEtcdTest, UpdateWithTTLExpires) {
   duration<int> kTtl(3);
 
-  Status status;
   int64_t created_index;
-  status = BlockingCreate(kKey, kValue, &created_index);
-  EXPECT_TRUE(status.ok()) << status;
+  EXPECT_OK(BlockingCreate(kKeyUpdateTtl, kValue, &created_index));
 
   int64_t modified_index;
-  status = BlockingUpdateWithTTL(kKey, kValue2, kTtl, created_index,
-                                 &modified_index);
-  EXPECT_TRUE(status.ok()) << status;
+  EXPECT_OK(BlockingUpdateWithTTL(kKeyUpdateTtl, kValue2, kTtl, created_index,
+                                  &modified_index));
   EXPECT_LT(created_index, modified_index);
 
   EtcdClient::Node node;
-  status = BlockingGet(kKey, &node);
-  EXPECT_TRUE(status.ok()) << status;
+  EXPECT_OK(BlockingGet(kKeyUpdateTtl, &node));
   EXPECT_EQ(kValue2, node.value_);
   EXPECT_EQ(created_index, node.created_index_);
   EXPECT_EQ(modified_index, node.modified_index_);
@@ -252,24 +255,20 @@ TEST_F(FakeEtcdTest, UpdateWithTTLExpires) {
   sleep_for(kTtl + duration<int>(1));
 
   // Vanished, in a puff of digital smoke:
-  status = BlockingGet(kKey, &node);
-  EXPECT_EQ(util::error::NOT_FOUND, status.CanonicalCode()) << status;
+  EXPECT_THAT(BlockingGet(kKeyUpdateTtl, &node),
+              StatusIs(util::error::NOT_FOUND));
 }
 
 
 TEST_F(FakeEtcdTest, ForceSet) {
-  Status status;
   int64_t created_index;
-  status = BlockingCreate(kKey, kValue, &created_index);
-  EXPECT_TRUE(status.ok()) << status;
+  EXPECT_OK(BlockingCreate(kKeyForceSet, kValue, &created_index));
 
   int64_t modified_index;
-  status = BlockingForceSet(kKey, kValue2, &modified_index);
-  EXPECT_TRUE(status.ok()) << status;
+  EXPECT_OK(BlockingForceSet(kKeyForceSet, kValue2, &modified_index));
 
   EtcdClient::Node node;
-  status = BlockingGet(kKey, &node);
-  EXPECT_TRUE(status.ok()) << status;
+  EXPECT_OK(BlockingGet(kKeyForceSet, &node));
   EXPECT_EQ(kValue2, node.value_);
   EXPECT_EQ(created_index, node.created_index_);
   EXPECT_EQ(modified_index, node.modified_index_);
@@ -280,19 +279,16 @@ TEST_F(FakeEtcdTest, ForceSet) {
 TEST_F(FakeEtcdTest, ForceSetWithTTLExpires) {
   duration<int> kTtl(3);
 
-  Status status;
   int64_t created_index;
-  status = BlockingCreate(kKey, kValue, &created_index);
-  EXPECT_TRUE(status.ok()) << status;
+  EXPECT_OK(BlockingCreate(kKeyForceSetTtl, kValue, &created_index));
 
   int64_t modified_index;
-  status = BlockingForceSetWithTTL(kKey, kValue2, kTtl, &modified_index);
-  EXPECT_TRUE(status.ok()) << status;
+  EXPECT_OK(BlockingForceSetWithTTL(kKeyForceSetTtl, kValue2, kTtl,
+                                    &modified_index));
   EXPECT_LT(created_index, modified_index);
 
   EtcdClient::Node node;
-  status = BlockingGet(kKey, &node);
-  EXPECT_TRUE(status.ok()) << status;
+  EXPECT_OK(BlockingGet(kKeyForceSetTtl, &node));
   EXPECT_EQ(kValue2, node.value_);
   EXPECT_EQ(created_index, node.created_index_);
   EXPECT_EQ(modified_index, node.modified_index_);
@@ -301,8 +297,8 @@ TEST_F(FakeEtcdTest, ForceSetWithTTLExpires) {
   sleep_for(kTtl + duration<int>(1));
 
   // Vanished, in a puff of digital smoke:
-  status = BlockingGet(kKey, &node);
-  EXPECT_EQ(util::error::NOT_FOUND, status.CanonicalCode()) << status;
+  EXPECT_THAT(BlockingGet(kKeyForceSetTtl, &node),
+              StatusIs(util::error::NOT_FOUND));
 }
 
 
@@ -314,18 +310,18 @@ TEST_F(FakeEtcdTest, DeleteNonExistent) {
 
 TEST_F(FakeEtcdTest, DeleteIncorrectIndex) {
   int64_t created_index;
-  EXPECT_EQ(Status::OK, BlockingCreate(kKey, kValue, &created_index));
+  EXPECT_OK(BlockingCreate(kKeyDeleteIndex, kValue, &created_index));
 
   EtcdClient::Node node;
-  EXPECT_EQ(Status::OK, BlockingGet(kKey, &node));
+  EXPECT_OK(BlockingGet(kKeyDeleteIndex, &node));
   EXPECT_EQ(created_index, node.created_index_);
   EXPECT_EQ(created_index, node.modified_index_);
 
-  Status status(BlockingDelete(kKey, created_index + 1));
+  Status status(BlockingDelete(kKeyDeleteIndex, created_index + 1));
   EXPECT_EQ(util::error::FAILED_PRECONDITION, status.CanonicalCode())
       << status;
 
-  EXPECT_EQ(Status::OK, BlockingGet(kKey, &node));
+  EXPECT_OK(BlockingGet(kKeyDeleteIndex, &node));
   EXPECT_EQ(created_index, node.created_index_);
   EXPECT_EQ(created_index, node.modified_index_);
 }
@@ -333,17 +329,17 @@ TEST_F(FakeEtcdTest, DeleteIncorrectIndex) {
 
 TEST_F(FakeEtcdTest, Delete) {
   int64_t created_index;
-  EXPECT_EQ(Status::OK, BlockingCreate(kKey, kValue, &created_index));
+  EXPECT_OK(BlockingCreate(kKeyDelete, kValue, &created_index));
 
   EtcdClient::Node node;
-  EXPECT_EQ(Status::OK, BlockingGet(kKey, &node));
+  EXPECT_OK(BlockingGet(kKeyDelete, &node));
   EXPECT_EQ(created_index, node.created_index_);
   EXPECT_EQ(created_index, node.modified_index_);
 
-  EXPECT_EQ(Status::OK, BlockingDelete(kKey, created_index));
+  EXPECT_OK(BlockingDelete(kKeyDelete, created_index));
 
-  Status status(BlockingGet(kKey, &node));
-  EXPECT_EQ(util::error::NOT_FOUND, status.CanonicalCode()) << status;
+  EXPECT_THAT(BlockingGet(kKeyDelete, &node),
+              StatusIs(util::error::NOT_FOUND));
 }
 
 
@@ -401,11 +397,11 @@ TEST_F(FakeEtcdTest, WatcherForExecutor) {
   CheckingExecutor checking_executor(&pool, {nullptr, &watch, nullptr, &done});
   util::Task task(bind(&Notification::Notify, &done), &checking_executor);
   bool been_called(false);
-  client_.Watch(kDir, bind(&TestWatcherForExecutor, &watch, &been_called),
-                &task);
+  client_->Watch(kDir, bind(&TestWatcherForExecutor, &watch, &been_called),
+                 &task);
 
   int64_t created_index;
-  EXPECT_EQ(util::Status::OK, BlockingCreate(kPath1, kValue, &created_index));
+  EXPECT_OK(BlockingCreate(kPath1, kValue, &created_index));
 
   // Should fall straight through:
   // TODO(pphaneuf): But it doesn't really? I tried changing it for
@@ -448,8 +444,8 @@ TEST_F(FakeEtcdTest, WatcherForCreate) {
 
   Notification watch;
   util::SyncTask watch_task(&pool);
-  client_.Watch(kDir, bind(&TestWatcherForCreateCallback, &watch, _1),
-                watch_task.task());
+  client_->Watch(kDir, bind(&TestWatcherForCreateCallback, &watch, _1),
+                 watch_task.task());
 
   status = BlockingCreate(kPath2, kValue2, &created_index);
   EXPECT_TRUE(status.ok()) << status;
@@ -496,9 +492,9 @@ TEST_F(FakeEtcdTest, WatcherForDelete) {
   Notification watch;
   util::SyncTask watch_task(&pool);
   int num_calls(0);
-  client_.Watch(kDir,
-                bind(&TestWatcherForDeleteCallback, &watch, &num_calls, _1),
-                watch_task.task());
+  client_->Watch(kDir,
+                 bind(&TestWatcherForDeleteCallback, &watch, &num_calls, _1),
+                 watch_task.task());
 
   status = BlockingDelete(kPath1, created_index);
   EXPECT_TRUE(status.ok()) << status;
