@@ -46,27 +46,6 @@ void FillJsonForEntry(const EtcdClient::Node& node, const string& action,
 }
 
 
-void FillJsonForDir(const string& key, const vector<EtcdClient::Node>& nodes,
-                    const string& action, const shared_ptr<JsonObject>& json) {
-  JsonObject node;
-  node.Add("modifiedIndex", 1);
-  node.Add("createdIndex", 1);
-  node.Add("key", key);
-  node.AddBoolean("dir", true);
-  if (nodes.size() > 0) {
-    JsonArray json_nodes;
-    for (const auto& node : nodes) {
-      JsonObject json_node;
-      FillJsonForNode(node, &json_node);
-      json_nodes.Add(&json_node);
-    }
-    node.Add("nodes", json_nodes);
-  }
-  node.Add("action", action);
-  json->Add("node", node);
-}
-
-
 void MaybeSetExpiry(const map<string, string>& params,
                     EtcdClient::Node* node) {
   if (params.find("ttl") != params.end()) {
@@ -122,12 +101,10 @@ void FakeEtcdClient::Generic(const std::string& key,
                              Task* task) {
   PurgeExpiredEntries();
   switch (verb) {
-    case UrlFetcher::Verb::GET:
-      HandleGet(key, params, resp, task);
-      break;
     case UrlFetcher::Verb::PUT:
       HandlePut(key, params, resp, task);
       break;
+    case UrlFetcher::Verb::GET:
     case UrlFetcher::Verb::POST:
     case UrlFetcher::Verb::DELETE:
     default:
@@ -170,49 +147,34 @@ void FakeEtcdClient::NotifyForPath(const unique_lock<mutex>& lock,
 }
 
 
-void FakeEtcdClient::GetSingleEntry(const string& key, GenericResponse* resp,
-                                    Task* task) {
-  resp->etcd_index = index_;
-  if (entries_.find(key) != entries_.end()) {
-    const Node& node(entries_.find(key)->second);
-    resp->json_body = make_shared<JsonObject>();
-    FillJsonForEntry(node, "get", resp->json_body);
-    task->Return();
-  } else {
-    resp->json_body = make_shared<JsonObject>();
-    task->Return(Status(util::error::NOT_FOUND, "not found"));
-  }
-}
+void FakeEtcdClient::Get(const Request& req, GetResponse* resp, Task* task) {
+  VLOG(1) << "GET " << req.key;
+  CHECK(!req.key.empty());
+  CHECK_EQ(req.key.front(), '/');
+  CHECK(!req.recursive) << "not implemented";
+  CHECK_LE(req.wait_index, 0) << "not implemented";
 
-
-void FakeEtcdClient::GetDirectory(const string& key, GenericResponse* resp,
-                                  Task* task) {
-  VLOG(1) << "GET DIR";
-  CHECK(key.back() == '/');
-  vector<Node> nodes;
-  for (const auto& pair : entries_) {
-    if (pair.first.find(key) == 0) {
-      nodes.push_back(pair.second);
-    }
-  }
-  resp->etcd_index = index_;
-  resp->json_body = make_shared<JsonObject>();
-  FillJsonForDir(key, nodes, "get", resp->json_body);
-  VLOG(1) << resp->json_body->ToString();
-  task->Return();
-}
-
-
-void FakeEtcdClient::HandleGet(const string& key,
-                               const map<string, string>& params,
-                               GenericResponse* resp, Task* task) {
-  VLOG(1) << "GET " << key;
+  PurgeExpiredEntries();
   lock_guard<mutex> lock(mutex_);
-  if (key.back() == '/') {
-    return GetDirectory(key, resp, task);
+  resp->etcd_index = index_;
+  if (req.key.back() == '/') {
+    vector<Node> nodes;
+    for (const auto& pair : entries_) {
+      if (pair.first.find(req.key) == 0) {
+        nodes.push_back(pair.second);
+      }
+    }
+    resp->node = Node(1, 1, req.key, true, "", move(nodes), false);
   } else {
-    return GetSingleEntry(key, resp, task);
+    const map<string, Node>::const_iterator it(entries_.find(req.key));
+    if (it == entries_.end()) {
+      task->Return(Status(util::error::NOT_FOUND, "not found"));
+      return;
+    }
+    resp->node = it->second;
   }
+
+  task->Return();
 }
 
 
@@ -278,10 +240,12 @@ void FakeEtcdClient::HandlePut(const string& key,
 void FakeEtcdClient::Delete(const string& key, const int64_t current_index,
                             Task* task) {
   VLOG(1) << "DELETE " << key;
-  unique_lock<mutex> lock(mutex_);
   CHECK(!key.empty());
-  CHECK(key.back() != '/');
+  CHECK_EQ(key.front(), '/');
+  CHECK_NE(key.back(), '/');
 
+  PurgeExpiredEntries();
+  unique_lock<mutex> lock(mutex_);
   const map<string, Node>::iterator entry(entries_.find(key));
   if (entry == entries_.end()) {
     task->Return(Status(util::error::NOT_FOUND, "Node doesn't exist: " + key));

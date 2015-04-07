@@ -77,7 +77,7 @@ class EtcdClient {
 
   virtual ~EtcdClient();
 
-  void Get(const Request& req, GetResponse* resp, util::Task* task);
+  virtual void Get(const Request& req, GetResponse* resp, util::Task* task);
 
   void Create(const std::string& key, const std::string& value, Response* resp,
               util::Task* task);

@@ -20,6 +20,8 @@ class FakeEtcdClient : public EtcdClient {
 
   void DumpEntries();
 
+  void Get(const Request& req, GetResponse* resp, util::Task* task) override;
+
   void Delete(const std::string& key, const int64_t current_index,
               util::Task* task) override;
 
@@ -40,16 +42,6 @@ class FakeEtcdClient : public EtcdClient {
 
   void NotifyForPath(const std::unique_lock<std::mutex>& lock,
                      const std::string& path);
-
-  void GetSingleEntry(const std::string& key, GenericResponse* resp,
-                      util::Task* task);
-
-  void GetDirectory(const std::string& key, GenericResponse* resp,
-                    util::Task* task);
-
-  void HandleGet(const std::string& key,
-                 const std::map<std::string, std::string>& params,
-                 GenericResponse* resp, util::Task* task);
 
   util::Status CheckCompareFlags(
       const std::map<std::string, std::string> params, const std::string& key);
