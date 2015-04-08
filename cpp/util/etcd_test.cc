@@ -1,11 +1,10 @@
-#include "util/etcd.h"
-
 #include <gmock/gmock.h>
 #include <gtest/gtest.h>
 #include <memory>
 #include <string>
 
 #include "net/mock_url_fetcher.h"
+#include "util/etcd.h"
 #include "util/json_wrapper.h"
 #include "util/libevent_wrapper.h"
 #include "util/status_test_util.h"
@@ -360,8 +359,7 @@ TEST_F(EtcdTest, CreateWithTTL) {
                       kCreateJson, _1, _2, _3)));
   SyncTask task(base_.get());
   EtcdClient::Response resp;
-  client_.CreateWithTTL(kEntryKey, "123", std::chrono::duration<int>(100),
-                        &resp, task.task());
+  client_.CreateWithTTL(kEntryKey, "123", seconds(100), &resp, task.task());
   task.Wait();
   EXPECT_OK(task);
   EXPECT_EQ(7, resp.etcd_index);
@@ -383,8 +381,7 @@ TEST_F(EtcdTest, CreateWithTTLFails) {
                       kKeyAlreadyExistsJson, _1, _2, _3)));
   SyncTask task(base_.get());
   EtcdClient::Response resp;
-  client_.CreateWithTTL(kEntryKey, "123", std::chrono::duration<int>(100),
-                        &resp, task.task());
+  client_.CreateWithTTL(kEntryKey, "123", seconds(100), &resp, task.task());
   task.Wait();
   EXPECT_THAT(task.status(), StatusIs(util::error::FAILED_PRECONDITION,
                                       "Key already exists"));
@@ -445,8 +442,7 @@ TEST_F(EtcdTest, UpdateWithTTL) {
                       kUpdateJson, _1, _2, _3)));
   SyncTask task(base_.get());
   EtcdClient::Response resp;
-  client_.UpdateWithTTL(kEntryKey, "123", std::chrono::duration<int>(100), 5,
-                        &resp, task.task());
+  client_.UpdateWithTTL(kEntryKey, "123", seconds(100), 5, &resp, task.task());
   task.Wait();
   EXPECT_OK(task);
   EXPECT_EQ(6, resp.etcd_index);
@@ -467,8 +463,7 @@ TEST_F(EtcdTest, UpdateWithTTLFails) {
                       kCompareFailedJson, _1, _2, _3)));
   SyncTask task(base_.get());
   EtcdClient::Response resp;
-  client_.UpdateWithTTL(kEntryKey, "123", std::chrono::duration<int>(100), 5,
-                        &resp, task.task());
+  client_.UpdateWithTTL(kEntryKey, "123", seconds(100), 5, &resp, task.task());
   task.Wait();
   EXPECT_THAT(task.status(),
               StatusIs(util::error::FAILED_PRECONDITION, "Compare failed"));
@@ -549,8 +544,7 @@ TEST_F(EtcdTest, ForceSetWithTTLForNewKey) {
                       kCreateJson, _1, _2, _3)));
   SyncTask task(base_.get());
   EtcdClient::Response resp;
-  client_.ForceSetWithTTL(kEntryKey, "123", std::chrono::duration<int>(100),
-                          &resp, task.task());
+  client_.ForceSetWithTTL(kEntryKey, "123", seconds(100), &resp, task.task());
   task.Wait();
   EXPECT_OK(task);
   EXPECT_EQ(7, resp.etcd_index);
