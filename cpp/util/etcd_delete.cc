@@ -20,7 +20,6 @@ DEFINE_int32(etcd_delete_concurrency, 4,
              "number of etcd keys to delete at a time");
 
 namespace cert_trans {
-
 namespace {
 
 
@@ -94,7 +93,8 @@ void DeleteState::StartNextRequest(unique_lock<mutex>&& lock) {
     return;
   }
 
-  while (outstanding_ < FLAGS_etcd_delete_concurrency && it_ != keys_.end()) {
+  while (outstanding_ < FLAGS_etcd_delete_concurrency && it_ != keys_.end() &&
+         task_->IsActive()) {
     CHECK(lock.owns_lock());
     const pair<string, int64_t>& key(*it_);
     ++it_;
@@ -118,7 +118,7 @@ void DeleteState::StartNextRequest(unique_lock<mutex>&& lock) {
 
 void EtcdDeleteKeys(EtcdClient* client, vector<pair<string, int64_t>>&& keys,
                     Task* task) {
-  TaskHold hold(task);
+  TaskHold hold(CHECK_NOTNULL(task));
   DeleteState* const state(new DeleteState(client, move(keys), task));
   task->DeleteWhenDone(state);
 }

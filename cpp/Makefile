@@ -82,6 +82,7 @@ TESTS = \
 	monitoring/registry_test \
 	proto/serializer_test \
 	server/proxy_test \
+	util/etcd_delete_test \
 	util/etcd_test \
 	util/fake_etcd_test \
 	util/json_wrapper_test \
@@ -194,6 +195,13 @@ util/json_wrapper_test: util/json_wrapper_test.o util/libutil.a $(GTESTLIB)
 
 util/libevent_wrapper_test: util/libevent_wrapper_test.o util/libutil.a \
                             monitoring/libmonitoring.a $(GTESTLIB)
+
+util/etcd_delete_test: base/notification.o net/connection_pool.o net/url.o \
+                       net/url_fetcher.o util/etcd.o util/etcd_delete.o \
+                       util/etcd_delete_test.o util/json_wrapper.o \
+                       util/libevent_wrapper.o util/status.o util/sync_task.o \
+                       util/task.o util/testing.o util/thread_pool.o \
+                       $(GMOCKLIB) $(GTESTLIB)
 
 util/etcd_test: util/etcd_test.o base/notification.o net/url.o \
                 net/url_fetcher.o net/connection_pool.o util/etcd.o \

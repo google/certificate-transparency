@@ -79,27 +79,29 @@ class EtcdClient {
 
   virtual void Get(const Request& req, GetResponse* resp, util::Task* task);
 
-  void Create(const std::string& key, const std::string& value, Response* resp,
-              util::Task* task);
+  virtual void Create(const std::string& key, const std::string& value,
+                      Response* resp, util::Task* task);
 
-  void CreateWithTTL(const std::string& key, const std::string& value,
-                     const std::chrono::seconds& ttl, Response* resp,
-                     util::Task* task);
+  virtual void CreateWithTTL(const std::string& key, const std::string& value,
+                             const std::chrono::seconds& ttl, Response* resp,
+                             util::Task* task);
 
-  void Update(const std::string& key, const std::string& value,
-              const int64_t previous_index, Response* resp, util::Task* task);
+  virtual void Update(const std::string& key, const std::string& value,
+                      const int64_t previous_index, Response* resp,
+                      util::Task* task);
 
-  void UpdateWithTTL(const std::string& key, const std::string& value,
-                     const std::chrono::seconds& ttl,
-                     const int64_t previous_index, Response* resp,
-                     util::Task* task);
+  virtual void UpdateWithTTL(const std::string& key, const std::string& value,
+                             const std::chrono::seconds& ttl,
+                             const int64_t previous_index, Response* resp,
+                             util::Task* task);
 
-  void ForceSet(const std::string& key, const std::string& value,
-                Response* resp, util::Task* task);
+  virtual void ForceSet(const std::string& key, const std::string& value,
+                        Response* resp, util::Task* task);
 
-  void ForceSetWithTTL(const std::string& key, const std::string& value,
-                       const std::chrono::seconds& ttl, Response* resp,
-                       util::Task* task);
+  virtual void ForceSetWithTTL(const std::string& key,
+                               const std::string& value,
+                               const std::chrono::seconds& ttl, Response* resp,
+                               util::Task* task);
 
   virtual void Delete(const std::string& key, const int64_t current_index,
                       util::Task* task);

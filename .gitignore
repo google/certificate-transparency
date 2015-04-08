@@ -53,6 +53,7 @@
 /cpp/tools/dump_sth
 /cpp/tools/etcd_watch
 /cpp/util/bench_etcd
+/cpp/util/etcd_delete_test
 /cpp/util/etcd_masterelection
 /cpp/util/etcd_test
 /cpp/util/fake_etcd_test
