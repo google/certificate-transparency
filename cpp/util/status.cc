@@ -81,10 +81,10 @@ extern ostream& operator<<(ostream& os, util::error::Code code) {
   switch (code) {
     case util::error::OK:
       os << "OK";
-      break;
+      return os;
     case util::error::CANCELLED:
       os << "CANCELLED";
-      break;
+      return os;
     case util::error::UNKNOWN:
       os << "UNKNOWN";
       return os;
