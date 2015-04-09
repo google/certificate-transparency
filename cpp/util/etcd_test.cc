@@ -144,6 +144,26 @@ const char kCompareFailedJson[] =
     "   \"index\": 8"
     "}";
 
+const char kStoreStatsJson[] =
+    "{"
+    "   \"setsFail\" : 1,"
+    "   \"getsSuccess\" : 2,"
+    "   \"watchers\" : 3,"
+    "   \"expireCount\" : 4,"
+    "   \"createFail\" : 5,"
+    "   \"setsSuccess\" : 6,"
+    "   \"compareAndDeleteFail\" : 7,"
+    "   \"createSuccess\" : 8,"
+    "   \"deleteFail\" : 9,"
+    "   \"compareAndSwapSuccess\" : 10,"
+    "   \"compareAndSwapFail\" : 11,"
+    "   \"compareAndDeleteSuccess\" : 12,"
+    "   \"updateFail\" : 13,"
+    "   \"deleteSuccess\" : 14,"
+    "   \"updateSuccess\" : 15,"
+    "   \"getsFail\" : 16"
+    "}";
+
 const char kEtcdHost[] = "etcd.example.net";
 const int kEtcdPort = 4242;
 
@@ -165,10 +185,10 @@ class EtcdTest : public ::testing::Test {
   EtcdClient client_;
 };
 
-string GetEtcdUrl(const string& key) {
+string GetEtcdUrl(const string& key, const string& key_space = "/v2/keys") {
   CHECK(!key.empty() && key[0] == '/') << "key isn't slash-prefixed: " << key;
   return "http://" + string(kEtcdHost) + ":" + to_string(kEtcdPort) +
-         "/v2/keys" + key;
+         key_space + key;
 }
 
 void HandleFetch(Status status, int status_code,
@@ -586,6 +606,41 @@ TEST_F(EtcdTest, DeleteFails) {
   EXPECT_THAT(task.status(),
               StatusIs(util::error::FAILED_PRECONDITION, "Compare failed"));
 }
+
+TEST_F(EtcdTest, GetStoreStats) {
+  EXPECT_CALL(url_fetcher_,
+              Fetch(IsUrlFetchRequest(UrlFetcher::Verb::GET,
+                                      URL(GetEtcdUrl("/store", "/v2/stats") +
+                                          "?consistent=true&quorum=true"),
+                                      IsEmpty(), ""),
+                    _, _))
+      .WillOnce(
+          Invoke(bind(HandleFetch, Status::OK, 200,
+                      UrlFetcher::Headers{make_pair("x-etcd-index", "1")},
+                      kStoreStatsJson, _1, _2, _3)));
+  SyncTask task(base_.get());
+  EtcdClient::StatsResponse response;
+  client_.GetStoreStats(&response, task.task());
+  task.Wait();
+  EXPECT_OK(task);
+  EXPECT_EQ(1, response.stats["setsFail"]);
+  EXPECT_EQ(2, response.stats["getsSuccess"]);
+  EXPECT_EQ(3, response.stats["watchers"]);
+  EXPECT_EQ(4, response.stats["expireCount"]);
+  EXPECT_EQ(5, response.stats["createFail"]);
+  EXPECT_EQ(6, response.stats["setsSuccess"]);
+  EXPECT_EQ(7, response.stats["compareAndDeleteFail"]);
+  EXPECT_EQ(8, response.stats["createSuccess"]);
+  EXPECT_EQ(9, response.stats["deleteFail"]);
+  EXPECT_EQ(10, response.stats["compareAndSwapSuccess"]);
+  EXPECT_EQ(11, response.stats["compareAndSwapFail"]);
+  EXPECT_EQ(12, response.stats["compareAndDeleteSuccess"]);
+  EXPECT_EQ(13, response.stats["updateFail"]);
+  EXPECT_EQ(14, response.stats["deleteSuccess"]);
+  EXPECT_EQ(15, response.stats["updateSuccess"]);
+  EXPECT_EQ(16, response.stats["getsFail"]);
+}
+
 
 }  // namespace
 }  // namespace cert_trans

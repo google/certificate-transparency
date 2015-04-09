@@ -70,6 +70,10 @@ class EtcdClient {
     std::shared_ptr<JsonObject> json_body;
   };
 
+  struct StatsResponse : public Response {
+    std::map<std::string, int64_t> stats;
+  };
+
   typedef std::function<void(const std::vector<Node>& updates)> WatchCallback;
 
   // TODO(pphaneuf): This should take a set of servers, not just one.
@@ -106,6 +110,8 @@ class EtcdClient {
   virtual void Delete(const std::string& key, const int64_t current_index,
                       util::Task* task);
 
+  virtual void GetStoreStats(StatsResponse* resp, util::Task* task);
+
   // The "cb" will be called on the "task" executor. Also, only one
   // will be sent to the executor at a time (for a given call to this
   // method, not for all of them), to make sure they are received in
@@ -126,7 +132,7 @@ class EtcdClient {
   HostPortPair GetEndpoint() const;
   HostPortPair UpdateEndpoint(const std::string& host, uint16_t port);
   void FetchDone(RequestState* etcd_req, util::Task* task);
-  void Generic(const std::string& key,
+  void Generic(const std::string& key, const std::string& key_space,
                const std::map<std::string, std::string>& params,
                UrlFetcher::Verb verb, GenericResponse* resp, util::Task* task);
 

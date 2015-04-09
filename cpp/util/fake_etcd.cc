@@ -59,6 +59,7 @@ void FakeEtcdClient::Watch(const string& key, const WatchCallback& cb,
   ScheduleWatchCallback(lock, task, bind(cb, move(initial_updates)));
   watches_[key].push_back(make_pair(cb, task));
   task->WhenCancelled(bind(&FakeEtcdClient::CancelWatch, this, task));
+  ++stats_["watchers"];
 }
 
 
@@ -70,6 +71,7 @@ void FakeEtcdClient::PurgeExpiredEntries() {
       it->second.deleted_ = true;
       NotifyForPath(lock, it->first);
       it = entries_.erase(it);
+      ++stats_["expireCount"];
     } else {
       ++it;
     }
@@ -117,11 +119,12 @@ void FakeEtcdClient::Get(const Request& req, GetResponse* resp, Task* task) {
     const map<string, Node>::const_iterator it(entries_.find(req.key));
     if (it == entries_.end()) {
       task->Return(Status(util::error::NOT_FOUND, "not found"));
+      ++stats_["getsFail"];
       return;
     }
     resp->node = it->second;
   }
-
+  ++stats_["getsSuccess"];
   task->Return();
 }
 
@@ -178,26 +181,40 @@ void FakeEtcdClient::InternalPut(const string& key, const string& value,
 }
 
 
+void FakeEtcdClient::UpdateOperationStats(const string& op, const Task* task) {
+  CHECK_NOTNULL(task);
+  if (!task->IsActive()) {
+    std::lock_guard<std::mutex> lock(mutex_);
+    ++stats_[op + (task->status().ok() ? "Success" : "Fail")];
+  }
+}
+
+
 void FakeEtcdClient::Create(const string& key, const string& value,
                             Response* resp, Task* task) {
-  return InternalPut(key, value, system_clock::time_point::max(), true, -1,
-                     resp, task);
+  task->CleanupWhenDone(
+      bind(&FakeEtcdClient::UpdateOperationStats, this, "create", task));
+  InternalPut(key, value, system_clock::time_point::max(), true, -1, resp,
+              task);
 }
 
 
 void FakeEtcdClient::CreateWithTTL(const string& key, const string& value,
                                    const seconds& ttl, Response* resp,
                                    Task* task) {
-  return InternalPut(key, value, system_clock::now() + ttl, true, -1, resp,
-                     task);
+  task->CleanupWhenDone(
+      bind(&FakeEtcdClient::UpdateOperationStats, this, "create", task));
+  InternalPut(key, value, system_clock::now() + ttl, true, -1, resp, task);
 }
 
 
 void FakeEtcdClient::Update(const string& key, const string& value,
                             const int64_t previous_index, Response* resp,
                             Task* task) {
-  return InternalPut(key, value, system_clock::time_point::max(), false,
-                     previous_index, resp, task);
+  task->CleanupWhenDone(bind(&FakeEtcdClient::UpdateOperationStats, this,
+                             "compareAndSwap", task));
+  InternalPut(key, value, system_clock::time_point::max(), false,
+              previous_index, resp, task);
 }
 
 
@@ -205,15 +222,19 @@ void FakeEtcdClient::UpdateWithTTL(const string& key, const string& value,
                                    const seconds& ttl,
                                    const int64_t previous_index,
                                    Response* resp, Task* task) {
-  return InternalPut(key, value, system_clock::now() + ttl, false,
-                     previous_index, resp, task);
+  task->CleanupWhenDone(bind(&FakeEtcdClient::UpdateOperationStats, this,
+                             "compareAndSwap", task));
+  InternalPut(key, value, system_clock::now() + ttl, false, previous_index,
+              resp, task);
 }
 
 
 void FakeEtcdClient::ForceSet(const string& key, const string& value,
                               Response* resp, Task* task) {
-  return InternalPut(key, value, system_clock::time_point::max(), false, -1,
-                     resp, task);
+  task->CleanupWhenDone(
+      bind(&FakeEtcdClient::UpdateOperationStats, this, "set", task));
+  InternalPut(key, value, system_clock::time_point::max(), false, -1, resp,
+              task);
 }
 
 
@@ -221,8 +242,9 @@ void FakeEtcdClient::ForceSetWithTTL(const std::string& key,
                                      const std::string& value,
                                      const std::chrono::seconds& ttl,
                                      Response* resp, util::Task* task) {
-  return InternalPut(key, value, system_clock::now() + ttl, false, -1, resp,
-                     task);
+  task->CleanupWhenDone(
+      bind(&FakeEtcdClient::UpdateOperationStats, this, "set", task));
+  InternalPut(key, value, system_clock::now() + ttl, false, -1, resp, task);
 }
 
 
@@ -237,10 +259,12 @@ void FakeEtcdClient::Delete(const string& key, const int64_t current_index,
   unique_lock<mutex> lock(mutex_);
   const map<string, Node>::iterator entry(entries_.find(key));
   if (entry == entries_.end()) {
+    ++stats_["compareAndDeleteFail"];
     task->Return(Status(util::error::NOT_FOUND, "Node doesn't exist: " + key));
     return;
   }
   if (entry->second.modified_index_ != current_index) {
+    ++stats_["compareAndDeleteFail"];
     task->Return(Status(util::error::FAILED_PRECONDITION,
                         "Incorrect index:  prevIndex=" +
                             to_string(current_index) +
@@ -250,9 +274,19 @@ void FakeEtcdClient::Delete(const string& key, const int64_t current_index,
   }
   entry->second.deleted_ = true;
   ++index_;
+  ++stats_["compareAndDeleteSuccess"];
   task->Return();
   NotifyForPath(lock, key);
   entries_.erase(entry);
+}
+
+
+void FakeEtcdClient::GetStoreStats(StatsResponse* resp, Task* task) {
+  CHECK_NOTNULL(resp);
+  CHECK_NOTNULL(task);
+  ++stats_["getsSuccess"];
+  resp->stats = stats_;
+  task->Return();
 }
 
 
@@ -265,6 +299,7 @@ void FakeEtcdClient::CancelWatch(Task* task) {
         CHECK(!found);
         found = true;
         VLOG(1) << "Removing watcher " << it->second << " on " << pair.first;
+        --stats_["watchers"];
         // Outstanding notifications have a hold on this task, so they
         // will all go through before the task actually completes. But
         // we won't be sending new notifications.

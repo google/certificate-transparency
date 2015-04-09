@@ -156,6 +156,17 @@ class FakeEtcdTest : public ::testing::Test {
     return retval;
   }
 
+  void CheckStatEq(const string& stat, int64_t value) {
+    SyncTask task(base_.get());
+    EtcdClient::StatsResponse resp;
+    client_->GetStoreStats(&resp, task.task());
+    task.Wait();
+    ASSERT_OK(task.status());
+    ASSERT_EQ(value, resp.stats[stat]) << stat << " != " << value << ", found "
+                                       << resp.stats[stat];
+    ;
+  }
+
   std::shared_ptr<libevent::Base> base_;
   libevent::EventPumpThread event_pump_;
   UrlFetcher fetcher_;
@@ -173,6 +184,7 @@ TEST_F(FakeEtcdTest, Create) {
   EXPECT_EQ(kValue, node.value_);
   EXPECT_EQ(created_index, node.created_index_);
   EXPECT_EQ(created_index, node.modified_index_);
+  CheckStatEq("createSuccess", 1);
 }
 
 
@@ -181,6 +193,7 @@ TEST_F(FakeEtcdTest, CreateFailsIfExists) {
   EXPECT_OK(BlockingCreate(key_prefix_, kValue, &created_index));
   EXPECT_THAT(BlockingCreate(key_prefix_, kValue, &created_index),
               StatusIs(util::error::FAILED_PRECONDITION));
+  CheckStatEq("createFail", 1);
 }
 
 
@@ -191,6 +204,7 @@ TEST_F(FakeEtcdTest, Update) {
   int64_t modified_index;
   EXPECT_OK(
       BlockingUpdate(key_prefix_, kValue2, created_index, &modified_index));
+  CheckStatEq("compareAndSwapSuccess", 1);
 
   EtcdClient::Node node;
   EXPECT_OK(BlockingGet(key_prefix_, &node));
@@ -209,6 +223,7 @@ TEST_F(FakeEtcdTest, UpdateFailsWithIncorrectPreviousIndex) {
   EXPECT_THAT(BlockingUpdate(key_prefix_, kValue2, created_index - 1,
                              &modified_index),
               StatusIs(util::error::FAILED_PRECONDITION));
+  CheckStatEq("compareAndSwapFail", 1);
   EXPECT_EQ(-1, modified_index);
 
   EtcdClient::Node node;
@@ -224,6 +239,7 @@ TEST_F(FakeEtcdTest, CreateWithTTLExpires) {
 
   int64_t created_index;
   EXPECT_OK(BlockingCreateWithTTL(key_prefix_, kValue, kTtl, &created_index));
+  CheckStatEq("createSuccess", 1);
 
   EtcdClient::Node node;
   EXPECT_OK(BlockingGet(key_prefix_, &node));
@@ -237,6 +253,7 @@ TEST_F(FakeEtcdTest, CreateWithTTLExpires) {
   // Vanished, in a puff of digital smoke:
   EXPECT_THAT(BlockingGet(key_prefix_, &node),
               StatusIs(util::error::NOT_FOUND));
+  CheckStatEq("expireCount", 1);
 }
 
 
@@ -245,10 +262,12 @@ TEST_F(FakeEtcdTest, UpdateWithTTLExpires) {
 
   int64_t created_index;
   EXPECT_OK(BlockingCreate(key_prefix_, kValue, &created_index));
+  CheckStatEq("createSuccess", 1);
 
   int64_t modified_index;
   EXPECT_OK(BlockingUpdateWithTTL(key_prefix_, kValue2, kTtl, created_index,
                                   &modified_index));
+  CheckStatEq("compareAndSwapSuccess", 1);
   EXPECT_LT(created_index, modified_index);
 
   EtcdClient::Node node;
@@ -262,15 +281,18 @@ TEST_F(FakeEtcdTest, UpdateWithTTLExpires) {
 
   // Vanished, in a puff of digital smoke:
   EXPECT_THAT(BlockingGet(key_prefix_, &node), StatusIs(util::error::NOT_FOUND));
+  CheckStatEq("expireCount", 1);
 }
 
 
 TEST_F(FakeEtcdTest, ForceSet) {
   int64_t created_index;
   EXPECT_OK(BlockingCreate(key_prefix_, kValue, &created_index));
+  CheckStatEq("createSuccess", 1);
 
   int64_t modified_index;
   EXPECT_OK(BlockingForceSet(key_prefix_, kValue2, &modified_index));
+  CheckStatEq("setSuccess", 1);
 
   EtcdClient::Node node;
   EXPECT_OK(BlockingGet(key_prefix_, &node));
@@ -286,10 +308,12 @@ TEST_F(FakeEtcdTest, ForceSetWithTTLExpires) {
 
   int64_t created_index;
   EXPECT_OK(BlockingCreate(key_prefix_, kValue, &created_index));
+  CheckStatEq("createSuccess", 1);
 
   int64_t modified_index;
   EXPECT_OK(BlockingForceSetWithTTL(key_prefix_, kValue2, kTtl,
                                     &modified_index));
+  CheckStatEq("setSuccess", 1);
   EXPECT_LT(created_index, modified_index);
 
   EtcdClient::Node node;
@@ -303,12 +327,14 @@ TEST_F(FakeEtcdTest, ForceSetWithTTLExpires) {
 
   // Vanished, in a puff of digital smoke:
   EXPECT_THAT(BlockingGet(key_prefix_, &node), StatusIs(util::error::NOT_FOUND));
+  CheckStatEq("expireCount", 1);
 }
 
 
 TEST_F(FakeEtcdTest, DeleteNonExistent) {
   Status status(BlockingDelete("/potato", 42));
   EXPECT_EQ(util::error::NOT_FOUND, status.CanonicalCode()) << status;
+  CheckStatEq("compareAndDeleteFail", 1);
 }
 
 
@@ -323,6 +349,7 @@ TEST_F(FakeEtcdTest, DeleteIncorrectIndex) {
 
   EXPECT_THAT(BlockingDelete(key_prefix_, created_index + 1),
               StatusIs(util::error::FAILED_PRECONDITION));
+  CheckStatEq("compareAndDeleteFail", 1);
 
   EXPECT_OK(BlockingGet(key_prefix_, &node));
   EXPECT_EQ(created_index, node.created_index_);
@@ -340,6 +367,7 @@ TEST_F(FakeEtcdTest, Delete) {
   EXPECT_EQ(created_index, node.modified_index_);
 
   EXPECT_OK(BlockingDelete(key_prefix_, created_index));
+  CheckStatEq("compareAndDeleteSuccess", 1);
 
   EXPECT_THAT(BlockingGet(key_prefix_, &node),
               StatusIs(util::error::NOT_FOUND));
@@ -409,6 +437,7 @@ TEST_F(FakeEtcdTest, WatcherForExecutor) {
       kDir, bind(&MockFunction<void(const vector<EtcdClient::Node>&)>::Call,
                  &watcher, _1),
       task.task());
+  CheckStatEq("watchers", 1);
 
   ASSERT_TRUE(initial.WaitForNotificationWithTimeout(seconds(1)));
   Mock::VerifyAndClearExpectations(&watcher);
@@ -428,6 +457,7 @@ TEST_F(FakeEtcdTest, WatcherForExecutor) {
   task.Cancel();
   task.Wait();
   EXPECT_THAT(task.status(), StatusIs(util::error::CANCELLED));
+  CheckStatEq("watchers", 0);
 }
 
 
@@ -449,6 +479,7 @@ TEST_F(FakeEtcdTest, WatcherForCreate) {
       kDir, bind(&MockFunction<void(const vector<EtcdClient::Node>&)>::Call,
                  &watcher, _1),
       watch_task.task());
+  CheckStatEq("watchers", 1);
 
   ASSERT_TRUE(initial.WaitForNotificationWithTimeout(seconds(1)));
   Mock::VerifyAndClearExpectations(&watcher);
@@ -465,6 +496,7 @@ TEST_F(FakeEtcdTest, WatcherForCreate) {
   watch_task.Cancel();
   watch_task.Wait();
   EXPECT_THAT(watch_task.status(), StatusIs(util::error::CANCELLED));
+  CheckStatEq("watchers", 0);
 }
 
 
@@ -485,6 +517,7 @@ TEST_F(FakeEtcdTest, WatcherForDelete) {
       kDir, bind(&MockFunction<void(const vector<EtcdClient::Node>&)>::Call,
                  &watcher, _1),
       watch_task.task());
+  CheckStatEq("watchers", 1);
 
   ASSERT_TRUE(initial.WaitForNotificationWithTimeout(seconds(1)));
   Mock::VerifyAndClearExpectations(&watcher);
@@ -500,6 +533,7 @@ TEST_F(FakeEtcdTest, WatcherForDelete) {
   watch_task.Cancel();
   watch_task.Wait();
   EXPECT_THAT(watch_task.status(), StatusIs(util::error::CANCELLED));
+  CheckStatEq("watchers", 0);
 }
 
 
