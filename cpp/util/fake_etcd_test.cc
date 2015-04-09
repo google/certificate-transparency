@@ -4,6 +4,7 @@
 #include <functional>
 #include <gflags/gflags.h>
 #include <glog/logging.h>
+#include <gmock/gmock.h>
 #include <gtest/gtest.h>
 #include <memory>
 #include <mutex>
@@ -33,6 +34,12 @@ using std::string;
 using std::this_thread::sleep_for;
 using std::unique_ptr;
 using std::vector;
+using testing::DoAll;
+using testing::ElementsAre;
+using testing::InvokeWithoutArgs;
+using testing::Mock;
+using testing::MockFunction;
+using testing::StrictMock;
 using util::Status;
 using util::SyncTask;
 using util::testing::StatusIs;
@@ -342,73 +349,81 @@ TEST_F(FakeEtcdTest, Delete) {
 
 class CheckingExecutor : public util::Executor {
  public:
-  CheckingExecutor(util::Executor* inner, const deque<Notification*>& expected) : inner_(CHECK_NOTNULL(inner)), expected_(expected) {
+  CheckingExecutor() : inner_(1), in_executor_(false) {
   }
 
   void Add(const std::function<void()>& closure) override {
-    inner_->Add(bind(&CheckingExecutor::Check, this, closure));
+    inner_.Add(bind(&CheckingExecutor::Check, this, closure));
+  }
+
+  void CheckInExecutor() const {
+    lock_guard<mutex> lock(lock_);
+    EXPECT_TRUE(in_executor_);
   }
 
  private:
   void Check(const std::function<void()>& closure) {
-    Notification* const notification(GetNext());
-    if (notification) {
-      EXPECT_FALSE(notification->HasBeenNotified());
-      closure();
-      EXPECT_TRUE(notification->HasBeenNotified());
-    } else {
-      closure();
+    {
+      lock_guard<mutex> lock(lock_);
+      CHECK(!in_executor_);
+      in_executor_ = true;
+    }
+    closure();
+    {
+      lock_guard<mutex> lock(lock_);
+      CHECK(in_executor_);
+      in_executor_ = false;
     }
   }
 
-  Notification* GetNext() {
-    lock_guard<mutex> lock(lock_);
-    Notification* const notification(expected_.front());
-    expected_.pop_front();
-    return notification;
-  }
-
-  util::Executor* const inner_;
-  mutex lock_;
-  deque<Notification*> expected_;
+  ThreadPool inner_;
+  mutable mutex lock_;
+  bool in_executor_;
 };
 
 
-void TestWatcherForExecutor(Notification* notifier, bool* been_called) {
-  if (*been_called) {
-    notifier->Notify();
-  }
-  *been_called = true;
+MATCHER_P2(EtcdClientNodeIs, key, value, "") {
+  return arg.key_ == key && arg.value_ == value;
 }
 
 
 TEST_F(FakeEtcdTest, WatcherForExecutor) {
-  ThreadPool pool(2);
+  // Make sure the directory exists and has something in it before watching.
+  const string kKeyBogus(string(kDir) + "bogus");
+  int64_t bogus_index;
+  ASSERT_OK(BlockingCreate(kKeyBogus, "", &bogus_index));
 
-  Notification watch;
-  Notification done;
+  StrictMock<MockFunction<void(const vector<EtcdClient::Node>&)>> watcher;
+  CheckingExecutor checking_executor;
+  SyncTask task(&checking_executor);
+  Notification initial;
+  EXPECT_CALL(watcher, Call(ElementsAre(EtcdClientNodeIs(kKeyBogus, ""))))
+      .WillOnce(DoAll(InvokeWithoutArgs(&initial, &Notification::Notify),
+                      InvokeWithoutArgs(&checking_executor,
+                                        &CheckingExecutor::CheckInExecutor)));
 
-  // First time is the initial watch state, second time is the create
-  // notification, then the cancellation callback, and finally the
-  // done callback.
-  CheckingExecutor checking_executor(&pool, {nullptr, &watch, nullptr, &done});
-  util::Task task(bind(&Notification::Notify, &done), &checking_executor);
-  bool been_called(false);
-  client_->Watch(kDir, bind(&TestWatcherForExecutor, &watch, &been_called),
-                 &task);
+  client_->Watch(
+      kDir, bind(&MockFunction<void(const vector<EtcdClient::Node>&)>::Call,
+                 &watcher, _1),
+      task.task());
+
+  ASSERT_TRUE(initial.WaitForNotificationWithTimeout(seconds(1)));
+  Mock::VerifyAndClearExpectations(&watcher);
+
+  Notification second;
+  EXPECT_CALL(watcher, Call(ElementsAre(EtcdClientNodeIs(kPath1, kValue))))
+      .WillOnce(DoAll(InvokeWithoutArgs(&second, &Notification::Notify),
+                      InvokeWithoutArgs(&checking_executor,
+                                        &CheckingExecutor::CheckInExecutor)));
 
   int64_t created_index;
   EXPECT_OK(BlockingCreate(kPath1, kValue, &created_index));
 
-  // Should fall straight through:
-  // TODO(pphaneuf): But it doesn't really? I tried changing it for
-  // EXPECT_TRUE(notifier.HasBeenNotified()), but that fails
-  // sometimes.
-  watch.WaitForNotification();
+  ASSERT_TRUE(second.WaitForNotificationWithTimeout(seconds(1)));
 
   task.Cancel();
-  done.WaitForNotification();
-  EXPECT_EQ(Status::CANCELLED, task.status());
+  task.Wait();
+  EXPECT_THAT(task.status(), StatusIs(util::error::CANCELLED));
 }
 
 
