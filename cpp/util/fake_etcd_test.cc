@@ -37,9 +37,11 @@ using std::vector;
 using testing::DoAll;
 using testing::ElementsAre;
 using testing::InvokeWithoutArgs;
+using testing::Matches;
 using testing::Mock;
 using testing::MockFunction;
 using testing::StrictMock;
+using testing::_;
 using util::Status;
 using util::SyncTask;
 using util::testing::StatusIs;
@@ -382,8 +384,9 @@ class CheckingExecutor : public util::Executor {
 };
 
 
-MATCHER_P2(EtcdClientNodeIs, key, value, "") {
-  return arg.key_ == key && arg.value_ == value;
+MATCHER_P3(EtcdClientNodeIs, key, value, deleted, "") {
+  return Matches(key)(arg.key_) && Matches(value)(arg.value_) &&
+         Matches(deleted)(arg.deleted_);
 }
 
 
@@ -397,7 +400,8 @@ TEST_F(FakeEtcdTest, WatcherForExecutor) {
   CheckingExecutor checking_executor;
   SyncTask task(&checking_executor);
   Notification initial;
-  EXPECT_CALL(watcher, Call(ElementsAre(EtcdClientNodeIs(kKeyBogus, ""))))
+  EXPECT_CALL(watcher,
+              Call(ElementsAre(EtcdClientNodeIs(kKeyBogus, "", false))))
       .WillOnce(DoAll(InvokeWithoutArgs(&initial, &Notification::Notify),
                       InvokeWithoutArgs(&checking_executor,
                                         &CheckingExecutor::CheckInExecutor)));
@@ -411,7 +415,8 @@ TEST_F(FakeEtcdTest, WatcherForExecutor) {
   Mock::VerifyAndClearExpectations(&watcher);
 
   Notification second;
-  EXPECT_CALL(watcher, Call(ElementsAre(EtcdClientNodeIs(kPath1, kValue))))
+  EXPECT_CALL(watcher,
+              Call(ElementsAre(EtcdClientNodeIs(kPath1, kValue, false))))
       .WillOnce(DoAll(InvokeWithoutArgs(&second, &Notification::Notify),
                       InvokeWithoutArgs(&checking_executor,
                                         &CheckingExecutor::CheckInExecutor)));
@@ -427,98 +432,70 @@ TEST_F(FakeEtcdTest, WatcherForExecutor) {
 }
 
 
-void TestWatcherForCreateCallback(Notification* notifier,
-                                  const vector<EtcdClient::Node>& updates) {
-  static int num_calls(0);
-  LOG(INFO) << "Update " << num_calls;
-  if (num_calls == 0) {
-    // initial call will all dir entries
-    EXPECT_EQ(1, updates.size());
-    EXPECT_EQ(false, updates[0].deleted_);
-    EXPECT_EQ(kPath1, updates[0].key_);
-    EXPECT_EQ(kValue, updates[0].value_);
-  } else {
-    EXPECT_EQ(1, updates.size());
-    EXPECT_EQ(false, updates[0].deleted_);
-    EXPECT_EQ(kPath2, updates[0].key_);
-    EXPECT_EQ(kValue2, updates[0].value_);
-    notifier->Notify();
-  }
-  ++num_calls;
-}
-
-
 TEST_F(FakeEtcdTest, WatcherForCreate) {
-  ThreadPool pool(2);
   int64_t created_index;
-  Status status(BlockingCreate(kPath1, kValue, &created_index));
-  EXPECT_TRUE(status.ok()) << status;
+  EXPECT_OK(BlockingCreate(kPath1, kValue, &created_index));
 
-  Notification watch;
-  util::SyncTask watch_task(&pool);
-  client_->Watch(kDir, bind(&TestWatcherForCreateCallback, &watch, _1),
-                 watch_task.task());
+  StrictMock<MockFunction<void(const vector<EtcdClient::Node>&)>> watcher;
+  Notification initial;
+  EXPECT_CALL(watcher,
+              Call(ElementsAre(EtcdClientNodeIs(kPath1, "value", false))))
+      .WillOnce(InvokeWithoutArgs(&initial, &Notification::Notify));
 
-  status = BlockingCreate(kPath2, kValue2, &created_index);
-  EXPECT_TRUE(status.ok()) << status;
+  util::SyncTask watch_task(base_.get());
+  client_->Watch(
+      kDir, bind(&MockFunction<void(const vector<EtcdClient::Node>&)>::Call,
+                 &watcher, _1),
+      watch_task.task());
 
-  // Should fall straight through:
-  // TODO(pphaneuf): But it doesn't really? I tried changing it for
-  // EXPECT_TRUE(notifier.HasBeenNotified()), but that fails
-  // sometimes.
-  watch.WaitForNotification();
+  ASSERT_TRUE(initial.WaitForNotificationWithTimeout(seconds(1)));
+  Mock::VerifyAndClearExpectations(&watcher);
+
+  Notification second;
+  EXPECT_CALL(watcher,
+              Call(ElementsAre(EtcdClientNodeIs(kPath2, kValue2, false))))
+      .WillOnce(InvokeWithoutArgs(&second, &Notification::Notify));
+
+  EXPECT_OK(BlockingCreate(kPath2, kValue2, &created_index));
+
+  EXPECT_TRUE(initial.WaitForNotificationWithTimeout(seconds(1)));
 
   watch_task.Cancel();
   watch_task.Wait();
-}
-
-
-void TestWatcherForDeleteCallback(Notification* notifier, int* num_calls,
-                                  const vector<EtcdClient::Node>& updates) {
-  static mutex mymutex;
-
-  lock_guard<mutex> lock(mymutex);
-  LOG(INFO) << "Delete " << num_calls;
-  if (*num_calls == 0) {
-    // initial call will all dir entries
-    EXPECT_EQ(1, updates.size());
-    EXPECT_EQ(false, updates[0].deleted_);
-    EXPECT_EQ(kPath1, updates[0].key_);
-    EXPECT_EQ(kValue, updates[0].value_);
-  } else {
-    EXPECT_EQ(1, updates.size());
-    EXPECT_EQ(true, updates[0].deleted_);
-    EXPECT_EQ(kPath1, updates[0].key_);
-    notifier->Notify();
-  }
-  ++(*num_calls);
+  EXPECT_THAT(watch_task.status(), StatusIs(util::error::CANCELLED));
 }
 
 
 TEST_F(FakeEtcdTest, WatcherForDelete) {
-  ThreadPool pool(2);
   int64_t created_index;
-  Status status(BlockingCreate(kPath1, kValue, &created_index));
-  EXPECT_TRUE(status.ok()) << status;
+  EXPECT_OK(BlockingCreate(kPath1, kValue, &created_index));
 
-  Notification watch;
-  util::SyncTask watch_task(&pool);
-  int num_calls(0);
-  client_->Watch(kDir,
-                 bind(&TestWatcherForDeleteCallback, &watch, &num_calls, _1),
-                 watch_task.task());
+  StrictMock<MockFunction<void(const vector<EtcdClient::Node>&)>> watcher;
+  Notification initial;
+  EXPECT_CALL(watcher,
+              Call(ElementsAre(EtcdClientNodeIs(kPath1, "value", false))))
+      .WillOnce(InvokeWithoutArgs(&initial, &Notification::Notify));
 
-  status = BlockingDelete(kPath1, created_index);
-  EXPECT_TRUE(status.ok()) << status;
+  util::SyncTask watch_task(base_.get());
+  client_->Watch(
+      kDir, bind(&MockFunction<void(const vector<EtcdClient::Node>&)>::Call,
+                 &watcher, _1),
+      watch_task.task());
 
-  // Should fall straight through:
-  // TODO(pphaneuf): But it doesn't really? I tried changing it for
-  // EXPECT_TRUE(watch.HasBeenNotified()), but that fails
-  // sometimes.
-  watch.WaitForNotification();
+  ASSERT_TRUE(initial.WaitForNotificationWithTimeout(seconds(1)));
+  Mock::VerifyAndClearExpectations(&watcher);
+
+  Notification second;
+  EXPECT_CALL(watcher, Call(ElementsAre(EtcdClientNodeIs(kPath1, _, true))))
+      .WillOnce(InvokeWithoutArgs(&second, &Notification::Notify));
+
+  EXPECT_OK(BlockingDelete(kPath1, created_index));
+
+  EXPECT_TRUE(initial.WaitForNotificationWithTimeout(seconds(1)));
 
   watch_task.Cancel();
   watch_task.Wait();
+  EXPECT_THAT(watch_task.status(), StatusIs(util::error::CANCELLED));
 }
 
 
