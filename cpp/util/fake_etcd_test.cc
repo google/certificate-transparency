@@ -21,7 +21,7 @@
 namespace cert_trans {
 
 using std::bind;
-using std::chrono::duration;
+using std::chrono::seconds;
 using std::deque;
 using std::function;
 using std::lock_guard;
@@ -89,8 +89,7 @@ class FakeEtcdTest : public ::testing::Test {
   }
 
   Status BlockingCreateWithTTL(const string& key, const string& value,
-                               const duration<int64_t>& ttl,
-                               int64_t* created_index) {
+                               const seconds& ttl, int64_t* created_index) {
     SyncTask task(base_.get());
     EtcdClient::Response resp;
     client_->CreateWithTTL(key, value, ttl, &resp, task.task());
@@ -110,8 +109,7 @@ class FakeEtcdTest : public ::testing::Test {
   }
 
   Status BlockingUpdateWithTTL(const string& key, const string& value,
-                               const duration<int>& ttl,
-                               int64_t previous_index,
+                               const seconds& ttl, int64_t previous_index,
                                int64_t* modified_index) {
     SyncTask task(base_.get());
     EtcdClient::Response resp;
@@ -133,8 +131,7 @@ class FakeEtcdTest : public ::testing::Test {
   }
 
   Status BlockingForceSetWithTTL(const string& key, const string& value,
-                                 const duration<int>& ttl,
-                                 int64_t* modified_index) {
+                                 const seconds& ttl, int64_t* modified_index) {
     SyncTask task(base_.get());
     EtcdClient::Response resp;
     client_->ForceSetWithTTL(key, value, ttl, &resp, task.task());
@@ -213,7 +210,7 @@ TEST_F(FakeEtcdTest, UpdateFailsWithIncorrectPreviousIndex) {
 
 
 TEST_F(FakeEtcdTest, CreateWithTTLExpires) {
-  duration<int> kTtl(3);
+  seconds kTtl(3);
 
   int64_t created_index;
   EXPECT_OK(
@@ -226,7 +223,7 @@ TEST_F(FakeEtcdTest, CreateWithTTLExpires) {
   EXPECT_EQ(created_index, node.modified_index_);
 
   // Now wait for it to expire
-  sleep_for(kTtl + duration<int>(1));
+  sleep_for(kTtl + seconds(1));
 
   // Vanished, in a puff of digital smoke:
   EXPECT_THAT(BlockingGet(kKeyCreateTtl, &node),
@@ -235,7 +232,7 @@ TEST_F(FakeEtcdTest, CreateWithTTLExpires) {
 
 
 TEST_F(FakeEtcdTest, UpdateWithTTLExpires) {
-  duration<int> kTtl(3);
+  seconds kTtl(3);
 
   int64_t created_index;
   EXPECT_OK(BlockingCreate(kKeyUpdateTtl, kValue, &created_index));
@@ -252,7 +249,7 @@ TEST_F(FakeEtcdTest, UpdateWithTTLExpires) {
   EXPECT_EQ(modified_index, node.modified_index_);
 
   // Now wait for it to expire
-  sleep_for(kTtl + duration<int>(1));
+  sleep_for(kTtl + seconds(1));
 
   // Vanished, in a puff of digital smoke:
   EXPECT_THAT(BlockingGet(kKeyUpdateTtl, &node),
@@ -277,7 +274,7 @@ TEST_F(FakeEtcdTest, ForceSet) {
 
 
 TEST_F(FakeEtcdTest, ForceSetWithTTLExpires) {
-  duration<int> kTtl(3);
+  seconds kTtl(3);
 
   int64_t created_index;
   EXPECT_OK(BlockingCreate(kKeyForceSetTtl, kValue, &created_index));
@@ -294,7 +291,7 @@ TEST_F(FakeEtcdTest, ForceSetWithTTLExpires) {
   EXPECT_EQ(modified_index, node.modified_index_);
 
   // Now wait for it to expire
-  sleep_for(kTtl + duration<int>(1));
+  sleep_for(kTtl + seconds(1));
 
   // Vanished, in a puff of digital smoke:
   EXPECT_THAT(BlockingGet(kKeyForceSetTtl, &node),
