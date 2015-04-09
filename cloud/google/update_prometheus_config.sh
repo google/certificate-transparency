@@ -14,6 +14,7 @@ sed -- "s%@@TARGETS@@%${LOG_HOSTS}%g" < ${DIR}/../prometheus/prometheus.conf > $
 
 
 for i in ${PROMETHEUS_MACHINES[@]}; do
+  WaitMachineUp ${i}
   ${GCLOUD} compute copy-files \
     ${TMP_CONFIG} ${i}:.
   ${GCLOUD} compute ssh ${i} --command "
