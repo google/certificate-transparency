@@ -21,7 +21,7 @@ function WaitForStatus() {
 
 function WaitMachineUp() {
   echo "Waiting for ${1}"
-  until ${GCLOUD} compute ssh ${1} -c "logout"; do
+  until ${GCLOUD} compute ssh ${1} --command "exit"; do
     sleep 1
     echo -n .
   done
