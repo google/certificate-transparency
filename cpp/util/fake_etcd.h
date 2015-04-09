@@ -7,10 +7,11 @@
 #include <string>
 
 #include "util/etcd.h"
+#include "util/statusor.h"
 #include "util/task.h"
 
-
 namespace cert_trans {
+
 
 class FakeEtcdClient : public EtcdClient {
  public:
@@ -43,7 +44,7 @@ class FakeEtcdClient : public EtcdClient {
   void NotifyForPath(const std::unique_lock<std::mutex>& lock,
                      const std::string& path);
 
-  util::Status CheckCompareFlags(
+  util::StatusOr<bool> CheckCompareFlags(
       const std::map<std::string, std::string> params, const std::string& key);
 
   void HandlePost(const std::string& key,

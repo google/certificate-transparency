@@ -21,6 +21,7 @@ using std::to_string;
 using std::unique_lock;
 using std::vector;
 using util::Status;
+using util::StatusOr;
 using util::Task;
 
 namespace cert_trans {
@@ -178,16 +179,19 @@ void FakeEtcdClient::Get(const Request& req, GetResponse* resp, Task* task) {
 }
 
 
-Status FakeEtcdClient::CheckCompareFlags(const map<string, string> params,
-                                         const string& key) {
+StatusOr<bool> FakeEtcdClient::CheckCompareFlags(
+    const map<string, string> params, const string& key) {
+  bool new_node(true);
   const bool entry_exists(entries_.find(key) != entries_.end());
-  string prev_exist;
-  if (GetParam(params, "prevExist", &prev_exist)) {
-    if (entry_exists && prev_exist == "false") {
+  string prev_exist_str;
+  if (GetParam(params, "prevExist", &prev_exist_str)) {
+    const bool prev_exist(prev_exist_str == "true");
+    if (entry_exists && !prev_exist) {
       return Status(util::error::FAILED_PRECONDITION, key + " Already exists");
-    } else if (!entry_exists && prev_exist == "true") {
+    } else if (!entry_exists && prev_exist) {
       return Status(util::error::FAILED_PRECONDITION, key + " Not found");
     }
+    new_node = false;
   }
   string prev_index;
   if (GetParam(params, "prevIndex", &prev_index)) {
@@ -201,8 +205,9 @@ Status FakeEtcdClient::CheckCompareFlags(const map<string, string> params,
                     "Incorrect index:  prevIndex=" + prev_index +
                         " but modified_index_=" + modified_index);
     }
+    new_node = false;
   }
-  return Status::OK;
+  return new_node;
 }
 
 
@@ -216,14 +221,14 @@ void FakeEtcdClient::HandlePut(const string& key,
   const string& value(params.find("value")->second);
   Node node(index_, index_, key, false, value, {}, false);
   MaybeSetExpiry(params, &node);
-  Status status(CheckCompareFlags(params, key));
-  if (!status.ok()) {
+  StatusOr<bool> new_node(CheckCompareFlags(params, key));
+  if (!new_node.status().ok()) {
     resp->etcd_index = index_;
     resp->json_body = make_shared<JsonObject>();
-    task->Return(status);
+    task->Return(new_node.status());
     return;
   }
-  if (entries_.find(key) != entries_.end()) {
+  if (!new_node.ValueOrDie() && entries_.find(key) != entries_.end()) {
     VLOG(1) << "Keeping original created_index_";
     node.created_index_ = entries_.find(key)->second.created_index_;
   }

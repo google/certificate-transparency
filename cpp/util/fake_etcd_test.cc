@@ -267,7 +267,7 @@ TEST_F(FakeEtcdTest, ForceSet) {
   EtcdClient::Node node;
   EXPECT_OK(BlockingGet(kKeyForceSet, &node));
   EXPECT_EQ(kValue2, node.value_);
-  EXPECT_EQ(created_index, node.created_index_);
+  EXPECT_EQ(modified_index, node.created_index_);
   EXPECT_EQ(modified_index, node.modified_index_);
   EXPECT_LT(created_index, modified_index);
 }
@@ -287,7 +287,7 @@ TEST_F(FakeEtcdTest, ForceSetWithTTLExpires) {
   EtcdClient::Node node;
   EXPECT_OK(BlockingGet(kKeyForceSetTtl, &node));
   EXPECT_EQ(kValue2, node.value_);
-  EXPECT_EQ(created_index, node.created_index_);
+  EXPECT_EQ(modified_index, node.created_index_);
   EXPECT_EQ(modified_index, node.modified_index_);
 
   // Now wait for it to expire
