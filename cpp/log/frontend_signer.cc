@@ -17,6 +17,7 @@ using cert_trans::LoggedCertificate;
 using ct::LogEntry;
 using ct::SignedCertificateTimestamp;
 using std::string;
+using util::Status;
 
 FrontendSigner::FrontendSigner(Database<cert_trans::LoggedCertificate>* db,
                                ConsistentStore<LoggedCertificate>* store,
@@ -26,8 +27,8 @@ FrontendSigner::FrontendSigner(Database<cert_trans::LoggedCertificate>* db,
       signer_(CHECK_NOTNULL(signer)) {
 }
 
-FrontendSigner::SubmitResult FrontendSigner::QueueEntry(
-    const LogEntry& entry, SignedCertificateTimestamp* sct) {
+Status FrontendSigner::QueueEntry(const LogEntry& entry,
+                                  SignedCertificateTimestamp* sct) {
   const string sha256_hash(
       Sha256Hasher::Sha256Digest(Serializer::LeafCertificate(entry)));
   CHECK(!sha256_hash.empty());
@@ -47,7 +48,8 @@ FrontendSigner::SubmitResult FrontendSigner::QueueEntry(
     if (sct != nullptr) {
       *sct = logged.sct();
     }
-    return DUPLICATE;
+    return Status(util::error::ALREADY_EXISTS,
+                  "entry already exists in Database");
   }
   CHECK_EQ(Database<cert_trans::LoggedCertificate>::NOT_FOUND, db_result);
 
@@ -70,13 +72,7 @@ FrontendSigner::SubmitResult FrontendSigner::QueueEntry(
     *sct = new_logged.sct();
   }
 
-  if (status.CanonicalCode() == util::error::ALREADY_EXISTS) {
-    return DUPLICATE;
-  } else {
-    // TODO(alcutter): really need to propagate failures back up!
-    CHECK(status.ok());
-    return NEW;
-  }
+  return status;
 }
 
 
