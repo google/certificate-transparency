@@ -100,11 +100,11 @@ using cert_trans::ClusterStateController;
 using cert_trans::ConsistentStore;
 using cert_trans::ContinuousFetcher;
 using cert_trans::Counter;
-using cert_trans::Gauge;
 using cert_trans::EtcdClient;
 using cert_trans::EtcdConsistentStore;
 using cert_trans::FakeEtcdClient;
 using cert_trans::FileStorage;
+using cert_trans::Gauge;
 using cert_trans::HttpHandler;
 using cert_trans::JsonOutput;
 using cert_trans::Latency;
@@ -113,8 +113,8 @@ using cert_trans::MasterElection;
 using cert_trans::PeriodicClosure;
 using cert_trans::Proxy;
 using cert_trans::ReadPrivateKey;
-using cert_trans::StrictConsistentStore;
 using cert_trans::ScopedLatency;
+using cert_trans::StrictConsistentStore;
 using cert_trans::ThreadPool;
 using cert_trans::TreeSigner;
 using cert_trans::Update;
@@ -134,6 +134,7 @@ using std::mutex;
 using std::placeholders::_1;
 using std::shared_ptr;
 using std::string;
+using std::this_thread::sleep_for;
 using std::thread;
 using std::unique_ptr;
 
@@ -233,9 +234,9 @@ void CleanUpEntries(ConsistentStore<LoggedCertificate>* store,
   CHECK_NOTNULL(election);
   const steady_clock::duration period(
       (seconds(FLAGS_cleanup_frequency_seconds)));
-  steady_clock::time_point target_run_time(steady_clock::now());
 
   while (true) {
+    const steady_clock::time_point start(steady_clock::now());
     if (election->IsMaster()) {
       const ScopedLatency sequencer_delete_latency(
           sequencer_delete_latency_ms.ScopedLatency());
@@ -245,12 +246,11 @@ void CleanUpEntries(ConsistentStore<LoggedCertificate>* store,
       }
     }
 
-    const steady_clock::time_point now(steady_clock::now());
-    while (target_run_time <= now) {
-      target_run_time += period;
+    const steady_clock::time_point end(steady_clock::now());
+    const steady_clock::time_point next_run(start + period);
+    if (next_run > end) {
+      sleep_for(next_run - end);
     }
-
-    std::this_thread::sleep_for(target_run_time - now);
   }
 }
 
@@ -278,7 +278,7 @@ void SequenceEntries(TreeSigner<LoggedCertificate>* tree_signer,
       target_run_time += period;
     }
 
-    std::this_thread::sleep_for(target_run_time - now);
+    sleep_for(target_run_time - now);
   }
 }
 
@@ -321,7 +321,7 @@ void SignMerkleTree(TreeSigner<LoggedCertificate>* tree_signer,
     while (target_run_time <= now) {
       target_run_time += period;
     }
-    std::this_thread::sleep_for(target_run_time - now);
+    sleep_for(target_run_time - now);
   }
 }
 
@@ -341,7 +341,7 @@ void RefreshNodeState(ClusterStateController<LoggedCertificate>* controller) {
     while (target_run_time <= now) {
       target_run_time += period;
     }
-    std::this_thread::sleep_for(target_run_time - now);
+    sleep_for(target_run_time - now);
   }
 }
 
