@@ -13,7 +13,7 @@ You should have:
 * Signed up for a [Google Cloud](https://cloud.google.com) account _[only required if you're intending to use GCE, of course]_
 
 ### Dependencies for Debian-based distros
-Assuming you're happy to use the stock versions of dependencies, Debian-based distros (including Ubuntoo etc.) have many of them pre-packaged which will make your life easier, you can install them using the following command:
+Assuming you're happy to use the stock versions of dependencies, Debian-based distros (including Ubuntu etc.) have many of them pre-packaged which will make your life easier, you can install them using the following command:
 ```bash
 sudo apt-get update
 sudo apt-get -V -y install \
@@ -29,7 +29,6 @@ sudo apt-get -V -y install \
        libgoogle-glog-dev \
        libsqlite3-dev \
        libjson-c-dev \
-       libevent-2.0-5 \
        libevent-dev \
        libldns-dev \
        wget \
