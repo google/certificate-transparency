@@ -11,6 +11,7 @@ all: cpp java python
 docker: cpp 
 	sudo docker build -t localhost:5000/certificate_transparency/super_duper:test .
 	cd cloud/etcd && sudo docker build -t localhost:5000/certificate_transparency/etcd:test .
+	cd cloud/prometheus && sudo docker build -t localhost:5000/certificate_transparency/prometheus:test .
 
 java:
 	ant build
