@@ -1,5 +1,6 @@
 #!/usr/bin/env python
 # coding=utf-8
+import time
 import unittest
 from ct.client.db import cert_desc
 from ct.crypto import cert
@@ -46,6 +47,11 @@ class CertificateDescriptionTest(unittest.TestCase):
         self.assertEqual(proto.serial_number,
                          str(CERT.serial_number().human_readable()
                              .upper().replace(':', '')))
+        self.assertEqual(time.gmtime(proto.validity.not_before / 1000),
+                         CERT.not_before())
+        self.assertEqual(time.gmtime(proto.validity.not_after / 1000),
+                         CERT.not_after())
+
         observations_tuples = [(unicode(obs.description),
                                 unicode(obs.reason) if obs.reason else u'',
                                 obs.details_to_proto())
