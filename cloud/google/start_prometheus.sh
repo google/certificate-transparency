@@ -21,7 +21,7 @@ done
 wait
 
 MANIFEST=/tmp/prometheus_container.yaml
-sed --e "s^@@GCS_BUCKET@@^${GCS_BUCKET}^ \
+sed --e "s^@@GCS_BUCKET@@^${GCS_BUCKET}^" \
     < ${DIR}/prometheus_container.yaml > ${MANIFEST}
 
 
