@@ -6,7 +6,9 @@
 #include "log/cert.h"
 #include "log/cert_submission_handler.h"
 #include "log/frontend_signer.h"
+#include "monitoring/event_metric.h"
 #include "proto/ct.pb.h"
+#include "util/status.h"
 
 using cert_trans::CertChain;
 using cert_trans::PreCertChain;
@@ -15,9 +17,19 @@ using ct::SignedCertificateTimestamp;
 using std::string;
 using std::lock_guard;
 using std::mutex;
+using util::Status;
+
+namespace {
+
+static cert_trans::EventMetric<std::string, std::string>
+    submission_status_metric(
+        "submission_status", "entry_type", "status",
+        "Submission status totals broken down by entry type and status code.");
+
+}  // namespace
 
 Frontend::Frontend(CertSubmissionHandler* handler, FrontendSigner* signer)
-    : handler_(handler), signer_(signer), stats_() {
+    : handler_(handler), signer_(signer) {
 }
 
 Frontend::~Frontend() {
@@ -25,41 +37,21 @@ Frontend::~Frontend() {
   delete handler_;
 }
 
-void Frontend::GetStats(Frontend::FrontendStats* stats) const {
-  lock_guard<mutex> lock(stats_mutex_);
-  *stats = stats_;
-}
-
-SubmitResult Frontend::QueueProcessedEntry(
+Status Frontend::QueueProcessedEntry(
     CertSubmissionHandler::SubmitResult pre_result, const LogEntry& entry,
     SignedCertificateTimestamp* sct) {
   if (pre_result != CertSubmissionHandler::OK) {
-    SubmitResult result = GetSubmitError(pre_result);
-    UpdateStats(entry.type(), result);
-    return result;
+    const Status status(GetSubmitError(pre_result));
+    return UpdateStats(entry.type(), status);
   }
 
   // Step 2. Submit to database.
-  FrontendSigner::SubmitResult signer_result = signer_->QueueEntry(entry, sct);
-
-  SubmitResult result;
-  switch (signer_result) {
-    case FrontendSigner::NEW:
-      result = ADDED;
-      break;
-    case FrontendSigner::DUPLICATE:
-      result = DUPLICATE;
-      break;
-    default:
-      LOG(FATAL) << "Unknown FrontendSigner return code " << signer_result;
-  }
-
-  UpdateStats(entry.type(), result);
-  return result;
+  const Status status(signer_->QueueEntry(entry, sct));
+  return UpdateStats(entry.type(), status);
 }
 
-SubmitResult Frontend::QueueX509Entry(CertChain* chain,
-                                      SignedCertificateTimestamp* sct) {
+Status Frontend::QueueX509Entry(CertChain* chain,
+                                SignedCertificateTimestamp* sct) {
   LogEntry entry;
   // Make sure the correct statistics get updated in case of error.
   entry.set_type(ct::X509_ENTRY);
@@ -67,8 +59,8 @@ SubmitResult Frontend::QueueX509Entry(CertChain* chain,
                              entry, sct);
 }
 
-SubmitResult Frontend::QueuePreCertEntry(PreCertChain* chain,
-                                         SignedCertificateTimestamp* sct) {
+Status Frontend::QueuePreCertEntry(PreCertChain* chain,
+                                   SignedCertificateTimestamp* sct) {
   LogEntry entry;
   // Make sure the correct statistics get updated in case of error.
   entry.set_type(ct::PRECERT_ENTRY);
@@ -111,95 +103,41 @@ std::string Frontend::SubmitResultString(SubmitResult result) {
 }
 
 // static
-SubmitResult Frontend::GetSubmitError(
-    CertSubmissionHandler::SubmitResult result) {
+Status Frontend::GetSubmitError(CertSubmissionHandler::SubmitResult result) {
   CHECK_NE(result, CertSubmissionHandler::OK);
 
-  SubmitResult submit_result;
   switch (result) {
     case CertSubmissionHandler::EMPTY_SUBMISSION:
+      return util::Status(util::error::INVALID_ARGUMENT, "empty submission");
     case CertSubmissionHandler::INVALID_PEM_ENCODED_CHAIN:
-      submit_result = BAD_PEM_FORMAT;
-      break;
+      return util::Status(util::error::INVALID_ARGUMENT,
+                          "invalid PEM encoded chain");
     case CertSubmissionHandler::SUBMISSION_TOO_LONG:
-      submit_result = SUBMISSION_TOO_LONG;
-      break;
+      return util::Status(util::error::INVALID_ARGUMENT,
+                          "submission too long");
     case CertSubmissionHandler::INVALID_CERTIFICATE_CHAIN:
+      return util::Status(util::error::INVALID_ARGUMENT,
+                          "invalid certificate chain");
     case CertSubmissionHandler::UNKNOWN_ROOT:
-      submit_result = CERTIFICATE_VERIFY_ERROR;
-      break;
+      return util::Status(util::error::FAILED_PRECONDITION, "unknown root");
     case CertSubmissionHandler::PRECERT_CHAIN_NOT_WELL_FORMED:
-      submit_result = PRECERT_CHAIN_NOT_WELL_FORMED;
-      break;
+      return util::Status(util::error::INVALID_ARGUMENT,
+                          "prechain not well formed");
     case CertSubmissionHandler::INTERNAL_ERROR:
-      submit_result = INTERNAL_ERROR;
-      break;
+      return util::Status(util::error::INTERNAL, "internal error");
     default:
       LOG(FATAL) << "Unknown CertSubmissionHandler return code " << result;
   }
-  return submit_result;
 }
 
-void Frontend::UpdateStats(ct::LogEntryType type, SubmitResult result) {
-  if (type == ct::X509_ENTRY)
-    UpdateX509Stats(result);
-  else
-    UpdatePrecertStats(result);
-}
-
-void Frontend::UpdateX509Stats(SubmitResult result) {
-  lock_guard<mutex> lock(stats_mutex_);
-  switch (result) {
-    case ADDED:
-      ++stats_.x509_accepted;
-      break;
-    case DUPLICATE:
-      ++stats_.x509_duplicates;
-      break;
-    case BAD_PEM_FORMAT:
-      ++stats_.x509_bad_pem_certs;
-      break;
-    case SUBMISSION_TOO_LONG:
-      ++stats_.x509_too_long_certs;
-      break;
-    case CERTIFICATE_VERIFY_ERROR:
-      ++stats_.x509_verify_errors;
-      break;
-    case INTERNAL_ERROR:
-      ++stats_.internal_errors;
-      break;
-    case PRECERT_CHAIN_NOT_WELL_FORMED:
-      LOG(FATAL) << "invalid PRECERT_CHAIN_NOT_WELL_FORMED on an X509 certificate";
-    default:
-      LOG(FATAL) << "unknown SubmitResult enum value: " << result;
+Status Frontend::UpdateStats(ct::LogEntryType type, const Status& status) {
+  if (type == ct::X509_ENTRY) {
+    submission_status_metric.RecordEvent(
+        "x509", util::ErrorCodeString(status.CanonicalCode()), 1);
+  } else {
+    submission_status_metric.RecordEvent(
+        "precert", util::ErrorCodeString(status.CanonicalCode()), 1);
   }
+  return status;
 }
 
-void Frontend::UpdatePrecertStats(SubmitResult result) {
-  lock_guard<mutex> lock(stats_mutex_);
-  switch (result) {
-    case ADDED:
-      ++stats_.precert_accepted;
-      break;
-    case DUPLICATE:
-      ++stats_.precert_duplicates;
-      break;
-    case BAD_PEM_FORMAT:
-      ++stats_.precert_bad_pem_certs;
-      break;
-    case SUBMISSION_TOO_LONG:
-      ++stats_.precert_too_long_certs;
-      break;
-    case CERTIFICATE_VERIFY_ERROR:
-      ++stats_.precert_verify_errors;
-      break;
-    case PRECERT_CHAIN_NOT_WELL_FORMED:
-      ++stats_.precert_format_errors;
-      break;
-    case INTERNAL_ERROR:
-      ++stats_.internal_errors;
-      break;
-    default:
-      LOG(FATAL) << "unknown SubmitResult enum value: " << result;
-  }
-}

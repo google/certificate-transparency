@@ -12,14 +12,13 @@ template <class Logged>
 class Database;
 class LogSigner;
 
+namespace util {
+class Status;
+}  // namespace util
+
 
 class FrontendSigner {
  public:
-  enum SubmitResult {
-    NEW,
-    DUPLICATE,
-  };
-
   // Does not take ownership of |db|, |store| or |signer|.
   FrontendSigner(
       Database<cert_trans::LoggedCertificate>* db,
@@ -30,7 +29,7 @@ class FrontendSigner {
   // and return either a new timestamp-signature pair,
   // or a previously existing one. (Currently also copies the
   // entry to the sct but you shouldn't rely on this.)
-  SubmitResult QueueEntry(const ct::LogEntry& entry,
+  util::Status QueueEntry(const ct::LogEntry& entry,
                           ct::SignedCertificateTimestamp* sct);
 
  private:

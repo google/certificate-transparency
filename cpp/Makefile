@@ -289,6 +289,7 @@ log/cert_test: log/cert_test.o log/cert.o log/ct_extensions.o util/libutil.a \
                merkletree/serial_hasher.o log/frontend.o proto/ct.pb.o \
                log/frontend_signer.o log/cert_submission_handler.o \
                log/log_signer.o log/signer.o log/verifier.o proto/serializer.o \
+               monitoring/libmonitoring.a util/status.o util/protobuf_util.o \
                log/cert_checker.o $(GTESTLIB)
 
 log/cert_checker_test: log/cert_checker_test.o log/cert.o log/cert_checker.o \
@@ -296,12 +297,16 @@ log/cert_checker_test: log/cert_checker_test.o log/cert.o log/cert_checker.o \
                        merkletree/serial_hasher.o log/frontend.o proto/ct.pb.o \
                        log/frontend_signer.o log/cert_submission_handler.o \
                        log/log_signer.o log/signer.o log/verifier.o \
-                       proto/serializer.o log/cert_checker.o $(GTESTLIB)
+                       monitoring/libmonitoring.a proto/serializer.o \
+                       util/status.o util/protobuf_util.o log/cert_checker.o \
+                       $(GTESTLIB)
 
 log/cert_submission_handler_test: log/cert_submission_handler_test.o \
                                   log/libcert.a util/libutil.a \
                                   log/frontend.o log/frontend_signer.o \
                                   proto/libproto.a log/log_signer.o \
+                                  monitoring/libmonitoring.a \
+                                  util/status.o util/protobuf_util.o \
                                   log/signer.o log/verifier.o $(GTESTLIB)
 
 log/cluster_state_controller_test: base/notification.o fetcher/peer.o \

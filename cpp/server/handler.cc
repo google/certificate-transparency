@@ -121,12 +121,12 @@ bool ExtractChain(JsonOutput* output, evhttp_request* req, CertChain* chain) {
 
 
 void AddChainReply(JsonOutput* output, evhttp_request* req,
-                   SubmitResult result,
+                   const util::Status& add_status,
                    const SignedCertificateTimestamp& sct) {
-  if (result != ADDED && result != DUPLICATE) {
-    const string error(Frontend::SubmitResultString(result));
-    VLOG(1) << "error adding chain: " << error;
-    return output->SendError(req, HTTP_BADREQUEST, error);
+  if (!add_status.ok() &&
+      add_status.CanonicalCode() != util::error::ALREADY_EXISTS) {
+    VLOG(1) << "error adding chain: " << add_status;
+    return output->SendError(req, HTTP_BADREQUEST, add_status.error_message());
   }
 
   JsonObject json_reply;

@@ -1,5 +1,6 @@
 /* -*- indent-tabs-mode: nil -*- */
 #include <glog/logging.h>
+#include <gmock/gmock.h>
 #include <gtest/gtest.h>
 #include <string>
 
@@ -19,6 +20,7 @@
 #include "util/libevent_wrapper.h"
 #include "util/mock_masterelection.h"
 #include "util/status.h"
+#include "util/status_test_util.h"
 #include "util/testing.h"
 #include "util/thread_pool.h"
 #include "util/util.h"
@@ -40,7 +42,9 @@ using std::make_shared;
 using std::shared_ptr;
 using std::string;
 using std::vector;
+using testing::_;
 using testing::NiceMock;
+using util::testing::StatusIs;
 
 typedef Database<LoggedCertificate> DB;
 typedef FrontendSigner FS;
@@ -87,7 +91,7 @@ TYPED_TEST(FrontendSignerTest, LogKatTest) {
   this->test_signer_.SetDefaults(&default_entry);
 
   // Log and expect success.
-  EXPECT_EQ(FS::NEW, this->frontend_.QueueEntry(default_entry, NULL));
+  EXPECT_OK(this->frontend_.QueueEntry(default_entry, NULL));
 
   // Look it up and expect to get the right thing back.
   string hash =
@@ -105,8 +109,8 @@ TYPED_TEST(FrontendSignerTest, Log) {
   this->test_signer_.CreateUnique(&entry1);
 
   // Log and expect success.
-  EXPECT_EQ(FS::NEW, this->frontend_.QueueEntry(entry0, NULL));
-  EXPECT_EQ(FS::NEW, this->frontend_.QueueEntry(entry1, NULL));
+  EXPECT_OK(this->frontend_.QueueEntry(entry0, NULL));
+  EXPECT_OK(this->frontend_.QueueEntry(entry1, NULL));
 
   // Look it up and expect to get the right thing back.
   string hash0 =
@@ -132,11 +136,11 @@ TYPED_TEST(FrontendSignerTest, Time) {
 
   // Log and expect success.
   SignedCertificateTimestamp sct0, sct1;
-  EXPECT_EQ(FS::NEW, this->frontend_.QueueEntry(entry0, &sct0));
+  EXPECT_OK(this->frontend_.QueueEntry(entry0, &sct0));
   EXPECT_LE(sct0.timestamp(), util::TimeInMilliseconds());
   EXPECT_GT(sct0.timestamp(), 0U);
 
-  EXPECT_EQ(FS::NEW, this->frontend_.QueueEntry(entry1, &sct1));
+  EXPECT_OK(this->frontend_.QueueEntry(entry1, &sct1));
   EXPECT_LE(sct0.timestamp(), sct1.timestamp());
   EXPECT_LE(sct1.timestamp(), util::TimeInMilliseconds());
 }
@@ -147,11 +151,12 @@ TYPED_TEST(FrontendSignerTest, LogDuplicates) {
 
   SignedCertificateTimestamp sct0, sct1;
   // Log and expect success.
-  EXPECT_EQ(FS::NEW, this->frontend_.QueueEntry(entry, &sct0));
+  EXPECT_OK(this->frontend_.QueueEntry(entry, &sct0));
   // Wait for time to change.
   usleep(2000);
   // Try to log again.
-  EXPECT_EQ(FS::DUPLICATE, this->frontend_.QueueEntry(entry, &sct1));
+  EXPECT_THAT(this->frontend_.QueueEntry(entry, &sct1),
+              StatusIs(util::error::ALREADY_EXISTS, _));
 
   // Expect to get the original timestamp.
   EXPECT_EQ(sct0.timestamp(), sct1.timestamp());
@@ -172,11 +177,12 @@ TYPED_TEST(FrontendSignerTest, LogDuplicatesDifferentChain) {
 
   SignedCertificateTimestamp sct0, sct1;
   // Log and expect success.
-  EXPECT_EQ(FS::NEW, this->frontend_.QueueEntry(entry0, &sct0));
+  EXPECT_OK(this->frontend_.QueueEntry(entry0, &sct0));
   // Wait for time to change.
   usleep(2000);
   // Try to log again.
-  EXPECT_EQ(FS::DUPLICATE, this->frontend_.QueueEntry(entry1, &sct1));
+  EXPECT_THAT(this->frontend_.QueueEntry(entry1, &sct1),
+              StatusIs(util::error::ALREADY_EXISTS, _));
 
   // Expect to get the original timestamp.
   EXPECT_EQ(sct0.timestamp(), sct1.timestamp());
@@ -189,8 +195,8 @@ TYPED_TEST(FrontendSignerTest, Verify) {
 
   // Log and expect success.
   SignedCertificateTimestamp sct0, sct1;
-  EXPECT_EQ(FS::NEW, this->frontend_.QueueEntry(entry0, &sct0));
-  EXPECT_EQ(FS::NEW, this->frontend_.QueueEntry(entry1, &sct1));
+  EXPECT_OK(this->frontend_.QueueEntry(entry0, &sct0));
+  EXPECT_OK(this->frontend_.QueueEntry(entry1, &sct1));
 
   // Verify results.
 
@@ -214,10 +220,10 @@ TYPED_TEST(FrontendSignerTest, TimedVerify) {
 
   // Log and expect success.
   SignedCertificateTimestamp sct0, sct1;
-  EXPECT_EQ(FS::NEW, this->frontend_.QueueEntry(entry0, &sct0));
+  EXPECT_OK(this->frontend_.QueueEntry(entry0, &sct0));
   // Make sure we get different timestamps.
   usleep(2000);
-  EXPECT_EQ(FS::NEW, this->frontend_.QueueEntry(entry1, &sct1));
+  EXPECT_OK(this->frontend_.QueueEntry(entry1, &sct1));
 
   EXPECT_GT(sct1.timestamp(), sct0.timestamp());
 

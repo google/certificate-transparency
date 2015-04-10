@@ -77,60 +77,48 @@ string Status::ToString() const {
   return oss.str();
 }
 
-extern ostream& operator<<(ostream& os, util::error::Code code) {
-  switch (code) {
+string ErrorCodeString(util::error::Code error) {
+  switch (error) {
     case util::error::OK:
-      os << "OK";
-      return os;
+      return "OK";
     case util::error::CANCELLED:
-      os << "CANCELLED";
-      return os;
+      return "CANCELLED";
     case util::error::UNKNOWN:
-      os << "UNKNOWN";
-      return os;
+      return "UNKNOWN";
     case util::error::INVALID_ARGUMENT:
-      os << "INVALID_ARGUMENT";
-      return os;
+      return "INVALID_ARGUMENT";
     case util::error::DEADLINE_EXCEEDED:
-      os << "DEADLINE_EXCEEDED";
-      return os;
+      return "DEADLINE_EXCEEDED";
     case util::error::NOT_FOUND:
-      os << "NOT_FOUND";
-      return os;
+      return "NOT_FOUND";
     case util::error::ALREADY_EXISTS:
-      os << "ALREADY_EXISTS";
-      return os;
+      return "ALREADY_EXISTS";
     case util::error::PERMISSION_DENIED:
-      os << "PERMISSION_DENIED";
-      return os;
+      return "PERMISSION_DENIED";
     case util::error::RESOURCE_EXHAUSTED:
-      os << "RESOURCE_EXHAUSTED";
-      return os;
+      return "RESOURCE_EXHAUSTED";
     case util::error::FAILED_PRECONDITION:
-      os << "FAILED_PRECONDITION";
-      return os;
+      return "FAILED_PRECONDITION";
     case util::error::ABORTED:
-      os << "ABORTED";
-      return os;
+      return "ABORTED";
     case util::error::OUT_OF_RANGE:
-      os << "OUT_OF_RANGE";
-      return os;
+      return "OUT_OF_RANGE";
     case util::error::UNIMPLEMENTED:
-      os << "UNIMPLEMENTED";
-      return os;
+      return "UNIMPLEMENTED";
     case util::error::INTERNAL:
-      os << "INTERNAL";
-      return os;
+      return "INTERNAL";
     case util::error::UNAVAILABLE:
-      os << "UNAVAILABLE";
-      return os;
+      return "UNAVAILABLE";
     case util::error::DATA_LOSS:
-      os << "DATA_LOSS";
-      return os;
+      return "DATA_LOSS";
   }
   // Avoid using a "default" in the switch, so that the compiler can
   // give us a warning, but still provide a fallback here.
-  os << static_cast<int>(code);
+  return std::to_string(error);
+}
+
+extern ostream& operator<<(ostream& os, util::error::Code code) {
+  os << ErrorCodeString(code);
   return os;
 }
 
