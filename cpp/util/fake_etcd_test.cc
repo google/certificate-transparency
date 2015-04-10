@@ -460,7 +460,7 @@ TEST_F(FakeEtcdTest, WatcherForCreate) {
 
   EXPECT_OK(BlockingCreate(kPath2, kValue2, &created_index));
 
-  EXPECT_TRUE(initial.WaitForNotificationWithTimeout(seconds(1)));
+  EXPECT_TRUE(second.WaitForNotificationWithTimeout(seconds(1)));
 
   watch_task.Cancel();
   watch_task.Wait();
@@ -495,7 +495,7 @@ TEST_F(FakeEtcdTest, WatcherForDelete) {
 
   EXPECT_OK(BlockingDelete(kPath, created_index));
 
-  EXPECT_TRUE(initial.WaitForNotificationWithTimeout(seconds(1)));
+  EXPECT_TRUE(second.WaitForNotificationWithTimeout(seconds(1)));
 
   watch_task.Cancel();
   watch_task.Wait();
