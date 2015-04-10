@@ -36,13 +36,6 @@ class MockEtcdClient : public EtcdClient {
                             const int64_t current_index, util::Task* task));
   MOCK_METHOD3(Watch, void(const std::string& key, const WatchCallback& cb,
                            util::Task* task));
-
-  // TODO(pphaneuf): Shouldn't be used, and shouldn't be there, but
-  // has to be for now.
-  MOCK_METHOD5(Generic, void(const std::string& key,
-                             const std::map<std::string, std::string>& params,
-                             UrlFetcher::Verb verb, GenericResponse* resp,
-                             util::Task* task));
 };
 
 

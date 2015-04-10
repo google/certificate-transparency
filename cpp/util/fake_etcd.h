@@ -23,6 +23,29 @@ class FakeEtcdClient : public EtcdClient {
 
   void Get(const Request& req, GetResponse* resp, util::Task* task) override;
 
+  void Create(const std::string& key, const std::string& value, Response* resp,
+              util::Task* task) override;
+
+  void CreateWithTTL(const std::string& key, const std::string& value,
+                     const std::chrono::seconds& ttl, Response* resp,
+                     util::Task* task) override;
+
+  void Update(const std::string& key, const std::string& value,
+              const int64_t previous_index, Response* resp,
+              util::Task* task) override;
+
+  void UpdateWithTTL(const std::string& key, const std::string& value,
+                     const std::chrono::seconds& ttl,
+                     const int64_t previous_index, Response* resp,
+                     util::Task* task) override;
+
+  void ForceSet(const std::string& key, const std::string& value,
+                Response* resp, util::Task* task) override;
+
+  void ForceSetWithTTL(const std::string& key, const std::string& value,
+                       const std::chrono::seconds& ttl, Response* resp,
+                       util::Task* task) override;
+
   void Delete(const std::string& key, const int64_t current_index,
               util::Task* task) override;
 
@@ -32,24 +55,16 @@ class FakeEtcdClient : public EtcdClient {
   void Watch(const std::string& key, const WatchCallback& cb,
              util::Task* task) override;
 
- protected:
-  void Generic(const std::string& key,
-               const std::map<std::string, std::string>& params,
-               UrlFetcher::Verb verb, GenericResponse* resp,
-               util::Task* task) override;
-
  private:
   void PurgeExpiredEntries();
 
   void NotifyForPath(const std::unique_lock<std::mutex>& lock,
                      const std::string& path);
 
-  util::StatusOr<bool> CheckCompareFlags(
-      const std::map<std::string, std::string> params, const std::string& key);
-
-  void HandlePut(const std::string& key,
-                 const std::map<std::string, std::string>& params,
-                 GenericResponse* resp, util::Task* task);
+  void InternalPut(const std::string& key, const std::string& value,
+                   const std::chrono::system_clock::time_point& expires,
+                   bool create, int64_t prev_index, Response* resp,
+                   util::Task* task);
 
   void CancelWatch(util::Task* task);
 

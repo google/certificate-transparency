@@ -117,11 +117,6 @@ class EtcdClient {
   // Testing only
   EtcdClient();
 
-  virtual void Generic(const std::string& key,
-                       const std::map<std::string, std::string>& params,
-                       UrlFetcher::Verb verb, GenericResponse* resp,
-                       util::Task* task);
-
  private:
   typedef std::pair<std::string, uint16_t> HostPortPair;
 
@@ -131,6 +126,9 @@ class EtcdClient {
   HostPortPair GetEndpoint() const;
   HostPortPair UpdateEndpoint(const std::string& host, uint16_t port);
   void FetchDone(RequestState* etcd_req, util::Task* task);
+  void Generic(const std::string& key,
+               const std::map<std::string, std::string>& params,
+               UrlFetcher::Verb verb, GenericResponse* resp, util::Task* task);
 
   void WatchInitialGetDone(WatchState* state, GetResponse* resp,
                            util::Task* task);

@@ -25,48 +25,6 @@ using util::StatusOr;
 using util::Task;
 
 namespace cert_trans {
-namespace {
-
-
-void FillJsonForNode(const EtcdClient::Node& node, JsonObject* json) {
-  json->Add("modifiedIndex", node.modified_index_);
-  json->Add("createdIndex", node.created_index_);
-  json->Add("key", node.key_);
-  if (!node.deleted_) {
-    json->Add("value", node.value_);
-  }
-}
-
-
-void FillJsonForEntry(const EtcdClient::Node& node, const string& action,
-                      const shared_ptr<JsonObject>& json) {
-  JsonObject json_node;
-  FillJsonForNode(node, &json_node);
-  json->Add("action", action);
-  json->Add("node", json_node);
-}
-
-
-void MaybeSetExpiry(const map<string, string>& params,
-                    EtcdClient::Node* node) {
-  if (params.find("ttl") != params.end()) {
-    const string& ttl(params.find("ttl")->second);
-    node->expires_ = system_clock::now() + seconds(stoi(ttl));
-  }
-}
-
-
-bool GetParam(const map<string, string>& params, const string& name,
-              string* out) {
-  if (params.find(name) == params.end()) {
-    return false;
-  }
-  *out = params.find(name)->second;
-  return true;
-}
-
-
-}  // namespace
 
 
 FakeEtcdClient::FakeEtcdClient() : index_(1) {
@@ -93,25 +51,6 @@ void FakeEtcdClient::Watch(const string& key, const WatchCallback& cb,
   ScheduleWatchCallback(lock, task, bind(cb, move(initial_updates)));
   watches_[key].push_back(make_pair(cb, task));
   task->WhenCancelled(bind(&FakeEtcdClient::CancelWatch, this, task));
-}
-
-
-void FakeEtcdClient::Generic(const std::string& key,
-                             const std::map<std::string, std::string>& params,
-                             UrlFetcher::Verb verb, GenericResponse* resp,
-                             Task* task) {
-  PurgeExpiredEntries();
-  switch (verb) {
-    case UrlFetcher::Verb::PUT:
-      HandlePut(key, params, resp, task);
-      break;
-    case UrlFetcher::Verb::GET:
-    case UrlFetcher::Verb::POST:
-    case UrlFetcher::Verb::DELETE:
-    default:
-      LOG(FATAL) << "Unsupported verb " << static_cast<int>(verb);
-  }
-  DumpEntries();
 }
 
 
@@ -179,66 +118,98 @@ void FakeEtcdClient::Get(const Request& req, GetResponse* resp, Task* task) {
 }
 
 
-StatusOr<bool> FakeEtcdClient::CheckCompareFlags(
-    const map<string, string> params, const string& key) {
-  bool new_node(true);
-  const bool entry_exists(entries_.find(key) != entries_.end());
-  string prev_exist_str;
-  if (GetParam(params, "prevExist", &prev_exist_str)) {
-    const bool prev_exist(prev_exist_str == "true");
-    if (entry_exists && !prev_exist) {
-      return Status(util::error::FAILED_PRECONDITION, key + " Already exists");
-    } else if (!entry_exists && prev_exist) {
-      return Status(util::error::FAILED_PRECONDITION, key + " Not found");
-    }
-    new_node = false;
-  }
-  string prev_index;
-  if (GetParam(params, "prevIndex", &prev_index)) {
-    if (!entry_exists) {
-      return Status(util::error::FAILED_PRECONDITION,
-                    "Node doesn't exist: " + key);
-    }
-    const string modified_index(to_string(entries_[key].modified_index_));
-    if (prev_index != modified_index) {
-      return Status(util::error::FAILED_PRECONDITION,
-                    "Incorrect index:  prevIndex=" + prev_index +
-                        " but modified_index_=" + modified_index);
-    }
-    new_node = false;
-  }
-  return new_node;
-}
+void FakeEtcdClient::InternalPut(const string& key, const string& value,
+                                 const system_clock::time_point& expires,
+                                 bool create, int64_t prev_index,
+                                 Response* resp, Task* task) {
+  CHECK_GT(key.size(), 0);
+  CHECK_EQ(key.front(), '/');
+  CHECK_NE(key.back(), '/');
+  CHECK(!create || prev_index <= 0);
 
-
-void FakeEtcdClient::HandlePut(const string& key,
-                               const map<string, string>& params,
-                               GenericResponse* resp, Task* task) {
-  VLOG(1) << "PUT " << key;
+  *resp = EtcdClient::Response();
+  PurgeExpiredEntries();
   unique_lock<mutex> lock(mutex_);
-  CHECK(key.back() != '/');
-  CHECK(params.find("value") != params.end());
-  const string& value(params.find("value")->second);
-  Node node(index_, index_, key, false, value, {}, false);
-  MaybeSetExpiry(params, &node);
-  StatusOr<bool> new_node(CheckCompareFlags(params, key));
-  if (!new_node.status().ok()) {
-    resp->etcd_index = index_;
-    resp->json_body = make_shared<JsonObject>();
-    task->Return(new_node.status());
+  const int64_t new_index(index_ + 1);
+  Node node(new_index, new_index, key, false, value, {}, false);
+  node.expires_ = expires;
+  const map<string, Node>::const_iterator entry(entries_.find(key));
+  if (create && entry != entries_.end()) {
+    task->Return(
+        Status(util::error::FAILED_PRECONDITION, key + " already exists"));
     return;
   }
-  if (!new_node.ValueOrDie() && entries_.find(key) != entries_.end()) {
-    VLOG(1) << "Keeping original created_index_";
-    node.created_index_ = entries_.find(key)->second.created_index_;
+
+  if (prev_index > 0) {
+    if (entry == entries_.end()) {
+      task->Return(Status(util::error::FAILED_PRECONDITION,
+                          "node doesn't exist: " + key));
+      return;
+    }
+    if (prev_index != entry->second.modified_index_) {
+      task->Return(Status(util::error::FAILED_PRECONDITION,
+                          "incorrect index:  prevIndex=" +
+                              to_string(prev_index) + " but modified_index_=" +
+                              to_string(entry->second.modified_index_)));
+      return;
+    }
+    node.created_index_ = entry->second.created_index_;
   }
 
   entries_[key] = node;
-  resp->etcd_index = ++index_;
-  resp->json_body = make_shared<JsonObject>();
-  FillJsonForEntry(node, "set", resp->json_body);
+  resp->etcd_index = new_index;
+  index_ = new_index;
   task->Return();
   NotifyForPath(lock, key);
+  DumpEntries();
+}
+
+
+void FakeEtcdClient::Create(const string& key, const string& value,
+                            Response* resp, Task* task) {
+  return InternalPut(key, value, system_clock::time_point::max(), true, -1,
+                     resp, task);
+}
+
+
+void FakeEtcdClient::CreateWithTTL(const string& key, const string& value,
+                                   const seconds& ttl, Response* resp,
+                                   Task* task) {
+  return InternalPut(key, value, system_clock::now() + ttl, true, -1, resp,
+                     task);
+}
+
+
+void FakeEtcdClient::Update(const string& key, const string& value,
+                            const int64_t previous_index, Response* resp,
+                            Task* task) {
+  return InternalPut(key, value, system_clock::time_point::max(), false,
+                     previous_index, resp, task);
+}
+
+
+void FakeEtcdClient::UpdateWithTTL(const string& key, const string& value,
+                                   const seconds& ttl,
+                                   const int64_t previous_index,
+                                   Response* resp, Task* task) {
+  return InternalPut(key, value, system_clock::now() + ttl, false,
+                     previous_index, resp, task);
+}
+
+
+void FakeEtcdClient::ForceSet(const string& key, const string& value,
+                              Response* resp, Task* task) {
+  return InternalPut(key, value, system_clock::time_point::max(), false, -1,
+                     resp, task);
+}
+
+
+void FakeEtcdClient::ForceSetWithTTL(const std::string& key,
+                                     const std::string& value,
+                                     const std::chrono::seconds& ttl,
+                                     Response* resp, util::Task* task) {
+  return InternalPut(key, value, system_clock::now() + ttl, false, -1, resp,
+                     task);
 }
 
 
