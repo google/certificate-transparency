@@ -107,6 +107,7 @@ Run the following commands:
 
 ## Updating the log server binaries
 If you're like to update the running CT Log Server code, then it's just a matter of building new Docker images, pushing them up to GCS, and restarting the containers.
+
 1. Make whatever changes you wish to the code base, then rebuild and create new docker image:
    ```bash
    make -C cpp -j24 proto/libproto.a server/ct-server
