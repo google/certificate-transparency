@@ -32,7 +32,8 @@ Header "Creating etcd instances..."
 for i in `seq ${ETCD_NUM_REPLICAS}`; do
   echo "Creating instance ${ETCD_MACHINES[$i]}"
 
-  sed --e "s^@@DISCOVERY@@^${DISCOVERY}^
+  sed --e "s^@@GCS_BUCKET@@^${GCS_BUCKET}^
+           s^@@DISCOVERY@@^${DISCOVERY}^
            s^@@ETCD_NAME@@^${ETCD_MACHINES[$i]}^
            s^@@CONTAINER_HOST@@^${ETCD_MACHINES[$i]}^" \
           < ${DIR}/etcd_container.yaml  > ${MANIFEST}.${i}

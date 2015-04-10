@@ -2,6 +2,7 @@ export PROJECT=${PROJECT:-your-gce-project}
 export CLUSTER=${CLUSTER:-${USER}-ctlog}
 export REGION=${REGION:-europe-west1}
 export ZONE=${ZONE:-${REGION}-b}
+export GCS_BUCKET=${GCS_BUCKET:-${PROJECT}_ctlog_images}
 
 export ETCD_NUM_REPLICAS=3
 export ETCD_DISK_SIZE=200GB

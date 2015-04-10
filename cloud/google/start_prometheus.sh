@@ -20,7 +20,10 @@ for i in ${PROMETHEUS_DISKS[@]}; do
 done
 wait
 
-MANIFEST=${DIR}/prometheus_container.yaml
+MANIFEST=/tmp/prometheus_container.yaml
+sed --e "s^@@GCS_BUCKET@@^${GCS_BUCKET}^ \
+    < ${DIR}/prometheus_container.yaml > ${MANIFEST}
+
 
 Header "Creating prometheus instances..."
 for i in `seq ${PROMETHEUS_NUM_REPLICAS}`; do

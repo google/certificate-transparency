@@ -8,7 +8,7 @@ containers:
         hostPort: 5000
     env:
       - name: GCS_BUCKET
-        value: ctlog_images
+        value: @@GCS_BUCKET@@
   - name: etcd
     image: localhost:5000/certificate_transparency/etcd:test
     ports:
