@@ -47,17 +47,9 @@ class FakeEtcdClient : public EtcdClient {
   util::StatusOr<bool> CheckCompareFlags(
       const std::map<std::string, std::string> params, const std::string& key);
 
-  void HandlePost(const std::string& key,
-                  const std::map<std::string, std::string>& params,
-                  GenericResponse* resp, util::Task* task);
-
   void HandlePut(const std::string& key,
                  const std::map<std::string, std::string>& params,
                  GenericResponse* resp, util::Task* task);
-
-  void HandleDelete(const std::string& key,
-                    const std::map<std::string, std::string>& params,
-                    GenericResponse* resp, util::Task* task);
 
   void CancelWatch(util::Task* task);
 
