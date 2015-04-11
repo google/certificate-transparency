@@ -502,5 +502,6 @@ benchmark: merkletree/merkle_tree_large_test log/database_large_test
 clean:
 	find . -name '*.[o|a]' | xargs rm -f
 	find . -name '*_test' | xargs rm -f
+	find . -name .depend | xargs rm -f
 	rm -f proto/*.pb.h proto/*.pb.cc */.depend*
 	rm -rf gmock/*
