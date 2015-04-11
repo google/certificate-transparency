@@ -5,6 +5,7 @@
 #include <glog/logging.h>
 #include <mutex>
 
+using std::bind;
 using std::move;
 using std::mutex;
 using std::pair;
