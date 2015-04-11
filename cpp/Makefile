@@ -5,7 +5,7 @@ default: all
 
 -include local.mk
 
-CXXFLAG = -std=c++11 -fno-exceptions -Wall -Werror -g -O3 --stdlib=libstdc++
+CXXFLAG = -std=c++11 -fno-exceptions -Wall -Werror -g -O3
 LINK.cc = $(CXX) $(LDFLAGS) $(TARGET_ARCH)
 LINK.o = $(LINK.cc)
 
@@ -21,6 +21,7 @@ ifeq ($(PLATFORM), FreeBSD)
   LDLIBS += -L/usr/local/lib/event2
 else
   LDLIBS += -lresolv
+  CXXFLAG += --stdlib=libstdc++
 endif
 
 # Need OpenSSL >= 1.0.0
