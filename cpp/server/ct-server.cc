@@ -370,7 +370,13 @@ void locking_function(int mode, int n, const char* file, int line) {
 
 
 void threadid_function(CRYPTO_THREADID* id) {
+  // FIXME(benl): platform differences should all live together somewhere,
+  // and ideally done by feature detection.
+#ifdef __FreeBSD__
+  CRYPTO_THREADID_set_pointer(id, pthread_self());
+#else
   CRYPTO_THREADID_set_numeric(id, pthread_self());
+#endif
 }
 
 
