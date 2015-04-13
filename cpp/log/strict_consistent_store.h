@@ -34,7 +34,7 @@ class StrictConsistentStore : public ConsistentStore<Logged> {
 
   util::Status SetClusterConfig(const ct::ClusterConfig& config) override;
 
-  util::Status CleanupOldEntries() override;
+  util::StatusOr<int64_t> CleanupOldEntries() override;
 
   // Other methods:
 
