@@ -27,7 +27,15 @@ using util::Task;
 namespace cert_trans {
 
 
-FakeEtcdClient::FakeEtcdClient() : index_(1) {
+FakeEtcdClient::FakeEtcdClient(libevent::Base* base)
+    : base_(CHECK_NOTNULL(base)), parent_task_(base_), index_(1) {
+}
+
+
+FakeEtcdClient::~FakeEtcdClient() {
+  parent_task_.task()->Return();
+  parent_task_.Wait();
+  CHECK_EQ(parent_task_.status(), Status::OK);
 }
 
 
@@ -162,6 +170,11 @@ void FakeEtcdClient::InternalPut(const string& key, const string& value,
   task->Return();
   NotifyForPath(lock, key);
   DumpEntries();
+  if (expires < system_clock::time_point::max()) {
+    const std::chrono::duration<double> delay(expires - system_clock::now());
+    base_->Delay(delay, parent_task_.task()->AddChild(
+                            bind(&FakeEtcdClient::PurgeExpiredEntries, this)));
+  }
 }
 
 

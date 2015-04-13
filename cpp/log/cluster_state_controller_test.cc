@@ -48,6 +48,7 @@ class ClusterStateControllerTest : public ::testing::Test {
       : pool_(3),
         base_(make_shared<libevent::Base>()),
         pump_(base_),
+        etcd_(base_.get()),
         store1_(new EtcdConsistentStore<LoggedCertificate>(&pool_, &etcd_,
                                                            &election1_, "",
                                                            kNodeId1)),

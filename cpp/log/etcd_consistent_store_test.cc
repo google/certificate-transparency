@@ -63,7 +63,8 @@ class EtcdConsistentStoreTest : public ::testing::Test {
   EtcdConsistentStoreTest()
       : base_(make_shared<libevent::Base>()),
         executor_(2),
-        event_pump_(base_) {
+        event_pump_(base_),
+        client_(base_.get()) {
   }
 
  protected:

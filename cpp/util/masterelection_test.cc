@@ -146,11 +146,11 @@ class ElectionTest : public ::testing::Test {
  public:
   ElectionTest()
       : base_(make_shared<libevent::Base>()),
+        event_pump_(base_),
         url_fetcher_(base_.get()),
-        client_(FLAGS_etcd.empty() ? new FakeEtcdClient
+        client_(FLAGS_etcd.empty() ? new FakeEtcdClient(base_.get())
                                    : new EtcdClient(&url_fetcher_, FLAGS_etcd,
-                                                    FLAGS_etcd_port)),
-        event_pump_(base_) {
+                                                    FLAGS_etcd_port)) {
   }
 
 
@@ -161,10 +161,10 @@ class ElectionTest : public ::testing::Test {
 
 
   shared_ptr<libevent::Base> base_;
+  libevent::EventPumpThread event_pump_;
   UrlFetcher url_fetcher_;
   atomic<bool> running_;
   const unique_ptr<EtcdClient> client_;
-  libevent::EventPumpThread event_pump_;
 };
 
 

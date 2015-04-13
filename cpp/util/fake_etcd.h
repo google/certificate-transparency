@@ -7,7 +7,9 @@
 #include <string>
 
 #include "util/etcd.h"
+#include "util/libevent_wrapper.h"
 #include "util/statusor.h"
+#include "util/sync_task.h"
 #include "util/task.h"
 
 namespace cert_trans {
@@ -15,9 +17,9 @@ namespace cert_trans {
 
 class FakeEtcdClient : public EtcdClient {
  public:
-  FakeEtcdClient();
+  explicit FakeEtcdClient(libevent::Base* base);
 
-  virtual ~FakeEtcdClient() = default;
+  virtual ~FakeEtcdClient();
 
   void DumpEntries();
 
@@ -75,6 +77,8 @@ class FakeEtcdClient : public EtcdClient {
                              const std::function<void()>& callback);
   void RunWatchCallback();
 
+  libevent::Base* const base_;
+  util::SyncTask parent_task_;
   std::mutex mutex_;
   int64_t index_;
   std::map<std::string, Node> entries_;

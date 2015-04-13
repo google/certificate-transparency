@@ -458,7 +458,7 @@ int main(int argc, char* argv[]) {
 
   std::unique_ptr<EtcdClient> etcd_client(
       stand_alone_mode
-          ? new FakeEtcdClient
+          ? new FakeEtcdClient(event_base.get())
           : new EtcdClient(&url_fetcher, FLAGS_etcd_host, FLAGS_etcd_port));
 
   // No real reason to let this be configurable per node; you can really

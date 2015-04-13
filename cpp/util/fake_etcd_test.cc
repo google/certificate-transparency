@@ -62,7 +62,7 @@ class FakeEtcdTest : public ::testing::Test {
         event_pump_(base_),
         fetcher_(base_.get()),
         client_(FLAGS_etcd.empty()
-                    ? new FakeEtcdClient
+                    ? new FakeEtcdClient(base_.get())
                     : new EtcdClient(&fetcher_, FLAGS_etcd, FLAGS_etcd_port)),
         key_prefix_(BuildKeyPrefix()) {
   }
@@ -496,6 +496,40 @@ TEST_F(FakeEtcdTest, WatcherForDelete) {
   EXPECT_OK(BlockingDelete(kPath, created_index));
 
   EXPECT_TRUE(second.WaitForNotificationWithTimeout(seconds(1)));
+
+  watch_task.Cancel();
+  watch_task.Wait();
+  EXPECT_THAT(watch_task.status(), StatusIs(util::error::CANCELLED));
+}
+
+
+TEST_F(FakeEtcdTest, WatcherWithTTLExpires) {
+  const string kDir(key_prefix_);
+  const string kPath(kDir + "/subkey");
+  const seconds kTtl(3);
+  int64_t created_index;
+  EXPECT_OK(BlockingCreateWithTTL(kPath, kValue, kTtl, &created_index));
+
+  StrictMock<MockFunction<void(const vector<EtcdClient::Node>&)>> watcher;
+  Notification initial;
+  EXPECT_CALL(watcher,
+              Call(ElementsAre(EtcdClientNodeIs(kPath, "value", false))))
+      .WillOnce(InvokeWithoutArgs(&initial, &Notification::Notify));
+
+  util::SyncTask watch_task(base_.get());
+  client_->Watch(
+      kDir, bind(&MockFunction<void(const vector<EtcdClient::Node>&)>::Call,
+                 &watcher, _1),
+      watch_task.task());
+
+  ASSERT_TRUE(initial.WaitForNotificationWithTimeout(seconds(1)));
+  Mock::VerifyAndClearExpectations(&watcher);
+
+  Notification second;
+  EXPECT_CALL(watcher, Call(ElementsAre(EtcdClientNodeIs(kPath, _, true))))
+      .WillOnce(InvokeWithoutArgs(&second, &Notification::Notify));
+
+  EXPECT_TRUE(second.WaitForNotificationWithTimeout(kTtl + seconds(1)));
 
   watch_task.Cancel();
   watch_task.Wait();

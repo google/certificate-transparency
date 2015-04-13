@@ -59,6 +59,7 @@ class FrontendSignerTest : public ::testing::Test {
                   new MerkleVerifier(new Sha256Hasher())),
         base_(make_shared<libevent::Base>()),
         event_pump_(base_),
+        etcd_client_(base_.get()),
         pool_(2),
         store_(&pool_, &etcd_client_, &election_, "/root", "id"),
         frontend_(db(), &store_, TestSigner::DefaultLogSigner()) {

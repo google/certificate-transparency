@@ -94,6 +94,7 @@ class FrontendTest : public ::testing::Test {
         checker_(),
         base_(make_shared<libevent::Base>()),
         event_pump_(base_),
+        etcd_client_(base_.get()),
         pool_(2),
         store_(&pool_, &etcd_client_, &election_, "/root", "id"),
         frontend_(new CertSubmissionHandler(&checker_),

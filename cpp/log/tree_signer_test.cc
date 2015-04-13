@@ -51,6 +51,7 @@ class TreeSignerTest : public ::testing::Test {
       : test_db_(),
         base_(make_shared<libevent::Base>()),
         event_pump_(base_),
+        etcd_client_(base_.get()),
         pool_(2),
         test_signer_(),
         verifier_(),
