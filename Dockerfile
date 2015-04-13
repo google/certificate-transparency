@@ -27,6 +27,7 @@ VOLUME /mnt/ctlog
 CMD cd /mnt/ctlog/ && \
     if [ ! -d logs ]; then mkdir logs; fi && \
     MY_IP=$(awk "/${HOSTNAME}/ {print \$1}" < /etc/hosts) && \
+    export V_LEVEL=${V_LEVEL:-0} && \
     echo "My IP: ${MY_IP}" && \
     echo "Container: ${CONTAINER_HOST}" && \
     echo "Etcd: ${ETCD_HOST}:${ETCD_PORT}" && \
@@ -44,5 +45,5 @@ CMD cd /mnt/ctlog/ && \
         --etcd_host=${ETCD_HOST} \
         --etcd_port=${ETCD_PORT} \
         --etcd_delete_concurrency=100 \
-        --v=1
+        --v=${V_LEVEL}
 EXPOSE 80

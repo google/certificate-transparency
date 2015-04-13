@@ -95,7 +95,7 @@ bool ExtractChain(JsonOutput* output, evhttp_request* req, CertChain* chain) {
     return false;
   }
 
-  VLOG(1) << "ExtractChain chain:\n" << json_chain.DebugString();
+  VLOG(2) << "ExtractChain chain:\n" << json_chain.DebugString();
 
   for (int i = 0; i < json_chain.Length(); ++i) {
     JsonString json_cert(json_chain, i);
@@ -256,7 +256,7 @@ void HttpHandler::ProxyInterceptor(
   // controller (i.e NodeIsStale()) can block pending other libevent
   // updates, and since we're on the libevent thread here...
   pool_->Add([this, request, local_handler]() {
-    VLOG(1) << "Running proxy interceptor...";
+    VLOG(2) << "Running proxy interceptor...";
     // TODO(alcutter): We can be a bit smarter about when to proxy off the
     // request - being stale wrt to the current serving STH doesn't
     // automatically mean we're unable to answer this request.
@@ -425,7 +425,7 @@ void HttpHandler::GetSTH(evhttp_request* req) const {
 
   const SignedTreeHead& sth(log_lookup_->GetSTH());
 
-  VLOG(1) << "SignedTreeHead:\n" << sth.DebugString();
+  VLOG(2) << "SignedTreeHead:\n" << sth.DebugString();
 
   JsonObject json_reply;
   json_reply.Add("tree_size", sth.tree_size());
@@ -433,7 +433,7 @@ void HttpHandler::GetSTH(evhttp_request* req) const {
   json_reply.AddBase64("sha256_root_hash", sth.sha256_root_hash());
   json_reply.Add("tree_head_signature", sth.signature());
 
-  VLOG(1) << "GetSTH:\n" << json_reply.DebugString();
+  VLOG(2) << "GetSTH:\n" << json_reply.DebugString();
 
   output_->SendJsonReply(req, HTTP_OK, json_reply);
 }
