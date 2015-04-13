@@ -28,6 +28,7 @@ CMD cd /mnt/ctlog/ && \
     if [ ! -d logs ]; then mkdir logs; fi && \
     MY_IP=$(awk "/${HOSTNAME}/ {print \$1}" < /etc/hosts) && \
     export V_LEVEL=${V_LEVEL:-0} && \
+    export NUM_HTTP_SERVER_THREADS=${NUM_HTTP_SERVER_THREADS:-32} && \
     echo "My IP: ${MY_IP}" && \
     echo "Container: ${CONTAINER_HOST}" && \
     echo "Etcd: ${ETCD_HOST}:${ETCD_PORT}" && \
@@ -45,5 +46,6 @@ CMD cd /mnt/ctlog/ && \
         --etcd_host=${ETCD_HOST} \
         --etcd_port=${ETCD_PORT} \
         --etcd_delete_concurrency=100 \
+        --num_http_server_threads=${NUM_HTTP_SERVER_THREADS} \
         --v=${V_LEVEL}
 EXPOSE 80
