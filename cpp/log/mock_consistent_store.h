@@ -57,7 +57,7 @@ class MockConsistentStore : public ConsistentStore<Logged> {
 
   MOCK_METHOD1(SetClusterConfig, util::Status(const ct::ClusterConfig&));
 
-  MOCK_METHOD0(CleanupOldEntries, util::Status());
+  MOCK_METHOD0(CleanupOldEntries, util::StatusOr<int64_t>());
 };
 
 }  // namespace cert_log

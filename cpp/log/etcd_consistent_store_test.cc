@@ -16,6 +16,7 @@
 #include "util/fake_etcd.h"
 #include "util/libevent_wrapper.h"
 #include "util/mock_masterelection.h"
+#include "util/status_test_util.h"
 #include "util/testing.h"
 #include "util/thread_pool.h"
 #include "util/util.h"
@@ -50,7 +51,9 @@ using testing::Pair;
 using testing::Return;
 using testing::SetArgumentPointee;
 using util::Status;
+using util::StatusOr;
 using util::SyncTask;
+using util::testing::StatusIs;
 
 
 const char kRoot[] = "/root";
@@ -131,7 +134,7 @@ class EtcdConsistentStoreTest : public ::testing::Test {
     }
   }
 
-  util::Status CleanupOldEntries() {
+  util::StatusOr<int64_t> CleanupOldEntries() {
     return store_->CleanupOldEntries();
   }
 
@@ -640,8 +643,16 @@ TEST_F(EtcdConsistentStoreTest, WatchClusterConfig) {
 
 TEST_F(EtcdConsistentStoreTest, TestDoesNotCleanUpIfNotMaster) {
   EXPECT_CALL(election_, IsMaster()).WillRepeatedly(Return(false));
-  EXPECT_EQ(util::error::PERMISSION_DENIED,
-            CleanupOldEntries().CanonicalCode());
+  EXPECT_THAT(CleanupOldEntries().status(),
+              StatusIs(util::error::PERMISSION_DENIED));
+}
+
+
+TEST_F(EtcdConsistentStoreTest, TestEmptyClean) {
+  EXPECT_CALL(election_, IsMaster()).WillRepeatedly(Return(true));
+  const StatusOr<int64_t> num_cleaned(CleanupOldEntries());
+  ASSERT_OK(num_cleaned.status());
+  EXPECT_EQ(0, num_cleaned.ValueOrDie());
 }
 
 
@@ -685,7 +696,11 @@ TEST_F(EtcdConsistentStoreTest, TestCleansUpToNewSTH) {
   sth.set_timestamp(345345);
   sth.set_tree_size(103);
   CHECK(store_->SetServingSTH(sth).ok());
-  CHECK_EQ(util::Status::OK, CleanupOldEntries());
+  {
+    const StatusOr<int64_t> num_cleaned(CleanupOldEntries());
+    ASSERT_OK(num_cleaned.status());
+    EXPECT_EQ(3, num_cleaned.ValueOrDie());
+  }
 
   EntryHandle<LoggedCertificate> unused;
   EXPECT_EQ(util::error::NOT_FOUND,
@@ -711,7 +726,12 @@ TEST_F(EtcdConsistentStoreTest, TestCleansUpToNewSTH) {
   sth.set_timestamp(sth.timestamp() + 1);
   sth.set_tree_size(105);
   CHECK(store_->SetServingSTH(sth).ok());
-  CHECK_EQ(util::Status::OK, CleanupOldEntries());
+  {
+    const StatusOr<int64_t> num_cleaned(CleanupOldEntries());
+    ASSERT_OK(num_cleaned.status());
+    EXPECT_EQ(2, num_cleaned.ValueOrDie());
+  }
+
 
   // Ensure they were:
   EXPECT_EQ(util::error::NOT_FOUND,

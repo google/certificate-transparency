@@ -153,7 +153,10 @@ class ConsistentStore {
 
   virtual util::Status SetClusterConfig(const ct::ClusterConfig& config) = 0;
 
-  virtual util::Status CleanupOldEntries() = 0;
+  // Cleans up entries in the store according to the implementation's policy.
+  // Returns either the number of entries cleaned up, or a Status describing
+  // the error.
+  virtual util::StatusOr<int64_t> CleanupOldEntries() = 0;
 
  private:
   DISALLOW_COPY_AND_ASSIGN(ConsistentStore);

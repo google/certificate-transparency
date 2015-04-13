@@ -70,7 +70,7 @@ class EtcdConsistentStore : public ConsistentStore<Logged> {
 
   // Removes sequenced entries with sequence numbers covered by the current
   // serving STH.
-  util::Status CleanupOldEntries() override;
+  util::StatusOr<int64_t> CleanupOldEntries() override;
 
  private:
   void WaitForServingSTHVersion(std::unique_lock<std::mutex>* lock,

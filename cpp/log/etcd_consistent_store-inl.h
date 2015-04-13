@@ -708,7 +708,7 @@ void EtcdConsistentStore<Logged>::OnEtcdServingSTHUpdated(
 
 
 template <class Logged>
-util::Status EtcdConsistentStore<Logged>::CleanupOldEntries() {
+util::StatusOr<int64_t> EtcdConsistentStore<Logged>::CleanupOldEntries() {
   ScopedLatency scoped_latency(
       etcd_latency_by_op_ms.ScopedLatency("cleanup_old_entries"));
 
@@ -721,7 +721,7 @@ util::Status EtcdConsistentStore<Logged>::CleanupOldEntries() {
   std::unique_lock<std::mutex> lock(mutex_);
   if (!serving_sth_) {
     LOG(INFO) << "No current serving_sth, nothing to do.";
-    return util::Status::OK;
+    return 0;
   }
   const int64_t clean_up_to_sequence_number(
       serving_sth_->Entry().tree_size() - 1);
@@ -777,6 +777,7 @@ util::Status EtcdConsistentStore<Logged>::CleanupOldEntries() {
     VLOG(1) << "Cleanup will delete entry (" << util::ToBase64(hash)
             << ") corresponding to sequence number " << sequence_number;
   }
+  const int64_t num_entries_cleaned(keys_to_delete.size());
   util::SyncTask task(executor_);
   EtcdDeleteKeys(client_, std::move(keys_to_delete), task.task());
   task.Wait();
@@ -784,7 +785,7 @@ util::Status EtcdConsistentStore<Logged>::CleanupOldEntries() {
   if (!status.ok()) {
     LOG(WARNING) << "EtcdDeleteKeys failed: " << task.status();
   }
-  return status;
+  return num_entries_cleaned;
 }
 
 

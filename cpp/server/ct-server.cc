@@ -145,9 +145,6 @@ Gauge<>* latest_local_tree_size_gauge =
 Counter<bool>* sequencer_total_runs = Counter<bool>::New(
     "sequencer_total_runs", "successful",
     "Total number of sequencer runs broken out by success.");
-Latency<milliseconds> sequencer_delete_latency_ms(
-    "sequencer_delete_latency_ms",
-    "Total time spent deleting entries by sequencer");
 Latency<milliseconds> sequencer_sequence_latency_ms(
     "sequencer_sequence_latency_ms",
     "Total time spent sequencing entries by sequencer");
@@ -237,11 +234,19 @@ void CleanUpEntries(ConsistentStore<LoggedCertificate>* store,
 
   while (true) {
     if (election->IsMaster()) {
-      const ScopedLatency sequencer_delete_latency(
-          sequencer_delete_latency_ms.ScopedLatency());
-      util::Status status(store->CleanupOldEntries());
-      if (!status.ok()) {
-        LOG(WARNING) << "Problem cleaning up old entries: " << status;
+      // Keep cleaning up until there's no more work to do.
+      // This should help to keep the etcd contents size down during heavy
+      // load.
+      while (true) {
+        const util::StatusOr<int64_t> num_cleaned(store->CleanupOldEntries());
+        if (!num_cleaned.ok()) {
+          LOG(WARNING) << "Problem cleaning up old entries: "
+                       << num_cleaned.status();
+          break;
+        }
+        if (num_cleaned.ValueOrDie() == 0) {
+          break;
+        }
       }
     }
 
