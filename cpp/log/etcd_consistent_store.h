@@ -10,6 +10,7 @@
 #include "log/consistent_store.h"
 #include "proto/ct.pb.h"
 #include "util/etcd.h"
+#include "util/libevent_wrapper.h"
 #include "util/status.h"
 #include "util/sync_task.h"
 
@@ -24,9 +25,9 @@ class EtcdConsistentStore : public ConsistentStore<Logged> {
   // No change of ownership for |client|, |executor| must continue to be valid
   // at least as long as this object is, and should not be the libevent::Base
   // used by |client|.
-  EtcdConsistentStore(util::Executor* executor, EtcdClient* client,
-                      const MasterElection* election, const std::string& root,
-                      const std::string& node_id);
+  EtcdConsistentStore(libevent::Base* base, util::Executor* executor,
+                      EtcdClient* client, const MasterElection* election,
+                      const std::string& root, const std::string& node_id);
 
   virtual ~EtcdConsistentStore();
 
@@ -137,18 +138,31 @@ class EtcdConsistentStore : public ConsistentStore<Logged> {
 
   void OnEtcdServingSTHUpdated(const Update<ct::SignedTreeHead>& update);
 
+  void OnClusterConfigUpdated(const Update<ct::ClusterConfig>& update);
+
+  void StartEtcdStatsFetch();
+  void EtcdStatsFetchDone(EtcdClient::StatsResponse* response,
+                          util::Task* task);
+
+  util::Status MaybeReject(const std::string& type) const;
+
   EtcdClient* const client_;  // We don't own this.
+  libevent::Base* base_;                  // We don't own this.
   util::Executor* const executor_;        // We don't own this.
   const MasterElection* const election_;  // We don't own this.
   const std::string root_;
   const std::string node_id_;
   std::condition_variable serving_sth_cv_;
   util::SyncTask serving_sth_watch_task_;
+  util::SyncTask cluster_config_watch_task_;
+  util::SyncTask etcd_stats_task_;
 
   mutable std::mutex mutex_;
   bool received_initial_sth_;
   std::unique_ptr<EntryHandle<ct::SignedTreeHead>> serving_sth_;
+  std::unique_ptr<ct::ClusterConfig> cluster_config_;
   bool exiting_;
+  int64_t num_etcd_entries_;
 
   friend class EtcdConsistentStoreTest;
   template <class T>

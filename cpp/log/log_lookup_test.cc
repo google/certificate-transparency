@@ -55,7 +55,7 @@ class LogLookupTest : public ::testing::Test {
         event_pump_(base_),
         etcd_client_(base_.get()),
         pool_(2),
-        store_(&pool_, &etcd_client_, &election_, "/root", "id"),
+        store_(base_.get(), &pool_, &etcd_client_, &election_, "/root", "id"),
         test_signer_(),
         tree_signer_(std::chrono::duration<double>(0), db(), &store_,
                      TestSigner::DefaultLogSigner()),

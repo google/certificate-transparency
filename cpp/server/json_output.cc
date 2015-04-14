@@ -79,6 +79,11 @@ void JsonOutput::SendJsonReply(evhttp_request* req, int http_status,
   CHECK_EQ(evhttp_add_header(evhttp_request_get_output_headers(req),
                              "Content-Type", kJsonContentType),
            0);
+  if (http_status == HTTP_SERVUNAVAIL) {
+    CHECK_EQ(evhttp_add_header(evhttp_request_get_output_headers(req),
+                               "Retry-After", "10"),
+             0);
+  }
   const string resp_body(json.ToString());
   CHECK_GT(evbuffer_add_printf(evhttp_request_get_output_buffer(req), "%s",
                                resp_body.c_str()),

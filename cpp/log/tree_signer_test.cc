@@ -62,9 +62,8 @@ class TreeSignerTest : public ::testing::Test {
     test_db_.reset(new TestDB<T>);
     verifier_.reset(new LogVerifier(TestSigner::DefaultLogSigVerifier(),
                                     new MerkleVerifier(new Sha256Hasher())));
-    store_.reset(
-        new EtcdConsistentStore<LoggedCertificate>(&pool_, &etcd_client_,
-                                                   &election_, "/root", "id"));
+    store_.reset(new EtcdConsistentStore<LoggedCertificate>(
+        base_.get(), &pool_, &etcd_client_, &election_, "/root", "id"));
     tree_signer_.reset(new TS(std::chrono::duration<double>(0), db(),
                               store_.get(), TestSigner::DefaultLogSigner()));
     // Set a default empty STH so that we can call UpdateTree() on the signer.

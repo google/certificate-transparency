@@ -22,6 +22,7 @@
 #include "util/util.h"
 
 DECLARE_int32(node_state_ttl_seconds);
+DECLARE_int32(etcd_stats_collection_interval_seconds);
 
 namespace cert_trans {
 
@@ -72,8 +73,9 @@ class EtcdConsistentStoreTest : public ::testing::Test {
 
  protected:
   void SetUp() override {
+    FLAGS_etcd_stats_collection_interval_seconds = 1;
     store_.reset(new EtcdConsistentStore<LoggedCertificate>(
-        &executor_, &client_, &election_, kRoot, kNodeId));
+        base_.get(), &executor_, &client_, &election_, kRoot, kNodeId));
     InsertEntry("/root/sequence_mapping", SequenceMapping());
   }
 
@@ -201,6 +203,11 @@ class EtcdConsistentStoreTest : public ::testing::Test {
   ct::SignedTreeHead ServingSTH() {
     return store_->serving_sth_->Entry();
   }
+
+  int64_t GetNumEtcdEntries() const {
+    return store_->num_etcd_entries_;
+  }
+
 
   shared_ptr<libevent::Base> base_;
   ThreadPool executor_;
@@ -755,6 +762,33 @@ TEST_F(EtcdConsistentStoreTest, TestCleansUpToNewSTH) {
               pending_entries_post[i].Handle());
     EXPECT_EQ(pending_entries_pre[i].Entry(), pending_entries_post[i].Entry());
   }
+}
+
+
+TEST_F(EtcdConsistentStoreTest, TestStoreStatsFetcher) {
+  EXPECT_EQ(0, GetNumEtcdEntries());
+  PopulateForCleanupTests(100, 100, 100);
+  sleep(2 * FLAGS_etcd_stats_collection_interval_seconds);
+  EXPECT_LE(200, GetNumEtcdEntries());
+}
+
+
+TEST_F(EtcdConsistentStoreTest, TestRejectsAddsWhenOverCapacity) {
+  ct::ClusterConfig config;
+  config.set_etcd_reject_add_pending_threshold(2);
+  util::Status status(store_->SetClusterConfig(config));
+  ASSERT_OK(status);
+
+  EXPECT_EQ(0, GetNumEtcdEntries());
+
+  PopulateForCleanupTests(3, 0, 1);
+  sleep(2 * FLAGS_etcd_stats_collection_interval_seconds);
+
+  EXPECT_LT(2, GetNumEtcdEntries());
+
+  LoggedCertificate cert(MakeCert(1000, "cert1000"));
+  EXPECT_THAT(store_->AddPendingEntry(&cert),
+              StatusIs(util::error::RESOURCE_EXHAUSTED));
 }
 
 

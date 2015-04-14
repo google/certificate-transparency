@@ -9,12 +9,15 @@
 #include "base/notification.h"
 #include "log/etcd_consistent_store.h"
 #include "log/logged_certificate.h"
+#include "monitoring/event_metric.h"
 #include "monitoring/monitoring.h"
 #include "monitoring/latency.h"
 #include "util/etcd_delete.h"
 #include "util/executor.h"
 #include "util/masterelection.h"
 #include "util/util.h"
+
+DECLARE_int32(etcd_stats_collection_interval_seconds);
 
 DECLARE_int32(node_state_ttl_seconds);
 
@@ -33,6 +36,20 @@ static Gauge<std::string>* etcd_total_entries =
     Gauge<std::string>::New("etcd_total_entries", "type",
                             "Total number of entries in etcd by type.");
 
+static Gauge<std::string>* etcd_store_stats =
+    Gauge<std::string>::New("etcd_store_stats", "name",
+                            "Re-export of etcd's store stats.");
+
+static EventMetric<std::string> etcd_throttle_delay_ms(
+    "etcd_throttle_delay_ms", "type",
+    "Count and total thottle delay applied to requests, broken down by "
+    "request type");
+
+static Counter<std::string>* etcd_rejected_requests =
+    Counter<std::string>::New("etcd_rejected_requests", "type",
+                              "Total number of requests rejected due to "
+                              "overload, broken down by request type.");
+
 static Latency<std::chrono::milliseconds, std::string> etcd_latency_by_op_ms(
     "etcd_latency_by_op_ms", "operation",
     "Etcd latency in ms broken down by operation.");
@@ -49,20 +66,61 @@ void CheckMappingIsOrdered(const ct::SequenceMapping& mapping) {
 }
 
 
+util::StatusOr<int64_t> GetStat(const std::map<std::string, int64_t>& stats,
+                                const std::string& name) {
+  const auto& it(stats.find(name));
+  if (it == stats.end()) {
+    return util::Status(util::error::FAILED_PRECONDITION, name + " missing.");
+  }
+  return it->second;
+}
+
+
+util::StatusOr<int64_t> CalculateNumEtcdEntries(
+    const std::map<std::string, int64_t>& stats) {
+  util::StatusOr<int64_t> created(GetStat(stats, "createSuccess"));
+  if (!created.ok()) {
+    return created;
+  }
+
+  util::StatusOr<int64_t> deleted(GetStat(stats, "deleteSuccess"));
+  if (!deleted.ok()) {
+    return deleted;
+  }
+
+  util::StatusOr<int64_t> compareDeleted(
+      GetStat(stats, "compareAndDeleteSuccess"));
+  if (!compareDeleted.ok()) {
+    return compareDeleted;
+  }
+  util::StatusOr<int64_t> expired(GetStat(stats, "expireCount"));
+  if (!expired.ok()) {
+    return expired;
+  }
+
+  const int64_t num_removed(deleted.ValueOrDie() +
+                            compareDeleted.ValueOrDie() +
+                            expired.ValueOrDie());
+  return created.ValueOrDie() - num_removed;
+}
+
 }  // namespace
 
 
 template <class Logged>
 EtcdConsistentStore<Logged>::EtcdConsistentStore(
-    util::Executor* executor, EtcdClient* client,
+    libevent::Base* base, util::Executor* executor, EtcdClient* client,
     const MasterElection* election, const std::string& root,
     const std::string& node_id)
     : client_(CHECK_NOTNULL(client)),
+      base_(CHECK_NOTNULL(base)),
       executor_(CHECK_NOTNULL(executor)),
       election_(CHECK_NOTNULL(election)),
       root_(root),
       node_id_(node_id),
       serving_sth_watch_task_(CHECK_NOTNULL(executor)),
+      cluster_config_watch_task_(CHECK_NOTNULL(executor)),
+      etcd_stats_task_(executor_),
       received_initial_sth_(false),
       exiting_(false) {
   // Set up watches on things we're interested in...
@@ -70,6 +128,12 @@ EtcdConsistentStore<Logged>::EtcdConsistentStore(
       std::bind(&EtcdConsistentStore<Logged>::OnEtcdServingSTHUpdated, this,
                 std::placeholders::_1),
       serving_sth_watch_task_.task());
+  WatchClusterConfig(
+      std::bind(&EtcdConsistentStore<Logged>::OnClusterConfigUpdated, this,
+                std::placeholders::_1),
+      cluster_config_watch_task_.task());
+
+  StartEtcdStatsFetch();
 
   // And wait for the initial updates to come back so that we've got a
   // view on the current state before proceding...
@@ -84,8 +148,13 @@ template <class Logged>
 EtcdConsistentStore<Logged>::~EtcdConsistentStore() {
   VLOG(1) << "Cancelling watch tasks.";
   serving_sth_watch_task_.Cancel();
+  cluster_config_watch_task_.Cancel();
   VLOG(1) << "Waiting for watch tasks to return.";
   serving_sth_watch_task_.Wait();
+  cluster_config_watch_task_.Wait();
+  VLOG(1) << "Cancelling stats task.";
+  etcd_stats_task_.Cancel();
+  etcd_stats_task_.Wait();
   VLOG(1) << "Joining cleanup thread";
   {
     std::lock_guard<std::mutex> lock(mutex_);
@@ -219,9 +288,15 @@ util::Status EtcdConsistentStore<Logged>::AddPendingEntry(Logged* entry) {
 
   CHECK_NOTNULL(entry);
   CHECK(!entry->has_sequence_number());
+
+  util::Status status(MaybeReject("add_pending_entry"));
+  if (!status.ok()) {
+    return status;
+  }
+
   const std::string full_path(GetEntryPath(*entry));
   EntryHandle<Logged> handle(full_path, *entry);
-  util::Status status(CreateEntry(&handle));
+  status = CreateEntry(&handle);
   if (status.CanonicalCode() == util::error::FAILED_PRECONDITION) {
     // Entry with that hash already exists.
     EntryHandle<Logged> preexisting_entry;
@@ -690,11 +765,11 @@ void EtcdConsistentStore<Logged>::UpdateLocalServingSTH(
 template <class Logged>
 void EtcdConsistentStore<Logged>::OnEtcdServingSTHUpdated(
     const Update<ct::SignedTreeHead>& update) {
-  VLOG(1) << "Got ServingSTH version " << update.handle_.Handle() << ": "
-          << update.handle_.Entry().DebugString();
   std::unique_lock<std::mutex> lock(mutex_);
 
   if (update.exists_) {
+    VLOG(1) << "Got ServingSTH version " << update.handle_.Handle() << ": "
+            << update.handle_.Entry().DebugString();
     UpdateLocalServingSTH(lock, update.handle_);
   } else {
     LOG(WARNING) << "ServingSTH non-existent/deleted.";
@@ -704,6 +779,21 @@ void EtcdConsistentStore<Logged>::OnEtcdServingSTHUpdated(
   received_initial_sth_ = true;
   lock.unlock();
   serving_sth_cv_.notify_all();
+}
+
+
+template <class Logged>
+void EtcdConsistentStore<Logged>::OnClusterConfigUpdated(
+    const Update<ct::ClusterConfig>& update) {
+  if (update.exists_) {
+    VLOG(1) << "Got ClusterConfig version " << update.handle_.Handle() << ": "
+            << update.handle_.Entry().DebugString();
+    std::lock_guard<std::mutex> lock(mutex_);
+    cluster_config_.reset(new ct::ClusterConfig(update.handle_.Entry()));
+  } else {
+    LOG(WARNING) << "ClusterConfig non-existent/deleted.";
+    // TODO(alcutter): What to do here?
+  }
 }
 
 
@@ -786,6 +876,82 @@ util::StatusOr<int64_t> EtcdConsistentStore<Logged>::CleanupOldEntries() {
     LOG(WARNING) << "EtcdDeleteKeys failed: " << task.status();
   }
   return num_entries_cleaned;
+}
+
+
+template <class Logged>
+void EtcdConsistentStore<Logged>::StartEtcdStatsFetch() {
+  if (etcd_stats_task_.task()->CancelRequested()) {
+    etcd_stats_task_.task()->Return(util::Status::CANCELLED);
+    return;
+  }
+  EtcdClient::StatsResponse* response(new EtcdClient::StatsResponse);
+  util::Task* stats_task(etcd_stats_task_.task()->AddChild(
+      bind(&EtcdConsistentStore<Logged>::EtcdStatsFetchDone, this, response,
+           std::placeholders::_1)));
+  client_->GetStoreStats(response, stats_task);
+}
+
+
+template <class Logged>
+void EtcdConsistentStore<Logged>::EtcdStatsFetchDone(
+    EtcdClient::StatsResponse* response, util::Task* task) {
+  CHECK_NOTNULL(response);
+  CHECK_NOTNULL(task);
+  std::unique_ptr<EtcdClient::StatsResponse> response_deleter(response);
+  if (task->status().ok()) {
+    for (const auto& stat : response->stats) {
+      VLOG(2) << "etcd stat: " << stat.first << " = " << stat.second;
+      etcd_store_stats->Set(stat.first, stat.second);
+    }
+    const util::StatusOr<int64_t> num_entries(
+        CalculateNumEtcdEntries(response->stats));
+    if (num_entries.ok()) {
+      {
+        std::lock_guard<std::mutex> lock(mutex_);
+        num_etcd_entries_ = num_entries.ValueOrDie();
+      }
+      etcd_total_entries->Set("all", num_etcd_entries_);
+    } else {
+      VLOG(1) << "Failed to calculate num_entries: " << num_entries.status();
+    }
+  } else {
+    LOG(WARNING) << "Etcd stats fetch failed: " << task->status();
+  }
+
+  base_->Delay(
+      std::chrono::seconds(FLAGS_etcd_stats_collection_interval_seconds),
+      etcd_stats_task_.task()->AddChild(
+          std::bind(&EtcdConsistentStore<Logged>::StartEtcdStatsFetch, this)));
+}
+
+// This method attempts to modulate the incoming traffic in response to the
+// number of entries currently in etcd.
+//
+// Once the number of entries is above reject_threshold, we will start
+// returning a RESOURCE_EXHAUSTED status, which should result in a 503 being
+// sent to the client.
+template <class Logged>
+util::Status EtcdConsistentStore<Logged>::MaybeReject(
+    const std::string& type) const {
+  std::unique_lock<std::mutex> lock(mutex_);
+
+  if (!cluster_config_) {
+    // No config, whatever.
+    return util::Status::OK;
+  }
+
+  const int64_t etcd_size(num_etcd_entries_);
+  const int64_t reject_threshold(
+      cluster_config_->etcd_reject_add_pending_threshold());
+  lock.unlock();
+
+  if (etcd_size >= reject_threshold) {
+    etcd_rejected_requests->Increment(type);
+    return util::Status(util::error::RESOURCE_EXHAUSTED,
+                        "Rejected due to high number of pending entries.");
+  }
+  return util::Status::OK;
 }
 
 

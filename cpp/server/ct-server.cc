@@ -88,6 +88,9 @@ DEFINE_string(etcd_host, "", "Hostname of the etcd server");
 DEFINE_int32(etcd_port, 0, "Port of the etcd server.");
 DEFINE_int32(node_state_refresh_seconds, 10,
              "How often to refresh the ClusterNodeState entry for this node.");
+DEFINE_int32(watchdog_seconds, 120,
+             "How many seconds without successfully refreshing this node's "
+             "before firing the watchdog timer.");
 DEFINE_bool(watchdog_timeout_is_fatal, true,
             "Exit if the watchdog timer fires.");
 DEFINE_int32(num_http_server_threads, 16,
@@ -338,7 +341,7 @@ void RefreshNodeState(ClusterStateController<LoggedCertificate>* controller) {
   while (true) {
     // If we haven't managed to refresh our state file in a timely fashion,
     // then send us a SIGALRM:
-    alarm(FLAGS_node_state_refresh_seconds * 4);
+    alarm(FLAGS_watchdog_seconds);
 
     controller->RefreshNodeState();
 
@@ -477,10 +480,9 @@ int main(int argc, char* argv[]) {
   // via HTTP.
   ThreadPool internal_pool(8);
   StrictConsistentStore<LoggedCertificate> consistent_store(
-      &election,
-      new EtcdConsistentStore<LoggedCertificate>(&internal_pool,
-                                                 etcd_client.get(), &election,
-                                                 "/root", node_id));
+      &election, new EtcdConsistentStore<LoggedCertificate>(
+                     event_base.get(), &internal_pool, etcd_client.get(),
+                     &election, "/root", node_id));
 
   const unique_ptr<ContinuousFetcher> fetcher(
       ContinuousFetcher::New(event_base.get(), &internal_pool, db));
