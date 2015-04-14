@@ -39,7 +39,8 @@ FakeEtcdClient::~FakeEtcdClient() {
 }
 
 
-void FakeEtcdClient::DumpEntries() {
+void FakeEtcdClient::DumpEntries(const unique_lock<mutex>& lock) const {
+  CHECK(lock.owns_lock());
   for (const auto& pair : entries_) {
     VLOG(1) << pair.second.ToString();
   }
@@ -63,8 +64,9 @@ void FakeEtcdClient::Watch(const string& key, const WatchCallback& cb,
 }
 
 
-void FakeEtcdClient::PurgeExpiredEntries() {
-  unique_lock<mutex> lock(mutex_);
+void FakeEtcdClient::PurgeExpiredEntriesWithLock(
+    const unique_lock<mutex>& lock) {
+  CHECK(lock.owns_lock());
   for (auto it = entries_.begin(); it != entries_.end();) {
     if (it->second.expires_ < system_clock::now()) {
       VLOG(1) << "Deleting expired entry " << it->first;
@@ -76,6 +78,12 @@ void FakeEtcdClient::PurgeExpiredEntries() {
       ++it;
     }
   }
+}
+
+
+void FakeEtcdClient::PurgeExpiredEntries() {
+  unique_lock<mutex> lock(mutex_);
+  PurgeExpiredEntriesWithLock(lock);
 }
 
 
@@ -104,8 +112,8 @@ void FakeEtcdClient::Get(const Request& req, GetResponse* resp, Task* task) {
   CHECK(!req.recursive) << "not implemented";
   CHECK_LE(req.wait_index, 0) << "not implemented";
 
-  PurgeExpiredEntries();
-  lock_guard<mutex> lock(mutex_);
+  unique_lock<mutex> lock(mutex_);
+  PurgeExpiredEntriesWithLock(lock);
   resp->etcd_index = index_;
   if (req.key.back() == '/') {
     vector<Node> nodes;
@@ -139,8 +147,8 @@ void FakeEtcdClient::InternalPut(const string& key, const string& value,
   CHECK(!create || prev_index <= 0);
 
   *resp = EtcdClient::Response();
-  PurgeExpiredEntries();
   unique_lock<mutex> lock(mutex_);
+  PurgeExpiredEntriesWithLock(lock);
   const int64_t new_index(index_ + 1);
   Node node(new_index, new_index, key, false, value, {}, false);
   node.expires_ = expires;
@@ -172,7 +180,7 @@ void FakeEtcdClient::InternalPut(const string& key, const string& value,
   index_ = new_index;
   task->Return();
   NotifyForPath(lock, key);
-  DumpEntries();
+  DumpEntries(lock);
   if (expires < system_clock::time_point::max()) {
     const std::chrono::duration<double> delay(expires - system_clock::now());
     base_->Delay(delay, parent_task_.task()->AddChild(
@@ -255,8 +263,8 @@ void FakeEtcdClient::Delete(const string& key, const int64_t current_index,
   CHECK_EQ(key.front(), '/');
   CHECK_NE(key.back(), '/');
 
-  PurgeExpiredEntries();
   unique_lock<mutex> lock(mutex_);
+  PurgeExpiredEntriesWithLock(lock);
   const map<string, Node>::iterator entry(entries_.find(key));
   if (entry == entries_.end()) {
     ++stats_["compareAndDeleteFail"];

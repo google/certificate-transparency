@@ -21,8 +21,6 @@ class FakeEtcdClient : public EtcdClient {
 
   virtual ~FakeEtcdClient();
 
-  void DumpEntries();
-
   void Get(const Request& req, GetResponse* resp, util::Task* task) override;
 
   void Create(const std::string& key, const std::string& value, Response* resp,
@@ -60,6 +58,9 @@ class FakeEtcdClient : public EtcdClient {
              util::Task* task) override;
 
  private:
+  void DumpEntries(const std::unique_lock<std::mutex>& lock) const;
+
+  void PurgeExpiredEntriesWithLock(const std::unique_lock<std::mutex>& lock);
   void PurgeExpiredEntries();
 
   void NotifyForPath(const std::unique_lock<std::mutex>& lock,
