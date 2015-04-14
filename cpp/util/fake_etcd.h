@@ -51,6 +51,8 @@ class FakeEtcdClient : public EtcdClient {
   void Delete(const std::string& key, const int64_t current_index,
               util::Task* task) override;
 
+  void GetStoreStats(StatsResponse* resp, util::Task* task) override;
+
   // The callbacks for *all* watches will be called one at a time, in
   // order, which is a stronger guarantee than the one
   // EtcdClient::Watch has.
@@ -67,6 +69,8 @@ class FakeEtcdClient : public EtcdClient {
                    const std::chrono::system_clock::time_point& expires,
                    bool create, int64_t prev_index, Response* resp,
                    util::Task* task);
+
+  void UpdateOperationStats(const std::string& op, const util::Task* task);
 
   void CancelWatch(util::Task* task);
 
@@ -85,6 +89,7 @@ class FakeEtcdClient : public EtcdClient {
   std::map<std::string, std::vector<std::pair<WatchCallback, util::Task*>>>
       watches_;
   std::deque<std::pair<util::Task*, std::function<void()>>> watches_callbacks_;
+  std::map<std::string, int64_t> stats_;
 
   friend class ElectionTest;
 };

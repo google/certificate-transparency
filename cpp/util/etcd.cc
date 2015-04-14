@@ -47,6 +47,19 @@ namespace cert_trans {
 
 namespace {
 
+const char* kStoreStats[] = {"setsFail", "getsSuccess", "watchers",
+                             "expireCount", "createFail", "setsSuccess",
+                             "compareAndDeleteFail", "createSuccess",
+                             "deleteFail", "compareAndSwapSuccess",
+                             "compareAndSwapFail", "compareAndDeleteSuccess",
+                             "updateFail", "deleteSuccess", "updateSuccess",
+                             "getsFail"};
+
+const char kKeysSpace[] = "/v2/keys";
+const char kStatsSpace[] = "/v2/stats";
+
+const char kStoreStatsKey[] = "/store";
+
 
 string MessageFromJsonStatus(const shared_ptr<JsonObject>& json) {
   string message;
@@ -180,6 +193,42 @@ void GetRequestDone(const string& keyname, EtcdClient::GetResponse* resp,
 }
 
 
+void CopyStat(const string& key, const JsonObject& from,
+              map<string, int64_t>* to) {
+  CHECK_NOTNULL(to);
+  const JsonInt stat(from, key.c_str());
+  if (!stat.Ok()) {
+    LOG(WARNING) << "Failed to find stat " << key;
+    return;
+  }
+  (*to)[key] = stat.Value();
+}
+
+
+void GetStoreStatsRequestDone(EtcdClient::StatsResponse* resp,
+                              Task* parent_task,
+                              EtcdClient::GenericResponse* gen_resp,
+                              Task* task) {
+  *resp = EtcdClient::StatsResponse();
+  resp->etcd_index = gen_resp->etcd_index;
+  if (!task->status().ok()) {
+    parent_task->Return(task->status());
+    return;
+  }
+
+  if (!gen_resp->json_body->Ok()) {
+    parent_task->Return(Status(util::error::FAILED_PRECONDITION,
+                               "Invalid JSON: json_body not Ok."));
+    return;
+  }
+
+  for (const auto& stat : kStoreStats) {
+    CopyStat(stat, *gen_resp->json_body, &resp->stats);
+  }
+  parent_task->Return();
+}
+
+
 void CreateRequestDone(EtcdClient::Response* resp, Task* parent_task,
                        EtcdClient::GenericResponse* gen_resp, Task* task) {
   if (!task->status().ok()) {
@@ -292,8 +341,9 @@ static const EtcdClient::Node kInvalidNode(-1, -1, "", false, "", {}, true);
 
 struct EtcdClient::RequestState {
   RequestState(UrlFetcher::Verb verb, const string& key,
-               map<string, string> params, const HostPortPair& host_port,
-               GenericResponse* gen_resp, Task* parent_task)
+               const string& key_space, map<string, string> params,
+               const HostPortPair& host_port, GenericResponse* gen_resp,
+               Task* parent_task)
       : gen_resp_(CHECK_NOTNULL(gen_resp)),
         parent_task_(CHECK_NOTNULL(parent_task)) {
     CHECK(!key.empty());
@@ -313,7 +363,7 @@ struct EtcdClient::RequestState {
       LOG_EVERY_N(WARNING, 100) << "Sending request without 'quorum=true'";
     }
 
-    req_.url.SetPath("/v2/keys" + key);
+    req_.url.SetPath(key_space + key);
     switch (req_.verb) {
       case UrlFetcher::Verb::POST:
       case UrlFetcher::Verb::PUT:
@@ -663,7 +713,7 @@ void EtcdClient::Get(const Request& req, GetResponse* resp, Task* task) {
   }
   GenericResponse* const gen_resp(new GenericResponse);
   task->DeleteWhenDone(gen_resp);
-  Generic(req.key, params, UrlFetcher::Verb::GET, gen_resp,
+  Generic(req.key, kKeysSpace, params, UrlFetcher::Verb::GET, gen_resp,
           task->AddChild(
               bind(&GetRequestDone, req.key, resp, task, gen_resp, _1)));
 }
@@ -676,7 +726,7 @@ void EtcdClient::Create(const string& key, const string& value, Response* resp,
   params["prevExist"] = "false";
   GenericResponse* const gen_resp(new GenericResponse);
   task->DeleteWhenDone(gen_resp);
-  Generic(key, params, UrlFetcher::Verb::PUT, gen_resp,
+  Generic(key, kKeysSpace, params, UrlFetcher::Verb::PUT, gen_resp,
           task->AddChild(bind(&CreateRequestDone, resp, task, gen_resp, _1)));
 }
 
@@ -690,7 +740,7 @@ void EtcdClient::CreateWithTTL(const string& key, const string& value,
   params["ttl"] = to_string(ttl.count());
   GenericResponse* const gen_resp(new GenericResponse);
   task->DeleteWhenDone(gen_resp);
-  Generic(key, params, UrlFetcher::Verb::PUT, gen_resp,
+  Generic(key, kKeysSpace, params, UrlFetcher::Verb::PUT, gen_resp,
           task->AddChild(bind(&CreateRequestDone, resp, task, gen_resp, _1)));
 }
 
@@ -703,7 +753,7 @@ void EtcdClient::Update(const string& key, const string& value,
   params["prevIndex"] = to_string(previous_index);
   GenericResponse* const gen_resp(new GenericResponse);
   task->DeleteWhenDone(gen_resp);
-  Generic(key, params, UrlFetcher::Verb::PUT, gen_resp,
+  Generic(key, kKeysSpace, params, UrlFetcher::Verb::PUT, gen_resp,
           task->AddChild(bind(&UpdateRequestDone, resp, task, gen_resp, _1)));
 }
 
@@ -718,7 +768,7 @@ void EtcdClient::UpdateWithTTL(const string& key, const string& value,
   params["ttl"] = to_string(ttl.count());
   GenericResponse* const gen_resp(new GenericResponse);
   task->DeleteWhenDone(gen_resp);
-  Generic(key, params, UrlFetcher::Verb::PUT, gen_resp,
+  Generic(key, kKeysSpace, params, UrlFetcher::Verb::PUT, gen_resp,
           task->AddChild(bind(&UpdateRequestDone, resp, task, gen_resp, _1)));
 }
 
@@ -729,7 +779,7 @@ void EtcdClient::ForceSet(const string& key, const string& value,
   params["value"] = value;
   GenericResponse* const gen_resp(new GenericResponse);
   task->DeleteWhenDone(gen_resp);
-  Generic(key, params, UrlFetcher::Verb::PUT, gen_resp,
+  Generic(key, kKeysSpace, params, UrlFetcher::Verb::PUT, gen_resp,
           task->AddChild(
               bind(&ForceSetRequestDone, resp, task, gen_resp, _1)));
 }
@@ -743,7 +793,7 @@ void EtcdClient::ForceSetWithTTL(const string& key, const string& value,
   params["ttl"] = to_string(ttl.count());
   GenericResponse* const gen_resp(new GenericResponse);
   task->DeleteWhenDone(gen_resp);
-  Generic(key, params, UrlFetcher::Verb::PUT, gen_resp,
+  Generic(key, kKeysSpace, params, UrlFetcher::Verb::PUT, gen_resp,
           task->AddChild(
               bind(&ForceSetRequestDone, resp, task, gen_resp, _1)));
 }
@@ -756,7 +806,18 @@ void EtcdClient::Delete(const string& key, const int64_t current_index,
   GenericResponse* const gen_resp(new GenericResponse);
   task->DeleteWhenDone(gen_resp);
 
-  Generic(key, params, UrlFetcher::Verb::DELETE, gen_resp, task);
+  Generic(key, kKeysSpace, params, UrlFetcher::Verb::DELETE, gen_resp, task);
+}
+
+
+void EtcdClient::GetStoreStats(StatsResponse* resp, Task* task) {
+  map<string, string> params;
+  GenericResponse* const gen_resp(new GenericResponse);
+  task->DeleteWhenDone(gen_resp);
+
+  Generic(kStoreStatsKey, kStatsSpace, params, UrlFetcher::Verb::GET, gen_resp,
+          task->AddChild(
+              bind(&GetStoreStatsRequestDone, resp, task, gen_resp, _1)));
 }
 
 
@@ -772,11 +833,12 @@ void EtcdClient::Watch(const string& key, const WatchCallback& cb,
 }
 
 
-void EtcdClient::Generic(const string& key, const map<string, string>& params,
+void EtcdClient::Generic(const string& key, const string& key_space,
+                         const map<string, string>& params,
                          UrlFetcher::Verb verb, GenericResponse* resp,
                          Task* task) {
-  RequestState* const etcd_req(
-      new RequestState(verb, key, params, GetEndpoint(), resp, task));
+  RequestState* const etcd_req(new RequestState(verb, key, key_space, params,
+                                                GetEndpoint(), resp, task));
   task->DeleteWhenDone(etcd_req);
 
   fetcher_->Fetch(etcd_req->req_, &etcd_req->resp_,
