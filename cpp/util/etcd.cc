@@ -599,7 +599,8 @@ string EtcdClient::Node::ToString() const {
     time_t time_c = system_clock::to_time_t(expires_);
     oss << " expires: " << ctime(&time_c);
   }
-  oss << " deleted: " << deleted_ << "]";
+
+  oss << " dir: " << is_dir_ << " deleted: " << deleted_ << "]";
   return oss.str();
 }
 

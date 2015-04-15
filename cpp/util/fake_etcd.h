@@ -54,7 +54,7 @@ class FakeEtcdClient : public EtcdClient {
   // The callbacks for *all* watches will be called one at a time, in
   // order, which is a stronger guarantee than the one
   // EtcdClient::Watch has.
-  void Watch(const std::string& key, const WatchCallback& cb,
+  void Watch(const std::string& rawkey, const WatchCallback& cb,
              util::Task* task) override;
 
  private:
@@ -66,7 +66,7 @@ class FakeEtcdClient : public EtcdClient {
   void NotifyForPath(const std::unique_lock<std::mutex>& lock,
                      const std::string& path);
 
-  void InternalPut(const std::string& key, const std::string& value,
+  void InternalPut(const std::string& rawkey, const std::string& value,
                    const std::chrono::system_clock::time_point& expires,
                    bool create, int64_t prev_index, Response* resp,
                    util::Task* task);

@@ -25,6 +25,44 @@ using util::StatusOr;
 using util::Task;
 
 namespace cert_trans {
+namespace {
+
+
+string NormalizeKey(const string& input) {
+  CHECK(!input.empty());
+  CHECK_EQ(input[0], '/');
+
+  string::size_type offset(0);
+  string output;
+  while (offset < input.size()) {
+    const string::size_type next_part(input.find_first_not_of('/', offset));
+    const string::size_type next_slash(input.find_first_of('/', next_part));
+
+    if (next_part != string::npos) {
+      const string part(input.substr(next_part - 1, next_slash - next_part + 1));
+
+      if (part == "/..") {
+        const string::size_type prev_slash(output.find_last_of('/'));
+        if (prev_slash != string::npos) {
+          output.erase(prev_slash);
+        }
+      } else if (part != "/.") {
+        output.append(part);
+      }
+    }
+
+    offset = next_slash;
+  }
+
+  if (output.empty()) {
+    output.push_back('/');
+  }
+
+  return output;
+}
+
+
+}  // namespace
 
 
 FakeEtcdClient::FakeEtcdClient(libevent::Base* base)
@@ -47,14 +85,24 @@ void FakeEtcdClient::DumpEntries(const unique_lock<mutex>& lock) const {
 }
 
 
-void FakeEtcdClient::Watch(const string& key, const WatchCallback& cb,
+void FakeEtcdClient::Watch(const string& rawkey, const WatchCallback& cb,
                            Task* task) {
+  const string key(NormalizeKey(rawkey));
   unique_lock<mutex> lock(mutex_);
   vector<Node> initial_updates;
-  for (const auto& pair : entries_) {
-    if (pair.first.find(key) == 0) {
-      CHECK(!pair.second.deleted_);
-      initial_updates.emplace_back(pair.second);
+  map<string, Node>::const_iterator it(entries_.find(key));
+  if (it != entries_.end()) {
+    if (it->second.is_dir_) {
+      const string key_prefix(key + "/");
+      for (++it; it != entries_.end() &&
+                 it->first.compare(0, key_prefix.size(), key_prefix) == 0;
+           ++it) {
+        CHECK(!it->second.deleted_);
+        initial_updates.emplace_back(it->second);
+      }
+    } else {
+      CHECK(!it->second.deleted_);
+      initial_updates.emplace_back(it->second);
     }
   }
   ScheduleWatchCallback(lock, task, bind(cb, move(initial_updates)));
@@ -107,9 +155,8 @@ void FakeEtcdClient::NotifyForPath(const unique_lock<mutex>& lock,
 
 void FakeEtcdClient::Get(const Request& req, GetResponse* resp, Task* task) {
   VLOG(1) << "GET " << req.key;
-  CHECK(!req.key.empty());
-  CHECK_EQ(req.key.front(), '/');
-  CHECK(!req.recursive) << "not implemented";
+  const string key(NormalizeKey(req.key));
+
   CHECK_LE(req.wait_index, 0) << "not implemented";
 
   task->CleanupWhenDone(
@@ -118,39 +165,86 @@ void FakeEtcdClient::Get(const Request& req, GetResponse* resp, Task* task) {
   unique_lock<mutex> lock(mutex_);
   PurgeExpiredEntriesWithLock(lock);
   resp->etcd_index = index_;
-  if (req.key.back() == '/') {
-    vector<Node> nodes;
-    for (const auto& pair : entries_) {
-      if (pair.first.find(req.key) == 0) {
-        nodes.push_back(pair.second);
+
+  map<string, Node>::const_iterator it(entries_.find(key));
+  if (it == entries_.end()) {
+    task->Return(Status(util::error::NOT_FOUND, "not found"));
+    return;
+  }
+  resp->node = it->second;
+  ++it;
+
+  vector<Node*> parent_nodes{&resp->node};
+  while (!parent_nodes.empty() && it != entries_.end()) {
+    const string key_prefix(parent_nodes.back()->key_ + "/");
+    if (it->first.compare(0, key_prefix.size(), key_prefix) > 0) {
+      parent_nodes.pop_back();
+      continue;
+    }
+
+    if (req.recursive) {
+      parent_nodes.back()->nodes_.emplace_back(it->second);
+
+      if (it->second.is_dir_) {
+        // The node we just added is now the current parent node.
+        parent_nodes.push_back(&parent_nodes.back()->nodes_.back());
+      }
+    } else {
+      if (it->first.find_first_of('/', key_prefix.size()) == string::npos) {
+        resp->node.nodes_.emplace_back(it->second);
       }
     }
-    resp->node = Node(1, 1, req.key, true, "", move(nodes), false);
-  } else {
-    const map<string, Node>::const_iterator it(entries_.find(req.key));
-    if (it == entries_.end()) {
-      task->Return(Status(util::error::NOT_FOUND, "not found"));
-      return;
-    }
-    resp->node = it->second;
+
+    ++it;
   }
   task->Return();
 }
 
 
-void FakeEtcdClient::InternalPut(const string& key, const string& value,
+void FakeEtcdClient::InternalPut(const string& rawkey, const string& value,
                                  const system_clock::time_point& expires,
                                  bool create, int64_t prev_index,
                                  Response* resp, Task* task) {
-  CHECK_GT(key.size(), 0);
-  CHECK_EQ(key.front(), '/');
+  const string key(NormalizeKey(rawkey));
   CHECK_NE(key.back(), '/');
   CHECK(!create || prev_index <= 0);
+
+  vector<string> parents;
+  for (string::size_type offset = 0; offset < key.size();) {
+    const string::size_type next_slash(key.find_first_of('/', offset + 1));
+    if (next_slash == string::npos) {
+      break;
+    }
+
+    parents.emplace_back(key.substr(offset + 1, next_slash - offset - 1));
+    offset = next_slash;
+  }
 
   *resp = EtcdClient::Response();
   unique_lock<mutex> lock(mutex_);
   PurgeExpiredEntriesWithLock(lock);
   const int64_t new_index(index_ + 1);
+
+  // If we're creating, make sure all the parent entries exist and are
+  // directories, creating them as needed.
+  if (create) {
+    string parent_key;
+    for (const string& path : parents) {
+      parent_key.append("/" + path);
+      // Either this inserts a directory, or it fails, and it gets us
+      // the entry. If we insert a directory, then success is
+      // guaranteed below, so we're sure to update index_
+      // appropriately.
+      if (!entries_.insert(make_pair(parent_key,
+                                     Node(new_index, new_index, parent_key,
+                                          true, "", {}, false)))
+               .first->second.is_dir_) {
+        task->Return(Status(util::error::ABORTED, "Not a directory"));
+        return;
+      }
+    }
+  }
+
   Node node(new_index, new_index, key, false, value, {}, false);
   node.expires_ = expires;
   const map<string, Node>::const_iterator entry(entries_.find(key));

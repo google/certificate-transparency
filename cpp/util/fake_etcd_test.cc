@@ -665,6 +665,77 @@ TEST_F(FakeEtcdTest, WatcherWithTTLExpires) {
 }
 
 
+TEST_F(FakeEtcdTest, PutUnderNonDir) {
+  const string kPath1(key_prefix_);
+  const string kPath2(kPath1 + "/subkey");
+
+  int64_t created_index;
+  EXPECT_OK(BlockingCreate(kPath1, kValue, &created_index));
+  EXPECT_THAT(BlockingCreate(kPath2, kValue, &created_index),
+              StatusIs(util::error::ABORTED, "Not a directory"));
+}
+
+
+TEST_F(FakeEtcdTest, GetDir) {
+  const string kDir(key_prefix_);
+  const string kPath1(kDir + "/1");
+  const string kPath2(kDir + "/2");
+  const string kPath3(kPath2 + "/1/foo/bar/baz");
+  const string kPath4(kDir + "/3");
+  const string kPath5(kPath4 + "/1");
+
+  int64_t created_index;
+  EXPECT_OK(BlockingCreate(kPath1, kValue, &created_index));
+  EXPECT_OK(BlockingCreate(kPath3, kValue, &created_index));
+  EXPECT_OK(BlockingCreate(kPath5, kValue, &created_index));
+  EXPECT_OK(BlockingCreate(kDir + "x", kValue, &created_index));
+
+  SyncTask task(base_.get());
+  EtcdClient::Request req(kDir);
+  EtcdClient::GetResponse resp;
+  client_->Get(req, &resp, task.task());
+  task.Wait();
+  EXPECT_OK(task.status());
+  EXPECT_EQ(kDir, resp.node.key_);
+  EXPECT_TRUE(resp.node.is_dir_);
+  EXPECT_TRUE(resp.node.value_.empty());
+  EXPECT_EQ(3, resp.node.nodes_.size());
+  // TODO(pphaneuf): Check that the sub-nodes are as we expect them.
+}
+
+
+TEST_F(FakeEtcdTest, GetDirRecursive) {
+  const string kDir(key_prefix_);
+  const string kPath1(kDir + "/sub");
+  const string kPath2(kPath1 + "/key");
+
+  int64_t created_index;
+  EXPECT_OK(BlockingCreate(kPath2, kValue, &created_index));
+
+  SyncTask task(base_.get());
+  EtcdClient::Request req(kDir);
+  req.recursive = true;
+  EtcdClient::GetResponse resp;
+  client_->Get(req, &resp, task.task());
+  task.Wait();
+  EXPECT_OK(task.status());
+  EXPECT_EQ(kDir, resp.node.key_);
+  EXPECT_TRUE(resp.node.is_dir_);
+  EXPECT_TRUE(resp.node.value_.empty());
+  ASSERT_EQ(1, resp.node.nodes_.size());
+
+  EXPECT_EQ(kPath1, resp.node.nodes_[0].key_);
+  EXPECT_TRUE(resp.node.nodes_[0].is_dir_);
+  EXPECT_TRUE(resp.node.nodes_[0].value_.empty());
+  ASSERT_EQ(1, resp.node.nodes_[0].nodes_.size());
+
+  EXPECT_EQ(kPath2, resp.node.nodes_[0].nodes_[0].key_);
+  EXPECT_FALSE(resp.node.nodes_[0].nodes_[0].is_dir_);
+  EXPECT_TRUE(resp.node.nodes_[0].nodes_[0].nodes_.empty());
+  EXPECT_EQ(kValue, resp.node.nodes_[0].nodes_[0].value_);
+}
+
+
 }  // namespace cert_trans
 
 
