@@ -112,6 +112,9 @@ void FakeEtcdClient::Get(const Request& req, GetResponse* resp, Task* task) {
   CHECK(!req.recursive) << "not implemented";
   CHECK_LE(req.wait_index, 0) << "not implemented";
 
+  task->CleanupWhenDone(
+      bind(&FakeEtcdClient::UpdateOperationStats, this, "gets", task));
+
   unique_lock<mutex> lock(mutex_);
   PurgeExpiredEntriesWithLock(lock);
   resp->etcd_index = index_;
@@ -127,12 +130,10 @@ void FakeEtcdClient::Get(const Request& req, GetResponse* resp, Task* task) {
     const map<string, Node>::const_iterator it(entries_.find(req.key));
     if (it == entries_.end()) {
       task->Return(Status(util::error::NOT_FOUND, "not found"));
-      ++stats_["getsFail"];
       return;
     }
     resp->node = it->second;
   }
-  ++stats_["getsSuccess"];
   task->Return();
 }
 
@@ -240,7 +241,7 @@ void FakeEtcdClient::UpdateWithTTL(const string& key, const string& value,
 void FakeEtcdClient::ForceSet(const string& key, const string& value,
                               Response* resp, Task* task) {
   task->CleanupWhenDone(
-      bind(&FakeEtcdClient::UpdateOperationStats, this, "set", task));
+      bind(&FakeEtcdClient::UpdateOperationStats, this, "sets", task));
   InternalPut(key, value, system_clock::time_point::max(), false, -1, resp,
               task);
 }
@@ -251,7 +252,7 @@ void FakeEtcdClient::ForceSetWithTTL(const std::string& key,
                                      const std::chrono::seconds& ttl,
                                      Response* resp, util::Task* task) {
   task->CleanupWhenDone(
-      bind(&FakeEtcdClient::UpdateOperationStats, this, "set", task));
+      bind(&FakeEtcdClient::UpdateOperationStats, this, "sets", task));
   InternalPut(key, value, system_clock::now() + ttl, false, -1, resp, task);
 }
 
@@ -292,7 +293,6 @@ void FakeEtcdClient::Delete(const string& key, const int64_t current_index,
 void FakeEtcdClient::GetStoreStats(StatsResponse* resp, Task* task) {
   CHECK_NOTNULL(resp);
   CHECK_NOTNULL(task);
-  ++stats_["getsSuccess"];
   resp->stats = stats_;
   task->Return();
 }
