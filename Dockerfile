@@ -46,5 +46,13 @@ CMD cd /mnt/ctlog/ && \
         --etcd_port=${ETCD_PORT} \
         --etcd_delete_concurrency=100 \
         --num_http_server_threads=${NUM_HTTP_SERVER_THREADS} \
-        --v=${V_LEVEL}
+        --v=${V_LEVEL}; \
+    if [ -e core ]; then \
+      CORE_DIR="/mnt/ctlog/cores/$(date +%s)"; \
+      mkdir -p ${CORE_DIR}; \
+      cp -v core ${CORE_DIR}; \
+      cp -v /usr/local/bin/ct-server ${CORE_DIR}; \
+      echo "Core saved to ${CORE_DIR}"; \
+    fi
+
 EXPOSE 80
