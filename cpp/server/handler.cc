@@ -61,15 +61,6 @@ DEFINE_int32(max_leaf_entries_per_response, 1000,
 namespace {
 
 
-static Counter<string>* total_http_server_requests(
-    Counter<string>::New("total_http_server_requests", "path",
-                         "Total number of HTTP requests received for a given "
-                         "path."));
-static Counter<string, int>* total_http_server_response_codes(
-    Counter<string, int>::New("total_http_server_response_codes", "path",
-                              "response_code",
-                              "Total number of responses sent with a given "
-                              "HTTP response code for a given path."));
 static Latency<milliseconds, string> http_server_request_latency_ms(
     "total_http_server_request_latency_ms", "path",
     "Total request latency in ms broken down by path");
@@ -243,9 +234,6 @@ void StatsHandlerInterceptor(const string& path,
       http_server_request_latency_ms.ScopedLatency(path));
 
   cb(req);
-
-  total_http_server_requests->Increment(path);
-  total_http_server_response_codes->Increment(path, req->response_code);
 }
 
 

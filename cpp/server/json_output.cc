@@ -1,9 +1,12 @@
 #include "server/json_output.h"
 
+#include <evhttp.h>
 #include <event2/http.h>
 #include <glog/logging.h>
 #include <string>
 
+#include "monitoring/monitoring.h"
+#include "monitoring/latency.h"
 #include "util/json_wrapper.h"
 #include "util/libevent_wrapper.h"
 
@@ -12,6 +15,16 @@ using std::string;
 namespace cert_trans {
 namespace {
 
+
+static Counter<string>* total_http_server_requests(
+    Counter<string>::New("total_http_server_requests", "path",
+                         "Total number of HTTP requests received for a given "
+                         "path."));
+static Counter<string, int>* total_http_server_response_codes(
+    Counter<string, int>::New("total_http_server_response_codes", "path",
+                              "response_code",
+                              "Total number of responses sent with a given "
+                              "HTTP response code for a given path."));
 
 static const char kJsonContentType[] = "application/json; charset=utf-8";
 
@@ -44,6 +57,10 @@ string LogRequest(evhttp_request* req, int http_status, int resp_body_length) {
       break;
   }
 
+  const string path(evhttp_uri_get_path(evhttp_request_get_evhttp_uri(req)));
+  total_http_server_requests->Increment(path);
+  total_http_server_response_codes->Increment(path, req->response_code);
+
   const string uri(evhttp_request_get_uri(req));
   return string(peer_addr) + " \"" + http_verb + " " + uri + "\" " +
          std::to_string(http_status) + " " + std::to_string(resp_body_length);
@@ -70,6 +87,7 @@ void JsonOutput::SendJsonReply(evhttp_request* req, int http_status,
   const string logstr(LogRequest(req, http_status, resp_body.size()));
   const auto send_reply([req, http_status, logstr]() {
     evhttp_send_reply(req, http_status, /*reason*/ NULL, /*databuf*/ NULL);
+
     LOG(INFO) << logstr;
   });
 
