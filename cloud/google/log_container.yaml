@@ -25,9 +25,35 @@ containers:
     volumeMounts:
       - name: log-data
         mountPath: /mnt/ctlog
+  - name: cadvisor-monitor
+    image: google/cadvisor:latest
+    ports:
+      - name: cadvisor-monitor
+        containerPort: 8080
+        hostPort: 8080
+    volumeMounts:
+      - name: var-run
+        mountPath: /var/run
+      - name: sys
+        mountPath: /sys
+        readOnly: true
+      - name: var-lib-docker
+        mountPath: /var/lib/docker
+        readOnly: true
 volumes:
   - name: log-data
     source:
       hostDir:
         path: /data/ctlog
-
+  - name: var-run
+    source:
+      hostDir:
+        path: /var/run
+  - name: sys
+    source:
+      hostDir:
+        path: /sys
+  - name: var-lib-docker
+    source:
+      hostDir:
+        path: /var/lib/docker
