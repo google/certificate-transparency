@@ -1,6 +1,7 @@
 #ifndef CERT_TRANS_MONITORING_EVENT_METRIC_H_
 #define CERT_TRANS_MONITORING_EVENT_METRIC_H_
 
+#include <memory>
 #include <mutex>
 #include <string>
 
