@@ -6,11 +6,19 @@ source ${DIR}/util.sh
 set -e
 GCLOUD="gcloud"
 
-LOG_HOSTS=$(for i in ${LOG_MACHINES[@]};
-  do echo -n "target: \"http://${i}:80/metrics\"\n"; done)
+LOG_HOSTS=$(
+  for i in ${LOG_MACHINES[@]}; do
+    echo -n "target: \"http://${i}:80/metrics\"\n";
+    echo -n "target: \"http://${i}:8080/metrics\"\n";
+  done)
+ETCD_HOSTS=$(
+  for i in ${ETCD_MACHINES[@]}; do
+    echo -n "target: \"http://${i}:8080/metrics\"\n";
+  done)
 
 export TMP_CONFIG=/tmp/prometheus.conf
-sed -- "s%@@TARGETS@@%${LOG_HOSTS}%g" < ${DIR}/../prometheus/prometheus.conf > ${TMP_CONFIG}
+sed -- "s%@@LOG_TARGETS@@%${LOG_HOSTS}%g
+        s%@@ETCD_TARGETS@@%${ETCD_HOSTS}%g" < ${DIR}/../prometheus/prometheus.conf > ${TMP_CONFIG}
 
 
 for i in ${PROMETHEUS_MACHINES[@]}; do
