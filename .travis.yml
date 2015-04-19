@@ -15,7 +15,7 @@ before_install:
  - sudo apt-add-repository -y ppa:fcitx-team/nightly
  - sudo apt-add-repository -y ppa:chris-lea/protobuf
  - sudo apt-get update -qq
- - sudo apt-get install -qq protobuf-compiler libprotobuf-java libprotobuf-dev python-dev libjson-c-dev libgoogle-glog-dev libgflags-dev libldns-dev libstdc++-4.8-dev
+ - sudo apt-get install -qq openssl libssl-dev protobuf-compiler libprotobuf-java libprotobuf-dev python-dev libjson-c-dev libgoogle-glog-dev libgflags-dev libldns-dev libstdc++-4.8-dev
 # Stupid frikkin' google-mock package on Precise is b0rked, so hack it up:
  - wget https://googlemock.googlecode.com/files/gmock-1.7.0.zip -O /tmp/gmock-1.7.0.zip
  - unzip -d /tmp /tmp/gmock-1.7.0.zip
@@ -28,15 +28,8 @@ before_install:
  - java -version
  - javac -version
  - go version
-# Need a recent version of openssl
- - wget https://www.openssl.org/source/openssl-1.0.1l.tar.gz -O /tmp/openssl-1.0.1l.tar.gz
- - tar -zxf /tmp/openssl-1.0.1l.tar.gz
- - cd openssl-1.0.1l
- - ./config --prefix=/usr/local --openssldir=/usr/local/openssl
- - make
- - sudo make install
- - cd ..
+ - openssl version
 
 script:
- - make alltests OPENSSLDIR=/usr/local/openssl
+ - make alltests
  - go test -v ./go/...
