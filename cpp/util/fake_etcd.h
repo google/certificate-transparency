@@ -5,6 +5,7 @@
 #include <map>
 #include <queue>
 #include <string>
+#include <tuple>
 
 #include "util/etcd.h"
 #include "util/libevent_wrapper.h"
@@ -74,6 +75,7 @@ class FakeEtcdClient : public EtcdClient {
   void UpdateOperationStats(const std::string& op, const util::Task* task);
 
   void CancelWatch(util::Task* task);
+  void CancelWaitingGet(const std::string& key, util::Task* task);
 
   // Arranges for the watch callbacks to be called in order. Should be
   // called with mutex_ held.
@@ -87,6 +89,8 @@ class FakeEtcdClient : public EtcdClient {
   std::mutex mutex_;
   int64_t index_;
   std::map<std::string, Node> entries_;
+  std::multimap<std::string, std::tuple<bool, GetResponse*, util::Task*>>
+      waiting_gets_;
   std::map<std::string, std::vector<std::pair<WatchCallback, util::Task*>>>
       watches_;
   std::deque<std::pair<util::Task*, std::function<void()>>> watches_callbacks_;

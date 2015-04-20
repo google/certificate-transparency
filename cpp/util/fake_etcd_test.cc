@@ -69,11 +69,15 @@ class FakeEtcdTest : public ::testing::Test {
   }
 
  protected:
-  Status BlockingGet(const string& key, EtcdClient::Node* node) {
+  Status BlockingGet(const string& key, EtcdClient::Node* node,
+                     int64_t* etcd_index = nullptr) {
     SyncTask task(base_.get());
     EtcdClient::GetResponse resp;
     client_->Get(key, &resp, task.task());
     task.Wait();
+    if (etcd_index) {
+      *etcd_index = resp.etcd_index;
+    }
     *node = resp.node;
     return task.status();
   }
@@ -695,7 +699,7 @@ TEST_F(FakeEtcdTest, GetDir) {
   EtcdClient::GetResponse resp;
   client_->Get(req, &resp, task.task());
   task.Wait();
-  EXPECT_OK(task.status());
+  EXPECT_OK(task);
   EXPECT_EQ(kDir, resp.node.key_);
   EXPECT_TRUE(resp.node.is_dir_);
   EXPECT_TRUE(resp.node.value_.empty());
@@ -718,7 +722,7 @@ TEST_F(FakeEtcdTest, GetDirRecursive) {
   EtcdClient::GetResponse resp;
   client_->Get(req, &resp, task.task());
   task.Wait();
-  EXPECT_OK(task.status());
+  EXPECT_OK(task);
   EXPECT_EQ(kDir, resp.node.key_);
   EXPECT_TRUE(resp.node.is_dir_);
   EXPECT_TRUE(resp.node.value_.empty());
@@ -733,6 +737,206 @@ TEST_F(FakeEtcdTest, GetDirRecursive) {
   EXPECT_FALSE(resp.node.nodes_[0].nodes_[0].is_dir_);
   EXPECT_TRUE(resp.node.nodes_[0].nodes_[0].nodes_.empty());
   EXPECT_EQ(kValue, resp.node.nodes_[0].nodes_[0].value_);
+}
+
+
+// This test is not expected to pass with the real etcd, it tests an
+// aspect specific to the fake implementation.
+TEST_F(FakeEtcdTest, GetWaitOldIndex) {
+  const string kPath(key_prefix_);
+
+  int64_t created_index;
+  EXPECT_OK(BlockingCreate(kPath, kValue, &created_index));
+
+  SyncTask task(base_.get());
+  EtcdClient::Request req(kPath);
+  req.wait_index = created_index;
+  EtcdClient::GetResponse resp;
+  client_->Get(req, &resp, task.task());
+  task.Wait();
+  EXPECT_THAT(task.status(), StatusIs(util::error::ABORTED));
+  EXPECT_EQ(created_index, resp.etcd_index);
+}
+
+
+TEST_F(FakeEtcdTest, GetWaitNonExistent) {
+  const string kPath(key_prefix_);
+
+  EtcdClient::Node node;
+  int64_t index;
+  EXPECT_THAT(BlockingGet(key_prefix_, &node, &index),
+              StatusIs(util::error::NOT_FOUND));
+
+  SyncTask task(base_.get());
+  EtcdClient::Request req(kPath);
+  req.wait_index = index + 1;
+  EtcdClient::GetResponse resp;
+  client_->Get(req, &resp, task.task());
+  ASSERT_TRUE(task.task()->IsActive());
+
+  sleep_for(seconds(1));
+  EXPECT_TRUE(task.task()->IsActive());
+
+  int64_t created_index;
+  EXPECT_OK(BlockingCreate(kPath, kValue, &created_index));
+
+  task.Wait();
+  EXPECT_OK(task);
+  EXPECT_EQ(created_index - 1, resp.etcd_index);
+  EXPECT_EQ(kPath, resp.node.key_);
+  EXPECT_EQ(kValue, resp.node.value_);
+  EXPECT_EQ(created_index, resp.node.created_index_);
+  EXPECT_EQ(created_index, resp.node.modified_index_);
+  EXPECT_FALSE(resp.node.is_dir_);
+  EXPECT_TRUE(resp.node.nodes_.empty());
+  EXPECT_FALSE(resp.node.deleted_);
+}
+
+
+TEST_F(FakeEtcdTest, GetWaitUpdateExisting) {
+  const string kPath(key_prefix_);
+
+  int64_t created_index;
+  EXPECT_OK(BlockingCreate(kPath, kValue, &created_index));
+
+  SyncTask task(base_.get());
+  EtcdClient::Request req(kPath);
+  req.wait_index = created_index + 1;
+  EtcdClient::GetResponse resp;
+  client_->Get(req, &resp, task.task());
+  ASSERT_TRUE(task.task()->IsActive());
+
+  sleep_for(seconds(1));
+  EXPECT_TRUE(task.task()->IsActive());
+
+  int64_t updated_index;
+  EXPECT_OK(BlockingUpdate(kPath, kValue2, created_index, &updated_index));
+
+  task.Wait();
+  EXPECT_OK(task);
+  EXPECT_EQ(created_index, resp.etcd_index);
+  EXPECT_EQ(kPath, resp.node.key_);
+  EXPECT_EQ(kValue2, resp.node.value_);
+  EXPECT_EQ(created_index, resp.node.created_index_);
+  EXPECT_EQ(updated_index, resp.node.modified_index_);
+  EXPECT_FALSE(resp.node.is_dir_);
+  EXPECT_TRUE(resp.node.nodes_.empty());
+  EXPECT_FALSE(resp.node.deleted_);
+}
+
+
+TEST_F(FakeEtcdTest, GetWaitSetExisting) {
+  const string kPath(key_prefix_);
+
+  int64_t created_index;
+  EXPECT_OK(BlockingCreate(kPath, kValue, &created_index));
+
+  SyncTask task(base_.get());
+  EtcdClient::Request req(kPath);
+  req.wait_index = created_index + 1;
+  EtcdClient::GetResponse resp;
+  client_->Get(req, &resp, task.task());
+  ASSERT_TRUE(task.task()->IsActive());
+
+  sleep_for(seconds(1));
+  EXPECT_TRUE(task.task()->IsActive());
+
+  int64_t updated_index;
+  EXPECT_OK(BlockingForceSet(kPath, kValue2, &updated_index));
+
+  task.Wait();
+  EXPECT_OK(task);
+  EXPECT_EQ(created_index, resp.etcd_index);
+  EXPECT_EQ(kPath, resp.node.key_);
+  EXPECT_EQ(kValue2, resp.node.value_);
+  EXPECT_EQ(updated_index, resp.node.created_index_);
+  EXPECT_EQ(updated_index, resp.node.modified_index_);
+  EXPECT_FALSE(resp.node.is_dir_);
+  EXPECT_TRUE(resp.node.nodes_.empty());
+  EXPECT_FALSE(resp.node.deleted_);
+}
+
+
+TEST_F(FakeEtcdTest, GetWaitDeleteExisting) {
+  const string kPath(key_prefix_);
+
+  int64_t created_index;
+  EXPECT_OK(BlockingCreate(kPath, kValue, &created_index));
+
+  SyncTask task(base_.get());
+  EtcdClient::Request req(kPath);
+  req.wait_index = created_index + 1;
+  EtcdClient::GetResponse resp;
+  client_->Get(req, &resp, task.task());
+  ASSERT_TRUE(task.task()->IsActive());
+
+  sleep_for(seconds(1));
+  EXPECT_TRUE(task.task()->IsActive());
+
+  EXPECT_OK(BlockingDelete(kPath, created_index));
+
+  task.Wait();
+  EXPECT_OK(task);
+  EXPECT_EQ(created_index, resp.etcd_index);
+  EXPECT_EQ(kPath, resp.node.key_);
+  EXPECT_TRUE(resp.node.value_.empty());
+  EXPECT_EQ(created_index, resp.node.created_index_);
+  EXPECT_EQ(created_index + 1, resp.node.modified_index_);
+  EXPECT_FALSE(resp.node.is_dir_);
+  EXPECT_TRUE(resp.node.nodes_.empty());
+  EXPECT_TRUE(resp.node.deleted_);
+}
+
+
+TEST_F(FakeEtcdTest, GetWaitRecursive) {
+  const string kDir1(key_prefix_ + "/1");
+  const string kPath1(kDir1 + "/subkey");
+  const string kDir2(key_prefix_ + "/2");
+
+  EtcdClient::Node node;
+  int64_t index;
+  EXPECT_THAT(BlockingGet(key_prefix_, &node, &index),
+              StatusIs(util::error::NOT_FOUND));
+
+  SyncTask task1(base_.get());
+  EtcdClient::Request req1(kDir1);
+  req1.recursive = true;
+  req1.wait_index = index + 1;
+  EtcdClient::GetResponse resp1;
+  client_->Get(req1, &resp1, task1.task());
+  ASSERT_TRUE(task1.task()->IsActive());
+
+  SyncTask task2(base_.get());
+  EtcdClient::Request req2(kDir2);
+  req2.recursive = true;
+  req2.wait_index = index + 1;
+  EtcdClient::GetResponse resp2;
+  client_->Get(req2, &resp2, task2.task());
+  ASSERT_TRUE(task2.task()->IsActive());
+
+  sleep_for(seconds(1));
+  EXPECT_TRUE(task1.task()->IsActive());
+  EXPECT_TRUE(task2.task()->IsActive());
+
+  int64_t created_index;
+  EXPECT_OK(BlockingCreate(kPath1, kValue, &created_index));
+
+  task1.Wait();
+  EXPECT_OK(task1);
+  EXPECT_EQ(index, resp1.etcd_index);
+  EXPECT_EQ(kPath1, resp1.node.key_);
+  EXPECT_EQ(kValue, resp1.node.value_);
+  EXPECT_EQ(created_index, resp1.node.created_index_);
+  EXPECT_EQ(created_index, resp1.node.modified_index_);
+  EXPECT_FALSE(resp1.node.is_dir_);
+  EXPECT_TRUE(resp1.node.nodes_.empty());
+  EXPECT_FALSE(resp1.node.deleted_);
+
+  sleep_for(seconds(1));
+  EXPECT_TRUE(task2.task()->IsActive());
+  task2.Cancel();
+  task2.Wait();
+  EXPECT_THAT(task2.status(), StatusIs(util::error::CANCELLED));
 }
 
 

@@ -169,6 +169,9 @@ void GetRequestDone(const string& keyname, EtcdClient::GetResponse* resp,
   *resp = EtcdClient::GetResponse();
   resp->etcd_index = gen_resp->etcd_index;
   if (!task->status().ok()) {
+    // TODO(pphaneuf): Handle connection timeout (status UNKNOWN)
+    // better here? Or add deadline support here and in UrlFetcher,
+    // with retries, so that this doesn't get all the way here?
     parent_task->Return(
         Status(task->status().CanonicalCode(),
                task->status().error_message() + " (" + keyname + ")"));

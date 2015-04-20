@@ -8,16 +8,20 @@ using std::bind;
 using std::chrono::seconds;
 using std::chrono::system_clock;
 using std::function;
+using std::get;
 using std::lock_guard;
 using std::make_shared;
+using std::make_tuple;
 using std::map;
 using std::move;
+using std::multimap;
 using std::mutex;
 using std::ostringstream;
 using std::shared_ptr;
 using std::stoi;
 using std::string;
 using std::to_string;
+using std::tuple;
 using std::unique_lock;
 using std::vector;
 using util::Status;
@@ -59,6 +63,21 @@ string NormalizeKey(const string& input) {
   }
 
   return output;
+}
+
+
+bool WatchMatchesKey(const string& watch_key, const string& notify_key,
+                     bool recursive) {
+  if (watch_key == notify_key) {
+    return true;
+  }
+
+  if (!recursive) {
+    return false;
+  }
+
+  const string dir(watch_key + "/");
+  return watch_key == "/" || notify_key.compare(0, dir.size(), dir) == 0;
 }
 
 
@@ -139,9 +158,23 @@ void FakeEtcdClient::NotifyForPath(const unique_lock<mutex>& lock,
                                    const string& path) {
   CHECK(lock.owns_lock());
   VLOG(1) << "notifying " << path;
-  const bool exists(entries_.find(path) != entries_.end());
-  CHECK(exists);
-  const Node& node(entries_.find(path)->second);
+  const map<string, Node>::const_iterator node_it(entries_.find(path));
+  CHECK(node_it != entries_.end());
+  const Node& node(node_it->second);
+
+  const multimap<string, tuple<bool, GetResponse*, Task*>>::iterator last(
+      waiting_gets_.upper_bound(path));
+  multimap<string, tuple<bool, GetResponse*, Task*>>::iterator it;
+  for (it = waiting_gets_.begin(); it != last;) {
+    if (WatchMatchesKey(it->first, node.key_, get<0>(it->second))) {
+      get<1>(it->second)->node = node;
+      get<2>(it->second)->Return();
+      it = waiting_gets_.erase(it);
+    } else {
+      ++it;
+    }
+  }
+
   for (const auto& pair : watches_) {
     if (path.find(pair.first) == 0) {
       for (const auto& cb_cookie : pair.second) {
@@ -157,7 +190,7 @@ void FakeEtcdClient::Get(const Request& req, GetResponse* resp, Task* task) {
   VLOG(1) << "GET " << req.key;
   const string key(NormalizeKey(req.key));
 
-  CHECK_LE(req.wait_index, 0) << "not implemented";
+  CHECK_NE(key, "/") << "not implemented";
 
   task->CleanupWhenDone(
       bind(&FakeEtcdClient::UpdateOperationStats, this, "gets", task));
@@ -165,6 +198,22 @@ void FakeEtcdClient::Get(const Request& req, GetResponse* resp, Task* task) {
   unique_lock<mutex> lock(mutex_);
   PurgeExpiredEntriesWithLock(lock);
   resp->etcd_index = index_;
+
+  if (req.wait_index > 0) {
+    if (req.wait_index <= index_) {
+      // Our fake history log is *very* small!
+      task->Return(
+          Status(util::error::ABORTED,
+                 "The event in requested index is outdated and cleared"));
+      return;
+    }
+
+    waiting_gets_.insert(
+        make_pair(key, make_tuple(req.recursive, resp, task)));
+    task->WhenCancelled(
+        bind(&FakeEtcdClient::CancelWaitingGet, this, key, task));
+    return;
+  }
 
   map<string, Node>::const_iterator it(entries_.find(key));
   if (it == entries_.end()) {
@@ -375,8 +424,9 @@ void FakeEtcdClient::Delete(const string& key, const int64_t current_index,
                             to_string(entry->second.modified_index_)));
     return;
   }
+  entry->second.modified_index_ = ++index_;
+  entry->second.value_.clear();
   entry->second.deleted_ = true;
-  ++index_;
   ++stats_["compareAndDeleteSuccess"];
   task->Return();
   NotifyForPath(lock, key);
@@ -410,6 +460,21 @@ void FakeEtcdClient::CancelWatch(Task* task) {
       } else {
         ++it;
       }
+    }
+  }
+}
+
+
+void FakeEtcdClient::CancelWaitingGet(const string& key, Task* task) {
+  lock_guard<mutex> lock(mutex_);
+  const multimap<string, tuple<bool, GetResponse*, Task*>>::iterator last(
+      waiting_gets_.upper_bound(key));
+
+  for (auto it = waiting_gets_.lower_bound(key); it != last; ++it) {
+    if (get<2>(it->second) == task) {
+      waiting_gets_.erase(it);
+      task->Return(Status::CANCELLED);
+      return;
     }
   }
 }
