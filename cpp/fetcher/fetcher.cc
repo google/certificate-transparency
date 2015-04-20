@@ -15,6 +15,7 @@ using std::lock_guard;
 using std::move;
 using std::mutex;
 using std::placeholders::_1;
+using std::unique_lock;
 using std::unique_ptr;
 using std::vector;
 using util::Status;
@@ -42,7 +43,6 @@ struct Range {
     CHECK_GT(size_, 0);
   };
 
-  mutex lock_;
   State state_;
   int64_t size_;
   unique_ptr<Range> next_;
@@ -54,7 +54,8 @@ struct FetchState {
              unique_ptr<PeerGroup>&& peer_group, Task* task);
 
   void WalkEntries();
-  void FetchRange(Range* current, int64_t index, Task* range_task);
+  void FetchRange(const unique_lock<mutex>& lock, Range* current,
+                  int64_t index, Task* range_task);
   void WriteToDatabase(int64_t index, Range* range,
                        const vector<AsyncLogClient::Entry>* retval,
                        Task* range_task, Task* fetch_task);
@@ -111,7 +112,7 @@ void FetchState::WalkEntries() {
     return;
   }
 
-  lock_guard<mutex> lock(lock_);
+  unique_lock<mutex> lock(lock_);
 
   // Prune fetched sequences at the beginning.
   while (entries_ && entries_->state_ == Range::HAVE) {
@@ -130,8 +131,6 @@ void FetchState::WalkEntries() {
   int num_fetch(0);
   for (Range* current = entries_.get(); current;
        index += current->size_, current = current->next_.get()) {
-    lock_guard<mutex> lock(current->lock_);
-
     // Coalesce with the next Range, if possible.
     if (current->state_ != Range::FETCHING) {
       while (current->next_ && current->next_->state_ == current->state_) {
@@ -164,7 +163,7 @@ void FetchState::WalkEntries() {
           current->size_ = FLAGS_fetcher_batch_size;
         }
 
-        FetchRange(current, index,
+        FetchRange(lock, current, index,
                    task_->AddChild(bind(&FetchState::WalkEntries, this)));
         ++num_fetch;
 
@@ -178,7 +177,9 @@ void FetchState::WalkEntries() {
 }
 
 
-void FetchState::FetchRange(Range* current, int64_t index, Task* range_task) {
+void FetchState::FetchRange(const unique_lock<mutex>& lock, Range* current,
+                            int64_t index, Task* range_task) {
+  CHECK(lock.owns_lock());
   const int64_t end_index(index + current->size_ - 1);
   VLOG(1) << "fetching from offset " << index << " to " << end_index;
 
@@ -201,7 +202,7 @@ void FetchState::WriteToDatabase(int64_t index, Range* range,
   if (!fetch_task->status().ok()) {
     LOG(INFO) << "error fetching entries at index " << index << ": "
               << fetch_task->status();
-    lock_guard<mutex> lock(range->lock_);
+    lock_guard<mutex> lock(lock_);
     range->state_ = Range::WANT;
     range_task->Return(fetch_task->status());
     return;
@@ -231,7 +232,7 @@ void FetchState::WriteToDatabase(int64_t index, Range* range,
   }
 
   {
-    lock_guard<mutex> lock(range->lock_);
+    lock_guard<mutex> lock(lock_);
     // TODO(pphaneuf): If we have problems fetching entries, to what
     // point should we retry? Or should we just return on the task
     // with an error?
