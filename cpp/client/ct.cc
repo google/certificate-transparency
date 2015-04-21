@@ -1,4 +1,5 @@
 /* -*- indent-tabs-mode: nil -*- */
+#include <event2/thread.h>
 #include <fcntl.h>
 #include <fstream>
 #include <gflags/gflags.h>
@@ -983,6 +984,7 @@ int main(int argc, char** argv) {
   google::SetUsageMessage(argv[0] + string(kUsage));
   google::ParseCommandLineFlags(&argc, &argv, true);
   google::InitGoogleLogging(argv[0]);
+  evthread_use_pthreads();
 
   const string main_command(argv[0]);
   if (argc < 2) {
