@@ -111,6 +111,7 @@ cpp_libcore_a_SOURCES = \
 	cpp/log/filesystem_ops.cc \
 	cpp/log/frontend.cc \
 	cpp/log/frontend_signer.cc \
+	cpp/log/leveldb_db_cert.cc \
 	cpp/log/log_lookup_cert.cc \
 	cpp/log/log_signer.cc \
 	cpp/log/log_verifier.cc \
@@ -155,7 +156,7 @@ cpp_server_ct_server_LDADD = \
 	cpp/libcore.a \
 	$(json_c_LIBS) \
 	$(libevent_LIBS) \
-	-lglog -lgflags -lcrypto -lprotobuf -lpthread -lsqlite3
+	-lglog -lgflags -lcrypto -lprotobuf -lpthread -lsqlite3 -lleveldb -lsnappy
 cpp_server_ct_server_SOURCES = \
 	cpp/client/async_log_client.cc \
 	cpp/proto/serializer.cc \
@@ -280,7 +281,7 @@ cpp_log_cluster_state_controller_test_LDADD = \
 	cpp/libtest.a \
 	$(json_c_LIBS) \
 	$(libevent_LIBS) \
-	-lglog -lgflags -lprotobuf -lpthread -lsqlite3 -lcrypto
+	-lglog -lgflags -lprotobuf -lpthread -lsqlite3 -lcrypto -lleveldb -lsnappy
 cpp_log_cluster_state_controller_test_SOURCES = \
 	cpp/client/async_log_client.cc \
 	cpp/log/cluster_state_controller_test.cc \
@@ -297,7 +298,7 @@ cpp_log_database_test_LDADD = \
 	cpp/libcore.a \
 	cpp/libtest.a \
 	$(libevent_LIBS) \
-	-lglog -lgflags -lprotobuf -lpthread -lsqlite3 -lpthread -lcrypto
+	-lglog -lgflags -lprotobuf -lpthread -lsqlite3 -lpthread -lcrypto -lleveldb -lsnappy
 cpp_log_database_test_SOURCES = \
 	cpp/log/database_test.cc \
 	cpp/log/test_signer.cc \
@@ -325,7 +326,7 @@ cpp_log_file_storage_test_LDADD = \
 	cpp/libcore.a \
 	cpp/libtest.a \
 	$(libevent_LIBS) \
-	-lglog -lgflags -lprotobuf -lpthread -lcrypto -lsqlite3
+	-lglog -lgflags -lprotobuf -lpthread -lcrypto -lsqlite3 -lleveldb -lsnappy
 cpp_log_file_storage_test_SOURCES = \
 	cpp/log/file_storage.cc \
 	cpp/log/file_storage_test.cc \
@@ -338,7 +339,7 @@ cpp_log_frontend_signer_test_LDADD = \
 	cpp/libtest.a \
 	$(json_c_LIBS) \
 	$(libevent_LIBS) \
-	-lglog -lgflags -lprotobuf -lpthread -lcrypto -lsqlite3
+	-lglog -lgflags -lprotobuf -lpthread -lcrypto -lsqlite3 -lleveldb -lsnappy
 cpp_log_frontend_signer_test_SOURCES = \
 	cpp/log/frontend_signer_test.cc \
 	cpp/log/test_signer.cc \
@@ -355,7 +356,7 @@ cpp_log_log_lookup_test_LDADD = \
 	cpp/libtest.a \
 	$(json_c_LIBS) \
 	$(libevent_LIBS) \
-	-lglog -lgflags -lprotobuf -lpthread -lcrypto -lsqlite3
+	-lglog -lgflags -lprotobuf -lpthread -lcrypto -lsqlite3 -lleveldb -lsnappy
 cpp_log_log_lookup_test_SOURCES = \
 	cpp/log/log_lookup_test.cc \
 	cpp/log/test_signer.cc \
@@ -407,7 +408,7 @@ cpp_log_tree_signer_test_LDADD = \
 	cpp/libtest.a \
 	$(json_c_LIBS) \
 	$(libevent_LIBS) \
-	-lglog -lgflags -lprotobuf -lpthread -lcrypto -lsqlite3
+	-lglog -lgflags -lprotobuf -lpthread -lcrypto -lsqlite3 -lleveldb -lsnappy
 cpp_log_tree_signer_test_SOURCES = \
 	cpp/log/test_signer.cc \
 	cpp/log/tree_signer_test.cc \
@@ -553,7 +554,7 @@ cpp_util_masterelection_test_LDADD = \
 	cpp/libtest.a \
 	$(json_c_LIBS) \
 	$(libevent_LIBS) \
-	-lglog -lgflags -lprotobuf -lpthread
+	-lglog -lgflags -lprotobuf -lpthread -lleveldb -lsnappy
 cpp_util_masterelection_test_SOURCES = \
 	cpp/util/json_wrapper.cc \
 	cpp/util/libevent_wrapper.cc \
@@ -650,7 +651,7 @@ cpp_log_database_large_test_LDADD = \
 	cpp/libcore.a \
 	cpp/libtest.a \
 	$(libevent_LIBS) \
-	-lglog -lgflags -lprotobuf -lpthread -lcrypto -lsqlite3
+	-lglog -lgflags -lprotobuf -lpthread -lcrypto -lsqlite3 -lleveldb -lsnappy
 cpp_log_database_large_test_SOURCES = \
 	cpp/log/database_large_test.cc \
 	cpp/log/test_signer.cc \
@@ -663,7 +664,7 @@ cpp_log_frontend_test_LDADD = \
 	cpp/libtest.a \
 	$(json_c_LIBS) \
 	$(libevent_LIBS) \
-	-lglog -lgflags -lprotobuf -lpthread -lcrypto -lsqlite3
+	-lglog -lgflags -lprotobuf -lpthread -lcrypto -lsqlite3 -lleveldb -lsnappy
 cpp_log_frontend_test_SOURCES = \
 	cpp/log/frontend_test.cc \
 	cpp/log/test_signer.cc \

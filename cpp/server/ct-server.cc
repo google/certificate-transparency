@@ -27,6 +27,7 @@
 #include "log/file_storage.h"
 #include "log/frontend.h"
 #include "log/frontend_signer.h"
+#include "log/leveldb_db.h"
 #include "log/log_lookup.h"
 #include "log/log_signer.h"
 #include "log/sqlite_db.h"
@@ -58,7 +59,10 @@ DEFINE_string(trusted_cert_file, "",
 DEFINE_string(cert_dir, "", "Storage directory for certificates");
 DEFINE_string(tree_dir, "", "Storage directory for trees");
 DEFINE_string(meta_dir, "", "Storage directory for meta info");
-DEFINE_string(sqlite_db, "", "Database for certificate and tree storage");
+DEFINE_string(sqlite_db, "",
+              "SQLite database for certificate and tree storage");
+DEFINE_string(leveldb_db, "",
+              "LevelDB database for certificate and tree storage");
 // TODO(ekasper): sanity-check these against the directory structure.
 DEFINE_int32(cert_storage_depth, 0,
              "Subdirectory depth for certificates; if the directory is not "
@@ -424,22 +428,24 @@ int main(int argc, char* argv[]) {
   CHECK(checker.LoadTrustedCertificates(FLAGS_trusted_cert_file))
       << "Could not load CA certs from " << FLAGS_trusted_cert_file;
 
-  if (FLAGS_sqlite_db.empty()) {
-    CHECK_NE(FLAGS_cert_dir, FLAGS_tree_dir)
-        << "Certificate directory and tree directory must differ";
+  if (!FLAGS_sqlite_db.empty() + !FLAGS_leveldb_db.empty() +
+          (!FLAGS_cert_dir.empty() | !FLAGS_tree_dir.empty()) !=
+      1) {
+    std::cerr << "Must only specify one database type.";
+    exit(1);
   }
 
-  if ((!FLAGS_cert_dir.empty() || !FLAGS_tree_dir.empty()) &&
-      !FLAGS_sqlite_db.empty()) {
-    std::cerr << "Choose either file or sqlite database, not both"
-              << std::endl;
-    exit(1);
+  if (FLAGS_sqlite_db.empty() && FLAGS_leveldb_db.empty()) {
+    CHECK_NE(FLAGS_cert_dir, FLAGS_tree_dir)
+        << "Certificate directory and tree directory must differ";
   }
 
   Database<LoggedCertificate>* db;
 
   if (!FLAGS_sqlite_db.empty()) {
     db = new SQLiteDB<LoggedCertificate>(FLAGS_sqlite_db);
+  } else if (!FLAGS_leveldb_db.empty()) {
+    db = new LevelDB<LoggedCertificate>(FLAGS_leveldb_db);
   } else {
     db = new FileDB<LoggedCertificate>(
         new FileStorage(FLAGS_cert_dir, FLAGS_cert_storage_depth),

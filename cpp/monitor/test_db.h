@@ -6,11 +6,11 @@
 
 template <>
 void TestDB<monitor::SQLiteDB>::Setup() {
-  db_ = new monitor::SQLiteDB(tmp_.TmpStorageDir() + "/sqlite");
+  db_.reset(new monitor::SQLiteDB(tmp_.TmpStorageDir() + "/sqlite"));
 }
 
 template <>
-monitor::SQLiteDB* TestDB<monitor::SQLiteDB>::SecondDB() const {
+monitor::SQLiteDB* TestDB<monitor::SQLiteDB>::SecondDB() {
   return new monitor::SQLiteDB(tmp_.TmpStorageDir() + "/sqlite");
 }
 
