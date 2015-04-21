@@ -83,9 +83,22 @@ bool WatchMatchesKey(const string& watch_key, const string& notify_key,
 
 }  // namespace
 
+namespace {
+const char* kStoreStats[] = {"setsFail", "getsSuccess", "watchers",
+                             "expireCount", "createFail", "setsSuccess",
+                             "compareAndDeleteFail", "createSuccess",
+                             "deleteFail", "compareAndSwapSuccess",
+                             "compareAndSwapFail", "compareAndDeleteSuccess",
+                             "updateFail", "deleteSuccess", "updateSuccess",
+                             "getsFail"};
+}  // namespace
+
 
 FakeEtcdClient::FakeEtcdClient(libevent::Base* base)
     : base_(CHECK_NOTNULL(base)), parent_task_(base_), index_(1) {
+  for (const auto& s : kStoreStats) {
+    stats_[s] = 0;
+  }
 }
 
 

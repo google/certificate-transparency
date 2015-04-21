@@ -250,6 +250,11 @@ message ClusterConfig {
   // serving STH candidate must be servable from at least 3 of your 4 nodes.
   optional double minimum_serving_fraction = 2;
   /////////////////////////////////
+
+  // When the number of entries in the EtcedConsistentStore exceeds this value,
+  // the log server will reject all calls to add-[pre-]chain to protect itself
+  // and etcd.
+  optional double etcd_reject_add_pending_threshold = 3 [default = 30000];
 }
 
 message SequenceMapping {

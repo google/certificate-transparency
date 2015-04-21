@@ -155,10 +155,9 @@ int main(int argc, char* argv[]) {
       BuildAndJoinMasterElection(node_id, event_base, &etcd_client));
   ThreadPool internal_pool(4);
   StrictConsistentStore<LoggedCertificate> consistent_store(
-      election.get(),
-      new EtcdConsistentStore<LoggedCertificate>(&internal_pool, &etcd_client,
-                                                 election.get(), "/root",
-                                                 node_id));
+      election.get(), new EtcdConsistentStore<LoggedCertificate>(
+                          event_base.get(), &internal_pool, &etcd_client,
+                          election.get(), "/root", node_id));
   SQLiteDB<LoggedCertificate> db("/tmp/clustertooldb");
 
 

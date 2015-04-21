@@ -117,7 +117,11 @@ void AddChainReply(JsonOutput* output, evhttp_request* req,
   if (!add_status.ok() &&
       add_status.CanonicalCode() != util::error::ALREADY_EXISTS) {
     VLOG(1) << "error adding chain: " << add_status;
-    return output->SendError(req, HTTP_BADREQUEST, add_status.error_message());
+    const int response_code(add_status.CanonicalCode() ==
+                                    util::error::RESOURCE_EXHAUSTED
+                                ? HTTP_SERVUNAVAIL
+                                : HTTP_BADREQUEST);
+    return output->SendError(req, response_code, add_status.error_message());
   }
 
   JsonObject json_reply;

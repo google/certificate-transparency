@@ -46,6 +46,11 @@ util::Status InitLog(const ct::ClusterConfig& cluster_config,
 template <class Logged>
 util::Status SetClusterConfig(const ct::ClusterConfig& cluster_config,
                               ConsistentStore<Logged>* consistent_store) {
+  if (cluster_config.etcd_reject_add_pending_threshold() < 0) {
+    return util::Status(util::error::INVALID_ARGUMENT,
+                        "etcd_reject_add_pending_threshold cannot be less "
+                        "than 0");
+  }
   return consistent_store->SetClusterConfig(cluster_config);
 }
 

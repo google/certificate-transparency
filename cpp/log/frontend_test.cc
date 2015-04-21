@@ -96,7 +96,7 @@ class FrontendTest : public ::testing::Test {
         event_pump_(base_),
         etcd_client_(base_.get()),
         pool_(2),
-        store_(&pool_, &etcd_client_, &election_, "/root", "id"),
+        store_(base_.get(), &pool_, &etcd_client_, &election_, "/root", "id"),
         frontend_(new CertSubmissionHandler(&checker_),
                   new FrontendSigner(db(), &store_,
                                      TestSigner::DefaultLogSigner())) {
