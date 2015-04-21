@@ -2,20 +2,36 @@
 
 # Various common files to exclude.
 *.a
+*.log
 *.o
 *.pb.cc
 *.pb.h
 *.pyc
 *.so
+*.trs
 *_pb2.py
 *~
 .*.sw[lmnop]
 .depend
+.deps/
+.dirstamp
 
 # More specific files.
+/Makefile
+/Makefile.in
+/aclocal.m4
+/ar-lib
+/autom4te.cache/
+/compile
+/config.log
+/config.status
+/configure
 /cpp/base/notification_test
 /cpp/client/ct
-/cpp/gmock/
+/cpp/config.h
+/cpp/config.h.in
+/cpp/gmock-all.cc
+/cpp/gtest-all.cc
 /cpp/local.mk
 /cpp/log/cert_checker_test
 /cpp/log/cert_submission_handler_test
@@ -48,6 +64,7 @@
 /cpp/server/ct-dns-server
 /cpp/server/ct-server
 /cpp/server/proxy_test
+/cpp/stamp-h1
 /cpp/tools/ct-clustertool
 /cpp/tools/dump_cert
 /cpp/tools/dump_sth
@@ -63,9 +80,13 @@
 /cpp/util/sync_etcd_test
 /cpp/util/sync_task_test
 /cpp/util/task_test
+/depcomp
+/install-sh
 /java/build
 /local.properties
+/missing
 /python/_trial_temp/
+/test-driver
 /test/*.bin
 /test/*.csr
 /test/*.der

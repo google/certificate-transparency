@@ -19,9 +19,6 @@ using cert_trans::PreCertChain;
 using std::string;
 using std::vector;
 
-DEFINE_string(test_certs_dir, "../../test/testdata",
-              "Path to test certificates");
-
 // Valid certificates.
 // Self-signed
 static const char kCaCert[] = "ca-cert.pem";
@@ -103,6 +100,9 @@ namespace {
 
 class CertCheckerTest : public ::testing::Test {
  protected:
+  CertCheckerTest() : cert_dir_(FLAGS_test_srcdir + "/test/testdata") {
+  }
+
   string leaf_pem_;
   string ca_precert_pem_;
   string precert_pem_;
@@ -111,13 +111,12 @@ class CertCheckerTest : public ::testing::Test {
   string chain_leaf_pem_;
   string ca_pem_;
   CertChecker checker_;
-  string cert_dir_;
+  const string cert_dir_;
 
   void SetUp() {
-    cert_dir_ = FLAGS_test_certs_dir;
     CHECK(util::ReadTextFile(cert_dir_ + "/" + kLeafCert, &leaf_pem_))
         << "Could not read test data from " << cert_dir_
-        << ". Wrong --test_certs_dir?";
+        << ". Wrong --test_srcdir?";
     CHECK(util::ReadTextFile(cert_dir_ + "/" + kCaPreCert, &ca_precert_pem_));
     CHECK(util::ReadTextFile(cert_dir_ + "/" + kPreCert, &precert_pem_));
     CHECK(util::ReadTextFile(cert_dir_ + "/" + kPreWithPreCaCert,

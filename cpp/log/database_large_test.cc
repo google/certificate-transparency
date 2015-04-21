@@ -17,7 +17,7 @@
 #include "util/testing.h"
 #include "util/util.h"
 
-DEFINE_int32(database_size, 0,
+DEFINE_int32(database_size, 100,
              "Number of entries to put in the test database. Be careful "
              "choosing this, as the database will fill up your disk (entries "
              "are a few kB each). Maximum is limited to 1 000 000. Also note "

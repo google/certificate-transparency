@@ -15,9 +15,6 @@ namespace cert_trans {
 
 using std::string;
 
-DEFINE_string(test_certs_dir, "../../test/testdata",
-              "Path to test certificates");
-
 static const char kSimpleCert[] = "test-cert.pem";
 static const char kSimpleCaCert[] = "ca-cert.pem";
 static const char kFakeCertWithSCT[] = "test-cert-proof.pem";
@@ -35,10 +32,10 @@ class CtExtensionsTest : public ::testing::Test {
   string embedded_sct_cert_;
 
   void SetUp() {
-    const string cert_dir = FLAGS_test_certs_dir;
+    const string cert_dir(FLAGS_test_srcdir + "/test/testdata");
     CHECK(util::ReadTextFile(cert_dir + "/" + kSimpleCert, &simple_cert_))
         << "Could not read test data from " << cert_dir
-        << ". Wrong --test_certs_dir?";
+        << ". Wrong --test_srcdir?";
     CHECK(
         util::ReadTextFile(cert_dir + "/" + kSimpleCaCert, &simple_ca_cert_));
     CHECK(util::ReadTextFile(cert_dir + "/" + kFakeCertWithSCT, &sct_cert_));

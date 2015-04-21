@@ -1,6 +1,10 @@
 #ifndef TESTING_H
 #define TESTING_H
 
+#include <gflags/gflags.h>
+
+DECLARE_string(test_srcdir);
+
 namespace cert_trans {
 namespace test {
 

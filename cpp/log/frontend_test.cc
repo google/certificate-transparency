@@ -28,8 +28,6 @@
 #include "util/thread_pool.h"
 #include "util/util.h"
 
-DEFINE_string(test_certs_dir, "../test/testdata", "Path to test certificates");
-
 //  Valid certificates.
 // Self-signed
 static const char kCaCert[] = "ca-cert.pem";
@@ -99,14 +97,14 @@ class FrontendTest : public ::testing::Test {
         store_(base_.get(), &pool_, &etcd_client_, &election_, "/root", "id"),
         frontend_(new CertSubmissionHandler(&checker_),
                   new FrontendSigner(db(), &store_,
-                                     TestSigner::DefaultLogSigner())) {
+                                     TestSigner::DefaultLogSigner())),
+        cert_dir_(FLAGS_test_srcdir + "/test/testdata") {
   }
 
   void SetUp() {
-    cert_dir_ = FLAGS_test_certs_dir;
     CHECK(util::ReadTextFile(cert_dir_ + "/" + kLeafCert, &leaf_pem_))
         << "Could not read test data from " << cert_dir_
-        << ". Wrong --test_certs_dir?";
+        << ". Wrong --test_srcdir?";
     CHECK(util::ReadTextFile(cert_dir_ + "/" + kCaPreCert, &ca_precert_pem_));
     CHECK(util::ReadTextFile(cert_dir_ + "/" + kPreCert, &precert_pem_));
     CHECK(util::ReadBinaryFile(cert_dir_ + "/" + kPreWithPreCaCert,
@@ -138,7 +136,7 @@ class FrontendTest : public ::testing::Test {
   NiceMock<MockMasterElection> election_;
   EtcdConsistentStore<LoggedCertificate> store_;
   FE frontend_;
-  string cert_dir_;
+  const string cert_dir_;
   string leaf_pem_;
   string ca_precert_pem_;
   string precert_pem_;

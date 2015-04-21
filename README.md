@@ -13,7 +13,6 @@ Auditing for TLS certificates.
 
 The checking of SCTs included in the [RFC 6962](http://tools.ietf.org/html/rfc6962) TLS extension is only included in OpenSSL 1.0.2. As of this writing, this version is not yet released, so this means hand building the ```OpenSSL_1_0_2-stable``` branch from the [OpenSSL git repository](https://www.openssl.org/source/repos.html).
 
- - [CMake](http://www.cmake.org/)
  - [googlemock](https://code.google.com/p/googlemock/) (tested with 1.7.0)
 
 Gmock provides a bundled version of gtest, which will also be used.

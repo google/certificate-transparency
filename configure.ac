@@ -1,0 +1,54 @@
+AC_PREREQ([2.69])
+AC_INIT([certificate-transparency], [0.9], [certificate-transparency@googlegroups.com])
+AM_INIT_AUTOMAKE([-Wall -Werror foreign subdir-objects])
+AC_CONFIG_SRCDIR([cpp/server/ct-server.cc])
+AC_CONFIG_HEADERS([cpp/config.h])
+AC_CONFIG_MACRO_DIRS([m4])
+AM_SILENT_RULES([yes])
+AC_LANG([C++])
+
+# Checks for programs.
+AC_PROG_AWK
+AC_PROG_CXX
+AC_PROG_CC
+AC_PROG_CPP
+AC_PROG_LN_S
+AC_PROG_RANLIB
+AM_PROG_AR
+AX_CXX_COMPILE_STDCXX_11
+
+PKG_CHECK_MODULES([json_c], [json-c])
+
+# Checks for header files.
+AC_HEADER_RESOLV
+AC_CHECK_HEADERS([arpa/inet.h fcntl.h limits.h netinet/in.h stddef.h stdint.h stdlib.h string.h sys/socket.h sys/time.h unistd.h])
+
+# Checks for libraries.
+AC_SEARCH_LIBS([__b64_ntop], [resolv])
+
+# Checks for typedefs, structures, and compiler characteristics.
+AC_TYPE_INT32_T
+AC_TYPE_INT64_T
+AC_TYPE_MODE_T
+AC_TYPE_SIZE_T
+AC_TYPE_SSIZE_T
+AC_TYPE_UINT16_T
+AC_TYPE_UINT32_T
+AC_TYPE_UINT64_T
+AC_TYPE_UINT8_T
+
+# Checks for library functions.
+AC_FUNC_FORK
+AC_CHECK_FUNCS([alarm gettimeofday memset mkdir select socket strdup strerror strtol])
+
+GMOCK_DIR="${GMOCK_DIR=/usr/src/gmock}"
+AC_ARG_VAR([GMOCK_DIR], [directory containing Google Mock])
+
+# TODO(pphaneuf): We should validate that we have all the tools and
+# libraries that we require here, instead of letting the compilation
+# fail later during the build (sometimes in ways that are unclear to
+# the user.
+
+AC_DEFINE_UNQUOTED([TEST_SRCDIR], ["$srcdir"], [Top of the source directory, for tests.])
+AC_CONFIG_FILES([Makefile])
+AC_OUTPUT

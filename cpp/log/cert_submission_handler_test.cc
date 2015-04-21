@@ -12,8 +12,6 @@
 #include "util/testing.h"
 #include "util/util.h"
 
-DEFINE_string(test_certs_dir, "test/testdata", "Path to test certificates");
-
 // Valid certificates.
 // Self-signed
 static const char kCaCert[] = "ca-cert.pem";
@@ -49,21 +47,20 @@ class CertSubmissionHandlerTest : public ::testing::Test {
   string precert_with_preca_;
   string intermediate_;
   string chain_leaf_;
-  string cert_dir_;
+  const string cert_dir_;
   CertSubmissionHandler* handler_;
   CertChecker* checker_;
 
-  CertSubmissionHandlerTest() : handler_(NULL) {
+  CertSubmissionHandlerTest() : cert_dir_(FLAGS_test_srcdir + "/test/testdata"), handler_(NULL) {
   }
 
   void SetUp() {
-    cert_dir_ = FLAGS_test_certs_dir;
     checker_ = new CertChecker();
     checker_->LoadTrustedCertificates(cert_dir_ + "/" + kCaCert);
     handler_ = new CertSubmissionHandler(checker_);
     CHECK(util::ReadBinaryFile(cert_dir_ + "/" + kCaCert, &ca_))
         << "Could not read test data from " << cert_dir_
-        << ". Wrong --test_certs_dir?";
+        << ". Wrong --test_srcdir?";
     CHECK(util::ReadBinaryFile(cert_dir_ + "/" + kLeafCert, &leaf_));
     CHECK(util::ReadBinaryFile(cert_dir_ + "/" + kCaPreCert, &ca_precert_));
     CHECK(util::ReadBinaryFile(cert_dir_ + "/" + kPreCert, &precert_));
