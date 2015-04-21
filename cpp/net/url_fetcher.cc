@@ -47,6 +47,8 @@ evhttp_cmd_type VerbToCmdType(UrlFetcher::Verb verb) {
     case UrlFetcher::Verb::DELETE:
       return EVHTTP_REQ_DELETE;
   }
+
+  LOG(FATAL) << "unknown UrlFetcher::Verb: " << static_cast<int>(verb);
 }
 
 

@@ -757,7 +757,7 @@ TEST_F(EtcdConsistentStoreTest, TestCleansUpToNewSTH) {
   vector<EntryHandle<LoggedCertificate>> pending_entries_post;
   CHECK(store_->GetPendingEntries(&pending_entries_post).ok());
   EXPECT_EQ(pending_entries_pre.size(), pending_entries_post.size());
-  for (int i = 0; i < pending_entries_pre.size(); ++i) {
+  for (int i = 0; i < static_cast<int>(pending_entries_pre.size()); ++i) {
     EXPECT_EQ(pending_entries_pre[i].Handle(),
               pending_entries_post[i].Handle());
     EXPECT_EQ(pending_entries_pre[i].Entry(), pending_entries_post[i].Entry());

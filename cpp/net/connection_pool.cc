@@ -57,9 +57,11 @@ void ConnectionPool::Put(evhttp_connection_unique_ptr&& conn) {
   lock_guard<mutex> lock(lock_);
   auto& entry(conns_[key]);
 
+  CHECK_GE(FLAGS_url_fetcher_max_conn_per_host_port, 0);
   entry.emplace_back(move(conn));
-  if (entry.size() > FLAGS_url_fetcher_max_conn_per_host_port &&
-      !cleanup_scheduled_) {
+  if (!cleanup_scheduled_ &&
+      entry.size() >
+          static_cast<uint>(FLAGS_url_fetcher_max_conn_per_host_port)) {
     cleanup_scheduled_ = true;
     base_->Add(bind(&ConnectionPool::Cleanup, this));
   }
@@ -72,7 +74,8 @@ void ConnectionPool::Cleanup() {
 
   // std::map<HostPortPair, std::deque<evhttp_connection_unique_ptr>> conns_;
   for (auto& entry : conns_) {
-    while (entry.second.size() > FLAGS_url_fetcher_max_conn_per_host_port) {
+    while (entry.second.size() >
+           static_cast<uint>(FLAGS_url_fetcher_max_conn_per_host_port)) {
       entry.second.pop_front();
     }
   }

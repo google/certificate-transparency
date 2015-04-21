@@ -275,9 +275,10 @@ bool LeafEntriesMatch(const Logged& a, const Logged& b) {
       return a.entry().precert_entry().pre_certificate() ==
              b.entry().precert_entry().pre_certificate();
     case ct::UNKNOWN_ENTRY_TYPE:
-      LOG(FATAL) << "Encountered UNKNOWN_ENTRY_TYPE:\n"
-                 << a.entry().DebugString();
+      // Handle it below.
+      break;
   }
+  LOG(FATAL) << "Encountered UNKNOWN_ENTRY_TYPE:\n" << a.entry().DebugString();
 }
 
 

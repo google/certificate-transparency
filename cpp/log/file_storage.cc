@@ -91,7 +91,7 @@ util::Status FileStorage::LookupEntry(const string& key,
 
 
 string FileStorage::StoragePathBasename(const string& hex) const {
-  if (hex.length() <= storage_depth_)
+  if (hex.length() <= static_cast<uint>(storage_depth_))
     return "-";
   return hex.substr(storage_depth_);
 }
@@ -100,7 +100,7 @@ string FileStorage::StoragePathBasename(const string& hex) const {
 string FileStorage::StoragePathComponent(const string& hex, int n) const {
   CHECK_GE(n, 0);
   CHECK_LT(n, storage_depth_);
-  if (n >= hex.length())
+  if (static_cast<uint>(n) >= hex.length())
     return "-";
   return string(1, hex[n]);
 }

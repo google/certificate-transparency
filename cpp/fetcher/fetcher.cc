@@ -250,7 +250,7 @@ void FetchState::WriteToDatabase(int64_t index, Range* range,
     }
   }
 
-  if (processed < retval->size()) {
+  if (static_cast<uint64_t>(processed) < retval->size()) {
     // We couldn't insert everything that we received into the
     // database, this is fairly serious, return an error for the
     // overall operation and let the higher level deal with it.
