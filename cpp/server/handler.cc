@@ -235,7 +235,7 @@ void StatsHandlerInterceptor(const string& path,
                              const libevent::HttpServer::HandlerCallback& cb,
                              evhttp_request* req) {
   ScopedLatency total_http_server_request_latency(
-      http_server_request_latency_ms.ScopedLatency(path));
+      http_server_request_latency_ms.GetScopedLatency(path));
 
   cb(req);
 }

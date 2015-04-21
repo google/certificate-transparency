@@ -63,7 +63,7 @@ class Latency {
   void RecordLatency(const LabelTypes&... labels,
                      std::chrono::duration<double> latency);
 
-  ScopedLatency ScopedLatency(const LabelTypes&... labels);
+  ScopedLatency GetScopedLatency(const LabelTypes&... labels);
 
  private:
   EventMetric<LabelTypes...> metric_;
@@ -118,7 +118,7 @@ void Latency<TimeUnit, LabelTypes...>::RecordLatency(
 
 
 template <class TimeUnit, class... LabelTypes>
-ScopedLatency Latency<TimeUnit, LabelTypes...>::ScopedLatency(
+ScopedLatency Latency<TimeUnit, LabelTypes...>::GetScopedLatency(
     const LabelTypes&... labels) {
   return cert_trans::ScopedLatency(
       std::bind(&Latency<TimeUnit, LabelTypes...>::RecordLatency, this,

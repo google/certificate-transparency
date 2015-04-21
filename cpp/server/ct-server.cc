@@ -273,7 +273,7 @@ void SequenceEntries(TreeSigner<LoggedCertificate>* tree_signer,
   while (true) {
     if (election->IsMaster()) {
       const ScopedLatency sequencer_sequence_latency(
-          sequencer_sequence_latency_ms.ScopedLatency());
+          sequencer_sequence_latency_ms.GetScopedLatency());
       util::Status status(tree_signer->SequenceNewEntries());
       if (!status.ok()) {
         LOG(WARNING) << "Problem sequencing new entries: " << status;
@@ -304,7 +304,8 @@ void SignMerkleTree(TreeSigner<LoggedCertificate>* tree_signer,
 
   while (true) {
     {
-      ScopedLatency signer_run_latency(signer_run_latency_ms.ScopedLatency());
+      ScopedLatency signer_run_latency(
+          signer_run_latency_ms.GetScopedLatency());
       const TreeSigner<LoggedCertificate>::UpdateResult result(
           tree_signer->UpdateTree());
       switch (result) {
