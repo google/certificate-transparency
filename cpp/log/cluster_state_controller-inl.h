@@ -163,6 +163,17 @@ void ClusterStateController<Logged>::NewTreeHead(
   local_node_state_.mutable_newest_sth()->CopyFrom(sth);
   PushLocalNodeState(lock);
 
+  ct::SignedTreeHead sth_to_write;
+  if (write_sth) {
+    sth_to_write = *actual_serving_sth_;
+  }
+
+  // Updating the tree below can take a while if the tree delta is large and
+  // the DB is under load (e.g. due to fetcher / external traffic), the tree
+  // itself is locked during this process so we can release our lock here to
+  // not block other operations (e.g. watchdog operations.)
+  lock.unlock();
+
   if (write_sth) {
     // TODO(alcutter): Perhaps we need to know about updates to the contiguous
     // tree size in the DB again, so that we can write this out as soon as
@@ -326,9 +337,12 @@ template <class Logged>
 void ClusterStateController<Logged>::OnServingSthUpdated(
     const Update<ct::SignedTreeHead>& update) {
   std::unique_lock<std::mutex> lock(mutex_);
+  bool write_sth(true);
+
   if (!update.exists_) {
     LOG(WARNING) << "Cluster has no Serving STH!";
     actual_serving_sth_.reset();
+    write_sth = false;
   } else {
     // TODO(alcutter): Validate STH and verify consistency with whatever we've
     // already got locally.
@@ -346,7 +360,6 @@ void ClusterStateController<Logged>::OnServingSthUpdated(
     // Double check this STH is newer than, or idential to, what we have in
     // the database. (It definitely should be!)
     ct::SignedTreeHead db_sth;
-    bool write_sth(true);
     const typename Database<Logged>::LookupResult lookup_result(
         database_->LatestTreeHead(&db_sth));
     switch (lookup_result) {
@@ -383,19 +396,26 @@ void ClusterStateController<Logged>::OnServingSthUpdated(
       write_sth = false;
     }
 
-    if (write_sth) {
-      // All good, write this STH to our local DB:
-      CHECK_EQ(Database<Logged>::OK,
-               database_->WriteTreeHead(*actual_serving_sth_));
-    }
   }
-
   // TODO(alcutter): Determine whether we should be serving given the current
   // STH and our local database contents.
 
   // This could affect our ability to produce new STHs, so better check
   // whether we should leave the election for now:
   DetermineElectionParticipation(lock);
+
+  ct::SignedTreeHead sth_to_write;
+  if (write_sth) {
+    sth_to_write = *actual_serving_sth_;
+  }
+
+  lock.unlock();
+
+  if (write_sth) {
+    // All good, write this STH to our local DB:
+    CHECK_EQ(Database<Logged>::OK,
+             database_->WriteTreeHead(*actual_serving_sth_));
+  }
 }
 
 

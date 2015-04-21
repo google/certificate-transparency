@@ -5,6 +5,7 @@
 #include <functional>
 #include <map>
 #include <memory>
+#include <queue>
 #include <string>
 
 #include "fetcher/continuous_fetcher.h"

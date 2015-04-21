@@ -51,7 +51,8 @@ class CertSubmissionHandlerTest : public ::testing::Test {
   CertSubmissionHandler* handler_;
   CertChecker* checker_;
 
-  CertSubmissionHandlerTest() : cert_dir_(FLAGS_test_srcdir + "/test/testdata"), handler_(NULL) {
+  CertSubmissionHandlerTest()
+      : cert_dir_(FLAGS_test_srcdir + "/test/testdata"), handler_(NULL) {
   }
 
   void SetUp() {
