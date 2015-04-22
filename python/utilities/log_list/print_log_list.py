@@ -116,9 +116,9 @@ def generate_code_for_chromium(json_log_list, output_file):
         num_splits = int(math.ceil(len(hex_key) / float(line_width)))
         split_hex_key = ['"%s"' % hex_key[i * line_width:(i + 1) * line_width]
                          for i in range(num_splits)]
-        s = "  {"
-        s += "\n    ".join(split_hex_key)
-        s += ',\n    "%s"\n  }' % (log["description"])
+        s = "    {"
+        s += "\n     ".join(split_hex_key)
+        s += ',\n     "%s"}' % (log["description"])
         list_code.append(s)
         if not key_length_in_bytes:
             key_length_in_bytes = len(log_key)
@@ -128,7 +128,7 @@ def generate_code_for_chromium(json_log_list, output_file):
     write_log_info_struct_definition(f, key_length_in_bytes + 1)
     f.write("const CTLogInfo kCTLogList[] = {\n")
     f.write(",\n" . join(list_code))
-    f.write("\n};\n")
+    f.write("};\n")
     f.write("\nconst size_t kNumKnownCTLogs = %d;\n" % len(logs))
     write_cpp_footer(f, include_guard)
 
