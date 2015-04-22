@@ -19,7 +19,7 @@ done
 export LOG_NUM_REPLICAS=3
 export LOG_DISK_SIZE=200GB
 export LOG_BASE_NAME="${CLUSTER}-log"
-export LOG_MACHINE_TYPE=n1-standard-2
+export LOG_MACHINE_TYPE=n1-highmem-2
 declare -a LOG_MACHINES LOG_DISKS
 export LOG_MACHINES LOG_DISKS
 for i in $(seq ${LOG_NUM_REPLICAS}); do
