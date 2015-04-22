@@ -16,6 +16,7 @@ AC_PROG_LN_S
 AC_PROG_RANLIB
 AM_PROG_AR
 AX_CXX_COMPILE_STDCXX_11
+AC_CHECK_PROGS([ANT], [ant])
 
 PKG_CHECK_MODULES([json_c], [json-c])
 
@@ -49,6 +50,7 @@ AC_ARG_VAR([GMOCK_DIR], [directory containing Google Mock])
 # fail later during the build (sometimes in ways that are unclear to
 # the user.
 
+AM_CONDITIONAL([HAVE_ANT], [test -n "$ANT"])
 AC_DEFINE_UNQUOTED([TEST_SRCDIR], ["$srcdir"], [Top of the source directory, for tests.])
 AC_CONFIG_FILES([Makefile])
 AC_OUTPUT

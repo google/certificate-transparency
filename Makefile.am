@@ -79,7 +79,9 @@ all-local:
 
 clean-local:
 	$(MAKE) -C python clean
-	ant clean
+if HAVE_ANT
+	$(ANT) clean
+endif
 
 %.pb.h %.pb.cc: %.proto
 	$(AM_V_GEN)protoc $^ --cpp_out=.
