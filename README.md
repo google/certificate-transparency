@@ -46,23 +46,28 @@ You can specify a non-installed locally built library using the ```LIBEVENTDIR``
 
 ## Building ##
 
-You can build the log server by pointing to your custom OpenSSL and/or gtest (if needed):
+You can build the log server with the following commands:
 
-```
-$ make OPENSSLDIR=<path to openssl> GTESTDIR=<path to gtest> LIBEVENTDIR=<path to libevent>
-```
+    $ ./autogen.sh  # only necessary if you're building from git
+    $ ./configure
+    $ make
 
-If you need to set custom options for your compiler, then you can do this by setting LOCAL_CXXFLAGS. You can also customise the C++ compile in cpp/local.mk.
+You can give the ```configure``` script extra parameters, to set
+compilation flags, or point to custom versions of some dependencies
+(notably, googlemock often needs this). For example, to compile with
+Clang, using googlemock in ```$HOME/gmock```, and a custom libevent
+in ```$HOME/libevent```:
 
-Once more, use gmake on BSD systems.
+    $ ./configure CXX=clang++ GMOCK_DIR=$HOME CPPFLAGS="-I$HOME/libevent/include" LDFLAGS="-L$HOME/libevent/.libs"
+
+Running ```./configure --help``` provides more information about
+various variables that can be set.
 
 ## Running Unit Tests ##
 
 Run unit tests with this command
 
-```
-$ make OPENSSLDIR=<path to openssl> GTESTDIR=<path to gtest> test
-```
+    $ make check
 
 If the build still fails because of missing libraries, you may need to set the
 environment variable ```LD_LIBRARY_PATH```. On Linux, if you did not change the
