@@ -114,8 +114,11 @@ void FetchState::WalkEntries() {
 
   unique_lock<mutex> lock(lock_);
 
-  // Prune fetched sequences at the beginning.
-  while (entries_ && entries_->state_ == Range::HAVE) {
+  // Prune fetched and unavailable sequences at the beginning.
+  const int64_t remote_tree_size(peer_group_->TreeSize());
+  while (entries_ &&
+         (entries_->state_ == Range::HAVE ||
+          (entries_->state_ == Range::WANT && remote_tree_size < start_))) {
     VLOG(1) << "pruning " << entries_->size_ << " at offset " << start_;
     start_ += entries_->size_;
     entries_ = move(entries_->next_);
@@ -155,6 +158,12 @@ void FetchState::WalkEntries() {
         VLOG(2) << "at offset " << index << ", we want " << current->size_
                 << " entries";
 
+        // Do not start a fetch if we think our peer group does not
+        // have it.
+        if (index >= remote_tree_size) {
+          break;
+        }
+
         // If the range is bigger than the maximum batch size, split it.
         if (current->size_ > FLAGS_fetcher_batch_size) {
           current->next_.reset(
@@ -170,7 +179,8 @@ void FetchState::WalkEntries() {
         break;
     }
 
-    if (num_fetch >= FLAGS_fetcher_concurrent_fetches) {
+    if (num_fetch >= FLAGS_fetcher_concurrent_fetches ||
+        index >= remote_tree_size) {
       break;
     }
   }
