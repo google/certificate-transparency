@@ -1,5 +1,6 @@
 #include "util/util.h"
 
+#include <modp_b64.h>
 #include <cstring>
 #include <fstream>
 #include <glog/logging.h>
@@ -166,26 +167,33 @@ string RandomString(size_t min_length, size_t max_length) {
   return ret;
 }
 
+string FromBase64(const string& b64) {
+  return FromBase64(b64.data(), b64.length());
+}
+
 string FromBase64(const char* b64) {
   size_t length = strlen(b64);
+  return FromBase64(b64, length);
+}
+
+string FromBase64(const char* b64, size_t length) {
   // Lazy: base 64 encoding is always >= in length to decoded value
   // (equality occurs for zero length).
-  u_char* buf = new u_char[length];
-  int rlength = b64_pton(b64, buf, length);
+  char* buf = new char[modp_b64_decode_len(length)];
+  int rlength = modp_b64_decode(buf, b64, length);
   // Treat decode errors as empty strings.
   if (rlength < 0)
     rlength = 0;
-  string ret(reinterpret_cast<char*>(buf), rlength);
+  string ret(buf, rlength);
   delete[] buf;
   return ret;
 }
 
 string ToBase64(const string& from) {
   // base 64 is 4 output bytes for every 3 input bytes (rounded up).
-  size_t length = ((from.size() + 2) / 3) * 4;
+  size_t length = modp_b64_encode_len(from.length());
   char* buf = new char[length + 1];
-  length =
-      b64_ntop((const u_char*)from.data(), from.length(), buf, length + 1);
+  length = modp_b64_encode(buf, from.data(), from.length());
   string ret(buf, length);
   delete[] buf;
   return ret;

@@ -8,6 +8,7 @@ RUN apt-get update && \
     apt-get install -qqy \
         ca-certificates \
         etcdctl \
+        libmodpbase64-0 \
         libevent-2.0.5 \
         libevent-core-2.0.5 \
         libevent-extra-2.0.5 \
