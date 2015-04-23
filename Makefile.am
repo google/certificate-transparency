@@ -154,7 +154,7 @@ cpp_libtest_a_SOURCES = \
 cpp_server_ct_server_LDADD = \
 	cpp/libcore.a \
 	$(json_c_LIBS) \
-	-lglog -lgflags -lcrypto -lprotobuf -levent -levent_pthreads -lsqlite3
+	-lglog -lgflags -lcrypto -lprotobuf -levent -levent_pthreads -lpthread -lsqlite3
 cpp_server_ct_server_SOURCES = \
 	cpp/client/async_log_client.cc \
 	cpp/proto/serializer.cc \
@@ -177,7 +177,7 @@ cpp_server_ct_server_SOURCES = \
 cpp_tools_ct_clustertool_LDADD = \
 	cpp/libcore.a \
 	$(json_c_LIBS) \
-	-lgflags -lglog -levent -levent_pthreads -lprotobuf -lcrypto -lsqlite3
+	-lgflags -lglog -levent -levent_pthreads -lpthread -lprotobuf -lcrypto -lsqlite3
 cpp_tools_ct_clustertool_SOURCES = \
 	cpp/proto/serializer.cc \
 	cpp/tools/clustertool_main.cc \
@@ -192,7 +192,7 @@ cpp_tools_ct_clustertool_SOURCES = \
 cpp_client_ct_LDADD = \
 	cpp/libcore.a \
 	$(json_c_LIBS) \
-	-lglog -lgflags -lprotobuf -lcrypto -lssl -levent -levent_pthreads -lsqlite3
+	-lglog -lgflags -lprotobuf -lcrypto -lssl -levent -levent_pthreads -lpthread -lsqlite3
 cpp_client_ct_SOURCES = \
 	cpp/client/async_log_client.cc \
 	cpp/client/client.cc \
@@ -235,7 +235,7 @@ cpp_tools_dump_sth_SOURCES = \
 cpp_tools_etcd_watch_LDADD = \
 	cpp/libcore.a \
 	$(json_c_LIBS) \
-	-lgflags -lglog -levent -levent_pthreads
+	-lgflags -lglog -levent -levent_pthreads -lpthread
 cpp_tools_etcd_watch_SOURCES = \
 	cpp/tools/etcd_watch.cc \
 	cpp/util/json_wrapper.cc \
@@ -244,7 +244,7 @@ cpp_tools_etcd_watch_SOURCES = \
 cpp_util_bench_etcd_LDADD = \
 	cpp/libcore.a \
 	$(json_c_LIBS) \
-	-lgflags -lglog -levent -levent_pthreads
+	-lgflags -lglog -levent -levent_pthreads -lpthread
 cpp_util_bench_etcd_SOURCES = \
 	cpp/util/bench_etcd.cc \
 	cpp/util/json_wrapper.cc \
@@ -253,7 +253,7 @@ cpp_util_bench_etcd_SOURCES = \
 cpp_util_etcd_masterelection_LDADD = \
 	cpp/libcore.a \
 	$(json_c_LIBS) \
-	-lgflags -lglog -levent -levent_pthreads -lprotobuf
+	-lgflags -lglog -levent -levent_pthreads -lpthread -lprotobuf
 cpp_util_etcd_masterelection_SOURCES = \
 	cpp/util/etcd_masterelection.cc \
 	cpp/util/json_wrapper.cc \
@@ -288,7 +288,7 @@ cpp_log_cluster_state_controller_test_SOURCES = \
 cpp_log_database_test_LDADD = \
 	cpp/libcore.a \
 	cpp/libtest.a \
-	-lglog -lgflags -lprotobuf -lpthread -lsqlite3 -levent -levent_pthreads -lcrypto
+	-lglog -lgflags -lprotobuf -lpthread -lsqlite3 -levent -levent_pthreads -lpthread -lcrypto
 cpp_log_database_test_SOURCES = \
 	cpp/log/database_test.cc \
 	cpp/log/test_signer.cc \
