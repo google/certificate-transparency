@@ -524,7 +524,7 @@ util::Status EtcdConsistentStore<Logged>::GetEntry(
     return task.status();
   }
   T t;
-  CHECK(t.ParseFromString(util::FromBase64(resp.node.value_.c_str())));
+  CHECK(t.ParseFromString(util::FromBase64(resp.node.value_)));
   entry->Set(path, t, resp.node.modified_index_);
   return util::Status::OK;
 }
@@ -552,7 +552,7 @@ util::Status EtcdConsistentStore<Logged>::GetAllEntriesInDir(
   }
   for (const auto& node : resp.node.nodes_) {
     T t;
-    CHECK(t.ParseFromString(util::FromBase64(node.value_.c_str())));
+    CHECK(t.ParseFromString(util::FromBase64(node.value_)));
     entries->emplace_back(
         EntryHandle<Logged>(node.key_, t, node.modified_index_));
   }
@@ -739,7 +739,7 @@ template <class Logged>
 template <class T>
 Update<T> EtcdConsistentStore<Logged>::TypedUpdateFromNode(
     const EtcdClient::Node& node) {
-  const std::string raw_value(util::FromBase64(node.value_.c_str()));
+  const std::string raw_value(util::FromBase64(node.value_));
   T thing;
   CHECK(thing.ParseFromString(raw_value)) << raw_value;
   EntryHandle<T> handle(node.key_, thing);

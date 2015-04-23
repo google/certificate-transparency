@@ -154,7 +154,7 @@ cpp_libtest_a_SOURCES = \
 cpp_server_ct_server_LDADD = \
 	cpp/libcore.a \
 	$(json_c_LIBS) \
-	-lglog -lgflags -lcrypto -lprotobuf -levent -levent_pthreads -lpthread -lsqlite3
+	-lglog -lgflags -lcrypto -lprotobuf -levent -levent_pthreads -lpthread -lsqlite3 -lmodpbase64
 cpp_server_ct_server_SOURCES = \
 	cpp/client/async_log_client.cc \
 	cpp/proto/serializer.cc \
@@ -177,7 +177,7 @@ cpp_server_ct_server_SOURCES = \
 cpp_tools_ct_clustertool_LDADD = \
 	cpp/libcore.a \
 	$(json_c_LIBS) \
-	-lgflags -lglog -levent -levent_pthreads -lpthread -lprotobuf -lcrypto -lsqlite3
+	-lgflags -lglog -levent -levent_pthreads -lpthread -lprotobuf -lcrypto -lsqlite3 -lmodpbase64
 cpp_tools_ct_clustertool_SOURCES = \
 	cpp/proto/serializer.cc \
 	cpp/tools/clustertool_main.cc \
@@ -192,7 +192,7 @@ cpp_tools_ct_clustertool_SOURCES = \
 cpp_client_ct_LDADD = \
 	cpp/libcore.a \
 	$(json_c_LIBS) \
-	-lglog -lgflags -lprotobuf -lcrypto -lssl -levent -levent_pthreads -lpthread -lsqlite3
+	-lglog -lgflags -lprotobuf -lcrypto -lssl -levent -levent_pthreads -lpthread -lsqlite3 -lmodpbase64
 cpp_client_ct_SOURCES = \
 	cpp/client/async_log_client.cc \
 	cpp/client/client.cc \
@@ -211,7 +211,7 @@ cpp_client_ct_SOURCES = \
 
 cpp_server_ct_dns_server_LDADD = \
 	cpp/libcore.a \
-	-lprotobuf -lgflags -lglog -lldns -lsqlite3 -lcrypto
+	-lprotobuf -lgflags -lglog -lldns -lsqlite3 -lcrypto -lmodpbase64
 cpp_server_ct_dns_server_SOURCES = \
 	cpp/proto/serializer.cc \
 	cpp/server/ct-dns-server.cc \
@@ -221,7 +221,7 @@ cpp_server_ct_dns_server_SOURCES = \
 
 cpp_tools_dump_cert_LDADD = \
 	cpp/libcore.a \
-	-lprotobuf -lglog -lgflags
+	-lprotobuf -lglog -lgflags -lmodpbase64
 cpp_tools_dump_cert_SOURCES = \
 	cpp/tools/dump_cert.cc \
 	cpp/util/util.cc
@@ -253,7 +253,7 @@ cpp_util_bench_etcd_SOURCES = \
 cpp_util_etcd_masterelection_LDADD = \
 	cpp/libcore.a \
 	$(json_c_LIBS) \
-	-lgflags -lglog -levent -levent_pthreads -lpthread -lprotobuf
+	-lgflags -lglog -levent -levent_pthreads -lpthread -lprotobuf -lmodpbase64
 cpp_util_etcd_masterelection_SOURCES = \
 	cpp/util/etcd_masterelection.cc \
 	cpp/util/json_wrapper.cc \
@@ -272,7 +272,7 @@ cpp_log_cluster_state_controller_test_LDADD = \
 	cpp/libcore.a \
 	cpp/libtest.a \
 	$(json_c_LIBS) \
-	-lglog -lgflags -lprotobuf -levent -levent_pthreads -lpthread -lsqlite3 -lcrypto
+	-lglog -lgflags -lprotobuf -levent -levent_pthreads -lpthread -lsqlite3 -lcrypto -lmodpbase64
 cpp_log_cluster_state_controller_test_SOURCES = \
 	cpp/client/async_log_client.cc \
 	cpp/log/cluster_state_controller_test.cc \
@@ -288,7 +288,7 @@ cpp_log_cluster_state_controller_test_SOURCES = \
 cpp_log_database_test_LDADD = \
 	cpp/libcore.a \
 	cpp/libtest.a \
-	-lglog -lgflags -lprotobuf -lpthread -lsqlite3 -levent -levent_pthreads -lpthread -lcrypto
+	-lglog -lgflags -lprotobuf -lpthread -lsqlite3 -levent -levent_pthreads -lpthread -lcrypto -lmodpbase64
 cpp_log_database_test_SOURCES = \
 	cpp/log/database_test.cc \
 	cpp/log/test_signer.cc \
@@ -300,7 +300,7 @@ cpp_log_etcd_consistent_store_test_LDADD = \
 	cpp/libcore.a \
 	cpp/libtest.a \
 	$(json_c_LIBS) \
-	-lglog -lgflags -lprotobuf -levent -levent_pthreads -lpthread -lcrypto
+	-lglog -lgflags -lprotobuf -levent -levent_pthreads -lpthread -lcrypto -lmodpbase64
 cpp_log_etcd_consistent_store_test_SOURCES = \
 	cpp/log/etcd_consistent_store_test.cc \
 	cpp/proto/serializer.cc \
@@ -314,7 +314,7 @@ cpp_log_etcd_consistent_store_test_SOURCES = \
 cpp_log_file_storage_test_LDADD = \
 	cpp/libcore.a \
 	cpp/libtest.a \
-	-lglog -lgflags -lprotobuf -levent -levent_pthreads -lpthread -lcrypto -lsqlite3
+	-lglog -lgflags -lprotobuf -levent -levent_pthreads -lpthread -lcrypto -lsqlite3 -lmodpbase64
 cpp_log_file_storage_test_SOURCES = \
 	cpp/log/file_storage.cc \
 	cpp/log/file_storage_test.cc \
@@ -326,7 +326,7 @@ cpp_log_frontend_signer_test_LDADD = \
 	cpp/libcore.a \
 	cpp/libtest.a \
 	$(json_c_LIBS) \
-	-lglog -lgflags -lprotobuf -levent -levent_pthreads -lpthread -lcrypto -lsqlite3
+	-lglog -lgflags -lprotobuf -levent -levent_pthreads -lpthread -lcrypto -lsqlite3 -lmodpbase64
 cpp_log_frontend_signer_test_SOURCES = \
 	cpp/log/frontend_signer_test.cc \
 	cpp/log/test_signer.cc \
@@ -342,7 +342,7 @@ cpp_log_log_lookup_test_LDADD = \
 	cpp/libcore.a \
 	cpp/libtest.a \
 	$(json_c_LIBS) \
-	-lglog -lgflags -lprotobuf -levent -levent_pthreads -lpthread -lcrypto -lsqlite3
+	-lglog -lgflags -lprotobuf -levent -levent_pthreads -lpthread -lcrypto -lsqlite3 -lmodpbase64
 cpp_log_log_lookup_test_SOURCES = \
 	cpp/log/log_lookup_test.cc \
 	cpp/log/test_signer.cc \
@@ -357,7 +357,7 @@ cpp_log_log_lookup_test_SOURCES = \
 cpp_log_log_signer_test_LDADD = \
 	cpp/libcore.a \
 	cpp/libtest.a \
-	-lglog -lgflags -lprotobuf -levent -levent_pthreads -lpthread -lcrypto
+	-lglog -lgflags -lprotobuf -levent -levent_pthreads -lpthread -lcrypto -lmodpbase64
 cpp_log_log_signer_test_SOURCES = \
 	cpp/log/log_signer_test.cc \
 	cpp/log/test_signer.cc \
@@ -367,7 +367,7 @@ cpp_log_log_signer_test_SOURCES = \
 cpp_log_logged_certificate_test_LDADD = \
 	cpp/libcore.a \
 	cpp/libtest.a \
-	-lglog -lgflags -lprotobuf -levent -levent_pthreads -lpthread -lcrypto
+	-lglog -lgflags -lprotobuf -levent -levent_pthreads -lpthread -lcrypto -lmodpbase64
 cpp_log_logged_certificate_test_SOURCES = \
 	cpp/log/logged_certificate_test.cc \
 	cpp/proto/serializer.cc \
@@ -377,7 +377,7 @@ cpp_log_strict_consistent_store_test_LDADD = \
 	cpp/libcore.a \
 	cpp/libtest.a \
 	$(json_c_LIBS) \
-	-lglog -lgflags -lprotobuf -lpthread -levent -levent_pthreads
+	-lglog -lgflags -lprotobuf -lpthread -levent -levent_pthreads -lmodpbase64
 cpp_log_strict_consistent_store_test_SOURCES = \
 	cpp/log/strict_consistent_store_cert.cc \
 	cpp/log/strict_consistent_store_test.cc \
@@ -390,7 +390,7 @@ cpp_log_tree_signer_test_LDADD = \
 	cpp/libcore.a \
 	cpp/libtest.a \
 	$(json_c_LIBS) \
-	-lglog -lgflags -lprotobuf -lpthread -levent -levent_pthreads -lcrypto -lsqlite3
+	-lglog -lgflags -lprotobuf -lpthread -levent -levent_pthreads -lcrypto -lsqlite3 -lmodpbase64
 cpp_log_tree_signer_test_SOURCES = \
 	cpp/log/test_signer.cc \
 	cpp/log/tree_signer_test.cc \
@@ -405,7 +405,7 @@ cpp_log_tree_signer_test_SOURCES = \
 cpp_log_signer_verifier_test_LDADD = \
 	cpp/libcore.a \
 	cpp/libtest.a \
-	-lglog -lgflags -lprotobuf -lpthread -levent -levent_pthreads -lcrypto
+	-lglog -lgflags -lprotobuf -lpthread -levent -levent_pthreads -lcrypto -lmodpbase64
 cpp_log_signer_verifier_test_SOURCES = \
 	cpp/log/signer_verifier_test.cc \
 	cpp/log/test_signer.cc \
@@ -415,7 +415,7 @@ cpp_log_signer_verifier_test_SOURCES = \
 cpp_monitor_database_test_LDADD = \
 	cpp/libcore.a \
 	cpp/libtest.a \
-	-lglog -lgflags -lprotobuf -levent -levent_pthreads -lpthread -lcrypto -lsqlite3
+	-lglog -lgflags -lprotobuf -levent -levent_pthreads -lpthread -lcrypto -lsqlite3 -lmodpbase64
 cpp_monitor_database_test_SOURCES = \
 	cpp/log/test_signer.cc \
 	cpp/monitor/database.cc \
@@ -427,7 +427,7 @@ cpp_monitor_database_test_SOURCES = \
 cpp_monitoring_prometheus_counter_test_LDADD = \
 	cpp/libcore.a \
 	cpp/libtest.a \
-	-lglog -lgflags -lprotobuf -lpthread -levent -levent_pthreads
+	-lglog -lgflags -lprotobuf -lpthread -levent -levent_pthreads -lmodpbase64
 cpp_monitoring_prometheus_counter_test_SOURCES = \
 	cpp/monitoring/prometheus/counter_test.cc \
 	cpp/util/protobuf_util.cc
@@ -435,7 +435,7 @@ cpp_monitoring_prometheus_counter_test_SOURCES = \
 cpp_monitoring_prometheus_gauge_test_LDADD = \
 	cpp/libcore.a \
 	cpp/libtest.a \
-	-lglog -lgflags -lprotobuf -levent -levent_pthreads -lpthread
+	-lglog -lgflags -lprotobuf -levent -levent_pthreads -lpthread -lmodpbase64
 cpp_monitoring_prometheus_gauge_test_SOURCES = \
 	cpp/monitoring/prometheus/gauge_test.cc \
 	cpp/util/protobuf_util.cc
@@ -451,7 +451,7 @@ cpp_monitoring_registry_test_SOURCES = \
 cpp_proto_serializer_test_LDADD = \
 	cpp/libcore.a \
 	cpp/libtest.a \
-	-lglog -lgflags -lprotobuf -levent -levent_pthreads -lpthread
+	-lglog -lgflags -lprotobuf -levent -levent_pthreads -lpthread -lmodpbase64
 cpp_proto_serializer_test_SOURCES = \
 	cpp/proto/serializer.cc \
 	cpp/proto/serializer_test.cc \
@@ -461,7 +461,7 @@ cpp_server_proxy_test_LDADD = \
 	cpp/libcore.a \
 	cpp/libtest.a \
 	$(json_c_LIBS) \
-	-lglog -lgflags -lprotobuf -levent -levent_pthreads -lpthread
+	-lglog -lgflags -lprotobuf -levent -levent_pthreads -lpthread -lmodpbase64
 cpp_server_proxy_test_SOURCES = \
 	cpp/server/json_output.cc \
 	cpp/server/proxy.cc \
@@ -505,7 +505,7 @@ cpp_util_fake_etcd_test_SOURCES = \
 cpp_util_json_wrapper_test_LDADD = \
 	cpp/libtest.a \
 	$(json_c_LIBS) \
-	-lglog -lgflags -levent -levent_pthreads -lpthread
+	-lglog -lgflags -levent -levent_pthreads -lpthread -lmodpbase64
 cpp_util_json_wrapper_test_SOURCES = \
 	cpp/util/json_wrapper.cc \
 	cpp/util/json_wrapper_test.cc \
@@ -523,7 +523,7 @@ cpp_util_masterelection_test_LDADD = \
 	cpp/libcore.a \
 	cpp/libtest.a \
 	$(json_c_LIBS) \
-	-lglog -lgflags -lprotobuf -levent -levent_pthreads -lpthread
+	-lglog -lgflags -lprotobuf -levent -levent_pthreads -lpthread -lmodpbase64
 cpp_util_masterelection_test_SOURCES = \
 	cpp/util/json_wrapper.cc \
 	cpp/util/libevent_wrapper.cc \
@@ -534,7 +534,7 @@ cpp_util_masterelection_test_SOURCES = \
 cpp_merkletree_merkle_tree_test_LDADD = \
 	cpp/libcore.a \
 	cpp/libtest.a \
-	-lglog -lgflags -levent -levent_pthreads -lpthread -lcrypto
+	-lglog -lgflags -levent -levent_pthreads -lpthread -lcrypto -lmodpbase64
 cpp_merkletree_merkle_tree_test_SOURCES = \
 	cpp/util/util.cc \
 	cpp/merkletree/merkle_tree_test.cc
@@ -542,7 +542,7 @@ cpp_merkletree_merkle_tree_test_SOURCES = \
 cpp_merkletree_serial_hasher_test_LDADD = \
 	cpp/libcore.a \
 	cpp/libtest.a \
-	-lglog -lgflags -lpthread -levent -levent_pthreads -lcrypto
+	-lglog -lgflags -lpthread -levent -levent_pthreads -lcrypto -lmodpbase64
 cpp_merkletree_serial_hasher_test_SOURCES = \
 	cpp/util/util.cc \
 	cpp/merkletree/serial_hasher_test.cc
@@ -550,7 +550,7 @@ cpp_merkletree_serial_hasher_test_SOURCES = \
 cpp_merkletree_tree_hasher_test_LDADD = \
 	cpp/libcore.a \
 	cpp/libtest.a \
-	-lglog -lgflags -lpthread -levent -levent_pthreads -lcrypto
+	-lglog -lgflags -lpthread -levent -levent_pthreads -lcrypto -lmodpbase64
 cpp_merkletree_tree_hasher_test_SOURCES = \
 	cpp/util/util.cc \
 	cpp/merkletree/tree_hasher_test.cc
@@ -574,7 +574,7 @@ cpp_util_task_test_SOURCES = \
 cpp_log_cert_checker_test_LDADD = \
 	cpp/libcore.a \
 	cpp/libtest.a \
-	-lglog -lgflags -levent -levent_pthreads -lpthread -lcrypto
+	-lglog -lgflags -levent -levent_pthreads -lpthread -lcrypto -lmodpbase64
 cpp_log_cert_checker_test_SOURCES = \
 	cpp/log/cert_checker_test.cc \
 	cpp/util/openssl_util.cc \
@@ -583,7 +583,7 @@ cpp_log_cert_checker_test_SOURCES = \
 cpp_log_cert_submission_handler_test_LDADD = \
 	cpp/libcore.a \
 	cpp/libtest.a \
-	-lglog -lgflags -lprotobuf -levent -levent_pthreads -lpthread -lcrypto
+	-lglog -lgflags -lprotobuf -levent -levent_pthreads -lpthread -lcrypto -lmodpbase64
 cpp_log_cert_submission_handler_test_SOURCES = \
 	cpp/log/cert_submission_handler_test.cc \
 	cpp/util/openssl_util.cc \
@@ -592,7 +592,7 @@ cpp_log_cert_submission_handler_test_SOURCES = \
 cpp_log_cert_test_LDADD = \
 	cpp/libcore.a \
 	cpp/libtest.a \
-	-lglog -lgflags -levent -levent_pthreads -lpthread -lcrypto
+	-lglog -lgflags -levent -levent_pthreads -lpthread -lcrypto -lmodpbase64
 cpp_log_cert_test_SOURCES = \
 	cpp/log/cert_test.cc \
 	cpp/util/openssl_util.cc \
@@ -601,7 +601,7 @@ cpp_log_cert_test_SOURCES = \
 cpp_log_ct_extensions_test_LDADD = \
 	cpp/libcore.a \
 	cpp/libtest.a \
-	-lglog -lgflags -levent -levent_pthreads -lpthread -lcrypto
+	-lglog -lgflags -levent -levent_pthreads -lpthread -lcrypto -lmodpbase64
 cpp_log_ct_extensions_test_SOURCES = \
 	cpp/log/ct_extensions_test.cc \
 	cpp/util/openssl_util.cc \
@@ -610,7 +610,7 @@ cpp_log_ct_extensions_test_SOURCES = \
 cpp_log_database_large_test_LDADD = \
 	cpp/libcore.a \
 	cpp/libtest.a \
-	-lglog -lgflags -lprotobuf -levent -levent_pthreads -lpthread -lcrypto -lsqlite3
+	-lglog -lgflags -lprotobuf -levent -levent_pthreads -lpthread -lcrypto -lsqlite3 -lmodpbase64
 cpp_log_database_large_test_SOURCES = \
 	cpp/log/database_large_test.cc \
 	cpp/log/test_signer.cc \
@@ -622,7 +622,7 @@ cpp_log_frontend_test_LDADD = \
 	cpp/libcore.a \
 	cpp/libtest.a \
 	$(json_c_LIBS) \
-	-lglog -lgflags -lprotobuf -levent -levent_pthreads -lpthread -lcrypto -lsqlite3
+	-lglog -lgflags -lprotobuf -levent -levent_pthreads -lpthread -lcrypto -lsqlite3 -lmodpbase64
 cpp_log_frontend_test_SOURCES = \
 	cpp/log/frontend_test.cc \
 	cpp/log/test_signer.cc \
@@ -638,7 +638,7 @@ cpp_log_frontend_test_SOURCES = \
 cpp_merkletree_merkle_tree_large_test_LDADD = \
 	cpp/libcore.a \
 	cpp/libtest.a \
-	-lglog -lgflags -levent -levent_pthreads -lpthread -lcrypto
+	-lglog -lgflags -levent -levent_pthreads -lpthread -lcrypto -lmodpbase64
 cpp_merkletree_merkle_tree_large_test_SOURCES = \
 	cpp/merkletree/merkle_tree_large_test.cc \
 	cpp/util/util.cc

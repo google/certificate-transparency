@@ -45,6 +45,7 @@ Make sure to install glog **after** gflags, to avoid linking errors.
 
  - [sqlite3](http://www.sqlite.org/)
  - [JSON-C](https://github.com/json-c/json-c/), at least 0.11
+ - [libmodpbase64](https://code.google.com/p/stringencoders/)
 
 You can specify a JSON-C library in a non-standard location using the
 `JSONCLIBDIR` environment variable. Version 0.10 would work as well,

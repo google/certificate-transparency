@@ -33,7 +33,9 @@ uint64_t TimeInMilliseconds();
 // srand() is called if needed.
 std::string RandomString(size_t min_length, size_t max_length);
 
+std::string FromBase64(const std::string& b64);
 std::string FromBase64(const char* b64);
+std::string FromBase64(const char* b64, size_t length);
 
 std::string ToBase64(const std::string& from);
 
