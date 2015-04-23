@@ -35,7 +35,7 @@ install:
  - ./autogen.sh
 
 script:
- - ./configure && make -j$(getconf _NPROCESSORS_ONLN) check
+ - ./configure && make -j$(getconf _NPROCESSORS_ONLN) check VERBOSE=1
  - ant build test
  - make -C python test
  - go test -v ./go/...
