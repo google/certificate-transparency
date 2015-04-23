@@ -1,6 +1,6 @@
 
 AM_CPPFLAGS = \
-	-I$(GMOCK_DIR)/gtest/include \
+	-I$(GTEST_DIR)/include \
 	$(json_c_CFLAGS)
 
 AM_CXXFLAGS = \
@@ -86,7 +86,7 @@ endif
 %.pb.h %.pb.cc: %.proto
 	$(AM_V_GEN)protoc $^ --cpp_out=.
 
-cpp/gtest-all.cc: $(GMOCK_DIR)/gtest/src/gtest-all.cc
+cpp/gtest-all.cc: $(GTEST_DIR)/src/gtest-all.cc
 	$(AM_V_at)cp $^ $@
 
 cpp/gmock-all.cc: $(GMOCK_DIR)/src/gmock-all.cc
@@ -143,7 +143,7 @@ cpp_libcore_a_SOURCES = \
 
 cpp_libtest_a_CPPFLAGS = \
 	-I$(GMOCK_DIR) \
-	-I$(GMOCK_DIR)/gtest \
+	-I$(GTEST_DIR) \
 	$(AM_CPPFLAGS)
 cpp_libtest_a_SOURCES = \
 	cpp/gmock-all.cc \

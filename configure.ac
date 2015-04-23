@@ -44,6 +44,8 @@ AC_CHECK_FUNCS([alarm gettimeofday memset mkdir select socket strdup strerror st
 
 GMOCK_DIR="${GMOCK_DIR=/usr/src/gmock}"
 AC_ARG_VAR([GMOCK_DIR], [directory containing Google Mock])
+GTEST_DIR="${GTEST_DIR="\$\(GMOCK_DIR\)/gtest"}"
+AC_ARG_VAR([GTEST_DIR], [directory containing Google Test])
 
 # TODO(pphaneuf): We should validate that we have all the tools and
 # libraries that we require here, instead of letting the compilation
