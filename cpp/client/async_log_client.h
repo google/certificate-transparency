@@ -11,6 +11,10 @@
 #include "net/url_fetcher.h"
 #include "proto/ct.pb.h"
 
+namespace util {
+class Executor;
+}  // namespace util
+
 namespace cert_trans {
 
 
