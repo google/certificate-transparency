@@ -49,11 +49,13 @@ void LogLookup<Logged>::UpdateFromSTH(const ct::SignedTreeHead& sth) {
   if (sth.timestamp() == latest_tree_head_.timestamp())
     return;
 
-  CHECK(sth.timestamp() > latest_tree_head_.timestamp() &&
-        sth.tree_size() >= cert_tree_.LeafCount())
-      << "Database replied with an STH that is older than ours: "
-      << "Our STH:\n" << latest_tree_head_.DebugString() << "Database STH:\n"
-      << sth.DebugString();
+  if (sth.timestamp() <= latest_tree_head_.timestamp() ||
+      sth.tree_size() < cert_tree_.LeafCount()) {
+    LOG(WARNING) << "Database replied with an STH that is older than ours: "
+                 << "Our STH:\n" << latest_tree_head_.DebugString()
+                 << "Database STH:\n" << sth.DebugString();
+    return;
+  }
 
   // Record the new hashes: append all of them, die on any error.
   // TODO(ekasper): make tree signer write leaves out to the database,

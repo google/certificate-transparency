@@ -276,10 +276,16 @@ typename Database<Logged>::WriteResult SQLiteDB<Logged>::WriteTreeHead_(
   int r2 = statement.Step();
   if (r2 == SQLITE_CONSTRAINT) {
     sqlite::Statement s2(db_,
-                         "SELECT timestamp FROM trees "
+                         "SELECT timestamp,sth FROM trees "
                          "WHERE timestamp = ?");
     s2.BindUInt64(0, sth.timestamp());
     CHECK_EQ(SQLITE_ROW, s2.Step());
+    std::string existing_sth_data;
+    s2.GetBlob(1, &existing_sth_data);
+    if (existing_sth_data == sth_data) {
+      LOG(WARNING) << "Attempted to store indentical STH in DB.";
+      return this->OK;
+    }
     return this->DUPLICATE_TREE_HEAD_TIMESTAMP;
   }
   CHECK_EQ(SQLITE_DONE, r2);

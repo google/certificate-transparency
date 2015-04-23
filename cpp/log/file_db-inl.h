@@ -16,6 +16,7 @@
 #include "proto/serializer.h"
 #include "monitoring/monitoring.h"
 #include "monitoring/latency.h"
+#include "util/util.h"
 
 
 namespace {
@@ -164,6 +165,13 @@ typename Database<Logged>::WriteResult FileDB<Logged>::WriteTreeHead_(
   std::unique_lock<std::mutex> lock(lock_);
   util::Status status(tree_storage_->CreateEntry(timestamp_key, data));
   if (status.CanonicalCode() == util::error::ALREADY_EXISTS) {
+    std::string existing_sth_data;
+    status = tree_storage_->LookupEntry(timestamp_key, &existing_sth_data);
+    CHECK_EQ(status, util::Status::OK);
+    if (existing_sth_data == data) {
+      LOG(WARNING) << "Attempted to store identical STH in DB.";
+      return this->OK;
+    }
     return this->DUPLICATE_TREE_HEAD_TIMESTAMP;
   }
   CHECK_EQ(status, util::Status::OK);

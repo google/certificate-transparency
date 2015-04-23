@@ -43,7 +43,8 @@ string NormalizeKey(const string& input) {
     const string::size_type next_slash(input.find_first_of('/', next_part));
 
     if (next_part != string::npos) {
-      const string part(input.substr(next_part - 1, next_slash - next_part + 1));
+      const string part(
+          input.substr(next_part - 1, next_slash - next_part + 1));
 
       if (part == "/..") {
         const string::size_type prev_slash(output.find_last_of('/'));
