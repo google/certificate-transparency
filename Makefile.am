@@ -1,5 +1,6 @@
 
 AM_CPPFLAGS = \
+	-I$(GMOCK_DIR)/include \
 	-I$(GTEST_DIR)/include \
 	$(json_c_CFLAGS)
 
