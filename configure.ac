@@ -7,6 +7,11 @@ AC_CONFIG_MACRO_DIRS([m4])
 AM_SILENT_RULES([yes])
 AC_LANG([C++])
 
+GMOCK_DIR="${GMOCK_DIR=/usr/src/gmock}"
+AC_ARG_VAR([GMOCK_DIR], [directory containing Google Mock])
+GTEST_DIR="${GTEST_DIR="$GMOCK_DIR/gtest"}"
+AC_ARG_VAR([GTEST_DIR], [directory containing Google Test])
+
 # Checks for programs.
 AC_PROG_AWK
 AC_PROG_CXX
@@ -23,6 +28,24 @@ PKG_CHECK_MODULES([json_c], [json-c])
 # Checks for header files.
 AC_HEADER_RESOLV
 AC_CHECK_HEADERS([arpa/inet.h fcntl.h limits.h netinet/in.h stddef.h stdint.h stdlib.h string.h sys/socket.h sys/time.h unistd.h])
+
+# Check for working GTest/GMock.
+saved_CPPFLAGS="$CPPFLAGS"
+AS_UNSET([missing_gtest])
+AS_UNSET([missing_gmock])
+AS_VAR_APPEND([CPPFLAGS], [" -I$GTEST_DIR/include"])
+AC_CHECK_HEADER([gtest/gtest.h],, [missing_gtest=1])
+AS_VAR_APPEND([CPPFLAGS], [" -I$GMOCK_DIR/include"])
+AC_CHECK_HEADER([gmock/gmock.h],, [missing_gmock=1])
+AS_VAR_APPEND([CPPFLAGS], [" -I$GTEST_DIR"])
+AC_CHECK_HEADER([$GTEST_DIR/src/gtest-all.cc],, [missing_gtest=1])
+AS_VAR_APPEND([CPPFLAGS], [" -I$GMOCK_DIR"])
+AC_CHECK_HEADER([$GMOCK_DIR/src/gmock-all.cc],, [missing_gmock=1])
+CPPFLAGS="$saved_CPPFLAGS"
+AS_IF([test -n "$missing_gtest"],
+      [AC_MSG_ERROR([could not find a working Google Test])])
+AS_IF([test -n "$missing_gmock"],
+      [AC_MSG_ERROR([could not find a working Google Mock])])
 
 # Checks for libraries.
 AC_SEARCH_LIBS([__b64_ntop], [resolv])
@@ -41,11 +64,6 @@ AC_TYPE_UINT8_T
 # Checks for library functions.
 AC_FUNC_FORK
 AC_CHECK_FUNCS([alarm gettimeofday memset mkdir select socket strdup strerror strtol])
-
-GMOCK_DIR="${GMOCK_DIR=/usr/src/gmock}"
-AC_ARG_VAR([GMOCK_DIR], [directory containing Google Mock])
-GTEST_DIR="${GTEST_DIR="\$\(GMOCK_DIR\)/gtest"}"
-AC_ARG_VAR([GTEST_DIR], [directory containing Google Test])
 
 # TODO(pphaneuf): We should validate that we have all the tools and
 # libraries that we require here, instead of letting the compilation
