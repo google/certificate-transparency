@@ -28,6 +28,8 @@ PKG_CHECK_MODULES([json_c], [json-c])
 # Checks for header files.
 AC_HEADER_RESOLV
 AC_CHECK_HEADERS([arpa/inet.h fcntl.h limits.h netinet/in.h stddef.h stdint.h stdlib.h string.h sys/socket.h sys/time.h unistd.h])
+AC_CHECK_HEADER([event2/event.h],,
+                [AC_MSG_ERROR([libevent headers could not be found])])
 
 # Check for working GTest/GMock.
 saved_CPPFLAGS="$CPPFLAGS"
@@ -49,6 +51,17 @@ AS_IF([test -n "$missing_gmock"],
 
 # Checks for libraries.
 AC_SEARCH_LIBS([__b64_ntop], [resolv])
+
+save_LIBS="$LIBS"
+AS_UNSET([LIBS])
+AC_SEARCH_LIBS([event_base_dispatch], [event],, [missing_libevent=1],
+               [$save_LIBS])
+AC_SEARCH_LIBS([evthread_use_pthreads], [event_pthreads],, [missing_libevent=1],
+               [$save_LIBS])
+AC_SUBST([libevent_LIBS], [$LIBS])
+AS_IF([test -n "$missing_libevent"],
+      [AC_MSG_ERROR([could not find the libevent libraries])])
+LIBS="$save_LIBS"
 
 # Checks for typedefs, structures, and compiler characteristics.
 AC_TYPE_INT32_T
