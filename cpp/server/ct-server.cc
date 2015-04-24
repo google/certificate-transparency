@@ -95,6 +95,9 @@ DEFINE_bool(watchdog_timeout_is_fatal, true,
             "Exit if the watchdog timer fires.");
 DEFINE_int32(num_http_server_threads, 16,
              "Number of threads for servicing the incoming HTTP requests.");
+DEFINE_bool(i_know_stand_alone_mode_can_lose_data, false,
+            "Set this to allow stand-alone mode, even though it will lost "
+            "submissions in the case of a crash.");
 
 namespace libevent = cert_trans::libevent;
 
@@ -461,7 +464,10 @@ int main(int argc, char* argv[]) {
   UrlFetcher url_fetcher(event_base.get());
 
   const bool stand_alone_mode(FLAGS_etcd_host.empty());
-
+  if (stand_alone_mode && !FLAGS_i_know_stand_alone_mode_can_lose_data) {
+    LOG(FATAL) << "attempted to run in stand-alone mode without the "
+                  "--i_know_stand_alone_mode_can_lose_data flag";
+  }
   LOG(INFO) << "Running in "
             << (stand_alone_mode ? "STAND-ALONE" : "CLUSTERED") << " mode.";
 
