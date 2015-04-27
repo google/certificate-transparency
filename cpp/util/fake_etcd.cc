@@ -347,6 +347,42 @@ void FakeEtcdClient::InternalPut(const string& rawkey, const string& value,
 }
 
 
+void FakeEtcdClient::InternalDelete(const string& key,
+                                    const int64_t current_index, Task* task) {
+  VLOG(1) << "DELETE " << key;
+  CHECK(!key.empty());
+  CHECK_EQ(key.front(), '/');
+  CHECK_NE(key.back(), '/');
+
+  const string op_name(current_index > 0 ? "compareAndDelete" : "delete");
+
+  unique_lock<mutex> lock(mutex_);
+  PurgeExpiredEntriesWithLock(lock);
+  const map<string, Node>::iterator entry(entries_.find(key));
+  if (entry == entries_.end()) {
+    ++stats_[op_name + "Fail"];
+    task->Return(Status(util::error::NOT_FOUND, "Node doesn't exist: " + key));
+    return;
+  }
+  if (current_index > 0 && entry->second.modified_index_ != current_index) {
+    ++stats_[op_name + "Fail"];
+    task->Return(Status(util::error::FAILED_PRECONDITION,
+                        "Incorrect index:  prevIndex=" +
+                            to_string(current_index) +
+                            " but modified_index_=" +
+                            to_string(entry->second.modified_index_)));
+    return;
+  }
+  entry->second.modified_index_ = ++index_;
+  entry->second.value_.clear();
+  entry->second.deleted_ = true;
+  ++stats_[op_name + "Success"];
+  task->Return();
+  NotifyForPath(lock, key);
+  entries_.erase(entry);
+}
+
+
 void FakeEtcdClient::UpdateOperationStats(const string& op, const Task* task) {
   CHECK_NOTNULL(task);
   if (!task->IsActive()) {
@@ -416,35 +452,13 @@ void FakeEtcdClient::ForceSetWithTTL(const std::string& key,
 
 void FakeEtcdClient::Delete(const string& key, const int64_t current_index,
                             Task* task) {
-  VLOG(1) << "DELETE " << key;
-  CHECK(!key.empty());
-  CHECK_EQ(key.front(), '/');
-  CHECK_NE(key.back(), '/');
+  CHECK_GT(current_index, 0);
+  InternalDelete(key, current_index, task);
+}
 
-  unique_lock<mutex> lock(mutex_);
-  PurgeExpiredEntriesWithLock(lock);
-  const map<string, Node>::iterator entry(entries_.find(key));
-  if (entry == entries_.end()) {
-    ++stats_["compareAndDeleteFail"];
-    task->Return(Status(util::error::NOT_FOUND, "Node doesn't exist: " + key));
-    return;
-  }
-  if (entry->second.modified_index_ != current_index) {
-    ++stats_["compareAndDeleteFail"];
-    task->Return(Status(util::error::FAILED_PRECONDITION,
-                        "Incorrect index:  prevIndex=" +
-                            to_string(current_index) +
-                            " but modified_index_=" +
-                            to_string(entry->second.modified_index_)));
-    return;
-  }
-  entry->second.modified_index_ = ++index_;
-  entry->second.value_.clear();
-  entry->second.deleted_ = true;
-  ++stats_["compareAndDeleteSuccess"];
-  task->Return();
-  NotifyForPath(lock, key);
-  entries_.erase(entry);
+
+void FakeEtcdClient::ForceDelete(const string& key, Task* task) {
+  InternalDelete(key, 0, task);
 }
 
 

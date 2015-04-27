@@ -110,6 +110,8 @@ class EtcdClient {
   virtual void Delete(const std::string& key, const int64_t current_index,
                       util::Task* task);
 
+  virtual void ForceDelete(const std::string& key, util::Task* task);
+
   virtual void GetStoreStats(StatsResponse* resp, util::Task* task);
 
   // The "cb" will be called on the "task" executor. Also, only one

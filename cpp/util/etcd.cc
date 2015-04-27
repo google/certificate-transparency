@@ -814,6 +814,14 @@ void EtcdClient::Delete(const string& key, const int64_t current_index,
 }
 
 
+void EtcdClient::ForceDelete(const string& key, Task* task) {
+  GenericResponse* const gen_resp(new GenericResponse);
+  task->DeleteWhenDone(gen_resp);
+
+  Generic(key, kKeysSpace, {}, UrlFetcher::Verb::DELETE, gen_resp, task);
+}
+
+
 void EtcdClient::GetStoreStats(StatsResponse* resp, Task* task) {
   map<string, string> params;
   GenericResponse* const gen_resp(new GenericResponse);

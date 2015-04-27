@@ -34,6 +34,7 @@ class MockEtcdClient : public EtcdClient {
                     util::Task* task));
   MOCK_METHOD3(Delete, void(const std::string& key,
                             const int64_t current_index, util::Task* task));
+  MOCK_METHOD2(ForceDelete, void(const std::string& key, util::Task* task));
   MOCK_METHOD2(GetStoreStats,
                void(EtcdClient::StatsResponse* resp, util::Task* task));
   MOCK_METHOD3(Watch, void(const std::string& key, const WatchCallback& cb,

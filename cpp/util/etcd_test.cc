@@ -607,6 +607,23 @@ TEST_F(EtcdTest, DeleteFails) {
               StatusIs(util::error::FAILED_PRECONDITION, "Compare failed"));
 }
 
+TEST_F(EtcdTest, ForceDelete) {
+  EXPECT_CALL(url_fetcher_,
+              Fetch(IsUrlFetchRequest(UrlFetcher::Verb::DELETE,
+                                      URL(GetEtcdUrl(kEntryKey) +
+                                          "?consistent=true&quorum=true"),
+                                      IsEmpty(), ""),
+                    _, _))
+      .WillOnce(
+          Invoke(bind(HandleFetch, Status::OK, 200,
+                      UrlFetcher::Headers{make_pair("x-etcd-index", "1")},
+                      kDeleteJson, _1, _2, _3)));
+  SyncTask task(base_.get());
+  client_.ForceDelete(kEntryKey, task.task());
+  task.Wait();
+  EXPECT_OK(task);
+}
+
 TEST_F(EtcdTest, GetStoreStats) {
   EXPECT_CALL(url_fetcher_,
               Fetch(IsUrlFetchRequest(UrlFetcher::Verb::GET,

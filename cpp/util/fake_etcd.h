@@ -50,6 +50,8 @@ class FakeEtcdClient : public EtcdClient {
   void Delete(const std::string& key, const int64_t current_index,
               util::Task* task) override;
 
+  void ForceDelete(const std::string& key, util::Task* task) override;
+
   void GetStoreStats(StatsResponse* resp, util::Task* task) override;
 
   // The callbacks for *all* watches will be called one at a time, in
@@ -71,6 +73,9 @@ class FakeEtcdClient : public EtcdClient {
                    const std::chrono::system_clock::time_point& expires,
                    bool create, int64_t prev_index, Response* resp,
                    util::Task* task);
+
+  void InternalDelete(const std::string& key, const int64_t current_index,
+                      util::Task* task);
 
   void UpdateOperationStats(const std::string& op, const util::Task* task);
 
