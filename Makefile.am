@@ -434,7 +434,7 @@ cpp_monitor_database_test_LDADD = \
 	cpp/libcore.a \
 	cpp/libtest.a \
 	$(libevent_LIBS) \
-	-lglog -lgflags -lprotobuf -lcrypto -lsqlite3
+	-lglog -lgflags -lprotobuf -lcrypto -lsqlite3 -lpthread
 cpp_monitor_database_test_SOURCES = \
 	cpp/log/test_signer.cc \
 	cpp/monitor/database.cc \
