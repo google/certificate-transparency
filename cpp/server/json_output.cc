@@ -59,7 +59,7 @@ string LogRequest(evhttp_request* req, int http_status, int resp_body_length) {
 
   const string path(evhttp_uri_get_path(evhttp_request_get_evhttp_uri(req)));
   total_http_server_requests->Increment(path);
-  total_http_server_response_codes->Increment(path, req->response_code);
+  total_http_server_response_codes->Increment(path, http_status);
 
   const string uri(evhttp_request_get_uri(req));
   return string(peer_addr) + " \"" + http_verb + " " + uri + "\" " +
