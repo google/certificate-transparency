@@ -90,6 +90,7 @@ def write_log_info_struct_definition(f, log_key_length):
         "struct CTLogInfo {\n"
         "  const char log_key[%d];\n"
         "  const char* const log_name;\n"
+        "  const char* const log_url;\n"
         "};\n\n" % log_key_length))
 
 
@@ -118,7 +119,8 @@ def generate_code_for_chromium(json_log_list, output_file):
                          for i in range(num_splits)]
         s = "    {"
         s += "\n     ".join(split_hex_key)
-        s += ',\n     "%s"}' % (log["description"])
+        s += ',\n     "%s"' % (log["description"])
+        s += ',\n     "https://%s"}' % (log["url"])
         list_code.append(s)
         if not key_length_in_bytes:
             key_length_in_bytes = len(log_key)
