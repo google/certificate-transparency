@@ -23,7 +23,7 @@ function WaitForEtcd() {
 }
 
 function PopulateEtcd() {
-  export PUT="curl -s -L -X PUT"
+  export PUT="curl -s -L -X PUT --retry 10"
   export ETCD="${ETCD_MACHINES[1]}:4001"
   gcloud compute ssh ${ETCD_MACHINES[1]} --command "\
     ${PUT} ${ETCD}/v2/keys/root/serving_sth && \
