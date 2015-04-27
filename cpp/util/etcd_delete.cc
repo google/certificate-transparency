@@ -8,7 +8,6 @@
 using std::bind;
 using std::move;
 using std::mutex;
-using std::pair;
 using std::placeholders::_1;
 using std::string;
 using std::unique_lock;
@@ -26,8 +25,7 @@ namespace {
 
 class DeleteState {
  public:
-  DeleteState(EtcdClient* client, vector<pair<string, int64_t>>&& keys,
-              Task* task)
+  DeleteState(EtcdClient* client, vector<string>&& keys, Task* task)
       : client_(CHECK_NOTNULL(client)),
         task_(CHECK_NOTNULL(task)),
         outstanding_(0),
@@ -55,8 +53,8 @@ class DeleteState {
   Task* const task_;
   mutex mutex_;
   int outstanding_;
-  const vector<pair<string, int64_t>> keys_;
-  vector<pair<string, int64_t>>::const_iterator it_;
+  const vector<string> keys_;
+  vector<string>::const_iterator it_;
 };
 
 
@@ -64,9 +62,11 @@ void DeleteState::RequestDone(Task* child_task) {
   unique_lock<mutex> lock(mutex_);
   --outstanding_;
 
-  // If a child task has an error, return that error, and do not start
-  // any more requests.
-  if (!child_task->status().ok()) {
+  // If a child task has an error (except for not found, this is close
+  // enough to success), return that error, and do not start any more
+  // requests.
+  if (!child_task->status().ok() &&
+      child_task->status().CanonicalCode() != util::error::NOT_FOUND) {
     lock.unlock();
     task_->Return(child_task->status());
     return;
@@ -97,16 +97,15 @@ void DeleteState::StartNextRequest(unique_lock<mutex>&& lock) {
   while (outstanding_ < FLAGS_etcd_delete_concurrency && it_ != keys_.end() &&
          task_->IsActive()) {
     CHECK(lock.owns_lock());
-    const pair<string, int64_t>& key(*it_);
+    const string& key(*it_);
     ++it_;
     ++outstanding_;
 
     // In case the task uses an inline executor.
     lock.unlock();
 
-    client_->Delete(key.first, key.second,
-                    task_->AddChild(
-                        bind(&DeleteState::RequestDone, this, _1)));
+    client_->ForceDelete(key, task_->AddChild(
+                                  bind(&DeleteState::RequestDone, this, _1)));
 
     // We must be holding the lock to evaluate the loop condition.
     lock.lock();
@@ -117,8 +116,8 @@ void DeleteState::StartNextRequest(unique_lock<mutex>&& lock) {
 }  // namespace
 
 
-void EtcdDeleteKeys(EtcdClient* client, vector<pair<string, int64_t>>&& keys,
-                    Task* task) {
+void EtcdForceDeleteKeys(EtcdClient* client, vector<string>&& keys,
+                         Task* task) {
   TaskHold hold(CHECK_NOTNULL(task));
   DeleteState* const state(new DeleteState(client, move(keys), task));
   task->DeleteWhenDone(state);

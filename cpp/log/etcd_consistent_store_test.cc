@@ -728,7 +728,6 @@ TEST_F(EtcdConsistentStoreTest, TestCleansUpToNewSTH) {
   EXPECT_EQ(orig_seq_mapping.Entry().DebugString(),
             seq_mapping.Entry().DebugString());
 
-
   // Now update ServingSTH so that all sequenced entries should be cleaned up:
   sth.set_timestamp(sth.timestamp() + 1);
   sth.set_tree_size(105);
@@ -736,7 +735,7 @@ TEST_F(EtcdConsistentStoreTest, TestCleansUpToNewSTH) {
   {
     const StatusOr<int64_t> num_cleaned(CleanupOldEntries());
     ASSERT_OK(num_cleaned.status());
-    EXPECT_EQ(2, num_cleaned.ValueOrDie());
+    EXPECT_EQ(5, num_cleaned.ValueOrDie());
   }
 
 

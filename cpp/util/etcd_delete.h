@@ -3,7 +3,6 @@
 
 #include <stdint.h>
 #include <string>
-#include <utility>
 #include <vector>
 
 #include "util/etcd.h"
@@ -11,9 +10,10 @@
 namespace cert_trans {
 
 
-void EtcdDeleteKeys(EtcdClient* client,
-                    std::vector<std::pair<std::string, int64_t>>&& keys,
-                    util::Task* task);
+// Force delete keys in batches (implemented using concurrent
+// requests). The "keys" argument are pairs of key and modified index.
+void EtcdForceDeleteKeys(EtcdClient* client, std::vector<std::string>&& keys,
+                         util::Task* task);
 
 
 }  // namespace cert_trans

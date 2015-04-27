@@ -10,14 +10,16 @@
 
 using std::bind;
 using std::chrono::seconds;
-using std::make_pair;
 using std::move;
-using std::pair;
+using std::placeholders::_2;
+using std::placeholders::_3;
 using std::string;
 using std::vector;
 using testing::DoAll;
 using testing::Exactly;
 using testing::Expectation;
+using testing::IgnoreResult;
+using testing::Invoke;
 using testing::InvokeWithoutArgs;
 using testing::Mock;
 using testing::MockFunction;
@@ -53,7 +55,7 @@ TEST_F(EtcdDeleteDeathTest, ConcurrencyTooLow) {
   FLAGS_etcd_delete_concurrency = 0;
   SyncTask sync(&pool_);
 
-  EXPECT_DEATH(EtcdDeleteKeys(&client_, {}, sync.task()),
+  EXPECT_DEATH(EtcdForceDeleteKeys(&client_, {}, sync.task()),
                "FLAGS_etcd_delete_concurrency > 0");
 
   sync.task()->Return();
@@ -64,7 +66,7 @@ TEST_F(EtcdDeleteDeathTest, ConcurrencyTooLow) {
 TEST_F(EtcdDeleteDeathTest, NoClient) {
   SyncTask sync(&pool_);
 
-  EXPECT_DEATH(EtcdDeleteKeys(nullptr, {}, sync.task()),
+  EXPECT_DEATH(EtcdForceDeleteKeys(nullptr, {}, sync.task()),
                "'client' Must be non NULL");
 
   sync.task()->Return();
@@ -73,14 +75,14 @@ TEST_F(EtcdDeleteDeathTest, NoClient) {
 
 
 TEST_F(EtcdDeleteDeathTest, NoTask) {
-  EXPECT_DEATH(EtcdDeleteKeys(&client_, {}, nullptr),
+  EXPECT_DEATH(EtcdForceDeleteKeys(&client_, {}, nullptr),
                "'task' Must be non NULL");
 }
 
 
 TEST_F(EtcdDeleteTest, NothingToDo) {
   SyncTask sync(&pool_);
-  EtcdDeleteKeys(&client_, {}, sync.task());
+  EtcdForceDeleteKeys(&client_, {}, sync.task());
   sync.Wait();
   EXPECT_OK(sync.status());
 }
@@ -89,16 +91,14 @@ TEST_F(EtcdDeleteTest, NothingToDo) {
 TEST_F(EtcdDeleteTest, AlreadyCancelled) {
   SyncTask sync(&pool_);
   sync.Cancel();
-  EtcdDeleteKeys(&client_, {make_pair("/foo", 42)}, sync.task());
+  EtcdForceDeleteKeys(&client_, {"/foo"}, sync.task());
   sync.Wait();
   EXPECT_THAT(sync.status(), StatusIs(util::error::CANCELLED));
 }
 
 
 TEST_F(EtcdDeleteTest, CancelDuring) {
-  vector<pair<string, int64_t> > keys{make_pair("/one", 1),
-                                      make_pair("/two", 2),
-                                      make_pair("/three", 3)};
+  vector<string> keys{"/one", "/two", "/three"};
   ASSERT_LT(FLAGS_etcd_delete_concurrency, keys.size());
   SyncTask sync(&pool_);
 
@@ -106,13 +106,13 @@ TEST_F(EtcdDeleteTest, CancelDuring) {
   Notification first;
   Task* second_task(nullptr);
   Notification second;
-  EXPECT_CALL(client_, Delete("/one", 1, _))
-      .WillOnce(DoAll(SaveArg<2>(&first_task),
+  EXPECT_CALL(client_, ForceDelete("/one", _))
+      .WillOnce(DoAll(SaveArg<1>(&first_task),
                       InvokeWithoutArgs(&first, &Notification::Notify)));
-  EXPECT_CALL(client_, Delete("/two", 2, _))
-      .WillOnce(DoAll(SaveArg<2>(&second_task),
+  EXPECT_CALL(client_, ForceDelete("/two", _))
+      .WillOnce(DoAll(SaveArg<1>(&second_task),
                       InvokeWithoutArgs(&second, &Notification::Notify)));
-  EtcdDeleteKeys(&client_, move(keys), sync.task());
+  EtcdForceDeleteKeys(&client_, move(keys), sync.task());
 
   ASSERT_TRUE(first.WaitForNotificationWithTimeout(seconds(1)));
   ASSERT_TRUE(first_task);
@@ -129,9 +129,7 @@ TEST_F(EtcdDeleteTest, CancelDuring) {
 
 
 TEST_F(EtcdDeleteTest, WithinConcurrency) {
-  vector<pair<string, int64_t> > keys{make_pair("/one", 1),
-                                      make_pair("/two", 2),
-                                      make_pair("/three", 3)};
+  vector<string> keys{"/one", "/two", "/three"};
   ASSERT_LT(FLAGS_etcd_delete_concurrency, keys.size());
   SyncTask sync(&pool_);
 
@@ -139,13 +137,13 @@ TEST_F(EtcdDeleteTest, WithinConcurrency) {
   Notification first;
   Task* second_task(nullptr);
   Notification second;
-  EXPECT_CALL(client_, Delete("/one", 1, _))
-      .WillOnce(DoAll(SaveArg<2>(&first_task),
+  EXPECT_CALL(client_, ForceDelete("/one", _))
+      .WillOnce(DoAll(SaveArg<1>(&first_task),
                       InvokeWithoutArgs(&first, &Notification::Notify)));
-  EXPECT_CALL(client_, Delete("/two", 2, _))
-      .WillOnce(DoAll(SaveArg<2>(&second_task),
+  EXPECT_CALL(client_, ForceDelete("/two", _))
+      .WillOnce(DoAll(SaveArg<1>(&second_task),
                       InvokeWithoutArgs(&second, &Notification::Notify)));
-  EtcdDeleteKeys(&client_, move(keys), sync.task());
+  EtcdForceDeleteKeys(&client_, move(keys), sync.task());
 
   ASSERT_TRUE(first.WaitForNotificationWithTimeout(seconds(1)));
   ASSERT_TRUE(first_task);
@@ -163,9 +161,9 @@ TEST_F(EtcdDeleteTest, WithinConcurrency) {
   // the first requests "completes".
   Task* third_task(nullptr);
   Notification third;
-  EXPECT_CALL(client_, Delete("/three", 3, _))
+  EXPECT_CALL(client_, ForceDelete("/three", _))
       .After(first_done)
-      .WillOnce(DoAll(SaveArg<2>(&third_task),
+      .WillOnce(DoAll(SaveArg<1>(&third_task),
                       InvokeWithoutArgs(&third, &Notification::Notify)));
 
   second_task->Return();
@@ -182,9 +180,7 @@ TEST_F(EtcdDeleteTest, WithinConcurrency) {
 
 
 TEST_F(EtcdDeleteTest, ErrorHandling) {
-  vector<pair<string, int64_t> > keys{make_pair("/one", 1),
-                                      make_pair("/two", 2),
-                                      make_pair("/three", 3)};
+  vector<string> keys{"/one", "/two", "/three"};
   ASSERT_LT(FLAGS_etcd_delete_concurrency, keys.size());
   SyncTask sync(&pool_);
 
@@ -192,13 +188,13 @@ TEST_F(EtcdDeleteTest, ErrorHandling) {
   Notification first;
   Task* second_task(nullptr);
   Notification second;
-  EXPECT_CALL(client_, Delete("/one", 1, _))
-      .WillOnce(DoAll(SaveArg<2>(&first_task),
+  EXPECT_CALL(client_, ForceDelete("/one", _))
+      .WillOnce(DoAll(SaveArg<1>(&first_task),
                       InvokeWithoutArgs(&first, &Notification::Notify)));
-  EXPECT_CALL(client_, Delete("/two", 2, _))
-      .WillOnce(DoAll(SaveArg<2>(&second_task),
+  EXPECT_CALL(client_, ForceDelete("/two", _))
+      .WillOnce(DoAll(SaveArg<1>(&second_task),
                       InvokeWithoutArgs(&second, &Notification::Notify)));
-  EtcdDeleteKeys(&client_, move(keys), sync.task());
+  EtcdForceDeleteKeys(&client_, move(keys), sync.task());
 
   ASSERT_TRUE(first.WaitForNotificationWithTimeout(seconds(1)));
   ASSERT_TRUE(first_task);

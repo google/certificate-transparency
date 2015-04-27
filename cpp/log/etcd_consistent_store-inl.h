@@ -828,49 +828,21 @@ util::StatusOr<int64_t> EtcdConsistentStore<Logged>::CleanupOldEntries() {
     return status;
   }
 
-  std::vector<EntryHandle<LoggedCertificate>> pending_entries;
-  status = GetPendingEntries(&pending_entries);
-  if (!status.ok()) {
-    LOG(WARNING) << "Failed to get pending entries for cleanup: " << status;
-    return status;
-  }
-  std::unordered_map<std::string, EntryHandle<LoggedCertificate>*>
-      pending_by_hash;
-  for (auto it(pending_entries.begin()); it != pending_entries.end(); ++it) {
-    CHECK(pending_by_hash.insert(std::make_pair(it->Entry().Hash(), &(*it)))
-              .second);
-  }
-
-  int mapping_index;
-  std::vector<std::pair<std::string, int64_t>> keys_to_delete;
-  for (mapping_index = 0;
+  std::vector<std::string> keys_to_delete;
+  for (int mapping_index = 0;
        mapping_index < sequence_mapping.Entry().mapping_size() &&
-           sequence_mapping.Entry().mapping(mapping_index).sequence_number() <=
-               clean_up_to_sequence_number;
+       sequence_mapping.Entry().mapping(mapping_index).sequence_number() <=
+           clean_up_to_sequence_number;
        ++mapping_index) {
-    const uint64_t sequence_number(
-        sequence_mapping.Entry().mapping(mapping_index).sequence_number());
-
-    // First we delete the corresponding entry from /entries
-    const std::string hash(
-        sequence_mapping.Entry().mapping(mapping_index).entry_hash());
-    auto it(pending_by_hash.find(hash));
-    if (it == pending_by_hash.end()) {
-      // Log a warning here, but don't bail on the clean up as we could just
-      // be recovering from a crash halfway through a previous clean up.
-      LOG(WARNING) << "Cleanup couldn't get entry (" << util::ToBase64(hash)
-                   << ") corresponding to sequenced entry #" << sequence_number
-                   << " : " << status;
-      continue;
-    }
-    keys_to_delete.emplace_back(
-        std::make_pair(it->second->Key(), it->second->Handle()));
-    VLOG(1) << "Cleanup will delete entry (" << util::ToBase64(hash)
-            << ") corresponding to sequence number " << sequence_number;
+    // Delete the entry from /entries.
+    keys_to_delete.emplace_back(GetEntryPath(
+        sequence_mapping.Entry().mapping(mapping_index).entry_hash()));
   }
+
+
   const int64_t num_entries_cleaned(keys_to_delete.size());
   util::SyncTask task(executor_);
-  EtcdDeleteKeys(client_, std::move(keys_to_delete), task.task());
+  EtcdForceDeleteKeys(client_, std::move(keys_to_delete), task.task());
   task.Wait();
   status = task.status();
   if (!status.ok()) {
