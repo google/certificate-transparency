@@ -15,7 +15,7 @@ class LogDBTest(object):
     # Set up a default fake test log server and STH.
     default_log = client_pb2.CtLogMetadata()
     default_log.log_server = "test"
-    default_log.log_id = "somekeyid"
+    default_log.log_id = "c29tZWtleWlk"  # b64("somekeyid")
     default_log.public_key_info.type = client_pb2.KeyInfo.ECDSA
     default_log.public_key_info.pem_key = "base64encodedkey"
 
@@ -113,6 +113,7 @@ class LogDBTest(object):
 
         new_log = client_pb2.CtLogMetadata()
         new_log.log_server = "test2"
+        new_log.log_id = "c29tZW90aGVya2V5aWQ="  # b64("someotherkeyid")
         self.db().add_log(new_log)
 
         new_sth.sth.sha256_root_hash = "hash2"
