@@ -69,8 +69,12 @@ sqlite3* SQLiteOpen(const std::string& dbfile) {
                            SQLITE_OPEN_READWRITE | SQLITE_OPEN_CREATE,
                            nullptr));
   CHECK_EQ(SQLITE_OK, sqlite3_exec(retval,
-                                   "CREATE TABLE leaves(hash BLOB UNIQUE, "
+                                   "CREATE TABLE leaves(hash BLOB, "
                                    "entry BLOB, sequence INTEGER UNIQUE)",
+                                   nullptr, nullptr, nullptr));
+  CHECK_EQ(SQLITE_OK, sqlite3_exec(retval,
+                                   "CREATE INDEX leaves_hash_idx ON "
+                                   "leaves(hash)",
                                    nullptr, nullptr, nullptr));
   CHECK_EQ(SQLITE_OK,
            sqlite3_exec(
@@ -164,6 +168,8 @@ typename Database<Logged>::WriteResult SQLiteDB<Logged>::CreateSequencedEntry_(
 
   int ret = statement.Step();
   if (ret == SQLITE_CONSTRAINT) {
+    // Check whether we're trying to store a hash/sequence pair which already
+    // exists - if it's identical we'll return OK as it could be the fetcher.
     sqlite::Statement s2(
         db_, "SELECT sequence, hash FROM leaves WHERE sequence = ?");
     s2.BindUInt64(0, logged.sequence_number());
@@ -174,14 +180,8 @@ typename Database<Logged>::WriteResult SQLiteDB<Logged>::CreateSequencedEntry_(
       if (hash == existing_hash) {
         return this->OK;
       }
-
-      return this->SEQUENCE_NUMBER_ALREADY_IN_USE;
     }
-
-    sqlite::Statement s3(db_, "SELECT hash FROM leaves WHERE hash = ?");
-    s3.BindBlob(0, hash);
-    CHECK_EQ(SQLITE_ROW, s3.Step());
-    return this->ENTRY_ALREADY_LOGGED;
+    return this->SEQUENCE_NUMBER_ALREADY_IN_USE;
   }
   CHECK_EQ(SQLITE_DONE, ret);
 
@@ -202,7 +202,7 @@ typename Database<Logged>::LookupResult SQLiteDB<Logged>::LookupByHash(
 
   sqlite::Statement statement(db_,
                               "SELECT entry, sequence FROM leaves "
-                              "WHERE hash = ?");
+                              "WHERE hash = ? ORDER BY sequence LIMIT 1");
 
   statement.BindBlob(0, hash);
 

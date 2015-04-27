@@ -30,6 +30,16 @@ static cert_trans::Latency<std::chrono::milliseconds, std::string>
 const char kMetaNodeIdKey[] = "node_id";
 
 
+std::string FormatSequenceNumber(const int64_t seq) {
+  return std::to_string(seq);
+}
+
+
+int64_t ParseSequenceNumber(const std::string& seq) {
+  return std::stoll(seq);
+}
+
+
 }  // namespace
 
 template <class Logged>
@@ -43,6 +53,7 @@ FileDB<Logged>::FileDB(cert_trans::FileStorage* cert_storage,
     : cert_storage_(CHECK_NOTNULL(cert_storage)),
       tree_storage_(CHECK_NOTNULL(tree_storage)),
       meta_storage_(CHECK_NOTNULL(meta_storage)),
+      contiguous_size_(0),
       latest_tree_timestamp_(0) {
   cert_trans::ScopedLatency latency(latency_by_op_ms.GetScopedLatency("open"));
   BuildIndex();
@@ -62,36 +73,27 @@ typename Database<Logged>::WriteResult FileDB<Logged>::CreateSequencedEntry_(
   cert_trans::ScopedLatency latency(
       latency_by_op_ms.GetScopedLatency("create_sequenced_entry"));
 
-  std::unique_lock<std::mutex> lock(lock_);
-  util::StatusOr<std::string> old_hash(
-      HashFromIndex(lock, logged.sequence_number()));
-  const std::string new_hash(logged.Hash());
-
-  if (old_hash.ok()) {
-    // Same log entry resubmitted, this is fine.
-    if (new_hash == old_hash.ValueOrDie()) {
-      return this->OK;
-    }
-
-    LOG(WARNING) << "Attempting to re-use sequence number "
-                 << logged.sequence_number() << " for entry: " << new_hash
-                 << " (existing: (" << old_hash.ValueOrDie() << "):\n"
-                 << logged.DebugString();
-
-    return this->SEQUENCE_NUMBER_ALREADY_IN_USE;
-  }
-
   std::string data;
   CHECK(logged.SerializeToString(&data));
 
+  const std::string seq_str(FormatSequenceNumber(logged.sequence_number()));
+
+  std::unique_lock<std::mutex> lock(lock_);
+
   // Try to create.
-  util::Status status(cert_storage_->CreateEntry(new_hash, data));
+  util::Status status(cert_storage_->CreateEntry(seq_str, data));
   if (status.CanonicalCode() == util::error::ALREADY_EXISTS) {
-    return this->ENTRY_ALREADY_LOGGED;
+    std::string existing_data;
+    status = cert_storage_->LookupEntry(seq_str, &existing_data);
+    CHECK_EQ(status, util::Status::OK);
+    if (existing_data == data) {
+      return this->OK;
+    }
+    return this->SEQUENCE_NUMBER_ALREADY_IN_USE;
   }
   CHECK_EQ(status, util::Status::OK);
 
-  InsertEntryMapping(logged.sequence_number(), new_hash);
+  InsertEntryMapping(logged.sequence_number(), logged.Hash());
 
   return this->OK;
 }
@@ -102,11 +104,20 @@ typename Database<Logged>::LookupResult FileDB<Logged>::LookupByHash(
     const std::string& hash, Logged* result) const {
   cert_trans::ScopedLatency latency(
       latency_by_op_ms.GetScopedLatency("lookup_by_hash"));
-  std::string cert_data;
-  util::Status status(cert_storage_->LookupEntry(hash, &cert_data));
-  if (status.CanonicalCode() == util::error::NOT_FOUND) {
+
+  std::unique_lock<std::mutex> lock(lock_);
+
+  auto i(id_by_hash_.find(hash));
+  if (i == id_by_hash_.end()) {
     return this->NOT_FOUND;
   }
+  const std::string seq_str(FormatSequenceNumber(i->second));
+
+  lock.unlock();
+
+  std::string cert_data;
+  const util::Status status(cert_storage_->LookupEntry(seq_str, &cert_data));
+  // Gotta be there, or we're in trouble...
   CHECK_EQ(status, util::Status::OK);
 
   Logged logged;
@@ -128,22 +139,16 @@ typename Database<Logged>::LookupResult FileDB<Logged>::LookupByIndex(
   cert_trans::ScopedLatency latency(
       latency_by_op_ms.GetScopedLatency("lookup_by_index"));
 
-  util::StatusOr<std::string> hash(
-      HashFromIndex(std::unique_lock<std::mutex>(lock_), sequence_number));
-  if (!hash.ok()) {
+  const std::string seq_str(FormatSequenceNumber(sequence_number));
+  std::string cert_data;
+  if (cert_storage_->LookupEntry(seq_str, &cert_data).CanonicalCode() ==
+      util::error::NOT_FOUND) {
     return this->NOT_FOUND;
   }
-
   if (result) {
-    std::string cert_data;
-    CHECK_EQ(cert_storage_->LookupEntry(hash.ValueOrDie(), &cert_data),
-             util::Status::OK);
-
     CHECK(result->ParseFromString(cert_data));
     CHECK_EQ(result->sequence_number(), sequence_number);
-    CHECK_EQ(result->Hash(), hash.ValueOrDie());
   }
-
   return this->LOOKUP_OK;
 }
 
@@ -205,7 +210,7 @@ int64_t FileDB<Logged>::TreeSize() const {
       latency_by_op_ms.GetScopedLatency("tree_size"));
   std::lock_guard<std::mutex> lock(lock_);
 
-  return dense_entries_.size();
+  return contiguous_size_;
 }
 
 
@@ -267,26 +272,27 @@ void FileDB<Logged>::BuildIndex() {
   // this should not be necessarily, but just to be sure...
   std::lock_guard<std::mutex> lock(lock_);
 
-  const std::set<std::string> hashes(cert_storage_->Scan());
-  dense_entries_.reserve(hashes.size());
+  const std::set<std::string> sequence_numbers(cert_storage_->Scan());
+  id_by_hash_.reserve(sequence_numbers.size());
 
-  for (const auto& hash : hashes) {
+  for (const auto& seq_path : sequence_numbers) {
+    const int64_t seq(ParseSequenceNumber(seq_path));
     std::string cert_data;
     // Read the data; tolerate no errors.
-    CHECK_EQ(cert_storage_->LookupEntry(hash, &cert_data), util::Status::OK)
-        << "Failed to read entry with hash " << hash;
+    CHECK_EQ(cert_storage_->LookupEntry(seq_path, &cert_data),
+             util::Status::OK)
+        << "Failed to read entry with sequence number " << seq;
 
     Logged logged;
     CHECK(logged.ParseFromString(cert_data))
-        << "Failed to parse entry with hash " << hash;
+        << "Failed to parse entry with sequence number " << seq;
     CHECK(logged.has_sequence_number())
-        << "No sequence number for entry with hash " << hash;
-    CHECK_GE(logged.sequence_number(), 0)
-        << "Entry has a negative sequence number: " << hash;
-    CHECK_EQ(logged.Hash(), hash) << "Incorrect digest for entry with hash "
-                                  << hash;
+        << "sequence_number() is unset for for entry with sequence number "
+        << seq;
+    CHECK_EQ(logged.sequence_number(), seq)
+        << "Entry has a negative sequence_number(): " << seq;
 
-    InsertEntryMapping(logged.sequence_number(), hash);
+    InsertEntryMapping(logged.sequence_number(), logged.Hash());
   }
 
   // Now read the STH entries.
@@ -319,58 +325,27 @@ typename Database<Logged>::LookupResult FileDB<Logged>::LatestTreeHeadNoLock(
 }
 
 
-template <class Logged>
-util::StatusOr<std::string> FileDB<Logged>::HashFromIndex(
-    const std::unique_lock<std::mutex>& lock, int64_t sequence_number) const {
-  CHECK(lock.owns_lock());
-  CHECK_GE(sequence_number, 0);
-
-  if (sequence_number < dense_entries_.size()) {
-    return dense_entries_[sequence_number];
-  }
-
-  std::map<int64_t, std::string>::const_iterator it(
-      sparse_entries_.find(sequence_number));
-  if (it != sparse_entries_.end()) {
-    return it->second;
-  }
-
-  return util::Status(util::error::NOT_FOUND,
-                      "no entry found for index " +
-                          std::to_string(sequence_number));
-}
-
-
 // This must be called with "lock_" held.
 template <class Logged>
 void FileDB<Logged>::InsertEntryMapping(int64_t sequence_number,
                                         const std::string& hash) {
-  CHECK_GE(sequence_number, dense_entries_.size())
-      << "sequence number " << sequence_number
-      << " already assigned when inserting hash " << hash;
+  if (!id_by_hash_.insert(std::make_pair(hash, sequence_number)).second) {
+    // This is a duplicate hash under a new sequence number.
+    // Make sure we track the entry with the lowest sequence number:
+    id_by_hash_[hash] = std::min(id_by_hash_[hash], sequence_number);
+  }
 
-  if (sequence_number == dense_entries_.size()) {
-    // We're optimistic!
-    dense_entries_.reserve(dense_entries_.size() + sparse_entries_.size() + 1);
-
-    // It's contiguous, put it back there, and check if we can pull in
-    // sparse entries.
-    dense_entries_.push_back(hash);
-
-    std::map<int64_t, std::string>::const_iterator it(sparse_entries_.begin());
-    while (it != sparse_entries_.end()) {
-      if (it->first != dense_entries_.size()) {
-        break;
-      }
-
-      dense_entries_.emplace_back(it->second);
-      it = sparse_entries_.erase(it);
+  if (sequence_number == contiguous_size_) {
+    ++contiguous_size_;
+    for (auto i = sparse_entries_.find(contiguous_size_);
+         i != sparse_entries_.end() && *i == contiguous_size_;) {
+      ++contiguous_size_;
+      i = sparse_entries_.erase(i);
     }
   } else {
     // It's not contiguous, put it with the other sparse entries.
-    CHECK(sparse_entries_.insert(make_pair(sequence_number, hash)).second)
-        << "sequence number " << sequence_number
-        << " already assigned when inserting hash " << hash;
+    CHECK(sparse_entries_.insert(sequence_number).second)
+        << "sequence number " << sequence_number << " already assigned.";
   }
 }
 

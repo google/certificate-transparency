@@ -111,19 +111,25 @@ TYPED_TEST(DBTest, CreateSequencedDuplicateEntryNewSequenceNumber) {
 
   EXPECT_EQ(DB::OK, this->db()->CreateSequencedEntry(logged_cert));
 
-  EXPECT_EQ(DB::ENTRY_ALREADY_LOGGED,
-            this->db()->CreateSequencedEntry(duplicate_cert));
+  EXPECT_EQ(DB::OK, this->db()->CreateSequencedEntry(duplicate_cert));
 
   EXPECT_EQ(DB::LOOKUP_OK,
             this->db()->LookupByHash(logged_cert.Hash(), &lookup_cert));
   // Check that we get the original entry back.
   TestSigner::TestEqualLoggedCerts(logged_cert, lookup_cert);
 
+  // Check that we can find it by sequence number too:
   lookup_cert.Clear();
   EXPECT_EQ(DB::LOOKUP_OK,
             this->db()->LookupByIndex(logged_cert.sequence_number(),
                                       &lookup_cert));
-  TestSigner::TestEqualLoggedCerts(logged_cert, lookup_cert);
+
+  // And that we can find the duplicate ok as well:
+  lookup_cert.Clear();
+  EXPECT_EQ(DB::LOOKUP_OK,
+            this->db()->LookupByIndex(duplicate_cert.sequence_number(),
+                                      &lookup_cert));
+  TestSigner::TestEqualLoggedCerts(duplicate_cert, lookup_cert);
 }
 
 

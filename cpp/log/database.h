@@ -48,9 +48,13 @@
 // };
 //
 // NOTE: This is a database interface for the log server.
-// Monitors/auditors shouldn't assume that log entries are keyed
-// uniquely by certificate hash -- it is an artefact of this
-// implementation, not a requirement of the I-D.
+// Implementations of this interface MUST provide for the same certificate
+// being sequenced multiple times in the tree.
+// Although the log server implementation which uses this database interface
+// should not allow duplicate entries to be created, this code base will also
+// support running in a log mirroring mode, and since the RFC does not forbid
+// the same certificate appearing multiple times in a log 3rd party logs may
+// exhibit this behavour the mirror must permit it too.
 
 
 template <class Logged>
@@ -114,13 +118,9 @@ class Database : public ReadOnlyDatabase<Logged> {
     MISSING_CERTIFICATE_HASH,
     // Create failed, an entry with this hash already exists.
     DUPLICATE_CERTIFICATE_HASH,
-    // Update failed, entry already has a sequence number.
-    ENTRY_ALREADY_LOGGED,
     // Update failed, entry does not exist.
     ENTRY_NOT_FOUND,
     // Another entry has this sequence number already.
-    // We only report this if the entry is pending (i.e., ENTRY_NOT_FOUND
-    // and ENTRY_ALREADY_LOGGED did not happen).
     SEQUENCE_NUMBER_ALREADY_IN_USE,
     // Timestamp is primary key, it must exist and be unique,
     DUPLICATE_TREE_HEAD_TIMESTAMP,
