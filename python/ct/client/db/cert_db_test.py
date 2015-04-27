@@ -108,7 +108,7 @@ class CertDBTest(object):
         for i in range(4):
             cert = certificate_pb2.X509Description()
             cert.der = "hello-%d" % i
-            cert.subject.extend([name_attribute("trusty ca %d" % i)])
+            cert.subject.extend([name_attribute("Trusty CA %d" % i)])
             cert.sha256_hash = str(i)
             self.db().store_cert_desc(cert, i, 0)
 
