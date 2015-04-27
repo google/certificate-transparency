@@ -81,8 +81,7 @@ def process_name(subject, reverse=True):
     # For now, make indexing work for the common case:
     # allow letter-digit-hyphen, as well as wildcards (RFC 2818).
     forbidden = re.compile(r"[^a-z\d\-\*]")
-    subject = subject.lower()
-    labels = subject.split(".")
+    labels = subject.lower().split(".")
     valid = all(map(lambda x: len(x) and not forbidden.search(x), labels))
 
     if valid:
@@ -91,7 +90,7 @@ def process_name(subject, reverse=True):
         return list(reversed(labels)) if reverse else labels
 
     else:
-        # ["john smith"], ["trustworthy certificate authority"],
+        # ["John Smith"], ["Trustworthy Certificate Authority"],
         # ["google.com\x00"], etc.
         # TODO(ekasper): figure out what to do (use stringprep as specified
         # by RFC 5280?) to properly handle non-letter-digit-hyphen names.
