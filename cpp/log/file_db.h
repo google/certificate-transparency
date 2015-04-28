@@ -7,6 +7,7 @@
 #include <mutex>
 #include <set>
 #include <stdint.h>
+#include <unordered_map>
 #include <vector>
 
 #include "base/macros.h"
@@ -74,8 +75,6 @@ class FileDB : public Database<Logged> {
   void BuildIndex();
   typename Database<Logged>::LookupResult LatestTreeHeadNoLock(
       ct::SignedTreeHead* result) const;
-  util::StatusOr<std::string> HashFromIndex(
-      const std::unique_lock<std::mutex>& lock, int64_t sequence_number) const;
   void InsertEntryMapping(int64_t sequence_number, const std::string& hash);
 
   const std::unique_ptr<cert_trans::FileStorage> cert_storage_;
@@ -87,14 +86,14 @@ class FileDB : public Database<Logged> {
   const std::unique_ptr<cert_trans::FileStorage> meta_storage_;
 
   mutable std::mutex lock_;
-  // This is a mapping of the sequence number to entry hashes, for
-  // index lookups. This is also the contiguous part of the log that
-  // we are able to serve.
-  std::vector<std::string> dense_entries_;
+
+  int64_t contiguous_size_;
+  std::unordered_map<std::string, int64_t> id_by_hash_;
+
   // This is a mapping of the non-contiguous entries of the log (which
   // can happen while it is being fetched). When entries here become
-  // contiguous with those in dense_entries_, they are moved there.
-  std::map<int64_t, std::string> sparse_entries_;
+  // contiguous with the head of the tree they'll be removed.
+  std::set<int64_t> sparse_entries_;
 
   uint64_t latest_tree_timestamp_;
   // The same as a string;
