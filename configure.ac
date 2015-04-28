@@ -74,6 +74,17 @@ AC_TYPE_UINT32_T
 AC_TYPE_UINT64_T
 AC_TYPE_UINT8_T
 
+AC_MSG_CHECKING([whether pthread_t is a pointer])
+AC_COMPILE_IFELSE([AC_LANG_PROGRAM([
+#include <pthread.h>
+void TakesPointer(void*);
+], [TakesPointer(pthread_self())])], [PTHREAD_T_IS_POINTER=yes],
+   [PTHREAD_T_IS_POINTER=no])
+AC_MSG_RESULT([$PTHREAD_T_IS_POINTER])
+AS_IF([test "x$PTHREAD_T_IS_POINTER" = xyes],
+      [AC_DEFINE([PTHREAD_T_IS_POINTER], [],
+                 [Whether pthread_t is a pointer.])])
+
 # Checks for library functions.
 AC_FUNC_FORK
 AC_CHECK_FUNCS([alarm gettimeofday memset mkdir select socket strdup strerror strtol])
