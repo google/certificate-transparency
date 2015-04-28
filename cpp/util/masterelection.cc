@@ -25,7 +25,9 @@ using util::Task;
 
 DEFINE_int32(master_keepalive_interval_seconds, 60,
              "Interval between refreshing mastership proposal.");
-
+DEFINE_int32(masterelection_retry_delay_seconds, 5,
+             "Seconds to delay before retrying a failed attempt to create a "
+             "proposal file.");
 
 namespace {
 
@@ -37,6 +39,11 @@ static Gauge<>* participating_in_election_gauge(
     Gauge<>::New("participating_in_election",
                  "Non-zero if this node is currently participating in the "
                  "masterelection."));
+
+static Counter<>* proposal_creation_failures(
+    Counter<>::New("election_proposal_creation_failures",
+                   "Total number of failures to create an election "
+                   "proposal."));
 
 
 // Special backing string which indicates that we're not backing any proposal.
@@ -220,7 +227,9 @@ void MasterElection::Transition(const unique_lock<mutex>& lock,
       CHECK_EQ(to, ProposalState::CREATING);
       break;
     case ProposalState::CREATING:
-      CHECK_EQ(to, ProposalState::UP_TO_DATE);
+      CHECK(to == ProposalState::AWAITING_CREATION ||
+            to == ProposalState::UP_TO_DATE)
+          << "proposal_state_: " << proposal_state_ << " to: " << to;
       break;
     case ProposalState::UP_TO_DATE:
       CHECK(to == ProposalState::AWAITING_UPDATE ||
@@ -269,11 +278,18 @@ void MasterElection::ProposalCreateDone(EtcdClient::Response* resp,
   unique_ptr<EtcdClient::Response> resp_deleter(resp);
   unique_ptr<Task> task_deleter(task);
   unique_lock<mutex> lock(mutex_);
-  // TODO(alcutter): recover gracefully if we're restarting and found an old
-  // proposal from this node
-  CHECK(task->status().ok())
-      << my_proposal_path_
-      << ": Problem creating proposal: " << task->status();
+
+  if (!task->status().ok()) {
+    proposal_creation_failures->Increment();
+    Transition(lock, ProposalState::AWAITING_CREATION);
+    LOG(WARNING) << "Problem creating proposal: " << task->status() << " "
+                 << "will retry.";
+    base_->Delay(seconds(FLAGS_masterelection_retry_delay_seconds),
+                 new Task(bind(&MasterElection::CreateProposal, this),
+                          base_.get()));
+    return;
+  }
+
   Transition(lock, ProposalState::UP_TO_DATE);
 
   VLOG(1) << my_proposal_path_ << ": Mastership proposal created at index "
