@@ -860,8 +860,8 @@ void EtcdConsistentStore<Logged>::StartEtcdStatsFetch() {
   }
   EtcdClient::StatsResponse* response(new EtcdClient::StatsResponse);
   util::Task* stats_task(etcd_stats_task_.task()->AddChild(
-      bind(&EtcdConsistentStore<Logged>::EtcdStatsFetchDone, this, response,
-           std::placeholders::_1)));
+      std::bind(&EtcdConsistentStore<Logged>::EtcdStatsFetchDone, this,
+                response, std::placeholders::_1)));
   client_->GetStoreStats(response, stats_task);
 }
 
