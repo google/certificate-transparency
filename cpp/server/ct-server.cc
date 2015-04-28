@@ -86,6 +86,7 @@ DEFINE_double(guard_window_seconds, 60,
               "number of seconds will not be sequenced.");
 DEFINE_string(etcd_host, "", "Hostname of the etcd server");
 DEFINE_int32(etcd_port, 0, "Port of the etcd server.");
+DEFINE_string(etcd_root, "/root", "Root of cluster entries in etcd.");
 DEFINE_int32(node_state_refresh_seconds, 10,
              "How often to refresh the ClusterNodeState entry for this node.");
 DEFINE_int32(watchdog_seconds, 120,
@@ -479,7 +480,7 @@ int main(int argc, char* argv[]) {
   // No real reason to let this be configurable per node; you can really
   // shoot yourself in the foot that way by effectively running multiple
   // distinct elections.
-  const string kLockDir("/election");
+  const string kLockDir(FLAGS_etcd_root + "/election");
   MasterElection election(event_base, etcd_client.get(), kLockDir, node_id);
 
   // For now, run with a dedicated thread pool as the executor for our
@@ -489,7 +490,7 @@ int main(int argc, char* argv[]) {
   StrictConsistentStore<LoggedCertificate> consistent_store(
       &election, new EtcdConsistentStore<LoggedCertificate>(
                      event_base.get(), &internal_pool, etcd_client.get(),
-                     &election, "/root", node_id));
+                     &election, FLAGS_etcd_root, node_id));
 
   const unique_ptr<ContinuousFetcher> fetcher(
       ContinuousFetcher::New(event_base.get(), &internal_pool, db));
