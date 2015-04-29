@@ -178,8 +178,7 @@ void ClusterStateController<Logged>::NewTreeHead(
     // TODO(alcutter): Perhaps we need to know about updates to the contiguous
     // tree size in the DB again, so that we can write this out as soon as
     // we're able to serve it.
-    CHECK_EQ(Database<Logged>::OK,
-             database_->WriteTreeHead(*actual_serving_sth_));
+    CHECK_EQ(Database<Logged>::OK, database_->WriteTreeHead(sth_to_write));
   }
 }
 
@@ -413,8 +412,7 @@ void ClusterStateController<Logged>::OnServingSthUpdated(
 
   if (write_sth) {
     // All good, write this STH to our local DB:
-    CHECK_EQ(Database<Logged>::OK,
-             database_->WriteTreeHead(*actual_serving_sth_));
+    CHECK_EQ(Database<Logged>::OK, database_->WriteTreeHead(sth_to_write));
   }
 }
 
