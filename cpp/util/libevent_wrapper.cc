@@ -1,12 +1,10 @@
 #include "util/libevent_wrapper.h"
 
 #include <climits>
-#include <evhttp.h>
 #include <event2/thread.h>
 #include <glog/logging.h>
 #include <math.h>
 #include <signal.h>
-
 
 using std::bind;
 using std::chrono::duration;

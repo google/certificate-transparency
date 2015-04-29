@@ -1,7 +1,8 @@
 #include "server/metrics.h"
 
 #include <cstring>
-#include <evhttp.h>
+#include <event2/buffer.h>
+#include <event2/http.h>
 #include <sstream>
 
 #include "monitoring/registry.h"

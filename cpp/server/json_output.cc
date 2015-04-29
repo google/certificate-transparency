@@ -1,7 +1,5 @@
 #include "server/json_output.h"
 
-#include <evhttp.h>
-#include <event2/http.h>
 #include <glog/logging.h>
 #include <string>
 

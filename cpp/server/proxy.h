@@ -1,7 +1,6 @@
 #ifndef CERT_TRANS_SERVER_PROXY_H_
 #define CERT_TRANS_SERVER_PROXY_H_
 
-#include <evhttp.h>
 #include <functional>
 #include <vector>
 
