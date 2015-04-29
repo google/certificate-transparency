@@ -1,6 +1,7 @@
 #include "util/etcd.h"
 
 #include <ctime>
+#include <gflags/gflags.h>
 #include <glog/logging.h>
 #include <utility>
 

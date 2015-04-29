@@ -2,6 +2,7 @@
 
 #include <atomic>
 #include <functional>
+#include <gflags/gflags.h>
 #include <gmock/gmock.h>
 #include <gtest/gtest.h>
 #include <map>

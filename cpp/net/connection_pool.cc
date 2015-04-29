@@ -1,5 +1,6 @@
 #include "net/connection_pool.h"
 
+#include <gflags/gflags.h>
 #include <glog/logging.h>
 
 using std::bind;

@@ -2,16 +2,17 @@
 #define CERT_TRANS_LOG_ETCD_CONSISTENT_STORE_INL_H_
 
 #include <chrono>
+#include <gflags/gflags.h>
 #include <glog/logging.h>
-#include <vector>
 #include <unordered_map>
+#include <vector>
 
 #include "base/notification.h"
 #include "log/etcd_consistent_store.h"
 #include "log/logged_certificate.h"
 #include "monitoring/event_metric.h"
-#include "monitoring/monitoring.h"
 #include "monitoring/latency.h"
+#include "monitoring/monitoring.h"
 #include "util/etcd_delete.h"
 #include "util/executor.h"
 #include "util/masterelection.h"
