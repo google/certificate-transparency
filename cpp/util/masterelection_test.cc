@@ -13,6 +13,7 @@
 #include "util/fake_etcd.h"
 #include "util/etcd.h"
 #include "util/periodic_closure.h"
+#include "util/status_test_util.h"
 #include "util/testing.h"
 
 
@@ -39,6 +40,7 @@ using testing::InvokeArgument;
 using testing::Pair;
 using testing::_;
 using util::Status;
+using util::SyncTask;
 
 
 const char kProposalDir[] = "/master/";
@@ -46,6 +48,7 @@ const char kProposalDir[] = "/master/";
 DEFINE_string(etcd, "", "etcd server address");
 DEFINE_int32(etcd_port, 4001, "etcd server port");
 DECLARE_int32(master_keepalive_interval_seconds);
+DECLARE_int32(masterelection_retry_delay_seconds);
 
 
 // Simple helper class, represents a thread of interest in participating in
@@ -257,6 +260,35 @@ TEST_F(ElectionTest, OkToCallStartAndStopElectionMultipleTimes) {
   EXPECT_FALSE(one.IsMaster());
   one.StopElection();
   EXPECT_FALSE(one.IsMaster());
+}
+
+
+TEST_F(ElectionTest, RetresCreatingProposal) {
+  FLAGS_masterelection_retry_delay_seconds = 1;
+  {
+    EtcdClient::Response resp;
+    SyncTask task(base_.get());
+    client_->Create(string(kProposalDir) + "1", "", &resp, task.task());
+    task.Wait();
+    ASSERT_OK(task.status());
+  }
+
+  Participant one(kProposalDir, "1", base_, client_.get());
+  one.StartElection();
+  sleep(2);
+  EXPECT_FALSE(one.IsMaster());
+
+  {
+    SyncTask task(base_.get());
+    client_->ForceDelete(string(kProposalDir) + "1", task.task());
+    task.Wait();
+    ASSERT_OK(task.status());
+  }
+
+  sleep(2);
+
+  EXPECT_TRUE(one.IsMaster());
+  one.StopElection();
 }
 
 
