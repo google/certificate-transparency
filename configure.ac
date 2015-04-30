@@ -36,8 +36,7 @@ AC_CHECK_HEADER([glog/logging.h],,
                 [AC_MSG_ERROR([glog headers could not be found])])
 AC_CHECK_HEADER([google/protobuf/message.h],,
                 [AC_MSG_ERROR([protobuf headers could not be found])])
-AC_CHECK_HEADER([ldns/ldns.h],,
-                [AC_MSG_ERROR([ldns headers could not be found])])
+AC_CHECK_HEADER([ldns/ldns.h],, [missing_ldns=yes])
 
 # Check for working GTest/GMock.
 saved_CPPFLAGS="$CPPFLAGS"
@@ -103,6 +102,7 @@ AC_CHECK_FUNCS([alarm gettimeofday memset mkdir select socket strdup strerror st
 # the user.
 
 AM_CONDITIONAL([HAVE_ANT], [test -n "$ANT"])
+AM_CONDITIONAL([HAVE_LDNS], [test -z "$missing_ldns"])
 AC_DEFINE_UNQUOTED([TEST_SRCDIR], ["$srcdir"], [Top of the source directory, for tests.])
 AC_CONFIG_FILES([Makefile])
 AC_OUTPUT

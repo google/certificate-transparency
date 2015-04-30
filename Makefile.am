@@ -21,12 +21,16 @@ bin_PROGRAMS = \
 	cpp/tools/ct-clustertool
 
 noinst_PROGRAMS = \
-	cpp/server/ct-dns-server \
 	cpp/tools/dump_cert \
 	cpp/tools/dump_sth \
 	cpp/tools/etcd_watch \
 	cpp/util/bench_etcd \
 	cpp/util/etcd_masterelection
+
+if HAVE_LDNS
+noinst_PROGRAMS += \
+	cpp/server/ct-dns-server
+endif
 
 noinst_LIBRARIES = \
 	cpp/libcore.a \
