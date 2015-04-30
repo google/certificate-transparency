@@ -1,0 +1,26 @@
+#!/bin/sh
+
+# Helper for gclient
+
+GMOCK=`pwd`/googlemock
+PATH=${INSTALL_DIR}/bin:$PATH
+
+set -e
+
+cd certificate-transparency
+if [ ! -f configure ]
+then
+	./autogen.sh
+fi
+if [ ! -f Makefile ]
+then
+  case `uname` in
+    Darwin)
+      EXTRA_LDFLAGS="-lresolv"
+      ;;
+    FreeBSD)
+      EXTRA_LIBS="-L/usr/local/lib"
+      ;;
+  esac
+  PKG_CONFIG_PATH="${INSTALL_DIR}/lib/pkgconfig" CPPFLAGS="-I${INSTALL_DIR}/include" LDFLAGS="-L${INSTALL_DIR}/lib $EXTRA_LDFLAGS" LIBS="-lpthread ${EXTRA_LIBS}" ./configure GMOCK_DIR=${GMOCK} ${CONFIGURE_FLAGS} PROTOC=${INSTALL_DIR}/bin/protoc LIBRARY_PATH=${INSTALL_DIR}/lib
+fi

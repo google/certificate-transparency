@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 DIR=$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )
 . ${DIR}/generate_certs.sh
 
@@ -17,12 +17,18 @@ ca_setup ${TARGET} ca false
 make_ca_certs ${TARGET} ${TARGET}/ca-hashes ca openssl
 cp ${TARGET}/01.pem ${TARGET}/ca-cert.pem
 
-sed -e "/0.organizationName=Certificate/ a commonName=localhost" ${DIR}/precert.conf > ${TARGET}/localhost.conf
-sed -e "/0.organizationName=Certificate/ a commonName=not-localhost" ${DIR}/precert.conf > ${TARGET}/not-localhost.conf
-sed -e "/0.organizationName=Certificate/ a commonName=binky.example.com" ${DIR}/precert.conf > ${TARGET}/binky_example_com.conf
-sed -e "/0.organizationName=Certificate/ a commonName=*.example.com" ${DIR}/precert.conf > ${TARGET}/star_example_com.conf
-sed -e "/0.organizationName=Certificate/ a commonName=example.com" ${DIR}/precert.conf > ${TARGET}/example_com.conf
-sed -e "/0.organizationName=Certificate/ a commonName=127.0.0.1" ${DIR}/precert.conf > ${TARGET}/127_0_0_1.conf
+sed -e '/0.organizationName=Certificate/ a\
+commonName=localhost' ${DIR}/precert.conf > ${TARGET}/localhost.conf
+sed -e '/0.organizationName=Certificate/ a\
+commonName=not-localhost' ${DIR}/precert.conf > ${TARGET}/not-localhost.conf
+sed -e '/0.organizationName=Certificate/ a\
+commonName=binky.example.com' ${DIR}/precert.conf > ${TARGET}/binky_example_com.conf
+sed -e '/0.organizationName=Certificate/ a\
+commonName=*.example.com' ${DIR}/precert.conf > ${TARGET}/star_example_com.conf
+sed -e '/0.organizationName=Certificate/ a\
+commonName=example.com' ${DIR}/precert.conf > ${TARGET}/example_com.conf
+sed -e '/0.organizationName=Certificate/ a\
+commonName=127.0.0.1' ${DIR}/precert.conf > ${TARGET}/127_0_0_1.conf
 
 request_cert ${TARGET} "not-localhost" ${TARGET}/not-localhost.conf true
 issue_cert ${TARGET} ca "not-localhost" ${TARGET}/not-localhost.conf simple false "not-localhost"

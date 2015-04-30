@@ -220,7 +220,8 @@ make_embedded_cert() {
     cp precert.conf $modified_config
   else
     echo "Will set the following common name: $common_name"
-    sed -e "/0.organizationName=Certificate/ a commonName=$common_name" precert.conf > $modified_config
+    sed -e "/0.organizationName=Certificate/ a\
+      commonName=$common_name" precert.conf > $modified_config
   fi
 
   # Generate a new, unencrypted private key and CSR

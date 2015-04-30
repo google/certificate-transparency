@@ -1,0 +1,11 @@
+all: Makefile
+	$(MAKE)
+	# Not good on OSX at the moment:
+	#make check
+	$(MAKE) install
+
+Makefile: configure
+	./configure --prefix=`pwd`/../install
+
+configure: configure.ac
+	autoreconf -i

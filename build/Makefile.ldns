@@ -1,0 +1,19 @@
+LIBTOOLIZE_TEST=$(shell libtoolize --version >/dev/null 2>&1 && echo found)
+LIBTOOLIZE_BIN=libtoolize
+ifneq ("$(LIBTOOLIZE_TEST)","found")
+LIBTOOLIZE_BIN=glibtoolize
+endif
+INSTALL_DIR=$(shell pwd)/../install
+
+all: Makefile
+	$(MAKE)
+# FIXME: skip test for now, requires dig, which FreeBSD doesn't have.
+#	make test
+	$(MAKE) install
+
+Makefile: configure
+	CPPFLAGS="-I$(INSTALL_DIR)/include" LDFLAGS="-L$(INSTALL_DIR)/lib" ./configure --prefix=$(INSTALL_DIR) --with-ssl=$(INSTALL_DIR)
+
+configure:
+	$(LIBTOOLIZE_BIN) -c --install
+	autoreconf --install

@@ -1,0 +1,12 @@
+all: $(INSTALL_DIR)/bin/openssl
+
+$(INSTALL_DIR)/bin/openssl: Makefile
+	$(MAKE)
+	$(MAKE) test
+	$(MAKE) install
+
+Makefile: config Configure Makefile.org
+	# Force a 64 bit build on MacOS
+	KERNEL_BITS=64 ./config --openssldir=$(INSTALL_DIR) shared
+	# just to be sure we don't have dregs left over
+	$(MAKE) clean

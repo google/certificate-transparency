@@ -1,0 +1,16 @@
+#GNUMAKE_BIN=gnumake
+#GNUMAKE_TEST=$(shell $GNUMAKE_BIN --version >/dev/null 2>&1 && echo found)
+#ifneq ("$(GNUMAKE_TEST)","found")
+#GNUMAKE_BIN=gmake
+#endif
+#GNUMAKE_TEST=$(shell $GNUMAKE_BIN --version >/dev/null 2>&1 && echo found)
+#ifneq ("$(GNUMAKE_TEST)","found")
+#GNUMAKE_BIN=make
+#endif
+
+
+all:
+	$(MAKE)
+	cp lib* ../install/lib
+	mkdir -p ../install/include/leveldb
+	cp include/leveldb/*.h ../install/include/leveldb

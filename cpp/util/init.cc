@@ -2,6 +2,7 @@
 
 #include <event2/thread.h>
 #include <evhtp.h>
+#include <gflags/gflags.h>
 #include <glog/logging.h>
 #include <openssl/crypto.h>
 #include <openssl/err.h>

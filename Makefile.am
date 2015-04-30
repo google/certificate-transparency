@@ -17,6 +17,9 @@ BUILT_SOURCES = \
 
 BUILD_VERSION = `git describe --abbrev=0 --dirty --always --tags`
 
+AM_TESTS_ENVIRONMENT = \
+export LD_LIBRARY_PATH=$(LIBRARY_PATH);
+
 .PHONY: cpp/version.cc
 cpp/version.o: \
 	CXXFLAGS+=-DBUILD_VERSION="\"$(BUILD_VERSION)\""
@@ -92,7 +95,7 @@ TESTS = \
 	cpp/util/thread_pool_test
 
 all-local:
-	$(MAKE) -C python
+	$(MAKE) -C python PROTOC=$(PROTOC)
 
 clean-local:
 	$(MAKE) -C python clean
@@ -101,7 +104,7 @@ if HAVE_ANT
 endif
 
 %.pb.h %.pb.cc: %.proto
-	$(AM_V_GEN)protoc $^ --cpp_out=.
+	$(AM_V_GEN)$(PROTOC) $^ --cpp_out=.
 
 cpp/gtest-all.cc: $(GTEST_DIR)/src/gtest-all.cc
 	$(AM_V_at)cp $^ $@

@@ -1,0 +1,28 @@
+#!/bin/sh
+
+# Helper for gclient
+
+set -e
+set -x
+
+INSTALL=`pwd`/install
+
+
+cd protobuf
+if [ ! -f configure ]
+then
+#  ln -s ../googletest/ gtest
+  ./autogen.sh
+fi
+if [ ! -f Makefile ]
+then
+# FIXME(benl): Use built-in tr1/tuple because it doesn't compile on
+# MacOS otherwise.
+  CXXFLAGS="-DGTEST_USE_OWN_TR1_TUPLE=1" ./configure --prefix=$INSTALL
+  make clean
+fi
+
+
+make
+make check
+make install

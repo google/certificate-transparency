@@ -14,6 +14,8 @@ GMOCK_DIR="${GMOCK_DIR=/usr/src/gmock}"
 AC_ARG_VAR([GMOCK_DIR], [directory containing Google Mock])
 GTEST_DIR="${GTEST_DIR="$GMOCK_DIR/gtest"}"
 AC_ARG_VAR([GTEST_DIR], [directory containing Google Test])
+LIBRARY_PATH="${LIBRARY_PATH=$srcdir/../install/lib}"
+AC_ARG_VAR([LIBRARY_PATH], [path containing library dependencies])
 
 # Checks for programs.
 AC_PROG_AWK
@@ -29,23 +31,39 @@ AC_CHECK_PROGS([ANT], [ant])
 PKG_CHECK_MODULES([json_c], [json-c])
 
 if test "x${enable_hardening}" != "xno"; then
-  common_harden_copts="-fstack-protector-all -fPIE -Wa,--noexecstack -Wformat -Wformat-security"
+  common_harden_copts="-fstack-protector-all -fPIC -Wa,--noexecstack -Wformat -Wformat-security"
   clang_harden_copts="-Qunused-arguments $common_harden_copts"
   gcc_harden_copts="$common_harden_copts"
+  #TODO(alcutter): perform magic to determine if c++/cc are indeed clang.
   AS_CASE([$CXX],
+          [c++], [AS_VAR_APPEND([CXXFLAGS], [" $clang_harden_copts"])], # probably Clang on FBSD/OSX
           [clang++], [AS_VAR_APPEND([CXXFLAGS], [" $clang_harden_copts"])],
           [g++], [AS_VAR_APPEND([CXXFLAGS], [" $gcc_harden_copts"])],
           [AC_MSG_FAILURE([Hardening enabled, but we don't have hardening flags for C++ compiler $CXX])])
   AS_CASE([$CC],
+          [cc], [AS_VAR_APPEND([CFLAGS], [" $clang_harden_copts"])], # probably Clang on FBSD/OSX
           [clang], [AS_VAR_APPEND([CFLAGS], [" $clang_harden_copts"])],
           [gcc], [AS_VAR_APPEND([CFLAGS], [" $gcc_harden_copts"])],
           [AC_MSG_FAILURE(["Hardening enabled, but we don't have hardening flags for C compiler $CC"])])
   AS_VAR_APPEND([CPPFLAGS], [" -D_FORTIFY_SOURCE=2"])
-  AS_VAR_APPEND([LDFLAGS], [" -pie -Wl,-z,relro,-z,now"])
+  AS_VAR_APPEND([LDFLAGS], [" -pie"])
+
+  saved_LDFLAGS=$LDFLAGS
+  AC_MSG_CHECKING([checking for RELRO support in linker])
+  LDFLAGS="-Wl,-z,relro,-z,now"
+  AC_LINK_IFELSE([AC_LANG_PROGRAM([], [])], [have_relro=yes], [have_relro=no])
+  AC_MSG_RESULT([$have_relro])
+  LDFLAGS=$saved_LDFLAGS
+  AS_IF([test "x$have_relro" = "xyes"],
+      [AS_VAR_APPEND([LDFLAGS], [" -Wl,-z,relro,-z,now"])])
+
   AC_DEFINE([ENABLE_HARDENING], [], [Hardening enabled.])
 else
   AC_MSG_WARN([NOT building hardened binaries])
 fi
+
+# Checks for other tools
+AC_PATH_PROG([PROTOC], [protoc],,)
 
 # Checks for header files.
 AC_HEADER_RESOLV
@@ -180,8 +198,10 @@ AC_CHECK_FUNCS([alarm gettimeofday memset mkdir select socket strdup strerror st
 # fail later during the build (sometimes in ways that are unclear to
 # the user.
 
+
 AM_CONDITIONAL([HAVE_ANT], [test -n "$ANT"])
 AM_CONDITIONAL([HAVE_LDNS], [test -z "$missing_ldns"])
 AC_DEFINE_UNQUOTED([TEST_SRCDIR], ["$srcdir"], [Top of the source directory, for tests.])
+AC_SUBST([LIBRARY_PATH])
 AC_CONFIG_FILES([Makefile])
 AC_OUTPUT

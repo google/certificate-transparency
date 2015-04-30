@@ -1,10 +1,24 @@
 #include "config.h"
 
+#include <arpa/inet.h>
+#ifdef HAVE_ARPA_NAMESER_H
+#  include <arpa/nameser.h> /* DNS HEADER struct */
+#endif
 #include <csignal>
 #include <fcntl.h>
 #include <gflags/gflags.h>
 #include <glog/logging.h>
 #include <gtest/gtest.h>
+#ifdef HAVE_NETDB_H
+#  include <netdb.h>
+#endif
+#include <netdb.h>
+#ifdef HAVE_NETINET_IN_H
+#  include <netinet/in.h>   /* inet_ functions / structs */
+#endif
+#ifdef HAVE_SYS_TYPES_H
+#  include <sys/types.h>
+#endif
 #include <stdlib.h>
 #include <sys/stat.h>
 #include <sys/wait.h>

@@ -49,7 +49,7 @@ Build CT server C++ code:
     ./configure GTEST_DIR=../gmock-1.7.0/gtest GMOCK_DIR=../gmock-1.7.0 \
         CPPFLAGS="-I../libevhtp-1.2.10 -I../libevhtp-1.2.10/evthr \
         -I../libevhtp-1.2.10/htparse" LDFLAGS=-L../libevhtp-1.2.10
-    make check 
+    make check
 
 Build and test Java code:
 
@@ -61,12 +61,55 @@ Build and test Python code:
 
 Best and test Go code:
 
-    go test -v ./go/... 
+    go test -v ./go/...
 
 
 ## Dependencies ##
 
  - A working C++11 compiler.
+
+ - autoconf/automake etc.
+ - cmake
+ - git
+ - GNU make
+ - libtool
+ - Tcl
+ - pkgconf
+ - python27
+ - [depot_tools](https://www.chromium.org/developers/how-tos/install-depot-tools)
+
+## Building with gclient ##
+
+This is the recommended method for all platforms as it gives you a reproducible
+build.
+
+Known to work on FreeBSD 10, OS X (10.10) [tested with XCode + brew installation
+of above deps], and Ubuntu 14.04.
+
+```bash
+mkdir ct  # or whatever directory you prefer
+cd ct
+gclient config git@github.com:google/certificate-transparency.git
+gclient sync
+# substitute gmake or gnumake below if that's that your platform calls it:
+make -C certificate-transparency check
+```
+
+If you're trying to clone from a branch on the CT repo then you'll need to
+substitute the following command for the `gclient config` command above,
+replacing `branch` as appropriate
+
+```bash
+gclient config --name="certificate-transparency" git@github.com:google/certificate-transparency.git@branch
+```
+
+To run any of the built binaries you'll need to:
+
+```bash
+export LD_LIBRARY_PATH=/path/to/ct/install/lib'
+```
+
+## Old Method ##
 
  - [OpenSSL](https://www.openssl.org/source/), at least 1.0.0q,
    preferably 1.0.1l or 1.0.2 (and up)
@@ -96,9 +139,9 @@ If you are on FreeBSD, you may need to apply the patch in gtest.patch
 to the gtest subdirectory of gmock.
 
  - [protobuf](https://github.com/google/protobuf) (tested with 2.5.0)
- - [gflags](https://code.google.com/p/gflags/) (tested with 1.6
+ - [gflags](https://github.com/gflags/gflags) (tested with 1.6
    and 2.0)
- - [glog](https://code.google.com/p/google-glog/) (tested with 0.3.1)
+ - [glog](https://github.com/google/glog) (tested with 0.3.1)
 
 Make sure to install glog **after** gflags, to avoid linking errors.
 
