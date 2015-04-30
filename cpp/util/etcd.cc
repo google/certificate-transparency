@@ -819,7 +819,8 @@ void EtcdClient::ForceDelete(const string& key, Task* task) {
   GenericResponse* const gen_resp(new GenericResponse);
   task->DeleteWhenDone(gen_resp);
 
-  Generic(key, kKeysSpace, {}, UrlFetcher::Verb::DELETE, gen_resp, task);
+  Generic(key, kKeysSpace, map<string, string>(), UrlFetcher::Verb::DELETE,
+          gen_resp, task);
 }
 
 
