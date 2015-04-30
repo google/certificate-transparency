@@ -1,0 +1,11 @@
+all: Makefile
+	make
+	make test
+	make install
+
+Makefile: configure
+	./configure --prefix=`pwd`/../install
+
+configure:
+	glibtoolize -c --install
+	autoreconf --install

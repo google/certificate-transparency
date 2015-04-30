@@ -1,0 +1,21 @@
+#!/bin/sh
+
+# Helper for gclient
+
+INSTALL=`pwd`/install
+GMOCK=`pwd`/googlemock
+PATH=$INSTALL/bin:$PATH
+
+set -e
+
+cd certificate-transparency
+if [ ! -f configure ]
+then
+	./autogen.sh
+fi
+if [ ! -f Makefile ]
+then
+    CPPFLAGS="-I$INSTALL/include" LDFLAGS="-L$INSTALL/lib" LIBS="-lresolv" ./configure GMOCK_DIR=$GMOCK
+fi
+
+make

@@ -9,6 +9,19 @@ Auditing for TLS certificates.
 
  - A working C++11 compiler.
 
+ - autoconf/automake etc.
+
+ - [depot_tools](https://www.chromium.org/developers/how-tos/install-depot-tools)
+
+## Building ##
+
+    $ mkdir ct  # or whatever directory you prefer
+    $ cd ct
+    $ gclient config git@github.com:google/certificate-transparency.git
+    $ gclient sync
+
+## Old Method ##
+
  - [OpenSSL](https://www.openssl.org/source/), at least 1.0.0q,
    preferably 1.0.1l or 1.0.2 (and up)
 
@@ -37,9 +50,9 @@ If you are on FreeBSD, you may need to apply the patch in gtest.patch
 to the gtest subdirectory of gmock.
 
  - [protobuf](https://github.com/google/protobuf) (tested with 2.5.0)
- - [gflags](https://code.google.com/p/gflags/) (tested with 1.6
+ - [gflags](https://github.com/gflags/gflags) (tested with 1.6
    and 2.0)
- - [glog](https://code.google.com/p/google-glog/) (tested with 0.3.1)
+ - [glog](https://github.com/google/glog) (tested with 0.3.1)
 
 Make sure to install glog **after** gflags, to avoid linking errors.
 

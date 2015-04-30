@@ -1,3 +1,5 @@
+#include <gflags/gflags.h>
+
 #include "log/etcd_consistent_store-inl.h"
 #include "log/logged_certificate.h"
 

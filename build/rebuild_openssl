@@ -1,0 +1,19 @@
+#!/bin/sh
+
+# Helper for gclient
+
+set -e
+
+INSTALL=`pwd`/install
+
+cd openssl
+if [ ! -f Makefile ]
+then
+    # Force a 64 bit build on MacOS
+    KERNEL_BITS=64 ./config --openssldir=$INSTALL shared
+    # just to be sure we don't have dregs left over
+    make clean
+fi
+make
+make test
+make install

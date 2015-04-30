@@ -56,7 +56,7 @@ void DelayDispatch(evutil_socket_t sock, short events, void* userdata) {
 }
 
 
-thread_local bool on_event_thread = false;
+__thread bool on_event_thread = false;
 
 
 }  // namespace

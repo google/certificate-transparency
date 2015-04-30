@@ -1,0 +1,5 @@
+all: Makefile
+	make && make install
+
+Makefile:
+	./configure --with-gflags=`pwd`/../gflags --prefix=`pwd`/../install
