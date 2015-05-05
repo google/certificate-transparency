@@ -320,9 +320,8 @@ void HttpHandler::GetEntries(evhttp_request* req) const {
 
   const multimap<string, string> query(ParseQuery(req));
 
-  const int64_t tree_size(db_->TreeSize());
   const int64_t start(GetIntParam(query, "start"));
-  if (start < 0 || start >= tree_size) {
+  if (start < 0) {
     return output_->SendError(req, HTTP_BADREQUEST,
                               "Missing or invalid \"start\" parameter.");
   }
@@ -332,13 +331,6 @@ void HttpHandler::GetEntries(evhttp_request* req) const {
     return output_->SendError(req, HTTP_BADREQUEST,
                               "Missing or invalid \"end\" parameter.");
   }
-
-  // If a bigger tree size than what we have has been requested, we'll
-  // send what we have.
-  // TODO(pphaneuf): The "start < 0 || start >= tree_size" test above
-  // catches the case where the tree is empty (and return an error),
-  // we should return an empty result instead.
-  end = std::min(end, tree_size - 1);
 
   // Limit the number of entries returned in a single request.
   end = std::min(end, start + FLAGS_max_leaf_entries_per_response);
@@ -504,7 +496,7 @@ void HttpHandler::BlockingGetEntries(evhttp_request* req, int64_t start,
 
     if (db_->LookupByIndex(i, &cert) !=
         ReadOnlyDatabase<LoggedCertificate>::LOOKUP_OK) {
-      return output_->SendError(req, HTTP_BADREQUEST, "Entry not found.");
+      break;
     }
 
     string leaf_input;
@@ -528,6 +520,10 @@ void HttpHandler::BlockingGetEntries(evhttp_request* req, int64_t start,
     }
 
     json_entries.Add(&json_entry);
+  }
+
+  if (json_entries.Length() < 1) {
+    return output_->SendError(req, HTTP_BADREQUEST, "Entry not found.");
   }
 
   JsonObject json_reply;
