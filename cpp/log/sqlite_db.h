@@ -50,7 +50,6 @@ class SQLiteDB : public Database<Logged> {
 
  private:
   LookupResult LatestTreeHeadNoLock(ct::SignedTreeHead* result) const;
-  void UpdateTreeSize();
   LookupResult NodeId(const std::unique_lock<std::mutex>& lock,
                       std::string* node_id);
 
@@ -62,7 +61,9 @@ class SQLiteDB : public Database<Logged> {
 
   mutable std::mutex lock_;
   sqlite3* const db_;
-  int64_t tree_size_;
+  // This is marked mutable, as it is a lazily updated cache updated
+  // from some of the getters.
+  mutable int64_t tree_size_;
   cert_trans::DatabaseNotifierHelper callbacks_;
   int64_t transaction_size_;
   bool in_transaction_;
