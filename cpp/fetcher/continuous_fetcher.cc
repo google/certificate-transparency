@@ -128,12 +128,13 @@ void ContinuousFetcherImpl::FetchDone(Task* task) {
   fetch_task_.reset();
 
   if (restart_fetch_) {
-    base_->Add(bind(&ContinuousFetcherImpl::FetchDelayDone, this, nullptr));
+    executor_->Add(
+        bind(&ContinuousFetcherImpl::FetchDelayDone, this, nullptr));
   } else {
     base_->Delay(seconds(FLAGS_delay_between_fetches_seconds),
                  new Task(bind(&ContinuousFetcherImpl::FetchDelayDone, this,
                                _1),
-                          base_));
+                          executor_));
   }
 }
 
