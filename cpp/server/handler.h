@@ -2,10 +2,13 @@
 #define CERT_TRANS_SERVER_HANDLER_H_
 
 #include <memory>
+#include <mutex>
 #include <stdint.h>
 #include <string>
 
 #include "util/libevent_wrapper.h"
+#include "util/sync_task.h"
+#include "util/task.h"
 
 class Frontend;
 template <class T>
@@ -38,6 +41,7 @@ class HttpHandler {
               const ClusterStateController<LoggedCertificate>* controller,
               const CertChecker* cert_checker, Frontend* frontend,
               Proxy* proxy, ThreadPool* pool, libevent::Base* event_base);
+  ~HttpHandler();
 
   void Add(libevent::HttpServer* server);
 
@@ -65,6 +69,9 @@ class HttpHandler {
   void BlockingAddPreChain(evhttp_request* req,
                            const std::shared_ptr<PreCertChain>& chain) const;
 
+  bool IsNodeStale() const;
+  void UpdateNodeStaleness(util::Task* task);
+
   JsonOutput* const output_;
   LogLookup<LoggedCertificate>* const log_lookup_;
   const ReadOnlyDatabase<LoggedCertificate>* const db_;
@@ -74,6 +81,10 @@ class HttpHandler {
   Proxy* const proxy_;
   ThreadPool* const pool_;
   libevent::Base* const event_base_;
+
+  util::SyncTask task_;
+  mutable std::mutex mutex_;
+  bool node_is_stale_;
 
   DISALLOW_COPY_AND_ASSIGN(HttpHandler);
 };

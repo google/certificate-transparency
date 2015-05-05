@@ -43,10 +43,13 @@ using ct::SignedCertificateTimestamp;
 using ct::SignedTreeHead;
 using std::bind;
 using std::chrono::milliseconds;
+using std::chrono::seconds;
 using std::function;
+using std::lock_guard;
 using std::make_pair;
 using std::make_shared;
 using std::multimap;
+using std::mutex;
 using std::placeholders::_1;
 using std::shared_ptr;
 using std::string;
@@ -55,8 +58,10 @@ using std::unique_ptr;
 using std::vector;
 
 DEFINE_int32(max_leaf_entries_per_response, 1000,
-             "Maximum number of entries "
-             "to put in the response of a get-entries request.");
+             "maximum number of entries to put in the response of a "
+             "get-entries request");
+DEFINE_int32(staleness_check_delay_secs, 5,
+             "number of seconds between node staleness checks");
 
 namespace {
 
@@ -227,7 +232,18 @@ HttpHandler::HttpHandler(
       frontend_(frontend),
       proxy_(CHECK_NOTNULL(proxy)),
       pool_(CHECK_NOTNULL(pool)),
-      event_base_(CHECK_NOTNULL(event_base)) {
+      event_base_(CHECK_NOTNULL(event_base)),
+      task_(pool_),
+      node_is_stale_(controller_->NodeIsStale()) {
+  event_base_->Delay(seconds(FLAGS_staleness_check_delay_secs),
+                     task_.task()->AddChild(
+                         bind(&HttpHandler::UpdateNodeStaleness, this, _1)));
+}
+
+
+HttpHandler::~HttpHandler() {
+  task_.task()->Return();
+  task_.Wait();
 }
 
 
@@ -244,20 +260,15 @@ void StatsHandlerInterceptor(const string& path,
 void HttpHandler::ProxyInterceptor(
     const libevent::HttpServer::HandlerCallback& local_handler,
     evhttp_request* request) {
-  // Need to punt this via the threadpool because the interaction with the
-  // controller (i.e NodeIsStale()) can block pending other libevent
-  // updates, and since we're on the libevent thread here...
-  pool_->Add([this, request, local_handler]() {
-    VLOG(2) << "Running proxy interceptor...";
-    // TODO(alcutter): We can be a bit smarter about when to proxy off the
-    // request - being stale wrt to the current serving STH doesn't
-    // automatically mean we're unable to answer this request.
-    if (controller_->NodeIsStale()) {
-      proxy_->ProxyRequest(request);
-    } else {
-      local_handler(request);
-    }
-  });
+  VLOG(2) << "Running proxy interceptor...";
+  // TODO(alcutter): We can be a bit smarter about when to proxy off
+  // the request - being stale wrt to the current serving STH doesn't
+  // automatically mean we're unable to answer this request.
+  if (IsNodeStale()) {
+    proxy_->ProxyRequest(request);
+  } else {
+    local_handler(request);
+  }
 }
 
 
@@ -545,4 +556,28 @@ void HttpHandler::BlockingAddPreChain(
                 CHECK_NOTNULL(frontend_)
                     ->QueuePreCertEntry(CHECK_NOTNULL(chain.get()), &sct),
                 sct);
+}
+
+
+bool HttpHandler::IsNodeStale() const {
+  lock_guard<mutex> lock(mutex_);
+  return node_is_stale_;
+}
+
+
+void HttpHandler::UpdateNodeStaleness(util::Task* task) {
+  if (!task_.task()->IsActive()) {
+    // We're shutting down, just return.
+    return;
+  }
+
+  const bool node_is_stale(controller_->NodeIsStale());
+  {
+    lock_guard<mutex> lock(mutex_);
+    node_is_stale_ = node_is_stale;
+  }
+
+  event_base_->Delay(seconds(FLAGS_staleness_check_delay_secs),
+                     task_.task()->AddChild(
+                         bind(&HttpHandler::UpdateNodeStaleness, this, _1)));
 }
