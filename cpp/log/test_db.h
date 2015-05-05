@@ -8,6 +8,7 @@
 #include "log/database.h"
 #include "log/file_db.h"
 #include "log/file_storage.h"
+#include "log/leveldb_db.h"
 #include "log/logged_certificate.h"
 #include "log/sqlite_db.h"
 
@@ -23,15 +24,15 @@ void TestDB<FileDB<cert_trans::LoggedCertificate> >::Setup() {
   CHECK_ERR(mkdir(tree_dir.c_str(), 0700));
   CHECK_ERR(mkdir(meta_dir.c_str(), 0700));
 
-  db_ = new FileDB<cert_trans::LoggedCertificate>(
+  db_.reset(new FileDB<cert_trans::LoggedCertificate>(
       new cert_trans::FileStorage(certs_dir, kCertStorageDepth),
       new cert_trans::FileStorage(tree_dir, kTreeStorageDepth),
-      new cert_trans::FileStorage(meta_dir, 0));
+      new cert_trans::FileStorage(meta_dir, 0)));
 }
 
 template <>
 FileDB<cert_trans::LoggedCertificate>*
-TestDB<FileDB<cert_trans::LoggedCertificate> >::SecondDB() const {
+TestDB<FileDB<cert_trans::LoggedCertificate> >::SecondDB() {
   std::string certs_dir = this->tmp_.TmpStorageDir() + "/certs";
   std::string tree_dir = this->tmp_.TmpStorageDir() + "/tree";
   std::string meta_dir = this->tmp_.TmpStorageDir() + "/meta";
@@ -43,25 +44,42 @@ TestDB<FileDB<cert_trans::LoggedCertificate> >::SecondDB() const {
 
 template <>
 void TestDB<SQLiteDB<cert_trans::LoggedCertificate> >::Setup() {
-  db_ = new SQLiteDB<cert_trans::LoggedCertificate>(tmp_.TmpStorageDir() +
-                                                    "/sqlite");
+  db_.reset(new SQLiteDB<cert_trans::LoggedCertificate>(tmp_.TmpStorageDir() +
+                                                        "/sqlite"));
 }
 
 template <>
 SQLiteDB<cert_trans::LoggedCertificate>*
-TestDB<SQLiteDB<cert_trans::LoggedCertificate> >::SecondDB() const {
+TestDB<SQLiteDB<cert_trans::LoggedCertificate> >::SecondDB() {
   return new SQLiteDB<cert_trans::LoggedCertificate>(tmp_.TmpStorageDir() +
                                                      "/sqlite");
+}
+
+template <>
+void TestDB<LevelDB<cert_trans::LoggedCertificate> >::Setup() {
+  db_.reset(new LevelDB<cert_trans::LoggedCertificate>(tmp_.TmpStorageDir() +
+                                                       "/leveldb"));
+}
+
+template <>
+LevelDB<cert_trans::LoggedCertificate>*
+TestDB<LevelDB<cert_trans::LoggedCertificate> >::SecondDB() {
+  // LevelDB won't allow the same DB to be opened concurrently so we have to
+  // close the original.
+  db_.reset();
+  return new LevelDB<cert_trans::LoggedCertificate>(tmp_.TmpStorageDir() +
+                                                    "/leveldb");
 }
 
 // Not a Database; we just use the same template for setup.
 template <>
 void TestDB<cert_trans::FileStorage>::Setup() {
-  db_ = new cert_trans::FileStorage(tmp_.TmpStorageDir(), kCertStorageDepth);
+  db_.reset(
+      new cert_trans::FileStorage(tmp_.TmpStorageDir(), kCertStorageDepth));
 }
 
 template <>
-cert_trans::FileStorage* TestDB<cert_trans::FileStorage>::SecondDB() const {
+cert_trans::FileStorage* TestDB<cert_trans::FileStorage>::SecondDB() {
   return new cert_trans::FileStorage(tmp_.TmpStorageDir(), kCertStorageDepth);
 }
 #endif  // LOG_TEST_DB_H

@@ -6,6 +6,7 @@
 #include "log/database.h"
 #include "log/file_db.h"
 #include "log/file_storage.h"
+#include "log/leveldb_db.h"
 #include "log/logged_certificate.h"
 #include "log/sqlite_db.h"
 #include "log/test_db.h"
@@ -40,7 +41,8 @@ class DBTest : public ::testing::Test {
 };
 
 typedef testing::Types<FileDB<cert_trans::LoggedCertificate>,
-                       SQLiteDB<cert_trans::LoggedCertificate> > Databases;
+                       SQLiteDB<cert_trans::LoggedCertificate>,
+                       LevelDB<cert_trans::LoggedCertificate>> Databases;
 
 typedef Database<cert_trans::LoggedCertificate> DB;
 

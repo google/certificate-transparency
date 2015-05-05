@@ -10,6 +10,7 @@
 #include "log/database.h"
 #include "log/file_db.h"
 #include "log/file_storage.h"
+#include "log/leveldb_db.h"
 #include "log/logged_certificate.h"
 #include "log/sqlite_db.h"
 #include "log/test_db.h"
@@ -65,8 +66,8 @@ class LargeDBTest : public ::testing::Test {
   TestSigner test_signer_;
 };
 
-typedef testing::Types<FileDB<LoggedCertificate>, SQLiteDB<LoggedCertificate> >
-    Databases;
+typedef testing::Types<FileDB<LoggedCertificate>, SQLiteDB<LoggedCertificate>,
+                       LevelDB<LoggedCertificate>> Databases;
 
 TYPED_TEST_CASE(LargeDBTest, Databases);
 
