@@ -15,6 +15,8 @@ RUN apt-get update && \
         libgflags2 \
         libgoogle-glog0 \
         libjson-c2 \
+        libleveldb1 \
+        libsnappy1 \
         libldns1 \
         libprotobuf8
 RUN update-ca-certificates && \
