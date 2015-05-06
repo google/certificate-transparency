@@ -474,7 +474,7 @@ void HttpHandler::AddChain(evhttp_request* req) {
     return;
   }
 
-  BlockingAddChain(req, chain);
+  pool_->Add(bind(&HttpHandler::BlockingAddChain, this, req, chain));
 }
 
 
@@ -484,7 +484,7 @@ void HttpHandler::AddPreChain(evhttp_request* req) {
     return;
   }
 
-  BlockingAddPreChain(req, chain);
+  pool_->Add(bind(&HttpHandler::BlockingAddPreChain, this, req, chain));
 }
 
 
