@@ -1,11 +1,13 @@
 all: Makefile
 	make
-	make test
+# FIXME: skip test for now, requires dig, which FreeBSD doesn't have.
+#	make test
 	make install
 
 Makefile: configure
-	./configure --prefix=`pwd`/../install
+	  CPPFLAGS="-I`pwd`/../install/include" LDFLAGS="-L`pwd`/../install/lib" ./configure --prefix=`pwd`/../install
 
 configure:
-	glibtoolize -c --install
+# FIXME: MacOS wants glibtoolize
+	libtoolize -c --install
 	autoreconf --install

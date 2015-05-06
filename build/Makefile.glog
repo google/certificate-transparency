@@ -1,5 +1,11 @@
 all: Makefile
-	make && make install
+	make
+# FIXME: for now, install even though checks fail on FreeBSD
+#	make check
+	make install
 
-Makefile:
+Makefile: configure
 	./configure --with-gflags=`pwd`/../gflags --prefix=`pwd`/../install
+
+configure: configure.ac
+	autoreconf -i

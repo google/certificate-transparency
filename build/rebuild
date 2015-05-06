@@ -15,7 +15,10 @@ then
 fi
 if [ ! -f Makefile ]
 then
-    CPPFLAGS="-I$INSTALL/include" LDFLAGS="-L$INSTALL/lib" LIBS="-lresolv" ./configure GMOCK_DIR=$GMOCK
+    # FIXME: MacOS needs -lresolv
+    #CPPFLAGS="-I$INSTALL/include" LDFLAGS="-L$INSTALL/lib" LIBS="-lresolv" ./configure GMOCK_DIR=$GMOCK
+    CPPFLAGS="-I$INSTALL/include" LDFLAGS="-L$INSTALL/lib" LIBS="-lpthread" ./configure GMOCK_DIR=$GMOCK
 fi
 
-make
+# FIXME: most platforms want make, FreeBSD wants gmake
+gmake
