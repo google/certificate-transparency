@@ -60,6 +60,17 @@ class CertificateDescriptionTest(unittest.TestCase):
                      for obs in proto.observations]
         self.assertItemsEqual(proto_obs, observations_tuples)
 
+    def test_process_value(self):
+        self.assertEqual(['London'], cert_desc.process_name('London'))
+        self.assertEqual(['Bob Smith'], cert_desc.process_name('Bob Smith'))
+        self.assertEqual(['com', 'googleapis', 'ct'], cert_desc.process_name('ct.googleapis.com'))
+        self.assertEqual(['com', 'github'], cert_desc.process_name('gItHuB.CoM'))
+        # These two are unfortunate outcomes:
+        # 1. single-word hostnames are indistinguishable from single-word CN
+        # terms like State, City, Organization
+        self.assertEqual(['LOCALhost'], cert_desc.process_name('LOCALhost'))
+        # 2. IP addresses should perhaps not be reversed like hostnames are
+        self.assertEqual(['1', '0', '168', '192'], cert_desc.process_name('192.168.0.1'))
 
 if __name__ == "__main__":
     unittest.main()

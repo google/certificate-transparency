@@ -82,9 +82,9 @@ def process_name(subject, reverse=True):
     # allow letter-digit-hyphen, as well as wildcards (RFC 2818).
     forbidden = re.compile(r"[^a-z\d\-\*]")
     labels = subject.lower().split(".")
-    valid = all(map(lambda x: len(x) and not forbidden.search(x), labels))
+    valid_dns_name = len(labels) > 1 and all(map(lambda x: len(x) and not forbidden.search(x), labels))
 
-    if valid:
+    if valid_dns_name:
         # ["com", "example", "*"], ["com", "example", "mail"],
         # ["localhost"], etc.
         return list(reversed(labels)) if reverse else labels
