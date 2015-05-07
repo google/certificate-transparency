@@ -501,20 +501,6 @@ int main(int argc, char* argv[]) {
   const unique_ptr<ContinuousFetcher> fetcher(
       ContinuousFetcher::New(event_base.get(), &internal_pool, db));
 
-  ClusterStateController<LoggedCertificate> cluster_controller(
-      &internal_pool, event_base, &url_fetcher, db, &consistent_store,
-      &election, fetcher.get());
-
-  // Publish this node's hostname:port info
-  cluster_controller.SetNodeHostPort(FLAGS_server, FLAGS_port);
-  {
-    ct::SignedTreeHead db_sth;
-    if (db->LatestTreeHead(&db_sth) ==
-        Database<LoggedCertificate>::LOOKUP_OK) {
-      cluster_controller.NewTreeHead(db_sth);
-    }
-  }
-
   // If we're joining an existing cluster, this node needs to get its database
   // up-to-date with the serving_sth before we can do anything, so we'll wait
   // here for that:
@@ -529,6 +515,7 @@ int main(int argc, char* argv[]) {
     }
   }
 
+  LogLookup<LoggedCertificate> log_lookup(db);
   TreeSigner<LoggedCertificate> tree_signer(std::chrono::duration<double>(
                                                 FLAGS_guard_window_seconds),
                                             db, &consistent_store,
@@ -578,9 +565,19 @@ int main(int argc, char* argv[]) {
     CHECK(!FLAGS_server.empty());
   }
 
-  Frontend frontend(new CertSubmissionHandler(&checker),
-                    new FrontendSigner(db, &consistent_store, &log_signer));
-  LogLookup<LoggedCertificate> log_lookup(db);
+  ClusterStateController<LoggedCertificate> cluster_controller(
+      &internal_pool, event_base, &url_fetcher, db, &consistent_store,
+      &election, fetcher.get());
+
+  // Publish this node's hostname:port info
+  cluster_controller.SetNodeHostPort(FLAGS_server, FLAGS_port);
+  {
+    ct::SignedTreeHead db_sth;
+    if (db->LatestTreeHead(&db_sth) ==
+        Database<LoggedCertificate>::LOOKUP_OK) {
+      cluster_controller.NewTreeHead(db_sth);
+    }
+  }
 
   // TODO(pphaneuf): We should be remaining in an "unhealthy state"
   // (either not accepting any requests, or returning some internal
@@ -591,6 +588,8 @@ int main(int argc, char* argv[]) {
                 &cluster_controller, &election);
   thread node_refresh(&RefreshNodeState, &cluster_controller);
 
+  Frontend frontend(new CertSubmissionHandler(&checker),
+                    new FrontendSigner(db, &consistent_store, &log_signer));
   ThreadPool pool(FLAGS_num_http_server_threads);
   JsonOutput output(event_base.get());
   Proxy proxy(event_base.get(), &output,
