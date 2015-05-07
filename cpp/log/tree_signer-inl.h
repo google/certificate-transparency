@@ -304,11 +304,11 @@ void TreeSigner<Logged>::BuildTree() {
 
   latest_tree_head_.CopyFrom(sth);
 
-  // Read the remaining sequenced entries. Note that it is possible to have
-  // more
-  // entries with sequence numbers than what the latest sth says. This happens
-  // when we assign some sequence numbers but die before we manage to sign the
-  // sth. It's not an inconsistency and will be corrected with UpdateTree().
+  // Read the remaining sequenced entries. Note that it is possible to
+  // have more entries with sequence numbers than what the latest sth
+  // says. This happens when we assign some sequence numbers but die
+  // before we manage to sign the sth. It's not an inconsistency and
+  // will be corrected with UpdateTree().
   for (size_t i = sth.tree_size();; ++i) {
     Logged logged;
     typename Database<Logged>::LookupResult db_result =
@@ -320,6 +320,8 @@ void TreeSigner<Logged>::BuildTree() {
 
     AppendToTree(logged);
   }
+
+  LOG(INFO) << "built a tree with " << cert_tree_.LeafCount() << " entries";
 }
 
 
