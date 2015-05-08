@@ -92,6 +92,17 @@ CompactMerkleTree::CompactMerkleTree(MerkleTree& model, SerialHasher* hasher)
   CHECK_EQ(model.LevelCount(), LevelCount());
 }
 
+
+CompactMerkleTree::CompactMerkleTree(const CompactMerkleTree& other,
+                                     SerialHasher* hasher)
+    : tree_(other.tree_),
+      treehasher_(hasher),
+      leaf_count_(other.leaf_count_),
+      leaves_processed_(other.leaves_processed_),
+      level_count_(other.level_count_),
+      root_(other.root_) {
+}
+
 CompactMerkleTree::~CompactMerkleTree() {
 }
 

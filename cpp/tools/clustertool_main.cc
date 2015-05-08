@@ -85,6 +85,9 @@ unique_ptr<TreeSigner<LoggedCertificate>> BuildTreeSigner(
     LogSigner* log_signer) {
   return unique_ptr<TreeSigner<LoggedCertificate>>(
       new TreeSigner<LoggedCertificate>(std::chrono::duration<double>(0), db,
+                                        unique_ptr<CompactMerkleTree>(
+                                            new CompactMerkleTree(
+                                                new Sha256Hasher)),
                                         consistent_store, log_signer));
 }
 

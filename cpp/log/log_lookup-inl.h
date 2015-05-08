@@ -182,6 +182,13 @@ std::string LogLookup<Logged>::LeafHash(const Logged& logged) const {
   return cert_tree_.LeafHash(serialized_leaf);
 }
 
+template <class Logged>
+std::unique_ptr<CompactMerkleTree> LogLookup<Logged>::GetCompactMerkleTree(
+    SerialHasher* hasher) {
+  std::lock_guard<std::mutex> lock(lock_);
+  return std::unique_ptr<CompactMerkleTree>(
+      new CompactMerkleTree(cert_tree_, hasher));
+}
 
 template <class Logged>
 int64_t LogLookup<Logged>::GetIndexInternal(

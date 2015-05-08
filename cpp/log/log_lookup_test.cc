@@ -39,6 +39,7 @@ using ct::SequenceMapping;
 using std::make_shared;
 using std::string;
 using std::shared_ptr;
+using std::unique_ptr;
 using testing::NiceMock;
 
 typedef Database<LoggedCertificate> DB;
@@ -57,8 +58,10 @@ class LogLookupTest : public ::testing::Test {
         pool_(2),
         store_(base_.get(), &pool_, &etcd_client_, &election_, "/root", "id"),
         test_signer_(),
-        tree_signer_(std::chrono::duration<double>(0), db(), &store_,
-                     TestSigner::DefaultLogSigner()),
+        tree_signer_(std::chrono::duration<double>(0), db(),
+                     unique_ptr<CompactMerkleTree>(
+                         new CompactMerkleTree(new Sha256Hasher)),
+                     &store_, TestSigner::DefaultLogSigner()),
         verifier_(TestSigner::DefaultLogSigVerifier(),
                   new MerkleVerifier(new Sha256Hasher())) {
     // Set some noddy STH so that we can call UpdateTree on the Tree Signer.

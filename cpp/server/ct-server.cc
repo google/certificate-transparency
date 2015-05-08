@@ -516,10 +516,10 @@ int main(int argc, char* argv[]) {
   }
 
   LogLookup<LoggedCertificate> log_lookup(db);
-  TreeSigner<LoggedCertificate> tree_signer(std::chrono::duration<double>(
-                                                FLAGS_guard_window_seconds),
-                                            db, &consistent_store,
-                                            &log_signer);
+  TreeSigner<LoggedCertificate> tree_signer(
+      std::chrono::duration<double>(FLAGS_guard_window_seconds), db,
+      log_lookup.GetCompactMerkleTree(new Sha256Hasher), &consistent_store,
+      &log_signer);
 
   if (stand_alone_mode) {
     // Set up a simple single-node environment.
