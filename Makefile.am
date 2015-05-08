@@ -160,7 +160,8 @@ cpp_server_ct_server_LDADD = \
 	cpp/libcore.a \
 	$(json_c_LIBS) \
 	$(libevent_LIBS) \
-	-lcrypto -lprotobuf -lsqlite3 -lleveldb -lsnappy
+	$(leveldb_LIBS) \
+	-lcrypto -lprotobuf -lsqlite3
 cpp_server_ct_server_SOURCES = \
 	cpp/client/async_log_client.cc \
 	cpp/proto/serializer.cc \
@@ -282,7 +283,8 @@ cpp_log_cluster_state_controller_test_LDADD = \
 	cpp/libtest.a \
 	$(json_c_LIBS) \
 	$(libevent_LIBS) \
-	-lprotobuf -lsqlite3 -lcrypto -lleveldb -lsnappy
+	$(leveldb_LIBS) \
+	-lprotobuf -lsqlite3 -lcrypto
 cpp_log_cluster_state_controller_test_SOURCES = \
 	cpp/client/async_log_client.cc \
 	cpp/log/cluster_state_controller_test.cc \
@@ -299,7 +301,8 @@ cpp_log_database_test_LDADD = \
 	cpp/libcore.a \
 	cpp/libtest.a \
 	$(libevent_LIBS) \
-	-lprotobuf -lsqlite3 -lcrypto -lleveldb -lsnappy
+	$(leveldb_LIBS) \
+	-lprotobuf -lsqlite3 -lcrypto
 cpp_log_database_test_SOURCES = \
 	cpp/log/database_test.cc \
 	cpp/log/test_signer.cc \
@@ -327,7 +330,8 @@ cpp_log_file_storage_test_LDADD = \
 	cpp/libcore.a \
 	cpp/libtest.a \
 	$(libevent_LIBS) \
-	-lprotobuf -lcrypto -lsqlite3 -lleveldb -lsnappy
+	$(leveldb_LIBS) \
+	-lprotobuf -lcrypto -lsqlite3
 cpp_log_file_storage_test_SOURCES = \
 	cpp/log/file_storage.cc \
 	cpp/log/file_storage_test.cc \
@@ -340,7 +344,8 @@ cpp_log_frontend_signer_test_LDADD = \
 	cpp/libtest.a \
 	$(json_c_LIBS) \
 	$(libevent_LIBS) \
-	-lprotobuf -lcrypto -lsqlite3 -lleveldb -lsnappy
+	$(leveldb_LIBS) \
+	-lprotobuf -lcrypto -lsqlite3
 cpp_log_frontend_signer_test_SOURCES = \
 	cpp/log/frontend_signer_test.cc \
 	cpp/log/test_signer.cc \
@@ -357,7 +362,8 @@ cpp_log_log_lookup_test_LDADD = \
 	cpp/libtest.a \
 	$(json_c_LIBS) \
 	$(libevent_LIBS) \
-	-lprotobuf -lcrypto -lsqlite3 -lleveldb -lsnappy
+	$(leveldb_LIBS) \
+	-lprotobuf -lcrypto -lsqlite3
 cpp_log_log_lookup_test_SOURCES = \
 	cpp/log/log_lookup_test.cc \
 	cpp/log/test_signer.cc \
@@ -409,7 +415,8 @@ cpp_log_tree_signer_test_LDADD = \
 	cpp/libtest.a \
 	$(json_c_LIBS) \
 	$(libevent_LIBS) \
-	-lprotobuf -lcrypto -lsqlite3 -lleveldb -lsnappy
+	$(leveldb_LIBS) \
+	-lprotobuf -lcrypto -lsqlite3
 cpp_log_tree_signer_test_SOURCES = \
 	cpp/log/test_signer.cc \
 	cpp/log/tree_signer_test.cc \
@@ -550,7 +557,8 @@ cpp_util_masterelection_test_LDADD = \
 	cpp/libtest.a \
 	$(json_c_LIBS) \
 	$(libevent_LIBS) \
-	-lprotobuf -lleveldb -lsnappy
+	$(leveldb_LIBS) \
+	-lprotobuf
 cpp_util_masterelection_test_SOURCES = \
 	cpp/util/json_wrapper.cc \
 	cpp/util/libevent_wrapper.cc \
@@ -645,7 +653,8 @@ cpp_log_database_large_test_LDADD = \
 	cpp/libcore.a \
 	cpp/libtest.a \
 	$(libevent_LIBS) \
-	-lprotobuf -lcrypto -lsqlite3 -lleveldb -lsnappy
+	$(leveldb_LIBS) \
+	-lprotobuf -lcrypto -lsqlite3
 cpp_log_database_large_test_SOURCES = \
 	cpp/log/database_large_test.cc \
 	cpp/log/test_signer.cc \
@@ -658,7 +667,8 @@ cpp_log_frontend_test_LDADD = \
 	cpp/libtest.a \
 	$(json_c_LIBS) \
 	$(libevent_LIBS) \
-	-lprotobuf -lcrypto -lsqlite3 -lleveldb -lsnappy
+	$(leveldb_LIBS) \
+	-lprotobuf -lcrypto -lsqlite3
 cpp_log_frontend_test_SOURCES = \
 	cpp/log/frontend_test.cc \
 	cpp/log/test_signer.cc \
