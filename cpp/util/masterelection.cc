@@ -502,7 +502,7 @@ void MasterElection::OnProposalUpdate(
 
   // Check to see whether the apparent master from the previous stage is backed
   // by all participating nodes:
-  bool found_master(!proposals_.empty());
+  CHECK(!proposals_.empty());
   // Check if everyone is in agreement about who the master is:
   for (const auto& pair : proposals_) {
     // Discount any participant who has explicitly abstained from the vote.
@@ -526,7 +526,6 @@ void MasterElection::OnProposalUpdate(
       VLOG(1) << my_proposal_path_ << ": Apparent master is "
               << apparent_master.key_ << " but " << pair.first
               << " is backing: " << pair.second.value_;
-      found_master = false;
       // No master, so we can't be master
       is_master_ = false;
       is_master_gauge->Set(0);
@@ -535,7 +534,6 @@ void MasterElection::OnProposalUpdate(
   }
 
   // There must be consensus about who the master is now.
-  CHECK(found_master);
   VLOG(2) << my_proposal_path_ << ": Agreed that master is "
           << apparent_master.key_;
   current_master_ = apparent_master;
