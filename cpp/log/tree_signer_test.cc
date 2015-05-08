@@ -34,6 +34,7 @@ using std::make_shared;
 using std::move;
 using std::shared_ptr;
 using std::string;
+using std::unique_ptr;
 using std::unordered_map;
 using std::vector;
 using testing::NiceMock;
@@ -65,6 +66,8 @@ class TreeSignerTest : public ::testing::Test {
     store_.reset(new EtcdConsistentStore<LoggedCertificate>(
         base_.get(), &pool_, &etcd_client_, &election_, "/root", "id"));
     tree_signer_.reset(new TS(std::chrono::duration<double>(0), db(),
+                              unique_ptr<CompactMerkleTree>(
+                                  new CompactMerkleTree(new Sha256Hasher)),
                               store_.get(), TestSigner::DefaultLogSigner()));
     // Set a default empty STH so that we can call UpdateTree() on the signer.
     store_->SetServingSTH(SignedTreeHead());
@@ -106,9 +109,12 @@ class TreeSignerTest : public ::testing::Test {
              this->db()->CreateSequencedEntry(*logged_cert));
   }
 
+
   TS* GetSimilar() {
-    return new TS(std::chrono::duration<double>(0), db(), store_.get(),
-                  TestSigner::DefaultLogSigner());
+    return new TS(std::chrono::duration<double>(0), db(),
+                  unique_ptr<CompactMerkleTree>(new CompactMerkleTree(
+                      *tree_signer_->cert_tree_, new Sha256Hasher)),
+                  store_.get(), TestSigner::DefaultLogSigner());
   }
 
   T* db() const {

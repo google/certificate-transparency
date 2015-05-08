@@ -62,13 +62,15 @@ struct PendingEntriesOrder
 template <class Logged>
 TreeSigner<Logged>::TreeSigner(
     const std::chrono::duration<double>& guard_window, Database<Logged>* db,
+    std::unique_ptr<CompactMerkleTree>&& merkle_tree,
     cert_trans::ConsistentStore<Logged>* consistent_store, LogSigner* signer)
     : guard_window_(guard_window),
       db_(db),
       consistent_store_(consistent_store),
       signer_(signer),
-      cert_tree_(new Sha256Hasher()),
+      cert_tree_(std::move(merkle_tree)),
       latest_tree_head_() {
+  CHECK(cert_tree_);
   // Try to get any STH previously published by this node.
   const util::StatusOr<ct::ClusterNodeState> node_state(
       consistent_store_->GetClusterNodeState());
@@ -79,8 +81,6 @@ TreeSigner<Logged>::TreeSigner(
   if (node_state.ok()) {
     latest_tree_head_ = node_state.ValueOrDie().newest_sth();
   }
-
-  BuildTree();
 }
 
 
@@ -237,7 +237,7 @@ typename TreeSigner<Logged>::UpdateResult TreeSigner<Logged>::UpdateTree() {
   uint64_t min_timestamp = LastUpdateTime() + 1;
 
   // Sequence any new sequenced entries from our local DB.
-  for (int64_t i(cert_tree_.LeafCount());; ++i) {
+  for (int64_t i(cert_tree_->LeafCount());; ++i) {
     Logged logged;
     typename Database<Logged>::LookupResult result(
         db_->LookupByIndex(i, &logged));
@@ -249,7 +249,7 @@ typename TreeSigner<Logged>::UpdateResult TreeSigner<Logged>::UpdateTree() {
     AppendToTree(logged);
     min_timestamp = std::max(min_timestamp, logged.sct().timestamp());
   }
-  int64_t next_seq(cert_tree_.LeafCount());
+  int64_t next_seq(cert_tree_->LeafCount());
   CHECK_GE(next_seq, 0);
 
   // Our tree is consistent with the database, i.e., each leaf in the tree has
@@ -268,70 +268,12 @@ typename TreeSigner<Logged>::UpdateResult TreeSigner<Logged>::UpdateTree() {
 
 
 template <class Logged>
-void TreeSigner<Logged>::BuildTree() {
-  DCHECK_EQ(0U, cert_tree_.LeafCount())
-      << "Attempting to build a tree when one already exists";
-  // Read the latest sth.
-  ct::SignedTreeHead sth;
-  typename Database<Logged>::LookupResult db_result =
-      db_->LatestTreeHead(&sth);
-
-  if (db_result == Database<Logged>::NOT_FOUND)
-    return;
-
-  CHECK(db_result == Database<Logged>::LOOKUP_OK);
-
-  // If the timestamp is from the future, then either the database is corrupt
-  // or our clock is corrupt; either way we shouldn't be signing things.
-  uint64_t current_time = util::TimeInMilliseconds();
-  CHECK_LE(sth.timestamp(), current_time)
-      << "Database has a timestamp from the future.";
-
-  // Read all logged and signed entries.
-  for (size_t i = 0; i < sth.tree_size(); ++i) {
-    Logged logged;
-    CHECK_EQ(Database<Logged>::LOOKUP_OK, db_->LookupByIndex(i, &logged));
-    CHECK_LE(logged.timestamp(), sth.timestamp());
-    CHECK_EQ(logged.sequence_number(), i);
-
-    AppendToTree(logged);
-    VLOG_IF(1, ((i % 100000) == 0)) << "added entry index " << i
-                                    << " to the tree signer";
-  }
-
-  // Check the root hash.
-  CHECK_EQ(cert_tree_.CurrentRoot(), sth.sha256_root_hash());
-
-  latest_tree_head_.CopyFrom(sth);
-
-  // Read the remaining sequenced entries. Note that it is possible to
-  // have more entries with sequence numbers than what the latest sth
-  // says. This happens when we assign some sequence numbers but die
-  // before we manage to sign the sth. It's not an inconsistency and
-  // will be corrected with UpdateTree().
-  for (size_t i = sth.tree_size();; ++i) {
-    Logged logged;
-    typename Database<Logged>::LookupResult db_result =
-        db_->LookupByIndex(i, &logged);
-    if (db_result == Database<Logged>::NOT_FOUND)
-      break;
-    CHECK_EQ(Database<Logged>::LOOKUP_OK, db_result);
-    CHECK_EQ(logged.sequence_number(), i);
-
-    AppendToTree(logged);
-  }
-
-  LOG(INFO) << "built a tree with " << cert_tree_.LeafCount() << " entries";
-}
-
-
-template <class Logged>
 bool TreeSigner<Logged>::Append(const Logged& logged) {
   // Serialize for inclusion in the tree.
   std::string serialized_leaf;
   CHECK(logged.SerializeForLeaf(&serialized_leaf));
 
-  CHECK_EQ(logged.sequence_number(), cert_tree_.LeafCount());
+  CHECK_EQ(logged.sequence_number(), cert_tree_->LeafCount());
   // Commit the sequence number of this certificate locally
   typename Database<Logged>::WriteResult db_result =
       db_->CreateSequencedEntry(logged);
@@ -339,12 +281,12 @@ bool TreeSigner<Logged>::Append(const Logged& logged) {
   if (db_result != Database<Logged>::OK) {
     CHECK_EQ(Database<Logged>::SEQUENCE_NUMBER_ALREADY_IN_USE, db_result);
     LOG(ERROR) << "Attempt to assign duplicate sequence number "
-               << cert_tree_.LeafCount();
+               << cert_tree_->LeafCount();
     return false;
   }
 
   // Update in-memory tree.
-  cert_tree_.AddLeaf(serialized_leaf);
+  cert_tree_->AddLeaf(serialized_leaf);
   return true;
 }
 
@@ -356,7 +298,7 @@ void TreeSigner<Logged>::AppendToTree(const Logged& logged) {
   CHECK(logged.SerializeForLeaf(&serialized_leaf));
 
   // Update in-memory tree.
-  cert_tree_.AddLeaf(serialized_leaf);
+  cert_tree_->AddLeaf(serialized_leaf);
 }
 
 
@@ -364,14 +306,14 @@ template <class Logged>
 void TreeSigner<Logged>::TimestampAndSign(uint64_t min_timestamp,
                                           ct::SignedTreeHead* sth) {
   sth->set_version(ct::V1);
-  sth->set_sha256_root_hash(cert_tree_.CurrentRoot());
+  sth->set_sha256_root_hash(cert_tree_->CurrentRoot());
   uint64_t timestamp = util::TimeInMilliseconds();
   if (timestamp < min_timestamp)
     // TODO(ekasper): shouldn't really happen if everyone's clocks are in sync;
     // log a warning if the skew is over some threshold?
     timestamp = min_timestamp;
   sth->set_timestamp(timestamp);
-  sth->set_tree_size(cert_tree_.LeafCount());
+  sth->set_tree_size(cert_tree_->LeafCount());
   LogSigner::SignResult ret = signer_->SignTreeHead(sth);
   if (ret != LogSigner::OK)
     // Make this one a hard fail. There is really no excuse for it.

@@ -31,9 +31,11 @@ namespace cert_trans {
 template <class Logged>
 class TreeSigner {
  public:
-  // No transfer of ownership for params.
+  // No transfer of ownership for params other than merkle_tree whose contents
+  // is moved into this object.
   TreeSigner(const std::chrono::duration<double>& guard_window,
              Database<Logged>* db,
+             std::unique_ptr<CompactMerkleTree>&& merkle_tree,
              cert_trans::ConsistentStore<Logged>* consistent_store,
              LogSigner* signer);
 
@@ -62,7 +64,6 @@ class TreeSigner {
   }
 
  private:
-  void BuildTree();
   bool Append(const Logged& logged);
   void AppendToTree(const Logged& logged_cert);
   void TimestampAndSign(uint64_t min_timestamp, ct::SignedTreeHead* sth);
@@ -71,12 +72,11 @@ class TreeSigner {
   Database<Logged>* const db_;
   cert_trans::ConsistentStore<Logged>* const consistent_store_;
   LogSigner* const signer_;
-  // TODO(ekasper): it's a waste for the signer to keep the entire tree in
-  // memory. Implement a compact version of the tree that runs in "restricted"
-  // mode, i.e., only remembers O(log n) nodes and cannot answer queries
-  // about audit paths or previous snapshots.
-  CompactMerkleTree cert_tree_;
+  const std::unique_ptr<CompactMerkleTree> cert_tree_;
   ct::SignedTreeHead latest_tree_head_;
+
+  template <class T>
+  friend class TreeSignerTest;
 };
 
 

@@ -9,6 +9,7 @@
 
 #include "base/macros.h"
 #include "log/database.h"
+#include "merkletree/compact_merkle_tree.h"
 #include "merkletree/merkle_tree.h"
 #include "proto/ct.pb.h"
 
@@ -55,6 +56,11 @@ class LogLookup {
   }
 
   std::string LeafHash(const Logged& logged) const;
+
+  // Creates a CompactMerkleTree based on the current state of our MerkleTree.
+  // Takes ownership of |hasher|.
+  std::unique_ptr<CompactMerkleTree> GetCompactMerkleTree(
+      SerialHasher* hasher);
 
  private:
   void UpdateFromSTH(const ct::SignedTreeHead& sth);

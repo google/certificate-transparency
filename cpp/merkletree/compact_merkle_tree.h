@@ -22,6 +22,9 @@ class CompactMerkleTree : public cert_trans::MerkleTreeInterface {
   // instantiation of the SerialHasher abstract class.
   // Takes ownership of the hasher.
   explicit CompactMerkleTree(SerialHasher* hasher);
+  CompactMerkleTree(const CompactMerkleTree& other, SerialHasher* hasher);
+
+  explicit CompactMerkleTree(CompactMerkleTree&& other) = default;
 
   // Creates a new CompactMerkleTree based on the data present in the
   // (non-compact) MerkleTree |model|.
