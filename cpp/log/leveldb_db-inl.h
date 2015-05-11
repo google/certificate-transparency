@@ -14,6 +14,10 @@
 #include "monitoring/latency.h"
 #include "util/util.h"
 
+DEFINE_int32(leveldb_max_open_files, 0,
+             "number of open files that can be used by leveldb");
+DEFINE_int32(leveldb_bloom_filter_bits_per_key, 0,
+             "number of open files that can be used by leveldb");
 
 namespace {
 
@@ -27,6 +31,20 @@ const char kMetaNodeIdKey[] = "metadata";
 const char kEntryPrefix[] = "entry-";
 const char kTreeHeadPrefix[] = "sth-";
 const char kMetaPrefix[] = "meta-";
+
+
+#ifdef HAVE_LEVELDB_FILTER_POLICY_H
+std::unique_ptr<const leveldb::FilterPolicy> BuildFilterPolicy() {
+  std::unique_ptr<const leveldb::FilterPolicy> retval;
+
+  if (FLAGS_leveldb_bloom_filter_bits_per_key > 0) {
+    retval.reset(CHECK_NOTNULL(leveldb::NewBloomFilterPolicy(
+        FLAGS_leveldb_bloom_filter_bits_per_key)));
+  }
+
+  return retval;
+}
+#endif
 
 
 std::string FormatSequenceNumber(const int64_t seq) {
@@ -47,11 +65,25 @@ const size_t LevelDB<Logged>::kTimestampBytesIndexed = 6;
 
 template <class Logged>
 LevelDB<Logged>::LevelDB(const std::string& dbfile)
-    : contiguous_size_(0), latest_tree_timestamp_(0) {
+    :
+#ifdef HAVE_LEVELDB_FILTER_POLICY_H
+      filter_policy_(BuildFilterPolicy()),
+#endif
+      contiguous_size_(0),
+      latest_tree_timestamp_(0) {
   LOG(INFO) << "Opening " << dbfile;
   cert_trans::ScopedLatency latency(latency_by_op_ms.GetScopedLatency("open"));
   leveldb::Options options;
   options.create_if_missing = true;
+  if (FLAGS_leveldb_max_open_files > 0) {
+    options.max_open_files = FLAGS_leveldb_max_open_files;
+  }
+#ifdef HAVE_LEVELDB_FILTER_POLICY_H
+  options.filter_policy = filter_policy_.get();
+#else
+  CHECK_EQ(FLAGS_leveldb_bloom_filter_bits_per_key, 0)
+      << "this version of leveldb does not have bloom filter support";
+#endif
   leveldb::DB* db;
   leveldb::Status status(leveldb::DB::Open(options, dbfile, &db));
   CHECK(status.ok()) << status.ToString();
@@ -286,8 +318,9 @@ void LevelDB<Logged>::BuildIndex() {
   // this should not be necessarily, but just to be sure...
   std::lock_guard<std::mutex> lock(lock_);
 
-  std::unique_ptr<leveldb::Iterator> it(
-      db_->NewIterator(leveldb::ReadOptions()));
+  leveldb::ReadOptions options;
+  options.fill_cache = false;
+  std::unique_ptr<leveldb::Iterator> it(db_->NewIterator(options));
   CHECK(it);
   it->Seek(kEntryPrefix);
 

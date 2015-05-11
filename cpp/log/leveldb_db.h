@@ -1,7 +1,12 @@
 #ifndef CERTIFICATE_LEVELDB_DB_H
 #define CERTIFICATE_LEVELDB_DB_H
 
+#include "config.h"
+
 #include <leveldb/db.h>
+#ifdef HAVE_LEVELDB_FILTER_POLICY_H
+#include <leveldb/filter_policy.h>
+#endif
 #include <map>
 #include <memory>
 #include <mutex>
@@ -63,6 +68,11 @@ class LevelDB : public Database<Logged> {
   void InsertEntryMapping(int64_t sequence_number, const std::string& hash);
 
   mutable std::mutex lock_;
+#ifdef HAVE_LEVELDB_FILTER_POLICY_H
+  // filter_policy_ must be valid for at least as long as db_ is, so
+  // keep this order.
+  const std::unique_ptr<const leveldb::FilterPolicy> filter_policy_;
+#endif
   std::unique_ptr<leveldb::DB> db_;
 
   int64_t contiguous_size_;

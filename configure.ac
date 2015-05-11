@@ -27,7 +27,7 @@ PKG_CHECK_MODULES([json_c], [json-c])
 
 # Checks for header files.
 AC_HEADER_RESOLV
-AC_CHECK_HEADERS([arpa/inet.h fcntl.h limits.h netinet/in.h stddef.h stdint.h stdlib.h string.h sys/socket.h sys/time.h unistd.h])
+AC_CHECK_HEADERS([arpa/inet.h fcntl.h limits.h netinet/in.h stddef.h stdint.h stdlib.h string.h sys/socket.h sys/time.h unistd.h leveldb/filter_policy.h])
 AC_CHECK_HEADER([event2/event.h],,
                 [AC_MSG_ERROR([libevent headers could not be found])])
 AC_CHECK_HEADER([gflags/gflags.h],,
@@ -36,6 +36,8 @@ AC_CHECK_HEADER([glog/logging.h],,
                 [AC_MSG_ERROR([glog headers could not be found])])
 AC_CHECK_HEADER([google/protobuf/message.h],,
                 [AC_MSG_ERROR([protobuf headers could not be found])])
+AC_CHECK_HEADER([leveldb/db.h],,
+                [AC_MSG_ERROR([leveldb headers could not be found])])
 AC_CHECK_HEADER([ldns/ldns.h],, [missing_ldns=yes])
 
 # Check for working GTest/GMock.
