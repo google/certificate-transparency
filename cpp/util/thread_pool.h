@@ -1,7 +1,9 @@
 #ifndef CERT_TRANS_UTIL_THREAD_POOL_H_
 #define CERT_TRANS_UTIL_THREAD_POOL_H_
 
+#include <chrono>
 #include <functional>
+#include <map>
 #include <memory>
 
 #include "base/macros.h"
@@ -26,6 +28,9 @@ class ThreadPool : public util::Executor {
   // Arranges for "closure" to be called in the thread pool. The
   // function must not be empty.
   void Add(const std::function<void()>& closure) override;
+
+  void Delay(const std::chrono::duration<double>& delay,
+             util::Task* task) override;
 
  private:
   class Impl;

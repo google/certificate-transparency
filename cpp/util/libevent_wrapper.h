@@ -34,7 +34,8 @@ class Base : public util::Executor {
   // Arranges to run the closure on the main loop.
   void Add(const std::function<void()>& cb) override;
 
-  void Delay(const std::chrono::duration<double>& delay, util::Task* task);
+  void Delay(const std::chrono::duration<double>& delay,
+             util::Task* task) override;
 
   void Dispatch();
   void DispatchOnce();

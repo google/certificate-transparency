@@ -78,7 +78,8 @@ TESTS = \
 	cpp/util/libevent_wrapper_test \
 	cpp/util/masterelection_test \
 	cpp/util/sync_task_test \
-	cpp/util/task_test
+	cpp/util/task_test \
+	cpp/util/thread_pool_test
 
 all-local:
 	$(MAKE) -C python
@@ -634,6 +635,14 @@ cpp_util_task_test_LDADD = \
 	$(libevent_LIBS)
 cpp_util_task_test_SOURCES = \
 	cpp/util/task_test.cc \
+	cpp/util/thread_pool.cc
+
+cpp_util_thread_pool_test_LDADD = \
+	cpp/libcore.a \
+	cpp/libtest.a \
+	$(libevent_LIBS)
+cpp_util_thread_pool_test_SOURCES = \
+	cpp/util/thread_pool_test.cc \
 	cpp/util/thread_pool.cc
 
 cpp_log_cert_checker_test_LDADD = \
