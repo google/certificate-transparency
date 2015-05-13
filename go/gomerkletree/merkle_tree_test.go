@@ -1,4 +1,4 @@
-package new_merkletree
+package gomerkletree
 
 import (
 	"bytes"
@@ -10,13 +10,13 @@ import (
 	"testing"
 )
 
-/* DummyDAO is a NewMerkleTree DAO type which simply returns an uppercase character
+/* DummyDAO is a MerkleTree DAO type which simply returns an uppercase character
  * for each leaf in the tree.  For obvious reasons, this makes it a little tricky
  * to support trees larger than 26 leaves, but for testing purposes that shouldn't
  * be a terrible burden.
  */
 type DummyDAO struct {
-	NewMerkleTreeDataInterface
+	MerkleTreeDataInterface
 
 	vals []byte
 }
@@ -69,8 +69,8 @@ func (h *NullHash) BlockSize() int {
 
 func TestNew(t *testing.T) {
 	// The explicit type declaration here is deliberate, to make absolutely
-	// sure that `New` is returning a `NewMerkleTree`.
-	var tree *NewMerkleTree
+	// sure that `New` is returning a `MerkleTree`.
+	var tree *MerkleTree
 	if tree = New(nil, nil, sha256.New); tree == nil {
 		t.Fail()
 	}
@@ -132,7 +132,7 @@ func TestAddLeaf(t *testing.T) {
 	}
 }
 
-func checkPath(t *testing.T, m *NewMerkleTree, index uint64, expectedPath []Hash) {
+func checkPath(t *testing.T, m *MerkleTree, index uint64, expectedPath []Hash) {
 	path, err := m.InclusionProof(index)
 	if err != nil {
 		t.Fatalf("InclusionProof(%v) returned error: %v", index, err)
@@ -180,7 +180,7 @@ func TestInclusionProofOnEmptyTree(t *testing.T) {
 
 	_, err := m.InclusionProof(0)
 
-	checkError(t, err, "NewMerkleTree: Can't calculate an inclusion proof on an empty tree")
+	checkError(t, err, "MerkleTree: Can't calculate an inclusion proof on an empty tree")
 }
 
 func TestInclusionProofOfInvalidLeaf(t *testing.T) {
@@ -188,10 +188,10 @@ func TestInclusionProofOfInvalidLeaf(t *testing.T) {
 
 	_, err := m.InclusionProof(2)
 
-	checkError(t, err, "NewMerkleTree: Invalid leaf index: 2")
+	checkError(t, err, "MerkleTree: Invalid leaf index: 2")
 }
 
-func checkConsistency(t *testing.T, m *NewMerkleTree, from, to uint64, expectedProof []Hash) {
+func checkConsistency(t *testing.T, m *MerkleTree, from, to uint64, expectedProof []Hash) {
 	proof, err := m.ConsistencyProof(from, to)
 	if err != nil {
 		t.Fatalf("ConsistencyProof(%v, %v) returned error: %v", from, to, err)
@@ -221,8 +221,8 @@ func TestConsistencyProof(t *testing.T) {
 	checkConsistency(t, m, 6, 8, sixToEight)
 
 	_, err := m.ConsistencyProof(1, 9)
-	checkError(t, err, "NewMerkleTree.ConsistencyProof: Value for 'to' greater than tree size (to=9, tree size=8)")
+	checkError(t, err, "MerkleTree.ConsistencyProof: Value for 'to' greater than tree size (to=9, tree size=8)")
 
 	_, err = m.ConsistencyProof(2, 0)
-	checkError(t, err, "NewMerkleTree.ConsistencyProof: 'to' greater than 'from'")
+	checkError(t, err, "MerkleTree.ConsistencyProof: 'to' greater than 'from'")
 }

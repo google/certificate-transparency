@@ -1,11 +1,11 @@
-package new_merkletree
+package gomerkletree
 
 type Hash []byte
 
-// NewMerkleTreeDataInterface defines the means by which a merkle hash tree can
+// MerkleTreeDataInterface defines the means by which a merkle hash tree can
 // retrieve data from an arbitrary data store, without tying the tree
 // implementation to any particular backend storage technology.
-type NewMerkleTreeDataInterface interface {
+type MerkleTreeDataInterface interface {
 	// EntryAt takes a (0-based) |index| into the list of leaf entries in
 	// the tree, and returns the contents of the leaf.  For a given
 	// |index| in a given tree, the value returned **MUST NOT** ever
@@ -18,11 +18,11 @@ type NewMerkleTreeDataInterface interface {
 	Size() uint64
 }
 
-// NewMerkleTreeCacheInterface provides a means for a merkle tree to cache
+// MerkleTreeCacheInterface provides a means for a merkle tree to cache
 // hash values in the tree.  Whilst all hash values *can* be recalculated
 // on the fly, it is far more efficient to be able to cache recently-used
 // values, to avoid needing to rehash everything.
-type NewMerkleTreeCacheInterface interface {
+type MerkleTreeCacheInterface interface {
 	GetNode([]byte) Hash
 	SetNode([]byte, Hash)
 }
