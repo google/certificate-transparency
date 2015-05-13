@@ -1,18 +1,11 @@
 /* -*- indent-tabs-mode: nil -*- */
 
-#include <chrono>
-#include <csignal>
-#include <cstring>
-#include <event2/buffer.h>
 #include <event2/thread.h>
-#include <functional>
 #include <gflags/gflags.h>
 #include <iostream>
-#include <memory>
-#include <mutex>
-#include <openssl/crypto.h>
 #include <openssl/err.h>
 #include <signal.h>
+#include <stdlib.h>
 #include <string>
 #include <unistd.h>
 
@@ -21,14 +14,10 @@
 #include "log/cert_checker.h"
 #include "log/cert_submission_handler.h"
 #include "log/cluster_state_controller.h"
-#include "log/ct_extensions.h"
 #include "log/etcd_consistent_store.h"
 #include "log/file_db.h"
 #include "log/file_storage.h"
-#include "log/frontend.h"
-#include "log/frontend_signer.h"
 #include "log/leveldb_db.h"
-#include "log/log_lookup.h"
 #include "log/log_signer.h"
 #include "log/sqlite_db.h"
 #include "log/strict_consistent_store.h"
@@ -37,14 +26,11 @@
 #include "monitoring/monitoring.h"
 #include "monitoring/registry.h"
 #include "server/handler.h"
-#include "server/json_output.h"
 #include "server/metrics.h"
-#include "server/proxy.h"
+#include "server/server.h"
 #include "util/etcd.h"
 #include "util/fake_etcd.h"
 #include "util/libevent_wrapper.h"
-#include "util/masterelection.h"
-#include "util/periodic_closure.h"
 #include "util/read_key.h"
 #include "util/status.h"
 #include "util/thread_pool.h"
@@ -93,13 +79,6 @@ DEFINE_double(guard_window_seconds, 60,
 DEFINE_string(etcd_host, "", "Hostname of the etcd server");
 DEFINE_int32(etcd_port, 0, "Port of the etcd server.");
 DEFINE_string(etcd_root, "/root", "Root of cluster entries in etcd.");
-DEFINE_int32(node_state_refresh_seconds, 10,
-             "How often to refresh the ClusterNodeState entry for this node.");
-DEFINE_int32(watchdog_seconds, 120,
-             "How many seconds without successfully refreshing this node's "
-             "before firing the watchdog timer.");
-DEFINE_bool(watchdog_timeout_is_fatal, true,
-            "Exit if the watchdog timer fires.");
 DEFINE_int32(num_http_server_threads, 16,
              "Number of threads for servicing the incoming HTTP requests.");
 DEFINE_bool(i_know_stand_alone_mode_can_lose_data, false,
@@ -119,14 +98,10 @@ using cert_trans::EtcdConsistentStore;
 using cert_trans::FakeEtcdClient;
 using cert_trans::FileStorage;
 using cert_trans::HttpHandler;
-using cert_trans::JsonOutput;
 using cert_trans::Latency;
 using cert_trans::LoggedCertificate;
-using cert_trans::MasterElection;
-using cert_trans::PeriodicClosure;
-using cert_trans::Proxy;
 using cert_trans::ReadPrivateKey;
-using cert_trans::StrictConsistentStore;
+using cert_trans::Server;
 using cert_trans::ScopedLatency;
 using cert_trans::ThreadPool;
 using cert_trans::TreeSigner;
@@ -149,6 +124,9 @@ using std::shared_ptr;
 using std::string;
 using std::thread;
 using std::unique_ptr;
+
+
+namespace {
 
 
 Gauge<>* latest_local_tree_size_gauge =
@@ -238,15 +216,15 @@ static const bool sign_dummy =
                           &ValidateIsPositive);
 
 void CleanUpEntries(ConsistentStore<LoggedCertificate>* store,
-                    const MasterElection* election) {
+                    const function<bool()>& is_master) {
   CHECK_NOTNULL(store);
-  CHECK_NOTNULL(election);
+  CHECK(is_master);
   const steady_clock::duration period(
       (seconds(FLAGS_cleanup_frequency_seconds)));
   steady_clock::time_point target_run_time(steady_clock::now());
 
   while (true) {
-    if (election->IsMaster()) {
+    if (is_master()) {
       // Keep cleaning up until there's no more work to do.
       // This should help to keep the etcd contents size down during heavy
       // load.
@@ -273,15 +251,15 @@ void CleanUpEntries(ConsistentStore<LoggedCertificate>* store,
 }
 
 void SequenceEntries(TreeSigner<LoggedCertificate>* tree_signer,
-                     const MasterElection* election) {
+                     const function<bool()>& is_master) {
   CHECK_NOTNULL(tree_signer);
-  CHECK_NOTNULL(election);
+  CHECK(is_master);
   const steady_clock::duration period(
       (seconds(FLAGS_sequencing_frequency_seconds)));
   steady_clock::time_point target_run_time(steady_clock::now());
 
   while (true) {
-    if (election->IsMaster()) {
+    if (is_master()) {
       const ScopedLatency sequencer_sequence_latency(
           sequencer_sequence_latency_ms.GetScopedLatency());
       util::Status status(tree_signer->SequenceNewEntries());
@@ -302,12 +280,10 @@ void SequenceEntries(TreeSigner<LoggedCertificate>* tree_signer,
 
 void SignMerkleTree(TreeSigner<LoggedCertificate>* tree_signer,
                     ConsistentStore<LoggedCertificate>* store,
-                    ClusterStateController<LoggedCertificate>* controller,
-                    const MasterElection* election) {
+                    ClusterStateController<LoggedCertificate>* controller) {
   CHECK_NOTNULL(tree_signer);
   CHECK_NOTNULL(store);
   CHECK_NOTNULL(controller);
-  CHECK_NOTNULL(election);
   const steady_clock::duration period(
       (seconds(FLAGS_tree_signing_frequency_seconds)));
   steady_clock::time_point target_run_time(steady_clock::now());
@@ -344,59 +320,6 @@ void SignMerkleTree(TreeSigner<LoggedCertificate>* tree_signer,
   }
 }
 
-void RefreshNodeState(ClusterStateController<LoggedCertificate>* controller) {
-  const steady_clock::duration period(
-      (seconds(FLAGS_node_state_refresh_seconds)));
-  steady_clock::time_point target_run_time(steady_clock::now());
-
-  while (true) {
-    // If we haven't managed to refresh our state file in a timely fashion,
-    // then send us a SIGALRM:
-    alarm(FLAGS_watchdog_seconds);
-
-    controller->RefreshNodeState();
-
-    const steady_clock::time_point now(steady_clock::now());
-    while (target_run_time <= now) {
-      target_run_time += period;
-    }
-    std::this_thread::sleep_for(target_run_time - now);
-  }
-}
-
-void WatchdogTimeout(int sig) {
-  if (FLAGS_watchdog_timeout_is_fatal) {
-    LOG(FATAL) << "Watchdog timed out, killing process.";
-  } else {
-    LOG(INFO) << "Watchdog timeout out, ignoring.";
-  }
-}
-
-
-// Functions to handle locking for OpenSSL when used in a multithreaded env in
-// here:
-namespace {
-
-
-void locking_function(int mode, int n, const char* file, int line) {
-  static mutex* openssl_locks = new mutex[CRYPTO_num_locks()];
-  if (mode & CRYPTO_LOCK) {
-    openssl_locks[n].lock();
-  } else {
-    openssl_locks[n].unlock();
-  }
-}
-
-
-void threadid_function(CRYPTO_THREADID* id) {
-#ifdef PTHREAD_T_IS_POINTER
-  CRYPTO_THREADID_set_pointer(id, pthread_self());
-#else
-  CRYPTO_THREADID_set_numeric(id, pthread_self());
-#endif
-}
-
-
 }  // namespace
 
 
@@ -410,15 +333,7 @@ int main(int argc, char* argv[]) {
   google::InitGoogleLogging(argv[0]);
   google::InstallFailureSignalHandler();
 
-  // Set-up OpenSSL for multithreaded use:
-  CRYPTO_THREADID_set_callback(threadid_function);
-  CRYPTO_set_locking_callback(locking_function);
-
-  OpenSSL_add_all_algorithms();
-  ERR_load_crypto_strings();
-  cert_trans::LoadCtExtensions();
-
-  CHECK_NE(SIG_ERR, std::signal(SIGALRM, &WatchdogTimeout));
+  Server<LoggedCertificate>::StaticInit();
 
   util::StatusOr<EVP_PKEY*> pkey(ReadPrivateKey(FLAGS_key));
   CHECK_EQ(pkey.status(), util::Status::OK);
@@ -453,21 +368,7 @@ int main(int argc, char* argv[]) {
         new FileStorage(FLAGS_meta_dir, 0));
   }
 
-  std::string node_id;
-  if (db->NodeId(&node_id) != Database<LoggedCertificate>::LOOKUP_OK) {
-    node_id = cert_trans::UUID4();
-    LOG(INFO) << "Initializing Node DB with UUID: " << node_id;
-    db->InitializeNode(node_id);
-  } else {
-    LOG(INFO) << "Found DB with Node UUID: " << node_id;
-  }
-
-  evthread_use_pthreads();
-  const shared_ptr<libevent::Base> event_base(make_shared<libevent::Base>());
-  // Temporary event pump for while we're setting things up and haven't yet
-  // entered the event loop at the bottom:
-  std::unique_ptr<libevent::EventPumpThread> pump(
-      new libevent::EventPumpThread(event_base));
+  shared_ptr<libevent::Base> event_base(make_shared<libevent::Base>());
   UrlFetcher url_fetcher(event_base.get());
 
   const bool stand_alone_mode(FLAGS_etcd_host.empty());
@@ -483,43 +384,20 @@ int main(int argc, char* argv[]) {
           ? new FakeEtcdClient(event_base.get())
           : new EtcdClient(&url_fetcher, FLAGS_etcd_host, FLAGS_etcd_port));
 
-  // No real reason to let this be configurable per node; you can really
-  // shoot yourself in the foot that way by effectively running multiple
-  // distinct elections.
-  const string kLockDir(FLAGS_etcd_root + "/election");
-  MasterElection election(event_base, etcd_client.get(), kLockDir, node_id);
+  Server<LoggedCertificate>::Options options;
+  options.server = FLAGS_server;
+  options.port = FLAGS_port;
+  options.etcd_root = FLAGS_etcd_root;
+  options.num_http_server_threads = FLAGS_num_http_server_threads;
 
-  // For now, run with a dedicated thread pool as the executor for our
-  // consistent store to avoid the possibility of DoS through thread starvation
-  // via HTTP.
-  ThreadPool internal_pool(8);
-  StrictConsistentStore<LoggedCertificate> consistent_store(
-      &election, new EtcdConsistentStore<LoggedCertificate>(
-                     event_base.get(), &internal_pool, etcd_client.get(),
-                     &election, FLAGS_etcd_root, node_id));
+  Server<LoggedCertificate> server(options, event_base, db, etcd_client.get(),
+                                   &url_fetcher, &log_signer, &checker);
+  server.Initialise();
 
-  const unique_ptr<ContinuousFetcher> fetcher(
-      ContinuousFetcher::New(event_base.get(), &internal_pool, db));
-
-  // If we're joining an existing cluster, this node needs to get its database
-  // up-to-date with the serving_sth before we can do anything, so we'll wait
-  // here for that:
-  util::StatusOr<ct::SignedTreeHead> serving_sth(
-      consistent_store.GetServingSTH());
-  if (serving_sth.ok()) {
-    while (db->TreeSize() < serving_sth.ValueOrDie().tree_size()) {
-      LOG(WARNING) << "Waiting for local database to catch up to serving_sth ("
-                   << db->TreeSize() << " of "
-                   << serving_sth.ValueOrDie().tree_size() << ")";
-      sleep(1);
-    }
-  }
-
-  LogLookup<LoggedCertificate> log_lookup(db);
   TreeSigner<LoggedCertificate> tree_signer(
       std::chrono::duration<double>(FLAGS_guard_window_seconds), db,
-      log_lookup.GetCompactMerkleTree(new Sha256Hasher), &consistent_store,
-      &log_signer);
+      server.log_lookup()->GetCompactMerkleTree(new Sha256Hasher),
+      server.consistent_store(), &log_signer);
 
   if (stand_alone_mode) {
     // Set up a simple single-node environment.
@@ -537,17 +415,17 @@ int main(int argc, char* argv[]) {
     config.set_minimum_serving_fraction(1);
     LOG(INFO) << "Setting default single-node ClusterConfig:\n"
               << config.DebugString();
-    consistent_store.SetClusterConfig(config);
+    server.consistent_store()->SetClusterConfig(config);
 
     // Since we're a single node cluster, we'll settle that we're the
     // master here, so that we can populate the initial STH
     // (StrictConsistentStore won't allow us to do so unless we're master.)
-    election.StartElection();
-    election.WaitToBecomeMaster();
+    server.election()->StartElection();
+    server.election()->WaitToBecomeMaster();
 
     {
       EtcdClient::Response resp;
-      util::SyncTask task(&internal_pool);
+      util::SyncTask task(event_base.get());
       etcd_client->Create("/root/sequence_mapping", "", &resp, task.task());
       task.Wait();
       CHECK_EQ(util::Status::OK, task.status());
@@ -560,56 +438,23 @@ int main(int argc, char* argv[]) {
     // Need to boot-strap the Serving STH too because we consider it an error
     // if it's not set, which in turn causes us to not attempt to become
     // master:
-    consistent_store.SetServingSTH(tree_signer.LatestSTH());
+    server.consistent_store()->SetServingSTH(tree_signer.LatestSTH());
   } else {
     CHECK(!FLAGS_server.empty());
   }
 
-  ClusterStateController<LoggedCertificate> cluster_controller(
-      &internal_pool, event_base, &url_fetcher, db, &consistent_store,
-      &election, fetcher.get());
-
-  // Publish this node's hostname:port info
-  cluster_controller.SetNodeHostPort(FLAGS_server, FLAGS_port);
-  {
-    ct::SignedTreeHead db_sth;
-    if (db->LatestTreeHead(&db_sth) ==
-        Database<LoggedCertificate>::LOOKUP_OK) {
-      cluster_controller.NewTreeHead(db_sth);
-    }
-  }
 
   // TODO(pphaneuf): We should be remaining in an "unhealthy state"
   // (either not accepting any requests, or returning some internal
   // server error) until we have an STH to serve.
-  thread sequencer(&SequenceEntries, &tree_signer, &election);
-  thread cleanup(&CleanUpEntries, &consistent_store, &election);
-  thread signer(&SignMerkleTree, &tree_signer, &consistent_store,
-                &cluster_controller, &election);
-  thread node_refresh(&RefreshNodeState, &cluster_controller);
+  const function<bool()> is_master(
+      bind(&Server<LoggedCertificate>::IsMaster, &server));
+  thread sequencer(&SequenceEntries, &tree_signer, is_master);
+  thread cleanup(&CleanUpEntries, server.consistent_store(), is_master);
+  thread signer(&SignMerkleTree, &tree_signer, server.consistent_store(),
+                server.cluster_state_controller());
 
-  Frontend frontend(new CertSubmissionHandler(&checker),
-                    new FrontendSigner(db, &consistent_store, &log_signer));
-  ThreadPool pool(FLAGS_num_http_server_threads);
-  JsonOutput output(event_base.get());
-  Proxy proxy(event_base.get(), &output,
-              bind(&ClusterStateController<LoggedCertificate>::GetFreshNodes,
-                   &cluster_controller),
-              &url_fetcher, &pool);
-  HttpHandler handler(&output, &log_lookup, db, &cluster_controller, &checker,
-                      &frontend, &proxy, &pool, event_base.get());
-
-  libevent::HttpServer server(*event_base);
-  handler.Add(&server);
-  server.AddHandler("/metrics",
-                    bind(&cert_trans::ExportPrometheusMetrics, _1));
-  server.Bind(NULL, FLAGS_port);
-
-  std::cout << "READY" << std::endl;
-
-  // Ding the temporary event pump because we're about to enter the event loop
-  pump.reset();
-  event_base->Dispatch();
+  server.Run();
 
   return 0;
 }
