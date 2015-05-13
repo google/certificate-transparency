@@ -10,25 +10,34 @@ import (
 	"math"
 )
 
+// NewMerkleTree is a type which calculates the hashes within a Merkle Hash
+// Tree, and to query the tree for inclusion and transparency proofs.
+type NewMerkleTree struct {
+	dao   NewMerkleTreeDataInterface
+	cache NewMerkleTreeCacheInterface
+
+	hasher func() hash.Hash
+}
+
 // New creates a new merkle hash tree.  The number of "leaves" of the tree,
 // as well as their contents, are retrieved through |dao|.  If you wish to
 // have acceptable performance on non-trivial tree sizes, you'll want to
 // provide |cache| (otherwise, pass `nil`).  The hash function used for all
 // nodes in the tree is specified by |hasher|.
-func New(dao NewMerkleTreeDataInterface, cache NewMerkleTreeCacheInterface, hasher hash.Hash) *NewMerkleTree {
+func New(dao NewMerkleTreeDataInterface, cache NewMerkleTreeCacheInterface, hasher func() hash.Hash) *NewMerkleTree {
 	return &NewMerkleTree{dao: dao, cache: cache, hasher: hasher}
 }
 
-func (mt NewMerkleTree) CurrentRoot() (Hash, error) {
+func (mt *NewMerkleTree) CurrentRoot() (Hash, error) {
 	if mt.dao.Size() == 0 {
 		// Special case: empty trees get hashes of empty strings
-		mt.hasher.Reset()
-		return mt.hasher.Sum([]byte{}), nil
+		h := mt.hasher()
+		return h.Sum([]byte{}), nil
 	}
 	return mt.subtreeRoot(0, mt.dao.Size()-1)
 }
 
-func (mt NewMerkleTree) InclusionProof(leaf uint64) ([]Hash, error) {
+func (mt *NewMerkleTree) InclusionProof(leaf uint64) ([]Hash, error) {
 	if mt.dao.Size() == 0 {
 		return nil, errors.New("NewMerkleTree: Can't calculate an inclusion proof on an empty tree")
 	}
@@ -40,7 +49,7 @@ func (mt NewMerkleTree) InclusionProof(leaf uint64) ([]Hash, error) {
 	return mt.inclusionSubtree(leaf, 0, mt.dao.Size()-1)
 }
 
-func (mt NewMerkleTree) ConsistencyProof(from, to uint64) ([]Hash, error) {
+func (mt *NewMerkleTree) ConsistencyProof(from, to uint64) ([]Hash, error) {
 	switch {
 	case from == 0:
 		// There's no algorithmic basis for this that I know of, but it is how
@@ -55,21 +64,21 @@ func (mt NewMerkleTree) ConsistencyProof(from, to uint64) ([]Hash, error) {
 	}
 }
 
-func (mt NewMerkleTree) hash(s []byte) Hash {
-	mt.hasher.Reset()
-	mt.hasher.Write(s)
-	return mt.hasher.Sum([]byte{})
+func (mt *NewMerkleTree) hash(s []byte) Hash {
+	h := mt.hasher()
+	h.Write(s)
+	return h.Sum([]byte{})
 }
 
-func (mt NewMerkleTree) leafHash(s []byte) Hash {
+func (mt *NewMerkleTree) leafHash(s []byte) Hash {
 	return mt.hash(bytes.Join([][]byte{{0x0}, s}, []byte{}))
 }
 
-func (mt NewMerkleTree) nodeHash(h1, h2 Hash) Hash {
+func (mt *NewMerkleTree) nodeHash(h1, h2 Hash) Hash {
 	return mt.hash(bytes.Join([][]byte{{0x1}, h1, h2}, []byte{}))
 }
 
-func (mt NewMerkleTree) subtreeRoot(n1, n2 uint64) (Hash, error) {
+func (mt *NewMerkleTree) subtreeRoot(n1, n2 uint64) (Hash, error) {
 	if n1 == n2 {
 		l, err := mt.dao.EntryAt(n1)
 		if err != nil {
@@ -92,7 +101,7 @@ func (mt NewMerkleTree) subtreeRoot(n1, n2 uint64) (Hash, error) {
 	return mt.nodeHash(s1, s2), nil
 }
 
-func (mt NewMerkleTree) inclusionSubtree(leaf, n1, n2 uint64) ([]Hash, error) {
+func (mt *NewMerkleTree) inclusionSubtree(leaf, n1, n2 uint64) ([]Hash, error) {
 	if n1 == n2 {
 		// Inclusion proof of a single element is the empty list
 		return []Hash{}, nil
@@ -134,7 +143,7 @@ func largestPowerOfTwoLessThan(n uint64) uint64 {
 	return uint64(math.Floor(math.Pow(2, math.Floor(math.Log2(float64(n)-1)))))
 }
 
-func (mt NewMerkleTree) subproof(from, t1, t2 uint64, b bool) ([]Hash, error) {
+func (mt *NewMerkleTree) subproof(from, t1, t2 uint64, b bool) ([]Hash, error) {
 	switch {
 	case t2 == from-1:
 		if b {

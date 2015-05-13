@@ -1,28 +1,6 @@
 package new_merkletree
 
-import "hash"
-
 type Hash []byte
-
-// NewMerkleTreeInterface is the set of methods which are required to
-// manipulate the contents of a Merkle Hash Tree (that is, add new entries),
-// and to query the tree for inclusion and transparency proofs.
-type NewMerkleTreeInterface interface {
-	// CurrentRootHash returns the hash of the entire current tree.
-	CurrentRootHash() (Hash, error)
-
-	// InclusionProof returns a list of the hashes of the "sibling"
-	// nodes to the leaf entry located at the (0-based) index specified.
-	// The returned list is presented in order, starting from the
-	// sibling to the item itself, and ending with a hash that is an
-	// immediate child of the root.
-	InclusionProof(entry uint64) ([]Hash, error)
-
-	// ConsistencyProof returns a list of the hashes that make up the
-	// consistency proof between the hash trees with size |tree1| and
-	// |tree2|.
-	ConsistencyProof(tree1 uint64, tree2 uint64) ([]Hash, error)
-}
 
 // NewMerkleTreeDataInterface defines the means by which a merkle hash tree can
 // retrieve data from an arbitrary data store, without tying the tree
@@ -47,15 +25,4 @@ type NewMerkleTreeDataInterface interface {
 type NewMerkleTreeCacheInterface interface {
 	GetNode([]byte) Hash
 	SetNode([]byte, Hash)
-}
-
-type NewMerkleTree struct {
-	// If a merkle tree you wish to be, you must implement these
-	// functions three.
-	NewMerkleTreeInterface
-
-	dao   NewMerkleTreeDataInterface
-	cache NewMerkleTreeCacheInterface
-
-	hasher hash.Hash
 }

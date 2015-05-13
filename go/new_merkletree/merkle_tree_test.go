@@ -71,14 +71,14 @@ func TestNew(t *testing.T) {
 	// The explicit type declaration here is deliberate, to make absolutely
 	// sure that `New` is returning a `NewMerkleTree`.
 	var tree *NewMerkleTree
-	if tree = New(nil, nil, sha256.New()); tree == nil {
+	if tree = New(nil, nil, sha256.New); tree == nil {
 		t.Fail()
 	}
 }
 
 func TestEmptyTree(t *testing.T) {
 	// Let's use sha256 for this one, just to show we can
-	tree := New(NewDummyDAO(0), nil, sha256.New())
+	tree := New(NewDummyDAO(0), nil, sha256.New)
 
 	actual, err := tree.CurrentRoot()
 	expect, _ := hex.DecodeString("e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855")
@@ -119,7 +119,7 @@ func rootForTestLeaves(numLeaves int) Hash {
 func TestAddLeaf(t *testing.T) {
 	for i := 0; i < 8; i++ {
 		dao := NewDummyDAO(i)
-		tree := New(dao, nil, new(NullHash))
+		tree := New(dao, nil, func() hash.Hash { return new(NullHash) })
 		r, err := tree.CurrentRoot()
 
 		if err != nil {
@@ -154,7 +154,7 @@ func checkPath(t *testing.T, m *NewMerkleTree, index uint64, expectedPath []Hash
 
 func TestInclusionProof(t *testing.T) {
 	// Test data as per RFC6962, s2.1.3
-	m := New(NewDummyDAO(7), nil, new(NullHash))
+	m := New(NewDummyDAO(7), nil, func() hash.Hash { return new(NullHash) })
 
 	pathToOne := []Hash{
 		[]byte("\x00A"), []byte("\x01\x00C\x00D"), []byte("\x01\x01\x00E\x00F\x00G")}
@@ -176,7 +176,7 @@ func checkError(t *testing.T, err error, msg string) {
 }
 
 func TestInclusionProofOnEmptyTree(t *testing.T) {
-	m := New(NewDummyDAO(0), nil, new(NullHash))
+	m := New(NewDummyDAO(0), nil, func() hash.Hash { return new(NullHash) })
 
 	_, err := m.InclusionProof(0)
 
@@ -184,7 +184,7 @@ func TestInclusionProofOnEmptyTree(t *testing.T) {
 }
 
 func TestInclusionProofOfInvalidLeaf(t *testing.T) {
-	m := New(NewDummyDAO(2), nil, new(NullHash))
+	m := New(NewDummyDAO(2), nil, func() hash.Hash { return new(NullHash) })
 
 	_, err := m.InclusionProof(2)
 
@@ -202,7 +202,7 @@ func checkConsistency(t *testing.T, m *NewMerkleTree, from, to uint64, expectedP
 }
 
 func TestConsistencyProof(t *testing.T) {
-	m := New(NewDummyDAO(8), nil, new(NullHash))
+	m := New(NewDummyDAO(8), nil, func() hash.Hash { return new(NullHash) })
 
 	zeroToSeven := []Hash{}
 	sevenToSeven := []Hash{}
