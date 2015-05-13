@@ -47,17 +47,37 @@ std::unique_ptr<const leveldb::FilterPolicy> BuildFilterPolicy() {
 #endif
 
 
-std::string FormatSequenceNumber(const int64_t seq) {
-  return std::to_string(seq);
+// WARNING: Do NOT change the type of "index" from int64_t, or you'll
+// break existing databases!
+std::string IndexToKey(int64_t index) {
+  const char nibble[] = "0123456789abcdef";
+  std::string index_str(sizeof(index) * 2, nibble[0]);
+  for (int i = sizeof(index) * 2; i > 0 && index > 0; --i) {
+    index_str[i - 1] = nibble[index & 0xf];
+    index = index >> 4;
+  }
+
+  return kEntryPrefix + index_str;
 }
 
 
-int64_t ParseSequenceNumber(const std::string& seq) {
-  return std::stoll(seq);
+int64_t KeyToIndex(leveldb::Slice key) {
+  CHECK(key.starts_with(kEntryPrefix));
+  key.remove_prefix(strlen(kEntryPrefix));
+  const std::string index_str(util::BinaryString(key.ToString()));
+
+  int64_t index(0);
+  CHECK_EQ(index_str.size(), sizeof(index));
+  for (int i = 0; i < sizeof(index); ++i) {
+    index = (index << 8) + index_str[i];
+  }
+
+  return index;
 }
 
 
 }  // namespace
+
 
 template <class Logged>
 const size_t LevelDB<Logged>::kTimestampBytesIndexed = 6;
@@ -106,14 +126,15 @@ typename Database<Logged>::WriteResult LevelDB<Logged>::CreateSequencedEntry_(
   std::string data;
   CHECK(logged.SerializeToString(&data));
 
-  const std::string seq_str(FormatSequenceNumber(logged.sequence_number()));
+  const std::string key(IndexToKey(logged.sequence_number()));
 
   std::string existing_data;
-  leveldb::Status status(db_->Get(leveldb::ReadOptions(),
-                                  kEntryPrefix + seq_str, &existing_data));
+  leveldb::Status status(
+      db_->Get(leveldb::ReadOptions(), key, &existing_data));
   if (status.IsNotFound()) {
-    status = db_->Put(leveldb::WriteOptions(), kEntryPrefix + seq_str, data);
-    CHECK(status.ok()) << "Failed to write sequenced entry (seq: " << seq_str
+    status = db_->Put(leveldb::WriteOptions(), key, data);
+    CHECK(status.ok()) << "Failed to write sequenced entry (seq: "
+                       << logged.sequence_number()
                        << "): " << status.ToString();
   } else {
     if (existing_data == data) {
@@ -140,11 +161,10 @@ typename Database<Logged>::LookupResult LevelDB<Logged>::LookupByHash(
   if (i == id_by_hash_.end()) {
     return this->NOT_FOUND;
   }
-  const std::string seq_str(FormatSequenceNumber(i->second));
 
   std::string cert_data;
   const leveldb::Status status(
-      db_->Get(leveldb::ReadOptions(), kEntryPrefix + seq_str, &cert_data));
+      db_->Get(leveldb::ReadOptions(), IndexToKey(i->second), &cert_data));
   if (status.IsNotFound()) {
     return this->NOT_FOUND;
   }
@@ -170,10 +190,9 @@ typename Database<Logged>::LookupResult LevelDB<Logged>::LookupByIndex(
   cert_trans::ScopedLatency latency(
       latency_by_op_ms.GetScopedLatency("lookup_by_index"));
 
-  const std::string seq_str(FormatSequenceNumber(sequence_number));
   std::string cert_data;
-  leveldb::Status status(
-      db_->Get(leveldb::ReadOptions(), kEntryPrefix + seq_str, &cert_data));
+  leveldb::Status status(db_->Get(leveldb::ReadOptions(),
+                                  IndexToKey(sequence_number), &cert_data));
   if (status.IsNotFound()) {
     return this->NOT_FOUND;
   }
@@ -325,17 +344,14 @@ void LevelDB<Logged>::BuildIndex() {
   it->Seek(kEntryPrefix);
 
   for (; it->Valid() && it->key().starts_with(kEntryPrefix); it->Next()) {
-    leveldb::Slice key_slice(it->key());
-    key_slice.remove_prefix(strlen(kEntryPrefix));
-    const std::string seq_string(key_slice.ToString());
-    const int64_t seq(ParseSequenceNumber(seq_string));
+    const int64_t seq(KeyToIndex(it->key()));
     Logged logged;
     CHECK(logged.ParseFromString(it->value().ToString()))
         << "Failed to parse entry with sequence number " << seq;
     CHECK(logged.has_sequence_number())
         << "No sequence number for entry with sequence number " << seq;
     CHECK_EQ(logged.sequence_number(), seq)
-        << "Entry has a negative sequence_number: " << seq;
+        << "Entry has unexpected sequence_number: " << seq;
 
     InsertEntryMapping(logged.sequence_number(), logged.Hash());
   }
