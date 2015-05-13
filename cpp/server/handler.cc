@@ -228,7 +228,7 @@ HttpHandler::HttpHandler(
       log_lookup_(CHECK_NOTNULL(log_lookup)),
       db_(CHECK_NOTNULL(db)),
       controller_(CHECK_NOTNULL(controller)),
-      cert_checker_(CHECK_NOTNULL(cert_checker)),
+      cert_checker_(cert_checker),
       frontend_(frontend),
       proxy_(CHECK_NOTNULL(proxy)),
       pool_(CHECK_NOTNULL(pool)),
@@ -289,10 +289,13 @@ void HttpHandler::Add(libevent::HttpServer* server) {
   // that they should be spun off to the thread pool.
   AddProxyWrappedHandler(server, "/ct/v1/get-entries",
                          bind(&HttpHandler::GetEntries, this, _1));
-  // Don't really need to proxy this one, but may as well just to keep
-  // everything tidy:
-  AddProxyWrappedHandler(server, "/ct/v1/get-roots",
-                         bind(&HttpHandler::GetRoots, this, _1));
+  // TODO(alcutter): Support this for mirrors too
+  if (cert_checker_) {
+    // Don't really need to proxy this one, but may as well just to keep
+    // everything tidy:
+    AddProxyWrappedHandler(server, "/ct/v1/get-roots",
+                           bind(&HttpHandler::GetRoots, this, _1));
+  }
   AddProxyWrappedHandler(server, "/ct/v1/get-proof-by-hash",
                          bind(&HttpHandler::GetProof, this, _1));
   AddProxyWrappedHandler(server, "/ct/v1/get-sth",

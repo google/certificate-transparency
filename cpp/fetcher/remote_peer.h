@@ -12,8 +12,12 @@ class RemotePeer : public Peer {
  public:
   // The "task" will return when the object is fully destroyed
   // (destroying this object starts the asynchronous destruction).
+  // |on_new_sth| will be called for each new STH that this object sees from
+  // the target log.
   RemotePeer(std::unique_ptr<AsyncLogClient>&& client,
-             std::unique_ptr<LogVerifier>&& verifier, util::Task* task);
+             std::unique_ptr<LogVerifier>&& verifier,
+             const std::function<void(const ct::SignedTreeHead&)>& on_new_sth,
+             util::Task* task);
   ~RemotePeer() override;
 
   int64_t TreeSize() const override;
