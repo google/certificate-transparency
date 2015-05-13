@@ -7,7 +7,6 @@ import (
 	"errors"
 	"fmt"
 	"hash"
-	"math"
 )
 
 // NewMerkleTree is a type which calculates the hashes within a Merkle Hash
@@ -136,11 +135,12 @@ func (mt *NewMerkleTree) inclusionSubtree(leaf, n1, n2 uint64) ([]Hash, error) {
 }
 
 func largestPowerOfTwoLessThan(n uint64) uint64 {
-	if n < 2 {
-		panic("Can't calculate tiny powers of two")
+	p := uint64(1)
+	for n -= 1; n > 1; n >>= 1 {
+		p <<= 1
 	}
 
-	return uint64(math.Floor(math.Pow(2, math.Floor(math.Log2(float64(n)-1)))))
+	return p
 }
 
 func (mt *NewMerkleTree) subproof(from, t1, t2 uint64, b bool) ([]Hash, error) {
