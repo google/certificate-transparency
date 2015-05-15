@@ -1,6 +1,10 @@
 #!/bin/bash
 DIR=$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )
-source ${DIR}/config.sh
+if [ "$1" == "" ]; then
+  echo "Usage: $0 <config.sh file>"
+  exit 1;
+fi
+source $1
 source ${DIR}/util.sh
 
 set -e
@@ -11,6 +15,11 @@ LOG_HOSTS=$(
     echo -n "target: \"http://${i}:80/metrics\"\n";
     echo -n "target: \"http://${i}:8080/metrics\"\n";
   done)
+MIRROR_HOSTS=$(
+  for i in ${MIRROR_MACHINES[@]}; do
+    echo -n "target: \"http://${i}:80/metrics\"\n";
+    echo -n "target: \"http://${i}:8080/metrics\"\n";
+  done)
 ETCD_HOSTS=$(
   for i in ${ETCD_MACHINES[@]}; do
     echo -n "target: \"http://${i}:8080/metrics\"\n";
@@ -18,6 +27,7 @@ ETCD_HOSTS=$(
 
 export TMP_CONFIG=/tmp/prometheus.conf
 sed -- "s%@@LOG_TARGETS@@%${LOG_HOSTS}%g
+        s%@@MIRROR_TARGETS@@%${MIRROR_HOSTS}%g
         s%@@ETCD_TARGETS@@%${ETCD_HOSTS}%g" < ${DIR}/../prometheus/prometheus.conf > ${TMP_CONFIG}
 
 
