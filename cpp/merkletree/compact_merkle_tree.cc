@@ -15,17 +15,18 @@ CompactMerkleTree::CompactMerkleTree(SerialHasher* hasher)
       treehasher_(hasher),
       leaf_count_(0),
       leaves_processed_(0),
-      level_count_(0) {
-  root_ = treehasher_.HashEmpty();
+      level_count_(0),
+      root_(treehasher_.HashEmpty()) {
 }
 
 CompactMerkleTree::CompactMerkleTree(MerkleTree& model, SerialHasher* hasher)
     : MerkleTreeInterface(),
-      tree_(model.LevelCount() - 1),
+      tree_(std::max(0L, int64_t(model.LevelCount()) - 1)),
       treehasher_(hasher),
       leaf_count_(model.LeafCount()),
       leaves_processed_(0),
-      level_count_(model.LevelCount()) {
+      level_count_(model.LevelCount()),
+      root_(treehasher_.HashEmpty()) {
   if (model.LeafCount() == 0) {
     return;
   }
