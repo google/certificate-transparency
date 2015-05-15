@@ -41,7 +41,7 @@ for i in `seq ${ETCD_NUM_REPLICAS}`; do
   ${GCLOUD} compute instances create -q ${ETCD_MACHINES[${i}]} \
       --machine-type ${ETCD_MACHINE_TYPE} \
       --image container-vm \
-      --disk name=${ETCD_DISKS[${i}]} mode=rw boot=no auto-delete=yes \
+      --disk name=${ETCD_DISKS[${i}]},mode=rw,boot=no,auto-delete=yes \
       --tags etcd-node \
       --metadata-from-file startup-script=${DIR}/node_init.sh \
                            google-container-manifest=${MANIFEST}.${i} &

@@ -35,7 +35,7 @@ for i in `seq ${LOG_NUM_REPLICAS}`; do
   ${GCLOUD} compute instances create -q ${LOG_MACHINES[${i}]} \
       --machine-type ${LOG_MACHINE_TYPE} \
       --image container-vm \
-      --disk name=${LOG_DISKS[${i}]} mode=rw boot=no auto-delete=yes \
+      --disk name=${LOG_DISKS[${i}]},mode=rw,boot=no,auto-delete=yes \
       --tags log-node \
       --metadata-from-file startup-script=${DIR}/node_init.sh \
                            google-container-manifest=${MANIFEST}.${i} &

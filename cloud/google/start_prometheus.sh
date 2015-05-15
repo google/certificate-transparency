@@ -32,7 +32,7 @@ for i in `seq ${PROMETHEUS_NUM_REPLICAS}`; do
   ${GCLOUD} compute instances create -q ${PROMETHEUS_MACHINES[${i}]} \
       --machine-type ${PROMETHEUS_MACHINE_TYPE} \
       --image container-vm \
-      --disk name=${PROMETHEUS_DISKS[${i}]} mode=rw boot=no auto-delete=yes \
+      --disk name=${PROMETHEUS_DISKS[${i}]},mode=rw,boot=no,auto-delete=yes \
       --tags prometheus-node \
       --metadata-from-file startup-script=${DIR}/node_init.sh \
                            google-container-manifest=${MANIFEST} &
