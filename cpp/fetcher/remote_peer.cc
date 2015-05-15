@@ -18,18 +18,23 @@ namespace cert_trans {
 
 
 struct RemotePeer::Impl {
-  Impl(unique_ptr<LogVerifier>&& verifier, util::Task* task)
-      : verifier_(move(verifier)), task_(CHECK_NOTNULL(task)) {
+  Impl(unique_ptr<LogVerifier>&& verifier,
+       const std::function<void(const ct::SignedTreeHead&)>& on_new_sth,
+       util::Task* task)
+      : verifier_(move(verifier)),
+        on_new_sth_(on_new_sth),
+        task_(CHECK_NOTNULL(task)) {
     CHECK(verifier_);
   }
 
   const std::unique_ptr<LogVerifier> verifier_;
+  const std::function<void(const ct::SignedTreeHead&)> on_new_sth_;
   util::Task* const task_;
 
   mutex lock_;
   shared_ptr<SignedTreeHead> sth_;
 
-  void DoneGetSTH(const std::shared_ptr<ct::SignedTreeHead>& new_sth,
+  void DoneGetSTH(const std::shared_ptr<ct::SignedTreeHead>& on_new_sth,
                   AsyncLogClient::Status status);
 };
 
@@ -58,12 +63,17 @@ void RemotePeer::Impl::DoneGetSTH(
   }
 
   sth_ = new_sth;
+  if (on_new_sth_) {
+    on_new_sth_(*sth_);
+  }
 }
 
 
-RemotePeer::RemotePeer(unique_ptr<AsyncLogClient>&& client,
-                       unique_ptr<LogVerifier>&& verifier, util::Task* task)
-    : Peer(move(client)), impl_(new Impl(move(verifier), task)) {
+RemotePeer::RemotePeer(
+    unique_ptr<AsyncLogClient>&& client, unique_ptr<LogVerifier>&& verifier,
+    const std::function<void(const ct::SignedTreeHead&)>& on_new_sth,
+    util::Task* task)
+    : Peer(move(client)), impl_(new Impl(move(verifier), on_new_sth, task)) {
   TaskHold hold(task);
   task->DeleteWhenDone(impl_);
 

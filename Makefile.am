@@ -17,6 +17,7 @@ BUILT_SOURCES = \
 
 bin_PROGRAMS = \
 	cpp/client/ct \
+	cpp/server/ct-mirror \
 	cpp/server/ct-server \
 	cpp/tools/ct-clustertool
 
@@ -155,6 +156,32 @@ cpp_libtest_a_SOURCES = \
 	cpp/gmock-all.cc \
 	cpp/gtest-all.cc \
 	cpp/util/testing.cc
+
+cpp_server_ct_mirror_LDADD = \
+	cpp/libcore.a \
+	$(json_c_LIBS) \
+	$(libevent_LIBS) \
+	$(leveldb_LIBS) \
+	-lcrypto -lprotobuf -lsqlite3
+cpp_server_ct_mirror_SOURCES = \
+	cpp/client/async_log_client.cc \
+	cpp/fetcher/remote_peer.cc \
+	cpp/proto/serializer.cc \
+	cpp/server/ct-mirror.cc \
+	cpp/server/handler.cc \
+	cpp/server/json_output.cc \
+	cpp/server/metrics.cc \
+	cpp/server/proxy.cc \
+	cpp/util/json_wrapper.cc \
+	cpp/util/libevent_wrapper.cc \
+	cpp/util/openssl_util.cc \
+	cpp/util/periodic_closure.cc \
+	cpp/util/protobuf_util.cc \
+	cpp/util/protobuf_util.h \
+	cpp/util/read_key.cc \
+	cpp/util/thread_pool.cc \
+	cpp/util/util.cc \
+	cpp/util/uuid.cc
 
 cpp_server_ct_server_LDADD = \
 	cpp/libcore.a \
