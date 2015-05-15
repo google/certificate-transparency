@@ -39,7 +39,7 @@ CMD cd /mnt/ctmirror/ && \
         --port=80 \
         --server=${CONTAINER_HOST} \
         --log_dir=/mnt/ctmirror/logs \
-        --sqlite_db=/mnt/ctmirror/mirror.sql \
+        --leveldb_db=/mnt/ctmirror/mirror.ldb \
         --etcd_host=${ETCD_HOST} \
         --etcd_port=${ETCD_PORT} \
         --num_http_server_threads=${NUM_HTTP_SERVER_THREADS} \

@@ -47,8 +47,7 @@ for i in `seq ${ETCD_NUM_REPLICAS}`; do
       --image container-vm \
       --disk name=${ETCD_DISKS[${i}]},mode=rw,boot=no,auto-delete=yes \
       --tags etcd-node \
-      --metadata-from-file startup-script=${DIR}/node_init.sh \
-                           google-container-manifest=${MANIFEST}.${i} &
+      --metadata-from-file startup-script=${DIR}/node_init.sh,google-container-manifest=${MANIFEST}.${i} &
 done
 wait
 
