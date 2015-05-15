@@ -577,6 +577,12 @@ TEST_F(MerkleTreeTest, AddLeafHash) {
   EXPECT_EQ(kHashValue, tree.LeafHash(index));
 }
 
+TEST_F(CompactMerkleTreeTest, TestCloneEmptyTreeProducesWorkingTree) {
+  MerkleTree tree(new Sha256Hasher);
+  CompactMerkleTree compact(tree, new Sha256Hasher);
+  EXPECT_STREQ(H(compact.CurrentRoot()).c_str(), kSHA256EmptyTreeHash.str);
+}
+
 // VERIFICATION TESTS
 
 class MerkleVerifierTest : public MerkleTreeTest {
