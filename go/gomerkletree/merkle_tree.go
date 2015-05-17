@@ -36,6 +36,10 @@ func (mt *MerkleTree) CurrentRoot() (Hash, error) {
 	return mt.subtreeRoot(0, mt.dao.Size()-1)
 }
 
+// InclusionProof returns a list of subtree hashes which can be used, in
+// conjunction with the leaf item at (zero-indexed) |leaf|, to prove that
+// the leaf item at |leaf| is, indeed, contained within the tree, and we're
+// not just making this stuff up.
 func (mt *MerkleTree) InclusionProof(leaf uint64) ([]Hash, error) {
 	if mt.dao.Size() == 0 {
 		return nil, errors.New("MerkleTree: Can't calculate an inclusion proof on an empty tree")
@@ -48,6 +52,11 @@ func (mt *MerkleTree) InclusionProof(leaf uint64) ([]Hash, error) {
 	return mt.inclusionSubtree(leaf, 0, mt.dao.Size()-1)
 }
 
+// ConsistencyProof returns a list of subtree hashes which allow the
+// recipient to prove that the tree head of the tree with size |to| contains
+// all of the elements of the tree of size |from|.  Both |from| and |to| are
+// tree sizes (that is, they are the number of elements in the tree, *not*
+// the zero-based index of the last item, as |InclusionProof| takes).
 func (mt *MerkleTree) ConsistencyProof(from, to uint64) ([]Hash, error) {
 	switch {
 	case from == 0:
