@@ -1,71 +1,11 @@
 package gomerkletree
 
 import (
-	"bytes"
 	"crypto/sha256"
 	"encoding/hex"
-	"hash"
 	"log"
-	"reflect"
 	"testing"
 )
-
-/* DummyDAO is a MerkleTree DAO type which simply returns an uppercase character
- * for each leaf in the tree.  For obvious reasons, this makes it a little tricky
- * to support trees larger than 26 leaves, but for testing purposes that shouldn't
- * be a terrible burden.
- */
-type DummyDAO struct {
-	MerkleTreeDataInterface
-
-	vals []byte
-}
-
-func NewDummyDAO(size int) *DummyDAO {
-	dao := new(DummyDAO)
-	dao.vals = []byte("ABCDEFGHIJKLMNOPQRSTUVWXYZ")[0:size]
-	return dao
-}
-
-func (dao DummyDAO) EntryAt(i uint64) ([]byte, error) {
-	return dao.vals[i : i+1], nil
-}
-
-func (dao DummyDAO) Size() uint64 {
-	return uint64(len(dao.vals))
-}
-
-/* NullHash is a stupidly simple "hash" algorithm that simply returns its input
- * as the output.  Why is this useful?  Testing.
- */
-type NullHash struct {
-	hash.Hash
-
-	s []byte
-}
-
-func (h *NullHash) Write(p []byte) (int, error) {
-	h.s = bytes.Join([][]byte{h.s, p}, []byte{})
-	return len(p), nil
-}
-
-func (h *NullHash) Sum(b []byte) []byte {
-	return bytes.Join([][]byte{h.s, b}, []byte{})
-}
-
-func (h *NullHash) Reset() {
-	h.s = []byte{}
-}
-
-func (h *NullHash) Size() int {
-	return len(h.s)
-}
-
-func (h *NullHash) BlockSize() int {
-	return 1
-}
-
-// Real testing methods start here.
 
 func TestNew(t *testing.T) {
 	// The explicit type declaration here is deliberate, to make absolutely
@@ -76,107 +16,18 @@ func TestNew(t *testing.T) {
 	}
 }
 
-func TestEmptyTree(t *testing.T) {
-	// Let's use sha256 for this one, just to show we can
-	tree := New(NewDummyDAO(0), nil, sha256.New)
 
-	actual, err := tree.CurrentRoot()
+
+func TestEmptyTree(t *testing.T) {
+	tree := New(newTestDAO(0), nil, sha256.New)
+
 	expect, _ := hex.DecodeString("e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855")
 
-	if err != nil {
-		t.Fatalf("CurrentRoot() returned error: %v", err)
-	}
-
-	if bytes.Compare(actual, expect) != 0 {
-		t.Fatalf("Incorrect root value\nexpected:\n%v\ngot:\n%v", hex.Dump(expect), hex.Dump(actual))
-	}
-}
-
-func rootForTestLeaves(numLeaves int) Hash {
-	switch numLeaves {
-	case 0:
-		return []byte("")
-	case 1:
-		return []byte("\x00A")
-	case 2:
-		return []byte("\x01\x00A\x00B")
-	case 3:
-		return []byte("\x01\x01\x00A\x00B\x00C")
-	case 4:
-		return []byte("\x01\x01\x00A\x00B\x01\x00C\x00D")
-	case 5:
-		return []byte("\x01\x01\x01\x00A\x00B\x01\x00C\x00D\x00E")
-	case 6:
-		return []byte("\x01\x01\x01\x00A\x00B\x01\x00C\x00D\x01\x00E\x00F")
-	case 7:
-		return []byte("\x01\x01\x01\x00A\x00B\x01\x00C\x00D\x01\x01\x00E\x00F\x00G")
-	default:
-		log.Fatalf("Unexpected numLeaves: %v", numLeaves)
-		return nil
-	}
-}
-
-func TestAddLeaf(t *testing.T) {
-	for i := 0; i < 8; i++ {
-		dao := NewDummyDAO(i)
-		tree := New(dao, nil, func() hash.Hash { return new(NullHash) })
-		r, err := tree.CurrentRoot()
-
-		if err != nil {
-			t.Fatalf("CurrentRoot() for i=%v returned error: %v", i, err)
-		}
-
-		if bytes.Compare(r, rootForTestLeaves(i)) != 0 {
-			t.Fatalf("Incorrect CurrentRoot (index=%v).\ngot:\n%v\nexpected:\n%v\n", i, hex.Dump(r), hex.Dump(rootForTestLeaves(i)))
-		}
-	}
-}
-
-func checkPath(t *testing.T, m *MerkleTree, index uint64, expectedPath []Hash) {
-	path, err := m.InclusionProof(index)
-	if err != nil {
-		t.Fatalf("InclusionProof(%v) returned error: %v", index, err)
-	}
-	if !reflect.DeepEqual(path, expectedPath) {
-		actual_path := []string{}
-		for _, e := range path {
-			actual_path = append(actual_path, hex.EncodeToString(e))
-		}
-
-		expected_path := []string{}
-		for _, e := range expectedPath {
-			expected_path = append(expected_path, hex.EncodeToString(e))
-		}
-
-		t.Fatalf("Incorrect path returned for leaf@%d:\n%v\nexpected:\n%v", index, actual_path, expected_path)
-	}
-}
-
-func TestInclusionProof(t *testing.T) {
-	// Test data as per RFC6962, s2.1.3
-	m := New(NewDummyDAO(7), nil, func() hash.Hash { return new(NullHash) })
-
-	pathToOne := []Hash{
-		[]byte("\x00A"), []byte("\x01\x00C\x00D"), []byte("\x01\x01\x00E\x00F\x00G")}
-	pathToSix := []Hash{
-		[]byte("\x01\x00E\x00F"), []byte("\x01\x01\x00A\x00B\x01\x00C\x00D")}
-
-	checkPath(t, m, 1, pathToOne)
-	checkPath(t, m, 6, pathToSix)
-}
-
-func checkError(t *testing.T, err error, msg string) {
-	if err == nil {
-		t.Fatalf("No error returned.\nExpected: %v", msg)
-	}
-
-	if err.Error() != msg {
-		t.Fatalf("Incorrect error message.\nExpected: %v\nGot: %v", msg, err.Error())
-	}
+	checkCurrentRoot(t, tree, 0, expect)
 }
 
 func TestInclusionProofOnEmptyTree(t *testing.T) {
-	m := New(NewDummyDAO(0), nil, func() hash.Hash { return new(NullHash) })
+	m := New(newTestDAO(0), nil, sha256.New)
 
 	_, err := m.InclusionProof(0)
 
@@ -184,45 +35,128 @@ func TestInclusionProofOnEmptyTree(t *testing.T) {
 }
 
 func TestInclusionProofOfInvalidLeaf(t *testing.T) {
-	m := New(NewDummyDAO(2), nil, func() hash.Hash { return new(NullHash) })
+	m := New(newTestDAO(2), nil, sha256.New)
 
 	_, err := m.InclusionProof(2)
 
 	checkError(t, err, "MerkleTree: Invalid leaf index: 2")
 }
 
-func checkConsistency(t *testing.T, m *MerkleTree, from, to uint64, expectedProof []Hash) {
-	proof, err := m.ConsistencyProof(from, to)
-	if err != nil {
-		t.Fatalf("ConsistencyProof(%v, %v) returned error: %v", from, to, err)
-	}
-	if !reflect.DeepEqual(proof, expectedProof) {
-		t.Fatalf("Incorrect proof returned for consistency %d to %d:\n%v\nexpected:\n%v", from, to, proof, expectedProof)
+func TestCurrentRoot(t *testing.T) {
+	for i := 1; i < 9; i++ {
+		dao  := newTestDAO(i)
+		tree := New(dao, nil, sha256.New)
+
+		checkCurrentRoot(t, tree, i, rootForTestDAOLeaves(i));
 	}
 }
 
+func TestInclusionProof(t *testing.T) {
+	m := New(newTestDAO(8), nil, sha256.New)
+
+	pathToZero := []Hash{
+		mustDecode("96a296d224f285c67bee93c30f8a309157f0daa35dc5b87e410b78630a09cfc7"),
+		mustDecode("5f083f0a1a33ca076a95279832580db3e0ef4584bdff1f54c8a360f50de3031e"),
+		mustDecode("6b47aaf29ee3c2af9af889bc1fb9254dabd31177f16232dd6aab035ca39bf6e4")}
+	pathToFive := []Hash{
+		mustDecode("bc1a0643b12e4d2d7c77918f44e0f4f79a838b6cf9ec5b5c283e1f4d88599e6b"),
+		mustDecode("ca854ea128ed050b41b35ffc1b87b8eb2bde461e9e3b5596ece6b9d5975a0ae0"),
+		mustDecode("d37ee418976dd95753c1c73862b9398fa2a2cf9b4ff0fdfe8b30cd95209614b7")}
+
+	checkPath(t, m, 0, pathToZero)
+	checkPath(t, m, 5, pathToFive)
+}
+
 func TestConsistencyProof(t *testing.T) {
-	m := New(NewDummyDAO(8), nil, func() hash.Hash { return new(NullHash) })
+	m := New(newTestDAO(8), nil, sha256.New)
 
-	zeroToSeven := []Hash{}
-	sevenToSeven := []Hash{}
-	threeToSeven := []Hash{Hash("\x00C"), Hash("\x00D"), Hash("\x01\x00A\x00B"), Hash("\x01\x01\x00E\x00F\x00G")}
-	fourToSeven := []Hash{Hash("\x01\x01\x00E\x00F\x00G")}
-	sixToSeven := []Hash{Hash("\x01\x00E\x00F"), Hash("\x00G"), Hash("\x01\x01\x00A\x00B\x01\x00C\x00D")}
-	twoToFive := []Hash{Hash("\x01\x00C\x00D"), Hash("\x00E")}
-	sixToEight := []Hash{Hash("\x01\x00E\x00F"), Hash("\x01\x00G\x00H"), Hash("\x01\x01\x00A\x00B\x01\x00C\x00D")}
+	oneToEight := []Hash{
+		mustDecode("96a296d224f285c67bee93c30f8a309157f0daa35dc5b87e410b78630a09cfc7"),
+		mustDecode("5f083f0a1a33ca076a95279832580db3e0ef4584bdff1f54c8a360f50de3031e"),
+		mustDecode("6b47aaf29ee3c2af9af889bc1fb9254dabd31177f16232dd6aab035ca39bf6e4")}
+	sixToEight := []Hash{
+		mustDecode("0ebc5d3437fbe2db158b9f126a1d118e308181031d0a949f8dededebc558ef6a"),
+		mustDecode("ca854ea128ed050b41b35ffc1b87b8eb2bde461e9e3b5596ece6b9d5975a0ae0"),
+		mustDecode("d37ee418976dd95753c1c73862b9398fa2a2cf9b4ff0fdfe8b30cd95209614b7")}
+	twoToFive := []Hash{
+		mustDecode("5f083f0a1a33ca076a95279832580db3e0ef4584bdff1f54c8a360f50de3031e"),
+		mustDecode("bc1a0643b12e4d2d7c77918f44e0f4f79a838b6cf9ec5b5c283e1f4d88599e6b")}
 
-	checkConsistency(t, m, 0, 7, zeroToSeven)
-	checkConsistency(t, m, 7, 7, sevenToSeven)
-	checkConsistency(t, m, 3, 7, threeToSeven)
-	checkConsistency(t, m, 4, 7, fourToSeven)
-	checkConsistency(t, m, 6, 7, sixToSeven)
-	checkConsistency(t, m, 2, 5, twoToFive)
+	checkConsistency(t, m, 1, 8, oneToEight)
 	checkConsistency(t, m, 6, 8, sixToEight)
+	checkConsistency(t, m, 2, 5, twoToFive)
+}
 
-	_, err := m.ConsistencyProof(1, 9)
-	checkError(t, err, "MerkleTree.ConsistencyProof: Value for 'to' greater than tree size (to=9, tree size=8)")
 
-	_, err = m.ConsistencyProof(2, 0)
-	checkError(t, err, "MerkleTree.ConsistencyProof: 'to' greater than 'from'")
+
+// Hex decodes |s| and returns the result.
+// If the decode fails logs a fatal error
+func mustDecode(s string) []byte {
+	b, err := hex.DecodeString(s)
+	if err != nil {
+		log.Fatal(err)
+	}
+	return b
+}
+
+// Returns the the expected root hash for a tree which has had the first
+// |numLeaves| of |testDAOLeaves| added to it, in order.
+// Logs a fatal error if |numLeaves| is too large.
+func rootForTestDAOLeaves(numLeaves int) []byte {
+	switch numLeaves {
+	case 1:
+		return mustDecode("6e340b9cffb37a989ca544e6bb780a2c78901d3fb33738768511a30617afa01d")
+	case 2:
+		return mustDecode("fac54203e7cc696cf0dfcb42c92a1d9dbaf70ad9e621f4bd8d98662f00e3c125")
+	case 3:
+		return mustDecode("aeb6bcfe274b70a14fb067a5e5578264db0fa9b51af5e0ba159158f329e06e77")
+	case 4:
+		return mustDecode("d37ee418976dd95753c1c73862b9398fa2a2cf9b4ff0fdfe8b30cd95209614b7")
+	case 5:
+		return mustDecode("4e3bbb1f7b478dcfe71fb631631519a3bca12c9aefca1612bfce4c13a86264d4")
+	case 6:
+		return mustDecode("76e67dadbcdf1e10e1b74ddc608abd2f98dfb16fbce75277b5232a127f2087ef")
+	case 7:
+		return mustDecode("ddb89be403809e325750d3d263cd78929c2942b7942a34b77e122c9594a74c8c")
+	case 8:
+		return mustDecode("5dc9da79a70659a9ad559cb701ded9a2ab9d823aad2f4960cfe370eff4604328")
+	default:
+		log.Fatalf("Unexpected numLeaves %d", numLeaves)
+	}
+	return nil
+}
+
+/* testDAO is a MerkleTree DAO type which returns known test data. */
+type testDAO struct {
+	MerkleTreeDataInterface
+
+	vals [][]byte
+}
+
+var testDAOLeaves [][]byte = [][]byte {
+	{},
+	{0x00},
+	{0x10},
+	{0x20, 0x21},
+	{0x30, 0x31},
+	{0x40, 0x41, 0x42, 0x43},
+	{0x50, 0x51, 0x52, 0x53, 0x54, 0x55, 0x56, 0x57},
+	{0x60, 0x61, 0x62, 0x63, 0x64, 0x65, 0x66, 0x67, 0x68, 0x69, 0x6a, 0x6b, 0x6c, 0x6d, 0x6e, 0x6f},
+}
+
+/* Create a new testDAO instance, with the first |size| leaves of data
+ * available.
+ */
+func newTestDAO(size int) *testDAO {
+	dao := new(testDAO)
+	dao.vals = testDAOLeaves[0:size]
+	return dao
+}
+
+func (dao testDAO) EntryAt(i uint64) ([]byte, error) {
+	return dao.vals[i], nil
+}
+
+func (dao testDAO) Size() uint64 {
+	return uint64(len(dao.vals))
 }
