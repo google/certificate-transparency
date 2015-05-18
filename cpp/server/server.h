@@ -242,6 +242,7 @@ Server<Logged>::Server(const Options& opts,
                           bind(&cert_trans::ExportPrometheusMetrics,
                                std::placeholders::_1));
   http_server_.Bind(nullptr, options_.port);
+  election_.StartElection();
 }
 
 template <class Logged>

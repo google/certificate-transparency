@@ -500,66 +500,6 @@ TEST_F(ClusterStateControllerTest, TestGetLocalNodeState) {
 }
 
 
-TEST_F(ClusterStateControllerTest, TestLeavesElectionIfDoesNotHaveLocalData) {
-  const int kTreeSize(2345);
-  const int kTreeSizeSmaller(kTreeSize - 1);
-  const int kTreeSizeLarger(kTreeSize + 1);
-
-  {
-    SignedTreeHead local_sth;
-    local_sth.set_timestamp(10000);
-    local_sth.set_tree_size(kTreeSizeSmaller);
-    controller_.NewTreeHead(local_sth);
-    sleep(1);
-  }
-
-  SignedTreeHead sth;
-  {
-    EXPECT_CALL(election1_, StartElection()).Times(1);
-    sth.set_timestamp(10000);
-    sth.set_tree_size(kTreeSizeSmaller);
-    store1_->SetServingSTH(sth);
-    sleep(1);
-  }
-
-  {
-    EXPECT_CALL(election1_, StopElection()).Times(1);
-    sth.set_timestamp(sth.timestamp() + 1);
-    sth.set_tree_size(kTreeSizeLarger);
-    store1_->SetServingSTH(sth);
-    sleep(1);
-  }
-}
-
-
-TEST_F(ClusterStateControllerTest, TestJoinsElectionIfHasLocalData) {
-  const int kTreeSizeSmaller(2345);
-  const int kTreeSizeLarger(kTreeSizeSmaller + 1);
-
-  {
-    SignedTreeHead local_sth;
-    local_sth.set_timestamp(10000);
-    local_sth.set_tree_size(kTreeSizeSmaller);
-    controller_.NewTreeHead(local_sth);
-    sleep(1);
-  }
-
-  SignedTreeHead sth;
-  sth.set_timestamp(10000);
-  sth.set_tree_size(kTreeSizeSmaller - 10);
-  store1_->SetServingSTH(sth);
-  sleep(1);
-
-  {
-    EXPECT_CALL(election1_, StartElection()).Times(1);
-    sth.set_timestamp(sth.timestamp() + 1);
-    sth.set_tree_size(kTreeSizeLarger);
-    controller_.NewTreeHead(sth);
-    sleep(1);
-  }
-}
-
-
 TEST_F(ClusterStateControllerTest, TestNodeHostPort) {
   const string kHost("myhostname");
   const int kPort(9999);
