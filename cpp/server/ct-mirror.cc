@@ -230,6 +230,7 @@ void STHUpdater(
     }
 
     const int64_t local_size(db->TreeSize());
+    latest_local_tree_size_gauge->Set(local_size);
 
     {
       lock_guard<mutex> lock(*queue_mutex);
