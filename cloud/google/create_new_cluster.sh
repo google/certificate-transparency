@@ -53,7 +53,7 @@ ${GCLOUD} config set compute/zone ${ZONE}
 
 echo "============================================================="
 echo "Creating etcd instances..."
-${DIR}/start_etcd.sh
+${DIR}/start_etcd.sh ${DIR}/config.sh
 
 WaitForEtcd
 
@@ -64,11 +64,11 @@ PopulateEtcd
 
 echo "============================================================="
 echo "Creating superduper instances..."
-${DIR}/start_log.sh
+${DIR}/start_log.sh ${DIR}/config.sh
 
 echo "============================================================="
 echo "Starting prometheus..."
-${DIR}/start_prometheus.sh
+${DIR}/start_prometheus.sh ${DIR}/config.sh
 ${DIR}/update_prometheus_config.sh ${DIR}/config.sh
 
 
@@ -85,7 +85,7 @@ gcloud compute target-pools create log-pool \
     --health-check get-sth-check
 gcloud compute target-pools add-instances log-pool \
     --zone $ZONE \
-    --instances ${LOG_MACHINES[@]} 
+    --instances ${LOG_MACHINES[@]}
 gcloud compute forwarding-rules create log-fwd-rule \
     --region $REGION \
     --port-range 80 \

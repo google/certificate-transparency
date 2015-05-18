@@ -44,7 +44,7 @@ ${GCLOUD} config set compute/zone ${ZONE}
 
 echo "============================================================="
 echo "Creating etcd instances..."
-${DIR}/start_etcd.sh
+${DIR}/start_etcd.sh ${DIR}/mirror-config.sh
 
 WaitForEtcd
 
@@ -55,11 +55,11 @@ PopulateEtcd
 
 echo "============================================================="
 echo "Creating supermirror instances..."
-${DIR}/start_mirror.sh
+${DIR}/start_mirror.sh ${DIR}/mirror-config.sh
 
 echo "============================================================="
 echo "Starting prometheus..."
-${DIR}/start_prometheus.sh
+${DIR}/start_prometheus.sh ${DIR}/mirror-config.sh
 ${DIR}/update_prometheus_config.sh ${DIR}/mirror-config.sh
 
 
