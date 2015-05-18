@@ -294,10 +294,13 @@ TYPED_TEST(DBTest, WriteTreeHeadOlderTimestamp) {
 
 TYPED_TEST(DBTest, Resume) {
   LoggedCertificate logged_cert, logged_cert2, lookup_cert, lookup_cert2;
+  const int64_t kSeq1(129);
+  const int64_t kSeq2(22);
+
   this->test_signer_.CreateUnique(&logged_cert);
-  logged_cert.set_sequence_number(42);
+  logged_cert.set_sequence_number(kSeq1);
   this->test_signer_.CreateUnique(&logged_cert2);
-  logged_cert2.set_sequence_number(22);
+  logged_cert2.set_sequence_number(kSeq2);
 
   EXPECT_EQ(DB::OK, this->db()->CreateSequencedEntry(logged_cert));
   EXPECT_EQ(DB::OK, this->db()->CreateSequencedEntry(logged_cert2));
@@ -313,13 +316,13 @@ TYPED_TEST(DBTest, Resume) {
 
   EXPECT_EQ(DB::LOOKUP_OK,
             db2->LookupByHash(logged_cert.Hash(), &lookup_cert));
-  EXPECT_EQ(42U, lookup_cert.sequence_number());
+  EXPECT_EQ(kSeq1, lookup_cert.sequence_number());
 
   TestSigner::TestEqualLoggedCerts(logged_cert, lookup_cert);
 
   EXPECT_EQ(DB::LOOKUP_OK,
             db2->LookupByHash(logged_cert2.Hash(), &lookup_cert2));
-  EXPECT_EQ(22U, lookup_cert2.sequence_number());
+  EXPECT_EQ(kSeq2, lookup_cert2.sequence_number());
 
   TestSigner::TestEqualLoggedCerts(logged_cert2, lookup_cert2);
 
