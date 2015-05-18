@@ -58,6 +58,11 @@ hooks = [
         "pattern": "^sqlite3/",
         "action": [ "make", "-C", "sqlite3", "-f",  os.path.join(here, "certificate-transparency/build/Makefile.sqlite3") ],
     },
+    {
+        "name": "leveldb",
+        "pattern": "^leveldb/",
+        "action": [ "make", "-C", "leveldb", "-f",  os.path.join(here, "certificate-transparency/build/Makefile.leveldb") ],
+    },
     # Do this last
     {
         "name": "ct",

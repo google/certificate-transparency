@@ -1,0 +1,5 @@
+all:
+	gmake
+	cp lib* ../install/lib
+	mkdir -p ../install/include/leveldb
+	cp include/leveldb/*.h ../install/include/leveldb
