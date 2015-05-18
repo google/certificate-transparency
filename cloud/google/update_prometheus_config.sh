@@ -8,12 +8,12 @@ GCLOUD="gcloud"
 
 LOG_HOSTS=$(
   for i in ${LOG_MACHINES[@]}; do
-    echo -n "target: \"http://${i}:80/metrics\"\n";
-    echo -n "target: \"http://${i}:8080/metrics\"\n";
+    echo -n "target: \"http://${i}.c.${PROJECT}.internal:80/metrics\"\n";
+    echo -n "target: \"http://${i}.c.${PROJECT}.internal:8080/metrics\"\n";
   done)
 ETCD_HOSTS=$(
   for i in ${ETCD_MACHINES[@]}; do
-    echo -n "target: \"http://${i}:8080/metrics\"\n";
+    echo -n "target: \"http://${i}.c.${PROJECT}.internal:8080/metrics\"\n";
   done)
 
 export TMP_CONFIG=/tmp/prometheus.conf
