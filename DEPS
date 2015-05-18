@@ -15,6 +15,7 @@ deps = {
      # Randomly chosen github mirror
      "sqlite3-export": "http://repo.or.cz/sqlite-export.git",
      "sqlite3": "http://repo.or.cz/sqlite.git@version-3.8.10.1",
+     "leveldb", "https://github.com/google/leveldb.git@v1.18",
 }
 
 import os
