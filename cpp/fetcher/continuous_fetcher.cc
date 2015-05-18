@@ -30,7 +30,7 @@ namespace {
 class ContinuousFetcherImpl : public ContinuousFetcher {
  public:
   ContinuousFetcherImpl(libevent::Base* base, Executor* executor,
-                        Database<LoggedCertificate>* db);
+                        Database<LoggedCertificate>* db, bool fetch_scts);
 
   void AddPeer(const string& node_id, const shared_ptr<Peer>& peer) override;
   void RemovePeer(const string& node_id);
@@ -43,6 +43,7 @@ class ContinuousFetcherImpl : public ContinuousFetcher {
   libevent::Base* const base_;
   Executor* const executor_;
   Database<LoggedCertificate>* const db_;
+  const bool fetch_scts_;
 
   mutex lock_;
   map<string, shared_ptr<Peer>> peers_;
@@ -56,10 +57,12 @@ class ContinuousFetcherImpl : public ContinuousFetcher {
 
 ContinuousFetcherImpl::ContinuousFetcherImpl(libevent::Base* base,
                                              Executor* executor,
-                                             Database<LoggedCertificate>* db)
+                                             Database<LoggedCertificate>* db,
+                                             bool fetch_scts)
     : base_(CHECK_NOTNULL(base)),
       executor_(CHECK_NOTNULL(executor)),
       db_(CHECK_NOTNULL(db)),
+      fetch_scts_(fetch_scts),
       restart_fetch_(false) {
 }
 
@@ -106,7 +109,7 @@ void ContinuousFetcherImpl::StartFetch(const unique_lock<mutex>& lock) {
 
   restart_fetch_ = false;
 
-  unique_ptr<PeerGroup> peer_group(new PeerGroup);
+  unique_ptr<PeerGroup> peer_group(new PeerGroup(fetch_scts_));
   for (const auto& peer : peers_) {
     peer_group->Add(peer.second);
   }
@@ -158,10 +161,10 @@ void ContinuousFetcherImpl::FetchDelayDone(Task* task) {
 
 // static
 unique_ptr<ContinuousFetcher> ContinuousFetcher::New(
-    libevent::Base* base, Executor* executor,
-    Database<LoggedCertificate>* db) {
+    libevent::Base* base, Executor* executor, Database<LoggedCertificate>* db,
+    bool fetch_scts) {
   return unique_ptr<ContinuousFetcher>(
-      new ContinuousFetcherImpl(base, executor, db));
+      new ContinuousFetcherImpl(base, executor, db, fetch_scts));
 }
 
 

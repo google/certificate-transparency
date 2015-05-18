@@ -22,7 +22,7 @@ namespace cert_trans {
 // TODO(pphaneuf): Make that last sentence true!
 class PeerGroup {
  public:
-  PeerGroup() = default;
+  explicit PeerGroup(bool fetch_scts_);
 
   // Adding a peer twice is not allowed.
   void Add(const std::shared_ptr<Peer>& peer);
@@ -43,6 +43,7 @@ class PeerGroup {
   std::shared_ptr<Peer> PickPeer(const int64_t needed_size) const;
 
   mutable std::mutex lock_;
+  const bool fetch_scts_;
   std::map<std::shared_ptr<Peer>, PeerState> peers_;
 
   DISALLOW_COPY_AND_ASSIGN(PeerGroup);

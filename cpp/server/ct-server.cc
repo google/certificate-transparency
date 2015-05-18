@@ -90,7 +90,6 @@ namespace libevent = cert_trans::libevent;
 using cert_trans::CertChecker;
 using cert_trans::ClusterStateController;
 using cert_trans::ConsistentStore;
-using cert_trans::ContinuousFetcher;
 using cert_trans::Counter;
 using cert_trans::Gauge;
 using cert_trans::EtcdClient;
@@ -392,7 +391,7 @@ int main(int argc, char* argv[]) {
 
   Server<LoggedCertificate> server(options, event_base, db, etcd_client.get(),
                                    &url_fetcher, &log_signer, &checker);
-  server.Initialise();
+  server.Initialise(false /* is_mirror */);
 
   TreeSigner<LoggedCertificate> tree_signer(
       std::chrono::duration<double>(FLAGS_guard_window_seconds), db,

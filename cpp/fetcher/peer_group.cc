@@ -43,6 +43,10 @@ void GetEntriesDone(AsyncLogClient::Status client_status,
 }  // namespace
 
 
+PeerGroup::PeerGroup(bool fetch_scts) : fetch_scts_(fetch_scts) {
+}
+
+
 void PeerGroup::Add(const shared_ptr<Peer>& peer) {
   lock_guard<mutex> lock(lock_);
 
@@ -76,9 +80,14 @@ void PeerGroup::FetchEntries(int64_t start_index, int64_t end_index,
   }
 
   // TODO(pphaneuf): Handle the case where we have no peer more cleanly.
-  peer->client().GetEntriesAndSCTs(start_index, end_index,
-                                   CHECK_NOTNULL(entries),
-                                   bind(GetEntriesDone, _1, entries, task));
+  if (fetch_scts_) {
+    peer->client().GetEntriesAndSCTs(start_index, end_index,
+                                     CHECK_NOTNULL(entries),
+                                     bind(GetEntriesDone, _1, entries, task));
+  } else {
+    peer->client().GetEntries(start_index, end_index, CHECK_NOTNULL(entries),
+                              bind(GetEntriesDone, _1, entries, task));
+  }
 }
 
 

@@ -509,6 +509,8 @@ void HttpHandler::BlockingGetEntries(evhttp_request* req, int64_t start,
         !cert.SerializeExtraData(&extra_data) ||
         (include_scts &&
          Serializer::SerializeSCT(cert.sct(), &sct_data) != Serializer::OK)) {
+      LOG(WARNING) << "Failed to serialize entry @ " << i << ":\n"
+                   << cert.DebugString();
       return output_->SendError(req, HTTP_INTERNAL, "Serialization failed.");
     }
 

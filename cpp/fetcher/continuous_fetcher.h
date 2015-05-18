@@ -22,7 +22,7 @@ class ContinuousFetcher {
  public:
   static std::unique_ptr<ContinuousFetcher> New(
       libevent::Base* base, util::Executor* executor,
-      Database<LoggedCertificate>* db);
+      Database<LoggedCertificate>* db, bool fetch_scts);
 
   virtual ~ContinuousFetcher() = default;
 
