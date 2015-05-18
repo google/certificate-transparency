@@ -37,10 +37,9 @@ for i in `seq ${MIRROR_NUM_REPLICAS}`; do
   ${GCLOUD} compute instances create -q ${MIRROR_MACHINES[${i}]} \
       --machine-type ${MIRROR_MACHINE_TYPE} \
       --image container-vm \
-      --disk name=${MIRROR_DISKS[${i}]} mode=rw boot=no auto-delete=yes \
+      --disk name=${MIRROR_DISKS[${i}]},mode=rw,boot=no,auto-delete=yes \
       --tags mirror-node \
-      --metadata-from-file startup-script=${DIR}/node_init.sh \
-                           google-container-manifest=${MANIFEST}.${i} &
+      --metadata-from-file startup-script=${DIR}/node_init.sh,google-container-manifest=${MANIFEST}.${i} &
 done
 wait
 
