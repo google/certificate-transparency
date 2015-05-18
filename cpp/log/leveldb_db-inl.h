@@ -3,6 +3,7 @@
 
 #include "log/leveldb_db.h"
 
+#include <gflags/gflags.h>
 #include <glog/logging.h>
 #include <map>
 #include <stdint.h>
