@@ -81,7 +81,7 @@ class Server {
   ClusterStateController<Logged>* cluster_state_controller();
   LogLookup<Logged>* log_lookup();
 
-  void Initialise();
+  void Initialise(bool is_mirror);
   void Run();
 
  private:
@@ -282,10 +282,10 @@ LogLookup<Logged>* Server<Logged>::log_lookup() {
 
 
 template <class Logged>
-void Server<Logged>::Initialise() {
-  fetcher_.reset(
-      ContinuousFetcher::New(event_base_.get(), &internal_pool_, db_)
-          .release());
+void Server<Logged>::Initialise(bool is_mirror) {
+  fetcher_.reset(ContinuousFetcher::New(event_base_.get(), &internal_pool_,
+                                        db_, !is_mirror)
+                     .release());
 
   // If we're joining an existing cluster, this node needs to get its database
   // up-to-date with the serving_sth before we can do anything, so we'll wait

@@ -103,7 +103,6 @@ using cert_trans::JsonOutput;
 using cert_trans::Latency;
 using cert_trans::LoggedCertificate;
 using cert_trans::MasterElection;
-using cert_trans::PeerGroup;
 using cert_trans::PeriodicClosure;
 using cert_trans::Proxy;
 using cert_trans::ReadPublicKey;
@@ -303,7 +302,7 @@ int main(int argc, char* argv[]) {
 
   Server<LoggedCertificate> server(options, event_base, db, etcd_client.get(),
                                    &url_fetcher, nullptr, nullptr);
-  server.Initialise();
+  server.Initialise(true /* is_mirror */);
 
   if (stand_alone_mode) {
     // Set up a simple single-node mirror environment for testing.
@@ -367,7 +366,7 @@ int main(int argc, char* argv[]) {
       new_sth, fetcher_task.task()->AddChild(
                    [](Task* task) { LOG(INFO) << "RemotePeer exited."; })));
   const unique_ptr<ContinuousFetcher> fetcher(
-      ContinuousFetcher::New(event_base.get(), &pool, db));
+      ContinuousFetcher::New(event_base.get(), &pool, db, false));
   fetcher->AddPeer("target", peer);
 
   thread sth_updater(&STHUpdater, db, server.cluster_state_controller(),
