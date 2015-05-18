@@ -260,9 +260,6 @@ template <class Logged>
 void ClusterStateController<Logged>::PushLocalNodeState(
     const std::unique_lock<std::mutex>& lock) {
   CHECK(lock.owns_lock());
-  // Our new node state may affect our ability to become master (e.g. perhaps
-  // we've caught up on our replication), so check and join if appropriate:
-  DetermineElectionParticipation(lock);
 
   const util::Status status(store_->SetClusterNodeState(local_node_state_));
   LOG_IF(WARNING, !status.ok()) << "Couldn't set ClusterNodeState: " << status;
@@ -396,12 +393,6 @@ void ClusterStateController<Logged>::OnServingSthUpdated(
     }
 
   }
-  // TODO(alcutter): Determine whether we should be serving given the current
-  // STH and our local database contents.
-
-  // This could affect our ability to produce new STHs, so better check
-  // whether we should leave the election for now:
-  DetermineElectionParticipation(lock);
 
   ct::SignedTreeHead sth_to_write;
   if (write_sth) {
@@ -500,38 +491,6 @@ void ClusterStateController<Logged>::CalculateServingSTH(
   // TODO(alcutter): Add a mechanism to take the cluster off-line until we have
   // sufficient nodes able to serve.
   LOG(WARNING) << "Failed to determine suitable serving STH.";
-}
-
-
-template <class Logged>
-void ClusterStateController<Logged>::DetermineElectionParticipation(
-    const std::unique_lock<std::mutex>& lock) {
-  CHECK(lock.owns_lock());
-  // Can't be in the election if the cluster isn't properly initialised
-  if (!actual_serving_sth_) {
-    LOG(WARNING) << "Cluster has no Serving STH - leaving election.";
-    return;
-  }
-
-  // Don't want to be the master if we don't yet have the data to be able to
-  // issue new STHs
-  if (!local_node_state_.has_newest_sth()) {
-    LOG(INFO) << "No local STH, leaving election.";
-    election_->StopElection();
-    return;
-  } else if (actual_serving_sth_->tree_size() >
-             local_node_state_.newest_sth().tree_size()) {
-    LOG(INFO) << "Serving STH tree_size (" << actual_serving_sth_->tree_size()
-              << " > Local newest_sth tree size ("
-              << local_node_state_.newest_sth().tree_size() << ")";
-    LOG(INFO) << "Local replication too far behind to be master - "
-                 "leaving election.";
-    election_->StopElection();
-    return;
-  }
-
-  // Otherwise, make sure we're joining in the election.
-  election_->StartElection();
 }
 
 
