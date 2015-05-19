@@ -22,6 +22,7 @@
 namespace cert_trans {
 
 using std::bind;
+using std::chrono::duration;
 using std::chrono::seconds;
 using std::deque;
 using std::function;
@@ -486,6 +487,11 @@ class CheckingExecutor : public util::Executor {
   void Add(const std::function<void()>& closure) override {
     inner_.Add(bind(&CheckingExecutor::Check, this, closure));
   }
+
+  void Delay(const duration<double>& delay, util::Task* task) override {
+    LOG(FATAL) << "Not implemented";
+  }
+
 
   void CheckInExecutor() const {
     lock_guard<mutex> lock(lock_);

@@ -1,4 +1,5 @@
 #include "util/thread_pool.h"
+#include "util/task.h"
 
 #include <condition_variable>
 #include <glog/logging.h>
@@ -7,16 +8,36 @@
 #include <thread>
 #include <vector>
 
+using std::chrono::duration;
+using std::chrono::duration_cast;
+using std::chrono::seconds;
+using std::chrono::steady_clock;
 using std::condition_variable;
 using std::function;
+using std::get;
 using std::lock_guard;
 using std::mutex;
-using std::queue;
+using std::priority_queue;
 using std::thread;
+using std::tuple;
 using std::unique_lock;
 using std::vector;
 
 namespace cert_trans {
+namespace {
+
+typedef tuple<steady_clock::time_point, function<void()>, util::Task*>
+    QueueEntry;
+
+
+struct QueueOrdering {
+  bool operator()(const QueueEntry& lhs, const QueueEntry& rhs) const {
+    return get<0>(lhs) > get<0>(rhs);
+  }
+};
+
+
+}  // namespace
 
 
 class ThreadPool::Impl {
@@ -31,7 +52,7 @@ class ThreadPool::Impl {
 
   mutex queue_lock_;
   condition_variable queue_cond_var_;
-  queue<function<void()> > queue_;
+  priority_queue<QueueEntry, vector<QueueEntry>, QueueOrdering> queue_;
 };
 
 
@@ -41,7 +62,8 @@ ThreadPool::Impl::~Impl() {
   {
     lock_guard<mutex> lock(queue_lock_);
     for (int i = threads_.size(); i > 0; --i)
-      queue_.push(function<void()>());
+      queue_.emplace(
+          make_tuple(steady_clock::time_point(), function<void()>(), nullptr));
   }
   // Notify all the threads *after* adding all the empty closures, to
   // avoid any races.
@@ -51,35 +73,58 @@ ThreadPool::Impl::~Impl() {
   for (auto& thread : threads_) {
     thread.join();
   }
+
+  // Workers should've drained everything from the queue.
+  CHECK(queue_.empty());
 }
 
 
 void ThreadPool::Impl::Worker() {
   while (true) {
-    function<void()> closure;
+    QueueEntry entry;
 
     {
       unique_lock<mutex> lock(queue_lock_);
-
-      // If there's nothing to do, wait until there is.
-      if (queue_.empty()) {
-        queue_cond_var_.wait(lock);
-
-        // condition_variable::wait can return spuriously.
-        if (queue_.empty())
-          continue;
+      while (queue_.empty() || get<0>(queue_.top()) > steady_clock::now()) {
+        const steady_clock::duration duration(
+            queue_.empty() ? seconds::max()
+                           : get<0>(queue_.top()) - steady_clock::now());
+        // If there's nothing to do, wait until there is.
+        queue_cond_var_.wait_for(lock, duration);
       }
 
-      // If we received an empty closure, exit cleanly.
-      if (!queue_.front())
-        break;
-
-      closure = queue_.front();
+      entry = queue_.top();
       queue_.pop();
+
+      // If we received an empty entry, exit cleanly.
+      if (!get<1>(entry)) {
+        // Anything left in the queue must be either other exit sentinels, or
+        // future (delayed) tasks, so we'll cancel anything we find, up until
+        // either the next exit sentinel, or the end of the queue.
+        VLOG(1) << "Cancelling delayed tasks...";
+        vector<util::Task*> to_be_cancelled;
+        while (!queue_.empty() && get<2>(queue_.top())) {
+          to_be_cancelled.push_back(CHECK_NOTNULL(get<2>(queue_.top())));
+          queue_.pop();
+        }
+
+        // Cancel the callbacks below outside of the lock to avoid deadlocking
+        // anyone who tries to Add() more stuff when they're cancelled.
+        // Anyone who does that is going to cause a CHECK fail in the d'tor of
+        // the pool anyway, but at least they'll know about it that way.
+        lock.unlock();
+
+        for (const auto& t : to_be_cancelled) {
+          t->Return(util::Status::CANCELLED);
+        }
+
+        VLOG(1) << "Cancelled " << to_be_cancelled.size() << " delayed tasks.";
+        return;
+      }
     }
 
     // Make sure not to hold the lock while calling the closure.
-    closure();
+    get<1>(entry)();
   }
 }
 
@@ -114,7 +159,19 @@ void ThreadPool::Add(const function<void()>& closure) {
 
   {
     lock_guard<mutex> lock(impl_->queue_lock_);
-    impl_->queue_.push(closure);
+    impl_->queue_.emplace(make_tuple(steady_clock::now(), closure, nullptr));
+  }
+  impl_->queue_cond_var_.notify_one();
+}
+
+
+void ThreadPool::Delay(const duration<double>& delay, util::Task* task) {
+  CHECK_NOTNULL(task);
+  {
+    lock_guard<mutex> lock(impl_->queue_lock_);
+    impl_->queue_.emplace(make_tuple(
+        steady_clock::now() + duration_cast<std::chrono::microseconds>(delay),
+        [task]() { task->Return(); }, task));
   }
   impl_->queue_cond_var_.notify_one();
 }

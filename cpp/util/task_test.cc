@@ -32,6 +32,10 @@ class InlineExecutor : public util::Executor {
   void Add(const std::function<void()>& closure) override {
     closure();
   }
+  void Delay(const std::chrono::duration<double>& delay,
+             util::Task* task) override {
+    LOG(FATAL) << "Not Implemented.";
+  }
 };
 
 
