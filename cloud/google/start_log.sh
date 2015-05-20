@@ -30,7 +30,9 @@ for i in `seq 0 $((${LOG_NUM_REPLICAS} - 1))`; do
   sed --e "s^@@PROJECT@@^${PROJECT}^
            s^@@ETCD_HOST@@^${ETCD_MACHINES[1]}^
            s^@@ETCD_PORT@@^4001^
-           s^@@CONTAINER_HOST@@^${LOG_MACHINES[$i]}^" \
+           s^@@CONTAINER_HOST@@^${LOG_MACHINES[$i]}^
+           s^@@MONITORING@@^${MONITORING}^
+           s^@@PROJECT@@^${PROJECT}^" \
           < ${DIR}/log_container.yaml  > ${MANIFEST}.${i}
 
   ${GCLOUD} compute instances create -q ${LOG_MACHINES[${i}]} \
@@ -39,6 +41,7 @@ for i in `seq 0 $((${LOG_NUM_REPLICAS} - 1))`; do
       --image container-vm \
       --disk name=${LOG_DISKS[${i}]},mode=rw,boot=no,auto-delete=yes \
       --tags log-node \
+      --scopes "monitoring,storage-ro,compute-ro,logging-write" \
       --metadata-from-file startup-script=${DIR}/node_init.sh,google-container-manifest=${MANIFEST}.${i} &
 done
 wait

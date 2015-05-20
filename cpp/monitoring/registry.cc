@@ -7,6 +7,10 @@ using std::set;
 
 namespace cert_trans {
 
+using std::lock_guard;
+using std::mutex;
+using std::set;
+
 // static
 Registry* Registry::Instance() {
   static Registry* registry(new Registry);

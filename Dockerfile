@@ -37,6 +37,8 @@ CMD cd /mnt/ctlog/ && \
     echo "My IP: ${MY_IP}" && \
     echo "Container: ${CONTAINER_HOST}" && \
     echo "Etcd: ${ETCD_HOST}:${ETCD_PORT}" && \
+    echo "Project: ${PROJECT}" && \
+    echo "Monitoring: ${MONITORING}" && \
     ulimit -c unlimited && \
     /usr/local/bin/ct-server \
         --port=80 \
@@ -51,6 +53,8 @@ CMD cd /mnt/ctlog/ && \
         --etcd_port=${ETCD_PORT} \
         --etcd_delete_concurrency=100 \
         --num_http_server_threads=${NUM_HTTP_SERVER_THREADS} \
+        --monitoring=${MONITORING} \
+        --google_compute_monitoring_push_url="http://www.googleapis.com/cloudmonitoring/v2beta2/projects/${PROJECT}/timeseries:write" \
         --v=${V_LEVEL}; \
     if [ -e core ]; then \
       CORE_DIR="/mnt/ctlog/cores/$(date +%s)"; \

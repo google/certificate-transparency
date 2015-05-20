@@ -80,10 +80,12 @@ echo "============================================================="
 echo "Creating superduper instances..."
 ${DIR}/start_log.sh ${DIR}/config.sh
 
-echo "============================================================="
-echo "Starting prometheus..."
-${DIR}/start_prometheus.sh ${DIR}/config.sh
-${DIR}/update_prometheus_config.sh ${DIR}/config.sh
+if [ "${MONITORING}" == "prometheus" ]; then
+  echo "============================================================="
+  echo "Starting prometheus..."
+  ${DIR}/start_prometheus.sh ${DIR}/config.sh
+  ${DIR}/update_prometheus_config.sh ${DIR}/config.sh
+fi
 
 
 echo "============================================================="

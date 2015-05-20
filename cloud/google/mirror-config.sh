@@ -1,3 +1,5 @@
+# TODO(alcutter): Pull out common stuff between here and config.sh
+
 export PROJECT=${PROJECT:-your-gce-project}
 export CLUSTER=${CLUSTER:-${USER}-ctmirror}
 export REGION=${REGION:-us-central1}
@@ -9,6 +11,9 @@ export GCS_BUCKET=${GCS_BUCKET:-${PROJECT}_ctlog_images}
 export MIRROR_TARGET_URL="${MIRROR_TARGET_URL:-https://ct.googleapis.com/aviator}"
 # Public key relative to the cloud/keys directory:
 export MIRROR_TARGET_PUBLIC_KEY=${MIRROR_TARGET_PUBLIC_KEY:-aviator.pem}
+# Monitoring system: "gcm" or "prometheus"
+export MONITORING="${MONITORING:-gcm}"
+
 
 export ETCD_NUM_REPLICAS_PER_ZONE=1
 export ETCD_DISK_SIZE=200GB
@@ -44,21 +49,23 @@ for z in ${ZONES}; do
 done
 
 
-export PROMETHEUS_NUM_REPLICAS_PER_ZONE=1
-export PROMETHEUS_DISK_SIZE=50GB
-export PROMETHEUS_BASE_NAME="${CLUSTER}-prometheus"
-export PROMETHEUS_MACHINE_TYPE=n1-standard-1
-declare -a PROMETHEUS_ZONES PROMETHEUS_MACHINES MIRROR_DISKS
-export PROMETHEUS_ZONES PROMETHEUS_MACHINES MIRROR_DISKS
-export PROMETHEUS_NUM_REPLICAS=0
-for z in ${ZONES}; do
-  for i in $(seq ${PROMETHEUS_NUM_REPLICAS_PER_ZONE}); do
-    PROMETHEUS_ZONES[${PROMETHEUS_NUM_REPLICAS}]="${REGION}-${z}"
-    PROMETHEUS_MACHINES[${PROMETHEUS_NUM_REPLICAS}]="${CLUSTER}-prometheus-${z}-${i}"
-    PROMETHEUS_DISKS[${PROMETHEUS_NUM_REPLICAS}]="${CLUSTER}-prometheus-disk-${z}-${i}"
-    PROMETHEUS_NUM_REPLICAS=$((${PROMETHEUS_NUM_REPLICAS} + 1))
+if [ "${MONITORING}" == "prometheus" ]; then
+  export PROMETHEUS_NUM_REPLICAS_PER_ZONE=1
+  export PROMETHEUS_DISK_SIZE=50GB
+  export PROMETHEUS_BASE_NAME="${CLUSTER}-prometheus"
+  export PROMETHEUS_MACHINE_TYPE=n1-standard-1
+  declare -a PROMETHEUS_ZONES PROMETHEUS_MACHINES MIRROR_DISKS
+  export PROMETHEUS_ZONES PROMETHEUS_MACHINES MIRROR_DISKS
+  export PROMETHEUS_NUM_REPLICAS=0
+  for z in ${ZONES}; do
+    for i in $(seq ${PROMETHEUS_NUM_REPLICAS_PER_ZONE}); do
+      PROMETHEUS_ZONES[${PROMETHEUS_NUM_REPLICAS}]="${REGION}-${z}"
+      PROMETHEUS_MACHINES[${PROMETHEUS_NUM_REPLICAS}]="${CLUSTER}-prometheus-${z}-${i}"
+      PROMETHEUS_DISKS[${PROMETHEUS_NUM_REPLICAS}]="${CLUSTER}-prometheus-disk-${z}-${i}"
+      PROMETHEUS_NUM_REPLICAS=$((${PROMETHEUS_NUM_REPLICAS} + 1))
+    done
   done
-done
+fi
 
 
 echo "============================================================="
@@ -69,6 +76,9 @@ echo "REGION:      ${REGION}"
 echo "ZONES:       ${ZONES}"
 echo "Num etcd:    ${ETCD_NUM_REPLICAS}"
 echo "Num mirrors: ${MIRROR_NUM_REPLICAS}"
-echo "Num prom:    ${PROMETHEUS_NUM_REPLICAS}"
+echo "Monitoring:  ${MONITORING}"
+if [ "${MONITORING}" == "prometheus" ]; then
+  echo "Num prom:    ${PROMETHEUS_NUM_REPLICAS}"
+fi
 echo "============================================================="
 echo

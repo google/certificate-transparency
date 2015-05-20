@@ -25,12 +25,13 @@ class Gauge : public Metric {
 
   void Set(const LabelTypes&... labels, double value);
 
+  // TODO(alcutter): Not over the moon about having this here.
   std::map<std::vector<std::string>, Metric::TimestampedValue> CurrentValues()
       const override;
 
  private:
   Gauge(const std::string& name,
-        const typename NameType<LabelTypes>::name&... labels,
+        const typename NameType<LabelTypes>::name&... label_names,
         const std::string& help);
 
   LabelledValues<LabelTypes...> values_;

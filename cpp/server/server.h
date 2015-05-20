@@ -23,6 +23,7 @@
 #include "log/log_signer.h"
 #include "log/sqlite_db.h"
 #include "log/tree_signer.h"
+#include "monitoring/gcm/exporter.h"
 #include "monitoring/latency.h"
 #include "monitoring/monitoring.h"
 #include "monitoring/registry.h"
@@ -109,6 +110,7 @@ class Server {
   std::unique_ptr<Proxy> proxy_;
   std::unique_ptr<HttpHandler> handler_;
   std::unique_ptr<std::thread> node_refresh_thread_;
+  std::unique_ptr<GCMExporter> gcm_exporter_;
 
   DISALLOW_COPY_AND_ASSIGN(Server);
 };
@@ -223,9 +225,18 @@ Server<Logged>::Server(const Options& opts,
       json_output_(event_base_.get()) {
   CHECK_LT(0, options_.port);
   CHECK_LT(0, options_.num_http_server_threads);
-  http_server_.AddHandler("/metrics",
-                          bind(&cert_trans::ExportPrometheusMetrics,
-                               std::placeholders::_1));
+
+  if (FLAGS_monitoring == kPrometheus) {
+    http_server_.AddHandler("/metrics",
+                            bind(&cert_trans::ExportPrometheusMetrics,
+                                 std::placeholders::_1));
+  } else if (FLAGS_monitoring == kGcm) {
+    gcm_exporter_.reset(
+        new GCMExporter(options_.server, url_fetcher_, internal_pool_));
+  } else {
+    LOG(FATAL) << "Please set --monitoring to one of the supported values.";
+  }
+
   http_server_.Bind(nullptr, options_.port);
   election_.StartElection();
 }
