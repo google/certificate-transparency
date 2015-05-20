@@ -9,8 +9,8 @@ source ${DIR}/util.sh
 
 GCLOUD="gcloud"
 
-Header "Deleting prometheus instances..."
-for i in ${PROMETHEUS_MACHINES[@]}; do
+Header "Deleting mirror instances..."
+for i in ${MIRROR_MACHINES[@]}; do
   echo "Deleting instance ${i}..."
   set +e
   ${GCLOUD} compute instances delete -q --delete-disks all ${i} &
@@ -18,7 +18,7 @@ for i in ${PROMETHEUS_MACHINES[@]}; do
 done
 wait
 
-for i in ${PROMETHEUS_DISKS[@]}; do
+for i in ${MIRROR_DISKS[@]}; do
   echo "Deleting disk ${i}..."
   set +e
   ${GCLOUD} compute disks delete -q ${i} > /dev/null &
