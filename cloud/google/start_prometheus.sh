@@ -38,8 +38,7 @@ for i in `seq ${PROMETHEUS_NUM_REPLICAS}`; do
       --image container-vm \
       --disk name=${PROMETHEUS_DISKS[${i}]},mode=rw,boot=no,auto-delete=yes \
       --tags prometheus-node \
-      --metadata-from-file startup-script=${DIR}/node_init.sh \
-                           google-container-manifest=${MANIFEST} &
+      --metadata-from-file startup-script=${DIR}/node_init.sh,google-container-manifest=${MANIFEST} &
 done
 wait
 
