@@ -69,6 +69,7 @@ TESTS = \
 	cpp/monitoring/prometheus/counter_test \
 	cpp/monitoring/prometheus/gauge_test \
 	cpp/monitoring/registry_test \
+	cpp/net/url_fetcher_test \
 	cpp/proto/serializer_test \
 	cpp/server/proxy_test \
 	cpp/util/etcd_delete_test \
@@ -98,6 +99,9 @@ cpp/gtest-all.cc: $(GTEST_DIR)/src/gtest-all.cc
 
 cpp/gmock-all.cc: $(GMOCK_DIR)/src/gmock-all.cc
 	$(AM_V_at)cp $^ $@
+
+test/testdata/urlfetcher_test_certs/localhost.pem: test/create_url_fetcher_test_certs.sh
+	$(AM_V_GEN)test/create_url_fetcher_test_certs.sh
 
 cpp_libcore_a_SOURCES = \
 	cpp/base/notification.cc \
@@ -137,12 +141,15 @@ cpp_libcore_a_SOURCES = \
 	cpp/monitoring/prometheus/metrics.pb.h \
 	cpp/monitoring/registry.cc \
 	cpp/net/connection_pool.cc \
+	cpp/third_party/curl/hostcheck.c \
+	cpp/third_party/isec_partners/openssl_hostname_validation.c \
 	cpp/net/url.cc \
 	cpp/net/url_fetcher.cc \
 	cpp/util/etcd.cc \
 	cpp/util/etcd_delete.cc \
 	cpp/util/fake_etcd.cc \
 	cpp/util/masterelection.cc \
+	cpp/util/openssl_util.cc \
 	cpp/util/status.cc \
 	cpp/util/sync_task.cc \
 	cpp/util/task.cc \
@@ -175,7 +182,6 @@ cpp_server_ct_mirror_SOURCES = \
 	cpp/server/proxy.cc \
 	cpp/util/json_wrapper.cc \
 	cpp/util/libevent_wrapper.cc \
-	cpp/util/openssl_util.cc \
 	cpp/util/periodic_closure.cc \
 	cpp/util/protobuf_util.cc \
 	cpp/util/protobuf_util.h \
@@ -200,7 +206,6 @@ cpp_server_ct_server_SOURCES = \
 	cpp/server/proxy.cc \
 	cpp/util/json_wrapper.cc \
 	cpp/util/libevent_wrapper.cc \
-	cpp/util/openssl_util.cc \
 	cpp/util/periodic_closure.cc \
 	cpp/util/protobuf_util.cc \
 	cpp/util/protobuf_util.h \
@@ -242,7 +247,6 @@ cpp_client_ct_SOURCES = \
 	cpp/proto/serializer.cc \
 	cpp/util/json_wrapper.cc \
 	cpp/util/libevent_wrapper.cc \
-	cpp/util/openssl_util.cc \
 	cpp/util/read_key.cc \
 	cpp/util/util.cc
 
@@ -319,7 +323,6 @@ cpp_log_cluster_state_controller_test_SOURCES = \
 	cpp/proto/serializer.cc \
 	cpp/util/json_wrapper.cc \
 	cpp/util/libevent_wrapper.cc \
-	cpp/util/openssl_util.cc \
 	cpp/util/periodic_closure.cc \
 	cpp/util/protobuf_util.cc \
 	cpp/util/thread_pool.cc \
@@ -507,6 +510,19 @@ cpp_monitoring_registry_test_SOURCES = \
 	cpp/monitoring/registry_test.cc \
 	cpp/util/protobuf_util.cc
 
+cpp_net_url_fetcher_test_LDADD = \
+	cpp/libcore.a \
+	cpp/libtest.a \
+	$(libevent_LIBS) \
+	-lprotobuf
+cpp_net_url_fetcher_test_SOURCES = \
+	cpp/net/url_fetcher_test.cc \
+	cpp/util/libevent_wrapper.cc \
+	cpp/util/protobuf_util.cc \
+	cpp/util/thread_pool.cc
+EXTRA_cpp_net_url_fetcher_test_DEPENDENCIES = \
+	test/testdata/urlfetcher_test_certs/localhost.pem
+
 cpp_proto_serializer_test_LDADD = \
 	cpp/libcore.a \
 	cpp/libtest.a \
@@ -648,7 +664,6 @@ cpp_log_cert_checker_test_LDADD = \
 	$(libevent_LIBS)
 cpp_log_cert_checker_test_SOURCES = \
 	cpp/log/cert_checker_test.cc \
-	cpp/util/openssl_util.cc \
 	cpp/util/util.cc
 
 cpp_log_cert_submission_handler_test_LDADD = \
@@ -658,7 +673,6 @@ cpp_log_cert_submission_handler_test_LDADD = \
 	-lprotobuf
 cpp_log_cert_submission_handler_test_SOURCES = \
 	cpp/log/cert_submission_handler_test.cc \
-	cpp/util/openssl_util.cc \
 	cpp/util/util.cc
 
 cpp_log_cert_test_LDADD = \
@@ -667,7 +681,6 @@ cpp_log_cert_test_LDADD = \
 	$(libevent_LIBS)
 cpp_log_cert_test_SOURCES = \
 	cpp/log/cert_test.cc \
-	cpp/util/openssl_util.cc \
 	cpp/util/util.cc
 
 cpp_log_ct_extensions_test_LDADD = \
@@ -676,7 +689,6 @@ cpp_log_ct_extensions_test_LDADD = \
 	$(libevent_LIBS)
 cpp_log_ct_extensions_test_SOURCES = \
 	cpp/log/ct_extensions_test.cc \
-	cpp/util/openssl_util.cc \
 	cpp/util/util.cc
 
 cpp_log_database_large_test_LDADD = \
@@ -705,7 +717,6 @@ cpp_log_frontend_test_SOURCES = \
 	cpp/proto/serializer.cc \
 	cpp/util/json_wrapper.cc \
 	cpp/util/libevent_wrapper.cc \
-	cpp/util/openssl_util.cc \
 	cpp/util/periodic_closure.cc \
 	cpp/util/protobuf_util.cc \
 	cpp/util/thread_pool.cc \

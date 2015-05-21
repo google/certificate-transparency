@@ -3,24 +3,140 @@
 #include <gflags/gflags.h>
 #include <glog/logging.h>
 
+#include "util/openssl_util.h"
+
+extern "C" {
+#include "third_party/curl/hostcheck.h"
+#include "third_party/isec_partners/openssl_hostname_validation.h"
+}  // extern "C"
+
+
 using std::bind;
 using std::lock_guard;
+using std::make_pair;
+using std::map;
 using std::move;
 using std::mutex;
 using std::pair;
+using std::placeholders::_1;
+using std::placeholders::_2;
 using std::string;
 using std::unique_lock;
 using std::unique_ptr;
+using util::ClearOpenSSLErrors;
+using util::DumpOpenSSLErrorStack;
 
 DEFINE_int32(url_fetcher_max_conn_per_host_port, 4,
              "maximum number of URL fetcher connections per host:port");
+DEFINE_string(trusted_root_certs, "/etc/ssl/certs/ca-certificates.crt",
+              "Location of trusted CA root certs for outgoing SSL "
+              "connections.");
+
 
 namespace cert_trans {
 namespace internal {
 
+
+// static
+mutex ConnectionPool::Connection::ssl_mutex_;
+// static
+map<const SSL*, const ConnectionPool::Connection*>
+    ConnectionPool::Connection::connections_by_ssl_;
+
+
+// static
+int ConnectionPool::Connection::SSLVerifyCallback(const int preverify_ok,
+                                                  X509_STORE_CTX* x509_ctx) {
+  CHECK_NOTNULL(x509_ctx);
+  X509* const server_cert(
+      CHECK_NOTNULL(X509_STORE_CTX_get_current_cert(x509_ctx)));
+
+  if (preverify_ok == 0) {
+    const int err(X509_STORE_CTX_get_error(x509_ctx));
+    char buf[256];
+    X509_NAME_oneline(X509_get_subject_name(server_cert), buf, 256);
+
+    LOG(WARNING) << "OpenSSL failed to verify cert for " << buf << ": "
+                 << X509_verify_cert_error_string(err);
+    return preverify_ok;
+  }
+
+  // Only do extra checks (i.e. hostname matching) for the end-entity cert.
+  const int depth(X509_STORE_CTX_get_error_depth(x509_ctx));
+  if (depth > 0) {
+    return preverify_ok;
+  }
+
+  const SSL* const ssl(static_cast<SSL*>(CHECK_NOTNULL(
+      X509_STORE_CTX_get_ex_data(x509_ctx,
+                                 SSL_get_ex_data_X509_STORE_CTX_idx()))));
+  const ConnectionPool::Connection* conn;
+  {
+    lock_guard<mutex> lock(ssl_mutex_);
+    auto it(connections_by_ssl_.find(ssl));
+    CHECK(it != connections_by_ssl_.end());
+    conn = it->second;
+  }
+  CHECK_NOTNULL(conn);
+
+  const HostnameValidationResult hostname_valid(
+      validate_hostname(conn->other_end().first.c_str(), server_cert));
+  if (hostname_valid != MatchFound) {
+    string error;
+    switch (hostname_valid) {
+      case MatchFound:
+        LOG(FATAL) << "Shouldn't get here.";
+        break;
+      case MatchNotFound:
+        error = "certificate doesn't match hostname";
+        break;
+      case NoSANPresent:
+        // I don't think we should ever see this, should be handled inside
+        // validate_hostname()
+        error = "no SAN present";
+        break;
+      case MalformedCertificate:
+        error = "certificate is malformed";
+        break;
+      case Error:
+        error = "unknown error";
+        break;
+    }
+    conn->connection()->request->status = kSSLErrorStatus;
+    LOG_EVERY_N(WARNING, 100)
+        << "Failed to validate SSL certificate: " << error << " : "
+        << DumpOpenSSLErrorStack();
+    ClearOpenSSLErrors();
+    return 0;
+  }
+  return 1;
+}
+
+
 ConnectionPool::Connection::Connection(evhtp_connection_t* conn,
                                        HostPortPair&& other_end)
-    : conn_(CHECK_NOTNULL(conn)), other_end_(move(other_end)) {
+    : conn_(CHECK_NOTNULL(conn)),
+      other_end_(move(other_end)),
+      ssl_(conn_->ssl) {
+  if (ssl_) {
+    {
+      lock_guard<mutex> lock(ssl_mutex_);
+      CHECK(connections_by_ssl_.insert(make_pair(ssl_, this)).second);
+    }
+    SSL_set_tlsext_host_name(ssl_, other_end_.first.c_str());
+  }
+}
+
+
+ConnectionPool::Connection::~Connection() {
+  // ssl_ is likely pointing to freed memory at this point, so while we use the
+  // value of the pointer itself here as a key don't try to dereference it!
+  if (ssl_) {
+    {
+      lock_guard<mutex> lock(ssl_mutex_);
+      CHECK_EQ(1, connections_by_ssl_.erase(ssl_));
+    }
+  }
 }
 
 
@@ -29,22 +145,60 @@ const HostPortPair& ConnectionPool::Connection::other_end() const {
 }
 
 
+void ConnectionPool::Connection::ReleaseConnection() {
+  conn_.release();
+  // Do not null out ssl_, despite the fact that it's a dangling pointer now we
+  // need it in the d'tor since the value of the pointer itself is a key into a
+  // map which needs to be updated.
+}
+
+
 ConnectionPool::ConnectionPool(libevent::Base* base)
-    : base_(CHECK_NOTNULL(base)), cleanup_scheduled_(false) {
+    : base_(CHECK_NOTNULL(base)),
+      cleanup_scheduled_(false),
+      ssl_ctx_(CHECK_NOTNULL(SSL_CTX_new(TLSv1_client_method())),
+               SSL_CTX_free) {
+  // Try to load trusted root certificates.
+  // TODO(alcutter): This is probably Linux specific, we'll need other sections
+  // for OSX etc.
+  if (SSL_CTX_load_verify_locations(ssl_ctx_.get(),
+                                    FLAGS_trusted_root_certs.c_str(),
+                                    nullptr) != 1) {
+    DumpOpenSSLErrorStack();
+    LOG(FATAL) << "Couldn't load trusted root certificates.";
+  }
+
+  SSL_CTX_set_verify(ssl_ctx_.get(), SSL_VERIFY_PEER,
+                     Connection::SSLVerifyCallback);
 }
 
 
 // static
-evhtp_res ConnectionPool::Connection::ConnectionClosedHook(
-    evhtp_connection_t* conn, void* arg) {
+evhtp_res ConnectionPool::Connection::ConnectionErrorHook(
+    evhtp_connection_t* conn, evhtp_error_flags errtype, void* arg) {
   CHECK_NOTNULL(conn);
   CHECK_NOTNULL(arg);
+  CHECK(libevent::Base::OnEventThread());
   ConnectionPool::Connection* const c(
       static_cast<ConnectionPool::Connection*>(arg));
-  VLOG(1) << "Releasing connection to " << c->other_end().first << ":"
+  VLOG(1) << "Releasing errored connection to " << c->other_end().first << ":"
           << c->other_end().second;
+
   CHECK_EQ(conn, c->connection());
-  c->conn_.release();
+
+  // Need to let the client know their request has failed, seems evhtp doesn't
+  // do that by default so we'll call the request done callback here.
+  if (conn->request) {
+    // If someone hasn't already modified the default status, set it to a
+    // generic "something went wrong" value here:
+    if (conn->request->status == 200) {
+      conn->request->status = kUnknownErrorStatus;
+    }
+    conn->request->cb(conn->request, conn->request->cbarg);
+    conn->request = nullptr;
+  }
+
+  c->ReleaseConnection();
   return EVHTP_RES_OK;
 }
 
@@ -77,9 +231,9 @@ void RemoveDeadConnectionsFromDeque(
 
 
 unique_ptr<ConnectionPool::Connection> ConnectionPool::Get(const URL& url) {
-  // TODO(pphaneuf): Add support for other protocols.
-  CHECK_EQ(url.Protocol(), "http");
-  HostPortPair key(url.Host(), url.Port() != 0 ? url.Port() : 80);
+  CHECK(url.Protocol() == "http" || url.Protocol() == "https");
+  const uint16_t default_port(url.Protocol() == "https" ? 443 : 80);
+  HostPortPair key(url.Host(), url.Port() != 0 ? url.Port() : default_port);
   unique_lock<mutex> lock(lock_);
 
   auto it(conns_.find(key));
@@ -90,12 +244,14 @@ unique_ptr<ConnectionPool::Connection> ConnectionPool::Get(const URL& url) {
 
   if (it == conns_.end() || it->second.empty()) {
     VLOG(1) << "new evhtp_connection for " << key.first << ":" << key.second;
-    unique_ptr<ConnectionPool::Connection> conn(
-        new Connection(base_->HttpConnectionNew(key.first, key.second),
-                       move(key)));
-    evhtp_set_hook(&conn->connection()->hooks, evhtp_hook_on_connection_fini,
+    unique_ptr<ConnectionPool::Connection> conn(new Connection(
+        url.Protocol() == "https"
+            ? base_->HttpsConnectionNew(key.first, key.second, ssl_ctx_.get())
+            : base_->HttpConnectionNew(key.first, key.second),
+        move(key)));
+    evhtp_set_hook(&conn->connection()->hooks, evhtp_hook_on_conn_error,
                    reinterpret_cast<evhtp_hook>(
-                       Connection::ConnectionClosedHook),
+                       Connection::ConnectionErrorHook),
                    reinterpret_cast<void*>(conn.get()));
     return conn;
   }

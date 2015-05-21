@@ -101,7 +101,8 @@ State::State(ConnectionPool* pool, const UrlFetcher::Request& request,
       request_(NormaliseRequest(request)),
       response_(CHECK_NOTNULL(response)),
       task_(CHECK_NOTNULL(task)) {
-  if (request_.url.Protocol() != "http") {
+  if (request_.url.Protocol() != "http" &&
+      request_.url.Protocol() != "https") {
     VLOG(1) << "unsupported protocol: " << request_.url.Protocol();
     task_->Return(Status(util::error::INVALID_ARGUMENT,
                          "UrlFetcher: unsupported protocol: " +
@@ -187,12 +188,9 @@ void State::RequestDone(evhtp_request_t* req) {
 
   response_->status_code = req->status;
   if (response_->status_code < 100) {
-    // TODO(alcutter): Does this still happen with evhtp? What does it mean?
-    // These questions, and more, answered in next week's episode.
-    VLOG(1) << "request has a status code lower than 100: "
-            << response_->status_code;
+    // There was a problem communicating with the remote host.
     task_->Return(
-        Status(util::error::FAILED_PRECONDITION, "connection refused"));
+        Status(util::error::FAILED_PRECONDITION, "connection failed"));
     return;
   }
 

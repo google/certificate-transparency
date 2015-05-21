@@ -5,6 +5,7 @@
 #include <map>
 #include <memory>
 #include <mutex>
+#include <openssl/ssl.h>
 #include <stdint.h>
 #include <string>
 
@@ -13,6 +14,15 @@
 #include "util/libevent_wrapper.h"
 
 namespace cert_trans {
+
+
+// Status code for when something went wrong with the connection.
+const int kUnknownErrorStatus = 0;
+
+// Status code for when there was an error with the SSL negotiation.
+const int kSSLErrorStatus = 1;
+
+
 namespace internal {
 
 
@@ -30,6 +40,8 @@ class ConnectionPool {
  public:
   class Connection {
    public:
+    ~Connection();
+
     evhtp_connection_t* connection() const {
       return conn_.get();
     }
@@ -37,14 +49,28 @@ class ConnectionPool {
     const HostPortPair& other_end() const;
 
    private:
-    static evhtp_res ConnectionClosedHook(evhtp_connection_t* conn, void* arg);
+    static evhtp_res ConnectionErrorHook(evhtp_connection_t* conn,
+                                         evhtp_error_flags errtype, void* arg);
+    static int SSLVerifyCallback(int preverify_ok, X509_STORE_CTX* x509_ctx);
 
     Connection(evhtp_connection_t* conn, HostPortPair&& other_end);
 
+    void ReleaseConnection();
+
     std::unique_ptr<evhtp_connection_t, evhtp_connection_deleter> conn_;
     const HostPortPair other_end_;
+    SSL* const ssl_;
+
+    // Gnarly, but we need a way to find the hostname from the SSL object.
+    // You *can* add user ex data to the SSL object, but there's no way to pass
+    // the index of your added data so AFAICT it's unusable from
+    // SSLVerifyCallback :/
+    static std::mutex ssl_mutex_;
+    static std::map<const SSL*, const Connection*> connections_by_ssl_;
 
     friend class ConnectionPool;
+
+    DISALLOW_COPY_AND_ASSIGN(Connection);
   };
 
   ConnectionPool(libevent::Base* base);
@@ -62,6 +88,8 @@ class ConnectionPool {
   // there are too many, we prune them from the front (LIFO).
   std::map<HostPortPair, std::deque<std::unique_ptr<Connection>>> conns_;
   bool cleanup_scheduled_;
+
+  std::unique_ptr<evhtp_ssl_ctx_t, void (*)(evhtp_ssl_ctx_t*)> ssl_ctx_;
 
   DISALLOW_COPY_AND_ASSIGN(ConnectionPool);
 };

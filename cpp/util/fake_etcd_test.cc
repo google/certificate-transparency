@@ -951,5 +951,12 @@ TEST_F(FakeEtcdTest, GetWaitRecursive) {
 
 int main(int argc, char** argv) {
   cert_trans::test::InitTesting(argv[0], &argc, &argv, true);
+
+  OpenSSL_add_all_algorithms();
+  ERR_load_BIO_strings();
+  ERR_load_crypto_strings();
+  SSL_load_error_strings();
+  SSL_library_init();
+
   return RUN_ALL_TESTS();
 }
