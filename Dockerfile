@@ -11,6 +11,7 @@ RUN apt-get update && \
         libevent-2.0.5 \
         libevent-core-2.0.5 \
         libevent-extra-2.0.5 \
+        libevent-openssl-2.0.5 \
         libevent-pthreads-2.0.5 \
         libgflags2 \
         libgoogle-glog0 \

@@ -9,6 +9,8 @@ using std::move;
 using std::mutex;
 using std::pair;
 using std::string;
+using std::unique_lock;
+using std::unique_ptr;
 
 DEFINE_int32(url_fetcher_max_conn_per_host_port, 4,
              "maximum number of URL fetcher connections per host:port");
@@ -16,45 +18,111 @@ DEFINE_int32(url_fetcher_max_conn_per_host_port, 4,
 namespace cert_trans {
 namespace internal {
 
+ConnectionPool::Connection::Connection(evhtp_connection_t* conn,
+                                       HostPortPair&& other_end)
+    : conn_(CHECK_NOTNULL(conn)), other_end_(move(other_end)) {
+}
+
+
+const HostPortPair& ConnectionPool::Connection::other_end() const {
+  return other_end_;
+}
+
+
 ConnectionPool::ConnectionPool(libevent::Base* base)
     : base_(CHECK_NOTNULL(base)), cleanup_scheduled_(false) {
 }
 
 
-evhttp_connection_unique_ptr ConnectionPool::Get(const URL& url) {
+// static
+evhtp_res ConnectionPool::Connection::ConnectionClosedHook(
+    evhtp_connection_t* conn, void* arg) {
+  CHECK_NOTNULL(conn);
+  CHECK_NOTNULL(arg);
+  ConnectionPool::Connection* const c(
+      static_cast<ConnectionPool::Connection*>(arg));
+  VLOG(1) << "Releasing connection to " << c->other_end().first << ":"
+          << c->other_end().second;
+  CHECK_EQ(conn, c->connection());
+  c->conn_.release();
+  return EVHTP_RES_OK;
+}
+
+
+namespace {
+
+
+void RemoveDeadConnectionsFromDeque(
+    const unique_lock<mutex>& lock,
+    std::deque<std::unique_ptr<ConnectionPool::Connection>>* deque) {
+  CHECK(lock.owns_lock());
+  CHECK(deque);
+
+  // Do a sweep and remove any dead connections
+  for (auto deque_it(deque->begin()); deque_it != deque->end();) {
+    CHECK(*deque_it);
+    if (!(*deque_it)->connection()) {
+      VLOG(1) << "Removing dead connection to "
+              << (*deque_it)->other_end().first << ":"
+              << (*deque_it)->other_end().second;
+      deque_it = deque->erase(deque_it);
+      continue;
+    }
+    ++deque_it;
+  }
+}
+
+
+}  // namespace
+
+
+unique_ptr<ConnectionPool::Connection> ConnectionPool::Get(const URL& url) {
   // TODO(pphaneuf): Add support for other protocols.
   CHECK_EQ(url.Protocol(), "http");
-  const HostPortPair key(url.Host(), url.Port() != 0 ? url.Port() : 80);
-  lock_guard<mutex> lock(lock_);
+  HostPortPair key(url.Host(), url.Port() != 0 ? url.Port() : 80);
+  unique_lock<mutex> lock(lock_);
 
   auto it(conns_.find(key));
-  if (it == conns_.end() || it->second.empty()) {
-    VLOG(1) << "new evhttp_connection for " << key.first << ":" << key.second;
-    return evhttp_connection_unique_ptr(
-        base_->HttpConnectionNew(key.first, key.second));
+
+  if (it != conns_.end() && !it->second.empty()) {
+    RemoveDeadConnectionsFromDeque(lock, &it->second);
   }
 
-  VLOG(1) << "cached evhttp_connection for " << key.first << ":" << key.second;
-  evhttp_connection_unique_ptr retval(move(it->second.back()));
+  if (it == conns_.end() || it->second.empty()) {
+    VLOG(1) << "new evhtp_connection for " << key.first << ":" << key.second;
+    unique_ptr<ConnectionPool::Connection> conn(
+        new Connection(base_->HttpConnectionNew(key.first, key.second),
+                       move(key)));
+    evhtp_set_hook(&conn->connection()->hooks, evhtp_hook_on_connection_fini,
+                   reinterpret_cast<evhtp_hook>(
+                       Connection::ConnectionClosedHook),
+                   reinterpret_cast<void*>(conn.get()));
+    return conn;
+  }
+
+  VLOG(1) << "cached evhtp_connection for " << key.first << ":" << key.second;
+  unique_ptr<ConnectionPool::Connection> retval(move(it->second.back()));
   it->second.pop_back();
+
+  CHECK_NOTNULL(retval->connection());
 
   return retval;
 }
 
 
-void ConnectionPool::Put(evhttp_connection_unique_ptr&& conn) {
+void ConnectionPool::Put(unique_ptr<ConnectionPool::Connection>&& conn) {
   if (!conn) {
-    VLOG(1) << "returned null evhttp_connection";
+    VLOG(1) << "returned null Connection";
     return;
   }
 
-  char* host;
-  uint16_t port;
-  evhttp_connection_get_peer(conn.get(), &host, &port);
-  const HostPortPair key(host, port);
+  if (!conn->connection()) {
+    VLOG(1) << "returned dead Connection";
+    return;
+  }
 
-  VLOG(1) << "returned evhttp_connection for " << key.first << ":"
-          << key.second;
+  const HostPortPair& key(conn->other_end());
+  VLOG(1) << "returned Connection for " << key.first << ":" << key.second;
   lock_guard<mutex> lock(lock_);
   auto& entry(conns_[key]);
 
@@ -70,17 +138,17 @@ void ConnectionPool::Put(evhttp_connection_unique_ptr&& conn) {
 
 
 void ConnectionPool::Cleanup() {
-  lock_guard<mutex> lock(lock_);
+  unique_lock<mutex> lock(lock_);
   cleanup_scheduled_ = false;
 
-  // std::map<HostPortPair, std::deque<evhttp_connection_unique_ptr>> conns_;
+  // std::map<HostPortPair, std::deque<unique_ptr<Connection>>> conns_;
   for (auto& entry : conns_) {
+    RemoveDeadConnectionsFromDeque(lock, &entry.second);
     while (entry.second.size() >
            static_cast<uint>(FLAGS_url_fetcher_max_conn_per_host_port)) {
       entry.second.pop_front();
     }
   }
-
 }
 
 
