@@ -86,11 +86,16 @@ void ThreadPool::Impl::Worker() {
     {
       unique_lock<mutex> lock(queue_lock_);
       while (queue_.empty() || get<0>(queue_.top()) > steady_clock::now()) {
-        const steady_clock::duration duration(
-            queue_.empty() ? seconds::max()
-                           : get<0>(queue_.top()) - steady_clock::now());
-        // If there's nothing to do, wait until there is.
-        queue_cond_var_.wait_for(lock, duration);
+        if (queue_.empty()) {
+          // If there's nothing to do, wait until there is.
+          queue_cond_var_.wait(lock);
+        } else {
+          // Otherwise, wait until the next thing we currently know about is
+          // ready.
+          const steady_clock::duration duration(get<0>(queue_.top()) -
+                                                steady_clock::now());
+          queue_cond_var_.wait_for(lock, duration);
+        }
       }
 
       entry = queue_.top();
