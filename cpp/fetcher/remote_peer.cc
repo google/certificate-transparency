@@ -74,15 +74,18 @@ void RemotePeer::Impl::DoneGetSTH(
            LogVerifier::VERIFY_OK)
       << "could not validate STH:\n" << new_sth->DebugString();
 
+  // TODO(alcutter): Need to check STH consistency here, including for older
+  // STHs which might come in.
+
   lock_guard<mutex> lock(lock_);
 
-  if (sth_) {
-    CHECK_GE(new_sth->tree_size(), sth_->tree_size());
-  } else {
-    CHECK_GE(new_sth->tree_size(), 0);
-  }
-
-  if (!sth_ || new_sth->timestamp() > sth_->timestamp()) {
+  if (new_sth->tree_size() < 0) {
+    LOG(WARNING) << "Unexpected tree size in new_sth:\n"
+                 << new_sth->DebugString();
+  } else if (sth_ && new_sth->tree_size() < sth_->tree_size()) {
+    LOG(WARNING) << "Received old STH:\n" << new_sth->DebugString();
+  } else if (!sth_ || new_sth->timestamp() > sth_->timestamp()) {
+    // This STH is good, we'll take it.
     sth_ = new_sth;
     if (on_new_sth_) {
       on_new_sth_(*sth_);
