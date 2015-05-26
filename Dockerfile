@@ -17,6 +17,7 @@ RUN apt-get update && \
         libjson-c2 \
         libleveldb1 \
         libsnappy1 \
+        libgoogle-perftools4 \
         libldns1 \
         libprotobuf8
 RUN update-ca-certificates && \
