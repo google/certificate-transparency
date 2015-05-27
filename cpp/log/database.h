@@ -4,6 +4,7 @@
 
 #include <functional>
 #include <glog/logging.h>
+#include <memory>
 #include <set>
 #include <stdint.h>
 
@@ -67,6 +68,19 @@ class ReadOnlyDatabase {
     NOT_FOUND,
   };
 
+  class Iterator {
+   public:
+    Iterator() = default;
+    virtual ~Iterator() = default;
+
+    // If there is an entry available, fill *entry and return true,
+    // otherwise return false.
+    virtual bool GetNextEntry(Logged* entry) = 0;
+
+   private:
+    DISALLOW_COPY_AND_ASSIGN(Iterator);
+  };
+
   virtual ~ReadOnlyDatabase() = default;
 
   // Look up by hash. If the entry exists write the result. If the
@@ -80,6 +94,9 @@ class ReadOnlyDatabase {
 
   // Return the tree head with the freshest timestamp.
   virtual LookupResult LatestTreeHead(ct::SignedTreeHead* result) const = 0;
+
+  // Scan the entries, starting with the given index.
+  virtual std::unique_ptr<Iterator> ScanEntries(int64_t start_index) = 0;
 
   // Return the number of entries of contiguous entries (what could be
   // put in a signed tree head). This can be greater than the tree

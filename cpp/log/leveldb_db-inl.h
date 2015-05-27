@@ -81,6 +81,38 @@ int64_t KeyToIndex(leveldb::Slice key) {
 
 
 template <class Logged>
+class LevelDB<Logged>::Iterator : public Database<Logged>::Iterator {
+ public:
+  Iterator(LevelDB<Logged>* db, int64_t start_index)
+      : it_(CHECK_NOTNULL(db)->db_->NewIterator(leveldb::ReadOptions())) {
+    CHECK(it_);
+    it_->Seek(IndexToKey(start_index));
+  }
+
+  bool GetNextEntry(Logged* entry) override {
+    if (!it_->Valid() || !it_->key().starts_with(kEntryPrefix)) {
+      return false;
+    }
+
+    const int64_t seq(KeyToIndex(it_->key()));
+    CHECK(entry->ParseFromArray(it_->value().data(), it_->value().size()))
+        << "failed to parse entry for key " << it_->key().ToString();
+    CHECK(entry->has_sequence_number())
+        << "no sequence number for entry with expected sequence number "
+        << seq;
+    CHECK_EQ(entry->sequence_number(), seq) << "unexpected sequence_number";
+
+    it_->Next();
+
+    return true;
+  }
+
+ private:
+  const std::unique_ptr<leveldb::Iterator> it_;
+};
+
+
+template <class Logged>
 const size_t LevelDB<Logged>::kTimestampBytesIndexed = 6;
 
 
@@ -206,6 +238,13 @@ typename Database<Logged>::LookupResult LevelDB<Logged>::LookupByIndex(
   }
 
   return this->LOOKUP_OK;
+}
+
+
+template <class Logged>
+std::unique_ptr<typename Database<Logged>::Iterator>
+LevelDB<Logged>::ScanEntries(int64_t start_index) {
+  return std::unique_ptr<Iterator>(new Iterator(this, start_index));
 }
 
 

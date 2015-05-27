@@ -52,6 +52,9 @@ class FileDB : public Database<Logged> {
   typename Database<Logged>::LookupResult LookupByIndex(
       int64_t sequence_number, Logged* result) const override;
 
+  std::unique_ptr<typename Database<Logged>::Iterator> ScanEntries(
+      int64_t start_index) override;
+
   typename Database<Logged>::WriteResult WriteTreeHead_(
       const ct::SignedTreeHead& sth) override;
 
@@ -72,6 +75,8 @@ class FileDB : public Database<Logged> {
       std::string* node_id) override;
 
  private:
+  class Iterator;
+
   void BuildIndex();
   typename Database<Logged>::LookupResult LatestTreeHeadNoLock(
       ct::SignedTreeHead* result) const;

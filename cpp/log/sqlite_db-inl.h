@@ -96,6 +96,38 @@ sqlite3* SQLiteOpen(const std::string& dbfile) {
 
 
 template <class Logged>
+class SQLiteDB<Logged>::Iterator : public Database<Logged>::Iterator {
+ public:
+  Iterator(SQLiteDB<Logged>* db, int64_t start_index)
+      : db_(CHECK_NOTNULL(db)), next_index_(start_index) {
+    CHECK_GE(next_index_, 0);
+  }
+
+  bool GetNextEntry(Logged* entry) override {
+    CHECK_NOTNULL(entry);
+    std::unique_lock<std::mutex> lock(db_->lock_);
+    if (next_index_ < db_->tree_size_) {
+      CHECK_EQ(db_->LookupByIndex(lock, next_index_, entry), db_->LOOKUP_OK);
+      ++next_index_;
+      return true;
+    }
+
+    const bool retval(db_->LookupNextIndex(lock, next_index_, entry) ==
+                      db_->LOOKUP_OK);
+    if (retval) {
+      next_index_ = entry->sequence_number() + 1;
+    }
+
+    return retval;
+  }
+
+ private:
+  SQLiteDB<Logged>* const db_;
+  int64_t next_index_;
+};
+
+
+template <class Logged>
 SQLiteDB<Logged>::SQLiteDB(const std::string& dbfile)
     : db_(SQLiteOpen(dbfile)),
       tree_size_(0),
@@ -239,8 +271,19 @@ typename Database<Logged>::LookupResult SQLiteDB<Logged>::LookupByIndex(
     int64_t sequence_number, Logged* result) const {
   cert_trans::ScopedLatency latency(
       latency_by_op_ms.GetScopedLatency("lookup_by_index"));
-  std::lock_guard<std::mutex> lock(lock_);
+  std::unique_lock<std::mutex> lock(lock_);
 
+  return LookupByIndex(lock, sequence_number, result);
+}
+
+
+template <class Logged>
+typename Database<Logged>::LookupResult SQLiteDB<Logged>::LookupByIndex(
+    const std::unique_lock<std::mutex>& lock, int64_t sequence_number,
+    Logged* result) const {
+  CHECK(lock.owns_lock());
+  CHECK_GE(sequence_number, 0);
+  CHECK_NOTNULL(result);
   sqlite::Statement statement(db_,
                               "SELECT entry, hash FROM leaves "
                               "WHERE sequence = ?");
@@ -265,6 +308,46 @@ typename Database<Logged>::LookupResult SQLiteDB<Logged>::LookupByIndex(
   }
 
   return this->LOOKUP_OK;
+}
+
+
+template <class Logged>
+typename Database<Logged>::LookupResult SQLiteDB<Logged>::LookupNextIndex(
+    const std::unique_lock<std::mutex>& lock, int64_t sequence_number,
+    Logged* result) const {
+  CHECK(lock.owns_lock());
+  CHECK_GE(sequence_number, 0);
+  CHECK_NOTNULL(result);
+  sqlite::Statement statement(db_,
+                              "SELECT entry, hash, sequence FROM leaves "
+                              "WHERE sequence >= ? ORDER BY sequence");
+  statement.BindUInt64(0, sequence_number);
+  if (statement.Step() == SQLITE_DONE) {
+    return this->NOT_FOUND;
+  }
+
+  std::string data;
+  statement.GetBlob(0, &data);
+  CHECK(result->ParseFromDatabase(data));
+
+  std::string hash;
+  statement.GetBlob(1, &hash);
+
+  CHECK_EQ(result->Hash(), hash);
+
+  result->set_sequence_number(statement.GetUInt64(2));
+  if (result->sequence_number() == tree_size_) {
+    ++tree_size_;
+  }
+
+  return this->LOOKUP_OK;
+}
+
+
+template <class Logged>
+std::unique_ptr<typename Database<Logged>::Iterator>
+SQLiteDB<Logged>::ScanEntries(int64_t start_index) {
+  return std::unique_ptr<Iterator>(new Iterator(this, start_index));
 }
 
 
@@ -318,9 +401,9 @@ typename Database<Logged>::LookupResult SQLiteDB<Logged>::LatestTreeHead(
     ct::SignedTreeHead* result) const {
   cert_trans::ScopedLatency latency(
       latency_by_op_ms.GetScopedLatency("latest_tree_head"));
-  std::lock_guard<std::mutex> lock(lock_);
+  std::unique_lock<std::mutex> lock(lock_);
 
-  return LatestTreeHeadNoLock(result);
+  return LatestTreeHeadNoLock(lock, result);
 }
 
 
@@ -361,7 +444,7 @@ void SQLiteDB<Logged>::AddNotifySTHCallback(
   callbacks_.Add(callback);
 
   ct::SignedTreeHead sth;
-  if (LatestTreeHeadNoLock(&sth) == this->LOOKUP_OK) {
+  if (LatestTreeHeadNoLock(lock, &sth) == this->LOOKUP_OK) {
     // Do not call the callback while holding the lock, as they might
     // want to perform some lookups.
     lock.unlock();
@@ -486,7 +569,7 @@ void SQLiteDB<Logged>::ForceNotifySTH() {
 
   ct::SignedTreeHead sth;
   const typename Database<Logged>::LookupResult db_result =
-      this->LatestTreeHeadNoLock(&sth);
+      this->LatestTreeHeadNoLock(lock, &sth);
   if (db_result == Database<Logged>::NOT_FOUND) {
     return;
   }
@@ -501,8 +584,10 @@ void SQLiteDB<Logged>::ForceNotifySTH() {
 
 
 template <class Logged>
-typename Database<Logged>::LookupResult
-SQLiteDB<Logged>::LatestTreeHeadNoLock(ct::SignedTreeHead* result) const {
+typename Database<Logged>::LookupResult SQLiteDB<Logged>::LatestTreeHeadNoLock(
+    const std::unique_lock<std::mutex>& lock,
+    ct::SignedTreeHead* result) const {
+  CHECK(lock.owns_lock());
   sqlite::Statement statement(db_,
                               "SELECT sth FROM trees WHERE timestamp IN "
                               "(SELECT MAX(timestamp) FROM trees)");

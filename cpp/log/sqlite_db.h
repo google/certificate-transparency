@@ -28,6 +28,9 @@ class SQLiteDB : public Database<Logged> {
   LookupResult LookupByIndex(int64_t sequence_number,
                              Logged* result) const override;
 
+  std::unique_ptr<typename Database<Logged>::Iterator> ScanEntries(
+      int64_t start_index) override;
+
   WriteResult WriteTreeHead_(const ct::SignedTreeHead& sth) override;
 
   LookupResult LatestTreeHead(ct::SignedTreeHead* result) const override;
@@ -49,7 +52,16 @@ class SQLiteDB : public Database<Logged> {
   void ForceNotifySTH();
 
  private:
-  LookupResult LatestTreeHeadNoLock(ct::SignedTreeHead* result) const;
+  class Iterator;
+
+  LookupResult LookupByIndex(const std::unique_lock<std::mutex>& lock,
+                             int64_t sequence_number, Logged* result) const;
+  // This finds the next entry with a sequence number equal or greater
+  // to the one specified.
+  LookupResult LookupNextIndex(const std::unique_lock<std::mutex>& lock,
+                               int64_t sequence_number, Logged* result) const;
+  LookupResult LatestTreeHeadNoLock(const std::unique_lock<std::mutex>& lock,
+                                    ct::SignedTreeHead* result) const;
   LookupResult NodeId(const std::unique_lock<std::mutex>& lock,
                       std::string* node_id);
 

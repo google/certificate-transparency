@@ -21,6 +21,7 @@ namespace {
 using cert_trans::LoggedCertificate;
 using ct::SignedTreeHead;
 using std::string;
+using std::unique_ptr;
 
 
 template <class T>
@@ -370,6 +371,55 @@ TYPED_TEST(DBTest, CannotOverwriteNodeId) {
 
 TYPED_TEST(DBTest, CannotHaveEmptyNodeId) {
   EXPECT_DEATH(this->db()->InitializeNode(""), "empty");
+}
+
+
+TYPED_TEST(DBTest, Iterator) {
+  LoggedCertificate logged_cert1, logged_cert2, logged_cert3;
+  const int64_t kSeq1(129);
+  const int64_t kSeq2(22);
+  const int64_t kSeq3(42);
+  // Make sure the entries are not in order.
+  CHECK_GT(kSeq1, kSeq2);
+  CHECK_GT(kSeq3, kSeq2);
+
+  this->test_signer_.CreateUnique(&logged_cert1);
+  logged_cert1.set_sequence_number(kSeq1);
+  ASSERT_EQ(DB::OK, this->db()->CreateSequencedEntry(logged_cert1));
+
+  this->test_signer_.CreateUnique(&logged_cert2);
+  logged_cert2.set_sequence_number(kSeq2);
+  ASSERT_EQ(DB::OK, this->db()->CreateSequencedEntry(logged_cert2));
+
+  this->test_signer_.CreateUnique(&logged_cert3);
+  logged_cert3.set_sequence_number(kSeq3);
+  ASSERT_EQ(DB::OK, this->db()->CreateSequencedEntry(logged_cert3));
+
+  unique_ptr<Database<LoggedCertificate>::Iterator> it(
+      this->db()->ScanEntries(0));
+  LoggedCertificate it_cert;
+  ASSERT_TRUE(it->GetNextEntry(&it_cert));
+  TestSigner::TestEqualLoggedCerts(logged_cert2, it_cert);
+
+  ASSERT_TRUE(it->GetNextEntry(&it_cert));
+  TestSigner::TestEqualLoggedCerts(logged_cert3, it_cert);
+
+  ASSERT_TRUE(it->GetNextEntry(&it_cert));
+  TestSigner::TestEqualLoggedCerts(logged_cert1, it_cert);
+
+  EXPECT_FALSE(it->GetNextEntry(&it_cert));
+
+  it = this->db()->ScanEntries(kSeq3);
+  ASSERT_TRUE(it->GetNextEntry(&it_cert));
+  TestSigner::TestEqualLoggedCerts(logged_cert3, it_cert);
+
+  ASSERT_TRUE(it->GetNextEntry(&it_cert));
+  TestSigner::TestEqualLoggedCerts(logged_cert1, it_cert);
+
+  EXPECT_FALSE(it->GetNextEntry(&it_cert));
+
+  it = this->db()->ScanEntries(kSeq1 + 1);
+  EXPECT_FALSE(it->GetNextEntry(&it_cert));
 }
 
 

@@ -42,8 +42,44 @@ int64_t ParseSequenceNumber(const std::string& seq) {
 
 }  // namespace
 
+
 template <class Logged>
 const size_t FileDB<Logged>::kTimestampBytesIndexed = 6;
+
+
+template <class Logged>
+class FileDB<Logged>::Iterator : public Database<Logged>::Iterator {
+ public:
+  Iterator(FileDB<Logged>* db, int64_t start_index)
+      : db_(CHECK_NOTNULL(db)), next_index_(start_index) {
+    CHECK_GE(next_index_, 0);
+  }
+
+  bool GetNextEntry(Logged* entry) override {
+    CHECK_NOTNULL(entry);
+    {
+      std::lock_guard<std::mutex> lock(db_->lock_);
+      if (next_index_ >= db_->contiguous_size_) {
+        std::set<int64_t>::const_iterator it(
+            db_->sparse_entries_.lower_bound(next_index_));
+        if (it == db_->sparse_entries_.end()) {
+          return false;
+        }
+
+        next_index_ = *it;
+      }
+    }
+
+    CHECK_EQ(db_->LookupByIndex(next_index_, entry),
+             Database<Logged>::LOOKUP_OK);
+    ++next_index_;
+    return true;
+  }
+
+ private:
+  FileDB<Logged>* const db_;
+  int64_t next_index_;
+};
 
 
 template <class Logged>
@@ -150,6 +186,13 @@ typename Database<Logged>::LookupResult FileDB<Logged>::LookupByIndex(
     CHECK_EQ(result->sequence_number(), sequence_number);
   }
   return this->LOOKUP_OK;
+}
+
+
+template <class Logged>
+std::unique_ptr<typename Database<Logged>::Iterator>
+FileDB<Logged>::ScanEntries(int64_t start_index) {
+  return std::unique_ptr<Iterator>(new Iterator(this, start_index));
 }
 
 
