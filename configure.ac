@@ -96,6 +96,16 @@ AS_IF([test -n "$missing_libevent"],
       [AC_MSG_ERROR([could not find the libevent libraries])])
 LIBS="$save_LIBS"
 
+# TCMalloc gubbins
+AC_ARG_WITH([tcmalloc],
+            [AS_HELP_STRING([--without-tcmalloc],
+                            [disable tcmalloc for memory allocations])],
+            [],
+            [with_tcmalloc=yes])
+AS_IF([test "x$with_tcmalloc" != xno],
+      [AC_CHECK_LIB([tcmalloc], [malloc],,
+                    [AC_MSG_FAILURE([no tcmalloc found (use --without-tcmalloc to disable)])])])
+
 # Checks for typedefs, structures, and compiler characteristics.
 AC_TYPE_INT32_T
 AC_TYPE_INT64_T
