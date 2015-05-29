@@ -1,6 +1,7 @@
 #include "util/libevent_wrapper.h"
 
 #include <climits>
+#include <evhtp.h>
 #include <event2/thread.h>
 #include <glog/logging.h>
 #include <math.h>
@@ -198,10 +199,10 @@ evdns_base* Base::GetDns() {
 }
 
 
-evhttp_connection* Base::HttpConnectionNew(const string& host,
-                                           unsigned short port) {
+evhtp_connection_t* Base::HttpConnectionNew(const string& host,
+                                            unsigned short port) {
   return CHECK_NOTNULL(
-      evhttp_connection_base_new(base_.get(), GetDns(), host.c_str(), port));
+      evhtp_connection_new_dns(base_.get(), GetDns(), host.c_str(), port));
 }
 
 

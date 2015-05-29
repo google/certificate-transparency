@@ -38,6 +38,8 @@ AC_CHECK_HEADER([google/protobuf/message.h],,
                 [AC_MSG_ERROR([protobuf headers could not be found])])
 AC_CHECK_HEADER([leveldb/db.h],,
                 [AC_MSG_ERROR([leveldb headers could not be found])])
+AC_CHECK_HEADER([evhtp.h],,
+                [AC_MSG_ERROR([libevhtp headers could not be found])])
 AC_CHECK_HEADER([ldns/ldns.h],, [missing_ldns=yes])
 
 # Check for working GTest/GMock.
@@ -61,6 +63,7 @@ AS_IF([test -n "$missing_gmock"],
 # Checks for libraries.
 AC_SEARCH_LIBS([__b64_ntop], [resolv])
 AC_SEARCH_LIBS([pthread_create], [pthread])
+AC_SEARCH_LIBS([evhtp_make_request], [evhtp])
 
 AC_MSG_CHECKING([checking for gflags library])
 LIBS="-lgflags $LIBS"
@@ -91,9 +94,13 @@ AC_SEARCH_LIBS([event_base_dispatch], [event],, [missing_libevent=1],
                [$save_LIBS])
 AC_SEARCH_LIBS([evthread_use_pthreads], [event_pthreads],, [missing_libevent=1],
                [$save_LIBS])
+AC_SEARCH_LIBS([bufferevent_openssl_socket_new], [event_openssl],, [missing_libevent_openssl=1],
+               [$save_LIBS])
 AC_SUBST([libevent_LIBS], [$LIBS])
 AS_IF([test -n "$missing_libevent"],
       [AC_MSG_ERROR([could not find the libevent libraries])])
+AS_IF([test -n "$missing_libevent_openssl"],
+      [AC_MSG_ERROR([could not find the libevent_openssl library])])
 LIBS="$save_LIBS"
 
 # TCMalloc gubbins

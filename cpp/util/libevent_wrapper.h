@@ -5,7 +5,9 @@
 #include <chrono>
 #include <event2/dns.h>
 #include <event2/event.h>
+// TODO(alcutter): Use evhtp for the HttpServer too.
 #include <event2/http.h>
+#include <evhtp.h>
 #include <functional>
 #include <memory>
 #include <mutex>
@@ -44,8 +46,8 @@ class Base : public util::Executor {
   event* EventNew(evutil_socket_t& sock, short events, Event* event) const;
   evhttp* HttpNew() const;
   evdns_base* GetDns();
-  evhttp_connection* HttpConnectionNew(const std::string& host,
-                                       unsigned short port);
+  evhtp_connection_t* HttpConnectionNew(const std::string& host,
+                                        unsigned short port);
 
  private:
   static void RunClosures(evutil_socket_t sock, short flag, void* userdata);

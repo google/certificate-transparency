@@ -1,19 +1,22 @@
 #include "net/url_fetcher.h"
 
+#include <evhtp.h>
 #include <event2/buffer.h>
 #include <event2/keyvalq_struct.h>
 #include <glog/logging.h>
+#include <htparse.h>
 
 #include "net/connection_pool.h"
 
 using cert_trans::internal::ConnectionPool;
-using cert_trans::internal::evhttp_connection_unique_ptr;
 using std::bind;
 using std::endl;
 using std::make_pair;
 using std::move;
 using std::ostream;
 using std::string;
+using std::to_string;
+using std::unique_ptr;
 using util::Status;
 using util::Task;
 using util::TaskHold;
@@ -33,19 +36,19 @@ struct UrlFetcher::Impl {
 namespace {
 
 
-evhttp_cmd_type VerbToCmdType(UrlFetcher::Verb verb) {
+htp_method VerbToCmdType(UrlFetcher::Verb verb) {
   switch (verb) {
     case UrlFetcher::Verb::GET:
-      return EVHTTP_REQ_GET;
+      return htp_method_GET;
 
     case UrlFetcher::Verb::POST:
-      return EVHTTP_REQ_POST;
+      return htp_method_POST;
 
     case UrlFetcher::Verb::PUT:
-      return EVHTTP_REQ_PUT;
+      return htp_method_PUT;
 
     case UrlFetcher::Verb::DELETE:
-      return EVHTTP_REQ_DELETE;
+      return htp_method_DELETE;
   }
 
   LOG(FATAL) << "unknown UrlFetcher::Verb: " << static_cast<int>(verb);
@@ -63,18 +66,18 @@ struct State {
   // The following methods must only be called on the libevent
   // dispatch thread.
   void MakeRequest();
-  void RequestDone(evhttp_request* req);
+  void RequestDone(evhtp_request_t* req);
 
   ConnectionPool* const pool_;
   const UrlFetcher::Request request_;
   UrlFetcher::Response* const response_;
   Task* const task_;
 
-  evhttp_connection_unique_ptr conn_;
+  unique_ptr<ConnectionPool::Connection> conn_;
 };
 
 
-void RequestCallback(evhttp_request* req, void* userdata) {
+void RequestCallback(evhtp_request_t* req, void* userdata) {
   static_cast<State*>(CHECK_NOTNULL(userdata))->RequestDone(req);
 }
 
@@ -110,15 +113,42 @@ State::State(ConnectionPool* pool, const UrlFetcher::Request& request,
 
 void State::MakeRequest() {
   CHECK(libevent::Base::OnEventThread());
-  evhttp_request* const http_req(
-      CHECK_NOTNULL(evhttp_request_new(&RequestCallback, this)));
+  evhtp_request_t* const http_req(
+      CHECK_NOTNULL(evhtp_request_new(&RequestCallback, this)));
+  if (!request_.body.empty() &&
+      request_.headers.find("Content-Length") == request_.headers.end()) {
+    evhtp_headers_add_header(
+        http_req->headers_out,
+        evhtp_header_new("Content-Length",
+                         to_string(request_.body.size()).c_str(), 1, 1));
+  }
   for (const auto& header : request_.headers) {
-    evhttp_add_header(evhttp_request_get_output_headers(http_req),
-                      header.first.c_str(), header.second.c_str());
+    evhtp_headers_add_header(http_req->headers_out,
+                             evhtp_header_new(header.first.c_str(),
+                                              header.second.c_str(), 1, 1));
   }
 
+  conn_ = pool_->Get(request_.url);
+
+  const htp_method verb(VerbToCmdType(request_.verb));
+  VLOG(1) << "evhtp_make_request(" << conn_.get()->connection() << ", "
+          << http_req << ", " << verb << ", \"" << request_.url.PathQuery()
+          << "\")";
+  if (evhtp_make_request(conn_->connection(), http_req, verb,
+                         request_.url.PathQuery().c_str()) != 0) {
+    VLOG(1) << "evhtp_make_request error";
+    // Put back the connection, RequestDone is not going to get
+    // called.
+    pool_->Put(move(conn_));
+    task_->Return(Status(util::error::INTERNAL, "evhtp_make_request error"));
+    return;
+  }
+
+  // evhtp_make_request doesn't know anything about the body, so we send it
+  // outselves here:
   if (!request_.body.empty()) {
-    if (evbuffer_add_reference(evhttp_request_get_output_buffer(http_req),
+    if (evbuffer_add_reference(bufferevent_get_output(
+                                   conn_->connection()->bev),
                                request_.body.data(), request_.body.size(),
                                nullptr, nullptr) != 0) {
       VLOG(1) << "error when adding the request body";
@@ -127,28 +157,21 @@ void State::MakeRequest() {
       return;
     }
   }
-
-  conn_ = pool_->Get(request_.url);
-
-  const evhttp_cmd_type verb(VerbToCmdType(request_.verb));
-  VLOG(1) << "evhttp_make_request(" << conn_.get() << ", " << http_req << ", "
-          << verb << ", \"" << request_.url.PathQuery() << "\")";
-  if (evhttp_make_request(conn_.get(), http_req, verb,
-                          request_.url.PathQuery().c_str()) != 0) {
-    VLOG(1) << "evhttp_make_request error";
-    // Put back the connection, RequestDone is not going to get
-    // called.
-    pool_->Put(move(conn_));
-    task_->Return(Status(util::error::INTERNAL, "evhttp_make_request error"));
-    return;
-  }
 }
 
 
-void State::RequestDone(evhttp_request* req) {
+struct evhtp_request_deleter {
+  void operator()(evhtp_request_t* r) const {
+    evhtp_request_free(r);
+  }
+};
+
+
+void State::RequestDone(evhtp_request_t* req) {
   CHECK(libevent::Base::OnEventThread());
   CHECK(conn_);
   pool_->Put(move(conn_));
+  unique_ptr<evhtp_request_t, evhtp_request_deleter> req_deleter(req);
 
   if (!req) {
     // TODO(pphaneuf): The dreaded null request... These are fairly
@@ -162,10 +185,10 @@ void State::RequestDone(evhttp_request* req) {
     return;
   }
 
-  response_->status_code = evhttp_request_get_response_code(req);
+  response_->status_code = req->status;
   if (response_->status_code < 100) {
-    // TODO(pphaneuf): According to my reading of libevent, this is
-    // most likely to be a connection refused?
+    // TODO(alcutter): Does this still happen with evhtp? What does it mean?
+    // These questions, and more, answered in next week's episode.
     VLOG(1) << "request has a status code lower than 100: "
             << response_->status_code;
     task_->Return(
@@ -174,15 +197,14 @@ void State::RequestDone(evhttp_request* req) {
   }
 
   response_->headers.clear();
-  for (evkeyval* ptr = evhttp_request_get_input_headers(req)->tqh_first; ptr;
+  for (evhtp_kv_s* ptr = req->headers_in->tqh_first; ptr;
        ptr = ptr->next.tqe_next) {
-    response_->headers.insert(make_pair(ptr->key, ptr->value));
+    response_->headers.insert(make_pair(ptr->key, ptr->val));
   }
 
-  const size_t body_length(
-      evbuffer_get_length(evhttp_request_get_input_buffer(req)));
-  string body(reinterpret_cast<const char*>(evbuffer_pullup(
-                  evhttp_request_get_input_buffer(req), body_length)),
+  const size_t body_length(evbuffer_get_length(req->buffer_in));
+  string body(reinterpret_cast<const char*>(
+                  evbuffer_pullup(req->buffer_in, body_length)),
               body_length);
   response_->body.swap(body);
 
