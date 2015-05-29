@@ -63,7 +63,14 @@ AS_IF([test -n "$missing_gmock"],
 # Checks for libraries.
 AC_SEARCH_LIBS([__b64_ntop], [resolv])
 AC_SEARCH_LIBS([pthread_create], [pthread])
-AC_SEARCH_LIBS([evhtp_make_request], [evhtp])
+
+dnl We're pretty crypto-centric, having the OpenSSL libraries in LIBS
+dnl is fine.
+AC_SEARCH_LIBS([CRYPTO_set_locking_callback], [crypto],, [missing_openssl=1],
+               [$save_LIBS])
+AC_SEARCH_LIBS([SSL_CTX_new], [ssl],, [missing_openssl=1], [$save_LIBS])
+AS_IF([test -n "$missing_openssl"],
+      [AC_MSG_ERROR([could not find the OpenSSL libraries])])
 
 AC_MSG_CHECKING([checking for gflags library])
 LIBS="-lgflags $LIBS"
@@ -94,13 +101,17 @@ AC_SEARCH_LIBS([event_base_dispatch], [event],, [missing_libevent=1],
                [$save_LIBS])
 AC_SEARCH_LIBS([evthread_use_pthreads], [event_pthreads],, [missing_libevent=1],
                [$save_LIBS])
-AC_SEARCH_LIBS([bufferevent_openssl_socket_new], [event_openssl],, [missing_libevent_openssl=1],
+AC_SEARCH_LIBS([bufferevent_openssl_socket_new], [event_openssl],,
+               [missing_libevent_openssl=1], [$save_LIBS])
+AC_SEARCH_LIBS([evhtp_make_request], [evhtp],, [missing_libevhtp=1],
                [$save_LIBS])
 AC_SUBST([libevent_LIBS], [$LIBS])
 AS_IF([test -n "$missing_libevent"],
       [AC_MSG_ERROR([could not find the libevent libraries])])
 AS_IF([test -n "$missing_libevent_openssl"],
       [AC_MSG_ERROR([could not find the libevent_openssl library])])
+AS_IF([test -n "$missing_libevhtp"],
+      [AC_MSG_ERROR([could not find the evhtp library])])
 LIBS="$save_LIBS"
 
 # TCMalloc gubbins
