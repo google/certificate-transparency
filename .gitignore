@@ -62,6 +62,7 @@
 /cpp/proto/serializer_test
 /cpp/server/blob-server
 /cpp/server/ct-dns-server
+/cpp/server/ct-mirror
 /cpp/server/ct-server
 /cpp/server/proxy_test
 /cpp/stamp-h1
@@ -80,6 +81,7 @@
 /cpp/util/sync_etcd_test
 /cpp/util/sync_task_test
 /cpp/util/task_test
+/cpp/util/thread_pool_test
 /depcomp
 /install-sh
 /java/build
