@@ -64,10 +64,26 @@ CmmuVy5FyQkgingGlg2o06ZMN+XsJyD5+yGFHHFIpsYnK8+7Rd+z
 -----END CERTIFICATE-----
 `
 
-func getRoots(logurl string) (*x509.CertPool) {
-	rootsjson, err := http.Get(logurl + "/ct/v1/get-roots")
+type Log struct {
+	url string
+	roots *x509.CertPool
+}
+
+func NewLog(url string) (*Log) {
+	return &Log{ url: url }
+}
+
+func (s *Log) Roots() (*x509.CertPool) {
+	if s.roots == nil {
+		s.roots = s.getRoots()
+	}
+	return s.roots
+}
+
+func (s *Log) getRoots() (*x509.CertPool) {
+	rootsjson, err := http.Get(s.url + "/ct/v1/get-roots")
 	if err != nil {
-		log.Fatalf("can't get roots from %s: %s", logurl, err)
+		log.Fatalf("can't get roots from %s: %s", s.url, err)
 	}
 	defer rootsjson.Body.Close()
 	if rootsjson.StatusCode != 200 {
@@ -99,7 +115,7 @@ func getRoots(logurl string) (*x509.CertPool) {
 	return ret
 }
 
-func PostChain(logurl string, chain []*x509.Certificate) {
+func (s *Log) PostChain(chain []*x509.Certificate) {
 	type Chain struct {
 		Chain [][]byte `json:"chain"`
 	}
@@ -112,7 +128,7 @@ func PostChain(logurl string, chain []*x509.Certificate) {
 		log.Fatalf("Can't marshal: %s", err)
 	}
 	log.Printf("post: %s", j)
-	resp, err := http.Post(logurl + "/ct/v1/add-chain", "application/json", bytes.NewReader(j))
+	resp, err := http.Post(s.url + "/ct/v1/add-chain", "application/json", bytes.NewReader(j))
 	if err != nil {
 		log.Fatalf("Can't post: %s", err)
 	}
@@ -128,10 +144,10 @@ func PostChain(logurl string, chain []*x509.Certificate) {
 	log.Printf("Log returned: %s", jo)
 }
 
-func PostChains(logurl string, chains [][]*x509.Certificate) {
+func (s *Log) PostChains(chains [][]*x509.Certificate) {
 	for i, chain := range chains {
 		log.Printf("post %d", i)
-		PostChain(logurl, chain)
+		s.PostChain(chain)
 	}
 }
 
@@ -204,12 +220,12 @@ type DedupedChain struct {
 	certs []*x509.Certificate
 }
 
-func (d *DedupedChain) fixChain(cert *x509.Certificate, intermediates *x509.CertPool, roots *x509.CertPool, logurl string) {
-	opts := x509.VerifyOptions{ Intermediates: intermediates, Roots: roots }
+func (d *DedupedChain) fixChain(cert *x509.Certificate, intermediates *x509.CertPool, l *Log) {
+	opts := x509.VerifyOptions{ Intermediates: intermediates, Roots: l.Roots() }
 	chain, err := cert.Verify(opts)
 	if err == nil {
 		dumpChains("verified", chain)
-		PostChains(logurl, chain)
+		l.PostChains(chain)
 		return
 	}
 	log.Printf("failed to verify certificate for %s: %s", cert.Subject.CommonName, err)
@@ -255,19 +271,19 @@ func (d *DedupedChain) fixChain(cert *x509.Certificate, intermediates *x509.Cert
 		chain, err := cert.Verify(opts)
 		if err == nil {
 			dumpChains("fixed", chain)
-			PostChains(logurl, chain)
+			l.PostChains(chain)
 			return
 		}
 	}
 }
 
-func (d *DedupedChain) fixAll(roots *x509.CertPool, logurl string) {
+func (d *DedupedChain) fixAll(l *Log) {
 	intermediates := x509.NewCertPool()
 	for _, c := range d.certs {
 		intermediates.AddCert(c)
 	}
 	for _, c := range d.certs {
-		d.fixChain(c, intermediates, roots, logurl)
+		d.fixChain(c, intermediates, l)
 	}
 }
 
@@ -281,7 +297,7 @@ func (d *DedupedChain) AddCert(cert *x509.Certificate) {
 	d.certs = append(d.certs, cert)
 }
 
-func processChains(file string, roots *x509.CertPool, logurl string) {
+func processChains(file string, l *Log) {
 	f, err := os.Open(file)
 	if err != nil {
 		log.Fatalf("Can't open %s: %s", err)
@@ -314,15 +330,14 @@ func processChains(file string, roots *x509.CertPool, logurl string) {
 		}
 		log.Printf("%d in chain", len(m.Chain))
 		dumpChain("input", c.certs)
-		c.fixAll(roots, logurl)
+		c.fixAll(l)
 	}
 }
 
 func main() {
 	//logurl := "https://ct.googleapis.com/aviator"
-	logurl := "https://ct.googleapis.com/rocketeer"
-	roots := getRoots(logurl)
-	processChains("/usr/home/ben/tmp/failed.json", roots, logurl)
+	l := NewLog("https://ct.googleapis.com/rocketeer")
+	processChains("/usr/home/ben/tmp/failed.json", l)
 	/*
 	s, _ := pem.Decode([]byte(cafbankPem))
 	cert, err := x509.ParseCertificate(s.Bytes)
