@@ -1,7 +1,6 @@
 package main
 
 import (
-	"bytes"
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
@@ -10,6 +9,7 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
+	"github.com/google/certificate-transparency/go/fix-chain"
 	"github.com/google/certificate-transparency/go/x509"
 	"log"
 	"net/http"
@@ -64,93 +64,6 @@ CmmuVy5FyQkgingGlg2o06ZMN+XsJyD5+yGFHHFIpsYnK8+7Rd+z
 -----END CERTIFICATE-----
 `
 
-type Log struct {
-	url string
-	roots *x509.CertPool
-}
-
-func NewLog(url string) (*Log) {
-	return &Log{ url: url }
-}
-
-func (s *Log) Roots() (*x509.CertPool) {
-	if s.roots == nil {
-		s.roots = s.getRoots()
-	}
-	return s.roots
-}
-
-func (s *Log) getRoots() (*x509.CertPool) {
-	rootsjson, err := http.Get(s.url + "/ct/v1/get-roots")
-	if err != nil {
-		log.Fatalf("can't get roots from %s: %s", s.url, err)
-	}
-	defer rootsjson.Body.Close()
-	if rootsjson.StatusCode != 200 {
-		log.Fatalf("can't deal with status other than 200: %d", rootsjson.StatusCode)
-	}
-	j, err := ioutil.ReadAll(rootsjson.Body)
-	//log.Printf("roots: %s", j)
-	type Certificates struct {
-		Certificates [][]byte
-	}
-	var certs Certificates
-	err = json.Unmarshal(j, &certs)
-	if err != nil {
-		log.Fatalf("can't parse json (%s): %s", err, j)
-	}
-	//log.Printf("certs: %#v", certs)
-	ret := x509.NewCertPool()
-	for i := 0 ; i < len(certs.Certificates) ; i++ {
-		r, err := x509.ParseCertificate(certs.Certificates[i])
-		switch err.(type) {
-		case nil:
-		case x509.NonFatalErrors:
-		default:
-			log.Fatalf("can't parse certificate: %s %#v", err, certs.Certificates[i])
-		}
-		ret.AddCert(r)
-		log.Printf("Root %d: %s", i, r.Subject.CommonName)
-	}
-	return ret
-}
-
-func (s *Log) PostChain(chain []*x509.Certificate) {
-	type Chain struct {
-		Chain [][]byte `json:"chain"`
-	}
-	var m Chain
-	for _, c := range chain {
-		m.Chain = append(m.Chain, c.Raw)
-	}
-	j, err := json.Marshal(m)
-	if err != nil {
-		log.Fatalf("Can't marshal: %s", err)
-	}
-	log.Printf("post: %s", j)
-	resp, err := http.Post(s.url + "/ct/v1/add-chain", "application/json", bytes.NewReader(j))
-	if err != nil {
-		log.Fatalf("Can't post: %s", err)
-	}
-	defer resp.Body.Close()
-	jo, err := ioutil.ReadAll(resp.Body)
-	if resp.StatusCode != 200 {
-		DumpChainPEM(chain)
-		log.Fatalf("Can't handle response %d: %s", resp.StatusCode, jo)
-	}
-	if err != nil {
-		log.Fatalf("Can't read response: %s", err)
-	}
-	log.Printf("Log returned: %s", jo)
-}
-
-func (s *Log) PostChains(chains [][]*x509.Certificate) {
-	for i, chain := range chains {
-		log.Printf("post %d", i)
-		s.PostChain(chain)
-	}
-}
-
 func Hash(s *x509.Certificate) ([sha256.Size]byte) {
 	return sha256.Sum256(s.Raw)
 }
@@ -158,15 +71,6 @@ func Hash(s *x509.Certificate) ([sha256.Size]byte) {
 func HexHash(s *x509.Certificate) (string) {
 	h := Hash(s)
 	return hex.EncodeToString(h[:])
-}
-
-func DumpChainPEM(chain []*x509.Certificate) {
-	var p string
-	for _, cert := range chain {
-		b := pem.Block { Type: "CERTIFICATE", Bytes: cert.Raw }
-		p += string(pem.EncodeToMemory(&b))
-	}
-	log.Printf(p)
 }
 
 func dumpChain(name string, certs []*x509.Certificate) {
@@ -220,7 +124,7 @@ type DedupedChain struct {
 	certs []*x509.Certificate
 }
 
-func (d *DedupedChain) fixChain(cert *x509.Certificate, intermediates *x509.CertPool, l *Log) {
+func (d *DedupedChain) fixChain(cert *x509.Certificate, intermediates *x509.CertPool, l *fix_chain.Log) {
 	opts := x509.VerifyOptions{ Intermediates: intermediates, Roots: l.Roots() }
 	chain, err := cert.Verify(opts)
 	if err == nil {
@@ -277,7 +181,7 @@ func (d *DedupedChain) fixChain(cert *x509.Certificate, intermediates *x509.Cert
 	}
 }
 
-func (d *DedupedChain) fixAll(l *Log) {
+func (d *DedupedChain) fixAll(l *fix_chain.Log) {
 	intermediates := x509.NewCertPool()
 	for _, c := range d.certs {
 		intermediates.AddCert(c)
@@ -297,7 +201,7 @@ func (d *DedupedChain) AddCert(cert *x509.Certificate) {
 	d.certs = append(d.certs, cert)
 }
 
-func processChains(file string, l *Log) {
+func processChains(file string, l *fix_chain.Log) {
 	f, err := os.Open(file)
 	if err != nil {
 		log.Fatalf("Can't open %s: %s", err)
@@ -336,7 +240,7 @@ func processChains(file string, l *Log) {
 
 func main() {
 	//logurl := "https://ct.googleapis.com/aviator"
-	l := NewLog("https://ct.googleapis.com/rocketeer")
+	l := fix_chain.NewLog("https://ct.googleapis.com/rocketeer")
 	processChains("/usr/home/ben/tmp/failed.json", l)
 	/*
 	s, _ := pem.Decode([]byte(cafbankPem))
