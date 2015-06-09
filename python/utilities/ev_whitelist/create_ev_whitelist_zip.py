@@ -21,13 +21,19 @@ CRX_URL = (
 TRUNCATED_HASH_LENGTH = 8
 GOLOMB_M_PARAMETER = 2 ** 47
 NUM_FETCHING_PROCESSES = 40
-LOGS_LIST = [
-    "https://ct.googleapis.com/pilot",
-    "https://ct.googleapis.com/aviator",
-    "https://ct1.digicert-ct.com/log",
-    "https://log.certly.io",
-    "https://ct.izenpe.com",
-]
+# Map between a log's URL and the index of the cut-off point after which
+# no new EV certificates will be whitelisted.
+# These entries are basically the index of the last EV cert that was found on
+# January 1st, when the EV whitelist was finalized.
+# Ultimately this allows re-generation of the whitelist, excluding certificates
+# that have recently expired, thus reducing its size.
+LOGS_LIST = {
+    "https://ct.googleapis.com/pilot":6082932,
+    "https://ct.googleapis.com/aviator":5360225,
+    "https://ct1.digicert-ct.com/log":1056,
+    "https://log.certly.io": 4729,
+    "https://ct.izenpe.com": 1,
+}
 
 FLAGS = gflags.FLAGS
 
@@ -113,7 +119,7 @@ def generate_new_ev_hashes_whitelist(logs_list):
     """Scans the provided logs_list and generates a compressed EV certs
     whitelist for all EV certs in all the logs."""
     all_hashes_set = set()
-    for log_url in logs_list:
+    for log_url, last_acceptable_entry in logs_list.items():
         output_dir = None
         if FLAGS.output_directory:
             parsed_url = urlparse.urlsplit(log_url)
@@ -127,7 +133,8 @@ def generate_new_ev_hashes_whitelist(logs_list):
             generate_ev_whitelist.generate_ev_cert_hashes_from_log(
                 log_url,
                 FLAGS.multi,
-                output_dir))
+                output_dir,
+                last_acceptable_entry))
         print "Scanned %d, %d matched, %d failed parsing (strict/partial)" % (
             res.total, res.matches, res.errors)
         print "There are %d EV hashes." % (len(hashes_set))

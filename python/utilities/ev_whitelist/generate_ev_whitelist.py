@@ -47,6 +47,8 @@ def find_matching_policy(certificate):
 def does_root_match_policy(policy_oid, cert_chain):
     """Returns true if the fingerprint of the root certificate matches the
     expected fingerprint for this EV policy OID."""
+    if not cert_chain: # Empty chain
+        return False
     root_fingerprint = hashlib.sha1(cert_chain[-1]).digest()
     return root_fingerprint in ev_metadata.EV_POLICIES[policy_oid]
 
@@ -66,9 +68,10 @@ def _write_cert_and_chain(
              "wb"))
 
 def _ev_match(
-        output_dir, certificate, entry_type, extra_data, certificate_index):
+        output_dir, last_acceptable_entry_index, certificate, entry_type,
+        extra_data, certificate_index):
     """Matcher function for the scanner. Returns the certificate's hash if
-    it is a valid EV certificate, None otherwise."""
+    it is a valid, non-expired, EV certificate, None otherwise."""
     # Only generate whitelist for non-precertificates. It is expected that if
     # a precertificate was submitted then the issued SCT would be embedded
     # in the final certificate.
@@ -84,6 +87,9 @@ def _ev_match(
             matching_policy, extra_data.certificate_chain):
         return None
 
+    if certificate_index > last_acceptable_entry_index:
+        return None
+
     # Matching certificate
     if output_dir:
         _write_cert_and_chain(
@@ -93,7 +99,7 @@ def _ev_match(
 
 
 def generate_ev_cert_hashes_from_log(
-        log_url, num_processes, output_directory):
+        log_url, num_processes, output_directory, last_acceptable_entry_index):
     """Scans the given log and generates a list of hashes for all EV
     certificates in it.
 
@@ -105,7 +111,8 @@ def generate_ev_cert_hashes_from_log(
     def add_hash(cert_hash):
         """Store the hash. Always called from the main process, so safe."""
         ev_hashes.add(cert_hash)
-    bound_ev_match = functools.partial(_ev_match, output_directory)
+    bound_ev_match = functools.partial(_ev_match, output_directory,
+                                       last_acceptable_entry_index)
     res = scanner.scan_log(bound_ev_match, log_url, num_processes, add_hash)
     return (res, ev_hashes)
 
