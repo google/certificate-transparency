@@ -87,7 +87,7 @@ func dumpChains(name string, chains [][]*x509.Certificate) {
 }
 
 func knownBad(name string) (bool) {
-	return name == "http://gca.nat.gov.tw/repository/Certs/IssuedToThisCA.p7b" || name == "http://grca.nat.gov.tw/repository/Certs/IssuedToThisCA.p7b" || name == "http://crt.trust-provider.com/AddTrustExternalCARoot.p7c"
+	return name == "http://gca.nat.gov.tw/repository/Certs/IssuedToThisCA.p7b" || name == "http://grca.nat.gov.tw/repository/Certs/IssuedToThisCA.p7b" || name == "http://crt.trust-provider.com/AddTrustExternalCARoot.p7c" || name == "http://crt.usertrust.com/AddTrustExternalCARoot.p7c"
 }
 
 var URLCache map[string][]byte
@@ -133,52 +133,44 @@ func (d *DedupedChain) fixChain(cert *x509.Certificate, intermediates *x509.Cert
 		return
 	}
 	log.Printf("failed to verify certificate for %s: %s", cert.Subject.CommonName, err)
-	urls := cert.IssuingCertificateURL
-	for i, url := range urls {
-		log.Printf("fetch issuer %d from %s", i, url)
-		/*
-		issuer, err := http.Get(url)
-		if err != nil {
-			log.Printf("failed to fetch issuer from %s: %s", url, err)
-			continue
-		}
-		defer issuer.Body.Close()
-		if issuer.StatusCode != 200 {
-			log.Printf("can't deal with status %d", issuer.StatusCode)
-			continue
-		}
-		body, err := ioutil.ReadAll(issuer.Body)
-*/
-		body, err := GetURL(url)
-		if err != nil {
-			log.Printf("can't get URL body from %s: %s", url, err)
-			continue
-		}
-		//log.Print(body)
-		icert, err := x509.ParseCertificate(body)
-		if err != nil {
-			s, _ := pem.Decode(body)
-			if s != nil {
-				icert, err = x509.ParseCertificate(s.Bytes)
-			}
-		}
-		if err != nil {
-			if knownBad(url) {
-				log.Printf("(ignored) failed to parse certificate: %s", err)
+	d2 := *d
+	d2.AddCert(cert)
+	for _, c := range d2.certs {
+		urls := c.IssuingCertificateURL
+		for i, url := range urls {
+			log.Printf("fetch issuer %d from %s", i, url)
+			body, err := GetURL(url)
+			if err != nil {
+				log.Printf("can't get URL body from %s: %s", url, err)
 				continue
-			} else {
-				log.Fatalf("failed to parse certificate: %s", err)
 			}
-		}
-		//log.Printf("%+v", icert)
-		opts.Intermediates.AddCert(icert)
-		chain, err := cert.Verify(opts)
-		if err == nil {
-			dumpChains("fixed", chain)
-			l.PostChains(chain)
-			return
+			//log.Print(body)
+			icert, err := x509.ParseCertificate(body)
+			if err != nil {
+				s, _ := pem.Decode(body)
+				if s != nil {
+					icert, err = x509.ParseCertificate(s.Bytes)
+				}
+			}
+			if err != nil {
+				if knownBad(url) {
+					log.Printf("(ignored) failed to parse certificate: %s", err)
+					continue
+				} else {
+					log.Fatalf("failed to parse certificate: %s", err)
+				}
+			}
+			//log.Printf("%+v", icert)
+			opts.Intermediates.AddCert(icert)
+			chain, err := cert.Verify(opts)
+			if err == nil {
+				dumpChains("fixed", chain)
+				l.PostChains(chain)
+				return
+			}
 		}
 	}
+	log.Printf("failed to fix certificate for %s", cert.Subject.CommonName)
 }
 
 func (d *DedupedChain) fixAll(l *fix_chain.Log) {
