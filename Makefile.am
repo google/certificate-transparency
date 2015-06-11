@@ -721,5 +721,6 @@ cpp_merkletree_merkle_tree_large_test_SOURCES = \
 
 docker: all
 	sudo docker build -t localhost:5000/certificate_transparency/super_duper:test .
+	sudo docker build -f Dockerfile-ct-mirror -t localhost:5000/certificate_transparency/super_mirror:test .
 	cd cloud/etcd && sudo docker build -t localhost:5000/certificate_transparency/etcd:test .
 	cd cloud/prometheus && sudo docker build -t localhost:5000/certificate_transparency/prometheus:test .
