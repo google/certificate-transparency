@@ -10,13 +10,13 @@ import (
 	"net/http"
 )
 
-func DumpChainPEM(chain []*x509.Certificate) {
+func DumpChainPEM(chain []*x509.Certificate) (string) {
 	var p string
 	for _, cert := range chain {
 		b := pem.Block { Type: "CERTIFICATE", Bytes: cert.Raw }
 		p += string(pem.EncodeToMemory(&b))
 	}
-	log.Printf(p)
+	return p
 }
 
 type Log struct {
@@ -95,8 +95,9 @@ func (s *Log) postChain(chain []*x509.Certificate) {
 	defer resp.Body.Close()
 	jo, err := ioutil.ReadAll(resp.Body)
 	if resp.StatusCode != 200 {
-		DumpChainPEM(chain)
-		log.Fatalf("Can't handle response %d: %s", resp.StatusCode, jo)
+		// FIXME: retry 500s.
+		log.Printf("Can't handle response %d: %s\nchain: %s", resp.StatusCode, jo, DumpChainPEM(chain))
+		return
 	}
 	if err != nil {
 		log.Fatalf("Can't read response: %s", err)
