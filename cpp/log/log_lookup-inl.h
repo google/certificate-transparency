@@ -61,6 +61,7 @@ void LogLookup<Logged>::UpdateFromSTH(const ct::SignedTreeHead& sth) {
   // TODO(ekasper): make tree signer write leaves out to the database,
   // so that we don't have to read the entries in.
   std::string leaf_hash;
+  auto it(db_->ScanEntries(cert_tree_.LeafCount()));
   for (int64_t sequence_number = cert_tree_.LeafCount();
        sequence_number < sth.tree_size(); ++sequence_number) {
     Logged logged;
@@ -68,8 +69,7 @@ void LogLookup<Logged>::UpdateFromSTH(const ct::SignedTreeHead& sth) {
     // handled more gracefully. E.g. we could retry a failed update
     // a number of times -- but until we know under which conditions
     // the database might fail (database busy?), just die.
-    CHECK_EQ(Database<Logged>::LOOKUP_OK,
-             db_->LookupByIndex(sequence_number, &logged))
+    CHECK(it->GetNextEntry(&logged))
         << "Latest STH has " << sth.tree_size() << "entries but we failed to "
         << "retrieve entry number " << sequence_number;
     CHECK(logged.has_sequence_number())

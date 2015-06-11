@@ -237,14 +237,12 @@ typename TreeSigner<Logged>::UpdateResult TreeSigner<Logged>::UpdateTree() {
   uint64_t min_timestamp = LastUpdateTime() + 1;
 
   // Sequence any new sequenced entries from our local DB.
+  auto it(db_->ScanEntries(cert_tree_->LeafCount()));
   for (int64_t i(cert_tree_->LeafCount());; ++i) {
     Logged logged;
-    typename Database<Logged>::LookupResult result(
-        db_->LookupByIndex(i, &logged));
-    if (result == Database<Logged>::NOT_FOUND) {
+    if (!it->GetNextEntry(&logged)) {
       break;
     }
-    CHECK_EQ(Database<Logged>::LOOKUP_OK, result);
     CHECK_EQ(logged.sequence_number(), i);
     AppendToTree(logged);
     min_timestamp = std::max(min_timestamp, logged.sct().timestamp());
