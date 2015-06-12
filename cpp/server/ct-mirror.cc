@@ -370,6 +370,8 @@ int main(int argc, char* argv[]) {
       ContinuousFetcher::New(event_base.get(), &pool, db, false));
   fetcher->AddPeer("target", peer);
 
+  server.WaitForReplication();
+
   thread sth_updater(&STHUpdater, db, server.cluster_state_controller(),
                      &queue_mutex, &queue,
                      fetcher_task.task()->AddChild([](Task* task) {

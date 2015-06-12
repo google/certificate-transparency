@@ -442,6 +442,7 @@ int main(int argc, char* argv[]) {
     CHECK(!FLAGS_server.empty());
   }
 
+  server.WaitForReplication();
 
   // TODO(pphaneuf): We should be remaining in an "unhealthy state"
   // (either not accepting any requests, or returning some internal

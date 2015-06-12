@@ -82,6 +82,7 @@ class Server {
   LogLookup<Logged>* log_lookup();
 
   void Initialise(bool is_mirror);
+  void WaitForReplication() const;
   void Run();
 
  private:
@@ -282,11 +283,7 @@ LogLookup<Logged>* Server<Logged>::log_lookup() {
 
 
 template <class Logged>
-void Server<Logged>::Initialise(bool is_mirror) {
-  fetcher_.reset(ContinuousFetcher::New(event_base_.get(), &internal_pool_,
-                                        db_, !is_mirror)
-                     .release());
-
+void Server<Logged>::WaitForReplication() const {
   // If we're joining an existing cluster, this node needs to get its database
   // up-to-date with the serving_sth before we can do anything, so we'll wait
   // here for that:
@@ -300,6 +297,14 @@ void Server<Logged>::Initialise(bool is_mirror) {
       sleep(1);
     }
   }
+}
+
+
+template <class Logged>
+void Server<Logged>::Initialise(bool is_mirror) {
+  fetcher_.reset(ContinuousFetcher::New(event_base_.get(), &internal_pool_,
+                                        db_, !is_mirror)
+                     .release());
 
   log_lookup_.reset(new LogLookup<LoggedCertificate>(db_));
 
