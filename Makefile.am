@@ -249,6 +249,7 @@ cpp_client_ct_SOURCES = \
 	cpp/util/json_wrapper.cc \
 	cpp/util/libevent_wrapper.cc \
 	cpp/util/read_key.cc \
+	cpp/util/thread_pool.cc \
 	cpp/util/util.cc
 
 cpp_server_ct_dns_server_LDADD = \
@@ -281,7 +282,8 @@ cpp_tools_etcd_watch_LDADD = \
 cpp_tools_etcd_watch_SOURCES = \
 	cpp/tools/etcd_watch.cc \
 	cpp/util/json_wrapper.cc \
-	cpp/util/libevent_wrapper.cc
+	cpp/util/libevent_wrapper.cc \
+	cpp/util/thread_pool.cc
 
 cpp_util_bench_etcd_LDADD = \
 	cpp/libcore.a \
@@ -290,7 +292,8 @@ cpp_util_bench_etcd_LDADD = \
 cpp_util_bench_etcd_SOURCES = \
 	cpp/util/bench_etcd.cc \
 	cpp/util/json_wrapper.cc \
-	cpp/util/libevent_wrapper.cc
+	cpp/util/libevent_wrapper.cc \
+	cpp/util/thread_pool.cc
 
 cpp_util_etcd_masterelection_LDADD = \
 	cpp/libcore.a \
@@ -302,7 +305,8 @@ cpp_util_etcd_masterelection_SOURCES = \
 	cpp/util/json_wrapper.cc \
 	cpp/util/libevent_wrapper.cc \
 	cpp/util/periodic_closure.cc \
-	cpp/util/protobuf_util.cc
+	cpp/util/protobuf_util.cc \
+	cpp/util/thread_pool.cc
 
 cpp_base_notification_test_LDADD = \
 	cpp/libtest.a \
@@ -609,7 +613,8 @@ cpp_util_masterelection_test_SOURCES = \
 	cpp/util/libevent_wrapper.cc \
 	cpp/util/masterelection_test.cc \
 	cpp/util/periodic_closure.cc \
-	cpp/util/protobuf_util.cc
+	cpp/util/protobuf_util.cc \
+	cpp/util/thread_pool.cc
 
 cpp_merkletree_merkle_tree_test_LDADD = \
 	cpp/libcore.a \

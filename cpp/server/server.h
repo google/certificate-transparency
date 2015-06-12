@@ -70,9 +70,9 @@ class Server {
   // Doesn't take ownership of anything.
   Server(const Options& opts,
          const std::shared_ptr<libevent::Base>& event_base,
-         Database<Logged>* db, EtcdClient* etcd_client,
-         UrlFetcher* url_fetcher, LogSigner* log_signer,
-         CertChecker* cert_checker);
+         ThreadPool* internal_pool, Database<Logged>* db,
+         EtcdClient* etcd_client, UrlFetcher* url_fetcher,
+         LogSigner* log_signer, CertChecker* cert_checker);
   ~Server();
 
   bool IsMaster() const;
@@ -96,7 +96,7 @@ class Server {
   UrlFetcher* const url_fetcher_;
   EtcdClient* const etcd_client_;
   MasterElection election_;
-  ThreadPool internal_pool_;
+  ThreadPool* internal_pool_;
   util::SyncTask server_task_;
   StrictConsistentStore<Logged> consistent_store_;
   const std::unique_ptr<Frontend> frontend_;
@@ -194,9 +194,9 @@ void Server<Logged>::StaticInit() {
 template <class Logged>
 Server<Logged>::Server(const Options& opts,
                        const std::shared_ptr<libevent::Base>& event_base,
-                       Database<Logged>* db, EtcdClient* etcd_client,
-                       UrlFetcher* url_fetcher, LogSigner* log_signer,
-                       CertChecker* cert_checker)
+                       ThreadPool* internal_pool, Database<Logged>* db,
+                       EtcdClient* etcd_client, UrlFetcher* url_fetcher,
+                       LogSigner* log_signer, CertChecker* cert_checker)
     : options_(opts),
       event_base_(event_base),
       event_pump_(new libevent::EventPumpThread(event_base_)),
@@ -208,11 +208,11 @@ Server<Logged>::Server(const Options& opts,
       etcd_client_(CHECK_NOTNULL(etcd_client)),
       election_(event_base_, etcd_client_, options_.etcd_root + "/election",
                 node_id_),
-      internal_pool_(8),
-      server_task_(&internal_pool_),
+      internal_pool_(CHECK_NOTNULL(internal_pool)),
+      server_task_(internal_pool_),
       consistent_store_(&election_,
                         new EtcdConsistentStore<LoggedCertificate>(
-                            event_base_.get(), &internal_pool_, etcd_client_,
+                            event_base_.get(), internal_pool_, etcd_client_,
                             &election_, options_.etcd_root, node_id_)),
       frontend_((log_signer && cert_checker)
                     ? new Frontend(new CertSubmissionHandler(cert_checker),
@@ -286,14 +286,14 @@ void Server<Logged>::WaitForReplication() const {
 
 template <class Logged>
 void Server<Logged>::Initialise(bool is_mirror) {
-  fetcher_.reset(ContinuousFetcher::New(event_base_.get(), &internal_pool_,
-                                        db_, !is_mirror)
+  fetcher_.reset(ContinuousFetcher::New(event_base_.get(), internal_pool_, db_,
+                                        !is_mirror)
                      .release());
 
   log_lookup_.reset(new LogLookup<LoggedCertificate>(db_));
 
   cluster_controller_.reset(new ClusterStateController<LoggedCertificate>(
-      &internal_pool_, event_base_, url_fetcher_, db_, &consistent_store_,
+      internal_pool_, event_base_, url_fetcher_, db_, &consistent_store_,
       &election_, fetcher_.get()));
 
   // Publish this node's hostname:port info

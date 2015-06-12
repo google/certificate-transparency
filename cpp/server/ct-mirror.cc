@@ -288,7 +288,8 @@ int main(int argc, char* argv[]) {
 
   const bool stand_alone_mode(FLAGS_etcd_host.empty());
   const shared_ptr<libevent::Base> event_base(make_shared<libevent::Base>());
-  UrlFetcher url_fetcher(event_base.get());
+  ThreadPool internal_pool(8);
+  UrlFetcher url_fetcher(event_base.get(), &internal_pool);
 
   const std::unique_ptr<EtcdClient> etcd_client(
       stand_alone_mode
@@ -301,8 +302,9 @@ int main(int argc, char* argv[]) {
   options.etcd_root = FLAGS_etcd_root;
   options.num_http_server_threads = FLAGS_num_http_server_threads;
 
-  Server<LoggedCertificate> server(options, event_base, db, etcd_client.get(),
-                                   &url_fetcher, nullptr, nullptr);
+  Server<LoggedCertificate> server(options, event_base, &internal_pool, db,
+                                   etcd_client.get(), &url_fetcher, nullptr,
+                                   nullptr);
   server.Initialise(true /* is_mirror */);
 
   if (stand_alone_mode) {

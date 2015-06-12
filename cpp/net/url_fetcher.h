@@ -18,6 +18,8 @@ namespace libevent {
 class Base;
 }
 
+class ThreadPool;
+
 
 class UrlFetcher {
  public:
@@ -52,7 +54,7 @@ class UrlFetcher {
     std::string body;
   };
 
-  UrlFetcher(libevent::Base* base);
+  UrlFetcher(libevent::Base* base, ThreadPool* thread_pool);
   virtual ~UrlFetcher();
 
   // If the status on the task is not OK, the response will be in an

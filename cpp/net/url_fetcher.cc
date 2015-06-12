@@ -7,6 +7,7 @@
 #include <htparse.h>
 
 #include "net/connection_pool.h"
+#include "util/thread_pool.h"
 
 using cert_trans::internal::ConnectionPool;
 using std::bind;
@@ -25,10 +26,14 @@ namespace cert_trans {
 
 
 struct UrlFetcher::Impl {
-  Impl(libevent::Base* base) : base_(CHECK_NOTNULL(base)), pool_(base_) {
+  Impl(libevent::Base* base, ThreadPool* thread_pool)
+      : base_(CHECK_NOTNULL(base)),
+        thread_pool_(CHECK_NOTNULL(thread_pool)),
+        pool_(base_) {
   }
 
   libevent::Base* const base_;
+  ThreadPool* const thread_pool_;
   internal::ConnectionPool pool_;
 };
 
@@ -56,18 +61,22 @@ htp_method VerbToCmdType(UrlFetcher::Verb verb) {
 
 
 struct State {
-  State(ConnectionPool* pool, const UrlFetcher::Request& request,
-        UrlFetcher::Response* response, Task* task);
+  State(libevent::Base* base, ConnectionPool* pool,
+        const UrlFetcher::Request& request, UrlFetcher::Response* response,
+        Task* task);
 
   ~State() {
     CHECK(!conn_) << "request state object still had a connection at cleanup?";
   }
 
+  void MakeRequest();
+
   // The following methods must only be called on the libevent
   // dispatch thread.
-  void MakeRequest();
+  void RunRequest();
   void RequestDone(evhtp_request_t* req);
 
+  libevent::Base* const base_;
   ConnectionPool* const pool_;
   const UrlFetcher::Request request_;
   UrlFetcher::Response* const response_;
@@ -95,9 +104,11 @@ UrlFetcher::Request NormaliseRequest(UrlFetcher::Request req) {
 }
 
 
-State::State(ConnectionPool* pool, const UrlFetcher::Request& request,
+State::State(libevent::Base* base, ConnectionPool* pool,
+             const UrlFetcher::Request& request,
              UrlFetcher::Response* response, Task* task)
-    : pool_(CHECK_NOTNULL(pool)),
+    : base_(CHECK_NOTNULL(base)),
+      pool_(CHECK_NOTNULL(pool)),
       request_(NormaliseRequest(request)),
       response_(CHECK_NOTNULL(response)),
       task_(CHECK_NOTNULL(task)) {
@@ -113,6 +124,13 @@ State::State(ConnectionPool* pool, const UrlFetcher::Request& request,
 
 
 void State::MakeRequest() {
+  CHECK(!libevent::Base::OnEventThread());
+  conn_ = pool_->Get(request_.url);
+  base_->Add(bind(&State::RunRequest, this));
+}
+
+
+void State::RunRequest() {
   CHECK(libevent::Base::OnEventThread());
   evhtp_request_t* const http_req(
       CHECK_NOTNULL(evhtp_request_new(&RequestCallback, this)));
@@ -129,7 +147,11 @@ void State::MakeRequest() {
                                               header.second.c_str(), 1, 1));
   }
 
-  conn_ = pool_->Get(request_.url);
+  if (!conn_->connection()) {
+    conn_.reset();
+    task_->Return(Status(util::error::UNAVAILABLE, "connection failed."));
+    return;
+  }
 
   const htp_method verb(VerbToCmdType(request_.verb));
   VLOG(1) << "evhtp_make_request(" << conn_.get()->connection() << ", "
@@ -171,7 +193,7 @@ struct evhtp_request_deleter {
 void State::RequestDone(evhtp_request_t* req) {
   CHECK(libevent::Base::OnEventThread());
   CHECK(conn_);
-  pool_->Put(move(conn_));
+  this->pool_->Put(move(conn_));
   unique_ptr<evhtp_request_t, evhtp_request_deleter> req_deleter(req);
 
   if (!req) {
@@ -189,8 +211,7 @@ void State::RequestDone(evhtp_request_t* req) {
   response_->status_code = req->status;
   if (response_->status_code < 100) {
     // There was a problem communicating with the remote host.
-    task_->Return(
-        Status(util::error::FAILED_PRECONDITION, "connection failed"));
+    task_->Return(Status(util::error::UNAVAILABLE, "connection failed"));
     return;
   }
 
@@ -218,8 +239,8 @@ UrlFetcher::UrlFetcher() {
 }
 
 
-UrlFetcher::UrlFetcher(libevent::Base* base)
-    : impl_(new Impl(CHECK_NOTNULL(base))) {
+UrlFetcher::UrlFetcher(libevent::Base* base, ThreadPool* thread_pool)
+    : impl_(new Impl(CHECK_NOTNULL(base), CHECK_NOTNULL(thread_pool))) {
 }
 
 
@@ -231,10 +252,14 @@ UrlFetcher::~UrlFetcher() {
 void UrlFetcher::Fetch(const Request& req, Response* resp, Task* task) {
   TaskHold hold(task);
 
-  State* const state(new State(&impl_->pool_, req, resp, task));
+  State* const state(new State(impl_->base_, &impl_->pool_, req, resp, task));
   task->DeleteWhenDone(state);
 
-  impl_->base_->Add(bind(&State::MakeRequest, state));
+  // Run State::MakeRequest() on the task's executor because it may
+  // block doing DNS resolution etc.
+  // TODO(alcutter): this can go back to being put straight on the event Base
+  // once evhtp supports creating SSL connections to a DNS name.
+  impl_->thread_pool_->Add(bind(&State::MakeRequest, state));
 }
 
 

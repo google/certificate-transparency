@@ -90,7 +90,9 @@ int ConnectionPool::Connection::SSLVerifyCallback(const int preverify_ok,
         error = "unknown error";
         break;
     }
-    conn->connection()->request->status = kSSLErrorStatus;
+    if (conn->connection()->request) {
+      conn->connection()->request->status = kSSLErrorStatus;
+    }
     LOG_EVERY_N(WARNING, 100)
         << "Failed to validate SSL certificate: " << error << " : "
         << DumpOpenSSLErrorStack();

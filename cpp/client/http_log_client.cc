@@ -19,6 +19,7 @@ using cert_trans::Cert;
 using cert_trans::CertChain;
 using cert_trans::HTTPLogClient;
 using cert_trans::PreCertChain;
+using cert_trans::ThreadPool;
 using ct::MerkleAuditProof;
 using ct::SignedCertificateTimestamp;
 using ct::SignedTreeHead;
@@ -43,7 +44,8 @@ void DoneRequest(AsyncLogClient::Status status, AsyncLogClient::Status* retval,
 
 HTTPLogClient::HTTPLogClient(const string& server)
     : base_(new libevent::Base()),
-      fetcher_(base_.get()),
+      pool_(),
+      fetcher_(base_.get(), &pool_),
       client_(base_.get(), &fetcher_, server) {
 }
 

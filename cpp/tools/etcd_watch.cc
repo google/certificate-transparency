@@ -6,10 +6,12 @@
 #include "util/etcd.h"
 #include "util/libevent_wrapper.h"
 #include "util/sync_task.h"
+#include "util/thread_pool.h"
 
 namespace libevent = cert_trans::libevent;
 
 using cert_trans::EtcdClient;
+using cert_trans::ThreadPool;
 using cert_trans::UrlFetcher;
 using std::cout;
 using std::endl;
@@ -38,7 +40,8 @@ int main(int argc, char* argv[]) {
   evthread_use_pthreads();
 
   libevent::Base event_base;
-  UrlFetcher fetcher(&event_base);
+  ThreadPool pool;
+  UrlFetcher fetcher(&event_base, &pool);
   EtcdClient etcd(&fetcher, FLAGS_etcd, FLAGS_etcd_port);
 
   SyncTask task(&event_base);

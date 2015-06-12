@@ -10,6 +10,7 @@
 #include "client/async_log_client.h"
 #include "proto/ct.pb.h"
 #include "util/libevent_wrapper.h"
+#include "util/thread_pool.h"
 
 namespace cert_trans {
 
@@ -41,6 +42,7 @@ class HTTPLogClient {
 
  private:
   const std::unique_ptr<libevent::Base> base_;
+  ThreadPool pool_;
   UrlFetcher fetcher_;
   AsyncLogClient client_;
 
