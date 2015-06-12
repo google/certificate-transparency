@@ -100,12 +100,4 @@ func main() {
 	processChains("/usr/home/ben/tmp/failed.json", f)
 	log.Printf("Wait for fixers")
 	f.Wait()
-	/*
-	s, _ := pem.Decode([]byte(cafbankPem))
-	cert, err := x509.ParseCertificate(s.Bytes)
-	if err != nil {
-		log.Fatalf("failed to parse certificate: %s", err)
-		return
-	}
-*/
 }
