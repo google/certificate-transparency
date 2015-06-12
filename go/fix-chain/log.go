@@ -115,6 +115,7 @@ func (s *Log) postServer() {
 		log.Printf("%d active posters", s.active)
 		s.postChain(c)
 		s.active--
+		log.Printf("%d active posters", s.active)
 		s.wg.Done()
 	}
 }

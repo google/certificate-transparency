@@ -57,7 +57,7 @@ CmmuVy5FyQkgingGlg2o06ZMN+XsJyD5+yGFHHFIpsYnK8+7Rd+z
 -----END CERTIFICATE-----
 `
 
-func processChains(file string, fixer *fix_chain.Fixer, l *fix_chain.Log) {
+func processChains(file string, fixer *fix_chain.Fixer) {
 	f, err := os.Open(file)
 	if err != nil {
 		log.Fatalf("Can't open %s: %s", err)
@@ -90,19 +90,16 @@ func processChains(file string, fixer *fix_chain.Fixer, l *fix_chain.Log) {
 		}
 		log.Printf("%d in chain", len(m.Chain))
 		c.Dump("input")
-		fixer.FixAll(&c, l)
+		fixer.FixAll(&c)
 	}
 }
 
 func main() {
 	//logurl := "https://ct.googleapis.com/aviator"
-	l := fix_chain.NewLog("https://ct.googleapis.com/rocketeer")
-	f := fix_chain.InitFixer()
-	processChains("/usr/home/ben/tmp/failed.json", f, l)
+	f := fix_chain.NewFixer("https://ct.googleapis.com/rocketeer")
+	processChains("/usr/home/ben/tmp/failed.json", f)
 	log.Printf("Wait for fixers")
 	f.Wait()
-	log.Printf("Wait for loggers")
-	l.Wait()
 	/*
 	s, _ := pem.Decode([]byte(cafbankPem))
 	cert, err := x509.ParseCertificate(s.Bytes)
