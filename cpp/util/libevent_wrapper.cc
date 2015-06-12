@@ -1,10 +1,13 @@
 #include "util/libevent_wrapper.h"
 
+#include <arpa/inet.h>
 #include <climits>
 #include <evhtp.h>
 #include <event2/thread.h>
 #include <glog/logging.h>
 #include <math.h>
+#include <netdb.h>
+#include <sys/socket.h>
 #include <signal.h>
 
 using std::bind;
@@ -21,6 +24,7 @@ using std::placeholders::_1;
 using std::recursive_mutex;
 using std::shared_ptr;
 using std::string;
+using std::unique_ptr;
 using std::vector;
 using util::TaskHold;
 
@@ -76,12 +80,71 @@ struct HttpServer::Handler {
 };
 
 
-Base::Base()
+class ResolverImpl : public Base::Resolver {
+ public:
+  string Resolve(const string& host) override {
+    struct addrinfo* info;
+    struct addrinfo hints;
+    memset(&hints, 0, sizeof(hints));
+    // It seems evhtp doesn't support IPv6 addresses because it uses
+    // inet_addr() to parse the passed in "stringified" address.
+    // Restrict to IPv4 addresses for now:
+    hints.ai_family = AF_INET;
+    hints.ai_socktype = SOCK_STREAM;
+    const int resolved(getaddrinfo(host.c_str(), AF_UNSPEC, &hints, &info));
+    if (resolved != 0) {
+      LOG(WARNING) << "Failed to resolve HTTPS hostname " << host << ": "
+                   << gai_strerror(resolved);
+      return nullptr;
+    }
+
+    struct addrinfo* res(info);
+    void* addr(nullptr);
+    while (res && !addr) {
+      switch (res->ai_family) {
+        case AF_INET:
+          addr =
+              &reinterpret_cast<struct sockaddr_in*>(res->ai_addr)->sin_addr;
+          break;
+        case AF_INET6:
+          // Just in case one day evhtp uses inet_pton()
+          addr =
+              &reinterpret_cast<struct sockaddr_in6*>(res->ai_addr)->sin6_addr;
+          break;
+        default:
+          res = res->ai_next;
+          break;
+      }
+    }
+
+    if (!addr) {
+      LOG(WARNING) << "Got no usable address for " << host;
+      return nullptr;
+    }
+
+    char addr_str[INET6_ADDRSTRLEN];
+    inet_ntop(res->ai_family, addr, addr_str, INET6_ADDRSTRLEN);
+    freeaddrinfo(info);
+    return string(addr_str);
+  }
+};
+
+
+Base::Base() : Base(unique_ptr<Resolver>(new ResolverImpl)) {
+}
+
+
+Base::Base(unique_ptr<Resolver>&& resolver)
     : base_(CHECK_NOTNULL(event_base_new()), event_base_free),
       dns_(nullptr, FreeEvDns),
       wake_closures_(event_new(base_.get(), -1, 0, &Base::RunClosures, this),
-                     &event_free) {
+                     &event_free),
+      resolver_(std::move(resolver)) {
   evthread_make_base_notifiable(base_.get());
+
+  // So much stuff breaks if there's not a Dns client around to keep the
+  // event loop doing stuff that we may as well just have one from the get go.
+  GetDns();
 }
 
 
@@ -206,6 +269,21 @@ evhtp_connection_t* Base::HttpConnectionNew(const string& host,
 }
 
 
+evhtp_connection_t* Base::HttpsConnectionNew(const string& host,
+                                             unsigned short port,
+                                             SSL_CTX* ssl_ctx) {
+  CHECK_NOTNULL(ssl_ctx);
+
+  // TODO(alcutter): remove this all temporary name resolution stuff when this
+  // PR is merged: https://github.com/ellzey/libevhtp/pull/163
+  const string addr_str(resolver_->Resolve(host));
+  VLOG(1) << "Got addr: " << addr_str << ":" << port;
+  evhtp_connection_t* ret(CHECK_NOTNULL(
+      evhtp_connection_ssl_new(base_.get(), addr_str.c_str(), port, ssl_ctx)));
+  return ret;
+}
+
+
 void Base::RunClosures(evutil_socket_t sock, short flag, void* userdata) {
   Base* self(static_cast<Base*>(CHECK_NOTNULL(userdata)));
 
@@ -296,9 +374,6 @@ EventPumpThread::~EventPumpThread() {
 
 
 void EventPumpThread::Pump() {
-  // Make sure there's at least the evdns listener, so that Dispatch()
-  // doesn't return immediately with nothing to do.
-  base_->GetDns();
   base_->Dispatch();
 }
 

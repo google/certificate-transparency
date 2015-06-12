@@ -155,25 +155,6 @@ void WatchdogTimeout(int sig) {
 }
 
 
-void locking_function(int mode, int n, const char* file, int line) {
-  static std::mutex* openssl_locks = new std::mutex[CRYPTO_num_locks()];
-  if (mode & CRYPTO_LOCK) {
-    openssl_locks[n].lock();
-  } else {
-    openssl_locks[n].unlock();
-  }
-}
-
-
-void threadid_function(CRYPTO_THREADID* id) {
-#ifdef PTHREAD_T_IS_POINTER
-  CRYPTO_THREADID_set_pointer(id, pthread_self());
-#else
-  CRYPTO_THREADID_set_numeric(id, pthread_self());
-#endif
-}
-
-
 template <class Logged>
 std::string GetNodeId(Database<Logged>* db) {
   std::string node_id;
@@ -195,11 +176,14 @@ std::string GetNodeId(Database<Logged>* db) {
 template <class Logged>
 void Server<Logged>::StaticInit() {
   // Set-up OpenSSL for multithreaded use:
-  CRYPTO_THREADID_set_callback(threadid_function);
-  CRYPTO_set_locking_callback(locking_function);
+  evhtp_ssl_use_threads();
 
   OpenSSL_add_all_algorithms();
+  ERR_load_BIO_strings();
   ERR_load_crypto_strings();
+  SSL_load_error_strings();
+  SSL_library_init();
+
   cert_trans::LoadCtExtensions();
   evthread_use_pthreads();
 

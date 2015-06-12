@@ -16,7 +16,7 @@ for i in $(seq ${ETCD_NUM_REPLICAS}); do
 done
 
 
-export MIRROR_TARGET_URL="http://ct.googleapis.com/pilot"
+export MIRROR_TARGET_URL="https://ct.googleapis.com/pilot"
 # Public key relative to the cloud/keys directory:
 export MIRROR_TARGET_PUBLIC_KEY=pilot.pem
 export MIRROR_NUM_REPLICAS=3
