@@ -8,6 +8,7 @@ import (
 	"github.com/google/certificate-transparency/go/x509"
 	"log"
 	"net/http"
+	"sync"
 )
 
 func DumpChainPEM(chain []*x509.Certificate) (string) {
@@ -24,6 +25,7 @@ type Log struct {
 	roots *x509.CertPool
 	poster chan []*x509.Certificate
 	active uint16
+	wg sync.WaitGroup
 }
 
 func NewLog(url string) (*Log) {
@@ -113,10 +115,12 @@ func (s *Log) postServer() {
 		log.Printf("%d active posters", s.active)
 		s.postChain(c)
 		s.active--
+		s.wg.Done()
 	}
 }
 
 func (s *Log) PostChain(chain []*x509.Certificate) {
+	s.wg.Add(1)
 	s.poster <- chain
 }
 
@@ -125,4 +129,8 @@ func (s *Log) PostChains(chains [][]*x509.Certificate) {
 		log.Printf("post %d", i)
 		s.PostChain(chain)
 	}
+}
+
+func (s *Log) Wait() {
+	s.wg.Wait()
 }

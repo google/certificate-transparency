@@ -99,6 +99,10 @@ func main() {
 	l := fix_chain.NewLog("https://ct.googleapis.com/rocketeer")
 	f := fix_chain.InitFixer()
 	processChains("/usr/home/ben/tmp/failed.json", f, l)
+	log.Printf("Wait for fixers")
+	f.Wait()
+	log.Printf("Wait for loggers")
+	l.Wait()
 	/*
 	s, _ := pem.Decode([]byte(cafbankPem))
 	cert, err := x509.ParseCertificate(s.Bytes)
