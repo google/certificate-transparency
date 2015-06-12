@@ -38,13 +38,6 @@ namespace internal {
 
 
 // static
-mutex ConnectionPool::Connection::ssl_mutex_;
-// static
-map<const SSL*, const ConnectionPool::Connection*>
-    ConnectionPool::Connection::connections_by_ssl_;
-
-
-// static
 int ConnectionPool::Connection::SSLVerifyCallback(const int preverify_ok,
                                                   X509_STORE_CTX* x509_ctx) {
   CHECK_NOTNULL(x509_ctx);
@@ -70,14 +63,9 @@ int ConnectionPool::Connection::SSLVerifyCallback(const int preverify_ok,
   const SSL* const ssl(static_cast<SSL*>(CHECK_NOTNULL(
       X509_STORE_CTX_get_ex_data(x509_ctx,
                                  SSL_get_ex_data_X509_STORE_CTX_idx()))));
-  const ConnectionPool::Connection* conn;
-  {
-    lock_guard<mutex> lock(ssl_mutex_);
-    auto it(connections_by_ssl_.find(ssl));
-    CHECK(it != connections_by_ssl_.end());
-    conn = it->second;
-  }
-  CHECK_NOTNULL(conn);
+  const ConnectionPool::Connection* const conn(
+      CHECK_NOTNULL(static_cast<const ConnectionPool::Connection*>(
+          SSL_get_ex_data(ssl, GetSSLConnectionIndex()))));
 
   const HostnameValidationResult hostname_valid(
       validate_hostname(conn->other_end().first.c_str(), server_cert));
@@ -113,29 +101,21 @@ int ConnectionPool::Connection::SSLVerifyCallback(const int preverify_ok,
 }
 
 
-ConnectionPool::Connection::Connection(evhtp_connection_t* conn,
-                                       HostPortPair&& other_end)
-    : conn_(CHECK_NOTNULL(conn)),
-      other_end_(move(other_end)),
-      ssl_(conn_->ssl) {
-  if (ssl_) {
-    {
-      lock_guard<mutex> lock(ssl_mutex_);
-      CHECK(connections_by_ssl_.insert(make_pair(ssl_, this)).second);
-    }
-    SSL_set_tlsext_host_name(ssl_, other_end_.first.c_str());
-  }
+// static
+int ConnectionPool::Connection::GetSSLConnectionIndex() {
+  static const int ssl_connection_index(
+      SSL_get_ex_new_index(0, nullptr, nullptr, nullptr, nullptr));
+  return ssl_connection_index;
 }
 
 
-ConnectionPool::Connection::~Connection() {
-  // ssl_ is likely pointing to freed memory at this point, so while we use the
-  // value of the pointer itself here as a key don't try to dereference it!
-  if (ssl_) {
-    {
-      lock_guard<mutex> lock(ssl_mutex_);
-      CHECK_EQ(1, connections_by_ssl_.erase(ssl_));
-    }
+ConnectionPool::Connection::Connection(evhtp_connection_t* conn,
+                                       HostPortPair&& other_end)
+    : conn_(CHECK_NOTNULL(conn)), other_end_(move(other_end)) {
+  if (conn_->ssl) {
+    SSL_set_ex_data(conn_->ssl, GetSSLConnectionIndex(),
+                    static_cast<void*>(this));
+    SSL_set_tlsext_host_name(conn_->ssl, other_end_.first.c_str());
   }
 }
 
