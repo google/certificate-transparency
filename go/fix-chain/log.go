@@ -23,11 +23,12 @@ type Log struct {
 	url string
 	roots *x509.CertPool
 	poster chan []*x509.Certificate
+	active uint16
 }
 
 func NewLog(url string) (*Log) {
 	s := &Log{ url: url, poster: make(chan []*x509.Certificate) }
-	for i := 0 ; i < 10 ; i++ {
+	for i := 0 ; i < 100 ; i++ {
 		go s.postServer()
 	}
 	return s
@@ -87,7 +88,7 @@ func (s *Log) postChain(chain []*x509.Certificate) {
 	if err != nil {
 		log.Fatalf("Can't marshal: %s", err)
 	}
-	log.Printf("post: %s", j)
+	//log.Printf("post: %s", j)
 	resp, err := http.Post(s.url + "/ct/v1/add-chain", "application/json", bytes.NewReader(j))
 	if err != nil {
 		log.Fatalf("Can't post: %s", err)
@@ -102,13 +103,16 @@ func (s *Log) postChain(chain []*x509.Certificate) {
 	if err != nil {
 		log.Fatalf("Can't read response: %s", err)
 	}
-	log.Printf("Log returned: %s", jo)
+	//log.Printf("Log returned: %s", jo)
 }
 
 func (s *Log) postServer() {
 	for {
 		c := <-s.poster
+		s.active++
+		log.Printf("%d active posters", s.active)
 		s.postChain(c)
+		s.active--
 	}
 }
 
