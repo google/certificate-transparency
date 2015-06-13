@@ -142,7 +142,7 @@ type Fixer struct {
 }
 
 func (f *Fixer) fixChain(cert *x509.Certificate, d *DedupedChain, intermediates *x509.CertPool, l *Log) {
-	opts := x509.VerifyOptions{ Intermediates: intermediates, Roots: l.Roots() }
+	opts := x509.VerifyOptions{ Intermediates: intermediates, Roots: l.Roots(), DisableTimeChecks: true }
 	chain, err := cert.Verify(opts)
 	if err == nil {
 		dumpChains("verified", chain)

@@ -20,16 +20,21 @@ func DumpChainPEM(chain []*x509.Certificate) (string) {
 	return p
 }
 
+type toLog struct {
+	chain []*x509.Certificate
+	retries uint16
+}
+
 type Log struct {
 	url string
 	roots *x509.CertPool
-	poster chan []*x509.Certificate
+	poster chan *toLog
 	active uint16
 	wg sync.WaitGroup
 }
 
 func NewLog(url string) (*Log) {
-	s := &Log{ url: url, poster: make(chan []*x509.Certificate) }
+	s := &Log{ url: url, poster: make(chan *toLog) }
 	for i := 0 ; i < 100 ; i++ {
 		go s.postServer()
 	}
@@ -78,12 +83,12 @@ func (s *Log) getRoots() (*x509.CertPool) {
 	return ret
 }
 
-func (s *Log) postChain(chain []*x509.Certificate) {
+func (s *Log) postChain(l *toLog) {
 	type Chain struct {
 		Chain [][]byte `json:"chain"`
 	}
 	var m Chain
-	for _, c := range chain {
+	for _, c := range l.chain {
 		m.Chain = append(m.Chain, c.Raw)
 	}
 	j, err := json.Marshal(m)
@@ -97,9 +102,17 @@ func (s *Log) postChain(chain []*x509.Certificate) {
 	}
 	defer resp.Body.Close()
 	jo, err := ioutil.ReadAll(resp.Body)
+	if resp.StatusCode == 502 {
+		log.Printf("Retry 502: %d", l.retries)
+		if l.retries == 0 {
+			return
+		}
+		l.retries--
+		s.postToLog(l)
+		return
+	}
 	if resp.StatusCode != 200 {
-		// FIXME: retry 500s.
-		log.Printf("Can't handle response %d: %s\nchain: %s", resp.StatusCode, jo, DumpChainPEM(chain))
+		log.Printf("Can't handle response %d: %s\nchain: %s", resp.StatusCode, jo, DumpChainPEM(l.chain))
 		return
 	}
 	if err != nil {
@@ -120,9 +133,14 @@ func (s *Log) postServer() {
 	}
 }
 
-func (s *Log) PostChain(chain []*x509.Certificate) {
+func (s *Log) postToLog(l *toLog) {
 	s.wg.Add(1)
-	s.poster <- chain
+	s.poster <- l
+}	
+
+func (s *Log) PostChain(chain []*x509.Certificate) {
+	l := &toLog{ chain: chain, retries: 5 }
+	s.postToLog(l)
 }
 
 func (s *Log) PostChains(chains [][]*x509.Certificate) {

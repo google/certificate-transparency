@@ -130,6 +130,7 @@ type VerifyOptions struct {
 	Intermediates *CertPool
 	Roots         *CertPool // if nil, the system roots are used
 	CurrentTime   time.Time // if zero, the current time is used
+	DisableTimeChecks bool
 	// KeyUsage specifies which Extended Key Usage values are acceptable.
 	// An empty list means ExtKeyUsageServerAuth. Key usage is considered a
 	// constraint down the chain which mirrors Windows CryptoAPI behaviour,
@@ -145,14 +146,16 @@ const (
 
 // isValid performs validity checks on the c.
 func (c *Certificate) isValid(certType int, currentChain []*Certificate, opts *VerifyOptions) error {
-	now := opts.CurrentTime
-	if now.IsZero() {
-		now = time.Now()
+	if !opts.DisableTimeChecks {
+		now := opts.CurrentTime
+		if now.IsZero() {
+			now = time.Now()
+		}
+		if now.Before(c.NotBefore) || now.After(c.NotAfter) {
+			return CertificateInvalidError{c, Expired}
+		}
 	}
-	if now.Before(c.NotBefore) || now.After(c.NotAfter) {
-		return CertificateInvalidError{c, Expired}
-	}
-
+	
 	if len(c.PermittedDNSDomains) > 0 {
 		ok := false
 		for _, domain := range c.PermittedDNSDomains {
