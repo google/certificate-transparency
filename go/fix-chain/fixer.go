@@ -166,32 +166,34 @@ func (f *Fixer) FixAll(d *DedupedChain) {
 }
 
 func (f *Fixer) deferFixChain(cert *x509.Certificate, chain *DedupedChain, opts *x509.VerifyOptions) {
-	f.wg.Add(1)
 	f.fix <- &Fix{ cert: cert, chain: chain, opts: opts }
 }
 
 func (f *Fixer) fixServer() {
-	for {
-		fix := <-f.fix
+	defer f.wg.Done()
+
+	for fix := range f.fix {
 		f.active++
 		log.Printf("%d active fixers", f.active)
 		fixChain(fix, f.log)
 		f.active--
 		log.Printf("%d active fixers", f.active)
-		f.wg.Done()
 	}
 }
 
 func (f *Fixer) Wait() {
+	close(f.fix)
+	
 	// Must wait for fixers first, in case they log something.
 	f.wg.Wait()
 	f.log.Wait()
 }
 
-func NewFixer(logurl string) (f *Fixer) {
-	f = &Fixer { fix: make(chan *Fix), log: NewLog(logurl) }
+func NewFixer(logurl string) *Fixer {
+	f := &Fixer{fix: make(chan *Fix), log: NewLog(logurl)}
 	for i := 0 ; i < 100 ; i++ {
+		f.wg.Add(1)
 		go f.fixServer()
 	}
-	return
+	return f
 }
