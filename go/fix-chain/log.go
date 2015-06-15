@@ -11,7 +11,7 @@ import (
 	"sync"
 )
 
-func DumpChainPEM(chain []*x509.Certificate) (string) {
+func DumpChainPEM(chain []*x509.Certificate) string {
 	var p string
 	for _, cert := range chain {
 		b := pem.Block { Type: "CERTIFICATE", Bytes: cert.Raw }
@@ -33,7 +33,7 @@ type Log struct {
 	wg sync.WaitGroup
 }
 
-func NewLog(url string) (*Log) {
+func NewLog(url string) *Log {
 	s := &Log{ url: url, poster: make(chan *toLog) }
 	for i := 0 ; i < 100 ; i++ {
 		go s.postServer()
@@ -41,14 +41,14 @@ func NewLog(url string) (*Log) {
 	return s
 }
 
-func (s *Log) Roots() (*x509.CertPool) {
+func (s *Log) Roots() *x509.CertPool {
 	if s.roots == nil {
 		s.roots = s.getRoots()
 	}
 	return s.roots
 }
 
-func (s *Log) getRoots() (*x509.CertPool) {
+func (s *Log) getRoots() *x509.CertPool {
 	rootsjson, err := http.Get(s.url + "/ct/v1/get-roots")
 	if err != nil {
 		log.Fatalf("can't get roots from %s: %s", s.url, err)
