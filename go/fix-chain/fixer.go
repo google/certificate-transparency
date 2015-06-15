@@ -165,7 +165,6 @@ func (f *Fixer) FixAll(d *DedupedChain) {
 	}
 }
 
-// FIXME: make |log| a property of Fixer.
 func (f *Fixer) deferFixChain(cert *x509.Certificate, chain *DedupedChain, opts *x509.VerifyOptions) {
 	f.wg.Add(1)
 	f.fix <- &Fix{ cert: cert, chain: chain, opts: opts }
