@@ -48,29 +48,27 @@ func knownBad(name string) bool {
 
 var urlCache = make(map[string][]byte)
 
-func GetURL(url string) (r []byte, err error) {
+func getURL(url string) ([]byte, error) {
 	r, ok := urlCache[url]
 	if ok {
 		log.Printf("HIT! %s", url)
-	} else {
-		c, err0 := http.Get(url)
-		// FIXME: cache errors
-		if err0 != nil {
-			err = err0
-			return
-		}
-		defer c.Body.Close()
-		if c.StatusCode != 200 {
-			err = errors.New(fmt.Sprintf("can't deal with status %d", c.StatusCode))
-			return
-		}
-		r, err = ioutil.ReadAll(c.Body)
-		if err != nil {
-			return
-		}
-		urlCache[url] = r
+		return r, nil
 	}
-	return
+	c, err := http.Get(url)
+	// FIXME: cache errors
+	if err != nil {
+		return nil, err
+	}
+	defer c.Body.Close()
+	if c.StatusCode != 200 {
+		return nil, errors.New(fmt.Sprintf("can't deal with status %d", c.StatusCode))
+	}
+	r, err = ioutil.ReadAll(c.Body)
+	if err != nil {
+		return nil, err
+	}
+	urlCache[url] = r
+	return r, nil
 }
 
 type DedupedChain struct {
@@ -104,7 +102,7 @@ func fixChain(fix *Fix, l *Log) {
 		urls := c.IssuingCertificateURL
 		for i, url := range urls {
 			log.Printf("fetch issuer %d from %s", i, url)
-			body, err := GetURL(url)
+			body, err := getURL(url)
 			if err != nil {
 				log.Printf("can't get URL body from %s: %s", url, err)
 				continue
