@@ -98,7 +98,7 @@ sqlite3* SQLiteOpen(const std::string& dbfile) {
 template <class Logged>
 class SQLiteDB<Logged>::Iterator : public Database<Logged>::Iterator {
  public:
-  Iterator(SQLiteDB<Logged>* db, int64_t start_index)
+  Iterator(const SQLiteDB<Logged>* db, int64_t start_index)
       : db_(CHECK_NOTNULL(db)), next_index_(start_index) {
     CHECK_GE(next_index_, 0);
   }
@@ -122,7 +122,7 @@ class SQLiteDB<Logged>::Iterator : public Database<Logged>::Iterator {
   }
 
  private:
-  SQLiteDB<Logged>* const db_;
+  const SQLiteDB<Logged>* const db_;
   int64_t next_index_;
 };
 
@@ -346,7 +346,7 @@ typename Database<Logged>::LookupResult SQLiteDB<Logged>::LookupNextIndex(
 
 template <class Logged>
 std::unique_ptr<typename Database<Logged>::Iterator>
-SQLiteDB<Logged>::ScanEntries(int64_t start_index) {
+SQLiteDB<Logged>::ScanEntries(int64_t start_index) const {
   return std::unique_ptr<Iterator>(new Iterator(this, start_index));
 }
 

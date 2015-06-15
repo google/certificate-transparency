@@ -29,7 +29,7 @@ class SQLiteDB : public Database<Logged> {
                              Logged* result) const override;
 
   std::unique_ptr<typename Database<Logged>::Iterator> ScanEntries(
-      int64_t start_index) override;
+      int64_t start_index) const override;
 
   WriteResult WriteTreeHead_(const ct::SignedTreeHead& sth) override;
 

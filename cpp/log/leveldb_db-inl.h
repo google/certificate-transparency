@@ -83,7 +83,7 @@ int64_t KeyToIndex(leveldb::Slice key) {
 template <class Logged>
 class LevelDB<Logged>::Iterator : public Database<Logged>::Iterator {
  public:
-  Iterator(LevelDB<Logged>* db, int64_t start_index)
+  Iterator(const LevelDB<Logged>* db, int64_t start_index)
       : it_(CHECK_NOTNULL(db)->db_->NewIterator(leveldb::ReadOptions())) {
     CHECK(it_);
     it_->Seek(IndexToKey(start_index));
@@ -243,7 +243,7 @@ typename Database<Logged>::LookupResult LevelDB<Logged>::LookupByIndex(
 
 template <class Logged>
 std::unique_ptr<typename Database<Logged>::Iterator>
-LevelDB<Logged>::ScanEntries(int64_t start_index) {
+LevelDB<Logged>::ScanEntries(int64_t start_index) const {
   return std::unique_ptr<Iterator>(new Iterator(this, start_index));
 }
 

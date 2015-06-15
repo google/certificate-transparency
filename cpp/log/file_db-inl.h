@@ -50,7 +50,7 @@ const size_t FileDB<Logged>::kTimestampBytesIndexed = 6;
 template <class Logged>
 class FileDB<Logged>::Iterator : public Database<Logged>::Iterator {
  public:
-  Iterator(FileDB<Logged>* db, int64_t start_index)
+  Iterator(const FileDB<Logged>* db, int64_t start_index)
       : db_(CHECK_NOTNULL(db)), next_index_(start_index) {
     CHECK_GE(next_index_, 0);
   }
@@ -77,7 +77,7 @@ class FileDB<Logged>::Iterator : public Database<Logged>::Iterator {
   }
 
  private:
-  FileDB<Logged>* const db_;
+  const FileDB<Logged>* const db_;
   int64_t next_index_;
 };
 
@@ -191,7 +191,7 @@ typename Database<Logged>::LookupResult FileDB<Logged>::LookupByIndex(
 
 template <class Logged>
 std::unique_ptr<typename Database<Logged>::Iterator>
-FileDB<Logged>::ScanEntries(int64_t start_index) {
+FileDB<Logged>::ScanEntries(int64_t start_index) const {
   return std::unique_ptr<Iterator>(new Iterator(this, start_index));
 }
 
