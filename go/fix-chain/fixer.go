@@ -138,7 +138,7 @@ func fixChain(fix *Fix, l *Log) {
 
 type Fixer struct {
 	fix chan *Fix
-	active uint16
+	active int
 	wg sync.WaitGroup
 	log *Log
 }
