@@ -59,6 +59,7 @@
 /cpp/monitoring/prometheus/counter_test
 /cpp/monitoring/prometheus/gauge_test
 /cpp/monitoring/registry_test
+/cpp/net/url_fetcher_test
 /cpp/proto/serializer_test
 /cpp/server/blob-server
 /cpp/server/ct-dns-server
