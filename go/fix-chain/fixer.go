@@ -13,11 +13,11 @@ import (
 	"sync"
 )
 
-func Hash(s *x509.Certificate) ([sha256.Size]byte) {
+func Hash(s *x509.Certificate) [sha256.Size]byte {
 	return sha256.Sum256(s.Raw)
 }
 
-func HexHash(s *x509.Certificate) (string) {
+func HexHash(s *x509.Certificate) string {
 	h := Hash(s)
 	return hex.EncodeToString(h[:])
 }
@@ -35,8 +35,15 @@ func dumpChains(name string, chains [][]*x509.Certificate) {
 	}
 }
 
-func knownBad(name string) (bool) {
-	return name == "http://gca.nat.gov.tw/repository/Certs/IssuedToThisCA.p7b" || name == "http://grca.nat.gov.tw/repository/Certs/IssuedToThisCA.p7b" || name == "http://crt.trust-provider.com/AddTrustExternalCARoot.p7c" || name == "http://crt.usertrust.com/AddTrustExternalCARoot.p7c"
+var knownBadCerts = map[string]bool {
+	"http://gca.nat.gov.tw/repository/Certs/IssuedToThisCA.p7b":  true,
+	"http://grca.nat.gov.tw/repository/Certs/IssuedToThisCA.p7b": true,
+	"http://crt.trust-provider.com/AddTrustExternalCARoot.p7c":   true,
+	"http://crt.usertrust.com/AddTrustExternalCARoot.p7c":        true,
+}
+
+func knownBad(name string) bool {
+	return knownBadCerts[name]
 }
 
 var URLCache map[string][]byte
