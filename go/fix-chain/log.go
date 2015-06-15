@@ -28,13 +28,13 @@ type toLog struct {
 type Log struct {
 	url string
 	roots *x509.CertPool
-	poster chan *toLog
+	posts chan *toLog
 	active uint16
-	wg sync.WaitGroup
+	wg sync.WaitGroup  // Note that this counts the number of active requests, not active servers, because we can't close it to signal the end, because of retries.
 }
 
 func NewLog(url string) *Log {
-	s := &Log{ url: url, poster: make(chan *toLog) }
+	s := &Log{url: url, posts: make(chan *toLog)}
 	for i := 0 ; i < 100 ; i++ {
 		go s.postServer()
 	}
@@ -123,19 +123,19 @@ func (s *Log) postChain(l *toLog) {
 
 func (s *Log) postServer() {
 	for {
-		c := <-s.poster
+		c := <-s.posts
 		s.active++
-		log.Printf("%d active posters", s.active)
+		log.Printf("%d active posts", s.active)
 		s.postChain(c)
 		s.active--
-		log.Printf("%d active posters", s.active)
+		log.Printf("%d active posts", s.active)
 		s.wg.Done()
 	}
 }
 
 func (s *Log) postToLog(l *toLog) {
 	s.wg.Add(1)
-	s.poster <- l
+	s.posts <- l
 }	
 
 func (s *Log) PostChain(chain []*x509.Certificate) {
