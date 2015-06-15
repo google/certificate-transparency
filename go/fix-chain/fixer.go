@@ -46,13 +46,10 @@ func knownBad(name string) bool {
 	return knownBadCerts[name]
 }
 
-var URLCache map[string][]byte
+var urlCache = make(map[string][]byte)
 
 func GetURL(url string) (r []byte, err error) {
-	if URLCache == nil {
-		URLCache = make(map[string][]byte)
-	}
-	r, ok := URLCache[url]
+	r, ok := urlCache[url]
 	if ok {
 		log.Printf("HIT! %s", url)
 	} else {
@@ -71,7 +68,7 @@ func GetURL(url string) (r []byte, err error) {
 		if err != nil {
 			return
 		}
-		URLCache[url] = r
+		urlCache[url] = r
 	}
 	return
 }
