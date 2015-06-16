@@ -494,11 +494,11 @@ void HttpHandler::AddPreChain(evhttp_request* req) {
 void HttpHandler::BlockingGetEntries(evhttp_request* req, int64_t start,
                                      int64_t end, bool include_scts) const {
   JsonArray json_entries;
+  auto it(db_->ScanEntries(start));
   for (int64_t i = start; i <= end; ++i) {
     LoggedCertificate cert;
 
-    if (db_->LookupByIndex(i, &cert) !=
-        ReadOnlyDatabase<LoggedCertificate>::LOOKUP_OK) {
+    if (!it->GetNextEntry(&cert) || cert.sequence_number() != i) {
       break;
     }
 
