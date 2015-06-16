@@ -53,7 +53,7 @@ class FileDB : public Database<Logged> {
       int64_t sequence_number, Logged* result) const override;
 
   std::unique_ptr<typename Database<Logged>::Iterator> ScanEntries(
-      int64_t start_index) override;
+      int64_t start_index) const override;
 
   typename Database<Logged>::WriteResult WriteTreeHead_(
       const ct::SignedTreeHead& sth) override;

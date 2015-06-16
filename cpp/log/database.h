@@ -96,7 +96,7 @@ class ReadOnlyDatabase {
   virtual LookupResult LatestTreeHead(ct::SignedTreeHead* result) const = 0;
 
   // Scan the entries, starting with the given index.
-  virtual std::unique_ptr<Iterator> ScanEntries(int64_t start_index) = 0;
+  virtual std::unique_ptr<Iterator> ScanEntries(int64_t start_index) const = 0;
 
   // Return the number of entries of contiguous entries (what could be
   // put in a signed tree head). This can be greater than the tree
