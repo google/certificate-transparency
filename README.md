@@ -31,7 +31,7 @@ Some systems make the googlemock source available as a package; on
 Debian, this is in the google-mock package, which puts it in
 `/usr/src/gmock`. Our `Makefile` looks in that location by default,
 but if your googlemock sources are in a different location, set the
-`GMOCKDIR` environment variable to point at them.
+`GMOCK_DIR` environment variable to point at them.
 
 If you are on FreeBSD, you may need to apply the patch in gtest.patch
 to the gtest subdirectory of gmock.
