@@ -2,6 +2,8 @@
 #define CERT_TRANS_MONITORING_METRIC_H_
 
 #include <ostream>
+#include <map>
+#include <set>
 #include <string>
 #include <vector>
 
@@ -22,18 +24,17 @@ struct NameType {
 // Base class for all metric types
 class Metric {
  public:
-  virtual void Export(std::ostream* os) const = 0;
+  typedef std::pair<std::chrono::time_point<std::chrono::system_clock>, double>
+      TimestampedValue;
 
-  virtual void ExportText(std::ostream* os) const = 0;
+  enum Type {
+    COUNTER,
+    GAUGE,
+  };
 
- protected:
-  Metric(const std::string& name, const std::vector<std::string>& label_names,
-         const std::string& help)
-      : name_(name), label_names_(label_names), help_(help) {
-    Registry::Instance()->AddMetric(this);
+  Type Type() const {
+    return type_;
   }
-
-  virtual ~Metric() = default;
 
   // Returns the name of this metric
   const std::string& Name() const {
@@ -60,7 +61,22 @@ class Metric {
     return name_ < rhs.name_;
   }
 
+  // TODO(alcutter): Not over the moon about having this here, but it'll do for
+  // now.
+  virtual std::map<std::vector<std::string>, TimestampedValue> CurrentValues()
+      const = 0;
+
+ protected:
+  Metric(enum Type type, const std::string& name,
+         const std::vector<std::string>& label_names, const std::string& help)
+      : type_(type), name_(name), label_names_(label_names), help_(help) {
+    Registry::Instance()->AddMetric(this);
+  }
+
+  virtual ~Metric() = default;
+
  private:
+  const enum Type type_;
   const std::string name_;
   const std::vector<std::string> label_names_;
   const std::string help_;

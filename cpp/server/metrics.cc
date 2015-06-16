@@ -5,9 +5,8 @@
 #include <event2/http.h>
 #include <sstream>
 
-#include "monitoring/registry.h"
+#include "monitoring/prometheus/exporter.h"
 
-using cert_trans::Registry;
 using std::ostringstream;
 using std::strncmp;
 
@@ -37,11 +36,11 @@ void ExportPrometheusMetrics(evhttp_request* req) {
                    kPrometheusProtoContentTypeLen) == 0) {
     evhttp_add_header(evhttp_request_get_output_headers(req), "Content-Type",
                       kPrometheusProtoContentType);
-    Registry::Instance()->Export(&oss);
+    ExportMetricsToPrometheus(&oss);
   } else {
     evhttp_add_header(evhttp_request_get_output_headers(req), "Content-Type",
                       "text/html");
-    Registry::Instance()->ExportHTML(&oss);
+    ExportMetricsToHtml(&oss);
   }
 
   evbuffer_add(evhttp_request_get_output_buffer(req), oss.str().data(),
