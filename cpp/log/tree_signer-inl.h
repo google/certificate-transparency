@@ -236,11 +236,11 @@ typename TreeSigner<Logged>::UpdateResult TreeSigner<Logged>::UpdateTree() {
   // That'll get handled by the Serving STH selection code.
   uint64_t min_timestamp = LastUpdateTime() + 1;
 
-  // Sequence any new sequenced entries from our local DB.
+  // Add any newly sequenced entries from our local DB.
   auto it(db_->ScanEntries(cert_tree_->LeafCount()));
   for (int64_t i(cert_tree_->LeafCount());; ++i) {
     Logged logged;
-    if (!it->GetNextEntry(&logged)) {
+    if (!it->GetNextEntry(&logged) || logged.sequence_number() != i) {
       break;
     }
     CHECK_EQ(logged.sequence_number(), i);

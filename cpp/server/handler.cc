@@ -498,7 +498,7 @@ void HttpHandler::BlockingGetEntries(evhttp_request* req, int64_t start,
   for (int64_t i = start; i <= end; ++i) {
     LoggedCertificate cert;
 
-    if (!it->GetNextEntry(&cert)) {
+    if (!it->GetNextEntry(&cert) || cert.sequence_number() != i) {
       break;
     }
 
