@@ -23,13 +23,8 @@ class Registry {
   // This method is only for use in testing.
   void ResetForTestingOnly();
 
-  // Exports the registered metrics onto |ostream|.
-  // This is used to e.g. export metrics onto an HTTP endpoint for ingestion by
-  // external monitoring programs.
-  void Export(std::ostream* ostream) const;
-
-  // Exports the registered metrics, formatted into HTML, onto |ostream|.
-  void ExportHTML(std::ostream* ostream) const;
+  // Returns the set of currently known metrics.
+  std::set<const Metric*> GetMetrics() const;
 
  private:
   Registry() = default;
