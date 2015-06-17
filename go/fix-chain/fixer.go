@@ -117,10 +117,10 @@ func fixChain(fix *Fix, l *Log) {
 			}
 			if err != nil {
 				if knownBad(url) {
-					log.Printf("(ignored) failed to parse certificate: %s", err)
+					log.Printf("(ignored) failed to parse certificate from %s: %s", url, err)
 					continue
 				} else {
-					log.Fatalf("failed to parse certificate: %s", err)
+					log.Fatalf("failed to parse certificate from %s: %s", url, err)
 				}
 			}
 			//log.Printf("%+v", icert)

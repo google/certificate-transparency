@@ -14,6 +14,8 @@ func processChains(file string, fixer *fix_chain.Fixer) {
 	if err != nil {
 		log.Fatalf("Can't open %s: %s", err)
 	}
+	defer f.Close()
+	
 	type Chain struct {
 		Chain [][]byte
 	}
@@ -29,16 +31,16 @@ func processChains(file string, fixer *fix_chain.Fixer) {
 		//log.Printf("%#v\n", m.Chain)
 		//c := x509.NewCertPool()
 		var c fix_chain.DedupedChain
-		for i := 0 ; i < len(m.Chain) ; i++ {
-			r, err := x509.ParseCertificate(m.Chain[i])
+		for _, derBytes := range m.Chain {
+			cert, err := x509.ParseCertificate(derBytes)
 			switch err.(type) {
 			case nil:
 			case x509.NonFatalErrors:
 			default:
-				log.Fatalf("can't parse certificate: %s %#v", err, m.Chain[i])
+				log.Fatalf("can't parse certificate: %s %#v", err, derBytes)
 			}
-			c.AddCert(r)
-			//log.Printf("Chain %d: %s", i, r.Subject.CommonName)
+
+			c.AddCert(cert)
 		}
 		log.Printf("%d in chain", len(m.Chain))
 		c.Dump("input")
@@ -47,8 +49,8 @@ func processChains(file string, fixer *fix_chain.Fixer) {
 }
 
 func main() {
-	//logurl := "https://ct.googleapis.com/rocketeer"
-	logurl := "https://ct.googleapis.com/aviator"
+	logurl := "https://ct.googleapis.com/rocketeer"
+	//logurl := "https://ct.googleapis.com/aviator"
 	f := fix_chain.NewFixer(logurl)
 	processChains("/usr/home/ben/tmp/failed.json", f)
 	log.Printf("Wait for fixers")

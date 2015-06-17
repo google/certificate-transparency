@@ -98,7 +98,15 @@ func (s *Log) postChain(l *toLog) {
 	//log.Printf("post: %s", j)
 	resp, err := http.Post(s.url + "/ct/v1/add-chain", "application/json", bytes.NewReader(j))
 	if err != nil {
-		log.Fatalf("Can't post: %s", err)
+		// FIXME: can we figure out what the error was? So far
+		// I've only ever seen EOF, but its just text...
+		if l.retries == 0 {
+			log.Fatalf("Can't post: %s", err)
+		}
+		log.Printf("Can't post: %s", err)
+		l.retries--
+		s.postToLog(l)
+		return
 	}
 	defer resp.Body.Close()
 	jo, err := ioutil.ReadAll(resp.Body)
