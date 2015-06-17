@@ -1,59 +1,54 @@
-version: v1beta2
-containers:
-  - name: registry
-    image: google/docker-registry
-    ports:
-      - name: registry
-        containerPort: 5000
-        hostPort: 5000
-    env:
-      - name: GCS_BUCKET
-        value: @@GCS_BUCKET@@
-  - name: super-duper
-    image: localhost:5000/certificate_transparency/super_duper:test
-    ports:
-      - name: super-duper
-        containerPort: 80
-        hostPort: 80
-    env:
-      - name: ETCD_HOST
-        value: @@ETCD_HOST@@
-      - name: ETCD_PORT
-        value: @@ETCD_PORT@@
-      - name: CONTAINER_HOST
-        value: @@CONTAINER_HOST@@
-    volumeMounts:
-      - name: log-data
-        mountPath: /mnt/ctlog
-  - name: cadvisor-monitor
-    image: google/cadvisor:latest
-    ports:
-      - name: cadvisor-monitor
-        containerPort: 8080
-        hostPort: 8080
-    volumeMounts:
-      - name: var-run
-        mountPath: /var/run
-      - name: sys
-        mountPath: /sys
-        readOnly: true
-      - name: var-lib-docker
-        mountPath: /var/lib/docker
-        readOnly: true
-volumes:
-  - name: log-data
-    source:
+version: v1
+kind: Pod
+spec:
+  containers:
+    - name: super-duper
+      image: gcr.io/@@PROJECT@@/super_duper:test
+      imagePullPolicy: Always
+      ports:
+        - name: super-duper
+          containerPort: 80
+          hostPort: 80
+          protocol: TCP
+      env:
+        - name: ETCD_HOST
+          value: "@@ETCD_HOST@@"
+        - name: ETCD_PORT
+          value: "@@ETCD_PORT@@"
+        - name: CONTAINER_HOST
+          value: "@@CONTAINER_HOST@@"
+      volumeMounts:
+        - name: log-data
+          mountPath: /mnt/ctlog
+    - name: cadvisor-monitor
+      image: google/cadvisor:latest
+      imagePullPolicy: Always
+      ports:
+        - name: cadvisor-monitor
+          containerPort: 8080
+          hostPort: 8080
+          protocol: TCP
+      volumeMounts:
+        - name: var-run
+          mountPath: /var/run
+        - name: sys
+          mountPath: /sys
+          readOnly: true
+        - name: var-lib-docker
+          mountPath: /var/lib/docker
+          readOnly: true
+  restartPolicy: Always
+  dnsPolicy: ClusterFirst
+  volumes:
+    - name: log-data
       hostDir:
-        path: /data/ctlog
-  - name: var-run
-    source:
+        path: "/data/ctlog"
+    - name: var-run
       hostDir:
-        path: /var/run
-  - name: sys
-    source:
+        path: "/var/run"
+    - name: sys
       hostDir:
-        path: /sys
-  - name: var-lib-docker
-    source:
+        path: "/sys"
+    - name: var-lib-docker
       hostDir:
-        path: /var/lib/docker
+        path: "/var/lib/docker"
