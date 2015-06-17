@@ -149,7 +149,8 @@ int main(int argc, char* argv[]) {
   const shared_ptr<libevent::Base> event_base(make_shared<libevent::Base>());
   std::unique_ptr<libevent::EventPumpThread> pump(
       new libevent::EventPumpThread(event_base));
-  UrlFetcher fetcher(event_base.get());
+  ThreadPool pool;
+  UrlFetcher fetcher(event_base.get(), &pool);
 
   EtcdClient etcd_client(&fetcher, FLAGS_etcd_host, FLAGS_etcd_port);
 

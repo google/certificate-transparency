@@ -10,10 +10,12 @@
 #include "util/etcd.h"
 #include "util/libevent_wrapper.h"
 #include "util/sync_task.h"
+#include "util/thread_pool.h"
 
 namespace libevent = cert_trans::libevent;
 
 using cert_trans::EtcdClient;
+using cert_trans::ThreadPool;
 using cert_trans::UrlFetcher;
 using std::bind;
 using std::make_shared;
@@ -84,7 +86,8 @@ void State::RequestDone(Task* child_task) {
 void test_etcd(int thread_num) {
   const shared_ptr<libevent::Base> event_base(make_shared<libevent::Base>());
   libevent::EventPumpThread pump(event_base);
-  UrlFetcher fetcher(event_base.get());
+  ThreadPool pool;
+  UrlFetcher fetcher(event_base.get(), &pool);
   EtcdClient etcd(&fetcher, FLAGS_etcd, FLAGS_etcd_port);
   SyncTask task(event_base.get());
   State state(&etcd, thread_num, task.task());

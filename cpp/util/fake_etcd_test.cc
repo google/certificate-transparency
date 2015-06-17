@@ -62,7 +62,8 @@ class FakeEtcdTest : public ::testing::Test {
   FakeEtcdTest()
       : base_(std::make_shared<libevent::Base>()),
         event_pump_(base_),
-        fetcher_(base_.get()),
+        pool_(),
+        fetcher_(base_.get(), &pool_),
         client_(FLAGS_etcd.empty()
                     ? new FakeEtcdClient(base_.get())
                     : new EtcdClient(&fetcher_, FLAGS_etcd, FLAGS_etcd_port)),
@@ -175,6 +176,7 @@ class FakeEtcdTest : public ::testing::Test {
 
   std::shared_ptr<libevent::Base> base_;
   libevent::EventPumpThread event_pump_;
+  ThreadPool pool_;
   UrlFetcher fetcher_;
   const unique_ptr<EtcdClient> client_;
   const string key_prefix_;

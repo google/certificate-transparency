@@ -80,9 +80,9 @@ class UrlFetcherTest : public ::testing::Test {
       : base_(make_shared<libevent::Base>(
             unique_ptr<libevent::Base::Resolver>(new LocalhostResolver))),
         event_pump_(base_),
-        pool_(1) {
+        pool_() {
     FLAGS_trusted_root_certs = FLAGS_cert_dir + "/ca-cert.pem";
-    fetcher_.reset(new UrlFetcher(base_.get()));
+    fetcher_.reset(new UrlFetcher(base_.get(), &pool_));
   }
 
  protected:
@@ -114,7 +114,7 @@ TEST_F(UrlFetcherTest, TestCertDoesNotMatchHost) {
   SyncTask task(&pool_);
   fetcher_->Fetch(req, &resp, task.task());
   task.Wait();
-  EXPECT_THAT(task.status(), StatusIs(util::error::FAILED_PRECONDITION));
+  EXPECT_THAT(task.status(), StatusIs(util::error::UNAVAILABLE));
   EXPECT_EQ(kSSLErrorStatus, resp.status_code);
 }
 
@@ -126,7 +126,7 @@ TEST_F(UrlFetcherTest, TestNotListening) {
   SyncTask task(&pool_);
   fetcher_->Fetch(req, &resp, task.task());
   task.Wait();
-  EXPECT_THAT(task.status(), StatusIs(util::error::FAILED_PRECONDITION));
+  EXPECT_THAT(task.status(), StatusIs(util::error::UNAVAILABLE));
   EXPECT_EQ(kUnknownErrorStatus, resp.status_code);
 }
 
@@ -152,7 +152,7 @@ TEST_F(UrlFetcherTest, TestStarDoesNotMatcheIncorrectParentDomain) {
   SyncTask task(&pool_);
   fetcher_->Fetch(req, &resp, task.task());
   task.Wait();
-  EXPECT_THAT(task.status(), StatusIs(util::error::FAILED_PRECONDITION));
+  EXPECT_THAT(task.status(), StatusIs(util::error::UNAVAILABLE));
   EXPECT_EQ(kSSLErrorStatus, resp.status_code);
 }
 
@@ -178,7 +178,7 @@ TEST_F(UrlFetcherTest, TestSubdomainDoesNotMatchIncorrectParentDomain) {
   SyncTask task(&pool_);
   fetcher_->Fetch(req, &resp, task.task());
   task.Wait();
-  EXPECT_THAT(task.status(), StatusIs(util::error::FAILED_PRECONDITION));
+  EXPECT_THAT(task.status(), StatusIs(util::error::UNAVAILABLE));
   EXPECT_EQ(kSSLErrorStatus, resp.status_code);
 }
 
@@ -191,7 +191,7 @@ TEST_F(UrlFetcherTest, TestSubstringSubjectDoesNotMatch) {
   SyncTask task(&pool_);
   fetcher_->Fetch(req, &resp, task.task());
   task.Wait();
-  EXPECT_THAT(task.status(), StatusIs(util::error::FAILED_PRECONDITION));
+  EXPECT_THAT(task.status(), StatusIs(util::error::UNAVAILABLE));
   EXPECT_EQ(kSSLErrorStatus, resp.status_code);
 }
 
@@ -204,7 +204,7 @@ TEST_F(UrlFetcherTest, TestSuperstringSubjectDoesNotMatch) {
   SyncTask task(&pool_);
   fetcher_->Fetch(req, &resp, task.task());
   task.Wait();
-  EXPECT_THAT(task.status(), StatusIs(util::error::FAILED_PRECONDITION));
+  EXPECT_THAT(task.status(), StatusIs(util::error::UNAVAILABLE));
   EXPECT_EQ(kSSLErrorStatus, resp.status_code);
 }
 
@@ -216,7 +216,7 @@ TEST_F(UrlFetcherTest, TestSubstringHostDoesNotMatch) {
   SyncTask task(&pool_);
   fetcher_->Fetch(req, &resp, task.task());
   task.Wait();
-  EXPECT_THAT(task.status(), StatusIs(util::error::FAILED_PRECONDITION));
+  EXPECT_THAT(task.status(), StatusIs(util::error::UNAVAILABLE));
   EXPECT_EQ(kSSLErrorStatus, resp.status_code);
 }
 
@@ -241,7 +241,7 @@ TEST_F(UrlFetcherTest, TestWrongIpDoesNotMatch) {
   SyncTask task(&pool_);
   fetcher_->Fetch(req, &resp, task.task());
   task.Wait();
-  EXPECT_THAT(task.status(), StatusIs(util::error::FAILED_PRECONDITION));
+  EXPECT_THAT(task.status(), StatusIs(util::error::UNAVAILABLE));
   EXPECT_EQ(kSSLErrorStatus, resp.status_code);
 }
 

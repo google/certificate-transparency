@@ -14,6 +14,7 @@
 #include "util/etcd.h"
 #include "util/periodic_closure.h"
 #include "util/status_test_util.h"
+#include "util/thread_pool.h"
 #include "util/testing.h"
 
 
@@ -150,7 +151,8 @@ class ElectionTest : public ::testing::Test {
   ElectionTest()
       : base_(make_shared<libevent::Base>()),
         event_pump_(base_),
-        url_fetcher_(base_.get()),
+        pool_(),
+        url_fetcher_(base_.get(), &pool_),
         client_(FLAGS_etcd.empty() ? new FakeEtcdClient(base_.get())
                                    : new EtcdClient(&url_fetcher_, FLAGS_etcd,
                                                     FLAGS_etcd_port)) {
@@ -165,6 +167,7 @@ class ElectionTest : public ::testing::Test {
 
   shared_ptr<libevent::Base> base_;
   libevent::EventPumpThread event_pump_;
+  ThreadPool pool_;
   UrlFetcher url_fetcher_;
   atomic<bool> running_;
   const unique_ptr<EtcdClient> client_;
