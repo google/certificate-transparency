@@ -59,10 +59,12 @@ echo "============================================================="
 echo "Creating supermirror instances..."
 ${DIR}/start_mirror.sh ${DIR}/mirror-config.sh
 
-echo "============================================================="
-echo "Starting prometheus..."
-${DIR}/start_prometheus.sh ${DIR}/mirror-config.sh
-${DIR}/update_prometheus_config.sh ${DIR}/mirror-config.sh
+if [ "${MONITORING}" == "prometheus" ]; then
+  echo "============================================================="
+  echo "Starting prometheus..."
+  ${DIR}/start_prometheus.sh ${DIR}/mirror-config.sh
+  ${DIR}/update_prometheus_config.sh ${DIR}/mirror-config.sh
+fi
 
 
 echo "============================================================="

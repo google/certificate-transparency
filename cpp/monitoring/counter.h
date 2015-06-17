@@ -33,7 +33,7 @@ class Counter : public Metric {
 
  private:
   Counter(const std::string& name,
-          const typename NameType<LabelTypes>::name&... labels,
+          const typename NameType<LabelTypes>::name&... label_names,
           const std::string& help);
 
   LabelledValues<LabelTypes...> values_;

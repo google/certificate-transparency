@@ -1,8 +1,8 @@
 #ifndef CERT_TRANS_MONITORING_METRIC_H_
 #define CERT_TRANS_MONITORING_METRIC_H_
 
-#include <ostream>
 #include <map>
+#include <ostream>
 #include <set>
 #include <string>
 #include <vector>
@@ -24,7 +24,7 @@ struct NameType {
 // Base class for all metric types
 class Metric {
  public:
-  typedef std::pair<std::chrono::time_point<std::chrono::system_clock>, double>
+  typedef std::pair<std::chrono::system_clock::time_point, double>
       TimestampedValue;
 
   enum Type {

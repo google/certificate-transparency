@@ -21,6 +21,10 @@ spec:
           value: "@@TARGET_LOG_URL@@"
         - name: TARGET_LOG_PUBLIC_KEY
           value: "@@TARGET_LOG_PUBLIC_KEY@@"
+        - name: PROJECT
+          value: @@PROJECT@@
+        - name: MONITORING
+          value: @@MONITORING@@
       volumeMounts:
         - name: logdata
           mountPath: /mnt/ctmirror

@@ -36,6 +36,8 @@ CMD cd /mnt/ctmirror/ && \
     echo "Etcd: ${ETCD_HOST}:${ETCD_PORT}" && \
     echo "Target: ${TARGET_LOG_URL}" && \
     echo "Target Key: ${TARGET_LOG_PUBLIC_KEY}" && \
+    echo "Project: ${PROJECT}" && \
+    echo "Monitoring: ${MONITORING}" && \
     ulimit -c unlimited && \
     /usr/local/bin/ct-mirror \
         --port=80 \
@@ -47,6 +49,8 @@ CMD cd /mnt/ctmirror/ && \
         --num_http_server_threads=${NUM_HTTP_SERVER_THREADS} \
         --target_public_key=/usr/local/etc/keys/${TARGET_LOG_PUBLIC_KEY} \
         --target_log_uri=${TARGET_LOG_URL} \
+        --monitoring=${MONITORING} \
+        --google_compute_monitoring_base_url="https://www.googleapis.com/cloudmonitoring/v2beta2/projects/${PROJECT}" \
         --v=${V_LEVEL}; \
     if [ -e core ]; then \
       CORE_DIR="/mnt/ctmirror/cores/$(date +%s)"; \

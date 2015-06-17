@@ -17,7 +17,11 @@ spec:
           value: "@@ETCD_PORT@@"
         - name: CONTAINER_HOST
           value: "@@CONTAINER_HOST@@"
-      volumeMounts:
+        - name: PROJECT
+          value: @@PROJECT@@
+        - name: MONITORING
+          value: @@MONITORING@@
+       volumeMounts:
         - name: log-data
           mountPath: /mnt/ctlog
     - name: cadvisor-monitor
