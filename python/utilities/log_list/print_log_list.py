@@ -120,7 +120,7 @@ def generate_code_for_chromium(json_log_list, output_file):
         s = "    {"
         s += "\n     ".join(split_hex_key)
         s += ',\n     "%s"' % (log["description"])
-        s += ',\n     "https://%s"}' % (log["url"])
+        s += ',\n     "https://%s/"}' % (log["url"])
         list_code.append(s)
         if not key_length_in_bytes:
             key_length_in_bytes = len(log_key)
