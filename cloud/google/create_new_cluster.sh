@@ -11,6 +11,7 @@ if [ ! -x ${DIR}/../../cpp/tools/ct-clustertool ]; then
 fi
 
 function WaitForEtcd() {
+  echo "Waiting for etcd..."
   while true; do
     gcloud compute ssh ${ETCD_MACHINES[1]} --command "\
      until curl -s -L -m 10 localhost:4001/v2/keys/ > /dev/null; do \

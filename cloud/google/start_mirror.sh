@@ -30,7 +30,7 @@ Header "Creating mirror instances..."
 for i in `seq ${MIRROR_NUM_REPLICAS}`; do
   echo "Creating instance ${MIRROR_MACHINES[$i]}"
 
-  sed --e "s^@@GCS_BUCKET@@^${GCS_BUCKET}^
+  sed --e "s^@@PROJECT@@^${PROJECT}^
            s^@@ETCD_HOST@@^${ETCD_MACHINES[1]}^
            s^@@ETCD_PORT@@^4001^
            s^@@CONTAINER_HOST@@^${MIRROR_MACHINES[$i]}^

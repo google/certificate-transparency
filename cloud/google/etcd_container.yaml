@@ -1,63 +1,59 @@
-version: v1beta2
-containers:
-  - name: registry
-    image: google/docker-registry
-    ports:
-      - name: registry
-        containerPort: 5000
-        hostPort: 5000
-    env:
-      - name: GCS_BUCKET
-        value: @@GCS_BUCKET@@
-  - name: etcd
-    image: localhost:5000/certificate_transparency/etcd:test
-    ports:
-      - name: etcd-client
-        containerPort: 4001
-        hostPort: 4001
-      - name: etcd-peer
-        containerPort: 7001
-        hostPort: 7001
-    env:
-      - name: DISCOVERY
-        value: @@DISCOVERY@@
-      - name: ETCD_NAME
-        value: "@@ETCD_NAME@@"
-      - name: CONTAINER_HOST
-        value: "@@CONTAINER_HOST@@"
-    volumeMounts:
-      - name: etcd-data
-        path: /opt/etcd/data
-        readOnly: false
-  - name: cadvisor-monitor
-    image: google/cadvisor:latest
-    ports:
-      - name: cadvisor-monitor
-        containerPort: 8080
-        hostPort: 8080
-    volumeMounts:
-      - name: var-run
-        mountPath: /var/run
-      - name: sys
-        mountPath: /sys
-        readOnly: true
-      - name: var-lib-docker
-        mountPath: /var/lib/docker
-        readOnly: true
-volumes:
-  - name: etcd-data
-    source:
-      hostDir:
-        path: "/data/etcd"
-  - name: var-run
-    source:
-      hostDir:
+version: v1
+kind: Pod
+spec:
+  containers:
+    - name: etcd
+      image: "gcr.io/@@PROJECT@@/etcd:test"
+      imagePullPolicy: Always
+      ports:
+        - name: etcd-client
+          containerPort: 4001
+          hostPort: 4001
+          protocol: TCP
+        - name: etcd-peer
+          containerPort: 7001
+          hostPort: 7001
+          protocol: TCP
+      env:
+        - name: DISCOVERY
+          value: "@@DISCOVERY@@"
+        - name: ETCD_NAME
+          value: "@@ETCD_NAME@@"
+        - name: CONTAINER_HOST
+          value: "@@CONTAINER_HOST@@"
+      volumeMounts:
+        - name: etcddata
+          mountPath: /opt/etcd/data
+          readOnly: false
+    - name: cadvisor-monitor
+      image: google/cadvisor:latest
+      imagePullPolicy: Always
+      ports:
+        - name: cadvisor-monitor
+          containerPort: 8080
+          hostPort: 8080
+          protocol: TCP
+      volumeMounts:
+        - name: varrun
+          mountPath: /var/run
+        - name: sys
+          mountPath: /sys
+          readOnly: true
+        - name: varlibdocker
+          mountPath: /var/lib/docker
+          readOnly: true
+  restartPolicy: Always
+  dnsPolicy: ClusterFirst
+  volumes:
+    - name: etcddata
+      hostPath:
+        path: /data/etcd
+    - name: varrun
+      hostPath:
         path: /var/run
-  - name: sys
-    source:
-      hostDir:
+    - name: sys
+      hostPath:
         path: /sys
-  - name: var-lib-docker
-    source:
-      hostDir:
+    - name: varlibdocker
+      hostPath:
         path: /var/lib/docker
