@@ -11,6 +11,7 @@ if [ ! -x ${DIR}/../../cpp/tools/ct-clustertool ]; then
 fi
 
 function WaitForEtcd() {
+  echo "Waiting for etcd @ ${ETCD_MACHINES[1]}"
   while true; do
     gcloud compute ssh ${ETCD_MACHINES[1]} \
         --zone ${ETCD_ZONES[1]} \
@@ -33,8 +34,12 @@ function PopulateEtcd() {
     ${PUT} ${ETCD}/v2/keys/root/serving_sth && \
     ${PUT} ${ETCD}/v2/keys/root/cluster_config && \
     ${PUT} ${ETCD}/v2/keys/root/nodes/ -d dir=true"
+  # Workaround copy-files ignoring the --zone flag:
+  gcloud config set compute/zone ${ETCD_ZONES[1]}
   gcloud compute copy-files ${DIR}/../../cpp/tools/ct-clustertool \
     ${ETCD_MACHINES[1]}:.
+  # Remove workaround
+  gcloud config unset compute/zone
 }
 
 echo "============================================================="
