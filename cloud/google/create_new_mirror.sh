@@ -12,7 +12,9 @@ fi
 
 function WaitForEtcd() {
   while true; do
-    gcloud compute ssh ${ETCD_MACHINES[1]} --command "\
+    gcloud compute ssh ${ETCD_MACHINES[1]} \
+        --zone ${ETCD_ZONES[1]} \
+        --command "\
      until curl -s -L -m 10 localhost:4001/v2/keys/ > /dev/null; do \
        echo -n .; \
        sleep 1; \
@@ -25,7 +27,9 @@ function WaitForEtcd() {
 function PopulateEtcd() {
   export PUT="curl -s -L -X PUT --retry 10"
   export ETCD="${ETCD_MACHINES[1]}:4001"
-  gcloud compute ssh ${ETCD_MACHINES[1]} --command "\
+  gcloud compute ssh ${ETCD_MACHINES[1]} \
+      --zone ${ETCD_ZONES[1]} \
+      --command "\
     ${PUT} ${ETCD}/v2/keys/root/serving_sth && \
     ${PUT} ${ETCD}/v2/keys/root/cluster_config && \
     ${PUT} ${ETCD}/v2/keys/root/nodes/ -d dir=true"
@@ -39,8 +43,6 @@ echo "============================================================="
 
 # Set gcloud defaults:
 ${GCLOUD} config set project ${PROJECT}
-${GCLOUD} config set compute/zone ${ZONE}
-
 
 echo "============================================================="
 echo "Creating etcd instances..."
@@ -75,7 +77,6 @@ gcloud compute target-pools create mirror-pool \
     --region ${REGION} \
     --health-check get-sth-check
 gcloud compute target-pools add-instances mirror-pool \
-    --zone $ZONE \
     --instances ${MIRROR_MACHINES[@]}
 gcloud compute forwarding-rules create mirror-fwd-rule \
     --region $REGION \

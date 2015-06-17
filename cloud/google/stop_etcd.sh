@@ -10,18 +10,21 @@ source ${DIR}/util.sh
 GCLOUD="gcloud"
 
 Header "Deleting etcd instances..."
-for i in ${ETCD_MACHINES[@]}; do
-  echo "Deleting instance ${i}..."
+for i in `seq 0 $((${ETCD_NUM_REPLICAS} - 1))`; do
+  echo "Deleting instance ${ETCD_MACHINES[${i}]}..."
   set +e
-  ${GCLOUD} compute instances delete -q --delete-disks all ${i} &
+  ${GCLOUD} compute instances delete -q ${ETCD_MACHINES[${i}]} \
+      --zone=${ETCD_ZONES[${i}]} \
+      --delete-disks all &
   set -e
 done
 wait
 
-for i in ${ETCD_DISKS[@]}; do
-  echo "Deleting disk ${i}..."
+for i in `seq 0 $((${ETCD_NUM_REPLICAS} - 1))`; do
+  echo "Deleting disk ${ETCD_DISKS[${i}]}..."
   set +e
-  ${GCLOUD} compute disks delete -q ${i} > /dev/null &
+  ${GCLOUD} compute disks delete -q ${ETCD_DISKS[${i}]} \
+      --zone=${ETCD_ZONES[${i}]} > /dev/null &
   set -e
 done
 wait

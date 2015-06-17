@@ -10,18 +10,21 @@ source ${DIR}/util.sh
 GCLOUD="gcloud"
 
 Header "Deleting prometheus instances..."
-for i in ${PROMETHEUS_MACHINES[@]}; do
-  echo "Deleting instance ${i}..."
+for i in `seq 0 $((${PROMETHEUS_NUM_REPLICAS} - 1))`; do
+  echo "Deleting instance ${PROMETHEUS_MACHINES[${i}]}..."
   set +e
-  ${GCLOUD} compute instances delete -q --delete-disks all ${i} &
+  ${GCLOUD} compute instances delete -q ${PROMETHEUS_MACHINES[${i}]} \
+      --zone ${PROMETHEUS_ZONES[${i}]} \
+      --delete-disks all &
   set -e
 done
 wait
 
-for i in ${PROMETHEUS_DISKS[@]}; do
-  echo "Deleting disk ${i}..."
+for i in `seq 0 $((${PROMETHEUS_NUM_REPLICAS} - 1))`; do
+  echo "Deleting disk ${PROMETHEUS_DISKS[${i}]}..."
   set +e
-  ${GCLOUD} compute disks delete -q ${i} > /dev/null &
+  ${GCLOUD} compute disks delete -q ${PROMETHEUS_DISKS[${i}]} \
+      --zone ${PROMETHEUS_ZONES[${i}]} > /dev/null &
   set -e
 done
 wait

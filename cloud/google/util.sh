@@ -10,18 +10,21 @@ function Header() {
 function WaitForStatus() {
   TYPE=$1
   NAME=$2
-  WANT_STATUS=$3
+  ZONE=$3
+  WANT_STATUS=$4
   STATUS=""
   until [[ "${STATUS}" =~ "${WANT_STATUS}" ]]; do
     sleep 1
-    STATUS=$(${GCLOUD} compute ${TYPE} describe ${NAME} | grep "status:")
+    STATUS=$(${GCLOUD} compute ${TYPE} describe ${NAME} --zone ${ZONE} | grep "status:")
     echo ${STATUS}
   done
 }
 
 function WaitMachineUp() {
-  echo "Waiting for ${1}"
-  until ${GCLOUD} compute ssh ${1} --command "exit"; do
+  INSTANCE=${1}
+  ZONE=${2}
+  echo "Waiting for ${INSTANCE}"
+  until ${GCLOUD} compute ssh ${INSTANCE} --zone ${ZONE} --command "exit"; do
     sleep 1
     echo -n .
   done

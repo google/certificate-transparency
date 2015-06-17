@@ -6,18 +6,21 @@ source ${DIR}/config.sh
 GCLOUD="gcloud"
 
 Header "Deleting log instances..."
-for i in ${LOG_MACHINES[@]}; do
-  echo "Deleting instance ${i}..."
+for i in `seq 0 $((${LOG_NUM_REPLICAS} - 1))`; do
+  echo "Deleting instance ${LOG_MACHINES[${i}]}..."
   set +e
-  ${GCLOUD} compute instances delete -q --delete-disks all ${i} &
+  ${GCLOUD} compute instances delete -q ${LOG_MACHINES[${i}]} \
+      --zone ${LOG_ZONES[${i}]} \
+      --delete-disks all &
   set -e
 done
 wait
 
-for i in ${LOG_DISKS[@]}; do
-  echo "Deleting disk ${i}..."
+for i in `seq 0 $((${LOG_NUM_REPLICAS} - 1))`; do
+  echo "Deleting disk ${LOG_DISKS[${i}]}..."
   set +e
-  ${GCLOUD} compute disks delete -q ${i} > /dev/null &
+  ${GCLOUD} compute disks delete -q ${LOG_DISKS[${i}]} \
+      --zone ${LOG_ZONES[${i}]} > /dev/null &
   set -e
 done
 wait

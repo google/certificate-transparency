@@ -11,23 +11,24 @@ set -e
 GCLOUD="gcloud"
 
 Header "Creating mirror persistent disks..."
-for i in ${MIRROR_DISKS[@]}; do
-  echo "Creating disk ${i}..."
-  ${GCLOUD} compute disks create -q ${i} \
+for i in `seq 0 $((${MIRROR_NUM_REPLICAS} - 1))`; do
+  echo "Creating disk ${MIRROR_DISKS[${i}]}..."
+  ${GCLOUD} compute disks create -q ${MIRROR_DISKS[${i}]} \
+      --zone ${MIRROR_ZONES[${i}]} \
       --size=${MIRROR_DISK_SIZE} &
 done
 wait
 
-for i in ${MIRROR_DISKS[@]}; do
-  echo "Waiting for disk ${i}..."
-  WaitForStatus disks ${i} READY &
+for i in `seq 0 $((${MIRROR_NUM_REPLICAS} - 1))`; do
+  echo "Waiting for disk ${MIRROR_DISKS[${i}]}..."
+  WaitForStatus disks ${MIRROR_DISKS[${i}]} ${MIRROR_ZONES[${i}]} READY &
 done
 wait
 
 MANIFEST=/tmp/mirror_container.yaml
 
 Header "Creating mirror instances..."
-for i in `seq ${MIRROR_NUM_REPLICAS}`; do
+for i in `seq 0 $((${MIRROR_NUM_REPLICAS} - 1))`; do
   echo "Creating instance ${MIRROR_MACHINES[$i]}"
 
   sed --e "s^@@PROJECT@@^${PROJECT}^
@@ -39,6 +40,7 @@ for i in `seq ${MIRROR_NUM_REPLICAS}`; do
           < ${DIR}/mirror_container.yaml  > ${MANIFEST}.${i}
 
   ${GCLOUD} compute instances create -q ${MIRROR_MACHINES[${i}]} \
+      --zone ${MIRROR_ZONES[${i}]} \
       --machine-type ${MIRROR_MACHINE_TYPE} \
       --image container-vm \
       --disk name=${MIRROR_DISKS[${i}]},mode=rw,boot=no,auto-delete=yes \
@@ -47,9 +49,9 @@ for i in `seq ${MIRROR_NUM_REPLICAS}`; do
 done
 wait
 
-for i in ${MIRROR_MACHINES[@]}; do
-  echo "Waiting for instance ${i}..."
-  WaitForStatus instances ${i} RUNNING &
+for i in `seq 0 $((${MIRROR_NUM_REPLICAS} - 1))`; do
+  echo "Waiting for instance ${MIRROR_MACHINES[${i}]}..."
+  WaitForStatus instances ${MIRROR_MACHINES[${i}]} ${MIRROR_ZONES[${i}]} RUNNING &
 done
 wait
 

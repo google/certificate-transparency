@@ -7,23 +7,24 @@ set -e
 GCLOUD="gcloud"
 
 Header "Creating log persistent disks..."
-for i in ${LOG_DISKS[@]}; do
-  echo "Creating disk ${i}..."
-  ${GCLOUD} compute disks create -q ${i} \
+for i in `seq 0 $((${LOG_NUM_REPLICAS} - 1))`; do
+  echo "Creating disk ${LOG_DISKS[${i}]}..."
+  ${GCLOUD} compute disks create -q ${LOG_DISKS[${i}]} \
+      --zone=${LOG_ZONES[${i}]} \
       --size=${LOG_DISK_SIZE} &
 done
 wait
 
-for i in ${LOG_DISKS[@]}; do
-  echo "Waiting for disk ${i}..."
-  WaitForStatus disks ${i} READY &
+for i in `seq 0 $((${LOG_NUM_REPLICAS} - 1))`; do
+  echo "Waiting for disk ${LOG_DISKS[${i}]}..."
+  WaitForStatus disks ${LOG_DISKS[${i}]} ${LOG_ZONES[${i}]} READY &
 done
 wait
 
 MANIFEST=/tmp/log_container.yaml
 
 Header "Creating log instances..."
-for i in `seq ${LOG_NUM_REPLICAS}`; do
+for i in `seq 0 $((${LOG_NUM_REPLICAS} - 1))`; do
   echo "Creating instance ${LOG_MACHINES[$i]}"
 
   sed --e "s^@@PROJECT@@^${PROJECT}^
@@ -33,6 +34,7 @@ for i in `seq ${LOG_NUM_REPLICAS}`; do
           < ${DIR}/log_container.yaml  > ${MANIFEST}.${i}
 
   ${GCLOUD} compute instances create -q ${LOG_MACHINES[${i}]} \
+      --zone=${LOG_ZONES[${i}]} \
       --machine-type ${LOG_MACHINE_TYPE} \
       --image container-vm \
       --disk name=${LOG_DISKS[${i}]},mode=rw,boot=no,auto-delete=yes \
@@ -41,9 +43,9 @@ for i in `seq ${LOG_NUM_REPLICAS}`; do
 done
 wait
 
-for i in ${LOG_MACHINES[@]}; do
-  echo "Waiting for instance ${i}..."
-  WaitForStatus instances ${i} RUNNING &
+for i in `seq 0 $((${LOG_NUM_REPLICAS} - 1))`; do
+  echo "Waiting for instance ${LOG_MACHINES[${i}]}..."
+  WaitForStatus instances ${LOG_MACHINES[${i}]} ${LOG_ZONES[${i}]} RUNNING &
 done
 wait
 

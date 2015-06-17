@@ -10,18 +10,21 @@ source ${DIR}/util.sh
 GCLOUD="gcloud"
 
 Header "Deleting mirror instances..."
-for i in ${MIRROR_MACHINES[@]}; do
-  echo "Deleting instance ${i}..."
+for i in `seq 0 $((${MIRROR_NUM_REPLICAS} - 1))`; do
+  echo "Deleting instance ${MIRROR_MACHINES[${i}]}..."
   set +e
-  ${GCLOUD} compute instances delete -q --delete-disks all ${i} &
+  ${GCLOUD} compute instances delete -q ${MIRROR_MACHINES[${i}]} \
+      --zone ${MIRROR_ZONES[${i}]} \
+      --delete-disks all &
   set -e
 done
 wait
 
-for i in ${MIRROR_DISKS[@]}; do
-  echo "Deleting disk ${i}..."
+for i in `seq 0 $((${MIRROR_NUM_REPLICAS} - 1))`; do
+  echo "Deleting disk ${MIRROR_DISKS[${i}]}..."
   set +e
-  ${GCLOUD} compute disks delete -q ${i} > /dev/null &
+  ${GCLOUD} compute disks delete -q ${MIRROR_DISKS[${i}]} \
+      --zone ${MIRROR_ZONES[${i}]} > /dev/null &
   set -e
 done
 wait

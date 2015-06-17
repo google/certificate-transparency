@@ -31,15 +31,28 @@ sed -- "s%@@LOG_TARGETS@@%${LOG_HOSTS}%g
         s%@@ETCD_TARGETS@@%${ETCD_HOSTS}%g" < ${DIR}/../prometheus/prometheus.conf > ${TMP_CONFIG}
 
 
-for i in ${PROMETHEUS_MACHINES[@]}; do
-  WaitMachineUp ${i}
+for i in `seq 0 $((${PROMETHEUS_NUM_REPLICAS} - 1))`; do
+  INSTANCE=${PROMETHEUS_MACHINES[${i}]}
+  ZONE=${PROMETHEUS_ZONES[${i}]}
+  WaitMachineUp ${INSTANCE} ${ZONE}
+
+  # Workaround copy-files ignoring the --zone flag:
+  gcloud config set compute/zone ${ETCD_ZONES[1]}
   ${GCLOUD} compute copy-files \
-    ${TMP_CONFIG} ${i}:.
-  ${GCLOUD} compute ssh ${i} --command "
+      --zone ${ZONE} \
+      ${TMP_CONFIG} ${INSTANCE}:.
+  # Remove workaround
+  gcloud config unset compute/zone
+
+  ${GCLOUD} compute ssh ${INSTANCE} \
+      --zone ${ZONE} \
+      --command "
     sudo mkdir -p /data/prometheus/config &&
     sudo mv prometheus.conf /data/prometheus/config/prometheus.conf &&
     sudo chmod 644 /data/prometheus/config/prometheus.conf"
-  ${GCLOUD} compute ssh ${i} --command '
+  ${GCLOUD} compute ssh ${INSTANCE} \
+      --zone ${ZONE} \
+      --command '
     CONTAINER=$(sudo docker ps | grep prometheus | awk -- "{print \$1}" )
     if [ "${CONTAINER}" != "" ]; then
       echo "Restarting prometheus container ${CONTAINER}..."

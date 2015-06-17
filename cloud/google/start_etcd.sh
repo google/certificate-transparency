@@ -11,16 +11,17 @@ set -e
 GCLOUD="gcloud"
 
 Header "Creating etcd persistent disks..."
-for i in ${ETCD_DISKS[@]}; do
-  echo "Creating disk ${i}..."
-  ${GCLOUD} compute disks create -q ${i} \
+for i in `seq 0 $((${ETCD_NUM_REPLICAS} - 1))`; do
+  echo "Creating disk ${ETCD_DISKS[${i}]}..."
+  ${GCLOUD} compute disks create -q ${ETCD_DISKS[${i}]} \
+      --zone=${ETCD_ZONES[${i}]} \
       --size=${ETCD_DISK_SIZE} &
 done
 wait
 
-for i in ${ETCD_DISKS[@]}; do
-  echo "Waiting for disk ${i}..."
-  WaitForStatus disks ${i} READY &
+for i in `seq 0 $((${ETCD_NUM_REPLICAS} - 1))`; do
+  echo "Waiting for disk ${ETCD_DISKS[${i}]}..."
+  WaitForStatus disks ${ETCD_DISKS[${i}]} ${ETCD_ZONES[${i}]} READY &
 done
 wait
 
@@ -33,7 +34,7 @@ echo
 
 
 Header "Creating etcd instances..."
-for i in `seq ${ETCD_NUM_REPLICAS}`; do
+for i in `seq 0 $((${ETCD_NUM_REPLICAS} - 1))`; do
   echo "Creating instance ${ETCD_MACHINES[$i]}"
 
   sed --e "s^@@PROJECT@@^${PROJECT}^
@@ -43,6 +44,7 @@ for i in `seq ${ETCD_NUM_REPLICAS}`; do
           < ${DIR}/etcd_container.yaml  > ${MANIFEST}.${i}
 
   ${GCLOUD} compute instances create -q ${ETCD_MACHINES[${i}]} \
+      --zone ${ETCD_ZONES[${i}]} \
       --machine-type ${ETCD_MACHINE_TYPE} \
       --image container-vm \
       --disk name=${ETCD_DISKS[${i}]},mode=rw,boot=no,auto-delete=yes \
@@ -51,9 +53,9 @@ for i in `seq ${ETCD_NUM_REPLICAS}`; do
 done
 wait
 
-for i in ${ETCD_MACHINES[@]}; do
-  echo "Waiting for instance ${i}..."
-  WaitForStatus instances ${i} RUNNING &
+for i in `seq 0 $((${ETCD_NUM_REPLICAS} - 1))`; do
+  echo "Waiting for instance ${ETCD_MACHINES[${i}]}..."
+  WaitForStatus instances ${ETCD_MACHINES[${i}]} ${ETCD_ZONES[${i}]} RUNNING &
 done
 wait
 
