@@ -11,9 +11,11 @@ if [ ! -x ${DIR}/../../cpp/tools/ct-clustertool ]; then
 fi
 
 function WaitForEtcd() {
-  echo "Waiting for etcd..."
+  echo "Waiting for etcd @ ${ETCD_MACHINES[1]}"
   while true; do
-    gcloud compute ssh ${ETCD_MACHINES[1]} --command "\
+    gcloud compute ssh ${ETCD_MACHINES[1]} \
+        --zone ${ETCD_ZONES[1]} \
+        --command "\
      until curl -s -L -m 10 localhost:4001/v2/keys/ > /dev/null; do \
        echo -n .; \
        sleep 1; \
@@ -26,15 +28,26 @@ function WaitForEtcd() {
 function PopulateEtcd() {
   export PUT="curl -s -L -X PUT --retry 10"
   export ETCD="${ETCD_MACHINES[1]}:4001"
-  gcloud compute ssh ${ETCD_MACHINES[1]} --command "\
+  gcloud compute ssh ${ETCD_MACHINES[1]} \
+      --zone ${ETCD_ZONES[1]} \
+      --command "\
     ${PUT} ${ETCD}/v2/keys/root/serving_sth && \
     ${PUT} ${ETCD}/v2/keys/root/cluster_config && \
     ${PUT} ${ETCD}/v2/keys/root/sequence_mapping && \
     ${PUT} ${ETCD}/v2/keys/root/entries/ -d dir=true && \
     ${PUT} ${ETCD}/v2/keys/root/nodes/ -d dir=true"
-  gcloud compute copy-files ${DIR}/../../cpp/tools/ct-clustertool \
-    ${ETCD_MACHINES[1]}:.
-  gcloud compute ssh ${ETCD_MACHINES[1]} --command "\
+
+  # Workaround copy-files ignoring the --zone flag:
+  gcloud config set compute/zone ${ETCD_ZONES[1]}
+  gcloud compute copy-files \
+      ${DIR}/../../cpp/tools/ct-clustertool ${ETCD_MACHINES[1]}:. \
+      --zone ${ETCD_ZONES[1]}
+  # Remove workaround
+  gcloud config unset compute/zone
+
+  gcloud compute ssh ${ETCD_MACHINES[1]} \
+      --zone ${ETCD_ZONES[1]} \
+      --command "\
     sudo docker run localhost:5000/certificate_transparency/super_duper:test \
       /usr/local/bin/ct-clustertool initlog \
       --key=/usr/local/etc/ct-server-key.pem \
@@ -49,7 +62,7 @@ echo "============================================================="
 
 # Set gcloud defaults:
 ${GCLOUD} config set project ${PROJECT}
-${GCLOUD} config set compute/zone ${ZONE}
+${GCLOUD} config unset compute/zone
 
 
 echo "============================================================="

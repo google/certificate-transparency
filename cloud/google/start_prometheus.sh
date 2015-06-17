@@ -11,16 +11,17 @@ set -e
 GCLOUD="gcloud"
 
 Header "Creating prometheus persistent disks..."
-for i in ${PROMETHEUS_DISKS[@]}; do
-  echo "Creating disk ${i}..."
-  ${GCLOUD} compute disks create -q ${i} \
+for i in `seq 0 $((${PROMETHEUS_NUM_REPLICAS} - 1))`; do
+  echo "Creating disk ${PROMETHEUS_DISKS[${i}]}..."
+  ${GCLOUD} compute disks create -q ${PROMETHEUS_DISKS[${i}]} \
+      --zone=${PROMETHEUS_ZONES[${i}]} \
       --size=${PROMETHEUS_DISK_SIZE} &
 done
 wait
 
-for i in ${PROMETHEUS_DISKS[@]}; do
-  echo "Waiting for disk ${i}..."
-  WaitForStatus disks ${i} READY &
+for i in `seq 0 $((${PROMETHEUS_NUM_REPLICAS} - 1))`; do
+  echo "Waiting for disk ${PROMETHEUS_DISKS[${i}]}..."
+  WaitForStatus disks ${PROMETHEUS_DISKS[${i}]} ${PROMETHEUS_ZONES[${i}]} READY &
 done
 wait
 
@@ -30,10 +31,11 @@ sed --e "s^@@PROJECT@@^${PROJECT}^" \
 
 
 Header "Creating prometheus instances..."
-for i in `seq ${PROMETHEUS_NUM_REPLICAS}`; do
+for i in `seq 0 $((${PROMETHEUS_NUM_REPLICAS} - 1))`; do
   echo "Creating instance ${PROMETHEUS_MACHINES[$i]}"
 
   ${GCLOUD} compute instances create -q ${PROMETHEUS_MACHINES[${i}]} \
+      --zone=${PROMETHEUS_ZONES[${i}]} \
       --machine-type ${PROMETHEUS_MACHINE_TYPE} \
       --image container-vm \
       --disk name=${PROMETHEUS_DISKS[${i}]},mode=rw,boot=no,auto-delete=yes \
@@ -42,9 +44,9 @@ for i in `seq ${PROMETHEUS_NUM_REPLICAS}`; do
 done
 wait
 
-for i in ${PROMETHEUS_MACHINES[@]}; do
-  echo "Waiting for instance ${i}..."
-  WaitForStatus instances ${i} RUNNING &
+for i in `seq 0 $((${PROMETHEUS_NUM_REPLICAS} - 1))`; do
+  echo "Waiting for instance ${PROMETHEUS_MACHINES[${i}]}..."
+  WaitForStatus instances ${PROMETHEUS_MACHINES[${i}]} ${PROMETHEUS_ZONES[${i}]} RUNNING &
 done
 wait
 
