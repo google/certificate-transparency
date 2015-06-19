@@ -265,7 +265,9 @@ void HttpHandler::ProxyInterceptor(
   // the request - being stale wrt to the current serving STH doesn't
   // automatically mean we're unable to answer this request.
   if (IsNodeStale()) {
-    proxy_->ProxyRequest(request);
+    // Can't do this on the libevent thread since it can block on the lock in
+    // ClusterStatusController::GetFreshNodes().
+    pool_->Add(bind(&Proxy::ProxyRequest, proxy_, request));
   } else {
     local_handler(request);
   }
