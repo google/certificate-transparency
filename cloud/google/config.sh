@@ -1,13 +1,8 @@
-export PROJECT=${PROJECT:-your-gce-project}
-export CLUSTER=${CLUSTER:-${USER}-ctlog}
-export REGION=${REGION:-europe-west1}
-# space separated list of zones within ${REGION} in which to run jobs.
-# e.g. "b c d"
-export ZONES="b c d"
-export GCS_BUCKET=${GCS_BUCKET:-${PROJECT}_ctlog_images}
-# Monitoring system: "gcm" or "prometheus"
-export MONITORING="gcm"
-
+if [ "$1" == "" ]; then
+  echo "Usage $0: <config-file>"
+  exit 1
+fi
+source $1
 
 export ETCD_NUM_REPLICAS_PER_ZONE=1
 export ETCD_DISK_SIZE=200GB
@@ -25,22 +20,51 @@ for z in ${ZONES}; do
   done
 done
 
+if [ "${INSTANCE_TYPE}" == "mirror" ]; then
+  if [ "${MIRROR_TARGET_URL}" == "" ]; then
+    echo "Must set MIRROR_TARGET_URL for mirror instance type."
+    exit 1
+  fi
+  if [ "${MIRROR_TARGET_PUBLIC_KEY}" == "" ]; then
+    echo "Must set MIRROR_TARGET_PUBLIC_KEY for mirror instance type."
+    exit 1
+  fi
 
-export LOG_NUM_REPLICAS_PER_ZONE=2
-export LOG_DISK_SIZE=200GB
-export LOG_BASE_NAME="${CLUSTER}-log"
-export LOG_MACHINE_TYPE=n1-highmem-2
-declare -a LOG_ZONES LOG_MACHINES LOG_DISKS
-export LOG_ZONES LOG_MACHINES LOG_DISKS
-export LOG_NUM_REPLICAS=0
-for z in ${ZONES}; do
-  for i in $(seq ${LOG_NUM_REPLICAS_PER_ZONE}); do
-    LOG_ZONES[${LOG_NUM_REPLICAS}]="${REGION}-${z}"
-    LOG_MACHINES[${LOG_NUM_REPLICAS}]="${CLUSTER}-log-${z}-${i}"
-    LOG_DISKS[${LOG_NUM_REPLICAS}]="${CLUSTER}-log-disk-${z}-${i}"
-    LOG_NUM_REPLICAS=$((${LOG_NUM_REPLICAS} + 1))
+  export MIRROR_NUM_REPLICAS_PER_ZONE=${MIRROR_NUM_REPLICAS_PER_ZONE:-2}
+  export MIRROR_DISK_SIZE=${MIRROR_DISK_SIZE:-200GB}
+  export MIRROR_MACHINE_TYPE=${MIRROR_MACHINE_TYPE:-n1-highmem-2}
+  export MIRROR_BASE_NAME="${CLUSTER}-mirror"
+  declare -a MIRROR_ZONES MIRROR_MACHINES MIRROR_DISKS
+  export MIRROR_ZONES MIRROR_MACHINES MIRROR_DISKS
+  export MIRROR_NUM_REPLICAS=0
+  for z in ${ZONES}; do
+    for i in $(seq ${MIRROR_NUM_REPLICAS_PER_ZONE}); do
+      MIRROR_ZONES[${MIRROR_NUM_REPLICAS}]="${REGION}-${z}"
+      MIRROR_MACHINES[${MIRROR_NUM_REPLICAS}]="${CLUSTER}-mirror-${z}-${i}"
+      MIRROR_DISKS[${MIRROR_NUM_REPLICAS}]="${CLUSTER}-mirror-disk-${z}-${i}"
+      MIRROR_NUM_REPLICAS=$((${MIRROR_NUM_REPLICAS} + 1))
+    done
   done
-done
+elif [ "${INSTANCE_TYPE}" == "log" ]; then
+  export LOG_NUM_REPLICAS_PER_ZONE=${LOG_NUM_REPLICAS_PER_ZONE:-2}
+  export LOG_DISK_SIZE=${LOG_DISK_SIZE:-200GB}
+  export LOG_MACHINE_TYPE=${LOG_MACHINE_TYPE:-n1-highmem-2}
+  export LOG_BASE_NAME="${CLUSTER}-log"
+  declare -a LOG_ZONES LOG_MACHINES LOG_DISKS
+  export LOG_ZONES LOG_MACHINES LOG_DISKS
+  export LOG_NUM_REPLICAS=0
+  for z in ${ZONES}; do
+    for i in $(seq ${LOG_NUM_REPLICAS_PER_ZONE}); do
+      LOG_ZONES[${LOG_NUM_REPLICAS}]="${REGION}-${z}"
+      LOG_MACHINES[${LOG_NUM_REPLICAS}]="${CLUSTER}-log-${z}-${i}"
+      LOG_DISKS[${LOG_NUM_REPLICAS}]="${CLUSTER}-log-disk-${z}-${i}"
+      LOG_NUM_REPLICAS=$((${LOG_NUM_REPLICAS} + 1))
+    done
+  done
+else
+  echo "INSTANCE_TYPE must be set to either 'mirror' or 'log'"
+  exit 1
+fi
 
 
 if [ "${MONITORING}" == "prometheus" ]; then
@@ -59,12 +83,16 @@ if [ "${MONITORING}" == "prometheus" ]; then
       PROMETHEUS_NUM_REPLICAS=$((${PROMETHEUS_NUM_REPLICAS} + 1))
     done
   done
+elif [ "${MONITORING}" != "gcm" ]; then
+  echo "MONITORING must be set to either 'prometheus' or 'gcm'"
+  exit 1
 fi
 
 
 echo "============================================================="
 echo "Cluster config:"
 echo "PROJECT:     ${PROJECT}"
+echo "TYPE:        ${INSTANCE_TYPE}"
 echo "CLUSTER:     ${CLUSTER}"
 echo "REGION:      ${REGION}"
 echo "ZONES:       ${ZONES}"

@@ -4,7 +4,7 @@ if [ "$1" == "" ]; then
   echo "Usage: $0 <config.sh file>"
   exit 1;
 fi
-source $1
+source ${DIR}/config.sh $1
 source ${DIR}/util.sh
 
 GCLOUD="gcloud"
