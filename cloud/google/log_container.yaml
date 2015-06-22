@@ -3,7 +3,7 @@ kind: Pod
 spec:
   containers:
     - name: super-duper
-      image: gcr.io/@@PROJECT@@/super_duper:test
+      image: "gcr.io/@@PROJECT@@/super_duper:test"
       imagePullPolicy: Always
       ports:
         - name: super-duper
@@ -18,11 +18,11 @@ spec:
         - name: CONTAINER_HOST
           value: "@@CONTAINER_HOST@@"
         - name: PROJECT
-          value: @@PROJECT@@
+          value: "@@PROJECT@@"
         - name: MONITORING
-          value: @@MONITORING@@
-       volumeMounts:
-        - name: log-data
+          value: "@@MONITORING@@"
+      volumeMounts:
+        - name: logdata
           mountPath: /mnt/ctlog
     - name: cadvisor-monitor
       image: google/cadvisor:latest
@@ -33,26 +33,26 @@ spec:
           hostPort: 8080
           protocol: TCP
       volumeMounts:
-        - name: var-run
+        - name: varrun
           mountPath: /var/run
         - name: sys
           mountPath: /sys
           readOnly: true
-        - name: var-lib-docker
+        - name: varlibdocker
           mountPath: /var/lib/docker
           readOnly: true
   restartPolicy: Always
   dnsPolicy: ClusterFirst
   volumes:
-    - name: log-data
-      hostDir:
+    - name: logdata
+      hostPath:
         path: "/data/ctlog"
-    - name: var-run
-      hostDir:
+    - name: varrun
+      hostPath:
         path: "/var/run"
     - name: sys
-      hostDir:
+      hostPath:
         path: "/sys"
-    - name: var-lib-docker
-      hostDir:
+    - name: varlibdocker
+      hostPath:
         path: "/var/lib/docker"
