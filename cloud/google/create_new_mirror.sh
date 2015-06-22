@@ -2,8 +2,13 @@
 set -e
 DIR=$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )
 GCLOUD="gcloud"
+if [ "$1" == "" ]; then
+  echo "Usage: $0 <config-file>"
+  exit 1
+fi
+CONFIG_FILE="$1"
 
-. ${DIR}/mirror-config.sh
+. ${DIR}/config.sh ${CONFIG_FILE}
 
 if [ ! -x ${DIR}/../../cpp/tools/ct-clustertool ]; then
   echo "Please ensure that cpp/tools/ct-clustertool is built."
@@ -51,7 +56,7 @@ ${GCLOUD} config set project ${PROJECT}
 
 echo "============================================================="
 echo "Creating etcd instances..."
-${DIR}/start_etcd.sh ${DIR}/mirror-config.sh
+${DIR}/start_etcd.sh ${CONFIG_FILE}
 
 WaitForEtcd
 
@@ -62,13 +67,13 @@ PopulateEtcd
 
 echo "============================================================="
 echo "Creating supermirror instances..."
-${DIR}/start_mirror.sh ${DIR}/mirror-config.sh
+${DIR}/start_mirror.sh ${CONFIG_FILE}
 
 if [ "${MONITORING}" == "prometheus" ]; then
   echo "============================================================="
   echo "Starting prometheus..."
-  ${DIR}/start_prometheus.sh ${DIR}/mirror-config.sh
-  ${DIR}/update_prometheus_config.sh ${DIR}/mirror-config.sh
+  ${DIR}/start_prometheus.sh ${CONFIG_FILE}
+  ${DIR}/update_prometheus_config.sh ${CONFIG_FILE}
 fi
 
 

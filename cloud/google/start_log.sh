@@ -1,7 +1,11 @@
 #!/bin/bash
 DIR=$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )
+if [ "$1" == "" ]; then
+  echo "Usage $0: <config-file>"
+  exit 1
+fi
 source ${DIR}/util.sh
-source ${DIR}/config.sh
+source ${DIR}/config.sh $1
 
 set -e
 GCLOUD="gcloud"
