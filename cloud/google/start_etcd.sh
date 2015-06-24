@@ -26,7 +26,12 @@ done
 wait
 
 MANIFEST=/tmp/etcd_container.yaml
-DISCOVERY=$(curl -s https://discovery.etcd.io/new?size=3)
+echo -n "Getting Discovery URL"
+while [ "${DISCOVERY}" == "" ]; do
+  DISCOVERY=$(curl -s https://discovery.etcd.io/new?size=${ETCD_NUM_REPLICAS})
+  echo .
+  sleep 1
+done
 
 echo
 echo "Using Discovery URL: ${DISCOVERY}"

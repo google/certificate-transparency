@@ -54,7 +54,7 @@ CMD cd /mnt/ctlog/ && \
         --etcd_delete_concurrency=100 \
         --num_http_server_threads=${NUM_HTTP_SERVER_THREADS} \
         --monitoring=${MONITORING} \
-        --google_compute_monitoring_push_url="http://www.googleapis.com/cloudmonitoring/v2beta2/projects/${PROJECT}/timeseries:write" \
+        --google_compute_monitoring_base_url="https://www.googleapis.com/cloudmonitoring/v2beta2/projects/${PROJECT}" \
         --v=${V_LEVEL}; \
     if [ -e core ]; then \
       CORE_DIR="/mnt/ctlog/cores/$(date +%s)"; \
