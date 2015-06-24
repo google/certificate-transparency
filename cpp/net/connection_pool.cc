@@ -138,8 +138,9 @@ void ConnectionPool::Connection::ReleaseConnection() {
 ConnectionPool::ConnectionPool(libevent::Base* base)
     : base_(CHECK_NOTNULL(base)),
       cleanup_scheduled_(false),
-      ssl_ctx_(CHECK_NOTNULL(SSL_CTX_new(TLSv1_client_method())),
-               SSL_CTX_free) {
+      ssl_ctx_(SSL_CTX_new(TLSv1_client_method()), SSL_CTX_free) {
+  CHECK(ssl_ctx_) << "could not build SSL context: " << DumpOpenSSLErrorStack();
+
   // Try to load trusted root certificates.
   // TODO(alcutter): This is probably Linux specific, we'll need other sections
   // for OSX etc.
