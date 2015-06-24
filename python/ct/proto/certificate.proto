@@ -2,6 +2,8 @@ syntax = "proto2";
 
 package ct;
 
+import "ct/proto/client.proto";
+
 message Validity {
   // Milliseconds since epoch.
   optional uint64 not_before = 1;
@@ -58,4 +60,6 @@ message X509Description {
   repeated Observation observations = 11;
 
   repeated DNAttribute root_issuer = 12;
+
+  optional LogEntryType entry_type = 13;
 }

@@ -13,6 +13,7 @@ from ct.client.db import cert_desc
 from ct.crypto import cert
 from ct.crypto import error
 from ct.proto import certificate_pb2
+from ct.proto import client_pb2
 from Queue import Queue
 
 FLAGS = gflags.FLAGS
@@ -34,7 +35,7 @@ def _scan_der_cert(der_certs, checks):
     current = -1
     try:
         result = []
-        for log_index, der_cert, der_chain in der_certs:
+        for log_index, der_cert, der_chain, entry_type in der_certs:
             current = log_index
             partial_result = []
             strict_failure = False
@@ -60,6 +61,9 @@ def _scan_der_cert(der_certs, checks):
                 desc = certificate_pb2.X509Description()
                 desc.der = der_cert
                 desc.sha256_hash = hashlib.sha256(der_cert).digest()
+
+            desc.entry_type = entry_type
+
             try:
                 root = cert.Certificate(der_chain[-1], strict_der=False)
             except error.Error:
@@ -113,7 +117,8 @@ class CertificateReport(object):
         """Scans certificates in der form for all supported observations.
 
         Args:
-            der_certs: non empty array of (log_index, der_cert, der_chain) tuples.
+            der_certs: non empty array of
+                       (log_index, der_cert, der_chain, entry_type) tuples.
         """
         if not self._pool:
             self._pool = multiprocessing.Pool(processes=FLAGS.reporter_workers)

@@ -314,7 +314,8 @@ class Monitor(object):
                     parsed_entry.extra_data.
                     precert_chain_entry.precertificate_chain)
             der_chain = der_chain[:]
-            der_certs.append((entry_index, der_cert, der_chain))
+            der_certs.append((entry_index, der_cert, der_chain,
+                              ts_entry.entry_type))
         self.__report.scan_der_certs(der_certs)
 
     class EntryConsumer(object):
