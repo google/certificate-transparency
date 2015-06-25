@@ -2,7 +2,9 @@ import re
 import hashlib
 import time
 from ct.crypto import cert
+from ct.crypto.asn1 import x509_common
 from ct.proto import certificate_pb2
+
 
 def from_cert(certificate, observations=[]):
     """Pulls out interesting fields from certificate, so format of data will
@@ -44,6 +46,26 @@ def from_cert(certificate, observations=[]):
     try:
         proto.serial_number = str(certificate.serial_number().human_readable()
                                   .upper().replace(':', ''))
+    except cert.CertificateError:
+        pass
+
+    try:
+        tbs_alg = certificate.signature()["algorithm"]
+        proto.tbs_signature.algorithm_id = tbs_alg.long_name
+
+        tbs_params = certificate.signature()["parameters"]
+        proto.tbs_signature.parameters = tbs_params.value
+
+        cert_alg = certificate.signature_algorithm()["algorithm"]
+        proto.cert_signature.algorithm_id = cert_alg.long_name
+
+        cert_params = certificate.signature_algorithm()["parameters"]
+        proto.cert_signature.parameters = cert_params.value
+    except cert.CertificateError:
+        pass
+
+    try:
+        proto.basic_constraint_ca = bool(certificate.basic_constraint_ca())
     except cert.CertificateError:
         pass
 

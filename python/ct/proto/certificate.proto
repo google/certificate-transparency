@@ -61,5 +61,9 @@ message X509Description {
 
   repeated DNAttribute root_issuer = 12;
 
+  // Type of Log Entry this cert came from: X509 or PRECERT.
   optional LogEntryType entry_type = 13;
+
+  // True if this cert has the Basic Constraint CA=TRUE.
+  optional bool basic_constraint_ca = 14;
 }
