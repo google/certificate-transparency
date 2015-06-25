@@ -13,8 +13,24 @@ import (
 	"sync"
 )
 
-func Hash(s *x509.Certificate) [sha256.Size]byte {
+const HashSize = sha256.Size
+
+func Hash(s *x509.Certificate) [HashSize]byte {
 	return sha256.Sum256(s.Raw)
+}
+
+func HashChain(ch []*x509.Certificate) (r [HashSize]byte) {
+	h := sha256.New()
+	for _, c := range ch {
+		// FIXME: surely there's an easier way?
+		h2 := make([]byte, HashSize)
+		h3 := Hash(c)
+		copy(h2, h3[:])
+		h.Write(h2)
+	}
+	h2 := h.Sum([]byte{})
+	copy(r[:], h2)
+	return 
 }
 
 func HexHash(s *x509.Certificate) string {

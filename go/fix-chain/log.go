@@ -31,10 +31,13 @@ type Log struct {
 	posts chan *toLog
 	active uint16
 	wg sync.WaitGroup  // Note that this counts the number of active requests, not active servers, because we can't close it to signal the end, because of retries.
+	postCache map[[HashSize]byte]bool
+	postChainCache map[[HashSize]byte]bool
+	pcMutex sync.Mutex
 }
 
 func NewLog(url string) *Log {
-	s := &Log{url: url, posts: make(chan *toLog)}
+	s := &Log{url: url, posts: make(chan *toLog), postCache: make(map[[HashSize]byte]bool), postChainCache: make(map[[HashSize]byte]bool)}
 	for i := 0 ; i < 100 ; i++ {
 		go s.postServer()
 	}
@@ -84,6 +87,11 @@ func (s *Log) getRoots() *x509.CertPool {
 }
 
 func (s *Log) postChain(l *toLog) {
+	h := Hash(l.chain[0])
+	if s.postCache[h] {
+		log.Printf("Already posted (late)")
+		return
+	}
 	type Chain struct {
 		Chain [][]byte `json:"chain"`
 	}
@@ -96,6 +104,7 @@ func (s *Log) postChain(l *toLog) {
 		log.Fatalf("Can't marshal: %s", err)
 	}
 	//log.Printf("post: %s", j)
+	
 	resp, err := http.Post(s.url + "/ct/v1/add-chain", "application/json", bytes.NewReader(j))
 	if err != nil {
 		// FIXME: can we figure out what the error was? So far
@@ -126,6 +135,7 @@ func (s *Log) postChain(l *toLog) {
 	if err != nil {
 		log.Fatalf("Can't read response: %s", err)
 	}
+	s.postCache[h] = true
 	//log.Printf("Log returned: %s", jo)
 }
 
@@ -144,9 +154,28 @@ func (s *Log) postServer() {
 func (s *Log) postToLog(l *toLog) {
 	s.wg.Add(1)
 	s.posts <- l
-}	
+}
 
 func (s *Log) PostChain(chain []*x509.Certificate) {
+	h := Hash(chain[0])
+	if s.postCache[h] {
+		log.Printf("Already posted")
+		return
+	}
+	// if we assume all chains for the same cert are equally
+	// likely to succeed, then we could mark the cert as posted
+	// here. However, bugs might cause a log to refuse one chain
+	// and accept another, so try each unique chain.
+	//s.postCache[h] = true
+	h = HashChain(chain)
+	s.pcMutex.Lock()
+	if s.postChainCache[h] {
+		s.pcMutex.Unlock()
+		log.Printf("Chain already posted")
+		return
+	}
+	s.postChainCache[h] = true
+	s.pcMutex.Unlock()
 	l := &toLog{ chain: chain, retries: 5 }
 	s.postToLog(l)
 }
