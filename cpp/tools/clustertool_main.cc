@@ -186,5 +186,6 @@ int main(int argc, char* argv[]) {
   LOG(INFO) << status;
   election->StopElection();
 
-  return status.error_code();
+  // TODO(alcutter): Watches hang forever even when Cancel()'d, fix that.
+  exit(status.error_code());
 }
