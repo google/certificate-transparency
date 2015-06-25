@@ -62,20 +62,6 @@ const char kStatsSpace[] = "/v2/stats";
 const char kStoreStatsKey[] = "/store";
 
 
-string MessageFromJsonStatus(const shared_ptr<JsonObject>& json) {
-  string message;
-  const JsonString m(*json, "message");
-
-  if (!m.Ok()) {
-    message = json->DebugString();
-  } else {
-    message = m.Value();
-  }
-
-  return message;
-}
-
-
 util::error::Code ErrorCodeForHttpResponseCode(int response_code) {
   switch (response_code) {
     case 200:
@@ -97,12 +83,70 @@ util::error::Code ErrorCodeForHttpResponseCode(int response_code) {
 }
 
 
-Status StatusFromResponseCode(const int response_code,
-                              const shared_ptr<JsonObject>& json) {
+util::error::Code StatusCodeFromEtcdErrorCode(int etcd_code) {
+  switch (etcd_code) {
+    case 100:  // Key not found
+      return util::error::NOT_FOUND;
+    case 101:  // Compare failed
+    case 102:  // Not a file
+    case 104:  // Not a directory
+    case 105:  // Key already exists
+    case 107:  // Root is read-only
+    case 108:  // Directory not empty
+      return util::error::FAILED_PRECONDITION;
+
+    case 201:  // PrevValue missing
+    case 202:  // Provided TTL is not a number
+    case 203:  // Provided index is not a number
+    case 209:  // Invalid field
+    case 210:  // Invalid POST form
+      return util::error::FAILED_PRECONDITION;
+
+    case 300:  // Raft Internal Error
+    case 301:  // During Leader Election
+      return util::error::UNAVAILABLE;
+
+    case 400:  // Watcher is cleared due to etcd recovery
+    case 401:  // Event in requested index is outdated and cleared.
+      return util::error::INVALID_ARGUMENT;
+
+    default:
+      return util::error::UNKNOWN;
+  }
+}
+
+
+string EtcdErrorMessage(const JsonObject& json) {
+  const JsonString message(json, "message");
+  const JsonString cause(json, "cause");
+
+  string ret("Etcd message: ");
+  if (message.Ok()) {
+    ret += message.Value();
+    if (cause.Ok()) {
+      ret += ", cause: " + string(cause.Value());
+    }
+  } else {
+    ret = json.DebugString();
+  }
+  return ret;
+}
+
+
+Status StatusFromResponse(int response_code, const JsonObject& json) {
+  // Prefer the etcd errorCode if there is one:
+  if (json.Ok()) {
+    const JsonInt error_code(json, "errorCode");
+    if (error_code.Ok()) {
+      return Status(StatusCodeFromEtcdErrorCode(error_code.Value()),
+                    EtcdErrorMessage(json));
+    }
+  }
+  // Otherwise use the HTTP code:
   const util::error::Code error_code(
       ErrorCodeForHttpResponseCode(response_code));
   const string error_message(
-      error_code == util::error::OK ? "" : MessageFromJsonStatus(json));
+      error_code == util::error::OK ? "" : json.DebugString());
   return Status(error_code, error_message);
 }
 
@@ -672,6 +716,8 @@ void EtcdClient::FetchDone(RequestState* etcd_req, Task* task) {
 
   etcd_req->gen_resp_->json_body =
       make_shared<JsonObject>(etcd_req->resp_.body);
+  CHECK_NOTNULL(etcd_req->gen_resp_->json_body.get());
+
   etcd_req->gen_resp_->etcd_index = -1;
 
   UrlFetcher::Headers::const_iterator it(
@@ -681,8 +727,8 @@ void EtcdClient::FetchDone(RequestState* etcd_req, Task* task) {
   }
 
   etcd_req->parent_task_->Return(
-      StatusFromResponseCode(etcd_req->resp_.status_code,
-                             etcd_req->gen_resp_->json_body));
+      StatusFromResponse(etcd_req->resp_.status_code,
+                         *etcd_req->gen_resp_->json_body));
 }
 
 
