@@ -717,6 +717,9 @@ void EtcdClient::FetchDone(RequestState* etcd_req, Task* task) {
   etcd_req->gen_resp_->json_body =
       make_shared<JsonObject>(etcd_req->resp_.body);
   CHECK_NOTNULL(etcd_req->gen_resp_->json_body.get());
+  if (!etcd_req->gen_resp_->json_body->Ok()) {
+    LOG(WARNING) << "Got invalid JSON: " << etcd_req->resp_.body;
+  }
 
   etcd_req->gen_resp_->etcd_index = -1;
 
