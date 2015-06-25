@@ -48,7 +48,7 @@ CMD cd /mnt/ctlog/ && \
         --log_dir=/mnt/ctlog/logs \
         --tree_signing_frequency_seconds=30 \
         --guard_window_seconds=10 \
-        --sqlite_db=/mnt/ctlog/sqlite.db \
+        --leveldb_db=/mnt/ctlog/log.ldb \
         --etcd_host=${ETCD_HOST} \
         --etcd_port=${ETCD_PORT} \
         --etcd_delete_concurrency=100 \
