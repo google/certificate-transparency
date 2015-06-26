@@ -32,20 +32,29 @@ using std::unique_ptr;
 using util::ClearOpenSSLErrors;
 using util::DumpOpenSSLErrorStack;
 
-DEFINE_int32(url_fetcher_max_conn_per_host_port, 4,
-             "maximum number of URL fetcher connections per host:port");
 DEFINE_int32(
-    connection_pool_max_unused_age_seconds, 60 * 30,
+    connection_read_timeout_seconds, 60,
+    "Connection read timeout in seconds, only applies while willing to read.");
+DEFINE_int32(connection_write_timeout_seconds, 60,
+             "Connection write timeout in seconds, only applies while willing "
+             "to write.");
+DEFINE_int32(
+    connection_pool_max_unused_age_seconds, 60 * 5,
     "When there are more than --url_fetcher_max_conn_per_host_port "
     "connections per host:port pair, any unused for at least this long will "
     "be removed.");
 DEFINE_string(trusted_root_certs, "/etc/ssl/certs/ca-certificates.crt",
               "Location of trusted CA root certs for outgoing SSL "
               "connections.");
+DEFINE_int32(url_fetcher_max_conn_per_host_port, 4,
+             "maximum number of URL fetcher connections per host:port");
 
 
 namespace cert_trans {
 namespace internal {
+
+
+const int kZeroMillis = 0;
 
 
 static Gauge<string>* connections_per_host_port(
@@ -248,6 +257,12 @@ unique_ptr<ConnectionPool::Connection> ConnectionPool::Get(const URL& url) {
             ? base_->HttpsConnectionNew(key.first, key.second, ssl_ctx_.get())
             : base_->HttpConnectionNew(key.first, key.second),
         move(key)));
+    struct timeval read_timeout = {FLAGS_connection_read_timeout_seconds,
+                                   kZeroMillis};
+    struct timeval write_timeout = {FLAGS_connection_write_timeout_seconds,
+                                    kZeroMillis};
+    evhtp_connection_set_timeouts(conn->connection(), &read_timeout,
+                                  &write_timeout);
     evhtp_set_hook(&conn->connection()->hooks, evhtp_hook_on_conn_error,
                    reinterpret_cast<evhtp_hook>(
                        Connection::ConnectionErrorHook),
