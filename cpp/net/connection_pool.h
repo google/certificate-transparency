@@ -71,6 +71,13 @@ class ConnectionPool {
   void Put(std::unique_ptr<Connection>&& conn);
 
  private:
+  typedef std::pair<std::chrono::system_clock::time_point,
+                    std::unique_ptr<Connection>> TimestampedConnection;
+
+  static void RemoveDeadConnectionsFromDeque(
+      const std::unique_lock<std::mutex>& lock,
+      std::deque<TimestampedConnection>* deque);
+
   void Cleanup();
 
   libevent::Base* const base_;
@@ -78,7 +85,7 @@ class ConnectionPool {
   std::mutex lock_;
   // We get and put connections from the back of the deque, and when
   // there are too many, we prune them from the front (LIFO).
-  std::map<HostPortPair, std::deque<std::unique_ptr<Connection>>> conns_;
+  std::map<HostPortPair, std::deque<TimestampedConnection>> conns_;
   bool cleanup_scheduled_;
 
   std::unique_ptr<evhtp_ssl_ctx_t, void (*)(evhtp_ssl_ctx_t*)> ssl_ctx_;

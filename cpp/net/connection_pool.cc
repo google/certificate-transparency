@@ -1,8 +1,10 @@
 #include "net/connection_pool.h"
 
+#include <chrono>
 #include <gflags/gflags.h>
 #include <glog/logging.h>
 
+#include "monitoring/monitoring.h"
 #include "util/openssl_util.h"
 
 extern "C" {
@@ -12,6 +14,9 @@ extern "C" {
 
 
 using std::bind;
+using std::chrono::duration_cast;
+using std::chrono::seconds;
+using std::chrono::system_clock;
 using std::lock_guard;
 using std::make_pair;
 using std::map;
@@ -21,6 +26,7 @@ using std::pair;
 using std::placeholders::_1;
 using std::placeholders::_2;
 using std::string;
+using std::to_string;
 using std::unique_lock;
 using std::unique_ptr;
 using util::ClearOpenSSLErrors;
@@ -28,6 +34,11 @@ using util::DumpOpenSSLErrorStack;
 
 DEFINE_int32(url_fetcher_max_conn_per_host_port, 4,
              "maximum number of URL fetcher connections per host:port");
+DEFINE_int32(
+    connection_pool_max_unused_age_seconds, 60 * 30,
+    "When there are more than --url_fetcher_max_conn_per_host_port "
+    "connections per host:port pair, any unused for at least this long will "
+    "be removed.");
 DEFINE_string(trusted_root_certs, "/etc/ssl/certs/ca-certificates.crt",
               "Location of trusted CA root certs for outgoing SSL "
               "connections.");
@@ -35,6 +46,16 @@ DEFINE_string(trusted_root_certs, "/etc/ssl/certs/ca-certificates.crt",
 
 namespace cert_trans {
 namespace internal {
+
+
+static Gauge<string>* connections_per_host_port(
+    Gauge<string>::New("connections_per_host_port", "host_port",
+                       "Number of cached connections port host:port"));
+
+
+string HostPortString(const HostPortPair& pair) {
+  return pair.first + ":" + to_string(pair.second);
+}
 
 
 // static
@@ -186,31 +207,26 @@ evhtp_res ConnectionPool::Connection::ConnectionErrorHook(
 }
 
 
-namespace {
-
-
-void RemoveDeadConnectionsFromDeque(
+// static
+void ConnectionPool::RemoveDeadConnectionsFromDeque(
     const unique_lock<mutex>& lock,
-    std::deque<std::unique_ptr<ConnectionPool::Connection>>* deque) {
+    std::deque<ConnectionPool::TimestampedConnection>* deque) {
   CHECK(lock.owns_lock());
   CHECK(deque);
 
   // Do a sweep and remove any dead connections
   for (auto deque_it(deque->begin()); deque_it != deque->end();) {
-    CHECK(*deque_it);
-    if (!(*deque_it)->connection()) {
+    CHECK(deque_it->second);
+    if (!deque_it->second->connection()) {
       VLOG(1) << "Removing dead connection to "
-              << (*deque_it)->other_end().first << ":"
-              << (*deque_it)->other_end().second;
+              << deque_it->second->other_end().first << ":"
+              << deque_it->second->other_end().second;
       deque_it = deque->erase(deque_it);
       continue;
     }
     ++deque_it;
   }
 }
-
-
-}  // namespace
 
 
 unique_ptr<ConnectionPool::Connection> ConnectionPool::Get(const URL& url) {
@@ -240,9 +256,9 @@ unique_ptr<ConnectionPool::Connection> ConnectionPool::Get(const URL& url) {
   }
 
   VLOG(1) << "cached evhtp_connection for " << key.first << ":" << key.second;
-  unique_ptr<ConnectionPool::Connection> retval(move(it->second.back()));
+  unique_ptr<ConnectionPool::Connection> retval(
+      move(it->second.back().second));
   it->second.pop_back();
-
   CHECK_NOTNULL(retval->connection());
 
   return retval;
@@ -266,7 +282,10 @@ void ConnectionPool::Put(unique_ptr<ConnectionPool::Connection>&& conn) {
   auto& entry(conns_[key]);
 
   CHECK_GE(FLAGS_url_fetcher_max_conn_per_host_port, 0);
-  entry.emplace_back(move(conn));
+  entry.emplace_back(make_pair(system_clock::now(), move(conn)));
+  const string hostport(HostPortString(key));
+  VLOG(1) << "ConnectionPool for " << hostport << " size : " << entry.size();
+  connections_per_host_port->Set(hostport, entry.size());
   if (!cleanup_scheduled_ &&
       entry.size() >
           static_cast<uint>(FLAGS_url_fetcher_max_conn_per_host_port)) {
@@ -279,14 +298,22 @@ void ConnectionPool::Put(unique_ptr<ConnectionPool::Connection>&& conn) {
 void ConnectionPool::Cleanup() {
   unique_lock<mutex> lock(lock_);
   cleanup_scheduled_ = false;
+  const system_clock::time_point cutoff(
+      system_clock::now() -
+      seconds(FLAGS_connection_pool_max_unused_age_seconds));
 
-  // std::map<HostPortPair, std::deque<unique_ptr<Connection>>> conns_;
+  // conns_ is a std::map<HostPortPair, std::deque<TimestampedConnection>>
   for (auto& entry : conns_) {
     RemoveDeadConnectionsFromDeque(lock, &entry.second);
-    while (entry.second.size() >
-           static_cast<uint>(FLAGS_url_fetcher_max_conn_per_host_port)) {
+    while (entry.second.front().first < cutoff &&
+           entry.second.size() >
+               static_cast<uint>(FLAGS_url_fetcher_max_conn_per_host_port)) {
       entry.second.pop_front();
     }
+    const string hostport(HostPortString(entry.first));
+    VLOG(1) << "ConnectionPool for " << hostport
+            << " size : " << entry.second.size();
+    connections_per_host_port->Set(hostport, entry.second.size());
   }
 }
 
