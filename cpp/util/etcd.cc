@@ -108,7 +108,7 @@ util::error::Code StatusCodeFromEtcdErrorCode(int etcd_code) {
 
     case 400:  // Watcher is cleared due to etcd recovery
     case 401:  // Event in requested index is outdated and cleared.
-      return util::error::INVALID_ARGUMENT;
+      return util::error::ABORTED;
 
     default:
       return util::error::UNKNOWN;
