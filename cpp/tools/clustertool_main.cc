@@ -133,8 +133,12 @@ ClusterConfig LoadConfig() {
 int main(int argc, char* argv[]) {
   google::ParseCommandLineFlags(&argc, &argv, true);
   google::InitGoogleLogging(argv[0]);
+  evhtp_ssl_use_threads();
   OpenSSL_add_all_algorithms();
+  ERR_load_BIO_strings();
   ERR_load_crypto_strings();
+  SSL_load_error_strings();
+  SSL_library_init();
   evthread_use_pthreads();
   FLAGS_logtostderr = true;
 
@@ -182,5 +186,6 @@ int main(int argc, char* argv[]) {
   LOG(INFO) << status;
   election->StopElection();
 
-  return status.error_code();
+  // TODO(alcutter): Watches hang forever even when Cancel()'d, fix that.
+  exit(status.error_code());
 }

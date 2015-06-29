@@ -30,7 +30,7 @@ function WaitForEtcd() {
   done
 }
 
-function PopulateEtcd() {
+function PopulateEtcdForLog() {
   export PUT="curl -s -L -X PUT --retry 10"
   export ETCD="${ETCD_MACHINES[1]}:4001"
   gcloud compute ssh ${ETCD_MACHINES[1]} \
@@ -42,18 +42,10 @@ function PopulateEtcd() {
     ${PUT} ${ETCD}/v2/keys/root/entries/ -d dir=true && \
     ${PUT} ${ETCD}/v2/keys/root/nodes/ -d dir=true"
 
-  # Workaround copy-files ignoring the --zone flag:
-  gcloud config set compute/zone ${ETCD_ZONES[1]}
-  gcloud compute copy-files \
-      ${DIR}/../../cpp/tools/ct-clustertool ${ETCD_MACHINES[1]}:. \
-      --zone ${ETCD_ZONES[1]}
-  # Remove workaround
-  gcloud config unset compute/zone
-
   gcloud compute ssh ${ETCD_MACHINES[1]} \
       --zone ${ETCD_ZONES[1]} \
       --command "\
-    sudo docker run localhost:5000/certificate_transparency/super_duper:test \
+    sudo docker run gcr.io/${PROJECT}/super_duper:test \
       /usr/local/bin/ct-clustertool initlog \
       --key=/usr/local/etc/ct-server-key.pem \
       --etcd_host=${ETCD_MACHINES[1]} \
@@ -61,14 +53,24 @@ function PopulateEtcd() {
       --logtostderr"
 }
 
+function PopulateEtcdForMirror() {
+  export PUT="curl -s -L -X PUT --retry 10"
+  export ETCD="${ETCD_MACHINES[1]}:4001"
+  gcloud compute ssh ${ETCD_MACHINES[1]} \
+      --zone ${ETCD_ZONES[1]} \
+      --command "\
+    ${PUT} ${ETCD}/v2/keys/root/serving_sth && \
+    ${PUT} ${ETCD}/v2/keys/root/cluster_config && \
+    ${PUT} ${ETCD}/v2/keys/root/nodes/ -d dir=true"
+}
+
+
 echo "============================================================="
-echo "Creating new GCE-based cluster."
+echo "Creating new GCE-based ${INSTANCE_TYPE} cluster."
 echo "============================================================="
 
 # Set gcloud defaults:
 ${GCLOUD} config set project ${PROJECT}
-${GCLOUD} config unset compute/zone
-
 
 echo "============================================================="
 echo "Creating etcd instances..."
@@ -78,12 +80,31 @@ WaitForEtcd
 
 echo "============================================================="
 echo "Populating etcd with default entries..."
-PopulateEtcd
-
+case "${INSTANCE_TYPE}" in
+  "log")
+    PopulateEtcdForLog
+    ;;
+  "mirror")
+    PopulateEtcdForMirror
+    ;;
+  *)
+    echo "Unknown INSTANCE_TYPE: ${INSTANCE_TYPE}"
+    exit 1
+esac
 
 echo "============================================================="
-echo "Creating superduper instances..."
-${DIR}/start_log.sh ${CONFIG_FILE}
+echo "Creating superduper ${INSTANCE_TYPE} instances..."
+case "${INSTANCE_TYPE}" in
+  "log")
+    ${DIR}/start_log.sh ${CONFIG_FILE}
+    ;;
+  "mirror")
+    ${DIR}/start_mirror.sh ${CONFIG_FILE}
+    ;;
+  *)
+    echo "Unknown INSTANCE_TYPE: ${INSTANCE_TYPE}"
+    exit 1
+esac
 
 if [ "${MONITORING}" == "prometheus" ]; then
   echo "============================================================="
@@ -92,29 +113,6 @@ if [ "${MONITORING}" == "prometheus" ]; then
   ${DIR}/update_prometheus_config.sh ${CONFIG_FILE}
 fi
 
-
-echo "============================================================="
-echo "Creating network rules..."
-gcloud compute http-health-checks create get-sth-check \
-    --port 80 \
-    --request-path /ct/v1/get-sth
-gcloud compute firewall-rules create log-node-80 \
-    --allow tcp:80 \
-    --target-tags log-node
-gcloud compute target-pools create log-pool \
-    --region ${REGION} \
-    --health-check get-sth-check
-gcloud compute target-pools add-instances log-pool \
-    --zone $ZONE \
-    --instances ${LOG_MACHINES[@]}
-gcloud compute forwarding-rules create log-fwd-rule \
-    --region $REGION \
-    --port-range 80 \
-    --target-pool log-pool
-
-echo "============================================================="
-echo "External IPs:"
-gcloud compute forwarding-rules list
-echo "============================================================="
+${DIR}/configure_service.sh ${CONFIG_FILE}
 
 echo "Job done!"
