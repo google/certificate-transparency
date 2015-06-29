@@ -1,9 +1,9 @@
 #!/usr/bin/env python
 """Generates a list of hashes of EV certificates found in a log."""
 
+import httplib2
 import json
 import os
-import requests
 import shutil
 import StringIO
 import sys
@@ -43,12 +43,16 @@ gflags.DEFINE_string("output_truncated_hashes", "raw_truncated_hashes",
 class EVCRXHandler(object):
     """Produces updated EV whitelist Chrome extension."""
     def __init__(self, crx_url=CRX_URL):
-        req = requests.get(crx_url)
-        if not req.ok:
+        http = httplib2.Http()
+        http.force_exception_to_status_code = True
+        response_header, response_body = http.request(crx_url)
+        status = (int(response_header["status"])
+                  if "status" in response_header else 0)
+        if status != 200:
             raise Exception("Error while fetching %s: %d" %
-                            crx_url, req.status_code)
+                            crx_url, status)
         # Skip the CRX header.
-        crx_zip_bytes = req.content[566:]
+        crx_zip_bytes = response_body[566:]
         sio = StringIO.StringIO(crx_zip_bytes)
         zipped_crx = zipfile.ZipFile(sio)
         unpacked_crx_dir = tempfile.mkdtemp(prefix="tmpcrx")

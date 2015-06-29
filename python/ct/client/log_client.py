@@ -1,14 +1,16 @@
 """RFC 6962 client API."""
 import base64
 import json
-
+import collections
 from ct.client.db import database
 from ct.crypto import verify
 from ct.proto import client_pb2
 import gflags
+import httplib2
 import logging
 import random
-import requests
+import urllib
+import urlparse
 
 from twisted.internet import defer
 from twisted.internet import error
@@ -196,9 +198,8 @@ def _parse_consistency_proof(response, servername):
 # A class that we can mock out to generate fake responses.
 class RequestHandler(object):
     """HTTPS requests."""
-    def __init__(self, connection_timeout=60, ca_bundle=True):
-      self._timeout = connection_timeout
-      self._ca_bundle = ca_bundle
+    def __init__(self, connection_timeout=60, ca_bundle=None):
+        self._http = httplib2.Http(timeout=connection_timeout, ca_certs=ca_bundle)
 
     def __repr__(self):
         return "%r()" % self.__class__.__name__
@@ -209,17 +210,20 @@ class RequestHandler(object):
     def get_response(self, uri, params=None):
         """Get an HTTP response for a GET request."""
         try:
-            return requests.get(uri, params=params, timeout=self._timeout,
-                                verify=self._ca_bundle)
-        except requests.exceptions.RequestException as e:
+            return self._build_requests_style_response(
+                self._http.request(self._uri_with_params(uri, params)))
+        except httplib2.HttpLib2Error as e:
             raise HTTPError("Connection to %s failed: %s" % (uri, e))
 
     def post_response(self, uri, post_data):
         try:
-            return requests.post(uri, data=json.dumps(post_data),
-                                 timeout=self._timeout, verify=self._ca_bundle)
-        except requests.exceptions.RequestException as e:
+            return self._build_requests_style_response(
+                self._http.request(uri, "POST", json.dumps(post_data)))
+        except httplib2.HttpLib2Error as e:
             raise HTTPError("POST to %s failed: %s" % (uri, e))
+
+    # Mimic the Response class from the requests API.
+    Response = collections.namedtuple('Response', ['status_code', 'reason', 'content', 'headers'])
 
     @staticmethod
     def check_response_status(code, reason, content='', headers=''):
@@ -231,6 +235,22 @@ class RequestHandler(object):
             raise HTTPServerError("%s (%s) %s" % (reason, content, headers))
         else:
             raise HTTPError("%s (%s) %s" % (reason, content, headers))
+
+    @staticmethod
+    def _uri_with_params(uri, params=None):
+        if not params:
+            return uri
+        components = list(urlparse.urlparse(uri))
+        if params:
+            # Update the URI query, which is at index 4 of the tuple.
+            components[4] = urllib.urlencode(params)
+        return urlparse.urlunparse(components)
+
+    @staticmethod
+    def _build_requests_style_response((resp_hdr, resp_body)):
+        status_code = int(resp_hdr.pop("status")) if "status" in resp_hdr else 0
+        reason = resp_hdr["reason"] if "reason" in resp_hdr else ""
+        return RequestHandler.Response(status_code, reason, resp_body, resp_hdr)
 
     def get_response_body(self, uri, params=None):
         response = self.get_response(uri, params=params)
@@ -260,16 +280,13 @@ class LogClient(object):
         handler: A custom RequestHandler to use. If not specified, a new one
         will be created.
         connection_timeout: Timeout (in seconds) for all GET and POST requests.
-        ca_bundle: True or a file path containing a set of CA roots. See
-        Requests documentation for more information:
-        http://docs.python-requests.org/en/latest/user/advanced/#ssl-cert-verification
-        Note that a false-y value is not allowed.
+        ca_bundle: None or a file path containing a set of CA roots.  If None,
+        httplib2 will attempt to locate a set of CA roots, falling back on its
+        own bundle if need be. See httplib2 documentation for more information.
     """
     def __init__(self, uri, handler=None, connection_timeout=60,
-                 ca_bundle=True):
+                 ca_bundle=None):
         self._uri = uri
-        if not ca_bundle:
-          raise ClientError("Refusing to turn off SSL certificate checking.")
         if handler:
           self._req = handler
         else:

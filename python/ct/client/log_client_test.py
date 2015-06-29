@@ -337,6 +337,19 @@ class LogClientTest(unittest.TestCase):
         self.assertRaises(log_client.InvalidResponseError,
                           client._parse_sct, json_sct_response)
 
+    def test_uri_with_params(self):
+        self.assertEqual(
+            'http://www.google.com',
+            log_client.RequestHandler._uri_with_params('http://www.google.com',
+                                                      {}))
+        self.assertEqual(
+            'http://www.google.com?a=1&b=2',
+            log_client.RequestHandler._uri_with_params('http://www.google.com',
+                                                      {'a': 1, 'b': 2}))
+        self.assertEqual(
+            'http://www.google.com/?a=1&b=foo+bar',
+            log_client.RequestHandler._uri_with_params('http://www.google.com/',
+                                                      {'a': 1, 'b': 'foo bar'}))
 
 if __name__ == "__main__":
     sys.argv = FLAGS(sys.argv)

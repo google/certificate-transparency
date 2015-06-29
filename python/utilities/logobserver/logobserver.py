@@ -1,10 +1,10 @@
 #!/usr/bin/env python
 import gflags
 from google.protobuf import text_format
+import httplib2
 import logging
 import os
 import sys
-import requests
 
 from ct.cert_analysis import tld_list
 from ct.client.db import sqlite_connection as sqlitecon
@@ -39,13 +39,14 @@ if __name__ == '__main__':
     create_directory(FLAGS.ct_sqlite_temp_dir)
     create_directory(FLAGS.monitor_state_dir)
 
-    try:
-        list_ = requests.get(tld_list.TLD_LIST_ADDR, timeout=5)
-        if list_.status_code == 200:
-            create_directory(FLAGS.tld_list_dir)
-            with open('/'.join((FLAGS.tld_list_dir, "tld_list")), 'w') as f:
-                f.write(list_.content)
-    except requests.exceptions.RequestException:
+    http = httplib2.Http(timeout=5)
+    http.force_exception_to_status_code = True
+    resp_hdr, resp_body = http.request(tld_list.TLD_LIST_ADDR)
+    if resp_hdr["status"] and int(resp_hdr["status"]) == 200:
+        create_directory(FLAGS.tld_list_dir)
+        with open('/'.join((FLAGS.tld_list_dir, "tld_list")), 'w') as f:
+            f.write(resp_body)
+    else:
         logging.warning("Couldn't fetch top level domain list")
 
     sqlite_log_db = sqlite_log_db.SQLiteLogDB(
