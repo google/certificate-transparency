@@ -105,11 +105,11 @@ def _scan(entry_queue, log_url, range_description):
         entries = client.get_entries(range_start, range_end)
         scanned = range_start
         for entry in entries:
-            scanned += 1
             # Can't pickle protocol buffers with protobuf module version < 2.5.0
             # (https://code.google.com/p/protobuf/issues/detail?id=418)
             # so send serialized entry.
             entry_queue.put((scanned, entry.SerializeToString()))
+            scanned += 1
     except Exception as e:
         print "Exception when fetching range %d to %d:\n%s" % (
             range_start, range_end, e)
