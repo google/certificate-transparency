@@ -9,10 +9,11 @@ from ct.cert_analysis import observation
 
 CERT = cert.Certificate.from_der_file("ct/crypto/testdata/google_cert.der")
 CA_CERT = cert.Certificate.from_pem_file("ct/crypto/testdata/verisign_intermediate.pem")
+DSA_SHA256_CERT = cert.Certificate.from_der_file("ct/crypto/testdata/dsa_with_sha256.der")
 
 class CertificateDescriptionTest(unittest.TestCase):
     def test_from_cert(self):
-        for test_case in [(CERT, False), (CA_CERT, True)]:
+        for test_case in [(CERT, False), (DSA_SHA256_CERT, False), (CA_CERT, True)]:
             (source, expect_ca_true) = test_case
 
             observations = []
@@ -71,10 +72,18 @@ class CertificateDescriptionTest(unittest.TestCase):
             self.assertEqual(proto.tbs_signature.algorithm_id,
                              proto.cert_signature.algorithm_id)
 
-            self.assertEqual(proto.tbs_signature.parameters,
-                             source.signature()["parameters"])
-            self.assertEqual(proto.cert_signature.parameters,
-                             source.signature_algorithm()["parameters"])
+            if source.signature()["parameters"]:
+                self.assertEqual(proto.tbs_signature.parameters,
+                                 source.signature()["parameters"])
+            else:
+                self.assertFalse(proto.tbs_signature.HasField('parameters'))
+
+            if source.signature_algorithm()["parameters"]:
+                self.assertEqual(proto.cert_signature.parameters,
+                                 source.signature_algorithm()["parameters"])
+            else:
+                self.assertFalse(proto.cert_signature.HasField('parameters'))
+
             self.assertEqual(proto.tbs_signature.parameters,
                              proto.cert_signature.parameters)
 
