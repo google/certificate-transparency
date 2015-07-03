@@ -172,14 +172,13 @@ ECDSA_WITH_SHA384 = ObjectIdentifier(value="1.2.840.10045.4.3.3")
 ECDSA_WITH_SHA512 = ObjectIdentifier(value="1.2.840.10045.4.3.4")
 # RFC 4055
 ID_RSASSA_PSS = ObjectIdentifier(value="1.2.840.113549.1.1.10")
-# RFC 4491
-ID_GOSTR3411_94_WITH_GOSTR3410_94 = ObjectIdentifier(value="1.2.643.2.2.4")
-ID_GOSTR3411_94_WITH_GOSTR3410_2001 = ObjectIdentifier(value="1.2.643.2.2.3")
-# RFC 3447
 ID_SHA256_WITH_RSA_ENCRYPTION = ObjectIdentifier(value="1.2.840.113549.1.1.11")
 ID_SHA384_WITH_RSA_ENCRYPTION = ObjectIdentifier(value="1.2.840.113549.1.1.12")
 ID_SHA512_WITH_RSA_ENCRYPTION = ObjectIdentifier(value="1.2.840.113549.1.1.13")
 ID_SHA224_WITH_RSA_ENCRYPTION = ObjectIdentifier(value="1.2.840.113549.1.1.14")
+# RFC 4491
+ID_GOSTR3411_94_WITH_GOSTR3410_94 = ObjectIdentifier(value="1.2.643.2.2.4")
+ID_GOSTR3411_94_WITH_GOSTR3410_2001 = ObjectIdentifier(value="1.2.643.2.2.3")
 # RFC 5758
 ID_DSA_WITH_SHA224 = ObjectIdentifier(value="2.16.840.1.101.3.4.3.1")
 ID_DSA_WITH_SHA256 = ObjectIdentifier(value="2.16.840.1.101.3.4.3.2")
