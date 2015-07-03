@@ -51,16 +51,20 @@ def from_cert(certificate, observations=[]):
 
     try:
         tbs_alg = certificate.signature()["algorithm"]
-        proto.tbs_signature.algorithm_id = tbs_alg.long_name
+        if tbs_alg:
+            proto.tbs_signature.algorithm_id = tbs_alg.long_name
 
         tbs_params = certificate.signature()["parameters"]
-        proto.tbs_signature.parameters = tbs_params.value
+        if tbs_params:
+            proto.tbs_signature.parameters = tbs_params.value
 
         cert_alg = certificate.signature_algorithm()["algorithm"]
-        proto.cert_signature.algorithm_id = cert_alg.long_name
+        if cert_alg:
+            proto.cert_signature.algorithm_id = cert_alg.long_name
 
         cert_params = certificate.signature_algorithm()["parameters"]
-        proto.cert_signature.parameters = cert_params.value
+        if cert_params:
+            proto.cert_signature.parameters = cert_params.value
     except cert.CertificateError:
         pass
 
