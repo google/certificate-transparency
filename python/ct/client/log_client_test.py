@@ -342,14 +342,18 @@ class LogClientTest(unittest.TestCase):
             'http://www.google.com',
             log_client.RequestHandler._uri_with_params('http://www.google.com',
                                                       {}))
-        self.assertEqual(
-            'http://www.google.com?a=1&b=2',
+
+        self.assertIn(
             log_client.RequestHandler._uri_with_params('http://www.google.com',
-                                                      {'a': 1, 'b': 2}))
-        self.assertEqual(
-            'http://www.google.com/?a=1&b=foo+bar',
+                                                       {'a': 1, 'b': 2}),
+            ['http://www.google.com?a=1&b=2', 'http://www.google.com?b=2&a=1'])
+
+        self.assertIn(
             log_client.RequestHandler._uri_with_params('http://www.google.com/',
-                                                      {'a': 1, 'b': 'foo bar'}))
+                                                       {'a': 1,
+                                                        'b': 'foo bar'}),
+            ['http://www.google.com/?a=1&b=foo+bar',
+             'http://www.google.com/?b=foo+bar&a=1'])
 
 if __name__ == "__main__":
     sys.argv = FLAGS(sys.argv)
