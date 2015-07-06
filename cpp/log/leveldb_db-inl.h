@@ -274,8 +274,9 @@ typename Database<Logged>::WriteResult LevelDB<Logged>::WriteTreeHead_(
     return this->DUPLICATE_TREE_HEAD_TIMESTAMP;
   }
 
-  status =
-      db_->Put(leveldb::WriteOptions(), kTreeHeadPrefix + timestamp_key, data);
+  leveldb::WriteOptions opts;
+  opts.sync = true;
+  status = db_->Put(opts, kTreeHeadPrefix + timestamp_key, data);
   CHECK(status.ok()) << "Failed to write tree head (" << timestamp_key
                      << "): " << status.ToString();
 
