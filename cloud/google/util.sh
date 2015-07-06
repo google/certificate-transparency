@@ -31,6 +31,28 @@ function WaitMachineUp() {
   echo "${1} is up."
 }
 
+function WaitHttpStatus() {
+  INSTANCE=${1}
+  ZONE=${2}
+  HTTP_PATH=${3}
+  WANTED_STATUS=${4:-200}
+  URL=${INSTANCE}:80${HTTP_PATH}
+  echo "Waiting for HTTP ${WANTED_STATUS} from ${URL} "
+  ${GCLOUD} compute ssh ${INSTANCE} \
+    --zone ${ZONE} \
+    --command "
+      STATUS_CODE=''
+      while [ \"\${STATUS_CODE}\" != \"${WANTED_STATUS}\" ]; do
+        STATUS_CODE=\$(curl --write-out %{http_code} \
+            --silent \
+            --output /dev/null \
+            ${URL})
+        echo -n .
+        sleep 1
+      done"
+}
+
+
 function AppendAndJoin {
   local SUFFIX=${1}
   local SEPARATOR=${2}

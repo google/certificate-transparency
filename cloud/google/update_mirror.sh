@@ -11,8 +11,6 @@ set -e
 GCLOUD="gcloud"
 
 Header "Updating mirror instances..."
-# TODO(alcutter): Wait for each task (or zone?) to be healthy before
-# proceeding.
 for i in `seq 0 $((${MIRROR_NUM_REPLICAS} - 1))`; do
   echo "Updating ${MIRROR_MACHINES[${i}]}"
   gcloud compute ssh ${MIRROR_MACHINES[${i}]} \
@@ -20,6 +18,7 @@ for i in `seq 0 $((${MIRROR_NUM_REPLICAS} - 1))`; do
       --command \
           'sudo docker pull gcr.io/'${PROJECT}'/super_mirror:test &&
            sudo docker kill $(sudo docker ps | grep super_mirror | awk -- "{print \$1}" )'
+  WaitHttpStatus ${MIRROR_MACHINES[${i}]} ${MIRRORLOG_ZONES[${i}]} /ct/v1/get-sth 200
 done;
 
 
