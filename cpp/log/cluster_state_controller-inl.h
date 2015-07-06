@@ -273,8 +273,8 @@ void ClusterStateController<Logged>::OnClusterStateUpdated(
   for (const auto& update : updates) {
     const std::string& node_id(update.handle_.Key());
     if (update.exists_) {
-      VLOG(1) << "Node joined: " << node_id;
       auto it(all_peers_.find(node_id));
+      VLOG_IF(1, it == all_peers_.end()) << "Node joined: " << node_id;
 
       // If the host or port change, remove the ClusterPeer, so that
       // we re-create it.
@@ -348,8 +348,8 @@ void ClusterStateController<Logged>::OnServingSthUpdated(
     }
 
     actual_serving_sth_.reset(new ct::SignedTreeHead(update.handle_.Entry()));
-    LOG(INFO) << "Received new Serving STH:\n"
-              << actual_serving_sth_->DebugString();
+    LOG(INFO) << "Received new Serving STH: "
+              << actual_serving_sth_->ShortDebugString();
     serving_tree_size->Set(actual_serving_sth_->tree_size());
     serving_tree_timestamp->Set(actual_serving_sth_->timestamp());
 
@@ -447,6 +447,7 @@ void ClusterStateController<Logged>::CalculateServingSTH(
       calculated_serving_sth_ ? calculated_serving_sth_->tree_size() : 0);
   CHECK_LE(0, current_tree_size);
 
+  bool candidates_include_current(false);
   // Work backwards (from largest STH size) until we see that there's enough
   // coverage (according to the criteria above) to serve an STH (or determine
   // that there are insufficient nodes to serve anything.)
@@ -470,6 +471,8 @@ void ClusterStateController<Logged>::CalculateServingSTH(
         VLOG(1) << "Discarding candidate STH:\n" << candidate_sth.DebugString()
                 << "\nbecause its timestamp is <= current serving STH "
                 << "timestamp (" << actual_serving_sth_->timestamp() << ")";
+        candidates_include_current |= candidate_sth.SerializeAsString() ==
+                                      actual_serving_sth_->SerializeAsString();
         continue;
       }
 
@@ -479,7 +482,7 @@ void ClusterStateController<Logged>::CalculateServingSTH(
           new ct::SignedTreeHead(sth_by_size[it->first]));
       // Push this STH out to the cluster if we're master:
       if (election_->IsMaster()) {
-        LOG(INFO) << "Pushing new STH out to cluster";
+        VLOG(1) << "Pushing new STH out to cluster";
         update_required_ = true;
         update_required_cv_.notify_all();
       } else {
@@ -490,7 +493,11 @@ void ClusterStateController<Logged>::CalculateServingSTH(
   }
   // TODO(alcutter): Add a mechanism to take the cluster off-line until we have
   // sufficient nodes able to serve.
-  LOG(WARNING) << "Failed to determine suitable serving STH.";
+  if (!candidates_include_current) {
+    LOG(WARNING) << "Failed to determine suitable serving STH.";
+  } else {
+    VLOG(1) << "Continuing to serve previous STH.";
+  }
 }
 
 
@@ -522,10 +529,9 @@ void ClusterStateController<Logged>::ClusterServingSTHUpdater() {
     if (election_->IsMaster()) {
       LOG(INFO) << "Setting cluster serving STH @ " << local_sth.timestamp();
       util::Status status(store_->SetServingSTH(local_sth));
-      if (!status.ok()) {
-        LOG(WARNING) << "SetServingSTH @ " << local_sth.timestamp()
-                     << " failed: " << status;
-      }
+      LOG_IF(WARNING, !status.ok()) << "SetServingSTH @ "
+                                    << local_sth.timestamp()
+                                    << " failed: " << status;
     } else {
       LOG(INFO) << "Not setting cluster serving STH because no-longer master.";
     }
