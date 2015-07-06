@@ -11,8 +11,6 @@ set -e
 GCLOUD="gcloud"
 
 Header "Updating log instances..."
-# TODO(alcutter): Wait for each task (or zone?) to be healthy before
-# proceeding.
 for i in `seq 0 $((${LOG_NUM_REPLICAS} - 1))`; do
   echo "Updating ${LOG_MACHINES[${i}]}"
   gcloud compute ssh ${LOG_MACHINES[${i}]} \
@@ -20,6 +18,7 @@ for i in `seq 0 $((${LOG_NUM_REPLICAS} - 1))`; do
       --command \
           'sudo docker pull gcr.io/'${PROJECT}'/super_duper:test &&
            sudo docker kill $(sudo docker ps | grep super_duper | awk -- "{print \$1}" )'
+  WaitHttpStatus ${LOG_MACHINES[${i}]} ${LOG_ZONES[${i}]} /ct/v1/get-sth 200
 done;
 
 
