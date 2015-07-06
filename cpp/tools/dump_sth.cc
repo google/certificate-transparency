@@ -4,6 +4,7 @@
 #include <iostream>
 
 #include "proto/ct.pb.h"
+#include "version.h"
 
 using std::cout;
 using std::endl;
@@ -27,6 +28,8 @@ void DumpSth(const char *filename) {
 int main(int argc, char *argv[]) {
   google::ParseCommandLineFlags(&argc, &argv, true);
   google::InitGoogleLogging(argv[0]);
+
+  LOG(INFO) << "Build version: " << kBuildVersion;
 
   for (int i = 1; i < argc; ++i)
     DumpSth(argv[i]);

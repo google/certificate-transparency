@@ -12,8 +12,15 @@ BUILT_SOURCES = \
 	cpp/gtest-all.cc \
 	cpp/monitoring/prometheus/metrics.pb.cc \
 	cpp/monitoring/prometheus/metrics.pb.h \
+	cpp/version.h \
 	proto/ct.pb.cc \
 	proto/ct.pb.h
+
+BUILD_VERSION=`git describe --abbrev=0 --dirty --always --tags`
+
+.PHONY: cpp/version.h
+cpp/version.h:
+	$(AM_V_GEN)echo "const char kBuildVersion[] = \"$(BUILD_VERSION)\";" > $@-t && mv $@-t $@
 
 bin_PROGRAMS = \
 	cpp/client/ct \

@@ -83,6 +83,7 @@
 /cpp/util/sync_task_test
 /cpp/util/task_test
 /cpp/util/thread_pool_test
+/cpp/version.h
 /depcomp
 /install-sh
 /java/build
