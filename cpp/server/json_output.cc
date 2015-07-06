@@ -91,7 +91,7 @@ void JsonOutput::SendJsonReply(evhttp_request* req, int http_status,
   const auto send_reply([req, http_status, logstr]() {
     evhttp_send_reply(req, http_status, /*reason*/ NULL, /*databuf*/ NULL);
 
-    LOG(INFO) << logstr;
+    VLOG(1) << logstr;
   });
 
   if (!libevent::Base::OnEventThread()) {
