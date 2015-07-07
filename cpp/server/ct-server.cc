@@ -35,6 +35,7 @@
 #include "util/status.h"
 #include "util/thread_pool.h"
 #include "util/uuid.h"
+#include "version.h"
 
 DEFINE_string(server, "localhost", "Server host");
 DEFINE_int32(port, 9999, "Server port");
@@ -331,6 +332,8 @@ int main(int argc, char* argv[]) {
   google::ParseCommandLineFlags(&argc, &argv, true);
   google::InitGoogleLogging(argv[0]);
   google::InstallFailureSignalHandler();
+
+  LOG(INFO) << "Build version: " << kBuildVersion;
 
   Server<LoggedCertificate>::StaticInit();
 

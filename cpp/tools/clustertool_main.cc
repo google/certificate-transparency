@@ -20,6 +20,7 @@
 #include "util/read_key.h"
 #include "util/status.h"
 #include "util/thread_pool.h"
+#include "version.h"
 
 namespace libevent = cert_trans::libevent;
 
@@ -133,6 +134,10 @@ ClusterConfig LoadConfig() {
 int main(int argc, char* argv[]) {
   google::ParseCommandLineFlags(&argc, &argv, true);
   google::InitGoogleLogging(argv[0]);
+  FLAGS_logtostderr = true;
+
+  LOG(INFO) << "Build version: " << kBuildVersion;
+
   evhtp_ssl_use_threads();
   OpenSSL_add_all_algorithms();
   ERR_load_BIO_strings();
@@ -140,7 +145,6 @@ int main(int argc, char* argv[]) {
   SSL_load_error_strings();
   SSL_library_init();
   evthread_use_pthreads();
-  FLAGS_logtostderr = true;
 
   if (argc == 1) {
     Usage();

@@ -7,6 +7,7 @@
 #include "util/libevent_wrapper.h"
 #include "util/sync_task.h"
 #include "util/thread_pool.h"
+#include "version.h"
 
 namespace libevent = cert_trans::libevent;
 
@@ -37,6 +38,9 @@ void Notify(const vector<EtcdClient::Node>& updates) {
 int main(int argc, char* argv[]) {
   google::ParseCommandLineFlags(&argc, &argv, true);
   google::InitGoogleLogging(argv[0]);
+
+  LOG(INFO) << "Build version: " << kBuildVersion;
+
   evthread_use_pthreads();
 
   libevent::Base event_base;
