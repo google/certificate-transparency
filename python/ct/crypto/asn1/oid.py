@@ -243,6 +243,11 @@ ID_QT_CPS = ObjectIdentifier(value="1.3.6.1.5.5.7.2.1")
 ID_QT_UNOTICE = ObjectIdentifier(value="1.3.6.1.5.5.7.2.2")
 ANY_POLICY = ObjectIdentifier(value="2.5.29.32.0")
 
+# CT Specific
+CT_EMBEDDED_SCT_LIST = ObjectIdentifier(value="1.3.6.1.4.1.11129.2.4.2")
+CT_POISON = ObjectIdentifier(value="1.3.6.1.4.1.11129.2.4.3")
+CT_PRECERTIFICATE_SIGNING = ObjectIdentifier(value="1.3.6.1.4.1.11129.2.4.4")
+
 _OID_NAME_DICT = {
     # Object identifier long names taken verbatim from the RFCs.
     # Short names are colloquial.
@@ -327,7 +332,11 @@ _OID_NAME_DICT = {
     ID_AD_CA_ISSUERS: ("id-ad-caIssuers", "caIssuers"),
     ID_QT_CPS: ("id-qt-cps", "CPS"),
     ID_QT_UNOTICE: ("id-qt-unotice", "UserNotice"),
-    ANY_POLICY: ("anyPolicy", "anyPolicy")
+    ANY_POLICY: ("anyPolicy", "anyPolicy"),
+
+    CT_EMBEDDED_SCT_LIST: ("ctEmbeddedSCT", "ctEmbeddedSCT"),
+    CT_POISON: ("ctPoison", "ctPoison"),
+    CT_PRECERTIFICATE_SIGNING: ("ctPrecertificateSigningCert", "ctPrecertificateSigningCert")
     }
 
 _OID_DECODING_DICT = {}

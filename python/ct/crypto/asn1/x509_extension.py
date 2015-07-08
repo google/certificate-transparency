@@ -208,6 +208,8 @@ class AccessDescription(types.Sequence):
 class AuthorityInfoAccess(types.SequenceOf):
     component = AccessDescription
 
+class SignedCertificateTimestampList(types.OctetString):
+    pass
 
 # Hack! This is not a valid ASN.1 definition but it works: an extension value
 # value is defined as a DER-encoded value wrapped in an OctetString.
@@ -227,7 +229,9 @@ _EXTENSION_DICT = {
     oid.ID_CE_AUTHORITY_KEY_IDENTIFIER: AuthorityKeyIdentifier,
     oid.ID_CE_CERTIFICATE_POLICIES: CertificatePolicies,
     oid.ID_CE_CRL_DISTRIBUTION_POINTS: CRLDistributionPoints,
-    oid.ID_PE_AUTHORITY_INFO_ACCESS: AuthorityInfoAccess
+    oid.ID_PE_AUTHORITY_INFO_ACCESS: AuthorityInfoAccess,
+    oid.CT_POISON: types.Null,
+    oid.CT_EMBEDDED_SCT_LIST: SignedCertificateTimestampList
     }
 
 

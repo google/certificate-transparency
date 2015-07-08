@@ -725,6 +725,20 @@ class Integer(Simple):
     def _decode_value(cls, buf, strict=True):
         return decode_int(buf, strict=strict)
 
+@Universal(5, tag.PRIMITIVE)
+class Null(Simple):
+    """Null."""
+
+    def _encode_value(self):
+        return ""
+
+    @classmethod
+    def _convert_value(cls, value):
+        return None
+
+    @classmethod
+    def _decode_value(cls, buf, strict=True):
+        return None
 
 class ASN1String(Simple):
     """Base class for string types."""
