@@ -33,7 +33,7 @@ def exit_with_message(error_message):
     sys.exit(1)
 
 
-def verify_sct(c, sct_tls, log_key_pem):
+def verify_sct(chain, sct_tls, log_key_pem):
     sct = client_pb2.SignedCertificateTimestamp()
     tls_message.decode(sct_tls, sct)
 
@@ -42,7 +42,7 @@ def verify_sct(c, sct_tls, log_key_pem):
     key_info.pem_key = log_key_pem
 
     lv = verify.LogVerifier(key_info)
-    print lv.verify_sct(sct, c)
+    print lv.verify_sct(sct, chain)
 
 
 def main(argv):
@@ -61,7 +61,7 @@ def main(argv):
     except gflags.FlagsError as e:
         exit_with_message("Error parsing flags: %s" % e)
 
-    command, cert_file = (argv[0:2])
+    command, cert_file = argv[0:2]
 
     if command != "verify_sct":
         exit_with_message("Unknown command %s" % command)
@@ -69,7 +69,9 @@ def main(argv):
     if not cert_file:
         exit_with_message("No certificate file given")
 
-    verify_sct(cert.Certificate.from_pem_file(cert_file, strict_der=False),
+    chain = list(cert.certs_from_pem_file(cert_file, strict_der = False))
+
+    verify_sct(chain,
                open(FLAGS.sct, 'rb').read(),
                open(FLAGS.log_key, 'rb').read())
     sys.exit(0)

@@ -250,6 +250,8 @@ class LogVerifierTest(unittest.TestCase):
                           old_sth, new_sth, proof)
 
     def test_verify_sct_valid_signature(self):
+        root_cert = cert.Certificate.from_pem_file(
+            os.path.join(FLAGS.testdata_dir, 'ca-cert.pem'))
         test_cert = cert.Certificate.from_pem_file(
             os.path.join(FLAGS.testdata_dir, 'test-cert.pem'))
         sct = client_pb2.SignedCertificateTimestamp()
@@ -260,9 +262,11 @@ class LogVerifierTest(unittest.TestCase):
         key_info.pem_key = read_testdata_file('ct-server-key-public.pem')
 
         verifier = verify.LogVerifier(key_info)
-        self.assertTrue(verifier.verify_sct(sct, test_cert))
+        self.assertTrue(verifier.verify_sct(sct, [test_cert, root_cert]))
 
     def test_verify_sct_invalid_signature(self):
+        root_cert = cert.Certificate.from_pem_file(
+            os.path.join(FLAGS.testdata_dir, 'ca-cert.pem'))
         test_cert = cert.Certificate.from_pem_file(
             os.path.join(FLAGS.testdata_dir, 'test-cert.pem'))
         sct = client_pb2.SignedCertificateTimestamp()
@@ -275,7 +279,7 @@ class LogVerifierTest(unittest.TestCase):
 
         verifier = verify.LogVerifier(key_info)
         self.assertRaises(error.SignatureError,
-                          verifier.verify_sct, sct, test_cert)
+                          verifier.verify_sct, sct, [test_cert, root_cert])
 
 if __name__ == "__main__":
     sys.argv = FLAGS(sys.argv)

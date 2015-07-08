@@ -80,7 +80,7 @@ def _submit_to_all_logs(log_list, certs_chain):
     for raw_sct in raw_scts_for_cert:
         key_id = raw_sct.id.key_id
         try:
-            log_id_to_verifier[key_id].verify_sct(raw_sct, certs_chain[0])
+            log_id_to_verifier[key_id].verify_sct(raw_sct, certs_chain)
             validated_scts.append(raw_sct)
         except error.SignatureError as err:
             logging.warning(

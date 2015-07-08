@@ -192,7 +192,7 @@ class LogVerifier(object):
 
 
     @error.returns_true_or_raises
-    def verify_sct(self, sct, certificate):
+    def verify_sct(self, sct, chain):
         """Verify the SCT over the X.509 certificate provided
 
         Not suitable for Precertificates.
@@ -200,7 +200,8 @@ class LogVerifier(object):
         Args:
             sct: client_pb2.SignedCertificateTimestamp proto. Must have
                 all fields present.
-            certificate: cert.Certificate instance.
+            chain: list of cert.Certificate instances. Begins with the
+                certificate to be checked.
 
         Returns:
             True. The return value is enforced by a decorator and need not be
@@ -215,12 +216,17 @@ class LogVerifier(object):
         if sct.version != ct_pb2.V1:
             raise error.UnsupportedVersionError("Cannot handle version: %s" %
                                                 sct.version)
+        try:
+            leaf_cert = chain[0]
+        except IndexError:
+            raise ValueError("Chain must contain leaf certificate.")
+
         dsentry = client_pb2.DigitallySignedTimestampedEntry()
         dsentry.sct_version = ct_pb2.V1
         dsentry.signature_type = client_pb2.CERTIFICATE_TIMESTAMP
         dsentry.timestamp = sct.timestamp
         dsentry.entry_type = client_pb2.X509_ENTRY
-        dsentry.asn1_cert = certificate.to_der()
+        dsentry.asn1_cert = leaf_cert.to_der()
         dsentry.ct_extensions = sct.extensions
 
         signature_input = tls_message.encode(dsentry)
