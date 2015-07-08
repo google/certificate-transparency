@@ -975,6 +975,16 @@ class Any(ASN1String):
                                                             label=label)
         return super(Any, self).human_readable_lines(wrap=wrap, label=label)
 
+    def modified(self):
+        if self._decoded_value is not None:
+            return self._decoded_value.modified()
+        return False
+
+    def _encode_value(self):
+        if self._decoded_value is not None and self._decoded_value.modified():
+            return self._decoded_value.encode()
+        return self._value
+
     @property
     def decoded(self):
         return self._decoded_value is not None

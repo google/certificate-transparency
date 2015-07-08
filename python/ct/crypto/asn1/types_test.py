@@ -558,6 +558,21 @@ class AnyTest(type_test_base.TypeTestBase):
         self.assertTrue(a2.decoded)
         self.assertEqual(a2.decoded_value, dummy)
 
+    def test_modify(self):
+        dummy = DummySequence(value={"bool": True, "any": "\x01\x01\xff"})
+        a = types.Any(dummy)
+        self.assertFalse(a.modified())
+        a.decoded_value["bool"] = False
+        self.assertTrue(a.modified())
+
+        enc = dummy.encode()
+        a2 = types.Any(enc)
+        self.assertFalse(a2.modified())
+        a2.decode_inner(value_type=DummySequence)
+        self.assertFalse(a2.modified())
+        a2.decoded_value["bool"] = True
+        self.assertTrue(a2.modified())
+
 
 class ChoiceTest(type_test_base.TypeTestBase):
     class MyChoice(types.Choice):
