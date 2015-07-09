@@ -1,6 +1,9 @@
 package main
 
 import (
+	"bytes"
+	"crypto/sha256"
+	"encoding/base64"
 	"encoding/json"
 	"io"
 	"github.com/google/certificate-transparency/go/fix-chain"
@@ -49,11 +52,33 @@ func processChains(file string, fixer *fix_chain.Fixer) {
 	}
 }
 
-func logErrors(wg *sync.WaitGroup, errors chan *fix_chain.FixError) {
+func ContentStore(base string, sub string, c []byte) {
+	r := sha256.Sum256(c)
+	h := base64.URLEncoding.EncodeToString(r[:])
+	d := base + "/" + sub
+	os.MkdirAll(d, 0777)
+	fn := d + "/" + h
+	f, err := os.Create(fn)
+	if err != nil {
+		log.Fatalf("Can't create %s: %s", fn, err)
+	}
+	defer f.Close()
+	f.Write(c)
+}
+
+func logErrors(wg *sync.WaitGroup, errors chan *fix_chain.FixError, base string) {
 	defer wg.Done()
 	
 	for err := range errors {
-		log.Printf("Error! %s", err.String())
+		//log.Printf("Error! %s", err.String())
+		var b bytes.Buffer
+		j := json.NewEncoder(&b)
+		err2 := j.Encode(err)
+		if err2 != nil {
+			log.Fatalf("JSON encode failed: %s", err2)
+		}
+		//log.Printf("Error! %s", b.Bytes())
+		ContentStore(base, err.TypeString(), b.Bytes())
 	}
 }
 
@@ -65,7 +90,7 @@ func main() {
 	wg.Add(1)
 	
 	errors := make(chan *fix_chain.FixError)
-	go logErrors(&wg, errors)
+	go logErrors(&wg, errors, os.Args[1])
 	
 	f := fix_chain.NewFixer(logurl, errors)
 	

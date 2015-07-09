@@ -133,7 +133,7 @@ func augmentIntermediates(pool *x509.CertPool, url string, u *URLCache) *FixErro
 				
 	if err != nil {
 		//log.Fatalf("failed to parse certificate from %s: %s", url, err)
-		return &FixError{Type: ParseFailure, URL: url, Error: err}
+		return &FixError{Type: ParseFailure, URL: url, Bad: body, Error: err}
 	}
 	pool.AddCert(icert)
 	return nil
@@ -161,7 +161,9 @@ func fixChain(fix *Fix) {
 			}
 		}
 	}
-	log.Printf("failed to fix certificate for %s", fix.cert.Subject.CommonName)
+	//log.Printf("failed to fix certificate for %s", fix.cert.Subject.CommonName)
+	fix.fixer.notfixed++
+	fix.fixer.errors <- &FixError{Type:FixFailed, Cert: fix.cert, Chain: fix.chain}
 }
 
 type Fixer struct {
@@ -172,6 +174,7 @@ type Fixer struct {
 	reconstructed uint
 	notreconstructed uint
 	fixed uint
+	notfixed uint
 	alreadydone uint
 	
 	wg sync.WaitGroup
@@ -249,7 +252,7 @@ func NewFixer(logurl string, errors chan *FixError) *Fixer {
 	t := time.NewTicker(time.Second)
 	go func() {
 		for _ = range t.C {
-			log.Printf("fixers: %d active, %d skipped, %d reconstructed, %d not reconstructed, %d fixed, %d already done", f.active, f.skipped, f.reconstructed, f.notreconstructed, f.fixed, f.alreadydone)
+			log.Printf("fixers: %d active, %d skipped, %d reconstructed, %d not reconstructed, %d fixed, %d not fixed, %d already done", f.active, f.skipped, f.reconstructed, f.notreconstructed, f.fixed, f.notfixed, f.alreadydone)
 		}
 	}()
 
