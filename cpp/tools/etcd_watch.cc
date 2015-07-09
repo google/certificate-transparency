@@ -39,7 +39,7 @@ int main(int argc, char* argv[]) {
   google::ParseCommandLineFlags(&argc, &argv, true);
   google::InitGoogleLogging(argv[0]);
 
-  LOG(INFO) << "Build version: " << kBuildVersion;
+  LOG(INFO) << "Build version: " << cert_trans::kBuildVersion;
 
   evthread_use_pthreads();
 

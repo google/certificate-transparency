@@ -136,7 +136,7 @@ int main(int argc, char* argv[]) {
   google::InitGoogleLogging(argv[0]);
   FLAGS_logtostderr = true;
 
-  LOG(INFO) << "Build version: " << kBuildVersion;
+  LOG(INFO) << "Build version: " << cert_trans::kBuildVersion;
 
   evhtp_ssl_use_threads();
   OpenSSL_add_all_algorithms();

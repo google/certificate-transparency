@@ -260,7 +260,7 @@ int main(int argc, char* argv[]) {
   google::InitGoogleLogging(argv[0]);
   google::InstallFailureSignalHandler();
 
-  LOG(INFO) << "Build version: " << kBuildVersion;
+  LOG(INFO) << "Build version: " << cert_trans::kBuildVersion;
 
   Server<LoggedCertificate>::StaticInit();
 

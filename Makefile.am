@@ -12,15 +12,14 @@ BUILT_SOURCES = \
 	cpp/gtest-all.cc \
 	cpp/monitoring/prometheus/metrics.pb.cc \
 	cpp/monitoring/prometheus/metrics.pb.h \
-	cpp/version.h \
 	proto/ct.pb.cc \
 	proto/ct.pb.h
 
-BUILD_VERSION=`git describe --abbrev=0 --dirty --always --tags`
+BUILD_VERSION = `git describe --abbrev=0 --dirty --always --tags`
 
-.PHONY: cpp/version.h
-cpp/version.h:
-	$(AM_V_GEN)echo "const char kBuildVersion[] = \"$(BUILD_VERSION)\";" > $@-t && mv $@-t $@
+.PHONY: cpp/version.cc
+cpp/version.o: \
+	CXXFLAGS+=-DBUILD_VERSION="\"$(BUILD_VERSION)\""
 
 bin_PROGRAMS = \
 	cpp/client/ct \
@@ -199,7 +198,8 @@ cpp_server_ct_mirror_SOURCES = \
 	cpp/util/read_key.cc \
 	cpp/util/thread_pool.cc \
 	cpp/util/util.cc \
-	cpp/util/uuid.cc
+	cpp/util/uuid.cc \
+	cpp/version.cc
 
 cpp_server_ct_server_LDADD = \
 	cpp/libcore.a \
@@ -223,7 +223,8 @@ cpp_server_ct_server_SOURCES = \
 	cpp/util/read_key.cc \
 	cpp/util/thread_pool.cc \
 	cpp/util/util.cc \
-	cpp/util/uuid.cc
+	cpp/util/uuid.cc \
+	cpp/version.cc
 
 cpp_tools_ct_clustertool_LDADD = \
 	cpp/libcore.a \
@@ -239,7 +240,8 @@ cpp_tools_ct_clustertool_SOURCES = \
 	cpp/util/protobuf_util.cc \
 	cpp/util/read_key.cc \
 	cpp/util/thread_pool.cc \
-	cpp/util/util.cc
+	cpp/util/util.cc \
+	cpp/version.cc
 
 cpp_client_ct_LDADD = \
 	cpp/libcore.a \
@@ -277,13 +279,15 @@ cpp_tools_dump_cert_LDADD = \
 	-lprotobuf
 cpp_tools_dump_cert_SOURCES = \
 	cpp/tools/dump_cert.cc \
-	cpp/util/util.cc
+	cpp/util/util.cc \
+	cpp/version.cc
 
 cpp_tools_dump_sth_LDADD = \
 	cpp/libcore.a \
 	-lprotobuf
 cpp_tools_dump_sth_SOURCES = \
-	cpp/tools/dump_sth.cc
+	cpp/tools/dump_sth.cc \
+	cpp/version.cc
 
 cpp_tools_etcd_watch_LDADD = \
 	cpp/libcore.a \
@@ -293,7 +297,8 @@ cpp_tools_etcd_watch_SOURCES = \
 	cpp/tools/etcd_watch.cc \
 	cpp/util/json_wrapper.cc \
 	cpp/util/libevent_wrapper.cc \
-	cpp/util/thread_pool.cc
+	cpp/util/thread_pool.cc \
+	cpp/version.cc
 
 cpp_util_bench_etcd_LDADD = \
 	cpp/libcore.a \
