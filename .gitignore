@@ -89,6 +89,7 @@
 /local.properties
 /missing
 /python/_trial_temp/
+/registry-params.env
 /test-driver
 /test/*.bin
 /test/*.csr
@@ -102,6 +103,7 @@
 /test/testdata/error.log
 /test/testdata/logs
 /test/testdata/test-cert-proof-extension.pem
+/test/testdata/urlfetcher_test_certs/
 
 # IntelliJ artefacts
 /java/.idea/dictionaries/
