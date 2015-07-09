@@ -4,12 +4,10 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/pem"
-	"errors"
 	"fmt"
 	"github.com/google/certificate-transparency/go/x509"
-	"io/ioutil"
 	"log"
-	"net/http"
+	"sort"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -32,7 +30,38 @@ func HashChain(ch []*x509.Certificate) (r [HashSize]byte) {
 	}
 	h2 := h.Sum([]byte{})
 	copy(r[:], h2)
-	return 
+	return
+}
+
+type Bag struct {
+	certs []*x509.Certificate
+}
+func (b Bag) Len() int { return len(b.certs) }
+func (b Bag) Less(i, j int) bool {
+	ci := b.certs[i].Raw
+	cj := b.certs[j].Raw
+	if len(ci) < len(cj) {
+		return true
+	}
+	if len(ci) > len(cj) {
+		return false
+	}
+	for n, _ := range ci {
+		if ci[n] < cj[n] {
+			return true
+		}
+		if ci[n] > cj[n] {
+			return false
+		}
+	}
+	return false
+}
+func (b Bag) Swap(i, j int) { t := b.certs[i]; b.certs[i] = b.certs[j]; b.certs[j] = t }
+
+func HashBag(bag []*x509.Certificate) [HashSize]byte {
+	b := Bag{certs: bag}
+	sort.Sort(b)
+	return HashChain(b.certs)
 }
 
 func HexHash(s *x509.Certificate) string {
@@ -51,31 +80,6 @@ func dumpChains(name string, chains [][]*x509.Certificate) {
 		n := fmt.Sprintf("%s %d", name, i)
 		dumpChain(n, chain)
 	}
-}
-
-var urlCache = make(map[string][]byte)
-
-func getURL(url string) ([]byte, error) {
-	r, ok := urlCache[url]
-	if ok {
-		log.Printf("HIT! %s", url)
-		return r, nil
-	}
-	c, err := http.Get(url)
-	// FIXME: cache errors
-	if err != nil {
-		return nil, err
-	}
-	defer c.Body.Close()
-	if c.StatusCode != 200 {
-		return nil, errors.New(fmt.Sprintf("can't deal with status %d", c.StatusCode))
-	}
-	r, err = ioutil.ReadAll(c.Body)
-	if err != nil {
-		return nil, err
-	}
-	urlCache[url] = r
-	return r, nil
 }
 
 type DedupedChain struct {
@@ -100,10 +104,11 @@ type Fix struct {
 	cert *x509.Certificate
 	chain *DedupedChain
 	opts *x509.VerifyOptions
+	fixer *Fixer
 }
 
 // Returns a partially filled FixError on error
-func augmentIntermediates(pool *x509.CertPool, url string) *FixError {
+func augmentIntermediates(pool *x509.CertPool, url string, u *URLCache) *FixError {
 	r := urlReplacement(url)
 	if r != nil {
 		log.Printf("Replaced %s: %+v", url, r)
@@ -112,7 +117,7 @@ func augmentIntermediates(pool *x509.CertPool, url string) *FixError {
 		}
 		return nil
 	}
-	body, err := getURL(url)
+	body, err := u.getURL(url)
 	if err != nil {
 		//log.Printf("can't get URL body from %s: %s", url, err)
 		return &FixError{Type: CannotFetchURL, URL: url, Error: err}
@@ -134,23 +139,24 @@ func augmentIntermediates(pool *x509.CertPool, url string) *FixError {
 	return nil
 }
 
-func fixChain(fix *Fix, l *Log, errors chan *FixError) {
+func fixChain(fix *Fix) {
 	d2 := *fix.chain
 	d2.AddCert(fix.cert)
 	for _, c := range d2.certs {
 		urls := c.IssuingCertificateURL
-		for i, url := range urls {
-			log.Printf("fetch issuer %d from %s", i, url)
-			ferr := augmentIntermediates(fix.opts.Intermediates, url)
+		for _, url := range urls {
+			//log.Printf("fetch issuer %d from %s", i, url)
+			ferr := augmentIntermediates(fix.opts.Intermediates, url, fix.fixer.cache)
 			if ferr != nil {
 				ferr.Cert = fix.cert
 				ferr.Chain = fix.chain
-				errors <- ferr
+				fix.fixer.errors <- ferr
 			}
 			chain, err := fix.cert.Verify(*fix.opts)
 			if err == nil {
 				//dumpChains("fixed", chain)
-				l.PostChains(chain)
+				fix.fixer.fixed++
+				fix.fixer.log.PostChains(chain)
 				return
 			}
 		}
@@ -161,10 +167,18 @@ func fixChain(fix *Fix, l *Log, errors chan *FixError) {
 type Fixer struct {
 	fix chan *Fix
 	active uint32
+	// Counters may not be entirely accurate due to non-atomicity
 	skipped uint
+	reconstructed uint
+	notreconstructed uint
+	fixed uint
+	alreadydone uint
+	
 	wg sync.WaitGroup
 	log *Log
 	errors chan *FixError
+	cache *URLCache
+	done map[[HashSize]byte]bool
 }
 
 func (f *Fixer) fixChain(cert *x509.Certificate, d *DedupedChain, intermediates *x509.CertPool, l *Log) {
@@ -177,14 +191,22 @@ func (f *Fixer) fixChain(cert *x509.Certificate, d *DedupedChain, intermediates 
 	chain, err := cert.Verify(opts)
 	if err == nil {
 		//dumpChains("verified", chain)
+		f.reconstructed++
 		l.PostChains(chain)
 		return
 	}
-	log.Printf("failed to verify certificate for %s: %s", cert.Subject.CommonName, err)
+	//log.Printf("failed to verify certificate for %s: %s", cert.Subject.CommonName, err)
+	f.notreconstructed++
 	f.deferFixChain(cert, d, &opts)
 }
 
 func (f *Fixer) FixAll(d *DedupedChain) {
+	h := HashBag(d.certs)
+	if f.done[h] {
+		f.alreadydone++
+		return
+	}
+	f.done[h] = true
 	intermediates := x509.NewCertPool()
 	for _, c := range d.certs {
 		intermediates.AddCert(c)
@@ -195,7 +217,7 @@ func (f *Fixer) FixAll(d *DedupedChain) {
 }
 
 func (f *Fixer) deferFixChain(cert *x509.Certificate, chain *DedupedChain, opts *x509.VerifyOptions) {
-	f.fix <- &Fix{ cert: cert, chain: chain, opts: opts }
+	f.fix <- &Fix{ cert: cert, chain: chain, opts: opts, fixer: f }
 }
 
 func (f *Fixer) fixServer() {
@@ -203,7 +225,7 @@ func (f *Fixer) fixServer() {
 
 	for fix := range f.fix {
 		atomic.AddUint32(&f.active, 1)
-		fixChain(fix, f.log, f.errors)
+		fixChain(fix)
 		atomic.AddUint32(&f.active, ^uint32(0))
 	}
 }
@@ -217,7 +239,7 @@ func (f *Fixer) Wait() {
 }
 
 func NewFixer(logurl string, errors chan *FixError) *Fixer {
-	f := &Fixer{fix: make(chan *Fix), log: NewLog(logurl), errors: errors}
+	f := &Fixer{fix: make(chan *Fix), log: NewLog(logurl), errors: errors, cache: NewURLCache(), done: make(map[[HashSize]byte]bool)}
 
 	for i := 0 ; i < 100 ; i++ {
 		f.wg.Add(1)
@@ -227,8 +249,7 @@ func NewFixer(logurl string, errors chan *FixError) *Fixer {
 	t := time.NewTicker(time.Second)
 	go func() {
 		for _ = range t.C {
-			log.Printf("fixers: %d active, %d skipped", f.active,
-				f.skipped)
+			log.Printf("fixers: %d active, %d skipped, %d reconstructed, %d not reconstructed, %d fixed, %d already done", f.active, f.skipped, f.reconstructed, f.notreconstructed, f.fixed, f.alreadydone)
 		}
 	}()
 
