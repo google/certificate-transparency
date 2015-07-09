@@ -11,6 +11,8 @@
 #include "util/sync_task.h"
 #include "util/testing.h"
 
+DECLARE_int32(etcd_watch_error_retry_delay_seconds);
+
 namespace cert_trans {
 
 using std::bind;
@@ -23,9 +25,11 @@ using std::placeholders::_3;
 using std::shared_ptr;
 using std::string;
 using std::to_string;
+using std::vector;
 using testing::ElementsAre;
 using testing::HasSubstr;
 using testing::Invoke;
+using testing::InSequence;
 using testing::IsEmpty;
 using testing::Pair;
 using testing::StrCaseEq;
@@ -623,6 +627,41 @@ TEST_F(EtcdTest, ForceDelete) {
   client_.ForceDelete(kEntryKey, task.task());
   task.Wait();
   EXPECT_OK(task);
+}
+
+TEST_F(EtcdTest, WatchInitialGetFailureCausesRetry) {
+  FLAGS_etcd_watch_error_retry_delay_seconds = 1;
+  {
+    InSequence s;
+    EXPECT_CALL(url_fetcher_,
+                Fetch(IsUrlFetchRequest(UrlFetcher::Verb::GET,
+                                        URL(GetEtcdUrl(kEntryKey) +
+                                            "?consistent=true&quorum=true"),
+                                        IsEmpty(), ""),
+                      _, _))
+        .WillOnce(
+            Invoke(bind(HandleFetch, Status(util::error::UNAVAILABLE, ""), 0,
+                        UrlFetcher::Headers{}, "", _1, _2, _3)));
+    EXPECT_CALL(url_fetcher_,
+                Fetch(IsUrlFetchRequest(UrlFetcher::Verb::GET,
+                                        URL(GetEtcdUrl(kEntryKey) +
+                                            "?consistent=true&quorum=true"),
+                                        IsEmpty(), ""),
+                      _, _))
+        .WillOnce(
+            Invoke(bind(HandleFetch, Status::OK, 200,
+                        UrlFetcher::Headers{make_pair("x-etcd-index", "9")},
+                        kGetJson, _1, _2, _3)));
+  }
+
+  SyncTask task(base_.get());
+  client_.Watch(kEntryKey, [&task](const vector<EtcdClient::Node>& updates) {
+    EXPECT_EQ(1, updates.size());
+    EXPECT_EQ(9, updates[0].modified_index_);
+    EXPECT_EQ("123", updates[0].value_);
+    task.Cancel();
+  }, task.task());
+  task.Wait();
 }
 
 TEST_F(EtcdTest, GetStoreStats) {
