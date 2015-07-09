@@ -40,10 +40,11 @@ void DumpLoggedCert(const char* filename) {
 
 
 int main(int argc, char* argv[]) {
+  google::SetVersionString(cert_trans::kBuildVersion);
   google::ParseCommandLineFlags(&argc, &argv, true);
   google::InitGoogleLogging(argv[0]);
 
-  LOG(INFO) << "Build version: " << cert_trans::kBuildVersion;
+  LOG(INFO) << "Build version: " << google::VersionString();
 
   for (int i = 1; i < argc; ++i)
     DumpLoggedCert(argv[i]);

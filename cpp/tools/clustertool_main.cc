@@ -132,11 +132,12 @@ ClusterConfig LoadConfig() {
 
 
 int main(int argc, char* argv[]) {
+  google::SetVersionString(cert_trans::kBuildVersion);
   google::ParseCommandLineFlags(&argc, &argv, true);
   google::InitGoogleLogging(argv[0]);
   FLAGS_logtostderr = true;
 
-  LOG(INFO) << "Build version: " << cert_trans::kBuildVersion;
+  LOG(INFO) << "Build version: " << google::VersionString();
 
   evhtp_ssl_use_threads();
   OpenSSL_add_all_algorithms();

@@ -329,11 +329,12 @@ int main(int argc, char* argv[]) {
   signal(SIGINT, SIG_IGN);
   signal(SIGTERM, SIG_IGN);
 
+  google::SetVersionString(cert_trans::kBuildVersion);
   google::ParseCommandLineFlags(&argc, &argv, true);
   google::InitGoogleLogging(argv[0]);
   google::InstallFailureSignalHandler();
 
-  LOG(INFO) << "Build version: " << cert_trans::kBuildVersion;
+  LOG(INFO) << "Build version: " << google::VersionString();
 
   Server<LoggedCertificate>::StaticInit();
 

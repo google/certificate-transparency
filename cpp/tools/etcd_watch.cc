@@ -36,10 +36,11 @@ void Notify(const vector<EtcdClient::Node>& updates) {
 
 
 int main(int argc, char* argv[]) {
+  google::SetVersionString(cert_trans::kBuildVersion);
   google::ParseCommandLineFlags(&argc, &argv, true);
   google::InitGoogleLogging(argv[0]);
 
-  LOG(INFO) << "Build version: " << cert_trans::kBuildVersion;
+  LOG(INFO) << "Build version: " << google::VersionString();
 
   evthread_use_pthreads();
 

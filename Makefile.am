@@ -272,7 +272,8 @@ cpp_server_ct_dns_server_SOURCES = \
 	cpp/server/ct-dns-server.cc \
 	cpp/server/event.cc \
 	cpp/util/protobuf_util.cc \
-	cpp/util/util.cc
+	cpp/util/util.cc \
+	cpp/version.cc
 
 cpp_tools_dump_cert_LDADD = \
 	cpp/libcore.a \
