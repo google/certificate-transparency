@@ -4,9 +4,10 @@ import (
 	"encoding/json"
 	"io"
 	"github.com/google/certificate-transparency/go/fix-chain"
-	"github.com/google/certificate-transparency/go/x509"
 	"log"
 	"os"
+	"sync"
+	"github.com/google/certificate-transparency/go/x509"
 )
 
 func processChains(file string, fixer *fix_chain.Fixer) {
@@ -42,17 +43,37 @@ func processChains(file string, fixer *fix_chain.Fixer) {
 
 			c.AddCert(cert)
 		}
-		log.Printf("%d in chain", len(m.Chain))
-		c.Dump("input")
+		//log.Printf("%d in chain", len(m.Chain))
+		//c.Dump("input")
 		fixer.FixAll(&c)
+	}
+}
+
+func logErrors(wg *sync.WaitGroup, errors chan *fix_chain.FixError) {
+	defer wg.Done()
+	
+	for err := range errors {
+		log.Printf("Error! %s", err.String())
 	}
 }
 
 func main() {
 	logurl := "https://ct.googleapis.com/rocketeer"
 	//logurl := "https://ct.googleapis.com/aviator"
-	f := fix_chain.NewFixer(logurl)
+	
+	var wg sync.WaitGroup
+	wg.Add(1)
+	
+	errors := make(chan *fix_chain.FixError)
+	go logErrors(&wg, errors)
+	
+	f := fix_chain.NewFixer(logurl, errors)
+	
 	processChains("/usr/home/ben/tmp/failed.json", f)
+	
 	log.Printf("Wait for fixers")
 	f.Wait()
+	close(errors)
+	log.Printf("Wait for errors")
+	wg.Wait()
 }

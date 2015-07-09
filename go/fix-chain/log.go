@@ -9,6 +9,8 @@ import (
 	"log"
 	"net/http"
 	"sync"
+	"sync/atomic"
+	"time"
 )
 
 func DumpChainPEM(chain []*x509.Certificate) string {
@@ -29,7 +31,13 @@ type Log struct {
 	url string
 	roots *x509.CertPool
 	posts chan *toLog
-	active uint16
+	active uint32
+	// these counters are not atomically updated, so may not be quite right
+	posted int
+	reposted int
+	latereposted int
+	chainreposted int
+	
 	wg sync.WaitGroup  // Note that this counts the number of active requests, not active servers, because we can't close it to signal the end, because of retries.
 	postCache map[[HashSize]byte]bool
 	postChainCache map[[HashSize]byte]bool
@@ -41,8 +49,19 @@ func NewLog(url string) *Log {
 	for i := 0 ; i < 100 ; i++ {
 		go s.postServer()
 	}
+	t := time.NewTicker(time.Second)
+	go func() {
+		for _ = range t.C {
+			log.Printf("posters: %d active, %d posted, %d reposted, %d reposted (late), %d chains reposted", s.active, s.posted, s.reposted, s.latereposted, s.chainreposted)
+		}
+	}()
+
 	return s
 }
+
+func (s *Log) Posted(cert *x509.Certificate) bool {
+	return s.postCache[Hash(cert)]
+}	
 
 func (s *Log) Roots() *x509.CertPool {
 	if s.roots == nil {
@@ -89,7 +108,7 @@ func (s *Log) getRoots() *x509.CertPool {
 func (s *Log) postChain(l *toLog) {
 	h := Hash(l.chain[0])
 	if s.postCache[h] {
-		log.Printf("Already posted (late)")
+		s.latereposted++
 		return
 	}
 	type Chain struct {
@@ -142,11 +161,9 @@ func (s *Log) postChain(l *toLog) {
 func (s *Log) postServer() {
 	for {
 		c := <-s.posts
-		s.active++
-		log.Printf("%d active posts", s.active)
+		atomic.AddUint32(&s.active, 1)
 		s.postChain(c)
-		s.active--
-		log.Printf("%d active posts", s.active)
+		atomic.AddUint32(&s.active, ^uint32(0))
 		s.wg.Done()
 	}
 }
@@ -157,9 +174,10 @@ func (s *Log) postToLog(l *toLog) {
 }
 
 func (s *Log) PostChain(chain []*x509.Certificate) {
+	s.posted++
 	h := Hash(chain[0])
 	if s.postCache[h] {
-		log.Printf("Already posted")
+		s.reposted++
 		return
 	}
 	// if we assume all chains for the same cert are equally
@@ -171,7 +189,7 @@ func (s *Log) PostChain(chain []*x509.Certificate) {
 	s.pcMutex.Lock()
 	if s.postChainCache[h] {
 		s.pcMutex.Unlock()
-		log.Printf("Chain already posted")
+		s.chainreposted++
 		return
 	}
 	s.postChainCache[h] = true
@@ -181,8 +199,7 @@ func (s *Log) PostChain(chain []*x509.Certificate) {
 }
 
 func (s *Log) PostChains(chains [][]*x509.Certificate) {
-	for i, chain := range chains {
-		log.Printf("post %d", i)
+	for _, chain := range chains {
 		s.PostChain(chain)
 	}
 }

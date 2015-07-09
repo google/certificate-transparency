@@ -11,6 +11,8 @@ import (
 	"log"
 	"net/http"
 	"sync"
+	"sync/atomic"
+	"time"
 )
 
 const HashSize = sha256.Size
@@ -49,17 +51,6 @@ func dumpChains(name string, chains [][]*x509.Certificate) {
 		n := fmt.Sprintf("%s %d", name, i)
 		dumpChain(n, chain)
 	}
-}
-
-var knownBadCerts = map[string]bool {
-	"http://gca.nat.gov.tw/repository/Certs/IssuedToThisCA.p7b":  true,
-	"http://grca.nat.gov.tw/repository/Certs/IssuedToThisCA.p7b": true,
-	"http://crt.trust-provider.com/AddTrustExternalCARoot.p7c":   true,
-	"http://crt.usertrust.com/AddTrustExternalCARoot.p7c":        true,
-}
-
-func knownBad(name string) bool {
-	return knownBadCerts[name]
 }
 
 var urlCache = make(map[string][]byte)
@@ -111,39 +102,54 @@ type Fix struct {
 	opts *x509.VerifyOptions
 }
 
-func fixChain(fix *Fix, l *Log) {
+// Returns a partially filled FixError on error
+func augmentIntermediates(pool *x509.CertPool, url string) *FixError {
+	r := urlReplacement(url)
+	if r != nil {
+		log.Printf("Replaced %s: %+v", url, r)
+		for _, c := range r {
+			pool.AddCert(c)
+		}
+		return nil
+	}
+	body, err := getURL(url)
+	if err != nil {
+		//log.Printf("can't get URL body from %s: %s", url, err)
+		return &FixError{Type: CannotFetchURL, URL: url, Error: err}
+	}
+	//log.Print(body)
+	icert, err := x509.ParseCertificate(body)
+	if err != nil {
+		s, _ := pem.Decode(body)
+		if s != nil {
+			icert, err = x509.ParseCertificate(s.Bytes)
+		}
+	}
+				
+	if err != nil {
+		//log.Fatalf("failed to parse certificate from %s: %s", url, err)
+		return &FixError{Type: ParseFailure, URL: url, Error: err}
+	}
+	pool.AddCert(icert)
+	return nil
+}
+
+func fixChain(fix *Fix, l *Log, errors chan *FixError) {
 	d2 := *fix.chain
 	d2.AddCert(fix.cert)
 	for _, c := range d2.certs {
 		urls := c.IssuingCertificateURL
 		for i, url := range urls {
 			log.Printf("fetch issuer %d from %s", i, url)
-			body, err := getURL(url)
-			if err != nil {
-				log.Printf("can't get URL body from %s: %s", url, err)
-				continue
+			ferr := augmentIntermediates(fix.opts.Intermediates, url)
+			if ferr != nil {
+				ferr.Cert = fix.cert
+				ferr.Chain = fix.chain
+				errors <- ferr
 			}
-			//log.Print(body)
-			icert, err := x509.ParseCertificate(body)
-			if err != nil {
-				s, _ := pem.Decode(body)
-				if s != nil {
-					icert, err = x509.ParseCertificate(s.Bytes)
-				}
-			}
-			if err != nil {
-				if knownBad(url) {
-					log.Printf("(ignored) failed to parse certificate from %s: %s", url, err)
-					continue
-				} else {
-					log.Fatalf("failed to parse certificate from %s: %s", url, err)
-				}
-			}
-			//log.Printf("%+v", icert)
-			fix.opts.Intermediates.AddCert(icert)
 			chain, err := fix.cert.Verify(*fix.opts)
 			if err == nil {
-				dumpChains("fixed", chain)
+				//dumpChains("fixed", chain)
 				l.PostChains(chain)
 				return
 			}
@@ -154,16 +160,23 @@ func fixChain(fix *Fix, l *Log) {
 
 type Fixer struct {
 	fix chan *Fix
-	active int
+	active uint32
+	skipped uint
 	wg sync.WaitGroup
 	log *Log
+	errors chan *FixError
 }
 
 func (f *Fixer) fixChain(cert *x509.Certificate, d *DedupedChain, intermediates *x509.CertPool, l *Log) {
+	if l.Posted(cert) {
+		//log.Printf("Skip already posted cert")
+		f.skipped++
+		return
+	}
 	opts := x509.VerifyOptions{ Intermediates: intermediates, Roots: l.Roots(), DisableTimeChecks: true, KeyUsages: []x509.ExtKeyUsage{x509.ExtKeyUsageAny} }
 	chain, err := cert.Verify(opts)
 	if err == nil {
-		dumpChains("verified", chain)
+		//dumpChains("verified", chain)
 		l.PostChains(chain)
 		return
 	}
@@ -189,11 +202,9 @@ func (f *Fixer) fixServer() {
 	defer f.wg.Done()
 
 	for fix := range f.fix {
-		f.active++
-		log.Printf("%d active fixers", f.active)
-		fixChain(fix, f.log)
-		f.active--
-		log.Printf("%d active fixers", f.active)
+		atomic.AddUint32(&f.active, 1)
+		fixChain(fix, f.log, f.errors)
+		atomic.AddUint32(&f.active, ^uint32(0))
 	}
 }
 
@@ -205,11 +216,21 @@ func (f *Fixer) Wait() {
 	f.log.Wait()
 }
 
-func NewFixer(logurl string) *Fixer {
-	f := &Fixer{fix: make(chan *Fix), log: NewLog(logurl)}
+func NewFixer(logurl string, errors chan *FixError) *Fixer {
+	f := &Fixer{fix: make(chan *Fix), log: NewLog(logurl), errors: errors}
+
 	for i := 0 ; i < 100 ; i++ {
 		f.wg.Add(1)
 		go f.fixServer()
 	}
+
+	t := time.NewTicker(time.Second)
+	go func() {
+		for _ = range t.C {
+			log.Printf("fixers: %d active, %d skipped", f.active,
+				f.skipped)
+		}
+	}()
+
 	return f
 }
