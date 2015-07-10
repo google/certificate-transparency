@@ -91,18 +91,22 @@ func logStringErrors(wg *sync.WaitGroup, errors chan *fix_chain.FixError,
 }
 
 func main() {
-	logurl := "https://ct.googleapis.com/rocketeer"
+	//logurl := "https://ct.googleapis.com/rocketeer"
 	//logurl := "https://ct.googleapis.com/aviator"
+	logurl := os.Args[1]
+	chains := os.Args[2]
+	errdir := os.Args[3]
 
 	var wg sync.WaitGroup
 	wg.Add(1)
 
 	errors := make(chan *fix_chain.FixError)
-	go logStringErrors(&wg, errors, os.Args[1])
+	go logStringErrors(&wg, errors, errdir)
 
 	f := fix_chain.NewFixer(logurl, errors)
 
-	processChains("/usr/home/ben/tmp/failed.json", f)
+	//processChains("/usr/home/ben/tmp/failed.json", f)
+	processChains(chains, f)
 
 	log.Printf("Wait for fixers")
 	f.Wait()
