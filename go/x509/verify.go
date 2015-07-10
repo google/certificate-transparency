@@ -126,10 +126,10 @@ func (e SystemRootsError) Error() string {
 // VerifyOptions contains parameters for Certificate.Verify. It's a structure
 // because other PKIX verification APIs have ended up needing many options.
 type VerifyOptions struct {
-	DNSName       string
-	Intermediates *CertPool
-	Roots         *CertPool // if nil, the system roots are used
-	CurrentTime   time.Time // if zero, the current time is used
+	DNSName           string
+	Intermediates     *CertPool
+	Roots             *CertPool // if nil, the system roots are used
+	CurrentTime       time.Time // if zero, the current time is used
 	DisableTimeChecks bool
 	// KeyUsage specifies which Extended Key Usage values are acceptable.
 	// An empty list means ExtKeyUsageServerAuth. Key usage is considered a
@@ -155,7 +155,7 @@ func (c *Certificate) isValid(certType int, currentChain []*Certificate, opts *V
 			return CertificateInvalidError{c, Expired}
 		}
 	}
-	
+
 	if len(c.PermittedDNSDomains) > 0 {
 		ok := false
 		for _, domain := range c.PermittedDNSDomains {
