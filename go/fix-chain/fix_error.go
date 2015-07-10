@@ -18,27 +18,28 @@ const (
 )
 
 type FixError struct {
-	Type ErrorType
-	// The supplied leaf certificate
-	Cert *x509.Certificate
-	// The supplied chain
-	Chain []*x509.Certificate
-	// URL, if a URL is involved
-	URL string
-	// The offending bytes, if applicable
-	Bad []byte
-	// And the error
-	Error error
+	Type  ErrorType
+	Cert  *x509.Certificate   // The supplied leaf certificate
+	Chain []*x509.Certificate // The supplied chain
+	URL   string              // URL, if a URL is involved
+	Bad   []byte              // The offending bytes, if applicable
+	Error error               // And the error
 }
 
 func (e FixError) TypeString() string {
-	switch(e.Type) {
-	case ParseFailure: return "ParseFailure"
-	case CannotFetchURL: return "CannotFetchURL"
-	case FixFailed: return "FixFailed"
-	case LogPostFailed: return "LogPostFailed"
-	case VerifyFailed: return "VerifyFailed"
-	default: return fmt.Sprintf("Type%d", e.Type)
+	switch e.Type {
+	case ParseFailure:
+		return "ParseFailure"
+	case CannotFetchURL:
+		return "CannotFetchURL"
+	case FixFailed:
+		return "FixFailed"
+	case LogPostFailed:
+		return "LogPostFailed"
+	case VerifyFailed:
+		return "VerifyFailed"
+	default:
+		return fmt.Sprintf("Type%d", e.Type)
 	}
 }
 
@@ -64,11 +65,11 @@ func (e FixError) MarshalJSON() ([]byte, error) {
 	var b bytes.Buffer
 	j := json.NewEncoder(&b)
 	var m struct {
-		Type string
-		Cert []byte
+		Type  string
+		Cert  []byte
 		Chain [][]byte
-		URL string
-		Bad []byte
+		URL   string
+		Bad   []byte
 		Error string
 	}
 	m.Type = e.TypeString()

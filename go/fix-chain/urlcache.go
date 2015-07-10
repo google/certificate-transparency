@@ -12,11 +12,11 @@ import (
 type URLCache struct {
 	cache map[string][]byte
 	// counters may not be totally accurate due to non-atomicity
-	hit uint
-	miss uint
-	errors uint
+	hit       uint
+	miss      uint
+	errors    uint
 	badstatus uint
-	readfail uint
+	readfail  uint
 }
 
 func (u *URLCache) getURL(url string) ([]byte, error) {
@@ -52,7 +52,10 @@ func NewURLCache() *URLCache {
 	t := time.NewTicker(time.Second)
 	go func() {
 		for _ = range t.C {
-			log.Printf("cache: %d hits, %d misses, %d errors, %d bad status, %d read fail, %d cached", u.hit, u.miss, u.errors, u.badstatus, u.readfail, len(u.cache))
+			log.Printf("cache: %d hits, %d misses, %d errors, " +
+				"%d bad status, %d read fail, %d cached", u.hit,
+				u.miss, u.errors, u.badstatus, u.readfail,
+				len(u.cache))
 		}
 	}()
 

@@ -6,8 +6,8 @@ import (
 	"encoding/pem"
 	"errors"
 	"fmt"
-	"io/ioutil"
 	"github.com/google/certificate-transparency/go/x509"
+	"io/ioutil"
 	"log"
 	"net/http"
 	"sync"
@@ -18,43 +18,47 @@ import (
 func DumpChainPEM(chain []*x509.Certificate) string {
 	var p string
 	for _, cert := range chain {
-		b := pem.Block { Type: "CERTIFICATE", Bytes: cert.Raw }
+		b := pem.Block{Type: "CERTIFICATE", Bytes: cert.Raw}
 		p += string(pem.EncodeToMemory(&b))
 	}
 	return p
 }
 
 func DumpPEM(cert []byte) string {
-	b := pem.Block { Type: "CERTIFICATE", Bytes: cert }
+	b := pem.Block{Type: "CERTIFICATE", Bytes: cert}
 	return string(pem.EncodeToMemory(&b))
 }
 
 type toLog struct {
-	chain []*x509.Certificate
+	chain   []*x509.Certificate
 	retries uint16
 }
 
 type Log struct {
-	url string
-	roots *x509.CertPool
-	posts chan *toLog
+	url    string
+	roots  *x509.CertPool
+	posts  chan *toLog
 	active uint32
 	// these counters are not atomically updated, so may not be quite right
-	posted int
-	reposted int
-	latereposted int
+	posted        int
+	reposted      int
+	latereposted  int
 	chainreposted int
-	
-	wg sync.WaitGroup  // Note that this counts the number of active requests, not active servers, because we can't close it to signal the end, because of retries.
-	postCache map[[HashSize]byte]bool
+
+	wg             sync.WaitGroup // Note that this counts the
+				      // number of active requests,
+				      // not active servers, because
+				      // we can't close it to signal
+				      // the end, because of retries.
+	postCache      map[[HashSize]byte]bool
 	postChainCache map[[HashSize]byte]bool
-	pcMutex sync.Mutex
-	errors chan *FixError
+	pcMutex        sync.Mutex
+	errors         chan *FixError
 }
 
 func (s *Log) Posted(cert *x509.Certificate) bool {
 	return s.postCache[Hash(cert)]
-}	
+}
 
 func (s *Log) Roots() *x509.CertPool {
 	if s.roots == nil {
@@ -70,7 +74,8 @@ func (s *Log) getRoots() *x509.CertPool {
 	}
 	defer rootsjson.Body.Close()
 	if rootsjson.StatusCode != 200 {
-		log.Fatalf("can't deal with status other than 200: %d", rootsjson.StatusCode)
+		log.Fatalf("can't deal with status other than 200: %d",
+			rootsjson.StatusCode)
 	}
 	j, err := ioutil.ReadAll(rootsjson.Body)
 	//log.Printf("roots: %s", j)
@@ -84,13 +89,14 @@ func (s *Log) getRoots() *x509.CertPool {
 	}
 	//log.Printf("certs: %#v", certs)
 	ret := x509.NewCertPool()
-	for i := 0 ; i < len(certs.Certificates) ; i++ {
+	for i := 0; i < len(certs.Certificates); i++ {
 		r, err := x509.ParseCertificate(certs.Certificates[i])
 		switch err.(type) {
 		case nil:
 		case x509.NonFatalErrors:
 		default:
-			log.Fatalf("can't parse certificate: %s %#v", err, certs.Certificates[i])
+			log.Fatalf("can't parse certificate: %s %#v", err,
+				certs.Certificates[i])
 		}
 		ret.AddCert(r)
 		log.Printf("Root %d: %s", i, r.Subject.CommonName)
@@ -116,8 +122,9 @@ func (s *Log) postChain(l *toLog) {
 		log.Fatalf("Can't marshal: %s", err)
 	}
 	//log.Printf("post: %s", j)
-	
-	resp, err := http.Post(s.url + "/ct/v1/add-chain", "application/json", bytes.NewReader(j))
+
+	resp, err := http.Post(s.url+"/ct/v1/add-chain", "application/json",
+		bytes.NewReader(j))
 	if err != nil {
 		// FIXME: can we figure out what the error was? So far
 		// I've only ever seen EOF, but its just text...
@@ -143,9 +150,11 @@ func (s *Log) postChain(l *toLog) {
 	if resp.StatusCode != 200 {
 		//log.Printf("Can't handle response %d: %s\nchain: %s", resp.StatusCode, jo, DumpChainPEM(l.chain))
 		s.errors <- &FixError{
-			Type: LogPostFailed,
+			Type:  LogPostFailed,
 			Chain: l.chain,
-			Error: errors.New(fmt.Sprintf("Can't handle response %d: %s", resp.StatusCode, jo)),
+			Error: errors.New(
+				fmt.Sprintf("Can't handle response %d: %s",
+					resp.StatusCode, jo)),
 		}
 		return
 	}
@@ -192,7 +201,7 @@ func (s *Log) PostChain(chain []*x509.Certificate) {
 	}
 	s.postChainCache[h] = true
 	s.pcMutex.Unlock()
-	l := &toLog{ chain: chain, retries: 5 }
+	l := &toLog{chain: chain, retries: 5}
 	s.postToLog(l)
 }
 
@@ -207,17 +216,21 @@ func (s *Log) Wait() {
 }
 
 func NewLog(url string, errors chan *FixError) *Log {
-	s := &Log{url: url, posts: make(chan *toLog), postCache: make(map[[HashSize]byte]bool), postChainCache: make(map[[HashSize]byte]bool), errors: errors}
-	for i := 0 ; i < 100 ; i++ {
+	s := &Log{url: url, posts: make(chan *toLog),
+		postCache: make(map[[HashSize]byte]bool),
+		postChainCache: make(map[[HashSize]byte]bool), errors: errors}
+	for i := 0; i < 100; i++ {
 		go s.postServer()
 	}
 	t := time.NewTicker(time.Second)
 	go func() {
 		for _ = range t.C {
-			log.Printf("posters: %d active, %d posted, %d reposted, %d reposted (late), %d chains reposted", s.active, s.posted, s.reposted, s.latereposted, s.chainreposted)
+			log.Printf("posters: %d active, %d posted, " +
+				"%d reposted, %d reposted (late), " +
+				"%d chains reposted", s.active, s.posted,
+				s.reposted, s.latereposted, s.chainreposted)
 		}
 	}()
 
 	return s
 }
-

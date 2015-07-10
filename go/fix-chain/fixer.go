@@ -36,6 +36,7 @@ func HashChain(ch []*x509.Certificate) (r [HashSize]byte) {
 type Bag struct {
 	certs []*x509.Certificate
 }
+
 func (b Bag) Len() int { return len(b.certs) }
 func (b Bag) Less(i, j int) bool {
 	ci := b.certs[i].Raw
@@ -56,7 +57,11 @@ func (b Bag) Less(i, j int) bool {
 	}
 	return false
 }
-func (b Bag) Swap(i, j int) { t := b.certs[i]; b.certs[i] = b.certs[j]; b.certs[j] = t }
+func (b Bag) Swap(i, j int) {
+	t := b.certs[i]
+	b.certs[i] = b.certs[j]
+	b.certs[j] = t
+}
 
 func HashBag(bag []*x509.Certificate) [HashSize]byte {
 	b := Bag{certs: bag}
@@ -71,7 +76,8 @@ func HexHash(s *x509.Certificate) string {
 
 func dumpChain(name string, certs []*x509.Certificate) {
 	for i, cert := range certs {
-		log.Printf("%s %d: %s %s", name, i, HexHash(cert), cert.Subject.CommonName)
+		log.Printf("%s %d: %s %s", name, i, HexHash(cert),
+			cert.Subject.CommonName)
 	}
 }
 
@@ -101,14 +107,15 @@ func (d *DedupedChain) Dump(name string) {
 }
 
 type Fix struct {
-	cert *x509.Certificate
+	cert  *x509.Certificate
 	chain *DedupedChain
-	opts *x509.VerifyOptions
+	opts  *x509.VerifyOptions
 	fixer *Fixer
 }
 
 // Returns a partially filled FixError on error
-func augmentIntermediates(pool *x509.CertPool, url string, u *URLCache) *FixError {
+func augmentIntermediates(pool *x509.CertPool, url string,
+	u *URLCache) *FixError {
 	r := urlReplacement(url)
 	if r != nil {
 		log.Printf("Replaced %s: %+v", url, r)
@@ -130,10 +137,11 @@ func augmentIntermediates(pool *x509.CertPool, url string, u *URLCache) *FixErro
 			icert, err = x509.ParseCertificate(s.Bytes)
 		}
 	}
-				
+
 	if err != nil {
 		//log.Fatalf("failed to parse certificate from %s: %s", url, err)
-		return &FixError{Type: ParseFailure, URL: url, Bad: body, Error: err}
+		return &FixError{Type: ParseFailure, URL: url, Bad: body,
+			Error: err}
 	}
 	pool.AddCert(icert)
 	return nil
@@ -146,7 +154,8 @@ func fixChain(fix *Fix) {
 		urls := c.IssuingCertificateURL
 		for _, url := range urls {
 			//log.Printf("fetch issuer %d from %s", i, url)
-			ferr := augmentIntermediates(fix.opts.Intermediates, url, fix.fixer.cache)
+			ferr := augmentIntermediates(fix.opts.Intermediates,
+				url, fix.fixer.cache)
 			if ferr != nil {
 				ferr.Cert = fix.cert
 				ferr.Chain = fix.chain.certs
@@ -163,25 +172,26 @@ func fixChain(fix *Fix) {
 	}
 	//log.Printf("failed to fix certificate for %s", fix.cert.Subject.CommonName)
 	fix.fixer.notfixed++
-	fix.fixer.errors <- &FixError{Type:FixFailed, Cert: fix.cert, Chain: fix.chain.certs}
+	fix.fixer.errors <- &FixError{Type: FixFailed, Cert: fix.cert,
+		Chain: fix.chain.certs}
 }
 
 type Fixer struct {
-	fix chan *Fix
+	fix    chan *Fix
 	active uint32
 	// Counters may not be entirely accurate due to non-atomicity
-	skipped uint
-	reconstructed uint
+	skipped          uint
+	reconstructed    uint
 	notreconstructed uint
-	fixed uint
-	notfixed uint
-	alreadydone uint
-	
-	wg sync.WaitGroup
-	log *Log
+	fixed            uint
+	notfixed         uint
+	alreadydone      uint
+
+	wg     sync.WaitGroup
+	log    *Log
 	errors chan *FixError
-	cache *URLCache
-	done map[[HashSize]byte]bool
+	cache  *URLCache
+	done   map[[HashSize]byte]bool
 }
 
 func (f *Fixer) fixChain(cert *x509.Certificate, d *DedupedChain, intermediates *x509.CertPool, l *Log) {
@@ -190,7 +200,9 @@ func (f *Fixer) fixChain(cert *x509.Certificate, d *DedupedChain, intermediates 
 		f.skipped++
 		return
 	}
-	opts := x509.VerifyOptions{ Intermediates: intermediates, Roots: l.Roots(), DisableTimeChecks: true, KeyUsages: []x509.ExtKeyUsage{x509.ExtKeyUsageAny} }
+	opts := x509.VerifyOptions{Intermediates: intermediates,
+		Roots: l.Roots(), DisableTimeChecks: true,
+		KeyUsages: []x509.ExtKeyUsage{x509.ExtKeyUsageAny}}
 	chain, err := cert.Verify(opts)
 	if err == nil {
 		//dumpChains("verified", chain)
@@ -199,7 +211,8 @@ func (f *Fixer) fixChain(cert *x509.Certificate, d *DedupedChain, intermediates 
 		return
 	}
 	//log.Printf("failed to verify certificate for %s: %s", cert.Subject.CommonName, err)
-	f.errors <- &FixError{Type: VerifyFailed, Cert: cert, Chain: d.certs, Error: err}
+	f.errors <- &FixError{Type: VerifyFailed, Cert: cert, Chain: d.certs,
+		Error: err}
 	f.notreconstructed++
 	f.deferFixChain(cert, d, &opts)
 }
@@ -220,8 +233,9 @@ func (f *Fixer) FixAll(d *DedupedChain) {
 	}
 }
 
-func (f *Fixer) deferFixChain(cert *x509.Certificate, chain *DedupedChain, opts *x509.VerifyOptions) {
-	f.fix <- &Fix{ cert: cert, chain: chain, opts: opts, fixer: f }
+func (f *Fixer) deferFixChain(cert *x509.Certificate, chain *DedupedChain,
+	opts *x509.VerifyOptions) {
+	f.fix <- &Fix{cert: cert, chain: chain, opts: opts, fixer: f}
 }
 
 func (f *Fixer) fixServer() {
@@ -236,16 +250,18 @@ func (f *Fixer) fixServer() {
 
 func (f *Fixer) Wait() {
 	close(f.fix)
-	
+
 	// Must wait for fixers first, in case they log something.
 	f.wg.Wait()
 	f.log.Wait()
 }
 
 func NewFixer(logurl string, errors chan *FixError) *Fixer {
-	f := &Fixer{fix: make(chan *Fix), log: NewLog(logurl, errors), errors: errors, cache: NewURLCache(), done: make(map[[HashSize]byte]bool)}
+	f := &Fixer{fix: make(chan *Fix), log: NewLog(logurl, errors),
+		errors: errors, cache: NewURLCache(),
+		done: make(map[[HashSize]byte]bool)}
 
-	for i := 0 ; i < 100 ; i++ {
+	for i := 0; i < 100; i++ {
 		f.wg.Add(1)
 		go f.fixServer()
 	}
@@ -253,7 +269,12 @@ func NewFixer(logurl string, errors chan *FixError) *Fixer {
 	t := time.NewTicker(time.Second)
 	go func() {
 		for _ = range t.C {
-			log.Printf("fixers: %d active, %d skipped, %d reconstructed, %d not reconstructed, %d fixed, %d not fixed, %d already done", f.active, f.skipped, f.reconstructed, f.notreconstructed, f.fixed, f.notfixed, f.alreadydone)
+			log.Printf("fixers: %d active, %d skipped, " +
+				"%d reconstructed, %d not reconstructed, " +
+				"%d fixed, %d not fixed, %d already done",
+				f.active, f.skipped, f.reconstructed,
+				f.notreconstructed, f.fixed, f.notfixed,
+				f.alreadydone)
 		}
 	}()
 

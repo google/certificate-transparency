@@ -2,17 +2,17 @@ package fix_chain
 
 import (
 	"encoding/pem"
-	"log"
 	"github.com/google/certificate-transparency/go/x509"
+	"log"
 )
 
 // Go has no PKCS#7 implementation. Rather than fix that, manually
 // replace the few PKCS#7 URLs we know of.
 
-var replacements = map[string][]string {
+var replacements = map[string][]string{
 	"http://gca.nat.gov.tw/repository/Certs/IssuedToThisCA.p7b": {
-// subject=/C=TW/O=\xE8\xA1\x8C\xE6\x94\xBF\xE9\x99\xA2/OU=\xE6\x94\xBF\xE5\xBA\x9C\xE6\x86\x91\xE8\xAD\x89\xE7\xAE\xA1\xE7\x90\x86\xE4\xB8\xAD\xE5\xBF\x83
-// issuer=/C=TW/O=Government Root Certification Authority
+		// subject=/C=TW/O=\xE8\xA1\x8C\xE6\x94\xBF\xE9\x99\xA2/OU=\xE6\x94\xBF\xE5\xBA\x9C\xE6\x86\x91\xE8\xAD\x89\xE7\xAE\xA1\xE7\x90\x86\xE4\xB8\xAD\xE5\xBF\x83
+		// issuer=/C=TW/O=Government Root Certification Authority
 		`-----BEGIN CERTIFICATE-----
 MIIFJTCCAw2gAwIBAgIQCI3SljuLYpwZTjIA2nfOLDANBgkqhkiG9w0BAQsFADA/
 MQswCQYDVQQGEwJUVzEwMC4GA1UECgwnR292ZXJubWVudCBSb290IENlcnRpZmlj
@@ -43,8 +43,8 @@ usT8CveFOCjr2uJBXaBgmBr4I5/1oJypzZLmP65VtxSMtA5cmgooVRGAe+QrYufJ
 lGZiIUjmkqpNzh5q6oShkzqJPpqRviug2oZXQb9q9Qgj4zkr8KA5NkYVG+KNWR5V
 LD9SyuP1AJcZmxUKQtDEZJCJtISXfybg0A==
 -----END CERTIFICATE-----`,
-// subject=/C=TW/O=\xE8\xA1\x8C\xE6\x94\xBF\xE9\x99\xA2/OU=\xE6\x94\xBF\xE5\xBA\x9C\xE6\x86\x91\xE8\xAD\x89\xE7\xAE\xA1\xE7\x90\x86\xE4\xB8\xAD\xE5\xBF\x83
-//issuer=/C=TW/O=Government Root Certification Authority
+		// subject=/C=TW/O=\xE8\xA1\x8C\xE6\x94\xBF\xE9\x99\xA2/OU=\xE6\x94\xBF\xE5\xBA\x9C\xE6\x86\x91\xE8\xAD\x89\xE7\xAE\xA1\xE7\x90\x86\xE4\xB8\xAD\xE5\xBF\x83
+		//issuer=/C=TW/O=Government Root Certification Authority
 		`-----BEGIN CERTIFICATE-----
 MIIFJTCCAw2gAwIBAgIRAP+94tm8qUrtFSYcQfB4flUwDQYJKoZIhvcNAQEFBQAw
 PzELMAkGA1UEBhMCVFcxMDAuBgNVBAoMJ0dvdmVybm1lbnQgUm9vdCBDZXJ0aWZp
@@ -74,10 +74,10 @@ Cfvc6LJHttAQv/8nFQgTvDAWSkGmba7PgBMeACkQE/5e3qd8Hr20gs7df0O1UCgD
 ST3oZmF0B2MwtBU4IDNRMmrDlx+ZvfE50guQd1jPSSeNrHyycgILnzLMjwMIEaRf
 P34C7KkB1WrJ+IUNL7Wsp4WxEaL8whKzJnaBNMPCDHz4tUuanBtDSuSu2oWYLTNx
 58KYKSxTbOGbBt1cRf10CCR1/3YGE9C7rg==
------END CERTIFICATE-----` },
+-----END CERTIFICATE-----`},
 	"http://crt.usertrust.com/AddTrustExternalCARoot.p7c": {
-// subject=/C=SE/O=AddTrust AB/OU=AddTrust External TTP Network/CN=AddTrust External CA Root
-// issuer=/C=SE/O=AddTrust AB/OU=AddTrust External TTP Network/CN=AddTrust External CA Root
+		// subject=/C=SE/O=AddTrust AB/OU=AddTrust External TTP Network/CN=AddTrust External CA Root
+		// issuer=/C=SE/O=AddTrust AB/OU=AddTrust External TTP Network/CN=AddTrust External CA Root
 		`-----BEGIN CERTIFICATE-----
 MIIENjCCAx6gAwIBAgIBATANBgkqhkiG9w0BAQUFADBvMQswCQYDVQQGEwJTRTEU
 MBIGA1UEChMLQWRkVHJ1c3QgQUIxJjAkBgNVBAsTHUFkZFRydXN0IEV4dGVybmFs
@@ -103,8 +103,8 @@ Nr4TDea9Y355e6cJDUCrat2PisP29owaQgVR1EX1n6diIWgVIEM8med8vSTYqZEX
 c4g/VhsxOBi0cQ+azcgOno4uG+GMmIPLHzHxREzGBHNJdmAPx/i9F4BrLunMTA5a
 mnkPIAou1Z5jJh5VkpTYghdae9C8x49OhgQ=
 -----END CERTIFICATE-----`,
-// subject=/C=SE/O=AddTrust AB/OU=AddTrust External TTP Network/CN=AddTrust External CA Root
-// issuer=/C=US/ST=UT/L=Salt Lake City/O=The USERTRUST Network/OU=http://www.usertrust.com/CN=UTN - DATACorp SGC
+		// subject=/C=SE/O=AddTrust AB/OU=AddTrust External TTP Network/CN=AddTrust External CA Root
+		// issuer=/C=US/ST=UT/L=Salt Lake City/O=The USERTRUST Network/OU=http://www.usertrust.com/CN=UTN - DATACorp SGC
 		`-----BEGIN CERTIFICATE-----
 MIIEezCCA2OgAwIBAgIQftGpq77jb0bNa04pNJBW8zANBgkqhkiG9w0BAQUFADCB
 kzELMAkGA1UEBhMCVVMxCzAJBgNVBAgTAlVUMRcwFQYDVQQHEw5TYWx0IExha2Ug
@@ -130,10 +130,10 @@ PPO582kaafSkCNQgTbHyYyfhnwFDN7CxeudxyHoh7qg1wZ3mvGizRoCaPQRyPC9I
 9m6SROF8nMESeKYZAeLvYPt6V/MyKAa1uh2RGyhdZGpfU5wO1erMRb19RguvU0nG
 zIAYW1utsWITYE45WVHEpobL8Q1t3t0xC1+jB6D7PkaqSXMEfYoLsC9GYo7hvVBl
 KLHIdkr0IgMMVdT8DIdWfgtl74frfPclt80nTNs8CSlpF46LsEfo2mC3p2lm+ws=
------END CERTIFICATE-----` },
+-----END CERTIFICATE-----`},
 	"http://grca.nat.gov.tw/repository/Certs/IssuedToThisCA.p7b": {
-// subject=/C=TW/O=Government Root Certification Authority
-// issuer=/C=TW/O=Government Root Certification Authority
+		// subject=/C=TW/O=Government Root Certification Authority
+		// issuer=/C=TW/O=Government Root Certification Authority
 		`-----BEGIN CERTIFICATE-----
 MIIGSTCCBDGgAwIBAgIQMlyJOyY4kQwld2TzSNCtpTANBgkqhkiG9w0BAQsFADA/
 MQswCQYDVQQGEwJUVzEwMC4GA1UECgwnR292ZXJubWVudCBSb290IENlcnRpZmlj
@@ -170,8 +170,8 @@ ePMmkuPG6RscGUmt/CHIBELrVuUg9fBsqHhXsEcLwPxpCa3zoz+65l3xC96C7dOs
 nILgAleXRJeNnNWztqPMjsmK3bskVfr7JZ/mUfTlkujH33gYl49q+04CcYgeP1zq
 Yu1iuTWLXNZzI2QG/3rs8Q9ZYXwyJReCoxC5d+I=
 -----END CERTIFICATE-----`,
-// subject=/C=TW/O=Government Root Certification Authority
-// issuer=/C=TW/O=Government Root Certification Authority
+		// subject=/C=TW/O=Government Root Certification Authority
+		// issuer=/C=TW/O=Government Root Certification Authority
 		`-----BEGIN CERTIFICATE-----
 MIIGSTCCBDGgAwIBAgIRAP7mJmeBQUNcX66p8ttLpm8wDQYJKoZIhvcNAQEFBQAw
 PzELMAkGA1UEBhMCVFcxMDAuBgNVBAoMJ0dvdmVybm1lbnQgUm9vdCBDZXJ0aWZp
@@ -207,7 +207,7 @@ H4OADQnWfsH96MWrA2OQAU/3n7SGuwDsT3I8oYwXCZ4Za0FMJIcftZuA8soU7bHo
 Tvmiar3DZrvPZE6uq0dHboxVt/4Qsogv+3PMRkqV6X8lk18hzkClEvToQh4xUW2R
 wnXMUCSjca4A59fi12K6chOo3hv0gIe9OQAkSGWrlAOfCERTio8fW8dC+/or/ZgX
 ha+uQ1DoDj7b4KImmT4M6idBYze1/LoKcnizOQs=
------END CERTIFICATE-----` },
+-----END CERTIFICATE-----`},
 }
 
 func urlReplacement(url string) []*x509.Certificate {

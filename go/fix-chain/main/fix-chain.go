@@ -5,12 +5,12 @@ import (
 	"crypto/sha256"
 	"encoding/base64"
 	"encoding/json"
-	"io"
 	"github.com/google/certificate-transparency/go/fix-chain"
+	"github.com/google/certificate-transparency/go/x509"
+	"io"
 	"log"
 	"os"
 	"sync"
-	"github.com/google/certificate-transparency/go/x509"
 )
 
 func processChains(file string, fixer *fix_chain.Fixer) {
@@ -19,11 +19,11 @@ func processChains(file string, fixer *fix_chain.Fixer) {
 		log.Fatalf("Can't open %s: %s", err)
 	}
 	defer f.Close()
-	
+
 	type Chain struct {
 		Chain [][]byte
 	}
-		
+
 	dec := json.NewDecoder(f)
 	for {
 		var m Chain
@@ -41,7 +41,8 @@ func processChains(file string, fixer *fix_chain.Fixer) {
 			case nil:
 			case x509.NonFatalErrors:
 			default:
-				log.Fatalf("can't parse certificate: %s %#v", err, derBytes)
+				log.Fatalf("can't parse certificate: %s %#v",
+					err, derBytes)
 			}
 
 			c.AddCert(cert)
@@ -68,7 +69,7 @@ func ContentStore(base string, sub string, c []byte) {
 
 func logJSONErrors(wg *sync.WaitGroup, errors chan *fix_chain.FixError, base string) {
 	defer wg.Done()
-	
+
 	for err := range errors {
 		var b bytes.Buffer
 		j := json.NewEncoder(&b)
@@ -80,9 +81,10 @@ func logJSONErrors(wg *sync.WaitGroup, errors chan *fix_chain.FixError, base str
 	}
 }
 
-func logStringErrors(wg *sync.WaitGroup, errors chan *fix_chain.FixError, base string) {
+func logStringErrors(wg *sync.WaitGroup, errors chan *fix_chain.FixError,
+	base string) {
 	defer wg.Done()
-	
+
 	for err := range errors {
 		ContentStore(base, err.TypeString(), []byte(err.String()))
 	}
@@ -91,17 +93,17 @@ func logStringErrors(wg *sync.WaitGroup, errors chan *fix_chain.FixError, base s
 func main() {
 	logurl := "https://ct.googleapis.com/rocketeer"
 	//logurl := "https://ct.googleapis.com/aviator"
-	
+
 	var wg sync.WaitGroup
 	wg.Add(1)
-	
+
 	errors := make(chan *fix_chain.FixError)
 	go logStringErrors(&wg, errors, os.Args[1])
-	
+
 	f := fix_chain.NewFixer(logurl, errors)
-	
+
 	processChains("/usr/home/ben/tmp/failed.json", f)
-	
+
 	log.Printf("Wait for fixers")
 	f.Wait()
 	close(errors)
