@@ -4,6 +4,8 @@ import (
 	"bytes"
 	"encoding/json"
 	"encoding/pem"
+	"errors"
+	"fmt"
 	"io/ioutil"
 	"github.com/google/certificate-transparency/go/x509"
 	"log"
@@ -20,6 +22,11 @@ func DumpChainPEM(chain []*x509.Certificate) string {
 		p += string(pem.EncodeToMemory(&b))
 	}
 	return p
+}
+
+func DumpPEM(cert []byte) string {
+	b := pem.Block { Type: "CERTIFICATE", Bytes: cert }
+	return string(pem.EncodeToMemory(&b))
 }
 
 type toLog struct {
@@ -42,21 +49,7 @@ type Log struct {
 	postCache map[[HashSize]byte]bool
 	postChainCache map[[HashSize]byte]bool
 	pcMutex sync.Mutex
-}
-
-func NewLog(url string) *Log {
-	s := &Log{url: url, posts: make(chan *toLog), postCache: make(map[[HashSize]byte]bool), postChainCache: make(map[[HashSize]byte]bool)}
-	for i := 0 ; i < 100 ; i++ {
-		go s.postServer()
-	}
-	t := time.NewTicker(time.Second)
-	go func() {
-		for _ = range t.C {
-			log.Printf("posters: %d active, %d posted, %d reposted, %d reposted (late), %d chains reposted", s.active, s.posted, s.reposted, s.latereposted, s.chainreposted)
-		}
-	}()
-
-	return s
+	errors chan *FixError
 }
 
 func (s *Log) Posted(cert *x509.Certificate) bool {
@@ -148,7 +141,12 @@ func (s *Log) postChain(l *toLog) {
 		return
 	}
 	if resp.StatusCode != 200 {
-		log.Printf("Can't handle response %d: %s\nchain: %s", resp.StatusCode, jo, DumpChainPEM(l.chain))
+		//log.Printf("Can't handle response %d: %s\nchain: %s", resp.StatusCode, jo, DumpChainPEM(l.chain))
+		s.errors <- &FixError{
+			Type: LogPostFailed,
+			Chain: l.chain,
+			Error: errors.New(fmt.Sprintf("Can't handle response %d: %s", resp.StatusCode, jo)),
+		}
 		return
 	}
 	if err != nil {
@@ -207,3 +205,19 @@ func (s *Log) PostChains(chains [][]*x509.Certificate) {
 func (s *Log) Wait() {
 	s.wg.Wait()
 }
+
+func NewLog(url string, errors chan *FixError) *Log {
+	s := &Log{url: url, posts: make(chan *toLog), postCache: make(map[[HashSize]byte]bool), postChainCache: make(map[[HashSize]byte]bool), errors: errors}
+	for i := 0 ; i < 100 ; i++ {
+		go s.postServer()
+	}
+	t := time.NewTicker(time.Second)
+	go func() {
+		for _ = range t.C {
+			log.Printf("posters: %d active, %d posted, %d reposted, %d reposted (late), %d chains reposted", s.active, s.posted, s.reposted, s.latereposted, s.chainreposted)
+		}
+	}()
+
+	return s
+}
+

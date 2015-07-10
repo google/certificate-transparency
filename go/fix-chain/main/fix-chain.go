@@ -66,19 +66,25 @@ func ContentStore(base string, sub string, c []byte) {
 	f.Write(c)
 }
 
-func logErrors(wg *sync.WaitGroup, errors chan *fix_chain.FixError, base string) {
+func logJSONErrors(wg *sync.WaitGroup, errors chan *fix_chain.FixError, base string) {
 	defer wg.Done()
 	
 	for err := range errors {
-		//log.Printf("Error! %s", err.String())
 		var b bytes.Buffer
 		j := json.NewEncoder(&b)
 		err2 := j.Encode(err)
 		if err2 != nil {
 			log.Fatalf("JSON encode failed: %s", err2)
 		}
-		//log.Printf("Error! %s", b.Bytes())
 		ContentStore(base, err.TypeString(), b.Bytes())
+	}
+}
+
+func logStringErrors(wg *sync.WaitGroup, errors chan *fix_chain.FixError, base string) {
+	defer wg.Done()
+	
+	for err := range errors {
+		ContentStore(base, err.TypeString(), []byte(err.String()))
 	}
 }
 
@@ -90,7 +96,7 @@ func main() {
 	wg.Add(1)
 	
 	errors := make(chan *fix_chain.FixError)
-	go logErrors(&wg, errors, os.Args[1])
+	go logStringErrors(&wg, errors, os.Args[1])
 	
 	f := fix_chain.NewFixer(logurl, errors)
 	

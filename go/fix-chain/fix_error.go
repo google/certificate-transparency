@@ -3,7 +3,6 @@ package fix_chain
 import (
 	"bytes"
 	"encoding/json"
-	"encoding/pem"
 	"fmt"
 	"github.com/google/certificate-transparency/go/x509"
 )
@@ -14,6 +13,8 @@ const (
 	ParseFailure ErrorType = iota
 	CannotFetchURL
 	FixFailed
+	LogPostFailed
+	VerifyFailed
 )
 
 type FixError struct {
@@ -21,7 +22,7 @@ type FixError struct {
 	// The supplied leaf certificate
 	Cert *x509.Certificate
 	// The supplied chain
-	Chain *DedupedChain
+	Chain []*x509.Certificate
 	// URL, if a URL is involved
 	URL string
 	// The offending bytes, if applicable
@@ -35,20 +36,26 @@ func (e FixError) TypeString() string {
 	case ParseFailure: return "ParseFailure"
 	case CannotFetchURL: return "CannotFetchURL"
 	case FixFailed: return "FixFailed"
-	default: return fmt.Sprint("Type%d", e.Type)
+	case LogPostFailed: return "LogPostFailed"
+	case VerifyFailed: return "VerifyFailed"
+	default: return fmt.Sprintf("Type%d", e.Type)
 	}
 }
 
 func (e FixError) String() (s string) {
-	s = e.TypeString()
-	s += "\n" + e.Error.Error() + "\n"
-	if e.URL != "" {
-		s += e.URL + "\n"
+	s = e.TypeString() + "\n"
+	if e.Error != nil {
+		s += "Error: " + e.Error.Error() + "\n"
 	}
-	b := pem.Block { Type: "CERTIFICATE", Bytes: e.Cert.Raw }
-	s += string(pem.EncodeToMemory(&b))
+	if e.URL != "" {
+		s += "URL: " + e.URL + "\n"
+	}
+	s += "Bad: " + DumpPEM(e.Bad)
+	if e.Cert != nil {
+		s += "Cert: " + DumpPEM(e.Cert.Raw)
+	}
 	if e.Chain != nil {
-		s += DumpChainPEM(e.Chain.certs)
+		s += "Chain: " + DumpChainPEM(e.Chain)
 	}
 	return
 }
@@ -66,7 +73,7 @@ func (e FixError) MarshalJSON() ([]byte, error) {
 	}
 	m.Type = e.TypeString()
 	m.Cert = e.Cert.Raw
-	for _, c := range e.Chain.certs {
+	for _, c := range e.Chain {
 		m.Chain = append(m.Chain, c.Raw)
 	}
 	m.URL = e.URL

@@ -149,7 +149,7 @@ func fixChain(fix *Fix) {
 			ferr := augmentIntermediates(fix.opts.Intermediates, url, fix.fixer.cache)
 			if ferr != nil {
 				ferr.Cert = fix.cert
-				ferr.Chain = fix.chain
+				ferr.Chain = fix.chain.certs
 				fix.fixer.errors <- ferr
 			}
 			chain, err := fix.cert.Verify(*fix.opts)
@@ -163,7 +163,7 @@ func fixChain(fix *Fix) {
 	}
 	//log.Printf("failed to fix certificate for %s", fix.cert.Subject.CommonName)
 	fix.fixer.notfixed++
-	fix.fixer.errors <- &FixError{Type:FixFailed, Cert: fix.cert, Chain: fix.chain}
+	fix.fixer.errors <- &FixError{Type:FixFailed, Cert: fix.cert, Chain: fix.chain.certs}
 }
 
 type Fixer struct {
@@ -199,6 +199,7 @@ func (f *Fixer) fixChain(cert *x509.Certificate, d *DedupedChain, intermediates 
 		return
 	}
 	//log.Printf("failed to verify certificate for %s: %s", cert.Subject.CommonName, err)
+	f.errors <- &FixError{Type: VerifyFailed, Cert: cert, Chain: d.certs, Error: err}
 	f.notreconstructed++
 	f.deferFixChain(cert, d, &opts)
 }
@@ -242,7 +243,7 @@ func (f *Fixer) Wait() {
 }
 
 func NewFixer(logurl string, errors chan *FixError) *Fixer {
-	f := &Fixer{fix: make(chan *Fix), log: NewLog(logurl), errors: errors, cache: NewURLCache(), done: make(map[[HashSize]byte]bool)}
+	f := &Fixer{fix: make(chan *Fix), log: NewLog(logurl, errors), errors: errors, cache: NewURLCache(), done: make(map[[HashSize]byte]bool)}
 
 	for i := 0 ; i < 100 ; i++ {
 		f.wg.Add(1)
