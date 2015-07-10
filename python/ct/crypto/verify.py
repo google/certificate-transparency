@@ -347,4 +347,46 @@ class LogVerifier(object):
 
         return self._verify(signature_input, sct.signature.signature)
 
+    def verify_embedded_scts(self, chain):
+        """Extract and verify SCTs embedded in an X.509 certificate.
+
+        Args:
+            chain: list of cert.Certificate instances.
+
+        Returns:
+            List of (SignedCertificateTimestamp, bool) pairs, one for each SCT
+                present in the certificate. The boolean is True if the
+                corresponding SCT is valid, False otherwise.
+
+        Raises:
+            ct.crypto.error.EncodingError: failed to encode signature input,
+                or decode the signature.
+            ct.crypto.error.IncompleteChainError: the chain is empty.
+        """
+
+        try:
+            leaf_cert = chain[0]
+        except IndexError:
+            raise error.IncompleteChainError(
+                    "Chain must contain leaf certificate.")
+
+        scts_blob = leaf_cert.embedded_sct_list()
+        if scts_blob is None:
+            return []
+
+        scts = client_pb2.SignedCertificateTimestampList()
+        tls_message.decode(scts_blob, scts)
+
+        result = []
+        for sct_blob in scts.sct_list:
+            sct = client_pb2.SignedCertificateTimestamp()
+            tls_message.decode(sct_blob, sct)
+
+            try:
+                self.verify_sct(sct, chain)
+                result.append((sct, True))
+            except error.VerifyError:
+                result.append((sct, False))
+
+        return result
 

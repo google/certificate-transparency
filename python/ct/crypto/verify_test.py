@@ -265,6 +265,16 @@ class LogVerifierTest(unittest.TestCase):
         verifier = verify.LogVerifier(key_info)
         return verifier.verify_sct(sct, chain)
 
+    def _test_verify_embedded_scts(self, chain):
+        chain = map(lambda name: cert.Certificate.from_pem_file(
+                        os.path.join(FLAGS.testdata_dir, name)), chain)
+
+        key_info = client_pb2.KeyInfo()
+        key_info.type = client_pb2.KeyInfo.ECDSA
+        key_info.pem_key = read_testdata_file('ct-server-key-public.pem')
+
+        verifier = verify.LogVerifier(key_info)
+        return verifier.verify_embedded_scts(chain)
 
     def test_verify_sct_valid_signature(self):
         self.assertTrue(self._test_verify_sct(
@@ -314,6 +324,30 @@ class LogVerifierTest(unittest.TestCase):
                           'test-embedded-with-preca-pre-cert.proof',
                           ['test-embedded-with-preca-pre-cert.pem',
                            'ca-pre-cert.pem'])
+
+    def test_verify_embedded_scts_valid_signature(self):
+        sct = client_pb2.SignedCertificateTimestamp()
+        tls_message.decode(read_testdata_file('test-embedded-pre-cert.proof'),
+                           sct)
+
+        result = self._test_verify_embedded_scts(
+                    ['test-embedded-cert.pem', 'ca-cert.pem'])
+        self.assertEqual(result, [(sct, True)])
+
+    def test_verify_embedded_scts_invalid_signature(self):
+        result = self._test_verify_embedded_scts(
+                    ['test-invalid-embedded-cert.pem', 'ca-cert.pem'])
+        self.assertFalse(result[0][1])
+
+    def test_verify_embedded_scts_with_preca_valid_signature(self):
+        sct = client_pb2.SignedCertificateTimestamp()
+        tls_message.decode(
+                read_testdata_file('test-embedded-with-preca-pre-cert.proof'),
+                sct)
+
+        result = self._test_verify_embedded_scts(
+                    ['test-embedded-with-preca-cert.pem', 'ca-cert.pem'])
+        self.assertEqual(result, [(sct, True)])
 
 if __name__ == "__main__":
     sys.argv = FLAGS(sys.argv)

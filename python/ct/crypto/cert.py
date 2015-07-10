@@ -850,6 +850,22 @@ class Certificate(object):
         return [a[x509_ext.ACCESS_LOCATION] for a in aia
                 if a[x509_ext.ACCESS_METHOD] == oid.ID_AD_OCSP]
 
+    def embedded_sct_list(self):
+        """Get the encoded list of embedded timestamps
+
+        Returns:
+            bytes representing a TLS encoded SignedCertificateTimestampList,
+            or None if not present
+
+        Raises:
+            CertificateError: corrupt extension, or multiple extension values.
+        """
+        signed_certificate_timestamp_list = (
+                self._get_decoded_extension_value(oid.CT_EMBEDDED_SCT_LIST))
+        if signed_certificate_timestamp_list is None:
+            return None
+        return signed_certificate_timestamp_list.value
+
     def has_extension(self, extn_id):
         """Check if certificate contains a given extnsion.
 
