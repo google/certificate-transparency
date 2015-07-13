@@ -249,37 +249,71 @@ class LogVerifierTest(unittest.TestCase):
                           verifier.verify_sth_consistency,
                           old_sth, new_sth, proof)
 
-    def test_verify_sct_valid_signature(self):
-        root_cert = cert.Certificate.from_pem_file(
-            os.path.join(FLAGS.testdata_dir, 'ca-cert.pem'))
-        test_cert = cert.Certificate.from_pem_file(
-            os.path.join(FLAGS.testdata_dir, 'test-cert.pem'))
+    def _test_verify_sct(self, proof, chain, fake_timestamp = None):
         sct = client_pb2.SignedCertificateTimestamp()
-        tls_message.decode(read_testdata_file('test-cert.proof'), sct)
+        tls_message.decode(read_testdata_file(proof), sct)
+        if fake_timestamp is not None:
+            sct.timestamp = fake_timestamp
+
+        chain = map(lambda name: cert.Certificate.from_pem_file(
+                        os.path.join(FLAGS.testdata_dir, name)), chain)
 
         key_info = client_pb2.KeyInfo()
         key_info.type = client_pb2.KeyInfo.ECDSA
         key_info.pem_key = read_testdata_file('ct-server-key-public.pem')
 
         verifier = verify.LogVerifier(key_info)
-        self.assertTrue(verifier.verify_sct(sct, [test_cert, root_cert]))
+        return verifier.verify_sct(sct, chain)
+
+
+    def test_verify_sct_valid_signature(self):
+        self.assertTrue(self._test_verify_sct(
+                                'test-cert.proof',
+                                ['test-cert.pem', 'ca-cert.pem']))
 
     def test_verify_sct_invalid_signature(self):
-        root_cert = cert.Certificate.from_pem_file(
-            os.path.join(FLAGS.testdata_dir, 'ca-cert.pem'))
-        test_cert = cert.Certificate.from_pem_file(
-            os.path.join(FLAGS.testdata_dir, 'test-cert.pem'))
-        sct = client_pb2.SignedCertificateTimestamp()
-        tls_message.decode(read_testdata_file('test-cert.proof'), sct)
-        sct.timestamp = 1234567
-
-        key_info = client_pb2.KeyInfo()
-        key_info.type = client_pb2.KeyInfo.ECDSA
-        key_info.pem_key = read_testdata_file('ct-server-key-public.pem')
-
-        verifier = verify.LogVerifier(key_info)
         self.assertRaises(error.SignatureError,
-                          verifier.verify_sct, sct, [test_cert, root_cert])
+                          self._test_verify_sct,
+                          'test-cert.proof',
+                          ['test-cert.pem', 'ca-cert.pem'],
+                          fake_timestamp = 1234567)
+
+    def test_verify_sct_precertificate_valid_signature(self):
+        self.assertTrue(self._test_verify_sct(
+                                'test-embedded-pre-cert.proof',
+                                ['test-embedded-pre-cert.pem', 'ca-cert.pem']))
+
+    def test_verify_sct_precertificate_invalid_signature(self):
+        self.assertRaises(error.SignatureError,
+                          self._test_verify_sct,
+                          'test-embedded-pre-cert.proof',
+                          ['test-embedded-pre-cert.pem', 'ca-cert.pem'],
+                          fake_timestamp = 1234567)
+
+    def test_verify_sct_precertificate_with_preca_valid_signature(self):
+        self.assertTrue(self._test_verify_sct(
+                                'test-embedded-with-preca-pre-cert.proof',
+                                ['test-embedded-with-preca-pre-cert.pem',
+                                 'ca-pre-cert.pem', 'ca-cert.pem']))
+
+    def test_verify_sct_missing_leaf_cert(self):
+        self.assertRaises(error.IncompleteChainError,
+                          self._test_verify_sct,
+                          'test-cert.proof',
+                          [])
+
+    def test_verify_sct_missing_issuer_cert(self):
+        self.assertRaises(error.IncompleteChainError,
+                          self._test_verify_sct,
+                          'test-embedded-pre-cert.proof',
+                          ['test-embedded-pre-cert.pem'])
+
+    def test_verify_sct_with_preca_missing_issuer_cert(self):
+        self.assertRaises(error.IncompleteChainError,
+                          self._test_verify_sct,
+                          'test-embedded-with-preca-pre-cert.proof',
+                          ['test-embedded-with-preca-pre-cert.pem',
+                           'ca-pre-cert.pem'])
 
 if __name__ == "__main__":
     sys.argv = FLAGS(sys.argv)

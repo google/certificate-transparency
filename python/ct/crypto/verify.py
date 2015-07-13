@@ -7,6 +7,9 @@ import struct
 from ct.crypto import error
 from ct.crypto import merkle
 from ct.crypto import pem
+from ct.crypto.asn1 import oid
+from ct.crypto.asn1 import x509_extension as x509_ext
+from ct.crypto.asn1 import x509_name
 from ct.proto import client_pb2
 from ct.proto import ct_pb2
 from ct.serialization import tls_message
@@ -50,6 +53,130 @@ def decode_signature(signature):
                                    len(remaining)))
     return (hash_algo, sig_algo, remaining)
 
+def _get_precertificate_issuer(chain):
+    try:
+        issuer = chain[1]
+    except IndexError:
+        raise error.IncompleteChainError(
+                "Chain with PreCertificate must contain issuer.")
+
+    if not issuer.extended_key_usage(oid.CT_PRECERTIFICATE_SIGNING):
+        return issuer
+    else:
+        try:
+            return chain[2]
+        except IndexError:
+            raise error.IncompleteChainError(
+                "Chain with PreCertificate signed by PreCertificate "
+                "Signing Cert must contain issuer.")
+
+def _find_extension(asn1, extn_id):
+    """Find an extension from a certificate's ASN.1 representation
+
+    Args:
+        asn1: x509.Certificate instance.
+        extn_id: OID of the extension to look for.
+
+    Returns:
+        The decoded value of the extension, or None if not found.
+        This is a reference and can be modified.
+    """
+    for e in asn1["tbsCertificate"]["extensions"]:
+        if e["extnID"] == extn_id:
+            return e["extnValue"].decoded_value
+
+    return None
+
+def _remove_extension(asn1, extn_id):
+    """Remove an extension from a certificate's ASN.1 representation
+
+    Args:
+        asn1: x509.Certificate instance.
+        extn_id: OID of the extension to be removed.
+    """
+    asn1["tbsCertificate"]["extensions"] = (
+        filter(lambda e: e["extnID"] != extn_id,
+               asn1["tbsCertificate"]["extensions"])
+    )
+
+def _encode_tbs_certificate_for_validation(cert, issuer):
+    """Normalize a Certificate for CT Signing / Verification
+    The poison and embedded sct extensions are removed if present,
+    and the issuer information is changed to match the one given in
+    argument. The resulting TBS certificate is encoded.
+
+    Args:
+        cert: Certificate instance to be normalized
+        issuer: Issuer certificate used to fix issuer information in TBS
+                certificate.
+
+    Returns:
+        DER encoding of the normalized TBS Certificate
+    """
+    asn1 = cert.to_asn1()
+    issuer_asn1 = issuer.to_asn1()
+
+    _remove_extension(asn1, oid.CT_POISON)
+    _remove_extension(asn1, oid.CT_EMBEDDED_SCT_LIST)
+    asn1["tbsCertificate"]["issuer"] = issuer_asn1["tbsCertificate"]["subject"]
+
+    akid = _find_extension(asn1, oid.ID_CE_AUTHORITY_KEY_IDENTIFIER)
+    if akid is not None:
+        akid[x509_ext.KEY_IDENTIFIER] = issuer.subject_key_identifier()
+        akid[x509_ext.AUTHORITY_CERT_SERIAL_NUMBER] = issuer.serial_number()
+        akid[x509_ext.AUTHORITY_CERT_ISSUER] = [
+            x509_name.GeneralName({
+                x509_name.DIRECTORY_NAME: issuer_asn1["tbsCertificate"]["issuer"]
+            })
+        ]
+
+    return asn1["tbsCertificate"].encode()
+
+def _is_precertificate(cert):
+    return (cert.has_extension(oid.CT_POISON) or
+            cert.has_extension(oid.CT_EMBEDDED_SCT_LIST))
+
+def _create_dst_entry(sct, chain):
+    """Create a Digitally Signed Timestamped Entry to be validated
+
+    Args:
+        sct: client_pb2.SignedCertificateTimestamp instance.
+        chain: list of Certificate instances.
+
+    Returns:
+        client_pb2.DigitallySignedTimestampedEntry instance with all
+        fields set.
+
+    Raises:
+        ct.crypto.error.IncompleteChainError: a certificate is missing
+            from the chain.
+    """
+
+    try:
+        leaf_cert = chain[0]
+    except IndexError:
+        raise error.IncompleteChainError(
+                "Chain must contain leaf certificate.")
+
+    entry = client_pb2.DigitallySignedTimestampedEntry()
+    entry.sct_version = ct_pb2.V1
+    entry.signature_type = client_pb2.CERTIFICATE_TIMESTAMP
+    entry.timestamp = sct.timestamp
+    entry.ct_extensions = sct.extensions
+
+    if _is_precertificate(leaf_cert):
+        issuer = _get_precertificate_issuer(chain)
+
+        entry.entry_type = client_pb2.PRECERT_ENTRY
+        entry.pre_cert.issuer_key_hash = issuer.key_hash('sha256')
+        entry.pre_cert.tbs_certificate = (
+            _encode_tbs_certificate_for_validation(leaf_cert, issuer)
+        )
+    else:
+        entry.entry_type = client_pb2.X509_ENTRY
+        entry.asn1_cert = leaf_cert.to_der()
+
+    return entry
 
 class LogVerifier(object):
     """CT log verifier."""
@@ -190,12 +317,9 @@ class LogVerifier(object):
             new_sth.sha256_root_hash, proof)
         return True
 
-
     @error.returns_true_or_raises
     def verify_sct(self, sct, chain):
         """Verify the SCT over the X.509 certificate provided
-
-        Not suitable for Precertificates.
 
         Args:
             sct: client_pb2.SignedCertificateTimestamp proto. Must have
@@ -211,24 +335,16 @@ class LogVerifier(object):
             ct.crypto.error.EncodingError: failed to encode signature input,
                 or decode the signature.
             ct.crypto.error.SignatureError: invalid signature.
+            ct.crypto.error.IncompleteChainError: a certificate is missing
+                from the chain.
         """
 
         if sct.version != ct_pb2.V1:
             raise error.UnsupportedVersionError("Cannot handle version: %s" %
                                                 sct.version)
-        try:
-            leaf_cert = chain[0]
-        except IndexError:
-            raise ValueError("Chain must contain leaf certificate.")
-
-        dsentry = client_pb2.DigitallySignedTimestampedEntry()
-        dsentry.sct_version = ct_pb2.V1
-        dsentry.signature_type = client_pb2.CERTIFICATE_TIMESTAMP
-        dsentry.timestamp = sct.timestamp
-        dsentry.entry_type = client_pb2.X509_ENTRY
-        dsentry.asn1_cert = leaf_cert.to_der()
-        dsentry.ct_extensions = sct.extensions
-
-        signature_input = tls_message.encode(dsentry)
+        entry = _create_dst_entry(sct, chain)
+        signature_input = tls_message.encode(entry)
 
         return self._verify(signature_input, sct.signature.signature)
+
+

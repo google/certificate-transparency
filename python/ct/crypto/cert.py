@@ -189,6 +189,10 @@ class Certificate(object):
     def is_identical_to(self, other_cert):
         return self.to_der() == other_cert.to_der()
 
+    def to_asn1(self):
+        """Get a copy of the ASN.1 representation of the certificate."""
+        return x509.Certificate.decode(self._asn1_cert.encode())
+
     def get_extensions(self):
         """Get all extensions.
 
@@ -617,6 +621,20 @@ class Certificate(object):
         h.update(self._asn1_cert.encode())
         return h.digest()
 
+    def key_hash(self, hashfunc="sha1"):
+        """Get the certificate's public key hash.
+
+        Args:
+            hashfunc: name of a hash function. Algorithms always present are
+                'md5', 'sha1', 'sha224', 'sha256', 'sha384', and 'sha512'.
+        Returns:
+            a (binary) hash digest of the public key.
+        """
+        h = hashlib.new(hashfunc)
+        h.update(
+            self._asn1_cert["tbsCertificate"]["subjectPublicKeyInfo"].encode())
+        return h.digest()
+
     def key_usage(self, key_usage):
         """Whether the certificate has the given key usage asserted.
 
@@ -826,6 +844,19 @@ class Certificate(object):
         return [a[x509_ext.ACCESS_LOCATION] for a in aia
                 if a[x509_ext.ACCESS_METHOD] == oid.ID_AD_OCSP]
 
+    def has_extension(self, extn_id):
+        """Check if certificate contains a given extnsion.
+
+        Args:
+            extn_id: extension OID.
+
+        Returns:
+            True or False
+
+        Raises:
+            CertificateError: corrupt extension, or multiple extension values.
+        """
+        return self._get_decoded_extension_value(extn_id) is not None
 
 def certs_from_pem(pem_string, skip_invalid_blobs=False, strict_der=True):
     """Read multiple PEM-encoded certificates from a string.

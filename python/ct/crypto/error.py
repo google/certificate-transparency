@@ -113,6 +113,10 @@ class ASN1IllegalCharacter(ASN1Error):
                                                                     self.index],
                                                               self.index)
 
+class IncompleteChainError(VerifyError):
+    """A certificate is missing from the chain"""
+    pass
+
 class SignatureError(VerifyError):
     """A public-key signature does not verify."""
     pass
