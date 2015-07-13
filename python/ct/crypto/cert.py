@@ -75,6 +75,7 @@ class Certificate(object):
         return cls.from_der(der_cert, strict_der=strict_der)
 
     def _has_multiple_extension_values(self):
+        """Returns true if any extension appears more than once."""
         extns = self._asn1_cert["tbsCertificate"]["extensions"] or []
         extn_value_count = collections.Counter([e["extnID"] for e in extns])
         return any([c > 1 for c in extn_value_count.values()])
@@ -176,17 +177,19 @@ class Certificate(object):
             certificate
             IOError: the file could not be read.
         """
-        with open(der_file, "rb") as f:
-            return cls.from_der(f.read(), strict_der=strict_der)
+        with open(der_file, "rb") as der_cert_file:
+            return cls.from_der(der_cert_file.read(), strict_der=strict_der)
 
     def to_der(self):
         """Get the DER-encoding of the certificate."""
         return self._asn1_cert.encode()
 
     def to_pem(self):
-      return pem.to_pem(self._asn1_cert.encode(), self.PEM_MARKERS[0])
+        """Get the PEM-encoding of the certificate."""
+        return pem.to_pem(self._asn1_cert.encode(), self.PEM_MARKERS[0])
 
     def is_identical_to(self, other_cert):
+        """Returns True if this certificate is identical to |other_cert|."""
         return self.to_der() == other_cert.to_der()
 
     def to_asn1(self):
@@ -252,7 +255,7 @@ class Certificate(object):
         try:
             return self._asn1_cert["tbsCertificate"]["subject"].attributes(
                 oid.ID_AT_COMMON_NAME)
-        except error.ASN1Error as e:
+        except error.ASN1Error:
             raise CertificateError("Corrupt common name attribute")
 
     def subject_organization_name(self):
@@ -268,7 +271,8 @@ class Certificate(object):
             return self._asn1_cert["tbsCertificate"]["subject"].attributes(
                     oid.ID_AT_ORGANIZATION_NAME)
         except error.ASN1Error:
-            raise CertificateError("Corrupt subject organization name attribute.")
+            raise CertificateError("Corrupt subject organization name "
+                                   "attribute.")
 
     def subject_street_address(self):
         """Get subject street address.
@@ -387,7 +391,7 @@ class Certificate(object):
         subject_alternative_names fashion.
         """
         subject = self._asn1_cert["tbsCertificate"]["subject"]
-        return [(sub['type'],  sub['value'])
+        return [(sub['type'], sub['value'])
                 for sub in subject.flatten()]
 
     def issuer(self):
@@ -395,10 +399,11 @@ class Certificate(object):
         subject method fashion.
         """
         issuer = self._asn1_cert["tbsCertificate"]["issuer"]
-        return [(iss['type'],  iss['value'])
+        return [(iss['type'], iss['value'])
                 for iss in issuer.flatten()]
 
     def _get_subject_alt_names_by_type(self, san_type):
+        """Returns the SAN extension values corresponding to |san_type|"""
         # A certificate should only have one SAN extension but we can't rely on
         # this (in non-strict mode), so we return everything we find.
         sans = self._get_decoded_extension_values(oid.ID_CE_SUBJECT_ALT_NAME)
@@ -715,42 +720,43 @@ class Certificate(object):
         return self._get_decoded_extension_value(oid.ID_CE_EXT_KEY_USAGE) or []
 
     def subject_key_identifier(self):
-      """Get the subject key identifier.
+        """Get the subject key identifier.
 
-      Returns:
-          An x509_extension.KeyIdentifier (ASN.1 OctetString) holding the value
-              of the subject key identifier, or None if the subject key
-              identifier extension is not present.
-      Raises:
-          CertificateError: corrupt extension, or multiple extension values.
-      """
-      return self._get_decoded_extension_value(oid.ID_CE_SUBJECT_KEY_IDENTIFIER)
+        Returns:
+            An x509_extension.KeyIdentifier (ASN.1 OctetString) holding the
+            value of the subject key identifier, or None if the subject key
+            identifier extension is not present.
+        Raises:
+            CertificateError: corrupt extension, or multiple extension values.
+        """
+        return self._get_decoded_extension_value(
+            oid.ID_CE_SUBJECT_KEY_IDENTIFIER)
 
     def authority_key_identifier(self, identifier_type=x509_ext.KEY_IDENTIFIER):
-      """Get the authority key identifier of the given type.
+        """Get the authority key identifier of the given type.
 
-      Args:
-          identifier_type: the identifier component to fetch, one of
+        Args:
+            identifier_type: the identifier component to fetch, one of
               x509_extension.KEY_IDENTIFIER,
               x509_extension.AUTHORITY_CERT_ISSUER,
               x509_extension.AUTHORITY_CERT_SERIAL_NUMBER.
 
-      Returns:
-          the identifier component of the appropriate type, or None if the
-          component/extension is not present. The types are
+        Returns:
+            the identifier component of the appropriate type, or None if the
+            component/extension is not present. The types are
               x509_extension.KEY_IDENTIFIER: x509_extension.KeyIdentifier
                   (an OCTET STRING),
               x509_extension.AUTHORITY_CERT_ISSUER: x509_name.GeneralNames,
               x509_extension.AUTHORITY_CERT_SERIAL_NUMBER:
                   x509_common.CertificateSerialNumber.
 
-      Raises:
-          CertificateError: corrupt extension, or multiple extension values.
-      """
-      akid = self._get_decoded_extension_value(
-          oid.ID_CE_AUTHORITY_KEY_IDENTIFIER)
+        Raises:
+            CertificateError: corrupt extension, or multiple extension values.
+        """
+        akid = self._get_decoded_extension_value(
+            oid.ID_CE_AUTHORITY_KEY_IDENTIFIER)
 
-      return akid[identifier_type] if akid else None
+        return akid[identifier_type] if akid else None
 
     def policies(self):
         """List certificate policies.
