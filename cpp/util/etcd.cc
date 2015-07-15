@@ -474,7 +474,8 @@ void EtcdClient::WatchInitialGetDone(WatchState* state, GetResponse* resp,
   // TODO(pphaneuf): Need better error handling here. Have to review
   // what the possible errors are, most of them should probably be
   // dealt with using retries?
-  CHECK(task->status().ok()) << "initial get error: " << task->status();
+  CHECK_EQ(Status::OK, task->status()) << "initial get error for key "
+                                       << state->key_;
 
   state->highest_index_seen_ =
       max(state->highest_index_seen_, resp->etcd_index);
