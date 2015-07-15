@@ -472,9 +472,18 @@ void EtcdClient::WatchInitialGetDone(WatchState* state, GetResponse* resp,
   }
 
   // TODO(pphaneuf): Need better error handling here. Have to review
-  // what the possible errors are, most of them should probably be
-  // dealt with using retries?
-  CHECK(task->status().ok()) << "initial get error: " << task->status();
+  // what the possible errors are, for now we'll just retry after a delay.
+  if (!task->status().ok()) {
+    LOG(WARNING) << "Initial get error: " << task->status() << ", will retry "
+                 << "in " << FLAGS_etcd_watch_error_retry_delay_seconds
+                 << " second(s)";
+    state->task_->executor()->Delay(
+        seconds(FLAGS_etcd_watch_error_retry_delay_seconds),
+        state->task_->AddChild([this, state](Task* task) {
+          this->WatchRequestDone(state, nullptr, nullptr);
+        }));
+    return;
+  }
 
   state->highest_index_seen_ =
       max(state->highest_index_seen_, resp->etcd_index);
