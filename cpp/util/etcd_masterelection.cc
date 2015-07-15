@@ -33,7 +33,7 @@ int main(int argc, char* argv[]) {
   ThreadPool pool;
   UrlFetcher fetcher(event_base.get(), &pool);
 
-  EtcdClient etcd(&fetcher, FLAGS_etcd, FLAGS_etcd_port);
+  EtcdClient etcd(&pool, &fetcher, FLAGS_etcd, FLAGS_etcd_port);
   MasterElection election(event_base, &etcd, FLAGS_proposal_dir,
                           FLAGS_node_id);
   election.StartElection();

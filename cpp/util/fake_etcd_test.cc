@@ -66,7 +66,8 @@ class FakeEtcdTest : public ::testing::Test {
         fetcher_(base_.get(), &pool_),
         client_(FLAGS_etcd.empty()
                     ? new FakeEtcdClient(base_.get())
-                    : new EtcdClient(&fetcher_, FLAGS_etcd, FLAGS_etcd_port)),
+                    : new EtcdClient(&pool_, &fetcher_, FLAGS_etcd,
+                                     FLAGS_etcd_port)),
         key_prefix_(BuildKeyPrefix()) {
   }
 

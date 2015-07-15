@@ -27,6 +27,7 @@ using std::placeholders::_3;
 using std::shared_ptr;
 using std::string;
 using std::to_string;
+using std::unique_ptr;
 using std::vector;
 using testing::ElementsAre;
 using testing::HasSubstr;
@@ -171,6 +172,8 @@ const char kStoreStatsJson[] =
     "   \"getsFail\" : 16"
     "}";
 
+const char kVersionString[] = "ETCD VERSION";
+
 const char kEtcdHost[] = "etcd.example.net";
 const int kEtcdPort = 4242;
 
@@ -182,25 +185,6 @@ const int kEtcdPort3 = 6262;
 
 const char kDefaultSpace[] = "/v2/keys";
 
-class EtcdTest : public ::testing::Test {
- public:
-  EtcdTest()
-      : base_(make_shared<libevent::Base>()),
-        pump_(base_),
-        client_(&url_fetcher_, kEtcdHost, kEtcdPort) {
-  }
-
-  shared_ptr<JsonObject> MakeJson(const string& json) {
-    return make_shared<JsonObject>(json);
-  }
-
-  const shared_ptr<libevent::Base> base_;
-  StrictMock<MockUrlFetcher> url_fetcher_;
-  libevent::EventPumpThread pump_;
-  EtcdClient client_;
-};
-
-typedef EtcdTest EtcdDeathTest;
 
 string GetEtcdUrl(const string& key, const string& key_space = kDefaultSpace,
                   const string& host = kEtcdHost,
@@ -208,6 +192,7 @@ string GetEtcdUrl(const string& key, const string& key_space = kDefaultSpace,
   CHECK(!key.empty() && key[0] == '/') << "key isn't slash-prefixed: " << key;
   return "http://" + string(host) + ":" + to_string(port) + key_space + key;
 }
+
 
 void HandleFetch(Status status, int status_code,
                  const UrlFetcher::Headers& headers, const string& body,
@@ -218,6 +203,47 @@ void HandleFetch(Status status, int status_code,
   resp->body = body;
   task->Return(status);
 }
+
+
+class EtcdTest : public ::testing::Test {
+ public:
+  EtcdTest()
+      : base_(make_shared<libevent::Base>()),
+        pump_(base_),
+        client_(base_.get(), &url_fetcher_, kEtcdHost, kEtcdPort) {
+    ExpectVersionCalls(url_fetcher_, kEtcdHost, kEtcdPort);
+    ExpectVersionCalls(url_fetcher_, kEtcdHost2, kEtcdPort2);
+    ExpectVersionCalls(url_fetcher_, kEtcdHost3, kEtcdPort3);
+  }
+
+ protected:
+  void ExpectVersionCalls(MockUrlFetcher& fetcher,
+                          const string& host,
+                          uint16_t port) {
+    EXPECT_CALL(url_fetcher_,
+                Fetch(IsUrlFetchRequest(UrlFetcher::Verb::GET,
+                                        URL(GetEtcdUrl("/version", "", host,
+                                                       port)),
+                                        IsEmpty(), ""),
+                      _, _))
+        .WillRepeatedly(
+            Invoke(bind(HandleFetch, Status::OK, 200, UrlFetcher::Headers{},
+                        kVersionString, _1, _2, _3)));
+  }
+
+  shared_ptr<JsonObject> MakeJson(const string& json) {
+    return make_shared<JsonObject>(json);
+  }
+
+  const shared_ptr<libevent::Base> base_;
+  MockUrlFetcher url_fetcher_;
+  libevent::EventPumpThread pump_;
+  EtcdClient client_;
+};
+
+
+typedef EtcdTest EtcdDeathTest;
+
 
 TEST_F(EtcdTest, Get) {
   EXPECT_CALL(url_fetcher_,
@@ -240,6 +266,7 @@ TEST_F(EtcdTest, Get) {
   EXPECT_EQ(9, resp.node.modified_index_);
   EXPECT_EQ("123", resp.node.value_);
 }
+
 
 TEST_F(EtcdTest, GetRecursive) {
   EXPECT_CALL(url_fetcher_,
@@ -266,6 +293,7 @@ TEST_F(EtcdTest, GetRecursive) {
   EXPECT_EQ("123", resp.node.value_);
 }
 
+
 TEST_F(EtcdTest, GetForInvalidKey) {
   EXPECT_CALL(url_fetcher_,
               Fetch(IsUrlFetchRequest(UrlFetcher::Verb::GET,
@@ -285,6 +313,7 @@ TEST_F(EtcdTest, GetForInvalidKey) {
                                       AllOf(HasSubstr("Key not found"),
                                             HasSubstr(string(kEntryKey)))));
 }
+
 
 TEST_F(EtcdTest, GetAll) {
   EXPECT_CALL(url_fetcher_,
@@ -309,6 +338,7 @@ TEST_F(EtcdTest, GetAll) {
   EXPECT_EQ(7, resp.node.nodes_[1].modified_index_);
   EXPECT_EQ("456", resp.node.nodes_[1].value_);
 }
+
 
 TEST_F(EtcdTest, GetWaitTooOld) {
   const int kOldIndex(42);
@@ -339,6 +369,7 @@ TEST_F(EtcdTest, GetWaitTooOld) {
   EXPECT_EQ(kNewIndex, resp.etcd_index);
 }
 
+
 TEST_F(EtcdTest, Create) {
   EXPECT_CALL(
       url_fetcher_,
@@ -360,6 +391,7 @@ TEST_F(EtcdTest, Create) {
   EXPECT_EQ(7, resp.etcd_index);
 }
 
+
 TEST_F(EtcdTest, CreateFails) {
   EXPECT_CALL(
       url_fetcher_,
@@ -380,6 +412,7 @@ TEST_F(EtcdTest, CreateFails) {
   EXPECT_THAT(task.status(), StatusIs(util::error::FAILED_PRECONDITION,
                                       HasSubstr("Key already exists")));
 }
+
 
 TEST_F(EtcdTest, CreateWithTTL) {
   EXPECT_CALL(
@@ -403,6 +436,7 @@ TEST_F(EtcdTest, CreateWithTTL) {
   EXPECT_EQ(7, resp.etcd_index);
 }
 
+
 TEST_F(EtcdTest, CreateWithTTLFails) {
   EXPECT_CALL(
       url_fetcher_,
@@ -425,6 +459,7 @@ TEST_F(EtcdTest, CreateWithTTLFails) {
                                       HasSubstr("Key already exists")));
 }
 
+
 TEST_F(EtcdTest, Update) {
   EXPECT_CALL(url_fetcher_,
               Fetch(IsUrlFetchRequest(
@@ -445,6 +480,7 @@ TEST_F(EtcdTest, Update) {
   EXPECT_EQ(6, resp.etcd_index);
 }
 
+
 TEST_F(EtcdTest, UpdateFails) {
   EXPECT_CALL(url_fetcher_,
               Fetch(IsUrlFetchRequest(
@@ -464,6 +500,7 @@ TEST_F(EtcdTest, UpdateFails) {
   EXPECT_THAT(task.status(), StatusIs(util::error::FAILED_PRECONDITION,
                                       HasSubstr("Compare failed")));
 }
+
 
 TEST_F(EtcdTest, UpdateWithTTL) {
   EXPECT_CALL(
@@ -486,6 +523,7 @@ TEST_F(EtcdTest, UpdateWithTTL) {
   EXPECT_EQ(6, resp.etcd_index);
 }
 
+
 TEST_F(EtcdTest, UpdateWithTTLFails) {
   EXPECT_CALL(
       url_fetcher_,
@@ -507,6 +545,7 @@ TEST_F(EtcdTest, UpdateWithTTLFails) {
                                       HasSubstr("Compare failed")));
 }
 
+
 TEST_F(EtcdTest, ForceSetForPreexistingKey) {
   EXPECT_CALL(url_fetcher_,
               Fetch(IsUrlFetchRequest(
@@ -527,6 +566,7 @@ TEST_F(EtcdTest, ForceSetForPreexistingKey) {
   EXPECT_EQ(6, resp.etcd_index);
 }
 
+
 TEST_F(EtcdTest, ForceSetForNewKey) {
   EXPECT_CALL(url_fetcher_,
               Fetch(IsUrlFetchRequest(
@@ -546,6 +586,7 @@ TEST_F(EtcdTest, ForceSetForNewKey) {
   EXPECT_OK(task);
   EXPECT_EQ(7, resp.etcd_index);
 }
+
 
 TEST_F(EtcdTest, ForceSetWithTTLForPreexistingKey) {
   EXPECT_CALL(url_fetcher_,
@@ -568,6 +609,7 @@ TEST_F(EtcdTest, ForceSetWithTTLForPreexistingKey) {
   EXPECT_EQ(6, resp.etcd_index);
 }
 
+
 TEST_F(EtcdTest, ForceSetWithTTLForNewKey) {
   EXPECT_CALL(url_fetcher_,
               Fetch(IsUrlFetchRequest(
@@ -588,6 +630,7 @@ TEST_F(EtcdTest, ForceSetWithTTLForNewKey) {
   EXPECT_EQ(7, resp.etcd_index);
 }
 
+
 TEST_F(EtcdTest, Delete) {
   EXPECT_CALL(
       url_fetcher_,
@@ -605,6 +648,7 @@ TEST_F(EtcdTest, Delete) {
   task.Wait();
   EXPECT_OK(task);
 }
+
 
 TEST_F(EtcdTest, DeleteFails) {
   EXPECT_CALL(
@@ -625,6 +669,7 @@ TEST_F(EtcdTest, DeleteFails) {
                                       HasSubstr("Compare failed")));
 }
 
+
 TEST_F(EtcdTest, ForceDelete) {
   EXPECT_CALL(url_fetcher_,
               Fetch(IsUrlFetchRequest(UrlFetcher::Verb::DELETE,
@@ -641,6 +686,7 @@ TEST_F(EtcdTest, ForceDelete) {
   task.Wait();
   EXPECT_OK(task);
 }
+
 
 TEST_F(EtcdTest, WatchInitialGetFailureCausesRetry) {
   FLAGS_etcd_watch_error_retry_delay_seconds = 1;
@@ -677,9 +723,10 @@ TEST_F(EtcdTest, WatchInitialGetFailureCausesRetry) {
   task.Wait();
 }
 
+
 TEST_F(EtcdTest, WatchInitialGetFailureRetriesOnNextEtcd) {
   FLAGS_etcd_watch_error_retry_delay_seconds = 1;
-  EtcdClient multi_client(&url_fetcher_,
+  EtcdClient multi_client(base_.get(), &url_fetcher_,
                           {EtcdClient::HostPortPair(kEtcdHost, kEtcdPort),
                            EtcdClient::HostPortPair(kEtcdHost2, kEtcdPort2)});
   {
@@ -779,7 +826,7 @@ TEST_F(EtcdTest, WatchHangingGetTimeoutCausesRetry) {
 
 
 TEST_F(EtcdTest, UnavailableEtcdRetriesOnNewServer) {
-  EtcdClient multi_client(&url_fetcher_,
+  EtcdClient multi_client(base_.get(), &url_fetcher_,
                           {EtcdClient::HostPortPair(kEtcdHost, kEtcdPort),
                            EtcdClient::HostPortPair(kEtcdHost2, kEtcdPort2)});
 
@@ -848,9 +895,10 @@ TEST_F(EtcdTest, UnavailableEtcdRetriesOnNewServer) {
   EXPECT_OK(task.status());
 }
 
+
 TEST_F(EtcdTest, FollowsMasterChangeRedirectToNewHost) {
   // Excludes kEtcdHost3:
-  EtcdClient multi_client(&url_fetcher_,
+  EtcdClient multi_client(base_.get(), &url_fetcher_,
                           {EtcdClient::HostPortPair(kEtcdHost, kEtcdPort),
                            EtcdClient::HostPortPair(kEtcdHost2, kEtcdPort2)});
 
@@ -897,8 +945,9 @@ TEST_F(EtcdTest, FollowsMasterChangeRedirectToNewHost) {
   EXPECT_OK(task.status());
 }
 
+
 TEST_F(EtcdTest, FollowsMasterChangeRedirectToKnownHost) {
-  EtcdClient multi_client(&url_fetcher_,
+  EtcdClient multi_client(base_.get(), &url_fetcher_,
                           {EtcdClient::HostPortPair(kEtcdHost, kEtcdPort),
                            EtcdClient::HostPortPair(kEtcdHost2, kEtcdPort2)});
 
@@ -945,6 +994,7 @@ TEST_F(EtcdTest, FollowsMasterChangeRedirectToKnownHost) {
   EXPECT_OK(task.status());
 }
 
+
 TEST_F(EtcdTest, GetStoreStats) {
   EXPECT_CALL(url_fetcher_,
               Fetch(IsUrlFetchRequest(UrlFetcher::Verb::GET,
@@ -979,6 +1029,7 @@ TEST_F(EtcdTest, GetStoreStats) {
   EXPECT_EQ(16, response.stats["getsFail"]);
 }
 
+
 TEST_F(EtcdTest, SplitHosts) {
   const string hosts(string(kEtcdHost) + ":" + to_string(kEtcdPort) + "," +
                      kEtcdHost2 + ":" + to_string(kEtcdPort2));
@@ -989,6 +1040,7 @@ TEST_F(EtcdTest, SplitHosts) {
   EXPECT_EQ(kEtcdHost2, split_hosts.back().first);
   EXPECT_EQ(kEtcdPort2, split_hosts.back().second);
 }
+
 
 TEST_F(EtcdTest, SplitHostsIgnoresBlanks) {
   const string hosts(string(kEtcdHost) + ":" + to_string(kEtcdPort) + ",," +
@@ -1001,6 +1053,7 @@ TEST_F(EtcdTest, SplitHostsIgnoresBlanks) {
   EXPECT_EQ(kEtcdPort2, split_hosts.back().second);
 }
 
+
 TEST_F(EtcdTest, SplitHostsIgnoresTrailingComma) {
   const string hosts(string(kEtcdHost) + ":" + to_string(kEtcdPort) + "," +
                      kEtcdHost2 + ":" + to_string(kEtcdPort2) + ",");
@@ -1011,6 +1064,7 @@ TEST_F(EtcdTest, SplitHostsIgnoresTrailingComma) {
   EXPECT_EQ(kEtcdHost2, split_hosts.back().first);
   EXPECT_EQ(kEtcdPort2, split_hosts.back().second);
 }
+
 
 TEST_F(EtcdTest, SplitHostsIgnoresPrecedingComma) {
   const string hosts("," + string(kEtcdHost) + ":" + to_string(kEtcdPort) +
@@ -1023,30 +1077,128 @@ TEST_F(EtcdTest, SplitHostsIgnoresPrecedingComma) {
   EXPECT_EQ(kEtcdPort2, split_hosts.back().second);
 }
 
+
 TEST_F(EtcdTest, SplitHostsWithAllBlanks) {
   const list<EtcdClient::HostPortPair> split_hosts(SplitHosts(",,,,"));
   EXPECT_EQ(0, split_hosts.size());
 }
+
 
 TEST_F(EtcdTest, SplitHostsWithEmptyString) {
   const list<EtcdClient::HostPortPair> split_hosts(SplitHosts(""));
   EXPECT_EQ(0, split_hosts.size());
 }
 
+
 TEST_F(EtcdDeathTest, SplitHostsWithInvalidHostPortString) {
   EXPECT_DEATH(SplitHosts("host:2:monkey"), "Invalid host:port string");
 }
+
 
 TEST_F(EtcdDeathTest, SplitHostsWithNegativePort) {
   EXPECT_DEATH(SplitHosts("host:-1"), "Port is <= 0");
 }
 
+
 TEST_F(EtcdDeathTest, SplitHostsWithOutOfRangePort) {
   EXPECT_DEATH(SplitHosts("host:65536"), "Port is > 65535");
 }
 
+
+TEST_F(EtcdTest, LogsVersion) {
+  EXPECT_CALL(url_fetcher_,
+              Fetch(IsUrlFetchRequest(UrlFetcher::Verb::GET,
+                                      URL(GetEtcdUrl(kEntryKey) +
+                                          "?consistent=true&quorum=true"),
+                                      IsEmpty(), ""),
+                    _, _))
+      .Times(2)
+      .WillRepeatedly(
+          Invoke(bind(HandleFetch, Status::OK, 200,
+                      UrlFetcher::Headers{make_pair("x-etcd-index", "11")},
+                      kGetJson, _1, _2, _3)));
+
+  EXPECT_CALL(url_fetcher_,
+              Fetch(IsUrlFetchRequest(UrlFetcher::Verb::GET,
+                                      URL(GetEtcdUrl("/version", "")),
+                                      IsEmpty(), ""),
+                    _, _))
+      .WillOnce(
+          Invoke(bind(HandleFetch, Status::OK, 200, UrlFetcher::Headers{},
+                      kVersionString, _1, _2, _3)));
+
+  // Version fetching is lazy, so we have to run some other request to kick
+  // it off
+  {
+    SyncTask task(base_.get());
+    EtcdClient::GetResponse resp;
+    client_.Get(string(kEntryKey), &resp, task.task());
+    task.Wait();
+  }
+  // However, a second call to the same etcd should not cause another version
+  // request to be sent
+  {
+    SyncTask task(base_.get());
+    EtcdClient::GetResponse resp;
+    client_.Get(string(kEntryKey), &resp, task.task());
+    task.Wait();
+  }
+}
+
+
+TEST_F(EtcdTest, LogsVersionWhenChangingServer) {
+  {
+    InSequence s;
+    EXPECT_CALL(url_fetcher_,
+                Fetch(IsUrlFetchRequest(UrlFetcher::Verb::GET,
+                                        URL(GetEtcdUrl(kEntryKey) +
+                                            "?consistent=true&quorum=true"),
+                                        IsEmpty(), ""),
+                      _, _))
+        .WillOnce(Invoke(bind(
+            HandleFetch, Status::OK, 307,
+            UrlFetcher::Headers{make_pair("x-etcd-index", "11"),
+                                make_pair("location", GetEtcdUrl("/", ""))},
+            kGetJson, _1, _2, _3)));
+
+    EXPECT_CALL(url_fetcher_,
+                Fetch(IsUrlFetchRequest(UrlFetcher::Verb::GET,
+                                        URL(GetEtcdUrl(kEntryKey) +
+                                            "?consistent=true&quorum=true"),
+                                        IsEmpty(), ""),
+                      _, _))
+        .WillOnce(
+            Invoke(bind(HandleFetch, Status::OK, 200,
+                        UrlFetcher::Headers{make_pair("x-etcd-index", "11")},
+                        kGetJson, _1, _2, _3)));
+  }
+
+  EXPECT_CALL(url_fetcher_,
+              Fetch(IsUrlFetchRequest(UrlFetcher::Verb::GET,
+                                      URL(GetEtcdUrl("/version", "")),
+                                      IsEmpty(), ""),
+                    _, _))
+      .Times(2)
+      .WillRepeatedly(
+          Invoke(bind(HandleFetch, Status::OK, 200, UrlFetcher::Headers{},
+                      kVersionString, _1, _2, _3)));
+
+  // Version fetching is lazy, so we have to run some other request to kick
+  // it off.
+  // But the first response returns a redirect to another etcd master, so
+  // when we follow that we should perform another version request.
+  {
+    SyncTask task(base_.get());
+    EtcdClient::GetResponse resp;
+    client_.Get(string(kEntryKey), &resp, task.task());
+    task.Wait();
+  }
+}
+
+
 }  // namespace
 }  // namespace cert_trans
+
 
 int main(int argc, char** argv) {
   cert_trans::test::InitTesting(argv[0], &argc, &argv, true);

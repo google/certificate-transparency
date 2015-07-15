@@ -41,7 +41,7 @@ int main(int argc, char* argv[]) {
   libevent::Base event_base;
   ThreadPool pool;
   UrlFetcher fetcher(&event_base, &pool);
-  EtcdClient etcd(&fetcher, FLAGS_etcd, FLAGS_etcd_port);
+  EtcdClient etcd(&pool, &fetcher, FLAGS_etcd, FLAGS_etcd_port);
 
   SyncTask task(&event_base);
   etcd.Watch(FLAGS_key, Notify, task.task());

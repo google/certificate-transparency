@@ -354,7 +354,8 @@ int main(int argc, char* argv[]) {
   const std::unique_ptr<EtcdClient> etcd_client(
       stand_alone_mode
           ? new FakeEtcdClient(event_base.get())
-          : new EtcdClient(&url_fetcher, SplitHosts(FLAGS_etcd_servers)));
+          : new EtcdClient(&internal_pool, &url_fetcher,
+                           SplitHosts(FLAGS_etcd_servers)));
 
   Server<LoggedCertificate>::Options options;
   options.server = FLAGS_server;

@@ -149,7 +149,7 @@ int main(int argc, char* argv[]) {
   ThreadPool pool;
   UrlFetcher fetcher(event_base.get(), &pool);
 
-  EtcdClient etcd_client(&fetcher, SplitHosts(FLAGS_etcd_servers));
+  EtcdClient etcd_client(&pool, &fetcher, SplitHosts(FLAGS_etcd_servers));
 
   const string node_id("clustertool");
   unique_ptr<MasterElection> election(
