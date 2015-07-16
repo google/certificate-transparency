@@ -471,7 +471,7 @@ class Certificate(object):
         """Get TBSCertificate signature.
 
         Returns:
-            an AlgorithmIdentifier.
+            an ASN.1 BitString.
         """
         return self._asn1_cert["tbsCertificate"]["signature"]
 
