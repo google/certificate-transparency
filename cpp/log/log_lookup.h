@@ -55,6 +55,8 @@ class LogLookup {
     return latest_tree_head_;
   }
 
+  std::string RootAtSnapshot(size_t tree_size);
+
   std::string LeafHash(const Logged& logged) const;
 
   // Creates a CompactMerkleTree based on the current state of our MerkleTree.
