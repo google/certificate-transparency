@@ -69,7 +69,7 @@ int64_t KeyToIndex(leveldb::Slice key) {
 
   int64_t index(0);
   CHECK_EQ(index_str.size(), sizeof(index));
-  for (int i = 0; i < sizeof(index); ++i) {
+  for (size_t i = 0; i < sizeof(index); ++i) {
     index = (index << 8) | static_cast<unsigned char>(index_str[i]);
   }
 

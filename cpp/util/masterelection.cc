@@ -349,13 +349,12 @@ void MasterElection::UpdateProposal(const string& backed) {
                          seconds(FLAGS_master_keepalive_interval_seconds * 2),
                          my_proposal_modified_index_, resp,
                          new Task(bind(&MasterElection::ProposalUpdateDone,
-                                       this, backed, resp, _1),
+                                       this, resp, _1),
                                   base_.get()));
 }
 
 
-void MasterElection::ProposalUpdateDone(const string& backed,
-                                        EtcdClient::Response* resp,
+void MasterElection::ProposalUpdateDone(EtcdClient::Response* resp,
                                         Task* task) {
   unique_ptr<EtcdClient::Response> resp_deleter(resp);
   unique_lock<mutex> lock(mutex_);

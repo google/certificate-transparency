@@ -37,7 +37,7 @@ void FreeEvDns(evdns_base* dns) {
 }
 
 
-static void Handler_ExitLoop(evutil_socket_t sig, short events, void* base) {
+static void Handler_ExitLoop(evutil_socket_t, short, void* base) {
   event_base_loopexit((event_base*)base, NULL);
 }
 
@@ -56,7 +56,7 @@ void DelayCancel(event* timer, util::Task* task) {
 }
 
 
-void DelayDispatch(evutil_socket_t sock, short events, void* userdata) {
+void DelayDispatch(evutil_socket_t, short, void* userdata) {
   static_cast<util::Task*>(CHECK_NOTNULL(userdata))->Return();
 }
 
@@ -284,7 +284,7 @@ evhtp_connection_t* Base::HttpsConnectionNew(const string& host,
 }
 
 
-void Base::RunClosures(evutil_socket_t sock, short flag, void* userdata) {
+void Base::RunClosures(evutil_socket_t, short, void* userdata) {
   Base* self(static_cast<Base*>(CHECK_NOTNULL(userdata)));
 
   vector<function<void()>> closures;

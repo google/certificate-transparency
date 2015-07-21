@@ -47,7 +47,7 @@ struct i__ {};
 
 
 template <class Tuple>
-void label_values(const Tuple& t, std::vector<std::string>* values, i__<0>) {
+void label_values(const Tuple&, std::vector<std::string>*, i__<0>) {
 }
 
 

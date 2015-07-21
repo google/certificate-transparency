@@ -40,8 +40,7 @@ static const char kPrecertificateSigningLN[] =
 static const char kASN1NullValue[] = "NULL";
 
 // String conversion for an ASN1 NULL
-static char* ASN1NullToString(X509V3_EXT_METHOD* method,
-                              ASN1_NULL* asn1_null) {
+static char* ASN1NullToString(X509V3_EXT_METHOD*, ASN1_NULL* asn1_null) {
   if (asn1_null == NULL)
     return NULL;
   char* buf = strdup(kASN1NullValue);
@@ -49,7 +48,7 @@ static char* ASN1NullToString(X509V3_EXT_METHOD* method,
 }
 
 // String conversion from an ASN1:NULL conf.
-static ASN1_NULL* StringToASN1Null(X509V3_EXT_METHOD* method, X509V3_CTX* ctx,
+static ASN1_NULL* StringToASN1Null(X509V3_EXT_METHOD*, X509V3_CTX*,
                                    char* str) {
   if (str == NULL || strcmp(str, kASN1NullValue) != 0) {
     return NULL;

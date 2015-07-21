@@ -423,7 +423,7 @@ int64_t SQLiteDB<Logged>::TreeSize() const {
   while (ret == SQLITE_ROW) {
     const sqlite3_uint64 sequence(statement.GetUInt64(0));
 
-    if (sequence != tree_size_) {
+    if (sequence != static_cast<uint64_t>(tree_size_)) {
       return tree_size_;
     }
 

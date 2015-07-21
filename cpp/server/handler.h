@@ -70,7 +70,7 @@ class HttpHandler {
                            const std::shared_ptr<PreCertChain>& chain) const;
 
   bool IsNodeStale() const;
-  void UpdateNodeStaleness(util::Task* task);
+  void UpdateNodeStaleness();
 
   JsonOutput* const output_;
   LogLookup<LoggedCertificate>* const log_lookup_;

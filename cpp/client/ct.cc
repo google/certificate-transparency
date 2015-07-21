@@ -249,8 +249,7 @@ static bool PrecertChainToEntry(const cert_trans::PreCertChain& chain,
 }
 
 static bool VerifySCTAndPopulateSSLClientCTData(
-    const SignedCertificateTimestamp& sct, const LogEntry& log_entry,
-    SSLClientCTData* ct_data) {
+    const SignedCertificateTimestamp& sct, SSLClientCTData* ct_data) {
   SSLClientCTData::SCTInfo* sct_info = ct_data->add_attached_sct_info();
   sct_info->mutable_sct()->CopyFrom(sct);
   LogVerifier* verifier = GetLogVerifierFromFlags();
@@ -277,7 +276,7 @@ static bool CheckSCT(const SignedCertificateTimestamp& sct,
     return false;
   }
   ct_data->mutable_reconstructed_entry()->CopyFrom(entry);
-  return VerifySCTAndPopulateSSLClientCTData(sct, entry, ct_data);
+  return VerifySCTAndPopulateSSLClientCTData(sct, ct_data);
 }
 
 // Checks an SCT issued for a Precert.
@@ -289,7 +288,7 @@ static bool CheckSCT(const SignedCertificateTimestamp& sct,
     return false;
   }
   ct_data->mutable_reconstructed_entry()->CopyFrom(entry);
-  return VerifySCTAndPopulateSSLClientCTData(sct, entry, ct_data);
+  return VerifySCTAndPopulateSSLClientCTData(sct, ct_data);
 }
 
 void WriteFile(const std::string& file, const std::string& contents,

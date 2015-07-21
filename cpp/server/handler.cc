@@ -237,7 +237,7 @@ HttpHandler::HttpHandler(
       node_is_stale_(controller_->NodeIsStale()) {
   event_base_->Delay(seconds(FLAGS_staleness_check_delay_secs),
                      task_.task()->AddChild(
-                         bind(&HttpHandler::UpdateNodeStaleness, this, _1)));
+                         bind(&HttpHandler::UpdateNodeStaleness, this)));
 }
 
 
@@ -568,7 +568,7 @@ bool HttpHandler::IsNodeStale() const {
 }
 
 
-void HttpHandler::UpdateNodeStaleness(util::Task* task) {
+void HttpHandler::UpdateNodeStaleness() {
   if (!task_.task()->IsActive()) {
     // We're shutting down, just return.
     return;
@@ -582,5 +582,5 @@ void HttpHandler::UpdateNodeStaleness(util::Task* task) {
 
   event_base_->Delay(seconds(FLAGS_staleness_check_delay_secs),
                      task_.task()->AddChild(
-                         bind(&HttpHandler::UpdateNodeStaleness, this, _1)));
+                         bind(&HttpHandler::UpdateNodeStaleness, this)));
 }

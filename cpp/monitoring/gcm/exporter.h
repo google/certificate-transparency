@@ -22,7 +22,7 @@ class GCMExporter {
  private:
   void RefreshCredentials();
   void CreateMetrics() const;
-  void PushMetrics(util::Task* child_task);
+  void PushMetrics();
 
   const std::string instance_name_;
   UrlFetcher* const fetcher_;
