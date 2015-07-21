@@ -184,17 +184,21 @@ class CertificateTest(unittest.TestCase):
     def test_identical_to_self(self):
         c = self.cert_from_pem_file(self._PEM_FILE)
         self.assertTrue(c.is_identical_to(c))
+        self.assertEqual(c, c)
 
     def test_identical(self):
         c = self.cert_from_pem_file(self._PEM_FILE)
         c2 = self.cert_from_pem_file(self._PEM_FILE)
         self.assertTrue(c.is_identical_to(c2))
         self.assertTrue(c2.is_identical_to(c))
+        self.assertEqual(c2, c)
 
     def test_not_identical(self):
         c = self.cert_from_pem_file(self._PEM_FILE)
         c2 = self.cert_from_pem_file(self._V1_PEM_FILE)
         self.assertFalse(c2.is_identical_to(c))
+        self.assertNotEqual(c2, c)
+        self.assertNotEqual(c2, "foo")
 
     def test_parse_matrixssl(self):
         """Test parsing of old MatrixSSL.org sample certificate
