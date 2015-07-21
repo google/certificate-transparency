@@ -33,8 +33,8 @@
 #include "monitor/sqlite_db.h"
 #include "proto/ct.pb.h"
 #include "proto/serializer.h"
+#include "util/init.h"
 #include "util/read_key.h"
-#include "util/util.h"
 
 DEFINE_string(ssl_client_trusted_cert_dir, "",
               "Trusted root certificates for the ssl client");
@@ -981,19 +981,13 @@ int Monitor() {
 // (on UNIX, 134 is expected)
 int main(int argc, char** argv) {
   google::SetUsageMessage(argv[0] + string(kUsage));
-  google::ParseCommandLineFlags(&argc, &argv, true);
-  google::InitGoogleLogging(argv[0]);
-  evthread_use_pthreads();
+  util::InitCT(&argc, &argv);
 
   const string main_command(argv[0]);
   if (argc < 2) {
     std::cout << google::ProgramUsage();
     return 1;
   }
-
-  SSL_library_init();
-  ERR_load_SSL_strings();
-  cert_trans::LoadCtExtensions();
 
   const string cmd(argv[1]);
 
