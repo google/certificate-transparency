@@ -16,6 +16,7 @@ using std::bind;
 using std::chrono::seconds;
 using std::chrono::system_clock;
 using std::ctime;
+using std::list;
 using std::lock_guard;
 using std::make_pair;
 using std::make_shared;
@@ -26,6 +27,7 @@ using std::mutex;
 using std::ostringstream;
 using std::placeholders::_1;
 using std::shared_ptr;
+using std::stoi;
 using std::string;
 using std::time_t;
 using std::to_string;
@@ -474,6 +476,16 @@ void EtcdClient::WatchInitialGetDone(WatchState* state, GetResponse* resp,
   // TODO(pphaneuf): Need better error handling here. Have to review
   // what the possible errors are, for now we'll just retry after a delay.
   if (!task->status().ok()) {
+    if (task->status().error_code() == util::error::UNAVAILABLE) {
+      LOG(WARNING) << "Initial get error: " << task->status() << ", retrying "
+                   << "on next etcd server.";
+      ChooseNextServer();
+      state->task_->AddChild([this, state](Task* task) {
+        this->WatchRequestDone(state, nullptr, nullptr);
+      });
+      return;
+    }
+
     LOG(WARNING) << "Initial get error: " << task->status() << ", will retry "
                  << "in " << FLAGS_etcd_watch_error_retry_delay_seconds
                  << " second(s)";
@@ -668,10 +680,36 @@ bool EtcdClient::Node::HasExpiry() const {
 
 
 EtcdClient::EtcdClient(UrlFetcher* fetcher, const string& host, uint16_t port)
-    : fetcher_(CHECK_NOTNULL(fetcher)), endpoint_(host, port) {
-  CHECK(!endpoint_.first.empty());
-  CHECK_GT(endpoint_.second, 0);
+    : EtcdClient(fetcher, list<HostPortPair>{HostPortPair(host, port)}) {
+}
+
+
+EtcdClient::EtcdClient(UrlFetcher* fetcher, const list<HostPortPair>& etcds)
+    : fetcher_(CHECK_NOTNULL(fetcher)), etcds_(etcds) {
+  CHECK(!etcds_.empty());
   VLOG(1) << "EtcdClient: " << this;
+
+  for (const auto& e : etcds_) {
+    CHECK(!e.first.empty());
+    CHECK_GT(e.second, 0);
+  }
+
+  ChooseNextServer();
+}
+
+
+void EtcdClient::ChooseNextServer() {
+  // Grab the next etcd server to try:
+  HostPortPair new_endpoint(move(etcds_.front()));
+  etcds_.pop_front();
+
+  // Set it as our new endpoint
+  UpdateEndpoint(new_endpoint.first, new_endpoint.second);
+
+  // And copy it back to the end of the list:
+  etcds_.emplace_back(move(new_endpoint));
+  LOG(INFO) << "Selected new etcd server: " << endpoint_.first << ":"
+            << endpoint_.second;
 }
 
 
@@ -688,13 +726,23 @@ void EtcdClient::FetchDone(RequestState* etcd_req, Task* task) {
   VLOG(2) << "EtcdClient::FetchDone: " << task->status();
 
   if (!task->status().ok()) {
-    // TODO(pphaneuf): If there is a connection problem, we should re-do the
-    // request on another node.
+    if (task->status().error_code() == util::error::UNAVAILABLE) {
+      // Seems etcd wasn't available; pick a new etcd server and retry
+      LOG(WARNING) << "Etcd fetch failed: " << task->status() << ", retrying "
+                   << "on next etcd server.";
+      ChooseNextServer();
+      etcd_req->SetHostPort(endpoint_);
+      fetcher_->Fetch(etcd_req->req_, &etcd_req->resp_,
+                      etcd_req->parent_task_->AddChild(
+                          bind(&EtcdClient::FetchDone, this, etcd_req, _1)));
+      return;
+    }
+    // Otherwise just let the requestor know.
     etcd_req->parent_task_->Return(task->status());
     return;
-  } else {
-    VLOG(2) << "response:\n" << etcd_req->resp_;
   }
+
+  VLOG(2) << "response:\n" << etcd_req->resp_;
 
   if (etcd_req->resp_.status_code == 307) {
     UrlFetcher::Headers::const_iterator it(
@@ -918,5 +966,17 @@ void EtcdClient::Generic(const string& key, const string& key_space,
                       bind(&EtcdClient::FetchDone, this, etcd_req, _1)));
 }
 
+list<EtcdClient::HostPortPair> SplitHosts(const string& hosts_string) {
+  vector<string> hosts(util::split(hosts_string, ','));
+  CHECK(!hosts.empty());
+
+  list<EtcdClient::HostPortPair> ret;
+  for (const auto& h : hosts) {
+    vector<string> hp(util::split(h, ':'));
+    CHECK_EQ(2, hp.size());
+    ret.emplace_back(EtcdClient::HostPortPair(hp[0], stoi(hp[1])));
+  }
+  return ret;
+}
 
 }  // namespace cert_trans

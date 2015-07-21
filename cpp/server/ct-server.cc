@@ -77,8 +77,8 @@ DEFINE_int32(tree_signing_frequency_seconds, 600,
 DEFINE_double(guard_window_seconds, 60,
               "Unsequenced entries newer than this "
               "number of seconds will not be sequenced.");
-DEFINE_string(etcd_host, "", "Hostname of the etcd server");
-DEFINE_int32(etcd_port, 0, "Port of the etcd server.");
+DEFINE_string(etcd_hosts, "",
+              "Comma separated list of 'Hostname:Port' of the etcd server(s)");
 DEFINE_string(etcd_root, "/root", "Root of cluster entries in etcd.");
 DEFINE_int32(num_http_server_threads, 16,
              "Number of threads for servicing the incoming HTTP requests.");
@@ -101,8 +101,9 @@ using cert_trans::HttpHandler;
 using cert_trans::Latency;
 using cert_trans::LoggedCertificate;
 using cert_trans::ReadPrivateKey;
-using cert_trans::Server;
 using cert_trans::ScopedLatency;
+using cert_trans::Server;
+using cert_trans::SplitHosts;
 using cert_trans::ThreadPool;
 using cert_trans::TreeSigner;
 using cert_trans::Update;
@@ -370,7 +371,7 @@ int main(int argc, char* argv[]) {
   ThreadPool internal_pool(8);
   UrlFetcher url_fetcher(event_base.get(), &internal_pool);
 
-  const bool stand_alone_mode(FLAGS_etcd_host.empty());
+  const bool stand_alone_mode(FLAGS_etcd_hosts.empty());
   if (stand_alone_mode && !FLAGS_i_know_stand_alone_mode_can_lose_data) {
     LOG(FATAL) << "attempted to run in stand-alone mode without the "
                   "--i_know_stand_alone_mode_can_lose_data flag";
@@ -381,7 +382,7 @@ int main(int argc, char* argv[]) {
   std::unique_ptr<EtcdClient> etcd_client(
       stand_alone_mode
           ? new FakeEtcdClient(event_base.get())
-          : new EtcdClient(&url_fetcher, FLAGS_etcd_host, FLAGS_etcd_port));
+          : new EtcdClient(&url_fetcher, SplitHosts(FLAGS_etcd_hosts)));
 
   Server<LoggedCertificate>::Options options;
   options.server = FLAGS_server;

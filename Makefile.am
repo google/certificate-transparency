@@ -164,6 +164,7 @@ cpp_libcore_a_SOURCES = \
 	cpp/util/status.cc \
 	cpp/util/sync_task.cc \
 	cpp/util/task.cc \
+	cpp/util/util.cc \
 	proto/ct.pb.cc \
 	proto/ct.pb.h
 

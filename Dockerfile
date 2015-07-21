@@ -49,8 +49,7 @@ CMD cd /mnt/ctlog/ && \
         --tree_signing_frequency_seconds=30 \
         --guard_window_seconds=10 \
         --leveldb_db=/mnt/ctlog/log.ldb \
-        --etcd_host=${ETCD_HOST} \
-        --etcd_port=${ETCD_PORT} \
+        --etcd_hosts="${ETCD_HOST}:${ETCD_PORT}" \
         --etcd_delete_concurrency=100 \
         --num_http_server_threads=${NUM_HTTP_SERVER_THREADS} \
         --monitoring=${MONITORING} \

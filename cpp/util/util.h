@@ -5,6 +5,7 @@
 
 #include <stdint.h>
 #include <string>
+#include <vector>
 
 namespace util {
 
@@ -36,6 +37,8 @@ std::string RandomString(size_t min_length, size_t max_length);
 std::string FromBase64(const char* b64);
 
 std::string ToBase64(const std::string& from);
+
+std::vector<std::string> split(const std::string& in, char delim = ',');
 
 }  // namespace util
 

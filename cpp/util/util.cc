@@ -15,13 +15,19 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string>
+#include <sstream>
 #include <sys/time.h>
 #include <unistd.h>
+#include <vector>
 
 #include "log/ct_extensions.h"
 #include "version.h"
 
+using std::getline;
+using std::move;
 using std::string;
+using std::stringstream;
+using std::vector;
 
 namespace util {
 
@@ -196,6 +202,19 @@ string ToBase64(const string& from) {
       b64_ntop((const u_char*)from.data(), from.length(), buf, length + 1);
   string ret(buf, length);
   delete[] buf;
+  return ret;
+}
+
+vector<string> split(const string& in, char delim) {
+  vector<string> ret;
+  string item;
+
+  stringstream ss(in);
+  while (getline(ss, item, delim)) {
+    if (!item.empty()) {
+      ret.emplace_back(move(item));
+    }
+  }
   return ret;
 }
 
