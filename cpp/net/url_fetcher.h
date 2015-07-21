@@ -74,8 +74,12 @@ class UrlFetcher {
 };
 
 
+std::ostream& operator<<(std::ostream& output, const UrlFetcher::Request& req);
 std::ostream& operator<<(std::ostream& output,
                          const UrlFetcher::Response& resp);
+::std::ostream& operator<<(::std::ostream& os,
+                           const UrlFetcher::Headers& headers);
+::std::ostream& operator<<(::std::ostream& os, const UrlFetcher::Verb& verb);
 
 
 }  // namespace cert_trans

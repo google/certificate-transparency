@@ -277,4 +277,42 @@ ostream& operator<<(ostream& output, const UrlFetcher::Response& resp) {
 }
 
 
+ostream& operator<<(ostream& output, const UrlFetcher::Request& req) {
+  output << "verb: " << req.verb << endl
+         << "url: " << req.url << endl
+         << "headers: " << req.headers << endl
+         << "body: <<EOF" << endl
+         << req.body << "EOF" << endl;
+  return output;
+}
+
+
+ostream& operator<<(ostream& os, const UrlFetcher::Verb& verb) {
+  switch (verb) {
+    case UrlFetcher::Verb::GET:
+      os << "GET";
+      break;
+    case UrlFetcher::Verb::POST:
+      os << "POST";
+      break;
+    case UrlFetcher::Verb::PUT:
+      os << "PUT";
+      break;
+    case UrlFetcher::Verb::DELETE:
+      os << "DELETE";
+      break;
+  }
+  return os;
+}
+
+
+ostream& operator<<(ostream& os, const UrlFetcher::Headers& headers) {
+  os << "{" << endl;
+  for (const auto& h : headers) {
+    os << "  " << h.first << ": " << h.second << endl;
+  }
+  return os << "}";
+}
+
+
 }  // namespace cert_trans
