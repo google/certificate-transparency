@@ -476,16 +476,6 @@ void EtcdClient::WatchInitialGetDone(WatchState* state, GetResponse* resp,
   // TODO(pphaneuf): Need better error handling here. Have to review
   // what the possible errors are, for now we'll just retry after a delay.
   if (!task->status().ok()) {
-    if (task->status().error_code() == util::error::UNAVAILABLE) {
-      LOG(WARNING) << "Initial get error: " << task->status() << ", retrying "
-                   << "on next etcd server.";
-      ChooseNextServer();
-      state->task_->AddChild([this, state](Task* task) {
-        this->WatchRequestDone(state, nullptr, nullptr);
-      });
-      return;
-    }
-
     LOG(WARNING) << "Initial get error: " << task->status() << ", will retry "
                  << "in " << FLAGS_etcd_watch_error_retry_delay_seconds
                  << " second(s)";
@@ -686,30 +676,30 @@ EtcdClient::EtcdClient(UrlFetcher* fetcher, const string& host, uint16_t port)
 
 EtcdClient::EtcdClient(UrlFetcher* fetcher, const list<HostPortPair>& etcds)
     : fetcher_(CHECK_NOTNULL(fetcher)), etcds_(etcds) {
-  CHECK(!etcds_.empty());
+  CHECK(!etcds_.empty()) << "No etcd hosts provided.";
   VLOG(1) << "EtcdClient: " << this;
 
   for (const auto& e : etcds_) {
-    CHECK(!e.first.empty());
-    CHECK_GT(e.second, 0);
+    CHECK(!e.first.empty()) << "Empty host specified";
+    CHECK_GT(e.second, 0) << "Invalid port specified";
   }
+}
 
-  ChooseNextServer();
+
+EtcdClient::HostPortPair EtcdClient::endpoint() const {
+  lock_guard<mutex> lock(lock_);
+  return etcds_.front();
 }
 
 
 void EtcdClient::ChooseNextServer() {
-  // Grab the next etcd server to try:
-  HostPortPair new_endpoint(move(etcds_.front()));
+  lock_guard<mutex> lock(lock_);
+
+  etcds_.emplace_back(etcds_.front());
   etcds_.pop_front();
 
-  // Set it as our new endpoint
-  UpdateEndpoint(new_endpoint.first, new_endpoint.second);
-
-  // And copy it back to the end of the list:
-  etcds_.emplace_back(move(new_endpoint));
-  LOG(INFO) << "Selected new etcd server: " << endpoint_.first << ":"
-            << endpoint_.second;
+  LOG(INFO) << "Selected new etcd server: " << etcds_.front().first << ":"
+            << etcds_.front().second;
 }
 
 
@@ -731,7 +721,7 @@ void EtcdClient::FetchDone(RequestState* etcd_req, Task* task) {
       LOG(WARNING) << "Etcd fetch failed: " << task->status() << ", retrying "
                    << "on next etcd server.";
       ChooseNextServer();
-      etcd_req->SetHostPort(endpoint_);
+      etcd_req->SetHostPort(endpoint());
       fetcher_->Fetch(etcd_req->req_, &etcd_req->resp_,
                       etcd_req->parent_task_->AddChild(
                           bind(&EtcdClient::FetchDone, this, etcd_req, _1)));
@@ -794,17 +784,28 @@ void EtcdClient::FetchDone(RequestState* etcd_req, Task* task) {
 
 EtcdClient::HostPortPair EtcdClient::GetEndpoint() const {
   lock_guard<mutex> lock(lock_);
-  return endpoint_;
+  return etcds_.front();
 }
 
 
 EtcdClient::HostPortPair EtcdClient::UpdateEndpoint(const string& host,
                                                     uint16_t port) {
   lock_guard<mutex> lock(lock_);
-  VLOG_IF(1, endpoint_.first != host || endpoint_.second != port)
-      << "new endpoint: " << host << ":" << port;
-  endpoint_ = make_pair(host, port);
-  return endpoint_;
+  HostPortPair new_endpoint(host, port);
+  auto it(find(etcds_.begin(), etcds_.end(), new_endpoint));
+  if (it == etcds_.end()) {
+    // TODO(alcutter): We don't really have a way of knowning when to remove
+    // etcd endpoints at the moment.  We should really be querying the etcd
+    // cluster for its members and using that list.
+    etcds_.emplace_front(move(new_endpoint));
+  } else {
+    etcds_.emplace_front(move(*it));
+    etcds_.erase(it);
+  }
+
+  LOG(INFO) << "Selected new etcd server: " << etcds_.front().first << ":"
+            << etcds_.front().second;
+  return endpoint();
 }
 
 
@@ -968,13 +969,15 @@ void EtcdClient::Generic(const string& key, const string& key_space,
 
 list<EtcdClient::HostPortPair> SplitHosts(const string& hosts_string) {
   vector<string> hosts(util::split(hosts_string, ','));
-  CHECK(!hosts.empty());
 
   list<EtcdClient::HostPortPair> ret;
   for (const auto& h : hosts) {
     vector<string> hp(util::split(h, ':'));
-    CHECK_EQ(2, hp.size());
-    ret.emplace_back(EtcdClient::HostPortPair(hp[0], stoi(hp[1])));
+    CHECK_EQ(2, hp.size()) << "Invalid host:port string: '" << h << "'";
+    const int port(stoi(hp[1]));
+    CHECK_LT(0, port) << "Port is <= 0";
+    CHECK_GE(65535, port) << "Port is > 65535";
+    ret.emplace_back(EtcdClient::HostPortPair(hp[0], port));
   }
   return ret;
 }

@@ -44,7 +44,7 @@ CMD cd /mnt/ctmirror/ && \
         --server=${CONTAINER_HOST} \
         --log_dir=/mnt/ctmirror/logs \
         --leveldb_db=/mnt/ctmirror/mirror.ldb \
-        --etcd_hosts="${ETCD_HOST}:${ETCD_PORT} \
+        --etcd_servers="${ETCD_HOST}:${ETCD_PORT} \
         --num_http_server_threads=${NUM_HTTP_SERVER_THREADS} \
         --target_public_key=/usr/local/etc/keys/${TARGET_LOG_PUBLIC_KEY} \
         --target_log_uri=${TARGET_LOG_URL} \

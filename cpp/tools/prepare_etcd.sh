@@ -18,5 +18,5 @@ curl -L -X PUT ${ETCD}/v2/keys/root/serving_sth
 curl -L -X PUT ${ETCD}/v2/keys/root/cluster_config
 ${DIR}/ct-clustertool initlog \
     --key=${LOG_KEY} \
-    --etcd_hosts="${ETCD_HOST}:${ETCD_PORT}" \
+    --etcd_servers="${ETCD_HOST}:${ETCD_PORT}" \
     --logtostderr

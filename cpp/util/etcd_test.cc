@@ -197,6 +197,8 @@ class EtcdTest : public ::testing::Test {
   EtcdClient client_;
 };
 
+typedef EtcdTest EtcdDeathTest;
+
 string GetEtcdUrl(const string& key, const string& key_space = kDefaultSpace,
                   const string& host = kEtcdHost,
                   const uint16_t port = kEtcdPort) {
@@ -674,10 +676,9 @@ TEST_F(EtcdTest, WatchInitialGetFailureCausesRetry) {
 
 TEST_F(EtcdTest, WatchInitialGetFailureRetriesOnNextEtcd) {
   FLAGS_etcd_watch_error_retry_delay_seconds = 1;
-  EtcdClient multi_client(
-      &url_fetcher_, list<EtcdClient::HostPortPair>{
-                         EtcdClient::HostPortPair(kEtcdHost, kEtcdPort),
-                         EtcdClient::HostPortPair(kEtcdHost2, kEtcdPort2)});
+  EtcdClient multi_client(&url_fetcher_,
+                          {EtcdClient::HostPortPair(kEtcdHost, kEtcdPort),
+                           EtcdClient::HostPortPair(kEtcdHost2, kEtcdPort2)});
   {
     InSequence s;
     EXPECT_CALL(url_fetcher_,
@@ -716,10 +717,9 @@ TEST_F(EtcdTest, WatchInitialGetFailureRetriesOnNextEtcd) {
 }
 
 TEST_F(EtcdTest, UnavailableEtcdRetriesOnNewServer) {
-  EtcdClient multi_client(
-      &url_fetcher_, list<EtcdClient::HostPortPair>{
-                         EtcdClient::HostPortPair(kEtcdHost, kEtcdPort),
-                         EtcdClient::HostPortPair(kEtcdHost2, kEtcdPort2)});
+  EtcdClient multi_client(&url_fetcher_,
+                          {EtcdClient::HostPortPair(kEtcdHost, kEtcdPort),
+                           EtcdClient::HostPortPair(kEtcdHost2, kEtcdPort2)});
 
   {
     InSequence s;
@@ -822,6 +822,28 @@ TEST_F(EtcdTest, GetStoreStats) {
 
 TEST_F(EtcdTest, SplitHosts) {
   const string hosts(string(kEtcdHost) + ":" + to_string(kEtcdPort) + "," +
+                     kEtcdHost2 + ":" + to_string(kEtcdPort2));
+  const list<EtcdClient::HostPortPair> split_hosts(SplitHosts(hosts));
+  EXPECT_EQ(2, split_hosts.size());
+  EXPECT_EQ(kEtcdHost, split_hosts.front().first);
+  EXPECT_EQ(kEtcdPort, split_hosts.front().second);
+  EXPECT_EQ(kEtcdHost2, split_hosts.back().first);
+  EXPECT_EQ(kEtcdPort2, split_hosts.back().second);
+}
+
+TEST_F(EtcdTest, SplitHostsIgnoresBlanks) {
+  const string hosts(string(kEtcdHost) + ":" + to_string(kEtcdPort) + ",," +
+                     kEtcdHost2 + ":" + to_string(kEtcdPort2));
+  const list<EtcdClient::HostPortPair> split_hosts(SplitHosts(hosts));
+  EXPECT_EQ(2, split_hosts.size());
+  EXPECT_EQ(kEtcdHost, split_hosts.front().first);
+  EXPECT_EQ(kEtcdPort, split_hosts.front().second);
+  EXPECT_EQ(kEtcdHost2, split_hosts.back().first);
+  EXPECT_EQ(kEtcdPort2, split_hosts.back().second);
+}
+
+TEST_F(EtcdTest, SplitHostsIgnoresTrailingComma) {
+  const string hosts(string(kEtcdHost) + ":" + to_string(kEtcdPort) + "," +
                      kEtcdHost2 + ":" + to_string(kEtcdPort2) + ",");
   const list<EtcdClient::HostPortPair> split_hosts(SplitHosts(hosts));
   EXPECT_EQ(2, split_hosts.size());
@@ -829,6 +851,39 @@ TEST_F(EtcdTest, SplitHosts) {
   EXPECT_EQ(kEtcdPort, split_hosts.front().second);
   EXPECT_EQ(kEtcdHost2, split_hosts.back().first);
   EXPECT_EQ(kEtcdPort2, split_hosts.back().second);
+}
+
+TEST_F(EtcdTest, SplitHostsIgnoresPrecedingComma) {
+  const string hosts("," + string(kEtcdHost) + ":" + to_string(kEtcdPort) +
+                     "," + kEtcdHost2 + ":" + to_string(kEtcdPort2));
+  const list<EtcdClient::HostPortPair> split_hosts(SplitHosts(hosts));
+  EXPECT_EQ(2, split_hosts.size());
+  EXPECT_EQ(kEtcdHost, split_hosts.front().first);
+  EXPECT_EQ(kEtcdPort, split_hosts.front().second);
+  EXPECT_EQ(kEtcdHost2, split_hosts.back().first);
+  EXPECT_EQ(kEtcdPort2, split_hosts.back().second);
+}
+
+TEST_F(EtcdTest, SplitHostsWithAllBlanks) {
+  const list<EtcdClient::HostPortPair> split_hosts(SplitHosts(",,,,"));
+  EXPECT_EQ(0, split_hosts.size());
+}
+
+TEST_F(EtcdTest, SplitHostsWithEmptyString) {
+  const list<EtcdClient::HostPortPair> split_hosts(SplitHosts(""));
+  EXPECT_EQ(0, split_hosts.size());
+}
+
+TEST_F(EtcdDeathTest, SplitHostsWithInvalidHostPortString) {
+  EXPECT_DEATH(SplitHosts("host:2:monkey"), "Invalid host:port string");
+}
+
+TEST_F(EtcdDeathTest, SplitHostsWithNegativePort) {
+  EXPECT_DEATH(SplitHosts("host:-1"), "Port is <= 0");
+}
+
+TEST_F(EtcdDeathTest, SplitHostsWithOutOfRangePort) {
+  EXPECT_DEATH(SplitHosts("host:65536"), "Port is > 65535");
 }
 
 }  // namespace

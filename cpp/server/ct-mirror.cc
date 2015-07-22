@@ -74,8 +74,8 @@ DEFINE_int32(log_stats_frequency_seconds, 3600,
              "Must be greater than 0.");
 DEFINE_int32(target_poll_frequency_seconds, 10,
              "How often should the target log be polled for updates.");
-DEFINE_string(etcd_hosts, "",
-              "Comma separated list of 'Hostname:Port' of the etcd server(s)");
+DEFINE_string(etcd_servers, "",
+              "Comma separated list of 'hostname:port' of the etcd server(s)");
 DEFINE_string(etcd_root, "/root", "Root of cluster entries in etcd.");
 DEFINE_int32(num_http_server_threads, 16,
              "Number of threads for servicing the incoming HTTP requests.");
@@ -286,7 +286,7 @@ int main(int argc, char* argv[]) {
         new FileStorage(FLAGS_meta_dir, 0));
   }
 
-  const bool stand_alone_mode(FLAGS_etcd_hosts.empty());
+  const bool stand_alone_mode(FLAGS_etcd_servers.empty());
   const shared_ptr<libevent::Base> event_base(make_shared<libevent::Base>());
   ThreadPool internal_pool(8);
   UrlFetcher url_fetcher(event_base.get(), &internal_pool);
@@ -294,7 +294,7 @@ int main(int argc, char* argv[]) {
   const std::unique_ptr<EtcdClient> etcd_client(
       stand_alone_mode
           ? new FakeEtcdClient(event_base.get())
-          : new EtcdClient(&url_fetcher, SplitHosts(FLAGS_etcd_hosts)));
+          : new EtcdClient(&url_fetcher, SplitHosts(FLAGS_etcd_servers)));
 
   Server<LoggedCertificate>::Options options;
   options.server = FLAGS_server;

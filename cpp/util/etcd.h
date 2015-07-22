@@ -2,13 +2,13 @@
 #define CERT_TRANS_UTIL_ETCD_H_
 
 #include <chrono>
-#include <glog/logging.h>
 #include <list>
 #include <map>
 #include <memory>
 #include <mutex>
 #include <stdint.h>
 #include <string>
+#include <utility>
 #include <vector>
 
 #include "base/macros.h"
@@ -150,11 +150,13 @@ class EtcdClient {
   void WatchRequestDone(WatchState* state, GetResponse* gen_resp,
                         util::Task* child_task);
 
+  HostPortPair endpoint() const;
+
   UrlFetcher* const fetcher_;
-  std::list<HostPortPair> etcds_;
 
   mutable std::mutex lock_;
-  HostPortPair endpoint_;
+  std::list<HostPortPair> etcds_;
+
 
   DISALLOW_COPY_AND_ASSIGN(EtcdClient);
 };
