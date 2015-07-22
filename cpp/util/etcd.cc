@@ -794,7 +794,7 @@ EtcdClient::HostPortPair EtcdClient::UpdateEndpoint(const string& host,
   HostPortPair new_endpoint(host, port);
   auto it(find(etcds_.begin(), etcds_.end(), new_endpoint));
   if (it == etcds_.end()) {
-    // TODO(alcutter): We don't really have a way of knowning when to remove
+    // TODO(alcutter): We don't really have a way of knowing when to remove
     // etcd endpoints at the moment.  We should really be querying the etcd
     // cluster for its members and using that list.
     etcds_.emplace_front(move(new_endpoint));

@@ -157,7 +157,6 @@ class EtcdClient {
   mutable std::mutex lock_;
   std::list<HostPortPair> etcds_;
 
-
   DISALLOW_COPY_AND_ASSIGN(EtcdClient);
 };
 
