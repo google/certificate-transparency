@@ -200,6 +200,12 @@ class CertificateTest(unittest.TestCase):
         self.assertNotEqual(c2, c)
         self.assertNotEqual(c2, "foo")
 
+    def test_hash(self):
+        c = self.cert_from_pem_file(self._PEM_FILE)
+        c2 = self.cert_from_pem_file(self._PEM_FILE)
+        self.assertEqual(hash(c), hash(c))
+        self.assertEqual(hash(c), hash(c2))
+
     def test_parse_matrixssl(self):
         """Test parsing of old MatrixSSL.org sample certificate
 
