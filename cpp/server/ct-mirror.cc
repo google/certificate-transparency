@@ -370,8 +370,9 @@ int main(int argc, char* argv[]) {
       unique_ptr<LogVerifier>(
           new LogVerifier(new LogSigVerifier(pubkey.ValueOrDie()),
                           new MerkleVerifier(new Sha256Hasher))),
-      new_sth, fetcher_task.task()->AddChild(
-                   [](Task* task) { LOG(INFO) << "RemotePeer exited."; })));
+      server.log_lookup(), new_sth,
+      fetcher_task.task()->AddChild(
+          [](Task* task) { LOG(INFO) << "RemotePeer exited."; })));
   const unique_ptr<ContinuousFetcher> fetcher(
       ContinuousFetcher::New(event_base.get(), &pool, db, false));
   fetcher->AddPeer("target", peer);

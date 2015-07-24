@@ -172,6 +172,14 @@ typename LogLookup<Logged>::LookupResult LogLookup<Logged>::AuditProof(
   return AuditProof(leaf_index, tree_size, proof);
 }
 
+
+template <class Logged>
+std::string LogLookup<Logged>::RootAtSnapshot(size_t tree_size) {
+  std::lock_guard<std::mutex> lock(lock_);
+  return cert_tree_.RootAtSnapshot(tree_size);
+}
+
+
 template <class Logged>
 std::string LogLookup<Logged>::LeafHash(const Logged& logged) const {
   std::string serialized_leaf;

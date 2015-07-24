@@ -50,6 +50,7 @@ check_PROGRAMS = \
 # commit 9391d114.
 TESTS = \
 	cpp/base/notification_test \
+	cpp/fetcher/remote_peer_test \
 	cpp/log/cert_checker_test \
 	cpp/log/cert_submission_handler_test \
 	cpp/log/cert_test \
@@ -331,6 +332,25 @@ cpp_base_notification_test_SOURCES = \
 	cpp/base/notification.cc \
 	cpp/base/notification_test.cc
 
+cpp_fetcher_remote_peer_test_LDADD = \
+	cpp/libcore.a \
+	cpp/libtest.a \
+	$(json_c_LIBS) \
+	$(libevent_LIBS) \
+	$(leveldb_LIBS) \
+	-lprotobuf -lsqlite3
+cpp_fetcher_remote_peer_test_SOURCES = \
+	cpp/client/async_log_client.cc \
+	cpp/fetcher/remote_peer.cc \
+	cpp/fetcher/remote_peer_test.cc \
+	cpp/log/test_signer.cc \
+	cpp/proto/serializer.cc \
+	cpp/util/json_wrapper.cc \
+	cpp/util/libevent_wrapper.cc \
+	cpp/util/periodic_closure.cc \
+	cpp/util/protobuf_util.cc \
+	cpp/util/thread_pool.cc \
+	cpp/util/util.cc
 cpp_log_cluster_state_controller_test_LDADD = \
 	cpp/libcore.a \
 	cpp/libtest.a \
