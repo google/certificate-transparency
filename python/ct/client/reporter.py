@@ -38,6 +38,7 @@ def _scan_der_cert(der_certs, checks):
         for log_index, der_cert, der_chain, entry_type in der_certs:
             current = log_index
             partial_result = []
+            certificate = None
             strict_failure = False
             try:
                 certificate = cert.Certificate(der_cert)
@@ -63,17 +64,25 @@ def _scan_der_cert(der_certs, checks):
                 desc.sha256_hash = hashlib.sha256(der_cert).digest()
 
             desc.entry_type = entry_type
+            root = None
 
-            try:
-                root = cert.Certificate(der_chain[-1], strict_der=False)
-            except error.Error:
-                pass
+            if der_chain:
+                try:
+                    root = cert.Certificate(der_chain[-1], strict_der=False)
+                except error.Error:
+                    pass
             else:
+                # No chain implies this is a root certificate.
+                # Note that certificate may be None.
+                root = certificate
+
+            if root:
                 for iss in [(type_.short_name, cert_desc.to_unicode(
                         '.'.join(cert_desc.process_name(value.human_readable()))))
                             for type_, value in root.issuer()]:
                     proto_iss = desc.root_issuer.add()
                     proto_iss.type, proto_iss.value = iss
+
             result.append((desc, log_index, partial_result))
         return result
     except Exception:
