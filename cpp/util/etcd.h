@@ -2,17 +2,20 @@
 #define CERT_TRANS_UTIL_ETCD_H_
 
 #include <chrono>
+#include <list>
 #include <map>
 #include <memory>
 #include <mutex>
 #include <stdint.h>
 #include <string>
+#include <utility>
 #include <vector>
 
 #include "base/macros.h"
 #include "net/url_fetcher.h"
 #include "util/status.h"
 #include "util/task.h"
+#include "util/util.h"
 
 class JsonObject;
 
@@ -21,6 +24,8 @@ namespace cert_trans {
 
 class EtcdClient {
  public:
+  typedef std::pair<std::string, uint16_t> HostPortPair;
+
   struct Node {
     static const Node& InvalidNode();
 
@@ -76,8 +81,9 @@ class EtcdClient {
 
   typedef std::function<void(const std::vector<Node>& updates)> WatchCallback;
 
-  // TODO(pphaneuf): This should take a set of servers, not just one.
   EtcdClient(UrlFetcher* fetcher, const std::string& host, uint16_t port);
+
+  EtcdClient(UrlFetcher* fetcher, const std::list<HostPortPair>& etcds);
 
   virtual ~EtcdClient();
 
@@ -126,13 +132,12 @@ class EtcdClient {
   EtcdClient();
 
  private:
-  typedef std::pair<std::string, uint16_t> HostPortPair;
-
   struct RequestState;
   struct WatchState;
 
+  HostPortPair ChooseNextServer();
   HostPortPair GetEndpoint() const;
-  HostPortPair UpdateEndpoint(const std::string& host, uint16_t port);
+  HostPortPair UpdateEndpoint(HostPortPair&& new_endpoint);
   void FetchDone(RequestState* etcd_req, util::Task* task);
   void Generic(const std::string& key, const std::string& key_space,
                const std::map<std::string, std::string>& params,
@@ -148,10 +153,16 @@ class EtcdClient {
   UrlFetcher* const fetcher_;
 
   mutable std::mutex lock_;
-  HostPortPair endpoint_;
+  std::list<HostPortPair> etcds_;
 
   DISALLOW_COPY_AND_ASSIGN(EtcdClient);
 };
+
+
+// Splits strings of the form "host:port,host:port,..." to a list of
+// HostPortPairs.
+std::list<EtcdClient::HostPortPair> SplitHosts(
+    const std::string& hosts_string);
 
 
 }  // namespace cert_trans

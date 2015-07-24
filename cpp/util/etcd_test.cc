@@ -1,5 +1,6 @@
 #include <gmock/gmock.h>
 #include <gtest/gtest.h>
+#include <list>
 #include <memory>
 #include <string>
 
@@ -17,6 +18,7 @@ namespace cert_trans {
 
 using std::bind;
 using std::chrono::seconds;
+using std::list;
 using std::make_pair;
 using std::make_shared;
 using std::placeholders::_1;
@@ -172,6 +174,14 @@ const char kStoreStatsJson[] =
 const char kEtcdHost[] = "etcd.example.net";
 const int kEtcdPort = 4242;
 
+const char kEtcdHost2[] = "etcd2.example.net";
+const int kEtcdPort2 = 5252;
+
+const char kEtcdHost3[] = "etcd3.example.net";
+const int kEtcdPort3 = 6262;
+
+const char kDefaultSpace[] = "/v2/keys";
+
 class EtcdTest : public ::testing::Test {
  public:
   EtcdTest()
@@ -190,10 +200,13 @@ class EtcdTest : public ::testing::Test {
   EtcdClient client_;
 };
 
-string GetEtcdUrl(const string& key, const string& key_space = "/v2/keys") {
+typedef EtcdTest EtcdDeathTest;
+
+string GetEtcdUrl(const string& key, const string& key_space = kDefaultSpace,
+                  const string& host = kEtcdHost,
+                  const uint16_t port = kEtcdPort) {
   CHECK(!key.empty() && key[0] == '/') << "key isn't slash-prefixed: " << key;
-  return "http://" + string(kEtcdHost) + ":" + to_string(kEtcdPort) +
-         key_space + key;
+  return "http://" + string(host) + ":" + to_string(port) + key_space + key;
 }
 
 void HandleFetch(Status status, int status_code,
@@ -664,6 +677,215 @@ TEST_F(EtcdTest, WatchInitialGetFailureCausesRetry) {
   task.Wait();
 }
 
+TEST_F(EtcdTest, WatchInitialGetFailureRetriesOnNextEtcd) {
+  FLAGS_etcd_watch_error_retry_delay_seconds = 1;
+  EtcdClient multi_client(&url_fetcher_,
+                          {EtcdClient::HostPortPair(kEtcdHost, kEtcdPort),
+                           EtcdClient::HostPortPair(kEtcdHost2, kEtcdPort2)});
+  {
+    InSequence s;
+    EXPECT_CALL(url_fetcher_,
+                Fetch(IsUrlFetchRequest(UrlFetcher::Verb::GET,
+                                        URL(GetEtcdUrl(kEntryKey) +
+                                            "?consistent=true&quorum=true"),
+                                        IsEmpty(), ""),
+                      _, _))
+        .WillOnce(
+            Invoke(bind(HandleFetch, Status(util::error::UNAVAILABLE, ""), 0,
+                        UrlFetcher::Headers{}, "", _1, _2, _3)));
+    EXPECT_CALL(
+        url_fetcher_,
+        Fetch(IsUrlFetchRequest(UrlFetcher::Verb::GET,
+                                URL(GetEtcdUrl(kEntryKey, kDefaultSpace,
+                                               kEtcdHost2, kEtcdPort2) +
+                                    "?consistent=true&quorum=true"),
+                                IsEmpty(), ""),
+              _, _))
+        .WillOnce(
+            Invoke(bind(HandleFetch, Status::OK, 200,
+                        UrlFetcher::Headers{make_pair("x-etcd-index", "9")},
+                        kGetJson, _1, _2, _3)));
+  }
+
+  SyncTask task(base_.get());
+  multi_client.Watch(kEntryKey,
+                     [&task](const vector<EtcdClient::Node>& updates) {
+                       EXPECT_EQ(1, updates.size());
+                       EXPECT_EQ(9, updates[0].modified_index_);
+                       EXPECT_EQ("123", updates[0].value_);
+                       task.Cancel();
+                     },
+                     task.task());
+  task.Wait();
+}
+
+TEST_F(EtcdTest, UnavailableEtcdRetriesOnNewServer) {
+  EtcdClient multi_client(&url_fetcher_,
+                          {EtcdClient::HostPortPair(kEtcdHost, kEtcdPort),
+                           EtcdClient::HostPortPair(kEtcdHost2, kEtcdPort2)});
+
+  {
+    InSequence s;
+
+    // first server fails
+    EXPECT_CALL(
+        url_fetcher_,
+        Fetch(IsUrlFetchRequest(
+                  UrlFetcher::Verb::PUT, URL(GetEtcdUrl(kEntryKey)),
+                  ElementsAre(Pair(StrCaseEq("content-type"),
+                                   "application/x-www-form-urlencoded")),
+                  "consistent=true&prevIndex=5&quorum=true&ttl=100&value=123"),
+              _, _))
+        .WillOnce(
+            Invoke(bind(HandleFetch, Status(util::error::UNAVAILABLE, ""), 0,
+                        UrlFetcher::Headers{}, "", _1, _2, _3)));
+    // second does too
+    EXPECT_CALL(
+        url_fetcher_,
+        Fetch(IsUrlFetchRequest(
+                  UrlFetcher::Verb::PUT,
+                  URL(GetEtcdUrl(kEntryKey, kDefaultSpace, kEtcdHost2,
+                                 kEtcdPort2)),
+                  ElementsAre(Pair(StrCaseEq("content-type"),
+                                   "application/x-www-form-urlencoded")),
+                  "consistent=true&prevIndex=5&quorum=true&ttl=100&value=123"),
+              _, _))
+        .WillOnce(
+            Invoke(bind(HandleFetch, Status(util::error::UNAVAILABLE, ""), 0,
+                        UrlFetcher::Headers{}, "", _1, _2, _3)));
+    // try with first again, fail.
+    EXPECT_CALL(
+        url_fetcher_,
+        Fetch(IsUrlFetchRequest(
+                  UrlFetcher::Verb::PUT, URL(GetEtcdUrl(kEntryKey)),
+                  ElementsAre(Pair(StrCaseEq("content-type"),
+                                   "application/x-www-form-urlencoded")),
+                  "consistent=true&prevIndex=5&quorum=true&ttl=100&value=123"),
+              _, _))
+        .WillOnce(
+            Invoke(bind(HandleFetch, Status(util::error::UNAVAILABLE, ""), 0,
+                        UrlFetcher::Headers{}, "", _1, _2, _3)));
+    // finally the second etcd is up:
+    EXPECT_CALL(
+        url_fetcher_,
+        Fetch(IsUrlFetchRequest(
+                  UrlFetcher::Verb::PUT,
+                  URL(GetEtcdUrl(kEntryKey, kDefaultSpace, kEtcdHost2,
+                                 kEtcdPort2)),
+                  ElementsAre(Pair(StrCaseEq("content-type"),
+                                   "application/x-www-form-urlencoded")),
+                  "consistent=true&prevIndex=5&quorum=true&ttl=100&value=123"),
+              _, _))
+        .WillOnce(
+            Invoke(bind(HandleFetch, Status::OK, 200, UrlFetcher::Headers{},
+                        kUpdateJson, _1, _2, _3)));
+  }
+
+  SyncTask task(base_.get());
+  EtcdClient::Response resp;
+  multi_client.UpdateWithTTL(kEntryKey, "123", seconds(100), 5, &resp,
+                             task.task());
+  task.Wait();
+  EXPECT_OK(task.status());
+}
+
+TEST_F(EtcdTest, FollowsMasterChangeRedirectToNewHost) {
+  // Excludes kEtcdHost3:
+  EtcdClient multi_client(&url_fetcher_,
+                          {EtcdClient::HostPortPair(kEtcdHost, kEtcdPort),
+                           EtcdClient::HostPortPair(kEtcdHost2, kEtcdPort2)});
+
+  {
+    InSequence s;
+
+    // first server redirects to a new master which was previously unknown to
+    // the log server:
+    EXPECT_CALL(
+        url_fetcher_,
+        Fetch(IsUrlFetchRequest(
+                  UrlFetcher::Verb::PUT, URL(GetEtcdUrl(kEntryKey)),
+                  ElementsAre(Pair(StrCaseEq("content-type"),
+                                   "application/x-www-form-urlencoded")),
+                  "consistent=true&prevIndex=5&quorum=true&ttl=100&value=123"),
+              _, _))
+        .WillOnce(
+            Invoke(bind(HandleFetch, Status::OK, 307,
+                        UrlFetcher::Headers{make_pair(
+                            "location", GetEtcdUrl(kEntryKey, kDefaultSpace,
+                                                   kEtcdHost3, kEtcdPort3))},
+                        "", _1, _2, _3)));
+    // log should attempt to contact the new:
+    EXPECT_CALL(
+        url_fetcher_,
+        Fetch(IsUrlFetchRequest(
+                  UrlFetcher::Verb::PUT,
+                  URL(GetEtcdUrl(kEntryKey, kDefaultSpace, kEtcdHost3,
+                                 kEtcdPort3)),
+                  ElementsAre(Pair(StrCaseEq("content-type"),
+                                   "application/x-www-form-urlencoded")),
+                  "consistent=true&prevIndex=5&quorum=true&ttl=100&value=123"),
+              _, _))
+        .WillOnce(
+            Invoke(bind(HandleFetch, Status::OK, 200, UrlFetcher::Headers{},
+                        kUpdateJson, _1, _2, _3)));
+  }
+
+  SyncTask task(base_.get());
+  EtcdClient::Response resp;
+  multi_client.UpdateWithTTL(kEntryKey, "123", seconds(100), 5, &resp,
+                             task.task());
+  task.Wait();
+  EXPECT_OK(task.status());
+}
+
+TEST_F(EtcdTest, FollowsMasterChangeRedirectToKnownHost) {
+  EtcdClient multi_client(&url_fetcher_,
+                          {EtcdClient::HostPortPair(kEtcdHost, kEtcdPort),
+                           EtcdClient::HostPortPair(kEtcdHost2, kEtcdPort2)});
+
+  {
+    InSequence s;
+
+    // first server redirects to a new master which was previously known to the
+    // log server:
+    EXPECT_CALL(
+        url_fetcher_,
+        Fetch(IsUrlFetchRequest(
+                  UrlFetcher::Verb::PUT, URL(GetEtcdUrl(kEntryKey)),
+                  ElementsAre(Pair(StrCaseEq("content-type"),
+                                   "application/x-www-form-urlencoded")),
+                  "consistent=true&prevIndex=5&quorum=true&ttl=100&value=123"),
+              _, _))
+        .WillOnce(
+            Invoke(bind(HandleFetch, Status::OK, 307,
+                        UrlFetcher::Headers{make_pair(
+                            "location", GetEtcdUrl(kEntryKey, kDefaultSpace,
+                                                   kEtcdHost2, kEtcdPort2))},
+                        "", _1, _2, _3)));
+    // log should attempt to contact the new master:
+    EXPECT_CALL(
+        url_fetcher_,
+        Fetch(IsUrlFetchRequest(
+                  UrlFetcher::Verb::PUT,
+                  URL(GetEtcdUrl(kEntryKey, kDefaultSpace, kEtcdHost2,
+                                 kEtcdPort2)),
+                  ElementsAre(Pair(StrCaseEq("content-type"),
+                                   "application/x-www-form-urlencoded")),
+                  "consistent=true&prevIndex=5&quorum=true&ttl=100&value=123"),
+              _, _))
+        .WillOnce(
+            Invoke(bind(HandleFetch, Status::OK, 200, UrlFetcher::Headers{},
+                        kUpdateJson, _1, _2, _3)));
+  }
+
+  SyncTask task(base_.get());
+  EtcdClient::Response resp;
+  multi_client.UpdateWithTTL(kEntryKey, "123", seconds(100), 5, &resp,
+                             task.task());
+  task.Wait();
+  EXPECT_OK(task.status());
+}
+
 TEST_F(EtcdTest, GetStoreStats) {
   EXPECT_CALL(url_fetcher_,
               Fetch(IsUrlFetchRequest(UrlFetcher::Verb::GET,
@@ -698,6 +920,71 @@ TEST_F(EtcdTest, GetStoreStats) {
   EXPECT_EQ(16, response.stats["getsFail"]);
 }
 
+TEST_F(EtcdTest, SplitHosts) {
+  const string hosts(string(kEtcdHost) + ":" + to_string(kEtcdPort) + "," +
+                     kEtcdHost2 + ":" + to_string(kEtcdPort2));
+  const list<EtcdClient::HostPortPair> split_hosts(SplitHosts(hosts));
+  EXPECT_EQ(2, split_hosts.size());
+  EXPECT_EQ(kEtcdHost, split_hosts.front().first);
+  EXPECT_EQ(kEtcdPort, split_hosts.front().second);
+  EXPECT_EQ(kEtcdHost2, split_hosts.back().first);
+  EXPECT_EQ(kEtcdPort2, split_hosts.back().second);
+}
+
+TEST_F(EtcdTest, SplitHostsIgnoresBlanks) {
+  const string hosts(string(kEtcdHost) + ":" + to_string(kEtcdPort) + ",," +
+                     kEtcdHost2 + ":" + to_string(kEtcdPort2));
+  const list<EtcdClient::HostPortPair> split_hosts(SplitHosts(hosts));
+  EXPECT_EQ(2, split_hosts.size());
+  EXPECT_EQ(kEtcdHost, split_hosts.front().first);
+  EXPECT_EQ(kEtcdPort, split_hosts.front().second);
+  EXPECT_EQ(kEtcdHost2, split_hosts.back().first);
+  EXPECT_EQ(kEtcdPort2, split_hosts.back().second);
+}
+
+TEST_F(EtcdTest, SplitHostsIgnoresTrailingComma) {
+  const string hosts(string(kEtcdHost) + ":" + to_string(kEtcdPort) + "," +
+                     kEtcdHost2 + ":" + to_string(kEtcdPort2) + ",");
+  const list<EtcdClient::HostPortPair> split_hosts(SplitHosts(hosts));
+  EXPECT_EQ(2, split_hosts.size());
+  EXPECT_EQ(kEtcdHost, split_hosts.front().first);
+  EXPECT_EQ(kEtcdPort, split_hosts.front().second);
+  EXPECT_EQ(kEtcdHost2, split_hosts.back().first);
+  EXPECT_EQ(kEtcdPort2, split_hosts.back().second);
+}
+
+TEST_F(EtcdTest, SplitHostsIgnoresPrecedingComma) {
+  const string hosts("," + string(kEtcdHost) + ":" + to_string(kEtcdPort) +
+                     "," + kEtcdHost2 + ":" + to_string(kEtcdPort2));
+  const list<EtcdClient::HostPortPair> split_hosts(SplitHosts(hosts));
+  EXPECT_EQ(2, split_hosts.size());
+  EXPECT_EQ(kEtcdHost, split_hosts.front().first);
+  EXPECT_EQ(kEtcdPort, split_hosts.front().second);
+  EXPECT_EQ(kEtcdHost2, split_hosts.back().first);
+  EXPECT_EQ(kEtcdPort2, split_hosts.back().second);
+}
+
+TEST_F(EtcdTest, SplitHostsWithAllBlanks) {
+  const list<EtcdClient::HostPortPair> split_hosts(SplitHosts(",,,,"));
+  EXPECT_EQ(0, split_hosts.size());
+}
+
+TEST_F(EtcdTest, SplitHostsWithEmptyString) {
+  const list<EtcdClient::HostPortPair> split_hosts(SplitHosts(""));
+  EXPECT_EQ(0, split_hosts.size());
+}
+
+TEST_F(EtcdDeathTest, SplitHostsWithInvalidHostPortString) {
+  EXPECT_DEATH(SplitHosts("host:2:monkey"), "Invalid host:port string");
+}
+
+TEST_F(EtcdDeathTest, SplitHostsWithNegativePort) {
+  EXPECT_DEATH(SplitHosts("host:-1"), "Port is <= 0");
+}
+
+TEST_F(EtcdDeathTest, SplitHostsWithOutOfRangePort) {
+  EXPECT_DEATH(SplitHosts("host:65536"), "Port is > 65535");
+}
 
 }  // namespace
 }  // namespace cert_trans

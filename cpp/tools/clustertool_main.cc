@@ -31,6 +31,7 @@ using cert_trans::LoggedCertificate;
 using cert_trans::MasterElection;
 using cert_trans::ReadPrivateKey;
 using cert_trans::StrictConsistentStore;
+using cert_trans::SplitHosts;
 using cert_trans::ThreadPool;
 using cert_trans::TreeSigner;
 using cert_trans::UrlFetcher;
@@ -49,8 +50,8 @@ using util::Status;
 DEFINE_string(cluster_config, "",
               "Path of file containing the cluster config (in ASCII proto "
               "format.)");
-DEFINE_string(etcd_host, "", "Hostname of the etcd server");
-DEFINE_int32(etcd_port, 0, "Port of the etcd server.");
+DEFINE_string(etcd_servers, "",
+              "Comma separated list of 'hostname:port' of the etcd server(s)");
 DEFINE_string(key, "", "PEM-encoded server private key file");
 
 
@@ -140,8 +141,7 @@ int main(int argc, char* argv[]) {
     return util::error::INVALID_ARGUMENT;
   }
 
-  CHECK(!FLAGS_etcd_host.empty());
-  CHECK_NE(0, FLAGS_etcd_port);
+  CHECK(!FLAGS_etcd_servers.empty());
 
   const shared_ptr<libevent::Base> event_base(make_shared<libevent::Base>());
   std::unique_ptr<libevent::EventPumpThread> pump(
@@ -149,7 +149,7 @@ int main(int argc, char* argv[]) {
   ThreadPool pool;
   UrlFetcher fetcher(event_base.get(), &pool);
 
-  EtcdClient etcd_client(&fetcher, FLAGS_etcd_host, FLAGS_etcd_port);
+  EtcdClient etcd_client(&fetcher, SplitHosts(FLAGS_etcd_servers));
 
   const string node_id("clustertool");
   unique_ptr<MasterElection> election(
