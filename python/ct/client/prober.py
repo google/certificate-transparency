@@ -42,7 +42,7 @@ class ProberThread(threading.Thread):
             hasher = merkle.TreeHasher()
             verifier = verify.LogVerifier(log.public_key_info,
                                           merkle.MerkleVerifier(hasher))
-            state_keeper = state_keeper_class(FLAGS.monitor_state_dir +
+            state_keeper = state_keeper_class(monitor_state_dir +
                                              "/" + log.log_id)
             log_key = db.get_log_id(log.log_server)
             self.__monitors.append(monitor.Monitor(client, verifier, hasher, db,
