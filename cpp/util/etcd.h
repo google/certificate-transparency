@@ -135,9 +135,9 @@ class EtcdClient {
   struct RequestState;
   struct WatchState;
 
-  void ChooseNextServer();
+  HostPortPair ChooseNextServer();
   HostPortPair GetEndpoint() const;
-  HostPortPair UpdateEndpoint(const std::string& host, uint16_t port);
+  HostPortPair UpdateEndpoint(HostPortPair&& new_endpoint);
   void FetchDone(RequestState* etcd_req, util::Task* task);
   void Generic(const std::string& key, const std::string& key_space,
                const std::map<std::string, std::string>& params,
@@ -149,8 +149,6 @@ class EtcdClient {
   void StartWatchRequest(WatchState* state);
   void WatchRequestDone(WatchState* state, GetResponse* gen_resp,
                         util::Task* child_task);
-
-  HostPortPair endpoint() const;
 
   UrlFetcher* const fetcher_;
 

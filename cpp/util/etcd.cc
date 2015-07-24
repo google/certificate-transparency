@@ -686,13 +686,7 @@ EtcdClient::EtcdClient(UrlFetcher* fetcher, const list<HostPortPair>& etcds)
 }
 
 
-EtcdClient::HostPortPair EtcdClient::endpoint() const {
-  lock_guard<mutex> lock(lock_);
-  return etcds_.front();
-}
-
-
-void EtcdClient::ChooseNextServer() {
+EtcdClient::HostPortPair EtcdClient::ChooseNextServer() {
   lock_guard<mutex> lock(lock_);
 
   etcds_.emplace_back(etcds_.front());
@@ -700,6 +694,7 @@ void EtcdClient::ChooseNextServer() {
 
   LOG(INFO) << "Selected new etcd server: " << etcds_.front().first << ":"
             << etcds_.front().second;
+  return etcds_.front();
 }
 
 
@@ -720,8 +715,7 @@ void EtcdClient::FetchDone(RequestState* etcd_req, Task* task) {
       // Seems etcd wasn't available; pick a new etcd server and retry
       LOG(WARNING) << "Etcd fetch failed: " << task->status() << ", retrying "
                    << "on next etcd server.";
-      ChooseNextServer();
-      etcd_req->SetHostPort(endpoint());
+      etcd_req->SetHostPort(ChooseNextServer());
       fetcher_->Fetch(etcd_req->req_, &etcd_req->resp_,
                       etcd_req->parent_task_->AddChild(
                           bind(&EtcdClient::FetchDone, this, etcd_req, _1)));
@@ -753,7 +747,8 @@ void EtcdClient::FetchDone(RequestState* etcd_req, Task* task) {
       return;
     }
 
-    etcd_req->SetHostPort(UpdateEndpoint(url.Host(), url.Port()));
+    etcd_req->SetHostPort(
+        UpdateEndpoint(HostPortPair(url.Host(), url.Port())));
 
     fetcher_->Fetch(etcd_req->req_, &etcd_req->resp_,
                     etcd_req->parent_task_->AddChild(
@@ -788,10 +783,9 @@ EtcdClient::HostPortPair EtcdClient::GetEndpoint() const {
 }
 
 
-EtcdClient::HostPortPair EtcdClient::UpdateEndpoint(const string& host,
-                                                    uint16_t port) {
+EtcdClient::HostPortPair EtcdClient::UpdateEndpoint(
+    HostPortPair&& new_endpoint) {
   lock_guard<mutex> lock(lock_);
-  HostPortPair new_endpoint(host, port);
   auto it(find(etcds_.begin(), etcds_.end(), new_endpoint));
   if (it == etcds_.end()) {
     // TODO(alcutter): We don't really have a way of knowing when to remove
@@ -799,13 +793,12 @@ EtcdClient::HostPortPair EtcdClient::UpdateEndpoint(const string& host,
     // cluster for its members and using that list.
     etcds_.emplace_front(move(new_endpoint));
   } else {
-    etcds_.emplace_front(move(*it));
-    etcds_.erase(it);
+    etcds_.splice(etcds_.begin(), etcds_, it);
   }
 
   LOG(INFO) << "Selected new etcd server: " << etcds_.front().first << ":"
             << etcds_.front().second;
-  return endpoint();
+  return etcds_.front();
 }
 
 
