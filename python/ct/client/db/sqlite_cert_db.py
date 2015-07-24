@@ -123,7 +123,7 @@ class SQLiteCertDB(cert_db.CertDB):
                             sqlite3.Binary(obs.details)))
 
     def store_certs_desc(self, certs, log_key):
-        """Store certificates using it's descriptions.
+        """Store certificates using their descriptions.
 
         Args:
             certs:         iterable of (CertificateDescription, index) tuples
@@ -134,7 +134,7 @@ class SQLiteCertDB(cert_db.CertDB):
                 self.__store_cert(cert[0], cert[1], log_key, cursor)
 
     def store_cert_desc(self, cert, index, log_key):
-        """Store certificate using it's description.
+        """Store a certificate using its description.
 
         Args:
             cert:          CertificateDescription
