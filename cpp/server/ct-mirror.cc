@@ -24,12 +24,14 @@
 #include "fetcher/peer_group.h"
 #include "log/cluster_state_controller.h"
 #include "log/ct_extensions.h"
+#include "log/database.h"
 #include "log/etcd_consistent_store.h"
 #include "log/file_db.h"
 #include "log/file_storage.h"
 #include "log/leveldb_db.h"
 #include "log/sqlite_db.h"
 #include "log/strict_consistent_store.h"
+#include "merkletree/compact_merkle_tree.h"
 #include "merkletree/merkle_verifier.h"
 #include "monitoring/latency.h"
 #include "monitoring/monitoring.h"
@@ -48,6 +50,7 @@
 #include "util/read_key.h"
 #include "util/status.h"
 #include "util/thread_pool.h"
+#include "util/util.h"
 #include "util/uuid.h"
 
 DEFINE_string(server, "localhost", "Server host");
@@ -134,6 +137,7 @@ using std::shared_ptr;
 using std::string;
 using std::thread;
 using std::unique_ptr;
+using util::HexString;
 using util::StatusOr;
 using util::SyncTask;
 using util::Task;
@@ -145,6 +149,11 @@ namespace {
 Gauge<>* latest_local_tree_size_gauge =
     Gauge<>::New("latest_local_tree_size",
                  "Size of latest locally available STH.");
+
+Counter<>* inconsistent_sths_received =
+    Counter<>::New("inconsistent_sths_received",
+                   "Number of STHs received from the mirror target whose root "
+                   "hash does not match the locally built tree.");
 
 
 // Basic sanity checks on flag values.
@@ -218,12 +227,14 @@ static const bool follow_dummy =
 void STHUpdater(
     Database<LoggedCertificate>* db,
     ClusterStateController<LoggedCertificate>* cluster_state_controller,
-    mutex* queue_mutex, map<int64_t, ct::SignedTreeHead>* queue, Task* task) {
+    mutex* queue_mutex, map<int64_t, ct::SignedTreeHead>* queue,
+    LogLookup<LoggedCertificate>* log_lookup, Task* task) {
   CHECK_NOTNULL(db);
   CHECK_NOTNULL(cluster_state_controller);
   CHECK_NOTNULL(queue_mutex);
   CHECK_NOTNULL(queue);
   CHECK_NOTNULL(task);
+  CHECK_NOTNULL(log_lookup);
 
   while (true) {
     if (task->CancelRequested()) {
@@ -233,13 +244,62 @@ void STHUpdater(
     const int64_t local_size(db->TreeSize());
     latest_local_tree_size_gauge->Set(local_size);
 
+    // log_lookup doesn't yet have the data for the new STHs integrated (that
+    // happens via a callback when the WriteTreeHead() method is called on the
+    // DB), so we'll used a compact tree to pre-validate the STH roots.
+    //
+    // We'll start with one based on the current state of our serving tree and
+    // update it to the STH sizes we're checking.
+    unique_ptr<CompactMerkleTree> new_tree(
+        log_lookup->GetCompactMerkleTree(new Sha256Hasher));
+
     {
       lock_guard<mutex> lock(*queue_mutex);
+      unique_ptr<Database<LoggedCertificate>::Iterator> entries(
+          db->ScanEntries(new_tree->LeafCount()));
       while (!queue->empty() &&
              queue->begin()->second.tree_size() <= local_size) {
-        LOG(INFO) << "Can serve new STH of size "
-                  << queue->begin()->second.tree_size() << " locally";
-        cluster_state_controller->NewTreeHead(queue->begin()->second);
+        const SignedTreeHead& next_sth(queue->begin()->second);
+
+        // First, if necessary, catch our local compact tree up to the
+        // candidate STH size:
+        {
+          LoggedCertificate entry;
+          CHECK_LE(next_sth.tree_size(), local_size);
+          while (new_tree->LeafCount() < next_sth.tree_size()) {
+            CHECK(entries->GetNextEntry(&entry));
+            CHECK(entry.has_sequence_number());
+            CHECK_EQ(new_tree->LeafCount(), entry.sequence_number());
+            string serialized_leaf;
+            CHECK(entry.SerializeForLeaf(&serialized_leaf));
+            CHECK_EQ(entry.sequence_number() + 1,
+                     new_tree->AddLeaf(serialized_leaf));
+          }
+        }
+
+        // If the candidate STH is historical, use the RootAtSnapshot() from
+        // our serving tree, otherwise use the root we just calculated with our
+        // compact tree.
+        const string local_root_at_snapshot(
+            next_sth.tree_size() > log_lookup->GetSTH().tree_size()
+                ? new_tree->CurrentRoot()
+                : log_lookup->RootAtSnapshot(next_sth.tree_size()));
+
+        if (next_sth.sha256_root_hash() != local_root_at_snapshot) {
+          LOG(WARNING) << "Received STH:\n" << next_sth.DebugString()
+                       << " whose root:\n"
+                       << HexString(next_sth.sha256_root_hash())
+                       << "\ndoes not match that of local tree at "
+                       << "corresponding snapshot:\n"
+                       << HexString(local_root_at_snapshot);
+          inconsistent_sths_received->Increment();
+          // TODO(alcutter): We should probably write these bad STHs out to a
+          // separate DB table for later analysis.
+          continue;
+        }
+        LOG(INFO) << "Can serve new STH of size " << next_sth.tree_size()
+                  << " locally";
+        cluster_state_controller->NewTreeHead(next_sth);
         queue->erase(queue->begin());
       }
     }
@@ -365,9 +425,8 @@ int main(int argc, char* argv[]) {
       unique_ptr<LogVerifier>(
           new LogVerifier(new LogSigVerifier(pubkey.ValueOrDie()),
                           new MerkleVerifier(new Sha256Hasher))),
-      server.log_lookup(), new_sth,
-      fetcher_task.task()->AddChild(
-          [](Task*) { LOG(INFO) << "RemotePeer exited."; })));
+      new_sth, fetcher_task.task()->AddChild(
+                   [](Task*) { LOG(INFO) << "RemotePeer exited."; })));
   const unique_ptr<ContinuousFetcher> fetcher(
       ContinuousFetcher::New(event_base.get(), &pool, db, false));
   fetcher->AddPeer("target", peer);
@@ -375,7 +434,7 @@ int main(int argc, char* argv[]) {
   server.WaitForReplication();
 
   thread sth_updater(&STHUpdater, db, server.cluster_state_controller(),
-                     &queue_mutex, &queue,
+                     &queue_mutex, &queue, server.log_lookup(),
                      fetcher_task.task()->AddChild(
                          [](Task*) { LOG(INFO) << "STHUpdater exited."; }));
 
