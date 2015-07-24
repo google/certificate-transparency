@@ -54,13 +54,13 @@ class CertificateReportTest(base_check_test.BaseCheckTest):
 
     def test_scan_der_cert_no_checks(self):
         report = self.CertificateReportBase([])
-        report.scan_der_certs([(0, STRICT_DER, [''], client_pb2.X509_ENTRY)])
+        report.scan_der_certs([(0, STRICT_DER, [], client_pb2.X509_ENTRY)])
         result = report.report()
         self.assertEqual(len(sum(result.values(), [])), 0)
 
     def test_scan_der_cert_broken_cert(self):
         report = self.CertificateReportBase([])
-        report.scan_der_certs([(0, "asdf", [''], client_pb2.X509_ENTRY)])
+        report.scan_der_certs([(0, "asdf", [], client_pb2.X509_ENTRY)])
         result = report.report()
         self.assertObservationIn(asn1.All(),
                       sum(result.values(), []))
@@ -68,7 +68,7 @@ class CertificateReportTest(base_check_test.BaseCheckTest):
 
     def test_scan_der_cert_check(self):
         report = self.CertificateReportBase([FakeCheck()])
-        report.scan_der_certs([(0, STRICT_DER, [''], client_pb2.X509_ENTRY)])
+        report.scan_der_certs([(0, STRICT_DER, [], client_pb2.X509_ENTRY)])
         result = report.report()
 
         self.assertObservationIn(asn1.Strict("Boom!"),
@@ -77,7 +77,7 @@ class CertificateReportTest(base_check_test.BaseCheckTest):
 
     def test_scan_der_cert_check_non_strict(self):
         report = self.CertificateReportBase([FakeCheck()])
-        report.scan_der_certs([(0, NON_STRICT_DER, [''], client_pb2.X509_ENTRY)])
+        report.scan_der_certs([(0, NON_STRICT_DER, [], client_pb2.X509_ENTRY)])
         result = report.report()
         # There should be FakeCheck and asn.1 strict parsing failure
         self.assertEqual(len(sum(result.values(), [])), 2)
@@ -85,8 +85,8 @@ class CertificateReportTest(base_check_test.BaseCheckTest):
 
     def test_entry_type_propogated(self):
         report = self.CertificateReportBase([])
-        report.scan_der_certs([(0, STRICT_DER, [''], client_pb2.PRECERT_ENTRY),
-                               (1, STRICT_DER, [''], client_pb2.X509_ENTRY)])
+        report.scan_der_certs([(0, STRICT_DER, [], client_pb2.PRECERT_ENTRY),
+                               (1, STRICT_DER, [], client_pb2.X509_ENTRY)])
         result = report.report()
         self.assertEqual(len(sum(result.values(), [])), 0)
 
