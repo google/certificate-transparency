@@ -11,7 +11,6 @@
 #include "base/notification.h"
 #include "client/async_log_client.h"
 #include "fetcher/remote_peer.h"
-#include "log/log_lookup.h"
 #include "log/log_verifier.h"
 #include "log/test_db.h"
 #include "log/test_signer.h"
@@ -66,7 +65,7 @@ namespace cert_trans {
 DECLARE_int32(remote_peer_sth_refresh_interval_seconds);
 
 const char kLogUrl[] = "https://example.com";
-const char kInvalidSthReceivedMetric[] = "invalid_sths_received";
+const char kInvalidSthReceivedMetric[] = "remote_peer_invalid_sths_received";
 
 
 void HandleFetch(Status status, int status_code,
@@ -97,7 +96,6 @@ class RemotePeerTest : public ::testing::Test {
       : base_(make_shared<libevent::Base>()),
         event_pump_(base_),
         etcd_client_(base_.get()),
-        log_lookup_(test_db_.db()),
         store_(base_.get(), &pool_, &etcd_client_, &election_, "/root", "id"),
         tree_signer_(std::chrono::duration<double>(0), test_db_.db(),
                      unique_ptr<CompactMerkleTree>(
@@ -114,14 +112,13 @@ class RemotePeerTest : public ::testing::Test {
   }
 
   void CreatePeer() {
-    peer_.reset(
-        new RemotePeer(unique_ptr<AsyncLogClient>(
-                           new AsyncLogClient(&pool_, &fetcher_, kLogUrl)),
-                       unique_ptr<LogVerifier>(new LogVerifier(
-                           TestSigner::DefaultLogSigVerifier(),
-                           new MerkleVerifier(new Sha256Hasher))),
-                       &log_lookup_, bind(&RemotePeerTest::OnNewSTH, this, _1),
-                       task_.task()));
+    peer_.reset(new RemotePeer(
+        unique_ptr<AsyncLogClient>(
+            new AsyncLogClient(&pool_, &fetcher_, kLogUrl)),
+        unique_ptr<LogVerifier>(
+            new LogVerifier(TestSigner::DefaultLogSigVerifier(),
+                            new MerkleVerifier(new Sha256Hasher))),
+        bind(&RemotePeerTest::OnNewSTH, this, _1), task_.task()));
   }
 
   void StoreInitialSthMetricValues() {
@@ -194,7 +191,6 @@ class RemotePeerTest : public ::testing::Test {
   TestDB<LevelDB<LoggedCertificate>> test_db_;
   ThreadPool pool_;
   NiceMock<MockMasterElection> election_;
-  LogLookup<LoggedCertificate> log_lookup_;
   cert_trans::EtcdConsistentStore<LoggedCertificate> store_;
   TestSigner test_signer_;
   TreeSigner<LoggedCertificate> tree_signer_;
@@ -246,7 +242,6 @@ TEST_F(RemotePeerTest, RejectsSTHWithInvalidTimestamp) {
 
   EXPECT_EQ(1, GetInvalidSthMetricValue("invalid_timestamp"));
   EXPECT_EQ(0, GetInvalidSthMetricValue("invalid_signature"));
-  EXPECT_EQ(0, GetInvalidSthMetricValue("incorrect_root"));
 }
 
 
@@ -281,45 +276,6 @@ TEST_F(RemotePeerTest, RejectsSTHWithInvalidSignature) {
 
   EXPECT_EQ(0, GetInvalidSthMetricValue("invalid_timestamp"));
   EXPECT_EQ(1, GetInvalidSthMetricValue("invalid_signature"));
-  EXPECT_EQ(0, GetInvalidSthMetricValue("incorrect_root"));
-}
-
-
-TEST_F(RemotePeerTest, RejectsSTHWithInvalidRoot) {
-  tree_signer_.UpdateTree();
-
-  const SignedTreeHead sth(tree_signer_.LatestSTH());
-
-  SignedTreeHead modified_sth(sth);
-  modified_sth.set_sha256_root_hash("0123465789abcdef0123456789abcdef");
-  ASSERT_EQ(LogSigner::OK,
-            test_signer_.DefaultLogSigner()->SignTreeHead(&modified_sth));
-
-  tree_signer_.UpdateTree();
-  SignedTreeHead new_sth(tree_signer_.LatestSTH());
-
-  {
-    InSequence s;
-    ExpectGetSth(sth);
-    ExpectGetSth(modified_sth);
-    ExpectGetSth(new_sth, true /* repeatedly */);
-  }
-
-  Notification notify;
-  {
-    InSequence t;
-    EXPECT_CALL(*this, OnNewSTH(EqualsSTH(sth))).Times(1);
-    EXPECT_CALL(*this, OnNewSTH(EqualsSTH(modified_sth))).Times(0);
-    EXPECT_CALL(*this, OnNewSTH(EqualsSTH(new_sth)))
-        .WillOnce(Invoke(bind(&Notification::Notify, &notify)));
-  }
-
-  CreatePeer();
-  notify.WaitForNotificationWithTimeout(seconds(5));
-
-  EXPECT_EQ(0, GetInvalidSthMetricValue("invalid_timestamp"));
-  EXPECT_EQ(0, GetInvalidSthMetricValue("invalid_signature"));
-  EXPECT_EQ(1, GetInvalidSthMetricValue("incorrect_root"));
 }
 
 

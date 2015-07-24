@@ -2,7 +2,6 @@
 #define CERT_TRANS_FETCHER_REMOTE_PEER_H_
 
 #include "fetcher/peer.h"
-#include "log/log_lookup.h"
 #include "log/log_verifier.h"
 #include "util/task.h"
 
@@ -19,7 +18,6 @@ class RemotePeer : public Peer {
   // the target log.
   RemotePeer(std::unique_ptr<AsyncLogClient>&& client,
              std::unique_ptr<LogVerifier>&& verifier,
-             LogLookup<LoggedCertificate>* log_lookup,
              const std::function<void(const ct::SignedTreeHead&)>& on_new_sth,
              util::Task* task);
   ~RemotePeer() override;

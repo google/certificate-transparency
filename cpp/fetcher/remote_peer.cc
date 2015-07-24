@@ -30,19 +30,17 @@ DEFINE_int32(remote_peer_sth_refresh_interval_seconds, 10,
              "remote peer.");
 
 Counter<string>* invalid_sths_received =
-    Counter<string>::New("invalid_sths_received", "reason",
+    Counter<string>::New("remote_peer_invalid_sths_received", "reason",
                          "Number of incorrect/invalid STHs received from "
                          "target, broken down by reason.");
 
 
 struct RemotePeer::Impl {
   Impl(unique_ptr<LogVerifier>&& verifier, AsyncLogClient* client,
-       LogLookup<LoggedCertificate>* log_lookup,
        const std::function<void(const ct::SignedTreeHead&)>& on_new_sth,
        util::Task* task)
       : verifier_(move(verifier)),
         client_(CHECK_NOTNULL(client)),
-        log_lookup_(CHECK_NOTNULL(log_lookup)),
         on_new_sth_(on_new_sth),
         task_(CHECK_NOTNULL(task)) {
     CHECK(verifier_);
@@ -50,7 +48,6 @@ struct RemotePeer::Impl {
 
   const std::unique_ptr<LogVerifier> verifier_;
   AsyncLogClient* const client_;
-  LogLookup<LoggedCertificate>* const log_lookup_;
   const std::function<void(const ct::SignedTreeHead&)> on_new_sth_;
   util::Task* const task_;
 
@@ -82,7 +79,7 @@ void RemotePeer::Impl::DoneGetSTH(
   }
 
   if (status == AsyncLogClient::OK) {
-    bool sth_provisionally_valid(true);
+    bool sth_provisionally_valid(false);
 
     const LogVerifier::VerifyResult result(verifier_->VerifySignedTreeHead(
         *new_sth, 0, (time(NULL) + 10) * kNumMillisPerSecond));
@@ -92,36 +89,23 @@ void RemotePeer::Impl::DoneGetSTH(
     switch (result) {
       case LogVerifier::VERIFY_OK:
         // Alright!
+        sth_provisionally_valid = true;
         break;
       case LogVerifier::INVALID_TIMESTAMP:
         LOG(WARNING) << "Invalid timestamp on received STH:\n"
                      << new_sth->DebugString();
         invalid_sths_received->Increment("invalid_timestamp");
-        sth_provisionally_valid = false;
         break;
       case LogVerifier::INVALID_SIGNATURE:
         LOG(WARNING) << "Invalid signature on received STH:\n"
                      << new_sth->DebugString();
         invalid_sths_received->Increment("invalid_signature");
-        sth_provisionally_valid = false;
         break;
       case LogVerifier::INCONSISTENT_TIMESTAMPS:
       case LogVerifier::INVALID_MERKLE_PATH:
       case LogVerifier::INVALID_FORMAT:
-        sth_provisionally_valid = false;
         LOG(FATAL) << "Unexpected verify result for VerifySignedTreeHead(): "
                    << result;
-    }
-
-    const string local_root_at_snapshot(
-        log_lookup_->RootAtSnapshot(new_sth->tree_size()));
-    if (new_sth->sha256_root_hash() != local_root_at_snapshot) {
-      LOG(WARNING) << "Received STH:\n" << new_sth->DebugString()
-                   << " whose root:\n" << HexString(new_sth->sha256_root_hash())
-                   << "\ndoes not match that of local tree at corresponding "
-                   << "snapshot:\n" << HexString(local_root_at_snapshot);
-      invalid_sths_received->Increment("incorrect_root");
-      sth_provisionally_valid = false;
     }
 
     if (sth_provisionally_valid) {
@@ -154,12 +138,10 @@ void RemotePeer::Impl::DoneGetSTH(
 
 RemotePeer::RemotePeer(
     unique_ptr<AsyncLogClient>&& client, unique_ptr<LogVerifier>&& verifier,
-    LogLookup<LoggedCertificate>* log_lookup,
     const std::function<void(const ct::SignedTreeHead&)>& on_new_sth,
     util::Task* task)
     : Peer(move(client)),
-      impl_(new Impl(move(verifier), client_.get(), log_lookup, on_new_sth,
-                     task)) {
+      impl_(new Impl(move(verifier), client_.get(), on_new_sth, task)) {
   TaskHold hold(task);
   task->DeleteWhenDone(impl_);
 
