@@ -25,6 +25,7 @@ DEFINE_int32(google_compute_monitoring_credentials_refresh_interval_minutes,
 
 namespace cert_trans {
 
+using std::bind;
 using std::chrono::minutes;
 using std::chrono::seconds;
 using std::chrono::system_clock;
@@ -67,7 +68,7 @@ GCMExporter::GCMExporter(const string& instance_name, UrlFetcher* fetcher,
   CreateMetrics();
   // Push the first set of metrics, this will also schedule the next push
   // automatically.
-  PushMetrics(nullptr /* we're not a Task here */);
+  PushMetrics();
 }
 
 
@@ -189,7 +190,7 @@ void AddLabel(const string& key, const string& value, JsonObject* labels) {
 }  // namespace
 
 
-void GCMExporter::PushMetrics(util::Task* child_task) {
+void GCMExporter::PushMetrics() {
   if (task_.task()->CancelRequested()) {
     task_.task()->Return(util::Status::CANCELLED);
     return;
@@ -215,7 +216,7 @@ void GCMExporter::PushMetrics(util::Task* child_task) {
     CHECK_NOTNULL(m);
     for (auto& p : m->CurrentValues()) {
       JsonObject labels;
-      for (int i(0); i < p.first.size(); ++i) {
+      for (size_t i(0); i < p.first.size(); ++i) {
         AddLabel(m->LabelName(i), p.first[i], &labels);
       }
 
@@ -264,7 +265,7 @@ void GCMExporter::PushMetrics(util::Task* child_task) {
 
   executor_->Delay(
       seconds(FLAGS_google_compute_monitoring_push_interval_seconds),
-      task_.task()->AddChild(bind(&GCMExporter::PushMetrics, this, _1)));
+      task_.task()->AddChild(bind(&GCMExporter::PushMetrics, this)));
 }
 
 

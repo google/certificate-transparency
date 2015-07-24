@@ -188,7 +188,7 @@ ConnectionPool::ConnectionPool(libevent::Base* base)
 
 // static
 evhtp_res ConnectionPool::Connection::ConnectionErrorHook(
-    evhtp_connection_t* conn, evhtp_error_flags errtype, void* arg) {
+    evhtp_connection_t* conn, evhtp_error_flags, void* arg) {
   CHECK_NOTNULL(conn);
   CHECK_NOTNULL(arg);
   CHECK(libevent::Base::OnEventThread());

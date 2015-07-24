@@ -148,7 +148,7 @@ Gauge<>* latest_local_tree_size_gauge =
 
 
 // Basic sanity checks on flag values.
-static bool ValidatePort(const char* flagname, int port) {
+static bool ValidatePort(const char*, int port) {
   if (port <= 0 || port > 65535) {
     std::cout << "Port value " << port << " is invalid. " << std::endl;
     return false;
@@ -372,7 +372,7 @@ int main(int argc, char* argv[]) {
                           new MerkleVerifier(new Sha256Hasher))),
       server.log_lookup(), new_sth,
       fetcher_task.task()->AddChild(
-          [](Task* task) { LOG(INFO) << "RemotePeer exited."; })));
+          [](Task*) { LOG(INFO) << "RemotePeer exited."; })));
   const unique_ptr<ContinuousFetcher> fetcher(
       ContinuousFetcher::New(event_base.get(), &pool, db, false));
   fetcher->AddPeer("target", peer);
@@ -381,9 +381,8 @@ int main(int argc, char* argv[]) {
 
   thread sth_updater(&STHUpdater, db, server.cluster_state_controller(),
                      &queue_mutex, &queue,
-                     fetcher_task.task()->AddChild([](Task* task) {
-                       LOG(INFO) << "STHUpdater exited.";
-                     }));
+                     fetcher_task.task()->AddChild(
+                         [](Task*) { LOG(INFO) << "STHUpdater exited."; }));
 
   server.Run();
 

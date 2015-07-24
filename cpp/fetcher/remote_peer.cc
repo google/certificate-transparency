@@ -10,6 +10,7 @@
 
 using cert_trans::LoggedCertificate;
 using ct::SignedTreeHead;
+using std::bind;
 using std::chrono::seconds;
 using std::lock_guard;
 using std::make_shared;
@@ -56,13 +57,13 @@ struct RemotePeer::Impl {
   mutex lock_;
   shared_ptr<SignedTreeHead> sth_;
 
-  void FetchSTH(util::Task* task);
+  void FetchSTH();
   void DoneGetSTH(const std::shared_ptr<ct::SignedTreeHead>& on_new_sth,
                   AsyncLogClient::Status status);
 };
 
 
-void RemotePeer::Impl::FetchSTH(util::Task* task) {
+void RemotePeer::Impl::FetchSTH() {
   if (CHECK_NOTNULL(task_)->CancelRequested()) {
     task_->Return(util::Status::CANCELLED);
     return;
@@ -80,69 +81,74 @@ void RemotePeer::Impl::DoneGetSTH(
     return;
   }
 
-  bool sth_provisionally_valid(true);
+  if (status == AsyncLogClient::OK) {
+    bool sth_provisionally_valid(true);
 
-  const LogVerifier::VerifyResult result(verifier_->VerifySignedTreeHead(
-      *new_sth, 0, (time(NULL) + 10) * kNumMillisPerSecond));
+    const LogVerifier::VerifyResult result(verifier_->VerifySignedTreeHead(
+        *new_sth, 0, (time(NULL) + 10) * kNumMillisPerSecond));
 
-  // TODO(alcutter): We should probably log these invalid STHs somewhere a bit
-  // more durable.
-  switch (result) {
-    case LogVerifier::VERIFY_OK:
-      // Alright!
-      break;
-    case LogVerifier::INVALID_TIMESTAMP:
-      LOG(WARNING) << "Invalid timestamp on received STH:\n"
-                   << new_sth->DebugString();
-      invalid_sths_received->Increment("invalid_timestamp");
+    // TODO(alcutter): We should probably log these invalid STHs somewhere a bit
+    // more durable.
+    switch (result) {
+      case LogVerifier::VERIFY_OK:
+        // Alright!
+        break;
+      case LogVerifier::INVALID_TIMESTAMP:
+        LOG(WARNING) << "Invalid timestamp on received STH:\n"
+                     << new_sth->DebugString();
+        invalid_sths_received->Increment("invalid_timestamp");
+        sth_provisionally_valid = false;
+        break;
+      case LogVerifier::INVALID_SIGNATURE:
+        LOG(WARNING) << "Invalid signature on received STH:\n"
+                     << new_sth->DebugString();
+        invalid_sths_received->Increment("invalid_signature");
+        sth_provisionally_valid = false;
+        break;
+      case LogVerifier::INCONSISTENT_TIMESTAMPS:
+      case LogVerifier::INVALID_MERKLE_PATH:
+      case LogVerifier::INVALID_FORMAT:
+        sth_provisionally_valid = false;
+        LOG(FATAL) << "Unexpected verify result for VerifySignedTreeHead(): "
+                   << result;
+    }
+
+    const string local_root_at_snapshot(
+        log_lookup_->RootAtSnapshot(new_sth->tree_size()));
+    if (new_sth->sha256_root_hash() != local_root_at_snapshot) {
+      LOG(WARNING) << "Received STH:\n" << new_sth->DebugString()
+                   << " whose root:\n" << HexString(new_sth->sha256_root_hash())
+                   << "\ndoes not match that of local tree at corresponding "
+                   << "snapshot:\n" << HexString(local_root_at_snapshot);
+      invalid_sths_received->Increment("incorrect_root");
       sth_provisionally_valid = false;
-      break;
-    case LogVerifier::INVALID_SIGNATURE:
-      LOG(WARNING) << "Invalid signature on received STH:\n"
-                   << new_sth->DebugString();
-      invalid_sths_received->Increment("invalid_signature");
-      sth_provisionally_valid = false;
-      break;
-    case LogVerifier::INCONSISTENT_TIMESTAMPS:
-    case LogVerifier::INVALID_MERKLE_PATH:
-    case LogVerifier::INVALID_FORMAT:
-      sth_provisionally_valid = false;
-      LOG(FATAL) << "Unexpected verify result for VerifySignedTreeHead(): "
-                 << result;
-  }
+    }
 
-  const string local_root_at_snapshot(
-      log_lookup_->RootAtSnapshot(new_sth->tree_size()));
-  if (new_sth->sha256_root_hash() != local_root_at_snapshot) {
-    LOG(WARNING) << "Received STH:\n" << new_sth->DebugString()
-                 << " whose root:\n" << HexString(new_sth->sha256_root_hash())
-                 << "\ndoes not match that of local tree at corresponding "
-                 << "snapshot:\n" << HexString(local_root_at_snapshot);
-    invalid_sths_received->Increment("incorrect_root");
-    sth_provisionally_valid = false;
-  }
+    if (sth_provisionally_valid) {
+      lock_guard<mutex> lock(lock_);
 
-  if (sth_provisionally_valid) {
-    lock_guard<mutex> lock(lock_);
-
-    if (new_sth->tree_size() < 0) {
-      LOG(WARNING) << "Unexpected tree size in new_sth:\n"
-                   << new_sth->DebugString();
-    } else if (sth_ && new_sth->tree_size() < sth_->tree_size()) {
-      LOG(WARNING) << "Received old STH:\n" << new_sth->DebugString();
-    } else if (!sth_ || new_sth->timestamp() > sth_->timestamp()) {
-      // This STH is good, we'll take it.
-      sth_ = new_sth;
-      if (on_new_sth_) {
-        on_new_sth_(*sth_);
+      if (new_sth->tree_size() < 0) {
+        LOG(WARNING) << "Unexpected tree size in new_sth:\n"
+                     << new_sth->DebugString();
+      } else if (sth_ && new_sth->tree_size() < sth_->tree_size()) {
+        LOG(WARNING) << "Received old STH:\n" << new_sth->DebugString();
+      } else if (!sth_ || new_sth->timestamp() > sth_->timestamp()) {
+        // This STH is good, we'll take it.
+        sth_ = new_sth;
+        if (on_new_sth_) {
+          on_new_sth_(*sth_);
+        }
       }
     }
+  } else {
+    LOG(WARNING) << "Problem fetching STH, got error " << status
+                 << " from AsyncLogClient";
   }
 
   // Schedule another STH fetch
   task_->executor()->Delay(
       seconds(FLAGS_remote_peer_sth_refresh_interval_seconds),
-      task_->AddChild(bind(&RemotePeer::Impl::FetchSTH, this, _1)));
+      task_->AddChild(bind(&RemotePeer::Impl::FetchSTH, this)));
 }
 
 
@@ -157,7 +163,7 @@ RemotePeer::RemotePeer(
   TaskHold hold(task);
   task->DeleteWhenDone(impl_);
 
-  impl_->FetchSTH(nullptr);
+  impl_->FetchSTH();
 }
 
 

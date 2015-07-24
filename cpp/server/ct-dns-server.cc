@@ -22,18 +22,14 @@ DEFINE_string(domain, "", "Domain");
 DEFINE_string(db, "", "Database for certificate and tree storage");
 
 // Basic sanity checks on flag values.
-static bool ValidatePort(const char* flagname, int32_t port) {
-  if (port <= 0 || port > 65535) {
-    std::cerr << "Port value " << port << " is invalid. " << std::endl;
-    return false;
-  }
-  return true;
+static bool ValidatePort(const char*, int32_t port) {
+  return (port <= 0 || port > 65535);
 }
 
 static const bool port_dummy =
     RegisterFlagValidator(&FLAGS_port, &ValidatePort);
 
-static bool NonEmptyString(const char* flagname, const string& str) {
+static bool NonEmptyString(const char*, const string& str) {
   return !str.empty();
 }
 

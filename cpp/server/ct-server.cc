@@ -148,7 +148,7 @@ Latency<milliseconds> signer_run_latency_ms("signer_run_latency_ms",
 
 
 // Basic sanity checks on flag values.
-static bool ValidatePort(const char* flagname, int port) {
+static bool ValidatePort(const char*, int port) {
   if (port <= 0 || port > 65535) {
     std::cout << "Port value " << port << " is invalid. " << std::endl;
     return false;

@@ -479,7 +479,7 @@ void EtcdClient::WatchInitialGetDone(WatchState* state, GetResponse* resp,
                  << " second(s)";
     state->task_->executor()->Delay(
         seconds(FLAGS_etcd_watch_error_retry_delay_seconds),
-        state->task_->AddChild([this, state](Task* task) {
+        state->task_->AddChild([this, state](Task*) {
           this->WatchRequestDone(state, nullptr, nullptr);
         }));
     return;

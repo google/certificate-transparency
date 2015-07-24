@@ -18,7 +18,7 @@ void AddLabelTypes(::io::prometheus::client::Metric* metric,
                    const std::vector<std::string>& values) {
   CHECK_NOTNULL(metric);
   CHECK_EQ(names.size(), values.size());
-  for (int i(0); i < names.size(); ++i) {
+  for (size_t i(0); i < names.size(); ++i) {
     ::io::prometheus::client::LabelPair* label_pair(metric->add_label());
     label_pair->set_name(names[i]);
     label_pair->set_value(values[i]);

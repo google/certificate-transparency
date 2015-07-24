@@ -24,9 +24,9 @@ using std::string;
 const uint16_t CT_EXTENSION_TYPE = 18;
 
 // static
-int SSLClient::ExtensionCallback(SSL* s, unsigned ext_type,
-                                 const unsigned char* in, size_t inlen,
-                                 int* al, void* arg) {
+int SSLClient::ExtensionCallback(SSL*, unsigned ext_type,
+                                 const unsigned char* in, size_t inlen, int*,
+                                 void* arg) {
   char pem_name[100];
   unsigned char ext_buf[4 + 65536];
 
