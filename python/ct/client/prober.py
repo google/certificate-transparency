@@ -42,8 +42,11 @@ class ProberThread(threading.Thread):
             hasher = merkle.TreeHasher()
             verifier = verify.LogVerifier(log.public_key_info,
                                           merkle.MerkleVerifier(hasher))
-            state_keeper = state_keeper_class(FLAGS.monitor_state_dir +
-                                             "/" + log.log_id)
+            # Convert from standard Base64 to URL-safe Base64 so that the log ID
+            # can be used as part of a file path.
+            log_id_urlsafe = log.log_id.replace('/', '_').replace('+', '-')
+            state_keeper = state_keeper_class(monitor_state_dir +
+                                             "/" + log_id_urlsafe)
             log_key = db.get_log_id(log.log_server)
             self.__monitors.append(monitor.Monitor(client, verifier, hasher, db,
                                                    cert_db, log_key,
