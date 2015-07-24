@@ -9,7 +9,8 @@
 #include "log/sqlite_db.h"
 #include "proto/ct.pb.h"
 #include "server/event.h"
-#include "version.h"
+#include "util/init.h"
+#include "util/util.h"
 
 using cert_trans::LoggedCertificate;
 using ct::SignedTreeHead;
@@ -264,11 +265,7 @@ class Keyboard : public Server {
 };
 
 int main(int argc, char* argv[]) {
-  google::SetVersionString(cert_trans::kBuildVersion);
-  google::ParseCommandLineFlags(&argc, &argv, true);
-  google::InitGoogleLogging(argv[0]);
-
-  LOG(INFO) << "Build version: " << google::VersionString();
+  util::InitCT(&argc, &argv);
 
   // TODO(pphaneuf): This current *has* to be SQLite, because it
   // depends on sharing the database with a ct-server that will

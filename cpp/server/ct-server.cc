@@ -30,12 +30,12 @@
 #include "server/server.h"
 #include "util/etcd.h"
 #include "util/fake_etcd.h"
+#include "util/init.h"
 #include "util/libevent_wrapper.h"
 #include "util/read_key.h"
 #include "util/status.h"
 #include "util/thread_pool.h"
 #include "util/uuid.h"
-#include "version.h"
 
 DEFINE_string(server, "localhost", "Server host");
 DEFINE_int32(port, 9999, "Server port");
@@ -329,12 +329,7 @@ int main(int argc, char* argv[]) {
   signal(SIGINT, SIG_IGN);
   signal(SIGTERM, SIG_IGN);
 
-  google::SetVersionString(cert_trans::kBuildVersion);
-  google::ParseCommandLineFlags(&argc, &argv, true);
-  google::InitGoogleLogging(argv[0]);
-  google::InstallFailureSignalHandler();
-
-  LOG(INFO) << "Build version: " << google::VersionString();
+  util::InitCT(&argc, &argv);
 
   Server<LoggedCertificate>::StaticInit();
 

@@ -4,8 +4,8 @@
 #include <iostream>
 
 #include "proto/ct.pb.h"
+#include "util/init.h"
 #include "util/util.h"
-#include "version.h"
 
 using std::cout;
 using std::endl;
@@ -40,11 +40,7 @@ void DumpLoggedCert(const char* filename) {
 
 
 int main(int argc, char* argv[]) {
-  google::SetVersionString(cert_trans::kBuildVersion);
-  google::ParseCommandLineFlags(&argc, &argv, true);
-  google::InitGoogleLogging(argv[0]);
-
-  LOG(INFO) << "Build version: " << google::VersionString();
+  util::InitCT(&argc, &argv);
 
   for (int i = 1; i < argc; ++i)
     DumpLoggedCert(argv[i]);

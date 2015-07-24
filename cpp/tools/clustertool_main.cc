@@ -16,11 +16,11 @@
 #include "log/tree_signer.h"
 #include "proto/ct.pb.h"
 #include "tools/clustertool-inl.h"
+#include "util/init.h"
 #include "util/masterelection.h"
 #include "util/read_key.h"
 #include "util/status.h"
 #include "util/thread_pool.h"
-#include "version.h"
 
 namespace libevent = cert_trans::libevent;
 
@@ -132,20 +132,8 @@ ClusterConfig LoadConfig() {
 
 
 int main(int argc, char* argv[]) {
-  google::SetVersionString(cert_trans::kBuildVersion);
-  google::ParseCommandLineFlags(&argc, &argv, true);
-  google::InitGoogleLogging(argv[0]);
+  util::InitCT(&argc, &argv);
   FLAGS_logtostderr = true;
-
-  LOG(INFO) << "Build version: " << google::VersionString();
-
-  evhtp_ssl_use_threads();
-  OpenSSL_add_all_algorithms();
-  ERR_load_BIO_strings();
-  ERR_load_crypto_strings();
-  SSL_load_error_strings();
-  SSL_library_init();
-  evthread_use_pthreads();
 
   if (argc == 1) {
     Usage();

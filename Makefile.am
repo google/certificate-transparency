@@ -191,6 +191,7 @@ cpp_server_ct_mirror_SOURCES = \
 	cpp/server/json_output.cc \
 	cpp/server/metrics.cc \
 	cpp/server/proxy.cc \
+	cpp/util/init.cc \
 	cpp/util/json_wrapper.cc \
 	cpp/util/libevent_wrapper.cc \
 	cpp/util/periodic_closure.cc \
@@ -216,6 +217,7 @@ cpp_server_ct_server_SOURCES = \
 	cpp/server/json_output.cc \
 	cpp/server/metrics.cc \
 	cpp/server/proxy.cc \
+	cpp/util/init.cc \
 	cpp/util/json_wrapper.cc \
 	cpp/util/libevent_wrapper.cc \
 	cpp/util/periodic_closure.cc \
@@ -235,6 +237,7 @@ cpp_tools_ct_clustertool_LDADD = \
 cpp_tools_ct_clustertool_SOURCES = \
 	cpp/proto/serializer.cc \
 	cpp/tools/clustertool_main.cc \
+	cpp/util/init.cc \
 	cpp/util/json_wrapper.cc \
 	cpp/util/libevent_wrapper.cc \
 	cpp/util/periodic_closure.cc \
@@ -259,28 +262,34 @@ cpp_client_ct_SOURCES = \
 	cpp/monitor/monitor.cc \
 	cpp/monitor/sqlite_db.cc \
 	cpp/proto/serializer.cc \
+	cpp/util/init.cc \
 	cpp/util/json_wrapper.cc \
 	cpp/util/libevent_wrapper.cc \
 	cpp/util/read_key.cc \
 	cpp/util/thread_pool.cc \
-	cpp/util/util.cc
+	cpp/util/util.cc \
+	cpp/version.cc
 
 cpp_server_ct_dns_server_LDADD = \
 	cpp/libcore.a \
+  ${libevent_LIBS} \
 	-lprotobuf -lldns -lsqlite3
 cpp_server_ct_dns_server_SOURCES = \
 	cpp/proto/serializer.cc \
 	cpp/server/ct-dns-server.cc \
 	cpp/server/event.cc \
+	cpp/util/init.cc \
 	cpp/util/protobuf_util.cc \
 	cpp/util/util.cc \
 	cpp/version.cc
 
 cpp_tools_dump_cert_LDADD = \
 	cpp/libcore.a \
+  ${libevent_LIBS} \
 	-lprotobuf
 cpp_tools_dump_cert_SOURCES = \
 	cpp/tools/dump_cert.cc \
+	cpp/util/init.cc \
 	cpp/util/util.cc \
 	cpp/version.cc
 
@@ -297,6 +306,7 @@ cpp_tools_etcd_watch_LDADD = \
 	$(libevent_LIBS)
 cpp_tools_etcd_watch_SOURCES = \
 	cpp/tools/etcd_watch.cc \
+	cpp/util/init.cc \
 	cpp/util/json_wrapper.cc \
 	cpp/util/libevent_wrapper.cc \
 	cpp/util/thread_pool.cc \
