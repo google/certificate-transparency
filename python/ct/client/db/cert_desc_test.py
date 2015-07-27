@@ -116,8 +116,11 @@ class CertificateDescriptionTest(unittest.TestCase):
         with time_utils.timezone("UTC"):
             self.assert_description_matches_source(cert, is_ca_cert)
 
-        # Test in a non-UTC timezone, to detect timezone issues
+        # Test in non-UTC timezones, to detect timezone issues
         with time_utils.timezone("America/Los_Angeles"):
+            self.assert_description_matches_source(cert, is_ca_cert)
+
+        with time_utils.timezone("Asia/Shanghai"):
             self.assert_description_matches_source(cert, is_ca_cert)
 
     def test_from_cert_with_dsa_sha256_cert(self):
@@ -127,8 +130,11 @@ class CertificateDescriptionTest(unittest.TestCase):
         with time_utils.timezone("UTC"):
             self.assert_description_matches_source(cert, is_ca_cert)
 
-        # Test in a non-UTC timezone, to detect timezone issues
+        # Test in non-UTC timezones, to detect timezone issues
         with time_utils.timezone("America/Los_Angeles"):
+            self.assert_description_matches_source(cert, is_ca_cert)
+
+        with time_utils.timezone("Asia/Shanghai"):
             self.assert_description_matches_source(cert, is_ca_cert)
 
     def test_from_cert_with_ca_cert(self):
@@ -138,8 +144,11 @@ class CertificateDescriptionTest(unittest.TestCase):
         with time_utils.timezone("UTC"):
             self.assert_description_matches_source(cert, is_ca_cert)
 
-        # Test in a non-UTC timezone, to detect timezone issues
+        # Test in non-UTC timezones, to detect timezone issues
         with time_utils.timezone("America/Los_Angeles"):
+            self.assert_description_matches_source(cert, is_ca_cert)
+
+        with time_utils.timezone("Asia/Shanghai"):
             self.assert_description_matches_source(cert, is_ca_cert)
 
     def test_process_value(self):
