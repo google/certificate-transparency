@@ -1,6 +1,6 @@
 import re
 import hashlib
-import time
+import calendar
 from ct.crypto import cert
 from ct.crypto.asn1 import x509_common
 from ct.proto import certificate_pb2
@@ -75,8 +75,8 @@ def from_cert(certificate, observations=[]):
 
     try:
         proto.validity.not_before, proto.validity.not_after = (
-            1000 * int(time.mktime(certificate.not_before())),
-            1000 * int(time.mktime(certificate.not_after())))
+            1000 * int(calendar.timegm(certificate.not_before())),
+            1000 * int(calendar.timegm(certificate.not_after())))
     except cert.CertificateError:
         pass
 

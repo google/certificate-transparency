@@ -1,3 +1,4 @@
+import calendar
 import time
 
 from ct.crypto import cert
@@ -19,7 +20,8 @@ class AlgorithmMismatch(AlgorithmObservation):
 
 class SHA1Observation(AlgorithmObservation):
     def _format_details(self):
-        return time.strftime("%Y-%m-%dT%H:%M:%S%Z", self.details)
+        # Times are in UTC, so use "UTC" instead of %Z (which gives local TZ)
+        return time.strftime("%Y-%m-%dT%H:%M:%SUTC", self.details)
 
 
 class RsaSHA1(SHA1Observation):
@@ -57,7 +59,7 @@ class CheckSignatureAlgorithmsMismatch(object):
 def check_sha1_after_2017(not_after, algorithm):
     invalid_after = time.strptime("2017-01-01T00:00:00UTC",
                                   "%Y-%m-%dT%H:%M:%S%Z")
-    if time.mktime(not_after) - time.mktime(invalid_after) >= 0:
+    if calendar.timegm(not_after) - calendar.timegm(invalid_after) >= 0:
         if algorithm == oid.SHA1_WITH_RSA_ENCRYPTION:
             return RsaSHA1(not_after)
         elif algorithm == oid.ID_DSA_WITH_SHA1:

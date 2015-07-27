@@ -1,3 +1,4 @@
+import calendar
 import datetime
 import time
 
@@ -45,9 +46,8 @@ class CheckValidityNotBeforeFuture(object):
         try:
             not_before = certificate.not_before()
             now = datetime.datetime.utcnow()
-            # time.mktime assumes localtime, but because both dates are in utc
-            # comparision will be valid
-            if time.mktime(not_before) - time.mktime(now.utctimetuple()) > 0:
+
+            if calendar.timegm(not_before) - calendar.timegm(now.utctimetuple()) > 0:
                 return [NotBeforeInFuture(details=not_before)]
         except cert.CertificateError:
             pass
