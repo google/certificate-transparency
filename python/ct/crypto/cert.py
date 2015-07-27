@@ -56,6 +56,23 @@ class Certificate(object):
     def __str__(self):
         return self._asn1_cert.human_readable(label=self.__class__.__name__)
 
+    def __eq__(self, other):
+        if isinstance(other, type(self)):
+            return self.is_identical_to(other)
+        else:
+            return NotImplemented
+
+    def __ne__(self, other):
+        are_equal = self.__eq__(other)
+
+        if are_equal is NotImplemented:
+            return NotImplemented
+        else:
+            return not are_equal
+
+    def __hash__(self):
+        return hash(self.fingerprint())
+
     @classmethod
     def from_pem(cls, pem_string, strict_der=True):
         """Read a single PEM-encoded certificate from a string.
