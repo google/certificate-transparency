@@ -18,7 +18,7 @@ for i in `seq 0 $((${MIRROR_NUM_REPLICAS} - 1))`; do
       --command \
           'sudo docker pull gcr.io/'${PROJECT}'/super_mirror:test &&
            sudo docker kill $(sudo docker ps | grep super_mirror | awk -- "{print \$1}" )'
-  WaitHttpStatus ${MIRROR_MACHINES[${i}]} ${MIRRORLOG_ZONES[${i}]} /ct/v1/get-sth 200
+  WaitHttpStatus ${MIRROR_MACHINES[${i}]} ${MIRROR_ZONES[${i}]} /ct/v1/get-sth 200
 done;
 
 
