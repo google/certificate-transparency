@@ -91,19 +91,37 @@ class CertificateDescriptionTest(unittest.TestCase):
         self.assertEqual(proto.basic_constraint_ca, expect_ca_true)
 
     def test_from_cert(self):
+        cert = CERT
+        is_ca_cert = False
+
+        with time_utils.timezone("UTC"):
+            self.assert_description_matches_source(cert, is_ca_cert)
+
         # Test in a non-UTC timezone, to detect timezone issues
         with time_utils.timezone("America/Los_Angeles"):
-            self.assert_description_matches_source(CERT, False)
+            self.assert_description_matches_source(cert, is_ca_cert)
 
     def test_from_cert_with_dsa_sha256_cert(self):
+        cert = DSA_SHA256_CERT
+        is_ca_cert = False
+
+        with time_utils.timezone("UTC"):
+            self.assert_description_matches_source(cert, is_ca_cert)
+
         # Test in a non-UTC timezone, to detect timezone issues
         with time_utils.timezone("America/Los_Angeles"):
-            self.assert_description_matches_source(DSA_SHA256_CERT, False)
+            self.assert_description_matches_source(cert, is_ca_cert)
 
     def test_from_cert_with_ca_cert(self):
+        cert = CA_CERT
+        is_ca_cert = True
+
+        with time_utils.timezone("UTC"):
+            self.assert_description_matches_source(cert, is_ca_cert)
+
         # Test in a non-UTC timezone, to detect timezone issues
         with time_utils.timezone("America/Los_Angeles"):
-            self.assert_description_matches_source(CA_CERT, True)
+            self.assert_description_matches_source(cert, is_ca_cert)
 
     def test_process_value(self):
         self.assertEqual(["London"], cert_desc.process_name("London"))
