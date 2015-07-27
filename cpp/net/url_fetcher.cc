@@ -147,7 +147,7 @@ void State::RunRequest() {
                                               header.second.c_str(), 1, 1));
   }
 
-  if (!conn_->connection()) {
+  if (!conn_->connection() || conn_->GetErrored()) {
     conn_.reset();
     task_->Return(Status(util::error::UNAVAILABLE, "connection failed."));
     return;
@@ -210,8 +210,26 @@ void State::RequestDone(evhtp_request_t* req) {
 
   response_->status_code = req->status;
   if (response_->status_code < 100) {
-    // There was a problem communicating with the remote host.
-    task_->Return(Status(util::error::UNAVAILABLE, "connection failed"));
+    util::Status status;
+    switch (response_->status_code) {
+      case kTimeout:
+        status =
+            Status(util::error::DEADLINE_EXCEEDED, "connection timed out");
+        break;
+      case kSSLErrorStatus:
+        // There was a problem communicating with the remote host.
+        status = Status(util::error::UNAVAILABLE, "SSL connection failed");
+        break;
+      case kUnknownErrorStatus:
+        status = Status(util::error::UNAVAILABLE, "connection failed");
+        break;
+      default:
+        LOG(WARNING) << "Unknown status code encountered: "
+                     << response_->status_code;
+        status =
+            Status(util::error::UNKNOWN, "unknown status code encountered");
+    }
+    task_->Return(status);
     return;
   }
 

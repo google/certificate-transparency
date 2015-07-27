@@ -16,6 +16,8 @@
 #include "util/testing.h"
 #include "util/thread_pool.h"
 
+DECLARE_int32(connection_read_timeout_seconds);
+DECLARE_int32(connection_write_timeout_seconds);
 DECLARE_string(trusted_root_certs);
 
 namespace cert_trans {
@@ -38,6 +40,7 @@ const uint16_t kStarExampleComPort = 4435;
 const uint16_t kBinkyExampleComPort = 4436;
 const uint16_t kExampleComPort = 4437;
 const uint16_t k127_0_0_1Port = 4438;
+const uint16_t kHangPort = 4439;
 
 
 namespace {
@@ -52,7 +55,8 @@ class LocalhostResolver : public libevent::Base::Resolver {
 
 
 pid_t RunOpenSSLServer(uint16_t port, const std::string& cert_file,
-                       const std::string& key_file) {
+                       const std::string& key_file,
+                       const std::string& mode = "-www") {
   pid_t pid(fork());
   if (pid == -1) {
     LOG(INFO) << "fork() failed: " << pid;
@@ -60,11 +64,11 @@ pid_t RunOpenSSLServer(uint16_t port, const std::string& cert_file,
     const string port_str(to_string(port));
     const string cert_str(FLAGS_cert_dir + "/" + cert_file);
     const string key_str(FLAGS_cert_dir + "/" + key_file);
-    const char* argv[]{"openssl", "s_server",
-                       "-accept", port_str.c_str(),
-                       "-cert",   cert_str.c_str(),
-                       "-key",    key_str.c_str(),
-                       "-www",    0L};
+    const char* argv[]{"openssl",    "s_server",
+                       "-accept",    port_str.c_str(),
+                       "-cert",      cert_str.c_str(),
+                       "-key",       key_str.c_str(),
+                       mode.c_str(), 0L};
     execvp(argv[0], const_cast<char**>(argv));
   }
   return pid;
@@ -246,6 +250,22 @@ TEST_F(UrlFetcherTest, TestWrongIpDoesNotMatch) {
 }
 
 
+TEST_F(UrlFetcherTest, TestTimeout) {
+  UrlFetcher::Request req(URL("http://localhost:" + to_string(kHangPort)));
+  UrlFetcher::Response resp;
+
+  FLAGS_connection_read_timeout_seconds = 1;
+  FLAGS_connection_write_timeout_seconds = 1;
+
+  SyncTask task(&pool_);
+  fetcher_->Fetch(req, &resp, task.task());
+  task.Wait();
+
+  EXPECT_THAT(task.status(), StatusIs(util::error::DEADLINE_EXCEEDED));
+  EXPECT_EQ(kTimeout, resp.status_code);
+}
+
+
 }  // namespace cert_trans
 
 
@@ -289,6 +309,22 @@ int main(int argc, char** argv) {
 
   signal(SIGPIPE, SIG_IGN);
 
+  int hang_fd(socket(AF_INET, SOCK_STREAM, 0));
+  CHECK_NE(-1, hang_fd);
+  CHECK_NE(-1, fcntl(hang_fd, F_SETFL, O_NONBLOCK));
+  struct sockaddr_in hang_addr;
+  bzero((char*)&hang_addr, sizeof(hang_addr));
+  hang_addr.sin_family = AF_INET;
+  hang_addr.sin_addr.s_addr = INADDR_ANY;
+  hang_addr.sin_port = htons(cert_trans::kHangPort);
+  CHECK_EQ(0, bind(hang_fd, reinterpret_cast<struct sockaddr*>(&hang_addr),
+                   sizeof(hang_addr)));
+  CHECK_EQ(0, listen(hang_fd, 10));
+  struct sockaddr_in other_addr;
+  socklen_t other_size;
+  accept(hang_fd, reinterpret_cast<struct sockaddr*>(&other_addr),
+         &other_size);
+
   localhost_pid =
       cert_trans::RunOpenSSLServer(cert_trans::kLocalHostPort,
                                    "localhost-cert.pem", "localhost-key.pem");
@@ -310,9 +346,11 @@ int main(int argc, char** argv) {
   ip_address_pid =
       cert_trans::RunOpenSSLServer(cert_trans::k127_0_0_1Port,
                                    "127_0_0_1-cert.pem", "127_0_0_1-key.pem");
+
   sleep(1);
 
   const int ret(RUN_ALL_TESTS());
   KillAllOpenSSLServers();
+  close(hang_fd);
   return ret;
 }
