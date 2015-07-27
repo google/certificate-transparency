@@ -1,5 +1,7 @@
 version: v1
 kind: Pod
+metadata:
+  name: "@@CONTAINER_HOST@@"
 spec:
   containers:
     - name: etcd
@@ -29,7 +31,7 @@ spec:
       image: google/cadvisor:latest
       imagePullPolicy: Always
       ports:
-        - name: cadvisor-monitor
+        - name: cadvisor-mon
           containerPort: 8080
           hostPort: 8080
           protocol: TCP
