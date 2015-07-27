@@ -6,88 +6,150 @@ from ct.client.db import cert_desc
 from ct.crypto import cert
 from ct.cert_analysis import all_checks
 from ct.cert_analysis import observation
+from ct.test import time_utils
 
 CERT = cert.Certificate.from_der_file("ct/crypto/testdata/google_cert.der")
 CA_CERT = cert.Certificate.from_pem_file("ct/crypto/testdata/verisign_intermediate.pem")
 DSA_SHA256_CERT = cert.Certificate.from_der_file("ct/crypto/testdata/dsa_with_sha256.der")
 
 class CertificateDescriptionTest(unittest.TestCase):
-    def test_from_cert(self):
-        for test_case in [(CERT, False), (DSA_SHA256_CERT, False), (CA_CERT, True)]:
-            (source, expect_ca_true) = test_case
+    def get_observations(self, source):
+        observations = []
 
-            observations = []
-            for check in all_checks.ALL_CHECKS:
-                observations += check.check(source) or []
-            observations.append(observation.Observation(
-                "AE", u'ćę©ß→æ→ćąßę-ß©ąńśþa©ęńć←', (u'əę”ąłęµ', u'…łą↓ð→↓ś→ę')))
-            proto = cert_desc.from_cert(source, observations)
-            self.assertEqual(proto.der, source.to_der())
+        for check in all_checks.ALL_CHECKS:
+            observations += check.check(source) or []
 
-            subject = [(att.type, att.value) for att in proto.subject]
-            cert_subject = [(type_.short_name,
-                         cert_desc.to_unicode('.'.join(
-                                 cert_desc.process_name(value.human_readable()))))
-                        for type_, value in source.subject()]
-            self.assertItemsEqual(cert_subject, subject)
+        observations.append(observation.Observation(
+            "AE", u'ćę©ß→æ→ćąßę-ß©ąńśþa©ęńć←', (u'əę”ąłęµ', u'…łą↓ð→↓ś→ę')))
 
-            issuer = [(att.type, att.value) for att in proto.issuer]
-            cert_issuer = [(type_.short_name,
-                         cert_desc.to_unicode('.'.join(
-                                 cert_desc.process_name(value.human_readable()))))
-                        for type_, value in source.issuer()]
-            self.assertItemsEqual(cert_issuer, issuer)
+        return observations
 
-            subject_alternative_names = [(att.type, att.value)
-                                         for att in proto.subject_alternative_names]
-            cert_subject_alternative_names = [(san.component_key(),
-                                               cert_desc.to_unicode('.'.join(
-                                                cert_desc.process_name(
-                                         san.component_value().human_readable()))))
-                        for san in source.subject_alternative_names()]
-            self.assertItemsEqual(cert_subject_alternative_names,
-                                  subject_alternative_names)
+    def assert_description_subject_matches_source(self, proto, source):
+        subject = [(att.type, att.value) for att in proto.subject]
+        cert_subject = [(type_.short_name,
+                     cert_desc.to_unicode('.'.join(
+                             cert_desc.process_name(value.human_readable()))))
+                    for type_, value in source.subject()]
+        self.assertItemsEqual(cert_subject, subject)
 
-            self.assertEqual(proto.version, str(source.version().value))
-            self.assertEqual(proto.serial_number,
-                             str(source.serial_number().human_readable()
-                                 .upper().replace(':', '')))
-            self.assertEqual(time.gmtime(proto.validity.not_before / 1000),
-                             source.not_before())
-            self.assertEqual(time.gmtime(proto.validity.not_after / 1000),
-                             source.not_after())
+    def assert_description_issuer_matches_source(self, proto, source):
+        issuer = [(att.type, att.value) for att in proto.issuer]
+        cert_issuer = [(type_.short_name,
+                     cert_desc.to_unicode('.'.join(
+                             cert_desc.process_name(value.human_readable()))))
+                    for type_, value in source.issuer()]
+        self.assertItemsEqual(cert_issuer, issuer)
 
-            observations_tuples = [(unicode(obs.description),
-                                    unicode(obs.reason) if obs.reason else u'',
-                                    obs.details_to_proto())
-                                   for obs in observations]
-            proto_obs = [(obs.description, obs.reason, obs.details)
-                         for obs in proto.observations]
-            self.assertItemsEqual(proto_obs, observations_tuples)
+    def assert_description_alt_subject_names_match_source(self, proto, source):
+        subject_alternative_names = [(att.type, att.value)
+                                     for att in proto.subject_alternative_names]
+        cert_subject_alternative_names = [(san.component_key(),
+                                           cert_desc.to_unicode('.'.join(
+                                            cert_desc.process_name(
+                                     san.component_value().human_readable()))))
+                    for san in source.subject_alternative_names()]
+        self.assertItemsEqual(cert_subject_alternative_names,
+                              subject_alternative_names)
 
-            self.assertEqual(proto.tbs_signature.algorithm_id,
-                             source.signature()["algorithm"].long_name)
-            self.assertEqual(proto.cert_signature.algorithm_id,
-                             source.signature_algorithm()["algorithm"].long_name)
-            self.assertEqual(proto.tbs_signature.algorithm_id,
-                             proto.cert_signature.algorithm_id)
+    def assert_description_serial_number_matches_source(self, proto, source):
+        self.assertEqual(proto.serial_number,
+                         str(source.serial_number().human_readable()
+                             .upper().replace(':', '')))
 
-            if source.signature()["parameters"]:
-                self.assertEqual(proto.tbs_signature.parameters,
-                                 source.signature()["parameters"])
-            else:
-                self.assertFalse(proto.tbs_signature.HasField('parameters'))
+    def assert_description_validity_dates_match_source(self, proto, source):
+        self.assertEqual(time.gmtime(proto.validity.not_before / 1000),
+                         source.not_before())
+        self.assertEqual(time.gmtime(proto.validity.not_after / 1000),
+                         source.not_after())
 
-            if source.signature_algorithm()["parameters"]:
-                self.assertEqual(proto.cert_signature.parameters,
-                                 source.signature_algorithm()["parameters"])
-            else:
-                self.assertFalse(proto.cert_signature.HasField('parameters'))
+    def assert_description_observations_match_source(self, proto, observations):
+        observations_tuples = [(unicode(obs.description),
+                                unicode(obs.reason) if obs.reason else u'',
+                                obs.details_to_proto())
+                               for obs in observations]
+        proto_obs = [(obs.description, obs.reason, obs.details)
+                     for obs in proto.observations]
+        self.assertItemsEqual(proto_obs, observations_tuples)
 
+    def assert_description_signature_matches_source(self, proto, source):
+        self.assertEqual(proto.tbs_signature.algorithm_id,
+                         source.signature()["algorithm"].long_name)
+        self.assertEqual(proto.cert_signature.algorithm_id,
+                         source.signature_algorithm()["algorithm"].long_name)
+        self.assertEqual(proto.tbs_signature.algorithm_id,
+                         proto.cert_signature.algorithm_id)
+
+        if source.signature()["parameters"]:
             self.assertEqual(proto.tbs_signature.parameters,
-                             proto.cert_signature.parameters)
+                             source.signature()["parameters"])
+        else:
+            self.assertFalse(proto.tbs_signature.HasField('parameters'))
 
-            self.assertEqual(proto.basic_constraint_ca, expect_ca_true)
+        if source.signature_algorithm()["parameters"]:
+            self.assertEqual(proto.cert_signature.parameters,
+                             source.signature_algorithm()["parameters"])
+        else:
+            self.assertFalse(proto.cert_signature.HasField('parameters'))
+
+        self.assertEqual(proto.tbs_signature.parameters,
+                         proto.cert_signature.parameters)
+
+    def assert_description_matches_source(self, source, expect_ca_true):
+        observations = self.get_observations(source)
+        proto = cert_desc.from_cert(source, observations)
+
+        self.assertEqual(proto.der, source.to_der())
+        self.assert_description_subject_matches_source(proto, source)
+        self.assert_description_issuer_matches_source(proto, source)
+        self.assert_description_alt_subject_names_match_source(proto, source)
+        self.assertEqual(proto.version, str(source.version().value))
+        self.assert_description_serial_number_matches_source(proto, source)
+        self.assert_description_validity_dates_match_source(proto, source)
+        self.assert_description_observations_match_source(proto, observations)
+        self.assert_description_signature_matches_source(proto, source)
+        self.assertEqual(proto.basic_constraint_ca, expect_ca_true)
+
+    def test_from_cert(self):
+        cert = CERT
+        is_ca_cert = False
+
+        with time_utils.timezone("UTC"):
+            self.assert_description_matches_source(cert, is_ca_cert)
+
+        # Test in non-UTC timezones, to detect timezone issues
+        with time_utils.timezone("America/Los_Angeles"):
+            self.assert_description_matches_source(cert, is_ca_cert)
+
+        with time_utils.timezone("Asia/Shanghai"):
+            self.assert_description_matches_source(cert, is_ca_cert)
+
+    def test_from_cert_with_dsa_sha256_cert(self):
+        cert = DSA_SHA256_CERT
+        is_ca_cert = False
+
+        with time_utils.timezone("UTC"):
+            self.assert_description_matches_source(cert, is_ca_cert)
+
+        # Test in non-UTC timezones, to detect timezone issues
+        with time_utils.timezone("America/Los_Angeles"):
+            self.assert_description_matches_source(cert, is_ca_cert)
+
+        with time_utils.timezone("Asia/Shanghai"):
+            self.assert_description_matches_source(cert, is_ca_cert)
+
+    def test_from_cert_with_ca_cert(self):
+        cert = CA_CERT
+        is_ca_cert = True
+
+        with time_utils.timezone("UTC"):
+            self.assert_description_matches_source(cert, is_ca_cert)
+
+        # Test in non-UTC timezones, to detect timezone issues
+        with time_utils.timezone("America/Los_Angeles"):
+            self.assert_description_matches_source(cert, is_ca_cert)
+
+        with time_utils.timezone("Asia/Shanghai"):
+            self.assert_description_matches_source(cert, is_ca_cert)
 
     def test_process_value(self):
         self.assertEqual(["London"], cert_desc.process_name("London"))
