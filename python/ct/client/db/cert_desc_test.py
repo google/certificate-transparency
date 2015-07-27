@@ -13,17 +13,18 @@ CA_CERT = cert.Certificate.from_pem_file("ct/crypto/testdata/verisign_intermedia
 DSA_SHA256_CERT = cert.Certificate.from_der_file("ct/crypto/testdata/dsa_with_sha256.der")
 
 class CertificateDescriptionTest(unittest.TestCase):
-    def assert_description_matches_source(self, source, expect_ca_true):
+    def get_observations(self, source):
         observations = []
+
         for check in all_checks.ALL_CHECKS:
             observations += check.check(source) or []
+
         observations.append(observation.Observation(
             "AE", u'ćę©ß→æ→ćąßę-ß©ąńśþa©ęńć←', (u'əę”ąłęµ', u'…łą↓ð→↓ś→ę')))
 
-        proto = cert_desc.from_cert(source, observations)
+        return observations
 
-        self.assertEqual(proto.der, source.to_der())
-
+    def assert_description_subject_matches_source(self, proto, source):
         subject = [(att.type, att.value) for att in proto.subject]
         cert_subject = [(type_.short_name,
                      cert_desc.to_unicode('.'.join(
@@ -31,6 +32,7 @@ class CertificateDescriptionTest(unittest.TestCase):
                     for type_, value in source.subject()]
         self.assertItemsEqual(cert_subject, subject)
 
+    def assert_description_issuer_matches_source(self, proto, source):
         issuer = [(att.type, att.value) for att in proto.issuer]
         cert_issuer = [(type_.short_name,
                      cert_desc.to_unicode('.'.join(
@@ -38,6 +40,7 @@ class CertificateDescriptionTest(unittest.TestCase):
                     for type_, value in source.issuer()]
         self.assertItemsEqual(cert_issuer, issuer)
 
+    def assert_description_alt_subject_names_match_source(self, proto, source):
         subject_alternative_names = [(att.type, att.value)
                                      for att in proto.subject_alternative_names]
         cert_subject_alternative_names = [(san.component_key(),
@@ -48,16 +51,18 @@ class CertificateDescriptionTest(unittest.TestCase):
         self.assertItemsEqual(cert_subject_alternative_names,
                               subject_alternative_names)
 
-        self.assertEqual(proto.version, str(source.version().value))
+    def assert_description_serial_number_matches_source(self, proto, source):
         self.assertEqual(proto.serial_number,
                          str(source.serial_number().human_readable()
                              .upper().replace(':', '')))
 
+    def assert_description_validity_dates_match_source(self, proto, source):
         self.assertEqual(time.gmtime(proto.validity.not_before / 1000),
                          source.not_before())
         self.assertEqual(time.gmtime(proto.validity.not_after / 1000),
                          source.not_after())
 
+    def assert_description_observations_match_source(self, proto, observations):
         observations_tuples = [(unicode(obs.description),
                                 unicode(obs.reason) if obs.reason else u'',
                                 obs.details_to_proto())
@@ -66,6 +71,7 @@ class CertificateDescriptionTest(unittest.TestCase):
                      for obs in proto.observations]
         self.assertItemsEqual(proto_obs, observations_tuples)
 
+    def assert_description_signature_matches_source(self, proto, source):
         self.assertEqual(proto.tbs_signature.algorithm_id,
                          source.signature()["algorithm"].long_name)
         self.assertEqual(proto.cert_signature.algorithm_id,
@@ -88,6 +94,19 @@ class CertificateDescriptionTest(unittest.TestCase):
         self.assertEqual(proto.tbs_signature.parameters,
                          proto.cert_signature.parameters)
 
+    def assert_description_matches_source(self, source, expect_ca_true):
+        observations = self.get_observations(source)
+        proto = cert_desc.from_cert(source, observations)
+
+        self.assertEqual(proto.der, source.to_der())
+        self.assert_description_subject_matches_source(proto, source)
+        self.assert_description_issuer_matches_source(proto, source)
+        self.assert_description_alt_subject_names_match_source(proto, source)
+        self.assertEqual(proto.version, str(source.version().value))
+        self.assert_description_serial_number_matches_source(proto, source)
+        self.assert_description_validity_dates_match_source(proto, source)
+        self.assert_description_observations_match_source(proto, observations)
+        self.assert_description_signature_matches_source(proto, source)
         self.assertEqual(proto.basic_constraint_ca, expect_ca_true)
 
     def test_from_cert(self):
