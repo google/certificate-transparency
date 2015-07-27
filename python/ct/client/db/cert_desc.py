@@ -1,6 +1,6 @@
-import re
-import hashlib
 import calendar
+import hashlib
+import re
 from ct.crypto import cert
 from ct.crypto.asn1 import x509_common
 from ct.proto import certificate_pb2
