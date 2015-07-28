@@ -1,5 +1,7 @@
 version: v1
 kind: Pod
+metadata:
+  name: "@@CONTAINER_HOST@@"
 spec:
   containers:
     - name: super-duper
@@ -24,11 +26,11 @@ spec:
       volumeMounts:
         - name: logdata
           mountPath: /mnt/ctlog
-    - name: cadvisor-monitor
+    - name: cadvisor-mon
       image: google/cadvisor:latest
       imagePullPolicy: Always
       ports:
-        - name: cadvisor-monitor
+        - name: cadvisor-mon
           containerPort: 8080
           hostPort: 8080
           protocol: TCP
