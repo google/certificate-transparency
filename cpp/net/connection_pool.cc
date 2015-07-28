@@ -1,6 +1,7 @@
 #include "net/connection_pool.h"
 
 #include <chrono>
+#include <event2/event.h>
 #include <gflags/gflags.h>
 #include <glog/logging.h>
 
@@ -143,12 +144,26 @@ int ConnectionPool::Connection::GetSSLConnectionIndex() {
 
 ConnectionPool::Connection::Connection(evhtp_connection_t* conn,
                                        HostPortPair&& other_end)
-    : conn_(CHECK_NOTNULL(conn)), other_end_(move(other_end)) {
+    : conn_(CHECK_NOTNULL(conn)),
+      other_end_(move(other_end)),
+      errored_(false) {
   if (conn_->ssl) {
     SSL_set_ex_data(conn_->ssl, GetSSLConnectionIndex(),
                     static_cast<void*>(this));
     SSL_set_tlsext_host_name(conn_->ssl, other_end_.first.c_str());
   }
+}
+
+
+void ConnectionPool::Connection::SetErrored() {
+  lock_guard<mutex> lock(lock_);
+  errored_ = true;
+}
+
+
+bool ConnectionPool::Connection::GetErrored() const {
+  lock_guard<mutex> lock(lock_);
+  return errored_;
 }
 
 
@@ -159,9 +174,6 @@ const HostPortPair& ConnectionPool::Connection::other_end() const {
 
 void ConnectionPool::Connection::ReleaseConnection() {
   conn_.release();
-  // Do not null out ssl_, despite the fact that it's a dangling pointer now we
-  // need it in the d'tor since the value of the pointer itself is a key into a
-  // map which needs to be updated.
 }
 
 
@@ -186,9 +198,25 @@ ConnectionPool::ConnectionPool(libevent::Base* base)
 }
 
 
+namespace {
+
+
+string ErrorFlagDescription(const evhtp_error_flags flags) {
+  return string(flags & BEV_EVENT_READING ? " READING" : "") +
+         (flags & BEV_EVENT_WRITING ? " WRITING" : "") +
+         (flags & BEV_EVENT_EOF ? " EOF" : "") +
+         (flags & BEV_EVENT_ERROR ? " ERROR" : "") +
+         (flags & BEV_EVENT_TIMEOUT ? " TIMEOUT" : "") +
+         (flags & BEV_EVENT_CONNECTED ? " CONNECTED" : "");
+}
+
+
+}  // namespace
+
+
 // static
 evhtp_res ConnectionPool::Connection::ConnectionErrorHook(
-    evhtp_connection_t* conn, evhtp_error_flags, void* arg) {
+    evhtp_connection_t* conn, evhtp_error_flags flags, void* arg) {
   CHECK_NOTNULL(conn);
   CHECK_NOTNULL(arg);
   CHECK(libevent::Base::OnEventThread());
@@ -198,6 +226,7 @@ evhtp_res ConnectionPool::Connection::ConnectionErrorHook(
           << c->other_end().second;
 
   CHECK_EQ(conn, c->connection());
+  c->SetErrored();
 
   // Need to let the client know their request has failed, seems evhtp doesn't
   // do that by default so we'll call the request done callback here.
@@ -205,13 +234,28 @@ evhtp_res ConnectionPool::Connection::ConnectionErrorHook(
     // If someone hasn't already modified the default status, set it to a
     // generic "something went wrong" value here:
     if (conn->request->status == 200) {
-      conn->request->status = kUnknownErrorStatus;
+      VLOG(1) << "error flag (0x" << std::hex << static_cast<int>(flags)
+              << "):" << ErrorFlagDescription(flags);
+      if (flags & BEV_EVENT_TIMEOUT) {
+        conn->request->status = kTimeout;
+      } else {
+        conn->request->status = kUnknownErrorStatus;
+      }
+    } else {
+      VLOG(1) << "status already set to " << conn->request->status;
     }
+    // The callback is going to Put() the Connection back, which will release
+    // the underlying connection, and then delete the Connection wrapper when
+    // it's determined that it's bad.
     conn->request->cb(conn->request, conn->request->cbarg);
     conn->request = nullptr;
+  } else {
+    // Since we're not calling the callback we need to release the connection
+    // ourselves.  We don't delete the Connection here because someone still
+    // has a unique_ptr to it somewhere, and it'll get cleaned up as part of
+    // their lifecycle.
+    c->ReleaseConnection();
   }
-
-  c->ReleaseConnection();
   return EVHTP_RES_OK;
 }
 
@@ -288,6 +332,15 @@ void ConnectionPool::Put(unique_ptr<ConnectionPool::Connection>&& conn) {
 
   if (!conn->connection()) {
     VLOG(1) << "returned dead Connection";
+    conn->ReleaseConnection();
+    conn.reset();
+    return;
+  }
+
+  if (conn->GetErrored()) {
+    VLOG(1) << "returned errored Connection";
+    conn->ReleaseConnection();
+    conn.reset();
     return;
   }
 

@@ -22,6 +22,9 @@ const int kUnknownErrorStatus = 0;
 // Status code for when there was an error with the SSL negotiation.
 const int kSSLErrorStatus = 1;
 
+// Status code for when the connection timed-out.
+const int kTimeout = 2;
+
 
 namespace internal {
 
@@ -46,6 +49,8 @@ class ConnectionPool {
 
     const HostPortPair& other_end() const;
 
+    bool GetErrored() const;
+
    private:
     static evhtp_res ConnectionErrorHook(evhtp_connection_t* conn,
                                          evhtp_error_flags errtype, void* arg);
@@ -55,10 +60,16 @@ class ConnectionPool {
 
     Connection(evhtp_connection_t* conn, HostPortPair&& other_end);
 
+    void SetErrored();
+
+
     void ReleaseConnection();
 
     std::unique_ptr<evhtp_connection_t, evhtp_connection_deleter> conn_;
     const HostPortPair other_end_;
+
+    mutable std::mutex lock_;
+    bool errored_;
 
     friend class ConnectionPool;
 

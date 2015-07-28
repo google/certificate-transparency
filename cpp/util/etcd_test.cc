@@ -719,6 +719,65 @@ TEST_F(EtcdTest, WatchInitialGetFailureRetriesOnNextEtcd) {
   task.Wait();
 }
 
+
+TEST_F(EtcdTest, WatchHangingGetTimeoutCausesRetry) {
+  FLAGS_etcd_watch_error_retry_delay_seconds = 1;
+
+  {
+    InSequence s;
+    EXPECT_CALL(url_fetcher_,
+                Fetch(IsUrlFetchRequest(UrlFetcher::Verb::GET,
+                                        URL(GetEtcdUrl(kEntryKey) +
+                                            "?consistent=true&quorum=true"),
+                                        IsEmpty(), ""),
+                      _, _))
+        .WillOnce(
+            Invoke(bind(HandleFetch, Status::OK, 200,
+                        UrlFetcher::Headers{make_pair("x-etcd-index", "9")},
+                        kGetJson, _1, _2, _3)));
+    EXPECT_CALL(url_fetcher_,
+                Fetch(IsUrlFetchRequest(UrlFetcher::Verb::GET,
+                                        URL(GetEtcdUrl(kEntryKey) +
+                                            "?consistent=true&quorum=false" +
+                                            "&recursive=true&wait=true" +
+                                            "&waitIndex=10"),
+                                        IsEmpty(), ""),
+                      _, _))
+        .WillOnce(Invoke(bind(HandleFetch,
+                              Status(util::error::DEADLINE_EXCEEDED, ""), 0,
+                              UrlFetcher::Headers{}, "", _1, _2, _3)));
+    EXPECT_CALL(url_fetcher_,
+                Fetch(IsUrlFetchRequest(UrlFetcher::Verb::GET,
+                                        URL(GetEtcdUrl(kEntryKey) +
+                                            "?consistent=true&quorum=false" +
+                                            "&recursive=true&wait=true" +
+                                            "&waitIndex=10"),
+                                        IsEmpty(), ""),
+                      _, _))
+        .WillOnce(
+            Invoke(bind(HandleFetch, Status::OK, 200,
+                        UrlFetcher::Headers{make_pair("x-etcd-index", "9")},
+                        kGetJson, _1, _2, _3)));
+  }
+
+  SyncTask task(base_.get());
+  int num_updates(0);
+  client_.Watch(kEntryKey,
+                [&task,
+                 &num_updates](const vector<EtcdClient::Node>& updates) {
+                  EXPECT_EQ(1, updates.size());
+                  EXPECT_EQ(9, updates[0].modified_index_);
+                  EXPECT_EQ("123", updates[0].value_);
+                  if (num_updates == 1) {
+                    task.Cancel();
+                  }
+                  ++num_updates;
+                },
+                task.task());
+  task.Wait();
+}
+
+
 TEST_F(EtcdTest, UnavailableEtcdRetriesOnNewServer) {
   EtcdClient multi_client(&url_fetcher_,
                           {EtcdClient::HostPortPair(kEtcdHost, kEtcdPort),

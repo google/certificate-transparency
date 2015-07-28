@@ -216,7 +216,7 @@ void GetRequestDone(const string& keyname, EtcdClient::GetResponse* resp,
   *resp = EtcdClient::GetResponse();
   resp->etcd_index = gen_resp->etcd_index;
   if (!task->status().ok()) {
-    // TODO(pphaneuf): Handle connection timeout (status UNKNOWN)
+    // TODO(pphaneuf): Handle connection timeout (status DEADLINE_EXCEEDED)
     // better here? Or add deadline support here and in UrlFetcher,
     // with retries, so that this doesn't get all the way here?
     parent_task->Return(
@@ -573,9 +573,8 @@ void EtcdClient::WatchRequestDone(WatchState* state, GetResponse* get_resp,
     return;
   }
 
-  // This is probably due to a timeout, just retry.
   if (!child_task->status().ok()) {
-    LOG_EVERY_N(INFO, 10) << "Watch request failed: " << child_task->status();
+    VLOG(1) << "Watch request errored: " << child_task->status();
     StartWatchRequest(state);
     return;
   }
