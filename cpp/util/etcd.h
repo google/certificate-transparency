@@ -14,6 +14,7 @@
 #include "base/macros.h"
 #include "net/url_fetcher.h"
 #include "util/status.h"
+#include "util/sync_task.h"
 #include "util/task.h"
 #include "util/util.h"
 
@@ -81,9 +82,9 @@ class EtcdClient {
 
   typedef std::function<void(const std::vector<Node>& updates)> WatchCallback;
 
-  EtcdClient(UrlFetcher* fetcher, const std::string& host, uint16_t port);
+  EtcdClient(util::Executor* executor, UrlFetcher* fetcher, const std::string& host, uint16_t port);
 
-  EtcdClient(UrlFetcher* fetcher, const std::list<HostPortPair>& etcds);
+  EtcdClient(util::Executor* executir, UrlFetcher* fetcher, const std::list<HostPortPair>& etcds);
 
   virtual ~EtcdClient();
 
@@ -150,10 +151,15 @@ class EtcdClient {
   void WatchRequestDone(WatchState* state, GetResponse* gen_resp,
                         util::Task* child_task);
 
+  void MaybeLogEtcdVersion();
+
+  util::Executor* const executor_;
+  std::unique_ptr<util::SyncTask> log_version_task_;
   UrlFetcher* const fetcher_;
 
   mutable std::mutex lock_;
   std::list<HostPortPair> etcds_;
+  bool logged_version_;
 
   DISALLOW_COPY_AND_ASSIGN(EtcdClient);
 };

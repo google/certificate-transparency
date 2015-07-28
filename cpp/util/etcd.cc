@@ -33,8 +33,10 @@ using std::time_t;
 using std::to_string;
 using std::unique_ptr;
 using std::vector;
+using util::Executor;
 using util::Status;
 using util::StatusOr;
+using util::SyncTask;
 using util::Task;
 
 DEFINE_int32(etcd_watch_error_retry_delay_seconds, 5,
@@ -668,13 +670,17 @@ bool EtcdClient::Node::HasExpiry() const {
 }
 
 
-EtcdClient::EtcdClient(UrlFetcher* fetcher, const string& host, uint16_t port)
-    : EtcdClient(fetcher, list<HostPortPair>{HostPortPair(host, port)}) {
+EtcdClient::EtcdClient(Executor* executor, UrlFetcher* fetcher, const string& host, uint16_t port)
+    : EtcdClient(executor, fetcher, list<HostPortPair>{HostPortPair(host, port)}) {
 }
 
 
-EtcdClient::EtcdClient(UrlFetcher* fetcher, const list<HostPortPair>& etcds)
-    : fetcher_(CHECK_NOTNULL(fetcher)), etcds_(etcds) {
+EtcdClient::EtcdClient(Executor* executor, UrlFetcher* fetcher, const list<HostPortPair>& etcds)
+    : executor_(CHECK_NOTNULL(executor)),
+      log_version_task_(new SyncTask(executor_)),
+      fetcher_(CHECK_NOTNULL(fetcher)),
+      etcds_(etcds),
+      logged_version_(false) {
   CHECK(!etcds_.empty()) << "No etcd hosts provided.";
   VLOG(1) << "EtcdClient: " << this;
 
@@ -697,12 +703,17 @@ EtcdClient::HostPortPair EtcdClient::ChooseNextServer() {
 }
 
 
-EtcdClient::EtcdClient() : fetcher_(nullptr) {
+EtcdClient::EtcdClient()
+    : executor_(nullptr), log_version_task_(nullptr), fetcher_(nullptr) {
 }
 
 
 EtcdClient::~EtcdClient() {
   VLOG(1) << "~EtcdClient: " << this;
+  if (log_version_task_) {
+    log_version_task_->task()->Return();
+    log_version_task_->Wait();
+  }
 }
 
 
@@ -749,6 +760,8 @@ void EtcdClient::FetchDone(RequestState* etcd_req, Task* task) {
     etcd_req->SetHostPort(
         UpdateEndpoint(HostPortPair(url.Host(), url.Port())));
 
+    MaybeLogEtcdVersion();
+
     fetcher_->Fetch(etcd_req->req_, &etcd_req->resp_,
                     etcd_req->parent_task_->AddChild(
                         bind(&EtcdClient::FetchDone, this, etcd_req, _1)));
@@ -785,6 +798,7 @@ EtcdClient::HostPortPair EtcdClient::GetEndpoint() const {
 EtcdClient::HostPortPair EtcdClient::UpdateEndpoint(
     HostPortPair&& new_endpoint) {
   lock_guard<mutex> lock(lock_);
+  logged_version_ = false;
   auto it(find(etcds_.begin(), etcds_.end(), new_endpoint));
   if (it == etcds_.end()) {
     // TODO(alcutter): We don't really have a way of knowing when to remove
@@ -950,6 +964,7 @@ void EtcdClient::Generic(const string& key, const string& key_space,
                          const map<string, string>& params,
                          UrlFetcher::Verb verb, GenericResponse* resp,
                          Task* task) {
+  MaybeLogEtcdVersion();
   RequestState* const etcd_req(new RequestState(verb, key, key_space, params,
                                                 GetEndpoint(), resp, task));
   task->DeleteWhenDone(etcd_req);
@@ -973,5 +988,28 @@ list<EtcdClient::HostPortPair> SplitHosts(const string& hosts_string) {
   }
   return ret;
 }
+
+void EtcdClient::MaybeLogEtcdVersion() {
+  lock_guard<mutex> lock(lock_);
+  if (logged_version_) {
+    return;
+  }
+  logged_version_ = true;
+
+  const UrlFetcher::Request req(
+      URL("http://" + etcds_.front().first + ":" +
+              to_string(etcds_.front().second) + "/version"));
+  UrlFetcher::Response* const resp(new UrlFetcher::Response);
+  fetcher_->Fetch(req, resp, log_version_task_->task()->AddChild([this, resp](
+                                 Task* child_task) {
+    unique_ptr<UrlFetcher::Response> resp_deleter(resp);
+    if (!child_task->status().ok()) {
+      LOG(WARNING) << "Failed to fetch etcd version: " << child_task->status();
+    } else {
+      LOG(INFO) << "Etcd version: " << resp->body;
+    }
+  }));
+}
+
 
 }  // namespace cert_trans

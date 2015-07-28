@@ -153,9 +153,10 @@ class ElectionTest : public ::testing::Test {
         event_pump_(base_),
         pool_(),
         url_fetcher_(base_.get(), &pool_),
-        client_(FLAGS_etcd.empty() ? new FakeEtcdClient(base_.get())
-                                   : new EtcdClient(&url_fetcher_, FLAGS_etcd,
-                                                    FLAGS_etcd_port)) {
+        client_(FLAGS_etcd.empty()
+                    ? new FakeEtcdClient(base_.get())
+                    : new EtcdClient(&pool_, &url_fetcher_, FLAGS_etcd,
+                                     FLAGS_etcd_port)) {
   }
 
 

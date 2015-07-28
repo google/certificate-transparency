@@ -88,7 +88,7 @@ void test_etcd(int thread_num) {
   libevent::EventPumpThread pump(event_base);
   ThreadPool pool;
   UrlFetcher fetcher(event_base.get(), &pool);
-  EtcdClient etcd(&fetcher, FLAGS_etcd, FLAGS_etcd_port);
+  EtcdClient etcd(&pool, &fetcher, FLAGS_etcd, FLAGS_etcd_port);
   SyncTask task(event_base.get());
   State state(&etcd, thread_num, task.task());
 
