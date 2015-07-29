@@ -1,15 +1,10 @@
 #include "util/util.h"
 
 #include <cstring>
-#include <event2/thread.h>
-#include <evhtp.h>
 #include <fstream>
 #include <glog/logging.h>
 #include <iostream>
 #include <netinet/in.h>  // for resolv.h
-#include <openssl/crypto.h>
-#include <openssl/err.h>
-#include <openssl/ssl.h>
 #include <resolv.h>      // for b64_ntop
 #include <stdint.h>
 #include <stdio.h>
