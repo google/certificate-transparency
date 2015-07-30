@@ -284,7 +284,5 @@ TEST_F(RemotePeerTest, RejectsSTHWithInvalidSignature) {
 
 int main(int argc, char** argv) {
   cert_trans::test::InitTesting(argv[0], &argc, &argv, true);
-  OpenSSL_add_all_algorithms();
-  ERR_load_crypto_strings();
   return RUN_ALL_TESTS();
 }
