@@ -4,7 +4,6 @@ import "google/protobuf/descriptor.proto";
 
 package ct;
 
-
 // TLS field options specify the wire format for parsing TLS wire messages
 // to protocol buffers, using the custom decoder in tls_message.py.
 // TODO(ekasper): encoder.
@@ -89,10 +88,11 @@ message TLSOptions {
 }
 
 extend google.protobuf.FieldOptions {
-  // 50000-99999 is intended for private use.
-  optional TLSOptions tls_opts = 50000;
+  // Registered with protobuf-global-extension-registry@google.com
+  optional TLSOptions tls_opts = 1023;
 }
 
 extend google.protobuf.EnumOptions {
-  optional TLSOptions tls_enum_opts = 50001;
+  // Registered with protobuf-global-extension-registry@google.com
+  optional TLSOptions tls_enum_opts = 1023;
 }
