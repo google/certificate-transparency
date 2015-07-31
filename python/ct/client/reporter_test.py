@@ -5,6 +5,7 @@ from collections import defaultdict
 from ct.cert_analysis import asn1
 from ct.cert_analysis import base_check_test
 from ct.client import reporter
+from ct.client.db import cert_desc
 from ct.client.db import sqlite_cert_db
 from ct.client.db import sqlite_connection as sqlitecon
 from ct.crypto import cert
@@ -15,6 +16,16 @@ STRICT_DER = cert.Certificate.from_der_file(
                     'ct/crypto/testdata/google_cert.der', False).to_der()
 NON_STRICT_DER = cert.Certificate.from_pem_file(
                     'ct/crypto/testdata/invalid_ip.pem', False).to_der()
+
+CHAIN_FILE = 'ct/crypto/testdata/google_chain.pem'
+
+CHAIN_DERS = [c.to_der() for c in cert.certs_from_pem_file(CHAIN_FILE)]
+
+SELF_SIGNED_ROOT_DER = cert.Certificate.from_pem_file(
+                    'ct/crypto/testdata/subrigo_net.pem', False).to_der()
+
+def readable_dn(dn_attribs):
+    return ",".join(["%s=%s" % (attr.type, attr.value) for attr in dn_attribs])
 
 class FakeCheck(object):
     @staticmethod
@@ -94,6 +105,36 @@ class CertificateReportTest(base_check_test.BaseCheckTest):
         self.assertEqual(len(certs), 2)
         self.assertEquals(certs[0].entry_type, client_pb2.PRECERT_ENTRY)
         self.assertEquals(certs[1].entry_type, client_pb2.X509_ENTRY)
+
+    def test_issuer_and_root_issuer_populated_from_chain(self):
+        self.assertEqual(3, len(CHAIN_DERS))
+
+        report = self.CertificateReportBase([])
+        report.scan_der_certs([(0, CHAIN_DERS[0], CHAIN_DERS[1:],
+                                client_pb2.X509_ENTRY)])
+        result = report.report()
+        self.assertEqual(len(sum(result.values(), [])), 0)
+
+        certs = report.certs()
+        self.assertEqual(len(certs), 1)
+
+        issuer_cert = cert_desc.from_cert(cert.Certificate(CHAIN_DERS[1]))
+        root_cert = cert_desc.from_cert(cert.Certificate(CHAIN_DERS[2]))
+
+        self.assertEqual(readable_dn(certs[0].issuer),
+                         'C=US,O=Google Inc,CN=Google Internet Authority')
+        self.assertEqual(readable_dn(certs[0].root_issuer),
+                         'C=US,O=Equifax,OU=Equifax Secure Certificate Authority')
+
+    def test_chain_containing_only_root_handled(self):
+        report = self.CertificateReportBase([])
+        report.scan_der_certs([(0, SELF_SIGNED_ROOT_DER, [], client_pb2.X509_ENTRY)])
+        result = report.report()
+        self.assertEqual(len(sum(result.values(), [])), 0)
+
+        certs = report.certs()
+        self.assertEqual(len(certs), 1)
+        self.assertEquals(certs[0].entry_type, client_pb2.X509_ENTRY)
 
 if __name__ == '__main__':
     unittest.main()
