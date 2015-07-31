@@ -66,4 +66,7 @@ message X509Description {
 
   // True if this cert has the Basic Constraint CA=TRUE.
   optional bool basic_constraint_ca = 14;
+
+  // SHA256 hash of issuer's public key.
+  optional bytes issuer_pk_sha256_hash = 15;
 }

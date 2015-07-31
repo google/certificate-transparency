@@ -136,5 +136,22 @@ class CertificateReportTest(base_check_test.BaseCheckTest):
         self.assertEqual(len(certs), 1)
         self.assertEquals(certs[0].entry_type, client_pb2.X509_ENTRY)
 
+    def test_issuer_public_key_populated_from_chain(self):
+        self.assertEqual(3, len(CHAIN_DERS))
+
+        report = self.CertificateReportBase([])
+        report.scan_der_certs([(0, CHAIN_DERS[0], CHAIN_DERS[1:],
+                                client_pb2.X509_ENTRY)])
+        result = report.report()
+        self.assertEqual(len(sum(result.values(), [])), 0)
+
+        certs = report.certs()
+        self.assertEqual(len(certs), 1)
+
+        issuer_cert = cert.Certificate(CHAIN_DERS[1])
+        issuer_pk_sha256 = issuer_cert.key_hash(hashfunc="sha256")
+
+        self.assertEqual(certs[0].issuer_pk_sha256_hash, issuer_pk_sha256)
+
 if __name__ == '__main__':
     unittest.main()

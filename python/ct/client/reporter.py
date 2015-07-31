@@ -68,6 +68,13 @@ def _scan_der_cert(der_certs, checks):
 
             if der_chain:
                 try:
+                    issuer = cert.Certificate(der_chain[0], strict_der=False)
+                except error.Error:
+                     pass
+                else:
+                    desc.issuer_pk_sha256_hash = issuer.key_hash(hashfunc="sha256")
+
+                try:
                     root = cert.Certificate(der_chain[-1], strict_der=False)
                 except error.Error:
                     pass
