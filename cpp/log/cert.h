@@ -52,8 +52,12 @@ class Cert {
   // underlying copy succeeded.
   Cert* Clone() const;
 
-  // Frees the old X509 and attempts to load anew.
+  // Frees the old X509 and attempts to load a new one.
   Status LoadFromDerString(const std::string& der_string);
+
+  // Frees the old X509 and attempts to load from BIO in DER form. Caller
+  // still owns the BIO afterwards.
+  Status LoadFromDerBio(BIO *bio_in);
 
   // These just return an empty string if an error occurs.
   std::string PrintIssuerName() const;
@@ -181,6 +185,18 @@ class Cert {
   // Cert API for safety.
   Status OctetStringExtensionData(int extension_nid,
                                   std::string* result) const;
+
+  // Tests whether the certificate correctly follows the RFC rules for
+  // using wildcard redaction.
+  Cert::Status IsValidWildcardRedaction() const;
+  // Tests if a certificate correctly follows the rules for name constrained
+  // intermediate CA
+  Cert::Status IsValidNameConstrainedIntermediateCa() const;
+  // Tests if a hostname contains any redactions ('?' elements). If it does
+  // not then there is no need to apply the validation below
+  static bool IsRedactedHost(const std::string& hostname);
+  // Tests if a hostname containing any redactions follows the RFC rules
+  static bool IsValidRedactedHost(const std::string& hostname);
 
   // CertChecker needs access to the x509_ structure directly.
   friend class CertChecker;

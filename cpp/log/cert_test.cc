@@ -30,6 +30,48 @@ static const char kPreCert[] = "test-embedded-pre-cert.pem";
 // CA with no basic constraints and an MD2 signature.
 static const char kLegacyCaCert[] = "test-no-bc-ca-cert.pem";
 
+// Leaf cert with CN redaction no DNS or extension (test case 5)
+static const char kV2WildcardRedactTest5[] = "redact_test5.pem";
+// Leaf cert with CN/DNS wildcard redaction mismatch (test case 6)
+static const char kV2WildcardRedactTest6[] = "redact_test6.pem";
+// Leaf cert with valid V2 wildcard redaction (test case 7)
+static const char kV2WildcardRedactTest7[] = "redact_test7.pem";
+// Leaf cert with valid V2 '*' wildcard redaction (test case 8)
+static const char kV2WildcardRedactTest8[] = "redact_test8.pem";
+// Leaf cert with invalid redaction label (test case 9)
+static const char kV2WildcardRedactTest9[] = "redact_test9.pem";
+// Leaf cert with invalid V2 '*' wildcard redaction (test case 10)
+static const char kV2WildcardRedactTest10[] = "redact_test10.pem";
+// Leaf cert with invalid redaction, too many ext values (test case 11)
+static const char kV2WildcardRedactTest11[] = "redact_test11.pem";
+// Leaf cert with invalid V2 redacted label extension (test case 12)
+static const char kV2WildcardRedactTest12[] = "redact_test12.pem";
+// Leaf cert with not enough entries in extension (test case 13)
+static const char kV2WildcardRedactTest13[] = "redact_test13.pem";
+// Leaf cert with valid extension + multiple DNS entries (test case 14)
+static const char kV2WildcardRedactTest14[] = "redact_test14.pem";
+// Leaf cert with too many labels in extension (test case 15)
+static const char kV2WildcardRedactTest15[] = "redact_test15.pem";
+// Leaf cert with wildcard redaction in both CN and DNS-ID no extension
+static const char kV2WildcardRedactTest22[] = "redact_test22.pem";
+
+// Leaf cert with non CA constraints
+static const char kV2ConstraintTest2[] = "constraint_test2.pem";
+// Leaf cert with CA but no name constraints
+static const char kV2ConstraintTest3[] = "constraint_test3.pem";
+// Leaf cert with constraint and no CT ext
+static const char kV2ConstraintTest4[] = "constraint_test4.pem";
+// Leaf cert with constraint and CT ext but no DNS in constraint
+static const char kV2ConstraintTest5[] = "constraint_test5.pem";
+// Leaf cert with CA constraint + valid CT extension
+static const char kV2ConstraintTest6[] = "constraint_test6.pem";
+// Leaf cert with CA constraint + valid CT extension with multiple DNS
+static const char kV2ConstraintTest7[] = "constraint_test7.pem";
+// Leaf cert with CA constraint + valid CT extension, no IP exclude
+static const char kV2ConstraintTest8[] = "constraint_test8.pem";
+// Leaf cert with CA constraint + valid CT extension, partial IP exclude
+static const char kV2ConstraintTest9[] = "constraint_test9.pem";
+
 static const char kInvalidCertString[] =
     "-----BEGIN CERTIFICATE-----\ninvalid"
     "\n-----END CERTIFICATE-----\n";
@@ -148,8 +190,32 @@ class CertTest : public ::testing::Test {
   string leaf_with_intermediate_pem_;
   string legacy_ca_pem_;
 
+  string v2_wildcard_test5_pem_;
+  string v2_wildcard_test6_pem_;
+  string v2_wildcard_test7_pem_;
+  string v2_wildcard_test8_pem_;
+  string v2_wildcard_test9_pem_;
+  string v2_wildcard_test10_pem_;
+  string v2_wildcard_test11_pem_;
+  string v2_wildcard_test12_pem_;
+  string v2_wildcard_test13_pem_;
+  string v2_wildcard_test14_pem_;
+  string v2_wildcard_test15_pem_;
+  string v2_wildcard_test22_pem_;
+
+  string v2_constraint_test2_pem_;
+  string v2_constraint_test3_pem_;
+  string v2_constraint_test4_pem_;
+  string v2_constraint_test5_pem_;
+  string v2_constraint_test6_pem_;
+  string v2_constraint_test7_pem_;
+  string v2_constraint_test8_pem_;
+  string v2_constraint_test9_pem_;
+
   void SetUp() {
     const string cert_dir(FLAGS_test_srcdir + "/test/testdata");
+    const string cert_dir_v2(cert_dir + "/v2/");
+
     CHECK(util::ReadTextFile(cert_dir + "/" + kLeafCert, &leaf_pem_))
         << "Could not read test data from " << cert_dir
         << ". Wrong --test_srcdir?";
@@ -159,6 +225,50 @@ class CertTest : public ::testing::Test {
     CHECK(util::ReadTextFile(cert_dir + "/" + kLeafWithIntermediateCert,
                              &leaf_with_intermediate_pem_));
     CHECK(util::ReadTextFile(cert_dir + "/" + kLegacyCaCert, &legacy_ca_pem_));
+
+    // V2 Wildcard redaction test certs
+    CHECK(util::ReadTextFile(cert_dir_v2 + kV2WildcardRedactTest5,
+                             &v2_wildcard_test5_pem_));
+    CHECK(util::ReadTextFile(cert_dir_v2 + kV2WildcardRedactTest6,
+                             &v2_wildcard_test6_pem_));
+    CHECK(util::ReadTextFile(cert_dir_v2 + kV2WildcardRedactTest7,
+                             &v2_wildcard_test7_pem_));
+    CHECK(util::ReadTextFile(cert_dir_v2 + kV2WildcardRedactTest8,
+                             &v2_wildcard_test8_pem_));
+    CHECK(util::ReadTextFile(cert_dir_v2 + kV2WildcardRedactTest9,
+                             &v2_wildcard_test9_pem_));
+    CHECK(util::ReadTextFile(cert_dir_v2 + kV2WildcardRedactTest10,
+                             &v2_wildcard_test10_pem_));
+    CHECK(util::ReadTextFile(cert_dir_v2 + kV2WildcardRedactTest11,
+                             &v2_wildcard_test11_pem_));
+    CHECK(util::ReadTextFile(cert_dir_v2 + kV2WildcardRedactTest12,
+                             &v2_wildcard_test12_pem_));
+    CHECK(util::ReadTextFile(cert_dir_v2 + kV2WildcardRedactTest13,
+                             &v2_wildcard_test13_pem_));
+    CHECK(util::ReadTextFile(cert_dir_v2 + kV2WildcardRedactTest14,
+                             &v2_wildcard_test14_pem_));
+    CHECK(util::ReadTextFile(cert_dir_v2 + kV2WildcardRedactTest15,
+                             &v2_wildcard_test15_pem_));
+    CHECK(util::ReadTextFile(cert_dir_v2 + kV2WildcardRedactTest22,
+                             &v2_wildcard_test22_pem_));
+
+    // V2 Name constraint test certs
+    CHECK(util::ReadTextFile(cert_dir_v2 + kV2ConstraintTest2,
+                             &v2_constraint_test2_pem_));
+    CHECK(util::ReadTextFile(cert_dir_v2 + kV2ConstraintTest3,
+                             &v2_constraint_test3_pem_));
+    CHECK(util::ReadTextFile(cert_dir_v2 + kV2ConstraintTest4,
+                             &v2_constraint_test4_pem_));
+    CHECK(util::ReadTextFile(cert_dir_v2 + kV2ConstraintTest5,
+                             &v2_constraint_test5_pem_));
+    CHECK(util::ReadTextFile(cert_dir_v2 + kV2ConstraintTest6,
+                             &v2_constraint_test6_pem_));
+    CHECK(util::ReadTextFile(cert_dir_v2 + kV2ConstraintTest7,
+                             &v2_constraint_test7_pem_));
+    CHECK(util::ReadTextFile(cert_dir_v2 + kV2ConstraintTest8,
+                             &v2_constraint_test8_pem_));
+    CHECK(util::ReadTextFile(cert_dir_v2 + kV2ConstraintTest9,
+                             &v2_constraint_test9_pem_));
   }
 };
 
@@ -325,6 +435,159 @@ TEST_F(CertTest, SignatureAlgorithmMatches) {
   EXPECT_EQ(Cert::FALSE, mismatched_algs.IsSignedBy(issuer));
 }
 
+TEST_F(CertTest, TestIsRedactedHost) {
+  EXPECT_FALSE(Cert::IsRedactedHost(""));
+  EXPECT_FALSE(Cert::IsRedactedHost("example.com"));
+
+  EXPECT_TRUE(Cert::IsRedactedHost("?.example.com"));
+  EXPECT_TRUE(Cert::IsRedactedHost("?.?.example.com"));
+  EXPECT_TRUE(Cert::IsRedactedHost("top.?.example.com"));
+}
+
+TEST_F(CertTest, TestIsValidRedactedHost) {
+  EXPECT_TRUE(Cert::IsValidRedactedHost("?.example.com"));
+  EXPECT_TRUE(Cert::IsValidRedactedHost("?.?.example.com"));
+  EXPECT_TRUE(Cert::IsValidRedactedHost("*.?.example.com"));
+  EXPECT_TRUE(Cert::IsValidRedactedHost("*.?.?.example.com"));
+
+  EXPECT_FALSE(Cert::IsValidRedactedHost("top.?.example.com"));
+  EXPECT_FALSE(Cert::IsValidRedactedHost("top.secret.example.?"));
+  EXPECT_FALSE(Cert::IsValidRedactedHost("top.secret.?.com"));
+  EXPECT_FALSE(Cert::IsValidRedactedHost("top.*.secret.?.com"));
+  EXPECT_FALSE(Cert::IsValidRedactedHost("?.*.example.com"));
+  EXPECT_FALSE(Cert::IsValidRedactedHost("*.secret.?.com"));
+}
+
+TEST_F(CertTest, TestNoWildcardRedactionIsValid) {
+  Cert leaf(leaf_pem_);
+  EXPECT_EQ(Cert::TRUE, leaf.IsValidWildcardRedaction());
+}
+
+TEST_F(CertTest, TestWildcardRedactTestCase5) {
+  // This is invalid because the CN is redacted, no DNS or extension
+  Cert leaf(v2_wildcard_test5_pem_);
+  EXPECT_EQ(Cert::FALSE, leaf.IsValidWildcardRedaction());
+}
+
+TEST_F(CertTest, TestWildcardRedactTestCase6) {
+  // This is invalid because the CN differs from the first DNS-ID
+  Cert leaf(v2_wildcard_test6_pem_);
+  EXPECT_EQ(Cert::FALSE, leaf.IsValidWildcardRedaction());
+}
+
+TEST_F(CertTest, TestWildcardRedactTestCase7) {
+  // This should be a valid redaction of 1 label with everything set
+  // correctly in the extension
+  Cert leaf(v2_wildcard_test7_pem_);
+  EXPECT_EQ(Cert::TRUE, leaf.IsValidWildcardRedaction());
+}
+
+TEST_F(CertTest, TestWildcardRedactTestCase8) {
+  // This should be a valid redaction of 1 label with everything set
+  // correctly in the extension and a '*' at left of name.
+  Cert leaf(v2_wildcard_test8_pem_);
+  EXPECT_EQ(Cert::TRUE, leaf.IsValidWildcardRedaction());
+}
+
+TEST_F(CertTest, TestWildcardRedactTestCase9) {
+  // Should be invalid as the redacted label does not follow RFC rules
+  Cert leaf(v2_wildcard_test9_pem_);
+  EXPECT_EQ(Cert::FALSE, leaf.IsValidWildcardRedaction());
+}
+
+TEST_F(CertTest, TestWildcardRedactTestCase10) {
+  // Should be invalid as redacted label uses '*' incorrectly
+  Cert leaf(v2_wildcard_test10_pem_);
+  EXPECT_EQ(Cert::FALSE, leaf.IsValidWildcardRedaction());
+}
+
+TEST_F(CertTest, TestWildcardRedactTestCase11) {
+  // Should be invalid as there are too many label count values
+  Cert leaf(v2_wildcard_test11_pem_);
+  EXPECT_EQ(Cert::FALSE, leaf.IsValidWildcardRedaction());
+}
+
+TEST_F(CertTest, TestWildcardRedactTestCase12) {
+  // This should be invalid because the CT extension contains -ve value
+  Cert leaf(v2_wildcard_test12_pem_);
+  EXPECT_EQ(Cert::FALSE, leaf.IsValidWildcardRedaction());
+}
+
+TEST_F(CertTest, TestWildcardRedactTestCase13) {
+  // This should be invalid because the CT extension contains -ve value
+  Cert leaf(v2_wildcard_test13_pem_);
+  EXPECT_EQ(Cert::TRUE, leaf.IsValidWildcardRedaction());
+}
+
+TEST_F(CertTest, TestWildcardRedactTestCase14) {
+  // This should be invalid because the CT extension contains -ve value
+  Cert leaf(v2_wildcard_test14_pem_);
+  EXPECT_EQ(Cert::TRUE, leaf.IsValidWildcardRedaction());
+}
+
+TEST_F(CertTest, TestWildcardRedactTestCase15) {
+  // This should be invalid because the CT extension too many values
+  Cert leaf(v2_wildcard_test15_pem_);
+  EXPECT_EQ(Cert::FALSE, leaf.IsValidWildcardRedaction());
+}
+
+TEST_F(CertTest, TestWildcardRedactTestCase22) {
+  // This should be a redaction of 1 label but no extension required by
+  // RFC section 3.2.2
+  Cert leaf(v2_wildcard_test22_pem_);
+  EXPECT_EQ(Cert::FALSE, leaf.IsValidWildcardRedaction());
+}
+
+TEST_F(CertTest, TestConstraintTestCase2) {
+  // This should be valid as the cert is non CA and the checks do not apply
+  Cert leaf(v2_constraint_test2_pem_);
+  EXPECT_EQ(Cert::TRUE, leaf.IsValidNameConstrainedIntermediateCa());
+}
+
+TEST_F(CertTest, TestConstraintTestCase3) {
+  // This should be valid as the cert is CA but has no name constraint
+  Cert leaf(v2_constraint_test3_pem_);
+  EXPECT_EQ(Cert::TRUE, leaf.IsValidNameConstrainedIntermediateCa());
+}
+
+TEST_F(CertTest, TestConstraintTestCase4) {
+  // Not valid as there is a constraint but no CT ext
+  Cert leaf(v2_constraint_test4_pem_);
+  EXPECT_EQ(Cert::FALSE, leaf.IsValidNameConstrainedIntermediateCa());
+}
+
+TEST_F(CertTest, TestConstraintTestCase5) {
+  // Not valid as there is no DNS entry in name constraints
+  Cert leaf(v2_constraint_test5_pem_);
+  EXPECT_EQ(Cert::FALSE, leaf.IsValidNameConstrainedIntermediateCa());
+}
+
+TEST_F(CertTest, TestConstraintTestCase6) {
+  // This should be valid as the CA cert contains valid name constraints +
+  // CT extension
+  Cert leaf(v2_constraint_test6_pem_);
+  EXPECT_EQ(Cert::TRUE, leaf.IsValidNameConstrainedIntermediateCa());
+}
+
+TEST_F(CertTest, TestConstraintTestCase7) {
+  // This should be valid as the CA cert contains valid name constraints +
+  // CT extension + multiple DNS entries
+  Cert leaf(v2_constraint_test7_pem_);
+  EXPECT_EQ(Cert::TRUE, leaf.IsValidNameConstrainedIntermediateCa());
+}
+
+TEST_F(CertTest, TestConstraintTestCase8) {
+  // This should be invalid as there is no IP exclusion in name constraint
+  Cert leaf(v2_constraint_test8_pem_);
+  EXPECT_EQ(Cert::FALSE, leaf.IsValidNameConstrainedIntermediateCa());
+}
+
+TEST_F(CertTest, TestConstraintTestCase9) {
+  // This should be invalid as both IPv4 and v6 ranges not excluded
+  Cert leaf(v2_constraint_test9_pem_);
+  EXPECT_EQ(Cert::FALSE, leaf.IsValidNameConstrainedIntermediateCa());
+}
+
 TEST_F(TbsCertificateTest, DerEncoding) {
   Cert leaf(leaf_pem_);
   TbsCertificate tbs(leaf);
@@ -374,7 +637,6 @@ TEST_F(TbsCertificateTest, CopyIssuer) {
   EXPECT_EQ(Cert::TRUE, tbs2.DerEncoding(&der_after2));
   EXPECT_EQ(der_before2, der_after2);
 }
-
 
 TEST_F(CertChainTest, LoadValid) {
   // A single certificate.
