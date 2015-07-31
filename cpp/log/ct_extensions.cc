@@ -2,9 +2,9 @@
 
 #include <glog/logging.h>
 #include <openssl/asn1.h>
+#include <openssl/asn1t.h>
 #include <openssl/objects.h>
 #include <openssl/x509v3.h>
-#include <openssl/asn1t.h>
 #include <string.h>
 
 namespace cert_trans {
@@ -20,16 +20,16 @@ int NID_ctNameConstraintNologIntermediateCa = 0;
 const char kSCTListOID[] = "1.3.6.1.4.1.11129.2.4.1";
 // The SCT list embedded in the certificate itself
 const char kEmbeddedSCTListOID[] = "1.3.6.1.4.1.11129.2.4.2";
-// The poison extension
-const char kPoisonOID[] = "1.3.6.1.4.1.11129.2.4.3";
-// Extended Key Usage value for Precertificate signing
-const char kPrecertificateSigningOID[] = "1.3.6.1.4.1.11129.2.4.4";
-// Extension for wildcard redacted Precertificate indicating redaction count
-// (not used in V1)
-const char kPrecertificateRedactedLabelOID[] = "1.3.6.1.4.1.11129.2.4.6";
 // Extension indicating consent that certs from an intermediate CA with name
 // constraints may not be logged (not used in V1)
 const char kNameConstraintNologIntermediateOID[] = "1.3.6.1.4.1.11129.2.4.7";
+// The poison extension
+const char kPoisonOID[] = "1.3.6.1.4.1.11129.2.4.3";
+// Extension for wildcard redacted Precertificate indicating redaction count
+// (not used in V1)
+const char kPrecertificateRedactedLabelOID[] = "1.3.6.1.4.1.11129.2.4.6";
+// Extended Key Usage value for Precertificate signing
+const char kPrecertificateSigningOID[] = "1.3.6.1.4.1.11129.2.4.4";
 
 static const char kSCTListSN[] = "ctSCT";
 static const char kSCTListLN[] =

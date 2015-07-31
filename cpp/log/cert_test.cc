@@ -436,26 +436,26 @@ TEST_F(CertTest, SignatureAlgorithmMatches) {
 }
 
 TEST_F(CertTest, TestIsRedactedHost) {
-  EXPECT_FALSE(Cert::IsRedactedHost(""));
-  EXPECT_FALSE(Cert::IsRedactedHost("example.com"));
+  EXPECT_FALSE(cert_trans::IsRedactedHost(""));
+  EXPECT_FALSE(cert_trans::IsRedactedHost("example.com"));
 
-  EXPECT_TRUE(Cert::IsRedactedHost("?.example.com"));
-  EXPECT_TRUE(Cert::IsRedactedHost("?.?.example.com"));
-  EXPECT_TRUE(Cert::IsRedactedHost("top.?.example.com"));
+  EXPECT_TRUE(cert_trans::IsRedactedHost("?.example.com"));
+  EXPECT_TRUE(cert_trans::IsRedactedHost("?.?.example.com"));
+  EXPECT_TRUE(cert_trans::IsRedactedHost("top.?.example.com"));
 }
 
 TEST_F(CertTest, TestIsValidRedactedHost) {
-  EXPECT_TRUE(Cert::IsValidRedactedHost("?.example.com"));
-  EXPECT_TRUE(Cert::IsValidRedactedHost("?.?.example.com"));
-  EXPECT_TRUE(Cert::IsValidRedactedHost("*.?.example.com"));
-  EXPECT_TRUE(Cert::IsValidRedactedHost("*.?.?.example.com"));
+  EXPECT_TRUE(cert_trans::IsValidRedactedHost("?.example.com"));
+  EXPECT_TRUE(cert_trans::IsValidRedactedHost("?.?.example.com"));
+  EXPECT_TRUE(cert_trans::IsValidRedactedHost("*.?.example.com"));
+  EXPECT_TRUE(cert_trans::IsValidRedactedHost("*.?.?.example.com"));
 
-  EXPECT_FALSE(Cert::IsValidRedactedHost("top.?.example.com"));
-  EXPECT_FALSE(Cert::IsValidRedactedHost("top.secret.example.?"));
-  EXPECT_FALSE(Cert::IsValidRedactedHost("top.secret.?.com"));
-  EXPECT_FALSE(Cert::IsValidRedactedHost("top.*.secret.?.com"));
-  EXPECT_FALSE(Cert::IsValidRedactedHost("?.*.example.com"));
-  EXPECT_FALSE(Cert::IsValidRedactedHost("*.secret.?.com"));
+  EXPECT_FALSE(cert_trans::IsValidRedactedHost("top.?.example.com"));
+  EXPECT_FALSE(cert_trans::IsValidRedactedHost("top.secret.example.?"));
+  EXPECT_FALSE(cert_trans::IsValidRedactedHost("top.secret.?.com"));
+  EXPECT_FALSE(cert_trans::IsValidRedactedHost("top.*.secret.?.com"));
+  EXPECT_FALSE(cert_trans::IsValidRedactedHost("?.*.example.com"));
+  EXPECT_FALSE(cert_trans::IsValidRedactedHost("*.secret.?.com"));
 }
 
 TEST_F(CertTest, TestNoWildcardRedactionIsValid) {

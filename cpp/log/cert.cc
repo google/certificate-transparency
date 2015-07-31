@@ -37,6 +37,25 @@ static int X509_get_signature_nid(const X509* x) {
 
 namespace cert_trans {
 
+// Convert string from ASN1 and check it doesn't contain nul characters
+string ASN1ToStringAndCheckForNulls(ASN1_STRING *asn1_string,
+                                    string tag,
+                                    Cert::Status& status) {
+  string cpp_string = string(
+      reinterpret_cast<char*>(ASN1_STRING_data(asn1_string)),
+      ASN1_STRING_length(asn1_string));
+
+  // Make sure there isn't an embedded NUL character in the DNS ID
+  if (ASN1_STRING_length(asn1_string) != cpp_string.length()) {
+    LOG(ERROR) << "Embedded null in asn1 string: " << tag;
+    status = Cert::ERROR;
+  } else {
+    status = Cert::TRUE;
+  }
+
+  return cpp_string;
+}
+
 Cert::Cert(X509* x509) : x509_(x509) {
 }
 
@@ -109,6 +128,7 @@ Cert::Status Cert::LoadFromDerBio(BIO *bio_in) {
     LOG(WARNING) << "Input is not a valid encoded certificate";
     LOG_OPENSSL_ERRORS(WARNING);
   }
+  return TRUE;
 }
 
 
@@ -575,7 +595,7 @@ Cert::Status Cert::ExtensionStructure(int extension_nid,
   return TRUE;
 }
 
-bool Cert::IsRedactedHost(const string& hostname) {
+bool IsRedactedHost(const string& hostname) {
   // Split the hostname on '.' characters
   const vector<string> tokens(util::split(hostname, '.'));
 
@@ -588,7 +608,7 @@ bool Cert::IsRedactedHost(const string& hostname) {
   return false;
 }
 
-bool Cert::IsValidRedactedHost(const string& hostname) {
+bool IsValidRedactedHost(const string& hostname) {
   // Split the hostname on '.' characters
   const vector<string> tokens(util::split(hostname, '.'));
 
@@ -630,22 +650,22 @@ Cert::Status Cert::IsValidWildcardRedaction() const {
   STACK_OF(GENERAL_NAME)* subject_alt_names = (STACK_OF(GENERAL_NAME)*)
       X509_get_ext_d2i(x509_, NID_subject_alt_name, NULL, NULL);
 
-  if (subject_alt_names != NULL) {
+  if (subject_alt_names != nullptr) {
     const int subject_alt_name_count = sk_GENERAL_NAME_num(subject_alt_names);
 
     for (int i = 0; i < subject_alt_name_count; ++i) {
       GENERAL_NAME* name = sk_GENERAL_NAME_value(subject_alt_names, i);
 
-      if (name -> type == GEN_DNS) {
-        string dns_name = string(
-            reinterpret_cast<char*>(ASN1_STRING_data(name->d.dNSName)),
-            ASN1_STRING_length(name->d.dNSName));
+      Cert::Status name_status;
 
-        // Make sure there isn't an embedded NUL character in the DNS ID
-        if (ASN1_STRING_length(name->d.dNSName) != dns_name.length()) {
-          LOG(ERROR) << "Embedded null in DNS-ID";
+      if (name -> type == GEN_DNS) {
+        const string dns_name = ASN1ToStringAndCheckForNulls(name->d.dNSName,
+                                                             "DNS name",
+                                                             name_status);
+
+        if (name_status != TRUE) {
           sk_GENERAL_NAME_free(subject_alt_names);
-          return Cert::ERROR;
+          return name_status;
         }
 
         dns_alt_names.push_back(dns_name);
@@ -670,7 +690,7 @@ Cert::Status Cert::IsValidWildcardRedaction() const {
   // TODO(mhs): Confirm it's valid to not have a CN.
   X509_NAME* name = X509_get_subject_name(x509_);
 
-  if (name == NULL) {
+  if (name == nullptr) {
     LOG(ERROR) << "Missing X509 subject name";
     return Cert::ERROR;
   }
@@ -685,20 +705,17 @@ Cert::Status Cert::IsValidWildcardRedaction() const {
     if (name_entry != NULL) {
       ASN1_STRING *subject_name_asn1 = X509_NAME_ENTRY_get_data(name_entry);
 
-      if (subject_name_asn1 == NULL) {
+      if (subject_name_asn1 == nullptr) {
         LOG(WARNING) << "Missing subject name";
         // TODO(mhs_: Check this is correct behaviour. Is it OK to not have
         // a subject?
       } else {
-        common_name = string(
-            reinterpret_cast<char*>(ASN1_STRING_data(subject_name_asn1)),
-            ASN1_STRING_length(subject_name_asn1));
+        Cert::Status cn_status;
+        common_name = ASN1ToStringAndCheckForNulls(subject_name_asn1,
+                                                   "CN", cn_status);
 
-        // Make sure there isn't an embedded NUL character in the CN
-        if ((size_t) ASN1_STRING_length(subject_name_asn1)
-            != common_name.length()) {
-          LOG(ERROR) << "Embedded null in subject CN";
-          return Cert::ERROR;
+        if (cn_status != TRUE) {
+          return cn_status;
         }
       }
     }

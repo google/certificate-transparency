@@ -11,6 +11,12 @@
 
 namespace cert_trans {
 
+// Tests if a hostname contains any redactions ('?' elements). If it does
+// not then there is no need to apply the validation below
+bool IsRedactedHost(const std::string& hostname);
+// Tests if a hostname containing any redactions follows the RFC rules
+bool IsValidRedactedHost(const std::string& hostname);
+
 class Cert {
  public:
   // Takes ownership of the X509 structure. It's advisable to check
@@ -192,11 +198,6 @@ class Cert {
   // Tests if a certificate correctly follows the rules for name constrained
   // intermediate CA
   Cert::Status IsValidNameConstrainedIntermediateCa() const;
-  // Tests if a hostname contains any redactions ('?' elements). If it does
-  // not then there is no need to apply the validation below
-  static bool IsRedactedHost(const std::string& hostname);
-  // Tests if a hostname containing any redactions follows the RFC rules
-  static bool IsValidRedactedHost(const std::string& hostname);
 
   // CertChecker needs access to the x509_ structure directly.
   friend class CertChecker;
