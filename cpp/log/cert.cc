@@ -19,6 +19,7 @@
 #include <vector>
 
 using std::string;
+using std::vector;
 using std::unique_ptr;
 using util::ClearOpenSSLErrors;
 
@@ -39,7 +40,7 @@ namespace cert_trans {
 Cert::Cert(X509* x509) : x509_(x509) {
 }
 
-Cert::Cert(const std::string& pem_string) : x509_(NULL) {
+Cert::Cert(const string& pem_string) : x509_(NULL) {
   // A read-only bio.
   BIO* bio_in = BIO_new_mem_buf(const_cast<char*>(pem_string.data()),
                                 pem_string.length());
@@ -52,7 +53,7 @@ Cert::Cert(const std::string& pem_string) : x509_(NULL) {
   BIO_free(bio_in);
 
   if (x509_ == NULL) {
-    // At this point most likely the input was just corrupt. There are few
+    // At this point most likely the input was just corrupt. There are a few
     // real errors that may have happened (a malloc failure is one) and it is
     // virtually impossible to fish them out.
     LOG(WARNING) << "Input is not a valid PEM-encoded certificate";
@@ -76,7 +77,7 @@ Cert* Cert::Clone() const {
   return clone;
 }
 
-Cert::Status Cert::LoadFromDerString(const std::string& der_string) {
+Cert::Status Cert::LoadFromDerString(const string& der_string) {
   if (x509_ != NULL) {
     X509_free(x509_);
     x509_ = NULL;
@@ -93,14 +94,15 @@ Cert::Status Cert::LoadFromDerString(const std::string& der_string) {
 }
 
 Cert::Status Cert::LoadFromDerBio(BIO *bio_in) {
-  if (x509_ != NULL) {
+  if (x509_) {
+    // TODO(AlCutter): Use custom deallocator
     X509_free(x509_);
-    x509_ = NULL;
+    x509_ = nullptr;
   }
 
   x509_ = d2i_X509_bio(bio_in, &x509_);
 
-  if (x509_ == NULL) {
+  if (!x509_) {
     // At this point most likely the input was just corrupt. There are few
     // real errors that may have happened (a malloc failure is one) and it is
     // virtually impossible to fish them out.
@@ -533,8 +535,9 @@ Cert::Status Cert::GetExtension(int extension_nid,
                                 X509_EXTENSION** ext) const {
   int extension_index;
   Status status = ExtensionIndex(extension_nid, &extension_index);
-  if (status != TRUE)
+  if (status != TRUE) {
     return status;
+  }
 
   *ext = X509_get_ext(x509_, extension_index);
   if (*ext == NULL) {
@@ -572,11 +575,11 @@ Cert::Status Cert::ExtensionStructure(int extension_nid,
   return TRUE;
 }
 
-bool Cert::IsRedactedHost(const std::string& hostname) {
+bool Cert::IsRedactedHost(const string& hostname) {
   // Split the hostname on '.' characters
-  std::vector<string> tokens = util::split(hostname, '.');
+  const vector<string> tokens(util::split(hostname, '.'));
 
-  for (string str : tokens) {
+  for (const string& str : tokens) {
     if (str == "?") {
       return true;
     }
@@ -585,9 +588,9 @@ bool Cert::IsRedactedHost(const std::string& hostname) {
   return false;
 }
 
-bool Cert::IsValidRedactedHost(const std::string& hostname) {
+bool Cert::IsValidRedactedHost(const string& hostname) {
   // Split the hostname on '.' characters
-  std::vector<string> tokens = util::split(hostname, '.');
+  const vector<string> tokens(util::split(hostname, '.'));
 
   // Enforces the following rules: '?' must be to left of non redactions
   // If first label is '*' then treat it as if it was a redaction
@@ -618,23 +621,23 @@ Cert::Status Cert::IsValidWildcardRedaction() const {
     return Cert::ERROR;
   }
 
-  std::string common_name;
-  std::vector<std::string> dns_alt_names;
+  string common_name;
+  vector<string> dns_alt_names;
   int redacted_name_count = 0;
 
   // First. Check all the Subject Alt Name extension records. Any that are of
   // type DNS must pass validation if they are attempting to redact labels
-  STACK_OF(GENERAL_NAME) * subject_alt_names = (STACK_OF(GENERAL_NAME) *)
+  STACK_OF(GENERAL_NAME)* subject_alt_names = (STACK_OF(GENERAL_NAME)*)
       X509_get_ext_d2i(x509_, NID_subject_alt_name, NULL, NULL);
 
   if (subject_alt_names != NULL) {
-    int subject_alt_name_count = sk_GENERAL_NAME_num(subject_alt_names);
+    const int subject_alt_name_count = sk_GENERAL_NAME_num(subject_alt_names);
 
     for (int i = 0; i < subject_alt_name_count; ++i) {
       GENERAL_NAME* name = sk_GENERAL_NAME_value(subject_alt_names, i);
 
       if (name -> type == GEN_DNS) {
-        std::string dns_name = std::string(
+        string dns_name = string(
             reinterpret_cast<char*>(ASN1_STRING_data(name->d.dNSName)),
             ASN1_STRING_length(name->d.dNSName));
 
@@ -687,7 +690,7 @@ Cert::Status Cert::IsValidWildcardRedaction() const {
         // TODO(mhs_: Check this is correct behaviour. Is it OK to not have
         // a subject?
       } else {
-        common_name = std::string(
+        common_name = string(
             reinterpret_cast<char*>(ASN1_STRING_data(subject_name_asn1)),
             ASN1_STRING_length(subject_name_asn1));
 
@@ -734,7 +737,7 @@ Cert::Status Cert::IsValidWildcardRedaction() const {
                                    d2i_ASN1_INTEGER, ASN1_INTEGER_free);
 
   if (integers != NULL) {
-    int num_integers = sk_ASN1_INTEGER_num(integers);
+    const int num_integers = sk_ASN1_INTEGER_num(integers);
 
     // RFC text says there MUST NOT be more integers than there are DNS ids
     if (num_integers > dns_alt_names.size()) {
@@ -750,7 +753,7 @@ Cert::Status Cert::IsValidWildcardRedaction() const {
       ASN1_INTEGER* redacted_labels = sk_ASN1_INTEGER_value(integers, i);
       BIGNUM *value = ASN1_INTEGER_to_BN(redacted_labels, NULL);
 
-      int neg = value -> neg;
+      const bool neg = value -> neg;
       ASN1_INTEGER_free(redacted_labels);
 
       if (neg) {
@@ -786,7 +789,7 @@ Cert::Status Cert::IsValidNameConstrainedIntermediateCa() const {
     return Cert::TRUE;
   }
 
-  // So there now must be a CT exension and the name constraint must not be
+  // So there now must be a CT extension and the name constraint must not be
   // in error
   if (HasExtension(NID_name_constraints) != Cert::TRUE
       || HasExtension(NID_ctNameConstraintNologIntermediateCa) != Cert::TRUE) {
@@ -890,7 +893,7 @@ TbsCertificate::~TbsCertificate() {
     X509_free(x509_);
 }
 
-Cert::Status TbsCertificate::DerEncoding(std::string* result) const {
+Cert::Status TbsCertificate::DerEncoding(string* result) const {
   if (!IsLoaded()) {
     LOG(ERROR) << "TBS not loaded";
     return Cert::ERROR;
@@ -1138,7 +1141,7 @@ Cert::Status CertChain::IsValidCaIssuerChainMaybeLegacyRoot() const {
   }
 
   Cert::Status status;
-  for (std::vector<Cert*>::const_iterator it = chain_.begin();
+  for (vector<Cert*>::const_iterator it = chain_.begin();
        it + 1 < chain_.end(); ++it) {
     Cert* subject = *it;
     Cert* issuer = *(it + 1);
@@ -1168,7 +1171,7 @@ Cert::Status CertChain::IsValidSignatureChain() const {
   }
 
   Cert::Status status;
-  for (std::vector<Cert*>::const_iterator it = chain_.begin();
+  for (vector<Cert*>::const_iterator it = chain_.begin();
        it + 1 < chain_.end(); ++it) {
     Cert* subject = *it;
     Cert* issuer = *(it + 1);
@@ -1180,7 +1183,7 @@ Cert::Status CertChain::IsValidSignatureChain() const {
 }
 
 void CertChain::ClearChain() {
-  std::vector<Cert*>::const_iterator it;
+  vector<Cert*>::const_iterator it;
   for (it = chain_.begin(); it < chain_.end(); ++it)
     delete *it;
   chain_.clear();
