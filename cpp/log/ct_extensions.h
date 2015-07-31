@@ -12,7 +12,6 @@ void LoadCtExtensions();
 typedef struct RedactedLabelCount_st {
   STACK_OF(ASN1_INTEGER)* redacted_labels;
 } REDACTED_LABEL_COUNT;
-//DECLARE_ASN1_ITEM(REDACTED_LABEL_COUNT)
 
 // Defines asn.1 for redacted label count as a SEQUENCE OF ASN1_INTEGER
 ASN1_SEQUENCE(REDACTED_LABEL_COUNT) = {
