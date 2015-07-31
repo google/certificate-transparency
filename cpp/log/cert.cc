@@ -687,7 +687,7 @@ Cert::Status Cert::IsValidWildcardRedaction() const {
 
   // The next stage of validation is that if the subject name CN exists it
   // must match the first DNS id and have the same labels redacted
-  // TODO(mhs): Confirm it's valid to not have a CN.
+  // TODO: Confirm it's valid to not have a CN.
   X509_NAME* name = X509_get_subject_name(x509_);
 
   if (name == nullptr) {
@@ -707,7 +707,7 @@ Cert::Status Cert::IsValidWildcardRedaction() const {
 
       if (subject_name_asn1 == nullptr) {
         LOG(WARNING) << "Missing subject name";
-        // TODO(mhs_: Check this is correct behaviour. Is it OK to not have
+        // TODO: Check this is correct behaviour. Is it OK to not have
         // a subject?
       } else {
         Cert::Status cn_status;
@@ -845,7 +845,7 @@ Cert::Status Cert::IsValidNameConstrainedIntermediateCa() const {
   bool seen_ipv4 = false;
   bool seen_ipv6 = false;
 
-  // TODO(mhs): Does not handle more complex cases at the moment and I'm
+  // TODO: Does not handle more complex cases at the moment and I'm
   // not sure whether it should. E.g. a combination of multiple entries
   // that end up covering the whole available range. For the moment
   // things similar to the example in the RFC work.
