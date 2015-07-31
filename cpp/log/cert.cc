@@ -1,9 +1,11 @@
 /* -*- indent-tabs-mode: nil -*- */
 #include "log/cert.h"
+#include "log/ct_extensions.h"
+#include "merkletree/serial_hasher.h"
+#include "util/openssl_util.h"  // For LOG_OPENSSL_ERRORS
+#include "util/util.h"
 
 #include <glog/logging.h>
-#include <util/util.h>
-#include <memory>
 #include <openssl/asn1.h>
 #include <openssl/bio.h>
 #include <openssl/err.h>
@@ -11,13 +13,10 @@
 #include <openssl/pem.h>
 #include <openssl/x509.h>
 #include <openssl/x509v3.h>
+#include <memory>
 #include <string>
 #include <time.h>
 #include <vector>
-
-#include "log/ct_extensions.h"
-#include "merkletree/serial_hasher.h"
-#include "util/openssl_util.h"  // For LOG_OPENSSL_ERRORS
 
 using std::string;
 using std::unique_ptr;
