@@ -1093,8 +1093,8 @@ Cert::Status TbsCertificate::ExtensionIndex(int extension_nid,
 
 CertChain::CertChain(const string& pem_string) {
   // A read-only BIO.
-  BIO* bio_in = BIO_new_mem_buf(const_cast<char*>(pem_string.data()),
-                                pem_string.length());
+  BIO* const bio_in(BIO_new_mem_buf(const_cast<char*>(pem_string.data()),
+                                pem_string.length()));
   if (bio_in == NULL) {
     LOG_OPENSSL_ERRORS(ERROR);
     return;
