@@ -213,6 +213,8 @@ class Cert {
   Status ExtensionIndex(int extension_nid, int* extension_index) const;
   Status GetExtension(int extension_nid, X509_EXTENSION** ext) const;
   Status ExtensionStructure(int extension_nid, void** ext_struct) const;
+  bool ValidateRedactionSubjectAltNameAndCN(int *dns_alt_name_count,
+                                            Status *status) const;
   static std::string PrintName(X509_NAME* name);
   static std::string PrintTime(ASN1_TIME* when);
   static Status DerEncodedName(X509_NAME* name, std::string* result);
