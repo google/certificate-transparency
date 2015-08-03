@@ -39,18 +39,17 @@ namespace cert_trans {
 
 // Convert string from ASN1 and check it doesn't contain nul characters
 string ASN1ToStringAndCheckForNulls(ASN1_STRING *asn1_string,
-                                    string tag,
-                                    Cert::Status& status) {
-  string cpp_string = string(
-      reinterpret_cast<char*>(ASN1_STRING_data(asn1_string)),
-      ASN1_STRING_length(asn1_string));
+                                    const string& tag,
+                                    Cert::Status* status) {
+  const string cpp_string(reinterpret_cast<char*>(
+      ASN1_STRING_data(asn1_string)), ASN1_STRING_length(asn1_string));
 
   // Make sure there isn't an embedded NUL character in the DNS ID
   if (ASN1_STRING_length(asn1_string) != cpp_string.length()) {
     LOG(ERROR) << "Embedded null in asn1 string: " << tag;
-    status = Cert::ERROR;
+    *status = Cert::ERROR;
   } else {
-    status = Cert::TRUE;
+    *status = Cert::TRUE;
   }
 
   return cpp_string;
@@ -59,7 +58,7 @@ string ASN1ToStringAndCheckForNulls(ASN1_STRING *asn1_string,
 Cert::Cert(X509* x509) : x509_(x509) {
 }
 
-Cert::Cert(const string& pem_string) : x509_(NULL) {
+Cert::Cert(const string& pem_string) : x509_(nullptr) {
   // A read-only bio.
   BIO* bio_in = BIO_new_mem_buf(const_cast<char*>(pem_string.data()),
                                 pem_string.length());
@@ -87,7 +86,7 @@ Cert::~Cert() {
 
 Cert* Cert::Clone() const {
   X509* x509 = NULL;
-  if (x509_ != NULL) {
+  if (x509_) {
     x509 = X509_dup(x509_);
     if (x509 == NULL)
       LOG_OPENSSL_ERRORS(ERROR);
@@ -120,6 +119,7 @@ Cert::Status Cert::LoadFromDerBio(BIO *bio_in) {
   }
 
   x509_ = d2i_X509_bio(bio_in, &x509_);
+  CHECK_NOTNULL(bio_in);
 
   if (!x509_) {
     // At this point most likely the input was just corrupt. There are few
@@ -635,37 +635,37 @@ bool IsValidRedactedHost(const string& hostname) {
   return true;
 }
 
-Cert::Status Cert::IsValidWildcardRedaction() const {
-  if (!IsLoaded()) {
-    LOG(ERROR) << "Cert not loaded";
-    return Cert::ERROR;
-  }
-
+// Helper method for validating V2 redaction rules. If it returns true
+// then the result in status is final.
+bool Cert::ValidateRedactionSubjectAltNameAndCN(int *dns_alt_name_count,
+                                                Status *status) const {
   string common_name;
-  vector<string> dns_alt_names;
   int redacted_name_count = 0;
+  vector<string> dns_alt_names;
 
   // First. Check all the Subject Alt Name extension records. Any that are of
   // type DNS must pass validation if they are attempting to redact labels
-  STACK_OF(GENERAL_NAME)* subject_alt_names = (STACK_OF(GENERAL_NAME)*)
-      X509_get_ext_d2i(x509_, NID_subject_alt_name, NULL, NULL);
+  STACK_OF(GENERAL_NAME)* subject_alt_names =
+      static_cast<STACK_OF(GENERAL_NAME)*>(
+          X509_get_ext_d2i(x509_, NID_subject_alt_name, NULL, NULL));
 
-  if (subject_alt_names != nullptr) {
+  if (subject_alt_names) {
     const int subject_alt_name_count = sk_GENERAL_NAME_num(subject_alt_names);
 
     for (int i = 0; i < subject_alt_name_count; ++i) {
-      GENERAL_NAME* name = sk_GENERAL_NAME_value(subject_alt_names, i);
+      GENERAL_NAME* const name(sk_GENERAL_NAME_value(subject_alt_names, i));
 
       Cert::Status name_status;
 
-      if (name -> type == GEN_DNS) {
+      if (name->type == GEN_DNS) {
         const string dns_name = ASN1ToStringAndCheckForNulls(name->d.dNSName,
                                                              "DNS name",
-                                                             name_status);
+                                                             &name_status);
 
         if (name_status != TRUE) {
           sk_GENERAL_NAME_free(subject_alt_names);
-          return name_status;
+          *status = name_status;
+          return true;
         }
 
         dns_alt_names.push_back(dns_name);
@@ -674,7 +674,8 @@ Cert::Status Cert::IsValidWildcardRedaction() const {
           if (!IsValidRedactedHost(dns_name)) {
             LOG(WARNING) << "Invalid redacted host: " << dns_name;
             sk_GENERAL_NAME_free(subject_alt_names);
-            return Cert::FALSE;
+            *status = Cert::FALSE;
+            return true;
           }
 
           redacted_name_count++;
@@ -688,11 +689,12 @@ Cert::Status Cert::IsValidWildcardRedaction() const {
   // The next stage of validation is that if the subject name CN exists it
   // must match the first DNS id and have the same labels redacted
   // TODO: Confirm it's valid to not have a CN.
-  X509_NAME* name = X509_get_subject_name(x509_);
+  X509_NAME* const name(X509_get_subject_name(x509_));
 
-  if (name == nullptr) {
+  if (!name) {
     LOG(ERROR) << "Missing X509 subject name";
-    return Cert::ERROR;
+    *status = Cert::ERROR;
+    return true;
   }
 
   int name_pos = -1;
@@ -700,22 +702,24 @@ Cert::Status Cert::IsValidWildcardRedaction() const {
   name_pos = X509_NAME_get_index_by_NID(name, NID_commonName, name_pos);
 
   if (name_pos >= 0) {
-    X509_NAME_ENTRY* name_entry = X509_NAME_get_entry(name, name_pos);
+    X509_NAME_ENTRY* const name_entry(X509_NAME_get_entry(name, name_pos));
 
-    if (name_entry != NULL) {
-      ASN1_STRING *subject_name_asn1 = X509_NAME_ENTRY_get_data(name_entry);
+    if (name_entry) {
+      ASN1_STRING * const subject_name_asn1(
+          X509_NAME_ENTRY_get_data(name_entry));
 
-      if (subject_name_asn1 == nullptr) {
+      if (!subject_name_asn1) {
         LOG(WARNING) << "Missing subject name";
         // TODO: Check this is correct behaviour. Is it OK to not have
         // a subject?
       } else {
         Cert::Status cn_status;
         common_name = ASN1ToStringAndCheckForNulls(subject_name_asn1,
-                                                   "CN", cn_status);
+                                                   "CN", &cn_status);
 
         if (cn_status != TRUE) {
-          return cn_status;
+          *status = cn_status;
+          return true;
         }
       }
     }
@@ -727,7 +731,8 @@ Cert::Status Cert::IsValidWildcardRedaction() const {
     if (dns_alt_names[0] != common_name) {
       LOG(WARNING) << "CN " << common_name << " does not match DNS.0 "
           << dns_alt_names[0];
-      return Cert::FALSE;
+      *status = Cert::FALSE;
+      return true;
     }
   }
 
@@ -736,7 +741,28 @@ Cert::Status Cert::IsValidWildcardRedaction() const {
   // we found any redacted names. First though if nothing is redacted
   // then the rest of the rules need not be applied
   if (redacted_name_count == 0 && !IsRedactedHost(common_name)) {
-    return Cert::TRUE;
+    *status = Cert::TRUE;
+    return true;
+  }
+
+  *dns_alt_name_count = dns_alt_names.size();
+  return false; // validation has no definite result yet
+}
+
+Cert::Status Cert::IsValidWildcardRedaction() const {
+  if (!IsLoaded()) {
+    LOG(ERROR) << "Cert not loaded";
+    return Cert::ERROR;
+  }
+
+  Cert::Status status(ERROR);
+  int dns_alt_name_count = 0;
+
+  // First we apply all the checks to the subject CN and the list of DNS
+  // names in subject alt names. If these checks have a definite result
+  // then return it immediately.
+  if (ValidateRedactionSubjectAltNameAndCN(&dns_alt_name_count, &status)) {
+    return status;
   }
 
   // If we reach here then the RFC says the CT redaction count extension
@@ -749,17 +775,17 @@ Cert::Status Cert::IsValidWildcardRedaction() const {
   }
 
   // Unpack the extension contents, which should be SEQUENCE OF INTEGER
-  STACK_OF(ASN1_INTEGER)* integers = (STACK_OF(ASN1_INTEGER)*)
+  STACK_OF(ASN1_INTEGER)* const integers(static_cast<STACK_OF(ASN1_INTEGER)*>(
       ASN1_seq_unpack_ASN1_INTEGER(exty->value->data, exty->value->length,
-                                   d2i_ASN1_INTEGER, ASN1_INTEGER_free);
+                                   d2i_ASN1_INTEGER, ASN1_INTEGER_free)));
 
   if (integers != NULL) {
     const int num_integers = sk_ASN1_INTEGER_num(integers);
 
     // RFC text says there MUST NOT be more integers than there are DNS ids
-    if (num_integers > dns_alt_names.size()) {
+    if (num_integers > dns_alt_name_count) {
       LOG(WARNING) << "Too many integers in extension: " << num_integers
-          << " but only " << dns_alt_names.size() << " DNS names";
+          << " but only " << dns_alt_name_count << " DNS names";
       sk_ASN1_INTEGER_free(integers);
       return Cert::FALSE;
     }
@@ -767,8 +793,8 @@ Cert::Status Cert::IsValidWildcardRedaction() const {
     // All the integers in the sequence must be positive, check the sign
     // after conversion to BIGNUM
     for (int i = 0; i < num_integers; ++i) {
-      ASN1_INTEGER* redacted_labels = sk_ASN1_INTEGER_value(integers, i);
-      BIGNUM *value = ASN1_INTEGER_to_BN(redacted_labels, NULL);
+      ASN1_INTEGER* const redacted_labels(sk_ASN1_INTEGER_value(integers, i));
+      BIGNUM* const value(ASN1_INTEGER_to_BN(redacted_labels, nullptr));
 
       const bool neg = value -> neg;
       ASN1_INTEGER_free(redacted_labels);
@@ -815,10 +841,10 @@ Cert::Status Cert::IsValidNameConstrainedIntermediateCa() const {
   }
 
   int crit;
-  NAME_CONSTRAINTS* nc = (NAME_CONSTRAINTS *) X509_get_ext_d2i(
-      x509_, NID_name_constraints, &crit, NULL);
+  NAME_CONSTRAINTS* const nc((NAME_CONSTRAINTS *) X509_get_ext_d2i(
+      x509_, NID_name_constraints, &crit, nullptr));
 
-  if (nc == NULL || crit == -1) {
+  if (!nc || crit == -1) {
     LOG(ERROR) << "Couldn't parse the name constraint extension";
     return Cert::ERROR;
   }
@@ -830,10 +856,10 @@ Cert::Status Cert::IsValidNameConstrainedIntermediateCa() const {
   for (int permitted_subtree = 0;
       permitted_subtree < sk_GENERAL_SUBTREE_num(nc->permittedSubtrees);
       ++permitted_subtree) {
-    GENERAL_SUBTREE *perm_subtree = sk_GENERAL_SUBTREE_value(
-        nc->permittedSubtrees, permitted_subtree);
+    GENERAL_SUBTREE * const perm_subtree(sk_GENERAL_SUBTREE_value(
+        nc->permittedSubtrees, permitted_subtree));
 
-    if (perm_subtree->base != NULL && perm_subtree->base->type == GEN_DNS
+    if (perm_subtree->base && perm_subtree->base->type == GEN_DNS
         && perm_subtree->base->d.dNSName->length > 0) {
       seen_dns = true;
     }
@@ -853,11 +879,11 @@ Cert::Status Cert::IsValidNameConstrainedIntermediateCa() const {
       excluded_subtree < sk_GENERAL_SUBTREE_num(nc->excludedSubtrees);
       ++excluded_subtree) {
 
-    GENERAL_SUBTREE *excl_subtree = sk_GENERAL_SUBTREE_value(
-        nc->excludedSubtrees, excluded_subtree);
+    GENERAL_SUBTREE * const excl_subtree(sk_GENERAL_SUBTREE_value(
+        nc->excludedSubtrees, excluded_subtree));
 
     // Only consider entries that are of type ipAddress (OCTET_STRING)
-    if (excl_subtree->base != NULL && excl_subtree->base->type == GEN_IPADD) {
+    if (excl_subtree->base && excl_subtree->base->type == GEN_IPADD) {
       // First check that all the bytes of the string are zero
       bool all_zero = true;
       for (int i = 0; i < excl_subtree->base->d.ip->length; ++i) {
