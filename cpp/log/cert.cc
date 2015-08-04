@@ -38,7 +38,7 @@ static int X509_get_signature_nid(const X509* x) {
 namespace cert_trans {
 
 // Convert string from ASN1 and check it doesn't contain nul characters
-string ASN1ToStringAndCheckForNulls(ASN1_STRING *asn1_string,
+string ASN1ToStringAndCheckForNulls(ASN1_STRING* asn1_string,
                                     const string& tag,
                                     Cert::Status* status) {
   const string cpp_string(reinterpret_cast<char*>(
@@ -111,7 +111,7 @@ Cert::Status Cert::LoadFromDerString(const string& der_string) {
   return Cert::TRUE;
 }
 
-Cert::Status Cert::LoadFromDerBio(BIO *bio_in) {
+Cert::Status Cert::LoadFromDerBio(BIO* bio_in) {
   if (x509_) {
     // TODO(AlCutter): Use custom deallocator
     X509_free(x509_);
@@ -577,7 +577,7 @@ Cert::Status Cert::ExtensionStructure(int extension_nid,
   // "extension not found, found more than once or corrupt".
   Cert::Status status = HasExtension(extension_nid);
   if (status != TRUE)
-      return status;
+    return status;
 
   int crit;
 
@@ -705,7 +705,7 @@ bool Cert::ValidateRedactionSubjectAltNameAndCN(int *dns_alt_name_count,
     X509_NAME_ENTRY* const name_entry(X509_NAME_get_entry(name, name_pos));
 
     if (name_entry) {
-      ASN1_STRING * const subject_name_asn1(
+      ASN1_STRING* const subject_name_asn1(
           X509_NAME_ENTRY_get_data(name_entry));
 
       if (!subject_name_asn1) {
@@ -730,7 +730,7 @@ bool Cert::ValidateRedactionSubjectAltNameAndCN(int *dns_alt_name_count,
   if (!dns_alt_names.empty() && common_name.length() > 0) {
     if (dns_alt_names[0] != common_name) {
       LOG(WARNING) << "CN " << common_name << " does not match DNS.0 "
-          << dns_alt_names[0];
+                   << dns_alt_names[0];
       *status = Cert::FALSE;
       return true;
     }
@@ -746,7 +746,7 @@ bool Cert::ValidateRedactionSubjectAltNameAndCN(int *dns_alt_name_count,
   }
 
   *dns_alt_name_count = dns_alt_names.size();
-  return false; // validation has no definite result yet
+  return false;  // validation has no definite result yet
 }
 
 Cert::Status Cert::IsValidWildcardRedaction() const {
@@ -785,7 +785,7 @@ Cert::Status Cert::IsValidWildcardRedaction() const {
     // RFC text says there MUST NOT be more integers than there are DNS ids
     if (num_integers > dns_alt_name_count) {
       LOG(WARNING) << "Too many integers in extension: " << num_integers
-          << " but only " << dns_alt_name_count << " DNS names";
+                   << " but only " << dns_alt_name_count << " DNS names";
       sk_ASN1_INTEGER_free(integers);
       return Cert::FALSE;
     }
@@ -796,12 +796,12 @@ Cert::Status Cert::IsValidWildcardRedaction() const {
       ASN1_INTEGER* const redacted_labels(sk_ASN1_INTEGER_value(integers, i));
       BIGNUM* const value(ASN1_INTEGER_to_BN(redacted_labels, nullptr));
 
-      const bool neg = value -> neg;
+      const bool neg = value->neg;
       ASN1_INTEGER_free(redacted_labels);
 
       if (neg) {
         LOG(WARNING) << "Invalid negative redaction label count: "
-            << BN_bn2hex(value);
+                     << BN_bn2hex(value);
         BN_free(value);
         sk_ASN1_INTEGER_free(integers);
         return Cert::FALSE;
@@ -896,7 +896,7 @@ Cert::Status Cert::IsValidNameConstrainedIntermediateCa() const {
         if (excl_subtree->base->d.ip->length == 32) {
           // IPv6
           seen_ipv6 = true;
-        } if (excl_subtree->base->d.ip->length == 8) {
+        } else if (excl_subtree->base->d.ip->length == 8) {
           // IPv4
           seen_ipv4 = true;
         }
@@ -1094,7 +1094,7 @@ Cert::Status TbsCertificate::ExtensionIndex(int extension_nid,
 CertChain::CertChain(const string& pem_string) {
   // A read-only BIO.
   BIO* const bio_in(BIO_new_mem_buf(const_cast<char*>(pem_string.data()),
-                                pem_string.length()));
+                                    pem_string.length()));
   if (bio_in == NULL) {
     LOG_OPENSSL_ERRORS(ERROR);
     return;

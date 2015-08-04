@@ -63,7 +63,7 @@ class Cert {
 
   // Frees the old X509 and attempts to load from BIO in DER form. Caller
   // still owns the BIO afterwards.
-  Status LoadFromDerBio(BIO *bio_in);
+  Status LoadFromDerBio(BIO* bio_in);
 
   // These just return an empty string if an error occurs.
   std::string PrintIssuerName() const;
@@ -213,8 +213,8 @@ class Cert {
   Status ExtensionIndex(int extension_nid, int* extension_index) const;
   Status GetExtension(int extension_nid, X509_EXTENSION** ext) const;
   Status ExtensionStructure(int extension_nid, void** ext_struct) const;
-  bool ValidateRedactionSubjectAltNameAndCN(int *dns_alt_name_count,
-                                            Status *status) const;
+  bool ValidateRedactionSubjectAltNameAndCN(int* dns_alt_name_count,
+                                            Status* status) const;
   static std::string PrintName(X509_NAME* name);
   static std::string PrintTime(ASN1_TIME* when);
   static Status DerEncodedName(X509_NAME* name, std::string* result);
