@@ -104,11 +104,10 @@ class CertificateReport(object):
     __metaclass__ = abc.ABCMeta
 
     def __init__(self, checks=all_checks.ALL_CHECKS,
-                 pool_size=FLAGS.reporter_workers,
-                 queue_size=FLAGS.reporter_queue_size):
+                 queue_size=None):
         self.reset()
         self.checks = checks
-        self._jobs = Queue(queue_size)
+        self._jobs = Queue(queue_size or FLAGS.reporter_queue_size)
         self._pool = None
         self._writing_handler = None
 

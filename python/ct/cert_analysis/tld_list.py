@@ -13,7 +13,10 @@ TLD_LIST_ADDR = "https://publicsuffix.org/list/effective_tld_names.dat"
 class TLDList(object):
     """Contains list of top-level domains"""
     NOT_ADDRESS_REGEX = re.compile('[^a-z0-9\-.*]')
-    def __init__(self, tld_dir=FLAGS.tld_list_dir, tld_file_name="tld_list"):
+    def __init__(self, tld_dir=None, tld_file_name='tld_list'):
+        if tld_dir is None:
+            tld_dir = FLAGS.tld_list_dir
+
         tld_file = '/'.join((tld_dir, tld_file_name))
         try:
             with open(tld_file, 'r') as f:
