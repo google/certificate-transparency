@@ -1,4 +1,4 @@
-package fix_chain
+package fixchain
 
 import (
 	"errors"
