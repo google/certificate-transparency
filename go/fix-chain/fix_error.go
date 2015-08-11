@@ -17,6 +17,7 @@ const (
 	VerifyFailed
 )
 
+// Errors in the fixing process are reported in this structure.
 type FixError struct {
 	Type  ErrorType
 	Cert  *x509.Certificate   // The supplied leaf certificate
@@ -26,6 +27,7 @@ type FixError struct {
 	Error error               // And the error
 }
 
+// Return a string describing e.Type
 func (e FixError) TypeString() string {
 	switch e.Type {
 	case ParseFailure:
@@ -43,6 +45,7 @@ func (e FixError) TypeString() string {
 	}
 }
 
+// Convert an error to a (mostly) human readable string
 func (e FixError) String() (s string) {
 	s = e.TypeString() + "\n"
 	if e.Error != nil {
@@ -61,6 +64,7 @@ func (e FixError) String() (s string) {
 	return
 }
 
+// Convert an error to JSON
 func (e FixError) MarshalJSON() ([]byte, error) {
 	var b bytes.Buffer
 	j := json.NewEncoder(&b)

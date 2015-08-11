@@ -15,6 +15,8 @@ import (
 	"time"
 )
 
+// Stringify a chain in PEM format (FIXME: move all dumpers/printers
+// to one file?)
 func DumpChainPEM(chain []*x509.Certificate) string {
 	var p string
 	for _, cert := range chain {
@@ -24,6 +26,7 @@ func DumpChainPEM(chain []*x509.Certificate) string {
 	return p
 }
 
+// Stringify some bytes to PEM format
 func DumpPEM(cert []byte) string {
 	b := pem.Block{Type: "CERTIFICATE", Bytes: cert}
 	return string(pem.EncodeToMemory(&b))
@@ -34,6 +37,7 @@ type toLog struct {
 	retries uint16
 }
 
+// A certificate transparency log
 type Log struct {
 	url    string
 	roots  *x509.CertPool
@@ -56,11 +60,12 @@ type Log struct {
 	errors         chan *FixError
 }
 
-func (s *Log) Posted(cert *x509.Certificate) bool {
+func (s *Log) isPosted(cert *x509.Certificate) bool {
 	return s.postCache[Hash(cert)]
 }
 
-func (s *Log) Roots() *x509.CertPool {
+// The list of root certificates the log accepts
+func (s *Log) rootCerts() *x509.CertPool {
 	if s.roots == nil {
 		s.roots = s.getRoots()
 	}
@@ -180,7 +185,7 @@ func (s *Log) postToLog(l *toLog) {
 	s.posts <- l
 }
 
-func (s *Log) PostChain(chain []*x509.Certificate) {
+func (s *Log) postOneChain(chain []*x509.Certificate) {
 	s.posted++
 	h := Hash(chain[0])
 	if s.postCache[h] {
@@ -205,17 +210,17 @@ func (s *Log) PostChain(chain []*x509.Certificate) {
 	s.postToLog(l)
 }
 
-func (s *Log) PostChains(chains [][]*x509.Certificate) {
+func (s *Log) postChains(chains [][]*x509.Certificate) {
 	for _, chain := range chains {
-		s.PostChain(chain)
+		s.postOneChain(chain)
 	}
 }
 
-func (s *Log) Wait() {
+func (s *Log) wait() {
 	s.wg.Wait()
 }
 
-func NewLog(url string, errors chan *FixError) *Log {
+func newLog(url string, errors chan *FixError) *Log {
 	s := &Log{url: url, posts: make(chan *toLog),
 		postCache: make(map[[HashSize]byte]bool),
 		postChainCache: make(map[[HashSize]byte]bool), errors: errors}
