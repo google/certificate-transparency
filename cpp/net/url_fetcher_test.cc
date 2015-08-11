@@ -315,7 +315,9 @@ int main(int argc, char** argv) {
   struct sockaddr_in hang_addr;
   bzero((char*)&hang_addr, sizeof(hang_addr));
   hang_addr.sin_family = AF_INET;
-  hang_addr.sin_addr.s_addr = INADDR_ANY;
+  // Using LOOPBACK avoids triggering the firewall on some platforms. All
+  // our connections are to localhost
+  hang_addr.sin_addr.s_addr = INADDR_LOOPBACK;
   hang_addr.sin_port = htons(cert_trans::kHangPort);
   CHECK_EQ(0, bind(hang_fd, reinterpret_cast<struct sockaddr*>(&hang_addr),
                    sizeof(hang_addr)));
