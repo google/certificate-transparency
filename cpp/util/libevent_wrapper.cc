@@ -1,3 +1,4 @@
+#include "config.h"
 #include "util/libevent_wrapper.h"
 
 #include <arpa/inet.h>
@@ -61,7 +62,13 @@ void DelayDispatch(evutil_socket_t, short, void* userdata) {
 }
 
 
+#ifdef HAVE_THREAD_LOCAL
 thread_local bool on_event_thread = false;
+#elif HAVE___THREAD
+__thread bool on_event_thread = false;
+#else
+#error No suitable thread local storage available
+#endif
 
 
 }  // namespace
