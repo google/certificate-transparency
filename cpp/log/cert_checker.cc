@@ -4,6 +4,7 @@
 #include <glog/logging.h>
 #include <openssl/asn1.h>
 #include <openssl/bio.h>
+#include <openssl/cms.h>
 #include <openssl/pem.h>
 #include <openssl/x509.h>
 #include <openssl/x509v3.h>
@@ -23,9 +24,7 @@ using util::ClearOpenSSLErrors;
 
 namespace cert_trans {
 
-CertChecker::~CertChecker() {
-  ClearAllTrustedCertificates();
-}
+CertChecker::~CertChecker() { ClearAllTrustedCertificates(); }
 
 bool CertChecker::LoadTrustedCertificates(const string& cert_file) {
   // A read-only BIO.
@@ -54,7 +53,7 @@ bool CertChecker::LoadTrustedCertificates(const vector<string>& trusted_certs) {
   // A read-only memory BIO.
   BIO* bio_in = BIO_new_mem_buf(
       const_cast<void*>(reinterpret_cast<const void*>(concat_certs.c_str())),
-      -1  /* no length, since null-terminated */);
+      -1 /* no length, since null-terminated */);
   if (bio_in == NULL) {
     LOG_OPENSSL_ERRORS(ERROR);
     return false;
@@ -93,7 +92,7 @@ bool CertChecker::LoadTrustedCertificatesFromBIO(BIO* bio_in) {
       }
     } else {
       // See if we reached the end of the file.
-      unsigned long err = ERR_peek_last_error();
+      auto err = ERR_peek_last_error();
       if (ERR_GET_LIB(err) == ERR_LIB_PEM &&
           ERR_GET_REASON(err) == PEM_R_NO_START_LINE) {
         ClearOpenSSLErrors();
@@ -124,20 +123,19 @@ bool CertChecker::LoadTrustedCertificatesFromBIO(BIO* bio_in) {
     certs_to_add.pop_back();
   }
   LOG(INFO) << "Added " << new_certs << " new certificate(s) to trusted store";
+
   return true;
 }
 
 void CertChecker::ClearAllTrustedCertificates() {
   std::multimap<string, const Cert*>::iterator it = trusted_.begin();
-  for (; it != trusted_.end(); ++it)
-    delete it->second;
+  for (; it != trusted_.end(); ++it) delete it->second;
   trusted_.clear();
 }
 
 CertChecker::CertVerifyResult CertChecker::CheckCertChain(
     CertChain* chain) const {
-  if (chain == NULL || !chain->IsLoaded())
-    return INVALID_CERTIFICATE_CHAIN;
+  if (chain == NULL || !chain->IsLoaded()) return INVALID_CERTIFICATE_CHAIN;
 
   // Weed out things that should obviously be precert chains instead.
   Cert::Status status =
@@ -145,8 +143,7 @@ CertChecker::CertVerifyResult CertChecker::CheckCertChain(
   if (status != Cert::TRUE && status != Cert::FALSE) {
     return CertChecker::INTERNAL_ERROR;
   }
-  if (status == Cert::TRUE)
-    return PRECERT_EXTENSION_IN_CERT_CHAIN;
+  if (status == Cert::TRUE) return PRECERT_EXTENSION_IN_CERT_CHAIN;
 
   return CheckIssuerChain(chain);
 }
@@ -161,8 +158,7 @@ CertChecker::CertVerifyResult CertChecker::CheckIssuerChain(
   // Note that it is OK to allow a root cert that is not CA:true
   // because we will later check that it is trusted.
   Cert::Status status = chain->IsValidCaIssuerChainMaybeLegacyRoot();
-  if (status == Cert::FALSE)
-    return INVALID_CERTIFICATE_CHAIN;
+  if (status == Cert::FALSE) return INVALID_CERTIFICATE_CHAIN;
   if (status != Cert::TRUE) {
     LOG(ERROR) << "Failed to check issuer chain";
     return INTERNAL_ERROR;
@@ -179,8 +175,7 @@ CertChecker::CertVerifyResult CertChecker::CheckIssuerChain(
     // failure is intentional.
     return UNSUPPORTED_ALGORITHM_IN_CERT_CHAIN;
   }
-  if (status == Cert::FALSE)
-    return INVALID_CERTIFICATE_CHAIN;
+  if (status == Cert::FALSE) return INVALID_CERTIFICATE_CHAIN;
 
   if (status != Cert::TRUE) {
     LOG(ERROR) << "Failed to check signature chain";
@@ -192,11 +187,9 @@ CertChecker::CertVerifyResult CertChecker::CheckIssuerChain(
 CertChecker::CertVerifyResult CertChecker::CheckPreCertChain(
     PreCertChain* chain, string* issuer_key_hash,
     string* tbs_certificate) const {
-  if (chain == NULL || !chain->IsLoaded())
-    return INVALID_CERTIFICATE_CHAIN;
+  if (chain == NULL || !chain->IsLoaded()) return INVALID_CERTIFICATE_CHAIN;
   Cert::Status status = chain->IsWellFormed();
-  if (status == Cert::FALSE)
-    return PRECERT_CHAIN_NOT_WELL_FORMED;
+  if (status == Cert::FALSE) return PRECERT_CHAIN_NOT_WELL_FORMED;
   if (status != Cert::TRUE) {
     LOG(ERROR) << "Failed to check precert chain format";
     return INTERNAL_ERROR;
@@ -214,8 +207,7 @@ CertChecker::CertVerifyResult CertChecker::CheckPreCertChain(
   // have the necessary EKU set.
   // Preference is "no".
   CertVerifyResult res = CheckIssuerChain(chain);
-  if (res != OK)
-    return res;
+  if (res != OK) return res;
 
   Cert::Status uses_pre_issuer = chain->UsesPrecertSigningCertificate();
   if (uses_pre_issuer != Cert::TRUE && uses_pre_issuer != Cert::FALSE)
@@ -244,10 +236,8 @@ CertChecker::CertVerifyResult CertChecker::CheckPreCertChain(
       tbs.CopyIssuerFrom(*chain->PrecertIssuingCert()) != Cert::TRUE)
     return INTERNAL_ERROR;
 
-
   string der_tbs;
-  if (tbs.DerEncoding(&der_tbs) != Cert::TRUE)
-    return INTERNAL_ERROR;
+  if (tbs.DerEncoding(&der_tbs) != Cert::TRUE) return INTERNAL_ERROR;
 
   issuer_key_hash->assign(key_hash);
   tbs_certificate->assign(der_tbs);
@@ -272,8 +262,7 @@ CertChecker::CertVerifyResult CertChecker::GetTrustedCa(
   CertVerifyResult is_trusted = IsTrusted(*subject, &subject_name);
   // Either an error, or OK, meaning the last cert is in our trusted store.
   // Note the trusted cert need not necessarily be self-signed.
-  if (is_trusted != ROOT_NOT_IN_LOCAL_STORE)
-    return is_trusted;
+  if (is_trusted != ROOT_NOT_IN_LOCAL_STORE) return is_trusted;
 
   string issuer_name;
   Cert::Status status = subject->DerEncodedIssuerName(&issuer_name);
@@ -313,8 +302,7 @@ CertChecker::CertVerifyResult CertChecker::GetTrustedCa(
     }
   }
 
-  if (issuer == NULL)
-    return ROOT_NOT_IN_LOCAL_STORE;
+  if (issuer == NULL) return ROOT_NOT_IN_LOCAL_STORE;
 
   // Clone creates a new Cert but AddCert takes ownership even if Clone
   // failed and the cert can't be added, so we don't have to explicitly
@@ -341,8 +329,7 @@ CertChecker::CertVerifyResult CertChecker::IsTrusted(
   std::pair<std::multimap<string, const Cert*>::const_iterator,
             std::multimap<string, const Cert*>::const_iterator> cand_range =
       trusted_.equal_range(cert_name);
-  for (std::multimap<string, const Cert*>::const_iterator it =
-           cand_range.first;
+  for (std::multimap<string, const Cert*>::const_iterator it = cand_range.first;
        it != cand_range.second; ++it) {
     const Cert* cand = it->second;
     Cert::Status matches = cert.IsIdenticalTo(*cand);
@@ -355,6 +342,106 @@ CertChecker::CertVerifyResult CertChecker::IsTrusted(
     }
   }
   return ROOT_NOT_IN_LOCAL_STORE;
+}
+
+Cert::Status CertChecker::IsCmsSignedByCert(CMS_ContentInfo* const cms,
+                                            const Cert& cert) const {
+  if (!cert.IsLoaded()) {
+    LOG(ERROR) << "Can't check cert signer as it's not loaded";
+    return Cert::ERROR;
+  }
+
+  // This stack must not be freed as it points into the CMS structure
+  STACK_OF(CMS_SignerInfo) * const signers(CMS_get0_SignerInfos(cms));
+
+  if (signers) {
+    for (int s = 0; s < sk_CMS_SignerInfo_num(signers); ++s) {
+      CMS_SignerInfo* const signer = sk_CMS_SignerInfo_value(signers, s);
+
+      if (CMS_SignerInfo_cert_cmp(signer, cert.x509_) == 0) {
+        return Cert::TRUE;
+      }
+    }
+  }
+
+  return Cert::FALSE;
+}
+
+
+Cert::Status CertChecker::UnpackCmsDerBio(BIO* cms_bio_in,
+                                          const CertChain& certChain,
+                                          BIO* cms_bio_out) {
+  const Cert* subject = certChain.LastCert();
+  if (!subject || !subject->IsLoaded()) {
+    LOG(ERROR) << "Chain has no valid certs";
+    return Cert::ERROR;
+  }
+
+  CMS_ContentInfo* const cms_content_info = d2i_CMS_bio(cms_bio_in, nullptr);
+
+  if (!cms_content_info) {
+    LOG(ERROR) << "Could not parse CMS data";
+    LOG_OPENSSL_ERRORS(WARNING);
+    return Cert::ERROR;
+  }
+
+  const ASN1_OBJECT* message_content_type(
+      CMS_get0_eContentType(cms_content_info));
+  int content_type_nid = OBJ_obj2nid(message_content_type);
+  // TODO: Enforce content type here. This is not yet defined in the RFC.
+  if (content_type_nid != NID_ctV2CmsPayloadContentType) {
+    LOG(WARNING) << "CMS message content has unexpected type: "
+                 << content_type_nid;
+  }
+
+  // Convert the validation chain to a certificate stack that can be used with
+  // CMS_verify.
+  STACK_OF(X509)* validation_chain = sk_X509_new(nullptr);
+
+  for (int certNum = 0; certNum < certChain.Length(); ++certNum) {
+    sk_X509_push(validation_chain, certChain.CertAt(certNum)->x509_);
+  }
+
+  // Must set CMS_NOINTERN as the RFC says certs SHOULD be omitted from the
+  // message but the client might not have obeyed this. CMS_BINARY is required
+  // to avoid MIME-related translation. CMS_NO_SIGNER_CERT_VERIFY because we
+  // will do our own checks that the chain is valid and the message may not
+  // be signed directly by a trusted cert. We don't check it's a signed data
+  // object CMS type as OpenSSL does this.
+  int verified = CMS_verify(cms_content_info, validation_chain, nullptr,
+                            nullptr, cms_bio_out,
+                            CMS_NO_SIGNER_CERT_VERIFY | CMS_NOINTERN
+                            | CMS_BINARY);
+
+  sk_X509_free(validation_chain);
+
+  CMS_ContentInfo_free(cms_content_info);
+
+  return (verified == 1) ? Cert::TRUE : Cert::FALSE;
+}
+
+Cert* CertChecker::UnpackCmsSignedCertificate(BIO* cms_bio_in,
+                                              const CertChain& certChain) {
+  BIO* unpacked_bio = BIO_new(BIO_s_mem());
+  Cert* const cert = new Cert();
+
+  if (UnpackCmsDerBio(cms_bio_in, certChain, unpacked_bio) == Cert::TRUE) {
+    // The unpacked data should be a valid DER certificate.
+    // TODO: The RFC does not yet define this as the format so this may
+    // need to change.
+    Cert::Status status = cert->LoadFromDerBio(unpacked_bio);
+
+    if (status != Cert::TRUE) {
+      LOG(WARNING) << "Could not unpack cert from CMS DER encoded data";
+    }
+  } else {
+    LOG_OPENSSL_ERRORS(ERROR);
+  }
+
+  BIO_free(cms_bio_in);
+  BIO_free(unpacked_bio);
+
+  return cert;
 }
 
 }  // namespace cert_trans

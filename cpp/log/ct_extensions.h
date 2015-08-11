@@ -27,6 +27,8 @@ extern int NID_ctPrecertificateSigning;
 // V2 numerical identifiers
 extern int NID_ctPrecertificateRedactedLabelCount;
 extern int NID_ctNameConstraintNologIntermediateCa;
+// V2 payload content type
+extern int NID_ctV2CmsPayloadContentType;
 
 // The official CT OIDs
 // The SCT list in the extension of a superfluous certificate
@@ -39,6 +41,8 @@ extern const char kPoisonOID[];
 extern const char kPrecertificateSigningOID[];
 // Name constrained intermediate CA may not be logged
 extern const char kNameConstraintNologIntermediateOID[];
+// Content type name for Precert V2
+extern const char kV2PrecertPayloadContentType[];
 
 }  // namespace cert_trans
 
