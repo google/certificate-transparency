@@ -7,8 +7,8 @@ import (
 	"github.com/google/certificate-transparency/go/x509"
 )
 
+// FixError types
 type ErrorType int
-
 const (
 	ParseFailure ErrorType = iota
 	CannotFetchURL
