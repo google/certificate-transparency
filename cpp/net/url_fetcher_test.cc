@@ -1,3 +1,5 @@
+#include "config.h"
+
 #include <csignal>
 #include <fcntl.h>
 #include <gflags/gflags.h>
@@ -7,6 +9,9 @@
 #include <sys/stat.h>
 #include <sys/wait.h>
 #include <unistd.h>
+#ifdef HAVE_VFORK_H
+#include <vfork.h>
+#endif
 
 #include "net/connection_pool.h"
 #include "net/url_fetcher.h"
@@ -57,7 +62,12 @@ class LocalhostResolver : public libevent::Base::Resolver {
 pid_t RunOpenSSLServer(uint16_t port, const std::string& cert_file,
                        const std::string& key_file,
                        const std::string& mode = "-www") {
+#ifdef HAVE_WORKING_VFORK
+  pid_t pid(vfork());
+#else
   pid_t pid(fork());
+#endif
+
   if (pid == -1) {
     LOG(INFO) << "fork() failed: " << pid;
   } else if (pid == 0) {
