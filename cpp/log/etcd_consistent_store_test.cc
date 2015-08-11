@@ -289,8 +289,8 @@ TEST_F(EtcdConsistentStoreTest, TestSetServingSTHWontOverwriteWithOlder) {
   EXPECT_EQ(util::error::OUT_OF_RANGE, status.CanonicalCode()) << status;
 }
 
-
-TEST_F(EtcdConsistentStoreDeathTest, TestSetServingSTHChecksInconsistentSize) {
+TEST_F(EtcdConsistentStoreDeathTest,
+       TestSetServingSTHChecksInconsistentSizeDeathTest) {
   ct::SignedTreeHead sth;
   sth.set_timestamp(234);
   sth.set_tree_size(10);
@@ -338,7 +338,7 @@ TEST_F(EtcdConsistentStoreTest,
 
 
 TEST_F(EtcdConsistentStoreDeathTest,
-       TestAddPendingEntryForExistingNonIdenticalEntry) {
+       TestAddPendingEntryForExistingNonIdenticalEntryDeathTest) {
   LoggedCertificate cert(DefaultCert());
   LoggedCertificate other_cert(MakeCert(2342, "something else"));
 
@@ -353,7 +353,7 @@ TEST_F(EtcdConsistentStoreDeathTest,
 
 
 TEST_F(EtcdConsistentStoreDeathTest,
-       TestAddPendingEntryDoesNotAcceptSequencedEntry) {
+       TestAddPendingEntryDoesNotAcceptSequencedEntryDeathTest) {
   LoggedCertificate cert(DefaultCert());
   cert.set_sequence_number(76);
   EXPECT_DEATH(store_->AddPendingEntry(&cert),
@@ -402,7 +402,7 @@ TEST_F(EtcdConsistentStoreTest, TestGetPendingEntries) {
 
 
 TEST_F(EtcdConsistentStoreDeathTest,
-       TestGetPendingEntriesBarfsWithSequencedEntry) {
+       TestGetPendingEntriesBarfsWithSequencedEntryDeathTest) {
   const string kPath(string(kRoot) + "/entries/");
   LoggedCertificate one(MakeSequencedCert(123, "one", 666));
   InsertEntry(kPath + "one", one);
@@ -442,7 +442,7 @@ TEST_F(EtcdConsistentStoreTest,
 
 
 TEST_F(EtcdConsistentStoreDeathTest,
-       TestGetSequenceMappingBarfsOnGapsAboveTreeSize) {
+       TestGetSequenceMappingBarfsOnGapsAboveTreeSizeDeathTest) {
   SignedTreeHead sth;
   sth.set_tree_size(0);
   store_->SetServingSTH(sth);
@@ -482,7 +482,7 @@ TEST_F(EtcdConsistentStoreTest, TestUpdateSequenceMapping) {
 
 
 TEST_F(EtcdConsistentStoreDeathTest,
-       TestUpdateSequenceMappingBarfsWithOutOfOrderSequenceNumber) {
+       TestUpdateSequenceMappingBarfsWithOutOfOrderSequenceNumberDeathTest) {
   EntryHandle<SequenceMapping> mapping;
   Status status(store_->GetSequenceMapping(&mapping));
   EXPECT_EQ(Status::OK, status);
@@ -497,9 +497,9 @@ TEST_F(EtcdConsistentStoreDeathTest,
                "sequence_number\\(\\) < mapping");
 }
 
-
-TEST_F(EtcdConsistentStoreDeathTest,
-       TestUpdateSequenceMappingBarfsWithMappingNonContiguousToServingTree) {
+TEST_F(
+    EtcdConsistentStoreDeathTest,
+    TestUpdateSequenceMappingBarfsMappingNonContiguousToServingTreeDeathTest) {
   SignedTreeHead sth;
   sth.set_timestamp(123);
   sth.set_tree_size(1000);
