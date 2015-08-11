@@ -43,7 +43,7 @@ TEST_F(LibEventWrapperTest, TestTurtlesAllTheWayDown) {
 }
 
 
-TEST_F(LibEventWrapperDeathTest, TestCheckNotOnEventThread) {
+TEST_F(LibEventWrapperDeathTest, TestCheckNotOnEventThreadDeathTest) {
   // Should be fine:
   Base::CheckNotOnEventThread();
   // But...
