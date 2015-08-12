@@ -109,6 +109,21 @@ AC_DEFUN([CT_CHECK_TLS],
      fi
    fi])
 
+AC_DEFUN([CT_CHECK_INADDR_LOOPBACK],
+  [AC_CACHE_CHECK(
+     [whether the platform defines INADDR_LOOPBACK],
+     [ct_cv_inaddr_loopback],
+     [AC_LINK_IFELSE(
+        [AC_LANG_PROGRAM([ #include <netinet/in.h>
+           static int var = INADDR_LOOPBACK;], [return var;])],
+        [ct_cv_inaddr_loopback=yes],
+        [ct_cv_inaddr_loopback=no])])
+   if test $ct_cv_inaddr_loopback = yes; then
+     AC_DEFINE([HAVE_INADDR_LOOPBACK], [1],
+               [Define to 1 if the platform defines INADDR_LOOPBACK constant
+                in <netinet/in.h>.])
+   fi])
+
 AC_MSG_CHECKING([checking for gflags library])
 LIBS="-lgflags $LIBS"
 AC_LINK_IFELSE([AC_LANG_PROGRAM([#include <gflags/gflags.h>], [google::ParseCommandLineFlags(NULL, NULL, true)])], [have_gflags=yes], [have_gflags=no])
@@ -173,6 +188,7 @@ AC_TYPE_UINT64_T
 AC_TYPE_UINT8_T
 
 CT_CHECK_TLS
+CT_CHECK_INADDR_LOOPBACK
 
 AC_MSG_CHECKING([whether pthread_t is a pointer])
 AC_COMPILE_IFELSE([AC_LANG_PROGRAM([
