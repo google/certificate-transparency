@@ -45,8 +45,8 @@ type Log struct {
 	// these counters are not atomically updated, so may not be quite right
 	posted        int
 	reposted      int
-	latereposted  int
-	chainreposted int
+	lateReposted  int
+	chainReposted int
 
 	// Note that this counts the number of active requests, not
 	// active servers, because we can't close it to signal the
@@ -111,7 +111,7 @@ func (s *Log) getRoots() *x509.CertPool {
 func (s *Log) postChain(l *toLog) {
 	h := Hash(l.chain[0])
 	if s.postCache[h] {
-		s.latereposted++
+		s.lateReposted++
 		return
 	}
 	type Chain struct {
@@ -200,7 +200,7 @@ func (s *Log) postOneChain(chain []*x509.Certificate) {
 	s.pcMutex.Lock()
 	if s.postChainCache[h] {
 		s.pcMutex.Unlock()
-		s.chainreposted++
+		s.chainReposted++
 		return
 	}
 	s.postChainCache[h] = true
@@ -232,7 +232,7 @@ func newLog(url string, errors chan *FixError) *Log {
 			log.Printf("posters: %d active, %d posted, "+
 				"%d reposted, %d reposted (late), "+
 				"%d chains reposted", s.active, s.posted,
-				s.reposted, s.latereposted, s.chainreposted)
+				s.reposted, s.lateReposted, s.chainReposted)
 		}
 	}()
 
