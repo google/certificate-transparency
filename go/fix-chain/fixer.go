@@ -54,11 +54,8 @@ func (b Bag) Len() int { return len(b.certs) }
 func (b Bag) Less(i, j int) bool {
 	ci := b.certs[i].Raw
 	cj := b.certs[j].Raw
-	if len(ci) < len(cj) {
-		return true
-	}
-	if len(ci) > len(cj) {
-		return false
+	if len(ci) != len(cj) {
+		return len(ci) < len(cj)
 	}
 	for n, _ := range ci {
 		if ci[n] < cj[n] {
