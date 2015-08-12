@@ -135,10 +135,8 @@ func augmentIntermediates(pool *x509.CertPool, url string,
 	}
 	body, err := u.getURL(url)
 	if err != nil {
-		//log.Printf("can't get URL body from %s: %s", url, err)
 		return &FixError{Type: CannotFetchURL, URL: url, Error: err}
 	}
-	//log.Print(body)
 	icert, err := x509.ParseCertificate(body)
 	if err != nil {
 		s, _ := pem.Decode(body)
@@ -148,7 +146,6 @@ func augmentIntermediates(pool *x509.CertPool, url string,
 	}
 
 	if err != nil {
-		//log.Fatalf("failed to parse certificate from %s: %s", url, err)
 		return &FixError{Type: ParseFailure, URL: url, Bad: body,
 			Error: err}
 	}
@@ -162,7 +159,6 @@ func fixChain(fix *fix) {
 	for _, c := range d2.certs {
 		urls := c.IssuingCertificateURL
 		for _, url := range urls {
-			//log.Printf("fetch issuer %d from %s", i, url)
 			ferr := augmentIntermediates(fix.opts.Intermediates,
 				url, fix.fixer.cache)
 			if ferr != nil {
@@ -172,14 +168,12 @@ func fixChain(fix *fix) {
 			}
 			chain, err := fix.cert.Verify(*fix.opts)
 			if err == nil {
-				//dumpChains("fixed", chain)
 				fix.fixer.fixed++
 				fix.fixer.log.postChains(chain)
 				return
 			}
 		}
 	}
-	//log.Printf("failed to fix certificate for %s", fix.cert.Subject.CommonName)
 	fix.fixer.notfixed++
 	fix.fixer.errors <- &FixError{Type: FixFailed, Cert: fix.cert,
 		Chain: fix.chain.certs}
@@ -205,7 +199,6 @@ type Fixer struct {
 
 func (f *Fixer) fixChain(cert *x509.Certificate, d *DedupedChain, intermediates *x509.CertPool, l *Log) {
 	if l.isPosted(cert) {
-		//log.Printf("Skip already posted cert")
 		f.skipped++
 		return
 	}
@@ -214,12 +207,10 @@ func (f *Fixer) fixChain(cert *x509.Certificate, d *DedupedChain, intermediates 
 		KeyUsages: []x509.ExtKeyUsage{x509.ExtKeyUsageAny}}
 	chain, err := cert.Verify(opts)
 	if err == nil {
-		//dumpChains("verified", chain)
 		f.reconstructed++
 		l.postChains(chain)
 		return
 	}
-	//log.Printf("failed to verify certificate for %s: %s", cert.Subject.CommonName, err)
 	f.errors <- &FixError{Type: VerifyFailed, Cert: cert, Chain: d.certs,
 		Error: err}
 	f.notreconstructed++
