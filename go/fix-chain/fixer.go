@@ -272,8 +272,8 @@ func NewFixer(logURL string, errors chan *FixError) *Fixer {
 	t := time.NewTicker(time.Second)
 	go func() {
 		for _ = range t.C {
-			log.Printf("fixers: %d active, %d skipped, " +
-				"%d reconstructed, %d not reconstructed, " +
+			log.Printf("fixers: %d active, %d skipped, "+
+				"%d reconstructed, %d not reconstructed, "+
 				"%d fixed, %d not fixed, %d already done",
 				f.active, f.skipped, f.reconstructed,
 				f.notReconstructed, f.fixed, f.notFixed,

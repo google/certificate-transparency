@@ -9,6 +9,7 @@ import (
 
 // FixError types
 type ErrorType int
+
 const (
 	ParseFailure ErrorType = iota
 	CannotFetchURL

@@ -52,7 +52,7 @@ func NewURLCache() *URLCache {
 	t := time.NewTicker(time.Second)
 	go func() {
 		for _ = range t.C {
-			log.Printf("cache: %d hits, %d misses, %d errors, " +
+			log.Printf("cache: %d hits, %d misses, %d errors, "+
 				"%d bad status, %d read fail, %d cached", u.hit,
 				u.miss, u.errors, u.badstatus, u.readfail,
 				len(u.cache))

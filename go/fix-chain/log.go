@@ -49,11 +49,11 @@ type Log struct {
 	latereposted  int
 	chainreposted int
 
-	wg             sync.WaitGroup // Note that this counts the
-				      // number of active requests,
-				      // not active servers, because
-				      // we can't close it to signal
-				      // the end, because of retries.
+	wg sync.WaitGroup // Note that this counts the
+	// number of active requests,
+	// not active servers, because
+	// we can't close it to signal
+	// the end, because of retries.
 	postCache      map[[HashSize]byte]bool
 	postChainCache map[[HashSize]byte]bool
 	pcMutex        sync.Mutex
@@ -222,7 +222,7 @@ func (s *Log) wait() {
 
 func newLog(url string, errors chan *FixError) *Log {
 	s := &Log{url: url, posts: make(chan *toLog),
-		postCache: make(map[[HashSize]byte]bool),
+		postCache:      make(map[[HashSize]byte]bool),
 		postChainCache: make(map[[HashSize]byte]bool), errors: errors}
 	for i := 0; i < 100; i++ {
 		go s.postServer()
@@ -230,8 +230,8 @@ func newLog(url string, errors chan *FixError) *Log {
 	t := time.NewTicker(time.Second)
 	go func() {
 		for _ = range t.C {
-			log.Printf("posters: %d active, %d posted, " +
-				"%d reposted, %d reposted (late), " +
+			log.Printf("posters: %d active, %d posted, "+
+				"%d reposted, %d reposted (late), "+
 				"%d chains reposted", s.active, s.posted,
 				s.reposted, s.latereposted, s.chainreposted)
 		}
