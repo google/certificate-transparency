@@ -206,15 +206,15 @@ func (f *Fixer) fixChain(cert *x509.Certificate, d *DedupedChain, intermediates 
 		Roots: l.rootCerts(), DisableTimeChecks: true,
 		KeyUsages: []x509.ExtKeyUsage{x509.ExtKeyUsageAny}}
 	chain, err := cert.Verify(opts)
-	if err == nil {
-		f.reconstructed++
-		l.postChains(chain)
+	if err != nil {
+		f.errors <- &FixError{Type: VerifyFailed, Cert: cert,
+			Chain: d.certs, Error: err}
+		f.notReconstructed++
+		f.deferFixChain(cert, d, &opts)
 		return
 	}
-	f.errors <- &FixError{Type: VerifyFailed, Cert: cert, Chain: d.certs,
-		Error: err}
-	f.notReconstructed++
-	f.deferFixChain(cert, d, &opts)
+	f.reconstructed++
+	l.postChains(chain)
 }
 
 // Given a deduped chain, try to fix and submit each cert in the chain, using the rest of the chain to certify it
