@@ -97,8 +97,8 @@ func (s *Log) getRoots() *x509.CertPool {
 	for i := 0; i < len(certs.Certificates); i++ {
 		r, err := x509.ParseCertificate(certs.Certificates[i])
 		switch err.(type) {
-		case nil:
-		case x509.NonFatalErrors:
+		case nil, x509.NonFatalErrors:
+			// ignore
 		default:
 			log.Fatalf("can't parse certificate: %s %#v", err,
 				certs.Certificates[i])
