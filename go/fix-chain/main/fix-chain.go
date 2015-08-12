@@ -16,7 +16,7 @@ import (
 func processChains(file string, fixer *fixchain.Fixer) {
 	f, err := os.Open(file)
 	if err != nil {
-		log.Fatalf("Can't open %s: %s", err)
+		log.Fatalf("Can't open %s: %s", f, err)
 	}
 	defer f.Close()
 
@@ -32,14 +32,12 @@ func processChains(file string, fixer *fixchain.Fixer) {
 		} else if err != nil {
 			log.Fatal(err)
 		}
-		//log.Printf("%#v\n", m.Chain)
-		//c := x509.NewCertPool()
 		var c fixchain.DedupedChain
 		for _, derBytes := range m.Chain {
 			cert, err := x509.ParseCertificate(derBytes)
 			switch err.(type) {
-			case nil:
-			case x509.NonFatalErrors:
+			case nil, x509.NonFatalErrors:
+				// ignore
 			default:
 				log.Fatalf("can't parse certificate: %s %#v",
 					err, derBytes)
@@ -47,8 +45,6 @@ func processChains(file string, fixer *fixchain.Fixer) {
 
 			c.AddCert(cert)
 		}
-		//log.Printf("%d in chain", len(m.Chain))
-		//c.Dump("input")
 		fixer.FixAll(&c)
 	}
 }
@@ -91,21 +87,18 @@ func logStringErrors(wg *sync.WaitGroup, errors chan *fixchain.FixError,
 }
 
 func main() {
-	//logurl := "https://ct.googleapis.com/rocketeer"
-	//logurl := "https://ct.googleapis.com/aviator"
-	logurl := os.Args[1]
+	logURL := os.Args[1]
 	chains := os.Args[2]
-	errdir := os.Args[3]
+	errDir := os.Args[3]
 
 	var wg sync.WaitGroup
 	wg.Add(1)
 
 	errors := make(chan *fixchain.FixError)
-	go logStringErrors(&wg, errors, errdir)
+	go logStringErrors(&wg, errors, errDir)
 
-	f := fixchain.NewFixer(logurl, errors)
+	f := fixchain.NewFixer(logURL, errors)
 
-	//processChains("/usr/home/ben/tmp/failed.json", f)
 	processChains(chains, f)
 
 	log.Printf("Wait for fixers")

@@ -15,8 +15,8 @@ type URLCache struct {
 	hit       uint
 	miss      uint
 	errors    uint
-	badstatus uint
-	readfail  uint
+	badStatus uint
+	readFail  uint
 }
 
 func (u *URLCache) getURL(url string) ([]byte, error) {
@@ -33,12 +33,12 @@ func (u *URLCache) getURL(url string) ([]byte, error) {
 	}
 	defer c.Body.Close()
 	if c.StatusCode != 200 {
-		u.badstatus++
+		u.badStatus++
 		return nil, errors.New(fmt.Sprintf("can't deal with status %d", c.StatusCode))
 	}
 	r, err = ioutil.ReadAll(c.Body)
 	if err != nil {
-		u.readfail++
+		u.readFail++
 		return nil, err
 	}
 	u.miss++
@@ -54,7 +54,7 @@ func NewURLCache() *URLCache {
 		for _ = range t.C {
 			log.Printf("cache: %d hits, %d misses, %d errors, "+
 				"%d bad status, %d read fail, %d cached", u.hit,
-				u.miss, u.errors, u.badstatus, u.readfail,
+				u.miss, u.errors, u.badStatus, u.readFail,
 				len(u.cache))
 		}
 	}()
