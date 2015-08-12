@@ -174,7 +174,7 @@ func fixChain(fix *fix) {
 			}
 		}
 	}
-	fix.fixer.notfixed++
+	fix.fixer.notFixed++
 	fix.fixer.errors <- &FixError{Type: FixFailed, Cert: fix.cert,
 		Chain: fix.chain.certs}
 }
@@ -185,10 +185,10 @@ type Fixer struct {
 	// Counters may not be entirely accurate due to non-atomicity
 	skipped          uint
 	reconstructed    uint
-	notreconstructed uint
+	notReconstructed uint
 	fixed            uint
-	notfixed         uint
-	alreadydone      uint
+	notFixed         uint
+	alreadyDone      uint
 
 	wg     sync.WaitGroup
 	log    *Log
@@ -213,7 +213,7 @@ func (f *Fixer) fixChain(cert *x509.Certificate, d *DedupedChain, intermediates 
 	}
 	f.errors <- &FixError{Type: VerifyFailed, Cert: cert, Chain: d.certs,
 		Error: err}
-	f.notreconstructed++
+	f.notReconstructed++
 	f.deferFixChain(cert, d, &opts)
 }
 
@@ -221,7 +221,7 @@ func (f *Fixer) fixChain(cert *x509.Certificate, d *DedupedChain, intermediates 
 func (f *Fixer) FixAll(d *DedupedChain) {
 	h := HashBag(d.certs)
 	if f.done[h] {
-		f.alreadydone++
+		f.alreadyDone++
 		return
 	}
 	f.done[h] = true
@@ -276,8 +276,8 @@ func NewFixer(logurl string, errors chan *FixError) *Fixer {
 				"%d reconstructed, %d not reconstructed, " +
 				"%d fixed, %d not fixed, %d already done",
 				f.active, f.skipped, f.reconstructed,
-				f.notreconstructed, f.fixed, f.notfixed,
-				f.alreadydone)
+				f.notReconstructed, f.fixed, f.notFixed,
+				f.alreadyDone)
 		}
 	}()
 
