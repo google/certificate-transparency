@@ -143,6 +143,9 @@ func (s *Log) postChain(l *toLog) {
 	}
 	defer resp.Body.Close()
 	jo, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		log.Fatalf("Can't read response: %s", err)
+	}
 	if resp.StatusCode == 502 {
 		log.Printf("Retry 502: %d", l.retries)
 		if l.retries == 0 {
@@ -153,7 +156,6 @@ func (s *Log) postChain(l *toLog) {
 		return
 	}
 	if resp.StatusCode != 200 {
-		//log.Printf("Can't handle response %d: %s\nchain: %s", resp.StatusCode, jo, DumpChainPEM(l.chain))
 		s.errors <- &FixError{
 			Type:  LogPostFailed,
 			Chain: l.chain,
@@ -163,11 +165,7 @@ func (s *Log) postChain(l *toLog) {
 		}
 		return
 	}
-	if err != nil {
-		log.Fatalf("Can't read response: %s", err)
-	}
 	s.postCache[h] = true
-	//log.Printf("Log returned: %s", jo)
 }
 
 func (s *Log) postServer() {
@@ -196,7 +194,6 @@ func (s *Log) postOneChain(chain []*x509.Certificate) {
 	// likely to succeed, then we could mark the cert as posted
 	// here. However, bugs might cause a log to refuse one chain
 	// and accept another, so try each unique chain.
-	//s.postCache[h] = true
 	h = HashChain(chain)
 	s.pcMutex.Lock()
 	if s.postChainCache[h] {
