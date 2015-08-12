@@ -497,8 +497,7 @@ TEST_F(EtcdConsistentStoreDeathTest,
                "sequence_number\\(\\) < mapping");
 }
 
-TEST_F(
-    EtcdConsistentStoreDeathTest,
+TEST_F(EtcdConsistentStoreDeathTest,
     TestUpdateSequenceMappingBarfsMappingNonContiguousToServingTreeDeathTest) {
   SignedTreeHead sth;
   sth.set_timestamp(123);
