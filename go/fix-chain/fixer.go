@@ -210,7 +210,7 @@ func (f *Fixer) fixChain(cert *x509.Certificate, d *DedupedChain, intermediates 
 		f.errors <- &FixError{Type: VerifyFailed, Cert: cert,
 			Chain: d.certs, Error: err}
 		f.notReconstructed++
-		f.deferFixChain(cert, d, &opts)
+		f.queueFixChain(cert, d, &opts)
 		return
 	}
 	f.reconstructed++
@@ -234,7 +234,7 @@ func (f *Fixer) FixAll(d *DedupedChain) {
 	}
 }
 
-func (f *Fixer) deferFixChain(cert *x509.Certificate, chain *DedupedChain,
+func (f *Fixer) queueFixChain(cert *x509.Certificate, chain *DedupedChain,
 	opts *x509.VerifyOptions) {
 	f.fix <- &fix{cert: cert, chain: chain, opts: opts, fixer: f}
 }
@@ -259,8 +259,8 @@ func (f *Fixer) Wait() {
 }
 
 // Create a new fixer for a particular log
-func NewFixer(logurl string, errors chan *FixError) *Fixer {
-	f := &Fixer{fix: make(chan *fix), log: newLog(logurl, errors),
+func NewFixer(logURL string, errors chan *FixError) *Fixer {
+	f := &Fixer{fix: make(chan *fix), log: newLog(logURL, errors),
 		errors: errors, cache: NewURLCache(),
 		done: make(map[[HashSize]byte]bool)}
 
