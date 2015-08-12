@@ -20,8 +20,7 @@ import (
 func DumpChainPEM(chain []*x509.Certificate) string {
 	var p string
 	for _, cert := range chain {
-		b := pem.Block{Type: "CERTIFICATE", Bytes: cert.Raw}
-		p += string(pem.EncodeToMemory(&b))
+		p += DumpPEM(cert.Raw)
 	}
 	return p
 }
@@ -49,11 +48,11 @@ type Log struct {
 	latereposted  int
 	chainreposted int
 
-	wg sync.WaitGroup // Note that this counts the
-	// number of active requests,
-	// not active servers, because
-	// we can't close it to signal
-	// the end, because of retries.
+	// Note that this counts the number of active requests, not
+	// active servers, because we can't close it to signal the
+	// end, because of retries.
+	wg sync.WaitGroup
+	
 	postCache      map[[HashSize]byte]bool
 	postChainCache map[[HashSize]byte]bool
 	pcMutex        sync.Mutex
