@@ -36,7 +36,7 @@ TEST_F(ThreadPoolTest, Delay) {
 }
 
 
-TEST_F(ThreadPoolDeathTest, AddingMoreTasksAfterClosedGoesBang) {
+TEST_F(ThreadPoolDeathTest, AddingMoreTasksAfterClosedGoesBangDeathTest) {
   unique_ptr<ThreadPool> my_pool_of_one(new ThreadPool(1));
   SyncTask task(my_pool_of_one.get());
   my_pool_of_one->Delay(milliseconds(200), task.task());
@@ -94,5 +94,6 @@ TEST_F(ThreadPoolTest, CancelsDelayTasks) {
 
 int main(int argc, char** argv) {
   cert_trans::test::InitTesting(argv[0], &argc, &argv, true);
+  ::testing::FLAGS_gtest_death_test_style = "threadsafe";
   return RUN_ALL_TESTS();
 }

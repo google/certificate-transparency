@@ -4,6 +4,7 @@
 #include <gtest/gtest.h>
 #include <openssl/err.h>
 #include <openssl/evp.h>
+#include <memory>
 #include <string>
 
 #include "log/cert.h"
@@ -17,6 +18,7 @@ using cert_trans::CertChain;
 using cert_trans::CertChecker;
 using cert_trans::PreCertChain;
 using std::string;
+using std::unique_ptr;
 using std::vector;
 
 // Valid certificates.
@@ -54,6 +56,23 @@ static const char kMd2Chain[] = "test-md2-chain.pem";
 static const char kNonexistent[] = "test-nonexistent.pem";
 // A file with corrupted contents (bit flip from ca-cert.pem).
 static const char kCorrupted[] = "test-corrupted.pem";
+
+// A DER file containing a CMS signed message wrapping data that is not
+// valid DER
+static const char kCmsSignedDataTest2[] = "cms_test2.der";
+// A DER file containing a CMS signed message wrapping a DER encoded
+// certificate for test case 3 (valid signature, same signer as cert)
+static const char kCmsSignedDataTest3[] = "cms_test3.der";
+// A DER file with a CMS signed message but not signed by the same
+// key as the certificate it contains in the payload
+static const char kCmsSignedDataTest4[] = "cms_test4.der";
+// A DER file with a CMS signed message with intermediate as signer and
+// issuer of the embedded cert
+static const char kCmsSignedDataTest5[] = "cms_test5.der";
+
+// Subject name we expect in our embedded certificate CMS tests
+static const char kCmsTestSubject[] = "CN=?.example.com, C=GB, ST=Wales, "
+    "L=Erw Wen, O=Certificate Transparency";
 
 // Corresponds to kCaCert.
 static const char kCaCertPem[] =
@@ -100,7 +119,8 @@ namespace {
 
 class CertCheckerTest : public ::testing::Test {
  protected:
-  CertCheckerTest() : cert_dir_(FLAGS_test_srcdir + "/test/testdata") {
+  CertCheckerTest() : cert_dir_(FLAGS_test_srcdir + "/test/testdata"),
+      cert_dir_v2_(FLAGS_test_srcdir + "/test/testdata/v2/") {
   }
 
   string leaf_pem_;
@@ -112,6 +132,7 @@ class CertCheckerTest : public ::testing::Test {
   string ca_pem_;
   CertChecker checker_;
   const string cert_dir_;
+  const string cert_dir_v2_;
 
   void SetUp() {
     CHECK(util::ReadTextFile(cert_dir_ + "/" + kLeafCert, &leaf_pem_))
@@ -128,6 +149,24 @@ class CertCheckerTest : public ::testing::Test {
     CHECK(util::ReadTextFile(cert_dir_ + "/" + kCaCert, &ca_pem_));
   }
 };
+
+BIO* OpenTestFileBio(const string& filename) {
+  BIO* der_bio = BIO_new_file(filename.c_str(), "r");
+
+  CHECK(der_bio != nullptr);
+
+  return der_bio;
+}
+
+CMS_ContentInfo* ReadCmsFromDerFile(const string& filename) {
+  CMS_ContentInfo* notused = nullptr;
+  BIO* der_bio = OpenTestFileBio(filename);
+
+  CMS_ContentInfo* cms = d2i_CMS_bio(der_bio, &notused);
+  BIO_free(der_bio);
+
+  return cms;
+}
 
 TEST_F(CertCheckerTest, LoadTrustedCertificates) {
   EXPECT_EQ(0U, checker_.NumTrustedCertificates());
@@ -413,6 +452,123 @@ TEST_F(CertCheckerTest, ResolveIssuerCollisions) {
   ASSERT_TRUE(root2->IsLoaded());
   chain2.AddCert(root2);
   EXPECT_EQ(CertChecker::OK, checker_.CheckCertChain(&chain2));
+}
+
+TEST_F(CertCheckerTest, CmsSignTestCase2) {
+  // In this test the embedded data is not a certificate in DER format
+  // but it doesn't get unpacked and the signature is valid.
+  Cert ca(ca_pem_);
+
+  CMS_ContentInfo* cms = ReadCmsFromDerFile(cert_dir_v2_ + kCmsSignedDataTest2);
+  ASSERT_TRUE(cms != nullptr);
+  EXPECT_EQ(Cert::TRUE, checker_.IsCmsSignedByCert(cms, ca));
+  CMS_ContentInfo_free(cms);
+}
+
+TEST_F(CertCheckerTest, CmsSignTestCase3) {
+  // The CMS should be signed by the CA that signed the cert
+  Cert ca(ca_pem_);
+
+  CMS_ContentInfo* cms = ReadCmsFromDerFile(cert_dir_v2_ + kCmsSignedDataTest3);
+  ASSERT_TRUE(cms != nullptr);
+  EXPECT_EQ(Cert::TRUE, checker_.IsCmsSignedByCert(cms, ca));
+  CMS_ContentInfo_free(cms);
+}
+
+TEST_F(CertCheckerTest, CmsSignTestCase4) {
+  // The CMS is not signed by the CA that signed the cert it contains
+  Cert ca(ca_pem_);
+
+  CMS_ContentInfo* cms = ReadCmsFromDerFile(cert_dir_v2_ + kCmsSignedDataTest4);
+  ASSERT_TRUE(cms != nullptr);
+  EXPECT_EQ(Cert::FALSE, checker_.IsCmsSignedByCert(cms, ca));
+  CMS_ContentInfo_free(cms);
+}
+
+TEST_F(CertCheckerTest, CmsVerifyTestCase2) {
+  // For this test the embedded cert is invalid DER but CMS signed by the CA
+  CertChain chain(ca_pem_);
+  ASSERT_TRUE(chain.IsLoaded());
+
+  BIO* bio = OpenTestFileBio(cert_dir_v2_ + kCmsSignedDataTest2);
+  unique_ptr<Cert> unpacked_cert(
+      checker_.UnpackCmsSignedCertificate(bio, chain));
+
+  ASSERT_FALSE(unpacked_cert->IsLoaded());
+}
+
+TEST_F(CertCheckerTest, CmsVerifyTestCase3) {
+  // For this test the embedded cert is signed by the CA
+  CertChain chain(ca_pem_);
+  ASSERT_TRUE(chain.IsLoaded());
+
+  BIO* bio = OpenTestFileBio(cert_dir_v2_ + kCmsSignedDataTest3);
+  unique_ptr<Cert> unpacked_cert(
+      checker_.UnpackCmsSignedCertificate(bio, chain));
+
+  ASSERT_EQ(Cert::FALSE, unpacked_cert->HasBasicConstraintCATrue());
+  ASSERT_EQ(Cert::TRUE,
+            unpacked_cert->HasExtension(NID_authority_key_identifier));
+  // We built the embedded cert with redaction so this helps to prove
+  // that it was correctly unpacked
+  ASSERT_EQ(Cert::TRUE, unpacked_cert->IsValidWildcardRedaction());
+  ASSERT_EQ(kCmsTestSubject, unpacked_cert->PrintSubjectName());
+}
+
+TEST_F(CertCheckerTest, CmsVerifyTestCase4) {
+  // For this test the embedded cert is signed by the intermediate CA
+  CertChain chain(ca_pem_);
+  ASSERT_TRUE(chain.IsLoaded());
+
+  BIO* bio = OpenTestFileBio(cert_dir_v2_ + kCmsSignedDataTest4);
+  unique_ptr<Cert> unpacked_cert(
+      checker_.UnpackCmsSignedCertificate(bio, chain));
+
+  ASSERT_FALSE(unpacked_cert->IsLoaded());
+}
+
+TEST_F(CertCheckerTest, CmsVerifyTestCase5) {
+  // For this test the embedded cert is signed by the intermediate
+  CertChain chain(intermediate_pem_);
+  ASSERT_TRUE(chain.IsLoaded());
+
+  BIO* bio = OpenTestFileBio(cert_dir_v2_ + kCmsSignedDataTest5);
+  Cert* unpacked_cert = checker_.UnpackCmsSignedCertificate(bio, chain);
+
+  ASSERT_EQ(Cert::FALSE, unpacked_cert->HasBasicConstraintCATrue());
+  ASSERT_EQ(Cert::TRUE,
+            unpacked_cert->HasExtension(NID_authority_key_identifier));
+  // We built the embedded cert with redaction so this helps to prove
+  // that it was correctly unpacked
+  ASSERT_EQ(Cert::TRUE, unpacked_cert->IsValidWildcardRedaction());
+  ASSERT_EQ(kCmsTestSubject, unpacked_cert->PrintSubjectName());
+
+  delete unpacked_cert;
+}
+
+TEST_F(CertCheckerTest, CmsVerifyTestCase7) {
+  // For this test the embedded cert is signed by the intermediate
+  ASSERT_TRUE(checker_.LoadTrustedCertificates(cert_dir_ + "/" + kCaCert));
+  CertChain chain(leaf_pem_);
+  ASSERT_TRUE(chain.IsLoaded());
+
+  BIO* bio = OpenTestFileBio(cert_dir_v2_ + kCmsSignedDataTest5);
+  unique_ptr<Cert> unpacked_cert(
+      checker_.UnpackCmsSignedCertificate(bio, chain));
+
+  ASSERT_FALSE(unpacked_cert->IsLoaded());
+}
+
+TEST_F(CertCheckerTest, CmsVerifyTestCase8) {
+  // For this test the embedded cert is signed by the intermediate
+  CertChain chain(ca_pem_);
+  ASSERT_TRUE(chain.IsLoaded());
+
+  BIO* bio = OpenTestFileBio(cert_dir_v2_ + kCmsSignedDataTest5);
+  unique_ptr<Cert> unpacked_cert(
+      checker_.UnpackCmsSignedCertificate(bio, chain));
+
+  ASSERT_FALSE(unpacked_cert->IsLoaded());
 }
 
 }  // namespace

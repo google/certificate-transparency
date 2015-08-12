@@ -362,14 +362,14 @@ TYPED_TEST(DBTest, NoNodeIdSet) {
 }
 
 
-TYPED_TEST(DBTest, CannotOverwriteNodeId) {
+TYPED_TEST(DBTest, CannotOverwriteNodeIdDeathTest) {
   const string kNodeId("some_node_id");
   this->db()->InitializeNode(kNodeId);
   EXPECT_DEATH(this->db()->InitializeNode("something_else"), kNodeId);
 }
 
 
-TYPED_TEST(DBTest, CannotHaveEmptyNodeId) {
+TYPED_TEST(DBTest, CannotHaveEmptyNodeIdDeathTest) {
   EXPECT_DEATH(this->db()->InitializeNode(""), "empty");
 }
 

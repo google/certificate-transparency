@@ -2,7 +2,10 @@
 #ifndef CERT_CHECKER_H
 #define CERT_CHECKER_H
 
+#include <openssl/cms.h>
+#include <openssl/pem.h>
 #include <openssl/x509.h>
+#include <openssl/x509v3.h>
 
 #include <map>
 #include <string>
@@ -61,9 +64,23 @@ class CertChecker {
     return trusted_;
   }
 
-  virtual size_t NumTrustedCertificates() const {
-    return trusted_.size();
-  }
+  virtual size_t NumTrustedCertificates() const { return trusted_.size(); }
+
+  // Checks that a CMS_ContentInfo has a signer that matches a specified
+  // certificate. Does not verify the signature or check the payload.
+  virtual Cert::Status IsCmsSignedByCert(CMS_ContentInfo* cms,
+                                         const Cert& cert) const;
+
+  // Unpacks a CMS signed data object that is assumed to contain a certificate
+  // If the CMS signature verifies then we return a corresponding new Cert
+  // object built from the unpacked data. If it cannot be loaded as a
+  // certificate or fails CMS signing check then an unloaded empty Cert object
+  // is returned. The input BIO is freed. The caller owns the returned
+  // certificate.
+  // NOTE: Certificate chain validity checks must be done separately. This
+  // only checks that the CMS signature is valid.
+  virtual Cert* UnpackCmsSignedCertificate(BIO* cms_bio_in,
+                                           const CertChain& certChain);
 
   // Check that:
   // (1) Each certificate is correctly signed by the next one in the chain; and
@@ -98,8 +115,16 @@ class CertChecker {
   // Returns OK if the cert is trusted, ROOT_NOT_IN_LOCAL_STORE if it's not,
   // INVALID_CERTIFICATE_CHAIN if something is wrong with the cert, and
   // INTERNAL_ERROR if something terrible happened.
-  CertVerifyResult IsTrusted(const Cert& cert,
-                             std::string* subject_name) const;
+  CertVerifyResult IsTrusted(const Cert& cert, std::string* subject_name) const;
+
+  // Verifies that data from a DER BIO is signed by a cert in a chain.
+  // and writes the unwrapped content to another BIO. NULL can be passed for
+  // cms_bio_out if the caller just wishes to verify the signature. Does
+  // not free either BIO. Does not do any checks on the content of the
+  // CMS message or validate that the CMS signature is trusted to root.
+  virtual Cert::Status UnpackCmsDerBio(BIO* cms_bio_in,
+                                       const CertChain& certChain,
+                                       BIO* cms_bio_out);
 
   // A map by the DER encoding of the subject name.
   // All code manipulating this container must ensure contained elements are

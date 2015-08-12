@@ -11,6 +11,12 @@
 
 namespace cert_trans {
 
+// Tests if a hostname contains any redactions ('?' elements). If it does
+// not then there is no need to apply the validation below
+bool IsRedactedHost(const std::string& hostname);
+// Tests if a hostname containing any redactions follows the RFC rules
+bool IsValidRedactedHost(const std::string& hostname);
+
 class Cert {
  public:
   // Takes ownership of the X509 structure. It's advisable to check
@@ -52,8 +58,12 @@ class Cert {
   // underlying copy succeeded.
   Cert* Clone() const;
 
-  // Frees the old X509 and attempts to load anew.
+  // Frees the old X509 and attempts to load a new one.
   Status LoadFromDerString(const std::string& der_string);
+
+  // Frees the old X509 and attempts to load from BIO in DER form. Caller
+  // still owns the BIO afterwards.
+  Status LoadFromDerBio(BIO* bio_in);
 
   // These just return an empty string if an error occurs.
   std::string PrintIssuerName() const;
@@ -182,6 +192,13 @@ class Cert {
   Status OctetStringExtensionData(int extension_nid,
                                   std::string* result) const;
 
+  // Tests whether the certificate correctly follows the RFC rules for
+  // using wildcard redaction.
+  Cert::Status IsValidWildcardRedaction() const;
+  // Tests if a certificate correctly follows the rules for name constrained
+  // intermediate CA
+  Cert::Status IsValidNameConstrainedIntermediateCa() const;
+
   // CertChecker needs access to the x509_ structure directly.
   friend class CertChecker;
   friend class TbsCertificate;
@@ -196,6 +213,8 @@ class Cert {
   Status ExtensionIndex(int extension_nid, int* extension_index) const;
   Status GetExtension(int extension_nid, X509_EXTENSION** ext) const;
   Status ExtensionStructure(int extension_nid, void** ext_struct) const;
+  bool ValidateRedactionSubjectAltNameAndCN(int* dns_alt_name_count,
+                                            Status* status) const;
   static std::string PrintName(X509_NAME* name);
   static std::string PrintTime(ASN1_TIME* when);
   static Status DerEncodedName(X509_NAME* name, std::string* result);

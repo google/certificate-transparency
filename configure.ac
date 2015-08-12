@@ -72,6 +72,58 @@ AC_SEARCH_LIBS([SSL_CTX_new], [ssl],, [missing_openssl=1], [$save_LIBS])
 AS_IF([test -n "$missing_openssl"],
       [AC_MSG_ERROR([could not find the OpenSSL libraries])])
 
+dnl Checks for thread-local storage support.
+dnl
+dnl Taken from the openvswitch config code (Apache 2.0 License)
+dnl with some local modifications. Does not include <threads.h>
+dnl as this does not currently exist on GCC.
+dnl Checks whether the compiler and linker support the C11
+dnl thread_local macro from <threads.h>, and if so defines
+dnl HAVE_THREAD_LOCAL.  If not, checks whether the compiler and linker
+dnl support the GCC __thread extension, and if so defines
+dnl HAVE___THREAD.
+AC_DEFUN([CT_CHECK_TLS],
+  [AC_CACHE_CHECK(
+     [whether $CC has <threads.h> that supports thread_local],
+     [ct_cv_thread_local],
+     [AC_LINK_IFELSE(
+        [AC_LANG_PROGRAM([ static thread_local int var;], [return var;])],
+        [ct_cv_thread_local=yes],
+        [ct_cv_thread_local=no])])
+   if test $ct_cv_thread_local = yes; then
+     AC_DEFINE([HAVE_THREAD_LOCAL], [1],
+               [Define to 1 if the C compiler and linker supports the C11
+                thread_local macro defined in <threads.h>.])
+   else
+     AC_CACHE_CHECK(
+       [whether $CC supports __thread],
+       [ct_cv___thread],
+       [AC_LINK_IFELSE(
+          [AC_LANG_PROGRAM([static __thread int var;], [return var;])],
+          [ct_cv___thread=yes],
+          [ct_cv___thread=no])])
+     if test $ct_cv___thread = yes; then
+       AC_DEFINE([HAVE___THREAD], [1],
+                 [Define to 1 if the C compiler and linker supports the
+                  GCC __thread extensions.])
+     fi
+   fi])
+
+AC_DEFUN([CT_CHECK_INADDR_LOOPBACK],
+  [AC_CACHE_CHECK(
+     [whether the platform defines INADDR_LOOPBACK],
+     [ct_cv_inaddr_loopback],
+     [AC_LINK_IFELSE(
+        [AC_LANG_PROGRAM([ #include <netinet/in.h>
+           static int var = INADDR_LOOPBACK;], [return var;])],
+        [ct_cv_inaddr_loopback=yes],
+        [ct_cv_inaddr_loopback=no])])
+   if test $ct_cv_inaddr_loopback = yes; then
+     AC_DEFINE([HAVE_INADDR_LOOPBACK], [1],
+               [Define to 1 if the platform defines INADDR_LOOPBACK constant
+                in <netinet/in.h>.])
+   fi])
+
 AC_MSG_CHECKING([checking for gflags library])
 LIBS="-lgflags $LIBS"
 AC_LINK_IFELSE([AC_LANG_PROGRAM([#include <gflags/gflags.h>], [google::ParseCommandLineFlags(NULL, NULL, true)])], [have_gflags=yes], [have_gflags=no])
@@ -134,6 +186,9 @@ AC_TYPE_UINT16_T
 AC_TYPE_UINT32_T
 AC_TYPE_UINT64_T
 AC_TYPE_UINT8_T
+
+CT_CHECK_TLS
+CT_CHECK_INADDR_LOOPBACK
 
 AC_MSG_CHECKING([whether pthread_t is a pointer])
 AC_COMPILE_IFELSE([AC_LANG_PROGRAM([
