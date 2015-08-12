@@ -72,17 +72,19 @@ func (s *Log) rootCerts() *x509.CertPool {
 }
 
 func (s *Log) getRoots() *x509.CertPool {
-	rootsjson, err := http.Get(s.url + "/ct/v1/get-roots")
+	rootsJSON, err := http.Get(s.url + "/ct/v1/get-roots")
 	if err != nil {
 		log.Fatalf("can't get roots from %s: %s", s.url, err)
 	}
-	defer rootsjson.Body.Close()
-	if rootsjson.StatusCode != 200 {
+	defer rootsJSON.Body.Close()
+	if rootsJSON.StatusCode != 200 {
 		log.Fatalf("can't deal with status other than 200: %d",
-			rootsjson.StatusCode)
+			rootsJSON.StatusCode)
 	}
-	j, err := ioutil.ReadAll(rootsjson.Body)
-	//log.Printf("roots: %s", j)
+	j, err := ioutil.ReadAll(rootsJSON.Body)
+	if err != nil {
+		log.Fatalf("can't read roots: %s", err)
+	}
 	type Certificates struct {
 		Certificates [][]byte
 	}
@@ -91,7 +93,6 @@ func (s *Log) getRoots() *x509.CertPool {
 	if err != nil {
 		log.Fatalf("can't parse json (%s): %s", err, j)
 	}
-	//log.Printf("certs: %#v", certs)
 	ret := x509.NewCertPool()
 	for i := 0; i < len(certs.Certificates); i++ {
 		r, err := x509.ParseCertificate(certs.Certificates[i])
