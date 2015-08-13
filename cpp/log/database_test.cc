@@ -47,7 +47,12 @@ typedef testing::Types<FileDB<cert_trans::LoggedCertificate>,
 
 typedef Database<cert_trans::LoggedCertificate> DB;
 
+template <class T>
+class DBTestDeathTest : public DBTest<T> {
+};
+
 TYPED_TEST_CASE(DBTest, Databases);
+TYPED_TEST_CASE(DBTestDeathTest, Databases);
 
 
 TYPED_TEST(DBTest, CreateSequenced) {
@@ -362,14 +367,14 @@ TYPED_TEST(DBTest, NoNodeIdSet) {
 }
 
 
-TYPED_TEST(DBTest, CannotOverwriteNodeIdDeathTest) {
+TYPED_TEST(DBTestDeathTest, CannotOverwriteNodeId) {
   const string kNodeId("some_node_id");
   this->db()->InitializeNode(kNodeId);
   EXPECT_DEATH(this->db()->InitializeNode("something_else"), kNodeId);
 }
 
 
-TYPED_TEST(DBTest, CannotHaveEmptyNodeIdDeathTest) {
+TYPED_TEST(DBTestDeathTest, CannotHaveEmptyNodeId) {
   EXPECT_DEATH(this->db()->InitializeNode(""), "empty");
 }
 
