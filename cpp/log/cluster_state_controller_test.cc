@@ -501,6 +501,16 @@ TEST_F(ClusterStateControllerTest, TestGetLocalNodeState) {
 
 
 TEST_F(ClusterStateControllerTest, TestNodeHostPort) {
+  // Allow some time for our view of the node state to stabilize and then
+  // check that it has. Ideally we would wait for this to definitely happen
+  // but there seems to be no easy way to arrange this.
+  sleep(1);
+  const ClusterNodeState orig_node_state(GetNodeStateView(kNodeId1));
+  EXPECT_EQ(kNodeId1, orig_node_state.hostname());
+  EXPECT_EQ(9001, orig_node_state.log_port());
+
+  // Now try to change the state and again allow some time for our view
+  // to update
   const string kHost("myhostname");
   const int kPort(9999);
 
