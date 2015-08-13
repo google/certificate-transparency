@@ -36,7 +36,7 @@ TEST_F(ThreadPoolTest, Delay) {
 }
 
 
-TEST_F(ThreadPoolDeathTest, AddingMoreTasksAfterClosedGoesBangDeathTest) {
+TEST_F(ThreadPoolDeathTest, AddingMoreTasksAfterClosedGoesBang) {
   unique_ptr<ThreadPool> my_pool_of_one(new ThreadPool(1));
   SyncTask task(my_pool_of_one.get());
   my_pool_of_one->Delay(milliseconds(200), task.task());
