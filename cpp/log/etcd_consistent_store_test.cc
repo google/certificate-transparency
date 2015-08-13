@@ -290,7 +290,7 @@ TEST_F(EtcdConsistentStoreTest, TestSetServingSTHWontOverwriteWithOlder) {
 }
 
 TEST_F(EtcdConsistentStoreDeathTest,
-       TestSetServingSTHChecksInconsistentSizeDeathTest) {
+       TestSetServingSTHChecksInconsistentSize) {
   ct::SignedTreeHead sth;
   sth.set_timestamp(234);
   sth.set_tree_size(10);
@@ -338,7 +338,7 @@ TEST_F(EtcdConsistentStoreTest,
 
 
 TEST_F(EtcdConsistentStoreDeathTest,
-       TestAddPendingEntryForExistingNonIdenticalEntryDeathTest) {
+       TestAddPendingEntryForExistingNonIdenticalEntry) {
   LoggedCertificate cert(DefaultCert());
   LoggedCertificate other_cert(MakeCert(2342, "something else"));
 
@@ -353,7 +353,7 @@ TEST_F(EtcdConsistentStoreDeathTest,
 
 
 TEST_F(EtcdConsistentStoreDeathTest,
-       TestAddPendingEntryDoesNotAcceptSequencedEntryDeathTest) {
+       TestAddPendingEntryDoesNotAcceptSequencedEntry) {
   LoggedCertificate cert(DefaultCert());
   cert.set_sequence_number(76);
   EXPECT_DEATH(store_->AddPendingEntry(&cert),
@@ -402,7 +402,7 @@ TEST_F(EtcdConsistentStoreTest, TestGetPendingEntries) {
 
 
 TEST_F(EtcdConsistentStoreDeathTest,
-       TestGetPendingEntriesBarfsWithSequencedEntryDeathTest) {
+       TestGetPendingEntriesBarfsWithSequencedEntry) {
   const string kPath(string(kRoot) + "/entries/");
   LoggedCertificate one(MakeSequencedCert(123, "one", 666));
   InsertEntry(kPath + "one", one);
@@ -442,7 +442,7 @@ TEST_F(EtcdConsistentStoreTest,
 
 
 TEST_F(EtcdConsistentStoreDeathTest,
-       TestGetSequenceMappingBarfsOnGapsAboveTreeSizeDeathTest) {
+       TestGetSequenceMappingBarfsOnGapsAboveTreeSize) {
   SignedTreeHead sth;
   sth.set_tree_size(0);
   store_->SetServingSTH(sth);
@@ -482,7 +482,7 @@ TEST_F(EtcdConsistentStoreTest, TestUpdateSequenceMapping) {
 
 
 TEST_F(EtcdConsistentStoreDeathTest,
-       TestUpdateSequenceMappingBarfsWithOutOfOrderSequenceNumberDeathTest) {
+       TestUpdateSequenceMappingBarfsWithOutOfOrderSequenceNumber) {
   EntryHandle<SequenceMapping> mapping;
   Status status(store_->GetSequenceMapping(&mapping));
   EXPECT_EQ(Status::OK, status);
@@ -498,7 +498,7 @@ TEST_F(EtcdConsistentStoreDeathTest,
 }
 
 TEST_F(EtcdConsistentStoreDeathTest,
-    TestUpdateSequenceMappingBarfsMappingNonContiguousToServingTreeDeathTest) {
+    TestUpdateSequenceMappingBarfsMappingNonContiguousToServingTree) {
   SignedTreeHead sth;
   sth.set_timestamp(123);
   sth.set_tree_size(1000);
