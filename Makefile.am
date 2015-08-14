@@ -644,6 +644,8 @@ cpp_util_fake_etcd_test_SOURCES = \
 	cpp/util/json_wrapper.cc \
 	cpp/util/libevent_wrapper.cc \
 	cpp/util/thread_pool.cc
+EXTRA_cpp_util_fake_etcd_test_DEPENDENCIES = \
+	test/testdata/urlfetcher_test_certs/localhost.pem
 
 cpp_util_json_wrapper_test_LDADD = \
 	cpp/libtest.a \
@@ -676,6 +678,8 @@ cpp_util_masterelection_test_SOURCES = \
 	cpp/util/periodic_closure.cc \
 	cpp/util/protobuf_util.cc \
 	cpp/util/thread_pool.cc
+EXTRA_cpp_util_masterelection_test_DEPENDENCIES = \
+	test/testdata/urlfetcher_test_certs/localhost.pem
 
 cpp_merkletree_merkle_tree_test_LDADD = \
 	cpp/libcore.a \
