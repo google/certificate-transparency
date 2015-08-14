@@ -318,7 +318,7 @@ int main(int argc, char** argv) {
   hang_addr.sin_addr.s_addr = INADDR_ANY;
   hang_addr.sin_port = htons(cert_trans::kHangPort);
   CHECK_EQ(0, bind(hang_fd, reinterpret_cast<struct sockaddr*>(&hang_addr),
-                   sizeof(hang_addr)));
+                   sizeof(hang_addr))) << strerror(errno);
   CHECK_EQ(0, listen(hang_fd, 10));
   struct sockaddr_in other_addr;
   socklen_t other_size;
