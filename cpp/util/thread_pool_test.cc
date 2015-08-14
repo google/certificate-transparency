@@ -94,5 +94,6 @@ TEST_F(ThreadPoolTest, CancelsDelayTasks) {
 
 int main(int argc, char** argv) {
   cert_trans::test::InitTesting(argv[0], &argc, &argv, true);
+  ::testing::FLAGS_gtest_death_test_style = "threadsafe";
   return RUN_ALL_TESTS();
 }

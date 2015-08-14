@@ -36,6 +36,8 @@
 #include "util/thread_pool.h"
 #include "util/uuid.h"
 
+using std::bind;
+
 DEFINE_int32(node_state_refresh_seconds, 10,
              "How often to refresh the ClusterNodeState entry for this node.");
 DEFINE_int32(watchdog_seconds, 120,

@@ -19,6 +19,10 @@
 #include "util/testing.h"
 #include "util/thread_pool.h"
 
+DECLARE_string(trusted_root_certs);
+DEFINE_string(cert_dir, "test/testdata/urlfetcher_test_certs",
+              "Directory containing the test certs.");
+
 namespace cert_trans {
 
 using std::bind;
@@ -960,6 +964,9 @@ int main(int argc, char** argv) {
   ERR_load_crypto_strings();
   SSL_load_error_strings();
   SSL_library_init();
+
+  // Default value of trusted root certs may not be correct on all platforms
+  FLAGS_trusted_root_certs = FLAGS_cert_dir + "/ca-cert.pem";
 
   return RUN_ALL_TESTS();
 }

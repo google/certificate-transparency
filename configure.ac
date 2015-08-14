@@ -135,6 +135,9 @@ AC_TYPE_UINT32_T
 AC_TYPE_UINT64_T
 AC_TYPE_UINT8_T
 
+CT_CHECK_TLS
+AC_CHECK_DECLS([INADDR_LOOPBACK], [], [], [#include <netinet/in.h>])
+
 AC_MSG_CHECKING([whether pthread_t is a pointer])
 AC_COMPILE_IFELSE([AC_LANG_PROGRAM([
 #include <pthread.h>
