@@ -39,6 +39,10 @@ const char kNodeId3[] = "node3";
 
 class ClusterStateControllerTest : public ::testing::Test {
  public:
+  // TODO: Some of the tests in this class rely on sleep() calls.
+  // Ideally they should be waiting for defined conditions to avoid timing
+  // races.
+
   // TODO(pphaneuf): The size of the thread pool is a bit of a magic
   // number... We have some callbacks that block, so it has to be "at
   // least this" (so we're setting it explicitly, in case your machine
@@ -99,6 +103,8 @@ class ClusterStateControllerTest : public ::testing::Test {
     return controller_.local_node_state_;
   }
 
+  // TODO: This should probably return a util::StatusOr<ClusterNodeState>
+  // rather than failing a CHECK if absent.
   ct::ClusterNodeState GetNodeStateView(const string& node_id) {
     auto it(controller_.all_peers_.find("/nodes/" + node_id));
     CHECK(it != controller_.all_peers_.end());
