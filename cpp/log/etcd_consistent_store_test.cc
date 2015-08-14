@@ -289,8 +289,8 @@ TEST_F(EtcdConsistentStoreTest, TestSetServingSTHWontOverwriteWithOlder) {
   EXPECT_EQ(util::error::OUT_OF_RANGE, status.CanonicalCode()) << status;
 }
 
-
-TEST_F(EtcdConsistentStoreDeathTest, TestSetServingSTHChecksInconsistentSize) {
+TEST_F(EtcdConsistentStoreDeathTest,
+       TestSetServingSTHChecksInconsistentSize) {
   ct::SignedTreeHead sth;
   sth.set_timestamp(234);
   sth.set_tree_size(10);
@@ -497,9 +497,8 @@ TEST_F(EtcdConsistentStoreDeathTest,
                "sequence_number\\(\\) < mapping");
 }
 
-
 TEST_F(EtcdConsistentStoreDeathTest,
-       TestUpdateSequenceMappingBarfsWithMappingNonContiguousToServingTree) {
+    TestUpdateSequenceMappingBarfsMappingNonContiguousToServingTree) {
   SignedTreeHead sth;
   sth.set_timestamp(123);
   sth.set_tree_size(1000);
