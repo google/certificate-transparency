@@ -1,3 +1,5 @@
+#include "config.h"
+
 #include <csignal>
 #include <fcntl.h>
 #include <gflags/gflags.h>
@@ -7,6 +9,9 @@
 #include <sys/stat.h>
 #include <sys/wait.h>
 #include <unistd.h>
+#ifdef HAVE_VFORK_H
+#include <vfork.h>
+#endif
 
 #include "net/connection_pool.h"
 #include "net/url_fetcher.h"
@@ -57,7 +62,12 @@ class LocalhostResolver : public libevent::Base::Resolver {
 pid_t RunOpenSSLServer(uint16_t port, const std::string& cert_file,
                        const std::string& key_file,
                        const std::string& mode = "-www") {
+#ifdef HAVE_WORKING_VFORK
+  pid_t pid(vfork());
+#else
   pid_t pid(fork());
+#endif
+
   if (pid == -1) {
     LOG(INFO) << "fork() failed: " << pid;
   } else if (pid == 0) {
@@ -315,7 +325,13 @@ int main(int argc, char** argv) {
   struct sockaddr_in hang_addr;
   bzero((char*)&hang_addr, sizeof(hang_addr));
   hang_addr.sin_family = AF_INET;
-  hang_addr.sin_addr.s_addr = INADDR_ANY;
+  // Prefer to use INADDR_LOOPBACK if available as it avoids the firewall
+  // triggering on some platforms if we bind a non-local address.
+#ifdef HAVE_INADDR_LOOPBACK
+  hang_addr.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
+#else
+  hang_addr.sin_addr.s_addr = htonl(INADDR_ANY);
+#endif
   hang_addr.sin_port = htons(cert_trans::kHangPort);
   CHECK_EQ(0, bind(hang_fd, reinterpret_cast<struct sockaddr*>(&hang_addr),
                    sizeof(hang_addr)));
