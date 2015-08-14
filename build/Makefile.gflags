@@ -1,0 +1,11 @@
+all: make
+
+make: build/Makefile
+	# INSTALL says to run make test, but there's no such target
+	cd build && make && make install
+
+build/Makefile: build
+	cd build && cmake -DCMAKE_INSTALL_PREFIX=`pwd`/../../install ..
+
+build:
+	mkdir build
