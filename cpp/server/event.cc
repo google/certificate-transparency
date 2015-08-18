@@ -251,7 +251,7 @@ bool Services::InitServer(int* sock, int port, const char* ip, int type) {
   server.sin_family = AF_INET;
   server.sin_port = htons((unsigned short)port);
   if (ip == NULL)
-    server.sin_addr.s_addr = INADDR_ANY;
+    server.sin_addr.s_addr = htonl(INADDR_ANY);
   else
     memcpy(&server.sin_addr.s_addr, ip, 4);
 
