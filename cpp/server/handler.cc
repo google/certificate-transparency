@@ -71,75 +71,6 @@ static Latency<milliseconds, string> http_server_request_latency_ms(
     "Total request latency in ms broken down by path");
 
 
-bool ExtractChain(JsonOutput* output, evhttp_request* req, CertChain* chain) {
-  if (evhttp_request_get_command(req) != EVHTTP_REQ_POST) {
-    output->SendError(req, HTTP_BADMETHOD, "Method not allowed.");
-    return false;
-  }
-
-  // TODO(pphaneuf): Should we check that Content-Type says
-  // "application/json", as recommended by RFC4627?
-  JsonObject json_body(evhttp_request_get_input_buffer(req));
-  if (!json_body.Ok() || !json_body.IsType(json_type_object)) {
-    output->SendError(req, HTTP_BADREQUEST, "Unable to parse provided JSON.");
-    return false;
-  }
-
-  JsonArray json_chain(json_body, "chain");
-  if (!json_chain.Ok()) {
-    output->SendError(req, HTTP_BADREQUEST, "Unable to parse provided JSON.");
-    return false;
-  }
-
-  VLOG(2) << "ExtractChain chain:\n" << json_chain.DebugString();
-
-  for (int i = 0; i < json_chain.Length(); ++i) {
-    JsonString json_cert(json_chain, i);
-    if (!json_cert.Ok()) {
-      output->SendError(req, HTTP_BADREQUEST,
-                        "Unable to parse provided JSON.");
-      return false;
-    }
-
-    unique_ptr<Cert> cert(new Cert);
-    cert->LoadFromDerString(json_cert.FromBase64());
-    if (!cert->IsLoaded()) {
-      output->SendError(req, HTTP_BADREQUEST,
-                        "Unable to parse provided chain.");
-      return false;
-    }
-
-    chain->AddCert(cert.release());
-  }
-
-  return true;
-}
-
-
-void AddChainReply(JsonOutput* output, evhttp_request* req,
-                   const util::Status& add_status,
-                   const SignedCertificateTimestamp& sct) {
-  if (!add_status.ok() &&
-      add_status.CanonicalCode() != util::error::ALREADY_EXISTS) {
-    VLOG(1) << "error adding chain: " << add_status;
-    const int response_code(add_status.CanonicalCode() ==
-                                    util::error::RESOURCE_EXHAUSTED
-                                ? HTTP_SERVUNAVAIL
-                                : HTTP_BADREQUEST);
-    return output->SendError(req, response_code, add_status.error_message());
-  }
-
-  JsonObject json_reply;
-  json_reply.Add("sct_version", static_cast<int64_t>(0));
-  json_reply.AddBase64("id", sct.id().key_id());
-  json_reply.Add("timestamp", sct.timestamp());
-  json_reply.Add("extensions", "");
-  json_reply.Add("signature", sct.signature());
-
-  output->SendJsonReply(req, HTTP_OK, json_reply);
-}
-
-
 multimap<string, string> ParseQuery(evhttp_request* req) {
   evkeyvalq keyval;
   multimap<string, string> retval;
@@ -283,37 +214,72 @@ void HttpHandler::AddProxyWrappedHandler(
                                       stats_handler, _1)));
 }
 
-
-void HttpHandler::Add(libevent::HttpServer* server) {
-  CHECK_NOTNULL(server);
-  // TODO(pphaneuf): An optional prefix might be nice?
-  // TODO(pphaneuf): Find out which methods are CPU intensive enough
-  // that they should be spun off to the thread pool.
-  AddProxyWrappedHandler(server, "/ct/v1/get-entries",
-                         bind(&HttpHandler::GetEntries, this, _1));
-  // TODO(alcutter): Support this for mirrors too
-  if (cert_checker_) {
-    // Don't really need to proxy this one, but may as well just to keep
-    // everything tidy:
-    AddProxyWrappedHandler(server, "/ct/v1/get-roots",
-                           bind(&HttpHandler::GetRoots, this, _1));
+bool HttpHandler::ExtractChain(JsonOutput* output, evhttp_request* req,
+                               CertChain* chain) {
+  if (evhttp_request_get_command(req) != EVHTTP_REQ_POST) {
+    output->SendError(req, HTTP_BADMETHOD, "Method not allowed.");
+    return false;
   }
-  AddProxyWrappedHandler(server, "/ct/v1/get-proof-by-hash",
-                         bind(&HttpHandler::GetProof, this, _1));
-  AddProxyWrappedHandler(server, "/ct/v1/get-sth",
-                         bind(&HttpHandler::GetSTH, this, _1));
-  AddProxyWrappedHandler(server, "/ct/v1/get-sth-consistency",
-                         bind(&HttpHandler::GetConsistency, this, _1));
 
-  if (frontend_) {
-    // Proxy the add-* calls too, technically we could serve them, but a
-    // more up-to-date node will have a better chance of handling dupes
-    // correctly, rather than bloating the tree.
-    AddProxyWrappedHandler(server, "/ct/v1/add-chain",
-                           bind(&HttpHandler::AddChain, this, _1));
-    AddProxyWrappedHandler(server, "/ct/v1/add-pre-chain",
-                           bind(&HttpHandler::AddPreChain, this, _1));
+  // TODO(pphaneuf): Should we check that Content-Type says
+  // "application/json", as recommended by RFC4627?
+  JsonObject json_body(evhttp_request_get_input_buffer(req));
+  if (!json_body.Ok() || !json_body.IsType(json_type_object)) {
+    output->SendError(req, HTTP_BADREQUEST, "Unable to parse provided JSON.");
+    return false;
   }
+
+  JsonArray json_chain(json_body, "chain");
+  if (!json_chain.Ok()) {
+    output->SendError(req, HTTP_BADREQUEST, "Unable to parse provided JSON.");
+    return false;
+  }
+
+  VLOG(2) << "ExtractChain chain:\n" << json_chain.DebugString();
+
+  for (int i = 0; i < json_chain.Length(); ++i) {
+    JsonString json_cert(json_chain, i);
+    if (!json_cert.Ok()) {
+      output->SendError(req, HTTP_BADREQUEST,
+                        "Unable to parse provided JSON.");
+      return false;
+    }
+
+    unique_ptr<Cert> cert(new Cert);
+    cert->LoadFromDerString(json_cert.FromBase64());
+    if (!cert->IsLoaded()) {
+      output->SendError(req, HTTP_BADREQUEST,
+                        "Unable to parse provided chain.");
+      return false;
+    }
+
+    chain->AddCert(cert.release());
+  }
+
+  return true;
+}
+
+void HttpHandler::AddChainReply(JsonOutput* output, evhttp_request* req,
+                                const util::Status& add_status,
+                                const SignedCertificateTimestamp& sct) {
+  if (!add_status.ok() &&
+      add_status.CanonicalCode() != util::error::ALREADY_EXISTS) {
+    VLOG(1) << "error adding chain: " << add_status;
+    const int response_code(add_status.CanonicalCode() ==
+                                    util::error::RESOURCE_EXHAUSTED
+                                ? HTTP_SERVUNAVAIL
+                                : HTTP_BADREQUEST);
+    return output->SendError(req, response_code, add_status.error_message());
+  }
+
+  JsonObject json_reply;
+  json_reply.Add("sct_version", static_cast<int64_t>(0));
+  json_reply.AddBase64("id", sct.id().key_id());
+  json_reply.Add("timestamp", sct.timestamp());
+  json_reply.Add("extensions", "");
+  json_reply.Add("signature", sct.signature());
+
+  output->SendJsonReply(req, HTTP_OK, json_reply);
 }
 
 
@@ -321,7 +287,6 @@ void HttpHandler::GetEntries(evhttp_request* req) const {
   if (evhttp_request_get_command(req) != EVHTTP_REQ_GET) {
     return output_->SendError(req, HTTP_BADMETHOD, "Method not allowed.");
   }
-
 
   const multimap<string, string> query(ParseQuery(req));
 
@@ -347,7 +312,6 @@ void HttpHandler::GetEntries(evhttp_request* req) const {
 
   BlockingGetEntries(req, start, end, include_scts);
 }
-
 
 void HttpHandler::GetRoots(evhttp_request* req) const {
   if (evhttp_request_get_command(req) != EVHTTP_REQ_GET) {
@@ -483,16 +447,6 @@ void HttpHandler::AddChain(evhttp_request* req) {
 }
 
 
-void HttpHandler::AddPreChain(evhttp_request* req) {
-  const shared_ptr<PreCertChain> chain(make_shared<PreCertChain>());
-  if (!ExtractChain(output_, req, chain.get())) {
-    return;
-  }
-
-  pool_->Add(bind(&HttpHandler::BlockingAddPreChain, this, req, chain));
-}
-
-
 void HttpHandler::BlockingGetEntries(evhttp_request* req, int64_t start,
                                      int64_t end, bool include_scts) const {
   JsonArray json_entries;
@@ -541,7 +495,7 @@ void HttpHandler::BlockingGetEntries(evhttp_request* req, int64_t start,
 
 
 void HttpHandler::BlockingAddChain(evhttp_request* req,
-                                   const shared_ptr<CertChain>& chain) const {
+                                   const shared_ptr<CertChain>& chain) {
   SignedCertificateTimestamp sct;
 
   AddChainReply(output_, req,
@@ -549,18 +503,6 @@ void HttpHandler::BlockingAddChain(evhttp_request* req,
                     ->QueueX509Entry(CHECK_NOTNULL(chain.get()), &sct),
                 sct);
 }
-
-
-void HttpHandler::BlockingAddPreChain(
-    evhttp_request* req, const shared_ptr<PreCertChain>& chain) const {
-  SignedCertificateTimestamp sct;
-
-  AddChainReply(output_, req,
-                CHECK_NOTNULL(frontend_)
-                    ->QueuePreCertEntry(CHECK_NOTNULL(chain.get()), &sct),
-                sct);
-}
-
 
 bool HttpHandler::IsNodeStale() const {
   lock_guard<mutex> lock(mutex_);

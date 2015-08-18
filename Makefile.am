@@ -202,6 +202,8 @@ cpp_server_ct_mirror_SOURCES = \
 	cpp/proto/serializer.cc \
 	cpp/server/ct-mirror.cc \
 	cpp/server/handler.cc \
+	cpp/server/handler_v1.cc \
+	cpp/server/handler_v2.cc \
 	cpp/server/json_output.cc \
 	cpp/server/metrics.cc \
 	cpp/server/proxy.cc \
@@ -215,6 +217,15 @@ cpp_server_ct_mirror_SOURCES = \
 	cpp/util/util.cc \
 	cpp/util/uuid.cc \
 	cpp/version.cc
+EXTRA_cpp_server_ct_mirror_SOURCES = \
+        cpp/server/handler_factory_v1.cc \
+        cpp/server/handler_factory_v2.cc
+if CT_VERSION_1
+cpp_server_ct_mirror_SOURCES += cpp/server/handler_factory_v1.cc
+endif
+if CT_VERSION_2
+cpp_server_ct_mirror_SOURCES += cpp/server/handler_factory_v2.cc
+endif
 
 cpp_server_ct_server_LDADD = \
 	cpp/libcore.a \
@@ -222,11 +233,16 @@ cpp_server_ct_server_LDADD = \
 	$(libevent_LIBS) \
 	$(leveldb_LIBS) \
 	-lprotobuf -lsqlite3
+EXTRA_cpp_server_ct_server_SOURCES = \
+        cpp/server/handler_v1.cc \
+        cpp/server/handler_v2.cc
 cpp_server_ct_server_SOURCES = \
 	cpp/client/async_log_client.cc \
 	cpp/proto/serializer.cc \
 	cpp/server/ct-server.cc \
 	cpp/server/handler.cc \
+	cpp/server/handler_v1.cc \
+	cpp/server/handler_v2.cc \
 	cpp/server/json_output.cc \
 	cpp/server/metrics.cc \
 	cpp/server/proxy.cc \
@@ -240,6 +256,12 @@ cpp_server_ct_server_SOURCES = \
 	cpp/util/util.cc \
 	cpp/util/uuid.cc \
 	cpp/version.cc
+if CT_VERSION_1
+cpp_server_ct_server_SOURCES += cpp/server/handler_factory_v1.cc
+endif
+if CT_VERSION_2
+cpp_server_ct_server_SOURCES += cpp/server/handler_factory_v2.cc
+endif
 
 cpp_tools_ct_clustertool_LDADD = \
 	cpp/libcore.a \

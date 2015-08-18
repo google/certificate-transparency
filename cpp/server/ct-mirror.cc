@@ -36,7 +36,7 @@
 #include "monitoring/latency.h"
 #include "monitoring/monitoring.h"
 #include "monitoring/registry.h"
-#include "server/handler.h"
+#include "server/handler_factory.h"
 #include "server/json_output.h"
 #include "server/metrics.h"
 #include "server/proxy.h"
