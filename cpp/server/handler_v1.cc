@@ -54,10 +54,9 @@ HttpHandlerV1::~HttpHandlerV1() {}
 
 void HttpHandlerV1::Add(libevent::HttpServer* server) {
   CHECK_NOTNULL(server);
-  // TODO(pphaneuf): An optional prefix might be nice?
   // TODO(pphaneuf): Find out which methods are CPU intensive enough
   // that they should be spun off to the thread pool.
-  string handler_path_prefix("/ct/v1/");
+  const string handler_path_prefix("/ct/v1/");
 
   AddProxyWrappedHandler(server, handler_path_prefix + "get-entries",
                          bind(&HttpHandler::GetEntries, this, _1));
