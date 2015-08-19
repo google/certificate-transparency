@@ -21,7 +21,7 @@ CompactMerkleTree::CompactMerkleTree(SerialHasher* hasher)
 
 CompactMerkleTree::CompactMerkleTree(MerkleTree& model, SerialHasher* hasher)
     : MerkleTreeInterface(),
-      tree_(std::max(0L, int64_t(model.LevelCount()) - 1)),
+      tree_(std::max<int64_t>(0, model.LevelCount() - 1)),
       treehasher_(hasher),
       leaf_count_(model.LeafCount()),
       leaves_processed_(0),
