@@ -84,6 +84,7 @@ bool Client::Read(size_t length, string* result) {
       PCHECK(errno == EPIPE) << "Read failed";
       LOG(ERROR) << "Remote server closed the connection.";
       Disconnect();
+      delete[] buf;
       return false;
     }
 
