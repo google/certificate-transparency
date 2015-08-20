@@ -913,7 +913,7 @@ int GetSTH() {
 
   // Allow for 10 seconds of clock skew
   uint64_t latest = ((uint64_t)time(NULL) + 10) * 1000;
-  LogVerifier::VerifyResult result =
+  const LogVerifier::VerifyResult result =
       verifier->VerifySignedTreeHead(sth, 0, latest);
 
   LOG(INFO) << "STH is " << sth.DebugString();
