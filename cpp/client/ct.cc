@@ -254,7 +254,7 @@ static bool VerifySCTAndPopulateSSLClientCTData(
     const SignedCertificateTimestamp& sct, SSLClientCTData* ct_data) {
   SSLClientCTData::SCTInfo* sct_info = ct_data->add_attached_sct_info();
   sct_info->mutable_sct()->CopyFrom(sct);
-  unique_ptr<LogVerifier> verifier(GetLogVerifierFromFlags());
+  const unique_ptr<LogVerifier> verifier(GetLogVerifierFromFlags());
   string merkle_leaf;
   LogVerifier::VerifyResult result =
       verifier->VerifySignedCertificateTimestamp(
@@ -755,7 +755,7 @@ static void DiagnoseCertChain() {
       continue;
     }
     LOG(INFO) << "SCT number " << i + 1 << ":\n" << sct.DebugString();
-    if (verifier.get()) {
+    if (verifier) {
       if (sct.id().key_id() != verifier->KeyID()) {
         LOG(WARNING) << "SCT key ID does not match verifier's ID, skipping";
         continue;
