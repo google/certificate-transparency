@@ -5,6 +5,7 @@
 #include <gflags/gflags.h>
 #include <glog/logging.h>
 #include <iostream>
+#include <memory>
 #include <openssl/asn1.h>
 #include <openssl/bio.h>
 #include <openssl/bn.h>
@@ -136,6 +137,7 @@ using ct::SignedCertificateTimestamp;
 using ct::SignedCertificateTimestampList;
 using std::shared_ptr;
 using std::string;
+using std::unique_ptr;
 using std::vector;
 using util::StatusOr;
 
@@ -252,7 +254,7 @@ static bool VerifySCTAndPopulateSSLClientCTData(
     const SignedCertificateTimestamp& sct, SSLClientCTData* ct_data) {
   SSLClientCTData::SCTInfo* sct_info = ct_data->add_attached_sct_info();
   sct_info->mutable_sct()->CopyFrom(sct);
-  LogVerifier* verifier = GetLogVerifierFromFlags();
+  unique_ptr<LogVerifier> verifier(GetLogVerifierFromFlags());
   string merkle_leaf;
   LogVerifier::VerifyResult result =
       verifier->VerifySignedCertificateTimestamp(
@@ -717,12 +719,12 @@ static void DiagnoseCertChain() {
 
   LOG(INFO) << "Embedded proof extension found in certificate";
 
-  LogVerifier* verifier = NULL;
+  unique_ptr<LogVerifier> verifier;
   LogEntry entry;
   if (FLAGS_ct_server_public_key.empty()) {
     LOG(WARNING) << "No log server public key given, skipping verification";
   } else {
-    verifier = GetLogVerifierFromFlags();
+    verifier.reset(GetLogVerifierFromFlags());
     CertSubmissionHandler::X509ChainToEntry(chain, &entry);
   }
 
@@ -753,7 +755,7 @@ static void DiagnoseCertChain() {
       continue;
     }
     LOG(INFO) << "SCT number " << i + 1 << ":\n" << sct.DebugString();
-    if (verifier != NULL) {
+    if (verifier.get()) {
       if (sct.id().key_id() != verifier->KeyID()) {
         LOG(WARNING) << "SCT key ID does not match verifier's ID, skipping";
         continue;
@@ -907,7 +909,7 @@ int GetSTH() {
   ct::SignedTreeHead sth;
   CHECK_EQ(AsyncLogClient::OK, client.GetSTH(&sth));
 
-  LogVerifier* verifier = GetLogVerifierFromFlags();
+  unique_ptr<LogVerifier> verifier(GetLogVerifierFromFlags());
 
   // Allow for 10 seconds of clock skew
   uint64_t latest = ((uint64_t)time(NULL) + 10) * 1000;
