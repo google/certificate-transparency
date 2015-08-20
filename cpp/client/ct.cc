@@ -909,7 +909,7 @@ int GetSTH() {
   ct::SignedTreeHead sth;
   CHECK_EQ(AsyncLogClient::OK, client.GetSTH(&sth));
 
-  unique_ptr<LogVerifier> verifier(GetLogVerifierFromFlags());
+  const unique_ptr<LogVerifier> verifier(GetLogVerifierFromFlags());
 
   // Allow for 10 seconds of clock skew
   uint64_t latest = ((uint64_t)time(NULL) + 10) * 1000;
