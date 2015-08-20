@@ -55,8 +55,10 @@ string ASN1ToStringAndCheckForNulls(ASN1_STRING* asn1_string,
   return cpp_string;
 }
 
+
 Cert::Cert(X509* x509) : x509_(x509) {
 }
+
 
 Cert::Cert(const string& pem_string) : x509_(nullptr) {
   // A read-only bio.
@@ -79,10 +81,12 @@ Cert::Cert(const string& pem_string) : x509_(nullptr) {
   }
 }
 
+
 Cert::~Cert() {
   if (x509_ != NULL)
     X509_free(x509_);
 }
+
 
 Cert* Cert::Clone() const {
   X509* x509 = NULL;
@@ -94,6 +98,7 @@ Cert* Cert::Clone() const {
   Cert* clone = new Cert(x509);
   return clone;
 }
+
 
 Cert::Status Cert::LoadFromDerString(const string& der_string) {
   if (x509_ != NULL) {
@@ -110,6 +115,7 @@ Cert::Status Cert::LoadFromDerString(const string& der_string) {
   }
   return Cert::TRUE;
 }
+
 
 Cert::Status Cert::LoadFromDerBio(BIO* bio_in) {
   if (x509_) {
@@ -141,6 +147,7 @@ string Cert::PrintIssuerName() const {
   return PrintName(X509_get_issuer_name(x509_));
 }
 
+
 string Cert::PrintSubjectName() const {
   if (!IsLoaded()) {
     LOG(ERROR) << "Cert not loaded";
@@ -149,6 +156,7 @@ string Cert::PrintSubjectName() const {
 
   return PrintName(X509_get_subject_name(x509_));
 }
+
 
 // static
 string Cert::PrintName(X509_NAME* name) {
@@ -171,6 +179,7 @@ string Cert::PrintName(X509_NAME* name) {
   return ret;
 }
 
+
 string Cert::PrintNotBefore() const {
   if (!IsLoaded()) {
     LOG(ERROR) << "Cert not loaded";
@@ -179,6 +188,7 @@ string Cert::PrintNotBefore() const {
 
   return PrintTime(X509_get_notBefore(x509_));
 }
+
 
 string Cert::PrintNotAfter() const {
   if (!IsLoaded()) {
@@ -189,12 +199,14 @@ string Cert::PrintNotAfter() const {
   return PrintTime(X509_get_notAfter(x509_));
 }
 
+
 string Cert::PrintSignatureAlgorithm() const {
   const char* sigalg = OBJ_nid2ln(X509_get_signature_nid(x509_));
   if (sigalg == NULL)
     return "NULL";
   return string(sigalg);
 }
+
 
 // static
 string Cert::PrintTime(ASN1_TIME* when) {
@@ -218,9 +230,11 @@ string Cert::PrintTime(ASN1_TIME* when) {
   return ret;
 }
 
+
 Cert::Status Cert::IsIdenticalTo(const Cert& other) const {
   return X509_cmp(x509_, other.x509_) == 0 ? TRUE : FALSE;
 }
+
 
 Cert::Status Cert::HasExtension(int extension_nid) const {
   if (!IsLoaded()) {
@@ -231,6 +245,7 @@ Cert::Status Cert::HasExtension(int extension_nid) const {
   int ignored;
   return ExtensionIndex(extension_nid, &ignored);
 }
+
 
 Cert::Status Cert::HasCriticalExtension(int extension_nid) const {
   if (!IsLoaded()) {
@@ -245,6 +260,7 @@ Cert::Status Cert::HasCriticalExtension(int extension_nid) const {
 
   return X509_EXTENSION_get_critical(ext) > 0 ? TRUE : FALSE;
 }
+
 
 Cert::Status Cert::HasBasicConstraintCATrue() const {
   if (!IsLoaded()) {
@@ -269,6 +285,7 @@ Cert::Status Cert::HasBasicConstraintCATrue() const {
   BASIC_CONSTRAINTS_free(constraints);
   return is_ca ? TRUE : FALSE;
 }
+
 
 Cert::Status Cert::HasExtendedKeyUsage(int key_usage_nid) const {
   if (!IsLoaded()) {
@@ -310,6 +327,7 @@ Cert::Status Cert::HasExtendedKeyUsage(int key_usage_nid) const {
   return ext_key_usage_found ? TRUE : FALSE;
 }
 
+
 Cert::Status Cert::IsIssuedBy(const Cert& issuer) const {
   if (!IsLoaded() || !issuer.IsLoaded()) {
     LOG(ERROR) << "Cert not loaded";
@@ -319,6 +337,7 @@ Cert::Status Cert::IsIssuedBy(const Cert& issuer) const {
   // Seemingly no negative "real" error codes are returned from here.
   return ret == X509_V_OK ? TRUE : FALSE;
 }
+
 
 Cert::Status Cert::IsSignedBy(const Cert& issuer) const {
   if (!IsLoaded() || !issuer.IsLoaded()) {
@@ -353,6 +372,7 @@ Cert::Status Cert::IsSignedBy(const Cert& issuer) const {
   return ret > 0 ? TRUE : FALSE;
 }
 
+
 Cert::Status Cert::DerEncoding(string* result) const {
   if (!IsLoaded()) {
     LOG(ERROR) << "Cert not loaded";
@@ -374,6 +394,7 @@ Cert::Status Cert::DerEncoding(string* result) const {
   OPENSSL_free(der_buf);
   return TRUE;
 }
+
 
 Cert::Status Cert::PemEncoding(string* result) const {
   if (!IsLoaded()) {
@@ -398,6 +419,7 @@ Cert::Status Cert::PemEncoding(string* result) const {
   return TRUE;
 }
 
+
 Cert::Status Cert::Sha256Digest(string* result) const {
   if (!IsLoaded()) {
     LOG(ERROR) << "Cert not loaded";
@@ -417,6 +439,7 @@ Cert::Status Cert::Sha256Digest(string* result) const {
   result->assign(reinterpret_cast<char*>(digest), len);
   return TRUE;
 }
+
 
 Cert::Status Cert::DerEncodedTbsCertificate(string* result) const {
   if (!IsLoaded()) {
@@ -438,6 +461,7 @@ Cert::Status Cert::DerEncodedTbsCertificate(string* result) const {
   return TRUE;
 }
 
+
 Cert::Status Cert::DerEncodedSubjectName(string* result) const {
   if (!IsLoaded()) {
     LOG(ERROR) << "Cert not loaded";
@@ -446,6 +470,7 @@ Cert::Status Cert::DerEncodedSubjectName(string* result) const {
   return DerEncodedName(X509_get_subject_name(x509_), result);
 }
 
+
 Cert::Status Cert::DerEncodedIssuerName(string* result) const {
   if (!IsLoaded()) {
     LOG(ERROR) << "Cert not loaded";
@@ -453,6 +478,7 @@ Cert::Status Cert::DerEncodedIssuerName(string* result) const {
   }
   return DerEncodedName(X509_get_issuer_name(x509_), result);
 }
+
 
 // static
 Cert::Status Cert::DerEncodedName(X509_NAME* name, string* result) {
@@ -469,6 +495,7 @@ Cert::Status Cert::DerEncodedName(X509_NAME* name, string* result) {
   OPENSSL_free(der_buf);
   return TRUE;
 }
+
 
 Cert::Status Cert::PublicKeySha256Digest(string* result) const {
   if (!IsLoaded()) {
@@ -488,6 +515,7 @@ Cert::Status Cert::PublicKeySha256Digest(string* result) const {
   result->assign(reinterpret_cast<char*>(digest), len);
   return TRUE;
 }
+
 
 Cert::Status Cert::SPKISha256Digest(string* result) const {
   if (!IsLoaded()) {
@@ -513,6 +541,7 @@ Cert::Status Cert::SPKISha256Digest(string* result) const {
   return TRUE;
 }
 
+
 Cert::Status Cert::OctetStringExtensionData(int extension_nid,
                                             string* result) const {
   if (!IsLoaded()) {
@@ -533,6 +562,7 @@ Cert::Status Cert::OctetStringExtensionData(int extension_nid,
   return TRUE;
 }
 
+
 Cert::Status Cert::ExtensionIndex(int extension_nid,
                                   int* extension_index) const {
   int index = X509_get_ext_by_NID(x509_, extension_nid, -1);
@@ -550,6 +580,7 @@ Cert::Status Cert::ExtensionIndex(int extension_nid,
   *extension_index = index;
   return TRUE;
 }
+
 
 Cert::Status Cert::GetExtension(int extension_nid,
                                 X509_EXTENSION** ext) const {
@@ -569,6 +600,7 @@ Cert::Status Cert::GetExtension(int extension_nid,
     return TRUE;
   }
 }
+
 
 Cert::Status Cert::ExtensionStructure(int extension_nid,
                                       void** ext_struct) const {
@@ -595,6 +627,7 @@ Cert::Status Cert::ExtensionStructure(int extension_nid,
   return TRUE;
 }
 
+
 bool IsRedactedHost(const string& hostname) {
   // Split the hostname on '.' characters
   const vector<string> tokens(util::split(hostname, '.'));
@@ -607,6 +640,7 @@ bool IsRedactedHost(const string& hostname) {
 
   return false;
 }
+
 
 bool IsValidRedactedHost(const string& hostname) {
   // Split the hostname on '.' characters
@@ -635,10 +669,11 @@ bool IsValidRedactedHost(const string& hostname) {
   return true;
 }
 
+
 // Helper method for validating V2 redaction rules. If it returns true
 // then the result in status is final.
-bool Cert::ValidateRedactionSubjectAltNameAndCN(int *dns_alt_name_count,
-                                                Status *status) const {
+bool Cert::ValidateRedactionSubjectAltNameAndCN(int* dns_alt_name_count,
+                                                Status* status) const {
   string common_name;
   int redacted_name_count = 0;
   vector<string> dns_alt_names;
@@ -697,9 +732,8 @@ bool Cert::ValidateRedactionSubjectAltNameAndCN(int *dns_alt_name_count,
     return true;
   }
 
-  int name_pos = -1;
-
-  name_pos = X509_NAME_get_index_by_NID(name, NID_commonName, name_pos);
+  const int name_pos(
+      X509_NAME_get_index_by_NID(name, NID_commonName, -1));
 
   if (name_pos >= 0) {
     X509_NAME_ENTRY* const name_entry(X509_NAME_get_entry(name, name_pos));
@@ -727,7 +761,7 @@ bool Cert::ValidateRedactionSubjectAltNameAndCN(int *dns_alt_name_count,
 
   // If both a subject CN and DNS ids are present in the cert then the
   // first DNS id must exactly match the CN
-  if (!dns_alt_names.empty() && common_name.length() > 0) {
+  if (!dns_alt_names.empty() && !common_name.empty()) {
     if (dns_alt_names[0] != common_name) {
       LOG(WARNING) << "CN " << common_name << " does not match DNS.0 "
                    << dns_alt_names[0];
@@ -748,6 +782,7 @@ bool Cert::ValidateRedactionSubjectAltNameAndCN(int *dns_alt_name_count,
   *dns_alt_name_count = dns_alt_names.size();
   return false;  // validation has no definite result yet
 }
+
 
 Cert::Status Cert::IsValidWildcardRedaction() const {
   if (!IsLoaded()) {
@@ -779,7 +814,7 @@ Cert::Status Cert::IsValidWildcardRedaction() const {
       ASN1_seq_unpack_ASN1_INTEGER(exty->value->data, exty->value->length,
                                    d2i_ASN1_INTEGER, ASN1_INTEGER_free)));
 
-  if (integers != NULL) {
+  if (integers) {
     const int num_integers = sk_ASN1_INTEGER_num(integers);
 
     // RFC text says there MUST NOT be more integers than there are DNS ids
@@ -819,6 +854,7 @@ Cert::Status Cert::IsValidWildcardRedaction() const {
   return Cert::TRUE;
 }
 
+
 Cert::Status Cert::IsValidNameConstrainedIntermediateCa() const {
   if (!IsLoaded()) {
     LOG(ERROR) << "Cert not loaded";
@@ -841,8 +877,8 @@ Cert::Status Cert::IsValidNameConstrainedIntermediateCa() const {
   }
 
   int crit;
-  NAME_CONSTRAINTS* const nc((NAME_CONSTRAINTS *) X509_get_ext_d2i(
-      x509_, NID_name_constraints, &crit, nullptr));
+  NAME_CONSTRAINTS* const nc(static_cast<NAME_CONSTRAINTS*>(X509_get_ext_d2i(
+      x509_, NID_name_constraints, &crit, nullptr)));
 
   if (!nc || crit == -1) {
     LOG(ERROR) << "Couldn't parse the name constraint extension";
@@ -856,7 +892,7 @@ Cert::Status Cert::IsValidNameConstrainedIntermediateCa() const {
   for (int permitted_subtree = 0;
       permitted_subtree < sk_GENERAL_SUBTREE_num(nc->permittedSubtrees);
       ++permitted_subtree) {
-    GENERAL_SUBTREE * const perm_subtree(sk_GENERAL_SUBTREE_value(
+    GENERAL_SUBTREE* const perm_subtree(sk_GENERAL_SUBTREE_value(
         nc->permittedSubtrees, permitted_subtree));
 
     if (perm_subtree->base && perm_subtree->base->type == GEN_DNS
@@ -879,7 +915,7 @@ Cert::Status Cert::IsValidNameConstrainedIntermediateCa() const {
       excluded_subtree < sk_GENERAL_SUBTREE_num(nc->excludedSubtrees);
       ++excluded_subtree) {
 
-    GENERAL_SUBTREE * const excl_subtree(sk_GENERAL_SUBTREE_value(
+    GENERAL_SUBTREE* const excl_subtree(sk_GENERAL_SUBTREE_value(
         nc->excludedSubtrees, excluded_subtree));
 
     // Only consider entries that are of type ipAddress (OCTET_STRING)
@@ -919,6 +955,7 @@ Cert::Status Cert::IsValidNameConstrainedIntermediateCa() const {
   return TRUE;
 }
 
+
 TbsCertificate::TbsCertificate(const Cert& cert) : x509_(NULL) {
   if (!cert.IsLoaded()) {
     LOG(ERROR) << "Cert not loaded";
@@ -931,10 +968,12 @@ TbsCertificate::TbsCertificate(const Cert& cert) : x509_(NULL) {
     LOG_OPENSSL_ERRORS(ERROR);
 }
 
+
 TbsCertificate::~TbsCertificate() {
   if (x509_ != NULL)
     X509_free(x509_);
 }
+
 
 Cert::Status TbsCertificate::DerEncoding(string* result) const {
   if (!IsLoaded()) {
@@ -955,6 +994,7 @@ Cert::Status TbsCertificate::DerEncoding(string* result) const {
   OPENSSL_free(der_buf);
   return Cert::TRUE;
 }
+
 
 Cert::Status TbsCertificate::DeleteExtension(int extension_nid) {
   if (!IsLoaded()) {
@@ -995,6 +1035,7 @@ Cert::Status TbsCertificate::DeleteExtension(int extension_nid) {
 
   return Cert::TRUE;
 }
+
 
 Cert::Status TbsCertificate::CopyIssuerFrom(const Cert& from) {
   if (!from.IsLoaded()) {
@@ -1072,6 +1113,7 @@ Cert::Status TbsCertificate::CopyIssuerFrom(const Cert& from) {
   return Cert::TRUE;
 }
 
+
 Cert::Status TbsCertificate::ExtensionIndex(int extension_nid,
                                             int* extension_index) const {
   int index = X509_get_ext_by_NID(x509_, extension_nid, -1);
@@ -1121,6 +1163,7 @@ CertChain::CertChain(const string& pem_string) {
   }
 }
 
+
 Cert::Status CertChain::AddCert(Cert* cert) {
   if (cert == NULL || !cert->IsLoaded()) {
     LOG(ERROR) << "Attempting to add an invalid cert";
@@ -1132,6 +1175,7 @@ Cert::Status CertChain::AddCert(Cert* cert) {
   return Cert::TRUE;
 }
 
+
 Cert::Status CertChain::RemoveCert() {
   if (!IsLoaded()) {
     LOG(ERROR) << "Chain is not loaded";
@@ -1141,6 +1185,7 @@ Cert::Status CertChain::RemoveCert() {
   chain_.pop_back();
   return Cert::TRUE;
 }
+
 
 Cert::Status CertChain::RemoveCertsAfterFirstSelfSigned() {
   if (!IsLoaded()) {
@@ -1177,6 +1222,7 @@ CertChain::~CertChain() {
   ClearChain();
 }
 
+
 Cert::Status CertChain::IsValidCaIssuerChainMaybeLegacyRoot() const {
   if (!IsLoaded()) {
     LOG(ERROR) << "Chain is not loaded";
@@ -1207,6 +1253,7 @@ Cert::Status CertChain::IsValidCaIssuerChainMaybeLegacyRoot() const {
   return Cert::TRUE;
 }
 
+
 Cert::Status CertChain::IsValidSignatureChain() const {
   if (!IsLoaded()) {
     LOG(ERROR) << "Chain is not loaded";
@@ -1225,12 +1272,14 @@ Cert::Status CertChain::IsValidSignatureChain() const {
   return Cert::TRUE;
 }
 
+
 void CertChain::ClearChain() {
   vector<Cert*>::const_iterator it;
   for (it = chain_.begin(); it < chain_.end(); ++it)
     delete *it;
   chain_.clear();
 }
+
 
 Cert::Status PreCertChain::UsesPrecertSigningCertificate() const {
   const Cert* issuer = PrecertIssuingCert();
@@ -1241,6 +1290,7 @@ Cert::Status PreCertChain::UsesPrecertSigningCertificate() const {
 
   return issuer->HasExtendedKeyUsage(cert_trans::NID_ctPrecertificateSigning);
 }
+
 
 Cert::Status PreCertChain::IsWellFormed() const {
   if (!IsLoaded()) {
