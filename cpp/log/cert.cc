@@ -670,20 +670,12 @@ bool IsValidRedactedHost(const string& hostname) {
 }
 
 
-// Helper method for validating V2 redaction rules. If it returns true
-// then the result in status is final.
-bool Cert::ValidateRedactionSubjectAltNameAndCN(int* dns_alt_name_count,
-                                                Status* status) const {
-  string common_name;
-  int redacted_name_count = 0;
-  vector<string> dns_alt_names;
-
+bool validateRedactionSubjectAltNames(STACK_OF(GENERAL_NAME)* subject_alt_names,
+                                      vector<string>* dns_alt_names,
+                                      Cert::Status* status,
+                                      int* redacted_name_count) {
   // First. Check all the Subject Alt Name extension records. Any that are of
   // type DNS must pass validation if they are attempting to redact labels
-  STACK_OF(GENERAL_NAME)* subject_alt_names =
-      static_cast<STACK_OF(GENERAL_NAME)*>(
-          X509_get_ext_d2i(x509_, NID_subject_alt_name, NULL, NULL));
-
   if (subject_alt_names) {
     const int subject_alt_name_count = sk_GENERAL_NAME_num(subject_alt_names);
 
@@ -697,13 +689,13 @@ bool Cert::ValidateRedactionSubjectAltNameAndCN(int* dns_alt_name_count,
                                                              "DNS name",
                                                              &name_status);
 
-        if (name_status != TRUE) {
+        if (name_status != Cert::TRUE) {
           sk_GENERAL_NAME_free(subject_alt_names);
           *status = name_status;
           return true;
         }
 
-        dns_alt_names.push_back(dns_name);
+        dns_alt_names->push_back(dns_name);
 
         if (IsRedactedHost(dns_name)) {
           if (!IsValidRedactedHost(dns_name)) {
@@ -718,7 +710,33 @@ bool Cert::ValidateRedactionSubjectAltNameAndCN(int* dns_alt_name_count,
       }
     }
 
+    // This stage of validation is passed, result is not final yet
     sk_GENERAL_NAME_free(subject_alt_names);
+    return false;
+  }
+}
+
+
+// Helper method for validating V2 redaction rules. If it returns true
+// then the result in status is final.
+bool Cert::ValidateRedactionSubjectAltNameAndCN(int* dns_alt_name_count,
+                                                Status* status) const {
+  string common_name;
+  int redacted_name_count = 0;
+  vector<string> dns_alt_names;
+
+  STACK_OF(GENERAL_NAME)* subject_alt_names =
+      static_cast<STACK_OF(GENERAL_NAME)*>(
+          X509_get_ext_d2i(x509_, NID_subject_alt_name, NULL, NULL));
+
+  // Apply validation rules for subject alt names, if this returns true
+  // status is already final.
+  if (subject_alt_names &&
+      validateRedactionSubjectAltNames(subject_alt_names,
+                                       &dns_alt_names,
+                                       status,
+                                       &redacted_name_count)) {
+    return true;
   }
 
   // The next stage of validation is that if the subject name CN exists it
