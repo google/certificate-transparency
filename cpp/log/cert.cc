@@ -710,10 +710,11 @@ bool validateRedactionSubjectAltNames(STACK_OF(GENERAL_NAME)* subject_alt_names,
       }
     }
 
-    // This stage of validation is passed, result is not final yet
     sk_GENERAL_NAME_free(subject_alt_names);
-    return false;
   }
+
+  // This stage of validation is complete, result is not final yet
+  return false;
 }
 
 
