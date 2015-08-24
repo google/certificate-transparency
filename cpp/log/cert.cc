@@ -133,6 +133,7 @@ Cert::Status Cert::LoadFromDerBio(BIO* bio_in) {
     // virtually impossible to fish them out.
     LOG(WARNING) << "Input is not a valid encoded certificate";
     LOG_OPENSSL_ERRORS(WARNING);
+    return Cert::FALSE;
   }
   return TRUE;
 }
