@@ -194,7 +194,7 @@ cpp_libtest_a_SOURCES = \
 	cpp/util/testing.cc
 
 cpp_libserver_a_LIBDADD = \
-  cpp/libcore.a
+        cpp/libcore.a
 
 cpp_libserver_a_SOURCES = \
 	cpp/client/async_log_client.cc \
