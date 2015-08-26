@@ -33,6 +33,7 @@
 /cpp/gmock-all.cc
 /cpp/gtest-all.cc
 /cpp/local.mk
+/cpp/fetcher/remote_peer_test
 /cpp/log/cert_checker_test
 /cpp/log/cert_submission_handler_test
 /cpp/log/cert_test
@@ -56,6 +57,9 @@
 /cpp/merkletree/serial_hasher_test
 /cpp/merkletree/tree_hasher_test
 /cpp/monitor/database_test
+/cpp/monitoring/counter_test
+/cpp/monitoring/gauge_test
+/cpp/monitoring/gcm/exporter_test
 /cpp/monitoring/prometheus/counter_test
 /cpp/monitoring/prometheus/gauge_test
 /cpp/monitoring/registry_test
