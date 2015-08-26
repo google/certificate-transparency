@@ -4,7 +4,7 @@
 #include <glog/logging.h>
 #include <sstream>
 
-#include "monitoring/metric.h"
+#include "monitoring/monitoring.h"
 #include "monitoring/registry.h"
 #include "net/url.h"
 #include "util/json_wrapper.h"
@@ -22,6 +22,9 @@ DEFINE_int32(google_compute_monitoring_credentials_refresh_interval_minutes,
              30,
              "Interval between refreshing the auth credentials to write to "
              "GCM.");
+DEFINE_int32(google_compute_monitoring_retry_delay_seconds, 5,
+             "Seconds between retrying failed GCM requests.");
+
 
 namespace cert_trans {
 
@@ -36,9 +39,22 @@ using std::placeholders::_1;
 using std::string;
 using std::thread;
 using std::unique_lock;
+using std::unique_ptr;
 using util::Executor;
 using util::SyncTask;
+using util::Task;
 
+Counter<>* num_gcm_create_metric_failures =
+    Counter<>::New("num_gcm_create_metricpush_failures",
+                   "Number of failures to create metric metadata in GCM.");
+
+Counter<>* num_gcm_push_failures =
+    Counter<>::New("num_gcm_push_failures",
+                   "Number of failures to push metric data to GCM.");
+
+Counter<>* num_gcm_token_fetch_failures =
+    Counter<>::New("num_gcm_token_fetch_failures",
+                   "Number of failures to fetch GCM auth token");
 
 namespace {
 
@@ -63,12 +79,9 @@ GCMExporter::GCMExporter(const string& instance_name, UrlFetcher* fetcher,
     : instance_name_(instance_name),
       fetcher_(CHECK_NOTNULL(fetcher)),
       executor_(CHECK_NOTNULL(executor)),
-      task_(executor_) {
-  RefreshCredentials();
-  CreateMetrics();
-  // Push the first set of metrics, this will also schedule the next push
-  // automatically.
-  PushMetrics();
+      task_(executor_),
+      metrics_created_(false) {
+  executor_->Add(bind(&GCMExporter::PushMetrics, this));
 }
 
 
@@ -85,23 +98,36 @@ void GCMExporter::RefreshCredentials() {
            FLAGS_google_compute_monitoring_service_account + "/token")));
   req.headers.insert(make_pair("Metadata-Flavor", "Google"));
 
-  UrlFetcher::Response resp;
-  SyncTask task(executor_);
-  fetcher_->Fetch(req, &resp, task.task());
-  task.Wait();
+  UrlFetcher::Response* const resp(new UrlFetcher::Response);
+  fetcher_->Fetch(req, resp, task_.task()->AddChild(
+                                 bind(&GCMExporter::RefreshCredentialsDone,
+                                      this, resp, _1)));
+}
 
-  // TODO(alcutter): Handle this better
-  CHECK_EQ(util::Status::OK, task.status());
-  CHECK_EQ(200, resp.status_code);
+
+void GCMExporter::RefreshCredentialsDone(UrlFetcher::Response* resp,
+                                         Task* task) {
+  unique_ptr<UrlFetcher::Response> resp_deleter(resp);
+  if (!task->status().ok() || resp->status_code != 200) {
+    LOG(WARNING) << "Failed to refresh GCM credentials, status: "
+                 << task->status() << ", response code: " << resp->status_code;
+    num_gcm_token_fetch_failures->Increment();
+    executor_->Delay(
+        seconds(FLAGS_google_compute_monitoring_retry_delay_seconds),
+        task_.task()->AddChild(bind(&GCMExporter::RefreshCredentials, this)));
+    return;
+  }
   token_refreshed_at_ = system_clock::now();
 
-  JsonObject reply(resp.body);
-  CHECK(reply.Ok()) << "Failed to parse metadata JSON:\n" << resp.body;
+  JsonObject reply(resp->body);
+  CHECK(reply.Ok()) << "Failed to parse metadata JSON:\n" << resp->body;
   JsonString bearer(reply, "access_token");
   CHECK(bearer.Ok());
   bearer_token_ = bearer.Value();
 
   VLOG(1) << "GCM credentials refreshed";
+
+  PushMetrics();
 }
 
 
@@ -120,7 +146,7 @@ void AddLabelDescription(const string& key, const string& desc,
 }  // namespace
 
 
-void GCMExporter::CreateMetrics() const {
+void GCMExporter::CreateMetrics() {
   const std::set<const Metric*> metrics(Registry::Instance()->GetMetrics());
   for (auto& m : metrics) {
     CHECK_NOTNULL(m);
@@ -157,25 +183,36 @@ void GCMExporter::CreateMetrics() const {
     metric.Add("labels", labels);
     metric.Add("typeDescriptor", desc);
 
-    UrlFetcher::Request req((
-        URL(FLAGS_google_compute_monitoring_base_url + "/metricDescriptors")));
-    req.verb = UrlFetcher::Verb::POST;
-    req.headers.insert(make_pair("Content-Type", "application/json"));
-    req.headers.insert(make_pair("Authorization", "Bearer " + bearer_token_));
-    req.body = metric.ToString();
+    do {
+      UrlFetcher::Request req((URL(FLAGS_google_compute_monitoring_base_url +
+                                   "/metricDescriptors")));
+      req.verb = UrlFetcher::Verb::POST;
+      req.headers.insert(make_pair("Content-Type", "application/json"));
+      req.headers.insert(
+          make_pair("Authorization", "Bearer " + bearer_token_));
+      req.body = metric.ToString();
 
-    UrlFetcher::Response resp;
-    SyncTask task(executor_);
-    VLOG(1) << "Creating metric m.Name()...";
-    VLOG(2) << req.body;
-    fetcher_->Fetch(req, &resp, task.task());
-    task.Wait();
-    // TODO(alcutter): Handle this better?
-    CHECK_EQ(util::Status::OK, task.status());
-    CHECK_EQ(200, resp.status_code);
-    VLOG(1) << "Metrics Created.";
-    VLOG(2) << resp.body;
+      UrlFetcher::Response resp;
+      SyncTask task(executor_);
+      VLOG(1) << "Creating metric m.Name()...";
+      VLOG(2) << req.body;
+      fetcher_->Fetch(req, &resp, task.task());
+      task.Wait();
+      if (!task.status().ok() || resp.status_code != 200) {
+        LOG(WARNING) << "Failed to create/update metric metadata; status: "
+                     << task.status()
+                     << ", response_code: " << resp.status_code;
+        num_gcm_create_metric_failures->Increment();
+        // TODO(alcutter): consider breaking this up into separate child tasks.
+        sleep(FLAGS_google_compute_monitoring_retry_delay_seconds);
+        continue;
+      }
+      VLOG(1) << "Metrics Created.";
+      VLOG(2) << resp.body;
+      break;
+    } while (true);
   }
+  metrics_created_ = true;
 }
 
 
@@ -199,7 +236,14 @@ void GCMExporter::PushMetrics() {
   if (system_clock::now() - token_refreshed_at_ >
       minutes(
           FLAGS_google_compute_monitoring_credentials_refresh_interval_minutes)) {
+    // If necessary, asynchronously refresh credentials, and then call this
+    // method again when done.
     RefreshCredentials();
+    return;
+  }
+
+  if (!metrics_created_) {
+    CreateMetrics();
   }
 
   // Build up the JSON write request into this object:
@@ -252,16 +296,25 @@ void GCMExporter::PushMetrics() {
   req.headers.insert(make_pair("Authorization", "Bearer " + bearer_token_));
   req.body = metric_write.ToString();
 
-  UrlFetcher::Response resp;
-  SyncTask task(executor_);
+  UrlFetcher::Response* resp(new UrlFetcher::Response);
   VLOG(1) << "Pushing metrics...";
   VLOG(2) << req.body;
-  fetcher_->Fetch(req, &resp, task.task());
-  task.Wait();
-  CHECK_EQ(util::Status::OK, task.status());
-  CHECK_EQ(200, resp.status_code);
-  VLOG(1) << "Metrics pushed.";
-  VLOG(2) << resp.body;
+  fetcher_->Fetch(req, resp,
+                  task_.task()->AddChild(
+                      bind(&GCMExporter::PushMetricsDone, this, resp, _1)));
+}
+
+
+void GCMExporter::PushMetricsDone(UrlFetcher::Response* resp, Task* task) {
+  unique_ptr<UrlFetcher::Response> resp_deleter(resp);
+  if (!task->status().ok() || resp->status_code != 200) {
+    num_gcm_push_failures->Increment();
+    LOG(WARNING) << "Failed to push metrics to GCM, status: " << task->status()
+                 << ", reponse code: " << resp->status_code;
+  } else {
+    VLOG(1) << "Metrics pushed.";
+    VLOG(2) << resp->body;
+  }
 
   executor_->Delay(
       seconds(FLAGS_google_compute_monitoring_push_interval_seconds),
