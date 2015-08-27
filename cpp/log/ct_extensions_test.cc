@@ -166,16 +166,20 @@ TEST_F(CtExtensionsTest, TestPoisonExtension) {
 TEST_F(CtExtensionsTest, TestPrecertSigning) {
   // Sanity check
   Cert simple_ca_cert(simple_ca_cert_);
-  EXPECT_EQ(Cert::FALSE, simple_ca_cert.HasExtendedKeyUsage(
-                             cert_trans::NID_ctPrecertificateSigning));
+  StatusOr<bool> simple_ca_eku_status = simple_ca_cert.HasExtendedKeyUsage(
+      cert_trans::NID_ctPrecertificateSigning);
+  EXPECT_TRUE(simple_ca_eku_status.ok() &&
+              simple_ca_eku_status.ValueOrDie() == false);
 
   Cert pre_signing_cert(pre_signing_cert_);
   ASSERT_TRUE(pre_signing_cert.IsLoaded());
   // Check we can find the key usage by its advertised NID.
   // We should really be checking that the OID matches the expected OID but
   // what other key usage could this cert be having that the other one doesn't?
-  ASSERT_EQ(Cert::TRUE, pre_signing_cert.HasExtendedKeyUsage(
-                            cert_trans::NID_ctPrecertificateSigning));
+  StatusOr<bool> pre_signing_eku_status = pre_signing_cert.HasExtendedKeyUsage(
+      cert_trans::NID_ctPrecertificateSigning);
+  ASSERT_TRUE(pre_signing_eku_status.ok() &&
+              pre_signing_eku_status.ValueOrDie());
 }
 
 }  // namespace cert_trans
