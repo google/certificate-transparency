@@ -8,6 +8,9 @@
 #include <vector>
 
 #include "base/macros.h"
+#include "util/statusor.h"
+
+using util::StatusOr;
 
 namespace cert_trans {
 
