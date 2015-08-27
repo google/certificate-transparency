@@ -21,13 +21,18 @@ class GCMExporter {
 
  private:
   void RefreshCredentials();
-  void CreateMetrics() const;
+  void RefreshCredentialsDone(UrlFetcher::Response* resp, util::Task* task);
+
+  void CreateMetrics();
+
   void PushMetrics();
+  void PushMetricsDone(UrlFetcher::Response* resp, util::Task* task);
 
   const std::string instance_name_;
   UrlFetcher* const fetcher_;
   util::Executor* const executor_;
   util::SyncTask task_;
+  bool metrics_created_;
   std::chrono::system_clock::time_point token_refreshed_at_;
   std::string bearer_token_;
 
