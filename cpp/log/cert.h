@@ -109,7 +109,7 @@ class Cert {
   // or some other unknown error occurred while parsing the extensions.
   // NID must be either an OpenSSL built-in NID, or one registered by the user
   // with OBJ_create. (See log/ct_extensions.h for sample code.)
-  Status HasExtendedKeyUsage(int key_usage_nid) const;
+  StatusOr<bool> HasExtendedKeyUsage(int key_usage_nid) const;
 
   // Returns TRUE if the Cert's issuer matches |issuer|.
   // Returns FALSE if there is no match.

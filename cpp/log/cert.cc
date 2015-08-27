@@ -38,6 +38,35 @@ static int X509_get_signature_nid(const X509* x) {
 
 namespace cert_trans {
 
+// Useful because util::Status clashes with Cert::Status so we have to
+// refer to it within the namespace while Cert::Status exists.
+static const util::Status& ERROR_STATUS = util::Status::UNKNOWN;
+
+// TODO. These helpers can be removed when Cert::Status has been removed.
+// They make it easier to do an incremental removal
+
+static Cert::Status StatusOrBoolToCertStatus(StatusOr<bool> status) {
+  if (status.ok()) {
+    return status.ValueOrDie() ? Cert::TRUE : Cert::FALSE;
+  } else {
+    return Cert::ERROR;
+  }
+}
+
+
+static StatusOr<bool> CertStatusToStatusOrBool(Cert::Status status) {
+  if (status == Cert::FALSE) {
+    return StatusOr<bool>(false);
+  } else if (status == Cert::TRUE) {
+    return StatusOr<bool>(true);
+  } else {
+    return StatusOr<bool>(ERROR_STATUS);
+  }
+}
+
+// END of section to be cleaned up
+
+
 // Convert string from ASN1 and check it doesn't contain nul characters
 string ASN1ToStringAndCheckForNulls(ASN1_STRING* asn1_string,
                                     const string& tag,
@@ -289,10 +318,10 @@ Cert::Status Cert::HasBasicConstraintCATrue() const {
 }
 
 
-Cert::Status Cert::HasExtendedKeyUsage(int key_usage_nid) const {
+StatusOr<bool> Cert::HasExtendedKeyUsage(int key_usage_nid) const {
   if (!IsLoaded()) {
     LOG(ERROR) << "Cert not loaded";
-    return ERROR;
+    return ERROR_STATUS;
   }
 
   const ASN1_OBJECT* key_usage_obj = OBJ_nid2obj(key_usage_nid);
@@ -300,7 +329,7 @@ Cert::Status Cert::HasExtendedKeyUsage(int key_usage_nid) const {
     LOG(ERROR) << "OpenSSL OBJ_nid2obj returned NULL for NID " << key_usage_nid
                << ". Is the NID not recognised?";
     LOG_OPENSSL_ERRORS(WARNING);
-    return ERROR;
+    return ERROR_STATUS;
   }
 
   void* ext_struct;
@@ -311,8 +340,9 @@ Cert::Status Cert::HasExtendedKeyUsage(int key_usage_nid) const {
     LOG(ERROR) << "Failed to check ExtendedKeyUsage extension";
   }
 
-  if (status != TRUE)
-    return status;
+  if (status != TRUE) {
+    return CertStatusToStatusOrBool(status);
+  }
 
   // |eku| is never NULL upon success.
   EXTENDED_KEY_USAGE* eku = static_cast<EXTENDED_KEY_USAGE*>(ext_struct);
@@ -325,7 +355,7 @@ Cert::Status Cert::HasExtendedKeyUsage(int key_usage_nid) const {
   }
 
   EXTENDED_KEY_USAGE_free(eku);
-  return ext_key_usage_found ? TRUE : FALSE;
+  return StatusOr<bool>(ext_key_usage_found ? true : false);
 }
 
 
@@ -1308,7 +1338,10 @@ Cert::Status PreCertChain::UsesPrecertSigningCertificate() const {
     return Cert::FALSE;
   }
 
-  return issuer->HasExtendedKeyUsage(cert_trans::NID_ctPrecertificateSigning);
+  StatusOr<bool> issuer_eku_status =
+      issuer->HasExtendedKeyUsage(cert_trans::NID_ctPrecertificateSigning);
+
+  return StatusOrBoolToCertStatus(issuer_eku_status);
 }
 
 
