@@ -293,10 +293,10 @@ Cert::Status Cert::HasCriticalExtension(int extension_nid) const {
 }
 
 
-Cert::Status Cert::HasBasicConstraintCATrue() const {
+StatusOr<bool> Cert::HasBasicConstraintCATrue() const {
   if (!IsLoaded()) {
     LOG(ERROR) << "Cert not loaded";
-    return ERROR;
+    return StatusOr<bool>(ERROR_STATUS);
   }
 
   void* ext_struct;
@@ -307,21 +307,22 @@ Cert::Status Cert::HasBasicConstraintCATrue() const {
     LOG(ERROR) << "Failed to check BasicConstraints extension";
   }
 
-  if (status != TRUE)
-    return status;
+  if (status != TRUE) {
+    return CertStatusToStatusOrBool(status);
+  }
 
   // |constraints| is never NULL upon success.
   BASIC_CONSTRAINTS* constraints = static_cast<BASIC_CONSTRAINTS*>(ext_struct);
   bool is_ca = constraints->ca;
   BASIC_CONSTRAINTS_free(constraints);
-  return is_ca ? TRUE : FALSE;
+  return StatusOr<bool>(is_ca ? true : false);
 }
 
 
 StatusOr<bool> Cert::HasExtendedKeyUsage(int key_usage_nid) const {
   if (!IsLoaded()) {
     LOG(ERROR) << "Cert not loaded";
-    return ERROR_STATUS;
+    return StatusOr<bool>(ERROR_STATUS);
   }
 
   const ASN1_OBJECT* key_usage_obj = OBJ_nid2obj(key_usage_nid);
@@ -329,7 +330,7 @@ StatusOr<bool> Cert::HasExtendedKeyUsage(int key_usage_nid) const {
     LOG(ERROR) << "OpenSSL OBJ_nid2obj returned NULL for NID " << key_usage_nid
                << ". Is the NID not recognised?";
     LOG_OPENSSL_ERRORS(WARNING);
-    return ERROR_STATUS;
+    return StatusOr<bool>(ERROR_STATUS);
   }
 
   void* ext_struct;
@@ -913,7 +914,8 @@ Cert::Status Cert::IsValidNameConstrainedIntermediateCa() const {
 
   // If it's not a CA cert or there is no name constraint extension then we
   // don't need to apply the rules any further
-  if (HasBasicConstraintCATrue() != Cert::TRUE
+  StatusOr<bool> has_ca_constraint_status = HasBasicConstraintCATrue();
+  if (StatusOrBoolToCertStatus(has_ca_constraint_status) != Cert::TRUE
         || HasExtension(NID_name_constraints) == FALSE) {
     return Cert::TRUE;
   }
@@ -1288,9 +1290,10 @@ Cert::Status CertChain::IsValidCaIssuerChainMaybeLegacyRoot() const {
     // The root cert may not have CA:True
     status = issuer->IsSelfSigned();
     if (status == Cert::FALSE) {
-      Cert::Status s2 = issuer->HasBasicConstraintCATrue();
-      if (s2 != Cert::TRUE)
-        return s2;
+      StatusOr<bool> s2 = issuer->HasBasicConstraintCATrue();
+      if (StatusOrBoolToCertStatus(s2) != Cert::TRUE) {
+        return StatusOrBoolToCertStatus(s2);
+      }
     } else if (status != Cert::TRUE) {
       LOG(ERROR) << "Failed to check self-signed status";
       return Cert::ERROR;
