@@ -99,7 +99,7 @@ class Cert {
   // or is present but could not be decoded.
   // Returns ERROR if the cert is not loaded or some other unknown error
   // occurred while parsing the extensions.
-  Status HasBasicConstraintCATrue() const;
+  StatusOr<bool> HasBasicConstraintCATrue() const;
 
   // Returns TRUE if extendedKeyUsage extension is present and the specified
   // key usage is set.

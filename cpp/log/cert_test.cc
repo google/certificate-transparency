@@ -386,8 +386,10 @@ TEST_F(CertTest, Extensions) {
 
   EXPECT_EQ(Cert::TRUE, pre.HasCriticalExtension(cert_trans::NID_ctPoison));
 
-  EXPECT_EQ(Cert::FALSE, leaf.HasBasicConstraintCATrue());
-  EXPECT_EQ(Cert::TRUE, ca.HasBasicConstraintCATrue());
+  StatusOr<bool> leaf_ca_status = leaf.HasBasicConstraintCATrue();
+  EXPECT_TRUE(leaf_ca_status.ok() && leaf_ca_status.ValueOrDie() == false);
+  StatusOr<bool> ca_ca_status = ca.HasBasicConstraintCATrue();
+  EXPECT_TRUE(ca_ca_status.ok() && ca_ca_status.ValueOrDie() == true);
 
   StatusOr<bool> ca_pre_status = ca_pre.HasExtendedKeyUsage(
       cert_trans::NID_ctPrecertificateSigning);
