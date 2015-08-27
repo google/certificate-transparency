@@ -10,6 +10,7 @@
 #include <openssl/bio.h>
 #include <openssl/err.h>
 #include <openssl/evp.h>
+#include <openssl/objects.h>
 #include <openssl/pem.h>
 #include <openssl/x509.h>
 #include <openssl/x509v3.h>
@@ -294,7 +295,7 @@ Cert::Status Cert::HasExtendedKeyUsage(int key_usage_nid) const {
     return ERROR;
   }
 
-  ASN1_OBJECT* key_usage_obj = OBJ_nid2obj(key_usage_nid);
+  const ASN1_OBJECT* key_usage_obj = OBJ_nid2obj(key_usage_nid);
   if (key_usage_obj == NULL) {
     LOG(ERROR) << "OpenSSL OBJ_nid2obj returned NULL for NID " << key_usage_nid
                << ". Is the NID not recognised?";
@@ -323,7 +324,6 @@ Cert::Status Cert::HasExtendedKeyUsage(int key_usage_nid) const {
     }
   }
 
-  ASN1_OBJECT_free(key_usage_obj);
   EXTENDED_KEY_USAGE_free(eku);
   return ext_key_usage_found ? TRUE : FALSE;
 }
