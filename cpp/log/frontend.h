@@ -28,8 +28,6 @@ class Frontend {
   util::Status QueuePreCertEntry(cert_trans::PreCertChain* chain,
                                  ct::SignedCertificateTimestamp* sct);
 
-  static std::string SubmitResultString(SubmitResult result);
-
   const std::multimap<std::string, const cert_trans::Cert*>& GetRoots() const {
     return handler_->GetRoots();
   }

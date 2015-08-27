@@ -69,40 +69,6 @@ Status Frontend::QueuePreCertEntry(PreCertChain* chain,
 }
 
 // static
-std::string Frontend::SubmitResultString(SubmitResult result) {
-  string result_string;
-  switch (result) {
-    case ADDED:
-      result_string = "new submission accepted";
-      break;
-    case DUPLICATE:
-      result_string = "duplicate submission";
-    case BAD_PEM_FORMAT:
-      result_string = "not a valid PEM-encoded chain";
-      break;
-    // TODO(ekasper): the following two could/should be more precise.
-    case SUBMISSION_TOO_LONG:
-      result_string =
-          "DER-encoded certificate chain length "
-          "exceeds allowed limit";
-      break;
-    case CERTIFICATE_VERIFY_ERROR:
-      result_string = "could not verify certificate chain";
-      break;
-    case PRECERT_CHAIN_NOT_WELL_FORMED:
-      result_string = "precert chain not well-formed";
-      break;
-    case INTERNAL_ERROR:
-      result_string = "internal error";
-      break;
-    default:
-      LOG(FATAL) << "Unknown SubmissionHandler return code " << result;
-  }
-
-  return result_string;
-}
-
-// static
 Status Frontend::GetSubmitError(CertSubmissionHandler::SubmitResult result) {
   CHECK_NE(result, CertSubmissionHandler::OK);
 
@@ -140,4 +106,3 @@ Status Frontend::UpdateStats(ct::LogEntryType type, const Status& status) {
   }
   return status;
 }
-
