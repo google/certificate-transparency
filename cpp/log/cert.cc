@@ -38,6 +38,35 @@ static int X509_get_signature_nid(const X509* x) {
 
 namespace cert_trans {
 
+// Useful because util::Status clashes with Cert::Status so we have to
+// refer to it within the namespace while Cert::Status exists.
+static const util::Status& ERROR_STATUS = util::Status::UNKNOWN;
+
+// TODO. These helpers can be removed when Cert::Status has been removed.
+// They make it easier to do an incremental removal
+
+static Cert::Status StatusOrBoolToCertStatus(StatusOr<bool> status) {
+  if (status.ok()) {
+    return status.ValueOrDie() ? Cert::TRUE : Cert::FALSE;
+  } else {
+    return Cert::ERROR;
+  }
+}
+
+
+static StatusOr<bool> CertStatusToStatusOrBool(Cert::Status status) {
+  if (status == Cert::FALSE) {
+    return StatusOr<bool>(false);
+  } else if (status == Cert::TRUE) {
+    return StatusOr<bool>(true);
+  } else {
+    return StatusOr<bool>(ERROR_STATUS);
+  }
+}
+
+// END of section to be cleaned up
+
+
 // Convert string from ASN1 and check it doesn't contain nul characters
 string ASN1ToStringAndCheckForNulls(ASN1_STRING* asn1_string,
                                     const string& tag,
@@ -233,8 +262,8 @@ string Cert::PrintTime(ASN1_TIME* when) {
 }
 
 
-Cert::Status Cert::IsIdenticalTo(const Cert& other) const {
-  return X509_cmp(x509_, other.x509_) == 0 ? TRUE : FALSE;
+StatusOr<bool> Cert::IsIdenticalTo(const Cert& other) const {
+  return StatusOr<bool>(X509_cmp(x509_, other.x509_) == 0 ? true : false);
 }
 
 
@@ -264,10 +293,10 @@ Cert::Status Cert::HasCriticalExtension(int extension_nid) const {
 }
 
 
-Cert::Status Cert::HasBasicConstraintCATrue() const {
+StatusOr<bool> Cert::HasBasicConstraintCATrue() const {
   if (!IsLoaded()) {
     LOG(ERROR) << "Cert not loaded";
-    return ERROR;
+    return StatusOr<bool>(ERROR_STATUS);
   }
 
   void* ext_struct;
@@ -278,21 +307,22 @@ Cert::Status Cert::HasBasicConstraintCATrue() const {
     LOG(ERROR) << "Failed to check BasicConstraints extension";
   }
 
-  if (status != TRUE)
-    return status;
+  if (status != TRUE) {
+    return CertStatusToStatusOrBool(status);
+  }
 
   // |constraints| is never NULL upon success.
   BASIC_CONSTRAINTS* constraints = static_cast<BASIC_CONSTRAINTS*>(ext_struct);
   bool is_ca = constraints->ca;
   BASIC_CONSTRAINTS_free(constraints);
-  return is_ca ? TRUE : FALSE;
+  return StatusOr<bool>(is_ca ? true : false);
 }
 
 
-Cert::Status Cert::HasExtendedKeyUsage(int key_usage_nid) const {
+StatusOr<bool> Cert::HasExtendedKeyUsage(int key_usage_nid) const {
   if (!IsLoaded()) {
     LOG(ERROR) << "Cert not loaded";
-    return ERROR;
+    return StatusOr<bool>(ERROR_STATUS);
   }
 
   const ASN1_OBJECT* key_usage_obj = OBJ_nid2obj(key_usage_nid);
@@ -300,7 +330,7 @@ Cert::Status Cert::HasExtendedKeyUsage(int key_usage_nid) const {
     LOG(ERROR) << "OpenSSL OBJ_nid2obj returned NULL for NID " << key_usage_nid
                << ". Is the NID not recognised?";
     LOG_OPENSSL_ERRORS(WARNING);
-    return ERROR;
+    return StatusOr<bool>(ERROR_STATUS);
   }
 
   void* ext_struct;
@@ -311,8 +341,9 @@ Cert::Status Cert::HasExtendedKeyUsage(int key_usage_nid) const {
     LOG(ERROR) << "Failed to check ExtendedKeyUsage extension";
   }
 
-  if (status != TRUE)
-    return status;
+  if (status != TRUE) {
+    return CertStatusToStatusOrBool(status);
+  }
 
   // |eku| is never NULL upon success.
   EXTENDED_KEY_USAGE* eku = static_cast<EXTENDED_KEY_USAGE*>(ext_struct);
@@ -325,7 +356,7 @@ Cert::Status Cert::HasExtendedKeyUsage(int key_usage_nid) const {
   }
 
   EXTENDED_KEY_USAGE_free(eku);
-  return ext_key_usage_found ? TRUE : FALSE;
+  return StatusOr<bool>(ext_key_usage_found ? true : false);
 }
 
 
@@ -883,7 +914,8 @@ Cert::Status Cert::IsValidNameConstrainedIntermediateCa() const {
 
   // If it's not a CA cert or there is no name constraint extension then we
   // don't need to apply the rules any further
-  if (HasBasicConstraintCATrue() != Cert::TRUE
+  StatusOr<bool> has_ca_constraint_status = HasBasicConstraintCATrue();
+  if (StatusOrBoolToCertStatus(has_ca_constraint_status) != Cert::TRUE
         || HasExtension(NID_name_constraints) == FALSE) {
     return Cert::TRUE;
   }
@@ -1258,9 +1290,10 @@ Cert::Status CertChain::IsValidCaIssuerChainMaybeLegacyRoot() const {
     // The root cert may not have CA:True
     status = issuer->IsSelfSigned();
     if (status == Cert::FALSE) {
-      Cert::Status s2 = issuer->HasBasicConstraintCATrue();
-      if (s2 != Cert::TRUE)
-        return s2;
+      StatusOr<bool> s2 = issuer->HasBasicConstraintCATrue();
+      if (StatusOrBoolToCertStatus(s2) != Cert::TRUE) {
+        return StatusOrBoolToCertStatus(s2);
+      }
     } else if (status != Cert::TRUE) {
       LOG(ERROR) << "Failed to check self-signed status";
       return Cert::ERROR;
@@ -1308,7 +1341,10 @@ Cert::Status PreCertChain::UsesPrecertSigningCertificate() const {
     return Cert::FALSE;
   }
 
-  return issuer->HasExtendedKeyUsage(cert_trans::NID_ctPrecertificateSigning);
+  StatusOr<bool> issuer_eku_status =
+      issuer->HasExtendedKeyUsage(cert_trans::NID_ctPrecertificateSigning);
+
+  return StatusOrBoolToCertStatus(issuer_eku_status);
 }
 
 

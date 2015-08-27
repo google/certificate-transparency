@@ -345,12 +345,12 @@ CertChecker::CertVerifyResult CertChecker::IsTrusted(
            cand_range.first;
        it != cand_range.second; ++it) {
     const Cert* cand = it->second;
-    Cert::Status matches = cert.IsIdenticalTo(*cand);
-    if (matches != Cert::TRUE && matches != Cert::FALSE) {
+    StatusOr<bool> matches = cert.IsIdenticalTo(*cand);
+    if (!matches.ok()) {
       LOG(ERROR) << "Cert comparison failed";
       return INTERNAL_ERROR;
     }
-    if (matches == Cert::TRUE) {
+    if (matches.ValueOrDie() == true) {
       return OK;
     }
   }

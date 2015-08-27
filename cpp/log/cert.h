@@ -8,6 +8,9 @@
 #include <vector>
 
 #include "base/macros.h"
+#include "util/statusor.h"
+
+using util::StatusOr;
 
 namespace cert_trans {
 
@@ -72,7 +75,7 @@ class Cert {
   std::string PrintNotAfter() const;
   std::string PrintSignatureAlgorithm() const;
 
-  Status IsIdenticalTo(const Cert& other) const;
+  StatusOr<bool> IsIdenticalTo(const Cert& other) const;
 
   // Returns TRUE if the extension is present.
   // Returns FALSE if the extension is not present.
@@ -96,7 +99,7 @@ class Cert {
   // or is present but could not be decoded.
   // Returns ERROR if the cert is not loaded or some other unknown error
   // occurred while parsing the extensions.
-  Status HasBasicConstraintCATrue() const;
+  StatusOr<bool> HasBasicConstraintCATrue() const;
 
   // Returns TRUE if extendedKeyUsage extension is present and the specified
   // key usage is set.
@@ -106,7 +109,7 @@ class Cert {
   // or some other unknown error occurred while parsing the extensions.
   // NID must be either an OpenSSL built-in NID, or one registered by the user
   // with OBJ_create. (See log/ct_extensions.h for sample code.)
-  Status HasExtendedKeyUsage(int key_usage_nid) const;
+  StatusOr<bool> HasExtendedKeyUsage(int key_usage_nid) const;
 
   // Returns TRUE if the Cert's issuer matches |issuer|.
   // Returns FALSE if there is no match.
