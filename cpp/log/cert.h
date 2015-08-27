@@ -8,6 +8,9 @@
 #include <vector>
 
 #include "base/macros.h"
+#include "util/statusor.h"
+
+using util::StatusOr;
 
 namespace cert_trans {
 
@@ -72,7 +75,7 @@ class Cert {
   std::string PrintNotAfter() const;
   std::string PrintSignatureAlgorithm() const;
 
-  Status IsIdenticalTo(const Cert& other) const;
+  StatusOr<bool> IsIdenticalTo(const Cert& other) const;
 
   // Returns TRUE if the extension is present.
   // Returns FALSE if the extension is not present.

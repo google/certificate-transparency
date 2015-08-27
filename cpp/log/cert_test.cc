@@ -361,9 +361,15 @@ TEST_F(CertTest, TestUnsupportedAlgorithm) {
 TEST_F(CertTest, Identical) {
   Cert leaf(leaf_pem_);
   Cert ca(ca_pem_);
-  EXPECT_EQ(Cert::TRUE, leaf.IsIdenticalTo(leaf));
-  EXPECT_EQ(Cert::FALSE, leaf.IsIdenticalTo(ca));
-  EXPECT_EQ(Cert::FALSE, ca.IsIdenticalTo(leaf));
+
+  StatusOr<bool> leaf_leaf_status = leaf.IsIdenticalTo(leaf);
+  EXPECT_TRUE(leaf_leaf_status.ok() && leaf_leaf_status.ValueOrDie());
+
+  StatusOr<bool> leaf_ca_status = leaf.IsIdenticalTo(ca);
+  EXPECT_TRUE(leaf_ca_status.ok() && !leaf_ca_status.ValueOrDie());
+
+  StatusOr<bool> ca_leaf_status = ca.IsIdenticalTo(leaf);
+  EXPECT_TRUE(ca_leaf_status.ok() && !ca_leaf_status.ValueOrDie());
 }
 
 TEST_F(CertTest, Extensions) {
