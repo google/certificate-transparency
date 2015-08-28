@@ -33,15 +33,17 @@ def calculate_certificate_hash(certificate):
     return hasher.digest()[0:FLAGS.hash_trim]
 
 
-def find_matching_policy(certificate):
+def find_matching_policies(certificate):
     """Returns the certificate's EV policy OID, if exists."""
     try:
+        matching_policies = []
         for policy in certificate.policies():
             if policy['policyIdentifier'] in ev_metadata.EV_POLICIES:
-                return policy['policyIdentifier']
+                matching_policies.append(policy['policyIdentifier'])
+        return matching_policies
     except cert.CertificateError:
         pass
-    return None
+    return []
 
 
 def does_root_match_policy(policy_oid, cert_chain):
@@ -77,18 +79,23 @@ def _ev_match(
     # in the final certificate.
     if entry_type != client_pb2.X509_ENTRY:
         return None
+    # No point in including expired certificates.
     if certificate.is_expired():
         return None
-    matching_policy = find_matching_policy(certificate)
-    if not matching_policy:
-        return None
-
-    if not does_root_match_policy(
-            matching_policy, extra_data.certificate_chain):
-        return None
-
+    # Do not include entries beyond the last entry included in the whitelist
+    # generated on January 1st, 2015.
     if certificate_index > last_acceptable_entry_index:
         return None
+
+    # Only include certificates that have an EV OID.
+    matching_policies = find_matching_policies(certificate)
+    if not matching_policies:
+        return None
+
+    # Removed the requirement that the root of the chain matches the root that
+    # should be used for the EV policy OID.
+    # See https://code.google.com/p/chromium/issues/detail?id=524635 for
+    # details.
 
     # Matching certificate
     if output_dir:
