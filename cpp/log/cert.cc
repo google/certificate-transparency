@@ -315,7 +315,7 @@ StatusOr<bool> Cert::HasBasicConstraintCATrue() const {
   BASIC_CONSTRAINTS* constraints = static_cast<BASIC_CONSTRAINTS*>(ext_struct);
   bool is_ca = constraints->ca;
   BASIC_CONSTRAINTS_free(constraints);
-  return is_ca ? true : false;
+  return is_ca;
 }
 
 
