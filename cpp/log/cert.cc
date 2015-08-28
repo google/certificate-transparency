@@ -8,6 +8,7 @@
 #include <glog/logging.h>
 #include <openssl/asn1.h>
 #include <openssl/bio.h>
+#include <openssl/crypto.h>
 #include <openssl/err.h>
 #include <openssl/evp.h>
 #include <openssl/objects.h>
@@ -27,13 +28,15 @@ using util::ClearOpenSSLErrors;
 using util::StatusOr;
 using util::error::Code;
 
-#if OPENSSL_VERSION_NUMBER < 0x10002000L
+#if OPENSSL_VERSION_NUMBER < 0x10002000L || defined(OPENSSL_IS_BORINGSSL)
 // Backport from 1.0.2-beta3.
 static int i2d_re_X509_tbs(X509* x, unsigned char** pp) {
   x->cert_info->enc.modified = 1;
   return i2d_X509_CINF(x->cert_info, pp);
 }
+#endif
 
+#if OPENSSL_VERSION_NUMBER < 0x10002000L
 static int X509_get_signature_nid(const X509* x) {
   return OBJ_obj2nid(x->sig_alg->algorithm);
 }
@@ -385,6 +388,11 @@ StatusOr<bool> Cert::IsIssuedBy(const Cert& issuer) const {
   return X509_check_issued(const_cast<X509*>(issuer.x509_), x509_) == X509_V_OK;
 }
 
+StatusOr<bool> Cert::LogUnsupportedAlgorithm() const {
+  LOG(WARNING) << "Unsupported algorithm: " << PrintSignatureAlgorithm();
+  ClearOpenSSLErrors();
+  return util::Status(Code::UNIMPLEMENTED, "Unsupported algorithm");
+}
 
 StatusOr<bool> Cert::IsSignedBy(const Cert& issuer) const {
   if (!IsLoaded() || !issuer.IsLoaded()) {
@@ -401,22 +409,41 @@ StatusOr<bool> Cert::IsSignedBy(const Cert& issuer) const {
 
   const int ret(X509_verify(x509_, issuer_key));
   EVP_PKEY_free(issuer_key);
-  if (ret < 0) {
-    unsigned long err = ERR_peek_last_error();
-    int reason = ERR_GET_REASON(err);
-    if (ERR_GET_LIB(err) == ERR_LIB_ASN1 &&
-        (reason == ASN1_R_UNKNOWN_MESSAGE_DIGEST_ALGORITHM ||
-         reason == ASN1_R_UNKNOWN_SIGNATURE_ALGORITHM)) {
-      LOG(WARNING) << "Unsupported algorithm: " << PrintSignatureAlgorithm();
-      ClearOpenSSLErrors();
-      return util::Status(Code::UNIMPLEMENTED, "Unsupported algorithm");
-    } else {
-      LOG(ERROR) << "OpenSSL X509_verify returned error code " << ret;
-      LOG_OPENSSL_ERRORS(ERROR);
-      return util::Status(Code::INTERNAL, "X509 verify error");
-    }
+  if (ret == 1) {
+    return true;
   }
-  return ret > 0;
+  unsigned long err = ERR_peek_last_error();
+  const int reason = ERR_GET_REASON(err);
+  const int lib = ERR_GET_LIB(err);
+#if defined(OPENSSL_IS_BORINGSSL)
+  // BoringSSL returns only 0 and 1.  This is an attempt to
+  // approximate the circumstances that in OpenSSL cause a 0 return,
+  // and that are too boring/spammy to log, e.g. malformed inputs.
+  if (err == 0 || lib == ERR_LIB_ASN1 || lib == ERR_LIB_X509) {
+    ClearOpenSSLErrors();
+    return false;
+  }
+  if (lib == ERR_LIB_EVP && (
+      reason == EVP_R_UNKNOWN_MESSAGE_DIGEST_ALGORITHM ||
+      reason == EVP_R_UNKNOWN_SIGNATURE_ALGORITHM)) {
+    return LogUnsupportedAlgorithm();
+  }
+#else
+  // OpenSSL returns 0 for simple verification failures, and -1 for
+  // "exceptional circumstances".
+  if (ret == 0) {
+    ClearOpenSSLErrors();
+    return false;
+  }
+  if (lib == ERR_LIB_ASN1 && (
+      reason == ASN1_R_UNKNOWN_MESSAGE_DIGEST_ALGORITHM ||
+      reason == ASN1_R_UNKNOWN_SIGNATURE_ALGORITHM)) {
+    return LogUnsupportedAlgorithm();
+  }
+#endif
+  LOG(ERROR) << "OpenSSL X509_verify returned " << ret;
+  LOG_OPENSSL_ERRORS(ERROR);
+  return util::Status(Code::INTERNAL, "X509 verify error");
 }
 
 

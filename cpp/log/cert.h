@@ -221,6 +221,7 @@ class Cert {
   Status ExtensionStructure(int extension_nid, void** ext_struct) const;
   bool ValidateRedactionSubjectAltNameAndCN(int* dns_alt_name_count,
                                             Status* status) const;
+  util::StatusOr<bool> LogUnsupportedAlgorithm() const;
   static std::string PrintName(X509_NAME* name);
   static std::string PrintTime(ASN1_TIME* when);
   static util::Status DerEncodedName(X509_NAME* name, std::string* result);
