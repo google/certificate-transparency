@@ -72,7 +72,7 @@ class Cert {
   std::string PrintNotAfter() const;
   std::string PrintSignatureAlgorithm() const;
 
-  Status IsIdenticalTo(const Cert& other) const;
+  bool IsIdenticalTo(const Cert& other) const;
 
   // Returns TRUE if the extension is present.
   // Returns FALSE if the extension is not present.

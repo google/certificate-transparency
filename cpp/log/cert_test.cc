@@ -361,9 +361,9 @@ TEST_F(CertTest, TestUnsupportedAlgorithm) {
 TEST_F(CertTest, Identical) {
   Cert leaf(leaf_pem_);
   Cert ca(ca_pem_);
-  EXPECT_EQ(Cert::TRUE, leaf.IsIdenticalTo(leaf));
-  EXPECT_EQ(Cert::FALSE, leaf.IsIdenticalTo(ca));
-  EXPECT_EQ(Cert::FALSE, ca.IsIdenticalTo(leaf));
+  EXPECT_TRUE(leaf.IsIdenticalTo(leaf));
+  EXPECT_FALSE(leaf.IsIdenticalTo(ca));
+  EXPECT_FALSE(ca.IsIdenticalTo(leaf));
 }
 
 TEST_F(CertTest, Extensions) {

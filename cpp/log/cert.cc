@@ -233,8 +233,8 @@ string Cert::PrintTime(ASN1_TIME* when) {
 }
 
 
-Cert::Status Cert::IsIdenticalTo(const Cert& other) const {
-  return X509_cmp(x509_, other.x509_) == 0 ? TRUE : FALSE;
+bool Cert::IsIdenticalTo(const Cert& other) const {
+  return X509_cmp(x509_, other.x509_) == 0;
 }
 
 
