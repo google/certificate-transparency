@@ -356,7 +356,7 @@ StatusOr<bool> Cert::HasExtendedKeyUsage(int key_usage_nid) const {
   }
 
   EXTENDED_KEY_USAGE_free(eku);
-  return ext_key_usage_found ? true : false;
+  return ext_key_usage_found;
 }
 
 
