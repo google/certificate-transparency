@@ -39,11 +39,6 @@ class Frontend {
   util::Status QueueProcessedEntry(
       CertSubmissionHandler::SubmitResult pre_result,
       const ct::LogEntry& entry, ct::SignedCertificateTimestamp* sct);
-  static util::Status GetSubmitError(
-      CertSubmissionHandler::SubmitResult result);
-  util::Status UpdateStats(ct::LogEntryType type, const util::Status& result);
-  void UpdateX509Stats(const util::Status& status);
-  void UpdatePrecertStats(const util::Status& status);
 
   DISALLOW_COPY_AND_ASSIGN(Frontend);
 };

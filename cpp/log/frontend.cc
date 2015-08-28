@@ -26,50 +26,7 @@ static cert_trans::EventMetric<std::string, std::string>
         "submission_status", "entry_type", "status",
         "Submission status totals broken down by entry type and status code.");
 
-}  // namespace
-
-Frontend::Frontend(CertSubmissionHandler* handler, FrontendSigner* signer)
-    : handler_(handler), signer_(signer) {
-}
-
-Frontend::~Frontend() {
-  delete signer_;
-  delete handler_;
-}
-
-Status Frontend::QueueProcessedEntry(
-    CertSubmissionHandler::SubmitResult pre_result, const LogEntry& entry,
-    SignedCertificateTimestamp* sct) {
-  if (pre_result != CertSubmissionHandler::OK) {
-    const Status status(GetSubmitError(pre_result));
-    return UpdateStats(entry.type(), status);
-  }
-
-  // Step 2. Submit to database.
-  const Status status(signer_->QueueEntry(entry, sct));
-  return UpdateStats(entry.type(), status);
-}
-
-Status Frontend::QueueX509Entry(CertChain* chain,
-                                SignedCertificateTimestamp* sct) {
-  LogEntry entry;
-  // Make sure the correct statistics get updated in case of error.
-  entry.set_type(ct::X509_ENTRY);
-  return QueueProcessedEntry(handler_->ProcessX509Submission(chain, &entry),
-                             entry, sct);
-}
-
-Status Frontend::QueuePreCertEntry(PreCertChain* chain,
-                                   SignedCertificateTimestamp* sct) {
-  LogEntry entry;
-  // Make sure the correct statistics get updated in case of error.
-  entry.set_type(ct::PRECERT_ENTRY);
-  return QueueProcessedEntry(handler_->ProcessPreCertSubmission(chain, &entry),
-                             entry, sct);
-}
-
-// static
-Status Frontend::GetSubmitError(CertSubmissionHandler::SubmitResult result) {
+Status GetSubmitError(CertSubmissionHandler::SubmitResult result) {
   CHECK_NE(result, CertSubmissionHandler::OK);
 
   switch (result) {
@@ -96,7 +53,7 @@ Status Frontend::GetSubmitError(CertSubmissionHandler::SubmitResult result) {
   }
 }
 
-Status Frontend::UpdateStats(ct::LogEntryType type, const Status& status) {
+Status UpdateStats(ct::LogEntryType type, const Status& status) {
   if (type == ct::X509_ENTRY) {
     submission_status_metric.RecordEvent(
         "x509", util::ErrorCodeString(status.CanonicalCode()), 1);
@@ -105,4 +62,44 @@ Status Frontend::UpdateStats(ct::LogEntryType type, const Status& status) {
         "precert", util::ErrorCodeString(status.CanonicalCode()), 1);
   }
   return status;
+}
+
+}  // namespace
+
+Frontend::Frontend(CertSubmissionHandler* handler, FrontendSigner* signer)
+    : handler_(handler), signer_(signer) {
+}
+
+Frontend::~Frontend() {
+  delete signer_;
+  delete handler_;
+}
+
+Status Frontend::QueueProcessedEntry(
+    CertSubmissionHandler::SubmitResult pre_result, const LogEntry& entry,
+    SignedCertificateTimestamp* sct) {
+  if (pre_result != CertSubmissionHandler::OK) {
+    return UpdateStats(entry.type(), GetSubmitError(pre_result));
+  }
+
+  // Step 2. Submit to database.
+  return UpdateStats(entry.type(), signer_->QueueEntry(entry, sct));
+}
+
+Status Frontend::QueueX509Entry(CertChain* chain,
+                                SignedCertificateTimestamp* sct) {
+  LogEntry entry;
+  // Make sure the correct statistics get updated in case of error.
+  entry.set_type(ct::X509_ENTRY);
+  return QueueProcessedEntry(handler_->ProcessX509Submission(chain, &entry),
+                             entry, sct);
+}
+
+Status Frontend::QueuePreCertEntry(PreCertChain* chain,
+                                   SignedCertificateTimestamp* sct) {
+  LogEntry entry;
+  // Make sure the correct statistics get updated in case of error.
+  entry.set_type(ct::PRECERT_ENTRY);
+  return QueueProcessedEntry(handler_->ProcessPreCertSubmission(chain, &entry),
+                             entry, sct);
 }
