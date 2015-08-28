@@ -18,6 +18,30 @@ using ct::LogEntry;
 using ct::PrecertChainEntry;
 using ct::X509ChainEntry;
 using std::string;
+using util::Status;
+
+namespace {
+
+Status GetVerifyError(CertChecker::CertVerifyResult result) {
+  switch (result) {
+    case CertChecker::INVALID_CERTIFICATE_CHAIN:
+    case CertChecker::PRECERT_EXTENSION_IN_CERT_CHAIN:
+    case CertChecker::UNSUPPORTED_ALGORITHM_IN_CERT_CHAIN:
+      return Status(util::error::INVALID_ARGUMENT,
+                    "invalid certificate chain");
+    case CertChecker::PRECERT_CHAIN_NOT_WELL_FORMED:
+      return Status(util::error::INVALID_ARGUMENT, "prechain not well formed");
+    case CertChecker::ROOT_NOT_IN_LOCAL_STORE:
+      return Status(util::error::FAILED_PRECONDITION, "unknown root");
+    case CertChecker::INTERNAL_ERROR:
+      return Status(util::error::INTERNAL, "internal error");
+    case CertChecker::OK:
+      return Status::OK;
+  }
+  LOG(FATAL) << "Unknown CertChecker error " << result;
+}
+
+}  // namespace
 
 // TODO(ekasper): handle Cert errors consistently and log some errors here
 // if they fail.
@@ -70,11 +94,10 @@ bool CertSubmissionHandler::X509ChainToEntry(const CertChain& chain,
   }
 }
 
-CertSubmissionHandler::SubmitResult
-CertSubmissionHandler::ProcessX509Submission(CertChain* chain,
-                                             LogEntry* entry) {
+Status CertSubmissionHandler::ProcessX509Submission(CertChain* chain,
+                                                    LogEntry* entry) {
   if (!chain->IsLoaded())
-    return EMPTY_SUBMISSION;
+    return Status(util::error::INVALID_ARGUMENT, "empty submission");
 
   CertChecker::CertVerifyResult result = cert_checker_->CheckCertChain(chain);
   if (result != CertChecker::OK)
@@ -84,22 +107,21 @@ CertSubmissionHandler::ProcessX509Submission(CertChain* chain,
   string der_cert;
   // Nothing should fail anymore as we have validated the chain.
   if (chain->LeafCert()->DerEncoding(&der_cert) != Cert::TRUE)
-    return INTERNAL_ERROR;
+    return Status(util::error::INTERNAL, "could not DER-encode the chain");
 
   X509ChainEntry* x509_entry = entry->mutable_x509_entry();
   x509_entry->set_leaf_certificate(der_cert);
   for (size_t i = 1; i < chain->Length(); ++i) {
     if (chain->CertAt(i)->DerEncoding(&der_cert) != Cert::TRUE)
-      return INTERNAL_ERROR;
+      return Status(util::error::INTERNAL, "could not DER-encode the chain");
     x509_entry->add_certificate_chain(der_cert);
   }
   entry->set_type(ct::X509_ENTRY);
-  return OK;
+  return Status::OK;
 }
 
-CertSubmissionHandler::SubmitResult
-CertSubmissionHandler::ProcessPreCertSubmission(PreCertChain* chain,
-                                                LogEntry* entry) {
+Status CertSubmissionHandler::ProcessPreCertSubmission(PreCertChain* chain,
+                                                       LogEntry* entry) {
   PrecertChainEntry* precert_entry = entry->mutable_precert_entry();
   CertChecker::CertVerifyResult result = cert_checker_->CheckPreCertChain(
       chain, precert_entry->mutable_pre_cert()->mutable_issuer_key_hash(),
@@ -112,15 +134,15 @@ CertSubmissionHandler::ProcessPreCertSubmission(PreCertChain* chain,
   string der_cert;
   // Nothing should fail anymore as we have validated the chain.
   if (chain->LeafCert()->DerEncoding(&der_cert) != Cert::TRUE)
-    return INTERNAL_ERROR;
+    return Status(util::error::INTERNAL, "could not DER-encode the chain");
   precert_entry->set_pre_certificate(der_cert);
   for (size_t i = 1; i < chain->Length(); ++i) {
     if (chain->CertAt(i)->DerEncoding(&der_cert) != Cert::TRUE)
-      return INTERNAL_ERROR;
+      return Status(util::error::INTERNAL, "could not DER-encode the chain");
     precert_entry->add_precertificate_chain(der_cert);
   }
   entry->set_type(ct::PRECERT_ENTRY);
-  return OK;
+  return Status::OK;
 }
 
 // static
@@ -149,29 +171,4 @@ bool CertSubmissionHandler::SerializedTbs(const Cert& cert, string* result) {
     return false;
   result->assign(der_tbs);
   return true;
-}
-
-// static
-CertSubmissionHandler::SubmitResult CertSubmissionHandler::GetVerifyError(
-    CertChecker::CertVerifyResult result) {
-  SubmitResult submit_result;
-  switch (result) {
-    case CertChecker::INVALID_CERTIFICATE_CHAIN:
-    case CertChecker::PRECERT_EXTENSION_IN_CERT_CHAIN:
-    case CertChecker::UNSUPPORTED_ALGORITHM_IN_CERT_CHAIN:
-      submit_result = INVALID_CERTIFICATE_CHAIN;
-      break;
-    case CertChecker::PRECERT_CHAIN_NOT_WELL_FORMED:
-      submit_result = PRECERT_CHAIN_NOT_WELL_FORMED;
-      break;
-    case CertChecker::ROOT_NOT_IN_LOCAL_STORE:
-      submit_result = UNKNOWN_ROOT;
-      break;
-    case CertChecker::INTERNAL_ERROR:
-      submit_result = INTERNAL_ERROR;
-      break;
-    default:
-      LOG(FATAL) << "Unknown CertChecker error " << result;
-  }
-  return submit_result;
 }

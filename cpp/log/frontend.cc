@@ -26,33 +26,6 @@ static cert_trans::EventMetric<std::string, std::string>
         "submission_status", "entry_type", "status",
         "Submission status totals broken down by entry type and status code.");
 
-Status GetSubmitError(CertSubmissionHandler::SubmitResult result) {
-  CHECK_NE(result, CertSubmissionHandler::OK);
-
-  switch (result) {
-    case CertSubmissionHandler::EMPTY_SUBMISSION:
-      return util::Status(util::error::INVALID_ARGUMENT, "empty submission");
-    case CertSubmissionHandler::INVALID_PEM_ENCODED_CHAIN:
-      return util::Status(util::error::INVALID_ARGUMENT,
-                          "invalid PEM encoded chain");
-    case CertSubmissionHandler::SUBMISSION_TOO_LONG:
-      return util::Status(util::error::INVALID_ARGUMENT,
-                          "submission too long");
-    case CertSubmissionHandler::INVALID_CERTIFICATE_CHAIN:
-      return util::Status(util::error::INVALID_ARGUMENT,
-                          "invalid certificate chain");
-    case CertSubmissionHandler::UNKNOWN_ROOT:
-      return util::Status(util::error::FAILED_PRECONDITION, "unknown root");
-    case CertSubmissionHandler::PRECERT_CHAIN_NOT_WELL_FORMED:
-      return util::Status(util::error::INVALID_ARGUMENT,
-                          "prechain not well formed");
-    case CertSubmissionHandler::INTERNAL_ERROR:
-      return util::Status(util::error::INTERNAL, "internal error");
-    default:
-      LOG(FATAL) << "Unknown CertSubmissionHandler return code " << result;
-  }
-}
-
 Status UpdateStats(ct::LogEntryType type, const Status& status) {
   if (type == ct::X509_ENTRY) {
     submission_status_metric.RecordEvent(
@@ -73,11 +46,10 @@ Frontend::Frontend(CertSubmissionHandler* handler, FrontendSigner* signer)
 Frontend::~Frontend() {
 }
 
-Status Frontend::QueueProcessedEntry(
-    CertSubmissionHandler::SubmitResult pre_result, const LogEntry& entry,
-    SignedCertificateTimestamp* sct) {
-  if (pre_result != CertSubmissionHandler::OK) {
-    return UpdateStats(entry.type(), GetSubmitError(pre_result));
+Status Frontend::QueueProcessedEntry(Status pre_status, const LogEntry& entry,
+                                     SignedCertificateTimestamp* sct) {
+  if (!pre_status.ok()) {
+    return UpdateStats(entry.type(), pre_status);
   }
 
   // Step 2. Submit to database.

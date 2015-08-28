@@ -37,9 +37,9 @@ class Frontend {
   const std::unique_ptr<CertSubmissionHandler> handler_;
   const std::unique_ptr<FrontendSigner> signer_;
 
-  util::Status QueueProcessedEntry(
-      CertSubmissionHandler::SubmitResult pre_result,
-      const ct::LogEntry& entry, ct::SignedCertificateTimestamp* sct);
+  util::Status QueueProcessedEntry(util::Status pre_status,
+                                   const ct::LogEntry& entry,
+                                   ct::SignedCertificateTimestamp* sct);
 
   DISALLOW_COPY_AND_ASSIGN(Frontend);
 };
