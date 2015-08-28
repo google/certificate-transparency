@@ -92,7 +92,7 @@ class CertChecker {
                                          std::string* tbs_certificate) const;
 
  private:
-  CertVerifyResult CheckIssuerChain(CertChain* chain) const;
+  util::Status CheckIssuerChain(CertChain* chain) const;
   // Look issuer up from the trusted store, and verify signature.
   CertVerifyResult GetTrustedCa(CertChain* chain) const;
 

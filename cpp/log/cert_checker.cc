@@ -171,24 +171,23 @@ Status CertChecker::CheckCertChain(CertChain* chain) const {
     return Status(util::error::INVALID_ARGUMENT,
                   "precert extension in certificate chain");
 
-  return GetVerifyError(CheckIssuerChain(chain));
+  return CheckIssuerChain(chain);
 }
 
-CertChecker::CertVerifyResult CertChecker::CheckIssuerChain(
-    CertChain* chain) const {
+Status CertChecker::CheckIssuerChain(CertChain* chain) const {
   if (chain->RemoveCertsAfterFirstSelfSigned() != Cert::TRUE) {
     LOG(ERROR) << "Failed to trim chain";
-    return INTERNAL_ERROR;
+    return Status(util::error::INTERNAL, "failed to trim chain");
   }
 
   // Note that it is OK to allow a root cert that is not CA:true
   // because we will later check that it is trusted.
   Cert::Status status = chain->IsValidCaIssuerChainMaybeLegacyRoot();
   if (status == Cert::FALSE)
-    return INVALID_CERTIFICATE_CHAIN;
+    return Status(util::error::INVALID_ARGUMENT, "invalid certificate chain");
   if (status != Cert::TRUE) {
     LOG(ERROR) << "Failed to check issuer chain";
-    return INTERNAL_ERROR;
+    return Status(util::error::INTERNAL, "failed to check issuer chain");
   }
 
   status = chain->IsValidSignatureChain();
@@ -200,16 +199,17 @@ CertChecker::CertVerifyResult CertChecker::CheckIssuerChain(
     // it's more of an INTERNAL_ERROR. However a bust setup would manifest
     // itself in many other ways, including failing tests, so we assume the
     // failure is intentional.
-    return UNSUPPORTED_ALGORITHM_IN_CERT_CHAIN;
+    return Status(util::error::INVALID_ARGUMENT,
+                  "unsupported algorithm in certificate chain");
   }
   if (status == Cert::FALSE)
-    return INVALID_CERTIFICATE_CHAIN;
+    return Status(util::error::INVALID_ARGUMENT, "invalid certificate chain");
 
   if (status != Cert::TRUE) {
     LOG(ERROR) << "Failed to check signature chain";
-    return INTERNAL_ERROR;
+    return Status(util::error::INTERNAL, "failed to check signature chain");
   }
-  return GetTrustedCa(chain);
+  return GetVerifyError(GetTrustedCa(chain));
 }
 
 Status CertChecker::CheckPreCertChain(PreCertChain* chain,
@@ -236,9 +236,14 @@ Status CertChecker::CheckPreCertChain(PreCertChain* chain,
   // Precertificate Signing Certificates should be tolerated if they
   // have the necessary EKU set.
   // Preference is "no".
-  CertVerifyResult res = CheckIssuerChain(chain);
-  if (res != OK)
-    return GetVerifyError(res);
+
+  // TODO(pphaneuf): Once Cert::IsWellFormed returns a util::Status,
+  // remove the braces and re-use the one above.
+  {
+    Status status(CheckIssuerChain(chain));
+    if (!status.ok())
+      return status;
+  }
 
   Cert::Status uses_pre_issuer = chain->UsesPrecertSigningCertificate();
   if (uses_pre_issuer != Cert::TRUE && uses_pre_issuer != Cert::FALSE)
