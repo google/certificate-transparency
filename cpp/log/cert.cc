@@ -56,11 +56,11 @@ static Cert::Status StatusOrBoolToCertStatus(StatusOr<bool> status) {
 
 static StatusOr<bool> CertStatusToStatusOrBool(Cert::Status status) {
   if (status == Cert::FALSE) {
-    return StatusOr<bool>(false);
+    return false;
   } else if (status == Cert::TRUE) {
-    return StatusOr<bool>(true);
+    return true;
   } else {
-    return StatusOr<bool>(ERROR_STATUS);
+    return ERROR_STATUS;
   }
 }
 
@@ -296,7 +296,7 @@ Cert::Status Cert::HasCriticalExtension(int extension_nid) const {
 StatusOr<bool> Cert::HasBasicConstraintCATrue() const {
   if (!IsLoaded()) {
     LOG(ERROR) << "Cert not loaded";
-    return StatusOr<bool>(ERROR_STATUS);
+    return ERROR_STATUS;
   }
 
   void* ext_struct;
@@ -315,14 +315,14 @@ StatusOr<bool> Cert::HasBasicConstraintCATrue() const {
   BASIC_CONSTRAINTS* constraints = static_cast<BASIC_CONSTRAINTS*>(ext_struct);
   bool is_ca = constraints->ca;
   BASIC_CONSTRAINTS_free(constraints);
-  return StatusOr<bool>(is_ca ? true : false);
+  return is_ca ? true : false;
 }
 
 
 StatusOr<bool> Cert::HasExtendedKeyUsage(int key_usage_nid) const {
   if (!IsLoaded()) {
     LOG(ERROR) << "Cert not loaded";
-    return StatusOr<bool>(ERROR_STATUS);
+    return ERROR_STATUS;
   }
 
   const ASN1_OBJECT* key_usage_obj = OBJ_nid2obj(key_usage_nid);
@@ -330,7 +330,7 @@ StatusOr<bool> Cert::HasExtendedKeyUsage(int key_usage_nid) const {
     LOG(ERROR) << "OpenSSL OBJ_nid2obj returned NULL for NID " << key_usage_nid
                << ". Is the NID not recognised?";
     LOG_OPENSSL_ERRORS(WARNING);
-    return StatusOr<bool>(ERROR_STATUS);
+    return ERROR_STATUS;
   }
 
   void* ext_struct;
