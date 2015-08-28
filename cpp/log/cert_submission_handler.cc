@@ -20,29 +20,6 @@ using ct::X509ChainEntry;
 using std::string;
 using util::Status;
 
-namespace {
-
-Status GetVerifyError(CertChecker::CertVerifyResult result) {
-  switch (result) {
-    case CertChecker::INVALID_CERTIFICATE_CHAIN:
-    case CertChecker::PRECERT_EXTENSION_IN_CERT_CHAIN:
-    case CertChecker::UNSUPPORTED_ALGORITHM_IN_CERT_CHAIN:
-      return Status(util::error::INVALID_ARGUMENT,
-                    "invalid certificate chain");
-    case CertChecker::PRECERT_CHAIN_NOT_WELL_FORMED:
-      return Status(util::error::INVALID_ARGUMENT, "prechain not well formed");
-    case CertChecker::ROOT_NOT_IN_LOCAL_STORE:
-      return Status(util::error::FAILED_PRECONDITION, "unknown root");
-    case CertChecker::INTERNAL_ERROR:
-      return Status(util::error::INTERNAL, "internal error");
-    case CertChecker::OK:
-      return Status::OK;
-  }
-  LOG(FATAL) << "Unknown CertChecker error " << result;
-}
-
-}  // namespace
-
 // TODO(ekasper): handle Cert errors consistently and log some errors here
 // if they fail.
 CertSubmissionHandler::CertSubmissionHandler(CertChecker* cert_checker)
@@ -99,9 +76,9 @@ Status CertSubmissionHandler::ProcessX509Submission(CertChain* chain,
   if (!chain->IsLoaded())
     return Status(util::error::INVALID_ARGUMENT, "empty submission");
 
-  CertChecker::CertVerifyResult result = cert_checker_->CheckCertChain(chain);
-  if (result != CertChecker::OK)
-    return GetVerifyError(result);
+  const Status status(cert_checker_->CheckCertChain(chain));
+  if (!status.ok())
+    return status;
 
   // We have a valid chain; make the entry.
   string der_cert;
@@ -123,12 +100,12 @@ Status CertSubmissionHandler::ProcessX509Submission(CertChain* chain,
 Status CertSubmissionHandler::ProcessPreCertSubmission(PreCertChain* chain,
                                                        LogEntry* entry) {
   PrecertChainEntry* precert_entry = entry->mutable_precert_entry();
-  CertChecker::CertVerifyResult result = cert_checker_->CheckPreCertChain(
+  const Status status(cert_checker_->CheckPreCertChain(
       chain, precert_entry->mutable_pre_cert()->mutable_issuer_key_hash(),
-      precert_entry->mutable_pre_cert()->mutable_tbs_certificate());
+      precert_entry->mutable_pre_cert()->mutable_tbs_certificate()));
 
-  if (result != CertChecker::OK)
-    return GetVerifyError(result);
+  if (!status.ok())
+    return status;
 
   // We have a valid chain; make the entry.
   string der_cert;

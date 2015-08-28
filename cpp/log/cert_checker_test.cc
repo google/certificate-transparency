@@ -9,6 +9,7 @@
 #include "log/cert.h"
 #include "log/cert_checker.h"
 #include "log/ct_extensions.h"
+#include "util/status_test_util.h"
 #include "util/testing.h"
 #include "util/util.h"
 
@@ -18,6 +19,7 @@ using cert_trans::CertChecker;
 using cert_trans::PreCertChain;
 using std::string;
 using std::vector;
+using util::testing::StatusIs;
 
 // Valid certificates.
 // Self-signed
@@ -197,12 +199,12 @@ TEST_F(CertCheckerTest, Certificate) {
   ASSERT_TRUE(chain.IsLoaded());
 
   // Fail as we have no CA certs.
-  EXPECT_EQ(CertChecker::ROOT_NOT_IN_LOCAL_STORE,
-            checker_.CheckCertChain(&chain));
+  EXPECT_THAT(checker_.CheckCertChain(&chain),
+              StatusIs(util::error::FAILED_PRECONDITION));
 
   // Load CA certs and expect success.
   EXPECT_TRUE(checker_.LoadTrustedCertificates(cert_dir_ + "/" + kCaCert));
-  EXPECT_EQ(CertChecker::OK, checker_.CheckCertChain(&chain));
+  EXPECT_OK(checker_.CheckCertChain(&chain));
   EXPECT_EQ(2U, chain.Length());
 }
 
@@ -212,12 +214,12 @@ TEST_F(CertCheckerTest, CertificateWithRoot) {
   ASSERT_EQ(Cert::TRUE, chain.AddCert(new Cert(ca_pem_)));
 
   // Fail as even though we give a CA cert, it's not in the local store.
-  EXPECT_EQ(CertChecker::ROOT_NOT_IN_LOCAL_STORE,
-            checker_.CheckCertChain(&chain));
+  EXPECT_THAT(checker_.CheckCertChain(&chain),
+              StatusIs(util::error::FAILED_PRECONDITION));
 
   // Load CA certs and expect success.
   EXPECT_TRUE(checker_.LoadTrustedCertificates(cert_dir_ + "/" + kCaCert));
-  EXPECT_EQ(CertChecker::OK, checker_.CheckCertChain(&chain));
+  EXPECT_OK(checker_.CheckCertChain(&chain));
   EXPECT_EQ(2U, chain.Length());
 }
 
@@ -229,7 +231,7 @@ TEST_F(CertCheckerTest, TrimsRepeatedRoots) {
 
   // Load CA certs and expect success.
   EXPECT_TRUE(checker_.LoadTrustedCertificates(cert_dir_ + "/" + kCaCert));
-  EXPECT_EQ(CertChecker::OK, checker_.CheckCertChain(&chain));
+  EXPECT_OK(checker_.CheckCertChain(&chain));
   EXPECT_EQ(2U, chain.Length());
 }
 
@@ -240,19 +242,19 @@ TEST_F(CertCheckerTest, Intermediates) {
   CertChain chain(chain_leaf_pem_);
   ASSERT_TRUE(chain.IsLoaded());
   // Fail as it doesn't chain to a trusted CA.
-  EXPECT_EQ(CertChecker::ROOT_NOT_IN_LOCAL_STORE,
-            checker_.CheckCertChain(&chain));
+  EXPECT_THAT(checker_.CheckCertChain(&chain),
+              StatusIs(util::error::FAILED_PRECONDITION));
   // Add the intermediate and expect success.
   ASSERT_EQ(Cert::TRUE, chain.AddCert(new Cert(intermediate_pem_)));
   ASSERT_EQ(2U, chain.Length());
-  EXPECT_EQ(CertChecker::OK, checker_.CheckCertChain(&chain));
+  EXPECT_OK(checker_.CheckCertChain(&chain));
   EXPECT_EQ(3U, chain.Length());
 
   // An invalid chain, with two certs in wrong order.
   CertChain invalid(intermediate_pem_ + chain_leaf_pem_);
   ASSERT_TRUE(invalid.IsLoaded());
-  EXPECT_EQ(CertChecker::INVALID_CERTIFICATE_CHAIN,
-            checker_.CheckCertChain(&invalid));
+  EXPECT_THAT(checker_.CheckCertChain(&invalid),
+              StatusIs(util::error::INVALID_ARGUMENT));
 }
 
 TEST_F(CertCheckerTest, PreCert) {
@@ -264,13 +266,12 @@ TEST_F(CertCheckerTest, PreCert) {
 
   // Fail as we have no CA certs.
   string issuer_key_hash, tbs;
-  EXPECT_EQ(CertChecker::ROOT_NOT_IN_LOCAL_STORE,
-            checker_.CheckPreCertChain(&chain, &issuer_key_hash, &tbs));
+  EXPECT_THAT(checker_.CheckPreCertChain(&chain, &issuer_key_hash, &tbs),
+              StatusIs(util::error::FAILED_PRECONDITION));
 
   // Load CA certs and expect success.
   checker_.LoadTrustedCertificates(cert_dir_ + "/" + kCaCert);
-  EXPECT_EQ(CertChecker::OK,
-            checker_.CheckPreCertChain(&chain, &issuer_key_hash, &tbs));
+  EXPECT_OK(checker_.CheckPreCertChain(&chain, &issuer_key_hash, &tbs));
   string expected_key_hash;
   ASSERT_EQ(Cert::TRUE, chain.CertAt(1)->SPKISha256Digest(&expected_key_hash));
   EXPECT_EQ(expected_key_hash, issuer_key_hash);
@@ -287,13 +288,12 @@ TEST_F(CertCheckerTest, PreCertWithPreCa) {
 
   string issuer_key_hash, tbs;
   // Fail as we have no CA certs.
-  EXPECT_EQ(CertChecker::ROOT_NOT_IN_LOCAL_STORE,
-            checker_.CheckPreCertChain(&chain, &issuer_key_hash, &tbs));
+  EXPECT_THAT(checker_.CheckPreCertChain(&chain, &issuer_key_hash, &tbs),
+              StatusIs(util::error::FAILED_PRECONDITION));
 
   // Load CA certs and expect success.
   checker_.LoadTrustedCertificates(cert_dir_ + "/" + kCaCert);
-  EXPECT_EQ(CertChecker::OK,
-            checker_.CheckPreCertChain(&chain, &issuer_key_hash, &tbs));
+  EXPECT_OK(checker_.CheckPreCertChain(&chain, &issuer_key_hash, &tbs));
   string expected_key_hash;
   ASSERT_EQ(Cert::TRUE, chain.CertAt(2)->SPKISha256Digest(&expected_key_hash));
   EXPECT_EQ(expected_key_hash, issuer_key_hash);
@@ -304,8 +304,8 @@ TEST_F(CertCheckerTest, PreCertWithPreCa) {
   PreCertChain chain2(precert_with_preca_pem_);
   ASSERT_TRUE(chain2.IsLoaded());
   EXPECT_EQ(Cert::TRUE, chain2.IsWellFormed());
-  EXPECT_EQ(CertChecker::ROOT_NOT_IN_LOCAL_STORE,
-            checker_.CheckPreCertChain(&chain2, &issuer_key_hash, &tbs));
+  EXPECT_THAT(checker_.CheckPreCertChain(&chain2, &issuer_key_hash, &tbs),
+              StatusIs(util::error::FAILED_PRECONDITION));
 }
 
 TEST_F(CertCheckerTest, CertAsPreCert) {
@@ -313,8 +313,8 @@ TEST_F(CertCheckerTest, CertAsPreCert) {
 
   PreCertChain chain(leaf_pem_);
   string issuer_key_hash, tbs;
-  EXPECT_EQ(CertChecker::PRECERT_CHAIN_NOT_WELL_FORMED,
-            checker_.CheckPreCertChain(&chain, &issuer_key_hash, &tbs));
+  EXPECT_THAT(checker_.CheckPreCertChain(&chain, &issuer_key_hash, &tbs),
+              StatusIs(util::error::INVALID_ARGUMENT));
 }
 
 TEST_F(CertCheckerTest, PreCertAsCert) {
@@ -322,8 +322,8 @@ TEST_F(CertCheckerTest, PreCertAsCert) {
 
   const string chain_pem = precert_pem_ + ca_pem_;
   PreCertChain chain(chain_pem);
-  EXPECT_EQ(CertChecker::PRECERT_EXTENSION_IN_CERT_CHAIN,
-            checker_.CheckCertChain(&chain));
+  EXPECT_THAT(checker_.CheckCertChain(&chain),
+              StatusIs(util::error::INVALID_ARGUMENT));
 }
 
 // Accept if the root cert has no CA:True constraint and is in the trust store.
@@ -344,7 +344,7 @@ TEST_F(CertCheckerTest, AcceptNoBasicConstraintsAndMd2) {
   CertChain chain(chain_pem);
   ASSERT_TRUE(chain.IsLoaded());
 
-  EXPECT_EQ(CertChecker::OK, checker_.CheckCertChain(&chain));
+  EXPECT_OK(checker_.CheckCertChain(&chain));
 }
 
 // Don't accept if some other cert without CA:True tries to issue.
@@ -356,8 +356,8 @@ TEST_F(CertCheckerTest, DontAcceptNoBasicConstraints) {
 
   CertChain chain(chain_pem);
   ASSERT_TRUE(chain.IsLoaded());
-  EXPECT_EQ(CertChecker::INVALID_CERTIFICATE_CHAIN,
-            checker_.CheckCertChain(&chain));
+  EXPECT_THAT(checker_.CheckCertChain(&chain),
+              StatusIs(util::error::INVALID_ARGUMENT));
 }
 
 // Don't accept if anything else but the trusted root is signed with MD2.
@@ -376,8 +376,8 @@ TEST_F(CertCheckerTest, DontAcceptMD2) {
             chain.LastCert()->PrintSignatureAlgorithm());
 
 #ifdef OPENSSL_NO_MD2
-  EXPECT_EQ(CertChecker::UNSUPPORTED_ALGORITHM_IN_CERT_CHAIN,
-            checker_.CheckCertChain(&chain));
+  EXPECT_THAT(checker_.CheckCertChain(&chain),
+              StatusIs(util::error::INVALID_ARGUMENT));
 #else
   LOG(WARNING) << "Skipping test: MD2 is enabled! You should configure "
                << "OpenSSL with -DOPENSSL_NO_MD2 to be safe!";
@@ -395,7 +395,7 @@ TEST_F(CertCheckerTest, ResolveIssuerCollisions) {
       checker_.LoadTrustedCertificates(cert_dir_ + "/" + kCollisionRoot2));
   CertChain chain(chain_pem);
   ASSERT_TRUE(chain.IsLoaded());
-  EXPECT_EQ(CertChecker::OK, checker_.CheckCertChain(&chain));
+  EXPECT_OK(checker_.CheckCertChain(&chain));
 
   // The same, but include the root in the submission.
   ASSERT_TRUE(
@@ -406,13 +406,13 @@ TEST_F(CertCheckerTest, ResolveIssuerCollisions) {
   Cert* root1 = new Cert(root1_pem);
   ASSERT_TRUE(root1->IsLoaded());
   chain1.AddCert(root1);
-  EXPECT_EQ(CertChecker::OK, checker_.CheckCertChain(&chain1));
+  EXPECT_OK(checker_.CheckCertChain(&chain1));
 
   CertChain chain2(chain_pem);
   Cert* root2 = new Cert(root2_pem);
   ASSERT_TRUE(root2->IsLoaded());
   chain2.AddCert(root2);
-  EXPECT_EQ(CertChecker::OK, checker_.CheckCertChain(&chain2));
+  EXPECT_OK(checker_.CheckCertChain(&chain2));
 }
 
 }  // namespace

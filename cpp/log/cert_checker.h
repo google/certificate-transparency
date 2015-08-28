@@ -10,6 +10,7 @@
 
 #include "base/macros.h"
 #include "log/cert.h"
+#include "util/status.h"
 
 namespace cert_trans {
 
@@ -75,7 +76,7 @@ class CertChecker {
   // (or replace with store version) - the resulting chain is guaranteed to
   // contain at least one certificate. (Having exactly one certificate implies
   // someone is trying to log a root cert, which is fine though unexciting.)
-  virtual CertVerifyResult CheckCertChain(CertChain* chain) const;
+  virtual util::Status CheckCertChain(CertChain* chain) const;
 
   // Check that:
   // (1) The PreCertChain is well-formed according to I-D rules.
@@ -86,9 +87,9 @@ class CertChecker {
   // contain at least two certificates (three if there is a Precert Signing
   // Certificate);
   // If valid, also fills in the |issuer_key_hash| and |tbs_certificate|.
-  virtual CertVerifyResult CheckPreCertChain(
-      PreCertChain* chain, std::string* issuer_key_hash,
-      std::string* tbs_certificate) const;
+  virtual util::Status CheckPreCertChain(PreCertChain* chain,
+                                         std::string* issuer_key_hash,
+                                         std::string* tbs_certificate) const;
 
  private:
   CertVerifyResult CheckIssuerChain(CertChain* chain) const;

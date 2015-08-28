@@ -20,8 +20,32 @@
 using std::string;
 using std::vector;
 using util::ClearOpenSSLErrors;
+using util::Status;
 
 namespace cert_trans {
+
+namespace {
+
+Status GetVerifyError(CertChecker::CertVerifyResult result) {
+  switch (result) {
+    case CertChecker::INVALID_CERTIFICATE_CHAIN:
+    case CertChecker::PRECERT_EXTENSION_IN_CERT_CHAIN:
+    case CertChecker::UNSUPPORTED_ALGORITHM_IN_CERT_CHAIN:
+      return Status(util::error::INVALID_ARGUMENT,
+                    "invalid certificate chain");
+    case CertChecker::PRECERT_CHAIN_NOT_WELL_FORMED:
+      return Status(util::error::INVALID_ARGUMENT, "prechain not well formed");
+    case CertChecker::ROOT_NOT_IN_LOCAL_STORE:
+      return Status(util::error::FAILED_PRECONDITION, "unknown root");
+    case CertChecker::INTERNAL_ERROR:
+      return Status(util::error::INTERNAL, "internal error");
+    case CertChecker::OK:
+      return Status::OK;
+  }
+  LOG(FATAL) << "Unknown CertChecker error " << result;
+}
+
+}  // namespace
 
 CertChecker::~CertChecker() {
   ClearAllTrustedCertificates();
@@ -134,21 +158,21 @@ void CertChecker::ClearAllTrustedCertificates() {
   trusted_.clear();
 }
 
-CertChecker::CertVerifyResult CertChecker::CheckCertChain(
-    CertChain* chain) const {
+Status CertChecker::CheckCertChain(CertChain* chain) const {
   if (chain == NULL || !chain->IsLoaded())
-    return INVALID_CERTIFICATE_CHAIN;
+    return Status(util::error::INVALID_ARGUMENT, "invalid certificate chain");
 
   // Weed out things that should obviously be precert chains instead.
   Cert::Status status =
       chain->LeafCert()->HasCriticalExtension(cert_trans::NID_ctPoison);
   if (status != Cert::TRUE && status != Cert::FALSE) {
-    return CertChecker::INTERNAL_ERROR;
+    return Status(util::error::INTERNAL, "internal error");
   }
   if (status == Cert::TRUE)
-    return PRECERT_EXTENSION_IN_CERT_CHAIN;
+    return Status(util::error::INVALID_ARGUMENT,
+                  "precert extension in certificate chain");
 
-  return CheckIssuerChain(chain);
+  return GetVerifyError(CheckIssuerChain(chain));
 }
 
 CertChecker::CertVerifyResult CertChecker::CheckIssuerChain(
@@ -189,17 +213,17 @@ CertChecker::CertVerifyResult CertChecker::CheckIssuerChain(
   return GetTrustedCa(chain);
 }
 
-CertChecker::CertVerifyResult CertChecker::CheckPreCertChain(
-    PreCertChain* chain, string* issuer_key_hash,
-    string* tbs_certificate) const {
+Status CertChecker::CheckPreCertChain(PreCertChain* chain,
+                                      string* issuer_key_hash,
+                                      string* tbs_certificate) const {
   if (chain == NULL || !chain->IsLoaded())
-    return INVALID_CERTIFICATE_CHAIN;
+    return Status(util::error::INVALID_ARGUMENT, "invalid certificate chain");
   Cert::Status status = chain->IsWellFormed();
   if (status == Cert::FALSE)
-    return PRECERT_CHAIN_NOT_WELL_FORMED;
+    return Status(util::error::INVALID_ARGUMENT, "prechain not well formed");
   if (status != Cert::TRUE) {
     LOG(ERROR) << "Failed to check precert chain format";
-    return INTERNAL_ERROR;
+    return Status(util::error::INTERNAL, "internal error");
   }
   // Check the issuer and signature chain.
   // We do not, at this point, concern ourselves with whether the CA
@@ -215,26 +239,26 @@ CertChecker::CertVerifyResult CertChecker::CheckPreCertChain(
   // Preference is "no".
   CertVerifyResult res = CheckIssuerChain(chain);
   if (res != OK)
-    return res;
+    return GetVerifyError(res);
 
   Cert::Status uses_pre_issuer = chain->UsesPrecertSigningCertificate();
   if (uses_pre_issuer != Cert::TRUE && uses_pre_issuer != Cert::FALSE)
-    return INTERNAL_ERROR;
+    return Status(util::error::INTERNAL, "internal error");
 
   string key_hash;
   if (uses_pre_issuer == Cert::TRUE) {
     if (chain->Length() < 3 ||
         chain->CertAt(2)->SPKISha256Digest(&key_hash) != Cert::TRUE)
-      return INTERNAL_ERROR;
+      return Status(util::error::INTERNAL, "internal error");
   } else if (chain->Length() < 2 ||
              chain->CertAt(1)->SPKISha256Digest(&key_hash) != Cert::TRUE) {
-    return INTERNAL_ERROR;
+    return Status(util::error::INTERNAL, "internal error");
   }
   // A well-formed chain always has a precert.
   TbsCertificate tbs(*chain->PreCert());
   if (!tbs.IsLoaded() ||
       tbs.DeleteExtension(cert_trans::NID_ctPoison) != Cert::TRUE)
-    return INTERNAL_ERROR;
+    return Status(util::error::INTERNAL, "internal error");
 
   // If the issuing cert is the special Precert Signing Certificate,
   // replace the issuer with the one that will sign the final cert.
@@ -242,16 +266,17 @@ CertChecker::CertVerifyResult CertChecker::CheckPreCertChain(
   // is well-formed.
   if (uses_pre_issuer == Cert::TRUE &&
       tbs.CopyIssuerFrom(*chain->PrecertIssuingCert()) != Cert::TRUE)
-    return INTERNAL_ERROR;
+    return Status(util::error::INTERNAL, "internal error");
 
 
   string der_tbs;
   if (tbs.DerEncoding(&der_tbs) != Cert::TRUE)
-    return INTERNAL_ERROR;
+    return Status(util::error::INTERNAL,
+                  "could not DER-encode tbs certificate");
 
   issuer_key_hash->assign(key_hash);
   tbs_certificate->assign(der_tbs);
-  return OK;
+  return Status::OK;
 }
 
 CertChecker::CertVerifyResult CertChecker::GetTrustedCa(
