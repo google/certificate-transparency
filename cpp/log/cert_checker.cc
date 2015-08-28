@@ -2,6 +2,7 @@
 #include "log/cert_checker.h"
 
 #include <glog/logging.h>
+#include <memory>
 #include <openssl/asn1.h>
 #include <openssl/bio.h>
 #include <openssl/pem.h>
@@ -18,6 +19,7 @@
 #include "util/util.h"
 
 using std::string;
+using std::unique_ptr;
 using std::vector;
 using util::ClearOpenSSLErrors;
 using util::Status;
@@ -100,20 +102,17 @@ bool CertChecker::LoadTrustedCertificatesFromBIO(BIO* bio_in) {
     if (x509 != NULL) {
       // TODO(ekasper): check that the issuing CA cert is temporally valid
       // and at least warn if it isn't.
-      Cert* cert = new Cert(x509);
+      unique_ptr<Cert> cert(new Cert(x509));
       string subject_name;
       CertVerifyResult is_trusted = IsTrusted(*cert, &subject_name);
       if (is_trusted != OK && is_trusted != ROOT_NOT_IN_LOCAL_STORE) {
-        delete cert;
         error = true;
         break;
       }
 
       ++cert_count;
-      if (is_trusted == OK) {
-        delete cert;
-      } else {
-        certs_to_add.push_back(make_pair(subject_name, cert));
+      if (is_trusted != OK) {
+        certs_to_add.push_back(make_pair(subject_name, cert.release()));
       }
     } else {
       // See if we reached the end of the file.
