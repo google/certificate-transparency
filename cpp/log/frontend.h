@@ -2,6 +2,7 @@
 #ifndef FRONTEND_H
 #define FRONTEND_H
 
+#include <memory>
 #include <mutex>
 
 #include "base/macros.h"
@@ -33,8 +34,8 @@ class Frontend {
   }
 
  private:
-  CertSubmissionHandler* handler_;
-  FrontendSigner* signer_;
+  const std::unique_ptr<CertSubmissionHandler> handler_;
+  const std::unique_ptr<FrontendSigner> signer_;
 
   util::Status QueueProcessedEntry(
       CertSubmissionHandler::SubmitResult pre_result,

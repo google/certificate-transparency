@@ -50,7 +50,7 @@ class CertSubmissionHandler {
   static SubmitResult GetVerifyError(
       cert_trans::CertChecker::CertVerifyResult result);
 
-  cert_trans::CertChecker* cert_checker_;
+  cert_trans::CertChecker* const cert_checker_;
 
   DISALLOW_COPY_AND_ASSIGN(CertSubmissionHandler);
 };

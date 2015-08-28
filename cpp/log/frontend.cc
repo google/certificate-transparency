@@ -67,12 +67,10 @@ Status UpdateStats(ct::LogEntryType type, const Status& status) {
 }  // namespace
 
 Frontend::Frontend(CertSubmissionHandler* handler, FrontendSigner* signer)
-    : handler_(handler), signer_(signer) {
+    : handler_(CHECK_NOTNULL(handler)), signer_(CHECK_NOTNULL(signer)) {
 }
 
 Frontend::~Frontend() {
-  delete signer_;
-  delete handler_;
 }
 
 Status Frontend::QueueProcessedEntry(

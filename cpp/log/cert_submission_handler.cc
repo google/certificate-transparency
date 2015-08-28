@@ -22,7 +22,7 @@ using std::string;
 // TODO(ekasper): handle Cert errors consistently and log some errors here
 // if they fail.
 CertSubmissionHandler::CertSubmissionHandler(CertChecker* cert_checker)
-    : cert_checker_(cert_checker) {
+    : cert_checker_(CHECK_NOTNULL(cert_checker)) {
 }
 
 // static
