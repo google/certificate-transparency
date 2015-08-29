@@ -108,7 +108,7 @@ cpp/gtest-all.cc: $(GTEST_DIR)/src/gtest-all.cc
 cpp/gmock-all.cc: $(GMOCK_DIR)/src/gmock-all.cc
 	$(AM_V_at)cp $^ $@
 
-test/testdata/urlfetcher_test_certs/localhost.pem: test/create_url_fetcher_test_certs.sh
+test/testdata/urlfetcher_test_certs/localhost-key.pem: test/create_url_fetcher_test_certs.sh
 	$(AM_V_GEN)test/create_url_fetcher_test_certs.sh
 
 cpp_libcore_a_SOURCES = \
@@ -587,7 +587,7 @@ cpp_net_url_fetcher_test_SOURCES = \
 	cpp/util/protobuf_util.cc \
 	cpp/util/thread_pool.cc
 EXTRA_cpp_net_url_fetcher_test_DEPENDENCIES = \
-	test/testdata/urlfetcher_test_certs/localhost.pem
+	test/testdata/urlfetcher_test_certs/localhost-key.pem
 
 cpp_proto_serializer_test_LDADD = \
 	cpp/libcore.a \
@@ -645,7 +645,7 @@ cpp_util_fake_etcd_test_SOURCES = \
 	cpp/util/libevent_wrapper.cc \
 	cpp/util/thread_pool.cc
 EXTRA_cpp_util_fake_etcd_test_DEPENDENCIES = \
-	test/testdata/urlfetcher_test_certs/localhost.pem
+	test/testdata/urlfetcher_test_certs/localhost-key.pem
 
 cpp_util_json_wrapper_test_LDADD = \
 	cpp/libtest.a \
@@ -679,7 +679,7 @@ cpp_util_masterelection_test_SOURCES = \
 	cpp/util/protobuf_util.cc \
 	cpp/util/thread_pool.cc
 EXTRA_cpp_util_masterelection_test_DEPENDENCIES = \
-	test/testdata/urlfetcher_test_certs/localhost.pem
+	test/testdata/urlfetcher_test_certs/localhost-key.pem
 
 cpp_merkletree_merkle_tree_test_LDADD = \
 	cpp/libcore.a \
