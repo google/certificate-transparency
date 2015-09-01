@@ -17,7 +17,8 @@ import golomb_code
 import gflags
 
 CRX_URL = (
-    "https://clients2.googleusercontent.com/crx/blobs/QgAAAC6zw0qH2DJtnXe8Z7rUJP3gszY0B2FmNnbJa7CCi6Nx1HJCcIhGUhU4ejYyq6S5fBBIVJ1Amlh8I4ihdy5PD2khylH-MKyRnb_wjad-BSsrAMZSmuU4E8LUNSehqcmAXZkGETVkjdbMag/oafdbfcohdcjandcenmccfopbeklnicplive_main.platform.all.crx")
+    "https://clients2.googleusercontent.com/crx/blobs/QgAAAC6zw0qH2DJtnXe8Z7rUJP35Av6_uD2R0shIWqC2XwPmpwrDdH5TKyq_6MWRGfvCXV3f-8g220oUjAO-JvMYG2m5CSvsx6cHch05zQS7ZbtrAMZSmuWMzK-Yj7NpgCxtqGhyTFveAvi-IQ/oafdbfcohdcjandcenmccfopbeklnicp_main.platform.all.crx")
+
 TRUNCATED_HASH_LENGTH = 8
 GOLOMB_M_PARAMETER = 2 ** 47
 NUM_FETCHING_PROCESSES = 40
