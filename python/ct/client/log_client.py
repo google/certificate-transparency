@@ -6,6 +6,7 @@ from ct.client.db import database
 from ct.crypto import verify
 from ct.proto import client_pb2
 import gflags
+import httplib
 import httplib2
 import logging
 import random
@@ -198,8 +199,10 @@ def _parse_consistency_proof(response, servername):
 # A class that we can mock out to generate fake responses.
 class RequestHandler(object):
     """HTTPS requests."""
-    def __init__(self, connection_timeout=60, ca_bundle=None):
+    def __init__(self, connection_timeout=60, ca_bundle=None,
+                 num_retries=FLAGS.get_entries_max_retries):
         self._http = httplib2.Http(timeout=connection_timeout, ca_certs=ca_bundle)
+        self._num_retries = num_retries
 
     def __repr__(self):
         return "%r()" % self.__class__.__name__
@@ -209,11 +212,23 @@ class RequestHandler(object):
 
     def get_response(self, uri, params=None):
         """Get an HTTP response for a GET request."""
+        uri_with_params = self._uri_with_params(uri, params)
         try:
-            return self._build_requests_style_response(
-                self._http.request(self._uri_with_params(uri, params)))
+            num_get_attempts = self._num_retries + 1
+            while num_get_attempts > 0:
+                try:
+                    return self._build_requests_style_response(
+                        self._http.request(uri_with_params))
+                except httplib.IncompleteRead as e:
+                    num_get_attempts = num_get_attempts - 1
+                    logging.info("Retrying fetching %s, error %s" % (
+                            uri_with_params, e))
+            raise HTTPError(
+                    "Received incomplete reply to %s too many times" %
+                    uri_with_params)
         except httplib2.HttpLib2Error as e:
-            raise HTTPError("Connection to %s failed: %s" % (uri, e))
+            raise HTTPError("Connection to %s failed: %s" % (
+                    uri_with_params, e))
 
     def post_response(self, uri, post_data):
         try:

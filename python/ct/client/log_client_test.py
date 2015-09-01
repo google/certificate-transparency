@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 
 import base64
+import httplib
 import json
 import sys
 import unittest
@@ -337,6 +338,18 @@ class LogClientTest(unittest.TestCase):
         self.assertRaises(log_client.InvalidResponseError,
                           client._parse_sct, json_sct_response)
 
+class RequestHandlerTest(unittest.TestCase):
+    class RequestSideEffect:
+        def __init__(self, num_failures, canned_response=None):
+            self._num_failures = num_failures
+            self._canned_response = canned_response
+
+        def __call__(self, req_url):
+            if self._num_failures <= 0:
+                return self._canned_response
+            self._num_failures = self._num_failures - 1
+            raise httplib.IncompleteRead("incomplete read!")
+
     def test_uri_with_params(self):
         self.assertEqual(
             'http://www.google.com',
@@ -354,6 +367,30 @@ class LogClientTest(unittest.TestCase):
                                                         'b': 'foo bar'}),
             ['http://www.google.com/?a=1&b=foo+bar',
              'http://www.google.com/?b=foo+bar&a=1'])
+
+    def test_get_response_one_retry(self):
+        expected_body = 'valid_body'
+        handler = log_client.RequestHandler(num_retries=1)
+        mock_http_request = mock.Mock(
+                side_effect=
+                self.RequestSideEffect(1, ({'status': 200}, expected_body)))
+        handler._http.request = mock_http_request
+
+        received_response = handler.get_response('http://www.example.com')
+        self.assertEqual(expected_body, received_response.content)
+        self.assertEqual(200, received_response.status_code)
+
+    def test_get_response_too_many_retries(self):
+        handler = log_client.RequestHandler(num_retries=3)
+        mock_http_request = mock.Mock(
+                side_effect=self.RequestSideEffect(
+                    4, ({'status': 200}, 'body')))
+        handler._http.request = mock_http_request
+
+        self.assertRaises(log_client.HTTPError,
+                          handler.get_response, ('http://www.example.com'))
+
+
 
 if __name__ == "__main__":
     sys.argv = FLAGS(sys.argv)
