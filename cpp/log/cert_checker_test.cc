@@ -336,9 +336,7 @@ TEST_F(CertCheckerTest, AcceptNoBasicConstraintsAndMd2) {
   Cert ca(ca_pem);
   // Verify testdata properties: CA is legacy root.
   ASSERT_EQ("md2WithRSAEncryption", ca.PrintSignatureAlgorithm());
-  StatusOr<bool> has_ca_constraint = ca.HasBasicConstraintCATrue();
-  ASSERT_TRUE(has_ca_constraint.ok() &&
-              has_ca_constraint.ValueOrDie() == false);
+  ASSERT_FALSE(ca.HasBasicConstraintCATrue().ValueOrDie());
 
   string chain_pem;
   ASSERT_TRUE(util::ReadTextFile(cert_dir_ + "/" + kNoBCChain, &chain_pem));
@@ -373,8 +371,7 @@ TEST_F(CertCheckerTest, DontAcceptMD2) {
   ASSERT_TRUE(chain.IsLoaded());
   // Verify testdata properties: chain terminates in an MD2 intermediate.
   ASSERT_EQ(Cert::FALSE, chain.LastCert()->IsSelfSigned());
-  StatusOr<bool> last_ca_status = chain.LastCert()->HasBasicConstraintCATrue();
-  ASSERT_TRUE(last_ca_status.ok() && last_ca_status.ValueOrDie() == true);
+  ASSERT_TRUE(chain.LastCert()->HasBasicConstraintCATrue().ValueOrDie());
   ASSERT_EQ("md2WithRSAEncryption",
             chain.LastCert()->PrintSignatureAlgorithm());
 

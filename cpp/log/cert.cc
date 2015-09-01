@@ -23,6 +23,8 @@ using std::string;
 using std::vector;
 using std::unique_ptr;
 using util::ClearOpenSSLErrors;
+using util::StatusOr;
+using util::error::Code;
 
 #if OPENSSL_VERSION_NUMBER < 0x10002000L
 // Backport from 1.0.2-beta3.
@@ -36,36 +38,35 @@ static int X509_get_signature_nid(const X509* x) {
 }
 #endif
 
-namespace cert_trans {
-
-// Useful because util::Status clashes with Cert::Status so we have to
-// refer to it within the namespace while Cert::Status exists.
-static const util::Status& ERROR_STATUS = util::Status::UNKNOWN;
-
+namespace {
 // TODO. These helpers can be removed when Cert::Status has been removed.
 // They make it easier to do an incremental removal
 
-static Cert::Status StatusOrBoolToCertStatus(StatusOr<bool> status) {
+cert_trans::Cert::Status StatusOrBoolToCertStatus(StatusOr<bool> status) {
   if (status.ok()) {
-    return status.ValueOrDie() ? Cert::TRUE : Cert::FALSE;
+    return status.ValueOrDie() ? cert_trans::Cert::TRUE
+                               : cert_trans::Cert::FALSE;
   } else {
-    return Cert::ERROR;
+    return cert_trans::Cert::ERROR;
   }
 }
 
 
-static StatusOr<bool> CertStatusToStatusOrBool(Cert::Status status) {
-  if (status == Cert::FALSE) {
+StatusOr<bool> CertStatusToStatusOrBool(cert_trans::Cert::Status status) {
+  if (status == cert_trans::Cert::FALSE) {
     return false;
-  } else if (status == Cert::TRUE) {
+  } else if (status == cert_trans::Cert::TRUE) {
     return true;
   } else {
-    return ERROR_STATUS;
+    return util::Status(Code::UNKNOWN, "Unknown status");
   }
 }
 
 // END of section to be cleaned up
 
+}
+
+namespace cert_trans {
 
 // Convert string from ASN1 and check it doesn't contain nul characters
 string ASN1ToStringAndCheckForNulls(ASN1_STRING* asn1_string,
@@ -296,7 +297,7 @@ Cert::Status Cert::HasCriticalExtension(int extension_nid) const {
 StatusOr<bool> Cert::HasBasicConstraintCATrue() const {
   if (!IsLoaded()) {
     LOG(ERROR) << "Cert not loaded";
-    return ERROR_STATUS;
+    return util::Status(Code::FAILED_PRECONDITION, "Cert not loaded");
   }
 
   void* ext_struct;
@@ -322,7 +323,7 @@ StatusOr<bool> Cert::HasBasicConstraintCATrue() const {
 StatusOr<bool> Cert::HasExtendedKeyUsage(int key_usage_nid) const {
   if (!IsLoaded()) {
     LOG(ERROR) << "Cert not loaded";
-    return ERROR_STATUS;
+    return util::Status(Code::FAILED_PRECONDITION, "Cert not loaded");
   }
 
   const ASN1_OBJECT* key_usage_obj = OBJ_nid2obj(key_usage_nid);
@@ -330,7 +331,7 @@ StatusOr<bool> Cert::HasExtendedKeyUsage(int key_usage_nid) const {
     LOG(ERROR) << "OpenSSL OBJ_nid2obj returned NULL for NID " << key_usage_nid
                << ". Is the NID not recognised?";
     LOG_OPENSSL_ERRORS(WARNING);
-    return ERROR_STATUS;
+    return util::Status(Code::INTERNAL, "NID lookup failed");
   }
 
   void* ext_struct;
@@ -914,9 +915,9 @@ Cert::Status Cert::IsValidNameConstrainedIntermediateCa() const {
 
   // If it's not a CA cert or there is no name constraint extension then we
   // don't need to apply the rules any further
-  StatusOr<bool> has_ca_constraint_status = HasBasicConstraintCATrue();
-  if (StatusOrBoolToCertStatus(has_ca_constraint_status) != Cert::TRUE
-        || HasExtension(NID_name_constraints) == FALSE) {
+  StatusOr<bool> has_ca_constraint = HasBasicConstraintCATrue();
+  if (!has_ca_constraint.ok() || !has_ca_constraint.ValueOrDie()
+      || HasExtension(NID_name_constraints) == Cert::FALSE) {
     return Cert::TRUE;
   }
 
@@ -1341,10 +1342,8 @@ Cert::Status PreCertChain::UsesPrecertSigningCertificate() const {
     return Cert::FALSE;
   }
 
-  StatusOr<bool> issuer_eku_status =
-      issuer->HasExtendedKeyUsage(cert_trans::NID_ctPrecertificateSigning);
-
-  return StatusOrBoolToCertStatus(issuer_eku_status);
+  return StatusOrBoolToCertStatus(
+      issuer->HasExtendedKeyUsage(cert_trans::NID_ctPrecertificateSigning));
 }
 
 

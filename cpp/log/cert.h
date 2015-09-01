@@ -10,8 +10,6 @@
 #include "base/macros.h"
 #include "util/statusor.h"
 
-using util::StatusOr;
-
 namespace cert_trans {
 
 // Tests if a hostname contains any redactions ('?' elements). If it does
@@ -99,7 +97,7 @@ class Cert {
   // or is present but could not be decoded.
   // Returns ERROR if the cert is not loaded or some other unknown error
   // occurred while parsing the extensions.
-  StatusOr<bool> HasBasicConstraintCATrue() const;
+  util::StatusOr<bool> HasBasicConstraintCATrue() const;
 
   // Returns TRUE if extendedKeyUsage extension is present and the specified
   // key usage is set.
@@ -109,7 +107,7 @@ class Cert {
   // or some other unknown error occurred while parsing the extensions.
   // NID must be either an OpenSSL built-in NID, or one registered by the user
   // with OBJ_create. (See log/ct_extensions.h for sample code.)
-  StatusOr<bool> HasExtendedKeyUsage(int key_usage_nid) const;
+  util::StatusOr<bool> HasExtendedKeyUsage(int key_usage_nid) const;
 
   // Returns TRUE if the Cert's issuer matches |issuer|.
   // Returns FALSE if there is no match.
