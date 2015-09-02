@@ -49,7 +49,7 @@ struct Range {
     WANT,
   };
 
-  Range(State state, int64_t size, unique_ptr<Range>&& next = nullptr)
+  Range(State state, int64_t size, unique_ptr<Range> next = nullptr)
       : state_(state), size_(size), next_(move(next)) {
     CHECK(state_ == HAVE || state_ == FETCHING || state_ == WANT);
     CHECK_GT(size_, 0);
@@ -62,8 +62,7 @@ struct Range {
 
 
 struct FetchState {
-  FetchState(Database<LoggedCertificate>* db,
-             unique_ptr<PeerGroup>&& peer_group,
+  FetchState(Database<LoggedCertificate>* db, unique_ptr<PeerGroup> peer_group,
              const LogVerifier* log_verifier, Task* task);
 
   void WalkEntries();
@@ -88,7 +87,7 @@ struct FetchState {
 
 
 FetchState::FetchState(Database<LoggedCertificate>* db,
-                       unique_ptr<PeerGroup>&& peer_group,
+                       unique_ptr<PeerGroup> peer_group,
                        const LogVerifier* log_verifier, Task* task)
     : db_(CHECK_NOTNULL(db)),
       peer_group_(move(peer_group)),
@@ -311,7 +310,7 @@ void FetchState::WriteToDatabase(int64_t index, Range* range,
 
 
 void FetchLogEntries(Database<LoggedCertificate>* db,
-                     unique_ptr<PeerGroup>&& peer_group,
+                     unique_ptr<PeerGroup> peer_group,
                      const LogVerifier* log_verifier, Task* task) {
   TaskHold hold(task);
   task->DeleteWhenDone(

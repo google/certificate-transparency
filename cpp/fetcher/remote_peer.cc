@@ -36,7 +36,7 @@ Counter<string>* invalid_sths_received =
 
 
 struct RemotePeer::Impl {
-  Impl(unique_ptr<LogVerifier>&& verifier, AsyncLogClient* client,
+  Impl(unique_ptr<LogVerifier> verifier, AsyncLogClient* client,
        const std::function<void(const ct::SignedTreeHead&)>& on_new_sth,
        util::Task* task)
       : verifier_(move(verifier)),
@@ -137,7 +137,7 @@ void RemotePeer::Impl::DoneGetSTH(
 
 
 RemotePeer::RemotePeer(
-    unique_ptr<AsyncLogClient>&& client, unique_ptr<LogVerifier>&& verifier,
+    unique_ptr<AsyncLogClient> client, unique_ptr<LogVerifier> verifier,
     const std::function<void(const ct::SignedTreeHead&)>& on_new_sth,
     util::Task* task)
     : Peer(move(client)),

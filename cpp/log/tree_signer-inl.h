@@ -62,7 +62,7 @@ struct PendingEntriesOrder
 template <class Logged>
 TreeSigner<Logged>::TreeSigner(
     const std::chrono::duration<double>& guard_window, Database<Logged>* db,
-    std::unique_ptr<CompactMerkleTree>&& merkle_tree,
+    std::unique_ptr<CompactMerkleTree> merkle_tree,
     cert_trans::ConsistentStore<Logged>* consistent_store, LogSigner* signer)
     : guard_window_(guard_window),
       db_(db),

@@ -14,7 +14,7 @@ namespace cert_trans {
 
 
 void FetchLogEntries(Database<LoggedCertificate>* db,
-                     std::unique_ptr<PeerGroup>&& peer_group,
+                     std::unique_ptr<PeerGroup> peer_group,
                      const LogVerifier* log_verifier, util::Task* task);
 
 

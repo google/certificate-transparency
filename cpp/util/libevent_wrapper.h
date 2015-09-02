@@ -36,7 +36,7 @@ class Base : public util::Executor {
   static void CheckNotOnEventThread();
 
   Base();
-  Base(std::unique_ptr<Resolver>&& resolver);
+  Base(std::unique_ptr<Resolver> resolver);
   ~Base();
 
   // Arranges to run the closure on the main loop.

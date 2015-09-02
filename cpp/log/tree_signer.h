@@ -35,7 +35,7 @@ class TreeSigner {
   // is moved into this object.
   TreeSigner(const std::chrono::duration<double>& guard_window,
              Database<Logged>* db,
-             std::unique_ptr<CompactMerkleTree>&& merkle_tree,
+             std::unique_ptr<CompactMerkleTree> merkle_tree,
              cert_trans::ConsistentStore<Logged>* consistent_store,
              LogSigner* signer);
 

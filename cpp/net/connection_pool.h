@@ -79,7 +79,7 @@ class ConnectionPool {
   ConnectionPool(libevent::Base* base);
 
   std::unique_ptr<Connection> Get(const URL& url);
-  void Put(std::unique_ptr<Connection>&& conn);
+  void Put(std::unique_ptr<Connection> conn);
 
  private:
   typedef std::pair<std::chrono::system_clock::time_point,

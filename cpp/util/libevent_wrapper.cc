@@ -141,7 +141,7 @@ Base::Base() : Base(unique_ptr<Resolver>(new ResolverImpl)) {
 }
 
 
-Base::Base(unique_ptr<Resolver>&& resolver)
+Base::Base(unique_ptr<Resolver> resolver)
     : base_(CHECK_NOTNULL(event_base_new()), event_base_free),
       dns_(nullptr, FreeEvDns),
       wake_closures_(event_new(base_.get(), -1, 0, &Base::RunClosures, this),

@@ -324,7 +324,7 @@ unique_ptr<ConnectionPool::Connection> ConnectionPool::Get(const URL& url) {
 }
 
 
-void ConnectionPool::Put(unique_ptr<ConnectionPool::Connection>&& conn) {
+void ConnectionPool::Put(unique_ptr<ConnectionPool::Connection> conn) {
   if (!conn) {
     VLOG(1) << "returned null Connection";
     return;
