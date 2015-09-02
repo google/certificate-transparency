@@ -23,31 +23,9 @@ using std::unique_ptr;
 using std::vector;
 using util::ClearOpenSSLErrors;
 using util::Status;
+using util::StatusOr;
 
 namespace cert_trans {
-
-namespace {
-
-Status GetVerifyError(CertChecker::CertVerifyResult result) {
-  switch (result) {
-    case CertChecker::INVALID_CERTIFICATE_CHAIN:
-    case CertChecker::PRECERT_EXTENSION_IN_CERT_CHAIN:
-    case CertChecker::UNSUPPORTED_ALGORITHM_IN_CERT_CHAIN:
-      return Status(util::error::INVALID_ARGUMENT,
-                    "invalid certificate chain");
-    case CertChecker::PRECERT_CHAIN_NOT_WELL_FORMED:
-      return Status(util::error::INVALID_ARGUMENT, "prechain not well formed");
-    case CertChecker::ROOT_NOT_IN_LOCAL_STORE:
-      return Status(util::error::FAILED_PRECONDITION, "unknown root");
-    case CertChecker::INTERNAL_ERROR:
-      return Status(util::error::INTERNAL, "internal error");
-    case CertChecker::OK:
-      return Status::OK;
-  }
-  LOG(FATAL) << "Unknown CertChecker error " << result;
-}
-
-}  // namespace
 
 CertChecker::~CertChecker() {
   ClearAllTrustedCertificates();
@@ -104,14 +82,14 @@ bool CertChecker::LoadTrustedCertificatesFromBIO(BIO* bio_in) {
       // and at least warn if it isn't.
       unique_ptr<Cert> cert(new Cert(x509));
       string subject_name;
-      CertVerifyResult is_trusted = IsTrusted(*cert, &subject_name);
-      if (is_trusted != OK && is_trusted != ROOT_NOT_IN_LOCAL_STORE) {
+      const StatusOr<bool> is_trusted(IsTrusted(*cert, &subject_name));
+      if (!is_trusted.ok()) {
         error = true;
         break;
       }
 
       ++cert_count;
-      if (is_trusted != OK) {
+      if (!is_trusted.ValueOrDie()) {
         certs_to_add.push_back(make_pair(subject_name, cert.release()));
       }
     } else {
@@ -298,11 +276,12 @@ Status CertChecker::GetTrustedCa(CertChain* chain) const {
   }
 
   string subject_name;
-  CertVerifyResult is_trusted = IsTrusted(*subject, &subject_name);
-  // Either an error, or OK, meaning the last cert is in our trusted store.
-  // Note the trusted cert need not necessarily be self-signed.
-  if (is_trusted != ROOT_NOT_IN_LOCAL_STORE)
-    return GetVerifyError(is_trusted);
+  const StatusOr<bool> is_trusted(IsTrusted(*subject, &subject_name));
+  // Either an error, or true, meaning the last cert is in our trusted
+  // store.  Note the trusted cert need not necessarily be
+  // self-signed.
+  if (!is_trusted.ok() || is_trusted.ValueOrDie())
+    return is_trusted.status();
 
   string issuer_name;
   Cert::Status status = subject->DerEncodedIssuerName(&issuer_name);
@@ -360,14 +339,14 @@ Status CertChecker::GetTrustedCa(CertChain* chain) const {
   return Status::OK;
 }
 
-CertChecker::CertVerifyResult CertChecker::IsTrusted(
-    const Cert& cert, string* subject_name) const {
+StatusOr<bool> CertChecker::IsTrusted(const Cert& cert,
+                                      string* subject_name) const {
   string cert_name;
   Cert::Status status = cert.DerEncodedSubjectName(&cert_name);
   if (status == Cert::ERROR)
-    return INTERNAL_ERROR;
+    return Status(util::error::INTERNAL, "could not DER-decode subject name");
   else if (status != Cert::TRUE)
-    return INVALID_CERTIFICATE_CHAIN;
+    return Status(util::error::INVALID_ARGUMENT, "invalid certificate chain");
 
   *subject_name = cert_name;
 
@@ -379,10 +358,10 @@ CertChecker::CertVerifyResult CertChecker::IsTrusted(
        it != cand_range.second; ++it) {
     const Cert* cand = it->second;
     if (cert.IsIdenticalTo(*cand)) {
-      return OK;
+      return true;
     }
   }
-  return ROOT_NOT_IN_LOCAL_STORE;
+  return false;
 }
 
 }  // namespace cert_trans

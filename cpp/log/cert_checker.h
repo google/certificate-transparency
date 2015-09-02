@@ -11,6 +11,7 @@
 #include "base/macros.h"
 #include "log/cert.h"
 #include "util/status.h"
+#include "util/statusor.h"
 
 namespace cert_trans {
 
@@ -31,18 +32,6 @@ class CertChecker {
   CertChecker() = default;
 
   virtual ~CertChecker();
-
-  enum CertVerifyResult {
-    OK,
-    // Until we know what the precise cert chain policy is, bag all
-    // chain errors into INVALID_CERTIFICATE_CHAIN.
-    INVALID_CERTIFICATE_CHAIN,
-    PRECERT_CHAIN_NOT_WELL_FORMED,
-    ROOT_NOT_IN_LOCAL_STORE,
-    INTERNAL_ERROR,
-    PRECERT_EXTENSION_IN_CERT_CHAIN,
-    UNSUPPORTED_ALGORITHM_IN_CERT_CHAIN,
-  };
 
   // Load a file of concatenated PEM-certs.
   // Returns true if at least one certificate was successfully loaded, and no
@@ -97,11 +86,11 @@ class CertChecker {
   // Look issuer up from the trusted store, and verify signature.
   util::Status GetTrustedCa(CertChain* chain) const;
 
-  // Returns OK if the cert is trusted, ROOT_NOT_IN_LOCAL_STORE if it's not,
-  // INVALID_CERTIFICATE_CHAIN if something is wrong with the cert, and
-  // INTERNAL_ERROR if something terrible happened.
-  CertVerifyResult IsTrusted(const Cert& cert,
-                             std::string* subject_name) const;
+  // Returns true if the cert is trusted, false if it's not,
+  // INVALID_ARGUMENT if something is wrong with the cert, and
+  // INTERNAL if something terrible happened.
+  util::StatusOr<bool> IsTrusted(const Cert& cert,
+                                 std::string* subject_name) const;
 
   // A map by the DER encoding of the subject name.
   // All code manipulating this container must ensure contained elements are
