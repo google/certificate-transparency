@@ -108,6 +108,7 @@
 /test/testdata/logs
 /test/testdata/test-cert-proof-extension.pem
 /test/testdata/urlfetcher_test_certs/
+/test/testdata/*.srl
 
 # IntelliJ artefacts
 /java/.idea/dictionaries/
