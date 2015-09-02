@@ -370,14 +370,13 @@ TEST_F(CertCheckerTest, DontAcceptMD2) {
   CertChain chain(chain_pem);
   ASSERT_TRUE(chain.IsLoaded());
   // Verify testdata properties: chain terminates in an MD2 intermediate.
-  ASSERT_EQ(Cert::FALSE, chain.LastCert()->IsSelfSigned());
+  ASSERT_FALSE(chain.LastCert()->IsSelfSigned().ValueOrDie());
   ASSERT_TRUE(chain.LastCert()->HasBasicConstraintCATrue().ValueOrDie());
   ASSERT_EQ("md2WithRSAEncryption",
             chain.LastCert()->PrintSignatureAlgorithm());
 
 #ifdef OPENSSL_NO_MD2
-  EXPECT_THAT(checker_.CheckCertChain(&chain),
-              StatusIs(util::error::INVALID_ARGUMENT));
+  EXPECT_THAT(checker_.CheckCertChain(&chain), StatusIs(util::error::INTERNAL));
 #else
   LOG(WARNING) << "Skipping test: MD2 is enabled! You should configure "
                << "OpenSSL with -DOPENSSL_NO_MD2 to be safe!";

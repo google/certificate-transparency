@@ -24,6 +24,7 @@ using std::vector;
 using util::ClearOpenSSLErrors;
 using util::Status;
 using util::StatusOr;
+using util::error::Code;
 
 namespace cert_trans {
 
@@ -292,26 +293,27 @@ Status CertChecker::GetTrustedCa(CertChain* chain) const {
        it != issuer_range.second; ++it) {
     const Cert* issuer_cand = it->second;
 
-    Cert::Status ok = subject->IsSignedBy(*issuer_cand);
-    if (ok == Cert::UNSUPPORTED_ALGORITHM) {
+    StatusOr<bool> signed_by_issuer = subject->IsSignedBy(*issuer_cand);
+    if (signed_by_issuer.status().error_code() == Code::UNAVAILABLE) {
       // If the cert's algorithm is unsupported, then there's no point
       // continuing: it's unconditionally invalid.
       return Status(util::error::INVALID_ARGUMENT,
                     "unsupported algorithm in certificate chain");
     }
-    if (ok != Cert::TRUE && ok != Cert::FALSE) {
+    if (!signed_by_issuer.ok()) {
       LOG(ERROR) << "Failed to check signature for trusted root";
       return Status(util::error::INTERNAL,
                     "failed to check signature for trusted root");
     }
-    if (ok == Cert::TRUE) {
+    if (signed_by_issuer.ValueOrDie()) {
       issuer = issuer_cand;
       break;
     }
   }
 
-  if (!issuer)
+  if (!issuer) {
     return Status(util::error::FAILED_PRECONDITION, "unknown root");
+  }
 
   // Clone creates a new Cert but AddCert takes ownership even if Clone
   // failed and the cert can't be added, so we don't have to explicitly
