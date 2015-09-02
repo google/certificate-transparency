@@ -93,8 +93,9 @@ class CertChecker {
 
  private:
   util::Status CheckIssuerChain(CertChain* chain) const;
+
   // Look issuer up from the trusted store, and verify signature.
-  CertVerifyResult GetTrustedCa(CertChain* chain) const;
+  util::Status GetTrustedCa(CertChain* chain) const;
 
   // Returns OK if the cert is trusted, ROOT_NOT_IN_LOCAL_STORE if it's not,
   // INVALID_CERTIFICATE_CHAIN if something is wrong with the cert, and

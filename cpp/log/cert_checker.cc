@@ -56,7 +56,7 @@ CertChecker::~CertChecker() {
 bool CertChecker::LoadTrustedCertificates(const string& cert_file) {
   // A read-only BIO.
   BIO* bio_in = BIO_new(BIO_s_file());
-  if (bio_in == NULL) {
+  if (!bio_in) {
     LOG_OPENSSL_ERRORS(ERROR);
     return false;
   }
@@ -81,7 +81,7 @@ bool CertChecker::LoadTrustedCertificates(const vector<string>& trusted_certs) {
   BIO* bio_in = BIO_new_mem_buf(
       const_cast<void*>(reinterpret_cast<const void*>(concat_certs.c_str())),
       -1  /* no length, since null-terminated */);
-  if (bio_in == NULL) {
+  if (!bio_in) {
     LOG_OPENSSL_ERRORS(ERROR);
     return false;
   }
@@ -90,7 +90,7 @@ bool CertChecker::LoadTrustedCertificates(const vector<string>& trusted_certs) {
 }
 
 bool CertChecker::LoadTrustedCertificatesFromBIO(BIO* bio_in) {
-  CHECK(bio_in != NULL);
+  CHECK_NOTNULL(bio_in);
   std::vector<std::pair<string, Cert*> > certs_to_add;
   bool error = false;
   // certs_to_add may be empty if no new certs were added, so keep track of
@@ -98,8 +98,8 @@ bool CertChecker::LoadTrustedCertificatesFromBIO(BIO* bio_in) {
   size_t cert_count = 0;
 
   while (!error) {
-    X509* x509 = PEM_read_bio_X509(bio_in, NULL, NULL, NULL);
-    if (x509 != NULL) {
+    X509* x509 = PEM_read_bio_X509(bio_in, nullptr, nullptr, nullptr);
+    if (x509) {
       // TODO(ekasper): check that the issuing CA cert is temporally valid
       // and at least warn if it isn't.
       unique_ptr<Cert> cert(new Cert(x509));
@@ -158,7 +158,7 @@ void CertChecker::ClearAllTrustedCertificates() {
 }
 
 Status CertChecker::CheckCertChain(CertChain* chain) const {
-  if (chain == NULL || !chain->IsLoaded())
+  if (!chain || !chain->IsLoaded())
     return Status(util::error::INVALID_ARGUMENT, "invalid certificate chain");
 
   // Weed out things that should obviously be precert chains instead.
@@ -209,13 +209,13 @@ Status CertChecker::CheckIssuerChain(CertChain* chain) const {
     LOG(ERROR) << "Failed to check signature chain";
     return Status(util::error::INTERNAL, "failed to check signature chain");
   }
-  return GetVerifyError(GetTrustedCa(chain));
+  return GetTrustedCa(chain);
 }
 
 Status CertChecker::CheckPreCertChain(PreCertChain* chain,
                                       string* issuer_key_hash,
                                       string* tbs_certificate) const {
-  if (chain == NULL || !chain->IsLoaded())
+  if (!chain || !chain->IsLoaded())
     return Status(util::error::INVALID_ARGUMENT, "invalid certificate chain");
   Cert::Status status = chain->IsWellFormed();
   if (status == Cert::FALSE)
@@ -283,18 +283,18 @@ Status CertChecker::CheckPreCertChain(PreCertChain* chain,
   return Status::OK;
 }
 
-CertChecker::CertVerifyResult CertChecker::GetTrustedCa(
-    CertChain* chain) const {
+Status CertChecker::GetTrustedCa(CertChain* chain) const {
   const Cert* subject = chain->LastCert();
-  if (subject == NULL || !subject->IsLoaded()) {
+  if (!subject || !subject->IsLoaded()) {
     LOG(ERROR) << "Chain has no valid certs";
-    return INTERNAL_ERROR;
+    return Status(util::error::INTERNAL, "chain has no valid certificate");
   }
 
   // Look up issuer from the trusted store.
   if (trusted_.empty()) {
     LOG(WARNING) << "No trusted certificates loaded";
-    return ROOT_NOT_IN_LOCAL_STORE;
+    return Status(util::error::FAILED_PRECONDITION,
+                  "no trusted certificates loaded");
   }
 
   string subject_name;
@@ -302,25 +302,26 @@ CertChecker::CertVerifyResult CertChecker::GetTrustedCa(
   // Either an error, or OK, meaning the last cert is in our trusted store.
   // Note the trusted cert need not necessarily be self-signed.
   if (is_trusted != ROOT_NOT_IN_LOCAL_STORE)
-    return is_trusted;
+    return GetVerifyError(is_trusted);
 
   string issuer_name;
   Cert::Status status = subject->DerEncodedIssuerName(&issuer_name);
   if (status == Cert::ERROR)
-    return INTERNAL_ERROR;
+    return Status(util::error::INTERNAL, "internal error");
   else if (status != Cert::TRUE)
-    return INVALID_CERTIFICATE_CHAIN;
+    return Status(util::error::INVALID_ARGUMENT, "invalid certificate chain");
 
   if (subject_name == issuer_name) {
     // Self-signed: no need to scan again.
-    return ROOT_NOT_IN_LOCAL_STORE;
+    return Status(util::error::FAILED_PRECONDITION,
+                  "untrusted self-signed certificate");
   }
 
   std::pair<std::multimap<string, const Cert*>::const_iterator,
             std::multimap<string, const Cert*>::const_iterator> issuer_range =
       trusted_.equal_range(issuer_name);
 
-  const Cert* issuer = NULL;
+  const Cert* issuer(nullptr);
   for (std::multimap<string, const Cert*>::const_iterator it =
            issuer_range.first;
        it != issuer_range.second; ++it) {
@@ -330,11 +331,13 @@ CertChecker::CertVerifyResult CertChecker::GetTrustedCa(
     if (ok == Cert::UNSUPPORTED_ALGORITHM) {
       // If the cert's algorithm is unsupported, then there's no point
       // continuing: it's unconditionally invalid.
-      return UNSUPPORTED_ALGORITHM_IN_CERT_CHAIN;
+      return Status(util::error::INVALID_ARGUMENT,
+                    "unsupported algorithm in certificate chain");
     }
     if (ok != Cert::TRUE && ok != Cert::FALSE) {
       LOG(ERROR) << "Failed to check signature for trusted root";
-      return INTERNAL_ERROR;
+      return Status(util::error::INTERNAL,
+                    "failed to check signature for trusted root");
     }
     if (ok == Cert::TRUE) {
       issuer = issuer_cand;
@@ -342,18 +345,19 @@ CertChecker::CertVerifyResult CertChecker::GetTrustedCa(
     }
   }
 
-  if (issuer == NULL)
-    return ROOT_NOT_IN_LOCAL_STORE;
+  if (!issuer)
+    return Status(util::error::FAILED_PRECONDITION, "unknown root");
 
   // Clone creates a new Cert but AddCert takes ownership even if Clone
   // failed and the cert can't be added, so we don't have to explicitly
   // check for IsLoaded here.
   if (chain->AddCert(issuer->Clone()) != Cert::TRUE) {
     LOG(ERROR) << "Failed to add trusted root to chain";
-    return INTERNAL_ERROR;
+    return Status(util::error::INTERNAL,
+                  "failed to add trusted root to chain");
   }
 
-  return OK;
+  return Status::OK;
 }
 
 CertChecker::CertVerifyResult CertChecker::IsTrusted(
