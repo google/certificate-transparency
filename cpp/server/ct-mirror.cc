@@ -357,6 +357,14 @@ int main(int argc, char* argv[]) {
           : new EtcdClient(&internal_pool, &url_fetcher,
                            SplitHosts(FLAGS_etcd_servers)));
 
+  CHECK(!FLAGS_target_public_key.empty());
+  const StatusOr<EVP_PKEY*> pubkey(ReadPublicKey(FLAGS_target_public_key));
+  CHECK(pubkey.ok()) << "Failed to read target log's public key file: "
+                     << pubkey.status();
+
+  const LogVerifier log_verifier(new LogSigVerifier(pubkey.ValueOrDie()),
+                                 new MerkleVerifier(new Sha256Hasher));
+
   Server<LoggedCertificate>::Options options;
   options.server = FLAGS_server;
   options.port = FLAGS_port;
@@ -364,8 +372,9 @@ int main(int argc, char* argv[]) {
   options.num_http_server_threads = FLAGS_num_http_server_threads;
 
   Server<LoggedCertificate> server(options, event_base, &internal_pool, db,
-                                   etcd_client.get(), &url_fetcher, nullptr,
-                                   nullptr);
+                                   etcd_client.get(), &url_fetcher,
+                                   nullptr /* log_signer */, &log_verifier,
+                                   nullptr /* cert_checker */);
   server.Initialise(true /* is_mirror */);
 
   if (stand_alone_mode) {
@@ -395,12 +404,7 @@ int main(int argc, char* argv[]) {
     CHECK(!FLAGS_server.empty());
   }
 
-  CHECK(!FLAGS_target_public_key.empty());
   CHECK(!FLAGS_target_log_uri.empty());
-
-  const StatusOr<EVP_PKEY*> pubkey(ReadPublicKey(FLAGS_target_public_key));
-  CHECK(pubkey.ok()) << "Failed to read target log's public key file: "
-                     << pubkey.status();
 
   ThreadPool pool(16);
   SyncTask fetcher_task(&pool);
@@ -429,9 +433,8 @@ int main(int argc, char* argv[]) {
                           new MerkleVerifier(new Sha256Hasher))),
       new_sth, fetcher_task.task()->AddChild(
                    [](Task*) { LOG(INFO) << "RemotePeer exited."; })));
-  const unique_ptr<ContinuousFetcher> fetcher(
-      ContinuousFetcher::New(event_base.get(), &pool, db, false));
-  fetcher->AddPeer("target", peer);
+
+  server.continuous_fetcher()->AddPeer("target", peer);
 
   server.WaitForReplication();
 

@@ -19,9 +19,11 @@
 #include "log/file_storage.h"
 #include "log/leveldb_db.h"
 #include "log/log_signer.h"
+#include "log/log_verifier.h"
 #include "log/sqlite_db.h"
 #include "log/strict_consistent_store.h"
 #include "log/tree_signer.h"
+#include "merkletree/merkle_verifier.h"
 #include "monitoring/latency.h"
 #include "monitoring/monitoring.h"
 #include "monitoring/registry.h"
@@ -385,6 +387,9 @@ int main(int argc, char* argv[]) {
           : new EtcdClient(&internal_pool, &url_fetcher,
                            SplitHosts(FLAGS_etcd_servers)));
 
+  const LogVerifier log_verifier(new LogSigVerifier(pkey.ValueOrDie()),
+                                 new MerkleVerifier(new Sha256Hasher));
+
   Server<LoggedCertificate>::Options options;
   options.server = FLAGS_server;
   options.port = FLAGS_port;
@@ -393,7 +398,7 @@ int main(int argc, char* argv[]) {
 
   Server<LoggedCertificate> server(options, event_base, &internal_pool, db,
                                    etcd_client.get(), &url_fetcher,
-                                   &log_signer, &checker);
+                                   &log_signer, &log_verifier, &checker);
   server.Initialise(false /* is_mirror */);
 
   TreeSigner<LoggedCertificate> tree_signer(

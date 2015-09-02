@@ -75,7 +75,8 @@ class Server {
          const std::shared_ptr<libevent::Base>& event_base,
          ThreadPool* internal_pool, Database<Logged>* db,
          EtcdClient* etcd_client, UrlFetcher* url_fetcher,
-         LogSigner* log_signer, CertChecker* cert_checker);
+         LogSigner* log_signer, const LogVerifier* log_verifier,
+         CertChecker* cert_checker);
   ~Server();
 
   bool IsMaster() const;
@@ -83,6 +84,7 @@ class Server {
   ConsistentStore<Logged>* consistent_store();
   ClusterStateController<Logged>* cluster_state_controller();
   LogLookup<Logged>* log_lookup();
+  ContinuousFetcher* continuous_fetcher();
 
   void Initialise(bool is_mirror);
   void WaitForReplication() const;
@@ -94,6 +96,7 @@ class Server {
   std::unique_ptr<libevent::EventPumpThread> event_pump_;
   libevent::HttpServer http_server_;
   Database<Logged>* const db_;
+  const LogVerifier* const log_verifier_;
   CertChecker* const cert_checker_;
   const std::string node_id_;
   UrlFetcher* const url_fetcher_;
@@ -188,12 +191,14 @@ Server<Logged>::Server(const Options& opts,
                        const std::shared_ptr<libevent::Base>& event_base,
                        ThreadPool* internal_pool, Database<Logged>* db,
                        EtcdClient* etcd_client, UrlFetcher* url_fetcher,
-                       LogSigner* log_signer, CertChecker* cert_checker)
+                       LogSigner* log_signer, const LogVerifier* log_verifier,
+                       CertChecker* cert_checker)
     : options_(opts),
       event_base_(event_base),
       event_pump_(new libevent::EventPumpThread(event_base_)),
       http_server_(*event_base_),
       db_(CHECK_NOTNULL(db)),
+      log_verifier_(CHECK_NOTNULL(log_verifier)),
       cert_checker_(cert_checker),
       node_id_(GetNodeId(db_)),
       url_fetcher_(CHECK_NOTNULL(url_fetcher)),
@@ -268,6 +273,12 @@ LogLookup<Logged>* Server<Logged>::log_lookup() {
 
 
 template <class Logged>
+ContinuousFetcher* Server<Logged>::continuous_fetcher() {
+  return fetcher_.get();
+}
+
+
+template <class Logged>
 void Server<Logged>::WaitForReplication() const {
   // If we're joining an existing cluster, this node needs to get its database
   // up-to-date with the serving_sth before we can do anything, so we'll wait
@@ -288,7 +299,7 @@ void Server<Logged>::WaitForReplication() const {
 template <class Logged>
 void Server<Logged>::Initialise(bool is_mirror) {
   fetcher_.reset(ContinuousFetcher::New(event_base_.get(), internal_pool_, db_,
-                                        !is_mirror)
+                                        log_verifier_, !is_mirror)
                      .release());
 
   log_lookup_.reset(new LogLookup<LoggedCertificate>(db_));
@@ -303,6 +314,12 @@ void Server<Logged>::Initialise(bool is_mirror) {
     ct::SignedTreeHead db_sth;
     if (db_->LatestTreeHead(&db_sth) ==
         Database<LoggedCertificate>::LOOKUP_OK) {
+      const LogVerifier::VerifyResult sth_verify_result(
+          log_verifier_->VerifySignedTreeHead(db_sth));
+      if (sth_verify_result != LogVerifier::VERIFY_OK) {
+        LOG(FATAL) << "STH retrieved from DB did not verify: "
+                   << LogVerifier::VerifyResultString(sth_verify_result);
+      }
       cluster_controller_->NewTreeHead(db_sth);
     }
   }
