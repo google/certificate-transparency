@@ -288,26 +288,26 @@ class LogClient(object):
                  ca_bundle=None):
         self._uri = uri
         if handler:
-          self._req = handler
+          self._request_handler = handler
         else:
-          self._req = RequestHandler(connection_timeout, ca_bundle)
+          self._request_handler = RequestHandler(connection_timeout, ca_bundle)
 
     def __repr__(self):
-        return "%r(%r)" % (self.__class__.__name__, self._req)
+        return "%r(%r)" % (self.__class__.__name__, self._request_handler)
 
     def __str__(self):
-        return "%s(%s)" % (self.__class__.__name__, self._req.uri)
+        return "%s(%s)" % (self.__class__.__name__, self._request_handler.uri)
 
     @property
     def servername(self):
         return self._uri
 
     def _req_body(self, path, params=None):
-        return self._req.get_response_body(self._uri + "/" + path,
-                                           params=params)
+        return self._request_handler.get_response_body(self._uri + "/" + path,
+                                                       params=params)
 
     def _post_req_body(self, path, post_data=None):
-        return self._req.post_response_body(
+        return self._request_handler.post_response_body(
             self._uri + "/" + path, post_data=post_data)
 
     def _parse_sct(self, sct_response):
