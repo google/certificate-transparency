@@ -29,7 +29,9 @@ before_install:
  - sudo ln -s protobuf-java.jar /usr/share/java/protobuf.jar
  - mkdir -p $GOPATH/src/github.com/google
  - ln -s $PWD $GOPATH/src/github.com/google
- - go get -v -d ./...
+# Sigh, go get -t will fetch part of this package, but doesn't catch the transitive deps so grab it manually:
+ - go get github.com/stretchr/testify
+ - go get -v -d -t ./...
  - java -version
  - javac -version
  - go version
