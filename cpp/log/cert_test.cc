@@ -377,14 +377,13 @@ TEST_F(CertTest, Extensions) {
   EXPECT_EQ(Cert::TRUE, leaf.HasExtension(NID_authority_key_identifier));
   EXPECT_EQ(Cert::FALSE,
             leaf.HasCriticalExtension(NID_authority_key_identifier));
-
   EXPECT_EQ(Cert::TRUE, pre.HasCriticalExtension(cert_trans::NID_ctPoison));
 
-  EXPECT_EQ(Cert::FALSE, leaf.HasBasicConstraintCATrue());
-  EXPECT_EQ(Cert::TRUE, ca.HasBasicConstraintCATrue());
-
-  EXPECT_EQ(Cert::TRUE, ca_pre.HasExtendedKeyUsage(
-                            cert_trans::NID_ctPrecertificateSigning));
+  EXPECT_FALSE(leaf.HasBasicConstraintCATrue().ValueOrDie());
+  EXPECT_TRUE(ca.HasBasicConstraintCATrue().ValueOrDie());
+  EXPECT_TRUE(
+      ca_pre.HasExtendedKeyUsage(cert_trans::NID_ctPrecertificateSigning)
+          .ValueOrDie());
 }
 
 TEST_F(CertTest, Issuers) {
