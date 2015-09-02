@@ -8,12 +8,14 @@
 #include "log/logged_certificate.h"
 #include "util/task.h"
 
+class LogVerifier;
+
 namespace cert_trans {
 
 
 void FetchLogEntries(Database<LoggedCertificate>* db,
                      std::unique_ptr<PeerGroup>&& peer_group,
-                     util::Task* task);
+                     const LogVerifier* log_verifier, util::Task* task);
 
 
 }  // namespace cert_trans

@@ -6,6 +6,8 @@
 #include <mutex>
 
 #include "base/macros.h"
+#include "log/log_verifier.h"
+#include "monitoring/monitoring.h"
 
 using cert_trans::AsyncLogClient;
 using cert_trans::LoggedCertificate;
@@ -15,6 +17,8 @@ using std::lock_guard;
 using std::move;
 using std::mutex;
 using std::placeholders::_1;
+using std::string;
+using std::to_string;
 using std::unique_lock;
 using std::unique_ptr;
 using std::vector;
@@ -26,6 +30,14 @@ DEFINE_int32(fetcher_concurrent_fetches, 2,
              "number of concurrent fetch requests");
 DEFINE_int32(fetcher_batch_size, 1000,
              "maximum number of entries to fetch per request");
+
+namespace cert_trans {
+
+Counter<string>* num_invalid_entries_fetched =
+    Counter<string>::New("num_invalid_entries_fetched", "reason",
+                         "Number of invalid entries fetched from remote peers "
+                         "broken down by reason.");
+
 
 namespace {
 
@@ -51,7 +63,8 @@ struct Range {
 
 struct FetchState {
   FetchState(Database<LoggedCertificate>* db,
-             unique_ptr<PeerGroup>&& peer_group, Task* task);
+             unique_ptr<PeerGroup>&& peer_group,
+             const LogVerifier* log_verifier, Task* task);
 
   void WalkEntries();
   void FetchRange(const unique_lock<mutex>& lock, Range* current,
@@ -62,6 +75,7 @@ struct FetchState {
 
   Database<LoggedCertificate>* const db_;
   const unique_ptr<PeerGroup> peer_group_;
+  const LogVerifier* const log_verifier_;
   Task* const task_;
 
   mutex lock_;
@@ -74,9 +88,11 @@ struct FetchState {
 
 
 FetchState::FetchState(Database<LoggedCertificate>* db,
-                       unique_ptr<PeerGroup>&& peer_group, Task* task)
+                       unique_ptr<PeerGroup>&& peer_group,
+                       const LogVerifier* log_verifier, Task* task)
     : db_(CHECK_NOTNULL(db)),
       peer_group_(move(peer_group)),
+      log_verifier_(CHECK_NOTNULL(log_verifier)),
       task_(CHECK_NOTNULL(task)),
       start_(db_->TreeSize()) {
   // TODO(pphaneuf): Might be better to get that as a parameter?
@@ -226,10 +242,29 @@ void FetchState::WriteToDatabase(int64_t index, Range* range,
     LoggedCertificate cert;
     if (!cert.CopyFromClientLogEntry(entry)) {
       LOG(WARNING) << "could not convert entry to a LoggedCertificate";
+      num_invalid_entries_fetched->Increment("format");
       break;
     }
     if (entry.sct) {
       *cert.mutable_sct() = *entry.sct;
+      // If we have the full SCT (because this LogEntry came from another
+      // internal node which supports our private "give me the SCT too"
+      // option), then verify that the signature is good.
+      // TODO(pphaneuf): Note to self: util::Status this!
+      const LogVerifier::VerifyResult verify_result(
+          log_verifier_->VerifySignedCertificateTimestamp(
+              cert.contents().entry(), cert.sct()));
+      VLOG(1) << "SCT verify entry #" << index << ": "
+              << LogVerifier::VerifyResultString(verify_result);
+      if (verify_result != LogVerifier::VERIFY_OK) {
+        num_invalid_entries_fetched->Increment("sct_verify_failed");
+        const string msg("Failed to verify SCT signature for entry# " +
+                         to_string(index) + " : " +
+                         LogVerifier::VerifyResultString(verify_result));
+        LOG(WARNING) << msg;
+        task_->Return(Status(util::error::FAILED_PRECONDITION, msg));
+        return;
+      }
     }
     cert.set_sequence_number(index++);
     if (db_->CreateSequencedEntry(cert) == Database<LoggedCertificate>::OK) {
@@ -274,13 +309,13 @@ void FetchState::WriteToDatabase(int64_t index, Range* range,
 
 }  // namespace
 
-namespace cert_trans {
-
 
 void FetchLogEntries(Database<LoggedCertificate>* db,
-                     unique_ptr<PeerGroup>&& peer_group, Task* task) {
+                     unique_ptr<PeerGroup>&& peer_group,
+                     const LogVerifier* log_verifier, Task* task) {
   TaskHold hold(task);
-  task->DeleteWhenDone(new FetchState(db, move(peer_group), task));
+  task->DeleteWhenDone(
+      new FetchState(db, move(peer_group), log_verifier, task));
 }
 
 

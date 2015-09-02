@@ -15,6 +15,8 @@
 #include "util/libevent_wrapper.h"
 #include "util/task.h"
 
+class LogVerifier;
+
 namespace cert_trans {
 
 
@@ -22,7 +24,8 @@ class ContinuousFetcher {
  public:
   static std::unique_ptr<ContinuousFetcher> New(
       libevent::Base* base, util::Executor* executor,
-      Database<LoggedCertificate>* db, bool fetch_scts);
+      Database<LoggedCertificate>* db, const LogVerifier* log_verifier,
+      bool fetch_scts);
 
   virtual ~ContinuousFetcher() = default;
 

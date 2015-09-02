@@ -5,6 +5,7 @@
 
 #include "fetcher/fetcher.h"
 #include "fetcher/peer_group.h"
+#include "log/log_verifier.h"
 
 using std::bind;
 using std::chrono::seconds;
@@ -30,7 +31,8 @@ namespace {
 class ContinuousFetcherImpl : public ContinuousFetcher {
  public:
   ContinuousFetcherImpl(libevent::Base* base, Executor* executor,
-                        Database<LoggedCertificate>* db, bool fetch_scts);
+                        Database<LoggedCertificate>* db,
+                        const LogVerifier* log_verifier, bool fetch_scts);
 
   void AddPeer(const string& node_id, const shared_ptr<Peer>& peer) override;
   void RemovePeer(const string& node_id);
@@ -43,6 +45,7 @@ class ContinuousFetcherImpl : public ContinuousFetcher {
   libevent::Base* const base_;
   Executor* const executor_;
   Database<LoggedCertificate>* const db_;
+  const LogVerifier* const log_verifier_;
   const bool fetch_scts_;
 
   mutex lock_;
@@ -55,13 +58,13 @@ class ContinuousFetcherImpl : public ContinuousFetcher {
 };
 
 
-ContinuousFetcherImpl::ContinuousFetcherImpl(libevent::Base* base,
-                                             Executor* executor,
-                                             Database<LoggedCertificate>* db,
-                                             bool fetch_scts)
+ContinuousFetcherImpl::ContinuousFetcherImpl(
+    libevent::Base* base, Executor* executor, Database<LoggedCertificate>* db,
+    const LogVerifier* const log_verifier, bool fetch_scts)
     : base_(CHECK_NOTNULL(base)),
       executor_(CHECK_NOTNULL(executor)),
       db_(CHECK_NOTNULL(db)),
+      log_verifier_(CHECK_NOTNULL(log_verifier)),
       fetch_scts_(fetch_scts),
       restart_fetch_(false) {
 }
@@ -118,7 +121,7 @@ void ContinuousFetcherImpl::StartFetch(const unique_lock<mutex>& lock) {
       new Task(bind(&ContinuousFetcherImpl::FetchDone, this, _1), executor_));
 
   VLOG(1) << "starting fetch with tree size: " << peer_group->TreeSize();
-  FetchLogEntries(db_, move(peer_group), fetch_task_.get());
+  FetchLogEntries(db_, move(peer_group), log_verifier_, fetch_task_.get());
 }
 
 
@@ -162,9 +165,9 @@ void ContinuousFetcherImpl::FetchDelayDone(Task* task) {
 // static
 unique_ptr<ContinuousFetcher> ContinuousFetcher::New(
     libevent::Base* base, Executor* executor, Database<LoggedCertificate>* db,
-    bool fetch_scts) {
+    const LogVerifier* log_verifier, bool fetch_scts) {
   return unique_ptr<ContinuousFetcher>(
-      new ContinuousFetcherImpl(base, executor, db, fetch_scts));
+      new ContinuousFetcherImpl(base, executor, db, log_verifier, fetch_scts));
 }
 
 
