@@ -20,8 +20,8 @@
 #include <vector>
 
 using std::string;
-using std::vector;
 using std::unique_ptr;
+using std::vector;
 using util::ClearOpenSSLErrors;
 using util::StatusOr;
 using util::error::Code;
@@ -273,8 +273,16 @@ Cert::Status Cert::HasExtension(int extension_nid) const {
     return ERROR;
   }
 
-  int ignored;
-  return ExtensionIndex(extension_nid, &ignored);
+  const StatusOr<int> index(ExtensionIndex(extension_nid));
+  if (index.ok()) {
+    return TRUE;
+  }
+
+  if (index.status().CanonicalCode() == util::error::NOT_FOUND) {
+    return FALSE;
+  }
+
+  return ERROR;
 }
 
 
@@ -595,9 +603,8 @@ Cert::Status Cert::OctetStringExtensionData(int extension_nid,
 }
 
 
-Cert::Status Cert::ExtensionIndex(int extension_nid,
-                                  int* extension_index) const {
-  int index = X509_get_ext_by_NID(x509_, extension_nid, -1);
+util::StatusOr<int> Cert::ExtensionIndex(int extension_nid) const {
+  const int index(X509_get_ext_by_NID(x509_, extension_nid, -1));
   if (index < -1) {
     // The most likely and possibly only cause for a return code
     // other than -1 is an unrecognized NID.
@@ -605,27 +612,27 @@ Cert::Status Cert::ExtensionIndex(int extension_nid,
                << " for NID " << extension_nid
                << ". Is the NID not recognised?";
     LOG_OPENSSL_ERRORS(ERROR);
-    return ERROR;
+    return util::Status(util::error::INTERNAL, "X509_get_ext_by_NID error");
   }
   if (index == -1)
-    return FALSE;
-  *extension_index = index;
-  return TRUE;
+    return util::Status(util::error::NOT_FOUND, "extension not found");
+  return index;
 }
 
 
 Cert::Status Cert::GetExtension(int extension_nid,
                                 X509_EXTENSION** ext) const {
-  int extension_index;
-  Status status = ExtensionIndex(extension_nid, &extension_index);
-  if (status != TRUE) {
-    return status;
+  const StatusOr<int> extension_index(ExtensionIndex(extension_nid));
+  if (!extension_index.ok()) {
+    return extension_index.status().CanonicalCode() == util::error::NOT_FOUND
+               ? FALSE
+               : ERROR;
   }
 
-  *ext = X509_get_ext(x509_, extension_index);
+  *ext = X509_get_ext(x509_, extension_index.ValueOrDie());
   if (!*ext) {
     LOG(ERROR) << "Failed to retrieve extension for NID " << extension_nid
-               << ", at index " << extension_index;
+               << ", at index " << extension_index.ValueOrDie();
     LOG_OPENSSL_ERRORS(ERROR);
     return ERROR;
   } else {
@@ -1115,7 +1122,7 @@ Cert::Status TbsCertificate::CopyIssuerFrom(const Cert& from) {
   }
 
   // Verify that the Authority KeyID extensions are compatible.
-  int extension_index, from_extension_index;
+  int extension_index;
   Cert::Status status =
       ExtensionIndex(NID_authority_key_identifier, &extension_index);
   if (status == Cert::FALSE) {
@@ -1128,17 +1135,17 @@ Cert::Status TbsCertificate::CopyIssuerFrom(const Cert& from) {
     return Cert::ERROR;
   }
 
-  status =
-      from.ExtensionIndex(NID_authority_key_identifier, &from_extension_index);
-
-  if (status == Cert::FALSE) {
+  const StatusOr<int> from_extension_index(
+      from.ExtensionIndex(NID_authority_key_identifier));
+  if (from_extension_index.status().CanonicalCode() ==
+      util::error::NOT_FOUND) {
     // No extension found = cannot copy.
     LOG(WARNING) << "Unable to copy issuer: destination has an Authority "
                  << "KeyID extension, but the source has none.";
     return Cert::FALSE;
   }
 
-  if (status != Cert::TRUE) {
+  if (!from_extension_index.ok()) {
     LOG(ERROR) << "Failed to check Authority Key Identifier extension";
     return Cert::ERROR;
   }
@@ -1146,7 +1153,8 @@ Cert::Status TbsCertificate::CopyIssuerFrom(const Cert& from) {
   // Ok, now copy the extension, keeping the critical bit (which should always
   // be false in a valid cert, mind you).
   X509_EXTENSION* to_ext = X509_get_ext(x509_, extension_index);
-  X509_EXTENSION* from_ext = X509_get_ext(from.x509_, from_extension_index);
+  X509_EXTENSION* from_ext =
+      X509_get_ext(from.x509_, from_extension_index.ValueOrDie());
 
   if (!to_ext || !from_ext) {
     // Should not happen.

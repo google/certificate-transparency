@@ -211,7 +211,7 @@ class Cert {
   FRIEND_TEST(CtExtensionsTest, TestPrecertSigning);
 
  private:
-  Status ExtensionIndex(int extension_nid, int* extension_index) const;
+  util::StatusOr<int> ExtensionIndex(int extension_nid) const;
   Status GetExtension(int extension_nid, X509_EXTENSION** ext) const;
   Status ExtensionStructure(int extension_nid, void** ext_struct) const;
   bool ValidateRedactionSubjectAltNameAndCN(int* dns_alt_name_count,
