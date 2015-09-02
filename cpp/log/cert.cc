@@ -95,15 +95,15 @@ Cert::Cert(const string& pem_string) : x509_(nullptr) {
   // A read-only bio.
   BIO* bio_in = BIO_new_mem_buf(const_cast<char*>(pem_string.data()),
                                 pem_string.length());
-  if (bio_in == NULL) {
+  if (!bio_in) {
     LOG_OPENSSL_ERRORS(ERROR);
     return;
   }
 
-  x509_ = PEM_read_bio_X509(bio_in, NULL, NULL, NULL);
+  x509_ = PEM_read_bio_X509(bio_in, nullptr, nullptr, nullptr);
   BIO_free(bio_in);
 
-  if (x509_ == NULL) {
+  if (!x509_) {
     // At this point most likely the input was just corrupt. There are a few
     // real errors that may have happened (a malloc failure is one) and it is
     // virtually impossible to fish them out.
@@ -114,32 +114,31 @@ Cert::Cert(const string& pem_string) : x509_(nullptr) {
 
 
 Cert::~Cert() {
-  if (x509_ != NULL)
+  if (x509_)
     X509_free(x509_);
 }
 
 
 Cert* Cert::Clone() const {
-  X509* x509 = NULL;
+  X509* x509(nullptr);
   if (x509_) {
     x509 = X509_dup(x509_);
-    if (x509 == NULL)
+    if (!x509)
       LOG_OPENSSL_ERRORS(ERROR);
   }
-  Cert* clone = new Cert(x509);
-  return clone;
+  return new Cert(x509);
 }
 
 
 Cert::Status Cert::LoadFromDerString(const string& der_string) {
-  if (x509_ != NULL) {
+  if (x509_) {
     X509_free(x509_);
-    x509_ = NULL;
+    x509_ = nullptr;
   }
   const unsigned char* start =
       reinterpret_cast<const unsigned char*>(der_string.data());
-  x509_ = d2i_X509(NULL, &start, der_string.size());
-  if (x509_ == NULL) {
+  x509_ = d2i_X509(nullptr, &start, der_string.size());
+  if (!x509_) {
     LOG(WARNING) << "Input is not a valid DER-encoded certificate";
     LOG_OPENSSL_ERRORS(WARNING);
     return Cert::FALSE;
@@ -192,10 +191,10 @@ string Cert::PrintSubjectName() const {
 
 // static
 string Cert::PrintName(X509_NAME* name) {
-  if (name == NULL)
+  if (!name)
     return string();
   BIO* bio = BIO_new(BIO_s_mem());
-  if (bio == NULL) {
+  if (!bio) {
     LOG_OPENSSL_ERRORS(ERROR);
     return string();
   }
@@ -234,7 +233,7 @@ string Cert::PrintNotAfter() const {
 
 string Cert::PrintSignatureAlgorithm() const {
   const char* sigalg = OBJ_nid2ln(X509_get_signature_nid(x509_));
-  if (sigalg == NULL)
+  if (!sigalg)
     return "NULL";
   return string(sigalg);
 }
@@ -242,11 +241,11 @@ string Cert::PrintSignatureAlgorithm() const {
 
 // static
 string Cert::PrintTime(ASN1_TIME* when) {
-  if (when == NULL)
+  if (!when)
     return string();
 
   BIO* bio = BIO_new(BIO_s_mem());
-  if (bio == NULL) {
+  if (!bio) {
     LOG_OPENSSL_ERRORS(ERROR);
     return string();
   }
@@ -312,7 +311,7 @@ StatusOr<bool> Cert::HasBasicConstraintCATrue() const {
     return CertStatusToStatusOrBool(status);
   }
 
-  // |constraints| is never NULL upon success.
+  // |constraints| is never null upon success.
   BASIC_CONSTRAINTS* constraints = static_cast<BASIC_CONSTRAINTS*>(ext_struct);
   bool is_ca = constraints->ca;
   BASIC_CONSTRAINTS_free(constraints);
@@ -327,7 +326,7 @@ StatusOr<bool> Cert::HasExtendedKeyUsage(int key_usage_nid) const {
   }
 
   const ASN1_OBJECT* key_usage_obj = OBJ_nid2obj(key_usage_nid);
-  if (key_usage_obj == NULL) {
+  if (!key_usage_obj) {
     LOG(ERROR) << "OpenSSL OBJ_nid2obj returned NULL for NID " << key_usage_nid
                << ". Is the NID not recognised?";
     LOG_OPENSSL_ERRORS(WARNING);
@@ -346,7 +345,7 @@ StatusOr<bool> Cert::HasExtendedKeyUsage(int key_usage_nid) const {
     return CertStatusToStatusOrBool(status);
   }
 
-  // |eku| is never NULL upon success.
+  // |eku| is never null upon success.
   EXTENDED_KEY_USAGE* eku = static_cast<EXTENDED_KEY_USAGE*>(ext_struct);
   bool ext_key_usage_found = false;
   for (int i = 0; i < sk_ASN1_OBJECT_num(eku); ++i) {
@@ -379,7 +378,7 @@ Cert::Status Cert::IsSignedBy(const Cert& issuer) const {
   }
 
   EVP_PKEY* issuer_key = X509_get_pubkey(issuer.x509_);
-  if (issuer_key == NULL) {
+  if (!issuer_key) {
     LOG(WARNING) << "NULL issuer key";
     LOG_OPENSSL_ERRORS(WARNING);
     return FALSE;
@@ -412,7 +411,7 @@ Cert::Status Cert::DerEncoding(string* result) const {
     return ERROR;
   }
 
-  unsigned char* der_buf = NULL;
+  unsigned char* der_buf(nullptr);
   int der_length = i2d_X509(x509_, &der_buf);
 
   if (der_length < 0) {
@@ -480,7 +479,7 @@ Cert::Status Cert::DerEncodedTbsCertificate(string* result) const {
     return ERROR;
   }
 
-  unsigned char* der_buf = NULL;
+  unsigned char* der_buf(nullptr);
   int der_length = i2d_re_X509_tbs(x509_, &der_buf);
   if (der_length < 0) {
     // What does this return value mean? Let's assume it means the cert
@@ -515,7 +514,7 @@ Cert::Status Cert::DerEncodedIssuerName(string* result) const {
 
 // static
 Cert::Status Cert::DerEncodedName(X509_NAME* name, string* result) {
-  unsigned char* der_buf = NULL;
+  unsigned char* der_buf(nullptr);
   int der_length = i2d_X509_NAME(name, &der_buf);
   if (der_length < 0) {
     // What does this return value mean? Let's assume it means the cert
@@ -556,7 +555,7 @@ Cert::Status Cert::SPKISha256Digest(string* result) const {
     return ERROR;
   }
 
-  unsigned char* der_buf = NULL;
+  unsigned char* der_buf(nullptr);
   int der_length = i2d_X509_PUBKEY(X509_get_X509_PUBKEY(x509_), &der_buf);
   if (der_length < 0) {
     // What does this return value mean? Let's assume it means the cert
@@ -587,7 +586,7 @@ Cert::Status Cert::OctetStringExtensionData(int extension_nid,
   if (status != TRUE)
     return status;
 
-  // |octet| is never NULL upon success. Caller is responsible for the
+  // |octet| is never null upon success. Caller is responsible for the
   // correctness of this cast.
   ASN1_OCTET_STRING* octet = static_cast<ASN1_OCTET_STRING*>(ext_data);
   result->assign(reinterpret_cast<const char*>(octet->data), octet->length);
@@ -624,7 +623,7 @@ Cert::Status Cert::GetExtension(int extension_nid,
   }
 
   *ext = X509_get_ext(x509_, extension_index);
-  if (*ext == NULL) {
+  if (!*ext) {
     LOG(ERROR) << "Failed to retrieve extension for NID " << extension_nid
                << ", at index " << extension_index;
     LOG_OPENSSL_ERRORS(ERROR);
@@ -646,9 +645,9 @@ Cert::Status Cert::ExtensionStructure(int extension_nid,
 
   int crit;
 
-  *ext_struct = X509_get_ext_d2i(x509_, extension_nid, &crit, NULL);
+  *ext_struct = X509_get_ext_d2i(x509_, extension_nid, &crit, nullptr);
 
-  if (*ext_struct == NULL) {
+  if (!*ext_struct) {
     if (crit != -1) {
       LOG(WARNING) << "Corrupt extension data";
       LOG_OPENSSL_ERRORS(WARNING);
@@ -761,7 +760,7 @@ bool Cert::ValidateRedactionSubjectAltNameAndCN(int* dns_alt_name_count,
 
   STACK_OF(GENERAL_NAME)* subject_alt_names =
       static_cast<STACK_OF(GENERAL_NAME)*>(
-          X509_get_ext_d2i(x509_, NID_subject_alt_name, NULL, NULL));
+          X509_get_ext_d2i(x509_, NID_subject_alt_name, nullptr, nullptr));
 
   // Apply validation rules for subject alt names, if this returns true
   // status is already final.
@@ -1009,7 +1008,7 @@ Cert::Status Cert::IsValidNameConstrainedIntermediateCa() const {
 }
 
 
-TbsCertificate::TbsCertificate(const Cert& cert) : x509_(NULL) {
+TbsCertificate::TbsCertificate(const Cert& cert) : x509_(nullptr) {
   if (!cert.IsLoaded()) {
     LOG(ERROR) << "Cert not loaded";
     return;
@@ -1017,13 +1016,13 @@ TbsCertificate::TbsCertificate(const Cert& cert) : x509_(NULL) {
 
   x509_ = X509_dup(cert.x509_);
 
-  if (x509_ == NULL)
+  if (!x509_)
     LOG_OPENSSL_ERRORS(ERROR);
 }
 
 
 TbsCertificate::~TbsCertificate() {
-  if (x509_ != NULL)
+  if (x509_)
     X509_free(x509_);
 }
 
@@ -1034,7 +1033,7 @@ Cert::Status TbsCertificate::DerEncoding(string* result) const {
     return Cert::ERROR;
   }
 
-  unsigned char* der_buf = NULL;
+  unsigned char* der_buf(nullptr);
   int der_length = i2d_re_X509_tbs(x509_, &der_buf);
   if (der_length < 0) {
     // What does this return value mean? Let's assume it means the cert
@@ -1062,7 +1061,7 @@ Cert::Status TbsCertificate::DeleteExtension(int extension_nid) {
 
   X509_EXTENSION* ext = X509_delete_ext(x509_, extension_index);
 
-  if (ext == NULL) {
+  if (!ext) {
     // Truly odd.
     LOG(ERROR) << "Failed to delete the extension";
     LOG_OPENSSL_ERRORS(ERROR);
@@ -1104,7 +1103,7 @@ Cert::Status TbsCertificate::CopyIssuerFrom(const Cert& from) {
   // This just looks up the relevant pointer so there shouldn't
   // be any errors to clear.
   X509_NAME* ca_name = X509_get_issuer_name(from.x509_);
-  if (ca_name == NULL) {
+  if (!ca_name) {
     LOG(WARNING) << "Issuer certificate has NULL name";
     return Cert::FALSE;
   }
@@ -1149,7 +1148,7 @@ Cert::Status TbsCertificate::CopyIssuerFrom(const Cert& from) {
   X509_EXTENSION* to_ext = X509_get_ext(x509_, extension_index);
   X509_EXTENSION* from_ext = X509_get_ext(from.x509_, from_extension_index);
 
-  if (to_ext == NULL || from_ext == NULL) {
+  if (!to_ext || !from_ext) {
     // Should not happen.
     LOG(ERROR) << "Failed to retrive extension";
     LOG_OPENSSL_ERRORS(ERROR);
@@ -1190,15 +1189,14 @@ CertChain::CertChain(const string& pem_string) {
   // A read-only BIO.
   BIO* const bio_in(BIO_new_mem_buf(const_cast<char*>(pem_string.data()),
                                     pem_string.length()));
-  if (bio_in == NULL) {
+  if (!bio_in) {
     LOG_OPENSSL_ERRORS(ERROR);
     return;
   }
 
-  X509* x509 = NULL;
-  while ((x509 = PEM_read_bio_X509(bio_in, NULL, NULL, NULL)) != NULL) {
-    Cert* cert = new Cert(x509);
-    chain_.push_back(cert);
+  X509* x509(nullptr);
+  while ((x509 = PEM_read_bio_X509(bio_in, nullptr, nullptr, nullptr))) {
+    chain_.push_back(new Cert(x509));
   }
 
   BIO_free(bio_in);
@@ -1218,9 +1216,9 @@ CertChain::CertChain(const string& pem_string) {
 
 
 Cert::Status CertChain::AddCert(Cert* cert) {
-  if (cert == NULL || !cert->IsLoaded()) {
+  if (!cert || !cert->IsLoaded()) {
     LOG(ERROR) << "Attempting to add an invalid cert";
-    if (cert != NULL)
+    if (cert)
       delete cert;
     return Cert::ERROR;
   }
@@ -1337,7 +1335,7 @@ void CertChain::ClearChain() {
 
 Cert::Status PreCertChain::UsesPrecertSigningCertificate() const {
   const Cert* issuer = PrecertIssuingCert();
-  if (issuer == NULL) {
+  if (!issuer) {
     // No issuer, so it must be a real root CA from the store.
     return Cert::FALSE;
   }
