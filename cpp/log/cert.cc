@@ -20,6 +20,7 @@
 #include <vector>
 
 using std::string;
+using std::to_string;
 using std::unique_ptr;
 using std::vector;
 using util::ClearOpenSSLErrors;
@@ -292,12 +293,13 @@ Cert::Status Cert::HasCriticalExtension(int extension_nid) const {
     return ERROR;
   }
 
-  X509_EXTENSION* ext;
-  Status status = GetExtension(extension_nid, &ext);
-  if (status != TRUE)
-    return status;
+  const StatusOr<X509_EXTENSION*> ext(GetExtension(extension_nid));
+  if (!ext.ok()) {
+    return ext.status().CanonicalCode() == util::error::NOT_FOUND ? FALSE
+                                                                  : ERROR;
+  }
 
-  return X509_EXTENSION_get_critical(ext) > 0 ? TRUE : FALSE;
+  return X509_EXTENSION_get_critical(ext.ValueOrDie()) > 0 ? TRUE : FALSE;
 }
 
 
@@ -620,24 +622,24 @@ util::StatusOr<int> Cert::ExtensionIndex(int extension_nid) const {
 }
 
 
-Cert::Status Cert::GetExtension(int extension_nid,
-                                X509_EXTENSION** ext) const {
+StatusOr<X509_EXTENSION*> Cert::GetExtension(int extension_nid) const {
   const StatusOr<int> extension_index(ExtensionIndex(extension_nid));
   if (!extension_index.ok()) {
-    return extension_index.status().CanonicalCode() == util::error::NOT_FOUND
-               ? FALSE
-               : ERROR;
+    return extension_index.status();
   }
 
-  *ext = X509_get_ext(x509_, extension_index.ValueOrDie());
-  if (!*ext) {
+  X509_EXTENSION* const ext(X509_get_ext(x509_, extension_index.ValueOrDie()));
+  if (!ext) {
     LOG(ERROR) << "Failed to retrieve extension for NID " << extension_nid
                << ", at index " << extension_index.ValueOrDie();
     LOG_OPENSSL_ERRORS(ERROR);
-    return ERROR;
-  } else {
-    return TRUE;
+    return util::Status(util::error::INTERNAL,
+                        "failed to retrieve extension for NID " +
+                            to_string(extension_nid) + ", at index " +
+                            to_string(extension_index.ValueOrDie()));
   }
+
+  return ext;
 }
 
 
@@ -860,17 +862,20 @@ Cert::Status Cert::IsValidWildcardRedaction() const {
 
   // If we reach here then the RFC says the CT redaction count extension
   // MUST BE present.
-  X509_EXTENSION* exty;
-  if (GetExtension(NID_ctPrecertificateRedactedLabelCount,
-                   &exty) != Cert::TRUE) {
-    LOG(WARNING) << "Required CT redaction count extension missing from cert";
+  const StatusOr<X509_EXTENSION*> exty(
+      GetExtension(NID_ctPrecertificateRedactedLabelCount));
+  if (!exty.ok()) {
+    LOG(WARNING)
+        << "required CT redaction count extension could not be found in cert";
     return Cert::FALSE;
   }
 
   // Unpack the extension contents, which should be SEQUENCE OF INTEGER
-  STACK_OF(ASN1_INTEGER)* const integers(static_cast<STACK_OF(ASN1_INTEGER)*>(
-      ASN1_seq_unpack_ASN1_INTEGER(exty->value->data, exty->value->length,
-                                   d2i_ASN1_INTEGER, ASN1_INTEGER_free)));
+  STACK_OF(ASN1_INTEGER)* const integers(
+      static_cast<STACK_OF(ASN1_INTEGER)*>(
+          ASN1_seq_unpack_ASN1_INTEGER(exty.ValueOrDie()->value->data,
+                                       exty.ValueOrDie()->value->length,
+                                       d2i_ASN1_INTEGER, ASN1_INTEGER_free)));
 
   if (integers) {
     const int num_integers = sk_ASN1_INTEGER_num(integers);

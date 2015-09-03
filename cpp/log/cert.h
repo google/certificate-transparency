@@ -212,7 +212,7 @@ class Cert {
 
  private:
   util::StatusOr<int> ExtensionIndex(int extension_nid) const;
-  Status GetExtension(int extension_nid, X509_EXTENSION** ext) const;
+  util::StatusOr<X509_EXTENSION*> GetExtension(int extension_nid) const;
   Status ExtensionStructure(int extension_nid, void** ext_struct) const;
   bool ValidateRedactionSubjectAltNameAndCN(int* dns_alt_name_count,
                                             Status* status) const;

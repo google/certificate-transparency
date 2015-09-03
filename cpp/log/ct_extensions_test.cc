@@ -8,12 +8,14 @@
 
 #include "log/cert.h"
 #include "log/ct_extensions.h"
+#include "util/status_test_util.h"
 #include "util/testing.h"
 #include "util/util.h"
 
 namespace cert_trans {
 
 using std::string;
+using util::StatusOr;
 
 static const char kSimpleCert[] = "test-cert.pem";
 static const char kSimpleCaCert[] = "ca-cert.pem";
@@ -70,14 +72,13 @@ TEST_F(CtExtensionsTest, TestSCTExtension) {
   // Now fish the extension data out using the print methods and check they
   // operate as expected.
   // TODO(ekasper):
-  X509_EXTENSION* ext;
-  ASSERT_EQ(Cert::TRUE,
-            sct_cert.GetExtension(
-                cert_trans::NID_ctSignedCertificateTimestampList, &ext));
+  const StatusOr<X509_EXTENSION*> ext(
+      sct_cert.GetExtension(cert_trans::NID_ctSignedCertificateTimestampList));
+  ASSERT_OK(ext);
   BIO* buf = BIO_new(BIO_s_mem());
   ASSERT_NE(buf, static_cast<BIO*>(NULL));
 
-  EXPECT_EQ(1, X509V3_EXT_print(buf, ext, 0, 0));
+  EXPECT_EQ(1, X509V3_EXT_print(buf, ext.ValueOrDie(), 0, 0));
   CHECK_EQ(1, BIO_write(buf, "", 1));  // NULL-terminate
   char* result;
   BIO_get_mem_data(buf, &result);
@@ -112,15 +113,13 @@ TEST_F(CtExtensionsTest, TestEmbeddedSCTExtension) {
 
   // Now fish the extension data out using the print methods and check they
   // operate as expected.
-  X509_EXTENSION* ext;
-  ASSERT_EQ(Cert::TRUE,
-            embedded_sct_cert.GetExtension(
-                cert_trans::NID_ctEmbeddedSignedCertificateTimestampList,
-                &ext));
+  const StatusOr<X509_EXTENSION*> ext(embedded_sct_cert.GetExtension(
+      cert_trans::NID_ctEmbeddedSignedCertificateTimestampList));
+  ASSERT_OK(ext);
   BIO* buf = BIO_new(BIO_s_mem());
   ASSERT_NE(buf, static_cast<BIO*>(NULL));
 
-  EXPECT_EQ(1, X509V3_EXT_print(buf, ext, 0, 0));
+  EXPECT_EQ(1, X509V3_EXT_print(buf, ext.ValueOrDie(), 0, 0));
   CHECK_EQ(1, BIO_write(buf, "", 1));  // NULL-terminate
   char* result;
   BIO_get_mem_data(buf, &result);
@@ -145,14 +144,14 @@ TEST_F(CtExtensionsTest, TestPoisonExtension) {
 
   // Now fish the extension data out using the print methods and check they
   // operate as expected.
-  X509_EXTENSION* ext;
-  ASSERT_EQ(Cert::TRUE,
-            poison_cert.GetExtension(cert_trans::NID_ctPoison, &ext));
+  const StatusOr<X509_EXTENSION*> ext(
+      poison_cert.GetExtension(cert_trans::NID_ctPoison));
+  ASSERT_OK(ext);
 
   BIO* buf = BIO_new(BIO_s_mem());
   ASSERT_NE(buf, static_cast<BIO*>(NULL));
 
-  EXPECT_EQ(1, X509V3_EXT_print(buf, ext, 0, 0));
+  EXPECT_EQ(1, X509V3_EXT_print(buf, ext.ValueOrDie(), 0, 0));
   CHECK_EQ(1, BIO_write(buf, "", 1));  // NULL-terminate
   char* result;
   BIO_get_mem_data(buf, &result);
