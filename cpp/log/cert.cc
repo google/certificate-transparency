@@ -1319,22 +1319,42 @@ Cert::Status CertChain::IsValidCaIssuerChainMaybeLegacyRoot() const {
 }
 
 
-Cert::Status CertChain::IsValidSignatureChain() const {
+util::Status CertChain::IsValidSignatureChain() const {
   if (!IsLoaded()) {
     LOG(ERROR) << "Chain is not loaded";
-    return Cert::ERROR;
+    return util::Status(util::error::FAILED_PRECONDITION,
+                        "certificate chain is not loaded");
   }
 
-  Cert::Status status;
   for (vector<Cert*>::const_iterator it = chain_.begin();
        it + 1 < chain_.end(); ++it) {
     Cert* subject = *it;
     Cert* issuer = *(it + 1);
-    status = subject->IsSignedBy(*issuer);
-    if (status != Cert::TRUE)
-      return status;
+
+    switch (subject->IsSignedBy(*issuer)) {
+      case Cert::TRUE:
+        continue;
+      case Cert::FALSE:
+        return util::Status(util::error::INVALID_ARGUMENT,
+                            "invalid certificate chain");
+      case Cert::UNSUPPORTED_ALGORITHM:
+        // UNSUPPORTED_ALGORITHM can happen when a weak algorithm
+        // (such as MD2) is intentionally not accepted in which case
+        // it's correct to say that the chain is invalid.
+        // It can also happen when EVP is not properly initialized, in
+        // which case it's more of an INTERNAL_ERROR. However a bust
+        // setup would manifest itself in many other ways, including
+        // failing tests, so we assume the failure is intentional.
+        return util::Status(util::error::UNIMPLEMENTED,
+                            "unsupported algorithm in certificate chain");
+      case Cert::ERROR:
+        LOG(ERROR) << "Failed to check signature chain";
+        return util::Status(util::error::INTERNAL,
+                            "failed to check signature chain");
+    }
   }
-  return Cert::TRUE;
+
+  return util::Status::OK;
 }
 
 

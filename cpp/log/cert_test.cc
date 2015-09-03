@@ -7,6 +7,7 @@
 
 #include "log/cert.h"
 #include "log/ct_extensions.h"
+#include "util/status_test_util.h"
 #include "util/testing.h"
 #include "util/util.h"
 
@@ -15,6 +16,7 @@ using cert_trans::CertChain;
 using cert_trans::PreCertChain;
 using cert_trans::TbsCertificate;
 using std::string;
+using util::testing::StatusIs;
 
 // TODO(ekasper): add test certs with intermediates.
 // Valid certificates.
@@ -688,22 +690,24 @@ TEST_F(CertChainTest, IssuerChains) {
   // A single certificate.
   CertChain chain(leaf_pem_);
   EXPECT_EQ(Cert::TRUE, chain.IsValidCaIssuerChainMaybeLegacyRoot());
-  EXPECT_EQ(Cert::TRUE, chain.IsValidSignatureChain());
+  EXPECT_OK(chain.IsValidSignatureChain());
 
   // Two certs.
   CertChain chain2(leaf_pem_ + ca_pem_);
   EXPECT_EQ(Cert::TRUE, chain.IsValidCaIssuerChainMaybeLegacyRoot());
-  EXPECT_EQ(Cert::TRUE, chain.IsValidSignatureChain());
+  EXPECT_OK(chain.IsValidSignatureChain());
 
   // In reverse order.
   CertChain chain3(ca_pem_ + leaf_pem_);
   EXPECT_EQ(Cert::FALSE, chain3.IsValidCaIssuerChainMaybeLegacyRoot());
-  EXPECT_EQ(Cert::FALSE, chain3.IsValidSignatureChain());
+  EXPECT_THAT(chain3.IsValidSignatureChain(),
+              StatusIs(util::error::INVALID_ARGUMENT));
 
   // Invalid
   CertChain invalid("");
   EXPECT_EQ(Cert::ERROR, invalid.IsValidCaIssuerChainMaybeLegacyRoot());
-  EXPECT_EQ(Cert::ERROR, invalid.IsValidSignatureChain());
+  EXPECT_THAT(invalid.IsValidSignatureChain(),
+              StatusIs(util::error::FAILED_PRECONDITION));
 }
 
 TEST_F(CertChainTest, PreCertChain) {
@@ -713,7 +717,7 @@ TEST_F(CertChainTest, PreCertChain) {
   ASSERT_TRUE(pre_chain.IsLoaded());
   EXPECT_EQ(pre_chain.Length(), 2U);
   EXPECT_EQ(Cert::TRUE, pre_chain.IsValidCaIssuerChainMaybeLegacyRoot());
-  EXPECT_EQ(Cert::TRUE, pre_chain.IsValidSignatureChain());
+  EXPECT_OK(pre_chain.IsValidSignatureChain());
   EXPECT_EQ(Cert::TRUE, pre_chain.IsWellFormed());
 
   // Try to construct a precert chain from regular certs.
@@ -723,7 +727,7 @@ TEST_F(CertChainTest, PreCertChain) {
   ASSERT_TRUE(pre_chain2.IsLoaded());
   EXPECT_EQ(pre_chain2.Length(), 2U);
   EXPECT_EQ(Cert::TRUE, pre_chain2.IsValidCaIssuerChainMaybeLegacyRoot());
-  EXPECT_EQ(Cert::TRUE, pre_chain2.IsValidSignatureChain());
+  EXPECT_OK(pre_chain2.IsValidSignatureChain());
   EXPECT_EQ(Cert::FALSE, pre_chain2.IsWellFormed());
 }
 

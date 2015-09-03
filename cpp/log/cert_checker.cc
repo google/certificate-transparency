@@ -168,25 +168,11 @@ Status CertChecker::CheckIssuerChain(CertChain* chain) const {
     return Status(util::error::INTERNAL, "failed to check issuer chain");
   }
 
-  status = chain->IsValidSignatureChain();
-  if (status == Cert::UNSUPPORTED_ALGORITHM) {
-    // UNSUPPORTED_ALGORITHM can happen when a weak algorithm (such as MD2)
-    // is intentionally not accepted in which case it's correct to say that
-    // the chain is invalid.
-    // It can also happen when EVP is not properly initialized, in which case
-    // it's more of an INTERNAL_ERROR. However a bust setup would manifest
-    // itself in many other ways, including failing tests, so we assume the
-    // failure is intentional.
-    return Status(util::error::INVALID_ARGUMENT,
-                  "unsupported algorithm in certificate chain");
+  const Status valid_chain(chain->IsValidSignatureChain());
+  if (!valid_chain.ok()) {
+    return valid_chain;
   }
-  if (status == Cert::FALSE)
-    return Status(util::error::INVALID_ARGUMENT, "invalid certificate chain");
 
-  if (status != Cert::TRUE) {
-    LOG(ERROR) << "Failed to check signature chain";
-    return Status(util::error::INTERNAL, "failed to check signature chain");
-  }
   return GetTrustedCa(chain);
 }
 

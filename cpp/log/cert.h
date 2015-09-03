@@ -334,11 +334,9 @@ class CertChain {
   // Returns ERROR if the chain is not loaded or some error occurred.
   Cert::Status IsValidCaIssuerChainMaybeLegacyRoot() const;
 
-  // Returns TRUE if each cert is signed by the next cert in chain.
-  // Returns FALSE if the above does not hold.
-  // Returns ERROR if the chain is not loaded or some error occurred.
-  // Does not check whether issuers have CA capabilities.
-  Cert::Status IsValidSignatureChain() const;
+  // Is OK if each certificate is signed by the next certificate in
+  // the chain. Does not check whether issuers have CA capabilities.
+  util::Status IsValidSignatureChain() const;
 
  private:
   void ClearChain();
