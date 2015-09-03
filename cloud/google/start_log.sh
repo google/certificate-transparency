@@ -31,13 +31,7 @@ Header "Creating log instances..."
 for i in `seq 0 $((${LOG_NUM_REPLICAS} - 1))`; do
   echo "Creating instance ${LOG_MACHINES[$i]}"
 
-  sed --e "s^@@PROJECT@@^${PROJECT}^
-           s^@@ETCD_HOST@@^${ETCD_MACHINES[1]}^
-           s^@@ETCD_PORT@@^4001^
-           s^@@CONTAINER_HOST@@^${LOG_MACHINES[$i]}^
-           s^@@MONITORING@@^${MONITORING}^
-           s^@@PROJECT@@^${PROJECT}^" \
-          < ${DIR}/log_container.yaml  > ${MANIFEST}.${i}
+  echo "${LOG_META[${i}]}" > ${MANIFEST}.${i}
 
   ${GCLOUD} compute instances create -q ${LOG_MACHINES[${i}]} \
       --zone=${LOG_ZONES[${i}]} \

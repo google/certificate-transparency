@@ -1,7 +1,9 @@
+DIR=$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )
 if [ "$1" == "" ]; then
   echo "Usage $0: <config-file>"
   exit 1
 fi
+source ${DIR}/util.sh
 source $1
 
 export ETCD_NUM_REPLICAS_PER_ZONE=1
@@ -19,6 +21,7 @@ for z in ${ZONES}; do
     ETCD_NUM_REPLICAS=$((${ETCD_NUM_REPLICAS} + 1))
   done
 done
+export ETCD_SERVER_LIST=`AppendAndJoin ":4001" "," ${ETCD_MACHINES[@]}`
 
 if [ "${INSTANCE_TYPE}" == "mirror" ]; then
   if [ "${MIRROR_TARGET_URL}" == "" ]; then
@@ -34,7 +37,7 @@ if [ "${INSTANCE_TYPE}" == "mirror" ]; then
   export MIRROR_DISK_SIZE=${MIRROR_DISK_SIZE:-200GB}
   export MIRROR_MACHINE_TYPE=${MIRROR_MACHINE_TYPE:-n1-highmem-2}
   export MIRROR_BASE_NAME="${CLUSTER}-mirror"
-  declare -a MIRROR_ZONES MIRROR_MACHINES MIRROR_DISKS
+  declare -a MIRROR_ZONES MIRROR_MACHINES MIRROR_DISKS MIRROR_META
   export MIRROR_ZONES MIRROR_MACHINES MIRROR_DISKS
   export MIRROR_NUM_REPLICAS=0
   for z in ${ZONES}; do
@@ -42,6 +45,14 @@ if [ "${INSTANCE_TYPE}" == "mirror" ]; then
       MIRROR_ZONES[${MIRROR_NUM_REPLICAS}]="${REGION}-${z}"
       MIRROR_MACHINES[${MIRROR_NUM_REPLICAS}]="${CLUSTER}-mirror-${z}-${i}"
       MIRROR_DISKS[${MIRROR_NUM_REPLICAS}]="${CLUSTER}-mirror-disk-${z}-${i}"
+      MIRROR_META[${MIRROR_NUM_REPLICAS}]=$(
+          sed --e "s^@@PROJECT@@^${PROJECT}^
+                   s^@@ETCD_SERVERS@@^${ETCD_SERVER_LIST}^
+                   s^@@CONTAINER_HOST@@^${MIRROR_MACHINES[${MIRROR_NUM_REPLICAS}]}^
+                   s^@@TARGET_LOG_URL@@^${MIRROR_TARGET_URL}^
+                   s^@@TARGET_LOG_PUBLIC_KEY@@^${MIRROR_TARGET_PUBLIC_KEY}^
+                   s^@@MONITORING@@^${MONITORING}^" \
+                      < ${DIR}/mirror_container.yaml)
       MIRROR_NUM_REPLICAS=$((${MIRROR_NUM_REPLICAS} + 1))
     done
   done
@@ -58,6 +69,12 @@ elif [ "${INSTANCE_TYPE}" == "log" ]; then
       LOG_ZONES[${LOG_NUM_REPLICAS}]="${REGION}-${z}"
       LOG_MACHINES[${LOG_NUM_REPLICAS}]="${CLUSTER}-log-${z}-${i}"
       LOG_DISKS[${LOG_NUM_REPLICAS}]="${CLUSTER}-log-disk-${z}-${i}"
+      LOG_META[${LOG_NUM_REPLICAS}]=$(
+          sed --e "s^@@PROJECT@@^${PROJECT}^
+                   s^@@ETCD_SERVERS@@^${ETCD_SERVER_LIST}^
+                   s^@@CONTAINER_HOST@@^${LOG_MACHINES[${LOG_NUM_REPLICAS}]}^
+                   s^@@MONITORING@@^${MONITORING}^" \
+                      < ${DIR}/log_container.yaml)
       LOG_NUM_REPLICAS=$((${LOG_NUM_REPLICAS} + 1))
     done
   done

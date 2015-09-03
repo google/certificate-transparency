@@ -31,15 +31,7 @@ Header "Creating mirror instances..."
 for i in `seq 0 $((${MIRROR_NUM_REPLICAS} - 1))`; do
   echo "Creating instance ${MIRROR_MACHINES[$i]}"
 
-  sed --e "s^@@PROJECT@@^${PROJECT}^
-           s^@@ETCD_HOST@@^${ETCD_MACHINES[1]}^
-           s^@@ETCD_PORT@@^4001^
-           s^@@CONTAINER_HOST@@^${MIRROR_MACHINES[$i]}^
-           s^@@TARGET_LOG_URL@@^${MIRROR_TARGET_URL}^
-           s^@@TARGET_LOG_PUBLIC_KEY@@^${MIRROR_TARGET_PUBLIC_KEY}^
-           s^@@MONITORING@@^${MONITORING}^
-           s^@@PROJECT@@^${PROJECT}^" \
-          < ${DIR}/mirror_container.yaml  > ${MANIFEST}.${i}
+  echo "${MIRROR_META[${i}]}" > ${MANIFEST}.${i}
 
   ${GCLOUD} compute instances create -q ${MIRROR_MACHINES[${i}]} \
       --zone ${MIRROR_ZONES[${i}]} \

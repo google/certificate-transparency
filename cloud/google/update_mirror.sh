@@ -13,6 +13,13 @@ GCLOUD="gcloud"
 Header "Updating mirror instances..."
 for i in `seq 0 $((${MIRROR_NUM_REPLICAS} - 1))`; do
   echo "Updating ${MIRROR_MACHINES[${i}]}"
+  echo "${MIRROR_META[${i}]}" > /tmp/metadata.${i}
+
+  gcloud compute instances add-metadata \
+      ${MIRROR_MACHINES[${i}]} \
+      --zone ${MIRROR_ZONES[${i}]} \
+      --metadata-from-file google-container-manifest=/tmp/metadata.${i}
+
   gcloud compute ssh ${MIRROR_MACHINES[${i}]} \
       --zone ${MIRROR_ZONES[${i}]} \
       --command \

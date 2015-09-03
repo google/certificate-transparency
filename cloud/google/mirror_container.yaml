@@ -13,10 +13,8 @@ spec:
           hostPort: 80
           protocol: TCP
       env:
-        - name: ETCD_HOST
-          value: "@@ETCD_HOST@@"
-        - name: ETCD_PORT
-          value: "@@ETCD_PORT@@"
+        - name: ETCD_SERVERS
+          value: "@@ETCD_SERVERS@@"
         - name: CONTAINER_HOST
           value: "@@CONTAINER_HOST@@"
         - name: TARGET_LOG_URL

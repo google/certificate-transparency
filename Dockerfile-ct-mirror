@@ -33,7 +33,7 @@ CMD cd /mnt/ctmirror/ && \
     export NUM_HTTP_SERVER_THREADS=${NUM_HTTP_SERVER_THREADS:-32} && \
     echo "My IP: ${MY_IP}" && \
     echo "Container: ${CONTAINER_HOST}" && \
-    echo "Etcd: ${ETCD_HOST}:${ETCD_PORT}" && \
+    echo "Etcd: ${ETCD_SERVERS}" && \
     echo "Target: ${TARGET_LOG_URL}" && \
     echo "Target Key: ${TARGET_LOG_PUBLIC_KEY}" && \
     echo "Project: ${PROJECT}" && \
@@ -44,7 +44,7 @@ CMD cd /mnt/ctmirror/ && \
         --server=${CONTAINER_HOST} \
         --log_dir=/mnt/ctmirror/logs \
         --leveldb_db=/mnt/ctmirror/mirror.ldb \
-        --etcd_servers="${ETCD_HOST}:${ETCD_PORT}" \
+        --etcd_servers="${ETCD_SERVERS}" \
         --num_http_server_threads=${NUM_HTTP_SERVER_THREADS} \
         --target_public_key=/usr/local/etc/keys/${TARGET_LOG_PUBLIC_KEY} \
         --target_log_uri=${TARGET_LOG_URL} \
