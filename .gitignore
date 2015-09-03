@@ -104,6 +104,7 @@
 /test/apachectl
 /test/httpd-local.conf
 /test/httpd-new
+/test/testdata/*.srl
 /test/testdata/error.log
 /test/testdata/logs
 /test/testdata/test-cert-proof-extension.pem
