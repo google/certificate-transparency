@@ -359,7 +359,7 @@ void HttpHandler::GetRoots(evhttp_request* req) const {
   for (it = cert_checker_->GetTrustedCertificates().begin();
        it != cert_checker_->GetTrustedCertificates().end(); ++it) {
     string cert;
-    if (it->second->DerEncoding(&cert) != Cert::TRUE) {
+    if (it->second->DerEncoding(&cert) != util::Status::OK) {
       LOG(ERROR) << "Cert encoding failed";
       return output_->SendError(req, HTTP_INTERNAL, "Serialisation failed.");
     }

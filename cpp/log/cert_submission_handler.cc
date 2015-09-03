@@ -47,8 +47,9 @@ bool CertSubmissionHandler::X509ChainToEntry(const CertChain& chain,
 
     entry->set_type(ct::PRECERT_ENTRY);
     string key_hash;
-    if (chain.CertAt(1)->SPKISha256Digest(&key_hash) != Cert::TRUE)
+    if (chain.CertAt(1)->SPKISha256Digest(&key_hash) != Status::OK) {
       return false;
+    }
 
     entry->mutable_precert_entry()->mutable_pre_cert()->set_issuer_key_hash(
         key_hash);
@@ -63,8 +64,9 @@ bool CertSubmissionHandler::X509ChainToEntry(const CertChain& chain,
   } else {
     entry->set_type(ct::X509_ENTRY);
     string der_cert;
-    if (chain.LeafCert()->DerEncoding(&der_cert) != Cert::TRUE)
+    if (chain.LeafCert()->DerEncoding(&der_cert) != Status::OK) {
       return false;
+    }
 
     entry->mutable_x509_entry()->set_leaf_certificate(der_cert);
     return true;
@@ -83,14 +85,16 @@ Status CertSubmissionHandler::ProcessX509Submission(CertChain* chain,
   // We have a valid chain; make the entry.
   string der_cert;
   // Nothing should fail anymore as we have validated the chain.
-  if (chain->LeafCert()->DerEncoding(&der_cert) != Cert::TRUE)
+  if (chain->LeafCert()->DerEncoding(&der_cert) != Status::OK) {
     return Status(util::error::INTERNAL, "could not DER-encode the chain");
+  }
 
   X509ChainEntry* x509_entry = entry->mutable_x509_entry();
   x509_entry->set_leaf_certificate(der_cert);
   for (size_t i = 1; i < chain->Length(); ++i) {
-    if (chain->CertAt(i)->DerEncoding(&der_cert) != Cert::TRUE)
+    if (chain->CertAt(i)->DerEncoding(&der_cert) != Status::OK) {
       return Status(util::error::INTERNAL, "could not DER-encode the chain");
+    }
     x509_entry->add_certificate_chain(der_cert);
   }
   entry->set_type(ct::X509_ENTRY);
@@ -110,11 +114,12 @@ Status CertSubmissionHandler::ProcessPreCertSubmission(PreCertChain* chain,
   // We have a valid chain; make the entry.
   string der_cert;
   // Nothing should fail anymore as we have validated the chain.
-  if (chain->LeafCert()->DerEncoding(&der_cert) != Cert::TRUE)
+  if (chain->LeafCert()->DerEncoding(&der_cert) != Status::OK) {
     return Status(util::error::INTERNAL, "could not DER-encode the chain");
+  }
   precert_entry->set_pre_certificate(der_cert);
   for (size_t i = 1; i < chain->Length(); ++i) {
-    if (chain->CertAt(i)->DerEncoding(&der_cert) != Cert::TRUE)
+    if (chain->CertAt(i)->DerEncoding(&der_cert) != Status::OK)
       return Status(util::error::INTERNAL, "could not DER-encode the chain");
     precert_entry->add_precertificate_chain(der_cert);
   }

@@ -64,9 +64,10 @@ TEST_F(CtExtensionsTest, TestSCTExtension) {
                             cert_trans::NID_ctSignedCertificateTimestampList));
 
   string ext_data;
-  EXPECT_EQ(Cert::TRUE,
-            sct_cert.OctetStringExtensionData(
-                cert_trans::NID_ctSignedCertificateTimestampList, &ext_data));
+  EXPECT_TRUE(
+      sct_cert.OctetStringExtensionData(
+                  cert_trans::NID_ctSignedCertificateTimestampList, &ext_data)
+          .ValueOrDie());
   EXPECT_FALSE(ext_data.empty());
 
   // Now fish the extension data out using the print methods and check they
@@ -105,10 +106,11 @@ TEST_F(CtExtensionsTest, TestEmbeddedSCTExtension) {
             embedded_sct_cert.HasExtension(
                 cert_trans::NID_ctEmbeddedSignedCertificateTimestampList));
   string ext_data;
-  EXPECT_EQ(Cert::TRUE,
-            embedded_sct_cert.OctetStringExtensionData(
-                cert_trans::NID_ctEmbeddedSignedCertificateTimestampList,
-                &ext_data));
+  EXPECT_TRUE(embedded_sct_cert
+                  .OctetStringExtensionData(
+                      cert_trans::NID_ctEmbeddedSignedCertificateTimestampList,
+                      &ext_data)
+                  .ValueOrDie());
   EXPECT_FALSE(ext_data.empty());
 
   // Now fish the extension data out using the print methods and check they

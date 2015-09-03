@@ -134,49 +134,49 @@ class Cert {
   // Returns TRUE if the encoding succeeded.
   // Returns FALSE if the encoding failed.
   // Returns ERROR if the cert is not loaded.
-  Status DerEncoding(std::string* result) const;
+  util::Status DerEncoding(std::string* result) const;
 
   // Sets the PEM encoding of the cert in |result|.
   // Returns TRUE if the encoding succeeded.
   // Returns FALSE if the encoding failed.
   // Returns ERROR if the cert is not loaded.
-  Status PemEncoding(std::string* result) const;
+  util::Status PemEncoding(std::string* result) const;
 
   // Sets the SHA256 digest of the cert in |result|.
   // Returns TRUE if computing the digest succeeded.
   // Returns FALSE if computing the digest failed.
   // Returns ERROR if the cert is not loaded.
-  Status Sha256Digest(std::string* result) const;
+  util::Status Sha256Digest(std::string* result) const;
 
   // Sets the DER-encoded TBS component of the cert in |result|.
   // Returns TRUE if the encoding succeeded.
   // Returns FALSE if the encoding failed.
   // Returns ERROR if the cert is not loaded.
-  Status DerEncodedTbsCertificate(std::string* result) const;
+  util::Status DerEncodedTbsCertificate(std::string* result) const;
 
   // Sets the DER-encoded subject Name component of the cert in |result|.
   // Returns TRUE if the encoding succeeded.
   // Returns FALSE if the encoding failed.
   // Returns ERROR if the cert is not loaded.
-  Status DerEncodedSubjectName(std::string* result) const;
+  util::Status DerEncodedSubjectName(std::string* result) const;
 
   // Sets the DER-encoded issuer Name component of the cert in |result|.
   // Returns TRUE if the encoding succeeded.
   // Returns FALSE if the encoding failed.
   // Returns ERROR if the cert is not loaded.
-  Status DerEncodedIssuerName(std::string* result) const;
+  util::Status DerEncodedIssuerName(std::string* result) const;
 
   // Sets the SHA256 digest of the cert's public key in |result|.
   // Returns TRUE if computing the digest succeeded.
   // Returns FALSE if computing the digest failed.
   // Returns ERROR if the cert is not loaded.
-  Status PublicKeySha256Digest(std::string* result) const;
+  util::Status PublicKeySha256Digest(std::string* result) const;
 
   // Sets the SHA256 digest of the cert's subjectPublicKeyInfo in |result|.
   // Returns TRUE if computing the digest succeeded.
   // Returns FALSE if computing the digest failed.
   // Returns ERROR if the cert is not loaded.
-  Status SPKISha256Digest(std::string* result) const;
+  util::Status SPKISha256Digest(std::string* result) const;
 
   // Fetch data from an extension if encoded as an ASN1_OCTET_STRING.
   // Useful for handling custom extensions registered with X509V3_EXT_add.
@@ -195,8 +195,8 @@ class Cert {
   // recognised.
   // TODO(ekasper): consider registering known custom NIDS explicitly with the
   // Cert API for safety.
-  Status OctetStringExtensionData(int extension_nid,
-                                  std::string* result) const;
+  util::StatusOr<bool> OctetStringExtensionData(int extension_nid,
+                                                std::string* result) const;
 
   // Tests whether the certificate correctly follows the RFC rules for
   // using wildcard redaction.
@@ -223,7 +223,7 @@ class Cert {
                                             Status* status) const;
   static std::string PrintName(X509_NAME* name);
   static std::string PrintTime(ASN1_TIME* when);
-  static Status DerEncodedName(X509_NAME* name, std::string* result);
+  static util::Status DerEncodedName(X509_NAME* name, std::string* result);
   X509* x509_;
 
   DISALLOW_COPY_AND_ASSIGN(Cert);

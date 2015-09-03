@@ -221,7 +221,7 @@ static bool PrecertChainToEntry(const cert_trans::PreCertChain& chain,
 
   entry->set_type(ct::PRECERT_ENTRY);
   string key_hash;
-  if (chain.CertAt(1)->SPKISha256Digest(&key_hash) != Cert::TRUE) {
+  if (chain.CertAt(1)->SPKISha256Digest(&key_hash) != util::Status::OK) {
     LOG(ERROR) << "Failed to get SPKISha256.";
     return false;
   }
@@ -729,9 +729,10 @@ static void DiagnoseCertChain() {
   }
 
   string serialized_scts;
-  if (chain.LeafCert()->OctetStringExtensionData(
-          cert_trans::NID_ctEmbeddedSignedCertificateTimestampList,
-          &serialized_scts) != Cert::TRUE) {
+  StatusOr<bool> status = chain.LeafCert()->OctetStringExtensionData(
+      cert_trans::NID_ctEmbeddedSignedCertificateTimestampList,
+      &serialized_scts);
+  if (!status.ok() || !status.ValueOrDie()) {
     LOG(ERROR) << "SCT extension data is invalid.";
     return;
   }
@@ -815,10 +816,12 @@ void WrapEmbedded() {
                cert_trans::NID_ctEmbeddedSignedCertificateTimestampList));
 
   string serialized_scts;
-  CHECK_EQ(Cert::TRUE,
-           chain.LeafCert()->OctetStringExtensionData(
-               cert_trans::NID_ctEmbeddedSignedCertificateTimestampList,
-               &serialized_scts));
+  CHECK_EQ(true,
+           chain.LeafCert()
+               ->OctetStringExtensionData(
+                   cert_trans::NID_ctEmbeddedSignedCertificateTimestampList,
+                   &serialized_scts)
+               .ValueOrDie());
   SignedCertificateTimestampList sct_list;
   CHECK_EQ(Deserializer::OK,
            Deserializer::DeserializeSCTList(serialized_scts, &sct_list));
@@ -892,7 +895,7 @@ int GetRoots() {
   for (vector<unique_ptr<Cert>>::const_iterator it = roots.begin();
        it != roots.end(); ++it) {
     string pem_cert;
-    CHECK_EQ((*it)->PemEncoding(&pem_cert), Cert::TRUE);
+    CHECK_EQ((*it)->PemEncoding(&pem_cert), util::Status::OK);
     std::cout << pem_cert;
   }
 
