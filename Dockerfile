@@ -36,7 +36,7 @@ CMD cd /mnt/ctlog/ && \
     export NUM_HTTP_SERVER_THREADS=${NUM_HTTP_SERVER_THREADS:-32} && \
     echo "My IP: ${MY_IP}" && \
     echo "Container: ${CONTAINER_HOST}" && \
-    echo "Etcd: ${ETCD_HOST}:${ETCD_PORT}" && \
+    echo "Etcd: ${ETCD_SERVERS}" && \
     echo "Project: ${PROJECT}" && \
     echo "Monitoring: ${MONITORING}" && \
     ulimit -c unlimited && \
@@ -49,7 +49,7 @@ CMD cd /mnt/ctlog/ && \
         --tree_signing_frequency_seconds=30 \
         --guard_window_seconds=10 \
         --leveldb_db=/mnt/ctlog/log.ldb \
-        --etcd_servers="${ETCD_HOST}:${ETCD_PORT}" \
+        --etcd_servers="${ETCD_SERVERS}" \
         --etcd_delete_concurrency=100 \
         --num_http_server_threads=${NUM_HTTP_SERVER_THREADS} \
         --monitoring=${MONITORING} \

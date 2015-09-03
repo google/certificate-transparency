@@ -13,6 +13,13 @@ GCLOUD="gcloud"
 Header "Updating log instances..."
 for i in `seq 0 $((${LOG_NUM_REPLICAS} - 1))`; do
   echo "Updating ${LOG_MACHINES[${i}]}"
+  echo "${LOG_META[${i}]}" > /tmp/metadata.${i}
+
+  gcloud compute instances add-metadata \
+      ${LOG_MACHINES[${i}]} \
+      --zone ${LOG_ZONES[${i}]} \
+      --metadata-from-file google-container-manifest=/tmp/metadata.${i}
+
   gcloud compute ssh ${LOG_MACHINES[${i}]} \
       --zone ${LOG_ZONES[${i}]} \
       --command \
