@@ -88,6 +88,12 @@ string ASN1ToStringAndCheckForNulls(ASN1_STRING* asn1_string,
 }
 
 
+const Cert::Status Cert::TRUE;
+const Cert::Status Cert::FALSE;
+const Cert::Status Cert::ERROR;
+const Cert::Status Cert::UNSUPPORTED_ALGORITHM;
+
+
 Cert::Cert(X509* x509) : x509_(x509) {
 }
 

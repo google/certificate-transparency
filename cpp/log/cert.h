@@ -31,7 +31,7 @@ class Cert {
   }
   ~Cert();
 
-  enum Status {
+  enum class Status {
     TRUE,
     // OpenSSL makes it very hard to distinguish between input errors
     // (cert somehow corrupt) and internal library errors (malloc errors,
@@ -50,6 +50,11 @@ class Cert {
     // unconditionally not accepted.
     UNSUPPORTED_ALGORITHM,
   };
+
+  static const Status TRUE = Status::TRUE;
+  static const Status FALSE = Status::FALSE;
+  static const Status ERROR = Status::ERROR;
+  static const Status UNSUPPORTED_ALGORITHM = Status::UNSUPPORTED_ALGORITHM;
 
   bool IsLoaded() const {
     return x509_ != NULL;
@@ -271,6 +276,22 @@ class TbsCertificate {
 
   DISALLOW_COPY_AND_ASSIGN(TbsCertificate);
 };
+
+inline std::ostream& operator<<(std::ostream& out,
+                                const Cert::Status& status) {
+  switch (status) {
+    case Cert::Status::TRUE:
+      return out << "TRUE";
+    case Cert::Status::FALSE:
+      return out << "FALSE";
+    case Cert::Status::ERROR:
+      return out << "ERROR";
+    case Cert::Status::UNSUPPORTED_ALGORITHM:
+      return out << "UNSUPPORTED_ALGORITHM";
+  }
+
+  return out << "<unknown Cert::Status: " << static_cast<int>(status) << ")";
+}
 
 class CertChain {
  public:
