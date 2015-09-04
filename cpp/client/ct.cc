@@ -885,11 +885,11 @@ void GetEntries() {
 int GetRoots() {
   HTTPLogClient client(FLAGS_ct_server);
 
-  vector<shared_ptr<Cert> > roots;
+  vector<unique_ptr<Cert>> roots;
   CHECK_EQ(client.GetRoots(&roots), AsyncLogClient::OK);
 
   LOG(INFO) << "number of certs: " << roots.size();
-  for (vector<shared_ptr<Cert> >::const_iterator it = roots.begin();
+  for (vector<unique_ptr<Cert>>::const_iterator it = roots.begin();
        it != roots.end(); ++it) {
     string pem_cert;
     CHECK_EQ((*it)->PemEncoding(&pem_cert), Cert::TRUE);

@@ -54,7 +54,7 @@ class AsyncLogClient {
   void GetSTH(ct::SignedTreeHead* sth, const Callback& done);
 
   // This does not clear "roots" before appending to it.
-  void GetRoots(std::vector<std::shared_ptr<Cert> >* roots,
+  void GetRoots(std::vector<std::unique_ptr<Cert>>* roots,
                 const Callback& done);
 
   // This does not clear "entries" before appending the retrieved

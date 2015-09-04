@@ -22,10 +22,8 @@ using ct::SignedCertificateTimestamp;
 using ct::SignedTreeHead;
 using std::back_inserter;
 using std::bind;
-using std::make_shared;
 using std::move;
 using std::placeholders::_1;
-using std::shared_ptr;
 using std::string;
 using std::to_string;
 using std::unique_ptr;
@@ -104,7 +102,7 @@ void DoneGetSTH(UrlFetcher::Response* resp, SignedTreeHead* sth,
 }
 
 
-void DoneGetRoots(UrlFetcher::Response* resp, vector<shared_ptr<Cert> >* roots,
+void DoneGetRoots(UrlFetcher::Response* resp, vector<unique_ptr<Cert>>* roots,
                   const AsyncLogClient::Callback& done, util::Task* task) {
   unique_ptr<UrlFetcher::Response> resp_deleter(CHECK_NOTNULL(resp));
   unique_ptr<util::Task> task_deleter(CHECK_NOTNULL(task));
@@ -121,18 +119,18 @@ void DoneGetRoots(UrlFetcher::Response* resp, vector<shared_ptr<Cert> >* roots,
   if (!jroots.Ok())
     return done(AsyncLogClient::BAD_RESPONSE);
 
-  vector<shared_ptr<Cert> > retval;
+  vector<unique_ptr<Cert>> retval;
   for (int i = 0; i < jroots.Length(); ++i) {
     JsonString jcert(jroots, i);
     if (!jcert.Ok())
       return done(AsyncLogClient::BAD_RESPONSE);
 
-    shared_ptr<Cert> cert(make_shared<Cert>());
+    unique_ptr<Cert> cert(new Cert);
     const Cert::Status status(cert->LoadFromDerString(jcert.FromBase64()));
     if (status != Cert::TRUE)
       return done(AsyncLogClient::BAD_RESPONSE);
 
-    retval.push_back(cert);
+    retval.push_back(move(cert));
   }
 
   roots->swap(retval);
@@ -386,7 +384,7 @@ void AsyncLogClient::GetSTH(SignedTreeHead* sth, const Callback& done) {
 }
 
 
-void AsyncLogClient::GetRoots(vector<shared_ptr<Cert> >* roots,
+void AsyncLogClient::GetRoots(vector<unique_ptr<Cert>>* roots,
                               const Callback& done) {
   UrlFetcher::Response* const resp(new UrlFetcher::Response);
 

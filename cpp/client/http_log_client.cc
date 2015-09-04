@@ -24,9 +24,8 @@ using ct::MerkleAuditProof;
 using ct::SignedCertificateTimestamp;
 using ct::SignedTreeHead;
 using std::bind;
-using std::make_shared;
+using std::unique_ptr;
 using std::placeholders::_1;
-using std::shared_ptr;
 using std::string;
 using std::vector;
 
@@ -85,7 +84,7 @@ AsyncLogClient::Status HTTPLogClient::GetSTH(SignedTreeHead* sth) {
 }
 
 AsyncLogClient::Status HTTPLogClient::GetRoots(
-    vector<shared_ptr<Cert> >* roots) {
+    vector<unique_ptr<Cert>>* roots) {
   AsyncLogClient::Status retval(AsyncLogClient::UNKNOWN_ERROR);
   bool done(false);
 
