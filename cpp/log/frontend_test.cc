@@ -165,7 +165,7 @@ TYPED_TEST(FrontendTest, TestSubmitValid) {
   Cert cert(this->leaf_pem_);
 
   string sha256_digest;
-  ASSERT_EQ(Cert::TRUE, cert.Sha256Digest(&sha256_digest));
+  ASSERT_OK(cert.Sha256Digest(&sha256_digest));
   EXPECT_TRUE(
       this->store_.GetPendingEntryForHash(sha256_digest, &entry_handle).ok());
   const LoggedCertificate& logged_cert(entry_handle.Entry());
@@ -173,7 +173,7 @@ TYPED_TEST(FrontendTest, TestSubmitValid) {
   EXPECT_EQ(ct::X509_ENTRY, logged_cert.entry().type());
   // Compare the leaf cert.
   string der_string;
-  ASSERT_EQ(Cert::TRUE, cert.DerEncoding(&der_string));
+  ASSERT_OK(cert.DerEncoding(&der_string));
   EXPECT_EQ(H(der_string),
             H(logged_cert.entry().x509_entry().leaf_certificate()));
 
@@ -194,7 +194,7 @@ TYPED_TEST(FrontendTest, TestSubmitValidWithIntermediate) {
   Cert cert(this->chain_leaf_pem_);
 
   string sha256_digest;
-  ASSERT_EQ(Cert::TRUE, cert.Sha256Digest(&sha256_digest));
+  ASSERT_OK(cert.Sha256Digest(&sha256_digest));
   EntryHandle<LoggedCertificate> entry_handle;
   EXPECT_TRUE(
       this->store_.GetPendingEntryForHash(sha256_digest, &entry_handle).ok());
@@ -203,7 +203,7 @@ TYPED_TEST(FrontendTest, TestSubmitValidWithIntermediate) {
   EXPECT_EQ(ct::X509_ENTRY, logged_cert.entry().type());
   // Compare the leaf cert.
   string der_string;
-  ASSERT_EQ(Cert::TRUE, cert.DerEncoding(&der_string));
+  ASSERT_OK(cert.DerEncoding(&der_string));
   EXPECT_EQ(H(der_string),
             H(logged_cert.entry().x509_entry().leaf_certificate()));
 
@@ -216,7 +216,7 @@ TYPED_TEST(FrontendTest, TestSubmitValidWithIntermediate) {
   ASSERT_GE(logged_cert.entry().x509_entry().certificate_chain_size(), 1);
   Cert cert2(this->intermediate_pem_);
 
-  ASSERT_EQ(Cert::TRUE, cert2.DerEncoding(&der_string));
+  ASSERT_OK(cert2.DerEncoding(&der_string));
   EXPECT_EQ(H(der_string),
             H(logged_cert.entry().x509_entry().certificate_chain(0)));
 }
@@ -236,7 +236,7 @@ TYPED_TEST(FrontendTest, TestSubmitDuplicate) {
   Cert cert(this->leaf_pem_);
 
   string sha256_digest;
-  ASSERT_EQ(Cert::TRUE, cert.Sha256Digest(&sha256_digest));
+  ASSERT_OK(cert.Sha256Digest(&sha256_digest));
   EntryHandle<LoggedCertificate> entry_handle;
   EXPECT_TRUE(
       this->store_.GetPendingEntryForHash(sha256_digest, &entry_handle).ok());
@@ -245,7 +245,7 @@ TYPED_TEST(FrontendTest, TestSubmitDuplicate) {
   EXPECT_EQ(ct::X509_ENTRY, logged_cert.entry().type());
   // Compare the leaf cert.
   string der_string;
-  ASSERT_EQ(Cert::TRUE, cert.DerEncoding(&der_string));
+  ASSERT_OK(cert.DerEncoding(&der_string));
   EXPECT_EQ(H(der_string),
             H(logged_cert.entry().x509_entry().leaf_certificate()));
 
@@ -310,8 +310,8 @@ TYPED_TEST(FrontendTest, TestSubmitPrecert) {
             1);
 
   string pre_der, ca_der;
-  ASSERT_EQ(Cert::TRUE, pre.DerEncoding(&pre_der));
-  ASSERT_EQ(Cert::TRUE, ca.DerEncoding(&ca_der));
+  ASSERT_OK(pre.DerEncoding(&pre_der));
+  ASSERT_OK(ca.DerEncoding(&ca_der));
 
   EXPECT_EQ(H(pre_der),
             H(logged_cert.entry().precert_entry().pre_certificate()));
@@ -352,9 +352,9 @@ TYPED_TEST(FrontendTest, TestSubmitPrecertUsingPreCA) {
             2);
 
   string pre_der, ca_der, ca_pre_der;
-  ASSERT_EQ(Cert::TRUE, pre.DerEncoding(&pre_der));
-  ASSERT_EQ(Cert::TRUE, ca.DerEncoding(&ca_der));
-  ASSERT_EQ(Cert::TRUE, ca_pre.DerEncoding(&ca_pre_der));
+  ASSERT_OK(pre.DerEncoding(&pre_der));
+  ASSERT_OK(ca.DerEncoding(&ca_der));
+  ASSERT_OK(ca_pre.DerEncoding(&ca_pre_der));
 
   EXPECT_EQ(H(pre_der),
             H(logged_cert.entry().precert_entry().pre_certificate()));

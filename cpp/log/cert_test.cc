@@ -304,7 +304,7 @@ TEST_F(CertTest, LoadInvalid) {
 TEST_F(CertTest, LoadValidFromDer) {
   Cert leaf(leaf_pem_);
   string der;
-  ASSERT_EQ(Cert::TRUE, leaf.DerEncoding(&der));
+  ASSERT_OK(leaf.DerEncoding(&der));
   Cert second;
   EXPECT_EQ(Cert::TRUE, second.LoadFromDerString(der));
   EXPECT_TRUE(second.IsLoaded());
@@ -314,7 +314,7 @@ TEST_F(CertTest, LoadInvalidFromDer) {
   Cert leaf(leaf_pem_);
   // Make it look almost good for extra fun.
   string der;
-  ASSERT_EQ(Cert::TRUE, leaf.DerEncoding(&der));
+  ASSERT_OK(leaf.DerEncoding(&der));
   Cert second;
   EXPECT_EQ(Cert::FALSE, second.LoadFromDerString(der.substr(2)));
   EXPECT_FALSE(second.IsLoaded());
@@ -413,16 +413,16 @@ TEST_F(CertTest, DerEncodedNames) {
   ASSERT_TRUE(leaf.IsIssuedBy(ca).ValueOrDie());
 
   string leaf_subject, leaf_issuer, ca_subject, ca_issuer;
-  EXPECT_EQ(Cert::TRUE, leaf.DerEncodedSubjectName(&leaf_subject));
+  EXPECT_OK(leaf.DerEncodedSubjectName(&leaf_subject));
   EXPECT_FALSE(leaf_subject.empty());
 
-  EXPECT_EQ(Cert::TRUE, leaf.DerEncodedIssuerName(&leaf_issuer));
+  EXPECT_OK(leaf.DerEncodedIssuerName(&leaf_issuer));
   EXPECT_FALSE(leaf_issuer.empty());
 
-  EXPECT_EQ(Cert::TRUE, ca.DerEncodedSubjectName(&ca_subject));
+  EXPECT_OK(ca.DerEncodedSubjectName(&ca_subject));
   EXPECT_FALSE(ca_subject.empty());
 
-  EXPECT_EQ(Cert::TRUE, ca.DerEncodedIssuerName(&ca_issuer));
+  EXPECT_OK(ca.DerEncodedIssuerName(&ca_issuer));
   EXPECT_FALSE(ca_issuer.empty());
 
   EXPECT_EQ(leaf_issuer, ca_subject);
@@ -596,7 +596,7 @@ TEST_F(TbsCertificateTest, DerEncoding) {
   TbsCertificate tbs(leaf);
 
   string cert_tbs_der, raw_tbs_der;
-  EXPECT_EQ(Cert::TRUE, leaf.DerEncodedTbsCertificate(&cert_tbs_der));
+  EXPECT_OK(leaf.DerEncodedTbsCertificate(&cert_tbs_der));
   EXPECT_EQ(Cert::TRUE, tbs.DerEncoding(&raw_tbs_der));
   EXPECT_EQ(cert_tbs_der, raw_tbs_der);
 }

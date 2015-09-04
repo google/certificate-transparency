@@ -497,7 +497,7 @@ void AsyncLogClient::InternalAddChain(const CertChain& cert_chain,
   JsonArray jchain;
   for (size_t n = 0; n < cert_chain.Length(); ++n) {
     string cert;
-    CHECK_EQ(Cert::TRUE, cert_chain.CertAt(n)->DerEncoding(&cert));
+    CHECK_EQ(util::Status::OK, cert_chain.CertAt(n)->DerEncoding(&cert));
     jchain.AddBase64(cert);
   }
 

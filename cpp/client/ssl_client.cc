@@ -20,6 +20,8 @@ using ct::SSLClientCTData;
 using ct::SignedCertificateTimestamp;
 using ct::SignedCertificateTimestampList;
 using std::string;
+using util::error::Code;
+using util::StatusOr;
 
 const uint16_t CT_EXTENSION_TYPE = 18;
 
@@ -187,12 +189,14 @@ int SSLClient::VerifyCallback(X509_STORE_CTX* ctx, void* arg) {
       Cert::TRUE) {
     LOG(INFO) << "Embedded proof extension found in certificate, "
               << "verifying...";
-    Cert::Status status = chain.LeafCert()->OctetStringExtensionData(
+    util::Status status = chain.LeafCert()->OctetStringExtensionData(
         cert_trans::NID_ctEmbeddedSignedCertificateTimestampList,
         &serialized_scts);
-    if (status != Cert::TRUE) {
-      // Any error here is likely OpenSSL acting up, so just die.
-      CHECK_EQ(Cert::FALSE, status);
+    if (!status.ok()) {
+      // Any error here is likely OpenSSL acting up, so just die. Previously
+      // was CHECK_EQ(FALSE..., which meant fail check if not an error and not
+      // false
+      CHECK_EQ(Code::NOT_FOUND, status.CanonicalCode());
       LOG(ERROR) << "Failed to parse extension data: corrupt cert?";
     }
     // Else look for the proof in a superfluous cert.
@@ -202,11 +206,11 @@ int SSLClient::VerifyCallback(X509_STORE_CTX* ctx, void* arg) {
                  cert_trans::NID_ctSignedCertificateTimestampList) ==
                  Cert::TRUE) {
     LOG(INFO) << "Proof extension found in certificate, verifying...";
-    Cert::Status status = input_chain.LastCert()->OctetStringExtensionData(
+    util::Status status = input_chain.LastCert()->OctetStringExtensionData(
         cert_trans::NID_ctSignedCertificateTimestampList, &serialized_scts);
-    if (status != Cert::TRUE) {
+    if (!status.ok()) {
       // Any error here is likely OpenSSL acting up, so just die.
-      CHECK_EQ(Cert::FALSE, status);
+      CHECK_EQ(Code::NOT_FOUND, status.CanonicalCode());
       LOG(ERROR) << "Failed to parse extension data: corrupt cert?";
     }
   }

@@ -420,10 +420,10 @@ StatusOr<bool> Cert::IsSignedBy(const Cert& issuer) const {
 }
 
 
-Cert::Status Cert::DerEncoding(string* result) const {
+util::Status Cert::DerEncoding(string* result) const {
   if (!IsLoaded()) {
     LOG(ERROR) << "Cert not loaded";
-    return ERROR;
+    return util::Status(Code::FAILED_PRECONDITION, "Cert not loaded");
   }
 
   unsigned char* der_buf(nullptr);
@@ -434,26 +434,26 @@ Cert::Status Cert::DerEncoding(string* result) const {
     // is bad until proven otherwise.
     LOG(WARNING) << "Failed to serialize cert";
     LOG_OPENSSL_ERRORS(WARNING);
-    return FALSE;
+    return util::Status(Code::INVALID_ARGUMENT, "DER decoding failed");
   }
 
   result->assign(reinterpret_cast<char*>(der_buf), der_length);
   OPENSSL_free(der_buf);
-  return TRUE;
+  return util::Status::OK;
 }
 
 
-Cert::Status Cert::PemEncoding(string* result) const {
+util::Status Cert::PemEncoding(string* result) const {
   if (!IsLoaded()) {
     LOG(ERROR) << "Cert not loaded";
-    return ERROR;
+    return util::Status(Code::FAILED_PRECONDITION, "Cert not loaded");
   }
 
   unique_ptr<BIO, int (*)(BIO*)> bp(BIO_new(BIO_s_mem()), &BIO_free);
   if (!PEM_write_bio_X509(bp.get(), x509_)) {
     LOG(WARNING) << "Failed to serialize cert";
     LOG_OPENSSL_ERRORS(WARNING);
-    return FALSE;
+    return util::Status(Code::INVALID_ARGUMENT, "PEM serialize failed");
   }
 
   char* data;
@@ -463,14 +463,14 @@ Cert::Status Cert::PemEncoding(string* result) const {
 
   result->assign(data, len);
 
-  return TRUE;
+  return util::Status::OK;
 }
 
 
-Cert::Status Cert::Sha256Digest(string* result) const {
+util::Status Cert::Sha256Digest(string* result) const {
   if (!IsLoaded()) {
     LOG(ERROR) << "Cert not loaded";
-    return ERROR;
+    return util::Status(Code::FAILED_PRECONDITION, "Cert not loaded");
   }
 
   unsigned char digest[EVP_MAX_MD_SIZE];
@@ -480,18 +480,18 @@ Cert::Status Cert::Sha256Digest(string* result) const {
     // is bad until proven otherwise.
     LOG(WARNING) << "Failed to compute cert digest";
     LOG_OPENSSL_ERRORS(WARNING);
-    return FALSE;
+    return util::Status(Code::INVALID_ARGUMENT, "SHA256 digest failed");
   }
 
   result->assign(reinterpret_cast<char*>(digest), len);
-  return TRUE;
+  return util::Status::OK;
 }
 
 
-Cert::Status Cert::DerEncodedTbsCertificate(string* result) const {
+util::Status Cert::DerEncodedTbsCertificate(string* result) const {
   if (!IsLoaded()) {
     LOG(ERROR) << "Cert not loaded";
-    return ERROR;
+    return util::Status(Code::FAILED_PRECONDITION, "Cert not loaded");
   }
 
   unsigned char* der_buf(nullptr);
@@ -501,34 +501,34 @@ Cert::Status Cert::DerEncodedTbsCertificate(string* result) const {
     // is bad until proven otherwise.
     LOG(WARNING) << "Failed to serialize the TBS component";
     LOG_OPENSSL_ERRORS(WARNING);
-    return FALSE;
+    return util::Status(Code::INVALID_ARGUMENT, "TBS DER serialize failed");
   }
   result->assign(reinterpret_cast<char*>(der_buf), der_length);
   OPENSSL_free(der_buf);
-  return TRUE;
+  return util::Status::OK;
 }
 
 
-Cert::Status Cert::DerEncodedSubjectName(string* result) const {
+util::Status Cert::DerEncodedSubjectName(string* result) const {
   if (!IsLoaded()) {
     LOG(ERROR) << "Cert not loaded";
-    return ERROR;
+    return util::Status(Code::FAILED_PRECONDITION, "Cert not loaded");
   }
   return DerEncodedName(X509_get_subject_name(x509_), result);
 }
 
 
-Cert::Status Cert::DerEncodedIssuerName(string* result) const {
+util::Status Cert::DerEncodedIssuerName(string* result) const {
   if (!IsLoaded()) {
     LOG(ERROR) << "Cert not loaded";
-    return ERROR;
+    return util::Status(Code::FAILED_PRECONDITION, "Cert not loaded");
   }
   return DerEncodedName(X509_get_issuer_name(x509_), result);
 }
 
 
 // static
-Cert::Status Cert::DerEncodedName(X509_NAME* name, string* result) {
+util::Status Cert::DerEncodedName(X509_NAME* name, string* result) {
   unsigned char* der_buf(nullptr);
   int der_length = i2d_X509_NAME(name, &der_buf);
   if (der_length < 0) {
@@ -536,18 +536,18 @@ Cert::Status Cert::DerEncodedName(X509_NAME* name, string* result) {
     // is bad until proven otherwise.
     LOG(WARNING) << "Failed to serialize the subject name";
     LOG_OPENSSL_ERRORS(WARNING);
-    return FALSE;
+    return util::Status(Code::INVALID_ARGUMENT, "name DER serialize failed");
   }
   result->assign(reinterpret_cast<char*>(der_buf), der_length);
   OPENSSL_free(der_buf);
-  return TRUE;
+  return util::Status::OK;
 }
 
 
-Cert::Status Cert::PublicKeySha256Digest(string* result) const {
+util::Status Cert::PublicKeySha256Digest(string* result) const {
   if (!IsLoaded()) {
     LOG(ERROR) << "Cert not loaded";
-    return ERROR;
+    return util::Status(Code::FAILED_PRECONDITION, "Cert not loaded");
   }
 
   unsigned char digest[EVP_MAX_MD_SIZE];
@@ -557,17 +557,17 @@ Cert::Status Cert::PublicKeySha256Digest(string* result) const {
     // is bad until proven otherwise.
     LOG(WARNING) << "Failed to compute public key digest";
     LOG_OPENSSL_ERRORS(WARNING);
-    return FALSE;
+    return util::Status(Code::INVALID_ARGUMENT, "SHA256 digest failed");
   }
   result->assign(reinterpret_cast<char*>(digest), len);
-  return TRUE;
+  return util::Status::OK;
 }
 
 
-Cert::Status Cert::SPKISha256Digest(string* result) const {
+util::Status Cert::SPKISha256Digest(string* result) const {
   if (!IsLoaded()) {
     LOG(ERROR) << "Cert not loaded";
-    return ERROR;
+    return util::Status(Code::FAILED_PRECONDITION, "Cert not loaded");
   }
 
   unsigned char* der_buf(nullptr);
@@ -577,7 +577,7 @@ Cert::Status Cert::SPKISha256Digest(string* result) const {
     // is bad until proven otherwise.
     LOG(WARNING) << "Failed to serialize the Subject Public Key Info";
     LOG_OPENSSL_ERRORS(WARNING);
-    return FALSE;
+    return util::Status(Code::INVALID_ARGUMENT, "SPKI SHA256 digest failed");
   }
 
   string sha256_digest = Sha256Hasher::Sha256Digest(
@@ -585,28 +585,30 @@ Cert::Status Cert::SPKISha256Digest(string* result) const {
 
   result->assign(sha256_digest);
   OPENSSL_free(der_buf);
-  return TRUE;
+  return util::Status::OK;
 }
 
-
-Cert::Status Cert::OctetStringExtensionData(int extension_nid,
+util::Status Cert::OctetStringExtensionData(int extension_nid,
                                             string* result) const {
   if (!IsLoaded()) {
     LOG(ERROR) << "Cert not loaded";
-    return ERROR;
+    return util::Status(Code::FAILED_PRECONDITION, "Cert not loaded");
   }
 
   void* ext_data;
   Status status = ExtensionStructure(extension_nid, &ext_data);
-  if (status != TRUE)
-    return status;
+  if (status != TRUE) {
+    // TODO(Martin2112): This should return the result of ExtensionStructure()
+    // when it's been converted.
+    return util::Status(Code::NOT_FOUND, "Extension not present or invalid");
+  }
 
   // |octet| is never null upon success. Caller is responsible for the
   // correctness of this cast.
   ASN1_OCTET_STRING* octet = static_cast<ASN1_OCTET_STRING*>(ext_data);
   result->assign(reinterpret_cast<const char*>(octet->data), octet->length);
   ASN1_OCTET_STRING_free(octet);
-  return TRUE;
+  return util::Status::OK;
 }
 
 

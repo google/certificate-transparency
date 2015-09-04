@@ -217,10 +217,11 @@ Status CertChecker::CheckPreCertChain(PreCertChain* chain,
   string key_hash;
   if (uses_pre_issuer == Cert::TRUE) {
     if (chain->Length() < 3 ||
-        chain->CertAt(2)->SPKISha256Digest(&key_hash) != Cert::TRUE)
+        chain->CertAt(2)->SPKISha256Digest(&key_hash) != util::Status::OK)
       return Status(util::error::INTERNAL, "internal error");
   } else if (chain->Length() < 2 ||
-             chain->CertAt(1)->SPKISha256Digest(&key_hash) != Cert::TRUE) {
+             chain->CertAt(1)->SPKISha256Digest(&key_hash) !=
+                 util::Status::OK) {
     return Status(util::error::INTERNAL, "internal error");
   }
   // A well-formed chain always has a precert.
@@ -271,11 +272,12 @@ Status CertChecker::GetTrustedCa(CertChain* chain) const {
     return is_trusted.status();
 
   string issuer_name;
-  Cert::Status status = subject->DerEncodedIssuerName(&issuer_name);
-  if (status == Cert::ERROR)
-    return Status(util::error::INTERNAL, "internal error");
-  else if (status != Cert::TRUE)
+  util::Status status = subject->DerEncodedIssuerName(&issuer_name);
+  if (status != util::Status::OK) {
+    // Doesn't matter whether the extension doesn't or exist or is corrupt,
+    // it's still a bad chain
     return Status(util::error::INVALID_ARGUMENT, "invalid certificate chain");
+  }
 
   if (subject_name == issuer_name) {
     // Self-signed: no need to scan again.
@@ -330,11 +332,11 @@ Status CertChecker::GetTrustedCa(CertChain* chain) const {
 StatusOr<bool> CertChecker::IsTrusted(const Cert& cert,
                                       string* subject_name) const {
   string cert_name;
-  Cert::Status status = cert.DerEncodedSubjectName(&cert_name);
-  if (status == Cert::ERROR)
-    return Status(util::error::INTERNAL, "could not DER-decode subject name");
-  else if (status != Cert::TRUE)
+  util::Status status = cert.DerEncodedSubjectName(&cert_name);
+  if (status != util::Status::OK) {
+    // Doesn't matter whether it failed to decode or did not exist
     return Status(util::error::INVALID_ARGUMENT, "invalid certificate chain");
+  }
 
   *subject_name = cert_name;
 

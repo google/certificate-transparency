@@ -273,7 +273,7 @@ TEST_F(CertCheckerTest, PreCert) {
   checker_.LoadTrustedCertificates(cert_dir_ + "/" + kCaCert);
   EXPECT_OK(checker_.CheckPreCertChain(&chain, &issuer_key_hash, &tbs));
   string expected_key_hash;
-  ASSERT_EQ(Cert::TRUE, chain.CertAt(1)->SPKISha256Digest(&expected_key_hash));
+  ASSERT_OK(chain.CertAt(1)->SPKISha256Digest(&expected_key_hash));
   EXPECT_EQ(expected_key_hash, issuer_key_hash);
   // TODO(ekasper): proper KAT tests.
   EXPECT_FALSE(tbs.empty());
@@ -295,7 +295,7 @@ TEST_F(CertCheckerTest, PreCertWithPreCa) {
   checker_.LoadTrustedCertificates(cert_dir_ + "/" + kCaCert);
   EXPECT_OK(checker_.CheckPreCertChain(&chain, &issuer_key_hash, &tbs));
   string expected_key_hash;
-  ASSERT_EQ(Cert::TRUE, chain.CertAt(2)->SPKISha256Digest(&expected_key_hash));
+  ASSERT_OK(chain.CertAt(2)->SPKISha256Digest(&expected_key_hash));
   EXPECT_EQ(expected_key_hash, issuer_key_hash);
   // TODO(ekasper): proper KAT tests.
   EXPECT_FALSE(tbs.empty());
