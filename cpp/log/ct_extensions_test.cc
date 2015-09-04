@@ -52,16 +52,16 @@ class CtExtensionsTest : public ::testing::Test {
 TEST_F(CtExtensionsTest, TestSCTExtension) {
   // Sanity check
   Cert simple_cert(simple_cert_);
-  EXPECT_EQ(Cert::FALSE,
-            simple_cert.HasExtension(
-                cert_trans::NID_ctSignedCertificateTimestampList));
+  EXPECT_FALSE(simple_cert.HasExtension(
+      cert_trans::NID_ctSignedCertificateTimestampList).ValueOrDie());
 
   Cert sct_cert(sct_cert_);
   // Check we can find the extension by its advertised NID.
   // We should really be checking that the OID matches the expected OID but
   // what other extension could this cert be having that the other one doesn't?
-  ASSERT_EQ(Cert::TRUE, sct_cert.HasExtension(
-                            cert_trans::NID_ctSignedCertificateTimestampList));
+  ASSERT_TRUE(
+      sct_cert.HasExtension(cert_trans::NID_ctSignedCertificateTimestampList)
+          .ValueOrDie());
 
   string ext_data;
   EXPECT_OK(sct_cert.OctetStringExtensionData(
@@ -91,18 +91,20 @@ TEST_F(CtExtensionsTest, TestSCTExtension) {
 TEST_F(CtExtensionsTest, TestEmbeddedSCTExtension) {
   // Sanity check
   Cert simple_cert(simple_cert_);
-  EXPECT_EQ(Cert::FALSE,
-            simple_cert.HasExtension(
-                cert_trans::NID_ctEmbeddedSignedCertificateTimestampList));
+  EXPECT_FALSE(
+      simple_cert.HasExtension(
+                     cert_trans::NID_ctEmbeddedSignedCertificateTimestampList)
+          .ValueOrDie());
 
   Cert embedded_sct_cert(embedded_sct_cert_);
   ASSERT_TRUE(embedded_sct_cert.IsLoaded());
   // Check we can find the extension by its advertised NID.
   // We should really be checking that the OID matches the expected OID but
   // what other extension could this cert be having that the other one doesn't?
-  ASSERT_EQ(Cert::TRUE,
-            embedded_sct_cert.HasExtension(
-                cert_trans::NID_ctEmbeddedSignedCertificateTimestampList));
+  ASSERT_TRUE(embedded_sct_cert
+                  .HasExtension(
+                      cert_trans::NID_ctEmbeddedSignedCertificateTimestampList)
+                  .ValueOrDie());
   string ext_data;
   EXPECT_OK(embedded_sct_cert.OctetStringExtensionData(
       cert_trans::NID_ctEmbeddedSignedCertificateTimestampList, &ext_data));
@@ -130,14 +132,14 @@ TEST_F(CtExtensionsTest, TestEmbeddedSCTExtension) {
 TEST_F(CtExtensionsTest, TestPoisonExtension) {
   // Sanity check
   Cert simple_cert(simple_cert_);
-  EXPECT_EQ(Cert::FALSE, simple_cert.HasExtension(cert_trans::NID_ctPoison));
+  EXPECT_FALSE(simple_cert.HasExtension(cert_trans::NID_ctPoison).ValueOrDie());
 
   Cert poison_cert(poison_cert_);
   ASSERT_TRUE(poison_cert.IsLoaded());
   // Check we can find the extension by its advertised NID.
   // We should really be checking that the OID matches the expected OID but
   // what other extension could this cert be having that the other one doesn't?
-  ASSERT_EQ(Cert::TRUE, poison_cert.HasExtension(cert_trans::NID_ctPoison));
+  ASSERT_TRUE(poison_cert.HasExtension(cert_trans::NID_ctPoison).ValueOrDie());
 
   // Now fish the extension data out using the print methods and check they
   // operate as expected.

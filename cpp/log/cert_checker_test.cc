@@ -262,7 +262,7 @@ TEST_F(CertCheckerTest, PreCert) {
   PreCertChain chain(chain_pem);
 
   ASSERT_TRUE(chain.IsLoaded());
-  EXPECT_EQ(Cert::TRUE, chain.IsWellFormed());
+  EXPECT_TRUE(chain.IsWellFormed().ValueOrDie());
 
   // Fail as we have no CA certs.
   string issuer_key_hash, tbs;
@@ -284,7 +284,7 @@ TEST_F(CertCheckerTest, PreCertWithPreCa) {
   PreCertChain chain(chain_pem);
 
   ASSERT_TRUE(chain.IsLoaded());
-  EXPECT_EQ(Cert::TRUE, chain.IsWellFormed());
+  EXPECT_TRUE(chain.IsWellFormed().ValueOrDie());
 
   string issuer_key_hash, tbs;
   // Fail as we have no CA certs.
@@ -303,7 +303,7 @@ TEST_F(CertCheckerTest, PreCertWithPreCa) {
   // A second, invalid chain, with no CA precert.
   PreCertChain chain2(precert_with_preca_pem_);
   ASSERT_TRUE(chain2.IsLoaded());
-  EXPECT_EQ(Cert::TRUE, chain2.IsWellFormed());
+  EXPECT_TRUE(chain2.IsWellFormed().ValueOrDie());
   EXPECT_THAT(checker_.CheckPreCertChain(&chain2, &issuer_key_hash, &tbs),
               StatusIs(util::error::FAILED_PRECONDITION));
 }

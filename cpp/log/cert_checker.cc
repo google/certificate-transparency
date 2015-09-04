@@ -141,14 +141,15 @@ Status CertChecker::CheckCertChain(CertChain* chain) const {
     return Status(util::error::INVALID_ARGUMENT, "invalid certificate chain");
 
   // Weed out things that should obviously be precert chains instead.
-  Cert::Status status =
+  const StatusOr<bool> has_poison =
       chain->LeafCert()->HasCriticalExtension(cert_trans::NID_ctPoison);
-  if (status != Cert::TRUE && status != Cert::FALSE) {
+  if (!has_poison.ok()) {
     return Status(util::error::INTERNAL, "internal error");
   }
-  if (status == Cert::TRUE)
+  if (has_poison.ValueOrDie()) {
     return Status(util::error::INVALID_ARGUMENT,
                   "precert extension in certificate chain");
+  }
 
   return CheckIssuerChain(chain);
 }
@@ -178,12 +179,15 @@ Status CertChecker::CheckIssuerChain(CertChain* chain) const {
 Status CertChecker::CheckPreCertChain(PreCertChain* chain,
                                       string* issuer_key_hash,
                                       string* tbs_certificate) const {
-  if (!chain || !chain->IsLoaded())
+  if (!chain || !chain->IsLoaded()) {
     return Status(util::error::INVALID_ARGUMENT, "invalid certificate chain");
-  Cert::Status status = chain->IsWellFormed();
-  if (status == Cert::FALSE)
+  }
+
+  const StatusOr<bool> chain_well_formed(chain->IsWellFormed());
+  if (chain_well_formed.ok() && !chain_well_formed.ValueOrDie()) {
     return Status(util::error::INVALID_ARGUMENT, "prechain not well formed");
-  if (status != Cert::TRUE) {
+  }
+  if (!chain_well_formed.ok()) {
     LOG(ERROR) << "Failed to check precert chain format";
     return Status(util::error::INTERNAL, "internal error");
   }
@@ -208,12 +212,13 @@ Status CertChecker::CheckPreCertChain(PreCertChain* chain,
       return status;
   }
 
-  Cert::Status uses_pre_issuer = chain->UsesPrecertSigningCertificate();
-  if (uses_pre_issuer != Cert::TRUE && uses_pre_issuer != Cert::FALSE)
+  const StatusOr<bool> uses_pre_issuer = chain->UsesPrecertSigningCertificate();
+  if (!uses_pre_issuer.ok()) {
     return Status(util::error::INTERNAL, "internal error");
+  }
 
   string key_hash;
-  if (uses_pre_issuer == Cert::TRUE) {
+  if (uses_pre_issuer.ValueOrDie()) {
     if (chain->Length() < 3 ||
         chain->CertAt(2)->SPKISha256Digest(&key_hash) != util::Status::OK)
       return Status(util::error::INTERNAL, "internal error");
@@ -233,7 +238,7 @@ Status CertChecker::CheckPreCertChain(PreCertChain* chain,
   // replace the issuer with the one that will sign the final cert.
   // Should always succeed as we've already verified that the chain
   // is well-formed.
-  if (uses_pre_issuer == Cert::TRUE &&
+  if (uses_pre_issuer.ValueOrDie() &&
       !tbs.CopyIssuerFrom(*chain->PrecertIssuingCert()).ok()) {
     return Status(util::error::INTERNAL, "internal error");
   }

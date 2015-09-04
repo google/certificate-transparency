@@ -19,6 +19,7 @@ using ct::PrecertChainEntry;
 using ct::X509ChainEntry;
 using std::string;
 using util::Status;
+using util::StatusOr;
 
 // TODO(ekasper): handle Cert errors consistently and log some errors here
 // if they fail.
@@ -29,17 +30,18 @@ CertSubmissionHandler::CertSubmissionHandler(CertChecker* cert_checker)
 // static
 bool CertSubmissionHandler::X509ChainToEntry(const CertChain& chain,
                                              LogEntry* entry) {
-  if (!chain.IsLoaded())
+  if (!chain.IsLoaded()) {
     return false;
+  }
 
-  Cert::Status status = chain.LeafCert()->HasExtension(
+  const StatusOr<bool> has_embedded_proof = chain.LeafCert()->HasExtension(
       cert_trans::NID_ctEmbeddedSignedCertificateTimestampList);
-  if (status != Cert::TRUE && status != Cert::FALSE) {
+  if (!has_embedded_proof.ok()) {
     LOG(ERROR) << "Failed to check embedded SCT extension.";
     return false;
   }
 
-  if (status == Cert::TRUE) {
+  if (has_embedded_proof.ValueOrDie()) {
     if (chain.Length() < 2) {
       // need issuer
       return false;
@@ -133,9 +135,9 @@ bool CertSubmissionHandler::SerializedTbs(const Cert& cert, string* result) {
     return false;
   }
 
-  Cert::Status status = cert.HasExtension(
+  const StatusOr<bool> has_embedded_proof = cert.HasExtension(
       cert_trans::NID_ctEmbeddedSignedCertificateTimestampList);
-  if (status != Cert::TRUE && status != Cert::FALSE) {
+  if (!has_embedded_proof.ok()) {
     return false;
   }
 
@@ -145,7 +147,7 @@ bool CertSubmissionHandler::SerializedTbs(const Cert& cert, string* result) {
     return false;
   }
 
-  if (status == Cert::TRUE &&
+  if (has_embedded_proof.ValueOrDie() &&
       !tbs.DeleteExtension(
           cert_trans::NID_ctEmbeddedSignedCertificateTimestampList).ok()) {
     return false;
