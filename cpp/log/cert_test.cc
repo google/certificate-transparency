@@ -16,6 +16,7 @@ using cert_trans::CertChain;
 using cert_trans::PreCertChain;
 using cert_trans::TbsCertificate;
 using std::string;
+using util::error::Code;
 using util::testing::StatusIs;
 
 // TODO(ekasper): add test certs with intermediates.
@@ -353,7 +354,8 @@ TEST_F(CertTest, TestUnsupportedAlgorithm) {
 // see anything else. Make the test fail if this is not the case to notify the
 // user that their setup is insecure.
 #ifdef OPENSSL_NO_MD2
-  EXPECT_EQ(Cert::UNSUPPORTED_ALGORITHM, legacy.IsSignedBy(legacy));
+  EXPECT_THAT(legacy.IsSignedBy(legacy).status(),
+              StatusIs(Code::UNIMPLEMENTED));
 #else
   LOG(WARNING) << "Skipping test: MD2 is enabled! You should configure "
                << "OpenSSL with -DOPENSSL_NO_MD2 to be safe!";
@@ -394,21 +396,21 @@ TEST_F(CertTest, Issuers) {
   Cert ca_pre(ca_precert_pem_);
   Cert pre(precert_pem_);
 
-  EXPECT_EQ(Cert::TRUE, leaf.IsIssuedBy(ca));
-  EXPECT_EQ(Cert::TRUE, leaf.IsSignedBy(ca));
+  EXPECT_TRUE(leaf.IsIssuedBy(ca).ValueOrDie());
+  EXPECT_TRUE(leaf.IsSignedBy(ca).ValueOrDie());
 
-  EXPECT_EQ(Cert::FALSE, ca.IsIssuedBy(leaf));
-  EXPECT_EQ(Cert::FALSE, ca.IsSignedBy(leaf));
+  EXPECT_FALSE(ca.IsIssuedBy(leaf).ValueOrDie());
+  EXPECT_FALSE(ca.IsSignedBy(leaf).ValueOrDie());
 
-  EXPECT_EQ(Cert::FALSE, leaf.IsSelfSigned());
-  EXPECT_EQ(Cert::TRUE, ca.IsSelfSigned());
+  EXPECT_FALSE(leaf.IsSelfSigned().ValueOrDie());
+  EXPECT_TRUE(ca.IsSelfSigned().ValueOrDie());
 }
 
 TEST_F(CertTest, DerEncodedNames) {
   Cert leaf(leaf_pem_);
   Cert ca(ca_pem_);
 
-  ASSERT_EQ(Cert::TRUE, leaf.IsIssuedBy(ca));
+  ASSERT_TRUE(leaf.IsIssuedBy(ca).ValueOrDie());
 
   string leaf_subject, leaf_issuer, ca_subject, ca_issuer;
   EXPECT_EQ(Cert::TRUE, leaf.DerEncodedSubjectName(&leaf_subject));
@@ -431,9 +433,9 @@ TEST_F(CertTest, DerEncodedNames) {
 TEST_F(CertTest, SignatureAlgorithmMatches) {
   Cert matching_algs(kMatchingSigAlgsCertString);
   Cert issuer(kMismatchingSigAlgsCertIssuerString);
-  EXPECT_EQ(Cert::TRUE, matching_algs.IsSignedBy(issuer));
+  EXPECT_TRUE(matching_algs.IsSignedBy(issuer).ValueOrDie());
   Cert mismatched_algs(kMismatchingSigAlgsCertString);
-  EXPECT_EQ(Cert::FALSE, mismatched_algs.IsSignedBy(issuer));
+  EXPECT_FALSE(mismatched_algs.IsSignedBy(issuer).ValueOrDie());
 }
 
 TEST_F(CertTest, TestIsRedactedHost) {

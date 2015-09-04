@@ -112,16 +112,16 @@ class Cert {
   // Returns TRUE if the Cert's issuer matches |issuer|.
   // Returns FALSE if there is no match.
   // Returns ERROR if either cert is not loaded.
-  Status IsIssuedBy(const Cert& issuer) const;
+  util::StatusOr<bool> IsIssuedBy(const Cert& issuer) const;
 
   // Returns TRUE if the cert's signature can be verified by the issuer's
   // public key.
   // Returns FALSE if the signature cannot be verified.
   // Returns ERROR if either cert is not loaded or some other error occurs.
   // Does not check if issuer has CA capabilities.
-  Status IsSignedBy(const Cert& issuer) const;
+  util::StatusOr<bool> IsSignedBy(const Cert& issuer) const;
 
-  Status IsSelfSigned() const {
+  util::StatusOr<bool> IsSelfSigned() const {
     return IsIssuedBy(*this);
   }
 

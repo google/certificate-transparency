@@ -370,7 +370,7 @@ TEST_F(CertCheckerTest, DontAcceptMD2) {
   CertChain chain(chain_pem);
   ASSERT_TRUE(chain.IsLoaded());
   // Verify testdata properties: chain terminates in an MD2 intermediate.
-  ASSERT_EQ(Cert::FALSE, chain.LastCert()->IsSelfSigned());
+  ASSERT_FALSE(chain.LastCert()->IsSelfSigned().ValueOrDie());
   ASSERT_TRUE(chain.LastCert()->HasBasicConstraintCATrue().ValueOrDie());
   ASSERT_EQ("md2WithRSAEncryption",
             chain.LastCert()->PrintSignatureAlgorithm());

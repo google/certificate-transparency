@@ -370,31 +370,30 @@ StatusOr<bool> Cert::HasExtendedKeyUsage(int key_usage_nid) const {
 }
 
 
-Cert::Status Cert::IsIssuedBy(const Cert& issuer) const {
+StatusOr<bool> Cert::IsIssuedBy(const Cert& issuer) const {
   if (!IsLoaded() || !issuer.IsLoaded()) {
     LOG(ERROR) << "Cert not loaded";
-    return ERROR;
+    return util::Status(Code::FAILED_PRECONDITION, "Cert not loaded");
   }
-  int ret = X509_check_issued(const_cast<X509*>(issuer.x509_), x509_);
-  // Seemingly no negative "real" error codes are returned from here.
-  return ret == X509_V_OK ? TRUE : FALSE;
+  // Seemingly no negative "real" error codes are returned from openssl api.
+  return X509_check_issued(const_cast<X509*>(issuer.x509_), x509_) == X509_V_OK;
 }
 
 
-Cert::Status Cert::IsSignedBy(const Cert& issuer) const {
+StatusOr<bool> Cert::IsSignedBy(const Cert& issuer) const {
   if (!IsLoaded() || !issuer.IsLoaded()) {
     LOG(ERROR) << "Cert not loaded";
-    return ERROR;
+    return util::Status(Code::FAILED_PRECONDITION, "Cert not loaded");
   }
 
-  EVP_PKEY* issuer_key = X509_get_pubkey(issuer.x509_);
-  if (!issuer_key) {
+  EVP_PKEY* const issuer_key = X509_get_pubkey(issuer.x509_);
+  if (issuer_key == NULL) {
     LOG(WARNING) << "NULL issuer key";
     LOG_OPENSSL_ERRORS(WARNING);
-    return FALSE;
+    return false;
   }
 
-  int ret = X509_verify(x509_, issuer_key);
+  const int ret(X509_verify(x509_, issuer_key));
   EVP_PKEY_free(issuer_key);
   if (ret < 0) {
     unsigned long err = ERR_peek_last_error();
@@ -404,14 +403,14 @@ Cert::Status Cert::IsSignedBy(const Cert& issuer) const {
          reason == ASN1_R_UNKNOWN_SIGNATURE_ALGORITHM)) {
       LOG(WARNING) << "Unsupported algorithm: " << PrintSignatureAlgorithm();
       ClearOpenSSLErrors();
-      return UNSUPPORTED_ALGORITHM;
+      return util::Status(Code::UNIMPLEMENTED, "Unsupported algorithm");
     } else {
       LOG(ERROR) << "OpenSSL X509_verify returned error code " << ret;
       LOG_OPENSSL_ERRORS(ERROR);
-      return ERROR;
+      return util::Status(Code::INTERNAL, "X509 verify error");
     }
   }
-  return ret > 0 ? TRUE : FALSE;
+  return ret > 0;
 }
 
 
@@ -1261,10 +1260,10 @@ Cert::Status CertChain::RemoveCertsAfterFirstSelfSigned() {
 
   // Find the first self-signed certificate.
   for (size_t i = 0; i < chain_.size(); ++i) {
-    Cert::Status status = chain_[i]->IsSelfSigned();
-    if (status != Cert::TRUE && status != Cert::FALSE)
+    StatusOr<bool> status = chain_[i]->IsSelfSigned();
+    if (!status.ok()) {
       return Cert::ERROR;
-    if (status == Cert::TRUE) {
+    } else if (status.ValueOrDie()) {
       first_self_signed = i;
       break;
     }
@@ -1293,27 +1292,27 @@ Cert::Status CertChain::IsValidCaIssuerChainMaybeLegacyRoot() const {
     return Cert::ERROR;
   }
 
-  Cert::Status status;
   for (vector<Cert*>::const_iterator it = chain_.begin();
        it + 1 < chain_.end(); ++it) {
     Cert* subject = *it;
     Cert* issuer = *(it + 1);
 
     // The root cert may not have CA:True
-    status = issuer->IsSelfSigned();
-    if (status == Cert::FALSE) {
-      StatusOr<bool> s2 = issuer->HasBasicConstraintCATrue();
-      if (StatusOrBoolToCertStatus(s2) != Cert::TRUE) {
+    const StatusOr<bool> status = issuer->IsSelfSigned();
+    if (status.ok() && !status.ValueOrDie()) {
+      const StatusOr<bool> s2(issuer->HasBasicConstraintCATrue());
+      if (!s2.ok() || !s2.ValueOrDie()) {
         return StatusOrBoolToCertStatus(s2);
       }
-    } else if (status != Cert::TRUE) {
+    } else if (!status.ok()) {
       LOG(ERROR) << "Failed to check self-signed status";
       return Cert::ERROR;
     }
 
-    status = subject->IsIssuedBy(*issuer);
-    if (status != Cert::TRUE)
-      return status;
+    const StatusOr<bool> s3 = subject->IsIssuedBy(*issuer);
+    if (!s3.ok() || !s3.ValueOrDie()) {
+      return StatusOrBoolToCertStatus(s3);
+    }
   }
   return Cert::TRUE;
 }
@@ -1331,26 +1330,24 @@ util::Status CertChain::IsValidSignatureChain() const {
     Cert* subject = *it;
     Cert* issuer = *(it + 1);
 
-    switch (subject->IsSignedBy(*issuer)) {
-      case Cert::TRUE:
-        continue;
-      case Cert::FALSE:
-        return util::Status(util::error::INVALID_ARGUMENT,
-                            "invalid certificate chain");
-      case Cert::UNSUPPORTED_ALGORITHM:
-        // UNSUPPORTED_ALGORITHM can happen when a weak algorithm
-        // (such as MD2) is intentionally not accepted in which case
-        // it's correct to say that the chain is invalid.
-        // It can also happen when EVP is not properly initialized, in
-        // which case it's more of an INTERNAL_ERROR. However a bust
-        // setup would manifest itself in many other ways, including
-        // failing tests, so we assume the failure is intentional.
-        return util::Status(util::error::UNIMPLEMENTED,
-                            "unsupported algorithm in certificate chain");
-      case Cert::ERROR:
-        LOG(ERROR) << "Failed to check signature chain";
-        return util::Status(util::error::INTERNAL,
-                            "failed to check signature chain");
+    const StatusOr<bool> status = subject->IsSignedBy(*issuer);
+
+    // Propagate any failure status if we get one. This includes
+    // UNIMPLEMENTED for unsupported algorithms. This can happen
+    // when a weak algorithm (such as MD2) is intentionally not
+    // accepted in which case it's correct to say that the chain is invalid.
+    // It can also happen when EVP is not properly initialized, in
+    // which case it's more of an INTERNAL_ERROR. However a bust
+    // setup would manifest itself in many other ways, including
+    // failing tests, so we assume the failure is intentional.
+    if (!status.ok()) {
+      return status.status();
+    }
+
+    // Must have been signed by issuer or it's an invalid chain
+    if (!status.ValueOrDie()) {
+      return util::Status(util::error::INVALID_ARGUMENT,
+                          "invalid certificate chain");
     }
   }
 
