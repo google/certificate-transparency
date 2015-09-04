@@ -376,7 +376,8 @@ TEST_F(CertCheckerTest, DontAcceptMD2) {
             chain.LastCert()->PrintSignatureAlgorithm());
 
 #ifdef OPENSSL_NO_MD2
-  EXPECT_THAT(checker_.CheckCertChain(&chain), StatusIs(util::error::INTERNAL));
+  EXPECT_THAT(checker_.CheckCertChain(&chain),
+              StatusIs(util::error::INVALID_ARGUMENT));
 #else
   LOG(WARNING) << "Skipping test: MD2 is enabled! You should configure "
                << "OpenSSL with -DOPENSSL_NO_MD2 to be safe!";

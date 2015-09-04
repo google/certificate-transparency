@@ -354,8 +354,8 @@ TEST_F(CertTest, TestUnsupportedAlgorithm) {
 // see anything else. Make the test fail if this is not the case to notify the
 // user that their setup is insecure.
 #ifdef OPENSSL_NO_MD2
-  EXPECT_EQ(Code::UNIMPLEMENTED,
-            legacy.IsSignedBy(legacy).status().error_code());
+  EXPECT_THAT(legacy.IsSignedBy(legacy).status(),
+              StatusIs(Code::UNIMPLEMENTED));
 #else
   LOG(WARNING) << "Skipping test: MD2 is enabled! You should configure "
                << "OpenSSL with -DOPENSSL_NO_MD2 to be safe!";

@@ -294,7 +294,7 @@ Status CertChecker::GetTrustedCa(CertChain* chain) const {
     const Cert* issuer_cand = it->second;
 
     StatusOr<bool> signed_by_issuer = subject->IsSignedBy(*issuer_cand);
-    if (signed_by_issuer.status().error_code() == Code::UNAVAILABLE) {
+    if (signed_by_issuer.status().CanonicalCode() == Code::UNIMPLEMENTED) {
       // If the cert's algorithm is unsupported, then there's no point
       // continuing: it's unconditionally invalid.
       return Status(util::error::INVALID_ARGUMENT,
