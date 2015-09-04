@@ -154,7 +154,7 @@ Status CertChecker::CheckCertChain(CertChain* chain) const {
 }
 
 Status CertChecker::CheckIssuerChain(CertChain* chain) const {
-  if (chain->RemoveCertsAfterFirstSelfSigned() != Cert::TRUE) {
+  if (!chain->RemoveCertsAfterFirstSelfSigned()) {
     LOG(ERROR) << "Failed to trim chain";
     return Status(util::error::INTERNAL, "failed to trim chain");
   }
@@ -318,7 +318,7 @@ Status CertChecker::GetTrustedCa(CertChain* chain) const {
   // Clone creates a new Cert but AddCert takes ownership even if Clone
   // failed and the cert can't be added, so we don't have to explicitly
   // check for IsLoaded here.
-  if (chain->AddCert(issuer->Clone()) != Cert::TRUE) {
+  if (!chain->AddCert(issuer->Clone())) {
     LOG(ERROR) << "Failed to add trusted root to chain";
     return Status(util::error::INTERNAL,
                   "failed to add trusted root to chain");

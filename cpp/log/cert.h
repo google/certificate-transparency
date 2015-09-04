@@ -306,21 +306,19 @@ class CertChain {
 
   // Takes ownership of the cert.
   // If the cert has a valid X509 structure, adds it to the end of the chain
-  // and returns TRUE.
-  // Else returns ERROR.
-  Cert::Status AddCert(Cert* cert);
+  // and returns true.
+  // Else returns false.
+  bool AddCert(Cert* cert);
 
-  // Remove a cert from the end of the chain.
-  // If successful, returns TRUE.
-  // If the chain is empty, returns ERROR.
-  Cert::Status RemoveCert();
+  // Remove a cert from the end of the chain, if there is one.
+  void RemoveCert();
 
   // Keep the first self-signed, remove the rest. We keep the first one so that
   // chains consisting only of a self-signed cert don't become invalid.
-  // If successful, returns TRUE.
-  // If the chain is empty, returns ERROR.
-  // If the chain has no self-signed certs, does nothing and also returns TRUE.
-  Cert::Status RemoveCertsAfterFirstSelfSigned();
+  // If successful, returns true.
+  // If the chain is empty, returns false.
+  // If the chain has no self-signed certs, does nothing and also returns true.
+  bool RemoveCertsAfterFirstSelfSigned();
 
   // True if the chain loaded correctly, and contains at least one valid cert.
   bool IsLoaded() const {

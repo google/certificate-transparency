@@ -211,7 +211,7 @@ TEST_F(CertCheckerTest, Certificate) {
 TEST_F(CertCheckerTest, CertificateWithRoot) {
   CertChain chain(leaf_pem_);
   ASSERT_TRUE(chain.IsLoaded());
-  ASSERT_EQ(Cert::TRUE, chain.AddCert(new Cert(ca_pem_)));
+  ASSERT_TRUE(chain.AddCert(new Cert(ca_pem_)));
 
   // Fail as even though we give a CA cert, it's not in the local store.
   EXPECT_THAT(checker_.CheckCertChain(&chain),
@@ -226,8 +226,8 @@ TEST_F(CertCheckerTest, CertificateWithRoot) {
 TEST_F(CertCheckerTest, TrimsRepeatedRoots) {
   CertChain chain(leaf_pem_);
   ASSERT_TRUE(chain.IsLoaded());
-  ASSERT_EQ(Cert::TRUE, chain.AddCert(new Cert(ca_pem_)));
-  ASSERT_EQ(Cert::TRUE, chain.AddCert(new Cert(ca_pem_)));
+  ASSERT_TRUE(chain.AddCert(new Cert(ca_pem_)));
+  ASSERT_TRUE(chain.AddCert(new Cert(ca_pem_)));
 
   // Load CA certs and expect success.
   EXPECT_TRUE(checker_.LoadTrustedCertificates(cert_dir_ + "/" + kCaCert));
@@ -245,7 +245,7 @@ TEST_F(CertCheckerTest, Intermediates) {
   EXPECT_THAT(checker_.CheckCertChain(&chain),
               StatusIs(util::error::FAILED_PRECONDITION));
   // Add the intermediate and expect success.
-  ASSERT_EQ(Cert::TRUE, chain.AddCert(new Cert(intermediate_pem_)));
+  ASSERT_TRUE(chain.AddCert(new Cert(intermediate_pem_)));
   ASSERT_EQ(2U, chain.Length());
   EXPECT_OK(checker_.CheckCertChain(&chain));
   EXPECT_EQ(3U, chain.Length());

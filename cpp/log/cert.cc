@@ -1233,33 +1233,32 @@ CertChain::CertChain(const string& pem_string) {
 }
 
 
-Cert::Status CertChain::AddCert(Cert* cert) {
+bool CertChain::AddCert(Cert* cert) {
   if (!cert || !cert->IsLoaded()) {
     LOG(ERROR) << "Attempting to add an invalid cert";
     if (cert)
       delete cert;
-    return Cert::ERROR;
+    return false;
   }
   chain_.push_back(cert);
-  return Cert::TRUE;
+  return true;
 }
 
 
-Cert::Status CertChain::RemoveCert() {
-  if (!IsLoaded()) {
+void CertChain::RemoveCert() {
+  if (IsLoaded()) {
+    delete chain_.back();
+    chain_.pop_back();
+  } else {
     LOG(ERROR) << "Chain is not loaded";
-    return Cert::ERROR;
   }
-  delete chain_.back();
-  chain_.pop_back();
-  return Cert::TRUE;
 }
 
 
-Cert::Status CertChain::RemoveCertsAfterFirstSelfSigned() {
+bool CertChain::RemoveCertsAfterFirstSelfSigned() {
   if (!IsLoaded()) {
     LOG(ERROR) << "Chain is not loaded";
-    return Cert::ERROR;
+    return false;
   }
 
   size_t first_self_signed = chain_.size();
@@ -1268,7 +1267,7 @@ Cert::Status CertChain::RemoveCertsAfterFirstSelfSigned() {
   for (size_t i = 0; i < chain_.size(); ++i) {
     StatusOr<bool> status = chain_[i]->IsSelfSigned();
     if (!status.ok()) {
-      return Cert::ERROR;
+      return false;
     } else if (status.ValueOrDie()) {
       first_self_signed = i;
       break;
@@ -1276,14 +1275,14 @@ Cert::Status CertChain::RemoveCertsAfterFirstSelfSigned() {
   }
 
   if (first_self_signed == chain_.size())
-    return Cert::TRUE;
+    return true;
 
   // Remove everything after it.
   size_t chain_size = chain_.size();
   for (size_t i = first_self_signed + 1; i < chain_size; ++i) {
     RemoveCert();
   }
-  return Cert::TRUE;
+  return true;
 }
 
 
