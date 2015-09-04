@@ -729,11 +729,11 @@ static void DiagnoseCertChain() {
   }
 
   string serialized_scts;
-  StatusOr<bool> status = chain.LeafCert()->OctetStringExtensionData(
+  util::Status status = chain.LeafCert()->OctetStringExtensionData(
       cert_trans::NID_ctEmbeddedSignedCertificateTimestampList,
       &serialized_scts);
-  if (!status.ok() || !status.ValueOrDie()) {
-    LOG(ERROR) << "SCT extension data is invalid.";
+  if (!status.ok()) {
+    LOG(ERROR) << "SCT extension data is missing / invalid.";
     return;
   }
 
@@ -817,11 +817,9 @@ void WrapEmbedded() {
 
   string serialized_scts;
   CHECK_EQ(true,
-           chain.LeafCert()
-               ->OctetStringExtensionData(
-                   cert_trans::NID_ctEmbeddedSignedCertificateTimestampList,
-                   &serialized_scts)
-               .ValueOrDie());
+           chain.LeafCert()->OctetStringExtensionData(
+               cert_trans::NID_ctEmbeddedSignedCertificateTimestampList,
+               &serialized_scts).ok());
   SignedCertificateTimestampList sct_list;
   CHECK_EQ(Deserializer::OK,
            Deserializer::DeserializeSCTList(serialized_scts, &sct_list));

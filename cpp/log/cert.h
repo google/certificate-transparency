@@ -188,15 +188,15 @@ class Cert {
   // contents is an ASN1_OCTET_STRING. Only use if you know what
   // you're doing.
   //
-  // Returns TRUE if the extension data could be fetched and decoded.
-  // Returns FALSE if the extension is not present, or is present but is not
+  // Returns OK if the extension data could be fetched and decoded.
+  // Returns NOT_FOUND if the extension is not present, or is present but is not
   // a valid ASN1 OCTET STRING.
-  // Returns ERROR if the cert is not loaded or the extension_nid is not
-  // recognised.
+  // Returns a suitable status if the cert is not loaded or the extension_nid is
+  // not recognised.
   // TODO(ekasper): consider registering known custom NIDS explicitly with the
   // Cert API for safety.
-  util::StatusOr<bool> OctetStringExtensionData(int extension_nid,
-                                                std::string* result) const;
+  util::Status OctetStringExtensionData(int extension_nid,
+                                        std::string* result) const;
 
   // Tests whether the certificate correctly follows the RFC rules for
   // using wildcard redaction.

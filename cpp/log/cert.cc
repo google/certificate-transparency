@@ -588,8 +588,8 @@ util::Status Cert::SPKISha256Digest(string* result) const {
   return util::Status::OK;
 }
 
-StatusOr<bool> Cert::OctetStringExtensionData(int extension_nid,
-                                              string* result) const {
+util::Status Cert::OctetStringExtensionData(int extension_nid,
+                                            string* result) const {
   if (!IsLoaded()) {
     LOG(ERROR) << "Cert not loaded";
     return util::Status(Code::FAILED_PRECONDITION, "Cert not loaded");
@@ -598,7 +598,9 @@ StatusOr<bool> Cert::OctetStringExtensionData(int extension_nid,
   void* ext_data;
   Status status = ExtensionStructure(extension_nid, &ext_data);
   if (status != TRUE) {
-    return CertStatusToStatusOrBool(status);
+    // TODO(Martin2112): This should return the result of ExtensionStructure()
+    // when it's been converted.
+    return util::Status(Code::NOT_FOUND, "Extension not present or invalid");
   }
 
   // |octet| is never null upon success. Caller is responsible for the
@@ -606,7 +608,7 @@ StatusOr<bool> Cert::OctetStringExtensionData(int extension_nid,
   ASN1_OCTET_STRING* octet = static_cast<ASN1_OCTET_STRING*>(ext_data);
   result->assign(reinterpret_cast<const char*>(octet->data), octet->length);
   ASN1_OCTET_STRING_free(octet);
-  return true;
+  return util::Status::OK;
 }
 
 
