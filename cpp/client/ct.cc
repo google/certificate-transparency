@@ -221,7 +221,7 @@ static bool PrecertChainToEntry(const cert_trans::PreCertChain& chain,
 
   entry->set_type(ct::PRECERT_ENTRY);
   string key_hash;
-  if (chain.CertAt(1)->SPKISha256Digest(&key_hash) != util::Status::OK) {
+  if (!chain.CertAt(1)->SPKISha256Digest(&key_hash).ok()) {
     LOG(ERROR) << "Failed to get SPKISha256.";
     return false;
   }
