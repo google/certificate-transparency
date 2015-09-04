@@ -816,10 +816,10 @@ void WrapEmbedded() {
                cert_trans::NID_ctEmbeddedSignedCertificateTimestampList));
 
   string serialized_scts;
-  CHECK_EQ(true,
+  CHECK_EQ(::util::Status::OK,
            chain.LeafCert()->OctetStringExtensionData(
                cert_trans::NID_ctEmbeddedSignedCertificateTimestampList,
-               &serialized_scts).ok());
+               &serialized_scts));
   SignedCertificateTimestampList sct_list;
   CHECK_EQ(Deserializer::OK,
            Deserializer::DeserializeSCTList(serialized_scts, &sct_list));
