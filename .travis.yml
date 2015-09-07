@@ -24,7 +24,7 @@ before_install:
  - wget https://github.com/ellzey/libevhtp/archive/1.2.10.zip -O /tmp/libevhtp-1.2.10.zip
  - unzip -d /tmp/ /tmp/libevhtp-1.2.10.zip
  - mkdir /tmp/libevhtp-1.2.10/build
- - pushd /tmp/libevhtp-1.2.10/build && cmake -DEVHTP_DISABLE_REGEX:STRING=ON .. && sudo make install; popd
+ - pushd /tmp/libevhtp-1.2.10/build && cmake -DEVHTP_DISABLE_REGEX:STRING=ON -DCMAKE_C_FLAGS="-fPIC" .. && sudo make install; popd
  - sudo pip install -r python/requirements.txt
  - sudo ln -s protobuf-java.jar /usr/share/java/protobuf.jar
  - mkdir -p $GOPATH/src/github.com/google
