@@ -7,6 +7,9 @@ AC_CONFIG_MACRO_DIRS([m4])
 AM_SILENT_RULES([yes])
 AC_LANG([C++])
 
+AC_ARG_ENABLE(hardening,
+              AS_HELP_STRING([--disable-hardening], [Use C++ compiler flags which produce a hardened binary]))
+
 GMOCK_DIR="${GMOCK_DIR=/usr/src/gmock}"
 AC_ARG_VAR([GMOCK_DIR], [directory containing Google Mock])
 GTEST_DIR="${GTEST_DIR="$GMOCK_DIR/gtest"}"
@@ -24,6 +27,25 @@ AX_CXX_COMPILE_STDCXX_11
 AC_CHECK_PROGS([ANT], [ant])
 
 PKG_CHECK_MODULES([json_c], [json-c])
+
+if test "x${enable_hardening}" != "xno"; then
+  common_harden_copts="-fstack-protector-all -fPIE -Wa,--noexecstack -Wformat -Wformat-security"
+  clang_harden_copts="-Qunused-arguments $common_harden_copts"
+  gcc_harden_copts="$common_harden_copts"
+  AS_CASE([$CXX],
+          [clang++], [AS_VAR_APPEND([CXXFLAGS], [" $clang_harden_copts"])],
+          [g++], [AS_VAR_APPEND([CXXFLAGS], [" $gcc_harden_copts"])],
+          [AC_MSG_FAILURE([Hardening enabled, but we don't have hardening flags for C++ compiler $CXX])])
+  AS_CASE([$CC],
+          [clang], [AS_VAR_APPEND([CFLAGS], [" $clang_harden_copts"])],
+          [gcc], [AS_VAR_APPEND([CFLAGS], [" $gcc_harden_copts"])],
+          [AC_MSG_FAILURE(["Hardening enabled, but we don't have hardening flags for C compiler $CC"])])
+  AS_VAR_APPEND([CPPFLAGS], [" -D_FORTIFY_SOURCE=2"])
+  AS_VAR_APPEND([LDFLAGS], [" -pie -Wl,-z,relro,-z,now"])
+  AC_DEFINE([ENABLE_HARDENING], [], [Hardening enabled.])
+else
+  AC_MSG_WARN([NOT building hardened binaries])
+fi
 
 # Checks for header files.
 AC_HEADER_RESOLV

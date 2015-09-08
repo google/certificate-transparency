@@ -10,6 +10,7 @@
 #include <unistd.h>
 
 #include "log/ct_extensions.h"
+#include "config.h"
 #include "version.h"
 
 using std::string;
@@ -36,6 +37,11 @@ void InitCT(int* argc, char** argv[]) {
   cert_trans::LoadCtExtensions();
 
   LOG(INFO) << "Build version: " << google::VersionString();
+#ifdef ENABLE_HARDENING
+  LOG(INFO) << "Binary built with hardening enabled.";
+#else
+  LOG(WARNING) << "Binary built with hardening DISABLED.";
+#endif
 }
 
 
