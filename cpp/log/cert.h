@@ -244,9 +244,9 @@ class TbsCertificate {
   }
 
   // Sets the DER-encoded TBS structure in |result|.
-  // Returns TRUE if the encoding succeeded.
-  // Returns FALSE if the encoding failed.
-  // Returns ERROR if the cert is not loaded.
+  // Returns OK if the encoding succeeded.
+  // Returns a suitable eror status if the encoding failed.
+  // Returns FAILED_PRECONDITION if the cert is not loaded.
   util::Status DerEncoding(std::string* result) const;
 
   // Delete the matching extension, if present.
@@ -262,10 +262,10 @@ class TbsCertificate {
   // Requires that if Authority KeyID is present in the destination,
   // it must also be present in the source certificate.
   // Does not overwrite the critical bit.
-  // Returns TRUE if the operation succeeded.
-  // Returns FALSE if the operation could not be completed successfully.
-  // Returns ERROR if either cert is not loaded.
-  // Caller should not assume the cert was left unmodified upon FALSE as some
+  // Returns OK if the operation succeeded.
+  // Returns a suitable status if the operation could not be completed successfully.
+  // Returns FAILED_PRECONDITION if either cert is not loaded.
+  // Caller should not assume the dest cert was left unmodified without OK as
   // fields may have been copied successfully before an error occurred.
   util::Status CopyIssuerFrom(const Cert& from);
 
