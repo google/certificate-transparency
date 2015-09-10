@@ -247,16 +247,16 @@ class TbsCertificate {
   // Returns TRUE if the encoding succeeded.
   // Returns FALSE if the encoding failed.
   // Returns ERROR if the cert is not loaded.
-  Cert::Status DerEncoding(std::string* result) const;
+  util::Status DerEncoding(std::string* result) const;
 
   // Delete the matching extension, if present.
-  // Returns TRUE if the extension was present and was deleted.
-  // Returns FALSE if the extension was not present or occurred more than once.
+  // Returns OK if the extension was present and was deleted.
+  // Returns NOT_FOUND if the extension was not present.
   // If multiple extensions with this NID are present, deletes the first
-  // occurrence but returns FALSE.
-  // Returns ERROR if the cert is not loaded, the NID is not recognised
+  // occurrence but returns ALREADY_EXISTS.
+  // Returns a suitable status if the cert is not loaded, the NID is not recognised
   // or deletion failed internally.
-  Cert::Status DeleteExtension(int extension_nid);
+  util::Status DeleteExtension(int extension_nid);
 
   // Copy the issuer and Authority KeyID information.
   // Requires that if Authority KeyID is present in the destination,
@@ -267,10 +267,10 @@ class TbsCertificate {
   // Returns ERROR if either cert is not loaded.
   // Caller should not assume the cert was left unmodified upon FALSE as some
   // fields may have been copied successfully before an error occurred.
-  Cert::Status CopyIssuerFrom(const Cert& from);
+  util::Status CopyIssuerFrom(const Cert& from);
 
  private:
-  Cert::Status ExtensionIndex(int extension_nid, int* extension_index) const;
+  util::StatusOr<int> ExtensionIndex(int extension_nid) const;
   // OpenSSL does not expose a TBSCertificate API, so we keep the TBS wrapped
   // in the X509.
   X509* x509_;
