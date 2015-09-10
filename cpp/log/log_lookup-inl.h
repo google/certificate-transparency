@@ -17,6 +17,7 @@
 #include "merkletree/serial_hasher.h"
 #include "proto/ct.pb.h"
 #include "proto/serializer.h"
+#include "util/util.h"
 
 
 static const int kCtimeBufSize = 26;
@@ -85,7 +86,8 @@ void LogLookup<Logged>::UpdateFromSTH(const ct::SignedTreeHead& sth) {
     leaf_index_.insert(
         std::pair<std::string, int64_t>(leaf_hash, sequence_number));
   }
-  CHECK_EQ(cert_tree_.CurrentRoot(), sth.sha256_root_hash())
+  CHECK_EQ(util::HexString(cert_tree_.CurrentRoot()),
+           util::HexString(sth.sha256_root_hash()))
       << "Computed root hash and stored STH root hash do not match";
   LOG(INFO) << "Found " << sth.tree_size() - latest_tree_head_.tree_size()
             << " new log entries";
