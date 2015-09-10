@@ -22,7 +22,7 @@ Next, we need `libevhtp` version `1.2.10` which is not packaged in Ubuntu yet, s
     wget https://github.com/ellzey/libevhtp/archive/1.2.10.zip
     unzip 1.2.10.zip
     cd libevhtp-1.2.10/
-    cmake -DEVHTP_DISABLE_REGEX:STRING=ON .
+    CFLAGS="-fPIC" cmake -DEVHTP_DISABLE_REGEX:STRING=ON .
     make
     cd ..
 
