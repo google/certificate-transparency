@@ -31,6 +31,7 @@ noinst_PROGRAMS = \
 	cpp/tools/dump_cert \
 	cpp/tools/dump_sth \
 	cpp/tools/etcd_watch \
+	cpp/tools/db_tool \
 	cpp/util/bench_etcd \
 	cpp/util/etcd_masterelection
 
@@ -245,6 +246,18 @@ cpp_tools_ct_clustertool_SOURCES = \
 	cpp/util/protobuf_util.cc \
 	cpp/util/read_key.cc \
 	cpp/util/thread_pool.cc \
+	cpp/util/util.cc \
+	cpp/version.cc
+
+cpp_tools_db_tool_LDADD = \
+	cpp/libcore.a \
+	$(libevent_LIBS) \
+	$(leveldb_LIBS) \
+	-lprotobuf -lsqlite3
+cpp_tools_db_tool_SOURCES = \
+	cpp/proto/serializer.cc \
+	cpp/tools/db_tool.cc \
+	cpp/util/init.cc \
 	cpp/util/util.cc \
 	cpp/version.cc
 
