@@ -222,8 +222,8 @@ evhtp_res ConnectionPool::Connection::ConnectionErrorHook(
   CHECK(libevent::Base::OnEventThread());
   ConnectionPool::Connection* const c(
       static_cast<ConnectionPool::Connection*>(arg));
-  VLOG(1) << "Releasing errored connection to " << c->other_end().first << ":"
-          << c->other_end().second;
+  LOG(WARNING) << "Releasing errored connection to " << c->other_end().first
+               << ":" << c->other_end().second;
 
   CHECK_EQ(conn, c->connection());
   c->SetErrored();
@@ -234,15 +234,18 @@ evhtp_res ConnectionPool::Connection::ConnectionErrorHook(
     // If someone hasn't already modified the default status, set it to a
     // generic "something went wrong" value here:
     if (conn->request->status == 200) {
-      VLOG(1) << "error flag (0x" << std::hex << static_cast<int>(flags)
-              << "):" << ErrorFlagDescription(flags);
+      const string error_str(
+          evutil_socket_error_to_string(evutil_socket_geterror(conn->sock)));
+      LOG(WARNING) << "error flag (0x" << std::hex << static_cast<int>(flags)
+                   << "):" << ErrorFlagDescription(flags) << " : "
+                   << error_str;
       if (flags & BEV_EVENT_TIMEOUT) {
         conn->request->status = kTimeout;
       } else {
         conn->request->status = kUnknownErrorStatus;
       }
     } else {
-      VLOG(1) << "status already set to " << conn->request->status;
+      LOG(WARNING) << "status already set to " << conn->request->status;
     }
     // The callback is going to Put() the Connection back, which will release
     // the underlying connection, and then delete the Connection wrapper when
