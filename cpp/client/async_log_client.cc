@@ -126,9 +126,10 @@ void DoneGetRoots(UrlFetcher::Response* resp, vector<unique_ptr<Cert>>* roots,
       return done(AsyncLogClient::BAD_RESPONSE);
 
     unique_ptr<Cert> cert(new Cert);
-    const Cert::Status status(cert->LoadFromDerString(jcert.FromBase64()));
-    if (status != Cert::TRUE)
+    const util::Status status(cert->LoadFromDerString(jcert.FromBase64()));
+    if (!status.ok()) {
       return done(AsyncLogClient::BAD_RESPONSE);
+    }
 
     retval.push_back(move(cert));
   }

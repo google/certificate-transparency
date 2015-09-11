@@ -65,11 +65,11 @@ class Cert {
   Cert* Clone() const;
 
   // Frees the old X509 and attempts to load a new one.
-  Status LoadFromDerString(const std::string& der_string);
+  util::Status LoadFromDerString(const std::string& der_string);
 
   // Frees the old X509 and attempts to load from BIO in DER form. Caller
   // still owns the BIO afterwards.
-  Status LoadFromDerBio(BIO* bio_in);
+  util::Status LoadFromDerBio(BIO* bio_in);
 
   // These just return an empty string if an error occurs.
   std::string PrintIssuerName() const;
@@ -352,7 +352,7 @@ class CertChain {
   // certificates.
   // Returns FALSE if the above does not hold.
   // Returns ERROR if the chain is not loaded or some error occurred.
-  Cert::Status IsValidCaIssuerChainMaybeLegacyRoot() const;
+  util::Status IsValidCaIssuerChainMaybeLegacyRoot() const;
 
   // Is OK if each certificate is signed by the next certificate in
   // the chain. Does not check whether issuers have CA capabilities.
