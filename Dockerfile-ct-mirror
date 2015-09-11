@@ -35,6 +35,7 @@ CMD cd /mnt/ctmirror/ && \
     echo "Container: ${CONTAINER_HOST}" && \
     echo "Etcd: ${ETCD_SERVERS}" && \
     echo "Target: ${TARGET_LOG_URL}" && \
+    echo "Target TLS version: ${TARGET_LOG_TLS_VERSION}" && \
     echo "Target Key: ${TARGET_LOG_PUBLIC_KEY}" && \
     echo "Project: ${PROJECT}" && \
     echo "Monitoring: ${MONITORING}" && \
