@@ -463,132 +463,130 @@ TEST_F(CertTest, TestIsValidRedactedHost) {
 
 TEST_F(CertTest, TestNoWildcardRedactionIsValid) {
   Cert leaf(leaf_pem_);
-  EXPECT_EQ(Cert::TRUE, leaf.IsValidWildcardRedaction());
+  EXPECT_TRUE(leaf.IsValidWildcardRedaction().ok());
 }
 
 TEST_F(CertTest, TestWildcardRedactTestCase5) {
   // This is invalid because the CN is redacted, no DNS or extension
   Cert leaf(v2_wildcard_test5_pem_);
-  EXPECT_EQ(Cert::FALSE, leaf.IsValidWildcardRedaction());
+  EXPECT_FALSE(leaf.IsValidWildcardRedaction().ok());
 }
 
 TEST_F(CertTest, TestWildcardRedactTestCase6) {
   // This is invalid because the CN differs from the first DNS-ID
   Cert leaf(v2_wildcard_test6_pem_);
-  EXPECT_EQ(Cert::FALSE, leaf.IsValidWildcardRedaction());
+  EXPECT_FALSE(leaf.IsValidWildcardRedaction().ok());
 }
 
 TEST_F(CertTest, TestWildcardRedactTestCase7) {
   // This should be a valid redaction of 1 label with everything set
   // correctly in the extension
   Cert leaf(v2_wildcard_test7_pem_);
-  EXPECT_EQ(Cert::TRUE, leaf.IsValidWildcardRedaction());
+  EXPECT_TRUE(leaf.IsValidWildcardRedaction().ok());
 }
 
 TEST_F(CertTest, TestWildcardRedactTestCase8) {
   // This should be a valid redaction of 1 label with everything set
   // correctly in the extension and a '*' at left of name.
   Cert leaf(v2_wildcard_test8_pem_);
-  EXPECT_EQ(Cert::TRUE, leaf.IsValidWildcardRedaction());
+  EXPECT_TRUE(leaf.IsValidWildcardRedaction().ok());
 }
 
 TEST_F(CertTest, TestWildcardRedactTestCase9) {
   // Should be invalid as the redacted label does not follow RFC rules
   Cert leaf(v2_wildcard_test9_pem_);
-  EXPECT_EQ(Cert::FALSE, leaf.IsValidWildcardRedaction());
+  EXPECT_FALSE(leaf.IsValidWildcardRedaction().ok());
 }
 
 TEST_F(CertTest, TestWildcardRedactTestCase10) {
   // Should be invalid as redacted label uses '*' incorrectly
   Cert leaf(v2_wildcard_test10_pem_);
-  EXPECT_EQ(Cert::FALSE, leaf.IsValidWildcardRedaction());
+  EXPECT_FALSE(leaf.IsValidWildcardRedaction().ok());
 }
 
 TEST_F(CertTest, TestWildcardRedactTestCase11) {
   // Should be invalid as there are too many label count values
   Cert leaf(v2_wildcard_test11_pem_);
-  EXPECT_EQ(Cert::FALSE, leaf.IsValidWildcardRedaction());
+  EXPECT_FALSE(leaf.IsValidWildcardRedaction().ok());
 }
 
 TEST_F(CertTest, TestWildcardRedactTestCase12) {
   // This should be invalid because the CT extension contains -ve value
   Cert leaf(v2_wildcard_test12_pem_);
-  EXPECT_EQ(Cert::FALSE, leaf.IsValidWildcardRedaction());
+  EXPECT_FALSE(leaf.IsValidWildcardRedaction().ok());
 }
 
 TEST_F(CertTest, TestWildcardRedactTestCase13) {
-  // This should be invalid because the CT extension contains -ve value
   Cert leaf(v2_wildcard_test13_pem_);
-  EXPECT_EQ(Cert::TRUE, leaf.IsValidWildcardRedaction());
+  EXPECT_TRUE(leaf.IsValidWildcardRedaction().ok());
 }
 
 TEST_F(CertTest, TestWildcardRedactTestCase14) {
-  // This should be invalid because the CT extension contains -ve value
   Cert leaf(v2_wildcard_test14_pem_);
-  EXPECT_EQ(Cert::TRUE, leaf.IsValidWildcardRedaction());
+  EXPECT_TRUE(leaf.IsValidWildcardRedaction().ok());
 }
 
 TEST_F(CertTest, TestWildcardRedactTestCase15) {
-  // This should be invalid because the CT extension too many values
+  // This should be invalid because the CT extension has too many values
   Cert leaf(v2_wildcard_test15_pem_);
-  EXPECT_EQ(Cert::FALSE, leaf.IsValidWildcardRedaction());
+  EXPECT_FALSE(leaf.IsValidWildcardRedaction().ok());
 }
 
 TEST_F(CertTest, TestWildcardRedactTestCase22) {
   // This should be a redaction of 1 label but no extension required by
   // RFC section 3.2.2
   Cert leaf(v2_wildcard_test22_pem_);
-  EXPECT_EQ(Cert::FALSE, leaf.IsValidWildcardRedaction());
+  EXPECT_FALSE(leaf.IsValidWildcardRedaction().ok());
 }
 
 TEST_F(CertTest, TestConstraintTestCase2) {
   // This should be valid as the cert is non CA and the checks do not apply
   Cert leaf(v2_constraint_test2_pem_);
-  EXPECT_EQ(Cert::TRUE, leaf.IsValidNameConstrainedIntermediateCa());
+  EXPECT_TRUE(leaf.IsValidNameConstrainedIntermediateCa().ok());
 }
 
 TEST_F(CertTest, TestConstraintTestCase3) {
   // This should be valid as the cert is CA but has no name constraint
   Cert leaf(v2_constraint_test3_pem_);
-  EXPECT_EQ(Cert::TRUE, leaf.IsValidNameConstrainedIntermediateCa());
+  EXPECT_TRUE(leaf.IsValidNameConstrainedIntermediateCa().ok());
 }
 
 TEST_F(CertTest, TestConstraintTestCase4) {
   // Not valid as there is a constraint but no CT ext
   Cert leaf(v2_constraint_test4_pem_);
-  EXPECT_EQ(Cert::FALSE, leaf.IsValidNameConstrainedIntermediateCa());
+  EXPECT_FALSE(leaf.IsValidNameConstrainedIntermediateCa().ok());
 }
 
 TEST_F(CertTest, TestConstraintTestCase5) {
   // Not valid as there is no DNS entry in name constraints
   Cert leaf(v2_constraint_test5_pem_);
-  EXPECT_EQ(Cert::FALSE, leaf.IsValidNameConstrainedIntermediateCa());
+  EXPECT_FALSE(leaf.IsValidNameConstrainedIntermediateCa().ok());
 }
 
 TEST_F(CertTest, TestConstraintTestCase6) {
   // This should be valid as the CA cert contains valid name constraints +
   // CT extension
   Cert leaf(v2_constraint_test6_pem_);
-  EXPECT_EQ(Cert::TRUE, leaf.IsValidNameConstrainedIntermediateCa());
+  EXPECT_TRUE(leaf.IsValidNameConstrainedIntermediateCa().ok());
 }
 
 TEST_F(CertTest, TestConstraintTestCase7) {
   // This should be valid as the CA cert contains valid name constraints +
   // CT extension + multiple DNS entries
   Cert leaf(v2_constraint_test7_pem_);
-  EXPECT_EQ(Cert::TRUE, leaf.IsValidNameConstrainedIntermediateCa());
+  EXPECT_TRUE(leaf.IsValidNameConstrainedIntermediateCa().ok());
 }
 
 TEST_F(CertTest, TestConstraintTestCase8) {
   // This should be invalid as there is no IP exclusion in name constraint
   Cert leaf(v2_constraint_test8_pem_);
-  EXPECT_EQ(Cert::FALSE, leaf.IsValidNameConstrainedIntermediateCa());
+  EXPECT_FALSE(leaf.IsValidNameConstrainedIntermediateCa().ok());
 }
 
 TEST_F(CertTest, TestConstraintTestCase9) {
   // This should be invalid as both IPv4 and v6 ranges not excluded
   Cert leaf(v2_constraint_test9_pem_);
-  EXPECT_EQ(Cert::FALSE, leaf.IsValidNameConstrainedIntermediateCa());
+  EXPECT_FALSE(leaf.IsValidNameConstrainedIntermediateCa().ok());
 }
 
 TEST_F(TbsCertificateTest, DerEncoding) {
