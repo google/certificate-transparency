@@ -1130,12 +1130,12 @@ util::Status TbsCertificate::DeleteExtension(int extension_nid) {
 
   // ExtensionIndex returns the first matching index - if the extension
   // occurs more than once, just give up.
-  const StatusOr<int> ignored_index = ExtensionIndex(extension_nid);
+  const StatusOr<int> ignored_index(ExtensionIndex(extension_nid));
   if (ignored_index.ok()) {
     LOG(WARNING)
         << "Failed to delete the extension. Does the certificate have "
         << "duplicate extensions?";
-    return util::Status(Code::ALREADY_EXISTS, "Multiple extensions in cert");;
+    return util::Status(Code::ALREADY_EXISTS, "Multiple extensions in cert");
   }
 
   // It's not an error if the extension didn't exist the second time
