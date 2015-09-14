@@ -1108,14 +1108,14 @@ util::Status TbsCertificate::DeleteExtension(int extension_nid) {
     return util::Status(Code::FAILED_PRECONDITION, "Cert not loaded (TBS)");
   }
 
-  StatusOr<int> status = ExtensionIndex(extension_nid);
+  const StatusOr<int> extension_index(ExtensionIndex(extension_nid));
   // If the extension doesn't exist then there is nothing to do and this
   // propagates the NOT_FOUND status.
-  if (!status.ok()) {
-    return status.status();
+  if (!extension_index.ok()) {
+    return extension_index.status();
   }
 
-  X509_EXTENSION* ext = X509_delete_ext(x509_, status.ValueOrDie());
+  X509_EXTENSION* ext = X509_delete_ext(x509_, extension_index.ValueOrDie());
 
   if (!ext) {
     // Truly odd.
@@ -1130,8 +1130,8 @@ util::Status TbsCertificate::DeleteExtension(int extension_nid) {
 
   // ExtensionIndex returns the first matching index - if the extension
   // occurs more than once, just give up.
-  status = ExtensionIndex(extension_nid);
-  if (status.ok() || status.status().CanonicalCode() == Code::INTERNAL) {
+  const StatusOr<int> ignored_index = ExtensionIndex(extension_nid);
+  if (ignored_index.ok()) {
     LOG(WARNING)
         << "Failed to delete the extension. Does the certificate have "
         << "duplicate extensions?";
@@ -1140,8 +1140,9 @@ util::Status TbsCertificate::DeleteExtension(int extension_nid) {
 
   // It's not an error if the extension didn't exist the second time
   // as it should have been deleted.
-  if (!status.ok() && status.status().CanonicalCode() != Code::NOT_FOUND) {
-    return status.status();
+  if (!ignored_index.ok() &&
+      ignored_index.status().CanonicalCode() != Code::NOT_FOUND) {
+    return ignored_index.status();
   }
 
   return util::Status::OK;

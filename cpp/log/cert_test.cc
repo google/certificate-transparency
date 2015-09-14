@@ -608,7 +608,7 @@ TEST_F(TbsCertificateTest, DerEncoding) {
 
   string cert_tbs_der, raw_tbs_der;
   EXPECT_OK(leaf.DerEncodedTbsCertificate(&cert_tbs_der));
-  EXPECT_TRUE(tbs.DerEncoding(&raw_tbs_der).ok());
+  EXPECT_OK(tbs.DerEncoding(&raw_tbs_der));
   EXPECT_EQ(cert_tbs_der, raw_tbs_der);
 }
 
@@ -619,17 +619,18 @@ TEST_F(TbsCertificateTest, DeleteExtension) {
 
   TbsCertificate tbs(leaf);
   string der_before, der_after;
-  EXPECT_TRUE(tbs.DerEncoding(&der_before).ok());
-  EXPECT_TRUE(tbs.DeleteExtension(NID_authority_key_identifier).ok());
-  EXPECT_TRUE(tbs.DerEncoding(&der_after).ok());
+  EXPECT_OK(tbs.DerEncoding(&der_before));
+  EXPECT_OK(tbs.DeleteExtension(NID_authority_key_identifier));
+  EXPECT_OK(tbs.DerEncoding(&der_after));
   EXPECT_NE(der_before, der_after);
 
   ASSERT_EQ(Cert::FALSE, leaf.HasExtension(cert_trans::NID_ctPoison));
   TbsCertificate tbs2(leaf);
   string der_before2, der_after2;
-  EXPECT_TRUE(tbs2.DerEncoding(&der_before2).ok());
-  EXPECT_FALSE(tbs2.DeleteExtension(cert_trans::NID_ctPoison).ok());
-  EXPECT_TRUE(tbs2.DerEncoding(&der_after2).ok());
+  EXPECT_OK(tbs2.DerEncoding(&der_before2));
+  EXPECT_THAT(tbs2.DeleteExtension(cert_trans::NID_ctPoison),
+              StatusIs(util::error::NOT_FOUND));
+  EXPECT_OK(tbs2.DerEncoding(&der_after2));
   EXPECT_EQ(der_before2, der_after2);
 }
 
@@ -639,16 +640,16 @@ TEST_F(TbsCertificateTest, CopyIssuer) {
 
   TbsCertificate tbs(leaf);
   string der_before, der_after;
-  EXPECT_TRUE(tbs.DerEncoding(&der_before).ok());
-  EXPECT_TRUE(tbs.CopyIssuerFrom(different).ok());
-  EXPECT_TRUE(tbs.DerEncoding(&der_after).ok());
+  EXPECT_OK(tbs.DerEncoding(&der_before));
+  EXPECT_OK(tbs.CopyIssuerFrom(different));
+  EXPECT_OK(tbs.DerEncoding(&der_after));
   EXPECT_NE(der_before, der_after);
 
   TbsCertificate tbs2(leaf);
   string der_before2, der_after2;
-  EXPECT_TRUE(tbs2.DerEncoding(&der_before2).ok());
-  EXPECT_TRUE(tbs2.CopyIssuerFrom(leaf).ok());
-  EXPECT_TRUE(tbs2.DerEncoding(&der_after2).ok());
+  EXPECT_OK(tbs2.DerEncoding(&der_before2));
+  EXPECT_OK(tbs2.CopyIssuerFrom(leaf));
+  EXPECT_OK(tbs2.DerEncoding(&der_after2));
   EXPECT_EQ(der_before2, der_after2);
 }
 
