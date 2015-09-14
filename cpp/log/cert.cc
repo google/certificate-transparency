@@ -141,7 +141,7 @@ Cert* Cert::Clone() const {
 }
 
 
-Cert::Status Cert::LoadFromDerString(const string& der_string) {
+util::Status Cert::LoadFromDerString(const string& der_string) {
   if (x509_) {
     X509_free(x509_);
     x509_ = nullptr;
@@ -152,13 +152,13 @@ Cert::Status Cert::LoadFromDerString(const string& der_string) {
   if (!x509_) {
     LOG(WARNING) << "Input is not a valid DER-encoded certificate";
     LOG_OPENSSL_ERRORS(WARNING);
-    return Cert::FALSE;
+    return util::Status(Code::INVALID_ARGUMENT, "Not a valid encoded cert");
   }
-  return Cert::TRUE;
+  return util::Status::OK;
 }
 
 
-Cert::Status Cert::LoadFromDerBio(BIO* bio_in) {
+util::Status Cert::LoadFromDerBio(BIO* bio_in) {
   if (x509_) {
     // TODO(AlCutter): Use custom deallocator
     X509_free(x509_);
@@ -174,9 +174,9 @@ Cert::Status Cert::LoadFromDerBio(BIO* bio_in) {
     // virtually impossible to fish them out.
     LOG(WARNING) << "Input is not a valid encoded certificate";
     LOG_OPENSSL_ERRORS(WARNING);
-    return Cert::FALSE;
+    return util::Status(Code::INVALID_ARGUMENT, "Not a valid encoded cert");
   }
-  return TRUE;
+  return util::Status::OK;
 }
 
 
@@ -1328,10 +1328,10 @@ CertChain::~CertChain() {
 }
 
 
-Cert::Status CertChain::IsValidCaIssuerChainMaybeLegacyRoot() const {
+util::Status CertChain::IsValidCaIssuerChainMaybeLegacyRoot() const {
   if (!IsLoaded()) {
     LOG(ERROR) << "Chain is not loaded";
-    return Cert::ERROR;
+    return util::Status(Code::FAILED_PRECONDITION, "Cert not loaded");
   }
 
   for (vector<Cert*>::const_iterator it = chain_.begin();
@@ -1344,19 +1344,21 @@ Cert::Status CertChain::IsValidCaIssuerChainMaybeLegacyRoot() const {
     if (status.ok() && !status.ValueOrDie()) {
       const StatusOr<bool> s2(issuer->HasBasicConstraintCATrue());
       if (!s2.ok() || !s2.ValueOrDie()) {
-        return StatusOrBoolToCertStatus(s2);
+        return util::Status(Code::INVALID_ARGUMENT,
+                            "CA constraint check failed");
       }
     } else if (!status.ok()) {
       LOG(ERROR) << "Failed to check self-signed status";
-      return Cert::ERROR;
+      return util::Status(Code::INVALID_ARGUMENT,
+                          "Failed to check self signed status");
     }
 
     const StatusOr<bool> s3 = subject->IsIssuedBy(*issuer);
     if (!s3.ok() || !s3.ValueOrDie()) {
-      return StatusOrBoolToCertStatus(s3);
+      return util::Status(Code::INVALID_ARGUMENT, "Issuer check failed");
     }
   }
-  return Cert::TRUE;
+  return util::Status::OK;
 }
 
 
