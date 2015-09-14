@@ -234,13 +234,15 @@ static bool PrecertChainToEntry(const cert_trans::PreCertChain& chain,
     LOG(ERROR) << "Failed to get TbsCertificate.";
     return false;
   }
-  if (tbs.DeleteExtension(cert_trans::NID_ctPoison) != Cert::TRUE) {
+  // DeleteExtension can return NOT_FOUND but we checked the extension exists
+  // above so this is not expected.
+  if (!tbs.DeleteExtension(cert_trans::NID_ctPoison).ok()) {
     LOG(ERROR) << "Failed to delete poison extension.";
     return false;
   }
 
   string tbs_der;
-  if (tbs.DerEncoding(&tbs_der) != Cert::TRUE) {
+  if (!tbs.DerEncoding(&tbs_der).ok()) {
     LOG(ERROR) << "Couldn't serialize TbsCertificate to DER.";
     return false;
   }

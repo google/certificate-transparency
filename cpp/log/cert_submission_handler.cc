@@ -129,28 +129,33 @@ Status CertSubmissionHandler::ProcessPreCertSubmission(PreCertChain* chain,
 
 // static
 bool CertSubmissionHandler::SerializedTbs(const Cert& cert, string* result) {
-  if (!cert.IsLoaded())
+  if (!cert.IsLoaded()) {
     return false;
+  }
 
   Cert::Status status = cert.HasExtension(
       cert_trans::NID_ctEmbeddedSignedCertificateTimestampList);
-  if (status != Cert::TRUE && status != Cert::FALSE)
+  if (status != Cert::TRUE && status != Cert::FALSE) {
     return false;
+  }
 
   // Delete the embedded proof.
   TbsCertificate tbs(cert);
-  if (!tbs.IsLoaded())
+  if (!tbs.IsLoaded()) {
     return false;
+  }
 
   if (status == Cert::TRUE &&
-      tbs.DeleteExtension(
-          cert_trans::NID_ctEmbeddedSignedCertificateTimestampList) !=
-          Cert::TRUE)
+      !tbs.DeleteExtension(
+          cert_trans::NID_ctEmbeddedSignedCertificateTimestampList).ok()) {
     return false;
+  }
 
   string der_tbs;
-  if (tbs.DerEncoding(&der_tbs) != Cert::TRUE)
+  if (!tbs.DerEncoding(&der_tbs).ok()) {
     return false;
+  }
+
   result->assign(der_tbs);
   return true;
 }

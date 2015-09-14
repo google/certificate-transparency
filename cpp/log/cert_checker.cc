@@ -225,22 +225,24 @@ Status CertChecker::CheckPreCertChain(PreCertChain* chain,
   // A well-formed chain always has a precert.
   TbsCertificate tbs(*chain->PreCert());
   if (!tbs.IsLoaded() ||
-      tbs.DeleteExtension(cert_trans::NID_ctPoison) != Cert::TRUE)
+      !tbs.DeleteExtension(cert_trans::NID_ctPoison).ok()) {
     return Status(util::error::INTERNAL, "internal error");
+  }
 
   // If the issuing cert is the special Precert Signing Certificate,
   // replace the issuer with the one that will sign the final cert.
   // Should always succeed as we've already verified that the chain
   // is well-formed.
   if (uses_pre_issuer == Cert::TRUE &&
-      tbs.CopyIssuerFrom(*chain->PrecertIssuingCert()) != Cert::TRUE)
+      !tbs.CopyIssuerFrom(*chain->PrecertIssuingCert()).ok()) {
     return Status(util::error::INTERNAL, "internal error");
-
+  }
 
   string der_tbs;
-  if (tbs.DerEncoding(&der_tbs) != Cert::TRUE)
+  if (!tbs.DerEncoding(&der_tbs).ok()) {
     return Status(util::error::INTERNAL,
                   "could not DER-encode tbs certificate");
+  }
 
   issuer_key_hash->assign(key_hash);
   tbs_certificate->assign(der_tbs);
