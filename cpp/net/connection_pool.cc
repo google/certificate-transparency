@@ -50,6 +50,24 @@ DEFINE_string(trusted_root_certs, "/etc/ssl/certs/ca-certificates.crt",
 DEFINE_int32(url_fetcher_max_conn_per_host_port, 4,
              "maximum number of URL fetcher connections per host:port");
 
+DEFINE_string(tls_client_minimum_protocol, "tlsv12",
+              "Minimum acceptable TLS "
+              "version protocol (tlsv1, tlsv11, tlsv12)");
+
+DEFINE_string(
+    tls_client_ciphers,
+    "ECDHE-RSA-AES128-GCM-SHA256:ECDHE-ECDSA-AES128-GCM-SHA256:"
+    "ECDHE-RSA-AES256-GCM-SHA384:ECDHE-ECDSA-AES256-GCM-SHA384:"
+    "DHE-RSA-AES128-GCM-SHA256:DHE-DSS-AES128-GCM-SHA256:kEDH+AESGCM:"
+    "ECDHE-RSA-AES128-SHA256:ECDHE-ECDSA-AES128-SHA256:ECDHE-RSA-AES128-SHA:"
+    "ECDHE-ECDSA-AES128-SHA:ECDHE-RSA-AES256-SHA384:ECDHE-ECDSA-AES256-SHA384:"
+    "ECDHE-RSA-AES256-SHA:ECDHE-ECDSA-AES256-SHA:DHE-RSA-AES128-SHA256:"
+    "DHE-RSA-AES128-SHA:DHE-DSS-AES128-SHA256:DHE-RSA-AES256-SHA256:"
+    "DHE-DSS-AES256-SHA:DHE-RSA-AES256-SHA:"
+    "!aNULL:!eNULL:!EXPORT:!DES:!RC4:!3DES:!MD5:!PSK",
+    "List of ciphers the client will accept, default is the Mozilla 'Modern "
+    "compatibility' recommended list.");
+
 
 namespace cert_trans {
 namespace internal {
@@ -177,10 +195,47 @@ void ConnectionPool::Connection::ReleaseConnection() {
 }
 
 
+namespace {
+
+// No SSLv2 or SSLv3, thanks.
+const int kSslOpMinVersionTls1 = SSL_OP_NO_SSLv2 | SSL_OP_NO_SSLv3;
+const int kSslOpMinVersionTls11 = kSslOpMinVersionTls1 | SSL_OP_NO_TLSv1;
+const int kSslOpMinVersionTls12 = kSslOpMinVersionTls11 | SSL_OP_NO_TLSv1_1;
+
+
+// Create an SSL_CTX which permits the TLS versions specified by flags.
+// SSLv2 and SSLv3 are never supported.
+SSL_CTX* CreateSSLCTXFromFlags() {
+  SSL_CTX* ctx(SSL_CTX_new(SSLv23_client_method()));
+  CHECK_NOTNULL(ctx);
+
+  LOG(WARNING) << "Setting client minimum TLS protocol to "
+               << FLAGS_tls_client_minimum_protocol;
+
+  if (FLAGS_tls_client_minimum_protocol == "tlsv1") {
+    SSL_CTX_set_options(ctx, kSslOpMinVersionTls1);
+  } else if (FLAGS_tls_client_minimum_protocol == "tlsv11") {
+    SSL_CTX_set_options(ctx, kSslOpMinVersionTls11);
+  } else if (FLAGS_tls_client_minimum_protocol == "tlsv12") {
+    SSL_CTX_set_options(ctx, kSslOpMinVersionTls12);
+  } else {
+    LOG(FATAL) << "Unrecognised TLS version: "
+               << FLAGS_tls_client_minimum_protocol;
+  }
+
+  CHECK_EQ(1, SSL_CTX_set_cipher_list(ctx, FLAGS_tls_client_ciphers.c_str()));
+
+  return ctx;
+}
+
+
+}  // namespace
+
+
 ConnectionPool::ConnectionPool(libevent::Base* base)
     : base_(CHECK_NOTNULL(base)),
       cleanup_scheduled_(false),
-      ssl_ctx_(SSL_CTX_new(TLSv1_client_method()), SSL_CTX_free) {
+      ssl_ctx_(CreateSSLCTXFromFlags(), SSL_CTX_free) {
   CHECK(ssl_ctx_) << "could not build SSL context: " << DumpOpenSSLErrorStack();
 
   // Try to load trusted root certificates.

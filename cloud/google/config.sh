@@ -50,6 +50,7 @@ if [ "${INSTANCE_TYPE}" == "mirror" ]; then
                    s^@@ETCD_SERVERS@@^${ETCD_SERVER_LIST}^
                    s^@@CONTAINER_HOST@@^${MIRROR_MACHINES[${MIRROR_NUM_REPLICAS}]}^
                    s^@@TARGET_LOG_URL@@^${MIRROR_TARGET_URL}^
+                   s^@@TARGET_LOG_TLS_VERSION@@^${MIRROR_TARGET_TLS_VERSION:-tlsv12}^
                    s^@@TARGET_LOG_PUBLIC_KEY@@^${MIRROR_TARGET_PUBLIC_KEY}^
                    s^@@MONITORING@@^${MONITORING}^" \
                       < ${DIR}/mirror_container.yaml)

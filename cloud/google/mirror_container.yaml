@@ -19,6 +19,8 @@ spec:
           value: "@@CONTAINER_HOST@@"
         - name: TARGET_LOG_URL
           value: "@@TARGET_LOG_URL@@"
+        - name: TARGET_LOG_TLS_VERSION
+          value: "@@TARGET_LOG_TLS_VERSION@@"
         - name: TARGET_LOG_PUBLIC_KEY
           value: "@@TARGET_LOG_PUBLIC_KEY@@"
         - name: PROJECT
