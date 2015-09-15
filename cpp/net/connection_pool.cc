@@ -30,6 +30,7 @@ using std::string;
 using std::to_string;
 using std::unique_lock;
 using std::unique_ptr;
+using std::shared_ptr;
 using util::ClearOpenSSLErrors;
 using util::DumpOpenSSLErrorStack;
 
@@ -81,14 +82,81 @@ static Gauge<string>* connections_per_host_port(
                        "Number of cached connections port host:port"));
 
 
+namespace {
+
+
+int GetSSLConnectionIndex() {
+  static const int ssl_connection_index(
+      SSL_get_ex_new_index(0, nullptr, nullptr, nullptr, nullptr));
+  return ssl_connection_index;
+}
+
+
 string HostPortString(const HostPortPair& pair) {
   return pair.first + ":" + to_string(pair.second);
 }
 
 
+}  // namespace
+
+
+// This class wraps the evhtp_connection_t* and associated data which need to
+// hang around for at least the lifetime that structure.
+class EvConnection {
+ public:
+  // Called by OpenSSL to verify the hostname presented in the server cert.
+  static int SSLVerifyCallback(int preverify_ok, X509_STORE_CTX* x509_ctx);
+
+  // Called by libevhtp when it detects some kind of error with the connection.
+  static evhtp_res ConnectionErrorHook(evhtp_connection_t* conn,
+                                       evhtp_error_flags errtype, void* arg);
+
+  // Called by libevhtp once it's finished with the connection and is about to
+  // delete it.
+  static evhtp_res ConnectionFinishedHook(evhtp_connection_t* conn, void* arg);
+
+  EvConnection(evhtp_connection_t* conn, HostPortPair&& other_end)
+      : ev_conn_(CHECK_NOTNULL(conn)),
+        other_end_(move(other_end)),
+        errored_(false) {
+    if (ev_conn_->ssl) {
+      SSL_set_ex_data(ev_conn_->ssl, GetSSLConnectionIndex(),
+                      static_cast<void*>(this));
+      SSL_set_tlsext_host_name(ev_conn_->ssl, other_end_.first.c_str());
+    }
+  }
+
+  evhtp_connection_t* connection() const {
+    return ev_conn_;
+  }
+
+  const HostPortPair& other_end() const {
+    return other_end_;
+  }
+
+  void SetErrored() {
+    lock_guard<mutex> lock(lock_);
+    errored_ = true;
+  }
+
+  bool GetErrored() const {
+    lock_guard<mutex> lock(lock_);
+    return errored_;
+  }
+
+ private:
+  // We never really own this, evhtp does, as it likes to remind us.
+  evhtp_connection_t* ev_conn_;
+  const HostPortPair other_end_;
+
+  mutable std::mutex lock_;
+  bool errored_;
+};
+
+
 // static
-int ConnectionPool::Connection::SSLVerifyCallback(const int preverify_ok,
-                                                  X509_STORE_CTX* x509_ctx) {
+int EvConnection::SSLVerifyCallback(const int preverify_ok,
+                                    X509_STORE_CTX* x509_ctx) {
   CHECK_NOTNULL(x509_ctx);
   X509* const server_cert(
       CHECK_NOTNULL(X509_STORE_CTX_get_current_cert(x509_ctx)));
@@ -112,12 +180,12 @@ int ConnectionPool::Connection::SSLVerifyCallback(const int preverify_ok,
   const SSL* const ssl(static_cast<SSL*>(CHECK_NOTNULL(
       X509_STORE_CTX_get_ex_data(x509_ctx,
                                  SSL_get_ex_data_X509_STORE_CTX_idx()))));
-  const ConnectionPool::Connection* const conn(
-      CHECK_NOTNULL(static_cast<const ConnectionPool::Connection*>(
+  const EvConnection* const connection(
+      CHECK_NOTNULL(static_cast<const EvConnection*>(
           SSL_get_ex_data(ssl, GetSSLConnectionIndex()))));
 
   const HostnameValidationResult hostname_valid(
-      validate_hostname(conn->other_end().first.c_str(), server_cert));
+      validate_hostname(connection->other_end_.first.c_str(), server_cert));
   if (hostname_valid != MatchFound) {
     string error;
     switch (hostname_valid) {
@@ -139,8 +207,8 @@ int ConnectionPool::Connection::SSLVerifyCallback(const int preverify_ok,
         error = "unknown error";
         break;
     }
-    if (conn->connection()->request) {
-      conn->connection()->request->status = kSSLErrorStatus;
+    if (connection->ev_conn_->request) {
+      connection->ev_conn_->request->status = kSSLErrorStatus;
     }
     LOG_EVERY_N(WARNING, 100)
         << "Failed to validate SSL certificate: " << error << " : "
@@ -152,46 +220,23 @@ int ConnectionPool::Connection::SSLVerifyCallback(const int preverify_ok,
 }
 
 
-// static
-int ConnectionPool::Connection::GetSSLConnectionIndex() {
-  static const int ssl_connection_index(
-      SSL_get_ex_new_index(0, nullptr, nullptr, nullptr, nullptr));
-  return ssl_connection_index;
+ConnectionPool::Connection::Connection(const shared_ptr<EvConnection>& conn)
+    : connection_(conn) {
 }
 
 
-ConnectionPool::Connection::Connection(evhtp_connection_t* conn,
-                                       HostPortPair&& other_end)
-    : conn_(CHECK_NOTNULL(conn)),
-      other_end_(move(other_end)),
-      errored_(false) {
-  if (conn_->ssl) {
-    SSL_set_ex_data(conn_->ssl, GetSSLConnectionIndex(),
-                    static_cast<void*>(this));
-    SSL_set_tlsext_host_name(conn_->ssl, other_end_.first.c_str());
-  }
-}
-
-
-void ConnectionPool::Connection::SetErrored() {
-  lock_guard<mutex> lock(lock_);
-  errored_ = true;
+evhtp_connection_t* ConnectionPool::Connection::connection() const {
+  return connection_->connection();
 }
 
 
 bool ConnectionPool::Connection::GetErrored() const {
-  lock_guard<mutex> lock(lock_);
-  return errored_;
+  return connection_->GetErrored();
 }
 
 
 const HostPortPair& ConnectionPool::Connection::other_end() const {
-  return other_end_;
-}
-
-
-void ConnectionPool::Connection::ReleaseConnection() {
-  conn_.release();
+  return connection_->other_end();
 }
 
 
@@ -249,7 +294,7 @@ ConnectionPool::ConnectionPool(libevent::Base* base)
   }
 
   SSL_CTX_set_verify(ssl_ctx_.get(), SSL_VERIFY_PEER,
-                     Connection::SSLVerifyCallback);
+                     EvConnection::SSLVerifyCallback);
 }
 
 
@@ -270,17 +315,17 @@ string ErrorFlagDescription(const evhtp_error_flags flags) {
 
 
 // static
-evhtp_res ConnectionPool::Connection::ConnectionErrorHook(
-    evhtp_connection_t* conn, evhtp_error_flags flags, void* arg) {
+evhtp_res EvConnection::ConnectionErrorHook(evhtp_connection_t* conn,
+                                            evhtp_error_flags flags,
+                                            void* arg) {
   CHECK_NOTNULL(conn);
   CHECK_NOTNULL(arg);
   CHECK(libevent::Base::OnEventThread());
-  ConnectionPool::Connection* const c(
-      static_cast<ConnectionPool::Connection*>(arg));
-  LOG(WARNING) << "Releasing errored connection to " << c->other_end().first
-               << ":" << c->other_end().second;
+  EvConnection* const c(static_cast<EvConnection*>(arg));
+  LOG(WARNING) << "Releasing errored connection to " << c->other_end_.first
+               << ":" << c->other_end_.second;
 
-  CHECK_EQ(conn, c->connection());
+  CHECK_EQ(conn, c->ev_conn_);
   c->SetErrored();
 
   // Need to let the client know their request has failed, seems evhtp doesn't
@@ -307,13 +352,26 @@ evhtp_res ConnectionPool::Connection::ConnectionErrorHook(
     // it's determined that it's bad.
     conn->request->cb(conn->request, conn->request->cbarg);
     conn->request = nullptr;
-  } else {
-    // Since we're not calling the callback we need to release the connection
-    // ourselves.  We don't delete the Connection here because someone still
-    // has a unique_ptr to it somewhere, and it'll get cleaned up as part of
-    // their lifecycle.
-    c->ReleaseConnection();
   }
+  return EVHTP_RES_OK;
+}
+
+
+// static
+evhtp_res EvConnection::ConnectionFinishedHook(evhtp_connection_t* conn,
+                                               void* arg) {
+  CHECK_NOTNULL(conn);
+  CHECK_NOTNULL(arg);
+  CHECK(libevent::Base::OnEventThread());
+  // libevhtp has finished with this connection so we can release the
+  // shared_ptr we had to keep it around until now.
+  unique_ptr<shared_ptr<EvConnection>> const c(
+      static_cast<shared_ptr<EvConnection>*>(arg));
+  VLOG(1) << "Finished connection to " << (*c)->other_end_.first << ":"
+          << (*c)->other_end_.second;
+  // The underlying evhtp_connection_t is about to be freed, make sure nobody
+  // can hurt themselves via a dangling pointer.
+  (*c)->ev_conn_ = nullptr;
   return EVHTP_RES_OK;
 }
 
@@ -354,22 +412,38 @@ unique_ptr<ConnectionPool::Connection> ConnectionPool::Get(const URL& url) {
 
   if (it == conns_.end() || it->second.empty()) {
     VLOG(1) << "new evhtp_connection for " << key.first << ":" << key.second;
-    unique_ptr<ConnectionPool::Connection> conn(new Connection(
+    // This EvConnection has a slightly complicated lifetime; it needs to hang
+    // around until libevhtp/libevent have entirely finished with the
+    // evhtp_connection_t it references, and for at least as long as the life
+    // of the Connection we return from this method.
+    //
+    // This is accomplished through the use of a couple of shared_ptrs;
+    // this one, which goes inside the returned Connection object, and another
+    // created further below which gets passed in to the
+    // ConnectionFinishedHook.
+    auto conn(std::make_shared<EvConnection>(
         url.Protocol() == "https"
             ? base_->HttpsConnectionNew(key.first, key.second, ssl_ctx_.get())
             : base_->HttpConnectionNew(key.first, key.second),
         move(key)));
+    unique_ptr<ConnectionPool::Connection> handle(new Connection(conn));
     struct timeval read_timeout = {FLAGS_connection_read_timeout_seconds,
                                    kZeroMillis};
     struct timeval write_timeout = {FLAGS_connection_write_timeout_seconds,
                                     kZeroMillis};
-    evhtp_connection_set_timeouts(conn->connection(), &read_timeout,
+    evhtp_connection_set_timeouts(handle->connection(), &read_timeout,
                                   &write_timeout);
-    evhtp_set_hook(&conn->connection()->hooks, evhtp_hook_on_conn_error,
+    evhtp_set_hook(&handle->connection()->hooks, evhtp_hook_on_conn_error,
                    reinterpret_cast<evhtp_hook>(
-                       Connection::ConnectionErrorHook),
+                       EvConnection::ConnectionErrorHook),
                    reinterpret_cast<void*>(conn.get()));
-    return conn;
+    evhtp_set_hook(
+        &handle->connection()->hooks, evhtp_hook_on_connection_fini,
+        reinterpret_cast<evhtp_hook>(EvConnection::ConnectionFinishedHook),
+        // We'll hold on to another shared_ptr to the Connection
+        // until evhtp tells us that it's finished with the cnxn.
+        reinterpret_cast<void*>(new shared_ptr<EvConnection>(conn)));
+    return handle;
   }
 
   VLOG(1) << "cached evhtp_connection for " << key.first << ":" << key.second;
@@ -382,33 +456,31 @@ unique_ptr<ConnectionPool::Connection> ConnectionPool::Get(const URL& url) {
 }
 
 
-void ConnectionPool::Put(unique_ptr<ConnectionPool::Connection> conn) {
-  if (!conn) {
+void ConnectionPool::Put(unique_ptr<ConnectionPool::Connection> handle) {
+  if (!handle) {
     VLOG(1) << "returned null Connection";
     return;
   }
 
-  if (!conn->connection()) {
+  if (!handle->connection()) {
     VLOG(1) << "returned dead Connection";
-    conn->ReleaseConnection();
-    conn.reset();
+    handle.reset();
     return;
   }
 
-  if (conn->GetErrored()) {
+  if (handle->GetErrored()) {
     VLOG(1) << "returned errored Connection";
-    conn->ReleaseConnection();
-    conn.reset();
+    handle.reset();
     return;
   }
 
-  const HostPortPair& key(conn->other_end());
+  const HostPortPair& key(handle->other_end());
   VLOG(1) << "returned Connection for " << key.first << ":" << key.second;
   lock_guard<mutex> lock(lock_);
   auto& entry(conns_[key]);
 
   CHECK_GE(FLAGS_url_fetcher_max_conn_per_host_port, 0);
-  entry.emplace_back(make_pair(system_clock::now(), move(conn)));
+  entry.emplace_back(make_pair(system_clock::now(), move(handle)));
   const string hostport(HostPortString(key));
   VLOG(1) << "ConnectionPool for " << hostport << " size : " << entry.size();
   connections_per_host_port->Set(hostport, entry.size());

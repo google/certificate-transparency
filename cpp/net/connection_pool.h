@@ -37,40 +37,23 @@ struct evhtp_connection_deleter {
 
 
 typedef std::pair<std::string, uint16_t> HostPortPair;
+class EvConnection;
 
 
 class ConnectionPool {
  public:
   class Connection {
    public:
-    evhtp_connection_t* connection() const {
-      return conn_.get();
-    }
+    Connection(const std::shared_ptr<EvConnection>& evc);
+
+    evhtp_connection_t* connection() const;
 
     const HostPortPair& other_end() const;
 
     bool GetErrored() const;
 
    private:
-    static evhtp_res ConnectionErrorHook(evhtp_connection_t* conn,
-                                         evhtp_error_flags errtype, void* arg);
-    static int SSLVerifyCallback(int preverify_ok, X509_STORE_CTX* x509_ctx);
-
-    static int GetSSLConnectionIndex();
-
-    Connection(evhtp_connection_t* conn, HostPortPair&& other_end);
-
-    void SetErrored();
-
-
-    void ReleaseConnection();
-
-    std::unique_ptr<evhtp_connection_t, evhtp_connection_deleter> conn_;
-    const HostPortPair other_end_;
-
-    mutable std::mutex lock_;
-    bool errored_;
-
+    std::shared_ptr<EvConnection> connection_;
     friend class ConnectionPool;
 
     DISALLOW_COPY_AND_ASSIGN(Connection);
