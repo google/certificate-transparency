@@ -31,31 +31,6 @@ class Cert {
   }
   ~Cert();
 
-  enum class Status {
-    TRUE,
-    // OpenSSL makes it very hard to distinguish between input errors
-    // (cert somehow corrupt) and internal library errors (malloc errors,
-    // improper library initialization errors etc), hence the only errors
-    // we currently report are caller errors where the Cert is not loaded
-    // (and thus the method should not have been called in the first place),
-    // or the NID is not recognized, as well as some obvious internal errors.
-    // Any ops on certs that may have failed because the cert was malformed
-    // return FALSE unless we can track the failure down to OpenSSL with
-    // certainty.
-    FALSE,
-    ERROR,
-    // This can happen when an algorithm is not accepted (e.g. MD2).
-    // We signal UNSUPPORTED_ALGORITHM rather than FALSE on signature
-    // verification to indicate that the certificate signature is
-    // unconditionally not accepted.
-    UNSUPPORTED_ALGORITHM,
-  };
-
-  static const Status TRUE = Status::TRUE;
-  static const Status FALSE = Status::FALSE;
-  static const Status ERROR = Status::ERROR;
-  static const Status UNSUPPORTED_ALGORITHM = Status::UNSUPPORTED_ALGORITHM;
-
   bool IsLoaded() const {
     return x509_ != NULL;
   }
@@ -278,21 +253,6 @@ class TbsCertificate {
   DISALLOW_COPY_AND_ASSIGN(TbsCertificate);
 };
 
-inline std::ostream& operator<<(std::ostream& out,
-                                const Cert::Status& status) {
-  switch (status) {
-    case Cert::Status::TRUE:
-      return out << "TRUE";
-    case Cert::Status::FALSE:
-      return out << "FALSE";
-    case Cert::Status::ERROR:
-      return out << "ERROR";
-    case Cert::Status::UNSUPPORTED_ALGORITHM:
-      return out << "UNSUPPORTED_ALGORITHM";
-  }
-
-  return out << "<unknown Cert::Status: " << static_cast<int>(status) << ")";
-}
 
 class CertChain {
  public:
