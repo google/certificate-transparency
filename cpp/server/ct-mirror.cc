@@ -260,7 +260,8 @@ void STHUpdater(
           db->ScanEntries(new_tree->LeafCount()));
       while (!queue->empty() &&
              queue->begin()->second.tree_size() <= local_size) {
-        const SignedTreeHead& next_sth(queue->begin()->second);
+        const SignedTreeHead next_sth(queue->begin()->second);
+        queue->erase(queue->begin());
 
         // First, if necessary, catch our local compact tree up to the
         // candidate STH size:
@@ -301,7 +302,6 @@ void STHUpdater(
         LOG(INFO) << "Can serve new STH of size " << next_sth.tree_size()
                   << " locally";
         cluster_state_controller->NewTreeHead(next_sth);
-        queue->erase(queue->begin());
       }
     }
 
