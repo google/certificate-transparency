@@ -85,13 +85,14 @@ def write_cpp_header(f, include_guard):
         {"year": year, "include_guard": include_guard}))
 
 
-def write_log_info_struct_definition(f, log_key_length):
-    f.write((
+def write_log_info_struct_definition(f):
+    f.write(
         "struct CTLogInfo {\n"
-        "  const char log_key[%d];\n"
+        "  const char* const log_key;\n"
+        "  const size_t log_key_length;\n"
         "  const char* const log_name;\n"
         "  const char* const log_url;\n"
-        "};\n\n" % log_key_length))
+        "};\n\n")
 
 
 def write_cpp_footer(f, include_guard):
@@ -106,7 +107,6 @@ def generate_code_for_chromium(json_log_list, output_file):
     write_cpp_header(f, include_guard)
     logs = json_log_list["logs"]
     list_code = []
-    key_length_in_bytes = None
     for log in logs:
         log_key = base64.decodestring(log["key"])
         hex_key = "".join(["\\x%.2x" % ord(c) for c in log_key])
@@ -119,15 +119,12 @@ def generate_code_for_chromium(json_log_list, output_file):
                          for i in range(num_splits)]
         s = "    {"
         s += "\n     ".join(split_hex_key)
+        s += ',\n     %d' % (len(log_key))
         s += ',\n     "%s"' % (log["description"])
         s += ',\n     "https://%s/"}' % (log["url"])
         list_code.append(s)
-        if not key_length_in_bytes:
-            key_length_in_bytes = len(log_key)
-        else:
-            assert key_length_in_bytes == len(log_key)
 
-    write_log_info_struct_definition(f, key_length_in_bytes + 1)
+    write_log_info_struct_definition(f)
     f.write("const CTLogInfo kCTLogList[] = {\n")
     f.write(",\n" . join(list_code))
     f.write("};\n")
