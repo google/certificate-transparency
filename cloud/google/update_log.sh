@@ -11,21 +11,30 @@ set -e
 GCLOUD="gcloud"
 
 Header "Updating log instances..."
-for i in `seq 0 $((${LOG_NUM_REPLICAS} - 1))`; do
+i=0
+while [ $i -lt ${MIRROR_NUM_REPLICAS} ]; do
   echo "Updating ${LOG_MACHINES[${i}]}"
   echo "${LOG_META[${i}]}" > /tmp/metadata.${i}
 
-  gcloud compute instances add-metadata \
+  if ! gcloud compute instances add-metadata \
       ${LOG_MACHINES[${i}]} \
       --zone ${LOG_ZONES[${i}]} \
-      --metadata-from-file google-container-manifest=/tmp/metadata.${i}
+      --metadata-from-file google-container-manifest=/tmp/metadata.${i}; then
+    echo "Retrying"
+    continue
+  fi
 
-  gcloud compute ssh ${LOG_MACHINES[${i}]} \
+  if ! gcloud compute ssh ${LOG_MACHINES[${i}]} \
       --zone ${LOG_ZONES[${i}]} \
       --command \
           'sudo docker pull gcr.io/'${PROJECT}'/super_duper:test &&
-           sudo docker kill $(sudo docker ps | grep super_duper | awk -- "{print \$1}" )'
+           sudo docker kill $(sudo docker ps | grep super_duper | awk -- "{print \$1}" )'; then
+    echo "Retrying"
+    continue
+  fi
+
   WaitHttpStatus ${LOG_MACHINES[${i}]} ${LOG_ZONES[${i}]} /ct/v1/get-sth 200
+  i=$(($i + 1))
 done;
 
 
