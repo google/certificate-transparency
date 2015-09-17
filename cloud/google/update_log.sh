@@ -12,7 +12,7 @@ GCLOUD="gcloud"
 
 Header "Updating log instances..."
 i=0
-while [ $i -lt ${MIRROR_NUM_REPLICAS} ]; do
+while [ $i -lt ${LOG_NUM_REPLICAS} ]; do
   echo "Updating ${LOG_MACHINES[${i}]}"
   echo "${LOG_META[${i}]}" > /tmp/metadata.${i}
 
