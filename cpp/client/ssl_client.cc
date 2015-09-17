@@ -184,9 +184,20 @@ int SSLClient::VerifyCallback(X509_STORE_CTX* ctx, void* arg) {
 
   string serialized_scts;
   // First, see if the cert has an embedded proof.
-  if (chain.LeafCert()->HasExtension(
-          cert_trans::NID_ctEmbeddedSignedCertificateTimestampList) ==
-      Cert::TRUE) {
+  const StatusOr<bool> has_embedded_proof = chain.LeafCert()->HasExtension(
+      cert_trans::NID_ctEmbeddedSignedCertificateTimestampList);
+
+  // Pull out the superfluous cert extension if it exists for use later
+  // Let's assume the superfluous cert is always last in the chain.
+  const StatusOr<bool> superf_has_timestamp_list =
+      input_chain.Length() > 1
+          ? input_chain.LastCert()->HasExtension(
+                cert_trans::NID_ctSignedCertificateTimestampList)
+          : util::Status::UNKNOWN;
+
+  // First check for embedded proof, if not present then look for the proof in a
+  // superfluous cert.
+  if (has_embedded_proof.ok() && has_embedded_proof.ValueOrDie()) {
     LOG(INFO) << "Embedded proof extension found in certificate, "
               << "verifying...";
     util::Status status = chain.LeafCert()->OctetStringExtensionData(
@@ -199,12 +210,8 @@ int SSLClient::VerifyCallback(X509_STORE_CTX* ctx, void* arg) {
       CHECK_EQ(Code::NOT_FOUND, status.CanonicalCode());
       LOG(ERROR) << "Failed to parse extension data: corrupt cert?";
     }
-    // Else look for the proof in a superfluous cert.
-    // Let's assume the superfluous cert is always last in the chain.
-  } else if (input_chain.Length() > 1 &&
-             input_chain.LastCert()->HasExtension(
-                 cert_trans::NID_ctSignedCertificateTimestampList) ==
-                 Cert::TRUE) {
+  } else if (superf_has_timestamp_list.ok() &&
+             superf_has_timestamp_list.ValueOrDie()) {
     LOG(INFO) << "Proof extension found in certificate, verifying...";
     util::Status status = input_chain.LastCert()->OctetStringExtensionData(
         cert_trans::NID_ctSignedCertificateTimestampList, &serialized_scts);

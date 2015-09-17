@@ -379,10 +379,10 @@ TEST_F(CertTest, Extensions) {
 
 
   // Some facts we know are true about those test certs.
-  EXPECT_EQ(Cert::TRUE, leaf.HasExtension(NID_authority_key_identifier));
-  EXPECT_EQ(Cert::FALSE,
-            leaf.HasCriticalExtension(NID_authority_key_identifier));
-  EXPECT_EQ(Cert::TRUE, pre.HasCriticalExtension(cert_trans::NID_ctPoison));
+  EXPECT_TRUE(leaf.HasExtension(NID_authority_key_identifier).ValueOrDie());
+  EXPECT_FALSE(
+      leaf.HasCriticalExtension(NID_authority_key_identifier).ValueOrDie());
+  EXPECT_TRUE(pre.HasCriticalExtension(cert_trans::NID_ctPoison).ValueOrDie());
 
   EXPECT_FALSE(leaf.HasBasicConstraintCATrue().ValueOrDie());
   EXPECT_TRUE(ca.HasBasicConstraintCATrue().ValueOrDie());
@@ -615,7 +615,7 @@ TEST_F(TbsCertificateTest, DerEncoding) {
 TEST_F(TbsCertificateTest, DeleteExtension) {
   Cert leaf(leaf_pem_);
 
-  ASSERT_EQ(Cert::TRUE, leaf.HasExtension(NID_authority_key_identifier));
+  ASSERT_TRUE(leaf.HasExtension(NID_authority_key_identifier).ValueOrDie());
 
   TbsCertificate tbs(leaf);
   string der_before, der_after;
@@ -624,7 +624,7 @@ TEST_F(TbsCertificateTest, DeleteExtension) {
   EXPECT_OK(tbs.DerEncoding(&der_after));
   EXPECT_NE(der_before, der_after);
 
-  ASSERT_EQ(Cert::FALSE, leaf.HasExtension(cert_trans::NID_ctPoison));
+  ASSERT_FALSE(leaf.HasExtension(cert_trans::NID_ctPoison).ValueOrDie());
   TbsCertificate tbs2(leaf);
   string der_before2, der_after2;
   EXPECT_OK(tbs2.DerEncoding(&der_before2));
@@ -734,7 +734,7 @@ TEST_F(CertChainTest, PreCertChain) {
   EXPECT_EQ(pre_chain.Length(), 2U);
   EXPECT_OK(pre_chain.IsValidCaIssuerChainMaybeLegacyRoot());
   EXPECT_OK(pre_chain.IsValidSignatureChain());
-  EXPECT_EQ(Cert::TRUE, pre_chain.IsWellFormed());
+  EXPECT_TRUE(pre_chain.IsWellFormed().ValueOrDie());
 
   // Try to construct a precert chain from regular certs.
   // The chain should load, but is not well-formed.
@@ -744,7 +744,7 @@ TEST_F(CertChainTest, PreCertChain) {
   EXPECT_EQ(pre_chain2.Length(), 2U);
   EXPECT_OK(pre_chain2.IsValidCaIssuerChainMaybeLegacyRoot());
   EXPECT_OK(pre_chain2.IsValidSignatureChain());
-  EXPECT_EQ(Cert::FALSE, pre_chain2.IsWellFormed());
+  EXPECT_FALSE(pre_chain2.IsWellFormed().ValueOrDie());
 }
 
 }  // namespace

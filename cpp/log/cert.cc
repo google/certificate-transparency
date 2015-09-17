@@ -278,38 +278,42 @@ bool Cert::IsIdenticalTo(const Cert& other) const {
 }
 
 
-Cert::Status Cert::HasExtension(int extension_nid) const {
+util::StatusOr<bool> Cert::HasExtension(int extension_nid) const {
   if (!IsLoaded()) {
     LOG(ERROR) << "Cert not loaded";
-    return ERROR;
+    return util::Status(Code::FAILED_PRECONDITION, "Cert not loaded");
   }
 
   const StatusOr<int> index(ExtensionIndex(extension_nid));
   if (index.ok()) {
-    return TRUE;
+    return true;
   }
 
   if (index.status().CanonicalCode() == util::error::NOT_FOUND) {
-    return FALSE;
+    return false;
   }
 
-  return ERROR;
+  return util::Status(Code::INTERNAL, "Failed to get extension");
 }
 
 
-Cert::Status Cert::HasCriticalExtension(int extension_nid) const {
+StatusOr<bool> Cert::HasCriticalExtension(int extension_nid) const {
   if (!IsLoaded()) {
     LOG(ERROR) << "Cert not loaded";
-    return ERROR;
+    return util::Status(Code::FAILED_PRECONDITION, "Cert not loaded");
   }
 
   const StatusOr<X509_EXTENSION*> ext(GetExtension(extension_nid));
   if (!ext.ok()) {
-    return ext.status().CanonicalCode() == util::error::NOT_FOUND ? FALSE
-                                                                  : ERROR;
+    // The extension may be absent, which is not an error
+    if (ext.status().CanonicalCode() == util::error::NOT_FOUND) {
+      return false;
+    } else {
+      return util::Status(Code::INTERNAL, "Failed to get extension");
+    }
   }
 
-  return X509_EXTENSION_get_critical(ext.ValueOrDie()) > 0 ? TRUE : FALSE;
+  return X509_EXTENSION_get_critical(ext.ValueOrDie()) > 0;
 }
 
 
@@ -683,9 +687,10 @@ Cert::Status Cert::ExtensionStructure(int extension_nid,
   // Let's first check if the extension is present. This allows us to
   // distinguish between "NID not recognized" and the more harmless
   // "extension not found, found more than once or corrupt".
-  Cert::Status status = HasExtension(extension_nid);
-  if (status != TRUE)
-    return status;
+  const StatusOr<bool> status = HasExtension(extension_nid);
+  if (!status.ok() || !status.ValueOrDie()) {
+    return StatusOrBoolToCertStatus(status);
+  }
 
   int crit;
 
@@ -965,16 +970,32 @@ util::Status Cert::IsValidNameConstrainedIntermediateCa() const {
 
   // If it's not a CA cert or there is no name constraint extension then we
   // don't need to apply the rules any further
-  StatusOr<bool> has_ca_constraint = HasBasicConstraintCATrue();
-  if (!has_ca_constraint.ok() || !has_ca_constraint.ValueOrDie()
-      || HasExtension(NID_name_constraints) == Cert::FALSE) {
+  const StatusOr<bool> has_ca_constraint = HasBasicConstraintCATrue();
+  const StatusOr<bool> has_name_constraints =
+      HasExtension(NID_name_constraints);
+
+  // However, we don't expect either of the above lookups to fail as the
+  // extensions are registered.
+  if (!has_ca_constraint.ok()) {
+    return has_ca_constraint.status();
+  }
+
+  if (!has_name_constraints.ok()) {
+    return has_name_constraints.status();
+  }
+
+  if (!has_ca_constraint.ValueOrDie() || !has_name_constraints.ValueOrDie()) {
     return util::Status::OK;
   }
 
   // So there now must be a CT extension and the name constraint must not be
   // in error
-  if (HasExtension(NID_name_constraints) != Cert::TRUE
-      || HasExtension(NID_ctNameConstraintNologIntermediateCa) != Cert::TRUE) {
+  const StatusOr<bool> has_ct_nolog_intermediate =
+      HasExtension(NID_ctNameConstraintNologIntermediateCa);
+
+  CHECK(has_name_constraints.ValueOrDie());
+  if (!has_ct_nolog_intermediate.ok() ||
+      !has_ct_nolog_intermediate.ValueOrDie()) {
     LOG(WARNING) < "Name constraint extension without CT extension";
     return util::Status(Code::INVALID_ARGUMENT,
                         "Name constraint ext present, CT ext missing");
@@ -1419,49 +1440,61 @@ void CertChain::ClearChain() {
 }
 
 
-Cert::Status PreCertChain::UsesPrecertSigningCertificate() const {
+util::StatusOr<bool> PreCertChain::UsesPrecertSigningCertificate() const {
   const Cert* issuer = PrecertIssuingCert();
   if (!issuer) {
     // No issuer, so it must be a real root CA from the store.
-    return Cert::FALSE;
+    return false;
   }
 
-  return StatusOrBoolToCertStatus(
-      issuer->HasExtendedKeyUsage(cert_trans::NID_ctPrecertificateSigning));
+  return issuer->HasExtendedKeyUsage(cert_trans::NID_ctPrecertificateSigning);
 }
 
 
-Cert::Status PreCertChain::IsWellFormed() const {
+util::StatusOr<bool> PreCertChain::IsWellFormed() const {
   if (!IsLoaded()) {
     LOG(ERROR) << "Chain is not loaded";
-    return Cert::ERROR;
+    return util::Status(Code::FAILED_PRECONDITION, "Cert not loaded");
   }
 
   const Cert* pre = PreCert();
 
   // (1) Check that the leaf contains the critical poison extension.
-  Cert::Status status = pre->HasCriticalExtension(cert_trans::NID_ctPoison);
-  if (status != Cert::TRUE)
-    return status;
+  const StatusOr<bool> has_poison =
+      pre->HasCriticalExtension(cert_trans::NID_ctPoison);
+  if (!has_poison.ok() || !has_poison.ValueOrDie()) {
+    return has_poison;
+  }
 
   // (2) If signed by a Precertificate Signing Certificate, check that
   // the AKID extensions are compatible.
-  status = UsesPrecertSigningCertificate();
-  if (status == Cert::FALSE) {
+  const StatusOr<bool> uses_precert_signing = UsesPrecertSigningCertificate();
+  if (uses_precert_signing.ok() && !uses_precert_signing.ValueOrDie()) {
     // If there is no precert signing extendedKeyUsage, no more checks:
     // the cert was issued by a regular CA.
-    return Cert::TRUE;
+    return true;
   }
-  if (status != Cert::TRUE)
-    return status;
+
+  if (!uses_precert_signing.ok()) {
+    return uses_precert_signing.status();
+  }
+
+  CHECK(uses_precert_signing.ValueOrDie());
 
   const Cert* issuer = PrecertIssuingCert();
   // If pre has the extension set but the issuer doesn't, error.
-  status = pre->HasExtension(NID_authority_key_identifier);
-  if (status == Cert::FALSE)
-    return Cert::TRUE;
-  if (status != Cert::TRUE)
-    return status;
+  const StatusOr<bool> has_akid =
+      pre->HasExtension(NID_authority_key_identifier);
+
+  if (has_akid.ok() && !has_akid.ValueOrDie()) {
+    return true;
+  }
+  if (!has_akid.ok()) {
+    return has_akid;
+  }
+
+  CHECK(has_akid.ValueOrDie());
+
   // Extension present in the leaf: check it's present in the issuer.
   return issuer->HasExtension(NID_authority_key_identifier);
 }

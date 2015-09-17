@@ -86,7 +86,7 @@ class Cert {
   // or some other unknown error occurred while parsing the extensions.
   // NID must be either an OpenSSL built-in NID, or one registered by the user
   // with OBJ_create. (See log/ct_extensions.h for sample code.)
-  Status HasExtension(int extension_nid) const;
+  util::StatusOr<bool> HasExtension(int extension_nid) const;
 
   // Returns TRUE if the extension is present and critical.
   // Returns FALSE if the extension is not present, or is present but not
@@ -95,7 +95,7 @@ class Cert {
   // or some other unknown error occurred while parsing the extensions.
   // NID must be either an OpenSSL built-in NID, or one registered by the user
   // with OBJ_create. (See log/ct_extensions.h for sample code.)
-  Status HasCriticalExtension(int extension_nid) const;
+  util::StatusOr<bool> HasCriticalExtension(int extension_nid) const;
 
   // Returns TRUE if the basicConstraints extension is present and CA=TRUE.
   // Returns FALSE if the extension is not present, is present but CA=FALSE,
@@ -395,7 +395,7 @@ class PreCertChain : public CertChain {
   // Returns ERROR if the chain is not loaded, CT extensions could not be
   // detected or some other unknown error occurred while parsing the
   // extensions.
-  Cert::Status UsesPrecertSigningCertificate() const;
+  util::StatusOr<bool> UsesPrecertSigningCertificate() const;
 
   // Returns TRUE if
   // (1) the leaf certificate contains the critical poison extension;
@@ -410,7 +410,7 @@ class PreCertChain : public CertChain {
   // extensions.
   // This method does not verify any signatures, or otherwise check
   // that the chain is valid.
-  Cert::Status IsWellFormed() const;
+  util::StatusOr<bool> IsWellFormed() const;
 };
 
 }  // namespace cert_trans
