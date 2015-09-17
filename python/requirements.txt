@@ -7,3 +7,4 @@ python-gflags
 Twisted>=12.1
 httplib2>0.9
 bitstring
+pycrypto>=2.5
