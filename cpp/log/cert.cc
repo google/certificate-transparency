@@ -996,7 +996,7 @@ util::Status Cert::IsValidNameConstrainedIntermediateCa() const {
   CHECK(has_name_constraints.ValueOrDie());
   if (!has_ct_nolog_intermediate.ok() ||
       !has_ct_nolog_intermediate.ValueOrDie()) {
-    LOG(WARNING) < "Name constraint extension without CT extension";
+    LOG(WARNING) << "Name constraint extension without CT extension";
     return util::Status(Code::INVALID_ARGUMENT,
                         "Name constraint ext present, CT ext missing");
   }
