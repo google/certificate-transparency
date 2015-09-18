@@ -218,7 +218,7 @@ class Cert {
  private:
   util::StatusOr<int> ExtensionIndex(int extension_nid) const;
   util::StatusOr<X509_EXTENSION*> GetExtension(int extension_nid) const;
-  Status ExtensionStructure(int extension_nid, void** ext_struct) const;
+  util::StatusOr<void*> ExtensionStructure(int extension_nid) const;
   bool ValidateRedactionSubjectAltNameAndCN(int* dns_alt_name_count,
                                             util::Status* status) const;
   util::StatusOr<bool> LogUnsupportedAlgorithm() const;
