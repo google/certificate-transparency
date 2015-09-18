@@ -8,31 +8,24 @@ The scripts in the rep referenced below are targetted at running a log cluster i
 
 ## Prerequisites
 You should have:
-* Installed the dependencies listed in the top-level [README.md](https://github.com/google/certificate-transparency/README.md) file,
-* Installed the Docker utilities (and started the docker daemon if it's not already running)
-* Signed up for a [Google Cloud](https://cloud.google.com) account _[only required if you're intending to use GCE, of course]_
+* Installed the dependencies listed in the top-level 
+  [README.md](https://github.com/google/certificate-transparency/README.md) file,
+* Installed the Docker utilities (and started the docker daemon if it's not
+  already running)
+* Signed up for a [Google Cloud](https://cloud.google.com) account _[only
+  required if you're intending to use GCE, of course]_
 
 ### Dependencies for Debian-based distros
-Assuming you're happy to use the stock versions of dependencies, Debian-based distros (including Ubuntu etc.) have many of them pre-packaged which will make your life easier, you can install them using the following command:
+Assuming you're happy to use the stock versions of dependencies, Debian-based
+distros (including Ubuntu etc.) have many of them pre-packaged which will
+make your life easier, see the main
+[README.md](https://github.com/google/certificate-transparency/README.md) for
+the canonical list.
+
+In addition to the build dependencies above, you'll need some tools too.
+For supported operating systems, the latest versions of these tools can be
+installed with the following commands:
 ```bash
-sudo apt-get update
-sudo apt-get -V -y install \
-       pkg-config \
-       clang \
-       openssl \
-       libssl-dev \
-       cmake \
-       google-mock \
-       protobuf-compiler \
-       libprotobuf-dev \
-       libgflags-dev \
-       libgoogle-glog-dev \
-       libsqlite3-dev \
-       libjson-c-dev \
-       libevent-dev \
-       libldns-dev \
-       wget \
-       curl
 # Install latest version of Docker from docker.io (the system version is very old):
 wget -qO- https://get.docker.com/ | sh
 # Install latest version of Cloud SDK from Google
@@ -47,7 +40,9 @@ curl https://sdk.cloud.google.com | bash
    ```
    
 1. Enable the following APIs for your new project (look under the `APIs & Auth > APIs` tab in your project's area of your GCE console):
-   * Compute Engine API
+   * Google Cloud APIs > Compute Engine API
+   * Google Cloud APIs > Cloud Monitoring API
+   * Google Cloud APIs > Compute Engine Instance Groups API
    
 1. If you've not done it before, log in with gcloud:
    ```bash
@@ -55,43 +50,39 @@ curl https://sdk.cloud.google.com | bash
    gcloud config set project ${PROJECT}
    ```
    
-1. We're going to store our Docker images inside Google Compute Storage, so we need to create a storage bucket and set up a credentials file:
-   ```bash
-   export GCS_BUCKET=${PROJECT}_ctlog_images
-   gsutil mb gs://${GCS_BUCKET}
-   echo -e \
-       GCP_OAUTH2_REFRESH_TOKEN=$(gcloud auth print-refresh-token)\\n\
-       GCS_BUCKET=${GCS_BUCKET} > registry-params.env
-   ```
-   
-1. Start a local Docker registry (we'll use that to push the docker images to GCS):
-   ```bash
-   sudo docker run -d --env-file=registry-params.env \
-       -p 5000:5000 google/docker-registry
-   ```
+## Building Docker images
+  Firstly, follow the instructions in the main 
+  [README.md](https://github.com/google/certificate-transparency/README.md)
+  file to build the C++ code.
+  Once that's done, you can move on to building the Docker images by running
+  the following commands:
 
-## Fetching and building
    ```bash
-   export CXX=clang++
-   git clone https://github.com/google/certificate-transparency.git
-   cd certificate-transparency
-   make -C cpp -j24 proto/libproto.a server/ct-server
-   make docker
-   docker push localhost:5000/certificate_transparency/super_duper:test
-   docker push localhost:5000/certificate_transparency/etcd:test
-   docker push localhost:5000/certificate_transparency/prometheus:test
+   # Depending on whether you're going to run a Log or a Mirror, you only
+   # really need to run one of the next two commands, although running both
+   # won't cause any problems.
+   sudo docker build -f Dockerfile -t gcr.io/${PROJECT}/super_duper:test . &&
+       gcloud docker push gcr.io/${PROJECT}/super_duper:test
+   sudo docker build -f Dockerfile-ct-mirror -t gcr.io/${PROJECT}/super_mirror:test . &&
+       gcloud docker push gcr.io/${PROJECT}/super_mirror:test
+   sudo docker build -f cloud/etcd/Dockerfile -t gcr.io/${PROJECT}/etcd:test . &&
+       gcloud docker push gcr.io/${PROJECT}/etcd:test
+   sudo docker build -f cloud/prometheus/Dockerfile -t gcr.io/${PROJECT}/prometheus:test . &&
+       gcloud docker push gcr.io/${PROJECT}/prometheus:test
    ```
 
 ## Starting the cluster on Google Compute Engine
-1. Edit the settings in the `cloud/google/config.sh` file
-1. Run `cloud/google/create_new_cluster.sh`
+1. Create a new config file for your log/mirror, using one of the existing 
+   `cloud/google/configs/<name>.sh` files for reference.
+1. Run `cloud/google/create_new_cluster.sh cloud/google/configs/<name>.sh`
 1. Make a cup of tea while you wait for the jobs to come up
 1. [optional] Create an SSH tunnel for viewing the metrics on Prometheus:
    ```bash
-   gcloud compute ssh ${USER}-ctlog-prometheus-1 --ssh-flag="-L 9092:localhost:9090"
+   gcloud compute ssh ${CLUSTER}-prometheus-${ZONE}-1 --ssh-flag="-L 9092:localhost:9090"
    ```
    
-   Pointing your browser at [http://localhost:9092](http://localhost:9092) should let you add graphs/inspect the metrics gathered by prometheus.
+   Pointing your browser at [http://localhost:9092](http://localhost:9092)
+   should let you add graphs/inspect the metrics gathered by prometheus.
 
 
 ## Stopping the cluster on Google Compute Engine
@@ -105,27 +96,35 @@ Run the following commands:
    ```
 
 ## Updating the log server binaries
-If you're like to update the running CT Log Server code, then it's just a matter of building new Docker images, pushing them up to GCS, and restarting the containers.
+If you'd like to update the running CT Log Server code, then it's just a
+matter of building & pushing new Docker images (as above), and restarting the
+containers.
 
-1. Make whatever changes you wish to the code base, then rebuild and create new docker image:
+1. Make whatever changes you wish to the code base, then rebuild and create
+   new docker image:
    ```bash
-   make -C cpp -j24 proto/libproto.a server/ct-server
-   make docker
+   # For example, to update the image for a CT Log instance:
+   make -C cpp -j24 proto/libproto.a server/ct-server 
+   sudo docker build -f Dockerfile -t gcr.io/${PROJECT}/super_duper:test . &&
+       gcloud docker push gcr.io/${PROJECT}/super_duper:test
    ```
    
-1. push the image into GCS:
+1. Use the `cloud/google/update_{log,mirror,prometheus}.sh` scripts to update the jobs:
    ```bash
-   docker push localhost:5000/certificate_transparency/super_duper:test
+   # continuing our CT Log theme:
+   cloud/google/update_log cloud/google/configs/<name>.sh
    ```
-   
-1. finally, ssh into each of the log machines, they'll be called `${USER}-ctlog-log-X` (where X is a number in the range 1 to however many servers you have configured), e.g:
-   ```bash
-   gcloud compute ssh ${USER}-ctlog-log-1
-   ...ctlog-log-1$ sudo docker pull localhost:5000/certificate_transparency/super_duper:test
-   ...ctlog-log-1$ sudo docker ps
-   # find the container ID of the log container (since you've already updated the docker image tag,
-   # it's likely to be the container whose IMAGE name is just a hex number rather than the 
-   # `localhost:5000/...` style tag.) 
-   ...ctlog-log-1$ sudo docker kill <your_container_id_goes_here>
-   ```
-   The containers should re-start with the new image and continue on their way.  Since the log DB lives on persistent disks mounted by the container images, there shouldn't be any data loss doing this.
+
+   The containers should re-start with the new image and continue on their way.
+   Since the log DB lives on persistent disks mounted by the container images,
+   there shouldn't be any data loss doing this.
+
+   The `update_{log,mirror}.sh` scripts will wait for each instance to update
+   and become ready to serve again before moving on to update the next
+   instance.  This should ensure that you don't lose too much of your cluster's
+   serving capacity during the update, but it can mean that logs or mirrors
+   which contain a _large_ number of certificates (millions) may take a while
+   to update.
+
+   The Log/Mirror binaries will log the git hash from which they were built,
+   this can help to verify that they're running the correct version.
