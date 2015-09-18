@@ -42,33 +42,6 @@ static int X509_get_signature_nid(const X509* x) {
 }
 #endif
 
-namespace {
-// TODO. These helpers can be removed when Cert::Status has been removed.
-// They make it easier to do an incremental removal
-
-cert_trans::Cert::Status StatusOrBoolToCertStatus(StatusOr<bool> status) {
-  if (status.ok()) {
-    return status.ValueOrDie() ? cert_trans::Cert::TRUE
-                               : cert_trans::Cert::FALSE;
-  } else {
-    return cert_trans::Cert::ERROR;
-  }
-}
-
-
-StatusOr<bool> CertStatusToStatusOrBool(cert_trans::Cert::Status status) {
-  if (status == cert_trans::Cert::FALSE) {
-    return false;
-  } else if (status == cert_trans::Cert::TRUE) {
-    return true;
-  } else {
-    return util::Status(Code::UNKNOWN, "Unknown status");
-  }
-}
-
-// END of section to be cleaned up
-
-}
 
 namespace cert_trans {
 
@@ -323,22 +296,24 @@ StatusOr<bool> Cert::HasBasicConstraintCATrue() const {
     return util::Status(Code::FAILED_PRECONDITION, "Cert not loaded");
   }
 
-  void* ext_struct;
-  Status status = ExtensionStructure(NID_basic_constraints, &ext_struct);
+  const StatusOr<void*> ext_struct(ExtensionStructure(NID_basic_constraints));
 
-  if (status == ERROR) {
+  if (!ext_struct.ok()) {
     // Truly odd.
     LOG(ERROR) << "Failed to check BasicConstraints extension";
+    return ext_struct.status();
   }
 
-  if (status != TRUE) {
-    return CertStatusToStatusOrBool(status);
+  if (!ext_struct.ValueOrDie()) {
+    // No extension found
+    return false;
   }
 
   // |constraints| is never null upon success.
-  BASIC_CONSTRAINTS* constraints = static_cast<BASIC_CONSTRAINTS*>(ext_struct);
-  bool is_ca = constraints->ca;
-  BASIC_CONSTRAINTS_free(constraints);
+  BASIC_CONSTRAINTS* basic_constraints =
+      static_cast<BASIC_CONSTRAINTS*>(ext_struct.ValueOrDie());
+  bool is_ca = basic_constraints->ca;
+  BASIC_CONSTRAINTS_free(basic_constraints);
   return is_ca;
 }
 
@@ -357,20 +332,22 @@ StatusOr<bool> Cert::HasExtendedKeyUsage(int key_usage_nid) const {
     return util::Status(Code::INTERNAL, "NID lookup failed");
   }
 
-  void* ext_struct;
-  Status status = ExtensionStructure(NID_ext_key_usage, &ext_struct);
+  const StatusOr<void*> ext_key_usage = ExtensionStructure(NID_ext_key_usage);
 
-  if (status == ERROR) {
+  if (!ext_key_usage.ok()) {
     // Truly odd.
     LOG(ERROR) << "Failed to check ExtendedKeyUsage extension";
+    return ext_key_usage.status();
   }
 
-  if (status != TRUE) {
-    return CertStatusToStatusOrBool(status);
+  if (!ext_key_usage.ValueOrDie()) {
+    // No extension found
+    return false;
   }
 
   // |eku| is never null upon success.
-  EXTENDED_KEY_USAGE* eku = static_cast<EXTENDED_KEY_USAGE*>(ext_struct);
+  EXTENDED_KEY_USAGE* eku =
+      static_cast<EXTENDED_KEY_USAGE*>(ext_key_usage.ValueOrDie());
   bool ext_key_usage_found = false;
   for (int i = 0; i < sk_ASN1_OBJECT_num(eku); ++i) {
     if (OBJ_cmp(key_usage_obj, sk_ASN1_OBJECT_value(eku, i)) == 0) {
@@ -627,17 +604,17 @@ util::Status Cert::OctetStringExtensionData(int extension_nid,
     return util::Status(Code::FAILED_PRECONDITION, "Cert not loaded");
   }
 
-  void* ext_data;
-  Status status = ExtensionStructure(extension_nid, &ext_data);
-  if (status != TRUE) {
-    // TODO(Martin2112): This should return the result of ExtensionStructure()
-    // when it's been converted.
+  // Callers don't care whether extension is missing or invalid as they
+  // usually call this method after confirming it to be present.
+  const StatusOr<void*> ext_struct = ExtensionStructure(extension_nid);
+  if (!ext_struct.ok() || !ext_struct.ValueOrDie()) {
     return util::Status(Code::NOT_FOUND, "Extension not present or invalid");
   }
 
   // |octet| is never null upon success. Caller is responsible for the
   // correctness of this cast.
-  ASN1_OCTET_STRING* octet = static_cast<ASN1_OCTET_STRING*>(ext_data);
+  ASN1_OCTET_STRING* octet =
+      static_cast<ASN1_OCTET_STRING*>(ext_struct.ValueOrDie());
   result->assign(reinterpret_cast<const char*>(octet->data), octet->length);
   ASN1_OCTET_STRING_free(octet);
   return util::Status::OK;
@@ -682,30 +659,34 @@ StatusOr<X509_EXTENSION*> Cert::GetExtension(int extension_nid) const {
 }
 
 
-Cert::Status Cert::ExtensionStructure(int extension_nid,
-                                      void** ext_struct) const {
+util::StatusOr<void*> Cert::ExtensionStructure(int extension_nid) const {
   // Let's first check if the extension is present. This allows us to
   // distinguish between "NID not recognized" and the more harmless
   // "extension not found, found more than once or corrupt".
-  const StatusOr<bool> status = HasExtension(extension_nid);
-  if (!status.ok() || !status.ValueOrDie()) {
-    return StatusOrBoolToCertStatus(status);
+  const StatusOr<bool> has_ext = HasExtension(extension_nid);
+  if (!has_ext.ok()) {
+    return has_ext.status();
+  }
+
+  if (!has_ext.ValueOrDie()) {
+    return nullptr;
   }
 
   int crit;
 
-  *ext_struct = X509_get_ext_d2i(x509_, extension_nid, &crit, nullptr);
+  void* ext_struct = X509_get_ext_d2i(x509_, extension_nid, &crit, nullptr);
 
-  if (!*ext_struct) {
+  if (!ext_struct) {
     if (crit != -1) {
       LOG(WARNING) << "Corrupt extension data";
       LOG_OPENSSL_ERRORS(WARNING);
     }
 
-    return FALSE;
+    return util::Status(Code::FAILED_PRECONDITION,
+                        "Corrupt extension in cert?");
   }
 
-  return TRUE;
+  return ext_struct;
 }
 
 
