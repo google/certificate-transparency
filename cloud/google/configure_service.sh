@@ -42,16 +42,17 @@ gcloud compute firewall-rules create ${INSTANCE_TYPE}-node-80 \
     --target-tags ${INSTANCE_TYPE}-node
 
 for zone in ${ZONE_LIST}; do
-  gcloud preview instance-groups \
-      --zone ${zone} create "${INSTANCE_TYPE}-group-${zone}" \
+  gcloud compute instance-groups unmanaged \
+      create "${INSTANCE_TYPE}-group-${zone}" \
+      --zone ${zone} \
       --network "default" &
 done
 wait
 
 for i in `seq 0 $((${NODE_NUM_REPLICAS} - 1))`; do
-  gcloud preview instance-groups \
-      --zone ${NODE_ZONES[${i}]} instances \
-      --group "${INSTANCE_TYPE}-group-${NODE_ZONES[${i}]}" \
+  gcloud compute instance-groups unmanaged instances \
+      --zone ${NODE_ZONES[${i}]} \
+      --instance-group "${INSTANCE_TYPE}-group-${NODE_ZONES[${i}]}" \
       add ${NODE_MACHINES[${i}]} &
 done
 wait
