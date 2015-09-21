@@ -14,10 +14,6 @@ from ct.proto import client_pb2
 from ct.proto import ct_pb2
 from ct.serialization import tls_message
 
-SUPPORTED_HASH_ALGORITHMS = (
-    ct_pb2.DigitallySigned.SHA256,
-)
-
 SUPPORTED_SIGNATURE_ALGORITHMS = (
     ct_pb2.DigitallySigned.ECDSA,
     ct_pb2.DigitallySigned.RSA
@@ -43,7 +39,7 @@ def decode_signature(signature):
         raise error.EncodingError("Invalid algorithm prefix %s" %
                                       sig_prefix.encode("hex"))
     hash_algo, sig_algo = struct.unpack(">BB", sig_prefix)
-    if (hash_algo not in SUPPORTED_HASH_ALGORITHMS or
+    if (hash_algo != ct_pb2.DigitallySigned.SHA256 or
         sig_algo not in SUPPORTED_SIGNATURE_ALGORITHMS):
         raise error.EncodingError("Invalid algorithm(s) %d, %d" %
                                   (hash_algo, sig_algo))
