@@ -35,7 +35,7 @@ class ContinuousFetcherImpl : public ContinuousFetcher {
                         const LogVerifier* log_verifier, bool fetch_scts);
 
   void AddPeer(const string& node_id, const shared_ptr<Peer>& peer) override;
-  void RemovePeer(const string& node_id);
+  void RemovePeer(const string& node_id) override;
 
  private:
   void StartFetch(const unique_lock<mutex>& lock);
