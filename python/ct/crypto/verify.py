@@ -198,12 +198,7 @@ class LogVerifier(object):
                                                   key_info.type)
 
     def __repr__(self):
-        return "%r(public key: %r)" % (self.__class__.__name__,
-                                       self.__pubkey)
-
-    def __str__(self):
-        return "%s(public key: %s)" % (self.__class__.__name__,
-                                       self.__pubkey)
+        return "%s(%r)" % (self.__class__.__name__, self.__sig_verifier)
 
     def _encode_sth_input(self, sth_response):
         if len(sth_response.sha256_root_hash) != 32:

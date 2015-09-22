@@ -39,12 +39,7 @@ class EcdsaVerifier(object):
             raise error.EncodingError(e)
 
     def __repr__(self):
-        return "%r(public key: %r)" % (self.__class__.__name__,
-                                       pem.to_pem(self.__der,
-                                                  self.__WRITE_MARKER))
-
-    def __str__(self):
-        return "%s(public key: %s)" % (self.__class__.__name__,
+        return "%s(public key: %r)" % (self.__class__.__name__,
                                        pem.to_pem(self.__der,
                                                   self.__WRITE_MARKER))
 
