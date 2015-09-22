@@ -3,10 +3,10 @@
 import io
 import struct
 
-from ct.crypto import ecdsa_keys
 from ct.crypto import error
 from ct.crypto import merkle
-from ct.crypto import rsa_keys
+from ct.crypto import verify_ecdsa
+from ct.crypto import verify_rsa
 from ct.crypto.asn1 import oid
 from ct.crypto.asn1 import x509_extension as x509_ext
 from ct.crypto.asn1 import x509_name
@@ -190,9 +190,9 @@ class LogVerifier(object):
         """Initialize from KeyInfo protocol buffer and a MerkleVerifier."""
         self.__merkle_verifier = merkle_verifier
         if (key_info.type == client_pb2.KeyInfo.ECDSA):
-            self.__pubkey = ecdsa_keys.EcdsaPublicKey(key_info)
+            self.__sig_verifier = verify_ecdsa.EcdsaVerifier(key_info)
         elif (key_info.type == client_pb2.KeyInfo.RSA):
-            self.__pubkey = rsa_keys.RsaPublicKey(key_info)
+            self.__sig_verifier = verify_rsa.RsaVerifier(key_info)
         else:
             raise error.UnsupportedAlgorithmError("Key type %d not supported" %
                                                   key_info.type)
@@ -215,17 +215,17 @@ class LogVerifier(object):
 
     @error.returns_true_or_raises
     def _assert_correct_signature_algorithms(self, hash_algo, sig_algo):
-        if (hash_algo != self.__pubkey.HASH_ALGORITHM):
+        if (hash_algo != self.__sig_verifier.HASH_ALGORITHM):
             raise error.SignatureError(
                 "Hash algorithm used for the signature (%d) does not match the "
                 "one used for the public key (%d)" %
-                (hash_algo, self.__pubkey.HASH_ALGORITHM))
+                (hash_algo, self.__sig_verifier.HASH_ALGORITHM))
 
-        if (sig_algo != self.__pubkey.SIGNATURE_ALGORITHM):
+        if (sig_algo != self.__sig_verifier.SIGNATURE_ALGORITHM):
             raise error.SignatureError(
                 "Signing algorithm used (%d) does not match the one used for "
                 "the public key (%d)" %
-                (sig_algo, self.__pubkey.SIGNATURE_ALGORITHM))
+                (sig_algo, self.__sig_verifier.SIGNATURE_ALGORITHM))
 
         return True
 
@@ -253,7 +253,7 @@ class LogVerifier(object):
 
         self._assert_correct_signature_algorithms(hash_algo, sig_algo)
 
-        return self.__pubkey.verify(signature_input, signature)
+        return self.__sig_verifier.verify(signature_input, signature)
 
     @staticmethod
     @error.returns_true_or_raises
@@ -352,7 +352,8 @@ class LogVerifier(object):
         self._assert_correct_signature_algorithms(sct.signature.hash_algorithm,
                                                   sct.signature.sig_algorithm)
 
-        return self.__pubkey.verify(signature_input, sct.signature.signature)
+        return self.__sig_verifier.verify(signature_input,
+                                          sct.signature.signature)
 
     def verify_embedded_scts(self, chain):
         """Extract and verify SCTs embedded in an X.509 certificate.

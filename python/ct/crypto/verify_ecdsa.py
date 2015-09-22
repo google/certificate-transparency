@@ -5,8 +5,8 @@ from ct.proto import client_pb2
 import hashlib
 import ecdsa
 
-class EcdsaPublicKey(object):
-    """Wraps an ECDSA public key."""
+class EcdsaVerifier(object):
+    """Verifies ECDSA signatures."""
 
     # The signature algorithm used for this public key."""
     SIGNATURE_ALGORITHM = client_pb2.DigitallySigned.ECDSA
@@ -19,7 +19,7 @@ class EcdsaPublicKey(object):
     __WRITE_MARKER = "ECDSA PUBLIC KEY"
 
     def __init__(self, key_info):
-        """Loads a PEM-encoded ECDSA public key.
+        """Creates a verifier that uses a PEM-encoded ECDSA public key.
 
         Args:
         - key_info: KeyInfo protobuf message
@@ -50,7 +50,7 @@ class EcdsaPublicKey(object):
 
     @error.returns_true_or_raises
     def verify(self, signature_input, signature):
-        """Verifies the signature was created by the owner of this key.
+        """Verifies the signature was created by the owner of the public key.
 
         Args:
         - signature_input: The data that was originally signed.

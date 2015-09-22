@@ -6,8 +6,8 @@ import Crypto.Hash.SHA256
 import Crypto.PublicKey.RSA
 import Crypto.Signature.PKCS1_v1_5
 
-class RsaPublicKey(object):
-    """Wraps an RSA public key."""
+class RsaVerifier(object):
+    """Verifies RSA signatures."""
 
     # The signature algorithm used for this public key.
     SIGNATURE_ALGORITHM = client_pb2.DigitallySigned.RSA
@@ -20,7 +20,7 @@ class RsaPublicKey(object):
     __WRITE_MARKER = "RSA PUBLIC KEY"
 
     def __init__(self, key_info):
-        """Loads a PEM-encoded RSA public key.
+        """Creates a verifier that uses a PEM-encoded RSA public key.
 
         Args:
         - key_info: KeyInfo protobuf message
@@ -51,7 +51,7 @@ class RsaPublicKey(object):
 
     @error.returns_true_or_raises
     def verify(self, signature_input, signature):
-        """Verifies the signature was created by the owner of this key.
+        """Verifies the signature was created by the owner of the public key.
 
         Args:
         - signature_input: The data that was originally signed.
