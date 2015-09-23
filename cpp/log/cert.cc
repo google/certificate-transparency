@@ -45,6 +45,7 @@ static int X509_get_signature_nid(const X509* x) {
 
 namespace cert_trans {
 
+
 // Convert string from ASN1 and check it doesn't contain nul characters
 string ASN1ToStringAndCheckForNulls(ASN1_STRING* asn1_string,
                                     const string& tag,
@@ -292,15 +293,13 @@ StatusOr<bool> Cert::HasBasicConstraintCATrue() const {
 
   const StatusOr<void*> ext_struct(ExtensionStructure(NID_basic_constraints));
 
-  if (!ext_struct.ok()) {
+  if (ext_struct.status().CanonicalCode() == Code::NOT_FOUND) {
+    // No extension found
+    return false;
+  } else if (!ext_struct.ok()) {
     // Truly odd.
     LOG(ERROR) << "Failed to check BasicConstraints extension";
     return ext_struct.status();
-  }
-
-  if (!ext_struct.ValueOrDie()) {
-    // No extension found
-    return false;
   }
 
   // |constraints| is never null upon success.
@@ -328,15 +327,13 @@ StatusOr<bool> Cert::HasExtendedKeyUsage(int key_usage_nid) const {
 
   const StatusOr<void*> ext_key_usage = ExtensionStructure(NID_ext_key_usage);
 
-  if (!ext_key_usage.ok()) {
+  if (ext_key_usage.status().CanonicalCode() == Code::NOT_FOUND) {
+    // No extension found
+    return false;
+  } else if (!ext_key_usage.ok()) {
     // Truly odd.
     LOG(ERROR) << "Failed to check ExtendedKeyUsage extension";
     return ext_key_usage.status();
-  }
-
-  if (!ext_key_usage.ValueOrDie()) {
-    // No extension found
-    return false;
   }
 
   // |eku| is never null upon success.
@@ -601,8 +598,9 @@ util::Status Cert::OctetStringExtensionData(int extension_nid,
   // Callers don't care whether extension is missing or invalid as they
   // usually call this method after confirming it to be present.
   const StatusOr<void*> ext_struct = ExtensionStructure(extension_nid);
-  if (!ext_struct.ok() || !ext_struct.ValueOrDie()) {
-    return util::Status(Code::NOT_FOUND, "Extension not present or invalid");
+  if (!ext_struct.ok()
+      && ext_struct.status().CanonicalCode() == Code::NOT_FOUND) {
+    return ext_struct.status();
   }
 
   // |octet| is never null upon success. Caller is responsible for the
@@ -663,7 +661,8 @@ util::StatusOr<void*> Cert::ExtensionStructure(int extension_nid) const {
   }
 
   if (!has_ext.ValueOrDie()) {
-    return nullptr;
+    return util::Status(Code::NOT_FOUND, "Extension NID " +
+                        to_string(extension_nid) + " not present or invalid");
   }
 
   int crit;
@@ -726,7 +725,20 @@ bool IsValidRedactedHost(const string& hostname) {
 }
 
 
-bool validateRedactionSubjectAltNames(STACK_OF(GENERAL_NAME)* subject_alt_names,
+namespace {
+
+
+void FreeOpenSslStackOfGeneralName(STACK_OF(GENERAL_NAME)* general_name_stack) {
+  CHECK_NOTNULL(general_name_stack);
+  for (int i = 0; i < sk_GENERAL_NAME_num(general_name_stack); ++i) {
+    GENERAL_NAME* name(sk_GENERAL_NAME_value(general_name_stack, i));
+    GENERAL_NAME_free(name);
+  }
+  sk_GENERAL_NAME_free(general_name_stack);
+}
+
+
+bool ValidateRedactionSubjectAltNames(STACK_OF(GENERAL_NAME)* subject_alt_names,
                                       vector<string>* dns_alt_names,
                                       util::Status* status,
                                       int* redacted_name_count) {
@@ -746,7 +758,7 @@ bool validateRedactionSubjectAltNames(STACK_OF(GENERAL_NAME)* subject_alt_names,
                                                              &name_status);
 
         if (!name_status.ok()) {
-          sk_GENERAL_NAME_free(subject_alt_names);
+          FreeOpenSslStackOfGeneralName(subject_alt_names);
           *status = name_status;
           return true;
         }
@@ -756,7 +768,7 @@ bool validateRedactionSubjectAltNames(STACK_OF(GENERAL_NAME)* subject_alt_names,
         if (IsRedactedHost(dns_name)) {
           if (!IsValidRedactedHost(dns_name)) {
             LOG(WARNING) << "Invalid redacted host: " << dns_name;
-            sk_GENERAL_NAME_free(subject_alt_names);
+            FreeOpenSslStackOfGeneralName(subject_alt_names);
             *status = util::Status(Code::INVALID_ARGUMENT,
                                    "Invalid redacted hostname");
             return true;
@@ -767,12 +779,15 @@ bool validateRedactionSubjectAltNames(STACK_OF(GENERAL_NAME)* subject_alt_names,
       }
     }
 
-    sk_GENERAL_NAME_free(subject_alt_names);
+    FreeOpenSslStackOfGeneralName(subject_alt_names);
   }
 
   // This stage of validation is complete, result is not final yet
   return false;
 }
+
+
+}  // namespace
 
 
 // Helper method for validating V2 redaction rules. If it returns true
@@ -790,7 +805,7 @@ bool Cert::ValidateRedactionSubjectAltNameAndCN(int* dns_alt_name_count,
   // Apply validation rules for subject alt names, if this returns true
   // status is already final.
   if (subject_alt_names &&
-      validateRedactionSubjectAltNames(subject_alt_names,
+      ValidateRedactionSubjectAltNames(subject_alt_names,
                                        &dns_alt_names,
                                        status,
                                        &redacted_name_count)) {
@@ -860,6 +875,22 @@ bool Cert::ValidateRedactionSubjectAltNameAndCN(int* dns_alt_name_count,
 }
 
 
+namespace {
+
+
+void FreeOpenSslStackOfAsn1Integer(STACK_OF(ASN1_INTEGER)* asn1_integer_stack) {
+  CHECK_NOTNULL(asn1_integer_stack);
+  for (int i = 0; i < sk_ASN1_INTEGER_num(asn1_integer_stack); ++i) {
+    ASN1_INTEGER* asn1_int(sk_ASN1_INTEGER_value(asn1_integer_stack, i));
+    ASN1_INTEGER_free(asn1_int);
+  }
+  sk_ASN1_INTEGER_free(asn1_integer_stack);
+}
+
+
+}  // namespace
+
+
 util::Status Cert::IsValidWildcardRedaction() const {
   if (!IsLoaded()) {
     LOG(ERROR) << "Cert not loaded";
@@ -901,7 +932,7 @@ util::Status Cert::IsValidWildcardRedaction() const {
     if (num_integers > dns_alt_name_count) {
       LOG(WARNING) << "Too many integers in extension: " << num_integers
                    << " but only " << dns_alt_name_count << " DNS names";
-      sk_ASN1_INTEGER_free(integers);
+      FreeOpenSslStackOfAsn1Integer(integers);
       return util::Status(Code::INVALID_ARGUMENT,
                           "More integers in ext than redacted labels");
     }
@@ -913,20 +944,19 @@ util::Status Cert::IsValidWildcardRedaction() const {
       BIGNUM* const value(ASN1_INTEGER_to_BN(redacted_labels, nullptr));
 
       const bool neg = value->neg;
-      ASN1_INTEGER_free(redacted_labels);
-
       if (neg) {
-        LOG(WARNING) << "Invalid negative redaction label count: "
-                     << BN_bn2hex(value);
+        char* bn_hex = BN_bn2hex(value);
+        LOG(WARNING) << "Invalid negative redaction label count: " << bn_hex;
+        OPENSSL_free(bn_hex);
         BN_free(value);
-        sk_ASN1_INTEGER_free(integers);
+        FreeOpenSslStackOfAsn1Integer(integers);
         return util::Status(Code::INVALID_ARGUMENT, "Invalid -ve label count");
       }
 
       BN_free(value);
     }
 
-    sk_ASN1_INTEGER_free(integers);
+    FreeOpenSslStackOfAsn1Integer(integers);
   } else {
     LOG(WARNING) << "Failed to unpack SEQUENCE OF in CT extension";
     return util::Status(Code::INVALID_ARGUMENT,
@@ -1473,5 +1503,6 @@ util::StatusOr<bool> PreCertChain::IsWellFormed() const {
   // Extension present in the leaf: check it's present in the issuer.
   return issuer->HasExtension(NID_authority_key_identifier);
 }
+
 
 }  // namespace cert_trans
