@@ -8,6 +8,7 @@ protobuf
 ecdsa
 mock
 twisted (at least 12.1; tested with 13.2)
+pycrypto (at least 2.5; tested with 2.6.1)
 
 If you use pip, simply run `pip install -r requirements.txt`
 

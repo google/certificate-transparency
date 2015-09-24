@@ -1,19 +1,23 @@
 """Verify CT log statements."""
 
-import hashlib
 import io
 import struct
 
 from ct.crypto import error
 from ct.crypto import merkle
-from ct.crypto import pem
+from ct.crypto import verify_ecdsa
+from ct.crypto import verify_rsa
 from ct.crypto.asn1 import oid
 from ct.crypto.asn1 import x509_extension as x509_ext
 from ct.crypto.asn1 import x509_name
 from ct.proto import client_pb2
 from ct.proto import ct_pb2
 from ct.serialization import tls_message
-import ecdsa
+
+SUPPORTED_SIGNATURE_ALGORITHMS = (
+    ct_pb2.DigitallySigned.ECDSA,
+    ct_pb2.DigitallySigned.RSA
+)
 
 def decode_signature(signature):
     """Decode the TLS-encoded serialized signature.
@@ -36,7 +40,7 @@ def decode_signature(signature):
                                       sig_prefix.encode("hex"))
     hash_algo, sig_algo = struct.unpack(">BB", sig_prefix)
     if (hash_algo != ct_pb2.DigitallySigned.SHA256 or
-        sig_algo != ct_pb2.DigitallySigned.ECDSA):
+        sig_algo not in SUPPORTED_SIGNATURE_ALGORITHMS):
         raise error.EncodingError("Invalid algorithm(s) %d, %d" %
                                   (hash_algo, sig_algo))
 
@@ -178,35 +182,23 @@ def _create_dst_entry(sct, chain):
 
     return entry
 
+
 class LogVerifier(object):
     """CT log verifier."""
-    __ECDSA_READ_MARKERS = ("PUBLIC KEY", "ECDSA PUBLIC KEY")
-    __ECDSA_WRITE_MARKER = "ECDSA PUBLIC KEY"
 
     def __init__(self, key_info, merkle_verifier=merkle.MerkleVerifier()):
         """Initialize from KeyInfo protocol buffer and a MerkleVerifier."""
         self.__merkle_verifier = merkle_verifier
-        if key_info.type != client_pb2.KeyInfo.ECDSA:
+        if (key_info.type == client_pb2.KeyInfo.ECDSA):
+            self.__sig_verifier = verify_ecdsa.EcdsaVerifier(key_info)
+        elif (key_info.type == client_pb2.KeyInfo.RSA):
+            self.__sig_verifier = verify_rsa.RsaVerifier(key_info)
+        else:
             raise error.UnsupportedAlgorithmError("Key type %d not supported" %
                                                   key_info.type)
 
-        # Will raise a PemError on invalid encoding
-        self.__der, _ = pem.from_pem(key_info.pem_key,
-                                     LogVerifier.__ECDSA_READ_MARKERS)
-        try:
-            self.__pubkey = ecdsa.VerifyingKey.from_der(self.__der)
-        except ecdsa.der.UnexpectedDER as e:
-            raise error.EncodingError(e)
-
     def __repr__(self):
-        return "%r(public key: %r)" % (self.__class__.__name__,
-                                       pem.to_pem(self.__der,
-                                                  self.__ECDSA_WRITE_MARKER))
-
-    def __str__(self):
-        return "%s(public key: %s)" % (self.__class__.__name__,
-                                       pem.to_pem(self.__der,
-                                                  self.__ECDSA_WRITE_MARKER))
+        return "%s(%r)" % (self.__class__.__name__, self.__sig_verifier)
 
     def _encode_sth_input(self, sth_response):
         if len(sth_response.sha256_root_hash) != 32:
@@ -216,17 +208,21 @@ class LogVerifier(object):
                            sth_response.timestamp, sth_response.tree_size,
                            sth_response.sha256_root_hash)
 
-    def _verify(self, signature_input, signature):
-        try:
-            return self.__pubkey.verify(signature, signature_input,
-                                        hashfunc=hashlib.sha256,
-                                        sigdecode=ecdsa.util.sigdecode_der)
-        except ecdsa.der.UnexpectedDER:
-            raise error.EncodingError("Invalid DER encoding for signature %s",
-                                      signature.encode("hex"))
-        except ecdsa.keys.BadSignatureError:
-            raise error.SignatureError("Signature did not verify: %s",
-                                       signature.encode("hex"))
+    @error.returns_true_or_raises
+    def _assert_correct_signature_algorithms(self, hash_algo, sig_algo):
+        if (hash_algo != self.__sig_verifier.HASH_ALGORITHM):
+            raise error.SignatureError(
+                "Hash algorithm used for the signature (%d) does not match the "
+                "one used for the public key (%d)" %
+                (hash_algo, self.__sig_verifier.HASH_ALGORITHM))
+
+        if (sig_algo != self.__sig_verifier.SIGNATURE_ALGORITHM):
+            raise error.SignatureError(
+                "Signing algorithm used (%d) does not match the one used for "
+                "the public key (%d)" %
+                (sig_algo, self.__sig_verifier.SIGNATURE_ALGORITHM))
+
+        return True
 
     @error.returns_true_or_raises
     def verify_sth(self, sth_response):
@@ -246,10 +242,13 @@ class LogVerifier(object):
             ct.crypto.error.SignatureError: invalid signature.
         """
         signature_input = self._encode_sth_input(sth_response)
-        #TODO(eranm): Pass the actual hash and signature algorithms to the
-        # verify method.
-        (_, _, signature) = decode_signature(sth_response.tree_head_signature)
-        return self._verify(signature_input, signature)
+
+        (hash_algo, sig_algo, signature) = decode_signature(
+            sth_response.tree_head_signature)
+
+        self._assert_correct_signature_algorithms(hash_algo, sig_algo)
+
+        return self.__sig_verifier.verify(signature_input, signature)
 
     @staticmethod
     @error.returns_true_or_raises
@@ -345,7 +344,11 @@ class LogVerifier(object):
         entry = _create_dst_entry(sct, chain)
         signature_input = tls_message.encode(entry)
 
-        return self._verify(signature_input, sct.signature.signature)
+        self._assert_correct_signature_algorithms(sct.signature.hash_algorithm,
+                                                  sct.signature.sig_algorithm)
+
+        return self.__sig_verifier.verify(signature_input,
+                                          sct.signature.signature)
 
     def verify_embedded_scts(self, chain):
         """Extract and verify SCTs embedded in an X.509 certificate.
