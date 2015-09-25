@@ -12,6 +12,7 @@ import jsonschema
 import M2Crypto
 
 from cpp_generator import generate_cpp_header
+from java_generator import generate_java_source
 
 FLAGS = gflags.FLAGS
 
@@ -25,6 +26,10 @@ gflags.DEFINE_string("log_list_schema",
                      "JSON schema for the list of logs.")
 gflags.DEFINE_string("header_output", None,
                      "If specifed, generates C++ code for Chromium.")
+gflags.DEFINE_string("java_output", None,
+                     "If specifed, generates Java code.")
+gflags.DEFINE_string("java_class", "org.conscrypt.ct.KnownLogs",
+                     "Fully qualified name of the generated class.")
 gflags.DEFINE_boolean("skip_signature_check", False,
                      "Skip signature check (only validate schema).")
 
@@ -85,7 +90,10 @@ def run():
         sys.exit(2)
     if FLAGS.header_output:
         generate_cpp_header(parsed_json, FLAGS.header_output)
-    else:
+    if FLAGS.java_output:
+        generate_java_source(parsed_json, FLAGS.java_output, FLAGS.java_class)
+
+    if not FLAGS.header_output and not FLAGS.java_output:
         print_formatted_log_list(parsed_json)
 
 
