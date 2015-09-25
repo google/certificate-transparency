@@ -18,11 +18,41 @@ using std::string;
 namespace util {
 
 
+namespace {
+
+
+void LibEventLog(int severity, const char* msg) {
+  const string msg_s(msg);
+  switch (severity) {
+    case EVENT_LOG_DEBUG:
+      VLOG(1) << msg_s;
+      break;
+    case EVENT_LOG_MSG:
+      LOG(INFO) << msg_s;
+      break;
+    case EVENT_LOG_WARN:
+      LOG(WARNING) << msg_s;
+      break;
+    case EVENT_LOG_ERR:
+      LOG(ERROR) << msg_s;
+      break;
+    default:
+      LOG(ERROR) << "LibEvent(?): " << msg_s;
+      break;
+  }
+}
+
+
+}  // namespace
+
+
 void InitCT(int* argc, char** argv[]) {
   google::SetVersionString(cert_trans::kBuildVersion);
   google::ParseCommandLineFlags(argc, argv, true);
   google::InitGoogleLogging(*argv[0]);
   google::InstallFailureSignalHandler();
+
+  event_set_log_callback(&LibEventLog);
 
   evthread_use_pthreads();
   // Set-up OpenSSL for multithreaded use:

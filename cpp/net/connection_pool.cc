@@ -334,15 +334,22 @@ evhtp_res EvConnection::ConnectionErrorHook(evhtp_connection_t* conn,
     // If someone hasn't already modified the default status, set it to a
     // generic "something went wrong" value here:
     if (conn->request->status == 200) {
-      const string error_str(
-          evutil_socket_error_to_string(evutil_socket_geterror(conn->sock)));
-      LOG(WARNING) << "error flag (0x" << std::hex << static_cast<int>(flags)
-                   << "):" << ErrorFlagDescription(flags) << " : "
-                   << error_str;
-      if (flags & BEV_EVENT_TIMEOUT) {
+      bool log_error(true);
+      if (flags == BEV_EVENT_EOF) {
+        // not actually an error, we just read up to the EOF, probably the
+        // server didn't send a Content-Length header.
+        log_error = false;
+      } else if (flags & BEV_EVENT_TIMEOUT) {
         conn->request->status = kTimeout;
       } else {
         conn->request->status = kUnknownErrorStatus;
+      }
+      if (log_error) {
+        const string error_str(
+            evutil_socket_error_to_string(evutil_socket_geterror(conn->sock)));
+        LOG(WARNING) << "error flag (0x" << std::hex << static_cast<int>(flags)
+                     << "):" << ErrorFlagDescription(flags) << " : "
+                     << error_str;
       }
     } else {
       LOG(WARNING) << "status already set to " << conn->request->status;

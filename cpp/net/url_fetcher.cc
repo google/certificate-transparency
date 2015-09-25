@@ -157,6 +157,7 @@ void State::RunRequest() {
   VLOG(1) << "evhtp_make_request(" << conn_.get()->connection() << ", "
           << http_req << ", " << verb << ", \"" << request_.url.PathQuery()
           << "\")";
+  VLOG(2) << request_;
   if (evhtp_make_request(conn_->connection(), http_req, verb,
                          request_.url.PathQuery().c_str()) != 0) {
     VLOG(1) << "evhtp_make_request error";
@@ -244,6 +245,8 @@ void State::RequestDone(evhtp_request_t* req) {
                   evbuffer_pullup(req->buffer_in, body_length)),
               body_length);
   response_->body.swap(body);
+
+  VLOG(2) << *response_;
 
   task_->Return();
 }
