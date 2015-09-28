@@ -7,6 +7,7 @@
 
 #include "base/notification.h"
 #include "util/executor.h"
+#include "util/status_test_util.h"
 #include "util/task.h"
 #include "util/testing.h"
 #include "util/thread_pool.h"
@@ -155,7 +156,7 @@ void WaitForReturnCallback(TypeParam* s, Notification* notifier) {
   EXPECT_FALSE(s->task()->IsActive());
   EXPECT_TRUE(s->task()->IsDone());
   EXPECT_FALSE(s->task()->CancelRequested());
-  EXPECT_EQ(util::Status::OK, s->task()->status());
+  EXPECT_OK(s->task()->status());
   s->ContinueDone();
   notifier->Notify();
 }

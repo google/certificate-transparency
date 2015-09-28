@@ -280,13 +280,11 @@ TEST_F(EtcdConsistentStoreTest, TestSetServingSTHOverwrites) {
 TEST_F(EtcdConsistentStoreTest, TestSetServingSTHWontOverwriteWithOlder) {
   ct::SignedTreeHead sth;
   sth.set_timestamp(234);
-  util::Status status(store_->SetServingSTH(sth));
-  EXPECT_TRUE(status.ok()) << status;
+  EXPECT_OK(store_->SetServingSTH(sth));
 
   ct::SignedTreeHead sth2;
   sth2.set_timestamp(sth.timestamp() - 1);
-  status = store_->SetServingSTH(sth2);
-  EXPECT_EQ(util::error::OUT_OF_RANGE, status.CanonicalCode()) << status;
+  EXPECT_THAT(store_->SetServingSTH(sth2), StatusIs(util::error::OUT_OF_RANGE));
 }
 
 TEST_F(EtcdConsistentStoreDeathTest,
@@ -331,8 +329,8 @@ TEST_F(EtcdConsistentStoreTest,
   // Set up scenario:
   InsertEntry(kPath, other_cert);
 
-  util::Status status(store_->AddPendingEntry(&cert));
-  EXPECT_EQ(util::error::ALREADY_EXISTS, status.CanonicalCode());
+  EXPECT_THAT(store_->AddPendingEntry(&cert),
+              StatusIs(util::error::ALREADY_EXISTS));
   EXPECT_EQ(other_cert.timestamp(), cert.timestamp());
 }
 
@@ -377,8 +375,8 @@ TEST_F(EtcdConsistentStoreTest, TestGetPendingEntryForHash) {
 TEST_F(EtcdConsistentStoreTest, TestGetPendingEntryForNonExistantHash) {
   const string kPath(string(kRoot) + "/entries/" + util::HexString("Nah"));
   EntryHandle<LoggedCertificate> handle;
-  util::Status status(store_->GetPendingEntryForHash("Nah", &handle));
-  EXPECT_EQ(util::error::NOT_FOUND, status.CanonicalCode()) << status;
+  EXPECT_THAT(store_->GetPendingEntryForHash("Nah", &handle),
+              StatusIs(util::error::NOT_FOUND));
 }
 
 
@@ -437,7 +435,7 @@ TEST_F(EtcdConsistentStoreTest,
   mapping.add_mapping()->set_sequence_number(2);
   ForceSetEntry("/root/sequence_mapping", mapping);
   EntryHandle<SequenceMapping> entry;
-  EXPECT_EQ(util::Status::OK, store_->GetSequenceMapping(&entry));
+  EXPECT_OK(store_->GetSequenceMapping(&entry));
 }
 
 
@@ -551,7 +549,7 @@ TEST_F(EtcdConsistentStoreTest, TestSetClusterNodeStateHasTTL) {
   SyncTask task(base_.get());
   client_.Get(kPath, &resp, task.task());
   task.Wait();
-  EXPECT_EQ(util::error::NOT_FOUND, task.status().CanonicalCode());
+  EXPECT_THAT(task.status(), StatusIs(util::error::NOT_FOUND));
 }
 
 
@@ -710,17 +708,13 @@ TEST_F(EtcdConsistentStoreTest, TestCleansUpToNewSTH) {
   }
 
   EntryHandle<LoggedCertificate> unused;
-  EXPECT_EQ(util::error::NOT_FOUND,
-            store_->GetPendingEntryForHash(seq_to_hash[100], &unused)
-                .CanonicalCode());
-  EXPECT_EQ(util::error::NOT_FOUND,
-            store_->GetPendingEntryForHash(seq_to_hash[101], &unused)
-                .CanonicalCode());
-  EXPECT_EQ(util::error::NOT_FOUND,
-            store_->GetPendingEntryForHash(seq_to_hash[102], &unused)
-                .CanonicalCode());
-  EXPECT_EQ(Status::OK,
-            store_->GetPendingEntryForHash(seq_to_hash[103], &unused));
+  EXPECT_THAT(store_->GetPendingEntryForHash(seq_to_hash[100], &unused),
+              StatusIs(util::error::NOT_FOUND));
+  EXPECT_THAT(store_->GetPendingEntryForHash(seq_to_hash[101], &unused),
+              StatusIs(util::error::NOT_FOUND));
+  EXPECT_THAT(store_->GetPendingEntryForHash(seq_to_hash[102], &unused),
+              StatusIs(util::error::NOT_FOUND));
+  EXPECT_OK(store_->GetPendingEntryForHash(seq_to_hash[103], &unused));
 
   // Check that we didn't modify the sequence mapping:
   EntryHandle<SequenceMapping> seq_mapping;
@@ -740,12 +734,10 @@ TEST_F(EtcdConsistentStoreTest, TestCleansUpToNewSTH) {
 
 
   // Ensure they were:
-  EXPECT_EQ(util::error::NOT_FOUND,
-            store_->GetPendingEntryForHash(seq_to_hash[103], &unused)
-                .CanonicalCode());
-  EXPECT_EQ(util::error::NOT_FOUND,
-            store_->GetPendingEntryForHash(seq_to_hash[104], &unused)
-                .CanonicalCode());
+  EXPECT_THAT(store_->GetPendingEntryForHash(seq_to_hash[103], &unused),
+              StatusIs(util::error::NOT_FOUND));
+  EXPECT_THAT(store_->GetPendingEntryForHash(seq_to_hash[104], &unused),
+              StatusIs(util::error::NOT_FOUND));
 
   // Check that we didn't modify the sequence mapping:
   CHECK(store_->GetSequenceMapping(&seq_mapping).ok());

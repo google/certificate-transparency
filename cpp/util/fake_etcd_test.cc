@@ -430,7 +430,7 @@ TEST_F(FakeEtcdTest, DeleteNonExistent) {
   ++expected_stats["compareAndDeleteFail"];
 
   Status status(BlockingDelete("/potato", 42));
-  EXPECT_EQ(util::error::NOT_FOUND, status.CanonicalCode()) << status;
+  EXPECT_THAT(status, StatusIs(util::error::NOT_FOUND));
 
   map<string, int64_t> stats;
   ASSERT_OK(BlockingGetStats(&stats));
