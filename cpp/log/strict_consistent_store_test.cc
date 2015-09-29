@@ -9,6 +9,7 @@
 #include "util/mock_masterelection.h"
 #include "util/status.h"
 #include "util/statusor.h"
+#include "util/status_test_util.h"
 #include "util/testing.h"
 #include "util/util.h"
 
@@ -22,6 +23,7 @@ using testing::NiceMock;
 using testing::Return;
 using util::Status;
 using util::StatusOr;
+using util::testing::StatusIs;
 
 
 class StrictConsistentStoreTest : public ::testing::TestWithParam<bool> {
@@ -57,7 +59,7 @@ TEST_P(StrictConsistentStoreTest, TestNextAvailableSequenceNumber) {
     EXPECT_EQ(123, seq.ValueOrDie());
   } else {
     EXPECT_FALSE(seq.ok());
-    EXPECT_EQ(util::error::PERMISSION_DENIED, seq.status().CanonicalCode());
+    EXPECT_THAT(seq.status(), StatusIs(util::error::PERMISSION_DENIED));
   }
 }
 
@@ -74,10 +76,9 @@ TEST_P(StrictConsistentStoreTest, TestSetServingSTH) {
   util::Status status(strict_store_.SetServingSTH(sth));
 
   if (IsMaster()) {
-    EXPECT_TRUE(status.ok());
+    EXPECT_OK(status);
   } else {
-    EXPECT_FALSE(status.ok());
-    EXPECT_EQ(util::error::PERMISSION_DENIED, status.CanonicalCode());
+    EXPECT_THAT(status, StatusIs(util::error::PERMISSION_DENIED));
   }
 }
 
@@ -97,7 +98,7 @@ TEST_P(StrictConsistentStoreTest, TestUpdateSequenceMapping) {
     EXPECT_TRUE(status.ok());
   } else {
     EXPECT_FALSE(status.ok());
-    EXPECT_EQ(util::error::PERMISSION_DENIED, status.CanonicalCode());
+    EXPECT_THAT(status, StatusIs(util::error::PERMISSION_DENIED));
   }
 }
 
@@ -116,8 +117,7 @@ TEST_P(StrictConsistentStoreTest, TestClusterConfig) {
   if (IsMaster()) {
     EXPECT_TRUE(status.ok());
   } else {
-    EXPECT_FALSE(status.ok());
-    EXPECT_EQ(util::error::PERMISSION_DENIED, status.CanonicalCode());
+    EXPECT_THAT(status, StatusIs(util::error::PERMISSION_DENIED));
   }
 }
 

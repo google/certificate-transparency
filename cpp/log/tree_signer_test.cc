@@ -17,6 +17,7 @@
 #include "proto/ct.pb.h"
 #include "util/fake_etcd.h"
 #include "util/mock_masterelection.h"
+#include "util/status_test_util.h"
 #include "util/sync_task.h"
 #include "util/testing.h"
 #include "util/thread_pool.h"
@@ -176,7 +177,7 @@ TYPED_TEST(TreeSignerTest, Sign) {
   this->test_signer_.CreateUnique(&logged_cert);
   this->AddPendingEntry(&logged_cert);
   // this->AddSequencedEntry(&logged_cert, 0);
-  EXPECT_EQ(util::Status::OK, this->tree_signer_->SequenceNewEntries());
+  EXPECT_OK(this->tree_signer_->SequenceNewEntries());
   EXPECT_EQ(TS::OK, this->tree_signer_->UpdateTree());
 
   const SignedTreeHead sth(this->tree_signer_->LatestSTH());
@@ -291,7 +292,7 @@ TYPED_TEST(TreeSignerTest, SequenceNewEntriesCleansUpOldSequenceMappings) {
   LoggedCertificate logged_cert;
   this->test_signer_.CreateUnique(&logged_cert);
   this->AddPendingEntry(&logged_cert);
-  EXPECT_EQ(util::Status::OK, this->tree_signer_->SequenceNewEntries());
+  EXPECT_OK(this->tree_signer_->SequenceNewEntries());
   EXPECT_EQ(TS::OK, this->tree_signer_->UpdateTree());
   EXPECT_EQ(Status::OK,
             this->store_->SetServingSTH(this->tree_signer_->LatestSTH()));
@@ -313,7 +314,7 @@ TYPED_TEST(TreeSignerTest, SequenceNewEntriesCleansUpOldSequenceMappings) {
   }
   this->DeletePendingEntry(logged_cert);
   LOG(INFO) << "2";
-  EXPECT_EQ(util::Status::OK, this->tree_signer_->SequenceNewEntries());
+  EXPECT_OK(this->tree_signer_->SequenceNewEntries());
 
   {
     EntryHandle<SequenceMapping> mapping;

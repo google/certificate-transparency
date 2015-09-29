@@ -115,7 +115,7 @@ TEST_F(UrlFetcherTest, TestCertMatchesHost) {
   SyncTask task(&pool_);
   fetcher_->Fetch(req, &resp, task.task());
   task.Wait();
-  EXPECT_EQ(util::Status::OK, task.status());
+  EXPECT_OK(task.status());
   EXPECT_EQ(200, resp.status_code);
 }
 
@@ -153,7 +153,7 @@ TEST_F(UrlFetcherTest, TestStarMatchesSubdomain) {
   SyncTask task(&pool_);
   fetcher_->Fetch(req, &resp, task.task());
   task.Wait();
-  EXPECT_EQ(util::Status::OK, task.status());
+  EXPECT_OK(task.status());
   EXPECT_EQ(200, resp.status_code);
 }
 
@@ -179,7 +179,7 @@ TEST_F(UrlFetcherTest, TestSubdomainMatches) {
   SyncTask task(&pool_);
   fetcher_->Fetch(req, &resp, task.task());
   task.Wait();
-  EXPECT_EQ(util::Status::OK, task.status());
+  EXPECT_OK(task.status());
   EXPECT_EQ(200, resp.status_code);
 }
 
@@ -243,7 +243,7 @@ TEST_F(UrlFetcherTest, TestIpMatches) {
   SyncTask task(&pool_);
   fetcher_->Fetch(req, &resp, task.task());
   task.Wait();
-  EXPECT_EQ(util::Status::OK, task.status());
+  EXPECT_OK(task.status());
   EXPECT_EQ(200, resp.status_code);
 }
 
