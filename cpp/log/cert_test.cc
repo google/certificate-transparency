@@ -57,6 +57,10 @@ static const char kV2WildcardRedactTest14[] = "redact_test14.pem";
 static const char kV2WildcardRedactTest15[] = "redact_test15.pem";
 // Leaf cert with wildcard redaction in both CN and DNS-ID no extension
 static const char kV2WildcardRedactTest22[] = "redact_test22.pem";
+// Leaf cert with extension that is not a sequence (invalid)
+static const char kV2WildcardRedactTest23[] = "redact_test23.pem";
+// Leaf cert with extension sequence containing non integer value (invalid)
+static const char kV2WildcardRedactTest24[] = "redact_test24.pem";
 
 // Leaf cert with non CA constraints
 static const char kV2ConstraintTest2[] = "constraint_test2.pem";
@@ -205,6 +209,8 @@ class CertTest : public ::testing::Test {
   string v2_wildcard_test14_pem_;
   string v2_wildcard_test15_pem_;
   string v2_wildcard_test22_pem_;
+  string v2_wildcard_test23_pem_;
+  string v2_wildcard_test24_pem_;
 
   string v2_constraint_test2_pem_;
   string v2_constraint_test3_pem_;
@@ -254,6 +260,10 @@ class CertTest : public ::testing::Test {
                              &v2_wildcard_test15_pem_));
     CHECK(util::ReadTextFile(cert_dir_v2 + kV2WildcardRedactTest22,
                              &v2_wildcard_test22_pem_));
+    CHECK(util::ReadTextFile(cert_dir_v2 + kV2WildcardRedactTest23,
+                             &v2_wildcard_test23_pem_));
+    CHECK(util::ReadTextFile(cert_dir_v2 + kV2WildcardRedactTest24,
+                             &v2_wildcard_test24_pem_));
 
     // V2 Name constraint test certs
     CHECK(util::ReadTextFile(cert_dir_v2 + kV2ConstraintTest2,
@@ -544,6 +554,22 @@ TEST_F(CertTest, TestWildcardRedactTestCase22) {
   // This should be a redaction of 1 label but no extension required by
   // RFC section 3.2.2
   Cert leaf(v2_wildcard_test22_pem_);
+  EXPECT_THAT(leaf.IsValidWildcardRedaction(),
+              StatusIs(util::error::INVALID_ARGUMENT));
+}
+
+TEST_F(CertTest, TestWildcardRedactTestCase23) {
+  // Should not be valid because the CT extension is not a SEQUENCE OF
+  // type
+  Cert leaf(v2_wildcard_test23_pem_);
+  EXPECT_THAT(leaf.IsValidWildcardRedaction(),
+              StatusIs(util::error::INVALID_ARGUMENT));
+}
+
+TEST_F(CertTest, TestWildcardRedactTestCase24) {
+  // Should not be valid because not all the items in the CT extension sequence
+  // are ASN1_INTEGER type
+  Cert leaf(v2_wildcard_test24_pem_);
   EXPECT_THAT(leaf.IsValidWildcardRedaction(),
               StatusIs(util::error::INVALID_ARGUMENT));
 }
