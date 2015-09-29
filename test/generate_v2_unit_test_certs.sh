@@ -83,6 +83,8 @@ make_redaction_test_case test13
 make_redaction_test_case test14
 make_redaction_test_case test15
 make_redaction_test_case test22
+make_redaction_test_case test23
+make_redaction_test_case test24
 
 # Generate the name constraint test cases
 

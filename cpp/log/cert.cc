@@ -875,22 +875,6 @@ bool Cert::ValidateRedactionSubjectAltNameAndCN(int* dns_alt_name_count,
 }
 
 
-namespace {
-
-
-void FreeOpenSslStackOfAsn1Integer(STACK_OF(ASN1_INTEGER)* asn1_integer_stack) {
-  CHECK_NOTNULL(asn1_integer_stack);
-  for (int i = 0; i < sk_ASN1_INTEGER_num(asn1_integer_stack); ++i) {
-    ASN1_INTEGER* asn1_int(sk_ASN1_INTEGER_value(asn1_integer_stack, i));
-    ASN1_INTEGER_free(asn1_int);
-  }
-  sk_ASN1_INTEGER_free(asn1_integer_stack);
-}
-
-
-}  // namespace
-
-
 util::Status Cert::IsValidWildcardRedaction() const {
   if (!IsLoaded()) {
     LOG(ERROR) << "Cert not loaded";
@@ -918,21 +902,34 @@ util::Status Cert::IsValidWildcardRedaction() const {
                         "No CT redaction count extension");
   }
 
-  // Unpack the extension contents, which should be SEQUENCE OF INTEGER
-  STACK_OF(ASN1_INTEGER)* const integers(
-      static_cast<STACK_OF(ASN1_INTEGER)*>(
-          ASN1_seq_unpack_ASN1_INTEGER(exty.ValueOrDie()->value->data,
-                                       exty.ValueOrDie()->value->length,
-                                       d2i_ASN1_INTEGER, ASN1_INTEGER_free)));
+  // Ensure the data in the extension is a sequence. DER encoding is same for
+  // SEQUENCE and SEQUENCE OF and we'll check types later.
+  if (exty.ValueOrDie()->value->data[0] !=
+      (V_ASN1_SEQUENCE | V_ASN1_CONSTRUCTED)) {
+    LOG(WARNING) << "CT redaction count extension is not a SEQUENCE OF";
+    return util::Status(Code::INVALID_ARGUMENT,
+                        "CT redaction count extension not a sequence");
+  }
 
-  if (integers) {
-    const int num_integers = sk_ASN1_INTEGER_num(integers);
+  // Unpack the extension contents, which should be SEQUENCE OF INTEGER.
+  // For compatibility we unpack any sequence and check integer type as we go.
+  // Don't pass the pointer from the extension directly as it gets incremented
+  // during parsing.
+  const unsigned char* sequence_data(
+      const_cast<const unsigned char*>(exty.ValueOrDie()->value->data));
+  STACK_OF(ASN1_TYPE)* const asn1_types(
+      static_cast<STACK_OF(ASN1_TYPE)*>(
+          d2i_ASN1_SEQUENCE_ANY(
+              nullptr, &sequence_data, exty.ValueOrDie()->value->length)));
+
+  if (asn1_types) {
+    const int num_integers(sk_ASN1_TYPE_num(asn1_types));
 
     // RFC text says there MUST NOT be more integers than there are DNS ids
     if (num_integers > dns_alt_name_count) {
       LOG(WARNING) << "Too many integers in extension: " << num_integers
                    << " but only " << dns_alt_name_count << " DNS names";
-      FreeOpenSslStackOfAsn1Integer(integers);
+      sk_ASN1_TYPE_pop_free(asn1_types, ASN1_TYPE_free);
       return util::Status(Code::INVALID_ARGUMENT,
                           "More integers in ext than redacted labels");
     }
@@ -940,7 +937,17 @@ util::Status Cert::IsValidWildcardRedaction() const {
     // All the integers in the sequence must be positive, check the sign
     // after conversion to BIGNUM
     for (int i = 0; i < num_integers; ++i) {
-      ASN1_INTEGER* const redacted_labels(sk_ASN1_INTEGER_value(integers, i));
+      ASN1_TYPE* const asn1_type(sk_ASN1_TYPE_value(asn1_types, i));
+
+      if (asn1_type->type != V_ASN1_INTEGER) {
+        LOG(WARNING) << "Redaction count has non-integer in sequence"
+                     << asn1_type->type;
+        sk_ASN1_TYPE_pop_free(asn1_types, ASN1_TYPE_free);
+        return util::Status(Code::INVALID_ARGUMENT,
+                            "Non integer found in redaction label count");
+      }
+
+      ASN1_INTEGER* const redacted_labels(asn1_type->value.integer);
       BIGNUM* const value(ASN1_INTEGER_to_BN(redacted_labels, nullptr));
 
       const bool neg = value->neg;
@@ -949,14 +956,14 @@ util::Status Cert::IsValidWildcardRedaction() const {
         LOG(WARNING) << "Invalid negative redaction label count: " << bn_hex;
         OPENSSL_free(bn_hex);
         BN_free(value);
-        FreeOpenSslStackOfAsn1Integer(integers);
+        sk_ASN1_TYPE_pop_free(asn1_types, ASN1_TYPE_free);
         return util::Status(Code::INVALID_ARGUMENT, "Invalid -ve label count");
       }
 
       BN_free(value);
     }
 
-    FreeOpenSslStackOfAsn1Integer(integers);
+    sk_ASN1_TYPE_pop_free(asn1_types, ASN1_TYPE_free);
   } else {
     LOG(WARNING) << "Failed to unpack SEQUENCE OF in CT extension";
     return util::Status(Code::INVALID_ARGUMENT,
