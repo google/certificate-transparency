@@ -45,7 +45,7 @@ DEFINE_int32(
     "When there are more than --url_fetcher_max_conn_per_host_port "
     "connections per host:port pair, any unused for at least this long will "
     "be removed.");
-DEFINE_string(trusted_root_certs, "/etc/ssl/certs/ca-certificates.crt",
+DEFINE_string(trusted_root_certs, "",
               "Location of trusted CA root certs for outgoing SSL "
               "connections.");
 DEFINE_int32(url_fetcher_max_conn_per_host_port, 4,
@@ -284,13 +284,22 @@ ConnectionPool::ConnectionPool(libevent::Base* base)
   CHECK(ssl_ctx_) << "could not build SSL context: " << DumpOpenSSLErrorStack();
 
   // Try to load trusted root certificates.
-  // TODO(alcutter): This is probably Linux specific, we'll need other sections
-  // for OSX etc.
-  if (SSL_CTX_load_verify_locations(ssl_ctx_.get(),
-                                    FLAGS_trusted_root_certs.c_str(),
-                                    nullptr) != 1) {
-    DumpOpenSSLErrorStack();
-    LOG(FATAL) << "Couldn't load trusted root certificates.";
+  if (FLAGS_trusted_root_certs == "") {
+    LOG(INFO) << "Loading openssl default trusted root certificates...";
+    if (SSL_CTX_set_default_verify_paths(ssl_ctx_.get()) != 1) {
+      DumpOpenSSLErrorStack();
+      LOG(FATAL) << "Couldn't load openssl default trusted root certificates.";
+    }
+  } else {
+    LOG(INFO) << "Loading trusted root certificates from: "
+              << FLAGS_trusted_root_certs << " ...";
+    if (SSL_CTX_load_verify_locations(ssl_ctx_.get(),
+                                      FLAGS_trusted_root_certs.c_str(),
+                                      nullptr) != 1) {
+      DumpOpenSSLErrorStack();
+      LOG(FATAL) << "Couldn't load trusted root certificates: "
+                 << FLAGS_trusted_root_certs;
+    }
   }
 
   SSL_CTX_set_verify(ssl_ctx_.get(), SSL_VERIFY_PEER,
