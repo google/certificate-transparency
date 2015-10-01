@@ -170,7 +170,7 @@
 
   <target name="compile.ct.proto" description="Compile CT proto">
     <mkdir dir="${ctlogclient.generated.dir}"/>
-    <exec executable="protoc">
+    <exec executable="${protoc.bin}">
       <arg value="--java_out=${ctlogclient.generated.dir}"/>
       <arg value="proto/ct.proto"/>
     </exec>

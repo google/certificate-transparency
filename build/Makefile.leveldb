@@ -1,16 +1,7 @@
-#GNUMAKE_BIN=gnumake
-#GNUMAKE_TEST=$(shell $GNUMAKE_BIN --version >/dev/null 2>&1 && echo found)
-#ifneq ("$(GNUMAKE_TEST)","found")
-#GNUMAKE_BIN=gmake
-#endif
-#GNUMAKE_TEST=$(shell $GNUMAKE_BIN --version >/dev/null 2>&1 && echo found)
-#ifneq ("$(GNUMAKE_TEST)","found")
-#GNUMAKE_BIN=make
-#endif
-
-
 all:
-	$(MAKE)
-	cp lib* ../install/lib
-	mkdir -p ../install/include/leveldb
-	cp include/leveldb/*.h ../install/include/leveldb
+	# LevelDB's Makefile doesn't know about CPPFLAGS, so we have to wedge them
+	# in :/
+	CFLAGS="$(CFLAGS) $(CPPFLAGS)" CXXFLAGS="$(CXXFLAGS) $(CPPFLAGS)" $(MAKE)
+	cp lib* $(INSTALL_DIR)/lib
+	mkdir -p $(INSTALL_DIR)/include/leveldb
+	cp include/leveldb/*.h $(INSTALL_DIR)/include/leveldb

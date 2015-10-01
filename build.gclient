@@ -1,42 +1,64 @@
 # TODO(pphaneuf): Make this be good.
 
-.PHONY: configure-ct openssl protobuf libevent libevhtp gflags glog ldns sqlite3 leveldb json-c tcmalloc
+INSTALL_DIR?=$(shell pwd)/install
+export INSTALL_DIR
+
+PHONY: libunwind tcmalloc openssl protobuf libevent libevhtp gflags glog ldns sqlite3 leveldb json-c configure-ct
 
 all: configure-ct
 
-tcmalloc:
+_libunwind:
+	if [ -d libunwind ]; then \
+		$(MAKE) -C libunwind -f ../certificate-transparency/build/Makefile.unwind; \
+		(cd libunwind && git checkout --); \
+	fi
+
+_tcmalloc:
 	$(MAKE) -C tcmalloc -f ../certificate-transparency/build/Makefile.tcmalloc
+	cd tcmalloc && git checkout --
 
-openssl:
-	make -C openssl -f `pwd`/certificate-transparency/build/Makefile.openssl INSTALL_DIR=$(INSTALL_DIR)
+_openssl:
+	$(MAKE) -C openssl -f `pwd`/certificate-transparency/build/Makefile.openssl
+	cd openssl && git checkout -- apps/progs.h crypto/bn/bn_prime.h
 
-# TODO(alcutter): convert the remaining scripts to Makefiles
-protobuf:
-	certificate-transparency/build/rebuild_protobuf
+_protobuf:
+	$(MAKE) -C protobuf -f `pwd`/certificate-transparency/build/Makefile.protobuf
+	cd protobuf && git checkout --
+	cd protobuf/gtest && git checkout -- msvc/
 
-libevent:
-	certificate-transparency/build/rebuild_libevent
+_libevent:
+	$(MAKE) -C libevent -f ../certificate-transparency/build/Makefile.libevent
+	cd libevent && git checkout --
 
-libevhtp:
-	certificate-transparency/build/rebuild_libevhtp
+_libevhtp:
+	$(MAKE) -C libevhtp -f `pwd`/certificate-transparency/build/Makefile.libevhtp
+	cd libevhtp && git checkout --
 
-gflags:
+_gflags:
 	$(MAKE) -C gflags -f ../certificate-transparency/build/Makefile.gflags
+	cd gflags && git checkout --
 
-glog:
+_glog:
 	$(MAKE) -C glog -f ../certificate-transparency/build/Makefile.glog
+	# TODO(alcutter): get these removed in Ben's "fix" branch
+	cd glog && git checkout -- config.guess config.sub install-sh
 
-ldns:
+_ldns:
 	$(MAKE) -C ldns -f ../certificate-transparency/build/Makefile.ldns
+	cd ldns && git checkout --
 
-sqlite3:
+_sqlite3:
 	$(MAKE) -C sqlite3 -f ../certificate-transparency/build/Makefile.sqlite3
+	cd sqlite3 && git checkout --
 
-leveldb:
+_leveldb:
 	$(MAKE) -C leveldb -f ../certificate-transparency/build/Makefile.leveldb
+	cd leveldb && git checkout --
 
-json-c:
-	certificate-transparency/build/rebuild_json-c
+_json-c:
+	$(MAKE) -C json-c -f ../certificate-transparency/build/Makefile.json-c
+	cd json-c && git checkout --
 
-configure-ct: tcmalloc openssl protobuf libevent libevhtp gflags glog ldns sqlite3 leveldb json-c
-	certificate-transparency/build/configure-ct INSTALL_DIR=$(INSTALL_DIR)
+_configure-ct:
+  # TODO(alcutter/pphaneuf): consider inlining the contents of this script:
+	certificate-transparency/build/configure-ct

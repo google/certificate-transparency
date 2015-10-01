@@ -3,7 +3,7 @@ all: $(INSTALL_DIR)/bin/openssl
 $(INSTALL_DIR)/bin/openssl: Makefile
 	$(MAKE)
 	$(MAKE) test
-	$(MAKE) install
+	$(MAKE) install_sw
 
 Makefile: config Configure Makefile.org
 	# Force a 64 bit build on MacOS

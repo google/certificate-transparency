@@ -1,10 +1,11 @@
 PROTOC?=protoc
+INSTALL_DIR?=`pwd`/../../install
 
 all: ct/proto/client_pb2.py ct/proto/ct_pb2.py ct/proto/tls_options_pb2.py \
 	ct/proto/test_message_pb2.py ct/proto/certificate_pb2.py
 
 ct/proto/%_pb2.py: ct/proto/%.proto
-	$(PROTOC) $^ -I/usr/include/ -I/usr/local/include -I`pwd`/../../install/include -I. --python_out=.
+	$(PROTOC) $^ -I/usr/include/ -I/usr/local/include -I$(INSTALL_DIR)/include -I. --python_out=.
 
 ct/proto/ct_pb2.py: ../proto/ct.proto
 	$(PROTOC) --python_out=ct/proto -I../proto ../proto/ct.proto

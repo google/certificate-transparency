@@ -73,6 +73,7 @@ Best and test Go code:
  - git
  - GNU make
  - libtool
+ - shtool
  - Tcl
  - pkgconf
  - python27
@@ -89,7 +90,7 @@ of above deps], and Ubuntu 14.04.
 ```bash
 mkdir ct  # or whatever directory you prefer
 cd ct
-gclient config git@github.com:google/certificate-transparency.git
+gclient config --name="certificate-transparency" git@github.com:google/certificate-transparency.git
 gclient sync
 # substitute gmake or gnumake below if that's that your platform calls it:
 make -C certificate-transparency check

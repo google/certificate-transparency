@@ -3,7 +3,6 @@ LIBTOOLIZE_BIN=libtoolize
 ifneq ("$(LIBTOOLIZE_TEST)","found")
 LIBTOOLIZE_BIN=glibtoolize
 endif
-INSTALL_DIR=$(shell pwd)/../install
 
 all: Makefile
 	$(MAKE)
@@ -12,8 +11,8 @@ all: Makefile
 	$(MAKE) install
 
 Makefile: configure
-	CPPFLAGS="-I$(INSTALL_DIR)/include" LDFLAGS="-L$(INSTALL_DIR)/lib" ./configure --prefix=$(INSTALL_DIR) --with-ssl=$(INSTALL_DIR)
+	./configure --prefix=$(INSTALL_DIR) --with-ssl=$(INSTALL_DIR) CPPFLAGS="-I$(INSTALL_DIR)/include" LDFLAGS="-L$(INSTALL_DIR)/lib"
 
 configure:
 	$(LIBTOOLIZE_BIN) -c --install
-	autoreconf --install
+	autoreconf -vi

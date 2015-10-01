@@ -1,3 +1,4 @@
+ACLOCAL_AMFLAGS = -Im4
 
 AM_CPPFLAGS = \
 	-I$(GMOCK_DIR)/include \
@@ -18,7 +19,11 @@ BUILT_SOURCES = \
 BUILD_VERSION = `git describe --abbrev=0 --dirty --always --tags`
 
 AM_TESTS_ENVIRONMENT = \
-export LD_LIBRARY_PATH=$(LIBRARY_PATH);
+	LD_LIBRARY_PATH=$(INSTALL_DIR)/lib
+
+# TODO(pphaneuf): change these to autoconf substitutions
+export PROTOC
+export INSTALL_DIR
 
 .PHONY: cpp/version.cc
 cpp/version.o: \
@@ -48,6 +53,9 @@ noinst_LIBRARIES = \
 	cpp/libtest.a
 
 check_PROGRAMS = \
+	cpp/util/thread_pool_test \
+	cpp/monitoring/gcm/exporter_test \
+	cpp/net/url_fetcher_test \
 	$(TESTS)
 
 # TODO(pphaneuf): ct-dns-server-test.py has been disabled, because of
@@ -79,9 +87,7 @@ TESTS = \
 	cpp/monitor/database_test \
 	cpp/monitoring/counter_test \
 	cpp/monitoring/gauge_test \
-	cpp/monitoring/gcm/exporter_test \
 	cpp/monitoring/registry_test \
-	cpp/net/url_fetcher_test \
 	cpp/proto/serializer_test \
 	cpp/server/proxy_test \
 	cpp/util/etcd_delete_test \
@@ -91,11 +97,10 @@ TESTS = \
 	cpp/util/libevent_wrapper_test \
 	cpp/util/masterelection_test \
 	cpp/util/sync_task_test \
-	cpp/util/task_test \
-	cpp/util/thread_pool_test
+	cpp/util/task_test
 
 all-local:
-	$(MAKE) -C python PROTOC=$(PROTOC)
+	$(MAKE) -C python
 
 clean-local:
 	$(MAKE) -C python clean
