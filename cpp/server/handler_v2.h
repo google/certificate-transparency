@@ -17,11 +17,20 @@ class HttpHandlerV2 : public HttpHandler {
 
   ~HttpHandlerV2();
 
-  void Add(libevent::HttpServer* server) override;
-
-  void AddPreChain(evhttp_request* req) override;
-
-  void BlockingAddPreChain(
+  virtual void GetEntries(evhttp_request* req) const override;
+  virtual void GetRoots(evhttp_request* req) const override;
+  virtual void GetProof(evhttp_request* req) const override;
+  virtual void GetSTH(evhttp_request* req) const override;
+  virtual void GetConsistency(evhttp_request* req) const override;
+  virtual void AddChain(evhttp_request* req) override;
+  virtual void Add(libevent::HttpServer* server) override;
+  virtual void AddPreChain(evhttp_request* req) override;
+  virtual void BlockingGetEntries(evhttp_request* req, int64_t start,
+                                  int64_t end,
+                                  bool include_scts) const override;
+  virtual void BlockingAddChain(
+      evhttp_request* req, const std::shared_ptr<CertChain>& chain) override;
+  virtual void BlockingAddPreChain(
       evhttp_request* req,
       const std::shared_ptr<PreCertChain>& chain) override;
 

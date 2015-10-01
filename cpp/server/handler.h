@@ -47,18 +47,18 @@ class HttpHandler {
 
   virtual void Add(libevent::HttpServer* server) = 0;
 
-  void GetEntries(evhttp_request* req) const;
-  void GetRoots(evhttp_request* req) const;
-  void GetProof(evhttp_request* req) const;
-  void GetSTH(evhttp_request* req) const;
-  void GetConsistency(evhttp_request* req) const;
-  void AddChain(evhttp_request* req);
+  virtual void GetEntries(evhttp_request* req) const = 0;
+  virtual void GetRoots(evhttp_request* req) const = 0;
+  virtual void GetProof(evhttp_request* req) const = 0;
+  virtual void GetSTH(evhttp_request* req) const = 0;
+  virtual void GetConsistency(evhttp_request* req) const = 0;
+  virtual void AddChain(evhttp_request* req) = 0;
   virtual void AddPreChain(evhttp_request* req) = 0;
 
-  void BlockingGetEntries(evhttp_request* req, int64_t start,
-                                  int64_t end, bool include_scts) const;
-  void BlockingAddChain(
-      evhttp_request* req, const std::shared_ptr<CertChain>& chain);
+  virtual void BlockingGetEntries(evhttp_request* req, int64_t start,
+                                  int64_t end, bool include_scts) const = 0;
+  virtual void BlockingAddChain(
+      evhttp_request* req, const std::shared_ptr<CertChain>& chain) = 0;
   virtual void BlockingAddPreChain(
       evhttp_request* req,
       const std::shared_ptr<PreCertChain>& chain) = 0;
@@ -74,6 +74,14 @@ class HttpHandler {
   void AddProxyWrappedHandler(
       libevent::HttpServer* server, const std::string& path,
       const libevent::HttpServer::HandlerCallback& local_handler);
+  std::multimap<std::string, std::string> ParseQuery(evhttp_request* req) const;
+  bool GetParam(const std::multimap<std::string, std::string>& query,
+                const std::string& param, std::string* value) const;
+  int64_t GetIntParam(const std::multimap<std::string, std::string>& query,
+                      const std::string& param) const;
+  bool GetBoolParam(const std::multimap<std::string, std::string>& query,
+                    const std::string& param) const;
+  int GetMaxLeafEntriesPerResponse() const;
 
   JsonOutput* const output_;
   LogLookup<LoggedCertificate>* const log_lookup_;
