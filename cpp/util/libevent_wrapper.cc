@@ -1,14 +1,28 @@
 #include "config.h"
 #include "util/libevent_wrapper.h"
 
+
 #include <arpa/inet.h>
+#ifdef HAVE_ARPA_NAMESER_H
+#  include <arpa/nameser.h> /* DNS HEADER struct */
+#endif
 #include <climits>
 #include <evhtp.h>
 #include <event2/thread.h>
 #include <glog/logging.h>
 #include <math.h>
+#ifdef HAVE_NETDB_H
+#  include <netdb.h>
+#endif
 #include <netdb.h>
+#ifdef HAVE_NETINET_IN_H
+#  include <netinet/in.h>   /* inet_ functions / structs */
+#endif
+#include <resolv.h>
 #include <sys/socket.h>
+#ifdef HAVE_SYS_TYPES_H
+#  include <sys/types.h>
+#endif
 #include <signal.h>
 
 using std::bind;

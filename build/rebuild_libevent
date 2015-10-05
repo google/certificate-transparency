@@ -1,0 +1,30 @@
+#!/bin/sh
+
+# Helper for gclient
+
+set -e
+
+INSTALL=`pwd`/install
+
+cd libevent
+if [ ! -f configure ]
+then
+	./autogen.sh
+fi
+if [ ! -f Makefile ]
+then
+	CFLAGS="-I$INSTALL/include -L$INSTALL/lib -fPIC" LDFLAGS="-fPIC" ./configure --prefix=$INSTALL
+	# in case there's any cruft lying around
+	make clean
+fi
+
+make
+
+# FIXME: this fails on MacOS because :dns/gethostbyaddr
+# :dns/resolve_reverse are broken and should be disabled
+# (https://github.com/libevent/libevent/issues/38).
+# regress :dns/gethostbyaddr :dns/resolve_reverse
+# would fix it.
+#make check
+
+make install
