@@ -45,18 +45,20 @@ class HttpHandler {
               Proxy* proxy, ThreadPool* pool, libevent::Base* event_base);
   virtual ~HttpHandler();
 
+  // Register the handler methods with the server
   virtual void Add(libevent::HttpServer* server) = 0;
 
+  // Read requests
   virtual void GetEntries(evhttp_request* req) const = 0;
   virtual void GetRoots(evhttp_request* req) const = 0;
   virtual void GetProof(evhttp_request* req) const = 0;
   virtual void GetSTH(evhttp_request* req) const = 0;
   virtual void GetConsistency(evhttp_request* req) const = 0;
-  virtual void AddChain(evhttp_request* req) = 0;
-  virtual void AddPreChain(evhttp_request* req) = 0;
-
   virtual void BlockingGetEntries(evhttp_request* req, int64_t start,
                                   int64_t end, bool include_scts) const = 0;
+  // Write requests
+  virtual void AddChain(evhttp_request* req) = 0;
+  virtual void AddPreChain(evhttp_request* req) = 0;
   virtual void BlockingAddChain(
       evhttp_request* req, const std::shared_ptr<CertChain>& chain) = 0;
   virtual void BlockingAddPreChain(

@@ -61,27 +61,27 @@ void HttpHandlerV1::Add(libevent::HttpServer* server) {
   const string handler_path_prefix("/ct/v1/");
 
   AddProxyWrappedHandler(server, handler_path_prefix + "get-entries",
-                         bind(&HttpHandler::GetEntries, this, _1));
+                         bind(&HttpHandlerV1::GetEntries, this, _1));
   // TODO(alcutter): Support this for mirrors too
   if (cert_checker_) {
     // Don't really need to proxy this one, but may as well just to keep
     // everything tidy:
     AddProxyWrappedHandler(server, handler_path_prefix + "get-roots",
-                           bind(&HttpHandler::GetRoots, this, _1));
+                           bind(&HttpHandlerV1::GetRoots, this, _1));
   }
   AddProxyWrappedHandler(server, handler_path_prefix + "get-proof-by-hash",
-                         bind(&HttpHandler::GetProof, this, _1));
+                         bind(&HttpHandlerV1::GetProof, this, _1));
   AddProxyWrappedHandler(server, handler_path_prefix + "get-sth",
-                         bind(&HttpHandler::GetSTH, this, _1));
+                         bind(&HttpHandlerV1::GetSTH, this, _1));
   AddProxyWrappedHandler(server, handler_path_prefix + "get-sth-consistency",
-                         bind(&HttpHandler::GetConsistency, this, _1));
+                         bind(&HttpHandlerV1::GetConsistency, this, _1));
 
   if (frontend_) {
     // Proxy the add-* calls too, technically we could serve them, but a
     // more up-to-date node will have a better chance of handling dupes
     // correctly, rather than bloating the tree.
     AddProxyWrappedHandler(server, handler_path_prefix + "add-chain",
-                           bind(&HttpHandler::AddChain, this, _1));
+                           bind(&HttpHandlerV1::AddChain, this, _1));
     AddProxyWrappedHandler(server, handler_path_prefix + "add-pre-chain",
                            bind(&HttpHandlerV1::AddPreChain, this, _1));
   }
