@@ -53,8 +53,15 @@ string ASN1ToStringAndCheckForNulls(ASN1_STRING* asn1_string,
   const string cpp_string(reinterpret_cast<char*>(
       ASN1_STRING_data(asn1_string)), ASN1_STRING_length(asn1_string));
 
+  // Unfortunately ASN1_STRING_length returns a signed value
+  if (ASN1_STRING_length(asn1_string) < 0) {
+    *status = util::Status(Code::INVALID_ARGUMENT, "ASN1 string is corrupt?");
+  }
+
   // Make sure there isn't an embedded NUL character in the DNS ID
-  if (ASN1_STRING_length(asn1_string) != cpp_string.length()) {
+  // We now know it's not a negative length so this can't overflow.
+  if (static_cast<size_t>(ASN1_STRING_length(asn1_string)) !=
+      cpp_string.length()) {
     LOG(ERROR) << "Embedded null in asn1 string: " << tag;
     *status =
         util::Status(Code::INVALID_ARGUMENT, "Embedded null in asn1 string");
@@ -704,7 +711,7 @@ bool IsValidRedactedHost(const string& hostname) {
   // Enforces the following rules: '?' must be to left of non redactions
   // If first label is '*' then treat it as if it was a redaction
   bool can_redact = true;
-  for (int pos = 0; pos < tokens.size(); ++pos) {
+  for (size_t pos = 0; pos < tokens.size(); ++pos) {
     if (tokens[pos] == "?") {
       if (!can_redact) {
         return false;

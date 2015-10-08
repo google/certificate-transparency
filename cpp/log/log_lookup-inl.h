@@ -64,6 +64,10 @@ void LogLookup<Logged>::UpdateFromSTH(const ct::SignedTreeHead& sth) {
   // so that we don't have to read the entries in.
   std::string leaf_hash;
   auto it(db_->ScanEntries(cert_tree_.LeafCount()));
+  // LeafCount() is potentially unsigned here but as this is using memory
+  // the count can never get close to overflow in 64 bits.
+  CHECK_LE(cert_tree_.LeafCount(), INT64_MAX);
+
   for (int64_t sequence_number = cert_tree_.LeafCount();
        sequence_number < sth.tree_size(); ++sequence_number) {
     Logged logged;
@@ -80,7 +84,8 @@ void LogLookup<Logged>::UpdateFromSTH(const ct::SignedTreeHead& sth) {
 
     leaf_hash = LeafHash(logged);
     // TODO(ekasper): plug in the log public key so that we can verify the STH.
-    CHECK_EQ(sequence_number + 1, cert_tree_.AddLeafHash(leaf_hash));
+    CHECK_EQ(static_cast<size_t>(sequence_number + 1),
+             cert_tree_.AddLeafHash(leaf_hash));
     // Duplicate leaves shouldn't really happen but are not a problem either:
     // we just return the Merkle proof of the first occurrence.
     leaf_index_.insert(

@@ -189,7 +189,8 @@ util::Status TreeSigner<Logged>::SequenceNewEntries() {
   }
 
   // Sanity check: make sure no hashes above the serving_sth level vanished:
-  const uint64_t serving_tree_size(serving_sth.ValueOrDie().tree_size());
+  CHECK_LE(serving_sth.ValueOrDie().tree_size(), INT64_MAX);
+  const int64_t serving_tree_size(serving_sth.ValueOrDie().tree_size());
   for (const auto& s : sequenced_hashes) {
     if (!s.second.second /*present*/) {
       // if it disappeared, check it's underwater:
@@ -271,7 +272,9 @@ bool TreeSigner<Logged>::Append(const Logged& logged) {
   std::string serialized_leaf;
   CHECK(logged.SerializeForLeaf(&serialized_leaf));
 
-  CHECK_EQ(logged.sequence_number(), cert_tree_->LeafCount());
+  CHECK_LE(cert_tree_->LeafCount(), INT64_MAX);
+  CHECK_EQ(logged.sequence_number(),
+           static_cast<int64_t>(cert_tree_->LeafCount()));
   // Commit the sequence number of this certificate locally
   typename Database<Logged>::WriteResult db_result =
       db_->CreateSequencedEntry(logged);

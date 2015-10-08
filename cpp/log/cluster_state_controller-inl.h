@@ -301,7 +301,7 @@ void ClusterStateController<Logged>::OnClusterStateUpdated(
       }
     } else {
       VLOG(1) << "Node left: " << node_id;
-      CHECK_EQ(1, all_peers_.erase(node_id));
+      CHECK_EQ(static_cast<size_t>(1), all_peers_.erase(node_id));
       fetcher_->RemovePeer(node_id);
     }
   }

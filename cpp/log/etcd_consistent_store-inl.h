@@ -428,7 +428,7 @@ template <class T, class CB>
 void EtcdConsistentStore<Logged>::ConvertSingleUpdate(
     const std::string& full_path, const CB& callback,
     const std::vector<EtcdClient::Node>& updates) {
-  CHECK_LE(0, updates.size());
+  CHECK_LE(static_cast<size_t>(0), updates.size());
   if (updates.empty()) {
     EntryHandle<T> handle;
     handle.SetKey(full_path);
@@ -539,7 +539,7 @@ util::Status EtcdConsistentStore<Logged>::GetAllEntriesInDir(
       etcd_latency_by_op_ms.GetScopedLatency("get_all_entries_in_dir"));
 
   CHECK_NOTNULL(entries);
-  CHECK_EQ(0, entries->size());
+  CHECK_EQ(static_cast<size_t>(0), entries->size());
   util::SyncTask task(executor_);
   EtcdClient::GetResponse resp;
   client_->Get(dir, &resp, task.task());
@@ -712,10 +712,14 @@ void EtcdConsistentStore<Logged>::CheckMappingIsContiguousWithServingTree(
     const ct::SequenceMapping& mapping) const {
   std::lock_guard<std::mutex> lock(mutex_);
   if (serving_sth_ && mapping.mapping_size() > 0) {
-    const uint64_t tree_size(serving_sth_->Entry().tree_size());
+    // The sequence numbers are signed. However the tree size must fit in
+    // memory so the unsigned -> signed conversion below should not overflow.
+    CHECK_LE(serving_sth_->Entry().tree_size(), INT64_MAX);
+
+    const int64_t tree_size(serving_sth_->Entry().tree_size());
     // The mapping must not have a gap between its lowest mapping and the
     // serving tree
-    const uint64_t lowest_sequence_number(
+    const int64_t lowest_sequence_number(
         mapping.mapping(0).sequence_number());
     CHECK_LE(lowest_sequence_number, tree_size);
     // It must also be contiguous for all entries not yet included in the
@@ -723,7 +727,7 @@ void EtcdConsistentStore<Logged>::CheckMappingIsContiguousWithServingTree(
     // because the clean-up operation may not remove them in order.)
     bool above_sth(false);
     for (int i(0); i < mapping.mapping_size() - 1; ++i) {
-      const uint64_t mapped_seq(mapping.mapping(i).sequence_number());
+      const int64_t mapped_seq(mapping.mapping(i).sequence_number());
       if (mapped_seq >= tree_size) {
         CHECK_EQ(mapped_seq + 1, mapping.mapping(i + 1).sequence_number());
         above_sth = true;
