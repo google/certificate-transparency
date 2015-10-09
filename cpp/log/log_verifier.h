@@ -47,9 +47,12 @@ class LogVerifier {
         return "Invalid signature.";
       case INVALID_MERKLE_PATH:
         return "Invalid Merkle path.";
-      default:
-        LOG(FATAL) << "unknown value for VerifyResult enum: " << result;
     }
+
+    LOG(FATAL) << "unknown value for VerifyResult enum: " << result;
+    // It should not be possible for control to reach this point but this
+    // avoids a compilation warning on some platforms.
+    abort();
   }
 
   std::string KeyID() const {

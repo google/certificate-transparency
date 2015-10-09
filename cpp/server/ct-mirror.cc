@@ -268,13 +268,19 @@ void STHUpdater(
         {
           LoggedCertificate entry;
           CHECK_LE(next_sth.tree_size(), local_size);
-          while (new_tree->LeafCount() < next_sth.tree_size()) {
+          CHECK_GE(next_sth.tree_size(), 0);
+          const uint64_t next_sth_tree_size(
+              static_cast<uint64_t>(next_sth.tree_size()));
+          while (new_tree->LeafCount() < next_sth_tree_size) {
             CHECK(entries->GetNextEntry(&entry));
             CHECK(entry.has_sequence_number());
-            CHECK_EQ(new_tree->LeafCount(), entry.sequence_number());
+            CHECK_GE(entry.sequence_number(), 0);
+            const uint64_t entry_sequence_number(
+                static_cast<uint64_t>(entry.sequence_number()));
+            CHECK_EQ(new_tree->LeafCount(), entry_sequence_number);
             string serialized_leaf;
             CHECK(entry.SerializeForLeaf(&serialized_leaf));
-            CHECK_EQ(entry.sequence_number() + 1,
+            CHECK_EQ(entry_sequence_number + 1,
                      new_tree->AddLeaf(serialized_leaf));
           }
         }

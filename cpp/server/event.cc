@@ -10,7 +10,7 @@ time_t Services::rough_time_;
 FD::FD(EventLoop* loop, int fd, CanDelete deletable)
     : fd_(fd), loop_(loop), wants_erase_(false), deletable_(deletable) {
   DCHECK_GE(fd, 0);
-  CHECK_LT((unsigned)fd, FD_SETSIZE);
+  CHECK_LT((unsigned)fd, (unsigned)FD_SETSIZE);
   loop->Add(this);
   Activity();
 }
