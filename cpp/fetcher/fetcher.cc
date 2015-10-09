@@ -233,7 +233,7 @@ void FetchState::WriteToDatabase(int64_t index, Range* range,
     return;
   }
 
-  CHECK_GT(retval->size(), 0);
+  CHECK_GT(retval->size(), static_cast<size_t>(0));
 
   VLOG(1) << "received " << retval->size() << " entries at offset " << index;
   int64_t processed(0);
