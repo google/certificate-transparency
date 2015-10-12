@@ -1,9 +1,9 @@
-AC_PREREQ([2.69])
+AC_PREREQ([2.68])
 AC_INIT([certificate-transparency], [0.9], [certificate-transparency@googlegroups.com])
 AM_INIT_AUTOMAKE([-Wall -Werror foreign subdir-objects])
 AC_CONFIG_SRCDIR([cpp/server/ct-server.cc])
 AC_CONFIG_HEADERS([cpp/config.h])
-AC_CONFIG_MACRO_DIRS([m4])
+AC_CONFIG_MACRO_DIR([m4])
 AM_SILENT_RULES([yes])
 AC_LANG([C++])
 
@@ -14,13 +14,14 @@ GMOCK_DIR="${GMOCK_DIR=/usr/src/gmock}"
 AC_ARG_VAR([GMOCK_DIR], [directory containing Google Mock])
 GTEST_DIR="${GTEST_DIR="$GMOCK_DIR/gtest"}"
 AC_ARG_VAR([GTEST_DIR], [directory containing Google Test])
-LIBRARY_PATH="${LIBRARY_PATH=$srcdir/../install/lib}"
-AC_ARG_VAR([LIBRARY_PATH], [path containing library dependencies])
+INSTALL_DIR="${INSTALL_DIR=$srcdir/install}"
+AC_ARG_VAR([INSTALL_DIR], [location of installed dependencies])
 
 # Checks for programs.
 AC_PROG_AWK
 AC_PROG_CXX
 AC_PROG_CC
+AM_PROG_CC_C_O
 AC_PROG_CPP
 AC_PROG_LN_S
 AC_PROG_RANLIB
@@ -37,13 +38,13 @@ if test "x${enable_hardening}" != "xno"; then
   #TODO(alcutter): perform magic to determine if c++/cc are indeed clang.
   AS_CASE([$CXX],
           [c++], [AS_VAR_APPEND([CXXFLAGS], [" $clang_harden_copts"])], # probably Clang on FBSD/OSX
-          [clang++], [AS_VAR_APPEND([CXXFLAGS], [" $clang_harden_copts"])],
-          [g++], [AS_VAR_APPEND([CXXFLAGS], [" $gcc_harden_copts"])],
+          [clang++*], [AS_VAR_APPEND([CXXFLAGS], [" $clang_harden_copts"])],
+          [g++*], [AS_VAR_APPEND([CXXFLAGS], [" $gcc_harden_copts"])],
           [AC_MSG_FAILURE([Hardening enabled, but we don't have hardening flags for C++ compiler $CXX])])
   AS_CASE([$CC],
           [cc], [AS_VAR_APPEND([CFLAGS], [" $clang_harden_copts"])], # probably Clang on FBSD/OSX
-          [clang], [AS_VAR_APPEND([CFLAGS], [" $clang_harden_copts"])],
-          [gcc], [AS_VAR_APPEND([CFLAGS], [" $gcc_harden_copts"])],
+          [clang*], [AS_VAR_APPEND([CFLAGS], [" $clang_harden_copts"])],
+          [gcc*], [AS_VAR_APPEND([CFLAGS], [" $gcc_harden_copts"])],
           [AC_MSG_FAILURE(["Hardening enabled, but we don't have hardening flags for C compiler $CC"])])
   AS_VAR_APPEND([CPPFLAGS], [" -D_FORTIFY_SOURCE=2"])
   AS_VAR_APPEND([LDFLAGS], [" -pie"])
@@ -202,6 +203,6 @@ AC_CHECK_FUNCS([alarm gettimeofday memset mkdir select socket strdup strerror st
 AM_CONDITIONAL([HAVE_ANT], [test -n "$ANT"])
 AM_CONDITIONAL([HAVE_LDNS], [test -z "$missing_ldns"])
 AC_DEFINE_UNQUOTED([TEST_SRCDIR], ["$srcdir"], [Top of the source directory, for tests.])
-AC_SUBST([LIBRARY_PATH])
+AC_SUBST([INSTALL_DIR])
 AC_CONFIG_FILES([Makefile])
 AC_OUTPUT

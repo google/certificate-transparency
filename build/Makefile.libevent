@@ -1,0 +1,11 @@
+all: Makefile
+	$(MAKE)
+#	$(MAKE) check
+	$(MAKE) install
+
+Makefile: configure
+	./configure --prefix=$(INSTALL_DIR) CFLAGS="-I$(INSTALL_DIR)/include -L$(INSTALL_DIR)/lib -fPIC" LDFLAGS="-fPIC"
+	$(MAKE) clean
+
+configure: configure.ac
+	./autogen.sh

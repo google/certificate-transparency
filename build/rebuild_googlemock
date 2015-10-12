@@ -1,7 +1,0 @@
-#!/bin/sh
-
-# Helper for gclient
-
-set -e
-cd googlemock
-autoreconf -fvi

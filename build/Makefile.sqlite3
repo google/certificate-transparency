@@ -5,12 +5,12 @@ install: Makefile manifest
 	$(MAKE) sqlite3.c
 	# FIXME: test fails on FreeBSD at least
 	#$(MAKE) test
-	#$(MAKE) install DESTDIR=`pwd`/../install
+	#$(MAKE) install DESTDIR=$(INSTALL_DIR)
 	$(MAKE) install
 
 Makefile: Makefile.in configure
 	# Tcl doesn't install locally
-	CFLAGS="-fPIC" LDFLAGS="-fPIC" ./configure --prefix=`pwd`/../install --disable-tcl
+	./configure --prefix=$(INSTALL_DIR) --disable-tcl CFLAGS="-fPIC" LDFLAGS="-fPIC"
 
 manifest:
 	../sqlite3-export/create-fossil-manifest

@@ -1,3 +1,8 @@
+UNAME := $(shell uname)
+ifeq ($(UNAME),FreeBSD)
+EXTRA_LDFLAGS="-lexecinfo"
+endif
+
 all: Makefile
 	$(MAKE)
 	# Not good on OSX at the moment:
@@ -5,7 +10,8 @@ all: Makefile
 	$(MAKE) install
 
 Makefile: configure
-	./configure --prefix=`pwd`/../install
+	WARN_OVERRIDES="-Wno-unused-function"
+	./configure --prefix=$(INSTALL_DIR) CXXFLAGS="$(WARN_OVERRIDES)" CFLAGS="$(WARN_OVERRIDES)" CPPFLAGS="-I$(INSTALL_DIR)/include" LDFLAGS="-L$(INSTALL_DIR)/lib $(EXTRA_LDFLAGS)"
 
 configure: configure.ac
-	autoreconf -i
+	autoreconf -vi
