@@ -35,6 +35,15 @@ matrix:
           packages:
           - *common_packages
           - clang-3.6
+    - compiler: clang
+      os: linux
+      env: REAL_CC=clang-3.6 REAL_CXX=clang++-3.6 SANITIZE="-fsanitize=address -fno-omit-frame-pointer" ASAN_OPTIONS="detect_leaks=1:check_initialization_order=1" LSAN_OPTIONS="suppressions=${HOME}/lsan.supp"
+      addons:
+        apt:
+          sources: *common_sources
+          packages:
+          - *common_packages
+          - clang-3.6
   exclude:
     - compiler: gcc
       os: linux
@@ -61,6 +70,10 @@ before_install:
 # Set compiler version overrides if we have any:
  - if [ "${REAL_CC}" != "" ]; then export CC=${REAL_CC} CXX=${REAL_CXX}; fi
  - if [ "$TRAVIS_OS_NAME" == "osx" ]; then . ./build/travis.osx.before_install.sh; fi
+# Set up sanitizer blacklists:
+ - echo "leak:InitModule" > ${HOME}/lsan.supp
+ - echo "leak:SetExitLoopHandler" >> ${HOME}/lsan.supp
+ - echo "leak:masterelection_test" >> ${HOME}/lsan.supp
  - mkdir -p ${INSTALL_DIR}/include ${INSTALL_DIR}/lib ${INSTALL_DIR}/java
  - echo "INSTALL_DIR=${INSTALL_DIR}"
  - mkdir -p $GOPATH/src/github.com/google

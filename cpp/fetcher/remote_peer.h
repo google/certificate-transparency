@@ -27,6 +27,7 @@ class RemotePeer : public Peer {
  private:
   struct Impl;
 
+  util::Task* const task_;
   // This gets deleted via the util::Task.
   Impl* const impl_;
 };

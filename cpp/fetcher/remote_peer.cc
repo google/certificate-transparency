@@ -141,16 +141,17 @@ RemotePeer::RemotePeer(
     const std::function<void(const ct::SignedTreeHead&)>& on_new_sth,
     util::Task* task)
     : Peer(move(client)),
-      impl_(new Impl(move(verifier), client_.get(), on_new_sth, task)) {
+      task_(task),
+      impl_(new Impl(move(verifier), client_.get(), on_new_sth, task_)) {
   TaskHold hold(task);
-  task->DeleteWhenDone(impl_);
+  task_->DeleteWhenDone(impl_);
 
   impl_->FetchSTH();
 }
 
 
 RemotePeer::~RemotePeer() {
-  impl_->task_->Return(util::Status::CANCELLED);
+  task_->Return(util::Status::CANCELLED);
 }
 
 

@@ -2,6 +2,7 @@
 #include <glog/logging.h>
 #include <gmock/gmock.h>
 #include <gtest/gtest.h>
+#include <memory>
 #include <string>
 
 #include "log/etcd_consistent_store.h"
@@ -41,6 +42,7 @@ using ct::SignedCertificateTimestamp;
 using std::make_shared;
 using std::shared_ptr;
 using std::string;
+using std::unique_ptr;
 using std::vector;
 using testing::_;
 using testing::NiceMock;
@@ -62,7 +64,8 @@ class FrontendSignerTest : public ::testing::Test {
         etcd_client_(base_.get()),
         pool_(2),
         store_(base_.get(), &pool_, &etcd_client_, &election_, "/root", "id"),
-        frontend_(db(), &store_, TestSigner::DefaultLogSigner()) {
+        log_signer_(TestSigner::DefaultLogSigner()),
+        frontend_(db(), &store_, log_signer_.get()) {
   }
 
   T* db() const {
@@ -79,6 +82,7 @@ class FrontendSignerTest : public ::testing::Test {
   ThreadPool pool_;
   NiceMock<MockMasterElection> election_;
   EtcdConsistentStore<LoggedCertificate> store_;
+  unique_ptr<LogSigner> log_signer_;
   FS frontend_;
 };
 

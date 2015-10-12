@@ -2,6 +2,7 @@
 #include <glog/logging.h>
 #include <gmock/gmock.h>
 #include <gtest/gtest.h>
+#include <memory>
 #include <openssl/err.h>
 #include <openssl/evp.h>
 #include <string>
@@ -69,6 +70,7 @@ using std::make_shared;
 using std::shared_ptr;
 using std::string;
 using std::vector;
+using std::unique_ptr;
 using testing::_;
 using testing::NiceMock;
 using util::testing::StatusIs;
@@ -95,9 +97,9 @@ class FrontendTest : public ::testing::Test {
         etcd_client_(base_.get()),
         pool_(2),
         store_(base_.get(), &pool_, &etcd_client_, &election_, "/root", "id"),
+        log_signer_(TestSigner::DefaultLogSigner()),
         frontend_(new CertSubmissionHandler(&checker_),
-                  new FrontendSigner(db(), &store_,
-                                     TestSigner::DefaultLogSigner())),
+                  new FrontendSigner(db(), &store_, log_signer_.get())),
         cert_dir_(FLAGS_test_srcdir + "/test/testdata") {
   }
 
@@ -135,6 +137,7 @@ class FrontendTest : public ::testing::Test {
   ThreadPool pool_;
   NiceMock<MockMasterElection> election_;
   EtcdConsistentStore<LoggedCertificate> store_;
+  unique_ptr<LogSigner> log_signer_;
   FE frontend_;
   const string cert_dir_;
   string leaf_pem_;

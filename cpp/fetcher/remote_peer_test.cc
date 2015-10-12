@@ -97,10 +97,11 @@ class RemotePeerTest : public ::testing::Test {
         event_pump_(base_),
         etcd_client_(base_.get()),
         store_(base_.get(), &pool_, &etcd_client_, &election_, "/root", "id"),
+        log_signer_(TestSigner::DefaultLogSigner()),
         tree_signer_(std::chrono::duration<double>(0), test_db_.db(),
                      unique_ptr<CompactMerkleTree>(
                          new CompactMerkleTree(new Sha256Hasher)),
-                     &store_, TestSigner::DefaultLogSigner()),
+                     &store_, log_signer_.get()),
         task_(&pool_) {
     FLAGS_remote_peer_sth_refresh_interval_seconds = 1;
     StoreInitialSthMetricValues();
@@ -193,6 +194,7 @@ class RemotePeerTest : public ::testing::Test {
   NiceMock<MockMasterElection> election_;
   cert_trans::EtcdConsistentStore<LoggedCertificate> store_;
   TestSigner test_signer_;
+  unique_ptr<LogSigner> log_signer_;
   TreeSigner<LoggedCertificate> tree_signer_;
   SyncTask task_;
   MockUrlFetcher fetcher_;

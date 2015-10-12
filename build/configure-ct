@@ -6,7 +6,6 @@ GMOCK=`pwd`/googlemock
 PATH=${INSTALL_DIR}/bin:$PATH
 
 set -e
-set -x
 
 cd certificate-transparency
 if [ ! -f configure ]
@@ -16,7 +15,8 @@ then
 fi
 if [ ! -f Makefile ]
 then
-  EXTRA_CXXFLAGS="-Wall -Werror"
+  EXTRA_CXXFLAGS="-Wall -Werror ${SANITIZE}"
+  EXTRA_LDFLAGS="${SANITIZE}"
   if [[ "${CXX}" = clang* ]]; then
     export EXTRA_CXXFLAGS="${EXTRA_CXXFLAGS} -Qunused-arguments"
   fi
@@ -24,7 +24,6 @@ then
   # of the warnings:
   if [[ "${CXX}" =~ ^clang\+\+-3\.[67] ]] || [[ "${CXX}" =~ ^g\+\+-4\.[89] ]]; then
     export EXTRA_CXXFLAGS="${EXTRA_CXXFLAGS} -Wno-unused-local-typedefs -Wno-error-unused -Wno-return-type"
-    echo Doing this: $EXTRA_CXXFLAGS
   fi
   case `uname` in
     Darwin)
@@ -34,7 +33,7 @@ then
       EXTRA_LDFLAGS="${EXTRA_LDFLAGS} -L/usr/local/lib"
       ;;
     Linux)
-      EXTRA_LDFLAGS="-Wl,-rpath=${INSTALL_DIR}/lib"
+      EXTRA_LDFLAGS="${EXTRA_LDFLAGS} -Wl,-rpath=${INSTALL_DIR}/lib"
       ;;
   esac
 

@@ -62,8 +62,8 @@ std::string Verifier::ComputeKeyID(EVP_PKEY* pkey) {
   unsigned char* buf = new unsigned char[buf_len];
   unsigned char* p = buf;
   CHECK_EQ(i2d_PUBKEY(pkey, &p), buf_len);
-  std::string keystring(reinterpret_cast<char*>(buf), buf_len);
-  std::string ret = Sha256Hasher::Sha256Digest(keystring);
+  const std::string keystring(reinterpret_cast<char*>(buf), buf_len);
+  const std::string ret(Sha256Hasher::Sha256Digest(keystring));
   delete[] buf;
   return ret;
 }

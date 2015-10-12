@@ -59,6 +59,7 @@ static void Handler_ExitLoop(evutil_socket_t, short, void* base) {
 
 void SetExitLoopHandler(event_base* base, int signum) {
   struct event* signal_event;
+  // TODO(pphaneuf): this should be free'd
   signal_event = evsignal_new(base, signum, Handler_ExitLoop, base);
   CHECK_NOTNULL(signal_event);
   CHECK_GE(event_add(signal_event, NULL), 0);
