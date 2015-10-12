@@ -390,7 +390,7 @@ TEST_F(EtcdConsistentStoreTest, TestGetPendingEntries) {
   vector<EntryHandle<LoggedCertificate>> entries;
   util::Status status(store_->GetPendingEntries(&entries));
   EXPECT_TRUE(status.ok()) << status;
-  EXPECT_EQ(2, entries.size());
+  EXPECT_EQ(static_cast<size_t>(2), entries.size());
   vector<LoggedCertificate> certs;
   for (const auto& e : entries) {
     certs.push_back(e.Entry());
@@ -691,7 +691,7 @@ TEST_F(EtcdConsistentStoreTest, TestCleansUpToNewSTH) {
       }
     }
   }
-  EXPECT_EQ(4, pending_entries_pre.size());
+  EXPECT_EQ(static_cast<size_t>(4), pending_entries_pre.size());
 
   EXPECT_CALL(election_, IsMaster()).WillRepeatedly(Return(true));
 

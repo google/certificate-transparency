@@ -126,7 +126,7 @@ class RemotePeerTest : public ::testing::Test {
     for (const auto& m : metrics) {
       if (m->Name() == kInvalidSthReceivedMetric) {
         for (const auto& v : m->CurrentValues()) {
-          ASSERT_EQ(1, v.first.size());
+          ASSERT_EQ(static_cast<size_t>(1), v.first.size());
           invalid_sth_metric_values_[v.first[0]] = v.second.second;
         }
         return;

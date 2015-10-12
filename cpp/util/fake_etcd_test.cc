@@ -716,7 +716,7 @@ TEST_F(FakeEtcdTest, GetDir) {
   EXPECT_EQ(kDir, resp.node.key_);
   EXPECT_TRUE(resp.node.is_dir_);
   EXPECT_TRUE(resp.node.value_.empty());
-  EXPECT_EQ(3, resp.node.nodes_.size());
+  EXPECT_EQ(static_cast<size_t>(3), resp.node.nodes_.size());
   // TODO(pphaneuf): Check that the sub-nodes are as we expect them.
 }
 
@@ -739,12 +739,12 @@ TEST_F(FakeEtcdTest, GetDirRecursive) {
   EXPECT_EQ(kDir, resp.node.key_);
   EXPECT_TRUE(resp.node.is_dir_);
   EXPECT_TRUE(resp.node.value_.empty());
-  ASSERT_EQ(1, resp.node.nodes_.size());
+  ASSERT_EQ(static_cast<size_t>(1), resp.node.nodes_.size());
 
   EXPECT_EQ(kPath1, resp.node.nodes_[0].key_);
   EXPECT_TRUE(resp.node.nodes_[0].is_dir_);
   EXPECT_TRUE(resp.node.nodes_[0].value_.empty());
-  ASSERT_EQ(1, resp.node.nodes_[0].nodes_.size());
+  ASSERT_EQ(static_cast<size_t>(1), resp.node.nodes_[0].nodes_.size());
 
   EXPECT_EQ(kPath2, resp.node.nodes_[0].nodes_[0].key_);
   EXPECT_FALSE(resp.node.nodes_[0].nodes_[0].is_dir_);

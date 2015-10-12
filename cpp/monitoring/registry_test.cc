@@ -36,7 +36,7 @@ class RegistryTest : public ::testing::Test {
 TEST_F(RegistryTest, TestAddMetric) {
   unique_ptr<Counter<>> counter(Counter<>::New("name", "help"));
   unique_ptr<Gauge<>> gauge(Gauge<>::New("name", "help"));
-  EXPECT_EQ(2, GetMetrics().size());
+  EXPECT_EQ(static_cast<size_t>(2), GetMetrics().size());
   EXPECT_THAT(GetMetrics(),
               AllOf(Contains(counter.get()), Contains(gauge.get())));
 }

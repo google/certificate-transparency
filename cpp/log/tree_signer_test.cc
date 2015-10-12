@@ -319,7 +319,9 @@ TYPED_TEST(TreeSignerTest, SequenceNewEntriesCleansUpOldSequenceMappings) {
   {
     EntryHandle<SequenceMapping> mapping;
     CHECK_EQ(Status::OK, this->store_->GetSequenceMapping(&mapping));
-    EXPECT_EQ(new_logged_certs.size(), mapping.Entry().mapping_size());
+    CHECK_GE(mapping.Entry().mapping_size(), 0);
+    EXPECT_EQ(new_logged_certs.size(),
+              static_cast<size_t>(mapping.Entry().mapping_size()));
     for (int i(0); i < mapping.Entry().mapping_size(); ++i) {
       const auto& m(mapping.Entry().mapping(i));
       EXPECT_NE(new_logged_certs.end(), new_logged_certs.find(m.entry_hash()));
