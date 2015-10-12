@@ -639,7 +639,8 @@ TEST_F(ClusterStateControllerTest, TestGetFreshNodes) {
 
   {
     vector<ClusterNodeState> fresh(controller_.GetFreshNodes());
-    EXPECT_EQ(0, fresh.size());  // no STH yet - everyone is stale.
+    EXPECT_EQ(static_cast<size_t>(0),
+              fresh.size());  // no STH yet - everyone is stale.
   }
 
   // The 3 nodes have states which claim to have 100, 200, and 300 certs in

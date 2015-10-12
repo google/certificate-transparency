@@ -99,7 +99,7 @@ TEST_F(EtcdDeleteTest, AlreadyCancelled) {
 
 TEST_F(EtcdDeleteTest, CancelDuring) {
   vector<string> keys{"/one", "/two", "/three"};
-  ASSERT_LT(FLAGS_etcd_delete_concurrency, keys.size());
+  ASSERT_LT(static_cast<size_t>(FLAGS_etcd_delete_concurrency), keys.size());
   SyncTask sync(&pool_);
 
   Task* first_task(nullptr);
@@ -130,7 +130,7 @@ TEST_F(EtcdDeleteTest, CancelDuring) {
 
 TEST_F(EtcdDeleteTest, WithinConcurrency) {
   vector<string> keys{"/one", "/two", "/three"};
-  ASSERT_LT(FLAGS_etcd_delete_concurrency, keys.size());
+  ASSERT_LT(static_cast<size_t>(FLAGS_etcd_delete_concurrency), keys.size());
   SyncTask sync(&pool_);
 
   Task* first_task(nullptr);
@@ -181,7 +181,7 @@ TEST_F(EtcdDeleteTest, WithinConcurrency) {
 
 TEST_F(EtcdDeleteTest, ErrorHandling) {
   vector<string> keys{"/one", "/two", "/three"};
-  ASSERT_LT(FLAGS_etcd_delete_concurrency, keys.size());
+  ASSERT_LT(static_cast<size_t>(FLAGS_etcd_delete_concurrency), keys.size());
   SyncTask sync(&pool_);
 
   Task* first_task(nullptr);

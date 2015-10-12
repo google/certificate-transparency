@@ -332,7 +332,7 @@ TEST_F(EtcdTest, GetAll) {
   task.Wait();
   ASSERT_OK(task);
   EXPECT_TRUE(resp.node.is_dir_);
-  ASSERT_EQ(2, resp.node.nodes_.size());
+  ASSERT_EQ(static_cast<size_t>(2), resp.node.nodes_.size());
   EXPECT_EQ(9, resp.node.nodes_[0].modified_index_);
   EXPECT_EQ("123", resp.node.nodes_[0].value_);
   EXPECT_EQ(7, resp.node.nodes_[1].modified_index_);
@@ -715,7 +715,7 @@ TEST_F(EtcdTest, WatchInitialGetFailureCausesRetry) {
 
   SyncTask task(base_.get());
   client_.Watch(kEntryKey, [&task](const vector<EtcdClient::Node>& updates) {
-    EXPECT_EQ(1, updates.size());
+    EXPECT_EQ(static_cast<size_t>(1), updates.size());
     EXPECT_EQ(9, updates[0].modified_index_);
     EXPECT_EQ("123", updates[0].value_);
     task.Cancel();
@@ -757,7 +757,7 @@ TEST_F(EtcdTest, WatchInitialGetFailureRetriesOnNextEtcd) {
   SyncTask task(base_.get());
   multi_client.Watch(kEntryKey,
                      [&task](const vector<EtcdClient::Node>& updates) {
-                       EXPECT_EQ(1, updates.size());
+                       EXPECT_EQ(static_cast<size_t>(1), updates.size());
                        EXPECT_EQ(9, updates[0].modified_index_);
                        EXPECT_EQ("123", updates[0].value_);
                        task.Cancel();
@@ -812,7 +812,7 @@ TEST_F(EtcdTest, WatchHangingGetTimeoutCausesRetry) {
   client_.Watch(kEntryKey,
                 [&task,
                  &num_updates](const vector<EtcdClient::Node>& updates) {
-                  EXPECT_EQ(1, updates.size());
+                  EXPECT_EQ(static_cast<size_t>(1), updates.size());
                   EXPECT_EQ(9, updates[0].modified_index_);
                   EXPECT_EQ("123", updates[0].value_);
                   if (num_updates == 1) {
@@ -1034,7 +1034,7 @@ TEST_F(EtcdTest, SplitHosts) {
   const string hosts(string(kEtcdHost) + ":" + to_string(kEtcdPort) + "," +
                      kEtcdHost2 + ":" + to_string(kEtcdPort2));
   const list<EtcdClient::HostPortPair> split_hosts(SplitHosts(hosts));
-  EXPECT_EQ(2, split_hosts.size());
+  EXPECT_EQ(static_cast<size_t>(2), split_hosts.size());
   EXPECT_EQ(kEtcdHost, split_hosts.front().first);
   EXPECT_EQ(kEtcdPort, split_hosts.front().second);
   EXPECT_EQ(kEtcdHost2, split_hosts.back().first);
@@ -1046,7 +1046,7 @@ TEST_F(EtcdTest, SplitHostsIgnoresBlanks) {
   const string hosts(string(kEtcdHost) + ":" + to_string(kEtcdPort) + ",," +
                      kEtcdHost2 + ":" + to_string(kEtcdPort2));
   const list<EtcdClient::HostPortPair> split_hosts(SplitHosts(hosts));
-  EXPECT_EQ(2, split_hosts.size());
+  EXPECT_EQ(static_cast<size_t>(2), split_hosts.size());
   EXPECT_EQ(kEtcdHost, split_hosts.front().first);
   EXPECT_EQ(kEtcdPort, split_hosts.front().second);
   EXPECT_EQ(kEtcdHost2, split_hosts.back().first);
@@ -1058,7 +1058,7 @@ TEST_F(EtcdTest, SplitHostsIgnoresTrailingComma) {
   const string hosts(string(kEtcdHost) + ":" + to_string(kEtcdPort) + "," +
                      kEtcdHost2 + ":" + to_string(kEtcdPort2) + ",");
   const list<EtcdClient::HostPortPair> split_hosts(SplitHosts(hosts));
-  EXPECT_EQ(2, split_hosts.size());
+  EXPECT_EQ(static_cast<size_t>(2), split_hosts.size());
   EXPECT_EQ(kEtcdHost, split_hosts.front().first);
   EXPECT_EQ(kEtcdPort, split_hosts.front().second);
   EXPECT_EQ(kEtcdHost2, split_hosts.back().first);
@@ -1070,7 +1070,7 @@ TEST_F(EtcdTest, SplitHostsIgnoresPrecedingComma) {
   const string hosts("," + string(kEtcdHost) + ":" + to_string(kEtcdPort) +
                      "," + kEtcdHost2 + ":" + to_string(kEtcdPort2));
   const list<EtcdClient::HostPortPair> split_hosts(SplitHosts(hosts));
-  EXPECT_EQ(2, split_hosts.size());
+  EXPECT_EQ(static_cast<size_t>(2), split_hosts.size());
   EXPECT_EQ(kEtcdHost, split_hosts.front().first);
   EXPECT_EQ(kEtcdPort, split_hosts.front().second);
   EXPECT_EQ(kEtcdHost2, split_hosts.back().first);
@@ -1080,13 +1080,13 @@ TEST_F(EtcdTest, SplitHostsIgnoresPrecedingComma) {
 
 TEST_F(EtcdTest, SplitHostsWithAllBlanks) {
   const list<EtcdClient::HostPortPair> split_hosts(SplitHosts(",,,,"));
-  EXPECT_EQ(0, split_hosts.size());
+  EXPECT_EQ(static_cast<size_t>(0), split_hosts.size());
 }
 
 
 TEST_F(EtcdTest, SplitHostsWithEmptyString) {
   const list<EtcdClient::HostPortPair> split_hosts(SplitHosts(""));
-  EXPECT_EQ(0, split_hosts.size());
+  EXPECT_EQ(static_cast<size_t>(0), split_hosts.size());
 }
 
 
