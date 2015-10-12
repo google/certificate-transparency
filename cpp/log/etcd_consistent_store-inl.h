@@ -123,7 +123,8 @@ EtcdConsistentStore<Logged>::EtcdConsistentStore(
       cluster_config_watch_task_(CHECK_NOTNULL(executor)),
       etcd_stats_task_(executor_),
       received_initial_sth_(false),
-      exiting_(false) {
+      exiting_(false),
+      num_etcd_entries_(0) {
   // Set up watches on things we're interested in...
   WatchServingSTH(
       std::bind(&EtcdConsistentStore<Logged>::OnEtcdServingSTHUpdated, this,
