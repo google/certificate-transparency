@@ -39,8 +39,7 @@ Status UpdateStats(ct::LogEntryType type, const Status& status) {
 
 }  // namespace
 
-Frontend::Frontend(CertSubmissionHandler* handler, FrontendSigner* signer)
-    : handler_(CHECK_NOTNULL(handler)), signer_(CHECK_NOTNULL(signer)) {
+Frontend::Frontend(FrontendSigner* signer) : signer_(CHECK_NOTNULL(signer)) {
 }
 
 Frontend::~Frontend() {
@@ -48,28 +47,11 @@ Frontend::~Frontend() {
 
 Status Frontend::QueueProcessedEntry(Status pre_status, const LogEntry& entry,
                                      SignedCertificateTimestamp* sct) {
+  CHECK(entry.has_type());
   if (!pre_status.ok()) {
     return UpdateStats(entry.type(), pre_status);
   }
 
   // Step 2. Submit to database.
   return UpdateStats(entry.type(), signer_->QueueEntry(entry, sct));
-}
-
-Status Frontend::QueueX509Entry(CertChain* chain,
-                                SignedCertificateTimestamp* sct) {
-  LogEntry entry;
-  // Make sure the correct statistics get updated in case of error.
-  entry.set_type(ct::X509_ENTRY);
-  return QueueProcessedEntry(handler_->ProcessX509Submission(chain, &entry),
-                             entry, sct);
-}
-
-Status Frontend::QueuePreCertEntry(PreCertChain* chain,
-                                   SignedCertificateTimestamp* sct) {
-  LogEntry entry;
-  // Make sure the correct statistics get updated in case of error.
-  entry.set_type(ct::PRECERT_ENTRY);
-  return QueueProcessedEntry(handler_->ProcessPreCertSubmission(chain, &entry),
-                             entry, sct);
 }
