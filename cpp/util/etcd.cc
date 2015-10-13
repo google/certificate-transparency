@@ -980,7 +980,8 @@ list<EtcdClient::HostPortPair> SplitHosts(const string& hosts_string) {
   list<EtcdClient::HostPortPair> ret;
   for (const auto& h : hosts) {
     vector<string> hp(util::split(h, ':'));
-    CHECK_EQ(2, hp.size()) << "Invalid host:port string: '" << h << "'";
+    CHECK_EQ(static_cast<size_t>(2), hp.size()) << "Invalid host:port string: '"
+                                                << h << "'";
     const int port(stoi(hp[1]));
     CHECK_LT(0, port) << "Port is <= 0";
     CHECK_GE(65535, port) << "Port is > 65535";

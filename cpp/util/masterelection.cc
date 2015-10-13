@@ -419,7 +419,7 @@ void MasterElection::UpdateProposalView(
     } else {
       VLOG(1) << my_proposal_path_
               << ": Proposal deleted: " << update.ToString();
-      CHECK_EQ(1, proposals_.erase(update.key_))
+      CHECK_EQ(static_cast<size_t>(1), proposals_.erase(update.key_))
           << my_proposal_path_
           << ": Unknown proposal deleted: " << update.ToString();
     }
@@ -448,7 +448,7 @@ bool MasterElection::DetermineApparentMaster(
 void MasterElection::OnProposalUpdate(
     const vector<EtcdClient::Node>& updates) {
   unique_lock<mutex> lock(mutex_);
-  CHECK_GE(updates.size(), 1);
+  CHECK_GE(updates.size(), static_cast<size_t>(1));
   VLOG(1) << my_proposal_path_ << ": Got " << updates.size() << " update(s)";
   if (!running_) {
     VLOG(1) << my_proposal_path_
