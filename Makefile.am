@@ -383,6 +383,7 @@ cpp_fetcher_remote_peer_test_SOURCES = \
 	cpp/util/protobuf_util.cc \
 	cpp/util/thread_pool.cc \
 	cpp/util/util.cc
+
 cpp_log_cluster_state_controller_test_LDADD = \
 	cpp/libcore.a \
 	cpp/libtest.a \
