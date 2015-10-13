@@ -30,10 +30,10 @@
 /cpp/client/ct
 /cpp/config.h
 /cpp/config.h.in
+/cpp/fetcher/remote_peer_test
 /cpp/gmock-all.cc
 /cpp/gtest-all.cc
 /cpp/local.mk
-/cpp/fetcher/remote_peer_test
 /cpp/log/cert_checker_test
 /cpp/log/cert_submission_handler_test
 /cpp/log/cert_test
@@ -72,6 +72,7 @@
 /cpp/server/proxy_test
 /cpp/stamp-h1
 /cpp/tools/ct-clustertool
+/cpp/tools/db_tool
 /cpp/tools/dump_cert
 /cpp/tools/dump_sth
 /cpp/tools/etcd_watch
