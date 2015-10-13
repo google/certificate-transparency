@@ -66,7 +66,7 @@ void LogLookup<Logged>::UpdateFromSTH(const ct::SignedTreeHead& sth) {
   auto it(db_->ScanEntries(cert_tree_.LeafCount()));
   // LeafCount() is potentially unsigned here but as this is using memory
   // the count can never get close to overflow in 64 bits.
-  CHECK_LE(cert_tree_.LeafCount(), INT64_MAX);
+  CHECK_LE(cert_tree_.LeafCount(), (uint64_t) INT64_MAX);
 
   for (int64_t sequence_number = cert_tree_.LeafCount();
        sequence_number < sth.tree_size(); ++sequence_number) {
