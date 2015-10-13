@@ -183,7 +183,7 @@ bool EventLoop::EraseCheck(std::deque<FD*>::iterator* pfd) {
 // static
 void EventLoop::Set(int fd, fd_set* fdset, int* max) {
   DCHECK_GE(fd, 0);
-  CHECK_LT((unsigned)fd, FD_SETSIZE);
+  CHECK_LT((unsigned)fd, (unsigned)FD_SETSIZE);
   FD_SET(fd, fdset);
   if (fd > *max)
     *max = fd;
