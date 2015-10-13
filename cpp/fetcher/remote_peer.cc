@@ -143,7 +143,6 @@ RemotePeer::RemotePeer(
     : Peer(move(client)),
       impl_(new Impl(move(verifier), client_.get(), on_new_sth, task)) {
   TaskHold hold(task);
-  task->DeleteWhenDone(impl_);
 
   impl_->FetchSTH();
 }

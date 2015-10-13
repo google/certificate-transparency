@@ -1,6 +1,8 @@
 #ifndef CERT_TRANS_FETCHER_REMOTE_PEER_H_
 #define CERT_TRANS_FETCHER_REMOTE_PEER_H_
 
+#include <memory>
+
 #include "fetcher/peer.h"
 #include "log/log_verifier.h"
 #include "util/task.h"
@@ -27,8 +29,7 @@ class RemotePeer : public Peer {
  private:
   struct Impl;
 
-  // This gets deleted via the util::Task.
-  Impl* const impl_;
+  std::unique_ptr<Impl> const impl_;
 };
 
 
