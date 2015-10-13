@@ -161,10 +161,10 @@ cpp_libcore_a_SOURCES = \
 	cpp/monitoring/prometheus/metrics.pb.h \
 	cpp/monitoring/registry.cc \
 	cpp/net/connection_pool.cc \
-	cpp/third_party/curl/hostcheck.c \
-	cpp/third_party/isec_partners/openssl_hostname_validation.c \
 	cpp/net/url.cc \
 	cpp/net/url_fetcher.cc \
+	cpp/third_party/curl/hostcheck.c \
+	cpp/third_party/isec_partners/openssl_hostname_validation.c \
 	cpp/util/etcd.cc \
 	cpp/util/etcd_delete.cc \
 	cpp/util/fake_etcd.cc \
@@ -173,6 +173,8 @@ cpp_libcore_a_SOURCES = \
 	cpp/util/status.cc \
 	cpp/util/sync_task.cc \
 	cpp/util/task.cc \
+	cpp/util/thread_pool.cc \
+	cpp/util/thread_pool.h \
 	cpp/util/util.cc \
 	proto/ct.pb.cc \
 	proto/ct.pb.h
@@ -208,7 +210,6 @@ cpp_server_ct_mirror_SOURCES = \
 	cpp/util/protobuf_util.cc \
 	cpp/util/protobuf_util.h \
 	cpp/util/read_key.cc \
-	cpp/util/thread_pool.cc \
 	cpp/util/util.cc \
 	cpp/util/uuid.cc \
 	cpp/version.cc
@@ -234,7 +235,6 @@ cpp_server_ct_server_SOURCES = \
 	cpp/util/protobuf_util.cc \
 	cpp/util/protobuf_util.h \
 	cpp/util/read_key.cc \
-	cpp/util/thread_pool.cc \
 	cpp/util/util.cc \
 	cpp/util/uuid.cc \
 	cpp/version.cc
@@ -253,7 +253,6 @@ cpp_tools_ct_clustertool_SOURCES = \
 	cpp/util/periodic_closure.cc \
 	cpp/util/protobuf_util.cc \
 	cpp/util/read_key.cc \
-	cpp/util/thread_pool.cc \
 	cpp/util/util.cc \
 	cpp/version.cc
 
@@ -288,7 +287,6 @@ cpp_client_ct_SOURCES = \
 	cpp/util/json_wrapper.cc \
 	cpp/util/libevent_wrapper.cc \
 	cpp/util/read_key.cc \
-	cpp/util/thread_pool.cc \
 	cpp/util/util.cc \
 	cpp/version.cc
 
@@ -331,7 +329,6 @@ cpp_tools_etcd_watch_SOURCES = \
 	cpp/util/init.cc \
 	cpp/util/json_wrapper.cc \
 	cpp/util/libevent_wrapper.cc \
-	cpp/util/thread_pool.cc \
 	cpp/version.cc
 
 cpp_util_bench_etcd_LDADD = \
@@ -341,8 +338,7 @@ cpp_util_bench_etcd_LDADD = \
 cpp_util_bench_etcd_SOURCES = \
 	cpp/util/bench_etcd.cc \
 	cpp/util/json_wrapper.cc \
-	cpp/util/libevent_wrapper.cc \
-	cpp/util/thread_pool.cc
+	cpp/util/libevent_wrapper.cc
 
 cpp_util_etcd_masterelection_LDADD = \
 	cpp/libcore.a \
@@ -354,8 +350,7 @@ cpp_util_etcd_masterelection_SOURCES = \
 	cpp/util/json_wrapper.cc \
 	cpp/util/libevent_wrapper.cc \
 	cpp/util/periodic_closure.cc \
-	cpp/util/protobuf_util.cc \
-	cpp/util/thread_pool.cc
+	cpp/util/protobuf_util.cc
 
 cpp_base_notification_test_LDADD = \
 	cpp/libtest.a \
@@ -381,7 +376,6 @@ cpp_fetcher_remote_peer_test_SOURCES = \
 	cpp/util/libevent_wrapper.cc \
 	cpp/util/periodic_closure.cc \
 	cpp/util/protobuf_util.cc \
-	cpp/util/thread_pool.cc \
 	cpp/util/util.cc
 
 cpp_log_cluster_state_controller_test_LDADD = \
@@ -399,7 +393,6 @@ cpp_log_cluster_state_controller_test_SOURCES = \
 	cpp/util/libevent_wrapper.cc \
 	cpp/util/periodic_closure.cc \
 	cpp/util/protobuf_util.cc \
-	cpp/util/thread_pool.cc \
 	cpp/util/util.cc
 
 cpp_log_database_test_LDADD = \
@@ -428,7 +421,6 @@ cpp_log_etcd_consistent_store_test_SOURCES = \
 	cpp/util/libevent_wrapper.cc \
 	cpp/util/periodic_closure.cc \
 	cpp/util/protobuf_util.cc \
-	cpp/util/thread_pool.cc \
 	cpp/util/util.cc
 
 cpp_log_file_storage_test_LDADD = \
@@ -459,7 +451,6 @@ cpp_log_frontend_signer_test_SOURCES = \
 	cpp/util/libevent_wrapper.cc \
 	cpp/util/periodic_closure.cc \
 	cpp/util/protobuf_util.cc \
-	cpp/util/thread_pool.cc \
 	cpp/util/util.cc
 
 cpp_log_log_lookup_test_LDADD = \
@@ -477,7 +468,6 @@ cpp_log_log_lookup_test_SOURCES = \
 	cpp/util/libevent_wrapper.cc \
 	cpp/util/periodic_closure.cc \
 	cpp/util/protobuf_util.cc \
-	cpp/util/thread_pool.cc \
 	cpp/util/util.cc
 
 cpp_log_log_signer_test_LDADD = \
@@ -530,7 +520,6 @@ cpp_log_tree_signer_test_SOURCES = \
 	cpp/util/libevent_wrapper.cc \
 	cpp/util/periodic_closure.cc \
 	cpp/util/protobuf_util.cc \
-	cpp/util/thread_pool.cc \
 	cpp/util/util.cc
 
 cpp_log_signer_verifier_test_LDADD = \
@@ -568,8 +557,7 @@ cpp_monitoring_gcm_exporter_test_SOURCES = \
 	cpp/monitoring/gcm/exporter_test.cc \
 	cpp/util/json_wrapper.cc \
 	cpp/util/libevent_wrapper.cc \
-	cpp/util/protobuf_util.cc \
-	cpp/util/thread_pool.cc
+	cpp/util/protobuf_util.cc
 
 cpp_monitoring_counter_test_LDADD = \
 	cpp/libcore.a \
@@ -606,8 +594,7 @@ cpp_net_url_fetcher_test_LDADD = \
 cpp_net_url_fetcher_test_SOURCES = \
 	cpp/net/url_fetcher_test.cc \
 	cpp/util/libevent_wrapper.cc \
-	cpp/util/protobuf_util.cc \
-	cpp/util/thread_pool.cc
+	cpp/util/protobuf_util.cc
 EXTRA_cpp_net_url_fetcher_test_DEPENDENCIES = \
 	test/testdata/urlfetcher_test_certs/localhost-key.pem
 
@@ -643,8 +630,7 @@ cpp_util_etcd_delete_test_LDADD = \
 cpp_util_etcd_delete_test_SOURCES = \
 	cpp/util/etcd_delete_test.cc \
 	cpp/util/json_wrapper.cc \
-	cpp/util/libevent_wrapper.cc \
-	cpp/util/thread_pool.cc
+	cpp/util/libevent_wrapper.cc
 
 cpp_util_etcd_test_LDADD = \
 	cpp/libcore.a \
@@ -664,8 +650,7 @@ cpp_util_fake_etcd_test_LDADD = \
 cpp_util_fake_etcd_test_SOURCES = \
 	cpp/util/fake_etcd_test.cc \
 	cpp/util/json_wrapper.cc \
-	cpp/util/libevent_wrapper.cc \
-	cpp/util/thread_pool.cc
+	cpp/util/libevent_wrapper.cc
 EXTRA_cpp_util_fake_etcd_test_DEPENDENCIES = \
 	test/testdata/urlfetcher_test_certs/localhost-key.pem
 
@@ -698,8 +683,7 @@ cpp_util_masterelection_test_SOURCES = \
 	cpp/util/libevent_wrapper.cc \
 	cpp/util/masterelection_test.cc \
 	cpp/util/periodic_closure.cc \
-	cpp/util/protobuf_util.cc \
-	cpp/util/thread_pool.cc
+	cpp/util/protobuf_util.cc
 EXTRA_cpp_util_masterelection_test_DEPENDENCIES = \
 	test/testdata/urlfetcher_test_certs/localhost-key.pem
 
@@ -732,24 +716,21 @@ cpp_util_sync_task_test_LDADD = \
 	cpp/libtest.a \
 	$(libevent_LIBS)
 cpp_util_sync_task_test_SOURCES = \
-	cpp/util/sync_task_test.cc \
-	cpp/util/thread_pool.cc
+	cpp/util/sync_task_test.cc
 
 cpp_util_task_test_LDADD = \
 	cpp/libcore.a \
 	cpp/libtest.a \
 	$(libevent_LIBS)
 cpp_util_task_test_SOURCES = \
-	cpp/util/task_test.cc \
-	cpp/util/thread_pool.cc
+	cpp/util/task_test.cc
 
 cpp_util_thread_pool_test_LDADD = \
 	cpp/libcore.a \
 	cpp/libtest.a \
 	$(libevent_LIBS)
 cpp_util_thread_pool_test_SOURCES = \
-	cpp/util/thread_pool_test.cc \
-	cpp/util/thread_pool.cc
+	cpp/util/thread_pool_test.cc
 
 cpp_log_cert_checker_test_LDADD = \
 	cpp/libcore.a \
@@ -812,7 +793,6 @@ cpp_log_frontend_test_SOURCES = \
 	cpp/util/libevent_wrapper.cc \
 	cpp/util/periodic_closure.cc \
 	cpp/util/protobuf_util.cc \
-	cpp/util/thread_pool.cc \
 	cpp/util/util.cc
 
 cpp_merkletree_merkle_tree_large_test_LDADD = \
