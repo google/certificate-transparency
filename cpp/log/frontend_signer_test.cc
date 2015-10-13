@@ -9,7 +9,7 @@
 #include "log/file_db.h"
 #include "log/frontend_signer.h"
 #include "log/log_verifier.h"
-#include "log/logged_certificate.h"
+#include "log/logged_entry.h"
 #include "log/sqlite_db.h"
 #include "log/test_db.h"
 #include "log/test_signer.h"
@@ -34,7 +34,7 @@ using cert_trans::ConsistentStore;
 using cert_trans::EntryHandle;
 using cert_trans::EtcdConsistentStore;
 using cert_trans::FakeEtcdClient;
-using cert_trans::LoggedCertificate;
+using cert_trans::LoggedEntry;
 using cert_trans::MockMasterElection;
 using cert_trans::ThreadPool;
 using ct::LogEntry;
@@ -48,7 +48,7 @@ using testing::_;
 using testing::NiceMock;
 using util::testing::StatusIs;
 
-typedef Database<LoggedCertificate> DB;
+typedef Database<LoggedEntry> DB;
 typedef FrontendSigner FS;
 
 template <class T>
@@ -81,13 +81,12 @@ class FrontendSignerTest : public ::testing::Test {
   FakeEtcdClient etcd_client_;
   ThreadPool pool_;
   NiceMock<MockMasterElection> election_;
-  EtcdConsistentStore<LoggedCertificate> store_;
+  EtcdConsistentStore<LoggedEntry> store_;
   unique_ptr<LogSigner> log_signer_;
   FS frontend_;
 };
 
-typedef testing::Types<FileDB<LoggedCertificate>, SQLiteDB<LoggedCertificate>>
-    Databases;
+typedef testing::Types<FileDB<LoggedEntry>, SQLiteDB<LoggedEntry>> Databases;
 
 TYPED_TEST_CASE(FrontendSignerTest, Databases);
 
@@ -100,10 +99,10 @@ TYPED_TEST(FrontendSignerTest, LogKatTest) {
 
   // Look it up and expect to get the right thing back.
   string hash =
-      Sha256Hasher::Sha256Digest(Serializer::LeafCertificate(default_entry));
-  EntryHandle<LoggedCertificate> entry_handle;
+      Sha256Hasher::Sha256Digest(Serializer::LeafData(default_entry));
+  EntryHandle<LoggedEntry> entry_handle;
   EXPECT_TRUE(this->store_.GetPendingEntryForHash(hash, &entry_handle).ok());
-  const LoggedCertificate& logged_cert(entry_handle.Entry());
+  const LoggedEntry& logged_cert(entry_handle.Entry());
 
   TestSigner::TestEqualEntries(default_entry, logged_cert.entry());
 }
@@ -118,17 +117,15 @@ TYPED_TEST(FrontendSignerTest, Log) {
   EXPECT_OK(this->frontend_.QueueEntry(entry1, NULL));
 
   // Look it up and expect to get the right thing back.
-  string hash0 =
-      Sha256Hasher::Sha256Digest(Serializer::LeafCertificate(entry0));
-  string hash1 =
-      Sha256Hasher::Sha256Digest(Serializer::LeafCertificate(entry1));
+  string hash0 = Sha256Hasher::Sha256Digest(Serializer::LeafData(entry0));
+  string hash1 = Sha256Hasher::Sha256Digest(Serializer::LeafData(entry1));
 
-  EntryHandle<LoggedCertificate> entry_handle0;
-  EntryHandle<LoggedCertificate> entry_handle1;
+  EntryHandle<LoggedEntry> entry_handle0;
+  EntryHandle<LoggedEntry> entry_handle1;
   EXPECT_TRUE(this->store_.GetPendingEntryForHash(hash0, &entry_handle0).ok());
   EXPECT_TRUE(this->store_.GetPendingEntryForHash(hash1, &entry_handle1).ok());
-  const LoggedCertificate& logged_cert0(entry_handle0.Entry());
-  const LoggedCertificate& logged_cert1(entry_handle1.Entry());
+  const LoggedEntry& logged_cert0(entry_handle0.Entry());
+  const LoggedEntry& logged_cert1(entry_handle1.Entry());
 
   TestSigner::TestEqualEntries(entry0, logged_cert0.entry());
   TestSigner::TestEqualEntries(entry1, logged_cert1.entry());

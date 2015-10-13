@@ -6,7 +6,7 @@
 
 #include "base/macros.h"
 #include "log/consistent_store.h"
-#include "log/logged_certificate.h"
+#include "log/logged_entry.h"
 
 template <class Logged>
 class Database;
@@ -20,10 +20,9 @@ class Status;
 class FrontendSigner {
  public:
   // Does not take ownership of |db|, |store| or |signer|.
-  FrontendSigner(
-      Database<cert_trans::LoggedCertificate>* db,
-      cert_trans::ConsistentStore<cert_trans::LoggedCertificate>* store,
-      LogSigner* signer);
+  FrontendSigner(Database<cert_trans::LoggedEntry>* db,
+                 cert_trans::ConsistentStore<cert_trans::LoggedEntry>* store,
+                 LogSigner* signer);
 
   // Log the entry if it's not already in the database,
   // and return either a new timestamp-signature pair,
@@ -36,8 +35,8 @@ class FrontendSigner {
   void TimestampAndSign(const ct::LogEntry& entry,
                         ct::SignedCertificateTimestamp* sct) const;
 
-  Database<cert_trans::LoggedCertificate>* const db_;
-  cert_trans::ConsistentStore<cert_trans::LoggedCertificate>* const store_;
+  Database<cert_trans::LoggedEntry>* const db_;
+  cert_trans::ConsistentStore<cert_trans::LoggedEntry>* const store_;
   LogSigner* const signer_;
 
   DISALLOW_COPY_AND_ASSIGN(FrontendSigner);

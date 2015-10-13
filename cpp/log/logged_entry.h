@@ -1,7 +1,7 @@
 /* -*- mode: c++; indent-tabs-mode: nil -*- */
 
-#ifndef LOGGED_CERTIFICATE_H
-#define LOGGED_CERTIFICATE_H
+#ifndef LOGGED_ENTRY_H
+#define LOGGED_ENTRY_H
 
 #include <glog/logging.h>
 
@@ -13,10 +13,10 @@
 
 namespace cert_trans {
 
-class LoggedCertificate : public ct::LoggedCertificatePB {
+class LoggedEntry : public ct::LoggedEntryPB {
  public:
   std::string Hash() const {
-    return Sha256Hasher::Sha256Digest(Serializer::LeafCertificate(entry()));
+    return Sha256Hasher::Sha256Digest(Serializer::LeafData(entry()));
   }
 
   uint64_t timestamp() const {
@@ -53,12 +53,18 @@ class LoggedCertificate : public ct::LoggedCertificatePB {
   }
 
   bool SerializeExtraData(std::string* dst) const {
-    if (entry().type() == ct::X509_ENTRY)
-      return Serializer::SerializeX509Chain(entry().x509_entry(), dst) ==
-             Serializer::OK;
-    else
-      return Serializer::SerializePrecertChainEntry(entry().precert_entry(),
-                                                    dst) == Serializer::OK;
+    switch (entry().type()) {
+      case ct::X509_ENTRY:
+        return Serializer::SerializeX509Chain(entry().x509_entry(), dst) ==
+               Serializer::OK;
+      case ct::PRECERT_ENTRY:
+        return Serializer::SerializePrecertChainEntry(entry().precert_entry(),
+                                                      dst) == Serializer::OK;
+      case ct::UNKNOWN_ENTRY_TYPE:
+        // We'll handle this below, along with any unknown unknown types too.
+        break;
+      }
+    LOG(FATAL) << "Unknown entry type " << entry().type();
   }
 
   // Note that this method will not fully populate the SCT.
@@ -117,8 +123,7 @@ class LoggedCertificate : public ct::LoggedCertificatePB {
 };
 
 
-inline bool operator==(const LoggedCertificate& lhs,
-                       const LoggedCertificate& rhs) {
+inline bool operator==(const LoggedEntry& lhs, const LoggedEntry& rhs) {
   // TODO(alcutter): Do this properly
   std::string l_str, r_str;
   CHECK(lhs.SerializeToString(&l_str));
@@ -148,4 +153,4 @@ inline bool operator==(const ct::SignedCertificateTimestamp& lhs,
 
 }  // namespace cert_trans
 
-#endif
+#endif  // LOGGED_ENTRY_H

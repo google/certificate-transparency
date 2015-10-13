@@ -6,7 +6,7 @@
 
 #include "fetcher/mock_continuous_fetcher.h"
 #include "log/cluster_state_controller-inl.h"
-#include "log/logged_certificate.h"
+#include "log/logged_entry.h"
 #include "log/test_db.h"
 #include "net/mock_url_fetcher.h"
 #include "proto/ct.pb.h"
@@ -53,15 +53,15 @@ class ClusterStateControllerTest : public ::testing::Test {
         base_(make_shared<libevent::Base>()),
         pump_(base_),
         etcd_(base_.get()),
-        store1_(new EtcdConsistentStore<LoggedCertificate>(base_.get(), &pool_,
-                                                           &etcd_, &election1_,
-                                                           "", kNodeId1)),
-        store2_(new EtcdConsistentStore<LoggedCertificate>(base_.get(), &pool_,
-                                                           &etcd_, &election2_,
-                                                           "", kNodeId2)),
-        store3_(new EtcdConsistentStore<LoggedCertificate>(base_.get(), &pool_,
-                                                           &etcd_, &election3_,
-                                                           "", kNodeId3)),
+        store1_(new EtcdConsistentStore<LoggedEntry>(base_.get(), &pool_,
+                                                     &etcd_, &election1_, "",
+                                                     kNodeId1)),
+        store2_(new EtcdConsistentStore<LoggedEntry>(base_.get(), &pool_,
+                                                     &etcd_, &election2_, "",
+                                                     kNodeId2)),
+        store3_(new EtcdConsistentStore<LoggedEntry>(base_.get(), &pool_,
+                                                     &etcd_, &election3_, "",
+                                                     kNodeId3)),
         controller_(&pool_, base_, &url_fetcher_, test_db_.db(), store1_.get(),
                     &election1_, &fetcher_) {
     // There will be many calls to ContinuousFetcher::AddPeer during
@@ -111,7 +111,7 @@ class ClusterStateControllerTest : public ::testing::Test {
     return it->second->state();
   }
 
-  static void SetClusterConfig(ConsistentStore<LoggedCertificate>* store,
+  static void SetClusterConfig(ConsistentStore<LoggedEntry>* store,
                                const int min_nodes,
                                const double min_fraction) {
     ClusterConfig config;
@@ -130,14 +130,14 @@ class ClusterStateControllerTest : public ::testing::Test {
   MockContinuousFetcher fetcher_;
   libevent::EventPumpThread pump_;
   FakeEtcdClient etcd_;
-  TestDB<FileDB<LoggedCertificate>> test_db_;
+  TestDB<FileDB<LoggedEntry>> test_db_;
   NiceMock<MockMasterElection> election1_;
   NiceMock<MockMasterElection> election2_;
   NiceMock<MockMasterElection> election3_;
-  std::unique_ptr<EtcdConsistentStore<LoggedCertificate>> store1_;
-  std::unique_ptr<EtcdConsistentStore<LoggedCertificate>> store2_;
-  std::unique_ptr<EtcdConsistentStore<LoggedCertificate>> store3_;
-  ClusterStateController<LoggedCertificate> controller_;
+  std::unique_ptr<EtcdConsistentStore<LoggedEntry>> store1_;
+  std::unique_ptr<EtcdConsistentStore<LoggedEntry>> store2_;
+  std::unique_ptr<EtcdConsistentStore<LoggedEntry>> store3_;
+  ClusterStateController<LoggedEntry> controller_;
 };
 
 
@@ -155,7 +155,7 @@ TEST_F(ClusterStateControllerTest, TestNewTreeHead) {
 TEST_F(ClusterStateControllerTest, TestCalculateServingSTHAt50Percent) {
   NiceMock<MockMasterElection> election_is_master;
   EXPECT_CALL(election_is_master, IsMaster()).WillRepeatedly(Return(true));
-  ClusterStateController<LoggedCertificate> controller50(
+  ClusterStateController<LoggedEntry> controller50(
       &pool_, base_, &url_fetcher_, test_db_.db(), store1_.get(),
       &election_is_master, &fetcher_);
   SetClusterConfig(store1_.get(), 1 /* nodes */, 0.5 /* fraction */);
@@ -184,7 +184,7 @@ TEST_F(ClusterStateControllerTest, TestCalculateServingSTHAt50Percent) {
 TEST_F(ClusterStateControllerTest, TestCalculateServingSTHAt70Percent) {
   NiceMock<MockMasterElection> election_is_master;
   EXPECT_CALL(election_is_master, IsMaster()).WillRepeatedly(Return(true));
-  ClusterStateController<LoggedCertificate> controller70(
+  ClusterStateController<LoggedEntry> controller70(
       &pool_, base_, &url_fetcher_, test_db_.db(), store1_.get(),
       &election_is_master, &fetcher_);
   SetClusterConfig(store1_.get(), 1 /* nodes */, 0.7 /* fraction */);
@@ -212,7 +212,7 @@ TEST_F(ClusterStateControllerTest,
        TestCalculateServingSTHAt60PercentTwoNodeMin) {
   NiceMock<MockMasterElection> election_is_master;
   EXPECT_CALL(election_is_master, IsMaster()).WillRepeatedly(Return(true));
-  ClusterStateController<LoggedCertificate> controller60(
+  ClusterStateController<LoggedEntry> controller60(
       &pool_, base_, &url_fetcher_, test_db_.db(), store1_.get(),
       &election_is_master, &fetcher_);
   SetClusterConfig(store1_.get(), 2 /* nodes */, 0.6 /* fraction */);
@@ -239,7 +239,7 @@ TEST_F(ClusterStateControllerTest,
 TEST_F(ClusterStateControllerTest, TestCalculateServingSTHAsClusterMoves) {
   NiceMock<MockMasterElection> election_is_master;
   EXPECT_CALL(election_is_master, IsMaster()).WillRepeatedly(Return(true));
-  ClusterStateController<LoggedCertificate> controller50(
+  ClusterStateController<LoggedEntry> controller50(
       &pool_, base_, &url_fetcher_, test_db_.db(), store1_.get(),
       &election_is_master, &fetcher_);
   SetClusterConfig(store1_.get(), 1 /* nodes */, 0.5 /* fraction */);
@@ -306,7 +306,7 @@ TEST_F(ClusterStateControllerTest, TestKeepsNewerSTH) {
 TEST_F(ClusterStateControllerTest, TestCannotSelectSmallerSTH) {
   NiceMock<MockMasterElection> election_is_master;
   EXPECT_CALL(election_is_master, IsMaster()).WillRepeatedly(Return(true));
-  ClusterStateController<LoggedCertificate> controller50(
+  ClusterStateController<LoggedEntry> controller50(
       &pool_, base_, &url_fetcher_, test_db_.db(), store1_.get(),
       &election_is_master, &fetcher_);
   SetClusterConfig(store1_.get(), 1 /* nodes */, 0.5 /* fraction */);
@@ -354,7 +354,7 @@ TEST_F(ClusterStateControllerTest, TestCannotSelectSmallerSTH) {
 TEST_F(ClusterStateControllerTest, TestUsesLargestSTHWithIdenticalTimestamp) {
   NiceMock<MockMasterElection> election_is_master;
   EXPECT_CALL(election_is_master, IsMaster()).WillRepeatedly(Return(true));
-  ClusterStateController<LoggedCertificate> controller50(
+  ClusterStateController<LoggedEntry> controller50(
       &pool_, base_, &url_fetcher_, test_db_.db(), store1_.get(),
       &election_is_master, &fetcher_);
   SetClusterConfig(store1_.get(), 1 /* nodes */, 0.5 /* fraction */);
@@ -390,7 +390,7 @@ TEST_F(ClusterStateControllerTest, TestUsesLargestSTHWithIdenticalTimestamp) {
 TEST_F(ClusterStateControllerTest, TestDoesNotReuseSTHTimestamp) {
   NiceMock<MockMasterElection> election_is_master;
   EXPECT_CALL(election_is_master, IsMaster()).WillRepeatedly(Return(true));
-  ClusterStateController<LoggedCertificate> controller50(
+  ClusterStateController<LoggedEntry> controller50(
       &pool_, base_, &url_fetcher_, test_db_.db(), store1_.get(),
       &election_is_master, &fetcher_);
   SetClusterConfig(store1_.get(), 3 /* nodes */, 1 /* fraction */);
@@ -469,9 +469,10 @@ TEST_F(ClusterStateControllerTest,
        TestConfigChangesCauseServingSTHToBeRecalculated) {
   NiceMock<MockMasterElection> election_is_master;
   EXPECT_CALL(election_is_master, IsMaster()).WillRepeatedly(Return(true));
-  ClusterStateController<LoggedCertificate> controller(
-      &pool_, base_, &url_fetcher_, test_db_.db(), store1_.get(),
-      &election_is_master, &fetcher_);
+  ClusterStateController<LoggedEntry> controller(&pool_, base_, &url_fetcher_,
+                                                 test_db_.db(), store1_.get(),
+                                                 &election_is_master,
+                                                 &fetcher_);
   SetClusterConfig(store1_.get(), 0 /* nodes */, 0.5 /* fraction */);
   store1_->SetClusterNodeState(cns100_);
   store2_->SetClusterNodeState(cns200_);
@@ -538,7 +539,7 @@ TEST_F(ClusterStateControllerTest, TestStoresServingSthInDatabase) {
 
   {
     SignedTreeHead db_sth;
-    EXPECT_EQ(Database<LoggedCertificate>::LOOKUP_OK,
+    EXPECT_EQ(Database<LoggedEntry>::LOOKUP_OK,
               test_db_.db()->LatestTreeHead(&db_sth));
     EXPECT_EQ(sth.DebugString(), db_sth.DebugString());
   }
@@ -554,7 +555,7 @@ TEST_F(ClusterStateControllerTest, TestWaitsToStoreSTHInDatabaseWhenStale) {
 
   {
     SignedTreeHead db_sth;
-    EXPECT_EQ(Database<LoggedCertificate>::LOOKUP_OK,
+    EXPECT_EQ(Database<LoggedEntry>::LOOKUP_OK,
               test_db_.db()->LatestTreeHead(&db_sth));
     EXPECT_EQ(sth1.DebugString(), db_sth.DebugString());
   }
@@ -569,7 +570,7 @@ TEST_F(ClusterStateControllerTest, TestWaitsToStoreSTHInDatabaseWhenStale) {
     // Should still show the first STH in sth1, because the local DB
     // doesn't have the entries under sth2 yet.
     SignedTreeHead db_sth;
-    EXPECT_EQ(Database<LoggedCertificate>::LOOKUP_OK,
+    EXPECT_EQ(Database<LoggedEntry>::LOOKUP_OK,
               test_db_.db()->LatestTreeHead(&db_sth));
     EXPECT_EQ(sth1.DebugString(), db_sth.DebugString());
   }
@@ -584,7 +585,7 @@ TEST_F(ClusterStateControllerTest, TestWaitsToStoreSTHInDatabaseWhenStale) {
   {
     // Should now see the updated serving sth2
     SignedTreeHead db_sth;
-    EXPECT_EQ(Database<LoggedCertificate>::LOOKUP_OK,
+    EXPECT_EQ(Database<LoggedEntry>::LOOKUP_OK,
               test_db_.db()->LatestTreeHead(&db_sth));
     EXPECT_EQ(sth2.DebugString(), db_sth.DebugString());
   }
@@ -615,11 +616,11 @@ TEST_F(ClusterStateControllerTest, TestNodeIsStale) {
   EXPECT_TRUE(controller_.NodeIsStale());  // DB doesn't have the leaf
 
   {
-    LoggedCertificate cert;
+    LoggedEntry cert;
     cert.RandomForTest();
     cert.set_sequence_number(0);
     EXPECT_EQ(test_db_.db()->CreateSequencedEntry(cert),
-              Database<LoggedCertificate>::OK);
+              Database<LoggedEntry>::OK);
   }
 
   EXPECT_FALSE(controller_.NodeIsStale());
@@ -627,12 +628,12 @@ TEST_F(ClusterStateControllerTest, TestNodeIsStale) {
 
 
 TEST_F(ClusterStateControllerTest, TestGetFreshNodes) {
-  ClusterStateController<LoggedCertificate> c2(&pool_, base_, &url_fetcher_,
-                                               test_db_.db(), store2_.get(),
-                                               &election2_, &fetcher_);
-  ClusterStateController<LoggedCertificate> c3(&pool_, base_, &url_fetcher_,
-                                               test_db_.db(), store3_.get(),
-                                               &election3_, &fetcher_);
+  ClusterStateController<LoggedEntry> c2(&pool_, base_, &url_fetcher_,
+                                         test_db_.db(), store2_.get(),
+                                         &election2_, &fetcher_);
+  ClusterStateController<LoggedEntry> c3(&pool_, base_, &url_fetcher_,
+                                         test_db_.db(), store3_.get(),
+                                         &election3_, &fetcher_);
   store1_->SetClusterNodeState(cns100_);
   store2_->SetClusterNodeState(cns200_);
   store3_->SetClusterNodeState(cns300_);

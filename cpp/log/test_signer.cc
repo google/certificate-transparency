@@ -10,7 +10,7 @@
 #include <string>
 
 #include "log/log_signer.h"
-#include "log/logged_certificate.h"
+#include "log/logged_entry.h"
 #include "log/signer.h"
 #include "log/verifier.h"
 #include "merkletree/serial_hasher.h"
@@ -20,7 +20,7 @@
 #include "util/util.h"
 
 using cert_trans::Signer;
-using cert_trans::LoggedCertificate;
+using cert_trans::LoggedEntry;
 using cert_trans::Verifier;
 using ct::DigitallySigned;
 using ct::LogEntry;
@@ -269,7 +269,7 @@ void TestSigner::SetPrecertDefaults(SignedCertificateTimestamp* sct) {
 }
 
 // static
-void TestSigner::SetDefaults(LoggedCertificate* logged_cert) {
+void TestSigner::SetDefaults(LoggedEntry* logged_cert) {
   // Some time in September 2012.
   SetDefaults(logged_cert->mutable_sct());
   SetDefaults(logged_cert->mutable_entry());
@@ -352,7 +352,7 @@ void TestSigner::CreateUnique(LogEntry* entry) {
   }
 }
 
-void TestSigner::CreateUnique(LoggedCertificate* logged_cert) {
+void TestSigner::CreateUnique(LoggedEntry* logged_cert) {
   FillData(logged_cert);
   logged_cert->set_sequence_number(rand());
 
@@ -361,7 +361,7 @@ void TestSigner::CreateUnique(LoggedCertificate* logged_cert) {
                logged_cert->entry(), logged_cert->mutable_sct()));
 }
 
-void TestSigner::CreateUniqueFakeSignature(LoggedCertificate* logged_cert) {
+void TestSigner::CreateUniqueFakeSignature(LoggedEntry* logged_cert) {
   FillData(logged_cert);
 
   logged_cert->mutable_sct()->mutable_signature()->set_hash_algorithm(
@@ -433,8 +433,8 @@ void TestSigner::TestEqualSCTs(const SignedCertificateTimestamp& sct0,
 }
 
 // static
-void TestSigner::TestEqualLoggedCerts(const LoggedCertificate& c0,
-                                      const LoggedCertificate& c1) {
+void TestSigner::TestEqualLoggedCerts(const LoggedEntry& c0,
+                                      const LoggedEntry& c1) {
   TestEqualEntries(c0.entry(), c1.entry());
   TestEqualSCTs(c0.sct(), c1.sct());
 
@@ -455,7 +455,7 @@ void TestSigner::TestEqualTreeHeads(const SignedTreeHead& sth0,
   TestEqualDigitallySigned(sth0.signature(), sth1.signature());
 }
 
-void TestSigner::FillData(LoggedCertificate* logged_cert) {
+void TestSigner::FillData(LoggedEntry* logged_cert) {
   logged_cert->mutable_sct()->set_version(ct::V1);
   logged_cert->mutable_sct()->mutable_id()->set_key_id(B(kKeyID));
   logged_cert->mutable_sct()->set_timestamp(util::TimeInMilliseconds());
@@ -465,7 +465,7 @@ void TestSigner::FillData(LoggedCertificate* logged_cert) {
 
   CHECK_EQ(logged_cert->Hash(),
            Sha256Hasher::Sha256Digest(
-               Serializer::LeafCertificate(logged_cert->entry())));
+               Serializer::LeafData(logged_cert->entry())));
   string serialized_leaf;
   CHECK_EQ(Serializer::OK,
            Serializer::SerializeSCTMerkleTreeLeaf(logged_cert->sct(),

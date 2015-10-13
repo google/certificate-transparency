@@ -26,7 +26,7 @@
 namespace cert_trans {
 
 using cert_trans::EntryHandle;
-using cert_trans::LoggedCertificate;
+using cert_trans::LoggedEntry;
 using cert_trans::MockMasterElection;
 using ct::ClusterNodeState;
 using ct::SequenceMapping;
@@ -41,11 +41,11 @@ using std::vector;
 using testing::NiceMock;
 using util::Status;
 
-typedef Database<LoggedCertificate> DB;
-typedef TreeSigner<LoggedCertificate> TS;
+typedef Database<LoggedEntry> DB;
+typedef TreeSigner<LoggedEntry> TS;
 
 // TODO(alcutter): figure out if/how we can keep abstract rather than
-// hardcoding LoggedCertificate in here.
+// hardcoding LoggedEntry in here.
 template <class T>
 class TreeSignerTest : public ::testing::Test {
  protected:
@@ -64,7 +64,7 @@ class TreeSignerTest : public ::testing::Test {
     test_db_.reset(new TestDB<T>);
     verifier_.reset(new LogVerifier(TestSigner::DefaultLogSigVerifier(),
                                     new MerkleVerifier(new Sha256Hasher())));
-    store_.reset(new EtcdConsistentStore<LoggedCertificate>(
+    store_.reset(new EtcdConsistentStore<LoggedEntry>(
         base_.get(), &pool_, &etcd_client_, &election_, "/root", "id"));
     log_signer_.reset(TestSigner::DefaultLogSigner());
     tree_signer_.reset(new TS(std::chrono::duration<double>(0), db(),
@@ -82,24 +82,24 @@ class TreeSignerTest : public ::testing::Test {
     }
   }
 
-  void AddPendingEntry(LoggedCertificate* logged_cert) const {
+  void AddPendingEntry(LoggedEntry* logged_cert) const {
     logged_cert->clear_sequence_number();
     CHECK(this->store_->AddPendingEntry(logged_cert).ok());
   }
 
-  void DeletePendingEntry(const LoggedCertificate& logged_cert) const {
-    EntryHandle<LoggedCertificate> e;
+  void DeletePendingEntry(const LoggedEntry& logged_cert) const {
+    EntryHandle<LoggedEntry> e;
     CHECK_EQ(Status::OK,
              this->store_->GetPendingEntryForHash(logged_cert.Hash(), &e));
     CHECK_EQ(Status::OK, this->store_->DeleteEntry(&e));
   }
 
-  void AddSequencedEntry(LoggedCertificate* logged_cert, int64_t seq) const {
+  void AddSequencedEntry(LoggedEntry* logged_cert, int64_t seq) const {
     logged_cert->clear_sequence_number();
     CHECK(this->store_->AddPendingEntry(logged_cert).ok());
 
     // This below would normally be done by TreeSigner::SequenceNewEntries()
-    EntryHandle<LoggedCertificate> entry;
+    EntryHandle<LoggedEntry> entry;
     EntryHandle<SequenceMapping> mapping;
     CHECK(this->store_->GetSequenceMapping(&mapping).ok());
     SequenceMapping::Mapping* m(mapping.MutableEntry()->add_mapping());
@@ -107,7 +107,7 @@ class TreeSignerTest : public ::testing::Test {
     m->set_entry_hash(logged_cert->Hash());
     CHECK(this->store_->UpdateSequenceMapping(&mapping).ok());
     logged_cert->set_sequence_number(seq);
-    CHECK_EQ(Database<LoggedCertificate>::OK,
+    CHECK_EQ(Database<LoggedEntry>::OK,
              this->db()->CreateSequencedEntry(*logged_cert));
   }
 
@@ -128,19 +128,18 @@ class TreeSignerTest : public ::testing::Test {
   FakeEtcdClient etcd_client_;
   ThreadPool pool_;
   NiceMock<MockMasterElection> election_;
-  std::unique_ptr<EtcdConsistentStore<LoggedCertificate>> store_;
+  std::unique_ptr<EtcdConsistentStore<LoggedEntry>> store_;
   TestSigner test_signer_;
   unique_ptr<LogVerifier> verifier_;
   unique_ptr<LogSigner> log_signer_;
   unique_ptr<TS> tree_signer_;
 };
 
-typedef testing::Types<FileDB<LoggedCertificate>, SQLiteDB<LoggedCertificate>>
-    Databases;
+typedef testing::Types<FileDB<LoggedEntry>, SQLiteDB<LoggedEntry>> Databases;
 
 
-EntryHandle<LoggedCertificate> H(const LoggedCertificate& l) {
-  EntryHandle<LoggedCertificate> handle;
+EntryHandle<LoggedEntry> H(const LoggedEntry& l) {
+  EntryHandle<LoggedEntry> handle;
   handle.MutableEntry()->CopyFrom(l);
   return handle;
 }
@@ -149,21 +148,21 @@ EntryHandle<LoggedCertificate> H(const LoggedCertificate& l) {
 TYPED_TEST_CASE(TreeSignerTest, Databases);
 
 TYPED_TEST(TreeSignerTest, PendingEntriesOrder) {
-  PendingEntriesOrder<LoggedCertificate> ordering;
-  LoggedCertificate lowest;
+  PendingEntriesOrder<LoggedEntry> ordering;
+  LoggedEntry lowest;
   this->test_signer_.CreateUnique(&lowest);
 
   // Can't be lower than itself!
   EXPECT_FALSE(ordering(H(lowest), H(lowest)));
 
   // check timestamp:
-  LoggedCertificate higher_timestamp(lowest);
+  LoggedEntry higher_timestamp(lowest);
   higher_timestamp.mutable_sct()->set_timestamp(lowest.timestamp() + 1);
   EXPECT_TRUE(ordering(H(lowest), H(higher_timestamp)));
   EXPECT_FALSE(ordering(H(higher_timestamp), H(lowest)));
 
   // check hash fallback:
-  LoggedCertificate higher_hash(lowest);
+  LoggedEntry higher_hash(lowest);
   while (higher_hash.Hash() <= lowest.Hash()) {
     this->test_signer_.CreateUnique(&higher_hash);
     higher_hash.mutable_sct()->set_timestamp(lowest.timestamp());
@@ -175,7 +174,7 @@ TYPED_TEST(TreeSignerTest, PendingEntriesOrder) {
 
 // TODO(ekasper): KAT tests.
 TYPED_TEST(TreeSignerTest, Sign) {
-  LoggedCertificate logged_cert;
+  LoggedEntry logged_cert;
   this->test_signer_.CreateUnique(&logged_cert);
   this->AddPendingEntry(&logged_cert);
   // this->AddSequencedEntry(&logged_cert, 0);
@@ -189,7 +188,7 @@ TYPED_TEST(TreeSignerTest, Sign) {
 
 
 TYPED_TEST(TreeSignerTest, Timestamp) {
-  LoggedCertificate logged_cert;
+  LoggedEntry logged_cert;
   this->test_signer_.CreateUnique(&logged_cert);
   this->AddSequencedEntry(&logged_cert, 0);
 
@@ -200,7 +199,7 @@ TYPED_TEST(TreeSignerTest, Timestamp) {
   // Now create a second entry with a timestamp some time in the future
   // and verify that the signer's timestamp is greater than that.
   uint64_t future = last_update + 10000;
-  LoggedCertificate logged_cert2;
+  LoggedEntry logged_cert2;
   this->test_signer_.CreateUnique(&logged_cert2);
   logged_cert2.mutable_sct()->set_timestamp(future);
   this->AddSequencedEntry(&logged_cert2, 1);
@@ -211,7 +210,7 @@ TYPED_TEST(TreeSignerTest, Timestamp) {
 
 
 TYPED_TEST(TreeSignerTest, Verify) {
-  LoggedCertificate logged_cert;
+  LoggedEntry logged_cert;
   this->test_signer_.CreateUnique(&logged_cert);
   this->AddSequencedEntry(&logged_cert, 0);
 
@@ -224,7 +223,7 @@ TYPED_TEST(TreeSignerTest, Verify) {
 
 
 TYPED_TEST(TreeSignerTest, ResumeClean) {
-  LoggedCertificate logged_cert;
+  LoggedEntry logged_cert;
   this->test_signer_.CreateUnique(&logged_cert);
   this->AddSequencedEntry(&logged_cert, 0);
 
@@ -263,7 +262,7 @@ TYPED_TEST(TreeSignerTest, ResumePartialSign) {
     CHECK_EQ(util::Status::OK, this->store_->SetClusterNodeState(node_state));
   }
 
-  LoggedCertificate logged_cert;
+  LoggedEntry logged_cert;
   this->test_signer_.CreateUnique(&logged_cert);
   this->AddSequencedEntry(&logged_cert, 0);
 
@@ -287,7 +286,7 @@ TYPED_TEST(TreeSignerTest, SignEmpty) {
 
 
 TYPED_TEST(TreeSignerTest, SequenceNewEntriesCleansUpOldSequenceMappings) {
-  LoggedCertificate logged_cert;
+  LoggedEntry logged_cert;
   this->test_signer_.CreateUnique(&logged_cert);
   this->AddPendingEntry(&logged_cert);
   EXPECT_OK(this->tree_signer_->SequenceNewEntries());
@@ -303,9 +302,9 @@ TYPED_TEST(TreeSignerTest, SequenceNewEntriesCleansUpOldSequenceMappings) {
     EXPECT_EQ(logged_cert.Hash(), mapping.Entry().mapping(0).entry_hash());
   }
 
-  unordered_map<string, LoggedCertificate> new_logged_certs;
+  unordered_map<string, LoggedEntry> new_logged_certs;
   for (int i(0); i < 2; ++i) {
-    LoggedCertificate c;
+    LoggedEntry c;
     this->test_signer_.CreateUnique(&c);
     this->AddPendingEntry(&c);
     new_logged_certs.insert(make_pair(c.Hash(), c));

@@ -10,7 +10,7 @@
 #include "monitoring/monitoring.h"
 
 using cert_trans::AsyncLogClient;
-using cert_trans::LoggedCertificate;
+using cert_trans::LoggedEntry;
 using cert_trans::PeerGroup;
 using std::bind;
 using std::lock_guard;
@@ -62,7 +62,7 @@ struct Range {
 
 
 struct FetchState {
-  FetchState(Database<LoggedCertificate>* db, unique_ptr<PeerGroup> peer_group,
+  FetchState(Database<LoggedEntry>* db, unique_ptr<PeerGroup> peer_group,
              const LogVerifier* log_verifier, Task* task);
 
   void WalkEntries();
@@ -72,7 +72,7 @@ struct FetchState {
                        const vector<AsyncLogClient::Entry>* retval,
                        Task* range_task, Task* fetch_task);
 
-  Database<LoggedCertificate>* const db_;
+  Database<LoggedEntry>* const db_;
   const unique_ptr<PeerGroup> peer_group_;
   const LogVerifier* const log_verifier_;
   Task* const task_;
@@ -86,7 +86,7 @@ struct FetchState {
 };
 
 
-FetchState::FetchState(Database<LoggedCertificate>* db,
+FetchState::FetchState(Database<LoggedEntry>* db,
                        unique_ptr<PeerGroup> peer_group,
                        const LogVerifier* log_verifier, Task* task)
     : db_(CHECK_NOTNULL(db)),
@@ -238,9 +238,9 @@ void FetchState::WriteToDatabase(int64_t index, Range* range,
   VLOG(1) << "received " << retval->size() << " entries at offset " << index;
   int64_t processed(0);
   for (const auto& entry : *retval) {
-    LoggedCertificate cert;
+    LoggedEntry cert;
     if (!cert.CopyFromClientLogEntry(entry)) {
-      LOG(WARNING) << "could not convert entry to a LoggedCertificate";
+      LOG(WARNING) << "could not convert entry to a LoggedEntry";
       num_invalid_entries_fetched->Increment("format");
       break;
     }
@@ -266,7 +266,7 @@ void FetchState::WriteToDatabase(int64_t index, Range* range,
       }
     }
     cert.set_sequence_number(index++);
-    if (db_->CreateSequencedEntry(cert) == Database<LoggedCertificate>::OK) {
+    if (db_->CreateSequencedEntry(cert) == Database<LoggedEntry>::OK) {
       ++processed;
     } else {
       LOG(WARNING) << "could not insert entry into the database:\n"
@@ -309,7 +309,7 @@ void FetchState::WriteToDatabase(int64_t index, Range* range,
 }  // namespace
 
 
-void FetchLogEntries(Database<LoggedCertificate>* db,
+void FetchLogEntries(Database<LoggedEntry>* db,
                      unique_ptr<PeerGroup> peer_group,
                      const LogVerifier* log_verifier, Task* task) {
   TaskHold hold(task);

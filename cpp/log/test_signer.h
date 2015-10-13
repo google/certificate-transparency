@@ -9,7 +9,7 @@
 #include "merkletree/tree_hasher.h"
 
 namespace cert_trans {
-class LoggedCertificate;
+class LoggedEntry;
 class Signer;
 class Verifier;
 }
@@ -42,7 +42,7 @@ class TestSigner {
 
   // For KAT tests: a logged cert with a valid hash and signature.
   // TODO(ekasper): add an intermediate for better coverage.
-  static void SetDefaults(cert_trans::LoggedCertificate* logged_cert);
+  static void SetDefaults(cert_trans::LoggedEntry* logged_cert);
 
   // For KAT tests: a tree head with a valid signature.
   // Uses SHA256 for the tree hash.
@@ -68,11 +68,11 @@ class TestSigner {
   // signature - valid signature from the default signer
   // hash - valid sha256 hash of the leaf certificate
   // sequence number - cleared
-  void CreateUnique(cert_trans::LoggedCertificate* logged_cert);
+  void CreateUnique(cert_trans::LoggedEntry* logged_cert);
 
   // Same as above but set the default signature to avoid overhead from
   // signing.
-  void CreateUniqueFakeSignature(cert_trans::LoggedCertificate* logged_cert);
+  void CreateUniqueFakeSignature(cert_trans::LoggedEntry* logged_cert);
 
   // Generates a randomized entry as follows:
   // timestamp - current
@@ -99,8 +99,8 @@ class TestSigner {
   static void TestEqualSCTs(const ct::SignedCertificateTimestamp& sct0,
                             const ct::SignedCertificateTimestamp& sct1);
 
-  static void TestEqualLoggedCerts(const cert_trans::LoggedCertificate& c1,
-                                   const cert_trans::LoggedCertificate& c2);
+  static void TestEqualLoggedCerts(const cert_trans::LoggedEntry& c1,
+                                   const cert_trans::LoggedEntry& c2);
 
   static void TestEqualTreeHeads(const ct::SignedTreeHead& sth1,
                                  const ct::SignedTreeHead& sth2);
@@ -108,7 +108,7 @@ class TestSigner {
 
  private:
   // Fill everything apart from the signature.
-  void FillData(cert_trans::LoggedCertificate* logged_cert);
+  void FillData(cert_trans::LoggedEntry* logged_cert);
 
   LogSigner* default_signer_;
   // ct::SignedCertificateTimestamp default_sct_;

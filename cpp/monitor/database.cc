@@ -6,7 +6,7 @@
 namespace monitor {
 
 Database::WriteResult Database::CreateEntry(
-    const cert_trans::LoggedCertificate& logged) {
+    const cert_trans::LoggedEntry& logged) {
   std::string leaf;
   if (!logged.SerializeForLeaf(&leaf))
     return this->SERIALIZE_FAILED;
@@ -14,7 +14,7 @@ Database::WriteResult Database::CreateEntry(
   TreeHasher hasher(new Sha256Hasher);
   std::string leaf_hash = hasher.HashLeaf(leaf);
 
-  std::string cert = Serializer::LeafCertificate(logged.entry());
+  std::string cert = Serializer::LeafData(logged.entry());
 
   std::string cert_chain;
   if (!logged.SerializeExtraData(&cert_chain))

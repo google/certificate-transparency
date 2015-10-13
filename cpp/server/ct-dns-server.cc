@@ -5,14 +5,14 @@
 #include <string>
 
 #include "log/log_lookup.h"
-#include "log/logged_certificate.h"
+#include "log/logged_entry.h"
 #include "log/sqlite_db.h"
 #include "proto/ct.pb.h"
 #include "server/event.h"
 #include "util/init.h"
 #include "util/util.h"
 
-using cert_trans::LoggedCertificate;
+using cert_trans::LoggedEntry;
 using ct::SignedTreeHead;
 using google::RegisterFlagValidator;
 using std::string;
@@ -39,7 +39,7 @@ static const bool domain_dummy =
 
 class CTUDPDNSServer : public UDPServer {
  public:
-  CTUDPDNSServer(const string& domain, SQLiteDB<LoggedCertificate>* db,
+  CTUDPDNSServer(const string& domain, SQLiteDB<LoggedEntry>* db,
                  EventLoop* loop, int fd)
       : UDPServer(loop, fd), domain_(domain), lookup_(db), db_(db) {
   }
@@ -165,7 +165,7 @@ class CTUDPDNSServer : public UDPServer {
 
   string LeafHash(const string& index_str) const {
     int index = atoi(index_str.c_str());
-    LoggedCertificate cert;
+    LoggedEntry cert;
     if (db_->LookupByIndex(index, &cert) != db_->LOOKUP_OK)
       return "No such index";
     return util::ToBase64(lookup_.LeafHash(cert));
@@ -231,8 +231,8 @@ class CTUDPDNSServer : public UDPServer {
   }
 
   string domain_;
-  LogLookup<LoggedCertificate> lookup_;
-  SQLiteDB<LoggedCertificate>* const db_;
+  LogLookup<LoggedEntry> lookup_;
+  SQLiteDB<LoggedEntry>* const db_;
 };
 
 class Keyboard : public Server {
@@ -270,7 +270,7 @@ int main(int argc, char* argv[]) {
   // TODO(pphaneuf): This current *has* to be SQLite, because it
   // depends on sharing the database with a ct-server that will
   // populate it (which FileDB does not support).
-  SQLiteDB<LoggedCertificate> db(FLAGS_db);
+  SQLiteDB<LoggedEntry> db(FLAGS_db);
 
   EventLoop loop;
 

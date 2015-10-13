@@ -9,7 +9,7 @@
 #include "log/log_lookup.h"
 #include "log/log_signer.h"
 #include "log/log_verifier.h"
-#include "log/logged_certificate.h"
+#include "log/logged_entry.h"
 #include "log/sqlite_db.h"
 #include "log/test_db.h"
 #include "log/test_signer.h"
@@ -30,7 +30,7 @@ namespace libevent = cert_trans::libevent;
 using cert_trans::EntryHandle;
 using cert_trans::EtcdClient;
 using cert_trans::FakeEtcdClient;
-using cert_trans::LoggedCertificate;
+using cert_trans::LoggedEntry;
 using cert_trans::MockMasterElection;
 using cert_trans::ThreadPool;
 using cert_trans::TreeSigner;
@@ -42,9 +42,9 @@ using std::shared_ptr;
 using std::unique_ptr;
 using testing::NiceMock;
 
-typedef Database<LoggedCertificate> DB;
-typedef TreeSigner<LoggedCertificate> TS;
-typedef LogLookup<LoggedCertificate> LL;
+typedef Database<LoggedEntry> DB;
+typedef TreeSigner<LoggedEntry> TS;
+typedef LogLookup<LoggedEntry> LL;
 
 
 template <class T>
@@ -77,7 +77,7 @@ class LogLookupTest : public ::testing::Test {
   }
 
 
-  void CreateSequencedEntry(LoggedCertificate* logged_cert, int64_t seq) {
+  void CreateSequencedEntry(LoggedEntry* logged_cert, int64_t seq) {
     CHECK_NOTNULL(logged_cert);
     CHECK_GE(seq, 0);
     logged_cert->clear_sequence_number();
@@ -98,7 +98,7 @@ class LogLookupTest : public ::testing::Test {
     CHECK(this->store_.GetSequenceMapping(&mapping).ok());
 
     for (const auto& m : mapping.Entry().mapping()) {
-      EntryHandle<LoggedCertificate> entry;
+      EntryHandle<LoggedEntry> entry;
       CHECK_EQ(util::Status::OK,
                this->store_.GetPendingEntryForHash(m.entry_hash(), &entry));
       entry.MutableEntry()->set_sequence_number(m.sequence_number());
@@ -122,7 +122,7 @@ class LogLookupTest : public ::testing::Test {
   FakeEtcdClient etcd_client_;
   ThreadPool pool_;
   NiceMock<MockMasterElection> election_;
-  cert_trans::EtcdConsistentStore<LoggedCertificate> store_;
+  cert_trans::EtcdConsistentStore<LoggedEntry> store_;
   TestSigner test_signer_;
   unique_ptr<LogSigner> log_signer_;
   TS tree_signer_;
@@ -130,14 +130,13 @@ class LogLookupTest : public ::testing::Test {
 };
 
 
-typedef testing::Types<FileDB<LoggedCertificate>, SQLiteDB<LoggedCertificate> >
-    Databases;
+typedef testing::Types<FileDB<LoggedEntry>, SQLiteDB<LoggedEntry> > Databases;
 
 TYPED_TEST_CASE(LogLookupTest, Databases);
 
 
 TYPED_TEST(LogLookupTest, Lookup) {
-  LoggedCertificate logged_cert;
+  LoggedEntry logged_cert;
   this->test_signer_.CreateUnique(&logged_cert);
   this->CreateSequencedEntry(&logged_cert, 0);
 
@@ -151,7 +150,7 @@ TYPED_TEST(LogLookupTest, Lookup) {
 
 
 TYPED_TEST(LogLookupTest, NotFound) {
-  LoggedCertificate logged_cert;
+  LoggedEntry logged_cert;
   this->test_signer_.CreateUnique(&logged_cert);
   this->CreateSequencedEntry(&logged_cert, 0);
 
@@ -168,7 +167,7 @@ TYPED_TEST(LogLookupTest, NotFound) {
 
 TYPED_TEST(LogLookupTest, Update) {
   LL lookup(this->db());
-  LoggedCertificate logged_cert;
+  LoggedEntry logged_cert;
   this->test_signer_.CreateUnique(&logged_cert);
   this->CreateSequencedEntry(&logged_cert, 0);
 
@@ -183,7 +182,7 @@ TYPED_TEST(LogLookupTest, Update) {
 // Verify that the audit proof constructed is correct (assuming the signer
 // operates correctly). TODO(ekasper): KAT tests.
 TYPED_TEST(LogLookupTest, Verify) {
-  LoggedCertificate logged_cert;
+  LoggedEntry logged_cert;
   this->test_signer_.CreateUnique(&logged_cert);
   this->CreateSequencedEntry(&logged_cert, 0);
 
@@ -201,7 +200,7 @@ TYPED_TEST(LogLookupTest, Verify) {
 
 // Build a bigger tree so that we actually verify a non-empty path.
 TYPED_TEST(LogLookupTest, VerifyWithPath) {
-  LoggedCertificate logged_certs[13];
+  LoggedEntry logged_certs[13];
 
   // Make the tree not balanced for extra fun.
   for (int i = 0; i < 13; ++i) {

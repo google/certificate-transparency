@@ -12,7 +12,7 @@
 #include <unordered_map>
 #include <unordered_set>
 
-#include "log/logged_certificate.h"
+#include "log/logged_entry.h"
 #include "proto/ct.pb.h"
 #include "util/fake_etcd.h"
 #include "util/libevent_wrapper.h"
@@ -75,41 +75,40 @@ class EtcdConsistentStoreTest : public ::testing::Test {
  protected:
   void SetUp() override {
     FLAGS_etcd_stats_collection_interval_seconds = 1;
-    store_.reset(new EtcdConsistentStore<LoggedCertificate>(
-        base_.get(), &executor_, &client_, &election_, kRoot, kNodeId));
+    store_.reset(new EtcdConsistentStore<LoggedEntry>(base_.get(), &executor_,
+                                                      &client_, &election_,
+                                                      kRoot, kNodeId));
     InsertEntry("/root/sequence_mapping", SequenceMapping());
   }
 
-  LoggedCertificate DefaultCert() {
+  LoggedEntry DefaultCert() {
     return MakeCert(kTimestamp, "leaf");
   }
 
-  LoggedCertificate MakeCert(int timestamp, const string& body) {
-    LoggedCertificate cert;
+  LoggedEntry MakeCert(int timestamp, const string& body) {
+    LoggedEntry cert;
     cert.mutable_sct()->set_timestamp(timestamp);
     cert.mutable_entry()->set_type(ct::X509_ENTRY);
     cert.mutable_entry()->mutable_x509_entry()->set_leaf_certificate(body);
     return cert;
   }
 
-  LoggedCertificate MakeSequencedCert(int timestamp, const string& body,
-                                      int seq) {
-    LoggedCertificate cert(MakeCert(timestamp, body));
+  LoggedEntry MakeSequencedCert(int timestamp, const string& body, int seq) {
+    LoggedEntry cert(MakeCert(timestamp, body));
     cert.set_sequence_number(seq);
     return cert;
   }
 
-  string CertPath(const LoggedCertificate& cert) const {
+  string CertPath(const LoggedEntry& cert) const {
     return string(kRoot) + "/entries/ " + util::HexString(cert.Hash());
   }
 
-  EntryHandle<LoggedCertificate> HandleForCert(const LoggedCertificate& cert) {
-    return EntryHandle<LoggedCertificate>(CertPath(cert), cert);
+  EntryHandle<LoggedEntry> HandleForCert(const LoggedEntry& cert) {
+    return EntryHandle<LoggedEntry>(CertPath(cert), cert);
   }
 
-  EntryHandle<LoggedCertificate> HandleForCert(const LoggedCertificate& cert,
-                                               int handle) {
-    return EntryHandle<LoggedCertificate>(CertPath(cert), cert, handle);
+  EntryHandle<LoggedEntry> HandleForCert(const LoggedEntry& cert, int handle) {
+    return EntryHandle<LoggedEntry>(CertPath(cert), cert, handle);
   }
 
   void PopulateForCleanupTests(int num_seq, int num_pending,
@@ -122,7 +121,7 @@ class EtcdConsistentStoreTest : public ::testing::Test {
     for (int i = 0; i < num_seq; ++i) {
       std::ostringstream ss;
       ss << "sequenced body " << i;
-      LoggedCertificate lc(MakeCert(timestamp++, ss.str()));
+      LoggedEntry lc(MakeCert(timestamp++, ss.str()));
       CHECK(store_->AddPendingEntry(&lc).ok());
       SequenceMapping::Mapping* m(mapping.MutableEntry()->add_mapping());
       m->set_entry_hash(lc.Hash());
@@ -132,7 +131,7 @@ class EtcdConsistentStoreTest : public ::testing::Test {
     for (int i = 0; i < num_pending; ++i) {
       std::ostringstream ss;
       ss << "pending body " << i;
-      LoggedCertificate lc(MakeCert(timestamp++, ss.str()));
+      LoggedEntry lc(MakeCert(timestamp++, ss.str()));
       CHECK(store_->AddPendingEntry(&lc).ok());
     }
   }
@@ -215,7 +214,7 @@ class EtcdConsistentStoreTest : public ::testing::Test {
   libevent::EventPumpThread event_pump_;
   FakeEtcdClient client_;
   MockMasterElection election_;
-  unique_ptr<EtcdConsistentStore<LoggedCertificate>> store_;
+  unique_ptr<EtcdConsistentStore<LoggedEntry>> store_;
 };
 
 
@@ -305,7 +304,7 @@ TEST_F(EtcdConsistentStoreDeathTest,
 
 
 TEST_F(EtcdConsistentStoreTest, TestAddPendingEntryWorks) {
-  LoggedCertificate cert(DefaultCert());
+  LoggedEntry cert(DefaultCert());
   util::Status status(store_->AddPendingEntry(&cert));
   ASSERT_EQ(Status::OK, status);
   EtcdClient::GetResponse resp;
@@ -320,8 +319,8 @@ TEST_F(EtcdConsistentStoreTest, TestAddPendingEntryWorks) {
 
 TEST_F(EtcdConsistentStoreTest,
        TestAddPendingEntryForExistingEntryReturnsSct) {
-  LoggedCertificate cert(DefaultCert());
-  LoggedCertificate other_cert(DefaultCert());
+  LoggedEntry cert(DefaultCert());
+  LoggedEntry other_cert(DefaultCert());
   other_cert.mutable_sct()->set_timestamp(55555);
 
   const string kKey(util::HexString(cert.Hash()));
@@ -337,8 +336,8 @@ TEST_F(EtcdConsistentStoreTest,
 
 TEST_F(EtcdConsistentStoreDeathTest,
        TestAddPendingEntryForExistingNonIdenticalEntry) {
-  LoggedCertificate cert(DefaultCert());
-  LoggedCertificate other_cert(MakeCert(2342, "something else"));
+  LoggedEntry cert(DefaultCert());
+  LoggedEntry other_cert(MakeCert(2342, "something else"));
 
   const string kKey(util::HexString(cert.Hash()));
   const string kPath(string(kRoot) + "/entries/" + kKey);
@@ -352,7 +351,7 @@ TEST_F(EtcdConsistentStoreDeathTest,
 
 TEST_F(EtcdConsistentStoreDeathTest,
        TestAddPendingEntryDoesNotAcceptSequencedEntry) {
-  LoggedCertificate cert(DefaultCert());
+  LoggedEntry cert(DefaultCert());
   cert.set_sequence_number(76);
   EXPECT_DEATH(store_->AddPendingEntry(&cert),
                "!entry\\->has_sequence_number");
@@ -360,12 +359,12 @@ TEST_F(EtcdConsistentStoreDeathTest,
 
 
 TEST_F(EtcdConsistentStoreTest, TestGetPendingEntryForHash) {
-  const LoggedCertificate one(MakeCert(123, "one"));
+  const LoggedEntry one(MakeCert(123, "one"));
   const string kPath(string(kRoot) + "/entries/" +
                      util::HexString(one.Hash()));
   InsertEntry(kPath, one);
 
-  EntryHandle<LoggedCertificate> handle;
+  EntryHandle<LoggedEntry> handle;
   util::Status status(store_->GetPendingEntryForHash(one.Hash(), &handle));
   EXPECT_TRUE(status.ok()) << status;
   EXPECT_EQ(one, handle.Entry());
@@ -374,7 +373,7 @@ TEST_F(EtcdConsistentStoreTest, TestGetPendingEntryForHash) {
 
 TEST_F(EtcdConsistentStoreTest, TestGetPendingEntryForNonExistantHash) {
   const string kPath(string(kRoot) + "/entries/" + util::HexString("Nah"));
-  EntryHandle<LoggedCertificate> handle;
+  EntryHandle<LoggedEntry> handle;
   EXPECT_THAT(store_->GetPendingEntryForHash("Nah", &handle),
               StatusIs(util::error::NOT_FOUND));
 }
@@ -382,16 +381,16 @@ TEST_F(EtcdConsistentStoreTest, TestGetPendingEntryForNonExistantHash) {
 
 TEST_F(EtcdConsistentStoreTest, TestGetPendingEntries) {
   const string kPath(string(kRoot) + "/entries/");
-  const LoggedCertificate one(MakeCert(123, "one"));
-  const LoggedCertificate two(MakeCert(456, "two"));
+  const LoggedEntry one(MakeCert(123, "one"));
+  const LoggedEntry two(MakeCert(456, "two"));
   InsertEntry(kPath + "one", one);
   InsertEntry(kPath + "two", two);
 
-  vector<EntryHandle<LoggedCertificate>> entries;
+  vector<EntryHandle<LoggedEntry>> entries;
   util::Status status(store_->GetPendingEntries(&entries));
   EXPECT_TRUE(status.ok()) << status;
   EXPECT_EQ(static_cast<size_t>(2), entries.size());
-  vector<LoggedCertificate> certs;
+  vector<LoggedEntry> certs;
   for (const auto& e : entries) {
     certs.push_back(e.Entry());
   }
@@ -402,9 +401,9 @@ TEST_F(EtcdConsistentStoreTest, TestGetPendingEntries) {
 TEST_F(EtcdConsistentStoreDeathTest,
        TestGetPendingEntriesBarfsWithSequencedEntry) {
   const string kPath(string(kRoot) + "/entries/");
-  LoggedCertificate one(MakeSequencedCert(123, "one", 666));
+  LoggedEntry one(MakeSequencedCert(123, "one", 666));
   InsertEntry(kPath + "one", one);
-  vector<EntryHandle<LoggedCertificate>> entries;
+  vector<EntryHandle<LoggedEntry>> entries;
   EXPECT_DEATH(store_->GetPendingEntries(&entries), "has_sequence_number");
 }
 
@@ -671,7 +670,7 @@ TEST_F(EtcdConsistentStoreTest, TestCleansUpToNewSTH) {
   EXPECT_EQ(5, orig_seq_mapping.Entry().mapping_size());
 
   // Do the same for the pending entries
-  vector<EntryHandle<LoggedCertificate>> pending_entries_pre;
+  vector<EntryHandle<LoggedEntry>> pending_entries_pre;
   CHECK(store_->GetPendingEntries(&pending_entries_pre).ok());
   // Prune out any "pending" entries which have counterparts in the
   // "sequenced" set:
@@ -707,7 +706,7 @@ TEST_F(EtcdConsistentStoreTest, TestCleansUpToNewSTH) {
     EXPECT_EQ(3, num_cleaned.ValueOrDie());
   }
 
-  EntryHandle<LoggedCertificate> unused;
+  EntryHandle<LoggedEntry> unused;
   EXPECT_THAT(store_->GetPendingEntryForHash(seq_to_hash[100], &unused),
               StatusIs(util::error::NOT_FOUND));
   EXPECT_THAT(store_->GetPendingEntryForHash(seq_to_hash[101], &unused),
@@ -745,7 +744,7 @@ TEST_F(EtcdConsistentStoreTest, TestCleansUpToNewSTH) {
             seq_mapping.Entry().DebugString());
 
   // Check we've not touched the pending entries:
-  vector<EntryHandle<LoggedCertificate>> pending_entries_post;
+  vector<EntryHandle<LoggedEntry>> pending_entries_post;
   CHECK(store_->GetPendingEntries(&pending_entries_post).ok());
   EXPECT_EQ(pending_entries_pre.size(), pending_entries_post.size());
   for (int i = 0; i < static_cast<int>(pending_entries_pre.size()); ++i) {
@@ -777,7 +776,7 @@ TEST_F(EtcdConsistentStoreTest, TestRejectsAddsWhenOverCapacity) {
 
   EXPECT_LT(2, GetNumEtcdEntries());
 
-  LoggedCertificate cert(MakeCert(1000, "cert1000"));
+  LoggedEntry cert(MakeCert(1000, "cert1000"));
   EXPECT_THAT(store_->AddPendingEntry(&cert),
               StatusIs(util::error::RESOURCE_EXHAUSTED));
 }
