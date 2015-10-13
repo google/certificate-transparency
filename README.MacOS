@@ -1,4 +1,9 @@
-# Trusted root certificates
+## OSX Builds Now Use GClient ##
+
+We recommend that you use GClient to build on OSX. Please follow the 
+instructions in the [main readme](README.md) file.
+
+## Trusted root certificates ##
 
 The CT code requires a set of trusted root certificates in order to:
    1. Validate outbound HTTPS connections
@@ -45,3 +50,8 @@ security find-certificates -a -p /Library/Keychains/System.keychain > certs.pem
 security find-certificates -a -p /System/Library/Keychains/SystemRootCertificates.keychain >> certs.pem
 ```
 
+## Deprecated Build Process ##
+
+This may be out of date and is not guaranteed to work.
+
+gtest: install from source.

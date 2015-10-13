@@ -1,12 +1,88 @@
 certificate-transparency
 ========================
 
+#Auditing for TLS certificates#
+
 [![Build Status](https://travis-ci.org/google/certificate-transparency.svg?branch=master)](https://travis-ci.org/google/certificate-transparency)
 
-Auditing for TLS certificates.
 
-## Quickstart on Ubuntu ##
-The following steps will checkout the code and build it on a clean Ubuntu 14.04 LTS installation.  It has also been tested on an Ubuntu 15.04 installation.
+## Build With GClient ##
+
+This is now the recommended method for all supported platforms. It gives you 
+a reproducible build and avoids the need to build some dependencies manually.
+
+Known to work on FreeBSD 10, OS X (10.10) [tested with XCode + brew installation
+of deps listed below], and Ubuntu 14.04. Tested on Fedora 22 but may require
+manual override of compiler options as documented below. Tested on CentOS 7
+with similar caveats.
+
+### Install Dependencies ###
+
+Depending on which platform you have the exact packages required will vary.
+The following tools must be available for the GClient build to succeed:
+
+ - A working C++11 compiler.
+
+ - autoconf/automake etc.
+ - cmake
+ - git
+ - GNU make
+ - libtool
+ - shtool
+ - Tcl
+ - pkgconf
+ - python27
+ - [depot_tools](https://www.chromium.org/developers/how-tos/install-depot-tools)
+
+### Building with gclient ###
+
+```bash
+mkdir ct  # or whatever directory you prefer
+cd ct
+gclient config --name="certificate-transparency" https://github.com/google/certificate-transparency.git
+gclient sync
+# substitute gmake or gnumake below if that's what your platform calls it:
+make -C certificate-transparency check
+```
+
+If you're trying to clone from a branch on the CT repo then you'll need to
+substitute the following command for the `gclient config` command above,
+replacing `branch` as appropriate
+
+```bash
+gclient config --name="certificate-transparency" https://github.com/google/certificate-transparency.git@branch
+```
+
+### Platform Specific Notes ###
+
+#### Fedora / CentOS ####
+
+When you issue the `gclient sync` command you may need to set compiler options
+in order to build successfully. If the build fails to work try using:
+
+```CXXFLAGS="-O2 -Wno-error=unused-variable" gclient sync
+```
+
+If this gives an error about an unused typedef in a `glog` header file try this:
+
+```CXXFLAGS="-O2 -Wno-error=unused-variable -Wno-error=unused-local-typedefs" gclient sync
+```
+
+When changing `CXXFLAGS` it's safer to remove the existing build directories
+in case not all dependencies are properly accounted for and rebuilt. If 
+problems persist check that the Makefile in `certificate-transparency` 
+contains the options that were passed in `CXXFLAGS`.
+
+If there are still problems using GClient then an older style build can be
+attempted. The process should be similar to the one documented for Ubuntu
+below or in the [Fedora README](README.Fedora) depending on platform.
+
+## Deprecated: Quickstart on Ubuntu ##
+
+This should no longer be needed as the instructions above should work. But in
+case of difficulties the dependencies can be built manually. The following 
+steps will checkout the code and build it on a clean Ubuntu 14.04 LTS 
+installation.  It has also been tested on an Ubuntu 15.04 installation.
 
 First, install packaged dependencies:
 
@@ -64,53 +140,7 @@ Best and test Go code:
     go test -v ./go/...
 
 
-## Dependencies ##
-
- - A working C++11 compiler.
-
- - autoconf/automake etc.
- - cmake
- - git
- - GNU make
- - libtool
- - shtool
- - Tcl
- - pkgconf
- - python27
- - [depot_tools](https://www.chromium.org/developers/how-tos/install-depot-tools)
-
-## Building with gclient ##
-
-This is the recommended method for all platforms as it gives you a reproducible
-build.
-
-Known to work on FreeBSD 10, OS X (10.10) [tested with XCode + brew installation
-of above deps], and Ubuntu 14.04.
-
-```bash
-mkdir ct  # or whatever directory you prefer
-cd ct
-gclient config --name="certificate-transparency" git@github.com:google/certificate-transparency.git
-gclient sync
-# substitute gmake or gnumake below if that's that your platform calls it:
-make -C certificate-transparency check
-```
-
-If you're trying to clone from a branch on the CT repo then you'll need to
-substitute the following command for the `gclient config` command above,
-replacing `branch` as appropriate
-
-```bash
-gclient config --name="certificate-transparency" git@github.com:google/certificate-transparency.git@branch
-```
-
-To run any of the built binaries you'll need to:
-
-```bash
-export LD_LIBRARY_PATH=/path/to/ct/install/lib'
-```
-
-## Old Method ##
+## Deprecated: Older Build Method ##
 
  - [OpenSSL](https://www.openssl.org/source/), at least 1.0.0q,
    preferably 1.0.1l or 1.0.2 (and up)
@@ -174,7 +204,7 @@ platform we had to build from the source, specifically commit
   - pyasn1 and pyasn1-modules (optional, needed for `upload_server_cert.sh`)
   - [dnspython](http://www.dnspython.org/)
 
-## Building ##
+### Building ###
 
 You can build the log server with the following commands:
 
