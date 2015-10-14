@@ -66,10 +66,11 @@ class TreeSignerTest : public ::testing::Test {
                                     new MerkleVerifier(new Sha256Hasher())));
     store_.reset(new EtcdConsistentStore<LoggedCertificate>(
         base_.get(), &pool_, &etcd_client_, &election_, "/root", "id"));
+    log_signer_.reset(TestSigner::DefaultLogSigner());
     tree_signer_.reset(new TS(std::chrono::duration<double>(0), db(),
                               unique_ptr<CompactMerkleTree>(
                                   new CompactMerkleTree(new Sha256Hasher)),
-                              store_.get(), TestSigner::DefaultLogSigner()));
+                              store_.get(), log_signer_.get()));
     // Set a default empty STH so that we can call UpdateTree() on the signer.
     store_->SetServingSTH(SignedTreeHead());
     // Force an empty sequence mapping file:
@@ -115,13 +116,13 @@ class TreeSignerTest : public ::testing::Test {
     return new TS(std::chrono::duration<double>(0), db(),
                   unique_ptr<CompactMerkleTree>(new CompactMerkleTree(
                       *tree_signer_->cert_tree_, new Sha256Hasher)),
-                  store_.get(), TestSigner::DefaultLogSigner());
+                  store_.get(), log_signer_.get());
   }
 
   T* db() const {
     return test_db_->db();
   }
-  std::unique_ptr<TestDB<T>> test_db_;
+  unique_ptr<TestDB<T>> test_db_;
   shared_ptr<libevent::Base> base_;
   libevent::EventPumpThread event_pump_;
   FakeEtcdClient etcd_client_;
@@ -129,8 +130,9 @@ class TreeSignerTest : public ::testing::Test {
   NiceMock<MockMasterElection> election_;
   std::unique_ptr<EtcdConsistentStore<LoggedCertificate>> store_;
   TestSigner test_signer_;
-  std::unique_ptr<LogVerifier> verifier_;
-  std::unique_ptr<TS> tree_signer_;
+  unique_ptr<LogVerifier> verifier_;
+  unique_ptr<LogSigner> log_signer_;
+  unique_ptr<TS> tree_signer_;
 };
 
 typedef testing::Types<FileDB<LoggedCertificate>, SQLiteDB<LoggedCertificate>>
@@ -236,7 +238,7 @@ TYPED_TEST(TreeSignerTest, ResumeClean) {
     CHECK_EQ(util::Status::OK, this->store_->SetClusterNodeState(node_state));
   }
 
-  TS* signer2 = this->GetSimilar();
+  unique_ptr<TS> signer2(this->GetSimilar());
 
   // Update
   EXPECT_EQ(TS::OK, signer2->UpdateTree());
@@ -245,8 +247,6 @@ TYPED_TEST(TreeSignerTest, ResumeClean) {
   EXPECT_LT(sth.timestamp(), sth2.timestamp());
   EXPECT_EQ(sth.sha256_root_hash(), sth2.sha256_root_hash());
   EXPECT_EQ(sth.tree_size(), sth2.tree_size());
-
-  delete signer2;
 }
 
 
@@ -267,15 +267,13 @@ TYPED_TEST(TreeSignerTest, ResumePartialSign) {
   this->test_signer_.CreateUnique(&logged_cert);
   this->AddSequencedEntry(&logged_cert, 0);
 
-  TS* signer2 = this->GetSimilar();
+  unique_ptr<TS> signer2(this->GetSimilar());
   EXPECT_EQ(TS::OK, signer2->UpdateTree());
   const SignedTreeHead sth2(signer2->LatestSTH());
   // The signer should have picked up the sequence number commit.
   EXPECT_EQ(1U, sth2.tree_size());
   EXPECT_LT(sth.timestamp(), sth2.timestamp());
   EXPECT_NE(sth.sha256_root_hash(), sth2.sha256_root_hash());
-
-  delete signer2;
 }
 
 

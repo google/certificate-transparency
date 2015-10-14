@@ -58,10 +58,11 @@ class LogLookupTest : public ::testing::Test {
         pool_(2),
         store_(base_.get(), &pool_, &etcd_client_, &election_, "/root", "id"),
         test_signer_(),
+        log_signer_(TestSigner::DefaultLogSigner()),
         tree_signer_(std::chrono::duration<double>(0), db(),
                      unique_ptr<CompactMerkleTree>(
                          new CompactMerkleTree(new Sha256Hasher)),
-                     &store_, TestSigner::DefaultLogSigner()),
+                     &store_, log_signer_.get()),
         verifier_(TestSigner::DefaultLogSigVerifier(),
                   new MerkleVerifier(new Sha256Hasher())) {
     // Set some noddy STH so that we can call UpdateTree on the Tree Signer.
@@ -123,6 +124,7 @@ class LogLookupTest : public ::testing::Test {
   NiceMock<MockMasterElection> election_;
   cert_trans::EtcdConsistentStore<LoggedCertificate> store_;
   TestSigner test_signer_;
+  unique_ptr<LogSigner> log_signer_;
   TS tree_signer_;
   LogVerifier verifier_;
 };

@@ -11,7 +11,7 @@ all: Makefile
 
 Makefile: configure
 	WARN_OVERRIDES="-Wno-unused-function"
-	./configure --prefix=$(INSTALL_DIR) CXXFLAGS="$(WARN_OVERRIDES)" CFLAGS="$(WARN_OVERRIDES)" CPPFLAGS="-I$(INSTALL_DIR)/include" LDFLAGS="-L$(INSTALL_DIR)/lib $(EXTRA_LDFLAGS)"
+	./configure --prefix=$(INSTALL_DIR) CXXFLAGS="$(WARN_OVERRIDES)" CFLAGS="$(WARN_OVERRIDES)" CPPFLAGS="-I$(INSTALL_DIR)/include" LDFLAGS="-L$(INSTALL_DIR)/lib $(EXTRA_LDFLAGS)" || tail -1000 config.log
 
 configure: configure.ac
 	autoreconf -vi
