@@ -49,15 +49,6 @@ if test "x${enable_hardening}" != "xno"; then
   AS_VAR_APPEND([CPPFLAGS], [" -D_FORTIFY_SOURCE=2"])
   AS_VAR_APPEND([LDFLAGS], [" -pie"])
 
-  saved_LDFLAGS=$LDFLAGS
-  AC_MSG_CHECKING([checking for RELRO support in linker])
-  LDFLAGS="-Wl,-z,relro,-z,now"
-  AC_LINK_IFELSE([AC_LANG_PROGRAM([], [])], [have_relro=yes], [have_relro=no])
-  AC_MSG_RESULT([$have_relro])
-  LDFLAGS=$saved_LDFLAGS
-  AS_IF([test "x$have_relro" = "xyes"],
-      [AS_VAR_APPEND([LDFLAGS], [" -Wl,-z,relro,-z,now"])])
-
   AC_DEFINE([ENABLE_HARDENING], [], [Hardening enabled.])
 else
   AC_MSG_WARN([NOT building hardened binaries])
@@ -104,14 +95,13 @@ AS_IF([test -n "$missing_gmock"],
 # Checks for libraries.
 AC_SEARCH_LIBS([__b64_ntop], [resolv])
 AC_SEARCH_LIBS([pthread_create], [pthread])
+AC_SEARCH_LIBS([dlopen], [dl])
 
-dnl We're pretty crypto-centric, having the OpenSSL libraries in LIBS
-dnl is fine.
-AC_SEARCH_LIBS([CRYPTO_set_locking_callback], [crypto],, [missing_openssl=1],
-               [$save_LIBS])
-AC_SEARCH_LIBS([SSL_CTX_new], [ssl],, [missing_openssl=1], [$save_LIBS])
-AS_IF([test -n "$missing_openssl"],
-      [AC_MSG_ERROR([could not find the OpenSSL libraries])])
+AC_MSG_CHECKING([checking for lzma library])
+AC_SEARCH_LIBS([lzma_index_size], [lzma],,, [$save_LIBS])
+
+AC_MSG_CHECKING([checking whether we need -lrt])
+AC_SEARCH_LIBS([clock_gettime], [rt],,, [$save_LIBS])
 
 AC_MSG_CHECKING([checking for gflags library])
 LIBS="-lgflags $LIBS"
@@ -136,6 +126,14 @@ AS_IF([test -n "$missing_leveldb"],
       [AC_MSG_ERROR([could not find the leveldb/snappy libraries])])
 LIBS="$save_LIBS"
 
+dnl We're pretty crypto-centric, having the OpenSSL libraries in LIBS
+dnl is fine.
+AC_SEARCH_LIBS([CRYPTO_set_locking_callback], [crypto],, [missing_openssl=1],
+               [$save_LIBS])
+AC_SEARCH_LIBS([SSL_CTX_new], [ssl],, [missing_openssl=1], [$save_LIBS])
+AS_IF([test -n "$missing_openssl"],
+      [AC_MSG_ERROR([could not find the OpenSSL libraries])])
+
 save_LIBS="$LIBS"
 AS_UNSET([LIBS])
 AC_SEARCH_LIBS([event_base_dispatch], [event],, [missing_libevent=1],
@@ -144,13 +142,15 @@ AC_SEARCH_LIBS([evthread_use_pthreads], [event_pthreads],, [missing_libevent=1],
                [$save_LIBS])
 AC_SEARCH_LIBS([bufferevent_openssl_socket_new], [event_openssl],,
                [missing_libevent_openssl=1], [$save_LIBS])
-AC_SEARCH_LIBS([evhtp_make_request], [evhtp],, [missing_libevhtp=1],
-               [$save_LIBS])
-AC_SUBST([libevent_LIBS], [$LIBS])
 AS_IF([test -n "$missing_libevent"],
       [AC_MSG_ERROR([could not find the libevent libraries])])
 AS_IF([test -n "$missing_libevent_openssl"],
       [AC_MSG_ERROR([could not find the libevent_openssl library])])
+
+AC_SEARCH_LIBS([evhtp_make_request], [evhtp],, [missing_libevhtp=1],
+               [$save_LIBS])
+AC_SUBST([libevent_LIBS], [$LIBS])
+
 AS_IF([test -n "$missing_libevhtp"],
       [AC_MSG_ERROR([could not find the evhtp library])])
 LIBS="$save_LIBS"

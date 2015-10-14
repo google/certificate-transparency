@@ -7,6 +7,6 @@ $(INSTALL_DIR)/bin/openssl: Makefile
 
 Makefile: config Configure Makefile.org
 	# Force a 64 bit build on MacOS
-	KERNEL_BITS=64 ./config --openssldir=$(INSTALL_DIR) shared
+	KERNEL_BITS=64 ./config --openssldir=$(INSTALL_DIR) no-shared enable-static-engine -fPIC
 	# just to be sure we don't have dregs left over
 	$(MAKE) clean

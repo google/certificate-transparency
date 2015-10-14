@@ -11,6 +11,7 @@ deps = {
      "openssl": 				 "https://github.com/openssl/openssl.git@OpenSSL_1_0_2d",
      "protobuf":         "https://github.com/google/protobuf.git@v2.6.1",
      "protobuf/gtest":   "https://github.com/google/googletest.git@release-1.7.0",
+     "libsnappy":        "https://github.com/google/snappy.git@1.1.3",
      # Randomly chosen github mirror
      "sqlite3-export": 	 "http://repo.or.cz/sqlite-export.git",
      "sqlite3": 				 "http://repo.or.cz/sqlite.git@version-3.8.10.1",
@@ -75,11 +76,6 @@ hooks = [
         "action": [ make, "-f", os.path.join(here, "certificate-transparency/build.gclient"), "_openssl" ],
     },
     {
-        "name": "protobuf",
-        "pattern": "^protobuf/",
-        "action": [ make, "-f", os.path.join(here, "certificate-transparency/build.gclient"), "_protobuf" ],
-    },
-    {
         "name": "libevent",
         "pattern": "^libevent/",
         "action": [ make, "-f", os.path.join(here, "certificate-transparency/build.gclient"), "_libevent" ],
@@ -100,6 +96,11 @@ hooks = [
         "action": [ make, "-f", os.path.join(here, "certificate-transparency/build.gclient"), "_glog" ],
     },
     {
+        "name": "protobuf",
+        "pattern": "^protobuf/",
+        "action": [ make, "-f", os.path.join(here, "certificate-transparency/build.gclient"), "_protobuf" ],
+    },
+    {
         "name": "ldns",
         "pattern": "^ldns/",
         "action": [ make, "-f", os.path.join(here, "certificate-transparency/build.gclient"), "_ldns" ],
@@ -108,6 +109,11 @@ hooks = [
         "name": "sqlite3",
         "pattern": "^sqlite3/",
         "action": [ make, "-f", os.path.join(here, "certificate-transparency/build.gclient"), "_sqlite3" ],
+    },
+    {
+        "name": "libsnappy",
+        "pattern": "^libsnappy/",
+        "action": [ make, "-f", os.path.join(here, "certificate-transparency/build.gclient"), "_libsnappy" ],
     },
     {
         "name": "leveldb",

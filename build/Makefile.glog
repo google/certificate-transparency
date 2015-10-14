@@ -11,7 +11,7 @@ all: Makefile
 
 Makefile: configure
 	WARN_OVERRIDES="-Wno-error"
-	./configure --prefix=$(INSTALL_DIR) CPPFLAGS="-I${INSTALL_DIR}/include" LDFLAGS="-L${INSTALL_DIR}/lib ${EXTRA_LDFLAGS}" CXXFLAGS="$(WARN_OVERRIDES)" CFLAGS="$(WARN_OVERRIDES)"
+	./configure --prefix=$(INSTALL_DIR) --disable-shared --enable-static CPPFLAGS="-I${INSTALL_DIR}/include" LDFLAGS="-L${INSTALL_DIR}/lib ${EXTRA_LDFLAGS}" CXXFLAGS="$(WARN_OVERRIDES) -fPIC" CFLAGS="$(WARN_OVERRIDES) -fPIC"
 
 configure: configure.ac
 	autoreconf -vi
