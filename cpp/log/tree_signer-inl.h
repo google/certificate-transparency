@@ -272,7 +272,7 @@ bool TreeSigner<Logged>::Append(const Logged& logged) {
   std::string serialized_leaf;
   CHECK(logged.SerializeForLeaf(&serialized_leaf));
 
-  CHECK_LE(cert_tree_->LeafCount(), INT64_MAX);
+  CHECK_LE(cert_tree_->LeafCount(), static_cast<uint64_t>(INT64_MAX));
   CHECK_EQ(logged.sequence_number(),
            static_cast<int64_t>(cert_tree_->LeafCount()));
   // Commit the sequence number of this certificate locally
