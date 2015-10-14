@@ -872,18 +872,19 @@ class EntryProducer(object):
     def resumeProducing(self):
         if self._paused and not self._stopped:
             self._paused = False
-            self.produce()
+            d = self.produce()
+            d.addErrback(self.finishProducing)
 
     def stopProducing(self):
         self._paused = True
         self._stopped = True
 
-    def finishProducing(self, success=True):
+    def finishProducing(self, failure=None):
         self.stopProducing()
-        if success:
-          self._done.callback(self._end - self._start + 1)
+        if failure is None:
+            self._done.callback(self._end - self._start + 1)
         else:
-          self._done.callback(None)
+            self._done.errback(failure)
 
 
 class AsyncLogClient(object):

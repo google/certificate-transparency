@@ -177,7 +177,7 @@ class Monitor(object):
                                                      failure.getErrorMessage()))
         return False
 
-    def __update_sth_verify_consistency_before_accepting_eb(self, failure):
+    def __update_sth_verify_consistency_before_accepting_errback(self, failure):
         """Errback for verify_consistency method which is called before setting
         sth as verified. If STH was invalid appropriate error message is
         already logged, so we only want to return false as update_sth failed."""
@@ -229,7 +229,7 @@ class Monitor(object):
         # into rewinding the tree.
         d = self._verify_consistency(self.__state.verified_sth, sth_response)
         d.addCallback(lambda result: self._set_pending_sth(sth_response))
-        d.addErrback(self.__update_sth_verify_consistency_before_accepting_eb)
+        d.addErrback(self.__update_sth_verify_consistency_before_accepting_errback)
         return d
 
     def _update_sth(self):
@@ -287,7 +287,7 @@ class Monitor(object):
         else:
             return "all night"
 
-    def _fetch_entries_eb(self, e, consumer):
+    def _fetch_entries_errback(self, e, consumer):
         logging.error("get-entries from %s failed: %s" %
                       (self.servername, e))
         consumer.done(None)
@@ -317,6 +317,12 @@ class Monitor(object):
             der_certs.append((entry_index, der_cert, der_chain,
                               ts_entry.entry_type))
         self.__report.scan_der_certs(der_certs)
+
+    def _scan_entries_errback(self, e):
+        logging.error("Failed to scan entries from %s: %s",
+                      self.servername, e)
+        self._update_unverified_data(self._verified_tree)
+        return e
 
     class EntryConsumer(object):
         """Consumer for log_client.EntryProducer.
@@ -350,26 +356,9 @@ class Monitor(object):
                 self.consumed.callback(False)
                 return False
             # check that the batch is consistent with the eventual pending_sth
-            d = self._verify(self._partial_sth, self._unverified_tree, result)
-            d.addErrback(self._verify_errback)
-            self.consumed.callback(lambda x: d)
+            d = self._monitor._verify_new_tree(self._partial_sth, self._unverified_tree, result)
+            d.chainDeferred(self.consumed)
             return True
-
-        def _verify_errback(self, failure):
-            failure.trap(error.VerifyError)
-            self._monitor._update_unverified_data(self._monitor._verified_tree)
-            return False
-
-        def _verify_log(self, result, new_tree, verified_entries):
-            logging.info("Verified %d entries" % verified_entries)
-            self._monitor._set_verified_tree(new_tree)
-            return True
-
-        def _verify(self, partial_sth, new_tree, entries_count):
-            d = self._monitor._verify_consistency(partial_sth,
-                                                  self._pending_sth)
-            d.addCallback(self._verify_log, new_tree, entries_count)
-            return d
 
         def consume(self, entry_batch):
             self._fetched += len(entry_batch)
@@ -379,6 +368,7 @@ class Monitor(object):
             scan = threads.deferToThread(
                     self._monitor._scan_entries,
                     enumerate(entry_batch, self._next_sequence_number))
+            scan.addErrback(self._monitor._scan_entries_errback)
             # calculate the hash for the latest fetched certs
             # TODO(ekasper): parse temporary data into permanent storage.
             self._partial_sth, self._unverified_tree = \
@@ -403,7 +393,7 @@ class Monitor(object):
                                          self._unverified_tree)
         d = producer.startProducing(consumer)
         d.addCallback(consumer.done)
-        d.addErrback(self._fetch_entries_eb, consumer)
+        d.addErrback(self._fetch_entries_errback, consumer)
         return consumer.consumed
 
     def _update_entries(self):
@@ -419,9 +409,42 @@ class Monitor(object):
         last_parsed_size = self._unverified_tree.tree_size
 
         if wanted_entries > last_parsed_size:
-            return self._fetch_entries(last_parsed_size, wanted_entries-1)
+            d = self._fetch_entries(last_parsed_size, wanted_entries-1)
         else:
-            return self.__fired_deferred(True)
+            d = self._verify_entries()
+
+        d.addErrback(self._update_entries_errback)
+        return d
+
+    def _update_entries_errback(self, failure):
+        logging.error("Updating entries from %s failed: %s",
+                      self.servername, failure)
+        return False
+
+    def _verify_entries(self):
+        projected_sth, new_tree = self._compute_projected_sth_from_tree(
+                self._unverified_tree, ())
+
+        new_entries_count = new_tree.tree_size - self._verified_tree.tree_size
+
+        return self._verify_new_tree(projected_sth, new_tree, new_entries_count)
+
+    def _verify_new_tree(self, partial_sth, new_tree, new_entries_count):
+        d = self._verify_consistency(partial_sth, self.__state.pending_sth)
+
+        def set_verified_tree(result, new_tree, new_entries_count):
+            logging.info("Verified %d entries", (new_entries_count))
+            self._set_verified_tree(new_tree)
+            return True
+
+        d.addCallback(set_verified_tree, new_tree, new_entries_count)
+        d.addErrback(self._verify_new_tree_errback)
+        return d
+
+    def _verify_new_tree_errback(self, failure):
+            failure.trap(error.VerifyError)
+            self._update_unverified_data(self._verified_tree)
+            return False
 
     def _update_result(self, updates_result):
         if not updates_result:

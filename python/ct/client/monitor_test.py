@@ -1,5 +1,6 @@
 #!/usr/bin/env trial
 import copy
+import difflib
 import gflags
 import logging
 import mock
@@ -9,13 +10,10 @@ import sys
 from ct.client import log_client
 from ct.client.db import sqlite_connection as sqlitecon
 from ct.client.db import sqlite_log_db
-from ct.client.db import sqlite_temp_db
-from ct.client.db import sqlite_cert_db
 from ct.client import state
 from ct.client import monitor
 from ct.crypto import error
 from ct.crypto import merkle
-from ct.crypto import verify
 from ct.proto import client_pb2
 from twisted.internet import defer
 from twisted.trial import unittest
@@ -40,6 +38,10 @@ def dummy_compute_projected_sth(old_sth):
     old_sth.sha256_root_hash = tree.root_hash()
     return f
 
+# TODO(robpercival): This is a relatively complicated fake, and may hide subtle
+# bugs in how the Monitor interacts with the real EntryProducer. Using the real
+# EntryProducer with a FakeAgent, as async_log_client_test does, may be an
+# improvement.
 class FakeEntryProducer(object):
     def __init__(self, start, end, batch_size=None, throw=None):
         self._start = start
@@ -53,8 +55,7 @@ class FakeEntryProducer(object):
     @defer.deferredGenerator
     def produce(self):
         if self.throw:
-            self.done.errback(self.throw)
-            return
+            raise self.throw
         for i in range(self._start, self._end, self.batch_size):
             entries = []
             for j in range(i, min(i + self.batch_size, self._end)):
@@ -62,11 +63,10 @@ class FakeEntryProducer(object):
                 entry.leaf_input = "leaf_input-%d" % j
                 entry.extra_data = "extra_data-%d" % j
                 entries.append(entry)
-            d = defer.Deferred()
-            d.callback(entries)
+            d = self.consumer.consume(entries)
             wfd = defer.waitForDeferred(d)
             yield wfd
-            self.consumer.consume(wfd.getResult())
+            wfd.getResult()
             if self.stop:
                 break
 
@@ -74,11 +74,13 @@ class FakeEntryProducer(object):
             self.done.callback(self._end - self._start + 1)
 
     def startProducing(self, consumer):
+        self.stop = False
         self._start = self._real_start
         self._end = self._real_end
         self.consumer = consumer
         self.done = defer.Deferred()
-        self.produce()
+        d = self.produce()
+        d.addErrback(self.stopProducing)
         return self.done
 
     def change_range_after_start(self, start, end):
@@ -90,8 +92,10 @@ class FakeEntryProducer(object):
         self._real_start = start
         self._real_end = end
 
-    def stopProducing(self):
+    def stopProducing(self, failure=None):
         self.stop = True
+        if failure:
+            self.done.errback(failure)
 
 
 class FakeLogClient(object):
@@ -141,20 +145,23 @@ class MonitorTest(unittest.TestCase):
     _NEW_STH.tree_head_signature = "sig2"
     _NEW_STH_compute_projected = dummy_compute_projected_sth(_NEW_STH)
 
+    _DEFAULT_STATE = client_pb2.MonitorState()
+    _DEFAULT_STATE.verified_sth.CopyFrom(_DEFAULT_STH)
+    _DEFAULT_STH_compute_projected.dummy_tree.save(
+            _DEFAULT_STATE.unverified_tree)
+    _DEFAULT_STH_compute_projected.dummy_tree.save(
+            _DEFAULT_STATE.verified_tree)
+
     def setUp(self):
         if not FLAGS.verbose_tests:
           logging.disable(logging.CRITICAL)
         self.db = sqlite_log_db.SQLiteLogDB(
             sqlitecon.SQLiteConnectionManager(":memory:", keepalive=True))
-        self.temp_db = sqlite_temp_db.SQLiteTempDB(
-            sqlitecon.SQLiteConnectionManager(":memory:", keepalive=True))
         # We can't simply use DB in memory with keepalive True, because different
         # thread is writing to the database which results in an sqlite exception.
         self.cert_db = mock.MagicMock()
 
-        default_state = client_pb2.MonitorState()
-        default_state.verified_sth.CopyFrom(self._DEFAULT_STH)
-        self.state_keeper = InMemoryStateKeeper(default_state)
+        self.state_keeper = InMemoryStateKeeper(copy.deepcopy(self._DEFAULT_STATE))
         self.verifier = mock.Mock()
         self.hasher = merkle.TreeHasher()
 
@@ -164,8 +171,14 @@ class MonitorTest(unittest.TestCase):
         self.db.add_log(log)
 
     def verify_state(self, expected_state):
-        self.assertEqual(self.state_keeper.state, expected_state,
-            msg="%s== vs ==\n%s" % (self.state_keeper.state, expected_state))
+        if self.state_keeper.state != expected_state:
+            state_diff = difflib.unified_diff(
+                    str(expected_state).splitlines(),
+                    str(self.state_keeper.state).splitlines(),
+                    fromfile="expected", tofile="actual", lineterm="", n=5)
+
+            raise unittest.FailTest("State is incorrect\n" +
+                                    "\n".join(state_diff))
 
     def verify_tmp_data(self, start, end):
         # TODO: we are no longer using the temp db
@@ -208,7 +221,7 @@ class MonitorTest(unittest.TestCase):
             self.verify_tmp_data(self._DEFAULT_STH.tree_size,
                                  self._NEW_STH.tree_size-1)
             self.check_db_state_after_successful_updates(1)
-            for audited_sth in list(self.db.scan_latest_sth_range("log_server")):
+            for audited_sth in self.db.scan_latest_sth_range(m.servername):
                 self.assertEqual(self._NEW_STH, audited_sth.sth)
 
         return m.update().addCallback(self.assertTrue).addCallback(check_state)
@@ -221,17 +234,11 @@ class MonitorTest(unittest.TestCase):
         m._compute_projected_sth_from_tree = self._DEFAULT_STH_compute_projected
         def check_state(result):
             # Check that we wrote the state...
-            expected_state = client_pb2.MonitorState()
-            expected_state.verified_sth.CopyFrom(self._DEFAULT_STH)
-            m._compute_projected_sth_from_tree.dummy_tree.save(
-                                                   expected_state.verified_tree)
-            m._compute_projected_sth_from_tree.dummy_tree.save(
-                                               expected_state.unverified_tree)
-            self.verify_state(expected_state)
+            self.verify_state(self._DEFAULT_STATE)
 
             self.verify_tmp_data(0, self._DEFAULT_STH.tree_size-1)
             self.check_db_state_after_successful_updates(1)
-            for audited_sth in list(self.db.scan_latest_sth_range("log_server")):
+            for audited_sth in self.db.scan_latest_sth_range(m.servername):
                 self.assertEqual(self._DEFAULT_STH, audited_sth.sth)
 
         d = m.update().addCallback(self.assertTrue
@@ -241,23 +248,73 @@ class MonitorTest(unittest.TestCase):
     def test_update_no_new_entries(self):
         client = FakeLogClient(self._DEFAULT_STH)
 
-        self.temp_db.store_entries = mock.Mock()
-
         m = self.create_monitor(client)
         d = m.update()
         d.addCallback(self.assertTrue)
 
         def check_state(result):
             # Check that we kept the state...
-            expected_state = client_pb2.MonitorState()
-            expected_state.verified_sth.CopyFrom(self._DEFAULT_STH)
-            self.verify_state(expected_state)
+            self.verify_state(self._DEFAULT_STATE)
 
             # ...and wrote no entries.
-            self.assertFalse(self.temp_db.store_entries.called)
             self.check_db_state_after_successful_updates(0)
         d.addCallback(check_state)
         return d
+
+    def test_update_recovery(self):
+        client = FakeLogClient(self._NEW_STH)
+
+        # Setup initial state to be as though an update had failed part way
+        # through.
+        initial_state = copy.deepcopy(self._DEFAULT_STATE)
+        initial_state.pending_sth.CopyFrom(self._NEW_STH)
+        self._NEW_STH_compute_projected.dummy_tree.save(
+                initial_state.unverified_tree)
+        self.state_keeper.write(initial_state)
+
+        m = self.create_monitor(client)
+        m._compute_projected_sth_from_tree = self._NEW_STH_compute_projected
+
+        d = m.update()
+        d.addCallback(self.assertTrue)
+
+        def check_state(result):
+            # Check that we wrote the state...
+            expected_state = copy.deepcopy(initial_state)
+            expected_state.ClearField("pending_sth")
+            expected_state.verified_sth.CopyFrom(self._NEW_STH)
+            m._compute_projected_sth_from_tree.dummy_tree.save(
+                    expected_state.verified_tree)
+            m._compute_projected_sth_from_tree.dummy_tree.save(
+                    expected_state.unverified_tree)
+            self.verify_state(expected_state)
+
+            self.check_db_state_after_successful_updates(1)
+            for audited_sth in self.db.scan_latest_sth_range(m.servername):
+                self.assertEqual(self._NEW_STH, audited_sth.sth)
+        d.addCallback(check_state)
+        return d
+
+    def test_update_rolls_back_unverified_tree_on_scan_error(self):
+        client = FakeLogClient(self._NEW_STH)
+
+        m = self.create_monitor(client)
+        m._compute_projected_sth_from_tree = self._NEW_STH_compute_projected
+        m._scan_entries = mock.Mock(side_effect=ValueError("Boom!"))
+
+        def check_state(result):
+            # The changes to the unverified tree should have been discarded,
+            # so that entries are re-fetched and re-consumed next time.
+            expected_state = copy.deepcopy(self._DEFAULT_STATE)
+            expected_state.pending_sth.CopyFrom(self._NEW_STH)
+            self.verify_state(expected_state)
+            # The new STH should have been verified prior to the error.
+            audited_sths = list(self.db.scan_latest_sth_range(m.servername))
+            self.assertEqual(len(audited_sths), 2)
+            self.assertEqual(audited_sths[0].audit.status, client_pb2.VERIFIED)
+            self.assertEqual(audited_sths[1].audit.status, client_pb2.UNVERIFIED)
+
+        return m.update().addCallback(self.assertFalse).addCallback(check_state)
 
     def test_update_call_sequence(self):
         # Test that update calls update_sth and update_entries in sequence,
@@ -310,16 +367,13 @@ class MonitorTest(unittest.TestCase):
 
         def check_state(result):
             # Check that we updated the state.
-            expected_state = client_pb2.MonitorState()
-            expected_state.verified_sth.CopyFrom(self._DEFAULT_STH)
+            expected_state = copy.deepcopy(self._DEFAULT_STATE)
             expected_state.pending_sth.CopyFrom(self._NEW_STH)
-            merkle.CompactMerkleTree().save(expected_state.verified_tree)
-            merkle.CompactMerkleTree().save(expected_state.unverified_tree)
             self.verify_state(expected_state)
-            audited_sths = list(self.db.scan_latest_sth_range("log_server"))
+            audited_sths = list(self.db.scan_latest_sth_range(m.servername))
+            self.assertEqual(len(audited_sths), 2)
             self.assertEqual(audited_sths[0].audit.status, client_pb2.VERIFIED)
             self.assertEqual(audited_sths[1].audit.status, client_pb2.UNVERIFIED)
-            self.assertEqual(len(audited_sths), 2)
 
         return m._update_sth().addCallback(self.assertTrue
                                            ).addCallback(check_state)
@@ -331,9 +385,7 @@ class MonitorTest(unittest.TestCase):
         m = self.create_monitor(client)
         def check_state(result):
             # Check that we kept the state.
-            expected_state = client_pb2.MonitorState()
-            expected_state.verified_sth.CopyFrom(self._DEFAULT_STH)
-            self.verify_state(expected_state)
+            self.verify_state(self._DEFAULT_STATE)
             self.check_db_state_after_successful_updates(0)
 
         return m._update_sth().addCallback(self.assertFalse
@@ -356,9 +408,7 @@ class MonitorTest(unittest.TestCase):
             self.assertTrue(args[0].timestamp < args[1].timestamp)
 
             # Check that we kept the state.
-            expected_state = client_pb2.MonitorState()
-            expected_state.verified_sth.CopyFrom(self._DEFAULT_STH)
-            self.verify_state(expected_state)
+            self.verify_state(self._DEFAULT_STATE)
 
         return m._update_sth().addCallback(self.assertFalse
                                            ).addCallback(check_state)
@@ -372,10 +422,8 @@ class MonitorTest(unittest.TestCase):
         m = self.create_monitor(client)
         def check_state(result):
             # Check that we kept the state.
-            expected_state = client_pb2.MonitorState()
-            expected_state.verified_sth.CopyFrom(self._DEFAULT_STH)
-            self.verify_state(expected_state)
-            audited_sths = list(self.db.scan_latest_sth_range("log_server"))
+            self.verify_state(self._DEFAULT_STATE)
+            audited_sths = list(self.db.scan_latest_sth_range(m.servername))
             self.assertEqual(len(audited_sths), 2)
             self.assertEqual(audited_sths[0].audit.status,
                              client_pb2.VERIFY_ERROR)
@@ -396,9 +444,7 @@ class MonitorTest(unittest.TestCase):
         m = self.create_monitor(client)
         def check_state(result):
             # Check that we kept the state.
-            expected_state = client_pb2.MonitorState()
-            expected_state.verified_sth.CopyFrom(self._DEFAULT_STH)
-            self.verify_state(expected_state)
+            self.verify_state(self._DEFAULT_STATE)
             self.check_db_state_after_successful_updates(0)
 
         return m._update_sth().addCallback(self.assertFalse
@@ -410,17 +456,20 @@ class MonitorTest(unittest.TestCase):
                                get_entries_throw=log_client.HTTPError("Boom!"))
         client.get_entries = mock.Mock(
                 return_value=client.get_entries(0, self._NEW_STH.tree_size - 2))
-        self.temp_db.store_entries = mock.Mock()
 
         m = self.create_monitor(client)
 
-        # Get the new STH first.
+        # Get the new STH, then try (and fail) to update entries
         d = m._update_sth().addCallback(self.assertTrue)
-        d.addCallback(lambda x: m._update_entries().addCallback(self.assertFalse))
+        d.addCallback(lambda x: m._update_entries()).addCallback(self.assertFalse)
 
-        # Check that we wrote no entries.
-        d.addCallback(
-                lambda x: self.assertFalse(self.temp_db.store_entries.called))
+        def check_state(result):
+            # Check that we wrote no entries.
+            expected_state = copy.deepcopy(self._DEFAULT_STATE)
+            expected_state.pending_sth.CopyFrom(self._NEW_STH)
+            self.verify_state(expected_state)
+        d.addCallback(check_state)
+
         return d
 
     def test_update_entries_fails_not_enough_entries(self):
@@ -439,9 +488,11 @@ class MonitorTest(unittest.TestCase):
 
     def test_update_entries_fails_in_the_middle(self):
         client = FakeLogClient(self._NEW_STH)
-        faker_fake_entry_producer = FakeEntryProducer(0,
-                                                      self._NEW_STH.tree_size)
-        faker_fake_entry_producer.change_range_after_start(0, 5)
+        faker_fake_entry_producer = FakeEntryProducer(
+                self._DEFAULT_STH.tree_size,
+                self._NEW_STH.tree_size)
+        faker_fake_entry_producer.change_range_after_start(
+            self._DEFAULT_STH.tree_size, self._NEW_STH.tree_size - 5)
         client.get_entries = mock.Mock(return_value=faker_fake_entry_producer)
 
         m = self.create_monitor(client)
@@ -454,7 +505,7 @@ class MonitorTest(unittest.TestCase):
         return m._update_sth().addCallback(self.assertTrue).addCallback(
                 lambda _: m._update_entries().addCallback(self.assertFalse)
                 ).addCallback(try_again_with_all_entries).addCallback(lambda _:
-                    fake_fetch.assert_called_once_with(5, 19))
+                    fake_fetch.assert_called_once_with(15, 19))
 
 if __name__ == "__main__":
     sys.argv = FLAGS(sys.argv)
