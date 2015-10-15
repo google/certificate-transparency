@@ -32,6 +32,16 @@ class FakeCheck(object):
     def check(certificate):
         return [asn1.Strict("Boom!")]
 
+class BadCheck(object):
+    def __init__(self):
+        self.certs_checked = 0
+
+    def check(self, cert):
+        self.certs_checked += 1
+
+        if self.certs_checked == 1:
+            raise ValueError("Boom!")
+
 class CertificateReportTest(base_check_test.BaseCheckTest):
     class CertificateReportBase(reporter.CertificateReport):
         def __init__(self, checks):
@@ -153,6 +163,15 @@ class CertificateReportTest(base_check_test.BaseCheckTest):
         self.assertEqual(len(certs), 1)
         self.assertEqual(certs[0].issuer_pk_sha256_hash.encode('hex'),
             'b6b95432abae57fe020cb2b74f4f9f9173c8c708afc9e732ace23279047c6d05')
+
+    def test_if_scan_der_cert_check_raises_only_that_cert_skipped(self):
+        certs = [(0, STRICT_DER, [], client_pb2.X509_ENTRY),
+                 (1, STRICT_DER, [], client_pb2.X509_ENTRY)]
+
+        report = self.CertificateReportBase([BadCheck()])
+        report.scan_der_certs(certs)
+        report.report()
+        self.assertEqual(len(report.certs()), 1)
 
 if __name__ == '__main__':
     unittest.main()

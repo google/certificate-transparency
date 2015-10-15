@@ -13,7 +13,6 @@ from ct.client.db import cert_desc
 from ct.crypto import cert
 from ct.crypto import error
 from ct.proto import certificate_pb2
-from ct.proto import client_pb2
 from Queue import Queue
 
 FLAGS = gflags.FLAGS
@@ -25,17 +24,11 @@ gflags.DEFINE_integer("reporter_queue_size", 50,
                       "Size of entry queue in reporter")
 
 
-class PoolException(Exception):
-    def __init__(self, fail_info):
-        super(PoolException, self).__init__("One of threads in pool encountered"
-                                            " an exception")
-        self.failure = fail_info
-
 def _scan_der_cert(der_certs, checks):
     current = -1
-    try:
-        result = []
-        for log_index, der_cert, der_chain, entry_type in der_certs:
+    result = []
+    for log_index, der_cert, der_chain, entry_type in der_certs:
+        try:
             current = log_index
             partial_result = []
             certificate = None
@@ -70,7 +63,7 @@ def _scan_der_cert(der_certs, checks):
                 try:
                     issuer = cert.Certificate(der_chain[0], strict_der=False)
                 except error.Error:
-                     pass
+                    pass
                 else:
                     desc.issuer_pk_sha256_hash = issuer.key_hash(hashfunc="sha256")
 
@@ -91,12 +84,14 @@ def _scan_der_cert(der_certs, checks):
                     proto_iss.type, proto_iss.value = iss
 
             result.append((desc, log_index, partial_result))
-        return result
-    except Exception:
-        _, exception, exception_traceback = sys.exc_info()
-        exception_traceback  = traceback.format_exc(exception_traceback)
-        raise PoolException((exception, exception_traceback,
-                             der_certs[0][0], der_certs[-1][0], current))
+        except:
+            batch_start, batch_end = der_certs[0][0], der_certs[-1][0]
+            logging.exception(
+                    "Error scanning certificate %d in batch <%d, %d> - it will "
+                    "be excluded from the scan results",
+                    current, batch_start, batch_end)
+
+    return result
 
 
 class CertificateReport(object):
@@ -114,7 +109,7 @@ class CertificateReport(object):
     @abc.abstractmethod
     def report(self):
         """Report stored changes and reset report."""
-        if self._writing_handler:
+        if self._writing_handler and self._writing_handler.is_alive():
             self._jobs.join()
             self._jobs.put(None)
             self._writing_handler.join()
@@ -137,7 +132,7 @@ class CertificateReport(object):
         """
         if not self._pool:
             self._pool = multiprocessing.Pool(processes=FLAGS.reporter_workers)
-        if not self._writing_handler:
+        if not self._writing_handler or not self._writing_handler.is_alive():
             self._writing_handler = threading.Thread(target=handle_writing,
                                                      args=(self._jobs, self))
             self._writing_handler.start()
@@ -147,18 +142,14 @@ class CertificateReport(object):
 
 def handle_writing(queue, report):
     while True:
-        result = queue.get()
-        if result is None:
-            queue.task_done()
-            break
+        scan_results = queue.get()
+
         try:
-            result = result.get()
-        except PoolException as e:
-            ex, ex_tb, first, last, bad_one = e.failure
-            logging.error(ex_tb)
-            logging.error(ex.args[0])
-            logging.error("Entry %d in batch <%d, %d> %s" % (bad_one,
-                          first, last, "raised an exception during scan"))
-        else:
-            report._batch_scanned_callback(result)
-        queue.task_done()
+            if scan_results is None:
+                break
+
+            report._batch_scanned_callback(scan_results.get())
+        except:
+            logging.exception("Error occurred during certificate scanning")
+        finally:
+            queue.task_done()

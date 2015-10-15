@@ -21,19 +21,21 @@ class CertDBCertificateReport(reporter.CertificateReport):
 
     def report(self):
         super(CertDBCertificateReport, self).report()
-        self._certs_queue.join()
-        logging.info("Finished scheduled writing to CertDB")
-        self._certs_queue.put(None)
-        self.reset()
+
+        if self._writer and self._writer.is_alive():
+            self._certs_queue.join()
+            logging.info("Finished scheduled writing to CertDB")
+            self._certs_queue.put(None)
+            self.reset()
 
     def reset(self):
-        if self._writer:
+        if self._writer and self._writer.is_alive():
             self._writer.join()
             self._writer = None
 
 
     def _batch_scanned_callback(self, result):
-        if not self._writer:
+        if not self._writer or not self._writer.is_alive():
             self._writer = threading.Thread(target=_process_certs,
                                             args=(self._cert_db, self.log_key,
                                                   self._certs_queue))
@@ -44,8 +46,13 @@ class CertDBCertificateReport(reporter.CertificateReport):
 def _process_certs(db, log_key, certs_queue):
     while True:
         certs = certs_queue.get()
-        if certs is None:
+
+        try:
+            if certs is None:
+                break
+
+            db.store_certs_desc(certs, log_key)
+        except:
+            logging.exception("Failed to store certificate information")
+        finally:
             certs_queue.task_done()
-            break
-        db.store_certs_desc(certs, log_key)
-        certs_queue.task_done()
