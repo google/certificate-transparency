@@ -368,6 +368,21 @@ class AsyncLogClientTest(unittest.TestCase):
                             test_util.verify_entries(fake_db.entries, 0, 9))
         return consumer.consumed
 
+    class BadEntryConsumer(EntryConsumer):
+        def consume(self, entries):
+            self.received += entries
+            d = defer.Deferred()
+            d.errback(ValueError("Boom!"))
+            return d
+
+    def test_get_entries_fires_done_if_consumer_raises(self):
+        client = self.default_client()
+        producer = client.get_entries(0, 9)
+        consumer = self.BadEntryConsumer()
+        d = producer.startProducing(consumer)
+        d.addBoth(consumer.done)
+        self.pump_get_entries()
+        self.assertTrue(consumer.result.check(ValueError))
 
 if __name__ == "__main__":
     sys.argv = FLAGS(sys.argv)
