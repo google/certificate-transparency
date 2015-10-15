@@ -4,6 +4,7 @@ all: Makefile
 
 Makefile: CMakeLists.txt
 	cmake \
+		-DBUILD_SHARED_LIBS=FALSE \
 		-DCMAKE_INSTALL_PREFIX:STRING=$(INSTALL_DIR) \
 		-DLIBEVENT_LIBRARY_DIRS:STRING=$(INSTALL_DIR)/include \
 		-DLIBEVENT_LIBRARY:STRING=$(INSTALL_DIR)/lib/libevent.a \

@@ -1,11 +1,3 @@
-UNAME := $(shell uname)
-ifeq ($(UNAME),Darwin)
-EXTRA_CXXFLAGS="-DGTEST_USE_OWN_TR1_TUPLE=1"
-endif
-ifeq ($(UNAME),FreeBSD)
-EXTRA_CXXFLAGS="-DGTEST_USE_OWN_TR1_TUPLE=1"
-endif
-
 all: Makefile
 	$(MAKE)
 #	$(MAKE) check
@@ -16,4 +8,4 @@ Makefile: configure
 	$(MAKE) clean
 
 configure: configure.ac
-	./autogen.sh
+	autoreconf -iv

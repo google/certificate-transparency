@@ -31,11 +31,13 @@ then
       ;;
     FreeBSD)
       EXTRA_LDFLAGS="${EXTRA_LDFLAGS} -L/usr/local/lib"
+      EXTRA_LIBS="-lunwind"
       ;;
     Linux)
       EXTRA_LDFLAGS="${EXTRA_LDFLAGS} -Wl,-rpath=${INSTALL_DIR}/lib"
+      EXTRA_LIBS="-lunwind"
       ;;
   esac
 
-  ./configure GMOCK_DIR=${GMOCK} ${CONFIGURE_FLAGS} PROTOC=${INSTALL_DIR}/bin/protoc PKG_CONFIG_PATH="${INSTALL_DIR}/lib/pkgconfig" CPPFLAGS="-I${INSTALL_DIR}/include" CXXFLAGS="${CXXFLAGS} ${EXTRA_CXXFLAGS}" LDFLAGS="-L${INSTALL_DIR}/lib $EXTRA_LDFLAGS" LIBS="-lpthread ${EXTRA_LIBS}" INSTALL_DIR=${INSTALL_DIR} || tail -1000 config.log
+  ./configure GMOCK_DIR=${GMOCK} ${CONFIGURE_FLAGS} PROTOC=${INSTALL_DIR}/bin/protoc PKG_CONFIG_PATH="${INSTALL_DIR}/lib/pkgconfig" CPPFLAGS="-I${INSTALL_DIR}/include" CXXFLAGS="${CXXFLAGS} ${EXTRA_CXXFLAGS}" LDFLAGS="-L${INSTALL_DIR}/lib $EXTRA_LDFLAGS" LIBS="${EXTRA_LIBS}" INSTALL_DIR=${INSTALL_DIR} || tail -1000 config.log
 fi

@@ -51,6 +51,10 @@ _sqlite3:
 	$(MAKE) -C sqlite3 -f ../certificate-transparency/build/Makefile.sqlite3
 	cd sqlite3 && git checkout --
 
+_libsnappy:
+	$(MAKE) -C libsnappy -f ../certificate-transparency/build/Makefile.libsnappy
+	cd libsnappy && git checkout --
+
 _leveldb:
 	$(MAKE) -C leveldb -f ../certificate-transparency/build/Makefile.leveldb
 	cd leveldb && git checkout --

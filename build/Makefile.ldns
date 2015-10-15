@@ -11,7 +11,7 @@ all: Makefile
 	$(MAKE) install
 
 Makefile: configure
-	./configure --prefix=$(INSTALL_DIR) --with-ssl=$(INSTALL_DIR) CPPFLAGS="-I$(INSTALL_DIR)/include" LDFLAGS="-L$(INSTALL_DIR)/lib"
+	./configure --prefix=$(INSTALL_DIR) --disable-shared --enable-static --with-ssl=$(INSTALL_DIR) CPPFLAGS="-I$(INSTALL_DIR)/include" LDFLAGS="-L$(INSTALL_DIR)/lib" CXXFLAGS="-fPIC" CFLAGS="-fPIC"
 
 configure:
 	$(LIBTOOLIZE_BIN) -c --install
