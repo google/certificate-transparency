@@ -85,11 +85,12 @@ def _scan_der_cert(der_certs, checks):
 
             result.append((desc, log_index, partial_result))
         except:
-            batch_start, batch_end = der_certs[0][0], der_certs[-1][0]
+            batch_start_index, batch_end_index = (
+                    der_certs[0][0], der_certs[-1][0])
             logging.exception(
                     "Error scanning certificate %d in batch <%d, %d> - it will "
                     "be excluded from the scan results",
-                    current, batch_start, batch_end)
+                    current, batch_start_index, batch_end_index)
 
     return result
 
@@ -106,10 +107,13 @@ class CertificateReport(object):
         self._pool = None
         self._writing_handler = None
 
+    def _writing_handler_ready(self):
+        return self._writing_handler and self._writing_handler.is_alive()
+
     @abc.abstractmethod
     def report(self):
         """Report stored changes and reset report."""
-        if self._writing_handler and self._writing_handler.is_alive():
+        if self._writing_handler_ready():
             self._jobs.join()
             self._jobs.put(None)
             self._writing_handler.join()
@@ -132,7 +136,7 @@ class CertificateReport(object):
         """
         if not self._pool:
             self._pool = multiprocessing.Pool(processes=FLAGS.reporter_workers)
-        if not self._writing_handler or not self._writing_handler.is_alive():
+        if not self._writing_handler_ready():
             self._writing_handler = threading.Thread(target=handle_writing,
                                                      args=(self._jobs, self))
             self._writing_handler.start()
@@ -142,12 +146,12 @@ class CertificateReport(object):
 
 def handle_writing(queue, report):
     while True:
-        scan_results = queue.get()
-
         try:
-            if scan_results is None:
+            scan_results = queue.get()
+            # This check must be performed in the try block so task_done will
+            # be invoked in the finally block regardless of the check results.
+            if not scan_results:
                 break
-
             report._batch_scanned_callback(scan_results.get())
         except:
             logging.exception("Error occurred during certificate scanning")

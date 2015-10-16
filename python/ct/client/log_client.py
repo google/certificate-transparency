@@ -881,7 +881,7 @@ class EntryProducer(object):
 
     def finishProducing(self, failure=None):
         self.stopProducing()
-        if failure is None:
+        if not failure:
             self._done.callback(self._end - self._start + 1)
         else:
             self._done.errback(failure)
