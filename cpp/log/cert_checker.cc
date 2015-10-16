@@ -5,6 +5,7 @@
 #include <memory>
 #include <openssl/asn1.h>
 #include <openssl/bio.h>
+#include <openssl/cms.h>
 #include <openssl/pem.h>
 #include <openssl/x509.h>
 #include <openssl/x509v3.h>
@@ -95,7 +96,7 @@ bool CertChecker::LoadTrustedCertificatesFromBIO(BIO* bio_in) {
       }
     } else {
       // See if we reached the end of the file.
-      unsigned long err = ERR_peek_last_error();
+      auto err = ERR_peek_last_error();
       if (ERR_GET_LIB(err) == ERR_LIB_PEM &&
           ERR_GET_REASON(err) == PEM_R_NO_START_LINE) {
         ClearOpenSSLErrors();
@@ -126,13 +127,15 @@ bool CertChecker::LoadTrustedCertificatesFromBIO(BIO* bio_in) {
     certs_to_add.pop_back();
   }
   LOG(INFO) << "Added " << new_certs << " new certificate(s) to trusted store";
+
   return true;
 }
 
 void CertChecker::ClearAllTrustedCertificates() {
   std::multimap<string, const Cert*>::iterator it = trusted_.begin();
-  for (; it != trusted_.end(); ++it)
+  for (; it != trusted_.end(); ++it) {
     delete it->second;
+  }
   trusted_.clear();
 }
 
@@ -191,6 +194,7 @@ Status CertChecker::CheckPreCertChain(PreCertChain* chain,
     LOG(ERROR) << "Failed to check precert chain format";
     return Status(util::error::INTERNAL, "internal error");
   }
+
   // Check the issuer and signature chain.
   // We do not, at this point, concern ourselves with whether the CA
   // certificate that issued the precert is a Precertificate Signing
@@ -348,8 +352,7 @@ StatusOr<bool> CertChecker::IsTrusted(const Cert& cert,
   std::pair<std::multimap<string, const Cert*>::const_iterator,
             std::multimap<string, const Cert*>::const_iterator> cand_range =
       trusted_.equal_range(cert_name);
-  for (std::multimap<string, const Cert*>::const_iterator it =
-           cand_range.first;
+  for (std::multimap<string, const Cert*>::const_iterator it = cand_range.first;
        it != cand_range.second; ++it) {
     const Cert* cand = it->second;
     if (cert.IsIdenticalTo(*cand)) {
@@ -357,6 +360,111 @@ StatusOr<bool> CertChecker::IsTrusted(const Cert& cert,
     }
   }
   return false;
+}
+
+util::StatusOr<bool> CertChecker::IsCmsSignedByCert(CMS_ContentInfo* const cms,
+                                                    const Cert& cert) const {
+  CHECK_NOTNULL(cms);
+
+  if (!cert.IsLoaded()) {
+    LOG(ERROR) << "Can't check cert signer as it's not loaded";
+    return Status(util::error::FAILED_PRECONDITION, "Cert not loaded");
+  }
+
+  // This stack must not be freed as it points into the CMS structure
+  STACK_OF(CMS_SignerInfo)* const signers(CMS_get0_SignerInfos(cms));
+
+  if (signers) {
+    for (int s = 0; s < sk_CMS_SignerInfo_num(signers); ++s) {
+      CMS_SignerInfo* const signer = sk_CMS_SignerInfo_value(signers, s);
+
+      if (CMS_SignerInfo_cert_cmp(signer, cert.x509_) == 0) {
+        return true;
+      }
+    }
+  }
+
+  return false;
+}
+
+
+util::Status CertChecker::UnpackCmsDerBio(BIO* cms_bio_in,
+                                          const Cert& cert,
+                                          BIO* cms_bio_out) {
+  CHECK_NOTNULL(cms_bio_in);
+
+  if (!cert.IsLoaded()) {
+    LOG(ERROR) << "Cert for CMS verify not loaded";
+    return Status(util::error::FAILED_PRECONDITION, "Cert not loaded");
+  }
+
+  CMS_ContentInfo* const cms_content_info = d2i_CMS_bio(cms_bio_in, nullptr);
+
+  if (!cms_content_info) {
+    LOG(ERROR) << "Could not parse CMS data";
+    LOG_OPENSSL_ERRORS(WARNING);
+    return Status(util::error::INVALID_ARGUMENT,
+                  "CMS data could not be parsed");
+  }
+
+  const ASN1_OBJECT* message_content_type(
+      CMS_get0_eContentType(cms_content_info));
+  int content_type_nid = OBJ_obj2nid(message_content_type);
+  // TODO: Enforce content type here. This is not yet defined in the RFC.
+  if (content_type_nid != NID_ctV2CmsPayloadContentType) {
+    LOG(WARNING) << "CMS message content has unexpected type: "
+                 << content_type_nid;
+  }
+
+  // Create a certificate stack from our expected signing cert that can be used
+  // by CMS_verify.
+  STACK_OF(X509)* validation_chain = sk_X509_new(nullptr);
+
+  sk_X509_push(validation_chain, cert.x509_);
+
+  // Must set CMS_NOINTERN as the RFC says certs SHOULD be omitted from the
+  // message but the client might not have obeyed this. CMS_BINARY is required
+  // to avoid MIME-related translation. CMS_NO_SIGNER_CERT_VERIFY because we
+  // will do our own checks that the chain is valid and the message may not
+  // be signed directly by a trusted cert. We don't check it's a signed data
+  // object CMS type as OpenSSL does this.
+  int verified = CMS_verify(cms_content_info, validation_chain, nullptr,
+                            nullptr, cms_bio_out,
+                            CMS_NO_SIGNER_CERT_VERIFY | CMS_NOINTERN
+                            | CMS_BINARY);
+
+  sk_X509_free(validation_chain);
+
+  CMS_ContentInfo_free(cms_content_info);
+
+  return (verified == 1) ? util::Status::OK
+                         : util::Status(util::error::INVALID_ARGUMENT,
+                                        "CMS verification failed");
+}
+
+
+Cert* CertChecker::UnpackCmsSignedCertificate(BIO* cms_bio_in,
+                                              const Cert& verify_cert) {
+  CHECK_NOTNULL(cms_bio_in);
+  BIO* unpacked_bio = BIO_new(BIO_s_mem());
+  unique_ptr<Cert> cert(new Cert());
+
+  if (UnpackCmsDerBio(cms_bio_in, verify_cert, unpacked_bio).ok()) {
+    // The unpacked data should be a valid DER certificate.
+    // TODO: The RFC does not yet define this as the format so this may
+    // need to change.
+    util::Status status = cert->LoadFromDerBio(unpacked_bio);
+
+    if (!status.ok()) {
+      LOG(WARNING) << "Could not unpack cert from CMS DER encoded data";
+    }
+  } else {
+    LOG_OPENSSL_ERRORS(ERROR);
+  }
+
+  BIO_free(unpacked_bio);
+
+  return cert.release();
 }
 
 }  // namespace cert_trans

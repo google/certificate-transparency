@@ -15,6 +15,7 @@ int NID_ctPoison = 0;
 int NID_ctPrecertificateSigning = 0;
 int NID_ctPrecertificateRedactedLabelCount = 0;
 int NID_ctNameConstraintNologIntermediateCa = 0;
+int NID_ctV2CmsPayloadContentType = 0;
 
 // The SCT list in the extension of a superfluous certificate
 const char kSCTListOID[] = "1.3.6.1.4.1.11129.2.4.1";
@@ -30,6 +31,10 @@ const char kPoisonOID[] = "1.3.6.1.4.1.11129.2.4.3";
 const char kPrecertificateRedactedLabelOID[] = "1.3.6.1.4.1.11129.2.4.6";
 // Extended Key Usage value for Precertificate signing
 const char kPrecertificateSigningOID[] = "1.3.6.1.4.1.11129.2.4.4";
+// V2 Precert content type
+// TODO: Required content type not defined in draft yet. Placeholder in case
+// we use our own.
+const char kV2PrecertificateCmsContentTypeOID[] = "1.3.6.1.4.1.11129.2.4.8";
 
 static const char kSCTListSN[] = "ctSCT";
 static const char kSCTListLN[] =
@@ -42,10 +47,10 @@ static const char kEmbeddedSCTListLN[] =
 static const char kPoisonSN[] = "ctPoison";
 static const char kPoisonLN[] = "X509v3 Certificate Transparency Poison";
 static const char kPrecertificateSigningSN[] = "ctPresign";
-static const char kPrecertificateRedactedLabelCountSN[] = "ctPreredact";
 static const char kPrecertificateSigningLN[] =
     "Certificate Transparency "
     "Precertificate Signing";
+static const char kPrecertificateRedactedLabelCountSN[] = "ctPreredact";
 static const char kPrecertificateRedactedLabelCountLN[] =
     "Certificate Transparency "
     "Precertificate Redacted Label Count";
@@ -54,6 +59,10 @@ static const char kNameConstraintNologIntermediateSN[] =
 static const char kNameConstraintNologIntermediateLN[] =
     "Certificate Transparency "
     "Name Constrained Intermediate CA NoLog Allowed";
+static const char kV2PrecertCmsContentTypeSN[] = "ctV2PrecertCmsContentType";
+static const char kV2PrecertCmsContentTypeLN[] =
+    "Certificate Transparency "
+    "V2 Precertificate CMS Message Content Type";
 
 static const char kASN1NullValue[] = "NULL";
 
@@ -191,6 +200,12 @@ void LoadCtExtensions() {
   CHECK_EQ(1, X509V3_EXT_add(&ct_name_constraint_nolog_intermediate_ca_method));
   NID_ctNameConstraintNologIntermediateCa =
       ct_name_constraint_nolog_intermediate_ca_method.ext_nid;
+
+  // V2 Content types
+
+  NID_ctV2CmsPayloadContentType = OBJ_create(
+      kV2PrecertificateCmsContentTypeOID, kV2PrecertCmsContentTypeSN,
+      kV2PrecertCmsContentTypeLN);
 }
 
 }  // namespace cert_trans
