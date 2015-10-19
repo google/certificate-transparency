@@ -37,6 +37,7 @@
 /cpp/log/cert_checker_test
 /cpp/log/cert_submission_handler_test
 /cpp/log/cert_test
+/cpp/log/cert_verifier_test
 /cpp/log/cluster_state_controller_test
 /cpp/log/ct_extensions_test
 /cpp/log/database_large_test
