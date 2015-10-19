@@ -135,14 +135,6 @@ class CertCheckerTest : public ::testing::Test {
   }
 };
 
-BIO* OpenTestFileBio(const string& filename) {
-  BIO* der_bio = BIO_new_file(filename.c_str(), "r");
-
-  CHECK_NOTNULL(der_bio);
-
-  return der_bio;
-}
-
 TEST_F(CertCheckerTest, LoadTrustedCertificates) {
   EXPECT_EQ(0U, checker_.NumTrustedCertificates());
 
