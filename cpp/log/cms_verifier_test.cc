@@ -2,13 +2,13 @@
 #include <gflags/gflags.h>
 #include <glog/logging.h>
 #include <gtest/gtest.h>
-#include <log/cms_verifier.h>
 #include <openssl/err.h>
 #include <openssl/evp.h>
 #include <memory>
 #include <string>
 
 #include "log/cert.h"
+#include "log/cms_verifier.h"
 #include "log/ct_extensions.h"
 #include "util/status_test_util.h"
 #include "util/testing.h"
@@ -47,9 +47,9 @@ static const char kCmsTestSubject[] = "CN=?.example.com, C=GB, ST=Wales, "
 
 namespace {
 
-class CertVerifierTest : public ::testing::Test {
+class CmsVerifierTest : public ::testing::Test {
  protected:
-  CertVerifierTest()
+  CmsVerifierTest()
       : cert_dir_(FLAGS_test_srcdir + "/test/testdata"),
         cert_dir_v2_(FLAGS_test_srcdir + "/test/testdata/v2/") {
   }
@@ -79,7 +79,7 @@ BIO* OpenTestFileBio(const string& filename) {
   return der_bio;
 }
 
-TEST_F(CertVerifierTest, CmsSignTestCase2) {
+TEST_F(CmsVerifierTest, CmsSignTestCase2) {
   // In this test the embedded data is not a certificate in DER format
   // but it doesn't get unpacked and the signature is valid.
   Cert ca(ca_pem_);
@@ -90,7 +90,7 @@ TEST_F(CertVerifierTest, CmsSignTestCase2) {
   BIO_free(bio);
 }
 
-TEST_F(CertVerifierTest, CmsSignTestCase3) {
+TEST_F(CmsVerifierTest, CmsSignTestCase3) {
   // The CMS should be signed by the CA that signed the cert
   Cert ca(ca_pem_);
 
@@ -100,7 +100,7 @@ TEST_F(CertVerifierTest, CmsSignTestCase3) {
   BIO_free(bio);
 }
 
-TEST_F(CertVerifierTest, CmsSignTestCase4) {
+TEST_F(CmsVerifierTest, CmsSignTestCase4) {
   // The CMS is not signed by the CA that signed the cert it contains
   Cert ca(ca_pem_);
 
@@ -110,7 +110,7 @@ TEST_F(CertVerifierTest, CmsSignTestCase4) {
   BIO_free(bio);
 }
 
-TEST_F(CertVerifierTest, CmsVerifyTestCase2) {
+TEST_F(CmsVerifierTest, CmsVerifyTestCase2) {
   // For this test the embedded cert is invalid DER but CMS signed by the CA
   Cert cert(ca_pem_);
   ASSERT_TRUE(cert.IsLoaded());
@@ -123,7 +123,7 @@ TEST_F(CertVerifierTest, CmsVerifyTestCase2) {
   ASSERT_FALSE(unpacked_cert->IsLoaded());
 }
 
-TEST_F(CertVerifierTest, CmsVerifyTestCase3) {
+TEST_F(CmsVerifierTest, CmsVerifyTestCase3) {
   // For this test the embedded cert is signed by the CA
   Cert cert(ca_pem_);
   ASSERT_TRUE(cert.IsLoaded());
@@ -142,7 +142,7 @@ TEST_F(CertVerifierTest, CmsVerifyTestCase3) {
   ASSERT_EQ(kCmsTestSubject, unpacked_cert->PrintSubjectName());
 }
 
-TEST_F(CertVerifierTest, CmsVerifyTestCase4) {
+TEST_F(CmsVerifierTest, CmsVerifyTestCase4) {
   // For this test the embedded cert is signed by the intermediate CA
   Cert cert(ca_pem_);
   ASSERT_TRUE(cert.IsLoaded());
@@ -155,7 +155,7 @@ TEST_F(CertVerifierTest, CmsVerifyTestCase4) {
   ASSERT_FALSE(unpacked_cert->IsLoaded());
 }
 
-TEST_F(CertVerifierTest, CmsVerifyTestCase5) {
+TEST_F(CmsVerifierTest, CmsVerifyTestCase5) {
   // For this test the embedded cert is signed by the intermediate
   Cert cert(intermediate_pem_);
   ASSERT_TRUE(cert.IsLoaded());
@@ -174,7 +174,7 @@ TEST_F(CertVerifierTest, CmsVerifyTestCase5) {
   ASSERT_EQ(kCmsTestSubject, unpacked_cert->PrintSubjectName());
 }
 
-TEST_F(CertVerifierTest, CmsVerifyTestCase7) {
+TEST_F(CmsVerifierTest, CmsVerifyTestCase7) {
   // For this test the embedded cert is signed by the intermediate
   Cert cert(leaf_pem_);
   ASSERT_TRUE(cert.IsLoaded());
@@ -187,7 +187,7 @@ TEST_F(CertVerifierTest, CmsVerifyTestCase7) {
   ASSERT_FALSE(unpacked_cert->IsLoaded());
 }
 
-TEST_F(CertVerifierTest, CmsVerifyTestCase8) {
+TEST_F(CmsVerifierTest, CmsVerifyTestCase8) {
   // For this test the embedded cert is signed by the intermediate
   Cert cert(ca_pem_);
   ASSERT_TRUE(cert.IsLoaded());

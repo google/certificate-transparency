@@ -182,7 +182,7 @@ class Cert {
 
   // CertChecker needs access to the x509_ structure directly.
   friend class CertChecker;
-  // CertVerifier needs access to the x509_ structure directly.
+  // CmsVerifier needs access to the x509_ structure directly.
   friend class CmsVerifier;
   friend class TbsCertificate;
   // Allow CtExtensions tests to poke around the private members
