@@ -1,6 +1,6 @@
 /* -*- mode: c++; indent-tabs-mode: nil -*- */
-#ifndef CERT_VERIFIER_H
-#define CERT_VERIFIER_H
+#ifndef CMS_VERIFIER_H
+#define CMS_VERIFIER_H
 
 #include <memory>
 #include <openssl/asn1.h>
