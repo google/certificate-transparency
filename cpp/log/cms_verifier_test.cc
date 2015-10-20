@@ -71,6 +71,7 @@ class CmsVerifierTest : public ::testing::Test {
   }
 };
 
+
 BIO* OpenTestFileBio(const string& filename) {
   BIO* der_bio = BIO_new_file(filename.c_str(), "r");
 
@@ -78,6 +79,7 @@ BIO* OpenTestFileBio(const string& filename) {
 
   return der_bio;
 }
+
 
 TEST_F(CmsVerifierTest, CmsSignTestCase2) {
   // In this test the embedded data is not a certificate in DER format
@@ -90,6 +92,7 @@ TEST_F(CmsVerifierTest, CmsSignTestCase2) {
   BIO_free(bio);
 }
 
+
 TEST_F(CmsVerifierTest, CmsSignTestCase3) {
   // The CMS should be signed by the CA that signed the cert
   Cert ca(ca_pem_);
@@ -100,6 +103,7 @@ TEST_F(CmsVerifierTest, CmsSignTestCase3) {
   BIO_free(bio);
 }
 
+
 TEST_F(CmsVerifierTest, CmsSignTestCase4) {
   // The CMS is not signed by the CA that signed the cert it contains
   Cert ca(ca_pem_);
@@ -109,6 +113,7 @@ TEST_F(CmsVerifierTest, CmsSignTestCase4) {
   EXPECT_FALSE(verifier_.IsCmsSignedByCert(bio, ca).ValueOrDie());
   BIO_free(bio);
 }
+
 
 TEST_F(CmsVerifierTest, CmsVerifyTestCase2) {
   // For this test the embedded cert is invalid DER but CMS signed by the CA
@@ -122,6 +127,7 @@ TEST_F(CmsVerifierTest, CmsVerifyTestCase2) {
 
   ASSERT_FALSE(unpacked_cert->IsLoaded());
 }
+
 
 TEST_F(CmsVerifierTest, CmsVerifyTestCase3) {
   // For this test the embedded cert is signed by the CA
@@ -142,6 +148,7 @@ TEST_F(CmsVerifierTest, CmsVerifyTestCase3) {
   ASSERT_EQ(kCmsTestSubject, unpacked_cert->PrintSubjectName());
 }
 
+
 TEST_F(CmsVerifierTest, CmsVerifyTestCase4) {
   // For this test the embedded cert is signed by the intermediate CA
   Cert cert(ca_pem_);
@@ -154,6 +161,7 @@ TEST_F(CmsVerifierTest, CmsVerifyTestCase4) {
 
   ASSERT_FALSE(unpacked_cert->IsLoaded());
 }
+
 
 TEST_F(CmsVerifierTest, CmsVerifyTestCase5) {
   // For this test the embedded cert is signed by the intermediate
@@ -174,6 +182,7 @@ TEST_F(CmsVerifierTest, CmsVerifyTestCase5) {
   ASSERT_EQ(kCmsTestSubject, unpacked_cert->PrintSubjectName());
 }
 
+
 TEST_F(CmsVerifierTest, CmsVerifyTestCase7) {
   // For this test the embedded cert is signed by the intermediate
   Cert cert(leaf_pem_);
@@ -186,6 +195,7 @@ TEST_F(CmsVerifierTest, CmsVerifyTestCase7) {
 
   ASSERT_FALSE(unpacked_cert->IsLoaded());
 }
+
 
 TEST_F(CmsVerifierTest, CmsVerifyTestCase8) {
   // For this test the embedded cert is signed by the intermediate
@@ -201,6 +211,7 @@ TEST_F(CmsVerifierTest, CmsVerifyTestCase8) {
 }
 
 }  // namespace
+
 
 int main(int argc, char** argv) {
   cert_trans::test::InitTesting(argv[0], &argc, &argv, true);
