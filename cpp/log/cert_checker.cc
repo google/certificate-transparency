@@ -5,7 +5,6 @@
 #include <memory>
 #include <openssl/asn1.h>
 #include <openssl/bio.h>
-#include <openssl/cms.h>
 #include <openssl/pem.h>
 #include <openssl/x509.h>
 #include <openssl/x509v3.h>
