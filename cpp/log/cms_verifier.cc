@@ -1,12 +1,12 @@
 /* -*- indent-tabs-mode: nil -*- */
-#include "log/cert_verifier.h"
+#include <log/cms_verifier.h>
 #include "log/ct_extensions.h"
 
 using std::unique_ptr;
 using util::Status;
 
 namespace cert_trans {
-util::StatusOr<bool> CertVerifier::IsCmsSignedByCert(BIO* cms_bio_in,
+util::StatusOr<bool> CmsVerifier::IsCmsSignedByCert(BIO* cms_bio_in,
                                                      const Cert& cert) const {
   CHECK_NOTNULL(cms_bio_in);
 
@@ -44,7 +44,7 @@ util::StatusOr<bool> CertVerifier::IsCmsSignedByCert(BIO* cms_bio_in,
 }
 
 
-util::Status CertVerifier::UnpackCmsDerBio(BIO* cms_bio_in, const Cert& cert,
+util::Status CmsVerifier::UnpackCmsDerBio(BIO* cms_bio_in, const Cert& cert,
                                            BIO* cms_bio_out) {
   CHECK_NOTNULL(cms_bio_in);
 
@@ -98,7 +98,7 @@ util::Status CertVerifier::UnpackCmsDerBio(BIO* cms_bio_in, const Cert& cert,
 }
 
 
-Cert* CertVerifier::UnpackCmsSignedCertificate(BIO* cms_bio_in,
+Cert* CmsVerifier::UnpackCmsSignedCertificate(BIO* cms_bio_in,
                                                const Cert& verify_cert) {
   CHECK_NOTNULL(cms_bio_in);
   BIO* unpacked_bio = BIO_new(BIO_s_mem());

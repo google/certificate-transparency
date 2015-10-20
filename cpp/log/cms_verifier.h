@@ -14,11 +14,11 @@
 
 namespace cert_trans {
 
-class CertVerifier {
+class CmsVerifier {
  public:
-  CertVerifier() = default;
+  CmsVerifier() = default;
 
-  virtual ~CertVerifier() = default;
+  virtual ~CmsVerifier() = default;
 
   // NOTE: CMS related API is provisional and may evolve over the near
   // future. Public API does not refer to OpenSSL CMS data objects to
@@ -51,7 +51,7 @@ class CertVerifier {
   util::Status UnpackCmsDerBio(BIO* cms_bio_in, const Cert& certChain,
                                BIO* cms_bio_out);
 
-  DISALLOW_COPY_AND_ASSIGN(CertVerifier);
+  DISALLOW_COPY_AND_ASSIGN(CmsVerifier);
 };
 
 }  // namespace cert_trans

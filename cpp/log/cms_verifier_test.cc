@@ -2,20 +2,20 @@
 #include <gflags/gflags.h>
 #include <glog/logging.h>
 #include <gtest/gtest.h>
+#include <log/cms_verifier.h>
 #include <openssl/err.h>
 #include <openssl/evp.h>
 #include <memory>
 #include <string>
 
 #include "log/cert.h"
-#include "log/cert_verifier.h"
 #include "log/ct_extensions.h"
 #include "util/status_test_util.h"
 #include "util/testing.h"
 #include "util/util.h"
 
 using cert_trans::Cert;
-using cert_trans::CertVerifier;
+using cert_trans::CmsVerifier;
 using std::string;
 using std::unique_ptr;
 using std::vector;
@@ -59,7 +59,7 @@ class CertVerifierTest : public ::testing::Test {
   string leaf_pem_;
   const string cert_dir_;
   const string cert_dir_v2_;
-  CertVerifier verifier_;
+  CmsVerifier verifier_;
 
   void SetUp() {
     CHECK(util::ReadTextFile(cert_dir_ + "/" + kLeafCert, &leaf_pem_))

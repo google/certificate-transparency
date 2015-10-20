@@ -66,8 +66,8 @@ TESTS = \
 	cpp/log/cert_checker_test \
 	cpp/log/cert_submission_handler_test \
 	cpp/log/cert_test \
-	cpp/log/cert_verifier_test \
 	cpp/log/cluster_state_controller_test \
+	cpp/log/cms_verifier_test \
 	cpp/log/ct_extensions_test \
 	cpp/log/database_large_test \
 	cpp/log/database_test \
@@ -129,9 +129,9 @@ cpp_libcore_a_SOURCES = \
 	cpp/fetcher/peer_group.cc \
 	cpp/log/cert.cc \
 	cpp/log/cert_checker.cc \
-	cpp/log/cert_verifier.cc \
 	cpp/log/cert_submission_handler.cc \
 	cpp/log/cluster_state_controller_cert.cc \
+	cpp/log/cms_verifier.cc \
 	cpp/log/ct_extensions.cc \
 	cpp/log/database.cc \
 	cpp/log/etcd_consistent_store_cert.cc \
@@ -759,12 +759,12 @@ cpp_log_cert_test_SOURCES = \
 	cpp/log/cert_test.cc \
 	cpp/util/util.cc
 
-cpp_log_cert_verifier_test_LDADD = \
+cpp_log_cms_verifier_test_LDADD = \
 	cpp/libcore.a \
 	cpp/libtest.a \
 	$(libevent_LIBS)
-cpp_log_cert_verifier_test_SOURCES = \
-	cpp/log/cert_verifier_test.cc \
+cpp_log_cms_verifier_test_SOURCES = \
+	cpp/log/cms_verifier_test.cc \
 	cpp/util/util.cc
 
 cpp_log_ct_extensions_test_LDADD = \
