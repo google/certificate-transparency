@@ -6,6 +6,7 @@
 #include <stdint.h>
 #include <string>
 
+#include "proto/ct.pb.h"
 #include "util/libevent_wrapper.h"
 #include "util/sync_task.h"
 #include "util/task.h"
@@ -28,6 +29,7 @@ class PreCertChain;
 class Proxy;
 class ThreadPool;
 
+using ct::SignedCertificateTimestamp;
 
 class HttpHandler {
  public:
@@ -41,36 +43,47 @@ class HttpHandler {
               const ClusterStateController<LoggedCertificate>* controller,
               const CertChecker* cert_checker, Frontend* frontend,
               Proxy* proxy, ThreadPool* pool, libevent::Base* event_base);
-  ~HttpHandler();
+  virtual ~HttpHandler();
 
-  void Add(libevent::HttpServer* server);
+  // Register the handler methods with the server
+  virtual void Add(libevent::HttpServer* server) = 0;
 
- private:
+  // Read requests
+  virtual void GetEntries(evhttp_request* req) const = 0;
+  virtual void GetRoots(evhttp_request* req) const = 0;
+  virtual void GetProof(evhttp_request* req) const = 0;
+  virtual void GetSTH(evhttp_request* req) const = 0;
+  virtual void GetConsistency(evhttp_request* req) const = 0;
+  virtual void BlockingGetEntries(evhttp_request* req, int64_t start,
+                                  int64_t end, bool include_scts) const = 0;
+  // Write requests
+  virtual void AddChain(evhttp_request* req) = 0;
+  virtual void AddPreChain(evhttp_request* req) = 0;
+  virtual void BlockingAddChain(
+      evhttp_request* req, const std::shared_ptr<CertChain>& chain) = 0;
+  virtual void BlockingAddPreChain(
+      evhttp_request* req,
+      const std::shared_ptr<PreCertChain>& chain) = 0;
+
+ protected:
+  bool ExtractChain(JsonOutput* output, evhttp_request* req, CertChain* chain);
+  void AddChainReply(JsonOutput* output, evhttp_request* req,
+                     const util::Status& add_status,
+                     const SignedCertificateTimestamp& sct);
   void ProxyInterceptor(
       const libevent::HttpServer::HandlerCallback& next_handler,
       evhttp_request* request);
-
   void AddProxyWrappedHandler(
       libevent::HttpServer* server, const std::string& path,
       const libevent::HttpServer::HandlerCallback& local_handler);
-
-  void GetEntries(evhttp_request* req) const;
-  void GetRoots(evhttp_request* req) const;
-  void GetProof(evhttp_request* req) const;
-  void GetSTH(evhttp_request* req) const;
-  void GetConsistency(evhttp_request* req) const;
-  void AddChain(evhttp_request* req);
-  void AddPreChain(evhttp_request* req);
-
-  void BlockingGetEntries(evhttp_request* req, int64_t start, int64_t end,
-                          bool include_scts) const;
-  void BlockingAddChain(evhttp_request* req,
-                        const std::shared_ptr<CertChain>& chain) const;
-  void BlockingAddPreChain(evhttp_request* req,
-                           const std::shared_ptr<PreCertChain>& chain) const;
-
-  bool IsNodeStale() const;
-  void UpdateNodeStaleness();
+  std::multimap<std::string, std::string> ParseQuery(evhttp_request* req) const;
+  bool GetParam(const std::multimap<std::string, std::string>& query,
+                const std::string& param, std::string* value) const;
+  int64_t GetIntParam(const std::multimap<std::string, std::string>& query,
+                      const std::string& param) const;
+  bool GetBoolParam(const std::multimap<std::string, std::string>& query,
+                    const std::string& param) const;
+  int GetMaxLeafEntriesPerResponse() const;
 
   JsonOutput* const output_;
   LogLookup<LoggedCertificate>* const log_lookup_;
@@ -81,6 +94,11 @@ class HttpHandler {
   Proxy* const proxy_;
   ThreadPool* const pool_;
   libevent::Base* const event_base_;
+
+ private:
+
+  bool IsNodeStale() const;
+  void UpdateNodeStaleness();
 
   util::SyncTask task_;
   mutable std::mutex mutex_;

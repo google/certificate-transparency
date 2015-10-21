@@ -155,6 +155,20 @@ AS_IF([test -n "$missing_libevhtp"],
       [AC_MSG_ERROR([could not find the evhtp library])])
 LIBS="$save_LIBS"
 
+# CT protocol version support. Only one version may be enabled
+# at compile time. Defaults to v1 support (RFC 6962).
+AC_ARG_WITH(
+  ctversion,
+  AS_HELP_STRING([--with-ctversion=1 or 2],
+                 [ 1 (default) for rfc6962, 2 for rfc6962-bis]),
+                 AS_CASE([$withval],
+                 [1], [ctversion=1],
+                 [2], [ctversion=2],
+                 [*], [AC_MSG_FAILURE([ctversion must be 1 or 2])]),
+                 [ctversion=1])
+AM_CONDITIONAL([CT_VERSION_1], [test x$ctversion = x1])
+AM_CONDITIONAL([CT_VERSION_2], [test x$ctversion = x2])
+
 # TCMalloc gubbins
 AC_ARG_WITH([tcmalloc],
             [AS_HELP_STRING([--without-tcmalloc],

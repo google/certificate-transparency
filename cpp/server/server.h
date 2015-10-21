@@ -27,6 +27,7 @@
 #include "monitoring/latency.h"
 #include "monitoring/monitoring.h"
 #include "monitoring/registry.h"
+#include "server/handler_factory.h"
 #include "server/json_output.h"
 #include "server/proxy.h"
 #include "util/etcd.h"
@@ -333,10 +334,10 @@ void Server<Logged>::Initialise(bool is_mirror) {
                 bind(&ClusterStateController<LoggedCertificate>::GetFreshNodes,
                      cluster_controller_.get()),
                 url_fetcher_, &http_pool_));
-  handler_.reset(new HttpHandler(&json_output_, log_lookup_.get(), db_,
-                                 cluster_controller_.get(), cert_checker_,
-                                 frontend_.get(), proxy_.get(), &http_pool_,
-                                 event_base_.get()));
+  handler_.reset(HttpHandlerFactory::Create(
+      &json_output_, log_lookup_.get(), db_, cluster_controller_.get(),
+      cert_checker_, frontend_.get(), proxy_.get(), &http_pool_,
+      event_base_.get()));
 
   handler_->Add(&http_server_);
 }

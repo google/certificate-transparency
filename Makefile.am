@@ -32,7 +32,9 @@ cpp/version.o: \
 bin_PROGRAMS = \
 	cpp/client/ct \
 	cpp/server/ct-mirror \
+	cpp/server/ct-mirror-v2 \
 	cpp/server/ct-server \
+	cpp/server/ct-server-v2 \
 	cpp/tools/ct-clustertool
 
 noinst_PROGRAMS = \
@@ -50,6 +52,7 @@ endif
 
 noinst_LIBRARIES = \
 	cpp/libcore.a \
+	cpp/libserver.a \
 	cpp/libtest.a
 
 check_PROGRAMS = \
@@ -190,21 +193,20 @@ cpp_libtest_a_SOURCES = \
 	cpp/gtest-all.cc \
 	cpp/util/testing.cc
 
-cpp_server_ct_mirror_LDADD = \
-	cpp/libcore.a \
-	$(json_c_LIBS) \
-	$(libevent_LIBS) \
-	$(leveldb_LIBS) \
-	-lprotobuf -lsqlite3
-cpp_server_ct_mirror_SOURCES = \
+cpp_libserver_a_LIBDADD = \
+        cpp/libcore.a
+
+cpp_libserver_a_SOURCES = \
 	cpp/client/async_log_client.cc \
-	cpp/fetcher/remote_peer.cc \
-	cpp/proto/serializer.cc \
-	cpp/server/ct-mirror.cc \
 	cpp/server/handler.cc \
 	cpp/server/json_output.cc \
 	cpp/server/metrics.cc \
 	cpp/server/proxy.cc \
+	cpp/fetcher/remote_peer.cc \
+	cpp/monitoring/prometheus/exporter.cc \
+	cpp/monitoring/prometheus/metrics.pb.cc \
+	cpp/monitoring/prometheus/metrics.pb.h \
+	cpp/proto/serializer.cc \
 	cpp/util/init.cc \
 	cpp/util/json_wrapper.cc \
 	cpp/util/libevent_wrapper.cc \
@@ -216,30 +218,57 @@ cpp_server_ct_mirror_SOURCES = \
 	cpp/util/uuid.cc \
 	cpp/version.cc
 
-cpp_server_ct_server_LDADD = \
+cpp_server_ct_mirror_LDADD = \
 	cpp/libcore.a \
+	cpp/libserver.a \
 	$(json_c_LIBS) \
 	$(libevent_LIBS) \
 	$(leveldb_LIBS) \
 	-lprotobuf -lsqlite3
+
+cpp_server_ct_mirror_SOURCES = \
+	cpp/server/ct-mirror.cc \
+	cpp/server/handler_factory_v1.cc \
+	cpp/server/handler_v1.cc
+
+cpp_server_ct_mirror_v2_LDADD = \
+	cpp/libcore.a \
+	cpp/libserver.a \
+	$(json_c_LIBS) \
+	$(libevent_LIBS) \
+	$(leveldb_LIBS) \
+	-lprotobuf -lsqlite3
+
+cpp_server_ct_mirror_v2_SOURCES = \
+	cpp/server/ct-mirror.cc \
+	cpp/server/handler_factory_v2.cc \
+	cpp/server/handler_v2.cc
+
+cpp_server_ct_server_LDADD = \
+	cpp/libcore.a \
+	cpp/libserver.a \
+	$(json_c_LIBS) \
+	$(libevent_LIBS) \
+	$(leveldb_LIBS) \
+	-lprotobuf -lsqlite3
+
 cpp_server_ct_server_SOURCES = \
-	cpp/client/async_log_client.cc \
-	cpp/proto/serializer.cc \
 	cpp/server/ct-server.cc \
-	cpp/server/handler.cc \
-	cpp/server/json_output.cc \
-	cpp/server/metrics.cc \
-	cpp/server/proxy.cc \
-	cpp/util/init.cc \
-	cpp/util/json_wrapper.cc \
-	cpp/util/libevent_wrapper.cc \
-	cpp/util/periodic_closure.cc \
-	cpp/util/protobuf_util.cc \
-	cpp/util/protobuf_util.h \
-	cpp/util/read_key.cc \
-	cpp/util/util.cc \
-	cpp/util/uuid.cc \
-	cpp/version.cc
+	cpp/server/handler_factory_v1.cc \
+	cpp/server/handler_v1.cc
+	
+cpp_server_ct_server_v2_LDADD = \
+	cpp/libcore.a \
+	cpp/libserver.a \
+	$(json_c_LIBS) \
+	$(libevent_LIBS) \
+	$(leveldb_LIBS) \
+	-lprotobuf -lsqlite3
+
+cpp_server_ct_server_v2_SOURCES = \
+	cpp/server/ct-server.cc \
+	cpp/server/handler_factory_v2.cc \
+	cpp/server/handler_v2.cc
 
 cpp_tools_ct_clustertool_LDADD = \
 	cpp/libcore.a \
