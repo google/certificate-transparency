@@ -18,6 +18,20 @@ FLAGS = gflags.FLAGS
 gflags.DEFINE_string("testdata_dir", "../test/testdata",
                      "Location of test certs")
 
+SYMANTEC_B64_KEY = (
+    'MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEluqsHEYMG1XcDfy1lCdGV0JwOmkY4r'
+    '87xNuroPS2bMBTP01CEDPwWJePa75y9CrsHEKqAy8afig1dpkIPSEUhg=='
+)
+
+VENAFI_B64_KEY = (
+    'MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAolpIHxdSlTXLo1s6H1OCdp'
+    'Sj/4DyHDc8wLG9wVmLqy1lk9fz4ATVmm+/1iN2Nk8jmctUKK2MFUtlWXZBSpym97M7'
+    'frGlSaQXUWyA3CqQUEuIJOmlEjKTBEiQAvpfDjCHjlV2Be4qTM6jamkJbiWtgnYPhJ'
+    'L6ONaGTiSPm7Byy57iaz/hbckldSOIoRhYBiMzeNoA0DiRZ9KmfSeXZ1rB8y8X5urS'
+    'W+iBzf2SaOfzBvDpcoTuAaWx2DPazoOl28fP1hZ+kHUYvxbcMjttjauCFx+JII0dmu'
+    'ZNIwjfeG/GBb9frpSX219k1O4Wi6OEbHEr8at/XQ0y7gTikOxBn/s5wQIDAQAB'
+)
+
 def read_testdata_file(test_file):
     with open(os.path.join(FLAGS.testdata_dir, test_file), 'rb') as f:
         return f.read()
@@ -402,11 +416,6 @@ class LogVerifierEcdsaTest(LogVerifierTest, unittest.TestCase):
         self.assertRaises(error.EncodingError, verifier.verify_sth, sth)
 
     def test_verify_sth_for_bad_asn1_signature(self):
-        # Symantec's log public key.
-        symantec_b64_key = (
-            'MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEluqsHEYMG1XcDfy1lCdGV0JwOmkY4r'
-            '87xNuroPS2bMBTP01CEDPwWJePa75y9CrsHEKqAy8afig1dpkIPSEUhg=='
-        )
         # www.google.com certificate for which a bad SCT was issued.
         google_cert = (
             '-----BEGIN CERTIFICATE-----',
@@ -449,7 +458,7 @@ class LogVerifierEcdsaTest(LogVerifierTest, unittest.TestCase):
         key_info = client_pb2.KeyInfo()
         key_info.type = client_pb2.KeyInfo.ECDSA
         key_info.pem_key = pem.to_pem(
-            base64.decodestring(symantec_b64_key),
+            base64.decodestring(SYMANTEC_B64_KEY),
             'PUBLIC KEY')
         verifier = verify.LogVerifier(key_info)
         self.assertRaises(
@@ -457,6 +466,20 @@ class LogVerifierEcdsaTest(LogVerifierTest, unittest.TestCase):
             verifier.verify_sct,
             symantec_sct,
             [cert.Certificate.from_pem("\n".join(google_cert)),])
+
+
+class CreateKeyInfoTest(unittest.TestCase):
+    def test_create_key_info_with_rsa_key(self):
+        key_info = verify.create_key_info_from_raw_key(
+                base64.decodestring(VENAFI_B64_KEY))
+        self.assertEqual(key_info.type, client_pb2.KeyInfo.RSA)
+        self.assertTrue('PUBLIC KEY' in key_info.pem_key)
+
+    def test_create_key_info_with_ecdsa_key(self):
+        key_info = verify.create_key_info_from_raw_key(
+                base64.decodestring(SYMANTEC_B64_KEY))
+        self.assertEqual(key_info.type, client_pb2.KeyInfo.ECDSA)
+        self.assertTrue('PUBLIC KEY' in key_info.pem_key)
 
 
 if __name__ == "__main__":

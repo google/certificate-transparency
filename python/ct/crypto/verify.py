@@ -4,10 +4,12 @@ import io
 import struct
 
 from ct.crypto import error
+from ct.crypto import pem
 from ct.crypto import merkle
 from ct.crypto import verify_ecdsa
 from ct.crypto import verify_rsa
 from ct.crypto.asn1 import oid
+from ct.crypto.asn1 import x509_common
 from ct.crypto.asn1 import x509_extension as x509_ext
 from ct.crypto.asn1 import x509_name
 from ct.proto import client_pb2
@@ -393,3 +395,28 @@ class LogVerifier(object):
 
         return result
 
+
+def create_key_info_from_raw_key(log_key):
+    """Creates a KeyInfo from the given raw (DER-encoded) key.
+
+    Detects the key type (ECDSA or RSA), returning a client_pb2.KeyInfo
+    instance that can be used to construct a LogVerifier.
+
+    Args:
+        log_key: A DER-encoded key.
+
+    Returns:
+        A client_pb2.KeyInfo instance with all fields correctly filled.
+    """
+    key_info = client_pb2.KeyInfo()
+    decoded_key = x509_common.SubjectPublicKeyInfo.decode(log_key)
+    key_algorithm_oid = decoded_key['algorithm']['algorithm']
+    if key_algorithm_oid == oid.RSA_ENCRYPTION:
+        key_info.type = client_pb2.KeyInfo.RSA
+    elif key_algorithm_oid == oid.ID_EC_PUBLICKEY:
+        key_info.type = client_pb2.KeyInfo.ECDSA
+    else:
+        raise error.UnsupportedAlgorithmError(
+                'Unknown key type: %s' % key_algorithm_oid)
+    key_info.pem_key = pem.to_pem(log_key, 'PUBLIC KEY')
+    return key_info
