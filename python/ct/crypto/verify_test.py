@@ -1,5 +1,6 @@
 #!/usr/bin/env python
 
+import base64
 import gflags
 import os
 import sys
@@ -7,6 +8,7 @@ import unittest
 
 from ct.crypto import cert
 from ct.crypto import error
+from ct.crypto import pem
 from ct.crypto import verify
 from ct.proto import client_pb2
 from ct.serialization import tls_message
@@ -337,14 +339,17 @@ class LogVerifierEcdsaTest(LogVerifierTest, unittest.TestCase):
 
         # Increasing the length means there are not enough ASN.1 bytes left to
         # decode the sequence, however the ecdsa module silently slices it.
-        # TODO(ekasper): contribute a patch to upstream and make the tests fail
+        # Our ECDSA verifier checks for it and will fail.
         sth = client_pb2.SthResponse()
         sth.CopyFrom(sth_fixture)
         sth.tree_head_signature = (
             sth_fixture.tree_head_signature[:i] +
             chr(ord(sth_fixture.tree_head_signature[i]) + 1) +
             sth_fixture.tree_head_signature[i+1:])
-        self.assertTrue(verifier.verify_sth(sth))
+        self.assertRaises(
+            error.EncodingError,
+            verifier.verify_sth,
+            sth)
 
         # The byte that encodes the length of the first integer r in the
         # sequence (r, s). Modifying the length corrupts the second integer
@@ -367,8 +372,8 @@ class LogVerifierEcdsaTest(LogVerifierTest, unittest.TestCase):
         self.assertRaises(error.EncodingError, verifier.verify_sth, sth)
 
         # The byte that encodes the length of the second integer s in the
-        # sequence (r, s). Decreasing this length corrupts the integer, however
-        # increased length is silently sliced, as above.
+        # sequence (r, s). Increasing this length leaves bytes unread which
+        # is now also detected in the verify_ecdsa module.
         i = 42
         sth = client_pb2.SthResponse()
         sth.CopyFrom(sth_fixture)
@@ -384,7 +389,7 @@ class LogVerifierEcdsaTest(LogVerifierTest, unittest.TestCase):
             sth_fixture.tree_head_signature[:i] +
             chr(ord(sth_fixture.tree_head_signature[i]) + 1) +
             sth_fixture.tree_head_signature[i+1:])
-        self.assertTrue(verifier.verify_sth(sth))
+        self.assertRaises(error.EncodingError, verifier.verify_sth, sth)
 
         # Trailing garbage is correctly detected.
         sth = client_pb2.SthResponse()
@@ -395,6 +400,63 @@ class LogVerifierEcdsaTest(LogVerifierTest, unittest.TestCase):
             chr(ord(sth_fixture.tree_head_signature[3]) + 1) +
             sth_fixture.tree_head_signature[4:]) + "\x01"
         self.assertRaises(error.EncodingError, verifier.verify_sth, sth)
+
+    def test_verify_sth_for_bad_asn1_signature(self):
+        # Symantec's log public key.
+        symantec_b64_key = (
+            'MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEluqsHEYMG1XcDfy1lCdGV0JwOmkY4r'
+            '87xNuroPS2bMBTP01CEDPwWJePa75y9CrsHEKqAy8afig1dpkIPSEUhg=='
+        )
+        # www.google.com certificate for which a bad SCT was issued.
+        google_cert = (
+            '-----BEGIN CERTIFICATE-----',
+            'MIIEgDCCA2igAwIBAgIIdJ7+eILLLSgwDQYJKoZIhvcNAQELBQAwSTELMAkGA1UE',
+            'BhMCVVMxEzARBgNVBAoTCkdvb2dsZSBJbmMxJTAjBgNVBAMTHEdvb2dsZSBJbnRl',
+            'cm5ldCBBdXRob3JpdHkgRzIwHhcNMTUxMDA3MTExMDM4WhcNMTYwMTA1MDAwMDAw',
+            'WjBoMQswCQYDVQQGEwJVUzETMBEGA1UECAwKQ2FsaWZvcm5pYTEWMBQGA1UEBwwN',
+            'TW91bnRhaW4gVmlldzETMBEGA1UECgwKR29vZ2xlIEluYzEXMBUGA1UEAwwOd3d3',
+            'Lmdvb2dsZS5jb20wggEiMA0GCSqGSIb3DQEBAQUAA4IBDwAwggEKAoIBAQCR6Knj',
+            'TG6eyvY6C1VO7daC0AbWe3cenr9y9lVFQH2ej5r87znUvep4pC/bmG71aTd25wds',
+            'ScpclWNR4lkR9Ph45j8K+SjMXU7syiqFiWPWgVzyi4N3bXZw4w83RoTzfyUTn4Kx',
+            '9nsQLmjVS4wUMSEpWBmYfORwUwMF8BYp5qSkIUogZTADPY7Qr8tmwEq8jLHv9z62',
+            'SiYd9JEcGdhnajgXg/+/f+iIb1jhkbjsTjFJBHClgrtRqLZHSU1THZCK6iULTd1B',
+            '4yBNvXcHDaSBTPUSvZvZXo/msKfOqd0fHtny1icgl5CSU0tZrZPteomMnLMGdLlN',
+            'KHyqIX7XsAd3pNoXAgMBAAGjggFLMIIBRzAdBgNVHSUEFjAUBggrBgEFBQcDAQYI',
+            'KwYBBQUHAwIwGQYDVR0RBBIwEIIOd3d3Lmdvb2dsZS5jb20waAYIKwYBBQUHAQEE',
+            'XDBaMCsGCCsGAQUFBzAChh9odHRwOi8vcGtpLmdvb2dsZS5jb20vR0lBRzIuY3J0',
+            'MCsGCCsGAQUFBzABhh9odHRwOi8vY2xpZW50czEuZ29vZ2xlLmNvbS9vY3NwMB0G',
+            'A1UdDgQWBBSUPOkxr+tGC3JYs2JIdXVB2R+f8zAMBgNVHRMBAf8EAjAAMB8GA1Ud',
+            'IwQYMBaAFErdBhYbvPZotXb1gba7Yhq6WoEvMCEGA1UdIAQaMBgwDAYKKwYBBAHW',
+            'eQIFATAIBgZngQwBAgIwMAYDVR0fBCkwJzAloCOgIYYfaHR0cDovL3BraS5nb29n',
+            'bGUuY29tL0dJQUcyLmNybDANBgkqhkiG9w0BAQsFAAOCAQEAfBoIl5qeaJ7NZ6hB',
+            'WqeBZwbDV/DOHCPg3/84n8YGlfYdfXQpQdOWC5hfgEkkinBT0yp8dDTdXMUIT9Al',
+            'ZMrxE54xJ1cU6FPuZPDWOnzV+6YEW6P9RnTbqKgYCNkHFiFwVvFRm5RTEGei5TLv',
+            'l0zFDBusT/mgyvYBMIfW3vVPteEKKEz+aRCZHRiLAHbmJHj2+blVJeHGSF+eKN5q',
+            'GWgk7/pMww4JAXsLQ0mmL8qdJKivuiNcyyhbr8IeERiVcItKqfBsX1nwyUnYFWY3',
+            'HPkV+sXAPnpTGuxgYvTjcYDf8UO9lgDX5QubEFjjTuTIYAAabmc6Z4UKOS0O46Ne',
+            'z28m7Q==',
+            '-----END CERTIFICATE-----')
+        # The SCT with the bad signature.
+        sct_bytes = (
+            '00ddeb1d2b7a0d4fa6208b81ad8168707e2e8e9d01d55c888d3d11c4cdb6ecbecc'
+            '00000150421dfbb6000004030047304502200035de73784699d2ad8c3631aeda77'
+            'f70b2c899492b16f051fd6d38d46afc892022100a4d1b58c63002e5d0862a9f623'
+            'f67c8ccf5fc934bd28133fbc8f240aae4cab38'
+        ).decode('hex')
+
+        symantec_sct = client_pb2.SignedCertificateTimestamp()
+        tls_message.decode(sct_bytes, symantec_sct)
+        key_info = client_pb2.KeyInfo()
+        key_info.type = client_pb2.KeyInfo.ECDSA
+        key_info.pem_key = pem.to_pem(
+            base64.decodestring(symantec_b64_key),
+            'PUBLIC KEY')
+        verifier = verify.LogVerifier(key_info)
+        self.assertRaises(
+            error.EncodingError,
+            verifier.verify_sct,
+            symantec_sct,
+            [cert.Certificate.from_pem("\n".join(google_cert)),])
 
 
 if __name__ == "__main__":

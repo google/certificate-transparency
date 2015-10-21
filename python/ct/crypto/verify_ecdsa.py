@@ -1,9 +1,16 @@
 from ct.crypto import error
 from ct.crypto import pem
+from ct.crypto.asn1 import types
 from ct.proto import client_pb2
 
 import hashlib
 import ecdsa
+
+class _ECDSASignature(types.Sequence):
+    components = (
+            (types.Component("r", types.Integer)),
+            (types.Component("s", types.Integer))
+    )
 
 class EcdsaVerifier(object):
     """Verifies ECDSA signatures."""
@@ -59,12 +66,13 @@ class EcdsaVerifier(object):
         - error.SignatureError: If the signature fails verification.
         """
         try:
+            _ECDSASignature.decode(signature)
             return self.__key.verify(signature, signature_input,
                                      hashfunc=hashlib.sha256,
                                      sigdecode=ecdsa.util.sigdecode_der)
-        except ecdsa.der.UnexpectedDER:
+        except (ecdsa.der.UnexpectedDER, error.ASN1Error) as e:
             raise error.EncodingError("Invalid DER encoding for signature %s",
-                                      signature.encode("hex"))
+                                      signature.encode("hex"), e)
         except ecdsa.keys.BadSignatureError:
             raise error.SignatureError("Signature did not verify: %s",
                                        signature.encode("hex"))
