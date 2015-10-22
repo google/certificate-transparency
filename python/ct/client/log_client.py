@@ -200,8 +200,12 @@ def _parse_consistency_proof(response, servername):
 class RequestHandler(object):
     """HTTPS requests."""
     def __init__(self, connection_timeout=60, ca_bundle=None,
-                 num_retries=FLAGS.get_entries_max_retries):
-        self._http = httplib2.Http(timeout=connection_timeout, ca_certs=ca_bundle)
+                 num_retries=None):
+        self._http = httplib2.Http(
+            timeout=connection_timeout, ca_certs=ca_bundle)
+        # Explicitly check for None as num_retries being 0 is valid.
+        if num_retries is None:
+            num_retries = FLAGS.get_entries_max_retries
         self._num_retries = num_retries
 
     def __repr__(self):
