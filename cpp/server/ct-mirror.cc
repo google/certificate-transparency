@@ -105,7 +105,7 @@ using cert_trans::FileStorage;
 using cert_trans::HttpHandler;
 using cert_trans::JsonOutput;
 using cert_trans::Latency;
-using cert_trans::LoggedCertificate;
+using cert_trans::LoggedEntry;
 using cert_trans::MasterElection;
 using cert_trans::PeriodicClosure;
 using cert_trans::Proxy;
@@ -225,11 +225,10 @@ static const bool follow_dummy =
 }  // namespace
 
 
-void STHUpdater(
-    Database<LoggedCertificate>* db,
-    ClusterStateController<LoggedCertificate>* cluster_state_controller,
-    mutex* queue_mutex, map<int64_t, ct::SignedTreeHead>* queue,
-    LogLookup<LoggedCertificate>* log_lookup, Task* task) {
+void STHUpdater(Database<LoggedEntry>* db,
+                ClusterStateController<LoggedEntry>* cluster_state_controller,
+                mutex* queue_mutex, map<int64_t, ct::SignedTreeHead>* queue,
+                LogLookup<LoggedEntry>* log_lookup, Task* task) {
   CHECK_NOTNULL(db);
   CHECK_NOTNULL(cluster_state_controller);
   CHECK_NOTNULL(queue_mutex);
@@ -256,7 +255,7 @@ void STHUpdater(
 
     {
       lock_guard<mutex> lock(*queue_mutex);
-      unique_ptr<Database<LoggedCertificate>::Iterator> entries(
+      unique_ptr<Database<LoggedEntry>::Iterator> entries(
           db->ScanEntries(new_tree->LeafCount()));
       while (!queue->empty() &&
              queue->begin()->second.tree_size() <= local_size) {
@@ -266,7 +265,7 @@ void STHUpdater(
         // First, if necessary, catch our local compact tree up to the
         // candidate STH size:
         {
-          LoggedCertificate entry;
+          LoggedEntry entry;
           CHECK_LE(next_sth.tree_size(), local_size);
           CHECK_GE(next_sth.tree_size(), 0);
           const uint64_t next_sth_tree_size(
@@ -325,7 +324,7 @@ int main(int argc, char* argv[]) {
 
   util::InitCT(&argc, &argv);
 
-  Server<LoggedCertificate>::StaticInit();
+  Server<LoggedEntry>::StaticInit();
 
   if (!FLAGS_sqlite_db.empty() + !FLAGS_leveldb_db.empty() +
           (!FLAGS_cert_dir.empty() | !FLAGS_tree_dir.empty()) !=
@@ -339,14 +338,14 @@ int main(int argc, char* argv[]) {
         << "Certificate directory and tree directory must differ";
   }
 
-  Database<LoggedCertificate>* db;
+  Database<LoggedEntry>* db;
 
   if (!FLAGS_sqlite_db.empty()) {
-    db = new SQLiteDB<LoggedCertificate>(FLAGS_sqlite_db);
+    db = new SQLiteDB<LoggedEntry>(FLAGS_sqlite_db);
   } else if (!FLAGS_leveldb_db.empty()) {
-    db = new LevelDB<LoggedCertificate>(FLAGS_leveldb_db);
+    db = new LevelDB<LoggedEntry>(FLAGS_leveldb_db);
   } else {
-    db = new FileDB<LoggedCertificate>(
+    db = new FileDB<LoggedEntry>(
         new FileStorage(FLAGS_cert_dir, FLAGS_cert_storage_depth),
         new FileStorage(FLAGS_tree_dir, FLAGS_tree_storage_depth),
         new FileStorage(FLAGS_meta_dir, 0));
@@ -371,16 +370,16 @@ int main(int argc, char* argv[]) {
   const LogVerifier log_verifier(new LogSigVerifier(pubkey.ValueOrDie()),
                                  new MerkleVerifier(new Sha256Hasher));
 
-  Server<LoggedCertificate>::Options options;
+  Server<LoggedEntry>::Options options;
   options.server = FLAGS_server;
   options.port = FLAGS_port;
   options.etcd_root = FLAGS_etcd_root;
   options.num_http_server_threads = FLAGS_num_http_server_threads;
 
-  Server<LoggedCertificate> server(options, event_base, &internal_pool, db,
-                                   etcd_client.get(), &url_fetcher,
-                                   nullptr /* log_signer */, &log_verifier,
-                                   nullptr /* cert_checker */);
+  Server<LoggedEntry> server(options, event_base, &internal_pool, db,
+                             etcd_client.get(), &url_fetcher,
+                             nullptr /* log_signer */, &log_verifier,
+                             nullptr /* cert_checker */);
   server.Initialise(true /* is_mirror */);
 
   if (stand_alone_mode) {

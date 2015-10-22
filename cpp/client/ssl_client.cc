@@ -233,7 +233,7 @@ int SSLClient::VerifyCallback(X509_STORE_CTX* ctx, void* arg) {
     } else {
       args->ct_data.mutable_reconstructed_entry()->CopyFrom(entry);
       args->ct_data.set_certificate_sha256_hash(
-          Sha256Hasher::Sha256Digest(Serializer::LeafCertificate(entry)));
+          Sha256Hasher::Sha256Digest(Serializer::LeafData(entry)));
       // Only writes the checkpoint if verification succeeds.
       // Note: an optimized client could only verify the signature if it's
       // a certificate it hasn't seen before.

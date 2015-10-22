@@ -1,4 +1,4 @@
-#include "log/logged_certificate.h"
+#include "log/logged_entry.h"
 
 using ct::LogEntry;
 using ct::PreCert;
@@ -7,8 +7,7 @@ using ct::SignedCertificateTimestamp;
 namespace cert_trans {
 
 
-bool LoggedCertificate::CopyFromClientLogEntry(
-    const AsyncLogClient::Entry& entry) {
+bool LoggedEntry::CopyFromClientLogEntry(const AsyncLogClient::Entry& entry) {
   if (entry.leaf.timestamped_entry().entry_type() != ct::X509_ENTRY &&
       entry.leaf.timestamped_entry().entry_type() != ct::PRECERT_ENTRY) {
     LOG(INFO) << "unsupported entry_type: "

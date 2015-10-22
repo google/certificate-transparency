@@ -1,4 +1,4 @@
 #include "log/log_lookup-inl.h"
-#include "log/logged_certificate.h"
+#include "log/logged_entry.h"
 
-template class LogLookup<cert_trans::LoggedCertificate>;
+template class LogLookup<cert_trans::LoggedEntry>;

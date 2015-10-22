@@ -107,8 +107,7 @@ class Server {
   StrictConsistentStore<Logged> consistent_store_;
   const std::unique_ptr<Frontend> frontend_;
   std::unique_ptr<LogLookup<Logged>> log_lookup_;
-  std::unique_ptr<ClusterStateController<LoggedCertificate>>
-      cluster_controller_;
+  std::unique_ptr<ClusterStateController<LoggedEntry>> cluster_controller_;
   std::unique_ptr<ContinuousFetcher> fetcher_;
   ThreadPool http_pool_;
   JsonOutput json_output_;
@@ -124,7 +123,7 @@ class Server {
 namespace {
 
 
-void RefreshNodeState(ClusterStateController<LoggedCertificate>* controller,
+void RefreshNodeState(ClusterStateController<LoggedEntry>* controller,
                       util::Task* task) {
   CHECK_NOTNULL(task);
   const std::chrono::steady_clock::duration period(
@@ -165,7 +164,7 @@ void WatchdogTimeout(int) {
 template <class Logged>
 std::string GetNodeId(Database<Logged>* db) {
   std::string node_id;
-  if (db->NodeId(&node_id) != Database<LoggedCertificate>::LOOKUP_OK) {
+  if (db->NodeId(&node_id) != Database<LoggedEntry>::LOOKUP_OK) {
     node_id = cert_trans::UUID4();
     LOG(INFO) << "Initializing Node DB with UUID: " << node_id;
     db->InitializeNode(node_id);
@@ -208,7 +207,7 @@ Server<Logged>::Server(const Options& opts,
       internal_pool_(CHECK_NOTNULL(internal_pool)),
       server_task_(internal_pool_),
       consistent_store_(&election_,
-                        new EtcdConsistentStore<LoggedCertificate>(
+                        new EtcdConsistentStore<LoggedEntry>(
                             event_base_.get(), internal_pool_, etcd_client_,
                             &election_, options_.etcd_root, node_id_)),
       frontend_((log_signer && cert_checker)
@@ -302,9 +301,9 @@ void Server<Logged>::Initialise(bool is_mirror) {
                                         log_verifier_, !is_mirror)
                      .release());
 
-  log_lookup_.reset(new LogLookup<LoggedCertificate>(db_));
+  log_lookup_.reset(new LogLookup<LoggedEntry>(db_));
 
-  cluster_controller_.reset(new ClusterStateController<LoggedCertificate>(
+  cluster_controller_.reset(new ClusterStateController<LoggedEntry>(
       internal_pool_, event_base_, url_fetcher_, db_, &consistent_store_,
       &election_, fetcher_.get()));
 
@@ -312,8 +311,7 @@ void Server<Logged>::Initialise(bool is_mirror) {
   cluster_controller_->SetNodeHostPort(options_.server, options_.port);
   {
     ct::SignedTreeHead db_sth;
-    if (db_->LatestTreeHead(&db_sth) ==
-        Database<LoggedCertificate>::LOOKUP_OK) {
+    if (db_->LatestTreeHead(&db_sth) == Database<LoggedEntry>::LOOKUP_OK) {
       const LogVerifier::VerifyResult sth_verify_result(
           log_verifier_->VerifySignedTreeHead(db_sth));
       if (sth_verify_result != LogVerifier::VERIFY_OK) {
@@ -330,7 +328,7 @@ void Server<Logged>::Initialise(bool is_mirror) {
 
   proxy_.reset(
       new Proxy(event_base_.get(), &json_output_,
-                bind(&ClusterStateController<LoggedCertificate>::GetFreshNodes,
+                bind(&ClusterStateController<LoggedEntry>::GetFreshNodes,
                      cluster_controller_.get()),
                 url_fetcher_, &http_pool_));
   handler_.reset(new HttpHandler(&json_output_, log_lookup_.get(), db_,

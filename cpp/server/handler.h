@@ -23,7 +23,7 @@ class CertChecker;
 template <class T>
 class ClusterStateController;
 class JsonOutput;
-class LoggedCertificate;
+class LoggedEntry;
 class PreCertChain;
 class Proxy;
 class ThreadPool;
@@ -35,10 +35,9 @@ class HttpHandler {
   // this instance. The "frontend" parameter can be NULL, in which
   // case this server will not accept "add-chain" and "add-pre-chain"
   // requests.
-  HttpHandler(JsonOutput* json_output,
-              LogLookup<LoggedCertificate>* log_lookup,
-              const ReadOnlyDatabase<LoggedCertificate>* db,
-              const ClusterStateController<LoggedCertificate>* controller,
+  HttpHandler(JsonOutput* json_output, LogLookup<LoggedEntry>* log_lookup,
+              const ReadOnlyDatabase<LoggedEntry>* db,
+              const ClusterStateController<LoggedEntry>* controller,
               const CertChecker* cert_checker, Frontend* frontend,
               Proxy* proxy, ThreadPool* pool, libevent::Base* event_base);
   ~HttpHandler();
@@ -73,9 +72,9 @@ class HttpHandler {
   void UpdateNodeStaleness();
 
   JsonOutput* const output_;
-  LogLookup<LoggedCertificate>* const log_lookup_;
-  const ReadOnlyDatabase<LoggedCertificate>* const db_;
-  const ClusterStateController<LoggedCertificate>* const controller_;
+  LogLookup<LoggedEntry>* const log_lookup_;
+  const ReadOnlyDatabase<LoggedEntry>* const db_;
+  const ClusterStateController<LoggedEntry>* const controller_;
   const CertChecker* const cert_checker_;
   Frontend* const frontend_;
   Proxy* const proxy_;

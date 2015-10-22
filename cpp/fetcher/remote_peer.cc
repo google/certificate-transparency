@@ -8,7 +8,6 @@
 #include "monitoring/monitoring.h"
 #include "util/util.h"
 
-using cert_trans::LoggedCertificate;
 using ct::SignedTreeHead;
 using std::bind;
 using std::chrono::seconds;

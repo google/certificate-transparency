@@ -9,7 +9,7 @@
 
 #include "util/etcd.h"
 #include "log/etcd_consistent_store.h"
-#include "log/logged_certificate.h"
+#include "log/logged_entry.h"
 #include "log/log_signer.h"
 #include "log/sqlite_db.h"
 #include "log/strict_consistent_store.h"
@@ -29,7 +29,7 @@ template <class Logged>
 util::Status InitLog(const ct::ClusterConfig& cluster_config,
                      TreeSigner<Logged>* tree_signer,
                      ConsistentStore<Logged>* consistent_store) {
-  if (tree_signer->UpdateTree() != TreeSigner<LoggedCertificate>::OK) {
+  if (tree_signer->UpdateTree() != TreeSigner<LoggedEntry>::OK) {
     return util::Status(util::error::UNKNOWN, "Failed to Update Tree");
   }
 

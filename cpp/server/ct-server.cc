@@ -101,7 +101,7 @@ using cert_trans::FakeEtcdClient;
 using cert_trans::FileStorage;
 using cert_trans::HttpHandler;
 using cert_trans::Latency;
-using cert_trans::LoggedCertificate;
+using cert_trans::LoggedEntry;
 using cert_trans::ReadPrivateKey;
 using cert_trans::ScopedLatency;
 using cert_trans::Server;
@@ -218,7 +218,7 @@ static const bool sign_dummy =
     RegisterFlagValidator(&FLAGS_tree_signing_frequency_seconds,
                           &ValidateIsPositive);
 
-void CleanUpEntries(ConsistentStore<LoggedCertificate>* store,
+void CleanUpEntries(ConsistentStore<LoggedEntry>* store,
                     const function<bool()>& is_master) {
   CHECK_NOTNULL(store);
   CHECK(is_master);
@@ -253,7 +253,7 @@ void CleanUpEntries(ConsistentStore<LoggedCertificate>* store,
   }
 }
 
-void SequenceEntries(TreeSigner<LoggedCertificate>* tree_signer,
+void SequenceEntries(TreeSigner<LoggedEntry>* tree_signer,
                      const function<bool()>& is_master) {
   CHECK_NOTNULL(tree_signer);
   CHECK(is_master);
@@ -281,9 +281,9 @@ void SequenceEntries(TreeSigner<LoggedCertificate>* tree_signer,
   }
 }
 
-void SignMerkleTree(TreeSigner<LoggedCertificate>* tree_signer,
-                    ConsistentStore<LoggedCertificate>* store,
-                    ClusterStateController<LoggedCertificate>* controller) {
+void SignMerkleTree(TreeSigner<LoggedEntry>* tree_signer,
+                    ConsistentStore<LoggedEntry>* store,
+                    ClusterStateController<LoggedEntry>* controller) {
   CHECK_NOTNULL(tree_signer);
   CHECK_NOTNULL(store);
   CHECK_NOTNULL(controller);
@@ -295,17 +295,17 @@ void SignMerkleTree(TreeSigner<LoggedCertificate>* tree_signer,
     {
       ScopedLatency signer_run_latency(
           signer_run_latency_ms.GetScopedLatency());
-      const TreeSigner<LoggedCertificate>::UpdateResult result(
+      const TreeSigner<LoggedEntry>::UpdateResult result(
           tree_signer->UpdateTree());
       switch (result) {
-        case TreeSigner<LoggedCertificate>::OK: {
+        case TreeSigner<LoggedEntry>::OK: {
           const SignedTreeHead latest_sth(tree_signer->LatestSTH());
           latest_local_tree_size_gauge->Set(latest_sth.tree_size());
           controller->NewTreeHead(latest_sth);
           signer_total_runs->Increment(true /* successful */);
           break;
         }
-        case TreeSigner<LoggedCertificate>::INSUFFICIENT_DATA:
+        case TreeSigner<LoggedEntry>::INSUFFICIENT_DATA:
           LOG(INFO) << "Can't update tree because we don't have all the "
                     << "entries locally, will try again later.";
           signer_total_runs->Increment(false /* successful */);
@@ -334,7 +334,7 @@ int main(int argc, char* argv[]) {
 
   util::InitCT(&argc, &argv);
 
-  Server<LoggedCertificate>::StaticInit();
+  Server<LoggedEntry>::StaticInit();
 
   util::StatusOr<EVP_PKEY*> pkey(ReadPrivateKey(FLAGS_key));
   CHECK_EQ(pkey.status(), util::Status::OK);
@@ -356,14 +356,14 @@ int main(int argc, char* argv[]) {
         << "Certificate directory and tree directory must differ";
   }
 
-  Database<LoggedCertificate>* db;
+  Database<LoggedEntry>* db;
 
   if (!FLAGS_sqlite_db.empty()) {
-    db = new SQLiteDB<LoggedCertificate>(FLAGS_sqlite_db);
+    db = new SQLiteDB<LoggedEntry>(FLAGS_sqlite_db);
   } else if (!FLAGS_leveldb_db.empty()) {
-    db = new LevelDB<LoggedCertificate>(FLAGS_leveldb_db);
+    db = new LevelDB<LoggedEntry>(FLAGS_leveldb_db);
   } else {
-    db = new FileDB<LoggedCertificate>(
+    db = new FileDB<LoggedEntry>(
         new FileStorage(FLAGS_cert_dir, FLAGS_cert_storage_depth),
         new FileStorage(FLAGS_tree_dir, FLAGS_tree_storage_depth),
         new FileStorage(FLAGS_meta_dir, 0));
@@ -390,18 +390,18 @@ int main(int argc, char* argv[]) {
   const LogVerifier log_verifier(new LogSigVerifier(pkey.ValueOrDie()),
                                  new MerkleVerifier(new Sha256Hasher));
 
-  Server<LoggedCertificate>::Options options;
+  Server<LoggedEntry>::Options options;
   options.server = FLAGS_server;
   options.port = FLAGS_port;
   options.etcd_root = FLAGS_etcd_root;
   options.num_http_server_threads = FLAGS_num_http_server_threads;
 
-  Server<LoggedCertificate> server(options, event_base, &internal_pool, db,
-                                   etcd_client.get(), &url_fetcher,
-                                   &log_signer, &log_verifier, &checker);
+  Server<LoggedEntry> server(options, event_base, &internal_pool, db,
+                             etcd_client.get(), &url_fetcher, &log_signer,
+                             &log_verifier, &checker);
   server.Initialise(false /* is_mirror */);
 
-  TreeSigner<LoggedCertificate> tree_signer(
+  TreeSigner<LoggedEntry> tree_signer(
       std::chrono::duration<double>(FLAGS_guard_window_seconds), db,
       server.log_lookup()->GetCompactMerkleTree(new Sha256Hasher),
       server.consistent_store(), &log_signer);
@@ -440,7 +440,7 @@ int main(int argc, char* argv[]) {
 
     // Do an initial signing run to get the initial STH, again this is
     // temporary until we re-populate FakeEtcd from the DB.
-    CHECK_EQ(tree_signer.UpdateTree(), TreeSigner<LoggedCertificate>::OK);
+    CHECK_EQ(tree_signer.UpdateTree(), TreeSigner<LoggedEntry>::OK);
 
     // Need to boot-strap the Serving STH too because we consider it an error
     // if it's not set, which in turn causes us to not attempt to become
@@ -456,7 +456,7 @@ int main(int argc, char* argv[]) {
   // (either not accepting any requests, or returning some internal
   // server error) until we have an STH to serve.
   const function<bool()> is_master(
-      bind(&Server<LoggedCertificate>::IsMaster, &server));
+      bind(&Server<LoggedEntry>::IsMaster, &server));
   thread sequencer(&SequenceEntries, &tree_signer, is_master);
   thread cleanup(&CleanUpEntries, server.consistent_store(), is_master);
   thread signer(&SignMerkleTree, &tree_signer, server.consistent_store(),

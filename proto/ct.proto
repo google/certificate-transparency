@@ -167,7 +167,8 @@ message ShortMerkleAuditProof {
 // for logging entries and tree head state.                                   //
 ////////////////////////////////////////////////////////////////////////////////
 
-message LoggedCertificatePB {
+// TODO(alcutter): Come up with a better name :/
+message LoggedEntryPB {
   optional int64 sequence_number = 1;
   optional bytes merkle_leaf_hash = 2;
   message Contents {

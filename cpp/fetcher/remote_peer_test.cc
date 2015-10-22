@@ -189,13 +189,13 @@ class RemotePeerTest : public ::testing::Test {
   shared_ptr<libevent::Base> base_;
   libevent::EventPumpThread event_pump_;
   FakeEtcdClient etcd_client_;
-  TestDB<LevelDB<LoggedCertificate>> test_db_;
+  TestDB<LevelDB<LoggedEntry>> test_db_;
   ThreadPool pool_;
   NiceMock<MockMasterElection> election_;
-  cert_trans::EtcdConsistentStore<LoggedCertificate> store_;
+  cert_trans::EtcdConsistentStore<LoggedEntry> store_;
   TestSigner test_signer_;
   unique_ptr<LogSigner> log_signer_;
-  TreeSigner<LoggedCertificate> tree_signer_;
+  TreeSigner<LoggedEntry> tree_signer_;
   SyncTask task_;
   MockUrlFetcher fetcher_;
   unique_ptr<RemotePeer> peer_;

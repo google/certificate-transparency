@@ -9,7 +9,7 @@
 
 namespace {
 
-using cert_trans::LoggedCertificate;
+using cert_trans::LoggedEntry;
 using ct::SignedTreeHead;
 using std::string;
 
@@ -92,7 +92,7 @@ TYPED_TEST(DBTest, LookupLatestWrittenSTH) {
 }
 
 TYPED_TEST(DBTest, WriteEntryAndLookupHash) {
-  LoggedCertificate logged;
+  LoggedEntry logged;
   this->test_signer_.CreateUnique(&logged);
 
   EXPECT_EQ(DB::WRITE_OK, this->db()->CreateEntry(logged));

@@ -77,7 +77,7 @@ TESTS = \
 	cpp/log/frontend_test \
 	cpp/log/log_lookup_test \
 	cpp/log/log_signer_test \
-	cpp/log/logged_certificate_test \
+	cpp/log/logged_entry_test \
 	cpp/log/signer_verifier_test \
 	cpp/log/strict_consistent_store_test \
 	cpp/log/tree_signer_test \
@@ -144,7 +144,7 @@ cpp_libcore_a_SOURCES = \
 	cpp/log/log_lookup_cert.cc \
 	cpp/log/log_signer.cc \
 	cpp/log/log_verifier.cc \
-	cpp/log/logged_certificate.cc \
+	cpp/log/logged_entry.cc \
 	cpp/log/signer.cc \
 	cpp/log/sqlite_db_cert.cc \
 	cpp/log/strict_consistent_store_cert.cc \
@@ -483,13 +483,13 @@ cpp_log_log_signer_test_SOURCES = \
 	cpp/proto/serializer.cc \
 	cpp/util/util.cc
 
-cpp_log_logged_certificate_test_LDADD = \
+cpp_log_logged_entry_test_LDADD = \
 	cpp/libcore.a \
 	cpp/libtest.a \
 	$(libevent_LIBS) \
 	-lprotobuf
-cpp_log_logged_certificate_test_SOURCES = \
-	cpp/log/logged_certificate_test.cc \
+cpp_log_logged_entry_test_SOURCES = \
+	cpp/log/logged_entry_test.cc \
 	cpp/proto/serializer.cc \
 	cpp/util/util.cc
 

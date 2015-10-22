@@ -9,7 +9,7 @@
 #include "log/file_db.h"
 #include "log/file_storage.h"
 #include "log/leveldb_db.h"
-#include "log/logged_certificate.h"
+#include "log/logged_entry.h"
 #include "log/sqlite_db.h"
 #include "proto/serializer.h"
 #include "util/init.h"
@@ -34,7 +34,7 @@ DEFINE_int64(end, std::numeric_limits<int64_t>::max(),
              "Ending sequence number (inclusive).");
 
 using cert_trans::FileStorage;
-using cert_trans::LoggedCertificate;
+using cert_trans::LoggedEntry;
 using std::cerr;
 using std::cout;
 using std::function;
@@ -51,11 +51,11 @@ void Usage() {
 }
 
 
-void ForEachLeaf(const ReadOnlyDatabase<LoggedCertificate>* db,
-                 const function<void(const LoggedCertificate& cert)>& f) {
-  unique_ptr<ReadOnlyDatabase<LoggedCertificate>::Iterator> it(
+void ForEachLeaf(const ReadOnlyDatabase<LoggedEntry>* db,
+                 const function<void(const LoggedEntry& cert)>& f) {
+  unique_ptr<ReadOnlyDatabase<LoggedEntry>::Iterator> it(
       db->ScanEntries(FLAGS_start));
-  LoggedCertificate cert;
+  LoggedEntry cert;
   while (it->GetNextEntry(&cert)) {
     if (cert.sequence_number() > FLAGS_end) {
       break;
@@ -65,9 +65,9 @@ void ForEachLeaf(const ReadOnlyDatabase<LoggedCertificate>* db,
 }
 
 
-int DumpLeafInputs(const ReadOnlyDatabase<LoggedCertificate>* db) {
+int DumpLeafInputs(const ReadOnlyDatabase<LoggedEntry>* db) {
   CHECK_NOTNULL(db);
-  ForEachLeaf(db, [](const LoggedCertificate& cert) {
+  ForEachLeaf(db, [](const LoggedEntry& cert) {
     string serialized;
     const Serializer::SerializeResult r(Serializer::SerializeSCTSignatureInput(
         cert.contents().sct(), cert.contents().entry(), &serialized));
@@ -104,14 +104,14 @@ int main(int argc, char* argv[]) {
         << "Certificate directory and tree directory must differ";
   }
 
-  unique_ptr<ReadOnlyDatabase<LoggedCertificate>> db;
+  unique_ptr<ReadOnlyDatabase<LoggedEntry>> db;
 
   if (!FLAGS_sqlite_db.empty()) {
-    db.reset(new SQLiteDB<LoggedCertificate>(FLAGS_sqlite_db));
+    db.reset(new SQLiteDB<LoggedEntry>(FLAGS_sqlite_db));
   } else if (!FLAGS_leveldb_db.empty()) {
-    db.reset(new LevelDB<LoggedCertificate>(FLAGS_leveldb_db));
+    db.reset(new LevelDB<LoggedEntry>(FLAGS_leveldb_db));
   } else {
-    db.reset(new FileDB<LoggedCertificate>(
+    db.reset(new FileDB<LoggedEntry>(
         new FileStorage(FLAGS_cert_dir, FLAGS_cert_storage_depth),
         new FileStorage(FLAGS_tree_dir, FLAGS_tree_storage_depth),
         new FileStorage(FLAGS_meta_dir, 0)));

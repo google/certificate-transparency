@@ -7,7 +7,7 @@
 #include "log/file_db.h"
 #include "log/file_storage.h"
 #include "log/leveldb_db.h"
-#include "log/logged_certificate.h"
+#include "log/logged_entry.h"
 #include "log/sqlite_db.h"
 #include "log/test_db.h"
 #include "log/test_signer.h"
@@ -18,7 +18,7 @@
 
 namespace {
 
-using cert_trans::LoggedCertificate;
+using cert_trans::LoggedEntry;
 using ct::SignedTreeHead;
 using std::string;
 using std::unique_ptr;
@@ -41,11 +41,11 @@ class DBTest : public ::testing::Test {
   TestSigner test_signer_;
 };
 
-typedef testing::Types<FileDB<cert_trans::LoggedCertificate>,
-                       SQLiteDB<cert_trans::LoggedCertificate>,
-                       LevelDB<cert_trans::LoggedCertificate>> Databases;
+typedef testing::Types<FileDB<cert_trans::LoggedEntry>,
+                       SQLiteDB<cert_trans::LoggedEntry>,
+                       LevelDB<cert_trans::LoggedEntry>> Databases;
 
-typedef Database<cert_trans::LoggedCertificate> DB;
+typedef Database<cert_trans::LoggedEntry> DB;
 
 template <class T>
 class DBTestDeathTest : public DBTest<T> {
@@ -56,7 +56,7 @@ TYPED_TEST_CASE(DBTestDeathTest, Databases);
 
 
 TYPED_TEST(DBTest, CreateSequenced) {
-  LoggedCertificate logged_cert, lookup_cert;
+  LoggedEntry logged_cert, lookup_cert;
   this->test_signer_.CreateUnique(&logged_cert);
 
   EXPECT_EQ(DB::OK, this->db()->CreateSequencedEntry(logged_cert));
@@ -83,16 +83,16 @@ TYPED_TEST(DBTest, CreateSequenced) {
 
 
 TYPED_TEST(DBTest, CreateSequencedDuplicateEntry) {
-  LoggedCertificate logged_cert;
+  LoggedEntry logged_cert;
   this->test_signer_.CreateUnique(&logged_cert);
 
   EXPECT_EQ(DB::OK, this->db()->CreateSequencedEntry(logged_cert));
 
-  LoggedCertificate duplicate_cert;
+  LoggedEntry duplicate_cert;
   duplicate_cert.CopyFrom(logged_cert);
   EXPECT_EQ(DB::OK, this->db()->CreateSequencedEntry(duplicate_cert));
 
-  LoggedCertificate lookup_cert;
+  LoggedEntry lookup_cert;
   EXPECT_EQ(DB::LOOKUP_OK,
             this->db()->LookupByHash(logged_cert.Hash(), &lookup_cert));
   // Check that we get the original entry back.
@@ -107,7 +107,7 @@ TYPED_TEST(DBTest, CreateSequencedDuplicateEntry) {
 
 
 TYPED_TEST(DBTest, CreateSequencedDuplicateEntryNewSequenceNumber) {
-  LoggedCertificate logged_cert, duplicate_cert, lookup_cert;
+  LoggedEntry logged_cert, duplicate_cert, lookup_cert;
   this->test_signer_.CreateUnique(&logged_cert);
 
   duplicate_cert.CopyFrom(logged_cert);
@@ -142,7 +142,7 @@ TYPED_TEST(DBTest, CreateSequencedDuplicateEntryNewSequenceNumber) {
 
 
 TYPED_TEST(DBTest, CreateSequencedDuplicateSequenceNumber) {
-  LoggedCertificate logged_cert, duplicate_seq, lookup_cert;
+  LoggedEntry logged_cert, duplicate_seq, lookup_cert;
   this->test_signer_.CreateUnique(&logged_cert);
   this->test_signer_.CreateUnique(&duplicate_seq);
   duplicate_seq.set_sequence_number(logged_cert.sequence_number());
@@ -172,7 +172,7 @@ TYPED_TEST(DBTest, CreateSequencedDuplicateSequenceNumber) {
 
 
 TYPED_TEST(DBTest, TreeSize) {
-  LoggedCertificate logged_cert;
+  LoggedEntry logged_cert;
 
   this->test_signer_.CreateUnique(&logged_cert);
   logged_cert.set_sequence_number(0);
@@ -218,7 +218,7 @@ TYPED_TEST(DBTest, TreeSize) {
 
 
 TYPED_TEST(DBTest, LookupBySequenceNumber) {
-  LoggedCertificate logged_cert, logged_cert2, lookup_cert, lookup_cert2;
+  LoggedEntry logged_cert, logged_cert2, lookup_cert, lookup_cert2;
   this->test_signer_.CreateUnique(&logged_cert);
   logged_cert.set_sequence_number(42);
   this->test_signer_.CreateUnique(&logged_cert2);
@@ -299,7 +299,7 @@ TYPED_TEST(DBTest, WriteTreeHeadOlderTimestamp) {
 
 
 TYPED_TEST(DBTest, Resume) {
-  LoggedCertificate logged_cert, logged_cert2, lookup_cert, lookup_cert2;
+  LoggedEntry logged_cert, logged_cert2, lookup_cert, lookup_cert2;
   const int64_t kSeq1(129);
   const int64_t kSeq2(22);
 
@@ -318,7 +318,7 @@ TYPED_TEST(DBTest, Resume) {
   EXPECT_EQ(DB::OK, this->db()->WriteTreeHead(sth));
   EXPECT_EQ(DB::OK, this->db()->WriteTreeHead(sth2));
 
-  Database<cert_trans::LoggedCertificate>* db2 = this->test_db_.SecondDB();
+  Database<cert_trans::LoggedEntry>* db2 = this->test_db_.SecondDB();
 
   EXPECT_EQ(DB::LOOKUP_OK,
             db2->LookupByHash(logged_cert.Hash(), &lookup_cert));
@@ -342,7 +342,7 @@ TYPED_TEST(DBTest, Resume) {
 TYPED_TEST(DBTest, ResumeEmpty) {
   DB* db2 = this->test_db_.SecondDB();
 
-  LoggedCertificate lookup_cert;
+  LoggedEntry lookup_cert;
   EXPECT_EQ(DB::NOT_FOUND, db2->LookupByIndex(0, &lookup_cert));
 
   SignedTreeHead lookup_sth;
@@ -380,7 +380,7 @@ TYPED_TEST(DBTestDeathTest, CannotHaveEmptyNodeId) {
 
 
 TYPED_TEST(DBTest, Iterator) {
-  LoggedCertificate logged_cert1, logged_cert2, logged_cert3;
+  LoggedEntry logged_cert1, logged_cert2, logged_cert3;
   const int64_t kSeq1(129);
   const int64_t kSeq2(22);
   const int64_t kSeq3(42);
@@ -400,9 +400,8 @@ TYPED_TEST(DBTest, Iterator) {
   logged_cert3.set_sequence_number(kSeq3);
   ASSERT_EQ(DB::OK, this->db()->CreateSequencedEntry(logged_cert3));
 
-  unique_ptr<Database<LoggedCertificate>::Iterator> it(
-      this->db()->ScanEntries(0));
-  LoggedCertificate it_cert;
+  unique_ptr<Database<LoggedEntry>::Iterator> it(this->db()->ScanEntries(0));
+  LoggedEntry it_cert;
   ASSERT_TRUE(it->GetNextEntry(&it_cert));
   TestSigner::TestEqualLoggedCerts(logged_cert2, it_cert);
 

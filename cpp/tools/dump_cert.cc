@@ -16,7 +16,7 @@ namespace {
 
 void DumpLoggedCert(const char* filename) {
   ifstream input(filename);
-  ct::LoggedCertificatePB pb;
+  ct::LoggedEntryPB pb;
   CHECK(pb.ParseFromIstream(&input));
 
   if (pb.has_sequence_number())

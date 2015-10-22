@@ -171,7 +171,7 @@ Monitor::GetResult Monitor::GetEntries(int get_first, int get_last) {
 
     db_->BeginTransaction();
     for (size_t i = 0; i < entries.size(); i++) {
-      cert_trans::LoggedCertificate logged;
+      cert_trans::LoggedEntry logged;
       CHECK(logged.CopyFromClientLogEntry(entries.at(i)));
       CHECK_EQ(db_->CreateEntry(logged), Database::WRITE_OK);
     }

@@ -18,7 +18,7 @@
 #include "log/cluster_state_controller.h"
 #include "log/frontend.h"
 #include "log/log_lookup.h"
-#include "log/logged_certificate.h"
+#include "log/logged_entry.h"
 #include "monitoring/monitoring.h"
 #include "monitoring/latency.h"
 #include "server/json_output.h"
@@ -35,7 +35,7 @@ using cert_trans::Counter;
 using cert_trans::HttpHandler;
 using cert_trans::JsonOutput;
 using cert_trans::Latency;
-using cert_trans::LoggedCertificate;
+using cert_trans::LoggedEntry;
 using cert_trans::Proxy;
 using cert_trans::ScopedLatency;
 using ct::ShortMerkleAuditProof;
@@ -218,12 +218,13 @@ bool GetBoolParam(const multimap<string, string>& query, const string& param) {
 }  // namespace
 
 
-HttpHandler::HttpHandler(
-    JsonOutput* output, LogLookup<LoggedCertificate>* log_lookup,
-    const ReadOnlyDatabase<LoggedCertificate>* db,
-    const ClusterStateController<LoggedCertificate>* controller,
-    const CertChecker* cert_checker, Frontend* frontend, Proxy* proxy,
-    ThreadPool* pool, libevent::Base* event_base)
+HttpHandler::HttpHandler(JsonOutput* output,
+                         LogLookup<LoggedEntry>* log_lookup,
+                         const ReadOnlyDatabase<LoggedEntry>* db,
+                         const ClusterStateController<LoggedEntry>* controller,
+                         const CertChecker* cert_checker, Frontend* frontend,
+                         Proxy* proxy, ThreadPool* pool,
+                         libevent::Base* event_base)
     : output_(CHECK_NOTNULL(output)),
       log_lookup_(CHECK_NOTNULL(log_lookup)),
       db_(CHECK_NOTNULL(db)),
@@ -401,7 +402,7 @@ void HttpHandler::GetProof(evhttp_request* req) const {
 
   ShortMerkleAuditProof proof;
   if (log_lookup_->AuditProof(hash, tree_size, &proof) !=
-      LogLookup<LoggedCertificate>::OK) {
+      LogLookup<LoggedEntry>::OK) {
     return output_->SendError(req, HTTP_BADREQUEST, "Couldn't find hash.");
   }
 
@@ -498,7 +499,7 @@ void HttpHandler::BlockingGetEntries(evhttp_request* req, int64_t start,
   JsonArray json_entries;
   auto it(db_->ScanEntries(start));
   for (int64_t i = start; i <= end; ++i) {
-    LoggedCertificate cert;
+    LoggedEntry cert;
 
     if (!it->GetNextEntry(&cert) || cert.sequence_number() != i) {
       break;

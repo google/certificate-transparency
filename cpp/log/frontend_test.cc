@@ -14,7 +14,7 @@
 #include "log/frontend.h"
 #include "log/frontend_signer.h"
 #include "log/log_verifier.h"
-#include "log/logged_certificate.h"
+#include "log/logged_entry.h"
 #include "log/sqlite_db.h"
 #include "log/test_db.h"
 #include "log/test_signer.h"
@@ -60,7 +60,7 @@ using cert_trans::CertChecker;
 using cert_trans::EtcdConsistentStore;
 using cert_trans::FakeEtcdClient;
 using cert_trans::EntryHandle;
-using cert_trans::LoggedCertificate;
+using cert_trans::LoggedEntry;
 using cert_trans::MockMasterElection;
 using cert_trans::PreCertChain;
 using cert_trans::ThreadPool;
@@ -75,7 +75,7 @@ using testing::_;
 using testing::NiceMock;
 using util::testing::StatusIs;
 
-typedef Database<LoggedCertificate> DB;
+typedef Database<LoggedEntry> DB;
 typedef Frontend FE;
 
 // A slightly shorter notation for constructing hex strings from binary blobs.
@@ -136,7 +136,7 @@ class FrontendTest : public ::testing::Test {
   FakeEtcdClient etcd_client_;
   ThreadPool pool_;
   NiceMock<MockMasterElection> election_;
-  EtcdConsistentStore<LoggedCertificate> store_;
+  EtcdConsistentStore<LoggedEntry> store_;
   unique_ptr<LogSigner> log_signer_;
   FE frontend_;
   const string cert_dir_;
@@ -151,8 +151,7 @@ class FrontendTest : public ::testing::Test {
   string ca_pem_;
 };
 
-typedef testing::Types<FileDB<LoggedCertificate>, SQLiteDB<LoggedCertificate>>
-    Databases;
+typedef testing::Types<FileDB<LoggedEntry>, SQLiteDB<LoggedEntry>> Databases;
 
 TYPED_TEST_CASE(FrontendTest, Databases);
 
@@ -164,14 +163,14 @@ TYPED_TEST(FrontendTest, TestSubmitValid) {
   EXPECT_OK(this->frontend_.QueueX509Entry(&chain, &sct));
 
   // Look it up and expect to get the right thing back.
-  EntryHandle<LoggedCertificate> entry_handle;
+  EntryHandle<LoggedEntry> entry_handle;
   Cert cert(this->leaf_pem_);
 
   string sha256_digest;
   ASSERT_OK(cert.Sha256Digest(&sha256_digest));
   EXPECT_TRUE(
       this->store_.GetPendingEntryForHash(sha256_digest, &entry_handle).ok());
-  const LoggedCertificate& logged_cert(entry_handle.Entry());
+  const LoggedEntry& logged_cert(entry_handle.Entry());
 
   EXPECT_EQ(ct::X509_ENTRY, logged_cert.entry().type());
   // Compare the leaf cert.
@@ -198,10 +197,10 @@ TYPED_TEST(FrontendTest, TestSubmitValidWithIntermediate) {
 
   string sha256_digest;
   ASSERT_OK(cert.Sha256Digest(&sha256_digest));
-  EntryHandle<LoggedCertificate> entry_handle;
+  EntryHandle<LoggedEntry> entry_handle;
   EXPECT_TRUE(
       this->store_.GetPendingEntryForHash(sha256_digest, &entry_handle).ok());
-  const LoggedCertificate& logged_cert(entry_handle.Entry());
+  const LoggedEntry& logged_cert(entry_handle.Entry());
 
   EXPECT_EQ(ct::X509_ENTRY, logged_cert.entry().type());
   // Compare the leaf cert.
@@ -240,10 +239,10 @@ TYPED_TEST(FrontendTest, TestSubmitDuplicate) {
 
   string sha256_digest;
   ASSERT_OK(cert.Sha256Digest(&sha256_digest));
-  EntryHandle<LoggedCertificate> entry_handle;
+  EntryHandle<LoggedEntry> entry_handle;
   EXPECT_TRUE(
       this->store_.GetPendingEntryForHash(sha256_digest, &entry_handle).ok());
-  const LoggedCertificate& logged_cert(entry_handle.Entry());
+  const LoggedEntry& logged_cert(entry_handle.Entry());
 
   EXPECT_EQ(ct::X509_ENTRY, logged_cert.entry().type());
   // Compare the leaf cert.
@@ -296,9 +295,9 @@ TYPED_TEST(FrontendTest, TestSubmitPrecert) {
   // Look it up.
   string hash = Sha256Hasher::Sha256Digest(
       entry.precert_entry().pre_cert().tbs_certificate());
-  EntryHandle<LoggedCertificate> entry_handle;
+  EntryHandle<LoggedEntry> entry_handle;
   EXPECT_TRUE(this->store_.GetPendingEntryForHash(hash, &entry_handle).ok());
-  const LoggedCertificate& logged_cert(entry_handle.Entry());
+  const LoggedEntry& logged_cert(entry_handle.Entry());
   Cert pre(this->precert_pem_);
   Cert ca(this->ca_pem_);
 
@@ -337,9 +336,9 @@ TYPED_TEST(FrontendTest, TestSubmitPrecertUsingPreCA) {
   // Look it up.
   string hash = Sha256Hasher::Sha256Digest(
       entry.precert_entry().pre_cert().tbs_certificate());
-  EntryHandle<LoggedCertificate> entry_handle;
+  EntryHandle<LoggedEntry> entry_handle;
   EXPECT_TRUE(this->store_.GetPendingEntryForHash(hash, &entry_handle).ok());
-  const LoggedCertificate& logged_cert(entry_handle.Entry());
+  const LoggedEntry& logged_cert(entry_handle.Entry());
   Cert pre(this->precert_with_preca_pem_);
   Cert ca_pre(this->ca_precert_pem_);
   Cert ca(this->ca_pem_);

@@ -65,7 +65,7 @@ class Serializer {
   static SerializeResult CheckLogEntryFormat(const ct::LogEntry& entry);
 
   // Helper method to hide some of the ugly select logic.
-  static std::string LeafCertificate(const ct::LogEntry& entry);
+  static std::string LeafData(const ct::LogEntry& entry);
 
   static SerializeResult SerializeV1CertSCTSignatureInput(
       uint64_t timestamp, const std::string& certificate,

@@ -1,4 +1,4 @@
 #include "log/file_db-inl.h"
-#include "log/logged_certificate.h"
+#include "log/logged_entry.h"
 
-template class FileDB<cert_trans::LoggedCertificate>;
+template class FileDB<cert_trans::LoggedEntry>;

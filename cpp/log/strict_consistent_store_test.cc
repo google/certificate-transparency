@@ -4,7 +4,7 @@
 #include <gmock/gmock.h>
 #include <gtest/gtest.h>
 
-#include "log/logged_certificate.h"
+#include "log/logged_entry.h"
 #include "log/mock_consistent_store.h"
 #include "util/mock_masterelection.h"
 #include "util/status.h"
@@ -29,7 +29,7 @@ using util::testing::StatusIs;
 class StrictConsistentStoreTest : public ::testing::TestWithParam<bool> {
  public:
   StrictConsistentStoreTest()
-      : peer_(new NiceMock<MockConsistentStore<LoggedCertificate>>()),
+      : peer_(new NiceMock<MockConsistentStore<LoggedEntry>>()),
         strict_store_(&election_, peer_) {
     ON_CALL(election_, IsMaster()).WillByDefault(Return(IsMaster()));
   }
@@ -41,8 +41,8 @@ class StrictConsistentStoreTest : public ::testing::TestWithParam<bool> {
 
   NiceMock<MockMasterElection> election_;
   // strict_store_ takes ownership of this:
-  NiceMock<MockConsistentStore<LoggedCertificate>>* peer_;
-  StrictConsistentStore<LoggedCertificate> strict_store_;
+  NiceMock<MockConsistentStore<LoggedEntry>>* peer_;
+  StrictConsistentStore<LoggedEntry> strict_store_;
 };
 
 

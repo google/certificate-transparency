@@ -57,7 +57,7 @@ Serializer::SerializeResult Serializer::CheckLogEntryFormat(
 }
 
 // static
-string Serializer::LeafCertificate(const LogEntry& entry) {
+string Serializer::LeafData(const LogEntry& entry) {
   switch (entry.type()) {
     case ct::X509_ENTRY:
       CHECK(entry.x509_entry().has_leaf_certificate())

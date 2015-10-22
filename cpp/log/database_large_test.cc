@@ -11,7 +11,7 @@
 #include "log/file_db.h"
 #include "log/file_storage.h"
 #include "log/leveldb_db.h"
-#include "log/logged_certificate.h"
+#include "log/logged_entry.h"
 #include "log/sqlite_db.h"
 #include "log/test_db.h"
 #include "log/test_signer.h"
@@ -26,10 +26,10 @@ DEFINE_int32(database_size, 100,
 
 namespace {
 
-using cert_trans::LoggedCertificate;
+using cert_trans::LoggedEntry;
 using std::string;
 
-typedef Database<LoggedCertificate> DB;
+typedef Database<LoggedEntry> DB;
 
 template <class T>
 class LargeDBTest : public ::testing::Test {
@@ -41,7 +41,7 @@ class LargeDBTest : public ::testing::Test {
   }
 
   void FillDatabase(int entries) {
-    LoggedCertificate logged_cert;
+    LoggedEntry logged_cert;
     for (int i = 0; i < entries; ++i) {
       test_signer_.CreateUniqueFakeSignature(&logged_cert);
       logged_cert.set_sequence_number(i);
@@ -51,7 +51,7 @@ class LargeDBTest : public ::testing::Test {
 
   int ReadAllSequencedEntries(int num) {
     std::set<string>::const_iterator it;
-    LoggedCertificate lookup_cert;
+    LoggedEntry lookup_cert;
     for (int i = 0; i < num; ++i) {
       EXPECT_EQ(DB::LOOKUP_OK, this->db()->LookupByIndex(i, &lookup_cert));
     }
@@ -66,8 +66,8 @@ class LargeDBTest : public ::testing::Test {
   TestSigner test_signer_;
 };
 
-typedef testing::Types<FileDB<LoggedCertificate>, SQLiteDB<LoggedCertificate>,
-                       LevelDB<LoggedCertificate>> Databases;
+typedef testing::Types<FileDB<LoggedEntry>, SQLiteDB<LoggedEntry>,
+                       LevelDB<LoggedEntry>> Databases;
 
 TYPED_TEST_CASE(LargeDBTest, Databases);
 
