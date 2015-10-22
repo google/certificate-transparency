@@ -21,7 +21,6 @@ class CertChain;
 class CertChecker;
 template <class T>
 class ClusterStateController;
-class JsonOutput;
 class LoggedEntry;
 class PreCertChain;
 class Proxy;
@@ -42,7 +41,6 @@ class HttpHandler {
 
   void Add(libevent::HttpServer* server);
 
-  void SetOutput(JsonOutput* json_output);
   void SetProxy(Proxy* proxy);
 
  protected:
@@ -71,7 +69,6 @@ class HttpHandler {
   bool IsNodeStale() const;
   void UpdateNodeStaleness();
 
-  JsonOutput* output_;
   LogLookup<LoggedEntry>* const log_lookup_;
   const ReadOnlyDatabase<LoggedEntry>* const db_;
   const ClusterStateController<LoggedEntry>* const controller_;

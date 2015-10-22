@@ -67,6 +67,9 @@ string Serializer::LeafData(const LogEntry& entry) {
       CHECK(entry.precert_entry().pre_cert().has_tbs_certificate())
           << "Missing tbs certificate";
       return entry.precert_entry().pre_cert().tbs_certificate();
+    case ct::X_JSON_ENTRY:
+      CHECK(entry.x_json_entry().has_json()) << "Missing json";
+      return entry.x_json_entry().json();
     default:
       LOG(FATAL) << "Invalid entry type " << entry.type();
   }
@@ -119,6 +122,31 @@ Serializer::SerializeResult Serializer::SerializeV1PrecertSCTSignatureInput(
 }
 
 // static
+Serializer::SerializeResult Serializer::SerializeV1XJsonSCTSignatureInput(
+    uint64_t timestamp, const string& json, const string& extensions,
+    string* result) {
+  CHECK_NOTNULL(result);
+  // TODO(alcutter): CheckJsonFormat()?
+  SerializeResult res = CheckCertificateFormat(json);
+  if (res != OK) {
+    return res;
+  }
+  res = CheckExtensionsFormat(extensions);
+  if (res != OK) {
+    return res;
+  }
+  Serializer serializer;
+  serializer.WriteUint(ct::V1, kVersionLengthInBytes);
+  serializer.WriteUint(ct::CERTIFICATE_TIMESTAMP, kSignatureTypeLengthInBytes);
+  serializer.WriteUint(timestamp, kTimestampLengthInBytes);
+  serializer.WriteUint(ct::X_JSON_ENTRY, kLogEntryTypeLengthInBytes);
+  serializer.WriteVarBytes(json, kMaxCertificateLength);
+  serializer.WriteVarBytes(extensions, kMaxExtensionsLength);
+  result->assign(serializer.SerializedString());
+  return OK;
+}
+
+// static
 Serializer::SerializeResult Serializer::SerializeSCTSignatureInput(
     const SignedCertificateTimestamp& sct, const LogEntry& entry,
     string* result) {
@@ -134,6 +162,10 @@ Serializer::SerializeResult Serializer::SerializeSCTSignatureInput(
           sct.timestamp(), entry.precert_entry().pre_cert().issuer_key_hash(),
           entry.precert_entry().pre_cert().tbs_certificate(), sct.extensions(),
           result);
+    case ct::X_JSON_ENTRY:
+      CHECK(entry.has_x_json_entry());
+      *result = entry.x_json_entry().json();
+      return OK;
     default:
       return INVALID_ENTRY_TYPE;
   }
@@ -186,6 +218,31 @@ Serializer::SerializeResult Serializer::SerializeV1PrecertSCTMerkleTreeLeaf(
 }
 
 // static
+Serializer::SerializeResult Serializer::SerializeV1XJsonSCTMerkleTreeLeaf(
+    uint64_t timestamp, const string& json, const string& extensions,
+    string* result) {
+  CHECK_NOTNULL(result);
+  // TODO(alcutter): CheckJsonFormat()?
+  SerializeResult res = CheckCertificateFormat(json);
+  if (res != OK) {
+    return res;
+  }
+  res = CheckExtensionsFormat(extensions);
+  if (res != OK) {
+    return res;
+  }
+  Serializer serializer;
+  serializer.WriteUint(ct::V1, kVersionLengthInBytes);
+  serializer.WriteUint(ct::TIMESTAMPED_ENTRY, kMerkleLeafTypeLengthInBytes);
+  serializer.WriteUint(timestamp, kTimestampLengthInBytes);
+  serializer.WriteUint(ct::X_JSON_ENTRY, kLogEntryTypeLengthInBytes);
+  serializer.WriteVarBytes(json, kMaxCertificateLength);
+  serializer.WriteVarBytes(extensions, kMaxExtensionsLength);
+  result->assign(serializer.SerializedString());
+  return OK;
+}
+
+// static
 Serializer::SerializeResult Serializer::SerializeSCTMerkleTreeLeaf(
     const ct::SignedCertificateTimestamp& sct, const ct::LogEntry& entry,
     string* result) {
@@ -201,6 +258,10 @@ Serializer::SerializeResult Serializer::SerializeSCTMerkleTreeLeaf(
           sct.timestamp(), entry.precert_entry().pre_cert().issuer_key_hash(),
           entry.precert_entry().pre_cert().tbs_certificate(), sct.extensions(),
           result);
+    case ct::X_JSON_ENTRY:
+      return SerializeV1XJsonSCTMerkleTreeLeaf(sct.timestamp(),
+                                               entry.x_json_entry().json(),
+                                               sct.extensions(), result);
     default:
       return INVALID_ENTRY_TYPE;
   }
@@ -332,6 +393,9 @@ Serializer::SerializeResult Serializer::SerializeV1SignedEntryWithType(
       return SerializeV1SignedPrecertEntryWithType(
           entry.precert_entry().pre_cert().issuer_key_hash(),
           entry.precert_entry().pre_cert().tbs_certificate(), result);
+    case ct::X_JSON_ENTRY:
+      return SerializeV1SignedXJsonEntryWithType(entry.x_json_entry().json(),
+                                                 result);
     default:
       return INVALID_ENTRY_TYPE;
   }
@@ -364,6 +428,22 @@ Serializer::SerializeResult Serializer::SerializeV1SignedPrecertEntryWithType(
   serializer.WriteUint(ct::PRECERT_ENTRY, kLogEntryTypeLengthInBytes);
   serializer.WriteFixedBytes(issuer_key_hash);
   serializer.WriteVarBytes(tbs_certificate, kMaxCertificateLength);
+  result->assign(serializer.SerializedString());
+  return OK;
+}
+
+// static
+Serializer::SerializeResult Serializer::SerializeV1SignedXJsonEntryWithType(
+    const std::string& json, std::string* result) {
+  CHECK_NOTNULL(result);
+  // TODO(alcutter: CheckJsonFormat()?
+  SerializeResult res = CheckCertificateFormat(json);
+  if (res != OK) {
+    return res;
+  }
+  Serializer serializer;
+  serializer.WriteUint(ct::X_JSON_ENTRY, kLogEntryTypeLengthInBytes);
+  serializer.WriteVarBytes(json, kMaxCertificateLength);
   result->assign(serializer.SerializedString());
   return OK;
 }
@@ -701,6 +781,16 @@ Deserializer::DeserializeResult Deserializer::ReadDigitallySigned(
   return OK;
 }
 
+Deserializer::DeserializeResult Deserializer::ReadExtensions(
+    ct::TimestampedEntry* entry) {
+  string extensions;
+  if (!ReadVarBytes(Serializer::kMaxExtensionsLength, &extensions)) {
+    return INPUT_TOO_SHORT;
+  }
+  CHECK_NOTNULL(entry)->set_extensions(extensions);
+  return OK;
+}
+
 Deserializer::DeserializeResult Deserializer::ReadMerkleTreeLeaf(
     ct::MerkleTreeLeaf* leaf) {
   int version;
@@ -727,34 +817,48 @@ Deserializer::DeserializeResult Deserializer::ReadMerkleTreeLeaf(
   int entry_type;
   if (!ReadUint(Serializer::kLogEntryTypeLengthInBytes, &entry_type))
     return INPUT_TOO_SHORT;
-  if (entry_type != ct::X509_ENTRY && entry_type != ct::PRECERT_ENTRY)
-    return UNKNOWN_LOGENTRY_TYPE;
+
   entry->set_entry_type(static_cast<ct::LogEntryType>(entry_type));
 
-  if (entry_type == ct::X509_ENTRY) {
-    string x509;
-    if (!ReadVarBytes(Serializer::kMaxCertificateLength, &x509))
-      return INPUT_TOO_SHORT;
-    entry->mutable_signed_entry()->set_x509(x509);
-  } else {
-    string issuer_key_hash;
-    if (!ReadFixedBytes(32, &issuer_key_hash))
-      return INPUT_TOO_SHORT;
-    entry->mutable_signed_entry()->mutable_precert()->set_issuer_key_hash(
-        issuer_key_hash);
-    string tbs_certificate;
-    if (!ReadVarBytes(Serializer::kMaxCertificateLength, &tbs_certificate))
-      return INPUT_TOO_SHORT;
-    entry->mutable_signed_entry()->mutable_precert()->set_tbs_certificate(
-        tbs_certificate);
+  switch (entry_type) {
+    case ct::X509_ENTRY: {
+      string x509;
+      if (!ReadVarBytes(Serializer::kMaxCertificateLength, &x509))
+        return INPUT_TOO_SHORT;
+      entry->mutable_signed_entry()->set_x509(x509);
+      return ReadExtensions(entry);
+    }
+
+    case ct::PRECERT_ENTRY: {
+      string issuer_key_hash;
+      if (!ReadFixedBytes(32, &issuer_key_hash))
+        return INPUT_TOO_SHORT;
+      entry->mutable_signed_entry()->mutable_precert()->set_issuer_key_hash(
+          issuer_key_hash);
+      string tbs_certificate;
+      if (!ReadVarBytes(Serializer::kMaxCertificateLength, &tbs_certificate))
+        return INPUT_TOO_SHORT;
+      entry->mutable_signed_entry()->mutable_precert()->set_tbs_certificate(
+          tbs_certificate);
+      return ReadExtensions(entry);
+    }
+
+    case ct::X_JSON_ENTRY: {
+      string json;
+      if (!ReadVarBytes(Serializer::kMaxCertificateLength, &json)) {
+        return INPUT_TOO_SHORT;
+      }
+      entry->mutable_signed_entry()->set_json(json);
+      return ReadExtensions(entry);
+    }
+
+    case ct::UNKNOWN_ENTRY_TYPE: {
+      // handled below.
+      break;
+    }
   }
 
-  string extensions;
-  if (!ReadVarBytes(Serializer::kMaxExtensionsLength, &extensions))
-    return INPUT_TOO_SHORT;
-  entry->set_extensions(extensions);
-
-  return OK;
+  return UNKNOWN_LOGENTRY_TYPE;
 }
 
 Deserializer::DeserializeResult Deserializer::DeserializeMerkleTreeLeaf(

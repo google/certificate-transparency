@@ -106,7 +106,6 @@ using cert_trans::FileDB;
 using cert_trans::FileStorage;
 using cert_trans::Gauge;
 using cert_trans::HttpHandler;
-using cert_trans::JsonOutput;
 using cert_trans::Latency;
 using cert_trans::LevelDB;
 using cert_trans::LoggedEntry;

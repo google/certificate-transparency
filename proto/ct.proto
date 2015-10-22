@@ -39,6 +39,7 @@ enum LogEntryType {
   X509_ENTRY = 0;
   PRECERT_ENTRY = 1;
   // Not part of the I-D, and outside the valid range.
+  X_JSON_ENTRY = 32768;  // Experimental, don't rely on this!
   UNKNOWN_ENTRY_TYPE = 65536;
 }
 
@@ -75,12 +76,19 @@ message PrecertChainEntry {
   optional PreCert pre_cert = 3;
 }
 
+message XJSONEntry {
+  optional string json = 1;
+}
+
+// TODO(alcutter): Consider using extensions here instead.
 message LogEntry {
   optional LogEntryType type = 1 [ default = UNKNOWN_ENTRY_TYPE ];
 
   optional X509ChainEntry x509_entry = 2;
 
   optional PrecertChainEntry precert_entry = 3;
+
+  optional XJSONEntry x_json_entry = 4;
 }
 
 enum SignatureType {
@@ -123,6 +131,7 @@ enum MerkleLeafType {
 message SignedEntry {
   optional bytes x509 = 1;
   optional PreCert precert = 2;
+  optional bytes json = 3;
 }
 
 message TimestampedEntry {
