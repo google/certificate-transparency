@@ -15,10 +15,10 @@
 #include "util/masterelection.h"
 #include "util/statusor.h"
 
+namespace cert_trans {
+
 template <class Logged>
 class Database;
-
-namespace cert_trans {
 
 
 // A class which updates & maintains the states of the individual cluster

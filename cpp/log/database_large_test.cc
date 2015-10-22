@@ -26,7 +26,11 @@ DEFINE_int32(database_size, 100,
 
 namespace {
 
+using cert_trans::Database;
+using cert_trans::FileDB;
+using cert_trans::LevelDB;
 using cert_trans::LoggedEntry;
+using cert_trans::SQLiteDB;
 using std::string;
 
 typedef Database<LoggedEntry> DB;

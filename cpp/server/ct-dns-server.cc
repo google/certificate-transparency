@@ -13,6 +13,7 @@
 #include "util/util.h"
 
 using cert_trans::LoggedEntry;
+using cert_trans::SQLiteDB;
 using ct::SignedTreeHead;
 using google::RegisterFlagValidator;
 using std::string;

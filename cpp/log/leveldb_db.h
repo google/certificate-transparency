@@ -21,8 +21,8 @@
 #include "util/statusor.h"
 
 namespace cert_trans {
+
 class FileStorage;
-}
 
 template <class Logged>
 class LevelDB : public Database<Logged> {
@@ -94,4 +94,8 @@ class LevelDB : public Database<Logged> {
 
   DISALLOW_COPY_AND_ASSIGN(LevelDB);
 };
+
+
+}  // namespace cert_trans
+
 #endif  // CERTIFICATE_LEVELDB_DB_H

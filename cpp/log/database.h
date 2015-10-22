@@ -11,6 +11,8 @@
 #include "base/macros.h"
 #include "proto/ct.pb.h"
 
+namespace cert_trans {
+
 // The |Logged| class needs to provide this interface:
 // class Logged {
 //  public:
@@ -174,9 +176,6 @@ class Database : public ReadOnlyDatabase<Logged> {
  private:
   DISALLOW_COPY_AND_ASSIGN(Database);
 };
-
-
-namespace cert_trans {
 
 
 class DatabaseNotifierHelper {

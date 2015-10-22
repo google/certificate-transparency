@@ -31,11 +31,14 @@ namespace {
 namespace libevent = cert_trans::libevent;
 
 using cert_trans::ConsistentStore;
+using cert_trans::Database;
 using cert_trans::EntryHandle;
 using cert_trans::EtcdConsistentStore;
 using cert_trans::FakeEtcdClient;
+using cert_trans::FileDB;
 using cert_trans::LoggedEntry;
 using cert_trans::MockMasterElection;
+using cert_trans::SQLiteDB;
 using cert_trans::ThreadPool;
 using ct::LogEntry;
 using ct::SignedCertificateTimestamp;
@@ -44,8 +47,8 @@ using std::shared_ptr;
 using std::string;
 using std::unique_ptr;
 using std::vector;
-using testing::_;
 using testing::NiceMock;
+using testing::_;
 using util::testing::StatusIs;
 
 typedef Database<LoggedEntry> DB;

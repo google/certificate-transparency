@@ -16,8 +16,9 @@
 #include "util/statusor.h"
 
 namespace cert_trans {
+
 class FileStorage;
-}
+
 
 // Database interface that stores certificates and tree head
 // signatures in the filesystem.
@@ -35,9 +36,8 @@ class FileDB : public Database<Logged> {
   // of 8 buckets tree head updates within about 1 minute
   // (timestamps xxxxxxxx0000 - xxxxxxxxFFFF) to the same directory.
   // Takes ownership of |cert_storage|, |tree_storage|, and |meta_storage|.
-  FileDB(cert_trans::FileStorage* cert_storage,
-         cert_trans::FileStorage* tree_storage,
-         cert_trans::FileStorage* meta_storage);
+  FileDB(FileStorage* cert_storage, FileStorage* tree_storage,
+         FileStorage* meta_storage);
   ~FileDB();
 
   static const size_t kTimestampBytesIndexed;
@@ -82,13 +82,13 @@ class FileDB : public Database<Logged> {
       ct::SignedTreeHead* result) const;
   void InsertEntryMapping(int64_t sequence_number, const std::string& hash);
 
-  const std::unique_ptr<cert_trans::FileStorage> cert_storage_;
+  const std::unique_ptr<FileStorage> cert_storage_;
   // Store all tree heads, but currently only support looking up the latest
   // one.
   // Other necessary lookup indices (by tree size, by timestamp range?) TBD.
-  const std::unique_ptr<cert_trans::FileStorage> tree_storage_;
+  const std::unique_ptr<FileStorage> tree_storage_;
 
-  const std::unique_ptr<cert_trans::FileStorage> meta_storage_;
+  const std::unique_ptr<FileStorage> meta_storage_;
 
   mutable std::mutex lock_;
 
@@ -103,8 +103,12 @@ class FileDB : public Database<Logged> {
   uint64_t latest_tree_timestamp_;
   // The same as a string;
   std::string latest_timestamp_key_;
-  cert_trans::DatabaseNotifierHelper callbacks_;
+  DatabaseNotifierHelper callbacks_;
 
   DISALLOW_COPY_AND_ASSIGN(FileDB);
 };
+
+
+}  // namespace cert_trans
+
 #endif

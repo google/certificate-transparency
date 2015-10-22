@@ -18,7 +18,11 @@
 
 namespace {
 
+using cert_trans::Database;
+using cert_trans::FileDB;
+using cert_trans::LevelDB;
 using cert_trans::LoggedEntry;
+using cert_trans::SQLiteDB;
 using ct::SignedTreeHead;
 using std::string;
 using std::unique_ptr;

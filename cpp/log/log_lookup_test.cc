@@ -27,18 +27,21 @@ namespace {
 
 namespace libevent = cert_trans::libevent;
 
+using cert_trans::Database;
 using cert_trans::EntryHandle;
 using cert_trans::EtcdClient;
 using cert_trans::FakeEtcdClient;
+using cert_trans::FileDB;
 using cert_trans::LoggedEntry;
 using cert_trans::MockMasterElection;
+using cert_trans::SQLiteDB;
 using cert_trans::ThreadPool;
 using cert_trans::TreeSigner;
 using ct::MerkleAuditProof;
 using ct::SequenceMapping;
 using std::make_shared;
-using std::string;
 using std::shared_ptr;
+using std::string;
 using std::unique_ptr;
 using testing::NiceMock;
 

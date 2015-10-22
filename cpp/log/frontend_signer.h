@@ -8,19 +8,22 @@
 #include "log/consistent_store.h"
 #include "log/logged_entry.h"
 
-template <class Logged>
-class Database;
 class LogSigner;
 
 namespace util {
 class Status;
 }  // namespace util
 
+namespace cert_trans {
+template <class Logged>
+class Database;
+}  // namespace cert_trans
+
 
 class FrontendSigner {
  public:
   // Does not take ownership of |db|, |store| or |signer|.
-  FrontendSigner(Database<cert_trans::LoggedEntry>* db,
+  FrontendSigner(cert_trans::Database<cert_trans::LoggedEntry>* db,
                  cert_trans::ConsistentStore<cert_trans::LoggedEntry>* store,
                  LogSigner* signer);
 
@@ -35,7 +38,7 @@ class FrontendSigner {
   void TimestampAndSign(const ct::LogEntry& entry,
                         ct::SignedCertificateTimestamp* sct) const;
 
-  Database<cert_trans::LoggedEntry>* const db_;
+  cert_trans::Database<cert_trans::LoggedEntry>* const db_;
   cert_trans::ConsistentStore<cert_trans::LoggedEntry>* const store_;
   LogSigner* const signer_;
 

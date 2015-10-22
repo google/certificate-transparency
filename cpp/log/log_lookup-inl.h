@@ -24,7 +24,7 @@ static const int kCtimeBufSize = 26;
 
 
 template <class Logged>
-LogLookup<Logged>::LogLookup(ReadOnlyDatabase<Logged>* db)
+LogLookup<Logged>::LogLookup(cert_trans::ReadOnlyDatabase<Logged>* db)
     : db_(CHECK_NOTNULL(db)),
       cert_tree_(new Sha256Hasher),
       latest_tree_head_(),

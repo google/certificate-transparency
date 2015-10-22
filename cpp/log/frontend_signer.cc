@@ -11,13 +11,14 @@
 #include "util/status.h"
 #include "util/util.h"
 
-
 using cert_trans::ConsistentStore;
+using cert_trans::Database;
 using cert_trans::LoggedEntry;
 using ct::LogEntry;
 using ct::SignedCertificateTimestamp;
 using std::string;
 using util::Status;
+
 
 FrontendSigner::FrontendSigner(Database<cert_trans::LoggedEntry>* db,
                                ConsistentStore<LoggedEntry>* store,

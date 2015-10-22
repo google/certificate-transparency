@@ -14,12 +14,13 @@ namespace util {
 class Status;
 }  // namespace util
 
-template <class Logged>
-class Database;
 class LogSigner;
 
 
 namespace cert_trans {
+
+template <class Logged>
+class Database;
 
 
 // Signer for appending new entries to the log.

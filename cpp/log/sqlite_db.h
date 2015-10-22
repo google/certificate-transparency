@@ -10,6 +10,9 @@
 
 struct sqlite3;
 
+namespace cert_trans {
+
+
 template <class Logged>
 class SQLiteDB : public Database<Logged> {
  public:
@@ -76,11 +79,14 @@ class SQLiteDB : public Database<Logged> {
   // This is marked mutable, as it is a lazily updated cache updated
   // from some of the getters.
   mutable int64_t tree_size_;
-  cert_trans::DatabaseNotifierHelper callbacks_;
+  DatabaseNotifierHelper callbacks_;
   int64_t transaction_size_;
   bool in_transaction_;
 
   DISALLOW_COPY_AND_ASSIGN(SQLiteDB);
 };
+
+
+}  // namespace cert_trans
 
 #endif

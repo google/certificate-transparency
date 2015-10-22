@@ -13,8 +13,6 @@
 class Frontend;
 template <class T>
 class LogLookup;
-template <class T>
-class ReadOnlyDatabase;
 
 namespace cert_trans {
 
@@ -26,6 +24,8 @@ class JsonOutput;
 class LoggedEntry;
 class PreCertChain;
 class Proxy;
+template <class T>
+class ReadOnlyDatabase;
 class ThreadPool;
 
 

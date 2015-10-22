@@ -33,8 +33,12 @@ DEFINE_int64(start, 0, "Starting sequence number (inclusive).");
 DEFINE_int64(end, std::numeric_limits<int64_t>::max(),
              "Ending sequence number (inclusive).");
 
+using cert_trans::FileDB;
 using cert_trans::FileStorage;
+using cert_trans::LevelDB;
 using cert_trans::LoggedEntry;
+using cert_trans::ReadOnlyDatabase;
+using cert_trans::SQLiteDB;
 using std::cerr;
 using std::cout;
 using std::function;

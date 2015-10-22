@@ -25,13 +25,15 @@
 namespace libevent = cert_trans::libevent;
 
 using cert_trans::ConsistentStore;
+using cert_trans::Database;
 using cert_trans::EtcdClient;
 using cert_trans::EtcdConsistentStore;
 using cert_trans::LoggedEntry;
 using cert_trans::MasterElection;
 using cert_trans::ReadPrivateKey;
-using cert_trans::StrictConsistentStore;
+using cert_trans::SQLiteDB;
 using cert_trans::SplitHosts;
+using cert_trans::StrictConsistentStore;
 using cert_trans::ThreadPool;
 using cert_trans::TreeSigner;
 using cert_trans::UrlFetcher;

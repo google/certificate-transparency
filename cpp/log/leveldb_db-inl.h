@@ -20,12 +20,13 @@ DEFINE_int32(leveldb_max_open_files, 0,
 DEFINE_int32(leveldb_bloom_filter_bits_per_key, 0,
              "number of open files that can be used by leveldb");
 
+namespace cert_trans {
 namespace {
 
 
-static cert_trans::Latency<std::chrono::milliseconds, std::string>
-    latency_by_op_ms("leveldb_latency_by_operation_ms", "operation",
-                     "Database latency in ms broken out by operation.");
+static Latency<std::chrono::milliseconds, std::string> latency_by_op_ms(
+    "leveldb_latency_by_operation_ms", "operation",
+    "Database latency in ms broken out by operation.");
 
 
 const char kMetaNodeIdKey[] = "metadata";
@@ -125,7 +126,7 @@ LevelDB<Logged>::LevelDB(const std::string& dbfile)
       contiguous_size_(0),
       latest_tree_timestamp_(0) {
   LOG(INFO) << "Opening " << dbfile;
-  cert_trans::ScopedLatency latency(latency_by_op_ms.GetScopedLatency("open"));
+  ScopedLatency latency(latency_by_op_ms.GetScopedLatency("open"));
   leveldb::Options options;
   options.create_if_missing = true;
   if (FLAGS_leveldb_max_open_files > 0) {
@@ -151,7 +152,7 @@ typename Database<Logged>::WriteResult LevelDB<Logged>::CreateSequencedEntry_(
     const Logged& logged) {
   CHECK(logged.has_sequence_number());
   CHECK_GE(logged.sequence_number(), 0);
-  cert_trans::ScopedLatency latency(
+  ScopedLatency latency(
       latency_by_op_ms.GetScopedLatency("create_sequenced_entry"));
 
   std::unique_lock<std::mutex> lock(lock_);
@@ -185,8 +186,7 @@ typename Database<Logged>::WriteResult LevelDB<Logged>::CreateSequencedEntry_(
 template <class Logged>
 typename Database<Logged>::LookupResult LevelDB<Logged>::LookupByHash(
     const std::string& hash, Logged* result) const {
-  cert_trans::ScopedLatency latency(
-      latency_by_op_ms.GetScopedLatency("lookup_by_hash"));
+  ScopedLatency latency(latency_by_op_ms.GetScopedLatency("lookup_by_hash"));
 
   std::unique_lock<std::mutex> lock(lock_);
 
@@ -220,8 +220,7 @@ template <class Logged>
 typename Database<Logged>::LookupResult LevelDB<Logged>::LookupByIndex(
     int64_t sequence_number, Logged* result) const {
   CHECK_GE(sequence_number, 0);
-  cert_trans::ScopedLatency latency(
-      latency_by_op_ms.GetScopedLatency("lookup_by_index"));
+  ScopedLatency latency(latency_by_op_ms.GetScopedLatency("lookup_by_index"));
 
   std::string cert_data;
   leveldb::Status status(db_->Get(leveldb::ReadOptions(),
@@ -252,8 +251,7 @@ template <class Logged>
 typename Database<Logged>::WriteResult LevelDB<Logged>::WriteTreeHead_(
     const ct::SignedTreeHead& sth) {
   CHECK_GE(sth.tree_size(), 0);
-  cert_trans::ScopedLatency latency(
-      latency_by_op_ms.GetScopedLatency("write_tree_head"));
+  ScopedLatency latency(latency_by_op_ms.GetScopedLatency("write_tree_head"));
 
   // 6 bytes are good enough for some 9000 years.
   std::string timestamp_key =
@@ -295,8 +293,7 @@ typename Database<Logged>::WriteResult LevelDB<Logged>::WriteTreeHead_(
 template <class Logged>
 typename Database<Logged>::LookupResult LevelDB<Logged>::LatestTreeHead(
     ct::SignedTreeHead* result) const {
-  cert_trans::ScopedLatency latency(
-      latency_by_op_ms.GetScopedLatency("latest_tree_head"));
+  ScopedLatency latency(latency_by_op_ms.GetScopedLatency("latest_tree_head"));
   std::lock_guard<std::mutex> lock(lock_);
 
   return LatestTreeHeadNoLock(result);
@@ -305,8 +302,7 @@ typename Database<Logged>::LookupResult LevelDB<Logged>::LatestTreeHead(
 
 template <class Logged>
 int64_t LevelDB<Logged>::TreeSize() const {
-  cert_trans::ScopedLatency latency(
-      latency_by_op_ms.GetScopedLatency("tree_size"));
+  ScopedLatency latency(latency_by_op_ms.GetScopedLatency("tree_size"));
   std::lock_guard<std::mutex> lock(lock_);
 
   return contiguous_size_;
@@ -340,8 +336,7 @@ void LevelDB<Logged>::RemoveNotifySTHCallback(
 template <class Logged>
 void LevelDB<Logged>::InitializeNode(const std::string& node_id) {
   CHECK(!node_id.empty());
-  cert_trans::ScopedLatency latency(
-      latency_by_op_ms.GetScopedLatency("initialize_node"));
+  ScopedLatency latency(latency_by_op_ms.GetScopedLatency("initialize_node"));
   std::unique_lock<std::mutex> lock(lock_);
   std::string existing_id;
   leveldb::Status status(db_->Get(leveldb::ReadOptions(),
@@ -372,8 +367,7 @@ typename Database<Logged>::LookupResult LevelDB<Logged>::NodeId(
 
 template <class Logged>
 void LevelDB<Logged>::BuildIndex() {
-  cert_trans::ScopedLatency latency(
-      latency_by_op_ms.GetScopedLatency("build_index"));
+  ScopedLatency latency(latency_by_op_ms.GetScopedLatency("build_index"));
   // Technically, this should only be called from the constructor, so
   // this should not be necessarily, but just to be sure...
   std::lock_guard<std::mutex> lock(lock_);
@@ -455,5 +449,7 @@ void LevelDB<Logged>::InsertEntryMapping(int64_t sequence_number,
   }
 }
 
+
+}  // namespace cert_trans
 
 #endif  // CERT_TRANS_LOG_LEVELDB_DB_INL_H_
