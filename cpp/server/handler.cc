@@ -140,81 +140,6 @@ void AddChainReply(JsonOutput* output, evhttp_request* req,
 }
 
 
-multimap<string, string> ParseQuery(evhttp_request* req) {
-  evkeyvalq keyval;
-  multimap<string, string> retval;
-
-  // We return an empty result in case of a parsing error.
-  if (evhttp_parse_query_str(evhttp_uri_get_query(
-                                 evhttp_request_get_evhttp_uri(req)),
-                             &keyval) == 0) {
-    for (evkeyval* i = keyval.tqh_first; i; i = i->next.tqe_next) {
-      retval.insert(make_pair(i->key, i->value));
-    }
-  }
-
-  return retval;
-}
-
-
-bool GetParam(const multimap<string, string>& query, const string& param,
-              string* value) {
-  CHECK_NOTNULL(value);
-
-  multimap<string, string>::const_iterator it = query.find(param);
-  if (it == query.end()) {
-    return false;
-  }
-
-  const string possible_value(it->second);
-  ++it;
-
-  // Flag duplicate query parameters as invalid.
-  const bool retval(it == query.end() || it->first != param);
-  if (retval) {
-    *value = possible_value;
-  }
-
-  return retval;
-}
-
-
-// Returns -1 on error, and on success too if the parameter contains
-// -1 (so it's advised to only use it when expecting unsigned
-// parameters).
-int64_t GetIntParam(const multimap<string, string>& query,
-                    const string& param) {
-  int retval(-1);
-  string value;
-  if (GetParam(query, param, &value)) {
-    errno = 0;
-    const long num(strtol(value.c_str(), /*endptr*/ NULL, 10));
-    // Detect strtol() errors or overflow/underflow when casting to
-    // retval's type clips the value. We do the following by doing it,
-    // and checking that they're still equal afterward (this will
-    // still work if we change retval's type later on).
-    retval = num;
-    if (errno || static_cast<long>(retval) != num) {
-      VLOG(1) << "over/underflow getting \"" << param << "\": " << retval
-              << ", " << num << " (" << strerror(errno) << ")";
-      retval = -1;
-    }
-  }
-
-  return retval;
-}
-
-
-bool GetBoolParam(const multimap<string, string>& query, const string& param) {
-  string value;
-  if (GetParam(query, param, &value)) {
-    return (value == "true");
-  } else {
-    return false;
-  }
-}
-
-
 }  // namespace
 
 
@@ -324,15 +249,15 @@ void HttpHandler::GetEntries(evhttp_request* req) const {
   }
 
 
-  const multimap<string, string> query(ParseQuery(req));
+  const libevent::QueryParams query(libevent::ParseQuery(req));
 
-  const int64_t start(GetIntParam(query, "start"));
+  const int64_t start(libevent::GetIntParam(query, "start"));
   if (start < 0) {
     return output_->SendError(req, HTTP_BADREQUEST,
                               "Missing or invalid \"start\" parameter.");
   }
 
-  int64_t end(GetIntParam(query, "end"));
+  int64_t end(libevent::GetIntParam(query, "end"));
   if (end < start) {
     return output_->SendError(req, HTTP_BADREQUEST,
                               "Missing or invalid \"end\" parameter.");
@@ -344,7 +269,7 @@ void HttpHandler::GetEntries(evhttp_request* req) const {
   // Sekrit parameter to indicate that SCTs should be included too.
   // This is non-standard, and is only used internally by other log nodes when
   // "following" nodes with more data.
-  const bool include_scts(GetBoolParam(query, "include_scts"));
+  const bool include_scts(libevent::GetBoolParam(query, "include_scts"));
 
   BlockingGetEntries(req, start, end, include_scts);
 }
@@ -379,10 +304,10 @@ void HttpHandler::GetProof(evhttp_request* req) const {
     return output_->SendError(req, HTTP_BADMETHOD, "Method not allowed.");
   }
 
-  const multimap<string, string> query(ParseQuery(req));
+  const libevent::QueryParams query(libevent::ParseQuery(req));
 
   string b64_hash;
-  if (!GetParam(query, "hash", &b64_hash)) {
+  if (!libevent::GetParam(query, "hash", &b64_hash)) {
     return output_->SendError(req, HTTP_BADREQUEST,
                               "Missing or invalid \"hash\" parameter.");
   }
@@ -393,7 +318,7 @@ void HttpHandler::GetProof(evhttp_request* req) const {
                               "Invalid \"hash\" parameter.");
   }
 
-  const int64_t tree_size(GetIntParam(query, "tree_size"));
+  const int64_t tree_size(libevent::GetIntParam(query, "tree_size"));
   if (tree_size < 0 ||
       static_cast<int64_t>(tree_size) > log_lookup_->GetSTH().tree_size()) {
     return output_->SendError(req, HTTP_BADREQUEST,
@@ -445,15 +370,15 @@ void HttpHandler::GetConsistency(evhttp_request* req) const {
     return output_->SendError(req, HTTP_BADMETHOD, "Method not allowed.");
   }
 
-  const multimap<string, string> query(ParseQuery(req));
+  const libevent::QueryParams query(libevent::ParseQuery(req));
 
-  const int64_t first(GetIntParam(query, "first"));
+  const int64_t first(libevent::GetIntParam(query, "first"));
   if (first < 0) {
     return output_->SendError(req, HTTP_BADREQUEST,
                               "Missing or invalid \"first\" parameter.");
   }
 
-  const int64_t second(GetIntParam(query, "second"));
+  const int64_t second(libevent::GetIntParam(query, "second"));
   if (second < first) {
     return output_->SendError(req, HTTP_BADREQUEST,
                               "Missing or invalid \"second\" parameter.");

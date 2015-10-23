@@ -8,6 +8,7 @@
 #endif
 #include <climits>
 #include <evhtp.h>
+#include <event2/keyvalq_struct.h>
 #include <event2/thread.h>
 #include <glog/logging.h>
 #include <math.h>
@@ -34,6 +35,8 @@ using std::chrono::seconds;
 using std::chrono::system_clock;
 using std::function;
 using std::lock_guard;
+using std::make_pair;
+using std::multimap;
 using std::mutex;
 using std::placeholders::_1;
 using std::recursive_mutex;
@@ -380,6 +383,79 @@ bool HttpServer::AddHandler(const string& path, const HandlerCallback& cb) {
 
 void HttpServer::HandleRequest(evhttp_request* req, void* userdata) {
   static_cast<Handler*>(userdata)->cb(req);
+}
+
+
+QueryParams ParseQuery(evhttp_request* req) {
+  evkeyvalq keyval;
+  QueryParams retval;
+
+  // We return an empty result in case of a parsing error.
+  if (evhttp_parse_query_str(evhttp_uri_get_query(
+                                 evhttp_request_get_evhttp_uri(req)),
+                             &keyval) == 0) {
+    for (evkeyval* i = keyval.tqh_first; i; i = i->next.tqe_next) {
+      retval.insert(make_pair(i->key, i->value));
+    }
+  }
+
+  return retval;
+}
+
+
+bool GetParam(const QueryParams& query, const string& param, string* value) {
+  CHECK_NOTNULL(value);
+
+  auto it = query.find(param);
+  if (it == query.end()) {
+    return false;
+  }
+
+  const string possible_value(it->second);
+  ++it;
+
+  // Flag duplicate query parameters as invalid.
+  const bool retval(it == query.end() || it->first != param);
+  if (retval) {
+    *value = possible_value;
+  }
+
+  return retval;
+}
+
+
+// Returns -1 on error, and on success too if the parameter contains
+// -1 (so it's advised to only use it when expecting unsigned
+// parameters).
+int64_t GetIntParam(const QueryParams& query, const string& param) {
+  int retval(-1);
+  string value;
+  if (GetParam(query, param, &value)) {
+    errno = 0;
+    const long num(strtol(value.c_str(), /*endptr*/ NULL, 10));
+    // Detect strtol() errors or overflow/underflow when casting to
+    // retval's type clips the value. We do the following by doing it,
+    // and checking that they're still equal afterward (this will
+    // still work if we change retval's type later on).
+    retval = num;
+    if (errno || static_cast<long>(retval) != num) {
+      VLOG(1) << "over/underflow getting \"" << param << "\": " << retval
+              << ", " << num << " (" << strerror(errno) << ")";
+      retval = -1;
+    }
+  }
+
+  return retval;
+}
+
+
+bool GetBoolParam(const QueryParams& query, const string& param) {
+  string value;
+  if (GetParam(query, param, &value)) {
+    return (value == "true");
+  } else {
+    return false;
+  }
 }
 
 

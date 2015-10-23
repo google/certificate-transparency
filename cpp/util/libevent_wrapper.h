@@ -9,8 +9,10 @@
 #include <event2/http.h>
 #include <evhtp.h>
 #include <functional>
+#include <map>
 #include <memory>
 #include <mutex>
+#include <string>
 #include <thread>
 #include <vector>
 
@@ -123,6 +125,17 @@ class HttpServer {
 
   DISALLOW_COPY_AND_ASSIGN(HttpServer);
 };
+
+typedef std::multimap<std::string, std::string> QueryParams;
+
+QueryParams ParseQuery(evhttp_request* req);
+
+bool GetParam(const QueryParams& query, const std::string& param,
+              std::string* value);
+
+int64_t GetIntParam(const QueryParams& query, const std::string& param);
+
+bool GetBoolParam(const QueryParams& query, const std::string& param);
 
 
 class EventPumpThread {
