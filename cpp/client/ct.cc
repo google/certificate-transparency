@@ -875,7 +875,7 @@ void GetEntries() {
                ct::PRECERT_ENTRY);
       WriteCertificate(entry->leaf.timestamped_entry()
                            .signed_entry()
-                           .precert()
+                           .cert_info()
                            .tbs_certificate(),
                        e, 0, "pre");
       const ct::PrecertChainEntry& precertchain = entry->entry.precert_entry();

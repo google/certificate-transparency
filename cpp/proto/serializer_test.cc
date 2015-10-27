@@ -389,7 +389,8 @@ TEST_F(SerializerTest, DeserializeMerkleTreeLeafKAT) {
   EXPECT_EQ(leaf.timestamped_entry().entry_type(), ct::X509_ENTRY);
   EXPECT_EQ(leaf.timestamped_entry().signed_entry().x509(),
             DefaultCertEntry().x509_entry().leaf_certificate());
-  EXPECT_FALSE(leaf.timestamped_entry().signed_entry().has_precert());
+  // V1 X509 entries do not use the CertInfo structure
+  EXPECT_FALSE(leaf.timestamped_entry().signed_entry().has_cert_info());
 
   MerkleTreeLeaf leaf2;
   EXPECT_EQ(Deserializer::OK, Deserializer::DeserializeMerkleTreeLeaf(
@@ -400,10 +401,10 @@ TEST_F(SerializerTest, DeserializeMerkleTreeLeafKAT) {
   EXPECT_EQ(leaf2.timestamped_entry().entry_type(), ct::PRECERT_ENTRY);
   EXPECT_FALSE(leaf2.timestamped_entry().signed_entry().has_x509());
   EXPECT_EQ(
-      leaf2.timestamped_entry().signed_entry().precert().issuer_key_hash(),
+      leaf2.timestamped_entry().signed_entry().cert_info().issuer_key_hash(),
       DefaultIssuerKeyHash());
   EXPECT_EQ(
-      leaf2.timestamped_entry().signed_entry().precert().tbs_certificate(),
+      leaf2.timestamped_entry().signed_entry().cert_info().tbs_certificate(),
       DefaultTbsCertificate());
 }
 
