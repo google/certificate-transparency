@@ -1,6 +1,6 @@
 #include "merkletree/tree_hasher.h"
 
-#include <glog/logging.h>
+#include <assert.h>
 
 #include "merkletree/serial_hasher.h"
 
@@ -21,7 +21,8 @@ std::string EmptyHash(SerialHasher* hasher) {
 }  // namespace
 
 TreeHasher::TreeHasher(SerialHasher* hasher)
-    : hasher_(CHECK_NOTNULL(hasher)), empty_hash_(EmptyHash(hasher_.get())) {
+    : hasher_(hasher), empty_hash_(EmptyHash(hasher_.get())) {
+  assert(hasher_);
 }
 
 string TreeHasher::HashLeaf(const string& data) const {

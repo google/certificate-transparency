@@ -1,6 +1,6 @@
 #include "merkletree/compact_merkle_tree.h"
 
-#include <glog/logging.h>
+#include <assert.h>
 #include <stddef.h>
 #include <string>
 #include <vector>
@@ -80,7 +80,7 @@ CompactMerkleTree::CompactMerkleTree(MerkleTree& model, SerialHasher* hasher)
       }
       level++;
     }
-    CHECK(i == path.end()) << "Failed to consume all proof nodes";
+    assert(i == path.end());
   }
 
   // Now tree_ should contain a representation of the tree state just before
@@ -88,9 +88,9 @@ CompactMerkleTree::CompactMerkleTree(MerkleTree& model, SerialHasher* hasher)
   // here, which will perform any recalculations necessary to reach the final
   // tree.
   PushBack(0, model.LeafHash(model.LeafCount()));
-  CHECK_EQ(model.CurrentRoot(), CurrentRoot());
-  CHECK_EQ(model.LeafCount(), LeafCount());
-  CHECK_EQ(model.LevelCount(), LevelCount());
+  assert(model.CurrentRoot() == CurrentRoot());
+  assert(model.LeafCount() == LeafCount());
+  assert(model.LevelCount() ==LevelCount());
 }
 
 
@@ -128,7 +128,7 @@ string CompactMerkleTree::CurrentRoot() {
 }
 
 void CompactMerkleTree::PushBack(size_t level, string node) {
-  CHECK_EQ(node.size(), treehasher_.DigestSize());
+  assert(node.size() == treehasher_.DigestSize());
   if (tree_.size() <= level) {
     // First node at a new level.
     tree_.push_back(node);
