@@ -1,6 +1,6 @@
 UNAME := $(shell uname)
 ifeq ($(UNAME),FreeBSD)
-EXTRA_LDFLAGS="-lexecinfo"
+EXTRA_LDFLAGS="-lexecinfo -lunwind"
 endif
 
 all: Makefile
