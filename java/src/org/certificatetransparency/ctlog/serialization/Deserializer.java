@@ -118,7 +118,7 @@ public class Deserializer {
 
     } else if (entryType == Ct.LogEntryType.PRECERT_ENTRY) {
       Ct.PrecertChainEntry preCertChain = parsePrecerChainEntry(extraData,
-        treeLeaf.getTimestampedEntry().getSignedEntry().getPrecert());
+        treeLeaf.getTimestampedEntry().getSignedEntry().getCertInfo());
        logEntryBuilder.setPrecertEntry(preCertChain);
 
     } else {
@@ -176,19 +176,19 @@ public class Deserializer {
       signedEntryBuilder.setX509(x509);
 
     } else if (entryType == Ct.LogEntryType.PRECERT_ENTRY_VALUE) {
-      Ct.PreCert.Builder preCertBuilder = Ct.PreCert.newBuilder();
+      Ct.PreCert.Builder certInfoBuilder = Ct.CertInfo.newBuilder();
 
       byte[] arr = readFixedLength(in, 32);
-      preCertBuilder.setIssuerKeyHash(ByteString.copyFrom(arr));
+      certInfoBuilder.setIssuerKeyHash(ByteString.copyFrom(arr));
 
       // set tbs certificate
       arr = readFixedLength(in, 2);
       int length = (int) readNumber(in, 2);
 
-      preCertBuilder.setTbsCertificate(ByteString.copyFrom(readFixedLength(in, length)));
-      preCertBuilder.build();
+      certInfoBuilder.setTbsCertificate(ByteString.copyFrom(readFixedLength(in, length)));
+      certInfoBuilder.build();
 
-      signedEntryBuilder.setPrecert(preCertBuilder);
+      signedEntryBuilder.setPrecert(certInfoBuilder);
     } else {
       throw new SerializationException(String.format("Unknown entry type: %d", entryType));
     }
@@ -230,7 +230,7 @@ public class Deserializer {
    * @param preCert Precertificate.
    * @return {@link Ct.PrecertChainEntry} proto object.
    */
-  public static Ct.PrecertChainEntry parsePrecerChainEntry(InputStream in, Ct.PreCert preCert) {
+  public static Ct.PrecertChainEntry parsePrecerChainEntry(InputStream in, Ct.CertInfo preCert) {
     Ct.PrecertChainEntry.Builder preCertChain = Ct.PrecertChainEntry.newBuilder();
     preCertChain.setPreCert(preCert);
 
