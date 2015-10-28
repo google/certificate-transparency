@@ -740,12 +740,12 @@ Deserializer::DeserializeResult Deserializer::ReadMerkleTreeLeaf(
     string issuer_key_hash;
     if (!ReadFixedBytes(32, &issuer_key_hash))
       return INPUT_TOO_SHORT;
-    entry->mutable_signed_entry()->mutable_precert()->set_issuer_key_hash(
+    entry->mutable_signed_entry()->mutable_cert_info()->set_issuer_key_hash(
         issuer_key_hash);
     string tbs_certificate;
     if (!ReadVarBytes(Serializer::kMaxCertificateLength, &tbs_certificate))
       return INPUT_TOO_SHORT;
-    entry->mutable_signed_entry()->mutable_precert()->set_tbs_certificate(
+    entry->mutable_signed_entry()->mutable_cert_info()->set_tbs_certificate(
         tbs_certificate);
   }
 

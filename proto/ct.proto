@@ -51,13 +51,16 @@ message X509ChainEntry {
   repeated bytes certificate_chain = 2;
 }
 
+// In V1 this structure was called PreCert and only used for precertificates.
+// In V2 they have been unified and both log entry types use this.
+//
 // opaque TBSCertificate<1..2^16-1>;
 // struct {
 //   opaque issuer_key_hash[32];
 //   TBSCertificate tbs_certificate;
-// } PreCert;
+// } CertInfo;
 // TODO(benl, ekasper): call this something more original in the I-D.
-message PreCert {
+message CertInfo {
   optional bytes issuer_key_hash = 1;
   optional bytes tbs_certificate = 2;
 }
@@ -72,7 +75,7 @@ message PrecertChainEntry {
   // PreCert input to the SCT. Can be computed from the above.
   // Store it alongside the entry data so that the signers don't have to
   // parse certificates to recompute it.
-  optional PreCert pre_cert = 3;
+  optional CertInfo pre_cert = 3;
 }
 
 message LogEntry {
@@ -120,9 +123,14 @@ enum MerkleLeafType {
   UNKNOWN_LEAF_TYPE = 256;
 }
 
+// In V1 the x509 field was used to store the certificate and the signed
+// entry format differed from V2. In V2 entries the same structures are
+// used for both entry types and x509 is ignored. This complicates the
+// code but allows for existing saved protos to be read by a V1 implementation.
 message SignedEntry {
+  // This field will only be set for an X509 V1 entry
   optional bytes x509 = 1;
-  optional PreCert precert = 2;
+  optional CertInfo cert_info = 2;
 }
 
 message TimestampedEntry {

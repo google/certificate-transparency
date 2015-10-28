@@ -1,7 +1,7 @@
 #include "log/logged_entry.h"
 
 using ct::LogEntry;
-using ct::PreCert;
+using ct::CertInfo;
 using ct::SignedCertificateTimestamp;
 
 namespace cert_trans {
@@ -37,15 +37,15 @@ bool LoggedEntry::CopyFromClientLogEntry(const AsyncLogClient::Entry& entry) {
     }
 
     case ct::PRECERT_ENTRY: {
-      PreCert* const precert(
+      CertInfo* const precert(
           log_entry->mutable_precert_entry()->mutable_pre_cert());
       precert->set_issuer_key_hash(entry.leaf.timestamped_entry()
                                        .signed_entry()
-                                       .precert()
+                                       .cert_info()
                                        .issuer_key_hash());
       precert->set_tbs_certificate(entry.leaf.timestamped_entry()
                                        .signed_entry()
-                                       .precert()
+                                       .cert_info()
                                        .tbs_certificate());
       break;
     }
