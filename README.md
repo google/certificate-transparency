@@ -21,10 +21,9 @@ with similar caveats.
 Depending on which platform you have the exact packages required will vary.
 The following tools must be available for the GClient build to succeed:
 
- - A working C++11 compiler.
-
  - autoconf/automake etc.
- - cmake
+ - clang++ (>=3.4)
+ - cmake (>=v3.1.2)
  - git
  - GNU make
  - libtool
@@ -37,6 +36,7 @@ The following tools must be available for the GClient build to succeed:
 ### Building with gclient ###
 
 ```bash
+export CXX=clang++ CC=clang
 mkdir ct  # or whatever directory you prefer
 cd ct
 gclient config --name="certificate-transparency" https://github.com/google/certificate-transparency.git
