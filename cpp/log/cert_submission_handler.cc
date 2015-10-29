@@ -23,7 +23,7 @@ using util::StatusOr;
 
 // TODO(ekasper): handle Cert errors consistently and log some errors here
 // if they fail.
-CertSubmissionHandler::CertSubmissionHandler(CertChecker* cert_checker)
+CertSubmissionHandler::CertSubmissionHandler(const CertChecker* cert_checker)
     : cert_checker_(CHECK_NOTNULL(cert_checker)) {
 }
 
@@ -76,7 +76,8 @@ bool CertSubmissionHandler::X509ChainToEntry(const CertChain& chain,
 }
 
 Status CertSubmissionHandler::ProcessX509Submission(CertChain* chain,
-                                                    LogEntry* entry) {
+                                                    LogEntry* entry) const {
+  entry->set_type(ct::X509_ENTRY);
   if (!chain->IsLoaded())
     return Status(util::error::INVALID_ARGUMENT, "empty submission");
 
@@ -99,12 +100,12 @@ Status CertSubmissionHandler::ProcessX509Submission(CertChain* chain,
     }
     x509_entry->add_certificate_chain(der_cert);
   }
-  entry->set_type(ct::X509_ENTRY);
   return Status::OK;
 }
 
 Status CertSubmissionHandler::ProcessPreCertSubmission(PreCertChain* chain,
-                                                       LogEntry* entry) {
+                                                       LogEntry* entry) const {
+  entry->set_type(ct::PRECERT_ENTRY);
   PrecertChainEntry* precert_entry = entry->mutable_precert_entry();
   const Status status(cert_checker_->CheckPreCertChain(
       chain, precert_entry->mutable_pre_cert()->mutable_issuer_key_hash(),
@@ -125,7 +126,6 @@ Status CertSubmissionHandler::ProcessPreCertSubmission(PreCertChain* chain,
       return Status(util::error::INTERNAL, "could not DER-encode the chain");
     precert_entry->add_precertificate_chain(der_cert);
   }
-  entry->set_type(ct::PRECERT_ENTRY);
   return Status::OK;
 }
 

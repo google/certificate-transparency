@@ -36,7 +36,7 @@
 #include "monitoring/latency.h"
 #include "monitoring/monitoring.h"
 #include "monitoring/registry.h"
-#include "server/handler.h"
+#include "server/certificate_handler.h"
 #include "server/json_output.h"
 #include "server/metrics.h"
 #include "server/proxy.h"
@@ -93,6 +93,7 @@ DEFINE_int32(local_sth_update_frequency_seconds, 30,
 namespace libevent = cert_trans::libevent;
 
 using cert_trans::AsyncLogClient;
+using cert_trans::CertificateHttpHandler;
 using cert_trans::ClusterStateController;
 using cert_trans::ConsistentStore;
 using cert_trans::ContinuousFetcher;
@@ -378,13 +379,20 @@ int main(int argc, char* argv[]) {
   options.server = FLAGS_server;
   options.port = FLAGS_port;
   options.etcd_root = FLAGS_etcd_root;
-  options.num_http_server_threads = FLAGS_num_http_server_threads;
 
-  Server<LoggedEntry> server(options, event_base, &internal_pool, db,
-                             etcd_client.get(), &url_fetcher,
-                             nullptr /* log_signer */, &log_verifier,
-                             nullptr /* cert_checker */);
+  ThreadPool http_pool(FLAGS_num_http_server_threads);
+
+  Server<LoggedEntry> server(options, event_base, &internal_pool, &http_pool,
+                             db, etcd_client.get(), &url_fetcher,
+                             nullptr /* log_signer */, &log_verifier);
   server.Initialise(true /* is_mirror */);
+
+  CertificateHttpHandler handler(server.log_lookup(), db,
+                                 server.cluster_state_controller(),
+                                 nullptr /* checker */, nullptr /* Frontend */,
+                                 &internal_pool, event_base.get());
+
+  server.RegisterHandler(&handler);
 
   if (stand_alone_mode) {
     // Set up a simple single-node mirror environment for testing.

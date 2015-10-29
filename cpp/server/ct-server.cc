@@ -27,7 +27,7 @@
 #include "monitoring/latency.h"
 #include "monitoring/monitoring.h"
 #include "monitoring/registry.h"
-#include "server/handler.h"
+#include "server/certificate_handler.h"
 #include "server/metrics.h"
 #include "server/server.h"
 #include "util/etcd.h"
@@ -91,6 +91,7 @@ DEFINE_bool(i_know_stand_alone_mode_can_lose_data, false,
 namespace libevent = cert_trans::libevent;
 
 using cert_trans::CertChecker;
+using cert_trans::CertificateHttpHandler;
 using cert_trans::ClusterStateController;
 using cert_trans::ConsistentStore;
 using cert_trans::Counter;
@@ -101,7 +102,6 @@ using cert_trans::FakeEtcdClient;
 using cert_trans::FileDB;
 using cert_trans::FileStorage;
 using cert_trans::Gauge;
-using cert_trans::HttpHandler;
 using cert_trans::Latency;
 using cert_trans::LevelDB;
 using cert_trans::LoggedEntry;
@@ -398,12 +398,21 @@ int main(int argc, char* argv[]) {
   options.server = FLAGS_server;
   options.port = FLAGS_port;
   options.etcd_root = FLAGS_etcd_root;
-  options.num_http_server_threads = FLAGS_num_http_server_threads;
 
-  Server<LoggedEntry> server(options, event_base, &internal_pool, db,
-                             etcd_client.get(), &url_fetcher, &log_signer,
-                             &log_verifier, &checker);
+  ThreadPool http_pool(FLAGS_num_http_server_threads);
+
+  Server<LoggedEntry> server(options, event_base, &internal_pool, &http_pool,
+                             db, etcd_client.get(), &url_fetcher, &log_signer,
+                             &log_verifier);
   server.Initialise(false /* is_mirror */);
+
+  Frontend frontend(
+      new FrontendSigner(db, server.consistent_store(), &log_signer));
+  CertificateHttpHandler handler(server.log_lookup(), db,
+                                 server.cluster_state_controller(), &checker,
+                                 &frontend, &internal_pool, event_base.get());
+
+  server.RegisterHandler(&handler);
 
   TreeSigner<LoggedEntry> tree_signer(
       std::chrono::duration<double>(FLAGS_guard_window_seconds), db,

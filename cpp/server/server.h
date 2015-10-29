@@ -27,6 +27,7 @@
 #include "monitoring/latency.h"
 #include "monitoring/monitoring.h"
 #include "monitoring/registry.h"
+#include "server/handler.h"
 #include "server/json_output.h"
 #include "server/proxy.h"
 #include "util/etcd.h"
@@ -73,11 +74,13 @@ class Server {
   // Doesn't take ownership of anything.
   Server(const Options& opts,
          const std::shared_ptr<libevent::Base>& event_base,
-         ThreadPool* internal_pool, Database<Logged>* db,
-         EtcdClient* etcd_client, UrlFetcher* url_fetcher,
-         LogSigner* log_signer, const LogVerifier* log_verifier,
-         CertChecker* cert_checker);
+         ThreadPool* internal_pool, ThreadPool* http_pool,
+         Database<Logged>* db, EtcdClient* etcd_client,
+         UrlFetcher* url_fetcher, LogSigner* log_signer,
+         const LogVerifier* log_verifier);
   ~Server();
+
+  void RegisterHandler(HttpHandler* handler);
 
   bool IsMaster() const;
   MasterElection* election();
@@ -97,22 +100,20 @@ class Server {
   libevent::HttpServer http_server_;
   Database<Logged>* const db_;
   const LogVerifier* const log_verifier_;
-  CertChecker* const cert_checker_;
   const std::string node_id_;
   UrlFetcher* const url_fetcher_;
   EtcdClient* const etcd_client_;
   MasterElection election_;
-  ThreadPool* internal_pool_;
+  ThreadPool* const internal_pool_;
   util::SyncTask server_task_;
   StrictConsistentStore<Logged> consistent_store_;
   const std::unique_ptr<Frontend> frontend_;
   std::unique_ptr<LogLookup<Logged>> log_lookup_;
   std::unique_ptr<ClusterStateController<LoggedEntry>> cluster_controller_;
   std::unique_ptr<ContinuousFetcher> fetcher_;
-  ThreadPool http_pool_;
+  ThreadPool* const http_pool_;
   JsonOutput json_output_;
   std::unique_ptr<Proxy> proxy_;
-  std::unique_ptr<HttpHandler> handler_;
   std::unique_ptr<std::thread> node_refresh_thread_;
   std::unique_ptr<GCMExporter> gcm_exporter_;
 
@@ -188,17 +189,16 @@ void Server<Logged>::StaticInit() {
 template <class Logged>
 Server<Logged>::Server(const Options& opts,
                        const std::shared_ptr<libevent::Base>& event_base,
-                       ThreadPool* internal_pool, Database<Logged>* db,
-                       EtcdClient* etcd_client, UrlFetcher* url_fetcher,
-                       LogSigner* log_signer, const LogVerifier* log_verifier,
-                       CertChecker* cert_checker)
+                       ThreadPool* internal_pool, ThreadPool* http_pool,
+                       Database<Logged>* db, EtcdClient* etcd_client,
+                       UrlFetcher* url_fetcher, LogSigner* log_signer,
+                       const LogVerifier* log_verifier)
     : options_(opts),
       event_base_(event_base),
       event_pump_(new libevent::EventPumpThread(event_base_)),
       http_server_(*event_base_),
       db_(CHECK_NOTNULL(db)),
       log_verifier_(CHECK_NOTNULL(log_verifier)),
-      cert_checker_(cert_checker),
       node_id_(GetNodeId(db_)),
       url_fetcher_(CHECK_NOTNULL(url_fetcher)),
       etcd_client_(CHECK_NOTNULL(etcd_client)),
@@ -210,12 +210,7 @@ Server<Logged>::Server(const Options& opts,
                         new EtcdConsistentStore<LoggedEntry>(
                             event_base_.get(), internal_pool_, etcd_client_,
                             &election_, options_.etcd_root, node_id_)),
-      frontend_((log_signer && cert_checker)
-                    ? new Frontend(new CertSubmissionHandler(cert_checker),
-                                   new FrontendSigner(db_, &consistent_store_,
-                                                      log_signer))
-                    : nullptr),
-      http_pool_(options_.num_http_server_threads),
+      http_pool_(CHECK_NOTNULL(http_pool)),
       json_output_(event_base_.get()) {
   CHECK_LT(0, options_.port);
   CHECK_LT(0, options_.num_http_server_threads);
@@ -235,6 +230,7 @@ Server<Logged>::Server(const Options& opts,
   election_.StartElection();
 }
 
+
 template <class Logged>
 Server<Logged>::~Server() {
   server_task_.Cancel();
@@ -242,10 +238,22 @@ Server<Logged>::~Server() {
   server_task_.Wait();
 }
 
+
+template <class Logged>
+void Server<Logged>::RegisterHandler(HttpHandler* handler) {
+  CHECK_NOTNULL(handler);
+  // Configure the handler to use our JSON output and proxy instances:
+  handler->SetOutput(&json_output_);
+  handler->SetProxy(proxy_.get());
+  handler->Add(&http_server_);
+}
+
+
 template <class Logged>
 bool Server<Logged>::IsMaster() const {
   return election_.IsMaster();
 }
+
 
 template <class Logged>
 MasterElection* Server<Logged>::election() {
@@ -330,13 +338,7 @@ void Server<Logged>::Initialise(bool is_mirror) {
       new Proxy(event_base_.get(), &json_output_,
                 bind(&ClusterStateController<LoggedEntry>::GetFreshNodes,
                      cluster_controller_.get()),
-                url_fetcher_, &http_pool_));
-  handler_.reset(new HttpHandler(&json_output_, log_lookup_.get(), db_,
-                                 cluster_controller_.get(), cert_checker_,
-                                 frontend_.get(), proxy_.get(), &http_pool_,
-                                 event_base_.get()));
-
-  handler_->Add(&http_server_);
+                url_fetcher_, http_pool_));
 }
 
 
