@@ -9,6 +9,7 @@
 #include "proto/serializer.h"
 #include "util/status.h"
 
+
 // Parse incoming submissions, do preliminary sanity checks and pass them
 // through cert checker.
 // Prepare for signing by parsing the input into an appropriate
@@ -42,5 +43,6 @@ class CertSubmissionHandler {
 
   DISALLOW_COPY_AND_ASSIGN(CertSubmissionHandler);
 };
+
 
 #endif

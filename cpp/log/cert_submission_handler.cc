@@ -21,11 +21,13 @@ using std::string;
 using util::Status;
 using util::StatusOr;
 
+
 // TODO(ekasper): handle Cert errors consistently and log some errors here
 // if they fail.
 CertSubmissionHandler::CertSubmissionHandler(const CertChecker* cert_checker)
     : cert_checker_(CHECK_NOTNULL(cert_checker)) {
 }
+
 
 // static
 bool CertSubmissionHandler::X509ChainToEntry(const CertChain& chain,
@@ -75,6 +77,7 @@ bool CertSubmissionHandler::X509ChainToEntry(const CertChain& chain,
   }
 }
 
+
 Status CertSubmissionHandler::ProcessX509Submission(CertChain* chain,
                                                     LogEntry* entry) const {
   entry->set_type(ct::X509_ENTRY);
@@ -102,6 +105,7 @@ Status CertSubmissionHandler::ProcessX509Submission(CertChain* chain,
   }
   return Status::OK;
 }
+
 
 Status CertSubmissionHandler::ProcessPreCertSubmission(PreCertChain* chain,
                                                        LogEntry* entry) const {
