@@ -26,8 +26,6 @@ namespace libevent {
 class Base;
 }  // namespace libevent
 
-class JsonOutput;
-
 
 // Visible for testing
 void FilterHeaders(UrlFetcher::Headers* headers);
@@ -37,9 +35,8 @@ class Proxy {
  public:
   typedef std::function<std::vector<ct::ClusterNodeState>()>
       GetFreshNodesFunction;
-  Proxy(libevent::Base* base, JsonOutput* output,
-        const GetFreshNodesFunction& get_fresh_nodes, UrlFetcher* fetcher,
-        util::Executor* executor);
+  Proxy(libevent::Base* base, const GetFreshNodesFunction& get_fresh_nodes,
+        UrlFetcher* fetcher, util::Executor* executor);
 
   virtual ~Proxy() = default;
 
@@ -47,7 +44,6 @@ class Proxy {
 
  private:
   libevent::Base* const base_;
-  JsonOutput* const output_;
   const GetFreshNodesFunction get_fresh_nodes_;
   UrlFetcher* const fetcher_;
   util::Executor* const executor_;

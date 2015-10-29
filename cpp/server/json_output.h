@@ -3,8 +3,6 @@
 
 #include <string>
 
-#include "base/macros.h"
-
 struct evhttp_request;
 class JsonObject;
 
@@ -14,22 +12,12 @@ class Base;
 }  // namespace libevent
 
 
-class JsonOutput {
- public:
-  JsonOutput(libevent::Base* base);
-
-  void SendJsonReply(evhttp_request* req, int http_status,
-                     const JsonObject& json);
+void SendJsonReply(libevent::Base* base, evhttp_request* req, int http_status,
+                   const JsonObject& json);
 
 
-  void SendError(evhttp_request* req, int http_status,
-                 const std::string& error_msg);
-
- private:
-  libevent::Base* const base_;
-
-  DISALLOW_COPY_AND_ASSIGN(JsonOutput);
-};
+void SendJsonError(libevent::Base* base, evhttp_request* req, int http_status,
+                   const std::string& error_msg);
 
 
 }  // namespace cert_trans

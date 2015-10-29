@@ -114,7 +114,8 @@ void HttpHandler::AddEntryReply(evhttp_request* req,
                                     util::error::RESOURCE_EXHAUSTED
                                 ? HTTP_SERVUNAVAIL
                                 : HTTP_BADREQUEST);
-    return output_->SendError(req, response_code, add_status.error_message());
+    return SendJsonError(event_base_, req, response_code,
+                         add_status.error_message());
   }
 
   JsonObject json_reply;
@@ -124,7 +125,7 @@ void HttpHandler::AddEntryReply(evhttp_request* req,
   json_reply.Add("extensions", "");
   json_reply.Add("signature", sct.signature());
 
-  output_->SendJsonReply(req, HTTP_OK, json_reply);
+  SendJsonReply(event_base_, req, HTTP_OK, json_reply);
 }
 
 void HttpHandler::ProxyInterceptor(
@@ -187,21 +188,22 @@ void HttpHandler::SetProxy(Proxy* proxy) {
 
 void HttpHandler::GetEntries(evhttp_request* req) const {
   if (evhttp_request_get_command(req) != EVHTTP_REQ_GET) {
-    return output_->SendError(req, HTTP_BADMETHOD, "Method not allowed.");
+    return SendJsonError(event_base_, req, HTTP_BADMETHOD,
+                         "Method not allowed.");
   }
 
   const libevent::QueryParams query(libevent::ParseQuery(req));
 
   const int64_t start(libevent::GetIntParam(query, "start"));
   if (start < 0) {
-    return output_->SendError(req, HTTP_BADREQUEST,
-                              "Missing or invalid \"start\" parameter.");
+    return SendJsonError(event_base_, req, HTTP_BADREQUEST,
+                         "Missing or invalid \"start\" parameter.");
   }
 
   int64_t end(libevent::GetIntParam(query, "end"));
   if (end < start) {
-    return output_->SendError(req, HTTP_BADREQUEST,
-                              "Missing or invalid \"end\" parameter.");
+    return SendJsonError(event_base_, req, HTTP_BADREQUEST,
+                         "Missing or invalid \"end\" parameter.");
   }
 
   // Limit the number of entries returned in a single request.
@@ -218,34 +220,36 @@ void HttpHandler::GetEntries(evhttp_request* req) const {
 
 void HttpHandler::GetProof(evhttp_request* req) const {
   if (evhttp_request_get_command(req) != EVHTTP_REQ_GET) {
-    return output_->SendError(req, HTTP_BADMETHOD, "Method not allowed.");
+    return SendJsonError(event_base_, req, HTTP_BADMETHOD,
+                         "Method not allowed.");
   }
 
   const libevent::QueryParams query(libevent::ParseQuery(req));
 
   string b64_hash;
   if (!libevent::GetParam(query, "hash", &b64_hash)) {
-    return output_->SendError(req, HTTP_BADREQUEST,
-                              "Missing or invalid \"hash\" parameter.");
+    return SendJsonError(event_base_, req, HTTP_BADREQUEST,
+                         "Missing or invalid \"hash\" parameter.");
   }
 
   const string hash(util::FromBase64(b64_hash.c_str()));
   if (hash.empty()) {
-    return output_->SendError(req, HTTP_BADREQUEST,
-                              "Invalid \"hash\" parameter.");
+    return SendJsonError(event_base_, req, HTTP_BADREQUEST,
+                         "Invalid \"hash\" parameter.");
   }
 
   const int64_t tree_size(libevent::GetIntParam(query, "tree_size"));
   if (tree_size < 0 ||
       static_cast<int64_t>(tree_size) > log_lookup_->GetSTH().tree_size()) {
-    return output_->SendError(req, HTTP_BADREQUEST,
-                              "Missing or invalid \"tree_size\" parameter.");
+    return SendJsonError(event_base_, req, HTTP_BADREQUEST,
+                         "Missing or invalid \"tree_size\" parameter.");
   }
 
   ShortMerkleAuditProof proof;
   if (log_lookup_->AuditProof(hash, tree_size, &proof) !=
       LogLookup<LoggedEntry>::OK) {
-    return output_->SendError(req, HTTP_BADREQUEST, "Couldn't find hash.");
+    return SendJsonError(event_base_, req, HTTP_BADREQUEST,
+                         "Couldn't find hash.");
   }
 
   JsonArray json_audit;
@@ -257,13 +261,14 @@ void HttpHandler::GetProof(evhttp_request* req) const {
   json_reply.Add("leaf_index", proof.leaf_index());
   json_reply.Add("audit_path", json_audit);
 
-  output_->SendJsonReply(req, HTTP_OK, json_reply);
+  SendJsonReply(event_base_, req, HTTP_OK, json_reply);
 }
 
 
 void HttpHandler::GetSTH(evhttp_request* req) const {
   if (evhttp_request_get_command(req) != EVHTTP_REQ_GET) {
-    return output_->SendError(req, HTTP_BADMETHOD, "Method not allowed.");
+    return SendJsonError(event_base_, req, HTTP_BADMETHOD,
+                         "Method not allowed.");
   }
 
   const SignedTreeHead& sth(log_lookup_->GetSTH());
@@ -278,27 +283,28 @@ void HttpHandler::GetSTH(evhttp_request* req) const {
 
   VLOG(2) << "GetSTH:\n" << json_reply.DebugString();
 
-  output_->SendJsonReply(req, HTTP_OK, json_reply);
+  SendJsonReply(event_base_, req, HTTP_OK, json_reply);
 }
 
 
 void HttpHandler::GetConsistency(evhttp_request* req) const {
   if (evhttp_request_get_command(req) != EVHTTP_REQ_GET) {
-    return output_->SendError(req, HTTP_BADMETHOD, "Method not allowed.");
+    return SendJsonError(event_base_, req, HTTP_BADMETHOD,
+                         "Method not allowed.");
   }
 
   const libevent::QueryParams query(libevent::ParseQuery(req));
 
   const int64_t first(libevent::GetIntParam(query, "first"));
   if (first < 0) {
-    return output_->SendError(req, HTTP_BADREQUEST,
-                              "Missing or invalid \"first\" parameter.");
+    return SendJsonError(event_base_, req, HTTP_BADREQUEST,
+                         "Missing or invalid \"first\" parameter.");
   }
 
   const int64_t second(libevent::GetIntParam(query, "second"));
   if (second < first) {
-    return output_->SendError(req, HTTP_BADREQUEST,
-                              "Missing or invalid \"second\" parameter.");
+    return SendJsonError(event_base_, req, HTTP_BADREQUEST,
+                         "Missing or invalid \"second\" parameter.");
   }
 
   const vector<string> consistency(
@@ -312,7 +318,7 @@ void HttpHandler::GetConsistency(evhttp_request* req) const {
   JsonObject json_reply;
   json_reply.Add("consistency", json_cons);
 
-  output_->SendJsonReply(req, HTTP_OK, json_reply);
+  SendJsonReply(event_base_, req, HTTP_OK, json_reply);
 }
 
 
@@ -336,7 +342,8 @@ void HttpHandler::BlockingGetEntries(evhttp_request* req, int64_t start,
          Serializer::SerializeSCT(entry.sct(), &sct_data) != Serializer::OK)) {
       LOG(WARNING) << "Failed to serialize entry @ " << i << ":\n"
                    << entry.DebugString();
-      return output_->SendError(req, HTTP_INTERNAL, "Serialization failed.");
+      return SendJsonError(event_base_, req, HTTP_INTERNAL,
+                           "Serialization failed.");
     }
 
     JsonObject json_entry;
@@ -353,13 +360,14 @@ void HttpHandler::BlockingGetEntries(evhttp_request* req, int64_t start,
   }
 
   if (json_entries.Length() < 1) {
-    return output_->SendError(req, HTTP_BADREQUEST, "Entry not found.");
+    return SendJsonError(event_base_, req, HTTP_BADREQUEST,
+                         "Entry not found.");
   }
 
   JsonObject json_reply;
   json_reply.Add("entries", json_entries);
 
-  output_->SendJsonReply(req, HTTP_OK, json_reply);
+  SendJsonReply(event_base_, req, HTTP_OK, json_reply);
 }
 
 

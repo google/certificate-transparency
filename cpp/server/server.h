@@ -112,7 +112,6 @@ class Server {
   std::unique_ptr<ClusterStateController<LoggedEntry>> cluster_controller_;
   std::unique_ptr<ContinuousFetcher> fetcher_;
   ThreadPool* const http_pool_;
-  JsonOutput json_output_;
   std::unique_ptr<Proxy> proxy_;
   std::unique_ptr<std::thread> node_refresh_thread_;
   std::unique_ptr<GCMExporter> gcm_exporter_;
@@ -210,8 +209,7 @@ Server<Logged>::Server(const Options& opts,
                         new EtcdConsistentStore<LoggedEntry>(
                             event_base_.get(), internal_pool_, etcd_client_,
                             &election_, options_.etcd_root, node_id_)),
-      http_pool_(CHECK_NOTNULL(http_pool)),
-      json_output_(event_base_.get()) {
+      http_pool_(CHECK_NOTNULL(http_pool)) {
   CHECK_LT(0, options_.port);
   CHECK_LT(0, options_.num_http_server_threads);
 
@@ -243,7 +241,6 @@ template <class Logged>
 void Server<Logged>::RegisterHandler(HttpHandler* handler) {
   CHECK_NOTNULL(handler);
   // Configure the handler to use our JSON output and proxy instances:
-  handler->SetOutput(&json_output_);
   handler->SetProxy(proxy_.get());
   handler->Add(&http_server_);
 }
@@ -335,7 +332,7 @@ void Server<Logged>::Initialise(bool is_mirror) {
                                              server_task_.task()));
 
   proxy_.reset(
-      new Proxy(event_base_.get(), &json_output_,
+      new Proxy(event_base_.get(),
                 bind(&ClusterStateController<LoggedEntry>::GetFreshNodes,
                      cluster_controller_.get()),
                 url_fetcher_, http_pool_));

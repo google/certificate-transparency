@@ -24,9 +24,10 @@ using util::Status;
 namespace {
 
 
-bool ExtractChain(JsonOutput* output, evhttp_request* req, CertChain* chain) {
+bool ExtractChain(libevent::Base* base, evhttp_request* req,
+                  CertChain* chain) {
   if (evhttp_request_get_command(req) != EVHTTP_REQ_POST) {
-    output->SendError(req, HTTP_BADMETHOD, "Method not allowed.");
+    SendJsonError(base, req, HTTP_BADMETHOD, "Method not allowed.");
     return false;
   }
 
@@ -34,13 +35,15 @@ bool ExtractChain(JsonOutput* output, evhttp_request* req, CertChain* chain) {
   // "application/json", as recommended by RFC4627?
   JsonObject json_body(evhttp_request_get_input_buffer(req));
   if (!json_body.Ok() || !json_body.IsType(json_type_object)) {
-    output->SendError(req, HTTP_BADREQUEST, "Unable to parse provided JSON.");
+    SendJsonError(base, req, HTTP_BADREQUEST,
+                  "Unable to parse provided JSON.");
     return false;
   }
 
   JsonArray json_chain(json_body, "chain");
   if (!json_chain.Ok()) {
-    output->SendError(req, HTTP_BADREQUEST, "Unable to parse provided JSON.");
+    SendJsonError(base, req, HTTP_BADREQUEST,
+                  "Unable to parse provided JSON.");
     return false;
   }
 
@@ -49,16 +52,16 @@ bool ExtractChain(JsonOutput* output, evhttp_request* req, CertChain* chain) {
   for (int i = 0; i < json_chain.Length(); ++i) {
     JsonString json_cert(json_chain, i);
     if (!json_cert.Ok()) {
-      output->SendError(req, HTTP_BADREQUEST,
-                        "Unable to parse provided JSON.");
+      SendJsonError(base, req, HTTP_BADREQUEST,
+                    "Unable to parse provided JSON.");
       return false;
     }
 
     unique_ptr<Cert> cert(new Cert);
     cert->LoadFromDerString(json_cert.FromBase64());
     if (!cert->IsLoaded()) {
-      output->SendError(req, HTTP_BADREQUEST,
-                        "Unable to parse provided chain.");
+      SendJsonError(base, req, HTTP_BADREQUEST,
+                    "Unable to parse provided chain.");
       return false;
     }
 
@@ -108,7 +111,8 @@ void CertificateHttpHandler::AddHandlers(libevent::HttpServer* server) {
 
 void CertificateHttpHandler::GetRoots(evhttp_request* req) const {
   if (evhttp_request_get_command(req) != EVHTTP_REQ_GET) {
-    return output_->SendError(req, HTTP_BADMETHOD, "Method not allowed.");
+    return SendJsonError(event_base_, req, HTTP_BADMETHOD,
+                         "Method not allowed.");
   }
 
   JsonArray roots;
@@ -118,7 +122,8 @@ void CertificateHttpHandler::GetRoots(evhttp_request* req) const {
     string cert;
     if (it->second->DerEncoding(&cert) != util::Status::OK) {
       LOG(ERROR) << "Cert encoding failed";
-      return output_->SendError(req, HTTP_INTERNAL, "Serialisation failed.");
+      return SendJsonError(event_base_, req, HTTP_INTERNAL,
+                           "Serialisation failed.");
     }
     roots.AddBase64(cert);
   }
@@ -126,13 +131,13 @@ void CertificateHttpHandler::GetRoots(evhttp_request* req) const {
   JsonObject json_reply;
   json_reply.Add("certificates", roots);
 
-  output_->SendJsonReply(req, HTTP_OK, json_reply);
+  SendJsonReply(event_base_, req, HTTP_OK, json_reply);
 }
 
 
 void CertificateHttpHandler::AddChain(evhttp_request* req) {
   const shared_ptr<CertChain> chain(make_shared<CertChain>());
-  if (!ExtractChain(output_, req, chain.get())) {
+  if (!ExtractChain(event_base_, req, chain.get())) {
     return;
   }
 
@@ -143,7 +148,7 @@ void CertificateHttpHandler::AddChain(evhttp_request* req) {
 
 void CertificateHttpHandler::AddPreChain(evhttp_request* req) {
   const shared_ptr<PreCertChain> chain(make_shared<PreCertChain>());
-  if (!ExtractChain(output_, req, chain.get())) {
+  if (!ExtractChain(event_base_, req, chain.get())) {
     return;
   }
 

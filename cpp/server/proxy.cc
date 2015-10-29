@@ -44,9 +44,9 @@ static Counter<string, int>* total_proxied_responses(
                               "and status code."));
 
 
-void ProxyRequestDone(libevent::Base* base, JsonOutput* output,
-                      evhttp_request* request, const string& path,
-                      UrlFetcher::Response* response, Task* task) {
+void ProxyRequestDone(libevent::Base* base, evhttp_request* request,
+                      const string& path, UrlFetcher::Response* response,
+                      Task* task) {
   CHECK_NOTNULL(request);
   CHECK_NOTNULL(task);
   unique_ptr<UrlFetcher::Response> response_deleter(CHECK_NOTNULL(response));
@@ -55,8 +55,8 @@ void ProxyRequestDone(libevent::Base* base, JsonOutput* output,
   total_proxied_responses->Increment(path, response->status_code);
 
   if (!task->status().ok()) {
-    return output->SendError(request, HTTP_INTERNAL,
-                             "Proxied request failed.");
+    return SendJsonError(base, request, HTTP_INTERNAL,
+                         "Proxied request failed.");
   }
 
   // TODO(alcutter): Consider retrying the proxied request some number of times
@@ -111,11 +111,10 @@ void FilterHeaders(UrlFetcher::Headers* headers) {
 }
 
 
-Proxy::Proxy(libevent::Base* base, JsonOutput* output,
+Proxy::Proxy(libevent::Base* base,
              const GetFreshNodesFunction& get_fresh_nodes, UrlFetcher* fetcher,
              Executor* executor)
     : base_(CHECK_NOTNULL(base)),
-      output_(CHECK_NOTNULL(output)),
       get_fresh_nodes_(get_fresh_nodes),
       fetcher_(CHECK_NOTNULL(fetcher)),
       executor_(CHECK_NOTNULL(executor)) {
@@ -128,8 +127,8 @@ void Proxy::ProxyRequest(evhttp_request* req) const {
 
   const vector<ClusterNodeState> fresh_nodes(get_fresh_nodes_());
   if (fresh_nodes.empty()) {
-    return output_->SendError(req, HTTP_SERVUNAVAIL,
-                              "No node able to serve request.");
+    return SendJsonError(base_, req, HTTP_SERVUNAVAIL,
+                         "No node able to serve request.");
   }
   const ClusterNodeState& target(fresh_nodes[rand() % fresh_nodes.size()]);
 
@@ -154,7 +153,8 @@ void Proxy::ProxyRequest(evhttp_request* req) const {
       fetcher_req.verb = UrlFetcher::Verb::PUT;
       break;
     default:
-      return output_->SendError(req, HTTP_BADMETHOD, "Bad method requested.");
+      return SendJsonError(base_, req, HTTP_BADMETHOD,
+                           "Bad method requested.");
       break;
   }
 
@@ -177,10 +177,9 @@ void Proxy::ProxyRequest(evhttp_request* req) const {
   VLOG(1) << "Proxying request to " << url.Host() << ":" << url.Port()
           << url.PathQuery();
   UrlFetcher::Response* resp(new UrlFetcher::Response);
-  fetcher_->Fetch(fetcher_req, resp,
-                  new Task(bind(&ProxyRequestDone, base_, output_, req,
-                                url.Path(), resp, _1),
-                           executor_));
+  fetcher_->Fetch(fetcher_req, resp, new Task(bind(&ProxyRequestDone, base_,
+                                                   req, url.Path(), resp, _1),
+                                              executor_));
 }
 
 

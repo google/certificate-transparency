@@ -68,12 +68,10 @@ string LogRequest(evhttp_request* req, int http_status, int resp_body_length) {
 }  // namespace
 
 
-JsonOutput::JsonOutput(libevent::Base* base) : base_(CHECK_NOTNULL(base)) {
-}
-
-
-void JsonOutput::SendJsonReply(evhttp_request* req, int http_status,
-                               const JsonObject& json) {
+void SendJsonReply(libevent::Base* base, evhttp_request* req, int http_status,
+                   const JsonObject& json) {
+  CHECK_NOTNULL(base);
+  CHECK_NOTNULL(req);
   CHECK_EQ(evhttp_add_header(evhttp_request_get_output_headers(req),
                              "Content-Type", kJsonContentType),
            0);
@@ -95,20 +93,20 @@ void JsonOutput::SendJsonReply(evhttp_request* req, int http_status,
   });
 
   if (!libevent::Base::OnEventThread()) {
-    base_->Add(send_reply);
+    base->Add(send_reply);
   } else {
     send_reply();
   }
 }
 
 
-void JsonOutput::SendError(evhttp_request* req, int http_status,
-                           const string& error_msg) {
+void SendJsonError(libevent::Base* base, evhttp_request* req, int http_status,
+                   const string& error_msg) {
   JsonObject json_reply;
   json_reply.Add("error_message", error_msg);
   json_reply.AddBoolean("success", false);
 
-  SendJsonReply(req, http_status, json_reply);
+  SendJsonReply(base, req, http_status, json_reply);
 }
 
 
