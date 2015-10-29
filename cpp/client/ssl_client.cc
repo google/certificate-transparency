@@ -20,8 +20,8 @@ using ct::SSLClientCTData;
 using ct::SignedCertificateTimestamp;
 using ct::SignedCertificateTimestampList;
 using std::string;
-using util::error::Code;
 using util::StatusOr;
+using util::error::Code;
 
 const uint16_t CT_EXTENSION_TYPE = 18;
 
