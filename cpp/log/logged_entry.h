@@ -63,7 +63,7 @@ class LoggedEntry : public ct::LoggedEntryPB {
       case ct::UNKNOWN_ENTRY_TYPE:
         // We'll handle this below, along with any unknown unknown types too.
         break;
-      }
+    }
     LOG(FATAL) << "Unknown entry type " << entry().type();
   }
 

@@ -44,16 +44,13 @@ using ct::SignedTreeHead;
 using std::bind;
 using std::chrono::milliseconds;
 using std::chrono::seconds;
-using std::function;
 using std::lock_guard;
-using std::make_pair;
 using std::make_shared;
 using std::multimap;
 using std::mutex;
 using std::placeholders::_1;
 using std::shared_ptr;
 using std::string;
-using std::to_string;
 using std::unique_ptr;
 using std::vector;
 
@@ -247,7 +244,6 @@ void HttpHandler::GetEntries(evhttp_request* req) const {
   if (evhttp_request_get_command(req) != EVHTTP_REQ_GET) {
     return output_->SendError(req, HTTP_BADMETHOD, "Method not allowed.");
   }
-
 
   const libevent::QueryParams query(libevent::ParseQuery(req));
 
