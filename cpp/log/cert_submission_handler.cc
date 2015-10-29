@@ -21,6 +21,45 @@ using std::string;
 using util::Status;
 using util::StatusOr;
 
+namespace {
+
+
+bool SerializedTbs(const Cert& cert, string* result) {
+  if (!cert.IsLoaded()) {
+    return false;
+  }
+
+  const StatusOr<bool> has_embedded_proof = cert.HasExtension(
+      cert_trans::NID_ctEmbeddedSignedCertificateTimestampList);
+  if (!has_embedded_proof.ok()) {
+    return false;
+  }
+
+  // Delete the embedded proof.
+  TbsCertificate tbs(cert);
+  if (!tbs.IsLoaded()) {
+    return false;
+  }
+
+  if (has_embedded_proof.ValueOrDie() &&
+      !tbs.DeleteExtension(
+              cert_trans::NID_ctEmbeddedSignedCertificateTimestampList)
+           .ok()) {
+    return false;
+  }
+
+  string der_tbs;
+  if (!tbs.DerEncoding(&der_tbs).ok()) {
+    return false;
+  }
+
+  result->assign(der_tbs);
+  return true;
+}
+
+
+}  // namespace
+
 
 // TODO(ekasper): handle Cert errors consistently and log some errors here
 // if they fail.
@@ -131,37 +170,4 @@ Status CertSubmissionHandler::ProcessPreCertSubmission(PreCertChain* chain,
     precert_entry->add_precertificate_chain(der_cert);
   }
   return Status::OK;
-}
-
-// static
-bool CertSubmissionHandler::SerializedTbs(const Cert& cert, string* result) {
-  if (!cert.IsLoaded()) {
-    return false;
-  }
-
-  const StatusOr<bool> has_embedded_proof = cert.HasExtension(
-      cert_trans::NID_ctEmbeddedSignedCertificateTimestampList);
-  if (!has_embedded_proof.ok()) {
-    return false;
-  }
-
-  // Delete the embedded proof.
-  TbsCertificate tbs(cert);
-  if (!tbs.IsLoaded()) {
-    return false;
-  }
-
-  if (has_embedded_proof.ValueOrDie() &&
-      !tbs.DeleteExtension(
-          cert_trans::NID_ctEmbeddedSignedCertificateTimestampList).ok()) {
-    return false;
-  }
-
-  string der_tbs;
-  if (!tbs.DerEncoding(&der_tbs).ok()) {
-    return false;
-  }
-
-  result->assign(der_tbs);
-  return true;
 }

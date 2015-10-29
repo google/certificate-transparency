@@ -37,8 +37,6 @@ class CertSubmissionHandler {
   }
 
  private:
-  static bool SerializedTbs(const cert_trans::Cert& cert, std::string* result);
-
   const cert_trans::CertChecker* const cert_checker_;
 
   DISALLOW_COPY_AND_ASSIGN(CertSubmissionHandler);
