@@ -9,6 +9,8 @@
 #include "proto/serializer.h"
 #include "util/status.h"
 
+namespace cert_trans {
+
 
 // Parse incoming submissions, do preliminary sanity checks and pass them
 // through cert checker.
@@ -38,5 +40,7 @@ class CertSubmissionHandler {
   DISALLOW_COPY_AND_ASSIGN(CertSubmissionHandler);
 };
 
+
+}  // namespace cert_trans
 
 #endif

@@ -57,6 +57,7 @@ namespace libevent = cert_trans::libevent;
 using cert_trans::Cert;
 using cert_trans::CertChain;
 using cert_trans::CertChecker;
+using cert_trans::CertSubmissionHandler;
 using cert_trans::Database;
 using cert_trans::EntryHandle;
 using cert_trans::EtcdConsistentStore;

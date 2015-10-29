@@ -126,6 +126,7 @@ static const char kUsage[] =
 using cert_trans::AsyncLogClient;
 using cert_trans::Cert;
 using cert_trans::CertChain;
+using cert_trans::CertSubmissionHandler;
 using cert_trans::HTTPLogClient;
 using cert_trans::PreCertChain;
 using cert_trans::ReadPublicKey;

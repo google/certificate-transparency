@@ -35,6 +35,7 @@ namespace {
 using cert_trans::Cert;
 using cert_trans::CertChain;
 using cert_trans::CertChecker;
+using cert_trans::CertSubmissionHandler;
 using cert_trans::PreCertChain;
 using ct::LogEntry;
 using std::string;

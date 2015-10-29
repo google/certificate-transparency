@@ -21,6 +21,7 @@ using std::string;
 using util::Status;
 using util::StatusOr;
 
+namespace cert_trans {
 namespace {
 
 
@@ -171,3 +172,6 @@ Status CertSubmissionHandler::ProcessPreCertSubmission(PreCertChain* chain,
   }
   return Status::OK;
 }
+
+
+}  // namespace cert_trans
