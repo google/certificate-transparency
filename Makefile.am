@@ -33,6 +33,7 @@ bin_PROGRAMS = \
 	cpp/client/ct \
 	cpp/server/ct-mirror \
 	cpp/server/ct-server \
+	cpp/server/xjson-server \
 	cpp/tools/ct-clustertool
 
 noinst_PROGRAMS = \
@@ -232,6 +233,32 @@ cpp_server_ct_server_SOURCES = \
 	cpp/server/json_output.cc \
 	cpp/server/metrics.cc \
 	cpp/server/proxy.cc \
+	cpp/util/init.cc \
+	cpp/util/json_wrapper.cc \
+	cpp/util/libevent_wrapper.cc \
+	cpp/util/periodic_closure.cc \
+	cpp/util/protobuf_util.cc \
+	cpp/util/protobuf_util.h \
+	cpp/util/read_key.cc \
+	cpp/util/util.cc \
+	cpp/util/uuid.cc \
+	cpp/version.cc
+
+cpp_server_xjson_server_LDADD = \
+	cpp/libcore.a \
+	$(json_c_LIBS) \
+	$(libevent_LIBS) \
+	$(leveldb_LIBS) \
+	-lprotobuf -lsqlite3
+cpp_server_xjson_server_SOURCES = \
+	cpp/client/async_log_client.cc \
+	cpp/proto/serializer.cc \
+	cpp/server/handler.cc \
+	cpp/server/json_output.cc \
+	cpp/server/metrics.cc \
+	cpp/server/proxy.cc \
+	cpp/server/xjson-server.cc \
+	cpp/server/x_json_handler.cc \
 	cpp/util/init.cc \
 	cpp/util/json_wrapper.cc \
 	cpp/util/libevent_wrapper.cc \

@@ -60,6 +60,9 @@ class LoggedEntry : public ct::LoggedEntryPB {
       case ct::PRECERT_ENTRY:
         return Serializer::SerializePrecertChainEntry(entry().precert_entry(),
                                                       dst) == Serializer::OK;
+      case ct::X_JSON_ENTRY:
+        dst->clear();
+        return true;
       case ct::UNKNOWN_ENTRY_TYPE:
         // We'll handle this below, along with any unknown unknown types too.
         break;

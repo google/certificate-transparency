@@ -76,6 +76,10 @@ class Serializer {
       const std::string& tbs_certificate, const std::string& extensions,
       std::string* result);
 
+  static SerializeResult SerializeV1XJsonSCTSignatureInput(
+      uint64_t timestamp, const std::string& json,
+      const std::string& extensions, std::string* result);
+
   static SerializeResult SerializeSCTSignatureInput(
       const ct::SignedCertificateTimestamp& sct, const ct::LogEntry& entry,
       std::string* result);
@@ -88,6 +92,10 @@ class Serializer {
       uint64_t timestamp, const std::string& issuer_key_hash,
       const std::string& tbs_certificate, const std::string& extensions,
       std::string* result);
+
+  static SerializeResult SerializeV1XJsonSCTMerkleTreeLeaf(
+      uint64_t timestamp, const std::string& json,
+      const std::string& extensions, std::string* result);
 
   static SerializeResult SerializeSCTMerkleTreeLeaf(
       const ct::SignedCertificateTimestamp& sct, const ct::LogEntry& entry,
@@ -147,6 +155,9 @@ class Serializer {
   static SerializeResult SerializeV1SignedPrecertEntryWithType(
       const std::string& issuer_key_hash, const std::string& tbs_certificate,
       std::string* result);
+
+  static SerializeResult SerializeV1SignedXJsonEntryWithType(
+      const std::string& json, std::string* result);
 
  private:
   // This class is mostly a namespace for static methods, but a
@@ -303,6 +314,7 @@ class Deserializer {
 
   DeserializeResult ReadDigitallySigned(ct::DigitallySigned* sig);
 
+  DeserializeResult ReadExtensions(ct::TimestampedEntry* entry);
   DeserializeResult ReadMerkleTreeLeaf(ct::MerkleTreeLeaf* leaf);
 
   const char* current_pos_;

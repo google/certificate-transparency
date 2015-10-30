@@ -31,7 +31,6 @@ using cert_trans::CertChain;
 using cert_trans::CertChecker;
 using cert_trans::Counter;
 using cert_trans::HttpHandler;
-using cert_trans::JsonOutput;
 using cert_trans::Latency;
 using cert_trans::LoggedEntry;
 using cert_trans::Proxy;
@@ -73,8 +72,7 @@ HttpHandler::HttpHandler(LogLookup<LoggedEntry>* log_lookup,
                          const ReadOnlyDatabase<LoggedEntry>* db,
                          const ClusterStateController<LoggedEntry>* controller,
                          ThreadPool* pool, libevent::Base* event_base)
-    : output_(nullptr),
-      log_lookup_(CHECK_NOTNULL(log_lookup)),
+    : log_lookup_(CHECK_NOTNULL(log_lookup)),
       db_(CHECK_NOTNULL(db)),
       controller_(CHECK_NOTNULL(controller)),
       proxy_(nullptr),
@@ -171,12 +169,6 @@ void HttpHandler::Add(libevent::HttpServer* server) {
 
   // Now add any sub-class handlers.
   AddHandlers(server);
-}
-
-
-void HttpHandler::SetOutput(JsonOutput* output) {
-  LOG_IF(FATAL, output_) << "Attempting to re-add a HttpHandler.";
-  output_ = CHECK_NOTNULL(output);
 }
 
 
