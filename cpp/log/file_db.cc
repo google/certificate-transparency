@@ -1,7 +1,3 @@
-/* -*- indent-tabs-mode: nil -*- */
-#ifndef CERT_TRANS_LOG_FILE_DB_INL_H_
-#define CERT_TRANS_LOG_FILE_DB_INL_H_
-
 #include "log/file_db.h"
 
 #include <glog/logging.h>
@@ -378,5 +374,3 @@ void FileDB::InsertEntryMapping(int64_t sequence_number, const string& hash) {
 
 
 }  // namespace cert_trans
-
-#endif  // CERT_TRANS_LOG_FILE_DB_INL_H_
