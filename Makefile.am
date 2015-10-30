@@ -136,7 +136,7 @@ cpp_libcore_a_SOURCES = \
 	cpp/log/ct_extensions.cc \
 	cpp/log/database.cc \
 	cpp/log/etcd_consistent_store_cert.cc \
-	cpp/log/file_db_cert.cc \
+	cpp/log/file_db.cc \
 	cpp/log/file_storage.cc \
 	cpp/log/filesystem_ops.cc \
 	cpp/log/frontend.cc \
