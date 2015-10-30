@@ -355,15 +355,6 @@ util::Status EtcdConsistentStore<Logged>::GetPendingEntries(
 
 
 template <class Logged>
-bool LessBySequenceNumber(const EntryHandle<Logged>& lhs,
-                          const EntryHandle<Logged>& rhs) {
-  CHECK(lhs.Entry().has_sequence_number());
-  CHECK(rhs.Entry().has_sequence_number());
-  return lhs.Entry().sequence_number() < rhs.Entry().sequence_number();
-}
-
-
-template <class Logged>
 util::Status EtcdConsistentStore<Logged>::GetSequenceMapping(
     EntryHandle<ct::SequenceMapping>* sequence_mapping) const {
   ScopedLatency scoped_latency(
