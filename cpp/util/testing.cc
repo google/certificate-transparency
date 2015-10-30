@@ -3,6 +3,9 @@
 #include <event2/thread.h>
 #include <evhtp.h>
 #include <glog/logging.h>
+// Without this, build will fail due to clash between onigposix.h
+// and regex.h.
+#define GTEST_HAS_POSIX_RE 0
 #include <gtest/gtest.h>
 
 #include "config.h"
