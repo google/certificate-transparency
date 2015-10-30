@@ -24,7 +24,7 @@ DEFINE_string(node_id, "", "unique node id.");
 
 
 int main(int argc, char* argv[]) {
-  google::ParseCommandLineFlags(&argc, &argv, true);
+  gflags::ParseCommandLineFlags(&argc, &argv, true);
   google::InitGoogleLogging(argv[0]);
   evthread_use_pthreads();
   CHECK(!FLAGS_node_id.empty()) << "Must set --node_id";
