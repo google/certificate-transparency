@@ -71,6 +71,7 @@
 /cpp/server/ct-mirror
 /cpp/server/ct-server
 /cpp/server/proxy_test
+/cpp/server/xjson-server
 /cpp/stamp-h1
 /cpp/tools/ct-clustertool
 /cpp/tools/db_tool
