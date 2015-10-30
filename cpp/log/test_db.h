@@ -16,7 +16,7 @@ static const unsigned kCertStorageDepth = 3;
 static const unsigned kTreeStorageDepth = 8;
 
 template <>
-void TestDB<cert_trans::FileDB<cert_trans::LoggedEntry> >::Setup() {
+void TestDB<cert_trans::FileDB>::Setup() {
   std::string certs_dir = tmp_.TmpStorageDir() + "/certs";
   std::string tree_dir = tmp_.TmpStorageDir() + "/tree";
   std::string meta_dir = tmp_.TmpStorageDir() + "/meta";
@@ -24,19 +24,18 @@ void TestDB<cert_trans::FileDB<cert_trans::LoggedEntry> >::Setup() {
   CHECK_ERR(mkdir(tree_dir.c_str(), 0700));
   CHECK_ERR(mkdir(meta_dir.c_str(), 0700));
 
-  db_.reset(new cert_trans::FileDB<cert_trans::LoggedEntry>(
+  db_.reset(new cert_trans::FileDB(
       new cert_trans::FileStorage(certs_dir, kCertStorageDepth),
       new cert_trans::FileStorage(tree_dir, kTreeStorageDepth),
       new cert_trans::FileStorage(meta_dir, 0)));
 }
 
 template <>
-cert_trans::FileDB<cert_trans::LoggedEntry>*
-TestDB<cert_trans::FileDB<cert_trans::LoggedEntry> >::SecondDB() {
+cert_trans::FileDB* TestDB<cert_trans::FileDB>::SecondDB() {
   std::string certs_dir = this->tmp_.TmpStorageDir() + "/certs";
   std::string tree_dir = this->tmp_.TmpStorageDir() + "/tree";
   std::string meta_dir = this->tmp_.TmpStorageDir() + "/meta";
-  return new cert_trans::FileDB<cert_trans::LoggedEntry>(
+  return new cert_trans::FileDB(
       new cert_trans::FileStorage(certs_dir, kCertStorageDepth),
       new cert_trans::FileStorage(tree_dir, kTreeStorageDepth),
       new cert_trans::FileStorage(meta_dir, 0));

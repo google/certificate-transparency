@@ -70,8 +70,8 @@ class LargeDBTest : public ::testing::Test {
   TestSigner test_signer_;
 };
 
-typedef testing::Types<FileDB<LoggedEntry>, SQLiteDB<LoggedEntry>,
-                       LevelDB<LoggedEntry>> Databases;
+typedef testing::Types<FileDB, SQLiteDB<LoggedEntry>, LevelDB<LoggedEntry>>
+    Databases;
 
 TYPED_TEST_CASE(LargeDBTest, Databases);
 

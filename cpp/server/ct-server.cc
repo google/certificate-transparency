@@ -367,10 +367,9 @@ int main(int argc, char* argv[]) {
   } else if (!FLAGS_leveldb_db.empty()) {
     db = new LevelDB<LoggedEntry>(FLAGS_leveldb_db);
   } else {
-    db = new FileDB<LoggedEntry>(
-        new FileStorage(FLAGS_cert_dir, FLAGS_cert_storage_depth),
-        new FileStorage(FLAGS_tree_dir, FLAGS_tree_storage_depth),
-        new FileStorage(FLAGS_meta_dir, 0));
+    db = new FileDB(new FileStorage(FLAGS_cert_dir, FLAGS_cert_storage_depth),
+                    new FileStorage(FLAGS_tree_dir, FLAGS_tree_storage_depth),
+                    new FileStorage(FLAGS_meta_dir, 0));
   }
 
   shared_ptr<libevent::Base> event_base(make_shared<libevent::Base>());
