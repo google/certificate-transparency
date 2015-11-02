@@ -147,7 +147,7 @@ cpp_libcore_a_SOURCES = \
 	cpp/log/log_verifier.cc \
 	cpp/log/logged_entry.cc \
 	cpp/log/signer.cc \
-	cpp/log/sqlite_db_cert.cc \
+	cpp/log/sqlite_db.cc \
 	cpp/log/strict_consistent_store_cert.cc \
 	cpp/log/tree_signer_cert.cc \
 	cpp/log/verifier.cc \
