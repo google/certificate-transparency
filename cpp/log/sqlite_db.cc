@@ -13,6 +13,14 @@
 #include "monitoring/latency.h"
 #include "util/util.h"
 
+using std::unique_ptr;
+using std::chrono::milliseconds;
+using std::lock_guard;
+using std::mutex;
+using std::ostringstream;
+using std::string;
+using std::unique_lock;
+
 // Several of these flags pass their value directly through to SQLite PRAGMA
 // statements, see the SQLite documentation
 // (https://www.sqlite.org/pragma.html) for a description of the various
@@ -43,12 +51,12 @@ namespace cert_trans {
 namespace {
 
 
-static Latency<std::chrono::milliseconds, std::string> latency_by_op_ms(
+static Latency<milliseconds, string> latency_by_op_ms(
     "sqlitedb_latency_by_operation_ms", "operation",
     "Database latency in ms broken out by operation");
 
 
-sqlite3* SQLiteOpen(const std::string& dbfile) {
+sqlite3* SQLiteOpen(const string& dbfile) {
   ScopedLatency scoped_latency(latency_by_op_ms.GetScopedLatency("open"));
   sqlite3* retval;
 
@@ -103,7 +111,7 @@ class SQLiteDB::Iterator : public Database<LoggedEntry>::Iterator {
 
   bool GetNextEntry(LoggedEntry* entry) override {
     CHECK_NOTNULL(entry);
-    std::unique_lock<std::mutex> lock(db_->lock_);
+    unique_lock<mutex> lock(db_->lock_);
     if (next_index_ < db_->tree_size_) {
       CHECK_EQ(db_->LookupByIndex(lock, next_index_, entry), db_->LOOKUP_OK);
       ++next_index_;
@@ -125,14 +133,14 @@ class SQLiteDB::Iterator : public Database<LoggedEntry>::Iterator {
 };
 
 
-SQLiteDB::SQLiteDB(const std::string& dbfile)
+SQLiteDB::SQLiteDB(const string& dbfile)
     : db_(SQLiteOpen(dbfile)),
       tree_size_(0),
       transaction_size_(0),
       in_transaction_(false) {
-  std::unique_lock<std::mutex> lock(lock_);
+  unique_lock<mutex> lock(lock_);
   {
-    std::ostringstream oss;
+    ostringstream oss;
     oss << "PRAGMA synchronous = " << FLAGS_sqlite_synchronous_mode;
     sqlite::Statement statement(db_, oss.str().c_str());
     CHECK_EQ(SQLITE_DONE, statement.Step());
@@ -145,18 +153,18 @@ SQLiteDB::SQLiteDB(const std::string& dbfile)
   }
 
   {
-    std::ostringstream oss;
+    ostringstream oss;
     oss << "PRAGMA journal_mode = " << FLAGS_sqlite_journal_mode;
     sqlite::Statement statement(db_, oss.str().c_str());
     CHECK_EQ(SQLITE_ROW, statement.Step());
-    std::string mode;
+    string mode;
     statement.GetBlob(0, &mode);
     CHECK_STRCASEEQ(mode.c_str(), FLAGS_sqlite_journal_mode.c_str());
     CHECK_EQ(SQLITE_DONE, statement.Step());
   }
 
   {
-    std::ostringstream oss;
+    ostringstream oss;
     oss << "PRAGMA cache_size = " << FLAGS_sqlite_cache_size;
     sqlite::Statement statement(db_, oss.str().c_str());
     CHECK_EQ(SQLITE_DONE, statement.Step());
@@ -175,17 +183,17 @@ typename Database<LoggedEntry>::WriteResult SQLiteDB::CreateSequencedEntry_(
     const LoggedEntry& logged) {
   ScopedLatency latency(
       latency_by_op_ms.GetScopedLatency("create_sequenced_entry"));
-  std::unique_lock<std::mutex> lock(lock_);
+  unique_lock<mutex> lock(lock_);
 
   MaybeStartNewTransaction(lock);
 
   sqlite::Statement statement(db_,
                               "INSERT INTO leaves(hash, entry, sequence) "
                               "VALUES(?, ?, ?)");
-  const std::string hash(logged.Hash());
+  const string hash(logged.Hash());
   statement.BindBlob(0, hash);
 
-  std::string data;
+  string data;
   CHECK(logged.SerializeForDatabase(&data));
   statement.BindBlob(1, data);
 
@@ -200,7 +208,7 @@ typename Database<LoggedEntry>::WriteResult SQLiteDB::CreateSequencedEntry_(
         db_, "SELECT sequence, hash FROM leaves WHERE sequence = ?");
     s2.BindUInt64(0, logged.sequence_number());
     if (s2.Step() == SQLITE_ROW) {
-      std::string existing_hash;
+      string existing_hash;
       s2.GetBlob(1, &existing_hash);
 
       if (logged.sequence_number() == tree_size_) {
@@ -224,11 +232,11 @@ typename Database<LoggedEntry>::WriteResult SQLiteDB::CreateSequencedEntry_(
 
 
 typename Database<LoggedEntry>::LookupResult SQLiteDB::LookupByHash(
-    const std::string& hash, LoggedEntry* result) const {
+    const string& hash, LoggedEntry* result) const {
   CHECK_NOTNULL(result);
   ScopedLatency latency(latency_by_op_ms.GetScopedLatency("lookup_by_hash"));
 
-  std::lock_guard<std::mutex> lock(lock_);
+  lock_guard<mutex> lock(lock_);
 
   sqlite::Statement statement(db_,
                               "SELECT entry, sequence FROM leaves "
@@ -242,7 +250,7 @@ typename Database<LoggedEntry>::LookupResult SQLiteDB::LookupByHash(
   }
   CHECK_EQ(SQLITE_ROW, ret);
 
-  std::string data;
+  string data;
   statement.GetBlob(0, &data);
   CHECK(result->ParseFromDatabase(data));
 
@@ -262,14 +270,14 @@ typename Database<LoggedEntry>::LookupResult SQLiteDB::LookupByHash(
 typename Database<LoggedEntry>::LookupResult SQLiteDB::LookupByIndex(
     int64_t sequence_number, LoggedEntry* result) const {
   ScopedLatency latency(latency_by_op_ms.GetScopedLatency("lookup_by_index"));
-  std::unique_lock<std::mutex> lock(lock_);
+  unique_lock<mutex> lock(lock_);
 
   return LookupByIndex(lock, sequence_number, result);
 }
 
 
 typename Database<LoggedEntry>::LookupResult SQLiteDB::LookupByIndex(
-    const std::unique_lock<std::mutex>& lock, int64_t sequence_number,
+    const unique_lock<mutex>& lock, int64_t sequence_number,
     LoggedEntry* result) const {
   CHECK(lock.owns_lock());
   CHECK_GE(sequence_number, 0);
@@ -283,11 +291,11 @@ typename Database<LoggedEntry>::LookupResult SQLiteDB::LookupByIndex(
     return this->NOT_FOUND;
   }
 
-  std::string data;
+  string data;
   statement.GetBlob(0, &data);
   CHECK(result->ParseFromDatabase(data));
 
-  std::string hash;
+  string hash;
   statement.GetBlob(1, &hash);
 
   CHECK_EQ(result->Hash(), hash);
@@ -302,7 +310,7 @@ typename Database<LoggedEntry>::LookupResult SQLiteDB::LookupByIndex(
 
 
 typename Database<LoggedEntry>::LookupResult SQLiteDB::LookupNextIndex(
-    const std::unique_lock<std::mutex>& lock, int64_t sequence_number,
+    const unique_lock<mutex>& lock, int64_t sequence_number,
     LoggedEntry* result) const {
   CHECK(lock.owns_lock());
   CHECK_GE(sequence_number, 0);
@@ -315,11 +323,11 @@ typename Database<LoggedEntry>::LookupResult SQLiteDB::LookupNextIndex(
     return this->NOT_FOUND;
   }
 
-  std::string data;
+  string data;
   statement.GetBlob(0, &data);
   CHECK(result->ParseFromDatabase(data));
 
-  std::string hash;
+  string hash;
   statement.GetBlob(1, &hash);
 
   CHECK_EQ(result->Hash(), hash);
@@ -333,23 +341,23 @@ typename Database<LoggedEntry>::LookupResult SQLiteDB::LookupNextIndex(
 }
 
 
-std::unique_ptr<typename Database<LoggedEntry>::Iterator>
-SQLiteDB::ScanEntries(int64_t start_index) const {
-  return std::unique_ptr<Iterator>(new Iterator(this, start_index));
+unique_ptr<typename Database<LoggedEntry>::Iterator> SQLiteDB::ScanEntries(
+    int64_t start_index) const {
+  return unique_ptr<Iterator>(new Iterator(this, start_index));
 }
 
 
 typename Database<LoggedEntry>::WriteResult SQLiteDB::WriteTreeHead_(
     const ct::SignedTreeHead& sth) {
   ScopedLatency latency(latency_by_op_ms.GetScopedLatency("write_tree_head"));
-  std::unique_lock<std::mutex> lock(lock_);
+  unique_lock<mutex> lock(lock_);
 
   sqlite::Statement statement(db_,
                               "INSERT INTO trees(timestamp, sth) "
                               "VALUES(?, ?)");
   statement.BindUInt64(0, sth.timestamp());
 
-  std::string sth_data;
+  string sth_data;
   CHECK(sth.SerializeToString(&sth_data));
   statement.BindBlob(1, sth_data);
 
@@ -360,7 +368,7 @@ typename Database<LoggedEntry>::WriteResult SQLiteDB::WriteTreeHead_(
                          "WHERE timestamp = ?");
     s2.BindUInt64(0, sth.timestamp());
     CHECK_EQ(SQLITE_ROW, s2.Step());
-    std::string existing_sth_data;
+    string existing_sth_data;
     s2.GetBlob(1, &existing_sth_data);
     if (existing_sth_data == sth_data) {
       LOG(WARNING) << "Attempted to store indentical STH in DB.";
@@ -385,7 +393,7 @@ typename Database<LoggedEntry>::WriteResult SQLiteDB::WriteTreeHead_(
 typename Database<LoggedEntry>::LookupResult SQLiteDB::LatestTreeHead(
     ct::SignedTreeHead* result) const {
   ScopedLatency latency(latency_by_op_ms.GetScopedLatency("latest_tree_head"));
-  std::unique_lock<std::mutex> lock(lock_);
+  unique_lock<mutex> lock(lock_);
 
   return LatestTreeHeadNoLock(lock, result);
 }
@@ -393,7 +401,7 @@ typename Database<LoggedEntry>::LookupResult SQLiteDB::LatestTreeHead(
 
 int64_t SQLiteDB::TreeSize() const {
   ScopedLatency latency(latency_by_op_ms.GetScopedLatency("tree_size"));
-  std::unique_lock<std::mutex> lock(lock_);
+  unique_lock<mutex> lock(lock_);
 
   CHECK_GE(tree_size_, 0);
   sqlite::Statement statement(
@@ -420,7 +428,7 @@ int64_t SQLiteDB::TreeSize() const {
 
 void SQLiteDB::AddNotifySTHCallback(
     const typename Database<LoggedEntry>::NotifySTHCallback* callback) {
-  std::unique_lock<std::mutex> lock(lock_);
+  unique_lock<mutex> lock(lock_);
 
   callbacks_.Add(callback);
 
@@ -436,17 +444,17 @@ void SQLiteDB::AddNotifySTHCallback(
 
 void SQLiteDB::RemoveNotifySTHCallback(
     const typename Database<LoggedEntry>::NotifySTHCallback* callback) {
-  std::lock_guard<std::mutex> lock(lock_);
+  lock_guard<mutex> lock(lock_);
 
   callbacks_.Remove(callback);
 }
 
 
-void SQLiteDB::InitializeNode(const std::string& node_id) {
+void SQLiteDB::InitializeNode(const string& node_id) {
   ScopedLatency latency(latency_by_op_ms.GetScopedLatency("initialize_node"));
   CHECK(!node_id.empty());
-  std::unique_lock<std::mutex> lock(lock_);
-  std::string existing_id;
+  unique_lock<mutex> lock(lock_);
+  string existing_id;
   if (NodeId(lock, &existing_id) != this->NOT_FOUND) {
     LOG(FATAL) << "Attempting to initialize DB beloging to node with node_id: "
                << existing_id;
@@ -460,14 +468,14 @@ void SQLiteDB::InitializeNode(const std::string& node_id) {
 
 
 typename Database<LoggedEntry>::LookupResult SQLiteDB::NodeId(
-    std::string* node_id) {
-  std::unique_lock<std::mutex> lock(lock_);
+    string* node_id) {
+  unique_lock<mutex> lock(lock_);
   return NodeId(lock, CHECK_NOTNULL(node_id));
 }
 
 
 typename Database<LoggedEntry>::LookupResult SQLiteDB::NodeId(
-    const std::unique_lock<std::mutex>& lock, std::string* node_id) {
+    const unique_lock<mutex>& lock, string* node_id) {
   ScopedLatency latency(latency_by_op_ms.GetScopedLatency("set_node_id"));
   CHECK(lock.owns_lock());
   CHECK_NOTNULL(node_id);
@@ -486,7 +494,7 @@ typename Database<LoggedEntry>::LookupResult SQLiteDB::NodeId(
 }
 
 
-void SQLiteDB::BeginTransaction(const std::unique_lock<std::mutex>& lock) {
+void SQLiteDB::BeginTransaction(const unique_lock<mutex>& lock) {
   CHECK(lock.owns_lock());
   if (FLAGS_sqlite_batch_into_transactions) {
     CHECK_EQ(0, transaction_size_);
@@ -499,7 +507,7 @@ void SQLiteDB::BeginTransaction(const std::unique_lock<std::mutex>& lock) {
 }
 
 
-void SQLiteDB::EndTransaction(const std::unique_lock<std::mutex>& lock) {
+void SQLiteDB::EndTransaction(const unique_lock<mutex>& lock) {
   CHECK(lock.owns_lock());
   if (FLAGS_sqlite_batch_into_transactions) {
     CHECK(in_transaction_);
@@ -520,8 +528,7 @@ void SQLiteDB::EndTransaction(const std::unique_lock<std::mutex>& lock) {
 }
 
 
-void SQLiteDB::MaybeStartNewTransaction(
-    const std::unique_lock<std::mutex>& lock) {
+void SQLiteDB::MaybeStartNewTransaction(const unique_lock<mutex>& lock) {
   CHECK(lock.owns_lock());
   if (FLAGS_sqlite_batch_into_transactions &&
       transaction_size_ >= FLAGS_sqlite_transaction_batch_size) {
@@ -534,7 +541,7 @@ void SQLiteDB::MaybeStartNewTransaction(
 
 
 void SQLiteDB::ForceNotifySTH() {
-  std::unique_lock<std::mutex> lock(lock_);
+  unique_lock<mutex> lock(lock_);
 
   ct::SignedTreeHead sth;
   const typename Database<LoggedEntry>::LookupResult db_result =
@@ -553,8 +560,7 @@ void SQLiteDB::ForceNotifySTH() {
 
 
 typename Database<LoggedEntry>::LookupResult SQLiteDB::LatestTreeHeadNoLock(
-    const std::unique_lock<std::mutex>& lock,
-    ct::SignedTreeHead* result) const {
+    const unique_lock<mutex>& lock, ct::SignedTreeHead* result) const {
   CHECK(lock.owns_lock());
   sqlite::Statement statement(db_,
                               "SELECT sth FROM trees WHERE timestamp IN "
@@ -566,7 +572,7 @@ typename Database<LoggedEntry>::LookupResult SQLiteDB::LatestTreeHeadNoLock(
   }
   CHECK_EQ(SQLITE_ROW, ret);
 
-  std::string sth;
+  string sth;
   statement.GetBlob(0, &sth);
   CHECK(result->ParseFromString(sth));
 
