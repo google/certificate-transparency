@@ -32,6 +32,7 @@ using cert_trans::EntryHandle;
 using cert_trans::EtcdClient;
 using cert_trans::FakeEtcdClient;
 using cert_trans::FileDB;
+using cert_trans::LogLookup;
 using cert_trans::LoggedEntry;
 using cert_trans::MockMasterElection;
 using cert_trans::SQLiteDB;

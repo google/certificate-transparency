@@ -19,12 +19,14 @@
 #include "proto/serializer.h"
 #include "util/util.h"
 
+namespace cert_trans {
+
 
 static const int kCtimeBufSize = 26;
 
 
 template <class Logged>
-LogLookup<Logged>::LogLookup(cert_trans::ReadOnlyDatabase* db)
+LogLookup<Logged>::LogLookup(ReadOnlyDatabase* db)
     : db_(CHECK_NOTNULL(db)),
       cert_tree_(new Sha256Hasher),
       latest_tree_head_(),
@@ -98,8 +100,8 @@ void LogLookup<Logged>::UpdateFromSTH(const ct::SignedTreeHead& sth) {
             << " new log entries";
   latest_tree_head_.CopyFrom(sth);
 
-  const time_t last_update(static_cast<time_t>(
-      latest_tree_head_.timestamp() / cert_trans::kNumMillisPerSecond));
+  const time_t last_update(static_cast<time_t>(latest_tree_head_.timestamp() /
+                                               kNumMillisPerSecond));
   char buf[kCtimeBufSize];
   LOG(INFO) << "Tree successfully updated at " << ctime_r(&last_update, buf);
 }
@@ -221,5 +223,7 @@ int64_t LogLookup<Logged>::GetIndexInternal(
   return it->second;
 }
 
+
+}  // namespace cert_trans
 
 #endif  // CERT_TRANS_LOG_LOG_LOOKUP_INL_H_

@@ -16,7 +16,6 @@
 #include <string>
 #include <unistd.h>
 
-
 #include "config.h"
 #include "client/async_log_client.h"
 #include "fetcher/continuous_fetcher.h"
@@ -108,6 +107,7 @@ using cert_trans::Gauge;
 using cert_trans::HttpHandler;
 using cert_trans::Latency;
 using cert_trans::LevelDB;
+using cert_trans::LogLookup;
 using cert_trans::LoggedEntry;
 using cert_trans::MasterElection;
 using cert_trans::PeriodicClosure;

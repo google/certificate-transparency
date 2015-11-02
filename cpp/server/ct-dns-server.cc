@@ -12,6 +12,7 @@
 #include "util/init.h"
 #include "util/util.h"
 
+using cert_trans::LogLookup;
 using cert_trans::LoggedEntry;
 using cert_trans::SQLiteDB;
 using ct::SignedTreeHead;

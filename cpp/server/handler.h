@@ -12,8 +12,6 @@
 #include "util/task.h"
 
 class Frontend;
-template <class T>
-class LogLookup;
 
 namespace cert_trans {
 
@@ -21,6 +19,8 @@ class CertChain;
 class CertChecker;
 template <class T>
 class ClusterStateController;
+template <class T>
+class LogLookup;
 class LoggedEntry;
 class PreCertChain;
 class Proxy;

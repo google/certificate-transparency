@@ -13,13 +13,16 @@
 #include "merkletree/merkle_tree.h"
 #include "proto/ct.pb.h"
 
+namespace cert_trans {
+
+
 // Lookups into the database. Read-only, so could also be a mirror.
 // Keeps the entire Merkle Tree in memory to serve audit proofs.
 template <class Logged>
 class LogLookup {
  public:
   // The constructor loads the content from the database.
-  explicit LogLookup(cert_trans::ReadOnlyDatabase* db);
+  explicit LogLookup(ReadOnlyDatabase* db);
   ~LogLookup();
 
   enum LookupResult {
@@ -76,12 +79,16 @@ class LogLookup {
   // a shorter prefix (possibly with a multimap).
   std::map<std::string, int64_t> leaf_index_;
 
-  cert_trans::ReadOnlyDatabase* const db_;
+  ReadOnlyDatabase* const db_;
   MerkleTree cert_tree_;
   ct::SignedTreeHead latest_tree_head_;
 
-  const cert_trans::Database::NotifySTHCallback update_from_sth_cb_;
+  const Database::NotifySTHCallback update_from_sth_cb_;
 
   DISALLOW_COPY_AND_ASSIGN(LogLookup);
 };
+
+
+}  // namespace cert_trans
+
 #endif
