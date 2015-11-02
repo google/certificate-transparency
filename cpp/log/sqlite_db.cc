@@ -1,7 +1,3 @@
-/* -*- indent-tabs-mode: nil -*- */
-#ifndef CERT_TRANS_LOG_SQLITE_DB_INL_H_
-#define CERT_TRANS_LOG_SQLITE_DB_INL_H_
-
 #include "log/sqlite_db.h"
 
 #include <gflags/gflags.h>
@@ -581,5 +577,3 @@ typename Database<LoggedEntry>::LookupResult SQLiteDB::LatestTreeHeadNoLock(
 
 
 }  // namespace cert_trans
-
-#endif  // CERT_TRANS_LOG_SQLITE_DB_INL_H_
