@@ -29,6 +29,17 @@ class CmsVerifier {
   // certificate. Does not verify the signature or check the payload.
   virtual util::StatusOr<bool> IsCmsSignedByCert(BIO* cms_bio_in,
                                                  const Cert& cert) const;
+  // Checks that a CMS_ContentInfo has a signer that matches a specified
+  // certificate. Does not verify the signature or check the payload.
+  virtual util::StatusOr<bool> IsCmsSignedByCert(const std::string& cms_object,
+                                                 const Cert* cert) const;
+
+  // Unpacks a CMS signed data object that is assumed to contain a certificate
+  // Does not do any checks on signatures or cert validity at this point,
+  // the caller must do these separately. Returns a new Cert object built from
+  // the unpacked data, which will only be valid if we successfully unpacked
+  // the CMS blob.
+  virtual Cert* UnpackCmsSignedCertificate(const std::string& cms_object);
 
   // Unpacks a CMS signed data object that is assumed to contain a certificate
   // If the CMS signature verifies as being signed by the supplied Cert
@@ -50,6 +61,12 @@ class CmsVerifier {
   // CMS message or validate that the CMS signature is trusted to root.
   util::Status UnpackCmsDerBio(BIO* cms_bio_in, const Cert& certChain,
                                BIO* cms_bio_out);
+  // Writes the unwrapped content from a CMS object to another BIO. Does
+  // not free either BIO. Does not do any checks on the content of the
+  // CMS message or validate that the CMS signature is trusted to root.
+  // The unpacked data may not be a valid X.509 cert. The caller must
+  // apply any additional checks necessary.
+  util::Status UnpackCmsDerBio(BIO* cms_bio_in, BIO* cms_bio_out);
 
   DISALLOW_COPY_AND_ASSIGN(CmsVerifier);
 };
