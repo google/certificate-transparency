@@ -113,7 +113,7 @@ int main(int argc, char* argv[]) {
   if (!FLAGS_sqlite_db.empty()) {
     db.reset(new SQLiteDB(FLAGS_sqlite_db));
   } else if (!FLAGS_leveldb_db.empty()) {
-    db.reset(new LevelDB<LoggedEntry>(FLAGS_leveldb_db));
+    db.reset(new LevelDB(FLAGS_leveldb_db));
   } else {
     db.reset(
         new FileDB(new FileStorage(FLAGS_cert_dir, FLAGS_cert_storage_depth),

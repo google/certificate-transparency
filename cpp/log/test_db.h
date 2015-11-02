@@ -52,19 +52,16 @@ cert_trans::SQLiteDB* TestDB<cert_trans::SQLiteDB>::SecondDB() {
 }
 
 template <>
-void TestDB<cert_trans::LevelDB<cert_trans::LoggedEntry> >::Setup() {
-  db_.reset(new cert_trans::LevelDB<cert_trans::LoggedEntry>(
-      tmp_.TmpStorageDir() + "/leveldb"));
+void TestDB<cert_trans::LevelDB>::Setup() {
+  db_.reset(new cert_trans::LevelDB(tmp_.TmpStorageDir() + "/leveldb"));
 }
 
 template <>
-cert_trans::LevelDB<cert_trans::LoggedEntry>*
-TestDB<cert_trans::LevelDB<cert_trans::LoggedEntry> >::SecondDB() {
+cert_trans::LevelDB* TestDB<cert_trans::LevelDB>::SecondDB() {
   // LevelDB won't allow the same DB to be opened concurrently so we have to
   // close the original.
   db_.reset();
-  return new cert_trans::LevelDB<cert_trans::LoggedEntry>(
-      tmp_.TmpStorageDir() + "/leveldb");
+  return new cert_trans::LevelDB(tmp_.TmpStorageDir() + "/leveldb");
 }
 
 // Not a Database; we just use the same template for setup.

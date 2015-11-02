@@ -365,7 +365,7 @@ int main(int argc, char* argv[]) {
   if (!FLAGS_sqlite_db.empty()) {
     db = new SQLiteDB(FLAGS_sqlite_db);
   } else if (!FLAGS_leveldb_db.empty()) {
-    db = new LevelDB<LoggedEntry>(FLAGS_leveldb_db);
+    db = new LevelDB(FLAGS_leveldb_db);
   } else {
     db = new FileDB(new FileStorage(FLAGS_cert_dir, FLAGS_cert_storage_depth),
                     new FileStorage(FLAGS_tree_dir, FLAGS_tree_storage_depth),

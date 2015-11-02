@@ -300,7 +300,7 @@ int main(int argc, char* argv[]) {
   }
   Database<LoggedEntry>* db;
 
-  db = new LevelDB<LoggedEntry>(FLAGS_leveldb_db);
+  db = new LevelDB(FLAGS_leveldb_db);
 
   shared_ptr<libevent::Base> event_base(make_shared<libevent::Base>());
   ThreadPool internal_pool(8);
