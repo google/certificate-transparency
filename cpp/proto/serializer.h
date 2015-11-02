@@ -3,6 +3,7 @@
 #define SERIALIZER_H
 
 #include <glog/logging.h>
+#include <google/protobuf/repeated_field.h>
 #include <stdint.h>
 #include <string>
 
@@ -34,11 +35,14 @@ class Serializer {
     EMPTY_ELEM_IN_LIST,
     LIST_ELEM_TOO_LONG,
     LIST_TOO_LONG,
+    EXTENSIONS_NOT_ORDERED,
   };
 
   static const size_t kMaxCertificateLength;
   static const size_t kMaxCertificateChainLength;
   static const size_t kMaxSignatureLength;
+  static const size_t kMaxV2ExtensionType;
+  static const size_t kMaxV2ExtensionsCount;
   static const size_t kMaxExtensionsLength;
   static const size_t kMaxSerializedSCTLength;
   static const size_t kMaxSCTListLength;
@@ -62,7 +66,8 @@ class Serializer {
     return output_;
   }
 
-  static SerializeResult CheckLogEntryFormat(const ct::LogEntry& entry);
+  static SerializeResult CheckLogEntryFormatV1(const ct::LogEntry& entry);
+  static SerializeResult CheckLogEntryFormatV2(const ct::LogEntry& entry);
 
   // Helper method to hide some of the ugly select logic.
   static std::string LeafData(const ct::LogEntry& entry);
@@ -71,14 +76,36 @@ class Serializer {
       uint64_t timestamp, const std::string& certificate,
       const std::string& extensions, std::string* result);
 
+  static SerializeResult SerializeV2CertSCTSignatureInput(
+      uint64_t timestamp, const std::string& issuer_key_hash,
+      const std::string& tbs_certificate,
+      const google::protobuf::RepeatedPtrField<ct::SctExtension>&
+          sct_extension,
+      std::string* result);
+
   static SerializeResult SerializeV1PrecertSCTSignatureInput(
       uint64_t timestamp, const std::string& issuer_key_hash,
       const std::string& tbs_certificate, const std::string& extensions,
       std::string* result);
 
+  static SerializeResult SerializeV2PrecertSCTSignatureInput(
+      uint64_t timestamp, const std::string& issuer_key_hash,
+      const std::string& tbs_certificate,
+      const google::protobuf::RepeatedPtrField<ct::SctExtension>&
+          sct_extension,
+      std::string* result);
+
   static SerializeResult SerializeV1XJsonSCTSignatureInput(
       uint64_t timestamp, const std::string& json,
       const std::string& extensions, std::string* result);
+
+  static SerializeResult SerializeSCTSignatureInputV1(
+      const ct::SignedCertificateTimestamp& sct, const ct::LogEntry& entry,
+      std::string* result);
+
+  static SerializeResult SerializeSCTSignatureInputV2(
+      const ct::SignedCertificateTimestamp& sct, const ct::LogEntry& entry,
+      std::string* result);
 
   static SerializeResult SerializeSCTSignatureInput(
       const ct::SignedCertificateTimestamp& sct, const ct::LogEntry& entry,
@@ -93,9 +120,31 @@ class Serializer {
       const std::string& tbs_certificate, const std::string& extensions,
       std::string* result);
 
+  static SerializeResult SerializeV2CertSCTMerkleTreeLeaf(
+      uint64_t timestamp, const std::string& issuer_key_hash,
+      const std::string& tbs_certificate,
+      const google::protobuf::RepeatedPtrField<ct::SctExtension>&
+          sct_extension,
+      std::string* result);
+
+  static SerializeResult SerializeV2PrecertSCTMerkleTreeLeaf(
+      uint64_t timestamp, const std::string& issuer_key_hash,
+      const std::string& tbs_certificate,
+      const google::protobuf::RepeatedPtrField<ct::SctExtension>&
+          sct_extension,
+      std::string* result);
+
   static SerializeResult SerializeV1XJsonSCTMerkleTreeLeaf(
       uint64_t timestamp, const std::string& json,
       const std::string& extensions, std::string* result);
+
+  static SerializeResult SerializeSCTMerkleTreeLeafV1(
+      const ct::SignedCertificateTimestamp& sct, const ct::LogEntry& entry,
+      std::string* result);
+
+  static SerializeResult SerializeSCTMerkleTreeLeafV2(
+      const ct::SignedCertificateTimestamp& sct, const ct::LogEntry& entry,
+      std::string* result);
 
   static SerializeResult SerializeSCTMerkleTreeLeaf(
       const ct::SignedCertificateTimestamp& sct, const ct::LogEntry& entry,
@@ -105,10 +154,18 @@ class Serializer {
       uint64_t timestamp, int64_t tree_size, const std::string& root_hash,
       std::string* result);
 
+  static SerializeResult SerializeV2STHSignatureInput(
+      uint64_t timestamp, int64_t tree_size, const std::string& root_hash,
+      const google::protobuf::RepeatedPtrField<ct::SthExtension>&
+          sth_extension,
+      const std::string& log_id, std::string* result);
+
   static SerializeResult SerializeSTHSignatureInput(
       const ct::SignedTreeHead& sth, std::string* result);
 
-  SerializeResult WriteSCT(const ct::SignedCertificateTimestamp& sct);
+  SerializeResult WriteSCTV1(const ct::SignedCertificateTimestamp& sct);
+
+  SerializeResult WriteSCTV2(const ct::SignedCertificateTimestamp& sct);
 
   static SerializeResult SerializeSCT(
       const ct::SignedCertificateTimestamp& sct, std::string* result);
@@ -121,7 +178,7 @@ class Serializer {
   static SerializeResult SerializeX509Chain(const ct::X509ChainEntry& entry,
                                             std::string* result);
 
-  static SerializeResult SerializeX509Chain(
+  static SerializeResult SerializeX509ChainV1(
       const repeated_string& certificate_chain, std::string* result);
 
   static SerializeResult SerializePrecertChainEntry(
@@ -155,9 +212,15 @@ class Serializer {
   static SerializeResult SerializeV1SignedPrecertEntryWithType(
       const std::string& issuer_key_hash, const std::string& tbs_certificate,
       std::string* result);
+  static SerializeResult SerializeV2SignedPrecertEntryWithType(
+      const std::string& issuer_key_hash, const std::string& tbs_certificate,
+      std::string* result);
 
   static SerializeResult SerializeV1SignedXJsonEntryWithType(
       const std::string& json, std::string* result);
+
+  static SerializeResult CheckSctExtensionsFormat(
+      const google::protobuf::RepeatedPtrField<ct::SctExtension>& extension);
 
  private:
   // This class is mostly a namespace for static methods, but a
@@ -182,6 +245,9 @@ class Serializer {
   // Caller is responsible for checking |in| <= max_length
   // TODO(ekasper): could return a bool instead.
   void WriteVarBytes(const std::string& in, size_t max_length);
+
+  void WriteSctExtension(
+      const google::protobuf::RepeatedPtrField<ct::SctExtension>& extension);
 
   // Length of the serialized list (with length prefix).
   static size_t SerializedListLength(const repeated_string& in,
@@ -209,12 +275,19 @@ class Serializer {
 
   static SerializeResult CheckExtensionsFormat(const std::string& extensions);
 
+  static SerializeResult CheckSthExtensionsFormat(
+      const google::protobuf::RepeatedPtrField<ct::SthExtension>& extension);
+
   static SerializeResult CheckChainFormat(const repeated_string& chain);
 
-  static SerializeResult CheckX509ChainEntryFormat(
+  static SerializeResult CheckX509ChainEntryFormatV1(
+      const ct::X509ChainEntry& entry);
+  static SerializeResult CheckX509ChainEntryFormatV2(
       const ct::X509ChainEntry& entry);
 
-  static SerializeResult CheckPrecertChainEntryFormat(
+  static SerializeResult CheckPrecertChainEntryFormatV1(
+      const ct::PrecertChainEntry& entry);
+  static SerializeResult CheckPrecertChainEntryFormatV2(
       const ct::PrecertChainEntry& entry);
 
   std::string output_;
@@ -240,13 +313,21 @@ class Deserializer {
     EMPTY_ELEM_IN_LIST,
     UNKNOWN_LEAF_TYPE,
     UNKNOWN_LOGENTRY_TYPE,
+    EXTENSIONS_TOO_LONG,
+    EXTENSIONS_NOT_ORDERED,
   };
+
+  static const size_t kV2ExtensionCountLengthInBytes;
+  static const size_t kV2ExtensionTypeLengthInBytes;
 
   bool ReachedEnd() const {
     return bytes_remaining_ == 0;
   }
 
   DeserializeResult ReadSCT(ct::SignedCertificateTimestamp* sct);
+
+  DeserializeResult ReadSctExtension(
+      google::protobuf::RepeatedPtrField<ct::SctExtension>* extension);
 
   static DeserializeResult DeserializeSCT(const std::string& in,
                                           ct::SignedCertificateTimestamp* sct);
@@ -314,8 +395,14 @@ class Deserializer {
 
   DeserializeResult ReadDigitallySigned(ct::DigitallySigned* sig);
 
+  DeserializeResult ReadMerkleTreeLeaf(ct::MerkleTreeLeaf* leaf,
+                                       Deserializer& des);
+  DeserializeResult ReadMerkleTreeLeafV1(ct::MerkleTreeLeaf* leaf);
+  DeserializeResult ReadMerkleTreeLeafV2(ct::MerkleTreeLeaf* leaf);
   DeserializeResult ReadExtensions(ct::TimestampedEntry* entry);
   DeserializeResult ReadMerkleTreeLeaf(ct::MerkleTreeLeaf* leaf);
+  DeserializeResult ReadSCTV1(ct::SignedCertificateTimestamp* sct);
+  DeserializeResult ReadSCTV2(ct::SignedCertificateTimestamp* sct);
 
   const char* current_pos_;
   size_t bytes_remaining_;
