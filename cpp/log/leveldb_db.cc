@@ -1,6 +1,3 @@
-#ifndef CERT_TRANS_LOG_LEVELDB_DB_INL_H_
-#define CERT_TRANS_LOG_LEVELDB_DB_INL_H_
-
 #include "log/leveldb_db.h"
 
 #include <gflags/gflags.h>
@@ -433,5 +430,3 @@ void LevelDB::InsertEntryMapping(int64_t sequence_number,
 
 
 }  // namespace cert_trans
-
-#endif  // CERT_TRANS_LOG_LEVELDB_DB_INL_H_
