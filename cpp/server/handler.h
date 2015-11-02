@@ -37,7 +37,7 @@ class HttpHandler {
               const ReadOnlyDatabase<LoggedEntry>* db,
               const ClusterStateController<LoggedEntry>* controller,
               ThreadPool* pool, libevent::Base* event_base);
-  ~HttpHandler();
+  virtual ~HttpHandler();
 
   void Add(libevent::HttpServer* server);
 
