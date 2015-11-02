@@ -133,7 +133,7 @@ class LogLookupTest : public ::testing::Test {
 };
 
 
-typedef testing::Types<FileDB, SQLiteDB<LoggedEntry> > Databases;
+typedef testing::Types<FileDB, SQLiteDB> Databases;
 
 TYPED_TEST_CASE(LogLookupTest, Databases);
 

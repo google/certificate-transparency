@@ -156,7 +156,7 @@ class FrontendTest : public ::testing::Test {
   string ca_pem_;
 };
 
-typedef testing::Types<FileDB, SQLiteDB<LoggedEntry>> Databases;
+typedef testing::Types<FileDB, SQLiteDB> Databases;
 
 TYPED_TEST_CASE(FrontendTest, Databases);
 

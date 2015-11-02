@@ -42,16 +42,13 @@ cert_trans::FileDB* TestDB<cert_trans::FileDB>::SecondDB() {
 }
 
 template <>
-void TestDB<cert_trans::SQLiteDB<cert_trans::LoggedEntry> >::Setup() {
-  db_.reset(new cert_trans::SQLiteDB<cert_trans::LoggedEntry>(
-      tmp_.TmpStorageDir() + "/sqlite"));
+void TestDB<cert_trans::SQLiteDB>::Setup() {
+  db_.reset(new cert_trans::SQLiteDB(tmp_.TmpStorageDir() + "/sqlite"));
 }
 
 template <>
-cert_trans::SQLiteDB<cert_trans::LoggedEntry>*
-TestDB<cert_trans::SQLiteDB<cert_trans::LoggedEntry> >::SecondDB() {
-  return new cert_trans::SQLiteDB<cert_trans::LoggedEntry>(
-      tmp_.TmpStorageDir() + "/sqlite");
+cert_trans::SQLiteDB* TestDB<cert_trans::SQLiteDB>::SecondDB() {
+  return new cert_trans::SQLiteDB(tmp_.TmpStorageDir() + "/sqlite");
 }
 
 template <>

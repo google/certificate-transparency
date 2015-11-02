@@ -1,7 +1,3 @@
-/* -*- indent-tabs-mode: nil -*- */
-#ifndef CERT_TRANS_LOG_SQLITE_DB_INL_H_
-#define CERT_TRANS_LOG_SQLITE_DB_INL_H_
-
 #include "log/sqlite_db.h"
 
 #include <gflags/gflags.h>
@@ -12,6 +8,14 @@
 #include "monitoring/monitoring.h"
 #include "monitoring/latency.h"
 #include "util/util.h"
+
+using std::unique_ptr;
+using std::chrono::milliseconds;
+using std::lock_guard;
+using std::mutex;
+using std::ostringstream;
+using std::string;
+using std::unique_lock;
 
 // Several of these flags pass their value directly through to SQLite PRAGMA
 // statements, see the SQLite documentation
@@ -43,12 +47,12 @@ namespace cert_trans {
 namespace {
 
 
-static Latency<std::chrono::milliseconds, std::string> latency_by_op_ms(
+static Latency<milliseconds, string> latency_by_op_ms(
     "sqlitedb_latency_by_operation_ms", "operation",
     "Database latency in ms broken out by operation");
 
 
-sqlite3* SQLiteOpen(const std::string& dbfile) {
+sqlite3* SQLiteOpen(const string& dbfile) {
   ScopedLatency scoped_latency(latency_by_op_ms.GetScopedLatency("open"));
   sqlite3* retval;
 
@@ -94,17 +98,16 @@ sqlite3* SQLiteOpen(const std::string& dbfile) {
 }  // namespace
 
 
-template <class Logged>
-class SQLiteDB<Logged>::Iterator : public Database<Logged>::Iterator {
+class SQLiteDB::Iterator : public Database<LoggedEntry>::Iterator {
  public:
-  Iterator(const SQLiteDB<Logged>* db, int64_t start_index)
+  Iterator(const SQLiteDB* db, int64_t start_index)
       : db_(CHECK_NOTNULL(db)), next_index_(start_index) {
     CHECK_GE(next_index_, 0);
   }
 
-  bool GetNextEntry(Logged* entry) override {
+  bool GetNextEntry(LoggedEntry* entry) override {
     CHECK_NOTNULL(entry);
-    std::unique_lock<std::mutex> lock(db_->lock_);
+    unique_lock<mutex> lock(db_->lock_);
     if (next_index_ < db_->tree_size_) {
       CHECK_EQ(db_->LookupByIndex(lock, next_index_, entry), db_->LOOKUP_OK);
       ++next_index_;
@@ -121,20 +124,19 @@ class SQLiteDB<Logged>::Iterator : public Database<Logged>::Iterator {
   }
 
  private:
-  const SQLiteDB<Logged>* const db_;
+  const SQLiteDB* const db_;
   int64_t next_index_;
 };
 
 
-template <class Logged>
-SQLiteDB<Logged>::SQLiteDB(const std::string& dbfile)
+SQLiteDB::SQLiteDB(const string& dbfile)
     : db_(SQLiteOpen(dbfile)),
       tree_size_(0),
       transaction_size_(0),
       in_transaction_(false) {
-  std::unique_lock<std::mutex> lock(lock_);
+  unique_lock<mutex> lock(lock_);
   {
-    std::ostringstream oss;
+    ostringstream oss;
     oss << "PRAGMA synchronous = " << FLAGS_sqlite_synchronous_mode;
     sqlite::Statement statement(db_, oss.str().c_str());
     CHECK_EQ(SQLITE_DONE, statement.Step());
@@ -147,18 +149,18 @@ SQLiteDB<Logged>::SQLiteDB(const std::string& dbfile)
   }
 
   {
-    std::ostringstream oss;
+    ostringstream oss;
     oss << "PRAGMA journal_mode = " << FLAGS_sqlite_journal_mode;
     sqlite::Statement statement(db_, oss.str().c_str());
     CHECK_EQ(SQLITE_ROW, statement.Step());
-    std::string mode;
+    string mode;
     statement.GetBlob(0, &mode);
     CHECK_STRCASEEQ(mode.c_str(), FLAGS_sqlite_journal_mode.c_str());
     CHECK_EQ(SQLITE_DONE, statement.Step());
   }
 
   {
-    std::ostringstream oss;
+    ostringstream oss;
     oss << "PRAGMA cache_size = " << FLAGS_sqlite_cache_size;
     sqlite::Statement statement(db_, oss.str().c_str());
     CHECK_EQ(SQLITE_DONE, statement.Step());
@@ -168,28 +170,26 @@ SQLiteDB<Logged>::SQLiteDB(const std::string& dbfile)
 }
 
 
-template <class Logged>
-SQLiteDB<Logged>::~SQLiteDB() {
+SQLiteDB::~SQLiteDB() {
   CHECK_EQ(SQLITE_OK, sqlite3_close(db_));
 }
 
 
-template <class Logged>
-typename Database<Logged>::WriteResult SQLiteDB<Logged>::CreateSequencedEntry_(
-    const Logged& logged) {
+typename Database<LoggedEntry>::WriteResult SQLiteDB::CreateSequencedEntry_(
+    const LoggedEntry& logged) {
   ScopedLatency latency(
       latency_by_op_ms.GetScopedLatency("create_sequenced_entry"));
-  std::unique_lock<std::mutex> lock(lock_);
+  unique_lock<mutex> lock(lock_);
 
   MaybeStartNewTransaction(lock);
 
   sqlite::Statement statement(db_,
                               "INSERT INTO leaves(hash, entry, sequence) "
                               "VALUES(?, ?, ?)");
-  const std::string hash(logged.Hash());
+  const string hash(logged.Hash());
   statement.BindBlob(0, hash);
 
-  std::string data;
+  string data;
   CHECK(logged.SerializeForDatabase(&data));
   statement.BindBlob(1, data);
 
@@ -204,7 +204,7 @@ typename Database<Logged>::WriteResult SQLiteDB<Logged>::CreateSequencedEntry_(
         db_, "SELECT sequence, hash FROM leaves WHERE sequence = ?");
     s2.BindUInt64(0, logged.sequence_number());
     if (s2.Step() == SQLITE_ROW) {
-      std::string existing_hash;
+      string existing_hash;
       s2.GetBlob(1, &existing_hash);
 
       if (logged.sequence_number() == tree_size_) {
@@ -227,13 +227,12 @@ typename Database<Logged>::WriteResult SQLiteDB<Logged>::CreateSequencedEntry_(
 }
 
 
-template <class Logged>
-typename Database<Logged>::LookupResult SQLiteDB<Logged>::LookupByHash(
-    const std::string& hash, Logged* result) const {
+typename Database<LoggedEntry>::LookupResult SQLiteDB::LookupByHash(
+    const string& hash, LoggedEntry* result) const {
   CHECK_NOTNULL(result);
   ScopedLatency latency(latency_by_op_ms.GetScopedLatency("lookup_by_hash"));
 
-  std::lock_guard<std::mutex> lock(lock_);
+  lock_guard<mutex> lock(lock_);
 
   sqlite::Statement statement(db_,
                               "SELECT entry, sequence FROM leaves "
@@ -247,7 +246,7 @@ typename Database<Logged>::LookupResult SQLiteDB<Logged>::LookupByHash(
   }
   CHECK_EQ(SQLITE_ROW, ret);
 
-  std::string data;
+  string data;
   statement.GetBlob(0, &data);
   CHECK(result->ParseFromDatabase(data));
 
@@ -264,20 +263,18 @@ typename Database<Logged>::LookupResult SQLiteDB<Logged>::LookupByHash(
 }
 
 
-template <class Logged>
-typename Database<Logged>::LookupResult SQLiteDB<Logged>::LookupByIndex(
-    int64_t sequence_number, Logged* result) const {
+typename Database<LoggedEntry>::LookupResult SQLiteDB::LookupByIndex(
+    int64_t sequence_number, LoggedEntry* result) const {
   ScopedLatency latency(latency_by_op_ms.GetScopedLatency("lookup_by_index"));
-  std::unique_lock<std::mutex> lock(lock_);
+  unique_lock<mutex> lock(lock_);
 
   return LookupByIndex(lock, sequence_number, result);
 }
 
 
-template <class Logged>
-typename Database<Logged>::LookupResult SQLiteDB<Logged>::LookupByIndex(
-    const std::unique_lock<std::mutex>& lock, int64_t sequence_number,
-    Logged* result) const {
+typename Database<LoggedEntry>::LookupResult SQLiteDB::LookupByIndex(
+    const unique_lock<mutex>& lock, int64_t sequence_number,
+    LoggedEntry* result) const {
   CHECK(lock.owns_lock());
   CHECK_GE(sequence_number, 0);
   CHECK_NOTNULL(result);
@@ -290,11 +287,11 @@ typename Database<Logged>::LookupResult SQLiteDB<Logged>::LookupByIndex(
     return this->NOT_FOUND;
   }
 
-  std::string data;
+  string data;
   statement.GetBlob(0, &data);
   CHECK(result->ParseFromDatabase(data));
 
-  std::string hash;
+  string hash;
   statement.GetBlob(1, &hash);
 
   CHECK_EQ(result->Hash(), hash);
@@ -308,10 +305,9 @@ typename Database<Logged>::LookupResult SQLiteDB<Logged>::LookupByIndex(
 }
 
 
-template <class Logged>
-typename Database<Logged>::LookupResult SQLiteDB<Logged>::LookupNextIndex(
-    const std::unique_lock<std::mutex>& lock, int64_t sequence_number,
-    Logged* result) const {
+typename Database<LoggedEntry>::LookupResult SQLiteDB::LookupNextIndex(
+    const unique_lock<mutex>& lock, int64_t sequence_number,
+    LoggedEntry* result) const {
   CHECK(lock.owns_lock());
   CHECK_GE(sequence_number, 0);
   CHECK_NOTNULL(result);
@@ -323,11 +319,11 @@ typename Database<Logged>::LookupResult SQLiteDB<Logged>::LookupNextIndex(
     return this->NOT_FOUND;
   }
 
-  std::string data;
+  string data;
   statement.GetBlob(0, &data);
   CHECK(result->ParseFromDatabase(data));
 
-  std::string hash;
+  string hash;
   statement.GetBlob(1, &hash);
 
   CHECK_EQ(result->Hash(), hash);
@@ -341,25 +337,23 @@ typename Database<Logged>::LookupResult SQLiteDB<Logged>::LookupNextIndex(
 }
 
 
-template <class Logged>
-std::unique_ptr<typename Database<Logged>::Iterator>
-SQLiteDB<Logged>::ScanEntries(int64_t start_index) const {
-  return std::unique_ptr<Iterator>(new Iterator(this, start_index));
+unique_ptr<typename Database<LoggedEntry>::Iterator> SQLiteDB::ScanEntries(
+    int64_t start_index) const {
+  return unique_ptr<Iterator>(new Iterator(this, start_index));
 }
 
 
-template <class Logged>
-typename Database<Logged>::WriteResult SQLiteDB<Logged>::WriteTreeHead_(
+typename Database<LoggedEntry>::WriteResult SQLiteDB::WriteTreeHead_(
     const ct::SignedTreeHead& sth) {
   ScopedLatency latency(latency_by_op_ms.GetScopedLatency("write_tree_head"));
-  std::unique_lock<std::mutex> lock(lock_);
+  unique_lock<mutex> lock(lock_);
 
   sqlite::Statement statement(db_,
                               "INSERT INTO trees(timestamp, sth) "
                               "VALUES(?, ?)");
   statement.BindUInt64(0, sth.timestamp());
 
-  std::string sth_data;
+  string sth_data;
   CHECK(sth.SerializeToString(&sth_data));
   statement.BindBlob(1, sth_data);
 
@@ -370,7 +364,7 @@ typename Database<Logged>::WriteResult SQLiteDB<Logged>::WriteTreeHead_(
                          "WHERE timestamp = ?");
     s2.BindUInt64(0, sth.timestamp());
     CHECK_EQ(SQLITE_ROW, s2.Step());
-    std::string existing_sth_data;
+    string existing_sth_data;
     s2.GetBlob(1, &existing_sth_data);
     if (existing_sth_data == sth_data) {
       LOG(WARNING) << "Attempted to store indentical STH in DB.";
@@ -392,20 +386,18 @@ typename Database<Logged>::WriteResult SQLiteDB<Logged>::WriteTreeHead_(
 }
 
 
-template <class Logged>
-typename Database<Logged>::LookupResult SQLiteDB<Logged>::LatestTreeHead(
+typename Database<LoggedEntry>::LookupResult SQLiteDB::LatestTreeHead(
     ct::SignedTreeHead* result) const {
   ScopedLatency latency(latency_by_op_ms.GetScopedLatency("latest_tree_head"));
-  std::unique_lock<std::mutex> lock(lock_);
+  unique_lock<mutex> lock(lock_);
 
   return LatestTreeHeadNoLock(lock, result);
 }
 
 
-template <class Logged>
-int64_t SQLiteDB<Logged>::TreeSize() const {
+int64_t SQLiteDB::TreeSize() const {
   ScopedLatency latency(latency_by_op_ms.GetScopedLatency("tree_size"));
-  std::unique_lock<std::mutex> lock(lock_);
+  unique_lock<mutex> lock(lock_);
 
   CHECK_GE(tree_size_, 0);
   sqlite::Statement statement(
@@ -430,10 +422,9 @@ int64_t SQLiteDB<Logged>::TreeSize() const {
 }
 
 
-template <class Logged>
-void SQLiteDB<Logged>::AddNotifySTHCallback(
-    const typename Database<Logged>::NotifySTHCallback* callback) {
-  std::unique_lock<std::mutex> lock(lock_);
+void SQLiteDB::AddNotifySTHCallback(
+    const typename Database<LoggedEntry>::NotifySTHCallback* callback) {
+  unique_lock<mutex> lock(lock_);
 
   callbacks_.Add(callback);
 
@@ -447,21 +438,19 @@ void SQLiteDB<Logged>::AddNotifySTHCallback(
 }
 
 
-template <class Logged>
-void SQLiteDB<Logged>::RemoveNotifySTHCallback(
-    const typename Database<Logged>::NotifySTHCallback* callback) {
-  std::lock_guard<std::mutex> lock(lock_);
+void SQLiteDB::RemoveNotifySTHCallback(
+    const typename Database<LoggedEntry>::NotifySTHCallback* callback) {
+  lock_guard<mutex> lock(lock_);
 
   callbacks_.Remove(callback);
 }
 
 
-template <class Logged>
-void SQLiteDB<Logged>::InitializeNode(const std::string& node_id) {
+void SQLiteDB::InitializeNode(const string& node_id) {
   ScopedLatency latency(latency_by_op_ms.GetScopedLatency("initialize_node"));
   CHECK(!node_id.empty());
-  std::unique_lock<std::mutex> lock(lock_);
-  std::string existing_id;
+  unique_lock<mutex> lock(lock_);
+  string existing_id;
   if (NodeId(lock, &existing_id) != this->NOT_FOUND) {
     LOG(FATAL) << "Attempting to initialize DB beloging to node with node_id: "
                << existing_id;
@@ -474,17 +463,15 @@ void SQLiteDB<Logged>::InitializeNode(const std::string& node_id) {
 }
 
 
-template <class Logged>
-typename Database<Logged>::LookupResult SQLiteDB<Logged>::NodeId(
-    std::string* node_id) {
-  std::unique_lock<std::mutex> lock(lock_);
+typename Database<LoggedEntry>::LookupResult SQLiteDB::NodeId(
+    string* node_id) {
+  unique_lock<mutex> lock(lock_);
   return NodeId(lock, CHECK_NOTNULL(node_id));
 }
 
 
-template <class Logged>
-typename Database<Logged>::LookupResult SQLiteDB<Logged>::NodeId(
-    const std::unique_lock<std::mutex>& lock, std::string* node_id) {
+typename Database<LoggedEntry>::LookupResult SQLiteDB::NodeId(
+    const unique_lock<mutex>& lock, string* node_id) {
   ScopedLatency latency(latency_by_op_ms.GetScopedLatency("set_node_id"));
   CHECK(lock.owns_lock());
   CHECK_NOTNULL(node_id);
@@ -503,9 +490,7 @@ typename Database<Logged>::LookupResult SQLiteDB<Logged>::NodeId(
 }
 
 
-template <class Logged>
-void SQLiteDB<Logged>::BeginTransaction(
-    const std::unique_lock<std::mutex>& lock) {
+void SQLiteDB::BeginTransaction(const unique_lock<mutex>& lock) {
   CHECK(lock.owns_lock());
   if (FLAGS_sqlite_batch_into_transactions) {
     CHECK_EQ(0, transaction_size_);
@@ -518,9 +503,7 @@ void SQLiteDB<Logged>::BeginTransaction(
 }
 
 
-template <class Logged>
-void SQLiteDB<Logged>::EndTransaction(
-    const std::unique_lock<std::mutex>& lock) {
+void SQLiteDB::EndTransaction(const unique_lock<mutex>& lock) {
   CHECK(lock.owns_lock());
   if (FLAGS_sqlite_batch_into_transactions) {
     CHECK(in_transaction_);
@@ -541,9 +524,7 @@ void SQLiteDB<Logged>::EndTransaction(
 }
 
 
-template <class Logged>
-void SQLiteDB<Logged>::MaybeStartNewTransaction(
-    const std::unique_lock<std::mutex>& lock) {
+void SQLiteDB::MaybeStartNewTransaction(const unique_lock<mutex>& lock) {
   CHECK(lock.owns_lock());
   if (FLAGS_sqlite_batch_into_transactions &&
       transaction_size_ >= FLAGS_sqlite_transaction_batch_size) {
@@ -555,18 +536,17 @@ void SQLiteDB<Logged>::MaybeStartNewTransaction(
 }
 
 
-template <class Logged>
-void SQLiteDB<Logged>::ForceNotifySTH() {
-  std::unique_lock<std::mutex> lock(lock_);
+void SQLiteDB::ForceNotifySTH() {
+  unique_lock<mutex> lock(lock_);
 
   ct::SignedTreeHead sth;
-  const typename Database<Logged>::LookupResult db_result =
+  const typename Database<LoggedEntry>::LookupResult db_result =
       this->LatestTreeHeadNoLock(lock, &sth);
-  if (db_result == Database<Logged>::NOT_FOUND) {
+  if (db_result == Database<LoggedEntry>::NOT_FOUND) {
     return;
   }
 
-  CHECK(db_result == Database<Logged>::LOOKUP_OK);
+  CHECK(db_result == Database<LoggedEntry>::LOOKUP_OK);
 
   // Do not call the callbacks while holding the lock, as they might
   // want to perform some lookups.
@@ -575,10 +555,8 @@ void SQLiteDB<Logged>::ForceNotifySTH() {
 }
 
 
-template <class Logged>
-typename Database<Logged>::LookupResult SQLiteDB<Logged>::LatestTreeHeadNoLock(
-    const std::unique_lock<std::mutex>& lock,
-    ct::SignedTreeHead* result) const {
+typename Database<LoggedEntry>::LookupResult SQLiteDB::LatestTreeHeadNoLock(
+    const unique_lock<mutex>& lock, ct::SignedTreeHead* result) const {
   CHECK(lock.owns_lock());
   sqlite::Statement statement(db_,
                               "SELECT sth FROM trees WHERE timestamp IN "
@@ -590,7 +568,7 @@ typename Database<Logged>::LookupResult SQLiteDB<Logged>::LatestTreeHeadNoLock(
   }
   CHECK_EQ(SQLITE_ROW, ret);
 
-  std::string sth;
+  string sth;
   statement.GetBlob(0, &sth);
   CHECK(result->ParseFromString(sth));
 
@@ -599,5 +577,3 @@ typename Database<Logged>::LookupResult SQLiteDB<Logged>::LatestTreeHeadNoLock(
 
 
 }  // namespace cert_trans
-
-#endif  // CERT_TRANS_LOG_SQLITE_DB_INL_H_
