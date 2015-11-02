@@ -115,10 +115,10 @@ int main(int argc, char* argv[]) {
   } else if (!FLAGS_leveldb_db.empty()) {
     db.reset(new LevelDB<LoggedEntry>(FLAGS_leveldb_db));
   } else {
-    db.reset(new FileDB<LoggedEntry>(
-        new FileStorage(FLAGS_cert_dir, FLAGS_cert_storage_depth),
-        new FileStorage(FLAGS_tree_dir, FLAGS_tree_storage_depth),
-        new FileStorage(FLAGS_meta_dir, 0)));
+    db.reset(
+        new FileDB(new FileStorage(FLAGS_cert_dir, FLAGS_cert_storage_depth),
+                   new FileStorage(FLAGS_tree_dir, FLAGS_tree_storage_depth),
+                   new FileStorage(FLAGS_meta_dir, 0)));
   }
   // ------8<----------8<---------8<-----------
 

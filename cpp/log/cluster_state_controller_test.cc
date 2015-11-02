@@ -130,7 +130,7 @@ class ClusterStateControllerTest : public ::testing::Test {
   MockContinuousFetcher fetcher_;
   libevent::EventPumpThread pump_;
   FakeEtcdClient etcd_;
-  TestDB<FileDB<LoggedEntry>> test_db_;
+  TestDB<FileDB> test_db_;
   NiceMock<MockMasterElection> election1_;
   NiceMock<MockMasterElection> election2_;
   NiceMock<MockMasterElection> election3_;

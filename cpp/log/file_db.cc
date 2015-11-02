@@ -1,7 +1,3 @@
-/* -*- indent-tabs-mode: nil -*- */
-#ifndef CERT_TRANS_LOG_FILE_DB_INL_H_
-#define CERT_TRANS_LOG_FILE_DB_INL_H_
-
 #include "log/file_db.h"
 
 #include <glog/logging.h>
@@ -18,12 +14,23 @@
 #include "monitoring/latency.h"
 #include "util/util.h"
 
+using std::chrono::milliseconds;
+using std::lock_guard;
+using std::make_pair;
+using std::min;
+using std::mutex;
+using std::set;
+using std::stoll;
+using std::string;
+using std::to_string;
+using std::unique_lock;
+using std::unique_ptr;
 
 namespace cert_trans {
 namespace {
 
 
-static Latency<std::chrono::milliseconds, std::string> latency_by_op_ms(
+static Latency<milliseconds, string> latency_by_op_ms(
     "filedb_latency_by_operation_ms", "operation",
     "Database latency in ms broken out by operation.");
 
@@ -31,37 +38,35 @@ static Latency<std::chrono::milliseconds, std::string> latency_by_op_ms(
 const char kMetaNodeIdKey[] = "node_id";
 
 
-std::string FormatSequenceNumber(const int64_t seq) {
-  return std::to_string(seq);
+string FormatSequenceNumber(const int64_t seq) {
+  return to_string(seq);
 }
 
 
-int64_t ParseSequenceNumber(const std::string& seq) {
-  return std::stoll(seq);
+int64_t ParseSequenceNumber(const string& seq) {
+  return stoll(seq);
 }
 
 
 }  // namespace
 
 
-template <class Logged>
-const size_t FileDB<Logged>::kTimestampBytesIndexed = 6;
+const size_t FileDB::kTimestampBytesIndexed = 6;
 
 
-template <class Logged>
-class FileDB<Logged>::Iterator : public Database<Logged>::Iterator {
+class FileDB::Iterator : public Database<LoggedEntry>::Iterator {
  public:
-  Iterator(const FileDB<Logged>* db, int64_t start_index)
+  Iterator(const FileDB* db, int64_t start_index)
       : db_(CHECK_NOTNULL(db)), next_index_(start_index) {
     CHECK_GE(next_index_, 0);
   }
 
-  bool GetNextEntry(Logged* entry) override {
+  bool GetNextEntry(LoggedEntry* entry) override {
     CHECK_NOTNULL(entry);
     {
-      std::lock_guard<std::mutex> lock(db_->lock_);
+      lock_guard<mutex> lock(db_->lock_);
       if (next_index_ >= db_->contiguous_size_) {
-        std::set<int64_t>::const_iterator it(
+        set<int64_t>::const_iterator it(
             db_->sparse_entries_.lower_bound(next_index_));
         if (it == db_->sparse_entries_.end()) {
           return false;
@@ -72,20 +77,19 @@ class FileDB<Logged>::Iterator : public Database<Logged>::Iterator {
     }
 
     CHECK_EQ(db_->LookupByIndex(next_index_, entry),
-             Database<Logged>::LOOKUP_OK);
+             Database<LoggedEntry>::LOOKUP_OK);
     ++next_index_;
     return true;
   }
 
  private:
-  const FileDB<Logged>* const db_;
+  const FileDB* const db_;
   int64_t next_index_;
 };
 
 
-template <class Logged>
-FileDB<Logged>::FileDB(FileStorage* cert_storage, FileStorage* tree_storage,
-                       FileStorage* meta_storage)
+FileDB::FileDB(FileStorage* cert_storage, FileStorage* tree_storage,
+               FileStorage* meta_storage)
     : cert_storage_(CHECK_NOTNULL(cert_storage)),
       tree_storage_(CHECK_NOTNULL(tree_storage)),
       meta_storage_(CHECK_NOTNULL(meta_storage)),
@@ -96,30 +100,28 @@ FileDB<Logged>::FileDB(FileStorage* cert_storage, FileStorage* tree_storage,
 }
 
 
-template <class Logged>
-FileDB<Logged>::~FileDB() {
+FileDB::~FileDB() {
 }
 
 
-template <class Logged>
-typename Database<Logged>::WriteResult FileDB<Logged>::CreateSequencedEntry_(
-    const Logged& logged) {
+typename Database<LoggedEntry>::WriteResult FileDB::CreateSequencedEntry_(
+    const LoggedEntry& logged) {
   CHECK(logged.has_sequence_number());
   CHECK_GE(logged.sequence_number(), 0);
   ScopedLatency latency(
       latency_by_op_ms.GetScopedLatency("create_sequenced_entry"));
 
-  std::string data;
+  string data;
   CHECK(logged.SerializeToString(&data));
 
-  const std::string seq_str(FormatSequenceNumber(logged.sequence_number()));
+  const string seq_str(FormatSequenceNumber(logged.sequence_number()));
 
-  std::unique_lock<std::mutex> lock(lock_);
+  unique_lock<mutex> lock(lock_);
 
   // Try to create.
   util::Status status(cert_storage_->CreateEntry(seq_str, data));
   if (status.CanonicalCode() == util::error::ALREADY_EXISTS) {
-    std::string existing_data;
+    string existing_data;
     status = cert_storage_->LookupEntry(seq_str, &existing_data);
     CHECK_EQ(status, util::Status::OK);
     if (existing_data == data) {
@@ -135,27 +137,26 @@ typename Database<Logged>::WriteResult FileDB<Logged>::CreateSequencedEntry_(
 }
 
 
-template <class Logged>
-typename Database<Logged>::LookupResult FileDB<Logged>::LookupByHash(
-    const std::string& hash, Logged* result) const {
+typename Database<LoggedEntry>::LookupResult FileDB::LookupByHash(
+    const string& hash, LoggedEntry* result) const {
   ScopedLatency latency(latency_by_op_ms.GetScopedLatency("lookup_by_hash"));
 
-  std::unique_lock<std::mutex> lock(lock_);
+  unique_lock<mutex> lock(lock_);
 
   auto i(id_by_hash_.find(hash));
   if (i == id_by_hash_.end()) {
     return this->NOT_FOUND;
   }
-  const std::string seq_str(FormatSequenceNumber(i->second));
+  const string seq_str(FormatSequenceNumber(i->second));
 
   lock.unlock();
 
-  std::string cert_data;
+  string cert_data;
   const util::Status status(cert_storage_->LookupEntry(seq_str, &cert_data));
   // Gotta be there, or we're in trouble...
   CHECK_EQ(status, util::Status::OK);
 
-  Logged logged;
+  LoggedEntry logged;
   CHECK(logged.ParseFromString(cert_data));
   CHECK_EQ(logged.Hash(), hash);
 
@@ -167,14 +168,13 @@ typename Database<Logged>::LookupResult FileDB<Logged>::LookupByHash(
 }
 
 
-template <class Logged>
-typename Database<Logged>::LookupResult FileDB<Logged>::LookupByIndex(
-    int64_t sequence_number, Logged* result) const {
+typename Database<LoggedEntry>::LookupResult FileDB::LookupByIndex(
+    int64_t sequence_number, LoggedEntry* result) const {
   CHECK_GE(sequence_number, 0);
   ScopedLatency latency(latency_by_op_ms.GetScopedLatency("lookup_by_index"));
 
-  const std::string seq_str(FormatSequenceNumber(sequence_number));
-  std::string cert_data;
+  const string seq_str(FormatSequenceNumber(sequence_number));
+  string cert_data;
   if (cert_storage_->LookupEntry(seq_str, &cert_data).CanonicalCode() ==
       util::error::NOT_FOUND) {
     return this->NOT_FOUND;
@@ -187,30 +187,28 @@ typename Database<Logged>::LookupResult FileDB<Logged>::LookupByIndex(
 }
 
 
-template <class Logged>
-std::unique_ptr<typename Database<Logged>::Iterator>
-FileDB<Logged>::ScanEntries(int64_t start_index) const {
-  return std::unique_ptr<Iterator>(new Iterator(this, start_index));
+unique_ptr<typename Database<LoggedEntry>::Iterator> FileDB::ScanEntries(
+    int64_t start_index) const {
+  return unique_ptr<Iterator>(new Iterator(this, start_index));
 }
 
 
-template <class Logged>
-typename Database<Logged>::WriteResult FileDB<Logged>::WriteTreeHead_(
+typename Database<LoggedEntry>::WriteResult FileDB::WriteTreeHead_(
     const ct::SignedTreeHead& sth) {
   CHECK_GE(sth.tree_size(), 0);
   ScopedLatency latency(latency_by_op_ms.GetScopedLatency("write_tree_head"));
 
   // 6 bytes are good enough for some 9000 years.
-  std::string timestamp_key =
+  string timestamp_key =
       Serializer::SerializeUint(sth.timestamp(),
                                 FileDB::kTimestampBytesIndexed);
-  std::string data;
+  string data;
   CHECK(sth.SerializeToString(&data));
 
-  std::unique_lock<std::mutex> lock(lock_);
+  unique_lock<mutex> lock(lock_);
   util::Status status(tree_storage_->CreateEntry(timestamp_key, data));
   if (status.CanonicalCode() == util::error::ALREADY_EXISTS) {
-    std::string existing_sth_data;
+    string existing_sth_data;
     status = tree_storage_->LookupEntry(timestamp_key, &existing_sth_data);
     CHECK_EQ(status, util::Status::OK);
     if (existing_sth_data == data) {
@@ -233,29 +231,26 @@ typename Database<Logged>::WriteResult FileDB<Logged>::WriteTreeHead_(
 }
 
 
-template <class Logged>
-typename Database<Logged>::LookupResult FileDB<Logged>::LatestTreeHead(
+typename Database<LoggedEntry>::LookupResult FileDB::LatestTreeHead(
     ct::SignedTreeHead* result) const {
   ScopedLatency latency(latency_by_op_ms.GetScopedLatency("latest_tree_head"));
-  std::lock_guard<std::mutex> lock(lock_);
+  lock_guard<mutex> lock(lock_);
 
   return LatestTreeHeadNoLock(result);
 }
 
 
-template <class Logged>
-int64_t FileDB<Logged>::TreeSize() const {
+int64_t FileDB::TreeSize() const {
   ScopedLatency latency(latency_by_op_ms.GetScopedLatency("tree_size"));
-  std::lock_guard<std::mutex> lock(lock_);
+  lock_guard<mutex> lock(lock_);
 
   return contiguous_size_;
 }
 
 
-template <class Logged>
-void FileDB<Logged>::AddNotifySTHCallback(
-    const typename Database<Logged>::NotifySTHCallback* callback) {
-  std::unique_lock<std::mutex> lock(lock_);
+void FileDB::AddNotifySTHCallback(
+    const typename Database<LoggedEntry>::NotifySTHCallback* callback) {
+  unique_lock<mutex> lock(lock_);
 
   callbacks_.Add(callback);
 
@@ -267,21 +262,19 @@ void FileDB<Logged>::AddNotifySTHCallback(
 }
 
 
-template <class Logged>
-void FileDB<Logged>::RemoveNotifySTHCallback(
-    const typename Database<Logged>::NotifySTHCallback* callback) {
-  std::lock_guard<std::mutex> lock(lock_);
+void FileDB::RemoveNotifySTHCallback(
+    const typename Database<LoggedEntry>::NotifySTHCallback* callback) {
+  lock_guard<mutex> lock(lock_);
 
   callbacks_.Remove(callback);
 }
 
 
-template <class Logged>
-void FileDB<Logged>::InitializeNode(const std::string& node_id) {
+void FileDB::InitializeNode(const string& node_id) {
   CHECK(!node_id.empty());
   ScopedLatency latency(latency_by_op_ms.GetScopedLatency("initialize_node"));
-  std::unique_lock<std::mutex> lock(lock_);
-  std::string existing_id;
+  unique_lock<mutex> lock(lock_);
+  string existing_id;
   if (NodeId(&existing_id) != this->NOT_FOUND) {
     LOG(FATAL) << "Attempting to initialze DB belonging to node with node_id: "
                << existing_id;
@@ -290,9 +283,7 @@ void FileDB<Logged>::InitializeNode(const std::string& node_id) {
 }
 
 
-template <class Logged>
-typename Database<Logged>::LookupResult FileDB<Logged>::NodeId(
-    std::string* node_id) {
+typename Database<LoggedEntry>::LookupResult FileDB::NodeId(string* node_id) {
   CHECK_NOTNULL(node_id);
   if (!meta_storage_->LookupEntry(kMetaNodeIdKey, node_id).ok()) {
     return this->NOT_FOUND;
@@ -301,25 +292,24 @@ typename Database<Logged>::LookupResult FileDB<Logged>::NodeId(
 }
 
 
-template <class Logged>
-void FileDB<Logged>::BuildIndex() {
+void FileDB::BuildIndex() {
   ScopedLatency latency(latency_by_op_ms.GetScopedLatency("build_index"));
   // Technically, this should only be called from the constructor, so
   // this should not be necessarily, but just to be sure...
-  std::lock_guard<std::mutex> lock(lock_);
+  lock_guard<mutex> lock(lock_);
 
-  const std::set<std::string> sequence_numbers(cert_storage_->Scan());
+  const set<string> sequence_numbers(cert_storage_->Scan());
   id_by_hash_.reserve(sequence_numbers.size());
 
   for (const auto& seq_path : sequence_numbers) {
     const int64_t seq(ParseSequenceNumber(seq_path));
-    std::string cert_data;
+    string cert_data;
     // Read the data; tolerate no errors.
     CHECK_EQ(cert_storage_->LookupEntry(seq_path, &cert_data),
              util::Status::OK)
         << "Failed to read entry with sequence number " << seq;
 
-    Logged logged;
+    LoggedEntry logged;
     CHECK(logged.ParseFromString(cert_data))
         << "Failed to parse entry with sequence number " << seq;
     CHECK(logged.has_sequence_number())
@@ -332,7 +322,7 @@ void FileDB<Logged>::BuildIndex() {
   }
 
   // Now read the STH entries.
-  std::set<std::string> sth_timestamps = tree_storage_->Scan();
+  set<string> sth_timestamps = tree_storage_->Scan();
   if (!sth_timestamps.empty()) {
     latest_timestamp_key_ = *sth_timestamps.rbegin();
     CHECK_EQ(Deserializer::OK,
@@ -343,14 +333,13 @@ void FileDB<Logged>::BuildIndex() {
 }
 
 
-template <class Logged>
-typename Database<Logged>::LookupResult FileDB<Logged>::LatestTreeHeadNoLock(
+typename Database<LoggedEntry>::LookupResult FileDB::LatestTreeHeadNoLock(
     ct::SignedTreeHead* result) const {
   if (latest_tree_timestamp_ == 0) {
     return this->NOT_FOUND;
   }
 
-  std::string tree_data;
+  string tree_data;
   CHECK_EQ(tree_storage_->LookupEntry(latest_timestamp_key_, &tree_data),
            util::Status::OK);
 
@@ -362,13 +351,11 @@ typename Database<Logged>::LookupResult FileDB<Logged>::LatestTreeHeadNoLock(
 
 
 // This must be called with "lock_" held.
-template <class Logged>
-void FileDB<Logged>::InsertEntryMapping(int64_t sequence_number,
-                                        const std::string& hash) {
-  if (!id_by_hash_.insert(std::make_pair(hash, sequence_number)).second) {
+void FileDB::InsertEntryMapping(int64_t sequence_number, const string& hash) {
+  if (!id_by_hash_.insert(make_pair(hash, sequence_number)).second) {
     // This is a duplicate hash under a new sequence number.
     // Make sure we track the entry with the lowest sequence number:
-    id_by_hash_[hash] = std::min(id_by_hash_[hash], sequence_number);
+    id_by_hash_[hash] = min(id_by_hash_[hash], sequence_number);
   }
 
   if (sequence_number == contiguous_size_) {
@@ -387,5 +374,3 @@ void FileDB<Logged>::InsertEntryMapping(int64_t sequence_number,
 
 
 }  // namespace cert_trans
-
-#endif  // CERT_TRANS_LOG_FILE_DB_INL_H_

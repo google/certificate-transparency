@@ -135,7 +135,7 @@ class TreeSignerTest : public ::testing::Test {
   unique_ptr<TS> tree_signer_;
 };
 
-typedef testing::Types<FileDB<LoggedEntry>, SQLiteDB<LoggedEntry>> Databases;
+typedef testing::Types<FileDB, SQLiteDB<LoggedEntry>> Databases;
 
 
 EntryHandle<LoggedEntry> H(const LoggedEntry& l) {

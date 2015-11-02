@@ -12,6 +12,7 @@
 
 #include "base/macros.h"
 #include "log/database.h"
+#include "log/logged_entry.h"
 #include "proto/ct.pb.h"
 #include "util/statusor.h"
 
@@ -22,8 +23,7 @@ class FileStorage;
 
 // Database interface that stores certificates and tree head
 // signatures in the filesystem.
-template <class Logged>
-class FileDB : public Database<Logged> {
+class FileDB : public Database<LoggedEntry> {
  public:
   // Reference implementation: reads the entire database on boot
   // and builds an in-memory index.
@@ -43,42 +43,44 @@ class FileDB : public Database<Logged> {
   static const size_t kTimestampBytesIndexed;
 
   // Implement abstract functions, see database.h for comments.
-  typename Database<Logged>::WriteResult CreateSequencedEntry_(
-      const Logged& logged) override;
+  typename Database<LoggedEntry>::WriteResult CreateSequencedEntry_(
+      const LoggedEntry& logged) override;
 
-  typename Database<Logged>::LookupResult LookupByHash(
-      const std::string& hash, Logged* result) const override;
+  typename Database<LoggedEntry>::LookupResult LookupByHash(
+      const std::string& hash, LoggedEntry* result) const override;
 
-  typename Database<Logged>::LookupResult LookupByIndex(
-      int64_t sequence_number, Logged* result) const override;
+  typename Database<LoggedEntry>::LookupResult LookupByIndex(
+      int64_t sequence_number, LoggedEntry* result) const override;
 
-  std::unique_ptr<typename Database<Logged>::Iterator> ScanEntries(
+  std::unique_ptr<typename Database<LoggedEntry>::Iterator> ScanEntries(
       int64_t start_index) const override;
 
-  typename Database<Logged>::WriteResult WriteTreeHead_(
+  typename Database<LoggedEntry>::WriteResult WriteTreeHead_(
       const ct::SignedTreeHead& sth) override;
 
-  typename Database<Logged>::LookupResult LatestTreeHead(
+  typename Database<LoggedEntry>::LookupResult LatestTreeHead(
       ct::SignedTreeHead* result) const override;
 
   int64_t TreeSize() const override;
 
   void AddNotifySTHCallback(
-      const typename Database<Logged>::NotifySTHCallback* callback) override;
+      const typename Database<LoggedEntry>::NotifySTHCallback* callback)
+      override;
 
   void RemoveNotifySTHCallback(
-      const typename Database<Logged>::NotifySTHCallback* callback) override;
+      const typename Database<LoggedEntry>::NotifySTHCallback* callback)
+      override;
 
   void InitializeNode(const std::string& node_id) override;
 
-  typename Database<Logged>::LookupResult NodeId(
+  typename Database<LoggedEntry>::LookupResult NodeId(
       std::string* node_id) override;
 
  private:
   class Iterator;
 
   void BuildIndex();
-  typename Database<Logged>::LookupResult LatestTreeHeadNoLock(
+  typename Database<LoggedEntry>::LookupResult LatestTreeHeadNoLock(
       ct::SignedTreeHead* result) const;
   void InsertEntryMapping(int64_t sequence_number, const std::string& hash);
 
