@@ -45,7 +45,6 @@ using std::string;
 using std::unique_ptr;
 using testing::NiceMock;
 
-typedef Database<LoggedEntry> DB;
 typedef TreeSigner<LoggedEntry> TS;
 typedef LogLookup<LoggedEntry> LL;
 

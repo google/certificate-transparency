@@ -76,8 +76,7 @@ bool ExtractChain(libevent::Base* base, evhttp_request* req,
 
 
 CertificateHttpHandler::CertificateHttpHandler(
-    LogLookup<LoggedEntry>* log_lookup,
-    const ReadOnlyDatabase<LoggedEntry>* db,
+    LogLookup<LoggedEntry>* log_lookup, const ReadOnlyDatabase* db,
     const ClusterStateController<LoggedEntry>* controller,
     const CertChecker* cert_checker, Frontend* frontend, ThreadPool* pool,
     libevent::Base* event_base)

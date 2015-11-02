@@ -87,7 +87,7 @@ class ClusterStateController<Logged>::ClusterPeer : public Peer {
 template <class Logged>
 ClusterStateController<Logged>::ClusterStateController(
     util::Executor* executor, const std::shared_ptr<libevent::Base>& base,
-    UrlFetcher* url_fetcher, Database<Logged>* database,
+    UrlFetcher* url_fetcher, Database* database,
     ConsistentStore<Logged>* store, MasterElection* election,
     ContinuousFetcher* fetcher)
     : base_(base),
@@ -142,15 +142,14 @@ void ClusterStateController<Logged>::NewTreeHead(
     const ct::SignedTreeHead& sth) {
   std::unique_lock<std::mutex> lock(mutex_);
   ct::SignedTreeHead db_sth;
-  const typename Database<Logged>::LookupResult result(
-      database_->LatestTreeHead(&db_sth));
+  const Database::LookupResult result(database_->LatestTreeHead(&db_sth));
 
   const bool serving_sth_newer_than_db_sth(
       actual_serving_sth_ &&
-      ((result == Database<Logged>::LOOKUP_OK &&
+      ((result == Database::LOOKUP_OK &&
         db_sth.tree_size() <= actual_serving_sth_->tree_size() &&
         db_sth.timestamp() < actual_serving_sth_->timestamp()) ||
-       (result == Database<Logged>::NOT_FOUND)));
+       (result == Database::NOT_FOUND)));
 
   // Check whether this updated tree head would enable us to start serving the
   // current cluster serving STH. If so, we'll store it to the local DB below.
@@ -178,7 +177,7 @@ void ClusterStateController<Logged>::NewTreeHead(
     // TODO(alcutter): Perhaps we need to know about updates to the contiguous
     // tree size in the DB again, so that we can write this out as soon as
     // we're able to serve it.
-    CHECK_EQ(Database<Logged>::OK, database_->WriteTreeHead(sth_to_write));
+    CHECK_EQ(Database::OK, database_->WriteTreeHead(sth_to_write));
   }
 }
 
@@ -356,10 +355,10 @@ void ClusterStateController<Logged>::OnServingSthUpdated(
     // Double check this STH is newer than, or idential to, what we have in
     // the database. (It definitely should be!)
     ct::SignedTreeHead db_sth;
-    const typename Database<Logged>::LookupResult lookup_result(
+    const Database::LookupResult lookup_result(
         database_->LatestTreeHead(&db_sth));
     switch (lookup_result) {
-      case Database<Logged>::LOOKUP_OK:
+      case Database::LOOKUP_OK:
         VLOG(1) << "Local latest STH:\n" << db_sth.DebugString();
         // Check it's for the same log:
         CHECK_EQ(actual_serving_sth_->id().key_id(), db_sth.id().key_id());
@@ -379,7 +378,7 @@ void ClusterStateController<Logged>::OnServingSthUpdated(
           CHECK_GE(actual_serving_sth_->tree_size(), db_sth.tree_size());
         }
         break;
-      case Database<Logged>::NOT_FOUND:
+      case Database::NOT_FOUND:
         LOG(WARNING) << "Local DB doesn't have any STH, new node?";
         break;
       default:
@@ -403,7 +402,7 @@ void ClusterStateController<Logged>::OnServingSthUpdated(
 
   if (write_sth) {
     // All good, write this STH to our local DB:
-    CHECK_EQ(Database<Logged>::OK, database_->WriteTreeHead(sth_to_write));
+    CHECK_EQ(Database::OK, database_->WriteTreeHead(sth_to_write));
   }
 }
 

@@ -84,7 +84,7 @@ unique_ptr<LogSigner> BuildLogSigner() {
 
 
 unique_ptr<TreeSigner<LoggedEntry>> BuildTreeSigner(
-    Database<LoggedEntry>* db, ConsistentStore<LoggedEntry>* consistent_store,
+    Database* db, ConsistentStore<LoggedEntry>* consistent_store,
     LogSigner* log_signer) {
   return unique_ptr<TreeSigner<LoggedEntry>>(new TreeSigner<LoggedEntry>(
       std::chrono::duration<double>(0), db,

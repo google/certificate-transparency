@@ -19,7 +19,6 @@ class LogSigner;
 
 namespace cert_trans {
 
-template <class Logged>
 class Database;
 
 
@@ -34,8 +33,7 @@ class TreeSigner {
  public:
   // No transfer of ownership for params other than merkle_tree whose contents
   // is moved into this object.
-  TreeSigner(const std::chrono::duration<double>& guard_window,
-             Database<Logged>* db,
+  TreeSigner(const std::chrono::duration<double>& guard_window, Database* db,
              std::unique_ptr<CompactMerkleTree> merkle_tree,
              cert_trans::ConsistentStore<Logged>* consistent_store,
              LogSigner* signer);
@@ -70,7 +68,7 @@ class TreeSigner {
   void TimestampAndSign(uint64_t min_timestamp, ct::SignedTreeHead* sth);
 
   const std::chrono::duration<double> guard_window_;
-  Database<Logged>* const db_;
+  Database* const db_;
   cert_trans::ConsistentStore<Logged>* const consistent_store_;
   LogSigner* const signer_;
   const std::unique_ptr<CompactMerkleTree> cert_tree_;

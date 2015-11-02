@@ -52,8 +52,7 @@ shared_ptr<JsonObject> ExtractJson(libevent::Base* base, evhttp_request* req) {
 
 
 XJsonHttpHandler::XJsonHttpHandler(
-    LogLookup<LoggedEntry>* log_lookup,
-    const ReadOnlyDatabase<LoggedEntry>* db,
+    LogLookup<LoggedEntry>* log_lookup, const ReadOnlyDatabase* db,
     const ClusterStateController<LoggedEntry>* controller, Frontend* frontend,
     ThreadPool* pool, libevent::Base* event_base)
     : HttpHandler(log_lookup, db, controller, pool, event_base),

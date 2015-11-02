@@ -55,10 +55,9 @@ void Usage() {
 }
 
 
-void ForEachLeaf(const ReadOnlyDatabase<LoggedEntry>* db,
+void ForEachLeaf(const ReadOnlyDatabase* db,
                  const function<void(const LoggedEntry& cert)>& f) {
-  unique_ptr<ReadOnlyDatabase<LoggedEntry>::Iterator> it(
-      db->ScanEntries(FLAGS_start));
+  unique_ptr<ReadOnlyDatabase::Iterator> it(db->ScanEntries(FLAGS_start));
   LoggedEntry cert;
   while (it->GetNextEntry(&cert)) {
     if (cert.sequence_number() > FLAGS_end) {
@@ -69,7 +68,7 @@ void ForEachLeaf(const ReadOnlyDatabase<LoggedEntry>* db,
 }
 
 
-int DumpLeafInputs(const ReadOnlyDatabase<LoggedEntry>* db) {
+int DumpLeafInputs(const ReadOnlyDatabase* db) {
   CHECK_NOTNULL(db);
   ForEachLeaf(db, [](const LoggedEntry& cert) {
     string serialized;
@@ -108,7 +107,7 @@ int main(int argc, char* argv[]) {
         << "Certificate directory and tree directory must differ";
   }
 
-  unique_ptr<ReadOnlyDatabase<LoggedEntry>> db;
+  unique_ptr<ReadOnlyDatabase> db;
 
   if (!FLAGS_sqlite_db.empty()) {
     db.reset(new SQLiteDB(FLAGS_sqlite_db));

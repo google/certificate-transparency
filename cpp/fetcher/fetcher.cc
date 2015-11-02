@@ -62,7 +62,7 @@ struct Range {
 
 
 struct FetchState {
-  FetchState(Database<LoggedEntry>* db, unique_ptr<PeerGroup> peer_group,
+  FetchState(Database* db, unique_ptr<PeerGroup> peer_group,
              const LogVerifier* log_verifier, Task* task);
 
   void WalkEntries();
@@ -72,7 +72,7 @@ struct FetchState {
                        const vector<AsyncLogClient::Entry>* retval,
                        Task* range_task, Task* fetch_task);
 
-  Database<LoggedEntry>* const db_;
+  Database* const db_;
   const unique_ptr<PeerGroup> peer_group_;
   const LogVerifier* const log_verifier_;
   Task* const task_;
@@ -86,8 +86,7 @@ struct FetchState {
 };
 
 
-FetchState::FetchState(Database<LoggedEntry>* db,
-                       unique_ptr<PeerGroup> peer_group,
+FetchState::FetchState(Database* db, unique_ptr<PeerGroup> peer_group,
                        const LogVerifier* log_verifier, Task* task)
     : db_(CHECK_NOTNULL(db)),
       peer_group_(move(peer_group)),
@@ -266,7 +265,7 @@ void FetchState::WriteToDatabase(int64_t index, Range* range,
       }
     }
     cert.set_sequence_number(index++);
-    if (db_->CreateSequencedEntry(cert) == Database<LoggedEntry>::OK) {
+    if (db_->CreateSequencedEntry(cert) == Database::OK) {
       ++processed;
     } else {
       LOG(WARNING) << "could not insert entry into the database:\n"
@@ -309,8 +308,7 @@ void FetchState::WriteToDatabase(int64_t index, Range* range,
 }  // namespace
 
 
-void FetchLogEntries(Database<LoggedEntry>* db,
-                     unique_ptr<PeerGroup> peer_group,
+void FetchLogEntries(Database* db, unique_ptr<PeerGroup> peer_group,
                      const LogVerifier* log_verifier, Task* task) {
   TaskHold hold(task);
   task->DeleteWhenDone(

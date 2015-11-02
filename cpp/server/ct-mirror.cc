@@ -229,7 +229,7 @@ static const bool follow_dummy =
 }  // namespace
 
 
-void STHUpdater(Database<LoggedEntry>* db,
+void STHUpdater(Database* db,
                 ClusterStateController<LoggedEntry>* cluster_state_controller,
                 mutex* queue_mutex, map<int64_t, ct::SignedTreeHead>* queue,
                 LogLookup<LoggedEntry>* log_lookup, Task* task) {
@@ -259,7 +259,7 @@ void STHUpdater(Database<LoggedEntry>* db,
 
     {
       lock_guard<mutex> lock(*queue_mutex);
-      unique_ptr<Database<LoggedEntry>::Iterator> entries(
+      unique_ptr<Database::Iterator> entries(
           db->ScanEntries(new_tree->LeafCount()));
       while (!queue->empty() &&
              queue->begin()->second.tree_size() <= local_size) {
@@ -342,7 +342,7 @@ int main(int argc, char* argv[]) {
         << "Certificate directory and tree directory must differ";
   }
 
-  Database<LoggedEntry>* db;
+  Database* db;
 
   if (!FLAGS_sqlite_db.empty()) {
     db = new SQLiteDB(FLAGS_sqlite_db);

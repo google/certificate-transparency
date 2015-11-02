@@ -79,7 +79,6 @@ using testing::NiceMock;
 using testing::_;
 using util::testing::StatusIs;
 
-typedef Database<LoggedEntry> DB;
 typedef Frontend FE;
 
 // A slightly shorter notation for constructing hex strings from binary blobs.

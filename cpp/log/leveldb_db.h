@@ -17,13 +17,12 @@
 
 #include "base/macros.h"
 #include "log/database.h"
-#include "log/logged_entry.h"
 #include "proto/ct.pb.h"
 
 namespace cert_trans {
 
 
-class LevelDB : public Database<LoggedEntry> {
+class LevelDB : public Database {
  public:
   static const size_t kTimestampBytesIndexed;
 
@@ -31,41 +30,40 @@ class LevelDB : public Database<LoggedEntry> {
   ~LevelDB() = default;
 
   // Implement abstract functions, see database.h for comments.
-  Database<LoggedEntry>::WriteResult CreateSequencedEntry_(
+  Database::WriteResult CreateSequencedEntry_(
       const LoggedEntry& logged) override;
 
-  Database<LoggedEntry>::LookupResult LookupByHash(
-      const std::string& hash, LoggedEntry* result) const override;
+  Database::LookupResult LookupByHash(const std::string& hash,
+                                      LoggedEntry* result) const override;
 
-  Database<LoggedEntry>::LookupResult LookupByIndex(
-      int64_t sequence_number, LoggedEntry* result) const override;
+  Database::LookupResult LookupByIndex(int64_t sequence_number,
+                                       LoggedEntry* result) const override;
 
-  std::unique_ptr<Database<LoggedEntry>::Iterator> ScanEntries(
+  std::unique_ptr<Database::Iterator> ScanEntries(
       int64_t start_index) const override;
 
-  Database<LoggedEntry>::WriteResult WriteTreeHead_(
-      const ct::SignedTreeHead& sth) override;
+  Database::WriteResult WriteTreeHead_(const ct::SignedTreeHead& sth) override;
 
-  Database<LoggedEntry>::LookupResult LatestTreeHead(
+  Database::LookupResult LatestTreeHead(
       ct::SignedTreeHead* result) const override;
 
   int64_t TreeSize() const override;
 
   void AddNotifySTHCallback(
-      const Database<LoggedEntry>::NotifySTHCallback* callback) override;
+      const Database::NotifySTHCallback* callback) override;
 
   void RemoveNotifySTHCallback(
-      const Database<LoggedEntry>::NotifySTHCallback* callback) override;
+      const Database::NotifySTHCallback* callback) override;
 
   void InitializeNode(const std::string& node_id) override;
 
-  Database<LoggedEntry>::LookupResult NodeId(std::string* node_id) override;
+  Database::LookupResult NodeId(std::string* node_id) override;
 
  private:
   class Iterator;
 
   void BuildIndex();
-  Database<LoggedEntry>::LookupResult LatestTreeHeadNoLock(
+  Database::LookupResult LatestTreeHeadNoLock(
       ct::SignedTreeHead* result) const;
   void InsertEntryMapping(int64_t sequence_number, const std::string& hash);
 

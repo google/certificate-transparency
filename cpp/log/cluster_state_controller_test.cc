@@ -539,8 +539,7 @@ TEST_F(ClusterStateControllerTest, TestStoresServingSthInDatabase) {
 
   {
     SignedTreeHead db_sth;
-    EXPECT_EQ(Database<LoggedEntry>::LOOKUP_OK,
-              test_db_.db()->LatestTreeHead(&db_sth));
+    EXPECT_EQ(Database::LOOKUP_OK, test_db_.db()->LatestTreeHead(&db_sth));
     EXPECT_EQ(sth.DebugString(), db_sth.DebugString());
   }
 }
@@ -555,8 +554,7 @@ TEST_F(ClusterStateControllerTest, TestWaitsToStoreSTHInDatabaseWhenStale) {
 
   {
     SignedTreeHead db_sth;
-    EXPECT_EQ(Database<LoggedEntry>::LOOKUP_OK,
-              test_db_.db()->LatestTreeHead(&db_sth));
+    EXPECT_EQ(Database::LOOKUP_OK, test_db_.db()->LatestTreeHead(&db_sth));
     EXPECT_EQ(sth1.DebugString(), db_sth.DebugString());
   }
 
@@ -570,8 +568,7 @@ TEST_F(ClusterStateControllerTest, TestWaitsToStoreSTHInDatabaseWhenStale) {
     // Should still show the first STH in sth1, because the local DB
     // doesn't have the entries under sth2 yet.
     SignedTreeHead db_sth;
-    EXPECT_EQ(Database<LoggedEntry>::LOOKUP_OK,
-              test_db_.db()->LatestTreeHead(&db_sth));
+    EXPECT_EQ(Database::LOOKUP_OK, test_db_.db()->LatestTreeHead(&db_sth));
     EXPECT_EQ(sth1.DebugString(), db_sth.DebugString());
   }
 
@@ -585,8 +582,7 @@ TEST_F(ClusterStateControllerTest, TestWaitsToStoreSTHInDatabaseWhenStale) {
   {
     // Should now see the updated serving sth2
     SignedTreeHead db_sth;
-    EXPECT_EQ(Database<LoggedEntry>::LOOKUP_OK,
-              test_db_.db()->LatestTreeHead(&db_sth));
+    EXPECT_EQ(Database::LOOKUP_OK, test_db_.db()->LatestTreeHead(&db_sth));
     EXPECT_EQ(sth2.DebugString(), db_sth.DebugString());
   }
 }
@@ -619,8 +615,7 @@ TEST_F(ClusterStateControllerTest, TestNodeIsStale) {
     LoggedEntry cert;
     cert.RandomForTest();
     cert.set_sequence_number(0);
-    EXPECT_EQ(test_db_.db()->CreateSequencedEntry(cert),
-              Database<LoggedEntry>::OK);
+    EXPECT_EQ(Database::OK, test_db_.db()->CreateSequencedEntry(cert));
   }
 
   EXPECT_FALSE(controller_.NodeIsStale());

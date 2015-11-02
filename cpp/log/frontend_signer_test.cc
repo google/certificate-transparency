@@ -51,7 +51,6 @@ using testing::NiceMock;
 using testing::_;
 using util::testing::StatusIs;
 
-typedef Database<LoggedEntry> DB;
 typedef FrontendSigner FS;
 
 template <class T>

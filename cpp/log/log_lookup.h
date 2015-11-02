@@ -19,7 +19,7 @@ template <class Logged>
 class LogLookup {
  public:
   // The constructor loads the content from the database.
-  explicit LogLookup(cert_trans::ReadOnlyDatabase<Logged>* db);
+  explicit LogLookup(cert_trans::ReadOnlyDatabase* db);
   ~LogLookup();
 
   enum LookupResult {
@@ -76,12 +76,11 @@ class LogLookup {
   // a shorter prefix (possibly with a multimap).
   std::map<std::string, int64_t> leaf_index_;
 
-  cert_trans::ReadOnlyDatabase<Logged>* const db_;
+  cert_trans::ReadOnlyDatabase* const db_;
   MerkleTree cert_tree_;
   ct::SignedTreeHead latest_tree_head_;
 
-  const typename cert_trans::Database<Logged>::NotifySTHCallback
-      update_from_sth_cb_;
+  const cert_trans::Database::NotifySTHCallback update_from_sth_cb_;
 
   DISALLOW_COPY_AND_ASSIGN(LogLookup);
 };

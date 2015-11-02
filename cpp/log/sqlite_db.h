@@ -14,14 +14,14 @@ struct sqlite3;
 namespace cert_trans {
 
 
-class SQLiteDB : public Database<LoggedEntry> {
+class SQLiteDB : public Database {
  public:
   explicit SQLiteDB(const std::string& dbfile);
 
   ~SQLiteDB();
 
-  typedef typename Database<LoggedEntry>::WriteResult WriteResult;
-  typedef typename Database<LoggedEntry>::LookupResult LookupResult;
+  typedef Database::WriteResult WriteResult;
+  typedef Database::LookupResult LookupResult;
 
   WriteResult CreateSequencedEntry_(const LoggedEntry& logged) override;
 
@@ -31,7 +31,7 @@ class SQLiteDB : public Database<LoggedEntry> {
   LookupResult LookupByIndex(int64_t sequence_number,
                              LoggedEntry* result) const override;
 
-  std::unique_ptr<typename Database<LoggedEntry>::Iterator> ScanEntries(
+  std::unique_ptr<Database::Iterator> ScanEntries(
       int64_t start_index) const override;
 
   WriteResult WriteTreeHead_(const ct::SignedTreeHead& sth) override;
@@ -41,12 +41,10 @@ class SQLiteDB : public Database<LoggedEntry> {
   int64_t TreeSize() const override;
 
   void AddNotifySTHCallback(
-      const typename Database<LoggedEntry>::NotifySTHCallback* callback)
-      override;
+      const Database::NotifySTHCallback* callback) override;
 
   void RemoveNotifySTHCallback(
-      const typename Database<LoggedEntry>::NotifySTHCallback* callback)
-      override;
+      const Database::NotifySTHCallback* callback) override;
 
   void InitializeNode(const std::string& node_id) override;
   LookupResult NodeId(std::string* node_id) override;

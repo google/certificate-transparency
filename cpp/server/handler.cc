@@ -69,7 +69,7 @@ static Latency<milliseconds, string> http_server_request_latency_ms(
 
 
 HttpHandler::HttpHandler(LogLookup<LoggedEntry>* log_lookup,
-                         const ReadOnlyDatabase<LoggedEntry>* db,
+                         const ReadOnlyDatabase* db,
                          const ClusterStateController<LoggedEntry>* controller,
                          ThreadPool* pool, libevent::Base* event_base)
     : log_lookup_(CHECK_NOTNULL(log_lookup)),

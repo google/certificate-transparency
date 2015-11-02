@@ -16,7 +16,7 @@ class XJsonHttpHandler : public HttpHandler {
   // instance.  The |frontend| parameters can be NULL, in which case this
   // server will not accept "add-json" requests.
   XJsonHttpHandler(LogLookup<LoggedEntry>* log_lookup,
-                   const ReadOnlyDatabase<LoggedEntry>* db,
+                   const ReadOnlyDatabase* db,
                    const ClusterStateController<LoggedEntry>* controller,
                    Frontend* frontend, ThreadPool* pool,
                    libevent::Base* event_base);

@@ -74,10 +74,9 @@ class Server {
   // Doesn't take ownership of anything.
   Server(const Options& opts,
          const std::shared_ptr<libevent::Base>& event_base,
-         ThreadPool* internal_pool, ThreadPool* http_pool,
-         Database<Logged>* db, EtcdClient* etcd_client,
-         UrlFetcher* url_fetcher, LogSigner* log_signer,
-         const LogVerifier* log_verifier);
+         ThreadPool* internal_pool, ThreadPool* http_pool, Database* db,
+         EtcdClient* etcd_client, UrlFetcher* url_fetcher,
+         LogSigner* log_signer, const LogVerifier* log_verifier);
   ~Server();
 
   void RegisterHandler(HttpHandler* handler);
@@ -98,7 +97,7 @@ class Server {
   const std::shared_ptr<libevent::Base> event_base_;
   std::unique_ptr<libevent::EventPumpThread> event_pump_;
   libevent::HttpServer http_server_;
-  Database<Logged>* const db_;
+  Database* const db_;
   const LogVerifier* const log_verifier_;
   const std::string node_id_;
   UrlFetcher* const url_fetcher_;
@@ -161,10 +160,9 @@ void WatchdogTimeout(int) {
 }
 
 
-template <class Logged>
-std::string GetNodeId(Database<Logged>* db) {
+std::string GetNodeId(Database* db) {
   std::string node_id;
-  if (db->NodeId(&node_id) != Database<LoggedEntry>::LOOKUP_OK) {
+  if (db->NodeId(&node_id) != Database::LOOKUP_OK) {
     node_id = cert_trans::UUID4();
     LOG(INFO) << "Initializing Node DB with UUID: " << node_id;
     db->InitializeNode(node_id);
@@ -189,7 +187,7 @@ template <class Logged>
 Server<Logged>::Server(const Options& opts,
                        const std::shared_ptr<libevent::Base>& event_base,
                        ThreadPool* internal_pool, ThreadPool* http_pool,
-                       Database<Logged>* db, EtcdClient* etcd_client,
+                       Database* db, EtcdClient* etcd_client,
                        UrlFetcher* url_fetcher, LogSigner* log_signer,
                        const LogVerifier* log_verifier)
     : options_(opts),
@@ -316,7 +314,7 @@ void Server<Logged>::Initialise(bool is_mirror) {
   cluster_controller_->SetNodeHostPort(options_.server, options_.port);
   {
     ct::SignedTreeHead db_sth;
-    if (db_->LatestTreeHead(&db_sth) == Database<LoggedEntry>::LOOKUP_OK) {
+    if (db_->LatestTreeHead(&db_sth) == Database::LOOKUP_OK) {
       const LogVerifier::VerifyResult sth_verify_result(
           log_verifier_->VerifySignedTreeHead(db_sth));
       if (sth_verify_result != LogVerifier::VERIFY_OK) {

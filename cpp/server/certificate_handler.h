@@ -2,6 +2,7 @@
 #define CERT_TRANS_SERVER_CERTIFICATE_HANDLER_H_
 
 #include "log/cert_submission_handler.h"
+#include "log/database.h"
 #include "log/logged_entry.h"
 #include "server/handler.h"
 
@@ -15,7 +16,7 @@ class CertificateHttpHandler : public HttpHandler {
   // in which case this server will not accept "add-chain" and "add-pre-chain"
   // requests.
   CertificateHttpHandler(LogLookup<LoggedEntry>* log_lookup,
-                         const ReadOnlyDatabase<LoggedEntry>* db,
+                         const ReadOnlyDatabase* db,
                          const ClusterStateController<LoggedEntry>* controller,
                          const CertChecker* cert_checker, Frontend* frontend,
                          ThreadPool* pool, libevent::Base* event_base);

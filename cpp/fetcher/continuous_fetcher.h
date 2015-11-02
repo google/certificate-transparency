@@ -23,9 +23,8 @@ namespace cert_trans {
 class ContinuousFetcher {
  public:
   static std::unique_ptr<ContinuousFetcher> New(
-      libevent::Base* base, util::Executor* executor,
-      Database<LoggedEntry>* db, const LogVerifier* log_verifier,
-      bool fetch_scts);
+      libevent::Base* base, util::Executor* executor, Database* db,
+      const LogVerifier* log_verifier, bool fetch_scts);
 
   virtual ~ContinuousFetcher() = default;
 

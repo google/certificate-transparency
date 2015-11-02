@@ -98,7 +98,7 @@ sqlite3* SQLiteOpen(const string& dbfile) {
 }  // namespace
 
 
-class SQLiteDB::Iterator : public Database<LoggedEntry>::Iterator {
+class SQLiteDB::Iterator : public Database::Iterator {
  public:
   Iterator(const SQLiteDB* db, int64_t start_index)
       : db_(CHECK_NOTNULL(db)), next_index_(start_index) {
@@ -175,7 +175,7 @@ SQLiteDB::~SQLiteDB() {
 }
 
 
-typename Database<LoggedEntry>::WriteResult SQLiteDB::CreateSequencedEntry_(
+Database::WriteResult SQLiteDB::CreateSequencedEntry_(
     const LoggedEntry& logged) {
   ScopedLatency latency(
       latency_by_op_ms.GetScopedLatency("create_sequenced_entry"));
@@ -227,8 +227,8 @@ typename Database<LoggedEntry>::WriteResult SQLiteDB::CreateSequencedEntry_(
 }
 
 
-typename Database<LoggedEntry>::LookupResult SQLiteDB::LookupByHash(
-    const string& hash, LoggedEntry* result) const {
+Database::LookupResult SQLiteDB::LookupByHash(const string& hash,
+                                              LoggedEntry* result) const {
   CHECK_NOTNULL(result);
   ScopedLatency latency(latency_by_op_ms.GetScopedLatency("lookup_by_hash"));
 
@@ -263,8 +263,8 @@ typename Database<LoggedEntry>::LookupResult SQLiteDB::LookupByHash(
 }
 
 
-typename Database<LoggedEntry>::LookupResult SQLiteDB::LookupByIndex(
-    int64_t sequence_number, LoggedEntry* result) const {
+Database::LookupResult SQLiteDB::LookupByIndex(int64_t sequence_number,
+                                               LoggedEntry* result) const {
   ScopedLatency latency(latency_by_op_ms.GetScopedLatency("lookup_by_index"));
   unique_lock<mutex> lock(lock_);
 
@@ -272,9 +272,9 @@ typename Database<LoggedEntry>::LookupResult SQLiteDB::LookupByIndex(
 }
 
 
-typename Database<LoggedEntry>::LookupResult SQLiteDB::LookupByIndex(
-    const unique_lock<mutex>& lock, int64_t sequence_number,
-    LoggedEntry* result) const {
+Database::LookupResult SQLiteDB::LookupByIndex(const unique_lock<mutex>& lock,
+                                               int64_t sequence_number,
+                                               LoggedEntry* result) const {
   CHECK(lock.owns_lock());
   CHECK_GE(sequence_number, 0);
   CHECK_NOTNULL(result);
@@ -305,7 +305,7 @@ typename Database<LoggedEntry>::LookupResult SQLiteDB::LookupByIndex(
 }
 
 
-typename Database<LoggedEntry>::LookupResult SQLiteDB::LookupNextIndex(
+Database::LookupResult SQLiteDB::LookupNextIndex(
     const unique_lock<mutex>& lock, int64_t sequence_number,
     LoggedEntry* result) const {
   CHECK(lock.owns_lock());
@@ -337,14 +337,13 @@ typename Database<LoggedEntry>::LookupResult SQLiteDB::LookupNextIndex(
 }
 
 
-unique_ptr<typename Database<LoggedEntry>::Iterator> SQLiteDB::ScanEntries(
+unique_ptr<Database::Iterator> SQLiteDB::ScanEntries(
     int64_t start_index) const {
   return unique_ptr<Iterator>(new Iterator(this, start_index));
 }
 
 
-typename Database<LoggedEntry>::WriteResult SQLiteDB::WriteTreeHead_(
-    const ct::SignedTreeHead& sth) {
+Database::WriteResult SQLiteDB::WriteTreeHead_(const ct::SignedTreeHead& sth) {
   ScopedLatency latency(latency_by_op_ms.GetScopedLatency("write_tree_head"));
   unique_lock<mutex> lock(lock_);
 
@@ -386,7 +385,7 @@ typename Database<LoggedEntry>::WriteResult SQLiteDB::WriteTreeHead_(
 }
 
 
-typename Database<LoggedEntry>::LookupResult SQLiteDB::LatestTreeHead(
+Database::LookupResult SQLiteDB::LatestTreeHead(
     ct::SignedTreeHead* result) const {
   ScopedLatency latency(latency_by_op_ms.GetScopedLatency("latest_tree_head"));
   unique_lock<mutex> lock(lock_);
@@ -423,7 +422,7 @@ int64_t SQLiteDB::TreeSize() const {
 
 
 void SQLiteDB::AddNotifySTHCallback(
-    const typename Database<LoggedEntry>::NotifySTHCallback* callback) {
+    const Database::NotifySTHCallback* callback) {
   unique_lock<mutex> lock(lock_);
 
   callbacks_.Add(callback);
@@ -439,7 +438,7 @@ void SQLiteDB::AddNotifySTHCallback(
 
 
 void SQLiteDB::RemoveNotifySTHCallback(
-    const typename Database<LoggedEntry>::NotifySTHCallback* callback) {
+    const Database::NotifySTHCallback* callback) {
   lock_guard<mutex> lock(lock_);
 
   callbacks_.Remove(callback);
@@ -463,15 +462,14 @@ void SQLiteDB::InitializeNode(const string& node_id) {
 }
 
 
-typename Database<LoggedEntry>::LookupResult SQLiteDB::NodeId(
-    string* node_id) {
+Database::LookupResult SQLiteDB::NodeId(string* node_id) {
   unique_lock<mutex> lock(lock_);
   return NodeId(lock, CHECK_NOTNULL(node_id));
 }
 
 
-typename Database<LoggedEntry>::LookupResult SQLiteDB::NodeId(
-    const unique_lock<mutex>& lock, string* node_id) {
+Database::LookupResult SQLiteDB::NodeId(const unique_lock<mutex>& lock,
+                                        string* node_id) {
   ScopedLatency latency(latency_by_op_ms.GetScopedLatency("set_node_id"));
   CHECK(lock.owns_lock());
   CHECK_NOTNULL(node_id);
@@ -540,13 +538,13 @@ void SQLiteDB::ForceNotifySTH() {
   unique_lock<mutex> lock(lock_);
 
   ct::SignedTreeHead sth;
-  const typename Database<LoggedEntry>::LookupResult db_result =
+  const Database::LookupResult db_result =
       this->LatestTreeHeadNoLock(lock, &sth);
-  if (db_result == Database<LoggedEntry>::NOT_FOUND) {
+  if (db_result == Database::NOT_FOUND) {
     return;
   }
 
-  CHECK(db_result == Database<LoggedEntry>::LOOKUP_OK);
+  CHECK(db_result == Database::LOOKUP_OK);
 
   // Do not call the callbacks while holding the lock, as they might
   // want to perform some lookups.
@@ -555,7 +553,7 @@ void SQLiteDB::ForceNotifySTH() {
 }
 
 
-typename Database<LoggedEntry>::LookupResult SQLiteDB::LatestTreeHeadNoLock(
+Database::LookupResult SQLiteDB::LatestTreeHeadNoLock(
     const unique_lock<mutex>& lock, ct::SignedTreeHead* result) const {
   CHECK(lock.owns_lock());
   sqlite::Statement statement(db_,

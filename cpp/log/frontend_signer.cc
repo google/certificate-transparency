@@ -20,7 +20,7 @@ using std::string;
 using util::Status;
 
 
-FrontendSigner::FrontendSigner(Database<cert_trans::LoggedEntry>* db,
+FrontendSigner::FrontendSigner(Database* db,
                                ConsistentStore<LoggedEntry>* store,
                                LogSigner* signer)
     : db_(CHECK_NOTNULL(db)),
@@ -41,10 +41,9 @@ Status FrontendSigner::QueueEntry(const LogEntry& entry,
   // same cert gets added twice.
   // TODO(ekasper): switch to using SignedEntryWithType as the DB key.
   cert_trans::LoggedEntry logged;
-  Database<cert_trans::LoggedEntry>::LookupResult db_result =
-      db_->LookupByHash(sha256_hash, &logged);
+  Database::LookupResult db_result = db_->LookupByHash(sha256_hash, &logged);
 
-  if (db_result == Database<cert_trans::LoggedEntry>::LOOKUP_OK) {
+  if (db_result == Database::LOOKUP_OK) {
     // If we did find a local copy, return the previously issued SCT.
     if (sct != nullptr) {
       *sct = logged.sct();
@@ -52,7 +51,7 @@ Status FrontendSigner::QueueEntry(const LogEntry& entry,
     return Status(util::error::ALREADY_EXISTS,
                   "entry already exists in Database");
   }
-  CHECK_EQ(Database<cert_trans::LoggedEntry>::NOT_FOUND, db_result);
+  CHECK_EQ(Database::NOT_FOUND, db_result);
 
   // Dont have the cert locally, so create an SCT and store it and the cert.
   SignedCertificateTimestamp local_sct;

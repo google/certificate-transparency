@@ -61,7 +61,7 @@ struct PendingEntriesOrder
 
 template <class Logged>
 TreeSigner<Logged>::TreeSigner(
-    const std::chrono::duration<double>& guard_window, Database<Logged>* db,
+    const std::chrono::duration<double>& guard_window, Database* db,
     std::unique_ptr<CompactMerkleTree> merkle_tree,
     cert_trans::ConsistentStore<Logged>* consistent_store, LogSigner* signer)
     : guard_window_(guard_window),
@@ -218,7 +218,7 @@ util::Status TreeSigner<Logged>::SequenceNewEntries() {
        ++it) {
     VLOG(1) << "Adding to local DB: " << it->first;
     CHECK_EQ(it->first, it->second->sequence_number());
-    CHECK_EQ(Database<Logged>::OK, db_->CreateSequencedEntry(*(it->second)));
+    CHECK_EQ(Database::OK, db_->CreateSequencedEntry(*(it->second)));
   }
 
   VLOG(1) << "Sequenced " << num_sequenced << " entries.";
@@ -276,11 +276,10 @@ bool TreeSigner<Logged>::Append(const Logged& logged) {
   CHECK_EQ(logged.sequence_number(),
            static_cast<int64_t>(cert_tree_->LeafCount()));
   // Commit the sequence number of this certificate locally
-  typename Database<Logged>::WriteResult db_result =
-      db_->CreateSequencedEntry(logged);
+  Database::WriteResult db_result = db_->CreateSequencedEntry(logged);
 
-  if (db_result != Database<Logged>::OK) {
-    CHECK_EQ(Database<Logged>::SEQUENCE_NUMBER_ALREADY_IN_USE, db_result);
+  if (db_result != Database::OK) {
+    CHECK_EQ(Database::SEQUENCE_NUMBER_ALREADY_IN_USE, db_result);
     LOG(ERROR) << "Attempt to assign duplicate sequence number "
                << cert_tree_->LeafCount();
     return false;

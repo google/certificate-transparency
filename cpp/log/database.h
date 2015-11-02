@@ -9,58 +9,24 @@
 #include <stdint.h>
 
 #include "base/macros.h"
+#include "log/logged_entry.h"
 #include "proto/ct.pb.h"
 
 namespace cert_trans {
 
-// The |Logged| class needs to provide this interface:
-// class Logged {
-//  public:
-//   // construct an empty instance
-//   LoggedBlob();
+// This is a database interface for the log server.
 //
-//   // The key used for storage/retrieval in the database, calculated
-//   // from the content.
-//   std::string Hash() const;
+// Implementations of this interface MUST provide for the same
+// certificate being sequenced multiple times in the tree.
 //
-//   // The tree signer assigns a sequence number.
-//   void clear_sequence_number();
-//   void set_sequence_number(int64_t sequence);
-//   bool has_sequence_number() const;
-//   int64_t sequence_number() const;
-//
-//   // If the data has a timestamp associated with it, return it: any
-//   // STH including this item will have a later timestamp. Return 0 if
-//   // there is no timestamp.
-//   uint64_t timestamp() const;
-//
-//   // Serialization of contents (i.e. excluding sequence number and
-//   // hash) for storage/retrieval from the database
-//   bool SerializeForDatabase(std::string *dst) const;
-//   bool ParseFromDatabase(const std::string &src);
-//
-//   // Serialization for inclusion in the tree (i.e. this is what
-//   // clients would hash over).
-//   bool SerializeForLeaf(std::string *dst) const;
-//
-//   // Debugging.
-//   std::string DebugString() const;
-//
-//   // Fill with random content data for testing (no sequence number).
-//   void RandomForTest();
-// };
-//
-// NOTE: This is a database interface for the log server.
-// Implementations of this interface MUST provide for the same certificate
-// being sequenced multiple times in the tree.
-// Although the log server implementation which uses this database interface
-// should not allow duplicate entries to be created, this code base will also
-// support running in a log mirroring mode, and since the RFC does not forbid
-// the same certificate appearing multiple times in a log 3rd party logs may
-// exhibit this behavour the mirror must permit it too.
+// Although the log server implementation which uses this database
+// interface should not allow duplicate entries to be created, this
+// code base will also support running in a log mirroring mode, and
+// since the RFC does not forbid the same certificate appearing
+// multiple times in a log 3rd party logs may exhibit this behavour
+// the mirror must permit it too.
 
 
-template <class Logged>
 class ReadOnlyDatabase {
  public:
   typedef std::function<void(const ct::SignedTreeHead&)> NotifySTHCallback;
@@ -77,7 +43,7 @@ class ReadOnlyDatabase {
 
     // If there is an entry available, fill *entry and return true,
     // otherwise return false.
-    virtual bool GetNextEntry(Logged* entry) = 0;
+    virtual bool GetNextEntry(LoggedEntry* entry) = 0;
 
    private:
     DISALLOW_COPY_AND_ASSIGN(Iterator);
@@ -88,11 +54,11 @@ class ReadOnlyDatabase {
   // Look up by hash. If the entry exists write the result. If the
   // entry is not logged return NOT_FOUND.
   virtual LookupResult LookupByHash(const std::string& hash,
-                                    Logged* result) const = 0;
+                                    LoggedEntry* result) const = 0;
 
   // Look up by sequence number.
   virtual LookupResult LookupByIndex(int64_t sequence_number,
-                                     Logged* result) const = 0;
+                                     LoggedEntry* result) const = 0;
 
   // Return the tree head with the freshest timestamp.
   virtual LookupResult LatestTreeHead(ct::SignedTreeHead* result) const = 0;
@@ -128,8 +94,7 @@ class ReadOnlyDatabase {
 };
 
 
-template <class Logged>
-class Database : public ReadOnlyDatabase<Logged> {
+class Database : public ReadOnlyDatabase {
  public:
   enum WriteResult {
     OK,
@@ -150,7 +115,7 @@ class Database : public ReadOnlyDatabase<Logged> {
 
   // Attempt to create a new entry with the status LOGGED.
   // Fail if an entry with this hash already exists.
-  WriteResult CreateSequencedEntry(const Logged& logged) {
+  WriteResult CreateSequencedEntry(const LoggedEntry& logged) {
     CHECK(logged.has_sequence_number());
     CHECK_GE(logged.sequence_number(), 0);
     return CreateSequencedEntry_(logged);
@@ -170,7 +135,7 @@ class Database : public ReadOnlyDatabase<Logged> {
 
   // See the inline methods with similar names defined above for more
   // documentation.
-  virtual WriteResult CreateSequencedEntry_(const Logged& logged) = 0;
+  virtual WriteResult CreateSequencedEntry_(const LoggedEntry& logged) = 0;
   virtual WriteResult WriteTreeHead_(const ct::SignedTreeHead& sth) = 0;
 
  private:

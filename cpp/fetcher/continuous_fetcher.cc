@@ -30,8 +30,7 @@ namespace {
 
 class ContinuousFetcherImpl : public ContinuousFetcher {
  public:
-  ContinuousFetcherImpl(libevent::Base* base, Executor* executor,
-                        Database<LoggedEntry>* db,
+  ContinuousFetcherImpl(libevent::Base* base, Executor* executor, Database* db,
                         const LogVerifier* log_verifier, bool fetch_scts);
 
   void AddPeer(const string& node_id, const shared_ptr<Peer>& peer) override;
@@ -44,7 +43,7 @@ class ContinuousFetcherImpl : public ContinuousFetcher {
 
   libevent::Base* const base_;
   Executor* const executor_;
-  Database<LoggedEntry>* const db_;
+  Database* const db_;
   const LogVerifier* const log_verifier_;
   const bool fetch_scts_;
 
@@ -59,7 +58,7 @@ class ContinuousFetcherImpl : public ContinuousFetcher {
 
 
 ContinuousFetcherImpl::ContinuousFetcherImpl(
-    libevent::Base* base, Executor* executor, Database<LoggedEntry>* db,
+    libevent::Base* base, Executor* executor, Database* db,
     const LogVerifier* const log_verifier, bool fetch_scts)
     : base_(CHECK_NOTNULL(base)),
       executor_(CHECK_NOTNULL(executor)),
@@ -164,7 +163,7 @@ void ContinuousFetcherImpl::FetchDelayDone(Task* task) {
 
 // static
 unique_ptr<ContinuousFetcher> ContinuousFetcher::New(
-    libevent::Base* base, Executor* executor, Database<LoggedEntry>* db,
+    libevent::Base* base, Executor* executor, Database* db,
     const LogVerifier* log_verifier, bool fetch_scts) {
   return unique_ptr<ContinuousFetcher>(
       new ContinuousFetcherImpl(base, executor, db, log_verifier, fetch_scts));

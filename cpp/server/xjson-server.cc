@@ -298,7 +298,7 @@ int main(int argc, char* argv[]) {
     std::cerr << "Must specify database.";
     exit(1);
   }
-  Database<LoggedEntry>* db;
+  Database* db;
 
   db = new LevelDB(FLAGS_leveldb_db);
 

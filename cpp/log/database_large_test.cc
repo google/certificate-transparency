@@ -33,7 +33,6 @@ using cert_trans::LoggedEntry;
 using cert_trans::SQLiteDB;
 using std::string;
 
-typedef Database<LoggedEntry> DB;
 
 template <class T>
 class LargeDBTest : public ::testing::Test {
@@ -49,7 +48,7 @@ class LargeDBTest : public ::testing::Test {
     for (int i = 0; i < entries; ++i) {
       test_signer_.CreateUniqueFakeSignature(&logged_cert);
       logged_cert.set_sequence_number(i);
-      EXPECT_EQ(DB::OK, db()->CreateSequencedEntry(logged_cert));
+      EXPECT_EQ(Database::OK, db()->CreateSequencedEntry(logged_cert));
     }
   }
 
@@ -57,7 +56,8 @@ class LargeDBTest : public ::testing::Test {
     std::set<string>::const_iterator it;
     LoggedEntry lookup_cert;
     for (int i = 0; i < num; ++i) {
-      EXPECT_EQ(DB::LOOKUP_OK, this->db()->LookupByIndex(i, &lookup_cert));
+      EXPECT_EQ(Database::LOOKUP_OK,
+                this->db()->LookupByIndex(i, &lookup_cert));
     }
     return num;
   }

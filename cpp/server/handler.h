@@ -24,7 +24,6 @@ class ClusterStateController;
 class LoggedEntry;
 class PreCertChain;
 class Proxy;
-template <class T>
 class ReadOnlyDatabase;
 class ThreadPool;
 
@@ -33,8 +32,7 @@ class HttpHandler {
  public:
   // Does not take ownership of its parameters, which must outlive
   // this instance.
-  HttpHandler(LogLookup<LoggedEntry>* log_lookup,
-              const ReadOnlyDatabase<LoggedEntry>* db,
+  HttpHandler(LogLookup<LoggedEntry>* log_lookup, const ReadOnlyDatabase* db,
               const ClusterStateController<LoggedEntry>* controller,
               ThreadPool* pool, libevent::Base* event_base);
   virtual ~HttpHandler();
@@ -70,7 +68,7 @@ class HttpHandler {
   void UpdateNodeStaleness();
 
   LogLookup<LoggedEntry>* const log_lookup_;
-  const ReadOnlyDatabase<LoggedEntry>* const db_;
+  const ReadOnlyDatabase* const db_;
   const ClusterStateController<LoggedEntry>* const controller_;
   Proxy* proxy_;
   ThreadPool* const pool_;

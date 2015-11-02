@@ -15,7 +15,6 @@ class Status;
 }  // namespace util
 
 namespace cert_trans {
-template <class Logged>
 class Database;
 }  // namespace cert_trans
 
@@ -23,7 +22,7 @@ class Database;
 class FrontendSigner {
  public:
   // Does not take ownership of |db|, |store| or |signer|.
-  FrontendSigner(cert_trans::Database<cert_trans::LoggedEntry>* db,
+  FrontendSigner(cert_trans::Database* db,
                  cert_trans::ConsistentStore<cert_trans::LoggedEntry>* store,
                  LogSigner* signer);
 
@@ -38,7 +37,7 @@ class FrontendSigner {
   void TimestampAndSign(const ct::LogEntry& entry,
                         ct::SignedCertificateTimestamp* sct) const;
 
-  cert_trans::Database<cert_trans::LoggedEntry>* const db_;
+  cert_trans::Database* const db_;
   cert_trans::ConsistentStore<cert_trans::LoggedEntry>* const store_;
   LogSigner* const signer_;
 

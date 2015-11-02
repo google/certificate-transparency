@@ -360,7 +360,7 @@ int main(int argc, char* argv[]) {
         << "Certificate directory and tree directory must differ";
   }
 
-  Database<LoggedEntry>* db;
+  Database* db;
 
   if (!FLAGS_sqlite_db.empty()) {
     db = new SQLiteDB(FLAGS_sqlite_db);

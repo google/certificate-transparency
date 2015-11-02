@@ -54,7 +54,7 @@ int64_t ParseSequenceNumber(const string& seq) {
 const size_t FileDB::kTimestampBytesIndexed = 6;
 
 
-class FileDB::Iterator : public Database<LoggedEntry>::Iterator {
+class FileDB::Iterator : public Database::Iterator {
  public:
   Iterator(const FileDB* db, int64_t start_index)
       : db_(CHECK_NOTNULL(db)), next_index_(start_index) {
@@ -76,8 +76,7 @@ class FileDB::Iterator : public Database<LoggedEntry>::Iterator {
       }
     }
 
-    CHECK_EQ(db_->LookupByIndex(next_index_, entry),
-             Database<LoggedEntry>::LOOKUP_OK);
+    CHECK_EQ(db_->LookupByIndex(next_index_, entry), Database::LOOKUP_OK);
     ++next_index_;
     return true;
   }
@@ -104,7 +103,7 @@ FileDB::~FileDB() {
 }
 
 
-typename Database<LoggedEntry>::WriteResult FileDB::CreateSequencedEntry_(
+Database::WriteResult FileDB::CreateSequencedEntry_(
     const LoggedEntry& logged) {
   CHECK(logged.has_sequence_number());
   CHECK_GE(logged.sequence_number(), 0);
@@ -137,8 +136,8 @@ typename Database<LoggedEntry>::WriteResult FileDB::CreateSequencedEntry_(
 }
 
 
-typename Database<LoggedEntry>::LookupResult FileDB::LookupByHash(
-    const string& hash, LoggedEntry* result) const {
+Database::LookupResult FileDB::LookupByHash(const string& hash,
+                                            LoggedEntry* result) const {
   ScopedLatency latency(latency_by_op_ms.GetScopedLatency("lookup_by_hash"));
 
   unique_lock<mutex> lock(lock_);
@@ -168,8 +167,8 @@ typename Database<LoggedEntry>::LookupResult FileDB::LookupByHash(
 }
 
 
-typename Database<LoggedEntry>::LookupResult FileDB::LookupByIndex(
-    int64_t sequence_number, LoggedEntry* result) const {
+Database::LookupResult FileDB::LookupByIndex(int64_t sequence_number,
+                                             LoggedEntry* result) const {
   CHECK_GE(sequence_number, 0);
   ScopedLatency latency(latency_by_op_ms.GetScopedLatency("lookup_by_index"));
 
@@ -187,14 +186,12 @@ typename Database<LoggedEntry>::LookupResult FileDB::LookupByIndex(
 }
 
 
-unique_ptr<typename Database<LoggedEntry>::Iterator> FileDB::ScanEntries(
-    int64_t start_index) const {
+unique_ptr<Database::Iterator> FileDB::ScanEntries(int64_t start_index) const {
   return unique_ptr<Iterator>(new Iterator(this, start_index));
 }
 
 
-typename Database<LoggedEntry>::WriteResult FileDB::WriteTreeHead_(
-    const ct::SignedTreeHead& sth) {
+Database::WriteResult FileDB::WriteTreeHead_(const ct::SignedTreeHead& sth) {
   CHECK_GE(sth.tree_size(), 0);
   ScopedLatency latency(latency_by_op_ms.GetScopedLatency("write_tree_head"));
 
@@ -231,7 +228,7 @@ typename Database<LoggedEntry>::WriteResult FileDB::WriteTreeHead_(
 }
 
 
-typename Database<LoggedEntry>::LookupResult FileDB::LatestTreeHead(
+Database::LookupResult FileDB::LatestTreeHead(
     ct::SignedTreeHead* result) const {
   ScopedLatency latency(latency_by_op_ms.GetScopedLatency("latest_tree_head"));
   lock_guard<mutex> lock(lock_);
@@ -249,7 +246,7 @@ int64_t FileDB::TreeSize() const {
 
 
 void FileDB::AddNotifySTHCallback(
-    const typename Database<LoggedEntry>::NotifySTHCallback* callback) {
+    const Database::NotifySTHCallback* callback) {
   unique_lock<mutex> lock(lock_);
 
   callbacks_.Add(callback);
@@ -263,7 +260,7 @@ void FileDB::AddNotifySTHCallback(
 
 
 void FileDB::RemoveNotifySTHCallback(
-    const typename Database<LoggedEntry>::NotifySTHCallback* callback) {
+    const Database::NotifySTHCallback* callback) {
   lock_guard<mutex> lock(lock_);
 
   callbacks_.Remove(callback);
@@ -283,7 +280,7 @@ void FileDB::InitializeNode(const string& node_id) {
 }
 
 
-typename Database<LoggedEntry>::LookupResult FileDB::NodeId(string* node_id) {
+Database::LookupResult FileDB::NodeId(string* node_id) {
   CHECK_NOTNULL(node_id);
   if (!meta_storage_->LookupEntry(kMetaNodeIdKey, node_id).ok()) {
     return this->NOT_FOUND;
@@ -333,7 +330,7 @@ void FileDB::BuildIndex() {
 }
 
 
-typename Database<LoggedEntry>::LookupResult FileDB::LatestTreeHeadNoLock(
+Database::LookupResult FileDB::LatestTreeHeadNoLock(
     ct::SignedTreeHead* result) const {
   if (latest_tree_timestamp_ == 0) {
     return this->NOT_FOUND;

@@ -41,7 +41,6 @@ using std::vector;
 using testing::NiceMock;
 using util::Status;
 
-typedef Database<LoggedEntry> DB;
 typedef TreeSigner<LoggedEntry> TS;
 
 // TODO(alcutter): figure out if/how we can keep abstract rather than
@@ -107,8 +106,7 @@ class TreeSignerTest : public ::testing::Test {
     m->set_entry_hash(logged_cert->Hash());
     CHECK(this->store_->UpdateSequenceMapping(&mapping).ok());
     logged_cert->set_sequence_number(seq);
-    CHECK_EQ(Database<LoggedEntry>::OK,
-             this->db()->CreateSequencedEntry(*logged_cert));
+    CHECK_EQ(Database::OK, this->db()->CreateSequencedEntry(*logged_cert));
   }
 
 
