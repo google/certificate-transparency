@@ -1,6 +1,3 @@
-#ifndef CERT_TRANS_LOG_LEVELDB_DB_INL_H_
-#define CERT_TRANS_LOG_LEVELDB_DB_INL_H_
-
 #include "log/leveldb_db.h"
 
 #include <gflags/gflags.h>
@@ -15,6 +12,15 @@
 #include "monitoring/latency.h"
 #include "util/util.h"
 
+using std::chrono::milliseconds;
+using std::lock_guard;
+using std::make_pair;
+using std::min;
+using std::mutex;
+using std::string;
+using std::unique_lock;
+using std::unique_ptr;
+
 DEFINE_int32(leveldb_max_open_files, 0,
              "number of open files that can be used by leveldb");
 DEFINE_int32(leveldb_bloom_filter_bits_per_key, 0,
@@ -24,7 +30,7 @@ namespace cert_trans {
 namespace {
 
 
-static Latency<std::chrono::milliseconds, std::string> latency_by_op_ms(
+static Latency<milliseconds, string> latency_by_op_ms(
     "leveldb_latency_by_operation_ms", "operation",
     "Database latency in ms broken out by operation.");
 
@@ -36,8 +42,8 @@ const char kMetaPrefix[] = "meta-";
 
 
 #ifdef HAVE_LEVELDB_FILTER_POLICY_H
-std::unique_ptr<const leveldb::FilterPolicy> BuildFilterPolicy() {
-  std::unique_ptr<const leveldb::FilterPolicy> retval;
+unique_ptr<const leveldb::FilterPolicy> BuildFilterPolicy() {
+  unique_ptr<const leveldb::FilterPolicy> retval;
 
   if (FLAGS_leveldb_bloom_filter_bits_per_key > 0) {
     retval.reset(CHECK_NOTNULL(leveldb::NewBloomFilterPolicy(
@@ -51,9 +57,9 @@ std::unique_ptr<const leveldb::FilterPolicy> BuildFilterPolicy() {
 
 // WARNING: Do NOT change the type of "index" from int64_t, or you'll
 // break existing databases!
-std::string IndexToKey(int64_t index) {
+string IndexToKey(int64_t index) {
   const char nibble[] = "0123456789abcdef";
-  std::string index_str(sizeof(index) * 2, nibble[0]);
+  string index_str(sizeof(index) * 2, nibble[0]);
   for (int i = sizeof(index) * 2; i > 0 && index > 0; --i) {
     index_str[i - 1] = nibble[index & 0xf];
     index = index >> 4;
@@ -66,7 +72,7 @@ std::string IndexToKey(int64_t index) {
 int64_t KeyToIndex(leveldb::Slice key) {
   CHECK(key.starts_with(kEntryPrefix));
   key.remove_prefix(strlen(kEntryPrefix));
-  const std::string index_str(util::BinaryString(key.ToString()));
+  const string index_str(util::BinaryString(key.ToString()));
 
   int64_t index(0);
   CHECK_EQ(index_str.size(), sizeof(index));
@@ -81,16 +87,15 @@ int64_t KeyToIndex(leveldb::Slice key) {
 }  // namespace
 
 
-template <class Logged>
-class LevelDB<Logged>::Iterator : public Database<Logged>::Iterator {
+class LevelDB::Iterator : public Database<LoggedEntry>::Iterator {
  public:
-  Iterator(const LevelDB<Logged>* db, int64_t start_index)
+  Iterator(const LevelDB* db, int64_t start_index)
       : it_(CHECK_NOTNULL(db)->db_->NewIterator(leveldb::ReadOptions())) {
     CHECK(it_);
     it_->Seek(IndexToKey(start_index));
   }
 
-  bool GetNextEntry(Logged* entry) override {
+  bool GetNextEntry(LoggedEntry* entry) override {
     if (!it_->Valid() || !it_->key().starts_with(kEntryPrefix)) {
       return false;
     }
@@ -109,16 +114,14 @@ class LevelDB<Logged>::Iterator : public Database<Logged>::Iterator {
   }
 
  private:
-  const std::unique_ptr<leveldb::Iterator> it_;
+  const unique_ptr<leveldb::Iterator> it_;
 };
 
 
-template <class Logged>
-const size_t LevelDB<Logged>::kTimestampBytesIndexed = 6;
+const size_t LevelDB::kTimestampBytesIndexed = 6;
 
 
-template <class Logged>
-LevelDB<Logged>::LevelDB(const std::string& dbfile)
+LevelDB::LevelDB(const string& dbfile)
     :
 #ifdef HAVE_LEVELDB_FILTER_POLICY_H
       filter_policy_(BuildFilterPolicy()),
@@ -147,22 +150,21 @@ LevelDB<Logged>::LevelDB(const std::string& dbfile)
 }
 
 
-template <class Logged>
-typename Database<Logged>::WriteResult LevelDB<Logged>::CreateSequencedEntry_(
-    const Logged& logged) {
+Database<LoggedEntry>::WriteResult LevelDB::CreateSequencedEntry_(
+    const LoggedEntry& logged) {
   CHECK(logged.has_sequence_number());
   CHECK_GE(logged.sequence_number(), 0);
   ScopedLatency latency(
       latency_by_op_ms.GetScopedLatency("create_sequenced_entry"));
 
-  std::unique_lock<std::mutex> lock(lock_);
+  unique_lock<mutex> lock(lock_);
 
-  std::string data;
+  string data;
   CHECK(logged.SerializeToString(&data));
 
-  const std::string key(IndexToKey(logged.sequence_number()));
+  const string key(IndexToKey(logged.sequence_number()));
 
-  std::string existing_data;
+  string existing_data;
   leveldb::Status status(
       db_->Get(leveldb::ReadOptions(), key, &existing_data));
   if (status.IsNotFound()) {
@@ -183,19 +185,18 @@ typename Database<Logged>::WriteResult LevelDB<Logged>::CreateSequencedEntry_(
 }
 
 
-template <class Logged>
-typename Database<Logged>::LookupResult LevelDB<Logged>::LookupByHash(
-    const std::string& hash, Logged* result) const {
+Database<LoggedEntry>::LookupResult LevelDB::LookupByHash(
+    const string& hash, LoggedEntry* result) const {
   ScopedLatency latency(latency_by_op_ms.GetScopedLatency("lookup_by_hash"));
 
-  std::unique_lock<std::mutex> lock(lock_);
+  unique_lock<mutex> lock(lock_);
 
   auto i(id_by_hash_.find(hash));
   if (i == id_by_hash_.end()) {
     return this->NOT_FOUND;
   }
 
-  std::string cert_data;
+  string cert_data;
   const leveldb::Status status(
       db_->Get(leveldb::ReadOptions(), IndexToKey(i->second), &cert_data));
   if (status.IsNotFound()) {
@@ -204,7 +205,7 @@ typename Database<Logged>::LookupResult LevelDB<Logged>::LookupByHash(
   CHECK(status.ok()) << "Failed to get entry by hash(" << util::HexString(hash)
                      << "): " << status.ToString();
 
-  Logged logged;
+  LoggedEntry logged;
   CHECK(logged.ParseFromString(cert_data));
   CHECK_EQ(logged.Hash(), hash);
 
@@ -216,13 +217,12 @@ typename Database<Logged>::LookupResult LevelDB<Logged>::LookupByHash(
 }
 
 
-template <class Logged>
-typename Database<Logged>::LookupResult LevelDB<Logged>::LookupByIndex(
-    int64_t sequence_number, Logged* result) const {
+Database<LoggedEntry>::LookupResult LevelDB::LookupByIndex(
+    int64_t sequence_number, LoggedEntry* result) const {
   CHECK_GE(sequence_number, 0);
   ScopedLatency latency(latency_by_op_ms.GetScopedLatency("lookup_by_index"));
 
-  std::string cert_data;
+  string cert_data;
   leveldb::Status status(db_->Get(leveldb::ReadOptions(),
                                   IndexToKey(sequence_number), &cert_data));
   if (status.IsNotFound()) {
@@ -240,28 +240,26 @@ typename Database<Logged>::LookupResult LevelDB<Logged>::LookupByIndex(
 }
 
 
-template <class Logged>
-std::unique_ptr<typename Database<Logged>::Iterator>
-LevelDB<Logged>::ScanEntries(int64_t start_index) const {
-  return std::unique_ptr<Iterator>(new Iterator(this, start_index));
+unique_ptr<Database<LoggedEntry>::Iterator> LevelDB::ScanEntries(
+    int64_t start_index) const {
+  return unique_ptr<Iterator>(new Iterator(this, start_index));
 }
 
 
-template <class Logged>
-typename Database<Logged>::WriteResult LevelDB<Logged>::WriteTreeHead_(
+Database<LoggedEntry>::WriteResult LevelDB::WriteTreeHead_(
     const ct::SignedTreeHead& sth) {
   CHECK_GE(sth.tree_size(), 0);
   ScopedLatency latency(latency_by_op_ms.GetScopedLatency("write_tree_head"));
 
   // 6 bytes are good enough for some 9000 years.
-  std::string timestamp_key =
+  string timestamp_key =
       Serializer::SerializeUint(sth.timestamp(),
                                 LevelDB::kTimestampBytesIndexed);
-  std::string data;
+  string data;
   CHECK(sth.SerializeToString(&data));
 
-  std::unique_lock<std::mutex> lock(lock_);
-  std::string existing_data;
+  unique_lock<mutex> lock(lock_);
+  string existing_data;
   leveldb::Status status(db_->Get(leveldb::ReadOptions(),
                                   kTreeHeadPrefix + timestamp_key,
                                   &existing_data));
@@ -290,29 +288,26 @@ typename Database<Logged>::WriteResult LevelDB<Logged>::WriteTreeHead_(
 }
 
 
-template <class Logged>
-typename Database<Logged>::LookupResult LevelDB<Logged>::LatestTreeHead(
+Database<LoggedEntry>::LookupResult LevelDB::LatestTreeHead(
     ct::SignedTreeHead* result) const {
   ScopedLatency latency(latency_by_op_ms.GetScopedLatency("latest_tree_head"));
-  std::lock_guard<std::mutex> lock(lock_);
+  lock_guard<mutex> lock(lock_);
 
   return LatestTreeHeadNoLock(result);
 }
 
 
-template <class Logged>
-int64_t LevelDB<Logged>::TreeSize() const {
+int64_t LevelDB::TreeSize() const {
   ScopedLatency latency(latency_by_op_ms.GetScopedLatency("tree_size"));
-  std::lock_guard<std::mutex> lock(lock_);
+  lock_guard<mutex> lock(lock_);
 
   return contiguous_size_;
 }
 
 
-template <class Logged>
-void LevelDB<Logged>::AddNotifySTHCallback(
-    const typename Database<Logged>::NotifySTHCallback* callback) {
-  std::unique_lock<std::mutex> lock(lock_);
+void LevelDB::AddNotifySTHCallback(
+    const Database<LoggedEntry>::NotifySTHCallback* callback) {
+  unique_lock<mutex> lock(lock_);
 
   callbacks_.Add(callback);
 
@@ -324,40 +319,36 @@ void LevelDB<Logged>::AddNotifySTHCallback(
 }
 
 
-template <class Logged>
-void LevelDB<Logged>::RemoveNotifySTHCallback(
-    const typename Database<Logged>::NotifySTHCallback* callback) {
-  std::lock_guard<std::mutex> lock(lock_);
+void LevelDB::RemoveNotifySTHCallback(
+    const Database<LoggedEntry>::NotifySTHCallback* callback) {
+  lock_guard<mutex> lock(lock_);
 
   callbacks_.Remove(callback);
 }
 
 
-template <class Logged>
-void LevelDB<Logged>::InitializeNode(const std::string& node_id) {
+void LevelDB::InitializeNode(const string& node_id) {
   CHECK(!node_id.empty());
   ScopedLatency latency(latency_by_op_ms.GetScopedLatency("initialize_node"));
-  std::unique_lock<std::mutex> lock(lock_);
-  std::string existing_id;
+  unique_lock<mutex> lock(lock_);
+  string existing_id;
   leveldb::Status status(db_->Get(leveldb::ReadOptions(),
-                                  std::string(kMetaPrefix) + kMetaNodeIdKey,
+                                  string(kMetaPrefix) + kMetaNodeIdKey,
                                   &existing_id));
   if (!status.IsNotFound()) {
     LOG(FATAL) << "Attempting to initialize DB beloging to node with node_id: "
                << existing_id;
   }
   status = db_->Put(leveldb::WriteOptions(),
-                    std::string(kMetaPrefix) + kMetaNodeIdKey, node_id);
+                    string(kMetaPrefix) + kMetaNodeIdKey, node_id);
   CHECK(status.ok()) << "Failed to store NodeId: " << status.ToString();
 }
 
 
-template <class Logged>
-typename Database<Logged>::LookupResult LevelDB<Logged>::NodeId(
-    std::string* node_id) {
+Database<LoggedEntry>::LookupResult LevelDB::NodeId(string* node_id) {
   CHECK_NOTNULL(node_id);
-  if (!db_->Get(leveldb::ReadOptions(),
-                std::string(kMetaPrefix) + kMetaNodeIdKey, node_id)
+  if (!db_->Get(leveldb::ReadOptions(), string(kMetaPrefix) + kMetaNodeIdKey,
+                node_id)
            .ok()) {
     return this->NOT_FOUND;
   }
@@ -365,22 +356,21 @@ typename Database<Logged>::LookupResult LevelDB<Logged>::NodeId(
 }
 
 
-template <class Logged>
-void LevelDB<Logged>::BuildIndex() {
+void LevelDB::BuildIndex() {
   ScopedLatency latency(latency_by_op_ms.GetScopedLatency("build_index"));
   // Technically, this should only be called from the constructor, so
   // this should not be necessarily, but just to be sure...
-  std::lock_guard<std::mutex> lock(lock_);
+  lock_guard<mutex> lock(lock_);
 
   leveldb::ReadOptions options;
   options.fill_cache = false;
-  std::unique_ptr<leveldb::Iterator> it(db_->NewIterator(options));
+  unique_ptr<leveldb::Iterator> it(db_->NewIterator(options));
   CHECK(it);
   it->Seek(kEntryPrefix);
 
   for (; it->Valid() && it->key().starts_with(kEntryPrefix); it->Next()) {
     const int64_t seq(KeyToIndex(it->key()));
-    Logged logged;
+    LoggedEntry logged;
     CHECK(logged.ParseFromString(it->value().ToString()))
         << "Failed to parse entry with sequence number " << seq;
     CHECK(logged.has_sequence_number())
@@ -405,14 +395,13 @@ void LevelDB<Logged>::BuildIndex() {
 }
 
 
-template <class Logged>
-typename Database<Logged>::LookupResult LevelDB<Logged>::LatestTreeHeadNoLock(
+Database<LoggedEntry>::LookupResult LevelDB::LatestTreeHeadNoLock(
     ct::SignedTreeHead* result) const {
   if (latest_tree_timestamp_ == 0) {
     return this->NOT_FOUND;
   }
 
-  std::string tree_data;
+  string tree_data;
   leveldb::Status status(db_->Get(leveldb::ReadOptions(),
                                   kTreeHeadPrefix + latest_timestamp_key_,
                                   &tree_data));
@@ -427,13 +416,11 @@ typename Database<Logged>::LookupResult LevelDB<Logged>::LatestTreeHeadNoLock(
 
 
 // This must be called with "lock_" held.
-template <class Logged>
-void LevelDB<Logged>::InsertEntryMapping(int64_t sequence_number,
-                                         const std::string& hash) {
-  if (!id_by_hash_.insert(std::make_pair(hash, sequence_number)).second) {
+void LevelDB::InsertEntryMapping(int64_t sequence_number, const string& hash) {
+  if (!id_by_hash_.insert(make_pair(hash, sequence_number)).second) {
     // This is a duplicate hash under a new sequence number.
     // Make sure we track the entry with the lowest sequence number:
-    id_by_hash_[hash] = std::min(id_by_hash_[hash], sequence_number);
+    id_by_hash_[hash] = min(id_by_hash_[hash], sequence_number);
   }
   if (sequence_number == contiguous_size_) {
     ++contiguous_size_;
@@ -451,5 +438,3 @@ void LevelDB<Logged>::InsertEntryMapping(int64_t sequence_number,
 
 
 }  // namespace cert_trans
-
-#endif  // CERT_TRANS_LOG_LEVELDB_DB_INL_H_
