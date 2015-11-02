@@ -345,7 +345,7 @@ int main(int argc, char* argv[]) {
   Database<LoggedEntry>* db;
 
   if (!FLAGS_sqlite_db.empty()) {
-    db = new SQLiteDB<LoggedEntry>(FLAGS_sqlite_db);
+    db = new SQLiteDB(FLAGS_sqlite_db);
   } else if (!FLAGS_leveldb_db.empty()) {
     db = new LevelDB<LoggedEntry>(FLAGS_leveldb_db);
   } else {

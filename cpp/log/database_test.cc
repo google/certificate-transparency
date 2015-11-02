@@ -45,8 +45,8 @@ class DBTest : public ::testing::Test {
   TestSigner test_signer_;
 };
 
-typedef testing::Types<FileDB, SQLiteDB<cert_trans::LoggedEntry>,
-                       LevelDB<cert_trans::LoggedEntry>> Databases;
+typedef testing::Types<FileDB, SQLiteDB, LevelDB<cert_trans::LoggedEntry>>
+    Databases;
 
 typedef Database<cert_trans::LoggedEntry> DB;
 

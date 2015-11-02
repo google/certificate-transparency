@@ -89,7 +89,7 @@ class FrontendSignerTest : public ::testing::Test {
   FS frontend_;
 };
 
-typedef testing::Types<FileDB, SQLiteDB<LoggedEntry>> Databases;
+typedef testing::Types<FileDB, SQLiteDB> Databases;
 
 TYPED_TEST_CASE(FrontendSignerTest, Databases);
 

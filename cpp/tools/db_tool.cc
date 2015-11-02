@@ -111,7 +111,7 @@ int main(int argc, char* argv[]) {
   unique_ptr<ReadOnlyDatabase<LoggedEntry>> db;
 
   if (!FLAGS_sqlite_db.empty()) {
-    db.reset(new SQLiteDB<LoggedEntry>(FLAGS_sqlite_db));
+    db.reset(new SQLiteDB(FLAGS_sqlite_db));
   } else if (!FLAGS_leveldb_db.empty()) {
     db.reset(new LevelDB<LoggedEntry>(FLAGS_leveldb_db));
   } else {

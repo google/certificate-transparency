@@ -159,7 +159,7 @@ int main(int argc, char* argv[]) {
       new EtcdConsistentStore<LoggedEntry>(event_base.get(), &internal_pool,
                                            &etcd_client, election.get(),
                                            "/root", node_id));
-  SQLiteDB<LoggedEntry> db("/tmp/clustertooldb");
+  SQLiteDB db("/tmp/clustertooldb");
 
 
   const string command(argv[1]);

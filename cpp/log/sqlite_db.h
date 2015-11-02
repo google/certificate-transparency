@@ -7,31 +7,31 @@
 
 #include "base/macros.h"
 #include "log/database.h"
+#include "log/logged_entry.h"
 
 struct sqlite3;
 
 namespace cert_trans {
 
 
-template <class Logged>
-class SQLiteDB : public Database<Logged> {
+class SQLiteDB : public Database<LoggedEntry> {
  public:
   explicit SQLiteDB(const std::string& dbfile);
 
   ~SQLiteDB();
 
-  typedef typename Database<Logged>::WriteResult WriteResult;
-  typedef typename Database<Logged>::LookupResult LookupResult;
+  typedef typename Database<LoggedEntry>::WriteResult WriteResult;
+  typedef typename Database<LoggedEntry>::LookupResult LookupResult;
 
-  WriteResult CreateSequencedEntry_(const Logged& logged) override;
+  WriteResult CreateSequencedEntry_(const LoggedEntry& logged) override;
 
   LookupResult LookupByHash(const std::string& hash,
-                            Logged* result) const override;
+                            LoggedEntry* result) const override;
 
   LookupResult LookupByIndex(int64_t sequence_number,
-                             Logged* result) const override;
+                             LoggedEntry* result) const override;
 
-  std::unique_ptr<typename Database<Logged>::Iterator> ScanEntries(
+  std::unique_ptr<typename Database<LoggedEntry>::Iterator> ScanEntries(
       int64_t start_index) const override;
 
   WriteResult WriteTreeHead_(const ct::SignedTreeHead& sth) override;
@@ -41,10 +41,12 @@ class SQLiteDB : public Database<Logged> {
   int64_t TreeSize() const override;
 
   void AddNotifySTHCallback(
-      const typename Database<Logged>::NotifySTHCallback* callback) override;
+      const typename Database<LoggedEntry>::NotifySTHCallback* callback)
+      override;
 
   void RemoveNotifySTHCallback(
-      const typename Database<Logged>::NotifySTHCallback* callback) override;
+      const typename Database<LoggedEntry>::NotifySTHCallback* callback)
+      override;
 
   void InitializeNode(const std::string& node_id) override;
   LookupResult NodeId(std::string* node_id) override;
@@ -58,11 +60,13 @@ class SQLiteDB : public Database<Logged> {
   class Iterator;
 
   LookupResult LookupByIndex(const std::unique_lock<std::mutex>& lock,
-                             int64_t sequence_number, Logged* result) const;
+                             int64_t sequence_number,
+                             LoggedEntry* result) const;
   // This finds the next entry with a sequence number equal or greater
   // to the one specified.
   LookupResult LookupNextIndex(const std::unique_lock<std::mutex>& lock,
-                               int64_t sequence_number, Logged* result) const;
+                               int64_t sequence_number,
+                               LoggedEntry* result) const;
   LookupResult LatestTreeHeadNoLock(const std::unique_lock<std::mutex>& lock,
                                     ct::SignedTreeHead* result) const;
   LookupResult NodeId(const std::unique_lock<std::mutex>& lock,
