@@ -1,7 +1,3 @@
-/* -*- indent-tabs-mode: nil -*- */
-#ifndef CERT_TRANS_LOG_LOG_LOOKUP_INL_H_
-#define CERT_TRANS_LOG_LOG_LOOKUP_INL_H_
-
 #include "log/log_lookup.h"
 
 #include <glog/logging.h>
@@ -216,5 +212,3 @@ int64_t LogLookup::GetIndexInternal(
 
 
 }  // namespace cert_trans
-
-#endif  // CERT_TRANS_LOG_LOG_LOOKUP_INL_H_
