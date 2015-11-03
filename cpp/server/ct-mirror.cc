@@ -232,7 +232,7 @@ static const bool follow_dummy =
 void STHUpdater(Database* db,
                 ClusterStateController<LoggedEntry>* cluster_state_controller,
                 mutex* queue_mutex, map<int64_t, ct::SignedTreeHead>* queue,
-                LogLookup<LoggedEntry>* log_lookup, Task* task) {
+                LogLookup* log_lookup, Task* task) {
   CHECK_NOTNULL(db);
   CHECK_NOTNULL(cluster_state_controller);
   CHECK_NOTNULL(queue_mutex);

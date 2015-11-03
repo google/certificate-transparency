@@ -85,7 +85,7 @@ class Server {
   MasterElection* election();
   ConsistentStore<Logged>* consistent_store();
   ClusterStateController<Logged>* cluster_state_controller();
-  LogLookup<Logged>* log_lookup();
+  LogLookup* log_lookup();
   ContinuousFetcher* continuous_fetcher();
 
   void Initialise(bool is_mirror);
@@ -107,7 +107,7 @@ class Server {
   util::SyncTask server_task_;
   StrictConsistentStore<Logged> consistent_store_;
   const std::unique_ptr<Frontend> frontend_;
-  std::unique_ptr<LogLookup<Logged>> log_lookup_;
+  std::unique_ptr<LogLookup> log_lookup_;
   std::unique_ptr<ClusterStateController<LoggedEntry>> cluster_controller_;
   std::unique_ptr<ContinuousFetcher> fetcher_;
   ThreadPool* const http_pool_;
@@ -269,7 +269,7 @@ ClusterStateController<Logged>* Server<Logged>::cluster_state_controller() {
 
 
 template <class Logged>
-LogLookup<Logged>* Server<Logged>::log_lookup() {
+LogLookup* Server<Logged>::log_lookup() {
   return log_lookup_.get();
 }
 
@@ -304,7 +304,7 @@ void Server<Logged>::Initialise(bool is_mirror) {
                                         log_verifier_, !is_mirror)
                      .release());
 
-  log_lookup_.reset(new LogLookup<LoggedEntry>(db_));
+  log_lookup_.reset(new LogLookup(db_));
 
   cluster_controller_.reset(new ClusterStateController<LoggedEntry>(
       internal_pool_, event_base_, url_fetcher_, db_, &consistent_store_,

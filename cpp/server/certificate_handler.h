@@ -15,8 +15,7 @@ class CertificateHttpHandler : public HttpHandler {
   // this instance. The |frontend| and |cert_checker| parameters can be NULL,
   // in which case this server will not accept "add-chain" and "add-pre-chain"
   // requests.
-  CertificateHttpHandler(LogLookup<LoggedEntry>* log_lookup,
-                         const ReadOnlyDatabase* db,
+  CertificateHttpHandler(LogLookup* log_lookup, const ReadOnlyDatabase* db,
                          const ClusterStateController<LoggedEntry>* controller,
                          const CertChecker* cert_checker, Frontend* frontend,
                          ThreadPool* pool, libevent::Base* event_base);

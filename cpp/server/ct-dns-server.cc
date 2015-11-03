@@ -232,7 +232,7 @@ class CTUDPDNSServer : public UDPServer {
   }
 
   string domain_;
-  LogLookup<LoggedEntry> lookup_;
+  LogLookup lookup_;
   SQLiteDB* const db_;
 };
 

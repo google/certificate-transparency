@@ -25,25 +25,22 @@ namespace cert_trans {
 static const int kCtimeBufSize = 26;
 
 
-template <class Logged>
-LogLookup<Logged>::LogLookup(ReadOnlyDatabase* db)
+LogLookup::LogLookup(ReadOnlyDatabase* db)
     : db_(CHECK_NOTNULL(db)),
       cert_tree_(new Sha256Hasher),
       latest_tree_head_(),
-      update_from_sth_cb_(std::bind(&LogLookup<Logged>::UpdateFromSTH, this,
-                                    std::placeholders::_1)) {
+      update_from_sth_cb_(
+          std::bind(&LogLookup::UpdateFromSTH, this, std::placeholders::_1)) {
   db_->AddNotifySTHCallback(&update_from_sth_cb_);
 }
 
 
-template <class Logged>
-LogLookup<Logged>::~LogLookup() {
+LogLookup::~LogLookup() {
   db_->RemoveNotifySTHCallback(&update_from_sth_cb_);
 }
 
 
-template <class Logged>
-void LogLookup<Logged>::UpdateFromSTH(const ct::SignedTreeHead& sth) {
+void LogLookup::UpdateFromSTH(const ct::SignedTreeHead& sth) {
   std::lock_guard<std::mutex> lock(lock_);
 
   CHECK_EQ(ct::V1, sth.version())
@@ -72,7 +69,7 @@ void LogLookup<Logged>::UpdateFromSTH(const ct::SignedTreeHead& sth) {
 
   for (int64_t sequence_number = cert_tree_.LeafCount();
        sequence_number < sth.tree_size(); ++sequence_number) {
-    Logged logged;
+    LoggedEntry logged;
     // TODO(ekasper): perhaps some of these errors can/should be
     // handled more gracefully. E.g. we could retry a failed update
     // a number of times -- but until we know under which conditions
@@ -107,8 +104,7 @@ void LogLookup<Logged>::UpdateFromSTH(const ct::SignedTreeHead& sth) {
 }
 
 
-template <class Logged>
-typename LogLookup<Logged>::LookupResult LogLookup<Logged>::GetIndex(
+LogLookup::LookupResult LogLookup::GetIndex(
     const std::string& merkle_leaf_hash, int64_t* index) {
   std::unique_lock<std::mutex> lock(lock_);
   const int64_t myindex(GetIndexInternal(lock, merkle_leaf_hash));
@@ -123,8 +119,7 @@ typename LogLookup<Logged>::LookupResult LogLookup<Logged>::GetIndex(
 
 
 // Look up by SHA256-hash of the certificate.
-template <class Logged>
-typename LogLookup<Logged>::LookupResult LogLookup<Logged>::AuditProof(
+LogLookup::LookupResult LogLookup::AuditProof(
     const std::string& merkle_leaf_hash, ct::MerkleAuditProof* proof) {
   std::unique_lock<std::mutex> lock(lock_);
 
@@ -152,8 +147,7 @@ typename LogLookup<Logged>::LookupResult LogLookup<Logged>::AuditProof(
 }
 
 
-template <class Logged>
-typename LogLookup<Logged>::LookupResult LogLookup<Logged>::AuditProof(
+LogLookup::LookupResult LogLookup::AuditProof(
     int64_t leaf_index, size_t tree_size, ct::ShortMerkleAuditProof* proof) {
   std::lock_guard<std::mutex> lock(lock_);
 
@@ -170,8 +164,7 @@ typename LogLookup<Logged>::LookupResult LogLookup<Logged>::AuditProof(
 
 
 // Look up by SHA256-hash of the certificate and tree size.
-template <class Logged>
-typename LogLookup<Logged>::LookupResult LogLookup<Logged>::AuditProof(
+LogLookup::LookupResult LogLookup::AuditProof(
     const std::string& merkle_leaf_hash, size_t tree_size,
     ct::ShortMerkleAuditProof* proof) {
   int64_t leaf_index;
@@ -183,15 +176,13 @@ typename LogLookup<Logged>::LookupResult LogLookup<Logged>::AuditProof(
 }
 
 
-template <class Logged>
-std::string LogLookup<Logged>::RootAtSnapshot(size_t tree_size) {
+std::string LogLookup::RootAtSnapshot(size_t tree_size) {
   std::lock_guard<std::mutex> lock(lock_);
   return cert_tree_.RootAtSnapshot(tree_size);
 }
 
 
-template <class Logged>
-std::string LogLookup<Logged>::LeafHash(const Logged& logged) const {
+std::string LogLookup::LeafHash(const LoggedEntry& logged) const {
   std::string serialized_leaf;
   CHECK(logged.SerializeForLeaf(&serialized_leaf));
   // We do not need to take the lock for this call into cert_tree_, as
@@ -200,16 +191,16 @@ std::string LogLookup<Logged>::LeafHash(const Logged& logged) const {
   return cert_tree_.LeafHash(serialized_leaf);
 }
 
-template <class Logged>
-std::unique_ptr<CompactMerkleTree> LogLookup<Logged>::GetCompactMerkleTree(
+
+std::unique_ptr<CompactMerkleTree> LogLookup::GetCompactMerkleTree(
     SerialHasher* hasher) {
   std::lock_guard<std::mutex> lock(lock_);
   return std::unique_ptr<CompactMerkleTree>(
       new CompactMerkleTree(cert_tree_, hasher));
 }
 
-template <class Logged>
-int64_t LogLookup<Logged>::GetIndexInternal(
+
+int64_t LogLookup::GetIndexInternal(
     const std::unique_lock<std::mutex>& lock,
     const std::string& merkle_leaf_hash) const {
   CHECK(lock.owns_lock());
