@@ -68,8 +68,7 @@ static Latency<milliseconds, string> http_server_request_latency_ms(
 }  // namespace
 
 
-HttpHandler::HttpHandler(LogLookup<LoggedEntry>* log_lookup,
-                         const ReadOnlyDatabase* db,
+HttpHandler::HttpHandler(LogLookup* log_lookup, const ReadOnlyDatabase* db,
                          const ClusterStateController<LoggedEntry>* controller,
                          ThreadPool* pool, libevent::Base* event_base)
     : log_lookup_(CHECK_NOTNULL(log_lookup)),
@@ -238,8 +237,7 @@ void HttpHandler::GetProof(evhttp_request* req) const {
   }
 
   ShortMerkleAuditProof proof;
-  if (log_lookup_->AuditProof(hash, tree_size, &proof) !=
-      LogLookup<LoggedEntry>::OK) {
+  if (log_lookup_->AuditProof(hash, tree_size, &proof) != LogLookup::OK) {
     return SendJsonError(event_base_, req, HTTP_BADREQUEST,
                          "Couldn't find hash.");
   }

@@ -47,7 +47,6 @@ using std::unique_ptr;
 using testing::NiceMock;
 
 typedef TreeSigner<LoggedEntry> TS;
-typedef LogLookup<LoggedEntry> LL;
 
 
 template <class T>
@@ -146,9 +145,10 @@ TYPED_TEST(LogLookupTest, Lookup) {
   MerkleAuditProof proof;
   this->UpdateTree();
 
-  LL lookup(this->db());
+  LogLookup lookup(this->db());
   // Look the new entry up.
-  EXPECT_EQ(LL::OK, lookup.AuditProof(logged_cert.merkle_leaf_hash(), &proof));
+  EXPECT_EQ(LogLookup::OK,
+            lookup.AuditProof(logged_cert.merkle_leaf_hash(), &proof));
 }
 
 
@@ -160,16 +160,16 @@ TYPED_TEST(LogLookupTest, NotFound) {
   MerkleAuditProof proof;
   this->UpdateTree();
 
-  LL lookup(this->db());
+  LogLookup lookup(this->db());
 
   // Look up using a wrong hash.
   string hash = this->test_signer_.UniqueHash();
-  EXPECT_EQ(LL::NOT_FOUND, lookup.AuditProof(hash, &proof));
+  EXPECT_EQ(LogLookup::NOT_FOUND, lookup.AuditProof(hash, &proof));
 }
 
 
 TYPED_TEST(LogLookupTest, Update) {
-  LL lookup(this->db());
+  LogLookup lookup(this->db());
   LoggedEntry logged_cert;
   this->test_signer_.CreateUnique(&logged_cert);
   this->CreateSequencedEntry(&logged_cert, 0);
@@ -178,7 +178,8 @@ TYPED_TEST(LogLookupTest, Update) {
   this->UpdateTree();
 
   // Look the new entry up.
-  EXPECT_EQ(LL::OK, lookup.AuditProof(logged_cert.merkle_leaf_hash(), &proof));
+  EXPECT_EQ(LogLookup::OK,
+            lookup.AuditProof(logged_cert.merkle_leaf_hash(), &proof));
 }
 
 
@@ -192,9 +193,10 @@ TYPED_TEST(LogLookupTest, Verify) {
   MerkleAuditProof proof;
   this->UpdateTree();
 
-  LL lookup(this->db());
+  LogLookup lookup(this->db());
   // Look the new entry up.
-  EXPECT_EQ(LL::OK, lookup.AuditProof(logged_cert.merkle_leaf_hash(), &proof));
+  EXPECT_EQ(LogLookup::OK,
+            lookup.AuditProof(logged_cert.merkle_leaf_hash(), &proof));
   EXPECT_EQ(LogVerifier::VERIFY_OK,
             this->verifier_.VerifyMerkleAuditProof(logged_cert.entry(),
                                                    logged_cert.sct(), proof));
@@ -213,11 +215,11 @@ TYPED_TEST(LogLookupTest, VerifyWithPath) {
 
   this->UpdateTree();
 
-  LL lookup(this->db());
+  LogLookup lookup(this->db());
   MerkleAuditProof proof;
 
   for (int i = 0; i < 13; ++i) {
-    EXPECT_EQ(LL::OK,
+    EXPECT_EQ(LogLookup::OK,
               lookup.AuditProof(logged_certs[i].merkle_leaf_hash(), &proof));
     EXPECT_EQ(LogVerifier::VERIFY_OK,
               this->verifier_.VerifyMerkleAuditProof(logged_certs[i].entry(),

@@ -18,7 +18,6 @@ namespace cert_trans {
 
 // Lookups into the database. Read-only, so could also be a mirror.
 // Keeps the entire Merkle Tree in memory to serve audit proofs.
-template <class Logged>
 class LogLookup {
  public:
   // The constructor loads the content from the database.
@@ -60,7 +59,7 @@ class LogLookup {
 
   std::string RootAtSnapshot(size_t tree_size);
 
-  std::string LeafHash(const Logged& logged) const;
+  std::string LeafHash(const LoggedEntry& logged) const;
 
   // Creates a CompactMerkleTree based on the current state of our MerkleTree.
   // Takes ownership of |hasher|.

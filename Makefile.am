@@ -143,7 +143,7 @@ cpp_libcore_a_SOURCES = \
 	cpp/log/frontend.cc \
 	cpp/log/frontend_signer.cc \
 	cpp/log/leveldb_db.cc \
-	cpp/log/log_lookup_cert.cc \
+	cpp/log/log_lookup.cc \
 	cpp/log/log_signer.cc \
 	cpp/log/log_verifier.cc \
 	cpp/log/logged_entry.cc \

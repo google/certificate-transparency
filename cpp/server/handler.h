@@ -19,7 +19,6 @@ class CertChain;
 class CertChecker;
 template <class T>
 class ClusterStateController;
-template <class T>
 class LogLookup;
 class LoggedEntry;
 class PreCertChain;
@@ -32,7 +31,7 @@ class HttpHandler {
  public:
   // Does not take ownership of its parameters, which must outlive
   // this instance.
-  HttpHandler(LogLookup<LoggedEntry>* log_lookup, const ReadOnlyDatabase* db,
+  HttpHandler(LogLookup* log_lookup, const ReadOnlyDatabase* db,
               const ClusterStateController<LoggedEntry>* controller,
               ThreadPool* pool, libevent::Base* event_base);
   virtual ~HttpHandler();
@@ -67,7 +66,7 @@ class HttpHandler {
   bool IsNodeStale() const;
   void UpdateNodeStaleness();
 
-  LogLookup<LoggedEntry>* const log_lookup_;
+  LogLookup* const log_lookup_;
   const ReadOnlyDatabase* const db_;
   const ClusterStateController<LoggedEntry>* const controller_;
   Proxy* proxy_;
