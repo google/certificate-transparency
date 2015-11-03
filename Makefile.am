@@ -51,7 +51,6 @@ endif
 
 noinst_LIBRARIES = \
 	cpp/libcore.a \
-	cpp/libserver.a \
 	cpp/libtest.a
 
 check_PROGRAMS = \
@@ -129,6 +128,7 @@ cpp_libcore_a_SOURCES = \
 	cpp/fetcher/fetcher.cc \
 	cpp/fetcher/peer.cc \
 	cpp/fetcher/peer_group.cc \
+	cpp/fetcher/remote_peer.cc \
 	cpp/log/cert.cc \
 	cpp/log/cert_checker.cc \
 	cpp/log/cert_submission_handler.cc \
@@ -167,42 +167,33 @@ cpp_libcore_a_SOURCES = \
 	cpp/net/connection_pool.cc \
 	cpp/net/url.cc \
 	cpp/net/url_fetcher.cc \
+	cpp/proto/serializer.cc \
+	cpp/server/metrics.cc \
+	cpp/server/proxy.cc \
 	cpp/third_party/curl/hostcheck.c \
 	cpp/third_party/isec_partners/openssl_hostname_validation.c \
 	cpp/util/etcd.cc \
 	cpp/util/etcd_delete.cc \
 	cpp/util/fake_etcd.cc \
+	cpp/util/init.cc \
+	cpp/util/json_wrapper.cc \
+	cpp/util/libevent_wrapper.cc \
 	cpp/util/masterelection.cc \
 	cpp/util/openssl_util.cc \
+	cpp/util/periodic_closure.cc \
+	cpp/util/protobuf_util.cc \
+	cpp/util/protobuf_util.h \
+	cpp/util/read_key.cc \
 	cpp/util/status.cc \
 	cpp/util/sync_task.cc \
 	cpp/util/task.cc \
 	cpp/util/thread_pool.cc \
 	cpp/util/thread_pool.h \
 	cpp/util/util.cc \
+	cpp/util/uuid.cc \
+	cpp/version.cc \
 	proto/ct.pb.cc \
 	proto/ct.pb.h
-
-cpp_libserver_a_SOURCES = \
-	cpp/fetcher/remote_peer.cc \
-	cpp/monitoring/monitoring.cc \
-	cpp/monitoring/prometheus/exporter.cc \
-	cpp/monitoring/prometheus/metrics.pb.cc \
-	cpp/monitoring/prometheus/metrics.pb.h \
-	cpp/monitoring/registry.cc \
-	cpp/proto/serializer.cc \
-	cpp/server/metrics.cc \
-	cpp/server/proxy.cc \
-	cpp/util/init.cc \
-	cpp/util/json_wrapper.cc \
-	cpp/util/libevent_wrapper.cc \
-	cpp/util/periodic_closure.cc \
-	cpp/util/protobuf_util.cc \
-	cpp/util/protobuf_util.h \
-	cpp/util/read_key.cc \
-	cpp/util/util.cc \
-	cpp/util/uuid.cc \
-	cpp/version.cc
 
 cpp_libtest_a_CPPFLAGS = \
 	-I$(GMOCK_DIR) \
@@ -215,7 +206,6 @@ cpp_libtest_a_SOURCES = \
 
 cpp_server_ct_mirror_LDADD = \
 	cpp/libcore.a \
-	cpp/libserver.a \
 	$(json_c_LIBS) \
 	$(libevent_LIBS) \
 	$(leveldb_LIBS) \
@@ -229,7 +219,6 @@ cpp_server_ct_mirror_SOURCES = \
 
 cpp_server_ct_server_LDADD = \
 	cpp/libcore.a \
-	cpp/libserver.a \
 	$(json_c_LIBS) \
 	$(libevent_LIBS) \
 	$(leveldb_LIBS) \
@@ -243,7 +232,6 @@ cpp_server_ct_server_SOURCES = \
 
 cpp_server_xjson_server_LDADD = \
 	cpp/libcore.a \
-	cpp/libserver.a \
 	$(json_c_LIBS) \
 	$(libevent_LIBS) \
 	$(leveldb_LIBS) \
