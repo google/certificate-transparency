@@ -338,7 +338,7 @@ int main(int argc, char* argv[]) {
 
   util::InitCT(&argc, &argv);
 
-  Server<LoggedEntry>::StaticInit();
+  Server::StaticInit();
 
   util::StatusOr<EVP_PKEY*> pkey(ReadPrivateKey(FLAGS_key));
   CHECK_EQ(pkey.status(), util::Status::OK);
@@ -393,16 +393,15 @@ int main(int argc, char* argv[]) {
   const LogVerifier log_verifier(new LogSigVerifier(pkey.ValueOrDie()),
                                  new MerkleVerifier(new Sha256Hasher));
 
-  Server<LoggedEntry>::Options options;
+  Server::Options options;
   options.server = FLAGS_server;
   options.port = FLAGS_port;
   options.etcd_root = FLAGS_etcd_root;
 
   ThreadPool http_pool(FLAGS_num_http_server_threads);
 
-  Server<LoggedEntry> server(options, event_base, &internal_pool, &http_pool,
-                             db, etcd_client.get(), &url_fetcher, &log_signer,
-                             &log_verifier);
+  Server server(options, event_base, &internal_pool, &http_pool, db,
+                etcd_client.get(), &url_fetcher, &log_signer, &log_verifier);
   server.Initialise(false /* is_mirror */);
 
   Frontend frontend(
@@ -467,8 +466,7 @@ int main(int argc, char* argv[]) {
   // TODO(pphaneuf): We should be remaining in an "unhealthy state"
   // (either not accepting any requests, or returning some internal
   // server error) until we have an STH to serve.
-  const function<bool()> is_master(
-      bind(&Server<LoggedEntry>::IsMaster, &server));
+  const function<bool()> is_master(bind(&Server::IsMaster, &server));
   thread sequencer(&SequenceEntries, &tree_signer, is_master);
   thread cleanup(&CleanUpEntries, server.consistent_store(), is_master);
   thread signer(&SignMerkleTree, &tree_signer, server.consistent_store(),

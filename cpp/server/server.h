@@ -21,6 +21,7 @@
 #include "log/leveldb_db.h"
 #include "log/log_lookup.h"
 #include "log/log_signer.h"
+#include "log/logged_entry.h"
 #include "log/sqlite_db.h"
 #include "log/tree_signer.h"
 #include "monitoring/gcm/exporter.h"
@@ -54,7 +55,6 @@ Gauge<>* latest_local_tree_size_gauge =
                  "Size of latest locally generated STH.");
 
 
-template <class Logged>
 class Server {
  public:
   struct Options {
@@ -83,8 +83,8 @@ class Server {
 
   bool IsMaster() const;
   MasterElection* election();
-  ConsistentStore<Logged>* consistent_store();
-  ClusterStateController<Logged>* cluster_state_controller();
+  ConsistentStore<LoggedEntry>* consistent_store();
+  ClusterStateController<LoggedEntry>* cluster_state_controller();
   LogLookup* log_lookup();
   ContinuousFetcher* continuous_fetcher();
 
@@ -105,7 +105,7 @@ class Server {
   MasterElection election_;
   ThreadPool* const internal_pool_;
   util::SyncTask server_task_;
-  StrictConsistentStore<Logged> consistent_store_;
+  StrictConsistentStore<LoggedEntry> consistent_store_;
   const std::unique_ptr<Frontend> frontend_;
   std::unique_ptr<LogLookup> log_lookup_;
   std::unique_ptr<ClusterStateController<LoggedEntry>> cluster_controller_;
@@ -177,19 +177,16 @@ std::string GetNodeId(Database* db) {
 
 
 // static
-template <class Logged>
-void Server<Logged>::StaticInit() {
+void Server::StaticInit() {
   CHECK_NE(SIG_ERR, std::signal(SIGALRM, &WatchdogTimeout));
 }
 
 
-template <class Logged>
-Server<Logged>::Server(const Options& opts,
-                       const std::shared_ptr<libevent::Base>& event_base,
-                       ThreadPool* internal_pool, ThreadPool* http_pool,
-                       Database* db, EtcdClient* etcd_client,
-                       UrlFetcher* url_fetcher, LogSigner* log_signer,
-                       const LogVerifier* log_verifier)
+Server::Server(const Options& opts,
+               const std::shared_ptr<libevent::Base>& event_base,
+               ThreadPool* internal_pool, ThreadPool* http_pool, Database* db,
+               EtcdClient* etcd_client, UrlFetcher* url_fetcher,
+               LogSigner* log_signer, const LogVerifier* log_verifier)
     : options_(opts),
       event_base_(event_base),
       event_pump_(new libevent::EventPumpThread(event_base_)),
@@ -227,16 +224,14 @@ Server<Logged>::Server(const Options& opts,
 }
 
 
-template <class Logged>
-Server<Logged>::~Server() {
+Server::~Server() {
   server_task_.Cancel();
   node_refresh_thread_->join();
   server_task_.Wait();
 }
 
 
-template <class Logged>
-void Server<Logged>::RegisterHandler(HttpHandler* handler) {
+void Server::RegisterHandler(HttpHandler* handler) {
   CHECK_NOTNULL(handler);
   // Configure the handler to use our JSON output and proxy instances:
   handler->SetProxy(proxy_.get());
@@ -244,44 +239,37 @@ void Server<Logged>::RegisterHandler(HttpHandler* handler) {
 }
 
 
-template <class Logged>
-bool Server<Logged>::IsMaster() const {
+bool Server::IsMaster() const {
   return election_.IsMaster();
 }
 
 
-template <class Logged>
-MasterElection* Server<Logged>::election() {
+MasterElection* Server::election() {
   return &election_;
 }
 
 
-template <class Logged>
-ConsistentStore<Logged>* Server<Logged>::consistent_store() {
+ConsistentStore<LoggedEntry>* Server::consistent_store() {
   return &consistent_store_;
 }
 
 
-template <class Logged>
-ClusterStateController<Logged>* Server<Logged>::cluster_state_controller() {
+ClusterStateController<LoggedEntry>* Server::cluster_state_controller() {
   return cluster_controller_.get();
 }
 
 
-template <class Logged>
-LogLookup* Server<Logged>::log_lookup() {
+LogLookup* Server::log_lookup() {
   return log_lookup_.get();
 }
 
 
-template <class Logged>
-ContinuousFetcher* Server<Logged>::continuous_fetcher() {
+ContinuousFetcher* Server::continuous_fetcher() {
   return fetcher_.get();
 }
 
 
-template <class Logged>
-void Server<Logged>::WaitForReplication() const {
+void Server::WaitForReplication() const {
   // If we're joining an existing cluster, this node needs to get its database
   // up-to-date with the serving_sth before we can do anything, so we'll wait
   // here for that:
@@ -298,8 +286,7 @@ void Server<Logged>::WaitForReplication() const {
 }
 
 
-template <class Logged>
-void Server<Logged>::Initialise(bool is_mirror) {
+void Server::Initialise(bool is_mirror) {
   fetcher_.reset(ContinuousFetcher::New(event_base_.get(), internal_pool_, db_,
                                         log_verifier_, !is_mirror)
                      .release());
@@ -337,8 +324,7 @@ void Server<Logged>::Initialise(bool is_mirror) {
 }
 
 
-template <class Logged>
-void Server<Logged>::Run() {
+void Server::Run() {
   // Ding the temporary event pump because we're about to enter the event loop
   event_pump_.reset();
   event_base_->Dispatch();

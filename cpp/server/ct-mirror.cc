@@ -328,7 +328,7 @@ int main(int argc, char* argv[]) {
 
   util::InitCT(&argc, &argv);
 
-  Server<LoggedEntry>::StaticInit();
+  Server::StaticInit();
 
   if (!FLAGS_sqlite_db.empty() + !FLAGS_leveldb_db.empty() +
           (!FLAGS_cert_dir.empty() | !FLAGS_tree_dir.empty()) !=
@@ -373,16 +373,16 @@ int main(int argc, char* argv[]) {
   const LogVerifier log_verifier(new LogSigVerifier(pubkey.ValueOrDie()),
                                  new MerkleVerifier(new Sha256Hasher));
 
-  Server<LoggedEntry>::Options options;
+  Server::Options options;
   options.server = FLAGS_server;
   options.port = FLAGS_port;
   options.etcd_root = FLAGS_etcd_root;
 
   ThreadPool http_pool(FLAGS_num_http_server_threads);
 
-  Server<LoggedEntry> server(options, event_base, &internal_pool, &http_pool,
-                             db, etcd_client.get(), &url_fetcher,
-                             nullptr /* log_signer */, &log_verifier);
+  Server server(options, event_base, &internal_pool, &http_pool, db,
+                etcd_client.get(), &url_fetcher, nullptr /* log_signer */,
+                &log_verifier);
   server.Initialise(true /* is_mirror */);
 
   CertificateHttpHandler handler(server.log_lookup(), db,
