@@ -298,9 +298,7 @@ int main(int argc, char* argv[]) {
     std::cerr << "Must specify database.";
     exit(1);
   }
-  Database* db;
-
-  db = new LevelDB(FLAGS_leveldb_db);
+  LevelDB db(FLAGS_leveldb_db);
 
   shared_ptr<libevent::Base> event_base(make_shared<libevent::Base>());
   ThreadPool internal_pool(8);
@@ -329,20 +327,20 @@ int main(int argc, char* argv[]) {
 
   ThreadPool http_pool(FLAGS_num_http_server_threads);
 
-  Server server(options, event_base, &internal_pool, &http_pool, db,
+  Server server(options, event_base, &internal_pool, &http_pool, &db,
                 etcd_client.get(), &url_fetcher, &log_signer, &log_verifier);
   server.Initialise(false /* is_mirror */);
 
   Frontend frontend(
-      new FrontendSigner(db, server.consistent_store(), &log_signer));
-  XJsonHttpHandler handler(server.log_lookup(), db,
+      new FrontendSigner(&db, server.consistent_store(), &log_signer));
+  XJsonHttpHandler handler(server.log_lookup(), &db,
                            server.cluster_state_controller(), &frontend,
                            &internal_pool, event_base.get());
 
   server.RegisterHandler(&handler);
 
   TreeSigner<LoggedEntry> tree_signer(
-      std::chrono::duration<double>(FLAGS_guard_window_seconds), db,
+      std::chrono::duration<double>(FLAGS_guard_window_seconds), &db,
       server.log_lookup()->GetCompactMerkleTree(new Sha256Hasher),
       server.consistent_store(), &log_signer);
 
