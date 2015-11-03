@@ -105,9 +105,7 @@ script:
  - ant build test
  - ${MAKE} -C python test
  - |
-   if [ "$TRAVIS_OS_NAME" != "osx" ]; then
-     pushd ${GOPATH}
-     LD_LIBRARY_PATH=${INSTALL_DIR}/lib CGO_CPPFLAGS="-I${INSTALL_DIR}/include" CGO_LDFLAGS="-L${INSTALL_DIR}/lib -lunwind -lglog -lgflags" go test -v ./src/github.com/google/certificate-transparency/...
+   pushd ${GOPATH}
+   CGO_CPPFLAGS="-I${INSTALL_DIR}/include" CGO_LDFLAGS="-L${INSTALL_DIR}/lib" go test -v ./src/github.com/google/certificate-transparency/...
    popd
-   fi
 
