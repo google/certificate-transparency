@@ -60,12 +60,14 @@ gclient config --name="certificate-transparency" https://github.com/google/certi
 When you issue the `gclient sync` command you may need to set compiler options
 in order to build successfully. If the build fails to work try using:
 
-```CXXFLAGS="-O2 -Wno-error=unused-variable" gclient sync
+```bash
+CXXFLAGS="-O2 -Wno-error=unused-variable" gclient sync
 ```
 
 If this gives an error about an unused typedef in a `glog` header file try this:
 
-```CXXFLAGS="-O2 -Wno-error=unused-variable -Wno-error=unused-local-typedefs" gclient sync
+```bash
+CXXFLAGS="-O2 -Wno-error=unused-variable -Wno-error=unused-local-typedefs" gclient sync
 ```
 
 When changing `CXXFLAGS` it's safer to remove the existing build directories
