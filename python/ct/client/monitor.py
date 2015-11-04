@@ -51,14 +51,12 @@ class Monitor(object):
         self._unverified_tree.load(self.__state.unverified_tree)
 
     def __repr__(self):
-        return "%r(%r, %r, %r, %r)" % (self.__class__.__name__, self.__client,
-                                       self.__verifier, self.__db,
-                                       self.__state_file)
+        return "%r(%r, %r, %r)" % (self.__class__.__name__, self.__client,
+                                   self.__verifier, self.__db)
 
     def __str__(self):
-        return "%s(%s, %s, %s, %s)" % (self.__class__.__name__, self.__client,
-                                       self.__verifier, self.__db,
-                                       self.__state_file)
+        return "%s(%s, %s, %s)" % (self.__class__.__name__, self.__client,
+                                   self.__verifier, self.__db)
 
     def __update_state(self, new_state):
         """Update state and write to disk."""
