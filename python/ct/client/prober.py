@@ -51,8 +51,10 @@ class ProberThread(threading.Thread):
             self.__monitors.append(monitor.Monitor(client, verifier, hasher, db,
                                                    cert_db, log_key,
                                                    state_keeper))
+
         self.__last_update_start_time = 0
         self.__stopped = False
+        self.__called_later = None
 
     def __repr__(self):
        return "%r(%r)" % (self.__class__.__name__, self.__monitors)
@@ -60,8 +62,8 @@ class ProberThread(threading.Thread):
     def __str__(self):
        return "%s(%s)" % (self.__class__.__name__, self.__monitors)
 
-    def _log_probed_callback(self, succeded, monitor):
-        if succeded:
+    def _log_probed_callback(self, success, monitor):
+        if success:
             logging.info("Data for %s updated: latest timestamp is %s" %
                          (monitor.servername,
                           time.strftime("%c", time.localtime(
@@ -81,21 +83,40 @@ class ProberThread(threading.Thread):
         sleep_time = max(0, self.__start_time +
                          FLAGS.probe_frequency_secs - time.time())
         logging.info("Next probe loop in: %d seconds" % sleep_time)
-        reactor.callLater(sleep_time, self.probe_all_logs)
+        self.__called_later = reactor.callLater(sleep_time,
+                                                self.probe_all_logs)
 
+
+    def _has_outstanding_call_later(self):
+        return self.__called_later and self.__called_later.active()
 
     def probe_all_logs(self):
-        logging.info("Starting probe loop")
+        logging.info("Starting probe loop...")
+        self.__called_later = None
         self.__start_time = time.time()
         self.__probed = 0
         """Loop through all logs in the list and check for updates."""
-        for monitor_ in self.__monitors:
-            monitor_result = monitor_.update()
-            monitor_result.addCallback(self._log_probed_callback, monitor_)
+        if self.__monitors:
+            for monitor_ in self.__monitors:
+                monitor_result = monitor_.update()
+                monitor_result.addCallback(self._log_probed_callback, monitor_)
+                # TODO(hadfieldp): do we need an errback too?
+        else:
+            # If we're configured with no monitors we still need to behave
+            # correctly in order for the reactor to be stoppable.
+            self._all_logs_probed()
+        logging.info("Done starting probe loop.")
 
     def run(self):
-        reactor.callLater(0, self.probe_all_logs)
+        logging.info("Running reactor...")
+        self.__called_later = reactor.callLater(0, self.probe_all_logs)
         reactor.run(installSignalHandlers=0)
+        logging.info("Reactor no longer running.")
 
     def stop(self):
+        logging.info("Stopping reactor...")
+        if self._has_outstanding_call_later():
+            self.__called_later.cancel()
+            self.__called_later = None
         reactor.stop()
+        logging.info("Reactor stopped.")
