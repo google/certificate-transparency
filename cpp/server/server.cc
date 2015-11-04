@@ -19,6 +19,14 @@
 #include "util/uuid.h"
 
 using std::bind;
+using std::chrono::seconds;
+using std::chrono::steady_clock;
+using std::placeholders::_1;
+using std::shared_ptr;
+using std::signal;
+using std::string;
+using std::this_thread::sleep_for;
+using std::thread;
 
 DEFINE_int32(node_state_refresh_seconds, 10,
              "How often to refresh the ClusterNodeState entry for this node.");
@@ -44,10 +52,9 @@ namespace {
 void RefreshNodeState(ClusterStateController<LoggedEntry>* controller,
                       util::Task* task) {
   CHECK_NOTNULL(task);
-  const std::chrono::steady_clock::duration period(
-      (std::chrono::seconds(FLAGS_node_state_refresh_seconds)));
-  std::chrono::steady_clock::time_point target_run_time(
-      std::chrono::steady_clock::now());
+  const steady_clock::duration period(
+      (seconds(FLAGS_node_state_refresh_seconds)));
+  steady_clock::time_point target_run_time(steady_clock::now());
 
   while (true) {
     if (task->CancelRequested()) {
@@ -60,12 +67,11 @@ void RefreshNodeState(ClusterStateController<LoggedEntry>* controller,
 
     controller->RefreshNodeState();
 
-    const std::chrono::steady_clock::time_point now(
-        std::chrono::steady_clock::now());
+    const steady_clock::time_point now(steady_clock::now());
     while (target_run_time <= now) {
       target_run_time += period;
     }
-    std::this_thread::sleep_for(target_run_time - now);
+    sleep_for(target_run_time - now);
   }
 }
 
@@ -79,10 +85,10 @@ void WatchdogTimeout(int) {
 }
 
 
-std::string GetNodeId(Database* db) {
-  std::string node_id;
+string GetNodeId(Database* db) {
+  string node_id;
   if (db->NodeId(&node_id) != Database::LOOKUP_OK) {
-    node_id = cert_trans::UUID4();
+    node_id = UUID4();
     LOG(INFO) << "Initializing Node DB with UUID: " << node_id;
     db->InitializeNode(node_id);
   } else {
@@ -97,12 +103,12 @@ std::string GetNodeId(Database* db) {
 
 // static
 void Server::StaticInit() {
-  CHECK_NE(SIG_ERR, std::signal(SIGALRM, &WatchdogTimeout));
+  CHECK_NE(SIG_ERR, signal(SIGALRM, &WatchdogTimeout));
 }
 
 
 Server::Server(const Options& opts,
-               const std::shared_ptr<libevent::Base>& event_base,
+               const shared_ptr<libevent::Base>& event_base,
                ThreadPool* internal_pool, ThreadPool* http_pool, Database* db,
                EtcdClient* etcd_client, UrlFetcher* url_fetcher,
                const LogVerifier* log_verifier)
@@ -128,9 +134,7 @@ Server::Server(const Options& opts,
   CHECK_LT(0, options_.num_http_server_threads);
 
   if (FLAGS_monitoring == kPrometheus) {
-    http_server_.AddHandler("/metrics",
-                            bind(&cert_trans::ExportPrometheusMetrics,
-                                 std::placeholders::_1));
+    http_server_.AddHandler("/metrics", bind(&ExportPrometheusMetrics, _1));
   } else if (FLAGS_monitoring == kGcm) {
     gcm_exporter_.reset(
         new GCMExporter(options_.server, url_fetcher_, internal_pool_));
@@ -231,9 +235,9 @@ void Server::Initialise(bool is_mirror) {
     }
   }
 
-  node_refresh_thread_.reset(new std::thread(&RefreshNodeState,
-                                             cluster_controller_.get(),
-                                             server_task_.task()));
+  node_refresh_thread_.reset(new thread(&RefreshNodeState,
+                                        cluster_controller_.get(),
+                                        server_task_.task()));
 
   proxy_.reset(
       new Proxy(event_base_.get(),
