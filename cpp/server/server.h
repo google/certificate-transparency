@@ -69,7 +69,7 @@ class Server {
          const std::shared_ptr<libevent::Base>& event_base,
          ThreadPool* internal_pool, ThreadPool* http_pool, Database* db,
          EtcdClient* etcd_client, UrlFetcher* url_fetcher,
-         LogSigner* log_signer, const LogVerifier* log_verifier);
+         const LogVerifier* log_verifier);
   ~Server();
 
   void RegisterHandler(HttpHandler* handler);

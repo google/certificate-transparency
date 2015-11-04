@@ -381,8 +381,7 @@ int main(int argc, char* argv[]) {
   ThreadPool http_pool(FLAGS_num_http_server_threads);
 
   Server server(options, event_base, &internal_pool, &http_pool, db,
-                etcd_client.get(), &url_fetcher, nullptr /* log_signer */,
-                &log_verifier);
+                etcd_client.get(), &url_fetcher, &log_verifier);
   server.Initialise(true /* is_mirror */);
 
   CertificateHttpHandler handler(server.log_lookup(), db,
