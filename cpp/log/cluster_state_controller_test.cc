@@ -379,7 +379,7 @@ TEST_F(ClusterStateControllerTest, TestUsesLargestSTHWithIdenticalTimestamp) {
   cns3.mutable_newest_sth()->set_timestamp(1004);
   cns3.mutable_newest_sth()->set_tree_size(999);
   store3_->SetClusterNodeState(cns3);
-  sleep(1);
+  sleep(2);
 
   util::StatusOr<SignedTreeHead> sth(controller50.GetCalculatedServingSTH());
   EXPECT_EQ(cns2.newest_sth().tree_size(), sth.ValueOrDie().tree_size());
