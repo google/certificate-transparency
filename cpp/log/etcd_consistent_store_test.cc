@@ -13,6 +13,7 @@
 #include <unordered_set>
 
 #include "log/logged_entry.h"
+#include "monitoring/registry.h"
 #include "proto/ct.pb.h"
 #include "util/fake_etcd.h"
 #include "util/libevent_wrapper.h"
@@ -33,8 +34,10 @@ using ct::SignedTreeHead;
 using std::atomic;
 using std::bind;
 using std::chrono::milliseconds;
+using std::lock_guard;
 using std::make_pair;
 using std::make_shared;
+using std::mutex;
 using std::ostringstream;
 using std::pair;
 using std::placeholders::_1;
@@ -74,6 +77,7 @@ class EtcdConsistentStoreTest : public ::testing::Test {
 
  protected:
   void SetUp() override {
+    Registry::Instance()->ResetForTestingOnly();
     FLAGS_etcd_stats_collection_interval_seconds = 1;
     store_.reset(new EtcdConsistentStore<LoggedEntry>(base_.get(), &executor_,
                                                       &client_, &election_,
@@ -561,9 +565,16 @@ TEST_F(EtcdConsistentStoreTest, WatchServingSTH) {
   sth.set_timestamp(234234);
 
   SyncTask task(&executor_);
+  mutex mutex;
+  int call_count(0);
   store_->WatchServingSTH(
-      [&sth, &notify](const Update<ct::SignedTreeHead>& update) {
-        static int call_count(0);
+      [&sth, &notify, &call_count,
+       &mutex](const Update<ct::SignedTreeHead>& update) {
+        lock_guard<std::mutex> lock(mutex);
+        ASSERT_LE(call_count, 2) << "Extra update: key:" << update.handle_.Key() << "@"
+            << update.handle_.Handle()
+            << " exists:" << update.exists_
+            << " entry: " << update.handle_.Entry().DebugString();
         switch (call_count) {
           case 0:
             // initial empty state
@@ -575,8 +586,6 @@ TEST_F(EtcdConsistentStoreTest, WatchServingSTH) {
             EXPECT_EQ(sth.DebugString(), update.handle_.Entry().DebugString());
             notify.Notify();
             break;
-          default:
-            CHECK(false);
         }
         ++call_count;
       },
