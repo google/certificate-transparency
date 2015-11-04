@@ -1,48 +1,39 @@
 #ifndef CERT_TRANS_SERVER_SERVER_H_
 #define CERT_TRANS_SERVER_SERVER_H_
 
-#include <chrono>
-#include <csignal>
-#include <cstring>
-#include <functional>
-#include <gflags/gflags.h>
-#include <iostream>
 #include <memory>
-#include <mutex>
-#include <openssl/crypto.h>
+#include <stdint.h>
+#include <string>
+#include <thread>
 
-#include "config.h"
-#include "log/cert_submission_handler.h"
-#include "log/ct_extensions.h"
-#include "log/file_db.h"
-#include "log/file_storage.h"
-#include "log/frontend.h"
-#include "log/frontend_signer.h"
-#include "log/leveldb_db.h"
-#include "log/log_lookup.h"
-#include "log/log_signer.h"
-#include "log/log_verifier.h"
-#include "log/logged_entry.h"
-#include "log/sqlite_db.h"
+#include "base/macros.h"
 #include "log/strict_consistent_store.h"
-#include "log/tree_signer.h"
-#include "monitoring/gcm/exporter.h"
-#include "monitoring/latency.h"
-#include "monitoring/monitoring.h"
-#include "monitoring/registry.h"
-#include "server/handler.h"
-#include "server/json_output.h"
-#include "server/metrics.h"
-#include "server/proxy.h"
-#include "util/etcd.h"
-#include "util/periodic_closure.h"
-#include "util/read_key.h"
-#include "util/status.h"
-#include "util/thread_pool.h"
-#include "util/uuid.h"
+#include "monitoring/gauge.h"
+#include "util/libevent_wrapper.h"
+#include "util/masterelection.h"
+#include "util/sync_task.h"
+
+class Frontend;
+class LogVerifier;
 
 namespace cert_trans {
 
+template <class Logged>
+class ClusterStateController;
+// TODO(pphaneuf): Not needed?
+template <class Logged>
+class ConsistentStore;
+class ContinuousFetcher;
+class Database;
+class EtcdClient;
+class GCMExporter;
+class HttpHandler;
+class LogLookup;
+class LogSigner;
+class LoggedEntry;
+class Proxy;
+class ThreadPool;
+class UrlFetcher;
 
 // Size of latest locally generated STH.
 Gauge<>* latest_local_tree_size_gauge();

@@ -9,7 +9,6 @@
 #include <string>
 #include <unistd.h>
 
-
 #include "config.h"
 #include "log/cert_checker.h"
 #include "log/cert_submission_handler.h"
@@ -17,7 +16,10 @@
 #include "log/etcd_consistent_store.h"
 #include "log/file_db.h"
 #include "log/file_storage.h"
+#include "log/frontend_signer.h"
+#include "log/frontend.h"
 #include "log/leveldb_db.h"
+#include "log/log_lookup.h"
 #include "log/log_signer.h"
 #include "log/log_verifier.h"
 #include "log/sqlite_db.h"

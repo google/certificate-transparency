@@ -1,5 +1,23 @@
 #include "server/server.h"
 
+#include <chrono>
+#include <csignal>
+#include <functional>
+#include <gflags/gflags.h>
+
+#include "log/frontend.h"
+#include "server/proxy.h"
+#include "monitoring/gcm/exporter.h"
+#include "log/log_lookup.h"
+#include "log/log_verifier.h"
+#include "server/metrics.h"
+#include "log/cluster_state_controller.h"
+#include "log/etcd_consistent_store.h"
+#include "monitoring/monitoring.h"
+#include "server/handler.h"
+#include "util/thread_pool.h"
+#include "util/uuid.h"
+
 using std::bind;
 
 DEFINE_int32(node_state_refresh_seconds, 10,

@@ -16,11 +16,11 @@
 #include <string>
 #include <unistd.h>
 
-#include "config.h"
 #include "client/async_log_client.h"
+#include "config.h"
 #include "fetcher/continuous_fetcher.h"
-#include "fetcher/remote_peer.h"
 #include "fetcher/peer_group.h"
+#include "fetcher/remote_peer.h"
 #include "log/cluster_state_controller.h"
 #include "log/ct_extensions.h"
 #include "log/database.h"
@@ -28,6 +28,7 @@
 #include "log/file_db.h"
 #include "log/file_storage.h"
 #include "log/leveldb_db.h"
+#include "log/log_lookup.h"
 #include "log/sqlite_db.h"
 #include "log/strict_consistent_store.h"
 #include "merkletree/compact_merkle_tree.h"
