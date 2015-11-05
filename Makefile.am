@@ -215,8 +215,9 @@ cpp_server_ct_mirror_SOURCES = \
   cpp/client/async_log_client.cc \
 	cpp/server/ct-mirror.cc \
 	cpp/server/certificate_handler.cc \
+	cpp/server/handler.cc \
 	cpp/server/json_output.cc \
-	cpp/server/handler.cc
+	cpp/server/server_helper.cc
 
 cpp_server_ct_server_LDADD = \
 	cpp/libcore.a \
@@ -228,8 +229,9 @@ cpp_server_ct_server_SOURCES = \
   cpp/client/async_log_client.cc \
 	cpp/server/ct-server.cc \
 	cpp/server/certificate_handler.cc \
+	cpp/server/handler.cc \
 	cpp/server/json_output.cc \
-	cpp/server/handler.cc
+	cpp/server/server_helper.cc
 
 cpp_server_xjson_server_LDADD = \
 	cpp/libcore.a \
@@ -241,6 +243,7 @@ cpp_server_xjson_server_SOURCES = \
   cpp/client/async_log_client.cc \
 	cpp/server/handler.cc \
 	cpp/server/json_output.cc \
+	cpp/server/server_helper.cc \
 	cpp/server/xjson-server.cc \
 	cpp/server/x_json_handler.cc \
 	cpp/util/json_wrapper.cc

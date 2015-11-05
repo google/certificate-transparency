@@ -41,6 +41,7 @@
 #include "server/metrics.h"
 #include "server/proxy.h"
 #include "server/server.h"
+#include "server/server_helper.h"
 #include "util/etcd.h"
 #include "util/fake_etcd.h"
 #include "util/init.h"
@@ -55,21 +56,6 @@
 
 DEFINE_string(server, "localhost", "Server host");
 DEFINE_int32(port, 9999, "Server port");
-// TODO(alcutter): Just specify a root dir with a single flag.
-DEFINE_string(cert_dir, "", "Storage directory for certificates");
-DEFINE_string(tree_dir, "", "Storage directory for trees");
-DEFINE_string(meta_dir, "", "Storage directory for meta info");
-DEFINE_string(sqlite_db, "",
-              "SQLite database for certificate and tree storage");
-DEFINE_string(leveldb_db, "",
-              "LevelDB database for certificate and tree storage");
-// TODO(ekasper): sanity-check these against the directory structure.
-DEFINE_int32(cert_storage_depth, 0,
-             "Subdirectory depth for certificates; if the directory is not "
-             "empty, must match the existing depth.");
-DEFINE_int32(tree_storage_depth, 0,
-             "Subdirectory depth for tree signatures; if the directory is not "
-             "empty, must match the existing depth");
 DEFINE_int32(log_stats_frequency_seconds, 3600,
              "Interval for logging summary statistics. Approximate: the "
              "server will log statistics if in the beginning of its select "
@@ -118,6 +104,7 @@ using cert_trans::RemotePeer;
 using cert_trans::SQLiteDB;
 using cert_trans::ScopedLatency;
 using cert_trans::Server;
+using cert_trans::ServerHelper;
 using cert_trans::SplitHosts;
 using cert_trans::StrictConsistentStore;
 using cert_trans::ThreadPool;
@@ -182,22 +169,8 @@ static bool ValidateRead(const char* flagname, const string& path) {
   return true;
 }
 
-static bool ValidateWrite(const char* flagname, const string& path) {
-  if (path != "" && access(path.c_str(), W_OK) != 0) {
-    std::cout << "Cannot modify " << flagname << " at " << path << std::endl;
-    return false;
-  }
-  return true;
-}
-
 static const bool pubkey_dummy =
     RegisterFlagValidator(&FLAGS_target_public_key, &ValidateRead);
-
-static const bool cert_dir_dummy =
-    RegisterFlagValidator(&FLAGS_cert_dir, &ValidateWrite);
-
-static const bool tree_dir_dummy =
-    RegisterFlagValidator(&FLAGS_tree_dir, &ValidateWrite);
 
 static bool ValidateIsNonNegative(const char* flagname, int value) {
   if (value < 0) {
@@ -206,11 +179,6 @@ static bool ValidateIsNonNegative(const char* flagname, int value) {
   }
   return true;
 }
-
-static const bool c_st_dummy =
-    RegisterFlagValidator(&FLAGS_cert_storage_depth, &ValidateIsNonNegative);
-static const bool t_st_dummy =
-    RegisterFlagValidator(&FLAGS_tree_storage_depth, &ValidateIsNonNegative);
 
 static bool ValidateIsPositive(const char* flagname, int value) {
   if (value <= 0) {
@@ -331,29 +299,9 @@ int main(int argc, char* argv[]) {
 
   Server::StaticInit();
 
-  if (!FLAGS_sqlite_db.empty() + !FLAGS_leveldb_db.empty() +
-          (!FLAGS_cert_dir.empty() | !FLAGS_tree_dir.empty()) !=
-      1) {
-    std::cerr << "Must only specify one database type.";
-    exit(1);
-  }
-
-  if (FLAGS_sqlite_db.empty() && FLAGS_leveldb_db.empty()) {
-    CHECK_NE(FLAGS_cert_dir, FLAGS_tree_dir)
-        << "Certificate directory and tree directory must differ";
-  }
-
-  Database* db;
-
-  if (!FLAGS_sqlite_db.empty()) {
-    db = new SQLiteDB(FLAGS_sqlite_db);
-  } else if (!FLAGS_leveldb_db.empty()) {
-    db = new LevelDB(FLAGS_leveldb_db);
-  } else {
-    db = new FileDB(new FileStorage(FLAGS_cert_dir, FLAGS_cert_storage_depth),
-                    new FileStorage(FLAGS_tree_dir, FLAGS_tree_storage_depth),
-                    new FileStorage(FLAGS_meta_dir, 0));
-  }
+  ServerHelper::EnsureValidatorsRegistered();
+  Database* db = ServerHelper::ProvideDatabase();
+  CHECK(db != nullptr) << "No database instance created, check flag settings";
 
   const bool stand_alone_mode(FLAGS_etcd_servers.empty());
   const shared_ptr<libevent::Base> event_base(make_shared<libevent::Base>());
