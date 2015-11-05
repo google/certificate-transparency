@@ -27,7 +27,6 @@ class ContinuousFetcher;
 class Database;
 class EtcdClient;
 class GCMExporter;
-class HttpHandler;
 class LogLookup;
 class LogSigner;
 class LoggedEntry;
@@ -63,14 +62,14 @@ class Server {
          const LogVerifier* log_verifier);
   ~Server();
 
-  void RegisterHandler(HttpHandler* handler);
-
   bool IsMaster() const;
   MasterElection* election();
   ConsistentStore<LoggedEntry>* consistent_store();
   ClusterStateController<LoggedEntry>* cluster_state_controller();
   LogLookup* log_lookup();
   ContinuousFetcher* continuous_fetcher();
+  Proxy* proxy();
+  libevent::HttpServer* http_server();
 
   void Initialise(bool is_mirror);
   void WaitForReplication() const;

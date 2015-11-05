@@ -14,7 +14,6 @@
 #include "log/cluster_state_controller.h"
 #include "log/etcd_consistent_store.h"
 #include "monitoring/monitoring.h"
-#include "server/handler.h"
 #include "util/thread_pool.h"
 #include "util/uuid.h"
 
@@ -154,14 +153,6 @@ Server::~Server() {
 }
 
 
-void Server::RegisterHandler(HttpHandler* handler) {
-  CHECK_NOTNULL(handler);
-  // Configure the handler to use our JSON output and proxy instances:
-  handler->SetProxy(proxy_.get());
-  handler->Add(&http_server_);
-}
-
-
 bool Server::IsMaster() const {
   return election_.IsMaster();
 }
@@ -189,6 +180,16 @@ LogLookup* Server::log_lookup() {
 
 ContinuousFetcher* Server::continuous_fetcher() {
   return fetcher_.get();
+}
+
+
+Proxy* Server::proxy() {
+  return proxy_.get();
+}
+
+
+libevent::HttpServer* Server::http_server() {
+  return &http_server_;
 }
 
 

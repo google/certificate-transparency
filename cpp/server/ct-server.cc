@@ -412,7 +412,9 @@ int main(int argc, char* argv[]) {
                                  server.cluster_state_controller(), &checker,
                                  &frontend, &internal_pool, event_base.get());
 
-  server.RegisterHandler(&handler);
+  // Connect the handler, proxy and server together
+  handler.SetProxy(server.proxy());
+  handler.Add(server.http_server());
 
   TreeSigner<LoggedEntry> tree_signer(
       std::chrono::duration<double>(FLAGS_guard_window_seconds), db,
