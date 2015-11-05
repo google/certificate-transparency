@@ -14,15 +14,11 @@
 #include "log/cert_submission_handler.h"
 #include "log/cluster_state_controller.h"
 #include "log/etcd_consistent_store.h"
-#include "log/file_db.h"
-#include "log/file_storage.h"
 #include "log/frontend_signer.h"
 #include "log/frontend.h"
-#include "log/leveldb_db.h"
 #include "log/log_lookup.h"
 #include "log/log_signer.h"
 #include "log/log_verifier.h"
-#include "log/sqlite_db.h"
 #include "log/strict_consistent_store.h"
 #include "log/tree_signer.h"
 #include "merkletree/merkle_verifier.h"
@@ -97,7 +93,6 @@ using cert_trans::ReadPrivateKey;
 using cert_trans::SQLiteDB;
 using cert_trans::ScopedLatency;
 using cert_trans::Server;
-using cert_trans::ServerHelper;
 using cert_trans::SplitHosts;
 using cert_trans::ThreadPool;
 using cert_trans::TreeSigner;
@@ -310,9 +305,9 @@ int main(int argc, char* argv[]) {
   CHECK(checker.LoadTrustedCertificates(FLAGS_trusted_cert_file))
       << "Could not load CA certs from " << FLAGS_trusted_cert_file;
 
-  ServerHelper::EnsureValidatorsRegistered();
-  Database* db = ServerHelper::ProvideDatabase();
-  CHECK(db != nullptr) << "No database instance created, check flag settings";
+  cert_trans::EnsureValidatorsRegistered();
+  const unique_ptr<Database> db(cert_trans::ProvideDatabase());
+  CHECK(db) << "No database instance created, check flag settings";
 
   shared_ptr<libevent::Base> event_base(make_shared<libevent::Base>());
   ThreadPool internal_pool(8);
@@ -326,11 +321,10 @@ int main(int argc, char* argv[]) {
   LOG(INFO) << "Running in "
             << (stand_alone_mode ? "STAND-ALONE" : "CLUSTERED") << " mode.";
 
-  std::unique_ptr<EtcdClient> etcd_client(
-      stand_alone_mode
-          ? new FakeEtcdClient(event_base.get())
-          : new EtcdClient(&internal_pool, &url_fetcher,
-                           SplitHosts(FLAGS_etcd_servers)));
+  unique_ptr<EtcdClient> etcd_client(
+      stand_alone_mode ? new FakeEtcdClient(event_base.get())
+                       : new EtcdClient(&internal_pool, &url_fetcher,
+                                        SplitHosts(FLAGS_etcd_servers)));
 
   const LogVerifier log_verifier(new LogSigVerifier(pkey.ValueOrDie()),
                                  new MerkleVerifier(new Sha256Hasher));
@@ -342,13 +336,13 @@ int main(int argc, char* argv[]) {
 
   ThreadPool http_pool(FLAGS_num_http_server_threads);
 
-  Server server(options, event_base, &internal_pool, &http_pool, db,
+  Server server(options, event_base, &internal_pool, &http_pool, db.get(),
                 etcd_client.get(), &url_fetcher, &log_verifier);
   server.Initialise(false /* is_mirror */);
 
   Frontend frontend(
-      new FrontendSigner(db, server.consistent_store(), &log_signer));
-  CertificateHttpHandler handler(server.log_lookup(), db,
+      new FrontendSigner(db.get(), server.consistent_store(), &log_signer));
+  CertificateHttpHandler handler(server.log_lookup(), db.get(),
                                  server.cluster_state_controller(), &checker,
                                  &frontend, &internal_pool, event_base.get());
 
@@ -357,7 +351,7 @@ int main(int argc, char* argv[]) {
   handler.Add(server.http_server());
 
   TreeSigner<LoggedEntry> tree_signer(
-      std::chrono::duration<double>(FLAGS_guard_window_seconds), db,
+      std::chrono::duration<double>(FLAGS_guard_window_seconds), db.get(),
       server.log_lookup()->GetCompactMerkleTree(new Sha256Hasher),
       server.consistent_store(), &log_signer);
 

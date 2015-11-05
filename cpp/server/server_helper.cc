@@ -4,9 +4,8 @@
 
 using cert_trans::Server;
 using google::RegisterFlagValidator;
-using std::make_shared;
-using std::shared_ptr;
 using std::string;
+using std::unique_ptr;
 
 // TODO(alcutter): Just specify a root dir with a single flag.
 DEFINE_string(cert_dir, "", "Storage directory for certificates");
@@ -48,22 +47,22 @@ static const bool tree_dir_dummy =
 
 static const bool c_st_dummy =
     RegisterFlagValidator(&FLAGS_cert_storage_depth, &ValidateIsNonNegative);
+
 static const bool t_st_dummy =
     RegisterFlagValidator(&FLAGS_tree_storage_depth, &ValidateIsNonNegative);
 
 namespace cert_trans {
 
-// static
-void ServerHelper::EnsureValidatorsRegistered() {
+void EnsureValidatorsRegistered() {
   CHECK(cert_dir_dummy && tree_dir_dummy && c_st_dummy && t_st_dummy);
 }
 
-Database* ServerHelper::ProvideDatabase() {
+
+unique_ptr<Database> ProvideDatabase() {
   if (!FLAGS_sqlite_db.empty() + !FLAGS_leveldb_db.empty() +
           (!FLAGS_cert_dir.empty() | !FLAGS_tree_dir.empty()) !=
       1) {
-    std::cerr << "Must only specify one database type.";
-    exit(1);
+    LOG(FATAL) << "Must specify exactly one database type. Check flags.";
   }
 
   if (FLAGS_sqlite_db.empty() && FLAGS_leveldb_db.empty()) {
@@ -72,13 +71,14 @@ Database* ServerHelper::ProvideDatabase() {
   }
 
   if (!FLAGS_sqlite_db.empty()) {
-    return new SQLiteDB(FLAGS_sqlite_db);
+    return unique_ptr<Database>(new SQLiteDB(FLAGS_sqlite_db));
   } else if (!FLAGS_leveldb_db.empty()) {
-    return new LevelDB(FLAGS_leveldb_db);
+    return unique_ptr<Database>(new LevelDB(FLAGS_leveldb_db));
   } else {
-    return new FileDB(new FileStorage(FLAGS_cert_dir, FLAGS_cert_storage_depth),
-                      new FileStorage(FLAGS_tree_dir, FLAGS_tree_storage_depth),
-                      new FileStorage(FLAGS_meta_dir, 0));
+    return unique_ptr<Database>(
+        new FileDB(new FileStorage(FLAGS_cert_dir, FLAGS_cert_storage_depth),
+                   new FileStorage(FLAGS_tree_dir, FLAGS_tree_storage_depth),
+                   new FileStorage(FLAGS_meta_dir, 0)));
   }
 
   LOG(FATAL) << "No usable database is configured by flags";

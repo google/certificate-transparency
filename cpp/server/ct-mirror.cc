@@ -25,11 +25,7 @@
 #include "log/ct_extensions.h"
 #include "log/database.h"
 #include "log/etcd_consistent_store.h"
-#include "log/file_db.h"
-#include "log/file_storage.h"
-#include "log/leveldb_db.h"
 #include "log/log_lookup.h"
-#include "log/sqlite_db.h"
 #include "log/strict_consistent_store.h"
 #include "merkletree/compact_merkle_tree.h"
 #include "merkletree/merkle_verifier.h"
@@ -104,7 +100,6 @@ using cert_trans::RemotePeer;
 using cert_trans::SQLiteDB;
 using cert_trans::ScopedLatency;
 using cert_trans::Server;
-using cert_trans::ServerHelper;
 using cert_trans::SplitHosts;
 using cert_trans::StrictConsistentStore;
 using cert_trans::ThreadPool;
@@ -171,14 +166,6 @@ static bool ValidateRead(const char* flagname, const string& path) {
 
 static const bool pubkey_dummy =
     RegisterFlagValidator(&FLAGS_target_public_key, &ValidateRead);
-
-static bool ValidateIsNonNegative(const char* flagname, int value) {
-  if (value < 0) {
-    std::cout << flagname << " must not be negative" << std::endl;
-    return false;
-  }
-  return true;
-}
 
 static bool ValidateIsPositive(const char* flagname, int value) {
   if (value <= 0) {
@@ -299,20 +286,19 @@ int main(int argc, char* argv[]) {
 
   Server::StaticInit();
 
-  ServerHelper::EnsureValidatorsRegistered();
-  Database* db = ServerHelper::ProvideDatabase();
-  CHECK(db != nullptr) << "No database instance created, check flag settings";
+  cert_trans::EnsureValidatorsRegistered();
+  const unique_ptr<Database> db(cert_trans::ProvideDatabase());
+  CHECK(db) << "No database instance created, check flag settings";
 
   const bool stand_alone_mode(FLAGS_etcd_servers.empty());
   const shared_ptr<libevent::Base> event_base(make_shared<libevent::Base>());
   ThreadPool internal_pool(8);
   UrlFetcher url_fetcher(event_base.get(), &internal_pool);
 
-  const std::unique_ptr<EtcdClient> etcd_client(
-      stand_alone_mode
-          ? new FakeEtcdClient(event_base.get())
-          : new EtcdClient(&internal_pool, &url_fetcher,
-                           SplitHosts(FLAGS_etcd_servers)));
+  const unique_ptr<EtcdClient> etcd_client(
+      stand_alone_mode ? new FakeEtcdClient(event_base.get())
+                       : new EtcdClient(&internal_pool, &url_fetcher,
+                                        SplitHosts(FLAGS_etcd_servers)));
 
   CHECK(!FLAGS_target_public_key.empty());
   const StatusOr<EVP_PKEY*> pubkey(ReadPublicKey(FLAGS_target_public_key));
@@ -329,11 +315,11 @@ int main(int argc, char* argv[]) {
 
   ThreadPool http_pool(FLAGS_num_http_server_threads);
 
-  Server server(options, event_base, &internal_pool, &http_pool, db,
+  Server server(options, event_base, &internal_pool, &http_pool, db.get(),
                 etcd_client.get(), &url_fetcher, &log_verifier);
   server.Initialise(true /* is_mirror */);
 
-  CertificateHttpHandler handler(server.log_lookup(), db,
+  CertificateHttpHandler handler(server.log_lookup(), db.get(),
                                  server.cluster_state_controller(),
                                  nullptr /* checker */, nullptr /* Frontend */,
                                  &internal_pool, event_base.get());
@@ -403,7 +389,7 @@ int main(int argc, char* argv[]) {
 
   server.WaitForReplication();
 
-  thread sth_updater(&STHUpdater, db, server.cluster_state_controller(),
+  thread sth_updater(&STHUpdater, db.get(), server.cluster_state_controller(),
                      &queue_mutex, &queue, server.log_lookup(),
                      fetcher_task.task()->AddChild(
                          [](Task*) { LOG(INFO) << "STHUpdater exited."; }));
