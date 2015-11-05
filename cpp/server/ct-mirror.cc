@@ -390,7 +390,9 @@ int main(int argc, char* argv[]) {
                                  nullptr /* checker */, nullptr /* Frontend */,
                                  &internal_pool, event_base.get());
 
-  server.RegisterHandler(&handler);
+  // Connect the handler, proxy and server together
+  handler.SetProxy(server.proxy());
+  handler.Add(server.http_server());
 
   if (stand_alone_mode) {
     // Set up a simple single-node mirror environment for testing.
