@@ -133,7 +133,7 @@ Server::Server(const Options& opts,
   CHECK_LT(0, options_.num_http_server_threads);
 
   if (FLAGS_monitoring == kPrometheus) {
-    http_server_.AddHandler("/metrics", bind(&ExportPrometheusMetrics, _1));
+    http_server_.AddHandler("/metrics", ExportPrometheusMetrics);
   } else if (FLAGS_monitoring == kGcm) {
     gcm_exporter_.reset(
         new GCMExporter(options_.server, url_fetcher_, internal_pool_));
