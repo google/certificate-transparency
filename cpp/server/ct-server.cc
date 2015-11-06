@@ -14,15 +14,11 @@
 #include "log/cert_submission_handler.h"
 #include "log/cluster_state_controller.h"
 #include "log/etcd_consistent_store.h"
-#include "log/file_db.h"
-#include "log/file_storage.h"
 #include "log/frontend_signer.h"
 #include "log/frontend.h"
-#include "log/leveldb_db.h"
 #include "log/log_lookup.h"
 #include "log/log_signer.h"
 #include "log/log_verifier.h"
-#include "log/sqlite_db.h"
 #include "log/strict_consistent_store.h"
 #include "log/tree_signer.h"
 #include "merkletree/merkle_verifier.h"
@@ -32,6 +28,7 @@
 #include "server/certificate_handler.h"
 #include "server/metrics.h"
 #include "server/server.h"
+#include "server/server_helper.h"
 #include "util/etcd.h"
 #include "util/fake_etcd.h"
 #include "util/init.h"
@@ -46,21 +43,6 @@ DEFINE_int32(port, 9999, "Server port");
 DEFINE_string(key, "", "PEM-encoded server private key file");
 DEFINE_string(trusted_cert_file, "",
               "File for trusted CA certificates, in concatenated PEM format");
-// TODO(alcutter): Just specify a root dir with a single flag.
-DEFINE_string(cert_dir, "", "Storage directory for certificates");
-DEFINE_string(tree_dir, "", "Storage directory for trees");
-DEFINE_string(meta_dir, "", "Storage directory for meta info");
-DEFINE_string(sqlite_db, "",
-              "SQLite database for certificate and tree storage");
-DEFINE_string(leveldb_db, "",
-              "LevelDB database for certificate and tree storage");
-// TODO(ekasper): sanity-check these against the directory structure.
-DEFINE_int32(cert_storage_depth, 0,
-             "Subdirectory depth for certificates; if the directory is not "
-             "empty, must match the existing depth.");
-DEFINE_int32(tree_storage_depth, 0,
-             "Subdirectory depth for tree signatures; if the directory is not "
-             "empty, must match the existing depth");
 DEFINE_int32(log_stats_frequency_seconds, 3600,
              "Interval for logging summary statistics. Approximate: the "
              "server will log statistics if in the beginning of its select "
@@ -180,33 +162,6 @@ static const bool key_dummy = RegisterFlagValidator(&FLAGS_key, &ValidateRead);
 
 static const bool cert_dummy =
     RegisterFlagValidator(&FLAGS_trusted_cert_file, &ValidateRead);
-
-static bool ValidateWrite(const char* flagname, const string& path) {
-  if (path != "" && access(path.c_str(), W_OK) != 0) {
-    std::cout << "Cannot modify " << flagname << " at " << path << std::endl;
-    return false;
-  }
-  return true;
-}
-
-static const bool cert_dir_dummy =
-    RegisterFlagValidator(&FLAGS_cert_dir, &ValidateWrite);
-
-static const bool tree_dir_dummy =
-    RegisterFlagValidator(&FLAGS_tree_dir, &ValidateWrite);
-
-static bool ValidateIsNonNegative(const char* flagname, int value) {
-  if (value < 0) {
-    std::cout << flagname << " must not be negative" << std::endl;
-    return false;
-  }
-  return true;
-}
-
-static const bool c_st_dummy =
-    RegisterFlagValidator(&FLAGS_cert_storage_depth, &ValidateIsNonNegative);
-static const bool t_st_dummy =
-    RegisterFlagValidator(&FLAGS_tree_storage_depth, &ValidateIsNonNegative);
 
 static bool ValidateIsPositive(const char* flagname, int value) {
   if (value <= 0) {
@@ -350,29 +305,9 @@ int main(int argc, char* argv[]) {
   CHECK(checker.LoadTrustedCertificates(FLAGS_trusted_cert_file))
       << "Could not load CA certs from " << FLAGS_trusted_cert_file;
 
-  if (!FLAGS_sqlite_db.empty() + !FLAGS_leveldb_db.empty() +
-          (!FLAGS_cert_dir.empty() | !FLAGS_tree_dir.empty()) !=
-      1) {
-    std::cerr << "Must only specify one database type.";
-    exit(1);
-  }
-
-  if (FLAGS_sqlite_db.empty() && FLAGS_leveldb_db.empty()) {
-    CHECK_NE(FLAGS_cert_dir, FLAGS_tree_dir)
-        << "Certificate directory and tree directory must differ";
-  }
-
-  Database* db;
-
-  if (!FLAGS_sqlite_db.empty()) {
-    db = new SQLiteDB(FLAGS_sqlite_db);
-  } else if (!FLAGS_leveldb_db.empty()) {
-    db = new LevelDB(FLAGS_leveldb_db);
-  } else {
-    db = new FileDB(new FileStorage(FLAGS_cert_dir, FLAGS_cert_storage_depth),
-                    new FileStorage(FLAGS_tree_dir, FLAGS_tree_storage_depth),
-                    new FileStorage(FLAGS_meta_dir, 0));
-  }
+  cert_trans::EnsureValidatorsRegistered();
+  const unique_ptr<Database> db(cert_trans::ProvideDatabase());
+  CHECK(db) << "No database instance created, check flag settings";
 
   shared_ptr<libevent::Base> event_base(make_shared<libevent::Base>());
   ThreadPool internal_pool(8);
@@ -386,11 +321,10 @@ int main(int argc, char* argv[]) {
   LOG(INFO) << "Running in "
             << (stand_alone_mode ? "STAND-ALONE" : "CLUSTERED") << " mode.";
 
-  std::unique_ptr<EtcdClient> etcd_client(
-      stand_alone_mode
-          ? new FakeEtcdClient(event_base.get())
-          : new EtcdClient(&internal_pool, &url_fetcher,
-                           SplitHosts(FLAGS_etcd_servers)));
+  unique_ptr<EtcdClient> etcd_client(
+      stand_alone_mode ? new FakeEtcdClient(event_base.get())
+                       : new EtcdClient(&internal_pool, &url_fetcher,
+                                        SplitHosts(FLAGS_etcd_servers)));
 
   const LogVerifier log_verifier(new LogSigVerifier(pkey.ValueOrDie()),
                                  new MerkleVerifier(new Sha256Hasher));
@@ -402,13 +336,13 @@ int main(int argc, char* argv[]) {
 
   ThreadPool http_pool(FLAGS_num_http_server_threads);
 
-  Server server(options, event_base, &internal_pool, &http_pool, db,
+  Server server(options, event_base, &internal_pool, &http_pool, db.get(),
                 etcd_client.get(), &url_fetcher, &log_verifier);
   server.Initialise(false /* is_mirror */);
 
   Frontend frontend(
-      new FrontendSigner(db, server.consistent_store(), &log_signer));
-  CertificateHttpHandler handler(server.log_lookup(), db,
+      new FrontendSigner(db.get(), server.consistent_store(), &log_signer));
+  CertificateHttpHandler handler(server.log_lookup(), db.get(),
                                  server.cluster_state_controller(), &checker,
                                  &frontend, &internal_pool, event_base.get());
 
@@ -417,7 +351,7 @@ int main(int argc, char* argv[]) {
   handler.Add(server.http_server());
 
   TreeSigner<LoggedEntry> tree_signer(
-      std::chrono::duration<double>(FLAGS_guard_window_seconds), db,
+      std::chrono::duration<double>(FLAGS_guard_window_seconds), db.get(),
       server.log_lookup()->GetCompactMerkleTree(new Sha256Hasher),
       server.consistent_store(), &log_signer);
 
