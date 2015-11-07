@@ -30,6 +30,7 @@ AX_CXX_COMPILE_STDCXX_11
 AC_CHECK_PROGS([ANT], [ant])
 
 PKG_CHECK_MODULES([json_c], [json-c])
+PKG_CHECK_MODULES([evhtp], [evhtp])
 
 if test "x${enable_hardening}" != "xno"; then
   common_harden_copts="-fstack-protector-all -fPIC -Wa,--noexecstack -Wformat -Wformat-security"
@@ -70,8 +71,6 @@ AC_CHECK_HEADER([google/protobuf/message.h],,
                 [AC_MSG_ERROR([protobuf headers could not be found])])
 AC_CHECK_HEADER([leveldb/db.h],,
                 [AC_MSG_ERROR([leveldb headers could not be found])])
-AC_CHECK_HEADER([evhtp.h],,
-                [AC_MSG_ERROR([libevhtp headers could not be found])])
 AC_CHECK_HEADER([ldns/ldns.h],, [missing_ldns=yes])
 
 # Check for working GTest/GMock.
@@ -147,12 +146,8 @@ AS_IF([test -n "$missing_libevent"],
 AS_IF([test -n "$missing_libevent_openssl"],
       [AC_MSG_ERROR([could not find the libevent_openssl library])])
 
-AC_SEARCH_LIBS([evhtp_make_request], [evhtp],, [missing_libevhtp=1],
-               [$save_LIBS])
 AC_SUBST([libevent_LIBS], [$LIBS])
 
-AS_IF([test -n "$missing_libevhtp"],
-      [AC_MSG_ERROR([could not find the evhtp library])])
 LIBS="$save_LIBS"
 
 # TCMalloc gubbins

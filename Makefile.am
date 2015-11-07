@@ -3,6 +3,7 @@ ACLOCAL_AMFLAGS = -Im4
 AM_CPPFLAGS = \
 	-I$(GMOCK_DIR)/include \
 	-I$(GTEST_DIR)/include \
+	$(evhtp_CFLAGS) \
 	$(json_c_CFLAGS)
 
 AM_CXXFLAGS = \
@@ -216,6 +217,7 @@ cpp_libtest_a_SOURCES = \
 
 cpp_server_ct_mirror_LDADD = \
 	cpp/libcore.a \
+	$(evhtp_LIBS) \
 	$(json_c_LIBS) \
 	$(libevent_LIBS) \
 	$(leveldb_LIBS) \
@@ -230,6 +232,7 @@ cpp_server_ct_mirror_SOURCES = \
 
 cpp_server_ct_mirror_v2_LDADD = \
 	cpp/libcore.a \
+	$(evhtp_LIBS) \
 	$(json_c_LIBS) \
 	$(libevent_LIBS) \
 	$(leveldb_LIBS) \
@@ -244,6 +247,7 @@ cpp_server_ct_mirror_v2_SOURCES = \
 
 cpp_server_ct_server_LDADD = \
 	cpp/libcore.a \
+	$(evhtp_LIBS) \
 	$(json_c_LIBS) \
 	$(libevent_LIBS) \
 	$(leveldb_LIBS) \
@@ -259,6 +263,7 @@ cpp_server_ct_server_SOURCES = \
 
 cpp_server_ct_server_v2_LDADD = \
 	cpp/libcore.a \
+	$(evhtp_LIBS) \
 	$(json_c_LIBS) \
 	$(libevent_LIBS) \
 	$(leveldb_LIBS) \
@@ -274,6 +279,7 @@ cpp_server_ct_server_v2_SOURCES = \
 
 cpp_server_xjson_server_LDADD = \
 	cpp/libcore.a \
+	$(evhtp_LIBS) \
 	$(json_c_LIBS) \
 	$(libevent_LIBS) \
 	$(leveldb_LIBS) \
@@ -290,6 +296,7 @@ cpp_server_xjson_server_SOURCES = \
 
 cpp_tools_ct_clustertool_LDADD = \
 	cpp/libcore.a \
+	$(evhtp_LIBS) \
 	$(json_c_LIBS) \
 	$(libevent_LIBS) \
 	-lprotobuf -lsqlite3
@@ -307,6 +314,7 @@ cpp_tools_ct_clustertool_SOURCES = \
 
 cpp_tools_db_tool_LDADD = \
 	cpp/libcore.a \
+	$(evhtp_LIBS) \
 	$(libevent_LIBS) \
 	$(leveldb_LIBS) \
 	-lprotobuf -lsqlite3
@@ -319,6 +327,7 @@ cpp_tools_db_tool_SOURCES = \
 
 cpp_client_ct_LDADD = \
 	cpp/libcore.a \
+	$(evhtp_LIBS) \
 	$(json_c_LIBS) \
 	$(libevent_LIBS) \
 	-lprotobuf -lsqlite3
@@ -340,8 +349,9 @@ cpp_client_ct_SOURCES = \
 	cpp/version.cc
 
 cpp_server_ct_dns_server_LDADD = \
+	$(evhtp_LIBS) \
 	cpp/libcore.a \
-  ${libevent_LIBS} \
+	${libevent_LIBS} \
 	-lprotobuf -lldns -lsqlite3
 cpp_server_ct_dns_server_SOURCES = \
 	cpp/proto/serializer.cc \
@@ -354,6 +364,7 @@ cpp_server_ct_dns_server_SOURCES = \
 
 cpp_tools_dump_cert_LDADD = \
 	cpp/libcore.a \
+	$(evhtp_LIBS) \
   ${libevent_LIBS} \
 	-lprotobuf
 cpp_tools_dump_cert_SOURCES = \
@@ -371,6 +382,7 @@ cpp_tools_dump_sth_SOURCES = \
 
 cpp_tools_etcd_watch_LDADD = \
 	cpp/libcore.a \
+	$(evhtp_LIBS) \
 	$(json_c_LIBS) \
 	$(libevent_LIBS)
 cpp_tools_etcd_watch_SOURCES = \
@@ -382,6 +394,7 @@ cpp_tools_etcd_watch_SOURCES = \
 
 cpp_util_bench_etcd_LDADD = \
 	cpp/libcore.a \
+	$(evhtp_LIBS) \
 	$(json_c_LIBS) \
 	$(libevent_LIBS)
 cpp_util_bench_etcd_SOURCES = \
@@ -391,6 +404,7 @@ cpp_util_bench_etcd_SOURCES = \
 
 cpp_util_etcd_masterelection_LDADD = \
 	cpp/libcore.a \
+	$(evhtp_LIBS) \
 	$(json_c_LIBS) \
 	$(libevent_LIBS) \
 	-lprotobuf
@@ -403,6 +417,7 @@ cpp_util_etcd_masterelection_SOURCES = \
 
 cpp_base_notification_test_LDADD = \
 	cpp/libtest.a \
+	$(evhtp_LIBS) \
 	$(libevent_LIBS)
 cpp_base_notification_test_SOURCES = \
 	cpp/base/notification.cc \
@@ -411,6 +426,7 @@ cpp_base_notification_test_SOURCES = \
 cpp_fetcher_remote_peer_test_LDADD = \
 	cpp/libcore.a \
 	cpp/libtest.a \
+	$(evhtp_LIBS) \
 	$(json_c_LIBS) \
 	$(libevent_LIBS) \
 	$(leveldb_LIBS) \
@@ -430,6 +446,7 @@ cpp_fetcher_remote_peer_test_SOURCES = \
 cpp_log_cluster_state_controller_test_LDADD = \
 	cpp/libcore.a \
 	cpp/libtest.a \
+	$(evhtp_LIBS) \
 	$(json_c_LIBS) \
 	$(libevent_LIBS) \
 	$(leveldb_LIBS) \
@@ -447,6 +464,7 @@ cpp_log_cluster_state_controller_test_SOURCES = \
 cpp_log_database_test_LDADD = \
 	cpp/libcore.a \
 	cpp/libtest.a \
+	$(evhtp_LIBS) \
 	$(libevent_LIBS) \
 	$(leveldb_LIBS) \
 	-lprotobuf -lsqlite3
@@ -460,6 +478,7 @@ cpp_log_database_test_SOURCES = \
 cpp_log_etcd_consistent_store_test_LDADD = \
 	cpp/libcore.a \
 	cpp/libtest.a \
+	$(evhtp_LIBS) \
 	$(json_c_LIBS) \
 	$(libevent_LIBS) \
 	-lprotobuf
@@ -475,6 +494,7 @@ cpp_log_etcd_consistent_store_test_SOURCES = \
 cpp_log_file_storage_test_LDADD = \
 	cpp/libcore.a \
 	cpp/libtest.a \
+	$(evhtp_LIBS) \
 	$(libevent_LIBS) \
 	$(leveldb_LIBS) \
 	-lprotobuf -lsqlite3
@@ -488,6 +508,7 @@ cpp_log_file_storage_test_SOURCES = \
 cpp_log_frontend_signer_test_LDADD = \
 	cpp/libcore.a \
 	cpp/libtest.a \
+	$(evhtp_LIBS) \
 	$(json_c_LIBS) \
 	$(libevent_LIBS) \
 	$(leveldb_LIBS) \
@@ -505,6 +526,7 @@ cpp_log_frontend_signer_test_SOURCES = \
 cpp_log_log_lookup_test_LDADD = \
 	cpp/libcore.a \
 	cpp/libtest.a \
+	$(evhtp_LIBS) \
 	$(json_c_LIBS) \
 	$(libevent_LIBS) \
 	$(leveldb_LIBS) \
@@ -522,6 +544,7 @@ cpp_log_log_lookup_test_SOURCES = \
 cpp_log_log_signer_test_LDADD = \
 	cpp/libcore.a \
 	cpp/libtest.a \
+	$(evhtp_LIBS) \
 	$(libevent_LIBS) \
 	-lprotobuf
 cpp_log_log_signer_test_SOURCES = \
@@ -533,6 +556,7 @@ cpp_log_log_signer_test_SOURCES = \
 cpp_log_logged_entry_test_LDADD = \
 	cpp/libcore.a \
 	cpp/libtest.a \
+	$(evhtp_LIBS) \
 	$(libevent_LIBS) \
 	-lprotobuf
 cpp_log_logged_entry_test_SOURCES = \
@@ -543,6 +567,7 @@ cpp_log_logged_entry_test_SOURCES = \
 cpp_log_strict_consistent_store_test_LDADD = \
 	cpp/libcore.a \
 	cpp/libtest.a \
+	$(evhtp_LIBS) \
 	$(json_c_LIBS) \
 	$(libevent_LIBS) \
 	-lprotobuf
@@ -557,6 +582,7 @@ cpp_log_strict_consistent_store_test_SOURCES = \
 cpp_log_tree_signer_test_LDADD = \
 	cpp/libcore.a \
 	cpp/libtest.a \
+	$(evhtp_LIBS) \
 	$(json_c_LIBS) \
 	$(libevent_LIBS) \
 	$(leveldb_LIBS) \
@@ -574,6 +600,7 @@ cpp_log_tree_signer_test_SOURCES = \
 cpp_log_signer_verifier_test_LDADD = \
 	cpp/libcore.a \
 	cpp/libtest.a \
+	$(evhtp_LIBS) \
 	$(libevent_LIBS) \
 	-lprotobuf
 cpp_log_signer_verifier_test_SOURCES = \
@@ -585,6 +612,7 @@ cpp_log_signer_verifier_test_SOURCES = \
 cpp_monitor_database_test_LDADD = \
 	cpp/libcore.a \
 	cpp/libtest.a \
+	$(evhtp_LIBS) \
 	$(libevent_LIBS) \
 	-lprotobuf -lsqlite3
 cpp_monitor_database_test_SOURCES = \
@@ -598,9 +626,10 @@ cpp_monitor_database_test_SOURCES = \
 cpp_monitoring_gcm_exporter_test_LDADD = \
 	cpp/libcore.a \
 	cpp/libtest.a \
+	$(evhtp_LIBS) \
 	$(json_c_LIBS) \
 	$(libevent_LIBS) \
-	-lprotobuf -lcrypto -lssl -levhtp
+	-lprotobuf -lcrypto -lssl
 cpp_monitoring_gcm_exporter_test_SOURCES = \
 	cpp/monitoring/gcm/exporter.cc \
 	cpp/monitoring/gcm/exporter_test.cc \
@@ -611,6 +640,7 @@ cpp_monitoring_gcm_exporter_test_SOURCES = \
 cpp_monitoring_counter_test_LDADD = \
 	cpp/libcore.a \
 	cpp/libtest.a \
+	$(evhtp_LIBS) \
 	$(libevent_LIBS) \
 	-lprotobuf
 cpp_monitoring_counter_test_SOURCES = \
@@ -620,6 +650,7 @@ cpp_monitoring_counter_test_SOURCES = \
 cpp_monitoring_gauge_test_LDADD = \
 	cpp/libcore.a \
 	cpp/libtest.a \
+	$(evhtp_LIBS) \
 	$(libevent_LIBS) \
 	-lprotobuf
 cpp_monitoring_gauge_test_SOURCES = \
@@ -629,6 +660,7 @@ cpp_monitoring_gauge_test_SOURCES = \
 cpp_monitoring_registry_test_LDADD = \
 	cpp/libcore.a \
 	cpp/libtest.a \
+	$(evhtp_LIBS) \
 	$(libevent_LIBS) \
 	-lprotobuf
 cpp_monitoring_registry_test_SOURCES = \
@@ -638,6 +670,7 @@ cpp_monitoring_registry_test_SOURCES = \
 cpp_net_url_fetcher_test_LDADD = \
 	cpp/libcore.a \
 	cpp/libtest.a \
+	$(evhtp_LIBS) \
 	$(libevent_LIBS) \
 	-lprotobuf
 cpp_net_url_fetcher_test_SOURCES = \
@@ -650,6 +683,7 @@ EXTRA_cpp_net_url_fetcher_test_DEPENDENCIES = \
 cpp_proto_serializer_test_LDADD = \
 	cpp/libcore.a \
 	cpp/libtest.a \
+	$(evhtp_LIBS) \
 	$(libevent_LIBS) \
 	-lprotobuf
 cpp_proto_serializer_test_SOURCES = \
@@ -660,6 +694,7 @@ cpp_proto_serializer_test_SOURCES = \
 cpp_server_proxy_test_LDADD = \
 	cpp/libcore.a \
 	cpp/libtest.a \
+	$(evhtp_LIBS) \
 	$(json_c_LIBS) \
 	$(libevent_LIBS) \
 	-lprotobuf
@@ -673,6 +708,7 @@ cpp_server_proxy_test_SOURCES = \
 
 cpp_util_bignum_test_LDADD = \
 	cpp/libtest.a \
+	$(evhtp_LIBS) \
 	$(libevent_LIBS)
 cpp_util_bignum_test_SOURCES = \
 	cpp/util/bignum.cc \
@@ -681,6 +717,7 @@ cpp_util_bignum_test_SOURCES = \
 cpp_util_etcd_delete_test_LDADD = \
 	cpp/libcore.a \
 	cpp/libtest.a \
+	$(evhtp_LIBS) \
 	$(json_c_LIBS) \
 	$(libevent_LIBS)
 cpp_util_etcd_delete_test_SOURCES = \
@@ -691,6 +728,7 @@ cpp_util_etcd_delete_test_SOURCES = \
 cpp_util_etcd_test_LDADD = \
 	cpp/libcore.a \
 	cpp/libtest.a \
+	$(evhtp_LIBS) \
 	$(json_c_LIBS) \
 	$(libevent_LIBS)
 cpp_util_etcd_test_SOURCES = \
@@ -701,6 +739,7 @@ cpp_util_etcd_test_SOURCES = \
 cpp_util_fake_etcd_test_LDADD = \
 	cpp/libcore.a \
 	cpp/libtest.a \
+	$(evhtp_LIBS) \
 	$(json_c_LIBS) \
 	$(libevent_LIBS)
 cpp_util_fake_etcd_test_SOURCES = \
@@ -712,6 +751,7 @@ EXTRA_cpp_util_fake_etcd_test_DEPENDENCIES = \
 
 cpp_util_json_wrapper_test_LDADD = \
 	cpp/libtest.a \
+	$(evhtp_LIBS) \
 	$(json_c_LIBS) \
 	$(libevent_LIBS)
 cpp_util_json_wrapper_test_SOURCES = \
@@ -722,6 +762,7 @@ cpp_util_json_wrapper_test_SOURCES = \
 cpp_util_libevent_wrapper_test_LDADD = \
 	cpp/libcore.a \
 	cpp/libtest.a \
+	$(evhtp_LIBS) \
 	$(libevent_LIBS)
 cpp_util_libevent_wrapper_test_SOURCES = \
 	cpp/util/libevent_wrapper.cc \
@@ -730,6 +771,7 @@ cpp_util_libevent_wrapper_test_SOURCES = \
 cpp_util_masterelection_test_LDADD = \
 	cpp/libcore.a \
 	cpp/libtest.a \
+	$(evhtp_LIBS) \
 	$(json_c_LIBS) \
 	$(libevent_LIBS) \
 	$(leveldb_LIBS) \
@@ -746,6 +788,7 @@ EXTRA_cpp_util_masterelection_test_DEPENDENCIES = \
 cpp_merkletree_merkle_tree_test_LDADD = \
 	cpp/libcore.a \
 	cpp/libtest.a \
+	$(evhtp_LIBS) \
 	$(libevent_LIBS)
 cpp_merkletree_merkle_tree_test_SOURCES = \
 	cpp/util/util.cc \
@@ -754,6 +797,7 @@ cpp_merkletree_merkle_tree_test_SOURCES = \
 cpp_merkletree_serial_hasher_test_LDADD = \
 	cpp/libcore.a \
 	cpp/libtest.a \
+	$(evhtp_LIBS) \
 	$(libevent_LIBS)
 cpp_merkletree_serial_hasher_test_SOURCES = \
 	cpp/util/util.cc \
@@ -762,6 +806,7 @@ cpp_merkletree_serial_hasher_test_SOURCES = \
 cpp_merkletree_sparse_merkle_tree_test_LDADD = \
 	cpp/libcore.a \
 	cpp/libtest.a \
+	$(evhtp_LIBS) \
 	$(libevent_LIBS)
 cpp_merkletree_sparse_merkle_tree_test_SOURCES = \
 	cpp/util/util.cc \
@@ -770,6 +815,7 @@ cpp_merkletree_sparse_merkle_tree_test_SOURCES = \
 cpp_merkletree_tree_hasher_test_LDADD = \
 	cpp/libcore.a \
 	cpp/libtest.a \
+	$(evhtp_LIBS) \
 	$(libevent_LIBS)
 cpp_merkletree_tree_hasher_test_SOURCES = \
 	cpp/util/util.cc \
@@ -778,6 +824,7 @@ cpp_merkletree_tree_hasher_test_SOURCES = \
 cpp_merkletree_verifiable_map_test_LDADD = \
 	cpp/libcore.a \
 	cpp/libtest.a \
+	$(evhtp_LIBS) \
 	$(libevent_LIBS)
 cpp_merkletree_verifiable_map_test_SOURCES = \
 	cpp/util/util.cc \
@@ -786,6 +833,7 @@ cpp_merkletree_verifiable_map_test_SOURCES = \
 cpp_util_sync_task_test_LDADD = \
 	cpp/libcore.a \
 	cpp/libtest.a \
+	$(evhtp_LIBS) \
 	$(libevent_LIBS)
 cpp_util_sync_task_test_SOURCES = \
 	cpp/util/sync_task_test.cc
@@ -793,6 +841,7 @@ cpp_util_sync_task_test_SOURCES = \
 cpp_util_task_test_LDADD = \
 	cpp/libcore.a \
 	cpp/libtest.a \
+	$(evhtp_LIBS) \
 	$(libevent_LIBS)
 cpp_util_task_test_SOURCES = \
 	cpp/util/task_test.cc
@@ -800,6 +849,7 @@ cpp_util_task_test_SOURCES = \
 cpp_util_thread_pool_test_LDADD = \
 	cpp/libcore.a \
 	cpp/libtest.a \
+	$(evhtp_LIBS) \
 	$(libevent_LIBS)
 cpp_util_thread_pool_test_SOURCES = \
 	cpp/util/thread_pool_test.cc
@@ -807,6 +857,7 @@ cpp_util_thread_pool_test_SOURCES = \
 cpp_log_cert_checker_test_LDADD = \
 	cpp/libcore.a \
 	cpp/libtest.a \
+	$(evhtp_LIBS) \
 	$(libevent_LIBS)
 cpp_log_cert_checker_test_SOURCES = \
 	cpp/log/cert_checker_test.cc \
@@ -815,6 +866,7 @@ cpp_log_cert_checker_test_SOURCES = \
 cpp_log_cert_submission_handler_test_LDADD = \
 	cpp/libcore.a \
 	cpp/libtest.a \
+	$(evhtp_LIBS) \
 	$(libevent_LIBS) \
 	-lprotobuf
 cpp_log_cert_submission_handler_test_SOURCES = \
@@ -824,6 +876,7 @@ cpp_log_cert_submission_handler_test_SOURCES = \
 cpp_log_cert_test_LDADD = \
 	cpp/libcore.a \
 	cpp/libtest.a \
+	$(evhtp_LIBS) \
 	$(libevent_LIBS)
 cpp_log_cert_test_SOURCES = \
 	cpp/log/cert_test.cc \
@@ -832,6 +885,7 @@ cpp_log_cert_test_SOURCES = \
 cpp_log_cms_verifier_test_LDADD = \
 	cpp/libcore.a \
 	cpp/libtest.a \
+	$(evhtp_LIBS) \
 	$(libevent_LIBS)
 cpp_log_cms_verifier_test_SOURCES = \
 	cpp/log/cms_verifier_test.cc \
@@ -840,6 +894,7 @@ cpp_log_cms_verifier_test_SOURCES = \
 cpp_log_ct_extensions_test_LDADD = \
 	cpp/libcore.a \
 	cpp/libtest.a \
+	$(evhtp_LIBS) \
 	$(libevent_LIBS)
 cpp_log_ct_extensions_test_SOURCES = \
 	cpp/log/ct_extensions_test.cc \
@@ -848,6 +903,7 @@ cpp_log_ct_extensions_test_SOURCES = \
 cpp_log_database_large_test_LDADD = \
 	cpp/libcore.a \
 	cpp/libtest.a \
+	$(evhtp_LIBS) \
 	$(libevent_LIBS) \
 	$(leveldb_LIBS) \
 	-lprotobuf -lsqlite3
@@ -861,6 +917,7 @@ cpp_log_database_large_test_SOURCES = \
 cpp_log_frontend_test_LDADD = \
 	cpp/libcore.a \
 	cpp/libtest.a \
+	$(evhtp_LIBS) \
 	$(json_c_LIBS) \
 	$(libevent_LIBS) \
 	$(leveldb_LIBS) \
@@ -878,6 +935,7 @@ cpp_log_frontend_test_SOURCES = \
 cpp_merkletree_merkle_tree_large_test_LDADD = \
 	cpp/libcore.a \
 	cpp/libtest.a \
+	$(evhtp_LIBS) \
 	$(libevent_LIBS)
 cpp_merkletree_merkle_tree_large_test_SOURCES = \
 	cpp/merkletree/merkle_tree_large_test.cc \
