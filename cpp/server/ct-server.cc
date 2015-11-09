@@ -39,8 +39,6 @@
 #include "util/thread_pool.h"
 #include "util/uuid.h"
 
-DEFINE_string(server, "localhost", "Server host");
-DEFINE_int32(port, 9999, "Server port");
 DEFINE_string(key, "", "PEM-encoded server private key file");
 DEFINE_string(trusted_cert_file, "",
               "File for trusted CA certificates, in concatenated PEM format");
@@ -56,14 +54,8 @@ DEFINE_int32(tree_signing_frequency_seconds, 600,
 DEFINE_double(guard_window_seconds, 60,
               "Unsequenced entries newer than this "
               "number of seconds will not be sequenced.");
-DEFINE_string(etcd_servers, "",
-              "Comma separated list of 'hostname:port' of the etcd server(s)");
-DEFINE_string(etcd_root, "/root", "Root of cluster entries in etcd.");
 DEFINE_int32(num_http_server_threads, 16,
              "Number of threads for servicing the incoming HTTP requests.");
-DEFINE_bool(i_know_stand_alone_mode_can_lose_data, false,
-            "Set this to allow stand-alone mode, even though it will lost "
-            "submissions in the case of a crash.");
 
 namespace libevent = cert_trans::libevent;
 
@@ -124,19 +116,7 @@ Counter<bool>* signer_total_runs =
 Latency<milliseconds> signer_run_latency_ms("signer_run_latency_ms",
                                             "Total runtime of signer");
 
-
 // Basic sanity checks on flag values.
-static bool ValidatePort(const char*, int port) {
-  if (port <= 0 || port > 65535) {
-    std::cout << "Port value " << port << " is invalid. " << std::endl;
-    return false;
-  }
-  return true;
-}
-
-static const bool port_dummy =
-    RegisterFlagValidator(&FLAGS_port, &ValidatePort);
-
 static bool ValidateRead(const char* flagname, const string& path) {
   if (access(path.c_str(), R_OK) != 0) {
     std::cout << "Cannot access " << flagname << " at " << path << std::endl;
@@ -268,31 +248,21 @@ int main(int argc, char* argv[]) {
   ThreadPool internal_pool(8);
   UrlFetcher url_fetcher(event_base.get(), &internal_pool);
 
-  const bool stand_alone_mode(FLAGS_etcd_servers.empty());
-  if (stand_alone_mode && !FLAGS_i_know_stand_alone_mode_can_lose_data) {
-    LOG(FATAL) << "attempted to run in stand-alone mode without the "
-                  "--i_know_stand_alone_mode_can_lose_data flag";
-  }
+  const bool stand_alone_mode(cert_trans::IsStandalone(true));
   LOG(INFO) << "Running in "
             << (stand_alone_mode ? "STAND-ALONE" : "CLUSTERED") << " mode.";
 
   unique_ptr<EtcdClient> etcd_client(
-      stand_alone_mode ? new FakeEtcdClient(event_base.get())
-                       : new EtcdClient(&internal_pool, &url_fetcher,
-                                        SplitHosts(FLAGS_etcd_servers)));
+      cert_trans::ProvideEtcdClient(event_base.get(), &internal_pool,
+                                    &url_fetcher));
 
   const LogVerifier log_verifier(new LogSigVerifier(pkey.ValueOrDie()),
                                  new MerkleVerifier(new Sha256Hasher));
 
-  Server::Options options;
-  options.server = FLAGS_server;
-  options.port = FLAGS_port;
-  options.etcd_root = FLAGS_etcd_root;
-
   ThreadPool http_pool(FLAGS_num_http_server_threads);
 
-  Server server(options, event_base, &internal_pool, &http_pool, db.get(),
-                etcd_client.get(), &url_fetcher, &log_verifier);
+  Server server(event_base, &internal_pool, &http_pool,
+                db.get(), etcd_client.get(), &url_fetcher, &log_verifier);
   server.Initialise(false /* is_mirror */);
 
   Frontend frontend(
@@ -350,8 +320,6 @@ int main(int argc, char* argv[]) {
     // if it's not set, which in turn causes us to not attempt to become
     // master:
     server.consistent_store()->SetServingSTH(tree_signer.LatestSTH());
-  } else {
-    CHECK(!FLAGS_server.empty());
   }
 
   server.WaitForReplication();
