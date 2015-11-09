@@ -52,11 +52,6 @@
 
 DEFINE_string(server, "localhost", "Server host");
 DEFINE_int32(port, 9999, "Server port");
-DEFINE_int32(log_stats_frequency_seconds, 3600,
-             "Interval for logging summary statistics. Approximate: the "
-             "server will log statistics if in the beginning of its select "
-             "loop, at least this period has elapsed since the last log time. "
-             "Must be greater than 0.");
 DEFINE_int32(target_poll_frequency_seconds, 10,
              "How often should the target log be polled for updates.");
 DEFINE_string(etcd_servers, "",
@@ -174,10 +169,6 @@ static bool ValidateIsPositive(const char* flagname, int value) {
   }
   return true;
 }
-
-static const bool stats_dummy =
-    RegisterFlagValidator(&FLAGS_log_stats_frequency_seconds,
-                          &ValidateIsPositive);
 
 static const bool follow_dummy =
     RegisterFlagValidator(&FLAGS_target_poll_frequency_seconds,
