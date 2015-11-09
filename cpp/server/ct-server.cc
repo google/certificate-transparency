@@ -43,11 +43,6 @@ DEFINE_int32(port, 9999, "Server port");
 DEFINE_string(key, "", "PEM-encoded server private key file");
 DEFINE_string(trusted_cert_file, "",
               "File for trusted CA certificates, in concatenated PEM format");
-DEFINE_int32(log_stats_frequency_seconds, 3600,
-             "Interval for logging summary statistics. Approximate: the "
-             "server will log statistics if in the beginning of its select "
-             "loop, at least this period has elapsed since the last log time. "
-             "Must be greater than 0.");
 DEFINE_int32(sequencing_frequency_seconds, 10,
              "How often should new entries be sequenced. The sequencing runs "
              "in parallel with the tree signing and cleanup.");
@@ -170,10 +165,6 @@ static bool ValidateIsPositive(const char* flagname, int value) {
   }
   return true;
 }
-
-static const bool stats_dummy =
-    RegisterFlagValidator(&FLAGS_log_stats_frequency_seconds,
-                          &ValidateIsPositive);
 
 static const bool sign_dummy =
     RegisterFlagValidator(&FLAGS_tree_signing_frequency_seconds,
