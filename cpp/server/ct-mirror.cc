@@ -96,6 +96,7 @@ using cert_trans::SQLiteDB;
 using cert_trans::ScopedLatency;
 using cert_trans::Server;
 using cert_trans::SplitHosts;
+using cert_trans::StalenessTracker;
 using cert_trans::StrictConsistentStore;
 using cert_trans::ThreadPool;
 using cert_trans::Update;
@@ -293,10 +294,15 @@ int main(int argc, char* argv[]) {
                 etcd_client.get(), &url_fetcher, &log_verifier);
   server.Initialise(true /* is_mirror */);
 
+  unique_ptr<StalenessTracker> staleness_tracker(
+      new StalenessTracker(server.cluster_state_controller(), &internal_pool,
+                           event_base.get()));
+
   CertificateHttpHandler handler(server.log_lookup(), db.get(),
                                  server.cluster_state_controller(),
                                  nullptr /* checker */, nullptr /* Frontend */,
-                                 &internal_pool, event_base.get());
+                                 &internal_pool, event_base.get(),
+                                 staleness_tracker.get());
 
   // Connect the handler, proxy and server together
   handler.SetProxy(server.proxy());

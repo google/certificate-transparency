@@ -5,6 +5,7 @@
 #include "log/database.h"
 #include "log/logged_entry.h"
 #include "server/handler.h"
+#include "server/staleness_tracker.h"
 
 namespace cert_trans {
 
@@ -18,7 +19,8 @@ class CertificateHttpHandler : public HttpHandler {
   CertificateHttpHandler(LogLookup* log_lookup, const ReadOnlyDatabase* db,
                          const ClusterStateController<LoggedEntry>* controller,
                          const CertChecker* cert_checker, Frontend* frontend,
-                         ThreadPool* pool, libevent::Base* event_base);
+                         ThreadPool* pool, libevent::Base* event_base,
+                         StalenessTracker* staleness_tracker);
 
   ~CertificateHttpHandler() = default;
 

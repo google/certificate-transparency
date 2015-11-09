@@ -29,6 +29,7 @@
 #include "server/metrics.h"
 #include "server/server.h"
 #include "server/server_helper.h"
+#include "server/staleness_tracker.h"
 #include "server/x_json_handler.h"
 #include "util/etcd.h"
 #include "util/fake_etcd.h"
@@ -73,6 +74,7 @@ using cert_trans::ScopedLatency;
 using cert_trans::SequenceEntries;
 using cert_trans::Server;
 using cert_trans::SplitHosts;
+using cert_trans::StalenessTracker;
 using cert_trans::ThreadPool;
 using cert_trans::TreeSigner;
 using cert_trans::Update;
@@ -256,9 +258,13 @@ int main(int argc, char* argv[]) {
 
   Frontend frontend(
       new FrontendSigner(db.get(), server.consistent_store(), &log_signer));
+  unique_ptr<StalenessTracker> staleness_tracker(
+      new StalenessTracker(server.cluster_state_controller(), &internal_pool,
+                           event_base.get()));
   XJsonHttpHandler handler(server.log_lookup(), db.get(),
                            server.cluster_state_controller(), &frontend,
-                           &internal_pool, event_base.get());
+                           &internal_pool, event_base.get(),
+                           staleness_tracker.get());
 
   // Connect the handler, proxy and server together
   handler.SetProxy(server.proxy());

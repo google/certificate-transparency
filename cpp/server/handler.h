@@ -7,6 +7,7 @@
 #include <string>
 
 #include "proto/ct.pb.h"
+#include "server/staleness_tracker.h"
 #include "util/libevent_wrapper.h"
 #include "util/sync_task.h"
 #include "util/task.h"
@@ -33,7 +34,8 @@ class HttpHandler {
   // this instance.
   HttpHandler(LogLookup* log_lookup, const ReadOnlyDatabase* db,
               const ClusterStateController<LoggedEntry>* controller,
-              ThreadPool* pool, libevent::Base* event_base);
+              ThreadPool* pool, libevent::Base* event_base,
+              StalenessTracker* staleness_tracker);
   virtual ~HttpHandler();
 
   void Add(libevent::HttpServer* server);
@@ -72,10 +74,7 @@ class HttpHandler {
   Proxy* proxy_;
   ThreadPool* const pool_;
   libevent::Base* const event_base_;
-
-  util::SyncTask task_;
-  mutable std::mutex mutex_;
-  bool node_is_stale_;
+  StalenessTracker* staleness_tracker_;
 
   DISALLOW_COPY_AND_ASSIGN(HttpHandler);
 };
