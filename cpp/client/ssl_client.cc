@@ -128,9 +128,9 @@ void SSLClient::GetSSLClientCTData(SSLClientCTData* data) const {
 // proof is re-submitted (or submitted to another log) and the server attaches
 // that proof too, but let's not complicate things for now.
 // static
-LogVerifier::VerifyResult SSLClient::VerifySCT(const string& token,
-                                               LogVerifier* verifier,
-                                               SSLClientCTData* data) {
+LogVerifier::LogVerifyResult SSLClient::VerifySCT(const string& token,
+                                                  LogVerifier* verifier,
+                                                  SSLClientCTData* data) {
   CHECK(data->has_reconstructed_entry());
   SignedCertificateTimestamp local_sct;
   // Skip over bad SCTs. These could be either badly encoded ones, or
@@ -139,7 +139,7 @@ LogVerifier::VerifyResult SSLClient::VerifySCT(const string& token,
     return LogVerifier::INVALID_FORMAT;
 
   string merkle_leaf;
-  LogVerifier::VerifyResult result =
+  LogVerifier::LogVerifyResult result =
       verifier->VerifySignedCertificateTimestamp(data->reconstructed_entry(),
                                                  local_sct, &merkle_leaf);
   if (result != LogVerifier::VERIFY_OK)
@@ -245,7 +245,7 @@ int SSLClient::VerifyCallback(X509_STORE_CTX* ctx, void* arg) {
       } else {
         LOG(INFO) << "Received " << sct_list.sct_list_size() << " SCTs";
         for (int i = 0; i < sct_list.sct_list_size(); ++i) {
-          LogVerifier::VerifyResult result =
+          LogVerifier::LogVerifyResult result =
               VerifySCT(sct_list.sct_list(i), verifier, &args->ct_data);
 
           if (result == LogVerifier::VERIFY_OK) {

@@ -84,7 +84,7 @@ Monitor::VerifyResult Monitor::VerifySTHInternal() {
 
 Monitor::VerifyResult Monitor::VerifySTHWithInvalidTimestamp(
     const ct::SignedTreeHead& sth) {
-  LogVerifier::VerifyResult v_result =
+  LogVerifier::LogVerifyResult v_result =
       verifier_->VerifySignedTreeHead(sth, sth.timestamp(), sth.timestamp());
 
   if (v_result == LogVerifier::VERIFY_OK) {
@@ -101,7 +101,7 @@ Monitor::VerifyResult Monitor::VerifySTHWithInvalidTimestamp(
 
 Monitor::VerifyResult Monitor::VerifySTHInternal(
     const ct::SignedTreeHead& sth) {
-  LogVerifier::VerifyResult v_result = verifier_->VerifySignedTreeHead(sth);
+  LogVerifier::LogVerifyResult v_result = verifier_->VerifySignedTreeHead(sth);
   std::string v_result_string = LogVerifier::VerifyResultString(v_result);
 
   VerifyResult result = SIGNATURE_INVALID;

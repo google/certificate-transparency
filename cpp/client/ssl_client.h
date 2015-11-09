@@ -45,9 +45,9 @@ class SSLClient {
   void GetSSLClientCTData(ct::SSLClientCTData* data) const;
 
   // Need a static wrapper for the callback.
-  static LogVerifier::VerifyResult VerifySCT(const std::string& token,
-                                             LogVerifier* verifier,
-                                             ct::SSLClientCTData* data);
+  static LogVerifier::LogVerifyResult VerifySCT(const std::string& token,
+                                                LogVerifier* verifier,
+                                                ct::SSLClientCTData* data);
 
   // Custom verification callback for verifying the SCT token
   // in a superfluous certificate. Return values:

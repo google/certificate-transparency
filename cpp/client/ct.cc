@@ -259,7 +259,7 @@ static bool VerifySCTAndPopulateSSLClientCTData(
   sct_info->mutable_sct()->CopyFrom(sct);
   const unique_ptr<LogVerifier> verifier(GetLogVerifierFromFlags());
   string merkle_leaf;
-  LogVerifier::VerifyResult result =
+  LogVerifier::LogVerifyResult result =
       verifier->VerifySignedCertificateTimestamp(
           ct_data->reconstructed_entry(), sct, &merkle_leaf);
   if (result != LogVerifier::VERIFY_OK) {
@@ -653,7 +653,7 @@ static AuditResult Audit() {
     }
 
     LOG(INFO) << "Received proof:\n" << proof.DebugString();
-    LogVerifier::VerifyResult res =
+    LogVerifier::LogVerifyResult res =
         verifier->VerifyMerkleAuditProof(ct_data.reconstructed_entry(),
                                          ct_data.attached_sct_info(i).sct(),
                                          proof);
@@ -764,7 +764,7 @@ static void DiagnoseCertChain() {
         LOG(WARNING) << "SCT key ID does not match verifier's ID, skipping";
         continue;
       } else {
-        LogVerifier::VerifyResult res =
+        LogVerifier::LogVerifyResult res =
             verifier->VerifySignedCertificateTimestamp(entry, sct);
         if (res == LogVerifier::VERIFY_OK)
           LOG(INFO) << "SCT verified";
@@ -918,7 +918,7 @@ int GetSTH() {
 
   // Allow for 10 seconds of clock skew
   uint64_t latest = ((uint64_t)time(NULL) + 10) * 1000;
-  const LogVerifier::VerifyResult result =
+  const LogVerifier::LogVerifyResult result =
       verifier->VerifySignedTreeHead(sth, 0, latest);
 
   LOG(INFO) << "STH is " << sth.DebugString();

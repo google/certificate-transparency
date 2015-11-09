@@ -226,7 +226,7 @@ void Server::Initialise(bool is_mirror) {
   {
     ct::SignedTreeHead db_sth;
     if (db_->LatestTreeHead(&db_sth) == Database::LOOKUP_OK) {
-      const LogVerifier::VerifyResult sth_verify_result(
+      const LogVerifier::LogVerifyResult sth_verify_result(
           log_verifier_->VerifySignedTreeHead(db_sth));
       if (sth_verify_result != LogVerifier::VERIFY_OK) {
         LOG(FATAL) << "STH retrieved from DB did not verify: "

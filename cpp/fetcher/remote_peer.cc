@@ -80,7 +80,7 @@ void RemotePeer::Impl::DoneGetSTH(
   if (status == AsyncLogClient::OK) {
     bool sth_provisionally_valid(false);
 
-    const LogVerifier::VerifyResult result(verifier_->VerifySignedTreeHead(
+    const LogVerifier::LogVerifyResult result(verifier_->VerifySignedTreeHead(
         *new_sth, 0, (time(NULL) + 10) * kNumMillisPerSecond));
 
     // TODO(alcutter): We should probably log these invalid STHs somewhere a bit

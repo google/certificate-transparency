@@ -26,7 +26,7 @@ LogVerifier::~LogVerifier() {
   delete merkle_verifier_;
 }
 
-LogVerifier::VerifyResult LogVerifier::VerifySignedCertificateTimestamp(
+LogVerifier::LogVerifyResult LogVerifier::VerifySignedCertificateTimestamp(
     const LogEntry& entry, const SignedCertificateTimestamp& sct,
     uint64_t begin_range, uint64_t end_range, string* merkle_leaf_hash) const {
   if (!IsBetween(sct.timestamp(), begin_range, end_range))
@@ -46,7 +46,7 @@ LogVerifier::VerifyResult LogVerifier::VerifySignedCertificateTimestamp(
   return VERIFY_OK;
 }
 
-LogVerifier::VerifyResult LogVerifier::VerifySignedCertificateTimestamp(
+LogVerifier::LogVerifyResult LogVerifier::VerifySignedCertificateTimestamp(
     const LogEntry& entry, const SignedCertificateTimestamp& sct,
     string* merkle_leaf_hash) const {
   // Allow a bit of slack, say 1 second into the future.
@@ -55,7 +55,7 @@ LogVerifier::VerifyResult LogVerifier::VerifySignedCertificateTimestamp(
                                           merkle_leaf_hash);
 }
 
-LogVerifier::VerifyResult LogVerifier::VerifySignedTreeHead(
+LogVerifier::LogVerifyResult LogVerifier::VerifySignedTreeHead(
     const SignedTreeHead& sth, uint64_t begin_range,
     uint64_t end_range) const {
   if (!IsBetween(sth.timestamp(), begin_range, end_range))
@@ -66,13 +66,13 @@ LogVerifier::VerifyResult LogVerifier::VerifySignedTreeHead(
   return VERIFY_OK;
 }
 
-LogVerifier::VerifyResult LogVerifier::VerifySignedTreeHead(
+LogVerifier::LogVerifyResult LogVerifier::VerifySignedTreeHead(
     const SignedTreeHead& sth) const {
   // Allow a bit of slack, say 1 second into the future.
   return VerifySignedTreeHead(sth, 0, util::TimeInMilliseconds() + 1000);
 }
 
-LogVerifier::VerifyResult LogVerifier::VerifyMerkleAuditProof(
+LogVerifier::LogVerifyResult LogVerifier::VerifyMerkleAuditProof(
     const LogEntry& entry, const SignedCertificateTimestamp& sct,
     const MerkleAuditProof& merkle_proof) const {
   if (!IsBetween(merkle_proof.timestamp(), sct.timestamp(),

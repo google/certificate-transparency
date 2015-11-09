@@ -248,8 +248,7 @@ void FetchState::WriteToDatabase(int64_t index, Range* range,
       // If we have the full SCT (because this LogEntry came from another
       // internal node which supports our private "give me the SCT too"
       // option), then verify that the signature is good.
-      // TODO(pphaneuf): Note to self: util::Status this!
-      const LogVerifier::VerifyResult verify_result(
+      const LogVerifier::LogVerifyResult verify_result(
           log_verifier_->VerifySignedCertificateTimestamp(
               cert.contents().entry(), cert.sct()));
       VLOG(1) << "SCT verify entry #" << index << ": "
