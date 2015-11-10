@@ -44,22 +44,22 @@
 #include <openssl/x509.h>
 
 
-template<typename T, void (*func)(T*)>
+template <typename T, void (*func)(T *)>
 struct OpenSSLDeleter {
   void operator()(T *obj) {
     func(obj);
   }
 };
 
-template<typename StackType, typename T, void (*func)(T*)>
+template <typename StackType, typename T, void (*func)(T *)>
 struct OpenSSLStackDeleter {
   void operator()(StackType *obj) {
-    sk_pop_free(reinterpret_cast<_STACK*>(obj),
+    sk_pop_free(reinterpret_cast<_STACK *>(obj),
                 reinterpret_cast<void (*)(void *)>(func));
   }
 };
 
-template<typename T>
+template <typename T>
 struct OpenSSLFree {
   void operator()(T *buf) {
     OPENSSL_free(buf);
@@ -72,26 +72,33 @@ struct FileCloser {
   }
 };
 
-template<typename T, void (*func)(T*)>
+template <typename T, void (*func)(T *)>
 using ScopedOpenSSLType = std::unique_ptr<T, OpenSSLDeleter<T, func>>;
 
-template<typename StackType, typename T, void (*func)(T*)>
+template <typename StackType, typename T, void (*func)(T *)>
 using ScopedOpenSSLStack =
     std::unique_ptr<StackType, OpenSSLStackDeleter<StackType, T, func>>;
 
-template<typename T, typename CleanupRet, void (*init_func)(T*),
-         CleanupRet (*cleanup_func)(T*)>
+template <typename T, typename CleanupRet, void (*init_func)(T *),
+          CleanupRet (*cleanup_func)(T *)>
 class ScopedOpenSSLContext {
  public:
   ScopedOpenSSLContext() {
     init_func(&ctx_);
   }
+  ScopedOpenSSLContext(const ScopedOpenSSLContext &other) = delete;
+  ScopedOpenSSLContext(ScopedOpenSSLContext &&other) = delete;
+
   ~ScopedOpenSSLContext() {
     cleanup_func(&ctx_);
   }
 
-  T *get() { return &ctx_; }
-  const T *get() const { return &ctx_; }
+  T *get() {
+    return &ctx_;
+  }
+  const T *get() const {
+    return &ctx_;
+  }
 
   void Reset() {
     cleanup_func(&ctx_);
@@ -114,8 +121,8 @@ using ScopedEC_KEY = ScopedOpenSSLType<EC_KEY, EC_KEY_free>;
 using ScopedEC_POINT = ScopedOpenSSLType<EC_POINT, EC_POINT_free>;
 using ScopedEVP_PKEY = ScopedOpenSSLType<EVP_PKEY, EVP_PKEY_free>;
 using ScopedEVP_PKEY_CTX = ScopedOpenSSLType<EVP_PKEY_CTX, EVP_PKEY_CTX_free>;
-using ScopedPKCS8_PRIV_KEY_INFO = ScopedOpenSSLType<PKCS8_PRIV_KEY_INFO,
-                                                    PKCS8_PRIV_KEY_INFO_free>;
+using ScopedPKCS8_PRIV_KEY_INFO =
+    ScopedOpenSSLType<PKCS8_PRIV_KEY_INFO, PKCS8_PRIV_KEY_INFO_free>;
 #ifdef OPENSSL_IS_BORINGSSL
 using ScopedPKCS12 = ScopedOpenSSLType<PKCS12, PKCS12_free>;
 #endif  // OPENSSL_IS_BORINGSSL
@@ -128,17 +135,17 @@ using ScopedX509Stack = ScopedOpenSSLStack<STACK_OF(X509), X509, X509_free>;
 
 #ifdef OPENSSL_IS_BORINGSSL
 using ScopedCBB = ScopedOpenSSLContext<CBB, void, CBB_zero, CBB_cleanup>;
-using ScopedEVP_AEAD_CTX = ScopedOpenSSLContext<EVP_AEAD_CTX, void,
-                                                EVP_AEAD_CTX_zero,
-                                                EVP_AEAD_CTX_cleanup>;
+using ScopedEVP_AEAD_CTX =
+    ScopedOpenSSLContext<EVP_AEAD_CTX, void, EVP_AEAD_CTX_zero,
+                         EVP_AEAD_CTX_cleanup>;
 #endif  // OPENSSL_IS_BORINGSSL
-using ScopedEVP_CIPHER_CTX = ScopedOpenSSLContext<EVP_CIPHER_CTX, int,
-                                                  EVP_CIPHER_CTX_init,
-                                                  EVP_CIPHER_CTX_cleanup>;
-using ScopedEVP_MD_CTX = ScopedOpenSSLContext<EVP_MD_CTX, int, EVP_MD_CTX_init,
-                                              EVP_MD_CTX_cleanup>;
-using ScopedHMAC_CTX = ScopedOpenSSLContext<HMAC_CTX, void, HMAC_CTX_init,
-                                            HMAC_CTX_cleanup>;
+using ScopedEVP_CIPHER_CTX =
+    ScopedOpenSSLContext<EVP_CIPHER_CTX, int, EVP_CIPHER_CTX_init,
+                         EVP_CIPHER_CTX_cleanup>;
+using ScopedEVP_MD_CTX =
+    ScopedOpenSSLContext<EVP_MD_CTX, int, EVP_MD_CTX_init, EVP_MD_CTX_cleanup>;
+using ScopedHMAC_CTX =
+    ScopedOpenSSLContext<HMAC_CTX, void, HMAC_CTX_init, HMAC_CTX_cleanup>;
 
 using ScopedOpenSSLBytes = std::unique_ptr<uint8_t, OpenSSLFree<uint8_t>>;
 using ScopedOpenSSLString = std::unique_ptr<char, OpenSSLFree<char>>;
