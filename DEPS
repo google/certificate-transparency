@@ -7,7 +7,7 @@ deps = {
      "ldns":             "https://github.com/benlaurie/ldns.git@1.6.17-fix",
      "leveldb": 				 "https://github.com/google/leveldb.git@v1.18",
      "libevent": 				 "https://github.com/libevent/libevent.git@release-2.0.22-stable",
-     "libevhtp": 				 "https://github.com/ellzey/libevhtp.git@ba4c44eed1fb7a5cf8e4deb236af4f7675cc72d5",
+     "libevhtp": 				 "https://github.com/ellzey/libevhtp.git@1.2.11",
      "openssl": 				 "https://github.com/openssl/openssl.git@OpenSSL_1_0_2d",
      "protobuf":         "https://github.com/google/protobuf.git@v2.6.1",
      "protobuf/gtest":   "https://github.com/google/googletest.git@release-1.7.0",
