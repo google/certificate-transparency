@@ -8,6 +8,7 @@
 
 #include "log/cert.h"
 #include "log/ct_extensions.h"
+#include "util/openssl_scoped_types.h"
 #include "util/status_test_util.h"
 #include "util/testing.h"
 #include "util/util.h"
@@ -74,18 +75,16 @@ TEST_F(CtExtensionsTest, TestSCTExtension) {
   const StatusOr<X509_EXTENSION*> ext(
       sct_cert.GetExtension(cert_trans::NID_ctSignedCertificateTimestampList));
   ASSERT_OK(ext);
-  BIO* buf = BIO_new(BIO_s_mem());
-  ASSERT_NE(buf, static_cast<BIO*>(NULL));
+  ScopedBIO buf(BIO_new(BIO_s_mem()));
+  ASSERT_NE(buf.get(), static_cast<BIO*>(NULL));
 
-  EXPECT_EQ(1, X509V3_EXT_print(buf, ext.ValueOrDie(), 0, 0));
-  CHECK_EQ(1, BIO_write(buf, "", 1));  // NULL-terminate
+  EXPECT_EQ(1, X509V3_EXT_print(buf.get(), ext.ValueOrDie(), 0, 0));
+  CHECK_EQ(1, BIO_write(buf.get(), "", 1));  // NULL-terminate
   char* result;
-  BIO_get_mem_data(buf, &result);
+  BIO_get_mem_data(buf.get(), &result);
 
   // Should be printing the octet string contents in hex.
   EXPECT_STRCASEEQ(util::HexString(ext_data, ':').c_str(), result);
-
-  BIO_free(buf);
 }
 
 TEST_F(CtExtensionsTest, TestEmbeddedSCTExtension) {
@@ -115,18 +114,16 @@ TEST_F(CtExtensionsTest, TestEmbeddedSCTExtension) {
   const StatusOr<X509_EXTENSION*> ext(embedded_sct_cert.GetExtension(
       cert_trans::NID_ctEmbeddedSignedCertificateTimestampList));
   ASSERT_OK(ext);
-  BIO* buf = BIO_new(BIO_s_mem());
-  ASSERT_NE(buf, static_cast<BIO*>(NULL));
+  ScopedBIO buf(BIO_new(BIO_s_mem()));
+  ASSERT_NE(buf.get(), static_cast<BIO*>(NULL));
 
-  EXPECT_EQ(1, X509V3_EXT_print(buf, ext.ValueOrDie(), 0, 0));
-  CHECK_EQ(1, BIO_write(buf, "", 1));  // NULL-terminate
+  EXPECT_EQ(1, X509V3_EXT_print(buf.get(), ext.ValueOrDie(), 0, 0));
+  CHECK_EQ(1, BIO_write(buf.get(), "", 1));  // NULL-terminate
   char* result;
-  BIO_get_mem_data(buf, &result);
+  BIO_get_mem_data(buf.get(), &result);
 
   // Should be printing the octet string contents in hex.
   EXPECT_STRCASEEQ(util::HexString(ext_data, ':').c_str(), result);
-
-  BIO_free(buf);
 }
 
 TEST_F(CtExtensionsTest, TestPoisonExtension) {
@@ -147,18 +144,16 @@ TEST_F(CtExtensionsTest, TestPoisonExtension) {
       poison_cert.GetExtension(cert_trans::NID_ctPoison));
   ASSERT_OK(ext);
 
-  BIO* buf = BIO_new(BIO_s_mem());
-  ASSERT_NE(buf, static_cast<BIO*>(NULL));
+  ScopedBIO buf(BIO_new(BIO_s_mem()));
+  ASSERT_NE(buf.get(), static_cast<BIO*>(NULL));
 
-  EXPECT_EQ(1, X509V3_EXT_print(buf, ext.ValueOrDie(), 0, 0));
-  CHECK_EQ(1, BIO_write(buf, "", 1));  // NULL-terminate
+  EXPECT_EQ(1, X509V3_EXT_print(buf.get(), ext.ValueOrDie(), 0, 0));
+  CHECK_EQ(1, BIO_write(buf.get(), "", 1));  // NULL-terminate
   char* result;
-  BIO_get_mem_data(buf, &result);
+  BIO_get_mem_data(buf.get(), &result);
 
   // Should be printing "NULL".
   EXPECT_STREQ("NULL", result);
-
-  BIO_free(buf);
 }
 
 TEST_F(CtExtensionsTest, TestPrecertSigning) {

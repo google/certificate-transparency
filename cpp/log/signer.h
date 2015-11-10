@@ -8,6 +8,7 @@
 #include <stdint.h>
 
 #include "base/macros.h"
+#include "util/openssl_scoped_types.h"
 #include "proto/ct.pb.h"
 
 namespace cert_trans {
@@ -15,7 +16,7 @@ namespace cert_trans {
 class Signer {
  public:
   explicit Signer(EVP_PKEY* pkey);
-  virtual ~Signer();
+  virtual ~Signer() = default;
 
   virtual std::string KeyID() const;
 
@@ -29,7 +30,7 @@ class Signer {
  private:
   std::string RawSign(const std::string& data) const;
 
-  EVP_PKEY* pkey_;
+  ScopedEVP_PKEY pkey_;
   ct::DigitallySigned::HashAlgorithm hash_algo_;
   ct::DigitallySigned::SignatureAlgorithm sig_algo_;
   std::string key_id_;

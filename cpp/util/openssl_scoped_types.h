@@ -25,6 +25,7 @@
 #include <openssl/bio.h>
 #include <openssl/bn.h>
 #include <openssl/cmac.h>
+#include <openssl/cms.h>
 #include <openssl/dh.h>
 #include <openssl/ec.h>
 #ifdef OPENSSL_IS_BORINGSSL
@@ -40,8 +41,10 @@
 #include <openssl/pkcs8.h>
 #endif  // OPENSSL_IS_BORINGSSL
 #include <openssl/rsa.h>
+#include <openssl/ssl.h>
 #include <openssl/stack.h>
 #include <openssl/x509.h>
+#include <openssl/x509v3.h>
 
 
 template <typename T, void (*func)(T *)>
@@ -56,6 +59,13 @@ struct OpenSSLStackDeleter {
   void operator()(StackType *obj) {
     sk_pop_free(reinterpret_cast<_STACK *>(obj),
                 reinterpret_cast<void (*)(void *)>(func));
+  }
+};
+
+template <typename StackType>
+struct OpenSSLWeakStackDeleter {
+  void operator()(StackType *obj) {
+    sk_free(reinterpret_cast<_STACK *>(obj));
   }
 };
 
@@ -78,6 +88,11 @@ using ScopedOpenSSLType = std::unique_ptr<T, OpenSSLDeleter<T, func>>;
 template <typename StackType, typename T, void (*func)(T *)>
 using ScopedOpenSSLStack =
     std::unique_ptr<StackType, OpenSSLStackDeleter<StackType, T, func>>;
+
+// Deletes *only* the stack object, not its contents.
+template <typename StackType>
+using ScopedWeakOpenSSLStack =
+    std::unique_ptr<StackType, OpenSSLWeakStackDeleter<StackType>>;
 
 template <typename T, typename CleanupRet, void (*init_func)(T *),
           CleanupRet (*cleanup_func)(T *)>
@@ -109,11 +124,17 @@ class ScopedOpenSSLContext {
   T ctx_;
 };
 
+using ScopedASN1_OCTET_STRING =
+    ScopedOpenSSLType<ASN1_OCTET_STRING, ASN1_OCTET_STRING_free>;
+using ScopedBASIC_CONSTRAINTS =
+    ScopedOpenSSLType<BASIC_CONSTRAINTS, BASIC_CONSTRAINTS_free>;
 using ScopedBIO = ScopedOpenSSLType<BIO, BIO_vfree>;
 using ScopedBIGNUM = ScopedOpenSSLType<BIGNUM, BN_free>;
 using ScopedBN_CTX = ScopedOpenSSLType<BN_CTX, BN_CTX_free>;
 using ScopedBN_MONT_CTX = ScopedOpenSSLType<BN_MONT_CTX, BN_MONT_CTX_free>;
 using ScopedCMAC_CTX = ScopedOpenSSLType<CMAC_CTX, CMAC_CTX_free>;
+using ScopedCMS_ContentInfo =
+    ScopedOpenSSLType<CMS_ContentInfo, CMS_ContentInfo_free>;
 using ScopedDH = ScopedOpenSSLType<DH, DH_free>;
 using ScopedECDSA_SIG = ScopedOpenSSLType<ECDSA_SIG, ECDSA_SIG_free>;
 using ScopedEC_GROUP = ScopedOpenSSLType<EC_GROUP, EC_GROUP_free>;
@@ -121,17 +142,30 @@ using ScopedEC_KEY = ScopedOpenSSLType<EC_KEY, EC_KEY_free>;
 using ScopedEC_POINT = ScopedOpenSSLType<EC_POINT, EC_POINT_free>;
 using ScopedEVP_PKEY = ScopedOpenSSLType<EVP_PKEY, EVP_PKEY_free>;
 using ScopedEVP_PKEY_CTX = ScopedOpenSSLType<EVP_PKEY_CTX, EVP_PKEY_CTX_free>;
+using ScopedEXTENDED_KEY_USAGE =
+    ScopedOpenSSLType<EXTENDED_KEY_USAGE, EXTENDED_KEY_USAGE_free>;
 using ScopedPKCS8_PRIV_KEY_INFO =
     ScopedOpenSSLType<PKCS8_PRIV_KEY_INFO, PKCS8_PRIV_KEY_INFO_free>;
 #ifdef OPENSSL_IS_BORINGSSL
 using ScopedPKCS12 = ScopedOpenSSLType<PKCS12, PKCS12_free>;
 #endif  // OPENSSL_IS_BORINGSSL
 using ScopedRSA = ScopedOpenSSLType<RSA, RSA_free>;
+using ScopedSSL = ScopedOpenSSLType<SSL, SSL_free>;
+using ScopedSSL_CTX = ScopedOpenSSLType<SSL_CTX, SSL_CTX_free>;
 using ScopedX509 = ScopedOpenSSLType<X509, X509_free>;
 using ScopedX509_ALGOR = ScopedOpenSSLType<X509_ALGOR, X509_ALGOR_free>;
+using ScopedX509_EXTENSION =
+    ScopedOpenSSLType<X509_EXTENSION, X509_EXTENSION_free>;
+using ScopedX509_NAME = ScopedOpenSSLType<X509_NAME, X509_NAME_free>;
 using ScopedX509_SIG = ScopedOpenSSLType<X509_SIG, X509_SIG_free>;
 
+using ScopedASN1_TYPEStack =
+    ScopedOpenSSLStack<STACK_OF(ASN1_TYPE), ASN1_TYPE, ASN1_TYPE_free>;
+using ScopedGENERAL_NAMEStack =
+    ScopedOpenSSLStack<STACK_OF(GENERAL_NAME), GENERAL_NAME,
+                       GENERAL_NAME_free>;
 using ScopedX509Stack = ScopedOpenSSLStack<STACK_OF(X509), X509, X509_free>;
+using ScopedWeakX509Stack = ScopedWeakOpenSSLStack<STACK_OF(X509)>;
 
 #ifdef OPENSSL_IS_BORINGSSL
 using ScopedCBB = ScopedOpenSSLContext<CBB, void, CBB_zero, CBB_cleanup>;

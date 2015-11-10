@@ -8,6 +8,7 @@
 #include <vector>
 
 #include "base/macros.h"
+#include "util/openssl_scoped_types.h"
 #include "util/statusor.h"
 
 namespace cert_trans {
@@ -27,12 +28,11 @@ class Cert {
   // so caller should check IsLoaded() before doing anything else.
   // All attempts to operate on an unloaded cert will fail with ERROR.
   explicit Cert(const std::string& pem_string);
-  Cert() : x509_(NULL) {
+  Cert() {
   }
-  ~Cert();
 
   bool IsLoaded() const {
-    return x509_ != NULL;
+    return x509_ != nullptr;
   }
 
   // Never returns NULL but check IsLoaded() after Clone to verify the
@@ -202,7 +202,7 @@ class Cert {
   static std::string PrintName(X509_NAME* name);
   static std::string PrintTime(ASN1_TIME* when);
   static util::Status DerEncodedName(X509_NAME* name, std::string* result);
-  X509* x509_;
+  ScopedX509 x509_;
 
   DISALLOW_COPY_AND_ASSIGN(Cert);
 };
@@ -214,7 +214,6 @@ class TbsCertificate {
  public:
   // TODO(ekasper): add construction from PEM and DER as needed.
   explicit TbsCertificate(const Cert& cert);
-  ~TbsCertificate();
 
   bool IsLoaded() const {
     return x509_ != NULL;
@@ -250,7 +249,7 @@ class TbsCertificate {
   util::StatusOr<int> ExtensionIndex(int extension_nid) const;
   // OpenSSL does not expose a TBSCertificate API, so we keep the TBS wrapped
   // in the X509.
-  X509* x509_;
+  ScopedX509 x509_;
 
   DISALLOW_COPY_AND_ASSIGN(TbsCertificate);
 };

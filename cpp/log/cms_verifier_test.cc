@@ -86,10 +86,9 @@ TEST_F(CmsVerifierTest, CmsSignTestCase2) {
   // but it doesn't get unpacked and the signature is valid.
   Cert ca(ca_pem_);
 
-  BIO* bio = OpenTestFileBio(cert_dir_v2_ + kCmsSignedDataTest2);
-  ASSERT_NE(bio, nullptr);
-  EXPECT_TRUE(verifier_.IsCmsSignedByCert(bio, ca).ValueOrDie());
-  BIO_free(bio);
+  ScopedBIO bio(OpenTestFileBio(cert_dir_v2_ + kCmsSignedDataTest2));
+  ASSERT_NE(bio.get(), nullptr);
+  EXPECT_TRUE(verifier_.IsCmsSignedByCert(bio.get(), ca).ValueOrDie());
 }
 
 
@@ -97,10 +96,9 @@ TEST_F(CmsVerifierTest, CmsSignTestCase3) {
   // The CMS should be signed by the CA that signed the cert
   Cert ca(ca_pem_);
 
-  BIO* bio = OpenTestFileBio(cert_dir_v2_ + kCmsSignedDataTest3);
-  ASSERT_NE(bio, nullptr);
-  EXPECT_TRUE(verifier_.IsCmsSignedByCert(bio, ca).ValueOrDie());
-  BIO_free(bio);
+  ScopedBIO bio(OpenTestFileBio(cert_dir_v2_ + kCmsSignedDataTest3));
+  ASSERT_NE(bio.get(), nullptr);
+  EXPECT_TRUE(verifier_.IsCmsSignedByCert(bio.get(), ca).ValueOrDie());
 }
 
 
@@ -108,10 +106,9 @@ TEST_F(CmsVerifierTest, CmsSignTestCase4) {
   // The CMS is not signed by the CA that signed the cert it contains
   Cert ca(ca_pem_);
 
-  BIO* bio = OpenTestFileBio(cert_dir_v2_ + kCmsSignedDataTest4);
-  ASSERT_NE(bio, nullptr);
-  EXPECT_FALSE(verifier_.IsCmsSignedByCert(bio, ca).ValueOrDie());
-  BIO_free(bio);
+  ScopedBIO bio(OpenTestFileBio(cert_dir_v2_ + kCmsSignedDataTest4));
+  ASSERT_NE(bio.get(), nullptr);
+  EXPECT_FALSE(verifier_.IsCmsSignedByCert(bio.get(), ca).ValueOrDie());
 }
 
 
@@ -120,10 +117,9 @@ TEST_F(CmsVerifierTest, CmsVerifyTestCase2) {
   Cert cert(ca_pem_);
   ASSERT_TRUE(cert.IsLoaded());
 
-  BIO* bio = OpenTestFileBio(cert_dir_v2_ + kCmsSignedDataTest2);
+  ScopedBIO bio(OpenTestFileBio(cert_dir_v2_ + kCmsSignedDataTest2));
   unique_ptr<Cert> unpacked_cert(
-      verifier_.UnpackCmsSignedCertificate(bio, cert));
-  BIO_free(bio);
+      verifier_.UnpackCmsSignedCertificate(bio.get(), cert));
 
   ASSERT_FALSE(unpacked_cert->IsLoaded());
 }
@@ -134,10 +130,9 @@ TEST_F(CmsVerifierTest, CmsVerifyTestCase3) {
   Cert cert(ca_pem_);
   ASSERT_TRUE(cert.IsLoaded());
 
-  BIO* bio = OpenTestFileBio(cert_dir_v2_ + kCmsSignedDataTest3);
+  ScopedBIO bio(OpenTestFileBio(cert_dir_v2_ + kCmsSignedDataTest3));
   unique_ptr<Cert> unpacked_cert(
-      verifier_.UnpackCmsSignedCertificate(bio, cert));
-  BIO_free(bio);
+      verifier_.UnpackCmsSignedCertificate(bio.get(), cert));
 
   ASSERT_FALSE(unpacked_cert->HasBasicConstraintCATrue().ValueOrDie());
   ASSERT_TRUE(
@@ -154,10 +149,9 @@ TEST_F(CmsVerifierTest, CmsVerifyTestCase4) {
   Cert cert(ca_pem_);
   ASSERT_TRUE(cert.IsLoaded());
 
-  BIO* bio = OpenTestFileBio(cert_dir_v2_ + kCmsSignedDataTest4);
+  ScopedBIO bio(OpenTestFileBio(cert_dir_v2_ + kCmsSignedDataTest4));
   unique_ptr<Cert> unpacked_cert(
-      verifier_.UnpackCmsSignedCertificate(bio, cert));
-  BIO_free(bio);
+      verifier_.UnpackCmsSignedCertificate(bio.get(), cert));
 
   ASSERT_FALSE(unpacked_cert->IsLoaded());
 }
@@ -168,10 +162,9 @@ TEST_F(CmsVerifierTest, CmsVerifyTestCase5) {
   Cert cert(intermediate_pem_);
   ASSERT_TRUE(cert.IsLoaded());
 
-  BIO* bio = OpenTestFileBio(cert_dir_v2_ + kCmsSignedDataTest5);
+  ScopedBIO bio(OpenTestFileBio(cert_dir_v2_ + kCmsSignedDataTest5));
   unique_ptr<Cert> unpacked_cert(
-      verifier_.UnpackCmsSignedCertificate(bio, cert));
-  BIO_free(bio);
+      verifier_.UnpackCmsSignedCertificate(bio.get(), cert));
 
   ASSERT_FALSE(unpacked_cert->HasBasicConstraintCATrue().ValueOrDie());
   ASSERT_TRUE(
@@ -188,10 +181,9 @@ TEST_F(CmsVerifierTest, CmsVerifyTestCase7) {
   Cert cert(leaf_pem_);
   ASSERT_TRUE(cert.IsLoaded());
 
-  BIO* bio = OpenTestFileBio(cert_dir_v2_ + kCmsSignedDataTest5);
+  ScopedBIO bio(OpenTestFileBio(cert_dir_v2_ + kCmsSignedDataTest5));
   unique_ptr<Cert> unpacked_cert(
-      verifier_.UnpackCmsSignedCertificate(bio, cert));
-  BIO_free(bio);
+      verifier_.UnpackCmsSignedCertificate(bio.get(), cert));
 
   ASSERT_FALSE(unpacked_cert->IsLoaded());
 }
@@ -202,10 +194,9 @@ TEST_F(CmsVerifierTest, CmsVerifyTestCase8) {
   Cert cert(ca_pem_);
   ASSERT_TRUE(cert.IsLoaded());
 
-  BIO* bio = OpenTestFileBio(cert_dir_v2_ + kCmsSignedDataTest5);
+  ScopedBIO bio(OpenTestFileBio(cert_dir_v2_ + kCmsSignedDataTest5));
   unique_ptr<Cert> unpacked_cert(
-      verifier_.UnpackCmsSignedCertificate(bio, cert));
-  BIO_free(bio);
+      verifier_.UnpackCmsSignedCertificate(bio.get(), cert));
 
   ASSERT_FALSE(unpacked_cert->IsLoaded());
 }

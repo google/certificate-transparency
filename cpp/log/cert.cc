@@ -77,17 +77,16 @@ Cert::Cert(X509* x509) : x509_(x509) {
 }
 
 
-Cert::Cert(const string& pem_string) : x509_(nullptr) {
+Cert::Cert(const string& pem_string) {
   // A read-only bio.
-  BIO* bio_in = BIO_new_mem_buf(const_cast<char*>(pem_string.data()),
-                                pem_string.length());
+  ScopedBIO bio_in(BIO_new_mem_buf(const_cast<char*>(pem_string.data()),
+                                   pem_string.length()));
   if (!bio_in) {
     LOG_OPENSSL_ERRORS(ERROR);
     return;
   }
 
-  x509_ = PEM_read_bio_X509(bio_in, nullptr, nullptr, nullptr);
-  BIO_free(bio_in);
+  x509_.reset(PEM_read_bio_X509(bio_in.get(), nullptr, nullptr, nullptr));
 
   if (!x509_) {
     // At this point most likely the input was just corrupt. There are a few
@@ -99,16 +98,10 @@ Cert::Cert(const string& pem_string) : x509_(nullptr) {
 }
 
 
-Cert::~Cert() {
-  if (x509_)
-    X509_free(x509_);
-}
-
-
 Cert* Cert::Clone() const {
   X509* x509(nullptr);
   if (x509_) {
-    x509 = X509_dup(x509_);
+    x509 = X509_dup(x509_.get());
     if (!x509)
       LOG_OPENSSL_ERRORS(ERROR);
   }
@@ -117,13 +110,9 @@ Cert* Cert::Clone() const {
 
 
 util::Status Cert::LoadFromDerString(const string& der_string) {
-  if (x509_) {
-    X509_free(x509_);
-    x509_ = nullptr;
-  }
   const unsigned char* start =
       reinterpret_cast<const unsigned char*>(der_string.data());
-  x509_ = d2i_X509(nullptr, &start, der_string.size());
+  x509_.reset(d2i_X509(nullptr, &start, der_string.size()));
   if (!x509_) {
     LOG(WARNING) << "Input is not a valid DER-encoded certificate";
     LOG_OPENSSL_ERRORS(WARNING);
@@ -134,13 +123,7 @@ util::Status Cert::LoadFromDerString(const string& der_string) {
 
 
 util::Status Cert::LoadFromDerBio(BIO* bio_in) {
-  if (x509_) {
-    // TODO(AlCutter): Use custom deallocator
-    X509_free(x509_);
-    x509_ = nullptr;
-  }
-
-  x509_ = d2i_X509_bio(bio_in, &x509_);
+  x509_.reset(d2i_X509_bio(bio_in, nullptr));
   CHECK_NOTNULL(bio_in);
 
   if (!x509_) {
@@ -161,7 +144,7 @@ string Cert::PrintIssuerName() const {
     return string();
   }
 
-  return PrintName(X509_get_issuer_name(x509_));
+  return PrintName(X509_get_issuer_name(x509_.get()));
 }
 
 
@@ -171,7 +154,7 @@ string Cert::PrintSubjectName() const {
     return string();
   }
 
-  return PrintName(X509_get_subject_name(x509_));
+  return PrintName(X509_get_subject_name(x509_.get()));
 }
 
 
@@ -179,20 +162,18 @@ string Cert::PrintSubjectName() const {
 string Cert::PrintName(X509_NAME* name) {
   if (!name)
     return string();
-  BIO* bio = BIO_new(BIO_s_mem());
+  ScopedBIO bio(BIO_new(BIO_s_mem()));
   if (!bio) {
     LOG_OPENSSL_ERRORS(ERROR);
     return string();
   }
 
-  if (X509_NAME_print_ex(bio, name, 0, 0) != 1) {
+  if (X509_NAME_print_ex(bio.get(), name, 0, 0) != 1) {
     LOG_OPENSSL_ERRORS(ERROR);
-    BIO_free(bio);
     return string();
   }
 
-  string ret = util::ReadBIO(bio);
-  BIO_free(bio);
+  string ret = util::ReadBIO(bio.get());
   return ret;
 }
 
@@ -203,7 +184,7 @@ string Cert::PrintNotBefore() const {
     return string();
   }
 
-  return PrintTime(X509_get_notBefore(x509_));
+  return PrintTime(X509_get_notBefore(x509_.get()));
 }
 
 
@@ -213,12 +194,12 @@ string Cert::PrintNotAfter() const {
     return string();
   }
 
-  return PrintTime(X509_get_notAfter(x509_));
+  return PrintTime(X509_get_notAfter(x509_.get()));
 }
 
 
 string Cert::PrintSignatureAlgorithm() const {
-  const char* sigalg = OBJ_nid2ln(X509_get_signature_nid(x509_));
+  const char* sigalg = OBJ_nid2ln(X509_get_signature_nid(x509_.get()));
   if (!sigalg)
     return "NULL";
   return string(sigalg);
@@ -230,26 +211,24 @@ string Cert::PrintTime(ASN1_TIME* when) {
   if (!when)
     return string();
 
-  BIO* bio = BIO_new(BIO_s_mem());
+  ScopedBIO bio(BIO_new(BIO_s_mem()));
   if (!bio) {
     LOG_OPENSSL_ERRORS(ERROR);
     return string();
   }
 
-  if (ASN1_TIME_print(bio, when) != 1) {
+  if (ASN1_TIME_print(bio.get(), when) != 1) {
     LOG_OPENSSL_ERRORS(ERROR);
-    BIO_free(bio);
     return string();
   }
 
-  string ret = util::ReadBIO(bio);
-  BIO_free(bio);
+  string ret = util::ReadBIO(bio.get());
   return ret;
 }
 
 
 bool Cert::IsIdenticalTo(const Cert& other) const {
-  return X509_cmp(x509_, other.x509_) == 0;
+  return X509_cmp(x509_.get(), other.x509_.get()) == 0;
 }
 
 
@@ -310,10 +289,9 @@ StatusOr<bool> Cert::HasBasicConstraintCATrue() const {
   }
 
   // |constraints| is never null upon success.
-  BASIC_CONSTRAINTS* basic_constraints =
-      static_cast<BASIC_CONSTRAINTS*>(ext_struct.ValueOrDie());
+  ScopedBASIC_CONSTRAINTS basic_constraints(
+      static_cast<BASIC_CONSTRAINTS*>(ext_struct.ValueOrDie()));
   bool is_ca = basic_constraints->ca;
-  BASIC_CONSTRAINTS_free(basic_constraints);
   return is_ca;
 }
 
@@ -344,17 +322,16 @@ StatusOr<bool> Cert::HasExtendedKeyUsage(int key_usage_nid) const {
   }
 
   // |eku| is never null upon success.
-  EXTENDED_KEY_USAGE* eku =
-      static_cast<EXTENDED_KEY_USAGE*>(ext_key_usage.ValueOrDie());
+  ScopedEXTENDED_KEY_USAGE eku(
+      static_cast<EXTENDED_KEY_USAGE*>(ext_key_usage.ValueOrDie()));
   bool ext_key_usage_found = false;
-  for (int i = 0; i < sk_ASN1_OBJECT_num(eku); ++i) {
-    if (OBJ_cmp(key_usage_obj, sk_ASN1_OBJECT_value(eku, i)) == 0) {
+  for (int i = 0; i < sk_ASN1_OBJECT_num(eku.get()); ++i) {
+    if (OBJ_cmp(key_usage_obj, sk_ASN1_OBJECT_value(eku.get(), i)) == 0) {
       ext_key_usage_found = true;
       break;
     }
   }
 
-  EXTENDED_KEY_USAGE_free(eku);
   return ext_key_usage_found;
 }
 
@@ -365,7 +342,8 @@ StatusOr<bool> Cert::IsIssuedBy(const Cert& issuer) const {
     return util::Status(Code::FAILED_PRECONDITION, "Cert not loaded");
   }
   // Seemingly no negative "real" error codes are returned from openssl api.
-  return X509_check_issued(const_cast<X509*>(issuer.x509_), x509_) == X509_V_OK;
+  return X509_check_issued(const_cast<X509*>(issuer.x509_.get()),
+                           x509_.get()) == X509_V_OK;
 }
 
 StatusOr<bool> Cert::LogUnsupportedAlgorithm() const {
@@ -380,15 +358,14 @@ StatusOr<bool> Cert::IsSignedBy(const Cert& issuer) const {
     return util::Status(Code::FAILED_PRECONDITION, "Cert not loaded");
   }
 
-  EVP_PKEY* const issuer_key = X509_get_pubkey(issuer.x509_);
-  if (issuer_key == NULL) {
+  const ScopedEVP_PKEY issuer_key(X509_get_pubkey(issuer.x509_.get()));
+  if (!issuer_key) {
     LOG(WARNING) << "NULL issuer key";
     LOG_OPENSSL_ERRORS(WARNING);
     return false;
   }
 
-  const int ret(X509_verify(x509_, issuer_key));
-  EVP_PKEY_free(issuer_key);
+  const int ret(X509_verify(x509_.get(), issuer_key.get()));
   if (ret == 1) {
     return true;
   }
@@ -434,7 +411,7 @@ util::Status Cert::DerEncoding(string* result) const {
   }
 
   unsigned char* der_buf(nullptr);
-  int der_length = i2d_X509(x509_, &der_buf);
+  int der_length = i2d_X509(x509_.get(), &der_buf);
 
   if (der_length < 0) {
     // What does this return value mean? Let's assume it means the cert
@@ -456,8 +433,8 @@ util::Status Cert::PemEncoding(string* result) const {
     return util::Status(Code::FAILED_PRECONDITION, "Cert not loaded");
   }
 
-  unique_ptr<BIO, int (*)(BIO*)> bp(BIO_new(BIO_s_mem()), &BIO_free);
-  if (!PEM_write_bio_X509(bp.get(), x509_)) {
+  ScopedBIO bp(BIO_new(BIO_s_mem()));
+  if (!PEM_write_bio_X509(bp.get(), x509_.get())) {
     LOG(WARNING) << "Failed to serialize cert";
     LOG_OPENSSL_ERRORS(WARNING);
     return util::Status(Code::INVALID_ARGUMENT, "PEM serialize failed");
@@ -482,7 +459,7 @@ util::Status Cert::Sha256Digest(string* result) const {
 
   unsigned char digest[EVP_MAX_MD_SIZE];
   unsigned int len;
-  if (X509_digest(x509_, EVP_sha256(), digest, &len) != 1) {
+  if (X509_digest(x509_.get(), EVP_sha256(), digest, &len) != 1) {
     // What does this return value mean? Let's assume it means the cert
     // is bad until proven otherwise.
     LOG(WARNING) << "Failed to compute cert digest";
@@ -502,7 +479,7 @@ util::Status Cert::DerEncodedTbsCertificate(string* result) const {
   }
 
   unsigned char* der_buf(nullptr);
-  int der_length = i2d_re_X509_tbs(x509_, &der_buf);
+  int der_length = i2d_re_X509_tbs(x509_.get(), &der_buf);
   if (der_length < 0) {
     // What does this return value mean? Let's assume it means the cert
     // is bad until proven otherwise.
@@ -521,7 +498,7 @@ util::Status Cert::DerEncodedSubjectName(string* result) const {
     LOG(ERROR) << "Cert not loaded";
     return util::Status(Code::FAILED_PRECONDITION, "Cert not loaded");
   }
-  return DerEncodedName(X509_get_subject_name(x509_), result);
+  return DerEncodedName(X509_get_subject_name(x509_.get()), result);
 }
 
 
@@ -530,7 +507,7 @@ util::Status Cert::DerEncodedIssuerName(string* result) const {
     LOG(ERROR) << "Cert not loaded";
     return util::Status(Code::FAILED_PRECONDITION, "Cert not loaded");
   }
-  return DerEncodedName(X509_get_issuer_name(x509_), result);
+  return DerEncodedName(X509_get_issuer_name(x509_.get()), result);
 }
 
 
@@ -559,7 +536,7 @@ util::Status Cert::PublicKeySha256Digest(string* result) const {
 
   unsigned char digest[EVP_MAX_MD_SIZE];
   unsigned int len;
-  if (X509_pubkey_digest(x509_, EVP_sha256(), digest, &len) != 1) {
+  if (X509_pubkey_digest(x509_.get(), EVP_sha256(), digest, &len) != 1) {
     // What does this return value mean? Let's assume it means the cert
     // is bad until proven otherwise.
     LOG(WARNING) << "Failed to compute public key digest";
@@ -578,7 +555,8 @@ util::Status Cert::SPKISha256Digest(string* result) const {
   }
 
   unsigned char* der_buf(nullptr);
-  int der_length = i2d_X509_PUBKEY(X509_get_X509_PUBKEY(x509_), &der_buf);
+  int der_length =
+      i2d_X509_PUBKEY(X509_get_X509_PUBKEY(x509_.get()), &der_buf);
   if (der_length < 0) {
     // What does this return value mean? Let's assume it means the cert
     // is bad until proven otherwise.
@@ -612,16 +590,15 @@ util::Status Cert::OctetStringExtensionData(int extension_nid,
 
   // |octet| is never null upon success. Caller is responsible for the
   // correctness of this cast.
-  ASN1_OCTET_STRING* octet =
-      static_cast<ASN1_OCTET_STRING*>(ext_struct.ValueOrDie());
+  ScopedASN1_OCTET_STRING octet(
+      static_cast<ASN1_OCTET_STRING*>(ext_struct.ValueOrDie()));
   result->assign(reinterpret_cast<const char*>(octet->data), octet->length);
-  ASN1_OCTET_STRING_free(octet);
   return util::Status::OK;
 }
 
 
 util::StatusOr<int> Cert::ExtensionIndex(int extension_nid) const {
-  const int index(X509_get_ext_by_NID(x509_, extension_nid, -1));
+  const int index(X509_get_ext_by_NID(x509_.get(), extension_nid, -1));
   if (index < -1) {
     // The most likely and possibly only cause for a return code
     // other than -1 is an unrecognized NID.
@@ -643,7 +620,8 @@ StatusOr<X509_EXTENSION*> Cert::GetExtension(int extension_nid) const {
     return extension_index.status();
   }
 
-  X509_EXTENSION* const ext(X509_get_ext(x509_, extension_index.ValueOrDie()));
+  X509_EXTENSION* const ext(
+      X509_get_ext(x509_.get(), extension_index.ValueOrDie()));
   if (!ext) {
     LOG(ERROR) << "Failed to retrieve extension for NID " << extension_nid
                << ", at index " << extension_index.ValueOrDie();
@@ -674,7 +652,8 @@ util::StatusOr<void*> Cert::ExtensionStructure(int extension_nid) const {
 
   int crit;
 
-  void* ext_struct = X509_get_ext_d2i(x509_, extension_nid, &crit, nullptr);
+  void* ext_struct(
+      X509_get_ext_d2i(x509_.get(), extension_nid, &crit, nullptr));
 
   if (!ext_struct) {
     if (crit != -1) {
@@ -735,16 +714,6 @@ bool IsValidRedactedHost(const string& hostname) {
 namespace {
 
 
-void FreeOpenSslStackOfGeneralName(STACK_OF(GENERAL_NAME)* general_name_stack) {
-  CHECK_NOTNULL(general_name_stack);
-  for (int i = 0; i < sk_GENERAL_NAME_num(general_name_stack); ++i) {
-    GENERAL_NAME* name(sk_GENERAL_NAME_value(general_name_stack, i));
-    GENERAL_NAME_free(name);
-  }
-  sk_GENERAL_NAME_free(general_name_stack);
-}
-
-
 bool ValidateRedactionSubjectAltNames(STACK_OF(GENERAL_NAME)* subject_alt_names,
                                       vector<string>* dns_alt_names,
                                       util::Status* status,
@@ -765,7 +734,6 @@ bool ValidateRedactionSubjectAltNames(STACK_OF(GENERAL_NAME)* subject_alt_names,
                                                              &name_status);
 
         if (!name_status.ok()) {
-          FreeOpenSslStackOfGeneralName(subject_alt_names);
           *status = name_status;
           return true;
         }
@@ -775,7 +743,6 @@ bool ValidateRedactionSubjectAltNames(STACK_OF(GENERAL_NAME)* subject_alt_names,
         if (IsRedactedHost(dns_name)) {
           if (!IsValidRedactedHost(dns_name)) {
             LOG(WARNING) << "Invalid redacted host: " << dns_name;
-            FreeOpenSslStackOfGeneralName(subject_alt_names);
             *status = util::Status(Code::INVALID_ARGUMENT,
                                    "Invalid redacted hostname");
             return true;
@@ -785,8 +752,6 @@ bool ValidateRedactionSubjectAltNames(STACK_OF(GENERAL_NAME)* subject_alt_names,
         }
       }
     }
-
-    FreeOpenSslStackOfGeneralName(subject_alt_names);
   }
 
   // This stage of validation is complete, result is not final yet
@@ -805,24 +770,22 @@ bool Cert::ValidateRedactionSubjectAltNameAndCN(int* dns_alt_name_count,
   int redacted_name_count = 0;
   vector<string> dns_alt_names;
 
-  STACK_OF(GENERAL_NAME)* subject_alt_names =
-      static_cast<STACK_OF(GENERAL_NAME)*>(
-          X509_get_ext_d2i(x509_, NID_subject_alt_name, nullptr, nullptr));
+  ScopedGENERAL_NAMEStack subject_alt_names(
+      static_cast<STACK_OF(GENERAL_NAME)*>(X509_get_ext_d2i(
+          x509_.get(), NID_subject_alt_name, nullptr, nullptr)));
 
   // Apply validation rules for subject alt names, if this returns true
   // status is already final.
   if (subject_alt_names &&
-      ValidateRedactionSubjectAltNames(subject_alt_names,
-                                       &dns_alt_names,
-                                       status,
-                                       &redacted_name_count)) {
+      ValidateRedactionSubjectAltNames(subject_alt_names.get(), &dns_alt_names,
+                                       status, &redacted_name_count)) {
     return true;
   }
 
   // The next stage of validation is that if the subject name CN exists it
   // must match the first DNS id and have the same labels redacted
   // TODO: Confirm it's valid to not have a CN.
-  X509_NAME* const name(X509_get_subject_name(x509_));
+  X509_NAME* const name(X509_get_subject_name(x509_.get()));
 
   if (!name) {
     LOG(ERROR) << "Missing X509 subject name";
@@ -924,19 +887,17 @@ util::Status Cert::IsValidWildcardRedaction() const {
   // during parsing.
   const unsigned char* sequence_data(
       const_cast<const unsigned char*>(exty.ValueOrDie()->value->data));
-  STACK_OF(ASN1_TYPE)* const asn1_types(
-      static_cast<STACK_OF(ASN1_TYPE)*>(
-          d2i_ASN1_SEQUENCE_ANY(
-              nullptr, &sequence_data, exty.ValueOrDie()->value->length)));
+  ScopedASN1_TYPEStack asn1_types(static_cast<STACK_OF(ASN1_TYPE)*>(
+      d2i_ASN1_SEQUENCE_ANY(nullptr, &sequence_data,
+                            exty.ValueOrDie()->value->length)));
 
   if (asn1_types) {
-    const int num_integers(sk_ASN1_TYPE_num(asn1_types));
+    const int num_integers(sk_ASN1_TYPE_num(asn1_types.get()));
 
     // RFC text says there MUST NOT be more integers than there are DNS ids
     if (num_integers > dns_alt_name_count) {
       LOG(WARNING) << "Too many integers in extension: " << num_integers
                    << " but only " << dns_alt_name_count << " DNS names";
-      sk_ASN1_TYPE_pop_free(asn1_types, ASN1_TYPE_free);
       return util::Status(Code::INVALID_ARGUMENT,
                           "More integers in ext than redacted labels");
     }
@@ -944,33 +905,27 @@ util::Status Cert::IsValidWildcardRedaction() const {
     // All the integers in the sequence must be positive, check the sign
     // after conversion to BIGNUM
     for (int i = 0; i < num_integers; ++i) {
-      ASN1_TYPE* const asn1_type(sk_ASN1_TYPE_value(asn1_types, i));
+      ASN1_TYPE* const asn1_type(sk_ASN1_TYPE_value(asn1_types.get(), i));
 
       if (asn1_type->type != V_ASN1_INTEGER) {
         LOG(WARNING) << "Redaction count has non-integer in sequence"
                      << asn1_type->type;
-        sk_ASN1_TYPE_pop_free(asn1_types, ASN1_TYPE_free);
         return util::Status(Code::INVALID_ARGUMENT,
                             "Non integer found in redaction label count");
       }
 
       ASN1_INTEGER* const redacted_labels(asn1_type->value.integer);
-      BIGNUM* const value(ASN1_INTEGER_to_BN(redacted_labels, nullptr));
+      ScopedBIGNUM value(ASN1_INTEGER_to_BN(redacted_labels, nullptr));
 
       const bool neg = value->neg;
       if (neg) {
-        char* bn_hex = BN_bn2hex(value);
-        LOG(WARNING) << "Invalid negative redaction label count: " << bn_hex;
-        OPENSSL_free(bn_hex);
-        BN_free(value);
-        sk_ASN1_TYPE_pop_free(asn1_types, ASN1_TYPE_free);
+        ScopedOpenSSLString bn_hex(BN_bn2hex(value.get()));
+        LOG(WARNING) << "Invalid negative redaction label count: "
+                     << bn_hex.get();
         return util::Status(Code::INVALID_ARGUMENT, "Invalid -ve label count");
       }
-
-      BN_free(value);
     }
 
-    sk_ASN1_TYPE_pop_free(asn1_types, ASN1_TYPE_free);
   } else {
     LOG(WARNING) << "Failed to unpack SEQUENCE OF in CT extension";
     return util::Status(Code::INVALID_ARGUMENT,
@@ -1021,8 +976,8 @@ util::Status Cert::IsValidNameConstrainedIntermediateCa() const {
   }
 
   int crit;
-  NAME_CONSTRAINTS* const nc(static_cast<NAME_CONSTRAINTS*>(X509_get_ext_d2i(
-      x509_, NID_name_constraints, &crit, nullptr)));
+  NAME_CONSTRAINTS* const nc(static_cast<NAME_CONSTRAINTS*>(
+      X509_get_ext_d2i(x509_.get(), NID_name_constraints, &crit, nullptr)));
 
   if (!nc || crit == -1) {
     LOG(ERROR) << "Couldn't parse the name constraint extension";
@@ -1102,22 +1057,16 @@ util::Status Cert::IsValidNameConstrainedIntermediateCa() const {
 }
 
 
-TbsCertificate::TbsCertificate(const Cert& cert) : x509_(nullptr) {
+TbsCertificate::TbsCertificate(const Cert& cert) {
   if (!cert.IsLoaded()) {
     LOG(ERROR) << "Cert not loaded";
     return;
   }
 
-  x509_ = X509_dup(cert.x509_);
+  x509_.reset(X509_dup(cert.x509_.get()));
 
   if (!x509_)
     LOG_OPENSSL_ERRORS(ERROR);
-}
-
-
-TbsCertificate::~TbsCertificate() {
-  if (x509_)
-    X509_free(x509_);
 }
 
 
@@ -1128,7 +1077,7 @@ util::Status TbsCertificate::DerEncoding(string* result) const {
   }
 
   unsigned char* der_buf(nullptr);
-  int der_length = i2d_re_X509_tbs(x509_, &der_buf);
+  int der_length = i2d_re_X509_tbs(x509_.get(), &der_buf);
   if (der_length < 0) {
     // What does this return value mean? Let's assume it means the cert
     // is bad until proven otherwise.
@@ -1155,7 +1104,8 @@ util::Status TbsCertificate::DeleteExtension(int extension_nid) {
     return extension_index.status();
   }
 
-  X509_EXTENSION* ext = X509_delete_ext(x509_, extension_index.ValueOrDie());
+  ScopedX509_EXTENSION ext(
+      X509_delete_ext(x509_.get(), extension_index.ValueOrDie()));
 
   if (!ext) {
     // Truly odd.
@@ -1164,9 +1114,6 @@ util::Status TbsCertificate::DeleteExtension(int extension_nid) {
     return util::Status(Code::INTERNAL, "Failed to delete extension");
   }
 
-  // X509_delete_ext does not free the extension (GAH!), so we need to
-  // free separately.
-  X509_EXTENSION_free(ext);
 
   // ExtensionIndex returns the first matching index - if the extension
   // occurs more than once, just give up.
@@ -1202,13 +1149,13 @@ util::Status TbsCertificate::CopyIssuerFrom(const Cert& from) {
 
   // This just looks up the relevant pointer so there shouldn't
   // be any errors to clear.
-  X509_NAME* ca_name = X509_get_issuer_name(from.x509_);
+  X509_NAME* ca_name = X509_get_issuer_name(from.x509_.get());
   if (!ca_name) {
     LOG(WARNING) << "Issuer certificate has NULL name";
     return util::Status(Code::FAILED_PRECONDITION, "Issuer cert has NULL name");
   }
 
-  if (X509_set_issuer_name(x509_, ca_name) != 1) {
+  if (X509_set_issuer_name(x509_.get(), ca_name) != 1) {
     LOG(WARNING) << "Failed to set issuer name, Cert has NULL issuer?";
     LOG_OPENSSL_ERRORS(WARNING);
     return util::Status(Code::FAILED_PRECONDITION,
@@ -1247,9 +1194,9 @@ util::Status TbsCertificate::CopyIssuerFrom(const Cert& from) {
 
   // Ok, now copy the extension, keeping the critical bit (which should always
   // be false in a valid cert, mind you).
-  X509_EXTENSION* to_ext = X509_get_ext(x509_, status.ValueOrDie());
+  X509_EXTENSION* to_ext = X509_get_ext(x509_.get(), status.ValueOrDie());
   X509_EXTENSION* from_ext =
-      X509_get_ext(from.x509_, from_extension_index.ValueOrDie());
+      X509_get_ext(from.x509_.get(), from_extension_index.ValueOrDie());
 
   if (!to_ext || !from_ext) {
     // Should not happen.
@@ -1272,7 +1219,7 @@ util::Status TbsCertificate::CopyIssuerFrom(const Cert& from) {
 
 
 StatusOr<int> TbsCertificate::ExtensionIndex(int extension_nid) const {
-  int index = X509_get_ext_by_NID(x509_, extension_nid, -1);
+  int index = X509_get_ext_by_NID(x509_.get(), extension_nid, -1);
   if (index < -1) {
     // The most likely and possibly only cause for a return code
     // other than -1 is an unrecognized NID. This is different from a
@@ -1294,19 +1241,17 @@ StatusOr<int> TbsCertificate::ExtensionIndex(int extension_nid) const {
 
 CertChain::CertChain(const string& pem_string) {
   // A read-only BIO.
-  BIO* const bio_in(BIO_new_mem_buf(const_cast<char*>(pem_string.data()),
-                                    pem_string.length()));
+  ScopedBIO bio_in(BIO_new_mem_buf(const_cast<char*>(pem_string.data()),
+                                   pem_string.length()));
   if (!bio_in) {
     LOG_OPENSSL_ERRORS(ERROR);
     return;
   }
 
   X509* x509(nullptr);
-  while ((x509 = PEM_read_bio_X509(bio_in, nullptr, nullptr, nullptr))) {
+  while ((x509 = PEM_read_bio_X509(bio_in.get(), nullptr, nullptr, nullptr))) {
     chain_.push_back(new Cert(x509));
   }
-
-  BIO_free(bio_in);
 
   // The last error must be EOF.
   unsigned long err = ERR_peek_last_error();

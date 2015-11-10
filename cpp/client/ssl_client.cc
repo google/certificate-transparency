@@ -65,29 +65,26 @@ int SSLClient::ExtensionCallback(SSL*, unsigned ext_type,
 SSLClient::SSLClient(const string& server, uint16_t port, const string& ca_dir,
                      LogVerifier* verifier)
     : client_(server, port),
-      ctx_(NULL),
-      ssl_(NULL),
+      ctx_(CHECK_NOTNULL(SSL_CTX_new(TLSv1_client_method()))),
       verify_args_(verifier),
       connected_(false) {
-  ctx_ = SSL_CTX_new(TLSv1_client_method());
-  CHECK_NOTNULL(ctx_);
-
   // SSL_VERIFY_PEER makes the connection abort immediately
   // if verification fails.
-  SSL_CTX_set_verify(ctx_, SSL_VERIFY_PEER, NULL);
+  SSL_CTX_set_verify(ctx_.get(), SSL_VERIFY_PEER, NULL);
   // Set trusted CA certs.
   if (!ca_dir.empty()) {
-    CHECK_EQ(1, SSL_CTX_load_verify_locations(ctx_, NULL, ca_dir.c_str()))
+    CHECK_EQ(1,
+             SSL_CTX_load_verify_locations(ctx_.get(), NULL, ca_dir.c_str()))
         << "Unable to load trusted CA certificates.";
   } else {
     LOG(WARNING) << "No trusted CA certificates given.";
   }
 
-  SSL_CTX_set_cert_verify_callback(ctx_, &VerifyCallback, &verify_args_);
+  SSL_CTX_set_cert_verify_callback(ctx_.get(), &VerifyCallback, &verify_args_);
 
 #if OPENSSL_VERSION_NUMBER >= 0x10002000L
-  SSL_CTX_add_client_custom_ext(ctx_, CT_EXTENSION_TYPE, NULL, NULL, NULL,
-                                ExtensionCallback, &verify_args_);
+  SSL_CTX_add_client_custom_ext(ctx_.get(), CT_EXTENSION_TYPE, NULL, NULL,
+                                NULL, ExtensionCallback, &verify_args_);
 #else
   LOG(WARNING) << "OpenSSL version is too low to check the Certificate "
                   "Transparency TLS extension";
@@ -96,9 +93,6 @@ SSLClient::SSLClient(const string& server, uint16_t port, const string& ca_dir,
 
 SSLClient::~SSLClient() {
   Disconnect();
-  if (ctx_ != NULL)
-    SSL_CTX_free(ctx_);
-  delete verify_args_.verifier;
 }
 
 bool SSLClient::Connected() const {
@@ -106,11 +100,10 @@ bool SSLClient::Connected() const {
 }
 
 void SSLClient::Disconnect() {
-  if (ssl_ != NULL) {
-    SSL_shutdown(ssl_);
-    SSL_free(ssl_);
-    ssl_ = NULL;
+  if (ssl_) {
+    SSL_shutdown(ssl_.get());
     LOG(INFO) << "SSL session finished";
+    ssl_.reset();
   }
   client_.Disconnect();
   connected_ = false;
@@ -154,7 +147,7 @@ LogVerifier::LogVerifyResult SSLClient::VerifySCT(const string& token,
 int SSLClient::VerifyCallback(X509_STORE_CTX* ctx, void* arg) {
   VerifyCallbackArgs* args = reinterpret_cast<VerifyCallbackArgs*>(arg);
   CHECK_NOTNULL(args);
-  LogVerifier* verifier = args->verifier;
+  LogVerifier* verifier(args->verifier.get());
   CHECK_NOTNULL(verifier);
 
   int vfy = X509_verify_cert(ctx);
@@ -279,15 +272,18 @@ SSLClient::HandshakeResult SSLClient::SSLConnect(bool strict) {
   if (!client_.Connect())
     return SERVER_UNAVAILABLE;
 
-  ssl_ = SSL_new(ctx_);
-  CHECK_NOTNULL(ssl_);
-  BIO* bio = BIO_new_socket(client_.fd(), BIO_NOCLOSE);
-  CHECK_NOTNULL(bio);
-  // Takes ownership of bio.
-  SSL_set_bio(ssl_, bio, bio);
+  ssl_.reset(SSL_new(ctx_.get()));
+  CHECK_NOTNULL(ssl_.get());
+  ScopedBIO bio(BIO_new_socket(client_.fd(), BIO_NOCLOSE));
+  CHECK_NOTNULL(bio.get());
+  {
+    BIO* const b(bio.release());
+    // Takes ownership of bio.
+    SSL_set_bio(ssl_.get(), b, b);
+  }
 
   ResetVerifyCallbackArgs(strict);
-  int ret = SSL_connect(ssl_);
+  int ret = SSL_connect(ssl_.get());
   HandshakeResult result;
   if (ret == 1) {
     LOG(INFO) << "Handshake successful. SSL session started";
