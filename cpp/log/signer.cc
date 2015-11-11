@@ -31,11 +31,7 @@ Signer::Signer(EVP_PKEY* pkey) : pkey_(CHECK_NOTNULL(pkey)) {
     default:
       LOG(FATAL) << "Unsupported key type " << pkey_->type;
   }
-  key_id_ = Verifier::ComputeKeyID(pkey_);
-}
-
-Signer::~Signer() {
-  EVP_PKEY_free(pkey_);
+  key_id_ = Verifier::ComputeKeyID(pkey_.get());
 }
 
 std::string Signer::KeyID() const {
@@ -50,8 +46,7 @@ void Signer::Sign(const std::string& data,
 }
 
 Signer::Signer()
-    : pkey_(NULL),
-      hash_algo_(ct::DigitallySigned::NONE),
+    : hash_algo_(ct::DigitallySigned::NONE),
       sig_algo_(ct::DigitallySigned::ANONYMOUS) {
 }
 
@@ -61,10 +56,10 @@ std::string Signer::RawSign(const std::string& data) const {
   // NOTE: this syntax for setting the hash function requires OpenSSL >= 1.0.0.
   CHECK_EQ(1, EVP_SignInit(&ctx, EVP_sha256()));
   CHECK_EQ(1, EVP_SignUpdate(&ctx, data.data(), data.size()));
-  unsigned int sig_size = EVP_PKEY_size(pkey_);
+  unsigned int sig_size = EVP_PKEY_size(pkey_.get());
   unsigned char* sig = new unsigned char[sig_size];
 
-  CHECK_EQ(1, EVP_SignFinal(&ctx, sig, &sig_size, pkey_));
+  CHECK_EQ(1, EVP_SignFinal(&ctx, sig, &sig_size, pkey_.get()));
 
   EVP_MD_CTX_cleanup(&ctx);
   std::string ret(reinterpret_cast<char*>(sig), sig_size);

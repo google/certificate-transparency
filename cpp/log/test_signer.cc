@@ -17,6 +17,7 @@
 #include "merkletree/tree_hasher.h"
 #include "proto/ct.pb.h"
 #include "proto/serializer.h"
+#include "util/openssl_scoped_types.h"
 #include "util/util.h"
 
 using cert_trans::Signer;
@@ -155,18 +156,18 @@ const char kKeyID[] =
 
 EVP_PKEY* PrivateKeyFromPem(const string& pemkey) {
   // BIO_new_mem_buf is read-only.
-  BIO* bio = BIO_new_mem_buf(const_cast<char*>(pemkey.data()), pemkey.size());
-  EVP_PKEY* pkey = PEM_read_bio_PrivateKey(bio, NULL, NULL, NULL);
+  ScopedBIO bio(
+      BIO_new_mem_buf(const_cast<char*>(pemkey.data()), pemkey.size()));
+  EVP_PKEY* pkey = PEM_read_bio_PrivateKey(bio.get(), NULL, NULL, NULL);
   CHECK_NOTNULL(pkey);
-  BIO_free(bio);
   return pkey;
 }
 
 EVP_PKEY* PublicKeyFromPem(const string& pemkey) {
-  BIO* bio = BIO_new_mem_buf(const_cast<char*>(pemkey.data()), pemkey.size());
-  EVP_PKEY* pkey = PEM_read_bio_PUBKEY(bio, NULL, NULL, NULL);
+  ScopedBIO bio(
+      BIO_new_mem_buf(const_cast<char*>(pemkey.data()), pemkey.size()));
+  EVP_PKEY* pkey = PEM_read_bio_PUBKEY(bio.get(), NULL, NULL, NULL);
   CHECK_NOTNULL(pkey);
-  BIO_free(bio);
   return pkey;
 }
 

@@ -35,6 +35,7 @@
 #include "proto/ct.pb.h"
 #include "proto/serializer.h"
 #include "util/init.h"
+#include "util/openssl_scoped_types.h"
 #include "util/read_key.h"
 
 DEFINE_string(ssl_client_trusted_cert_dir, "",
@@ -168,29 +169,25 @@ static LogVerifier* GetLogVerifierFromFlags() {
 static void AddOctetExtension(X509* cert, int nid, const unsigned char* data,
                               int data_len, int critical) {
   // The extension as a single octet string.
-  ASN1_OCTET_STRING* inner = ASN1_OCTET_STRING_new();
-  CHECK_NOTNULL(inner);
-  CHECK_EQ(1, ASN1_OCTET_STRING_set(inner, data, data_len));
-  int buf_len = i2d_ASN1_OCTET_STRING(inner, NULL);
+  ScopedASN1_OCTET_STRING inner(ASN1_OCTET_STRING_new());
+  CHECK_NOTNULL(inner.get());
+  CHECK_EQ(1, ASN1_OCTET_STRING_set(inner.get(), data, data_len));
+  int buf_len = i2d_ASN1_OCTET_STRING(inner.get(), NULL);
   CHECK_GT(buf_len, 0);
 
-  unsigned char* buf = new unsigned char[buf_len];
+  unsigned char buf[buf_len];
   unsigned char* p = buf;
 
-  CHECK_EQ(buf_len, i2d_ASN1_OCTET_STRING(inner, &p));
+  CHECK_EQ(buf_len, i2d_ASN1_OCTET_STRING(inner.get(), &p));
 
   // The outer, opaque octet string.
-  ASN1_OCTET_STRING* asn1_data = ASN1_OCTET_STRING_new();
-  CHECK_NOTNULL(asn1_data);
-  CHECK_EQ(1, ASN1_OCTET_STRING_set(asn1_data, buf, buf_len));
+  ScopedASN1_OCTET_STRING asn1_data(ASN1_OCTET_STRING_new());
+  CHECK_NOTNULL(asn1_data.get());
+  CHECK_EQ(1, ASN1_OCTET_STRING_set(asn1_data.get(), buf, buf_len));
 
   X509_EXTENSION* ext =
-      X509_EXTENSION_create_by_NID(NULL, nid, critical, asn1_data);
+      X509_EXTENSION_create_by_NID(NULL, nid, critical, asn1_data.get());
   CHECK_EQ(1, X509_add_ext(cert, ext, -1));
-
-  ASN1_OCTET_STRING_free(inner);
-  ASN1_OCTET_STRING_free(asn1_data);
-  delete[] buf;
 }
 
 // Reconstructs a LogEntry from the given precert chain.
@@ -385,18 +382,17 @@ static void MakeCert() {
   PCHECK(cert_fd > 0) << "Could not open certificate file " << cert_file
                       << " for writing.";
 
-  BIO* out = BIO_new_fd(cert_fd, BIO_CLOSE);
+  ScopedBIO out(BIO_new_fd(cert_fd, BIO_CLOSE));
 
-  X509* x = X509_new();
+  ScopedX509 x(X509_new());
 
   // X509v3 (== 2)
-  X509_set_version(x, 2);
+  X509_set_version(x.get(), 2);
 
   // Random 128 bit serial number
-  BIGNUM* serial = BN_new();
-  BN_rand(serial, 128, 0, 0);
-  BN_to_ASN1_INTEGER(serial, X509_get_serialNumber(x));
-  BN_free(serial);
+  ScopedBIGNUM serial(BN_new());
+  BN_rand(serial.get(), 128, 0, 0);
+  BN_to_ASN1_INTEGER(serial.get(), X509_get_serialNumber(x.get()));
 
   // Set signature algorithm
   // FIXME: is there an opaque way to get the algorithm structure?
@@ -404,48 +400,45 @@ static void MakeCert() {
   x->cert_info->signature->parameter = NULL;
 
   // Set the start date to now
-  X509_gmtime_adj(X509_get_notBefore(x), 0);
+  X509_gmtime_adj(X509_get_notBefore(x.get()), 0);
   // End date to now + 1 second
-  X509_gmtime_adj(X509_get_notAfter(x), 1);
+  X509_gmtime_adj(X509_get_notAfter(x.get()), 1);
 
   // Create the issuer name
-  X509_NAME* issuer = X509_NAME_new();
-  X509_NAME_add_entry_by_NID(issuer, NID_commonName, V_ASN1_PRINTABLESTRING,
-                             const_cast<unsigned char*>(
-                                 reinterpret_cast<const unsigned char*>(
-                                     "Test")),
-                             4, 0, -1);
-  X509_set_issuer_name(x, issuer);
+  ScopedX509_NAME issuer(X509_NAME_new());
+  X509_NAME_add_entry_by_NID(
+      issuer.get(), NID_commonName, V_ASN1_PRINTABLESTRING,
+      const_cast<unsigned char*>(
+          reinterpret_cast<const unsigned char*>("Test")),
+      4, 0, -1);
+  X509_set_issuer_name(x.get(), issuer.release());
 
   // Create the subject name
-  X509_NAME* subject = X509_NAME_new();
-  X509_NAME_add_entry_by_NID(subject, NID_commonName, V_ASN1_PRINTABLESTRING,
-                             const_cast<unsigned char*>(
-                                 reinterpret_cast<const unsigned char*>(
-                                     "tseT")),
-                             4, 0, -1);
-  X509_set_subject_name(x, subject);
+  ScopedX509_NAME subject(X509_NAME_new());
+  X509_NAME_add_entry_by_NID(
+      subject.get(), NID_commonName, V_ASN1_PRINTABLESTRING,
+      const_cast<unsigned char*>(
+          reinterpret_cast<const unsigned char*>("tseT")),
+      4, 0, -1);
+  X509_set_subject_name(x.get(), subject.release());
 
   // Public key
-  RSA* rsa = RSA_new();
+  ScopedRSA rsa(RSA_new());
   static const unsigned char bits[1] = {3};
   rsa->n = BN_bin2bn(bits, 1, NULL);
   rsa->e = BN_bin2bn(bits, 1, NULL);
-  EVP_PKEY* evp_pkey = EVP_PKEY_new();
-  EVP_PKEY_assign_RSA(evp_pkey, rsa);
-  X509_PUBKEY_set(&X509_get_X509_PUBKEY(x), evp_pkey);
+  ScopedEVP_PKEY evp_pkey(EVP_PKEY_new());
+  EVP_PKEY_assign_RSA(evp_pkey.get(), rsa.release());
+  X509_PUBKEY_set(&X509_get_X509_PUBKEY(x), evp_pkey.release());
 
   // And finally, the proof in an extension
-  string serialized_sct_list = SCTToList(sct);
-  AddOctetExtension(x, cert_trans::NID_ctSignedCertificateTimestampList,
+  const string serialized_sct_list(SCTToList(sct));
+  AddOctetExtension(x.get(), cert_trans::NID_ctSignedCertificateTimestampList,
                     reinterpret_cast<const unsigned char*>(
                         serialized_sct_list.data()),
                     serialized_sct_list.size(), 1);
 
-  int i = i2d_X509_bio(out, x);
-  CHECK_GT(i, 0);
-
-  BIO_free(out);
+  CHECK_GT(i2d_X509_bio(out.get(), x.get()), 0);
 }
 
 // A sample tool for CAs showing how to add the CT proof as an extension.

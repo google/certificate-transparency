@@ -10,6 +10,7 @@
 #include "log/log_verifier.h"
 #include "proto/ct.pb.h"
 #include "base/macros.h"
+#include "util/openssl_scoped_types.h"
 
 class LogVerifier;
 
@@ -71,8 +72,8 @@ class SSLClient {
 
  private:
   Client client_;
-  SSL_CTX* ctx_;
-  SSL* ssl_;
+  ScopedSSL_CTX ctx_;
+  ScopedSSL ssl_;
   struct VerifyCallbackArgs {
     VerifyCallbackArgs(LogVerifier* log_verifier)
         : verifier(log_verifier),
@@ -82,7 +83,7 @@ class SSLClient {
     }
 
     // The verifier for checking log proofs.
-    LogVerifier* verifier;
+    std::unique_ptr<LogVerifier> verifier;
     // SCT verification result.
     bool sct_verified;
     bool require_sct;

@@ -15,6 +15,7 @@
 
 #include "log/cert.h"
 #include "log/ct_extensions.h"
+#include "util/openssl_scoped_types.h"
 #include "util/openssl_util.h"  // for LOG_OPENSSL_ERRORS
 #include "util/util.h"
 
@@ -34,20 +35,19 @@ CertChecker::~CertChecker() {
 
 bool CertChecker::LoadTrustedCertificates(const string& cert_file) {
   // A read-only BIO.
-  BIO* bio_in = BIO_new(BIO_s_file());
+  ScopedBIO bio_in(BIO_new(BIO_s_file()));
   if (!bio_in) {
     LOG_OPENSSL_ERRORS(ERROR);
     return false;
   }
 
-  if (BIO_read_filename(bio_in, cert_file.c_str()) <= 0) {
-    BIO_free(bio_in);
+  if (BIO_read_filename(bio_in.get(), cert_file.c_str()) <= 0) {
     LOG(ERROR) << "Failed to open file " << cert_file << " for reading";
     LOG_OPENSSL_ERRORS(ERROR);
     return false;
   }
 
-  return LoadTrustedCertificatesFromBIO(bio_in);
+  return LoadTrustedCertificatesFromBIO(bio_in.get());
 }
 
 bool CertChecker::LoadTrustedCertificates(const vector<string>& trusted_certs) {
@@ -57,15 +57,15 @@ bool CertChecker::LoadTrustedCertificates(const vector<string>& trusted_certs) {
     concat_certs.append(*it);
   }
   // A read-only memory BIO.
-  BIO* bio_in = BIO_new_mem_buf(
+  ScopedBIO bio_in(BIO_new_mem_buf(
       const_cast<void*>(reinterpret_cast<const void*>(concat_certs.c_str())),
-      -1  /* no length, since null-terminated */);
+      -1 /* no length, since null-terminated */));
   if (!bio_in) {
     LOG_OPENSSL_ERRORS(ERROR);
     return false;
   }
 
-  return LoadTrustedCertificatesFromBIO(bio_in);
+  return LoadTrustedCertificatesFromBIO(bio_in.get());
 }
 
 bool CertChecker::LoadTrustedCertificatesFromBIO(BIO* bio_in) {
@@ -77,11 +77,11 @@ bool CertChecker::LoadTrustedCertificatesFromBIO(BIO* bio_in) {
   size_t cert_count = 0;
 
   while (!error) {
-    X509* x509 = PEM_read_bio_X509(bio_in, nullptr, nullptr, nullptr);
+    ScopedX509 x509(PEM_read_bio_X509(bio_in, nullptr, nullptr, nullptr));
     if (x509) {
       // TODO(ekasper): check that the issuing CA cert is temporally valid
       // and at least warn if it isn't.
-      unique_ptr<Cert> cert(new Cert(x509));
+      unique_ptr<Cert> cert(new Cert(x509.release()));
       string subject_name;
       const StatusOr<bool> is_trusted(IsTrusted(*cert, &subject_name));
       if (!is_trusted.ok()) {
@@ -109,8 +109,6 @@ bool CertChecker::LoadTrustedCertificatesFromBIO(BIO* bio_in) {
       }
     }
   }
-
-  BIO_free(bio_in);
 
   if (error || !cert_count) {
     while (!certs_to_add.empty()) {

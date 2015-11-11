@@ -9,6 +9,7 @@
 #include <stdint.h>
 
 #include "base/macros.h"
+#include "util/openssl_scoped_types.h"
 #include "proto/ct.pb.h"
 
 namespace cert_trans {
@@ -23,7 +24,7 @@ class Verifier {
   };
 
   explicit Verifier(EVP_PKEY* pkey);
-  virtual ~Verifier();
+  virtual ~Verifier() = default;
 
   virtual std::string KeyID() const;
 
@@ -39,7 +40,7 @@ class Verifier {
  private:
   bool RawVerify(const std::string& data, const std::string& sig_string) const;
 
-  EVP_PKEY* pkey_;
+  ScopedEVP_PKEY pkey_;
   ct::DigitallySigned::HashAlgorithm hash_algo_;
   ct::DigitallySigned::SignatureAlgorithm sig_algo_;
   std::string key_id_;
