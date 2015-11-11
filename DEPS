@@ -44,9 +44,9 @@ import os
 import multiprocessing
 import sys
 
-print "Host platform is %s" % sys.platform
+print("Host platform is %s" % sys.platform)
 if sys.platform in deps_overrides:
-  print "Have %d overrides for platform" % len(deps_overrides[sys.platform])
+  print("Have %d overrides for platform" % len(deps_overrides[sys.platform]))
   deps.update(deps_overrides[sys.platform])
 if sys.platform in make_os:
 	make = make_os[sys.platform]
@@ -55,7 +55,7 @@ else:
 
 num_cores = multiprocessing.cpu_count()
 
-print "Using make %s with %d jobs" % (make, num_cores)
+print("Using make %s with %d jobs" % (make, num_cores))
 
 here = os.getcwd()
 
