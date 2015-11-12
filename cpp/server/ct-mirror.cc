@@ -50,13 +50,13 @@
 #include "util/util.h"
 #include "util/uuid.h"
 
-DEFINE_string(server, "localhost", "Server host");
-DEFINE_int32(port, 9999, "Server port");
+DEFINE_int32(log_stats_frequency_seconds, 3600,
+             "Interval for logging summary statistics. Approximate: the "
+             "server will log statistics if in the beginning of its select "
+             "loop, at least this period has elapsed since the last log time. "
+             "Must be greater than 0.");
 DEFINE_int32(target_poll_frequency_seconds, 10,
              "How often should the target log be polled for updates.");
-DEFINE_string(etcd_servers, "",
-              "Comma separated list of 'hostname:port' of the etcd server(s)");
-DEFINE_string(etcd_root, "/root", "Root of cluster entries in etcd.");
 DEFINE_int32(num_http_server_threads, 16,
              "Number of threads for servicing the incoming HTTP requests.");
 DEFINE_string(target_log_uri, "http://ct.googleapis.com/pilot",
@@ -140,17 +140,6 @@ Counter<>* inconsistent_sths_received =
 
 
 // Basic sanity checks on flag values.
-static bool ValidatePort(const char*, int port) {
-  if (port <= 0 || port > 65535) {
-    std::cout << "Port value " << port << " is invalid. " << std::endl;
-    return false;
-  }
-  return true;
-}
-
-static const bool port_dummy =
-    RegisterFlagValidator(&FLAGS_port, &ValidatePort);
-
 static bool ValidateRead(const char* flagname, const string& path) {
   if (access(path.c_str(), R_OK) != 0) {
     std::cout << "Cannot access " << flagname << " at " << path << std::endl;
@@ -281,15 +270,14 @@ int main(int argc, char* argv[]) {
   const unique_ptr<Database> db(cert_trans::ProvideDatabase());
   CHECK(db) << "No database instance created, check flag settings";
 
-  const bool stand_alone_mode(FLAGS_etcd_servers.empty());
+  const bool stand_alone_mode(cert_trans::IsStandalone(false));
   const shared_ptr<libevent::Base> event_base(make_shared<libevent::Base>());
   ThreadPool internal_pool(8);
   UrlFetcher url_fetcher(event_base.get(), &internal_pool);
 
   const unique_ptr<EtcdClient> etcd_client(
-      stand_alone_mode ? new FakeEtcdClient(event_base.get())
-                       : new EtcdClient(&internal_pool, &url_fetcher,
-                                        SplitHosts(FLAGS_etcd_servers)));
+      cert_trans::ProvideEtcdClient(event_base.get(), &internal_pool,
+                                    &url_fetcher));
 
   CHECK(!FLAGS_target_public_key.empty());
   const StatusOr<EVP_PKEY*> pubkey(ReadPublicKey(FLAGS_target_public_key));
@@ -299,14 +287,9 @@ int main(int argc, char* argv[]) {
   const LogVerifier log_verifier(new LogSigVerifier(pubkey.ValueOrDie()),
                                  new MerkleVerifier(new Sha256Hasher));
 
-  Server::Options options;
-  options.server = FLAGS_server;
-  options.port = FLAGS_port;
-  options.etcd_root = FLAGS_etcd_root;
-
   ThreadPool http_pool(FLAGS_num_http_server_threads);
 
-  Server server(options, event_base, &internal_pool, &http_pool, db.get(),
+  Server server(event_base, &internal_pool, &http_pool, db.get(),
                 etcd_client.get(), &url_fetcher, &log_verifier);
   server.Initialise(true /* is_mirror */);
 
@@ -342,8 +325,6 @@ int main(int argc, char* argv[]) {
     // (StrictConsistentStore won't allow us to do so unless we're master.)
     server.election()->StartElection();
     server.election()->WaitToBecomeMaster();
-  } else {
-    CHECK(!FLAGS_server.empty());
   }
 
   CHECK(!FLAGS_target_log_uri.empty());

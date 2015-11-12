@@ -40,23 +40,10 @@ Gauge<>* latest_local_tree_size_gauge();
 
 class Server {
  public:
-  struct Options {
-    Options() : port(0), num_http_server_threads(16) {
-    }
-
-    std::string server;
-    uint16_t port;
-
-    std::string etcd_root;
-
-    int num_http_server_threads;
-  };
-
   static void StaticInit();
 
   // Doesn't take ownership of anything.
-  Server(const Options& opts,
-         const std::shared_ptr<libevent::Base>& event_base,
+  Server(const std::shared_ptr<libevent::Base>& event_base,
          ThreadPool* internal_pool, ThreadPool* http_pool, Database* db,
          EtcdClient* etcd_client, UrlFetcher* url_fetcher,
          const LogVerifier* log_verifier);
@@ -76,7 +63,6 @@ class Server {
   void Run();
 
  private:
-  const Options options_;
   const std::shared_ptr<libevent::Base> event_base_;
   std::unique_ptr<libevent::EventPumpThread> event_pump_;
   libevent::HttpServer http_server_;

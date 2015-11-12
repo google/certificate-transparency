@@ -27,6 +27,12 @@ using std::string;
 using std::this_thread::sleep_for;
 using std::thread;
 
+// These flags are DEFINEd in server_helper to keep the validation logic
+// related to server startup options in one place.
+DECLARE_string(server);
+DECLARE_int32(port);
+DECLARE_string(etcd_root);
+
 DEFINE_int32(node_state_refresh_seconds, 10,
              "How often to refresh the ClusterNodeState entry for this node.");
 DEFINE_int32(watchdog_seconds, 120,
@@ -39,7 +45,9 @@ namespace cert_trans {
 
 
 Gauge<>* latest_local_tree_size_gauge() {
-  static Gauge<>* const gauge(Gauge<>::New("latest_local_tree_size", "Size of latest locally generated STH."));
+  static Gauge<>* const gauge(
+      Gauge<>::New("latest_local_tree_size",
+                   "Size of latest locally generated STH."));
 
   return gauge;
 }
@@ -106,13 +114,11 @@ void Server::StaticInit() {
 }
 
 
-Server::Server(const Options& opts,
-               const shared_ptr<libevent::Base>& event_base,
+Server::Server(const shared_ptr<libevent::Base>& event_base,
                ThreadPool* internal_pool, ThreadPool* http_pool, Database* db,
                EtcdClient* etcd_client, UrlFetcher* url_fetcher,
                const LogVerifier* log_verifier)
-    : options_(opts),
-      event_base_(event_base),
+    : event_base_(event_base),
       event_pump_(new libevent::EventPumpThread(event_base_)),
       http_server_(*event_base_),
       db_(CHECK_NOTNULL(db)),
@@ -120,28 +126,27 @@ Server::Server(const Options& opts,
       node_id_(GetNodeId(db_)),
       url_fetcher_(CHECK_NOTNULL(url_fetcher)),
       etcd_client_(CHECK_NOTNULL(etcd_client)),
-      election_(event_base_, etcd_client_, options_.etcd_root + "/election",
+      election_(event_base_, etcd_client_, FLAGS_etcd_root + "/election",
                 node_id_),
       internal_pool_(CHECK_NOTNULL(internal_pool)),
       server_task_(internal_pool_),
       consistent_store_(&election_,
                         new EtcdConsistentStore<LoggedEntry>(
                             event_base_.get(), internal_pool_, etcd_client_,
-                            &election_, options_.etcd_root, node_id_)),
+                            &election_, FLAGS_etcd_root, node_id_)),
       http_pool_(CHECK_NOTNULL(http_pool)) {
-  CHECK_LT(0, options_.port);
-  CHECK_LT(0, options_.num_http_server_threads);
+  CHECK_LT(0, FLAGS_port);
 
   if (FLAGS_monitoring == kPrometheus) {
     http_server_.AddHandler("/metrics", ExportPrometheusMetrics);
   } else if (FLAGS_monitoring == kGcm) {
     gcm_exporter_.reset(
-        new GCMExporter(options_.server, url_fetcher_, internal_pool_));
+        new GCMExporter(FLAGS_server, url_fetcher_, internal_pool_));
   } else {
     LOG(FATAL) << "Please set --monitoring to one of the supported values.";
   }
 
-  http_server_.Bind(nullptr, options_.port);
+  http_server_.Bind(nullptr, FLAGS_port);
   election_.StartElection();
 }
 
@@ -222,7 +227,7 @@ void Server::Initialise(bool is_mirror) {
       &election_, fetcher_.get()));
 
   // Publish this node's hostname:port info
-  cluster_controller_->SetNodeHostPort(options_.server, options_.port);
+  cluster_controller_->SetNodeHostPort(FLAGS_server, FLAGS_port);
   {
     ct::SignedTreeHead db_sth;
     if (db_->LatestTreeHead(&db_sth) == Database::LOOKUP_OK) {

@@ -17,6 +17,10 @@
 #include "log/file_storage.h"
 #include "log/leveldb_db.h"
 #include "log/sqlite_db.h"
+#include "util/etcd.h"
+#include "util/executor.h"
+#include "util/libevent_wrapper.h"
+#include "util/thread_pool.h"
 
 namespace cert_trans {
 
@@ -27,13 +31,27 @@ namespace cert_trans {
 // Do not link server_helper into servers that don't use it as it will confuse
 // the user with extra flags.
 //
-// Note methods named ProvideX create a new instance of X each call.
+// Note methods named ProvideX create a new instance of X each call. Typically
+// they are called once during server initialization and the return object
+// lifetime is the same as that of the server.
 
 // Calling this will CHECK if the flag validators failed to register
 void EnsureValidatorsRegistered();
 
+// Tests if the server was configured in standalone mode. Note can CHECK if
+// the command line options are inconsistent. If warn_data_loss is true
+// the user must set the --i_know_stand_alone_mode_can_lose_data flag as
+// standalone servers are inherently prone to data loss, though useful for
+// development and testing.
+bool IsStandalone(bool warn_data_loss);
+
 // Create one of the supported database types based on flags settings
 std::unique_ptr<Database> ProvideDatabase();
+
+// Create an EtcdClient implementation, either fake or real based on flags
+std::unique_ptr<EtcdClient> ProvideEtcdClient(libevent::Base* event_base,
+                                              ThreadPool* pool,
+                                              UrlFetcher* fetcher);
 
 }  // namespace cert_trans
 
