@@ -65,16 +65,13 @@ class HttpHandler {
   void BlockingGetEntries(evhttp_request* req, int64_t start, int64_t end,
                           bool include_scts) const;
 
-  bool IsNodeStale() const;
-  void UpdateNodeStaleness();
-
   LogLookup* const log_lookup_;
   const ReadOnlyDatabase* const db_;
   const ClusterStateController<LoggedEntry>* const controller_;
   Proxy* proxy_;
   ThreadPool* const pool_;
   libevent::Base* const event_base_;
-  StalenessTracker* staleness_tracker_;
+  StalenessTracker* const staleness_tracker_;
 
   DISALLOW_COPY_AND_ASSIGN(HttpHandler);
 };

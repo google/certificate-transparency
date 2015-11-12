@@ -69,7 +69,9 @@
 /cpp/server/blob-server
 /cpp/server/ct-dns-server
 /cpp/server/ct-mirror
+/cpp/server/ct-mirror-v2
 /cpp/server/ct-server
+/cpp/server/ct-server-v2
 /cpp/server/proxy_test
 /cpp/server/xjson-server
 /cpp/stamp-h1

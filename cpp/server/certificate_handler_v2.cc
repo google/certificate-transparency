@@ -21,19 +21,6 @@ using std::unique_ptr;
 using util::Status;
 
 
-namespace {
-
-
-bool ExtractChain(libevent::Base* base, evhttp_request* req,
-                  CertChain* chain) {
-  SendJsonError(base, req, HTTP_NOTIMPLEMENTED, "Not yet implemented.");
-  return false;
-}
-
-
-}  // namespace
-
-
 CertificateHttpHandlerV2::CertificateHttpHandlerV2(
     LogLookup* log_lookup, const ReadOnlyDatabase* db,
     const ClusterStateController<LoggedEntry>* controller,

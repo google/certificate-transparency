@@ -32,7 +32,6 @@ class CertificateHttpHandler : public HttpHandler {
   const CertSubmissionHandler submission_handler_;
   Frontend* const frontend_;
 
-  void GetEntries(evhttp_request* req) const;
   void GetRoots(evhttp_request* req) const;
   void AddChain(evhttp_request* req);
   void AddPreChain(evhttp_request* req);

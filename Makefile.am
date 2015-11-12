@@ -32,7 +32,9 @@ cpp/version.o: \
 bin_PROGRAMS = \
 	cpp/client/ct \
 	cpp/server/ct-mirror \
+	cpp/server/ct-mirror-v2 \
 	cpp/server/ct-server \
+	cpp/server/ct-server-v2 \
 	cpp/server/xjson-server \
 	cpp/tools/ct-clustertool
 
@@ -213,10 +215,24 @@ cpp_server_ct_mirror_LDADD = \
 	$(leveldb_LIBS) \
 	-lprotobuf -lsqlite3
 cpp_server_ct_mirror_SOURCES = \
-  cpp/client/async_log_client.cc \
+	cpp/client/async_log_client.cc \
 	cpp/server/ct-mirror.cc \
 	cpp/server/certificate_handler.cc \
 	cpp/server/handler.cc \
+	cpp/server/json_output.cc \
+	cpp/server/server_helper.cc
+
+cpp_server_ct_mirror_v2_LDADD = \
+	cpp/libcore.a \
+	$(json_c_LIBS) \
+	$(libevent_LIBS) \
+	$(leveldb_LIBS) \
+	-lprotobuf -lsqlite3
+cpp_server_ct_mirror_v2_SOURCES = \
+	cpp/client/async_log_client.cc \
+	cpp/server/ct-mirror_v2.cc \
+	cpp/server/certificate_handler_v2.cc \
+	cpp/server/handler_v2.cc \
 	cpp/server/json_output.cc \
 	cpp/server/server_helper.cc
 
@@ -227,12 +243,27 @@ cpp_server_ct_server_LDADD = \
 	$(leveldb_LIBS) \
 	-lprotobuf -lsqlite3
 cpp_server_ct_server_SOURCES = \
-  cpp/client/async_log_client.cc \
+	cpp/client/async_log_client.cc \
 	cpp/server/ct-server.cc \
 	cpp/server/certificate_handler.cc \
 	cpp/server/handler.cc \
 	cpp/server/json_output.cc \
-        cpp/server/log_processes.cc \
+	cpp/server/log_processes.cc \
+	cpp/server/server_helper.cc
+
+cpp_server_ct_server_v2_LDADD = \
+	cpp/libcore.a \
+	$(json_c_LIBS) \
+	$(libevent_LIBS) \
+	$(leveldb_LIBS) \
+	-lprotobuf -lsqlite3
+cpp_server_ct_server_v2_SOURCES = \
+	cpp/client/async_log_client.cc \
+	cpp/server/ct-server_v2.cc \
+	cpp/server/certificate_handler_v2.cc \
+	cpp/server/handler_v2.cc \
+	cpp/server/json_output.cc \
+	cpp/server/log_processes.cc \
 	cpp/server/server_helper.cc
 
 cpp_server_xjson_server_LDADD = \
@@ -242,10 +273,10 @@ cpp_server_xjson_server_LDADD = \
 	$(leveldb_LIBS) \
 	-lprotobuf -lsqlite3
 cpp_server_xjson_server_SOURCES = \
-  cpp/client/async_log_client.cc \
+	cpp/client/async_log_client.cc \
 	cpp/server/handler.cc \
 	cpp/server/json_output.cc \
-        cpp/server/log_processes.cc \
+	cpp/server/log_processes.cc \
 	cpp/server/server_helper.cc \
 	cpp/server/xjson-server.cc \
 	cpp/server/x_json_handler.cc \
