@@ -231,6 +231,7 @@ cpp_server_ct_server_SOURCES = \
 	cpp/server/certificate_handler.cc \
 	cpp/server/handler.cc \
 	cpp/server/json_output.cc \
+        cpp/server/log_processes.cc \
 	cpp/server/server_helper.cc
 
 cpp_server_xjson_server_LDADD = \
@@ -243,6 +244,7 @@ cpp_server_xjson_server_SOURCES = \
   cpp/client/async_log_client.cc \
 	cpp/server/handler.cc \
 	cpp/server/json_output.cc \
+        cpp/server/log_processes.cc \
 	cpp/server/server_helper.cc \
 	cpp/server/xjson-server.cc \
 	cpp/server/x_json_handler.cc \

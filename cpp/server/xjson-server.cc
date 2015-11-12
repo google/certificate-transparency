@@ -25,6 +25,7 @@
 #include "monitoring/latency.h"
 #include "monitoring/monitoring.h"
 #include "monitoring/registry.h"
+#include "server/log_processes.h"
 #include "server/metrics.h"
 #include "server/server.h"
 #include "server/server_helper.h"
@@ -41,9 +42,6 @@
 DEFINE_string(server, "localhost", "Server host");
 DEFINE_int32(port, 9999, "Server port");
 DEFINE_string(key, "", "PEM-encoded server private key file");
-DEFINE_int32(sequencing_frequency_seconds, 10,
-             "How often should new entries be sequenced. The sequencing runs "
-             "in parallel with the tree signing and cleanup.");
 DEFINE_int32(cleanup_frequency_seconds, 10,
              "How often should new entries be cleanedup. The cleanup runs in "
              "in parallel with the tree signing and sequencing.");
@@ -80,6 +78,7 @@ using cert_trans::LevelDB;
 using cert_trans::LoggedEntry;
 using cert_trans::ReadPrivateKey;
 using cert_trans::ScopedLatency;
+using cert_trans::SequenceEntries;
 using cert_trans::Server;
 using cert_trans::SplitHosts;
 using cert_trans::ThreadPool;
@@ -112,13 +111,6 @@ namespace {
 Gauge<>* latest_local_tree_size_gauge =
     Gauge<>::New("latest_local_tree_size",
                  "Size of latest locally generated STH.");
-
-Counter<bool>* sequencer_total_runs = Counter<bool>::New(
-    "sequencer_total_runs", "successful",
-    "Total number of sequencer runs broken out by success.");
-Latency<milliseconds> sequencer_sequence_latency_ms(
-    "sequencer_sequence_latency_ms",
-    "Total time spent sequencing entries by sequencer");
 
 Counter<bool>* signer_total_runs =
     Counter<bool>::New("signer_total_runs", "successful",
@@ -196,33 +188,6 @@ void CleanUpEntries(ConsistentStore<LoggedEntry>* store,
   }
 }
 
-void SequenceEntries(TreeSigner<LoggedEntry>* tree_signer,
-                     const function<bool()>& is_master) {
-  CHECK_NOTNULL(tree_signer);
-  CHECK(is_master);
-  const steady_clock::duration period(
-      (seconds(FLAGS_sequencing_frequency_seconds)));
-  steady_clock::time_point target_run_time(steady_clock::now());
-
-  while (true) {
-    if (is_master()) {
-      const ScopedLatency sequencer_sequence_latency(
-          sequencer_sequence_latency_ms.GetScopedLatency());
-      util::Status status(tree_signer->SequenceNewEntries());
-      if (!status.ok()) {
-        LOG(WARNING) << "Problem sequencing new entries: " << status;
-      }
-      sequencer_total_runs->Increment(status.ok());
-    }
-
-    const steady_clock::time_point now(steady_clock::now());
-    while (target_run_time <= now) {
-      target_run_time += period;
-    }
-
-    std::this_thread::sleep_for(target_run_time - now);
-  }
-}
 
 void SignMerkleTree(TreeSigner<LoggedEntry>* tree_signer,
                     ConsistentStore<LoggedEntry>* store,
