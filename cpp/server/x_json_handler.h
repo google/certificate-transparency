@@ -5,6 +5,7 @@
 
 #include "log/logged_entry.h"
 #include "server/handler.h"
+#include "server/staleness_tracker.h"
 #include "util/json_wrapper.h"
 
 namespace cert_trans {
@@ -18,7 +19,7 @@ class XJsonHttpHandler : public HttpHandler {
   XJsonHttpHandler(LogLookup* log_lookup, const ReadOnlyDatabase* db,
                    const ClusterStateController<LoggedEntry>* controller,
                    Frontend* frontend, ThreadPool* pool,
-                   libevent::Base* event_base);
+                   libevent::Base* event_base, StalenessTracker*);
 
   ~XJsonHttpHandler() = default;
 

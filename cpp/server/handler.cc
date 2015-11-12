@@ -1,15 +1,9 @@
 #include "server/handler.h"
 
 #include <algorithm>
-#include <functional>
 #include <gflags/gflags.h>
 #include <glog/logging.h>
-#include <memory>
-#include <mutex>
-#include <stdint.h>
-#include <stdlib.h>
 #include <string>
-#include <utility>
 #include <vector>
 
 #include "log/cert.h"
@@ -26,9 +20,6 @@
 
 namespace libevent = cert_trans::libevent;
 
-using cert_trans::Cert;
-using cert_trans::CertChain;
-using cert_trans::CertChecker;
 using cert_trans::Counter;
 using cert_trans::HttpHandler;
 using cert_trans::Latency;
@@ -54,8 +45,6 @@ using std::vector;
 DEFINE_int32(max_leaf_entries_per_response, 1000,
              "maximum number of entries to put in the response of a "
              "get-entries request");
-DEFINE_int32(staleness_check_delay_secs, 5,
-             "number of seconds between node staleness checks");
 
 namespace {
 
@@ -70,24 +59,19 @@ static Latency<milliseconds, string> http_server_request_latency_ms(
 
 HttpHandler::HttpHandler(LogLookup* log_lookup, const ReadOnlyDatabase* db,
                          const ClusterStateController<LoggedEntry>* controller,
-                         ThreadPool* pool, libevent::Base* event_base)
+                         ThreadPool* pool, libevent::Base* event_base,
+                         StalenessTracker* staleness_tracker)
     : log_lookup_(CHECK_NOTNULL(log_lookup)),
       db_(CHECK_NOTNULL(db)),
       controller_(CHECK_NOTNULL(controller)),
       proxy_(nullptr),
       pool_(CHECK_NOTNULL(pool)),
       event_base_(CHECK_NOTNULL(event_base)),
-      task_(pool_),
-      node_is_stale_(controller_->NodeIsStale()) {
-  event_base_->Delay(seconds(FLAGS_staleness_check_delay_secs),
-                     task_.task()->AddChild(
-                         bind(&HttpHandler::UpdateNodeStaleness, this)));
+      staleness_tracker_(CHECK_NOTNULL(staleness_tracker)) {
 }
 
 
 HttpHandler::~HttpHandler() {
-  task_.task()->Return();
-  task_.Wait();
 }
 
 
@@ -362,24 +346,10 @@ void HttpHandler::BlockingGetEntries(evhttp_request* req, int64_t start,
 
 
 bool HttpHandler::IsNodeStale() const {
-  lock_guard<mutex> lock(mutex_);
-  return node_is_stale_;
+  return staleness_tracker_->IsNodeStale();
 }
 
 
 void HttpHandler::UpdateNodeStaleness() {
-  if (!task_.task()->IsActive()) {
-    // We're shutting down, just return.
-    return;
-  }
-
-  const bool node_is_stale(controller_->NodeIsStale());
-  {
-    lock_guard<mutex> lock(mutex_);
-    node_is_stale_ = node_is_stale;
-  }
-
-  event_base_->Delay(seconds(FLAGS_staleness_check_delay_secs),
-                     task_.task()->AddChild(
-                         bind(&HttpHandler::UpdateNodeStaleness, this)));
+  staleness_tracker_->UpdateNodeStaleness();
 }

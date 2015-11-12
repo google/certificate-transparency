@@ -171,6 +171,7 @@ cpp_libcore_a_SOURCES = \
 	cpp/server/metrics.cc \
 	cpp/server/proxy.cc \
 	cpp/server/server.cc \
+	cpp/server/staleness_tracker.cc \
 	cpp/third_party/curl/hostcheck.c \
 	cpp/third_party/isec_partners/openssl_hostname_validation.c \
 	cpp/util/etcd.cc \
