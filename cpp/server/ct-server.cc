@@ -1,11 +1,8 @@
 /* -*- indent-tabs-mode: nil -*- */
 
-#include <event2/thread.h>
 #include <gflags/gflags.h>
 #include <iostream>
-#include <openssl/err.h>
 #include <signal.h>
-#include <stdlib.h>
 #include <string>
 #include <unistd.h>
 
@@ -22,36 +19,21 @@
 #include "log/strict_consistent_store.h"
 #include "log/tree_signer.h"
 #include "merkletree/merkle_verifier.h"
-#include "monitoring/latency.h"
-#include "monitoring/monitoring.h"
-#include "monitoring/registry.h"
 #include "server/certificate_handler.h"
 #include "server/log_processes.h"
-#include "server/metrics.h"
 #include "server/server.h"
 #include "server/server_helper.h"
 #include "server/staleness_tracker.h"
 #include "util/etcd.h"
-#include "util/fake_etcd.h"
 #include "util/init.h"
 #include "util/libevent_wrapper.h"
 #include "util/read_key.h"
 #include "util/status.h"
-#include "util/thread_pool.h"
 #include "util/uuid.h"
 
 DEFINE_string(key, "", "PEM-encoded server private key file");
 DEFINE_string(trusted_cert_file, "",
               "File for trusted CA certificates, in concatenated PEM format");
-DEFINE_int32(cleanup_frequency_seconds, 10,
-             "How often should new entries be cleanedup. The cleanup runs in "
-             "in parallel with the tree signing and sequencing.");
-DEFINE_int32(tree_signing_frequency_seconds, 600,
-             "How often should we issue a new signed tree head. Approximate: "
-             "the signer process will kick off if in the beginning of the "
-             "server select loop, at least this period has elapsed since the "
-             "last signing. Set this well below the MMD to ensure we sign in "
-             "a timely manner. Must be greater than 0.");
 DEFINE_double(guard_window_seconds, 60,
               "Unsequenced entries newer than this "
               "number of seconds will not be sequenced.");
@@ -62,43 +44,27 @@ namespace libevent = cert_trans::libevent;
 
 using cert_trans::CertChecker;
 using cert_trans::CertificateHttpHandler;
+using cert_trans::CleanUpEntries;
 using cert_trans::ClusterStateController;
 using cert_trans::ConsistentStore;
-using cert_trans::Counter;
 using cert_trans::Database;
 using cert_trans::EtcdClient;
 using cert_trans::EtcdConsistentStore;
-using cert_trans::FakeEtcdClient;
-using cert_trans::FileDB;
-using cert_trans::FileStorage;
-using cert_trans::Gauge;
-using cert_trans::Latency;
-using cert_trans::LevelDB;
 using cert_trans::LoggedEntry;
 using cert_trans::ReadPrivateKey;
-using cert_trans::SQLiteDB;
-using cert_trans::ScopedLatency;
 using cert_trans::SequenceEntries;
 using cert_trans::Server;
-using cert_trans::SplitHosts;
+using cert_trans::SignMerkleTree;
 using cert_trans::StalenessTracker;
 using cert_trans::ThreadPool;
 using cert_trans::TreeSigner;
-using cert_trans::Update;
 using cert_trans::UrlFetcher;
 using ct::ClusterNodeState;
 using ct::SignedTreeHead;
 using google::RegisterFlagValidator;
 using std::bind;
-using std::chrono::duration;
-using std::chrono::duration_cast;
-using std::chrono::milliseconds;
-using std::chrono::seconds;
-using std::chrono::steady_clock;
 using std::function;
 using std::make_shared;
-using std::mutex;
-using std::placeholders::_1;
 using std::shared_ptr;
 using std::string;
 using std::thread;
@@ -106,17 +72,6 @@ using std::unique_ptr;
 
 
 namespace {
-
-
-Gauge<>* latest_local_tree_size_gauge =
-    Gauge<>::New("latest_local_tree_size",
-                 "Size of latest locally generated STH.");
-
-Counter<bool>* signer_total_runs =
-    Counter<bool>::New("signer_total_runs", "successful",
-                       "Total number of signer runs broken out by success.");
-Latency<milliseconds> signer_run_latency_ms("signer_run_latency_ms",
-                                            "Total runtime of signer");
 
 // Basic sanity checks on flag values.
 static bool ValidateRead(const char* flagname, const string& path) {
@@ -131,95 +86,6 @@ static const bool key_dummy = RegisterFlagValidator(&FLAGS_key, &ValidateRead);
 
 static const bool cert_dummy =
     RegisterFlagValidator(&FLAGS_trusted_cert_file, &ValidateRead);
-
-static bool ValidateIsPositive(const char* flagname, int value) {
-  if (value <= 0) {
-    std::cout << flagname << " must be greater than 0" << std::endl;
-    return false;
-  }
-  return true;
-}
-
-static const bool sign_dummy =
-    RegisterFlagValidator(&FLAGS_tree_signing_frequency_seconds,
-                          &ValidateIsPositive);
-
-void CleanUpEntries(ConsistentStore<LoggedEntry>* store,
-                    const function<bool()>& is_master) {
-  CHECK_NOTNULL(store);
-  CHECK(is_master);
-  const steady_clock::duration period(
-      (seconds(FLAGS_cleanup_frequency_seconds)));
-  steady_clock::time_point target_run_time(steady_clock::now());
-
-  while (true) {
-    if (is_master()) {
-      // Keep cleaning up until there's no more work to do.
-      // This should help to keep the etcd contents size down during heavy
-      // load.
-      while (true) {
-        const util::StatusOr<int64_t> num_cleaned(store->CleanupOldEntries());
-        if (!num_cleaned.ok()) {
-          LOG(WARNING) << "Problem cleaning up old entries: "
-                       << num_cleaned.status();
-          break;
-        }
-        if (num_cleaned.ValueOrDie() == 0) {
-          break;
-        }
-      }
-    }
-
-    const steady_clock::time_point now(steady_clock::now());
-    while (target_run_time <= now) {
-      target_run_time += period;
-    }
-
-    std::this_thread::sleep_for(target_run_time - now);
-  }
-}
-
-void SignMerkleTree(TreeSigner<LoggedEntry>* tree_signer,
-                    ConsistentStore<LoggedEntry>* store,
-                    ClusterStateController<LoggedEntry>* controller) {
-  CHECK_NOTNULL(tree_signer);
-  CHECK_NOTNULL(store);
-  CHECK_NOTNULL(controller);
-  const steady_clock::duration period(
-      (seconds(FLAGS_tree_signing_frequency_seconds)));
-  steady_clock::time_point target_run_time(steady_clock::now());
-
-  while (true) {
-    {
-      ScopedLatency signer_run_latency(
-          signer_run_latency_ms.GetScopedLatency());
-      const TreeSigner<LoggedEntry>::UpdateResult result(
-          tree_signer->UpdateTree());
-      switch (result) {
-        case TreeSigner<LoggedEntry>::OK: {
-          const SignedTreeHead latest_sth(tree_signer->LatestSTH());
-          latest_local_tree_size_gauge->Set(latest_sth.tree_size());
-          controller->NewTreeHead(latest_sth);
-          signer_total_runs->Increment(true /* successful */);
-          break;
-        }
-        case TreeSigner<LoggedEntry>::INSUFFICIENT_DATA:
-          LOG(INFO) << "Can't update tree because we don't have all the "
-                    << "entries locally, will try again later.";
-          signer_total_runs->Increment(false /* successful */);
-          break;
-        default:
-          LOG(FATAL) << "Error updating tree: " << result;
-      }
-    }
-
-    const steady_clock::time_point now(steady_clock::now());
-    while (target_run_time <= now) {
-      target_run_time += period;
-    }
-    std::this_thread::sleep_for(target_run_time - now);
-  }
-}
 
 }  // namespace
 
