@@ -1,20 +1,11 @@
 /* -*- indent-tabs-mode: nil -*- */
 
-#include <chrono>
-#include <csignal>
-#include <cstring>
-#include <event2/buffer.h>
-#include <event2/thread.h>
-#include <functional>
 #include <gflags/gflags.h>
 #include <iostream>
-#include <memory>
-#include <mutex>
-#include <openssl/crypto.h>
-#include <openssl/err.h>
 #include <signal.h>
 #include <string>
 #include <unistd.h>
+#include <utility>
 
 #include "client/async_log_client.h"
 #include "config.h"
@@ -39,7 +30,6 @@
 #include "server/server.h"
 #include "server/server_helper.h"
 #include "util/etcd.h"
-#include "util/fake_etcd.h"
 #include "util/init.h"
 #include "util/libevent_wrapper.h"
 #include "util/masterelection.h"
@@ -78,13 +68,9 @@ using cert_trans::Counter;
 using cert_trans::Database;
 using cert_trans::EtcdClient;
 using cert_trans::EtcdConsistentStore;
-using cert_trans::FakeEtcdClient;
-using cert_trans::FileDB;
-using cert_trans::FileStorage;
 using cert_trans::Gauge;
 using cert_trans::HttpHandler;
 using cert_trans::Latency;
-using cert_trans::LevelDB;
 using cert_trans::LogLookup;
 using cert_trans::LoggedEntry;
 using cert_trans::MasterElection;
@@ -92,10 +78,8 @@ using cert_trans::PeriodicClosure;
 using cert_trans::Proxy;
 using cert_trans::ReadPublicKey;
 using cert_trans::RemotePeer;
-using cert_trans::SQLiteDB;
 using cert_trans::ScopedLatency;
 using cert_trans::Server;
-using cert_trans::SplitHosts;
 using cert_trans::StalenessTracker;
 using cert_trans::StrictConsistentStore;
 using cert_trans::ThreadPool;
