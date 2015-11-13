@@ -116,7 +116,7 @@ void HttpHandler::ProxyInterceptor(
   // TODO(alcutter): We can be a bit smarter about when to proxy off
   // the request - being stale wrt to the current serving STH doesn't
   // automatically mean we're unable to answer this request.
-  if (IsNodeStale()) {
+  if (staleness_tracker_->IsNodeStale()) {
     // Can't do this on the libevent thread since it can block on the lock in
     // ClusterStatusController::GetFreshNodes().
     pool_->Add(bind(&Proxy::ProxyRequest, proxy_, request));
@@ -156,7 +156,7 @@ void HttpHandler::Add(libevent::HttpServer* server) {
 
 
 void HttpHandler::SetProxy(Proxy* proxy) {
-  LOG_IF(FATAL, proxy_) << "Attempting to re-add a HttpHandler.";
+  LOG_IF(FATAL, proxy_) << "Attempting to re-add a Proxy.";
   proxy_ = CHECK_NOTNULL(proxy);
 }
 
@@ -342,14 +342,4 @@ void HttpHandler::BlockingGetEntries(evhttp_request* req, int64_t start,
   json_reply.Add("entries", json_entries);
 
   SendJsonReply(event_base_, req, HTTP_OK, json_reply);
-}
-
-
-bool HttpHandler::IsNodeStale() const {
-  return staleness_tracker_->IsNodeStale();
-}
-
-
-void HttpHandler::UpdateNodeStaleness() {
-  staleness_tracker_->UpdateNodeStaleness();
 }

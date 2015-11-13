@@ -1,5 +1,5 @@
-#ifndef CERT_TRANS_SERVER_HANDLER_H_
-#define CERT_TRANS_SERVER_HANDLER_H_
+#ifndef CERT_TRANS_SERVER_HANDLER_V2_H_
+#define CERT_TRANS_SERVER_HANDLER_V2_H_
 
 #include <memory>
 #include <mutex>
@@ -28,15 +28,15 @@ class ReadOnlyDatabase;
 class ThreadPool;
 
 
-class HttpHandler {
+class HttpHandlerV2 {
  public:
   // Does not take ownership of its parameters, which must outlive
   // this instance.
-  HttpHandler(LogLookup* log_lookup, const ReadOnlyDatabase* db,
+  HttpHandlerV2(LogLookup* log_lookup, const ReadOnlyDatabase* db,
               const ClusterStateController<LoggedEntry>* controller,
               ThreadPool* pool, libevent::Base* event_base,
               StalenessTracker* staleness_tracker);
-  virtual ~HttpHandler();
+  virtual ~HttpHandlerV2();
 
   void Add(libevent::HttpServer* server);
 
@@ -73,10 +73,10 @@ class HttpHandler {
   libevent::Base* const event_base_;
   StalenessTracker* const staleness_tracker_;
 
-  DISALLOW_COPY_AND_ASSIGN(HttpHandler);
+  DISALLOW_COPY_AND_ASSIGN(HttpHandlerV2);
 };
 
 
 }  // namespace cert_trans
 
-#endif  // CERT_TRANS_SERVER_HANDLER_H_
+#endif  // CERT_TRANS_SERVER_HANDLER_V2_H_
