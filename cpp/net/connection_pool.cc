@@ -449,7 +449,7 @@ unique_ptr<ConnectionPool::Connection> ConnectionPool::Get(const URL& url) {
                                     kZeroMillis};
     evhtp_connection_set_timeouts(handle->connection(), &read_timeout,
                                   &write_timeout);
-    evhtp_set_hook(&handle->connection()->hooks, evhtp_hook_on_conn_error,
+    evhtp_set_hook(&handle->connection()->hooks, evhtp_hook_on_error,
                    reinterpret_cast<evhtp_hook>(
                        EvConnection::ConnectionErrorHook),
                    reinterpret_cast<void*>(conn.get()));
