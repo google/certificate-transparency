@@ -85,12 +85,21 @@ bool WatchMatchesKey(const string& watch_key, const string& notify_key,
 }  // namespace
 
 namespace {
-const char* kStoreStats[] = {"setsFail", "getsSuccess", "watchers",
-                             "expireCount", "createFail", "setsSuccess",
-                             "compareAndDeleteFail", "createSuccess",
-                             "deleteFail", "compareAndSwapSuccess",
-                             "compareAndSwapFail", "compareAndDeleteSuccess",
-                             "updateFail", "deleteSuccess", "updateSuccess",
+const char* kStoreStats[] = {"setsFail",
+                             "getsSuccess",
+                             "watchers",
+                             "expireCount",
+                             "createFail",
+                             "setsSuccess",
+                             "compareAndDeleteFail",
+                             "createSuccess",
+                             "deleteFail",
+                             "compareAndSwapSuccess",
+                             "compareAndSwapFail",
+                             "compareAndDeleteSuccess",
+                             "updateFail",
+                             "deleteSuccess",
+                             "updateSuccess",
                              "getsFail"};
 }  // namespace
 

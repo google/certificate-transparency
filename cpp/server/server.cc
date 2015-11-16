@@ -1,19 +1,19 @@
 #include "server/server.h"
 
+#include <gflags/gflags.h>
 #include <chrono>
 #include <csignal>
 #include <functional>
-#include <gflags/gflags.h>
 
-#include "log/frontend.h"
-#include "server/proxy.h"
-#include "monitoring/gcm/exporter.h"
-#include "log/log_lookup.h"
-#include "log/log_verifier.h"
-#include "server/metrics.h"
 #include "log/cluster_state_controller.h"
 #include "log/etcd_consistent_store.h"
+#include "log/frontend.h"
+#include "log/log_lookup.h"
+#include "log/log_verifier.h"
+#include "monitoring/gcm/exporter.h"
 #include "monitoring/monitoring.h"
+#include "server/metrics.h"
+#include "server/proxy.h"
 #include "util/thread_pool.h"
 #include "util/uuid.h"
 

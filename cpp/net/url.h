@@ -1,8 +1,8 @@
 #ifndef CERT_TRANS_NET_URL_H_
 #define CERT_TRANS_NET_URL_H_
 
-#include <ostream>
 #include <stdint.h>
+#include <ostream>
 #include <string>
 
 namespace cert_trans {

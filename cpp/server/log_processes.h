@@ -21,7 +21,6 @@ void SequenceEntries(TreeSigner<LoggedEntry>* tree_signer,
 void SignMerkleTree(TreeSigner<LoggedEntry>* tree_signer,
                     ConsistentStore<LoggedEntry>* store,
                     ClusterStateController<LoggedEntry>* controller);
-
 }
 
 #endif  // CERT_TRANS_SERVER_LOG_PROCESSES_H_

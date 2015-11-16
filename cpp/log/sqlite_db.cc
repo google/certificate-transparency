@@ -5,8 +5,8 @@
 #include <sqlite3.h>
 
 #include "log/sqlite_statement.h"
-#include "monitoring/monitoring.h"
 #include "monitoring/latency.h"
+#include "monitoring/monitoring.h"
 #include "util/util.h"
 
 using std::unique_ptr;

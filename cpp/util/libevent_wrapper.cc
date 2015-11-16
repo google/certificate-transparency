@@ -4,25 +4,25 @@
 
 #include <arpa/inet.h>
 #ifdef HAVE_ARPA_NAMESER_H
-#  include <arpa/nameser.h> /* DNS HEADER struct */
+#include <arpa/nameser.h> /* DNS HEADER struct */
 #endif
-#include <climits>
-#include <evhtp.h>
 #include <event2/keyvalq_struct.h>
 #include <event2/thread.h>
+#include <evhtp.h>
 #include <glog/logging.h>
 #include <math.h>
+#include <climits>
 #ifdef HAVE_NETDB_H
-#  include <netdb.h>
+#include <netdb.h>
 #endif
 #include <netdb.h>
 #ifdef HAVE_NETINET_IN_H
-#  include <netinet/in.h>   /* inet_ functions / structs */
+#include <netinet/in.h> /* inet_ functions / structs */
 #endif
 #include <resolv.h>
 #include <sys/socket.h>
 #ifdef HAVE_SYS_TYPES_H
-#  include <sys/types.h>
+#include <sys/types.h>
 #endif
 #include <signal.h>
 
@@ -460,8 +460,7 @@ bool GetBoolParam(const QueryParams& query, const string& param) {
 
 
 EventPumpThread::EventPumpThread(const shared_ptr<Base>& base)
-    : base_(base),
-      pump_thread_(bind(&EventPumpThread::Pump, this)) {
+    : base_(base), pump_thread_(bind(&EventPumpThread::Pump, this)) {
 }
 
 

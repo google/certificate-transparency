@@ -1,6 +1,6 @@
-#include <fstream>
 #include <gflags/gflags.h>
 #include <glog/logging.h>
+#include <fstream>
 #include <iostream>
 
 #include "proto/ct.pb.h"
@@ -27,12 +27,12 @@ void DumpLoggedCert(const char* filename) {
          << endl;
 
   if (pb.contents().has_sct())
-    cout << "--- begin sct" << endl << pb.contents().sct().DebugString()
-         << "--- end sct" << endl;
+    cout << "--- begin sct" << endl
+         << pb.contents().sct().DebugString() << "--- end sct" << endl;
 
   if (pb.contents().has_entry())
-    cout << "--- begin entry" << endl << pb.contents().entry().DebugString()
-         << "--- end entry" << endl;
+    cout << "--- begin entry" << endl
+         << pb.contents().entry().DebugString() << "--- end entry" << endl;
 }
 
 

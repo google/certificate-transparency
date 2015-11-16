@@ -1,6 +1,6 @@
 #include "monitoring/prometheus/exporter.h"
-#include "monitoring/prometheus/metrics.pb.h"
 #include "monitoring/metric.h"
+#include "monitoring/prometheus/metrics.pb.h"
 #include "monitoring/registry.h"
 
 using std::chrono::duration_cast;

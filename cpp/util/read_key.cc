@@ -1,7 +1,7 @@
 #include "util/read_key.h"
 
-#include <memory>
 #include <openssl/pem.h>
+#include <memory>
 
 using std::unique_ptr;
 

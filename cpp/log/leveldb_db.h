@@ -7,11 +7,11 @@
 #ifdef HAVE_LEVELDB_FILTER_POLICY_H
 #include <leveldb/filter_policy.h>
 #endif
+#include <stdint.h>
 #include <map>
 #include <memory>
 #include <mutex>
 #include <set>
-#include <stdint.h>
 #include <unordered_map>
 #include <vector>
 

@@ -1,18 +1,20 @@
 /* -*- indent-tabs-mode: nil -*- */
 
 #include <gflags/gflags.h>
-#include <iostream>
+#include <openssl/err.h>
 #include <signal.h>
-#include <string>
+#include <stdlib.h>
 #include <unistd.h>
+#include <iostream>
+#include <string>
 
 #include "config.h"
 #include "log/cert_checker.h"
 #include "log/cert_submission_handler.h"
 #include "log/cluster_state_controller.h"
 #include "log/etcd_consistent_store.h"
-#include "log/frontend_signer.h"
 #include "log/frontend.h"
+#include "log/frontend_signer.h"
 #include "log/log_lookup.h"
 #include "log/log_signer.h"
 #include "log/log_verifier.h"
@@ -129,8 +131,8 @@ int main(int argc, char* argv[]) {
 
   ThreadPool http_pool(FLAGS_num_http_server_threads);
 
-  Server server(event_base, &internal_pool, &http_pool,
-                db.get(), etcd_client.get(), &url_fetcher, &log_verifier);
+  Server server(event_base, &internal_pool, &http_pool, db.get(),
+                etcd_client.get(), &url_fetcher, &log_verifier);
   server.Initialise(false /* is_mirror */);
 
   Frontend frontend(

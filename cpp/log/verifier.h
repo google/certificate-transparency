@@ -9,8 +9,8 @@
 #include <stdint.h>
 
 #include "base/macros.h"
-#include "util/openssl_scoped_types.h"
 #include "proto/ct.pb.h"
+#include "util/openssl_scoped_types.h"
 
 namespace cert_trans {
 

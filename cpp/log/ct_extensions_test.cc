@@ -54,7 +54,8 @@ TEST_F(CtExtensionsTest, TestSCTExtension) {
   // Sanity check
   Cert simple_cert(simple_cert_);
   EXPECT_FALSE(simple_cert.HasExtension(
-      cert_trans::NID_ctSignedCertificateTimestampList).ValueOrDie());
+                              cert_trans::NID_ctSignedCertificateTimestampList)
+                   .ValueOrDie());
 
   Cert sct_cert(sct_cert_);
   // Check we can find the extension by its advertised NID.
@@ -129,7 +130,8 @@ TEST_F(CtExtensionsTest, TestEmbeddedSCTExtension) {
 TEST_F(CtExtensionsTest, TestPoisonExtension) {
   // Sanity check
   Cert simple_cert(simple_cert_);
-  EXPECT_FALSE(simple_cert.HasExtension(cert_trans::NID_ctPoison).ValueOrDie());
+  EXPECT_FALSE(
+      simple_cert.HasExtension(cert_trans::NID_ctPoison).ValueOrDie());
 
   Cert poison_cert(poison_cert_);
   ASSERT_TRUE(poison_cert.IsLoaded());
@@ -160,7 +162,8 @@ TEST_F(CtExtensionsTest, TestPrecertSigning) {
   // Sanity check
   Cert simple_ca_cert(simple_ca_cert_);
   EXPECT_FALSE(simple_ca_cert.HasExtendedKeyUsage(
-      cert_trans::NID_ctPrecertificateSigning).ValueOrDie());
+                                 cert_trans::NID_ctPrecertificateSigning)
+                   .ValueOrDie());
 
   Cert pre_signing_cert(pre_signing_cert_);
   ASSERT_TRUE(pre_signing_cert.IsLoaded());
@@ -168,7 +171,8 @@ TEST_F(CtExtensionsTest, TestPrecertSigning) {
   // We should really be checking that the OID matches the expected OID but
   // what other key usage could this cert be having that the other one doesn't?
   ASSERT_TRUE(pre_signing_cert.HasExtendedKeyUsage(
-      cert_trans::NID_ctPrecertificateSigning).ValueOrDie());
+                                  cert_trans::NID_ctPrecertificateSigning)
+                  .ValueOrDie());
 }
 
 }  // namespace cert_trans

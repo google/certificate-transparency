@@ -1,21 +1,21 @@
 #include <event2/thread.h>
-#include <fstream>
 #include <gflags/gflags.h>
 #include <glog/logging.h>
 #include <google/protobuf/text_format.h>
-#include <iostream>
 #include <openssl/err.h>
+#include <fstream>
+#include <iostream>
 #include <sstream>
 
-#include "util/etcd.h"
 #include "log/etcd_consistent_store.h"
-#include "log/logged_entry.h"
 #include "log/log_signer.h"
+#include "log/logged_entry.h"
 #include "log/sqlite_db.h"
 #include "log/strict_consistent_store.h"
 #include "log/tree_signer.h"
 #include "proto/ct.pb.h"
 #include "tools/clustertool-inl.h"
+#include "util/etcd.h"
 #include "util/init.h"
 #include "util/masterelection.h"
 #include "util/read_key.h"

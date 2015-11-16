@@ -1,8 +1,8 @@
 #include "client/async_log_client.h"
 
-#include <algorithm>
 #include <event2/http.h>
 #include <glog/logging.h>
+#include <algorithm>
 #include <iterator>
 #include <memory>
 

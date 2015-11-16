@@ -2,13 +2,13 @@
 #include "log/cert_checker.h"
 
 #include <glog/logging.h>
-#include <memory>
 #include <openssl/asn1.h>
 #include <openssl/bio.h>
 #include <openssl/pem.h>
 #include <openssl/x509.h>
 #include <openssl/x509v3.h>
 #include <string.h>
+#include <memory>
 #include <string>
 #include <utility>
 #include <vector>
@@ -50,7 +50,8 @@ bool CertChecker::LoadTrustedCertificates(const string& cert_file) {
   return LoadTrustedCertificatesFromBIO(bio_in.get());
 }
 
-bool CertChecker::LoadTrustedCertificates(const vector<string>& trusted_certs) {
+bool CertChecker::LoadTrustedCertificates(
+    const vector<string>& trusted_certs) {
   string concat_certs;
   for (vector<string>::const_iterator it = trusted_certs.begin();
        it != trusted_certs.end(); ++it) {
@@ -213,7 +214,8 @@ Status CertChecker::CheckPreCertChain(PreCertChain* chain,
       return status;
   }
 
-  const StatusOr<bool> uses_pre_issuer = chain->UsesPrecertSigningCertificate();
+  const StatusOr<bool> uses_pre_issuer =
+      chain->UsesPrecertSigningCertificate();
   if (!uses_pre_issuer.ok()) {
     return Status(util::error::INTERNAL, "internal error");
   }
@@ -230,8 +232,7 @@ Status CertChecker::CheckPreCertChain(PreCertChain* chain,
   }
   // A well-formed chain always has a precert.
   TbsCertificate tbs(*chain->PreCert());
-  if (!tbs.IsLoaded() ||
-      !tbs.DeleteExtension(cert_trans::NID_ctPoison).ok()) {
+  if (!tbs.IsLoaded() || !tbs.DeleteExtension(cert_trans::NID_ctPoison).ok()) {
     return Status(util::error::INTERNAL, "internal error");
   }
 
@@ -349,7 +350,8 @@ StatusOr<bool> CertChecker::IsTrusted(const Cert& cert,
   std::pair<std::multimap<string, const Cert*>::const_iterator,
             std::multimap<string, const Cert*>::const_iterator> cand_range =
       trusted_.equal_range(cert_name);
-  for (std::multimap<string, const Cert*>::const_iterator it = cand_range.first;
+  for (std::multimap<string, const Cert*>::const_iterator it =
+           cand_range.first;
        it != cand_range.second; ++it) {
     const Cert* cand = it->second;
     if (cert.IsIdenticalTo(*cand)) {

@@ -164,10 +164,10 @@ class Cert {
   // you're doing.
   //
   // Returns OK if the extension data could be fetched and decoded.
-  // Returns NOT_FOUND if the extension is not present, or is present but is not
-  // a valid ASN1 OCTET STRING.
-  // Returns a suitable status if the cert is not loaded or the extension_nid is
-  // not recognised.
+  // Returns NOT_FOUND if the extension is not present, or is present but is
+  // not a valid ASN1 OCTET STRING.
+  // Returns a suitable status if the cert is not loaded or the extension_nid
+  // is not recognised.
   // TODO(ekasper): consider registering known custom NIDS explicitly with the
   // Cert API for safety.
   util::Status OctetStringExtensionData(int extension_nid,
@@ -230,8 +230,8 @@ class TbsCertificate {
   // Returns NOT_FOUND if the extension was not present.
   // If multiple extensions with this NID are present, deletes the first
   // occurrence but returns ALREADY_EXISTS.
-  // Returns a suitable status if the cert is not loaded, the NID is not recognised
-  // or deletion failed internally.
+  // Returns a suitable status if the cert is not loaded, the NID is not
+  // recognised or deletion failed internally.
   util::Status DeleteExtension(int extension_nid);
 
   // Copy the issuer and Authority KeyID information.
@@ -239,7 +239,8 @@ class TbsCertificate {
   // it must also be present in the source certificate.
   // Does not overwrite the critical bit.
   // Returns OK if the operation succeeded.
-  // Returns a suitable status if the operation could not be completed successfully.
+  // Returns a suitable status if the operation could not be completed
+  // successfully.
   // Returns FAILED_PRECONDITION if either cert is not loaded.
   // Caller should not assume the dest cert was left unmodified without OK as
   // fields may have been copied successfully before an error occurred.

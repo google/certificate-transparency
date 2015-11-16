@@ -1,8 +1,8 @@
 #include "net/url_fetcher.h"
 
-#include <evhtp.h>
 #include <event2/buffer.h>
 #include <event2/keyvalq_struct.h>
+#include <evhtp.h>
 #include <glog/logging.h>
 #include <htparse.h>
 
@@ -285,14 +285,11 @@ void UrlFetcher::Fetch(const Request& req, Response* resp, Task* task) {
 
 
 ostream& operator<<(ostream& output, const UrlFetcher::Response& resp) {
-  output << "status_code: " << resp.status_code << endl
-         << "headers {" << endl;
+  output << "status_code: " << resp.status_code << endl << "headers {" << endl;
   for (const auto& header : resp.headers) {
     output << "  " << header.first << ": " << header.second << endl;
   }
-  output << "}" << endl
-         << "body: <<EOF" << endl
-         << resp.body << "EOF" << endl;
+  output << "}" << endl << "body: <<EOF" << endl << resp.body << "EOF" << endl;
 
   return output;
 }

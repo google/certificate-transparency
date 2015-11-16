@@ -3,19 +3,19 @@
 #include <event2/thread.h>
 #include <gflags/gflags.h>
 #include <glog/logging.h>
-#include <memory>
 #include <openssl/err.h>
+#include <memory>
 #include <string>
 
-#include "util/etcd.h"
 #include "log/etcd_consistent_store.h"
-#include "log/logged_entry.h"
 #include "log/log_signer.h"
+#include "log/logged_entry.h"
 #include "log/sqlite_db.h"
 #include "log/strict_consistent_store.h"
 #include "log/tree_signer.h"
 #include "proto/ct.pb.h"
 #include "tools/clustertool.h"
+#include "util/etcd.h"
 #include "util/masterelection.h"
 #include "util/read_key.h"
 #include "util/status.h"

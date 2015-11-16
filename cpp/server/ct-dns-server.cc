@@ -1,6 +1,6 @@
 #include <gflags/gflags.h>
-#include <iostream>
 #include <ldns/ldns.h>
+#include <iostream>
 #include <sstream>
 #include <string>
 
@@ -55,7 +55,7 @@ class CTUDPDNSServer : public UDPServer {
       return;
     }
 
-    //ldns_pkt_print(stdout, packet);
+    // ldns_pkt_print(stdout, packet);
 
     if (ldns_pkt_qr(packet) != 0) {
       LOG(INFO) << "Packet is not a query";

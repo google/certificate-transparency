@@ -1,8 +1,8 @@
-#include <atomic>
-#include <functional>
 #include <gflags/gflags.h>
 #include <glog/logging.h>
 #include <gtest/gtest.h>
+#include <atomic>
+#include <functional>
 #include <thread>
 
 #include "base/notification.h"

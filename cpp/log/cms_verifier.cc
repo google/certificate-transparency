@@ -10,7 +10,7 @@ using util::StatusOr;
 
 namespace cert_trans {
 util::StatusOr<bool> CmsVerifier::IsCmsSignedByCert(BIO* cms_bio_in,
-                                                     const Cert& cert) const {
+                                                    const Cert& cert) const {
   CHECK_NOTNULL(cms_bio_in);
 
   if (!cert.IsLoaded()) {

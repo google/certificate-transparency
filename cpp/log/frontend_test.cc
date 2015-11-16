@@ -2,9 +2,9 @@
 #include <glog/logging.h>
 #include <gmock/gmock.h>
 #include <gtest/gtest.h>
-#include <memory>
 #include <openssl/err.h>
 #include <openssl/evp.h>
+#include <memory>
 #include <string>
 
 #include "log/cert_submission_handler.h"

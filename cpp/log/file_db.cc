@@ -1,17 +1,17 @@
 #include "log/file_db.h"
 
 #include <glog/logging.h>
+#include <stdint.h>
 #include <map>
 #include <set>
-#include <stdint.h>
 #include <string>
 #include <vector>
 
 #include "log/file_storage.h"
+#include "monitoring/latency.h"
+#include "monitoring/monitoring.h"
 #include "proto/ct.pb.h"
 #include "proto/serializer.h"
-#include "monitoring/monitoring.h"
-#include "monitoring/latency.h"
 #include "util/util.h"
 
 using std::chrono::milliseconds;

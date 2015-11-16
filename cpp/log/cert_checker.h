@@ -42,7 +42,8 @@ class CertChecker {
   virtual bool LoadTrustedCertificates(const std::string& trusted_cert_file);
 
   // Load directly from |trusted_certs|, a vector of PEM-certs.
-  // Returns true if at least one of the supplied certs was loaded successfully.
+  // Returns true if at least one of the supplied certs was loaded
+  // successfully.
   virtual bool LoadTrustedCertificates(
       const std::vector<std::string>& trusted_certs);
 
@@ -53,7 +54,9 @@ class CertChecker {
     return trusted_;
   }
 
-  virtual size_t NumTrustedCertificates() const { return trusted_.size(); }
+  virtual size_t NumTrustedCertificates() const {
+    return trusted_.size();
+  }
 
   // Check that:
   // (1) Each certificate is correctly signed by the next one in the chain; and

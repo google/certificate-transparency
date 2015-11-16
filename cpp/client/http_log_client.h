@@ -2,8 +2,8 @@
 #ifndef HTTP_LOG_CLIENT_H
 #define HTTP_LOG_CLIENT_H
 
-#include <memory>
 #include <stdint.h>
+#include <memory>
 #include <string>
 
 #include "base/macros.h"

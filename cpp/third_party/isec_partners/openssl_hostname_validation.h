@@ -55,5 +55,5 @@ typedef enum {
 * embedded in it.
 * Returns Error if there was an error.
 */
-HostnameValidationResult validate_hostname(const char *hostname,
-                                           const X509 *server_cert);
+HostnameValidationResult validate_hostname(const char* hostname,
+                                           const X509* server_cert);

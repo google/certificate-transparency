@@ -84,6 +84,7 @@ static ASN1_NULL* StringToASN1Null(X509V3_EXT_METHOD*, X509V3_CTX*,
   return ASN1_NULL_new();
 }
 
+// clang-format off
 static X509V3_EXT_METHOD ct_sctlist_method = {
     0,  // ext_nid, NID, will be created by OBJ_create()
     0,  // flags
@@ -157,6 +158,7 @@ static X509V3_EXT_METHOD ct_name_constraint_nolog_intermediate_ca_method = {
     reinterpret_cast<X509V3_EXT_S2I>(StringToASN1Null), 0, 0, 0, 0,
     NULL  // usr_data
 };
+// clang-format on
 
 void LoadCtExtensions() {
   // V1 Certificate Extensions
@@ -186,26 +188,29 @@ void LoadCtExtensions() {
 
   // V2 Certificate extensions
 
-  ct_redaction_count_method.ext_nid = OBJ_create(
-      kPrecertificateRedactedLabelOID, kPrecertificateRedactedLabelCountSN,
-      kPrecertificateRedactedLabelCountLN);
+  ct_redaction_count_method.ext_nid =
+      OBJ_create(kPrecertificateRedactedLabelOID,
+                 kPrecertificateRedactedLabelCountSN,
+                 kPrecertificateRedactedLabelCountLN);
   CHECK_NE(ct_redaction_count_method.ext_nid, 0);
   CHECK_EQ(1, X509V3_EXT_add(&ct_redaction_count_method));
   NID_ctPrecertificateRedactedLabelCount = ct_redaction_count_method.ext_nid;
 
-  ct_name_constraint_nolog_intermediate_ca_method.ext_nid = OBJ_create(
-      kNameConstraintNologIntermediateOID, kNameConstraintNologIntermediateSN,
-      kNameConstraintNologIntermediateLN);
+  ct_name_constraint_nolog_intermediate_ca_method.ext_nid =
+      OBJ_create(kNameConstraintNologIntermediateOID,
+                 kNameConstraintNologIntermediateSN,
+                 kNameConstraintNologIntermediateLN);
   CHECK_NE(ct_name_constraint_nolog_intermediate_ca_method.ext_nid, 0);
-  CHECK_EQ(1, X509V3_EXT_add(&ct_name_constraint_nolog_intermediate_ca_method));
+  CHECK_EQ(1,
+           X509V3_EXT_add(&ct_name_constraint_nolog_intermediate_ca_method));
   NID_ctNameConstraintNologIntermediateCa =
       ct_name_constraint_nolog_intermediate_ca_method.ext_nid;
 
   // V2 Content types
 
-  NID_ctV2CmsPayloadContentType = OBJ_create(
-      kV2PrecertificateCmsContentTypeOID, kV2PrecertCmsContentTypeSN,
-      kV2PrecertCmsContentTypeLN);
+  NID_ctV2CmsPayloadContentType =
+      OBJ_create(kV2PrecertificateCmsContentTypeOID,
+                 kV2PrecertCmsContentTypeSN, kV2PrecertCmsContentTypeLN);
 }
 
 }  // namespace cert_trans

@@ -2,10 +2,10 @@
 #include <gflags/gflags.h>
 #include <glog/logging.h>
 #include <gtest/gtest.h>
-#include <set>
 #include <stdlib.h>
-#include <string>
 #include <sys/resource.h>
+#include <set>
+#include <string>
 
 #include "log/database.h"
 #include "log/file_db.h"

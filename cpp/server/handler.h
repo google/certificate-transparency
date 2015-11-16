@@ -1,9 +1,9 @@
 #ifndef CERT_TRANS_SERVER_HANDLER_H_
 #define CERT_TRANS_SERVER_HANDLER_H_
 
+#include <stdint.h>
 #include <memory>
 #include <mutex>
-#include <stdint.h>
 #include <string>
 
 #include "proto/ct.pb.h"

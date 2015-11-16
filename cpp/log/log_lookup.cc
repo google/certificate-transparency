@@ -1,9 +1,9 @@
 #include "log/log_lookup.h"
 
 #include <glog/logging.h>
-#include <map>
 #include <stdint.h>
 #include <stdlib.h>
+#include <map>
 #include <string>
 #include <utility>
 #include <vector>

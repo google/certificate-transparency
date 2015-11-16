@@ -15,9 +15,9 @@
 #include <openssl/pem.h>
 #include <openssl/x509.h>
 #include <openssl/x509v3.h>
+#include <time.h>
 #include <memory>
 #include <string>
-#include <time.h>
 #include <vector>
 
 using std::string;
@@ -48,10 +48,10 @@ namespace cert_trans {
 
 // Convert string from ASN1 and check it doesn't contain nul characters
 string ASN1ToStringAndCheckForNulls(ASN1_STRING* asn1_string,
-                                    const string& tag,
-                                    util::Status* status) {
+                                    const string& tag, util::Status* status) {
   const string cpp_string(reinterpret_cast<char*>(
-      ASN1_STRING_data(asn1_string)), ASN1_STRING_length(asn1_string));
+                              ASN1_STRING_data(asn1_string)),
+                          ASN1_STRING_length(asn1_string));
 
   // Unfortunately ASN1_STRING_length returns a signed value
   if (ASN1_STRING_length(asn1_string) < 0) {
@@ -380,9 +380,9 @@ StatusOr<bool> Cert::IsSignedBy(const Cert& issuer) const {
     ClearOpenSSLErrors();
     return false;
   }
-  if (lib == ERR_LIB_EVP && (
-      reason == EVP_R_UNKNOWN_MESSAGE_DIGEST_ALGORITHM ||
-      reason == EVP_R_UNKNOWN_SIGNATURE_ALGORITHM)) {
+  if (lib == ERR_LIB_EVP &&
+      (reason == EVP_R_UNKNOWN_MESSAGE_DIGEST_ALGORITHM ||
+       reason == EVP_R_UNKNOWN_SIGNATURE_ALGORITHM)) {
     return LogUnsupportedAlgorithm();
   }
 #else
@@ -392,9 +392,9 @@ StatusOr<bool> Cert::IsSignedBy(const Cert& issuer) const {
     ClearOpenSSLErrors();
     return false;
   }
-  if (lib == ERR_LIB_ASN1 && (
-      reason == ASN1_R_UNKNOWN_MESSAGE_DIGEST_ALGORITHM ||
-      reason == ASN1_R_UNKNOWN_SIGNATURE_ALGORITHM)) {
+  if (lib == ERR_LIB_ASN1 &&
+      (reason == ASN1_R_UNKNOWN_MESSAGE_DIGEST_ALGORITHM ||
+       reason == ASN1_R_UNKNOWN_SIGNATURE_ALGORITHM)) {
     return LogUnsupportedAlgorithm();
   }
 #endif
@@ -583,8 +583,8 @@ util::Status Cert::OctetStringExtensionData(int extension_nid,
   // Callers don't care whether extension is missing or invalid as they
   // usually call this method after confirming it to be present.
   const StatusOr<void*> ext_struct = ExtensionStructure(extension_nid);
-  if (!ext_struct.ok()
-      && ext_struct.status().CanonicalCode() == Code::NOT_FOUND) {
+  if (!ext_struct.ok() &&
+      ext_struct.status().CanonicalCode() == Code::NOT_FOUND) {
     return ext_struct.status();
   }
 
@@ -647,7 +647,8 @@ util::StatusOr<void*> Cert::ExtensionStructure(int extension_nid) const {
 
   if (!has_ext.ValueOrDie()) {
     return util::Status(Code::NOT_FOUND, "Extension NID " +
-                        to_string(extension_nid) + " not present or invalid");
+                                             to_string(extension_nid) +
+                                             " not present or invalid");
   }
 
   int crit;
@@ -714,7 +715,8 @@ bool IsValidRedactedHost(const string& hostname) {
 namespace {
 
 
-bool ValidateRedactionSubjectAltNames(STACK_OF(GENERAL_NAME)* subject_alt_names,
+bool ValidateRedactionSubjectAltNames(STACK_OF(GENERAL_NAME) *
+                                          subject_alt_names,
                                       vector<string>* dns_alt_names,
                                       util::Status* status,
                                       int* redacted_name_count) {
@@ -729,9 +731,9 @@ bool ValidateRedactionSubjectAltNames(STACK_OF(GENERAL_NAME)* subject_alt_names,
       util::Status name_status;
 
       if (name->type == GEN_DNS) {
-        const string dns_name = ASN1ToStringAndCheckForNulls(name->d.dNSName,
-                                                             "DNS name",
-                                                             &name_status);
+        const string dns_name =
+            ASN1ToStringAndCheckForNulls(name->d.dNSName, "DNS name",
+                                         &name_status);
 
         if (!name_status.ok()) {
           *status = name_status;
@@ -789,12 +791,12 @@ bool Cert::ValidateRedactionSubjectAltNameAndCN(int* dns_alt_name_count,
 
   if (!name) {
     LOG(ERROR) << "Missing X509 subject name";
-    *status = util::Status(Code::INVALID_ARGUMENT, "Missing X509 subject name");
+    *status =
+        util::Status(Code::INVALID_ARGUMENT, "Missing X509 subject name");
     return true;
   }
 
-  const int name_pos(
-      X509_NAME_get_index_by_NID(name, NID_commonName, -1));
+  const int name_pos(X509_NAME_get_index_by_NID(name, NID_commonName, -1));
 
   if (name_pos >= 0) {
     X509_NAME_ENTRY* const name_entry(X509_NAME_get_entry(name, name_pos));
@@ -809,8 +811,8 @@ bool Cert::ValidateRedactionSubjectAltNameAndCN(int* dns_alt_name_count,
         // a subject?
       } else {
         util::Status cn_status;
-        common_name = ASN1ToStringAndCheckForNulls(subject_name_asn1,
-                                                   "CN", &cn_status);
+        common_name =
+            ASN1ToStringAndCheckForNulls(subject_name_asn1, "CN", &cn_status);
 
         if (!cn_status.ok()) {
           *status = cn_status;
@@ -826,7 +828,8 @@ bool Cert::ValidateRedactionSubjectAltNameAndCN(int* dns_alt_name_count,
     if (dns_alt_names[0] != common_name) {
       LOG(WARNING) << "CN " << common_name << " does not match DNS.0 "
                    << dns_alt_names[0];
-      *status = util::Status(Code::INVALID_ARGUMENT, "CN does not match DNS.0");
+      *status =
+          util::Status(Code::INVALID_ARGUMENT, "CN does not match DNS.0");
       return true;
     }
   }
@@ -989,13 +992,13 @@ util::Status Cert::IsValidNameConstrainedIntermediateCa() const {
   bool seen_dns = false;
 
   for (int permitted_subtree = 0;
-      permitted_subtree < sk_GENERAL_SUBTREE_num(nc->permittedSubtrees);
-      ++permitted_subtree) {
-    GENERAL_SUBTREE* const perm_subtree(sk_GENERAL_SUBTREE_value(
-        nc->permittedSubtrees, permitted_subtree));
+       permitted_subtree < sk_GENERAL_SUBTREE_num(nc->permittedSubtrees);
+       ++permitted_subtree) {
+    GENERAL_SUBTREE* const perm_subtree(
+        sk_GENERAL_SUBTREE_value(nc->permittedSubtrees, permitted_subtree));
 
-    if (perm_subtree->base && perm_subtree->base->type == GEN_DNS
-        && perm_subtree->base->d.dNSName->length > 0) {
+    if (perm_subtree->base && perm_subtree->base->type == GEN_DNS &&
+        perm_subtree->base->d.dNSName->length > 0) {
       seen_dns = true;
     }
   }
@@ -1011,11 +1014,10 @@ util::Status Cert::IsValidNameConstrainedIntermediateCa() const {
   // that end up covering the whole available range. For the moment
   // things similar to the example in the RFC work.
   for (int excluded_subtree = 0;
-      excluded_subtree < sk_GENERAL_SUBTREE_num(nc->excludedSubtrees);
-      ++excluded_subtree) {
-
-    GENERAL_SUBTREE* const excl_subtree(sk_GENERAL_SUBTREE_value(
-        nc->excludedSubtrees, excluded_subtree));
+       excluded_subtree < sk_GENERAL_SUBTREE_num(nc->excludedSubtrees);
+       ++excluded_subtree) {
+    GENERAL_SUBTREE* const excl_subtree(
+        sk_GENERAL_SUBTREE_value(nc->excludedSubtrees, excluded_subtree));
 
     // Only consider entries that are of type ipAddress (OCTET_STRING)
     if (excl_subtree->base && excl_subtree->base->type == GEN_IPADD) {
@@ -1152,7 +1154,8 @@ util::Status TbsCertificate::CopyIssuerFrom(const Cert& from) {
   X509_NAME* ca_name = X509_get_issuer_name(from.x509_.get());
   if (!ca_name) {
     LOG(WARNING) << "Issuer certificate has NULL name";
-    return util::Status(Code::FAILED_PRECONDITION, "Issuer cert has NULL name");
+    return util::Status(Code::FAILED_PRECONDITION,
+                        "Issuer cert has NULL name");
   }
 
   if (X509_set_issuer_name(x509_.get(), ca_name) != 1) {
@@ -1210,8 +1213,7 @@ util::Status TbsCertificate::CopyIssuerFrom(const Cert& from) {
       1) {
     LOG(ERROR) << "Failed to copy extension data.";
     LOG_OPENSSL_ERRORS(ERROR);
-    return util::Status(Code::INTERNAL,
-                        "Failed to copy extension data");
+    return util::Status(Code::INTERNAL, "Failed to copy extension data");
   }
 
   return util::Status::OK;

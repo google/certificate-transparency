@@ -5,11 +5,11 @@
 #include <openssl/ssl.h>
 #include <openssl/x509.h>
 
+#include "base/macros.h"
 #include "client/client.h"
 #include "client/ssl_client.h"
 #include "log/log_verifier.h"
 #include "proto/ct.pb.h"
-#include "base/macros.h"
 #include "util/openssl_scoped_types.h"
 
 class LogVerifier;

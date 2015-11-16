@@ -40,14 +40,16 @@ void CertificateHttpHandlerV2::AddHandlers(libevent::HttpServer* server) {
     // Don't really need to proxy this one, but may as well just to keep
     // everything tidy:
     AddProxyWrappedHandler(server, "/ct/v2/get-roots",
-                           bind(&CertificateHttpHandlerV2::GetRoots, this, _1));
+                           bind(&CertificateHttpHandlerV2::GetRoots, this,
+                                _1));
   }
   if (frontend_) {
     // Proxy the add-* calls too, technically we could serve them, but a
     // more up-to-date node will have a better chance of handling dupes
     // correctly, rather than bloating the tree.
     AddProxyWrappedHandler(server, "/ct/v2/add-chain",
-                           bind(&CertificateHttpHandlerV2::AddChain, this, _1));
+                           bind(&CertificateHttpHandlerV2::AddChain, this,
+                                _1));
     AddProxyWrappedHandler(server, "/ct/v2/add-pre-chain",
                            bind(&CertificateHttpHandlerV2::AddPreChain, this,
                                 _1));

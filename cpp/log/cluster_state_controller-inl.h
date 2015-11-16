@@ -3,8 +3,8 @@
 
 #include "log/cluster_state_controller.h"
 
-#include <functional>
 #include <stdint.h>
+#include <functional>
 
 #include "fetcher/peer.h"
 #include "log/database.h"
@@ -390,7 +390,6 @@ void ClusterStateController<Logged>::OnServingSthUpdated(
                 << "serving STH, not writing to DB.";
       write_sth = false;
     }
-
   }
 
   ct::SignedTreeHead sth_to_write;

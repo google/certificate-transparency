@@ -1,8 +1,8 @@
 #include "util/etcd.h"
 
-#include <ctime>
 #include <gflags/gflags.h>
 #include <glog/logging.h>
+#include <ctime>
 #include <utility>
 
 #include "util/json_wrapper.h"
@@ -41,10 +41,12 @@ using util::Task;
 
 DEFINE_int32(etcd_watch_error_retry_delay_seconds, 5,
              "delay between retrying etcd watch requests");
-DEFINE_bool(etcd_consistent, true, "Add consistent=true param to all requests. "
-            "Do not turn this off unless you *know* what you're doing.");
-DEFINE_bool(etcd_quorum, true, "Add quorum=true param to all requests. "
-            "Do not turn this off unless you *know* what you're doing.");
+DEFINE_bool(etcd_consistent, true,
+            "Add consistent=true param to all requests. Do not turn this off "
+            "unless you *know* what you're doing.");
+DEFINE_bool(etcd_quorum, true,
+            "Add quorum=true param to all requests. Do not turn this off "
+            "unless you *know* what you're doing.");
 DEFINE_int32(etcd_connection_timeout_seconds, 10,
              "Number of seconds after which to timeout etcd connections.");
 
@@ -52,12 +54,21 @@ namespace cert_trans {
 
 namespace {
 
-const char* kStoreStats[] = {"setsFail", "getsSuccess", "watchers",
-                             "expireCount", "createFail", "setsSuccess",
-                             "compareAndDeleteFail", "createSuccess",
-                             "deleteFail", "compareAndSwapSuccess",
-                             "compareAndSwapFail", "compareAndDeleteSuccess",
-                             "updateFail", "deleteSuccess", "updateSuccess",
+const char* kStoreStats[] = {"setsFail",
+                             "getsSuccess",
+                             "watchers",
+                             "expireCount",
+                             "createFail",
+                             "setsSuccess",
+                             "compareAndDeleteFail",
+                             "createSuccess",
+                             "deleteFail",
+                             "compareAndSwapSuccess",
+                             "compareAndSwapFail",
+                             "compareAndDeleteSuccess",
+                             "updateFail",
+                             "deleteSuccess",
+                             "updateSuccess",
                              "getsFail"};
 
 const char kKeysSpace[] = "/v2/keys";
@@ -670,12 +681,15 @@ bool EtcdClient::Node::HasExpiry() const {
 }
 
 
-EtcdClient::EtcdClient(Executor* executor, UrlFetcher* fetcher, const string& host, uint16_t port)
-    : EtcdClient(executor, fetcher, list<HostPortPair>{HostPortPair(host, port)}) {
+EtcdClient::EtcdClient(Executor* executor, UrlFetcher* fetcher,
+                       const string& host, uint16_t port)
+    : EtcdClient(executor, fetcher,
+                 list<HostPortPair>{HostPortPair(host, port)}) {
 }
 
 
-EtcdClient::EtcdClient(Executor* executor, UrlFetcher* fetcher, const list<HostPortPair>& etcds)
+EtcdClient::EtcdClient(Executor* executor, UrlFetcher* fetcher,
+                       const list<HostPortPair>& etcds)
     : executor_(CHECK_NOTNULL(executor)),
       log_version_task_(new SyncTask(executor_)),
       fetcher_(CHECK_NOTNULL(fetcher)),
@@ -980,8 +994,8 @@ list<EtcdClient::HostPortPair> SplitHosts(const string& hosts_string) {
   list<EtcdClient::HostPortPair> ret;
   for (const auto& h : hosts) {
     vector<string> hp(util::split(h, ':'));
-    CHECK_EQ(static_cast<size_t>(2), hp.size()) << "Invalid host:port string: '"
-                                                << h << "'";
+    CHECK_EQ(static_cast<size_t>(2), hp.size())
+        << "Invalid host:port string: '" << h << "'";
     const int port(stoi(hp[1]));
     CHECK_LT(0, port) << "Port is <= 0";
     CHECK_GE(65535, port) << "Port is > 65535";
@@ -997,9 +1011,9 @@ void EtcdClient::MaybeLogEtcdVersion() {
   }
   logged_version_ = true;
 
-  const UrlFetcher::Request req(
-      URL("http://" + etcds_.front().first + ":" +
-              to_string(etcds_.front().second) + "/version"));
+  const UrlFetcher::Request req(URL("http://" + etcds_.front().first + ":" +
+                                    to_string(etcds_.front().second) +
+                                    "/version"));
   UrlFetcher::Response* const resp(new UrlFetcher::Response);
   fetcher_->Fetch(req, resp, log_version_task_->task()->AddChild([this, resp](
                                  Task* child_task) {

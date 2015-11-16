@@ -1,8 +1,8 @@
 #include "server/handler_v2.h"
 
-#include <algorithm>
 #include <gflags/gflags.h>
 #include <glog/logging.h>
+#include <algorithm>
 #include <string>
 #include <vector>
 
@@ -57,10 +57,10 @@ static Latency<milliseconds, string> http_server_request_latency_ms(
 }  // namespace
 
 
-HttpHandlerV2::HttpHandlerV2(LogLookup* log_lookup, const ReadOnlyDatabase* db,
-                         const ClusterStateController<LoggedEntry>* controller,
-                         ThreadPool* pool, libevent::Base* event_base,
-                         StalenessTracker* staleness_tracker)
+HttpHandlerV2::HttpHandlerV2(
+    LogLookup* log_lookup, const ReadOnlyDatabase* db,
+    const ClusterStateController<LoggedEntry>* controller, ThreadPool* pool,
+    libevent::Base* event_base, StalenessTracker* staleness_tracker)
     : log_lookup_(CHECK_NOTNULL(log_lookup)),
       db_(CHECK_NOTNULL(db)),
       controller_(CHECK_NOTNULL(controller)),
@@ -85,9 +85,9 @@ void StatsHandlerInterceptor(const string& path,
 }
 
 
-void HttpHandlerV2::AddEntryReply(evhttp_request* req,
-                                const util::Status& add_status,
-                                const SignedCertificateTimestamp& sct) const {
+void HttpHandlerV2::AddEntryReply(
+    evhttp_request* req, const util::Status& add_status,
+    const SignedCertificateTimestamp& sct) const {
   return SendJsonError(event_base_, req, HTTP_NOTIMPLEMENTED,
                        "Not yet implemented.");
 }
@@ -169,7 +169,7 @@ void HttpHandlerV2::GetConsistency(evhttp_request* req) const {
 
 
 void HttpHandlerV2::BlockingGetEntries(evhttp_request* req, int64_t start,
-                                     int64_t end, bool include_scts) const {
+                                       int64_t end, bool include_scts) const {
   return SendJsonError(event_base_, req, HTTP_NOTIMPLEMENTED,
                        "Not yet implemented.");
 }

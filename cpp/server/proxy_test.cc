@@ -1,7 +1,7 @@
 #include "server/proxy.h"
 
-#include <gtest/gtest.h>
 #include <gmock/gmock.h>
+#include <gtest/gtest.h>
 
 #include "util/testing.h"
 

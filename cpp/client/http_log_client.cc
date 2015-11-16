@@ -2,8 +2,8 @@
 #include "client/http_log_client.h"
 
 #include <event2/buffer.h>
-#include <functional>
 #include <glog/logging.h>
+#include <functional>
 #include <memory>
 
 #include "log/cert.h"

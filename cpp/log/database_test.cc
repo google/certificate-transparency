@@ -49,8 +49,7 @@ typedef testing::Types<FileDB, SQLiteDB, LevelDB> Databases;
 
 
 template <class T>
-class DBTestDeathTest : public DBTest<T> {
-};
+class DBTestDeathTest : public DBTest<T> {};
 
 TYPED_TEST_CASE(DBTest, Databases);
 TYPED_TEST_CASE(DBTestDeathTest, Databases);

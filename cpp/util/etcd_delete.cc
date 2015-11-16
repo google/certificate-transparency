@@ -1,8 +1,8 @@
 #include "util/etcd_delete.h"
 
-#include <functional>
 #include <gflags/gflags.h>
 #include <glog/logging.h>
+#include <functional>
 #include <mutex>
 
 using std::bind;

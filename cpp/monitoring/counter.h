@@ -8,8 +8,8 @@
 #include <string>
 
 #include "base/macros.h"
-#include "monitoring/metric.h"
 #include "monitoring/labelled_values.h"
+#include "monitoring/metric.h"
 
 namespace cert_trans {
 

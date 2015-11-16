@@ -47,11 +47,13 @@ TEST_F(LibEventWrapperDeathTest, TestCheckNotOnEventThread) {
   // Should be fine:
   Base::CheckNotOnEventThread();
   // But...
-  EXPECT_DEATH({
-    std::shared_ptr<Base> base(std::make_shared<Base>());
-    base->Add(std::bind(&Base::CheckNotOnEventThread));
-    base->DispatchOnce();
-  }, "OnEventThread");
+  EXPECT_DEATH(
+      {
+        std::shared_ptr<Base> base(std::make_shared<Base>());
+        base->Add(std::bind(&Base::CheckNotOnEventThread));
+        base->DispatchOnce();
+      },
+      "OnEventThread");
 }
 
 

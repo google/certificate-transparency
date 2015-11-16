@@ -1,8 +1,8 @@
 #ifndef CERT_TRANS_MONITORING_LABELLED_VALUES_H_
 #define CERT_TRANS_MONITORING_LABELLED_VALUES_H_
 
-#include <chrono>
 #include <glog/logging.h>
+#include <chrono>
 #include <map>
 #include <mutex>
 

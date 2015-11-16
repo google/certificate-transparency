@@ -1,6 +1,6 @@
-#include <fstream>
 #include <gflags/gflags.h>
 #include <glog/logging.h>
+#include <fstream>
 #include <iostream>
 
 #include "proto/ct.pb.h"
@@ -13,7 +13,7 @@ using std::ifstream;
 namespace {
 
 
-void DumpSth(const char *filename) {
+void DumpSth(const char* filename) {
   ifstream input(filename);
   ct::SignedTreeHead pb;
   CHECK(pb.ParseFromIstream(&input));
@@ -25,7 +25,7 @@ void DumpSth(const char *filename) {
 }  // namespace
 
 
-int main(int argc, char *argv[]) {
+int main(int argc, char* argv[]) {
   google::SetVersionString(cert_trans::kBuildVersion);
   google::ParseCommandLineFlags(&argc, &argv, true);
   google::InitGoogleLogging(argv[0]);

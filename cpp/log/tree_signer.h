@@ -1,8 +1,8 @@
 #ifndef TREE_SIGNER_H
 #define TREE_SIGNER_H
 
-#include <chrono>
 #include <stdint.h>
+#include <chrono>
 
 #include "log/cluster_state_controller.h"
 #include "log/consistent_store.h"

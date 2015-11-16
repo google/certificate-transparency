@@ -74,19 +74,16 @@ class StatusOr {
 // Implementation.
 
 template <typename T>
-inline StatusOr<T>::StatusOr()
-    : status_(::util::error::UNKNOWN, "") {
+inline StatusOr<T>::StatusOr() : status_(::util::error::UNKNOWN, "") {
 }
 
 template <typename T>
-inline StatusOr<T>::StatusOr(const ::util::Status& status)
-    : status_(status) {
+inline StatusOr<T>::StatusOr(const ::util::Status& status) : status_(status) {
   CHECK(!status.ok()) << "Status::OK is not a valid argument to StatusOr";
 }
 
 template <typename T>
-inline StatusOr<T>::StatusOr(const T& value)
-    : value_(value) {
+inline StatusOr<T>::StatusOr(const T& value) : value_(value) {
 }
 
 template <typename T>

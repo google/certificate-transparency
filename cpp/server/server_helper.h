@@ -1,15 +1,15 @@
 #ifndef CERT_TRANS_SERVER_SERVER_HELPER_H_
 #define CERT_TRANS_SERVER_SERVER_HELPER_H_
 
+#include <gflags/gflags.h>
+#include <openssl/crypto.h>
 #include <chrono>
 #include <csignal>
 #include <cstring>
 #include <functional>
-#include <gflags/gflags.h>
 #include <iostream>
 #include <memory>
 #include <mutex>
-#include <openssl/crypto.h>
 
 #include "base/macros.h"
 #include "log/database.h"

@@ -42,7 +42,8 @@ static const char kCmsSignedDataTest4[] = "cms_test4.der";
 static const char kCmsSignedDataTest5[] = "cms_test5.der";
 
 // Subject name we expect in our embedded certificate CMS tests
-static const char kCmsTestSubject[] = "CN=?.example.com, C=GB, ST=Wales, "
+static const char kCmsTestSubject[] =
+    "CN=?.example.com, C=GB, ST=Wales, "
     "L=Erw Wen, O=Certificate Transparency";
 
 namespace {

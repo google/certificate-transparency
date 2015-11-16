@@ -202,10 +202,8 @@ LogSigVerifier::VerifyResult LogSigVerifier::VerifyV1PrecertSCTSignature(
 
   string serialized_sct;
   Serializer::SerializeResult serialize_result =
-      Serializer::SerializeV1PrecertSCTSignatureInput(timestamp,
-                                                      issuer_key_hash,
-                                                      tbs_cert, extensions,
-                                                      &serialized_sct);
+      Serializer::SerializeV1PrecertSCTSignatureInput(
+          timestamp, issuer_key_hash, tbs_cert, extensions, &serialized_sct);
   if (serialize_result != Serializer::OK)
     return GetSerializeError(serialize_result);
   return ConvertStatus(Verify(serialized_sct, signature));

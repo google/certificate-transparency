@@ -1,9 +1,9 @@
 #ifndef CERT_TRANS_LOG_ETCD_CONSISTENT_STORE_H_
 #define CERT_TRANS_LOG_ETCD_CONSISTENT_STORE_H_
 
+#include <stdint.h>
 #include <memory>
 #include <mutex>
-#include <stdint.h>
 #include <vector>
 
 #include "base/macros.h"
@@ -146,7 +146,7 @@ class EtcdConsistentStore : public ConsistentStore<Logged> {
 
   util::Status MaybeReject(const std::string& type) const;
 
-  EtcdClient* const client_;  // We don't own this.
+  EtcdClient* const client_;              // We don't own this.
   libevent::Base* base_;                  // We don't own this.
   util::Executor* const executor_;        // We don't own this.
   const MasterElection* const election_;  // We don't own this.

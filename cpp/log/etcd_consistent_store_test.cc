@@ -1,10 +1,10 @@
 #include "log/etcd_consistent_store.h"
 
-#include <atomic>
-#include <functional>
 #include <gflags/gflags.h>
 #include <gmock/gmock.h>
 #include <gtest/gtest.h>
+#include <atomic>
+#include <functional>
 #include <map>
 #include <memory>
 #include <string>
@@ -287,11 +287,11 @@ TEST_F(EtcdConsistentStoreTest, TestSetServingSTHWontOverwriteWithOlder) {
 
   ct::SignedTreeHead sth2;
   sth2.set_timestamp(sth.timestamp() - 1);
-  EXPECT_THAT(store_->SetServingSTH(sth2), StatusIs(util::error::OUT_OF_RANGE));
+  EXPECT_THAT(store_->SetServingSTH(sth2),
+              StatusIs(util::error::OUT_OF_RANGE));
 }
 
-TEST_F(EtcdConsistentStoreDeathTest,
-       TestSetServingSTHChecksInconsistentSize) {
+TEST_F(EtcdConsistentStoreDeathTest, TestSetServingSTHChecksInconsistentSize) {
   ct::SignedTreeHead sth;
   sth.set_timestamp(234);
   sth.set_tree_size(10);
@@ -499,7 +499,7 @@ TEST_F(EtcdConsistentStoreDeathTest,
 }
 
 TEST_F(EtcdConsistentStoreDeathTest,
-    TestUpdateSequenceMappingBarfsMappingNonContiguousToServingTree) {
+       TestUpdateSequenceMappingBarfsMappingNonContiguousToServingTree) {
   SignedTreeHead sth;
   sth.set_timestamp(123);
   sth.set_tree_size(1000);
@@ -571,9 +571,9 @@ TEST_F(EtcdConsistentStoreTest, WatchServingSTH) {
       [&sth, &notify, &call_count,
        &mutex](const Update<ct::SignedTreeHead>& update) {
         lock_guard<std::mutex> lock(mutex);
-        ASSERT_LE(call_count, 2) << "Extra update: key:" << update.handle_.Key() << "@"
-            << update.handle_.Handle()
-            << " exists:" << update.exists_
+        ASSERT_LE(call_count, 2)
+            << "Extra update: key:" << update.handle_.Key() << "@"
+            << update.handle_.Handle() << " exists:" << update.exists_
             << " entry: " << update.handle_.Entry().DebugString();
         switch (call_count) {
           case 0:

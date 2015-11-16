@@ -104,8 +104,9 @@ namespace {
 
 class CertCheckerTest : public ::testing::Test {
  protected:
-  CertCheckerTest() : cert_dir_(FLAGS_test_srcdir + "/test/testdata"),
-      cert_dir_v2_(FLAGS_test_srcdir + "/test/testdata/v2/") {
+  CertCheckerTest()
+      : cert_dir_(FLAGS_test_srcdir + "/test/testdata"),
+        cert_dir_v2_(FLAGS_test_srcdir + "/test/testdata/v2/") {
   }
 
   string leaf_pem_;

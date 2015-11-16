@@ -2,8 +2,8 @@
 #include <gtest/gtest.h>
 #include <stddef.h>
 #include <stdint.h>
-#include <string>
 #include <sys/resource.h>
+#include <string>
 #include <vector>
 
 #include "merkletree/merkle_tree.h"

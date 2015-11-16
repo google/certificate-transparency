@@ -1,9 +1,9 @@
 #ifndef TREEHASHER_H
 #define TREEHASHER_H
 
+#include <stddef.h>
 #include <memory>
 #include <mutex>
-#include <stddef.h>
 #include <string>
 
 #include "base/macros.h"

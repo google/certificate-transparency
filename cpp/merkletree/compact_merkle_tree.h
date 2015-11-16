@@ -5,8 +5,8 @@
 #include <string>
 #include <vector>
 
-#include "merkletree/merkle_tree_interface.h"
 #include "merkletree/merkle_tree.h"
+#include "merkletree/merkle_tree_interface.h"
 #include "merkletree/tree_hasher.h"
 
 class SerialHasher;

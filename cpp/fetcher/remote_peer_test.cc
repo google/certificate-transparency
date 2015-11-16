@@ -2,11 +2,11 @@
 #include <glog/logging.h>
 #include <gmock/gmock.h>
 #include <gtest/gtest.h>
-#include "log/etcd_consistent_store.h"
 #include <openssl/err.h>
 #include <openssl/evp.h>
 #include <set>
 #include <string>
+#include "log/etcd_consistent_store.h"
 
 #include "base/notification.h"
 #include "client/async_log_client.h"

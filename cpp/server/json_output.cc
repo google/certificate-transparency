@@ -3,8 +3,8 @@
 #include <glog/logging.h>
 #include <string>
 
-#include "monitoring/monitoring.h"
 #include "monitoring/latency.h"
+#include "monitoring/monitoring.h"
 #include "util/json_wrapper.h"
 #include "util/libevent_wrapper.h"
 

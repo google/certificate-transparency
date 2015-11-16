@@ -1,7 +1,7 @@
 /* -*- indent-tabs-mode: nil -*- */
 #include <gtest/gtest.h>
-#include <memory>
 #include <stdint.h>
+#include <memory>
 #include <string>
 
 #include "log/etcd_consistent_store-inl.h"
