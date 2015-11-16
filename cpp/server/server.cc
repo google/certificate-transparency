@@ -114,11 +114,13 @@ void Server::StaticInit() {
 }
 
 
-Server::Server(const shared_ptr<libevent::Base>& event_base,
+Server::Server(const ct::Version supported_ct_version,
+               const shared_ptr<libevent::Base>& event_base,
                ThreadPool* internal_pool, ThreadPool* http_pool, Database* db,
                EtcdClient* etcd_client, UrlFetcher* url_fetcher,
                const LogVerifier* log_verifier)
-    : event_base_(event_base),
+    : supported_ct_version_(supported_ct_version),
+      event_base_(event_base),
       event_pump_(new libevent::EventPumpThread(event_base_)),
       http_server_(*event_base_),
       db_(CHECK_NOTNULL(db)),
@@ -132,6 +134,7 @@ Server::Server(const shared_ptr<libevent::Base>& event_base,
       server_task_(internal_pool_),
       consistent_store_(&election_,
                         new EtcdConsistentStore<LoggedEntry>(
+                            supported_ct_version,
                             event_base_.get(), internal_pool_, etcd_client_,
                             &election_, FLAGS_etcd_root, node_id_)),
       http_pool_(CHECK_NOTNULL(http_pool)) {
@@ -223,8 +226,8 @@ void Server::Initialise(bool is_mirror) {
   log_lookup_.reset(new LogLookup(db_));
 
   cluster_controller_.reset(new ClusterStateController<LoggedEntry>(
-      internal_pool_, event_base_, url_fetcher_, db_, &consistent_store_,
-      &election_, fetcher_.get()));
+      supported_ct_version_, internal_pool_, event_base_, url_fetcher_, db_,
+      &consistent_store_, &election_, fetcher_.get()));
 
   // Publish this node's hostname:port info
   cluster_controller_->SetNodeHostPort(FLAGS_server, FLAGS_port);

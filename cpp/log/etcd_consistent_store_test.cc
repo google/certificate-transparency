@@ -79,9 +79,10 @@ class EtcdConsistentStoreTest : public ::testing::Test {
   void SetUp() override {
     Registry::Instance()->ResetForTestingOnly();
     FLAGS_etcd_stats_collection_interval_seconds = 1;
-    store_.reset(new EtcdConsistentStore<LoggedEntry>(base_.get(), &executor_,
-                                                      &client_, &election_,
-                                                      kRoot, kNodeId));
+    store_.reset(new EtcdConsistentStore<LoggedEntry>(ct::V1, base_.get(),
+                                                      &executor_, &client_,
+                                                      &election_, kRoot,
+                                                      kNodeId));
     InsertEntry("/root/sequence_mapping", SequenceMapping());
   }
 
@@ -790,6 +791,12 @@ TEST_F(EtcdConsistentStoreTest, TestRejectsAddsWhenOverCapacity) {
               StatusIs(util::error::RESOURCE_EXHAUSTED));
 }
 
+TEST_F(EtcdConsistentStoreTest, TestInconsistentVersionDeathTest) {
+  // Try to set a v2 config on a v1 store
+//  ct::ClusterConfig config;
+//  config.set_cluster_ct_version(ct::Version::V2);
+//  EXPECT_DEATH(store_->SetClusterConfig(config), "Set v1 store to v2 config");
+}
 
 }  // namespace cert_trans
 

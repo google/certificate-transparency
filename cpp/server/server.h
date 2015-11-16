@@ -43,7 +43,8 @@ class Server {
   static void StaticInit();
 
   // Doesn't take ownership of anything.
-  Server(const std::shared_ptr<libevent::Base>& event_base,
+  Server(const ct::Version supported_ct_version,
+         const std::shared_ptr<libevent::Base>& event_base,
          ThreadPool* internal_pool, ThreadPool* http_pool, Database* db,
          EtcdClient* etcd_client, UrlFetcher* url_fetcher,
          const LogVerifier* log_verifier);
@@ -63,6 +64,7 @@ class Server {
   void Run();
 
  private:
+  const ct::Version supported_ct_version_;
   const std::shared_ptr<libevent::Base> event_base_;
   std::unique_ptr<libevent::EventPumpThread> event_pump_;
   libevent::HttpServer http_server_;

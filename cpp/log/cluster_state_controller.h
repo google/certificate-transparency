@@ -31,7 +31,8 @@ class Database;
 template <class Logged>
 class ClusterStateController {
  public:
-  ClusterStateController(util::Executor* executor,
+  ClusterStateController(ct::Version supported_ct_version,
+                         util::Executor* executor,
                          const std::shared_ptr<libevent::Base>& base,
                          UrlFetcher* url_fetcher, Database* database,
                          ConsistentStore<Logged>* store,
@@ -101,6 +102,7 @@ class ClusterStateController {
   // Thread entry point for ServingSTH updater thread.
   void ClusterServingSTHUpdater();
 
+  const ct::Version supported_ct_version_;
   const std::shared_ptr<libevent::Base> base_;
   UrlFetcher* const url_fetcher_;         // Not owned by us
   Database* const database_;              // Not owned by us

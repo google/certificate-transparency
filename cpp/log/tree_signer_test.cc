@@ -63,7 +63,7 @@ class TreeSignerTest : public ::testing::Test {
     test_db_.reset(new TestDB<T>);
     verifier_.reset(new LogVerifier(TestSigner::DefaultLogSigVerifier(),
                                     new MerkleVerifier(new Sha256Hasher())));
-    store_.reset(new EtcdConsistentStore<LoggedEntry>(
+    store_.reset(new EtcdConsistentStore<LoggedEntry>(ct::V1,
         base_.get(), &pool_, &etcd_client_, &election_, "/root", "id"));
     log_signer_.reset(TestSigner::DefaultLogSigner());
     tree_signer_.reset(new TS(std::chrono::duration<double>(0), db(),

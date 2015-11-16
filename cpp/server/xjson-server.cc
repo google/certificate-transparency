@@ -87,6 +87,10 @@ static const bool key_dummy = RegisterFlagValidator(&FLAGS_key, &ValidateRead);
 
 }  // namespace
 
+// This is the supported CT version of this binary. It can be used to
+// apply sanity checks such as when creating or joining clusters.
+static const ct::Version kSUPPORTED_CT_VERSION = ct::V1;
+
 
 int main(int argc, char* argv[]) {
   // Ignore various signals whilst we start up.
@@ -123,8 +127,8 @@ int main(int argc, char* argv[]) {
 
   ThreadPool http_pool(FLAGS_num_http_server_threads);
 
-  Server server(event_base, &internal_pool, &http_pool, db.get(),
-                etcd_client.get(), &url_fetcher, &log_verifier);
+  Server server(kSUPPORTED_CT_VERSION, event_base, &internal_pool, &http_pool,
+                db.get(), etcd_client.get(), &url_fetcher, &log_verifier);
   server.Initialise(false /* is_mirror */);
 
   Frontend frontend(

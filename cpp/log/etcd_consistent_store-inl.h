@@ -109,10 +109,12 @@ util::StatusOr<int64_t> CalculateNumEtcdEntries(
 
 template <class Logged>
 EtcdConsistentStore<Logged>::EtcdConsistentStore(
+    const ct::Version supported_ct_version,
     libevent::Base* base, util::Executor* executor, EtcdClient* client,
     const MasterElection* election, const std::string& root,
     const std::string& node_id)
     : client_(CHECK_NOTNULL(client)),
+      supported_ct_version_(supported_ct_version),
       base_(CHECK_NOTNULL(base)),
       executor_(CHECK_NOTNULL(executor)),
       election_(CHECK_NOTNULL(election)),
@@ -410,13 +412,21 @@ util::Status EtcdConsistentStore<Logged>::SetClusterNodeState(
   ScopedLatency scoped_latency(
       etcd_latency_by_op_ms.GetScopedLatency("set_cluster_node_state"));
 
-  // TODO(alcutter): consider keeping the handle for this around to check that
-  // nobody else is updating our cluster state.
-  ct::ClusterNodeState local_state(state);
-  local_state.set_node_id(node_id_);
-  EntryHandle<ct::ClusterNodeState> entry(GetNodePath(node_id_), local_state);
-  const std::chrono::seconds ttl(FLAGS_node_state_ttl_seconds);
-  return ForceSetEntryWithTTL(ttl, &entry);
+  // Do not allow the node state to be set to a different version than the
+  // one we support
+  if (state.node_ct_version() == supported_ct_version_) {
+    // TODO(alcutter): consider keeping the handle for this around to check that
+    // nobody else is updating our cluster state.
+    ct::ClusterNodeState local_state(state);
+    local_state.set_node_id(node_id_);
+    EntryHandle<ct::ClusterNodeState> entry(GetNodePath(node_id_), local_state);
+    const std::chrono::seconds ttl(FLAGS_node_state_ttl_seconds);
+    return ForceSetEntryWithTTL(ttl, &entry);
+  } else {
+    return util::Status(
+        util::error::FAILED_PRECONDITION,
+        "SetClusterNodeState does not accept a change in version");
+  }
 }
 
 
@@ -500,6 +510,14 @@ util::Status EtcdConsistentStore<Logged>::SetClusterConfig(
     const ct::ClusterConfig& config) {
   ScopedLatency scoped_latency(
       etcd_latency_by_op_ms.GetScopedLatency("set_cluster_config"));
+
+  // Don't allow a cluster config to be set if it doesn't match our version
+  // Take the server down immediately to avoid possible data corruption
+  if (config.cluster_ct_version() != supported_ct_version_) {
+    LOG(FATAL) << "Cluster version mismatch. We are: "
+               << ct::Version_Name(supported_ct_version_) << " and we got "
+               << ct::Version_Name(config.cluster_ct_version());
+  }
 
   EntryHandle<ct::ClusterConfig> entry(GetFullPath(kClusterConfigFile),
                                        config);

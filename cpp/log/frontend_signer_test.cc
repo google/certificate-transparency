@@ -65,7 +65,8 @@ class FrontendSignerTest : public ::testing::Test {
         event_pump_(base_),
         etcd_client_(base_.get()),
         pool_(2),
-        store_(base_.get(), &pool_, &etcd_client_, &election_, "/root", "id"),
+        store_(ct::V1, base_.get(), &pool_, &etcd_client_, &election_, "/root",
+               "id"),
         log_signer_(TestSigner::DefaultLogSigner()),
         frontend_(db(), &store_, log_signer_.get()) {
   }

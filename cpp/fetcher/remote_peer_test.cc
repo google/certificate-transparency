@@ -96,7 +96,8 @@ class RemotePeerTest : public ::testing::Test {
       : base_(make_shared<libevent::Base>()),
         event_pump_(base_),
         etcd_client_(base_.get()),
-        store_(base_.get(), &pool_, &etcd_client_, &election_, "/root", "id"),
+        store_(ct::V1, base_.get(), &pool_, &etcd_client_, &election_, "/root",
+               "id"),
         log_signer_(TestSigner::DefaultLogSigner()),
         tree_signer_(std::chrono::duration<double>(0), test_db_.db(),
                      unique_ptr<CompactMerkleTree>(

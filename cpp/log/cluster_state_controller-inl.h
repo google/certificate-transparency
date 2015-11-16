@@ -86,11 +86,13 @@ class ClusterStateController<Logged>::ClusterPeer : public Peer {
 // Pierre's task-a-palooza idea perhaps?
 template <class Logged>
 ClusterStateController<Logged>::ClusterStateController(
+    ct::Version supported_ct_version,
     util::Executor* executor, const std::shared_ptr<libevent::Base>& base,
     UrlFetcher* url_fetcher, Database* database,
     ConsistentStore<Logged>* store, MasterElection* election,
     ContinuousFetcher* fetcher)
-    : base_(base),
+    : supported_ct_version_(supported_ct_version),
+      base_(base),
       url_fetcher_(CHECK_NOTNULL(url_fetcher)),
       database_(CHECK_NOTNULL(database)),
       store_(CHECK_NOTNULL(store)),
@@ -105,6 +107,9 @@ ClusterStateController<Logged>::ClusterStateController(
           std::bind(&ClusterStateController<Logged>::ClusterServingSTHUpdater,
                     this)) {
   CHECK_NOTNULL(base_.get());
+  // Set this early to make sure we catch version mismatches as the node starts
+  local_node_state_.set_node_ct_version(supported_ct_version);
+
   store_->WatchClusterNodeStates(
       std::bind(&ClusterStateController::OnClusterStateUpdated, this,
                 std::placeholders::_1),
@@ -244,11 +249,18 @@ ClusterStateController<Logged>::GetFreshNodes() const {
     const bool is_self(
         node.second->state().hostname() == local_node_state_.hostname() &&
         node.second->state().log_port() == local_node_state_.log_port());
-    if (!is_self && node.second->state().has_newest_sth() &&
-        node.second->state().newest_sth().tree_size() >=
-            actual_serving_sth_->tree_size()) {
-      VLOG(1) << "Node is fresh: " << node.second->state().node_id();
-      fresh.push_back(node.second->state());
+    // A node that is not serving the same version as the controller cannot
+    // be considered to be fresh
+    if (node.second->state().node_ct_version() == supported_ct_version_) {
+      if (!is_self && node.second->state().has_newest_sth() &&
+          node.second->state().newest_sth().tree_size() >=
+              actual_serving_sth_->tree_size()) {
+        VLOG(1) << "Node is fresh: " << node.second->state().node_id();
+        fresh.push_back(node.second->state());
+      }
+    } else {
+      VLOG(1) << "Node is inconsistent version: "
+              << node.second->state().node_id();
     }
   }
   return fresh;
@@ -318,7 +330,16 @@ void ClusterStateController<Logged>::OnClusterConfigUpdated(
     return;
   }
 
-  cluster_config_ = update.handle_.Entry();
+  // Before accepting this new config it must match our supported CT version.
+  // We will exit if not to avoid the risk of corrupting stored data.
+  const ct::ClusterConfig new_config = update.handle_.Entry();
+  if (new_config.cluster_ct_version() != supported_ct_version_) {
+    LOG(FATAL) << "Cluster config version mismatch. We are: "
+               << ct::Version_Name(supported_ct_version_) << " and we got: "
+               << ct::Version_Name(new_config.cluster_ct_version());
+  }
+
+  cluster_config_ = new_config;
   LOG(INFO) << "Received new ClusterConfig:\n"
             << cluster_config_.DebugString();
 
