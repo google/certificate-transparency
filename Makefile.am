@@ -94,6 +94,7 @@ TESTS = \
 	cpp/monitoring/registry_test \
 	cpp/proto/serializer_test \
 	cpp/server/proxy_test \
+	cpp/util/bignum_test \
 	cpp/util/etcd_delete_test \
 	cpp/util/etcd_test \
 	cpp/util/fake_etcd_test \
@@ -176,6 +177,7 @@ cpp_libcore_a_SOURCES = \
 	cpp/server/staleness_tracker.cc \
 	cpp/third_party/curl/hostcheck.c \
 	cpp/third_party/isec_partners/openssl_hostname_validation.c \
+	cpp/util/bignum.cc \
 	cpp/util/etcd.cc \
 	cpp/util/etcd_delete.cc \
 	cpp/util/fake_etcd.cc \
@@ -664,6 +666,13 @@ cpp_server_proxy_test_SOURCES = \
 	cpp/util/json_wrapper.cc \
 	cpp/util/libevent_wrapper.cc \
 	cpp/util/protobuf_util.cc
+
+cpp_util_bignum_test_LDADD = \
+	cpp/libtest.a \
+	$(libevent_LIBS)
+cpp_util_bignum_test_SOURCES = \
+	cpp/util/bignum.cc \
+	cpp/util/bignum_test.cc
 
 cpp_util_etcd_delete_test_LDADD = \
 	cpp/libcore.a \
