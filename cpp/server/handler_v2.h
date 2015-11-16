@@ -1,9 +1,9 @@
 #ifndef CERT_TRANS_SERVER_HANDLER_V2_H_
 #define CERT_TRANS_SERVER_HANDLER_V2_H_
 
+#include <stdint.h>
 #include <memory>
 #include <mutex>
-#include <stdint.h>
 #include <string>
 
 #include "proto/ct.pb.h"
@@ -33,9 +33,9 @@ class HttpHandlerV2 {
   // Does not take ownership of its parameters, which must outlive
   // this instance.
   HttpHandlerV2(LogLookup* log_lookup, const ReadOnlyDatabase* db,
-              const ClusterStateController<LoggedEntry>* controller,
-              ThreadPool* pool, libevent::Base* event_base,
-              StalenessTracker* staleness_tracker);
+                const ClusterStateController<LoggedEntry>* controller,
+                ThreadPool* pool, libevent::Base* event_base,
+                StalenessTracker* staleness_tracker);
   virtual ~HttpHandlerV2();
 
   void Add(libevent::HttpServer* server);

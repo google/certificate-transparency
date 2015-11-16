@@ -1,14 +1,14 @@
 /* -*- indent-tabs-mode: nil -*- */
 #include "log/file_storage.h"
 
-#include <cstdlib>
 #include <dirent.h>
 #include <errno.h>
 #include <glog/logging.h>
-#include <set>
-#include <string>
 #include <sys/stat.h>
 #include <unistd.h>
+#include <cstdlib>
+#include <set>
+#include <string>
 
 #include "log/filesystem_ops.h"
 #include "util/util.h"

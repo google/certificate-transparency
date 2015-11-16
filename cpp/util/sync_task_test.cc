@@ -1,5 +1,5 @@
-#include <chrono>
 #include <gtest/gtest.h>
+#include <chrono>
 #include <thread>
 
 #include "util/sync_task.h"

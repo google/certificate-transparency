@@ -1,9 +1,9 @@
 #include "net/connection_pool.h"
 
-#include <chrono>
 #include <event2/event.h>
 #include <gflags/gflags.h>
 #include <glog/logging.h>
+#include <chrono>
 
 #include "monitoring/monitoring.h"
 #include "util/openssl_util.h"
@@ -281,7 +281,8 @@ ConnectionPool::ConnectionPool(libevent::Base* base)
     : base_(CHECK_NOTNULL(base)),
       cleanup_scheduled_(false),
       ssl_ctx_(CreateSSLCTXFromFlags(), SSL_CTX_free) {
-  CHECK(ssl_ctx_) << "could not build SSL context: " << DumpOpenSSLErrorStack();
+  CHECK(ssl_ctx_) << "could not build SSL context: "
+                  << DumpOpenSSLErrorStack();
 
   // Try to load trusted root certificates.
   if (FLAGS_trusted_root_certs == "") {

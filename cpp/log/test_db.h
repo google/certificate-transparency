@@ -4,13 +4,13 @@
 
 #include <sys/stat.h>
 
-#include "util/test_db.h"
 #include "log/database.h"
 #include "log/file_db.h"
 #include "log/file_storage.h"
 #include "log/leveldb_db.h"
 #include "log/logged_entry.h"
 #include "log/sqlite_db.h"
+#include "util/test_db.h"
 
 static const unsigned kCertStorageDepth = 3;
 static const unsigned kTreeStorageDepth = 8;

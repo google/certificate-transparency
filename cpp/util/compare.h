@@ -1,8 +1,8 @@
 #ifndef CERT_TRANS_UTIL_COMPARE_H_
 #define CERT_TRANS_UTIL_COMPARE_H_
 
-#include <algorithm>
 #include <ctype.h>
+#include <algorithm>
 #include <string>
 
 namespace cert_trans {

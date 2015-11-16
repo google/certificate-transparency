@@ -1,10 +1,10 @@
 #ifndef CERT_TRANS_UTIL_MASTERELECTION_H_
 #define CERT_TRANS_UTIL_MASTERELECTION_H_
 
+#include <stdint.h>
 #include <condition_variable>
 #include <memory>
 #include <mutex>
-#include <stdint.h>
 #include <string>
 #include <thread>
 #include <vector>

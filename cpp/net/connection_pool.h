@@ -1,12 +1,12 @@
 #ifndef CERT_TRANS_NET_CONNECTION_POOL_H_
 #define CERT_TRANS_NET_CONNECTION_POOL_H_
 
+#include <openssl/ssl.h>
+#include <stdint.h>
 #include <deque>
 #include <map>
 #include <memory>
 #include <mutex>
-#include <openssl/ssl.h>
-#include <stdint.h>
 #include <string>
 
 #include "base/macros.h"

@@ -1,10 +1,10 @@
 #ifndef CERT_TRANS_FETCHER_PEER_GROUP_H_
 #define CERT_TRANS_FETCHER_PEER_GROUP_H_
 
+#include <stdint.h>
 #include <memory>
 #include <mutex>
 #include <set>
-#include <stdint.h>
 #include <vector>
 
 #include "base/macros.h"

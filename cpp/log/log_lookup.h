@@ -2,9 +2,9 @@
 #ifndef LOG_LOOKUP_H
 #define LOG_LOOKUP_H
 
+#include <stdint.h>
 #include <map>
 #include <mutex>
-#include <stdint.h>
 #include <string>
 
 #include "base/macros.h"

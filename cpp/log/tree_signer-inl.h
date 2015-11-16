@@ -4,11 +4,11 @@
 
 #include "log/tree_signer.h"
 
+#include <glog/logging.h>
+#include <stdint.h>
 #include <algorithm>
 #include <chrono>
-#include <glog/logging.h>
 #include <set>
-#include <stdint.h>
 #include <unordered_map>
 
 #include "log/database.h"
@@ -115,10 +115,10 @@ util::Status TreeSigner<Logged>::SequenceNewEntries() {
   for (const auto& m : mapping.Entry().mapping()) {
     // Go home clang-format, you're drunk.
     CHECK(
-        sequenced_hashes.insert(
-                             std::make_pair(m.entry_hash(),
-                                            std::make_pair(m.sequence_number(),
-                                                           false))).second);
+        sequenced_hashes
+            .insert(std::make_pair(m.entry_hash(),
+                                   std::make_pair(m.sequence_number(), false)))
+            .second);
   }
 
   std::vector<cert_trans::EntryHandle<Logged>> pending_entries;
@@ -176,9 +176,11 @@ util::Status TreeSigner<Logged>::SequenceNewEntries() {
       seq_mapping->set_sequence_number(seq_it->second.first);
       pending_entry.MutableEntry()->set_sequence_number(seq_it->second.first);
     }
-    CHECK(seq_to_entry.insert(std::make_pair(
-                                  pending_entry.Entry().sequence_number(),
-                                  pending_entry.MutableEntry())).second);
+    CHECK(
+        seq_to_entry.insert(
+                        std::make_pair(pending_entry.Entry().sequence_number(),
+                                       pending_entry.MutableEntry()))
+            .second);
   }
 
   const util::StatusOr<ct::SignedTreeHead> serving_sth(

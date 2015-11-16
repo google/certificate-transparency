@@ -1,10 +1,20 @@
 /* -*- indent-tabs-mode: nil -*- */
 
+#include <event2/buffer.h>
+#include <event2/thread.h>
 #include <gflags/gflags.h>
-#include <iostream>
+#include <openssl/crypto.h>
+#include <openssl/err.h>
 #include <signal.h>
-#include <string>
 #include <unistd.h>
+#include <chrono>
+#include <csignal>
+#include <cstring>
+#include <functional>
+#include <iostream>
+#include <memory>
+#include <mutex>
+#include <string>
 #include <utility>
 
 #include "client/async_log_client.h"

@@ -189,8 +189,8 @@ int SSLClient::VerifyCallback(X509_STORE_CTX* ctx, void* arg) {
                 cert_trans::NID_ctSignedCertificateTimestampList)
           : util::Status::UNKNOWN;
 
-  // First check for embedded proof, if not present then look for the proof in a
-  // superfluous cert.
+  // First check for embedded proof, if not present then look for the proof in
+  // a superfluous cert.
   if (has_embedded_proof.ok() && has_embedded_proof.ValueOrDie()) {
     LOG(INFO) << "Embedded proof extension found in certificate, "
               << "verifying...";

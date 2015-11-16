@@ -1,11 +1,11 @@
-#include <gtest/gtest.h>
 #include <errno.h>
-#include <iostream>
-#include <set>
+#include <gtest/gtest.h>
 #include <stdio.h>
-#include <string>
 #include <sys/stat.h>
 #include <unistd.h>
+#include <iostream>
+#include <set>
+#include <string>
 
 #include "log/file_storage.h"
 #include "log/filesystem_ops.h"

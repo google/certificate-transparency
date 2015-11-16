@@ -104,11 +104,10 @@ TEST_F(LogSignerTest, VerifySTHKatTest) {
   EXPECT_EQ(LogSigVerifier::OK, verifier_->VerifySTHSignature(default_sth));
 
   EXPECT_EQ(LogSigVerifier::OK,
-            verifier_->VerifyV1STHSignature(default_sth.timestamp(),
-                                            default_sth.tree_size(),
-                                            default_sth.sha256_root_hash(),
-                                            SerializedSignature(
-                                                default_sth.signature())));
+            verifier_->VerifyV1STHSignature(
+                default_sth.timestamp(), default_sth.tree_size(),
+                default_sth.sha256_root_hash(),
+                SerializedSignature(default_sth.signature())));
 }
 
 TEST_F(LogSignerTest, SignAndVerifyCertSCT) {
@@ -533,18 +532,16 @@ TEST_F(LogSignerTest, VerifyChangeSTHTimestamp) {
             verifier_->VerifySTHSignature(sth));
 
   EXPECT_EQ(LogSigVerifier::OK,
-            verifier_->VerifyV1STHSignature(default_sth.timestamp(),
-                                            default_sth.tree_size(),
-                                            default_sth.sha256_root_hash(),
-                                            SerializedSignature(
-                                                default_sth.signature())));
+            verifier_->VerifyV1STHSignature(
+                default_sth.timestamp(), default_sth.tree_size(),
+                default_sth.sha256_root_hash(),
+                SerializedSignature(default_sth.signature())));
 
   EXPECT_EQ(LogSigVerifier::INVALID_SIGNATURE,
-            verifier_->VerifyV1STHSignature(new_timestamp,
-                                            default_sth.tree_size(),
-                                            default_sth.sha256_root_hash(),
-                                            SerializedSignature(
-                                                default_sth.signature())));
+            verifier_->VerifyV1STHSignature(
+                new_timestamp, default_sth.tree_size(),
+                default_sth.sha256_root_hash(),
+                SerializedSignature(default_sth.signature())));
 }
 
 TEST_F(LogSignerTest, VerifyChangeCert) {
@@ -756,18 +753,16 @@ TEST_F(LogSignerTest, VerifyChangeTreeSize) {
             verifier_->VerifySTHSignature(sth));
 
   EXPECT_EQ(LogSigVerifier::OK,
-            verifier_->VerifyV1STHSignature(default_sth.timestamp(),
-                                            default_sth.tree_size(),
-                                            default_sth.sha256_root_hash(),
-                                            SerializedSignature(
-                                                default_sth.signature())));
+            verifier_->VerifyV1STHSignature(
+                default_sth.timestamp(), default_sth.tree_size(),
+                default_sth.sha256_root_hash(),
+                SerializedSignature(default_sth.signature())));
 
   EXPECT_EQ(LogSigVerifier::INVALID_SIGNATURE,
-            verifier_->VerifyV1STHSignature(default_sth.timestamp(),
-                                            new_tree_size,
-                                            default_sth.sha256_root_hash(),
-                                            SerializedSignature(
-                                                default_sth.signature())));
+            verifier_->VerifyV1STHSignature(
+                default_sth.timestamp(), new_tree_size,
+                default_sth.sha256_root_hash(),
+                SerializedSignature(default_sth.signature())));
 }
 
 TEST_F(LogSignerTest, VerifySCTBadHashAlgorithm) {

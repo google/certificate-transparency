@@ -1,8 +1,8 @@
-#include <functional>
 #include <gflags/gflags.h>
 #include <glog/logging.h>
-#include <iostream>
 #include <limits.h>
+#include <functional>
+#include <iostream>
 #include <memory>
 
 #include "log/database.h"

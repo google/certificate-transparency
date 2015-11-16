@@ -1,12 +1,12 @@
 #ifndef CERT_TRANS_UTIL_ETCD_H_
 #define CERT_TRANS_UTIL_ETCD_H_
 
+#include <stdint.h>
 #include <chrono>
 #include <list>
 #include <map>
 #include <memory>
 #include <mutex>
-#include <stdint.h>
 #include <string>
 #include <utility>
 #include <vector>
@@ -82,9 +82,11 @@ class EtcdClient {
 
   typedef std::function<void(const std::vector<Node>& updates)> WatchCallback;
 
-  EtcdClient(util::Executor* executor, UrlFetcher* fetcher, const std::string& host, uint16_t port);
+  EtcdClient(util::Executor* executor, UrlFetcher* fetcher,
+             const std::string& host, uint16_t port);
 
-  EtcdClient(util::Executor* executir, UrlFetcher* fetcher, const std::list<HostPortPair>& etcds);
+  EtcdClient(util::Executor* executir, UrlFetcher* fetcher,
+             const std::list<HostPortPair>& etcds);
 
   virtual ~EtcdClient();
 

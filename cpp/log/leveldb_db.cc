@@ -2,14 +2,14 @@
 
 #include <gflags/gflags.h>
 #include <glog/logging.h>
-#include <map>
 #include <stdint.h>
+#include <map>
 #include <string>
 
+#include "monitoring/latency.h"
+#include "monitoring/monitoring.h"
 #include "proto/ct.pb.h"
 #include "proto/serializer.h"
-#include "monitoring/monitoring.h"
-#include "monitoring/latency.h"
 #include "util/util.h"
 
 using std::chrono::milliseconds;

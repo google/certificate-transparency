@@ -2,10 +2,10 @@
 #ifndef CMS_VERIFIER_H
 #define CMS_VERIFIER_H
 
-#include <memory>
 #include <openssl/asn1.h>
 #include <openssl/bio.h>
 #include <openssl/cms.h>
+#include <memory>
 
 #include "base/macros.h"
 #include "log/cert.h"

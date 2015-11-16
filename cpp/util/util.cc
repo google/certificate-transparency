@@ -1,18 +1,18 @@
 #include "util/util.h"
 
-#include <cstring>
-#include <fstream>
 #include <glog/logging.h>
-#include <iostream>
 #include <netinet/in.h>  // for resolv.h
 #include <resolv.h>      // for b64_ntop
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include <string>
-#include <sstream>
 #include <sys/time.h>
 #include <unistd.h>
+#include <cstring>
+#include <fstream>
+#include <iostream>
+#include <sstream>
+#include <string>
 #include <vector>
 
 #include "log/ct_extensions.h"

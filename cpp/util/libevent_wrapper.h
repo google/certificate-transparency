@@ -1,10 +1,10 @@
 #ifndef CERT_TRANS_UTIL_LIBEVENT_WRAPPER_H_
 #define CERT_TRANS_UTIL_LIBEVENT_WRAPPER_H_
 
-#include <atomic>
-#include <chrono>
 #include <event2/dns.h>
 #include <event2/event.h>
+#include <atomic>
+#include <chrono>
 // TODO(alcutter): Use evhtp for the HttpServer too.
 #include <event2/http.h>
 #include <evhtp.h>

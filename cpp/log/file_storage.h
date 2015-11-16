@@ -1,9 +1,9 @@
 #ifndef CERT_TRANS_LOG_FILE_STORAGE_H_
 #define CERT_TRANS_LOG_FILE_STORAGE_H_
 
+#include <stdint.h>
 #include <memory>
 #include <set>
-#include <stdint.h>
 #include <string>
 
 #include "base/macros.h"

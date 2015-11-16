@@ -1,8 +1,8 @@
 #ifndef CERT_TRANS_SERVER_SERVER_H_
 #define CERT_TRANS_SERVER_SERVER_H_
 
-#include <memory>
 #include <stdint.h>
+#include <memory>
 #include <string>
 #include <thread>
 

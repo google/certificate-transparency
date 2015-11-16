@@ -7,11 +7,11 @@
 #include <openssl/crypto.h>
 #include <openssl/err.h>
 #include <openssl/ssl.h>
-#include <string>
 #include <unistd.h>
+#include <string>
 
-#include "log/ct_extensions.h"
 #include "config.h"
+#include "log/ct_extensions.h"
 #include "version.h"
 
 using std::string;

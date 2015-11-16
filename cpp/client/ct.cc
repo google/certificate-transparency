@@ -1,11 +1,8 @@
 /* -*- indent-tabs-mode: nil -*- */
 #include <event2/thread.h>
 #include <fcntl.h>
-#include <fstream>
 #include <gflags/gflags.h>
 #include <glog/logging.h>
-#include <iostream>
-#include <memory>
 #include <openssl/asn1.h>
 #include <openssl/bio.h>
 #include <openssl/bn.h>
@@ -15,8 +12,11 @@
 #include <openssl/ssl.h>
 #include <openssl/x509.h>
 #include <openssl/x509v3.h>
-#include <sstream>
 #include <stdio.h>
+#include <fstream>
+#include <iostream>
+#include <memory>
+#include <sstream>
 #include <string>
 
 #include "client/http_log_client.h"

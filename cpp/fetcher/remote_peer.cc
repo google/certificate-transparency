@@ -1,8 +1,8 @@
 #include "fetcher/remote_peer.h"
 
-#include <chrono>
 #include <gflags/gflags.h>
 #include <glog/logging.h>
+#include <chrono>
 
 #include "base/time_support.h"
 #include "monitoring/monitoring.h"
@@ -83,8 +83,8 @@ void RemotePeer::Impl::DoneGetSTH(
     const LogVerifier::LogVerifyResult result(verifier_->VerifySignedTreeHead(
         *new_sth, 0, (time(NULL) + 10) * kNumMillisPerSecond));
 
-    // TODO(alcutter): We should probably log these invalid STHs somewhere a bit
-    // more durable.
+    // TODO(alcutter): We should probably log these invalid STHs somewhere a
+    // bit more durable.
     switch (result) {
       case LogVerifier::VERIFY_OK:
         // Alright!

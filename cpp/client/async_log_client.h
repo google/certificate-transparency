@@ -1,9 +1,9 @@
 #ifndef CERT_TRANS_CLIENT_ASYNC_LOG_CLIENT_H_
 #define CERT_TRANS_CLIENT_ASYNC_LOG_CLIENT_H_
 
+#include <stdint.h>
 #include <functional>
 #include <memory>
-#include <stdint.h>
 #include <string>
 #include <vector>
 

@@ -8,8 +8,8 @@
 #include "log/mock_consistent_store.h"
 #include "util/mock_masterelection.h"
 #include "util/status.h"
-#include "util/statusor.h"
 #include "util/status_test_util.h"
+#include "util/statusor.h"
 #include "util/testing.h"
 #include "util/util.h"
 

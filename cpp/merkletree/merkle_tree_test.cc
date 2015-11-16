@@ -3,8 +3,8 @@
 #include <stddef.h>
 #include <stdint.h>
 #include <stdlib.h>
-#include <string>
 #include <time.h>
+#include <string>
 #include <vector>
 
 #include "merkletree/compact_merkle_tree.h"

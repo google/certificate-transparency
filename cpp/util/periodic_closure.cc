@@ -1,7 +1,7 @@
 #include "util/periodic_closure.h"
 
-#include <functional>
 #include <glog/logging.h>
+#include <functional>
 
 using std::bind;
 using std::chrono::duration_cast;

@@ -1,10 +1,10 @@
 /* -*- indent-tabs-mode: nil -*- */
 
 #include <gflags/gflags.h>
-#include <iostream>
 #include <signal.h>
-#include <string>
 #include <unistd.h>
+#include <iostream>
+#include <string>
 #include <utility>
 
 #include "client/async_log_client.h"
@@ -282,10 +282,10 @@ int main(int argc, char* argv[]) {
                            event_base.get()));
 
   CertificateHttpHandlerV2 handler(server.log_lookup(), db.get(),
-                                 server.cluster_state_controller(),
-                                 nullptr /* checker */, nullptr /* Frontend */,
-                                 &internal_pool, event_base.get(),
-                                 staleness_tracker.get());
+                                   server.cluster_state_controller(),
+                                   nullptr /* checker */,
+                                   nullptr /* Frontend */, &internal_pool,
+                                   event_base.get(), staleness_tracker.get());
 
   // Connect the handler, proxy and server together
   handler.SetProxy(server.proxy());

@@ -1,7 +1,7 @@
-#include <atomic>
 #include <event2/thread.h>
 #include <gflags/gflags.h>
 #include <glog/logging.h>
+#include <atomic>
 
 #include "util/etcd.h"
 #include "util/libevent_wrapper.h"

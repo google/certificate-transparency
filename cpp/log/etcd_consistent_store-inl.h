@@ -1,9 +1,9 @@
 #ifndef CERT_TRANS_LOG_ETCD_CONSISTENT_STORE_INL_H_
 #define CERT_TRANS_LOG_ETCD_CONSISTENT_STORE_INL_H_
 
-#include <chrono>
 #include <gflags/gflags.h>
 #include <glog/logging.h>
+#include <chrono>
 #include <unordered_map>
 #include <vector>
 
@@ -713,8 +713,7 @@ void EtcdConsistentStore<Logged>::CheckMappingIsContiguousWithServingTree(
     const int64_t tree_size(serving_sth_->Entry().tree_size());
     // The mapping must not have a gap between its lowest mapping and the
     // serving tree
-    const int64_t lowest_sequence_number(
-        mapping.mapping(0).sequence_number());
+    const int64_t lowest_sequence_number(mapping.mapping(0).sequence_number());
     CHECK_LE(lowest_sequence_number, tree_size);
     // It must also be contiguous for all entries not yet included in the
     // serving tree. (Note that entries below that may not be contiguous
@@ -813,8 +812,8 @@ util::StatusOr<int64_t> EtcdConsistentStore<Logged>::CleanupOldEntries() {
     LOG(INFO) << "No current serving_sth, nothing to do.";
     return 0;
   }
-  const int64_t clean_up_to_sequence_number(
-      serving_sth_->Entry().tree_size() - 1);
+  const int64_t clean_up_to_sequence_number(serving_sth_->Entry().tree_size() -
+                                            1);
   lock.unlock();
 
   LOG(INFO) << "Cleaning old entries up to and including sequence number: "

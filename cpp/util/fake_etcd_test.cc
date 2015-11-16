@@ -1,11 +1,11 @@
 #include "util/fake_etcd.h"
 
-#include <atomic>
-#include <functional>
 #include <gflags/gflags.h>
 #include <glog/logging.h>
 #include <gmock/gmock.h>
 #include <gtest/gtest.h>
+#include <atomic>
+#include <functional>
 #include <memory>
 #include <mutex>
 #include <string>
@@ -349,7 +349,8 @@ TEST_F(FakeEtcdTest, UpdateWithTTLExpires) {
   EXPECT_EQ(expected_stats, stats);
 
   // Vanished, in a puff of digital smoke:
-  EXPECT_THAT(BlockingGet(key_prefix_, &node), StatusIs(util::error::NOT_FOUND));
+  EXPECT_THAT(BlockingGet(key_prefix_, &node),
+              StatusIs(util::error::NOT_FOUND));
 }
 
 
@@ -399,8 +400,8 @@ TEST_F(FakeEtcdTest, ForceSetWithTTLExpires) {
   ++expected_stats["setsSuccess"];
 
   int64_t modified_index;
-  EXPECT_OK(BlockingForceSetWithTTL(key_prefix_, kValue2, kTtl,
-                                    &modified_index));
+  EXPECT_OK(
+      BlockingForceSetWithTTL(key_prefix_, kValue2, kTtl, &modified_index));
   ASSERT_OK(BlockingGetStats(&stats));
   EXPECT_EQ(expected_stats, stats);
   EXPECT_LT(created_index, modified_index);
@@ -420,7 +421,8 @@ TEST_F(FakeEtcdTest, ForceSetWithTTLExpires) {
   EXPECT_EQ(expected_stats, stats);
 
   // Vanished, in a puff of digital smoke:
-  EXPECT_THAT(BlockingGet(key_prefix_, &node), StatusIs(util::error::NOT_FOUND));
+  EXPECT_THAT(BlockingGet(key_prefix_, &node),
+              StatusIs(util::error::NOT_FOUND));
 }
 
 

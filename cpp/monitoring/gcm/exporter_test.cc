@@ -140,7 +140,7 @@ TEST_F(GCMExporterTest, TestCredentials) {
                     _, _))
       .WillRepeatedly(Invoke(bind(&HandleFetch, util::Status::OK, 200,
                                   UrlFetcher::Headers{}, "", _1, _2, _3)));
-   EXPECT_CALL(fetcher_,
+  EXPECT_CALL(fetcher_,
               Fetch(IsUrlFetchRequest(
                         UrlFetcher::Verb::POST, URL(push_url_),
                         UrlFetcher::Headers{

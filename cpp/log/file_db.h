@@ -2,11 +2,11 @@
 #ifndef CERTIFICATE_DB_H
 #define CERTIFICATE_DB_H
 
+#include <stdint.h>
 #include <map>
 #include <memory>
 #include <mutex>
 #include <set>
-#include <stdint.h>
 #include <unordered_map>
 #include <vector>
 

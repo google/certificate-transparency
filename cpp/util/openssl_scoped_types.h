@@ -15,9 +15,9 @@
 #ifndef OPENSSL_HEADER_CRYPTO_TEST_SCOPED_TYPES_H
 #define OPENSSL_HEADER_CRYPTO_TEST_SCOPED_TYPES_H
 
-#include <memory>
 #include <stdint.h>
 #include <stdio.h>
+#include <memory>
 
 #ifdef OPENSSL_IS_BORINGSSL
 #include <openssl/aead.h>
@@ -47,45 +47,45 @@
 #include <openssl/x509v3.h>
 
 
-template <typename T, void (*func)(T *)>
+template <typename T, void (*func)(T*)>
 struct OpenSSLDeleter {
-  void operator()(T *obj) {
+  void operator()(T* obj) {
     func(obj);
   }
 };
 
-template <typename StackType, typename T, void (*func)(T *)>
+template <typename StackType, typename T, void (*func)(T*)>
 struct OpenSSLStackDeleter {
-  void operator()(StackType *obj) {
-    sk_pop_free(reinterpret_cast<_STACK *>(obj),
-                reinterpret_cast<void (*)(void *)>(func));
+  void operator()(StackType* obj) {
+    sk_pop_free(reinterpret_cast<_STACK*>(obj),
+                reinterpret_cast<void (*)(void*)>(func));
   }
 };
 
 template <typename StackType>
 struct OpenSSLWeakStackDeleter {
-  void operator()(StackType *obj) {
-    sk_free(reinterpret_cast<_STACK *>(obj));
+  void operator()(StackType* obj) {
+    sk_free(reinterpret_cast<_STACK*>(obj));
   }
 };
 
 template <typename T>
 struct OpenSSLFree {
-  void operator()(T *buf) {
+  void operator()(T* buf) {
     OPENSSL_free(buf);
   }
 };
 
 struct FileCloser {
-  void operator()(FILE *file) {
+  void operator()(FILE* file) {
     fclose(file);
   }
 };
 
-template <typename T, void (*func)(T *)>
+template <typename T, void (*func)(T*)>
 using ScopedOpenSSLType = std::unique_ptr<T, OpenSSLDeleter<T, func>>;
 
-template <typename StackType, typename T, void (*func)(T *)>
+template <typename StackType, typename T, void (*func)(T*)>
 using ScopedOpenSSLStack =
     std::unique_ptr<StackType, OpenSSLStackDeleter<StackType, T, func>>;
 
@@ -94,24 +94,24 @@ template <typename StackType>
 using ScopedWeakOpenSSLStack =
     std::unique_ptr<StackType, OpenSSLWeakStackDeleter<StackType>>;
 
-template <typename T, typename CleanupRet, void (*init_func)(T *),
-          CleanupRet (*cleanup_func)(T *)>
+template <typename T, typename CleanupRet, void (*init_func)(T*),
+          CleanupRet (*cleanup_func)(T*)>
 class ScopedOpenSSLContext {
  public:
   ScopedOpenSSLContext() {
     init_func(&ctx_);
   }
-  ScopedOpenSSLContext(const ScopedOpenSSLContext &other) = delete;
-  ScopedOpenSSLContext(ScopedOpenSSLContext &&other) = delete;
+  ScopedOpenSSLContext(const ScopedOpenSSLContext& other) = delete;
+  ScopedOpenSSLContext(ScopedOpenSSLContext&& other) = delete;
 
   ~ScopedOpenSSLContext() {
     cleanup_func(&ctx_);
   }
 
-  T *get() {
+  T* get() {
     return &ctx_;
   }
-  const T *get() const {
+  const T* get() const {
     return &ctx_;
   }
 

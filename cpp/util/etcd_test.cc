@@ -217,15 +217,14 @@ class EtcdTest : public ::testing::Test {
   }
 
  protected:
-  void ExpectVersionCalls(MockUrlFetcher& fetcher,
-                          const string& host,
+  void ExpectVersionCalls(MockUrlFetcher& fetcher, const string& host,
                           uint16_t port) {
-    EXPECT_CALL(url_fetcher_,
-                Fetch(IsUrlFetchRequest(UrlFetcher::Verb::GET,
-                                        URL(GetEtcdUrl("/version", "", host,
-                                                       port)),
-                                        IsEmpty(), ""),
-                      _, _))
+    EXPECT_CALL(
+        url_fetcher_,
+        Fetch(IsUrlFetchRequest(UrlFetcher::Verb::GET,
+                                URL(GetEtcdUrl("/version", "", host, port)),
+                                IsEmpty(), ""),
+              _, _))
         .WillRepeatedly(
             Invoke(bind(HandleFetch, Status::OK, 200, UrlFetcher::Headers{},
                         kVersionString, _1, _2, _3)));
@@ -714,12 +713,14 @@ TEST_F(EtcdTest, WatchInitialGetFailureCausesRetry) {
   }
 
   SyncTask task(base_.get());
-  client_.Watch(kEntryKey, [&task](const vector<EtcdClient::Node>& updates) {
-    EXPECT_EQ(static_cast<size_t>(1), updates.size());
-    EXPECT_EQ(9, updates[0].modified_index_);
-    EXPECT_EQ("123", updates[0].value_);
-    task.Cancel();
-  }, task.task());
+  client_.Watch(kEntryKey,
+                [&task](const vector<EtcdClient::Node>& updates) {
+                  EXPECT_EQ(static_cast<size_t>(1), updates.size());
+                  EXPECT_EQ(9, updates[0].modified_index_);
+                  EXPECT_EQ("123", updates[0].value_);
+                  task.Cancel();
+                },
+                task.task());
   task.Wait();
 }
 

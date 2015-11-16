@@ -146,7 +146,7 @@ void FetchState::WalkEntries() {
 
   int64_t index(start_);
   int num_fetch(0);
-  for (Range* current = entries_.get(); current;
+  for (Range *current = entries_.get(); current;
        index += current->size_, current = current->next_.get()) {
     // Coalesce with the next Range, if possible.
     if (current->state_ != Range::FETCHING) {

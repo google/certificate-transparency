@@ -1,8 +1,8 @@
 #ifndef CERT_TRANS_LOG_FILESYSTEM_OPS_H_
 #define CERT_TRANS_LOG_FILESYSTEM_OPS_H_
 
-#include <string>
 #include <sys/types.h>
+#include <string>
 
 #include "base/macros.h"
 

@@ -1,21 +1,21 @@
 #include "util/masterelection.h"
 
-#include <atomic>
 #include <event2/thread.h>
-#include <map>
-#include <string>
 #include <gflags/gflags.h>
 #include <glog/logging.h>
 #include <gmock/gmock.h>
 #include <gtest/gtest.h>
+#include <atomic>
+#include <map>
+#include <string>
 
 #include "base/notification.h"
-#include "util/fake_etcd.h"
 #include "util/etcd.h"
+#include "util/fake_etcd.h"
 #include "util/periodic_closure.h"
 #include "util/status_test_util.h"
-#include "util/thread_pool.h"
 #include "util/testing.h"
+#include "util/thread_pool.h"
 
 DECLARE_string(trusted_root_certs);
 DEFINE_string(cert_dir, "test/testdata/urlfetcher_test_certs",

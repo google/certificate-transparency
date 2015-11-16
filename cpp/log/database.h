@@ -2,11 +2,11 @@
 #ifndef DATABASE_H
 #define DATABASE_H
 
-#include <functional>
 #include <glog/logging.h>
+#include <stdint.h>
+#include <functional>
 #include <memory>
 #include <set>
-#include <stdint.h>
 
 #include "base/macros.h"
 #include "log/logged_entry.h"

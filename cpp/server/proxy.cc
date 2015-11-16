@@ -1,11 +1,11 @@
 #include "server/proxy.h"
 
-#include <algorithm>
 #include <event2/buffer.h>
 #include <event2/http.h>
 #include <event2/http_compat.h>
 #include <event2/keyvalq_struct.h>
 #include <glog/logging.h>
+#include <algorithm>
 #include <string>
 #include <unordered_set>
 #include <vector>

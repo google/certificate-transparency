@@ -90,7 +90,7 @@ CompactMerkleTree::CompactMerkleTree(MerkleTree& model, SerialHasher* hasher)
   PushBack(0, model.LeafHash(model.LeafCount()));
   assert(model.CurrentRoot() == CurrentRoot());
   assert(model.LeafCount() == LeafCount());
-  assert(model.LevelCount() ==LevelCount());
+  assert(model.LevelCount() == LevelCount());
 }
 
 

@@ -2,13 +2,13 @@
 #ifndef CERT_TRANS_SERVER_EVENT_H_
 #define CERT_TRANS_SERVER_EVENT_H_
 
-#include <deque>
 #include <glog/logging.h>
 #include <netinet/in.h>
-#include <string>
 #include <sys/socket.h>
 #include <sys/types.h>
 #include <time.h>
+#include <deque>
+#include <string>
 
 #include "base/macros.h"
 

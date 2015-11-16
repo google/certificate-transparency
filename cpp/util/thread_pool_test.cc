@@ -1,8 +1,8 @@
 #include "util/thread_pool.h"
 
-#include <atomic>
 #include <glog/logging.h>
 #include <gtest/gtest.h>
+#include <atomic>
 #include <memory>
 
 #include "base/notification.h"

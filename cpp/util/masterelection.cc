@@ -1,9 +1,9 @@
 #include "util/masterelection.h"
 
-#include <climits>
-#include <functional>
 #include <gflags/gflags.h>
 #include <glog/logging.h>
+#include <climits>
+#include <functional>
 
 #include "monitoring/monitoring.h"
 #include "util/periodic_closure.h"

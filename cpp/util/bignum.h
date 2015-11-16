@@ -1,8 +1,8 @@
 #ifndef CERT_TRANS_UTIL_BIGNUM_H_
 #define CERT_TRANS_UTIL_BIGNUM_H_
 
-#include <cassert>
 #include <openssl/bn.h>
+#include <cassert>
 
 namespace cert_trans {
 
