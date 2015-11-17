@@ -25,7 +25,6 @@
 #include <openssl/bio.h>
 #include <openssl/bn.h>
 #include <openssl/cmac.h>
-#include <openssl/cms.h>
 #include <openssl/dh.h>
 #include <openssl/ec.h>
 #ifdef OPENSSL_IS_BORINGSSL
@@ -133,8 +132,6 @@ using ScopedBIGNUM = ScopedOpenSSLType<BIGNUM, BN_free>;
 using ScopedBN_CTX = ScopedOpenSSLType<BN_CTX, BN_CTX_free>;
 using ScopedBN_MONT_CTX = ScopedOpenSSLType<BN_MONT_CTX, BN_MONT_CTX_free>;
 using ScopedCMAC_CTX = ScopedOpenSSLType<CMAC_CTX, CMAC_CTX_free>;
-using ScopedCMS_ContentInfo =
-    ScopedOpenSSLType<CMS_ContentInfo, CMS_ContentInfo_free>;
 using ScopedDH = ScopedOpenSSLType<DH, DH_free>;
 using ScopedECDSA_SIG = ScopedOpenSSLType<ECDSA_SIG, ECDSA_SIG_free>;
 using ScopedEC_GROUP = ScopedOpenSSLType<EC_GROUP, EC_GROUP_free>;
