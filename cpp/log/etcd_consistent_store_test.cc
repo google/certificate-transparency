@@ -561,6 +561,17 @@ TEST_F(EtcdConsistentStoreTest, TestSetClusterNodeStateHasTTL) {
   EXPECT_THAT(task.status(), StatusIs(util::error::NOT_FOUND));
 }
 
+TEST_F(EtcdConsistentStoreTest, TestSetClusterNodeStateVersionChangeRejected) {
+  const string kPath(string(kRoot) + "/nodes/" + kNodeId);
+
+  ct::ClusterNodeState state;
+  state.set_node_id(kNodeId);
+  state.set_node_ct_version(ct::Version::V2);
+
+  util::Status status(store_->SetClusterNodeState(state));
+  EXPECT_THAT(status, StatusIs(util::error::FAILED_PRECONDITION));
+}
+
 
 TEST_F(EtcdConsistentStoreTest, WatchServingSTH) {
   Notification notify;
