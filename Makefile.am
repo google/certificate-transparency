@@ -87,6 +87,7 @@ TESTS = \
 	cpp/merkletree/merkle_tree_large_test \
 	cpp/merkletree/merkle_tree_test \
 	cpp/merkletree/serial_hasher_test \
+	cpp/merkletree/sparse_merkle_tree_test \
 	cpp/merkletree/tree_hasher_test \
 	cpp/monitor/database_test \
 	cpp/monitoring/counter_test \
@@ -160,6 +161,7 @@ cpp_libcore_a_SOURCES = \
 	cpp/merkletree/merkle_tree_math.cc \
 	cpp/merkletree/merkle_verifier.cc \
 	cpp/merkletree/serial_hasher.cc \
+	cpp/merkletree/sparse_merkle_tree.cc \
 	cpp/merkletree/tree_hasher.cc \
 	cpp/monitoring/gcm/exporter.cc \
 	cpp/monitoring/monitoring.cc \
@@ -754,6 +756,14 @@ cpp_merkletree_serial_hasher_test_LDADD = \
 cpp_merkletree_serial_hasher_test_SOURCES = \
 	cpp/util/util.cc \
 	cpp/merkletree/serial_hasher_test.cc
+
+cpp_merkletree_sparse_merkle_tree_test_LDADD = \
+	cpp/libcore.a \
+	cpp/libtest.a \
+	$(libevent_LIBS)
+cpp_merkletree_sparse_merkle_tree_test_SOURCES = \
+	cpp/util/util.cc \
+	cpp/merkletree/sparse_merkle_tree_test.cc
 
 cpp_merkletree_tree_hasher_test_LDADD = \
 	cpp/libcore.a \
