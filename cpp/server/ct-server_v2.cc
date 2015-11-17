@@ -89,6 +89,9 @@ static const bool cert_dummy =
 
 }  // namespace
 
+// This is the supported CT version of this binary. It can be used to
+// apply sanity checks such as when creating or joining clusters.
+const ct::Version kSUPPORTED_CT_VERSION = ct::V1;
 
 int main(int argc, char* argv[]) {
   // Ignore various signals whilst we start up.
@@ -129,8 +132,8 @@ int main(int argc, char* argv[]) {
 
   ThreadPool http_pool(FLAGS_num_http_server_threads);
 
-  Server server(event_base, &internal_pool, &http_pool, db.get(),
-                etcd_client.get(), &url_fetcher, &log_verifier);
+  Server server(kSUPPORTED_CT_VERSION, event_base, &internal_pool, &http_pool,
+                db.get(), etcd_client.get(), &url_fetcher, &log_verifier);
   server.Initialise(false /* is_mirror */);
 
   Frontend frontend(
@@ -150,7 +153,7 @@ int main(int argc, char* argv[]) {
   TreeSigner<LoggedEntry> tree_signer(
       std::chrono::duration<double>(FLAGS_guard_window_seconds), db.get(),
       server.log_lookup()->GetCompactMerkleTree(new Sha256Hasher),
-      server.consistent_store(), &log_signer);
+      server.consistent_store(), &log_signer, kSUPPORTED_CT_VERSION);
 
   if (stand_alone_mode) {
     // Set up a simple single-node environment.
