@@ -38,9 +38,7 @@ std::unique_ptr<AsyncLogClient> BuildAsyncLogClient(
       "http://" + state.hostname() + ":" + std::to_string(state.log_port())));
 }
 
-
 }  // namespace
-
 
 template <class Logged>
 class ClusterStateController<Logged>::ClusterPeer : public Peer {
@@ -251,7 +249,7 @@ ClusterStateController<Logged>::GetFreshNodes() const {
         node.second->state().log_port() == local_node_state_.log_port());
     // A node that is not serving the same version as the controller cannot
     // be considered to be fresh
-    if (node.second->state().node_ct_version() == supported_ct_version_) {
+    if (IsSameVersion(node.second.get()->state().node_ct_version())) {
       if (!is_self && node.second->state().has_newest_sth() &&
           node.second->state().newest_sth().tree_size() >=
               actual_serving_sth_->tree_size()) {
@@ -286,6 +284,7 @@ void ClusterStateController<Logged>::OnClusterStateUpdated(
     if (update.exists_) {
       auto it(all_peers_.find(node_id));
       VLOG_IF(1, it == all_peers_.end()) << "Node joined: " << node_id;
+      bool node_version_mismatch = false;
 
       // If the host or port change, remove the ClusterPeer, so that
       // we re-create it.
@@ -295,6 +294,13 @@ void ClusterStateController<Logged>::OnClusterStateUpdated(
                              update.handle_.Entry().log_port())) {
         all_peers_.erase(it);
         it = all_peers_.end();
+      } else if (it != all_peers_.end() &&
+                 !IsSameVersion(it->second.get()->state().node_ct_version())) {
+        // If the version is mismatched remove it so we don't attempt to
+        // update the version via UpdateClusterNodeState.
+        all_peers_.erase(it);
+        it = all_peers_.end();
+        node_version_mismatch = true;
       }
 
       if (it != all_peers_.end()) {
@@ -308,7 +314,15 @@ void ClusterStateController<Logged>::OnClusterStateUpdated(
         // own class, and share an instance between the interested
         // parties.
         all_peers_.emplace(node_id, peer);
-        fetcher_->AddPeer(node_id, peer);
+
+        // Only matching versions are added to fetcher so we don't talk
+        // to nodes that have a different version
+        if (!node_version_mismatch) {
+          fetcher_->AddPeer(node_id, peer);
+        } else {
+          VLOG(1) << "Node has mismatched version, dropping: " << node_id;
+          fetcher_->RemovePeer(node_id);
+        }
       }
     } else {
       VLOG(1) << "Node left: " << node_id;
@@ -373,7 +387,7 @@ void ClusterStateController<Logged>::OnServingSthUpdated(
     serving_tree_size->Set(actual_serving_sth_->tree_size());
     serving_tree_timestamp->Set(actual_serving_sth_->timestamp());
 
-    // Double check this STH is newer than, or idential to, what we have in
+    // Double check this STH is newer than, or identical to, what we have in
     // the database. (It definitely should be!)
     ct::SignedTreeHead db_sth;
     const Database::LookupResult lookup_result(

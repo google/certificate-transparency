@@ -425,7 +425,7 @@ util::Status EtcdConsistentStore<Logged>::SetClusterNodeState(
   } else {
     return util::Status(
         util::error::FAILED_PRECONDITION,
-        "SetClusterNodeState does not accept a change in version");
+        "SetClusterNodeState does not accept a different version");
   }
 }
 

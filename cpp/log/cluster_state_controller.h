@@ -102,6 +102,11 @@ class ClusterStateController {
   // Thread entry point for ServingSTH updater thread.
   void ClusterServingSTHUpdater();
 
+  // Check if a peer matches our version
+  inline bool IsSameVersion(ct::Version peer_version) const {
+    return peer_version == supported_ct_version_;
+  }
+
   const ct::Version supported_ct_version_;
   const std::shared_ptr<libevent::Base> base_;
   UrlFetcher* const url_fetcher_;         // Not owned by us
