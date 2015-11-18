@@ -40,7 +40,6 @@
 #include <openssl/pkcs8.h>
 #endif  // OPENSSL_IS_BORINGSSL
 #include <openssl/rsa.h>
-#include <openssl/ssl.h>
 #include <openssl/stack.h>
 #include <openssl/x509.h>
 #include <openssl/x509v3.h>
@@ -147,8 +146,6 @@ using ScopedPKCS8_PRIV_KEY_INFO =
 using ScopedPKCS12 = ScopedOpenSSLType<PKCS12, PKCS12_free>;
 #endif  // OPENSSL_IS_BORINGSSL
 using ScopedRSA = ScopedOpenSSLType<RSA, RSA_free>;
-using ScopedSSL = ScopedOpenSSLType<SSL, SSL_free>;
-using ScopedSSL_CTX = ScopedOpenSSLType<SSL_CTX, SSL_CTX_free>;
 using ScopedX509 = ScopedOpenSSLType<X509, X509_free>;
 using ScopedX509_ALGOR = ScopedOpenSSLType<X509_ALGOR, X509_ALGOR_free>;
 using ScopedX509_EXTENSION =
