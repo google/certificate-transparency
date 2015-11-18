@@ -20,6 +20,7 @@ class SerialHasher;
 // Visible out here because it's useful for testing too.
 const std::vector<std::string>* GetNullHashes(const TreeHasher& hasher);
 
+
 // Implementation of a Sparse Merkle Tree.
 //
 // The design is inspired by the tree described in
@@ -147,13 +148,6 @@ class SparseMerkleTree {
   }
 
   // Add a new leaf to the hash tree. Stores the hash of the leaf data in the
-  // tree structure at path |Hash(key)|, does not store the data itself.
-  //
-  // @param data Binary input blob
-  // @param path Binary path of node to set.
-  virtual void SetLeafByHash(const std::string& key, const std::string& data);
-
-  // Add a new leaf to the hash tree. Stores the hash of the leaf data in the
   // tree structure, does not store the data itself.
   //
   // @param data Binary input blob
@@ -188,34 +182,19 @@ class SparseMerkleTree {
   // TODO(alcutter): BIGNUM probably.
   typedef uint64_t IndexType;
 
-  struct Leaf {
-    Leaf(const Path& path, const std::string& value)
-        : path_(path), value_(value) {
-    }
-
-    std::string DebugString() const;
-
-    const Path path_;
-    std::string value_;
-  };
-
   struct TreeNode {
-    TreeNode() : type_(INTERNAL), hash_(nullptr) {
-    }
-    TreeNode(const std::string& hash)
-        : type_(INTERNAL), hash_(new std::string(hash)) {
+    TreeNode(const std::string& hash) : type_(INTERNAL), hash_(hash) {
     }
 
-    TreeNode(const Path& path, const std::string& leaf_value)
-        : type_(LEAF), leaf_(new Leaf(path, leaf_value)) {
+    TreeNode(const Path& path, const std::string& leaf_hash)
+        : type_(LEAF), path_(new Path(path)), hash_(leaf_hash) {
     }
 
     std::string DebugString() const;
 
     enum { INTERNAL, LEAF } type_;
-    // TODO(alcutter): sort this out
-    std::unique_ptr<std::string> hash_;
-    std::unique_ptr<Leaf> leaf_;
+    std::unique_ptr<Path> path_;
+    std::string hash_;
   };
 
   std::string CalculateSubtreeHash(size_t depth, IndexType index);
@@ -259,5 +238,14 @@ inline int PathBit(const SparseMerkleTree::Path& path, size_t bit) {
   CHECK_LT(bit, path.size() * 8);
   return (path[bit / 8] & (1 << (7 - bit % 8))) == 0 ? 0 : 1;
 }
+
+
+struct PathHasher {
+  size_t operator()(const SparseMerkleTree::Path& p) const {
+    return std::hash<std::string>()(
+        std::string(reinterpret_cast<const char*>(p.data()), p.size()));
+  }
+};
+
 
 #endif  // CERT_TRANS_MERKLETREE_SPARSE_MERKLE_TREE_H
