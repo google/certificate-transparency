@@ -14,6 +14,7 @@
 
 namespace {
 
+using cert_trans::ScopedBIGNUM;
 using std::lower_bound;
 using std::map;
 using std::mt19937;

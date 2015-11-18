@@ -22,6 +22,7 @@
 
 using cert_trans::Signer;
 using cert_trans::LoggedEntry;
+using cert_trans::ScopedBIO;
 using cert_trans::Verifier;
 using ct::DigitallySigned;
 using ct::LogEntry;
