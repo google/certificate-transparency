@@ -10,7 +10,7 @@
 #include "client/ssl_client.h"
 #include "log/log_verifier.h"
 #include "proto/ct.pb.h"
-#include "util/openssl_scoped_types.h"
+#include "util/openssl_scoped_ssl_types.h"
 
 class LogVerifier;
 
