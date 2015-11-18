@@ -14,12 +14,19 @@ BigNum::BigNum(int64_t w) : BigNum() {
 
 
 BigNum::BigNum(const BigNum& other) : BigNum() {
-  assert(BN_copy(&bn_, &other.bn_) != nullptr);
+  if (&other.bn_ != &bn_) {
+    assert(BN_copy(&bn_, &other.bn_) != nullptr);
+  }
 }
 
 
 BigNum::~BigNum() {
   BN_free(&bn_);
+}
+
+
+void BigNum::clear() {
+  CHECK_EQ(1, BN_set_word(&bn_, 0));
 }
 
 

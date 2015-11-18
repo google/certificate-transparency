@@ -1,6 +1,7 @@
 #ifndef CERT_TRANS_UTIL_BIGNUM_H_
 #define CERT_TRANS_UTIL_BIGNUM_H_
 
+#include <glog/logging.h>
 #include <openssl/bn.h>
 #include <cassert>
 
@@ -19,6 +20,13 @@ class BigNum {
 
   int num_bits() const;
 
+  int bit(size_t n) const;
+
+  void clear();
+
+  BigNum operator+(const BigNum& n) const;
+  BigNum operator+(int64_t n) const;
+
   BigNum& operator-=(const BigNum& n);
   BigNum& operator-=(int64_t n);
   BigNum& operator+=(const BigNum& n);
@@ -26,15 +34,14 @@ class BigNum {
   BigNum& operator<<=(int n);
   BigNum& operator>>=(int n);
 
+  int compare(const BigNum& rhs) const;
+
+  bool operator==(const BigNum& rhs) const;
+
+  bool operator<(const BigNum& rhs) const;
+
  private:
   BIGNUM bn_;
-
-  friend bool operator==(const BigNum& a, const BigNum& b);
-  friend bool operator==(const BigNum& a, int64_t b);
-  friend bool operator<(const BigNum& a, const BigNum& b);
-  friend bool operator<(const BigNum& a, int64_t b);
-  friend bool operator>(const BigNum& a, const BigNum& b);
-  friend bool operator>(const BigNum& a, int64_t b);
 };
 
 
@@ -50,6 +57,28 @@ inline BIGNUM* BigNum::bn() {
 
 inline int BigNum::num_bits() const {
   return BN_num_bits(&bn_);
+}
+
+
+inline int BigNum::bit(size_t n) const {
+  if (n >= num_bits()) {
+    return false;
+  }
+  return BN_is_bit_set(&bn_, n);
+}
+
+
+inline BigNum BigNum::operator+(const BigNum& n) const {
+  BigNum result(*this);
+  result += n;
+  return result;
+}
+
+
+inline BigNum BigNum::operator+(int64_t n) const {
+  BigNum result(*this);
+  result += n;
+  return result;
 }
 
 
@@ -89,19 +118,18 @@ inline BigNum& BigNum::operator>>=(int n) {
 }
 
 
-template <typename T, typename U>
-inline BigNum operator+(const T& a, const U& b) {
-  BigNum r(a);
-  r += b;
-  return r;
+inline int BigNum::compare(const BigNum& rhs) const {
+  return BN_cmp(&bn_, &rhs.bn_);
 }
 
 
-template <typename T, typename U>
-inline BigNum operator-(const T& a, const U& b) {
-  BigNum r(a);
-  r -= b;
-  return r;
+inline bool BigNum::operator==(const BigNum& rhs) const {
+  return compare(rhs) == 0;
+}
+
+
+inline bool BigNum::operator<(const BigNum& rhs) const {
+  return compare(rhs) < 0;
 }
 
 
@@ -118,10 +146,6 @@ inline BigNum operator>>(const BigNum& a, int n) {
   return r;
 }
 
-
-inline bool operator==(const BigNum& a, const BigNum& b) {
-  return BN_cmp(&a.bn_, &b.bn_) == 0;
-}
 
 
 namespace internal {
@@ -140,31 +164,21 @@ inline BigNum AsBigNum(int64_t n) {
 }  // namespace internal
 
 
-template <typename T, typename U>
-inline bool operator==(const T& a, const U& b) {
-  return internal::AsBigNum(a) == internal::AsBigNum(b);
+template <typename T>
+inline bool operator==(const T& a, const BigNum& b) {
+  return b.compare(internal::AsBigNum(a)) == 0;
 }
 
 
-inline bool operator<(const BigNum& a, const BigNum& b) {
-  return BN_cmp(&a.bn_, &b.bn_) < 0;
+template <typename T>
+inline bool operator<(const T& a, const BigNum& b) {
+  return b.compare(internal::AsBigNum(a)) >= 0;
 }
 
 
-template <typename T, typename U>
-inline bool operator<(const T& a, const U& b) {
-  return internal::AsBigNum(a) < internal::AsBigNum(b);
-}
-
-
-inline bool operator>(const BigNum& a, const BigNum& b) {
-  return BN_cmp(&a.bn_, &b.bn_) > 0;
-}
-
-
-template <typename T, typename U>
-inline bool operator>(const T& a, const U& b) {
-  return internal::AsBigNum(a) > internal::AsBigNum(b);
+template <typename T>
+inline bool operator>(const T& a, const BigNum& b) {
+  return b.compare(internal::AsBigNum(a)) <= 0;
 }
 
 
