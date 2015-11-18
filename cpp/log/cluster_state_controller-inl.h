@@ -439,7 +439,9 @@ void ClusterStateController<Logged>::CalculateServingSTH(
   std::map<int64_t, int> num_nodes_by_sth_size;
   for (const auto& node : all_peers_) {
     const ct::ClusterNodeState node_state(node.second->state());
-    if (node_state.has_newest_sth()) {
+    // Ignore anything we see that's not from our version
+    if (node_state.has_newest_sth() &&
+        IsSameVersion(node_state.node_ct_version())) {
       const int64_t tree_size(node_state.newest_sth().tree_size());
       CHECK_LE(0, tree_size);
       const int64_t timestamp(node_state.newest_sth().timestamp());
