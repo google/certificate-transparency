@@ -1,6 +1,7 @@
 /* -*- indent-tabs-mode: nil -*- */
 #include "log/cms_verifier.h"
 #include "log/ct_extensions.h"
+#include "util/cms_scoped_types.h"
 #include "util/openssl_scoped_types.h"
 
 using std::string;
