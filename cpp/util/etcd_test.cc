@@ -1105,6 +1105,22 @@ TEST_F(EtcdDeathTest, SplitHostsWithOutOfRangePort) {
   EXPECT_DEATH(SplitHosts("host:65536"), "Port is > 65535");
 }
 
+TEST_F(EtcdDeathTest, SplitHostsWithQuotedUrlInList) {
+  EXPECT_DEATH(SplitHosts("host:123,\"host:4002\", host:456"),
+               "Invalid etcd_server url specified: \\\"host:4002\\\"");
+}
+
+TEST_F(EtcdDeathTest, SplitHostsWithQuotedUrl) {
+  EXPECT_DEATH(SplitHosts("\"host:4001\""),
+               "Invalid etcd_server url specified: \\\"host:4001\\\"");
+}
+
+
+// Test that if the SplitHosts validation failed the bad URL would still
+// be caught
+TEST_F(EtcdDeathTest, UrlRejectsQuotedValue) {
+  EXPECT_DEATH(URL("\"host:4001\""), "URL invalid: \"host:4001\"");
+}
 
 TEST_F(EtcdTest, LogsVersion) {
   EXPECT_CALL(url_fetcher_,
