@@ -28,6 +28,10 @@ URL::URL(const string& url) {
   unique_ptr<evhttp_uri, void (*)(evhttp_uri*)> uri(
       evhttp_uri_parse(url.c_str()), &evhttp_uri_free);
 
+  if (!uri) {
+    LOG(FATAL) << "URL invalid: " << url;
+  }
+
   const int port(evhttp_uri_get_port(uri.get()));
   port_ = port > 0 && port <= UINT16_MAX ? port : 0;
 

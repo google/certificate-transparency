@@ -4,6 +4,7 @@
 #include <glog/logging.h>
 #include <ctime>
 #include <utility>
+#include <event2/http.h>
 
 #include "util/json_wrapper.h"
 #include "util/libevent_wrapper.h"
@@ -993,12 +994,21 @@ list<EtcdClient::HostPortPair> SplitHosts(const string& hosts_string) {
 
   list<EtcdClient::HostPortPair> ret;
   for (const auto& h : hosts) {
+    // First check that the entire etcd URL can be parsed by evhttp
+    unique_ptr<evhttp_uri, void (*)(evhttp_uri*)> uri(
+        evhttp_uri_parse(h.c_str()), &evhttp_uri_free);
+
+    if (!uri) {
+      LOG(FATAL) << "Invalid etcd_server url specified: " << h;
+    }
+
     vector<string> hp(util::split(h, ':'));
     CHECK_EQ(static_cast<size_t>(2), hp.size())
         << "Invalid host:port string: '" << h << "'";
     const int port(stoi(hp[1]));
     CHECK_LT(0, port) << "Port is <= 0";
     CHECK_GE(65535, port) << "Port is > 65535";
+
     ret.emplace_back(EtcdClient::HostPortPair(hp[0], port));
   }
   return ret;
