@@ -16,6 +16,7 @@
 
 using cert_trans::Cert;
 using cert_trans::CmsVerifier;
+using cert_trans::ScopedBIO;
 using std::string;
 using std::unique_ptr;
 using std::vector;

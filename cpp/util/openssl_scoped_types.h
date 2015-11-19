@@ -44,6 +44,8 @@
 #include <openssl/x509.h>
 #include <openssl/x509v3.h>
 
+namespace cert_trans {
+
 
 template <typename T, void (*func)(T*)>
 struct OpenSSLDeleter {
@@ -179,5 +181,8 @@ using ScopedOpenSSLBytes = std::unique_ptr<uint8_t, OpenSSLFree<uint8_t>>;
 using ScopedOpenSSLString = std::unique_ptr<char, OpenSSLFree<char>>;
 
 using ScopedFILE = std::unique_ptr<FILE, FileCloser>;
+
+
+}  // namespace cert_trans
 
 #endif  // OPENSSL_HEADER_CRYPTO_TEST_SCOPED_TYPES_H

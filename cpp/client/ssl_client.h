@@ -72,8 +72,8 @@ class SSLClient {
 
  private:
   Client client_;
-  ScopedSSL_CTX ctx_;
-  ScopedSSL ssl_;
+  cert_trans::ScopedSSL_CTX ctx_;
+  cert_trans::ScopedSSL ssl_;
   struct VerifyCallbackArgs {
     VerifyCallbackArgs(LogVerifier* log_verifier)
         : verifier(log_verifier),

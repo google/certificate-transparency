@@ -16,6 +16,7 @@
 using cert_trans::Cert;
 using cert_trans::CertChain;
 using cert_trans::CertSubmissionHandler;
+using cert_trans::ScopedBIO;
 using ct::LogEntry;
 using ct::SSLClientCTData;
 using ct::SignedCertificateTimestamp;
