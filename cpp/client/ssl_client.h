@@ -14,6 +14,9 @@
 
 class LogVerifier;
 
+namespace cert_trans {
+
+
 class SSLClient {
  public:
   // Takes ownership of the verifier. This client can currently
@@ -104,4 +107,8 @@ class SSLClient {
 
   DISALLOW_COPY_AND_ASSIGN(SSLClient);
 };
+
+
+}  // namespace cert_trans
+
 #endif

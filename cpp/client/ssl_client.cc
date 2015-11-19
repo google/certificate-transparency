@@ -13,10 +13,6 @@
 #include "merkletree/serial_hasher.h"
 #include "proto/serializer.h"
 
-using cert_trans::Cert;
-using cert_trans::CertChain;
-using cert_trans::CertSubmissionHandler;
-using cert_trans::ScopedBIO;
 using ct::LogEntry;
 using ct::SSLClientCTData;
 using ct::SignedCertificateTimestamp;
@@ -25,7 +21,13 @@ using std::string;
 using util::StatusOr;
 using util::error::Code;
 
+namespace cert_trans {
+namespace {
+
 const uint16_t CT_EXTENSION_TYPE = 18;
+
+} // namespace
+
 
 // static
 int SSLClient::ExtensionCallback(SSL*, unsigned ext_type,
@@ -300,3 +302,6 @@ SSLClient::HandshakeResult SSLClient::SSLConnect(bool strict) {
   }
   return result;
 }
+
+
+}  // namespace cert_trans

@@ -131,6 +131,7 @@ using cert_trans::CertSubmissionHandler;
 using cert_trans::HTTPLogClient;
 using cert_trans::PreCertChain;
 using cert_trans::ReadPublicKey;
+using cert_trans::SSLClient;
 using cert_trans::ScopedASN1_OCTET_STRING;
 using cert_trans::ScopedBIGNUM;
 using cert_trans::ScopedBIO;
