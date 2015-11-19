@@ -56,6 +56,7 @@
 /cpp/merkletree/merkle_tree_large_test
 /cpp/merkletree/merkle_tree_test
 /cpp/merkletree/serial_hasher_test
+/cpp/merkletree/sparse_merkle_tree_test
 /cpp/merkletree/tree_hasher_test
 /cpp/monitor/database_test
 /cpp/monitoring/counter_test
@@ -81,6 +82,7 @@
 /cpp/tools/dump_sth
 /cpp/tools/etcd_watch
 /cpp/util/bench_etcd
+/cpp/util/bignum_test
 /cpp/util/etcd_delete_test
 /cpp/util/etcd_masterelection
 /cpp/util/etcd_test
