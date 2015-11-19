@@ -432,6 +432,7 @@ void ClusterStateController<Logged>::CalculateServingSTH(
     const std::unique_lock<std::mutex>& lock) {
   VLOG(1) << "Calculating new ServingSTH...";
   CHECK(lock.owns_lock());
+  unsigned valid_serving_nodes = 0;
 
   // First, create a mapping of tree size to number of nodes at that size, and
   // a mapping of the newst STH for any given size:
@@ -448,6 +449,7 @@ void ClusterStateController<Logged>::CalculateServingSTH(
       CHECK_LE(0, timestamp);
 
       num_nodes_by_sth_size[tree_size]++;
+      valid_serving_nodes++;
 
       // Default timestamp (first call in here) will be 0
       if (node_state.newest_sth().timestamp() >
@@ -480,7 +482,7 @@ void ClusterStateController<Logged>::CalculateServingSTH(
     // able to serve this [and smaller] STHs.)
     num_nodes_seen += it->second;
     const double serving_fraction(static_cast<double>(num_nodes_seen) /
-                                  all_peers_.size());
+                                  valid_serving_nodes);
     if (serving_fraction >= cluster_config_.minimum_serving_fraction() &&
         num_nodes_seen >= cluster_config_.minimum_serving_nodes()) {
       const ct::SignedTreeHead& candidate_sth(sth_by_size[it->first]);
