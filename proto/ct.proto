@@ -38,14 +38,20 @@ message DigitallySigned {
 enum LogEntryType {
   X509_ENTRY = 0;
   PRECERT_ENTRY = 1;
+  PRECERT_ENTRY_V2 = 2;
   // Not part of the I-D, and outside the valid range.
   X_JSON_ENTRY = 32768;  // Experimental, don't rely on this!
   UNKNOWN_ENTRY_TYPE = 65536;
 }
 
 message X509ChainEntry {
+  // For V1 this entry just includes the certificate in the leaf_certificate
+  // field
   // <1..2^24-1>
   optional bytes leaf_certificate = 1;
+  // For V2 it includes the cert and key hash using CertInfo. The
+  // leaf_certificate field is not used
+  optional CertInfo cert_info = 3;
   // <0..2^24-1>
   // A chain from the leaf to a trusted root
   // (excluding leaf and possibly root).
@@ -57,8 +63,16 @@ message X509ChainEntry {
 //   opaque issuer_key_hash[32];
 //   TBSCertificate tbs_certificate;
 // } PreCert;
-// TODO(benl, ekasper): call this something more original in the I-D.
+// Retained for V1 API compatibility. May be removed in a future release.
 message PreCert {
+  optional bytes issuer_key_hash = 1;
+  optional bytes tbs_certificate = 2;
+}
+
+// In V2 this is used for both certificates and precertificates in SCTs. It
+// replaces PreCert and has the same structure. The older message remains for
+// compatibility with existing code that depends on this proto.
+message CertInfo {
   optional bytes issuer_key_hash = 1;
   optional bytes tbs_certificate = 2;
 }
@@ -74,6 +88,9 @@ message PrecertChainEntry {
   // Store it alongside the entry data so that the signers don't have to
   // parse certificates to recompute it.
   optional PreCert pre_cert = 3;
+  // As above for V2 messages. Only one of these fields will be set in a
+  // valid message
+  optional CertInfo cert_info = 4;
 }
 
 message XJSONEntry {
@@ -99,6 +116,7 @@ enum SignatureType {
 
 enum Version {
   V1 = 0;
+  V2 = 1;
   // Not part of the I-D, and outside the valid range.
   UNKNOWN_VERSION = 256;
 }
@@ -108,6 +126,13 @@ message LogID {
   optional bytes key_id = 1;
 }
 
+message SctExtension {
+  // Valid range is 0-65534
+  optional uint32 sct_extension_type = 1;
+  // Data is opaque and type specific. <0..2^16-1> bytes
+  optional bytes sct_extension_data = 2;
+}
+
 // TODO(ekasper): implement support for id.
 message SignedCertificateTimestamp {
   optional Version version = 1 [ default = UNKNOWN_VERSION ];
@@ -115,7 +140,10 @@ message SignedCertificateTimestamp {
   // UTC time in milliseconds, since January 1, 1970, 00:00.
   optional uint64 timestamp = 3;
   optional DigitallySigned signature = 4;
+  // V1 extensions
   optional bytes extensions = 5;
+  // V2 extensions <0..2^16-1>. Must be ordered by type (lowest first)
+  repeated SctExtension sct_extension = 6;
 }
 
 message SignedCertificateTimestampList {
@@ -129,16 +157,23 @@ enum MerkleLeafType {
 }
 
 message SignedEntry {
+  // For V1 signed entries either the x509 or precert field will be set
   optional bytes x509 = 1;
   optional PreCert precert = 2;
   optional bytes json = 3;
+  // For V2 all entries use the CertInfo field and the above fields are
+  // not set
+  optional CertInfo cert_info = 4;
 }
 
 message TimestampedEntry {
   optional uint64 timestamp = 1;
   optional LogEntryType entry_type = 2;
   optional SignedEntry signed_entry = 3;
+  // V1 extensions
   optional bytes extensions = 4;
+  // V2 extensions <0..2^16-1>. Must be ordered by type (lowest first)
+  repeated SctExtension sct_extension = 5;
 }
 
 // Stuff that's hashed into a Merkle leaf.
@@ -187,6 +222,13 @@ message LoggedEntryPB {
   required Contents contents = 3;
 }
 
+message SthExtension {
+  // Valid range is 0-65534
+  optional uint32 sth_extension_type = 1;
+  // Data is opaque and type specific <0..2^16-1> bytes
+  optional bytes sth_extension_data = 2;
+}
+
 message SignedTreeHead {
   // The version of the tree head signature.
   // (Note that each leaf has its own version, so a V2 tree
@@ -197,6 +239,8 @@ message SignedTreeHead {
   optional int64 tree_size = 4;
   optional bytes sha256_root_hash = 5;
   optional DigitallySigned signature = 6;
+  // Only supported in V2. <0..2^16-1>
+  repeated SthExtension sth_extension = 7;
 }
 
 // Stuff the SSL client spits out from a connection.

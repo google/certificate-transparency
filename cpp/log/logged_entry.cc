@@ -2,6 +2,7 @@
 
 using ct::LogEntry;
 using ct::PreCert;
+using ct::CertInfo;
 using ct::SignedCertificateTimestamp;
 
 namespace cert_trans {
@@ -47,6 +48,12 @@ bool LoggedEntry::CopyFromClientLogEntry(const AsyncLogClient::Entry& entry) {
                                        .signed_entry()
                                        .precert()
                                        .tbs_certificate());
+      break;
+    }
+
+    case ct::PRECERT_ENTRY_V2: {
+      // TODO(mhs): V2 implementation here + other changes above
+      LOG(FATAL) << "CT V2 not yet implemented";
       break;
     }
 

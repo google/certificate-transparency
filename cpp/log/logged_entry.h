@@ -60,6 +60,10 @@ class LoggedEntry : public ct::LoggedEntryPB {
       case ct::PRECERT_ENTRY:
         return Serializer::SerializePrecertChainEntry(entry().precert_entry(),
                                                       dst) == Serializer::OK;
+      case ct::PRECERT_ENTRY_V2:
+        // TODO(mhs): V2 implementation needs to be provided.
+        LOG(FATAL) << "CT V2 not yet implemented";
+        break;
       case ct::X_JSON_ENTRY:
         dst->clear();
         return true;

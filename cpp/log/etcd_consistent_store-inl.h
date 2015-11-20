@@ -275,6 +275,10 @@ bool LeafEntriesMatch(const Logged& a, const Logged& b) {
     case ct::PRECERT_ENTRY:
       return a.entry().precert_entry().pre_certificate() ==
              b.entry().precert_entry().pre_certificate();
+    case ct::PRECERT_ENTRY_V2:
+      // TODO(mhs): V2 implementation required here
+      LOG(FATAL) << "CT V2 not yet implemented";
+      break;
     case ct::X_JSON_ENTRY:
       return a.entry().x_json_entry().json() ==
              b.entry().x_json_entry().json();
