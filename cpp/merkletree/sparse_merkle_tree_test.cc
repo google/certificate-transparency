@@ -15,6 +15,7 @@
 namespace {
 
 using cert_trans::ScopedBIGNUM;
+using std::fill;
 using std::lower_bound;
 using std::map;
 using std::mt19937;
@@ -192,6 +193,13 @@ class SparseMerkleTreeTest : public testing::Test {
     return ret;
   }
 
+  SparseMerkleTree::Path PathFromString(const string& s) {
+    SparseMerkleTree::Path ret;
+    CHECK_LE(s.size(), ret.size());
+    fill(copy(s.begin(), s.end(), ret.begin()), ret.end(), 0);
+    return ret;
+  }
+
   TreeHasher tree_hasher_;
   SparseMerkleTree tree_;
   mt19937 rand_;
@@ -311,22 +319,22 @@ TEST_F(SparseMerkleTreeTest, DISABLED_SMTMemTest) {
 }
 
 
-TEST_F(SparseMerkleTreeTest, TestSetLeafByHash) {
+TEST_F(SparseMerkleTreeTest, TestSetLeaf) {
   tree_.CurrentRoot();
   LOG(INFO) << "Tree@0:";
   LOG(INFO) << tree_.Dump();
 
-  tree_.SetLeafByHash("one", "one");
+  tree_.SetLeaf(PathFromString("one"), "one");
   tree_.CurrentRoot();
   LOG(INFO) << "Tree@1:";
   LOG(INFO) << tree_.Dump();
 
-  tree_.SetLeafByHash("two", "two");
+  tree_.SetLeaf(PathFromString("two"), "two");
   tree_.CurrentRoot();
   LOG(INFO) << "Tree@2:";
   LOG(INFO) << tree_.Dump();
 
-  tree_.SetLeafByHash("three", "three");
+  tree_.SetLeaf(PathFromString("three"), "three");
   tree_.CurrentRoot();
   LOG(INFO) << "Tree@3:";
   LOG(INFO) << tree_.Dump();

@@ -89,6 +89,7 @@ TESTS = \
 	cpp/merkletree/serial_hasher_test \
 	cpp/merkletree/sparse_merkle_tree_test \
 	cpp/merkletree/tree_hasher_test \
+	cpp/merkletree/verifiable_map_test \
 	cpp/monitor/database_test \
 	cpp/monitoring/counter_test \
 	cpp/monitoring/gauge_test \
@@ -163,6 +164,7 @@ cpp_libcore_a_SOURCES = \
 	cpp/merkletree/serial_hasher.cc \
 	cpp/merkletree/sparse_merkle_tree.cc \
 	cpp/merkletree/tree_hasher.cc \
+	cpp/merkletree/verifiable_map.cc \
 	cpp/monitoring/gcm/exporter.cc \
 	cpp/monitoring/monitoring.cc \
 	cpp/monitoring/prometheus/exporter.cc \
@@ -772,6 +774,14 @@ cpp_merkletree_tree_hasher_test_LDADD = \
 cpp_merkletree_tree_hasher_test_SOURCES = \
 	cpp/util/util.cc \
 	cpp/merkletree/tree_hasher_test.cc
+
+cpp_merkletree_verifiable_map_test_LDADD = \
+	cpp/libcore.a \
+	cpp/libtest.a \
+	$(libevent_LIBS)
+cpp_merkletree_verifiable_map_test_SOURCES = \
+	cpp/util/util.cc \
+	cpp/merkletree/verifiable_map_test.cc
 
 cpp_util_sync_task_test_LDADD = \
 	cpp/libcore.a \
