@@ -203,7 +203,7 @@ class SparseMerkleTreeTest : public testing::Test {
 
 TEST_F(SparseMerkleTreeTest, PathBitAndPathStreamOperatorAgree) {
   ostringstream os;
-  const SparseMerkleTree::Path p(PathLow(0xaa));
+  const SparseMerkleTree::Path p(RandomPath());
   os << p;
   string b;
   for (int i(SparseMerkleTree::kDigestSizeBits - 1); i >= 0; --i) {
@@ -296,11 +296,12 @@ TEST_F(SparseMerkleTreeTest, SMTMemTest) {
   uint64_t time_before = util::TimeInMilliseconds();
   LOG(INFO) << "Setup";
 
-  for (int i(0); i < 10000000; ++i) {
+  for (int i(0); i < 1000000; ++i) {
     uint64_t r(rand_() + i);
     const string value(to_string(r));
     const SparseMerkleTree::Path p(PathLow(r));
     tree_.SetLeaf(p, value);
+    LOG_EVERY_N(INFO, 10000) << i;
   }
   LOG(INFO) << "Calculating Root";
   const string smt_root(tree_.CurrentRoot());

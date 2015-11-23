@@ -116,7 +116,7 @@ class SparseMerkleTree {
 
   // Represents a path into the SparseMerkleTree.
   // The MSB specifies the child of the root node of the tree, and so on until
-  // the LSB in the final byte specifies the leaf itself.
+  // the LSB of the BigNum specifies the leaf itself.
   //
   // i.e:
   // [M..............................L]
@@ -177,10 +177,6 @@ class SparseMerkleTree {
   std::string Dump() const;
 
  private:
-  // WARNING WARNING WARNING
-  // 64 < 256 !
-  // WARNING WARNING WARNING
-  // TODO(alcutter): BIGNUM probably.
   typedef cert_trans::BigNum IndexType;
 
   struct TreeNode {
@@ -235,9 +231,9 @@ inline SparseMerkleTree::Path PathFromBytes(const std::string& bytes) {
 }
 
 
-inline std::string BytesFromPath(const SparseMerkleTree::Path& path) {
-  const int digest_num_bytes(SparseMerkleTree::kDigestSizeBits / 8);
-  const int path_num_bytes(BN_num_bytes(path.bn()));
+std::string BytesFromPath(const SparseMerkleTree::Path& path) {
+  const size_t digest_num_bytes(SparseMerkleTree::kDigestSizeBits / 8);
+  const size_t path_num_bytes(BN_num_bytes(path.bn()));
   CHECK_LE(path_num_bytes, digest_num_bytes);
 
   std::array<char, digest_num_bytes> buf;
@@ -263,9 +259,14 @@ inline int PathBit(const SparseMerkleTree::Path& path, size_t bit) {
 }
 
 
+// Careful...
+// This hasher only hashes the bottom 64 bits of |path|.
+// This is probably sufficient for the intended use of bucketing Paths into an
+// unordered_map, but is otherwise likely not what you're looking for.
 struct SparseMerkleTree::PathHasher {
   size_t operator()(const SparseMerkleTree::Path& p) const {
-    return std::hash<std::string>()(std::string(BytesFromPath(p)));
+    const uint64_t bottom64(BN_get_word(p.bn()));
+    return std::hash<uint64_t>()(bottom64);
   }
 };
 
