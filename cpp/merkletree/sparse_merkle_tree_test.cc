@@ -6,6 +6,7 @@
 #include <map>
 #include <random>
 #include <string>
+#include <vector>
 
 #include "merkletree/sparse_merkle_tree.h"
 #include "util/openssl_scoped_types.h"
@@ -162,41 +163,33 @@ class SparseMerkleTreeTest : public testing::Test {
   }
 
  protected:
-  // Returns a Path with the high 64 bits set to |high|
+  // Returns a Path with the 64 msb set to |high|
   SparseMerkleTree::Path PathHigh(uint64_t high) {
     SparseMerkleTree::Path ret;
-    ret.fill(0);
-    for (size_t i(0); i < 8; ++i) {
-      ret[7 - i] = high & 0xff;
-      high >>= 8;
+    size_t path_index(0);
+    for (int i(sizeof(high) - 1); i >= 0; --i) {
+      LOG(INFO) << i;
+      ret[path_index] = (high >> (i * 8)) & 0xff;
+      ++path_index;
     }
+    LOG(INFO) << "HIGH(" << high << "): " << ret;
     return ret;
   }
 
-  // Returns a Path with the low 64 bits set to |high|
+  // Returns a Path with the 64 lbs set to |low|
   SparseMerkleTree::Path PathLow(uint64_t low) {
-    SparseMerkleTree::Path ret;
-    ret.fill(0);
-    for (size_t i(0); i < 8; ++i) {
-      ret[ret.size() - 1 - i] = low & 0xff;
-      low >>= 8;
-    }
+    SparseMerkleTree::Path ret(low);
     return ret;
   }
 
   // Returns a random Path.
   SparseMerkleTree::Path RandomPath() {
     SparseMerkleTree::Path ret;
+    size_t path_index(0);
     for (int i(0); i < ret.size(); ++i) {
-      ret[i] = rand_() & 0xff;
+      ret[path_index] |= (rand_() & 0xff);
+      ++path_index;
     }
-    return ret;
-  }
-
-  SparseMerkleTree::Path PathFromString(const string& s) {
-    SparseMerkleTree::Path ret;
-    CHECK_LE(s.size(), ret.size());
-    fill(copy(s.begin(), s.end(), ret.begin()), ret.end(), 0);
     return ret;
   }
 
@@ -212,7 +205,7 @@ TEST_F(SparseMerkleTreeTest, PathBitAndPathStreamOperatorAgree) {
   os << p;
   string b;
   for (size_t i(0); i < SparseMerkleTree::kDigestSizeBits; ++i) {
-    b += PathBit(p, i) == 0 ? '0' : '1';
+    b += p.nth_msb(i) == 0 ? '0' : '1';
   }
   EXPECT_EQ(os.str(), b);
 }
@@ -306,6 +299,7 @@ TEST_F(SparseMerkleTreeTest, DISABLED_SMTMemTest) {
     const string value(to_string(r));
     const SparseMerkleTree::Path p(PathLow(r));
     tree_.SetLeaf(p, value);
+    LOG_EVERY_N(INFO, 10000) << i;
   }
   LOG(INFO) << "Calculating Root";
   const string smt_root(tree_.CurrentRoot());
@@ -324,17 +318,17 @@ TEST_F(SparseMerkleTreeTest, TestSetLeaf) {
   LOG(INFO) << "Tree@0:";
   LOG(INFO) << tree_.Dump();
 
-  tree_.SetLeaf(PathFromString("one"), "one");
+  tree_.SetLeaf(PathFromBytes("one_____________________________"), "one");
   tree_.CurrentRoot();
   LOG(INFO) << "Tree@1:";
   LOG(INFO) << tree_.Dump();
 
-  tree_.SetLeaf(PathFromString("two"), "two");
+  tree_.SetLeaf(PathFromBytes("two_____________________________"), "two");
   tree_.CurrentRoot();
   LOG(INFO) << "Tree@2:";
   LOG(INFO) << tree_.Dump();
 
-  tree_.SetLeaf(PathFromString("three"), "three");
+  tree_.SetLeaf(PathFromBytes("three___________________________"), "three");
   tree_.CurrentRoot();
   LOG(INFO) << "Tree@3:";
   LOG(INFO) << tree_.Dump();
