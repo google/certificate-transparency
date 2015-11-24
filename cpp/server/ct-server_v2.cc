@@ -153,7 +153,7 @@ int main(int argc, char* argv[]) {
   TreeSigner<LoggedEntry> tree_signer(
       std::chrono::duration<double>(FLAGS_guard_window_seconds), db.get(),
       server.log_lookup()->GetCompactMerkleTree(new Sha256Hasher),
-      server.consistent_store(), &log_signer, kSUPPORTED_CT_VERSION);
+      server.consistent_store(), &log_signer);
 
   if (stand_alone_mode) {
     // Set up a simple single-node environment.
