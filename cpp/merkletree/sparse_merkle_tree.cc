@@ -46,14 +46,14 @@ void SparseMerkleTree::EnsureHaveLevel(size_t level) {
 
 
 void SparseMerkleTree::SetLeaf(const Path& path, const string& data) {
-  CHECK_EQ(treehasher_.DigestSize(), path.size());
+  CHECK_EQ(treehasher_.DigestSize() * 8, path.size());
   // Mark the tree dirty:
   root_hash_.clear();
   string leaf_hash(treehasher_.HashLeaf(data));
 
-  IndexType node_index(0);
-  for (int depth(0); depth <= kDigestSizeBits; ++depth) {
-    node_index += PathBit(path, depth);
+  IndexType node_index;
+  for (int depth(0); depth < kDigestSizeBits; ++depth) {
+    SetPathBit(&node_index, depth, PathBit(path, depth));
     EnsureHaveLevel(depth);
     auto it(tree_[depth].find(node_index));
     if (it == tree_[depth].end()) {
@@ -70,19 +70,31 @@ void SparseMerkleTree::SetLeaf(const Path& path, const string& data) {
       it->second.hash_ = std::move(leaf_hash);
       return;
     } else {
-      // restructure: push the existing node down a level and replace this one
-      // with an INTERNAL node
-      CHECK_LT(depth, kDigestSizeBits);
+      // The tree representation stores leaf nodes at the shortest unique with
+      // an INTERNAL node prefix of their paths (see explanation at the top of
+      // the header file), but we've now got another key which shares at least
+      // this much prefix so we need to move the existing "leaf" node down to
+      // the next level in the tree (and setting the current prefix to be an
+      // INTERNAL node) before going around the loop again.
+
+      // We should never find ourselves with a full key collision at the
+      // bottom of the tree, handling of idential keys happens above.
+      CHECK_LT(depth, kDigestSizeBits - 1) << "Oops, hit the end with path: "
+                                           << node_index;
+
       EnsureHaveLevel(depth + 1);
-      IndexType child_index((node_index << 1) +
-                            PathBit(*it->second.path_, depth + 1));
+
+      // Move the existing node down a level:
+      SetPathBit(&node_index, depth + 1,
+                 PathBit(*it->second.path_, depth + 1));
       CHECK(tree_[depth + 1]
-                .emplace(make_pair(child_index, std::move(it->second)))
+                .emplace(make_pair(node_index, std::move(it->second)))
                 .second);
+
+      // and update the entry in its old position to be an INTERNAL node.
       it->second.type_ = TreeNode::INTERNAL;
       it->second.hash_.clear();
     }
-    node_index <<= 1;
   }
   LOG(FATAL) << "Failed to set " << path << " to " << data;
 }
@@ -95,10 +107,11 @@ void SparseMerkleTree::DumpTree(ostream* os, size_t depth,
   }
   const string indent((depth + 1) * 2, '-');
   for (int side(0); side < 2; ++side) {
-    auto child(tree_[depth].find(index + side));
+    SetPathBit(&index, depth + 1, side);
+    auto child(tree_[depth].find(index));
     if (child != tree_[depth].end()) {
       *os << indent << side << ": " << child->second.DebugString() << "\n";
-      DumpTree(os, depth + 1, (index + side) << 1);
+      DumpTree(os, depth + 1, index);
     }
   }
 }
@@ -126,10 +139,16 @@ string SparseMerkleTree::CalculateSubtreeHash(size_t depth, IndexType index) {
         if (!it->second.hash_.empty()) {
           return it->second.hash_;
         }
-        IndexType left_child_index(index << 1);
+        // Create the path prefixes of the child nodes.
+        // The left will be the same as this node's prefix with a trailing "0"
+        IndexType left_child_index(index);
+
+        // The right is the same as this node's prefix, plus a trailing "1
+        IndexType right_child_index(index);
+        SetPathBit(&right_child_index, depth + 1, 1);
+
         const string left(CalculateSubtreeHash(depth + 1, left_child_index));
-        const string right(
-            CalculateSubtreeHash(depth + 1, left_child_index + 1));
+        const string right(CalculateSubtreeHash(depth + 1, right_child_index));
         it->second.hash_.assign(treehasher_.HashChildren(left, right));
         return it->second.hash_;
       }
@@ -137,7 +156,7 @@ string SparseMerkleTree::CalculateSubtreeHash(size_t depth, IndexType index) {
       case TreeNode::LEAF: {
         string ret(it->second.hash_);
         for (int i(kDigestSizeBits - 1); i > depth; --i) {
-          if (PathBit(*(it->second.path_), i) == 0) {
+          if (PathBit(*it->second.path_, i) == 0) {
             ret = treehasher_.HashChildren(ret, null_hashes_->at(i));
           } else {
             ret = treehasher_.HashChildren(null_hashes_->at(i), ret);
@@ -196,14 +215,3 @@ string SparseMerkleTree::TreeNode::DebugString() const {
   return os.str();
 }
 
-
-ostream& operator<<(ostream& out, const SparseMerkleTree::Path& path) {
-  for (size_t i(0); i < path.size(); ++i) {
-    uint8_t t(path[i]);
-    for (size_t b(8); b > 0; --b) {
-      out << (t & 0x80 ? '1' : '0');
-      t <<= 1;
-    }
-  }
-  return out;
-}

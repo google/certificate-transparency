@@ -6,6 +6,7 @@
 #include <map>
 #include <random>
 #include <string>
+#include <vector>
 
 #include "merkletree/sparse_merkle_tree.h"
 #include "util/openssl_scoped_types.h"
@@ -162,24 +163,27 @@ class SparseMerkleTreeTest : public testing::Test {
   }
 
  protected:
-  // Returns a Path with the high 64 bits set to |high|
+  // Returns a Path with the 64 msb set to |high|
   SparseMerkleTree::Path PathHigh(uint64_t high) {
     SparseMerkleTree::Path ret;
-    ret.fill(0);
-    for (size_t i(0); i < 8; ++i) {
-      ret[7 - i] = high & 0xff;
-      high >>= 8;
+    const size_t num_bits(sizeof(high) * 8);
+    const uint64_t top_bit(static_cast<uint64_t>(1) << (num_bits - 1));
+    for (int i(0); i < num_bits; ++i) {
+      SetPathBit(&ret, i, high & top_bit);
+      high <<= 1;
     }
     return ret;
   }
 
-  // Returns a Path with the low 64 bits set to |high|
+  // Returns a Path with the 64 least significant bits set to |low|
   SparseMerkleTree::Path PathLow(uint64_t low) {
     SparseMerkleTree::Path ret;
-    ret.fill(0);
-    for (size_t i(0); i < 8; ++i) {
-      ret[ret.size() - 1 - i] = low & 0xff;
-      low >>= 8;
+    const size_t num_bits(sizeof(low) * 8);
+    const uint64_t top_bit(static_cast<uint64_t>(1) << (num_bits - 1));
+    for (int i(num_bits - 1); i >= 0; --i) {
+      SetPathBit(&ret, SparseMerkleTree::kDigestSizeBits - 1 - i,
+                 low & top_bit);
+      low <<= 1;
     }
     return ret;
   }
@@ -188,16 +192,17 @@ class SparseMerkleTreeTest : public testing::Test {
   SparseMerkleTree::Path RandomPath() {
     SparseMerkleTree::Path ret;
     for (int i(0); i < ret.size(); ++i) {
-      ret[i] = rand_() & 0xff;
+      SetPathBit(&ret, i, rand_() & 0x01);
     }
     return ret;
   }
 
+  // Returns a Path with the MSBs set to the bytes in |s|
   SparseMerkleTree::Path PathFromString(const string& s) {
-    SparseMerkleTree::Path ret;
-    CHECK_LE(s.size(), ret.size());
-    fill(copy(s.begin(), s.end(), ret.begin()), ret.end(), 0);
-    return ret;
+    CHECK_LE(s.size(), SparseMerkleTree::kDigestSizeBits / 8);
+    string p(SparseMerkleTree::kDigestSizeBits / 8, 0);
+    copy(s.begin(), s.end(), p.begin());
+    return PathFromBytes(p);
   }
 
   TreeHasher tree_hasher_;
@@ -215,6 +220,18 @@ TEST_F(SparseMerkleTreeTest, PathBitAndPathStreamOperatorAgree) {
     b += PathBit(p, i) == 0 ? '0' : '1';
   }
   EXPECT_EQ(os.str(), b);
+}
+
+
+TEST_F(SparseMerkleTreeTest, PathFromBytes) {
+  string s(SparseMerkleTree::kDigestSizeBits / 8, 0);
+  SparseMerkleTree::Path p;
+  for (int i(0); i < 100; ++i) {
+    const int bit(rand_() % SparseMerkleTree::kDigestSizeBits);
+    SetPathBit(&p, bit, true);
+    s[bit / 8] |= 0x80 >> (bit % 8);
+  }
+  EXPECT_EQ(p, PathFromBytes(s));
 }
 
 
@@ -306,6 +323,7 @@ TEST_F(SparseMerkleTreeTest, DISABLED_SMTMemTest) {
     const string value(to_string(r));
     const SparseMerkleTree::Path p(PathLow(r));
     tree_.SetLeaf(p, value);
+    LOG_EVERY_N(INFO, 10000) << i;
   }
   LOG(INFO) << "Calculating Root";
   const string smt_root(tree_.CurrentRoot());

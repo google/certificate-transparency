@@ -34,7 +34,7 @@ class VerifiableMap {
   SparseMerkleTree merkle_tree_;
 
   // TODO(alcutter): allow arbitrary stores here.
-  std::unordered_map<SparseMerkleTree::Path, std::string, PathHasher> values_;
+  std::unordered_map<SparseMerkleTree::Path, std::string> values_;
 
   DISALLOW_COPY_AND_ASSIGN(VerifiableMap);
 };

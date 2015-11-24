@@ -3,7 +3,7 @@
 
 #include <glog/logging.h>
 #include <stddef.h>
-#include <array>
+#include <bitset>
 #include <string>
 #include <unordered_map>
 #include <vector>
@@ -114,23 +114,17 @@ class SparseMerkleTree {
   static const int kDigestSizeBits = 256;
 
   // Represents a path into the SparseMerkleTree.
-  // The MSB of the 0th entry in the path specifies the path from the root node
-  // of the tree, and so on until the LSB in the final byte specifies the leaf
-  // itself.
+  // The MSB path specifies the path from the root node of the tree, and so on
+  // until the LSB specifies the leaf itself.
   //
   // i.e:
-  //   0th        1st     ...
-  // [76543210|76543210|76...|...|...0]
+  // [255,...,...,...,...,...,..,...,0]
   //  ||                             |_____LSB of path, identifies leaf at
   //  lowest level in the tree
   //  ||___________________________________Identifies 2nd level child node
   //  |____________________________________Identifies 1st level child node
   //
-  //  The reasoning behind this convention is that looked as a single
-  //  kDigestSizeBits sized word, the value of the path is then the same as
-  //  the index of the leaf node it identifies, this also has the advantage
-  //  that the paths are lexographically sortable.
-  typedef std::array<uint8_t, kDigestSizeBits / 8> Path;
+  typedef std::bitset<kDigestSizeBits> Path;
 
   // The constructor takes a pointer to some concrete hash function
   // instantiation of the SerialHasher abstract class.
@@ -176,11 +170,7 @@ class SparseMerkleTree {
   std::string Dump() const;
 
  private:
-  // WARNING WARNING WARNING
-  // 64 < 256 !
-  // WARNING WARNING WARNING
-  // TODO(alcutter): BIGNUM probably.
-  typedef uint64_t IndexType;
+  typedef Path IndexType;
 
   struct TreeNode {
     TreeNode(const std::string& hash) : type_(INTERNAL), hash_(hash) {
@@ -212,40 +202,51 @@ class SparseMerkleTree {
   TreeHasher treehasher_;
   const std::vector<std::string>* const null_hashes_;
   // TODO(alcutter): investigate other structures
+  // The tree is stored as one unordered_map per tree level, with the 0th level
+  // being the closest to the root.
+  // Each level is a map of path Prefix to node.  The prefix is |level| bits
+  // long, i.e. intermediate nodes to a (4-bit) leaf path of "1101" would be:
+  //   "1xxx" --> level 0 intermediate
+  //   "11xx" --> level 1 intermediate
+  //   "110x" --> level 2 intermediate
+  //   "1101" --> level 3 leaf.
+  // Where 'x' are always set to a zero.
   std::vector<std::unordered_map<IndexType, TreeNode>> tree_;
   std::string root_hash_;
 };
 
 
-// Pretty print a Path
-std::ostream& operator<<(std::ostream& out,
-                         const SparseMerkleTree::Path& path);
+inline void SetPathBit(SparseMerkleTree::Path* path, size_t nth_msb,
+                       bool value) {
+  CHECK_NOTNULL(path);
+  CHECK_LT(nth_msb, SparseMerkleTree::kDigestSizeBits);
+  (*path)[SparseMerkleTree::kDigestSizeBits - 1 - nth_msb] = value;
+}
+
+
+inline int PathBit(const SparseMerkleTree::Path& path, size_t nth_msb) {
+  CHECK_LT(nth_msb, SparseMerkleTree::kDigestSizeBits);
+  return path[SparseMerkleTree::kDigestSizeBits - 1 - nth_msb];
+}
 
 
 // Creates a Path from the bits passed in.
+// MSB of the zeroth char is the MSB of the Path (i.e. the root end of the
+// tree.)
 inline SparseMerkleTree::Path PathFromBytes(const std::string& bytes) {
   SparseMerkleTree::Path path;
   // Path size must be a multiple of 8 for now.
-  CHECK_EQ(bytes.size(), path.size());
-
-  std::copy(bytes.begin(), bytes.end(), path.begin());
+  CHECK_EQ(bytes.size() * 8, path.size());
+  size_t path_index(0);
+  for (auto it(bytes.begin()); it != bytes.end(); ++it) {
+    const uint8_t byte(*it);
+    for (size_t b(0); b < 8; ++b) {
+      SetPathBit(&path, path_index, byte & (0x80 >> b));
+      ++path_index;
+    }
+  }
   return path;
 }
-
-
-// Extracts the |n|th most significant bit from |path|
-inline int PathBit(const SparseMerkleTree::Path& path, size_t bit) {
-  CHECK_LT(bit, path.size() * 8);
-  return (path[bit / 8] & (1 << (7 - bit % 8))) == 0 ? 0 : 1;
-}
-
-
-struct PathHasher {
-  size_t operator()(const SparseMerkleTree::Path& p) const {
-    return std::hash<std::string>()(
-        std::string(reinterpret_cast<const char*>(p.data()), p.size()));
-  }
-};
 
 
 #endif  // CERT_TRANS_MERKLETREE_SPARSE_MERKLE_TREE_H
