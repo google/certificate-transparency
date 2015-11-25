@@ -15,6 +15,7 @@ using std::array;
 using std::string;
 using std::unique_ptr;
 using util::StatusOr;
+using util::testing::StatusIs;
 using util::ToBase64;
 
 
@@ -32,7 +33,7 @@ TEST_F(VerifiableMapTest, TestGetNotFound) {
   const string kKey("unknown_key");
 
   const StatusOr<string> retrieved(map_.Get(kKey));
-  EXPECT_EQ(false, retrieved.ok());
+  EXPECT_THAT(retrieved.status(), StatusIs(util::error::NOT_FOUND));
 }
 
 TEST_F(VerifiableMapTest, TestSetGet) {
