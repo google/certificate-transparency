@@ -164,39 +164,34 @@ class SparseMerkleTreeTest : public testing::Test {
  protected:
   // Returns a Path with the high 64 bits set to |high|
   SparseMerkleTree::Path PathHigh(uint64_t high) {
-    SparseMerkleTree::Path ret;
-    ret.fill(0);
-    for (size_t i(0); i < 8; ++i) {
-      ret[7 - i] = high & 0xff;
-      high >>= 8;
-    }
+    SparseMerkleTree::Path ret(high);
+    ret <<= SparseMerkleTree::kDigestSizeBits - sizeof(high);
     return ret;
   }
 
   // Returns a Path with the low 64 bits set to |high|
   SparseMerkleTree::Path PathLow(uint64_t low) {
-    SparseMerkleTree::Path ret;
-    ret.fill(0);
-    for (size_t i(0); i < 8; ++i) {
-      ret[ret.size() - 1 - i] = low & 0xff;
-      low >>= 8;
-    }
+    SparseMerkleTree::Path ret(low);
     return ret;
   }
 
   // Returns a random Path.
   SparseMerkleTree::Path RandomPath() {
     SparseMerkleTree::Path ret;
-    for (int i(0); i < ret.size(); ++i) {
-      ret[i] = rand_() & 0xff;
+    for (int i(0); i < SparseMerkleTree::kDigestSizeBits / 8; ++i) {
+      ret <<= 8;
+      ret += rand_() & 0xff;
     }
     return ret;
   }
 
   SparseMerkleTree::Path PathFromString(const string& s) {
     SparseMerkleTree::Path ret;
-    CHECK_LE(s.size(), ret.size());
-    fill(copy(s.begin(), s.end(), ret.begin()), ret.end(), 0);
+    CHECK_LE(s.size(), SparseMerkleTree::kDigestSizeBits / 8);
+    for (const auto& b : s) {
+      ret <<= 8;
+      ret += static_cast<uint8_t>(b);
+    }
     return ret;
   }
 
@@ -211,7 +206,7 @@ TEST_F(SparseMerkleTreeTest, PathBitAndPathStreamOperatorAgree) {
   const SparseMerkleTree::Path p(RandomPath());
   os << p;
   string b;
-  for (size_t i(0); i < SparseMerkleTree::kDigestSizeBits; ++i) {
+  for (int i(SparseMerkleTree::kDigestSizeBits - 1); i >= 0; --i) {
     b += PathBit(p, i) == 0 ? '0' : '1';
   }
   EXPECT_EQ(os.str(), b);
@@ -294,18 +289,19 @@ TEST_F(SparseMerkleTreeTest, DISABLED_RefMemTest) {
 }
 
 
-TEST_F(SparseMerkleTreeTest, DISABLED_SMTMemTest) {
+TEST_F(SparseMerkleTreeTest, SMTMemTest) {
   struct rusage ru;
   getrusage(RUSAGE_SELF, &ru);
   long max_rss_before = ru.ru_maxrss;
   uint64_t time_before = util::TimeInMilliseconds();
   LOG(INFO) << "Setup";
 
-  for (int i(0); i < 10000000; ++i) {
+  for (int i(0); i < 1000000; ++i) {
     uint64_t r(rand_() + i);
     const string value(to_string(r));
     const SparseMerkleTree::Path p(PathLow(r));
     tree_.SetLeaf(p, value);
+    LOG_EVERY_N(INFO, 10000) << i;
   }
   LOG(INFO) << "Calculating Root";
   const string smt_root(tree_.CurrentRoot());
