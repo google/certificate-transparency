@@ -56,6 +56,10 @@ DEFINE_string(
     "PEM-encoded server public key file of the log we're mirroring.");
 DEFINE_int32(local_sth_update_frequency_seconds, 30,
              "Number of seconds between local checks for updated tree data.");
+// TODO(mhs): Remove this flag when V2 is complete
+DEFINE_bool(i_know_v2_is_not_finished_yet, false,
+            "Set this to allow V2 server startup as the functionality "
+            "is not complete yet");
 
 namespace libevent = cert_trans::libevent;
 
@@ -247,6 +251,11 @@ int main(int argc, char* argv[]) {
   signal(SIGTERM, SIG_IGN);
 
   util::InitCT(&argc, &argv);
+
+  if (!FLAGS_i_know_v2_is_not_finished_yet) {
+    LOG(FATAL)
+        << "You must set --i_know_v2_is_not_finished_yet to run a v2 server";
+  }
 
   Server::StaticInit();
 
