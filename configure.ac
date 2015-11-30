@@ -31,6 +31,7 @@ AC_CHECK_PROGS([ANT], [ant])
 
 PKG_CHECK_MODULES([json_c], [json-c])
 PKG_CHECK_MODULES([evhtp], [evhtp])
+PKG_CHECK_MODULES([icu], [icu-uc])
 
 if test "x${enable_hardening}" != "xno"; then
   common_harden_copts="-fstack-protector-all -fPIC -Wa,--noexecstack -Wformat -Wformat-security"

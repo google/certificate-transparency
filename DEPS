@@ -3,11 +3,14 @@ deps = {
      "glog":             "https://github.com/benlaurie/glog.git@0.3.4-fix",
      "googlemock": 			 "https://github.com/google/googlemock.git@release-1.7.0",
      "googlemock/gtest": "https://github.com/google/googletest.git@release-1.7.0",
+     "icu4c":            "https://github.com/icu-project/icu4c.git@bbd17a792336de5873550794f8304a4b548b0663",
      "json-c": 					 "https://github.com/AlCutter/json-c.git@json-c-0.12-20140410-fix",
      "ldns":             "https://github.com/benlaurie/ldns.git@1.6.17-fix",
      "leveldb": 				 "https://github.com/google/leveldb.git@v1.18",
      "libevent": 				 "https://github.com/libevent/libevent.git@release-2.0.22-stable",
-     "libevhtp": 				 "https://github.com/ellzey/libevhtp.git@ba4c44eed1fb7a5cf8e4deb236af4f7675cc72d5",
+     "libevhtp": 				 "https://github.com/ellzey/libevhtp.git@a89d9b3f9fdf2ebef41893b3d5e4466f4b0ecfda",
+     "certificate-transparency/third_party/objecthash":
+                         "https://github.com/benlaurie/objecthash.git@798f66bd8c5313da226aa7a60c114147910a7407",
      "openssl": 				 "https://github.com/openssl/openssl.git@OpenSSL_1_0_2d",
      "protobuf":         "https://github.com/google/protobuf.git@v2.6.1",
      "protobuf/gtest":   "https://github.com/google/googletest.git@release-1.7.0",
@@ -124,6 +127,16 @@ hooks = [
         "name": "json-c",
         "pattern": "^json-c/",
         "action": [ make, "-f", os.path.join(here, "certificate-transparency/build.gclient"), "_json-c" ],
+    },
+    {
+        "name": "icu4c",
+        "pattern": "^icu4c/",
+        "action": [ make, "-f", os.path.join(here, "certificate-transparency/build.gclient"), "_icu4c" ],
+    },
+    {
+        "name": "objecthash",
+        "pattern": "^certificate-transparency/third_party/objecthash/",
+        "action": [ make, "-f", os.path.join(here, "certificate-transparency/build.gclient"), "_objecthash" ],
     },
     # Do this last
     {

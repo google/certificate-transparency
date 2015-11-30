@@ -3,7 +3,9 @@ ACLOCAL_AMFLAGS = -Im4
 AM_CPPFLAGS = \
 	-I$(GMOCK_DIR)/include \
 	-I$(GTEST_DIR)/include \
+	-Ithird_party/objecthash \
 	$(evhtp_CFLAGS) \
+	$(icu_CFLAGS) \
 	$(json_c_CFLAGS)
 
 AM_CXXFLAGS = \
@@ -282,6 +284,7 @@ cpp_server_ct_server_v2_SOURCES = \
 cpp_server_xjson_server_LDADD = \
 	cpp/libcore.a \
 	$(evhtp_LIBS) \
+	$(icu_LIBS) \
 	$(json_c_LIBS) \
 	$(libevent_LIBS) \
 	$(leveldb_LIBS) \
@@ -294,7 +297,8 @@ cpp_server_xjson_server_SOURCES = \
 	cpp/server/server_helper.cc \
 	cpp/server/xjson-server.cc \
 	cpp/server/x_json_handler.cc \
-	cpp/util/json_wrapper.cc
+	cpp/util/json_wrapper.cc \
+	third_party/objecthash/objecthash.cc
 
 cpp_tools_ct_clustertool_LDADD = \
 	cpp/libcore.a \
@@ -352,8 +356,8 @@ cpp_client_ct_SOURCES = \
 	cpp/version.cc
 
 cpp_server_ct_dns_server_LDADD = \
-	$(evhtp_LIBS) \
 	cpp/libcore.a \
+	$(evhtp_LIBS) \
 	${libevent_LIBS} \
 	-lprotobuf -lldns -lsqlite3
 cpp_server_ct_dns_server_SOURCES = \

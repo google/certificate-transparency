@@ -3,6 +3,7 @@
 
 #include <glog/logging.h>
 #include <math.h>
+#include <objecthash.h>
 #include <string>
 
 #include "proto/ct.pb.h"

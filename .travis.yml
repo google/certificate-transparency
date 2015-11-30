@@ -96,16 +96,18 @@ install:
  - export PYTHONPATH=$(python -m site --user-site)
  - pip install --user --upgrade -r python/requirements.txt
 # Sigh, go get -t will fetch part of this package, but doesn't catch the transitive deps so grab it manually:
+ - pushd go
  - go get github.com/stretchr/testify
  - go get -v -d -t ./...
+ - popd
 
 script:
  - getconf _NPROCESSORS_ONLN
- - ${MAKE} -j$(getconf _NPROCESSORS_ONLN) check VERBOSE=1
+ - ${MAKE} -j$(getconf _NPROCESSORS_ONLN) check VERBOSE=1 V=${ENV_VERBOSE}
  - ant build test
  - ${MAKE} -C python test
  - |
    pushd ${GOPATH}
-   CGO_CPPFLAGS="-I${INSTALL_DIR}/include" CGO_LDFLAGS="-L${INSTALL_DIR}/lib" go test -v ./src/github.com/google/certificate-transparency/...
+   CGO_CPPFLAGS="-I${INSTALL_DIR}/include" CGO_LDFLAGS="-L${INSTALL_DIR}/lib" go test -v ./src/github.com/google/certificate-transparency/go/...
    popd
 
