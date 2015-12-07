@@ -39,6 +39,10 @@ DEFINE_double(guard_window_seconds, 60,
               "number of seconds will not be sequenced.");
 DEFINE_int32(num_http_server_threads, 16,
              "Number of threads for servicing the incoming HTTP requests.");
+// TODO(mhs): Remove this flag when V2 is complete
+DEFINE_bool(i_know_v2_is_not_finished_yet, false,
+            "Set this to allow V2 server startup as the functionality "
+            "is not complete yet");
 
 namespace libevent = cert_trans::libevent;
 
@@ -97,6 +101,11 @@ int main(int argc, char* argv[]) {
   signal(SIGTERM, SIG_IGN);
 
   util::InitCT(&argc, &argv);
+
+  if (!FLAGS_i_know_v2_is_not_finished_yet) {
+    LOG(FATAL)
+        << "You must set --i_know_v2_is_not_finished_yet to run a v2 server";
+  }
 
   Server::StaticInit();
 
