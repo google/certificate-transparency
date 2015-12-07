@@ -10,33 +10,56 @@
 #include "base/macros.h"
 #include "proto/ct.pb.h"
 
+
+// Serialization methods return OK on success,
+// or the first encountered error on failure.
+enum class SerializeResult {
+  OK,
+  INVALID_ENTRY_TYPE,
+  EMPTY_CERTIFICATE,
+  // TODO(alcutter): rename these to LEAFDATA_TOO_LONG or similar?
+  CERTIFICATE_TOO_LONG,
+  CERTIFICATE_CHAIN_TOO_LONG,
+  INVALID_HASH_ALGORITHM,
+  INVALID_SIGNATURE_ALGORITHM,
+  SIGNATURE_TOO_LONG,
+  INVALID_HASH_LENGTH,
+  EMPTY_PRECERTIFICATE_CHAIN,
+  UNSUPPORTED_VERSION,
+  EXTENSIONS_TOO_LONG,
+  INVALID_KEYID_LENGTH,
+  EMPTY_LIST,
+  EMPTY_ELEM_IN_LIST,
+  LIST_ELEM_TOO_LONG,
+  LIST_TOO_LONG,
+  EXTENSIONS_NOT_ORDERED,
+};
+
+std::ostream& operator<<(std::ostream& stream, const SerializeResult& r);
+
+
+enum class DeserializeResult {
+  OK,
+  INPUT_TOO_SHORT,
+  INVALID_HASH_ALGORITHM,
+  INVALID_SIGNATURE_ALGORITHM,
+  INPUT_TOO_LONG,
+  UNSUPPORTED_VERSION,
+  INVALID_LIST_ENCODING,
+  EMPTY_LIST,
+  EMPTY_ELEM_IN_LIST,
+  UNKNOWN_LEAF_TYPE,
+  UNKNOWN_LOGENTRY_TYPE,
+  EXTENSIONS_TOO_LONG,
+  EXTENSIONS_NOT_ORDERED,
+};
+
+std::ostream& operator<<(std::ostream& stream, const DeserializeResult& r);
+
 // A utility class for writing protocol buffer fields in canonical TLS style.
 class Serializer {
  public:
   typedef google::protobuf::RepeatedPtrField<std::string> repeated_string;
-
-  // Serialization methods return OK on success,
-  // or the first encountered error on failure.
-  enum SerializeResult {
-    OK,
-    INVALID_ENTRY_TYPE,
-    EMPTY_CERTIFICATE,
-    CERTIFICATE_TOO_LONG,
-    CERTIFICATE_CHAIN_TOO_LONG,
-    INVALID_HASH_ALGORITHM,
-    INVALID_SIGNATURE_ALGORITHM,
-    SIGNATURE_TOO_LONG,
-    INVALID_HASH_LENGTH,
-    EMPTY_PRECERTIFICATE_CHAIN,
-    UNSUPPORTED_VERSION,
-    EXTENSIONS_TOO_LONG,
-    INVALID_KEYID_LENGTH,
-    EMPTY_LIST,
-    EMPTY_ELEM_IN_LIST,
-    LIST_ELEM_TOO_LONG,
-    LIST_TOO_LONG,
-    EXTENSIONS_NOT_ORDERED,
-  };
 
   static const size_t kMaxCertificateLength;
   static const size_t kMaxCertificateChainLength;
@@ -301,22 +324,6 @@ class Deserializer {
   // FIXME: and so we should take a string *, not a string &.
   explicit Deserializer(const std::string& input);
 
-  enum DeserializeResult {
-    OK,
-    INPUT_TOO_SHORT,
-    INVALID_HASH_ALGORITHM,
-    INVALID_SIGNATURE_ALGORITHM,
-    INPUT_TOO_LONG,
-    UNSUPPORTED_VERSION,
-    INVALID_LIST_ENCODING,
-    EMPTY_LIST,
-    EMPTY_ELEM_IN_LIST,
-    UNKNOWN_LEAF_TYPE,
-    UNKNOWN_LOGENTRY_TYPE,
-    EXTENSIONS_TOO_LONG,
-    EXTENSIONS_NOT_ORDERED,
-  };
-
   static const size_t kV2ExtensionCountLengthInBytes;
   static const size_t kV2ExtensionTypeLengthInBytes;
 
@@ -355,10 +362,10 @@ class Deserializer {
     Deserializer deserializer(in);
     bool res = deserializer.ReadUint(bytes, result);
     if (!res)
-      return INPUT_TOO_SHORT;
+      return DeserializeResult::INPUT_TOO_SHORT;
     if (!deserializer.ReachedEnd())
-      return INPUT_TOO_LONG;
-    return OK;
+      return DeserializeResult::INPUT_TOO_LONG;
+    return DeserializeResult::OK;
   }
 
  private:

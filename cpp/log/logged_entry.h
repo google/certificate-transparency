@@ -49,17 +49,18 @@ class LoggedEntry : public ct::LoggedEntryPB {
 
   bool SerializeForLeaf(std::string* dst) const {
     return Serializer::SerializeSCTMerkleTreeLeaf(sct(), entry(), dst) ==
-           Serializer::OK;
+           SerializeResult::OK;
   }
 
   bool SerializeExtraData(std::string* dst) const {
     switch (entry().type()) {
       case ct::X509_ENTRY:
         return Serializer::SerializeX509Chain(entry().x509_entry(), dst) ==
-               Serializer::OK;
+               SerializeResult::OK;
       case ct::PRECERT_ENTRY:
         return Serializer::SerializePrecertChainEntry(entry().precert_entry(),
-                                                      dst) == Serializer::OK;
+                                                      dst) ==
+               SerializeResult::OK;
       case ct::PRECERT_ENTRY_V2:
         // TODO(mhs): V2 implementation needs to be provided.
         LOG(FATAL) << "CT V2 not yet implemented";

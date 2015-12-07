@@ -319,7 +319,8 @@ void HttpHandler::BlockingGetEntries(evhttp_request* req, int64_t start,
     if (!entry.SerializeForLeaf(&leaf_input) ||
         !entry.SerializeExtraData(&extra_data) ||
         (include_scts &&
-         Serializer::SerializeSCT(entry.sct(), &sct_data) != Serializer::OK)) {
+         Serializer::SerializeSCT(entry.sct(), &sct_data) !=
+             SerializeResult::OK)) {
       LOG(WARNING) << "Failed to serialize entry @ " << i << ":\n"
                    << entry.DebugString();
       return SendJsonError(event_base_, req, HTTP_INTERNAL,

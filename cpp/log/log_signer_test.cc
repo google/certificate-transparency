@@ -41,7 +41,7 @@ class LogSignerTest : public ::testing::Test {
 
   static string SerializedSignature(const DigitallySigned& signature) {
     string serialized_sig;
-    CHECK_EQ(Serializer::OK,
+    CHECK_EQ(SerializeResult::OK,
              Serializer::SerializeDigitallySigned(signature, &serialized_sig));
     return serialized_sig;
   }
@@ -242,7 +242,7 @@ TEST_F(LogSignerTest, SignAndVerifyCertSCTApiCrossCheck) {
 
   // Serialize and verify.
   string serialized_sig;
-  EXPECT_EQ(Serializer::OK,
+  EXPECT_EQ(SerializeResult::OK,
             Serializer::SerializeDigitallySigned(sct.signature(),
                                                  &serialized_sig));
 
@@ -262,7 +262,7 @@ TEST_F(LogSignerTest, SignAndVerifyCertSCTApiCrossCheck) {
 
   // Deserialize and verify.
   sct.clear_signature();
-  EXPECT_EQ(Deserializer::OK,
+  EXPECT_EQ(DeserializeResult::OK,
             Deserializer::DeserializeDigitallySigned(serialized_sig,
                                                      sct.mutable_signature()));
   EXPECT_EQ(LogSigVerifier::OK,
@@ -282,7 +282,7 @@ TEST_F(LogSignerTest, SignAndVerifyPrecertSCTApiCrossCheck) {
 
   // Serialize and verify.
   string serialized_sig;
-  EXPECT_EQ(Serializer::OK,
+  EXPECT_EQ(SerializeResult::OK,
             Serializer::SerializeDigitallySigned(sct.signature(),
                                                  &serialized_sig));
 
@@ -305,7 +305,7 @@ TEST_F(LogSignerTest, SignAndVerifyPrecertSCTApiCrossCheck) {
 
   // Deserialize and verify.
   sct.clear_signature();
-  EXPECT_EQ(Deserializer::OK,
+  EXPECT_EQ(DeserializeResult::OK,
             Deserializer::DeserializeDigitallySigned(serialized_sig,
                                                      sct.mutable_signature()));
   EXPECT_EQ(LogSigVerifier::OK,
@@ -322,7 +322,7 @@ TEST_F(LogSignerTest, SignAndVerifySTHApiCrossCheck) {
 
   // Serialize and verify.
   string serialized_sig;
-  EXPECT_EQ(Serializer::OK,
+  EXPECT_EQ(SerializeResult::OK,
             Serializer::SerializeDigitallySigned(sth.signature(),
                                                  &serialized_sig));
   EXPECT_EQ(LogSigVerifier::OK,
@@ -341,7 +341,7 @@ TEST_F(LogSignerTest, SignAndVerifySTHApiCrossCheck) {
 
   // Deserialize and verify.
   sth.clear_signature();
-  EXPECT_EQ(Deserializer::OK,
+  EXPECT_EQ(DeserializeResult::OK,
             Deserializer::DeserializeDigitallySigned(serialized_sig,
                                                      sth.mutable_signature()));
   EXPECT_EQ(LogSigVerifier::OK, verifier_->VerifySTHSignature(sth));

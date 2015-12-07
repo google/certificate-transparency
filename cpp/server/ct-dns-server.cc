@@ -221,7 +221,7 @@ class CTUDPDNSServer : public UDPServer {
 
     std::string signature;
     CHECK_EQ(Serializer::SerializeDigitallySigned(sth.signature(), &signature),
-             Serializer::OK);
+             SerializeResult::OK);
 
     stringstream ss;
     ss << sth.tree_size() << '.' << sth.timestamp() << '.'

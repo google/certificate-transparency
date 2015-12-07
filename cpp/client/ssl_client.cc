@@ -131,7 +131,7 @@ LogVerifier::LogVerifyResult SSLClient::VerifySCT(const string& token,
   SignedCertificateTimestamp local_sct;
   // Skip over bad SCTs. These could be either badly encoded ones, or
   // SCTs whose version we don't understand.
-  if (Deserializer::DeserializeSCT(token, &local_sct) != Deserializer::OK)
+  if (Deserializer::DeserializeSCT(token, &local_sct) != DeserializeResult::OK)
     return LogVerifier::INVALID_FORMAT;
 
   string merkle_leaf;
@@ -236,7 +236,7 @@ int SSLClient::VerifyCallback(X509_STORE_CTX* ctx, void* arg) {
       // a certificate it hasn't seen before.
       SignedCertificateTimestampList sct_list;
       if (Deserializer::DeserializeSCTList(serialized_scts, &sct_list) !=
-          Deserializer::OK) {
+          DeserializeResult::OK) {
         LOG(ERROR) << "Failed to parse SCT list.";
       } else {
         LOG(INFO) << "Received " << sct_list.sct_list_size() << " SCTs";

@@ -93,7 +93,7 @@ class JsonObject {
   void Add(const char* name, const ct::DigitallySigned& ds) {
     std::string signature;
     CHECK_EQ(Serializer::SerializeDigitallySigned(ds, &signature),
-             Serializer::OK);
+             SerializeResult::OK);
     AddBase64(name, signature);
   }
 
