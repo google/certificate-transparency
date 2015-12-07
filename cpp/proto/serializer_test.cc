@@ -691,7 +691,7 @@ class SerializerTest : public ::testing::Test {
 
 TEST_F(SerializerTest, SerializeDigitallySignedKatTest) {
   string result;
-  EXPECT_EQ(Serializer::OK,
+  EXPECT_EQ(SerializeResult::OK,
             Serializer::SerializeDigitallySigned(DefaultSCTSignature(),
                                                  &result));
   EXPECT_EQ(string(kDefaultSCTSignatureHexString), H(result));
@@ -699,20 +699,21 @@ TEST_F(SerializerTest, SerializeDigitallySignedKatTest) {
 
 TEST_F(SerializerTest, SerializeSCTKatTest) {
   string result;
-  EXPECT_EQ(Serializer::OK, Serializer::SerializeSCT(DefaultSCT(), &result));
+  EXPECT_EQ(SerializeResult::OK,
+            Serializer::SerializeSCT(DefaultSCT(), &result));
   EXPECT_EQ(string(kDefaultSCTHexString), H(result));
 }
 
 TEST_F(SerializerTest, SerializeSCTListKatTest) {
   string result;
-  EXPECT_EQ(Serializer::OK,
+  EXPECT_EQ(SerializeResult::OK,
             Serializer::SerializeSCTList(DefaultSCTList(), &result));
   EXPECT_EQ(string(kDefaultSCTListHexString), H(result));
 }
 
 TEST_F(SerializerTest, DeserializeSCTListKatTest) {
   SignedCertificateTimestampList sct_list;
-  EXPECT_EQ(Deserializer::OK,
+  EXPECT_EQ(DeserializeResult::OK,
             Deserializer::DeserializeSCTList(B(kDefaultSCTListHexString),
                                              &sct_list));
   EXPECT_EQ(1, sct_list.sct_list_size());
@@ -721,15 +722,18 @@ TEST_F(SerializerTest, DeserializeSCTListKatTest) {
 
 TEST_F(SerializerTest, SerializeSCTSignatureInputKatTestV1) {
   string cert_result, precert_result;
-  EXPECT_EQ(Serializer::OK, Serializer::SerializeV1CertSCTSignatureInput(
-                                DefaultSCTTimestamp(), DefaultCertificate(),
-                                DefaultExtensions(), &cert_result));
+  EXPECT_EQ(SerializeResult::OK,
+            Serializer::SerializeV1CertSCTSignatureInput(DefaultSCTTimestamp(),
+                                                         DefaultCertificate(),
+                                                         DefaultExtensions(),
+                                                         &cert_result));
   EXPECT_EQ(string(kDefaultCertSCTSignedHexString), H(cert_result));
 
-  EXPECT_EQ(Serializer::OK, Serializer::SerializeV1PrecertSCTSignatureInput(
-                                DefaultSCTTimestamp(), DefaultIssuerKeyHash(),
-                                DefaultTbsCertificate(), DefaultExtensions(),
-                                &precert_result));
+  EXPECT_EQ(SerializeResult::OK,
+            Serializer::SerializeV1PrecertSCTSignatureInput(
+                DefaultSCTTimestamp(), DefaultIssuerKeyHash(),
+                DefaultTbsCertificate(), DefaultExtensions(),
+                &precert_result));
   EXPECT_EQ(string(kDefaultPrecertSCTSignedHexString), H(precert_result));
 
   EXPECT_NE(cert_result, precert_result);
@@ -737,13 +741,13 @@ TEST_F(SerializerTest, SerializeSCTSignatureInputKatTestV1) {
   cert_result.clear();
   precert_result.clear();
 
-  EXPECT_EQ(Serializer::OK,
+  EXPECT_EQ(SerializeResult::OK,
             Serializer::SerializeSCTSignatureInput(DefaultSCT(),
                                                    DefaultCertEntry(),
                                                    &cert_result));
   EXPECT_EQ(string(kDefaultCertSCTSignedHexString), H(cert_result));
 
-  EXPECT_EQ(Serializer::OK,
+  EXPECT_EQ(SerializeResult::OK,
             Serializer::SerializeSCTSignatureInput(DefaultSCT(),
                                                    DefaultPrecertEntry(),
                                                    &precert_result));
@@ -752,16 +756,17 @@ TEST_F(SerializerTest, SerializeSCTSignatureInputKatTestV1) {
 
 TEST_F(SerializerTest, SerializeSCTSignatureInputKatTestV2) {
   string cert_result, precert_result;
-  EXPECT_EQ(Serializer::OK,
+  EXPECT_EQ(SerializeResult::OK,
             Serializer::SerializeV2CertSCTSignatureInput(
                 DefaultSCTTimestamp(), DefaultIssuerKeyHash(),
                 DefaultCertificateV2(), DefaultSctExtensions(), &cert_result));
   EXPECT_EQ(string(kDefaultCertSCTSignedHexStringV2), H(cert_result));
 
-  EXPECT_EQ(Serializer::OK, Serializer::SerializeV2PrecertSCTSignatureInput(
-                                DefaultSCTTimestamp(), DefaultIssuerKeyHash(),
-                                DefaultTbsCertificateV2(),
-                                DefaultSctExtensions(), &precert_result));
+  EXPECT_EQ(SerializeResult::OK,
+            Serializer::SerializeV2PrecertSCTSignatureInput(
+                DefaultSCTTimestamp(), DefaultIssuerKeyHash(),
+                DefaultTbsCertificateV2(), DefaultSctExtensions(),
+                &precert_result));
   EXPECT_EQ(string(kDefaultPrecertSCTSignedHexStringV2), H(precert_result));
 
   EXPECT_NE(cert_result, precert_result);
@@ -769,13 +774,13 @@ TEST_F(SerializerTest, SerializeSCTSignatureInputKatTestV2) {
   cert_result.clear();
   precert_result.clear();
 
-  EXPECT_EQ(Serializer::OK,
+  EXPECT_EQ(SerializeResult::OK,
             Serializer::SerializeSCTSignatureInput(DefaultSCTV2(),
                                                    DefaultCertEntryV2(),
                                                    &cert_result));
   EXPECT_EQ(string(kDefaultCertSCTSignedHexStringV2), H(cert_result));
 
-  EXPECT_EQ(Serializer::OK,
+  EXPECT_EQ(SerializeResult::OK,
             Serializer::SerializeSCTSignatureInput(DefaultSCTV2(),
                                                    DefaultPrecertEntryV2(),
                                                    &precert_result));
@@ -784,15 +789,18 @@ TEST_F(SerializerTest, SerializeSCTSignatureInputKatTestV2) {
 
 TEST_F(SerializerTest, SerializeSCTMerkleTreeLeafKatTestV1) {
   string cert_result, precert_result;
-  EXPECT_EQ(Serializer::OK, Serializer::SerializeV1CertSCTMerkleTreeLeaf(
-                                DefaultSCTTimestamp(), DefaultCertificate(),
-                                DefaultExtensions(), &cert_result));
+  EXPECT_EQ(SerializeResult::OK,
+            Serializer::SerializeV1CertSCTMerkleTreeLeaf(DefaultSCTTimestamp(),
+                                                         DefaultCertificate(),
+                                                         DefaultExtensions(),
+                                                         &cert_result));
   EXPECT_EQ(string(kDefaultCertSCTLeafHexString), H(cert_result));
 
-  EXPECT_EQ(Serializer::OK, Serializer::SerializeV1PrecertSCTMerkleTreeLeaf(
-                                DefaultSCTTimestamp(), DefaultIssuerKeyHash(),
-                                DefaultTbsCertificate(), DefaultExtensions(),
-                                &precert_result));
+  EXPECT_EQ(SerializeResult::OK,
+            Serializer::SerializeV1PrecertSCTMerkleTreeLeaf(
+                DefaultSCTTimestamp(), DefaultIssuerKeyHash(),
+                DefaultTbsCertificate(), DefaultExtensions(),
+                &precert_result));
   EXPECT_EQ(string(kDefaultPrecertSCTLeafHexString), H(precert_result));
 
   EXPECT_NE(cert_result, precert_result);
@@ -800,13 +808,13 @@ TEST_F(SerializerTest, SerializeSCTMerkleTreeLeafKatTestV1) {
   cert_result.clear();
   precert_result.clear();
 
-  EXPECT_EQ(Serializer::OK,
+  EXPECT_EQ(SerializeResult::OK,
             Serializer::SerializeSCTMerkleTreeLeaf(DefaultSCT(),
                                                    DefaultCertEntry(),
                                                    &cert_result));
   EXPECT_EQ(string(kDefaultCertSCTLeafHexString), H(cert_result));
 
-  EXPECT_EQ(Serializer::OK,
+  EXPECT_EQ(SerializeResult::OK,
             Serializer::SerializeSCTMerkleTreeLeaf(DefaultSCT(),
                                                    DefaultPrecertEntry(),
                                                    &precert_result));
@@ -815,16 +823,17 @@ TEST_F(SerializerTest, SerializeSCTMerkleTreeLeafKatTestV1) {
 
 TEST_F(SerializerTest, SerializeSCTMerkleTreeLeafKatTestV2) {
   string cert_result, precert_result;
-  EXPECT_EQ(Serializer::OK,
+  EXPECT_EQ(SerializeResult::OK,
             Serializer::SerializeV2CertSCTMerkleTreeLeaf(
                 DefaultSCTTimestamp(), DefaultIssuerKeyHash(),
                 DefaultCertificateV2(), DefaultSctExtensions(), &cert_result));
   EXPECT_EQ(string(kDefaultCertSCTLeafHexStringV2), H(cert_result));
 
-  EXPECT_EQ(Serializer::OK, Serializer::SerializeV2PrecertSCTMerkleTreeLeaf(
-                                DefaultSCTTimestamp(), DefaultIssuerKeyHash(),
-                                DefaultTbsCertificateV2(),
-                                DefaultSctExtensions(), &precert_result));
+  EXPECT_EQ(SerializeResult::OK,
+            Serializer::SerializeV2PrecertSCTMerkleTreeLeaf(
+                DefaultSCTTimestamp(), DefaultIssuerKeyHash(),
+                DefaultTbsCertificateV2(), DefaultSctExtensions(),
+                &precert_result));
   EXPECT_EQ(string(kDefaultPrecertSCTLeafHexStringV2), H(precert_result));
 
   EXPECT_NE(cert_result, precert_result);
@@ -832,13 +841,13 @@ TEST_F(SerializerTest, SerializeSCTMerkleTreeLeafKatTestV2) {
   cert_result.clear();
   precert_result.clear();
 
-  EXPECT_EQ(Serializer::OK,
+  EXPECT_EQ(SerializeResult::OK,
             Serializer::SerializeSCTMerkleTreeLeaf(DefaultSCTV2(),
                                                    DefaultCertEntryV2(),
                                                    &cert_result));
   EXPECT_EQ(string(kDefaultCertSCTLeafHexStringV2), H(cert_result));
 
-  EXPECT_EQ(Serializer::OK,
+  EXPECT_EQ(SerializeResult::OK,
             Serializer::SerializeSCTMerkleTreeLeaf(DefaultSCTV2(),
                                                    DefaultPrecertEntryV2(),
                                                    &precert_result));
@@ -847,8 +856,9 @@ TEST_F(SerializerTest, SerializeSCTMerkleTreeLeafKatTestV2) {
 
 TEST_F(SerializerTest, DeserializeMerkleTreeLeafKATV1Cert) {
   MerkleTreeLeaf leaf;
-  EXPECT_EQ(Deserializer::OK, Deserializer::DeserializeMerkleTreeLeaf(
-                                  B(kDefaultCertSCTLeafHexString), &leaf));
+  EXPECT_EQ(DeserializeResult::OK,
+            Deserializer::DeserializeMerkleTreeLeaf(
+                B(kDefaultCertSCTLeafHexString), &leaf));
   EXPECT_EQ(leaf.version(), ct::V1);
   EXPECT_EQ(leaf.type(), ct::TIMESTAMPED_ENTRY);
   EXPECT_EQ(leaf.timestamped_entry().timestamp(), DefaultSCTTimestamp());
@@ -860,8 +870,9 @@ TEST_F(SerializerTest, DeserializeMerkleTreeLeafKATV1Cert) {
 
 TEST_F(SerializerTest, DeserializeMerkleTreeLeafKATV1Precert) {
   MerkleTreeLeaf leaf;
-  EXPECT_EQ(Deserializer::OK, Deserializer::DeserializeMerkleTreeLeaf(
-                                  B(kDefaultPrecertSCTLeafHexString), &leaf));
+  EXPECT_EQ(DeserializeResult::OK,
+            Deserializer::DeserializeMerkleTreeLeaf(
+                B(kDefaultPrecertSCTLeafHexString), &leaf));
   EXPECT_EQ(leaf.version(), ct::V1);
   EXPECT_EQ(leaf.type(), ct::TIMESTAMPED_ENTRY);
   EXPECT_EQ(leaf.timestamped_entry().timestamp(), DefaultSCTTimestamp());
@@ -877,8 +888,9 @@ TEST_F(SerializerTest, DeserializeMerkleTreeLeafKATV1Precert) {
 
 TEST_F(SerializerTest, DeserializeMerkleTreeLeafKATV2Cert) {
   MerkleTreeLeaf leaf;
-  EXPECT_EQ(Deserializer::OK, Deserializer::DeserializeMerkleTreeLeaf(
-                                  B(kDefaultCertSCTLeafHexStringV2), &leaf));
+  EXPECT_EQ(DeserializeResult::OK,
+            Deserializer::DeserializeMerkleTreeLeaf(
+                B(kDefaultCertSCTLeafHexStringV2), &leaf));
   EXPECT_EQ(leaf.version(), ct::V2);
   EXPECT_EQ(leaf.type(), ct::TIMESTAMPED_ENTRY);
   EXPECT_EQ(leaf.timestamped_entry().timestamp(), DefaultSCTTimestamp());
@@ -894,7 +906,7 @@ TEST_F(SerializerTest, DeserializeMerkleTreeLeafKATV2Cert) {
 
 TEST_F(SerializerTest, DeserializeMerkleTreeLeafKATV2Precert) {
   MerkleTreeLeaf leaf;
-  EXPECT_EQ(Deserializer::OK,
+  EXPECT_EQ(DeserializeResult::OK,
             Deserializer::DeserializeMerkleTreeLeaf(
                 B(kDefaultPrecertSCTLeafHexStringV2), &leaf));
   EXPECT_EQ(leaf.version(), ct::V2);
@@ -913,21 +925,21 @@ TEST_F(SerializerTest, DeserializeMerkleTreeLeafKATV2Precert) {
 TEST_F(SerializerTest, DeserializeSCTKatTestV1) {
   string token = B(kDefaultSCTHexString);
   SignedCertificateTimestamp sct;
-  EXPECT_EQ(Deserializer::OK, Deserializer::DeserializeSCT(token, &sct));
+  EXPECT_EQ(DeserializeResult::OK, Deserializer::DeserializeSCT(token, &sct));
   CompareSCT(DefaultSCT(), sct);
 }
 
 TEST_F(SerializerTest, DeserializeSCTKatTestV2) {
   string token = B(kDefaultSCTHexStringV2);
   SignedCertificateTimestamp sct;
-  EXPECT_EQ(Deserializer::OK, Deserializer::DeserializeSCT(token, &sct));
+  EXPECT_EQ(DeserializeResult::OK, Deserializer::DeserializeSCT(token, &sct));
   CompareSCT(DefaultSCTV2(), sct);
 }
 
 TEST_F(SerializerTest, DeserializeDigitallySignedKatTest) {
   string serialized_sig = B(kDefaultSCTSignatureHexString);
   DigitallySigned signature;
-  EXPECT_EQ(Deserializer::OK,
+  EXPECT_EQ(DeserializeResult::OK,
             Deserializer::DeserializeDigitallySigned(serialized_sig,
                                                      &signature));
   CompareDS(DefaultSCTSignature(), signature);
@@ -938,7 +950,7 @@ TEST_F(SerializerTest, SerializeDeserializeSCTChangeHashAlgorithm) {
   sct.mutable_signature()->set_hash_algorithm(DigitallySigned::SHA224);
 
   string result;
-  EXPECT_EQ(Serializer::OK, Serializer::SerializeSCT(sct, &result));
+  EXPECT_EQ(SerializeResult::OK, Serializer::SerializeSCT(sct, &result));
 
   string default_result = string(kDefaultSCTHexString);
   string new_result = H(result);
@@ -946,7 +958,8 @@ TEST_F(SerializerTest, SerializeDeserializeSCTChangeHashAlgorithm) {
   EXPECT_NE(default_result, new_result);
 
   SignedCertificateTimestamp read_sct;
-  EXPECT_EQ(Deserializer::OK, Deserializer::DeserializeSCT(result, &read_sct));
+  EXPECT_EQ(DeserializeResult::OK,
+            Deserializer::DeserializeSCT(result, &read_sct));
   CompareSCT(read_sct, sct);
 }
 
@@ -955,17 +968,18 @@ TEST_F(SerializerTest, SerializeDeserializeSCTChangeSignature) {
   sct.mutable_signature()->set_signature("bazinga");
 
   string result;
-  EXPECT_EQ(Serializer::OK, Serializer::SerializeSCT(sct, &result));
+  EXPECT_EQ(SerializeResult::OK, Serializer::SerializeSCT(sct, &result));
   EXPECT_NE(string(kDefaultSCTHexString), H(result));
 
   SignedCertificateTimestamp read_sct;
-  EXPECT_EQ(Deserializer::OK, Deserializer::DeserializeSCT(result, &read_sct));
+  EXPECT_EQ(DeserializeResult::OK,
+            Deserializer::DeserializeSCT(result, &read_sct));
   CompareSCT(read_sct, sct);
 }
 
 TEST_F(SerializerTest, SerializeSCTSignatureInputEmptyCertificate) {
   string result;
-  EXPECT_EQ(Serializer::EMPTY_CERTIFICATE,
+  EXPECT_EQ(SerializeResult::EMPTY_CERTIFICATE,
             Serializer::SerializeV1CertSCTSignatureInput(DefaultSCTTimestamp(),
                                                          string(),
                                                          DefaultExtensions(),
@@ -973,14 +987,14 @@ TEST_F(SerializerTest, SerializeSCTSignatureInputEmptyCertificate) {
 
   LogEntry entry(DefaultCertEntry());
   entry.mutable_x509_entry()->clear_leaf_certificate();
-  EXPECT_EQ(Serializer::EMPTY_CERTIFICATE,
+  EXPECT_EQ(SerializeResult::EMPTY_CERTIFICATE,
             Serializer::SerializeSCTSignatureInput(DefaultSCT(), entry,
                                                    &result));
 }
 
 TEST_F(SerializerTest, SerializeSCTMerkleTreeLeafEmptyCertificate) {
   string result;
-  EXPECT_EQ(Serializer::EMPTY_CERTIFICATE,
+  EXPECT_EQ(SerializeResult::EMPTY_CERTIFICATE,
             Serializer::SerializeV1CertSCTMerkleTreeLeaf(DefaultSCTTimestamp(),
                                                          string(),
                                                          DefaultExtensions(),
@@ -988,63 +1002,63 @@ TEST_F(SerializerTest, SerializeSCTMerkleTreeLeafEmptyCertificate) {
 
   LogEntry entry(DefaultCertEntry());
   entry.mutable_x509_entry()->clear_leaf_certificate();
-  EXPECT_EQ(Serializer::EMPTY_CERTIFICATE,
+  EXPECT_EQ(SerializeResult::EMPTY_CERTIFICATE,
             Serializer::SerializeSCTMerkleTreeLeaf(DefaultSCT(), entry,
                                                    &result));
 }
 
 TEST_F(SerializerTest, SerializeSCTSignatureInputEmptyTbsCertificate) {
   string result;
-  EXPECT_EQ(Serializer::EMPTY_CERTIFICATE,
+  EXPECT_EQ(SerializeResult::EMPTY_CERTIFICATE,
             Serializer::SerializeV1PrecertSCTSignatureInput(
                 DefaultSCTTimestamp(), DefaultIssuerKeyHash(), string(),
                 DefaultExtensions(), &result));
 
   LogEntry entry(DefaultPrecertEntry());
   entry.mutable_precert_entry()->mutable_pre_cert()->clear_tbs_certificate();
-  EXPECT_EQ(Serializer::EMPTY_CERTIFICATE,
+  EXPECT_EQ(SerializeResult::EMPTY_CERTIFICATE,
             Serializer::SerializeSCTSignatureInput(DefaultSCT(), entry,
                                                    &result));
 }
 
 TEST_F(SerializerTest, SerializeSCTMerkleTreeLeafEmptyTbsCertificate) {
   string result;
-  EXPECT_EQ(Serializer::EMPTY_CERTIFICATE,
+  EXPECT_EQ(SerializeResult::EMPTY_CERTIFICATE,
             Serializer::SerializeV1PrecertSCTMerkleTreeLeaf(
                 DefaultSCTTimestamp(), DefaultIssuerKeyHash(), string(),
                 DefaultExtensions(), &result));
 
   LogEntry entry(DefaultPrecertEntry());
   entry.mutable_precert_entry()->mutable_pre_cert()->clear_tbs_certificate();
-  EXPECT_EQ(Serializer::EMPTY_CERTIFICATE,
+  EXPECT_EQ(SerializeResult::EMPTY_CERTIFICATE,
             Serializer::SerializeSCTMerkleTreeLeaf(DefaultSCT(), entry,
                                                    &result));
 }
 
 TEST_F(SerializerTest, SerializeSCTSignatureInputInvalidIssuerKeyHash) {
   string result;
-  EXPECT_EQ(Serializer::INVALID_HASH_LENGTH,
+  EXPECT_EQ(SerializeResult::INVALID_HASH_LENGTH,
             Serializer::SerializeV1PrecertSCTSignatureInput(
                 DefaultSCTTimestamp(), "hash" /* not 32 bytes */,
                 DefaultTbsCertificate(), DefaultExtensions(), &result));
 
   LogEntry entry(DefaultPrecertEntry());
   entry.mutable_precert_entry()->mutable_pre_cert()->set_issuer_key_hash("sh");
-  EXPECT_EQ(Serializer::INVALID_HASH_LENGTH,
+  EXPECT_EQ(SerializeResult::INVALID_HASH_LENGTH,
             Serializer::SerializeSCTSignatureInput(DefaultSCT(), entry,
                                                    &result));
 }
 
 TEST_F(SerializerTest, SerializeSCTMerkleTreeLeafInvalidIssuerKeyHash) {
   string result;
-  EXPECT_EQ(Serializer::INVALID_HASH_LENGTH,
+  EXPECT_EQ(SerializeResult::INVALID_HASH_LENGTH,
             Serializer::SerializeV1PrecertSCTMerkleTreeLeaf(
                 DefaultSCTTimestamp(), "hash" /* not 32 bytes */,
                 DefaultTbsCertificate(), DefaultExtensions(), &result));
 
   LogEntry entry(DefaultPrecertEntry());
   entry.mutable_precert_entry()->mutable_pre_cert()->set_issuer_key_hash("sh");
-  EXPECT_EQ(Serializer::INVALID_HASH_LENGTH,
+  EXPECT_EQ(SerializeResult::INVALID_HASH_LENGTH,
             Serializer::SerializeSCTMerkleTreeLeaf(DefaultSCT(), entry,
                                                    &result));
 }
@@ -1055,7 +1069,7 @@ TEST_F(SerializerTest, DeserializeSCTBadHashType) {
   token[43] = 0xff;
 
   SignedCertificateTimestamp sct;
-  EXPECT_EQ(Deserializer::INVALID_HASH_ALGORITHM,
+  EXPECT_EQ(DeserializeResult::INVALID_HASH_ALGORITHM,
             Deserializer::DeserializeSCT(token, &sct));
 }
 
@@ -1065,7 +1079,7 @@ TEST_F(SerializerTest, DeserializeSCTBadSignatureType) {
   token[44] = 0xff;
 
   SignedCertificateTimestamp sct;
-  EXPECT_EQ(Deserializer::INVALID_SIGNATURE_ALGORITHM,
+  EXPECT_EQ(DeserializeResult::INVALID_SIGNATURE_ALGORITHM,
             Deserializer::DeserializeSCT(token, &sct));
 }
 
@@ -1074,7 +1088,7 @@ TEST_F(SerializerTest, DeserializeSCTTooShort) {
 
   for (size_t i = 0; i < token.size(); ++i) {
     SignedCertificateTimestamp sct;
-    EXPECT_EQ(Deserializer::INPUT_TOO_SHORT,
+    EXPECT_EQ(DeserializeResult::INPUT_TOO_SHORT,
               Deserializer::DeserializeSCT(token.substr(0, i), &sct));
   }
 }
@@ -1087,36 +1101,36 @@ TEST_F(SerializerTest, DeserializeSCTTooLong) {
 
   // We can still read from the beginning of a longer string...
   Deserializer deserializer(token);
-  EXPECT_EQ(Deserializer::OK, deserializer.ReadSCT(&sct));
+  EXPECT_EQ(DeserializeResult::OK, deserializer.ReadSCT(&sct));
   EXPECT_FALSE(deserializer.ReachedEnd());
   CompareSCT(DefaultSCT(), sct);
 
   // ... but we can't deserialize.
-  EXPECT_EQ(Deserializer::INPUT_TOO_LONG,
+  EXPECT_EQ(DeserializeResult::INPUT_TOO_LONG,
             Deserializer::DeserializeSCT(token, &sct));
 }
 
 TEST_F(SerializerTest, SerializeSTHSignatureInputKatTestV1) {
   string result;
-  EXPECT_EQ(Serializer::OK,
+  EXPECT_EQ(SerializeResult::OK,
             Serializer::SerializeSTHSignatureInput(DefaultSTH(), &result));
   EXPECT_EQ(string(kDefaultSTHSignedHexString), H(result));
 
   result.clear();
-  EXPECT_EQ(Serializer::OK, Serializer::SerializeV1STHSignatureInput(
-                                DefaultSTHTimestamp(), DefaultTreeSize(),
-                                DefaultRootHash(), &result));
+  EXPECT_EQ(SerializeResult::OK, Serializer::SerializeV1STHSignatureInput(
+                                     DefaultSTHTimestamp(), DefaultTreeSize(),
+                                     DefaultRootHash(), &result));
   EXPECT_EQ(string(kDefaultSTHSignedHexString), H(result));
 }
 
 TEST_F(SerializerTest, SerializeSTHSignatureInputKatTestV2) {
   string result;
-  EXPECT_EQ(Serializer::OK,
+  EXPECT_EQ(SerializeResult::OK,
             Serializer::SerializeSTHSignatureInput(DefaultSTHV2(), &result));
   EXPECT_EQ(string(kDefaultSTHSignedHexStringV2), H(result));
 
   result.clear();
-  EXPECT_EQ(Serializer::OK,
+  EXPECT_EQ(SerializeResult::OK,
             Serializer::SerializeV2STHSignatureInput(
                 DefaultSTHTimestamp(), DefaultTreeSize(), DefaultRootHash(),
                 DefaultSthExtensions(), kDUMMY_LOG_ID, &result));
@@ -1125,7 +1139,7 @@ TEST_F(SerializerTest, SerializeSTHSignatureInputKatTestV2) {
 
 TEST_F(SerializerTest, SerializeSTHSignatureInputKatTestV2InvalidLogId) {
   string result;
-  EXPECT_EQ(Serializer::INVALID_KEYID_LENGTH,
+  EXPECT_EQ(SerializeResult::INVALID_KEYID_LENGTH,
             Serializer::SerializeV2STHSignatureInput(
                 DefaultSTHTimestamp(), DefaultTreeSize(), DefaultRootHash(),
                 DefaultSthExtensions(), "this isn't 32 bytes long", &result));
@@ -1134,12 +1148,12 @@ TEST_F(SerializerTest, SerializeSTHSignatureInputKatTestV2InvalidLogId) {
 TEST_F(SerializerTest, SerializeSTHSignatureInputKatTestV2WithExtensions) {
   string result;
   SignedTreeHead sth(DefaultSTHV2Ext());
-  EXPECT_EQ(Serializer::OK,
+  EXPECT_EQ(SerializeResult::OK,
             Serializer::SerializeSTHSignatureInput(sth, &result));
   EXPECT_EQ(string(kDefaultSTHSignedHexStringV2Extensions), H(result));
 
   result.clear();
-  EXPECT_EQ(Serializer::OK,
+  EXPECT_EQ(SerializeResult::OK,
             Serializer::SerializeV2STHSignatureInput(
                 DefaultSTHTimestamp(), DefaultTreeSize(), DefaultRootHash(),
                 DefaultSTHV2Ext().sth_extension(), kDUMMY_LOG_ID, &result));
@@ -1150,7 +1164,7 @@ TEST_F(SerializerTest, SerializeSTHSignatureInputBadHashV1) {
   SignedTreeHead sth(DefaultSTH());
   sth.set_sha256_root_hash("thisisnotthirtytwobyteslong");
   string result;
-  EXPECT_EQ(Serializer::INVALID_HASH_LENGTH,
+  EXPECT_EQ(SerializeResult::INVALID_HASH_LENGTH,
             Serializer::SerializeSTHSignatureInput(sth, &result));
 }
 
@@ -1158,13 +1172,13 @@ TEST_F(SerializerTest, SerializeSTHSignatureInputBadHashV2) {
   SignedTreeHead sth(DefaultSTHV2());
   sth.set_sha256_root_hash("thisisnotthirtytwobyteslong");
   string result;
-  EXPECT_EQ(Serializer::INVALID_HASH_LENGTH,
+  EXPECT_EQ(SerializeResult::INVALID_HASH_LENGTH,
             Serializer::SerializeSTHSignatureInput(sth, &result));
 }
 
 TEST_F(SerializerTest, SerializeSTHSignatureInputExtBadOrderV2) {
   string result;
-  EXPECT_EQ(Serializer::EXTENSIONS_NOT_ORDERED,
+  EXPECT_EQ(SerializeResult::EXTENSIONS_NOT_ORDERED,
             Serializer::SerializeSTHSignatureInput(DefaultSTHV2ExtBadOrder(),
                                                    &result));
 }
@@ -1173,27 +1187,27 @@ TEST_F(SerializerTest, SerializeSCTWithExtensionsTestV1) {
   SignedCertificateTimestamp sct(DefaultSCT());
   sct.set_extensions("hello");
   string result;
-  EXPECT_EQ(Serializer::OK, Serializer::SerializeSCT(sct, &result));
+  EXPECT_EQ(SerializeResult::OK, Serializer::SerializeSCT(sct, &result));
   EXPECT_NE(string(kDefaultSCTHexString), H(result));
 }
 
 TEST_F(SerializerTest, SerializeSCTWithExtensionsTestV2) {
   SignedCertificateTimestamp sct(DefaultSCTV2Ext());
   string result;
-  EXPECT_EQ(Serializer::OK, Serializer::SerializeSCT(sct, &result));
+  EXPECT_EQ(SerializeResult::OK, Serializer::SerializeSCT(sct, &result));
   EXPECT_EQ(string(kDefaultSCTHexStringV2Extensions), H(result));
 }
 
 TEST_F(SerializerTest, SerializeSCTWithExtensionsTestV2BadOrder) {
   SignedCertificateTimestamp sct(DefaultSCTV2ExtBadOrder());
   string result;
-  EXPECT_EQ(Serializer::EXTENSIONS_NOT_ORDERED,
+  EXPECT_EQ(SerializeResult::EXTENSIONS_NOT_ORDERED,
             Serializer::SerializeSCT(sct, &result));
 }
 
 TEST_F(SerializerTest, SerializeSCTSignatureInputWithExtensionsTestV1) {
   string result;
-  EXPECT_EQ(Serializer::OK,
+  EXPECT_EQ(SerializeResult::OK,
             Serializer::SerializeV1CertSCTSignatureInput(DefaultSCTTimestamp(),
                                                          DefaultCertificate(),
                                                          "hello", &result));
@@ -1202,7 +1216,7 @@ TEST_F(SerializerTest, SerializeSCTSignatureInputWithExtensionsTestV1) {
   result.clear();
   SignedCertificateTimestamp sct(DefaultSCT());
   sct.set_extensions("hello");
-  EXPECT_EQ(Serializer::OK,
+  EXPECT_EQ(SerializeResult::OK,
             Serializer::SerializeSCTSignatureInput(sct, DefaultCertEntry(),
                                                    &result));
   EXPECT_EQ(string(kDefaultCertSCTSignedHexStringExtensions), H(result));
@@ -1210,15 +1224,16 @@ TEST_F(SerializerTest, SerializeSCTSignatureInputWithExtensionsTestV1) {
 
 TEST_F(SerializerTest, SerializeSCTSignatureInputWithExtensionsTestV2) {
   string result;
-  EXPECT_EQ(Serializer::OK, Serializer::SerializeV2CertSCTSignatureInput(
-                                DefaultSCTTimestamp(), DefaultIssuerKeyHash(),
-                                DefaultCertificateV2(),
-                                DefaultSCTV2Ext().sct_extension(), &result));
+  EXPECT_EQ(SerializeResult::OK,
+            Serializer::SerializeV2CertSCTSignatureInput(
+                DefaultSCTTimestamp(), DefaultIssuerKeyHash(),
+                DefaultCertificateV2(), DefaultSCTV2Ext().sct_extension(),
+                &result));
   EXPECT_EQ(string(kDefaultCertSCTSignedHexStringV2Extensions), H(result));
 
   result.clear();
   SignedCertificateTimestamp sct(DefaultSCTV2Ext());
-  EXPECT_EQ(Serializer::OK,
+  EXPECT_EQ(SerializeResult::OK,
             Serializer::SerializeSCTSignatureInput(sct, DefaultCertEntryV2(),
                                                    &result));
   EXPECT_EQ(string(kDefaultCertSCTSignedHexStringV2Extensions), H(result));
@@ -1226,7 +1241,7 @@ TEST_F(SerializerTest, SerializeSCTSignatureInputWithExtensionsTestV2) {
 
 TEST_F(SerializerTest, SerializeSCTMerkleTreeLeafWithExtensionsTestV1) {
   string result;
-  EXPECT_EQ(Serializer::OK,
+  EXPECT_EQ(SerializeResult::OK,
             Serializer::SerializeV1CertSCTMerkleTreeLeaf(DefaultSCTTimestamp(),
                                                          DefaultCertificate(),
                                                          "hello", &result));
@@ -1235,7 +1250,7 @@ TEST_F(SerializerTest, SerializeSCTMerkleTreeLeafWithExtensionsTestV1) {
   result.clear();
   SignedCertificateTimestamp sct(DefaultSCT());
   sct.set_extensions("hello");
-  EXPECT_EQ(Serializer::OK,
+  EXPECT_EQ(SerializeResult::OK,
             Serializer::SerializeSCTMerkleTreeLeaf(sct, DefaultCertEntry(),
                                                    &result));
   EXPECT_NE(string(kDefaultCertSCTLeafHexString), H(result));
@@ -1243,15 +1258,16 @@ TEST_F(SerializerTest, SerializeSCTMerkleTreeLeafWithExtensionsTestV1) {
 
 TEST_F(SerializerTest, SerializeSCTMerkleTreeLeafWithExtensionsTestV2) {
   string result;
-  EXPECT_EQ(Serializer::OK, Serializer::SerializeV2CertSCTMerkleTreeLeaf(
-                                DefaultSCTTimestamp(), DefaultIssuerKeyHash(),
-                                DefaultCertificateV2(),
-                                DefaultSCTV2Ext().sct_extension(), &result));
+  EXPECT_EQ(SerializeResult::OK,
+            Serializer::SerializeV2CertSCTMerkleTreeLeaf(
+                DefaultSCTTimestamp(), DefaultIssuerKeyHash(),
+                DefaultCertificateV2(), DefaultSCTV2Ext().sct_extension(),
+                &result));
   EXPECT_EQ(string(kDefaultCertSCTLeafHexStringV2Extensions), H(result));
 
   result.clear();
   SignedCertificateTimestamp sct(DefaultSCTV2Ext());
-  EXPECT_EQ(Serializer::OK,
+  EXPECT_EQ(SerializeResult::OK,
             Serializer::SerializeSCTMerkleTreeLeaf(sct, DefaultCertEntryV2(),
                                                    &result));
   EXPECT_EQ(string(kDefaultCertSCTLeafHexStringV2Extensions), H(result));
@@ -1262,10 +1278,11 @@ TEST_F(SerializerTest, SerializeDeserializeSCTAddExtensionsV1) {
   sct.set_extensions("hello");
 
   string result;
-  EXPECT_EQ(Serializer::OK, Serializer::SerializeSCT(sct, &result));
+  EXPECT_EQ(SerializeResult::OK, Serializer::SerializeSCT(sct, &result));
 
   SignedCertificateTimestamp read_sct;
-  EXPECT_EQ(Deserializer::OK, Deserializer::DeserializeSCT(result, &read_sct));
+  EXPECT_EQ(DeserializeResult::OK,
+            Deserializer::DeserializeSCT(result, &read_sct));
   CompareSCT(sct, read_sct);
 }
 
@@ -1273,10 +1290,11 @@ TEST_F(SerializerTest, SerializeDeserializeSCTAddExtensionsV2) {
   SignedCertificateTimestamp sct(DefaultSCTV2Ext());
 
   string result;
-  EXPECT_EQ(Serializer::OK, Serializer::SerializeSCT(sct, &result));
+  EXPECT_EQ(SerializeResult::OK, Serializer::SerializeSCT(sct, &result));
 
   SignedCertificateTimestamp read_sct;
-  EXPECT_EQ(Deserializer::OK, Deserializer::DeserializeSCT(result, &read_sct));
+  EXPECT_EQ(DeserializeResult::OK,
+            Deserializer::DeserializeSCT(result, &read_sct));
   CompareSCT(sct, read_sct);
 }
 
@@ -1285,7 +1303,7 @@ TEST_F(SerializerTest, SerializeSCTUnsupportedVersion) {
   sct.set_version(ct::UNKNOWN_VERSION);
 
   string result;
-  EXPECT_EQ(Serializer::UNSUPPORTED_VERSION,
+  EXPECT_EQ(SerializeResult::UNSUPPORTED_VERSION,
             Serializer::SerializeSCT(sct, &result));
 }
 
@@ -1294,7 +1312,7 @@ TEST_F(SerializerTest, SerializeSCTSignatureInputUnsupportedVersion) {
   sct.set_version(ct::UNKNOWN_VERSION);
 
   string result;
-  EXPECT_EQ(Serializer::UNSUPPORTED_VERSION,
+  EXPECT_EQ(SerializeResult::UNSUPPORTED_VERSION,
             Serializer::SerializeSCTSignatureInput(sct, DefaultCertEntry(),
                                                    &result));
 }
@@ -1304,7 +1322,7 @@ TEST_F(SerializerTest, SerializeSCTMerkleTreeLeafUnsupportedVersion) {
   sct.set_version(ct::UNKNOWN_VERSION);
 
   string result;
-  EXPECT_EQ(Serializer::UNSUPPORTED_VERSION,
+  EXPECT_EQ(SerializeResult::UNSUPPORTED_VERSION,
             Serializer::SerializeSCTMerkleTreeLeaf(sct, DefaultCertEntry(),
                                                    &result));
 }
@@ -1314,7 +1332,7 @@ TEST_F(SerializerTest, SerializeSTHSignatureInputUnsupportedVersion) {
   sth.set_version(ct::UNKNOWN_VERSION);
 
   string result;
-  EXPECT_EQ(Serializer::UNSUPPORTED_VERSION,
+  EXPECT_EQ(SerializeResult::UNSUPPORTED_VERSION,
             Serializer::SerializeSTHSignatureInput(sth, &result));
 }
 
@@ -1324,14 +1342,14 @@ TEST_F(SerializerTest, DeserializeSCTUnsupportedVersion) {
   token[0] = 0xff;
 
   SignedCertificateTimestamp sct;
-  EXPECT_EQ(Deserializer::UNSUPPORTED_VERSION,
+  EXPECT_EQ(DeserializeResult::UNSUPPORTED_VERSION,
             Deserializer::DeserializeSCT(token, &sct));
 }
 
 TEST_F(SerializerTest, SerializeEmptySCTList) {
   SignedCertificateTimestampList sct_list;
   string result;
-  EXPECT_EQ(Serializer::EMPTY_LIST,
+  EXPECT_EQ(SerializeResult::EMPTY_LIST,
             Serializer::SerializeSCTList(sct_list, &result));
 }
 
@@ -1340,7 +1358,7 @@ TEST_F(SerializerTest, DeserializeEmptySCTList) {
   string empty_hex = "0000";
   SignedCertificateTimestampList sct_list;
   string result;
-  EXPECT_EQ(Deserializer::EMPTY_LIST,
+  EXPECT_EQ(DeserializeResult::EMPTY_LIST,
             Deserializer::DeserializeSCTList(B(empty_hex), &sct_list));
 }
 
@@ -1349,7 +1367,7 @@ TEST_F(SerializerTest, SerializeSCTListEmptySCTInList) {
   sct_list.add_sct_list(B(kDefaultSCTHexString));
   sct_list.add_sct_list(string());
   string result;
-  EXPECT_EQ(Serializer::EMPTY_ELEM_IN_LIST,
+  EXPECT_EQ(SerializeResult::EMPTY_ELEM_IN_LIST,
             Serializer::SerializeSCTList(sct_list, &result));
 }
 
@@ -1358,7 +1376,7 @@ TEST_F(SerializerTest, DeserializeSCTListEmptySCTInList) {
   string empty_hex = "00020000";
   SignedCertificateTimestampList sct_list;
   string result;
-  EXPECT_EQ(Deserializer::EMPTY_ELEM_IN_LIST,
+  EXPECT_EQ(DeserializeResult::EMPTY_ELEM_IN_LIST,
             Deserializer::DeserializeSCTList(B(empty_hex), &sct_list));
 }
 
@@ -1367,9 +1385,10 @@ TEST_F(SerializerTest, SerializeDeserializeMultiSCTList) {
   sct_list.add_sct_list("hello");
   sct_list.add_sct_list(B(kDefaultSCTHexString));
   string result;
-  EXPECT_EQ(Serializer::OK, Serializer::SerializeSCTList(sct_list, &result));
+  EXPECT_EQ(SerializeResult::OK,
+            Serializer::SerializeSCTList(sct_list, &result));
   SignedCertificateTimestampList read_sct_list;
-  EXPECT_EQ(Deserializer::OK,
+  EXPECT_EQ(DeserializeResult::OK,
             Deserializer::DeserializeSCTList(result, &read_sct_list));
   EXPECT_EQ(2, read_sct_list.sct_list_size());
   EXPECT_EQ("hello", read_sct_list.sct_list(0));
@@ -1380,7 +1399,7 @@ TEST_F(SerializerTest, DeserializeSCTListTooLong) {
   string sct_string(B(kDefaultSCTListHexString));
   sct_string.push_back('x');
   SignedCertificateTimestampList read_sct_list;
-  EXPECT_EQ(Deserializer::INPUT_TOO_LONG,
+  EXPECT_EQ(DeserializeResult::INPUT_TOO_LONG,
             Deserializer::DeserializeSCTList(sct_string, &read_sct_list));
 }
 
@@ -1388,7 +1407,7 @@ TEST_F(SerializerTest, DeserializeSCTListTooShort) {
   string sct_string(B(kDefaultSCTListHexString));
   string bad_string(sct_string.substr(0, sct_string.size() - 1));
   SignedCertificateTimestampList read_sct_list;
-  EXPECT_EQ(Deserializer::INPUT_TOO_SHORT,
+  EXPECT_EQ(DeserializeResult::INPUT_TOO_SHORT,
             Deserializer::DeserializeSCTList(bad_string, &read_sct_list));
 }
 
@@ -1396,7 +1415,7 @@ TEST_F(SerializerTest, DeserializeSCTListInvalidList) {
   // 2 byte-list, length of the first element allegedly 1 bytes...
   string invalid_hex = "00020001";
   SignedCertificateTimestampList read_sct_list;
-  EXPECT_EQ(Deserializer::INVALID_LIST_ENCODING,
+  EXPECT_EQ(DeserializeResult::INVALID_LIST_ENCODING,
             Deserializer::DeserializeSCTList(B(invalid_hex), &read_sct_list));
 }
 
@@ -1406,8 +1425,9 @@ TEST_F(SerializerTest, SerializeDeserializeX509Chain) {
   entry.add_certificate_chain("hello");
   entry.add_certificate_chain("world");
   string result;
-  EXPECT_EQ(Serializer::OK, Serializer::SerializeX509Chain(entry, &result));
-  EXPECT_EQ(Deserializer::OK,
+  EXPECT_EQ(SerializeResult::OK,
+            Serializer::SerializeX509Chain(entry, &result));
+  EXPECT_EQ(DeserializeResult::OK,
             Deserializer::DeserializeX509Chain(result, &read_entry));
   // TODO(ekasper): proper KAT tests
   EXPECT_EQ(2, read_entry.certificate_chain_size());
@@ -1420,8 +1440,9 @@ TEST_F(SerializerTest, SerializeDeserializeX509Chain) {
 TEST_F(SerializerTest, SerializeDeserializeX509Chain_EmptyChain) {
   X509ChainEntry entry, read_entry;
   string result;
-  EXPECT_EQ(Serializer::OK, Serializer::SerializeX509Chain(entry, &result));
-  EXPECT_EQ(Deserializer::OK,
+  EXPECT_EQ(SerializeResult::OK,
+            Serializer::SerializeX509Chain(entry, &result));
+  EXPECT_EQ(DeserializeResult::OK,
             Deserializer::DeserializeX509Chain(result, &read_entry));
   EXPECT_EQ(0, read_entry.certificate_chain_size());
 }
@@ -1431,7 +1452,7 @@ TEST_F(SerializerTest, SerializeDeserializeX509Chain_EmptyCert) {
   entry.add_certificate_chain("");
 
   string result;
-  EXPECT_EQ(Serializer::EMPTY_ELEM_IN_LIST,
+  EXPECT_EQ(SerializeResult::EMPTY_ELEM_IN_LIST,
             Serializer::SerializeX509Chain(entry, &result));
 }
 
@@ -1440,9 +1461,9 @@ TEST_F(SerializerTest, SerializeDeserializePrecertChainEntry) {
   entry.set_pre_certificate("hello");
   entry.add_precertificate_chain("world");
   string result;
-  EXPECT_EQ(Serializer::OK,
+  EXPECT_EQ(SerializeResult::OK,
             Serializer::SerializePrecertChainEntry(entry, &result));
-  EXPECT_EQ(Deserializer::OK,
+  EXPECT_EQ(DeserializeResult::OK,
             Deserializer::DeserializePrecertChainEntry(result, &read_entry));
   // TODO(ekasper): proper KAT tests
   EXPECT_EQ(1, read_entry.precertificate_chain_size());
@@ -1454,7 +1475,7 @@ TEST_F(SerializerTest, SerializeDeserializePrecertChainEntry_EmptyPrecert) {
   PrecertChainEntry entry, read_entry;
   entry.add_precertificate_chain("world");
   string result;
-  EXPECT_EQ(Serializer::EMPTY_CERTIFICATE,
+  EXPECT_EQ(SerializeResult::EMPTY_CERTIFICATE,
             Serializer::SerializePrecertChainEntry(entry, &result));
 }
 
@@ -1462,9 +1483,9 @@ TEST_F(SerializerTest, SerializeDeserializePrecertChainEntry_EmptyChain) {
   PrecertChainEntry entry, read_entry;
   entry.set_pre_certificate("hello");
   string result;
-  EXPECT_EQ(Serializer::OK,
+  EXPECT_EQ(SerializeResult::OK,
             Serializer::SerializePrecertChainEntry(entry, &result));
-  EXPECT_EQ(Deserializer::OK,
+  EXPECT_EQ(DeserializeResult::OK,
             Deserializer::DeserializePrecertChainEntry(result, &read_entry));
   EXPECT_EQ(0, read_entry.precertificate_chain_size());
   EXPECT_EQ("hello", read_entry.pre_certificate());
@@ -1475,31 +1496,33 @@ TEST_F(SerializerTest, SerializeDeserializePrecertChainEntry_EmptyChainCert) {
   entry.set_pre_certificate("hello");
   entry.add_precertificate_chain("");
   string result;
-  EXPECT_EQ(Serializer::EMPTY_ELEM_IN_LIST,
+  EXPECT_EQ(SerializeResult::EMPTY_ELEM_IN_LIST,
             Serializer::SerializePrecertChainEntry(entry, &result));
 }
 
 TEST_F(SerializerTest, SerializeSCTSignedEntryWithType_KatTest) {
   string cert_result, precert_result;
-  EXPECT_EQ(Serializer::OK, Serializer::SerializeV1SignedCertEntryWithType(
-                                DefaultCertificate(), &cert_result));
+  EXPECT_EQ(SerializeResult::OK,
+            Serializer::SerializeV1SignedCertEntryWithType(
+                DefaultCertificate(), &cert_result));
   EXPECT_EQ(string(kDefaultSignedCertEntryWithTypeHexString), H(cert_result));
 
-  EXPECT_EQ(Serializer::OK, Serializer::SerializeV1SignedPrecertEntryWithType(
-                                DefaultIssuerKeyHash(),
-                                DefaultTbsCertificate(), &precert_result));
+  EXPECT_EQ(SerializeResult::OK,
+            Serializer::SerializeV1SignedPrecertEntryWithType(
+                DefaultIssuerKeyHash(), DefaultTbsCertificate(),
+                &precert_result));
   EXPECT_EQ(string(kDefaultSignedPrecertEntryWithTypeHexString),
             H(precert_result));
 
   cert_result.clear();
   precert_result.clear();
 
-  EXPECT_EQ(Serializer::OK,
+  EXPECT_EQ(SerializeResult::OK,
             Serializer::SerializeV1SignedEntryWithType(DefaultCertEntry(),
                                                        &cert_result));
   EXPECT_EQ(string(kDefaultSignedCertEntryWithTypeHexString), H(cert_result));
 
-  EXPECT_EQ(Serializer::OK,
+  EXPECT_EQ(SerializeResult::OK,
             Serializer::SerializeV1SignedEntryWithType(DefaultPrecertEntry(),
                                                        &precert_result));
   EXPECT_EQ(string(kDefaultSignedPrecertEntryWithTypeHexString),
@@ -1508,37 +1531,37 @@ TEST_F(SerializerTest, SerializeSCTSignedEntryWithType_KatTest) {
 
 TEST_F(SerializerTest, SerializeSCTSignedEntryWithType_EmptyCertificate) {
   string result;
-  EXPECT_EQ(Serializer::EMPTY_CERTIFICATE,
+  EXPECT_EQ(SerializeResult::EMPTY_CERTIFICATE,
             Serializer::SerializeV1SignedCertEntryWithType(string(), &result));
 
   LogEntry entry(DefaultCertEntry());
   entry.mutable_x509_entry()->clear_leaf_certificate();
-  EXPECT_EQ(Serializer::EMPTY_CERTIFICATE,
+  EXPECT_EQ(SerializeResult::EMPTY_CERTIFICATE,
             Serializer::SerializeV1SignedEntryWithType(entry, &result));
 }
 
 TEST_F(SerializerTest, SerializeSCTSignedEntryWithType_EmptyTbsCertificate) {
   string result;
-  EXPECT_EQ(Serializer::EMPTY_CERTIFICATE,
+  EXPECT_EQ(SerializeResult::EMPTY_CERTIFICATE,
             Serializer::SerializeV1SignedPrecertEntryWithType(
                 DefaultIssuerKeyHash(), string(), &result));
 
   LogEntry entry(DefaultPrecertEntry());
   entry.mutable_precert_entry()->mutable_pre_cert()->clear_tbs_certificate();
-  EXPECT_EQ(Serializer::EMPTY_CERTIFICATE,
+  EXPECT_EQ(SerializeResult::EMPTY_CERTIFICATE,
             Serializer::SerializeV1SignedEntryWithType(entry, &result));
 }
 
 TEST_F(SerializerTest, SerializeSCTSignedEntryWithType_BadIssuerKeyHash) {
   string result;
-  EXPECT_EQ(Serializer::INVALID_HASH_LENGTH,
+  EXPECT_EQ(SerializeResult::INVALID_HASH_LENGTH,
             Serializer::SerializeV1SignedPrecertEntryWithType(
                 "bad", DefaultTbsCertificate(), &result));
 
   LogEntry entry(DefaultPrecertEntry());
   entry.mutable_precert_entry()->mutable_pre_cert()->set_issuer_key_hash(
       "bad");
-  EXPECT_EQ(Serializer::INVALID_HASH_LENGTH,
+  EXPECT_EQ(SerializeResult::INVALID_HASH_LENGTH,
             Serializer::SerializeV1SignedEntryWithType(entry, &result));
 }
 

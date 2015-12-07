@@ -53,7 +53,7 @@ class LogSigner : public cert_trans::Signer {
   SignResult SignTreeHead(ct::SignedTreeHead* sth) const;
 
  private:
-  static SignResult GetSerializeError(Serializer::SerializeResult result);
+  static SignResult GetSerializeError(SerializeResult result);
 };
 
 class LogSigVerifier : public cert_trans::Verifier {
@@ -103,9 +103,8 @@ class LogSigVerifier : public cert_trans::Verifier {
   VerifyResult VerifySTHSignature(const ct::SignedTreeHead& sth) const;
 
  private:
-  static VerifyResult GetSerializeError(Serializer::SerializeResult result);
+  static VerifyResult GetSerializeError(SerializeResult result);
 
-  static VerifyResult GetDeserializeSignatureError(
-      Deserializer::DeserializeResult result);
+  static VerifyResult GetDeserializeSignatureError(DeserializeResult result);
 };
 #endif

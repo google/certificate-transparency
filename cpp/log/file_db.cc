@@ -322,7 +322,7 @@ void FileDB::BuildIndex() {
   set<string> sth_timestamps = tree_storage_->Scan();
   if (!sth_timestamps.empty()) {
     latest_timestamp_key_ = *sth_timestamps.rbegin();
-    CHECK_EQ(Deserializer::OK,
+    CHECK_EQ(DeserializeResult::OK,
              Deserializer::DeserializeUint<uint64_t>(
                  latest_timestamp_key_, FileDB::kTimestampBytesIndexed,
                  &latest_tree_timestamp_));

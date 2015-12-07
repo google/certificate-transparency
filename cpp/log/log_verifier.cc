@@ -38,7 +38,7 @@ LogVerifier::LogVerifyResult LogVerifier::VerifySignedCertificateTimestamp(
   string serialized_leaf;
   // If SCT verification succeeded, then we should never fail here.
   if (merkle_leaf_hash != NULL) {
-    CHECK_EQ(Serializer::OK,
+    CHECK_EQ(SerializeResult::OK,
              Serializer::SerializeSCTMerkleTreeLeaf(sct, entry,
                                                     &serialized_leaf));
     merkle_leaf_hash->assign(merkle_verifier_->LeafHash(serialized_leaf));
@@ -80,10 +80,10 @@ LogVerifier::LogVerifyResult LogVerifier::VerifyMerkleAuditProof(
     return INCONSISTENT_TIMESTAMPS;
 
   string serialized_leaf;
-  Serializer::SerializeResult serialize_result =
+  SerializeResult serialize_result =
       Serializer::SerializeSCTMerkleTreeLeaf(sct, entry, &serialized_leaf);
 
-  if (serialize_result != Serializer::OK)
+  if (serialize_result != SerializeResult::OK)
     return INVALID_FORMAT;
 
   std::vector<string> path;

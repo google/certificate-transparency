@@ -38,7 +38,7 @@ class SignerVerifierTest : public ::testing::Test {
 
   static string SerializedSignature(const DigitallySigned& signature) {
     string serialized_sig;
-    CHECK_EQ(Serializer::OK,
+    CHECK_EQ(SerializeResult::OK,
              Serializer::SerializeDigitallySigned(signature, &serialized_sig));
     return serialized_sig;
   }

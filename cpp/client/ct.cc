@@ -157,7 +157,8 @@ static string SCTToList(const string& serialized_sct) {
   SignedCertificateTimestampList sct_list;
   sct_list.add_sct_list(serialized_sct);
   string result;
-  CHECK_EQ(Serializer::OK, Serializer::SerializeSCTList(sct_list, &result));
+  CHECK_EQ(SerializeResult::OK,
+           Serializer::SerializeSCTList(sct_list, &result));
   return result;
 }
 
@@ -370,7 +371,7 @@ static int Upload() {
   // the token.
 
   string proof;
-  if (Serializer::SerializeSCT(sct, &proof) != Serializer::OK) {
+  if (Serializer::SerializeSCT(sct, &proof) != SerializeResult::OK) {
     LOG(ERROR) << "Failed to serialize the server token";
     return 1;
   }
@@ -515,7 +516,8 @@ static void ProofToExtensionData() {
   delete[] buf;
 
   string sctliststr;
-  CHECK_EQ(Serializer::SerializeSCTList(sctlist, &sctliststr), Serializer::OK);
+  CHECK_EQ(Serializer::SerializeSCTList(sctlist, &sctliststr),
+           SerializeResult::OK);
 
   std::ostringstream extension_data_out;
 
@@ -746,7 +748,7 @@ static void DiagnoseCertChain() {
 
   SignedCertificateTimestampList sct_list;
   if (Deserializer::DeserializeSCTList(serialized_scts, &sct_list) !=
-      Deserializer::OK) {
+      DeserializeResult::OK) {
     LOG(ERROR) << "Failed to parse SCT list from certificate";
     return;
   }
@@ -755,7 +757,7 @@ static void DiagnoseCertChain() {
   for (int i = 0; i < sct_list.sct_list_size(); ++i) {
     SignedCertificateTimestamp sct;
     if (Deserializer::DeserializeSCT(sct_list.sct_list(i), &sct) !=
-        Deserializer::OK) {
+        DeserializeResult::OK) {
       LOG(ERROR) << "Failed to parse SCT number " << i + 1;
       continue;
     }
@@ -784,7 +786,7 @@ void Wrap() {
       << "Could not read SCT data from " << FLAGS_sct_in;
   SignedCertificateTimestamp sct;
   CHECK_EQ(Deserializer::DeserializeSCT(serialized_data, &sct),
-           Deserializer::OK);
+           DeserializeResult::OK);
 
   // FIXME(benl): This code is shared with DiagnoseCertChain().
   string cert_file = FLAGS_certificate_chain_in;
@@ -826,7 +828,7 @@ void WrapEmbedded() {
                cert_trans::NID_ctEmbeddedSignedCertificateTimestampList,
                &serialized_scts));
   SignedCertificateTimestampList sct_list;
-  CHECK_EQ(Deserializer::OK,
+  CHECK_EQ(DeserializeResult::OK,
            Deserializer::DeserializeSCTList(serialized_scts, &sct_list));
 
   // FIXME(benl): handle multiple SCTs!
@@ -834,7 +836,7 @@ void WrapEmbedded() {
 
   SignedCertificateTimestamp sct;
   CHECK_EQ(Deserializer::DeserializeSCT(sct_list.sct_list(0), &sct),
-           Deserializer::OK);
+           DeserializeResult::OK);
 
   SSLClientCTData ct_data;
   CHECK(CheckSCT(sct, chain, &ct_data));

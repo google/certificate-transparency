@@ -72,9 +72,9 @@ int DumpLeafInputs(const ReadOnlyDatabase* db) {
   CHECK_NOTNULL(db);
   ForEachLeaf(db, [](const LoggedEntry& cert) {
     string serialized;
-    const Serializer::SerializeResult r(Serializer::SerializeSCTSignatureInput(
+    const SerializeResult r(Serializer::SerializeSCTSignatureInput(
         cert.contents().sct(), cert.contents().entry(), &serialized));
-    if (r != Serializer::OK) {
+    if (r != SerializeResult::OK) {
       LOG(FATAL) << "Failed to serialize entry with seq# "
                  << cert.sequence_number() << " : " << r;
     }

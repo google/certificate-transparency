@@ -386,7 +386,7 @@ void LevelDB::BuildIndex() {
     leveldb::Slice key_slice(it->key());
     key_slice.remove_prefix(strlen(kTreeHeadPrefix));
     latest_timestamp_key_ = key_slice.ToString();
-    CHECK_EQ(Deserializer::OK,
+    CHECK_EQ(DeserializeResult::OK,
              Deserializer::DeserializeUint<uint64_t>(
                  latest_timestamp_key_, LevelDB::kTimestampBytesIndexed,
                  &latest_tree_timestamp_));

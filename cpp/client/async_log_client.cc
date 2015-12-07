@@ -88,7 +88,8 @@ void DoneGetSTH(UrlFetcher::Response* resp, SignedTreeHead* sth,
     return done(AsyncLogClient::BAD_RESPONSE);
   DigitallySigned signature;
   if (Deserializer::DeserializeDigitallySigned(jsignature.FromBase64(),
-                                               &signature) != Deserializer::OK)
+                                               &signature) !=
+      DeserializeResult::OK)
     return done(AsyncLogClient::BAD_RESPONSE);
 
   sth->Clear();
@@ -175,7 +176,7 @@ void DoneGetEntries(UrlFetcher::Response* resp,
     AsyncLogClient::Entry log_entry;
     if (Deserializer::DeserializeMerkleTreeLeaf(leaf_input.FromBase64(),
                                                 &log_entry.leaf) !=
-        Deserializer::OK) {
+        DeserializeResult::OK) {
       return done(AsyncLogClient::BAD_RESPONSE);
     }
 
@@ -191,7 +192,7 @@ void DoneGetEntries(UrlFetcher::Response* resp,
       unique_ptr<SignedCertificateTimestamp> sct(
           new SignedCertificateTimestamp);
       if (Deserializer::DeserializeSCT(sct_data.FromBase64(), sct.get()) !=
-          Deserializer::OK) {
+          DeserializeResult::OK) {
         return done(AsyncLogClient::BAD_RESPONSE);
       }
       log_entry.sct.reset(sct.release());
@@ -335,7 +336,8 @@ void DoneInternalAddChain(UrlFetcher::Response* resp,
 
   DigitallySigned signature;
   if (Deserializer::DeserializeDigitallySigned(jsignature.FromBase64(),
-                                               &signature) != Deserializer::OK)
+                                               &signature) !=
+      DeserializeResult::OK)
     return done(AsyncLogClient::BAD_RESPONSE);
 
   sct->Clear();
