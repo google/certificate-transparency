@@ -1100,7 +1100,7 @@ TEST_F(SerializerTest, DeserializeSCTTooLong) {
   SignedCertificateTimestamp sct;
 
   // We can still read from the beginning of a longer string...
-  Deserializer deserializer(token);
+  TLSDeserializer deserializer(token);
   EXPECT_EQ(DeserializeResult::OK, deserializer.ReadSCT(&sct));
   EXPECT_FALSE(deserializer.ReachedEnd());
   CompareSCT(DefaultSCT(), sct);

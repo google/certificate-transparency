@@ -56,6 +56,112 @@ enum class DeserializeResult {
 
 std::ostream& operator<<(std::ostream& stream, const DeserializeResult& r);
 
+typedef google::protobuf::RepeatedPtrField<std::string> repeated_string;
+typedef google::protobuf::RepeatedPtrField<ct::SctExtension>
+    repeated_sct_extension;
+
+SerializeResult CheckExtensionsFormat(const std::string& extensions);
+SerializeResult CheckSctExtensionsFormat(
+    const repeated_sct_extension& extension);
+
+// TODO(pphaneuf): Make this into normal functions in a namespace.
+class TLSSerializer {
+ public:
+  // returns binary data
+  std::string SerializedString() const {
+    return output_;
+  }
+
+  SerializeResult WriteSCTV1(const ct::SignedCertificateTimestamp& sct);
+
+  SerializeResult WriteSCTV2(const ct::SignedCertificateTimestamp& sct);
+
+  SerializeResult WriteList(const repeated_string& in, size_t max_elem_length,
+                            size_t max_total_length);
+
+  SerializeResult WriteDigitallySigned(const ct::DigitallySigned& sig);
+
+
+  template <class T>
+  void WriteUint(T in, size_t bytes) {
+    CHECK_LE(bytes, sizeof(in));
+    CHECK(bytes == sizeof(in) || in >> (bytes * 8) == 0);
+    for (; bytes > 0; --bytes)
+      output_.push_back(((in & (static_cast<T>(0xff) << ((bytes - 1) * 8))) >>
+                         ((bytes - 1) * 8)));
+  }
+
+  // Fixed-length byte array.
+  void WriteFixedBytes(const std::string& in);
+
+  // Variable-length byte array.
+  // Caller is responsible for checking |in| <= max_length
+  // TODO(ekasper): could return a bool instead.
+  void WriteVarBytes(const std::string& in, size_t max_length);
+
+  void WriteSctExtension(const repeated_sct_extension& extension);
+
+ private:
+  std::string output_;
+};
+
+
+class TLSDeserializer {
+ public:
+  // We do not make a copy, so input must remain valid.
+  // TODO(pphaneuf): And so we should take a string *, not a string &
+  // (which could be to a temporary, and not valid once the
+  // constructor returns).
+  explicit TLSDeserializer(const std::string& input);
+
+  bool ReachedEnd() const {
+    return bytes_remaining_ == 0;
+  }
+
+  DeserializeResult ReadSCT(ct::SignedCertificateTimestamp* sct);
+
+  DeserializeResult ReadList(size_t max_total_length, size_t max_elem_length,
+                             repeated_string* out);
+
+  DeserializeResult ReadDigitallySigned(ct::DigitallySigned* sig);
+
+  DeserializeResult ReadMerkleTreeLeaf(ct::MerkleTreeLeaf* leaf);
+  bool ReadVarBytes(size_t max_length, std::string* result);
+
+  template <class T>
+  bool ReadUint(size_t bytes, T* result) {
+    if (bytes_remaining_ < bytes)
+      return false;
+    T res = 0;
+    for (size_t i = 0; i < bytes; ++i) {
+      res = (res << 8) | static_cast<unsigned char>(*current_pos_);
+      ++current_pos_;
+    }
+
+    bytes_remaining_ -= bytes;
+    *result = res;
+    return true;
+  }
+
+ private:
+  static const size_t kV2ExtensionCountLengthInBytes;
+  static const size_t kV2ExtensionTypeLengthInBytes;
+
+  DeserializeResult ReadSctExtension(repeated_sct_extension* extension);
+  DeserializeResult ReadExtensions(ct::TimestampedEntry* entry);
+  DeserializeResult ReadMerkleTreeLeafV1(ct::MerkleTreeLeaf* leaf);
+  DeserializeResult ReadMerkleTreeLeafV2(ct::MerkleTreeLeaf* leaf);
+  DeserializeResult ReadSCTV1(ct::SignedCertificateTimestamp* sct);
+  DeserializeResult ReadSCTV2(ct::SignedCertificateTimestamp* sct);
+  bool ReadFixedBytes(size_t bytes, std::string* result);
+  bool ReadLengthPrefix(size_t max_length, size_t* result);
+
+  const char* current_pos_;
+  size_t bytes_remaining_;
+
+  DISALLOW_COPY_AND_ASSIGN(TLSDeserializer);
+};
+
 // A utility class for writing protocol buffer fields in canonical TLS style.
 class Serializer {
  public:
@@ -82,13 +188,6 @@ class Serializer {
   static const size_t kKeyHashLengthInBytes;
   static const size_t kTimestampLengthInBytes;
 
-  static size_t PrefixLength(size_t max_length);
-
-  // returns binary data
-  std::string SerializedString() const {
-    return output_;
-  }
-
   static SerializeResult CheckLogEntryFormatV1(const ct::LogEntry& entry);
   static SerializeResult CheckLogEntryFormatV2(const ct::LogEntry& entry);
 
@@ -102,9 +201,7 @@ class Serializer {
   static SerializeResult SerializeV2CertSCTSignatureInput(
       uint64_t timestamp, const std::string& issuer_key_hash,
       const std::string& tbs_certificate,
-      const google::protobuf::RepeatedPtrField<ct::SctExtension>&
-          sct_extension,
-      std::string* result);
+      const repeated_sct_extension& sct_extension, std::string* result);
 
   static SerializeResult SerializeV1PrecertSCTSignatureInput(
       uint64_t timestamp, const std::string& issuer_key_hash,
@@ -114,9 +211,7 @@ class Serializer {
   static SerializeResult SerializeV2PrecertSCTSignatureInput(
       uint64_t timestamp, const std::string& issuer_key_hash,
       const std::string& tbs_certificate,
-      const google::protobuf::RepeatedPtrField<ct::SctExtension>&
-          sct_extension,
-      std::string* result);
+      const repeated_sct_extension& sct_extension, std::string* result);
 
   static SerializeResult SerializeV1XJsonSCTSignatureInput(
       uint64_t timestamp, const std::string& json,
@@ -146,16 +241,12 @@ class Serializer {
   static SerializeResult SerializeV2CertSCTMerkleTreeLeaf(
       uint64_t timestamp, const std::string& issuer_key_hash,
       const std::string& tbs_certificate,
-      const google::protobuf::RepeatedPtrField<ct::SctExtension>&
-          sct_extension,
-      std::string* result);
+      const repeated_sct_extension& sct_extension, std::string* result);
 
   static SerializeResult SerializeV2PrecertSCTMerkleTreeLeaf(
       uint64_t timestamp, const std::string& issuer_key_hash,
       const std::string& tbs_certificate,
-      const google::protobuf::RepeatedPtrField<ct::SctExtension>&
-          sct_extension,
-      std::string* result);
+      const repeated_sct_extension& sct_extension, std::string* result);
 
   static SerializeResult SerializeV1XJsonSCTMerkleTreeLeaf(
       uint64_t timestamp, const std::string& json,
@@ -186,10 +277,6 @@ class Serializer {
   static SerializeResult SerializeSTHSignatureInput(
       const ct::SignedTreeHead& sth, std::string* result);
 
-  SerializeResult WriteSCTV1(const ct::SignedCertificateTimestamp& sct);
-
-  SerializeResult WriteSCTV2(const ct::SignedCertificateTimestamp& sct);
-
   static SerializeResult SerializeSCT(
       const ct::SignedCertificateTimestamp& sct, std::string* result);
 
@@ -215,7 +302,7 @@ class Serializer {
   // TODO(ekasper): tests for these!
   template <class T>
   static std::string SerializeUint(T in, size_t bytes = sizeof(T)) {
-    Serializer serializer;
+    TLSSerializer serializer;
     serializer.WriteUint(in, bytes);
     return serializer.SerializedString();
   }
@@ -242,40 +329,10 @@ class Serializer {
   static SerializeResult SerializeV1SignedXJsonEntryWithType(
       const std::string& json, std::string* result);
 
-  static SerializeResult CheckSctExtensionsFormat(
-      const google::protobuf::RepeatedPtrField<ct::SctExtension>& extension);
-
  private:
-  // This class is mostly a namespace for static methods, but a
-  // temporary instance of it is made internally.
+  // This class is mostly a namespace for static methods.
   // TODO(pphaneuf): Make this into normal functions in a namespace.
-  Serializer() {
-  }
-
-  template <class T>
-  void WriteUint(T in, size_t bytes) {
-    CHECK_LE(bytes, sizeof(in));
-    CHECK(bytes == sizeof(in) || in >> (bytes * 8) == 0);
-    for (; bytes > 0; --bytes)
-      output_.push_back(((in & (static_cast<T>(0xff) << ((bytes - 1) * 8))) >>
-                         ((bytes - 1) * 8)));
-  }
-
-  // Fixed-length byte array.
-  void WriteFixedBytes(const std::string& in);
-
-  // Variable-length byte array.
-  // Caller is responsible for checking |in| <= max_length
-  // TODO(ekasper): could return a bool instead.
-  void WriteVarBytes(const std::string& in, size_t max_length);
-
-  void WriteSctExtension(
-      const google::protobuf::RepeatedPtrField<ct::SctExtension>& extension);
-
-  // Length of the serialized list (with length prefix).
-  static size_t SerializedListLength(const repeated_string& in,
-                                     size_t max_elem_length,
-                                     size_t max_total_length);
+  Serializer() = delete;
 
   // Serialize (with length prefix).
   // FIXME(ekasper): for simplicity these reject if the list has empty
@@ -285,18 +342,9 @@ class Serializer {
                                        size_t max_elem_length,
                                        size_t max_total_length,
                                        std::string* result);
-  SerializeResult WriteList(const repeated_string& in, size_t max_elem_length,
-                            size_t max_total_length);
-
-  SerializeResult WriteDigitallySigned(const ct::DigitallySigned& sig);
-
   static SerializeResult CheckKeyHashFormat(const std::string& key_hash);
 
-  static SerializeResult CheckSignatureFormat(const ct::DigitallySigned& sig);
-
   static SerializeResult CheckCertificateFormat(const std::string& cert);
-
-  static SerializeResult CheckExtensionsFormat(const std::string& extensions);
 
   static SerializeResult CheckSthExtensionsFormat(
       const google::protobuf::RepeatedPtrField<ct::SthExtension>& extension);
@@ -312,29 +360,11 @@ class Serializer {
       const ct::PrecertChainEntry& entry);
   static SerializeResult CheckPrecertChainEntryFormatV2(
       const ct::PrecertChainEntry& entry);
-
-  std::string output_;
 };
 
 class Deserializer {
  public:
   typedef Serializer::repeated_string repeated_string;
-
-  // We do not make a copy, so input must remain valid.
-  // FIXME: and so we should take a string *, not a string &.
-  explicit Deserializer(const std::string& input);
-
-  static const size_t kV2ExtensionCountLengthInBytes;
-  static const size_t kV2ExtensionTypeLengthInBytes;
-
-  bool ReachedEnd() const {
-    return bytes_remaining_ == 0;
-  }
-
-  DeserializeResult ReadSCT(ct::SignedCertificateTimestamp* sct);
-
-  DeserializeResult ReadSctExtension(
-      google::protobuf::RepeatedPtrField<ct::SctExtension>* extension);
 
   static DeserializeResult DeserializeSCT(const std::string& in,
                                           ct::SignedCertificateTimestamp* sct);
@@ -356,10 +386,12 @@ class Deserializer {
   static DeserializeResult DeserializeMerkleTreeLeaf(const std::string& in,
                                                      ct::MerkleTreeLeaf* leaf);
 
+  // TODO(pphaneuf): Maybe the users of this should just use
+  // TLSDeserializer directly?
   template <class T>
   static DeserializeResult DeserializeUint(const std::string& in, size_t bytes,
                                            T* result) {
-    Deserializer deserializer(in);
+    TLSDeserializer deserializer(in);
     bool res = deserializer.ReadUint(bytes, result);
     if (!res)
       return DeserializeResult::INPUT_TOO_SHORT;
@@ -369,26 +401,9 @@ class Deserializer {
   }
 
  private:
-  template <class T>
-  bool ReadUint(size_t bytes, T* result) {
-    if (bytes_remaining_ < bytes)
-      return false;
-    T res = 0;
-    for (size_t i = 0; i < bytes; ++i) {
-      res = (res << 8) | static_cast<unsigned char>(*current_pos_);
-      ++current_pos_;
-    }
-
-    bytes_remaining_ -= bytes;
-    *result = res;
-    return true;
-  }
-
-  bool ReadFixedBytes(size_t bytes, std::string* result);
-
-  bool ReadLengthPrefix(size_t max_length, size_t* result);
-
-  bool ReadVarBytes(size_t max_length, std::string* result);
+  // This class is mostly a namespace for static methods.
+  // TODO(pphaneuf): Make this into normal functions in a namespace.
+  Deserializer() = delete;
 
   // FIXME(ekasper): for simplicity these reject if the list has empty
   // elements (all our use cases are like this) but they should take in
@@ -397,22 +412,6 @@ class Deserializer {
                                            size_t max_total_length,
                                            size_t max_elem_length,
                                            repeated_string* out);
-  DeserializeResult ReadList(size_t max_total_length, size_t max_elem_length,
-                             repeated_string* out);
-
-  DeserializeResult ReadDigitallySigned(ct::DigitallySigned* sig);
-
-  DeserializeResult ReadMerkleTreeLeaf(ct::MerkleTreeLeaf* leaf,
-                                       Deserializer& des);
-  DeserializeResult ReadMerkleTreeLeafV1(ct::MerkleTreeLeaf* leaf);
-  DeserializeResult ReadMerkleTreeLeafV2(ct::MerkleTreeLeaf* leaf);
-  DeserializeResult ReadExtensions(ct::TimestampedEntry* entry);
-  DeserializeResult ReadMerkleTreeLeaf(ct::MerkleTreeLeaf* leaf);
-  DeserializeResult ReadSCTV1(ct::SignedCertificateTimestamp* sct);
-  DeserializeResult ReadSCTV2(ct::SignedCertificateTimestamp* sct);
-
-  const char* current_pos_;
-  size_t bytes_remaining_;
 
   DISALLOW_COPY_AND_ASSIGN(Deserializer);
 };
