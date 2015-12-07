@@ -23,6 +23,7 @@
 #include "log/strict_consistent_store.h"
 #include "log/tree_signer.h"
 #include "merkletree/merkle_verifier.h"
+#include "proto/xjson_serializer.h"
 #include "server/log_processes.h"
 #include "server/server.h"
 #include "server/server_helper.h"
@@ -94,6 +95,7 @@ int main(int argc, char* argv[]) {
   signal(SIGINT, SIG_IGN);
   signal(SIGTERM, SIG_IGN);
 
+  ConfigureSerializerForV1XJSON();
   util::InitCT(&argc, &argv);
 
   Server::StaticInit();

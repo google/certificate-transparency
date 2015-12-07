@@ -7,6 +7,7 @@
 #include "log/log_lookup.h"
 #include "log/logged_entry.h"
 #include "log/sqlite_db.h"
+#include "proto/cert_serializer.h"
 #include "proto/ct.pb.h"
 #include "server/event.h"
 #include "util/init.h"
@@ -267,6 +268,7 @@ class Keyboard : public Server {
 
 int main(int argc, char* argv[]) {
   util::InitCT(&argc, &argv);
+  ConfigureSerializerForV1CT();
 
   // TODO(pphaneuf): This current *has* to be SQLite, because it
   // depends on sharing the database with a ct-server that will

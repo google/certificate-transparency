@@ -175,7 +175,9 @@ cpp_libcore_a_SOURCES = \
 	cpp/net/connection_pool.cc \
 	cpp/net/url.cc \
 	cpp/net/url_fetcher.cc \
+	cpp/proto/cert_serializer.cc \
 	cpp/proto/serializer.cc \
+	cpp/proto/xjson_serializer.cc \
 	cpp/server/metrics.cc \
 	cpp/server/proxy.cc \
 	cpp/server/server.cc \
@@ -340,6 +342,7 @@ cpp_client_ct_SOURCES = \
 	cpp/monitor/database.cc \
 	cpp/monitor/monitor.cc \
 	cpp/monitor/sqlite_db.cc \
+	cpp/proto/cert_serializer.cc \
 	cpp/proto/serializer.cc \
 	cpp/util/init.cc \
 	cpp/util/json_wrapper.cc \
@@ -384,7 +387,8 @@ cpp_tools_etcd_watch_LDADD = \
 	cpp/libcore.a \
 	$(evhtp_LIBS) \
 	$(json_c_LIBS) \
-	$(libevent_LIBS)
+	$(libevent_LIBS) \
+	-lprotobuf
 cpp_tools_etcd_watch_SOURCES = \
 	cpp/tools/etcd_watch.cc \
 	cpp/util/init.cc \
@@ -436,6 +440,7 @@ cpp_fetcher_remote_peer_test_SOURCES = \
 	cpp/fetcher/remote_peer.cc \
 	cpp/fetcher/remote_peer_test.cc \
 	cpp/log/test_signer.cc \
+	cpp/proto/cert_serializer.cc \
 	cpp/proto/serializer.cc \
 	cpp/util/json_wrapper.cc \
 	cpp/util/libevent_wrapper.cc \
@@ -454,6 +459,7 @@ cpp_log_cluster_state_controller_test_LDADD = \
 cpp_log_cluster_state_controller_test_SOURCES = \
 	cpp/client/async_log_client.cc \
 	cpp/log/cluster_state_controller_test.cc \
+	cpp/proto/cert_serializer.cc \
 	cpp/proto/serializer.cc \
 	cpp/util/json_wrapper.cc \
 	cpp/util/libevent_wrapper.cc \
@@ -471,6 +477,7 @@ cpp_log_database_test_LDADD = \
 cpp_log_database_test_SOURCES = \
 	cpp/log/database_test.cc \
 	cpp/log/test_signer.cc \
+	cpp/proto/cert_serializer.cc \
 	cpp/proto/serializer.cc \
 	cpp/util/protobuf_util.cc \
 	cpp/util/util.cc
@@ -484,6 +491,7 @@ cpp_log_etcd_consistent_store_test_LDADD = \
 	-lprotobuf
 cpp_log_etcd_consistent_store_test_SOURCES = \
 	cpp/log/etcd_consistent_store_test.cc \
+	cpp/proto/cert_serializer.cc \
 	cpp/proto/serializer.cc \
 	cpp/util/json_wrapper.cc \
 	cpp/util/libevent_wrapper.cc \
@@ -501,6 +509,7 @@ cpp_log_file_storage_test_LDADD = \
 cpp_log_file_storage_test_SOURCES = \
 	cpp/log/file_storage.cc \
 	cpp/log/file_storage_test.cc \
+	cpp/proto/cert_serializer.cc \
 	cpp/proto/serializer.cc \
 	cpp/util/protobuf_util.cc \
 	cpp/util/util.cc
@@ -516,6 +525,7 @@ cpp_log_frontend_signer_test_LDADD = \
 cpp_log_frontend_signer_test_SOURCES = \
 	cpp/log/frontend_signer_test.cc \
 	cpp/log/test_signer.cc \
+	cpp/proto/cert_serializer.cc \
 	cpp/proto/serializer.cc \
 	cpp/util/json_wrapper.cc \
 	cpp/util/libevent_wrapper.cc \
@@ -534,6 +544,7 @@ cpp_log_log_lookup_test_LDADD = \
 cpp_log_log_lookup_test_SOURCES = \
 	cpp/log/log_lookup_test.cc \
 	cpp/log/test_signer.cc \
+	cpp/proto/cert_serializer.cc \
 	cpp/proto/serializer.cc \
 	cpp/util/json_wrapper.cc \
 	cpp/util/libevent_wrapper.cc \
@@ -561,6 +572,7 @@ cpp_log_logged_entry_test_LDADD = \
 	-lprotobuf
 cpp_log_logged_entry_test_SOURCES = \
 	cpp/log/logged_entry_test.cc \
+	cpp/proto/cert_serializer.cc \
 	cpp/proto/serializer.cc \
 	cpp/util/util.cc
 
@@ -590,6 +602,7 @@ cpp_log_tree_signer_test_LDADD = \
 cpp_log_tree_signer_test_SOURCES = \
 	cpp/log/test_signer.cc \
 	cpp/log/tree_signer_test.cc \
+	cpp/proto/cert_serializer.cc \
 	cpp/proto/serializer.cc \
 	cpp/util/json_wrapper.cc \
 	cpp/util/libevent_wrapper.cc \
@@ -606,6 +619,7 @@ cpp_log_signer_verifier_test_LDADD = \
 cpp_log_signer_verifier_test_SOURCES = \
 	cpp/log/signer_verifier_test.cc \
 	cpp/log/test_signer.cc \
+	cpp/proto/cert_serializer.cc \
 	cpp/proto/serializer.cc \
 	cpp/util/util.cc
 
@@ -620,6 +634,7 @@ cpp_monitor_database_test_SOURCES = \
 	cpp/monitor/database.cc \
 	cpp/monitor/database_test.cc \
 	cpp/monitor/sqlite_db.cc \
+	cpp/proto/cert_serializer.cc \
 	cpp/proto/serializer.cc \
 	cpp/util/util.cc
 
@@ -687,6 +702,7 @@ cpp_proto_serializer_test_LDADD = \
 	$(libevent_LIBS) \
 	-lprotobuf
 cpp_proto_serializer_test_SOURCES = \
+	cpp/proto/cert_serializer.cc \
 	cpp/proto/serializer.cc \
 	cpp/proto/serializer_test.cc \
 	cpp/util/util.cc
@@ -910,6 +926,7 @@ cpp_log_database_large_test_LDADD = \
 cpp_log_database_large_test_SOURCES = \
 	cpp/log/database_large_test.cc \
 	cpp/log/test_signer.cc \
+	cpp/proto/cert_serializer.cc \
 	cpp/proto/serializer.cc \
 	cpp/util/protobuf_util.cc \
 	cpp/util/util.cc
@@ -925,6 +942,7 @@ cpp_log_frontend_test_LDADD = \
 cpp_log_frontend_test_SOURCES = \
 	cpp/log/frontend_test.cc \
 	cpp/log/test_signer.cc \
+	cpp/proto/cert_serializer.cc \
 	cpp/proto/serializer.cc \
 	cpp/util/json_wrapper.cc \
 	cpp/util/libevent_wrapper.cc \

@@ -33,6 +33,7 @@
 #include "monitoring/latency.h"
 #include "monitoring/monitoring.h"
 #include "monitoring/registry.h"
+#include "proto/cert_serializer.h"
 #include "server/certificate_handler.h"
 #include "server/json_output.h"
 #include "server/metrics.h"
@@ -258,6 +259,7 @@ int main(int argc, char* argv[]) {
   signal(SIGTERM, SIG_IGN);
 
   util::InitCT(&argc, &argv);
+  ConfigureSerializerForV1CT();
 
   Server::StaticInit();
 

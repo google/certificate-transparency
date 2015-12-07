@@ -21,6 +21,7 @@
 #include "log/strict_consistent_store.h"
 #include "log/tree_signer.h"
 #include "merkletree/merkle_verifier.h"
+#include "proto/cert_serializer.h"
 #include "server/certificate_handler.h"
 #include "server/log_processes.h"
 #include "server/server.h"
@@ -98,6 +99,7 @@ int main(int argc, char* argv[]) {
   signal(SIGINT, SIG_IGN);
   signal(SIGTERM, SIG_IGN);
 
+  ConfigureSerializerForV1CT();
   util::InitCT(&argc, &argv);
 
   Server::StaticInit();

@@ -23,6 +23,7 @@
 #include "monitoring/latency.h"
 #include "monitoring/monitoring.h"
 #include "monitoring/registry.h"
+#include "proto/cert_serializer.h"
 #include "server/certificate_handler_v2.h"
 #include "server/json_output.h"
 #include "server/metrics.h"
@@ -250,6 +251,7 @@ int main(int argc, char* argv[]) {
   signal(SIGINT, SIG_IGN);
   signal(SIGTERM, SIG_IGN);
 
+  ConfigureSerializerForV2CT();
   util::InitCT(&argc, &argv);
 
   if (!FLAGS_i_know_v2_is_not_finished_yet) {

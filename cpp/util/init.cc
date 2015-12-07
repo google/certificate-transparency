@@ -12,6 +12,7 @@
 
 #include "config.h"
 #include "log/ct_extensions.h"
+#include "proto/cert_serializer.h"
 #include "version.h"
 
 using std::string;
@@ -52,6 +53,8 @@ void InitCT(int* argc, char** argv[]) {
   google::ParseCommandLineFlags(argc, argv, true);
   google::InitGoogleLogging(*argv[0]);
   google::InstallFailureSignalHandler();
+
+  ConfigureSerializerForV1CT();
 
   event_set_log_callback(&LibEventLog);
 
