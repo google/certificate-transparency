@@ -52,29 +52,35 @@ SerializeResult CheckSignatureFormat(const DigitallySigned& sig);
 SerializeResult CheckSthExtensionsFormat(
     const repeated_sth_extension& extension);
 
-// static
-function<string(const ct::LogEntry&)> Serializer::leaf_data_;
-// static
+
+namespace {
+
+
+function<string(const ct::LogEntry&)> leaf_data;
+
 function<SerializeResult(const ct::SignedCertificateTimestamp& sct,
                          const ct::LogEntry& entry, std::string* result)>
-    Serializer::serialize_sct_sig_input_;
-// static
+    serialize_sct_sig_input;
+
 function<SerializeResult(const ct::SignedCertificateTimestamp& sct,
                          const ct::LogEntry& entry, std::string* result)>
-    Serializer::serialize_sct_merkle_leaf_;
-// static
+    serialize_sct_merkle_leaf;
+
 function<SerializeResult(uint64_t timestamp, int64_t tree_size,
                          const std::string& root_hash, std::string* result)>
-    Serializer::serialize_sth_sig_input_v1_;
-// static
+    serialize_sth_sig_input_v1;
+
 function<SerializeResult(uint64_t timestamp, int64_t tree_size,
                          const std::string& root_hash,
                          const repeated_sth_extension& sth_extension,
                          const std::string& log_id, std::string* result)>
-    Serializer::serialize_sth_sig_input_v2_;
-// static
+    serialize_sth_sig_input_v2;
+
 function<DeserializeResult(TLSDeserializer* d, ct::MerkleTreeLeaf* leaf)>
-    Deserializer::read_merkle_tree_leaf_;
+    read_merkle_tree_leaf;
+
+
+}  // namespace
 
 
 std::ostream& operator<<(std::ostream& stream, const SerializeResult& r) {
@@ -160,8 +166,8 @@ size_t PrefixLength(size_t max_length) {
 
 // static
 string Serializer::LeafData(const LogEntry& entry) {
-  CHECK(leaf_data_);
-  return leaf_data_(entry);
+  CHECK(leaf_data);
+  return leaf_data(entry);
 }
 
 
@@ -170,8 +176,8 @@ SerializeResult Serializer::SerializeV1STHSignatureInput(
     uint64_t timestamp, int64_t tree_size, const string& root_hash,
     string* result) {
   CHECK(result);
-  CHECK(serialize_sth_sig_input_v1_);
-  return serialize_sth_sig_input_v1_(timestamp, tree_size, root_hash, result);
+  CHECK(serialize_sth_sig_input_v1);
+  return serialize_sth_sig_input_v1(timestamp, tree_size, root_hash, result);
 }
 
 
@@ -199,8 +205,8 @@ SerializeResult Serializer::SerializeV2STHSignatureInput(
     const repeated_sth_extension& sth_extension, const string& log_id,
     string* result) {
   CHECK(result);
-  CHECK(serialize_sth_sig_input_v2_);
-  return serialize_sth_sig_input_v2_(timestamp, tree_size, root_hash,
+  CHECK(serialize_sth_sig_input_v2);
+  return serialize_sth_sig_input_v2(timestamp, tree_size, root_hash,
                                      sth_extension, log_id, result);
 }
 
@@ -267,8 +273,8 @@ SerializeResult Serializer::SerializeSCTMerkleTreeLeaf(
     const ct::SignedCertificateTimestamp& sct, const ct::LogEntry& entry,
     std::string* result) {
   CHECK(result);
-  CHECK(serialize_sct_merkle_leaf_);
-  return serialize_sct_merkle_leaf_(sct, entry, result);
+  CHECK(serialize_sct_merkle_leaf);
+  return serialize_sct_merkle_leaf(sct, entry, result);
 }
 
 
@@ -277,8 +283,8 @@ SerializeResult Serializer::SerializeSCTSignatureInput(
     const SignedCertificateTimestamp& sct, const LogEntry& entry,
     string* result) {
   CHECK(result);
-  CHECK(serialize_sct_sig_input_);
-  return serialize_sct_sig_input_(sct, entry, result);
+  CHECK(serialize_sct_sig_input);
+  return serialize_sct_sig_input(sct, entry, result);
 }
 
 
@@ -804,7 +810,7 @@ DeserializeResult Deserializer::DeserializeMerkleTreeLeaf(
     const std::string& in, ct::MerkleTreeLeaf* leaf) {
   TLSDeserializer des(in);
 
-  DeserializeResult ret = read_merkle_tree_leaf_(&des, leaf);
+  DeserializeResult ret = read_merkle_tree_leaf(&des, leaf);
   if (ret != DeserializeResult::OK) {
     return ret;
   }
@@ -819,41 +825,41 @@ DeserializeResult Deserializer::DeserializeMerkleTreeLeaf(
 
 // static
 void Serializer::ConfigureV1(
-    const function<string(const ct::LogEntry&)>& leaf_data,
+    const function<string(const ct::LogEntry&)>& leaf_data_func,
     const function<SerializeResult(
         const ct::SignedCertificateTimestamp& sct, const ct::LogEntry& entry,
-        std::string* result)>& serialize_sct_sig_input,
+        std::string* result)>& serialize_sct_sig_input_func,
     const function<SerializeResult(
         const ct::SignedCertificateTimestamp& sct, const ct::LogEntry& entry,
-        std::string* result)>& serialize_sct_merkle_leaf) {
+        std::string* result)>& serialize_sct_merkle_leaf_func) {
   CHECK(FLAGS_allow_reconfigure_serializer_test_only ||
-        (!leaf_data_ && !serialize_sct_sig_input_ &&
-         !serialize_sct_merkle_leaf_))
+        (!leaf_data&& !serialize_sct_sig_input &&
+         !serialize_sct_merkle_leaf))
       << "Serializer already configured";
-  leaf_data_ = leaf_data;
-  serialize_sct_sig_input_ = serialize_sct_sig_input;
-  serialize_sct_merkle_leaf_ = serialize_sct_merkle_leaf;
-  serialize_sth_sig_input_v1_ = ::SerializeV1STHSignatureInput;
+  leaf_data = leaf_data_func;
+  serialize_sct_sig_input = serialize_sct_sig_input_func;
+  serialize_sct_merkle_leaf = serialize_sct_merkle_leaf_func;
+  serialize_sth_sig_input_v1 = ::SerializeV1STHSignatureInput;
 }
 
 
 // static
 void Serializer::ConfigureV2(
-    const function<string(const ct::LogEntry&)>& leaf_data,
+    const function<string(const ct::LogEntry&)>& leaf_data_func,
     const function<SerializeResult(
         const ct::SignedCertificateTimestamp& sct, const ct::LogEntry& entry,
-        std::string* result)>& serialize_sct_sig_input,
+        std::string* result)>& serialize_sct_sig_input_func,
     const function<SerializeResult(
         const ct::SignedCertificateTimestamp& sct, const ct::LogEntry& entry,
-        std::string* result)>& serialize_sct_merkle_leaf) {
+        std::string* result)>& serialize_sct_merkle_leaf_func) {
   CHECK(FLAGS_allow_reconfigure_serializer_test_only ||
-        (!leaf_data_ && !serialize_sct_sig_input_ &&
-         !serialize_sct_merkle_leaf_))
+        (!leaf_data && !serialize_sct_sig_input &&
+         !serialize_sct_merkle_leaf))
       << "Serializer already configured";
-  leaf_data_ = leaf_data;
-  serialize_sct_sig_input_ = serialize_sct_sig_input;
-  serialize_sct_merkle_leaf_ = serialize_sct_merkle_leaf;
-  serialize_sth_sig_input_v2_ = ::SerializeV2STHSignatureInput;
+  leaf_data = leaf_data_func;
+  serialize_sct_sig_input = serialize_sct_sig_input_func;
+  serialize_sct_merkle_leaf = serialize_sct_merkle_leaf_func;
+  serialize_sth_sig_input_v2 = ::SerializeV2STHSignatureInput;
 }
 
 
@@ -861,9 +867,9 @@ void Serializer::ConfigureV2(
 void Deserializer::Configure(
     const function<DeserializeResult(TLSDeserializer* d,
                                      ct::MerkleTreeLeaf* leaf)>&
-        read_merkle_tree_leaf) {
+        read_merkle_tree_leaf_func) {
   CHECK(FLAGS_allow_reconfigure_serializer_test_only ||
-        !read_merkle_tree_leaf_)
+        !read_merkle_tree_leaf)
       << "Deserializer already configured";
-  read_merkle_tree_leaf_ = read_merkle_tree_leaf;
+  read_merkle_tree_leaf = read_merkle_tree_leaf_func;
 }

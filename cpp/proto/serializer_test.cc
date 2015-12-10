@@ -206,16 +206,6 @@ const char kDefaultCertSCTSignedHexStringV2Extensions[] =
     // extension 2 data "thx"
     "746878";
 
-#if 0
-const char kDefaultSignedCertEntryWithTypeHexString[] =
-    // entry type, 2 bytes
-    "0000"
-    // leaf certificate length, 3 bytes
-    "00000b"
-    // leaf certificate, 11 bytes
-    "6365727469666963617465";
-#endif
-
 const char kDefaultPrecertSCTSignedHexString[] =
     // version, 1 byte
     "00"

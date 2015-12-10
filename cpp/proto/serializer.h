@@ -259,25 +259,6 @@ class Serializer {
   // This class is mostly a namespace for static methods.
   // TODO(pphaneuf): Make this into normal functions in a namespace.
   Serializer() = delete;
-
-  static std::function<std::string(const ct::LogEntry&)> leaf_data_;
-  static std::function<SerializeResult(
-      const ct::SignedCertificateTimestamp& sct, const ct::LogEntry& entry,
-      std::string* result)>
-      serialize_sct_sig_input_;
-  static std::function<SerializeResult(
-      const ct::SignedCertificateTimestamp& sct, const ct::LogEntry& entry,
-      std::string* result)>
-      serialize_sct_merkle_leaf_;
-  static std::function<SerializeResult(uint64_t timestamp, int64_t tree_size,
-                                       const std::string& root_hash,
-                                       std::string* result)>
-      serialize_sth_sig_input_v1_;
-  static std::function<SerializeResult(
-      uint64_t timestamp, int64_t tree_size, const std::string& root_hash,
-      const repeated_sth_extension& sth_extension, const std::string& log_id,
-      std::string* result)>
-      serialize_sth_sig_input_v2_;
 };
 
 
@@ -325,10 +306,6 @@ class Deserializer {
   // This class is mostly a namespace for static methods.
   // TODO(pphaneuf): Make this into normal functions in a namespace.
   Deserializer() = delete;
-
-  static std::function<DeserializeResult(TLSDeserializer* d,
-                                         ct::MerkleTreeLeaf* leaf)>
-      read_merkle_tree_leaf_;
 
   // This should never do anything, but just in case...
   DISALLOW_COPY_AND_ASSIGN(Deserializer);
