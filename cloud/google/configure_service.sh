@@ -50,10 +50,10 @@ done
 wait
 
 for i in `seq 0 $((${NODE_NUM_REPLICAS} - 1))`; do
-  gcloud compute instance-groups unmanaged instances \
+  gcloud compute instance-groups unmanaged add-instances \
+      "${INSTANCE_TYPE}-group-${NODE_ZONES[${i}]}" \
       --zone ${NODE_ZONES[${i}]} \
-      --instance-group "${INSTANCE_TYPE}-group-${NODE_ZONES[${i}]}" \
-      add ${NODE_MACHINES[${i}]} &
+      --instances ${NODE_MACHINES[${i}]} &
 done
 wait
 
