@@ -33,7 +33,7 @@ CompactMerkleTree::CompactMerkleTree(MerkleTree& model, SerialHasher* hasher)
   // Get the inclusion proof path to the last entry in the tree, which by
   // definition must consist purely of left-hand nodes.
   std::vector<string> path(model.PathToCurrentRoot(model.LeafCount()));
-  if (path.size() > 0) {
+  if (!path.empty()) {
     /* We have to do some juggling here as tree_[] differs from our MerkleTree
     // structure in that incomplete right-hand subtrees 'fall-through' to lower
     // levels:
