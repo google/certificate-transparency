@@ -14,6 +14,7 @@
 
 #include "log/logged_entry.h"
 #include "monitoring/registry.h"
+#include "proto/cert_serializer.h"
 #include "proto/ct.pb.h"
 #include "util/fake_etcd.h"
 #include "util/libevent_wrapper.h"
@@ -796,5 +797,6 @@ TEST_F(EtcdConsistentStoreTest, TestRejectsAddsWhenOverCapacity) {
 int main(int argc, char** argv) {
   cert_trans::test::InitTesting(argv[0], &argc, &argv, true);
   ::testing::FLAGS_gtest_death_test_style = "threadsafe";
+  ConfigureSerializerForV1CT();
   return RUN_ALL_TESTS();
 }

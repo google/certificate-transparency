@@ -7,6 +7,7 @@
 #include <memory>
 
 #include "log/cert.h"
+#include "proto/cert_serializer.h"
 #include "proto/serializer.h"
 #include "util/json_wrapper.h"
 
@@ -199,12 +200,12 @@ void DoneGetEntries(UrlFetcher::Response* resp,
     }
 
     if (log_entry.leaf.timestamped_entry().entry_type() == ct::X509_ENTRY) {
-      Deserializer::DeserializeX509Chain(extra_data.FromBase64(),
-                                         log_entry.entry.mutable_x509_entry());
+      DeserializeX509Chain(extra_data.FromBase64(),
+                           log_entry.entry.mutable_x509_entry());
     } else if (log_entry.leaf.timestamped_entry().entry_type() ==
                ct::PRECERT_ENTRY) {
-      Deserializer::DeserializePrecertChainEntry(
-          extra_data.FromBase64(), log_entry.entry.mutable_precert_entry());
+      DeserializePrecertChainEntry(extra_data.FromBase64(),
+                                   log_entry.entry.mutable_precert_entry());
     } else {
       LOG(FATAL) << "Don't understand entry type: "
                  << log_entry.leaf.timestamped_entry().entry_type();

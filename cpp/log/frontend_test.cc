@@ -20,6 +20,7 @@
 #include "log/test_signer.h"
 #include "merkletree/merkle_verifier.h"
 #include "merkletree/serial_hasher.h"
+#include "proto/cert_serializer.h"
 #include "proto/ct.pb.h"
 #include "util/fake_etcd.h"
 #include "util/libevent_wrapper.h"
@@ -405,5 +406,6 @@ int main(int argc, char** argv) {
   OpenSSL_add_all_algorithms();
   ERR_load_crypto_strings();
   cert_trans::LoadCtExtensions();
+  ConfigureSerializerForV1CT();
   return RUN_ALL_TESTS();
 }

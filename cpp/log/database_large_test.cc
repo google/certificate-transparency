@@ -15,6 +15,7 @@
 #include "log/sqlite_db.h"
 #include "log/test_db.h"
 #include "log/test_signer.h"
+#include "proto/cert_serializer.h"
 #include "util/testing.h"
 #include "util/util.h"
 
@@ -117,5 +118,6 @@ int main(int argc, char** argv) {
   CHECK_GT(FLAGS_database_size, 0) << "Please specify the test database size";
   CHECK_LE(FLAGS_database_size, 1000000)
       << "Database size exceeds allowed maximum";
+  ConfigureSerializerForV1CT();
   return RUN_ALL_TESTS();
 }

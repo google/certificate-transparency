@@ -11,6 +11,7 @@
 #include "log/sqlite_db.h"
 #include "log/test_db.h"
 #include "log/test_signer.h"
+#include "proto/cert_serializer.h"
 #include "util/testing.h"
 #include "util/util.h"
 
@@ -433,5 +434,6 @@ TYPED_TEST(DBTest, Iterator) {
 int main(int argc, char** argv) {
   cert_trans::test::InitTesting(argv[0], &argc, &argv, true);
   ::testing::FLAGS_gtest_death_test_style = "threadsafe";
+  ConfigureSerializerForV1CT();
   return RUN_ALL_TESTS();
 }

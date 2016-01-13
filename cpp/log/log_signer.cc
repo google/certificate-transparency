@@ -50,11 +50,18 @@ LogSigner::~LogSigner() {
 LogSigner::SignResult LogSigner::SignV1CertificateTimestamp(
     uint64_t timestamp, const string& leaf_certificate,
     const string& extensions, string* result) const {
+  SignedCertificateTimestamp sct;
+  sct.set_version(ct::V1);
+  sct.set_timestamp(timestamp);
+  sct.set_extensions(extensions);
+
+  LogEntry entry;
+  entry.set_type(ct::X509_ENTRY);
+  entry.mutable_x509_entry()->set_leaf_certificate(leaf_certificate);
+
   string serialized_input;
   SerializeResult res =
-      Serializer::SerializeV1CertSCTSignatureInput(timestamp, leaf_certificate,
-                                                   extensions,
-                                                   &serialized_input);
+      Serializer::SerializeSCTSignatureInput(sct, entry, &serialized_input);
 
   if (res != SerializeResult::OK)
     return GetSerializeError(res);
@@ -70,10 +77,21 @@ LogSigner::SignResult LogSigner::SignV1PrecertificateTimestamp(
     uint64_t timestamp, const string& issuer_key_hash,
     const string& tbs_certificate, const string& extensions,
     string* result) const {
+  SignedCertificateTimestamp sct;
+  sct.set_version(ct::V1);
+  sct.set_timestamp(timestamp);
+  sct.set_extensions(extensions);
+
+  LogEntry entry;
+  entry.set_type(ct::PRECERT_ENTRY);
+  entry.mutable_precert_entry()->mutable_pre_cert()->set_issuer_key_hash(
+      issuer_key_hash);
+  entry.mutable_precert_entry()->mutable_pre_cert()->set_tbs_certificate(
+      tbs_certificate);
+
   string serialized_input;
-  SerializeResult res = Serializer::SerializeV1PrecertSCTSignatureInput(
-      timestamp, issuer_key_hash, tbs_certificate, extensions,
-      &serialized_input);
+  SerializeResult res =
+      Serializer::SerializeSCTSignatureInput(sct, entry, &serialized_input);
 
   if (res != SerializeResult::OK)
     return GetSerializeError(res);
@@ -177,11 +195,19 @@ LogSigVerifier::VerifyResult LogSigVerifier::VerifyV1CertSCTSignature(
     return GetDeserializeSignatureError(result);
   }
 
+  SignedCertificateTimestamp sct;
+  sct.set_version(ct::V1);
+  sct.set_timestamp(timestamp);
+  sct.set_extensions(extensions);
+
+  LogEntry entry;
+  entry.set_type(ct::X509_ENTRY);
+  entry.mutable_x509_entry()->set_leaf_certificate(leaf_cert);
+
   string serialized_sct;
   SerializeResult serialize_result =
-      Serializer::SerializeV1CertSCTSignatureInput(timestamp, leaf_cert,
-                                                   extensions,
-                                                   &serialized_sct);
+      Serializer::SerializeSCTSignatureInput(sct, entry, &serialized_sct);
+
   if (serialize_result != SerializeResult::OK)
     return GetSerializeError(serialize_result);
   return ConvertStatus(Verify(serialized_sct, signature));
@@ -196,10 +222,21 @@ LogSigVerifier::VerifyResult LogSigVerifier::VerifyV1PrecertSCTSignature(
   if (result != DeserializeResult::OK)
     return GetDeserializeSignatureError(result);
 
+  SignedCertificateTimestamp sct;
+  sct.set_version(ct::V1);
+  sct.set_timestamp(timestamp);
+  sct.set_extensions(extensions);
+
+  LogEntry entry;
+  entry.set_type(ct::PRECERT_ENTRY);
+  entry.mutable_precert_entry()->mutable_pre_cert()->set_issuer_key_hash(
+      issuer_key_hash);
+  entry.mutable_precert_entry()->mutable_pre_cert()->set_tbs_certificate(
+      tbs_cert);
+
   string serialized_sct;
   SerializeResult serialize_result =
-      Serializer::SerializeV1PrecertSCTSignatureInput(
-          timestamp, issuer_key_hash, tbs_cert, extensions, &serialized_sct);
+      Serializer::SerializeSCTSignatureInput(sct, entry, &serialized_sct);
   if (serialize_result != SerializeResult::OK)
     return GetSerializeError(serialize_result);
   return ConvertStatus(Verify(serialized_sct, signature));

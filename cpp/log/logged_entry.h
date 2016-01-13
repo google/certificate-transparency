@@ -7,6 +7,7 @@
 
 #include "client/async_log_client.h"
 #include "merkletree/serial_hasher.h"
+#include "proto/cert_serializer.h"
 #include "proto/ct.pb.h"
 #include "proto/serializer.h"
 #include "util/util.h"
@@ -55,11 +56,10 @@ class LoggedEntry : public ct::LoggedEntryPB {
   bool SerializeExtraData(std::string* dst) const {
     switch (entry().type()) {
       case ct::X509_ENTRY:
-        return Serializer::SerializeX509Chain(entry().x509_entry(), dst) ==
+        return SerializeX509Chain(entry().x509_entry(), dst) ==
                SerializeResult::OK;
       case ct::PRECERT_ENTRY:
-        return Serializer::SerializePrecertChainEntry(entry().precert_entry(),
-                                                      dst) ==
+        return SerializePrecertChainEntry(entry().precert_entry(), dst) ==
                SerializeResult::OK;
       case ct::PRECERT_ENTRY_V2:
         // TODO(mhs): V2 implementation needs to be provided.

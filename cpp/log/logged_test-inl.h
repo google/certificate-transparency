@@ -4,6 +4,7 @@
 
 #include <string>
 
+#include "proto/cert_serializer.h"
 #include "util/testing.h"
 
 
@@ -98,6 +99,7 @@ TYPED_TEST(LoggedTest, DifferentMerkleSerialization) {
 
 int main(int argc, char** argv) {
   cert_trans::test::InitTesting(argv[0], &argc, &argv, true);
+  ConfigureSerializerForV1CT();
   srand(time(NULL));
   return RUN_ALL_TESTS();
 }

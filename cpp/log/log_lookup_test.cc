@@ -16,6 +16,7 @@
 #include "log/tree_signer.h"
 #include "merkletree/merkle_verifier.h"
 #include "merkletree/serial_hasher.h"
+#include "proto/cert_serializer.h"
 #include "util/fake_etcd.h"
 #include "util/mock_masterelection.h"
 #include "util/sync_task.h"
@@ -234,5 +235,6 @@ TYPED_TEST(LogLookupTest, VerifyWithPath) {
 
 int main(int argc, char** argv) {
   cert_trans::test::InitTesting(argv[0], &argc, &argv, true);
+  ConfigureSerializerForV1CT();
   return RUN_ALL_TESTS();
 }
