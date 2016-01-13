@@ -30,6 +30,14 @@ SerializeResult SerializePrecertChainEntry(
     const std::string& pre_certificate,
     const repeated_string& precertificate_chain, std::string* result);
 
+// These two functions are depended on externally.
+SerializeResult SerializeV1SignedCertEntryWithType(
+    const std::string& leaf_certificate, std::string* result);
+
+SerializeResult SerializeV1SignedPrecertEntryWithType(
+    const std::string& issuer_key_hash, const std::string& tbs_certificate,
+    std::string* result);
+
 DeserializeResult DeserializeX509Chain(const std::string& in,
                                        ct::X509ChainEntry* x509_chain_entry);
 

@@ -605,6 +605,41 @@ SerializeResult SerializePrecertChainEntry(
 }
 
 
+SerializeResult SerializeV1SignedCertEntryWithType(
+    const std::string& leaf_certificate, std::string* result) {
+  SerializeResult res = CheckCertificateFormat(leaf_certificate);
+  if (res != SerializeResult::OK) {
+    return res;
+  }
+  TLSSerializer serializer;
+  serializer.WriteUint(ct::X509_ENTRY, Serializer::kLogEntryTypeLengthInBytes);
+  serializer.WriteVarBytes(leaf_certificate, kMaxCertificateLength);
+  result->assign(serializer.SerializedString());
+  return SerializeResult::OK;
+}
+
+
+SerializeResult SerializeV1SignedPrecertEntryWithType(
+    const std::string& issuer_key_hash, const std::string& tbs_certificate,
+    std::string* result) {
+  SerializeResult res = CheckCertificateFormat(tbs_certificate);
+  if (res != SerializeResult::OK) {
+    return res;
+  }
+  res = CheckKeyHashFormat(issuer_key_hash);
+  if (res != SerializeResult::OK) {
+    return res;
+  }
+  TLSSerializer serializer;
+  serializer.WriteUint(ct::PRECERT_ENTRY,
+                       Serializer::kLogEntryTypeLengthInBytes);
+  serializer.WriteFixedBytes(issuer_key_hash);
+  serializer.WriteVarBytes(tbs_certificate, kMaxCertificateLength);
+  result->assign(serializer.SerializedString());
+  return SerializeResult::OK;
+}
+
+
 // static
 DeserializeResult DeserializeX509Chain(const std::string& in,
                                        X509ChainEntry* x509_chain_entry) {
