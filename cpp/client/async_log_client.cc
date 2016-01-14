@@ -199,16 +199,21 @@ void DoneGetEntries(UrlFetcher::Response* resp,
       log_entry.sct.reset(sct.release());
     }
 
-    if (log_entry.leaf.timestamped_entry().entry_type() == ct::X509_ENTRY) {
-      DeserializeX509Chain(extra_data.FromBase64(),
-                           log_entry.entry.mutable_x509_entry());
-    } else if (log_entry.leaf.timestamped_entry().entry_type() ==
-               ct::PRECERT_ENTRY) {
-      DeserializePrecertChainEntry(extra_data.FromBase64(),
-                                   log_entry.entry.mutable_precert_entry());
-    } else {
-      LOG(FATAL) << "Don't understand entry type: "
-                 << log_entry.leaf.timestamped_entry().entry_type();
+    switch (log_entry.leaf.timestamped_entry().entry_type()) {
+      case ct::X509_ENTRY:
+        DeserializeX509Chain(extra_data.FromBase64(),
+                             log_entry.entry.mutable_x509_entry());
+        break;
+      case ct::PRECERT_ENTRY:
+        DeserializePrecertChainEntry(extra_data.FromBase64(),
+                                     log_entry.entry.mutable_precert_entry());
+        break;
+      case ct::X_JSON_ENTRY:
+        // nothing to do
+        break;
+      default:
+        LOG(FATAL) << "Don't understand entry type: "
+                   << log_entry.leaf.timestamped_entry().entry_type();
     }
 
     new_entries.emplace_back(move(log_entry));
