@@ -54,8 +54,6 @@ void InitCT(int* argc, char** argv[]) {
   google::InitGoogleLogging(*argv[0]);
   google::InstallFailureSignalHandler();
 
-  ConfigureSerializerForV1CT();
-
   event_set_log_callback(&LibEventLog);
 
   evthread_use_pthreads();
