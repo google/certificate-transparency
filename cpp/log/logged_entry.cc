@@ -10,7 +10,8 @@ namespace cert_trans {
 
 bool LoggedEntry::CopyFromClientLogEntry(const AsyncLogClient::Entry& entry) {
   if (entry.leaf.timestamped_entry().entry_type() != ct::X509_ENTRY &&
-      entry.leaf.timestamped_entry().entry_type() != ct::PRECERT_ENTRY) {
+      entry.leaf.timestamped_entry().entry_type() != ct::PRECERT_ENTRY &&
+      entry.leaf.timestamped_entry().entry_type() != ct::X_JSON_ENTRY) {
     LOG(INFO) << "unsupported entry_type: "
               << entry.leaf.timestamped_entry().entry_type();
     return false;
@@ -48,6 +49,12 @@ bool LoggedEntry::CopyFromClientLogEntry(const AsyncLogClient::Entry& entry) {
                                        .signed_entry()
                                        .precert()
                                        .tbs_certificate());
+      break;
+    }
+
+    case ct::X_JSON_ENTRY: {
+      log_entry->mutable_x_json_entry()->set_json(
+          entry.leaf.timestamped_entry().signed_entry().json());
       break;
     }
 
