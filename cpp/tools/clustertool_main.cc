@@ -13,6 +13,7 @@
 #include "log/sqlite_db.h"
 #include "log/strict_consistent_store.h"
 #include "log/tree_signer.h"
+#include "proto/cert_serializer.h"
 #include "proto/ct.pb.h"
 #include "tools/clustertool-inl.h"
 #include "util/etcd.h"
@@ -132,8 +133,10 @@ ClusterConfig LoadConfig() {
 
 
 int main(int argc, char* argv[]) {
-  util::InitCT(&argc, &argv);
   FLAGS_logtostderr = true;
+
+  ConfigureSerializerForV1CT();
+  util::InitCT(&argc, &argv);
 
   if (argc == 1) {
     Usage();
