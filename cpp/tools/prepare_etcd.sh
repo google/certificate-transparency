@@ -16,6 +16,7 @@ curl -L -X PUT ${ETCD}/v2/keys/root/entries -d dir=true
 curl -L -X PUT ${ETCD}/v2/keys/root/nodes -d dir=true
 curl -L -X PUT ${ETCD}/v2/keys/root/serving_sth
 curl -L -X PUT ${ETCD}/v2/keys/root/cluster_config
+curl -L -X PUT ${ETCD}/v2/keys/root/sequence_mapping
 ${DIR}/ct-clustertool initlog \
     --key=${LOG_KEY} \
     --etcd_servers="${ETCD_HOST}:${ETCD_PORT}" \
