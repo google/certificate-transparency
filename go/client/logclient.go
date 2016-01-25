@@ -187,21 +187,24 @@ func (c *LogClient) addChainWithRetry(path string, chain []ct.ASN1Cert, deadline
 	for _, link := range chain {
 		req.Chain = append(req.Chain, base64.StdEncoding.EncodeToString(link))
 	}
-	done := false
 	httpStatus := "Unknown"
 	backoffSeconds := 0
-	for !done {
-		var backoffTimer *time.Timer
+	for {
+		backoffTimer := time.NewTimer(0)
 		if backoffSeconds > 0 {
 			// Now back-off before retrying
 			log.Printf("Got %s, backing-off %d seconds.", httpStatus, backoffSeconds)
 			backoffTimer = time.NewTimer(time.Duration(backoffSeconds) * time.Second)
 			backoffSeconds = 0
 		}
-		select {
-		case <-deadline.C:
-			return nil, fmt.Errorf("Failed to submit chain, deadline passed")
-		case <-backoffTimer.C:
+		if deadline != nil {
+			select {
+			case <-deadline.C:
+				return nil, fmt.Errorf("Failed to submit chain, deadline passed")
+			case <-backoffTimer.C:
+			}
+		} else {
+			<-backoffTimer.C
 		}
 		httpResp, errorBody, err := c.postAndParse(c.uri+path, &req, &resp)
 		if err != nil {
@@ -210,7 +213,7 @@ func (c *LogClient) addChainWithRetry(path string, chain []ct.ASN1Cert, deadline
 		} else {
 			switch {
 			case httpResp.StatusCode == 200:
-				done = true
+				// success
 				break
 			case httpResp.StatusCode == 408:
 			case httpResp.StatusCode == 503:
