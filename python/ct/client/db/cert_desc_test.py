@@ -11,6 +11,7 @@ from ct.test import time_utils
 CERT = cert.Certificate.from_der_file("ct/crypto/testdata/google_cert.der")
 CA_CERT = cert.Certificate.from_pem_file("ct/crypto/testdata/verisign_intermediate.pem")
 DSA_SHA256_CERT = cert.Certificate.from_der_file("ct/crypto/testdata/dsa_with_sha256.der")
+BAD_UTF8_CERT = cert.Certificate.from_pem_file("ct/crypto/testdata/cert_bad_utf8_subject.pem")
 
 class CertificateDescriptionTest(unittest.TestCase):
     def get_observations(self, source):
@@ -151,6 +152,22 @@ class CertificateDescriptionTest(unittest.TestCase):
         with time_utils.timezone("Asia/Shanghai"):
             self.assert_description_matches_source(cert, is_ca_cert)
 
+    def test_cert_with_mangled_utf8(self):
+        cert = BAD_UTF8_CERT
+        is_ca_cert = False
+
+        with time_utils.timezone("UTC"):
+            self.assert_description_matches_source(cert, is_ca_cert)
+
+        # Test in non-UTC timezones, to detect timezone issues
+        with time_utils.timezone("America/Los_Angeles"):
+            self.assert_description_matches_source(cert, is_ca_cert)
+
+        with time_utils.timezone("Asia/Shanghai"):
+            self.assert_description_matches_source(cert, is_ca_cert)
+
+        proto = cert_desc.from_cert(cert, self.get_observations(cert))
+
     def test_process_value(self):
         self.assertEqual(["London"], cert_desc.process_name("London"))
         self.assertEqual(["Bob Smith"], cert_desc.process_name("Bob Smith"))
@@ -165,6 +182,15 @@ class CertificateDescriptionTest(unittest.TestCase):
         # 2. IP addresses should perhaps not be reversed like hostnames are
         self.assertEqual(["1", "0", "168", "192"],
                          cert_desc.process_name("192.168.0.1"))
+
+    def test_to_unicode(self):
+        self.assertEqual(u"foobar", cert_desc.to_unicode("foobar"))
+        # The given string is encoded using ISO-8859-1, not UTF-8.
+        # Assuming it is UTF-8 yields invalid Unicode \uDBE0.
+        self.assertNotEqual(u"R\uDBE0S", cert_desc.to_unicode("R\xED\xAF\xA0S"))
+        # Detecting the failure and retrying as ISO-8859-1.
+        self.assertEqual(u"R\u00ED\u00AF\u00A0S",
+                         cert_desc.to_unicode("R\xED\xAF\xA0S"))
 
 if __name__ == "__main__":
     unittest.main()

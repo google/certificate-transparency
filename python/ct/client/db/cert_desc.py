@@ -1,6 +1,8 @@
 import calendar
 import hashlib
 import re
+import unicodedata
+
 from ct.crypto import cert
 from ct.crypto.asn1 import x509_common
 from ct.proto import certificate_pb2
@@ -93,8 +95,16 @@ def from_cert(certificate, observations=[]):
     return proto
 
 
-def to_unicode(str_):
-    return unicode(str_, 'utf-8', 'replace')
+def to_unicode(value):
+    encoded = unicode(value, 'utf-8', 'replace')
+    for ch in encoded:
+        try:
+            _ = unicodedata.name(ch)
+        except ValueError:
+            # Mangled Unicode code-point. Perhaps this is just
+            # plain ISO-8859-1 data incorrectly reported as UTF-8.
+            return unicode(value, 'iso-8859-1', 'replace')
+    return encoded
 
 
 def process_name(subject, reverse=True):
