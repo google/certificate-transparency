@@ -179,8 +179,9 @@ func (c *LogClient) postAndParse(uri string, req interface{}, res interface{}) (
 }
 
 // Attempts to add |chain| to the log, using the api end-point specified by
-// |path|.
-func (c *LogClient) addChainWithRetry(path string, chain []ct.ASN1Cert, deadline time.Timer) (*ct.SignedCertificateTimestamp, error) {
+// |path|. If provided deadline is passed before submission is complete an
+// error will be returned.
+func (c *LogClient) addChainWithRetry(path string, chain []ct.ASN1Cert, deadline *time.Timer) (*ct.SignedCertificateTimestamp, error) {
 	var resp addChainResponse
 	var req addChainRequest
 	for _, link := range chain {
@@ -250,13 +251,19 @@ func (c *LogClient) addChainWithRetry(path string, chain []ct.ASN1Cert, deadline
 }
 
 // AddChain adds the (DER represented) X509 |chain| to the log.
-func (c *LogClient) AddChain(chain []ct.ASN1Cert, deadline time.Timer) (*ct.SignedCertificateTimestamp, error) {
-	return c.addChainWithRetry(AddChainPath, chain, deadline)
+func (c *LogClient) AddChain(chain []ct.ASN1Cert) (*ct.SignedCertificateTimestamp, error) {
+	return c.addChainWithRetry(AddChainPath, chain, nil)
 }
 
 // AddPreChain adds the (DER represented) Precertificate |chain| to the log.
-func (c *LogClient) AddPreChain(chain []ct.ASN1Cert, deadline time.Timer) (*ct.SignedCertificateTimestamp, error) {
-	return c.addChainWithRetry(AddPreChainPath, chain, deadline)
+func (c *LogClient) AddPreChain(chain []ct.ASN1Cert) (*ct.SignedCertificateTimestamp, error) {
+	return c.addChainWithRetry(AddPreChainPath, chain, nil)
+}
+
+// AddChainWithDeadline adds the (DER represented) X509 |chain| to the log and
+// fails if the provided deadline is passed before the chain is submitted.
+func (c *LogClient) AddChainWithDeadline(chain []ct.ASN1Cert, deadline *time.Timer) (*ct.SignedCertificateTimestamp, error) {
+	return c.addChainWithRetry(AddChainPath, chain, deadline)
 }
 
 // GetSTH retrieves the current STH from the log.
