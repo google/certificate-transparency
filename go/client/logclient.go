@@ -18,6 +18,7 @@ import (
 
 	"github.com/google/certificate-transparency/go"
 	"github.com/mreiferson/go-httpclient"
+	"golang.org/x/net/context"
 )
 
 // URI paths for CT Log endpoints
@@ -181,7 +182,7 @@ func (c *LogClient) postAndParse(uri string, req interface{}, res interface{}) (
 // Attempts to add |chain| to the log, using the api end-point specified by
 // |path|. If provided deadline is passed before submission is complete an
 // error will be returned.
-func (c *LogClient) addChainWithRetry(path string, chain []ct.ASN1Cert, deadline *time.Timer) (*ct.SignedCertificateTimestamp, error) {
+func (c *LogClient) addChainWithRetry(path string, chain []ct.ASN1Cert, deadline context.Context) (*ct.SignedCertificateTimestamp, error) {
 	var resp addChainResponse
 	var req addChainRequest
 	for _, link := range chain {
@@ -200,7 +201,7 @@ func (c *LogClient) addChainWithRetry(path string, chain []ct.ASN1Cert, deadline
 		}
 		if deadline != nil {
 			select {
-			case <-deadline.C:
+			case <-deadline.Done():
 				return nil, fmt.Errorf("Failed to submit chain, deadline passed")
 			case <-backoffTimer.C:
 			}
@@ -267,7 +268,7 @@ func (c *LogClient) AddPreChain(chain []ct.ASN1Cert) (*ct.SignedCertificateTimes
 
 // AddChainWithDeadline adds the (DER represented) X509 |chain| to the log and
 // fails if the provided deadline is passed before the chain is submitted.
-func (c *LogClient) AddChainWithDeadline(chain []ct.ASN1Cert, deadline *time.Timer) (*ct.SignedCertificateTimestamp, error) {
+func (c *LogClient) AddChainWithDeadline(chain []ct.ASN1Cert, deadline context.Context) (*ct.SignedCertificateTimestamp, error) {
 	return c.addChainWithRetry(AddChainPath, chain, deadline)
 }
 

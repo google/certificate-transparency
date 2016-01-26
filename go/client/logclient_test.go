@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/google/certificate-transparency/go"
+	"golang.org/x/net/context"
 )
 
 const (
@@ -157,9 +158,9 @@ func TestAddChainWithDeadline(t *testing.T) {
 	}
 
 	for _, tc := range testCases {
-		var deadline *time.Timer
+		var deadline context.Context
 		if tc.deadlineLength >= 0 {
-			deadline = time.NewTimer(time.Duration(tc.deadlineLength) * time.Second)
+			deadline, _ = context.WithDeadline(context.Background(), time.Now().Add(time.Duration(tc.deadlineLength)*time.Second))
 		}
 		retryAfter = tc.retryAfter
 		failuresBeforeSuccess = tc.failuresBeforeSuccess
