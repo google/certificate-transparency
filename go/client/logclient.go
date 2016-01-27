@@ -209,7 +209,7 @@ func (c *LogClient) addChainWithRetry(path string, chain []ct.ASN1Cert, deadline
 			<-backoffTimer.C
 		}
 		httpResp, errorBody, err := c.postAndParse(c.uri+path, &req, &resp)
-		if err != nil && err.Error() != "503 Service Unavailable" {
+		if err != nil {
 			backoffSeconds = 10
 		} else {
 			switch {
@@ -219,7 +219,7 @@ func (c *LogClient) addChainWithRetry(path string, chain []ct.ASN1Cert, deadline
 			case httpResp.StatusCode == 408:
 			case httpResp.StatusCode == 503:
 				fallthrough
-			case err != nil && err.Error() == "503 Service Unavailable":
+			case err != nil: // && err.Error() == "503 Service Unavailable":
 				// Retry
 				backoffSeconds = 10
 				if retryAfter := httpResp.Header.Get("Retry-After"); retryAfter != "" {
