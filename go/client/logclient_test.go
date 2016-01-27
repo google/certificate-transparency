@@ -110,7 +110,7 @@ func TestGetSTHWorks(t *testing.T) {
 	}
 }
 
-func TestAddChainWithDeadline(t *testing.T) {
+func TestAddChainWithContext(t *testing.T) {
 	retryAfter := 0
 	currentFailures := 0
 	failuresBeforeSuccess := 0
@@ -167,7 +167,7 @@ func TestAddChainWithDeadline(t *testing.T) {
 		currentFailures = 0
 
 		started := time.Now()
-		sct, err := c.AddChainWithDeadline(chain, deadline)
+		sct, err := c.AddChainWithContext(deadline, chain)
 		took := time.Since(started)
 		margin := leeway
 		if margin > tc.expected {
@@ -179,7 +179,7 @@ func TestAddChainWithDeadline(t *testing.T) {
 		if tc.success && err != nil {
 			t.Fatalf("Failed to submit chain: %s", err)
 		} else if err == nil && !tc.success {
-			t.Fatalf("Expected AddChainWithDeadline to fail")
+			t.Fatalf("Expected AddChainWithContext to fail")
 		}
 		if tc.success && sct == nil {
 			t.Fatalf("Nil SCT returned")

@@ -180,9 +180,9 @@ func (c *LogClient) postAndParse(uri string, req interface{}, res interface{}) (
 }
 
 // Attempts to add |chain| to the log, using the api end-point specified by
-// |path|. If provided deadline is passed before submission is complete an
+// |path|. If provided context is passed before submission is complete an
 // error will be returned.
-func (c *LogClient) addChainWithRetry(path string, chain []ct.ASN1Cert, deadline context.Context) (*ct.SignedCertificateTimestamp, error) {
+func (c *LogClient) addChainWithRetry(ctx context.Context, path string, chain []ct.ASN1Cert) (*ct.SignedCertificateTimestamp, error) {
 	var resp addChainResponse
 	var req addChainRequest
 	for _, link := range chain {
@@ -199,9 +199,9 @@ func (c *LogClient) addChainWithRetry(path string, chain []ct.ASN1Cert, deadline
 			backoffTimer = time.NewTimer(time.Duration(backoffSeconds) * time.Second)
 			backoffSeconds = 0
 		}
-		if deadline != nil {
+		if ctx != nil {
 			select {
-			case <-deadline.Done():
+			case <-ctx.Done():
 				return nil, fmt.Errorf("Failed to submit chain, deadline passed")
 			case <-backoffTimer.C:
 			}
@@ -258,18 +258,18 @@ func (c *LogClient) addChainWithRetry(path string, chain []ct.ASN1Cert, deadline
 
 // AddChain adds the (DER represented) X509 |chain| to the log.
 func (c *LogClient) AddChain(chain []ct.ASN1Cert) (*ct.SignedCertificateTimestamp, error) {
-	return c.addChainWithRetry(AddChainPath, chain, nil)
+	return c.addChainWithRetry(nil, AddChainPath, chain)
 }
 
 // AddPreChain adds the (DER represented) Precertificate |chain| to the log.
 func (c *LogClient) AddPreChain(chain []ct.ASN1Cert) (*ct.SignedCertificateTimestamp, error) {
-	return c.addChainWithRetry(AddPreChainPath, chain, nil)
+	return c.addChainWithRetry(nil, AddPreChainPath, chain)
 }
 
-// AddChainWithDeadline adds the (DER represented) X509 |chain| to the log and
+// AddChainWithContext adds the (DER represented) X509 |chain| to the log and
 // fails if the provided deadline is passed before the chain is submitted.
-func (c *LogClient) AddChainWithDeadline(chain []ct.ASN1Cert, deadline context.Context) (*ct.SignedCertificateTimestamp, error) {
-	return c.addChainWithRetry(AddChainPath, chain, deadline)
+func (c *LogClient) AddChainWithContext(ctx context.Context, chain []ct.ASN1Cert) (*ct.SignedCertificateTimestamp, error) {
+	return c.addChainWithRetry(ctx, AddChainPath, chain)
 }
 
 // GetSTH retrieves the current STH from the log.
