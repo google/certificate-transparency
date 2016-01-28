@@ -1,8 +1,8 @@
 #!/usr/bin/env python
 
 import base64
-import httplib
 import json
+import requests
 import sys
 import unittest
 
@@ -344,11 +344,11 @@ class RequestHandlerTest(unittest.TestCase):
             self._num_failures = num_failures
             self._canned_response = canned_response
 
-        def __call__(self, req_url):
+        def __call__(self, req_url, params, timeout, verify):
             if self._num_failures <= 0:
                 return self._canned_response
             self._num_failures = self._num_failures - 1
-            raise httplib.IncompleteRead("incomplete read!")
+            raise requests.exceptions.ConnectionError("incomplete read!")
 
     def test_uri_with_params(self):
         self.assertEqual(
@@ -371,10 +371,12 @@ class RequestHandlerTest(unittest.TestCase):
     def test_get_response_one_retry(self):
         expected_body = 'valid_body'
         handler = log_client.RequestHandler(num_retries=1)
-        mock_http_request = mock.Mock(
+        canned_response = requests.models.Response()
+        canned_response.status_code = 200
+        canned_response._content = expected_body
+        log_client.requests.get = mock.Mock(
                 side_effect=
-                self.RequestSideEffect(1, ({'status': 200}, expected_body)))
-        handler._http.request = mock_http_request
+                self.RequestSideEffect(1, canned_response))
 
         received_response = handler.get_response('http://www.example.com')
         self.assertEqual(expected_body, received_response.content)
@@ -382,14 +384,15 @@ class RequestHandlerTest(unittest.TestCase):
 
     def test_get_response_too_many_retries(self):
         handler = log_client.RequestHandler(num_retries=3)
-        mock_http_request = mock.Mock(
+        canned_response = requests.models.Response()
+        canned_response.status_code = 200
+        canned_response._content = 'body'
+        log_client.requests.get = mock.Mock(
                 side_effect=self.RequestSideEffect(
-                    4, ({'status': 200}, 'body')))
-        handler._http.request = mock_http_request
+                    4, canned_response))
 
         self.assertRaises(log_client.HTTPError,
                           handler.get_response, ('http://www.example.com'))
-
 
 
 if __name__ == "__main__":
