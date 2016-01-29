@@ -47,9 +47,8 @@ function PopulateEtcdForLog() {
       --command "\
     sudo docker run gcr.io/${PROJECT}/super_duper:test \
       /usr/local/bin/ct-clustertool initlog \
-      --key=/usr/local/etc/ct-server-key.pem \
-      --etcd_host=${ETCD_MACHINES[1]} \
-      --etcd_port=4001 \
+      --key=/usr/local/etc/server-key.pem \
+      --etcd_servers=${ETCD_MACHINES[1]}:4001 \
       --logtostderr"
 }
 
