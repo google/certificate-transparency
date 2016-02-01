@@ -104,12 +104,12 @@ type Ticker interface {
 type LogTicker struct{}
 
 func (t LogTicker) HandleTick(s *Scanner, startTime time.Time, sth *ct.SignedTreeHead) {
-	throughput := float64(s.certsProcessed) / time.Since(startTime).Seconds()
-	remainingCerts := int64(sth.TreeSize) - int64(s.opts.StartIndex) - s.certsProcessed
+	throughput := float64(s.CertsProcessed) / time.Since(startTime).Seconds()
+	remainingCerts := int64(sth.TreeSize) - int64(s.opts.StartIndex) - s.CertsProcessed
 	remainingSeconds := int(float64(remainingCerts) / throughput)
 	remainingString := humanTime(remainingSeconds)
-	s.Log(fmt.Sprintf("Processed: %d certs (to index %d). Throughput: %3.2f ETA: %s\n", s.certsProcessed,
-		s.opts.StartIndex+int64(s.certsProcessed), throughput, remainingString))
+	s.Log(fmt.Sprintf("Processed: %d certs (to index %d). Throughput: %3.2f ETA: %s\n", s.CertsProcessed,
+		s.opts.StartIndex+int64(s.CertsProcessed), throughput, remainingString))
 }
 
 // ScannerOptions holds configuration options for the Scanner
@@ -167,7 +167,7 @@ type Scanner struct {
 	opts ScannerOptions
 
 	// Counter of the number of certificates scanned
-	certsProcessed int64
+	CertsProcessed int64
 
 	// Counter of the number of precertificates encountered during the scan.
 	precertsSeen int64
@@ -218,7 +218,7 @@ func (s *Scanner) handleParseEntryError(err error, entryType ct.LogEntryType, in
 
 // Processes the given |entry| in the specified log.
 func (s *Scanner) processEntry(entry ct.LogEntry, foundCert func(*ct.LogEntry), foundPrecert func(*ct.LogEntry)) {
-	atomic.AddInt64(&s.certsProcessed, 1)
+	atomic.AddInt64(&s.CertsProcessed, 1)
 	switch entry.Leaf.TimestampedEntry.EntryType {
 	case ct.X509LogEntryType:
 		if s.opts.PrecertOnly {
@@ -352,7 +352,7 @@ func (s Scanner) Log(msg string) {
 func (s *Scanner) Scan(foundCert func(*ct.LogEntry),
 	foundPrecert func(*ct.LogEntry)) error {
 	s.Log("Starting up...\n")
-	s.certsProcessed = 0
+	s.CertsProcessed = 0
 	s.precertsSeen = 0
 	s.unparsableEntries = 0
 	s.entriesWithNonFatalErrors = 0
@@ -401,7 +401,7 @@ func (s *Scanner) Scan(foundCert func(*ct.LogEntry),
 	close(jobs)
 	matcherWG.Wait()
 
-	s.Log(fmt.Sprintf("Completed %d certs in %s", s.certsProcessed, humanTime(int(time.Since(startTime).Seconds()))))
+	s.Log(fmt.Sprintf("Completed %d certs in %s", s.CertsProcessed, humanTime(int(time.Since(startTime).Seconds()))))
 	s.Log(fmt.Sprintf("Saw %d precerts", s.precertsSeen))
 	s.Log(fmt.Sprintf("%d unparsable entries, %d non-fatal errors", s.unparsableEntries, s.entriesWithNonFatalErrors))
 	return nil
