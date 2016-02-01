@@ -153,6 +153,7 @@ func DefaultScannerOptions() *ScannerOptions {
 		ParallelFetch: 1,
 		StartIndex:    0,
 		Quiet:         false,
+		TickTime:      time.Second,
 		Tickers:       []Ticker{LogTicker{}},
 	}
 }
@@ -362,7 +363,7 @@ func (s *Scanner) Scan(foundCert func(*ct.LogEntry),
 	}
 	s.Log(fmt.Sprintf("Got STH with %d certs", latestSth.TreeSize))
 
-	ticker := time.NewTicker(time.Second)
+	ticker := time.NewTicker(s.opts.TickTime)
 	startTime := time.Now()
 	fetches := make(chan fetchRange, 1000)
 	jobs := make(chan matcherJob, 100000)
