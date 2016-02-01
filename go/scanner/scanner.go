@@ -95,6 +95,23 @@ func (m MatchSubjectRegex) PrecertificateMatches(p *ct.Precertificate) bool {
 	return false
 }
 
+// Clients wishing to implement their own Tickers should implement this interface
+type Ticker interface {
+    HandleTick(s *Scanner, startTime time.Time, sth *ct.SignedTreeHead)
+}
+
+// LogTicker prints the progress and throughput
+type LogTicker struct{}
+
+func (t LogTicker) HandleTick(s *Scanner, startTime time.Time, sth *ct.SignedTreeHead) {
+	throughput := float64(s.certsProcessed) / time.Since(startTime).Seconds()
+	remainingCerts := int64(sth.TreeSize) - int64(s.opts.StartIndex) - s.certsProcessed
+	remainingSeconds := int(float64(remainingCerts) / throughput)
+	remainingString := humanTime(remainingSeconds)
+	s.Log(fmt.Sprintf("Processed: %d certs (to index %d). Throughput: %3.2f ETA: %s\n", s.certsProcessed,
+		s.opts.StartIndex+int64(s.certsProcessed), throughput, remainingString))
+}
+
 // ScannerOptions holds configuration options for the Scanner
 type ScannerOptions struct {
 	// Custom matcher for x509 Certificates, functor will be called for each
@@ -118,6 +135,12 @@ type ScannerOptions struct {
 
 	// Don't print any status messages to stdout
 	Quiet bool
+
+	// The length of time to wait before calling Tickers
+	TickTime time.Duration
+
+	// Custom ticker functions, will be called on every tick
+	Tickers []Ticker
 }
 
 // Creates a new ScannerOptions struct with sensible defaults
@@ -130,6 +153,7 @@ func DefaultScannerOptions() *ScannerOptions {
 		ParallelFetch: 1,
 		StartIndex:    0,
 		Quiet:         false,
+		Tickers:       []Ticker{LogTicker{}},
 	}
 }
 
@@ -344,12 +368,9 @@ func (s *Scanner) Scan(foundCert func(*ct.LogEntry),
 	jobs := make(chan matcherJob, 100000)
 	go func() {
 		for range ticker.C {
-			throughput := float64(s.certsProcessed) / time.Since(startTime).Seconds()
-			remainingCerts := int64(latestSth.TreeSize) - int64(s.opts.StartIndex) - s.certsProcessed
-			remainingSeconds := int(float64(remainingCerts) / throughput)
-			remainingString := humanTime(remainingSeconds)
-			s.Log(fmt.Sprintf("Processed: %d certs (to index %d). Throughput: %3.2f ETA: %s\n", s.certsProcessed,
-				s.opts.StartIndex+int64(s.certsProcessed), throughput, remainingString))
+			for _, t := range s.opts.Tickers {
+				go t.HandleTick(s, startTime, latestSth)
+			}
 		}
 	}()
 

@@ -6,6 +6,7 @@ import (
 	"log"
 	"math/big"
 	"regexp"
+	"time"
 
 	"github.com/google/certificate-transparency/go"
 	"github.com/google/certificate-transparency/go/client"
@@ -25,6 +26,7 @@ var batchSize = flag.Int("batch_size", 1000, "Max number of entries to request a
 var numWorkers = flag.Int("num_workers", 2, "Number of concurrent matchers")
 var parallelFetch = flag.Int("parallel_fetch", 2, "Number of concurrent GetEntries fetches")
 var startIndex = flag.Int64("start_index", 0, "Log index to start scanning at")
+var tickTime = flag.Int("tick_time", 1, "Number of seconds to wait between logging operations")
 var quiet = flag.Bool("quiet", false, "Don't print out extra logging messages, only matches.")
 
 // Prints out a short bit of info about |cert|, found at |index| in the
@@ -80,6 +82,8 @@ func main() {
 		ParallelFetch: *parallelFetch,
 		StartIndex:    *startIndex,
 		Quiet:         *quiet,
+		TickTime:      time.Duration(*tickTime) * time.Second,
+		Tickers:       []scanner.Ticker{scanner.LogTicker{}},
 	}
 	scanner := scanner.NewScanner(logClient, opts)
 	scanner.Scan(logCertInfo, logPrecertInfo)
