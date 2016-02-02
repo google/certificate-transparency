@@ -35,7 +35,7 @@ then
       ;;
     Linux)
       EXTRA_LDFLAGS="${EXTRA_LDFLAGS} -Wl,-rpath=${INSTALL_DIR}/lib"
-      EXTRA_LIBS="-lunwind"
+      EXTRA_LIBS="-lunwind -llzma"
       ;;
   esac
 

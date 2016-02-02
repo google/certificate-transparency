@@ -18,7 +18,8 @@ deps = {
      # Randomly chosen github mirror
      "sqlite3-export": 	 "http://repo.or.cz/sqlite-export.git",
      "sqlite3": 				 "http://repo.or.cz/sqlite.git@version-3.8.10.1",
-		 "tcmalloc":				 "https://github.com/gperftools/gperftools.git@gperftools-2.4"
+		 "tcmalloc":				 "https://github.com/gperftools/gperftools.git@gperftools-2.4",
+     "xz-utils":             "http://git.tukaani.org/xz.git@9815cdf6987ef91a85493bfcfd1ce2aaf3b47a0a"
 }
 
 # Can't use deps_os for this because it doesn't know about freebsd :/
@@ -63,6 +64,11 @@ print("Using make %s with %d jobs" % (make, num_cores))
 here = os.getcwd()
 
 hooks = [
+    {
+        "name": "xz-utils",
+        "pattern": "^xz-utils/",
+        "action": [ make, "-f", os.path.join(here, "certificate-transparency/build.gclient"), "_lzma" ],
+    },
     {
         "name": "libunwind",
         "pattern": "^libunwind/",

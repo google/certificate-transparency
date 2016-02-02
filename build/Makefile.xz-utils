@@ -1,0 +1,8 @@
+all: Makefile
+	$(MAKE) install
+
+Makefile: configure
+	./configure --prefix=$(INSTALL_DIR) --disable-shared --enable-static CXXFLAGS="-fPIC" CFLAGS="-fPIC"
+
+configure: configure.ac
+	autoreconf -vi

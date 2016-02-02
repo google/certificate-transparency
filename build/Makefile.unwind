@@ -2,7 +2,7 @@ all: Makefile
 	$(MAKE) install
 
 Makefile: configure
-	./configure --prefix=$(INSTALL_DIR) --disable-shared --enable-static CXXFLAGS="-fPIC" CFLAGS="-fPIC"
+	./configure --prefix=$(INSTALL_DIR) --disable-shared --enable-static CXXFLAGS="-fPIC" CFLAGS="-fPIC" LDFLAGS="-L$(INSTALL_DIR)/lib"
 	# Don't really want to install latex:
 	sed -e 's/latex2man/echo/' -e 's/pdflatex/echo/' -ibak doc/Makefile
 
