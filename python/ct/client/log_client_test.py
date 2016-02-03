@@ -1,5 +1,9 @@
 #!/usr/bin/env python
 
+# Google build string - please do not remove.
+# GOOGLE_MAGIC_PY_BUILD_MARKER
+
+
 import base64
 import json
 import requests

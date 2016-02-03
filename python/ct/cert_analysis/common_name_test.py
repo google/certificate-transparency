@@ -1,5 +1,9 @@
 #!/usr/bin/env python
 # coding=utf-8
+
+# Google build string - please do not remove.
+# GOOGLE_MAGIC_PY_BUILD_MARKER
+
 import unittest
 import mock
 from ct.cert_analysis import base_check_test

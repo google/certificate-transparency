@@ -1,6 +1,9 @@
 #!/usr/bin/env python
 # coding=utf-8
 
+# Google build string - please do not remove.
+# GOOGLE_MAGIC_PY_BUILD_MARKER
+
 import gflags
 import time
 import unittest
