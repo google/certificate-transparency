@@ -15,6 +15,12 @@ _libunwind:
 		(cd libunwind && git checkout --); \
 	fi
 
+_lzma:
+	if [ -d xz-utils ]; then \
+		$(MAKE) -C xz-utils -f ../certificate-transparency/build/Makefile.xz-utils ; \
+		(cd xz-utils && git checkout --); \
+	fi
+
 _tcmalloc:
 	$(MAKE) -C tcmalloc -f ../certificate-transparency/build/Makefile.tcmalloc
 	cd tcmalloc && git checkout --

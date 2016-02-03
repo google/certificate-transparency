@@ -21,6 +21,7 @@ addons:
       - python-dev
       - libstdc++-4.9-dev
       - tcl8.5
+      - autopoint
 
 matrix:
   include:
