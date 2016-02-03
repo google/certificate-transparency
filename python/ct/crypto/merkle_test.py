@@ -1,9 +1,10 @@
 #!/usr/bin/env python
 
+import unittest
+
 from collections import namedtuple
 import hashlib
 import math
-import unittest
 
 from ct.crypto import error
 from ct.crypto import merkle

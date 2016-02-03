@@ -1,8 +1,9 @@
 #!/usr/bin/env python
 
+import unittest
+
 import os
 import tempfile
-import unittest
 
 from ct.client.db import sqlite_connection as sqlitecon
 from ct.client.db import sqlite_temp_db

@@ -1,8 +1,9 @@
 #!/usr/bin/env python
 
+import unittest
+
 import os
 import tempfile
-import unittest
 
 from ct.client import state
 from ct.proto import client_pb2

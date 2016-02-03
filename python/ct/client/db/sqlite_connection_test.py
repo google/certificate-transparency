@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 
-import sqlite3
 import unittest
+import sqlite3
 
 from ct.client.db import sqlite_connection as sqlitecon
 

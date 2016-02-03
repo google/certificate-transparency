@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 # coding=utf-8
 import unittest
+
 from ct.cert_analysis import tld_list
 
 TLD_DIR = "ct/cert_analysis/test_data/"

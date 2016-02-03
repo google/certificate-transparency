@@ -1,5 +1,6 @@
 #!/usr/bin/env python
 import unittest
+
 import mock
 from ct.cert_analysis import base_check_test
 from ct.cert_analysis import serial_number

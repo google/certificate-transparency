@@ -1,6 +1,7 @@
 #!/usr/bin/env python
-import copy
 import unittest
+
+import copy
 from ct.cert_analysis import base_check_test
 from ct.cert_analysis import extensions
 from ct.crypto.asn1 import oid

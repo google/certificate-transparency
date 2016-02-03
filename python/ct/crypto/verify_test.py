@@ -1,10 +1,11 @@
 #!/usr/bin/env python
 
+import unittest
+
 import base64
 import gflags
 import os
 import sys
-import unittest
 
 from ct.crypto import cert
 from ct.crypto import error

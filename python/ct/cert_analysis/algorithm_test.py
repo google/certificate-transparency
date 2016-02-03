@@ -1,5 +1,6 @@
 #!/usr/bin/env python
 import unittest
+
 import mock
 import time
 from ct.cert_analysis import algorithm

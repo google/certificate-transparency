@@ -1,6 +1,7 @@
 #!/usr/bin/env python
-import mock
 import unittest
+
+import mock
 from ct.cert_analysis import base_check_test
 from ct.cert_analysis import crl_pointers
 from ct.crypto import cert

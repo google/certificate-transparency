@@ -1,7 +1,8 @@
 #!/usr/bin/env python
 # coding=utf-8
-import mock
 import unittest
+
+import mock
 from ct.cert_analysis import tld_check
 
 def gen_dns_name(name):

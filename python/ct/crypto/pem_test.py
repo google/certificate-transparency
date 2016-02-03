@@ -1,8 +1,9 @@
 #!/usr/bin/env python
 
+import unittest
+
 import os
 from tempfile import mkstemp
-import unittest
 from ct.crypto import pem
 
 

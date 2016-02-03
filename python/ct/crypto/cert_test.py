@@ -1,9 +1,10 @@
 #!/usr/bin/env python
 # coding=utf-8
 
+import unittest
+
 import gflags
 import time
-import unittest
 import sys
 from ct.crypto import cert
 from ct.crypto import error

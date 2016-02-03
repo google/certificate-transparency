@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 # coding=utf-8
 import unittest
+
 import mock
 from ct.cert_analysis import base_check_test
 from ct.cert_analysis import common_name

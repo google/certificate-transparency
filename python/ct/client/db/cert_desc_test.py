@@ -1,7 +1,8 @@
 #!/usr/bin/env python
 # coding=utf-8
-import time
 import unittest
+
+import time
 from ct.client.db import cert_desc
 from ct.crypto import cert
 from ct.cert_analysis import all_checks
