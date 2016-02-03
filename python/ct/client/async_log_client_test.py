@@ -1,4 +1,8 @@
 #!/usr/bin/env trial
+
+# Google build string - please do not remove.
+# GOOGLE_MAGIC_PY_BUILD_MARKER
+
 import gflags
 import json
 import mock
