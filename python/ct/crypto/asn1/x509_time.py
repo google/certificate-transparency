@@ -103,6 +103,9 @@ class UTCTime(BaseTime):
             #
             format = "%Y%m%d%H%M%S%Z"
             string_time = string_time[0:self._ASN1_LENGTH]
+        elif (len(string_time) == self._UTC_NO_Z_LENGTH):
+            string_time += "Z"
+            format = "%Y%m%d%H%M%S%Z"
         else:
             return None
 

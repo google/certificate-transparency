@@ -19,6 +19,9 @@ class TimeTest(unittest.TestCase):
         t = x509_time.UTCTime(value="130822153902Z").gmtime()
         self.verify_time(t, 2013, 8, 22, 15, 39, 2)
 
+        t = x509_time.UTCTime(value="130822153902").gmtime()
+        self.verify_time(t, 2013, 8, 22, 15, 39, 2)
+
         t = x509_time.GeneralizedTime(value="20130822153902Z").gmtime()
         self.verify_time(t, 2013, 8, 22, 15, 39, 2)
 
