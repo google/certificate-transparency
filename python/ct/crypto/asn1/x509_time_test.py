@@ -52,6 +52,12 @@ class TimeTest(unittest.TestCase):
         t = x509_time.UTCTime(value="121214093107+1234").gmtime()
         self.verify_time(t, 2012, 12, 14, 9, 31, 7)
 
+    def test_time_missing_z(self):
+        self.assertRaises(x509_time.UTCTime, value="130822153902", strict=True)
+
+        t2 = x509_time.UTCTime(value="130822153902", strict=False).gmtime()
+        self.verify_time(t2, 2013, 8, 22, 15, 39, 2)
+
 
 if __name__ == "__main__":
     unittest.main()

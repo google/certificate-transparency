@@ -13,7 +13,7 @@ class BaseTime(types.ASN1String):
         super(BaseTime, self).__init__(value=value,
                                        serialized_value=serialized_value,
                                        strict=strict)
-        self._gmtime = self._decode_gmtime()
+        self._gmtime = self._decode_gmtime(strict=strict)
         # This is a lenient "strict": if we were able to decode the time,
         # even if it didn't fully conform to the standard, then we'll allow it.
         # If the time string is garbage then we raise.
@@ -34,7 +34,7 @@ class BaseTime(types.ASN1String):
         return self._gmtime
 
     @abc.abstractmethod
-    def _decode_gmtime(self):
+    def _decode_gmtime(self, strict):
         pass
 
     def __str__(self):
@@ -59,7 +59,7 @@ class UTCTime(BaseTime):
     # YYMMDDHHMMSS
     _UTC_NO_Z_LENGTH = 12
 
-    def _decode_gmtime(self):
+    def _decode_gmtime(self, strict):
         """GMT time.
 
         Returns:
@@ -103,6 +103,9 @@ class UTCTime(BaseTime):
             #
             format = "%Y%m%d%H%M%S%Z"
             string_time = string_time[0:self._ASN1_LENGTH]
+        elif (len(string_time) == self._UTC_NO_Z_LENGTH) and not strict:
+            string_time += "Z"
+            format = "%Y%m%d%H%M%S%Z"
         else:
             return None
 
@@ -131,7 +134,7 @@ class GeneralizedTime(BaseTime):
     # YYYYMMDDHHMMSSZ
     _ASN1_LENGTH = 15
 
-    def _decode_gmtime(self):
+    def _decode_gmtime(self, strict):
         """GMT time.
 
         Returns:
