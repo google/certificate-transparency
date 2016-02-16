@@ -29,7 +29,7 @@ class CertificateHttpHandler : public HttpHandler {
 
  private:
   const CertChecker* const cert_checker_;
-  const CertSubmissionHandler submission_handler_;
+  const std::unique_ptr<CertSubmissionHandler> submission_handler_;
   Frontend* const frontend_;
 
   void GetRoots(evhttp_request* req) const;
