@@ -22,8 +22,8 @@ class SSLClient {
   // Takes ownership of the verifier. This client can currently
   // only verify SCTs from a single log at a time.
   // TODO(ekasper): implement a proper multi-log auditor.
-  SSLClient(const std::string& server, uint16_t port,
-            const std::string& ca_dir, LogVerifier* verifier);
+  SSLClient(const std::string& server, uint16_t port, const std::string& ca_dir,
+            const std::string& ca_file, LogVerifier* verifier);
 
   ~SSLClient();
 

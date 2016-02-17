@@ -66,7 +66,7 @@ int SSLClient::ExtensionCallback(SSL*, unsigned ext_type,
 
 // TODO(ekasper): handle Cert::Status errors.
 SSLClient::SSLClient(const string& server, uint16_t port, const string& ca_dir,
-                     LogVerifier* verifier)
+                     const string& ca_file, LogVerifier* verifier)
     : client_(server, port),
       ctx_(CHECK_NOTNULL(SSL_CTX_new(TLSv1_client_method()))),
       verify_args_(verifier),
@@ -75,9 +75,11 @@ SSLClient::SSLClient(const string& server, uint16_t port, const string& ca_dir,
   // if verification fails.
   SSL_CTX_set_verify(ctx_.get(), SSL_VERIFY_PEER, NULL);
   // Set trusted CA certs.
-  if (!ca_dir.empty()) {
-    CHECK_EQ(1,
-             SSL_CTX_load_verify_locations(ctx_.get(), NULL, ca_dir.c_str()))
+  const char *ca_dir_str = ca_dir.empty() ? NULL : ca_dir.c_str();
+  const char *ca_file_str = ca_file.empty() ? NULL : ca_file.c_str();
+  if (ca_file_str != NULL || ca_dir_str != NULL) {
+    CHECK_EQ(1, SSL_CTX_load_verify_locations(ctx_.get(), ca_file_str,
+                                              ca_dir_str))
         << "Unable to load trusted CA certificates.";
   } else {
     LOG(WARNING) << "No trusted CA certificates given.";
