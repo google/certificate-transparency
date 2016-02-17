@@ -72,6 +72,15 @@ bool ExtractChain(libevent::Base* base, evhttp_request* req,
 }
 
 
+CertSubmissionHandler* MaybeCreateSubmissionHandler(
+    const CertChecker* checker) {
+  if (checker != nullptr) {
+    return new CertSubmissionHandler(checker);
+  }
+  return nullptr;
+}
+
+
 }  // namespace
 
 
@@ -82,8 +91,8 @@ CertificateHttpHandler::CertificateHttpHandler(
     libevent::Base* event_base, StalenessTracker* staleness_tracker)
     : HttpHandler(log_lookup, db, controller, pool, event_base,
                   staleness_tracker),
-      cert_checker_(CHECK_NOTNULL(cert_checker)),
-      submission_handler_(cert_checker_),
+      cert_checker_(cert_checker),
+      submission_handler_(MaybeCreateSubmissionHandler(cert_checker_)),
       frontend_(frontend) {
 }
 
@@ -163,7 +172,7 @@ void CertificateHttpHandler::BlockingAddChain(
 
   LogEntry entry;
   const Status status(frontend_->QueueProcessedEntry(
-      submission_handler_.ProcessX509Submission(chain.get(), &entry), entry,
+      submission_handler_->ProcessX509Submission(chain.get(), &entry), entry,
       &sct));
 
   AddEntryReply(req, status, sct);
@@ -176,8 +185,8 @@ void CertificateHttpHandler::BlockingAddPreChain(
 
   LogEntry entry;
   const Status status(frontend_->QueueProcessedEntry(
-      submission_handler_.ProcessPreCertSubmission(chain.get(), &entry), entry,
-      &sct));
+      submission_handler_->ProcessPreCertSubmission(chain.get(), &entry),
+      entry, &sct));
 
   AddEntryReply(req, status, sct);
 }
