@@ -179,8 +179,8 @@ func (c *LogClient) postAndParse(uri string, req interface{}, res interface{}) (
 	return resp, string(body), nil
 }
 
-func backoffForRetry(ctx context.Context, d int) error {
-	backoffTimer := time.NewTimer(time.Duration(d) * time.Second)
+func backoffForRetry(ctx context.Context, d time.Duration) error {
+	backoffTimer := time.NewTimer(d)
 	if ctx != nil {
 		select {
 		case <-ctx.Done():
@@ -209,7 +209,7 @@ func (c *LogClient) addChainWithRetry(ctx context.Context, path string, chain []
 		if backoffSeconds > 0 {
 			log.Printf("Got %s, backing-off %d seconds", httpStatus, backoffSeconds)
 		}
-		err := backoffForRetry(ctx, backoffSeconds)
+		err := backoffForRetry(ctx, time.Second*time.Duration(backoffSeconds))
 		if err != nil {
 			return nil, err
 		}
@@ -224,7 +224,6 @@ func (c *LogClient) addChainWithRetry(ctx context.Context, path string, chain []
 		switch {
 		case httpResp.StatusCode == 200:
 			done = true
-			break
 		case httpResp.StatusCode == 408:
 			// request timeout, retry immediately
 		case httpResp.StatusCode == 503:
@@ -236,7 +235,7 @@ func (c *LogClient) addChainWithRetry(ctx context.Context, path string, chain []
 				}
 			}
 		default:
-			return nil, fmt.Errorf("Got HTTP Status %s: %s", httpResp.Status, errorBody)
+			return nil, fmt.Errorf("got HTTP Status %s: %s", httpResp.Status, errorBody)
 		}
 		httpStatus = httpResp.Status
 	}
