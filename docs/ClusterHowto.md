@@ -128,3 +128,19 @@ containers.
 
    The Log/Mirror binaries will log the git hash from which they were built,
    this can help to verify that they're running the correct version.
+
+## Troubleshooting / Workarounds
+
+### Health Checks on GCE
+
+There seems to be an issue with the way GCE load balancer / health checks are
+set up by the scripts that can prevent them working properly. If this happens
+the health check status in Networking -> Http Load Balancing ->
+mirror-lb-backend is not displayed and the message "Error loading health status"
+appears in its place.
+
+This issue is being investigated. As a workaround edit the backend service,
+remove the backend mirror groups but don't save yet. Then add all the mirror
+groups back again so everything looks like it did before. Now save the edited
+service. Wait for a few seconds and the health status should now be displayed
+correctly.

@@ -44,8 +44,7 @@ gcloud compute firewall-rules create ${INSTANCE_TYPE}-node-80 \
 for zone in ${ZONE_LIST}; do
   gcloud compute instance-groups unmanaged \
       create "${INSTANCE_TYPE}-group-${zone}" \
-      --zone ${zone} \
-      --network "default" &
+      --zone ${zone} &
 done
 wait
 
@@ -70,7 +69,7 @@ gcloud compute backend-services create "${INSTANCE_TYPE}-lb-backend" \
 
 for zone in ${ZONE_LIST}; do
   gcloud compute backend-services add-backend "${INSTANCE_TYPE}-lb-backend" \
-    --group "${INSTANCE_TYPE}-group-${zone}" \
+    --instance-group "${INSTANCE_TYPE}-group-${zone}" \
     --zone ${zone} \
     --balancing-mode "UTILIZATION" \
     --capacity-scaler "1" \
