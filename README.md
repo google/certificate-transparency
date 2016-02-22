@@ -53,6 +53,15 @@ replacing `branch` as appropriate
 gclient config --name="certificate-transparency" https://github.com/google/certificate-transparency.git@branch
 ```
 
+### Language Specific Notes ###
+
+#### Java ####
+Building the Java code from source requires the [Protocol Buffers
+compiler](https://developers.google.com/protocol-buffers/) installed, with the
+`protoc` binary in your path and `protobuf.jar` in the system jars directory.
+The location of `protobuf.jar` (or any other jar required for the Java build)
+can be overridden by specifying it in `local.properties`.
+
 ### Platform Specific Notes ###
 
 #### Fedora / CentOS ####
