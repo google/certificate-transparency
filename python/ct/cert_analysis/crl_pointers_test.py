@@ -5,12 +5,12 @@ import mock
 from ct.cert_analysis import base_check_test
 from ct.cert_analysis import crl_pointers
 from ct.crypto import cert
+from ct.test import test_config
 
-CRYPTO_TEST_DATA_DIR = "ct/crypto/testdata/"
-CERT_WITH_CRL = cert.Certificate.from_pem_file(CRYPTO_TEST_DATA_DIR +
-                                                "aia.pem")
-CERT_WITHOUT_CRL = cert.Certificate.from_pem_file(CRYPTO_TEST_DATA_DIR +
-                                                   "promise_com.pem")
+CERT_WITH_CRL = cert.Certificate.from_pem_file(
+        test_config.get_test_file_path("aia.pem"))
+CERT_WITHOUT_CRL = cert.Certificate.from_pem_file(
+        test_config.get_test_file_path("promise_com.pem"))
 
 class CrlPointersTest(base_check_test.BaseCheckTest):
     def test_crl_existence_exist(self):

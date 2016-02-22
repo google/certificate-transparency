@@ -8,13 +8,18 @@ from ct.client.db import cert_desc
 from ct.crypto import cert
 from ct.cert_analysis import all_checks
 from ct.cert_analysis import observation
+from ct.test import test_config
 from ct.test import time_utils
 import gflags
 
-CERT = cert.Certificate.from_der_file("ct/crypto/testdata/google_cert.der")
-CA_CERT = cert.Certificate.from_pem_file("ct/crypto/testdata/verisign_intermediate.pem")
-DSA_SHA256_CERT = cert.Certificate.from_der_file("ct/crypto/testdata/dsa_with_sha256.der")
-BAD_UTF8_CERT = cert.Certificate.from_pem_file("ct/crypto/testdata/cert_bad_utf8_subject.pem")
+CERT = cert.Certificate.from_der_file(
+        test_config.get_test_file_path("google_cert.der"))
+CA_CERT = cert.Certificate.from_pem_file(
+        test_config.get_test_file_path("verisign_intermediate.pem"))
+DSA_SHA256_CERT = cert.Certificate.from_der_file(
+        test_config.get_test_file_path("dsa_with_sha256.der"))
+BAD_UTF8_CERT = cert.Certificate.from_pem_file(
+        test_config.get_test_file_path("cert_bad_utf8_subject.pem"))
 
 class CertificateDescriptionTest(unittest.TestCase):
     def get_observations(self, source):

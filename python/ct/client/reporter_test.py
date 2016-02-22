@@ -12,19 +12,20 @@ from ct.client.db import sqlite_connection as sqlitecon
 from ct.crypto import cert
 from ct.proto import certificate_pb2
 from ct.proto import client_pb2
+from ct.test import test_config
 import gflags
 
 STRICT_DER = cert.Certificate.from_der_file(
-                    'ct/crypto/testdata/google_cert.der', False).to_der()
+        test_config.get_test_file_path('google_cert.der'), False).to_der()
 NON_STRICT_DER = cert.Certificate.from_pem_file(
-                    'ct/crypto/testdata/invalid_ip.pem', False).to_der()
+        test_config.get_test_file_path('invalid_ip.pem'), False).to_der()
 
-CHAIN_FILE = 'ct/crypto/testdata/google_chain.pem'
+CHAIN_FILE = test_config.get_test_file_path('google_chain.pem')
 
 CHAIN_DERS = [c.to_der() for c in cert.certs_from_pem_file(CHAIN_FILE)]
 
 SELF_SIGNED_ROOT_DER = cert.Certificate.from_pem_file(
-                    'ct/crypto/testdata/subrigo_net.pem', False).to_der()
+        test_config.get_test_file_path('subrigo_net.pem'), False).to_der()
 
 def readable_dn(dn_attribs):
     return ",".join(["%s=%s" % (attr.type, attr.value) for attr in dn_attribs])
