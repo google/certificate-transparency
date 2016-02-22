@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 import unittest
 
+import sys
 from collections import defaultdict
 from ct.cert_analysis import asn1
 from ct.cert_analysis import base_check_test
@@ -11,6 +12,7 @@ from ct.client.db import sqlite_connection as sqlitecon
 from ct.crypto import cert
 from ct.proto import certificate_pb2
 from ct.proto import client_pb2
+import gflags
 
 STRICT_DER = cert.Certificate.from_der_file(
                     'ct/crypto/testdata/google_cert.der', False).to_der()
@@ -174,4 +176,5 @@ class CertificateReportTest(base_check_test.BaseCheckTest):
         self.assertEqual(len(report.certs()), 1)
 
 if __name__ == '__main__':
+    sys.argv = gflags.FLAGS(sys.argv)
     unittest.main()

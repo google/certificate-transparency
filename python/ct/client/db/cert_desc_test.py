@@ -3,11 +3,13 @@
 import unittest
 
 import time
+import sys
 from ct.client.db import cert_desc
 from ct.crypto import cert
 from ct.cert_analysis import all_checks
 from ct.cert_analysis import observation
 from ct.test import time_utils
+import gflags
 
 CERT = cert.Certificate.from_der_file("ct/crypto/testdata/google_cert.der")
 CA_CERT = cert.Certificate.from_pem_file("ct/crypto/testdata/verisign_intermediate.pem")
@@ -194,4 +196,5 @@ class CertificateDescriptionTest(unittest.TestCase):
                          cert_desc.to_unicode("R\xED\xAF\xA0S"))
 
 if __name__ == "__main__":
+    sys.argv = gflags.FLAGS(sys.argv)
     unittest.main()
