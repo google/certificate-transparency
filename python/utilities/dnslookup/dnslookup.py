@@ -122,7 +122,7 @@ if __name__ == '__main__':
 
         prev = h
 
-    logging.info("path = %s" % map(base64.b64encode, audit_path))
+    logging.info('path = %s' % map(base64.b64encode, audit_path))
 
     assert verifier.verify_leaf_hash_inclusion(leaf_hash, index, audit_path,
                                                sth)
