@@ -24,21 +24,18 @@ ALL_LOGS_URL = 'https://www.certificate-transparency.org/known-logs/all_logs_lis
 basepath = os.path.dirname(sys.argv[0])
 sys.path.append(os.path.join(basepath, '../../../python'))
 from ct.crypto import merkle, verify
-from ct.proto import ct_pb2, client_pb2
-
-ctpath = os.path.join(basepath, '../../../cpp/client/ct')
-libpath = os.path.join(basepath, '../../../../install/lib')
+from ct.proto import client_pb2
 
 class CTDNSLookup:
-    def __init__(self, domain, verifier, nameservers, port = 53):
+    def __init__(self, domain, verifier, resolver=None):
         self.verifier = verifier
         self.domain = domain
-        self.resolver = dns.resolver.get_default_resolver()
-        self.resolver.nameservers = nameservers
-        self.resolver.port = port
+        self.resolver = resolver
+        if not self.resolver:
+            self.resolver = dns.resolver.get_default_resolver()
 
     def Get(self, name):
-        logging.info('get %s' % name)
+        logging.info('get %s', name)
         answers = self.resolver.query(name, 'TXT')
         assert answers.rdtype == dns.rdatatype.TXT
         return answers
@@ -68,18 +65,18 @@ class CTDNSLookup:
         return self.GetOne('%d.%d.%d.tree' % (level, index, size))
 
     def GetIndexFromHash(self, hash):
-        return self.GetOne('%s.hash' % base64.b32encode(hash).replace('=', ''))
+        return self.GetOne('%s.hash' % base64.b32encode(hash).rstrip('='))
 
 if __name__ == '__main__':
-    logging.basicConfig(level="INFO")
+    logging.basicConfig(level='INFO')
 
     index = sys.argv[1]
 
-    keypem = ("-----BEGIN PUBLIC KEY-----\n"
-              "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEfahLEimAoz2t01p\n"
-              "3uMziiLOl/fHTDM0YDOhBRuiBARsV4UvxG2LdNgoIGLrtCzWE0J\n"
-              "5APC2em4JlvR8EEEFMoA==\n"
-              "-----END PUBLIC KEY-----\n")
+    keypem = ('-----BEGIN PUBLIC KEY-----\n'
+              'MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEfahLEimAoz2t01p\n'
+              '3uMziiLOl/fHTDM0YDOhBRuiBARsV4UvxG2LdNgoIGLrtCzWE0J\n'
+              '5APC2em4JlvR8EEEFMoA==\n'
+              '-----END PUBLIC KEY-----\n')
     logurl = 'http://ct.googleapis.com/pilot';
     logdns = 'pilot.ct.googleapis.com'
 
@@ -88,7 +85,7 @@ if __name__ == '__main__':
     j = response.read()
     j = json.loads(j)
     leaf_input = j['entries'][0]['leaf_input']
-    logging.info('leaf = %s' % leaf_input)
+    logging.info('leaf = %s', leaf_input)
     leaf = base64.b64decode(leaf_input)
     leaf_hash = hashlib.sha256(chr(0) + leaf).digest()
 
@@ -97,11 +94,11 @@ if __name__ == '__main__':
     keyinfo.pem_key =  keypem
     log_verifier = verify.LogVerifier(keyinfo)
 
-    lookup = CTDNSLookup(logdns, log_verifier, ['8.8.8.8'])
+    lookup = CTDNSLookup(logdns, log_verifier)
     sth = lookup.GetSTH()
-    logging.info('sth = %s' % sth)
+    logging.info('sth = %s', sth)
 
-    logging.info('hash = %s' % base64.b64encode(leaf_hash))
+    logging.info('hash = %s', base64.b64encode(leaf_hash))
     verifier = merkle.MerkleVerifier()
     index = int(index)
     audit_path = []
@@ -109,7 +106,7 @@ if __name__ == '__main__':
     apl = verifier.audit_path_length(index, sth.tree_size)
     for level in range(0, apl):
         h = lookup.GetEntry(level, index, sth.tree_size)
-        logging.info('hash = %s' % base64.b64encode(h))
+        logging.info('hash = %s', base64.b64encode(h))
         audit_path.append(h[:32])
 
         if prev:
@@ -122,7 +119,7 @@ if __name__ == '__main__':
 
         prev = h
 
-    logging.info('path = %s' % map(base64.b64encode, audit_path))
+    logging.info('path = %s', map(base64.b64encode, audit_path))
 
     assert verifier.verify_leaf_hash_inclusion(leaf_hash, index, audit_path,
                                                sth)
