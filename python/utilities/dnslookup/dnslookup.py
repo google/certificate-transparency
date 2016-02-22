@@ -6,6 +6,8 @@
 # does not start with an SSL connection, but instead fetches a log entry by
 # index and then verifies the proof over DNS.
 
+# You will need to install DNSPython (http://www.dnspython.org/)
+
 import base64
 import dns.resolver
 import hashlib
@@ -31,18 +33,18 @@ class CTDNSLookup:
     def __init__(self, domain, verifier, nameservers, port = 53):
         self.verifier = verifier
         self.domain = domain
-        self.resolver = dns.resolver.Resolver(configure=False)
+        self.resolver = dns.resolver.get_default_resolver()
         self.resolver.nameservers = nameservers
         self.resolver.port = port
 
     def Get(self, name):
-        logging.info("get " + name)
+        logging.info('get %s' % name)
         answers = self.resolver.query(name, 'TXT')
         assert answers.rdtype == dns.rdatatype.TXT
         return answers
 
     def GetOne(self, name):
-        name += '.' + self.domain
+        name += '.%s' % self.domain
         answers = self.Get(name)
         assert len(answers) == 1
         txt = answers[0]
@@ -63,11 +65,10 @@ class CTDNSLookup:
         return sth
 
     def GetEntry(self, level, index, size):
-        return self.GetOne(str(level) + '.' + str(index) + '.' + str(size)
-                           + '.tree')
+        return self.GetOne('%d.%d.%d.tree' % (level, index, size))
 
     def GetIndexFromHash(self, hash):
-        return self.GetOne(base64.b32encode(hash)[:-4] + '.hash')
+        return self.GetOne('%s.hash' % base64.b32encode(hash).replace('=', ''))
 
 if __name__ == '__main__':
     logging.basicConfig(level="INFO")
@@ -82,12 +83,12 @@ if __name__ == '__main__':
     logurl = 'http://ct.googleapis.com/pilot';
     logdns = 'pilot.ct.googleapis.com'
 
-    response = urllib2.urlopen(logurl + '/ct/v1/get-entries?start=' + index
-                               + '&end=' + index)
+    response = urllib2.urlopen('%s/ct/v1/get-entries?start=%s&end=%s'
+                               %  (logurl, index, index))
     j = response.read()
     j = json.loads(j)
     leaf_input = j['entries'][0]['leaf_input']
-    logging.info('leaf = ' + leaf_input)
+    logging.info('leaf = %s' % leaf_input)
     leaf = base64.b64decode(leaf_input)
     leaf_hash = hashlib.sha256(chr(0) + leaf).digest()
 
@@ -98,9 +99,9 @@ if __name__ == '__main__':
 
     lookup = CTDNSLookup(logdns, log_verifier, ['8.8.8.8'])
     sth = lookup.GetSTH()
-    logging.info("sth = " + str(sth))
+    logging.info('sth = %s' % sth)
 
-    logging.info("hash = " + base64.b64encode(leaf_hash))
+    logging.info('hash = %s' % base64.b64encode(leaf_hash))
     verifier = merkle.MerkleVerifier()
     index = int(index)
     audit_path = []
@@ -108,7 +109,7 @@ if __name__ == '__main__':
     apl = verifier.audit_path_length(index, sth.tree_size)
     for level in range(0, apl):
         h = lookup.GetEntry(level, index, sth.tree_size)
-        logging.info("hash = " + base64.b64encode(h))
+        logging.info('hash = %s' % base64.b64encode(h))
         audit_path.append(h[:32])
 
         if prev:
@@ -121,7 +122,7 @@ if __name__ == '__main__':
 
         prev = h
 
-    logging.info("path = " + str(map(base64.b64encode, audit_path)))
+    logging.info("path = %s" % map(base64.b64encode, audit_path))
 
     assert verifier.verify_leaf_hash_inclusion(leaf_hash, index, audit_path,
                                                sth)
