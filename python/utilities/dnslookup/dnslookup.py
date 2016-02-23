@@ -14,12 +14,8 @@ import hashlib
 import json
 import logging
 import os
-import subprocess
 import sys
-import tempfile
 import urllib2
-
-ALL_LOGS_URL = 'https://www.certificate-transparency.org/known-logs/all_logs_list.json'
 
 basepath = os.path.dirname(sys.argv[0])
 sys.path.append(os.path.join(basepath, '../../../python'))
