@@ -3,18 +3,13 @@
 
 import unittest
 
-import gflags
 import time
-import sys
 from ct.crypto import cert
 from ct.crypto import error
 from ct.crypto.asn1 import oid
 from ct.crypto.asn1 import x509_extension as x509_ext
 from ct.crypto.asn1 import x509_name
-
-FLAGS = gflags.FLAGS
-gflags.DEFINE_string("testdata_dir", "ct/crypto/testdata",
-                     "Location of test certs")
+from ct.test import test_config
 
 class CertificateTest(unittest.TestCase):
     _PEM_FILE = "google_cert.pem"
@@ -111,10 +106,10 @@ class CertificateTest(unittest.TestCase):
 
     @property
     def pem_file(self):
-        return FLAGS.testdata_dir + "/" + self._PEM_FILE
+        return test_config.get_test_file_path(self._PEM_FILE)
 
     def get_file(self, filename):
-        return FLAGS.testdata_dir + "/" + filename
+        return test_config.get_test_file_path(filename)
 
     def cert_from_pem_file(self, filename, strict=True):
         return cert.Certificate.from_pem_file(
@@ -745,5 +740,4 @@ class CertificateTest(unittest.TestCase):
 
 
 if __name__ == "__main__":
-    sys.argv = FLAGS(sys.argv)
     unittest.main()

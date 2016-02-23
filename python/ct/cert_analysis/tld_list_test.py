@@ -3,13 +3,13 @@
 import unittest
 
 from ct.cert_analysis import tld_list
+from ct.test import test_config
 
-TLD_DIR = "ct/cert_analysis/test_data/"
 TLD_FILE  = "test_tld_list"
 
 class TLDListTest(unittest.TestCase):
     def default_list(self):
-        return tld_list.TLDList(tld_dir=TLD_DIR,
+        return tld_list.TLDList(tld_dir=test_config.get_tld_directory(),
                                 tld_file_name=TLD_FILE)
 
     def test_tld_list_example_matches(self):

@@ -7,6 +7,7 @@ from ct.cert_analysis import base_check_test
 from ct.cert_analysis import dnsnames
 from ct.cert_analysis import tld_list
 from ct.cert_analysis import tld_check
+from ct.test import test_config
 
 def gen_dns_name(name):
     dns_name = mock.Mock()
@@ -17,9 +18,6 @@ def cert_with_urls(*args):
     certificate = mock.MagicMock()
     certificate.subject_dns_names = mock.Mock(return_value=list(args))
     return certificate
-
-tlds = tld_list.TLDList(tld_dir="ct/cert_analysis/test_data/",
-                        tld_file_name="test_tld_list")
 
 EXAMPLE = gen_dns_name("example.com")
 EXAMPLE_WILDCARD = gen_dns_name("*.example.com")
@@ -34,7 +32,7 @@ NON_UNICODE_TLD = gen_dns_name("\xff\x00.com")
 class DnsnamesTest(base_check_test.BaseCheckTest):
     def setUp(self):
         tld_check.CheckTldMatches.TLD_LIST_ = tld_list.TLDList(
-                tld_dir="ct/cert_analysis/test_data/",
+                tld_dir=test_config.get_tld_directory(),
                 tld_file_name="test_tld_list")
 
     def test_dnsnames_valid(self):

@@ -1,6 +1,7 @@
 #!/usr/bin/env python
-import mock
 import unittest
+
+import mock
 from ct.client import db_reporter
 
 

@@ -8,6 +8,7 @@ from ct.cert_analysis import common_name
 from ct.cert_analysis import tld_check
 from ct.cert_analysis import tld_list
 from ct.crypto import cert
+from ct.test import test_config
 
 def gen_common_name(name):
     common_name = mock.Mock()
@@ -19,9 +20,6 @@ def cert_with_urls(*args):
     certificate.subject_common_names = mock.Mock(return_value=list(args))
     return certificate
 
-tlds = tld_list.TLDList(tld_dir="ct/cert_analysis/test_data/",
-                        tld_file_name="test_tld_list")
-
 EXAMPLE = gen_common_name("example.com")
 NOT_TLD = gen_common_name("asdf.asdf")
 CA_NAME = gen_common_name("Trusty CA Ltd.")
@@ -31,7 +29,7 @@ NON_UNICODE_TLD = gen_common_name("\xff\x00.com")
 class CommonNameTest(base_check_test.BaseCheckTest):
     def setUp(self):
         tld_check.CheckTldMatches.TLD_LIST_ = tld_list.TLDList(
-                tld_dir="ct/cert_analysis/test_data/",
+                tld_dir=test_config.get_tld_directory(),
                 tld_file_name="test_tld_list")
 
     def test_common_name_tld_match(self):
