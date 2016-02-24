@@ -19,7 +19,7 @@ import urllib2
 
 basepath = os.path.dirname(sys.argv[0])
 sys.path.append(os.path.join(basepath, '../../../python'))
-from ct.crypto import merkle, verify
+from ct.crypto import merkle, pem, verify
 from ct.proto import client_pb2
 
 class CTDNSLookup:
@@ -85,9 +85,7 @@ if __name__ == '__main__':
     leaf = base64.b64decode(leaf_input)
     leaf_hash = hashlib.sha256(chr(0) + leaf).digest()
 
-    keyinfo = client_pb2.KeyInfo()
-    keyinfo.type = keyinfo.ECDSA
-    keyinfo.pem_key =  keypem
+    keyinfo = verify.create_key_info_from_raw_key(pem.from_pem(keypem, 'PUBLIC KEY'))
     log_verifier = verify.LogVerifier(keyinfo)
 
     lookup = CTDNSLookup(logdns, log_verifier)
