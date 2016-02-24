@@ -122,7 +122,6 @@ class PemReader(object):
                 line = line.rstrip("\r\n")
                 # PEM (RFC 1421) allows arbitrary comments between PEM blocks
                 # so we skip over those
-                print line, self.__marker_dict
                 if line in self.__marker_dict:
                     marker = self.__marker_dict[line]
                     break

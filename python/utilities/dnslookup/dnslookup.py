@@ -85,7 +85,7 @@ if __name__ == '__main__':
     leaf = base64.b64decode(leaf_input)
     leaf_hash = hashlib.sha256(chr(0) + leaf).digest()
 
-    keyinfo = verify.create_key_info_from_raw_key(pem.from_pem(keypem, 'PUBLIC KEY'))
+    keyinfo = verify.create_key_info_from_raw_key(pem.from_pem(keypem, 'PUBLIC KEY')[0])
     log_verifier = verify.LogVerifier(keyinfo)
 
     lookup = CTDNSLookup(logdns, log_verifier)
