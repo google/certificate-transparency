@@ -4,6 +4,7 @@ import base64
 import StringIO
 
 from ct.crypto import error
+import types
 
 
 class PemError(error.EncodingError):
@@ -24,8 +25,8 @@ class PemReader(object):
 
         Args:
             fileobj: the file object to read from.
-            markers: an iterable of markers accepted by the reader, e.g.,
-                CERTIFICATE, RSA PUBLIC KEY, etc.
+            markers: a single string or an iterable of markers accepted by the
+                reader, e.g., CERTIFICATE, RSA PUBLIC KEY, etc.
             skip_invalid_blobs: if False, invalid PEM blobs cause a PemError.
                 If True, invalid blobs are skipped. In non-skip mode, an
                 immediate StopIteration before any valid blocks are found, also
@@ -34,6 +35,8 @@ class PemReader(object):
         Raises:
             PemError: invalid PEM contents.
         """
+        if type(markers) in types.StringTypes:
+            markers = (markers,)
         self.__f = fileobj
         self.__marker_dict = ({(_START_TEMPLATE % m): m for m in markers})
         self.__valid_blobs_read = 0
@@ -119,6 +122,7 @@ class PemReader(object):
                 line = line.rstrip("\r\n")
                 # PEM (RFC 1421) allows arbitrary comments between PEM blocks
                 # so we skip over those
+                print line, self.__marker_dict
                 if line in self.__marker_dict:
                     marker = self.__marker_dict[line]
                     break
