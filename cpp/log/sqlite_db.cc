@@ -61,33 +61,35 @@ sqlite3* SQLiteOpen(const string& dbfile) {
   if (ret == SQLITE_OK) {
     return retval;
   }
-  CHECK_EQ(SQLITE_CANTOPEN, ret);
+  CHECK_EQ(SQLITE_CANTOPEN, ret) << sqlite3_errmsg(retval);
 
   // We have to close and reopen to avoid memory leaks.
-  CHECK_EQ(SQLITE_OK, sqlite3_close(retval));
+  CHECK_EQ(SQLITE_OK, sqlite3_close(retval)) << sqlite3_errmsg(retval);
   retval = nullptr;
 
   CHECK_EQ(SQLITE_OK,
            sqlite3_open_v2(dbfile.c_str(), &retval,
                            SQLITE_OPEN_READWRITE | SQLITE_OPEN_CREATE,
-                           nullptr));
+                           nullptr)) << sqlite3_errmsg(retval);
   CHECK_EQ(SQLITE_OK, sqlite3_exec(retval,
                                    "CREATE TABLE leaves(hash BLOB, "
                                    "entry BLOB, sequence INTEGER UNIQUE)",
-                                   nullptr, nullptr, nullptr));
+                                   nullptr, nullptr, nullptr)) <<
+      sqlite3_errmsg(retval);
   CHECK_EQ(SQLITE_OK, sqlite3_exec(retval,
                                    "CREATE INDEX leaves_hash_idx ON "
                                    "leaves(hash)",
-                                   nullptr, nullptr, nullptr));
+                                   nullptr, nullptr, nullptr)) <<
+      sqlite3_errmsg(retval);;
   CHECK_EQ(SQLITE_OK,
            sqlite3_exec(
                retval,
                "CREATE TABLE trees(sth BLOB UNIQUE, timestamp INTEGER UNIQUE)",
-               nullptr, nullptr, nullptr));
+               nullptr, nullptr, nullptr)) << sqlite3_errmsg(retval);
 
   CHECK_EQ(SQLITE_OK,
            sqlite3_exec(retval, "CREATE TABLE node(node_id BLOB UNIQUE)",
-                        nullptr, nullptr, nullptr));
+                        nullptr, nullptr, nullptr)) << sqlite3_errmsg(retval);
 
   LOG(INFO) << "New SQLite database created in " << dbfile;
 
@@ -139,7 +141,7 @@ SQLiteDB::SQLiteDB(const string& dbfile)
     ostringstream oss;
     oss << "PRAGMA synchronous = " << FLAGS_sqlite_synchronous_mode;
     sqlite::Statement statement(db_, oss.str().c_str());
-    CHECK_EQ(SQLITE_DONE, statement.Step());
+    CHECK_EQ(SQLITE_DONE, statement.Step()) << sqlite3_errmsg(db_);
     LOG(WARNING) << "SQLite \"synchronous\" pragma set to "
                  << FLAGS_sqlite_synchronous_mode;
     if (FLAGS_sqlite_batch_into_transactions) {
@@ -152,18 +154,18 @@ SQLiteDB::SQLiteDB(const string& dbfile)
     ostringstream oss;
     oss << "PRAGMA journal_mode = " << FLAGS_sqlite_journal_mode;
     sqlite::Statement statement(db_, oss.str().c_str());
-    CHECK_EQ(SQLITE_ROW, statement.Step());
+    CHECK_EQ(SQLITE_ROW, statement.Step()) << sqlite3_errmsg(db_);
     string mode;
     statement.GetBlob(0, &mode);
     CHECK_STRCASEEQ(mode.c_str(), FLAGS_sqlite_journal_mode.c_str());
-    CHECK_EQ(SQLITE_DONE, statement.Step());
+    CHECK_EQ(SQLITE_DONE, statement.Step()) << sqlite3_errmsg(db_);
   }
 
   {
     ostringstream oss;
     oss << "PRAGMA cache_size = " << FLAGS_sqlite_cache_size;
     sqlite::Statement statement(db_, oss.str().c_str());
-    CHECK_EQ(SQLITE_DONE, statement.Step());
+    CHECK_EQ(SQLITE_DONE, statement.Step()) << sqlite3_errmsg(db_);
   }
 
   BeginTransaction(lock);
@@ -171,7 +173,7 @@ SQLiteDB::SQLiteDB(const string& dbfile)
 
 
 SQLiteDB::~SQLiteDB() {
-  CHECK_EQ(SQLITE_OK, sqlite3_close(db_));
+  CHECK_EQ(SQLITE_OK, sqlite3_close(db_)) << sqlite3_errmsg(db_);
 }
 
 
@@ -217,7 +219,7 @@ Database::WriteResult SQLiteDB::CreateSequencedEntry_(
     }
     return this->SEQUENCE_NUMBER_ALREADY_IN_USE;
   }
-  CHECK_EQ(SQLITE_DONE, ret);
+  CHECK_EQ(SQLITE_DONE, ret) << sqlite3_errmsg(db_);
 
   if (logged.sequence_number() == tree_size_) {
     ++tree_size_;
@@ -244,7 +246,7 @@ Database::LookupResult SQLiteDB::LookupByHash(const string& hash,
   if (ret == SQLITE_DONE) {
     return this->NOT_FOUND;
   }
-  CHECK_EQ(SQLITE_ROW, ret);
+  CHECK_EQ(SQLITE_ROW, ret) << sqlite3_errmsg(db_);
 
   string data;
   statement.GetBlob(0, &data);
@@ -362,7 +364,7 @@ Database::WriteResult SQLiteDB::WriteTreeHead_(const ct::SignedTreeHead& sth) {
                          "SELECT timestamp,sth FROM trees "
                          "WHERE timestamp = ?");
     s2.BindUInt64(0, sth.timestamp());
-    CHECK_EQ(SQLITE_ROW, s2.Step());
+    CHECK_EQ(SQLITE_ROW, s2.Step()) << sqlite3_errmsg(db_);
     string existing_sth_data;
     s2.GetBlob(1, &existing_sth_data);
     if (existing_sth_data == sth_data) {
@@ -371,7 +373,7 @@ Database::WriteResult SQLiteDB::WriteTreeHead_(const ct::SignedTreeHead& sth) {
     }
     return this->DUPLICATE_TREE_HEAD_TIMESTAMP;
   }
-  CHECK_EQ(SQLITE_DONE, r2);
+  CHECK_EQ(SQLITE_DONE, r2) << sqlite3_errmsg(db_);
 
   EndTransaction(lock);
   BeginTransaction(lock);
@@ -415,7 +417,7 @@ int64_t SQLiteDB::TreeSize() const {
     ++tree_size_;
     ret = statement.Step();
   }
-  CHECK_EQ(SQLITE_DONE, ret);
+  CHECK_EQ(SQLITE_DONE, ret) << sqlite3_errmsg(db_);
 
   return tree_size_;
 }
@@ -458,7 +460,7 @@ void SQLiteDB::InitializeNode(const string& node_id) {
   statement.BindBlob(0, node_id);
 
   const int result(statement.Step());
-  CHECK_EQ(SQLITE_DONE, result);
+  CHECK_EQ(SQLITE_DONE, result) << sqlite3_errmsg(db_);
 }
 
 
@@ -479,11 +481,12 @@ Database::LookupResult SQLiteDB::NodeId(const unique_lock<mutex>& lock,
   if (result == SQLITE_DONE) {
     return this->NOT_FOUND;
   }
-  CHECK_EQ(SQLITE_ROW, result);
+  CHECK_EQ(SQLITE_ROW, result) << sqlite3_errmsg(db_);
 
   statement.GetBlob(0, node_id);
   result = statement.Step();
-  CHECK_EQ(SQLITE_DONE, result);  // There can only be one!
+  // There can only be one!
+  CHECK_EQ(SQLITE_DONE, result) << sqlite3_errmsg(db_);
   return this->LOOKUP_OK;
 }
 
@@ -495,7 +498,7 @@ void SQLiteDB::BeginTransaction(const unique_lock<mutex>& lock) {
     CHECK(!in_transaction_);
     VLOG(1) << "Beginning new transaction.";
     sqlite::Statement s(db_, "BEGIN TRANSACTION");
-    CHECK_EQ(SQLITE_DONE, s.Step());
+    CHECK_EQ(SQLITE_DONE, s.Step()) << sqlite3_errmsg(db_);
     in_transaction_ = true;
   }
 }
@@ -508,12 +511,12 @@ void SQLiteDB::EndTransaction(const unique_lock<mutex>& lock) {
     VLOG(1) << "Committing transaction.";
     {
       sqlite::Statement s(db_, "END TRANSACTION");
-      CHECK_EQ(SQLITE_DONE, s.Step());
+      CHECK_EQ(SQLITE_DONE, s.Step()) << sqlite3_errmsg(db_);
     }
     {
       sqlite::Statement s(db_, "PRAGMA wal_checkpoint(TRUNCATE)");
-      CHECK_EQ(SQLITE_ROW, s.Step());
-      CHECK_EQ(SQLITE_DONE, s.Step());
+      CHECK_EQ(SQLITE_ROW, s.Step()) << sqlite3_errmsg(db_);
+      CHECK_EQ(SQLITE_DONE, s.Step()) << sqlite3_errmsg(db_);
     }
 
     transaction_size_ = 0;
@@ -564,7 +567,7 @@ Database::LookupResult SQLiteDB::LatestTreeHeadNoLock(
   if (ret == SQLITE_DONE) {
     return this->NOT_FOUND;
   }
-  CHECK_EQ(SQLITE_ROW, ret);
+  CHECK_EQ(SQLITE_ROW, ret) << sqlite3_errmsg(db_);
 
   string sth;
   statement.GetBlob(0, &sth);

@@ -14,15 +14,16 @@ SQLiteDB::SQLiteDB(const string& dbfile) : db_(NULL) {
   int ret = sqlite3_open_v2(dbfile.c_str(), &db_, SQLITE_OPEN_READWRITE, NULL);
   if (ret == SQLITE_OK)
     return;
-  CHECK_EQ(SQLITE_CANTOPEN, ret);
+  CHECK_EQ(SQLITE_CANTOPEN, ret) << sqlite3_errmsg(db_);
 
   // We have to close and reopen to avoid memory leaks.
-  CHECK_EQ(SQLITE_OK, sqlite3_close(db_));
+  CHECK_EQ(SQLITE_OK, sqlite3_close(db_)) << sqlite3_errmsg(db_);
   db_ = NULL;
 
   CHECK_EQ(SQLITE_OK,
            sqlite3_open_v2(dbfile.c_str(), &db_,
-                           SQLITE_OPEN_READWRITE | SQLITE_OPEN_CREATE, NULL));
+                           SQLITE_OPEN_READWRITE | SQLITE_OPEN_CREATE, NULL)) <<
+      sqlite3_errmsg(db_);
 
   // HINT: AUTOINCREMENT starts at 1
 
@@ -35,7 +36,7 @@ SQLiteDB::SQLiteDB(const string& dbfile) : db_(NULL) {
                         "leaf_hash BLOB, "  // hash of MerkleTreeLeaf
                         "leaf BLOB"         // MerkleTreeLeaf
                         ")",
-                        NULL, NULL, NULL));
+                        NULL, NULL, NULL)) << sqlite3_errmsg(db_);
 
   CHECK_EQ(SQLITE_OK, sqlite3_exec(db_,
                                    "CREATE TABLE trees("
@@ -44,21 +45,23 @@ SQLiteDB::SQLiteDB(const string& dbfile) : db_(NULL) {
                                    "timestamp INTEGER UNIQUE, "
                                    "tree_size INTEGER, "
                                    "sth BLOB)",
-                                   NULL, NULL, NULL));
+                                   NULL, NULL, NULL)) << sqlite3_errmsg(db_);
 
   LOG(INFO) << "New SQLite database created in " << dbfile;
 }
 
 SQLiteDB::~SQLiteDB() {
-  CHECK_EQ(SQLITE_OK, sqlite3_close(db_));
+  CHECK_EQ(SQLITE_OK, sqlite3_close(db_)) << sqlite3_errmsg(db_);
 }
 
 void SQLiteDB::BeginTransaction() {
-  CHECK_EQ(SQLITE_OK, sqlite3_exec(db_, "BEGIN;", NULL, NULL, NULL));
+  CHECK_EQ(SQLITE_OK, sqlite3_exec(db_, "BEGIN;", NULL, NULL, NULL)) <<
+      sqlite3_errmsg(db_);
 }
 
 void SQLiteDB::EndTransaction() {
-  CHECK_EQ(SQLITE_OK, sqlite3_exec(db_, "COMMIT;", NULL, NULL, NULL));
+  CHECK_EQ(SQLITE_OK, sqlite3_exec(db_, "COMMIT;", NULL, NULL, NULL)) <<
+      sqlite3_errmsg(db_);
 }
 
 SQLiteDB::WriteResult SQLiteDB::CreateEntry_(const std::string& leaf,
@@ -115,7 +118,7 @@ SQLiteDB::LookupResult SQLiteDB::LookupLatestWrittenSTH(
   int ret = statement.Step();
   if (ret == SQLITE_DONE)
     return this->NOT_FOUND;
-  CHECK_EQ(SQLITE_ROW, ret);
+  CHECK_EQ(SQLITE_ROW, ret) << sqlite3_errmsg(db_);
 
   string sth;
   statement.GetBlob(0, &sth);
@@ -161,7 +164,7 @@ SQLiteDB::LookupResult SQLiteDB::LookupSTHByTimestamp(
   if (ret == SQLITE_DONE)
     return this->NOT_FOUND;
 
-  CHECK_EQ(SQLITE_ROW, ret);
+  CHECK_EQ(SQLITE_ROW, ret) << sqlite3_errmsg(db_);
 
   string sth;
   statement.GetBlob(0, &sth);
@@ -181,10 +184,10 @@ SQLiteDB::LookupResult SQLiteDB::LookupVerificationLevel(
   if (ret == SQLITE_DONE)
     return this->NOT_FOUND;
 
-  CHECK_EQ(SQLITE_ROW, ret);
+  CHECK_EQ(SQLITE_ROW, ret) << sqlite3_errmsg(db_);
   *result = SQLiteDB::VerificationLevel(statement.GetUInt64(0));
 
-  CHECK_EQ(statement.Step(), SQLITE_DONE);
+  CHECK_EQ(SQLITE_DONE, statement.Step()) << sqlite3_errmsg(db_);
   return this->LOOKUP_OK;
 }
 
