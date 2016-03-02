@@ -573,6 +573,9 @@ static void WriteSSLClientCTData(const SSLClientCTData& ct_data,
 static SSLClient::HandshakeResult Connect() {
   LogVerifier* verifier = GetLogVerifierFromFlags();
 
+  CHECK(!FLAGS_ssl_server.empty()) << "Must specify --ssl_server";
+  CHECK_NE(0, FLAGS_ssl_server_port) << "Must specify --ssl_server_port";
+
   SSLClient client(FLAGS_ssl_server, FLAGS_ssl_server_port,
                    FLAGS_ssl_client_trusted_cert_dir, verifier);
 
