@@ -65,8 +65,8 @@ int SSLClient::ExtensionCallback(SSL*, unsigned ext_type,
 }
 
 // TODO(ekasper): handle Cert::Status errors.
-SSLClient::SSLClient(const string& server, uint16_t port, const string& ca_dir,
-                     LogVerifier* verifier)
+SSLClient::SSLClient(const string& server, const string& port,
+                     const string& ca_dir, LogVerifier* verifier)
     : client_(server, port),
       ctx_(CHECK_NOTNULL(SSL_CTX_new(TLSv1_client_method()))),
       verify_args_(verifier),

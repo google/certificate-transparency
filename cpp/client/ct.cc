@@ -43,7 +43,7 @@ DEFINE_string(ssl_client_trusted_cert_dir, "",
 DEFINE_string(ct_server_public_key, "",
               "PEM-encoded public key file of the CT log server");
 DEFINE_string(ssl_server, "", "SSL server to connect to");
-DEFINE_int32(ssl_server_port, 0, "SSL server port");
+DEFINE_string(ssl_server_port, "", "SSL server port");
 DEFINE_string(ct_server_submission, "",
               "Certificate chain to submit to a CT log server. "
               "The file must consist of concatenated PEM certificates.");
@@ -575,7 +575,7 @@ static SSLClient::HandshakeResult Connect() {
   LogVerifier* verifier = GetLogVerifierFromFlags();
 
   CHECK(!FLAGS_ssl_server.empty()) << "Must specify --ssl_server";
-  CHECK_NE(0, FLAGS_ssl_server_port) << "Must specify --ssl_server_port";
+  CHECK(!FLAGS_ssl_server_port.empty()) << "Must specify --ssl_server_port";
 
   SSLClient client(FLAGS_ssl_server, FLAGS_ssl_server_port,
                    FLAGS_ssl_client_trusted_cert_dir, verifier);
