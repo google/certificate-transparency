@@ -51,6 +51,9 @@ DEFINE_int32(tree_signing_frequency_seconds, 600,
              "server select loop, at least this period has elapsed since the "
              "last signing. Set this well below the MMD to ensure we sign in "
              "a timely manner. Must be greater than 0.");
+DEFINE_bool(read_only, false,
+            "Set to make this server refuse to accept add-[pre-]chain requests"
+            ", or perform signing runs.");
 
 namespace libevent = cert_trans::libevent;
 
@@ -65,6 +68,7 @@ using std::function;
 using std::make_shared;
 using std::shared_ptr;
 using std::string;
+using std::unique_ptr;
 
 static const int kCtimeBufSize = 26;
 
@@ -189,9 +193,10 @@ int main(int argc, char* argv[]) {
   ERR_load_crypto_strings();
   cert_trans::LoadCtExtensions();
 
-  EVP_PKEY* pkey = NULL;
-  CHECK_EQ(ReadPrivateKey(&pkey, FLAGS_key), cert_trans::util::KEY_OK);
-  LogSigner log_signer(pkey);
+  if (FLAGS_read_only) {
+    LOG(WARNING) << "Starting in READ-ONLY mode.";
+  }
+
 
   CertChecker checker;
   CHECK(checker.LoadTrustedCertificates(FLAGS_trusted_cert_file))
@@ -220,28 +225,37 @@ int main(int argc, char* argv[]) {
   evthread_use_pthreads();
   const shared_ptr<libevent::Base> event_base(make_shared<libevent::Base>());
 
-  Frontend frontend(new CertSubmissionHandler(&checker),
-                    new FrontendSigner(db, &log_signer));
-  TreeSigner<LoggedCertificate> tree_signer(db, &log_signer);
   LogLookup<LoggedCertificate> log_lookup(db);
 
-  // This function is called "sign", but it also loads the LogLookup
-  // object from the database as a side-effect.
-  SignMerkleTree(&tree_signer, &log_lookup);
+  unique_ptr<LogSigner> log_signer;
+  unique_ptr<Frontend> frontend;
+  unique_ptr<TreeSigner<LoggedCertificate>> tree_signer;
+  if (!FLAGS_read_only) {
+    EVP_PKEY* pkey = NULL;
+    CHECK_EQ(ReadPrivateKey(&pkey, FLAGS_key), cert_trans::util::KEY_OK);
+    log_signer.reset(new LogSigner(pkey));
+    frontend.reset(new Frontend(new CertSubmissionHandler(&checker),
+                                new FrontendSigner(db, log_signer.get())));
+    tree_signer.reset(new TreeSigner<LoggedCertificate>(db, log_signer.get()));
+    SignMerkleTree(tree_signer.get(), &log_lookup);
 
-  const time_t last_update(
-      static_cast<time_t>(tree_signer.LastUpdateTime() / 1000));
-  if (last_update > 0) {
-    char buf[kCtimeBufSize];
-    LOG(INFO) << "Last tree update was at " << ctime_r(&last_update, buf);
+    const time_t last_update(
+        static_cast<time_t>(tree_signer->LastUpdateTime() / 1000));
+    if (last_update > 0) {
+      char buf[kCtimeBufSize];
+      LOG(INFO) << "Last tree update was at " << ctime_r(&last_update, buf);
+    }
   }
 
   ThreadPool pool;
-  HttpHandler handler(&log_lookup, db, &checker, &frontend, &pool);
+  HttpHandler handler(&log_lookup, db, &checker, frontend.get(), &pool);
 
-  PeriodicCallback tree_event(event_base, FLAGS_tree_signing_frequency_seconds,
-                              bind(&SignMerkleTree, &tree_signer,
-                                   &log_lookup));
+  unique_ptr<PeriodicCallback> tree_event;
+  if (!FLAGS_read_only) {
+    tree_event.reset(new PeriodicCallback(
+        event_base, FLAGS_tree_signing_frequency_seconds,
+        bind(&SignMerkleTree, tree_signer.get(), &log_lookup)));
+  }
 
   libevent::HttpServer server(*event_base);
   handler.Add(&server);
