@@ -1,5 +1,5 @@
 FROM ubuntu
-RUN echo 'Building new SuperDuper Docker image...'
+RUN echo 'Building new SuperDuper XJSON Docker image...'
 COPY test/testdata/ca-cert.pem /tmp/
 RUN apt-get update && \
     apt-get install -y software-properties-common && \
@@ -8,11 +8,9 @@ RUN apt-get update && \
     apt-get install -qqy \
         ca-certificates \
         etcdctl
-RUN update-ca-certificates && \
-    cat /etc/ssl/certs/* /tmp/ca-cert.pem > /usr/local/etc/ctlog_ca_roots.pem
 RUN groupadd -r ctlog && useradd -r -g ctlog ctlog
 RUN mkdir /mnt/ctlog
-COPY cpp/server/ct-server /usr/local/bin/
+COPY cpp/server/xjson-server /usr/local/bin/
 COPY test/testdata/ct-server-key.pem /usr/local/etc/server-key.pem
 COPY cpp/tools/ct-clustertool /usr/local/bin/
 VOLUME /mnt/ctlog
@@ -27,11 +25,10 @@ CMD cd /mnt/ctlog/ && \
     echo "Project: ${PROJECT}" && \
     echo "Monitoring: ${MONITORING}" && \
     ulimit -c unlimited && \
-    /usr/local/bin/ct-server \
+    /usr/local/bin/xjson-server \
         --port=80 \
         --server=${CONTAINER_HOST} \
         --key=/usr/local/etc/server-key.pem \
-        --trusted_cert_file=/usr/local/etc/ctlog_ca_roots.pem \
         --log_dir=/mnt/ctlog/logs \
         --tree_signing_frequency_seconds=30 \
         --guard_window_seconds=10 \
@@ -46,7 +43,7 @@ CMD cd /mnt/ctlog/ && \
       CORE_DIR="/mnt/ctlog/cores/$(date +%s)"; \
       mkdir -p ${CORE_DIR}; \
       cp -v core ${CORE_DIR}; \
-      cp -v /usr/local/bin/ct-server ${CORE_DIR}; \
+      cp -v /usr/local/bin/xjson-server ${CORE_DIR}; \
       echo "Core saved to ${CORE_DIR}"; \
     fi
 
