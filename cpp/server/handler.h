@@ -39,7 +39,7 @@ class HttpHandler {
   void AddChain(evhttp_request* req);
   void AddPreChain(evhttp_request* req);
 
-  void BlockingGetEntries(evhttp_request* req, int start, int end) const;
+  void BlockingGetEntries(evhttp_request* req, int start, int end, bool include_scts) const;
   void BlockingAddChain(evhttp_request* req,
                         const std::shared_ptr<CertChain>& chain) const;
   void BlockingAddPreChain(evhttp_request* req,
