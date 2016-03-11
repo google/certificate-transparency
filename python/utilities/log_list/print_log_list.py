@@ -13,6 +13,7 @@ import M2Crypto
 
 from cpp_generator import generate_cpp_header
 from java_generator import generate_java_source
+from openssl_generator import generate_openssl_conf
 
 FLAGS = gflags.FLAGS
 
@@ -30,6 +31,8 @@ gflags.DEFINE_string("java_output", None,
                      "If specifed, generates Java code.")
 gflags.DEFINE_string("java_class", "org.conscrypt.ct.KnownLogs",
                      "Fully qualified name of the generated class.")
+gflags.DEFINE_string("openssl_output", None,
+                     "If specified, generates a CONF file for OpenSSL.")
 gflags.DEFINE_boolean("skip_signature_check", False,
                      "Skip signature check (only validate schema).")
 
@@ -92,6 +95,8 @@ def run():
         generate_cpp_header(parsed_json, FLAGS.header_output)
     if FLAGS.java_output:
         generate_java_source(parsed_json, FLAGS.java_output, FLAGS.java_class)
+    if FLAGS.openssl_output:
+        generate_openssl_conf(parsed_json, FLAGS.openssl_output)
 
     if not FLAGS.header_output and not FLAGS.java_output:
         print_formatted_log_list(parsed_json)
