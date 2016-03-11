@@ -8,3 +8,4 @@ requests>=1.0
 Twisted>=12.1
 bitstring
 pycrypto>=2.5
+jsonschema
