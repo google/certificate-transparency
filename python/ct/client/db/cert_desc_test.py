@@ -20,6 +20,10 @@ DSA_SHA256_CERT = cert.Certificate.from_der_file(
         test_config.get_test_file_path("dsa_with_sha256.der"))
 BAD_UTF8_CERT = cert.Certificate.from_pem_file(
         test_config.get_test_file_path("cert_bad_utf8_subject.pem"))
+DOMAIN_IN_ISSUER_CERT = cert.Certificate.from_pem_file(
+        test_config.get_test_file_path("domain_in_issuer.pem"))
+DOMAIN_IN_O_COMPONENT = cert.Certificate.from_pem_file(
+        test_config.get_test_file_path("domain_in_o_component.pem"))
 
 class CertificateDescriptionTest(unittest.TestCase):
     def get_observations(self, source):
@@ -176,6 +180,16 @@ class CertificateDescriptionTest(unittest.TestCase):
 
         proto = cert_desc.from_cert(cert, self.get_observations(cert))
 
+    def test_does_not_reverse_domain_names_in_ou(self):
+        ou = [t for t in cert_desc.from_cert(DOMAIN_IN_ISSUER_CERT).issuer
+              if t.type == "OU"][0]
+        self.assertEqual("www.digicert.com", ou.value)
+
+    def test_does_not_reverse_domain_names_in_o_component(self):
+        ou = [t for t in cert_desc.from_cert(DOMAIN_IN_O_COMPONENT).subject
+              if t.type == "O"][0]
+        self.assertEqual("go-greenevents.com", ou.value)
+
     def test_process_value(self):
         self.assertEqual(["London"], cert_desc.process_name("London"))
         self.assertEqual(["Bob Smith"], cert_desc.process_name("Bob Smith"))
@@ -199,6 +213,7 @@ class CertificateDescriptionTest(unittest.TestCase):
         # Detecting the failure and retrying as ISO-8859-1.
         self.assertEqual(u"R\u00ED\u00AF\u00A0S",
                          cert_desc.to_unicode("R\xED\xAF\xA0S"))
+
 
 if __name__ == "__main__":
     sys.argv = gflags.FLAGS(sys.argv)

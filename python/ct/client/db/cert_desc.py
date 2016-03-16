@@ -15,7 +15,8 @@ def from_cert(certificate, observations=[]):
     proto.der = certificate.to_der()
     try:
         for sub in [(type_.short_name,
-                     to_unicode('.'.join(process_name(value.human_readable()))))
+                     to_unicode('.'.join(
+                         process_name(value.human_readable(), type_.short_name == 'CN'))))
                     for type_, value in certificate.subject()]:
             proto_sub = proto.subject.add()
             proto_sub.type, proto_sub.value = sub
@@ -24,7 +25,7 @@ def from_cert(certificate, observations=[]):
 
     try:
         for iss in [(type_.short_name,
-                     to_unicode('.'.join(process_name(value.human_readable()))))
+                     to_unicode('.'.join(process_name(value.human_readable(), False))))
                     for type_, value in certificate.issuer()]:
             proto_iss = proto.issuer.add()
             proto_iss.type, proto_iss.value = iss
