@@ -83,7 +83,45 @@ static const char kInvalidCertString[] =
     "-----BEGIN CERTIFICATE-----\ninvalid"
     "\n-----END CERTIFICATE-----\n";
 
+// This certificate is the same as |kMatchingSigAlgsCertString| below,
+// but with the unsigned signatureAlgorithm parameter changed so as to
+// not match the one in the signed part of the certificate.
 static const char kMismatchingSigAlgsCertString[] =
+    "-----BEGIN CERTIFICATE-----\n"
+    "MIIFVjCCBD2gAwIBAgIQGERW2P+5Xt15QiwP1NRmtTANBgkqhkiG9w0BAQsFADCB\n"
+    "kDELMAkGA1UEBhMCR0IxGzAZBgNVBAgTEkdyZWF0ZXIgTWFuY2hlc3RlcjEQMA4G\n"
+    "A1UEBxMHU2FsZm9yZDEaMBgGA1UEChMRQ09NT0RPIENBIExpbWl0ZWQxNjA0BgNV\n"
+    "BAMTLUNPTU9ETyBSU0EgRG9tYWluIFZhbGlkYXRpb24gU2VjdXJlIFNlcnZlciBD\n"
+    "QTAeFw0xNDA1MjEwMDAwMDBaFw0xNTA1MjkyMzU5NTlaMFQxITAfBgNVBAsTGERv\n"
+    "bWFpbiBDb250cm9sIFZhbGlkYXRlZDEUMBIGA1UECxMLUG9zaXRpdmVTU0wxGTAX\n"
+    "BgNVBAMTEHZpZGVvbWFnaWNhbC5jb20wggEiMA0GCSqGSIb3DQEBAQUAA4IBDwAw\n"
+    "ggEKAoIBAQDOMDIDA7wjsHNDp+cYa9On4oodRjnAxvgJQ852ahkZul+e816WzUTT\n"
+    "Bs8m0LFiXjRZtsl6AHOTVbSSK3iFrke6pVdwatVP95NsR4qQaU6ITfkD9hT01vOm\n"
+    "FrPv77X7RF6C0Pb8tH9ro8prpqJdTlMnjnPTQQy/ljrUaWyIQm0G1ujCApPQhQ7h\n"
+    "XRZYPAk0B5jSalA1q0tjjWKohlQaQMqXpHtbofvL9hUlWw6shJdd08tUH5o0UcW3\n"
+    "so0zHvVfwi4Gw6DiMc/a8aSmNJPO09Rf+xOYGB+wyMezH900OnuhMg6EZgMiRwfJ\n"
+    "O6+c6QyhLBt2Vq2Wtl8HvgwBSiCelq6FAgMBAAGjggHkMIIB4DAfBgNVHSMEGDAW\n"
+    "gBSQr2o6lFoL2JDqElZz30O0Oija5zAdBgNVHQ4EFgQU95g8ikB6kbC9vYcLhM38\n"
+    "6Qm3MyUwDgYDVR0PAQH/BAQDAgWgMAwGA1UdEwEB/wQCMAAwHQYDVR0lBBYwFAYI\n"
+    "KwYBBQUHAwEGCCsGAQUFBwMCMFAGA1UdIARJMEcwOwYMKwYBBAGyMQECAQMEMCsw\n"
+    "KQYIKwYBBQUHAgEWHWh0dHBzOi8vc2VjdXJlLmNvbW9kby5uZXQvQ1BTMAgGBmeB\n"
+    "DAECATBUBgNVHR8ETTBLMEmgR6BFhkNodHRwOi8vY3JsLmNvbW9kb2NhLmNvbS9D\n"
+    "T01PRE9SU0FEb21haW5WYWxpZGF0aW9uU2VjdXJlU2VydmVyQ0EuY3JsMIGFBggr\n"
+    "BgEFBQcBAQR5MHcwTwYIKwYBBQUHMAKGQ2h0dHA6Ly9jcnQuY29tb2RvY2EuY29t\n"
+    "L0NPTU9ET1JTQURvbWFpblZhbGlkYXRpb25TZWN1cmVTZXJ2ZXJDQS5jcnQwJAYI\n"
+    "KwYBBQUHMAGGGGh0dHA6Ly9vY3NwLmNvbW9kb2NhLmNvbTAxBgNVHREEKjAoghB2\n"
+    "aWRlb21hZ2ljYWwuY29tghR3d3cudmlkZW9tYWdpY2FsLmNvbTAOBgkqhkiG9w0B\n"
+    "AQsfZAADggEBABoB/+9vd+ns+5tCWuUNls5iYI+aq/J/wuoSzQ7F1L4YU4d2f7sq\n"
+    "iCC0L9IElGgjKeSVNI/YSPykn7W+KaqYYIoYmUDsDWRXn4F9lGew7HCoRQKKg3Xa\n"
+    "q5Cn8Xk4NYLoin+TJ1B3QblKEMJ12PKbjctPjevwYVrhNouJ+CAo5LpCYr9UmLN3\n"
+    "zL1pARWRBAmqB07LbiLbo5cXOY7XkbI7FlJ6x3fbLWc180f+h8i+QysQ6gWTFghn\n"
+    "SVpUjdu0SbcJpWexSgTLltleMmkvnw4jj/kdMnD8TKsA5qju3dsPYhRay76ojFEI\n"
+    "lc2MPExv3cqIR+AzMZuaY8I2TNDoCeKc5II=\n"
+    "-----END CERTIFICATE-----\n";
+
+// This certificate is the same as |kMismatchingSigAlgsCertString|, but
+// with an illegal value for the unsigned signatureAlgorithm parameter.
+static const char kIllegalSigAlgParameterCertString[] =
     "-----BEGIN CERTIFICATE-----\n"
     "MIIFWjCCBD2gAwIBAgIQGERW2P+5Xt15QiwP1NRmtTANBgkqhkiG9w0BAQsFADCB\n"
     "kDELMAkGA1UEBhMCR0IxGzAZBgNVBAgTEkdyZWF0ZXIgTWFuY2hlc3RlcjEQMA4G\n"
@@ -447,6 +485,15 @@ TEST_F(CertTest, SignatureAlgorithmMatches) {
   EXPECT_TRUE(matching_algs.IsSignedBy(issuer).ValueOrDie());
   Cert mismatched_algs(kMismatchingSigAlgsCertString);
   EXPECT_FALSE(mismatched_algs.IsSignedBy(issuer).ValueOrDie());
+}
+
+TEST_F(CertTest, IllegalSignatureAlgorithmParameter) {
+  Cert cert(kIllegalSigAlgParameterCertString);
+  #if defined(OPENSSL_IS_BORINGSSL) && defined(BORINGSSL_201603)
+  EXPECT_FALSE(cert.IsLoaded());
+  #else
+  EXPECT_TRUE(cert.IsLoaded());
+  #endif
 }
 
 TEST_F(CertTest, TestIsRedactedHost) {

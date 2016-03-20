@@ -372,7 +372,7 @@ StatusOr<bool> Cert::IsSignedBy(const Cert& issuer) const {
   unsigned long err = ERR_peek_last_error();
   const int reason = ERR_GET_REASON(err);
   const int lib = ERR_GET_LIB(err);
-#if defined(OPENSSL_IS_BORINGSSL)
+#if defined(OPENSSL_IS_BORINGSSL) && !defined(BORINGSSL_201603)
   // BoringSSL returns only 0 and 1.  This is an attempt to
   // approximate the circumstances that in OpenSSL cause a 0 return,
   // and that are too boring/spammy to log, e.g. malformed inputs.
@@ -386,9 +386,11 @@ StatusOr<bool> Cert::IsSignedBy(const Cert& issuer) const {
     return LogUnsupportedAlgorithm();
   }
 #else
-  // OpenSSL returns 0 for simple verification failures, and -1 for
-  // "exceptional circumstances".
-  if (ret == 0) {
+  // OpenSSL and recent versions of BoringSSL use ERR_R_EVP_LIB when a
+  // signature fails to verify. Clear errors in this case, but log
+  // unusual failures.
+  if (err == 0 || ((lib == ERR_LIB_X509 || lib == ERR_LIB_ASN1) &&
+                   reason == ERR_R_EVP_LIB)) {
     ClearOpenSSLErrors();
     return false;
   }
