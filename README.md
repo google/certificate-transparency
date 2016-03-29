@@ -154,7 +154,7 @@ released, so this means hand building the `OpenSSL_1_0_2-stable`
 branch from the
 [OpenSSL git repository](https://www.openssl.org/source/repos.html).
 
- - [googlemock](https://code.google.com/p/googlemock/) (tested with 1.7.0)
+ - [googlemock](https://github.com/google/googlemock) (tested with 1.7.0)
 
 Gmock provides a bundled version of gtest, which will also be used.
 
