@@ -102,6 +102,88 @@ func TestFixServer(t *testing.T) {
 	wg.Wait()
 }
 
+func TestRemoveSuperChains(t *testing.T) {
+	superChainsTests := []struct {
+		chains         [][]string
+		expectedChains [][]string
+	}{
+		{
+			chains: [][]string{
+				[]string{googleLeaf, thawteIntermediate},
+				[]string{googleLeaf},
+			},
+			expectedChains: [][]string{
+				[]string{"Google"},
+			},
+		},
+		{
+			chains: [][]string{
+				[]string{googleLeaf, verisignRoot},
+				[]string{googleLeaf, thawteIntermediate},
+				[]string{googleLeaf},
+			},
+			expectedChains: [][]string{
+				[]string{"Google"},
+			},
+		},
+		{
+			chains: [][]string{
+				[]string{googleLeaf, thawteIntermediate, verisignRoot},
+				[]string{googleLeaf, thawteIntermediate},
+				[]string{googleLeaf},
+			},
+			expectedChains: [][]string{
+				[]string{"Google"},
+			},
+		},
+		{
+			chains: [][]string{
+				[]string{googleLeaf, thawteIntermediate, verisignRoot},
+				[]string{googleLeaf},
+			},
+			expectedChains: [][]string{
+				[]string{"Google"},
+			},
+		},
+		{
+			chains: [][]string{
+				[]string{googleLeaf, thawteIntermediate, verisignRoot},
+				[]string{googleLeaf, verisignRoot},
+				[]string{googleLeaf, thawteIntermediate},
+			},
+			expectedChains: [][]string{
+				[]string{"Google", "Thawte"},
+				[]string{"Google", "VeriSign"},
+			},
+		},
+		{
+			chains: [][]string{
+				[]string{testLeaf, testIntermediate2},
+				[]string{googleLeaf, thawteIntermediate, verisignRoot},
+				[]string{testLeaf, testIntermediate2, testIntermediate1, testRoot},
+				[]string{googleLeaf, verisignRoot},
+				[]string{testLeaf, testIntermediate2, testIntermediate1},
+				[]string{googleLeaf, thawteIntermediate},
+				[]string{testLeaf, googleLeaf, thawteIntermediate, verisignRoot},
+			},
+			expectedChains: [][]string{
+				[]string{"Google", "Thawte"},
+				[]string{"Google", "VeriSign"},
+				[]string{"Leaf", "Intermediate2"},
+				[]string{"Leaf", "Google", "Thawte", "VeriSign"},
+			},
+		},
+	}
+
+	for i, test := range superChainsTests {
+		var chains [][]*x509.Certificate
+		for _, chain := range test.chains {
+			chains = append(chains, extractTestChain(t, i, chain))
+		}
+		matchTestChainList(t, i, test.expectedChains, removeSuperChains(chains))
+	}
+}
+
 // Fixer.updateCounters() tests
 func TestUpdateCounters(t *testing.T) {
 	counterTests := []struct {
@@ -126,7 +208,7 @@ func TestUpdateCounters(t *testing.T) {
 		for _, err := range test.errors {
 			ferrs = append(ferrs, &FixError{Type: err})
 		}
-		f.updateCounters(ferrs)
+		f.updateCounters(nil, ferrs)
 
 		if f.reconstructed != test.reconstructed {
 			t.Errorf("#%d: Incorrect value for reconstructed, wanted %d, got %d", i, test.reconstructed, f.reconstructed)
