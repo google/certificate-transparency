@@ -1,0 +1,12 @@
+all: make
+
+make: build/Makefile
+	cd build && $(MAKE) && \
+	cp -rv ../include $(INSTALL_DIR) && \
+	cp crypto/libcrypto.a ssl/libssl.a $(INSTALL_DIR)/lib
+
+build/Makefile: build
+	cd build && cmake -DBUILD_SHARED_LIBS=FALSE -DCMAKE_CXX_FLAGS:STRING=-fPIC -DCMAKE_C_FLAGS:STRING=-fPIC -DCMAKE_INSTALL_PREFIX=$(INSTALL_DIR) ..
+
+build:
+	mkdir -p build

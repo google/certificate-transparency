@@ -5,6 +5,7 @@ endif
 ifeq ($(UNAME),Darwin)
 EXTRA_LDFLAGS="-ldl"
 endif
+EXTRA_LDFLAGS+="-lpthread"
 
 all: Makefile
 	$(MAKE)

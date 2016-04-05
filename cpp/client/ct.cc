@@ -405,7 +405,8 @@ static void MakeCert() {
 
   // Set signature algorithm
   // FIXME: is there an opaque way to get the algorithm structure?
-  x->cert_info->signature->algorithm = OBJ_nid2obj(NID_sha1WithRSAEncryption);
+  // FIXME: Sort out const/non-const OpenssL/BoringSSL mismatch.
+  x->cert_info->signature->algorithm = const_cast<ASN1_OBJECT*>(OBJ_nid2obj(NID_sha1WithRSAEncryption));
   x->cert_info->signature->parameter = NULL;
 
   // Set the start date to now

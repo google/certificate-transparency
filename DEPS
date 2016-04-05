@@ -1,4 +1,17 @@
+vars = {
+     # Change this variable to the name of one of the alterniative SSL
+     # implementations below.
+     # If you change this in an existing client, you should probably rm -fr
+     # all the deps and rebuild everything from scratch.
+     "ssl_impl":         "boringssl",
+
+     # SSL implementation alternatives:
+     "openssl": 				 "https://github.com/openssl/openssl.git@OpenSSL_1_0_2d",
+     "boringssl":        "https://boringssl.googlesource.com/boringssl.git@2661"
+}
+
 deps = {
+     Var("ssl_impl"):    Var(Var("ssl_impl")),
      "gflags":  	 			 "https://github.com/gflags/gflags.git@v2.1.2",
      "glog":             "https://github.com/benlaurie/glog.git@0.3.4-fix",
      "googlemock": 			 "https://github.com/google/googlemock.git@release-1.7.0",
@@ -11,7 +24,6 @@ deps = {
      "libevhtp": 				 "https://github.com/ellzey/libevhtp.git@a89d9b3f9fdf2ebef41893b3d5e4466f4b0ecfda",
      "certificate-transparency/third_party/objecthash":
                          "https://github.com/benlaurie/objecthash.git@798f66bd8c5313da226aa7a60c114147910a7407",
-     "openssl": 				 "https://github.com/openssl/openssl.git@OpenSSL_1_0_2d",
      "protobuf":         "https://github.com/google/protobuf.git@v2.6.1",
      "protobuf/gtest":   "https://github.com/google/googletest.git@release-1.7.0",
      "libsnappy":        "https://github.com/google/snappy.git@1.1.3",
@@ -58,6 +70,7 @@ else:
 
 num_cores = multiprocessing.cpu_count()
 
+print("Building with %s", Var("ssl_impl"))
 print("Using make %s with %d jobs" % (make, num_cores))
 
 here = os.getcwd()
@@ -74,9 +87,9 @@ hooks = [
         "action": [ make, "-f", os.path.join(here, "certificate-transparency/build.gclient"), "_tcmalloc" ],
     },
     {
-        "name": "openssl",
-        "pattern": "^openssl/",
-        "action": [ make, "-f", os.path.join(here, "certificate-transparency/build.gclient"), "_openssl" ],
+        "name": "ssl",
+        "pattern": Var("ssl_impl") + "/",
+        "action": [ make, "-f", os.path.join(here, "certificate-transparency/build.gclient"), "_" + Var("ssl_impl") ],
     },
     {
         "name": "libevent",
@@ -102,11 +115,6 @@ hooks = [
         "name": "protobuf",
         "pattern": "^protobuf/",
         "action": [ make, "-f", os.path.join(here, "certificate-transparency/build.gclient"), "_protobuf" ],
-    },
-    {
-        "name": "ldns",
-        "pattern": "^ldns/",
-        "action": [ make, "-f", os.path.join(here, "certificate-transparency/build.gclient"), "_ldns" ],
     },
     {
         "name": "sqlite3",
@@ -137,11 +145,23 @@ hooks = [
         "name": "objecthash",
         "pattern": "^certificate-transparency/third_party/objecthash/",
         "action": [ make, "-f", os.path.join(here, "certificate-transparency/build.gclient"), "_objecthash" ],
-    },
-    # Do this last
+    }]
+
+# Currently only Openssl is supported for building the DNS server due to LDNS's dependency.
+if Var("ssl_impl") == 'openssl':
+  hooks.append(
+      {
+          "name": "ldns",
+          "pattern": "^ldns/",
+          "action": [ make, "-f", os.path.join(here, "certificate-transparency/build.gclient"), "_ldns" ],
+      })
+else:
+  print("NOT building DNS server since we're using BoringSSL.")
+
+# Do this last
+hooks.append(
     {
         "name": "ct",
         "pattern": "^certificate-transparency/",
         "action": [ make, "-j", str(num_cores), "-f", os.path.join(here, "certificate-transparency/build.gclient"), "_configure-ct" ],
-    }
-]
+    })

@@ -73,7 +73,6 @@ TESTS = \
 	cpp/log/cert_submission_handler_test \
 	cpp/log/cert_test \
 	cpp/log/cluster_state_controller_test \
-	cpp/log/cms_verifier_test \
 	cpp/log/ct_extensions_test \
 	cpp/log/database_large_test \
 	cpp/log/database_test \
@@ -109,6 +108,10 @@ TESTS = \
 	cpp/util/sync_task_test \
 	cpp/util/task_test
 
+if !OPENSSL_IS_BORINGSSL
+TESTS += cpp/log/cms_verifier_test
+endif
+
 all-local:
 	$(MAKE) -C python
 
@@ -141,7 +144,6 @@ cpp_libcore_a_SOURCES = \
 	cpp/log/cert_checker.cc \
 	cpp/log/cert_submission_handler.cc \
 	cpp/log/cluster_state_controller_cert.cc \
-	cpp/log/cms_verifier.cc \
 	cpp/log/ct_extensions.cc \
 	cpp/log/database.cc \
 	cpp/log/etcd_consistent_store_cert.cc \
@@ -209,6 +211,10 @@ cpp_libcore_a_SOURCES = \
 	cpp/version.cc \
 	proto/ct.pb.cc \
 	proto/ct.pb.h
+
+if !OPENSSL_IS_BORINGSSL
+cpp_libcore_a_SOURCES += cpp/log/cms_verifier.cc
+endif
 
 cpp_libtest_a_CPPFLAGS = \
 	-I$(GMOCK_DIR) \
@@ -902,6 +908,7 @@ cpp_log_cert_test_SOURCES = \
 	cpp/log/cert_test.cc \
 	cpp/util/util.cc
 
+if !OPENSSL_IS_BORINGSSL
 cpp_log_cms_verifier_test_LDADD = \
 	cpp/libcore.a \
 	cpp/libtest.a \
@@ -910,6 +917,7 @@ cpp_log_cms_verifier_test_LDADD = \
 cpp_log_cms_verifier_test_SOURCES = \
 	cpp/log/cms_verifier_test.cc \
 	cpp/util/util.cc
+endif
 
 cpp_log_ct_extensions_test_LDADD = \
 	cpp/libcore.a \

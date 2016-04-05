@@ -14,6 +14,7 @@ addons:
     sources: &common_sources
       - ubuntu-toolchain-r-test
       - llvm-toolchain-precise-3.6
+      - kalakris-cmake
     packages: &common_packages
       - autoconf
       - automake
@@ -21,6 +22,7 @@ addons:
       - python-dev
       - libstdc++-4.9-dev
       - tcl8.5
+      - cmake
 
 matrix:
   include:
