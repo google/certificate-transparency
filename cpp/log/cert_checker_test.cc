@@ -101,6 +101,193 @@ static const char kIntermediateCertPem[] =
     "iBEUO5P6TnqH3TfhOF8sKQg=\n"
     "-----END CERTIFICATE-----\n";
 
+static const char kDsaPrecertChain[] =
+"-----BEGIN CERTIFICATE-----\n"
+"MIIGbzCCBhWgAwIBAgIQQyzKVQswSJU51uhTRKJOcjALBglghkgBZQMEAwIwQDEL\n"
+"MAkGA1UEBhMCVVMxFTATBgNVBAoTDHRoYXd0ZSwgSW5jLjEaMBgGA1UEAxMRdGhh\n"
+"d3RlIERTQSBTU0wgQ0EwHhcNMTUxMjI5MDAwMDAwWhcNMTcxMjI3MjM1OTU5WjCB\n"
+"pzETMBEGCysGAQQBgjc8AgEDEwJHRTEdMBsGA1UEDxMUUHJpdmF0ZSBPcmdhbml6\n"
+"YXRpb24xEzARBgNVBAoUClVuaVBBWSBMVEQxEjAQBgNVBAUTCTQwMTk1Mzk5OTEL\n"
+"MAkGA1UEBhMCR0UxEDAOBgNVBAgTB1RiaWxpc2kxEDAOBgNVBAcUB1RiaWxpc2kx\n"
+"FzAVBgNVBAMUDnd3dy51bmlwYXkuY29tMIIDRzCCAjoGByqGSM44BAEwggItAoIB\n"
+"AQClyTxv5WDYR4Dv2+pCaEEFTtEayHGtbMmaHG3RR24DVgxtlS//xmk6z4fO03uj\n"
+"EdxylJ7UDZp1GrYxJXts2bixxH2jsoiuzs/PiCyS1TGsrdkD5Vi/y3wkYRzM3iBt\n"
+"abKu23ZANP6WansDX4jILYxOs2cc4GEQepOsuHqn2LWCBvxGP3KmTo0YwuV+sSO8\n"
+"IFTvHsGb0ZFKzZdFfjqPxXbGXiCGHHhuispi23SKqHEXdRjlyuWRjCDHJsyefKTk\n"
+"HW+1nx7lSZIBBB6tPXxdtk/cNcJESoZmXl9aNsYdo/63mQI5aA6iUXX09/FNTIMh\n"
+"dp3aoQHePhdGRRTOxoADIrVNAiEA45OTlEY+5SayLLZyqvLduEKEzOntK0ssMIUp\n"
+"GIXGMo8CggEBAJlGxvWVGST03IYlimBHX4VNpkuKqXGyMSnjNP0niqxVYmEjDUeN\n"
+"cqyoBoBEJO1wsT2/v4IUQXQoQ5yW95D/sfXEF806MLqkgzOPNhXHZsyjqntHMAKj\n"
+"t4hi9XOfjHUKXDINGpk0AwAk1Aajj4DavWjZ/8gBZWgkNHjNnV9UuBnIeBJmOO7C\n"
+"s57cQ98p3TpGHgk0l8+r3ELnaLf/UhJRr6C7SGIEdddMXGbnR1w968IRVZygL7lx\n"
+"3UF9XJFGcR6TuKt5/PA8oxqU+Phl+EEJm7TJ/+pT5KLEo+o0DghM4GVKC6h9u/gg\n"
+"4gBdsEQ4OtkLZ1pSU+Nvyz22TVWTz3D35XoDggEFAAKCAQA//na/RFHzfeuYBoaY\n"
+"0v4SkKwNwAInGn7pAvaF8AiENwesVnVTu8l7z+hi1CYv4fEGJNKkf44j6TTwjds8\n"
+"QTjJbGrg5RzXp3LGrJbAzW8zW/CxabF0pMo4eod3NjTC4sSgVTMawpw2oag/1T79\n"
+"LmDeGEJPbajmUUee9tfJJQK/UirzcB1n9/O2GK0Uthu8rH77IQPcM5Y8ambgwbIG\n"
+"eFXMSU1AODKj83kqPJmRvDcAIQs5ShA+yghs6qfA1m9V4At2sQtgf7iVkD6HKH9X\n"
+"v8izGABvDBVlk3ZRW2WXMeTyGeCl1T43+mnXMGs9i4r1KDuFdt/0WbXVA+F7AVYy\n"
+"u/cGo4IBljCCAZIwJQYDVR0RBB4wHIIKdW5pcGF5LmNvbYIOd3d3LnVuaXBheS5j\n"
+"b20wCQYDVR0TBAIwADAOBgNVHQ8BAf8EBAMCB4AwKwYDVR0fBCQwIjAgoB6gHIYa\n"
+"aHR0cDovL3RlLnN5bWNiLmNvbS90ZS5jcmwwcwYDVR0gBGwwajBoBgtghkgBhvhF\n"
+"AQcwATBZMCYGCCsGAQUFBwIBFhpodHRwczovL3d3dy50aGF3dGUuY29tL2NwczAv\n"
+"BggrBgEFBQcCAjAjDCFodHRwczovL3d3dy50aGF3dGUuY29tL3JlcG9zaXRvcnkw\n"
+"HQYDVR0lBBYwFAYIKwYBBQUHAwEGCCsGAQUFBwMCMB8GA1UdIwQYMBaAFMoTsU3s\n"
+"mn62fEUeuB3k0shyGrEdMFcGCCsGAQUFBwEBBEswSTAfBggrBgEFBQcwAYYTaHR0\n"
+"cDovL3RlLnN5bWNkLmNvbTAmBggrBgEFBQcwAoYaaHR0cDovL3RlLnN5bWNiLmNv\n"
+"bS90ZS5jcnQwEwYKKwYBBAHWeQIEAwEB/wQCBQAwCwYJYIZIAWUDBAMCA0cAMEQC\n"
+"IGqj1ElLQljLIir0ZWTzmr0wOXG2B8X649SNqOHhzXikAiAE9qn9RiIe/fpphfnx\n"
+"jks8c0MAUgqmpKIZWTpvNhja6Q==\n"
+"-----END CERTIFICATE-----\n"
+"-----BEGIN CERTIFICATE-----\n"
+"MIIGJDCCBcmgAwIBAgIQbT3s+pt4qr0oAI3ZcDdjDjALBglghkgBZQMEAwIwga4x\n"
+"CzAJBgNVBAYTAlVTMRUwEwYDVQQKEwx0aGF3dGUsIEluYy4xKDAmBgNVBAsTH0Nl\n"
+"cnRpZmljYXRpb24gU2VydmljZXMgRGl2aXNpb24xODA2BgNVBAsTLyhjKSAyMDEy\n"
+"IHRoYXd0ZSwgSW5jLiAtIEZvciBhdXRob3JpemVkIHVzZSBvbmx5MSQwIgYDVQQD\n"
+"Ext0aGF3dGUgUHJpbWFyeSBSb290IENBIC0gRzQwHhcNMTIxMjIwMDAwMDAwWhcN\n"
+"MjIxMjE5MjM1OTU5WjBAMQswCQYDVQQGEwJVUzEVMBMGA1UEChMMdGhhd3RlLCBJ\n"
+"bmMuMRowGAYDVQQDExF0aGF3dGUgRFNBIFNTTCBDQTCCA0gwggI6BgcqhkjOOAQB\n"
+"MIICLQKCAQEAsOkfT0p9OXj0/j9H+m2Ejyu6VTLpjydK1/dWyl/AQS5WE5GPgy0i\n"
+"6oJQCSEKLcZtJCcnrx9X2WJq/U9sxSydq0oP1R7BqXiRs3fphkJnBhW/OGJNnw13\n"
+"dnBrt9ffmaZNFFRCUQOsGDsSjBPOUQ4tuenBeF3Zs+DAfkDXzxcrK4OQs6qTYubn\n"
+"8QUphcoMaUURJv9aY8VfVpODN3Z5FeamrY72zAcGvc9ajFl45vVlK/dDbu8kMMdp\n"
+"b1wuNMTWUo/dxdPrtgpJA3ZnN9MDSzs2tcGWxYnpWFZTndTePn7xU0b3r/pN/ys7\n"
+"i5FBr1yqYVWelt5uGLMg+ZQ22GQnga8/eQIhAKdVID3cRKJNm0Rd77SM/GgY430w\n"
+"mefDvxS6pQDGnAzXAoIBAQCLQiKLU8kRBsWIkeuRPKlbqwSMkbNwaOYK6/Lh8x5k\n"
+"20djAqPOurHtzNWnAPAvZPYSjL+PR1ydHq4tRDEgjaVYlb5ZZeD8L6v0J/OWNTpS\n"
+"SmeKzHfD1QRP/2dxqiNweivUR4vw7m6wg8Y5ZxOFKbgAfdM08z2hbjkucrCzkbCr\n"
+"0NQUkUy+N4gvMKOIVDYVUiKUFSJmlRiYlCXJNaoIkKWcb4NjRBHjDKbmm4+Isco4\n"
+"PUQ3E7V+CdS6C8hOPdDwhcYm6FPrgbTPcuuoJgEI6YXjgywGCMja6zwEmU1F9NH6\n"
+"9TmpZiKCFDVhrBd5KgOemiiveAE2AAU1ctYz1pkqt2dXA4IBBgACggEBAJzaudYH\n"
+"djJGC5gPXFS+oWZc4SEicF5teHo2ZkI86j8TDGZWBCXHng3m/JrY3qT11tBU4go/\n"
+"XR5AQ9GYtLAiOXZKIdFSjyjrDGVotWNxpoZi1hXpVEsCAEwyWqKdO+47zUF2/tgc\n"
+"QzAnAwbb2NV9D35rg3wKenUKdQfp98PrlWUh2UOmFkae83eLr/7VxEF4nOF+CI/4\n"
+"Kx9y6Qy3So/OHucSp8206yqJ80EyYox9cnAeS81xBwJqn1LIPRFGJ85cEXRldATI\n"
+"+CvgvfdnpWnJaPPUvJoaPF9DVfi4FTGV7aFfeQfi9QemF8WMPq0JpdrFkfrnGVw9\n"
+"wxGzySeiXj7UDhKjggFCMIIBPjASBgNVHRMBAf8ECDAGAQH/AgEAMA4GA1UdDwEB\n"
+"/wQEAwIBBjAyBggrBgEFBQcBAQQmMCQwIgYIKwYBBQUHMAGGFmh0dHA6Ly9vY3Nw\n"
+"LnRoYXd0ZS5jb20wOwYDVR0gBDQwMjAwBgRVHSAAMCgwJgYIKwYBBQUHAgEWGmh0\n"
+"dHBzOi8vd3d3LnRoYXd0ZS5jb20vY3BzMDcGA1UdHwQwMC4wLKAqoCiGJmh0dHA6\n"
+"Ly9jcmwudGhhd3RlLmNvbS9UaGF3dGVQQ0EtRzQuY3JsMC4GA1UdEQQnMCWkIzAh\n"
+"MR8wHQYDVQQDExZTWU1DLURTQS1DQS0yMDQ4LTI1Ni00MB0GA1UdDgQWBBTKE7FN\n"
+"7Jp+tnxFHrgd5NLIchqxHTAfBgNVHSMEGDAWgBTHZ4lkIvGdsfOLg6bCDpmTUXbr\n"
+"ljALBglghkgBZQMEAwIDSAAwRQIhAKb8sDyC2UehqUcEPUQ65bnmmtiplEplDUZt\n"
+"ULqZQweDAiAr4MAcnfC9otwLcBllGVA4vsOKPsFSq5u2EPn3ovIynw==\n"
+"-----END CERTIFICATE-----\n";
+
+// This was generated from the above by manually flipping a bit
+// in one of the signature bytes of the precert.
+static const char kDsaPrecertChainInvalidSig[] =
+"-----BEGIN CERTIFICATE-----\n"
+"MIIGbzCCBhWgAwIBAgIQQyzKVQswSJU51uhTRKJOcjALBglghkgBZQMEAwIwQDEL\n"
+"MAkGA1UEBhMCVVMxFTATBgNVBAoTDHRoYXd0ZSwgSW5jLjEaMBgGA1UEAxMRdGhh\n"
+"d3RlIERTQSBTU0wgQ0EwHhcNMTUxMjI5MDAwMDAwWhcNMTcxMjI3MjM1OTU5WjCB\n"
+"pzETMBEGCysGAQQBgjc8AgEDEwJHRTEdMBsGA1UEDxMUUHJpdmF0ZSBPcmdhbml6\n"
+"YXRpb24xEzARBgNVBAoUClVuaVBBWSBMVEQxEjAQBgNVBAUTCTQwMTk1Mzk5OTEL\n"
+"MAkGA1UEBhMCR0UxEDAOBgNVBAgTB1RiaWxpc2kxEDAOBgNVBAcUB1RiaWxpc2kx\n"
+"FzAVBgNVBAMUDnd3dy51bmlwYXkuY29tMIIDRzCCAjoGByqGSM44BAEwggItAoIB\n"
+"AQClyTxv5WDYR4Dv2+pCaEEFTtEayHGtbMmaHG3RR24DVgxtlS//xmk6z4fO03uj\n"
+"EdxylJ7UDZp1GrYxJXts2bixxH2jsoiuzs/PiCyS1TGsrdkD5Vi/y3wkYRzM3iBt\n"
+"abKu23ZANP6WansDX4jILYxOs2cc4GEQepOsuHqn2LWCBvxGP3KmTo0YwuV+sSO8\n"
+"IFTvHsGb0ZFKzZdFfjqPxXbGXiCGHHhuispi23SKqHEXdRjlyuWRjCDHJsyefKTk\n"
+"HW+1nx7lSZIBBB6tPXxdtk/cNcJESoZmXl9aNsYdo/63mQI5aA6iUXX09/FNTIMh\n"
+"dp3aoQHePhdGRRTOxoADIrVNAiEA45OTlEY+5SayLLZyqvLduEKEzOntK0ssMIUp\n"
+"GIXGMo8CggEBAJlGxvWVGST03IYlimBHX4VNpkuKqXGyMSnjNP0niqxVYmEjDUeN\n"
+"cqyoBoBEJO1wsT2/v4IUQXQoQ5yW95D/sfXEF806MLqkgzOPNhXHZsyjqntHMAKj\n"
+"t4hi9XOfjHUKXDINGpk0AwAk1Aajj4DavWjZ/8gBZWgkNHjNnV9UuBnIeBJmOO7C\n"
+"s57cQ98p3TpGHgk0l8+r3ELnaLf/UhJRr6C7SGIEdddMXGbnR1w968IRVZygL7lx\n"
+"3UF9XJFGcR6TuKt5/PA8oxqU+Phl+EEJm7TJ/+pT5KLEo+o0DghM4GVKC6h9u/gg\n"
+"4gBdsEQ4OtkLZ1pSU+Nvyz22TVWTz3D35XoDggEFAAKCAQA//na/RFHzfeuYBoaY\n"
+"0v4SkKwNwAInGn7pAvaF8AiENwesVnVTu8l7z+hi1CYv4fEGJNKkf44j6TTwjds8\n"
+"QTjJbGrg5RzXp3LGrJbAzW8zW/CxabF0pMo4eod3NjTC4sSgVTMawpw2oag/1T79\n"
+"LmDeGEJPbajmUUee9tfJJQK/UirzcB1n9/O2GK0Uthu8rH77IQPcM5Y8ambgwbIG\n"
+"eFXMSU1AODKj83kqPJmRvDcAIQs5ShA+yghs6qfA1m9V4At2sQtgf7iVkD6HKH9X\n"
+"v8izGABvDBVlk3ZRW2WXMeTyGeCl1T43+mnXMGs9i4r1KDuFdt/0WbXVA+F7AVYy\n"
+"u/cGo4IBljCCAZIwJQYDVR0RBB4wHIIKdW5pcGF5LmNvbYIOd3d3LnVuaXBheS5j\n"
+"b20wCQYDVR0TBAIwADAOBgNVHQ8BAf8EBAMCB4AwKwYDVR0fBCQwIjAgoB6gHIYa\n"
+"aHR0cDovL3RlLnN5bWNiLmNvbS90ZS5jcmwwcwYDVR0gBGwwajBoBgtghkgBhvhF\n"
+"AQcwATBZMCYGCCsGAQUFBwIBFhpodHRwczovL3d3dy50aGF3dGUuY29tL2NwczAv\n"
+"BggrBgEFBQcCAjAjDCFodHRwczovL3d3dy50aGF3dGUuY29tL3JlcG9zaXRvcnkw\n"
+"HQYDVR0lBBYwFAYIKwYBBQUHAwEGCCsGAQUFBwMCMB8GA1UdIwQYMBaAFMoTsU3s\n"
+"mn62fEUeuB3k0shyGrEdMFcGCCsGAQUFBwEBBEswSTAfBggrBgEFBQcwAYYTaHR0\n"
+"cDovL3RlLnN5bWNkLmNvbTAmBggrBgEFBQcwAoYaaHR0cDovL3RlLnN5bWNiLmNv\n"
+"bS90ZS5jcnQwEwYKKwYBBAHWeQIEAwEB/wQCBQAwCwYJYIZIAWUDBAMCA0cAMEQC\n"
+"IGqj1ElLQljLIir0ZWTzmr0wOXG2B8X649SNqOHhzXikAiAE9qr9RiIe/fpphfnx\n"
+"jks8c0MAUgqmpKIZWTpvNhja6Q==\n"
+"-----END CERTIFICATE-----\n"
+"-----BEGIN CERTIFICATE-----\n"
+"MIIGJDCCBcmgAwIBAgIQbT3s+pt4qr0oAI3ZcDdjDjALBglghkgBZQMEAwIwga4x\n"
+"CzAJBgNVBAYTAlVTMRUwEwYDVQQKEwx0aGF3dGUsIEluYy4xKDAmBgNVBAsTH0Nl\n"
+"cnRpZmljYXRpb24gU2VydmljZXMgRGl2aXNpb24xODA2BgNVBAsTLyhjKSAyMDEy\n"
+"IHRoYXd0ZSwgSW5jLiAtIEZvciBhdXRob3JpemVkIHVzZSBvbmx5MSQwIgYDVQQD\n"
+"Ext0aGF3dGUgUHJpbWFyeSBSb290IENBIC0gRzQwHhcNMTIxMjIwMDAwMDAwWhcN\n"
+"MjIxMjE5MjM1OTU5WjBAMQswCQYDVQQGEwJVUzEVMBMGA1UEChMMdGhhd3RlLCBJ\n"
+"bmMuMRowGAYDVQQDExF0aGF3dGUgRFNBIFNTTCBDQTCCA0gwggI6BgcqhkjOOAQB\n"
+"MIICLQKCAQEAsOkfT0p9OXj0/j9H+m2Ejyu6VTLpjydK1/dWyl/AQS5WE5GPgy0i\n"
+"6oJQCSEKLcZtJCcnrx9X2WJq/U9sxSydq0oP1R7BqXiRs3fphkJnBhW/OGJNnw13\n"
+"dnBrt9ffmaZNFFRCUQOsGDsSjBPOUQ4tuenBeF3Zs+DAfkDXzxcrK4OQs6qTYubn\n"
+"8QUphcoMaUURJv9aY8VfVpODN3Z5FeamrY72zAcGvc9ajFl45vVlK/dDbu8kMMdp\n"
+"b1wuNMTWUo/dxdPrtgpJA3ZnN9MDSzs2tcGWxYnpWFZTndTePn7xU0b3r/pN/ys7\n"
+"i5FBr1yqYVWelt5uGLMg+ZQ22GQnga8/eQIhAKdVID3cRKJNm0Rd77SM/GgY430w\n"
+"mefDvxS6pQDGnAzXAoIBAQCLQiKLU8kRBsWIkeuRPKlbqwSMkbNwaOYK6/Lh8x5k\n"
+"20djAqPOurHtzNWnAPAvZPYSjL+PR1ydHq4tRDEgjaVYlb5ZZeD8L6v0J/OWNTpS\n"
+"SmeKzHfD1QRP/2dxqiNweivUR4vw7m6wg8Y5ZxOFKbgAfdM08z2hbjkucrCzkbCr\n"
+"0NQUkUy+N4gvMKOIVDYVUiKUFSJmlRiYlCXJNaoIkKWcb4NjRBHjDKbmm4+Isco4\n"
+"PUQ3E7V+CdS6C8hOPdDwhcYm6FPrgbTPcuuoJgEI6YXjgywGCMja6zwEmU1F9NH6\n"
+"9TmpZiKCFDVhrBd5KgOemiiveAE2AAU1ctYz1pkqt2dXA4IBBgACggEBAJzaudYH\n"
+"djJGC5gPXFS+oWZc4SEicF5teHo2ZkI86j8TDGZWBCXHng3m/JrY3qT11tBU4go/\n"
+"XR5AQ9GYtLAiOXZKIdFSjyjrDGVotWNxpoZi1hXpVEsCAEwyWqKdO+47zUF2/tgc\n"
+"QzAnAwbb2NV9D35rg3wKenUKdQfp98PrlWUh2UOmFkae83eLr/7VxEF4nOF+CI/4\n"
+"Kx9y6Qy3So/OHucSp8206yqJ80EyYox9cnAeS81xBwJqn1LIPRFGJ85cEXRldATI\n"
+"+CvgvfdnpWnJaPPUvJoaPF9DVfi4FTGV7aFfeQfi9QemF8WMPq0JpdrFkfrnGVw9\n"
+"wxGzySeiXj7UDhKjggFCMIIBPjASBgNVHRMBAf8ECDAGAQH/AgEAMA4GA1UdDwEB\n"
+"/wQEAwIBBjAyBggrBgEFBQcBAQQmMCQwIgYIKwYBBQUHMAGGFmh0dHA6Ly9vY3Nw\n"
+"LnRoYXd0ZS5jb20wOwYDVR0gBDQwMjAwBgRVHSAAMCgwJgYIKwYBBQUHAgEWGmh0\n"
+"dHBzOi8vd3d3LnRoYXd0ZS5jb20vY3BzMDcGA1UdHwQwMC4wLKAqoCiGJmh0dHA6\n"
+"Ly9jcmwudGhhd3RlLmNvbS9UaGF3dGVQQ0EtRzQuY3JsMC4GA1UdEQQnMCWkIzAh\n"
+"MR8wHQYDVQQDExZTWU1DLURTQS1DQS0yMDQ4LTI1Ni00MB0GA1UdDgQWBBTKE7FN\n"
+"7Jp+tnxFHrgd5NLIchqxHTAfBgNVHSMEGDAWgBTHZ4lkIvGdsfOLg6bCDpmTUXbr\n"
+"ljALBglghkgBZQMEAwIDSAAwRQIhAKb8sDyC2UehqUcEPUQ65bnmmtiplEplDUZt\n"
+"ULqZQweDAiAr4MAcnfC9otwLcBllGVA4vsOKPsFSq5u2EPn3ovIynw==\n"
+"-----END CERTIFICATE-----\n";
+
+static const char kDsaPrecertChainRootOnly[] =
+"-----BEGIN CERTIFICATE-----\n"
+"MIIGJDCCBcmgAwIBAgIQbT3s+pt4qr0oAI3ZcDdjDjALBglghkgBZQMEAwIwga4x\n"
+"CzAJBgNVBAYTAlVTMRUwEwYDVQQKEwx0aGF3dGUsIEluYy4xKDAmBgNVBAsTH0Nl\n"
+"cnRpZmljYXRpb24gU2VydmljZXMgRGl2aXNpb24xODA2BgNVBAsTLyhjKSAyMDEy\n"
+"IHRoYXd0ZSwgSW5jLiAtIEZvciBhdXRob3JpemVkIHVzZSBvbmx5MSQwIgYDVQQD\n"
+"Ext0aGF3dGUgUHJpbWFyeSBSb290IENBIC0gRzQwHhcNMTIxMjIwMDAwMDAwWhcN\n"
+"MjIxMjE5MjM1OTU5WjBAMQswCQYDVQQGEwJVUzEVMBMGA1UEChMMdGhhd3RlLCBJ\n"
+"bmMuMRowGAYDVQQDExF0aGF3dGUgRFNBIFNTTCBDQTCCA0gwggI6BgcqhkjOOAQB\n"
+"MIICLQKCAQEAsOkfT0p9OXj0/j9H+m2Ejyu6VTLpjydK1/dWyl/AQS5WE5GPgy0i\n"
+"6oJQCSEKLcZtJCcnrx9X2WJq/U9sxSydq0oP1R7BqXiRs3fphkJnBhW/OGJNnw13\n"
+"dnBrt9ffmaZNFFRCUQOsGDsSjBPOUQ4tuenBeF3Zs+DAfkDXzxcrK4OQs6qTYubn\n"
+"8QUphcoMaUURJv9aY8VfVpODN3Z5FeamrY72zAcGvc9ajFl45vVlK/dDbu8kMMdp\n"
+"b1wuNMTWUo/dxdPrtgpJA3ZnN9MDSzs2tcGWxYnpWFZTndTePn7xU0b3r/pN/ys7\n"
+"i5FBr1yqYVWelt5uGLMg+ZQ22GQnga8/eQIhAKdVID3cRKJNm0Rd77SM/GgY430w\n"
+"mefDvxS6pQDGnAzXAoIBAQCLQiKLU8kRBsWIkeuRPKlbqwSMkbNwaOYK6/Lh8x5k\n"
+"20djAqPOurHtzNWnAPAvZPYSjL+PR1ydHq4tRDEgjaVYlb5ZZeD8L6v0J/OWNTpS\n"
+"SmeKzHfD1QRP/2dxqiNweivUR4vw7m6wg8Y5ZxOFKbgAfdM08z2hbjkucrCzkbCr\n"
+"0NQUkUy+N4gvMKOIVDYVUiKUFSJmlRiYlCXJNaoIkKWcb4NjRBHjDKbmm4+Isco4\n"
+"PUQ3E7V+CdS6C8hOPdDwhcYm6FPrgbTPcuuoJgEI6YXjgywGCMja6zwEmU1F9NH6\n"
+"9TmpZiKCFDVhrBd5KgOemiiveAE2AAU1ctYz1pkqt2dXA4IBBgACggEBAJzaudYH\n"
+"djJGC5gPXFS+oWZc4SEicF5teHo2ZkI86j8TDGZWBCXHng3m/JrY3qT11tBU4go/\n"
+"XR5AQ9GYtLAiOXZKIdFSjyjrDGVotWNxpoZi1hXpVEsCAEwyWqKdO+47zUF2/tgc\n"
+"QzAnAwbb2NV9D35rg3wKenUKdQfp98PrlWUh2UOmFkae83eLr/7VxEF4nOF+CI/4\n"
+"Kx9y6Qy3So/OHucSp8206yqJ80EyYox9cnAeS81xBwJqn1LIPRFGJ85cEXRldATI\n"
+"+CvgvfdnpWnJaPPUvJoaPF9DVfi4FTGV7aFfeQfi9QemF8WMPq0JpdrFkfrnGVw9\n"
+"wxGzySeiXj7UDhKjggFCMIIBPjASBgNVHRMBAf8ECDAGAQH/AgEAMA4GA1UdDwEB\n"
+"/wQEAwIBBjAyBggrBgEFBQcBAQQmMCQwIgYIKwYBBQUHMAGGFmh0dHA6Ly9vY3Nw\n"
+"LnRoYXd0ZS5jb20wOwYDVR0gBDQwMjAwBgRVHSAAMCgwJgYIKwYBBQUHAgEWGmh0\n"
+"dHBzOi8vd3d3LnRoYXd0ZS5jb20vY3BzMDcGA1UdHwQwMC4wLKAqoCiGJmh0dHA6\n"
+"Ly9jcmwudGhhd3RlLmNvbS9UaGF3dGVQQ0EtRzQuY3JsMC4GA1UdEQQnMCWkIzAh\n"
+"MR8wHQYDVQQDExZTWU1DLURTQS1DQS0yMDQ4LTI1Ni00MB0GA1UdDgQWBBTKE7FN\n"
+"7Jp+tnxFHrgd5NLIchqxHTAfBgNVHSMEGDAWgBTHZ4lkIvGdsfOLg6bCDpmTUXbr\n"
+"ljALBglghkgBZQMEAwIDSAAwRQIhAKb8sDyC2UehqUcEPUQ65bnmmtiplEplDUZt\n"
+"ULqZQweDAiAr4MAcnfC9otwLcBllGVA4vsOKPsFSq5u2EPn3ovIynw==\n"
+"-----END CERTIFICATE-----\n";
+
 namespace {
 
 class CertCheckerTest : public ::testing::Test {
@@ -419,6 +606,58 @@ TEST_F(CertCheckerTest, ResolveIssuerCollisions) {
   ASSERT_TRUE(root2->IsLoaded());
   chain2.AddCert(move(root2));
   EXPECT_OK(checker_.CheckCertChain(&chain2));
+}
+
+TEST_F(CertCheckerTest, TestDsaPrecertFailsRootNotTrusted) {
+  // Load CA certs.
+  EXPECT_TRUE(checker_.LoadTrustedCertificates(cert_dir_ + "/" + kCaCert));
+  PreCertChain pre_chain(kDsaPrecertChain);
+  string issuer_key_hash, tbs;
+
+  // With our default roots this should not be accepted, but it shouldn't
+  // fail with an algorithm related error
+  const util::Status status(
+      checker_.CheckPreCertChain(&pre_chain, &issuer_key_hash, &tbs));
+
+  EXPECT_THAT(status,
+              StatusIs(util::error::FAILED_PRECONDITION, "unknown root"));
+}
+
+TEST_F(CertCheckerTest, TestDsaPrecertChain) {
+  // Explicitly set the root of this chain as trusted
+  checker_.ClearAllTrustedCertificates();
+  vector<string> roots;
+  roots.push_back(kDsaPrecertChainRootOnly);
+  checker_.LoadTrustedCertificates(roots);
+
+  PreCertChain pre_chain(kDsaPrecertChain);
+  string issuer_key_hash, tbs;
+
+  EXPECT_OK(checker_.CheckPreCertChain(&pre_chain, &issuer_key_hash, &tbs));
+  // Added a root CA.
+  EXPECT_EQ(2, pre_chain.Length());
+  // And set a SHA256 HASH
+  EXPECT_EQ(32, issuer_key_hash.size());
+  // And the TBS fields
+  EXPECT_FALSE(tbs.empty());
+}
+
+TEST_F(CertCheckerTest, TestDsaPrecertChainRejectsInvalidDsaSig) {
+  // Explicitly set the root of this chain as trusted
+  checker_.ClearAllTrustedCertificates();
+  vector<string> roots;
+  roots.push_back(kDsaPrecertChainRootOnly);
+  checker_.LoadTrustedCertificates(roots);
+
+  // This has a deliberately corrupt signature
+  PreCertChain pre_chain(kDsaPrecertChainInvalidSig);
+  string issuer_key_hash, tbs;
+
+  const util::Status status(
+        checker_.CheckPreCertChain(&pre_chain, &issuer_key_hash, &tbs));
+
+  EXPECT_THAT(status,
+              StatusIs(util::error::INVALID_ARGUMENT, "invalid certificate chain"));
 }
 
 }  // namespace
