@@ -76,6 +76,7 @@ before_install:
  - echo "leak:InitModule" > ${HOME}/lsan.supp
  - echo "leak:SetExitLoopHandler" >> ${HOME}/lsan.supp
  - echo "leak:masterelection_test" >> ${HOME}/lsan.supp
+ - if [ "${CLEAR_CACHE}" != "" ]; then echo "Clearing cache"; rm -fr ${TRAVIS_BUILD_DIR}/../ct ${TRAVIS_BUILD_DIR}/../install ${HOME}/.ccache; fi
  - mkdir -p ${INSTALL_DIR}/include ${INSTALL_DIR}/lib ${INSTALL_DIR}/java
  - echo "INSTALL_DIR=${INSTALL_DIR}"
  - mkdir -p $GOPATH/src/github.com/google
