@@ -41,8 +41,7 @@ class CTDNSLookup:
         answers = self.Get(name)
         assert len(answers) == 1
         txt = answers[0]
-        assert len(txt.strings) == 1
-        return txt.strings[0]
+        return ''.join(txt.strings)
 
     def GetSTH(self):
         sth_str = self.GetOne('sth')
