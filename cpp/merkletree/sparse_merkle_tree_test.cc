@@ -98,7 +98,7 @@ class Reference {
     // b) I want it to be as similar as possible to the code in the paper.
 
     ScopedBIGNUM offset(BN_new());
-    CHECK_EQ(1, BN_zero(offset.get()));
+    BN_zero(offset.get());
     const string ret(
         HStar2b(n, *values, values->begin(), values->end(), offset.get()));
     return ret;

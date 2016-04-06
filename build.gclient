@@ -5,7 +5,7 @@ export INSTALL_DIR
 PKG_CONFIG_PATH=$(shell pwd)/install/lib/pkgconfig
 export PKG_CONFIG_PATH
 
-PHONY: libunwind tcmalloc objecthash openssl protobuf libevent libevhtp gflags glog ldns sqlite3 leveldb json-c configure-ct
+PHONY: libunwind tcmalloc objecthash borginssl openssl protobuf libevent libevhtp gflags glog ldns sqlite3 leveldb json-c configure-ct
 
 all: configure-ct
 
@@ -24,6 +24,9 @@ _icu4c:
 
 _objecthash:
 	$(MAKE) -C certificate-transparency/third_party/objecthash -f `pwd`/certificate-transparency/build/Makefile.objecthash
+
+_boringssl:
+	$(MAKE) -C boringssl -f `pwd`/certificate-transparency/build/Makefile.boringssl
 
 _openssl:
 	$(MAKE) -C openssl -f `pwd`/certificate-transparency/build/Makefile.openssl

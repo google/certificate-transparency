@@ -489,7 +489,8 @@ TEST_F(CertTest, SignatureAlgorithmMatches) {
 
 TEST_F(CertTest, IllegalSignatureAlgorithmParameter) {
   Cert cert(kIllegalSigAlgParameterCertString);
-  #if defined(OPENSSL_IS_BORINGSSL) && defined(BORINGSSL_201603)
+  #if defined(OPENSSL_IS_BORINGSSL) && \
+              (defined(BORINGSSL_201603) || defined(BORINGSSL_201512))
   EXPECT_FALSE(cert.IsLoaded());
   #else
   EXPECT_TRUE(cert.IsLoaded());
