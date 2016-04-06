@@ -28,9 +28,10 @@ matrix:
   include:
     - compiler: clang
       os: osx
+      env: SSL=openssl
     - compiler: clang
       os: linux
-      env: REAL_CC=clang-3.6 REAL_CXX=clang++-3.6
+      env: SSL=boringssl REAL_CC=clang-3.6 REAL_CXX=clang++-3.6
       addons:
         apt:
           sources: *common_sources
@@ -39,7 +40,16 @@ matrix:
           - clang-3.6
     - compiler: clang
       os: linux
-      env: REAL_CC=clang-3.6 REAL_CXX=clang++-3.6 SANITIZE="-fsanitize=address -fno-omit-frame-pointer" ASAN_OPTIONS="detect_leaks=1:check_initialization_order=1" LSAN_OPTIONS="suppressions=${HOME}/lsan.supp"
+      env: SSL=openssl REAL_CC=clang-3.6 REAL_CXX=clang++-3.6
+      addons:
+        apt:
+          sources: *common_sources
+          packages:
+          - *common_packages
+          - clang-3.6
+    - compiler: clang
+      os: linux
+      env: SSL=openssl REAL_CC=clang-3.6 REAL_CXX=clang++-3.6 SANITIZE="-fsanitize=address -fno-omit-frame-pointer" ASAN_OPTIONS="detect_leaks=1:check_initialization_order=1" LSAN_OPTIONS="suppressions=${HOME}/lsan.supp"
       addons:
         apt:
           sources: *common_sources
@@ -93,7 +103,8 @@ install:
  - export PATH="$PATH:/usr/local/bin:"`pwd`/depot_tools
  - cd ct
  - ln -s ../certificate-transparency certificate-transparency
- - if [ ! -f .gclient ]; then gclient config --name="certificate-transparency" --unmanaged https://github.com/${TRAVIS_REPO_SLUG}.git; fi
+ - |-
+   gclient config --spec "solutions=[{\"name\": \"certificate-transparency\", \"url\": \"https://github.com/google/certificate-transparency.git\", \"deps_file\": \"DEPS\", \"managed\": False, \"custom_deps\": {}, \"safesync_url\": \"\", \"custom_vars\": { \"ssl_impl\": \"${SSL}\" } },]"
  - gclient sync
  - popd
  - export PYTHONPATH=$(python -m site --user-site)
