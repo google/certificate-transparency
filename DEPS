@@ -3,7 +3,7 @@ vars = {
      # implementations below.
      # If you change this in an existing client, you should probably rm -fr
      # all the deps and rebuild everything from scratch.
-     "ssl_impl":         "boringssl",
+     "ssl_impl":         "openssl",
 
      # SSL implementation alternatives:
      "openssl": 				 "https://github.com/openssl/openssl.git@OpenSSL_1_0_2d",
