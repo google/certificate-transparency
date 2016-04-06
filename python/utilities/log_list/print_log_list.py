@@ -6,6 +6,7 @@ import hashlib
 import json
 import os
 import sys
+import time
 
 import gflags
 import jsonschema
@@ -76,7 +77,13 @@ def print_formatted_log_list(json_log_list):
         hasher = hashlib.sha256()
         hasher.update(key)
         key_hash = hasher.digest()
-        print "  Key ID: %s" % (base64.encodestring(key_hash))
+        print "  Key ID: %s" % (base64.encodestring(key_hash)),
+        if "final_sth" in log_info:
+            final_sth = log_info["final_sth"]
+            print "  Log is frozen as of %s, final tree size %d" % (
+                time.asctime(time.gmtime(final_sth["timestamp"] / 1000.0)),
+                final_sth["tree_size"])
+        print "-" * 80
 
 def run():
     with open(FLAGS.log_list, "rb") as f:
