@@ -155,7 +155,9 @@ int SSLClient::VerifyCallback(X509_STORE_CTX* ctx, void* arg) {
 
   int vfy = X509_verify_cert(ctx);
   if (vfy != 1) {
-    LOG(ERROR) << "Certificate verification failed.";
+    int error = X509_STORE_CTX_get_error(ctx);
+    LOG(ERROR) << "Certificate verification failed: "
+               << X509_verify_cert_error_string(error);
     return vfy;
   }
 
