@@ -105,14 +105,14 @@ AC_SEARCH_LIBS([clock_gettime], [rt],,, [$save_LIBS])
 
 AC_MSG_CHECKING([checking for gflags library])
 LIBS="-lgflags $LIBS"
-AC_LINK_IFELSE([AC_LANG_PROGRAM([[#include <gflags/gflags.h>], [google::ParseCommandLineFlags(NULL, NULL, true)]])], [have_gflags=yes], [have_gflags=no])
+AC_LINK_IFELSE([AC_LANG_PROGRAM([[#include <gflags/gflags.h>]], [[google::ParseCommandLineFlags(NULL, NULL, true)]])], [have_gflags=yes], [have_gflags=no])
 AC_MSG_RESULT([$have_gflags])
 AS_IF([test "x$have_gflags" = "xno"],
       [AC_MSG_ERROR([gflags library could not be found])])
 
 AC_MSG_CHECKING([checking for glog library])
 LIBS="-lglog $LIBS"
-AC_LINK_IFELSE([AC_LANG_PROGRAM([[#include <glog/logging.h>], [google::InitGoogleLogging(NULL)]])], [have_glog=yes], [have_glog=no])
+AC_LINK_IFELSE([AC_LANG_PROGRAM([[#include <glog/logging.h>]], [[google::InitGoogleLogging(NULL)]])], [have_glog=yes], [have_glog=no])
 AC_MSG_RESULT([$have_glog])
 AS_IF([test "x$have_glog" = "xno"],
       [AC_MSG_ERROR([glog library could not be found])])
