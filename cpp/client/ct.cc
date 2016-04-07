@@ -163,7 +163,8 @@ static string SCTToList(const string& serialized_sct) {
 }
 
 static LogVerifier* GetLogVerifierFromFlags() {
-  CHECK(!FLAGS_ct_server_public_key.empty());
+  CHECK(!FLAGS_ct_server_public_key.empty()) <<
+    "Please give a CT server public key file with --ct_server_public_key";
 
   StatusOr<EVP_PKEY*> pkey(ReadPublicKey(FLAGS_ct_server_public_key));
   CHECK(pkey.ok()) << "could not read CT server public key file: "
