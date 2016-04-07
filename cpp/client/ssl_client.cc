@@ -80,7 +80,8 @@ SSLClient::SSLClient(const string& server, const string& port,
              SSL_CTX_load_verify_locations(ctx_.get(), NULL, ca_dir.c_str()))
         << "Unable to load trusted CA certificates.";
   } else {
-    LOG(WARNING) << "No trusted CA certificates given.";
+    SSL_CTX_set_default_verify_paths(ctx_.get());
+    LOG(INFO) << "Using system trusted CA certificates.";
   }
 
   SSL_CTX_set_cert_verify_callback(ctx_.get(), &VerifyCallback, &verify_args_);
