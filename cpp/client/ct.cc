@@ -43,7 +43,7 @@ DEFINE_string(ssl_client_trusted_cert_dir, "",
 DEFINE_string(ct_server_public_key, "",
               "PEM-encoded public key file of the CT log server");
 DEFINE_string(ssl_server, "", "SSL server to connect to");
-DEFINE_string(ssl_server_port, "", "SSL server port");
+DEFINE_string(ssl_server_port, "https", "SSL server port");
 DEFINE_string(ct_server_submission, "",
               "Certificate chain to submit to a CT log server. "
               "The file must consist of concatenated PEM certificates.");
