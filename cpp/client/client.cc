@@ -2,6 +2,7 @@
 
 #include <arpa/inet.h>
 #include <glog/logging.h>
+#include <netdb.h>
 #include <netinet/in.h>
 #include <stddef.h>
 #include <stdint.h>
@@ -15,7 +16,7 @@
 
 using std::string;
 
-Client::Client(const string& server, uint16_t port)
+Client::Client(const string& server, const string& port)
     : server_(server), port_(port), fd_(-1) {
 }
 
@@ -26,24 +27,42 @@ Client::~Client() {
 bool Client::Connect() {
   CHECK(!Connected());
 
-  fd_ = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
-  PCHECK(fd_ >= 0) << "Socket creation failed";
+  static const addrinfo server_addr_hints = {
+    AI_ADDRCONFIG, /* ai_flags */
+    AF_UNSPEC,     /* ai_family */
+    SOCK_STREAM,   /* ai_socktype */
+    IPPROTO_TCP    /* ai_protocol */
+  };
 
-  static struct sockaddr_in server_socket;
-  memset(&server_socket, 0, sizeof server_socket);
-  server_socket.sin_family = AF_INET;
-  server_socket.sin_port = htons(port_);
-  CHECK_EQ(1, inet_aton(server_.c_str(), &server_socket.sin_addr))
-      << "Can't parse server address: " << server_;
+  struct addrinfo* server_addr;
 
-  int ret =
-      connect(fd_, (struct sockaddr*)&server_socket, sizeof server_socket);
-  if (ret < 0) {
+  const int ret = getaddrinfo(server_.c_str(), port_.c_str(),
+                              &server_addr_hints, &server_addr);
+  CHECK_EQ(0, ret) << "Invalid server address '" << server_
+                   << "' and/or port '" << port_ << "': "
+                   << gai_strerror(ret);
+
+  bool is_connected = false;
+  while (!is_connected && server_addr != NULL) {
+    fd_ = socket(server_addr->ai_family,
+                 server_addr->ai_socktype,
+                 server_addr->ai_protocol);
+    PCHECK(fd_ >= 0) << "Socket creation failed";
+
+    if (connect(fd_, server_addr->ai_addr, server_addr->ai_addrlen) == 0) {
+      is_connected = true;
+    } else {
+      server_addr = server_addr->ai_next; // Try next address
+    }
+  }
+  freeaddrinfo(server_addr);
+
+  if (!is_connected) {
+    PLOG(ERROR) << "Connection to [" << server_ << "]:" << port_ << " failed";
     Disconnect();
-    PLOG(ERROR) << "Connection to " << server_ << ":" << port_ << " failed";
     return false;
   }
-  LOG(INFO) << "Connected to " << server_ << ":" << port_;
+  LOG(INFO) << "Connected to [" << server_ << "]:" << port_;
   return true;
 }
 
@@ -54,7 +73,7 @@ bool Client::Connected() const {
 void Client::Disconnect() {
   if (fd_ > 0) {
     close(fd_);
-    LOG(INFO) << "Disconnected from " << server_ << ":" << port_;
+    LOG(INFO) << "Disconnected from [" << server_ << "]:" << port_;
     fd_ = -1;
   }
 }

@@ -65,8 +65,8 @@ int SSLClient::ExtensionCallback(SSL*, unsigned ext_type,
 }
 
 // TODO(ekasper): handle Cert::Status errors.
-SSLClient::SSLClient(const string& server, uint16_t port, const string& ca_dir,
-                     LogVerifier* verifier)
+SSLClient::SSLClient(const string& server, const string& port,
+                     const string& ca_dir, LogVerifier* verifier)
     : client_(server, port),
       ctx_(CHECK_NOTNULL(SSL_CTX_new(TLSv1_client_method()))),
       verify_args_(verifier),
@@ -80,7 +80,8 @@ SSLClient::SSLClient(const string& server, uint16_t port, const string& ca_dir,
              SSL_CTX_load_verify_locations(ctx_.get(), NULL, ca_dir.c_str()))
         << "Unable to load trusted CA certificates.";
   } else {
-    LOG(WARNING) << "No trusted CA certificates given.";
+    SSL_CTX_set_default_verify_paths(ctx_.get());
+    LOG(INFO) << "Using system trusted CA certificates.";
   }
 
   SSL_CTX_set_cert_verify_callback(ctx_.get(), &VerifyCallback, &verify_args_);
@@ -155,7 +156,9 @@ int SSLClient::VerifyCallback(X509_STORE_CTX* ctx, void* arg) {
 
   int vfy = X509_verify_cert(ctx);
   if (vfy != 1) {
-    LOG(ERROR) << "Certificate verification failed.";
+    int error = X509_STORE_CTX_get_error(ctx);
+    LOG(ERROR) << "Certificate verification failed: "
+               << X509_verify_cert_error_string(error);
     return vfy;
   }
 

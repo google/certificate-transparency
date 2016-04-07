@@ -9,7 +9,7 @@
 // Socket creation for client connections.
 class Client {
  public:
-  Client(const std::string& server, uint16_t port);
+  Client(const std::string& server, const std::string& port);
 
   ~Client();
 
@@ -34,7 +34,7 @@ class Client {
 
  private:
   const std::string server_;
-  const uint16_t port_;
+  const std::string port_;
   int fd_;
 
   DISALLOW_COPY_AND_ASSIGN(Client);
