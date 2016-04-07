@@ -36,8 +36,8 @@ bool Client::Connect() {
 
   struct addrinfo* server_addr;
 
-  int ret = getaddrinfo(server_.c_str(), port_.c_str(), &server_addr_hints,
-                        &server_addr);
+  const int ret = getaddrinfo(server_.c_str(), port_.c_str(),
+                              &server_addr_hints, &server_addr);
   CHECK_EQ(0, ret) << "Invalid server address '" << server_
                    << "' and/or port '" << port_ << "': "
                    << gai_strerror(ret);
