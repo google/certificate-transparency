@@ -997,6 +997,7 @@ int Monitor() {
 int main(int argc, char** argv) {
   google::SetUsageMessage(argv[0] + string(kUsage));
   util::InitCT(&argc, &argv);
+  ConfigureSerializerForV1CT();
 
   const string main_command(argv[0]);
   if (argc < 2) {
