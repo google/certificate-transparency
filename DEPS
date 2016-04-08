@@ -70,7 +70,7 @@ else:
 
 num_cores = multiprocessing.cpu_count()
 
-print("Building with %s", Var("ssl_impl"))
+print("Building with %s" % Var("ssl_impl"))
 print("Using make %s with %d jobs" % (make, num_cores))
 
 here = os.getcwd()
