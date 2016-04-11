@@ -5,7 +5,7 @@ export INSTALL_DIR
 PKG_CONFIG_PATH=$(shell pwd)/install/lib/pkgconfig
 export PKG_CONFIG_PATH
 
-PHONY: libunwind tcmalloc objecthash borginssl openssl protobuf libevent libevhtp gflags glog ldns sqlite3 leveldb json-c configure-ct
+PHONY: libunwind tcmalloc objecthash boringssl openssl protobuf libevent libevhtp gflags glog ldns sqlite3 leveldb json-c configure-ct
 
 all: configure-ct
 

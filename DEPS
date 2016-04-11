@@ -1,5 +1,5 @@
 vars = {
-     # Change this variable to the name of one of the alterniative SSL
+     # Change this variable to the name of one of the alternative SSL
      # implementations below.
      # If you change this in an existing client, you should probably rm -fr
      # all the deps and rebuild everything from scratch.
