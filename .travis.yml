@@ -120,8 +120,8 @@ script:
  - ${MAKE} -j$(getconf _NPROCESSORS_ONLN) check VERBOSE=1 V=${ENV_VERBOSE}
  - ant build test
  - ${MAKE} -C python test
+ - pushd ${GOPATH}
  - |
-   pushd ${GOPATH}
-   CGO_CPPFLAGS="-I${INSTALL_DIR}/include" CGO_LDFLAGS="-L${INSTALL_DIR}/lib" go test -v ./src/github.com/google/certificate-transparency/go/...
-   popd
+   GODEBUG=cgocheck=0 CGO_CPPFLAGS="-I${INSTALL_DIR}/include" CGO_LDFLAGS="-L${INSTALL_DIR}/lib" go test -v ./src/github.com/google/certificate-transparency/go/...
+ - popd
 
