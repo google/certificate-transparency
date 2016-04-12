@@ -656,8 +656,8 @@ TEST_F(CertCheckerTest, TestDsaPrecertChainRejectsInvalidDsaSig) {
   const util::Status status(
         checker_.CheckPreCertChain(&pre_chain, &issuer_key_hash, &tbs));
 
-  EXPECT_THAT(status,
-              StatusIs(util::error::INVALID_ARGUMENT, "invalid certificate chain"));
+  EXPECT_THAT(status, StatusIs(util::error::INVALID_ARGUMENT,
+                               "invalid certificate chain"));
 }
 
 }  // namespace
