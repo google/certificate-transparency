@@ -97,10 +97,8 @@ def generate_cpp_header(json_log_list, output_file):
     f.write("const CTLogInfo kCTLogList[] = {\n")
     f.write(",\n" . join(list_code))
     f.write("};\n")
-    f.write("\nconst size_t kNumKnownCTLogs = %d;\n\n" % len(logs))
 
     write_log_ids_array(f, google_log_ids, 'kGoogleLogIDs')
-    f.write("const size_t kNumGoogleLogs = %d;\n" % len(google_log_ids))
 
     _write_cpp_footer(f, include_guard)
 
