@@ -59,3 +59,15 @@ EOF
 sudo cp /tmp/ct-info.conf /etc/google-fluentd/config.d/ct-info.conf
 sudo service google-fluentd restart
 # End google-fluentd stuff
+
+cat > /etc/logrotate.d/docker <<EOF
+/var/log/docker.log {
+  rotate 7
+  daily
+  compress
+  size=1M
+  missingok
+  delaycompress
+  copytruncate
+}
+EOF
