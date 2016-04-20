@@ -38,8 +38,12 @@ bin_PROGRAMS = \
 	cpp/server/ct-mirror-v2 \
 	cpp/server/ct-server \
 	cpp/server/ct-server-v2 \
-	cpp/server/xjson-server \
 	cpp/tools/ct-clustertool
+
+if HAVE_OBJECTHASH
+bin_PROGRAMS += \
+	cpp/server/xjson-server
+endif
 
 noinst_PROGRAMS = \
 	cpp/tools/dump_cert \
@@ -181,7 +185,6 @@ cpp_libcore_a_SOURCES = \
 	cpp/net/url_fetcher.cc \
 	cpp/proto/cert_serializer.cc \
 	cpp/proto/serializer.cc \
-	cpp/proto/xjson_serializer.cc \
 	cpp/server/metrics.cc \
 	cpp/server/proxy.cc \
 	cpp/server/server.cc \
@@ -297,12 +300,13 @@ cpp_server_xjson_server_LDADD = \
 	-lprotobuf -lsqlite3
 cpp_server_xjson_server_SOURCES = \
 	cpp/client/async_log_client.cc \
+	cpp/proto/xjson_serializer.cc \
 	cpp/server/handler.cc \
 	cpp/server/json_output.cc \
 	cpp/server/log_processes.cc \
 	cpp/server/server_helper.cc \
-	cpp/server/xjson-server.cc \
 	cpp/server/x_json_handler.cc \
+	cpp/server/xjson-server.cc \
 	cpp/util/json_wrapper.cc \
 	third_party/objecthash/objecthash.cc
 

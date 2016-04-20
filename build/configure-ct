@@ -39,7 +39,7 @@ then
       ;;
   esac
 
-  ./configure GMOCK_DIR=${GMOCK} ${CONFIGURE_FLAGS} PROTOC=${INSTALL_DIR}/bin/protoc PKG_CONFIG_PATH="${INSTALL_DIR}/lib/pkgconfig" CPPFLAGS="-I${INSTALL_DIR}/include" CXXFLAGS="${CXXFLAGS} ${EXTRA_CXXFLAGS}" LDFLAGS="-L${INSTALL_DIR}/lib $EXTRA_LDFLAGS" LIBS="${EXTRA_LIBS}" INSTALL_DIR=${INSTALL_DIR} || tail -1000 config.log
+  ./configure GMOCK_DIR=${GMOCK} ${CONFIGURE_FLAGS} PROTOC=${INSTALL_DIR}/bin/protoc PKG_CONFIG_PATH="${INSTALL_DIR}/lib/pkgconfig" CPPFLAGS="-I${INSTALL_DIR}/include -I${PWD}/third_party/objecthash" CXXFLAGS="${CXXFLAGS} ${EXTRA_CXXFLAGS}" LDFLAGS="-L${INSTALL_DIR}/lib -L${PWD}/third_party/objecthash $EXTRA_LDFLAGS" LIBS="${EXTRA_LIBS}" INSTALL_DIR=${INSTALL_DIR} || tail -1000 config.log
 
   ./config.status --config
 fi

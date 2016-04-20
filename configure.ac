@@ -73,6 +73,7 @@ AC_CHECK_HEADER([google/protobuf/message.h],,
 AC_CHECK_HEADER([leveldb/db.h],,
                 [AC_MSG_ERROR([leveldb headers could not be found])])
 AC_CHECK_HEADER([ldns/ldns.h],, [missing_ldns=yes])
+AC_CHECK_HEADER([objecthash.h],, [missing_objecthash=yes])
 
 # Check for working GTest/GMock.
 saved_CPPFLAGS="$CPPFLAGS"
@@ -209,6 +210,7 @@ AC_CHECK_FUNCS([alarm gettimeofday memset mkdir select socket strdup strerror st
 
 AM_CONDITIONAL([HAVE_ANT], [test -n "$ANT"])
 AM_CONDITIONAL([HAVE_LDNS], [test -z "$missing_ldns"])
+AM_CONDITIONAL([HAVE_OBJECTHASH], [test -z "$missing_objecthash"])
 AM_CONDITIONAL([OPENSSL_IS_BORINGSSL], [test -n "$openssl_is_boringssl"])
 AC_DEFINE_UNQUOTED([TEST_SRCDIR], ["$srcdir"], [Top of the source directory, for tests.])
 AC_SUBST([INSTALL_DIR])
