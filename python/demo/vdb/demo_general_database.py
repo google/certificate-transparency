@@ -88,12 +88,6 @@ class ReplCmd(cmd.Cmd):
   def help_load(self):
     print 'load <path> - load state from path'
 
-  def do_new(self, arg=''):
-    self.db = VerifiableDatabase()
-
-  def help_new(self):
-    print 'new - creates a new database, called by default upon launch'
-
   def do_set(self, arg):
     try:
       n, v = arg.split(' ')
