@@ -23,6 +23,9 @@ gflags.DEFINE_integer("reporter_workers", multiprocessing.cpu_count(),
 gflags.DEFINE_integer("reporter_queue_size", 50,
                       "Size of entry queue in reporter")
 
+gflags.DEFINE_bool("reporter_disable_checks", False,
+                   "Disable cert_analysis checks.")
+
 
 def _scan_der_cert(der_certs, checks):
     current = -1
@@ -102,7 +105,10 @@ class CertificateReport(object):
     def __init__(self, checks=all_checks.ALL_CHECKS,
                  queue_size=None):
         self.reset()
-        self.checks = checks
+        if FLAGS.reporter_disable_checks:
+            self.checks = []
+        else:
+            self.checks = checks
         self._jobs = Queue(queue_size or FLAGS.reporter_queue_size)
         self._pool = None
         self._writing_handler = None
