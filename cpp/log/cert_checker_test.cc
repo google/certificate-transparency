@@ -18,6 +18,7 @@ using cert_trans::Cert;
 using cert_trans::CertChain;
 using cert_trans::CertChecker;
 using cert_trans::PreCertChain;
+using std::move;
 using std::string;
 using std::unique_ptr;
 using std::vector;
@@ -216,7 +217,7 @@ TEST_F(CertCheckerTest, Certificate) {
 TEST_F(CertCheckerTest, CertificateWithRoot) {
   CertChain chain(leaf_pem_);
   ASSERT_TRUE(chain.IsLoaded());
-  ASSERT_TRUE(chain.AddCert(new Cert(ca_pem_)));
+  ASSERT_TRUE(chain.AddCert(unique_ptr<Cert>(new Cert(ca_pem_))));
 
   // Fail as even though we give a CA cert, it's not in the local store.
   EXPECT_THAT(checker_.CheckCertChain(&chain),
@@ -231,8 +232,8 @@ TEST_F(CertCheckerTest, CertificateWithRoot) {
 TEST_F(CertCheckerTest, TrimsRepeatedRoots) {
   CertChain chain(leaf_pem_);
   ASSERT_TRUE(chain.IsLoaded());
-  ASSERT_TRUE(chain.AddCert(new Cert(ca_pem_)));
-  ASSERT_TRUE(chain.AddCert(new Cert(ca_pem_)));
+  ASSERT_TRUE(chain.AddCert(unique_ptr<Cert>(new Cert(ca_pem_))));
+  ASSERT_TRUE(chain.AddCert(unique_ptr<Cert>(new Cert(ca_pem_))));
 
   // Load CA certs and expect success.
   EXPECT_TRUE(checker_.LoadTrustedCertificates(cert_dir_ + "/" + kCaCert));
@@ -250,7 +251,7 @@ TEST_F(CertCheckerTest, Intermediates) {
   EXPECT_THAT(checker_.CheckCertChain(&chain),
               StatusIs(util::error::FAILED_PRECONDITION));
   // Add the intermediate and expect success.
-  ASSERT_TRUE(chain.AddCert(new Cert(intermediate_pem_)));
+  ASSERT_TRUE(chain.AddCert(unique_ptr<Cert>(new Cert(intermediate_pem_))));
   ASSERT_EQ(2U, chain.Length());
   EXPECT_OK(checker_.CheckCertChain(&chain));
   EXPECT_EQ(3U, chain.Length());
@@ -408,15 +409,15 @@ TEST_F(CertCheckerTest, ResolveIssuerCollisions) {
   ASSERT_TRUE(
       util::ReadTextFile(cert_dir_ + "/" + kCollisionRoot2, &root2_pem));
   CertChain chain1(chain_pem);
-  Cert* root1 = new Cert(root1_pem);
+  unique_ptr<Cert> root1(new Cert(root1_pem));
   ASSERT_TRUE(root1->IsLoaded());
-  chain1.AddCert(root1);
+  chain1.AddCert(move(root1));
   EXPECT_OK(checker_.CheckCertChain(&chain1));
 
   CertChain chain2(chain_pem);
-  Cert* root2 = new Cert(root2_pem);
+  unique_ptr<Cert> root2(new Cert(root2_pem));
   ASSERT_TRUE(root2->IsLoaded());
-  chain2.AddCert(root2);
+  chain2.AddCert(move(root2));
   EXPECT_OK(checker_.CheckCertChain(&chain2));
 }
 

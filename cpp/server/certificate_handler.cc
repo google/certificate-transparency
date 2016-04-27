@@ -13,6 +13,7 @@ using ct::LogEntry;
 using ct::SignedCertificateTimestamp;
 using std::bind;
 using std::make_shared;
+using std::move;
 using std::multimap;
 using std::placeholders::_1;
 using std::shared_ptr;
@@ -65,7 +66,7 @@ bool ExtractChain(libevent::Base* base, evhttp_request* req,
       return false;
     }
 
-    chain->AddCert(cert.release());
+    chain->AddCert(move(cert));
   }
 
   return true;

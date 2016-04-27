@@ -98,14 +98,14 @@ Cert::Cert(const string& pem_string) {
 }
 
 
-Cert* Cert::Clone() const {
+unique_ptr<Cert> Cert::Clone() const {
   X509* x509(nullptr);
   if (x509_) {
     x509 = X509_dup(x509_.get());
     if (!x509)
       LOG_OPENSSL_ERRORS(ERROR);
   }
-  return new Cert(x509);
+  return unique_ptr<Cert>(new Cert(x509));
 }
 
 
@@ -1271,14 +1271,12 @@ CertChain::CertChain(const string& pem_string) {
 }
 
 
-bool CertChain::AddCert(Cert* cert) {
+bool CertChain::AddCert(unique_ptr<Cert> cert) {
   if (!cert || !cert->IsLoaded()) {
     LOG(ERROR) << "Attempting to add an invalid cert";
-    if (cert)
-      delete cert;
     return false;
   }
-  chain_.push_back(cert);
+  chain_.push_back(cert.release());
   return true;
 }
 

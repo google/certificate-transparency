@@ -16,6 +16,7 @@ using cert_trans::CertChain;
 using cert_trans::PreCertChain;
 using cert_trans::TbsCertificate;
 using std::string;
+using std::unique_ptr;
 using util::error::Code;
 using util::testing::StatusIs;
 
@@ -753,13 +754,13 @@ TEST_F(CertChainTest, AddCert) {
   CertChain chain(leaf_pem_);
   EXPECT_EQ(chain.Length(), 1U);
 
-  chain.AddCert(new Cert(ca_pem_));
+  chain.AddCert(unique_ptr<Cert>(new Cert(ca_pem_)));
   EXPECT_EQ(chain.Length(), 2U);
 
   chain.AddCert(NULL);
   EXPECT_EQ(chain.Length(), 2U);
 
-  chain.AddCert(new Cert("bogus"));
+  chain.AddCert(unique_ptr<Cert>(new Cert("bogus")));
   EXPECT_EQ(chain.Length(), 2U);
 }
 

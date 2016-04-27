@@ -1,9 +1,11 @@
 /* -*- mode: c++; indent-tabs-mode: nil -*- */
 #ifndef CERT_H
 #define CERT_H
+
 #include <gtest/gtest_prod.h>
 #include <openssl/asn1.h>
 #include <openssl/x509.h>
+#include <memory>
 #include <string>
 #include <vector>
 
@@ -37,7 +39,7 @@ class Cert {
 
   // Never returns NULL but check IsLoaded() after Clone to verify the
   // underlying copy succeeded.
-  Cert* Clone() const;
+  std::unique_ptr<Cert> Clone() const;
 
   // Frees the old X509 and attempts to load a new one.
   util::Status LoadFromDerString(const std::string& der_string);
@@ -267,11 +269,10 @@ class CertChain {
   explicit CertChain(const std::string& pem_string);
   ~CertChain();
 
-  // Takes ownership of the cert.
   // If the cert has a valid X509 structure, adds it to the end of the chain
   // and returns true.
   // Else returns false.
-  bool AddCert(Cert* cert);
+  bool AddCert(std::unique_ptr<Cert> cert);
 
   // Remove a cert from the end of the chain, if there is one.
   void RemoveCert();
@@ -322,6 +323,7 @@ class CertChain {
 
  private:
   void ClearChain();
+  // Owns the certs.
   std::vector<Cert*> chain_;
 
   DISALLOW_COPY_AND_ASSIGN(CertChain);
