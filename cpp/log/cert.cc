@@ -20,6 +20,7 @@
 #include <string>
 #include <vector>
 
+using std::move;
 using std::string;
 using std::to_string;
 using std::unique_ptr;
@@ -1254,7 +1255,7 @@ CertChain::CertChain(const string& pem_string) {
 
   X509* x509(nullptr);
   while ((x509 = PEM_read_bio_X509(bio_in.get(), nullptr, nullptr, nullptr))) {
-    chain_.push_back(new Cert(x509));
+    chain_.push_back(unique_ptr<Cert>(new Cert(x509)));
   }
 
   // The last error must be EOF.
@@ -1276,14 +1277,13 @@ bool CertChain::AddCert(unique_ptr<Cert> cert) {
     LOG(ERROR) << "Attempting to add an invalid cert";
     return false;
   }
-  chain_.push_back(cert.release());
+  chain_.push_back(move(cert));
   return true;
 }
 
 
 void CertChain::RemoveCert() {
   if (IsLoaded()) {
-    delete chain_.back();
     chain_.pop_back();
   } else {
     LOG(ERROR) << "Chain is not loaded";
@@ -1333,10 +1333,10 @@ util::Status CertChain::IsValidCaIssuerChainMaybeLegacyRoot() const {
     return util::Status(Code::FAILED_PRECONDITION, "Cert not loaded");
   }
 
-  for (vector<Cert*>::const_iterator it = chain_.begin();
+  for (vector<unique_ptr<Cert>>::const_iterator it = chain_.begin();
        it + 1 < chain_.end(); ++it) {
-    Cert* subject = *it;
-    Cert* issuer = *(it + 1);
+    const unique_ptr<Cert>& subject = *it;
+    const unique_ptr<Cert>& issuer = *(it + 1);
 
     // The root cert may not have CA:True
     const StatusOr<bool> status = issuer->IsSelfSigned();
@@ -1368,10 +1368,10 @@ util::Status CertChain::IsValidSignatureChain() const {
                         "certificate chain is not loaded");
   }
 
-  for (vector<Cert*>::const_iterator it = chain_.begin();
+  for (vector<unique_ptr<Cert>>::const_iterator it = chain_.begin();
        it + 1 < chain_.end(); ++it) {
-    Cert* subject = *it;
-    Cert* issuer = *(it + 1);
+    const unique_ptr<Cert>& subject = *it;
+    const unique_ptr<Cert>& issuer = *(it + 1);
 
     const StatusOr<bool> status = subject->IsSignedBy(*issuer);
 
@@ -1399,9 +1399,6 @@ util::Status CertChain::IsValidSignatureChain() const {
 
 
 void CertChain::ClearChain() {
-  vector<Cert*>::const_iterator it;
-  for (it = chain_.begin(); it < chain_.end(); ++it)
-    delete *it;
   chain_.clear();
 }
 

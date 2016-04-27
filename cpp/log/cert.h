@@ -296,17 +296,17 @@ class CertChain {
   Cert const* LeafCert() const {
     if (!IsLoaded())
       return NULL;
-    return chain_.front();
+    return chain_.front().get();
   }
 
   Cert const* CertAt(size_t position) const {
-    return chain_.size() <= position ? NULL : chain_[position];
+    return chain_.size() <= position ? NULL : chain_[position].get();
   }
 
   Cert const* LastCert() const {
     if (!IsLoaded())
       return NULL;
-    return chain_.back();
+    return chain_.back().get();
   }
 
   // Returns TRUE if the issuer of each cert is the subject of the
@@ -323,8 +323,7 @@ class CertChain {
 
  private:
   void ClearChain();
-  // Owns the certs.
-  std::vector<Cert*> chain_;
+  std::vector<std::unique_ptr<Cert>> chain_;
 
   DISALLOW_COPY_AND_ASSIGN(CertChain);
 };
