@@ -190,8 +190,10 @@ class AsyncLogClientTest(unittest.TestCase):
         return consumer
 
     def pump_get_entries(self,
-                     delay=FLAGS.get_entries_retry_delay,
+                     delay=None,
                      pumps=1):
+        if not delay:
+            delay = FLAGS.get_entries_retry_delay
         # Helper method which advances time past get_entries delay
         for _ in range(0, pumps):
             self.clock.pump([0, delay])
@@ -384,5 +386,5 @@ class AsyncLogClientTest(unittest.TestCase):
         self.pump_get_entries()
         self.assertTrue(consumer.result.check(ValueError))
 
-if __name__ == "__main__":
+if __name__ == "__main__" or __name__ == "ct.client.async_log_client_test":
     sys.argv = FLAGS(sys.argv)

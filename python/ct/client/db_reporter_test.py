@@ -2,7 +2,9 @@
 import unittest
 
 import mock
+import sys
 from ct.client import db_reporter
+import gflags
 
 
 class DbReporterTest(unittest.TestCase):
@@ -26,4 +28,5 @@ class DbReporterTest(unittest.TestCase):
         self.assertEqual(db.store_certs_desc.call_count, 2)
 
 if __name__ == '__main__':
+    sys.argv = gflags.FLAGS(sys.argv)
     unittest.main()

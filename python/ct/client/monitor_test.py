@@ -507,5 +507,5 @@ class MonitorTest(unittest.TestCase):
                 ).addCallback(try_again_with_all_entries).addCallback(lambda _:
                     fake_fetch.assert_called_once_with(15, 19))
 
-if __name__ == "__main__":
+if __name__ == "__main__" or __name__ == "ct.client.monitor_test":
     sys.argv = FLAGS(sys.argv)
