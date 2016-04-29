@@ -1,9 +1,5 @@
 package merkletree
 
-import (
-	"hash"
-)
-
 const (
 	// LeafPrefix is the domain separation prefix for leaf hashes.
 	LeafPrefix = 0
@@ -12,41 +8,33 @@ const (
 	NodePrefix = 1
 )
 
+// HasherFunc takes a slice of bytes and returns a cryptographic hash of those bytes.
+type HasherFunc func([]byte) []byte
+
 // TreeHasher performs the various hashing operations required when manipulating MerkleTrees.
 type TreeHasher struct {
-	hasher hash.Hash
+	hasher HasherFunc
 }
 
 // NewTreeHasher returns a new TreeHasher based on the passed in hash.
-func NewTreeHasher(h hash.Hash) *TreeHasher {
+func NewTreeHasher(h HasherFunc) *TreeHasher {
 	return &TreeHasher{
 		hasher: h,
 	}
 }
 
-// DigestSize returns the size in bytes of the underlying hash.
-func (h TreeHasher) DigestSize() int {
-	return h.hasher.Size()
-}
-
 // HashEmpty returns the hash of the empty string.
 func (h TreeHasher) HashEmpty() []byte {
-	h.hasher.Reset()
-	return h.hasher.Sum([]byte{})
+	return h.hasher([]byte{})
 }
 
 // HashLeaf returns the hash of the passed in leaf, after applying domain separation.
 func (h TreeHasher) HashLeaf(leaf []byte) []byte {
-	h.hasher.Reset()
-	h.hasher.Write([]byte{LeafPrefix})
-	return h.hasher.Sum(leaf)
+	return h.hasher([]byte{LeafPrefix})
 
 }
 
 // HashChildren returns the merkle hash of the two passed in children.
 func (h TreeHasher) HashChildren(left, right []byte) []byte {
-	h.hasher.Reset()
-	h.hasher.Write([]byte{NodePrefix})
-	h.hasher.Write(left)
-	return h.hasher.Sum(right)
+	return h.hasher(append(append([]byte{NodePrefix}, left...), right...))
 }

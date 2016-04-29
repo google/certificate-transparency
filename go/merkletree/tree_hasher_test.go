@@ -55,13 +55,18 @@ func getTestVector() testVector {
 }
 
 func getTreeHasher() *TreeHasher {
-	return NewTreeHasher(sha256.New())
+	return NewTreeHasher(func(b []byte) []byte {
+		h := sha256.Sum256(b)
+		return h[:]
+	})
 }
+
+const (
+	digestSize = sha256.Size
+)
 
 func TestCollisionEmptyHashZeroLengthLeaf(t *testing.T) {
 	th := getTreeHasher()
-
-	digestSize := th.DigestSize()
 
 	// Check that the empty hash is not the same as the hash of an empty leaf.
 	leaf1Digest := th.HashEmpty()
@@ -81,8 +86,6 @@ func TestCollisionEmptyHashZeroLengthLeaf(t *testing.T) {
 
 func TestCollisionDifferentLeaves(t *testing.T) {
 	th := getTreeHasher()
-
-	digestSize := th.DigestSize()
 
 	// Check that different leaves hash to different digests.
 	const leaf1 = "Hello"

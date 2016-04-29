@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
-	"hash"
 )
 
 // MerkleVerifier is a class which knows how to verify merkle inclusion and consistency proofs.
@@ -13,7 +12,7 @@ type MerkleVerifier struct {
 }
 
 // NewMerkleVerifier returns a new MerkleVerifier for a tree based on the passed in hasher.
-func NewMerkleVerifier(h hash.Hash) MerkleVerifier {
+func NewMerkleVerifier(h HasherFunc) MerkleVerifier {
 	return MerkleVerifier{
 		treeHasher: NewTreeHasher(h),
 	}

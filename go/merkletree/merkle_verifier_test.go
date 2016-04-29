@@ -183,7 +183,10 @@ func verifierConsistencyCheck(v *MerkleVerifier, snapshot1, snapshot2 int64, roo
 }
 
 func getVerifier() MerkleVerifier {
-	return NewMerkleVerifier(sha256.New())
+	return NewMerkleVerifier(func(b []byte) []byte {
+		h := sha256.Sum256(b)
+		return h[:]
+	})
 }
 
 type proofTestVector struct {
