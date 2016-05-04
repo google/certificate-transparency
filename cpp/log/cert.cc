@@ -44,6 +44,100 @@ static int X509_get_signature_nid(const X509* x) {
 #endif
 
 
+namespace {
+#if defined(OPENSSL_IS_BORINGSSL)
+// BoringSSL doesn't have DSA hooked up so to accept these certs we have
+// to do the work ourselves. Can be called with a non DSA issuer key but will
+// always return false in that case.
+//
+// cert is the certificate that is to be checked
+// issuer_key is the public key of the certificate issuer (should be DSA)
+// Returns true if the DSA signature was correctly verified or false if
+// it did not or there was any error along the way.
+StatusOr<bool> check_dsa_signature(const X509* cert,
+                                   EVP_PKEY* issuer_key) {
+  // Before we start rummaging about through pointers ensure everything we need
+  // is present
+  if (!cert || !issuer_key || !X509_get_cert_info(cert)) {
+    return ::util::Status(Code::FAILED_PRECONDITION,
+                          "cert is null or missing cert_info");
+  }
+
+  X509_CINF* cert_info = X509_get_cert_info(cert);
+  const X509_ALGOR* sig = X509_CINF_get_signature(cert_info);
+
+  if (!sig) {
+    return ::util::Status(Code::FAILED_PRECONDITION,
+                          "cert is missing a signature");
+  }
+
+  if (EVP_PKEY_type(issuer_key->type) != EVP_PKEY_DSA) {
+    return ::util::Status(Code::FAILED_PRECONDITION,
+                          "issuer does not have a DSA public key");
+  }
+
+  const int alg_nid = X509_get_signature_nid(cert);
+
+  int digest_nid;
+  // We need the nid of the digest so we can create an EVP_MD for it later.
+  // Should succeed as we already checked we have a DSA key
+  if (!OBJ_find_sigid_algs(alg_nid, &digest_nid, nullptr)) {
+    return ::util::Status(Code::INTERNAL, "lookup sigid for algorithm failed");
+  }
+
+  // Get the DER encoded certificate info from the cert
+  unsigned char* der_buf(nullptr);
+  const int der_length = i2d_X509_CINF(cert_info, &der_buf);
+  if (der_length < 0) {
+    // Failed to decode. Several possible reasons but we will just reject
+    // the input rather than trying to interpret the cause
+    LOG(WARNING) << "Failed to serialize the CINF component";
+    LOG_OPENSSL_ERRORS(WARNING);
+    return ::util::Status(Code::INVALID_ARGUMENT,
+                          "failed to serialize cert info");
+  }
+  std::unique_ptr<unsigned char> der_buf_ptr(der_buf);
+
+  // If the key is missing parameters we don't accept it. This is allowed
+  // by RFC 3279 but we have not found any examples in the wild where it's
+  // used.
+  if (EVP_PKEY_missing_parameters(issuer_key)) {
+    LOG(WARNING) << "DSA sig check needs key params but not available";
+    return ::util::Status(Code::INVALID_ARGUMENT,
+                          "DSA key in cert has missing parameters");
+  }
+
+  const DSA* dsa = EVP_PKEY_get0_DSA(issuer_key);
+  const EVP_MD* md = EVP_get_digestbynid(digest_nid);
+
+  if (dsa == nullptr || md == nullptr) {
+    return ::util::Status(Code::INTERNAL,
+                          "failed to create hasher or get DSA sig");
+  }
+
+  unsigned char md_buffer[EVP_MAX_MD_SIZE];
+  unsigned int md_size;
+
+  // Build the digest of the cert info. Can't use higher level APIs for
+  // this unfortunately as DSA is not connected up.
+  if (!EVP_Digest(der_buf_ptr.get(), der_length, md_buffer, &md_size, md,
+                  nullptr)) {
+    return ::util::Status(Code::INTERNAL, "digest failed");
+  }
+
+  int out_valid;
+  if (!DSA_check_signature(&out_valid, md_buffer, md_size,
+                           cert->signature->data, cert->signature->length,
+                           dsa)) {
+    return ::util::Status(Code::INTERNAL, "failed to check DSA signature");
+  }
+
+  return out_valid == 1;
+}
+
+#endif
+}
+
 namespace cert_trans {
 
 
@@ -370,6 +464,28 @@ StatusOr<bool> Cert::IsSignedBy(const Cert& issuer) const {
   if (ret == 1) {
     return true;
   }
+
+#if defined(OPENSSL_IS_BORINGSSL)
+  // With BoringSSL we might have a signature algorithm that is not supported
+  // by X509_verify but we still want to accept into a log. This is a weaker
+  // check than x509_verify but sufficient for our needs as we are rejecting
+  // spam rather than intending to trust the certificate.
+  // Let's see if we can verify a DSA signature
+  const StatusOr<bool> is_valid_dsa_sig =
+      check_dsa_signature(x509_.get(), issuer_key.get());
+
+  if (is_valid_dsa_sig.ok()) {
+    if (is_valid_dsa_sig.ValueOrDie()) {
+      ClearOpenSSLErrors();
+      return true;
+    } else {
+      // Ensure we return the same status as we'd have got from calling
+      // IsValidSignatureChain() under OpenSSL when the signature is not valid.
+      return util::Status(Code::INVALID_ARGUMENT, "invalid certificate chain");
+    }
+  }
+#endif
+
   unsigned long err = ERR_peek_last_error();
   const int reason = ERR_GET_REASON(err);
   const int lib = ERR_GET_LIB(err);
@@ -381,6 +497,7 @@ StatusOr<bool> Cert::IsSignedBy(const Cert& issuer) const {
     ClearOpenSSLErrors();
     return false;
   }
+
   if (lib == ERR_LIB_EVP &&
       (reason == EVP_R_UNKNOWN_MESSAGE_DIGEST_ALGORITHM ||
        reason == EVP_R_UNKNOWN_SIGNATURE_ALGORITHM)) {
@@ -417,8 +534,8 @@ util::Status Cert::DerEncoding(string* result) const {
   int der_length = i2d_X509(x509_.get(), &der_buf);
 
   if (der_length < 0) {
-    // What does this return value mean? Let's assume it means the cert
-    // is bad until proven otherwise.
+    // Failed to decode. Several possible reasons but we will just reject
+    // the input rather than trying to interpret the cause
     LOG(WARNING) << "Failed to serialize cert";
     LOG_OPENSSL_ERRORS(WARNING);
     return util::Status(Code::INVALID_ARGUMENT, "DER decoding failed");
@@ -463,8 +580,8 @@ util::Status Cert::Sha256Digest(string* result) const {
   unsigned char digest[EVP_MAX_MD_SIZE];
   unsigned int len;
   if (X509_digest(x509_.get(), EVP_sha256(), digest, &len) != 1) {
-    // What does this return value mean? Let's assume it means the cert
-    // is bad until proven otherwise.
+    // Failed to digest. Several possible reasons but we will just reject
+    // the input rather than trying to interpret the cause
     LOG(WARNING) << "Failed to compute cert digest";
     LOG_OPENSSL_ERRORS(WARNING);
     return util::Status(Code::INVALID_ARGUMENT, "SHA256 digest failed");
@@ -484,8 +601,8 @@ util::Status Cert::DerEncodedTbsCertificate(string* result) const {
   unsigned char* der_buf(nullptr);
   int der_length = i2d_re_X509_tbs(x509_.get(), &der_buf);
   if (der_length < 0) {
-    // What does this return value mean? Let's assume it means the cert
-    // is bad until proven otherwise.
+    // Failed to serialize. Several possible reasons but we will just reject
+    // the input rather than trying to interpret the cause
     LOG(WARNING) << "Failed to serialize the TBS component";
     LOG_OPENSSL_ERRORS(WARNING);
     return util::Status(Code::INVALID_ARGUMENT, "TBS DER serialize failed");
@@ -519,8 +636,8 @@ util::Status Cert::DerEncodedName(X509_NAME* name, string* result) {
   unsigned char* der_buf(nullptr);
   int der_length = i2d_X509_NAME(name, &der_buf);
   if (der_length < 0) {
-    // What does this return value mean? Let's assume it means the cert
-    // is bad until proven otherwise.
+    // Failed to serialize. Several possible reasons but we will just reject
+    // the input rather than trying to interpret the cause
     LOG(WARNING) << "Failed to serialize the subject name";
     LOG_OPENSSL_ERRORS(WARNING);
     return util::Status(Code::INVALID_ARGUMENT, "name DER serialize failed");
@@ -540,8 +657,8 @@ util::Status Cert::PublicKeySha256Digest(string* result) const {
   unsigned char digest[EVP_MAX_MD_SIZE];
   unsigned int len;
   if (X509_pubkey_digest(x509_.get(), EVP_sha256(), digest, &len) != 1) {
-    // What does this return value mean? Let's assume it means the cert
-    // is bad until proven otherwise.
+    // Failed to digest. Several possible reasons but we will just reject
+    // the input rather than trying to interpret the cause
     LOG(WARNING) << "Failed to compute public key digest";
     LOG_OPENSSL_ERRORS(WARNING);
     return util::Status(Code::INVALID_ARGUMENT, "SHA256 digest failed");
@@ -561,8 +678,8 @@ util::Status Cert::SPKISha256Digest(string* result) const {
   int der_length =
       i2d_X509_PUBKEY(X509_get_X509_PUBKEY(x509_.get()), &der_buf);
   if (der_length < 0) {
-    // What does this return value mean? Let's assume it means the cert
-    // is bad until proven otherwise.
+    // Failed to serialize. Several possible reasons but we will just reject
+    // the input rather than trying to interpret the cause
     LOG(WARNING) << "Failed to serialize the Subject Public Key Info";
     LOG_OPENSSL_ERRORS(WARNING);
     return util::Status(Code::INVALID_ARGUMENT, "SPKI SHA256 digest failed");
@@ -1061,7 +1178,6 @@ util::Status Cert::IsValidNameConstrainedIntermediateCa() const {
   return util::Status::OK;
 }
 
-
 TbsCertificate::TbsCertificate(const Cert& cert) {
   if (!cert.IsLoaded()) {
     LOG(ERROR) << "Cert not loaded";
@@ -1084,8 +1200,8 @@ util::Status TbsCertificate::DerEncoding(string* result) const {
   unsigned char* der_buf(nullptr);
   int der_length = i2d_re_X509_tbs(x509_.get(), &der_buf);
   if (der_length < 0) {
-    // What does this return value mean? Let's assume it means the cert
-    // is bad until proven otherwise.
+    // Failed to serialize. Several possible reasons but we will just reject
+    // the input rather than trying to interpret the cause
     LOG(WARNING) << "Failed to serialize the TBS component";
     LOG_OPENSSL_ERRORS(WARNING);
     return util::Status(Code::INTERNAL, "Failed to serialize TBS");

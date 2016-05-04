@@ -225,6 +225,7 @@ static const char kMismatchingSigAlgsCertIssuerString[] =
     "+AZxAeKCINT+b72x\n"
     "-----END CERTIFICATE-----\n";
 
+
 namespace {
 
 class CertTest : public ::testing::Test {
