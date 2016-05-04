@@ -30,7 +30,7 @@ func (h TreeHasher) HashEmpty() []byte {
 
 // HashLeaf returns the hash of the passed in leaf, after applying domain separation.
 func (h TreeHasher) HashLeaf(leaf []byte) []byte {
-	return h.hasher([]byte{LeafPrefix})
+	return h.hasher(append([]byte{LeafPrefix}, leaf...))
 
 }
 

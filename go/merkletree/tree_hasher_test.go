@@ -101,7 +101,7 @@ func TestCollisionDifferentLeaves(t *testing.T) {
 		t.Fatalf("Got unexpected leaf2 digest size %d, expected %d", got, want)
 	}
 
-	if bytes.Compare(leaf1Digest, leaf2Digest) == 0 {
+	if bytes.Equal(leaf1Digest, leaf2Digest) {
 		t.Fatalf("Digests of leaf1 (%v) and leaf2 (%v) should differ", leaf1Digest, leaf2Digest)
 	}
 

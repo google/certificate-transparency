@@ -18,7 +18,7 @@ func verifierCheck(v *MerkleVerifier, leafIndex, treeSize int64, proof [][]byte,
 	if err != nil {
 		return err
 	}
-	if want := root; bytes.Compare(got, want) != 0 {
+	if want := root; !bytes.Equal(got, want) {
 		return fmt.Errorf("got root:\n%v\nexpected:\n%v", got, want)
 	}
 	if err := v.VerifyInclusionProof(leafIndex, treeSize, proof, root, data); err != nil {
@@ -77,10 +77,12 @@ func verifierCheck(v *MerkleVerifier, leafIndex, treeSize int64, proof [][]byte,
 		return errors.New("incorrectly verified against proof with trailing root")
 	}
 
-	// Remove a node from the end
-	wrongProof = proof[:len(proof)-1]
-	if err := v.VerifyInclusionProof(leafIndex, treeSize, wrongProof, root, data); err == nil {
-		return errors.New("incorrectly verified against truncated proof")
+	if len(proof) > 0 {
+		// Remove a node from the end
+		wrongProof = proof[:len(proof)-1]
+		if err := v.VerifyInclusionProof(leafIndex, treeSize, wrongProof, root, data); err == nil {
+			return errors.New("incorrectly verified against truncated proof")
+		}
 	}
 
 	// Add garbage at the front
@@ -102,6 +104,12 @@ func verifierConsistencyCheck(v *MerkleVerifier, snapshot1, snapshot2 int64, roo
 	err := v.VerifyConsistencyProof(snapshot1, snapshot2, root1, root2, proof)
 	if err != nil {
 		return err
+	}
+
+	if len(proof) == 0 {
+		// For simplicity test only non-trivial proofs that have root1 != root2
+		// snapshot1 != 0 and snapshot1 != snapshot2.
+		return nil
 	}
 
 	// Wrong snapshot index
@@ -261,30 +269,30 @@ func getRoots() []proofTestVector {
 
 type consistencyTestVector struct {
 	snapshot1, snapshot2, proofLen int64
-	proof                          []proofTestVector
+	proof                          [3]proofTestVector
 }
 
 func getConsistencyProofs() []consistencyTestVector {
 	return []consistencyTestVector{
-		{1, 1, 0, []proofTestVector{{dh(""), 0}, {dh(""), 0}, {dh(""), 0}}},
+		{1, 1, 0, [3]proofTestVector{{dh(""), 0}, {dh(""), 0}, {dh(""), 0}}},
 		{1,
 			8,
 			3,
-			[]proofTestVector{
+			[3]proofTestVector{
 				{dh("96a296d224f285c67bee93c30f8a309157f0daa35dc5b87e410b78630a09cfc7"), 32},
 				{dh("5f083f0a1a33ca076a95279832580db3e0ef4584bdff1f54c8a360f50de3031e"), 32},
 				{dh("6b47aaf29ee3c2af9af889bc1fb9254dabd31177f16232dd6aab035ca39bf6e4"), 32}}},
 		{6,
 			8,
 			3,
-			[]proofTestVector{
+			[3]proofTestVector{
 				{dh("0ebc5d3437fbe2db158b9f126a1d118e308181031d0a949f8dededebc558ef6a"), 32},
 				{dh("ca854ea128ed050b41b35ffc1b87b8eb2bde461e9e3b5596ece6b9d5975a0ae0"), 32},
 				{dh("d37ee418976dd95753c1c73862b9398fa2a2cf9b4ff0fdfe8b30cd95209614b7"), 32}}},
 		{2,
 			5,
 			2,
-			[]proofTestVector{
+			[3]proofTestVector{
 				{dh("5f083f0a1a33ca076a95279832580db3e0ef4584bdff1f54c8a360f50de3031e"), 32},
 				{dh("bc1a0643b12e4d2d7c77918f44e0f4f79a838b6cf9ec5b5c283e1f4d88599e6b"), 32},
 				{dh(""), 0}}},
@@ -333,12 +341,12 @@ func TestVerifyInclusionProof(t *testing.T) {
 		proof := [][]byte{}
 		for j := int64(0); j < inclusionProofs[i].proofLength; j++ {
 			proof = append(proof, inclusionProofs[i].proof[j].h)
-			err := verifierCheck(&v, inclusionProofs[i].leaf, inclusionProofs[i].snapshot, proof,
-				roots[inclusionProofs[i].snapshot-1].h,
-				inputs[inclusionProofs[i].leaf-1].h)
-			if err != nil {
-				t.Fatalf("failed to verify proof: %s", err)
-			}
+		}
+		err := verifierCheck(&v, inclusionProofs[i].leaf, inclusionProofs[i].snapshot, proof,
+			roots[inclusionProofs[i].snapshot-1].h,
+			inputs[inclusionProofs[i].leaf-1].h)
+		if err != nil {
+			t.Fatalf("i=%d: %s", i, err)
 		}
 	}
 
@@ -348,11 +356,10 @@ func TestVerifyConsistencyProof(t *testing.T) {
 	v := getVerifier()
 
 	proof := [][]byte{}
-	root1 := []byte{}
-	root2 := []byte{}
+	root1 := []byte("don't care")
+	root2 := []byte("don't care")
 
 	// Snapshots that are always consistent
-
 	if err := verifierConsistencyCheck(&v, 0, 0, root1, root2, proof); err != nil {
 		t.Fatalf("Failed to verify proof: %s", err)
 	}
@@ -388,6 +395,7 @@ func TestVerifyConsistencyProof(t *testing.T) {
 
 	// Roots match but the proof is not empty.
 	root2 = dh(sha256EmptyTreeHash)
+	proof = [][]byte{dh(sha256EmptyTreeHash)}
 
 	if err := verifierConsistencyCheck(&v, 0, 0, root1, root2, proof); err == nil {
 		t.Fatal("Incorrectly verified non-empty proof")
@@ -398,21 +406,22 @@ func TestVerifyConsistencyProof(t *testing.T) {
 	if err := verifierConsistencyCheck(&v, 1, 1, root1, root2, proof); err == nil {
 		t.Fatal("Incorrectly verified non-empty proof")
 	}
+
 	// Known good proofs.
 	roots := getRoots()
 	proofs := getConsistencyProofs()
 	for i := 0; i < 4; i++ {
-		proof = [][]byte{}
+		proof := [][]byte{}
 		for j := int64(0); j < proofs[i].proofLen; j++ {
 			proof = append(proof, proofs[i].proof[j].h)
-			snapshot1 := proofs[i].snapshot1
-			snapshot2 := proofs[i].snapshot2
-			err := verifierConsistencyCheck(&v, snapshot1, snapshot2,
-				roots[snapshot1-1].h,
-				roots[snapshot2-1].h, proof)
-			if err != nil {
-				t.Fatalf("Failed to verify known good proof: %s", err)
-			}
+		}
+		snapshot1 := proofs[i].snapshot1
+		snapshot2 := proofs[i].snapshot2
+		err := verifierConsistencyCheck(&v, snapshot1, snapshot2,
+			roots[snapshot1-1].h,
+			roots[snapshot2-1].h, proof)
+		if err != nil {
+			t.Fatalf("Failed to verify known good proof for i=%d: %s", i, err)
 		}
 	}
 }

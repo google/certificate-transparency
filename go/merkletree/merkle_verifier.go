@@ -25,9 +25,9 @@ func (m MerkleVerifier) VerifyInclusionProof(leafIndex, treeSize int64, proof []
 		return err
 	}
 	if len(calcRoot) == 0 {
-		panic(errors.New("calculated empty root"))
+		return errors.New("calculated empty root")
 	}
-	if bytes.Compare(calcRoot, root) != 0 {
+	if !bytes.Equal(calcRoot, root) {
 		return fmt.Errorf("calculated root:\n%v\n does not match provided root:\n%s", calcRoot, root)
 	}
 	return nil
@@ -75,16 +75,21 @@ func (m MerkleVerifier) VerifyConsistencyProof(snapshot1, snapshot2 int64, root1
 		return fmt.Errorf("snapshot1 (%d) > snapshot2 (%d)", snapshot1, snapshot2)
 	}
 	if snapshot1 == snapshot2 {
-		if len(root1) == 0 {
-			return errors.New("invalid empty root1")
-		}
-		if bytes.Compare(root1, root2) != 0 {
+		if !bytes.Equal(root1, root2) {
 			return fmt.Errorf("root1:\n%v\ndoes not match root2:\n%v", root1, root2)
 		}
-		if len(proof) != 0 {
+		if len(proof) > 0 {
 			return fmt.Errorf("root1 and root2 match, but proof is non-empty")
 		}
 		// proof ok
+		return nil
+	}
+
+	if snapshot1 == 0 {
+		// Any snapshot greater than 0 is consistent with snapshot 0.
+		if len(proof) > 0 {
+			return fmt.Errorf("expected empty proof, but provided proof has %d components", len(proof))
+		}
 		return nil
 	}
 
@@ -107,6 +112,7 @@ func (m MerkleVerifier) VerifyConsistencyProof(snapshot1, snapshot2 int64, root1
 	if node > 0 {
 		node1Hash = proof[proofIndex]
 		node2Hash = proof[proofIndex]
+		proofIndex++
 	} else {
 		// The tree at snapshot1 was balanced, nothing to verify for root1.
 		node1Hash = root1
@@ -125,6 +131,7 @@ func (m MerkleVerifier) VerifyConsistencyProof(snapshot1, snapshot2 int64, root1
 		} else if node < lastNode {
 			// The sibling only exists in the later tree. The parent in the snapshot1 tree is a dummy copy.
 			node2Hash = m.treeHasher.HashChildren(node2Hash, proof[proofIndex])
+			proofIndex++
 		} else {
 			// Else the sibling does not exist in either tree. Do nothing.
 		}
@@ -134,7 +141,7 @@ func (m MerkleVerifier) VerifyConsistencyProof(snapshot1, snapshot2 int64, root1
 	}
 
 	// Verify the first root.
-	if bytes.Compare(node1Hash, root1) != 0 {
+	if !bytes.Equal(node1Hash, root1) {
 		return fmt.Errorf("failed to verify root1:\n%v\ncalculated root of:\n%v\nfrom proof", root1, node1Hash)
 	}
 
@@ -149,7 +156,7 @@ func (m MerkleVerifier) VerifyConsistencyProof(snapshot1, snapshot2 int64, root1
 	}
 
 	// Verify the second root.
-	if bytes.Compare(node2Hash, root2) != 0 {
+	if !bytes.Equal(node2Hash, root2) {
 		return fmt.Errorf("failed to verify root2:\n%v\ncalculated root of:\n%v\nfrom proof", root2, node2Hash)
 	}
 	if proofIndex != len(proof) {
