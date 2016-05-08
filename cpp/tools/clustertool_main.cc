@@ -159,9 +159,9 @@ int main(int argc, char* argv[]) {
   ThreadPool internal_pool(4);
   StrictConsistentStore<LoggedEntry> consistent_store(
       election.get(),
-      new EtcdConsistentStore<LoggedEntry>(event_base.get(), &internal_pool,
-                                           &etcd_client, election.get(),
-                                           "/root", node_id));
+      new EtcdConsistentStore<LoggedEntry>(ct::V1, event_base.get(),
+                                           &internal_pool, &etcd_client,
+                                           election.get(), "/root", node_id));
   SQLiteDB db("/tmp/clustertooldb");
 
 

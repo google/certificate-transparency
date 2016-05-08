@@ -161,6 +161,10 @@ static const bool follow_dummy =
 }  // namespace
 
 
+// This is the supported CT version of this binary. It can be used to
+// apply sanity checks such as when creating or joining clusters.
+static const ct::Version kSUPPORTED_CT_VERSION = ct::V1;
+
 void STHUpdater(Database* db,
                 ClusterStateController<LoggedEntry>* cluster_state_controller,
                 mutex* queue_mutex, map<int64_t, ct::SignedTreeHead>* queue,
@@ -286,8 +290,8 @@ int main(int argc, char* argv[]) {
 
   ThreadPool http_pool(FLAGS_num_http_server_threads);
 
-  Server server(event_base, &internal_pool, &http_pool, db.get(),
-                etcd_client.get(), &url_fetcher, &log_verifier);
+  Server server(kSUPPORTED_CT_VERSION, event_base, &internal_pool, &http_pool,
+                db.get(), etcd_client.get(), &url_fetcher, &log_verifier);
   server.Initialise(true /* is_mirror */);
 
   unique_ptr<StalenessTracker> staleness_tracker(
@@ -318,6 +322,7 @@ int main(int argc, char* argv[]) {
     ct::ClusterConfig config;
     config.set_minimum_serving_nodes(1);
     config.set_minimum_serving_fraction(1);
+    config.set_cluster_ct_version(kSUPPORTED_CT_VERSION);
     LOG(INFO) << "Setting default single-node ClusterConfig:\n"
               << config.DebugString();
     server.consistent_store()->SetClusterConfig(config);

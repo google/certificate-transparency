@@ -269,6 +269,8 @@ message ClusterNodeState {
   optional string hostname = 5;
   // port on which this log node is listening.
   optional int32 log_port = 6;
+  // all cluster nodes must be running the same binary version
+  optional Version node_ct_version = 7 [default = V1];
 }
 
 message ClusterControl {
@@ -305,10 +307,15 @@ message ClusterConfig {
   optional double minimum_serving_fraction = 2;
   /////////////////////////////////
 
-  // When the number of entries in the EtcedConsistentStore exceeds this value,
+  // When the number of entries in the EtcdConsistentStore exceeds this value,
   // the log server will reject all calls to add-[pre-]chain to protect itself
   // and etcd.
   optional double etcd_reject_add_pending_threshold = 3 [default = 30000];
+
+  // All nodes in a cluster must serve the same log version as there can be
+  // changes in data formats. This version must match the one supported
+  // by the server binary that is trying to join the cluster.
+  optional Version cluster_ct_version = 4 [default = V1];
 }
 
 message SequenceMapping {

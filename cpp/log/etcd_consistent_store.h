@@ -25,7 +25,8 @@ class EtcdConsistentStore : public ConsistentStore<Logged> {
   // No change of ownership for |client|, |executor| must continue to be valid
   // at least as long as this object is, and should not be the libevent::Base
   // used by |client|.
-  EtcdConsistentStore(libevent::Base* base, util::Executor* executor,
+  EtcdConsistentStore(const ct::Version supported_ct_version,
+                      libevent::Base* base, util::Executor* executor,
                       EtcdClient* client, const MasterElection* election,
                       const std::string& root, const std::string& node_id);
 
@@ -146,6 +147,7 @@ class EtcdConsistentStore : public ConsistentStore<Logged> {
 
   util::Status MaybeReject(const std::string& type) const;
 
+  ct::Version supported_ct_version_;
   EtcdClient* const client_;              // We don't own this.
   libevent::Base* base_;                  // We don't own this.
   util::Executor* const executor_;        // We don't own this.

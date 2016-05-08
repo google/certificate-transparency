@@ -38,9 +38,7 @@ std::unique_ptr<AsyncLogClient> BuildAsyncLogClient(
       "http://" + state.hostname() + ":" + std::to_string(state.log_port())));
 }
 
-
 }  // namespace
-
 
 template <class Logged>
 class ClusterStateController<Logged>::ClusterPeer : public Peer {
@@ -86,11 +84,13 @@ class ClusterStateController<Logged>::ClusterPeer : public Peer {
 // Pierre's task-a-palooza idea perhaps?
 template <class Logged>
 ClusterStateController<Logged>::ClusterStateController(
+    ct::Version supported_ct_version,
     util::Executor* executor, const std::shared_ptr<libevent::Base>& base,
     UrlFetcher* url_fetcher, Database* database,
     ConsistentStore<Logged>* store, MasterElection* election,
     ContinuousFetcher* fetcher)
-    : base_(base),
+    : supported_ct_version_(supported_ct_version),
+      base_(base),
       url_fetcher_(CHECK_NOTNULL(url_fetcher)),
       database_(CHECK_NOTNULL(database)),
       store_(CHECK_NOTNULL(store)),
@@ -105,6 +105,9 @@ ClusterStateController<Logged>::ClusterStateController(
           std::bind(&ClusterStateController<Logged>::ClusterServingSTHUpdater,
                     this)) {
   CHECK_NOTNULL(base_.get());
+  // Set this early to make sure we catch version mismatches as the node starts
+  local_node_state_.set_node_ct_version(supported_ct_version);
+
   store_->WatchClusterNodeStates(
       std::bind(&ClusterStateController::OnClusterStateUpdated, this,
                 std::placeholders::_1),
@@ -244,11 +247,18 @@ ClusterStateController<Logged>::GetFreshNodes() const {
     const bool is_self(
         node.second->state().hostname() == local_node_state_.hostname() &&
         node.second->state().log_port() == local_node_state_.log_port());
-    if (!is_self && node.second->state().has_newest_sth() &&
-        node.second->state().newest_sth().tree_size() >=
-            actual_serving_sth_->tree_size()) {
-      VLOG(1) << "Node is fresh: " << node.second->state().node_id();
-      fresh.push_back(node.second->state());
+    // A node that is not serving the same version as the controller cannot
+    // be considered to be fresh
+    if (IsSameVersion(node.second.get()->state().node_ct_version())) {
+      if (!is_self && node.second->state().has_newest_sth() &&
+          node.second->state().newest_sth().tree_size() >=
+              actual_serving_sth_->tree_size()) {
+        VLOG(1) << "Node is fresh: " << node.second->state().node_id();
+        fresh.push_back(node.second->state());
+      }
+    } else {
+      VLOG(1) << "Node is inconsistent version: "
+              << node.second->state().node_id();
     }
   }
   return fresh;
@@ -274,6 +284,7 @@ void ClusterStateController<Logged>::OnClusterStateUpdated(
     if (update.exists_) {
       auto it(all_peers_.find(node_id));
       VLOG_IF(1, it == all_peers_.end()) << "Node joined: " << node_id;
+      bool node_version_mismatch = false;
 
       // If the host or port change, remove the ClusterPeer, so that
       // we re-create it.
@@ -283,6 +294,13 @@ void ClusterStateController<Logged>::OnClusterStateUpdated(
                              update.handle_.Entry().log_port())) {
         all_peers_.erase(it);
         it = all_peers_.end();
+      } else if (it != all_peers_.end() &&
+                 !IsSameVersion(it->second.get()->state().node_ct_version())) {
+        // If the version is mismatched remove it so we don't attempt to
+        // update the version via UpdateClusterNodeState.
+        all_peers_.erase(it);
+        it = all_peers_.end();
+        node_version_mismatch = true;
       }
 
       if (it != all_peers_.end()) {
@@ -296,7 +314,15 @@ void ClusterStateController<Logged>::OnClusterStateUpdated(
         // own class, and share an instance between the interested
         // parties.
         all_peers_.emplace(node_id, peer);
-        fetcher_->AddPeer(node_id, peer);
+
+        // Only matching versions are added to fetcher so we don't talk
+        // to nodes that have a different version
+        if (!node_version_mismatch) {
+          fetcher_->AddPeer(node_id, peer);
+        } else {
+          VLOG(1) << "Node has mismatched version, dropping: " << node_id;
+          fetcher_->RemovePeer(node_id);
+        }
       }
     } else {
       VLOG(1) << "Node left: " << node_id;
@@ -318,7 +344,16 @@ void ClusterStateController<Logged>::OnClusterConfigUpdated(
     return;
   }
 
-  cluster_config_ = update.handle_.Entry();
+  // Before accepting this new config it must match our supported CT version.
+  // We will exit if not to avoid the risk of corrupting stored data.
+  const ct::ClusterConfig new_config = update.handle_.Entry();
+  if (new_config.cluster_ct_version() != supported_ct_version_) {
+    LOG(FATAL) << "Cluster config version mismatch. We are: "
+               << ct::Version_Name(supported_ct_version_) << " and we got: "
+               << ct::Version_Name(new_config.cluster_ct_version());
+  }
+
+  cluster_config_ = new_config;
   LOG(INFO) << "Received new ClusterConfig:\n"
             << cluster_config_.DebugString();
 
@@ -352,7 +387,7 @@ void ClusterStateController<Logged>::OnServingSthUpdated(
     serving_tree_size->Set(actual_serving_sth_->tree_size());
     serving_tree_timestamp->Set(actual_serving_sth_->timestamp());
 
-    // Double check this STH is newer than, or idential to, what we have in
+    // Double check this STH is newer than, or identical to, what we have in
     // the database. (It definitely should be!)
     ct::SignedTreeHead db_sth;
     const Database::LookupResult lookup_result(
@@ -411,6 +446,7 @@ void ClusterStateController<Logged>::CalculateServingSTH(
     const std::unique_lock<std::mutex>& lock) {
   VLOG(1) << "Calculating new ServingSTH...";
   CHECK(lock.owns_lock());
+  unsigned valid_serving_nodes = 0;
 
   // First, create a mapping of tree size to number of nodes at that size, and
   // a mapping of the newst STH for any given size:
@@ -418,13 +454,16 @@ void ClusterStateController<Logged>::CalculateServingSTH(
   std::map<int64_t, int> num_nodes_by_sth_size;
   for (const auto& node : all_peers_) {
     const ct::ClusterNodeState node_state(node.second->state());
-    if (node_state.has_newest_sth()) {
+    // Ignore anything we see that's not from our version
+    if (node_state.has_newest_sth() &&
+        IsSameVersion(node_state.node_ct_version())) {
       const int64_t tree_size(node_state.newest_sth().tree_size());
       CHECK_LE(0, tree_size);
       const int64_t timestamp(node_state.newest_sth().timestamp());
       CHECK_LE(0, timestamp);
 
       num_nodes_by_sth_size[tree_size]++;
+      valid_serving_nodes++;
 
       // Default timestamp (first call in here) will be 0
       if (node_state.newest_sth().timestamp() >
@@ -457,7 +496,7 @@ void ClusterStateController<Logged>::CalculateServingSTH(
     // able to serve this [and smaller] STHs.)
     num_nodes_seen += it->second;
     const double serving_fraction(static_cast<double>(num_nodes_seen) /
-                                  all_peers_.size());
+                                  valid_serving_nodes);
     if (serving_fraction >= cluster_config_.minimum_serving_fraction() &&
         num_nodes_seen >= cluster_config_.minimum_serving_nodes()) {
       const ct::SignedTreeHead& candidate_sth(sth_by_size[it->first]);

@@ -80,9 +80,14 @@ class EtcdConsistentStoreTest : public ::testing::Test {
   void SetUp() override {
     Registry::Instance()->ResetForTestingOnly();
     FLAGS_etcd_stats_collection_interval_seconds = 1;
-    store_.reset(new EtcdConsistentStore<LoggedEntry>(base_.get(), &executor_,
-                                                      &client_, &election_,
-                                                      kRoot, kNodeId));
+    store_.reset(new EtcdConsistentStore<LoggedEntry>(ct::V1, base_.get(),
+                                                      &executor_, &client_,
+                                                      &election_, kRoot,
+                                                      kNodeId));
+    store_v2_.reset(new EtcdConsistentStore<LoggedEntry>(ct::V2, base_.get(),
+                                                         &executor_, &client_,
+                                                         &election_, kRoot,
+                                                         kNodeId));
     InsertEntry("/root/sequence_mapping", SequenceMapping());
   }
 
@@ -220,6 +225,7 @@ class EtcdConsistentStoreTest : public ::testing::Test {
   FakeEtcdClient client_;
   MockMasterElection election_;
   unique_ptr<EtcdConsistentStore<LoggedEntry>> store_;
+  unique_ptr<EtcdConsistentStore<LoggedEntry>> store_v2_;
 };
 
 
@@ -556,6 +562,17 @@ TEST_F(EtcdConsistentStoreTest, TestSetClusterNodeStateHasTTL) {
   EXPECT_THAT(task.status(), StatusIs(util::error::NOT_FOUND));
 }
 
+TEST_F(EtcdConsistentStoreTest, TestSetClusterNodeStateVersionChangeRejected) {
+  const string kPath(string(kRoot) + "/nodes/" + kNodeId);
+
+  ct::ClusterNodeState state;
+  state.set_node_id(kNodeId);
+  state.set_node_ct_version(ct::Version::V2);
+
+  util::Status status(store_->SetClusterNodeState(state));
+  EXPECT_THAT(status, StatusIs(util::error::FAILED_PRECONDITION));
+}
+
 
 TEST_F(EtcdConsistentStoreTest, WatchServingSTH) {
   Notification notify;
@@ -791,6 +808,21 @@ TEST_F(EtcdConsistentStoreTest, TestRejectsAddsWhenOverCapacity) {
               StatusIs(util::error::RESOURCE_EXHAUSTED));
 }
 
+TEST_F(EtcdConsistentStoreTest, TestInconsistentVersionDeathTestV1V2) {
+  // Try to set a v2 config on a v1 store
+  ct::ClusterConfig config;
+  config.set_cluster_ct_version(ct::Version::V2);
+  EXPECT_DEATH(store_->SetClusterConfig(config),
+               "Cluster version mismatch. We are: V1 and we got V2");
+}
+
+TEST_F(EtcdConsistentStoreTest, TestInconsistentVersionDeathTestV2V1) {
+  // Try to set a v1 config on a v2 store
+  ct::ClusterConfig config;
+  config.set_cluster_ct_version(ct::Version::V1);
+  EXPECT_DEATH(store_v2_->SetClusterConfig(config),
+               "Cluster version mismatch. We are: V2 and we got V1");
+}
 
 }  // namespace cert_trans
 
