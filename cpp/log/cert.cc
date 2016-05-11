@@ -96,7 +96,10 @@ StatusOr<bool> check_dsa_signature(const X509* cert,
     return ::util::Status(Code::INVALID_ARGUMENT,
                           "failed to serialize cert info");
   }
-  std::unique_ptr<unsigned char> der_buf_ptr(der_buf);
+
+  string der_buf_str;
+  der_buf_str.assign(string(reinterpret_cast<char*>(der_buf), der_length));
+  OPENSSL_free(der_buf);
 
   // If the key is missing parameters we don't accept it. This is allowed
   // by RFC 3279 but we have not found any examples in the wild where it's
@@ -120,7 +123,7 @@ StatusOr<bool> check_dsa_signature(const X509* cert,
 
   // Build the digest of the cert info. Can't use higher level APIs for
   // this unfortunately as DSA is not connected up.
-  if (!EVP_Digest(der_buf_ptr.get(), der_length, md_buffer, &md_size, md,
+  if (!EVP_Digest(der_buf_str.c_str(), der_length, md_buffer, &md_size, md,
                   nullptr)) {
     return ::util::Status(Code::INTERNAL, "digest failed");
   }
