@@ -30,18 +30,6 @@ test: all
 	PYTHONPATH=$(PYTHONPATH):. ./ct/client/db_reporter_test.py
 	PYTHONPATH=$(PYTHONPATH):. ./ct/client/reporter_test.py
 	PYTHONPATH=$(PYTHONPATH):. ./ct/client/state_test.py
-	PYTHONPATH=$(PYTHONPATH):. ./ct/cert_analysis/algorithm_test.py
-	PYTHONPATH=$(PYTHONPATH):. ./ct/cert_analysis/ca_field_test.py
-	PYTHONPATH=$(PYTHONPATH):. ./ct/cert_analysis/dnsnames_test.py
-	PYTHONPATH=$(PYTHONPATH):. ./ct/cert_analysis/extensions_test.py
-	PYTHONPATH=$(PYTHONPATH):. ./ct/cert_analysis/common_name_test.py
-	PYTHONPATH=$(PYTHONPATH):. ./ct/cert_analysis/ip_addresses_test.py
-	PYTHONPATH=$(PYTHONPATH):. ./ct/cert_analysis/serial_number_test.py
-	PYTHONPATH=$(PYTHONPATH):. ./ct/cert_analysis/validity_test.py
-	PYTHONPATH=$(PYTHONPATH):. ./ct/cert_analysis/crl_pointers_test.py
-	PYTHONPATH=$(PYTHONPATH):. ./ct/cert_analysis/ocsp_pointers_test.py
-	PYTHONPATH=$(PYTHONPATH):. ./ct/cert_analysis/tld_check_test.py
-	PYTHONPATH=$(PYTHONPATH):. ./ct/cert_analysis/tld_list_test.py
 	PYTHONPATH=$(PYTHONPATH):. ./ct/serialization/tls_message_test.py
 # Tests using twisted trial instead of plain unittest.
 	PYTHONPATH=$(PYTHONPATH):. ./ct/client/monitor_test.py

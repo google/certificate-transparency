@@ -24,6 +24,7 @@ message DNAttribute {
   optional string value = 2;
 }
 
+// TODO(eran): Remove this message.
 message Observation {
   optional string description = 1;
 
@@ -57,6 +58,7 @@ message X509Description {
   // SHA256 hash from DER form.
   optional bytes sha256_hash = 10;
 
+  // Deprecated - The code to fill this field in was removed.
   repeated Observation observations = 11;
 
   repeated DNAttribute root_issuer = 12;

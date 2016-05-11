@@ -7,8 +7,6 @@ import sys
 import threading
 import traceback
 
-from ct.cert_analysis import all_checks
-from ct.cert_analysis import asn1
 from ct.client.db import cert_desc
 from ct.crypto import cert
 from ct.crypto import error
@@ -27,13 +25,12 @@ gflags.DEFINE_bool("reporter_disable_checks", False,
                    "Disable cert_analysis checks.")
 
 
-def _scan_der_cert(der_certs, checks):
+def _scan_der_cert(der_certs):
     current = -1
     result = []
     for log_index, der_cert, der_chain, entry_type in der_certs:
         try:
             current = log_index
-            partial_result = []
             certificate = None
             strict_failure = False
             try:
@@ -42,18 +39,9 @@ def _scan_der_cert(der_certs, checks):
                 try:
                     certificate = cert.Certificate(der_cert, strict_der=False)
                 except error.Error as e:
-                    partial_result.append(asn1.All())
                     strict_failure = True
-                else:
-                    if isinstance(e, error.ASN1IllegalCharacter):
-                        partial_result.append(asn1.Strict(reason=e.args[0],
-                                                       details=(e.string, e.index)))
-                    else:
-                        partial_result.append(asn1.Strict(reason=str(e)))
             if not strict_failure:
-                for check in checks:
-                    partial_result += check.check(certificate) or []
-                desc = cert_desc.from_cert(certificate, partial_result)
+                desc = cert_desc.from_cert(certificate)
             else:
                 desc = certificate_pb2.X509Description()
                 desc.der = der_cert
@@ -86,7 +74,7 @@ def _scan_der_cert(der_certs, checks):
                     proto_iss = desc.root_issuer.add()
                     proto_iss.type, proto_iss.value = iss
 
-            result.append((desc, log_index, partial_result))
+            result.append((desc, log_index))
         except:
             batch_start_index, batch_end_index = (
                     der_certs[0][0], der_certs[-1][0])
@@ -102,13 +90,8 @@ class CertificateReport(object):
     """Stores description of new entries between last verified STH and current."""
     __metaclass__ = abc.ABCMeta
 
-    def __init__(self, checks=all_checks.ALL_CHECKS,
-                 queue_size=None):
+    def __init__(self, queue_size=None):
         self.reset()
-        if FLAGS.reporter_disable_checks:
-            self.checks = []
-        else:
-            self.checks = checks
         self._jobs = Queue(queue_size or FLAGS.reporter_queue_size)
         self._pool = None
         self._writing_handler = None
@@ -147,7 +130,7 @@ class CertificateReport(object):
                                                      args=(self._jobs, self))
             self._writing_handler.start()
         self._jobs.put(self._pool.apply_async(_scan_der_cert,
-                                                 [der_certs, self.checks]))
+                                                 [der_certs]))
 
 
 def handle_writing(queue, report):

@@ -6,8 +6,6 @@ import time
 import sys
 from ct.client.db import cert_desc
 from ct.crypto import cert
-from ct.cert_analysis import all_checks
-from ct.cert_analysis import observation
 from ct.test import test_config
 from ct.test import time_utils
 import gflags
@@ -26,17 +24,6 @@ DOMAIN_IN_O_COMPONENT = cert.Certificate.from_pem_file(
         test_config.get_test_file_path("domain_in_o_component.pem"))
 
 class CertificateDescriptionTest(unittest.TestCase):
-    def get_observations(self, source):
-        observations = []
-
-        for check in all_checks.ALL_CHECKS:
-            observations += check.check(source) or []
-
-        observations.append(observation.Observation(
-            "AE", u'ćę©ß→æ→ćąßę-ß©ąńśþa©ęńć←', (u'əę”ąłęµ', u'…łą↓ð→↓ś→ę')))
-
-        return observations
-
     def assert_description_subject_matches_source(self, proto, source):
         subject = [(att.type, att.value) for att in proto.subject]
         cert_subject = [(type_.short_name,
@@ -75,15 +62,6 @@ class CertificateDescriptionTest(unittest.TestCase):
         self.assertEqual(time.gmtime(proto.validity.not_after / 1000),
                          source.not_after())
 
-    def assert_description_observations_match_source(self, proto, observations):
-        observations_tuples = [(unicode(obs.description),
-                                unicode(obs.reason) if obs.reason else u'',
-                                obs.details_to_proto())
-                               for obs in observations]
-        proto_obs = [(obs.description, obs.reason, obs.details)
-                     for obs in proto.observations]
-        self.assertItemsEqual(proto_obs, observations_tuples)
-
     def assert_description_signature_matches_source(self, proto, source):
         self.assertEqual(proto.tbs_signature.algorithm_id,
                          source.signature()["algorithm"].long_name)
@@ -108,8 +86,7 @@ class CertificateDescriptionTest(unittest.TestCase):
                          proto.cert_signature.parameters)
 
     def assert_description_matches_source(self, source, expect_ca_true):
-        observations = self.get_observations(source)
-        proto = cert_desc.from_cert(source, observations)
+        proto = cert_desc.from_cert(source)
 
         self.assertEqual(proto.der, source.to_der())
         self.assert_description_subject_matches_source(proto, source)
@@ -118,7 +95,6 @@ class CertificateDescriptionTest(unittest.TestCase):
         self.assertEqual(proto.version, str(source.version().value))
         self.assert_description_serial_number_matches_source(proto, source)
         self.assert_description_validity_dates_match_source(proto, source)
-        self.assert_description_observations_match_source(proto, observations)
         self.assert_description_signature_matches_source(proto, source)
         self.assertEqual(proto.basic_constraint_ca, expect_ca_true)
 
@@ -178,7 +154,7 @@ class CertificateDescriptionTest(unittest.TestCase):
         with time_utils.timezone("Asia/Shanghai"):
             self.assert_description_matches_source(cert, is_ca_cert)
 
-        proto = cert_desc.from_cert(cert, self.get_observations(cert))
+        proto = cert_desc.from_cert(cert)
 
     def test_does_not_reverse_domain_names_in_ou(self):
         ou = [t for t in cert_desc.from_cert(DOMAIN_IN_ISSUER_CERT).issuer

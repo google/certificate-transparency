@@ -1,7 +1,6 @@
 import logging
 import threading
 import gflags
-from ct.cert_analysis import all_checks
 from ct.client import reporter
 from Queue import Queue
 
@@ -12,12 +11,12 @@ gflags.DEFINE_integer("cert_db_writer_queue_size", 10, "Size of certificate "
 
 
 class CertDBCertificateReport(reporter.CertificateReport):
-    def __init__(self, cert_db, log_key, checks=all_checks.ALL_CHECKS):
+    def __init__(self, cert_db, log_key):
         self._cert_db = cert_db
         self.log_key = log_key
         self._certs_queue = Queue(FLAGS.cert_db_writer_queue_size)
         self._writer = None
-        super(CertDBCertificateReport, self).__init__(checks=checks)
+        super(CertDBCertificateReport, self).__init__()
 
     def _writer_ready(self):
         return self._writer and self._writer.is_alive()
@@ -42,7 +41,7 @@ class CertDBCertificateReport(reporter.CertificateReport):
                                             args=(self._cert_db, self.log_key,
                                                   self._certs_queue))
             self._writer.start()
-        self._certs_queue.put([(desc, index) for desc, index, _ in result])
+        self._certs_queue.put([(desc, index) for desc, index in result])
 
 
 def _process_certs(db, log_key, certs_queue):

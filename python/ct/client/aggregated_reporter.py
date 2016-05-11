@@ -1,12 +1,11 @@
-from ct.cert_analysis import all_checks
 from ct.client import reporter
 
 class AggregatedCertificateReport(reporter.CertificateReport):
     """Reporter which passes the function calls to other reporters passed through
     constructor."""
-    def __init__(self, reporters, checks=all_checks.ALL_CHECKS):
+    def __init__(self, reporters):
         self._reporters = reporters
-        super(AggregatedCertificateReport, self).__init__(checks=checks)
+        super(AggregatedCertificateReport, self).__init__()
 
     def report(self):
         super(AggregatedCertificateReport, self).report()
