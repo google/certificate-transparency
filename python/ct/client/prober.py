@@ -8,7 +8,7 @@ FLAGS = gflags.FLAGS
 gflags.DEFINE_integer("probe_frequency_secs", 10*60,
                       "How often to probe the logs for updates")
 
-from ct.client import log_client
+from ct.client import async_log_client
 from ct.client import monitor
 from ct.client import state
 from ct.crypto import merkle
@@ -36,7 +36,7 @@ class ProberThread(threading.Thread):
                                    "missing or empty fields: %s" % log)
 
             temp_db = temp_db_factory.create_storage(log.log_server)
-            client = log_client.AsyncLogClient(agent,
+            client = async_log_client.AsyncLogClient(agent,
                                                log.log_server,
                                                temp_db)
             hasher = merkle.TreeHasher()
