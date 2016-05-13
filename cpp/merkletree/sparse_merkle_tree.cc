@@ -32,8 +32,7 @@ const vector<string>* GetNullHashes(const TreeHasher& hasher) {
 
 
 SparseMerkleTree::SparseMerkleTree(SerialHasher* hasher)
-    : serial_hasher_(CHECK_NOTNULL(hasher)->Create()),
-      treehasher_(hasher),
+    : treehasher_(hasher),
       null_hashes_(GetNullHashes(treehasher_)) {
 }
 

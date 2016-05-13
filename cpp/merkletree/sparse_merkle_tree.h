@@ -208,7 +208,6 @@ class SparseMerkleTree {
   // Maybe add a new tree level.
   void EnsureHaveLevel(size_t n);
 
-  std::unique_ptr<SerialHasher> serial_hasher_;
   TreeHasher treehasher_;
   const std::vector<std::string>* const null_hashes_;
   // TODO(alcutter): investigate other structures
