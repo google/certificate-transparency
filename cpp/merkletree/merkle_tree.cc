@@ -9,10 +9,11 @@
 
 using cert_trans::MerkleTreeInterface;
 using std::string;
+using std::unique_ptr;
 
-MerkleTree::MerkleTree(SerialHasher* hasher)
+MerkleTree::MerkleTree(unique_ptr<SerialHasher> hasher)
     : MerkleTreeInterface(),
-      treehasher_(hasher),
+      treehasher_(hasher.release()),
       leaves_processed_(0),
       level_count_(0) {
 }

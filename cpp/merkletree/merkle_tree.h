@@ -3,6 +3,7 @@
 #define MERKLETREE_H
 
 #include <stddef.h>
+#include <memory>
 #include <string>
 #include <vector>
 
@@ -24,8 +25,7 @@ class MerkleTree : public cert_trans::MerkleTreeInterface {
  public:
   // The constructor takes a pointer to some concrete hash function
   // instantiation of the SerialHasher abstract class.
-  // Takes ownership of the hasher.
-  explicit MerkleTree(SerialHasher* hasher);
+  explicit MerkleTree(std::unique_ptr<SerialHasher> hasher);
   virtual ~MerkleTree();
 
   // Length of a node (i.e., a hash), in bytes.

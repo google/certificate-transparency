@@ -199,7 +199,7 @@ Monitor::ConfirmResult Monitor::ConfirmTreeInternal() {
 
 Monitor::ConfirmResult Monitor::ConfirmTreeInternal(
     const ct::SignedTreeHead& sth) {
-  MerkleTree mt(new Sha256Hasher);
+  MerkleTree mt(std::unique_ptr<Sha256Hasher>(new Sha256Hasher));
 
   Database::VerificationLevel lvl;
   CHECK_EQ(db_->LookupVerificationLevel(sth, &lvl), Database::LOOKUP_OK);
