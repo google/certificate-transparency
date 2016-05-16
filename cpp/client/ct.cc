@@ -145,10 +145,12 @@ using ct::MerkleAuditProof;
 using ct::SSLClientCTData;
 using ct::SignedCertificateTimestamp;
 using ct::SignedCertificateTimestampList;
+using ct::SignedTreeHead;
 using std::shared_ptr;
 using std::string;
 using std::unique_ptr;
 using std::vector;
+using util::Status;
 using util::StatusOr;
 
 // SCTs presented to clients have to be encoded as a list.
@@ -674,12 +676,12 @@ static int CheckConsistency() {
   string sth1_str;
   PCHECK(util::ReadBinaryFile(FLAGS_sth1, &sth1_str)) << "Can't read STH file "
                                                       << FLAGS_sth1;
-  ct::SignedTreeHead sth1;
+  SignedTreeHead sth1;
   CHECK(sth1.ParseFromString(sth1_str));
   string sth2_str;
   PCHECK(util::ReadBinaryFile(FLAGS_sth2, &sth2_str)) << "Can't read STH file "
                                                       << FLAGS_sth2;
-  ct::SignedTreeHead sth2;
+  SignedTreeHead sth2;
   CHECK(sth2.ParseFromString(sth2_str));
 
   std::vector<string> proof;
@@ -909,21 +911,22 @@ int GetSTH() {
 
   HTTPLogClient client(FLAGS_ct_server);
 
-  ct::SignedTreeHead sth;
-  CHECK_EQ(AsyncLogClient::OK, client.GetSTH(&sth));
+  const StatusOr<SignedTreeHead> sth(client.GetSTH());
+  CHECK_EQ(sth.status(), Status::OK);
 
   const unique_ptr<LogVerifier> verifier(GetLogVerifierFromFlags());
 
   // Allow for 10 seconds of clock skew
   uint64_t latest = ((uint64_t)time(NULL) + 10) * 1000;
   const LogVerifier::LogVerifyResult result =
-      verifier->VerifySignedTreeHead(sth, 0, latest);
+      verifier->VerifySignedTreeHead(sth.ValueOrDie(), 0, latest);
 
-  LOG(INFO) << "STH is " << sth.DebugString();
+  LOG(INFO) << "STH is " << sth.ValueOrDie().DebugString();
 
   if (result != LogVerifier::VERIFY_OK) {
     if (result == LogVerifier::INVALID_TIMESTAMP)
-      LOG(ERROR) << "STH has bad timestamp (" << sth.timestamp() << ")";
+      LOG(ERROR) << "STH has bad timestamp (" << sth.ValueOrDie().timestamp()
+                 << ")";
     else if (result == LogVerifier::INVALID_SIGNATURE)
       LOG(ERROR) << "STH signature doesn't validate";
     else
@@ -932,7 +935,7 @@ int GetSTH() {
   }
 
   string sth_str;
-  CHECK(sth.SerializeToString(&sth_str));
+  CHECK(sth.ValueOrDie().SerializeToString(&sth_str));
   WriteFile(FLAGS_ct_server_response_out, sth_str, "STH");
 
   return 0;

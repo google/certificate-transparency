@@ -24,10 +24,12 @@ using ct::MerkleAuditProof;
 using ct::SignedCertificateTimestamp;
 using ct::SignedTreeHead;
 using std::bind;
-using std::unique_ptr;
 using std::placeholders::_1;
 using std::string;
+using std::unique_ptr;
 using std::vector;
+using util::Status;
+using util::StatusOr;
 
 namespace {
 
@@ -71,17 +73,23 @@ AsyncLogClient::Status HTTPLogClient::UploadSubmission(
 }
 
 
-AsyncLogClient::Status HTTPLogClient::GetSTH(SignedTreeHead* sth) {
-  AsyncLogClient::Status retval(AsyncLogClient::UNKNOWN_ERROR);
+StatusOr<SignedTreeHead> HTTPLogClient::GetSTH() {
+  SignedTreeHead sth;
+  AsyncLogClient::Status status(AsyncLogClient::UNKNOWN_ERROR);
   bool done(false);
 
-  client_.GetSTH(sth, bind(&DoneRequest, _1, &retval, &done));
+  client_.GetSTH(&sth, bind(&DoneRequest, _1, &status, &done));
   while (!done) {
     base_->DispatchOnce();
   }
 
-  return retval;
+  if (status == AsyncLogClient::OK) {
+    return sth;
+  }
+
+  return Status::UNKNOWN;
 }
+
 
 AsyncLogClient::Status HTTPLogClient::GetRoots(
     vector<unique_ptr<Cert>>* roots) {
@@ -98,21 +106,16 @@ AsyncLogClient::Status HTTPLogClient::GetRoots(
 
 AsyncLogClient::Status HTTPLogClient::QueryAuditProof(
     const string& merkle_leaf_hash, MerkleAuditProof* proof) {
-  AsyncLogClient::Status retval(AsyncLogClient::UNKNOWN_ERROR);
-  bool done(false);
-  SignedTreeHead sth;
-
-  client_.GetSTH(&sth, bind(&DoneRequest, _1, &retval, &done));
-  while (!done) {
-    base_->DispatchOnce();
+  const StatusOr<SignedTreeHead> sth(GetSTH());
+  if (!sth.status().ok()) {
+    // This is okay because the only caller of QueryAuditProof only
+    // compares to OK.
+    return AsyncLogClient::UNKNOWN_ERROR;
   }
 
-  if (retval != AsyncLogClient::OK)
-    return retval;
-
-  retval = AsyncLogClient::UNKNOWN_ERROR;
-  done = false;
-  client_.QueryInclusionProof(sth, merkle_leaf_hash, proof,
+  AsyncLogClient::Status retval(AsyncLogClient::UNKNOWN_ERROR);
+  bool done(false);
+  client_.QueryInclusionProof(sth.ValueOrDie(), merkle_leaf_hash, proof,
                               bind(&DoneRequest, _1, &retval, &done));
 
   while (!done) {

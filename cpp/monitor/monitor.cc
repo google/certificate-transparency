@@ -7,7 +7,9 @@
 
 using cert_trans::AsyncLogClient;
 using cert_trans::HTTPLogClient;
+using ct::SignedTreeHead;
 using std::string;
+using util::StatusOr;
 
 namespace monitor {
 
@@ -20,9 +22,9 @@ Monitor::Monitor(Database* database, LogVerifier* log_verifier,
 }
 
 Monitor::GetResult Monitor::GetSTH() {
-  ct::SignedTreeHead new_sth;
+  const StatusOr<SignedTreeHead> new_sth(client_->GetSTH());
 
-  if (client_->GetSTH(&new_sth) != AsyncLogClient::OK)
+  if (!new_sth.status().ok())
     return NETWORK_PROBLEM;
 
   ct::SignedTreeHead current_sth;
@@ -33,8 +35,9 @@ Monitor::GetResult Monitor::GetSTH() {
   // failure.
   // This might lead to unexpected behaviour (i.e. a database write).
   if (ret == Database::NOT_FOUND ||
-      current_sth.SerializeAsString() != new_sth.SerializeAsString()) {
-    CHECK_EQ(db_->WriteSTH(new_sth), Database::WRITE_OK);
+      current_sth.SerializeAsString() !=
+          new_sth.ValueOrDie().SerializeAsString()) {
+    CHECK_EQ(db_->WriteSTH(new_sth.ValueOrDie()), Database::WRITE_OK);
 
     if (ret == Database::NOT_FOUND) {
       LOG(INFO) << "NEW DATABASE!";
@@ -47,9 +50,9 @@ Monitor::GetResult Monitor::GetSTH() {
       LOG(INFO) << util::ToBase64(current_sth.sha256_root_hash());
     }
     LOG(INFO) << "new STH:";
-    LOG(INFO) << new_sth.timestamp();
-    LOG(INFO) << new_sth.tree_size();
-    LOG(INFO) << util::ToBase64(new_sth.sha256_root_hash());
+    LOG(INFO) << new_sth.ValueOrDie().timestamp();
+    LOG(INFO) << new_sth.ValueOrDie().tree_size();
+    LOG(INFO) << util::ToBase64(new_sth.ValueOrDie().sha256_root_hash());
   } else {
     CHECK_EQ(ret, Database::LOOKUP_OK);
     LOG(INFO) << "STH unchanged";

@@ -10,6 +10,7 @@
 #include "client/async_log_client.h"
 #include "proto/ct.pb.h"
 #include "util/libevent_wrapper.h"
+#include "util/statusor.h"
 #include "util/thread_pool.h"
 
 namespace cert_trans {
@@ -25,7 +26,7 @@ class HTTPLogClient {
                                           bool pre,
                                           ct::SignedCertificateTimestamp* sct);
 
-  AsyncLogClient::Status GetSTH(ct::SignedTreeHead* sth);
+  util::StatusOr<ct::SignedTreeHead> GetSTH();
 
   AsyncLogClient::Status GetRoots(std::vector<std::unique_ptr<Cert>>* roots);
 
