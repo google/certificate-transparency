@@ -27,11 +27,8 @@ class AsyncLogClient {
  public:
   enum Status {
     OK,
-    CONNECT_FAILED,
     BAD_RESPONSE,
-    INTERNAL_ERROR,
     UNKNOWN_ERROR,
-    UPLOAD_FAILED,
     INVALID_INPUT,
   };
 

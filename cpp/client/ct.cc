@@ -337,11 +337,6 @@ static int Upload() {
   AsyncLogClient::Status ret =
       client.UploadSubmission(contents, FLAGS_precert, &sct);
 
-  if (ret == AsyncLogClient::CONNECT_FAILED) {
-    LOG(ERROR) << "Unable to connect";
-    return 2;
-  }
-
   if (ret != AsyncLogClient::OK) {
     LOG(ERROR) << "Submission failed, error = " << ret;
     return 1;
@@ -650,11 +645,6 @@ static AuditResult Audit() {
     // HTTP protocol does not supply this.
     proof.mutable_id()->set_key_id(sct_id);
 
-    if (ret == AsyncLogClient::CONNECT_FAILED) {
-      LOG(ERROR) << "Unable to connect";
-      delete verifier;
-      return CT_SERVER_UNAVAILABLE;
-    }
     if (ret != AsyncLogClient::OK) {
       LOG(ERROR) << "QueryAuditProof failed, error " << ret;
       continue;
