@@ -63,8 +63,8 @@ class LogLookupTest : public ::testing::Test {
         test_signer_(),
         log_signer_(TestSigner::DefaultLogSigner()),
         tree_signer_(std::chrono::duration<double>(0), db(),
-                     unique_ptr<CompactMerkleTree>(
-                         new CompactMerkleTree(new Sha256Hasher)),
+                     unique_ptr<CompactMerkleTree>(new CompactMerkleTree(
+                         unique_ptr<Sha256Hasher>(new Sha256Hasher))),
                      &store_, log_signer_.get()),
         verifier_(TestSigner::DefaultLogSigVerifier(),
                   new MerkleVerifier(new Sha256Hasher())) {

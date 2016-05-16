@@ -183,7 +183,7 @@ TEST_F(MerkleTreeFuzzTest, RootFuzz) {
 
 TEST_F(CompactMerkleTreeTest, RootFuzz) {
   for (size_t tree_size = 1; tree_size <= data_.size(); ++tree_size) {
-    CompactMerkleTree tree(new Sha256Hasher());
+    CompactMerkleTree tree(NewSha256Hasher());
     for (size_t j = 0; j < tree_size; ++j) {
       tree.AddLeaf(data_[j]);
       // Since the tree is evaluated lazily, the tree state is significant
@@ -334,7 +334,7 @@ TEST_F(MerkleTreeTest, RootTestVectors) {
 
 TEST_F(CompactMerkleTreeTest, RootTestVectors) {
   // The first tree: add nodes one by one.
-  CompactMerkleTree tree1(new Sha256Hasher());
+  CompactMerkleTree tree1(NewSha256Hasher());
   EXPECT_EQ(tree1.LeafCount(), 0U);
   EXPECT_EQ(tree1.LevelCount(), 0U);
   EXPECT_STREQ(H(tree1.CurrentRoot()).c_str(), kSHA256EmptyTreeHash.str);
@@ -346,7 +346,7 @@ TEST_F(CompactMerkleTreeTest, RootTestVectors) {
   }
 
   // The second tree: add all nodes at once.
-  CompactMerkleTree tree2(new Sha256Hasher());
+  CompactMerkleTree tree2(NewSha256Hasher());
   for (int i = 0; i < 8; ++i) {
     tree2.AddLeaf(S(kInputs[i]));
   }
@@ -355,7 +355,7 @@ TEST_F(CompactMerkleTreeTest, RootTestVectors) {
   EXPECT_STREQ(H(tree2.CurrentRoot()).c_str(), kSHA256Roots[7].str);
 
   // The third tree: add nodes in two chunks.
-  CompactMerkleTree tree3(new Sha256Hasher());
+  CompactMerkleTree tree3(NewSha256Hasher());
   // Add three nodes.
   for (int i = 0; i < 3; ++i) {
     tree3.AddLeaf(S(kInputs[i]));
@@ -374,7 +374,7 @@ TEST_F(CompactMerkleTreeTest, RootTestVectors) {
 
 TEST_F(CompactMerkleTreeTest, TestCopyCtorWithRootTestVectors) {
   MerkleTree tree1(NewSha256Hasher());
-  CompactMerkleTree refctree1(new Sha256Hasher());
+  CompactMerkleTree refctree1(NewSha256Hasher());
   EXPECT_EQ(tree1.LeafCount(), 0U);
   EXPECT_EQ(tree1.LevelCount(), 0U);
   EXPECT_STREQ(H(tree1.CurrentRoot()).c_str(), kSHA256EmptyTreeHash.str);
@@ -386,7 +386,7 @@ TEST_F(CompactMerkleTreeTest, TestCopyCtorWithRootTestVectors) {
   EXPECT_EQ(tree1.LevelCount(), kLevelCounts[7]);
   EXPECT_STREQ(H(tree1.CurrentRoot()).c_str(), kSHA256Roots[7].str);
 
-  CompactMerkleTree ctree1(tree1, new Sha256Hasher());
+  CompactMerkleTree ctree1(tree1, NewSha256Hasher());
   EXPECT_EQ(tree1.LeafCount(), ctree1.LeafCount());
   EXPECT_EQ(tree1.LevelCount(), ctree1.LevelCount());
   EXPECT_EQ(tree1.CurrentRoot(), ctree1.CurrentRoot());
@@ -403,7 +403,7 @@ TEST_F(CompactMerkleTreeTest, TestCopyCtorThenAddLeafWithRootTestVectors) {
   EXPECT_EQ(tree.LeafCount(), 5U);
   EXPECT_EQ(tree.LevelCount(), kLevelCounts[4]);
   EXPECT_STREQ(H(tree.CurrentRoot()).c_str(), kSHA256Roots[4].str);
-  CompactMerkleTree ctree(tree, new Sha256Hasher());
+  CompactMerkleTree ctree(tree, NewSha256Hasher());
   EXPECT_EQ(tree.LeafCount(), ctree.LeafCount());
   EXPECT_EQ(tree.LevelCount(), ctree.LevelCount());
   EXPECT_EQ(tree.CurrentRoot(), ctree.CurrentRoot());
@@ -431,7 +431,7 @@ TEST_F(CompactMerkleTreeFuzzTest, CopyCtorForLargerTreesThenAppend) {
     }
     EXPECT_EQ(tree.LeafCount(), tree_size);
     // Now build a CompactMerkleTree using |tree| as the model
-    CompactMerkleTree ctree(tree, new Sha256Hasher());
+    CompactMerkleTree ctree(tree, NewSha256Hasher());
     // And check that the public interface concurs
     EXPECT_EQ(tree.LeafCount(), ctree.LeafCount());
     EXPECT_EQ(tree.LevelCount(), ctree.LevelCount());
@@ -584,7 +584,7 @@ TEST_F(MerkleTreeTest, AddLeafHash) {
 
 TEST_F(CompactMerkleTreeTest, TestCloneEmptyTreeProducesWorkingTree) {
   MerkleTree tree(NewSha256Hasher());
-  CompactMerkleTree compact(tree, new Sha256Hasher);
+  CompactMerkleTree compact(tree, NewSha256Hasher());
   EXPECT_STREQ(H(compact.CurrentRoot()).c_str(), kSHA256EmptyTreeHash.str);
 }
 
@@ -593,7 +593,7 @@ TEST_F(CompactMerkleTreeTest, TestCloneEmptyTreeProducesWorkingTree) {
 class MerkleVerifierTest : public MerkleTreeTest {
  protected:
   MerkleVerifier verifier_;
-  MerkleVerifierTest() : MerkleTreeTest(), verifier_(new Sha256Hasher()) {
+  MerkleVerifierTest() : MerkleTreeTest(), verifier_(new Sha256Hasher) {
   }
 
   void VerifierCheck(int leaf, int tree_size, const std::vector<string>& path,

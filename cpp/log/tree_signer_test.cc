@@ -67,10 +67,11 @@ class TreeSignerTest : public ::testing::Test {
     store_.reset(new EtcdConsistentStore<LoggedEntry>(
         base_.get(), &pool_, &etcd_client_, &election_, "/root", "id"));
     log_signer_.reset(TestSigner::DefaultLogSigner());
-    tree_signer_.reset(new TS(std::chrono::duration<double>(0), db(),
-                              unique_ptr<CompactMerkleTree>(
-                                  new CompactMerkleTree(new Sha256Hasher)),
-                              store_.get(), log_signer_.get()));
+    tree_signer_.reset(
+        new TS(std::chrono::duration<double>(0), db(),
+               unique_ptr<CompactMerkleTree>(new CompactMerkleTree(
+                   unique_ptr<Sha256Hasher>(new Sha256Hasher))),
+               store_.get(), log_signer_.get()));
     // Set a default empty STH so that we can call UpdateTree() on the signer.
     store_->SetServingSTH(SignedTreeHead());
     // Force an empty sequence mapping file:
@@ -114,7 +115,8 @@ class TreeSignerTest : public ::testing::Test {
   TS* GetSimilar() {
     return new TS(std::chrono::duration<double>(0), db(),
                   unique_ptr<CompactMerkleTree>(new CompactMerkleTree(
-                      *tree_signer_->cert_tree_, new Sha256Hasher)),
+                      *tree_signer_->cert_tree_,
+                      unique_ptr<Sha256Hasher>(new Sha256Hasher))),
                   store_.get(), log_signer_.get());
   }
 

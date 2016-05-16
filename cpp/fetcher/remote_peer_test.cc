@@ -100,8 +100,8 @@ class RemotePeerTest : public ::testing::Test {
         store_(base_.get(), &pool_, &etcd_client_, &election_, "/root", "id"),
         log_signer_(TestSigner::DefaultLogSigner()),
         tree_signer_(std::chrono::duration<double>(0), test_db_.db(),
-                     unique_ptr<CompactMerkleTree>(
-                         new CompactMerkleTree(new Sha256Hasher)),
+                     unique_ptr<CompactMerkleTree>(new CompactMerkleTree(
+                         unique_ptr<Sha256Hasher>(new Sha256Hasher))),
                      &store_, log_signer_.get()),
         task_(&pool_) {
     FLAGS_remote_peer_sth_refresh_interval_seconds = 1;

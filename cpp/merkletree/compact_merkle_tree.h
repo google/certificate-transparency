@@ -2,6 +2,7 @@
 #define COMPACT_MERKLETREE_H
 
 #include <stddef.h>
+#include <memory>
 #include <string>
 #include <vector>
 
@@ -20,16 +21,15 @@ class CompactMerkleTree : public cert_trans::MerkleTreeInterface {
  public:
   // The constructor takes a pointer to some concrete hash function
   // instantiation of the SerialHasher abstract class.
-  // Takes ownership of the hasher.
-  explicit CompactMerkleTree(SerialHasher* hasher);
-  CompactMerkleTree(const CompactMerkleTree& other, SerialHasher* hasher);
+  explicit CompactMerkleTree(std::unique_ptr<SerialHasher> hasher);
+  CompactMerkleTree(const CompactMerkleTree& other,
+                    std::unique_ptr<SerialHasher> hasher);
 
   explicit CompactMerkleTree(CompactMerkleTree&& other) = default;
 
   // Creates a new CompactMerkleTree based on the data present in the
   // (non-compact) MerkleTree |model|.
-  // Takes ownership of |hasher|.
-  CompactMerkleTree(MerkleTree& model, SerialHasher* hasher);
+  CompactMerkleTree(MerkleTree& model, std::unique_ptr<SerialHasher> hasher);
 
   virtual ~CompactMerkleTree();
 
