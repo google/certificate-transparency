@@ -2,6 +2,7 @@
 #define MERKLEVERIFIER_H
 
 #include <stddef.h>
+#include <memory>
 #include <vector>
 
 #include "merkletree/tree_hasher.h"
@@ -13,8 +14,7 @@ class SerialHasher;
 
 class MerkleVerifier {
  public:
-  // Takes ownership of the SerialHasher.
-  MerkleVerifier(SerialHasher* hasher);
+  MerkleVerifier(std::unique_ptr<SerialHasher> hasher);
   ~MerkleVerifier();
 
   // Verify Merkle path. Return true iff the path is a valid proof for

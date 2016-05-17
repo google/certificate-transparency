@@ -4,8 +4,10 @@
 #include <vector>
 
 using std::string;
+using std::unique_ptr;
 
-MerkleVerifier::MerkleVerifier(SerialHasher* hasher) : treehasher_(hasher) {
+MerkleVerifier::MerkleVerifier(unique_ptr<SerialHasher> hasher)
+    : treehasher_(hasher.release()) {
 }
 
 MerkleVerifier::~MerkleVerifier() {

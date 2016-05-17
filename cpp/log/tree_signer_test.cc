@@ -62,8 +62,9 @@ class TreeSignerTest : public ::testing::Test {
 
   void SetUp() {
     test_db_.reset(new TestDB<T>);
-    verifier_.reset(new LogVerifier(TestSigner::DefaultLogSigVerifier(),
-                                    new MerkleVerifier(new Sha256Hasher())));
+    verifier_.reset(new LogVerifier(
+        TestSigner::DefaultLogSigVerifier(),
+        new MerkleVerifier(unique_ptr<Sha256Hasher>(new Sha256Hasher))));
     store_.reset(new EtcdConsistentStore<LoggedEntry>(
         base_.get(), &pool_, &etcd_client_, &election_, "/root", "id"));
     log_signer_.reset(TestSigner::DefaultLogSigner());

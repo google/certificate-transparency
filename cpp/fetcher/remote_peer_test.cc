@@ -117,9 +117,9 @@ class RemotePeerTest : public ::testing::Test {
     peer_.reset(new RemotePeer(
         unique_ptr<AsyncLogClient>(
             new AsyncLogClient(&pool_, &fetcher_, kLogUrl)),
-        unique_ptr<LogVerifier>(
-            new LogVerifier(TestSigner::DefaultLogSigVerifier(),
-                            new MerkleVerifier(new Sha256Hasher))),
+        unique_ptr<LogVerifier>(new LogVerifier(
+            TestSigner::DefaultLogSigVerifier(),
+            new MerkleVerifier(unique_ptr<Sha256Hasher>(new Sha256Hasher)))),
         bind(&RemotePeerTest::OnNewSTH, this, _1), task_.task()));
   }
 

@@ -280,7 +280,8 @@ int main(int argc, char* argv[]) {
                      << pubkey.status();
 
   const LogVerifier log_verifier(new LogSigVerifier(pubkey.ValueOrDie()),
-                                 new MerkleVerifier(new Sha256Hasher));
+                                 new MerkleVerifier(unique_ptr<Sha256Hasher>(
+                                     new Sha256Hasher)));
 
   ThreadPool http_pool(FLAGS_num_http_server_threads);
 
@@ -351,9 +352,9 @@ int main(int argc, char* argv[]) {
   const shared_ptr<RemotePeer> peer(make_shared<RemotePeer>(
       unique_ptr<AsyncLogClient>(
           new AsyncLogClient(&pool, &url_fetcher, FLAGS_target_log_uri)),
-      unique_ptr<LogVerifier>(
-          new LogVerifier(new LogSigVerifier(pubkey.ValueOrDie()),
-                          new MerkleVerifier(new Sha256Hasher))),
+      unique_ptr<LogVerifier>(new LogVerifier(
+          new LogSigVerifier(pubkey.ValueOrDie()),
+          new MerkleVerifier(unique_ptr<Sha256Hasher>(new Sha256Hasher)))),
       new_sth, fetcher_task.task()->AddChild(
                    [](Task*) { LOG(INFO) << "RemotePeer exited."; })));
 

@@ -67,7 +67,8 @@ class LogLookupTest : public ::testing::Test {
                          unique_ptr<Sha256Hasher>(new Sha256Hasher))),
                      &store_, log_signer_.get()),
         verifier_(TestSigner::DefaultLogSigVerifier(),
-                  new MerkleVerifier(new Sha256Hasher())) {
+                  new MerkleVerifier(
+                      unique_ptr<Sha256Hasher>(new Sha256Hasher))) {
     // Set some noddy STH so that we can call UpdateTree on the Tree Signer.
     store_.SetServingSTH(ct::SignedTreeHead());
     // Force an empty sequence mapping file:

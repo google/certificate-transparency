@@ -136,7 +136,8 @@ int main(int argc, char* argv[]) {
                                     &url_fetcher));
 
   const LogVerifier log_verifier(new LogSigVerifier(pkey.ValueOrDie()),
-                                 new MerkleVerifier(new Sha256Hasher));
+                                 new MerkleVerifier(unique_ptr<Sha256Hasher>(
+                                     new Sha256Hasher)));
 
   ThreadPool http_pool(FLAGS_num_http_server_threads);
 

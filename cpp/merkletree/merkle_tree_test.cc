@@ -593,7 +593,9 @@ TEST_F(CompactMerkleTreeTest, TestCloneEmptyTreeProducesWorkingTree) {
 class MerkleVerifierTest : public MerkleTreeTest {
  protected:
   MerkleVerifier verifier_;
-  MerkleVerifierTest() : MerkleTreeTest(), verifier_(new Sha256Hasher) {
+  MerkleVerifierTest()
+      : MerkleTreeTest(),
+        verifier_(unique_ptr<Sha256Hasher>(new Sha256Hasher)) {
   }
 
   void VerifierCheck(int leaf, int tree_size, const std::vector<string>& path,

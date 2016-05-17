@@ -173,7 +173,8 @@ static LogVerifier* GetLogVerifierFromFlags() {
                    << pkey.status();
 
   return new LogVerifier(new LogSigVerifier(pkey.ValueOrDie()),
-                         new MerkleVerifier(new Sha256Hasher()));
+                         new MerkleVerifier(
+                             unique_ptr<Sha256Hasher>(new Sha256Hasher)));
 }
 
 // Adds the data to the cert as an extension, formatted as a single
