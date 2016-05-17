@@ -68,6 +68,10 @@ class StatusOr {
     CHECK(ok()) << "Attempting to fetch value of non-OK StatusOr";
     return value_;
   }
+  inline T& ValueOrDie() {
+    CHECK(ok()) << "Attempting to fetch value of non-OK StatusOr";
+    return value_;
+  }
 
   template <typename U>
   friend class StatusOr;
