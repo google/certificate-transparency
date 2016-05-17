@@ -91,17 +91,21 @@ StatusOr<SignedTreeHead> HTTPLogClient::GetSTH() {
 }
 
 
-AsyncLogClient::Status HTTPLogClient::GetRoots(
-    vector<unique_ptr<Cert>>* roots) {
-  AsyncLogClient::Status retval(AsyncLogClient::UNKNOWN_ERROR);
+StatusOr<vector<unique_ptr<Cert>>> HTTPLogClient::GetRoots() {
+  vector<unique_ptr<Cert>> roots;
+  AsyncLogClient::Status status(AsyncLogClient::UNKNOWN_ERROR);
   bool done(false);
 
-  client_.GetRoots(roots, bind(&DoneRequest, _1, &retval, &done));
+  client_.GetRoots(&roots, bind(&DoneRequest, _1, &status, &done));
   while (!done) {
     base_->DispatchOnce();
   }
 
-  return retval;
+  if (status == AsyncLogClient::OK) {
+    return move(roots);
+  }
+
+  return Status::UNKNOWN;
 }
 
 AsyncLogClient::Status HTTPLogClient::QueryAuditProof(

@@ -28,7 +28,7 @@ class HTTPLogClient {
 
   util::StatusOr<ct::SignedTreeHead> GetSTH();
 
-  AsyncLogClient::Status GetRoots(std::vector<std::unique_ptr<Cert>>* roots);
+  util::StatusOr<std::vector<std::unique_ptr<Cert>>> GetRoots();
 
   AsyncLogClient::Status QueryAuditProof(const std::string& merkle_leaf_hash,
                                          ct::MerkleAuditProof* proof);

@@ -890,12 +890,13 @@ void GetEntries() {
 int GetRoots() {
   HTTPLogClient client(FLAGS_ct_server);
 
-  vector<unique_ptr<Cert>> roots;
-  CHECK_EQ(client.GetRoots(&roots), AsyncLogClient::OK);
+  const StatusOr<vector<unique_ptr<Cert>>> roots(client.GetRoots());
+  CHECK_EQ(roots.status(), Status::OK);
 
-  LOG(INFO) << "number of certs: " << roots.size();
-  for (vector<unique_ptr<Cert>>::const_iterator it = roots.begin();
-       it != roots.end(); ++it) {
+  LOG(INFO) << "number of certs: " << roots.ValueOrDie().size();
+  for (vector<unique_ptr<Cert>>::const_iterator it =
+           roots.ValueOrDie().begin();
+       it != roots.ValueOrDie().end(); ++it) {
     string pem_cert;
     CHECK_EQ((*it)->PemEncoding(&pem_cert), util::Status::OK);
     std::cout << pem_cert;
