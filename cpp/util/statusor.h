@@ -15,6 +15,8 @@
 #ifndef UTIL_STATUSOR_H__
 #define UTIL_STATUSOR_H__
 
+#include <utility>
+
 #include "glog/logging.h"
 #include "util/status.h"
 
@@ -32,9 +34,13 @@ class StatusOr {
 
   // Builds from the specified value.
   inline StatusOr(const T& value);  // NOLINT
+  inline StatusOr(T&& value);       // NOLINT
 
   // Copy constructor.
   inline StatusOr(const StatusOr& other);
+
+  // Move constructor.
+  inline StatusOr(StatusOr&& other);
 
   // Conversion copy constructor, T must be copy constructible from U.
   template <typename U>
@@ -87,8 +93,17 @@ inline StatusOr<T>::StatusOr(const T& value) : value_(value) {
 }
 
 template <typename T>
+inline StatusOr<T>::StatusOr(T&& value) : value_(std::move(value)) {
+}
+
+template <typename T>
 inline StatusOr<T>::StatusOr(const StatusOr& other)
     : status_(other.status_), value_(other.value_) {
+}
+
+template <typename T>
+inline StatusOr<T>::StatusOr(StatusOr&& other)
+    : status_(other.status_), value_(std::move(other.value_)) {
 }
 
 template <typename T>
