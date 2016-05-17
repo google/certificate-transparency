@@ -81,7 +81,7 @@ pair<ScopedBIGNUM, string> Value(uint64_t n, const string& v) {
 class Reference {
  public:
   Reference(SerialHasher* hasher)
-      : tree_hasher_(CHECK_NOTNULL(hasher)),
+      : tree_hasher_(unique_ptr<SerialHasher>(CHECK_NOTNULL(hasher))),
         hStarEmptyCache_{tree_hasher_.HashLeaf("")} {
   }
 
@@ -156,8 +156,8 @@ class Reference {
 class SparseMerkleTreeTest : public testing::Test {
  public:
   SparseMerkleTreeTest()
-      : tree_hasher_(new Sha256Hasher),
-        tree_(new Sha256Hasher()),
+      : tree_hasher_(unique_ptr<Sha256Hasher>(new Sha256Hasher)),
+        tree_(new Sha256Hasher),
         rand_({1234}) {
   }
 

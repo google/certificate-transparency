@@ -10,6 +10,7 @@
 namespace {
 
 using std::string;
+using std::unique_ptr;
 
 typedef struct {
   size_t input_length;
@@ -69,7 +70,8 @@ class TreeHasherTest : public ::testing::Test {
  protected:
   TreeHasher tree_hasher_;
   TestVector* test_vectors_;
-  TreeHasherTest() : tree_hasher_(new T()), test_vectors_(TestVectors<T>()) {
+  TreeHasherTest()
+      : tree_hasher_(unique_ptr<T>(new T)), test_vectors_(TestVectors<T>()) {
   }
 };
 

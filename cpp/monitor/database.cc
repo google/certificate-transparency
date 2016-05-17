@@ -11,7 +11,7 @@ Database::WriteResult Database::CreateEntry(
   if (!logged.SerializeForLeaf(&leaf))
     return this->SERIALIZE_FAILED;
 
-  TreeHasher hasher(new Sha256Hasher);
+  TreeHasher hasher(std::unique_ptr<Sha256Hasher>(new Sha256Hasher));
   std::string leaf_hash = hasher.HashLeaf(leaf);
 
   std::string cert = Serializer::LeafData(logged.entry());

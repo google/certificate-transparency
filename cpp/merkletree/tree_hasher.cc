@@ -5,8 +5,10 @@
 #include "merkletree/serial_hasher.h"
 
 using std::lock_guard;
+using std::move;
 using std::mutex;
 using std::string;
+using std::unique_ptr;
 
 namespace {
 
@@ -20,8 +22,8 @@ std::string EmptyHash(SerialHasher* hasher) {
 
 }  // namespace
 
-TreeHasher::TreeHasher(SerialHasher* hasher)
-    : hasher_(hasher), empty_hash_(EmptyHash(hasher_.get())) {
+TreeHasher::TreeHasher(unique_ptr<SerialHasher> hasher)
+    : hasher_(move(hasher)), empty_hash_(EmptyHash(hasher_.get())) {
   assert(hasher_);
 }
 

@@ -129,7 +129,7 @@ class MerkleTreeTest : public ::testing::Test {
  protected:
   TreeHasher tree_hasher_;
   std::vector<string> data_;
-  MerkleTreeTest() : tree_hasher_(new Sha256Hasher()) {
+  MerkleTreeTest() : tree_hasher_(unique_ptr<Sha256Hasher>(new Sha256Hasher)) {
     for (int i = 0; i < 256; ++i)
       data_.push_back(string(1, i));
   }

@@ -20,9 +20,9 @@
 #include "util/openssl_scoped_types.h"
 #include "util/util.h"
 
-using cert_trans::Signer;
 using cert_trans::LoggedEntry;
 using cert_trans::ScopedBIO;
+using cert_trans::Signer;
 using cert_trans::Verifier;
 using ct::DigitallySigned;
 using ct::LogEntry;
@@ -31,6 +31,7 @@ using ct::SignedCertificateTimestamp;
 using ct::SignedTreeHead;
 using ct::X509ChainEntry;
 using std::string;
+using std::unique_ptr;
 
 namespace {
 
@@ -178,7 +179,7 @@ TestSigner::TestSigner()
     : default_signer_(NULL),
       counter_(0),
       default_cert_(B(kDefaultDerCert)),
-      tree_hasher_(new Sha256Hasher()) {
+      tree_hasher_(unique_ptr<Sha256Hasher>(new Sha256Hasher)) {
   counter_ = util::TimeInMilliseconds();
   srand(counter_);
   EVP_PKEY* pkey = PrivateKeyFromPem(kEcP256PrivateKey);

@@ -13,6 +13,7 @@ namespace {
 using cert_trans::LoggedEntry;
 using ct::SignedTreeHead;
 using std::string;
+using std::unique_ptr;
 
 template <class T>
 class DBTest : public ::testing::Test {
@@ -103,7 +104,7 @@ TYPED_TEST(DBTest, WriteEntryAndLookupHash) {
 
   string leaf;
   logged.SerializeForLeaf(&leaf);
-  TreeHasher hasher(new Sha256Hasher);
+  TreeHasher hasher(unique_ptr<Sha256Hasher>(new Sha256Hasher));
   std::string leaf_hash = hasher.HashLeaf(leaf);
   EXPECT_EQ(leaf_hash, res);
 }

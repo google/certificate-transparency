@@ -8,12 +8,13 @@
 #include "merkletree/merkle_tree_math.h"
 
 using cert_trans::MerkleTreeInterface;
+using std::move;
 using std::string;
 using std::unique_ptr;
 
 MerkleTree::MerkleTree(unique_ptr<SerialHasher> hasher)
     : MerkleTreeInterface(),
-      treehasher_(hasher.release()),
+      treehasher_(move(hasher)),
       leaves_processed_(0),
       level_count_(0) {
 }

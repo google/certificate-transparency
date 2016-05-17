@@ -8,12 +8,13 @@
 #include "merkletree/merkle_tree_math.h"
 
 using cert_trans::MerkleTreeInterface;
+using std::move;
 using std::string;
 using std::unique_ptr;
 
 CompactMerkleTree::CompactMerkleTree(unique_ptr<SerialHasher> hasher)
     : MerkleTreeInterface(),
-      treehasher_(hasher.release()),
+      treehasher_(move(hasher)),
       leaf_count_(0),
       leaves_processed_(0),
       level_count_(0),
@@ -24,7 +25,7 @@ CompactMerkleTree::CompactMerkleTree(MerkleTree& model,
                                      unique_ptr<SerialHasher> hasher)
     : MerkleTreeInterface(),
       tree_(std::max<int64_t>(0, model.LevelCount() - 1)),
-      treehasher_(hasher.release()),
+      treehasher_(move(hasher)),
       leaf_count_(model.LeafCount()),
       leaves_processed_(0),
       level_count_(model.LevelCount()),
@@ -99,7 +100,7 @@ CompactMerkleTree::CompactMerkleTree(MerkleTree& model,
 CompactMerkleTree::CompactMerkleTree(const CompactMerkleTree& other,
                                      unique_ptr<SerialHasher> hasher)
     : tree_(other.tree_),
-      treehasher_(hasher.release()),
+      treehasher_(move(hasher)),
       leaf_count_(other.leaf_count_),
       leaves_processed_(other.leaves_processed_),
       level_count_(other.level_count_),
