@@ -9,6 +9,7 @@
 namespace {
 
 using std::string;
+using std::unique_ptr;
 
 const char kTestString[] = "Hello world!";
 const size_t kTestStringLength = 12;
@@ -97,13 +98,12 @@ TYPED_TEST(SerialHasherTest, Create) {
   string input, output, digest;
 
   for (size_t i = 0; this->test_vectors_[i].input != NULL; ++i) {
-    SerialHasher* new_hasher = this->hasher_->Create();
+    unique_ptr<SerialHasher> new_hasher(this->hasher_->Create());
     new_hasher->Reset();
     new_hasher->Update(
         S(this->test_vectors_[i].input, this->test_vectors_[i].input_length));
     digest = new_hasher->Final();
     EXPECT_STREQ(H(digest).c_str(), this->test_vectors_[i].output);
-    delete new_hasher;
   }
 }
 

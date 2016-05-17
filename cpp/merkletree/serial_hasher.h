@@ -3,6 +3,7 @@
 
 #include <openssl/sha.h>
 #include <stddef.h>
+#include <memory>
 #include <string>
 
 #include "base/macros.h"
@@ -26,8 +27,8 @@ class SerialHasher {
   // Finalize the hash context and return the binary digest blob.
   virtual std::string Final() = 0;
 
-  // A virtual constructor.  The caller gets ownership of the returned object.
-  virtual SerialHasher* Create() const = 0;
+  // A virtual constructor, creates a new instance of the same type.
+  virtual std::unique_ptr<SerialHasher> Create() const = 0;
 
  private:
   DISALLOW_COPY_AND_ASSIGN(SerialHasher);
@@ -44,11 +45,10 @@ class Sha256Hasher : public SerialHasher {
   void Reset();
   void Update(const std::string& data);
   std::string Final();
-  SerialHasher* Create() const;
+  std::unique_ptr<SerialHasher> Create() const;
 
   // Create a new hasher and call Reset(), Update(), and Final().
   static std::string Sha256Digest(const std::string& data);
-
 
  private:
   SHA256_CTX ctx_;
@@ -57,4 +57,5 @@ class Sha256Hasher : public SerialHasher {
 
   DISALLOW_COPY_AND_ASSIGN(Sha256Hasher);
 };
+
 #endif

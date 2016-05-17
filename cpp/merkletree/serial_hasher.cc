@@ -4,6 +4,7 @@
 #include <stddef.h>
 
 using std::string;
+using std::unique_ptr;
 
 const size_t Sha256Hasher::kDigestSize = SHA256_DIGEST_LENGTH;
 
@@ -32,8 +33,8 @@ string Sha256Hasher::Final() {
   return string(reinterpret_cast<char*>(hash), SHA256_DIGEST_LENGTH);
 }
 
-SerialHasher* Sha256Hasher::Create() const {
-  return new Sha256Hasher;
+unique_ptr<SerialHasher> Sha256Hasher::Create() const {
+  return unique_ptr<SerialHasher>(new Sha256Hasher);
 }
 
 // static
