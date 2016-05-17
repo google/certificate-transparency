@@ -11,8 +11,7 @@
 
 class TreeHasher {
  public:
-  // Takes ownership of the SerialHasher.
-  TreeHasher(SerialHasher* hasher);
+  TreeHasher(std::unique_ptr<SerialHasher> hasher);
 
   size_t DigestSize() const {
     return hasher_->DigestSize();
