@@ -7,7 +7,6 @@
 
 #include "base/macros.h"
 #include "log/cert.h"
-#include "log/submit_result.h"
 #include "proto/ct.pb.h"
 
 class FrontendSigner;
