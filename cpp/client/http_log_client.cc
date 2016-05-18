@@ -137,18 +137,23 @@ StatusOr<MerkleAuditProof> HTTPLogClient::QueryAuditProof(
   return Status::UNKNOWN;
 }
 
-AsyncLogClient::Status HTTPLogClient::GetEntries(
-    int first, int last, vector<AsyncLogClient::Entry>* entries) {
-  AsyncLogClient::Status retval(AsyncLogClient::UNKNOWN_ERROR);
+StatusOr<vector<AsyncLogClient::Entry>> HTTPLogClient::GetEntries(int first,
+                                                                  int last) {
+  vector<AsyncLogClient::Entry> entries;
+  AsyncLogClient::Status status(AsyncLogClient::UNKNOWN_ERROR);
   bool done(false);
 
-  client_.GetEntries(first, last, entries,
-                     bind(&DoneRequest, _1, &retval, &done));
+  client_.GetEntries(first, last, &entries,
+                     bind(&DoneRequest, _1, &status, &done));
   while (!done) {
     base_->DispatchOnce();
   }
 
-  return retval;
+  if (status == AsyncLogClient::OK) {
+    return move(entries);
+  }
+
+  return Status::UNKNOWN;
 }
 
 StatusOr<vector<string>> HTTPLogClient::GetSTHConsistency(int64_t size1,

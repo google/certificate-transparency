@@ -5,6 +5,7 @@
 #include <functional>
 #include <memory>
 #include <string>
+#include <utility>
 #include <vector>
 
 #include "base/macros.h"
@@ -33,6 +34,11 @@ class AsyncLogClient {
   };
 
   struct Entry {
+    Entry() = default;
+    Entry(Entry&& src)
+        : leaf(src.leaf), entry(src.entry), sct(std::move(src.sct)) {
+    }
+
     ct::MerkleTreeLeaf leaf;
     ct::LogEntry entry;
     std::unique_ptr<ct::SignedCertificateTimestamp> sct;

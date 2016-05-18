@@ -851,17 +851,16 @@ static void WriteCertificate(const std::string& cert, int entry,
 void GetEntries() {
   CHECK_NE(FLAGS_ct_server, "");
   HTTPLogClient client(FLAGS_ct_server);
-  std::vector<AsyncLogClient::Entry> entries;
-  AsyncLogClient::Status error =
-      client.GetEntries(FLAGS_get_first, FLAGS_get_last, &entries);
-  CHECK_EQ(error, AsyncLogClient::OK);
+  const StatusOr<vector<AsyncLogClient::Entry>> entries(
+      client.GetEntries(FLAGS_get_first, FLAGS_get_last));
+  CHECK_EQ(entries.status(), Status::OK);
 
   CHECK(!FLAGS_certificate_base.empty());
 
   int e = FLAGS_get_first;
-  for (std::vector<AsyncLogClient::Entry>::const_iterator
-           entry = entries.begin();
-       entry != entries.end(); ++entry, ++e) {
+  for (vector<AsyncLogClient::Entry>::const_iterator
+           entry = entries.ValueOrDie().begin();
+       entry != entries.ValueOrDie().end(); ++entry, ++e) {
     if (entry->leaf.timestamped_entry().entry_type() == ct::X509_ENTRY) {
       WriteCertificate(entry->leaf.timestamped_entry().signed_entry().x509(),
                        e, 0, "x509");

@@ -8,7 +8,9 @@
 using cert_trans::AsyncLogClient;
 using cert_trans::HTTPLogClient;
 using ct::SignedTreeHead;
+using std::move;
 using std::string;
+using std::vector;
 using util::StatusOr;
 
 namespace monitor {
@@ -154,18 +156,23 @@ Monitor::GetResult Monitor::GetEntries(int get_first, int get_last) {
   CHECK(get_first >= 0);
   CHECK(get_last >= get_first);
 
-  std::vector<AsyncLogClient::Entry> entries;
+  vector<AsyncLogClient::Entry> entries;
   int dload_count = 0;
   do {
     // If the server does not impose a limit, all entries from get_first to
     // get_last will be downloaded at once (could exceed memory).
-    AsyncLogClient::Status error =
-        client_->GetEntries(get_first + dload_count, get_last, &entries);
+    StatusOr<vector<AsyncLogClient::Entry>> entries_chunk(
+        client_->GetEntries(get_first + dload_count, get_last));
 
-    if (error != AsyncLogClient::OK) {
-      LOG(ERROR) << "HTTPLogClient returned with error " << error
+    if (!entries_chunk.status().ok()) {
+      LOG(ERROR) << "HTTPLogClient returned an error: "
+                 << entries_chunk.status()
                  << ". No entries have been written to the database.";
       return NETWORK_PROBLEM;
+    }
+
+    for (auto& entry : entries_chunk.ValueOrDie()) {
+      entries.emplace_back(move(entry));
     }
 
     LOG(INFO) << "Writing entries from " << get_first + dload_count << " to "

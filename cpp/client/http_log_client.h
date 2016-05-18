@@ -35,10 +35,8 @@ class HTTPLogClient {
   util::StatusOr<std::vector<std::string>> GetSTHConsistency(int64_t size1,
                                                              int64_t size2);
 
-  // This does not clear |entries| before appending the retrieved
-  // entries.
-  AsyncLogClient::Status GetEntries(
-      int first, int last, std::vector<AsyncLogClient::Entry>* entries);
+  util::StatusOr<std::vector<AsyncLogClient::Entry>> GetEntries(int first,
+                                                                int last);
 
  private:
   const std::unique_ptr<libevent::Base> base_;
