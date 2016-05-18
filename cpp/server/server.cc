@@ -216,9 +216,8 @@ void Server::WaitForReplication() const {
 
 
 void Server::Initialise(bool is_mirror) {
-  fetcher_.reset(ContinuousFetcher::New(event_base_.get(), internal_pool_, db_,
-                                        log_verifier_, !is_mirror)
-                     .release());
+  fetcher_ = ContinuousFetcher::New(event_base_.get(), internal_pool_, db_,
+                                    log_verifier_, !is_mirror);
 
   log_lookup_.reset(new LogLookup(db_));
 

@@ -196,7 +196,7 @@ void DoneGetEntries(UrlFetcher::Response* resp,
           DeserializeResult::OK) {
         return done(AsyncLogClient::BAD_RESPONSE);
       }
-      log_entry.sct.reset(sct.release());
+      log_entry.sct = move(sct);
     }
 
     switch (log_entry.leaf.timestamped_entry().entry_type()) {
