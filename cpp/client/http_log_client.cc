@@ -50,26 +50,31 @@ HTTPLogClient::HTTPLogClient(const string& server)
       client_(base_.get(), &fetcher_, server) {
 }
 
-AsyncLogClient::Status HTTPLogClient::UploadSubmission(
-    const string& submission, bool pre, SignedCertificateTimestamp* sct) {
-  AsyncLogClient::Status retval(AsyncLogClient::UNKNOWN_ERROR);
+StatusOr<SignedCertificateTimestamp> HTTPLogClient::UploadSubmission(
+    const string& submission, bool pre) {
+  SignedCertificateTimestamp sct;
+  AsyncLogClient::Status status(AsyncLogClient::UNKNOWN_ERROR);
   bool done(false);
 
   if (pre) {
     PreCertChain pre_cert_chain(submission);
-    client_.AddPreCertChain(pre_cert_chain, sct,
-                            bind(&DoneRequest, _1, &retval, &done));
+    client_.AddPreCertChain(pre_cert_chain, &sct,
+                            bind(&DoneRequest, _1, &status, &done));
   } else {
     CertChain cert_chain(submission);
-    client_.AddCertChain(cert_chain, sct,
-                         bind(&DoneRequest, _1, &retval, &done));
+    client_.AddCertChain(cert_chain, &sct,
+                         bind(&DoneRequest, _1, &status, &done));
   }
 
   while (!done) {
     base_->DispatchOnce();
   }
 
-  return retval;
+  if (status == AsyncLogClient::OK) {
+    return sct;
+  }
+
+  return Status::UNKNOWN;
 }
 
 

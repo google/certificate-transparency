@@ -335,13 +335,12 @@ static int Upload() {
   LOG(INFO) << "Uploading certificate submission from " << submission_file;
   LOG(INFO) << submission_file << " is " << contents.length() << " bytes.";
 
-  SignedCertificateTimestamp sct;
   HTTPLogClient client(FLAGS_ct_server);
-  AsyncLogClient::Status ret =
-      client.UploadSubmission(contents, FLAGS_precert, &sct);
+  const StatusOr<SignedCertificateTimestamp> sct(
+      client.UploadSubmission(contents, FLAGS_precert));
 
-  if (ret != AsyncLogClient::OK) {
-    LOG(ERROR) << "Submission failed, error = " << ret;
+  if (!sct.status().ok()) {
+    LOG(ERROR) << "Submission failed: " << sct.status();
     return 1;
   }
 
@@ -351,7 +350,7 @@ static int Upload() {
     PreCertChain chain(contents);
     // Need the issuing cert, otherwise we can't calculate its hash...
     if (chain.Length() > 1) {
-      CHECK(CheckSCT(sct, chain, &ct_data));
+      CHECK(CheckSCT(sct.ValueOrDie(), chain, &ct_data));
     } else {
       LOG(WARNING) << "Unable to verify Precert SCT without issuing "
                    << "certificate in chain.";
@@ -363,14 +362,15 @@ static int Upload() {
     // FIXME: this'll fail if we're uploading a cert which already has an
     // embedded SCT in it, and the issuing cert is not included in the chain
     // since we'll need to create the precert entry under the covers.
-    CHECK(CheckSCT(sct, chain, &ct_data));
+    CHECK(CheckSCT(sct.ValueOrDie(), chain, &ct_data));
   }
 
   // TODO(ekasper): Process the |contents| bundle so that we can verify
   // the token.
 
   string proof;
-  if (Serializer::SerializeSCT(sct, &proof) != SerializeResult::OK) {
+  if (Serializer::SerializeSCT(sct.ValueOrDie(), &proof) !=
+      SerializeResult::OK) {
     LOG(ERROR) << "Failed to serialize the server token";
     return 1;
   }

@@ -22,9 +22,8 @@ class HTTPLogClient {
  public:
   explicit HTTPLogClient(const std::string& server);
 
-  AsyncLogClient::Status UploadSubmission(const std::string& submission,
-                                          bool pre,
-                                          ct::SignedCertificateTimestamp* sct);
+  util::StatusOr<ct::SignedCertificateTimestamp> UploadSubmission(
+      const std::string& submission, bool pre);
 
   util::StatusOr<ct::SignedTreeHead> GetSTH();
 
