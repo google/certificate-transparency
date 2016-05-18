@@ -12,7 +12,6 @@ using ct::DigitallySigned;
 using ct::DigitallySigned_HashAlgorithm_IsValid;
 using ct::DigitallySigned_SignatureAlgorithm_IsValid;
 using ct::LogEntry;
-using ct::LogEntryType_IsValid;
 using ct::MerkleTreeLeaf;
 using ct::PrecertChainEntry;
 using ct::SignedCertificateTimestamp;

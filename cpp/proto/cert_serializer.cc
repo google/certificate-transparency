@@ -9,8 +9,6 @@
 #include "proto/serializer.h"
 
 using ct::DigitallySigned;
-using ct::DigitallySigned_HashAlgorithm_IsValid;
-using ct::DigitallySigned_SignatureAlgorithm_IsValid;
 using ct::LogEntry;
 using ct::LogEntryType_IsValid;
 using ct::MerkleTreeLeaf;
@@ -19,7 +17,6 @@ using ct::SignedCertificateTimestamp;
 using ct::SignedCertificateTimestampList;
 using ct::SthExtension;
 using ct::SctExtension;
-using ct::Version_IsValid;
 using ct::X509ChainEntry;
 using google::protobuf::RepeatedPtrField;
 using std::string;
