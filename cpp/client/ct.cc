@@ -637,21 +637,20 @@ static AuditResult Audit() {
       continue;
     }
 
-    MerkleAuditProof proof;
     HTTPLogClient client(FLAGS_ct_server);
 
     LOG(INFO) << "info = " << ct_data.attached_sct_info(i).DebugString();
-    AsyncLogClient::Status ret =
-        client.QueryAuditProof(ct_data.attached_sct_info(i).merkle_leaf_hash(),
-                               &proof);
+    const StatusOr<MerkleAuditProof> proof_http(client.QueryAuditProof(
+        ct_data.attached_sct_info(i).merkle_leaf_hash()));
 
-    // HTTP protocol does not supply this.
-    proof.mutable_id()->set_key_id(sct_id);
-
-    if (ret != AsyncLogClient::OK) {
-      LOG(ERROR) << "QueryAuditProof failed, error " << ret;
+    if (!proof_http.status().ok()) {
+      LOG(ERROR) << "QueryAuditProof failed: " << proof_http.status();
       continue;
     }
+
+    MerkleAuditProof proof(proof_http.ValueOrDie());
+    // HTTP protocol does not supply this.
+    proof.mutable_id()->set_key_id(sct_id);
 
     LOG(INFO) << "Received proof:\n" << proof.DebugString();
     LogVerifier::LogVerifyResult res =

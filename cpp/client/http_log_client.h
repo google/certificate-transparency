@@ -29,8 +29,8 @@ class HTTPLogClient {
 
   util::StatusOr<std::vector<std::unique_ptr<Cert>>> GetRoots();
 
-  AsyncLogClient::Status QueryAuditProof(const std::string& merkle_leaf_hash,
-                                         ct::MerkleAuditProof* proof);
+  util::StatusOr<ct::MerkleAuditProof> QueryAuditProof(
+      const std::string& merkle_leaf_hash);
 
   AsyncLogClient::Status GetSTHConsistency(int64_t size1, int64_t size2,
                                            std::vector<std::string>* proof);

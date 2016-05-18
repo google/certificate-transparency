@@ -113,25 +113,28 @@ StatusOr<vector<unique_ptr<Cert>>> HTTPLogClient::GetRoots() {
   return Status::UNKNOWN;
 }
 
-AsyncLogClient::Status HTTPLogClient::QueryAuditProof(
-    const string& merkle_leaf_hash, MerkleAuditProof* proof) {
+StatusOr<MerkleAuditProof> HTTPLogClient::QueryAuditProof(
+    const string& merkle_leaf_hash) {
   const StatusOr<SignedTreeHead> sth(GetSTH());
   if (!sth.status().ok()) {
-    // This is okay because the only caller of QueryAuditProof only
-    // compares to OK.
-    return AsyncLogClient::UNKNOWN_ERROR;
+    return sth.status();
   }
 
-  AsyncLogClient::Status retval(AsyncLogClient::UNKNOWN_ERROR);
+  MerkleAuditProof proof;
+  AsyncLogClient::Status status(AsyncLogClient::UNKNOWN_ERROR);
   bool done(false);
-  client_.QueryInclusionProof(sth.ValueOrDie(), merkle_leaf_hash, proof,
-                              bind(&DoneRequest, _1, &retval, &done));
+  client_.QueryInclusionProof(sth.ValueOrDie(), merkle_leaf_hash, &proof,
+                              bind(&DoneRequest, _1, &status, &done));
 
   while (!done) {
     base_->DispatchOnce();
   }
 
-  return retval;
+  if (status == AsyncLogClient::OK) {
+    return proof;
+  }
+
+  return Status::UNKNOWN;
 }
 
 AsyncLogClient::Status HTTPLogClient::GetEntries(
