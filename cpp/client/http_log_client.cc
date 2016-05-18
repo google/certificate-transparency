@@ -151,16 +151,21 @@ AsyncLogClient::Status HTTPLogClient::GetEntries(
   return retval;
 }
 
-AsyncLogClient::Status HTTPLogClient::GetSTHConsistency(
-    int64_t size1, int64_t size2, vector<string>* proof) {
-  AsyncLogClient::Status retval(AsyncLogClient::UNKNOWN_ERROR);
+StatusOr<vector<string>> HTTPLogClient::GetSTHConsistency(int64_t size1,
+                                                          int64_t size2) {
+  vector<string> proof;
+  AsyncLogClient::Status status(AsyncLogClient::UNKNOWN_ERROR);
   bool done(false);
 
-  client_.GetSTHConsistency(size1, size2, proof,
-                            bind(&DoneRequest, _1, &retval, &done));
+  client_.GetSTHConsistency(size1, size2, &proof,
+                            bind(&DoneRequest, _1, &status, &done));
   while (!done) {
     base_->DispatchOnce();
   }
 
-  return retval;
+  if (status == AsyncLogClient::OK) {
+    return proof;
+  }
+
+  return Status::UNKNOWN;
 }

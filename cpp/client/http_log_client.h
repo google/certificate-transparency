@@ -32,8 +32,8 @@ class HTTPLogClient {
   util::StatusOr<ct::MerkleAuditProof> QueryAuditProof(
       const std::string& merkle_leaf_hash);
 
-  AsyncLogClient::Status GetSTHConsistency(int64_t size1, int64_t size2,
-                                           std::vector<std::string>* proof);
+  util::StatusOr<std::vector<std::string>> GetSTHConsistency(int64_t size1,
+                                                             int64_t size2);
 
   // This does not clear |entries| before appending the retrieved
   // entries.

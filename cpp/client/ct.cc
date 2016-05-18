@@ -671,7 +671,7 @@ static AuditResult Audit() {
 
 static int CheckConsistency() {
   HTTPLogClient client(FLAGS_ct_server);
-  LogVerifier* verifier = GetLogVerifierFromFlags();
+  unique_ptr<LogVerifier> verifier(GetLogVerifierFromFlags());
 
   string sth1_str;
   PCHECK(util::ReadBinaryFile(FLAGS_sth1, &sth1_str)) << "Can't read STH file "
@@ -684,20 +684,17 @@ static int CheckConsistency() {
   SignedTreeHead sth2;
   CHECK(sth2.ParseFromString(sth2_str));
 
-  std::vector<string> proof;
-  CHECK_EQ(AsyncLogClient::OK,
-           client.GetSTHConsistency(sth1.tree_size(), sth2.tree_size(),
-                                    &proof));
+  const StatusOr<vector<string>> proof(
+      client.GetSTHConsistency(sth1.tree_size(), sth2.tree_size()));
+  CHECK_EQ(Status::OK, proof.status());
 
-  if (!verifier->VerifyConsistency(sth1, sth2, proof)) {
+  if (!verifier->VerifyConsistency(sth1, sth2, proof.ValueOrDie())) {
     LOG(ERROR) << "Consistency proof does not verify";
-    delete verifier;
     return 1;
   }
 
   LOG(INFO) << "Consistency proof verifies";
 
-  delete verifier;
   return 0;
 }
 
