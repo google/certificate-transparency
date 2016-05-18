@@ -205,7 +205,7 @@ unique_ptr<CompactMerkleTree> LogLookup::GetCompactMerkleTree(
     SerialHasher* hasher) {
   lock_guard<mutex> lock(lock_);
   return unique_ptr<CompactMerkleTree>(
-      new CompactMerkleTree(cert_tree_, unique_ptr<SerialHasher>(hasher)));
+      new CompactMerkleTree(&cert_tree_, unique_ptr<SerialHasher>(hasher)));
 }
 
 

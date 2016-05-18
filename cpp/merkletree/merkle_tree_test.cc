@@ -386,7 +386,7 @@ TEST_F(CompactMerkleTreeTest, TestCopyCtorWithRootTestVectors) {
   EXPECT_EQ(tree1.LevelCount(), kLevelCounts[7]);
   EXPECT_STREQ(H(tree1.CurrentRoot()).c_str(), kSHA256Roots[7].str);
 
-  CompactMerkleTree ctree1(tree1, NewSha256Hasher());
+  CompactMerkleTree ctree1(&tree1, NewSha256Hasher());
   EXPECT_EQ(tree1.LeafCount(), ctree1.LeafCount());
   EXPECT_EQ(tree1.LevelCount(), ctree1.LevelCount());
   EXPECT_EQ(tree1.CurrentRoot(), ctree1.CurrentRoot());
@@ -403,7 +403,7 @@ TEST_F(CompactMerkleTreeTest, TestCopyCtorThenAddLeafWithRootTestVectors) {
   EXPECT_EQ(tree.LeafCount(), 5U);
   EXPECT_EQ(tree.LevelCount(), kLevelCounts[4]);
   EXPECT_STREQ(H(tree.CurrentRoot()).c_str(), kSHA256Roots[4].str);
-  CompactMerkleTree ctree(tree, NewSha256Hasher());
+  CompactMerkleTree ctree(&tree, NewSha256Hasher());
   EXPECT_EQ(tree.LeafCount(), ctree.LeafCount());
   EXPECT_EQ(tree.LevelCount(), ctree.LevelCount());
   EXPECT_EQ(tree.CurrentRoot(), ctree.CurrentRoot());
@@ -431,7 +431,7 @@ TEST_F(CompactMerkleTreeFuzzTest, CopyCtorForLargerTreesThenAppend) {
     }
     EXPECT_EQ(tree.LeafCount(), tree_size);
     // Now build a CompactMerkleTree using |tree| as the model
-    CompactMerkleTree ctree(tree, NewSha256Hasher());
+    CompactMerkleTree ctree(&tree, NewSha256Hasher());
     // And check that the public interface concurs
     EXPECT_EQ(tree.LeafCount(), ctree.LeafCount());
     EXPECT_EQ(tree.LevelCount(), ctree.LevelCount());
@@ -584,7 +584,7 @@ TEST_F(MerkleTreeTest, AddLeafHash) {
 
 TEST_F(CompactMerkleTreeTest, TestCloneEmptyTreeProducesWorkingTree) {
   MerkleTree tree(NewSha256Hasher());
-  CompactMerkleTree compact(tree, NewSha256Hasher());
+  CompactMerkleTree compact(&tree, NewSha256Hasher());
   EXPECT_STREQ(H(compact.CurrentRoot()).c_str(), kSHA256EmptyTreeHash.str);
 }
 

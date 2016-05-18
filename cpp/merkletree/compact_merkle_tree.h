@@ -29,7 +29,13 @@ class CompactMerkleTree : public cert_trans::MerkleTreeInterface {
 
   // Creates a new CompactMerkleTree based on the data present in the
   // (non-compact) MerkleTree |model|.
-  CompactMerkleTree(MerkleTree& model, std::unique_ptr<SerialHasher> hasher);
+  // Takes ownership of |hasher|, does not use |model| after the
+  // construction.
+  // TODO(pphaneuf): This should take a const reference to the model,
+  // but implementation details currently make this too difficult.
+  // TODO(pphaneuf): It should also get its |hasher| from |model|,
+  // somehow.
+  CompactMerkleTree(MerkleTree* model, std::unique_ptr<SerialHasher> hasher);
 
   virtual ~CompactMerkleTree();
 

@@ -1,6 +1,7 @@
 #include "merkletree/compact_merkle_tree.h"
 
 #include <assert.h>
+#include <glog/logging.h>
 #include <stddef.h>
 #include <string>
 #include <vector>
@@ -21,21 +22,21 @@ CompactMerkleTree::CompactMerkleTree(unique_ptr<SerialHasher> hasher)
       root_(treehasher_.HashEmpty()) {
 }
 
-CompactMerkleTree::CompactMerkleTree(MerkleTree& model,
+CompactMerkleTree::CompactMerkleTree(MerkleTree* model,
                                      unique_ptr<SerialHasher> hasher)
     : MerkleTreeInterface(),
-      tree_(std::max<int64_t>(0, model.LevelCount() - 1)),
+      tree_(std::max<int64_t>(0, CHECK_NOTNULL(model)->LevelCount() - 1)),
       treehasher_(move(hasher)),
-      leaf_count_(model.LeafCount()),
+      leaf_count_(model->LeafCount()),
       leaves_processed_(0),
-      level_count_(model.LevelCount()),
+      level_count_(model->LevelCount()),
       root_(treehasher_.HashEmpty()) {
-  if (model.LeafCount() == 0) {
+  if (model->LeafCount() == 0) {
     return;
   }
   // Get the inclusion proof path to the last entry in the tree, which by
   // definition must consist purely of left-hand nodes.
-  std::vector<string> path(model.PathToCurrentRoot(model.LeafCount()));
+  std::vector<string> path(model->PathToCurrentRoot(model->LeafCount()));
   if (!path.empty()) {
     /* We have to do some juggling here as tree_[] differs from our MerkleTree
     // structure in that incomplete right-hand subtrees 'fall-through' to lower
@@ -72,7 +73,7 @@ CompactMerkleTree::CompactMerkleTree(MerkleTree& model,
     // index into tree_, starting at the leaf level:
     int level(0);
     std::vector<string>::const_iterator i = path.begin();
-    size_t size_of_previous_tree(model.LeafCount() - 1);
+    size_t size_of_previous_tree(model->LeafCount() - 1);
     for (; size_of_previous_tree != 0; size_of_previous_tree >>= 1) {
       if ((size_of_previous_tree & 1) != 0) {
         // if the level'th bit in the previous tree size is set, then we have
@@ -90,10 +91,10 @@ CompactMerkleTree::CompactMerkleTree(MerkleTree& model,
   // the last entry was added, so we PushBack the final right-hand entry
   // here, which will perform any recalculations necessary to reach the final
   // tree.
-  PushBack(0, model.LeafHash(model.LeafCount()));
-  assert(model.CurrentRoot() == CurrentRoot());
-  assert(model.LeafCount() == LeafCount());
-  assert(model.LevelCount() == LevelCount());
+  PushBack(0, model->LeafHash(model->LeafCount()));
+  assert(model->CurrentRoot() == CurrentRoot());
+  assert(model->LeafCount() == LeafCount());
+  assert(model->LevelCount() == LevelCount());
 }
 
 
