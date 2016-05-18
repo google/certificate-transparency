@@ -21,9 +21,6 @@ gflags.DEFINE_integer("reporter_workers", multiprocessing.cpu_count(),
 gflags.DEFINE_integer("reporter_queue_size", 50,
                       "Size of entry queue in reporter")
 
-gflags.DEFINE_bool("reporter_disable_checks", False,
-                   "Disable cert_analysis checks.")
-
 
 def _scan_der_cert(der_certs):
     current = -1
@@ -117,7 +114,8 @@ class CertificateReport(object):
         """Clean up report."""
 
     def scan_der_certs(self, der_certs):
-        """Scans certificates in der form for all supported observations.
+        """Scans certificates in der form, parsing them to produce
+        X509Description for each.
 
         Args:
             der_certs: non empty array of

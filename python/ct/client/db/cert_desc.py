@@ -8,7 +8,7 @@ from ct.crypto.asn1 import x509_common
 from ct.proto import certificate_pb2
 
 
-def from_cert(certificate, observations=[]):
+def from_cert(certificate):
     """Pulls out interesting fields from certificate, so format of data will
     be similar in every database implementation."""
     proto = certificate_pb2.X509Description()
@@ -84,14 +84,6 @@ def from_cert(certificate, observations=[]):
         pass
 
     proto.sha256_hash = hashlib.sha256(proto.der).digest()
-
-    for observation in observations:
-        proto_obs = proto.observations.add()
-        if observation.description:
-            proto_obs.description = observation.description
-        if observation.reason:
-            proto_obs.reason = observation.reason
-        proto_obs.details = observation.details_to_proto()
 
     return proto
 
