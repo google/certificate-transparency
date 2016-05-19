@@ -43,9 +43,9 @@ How to run a mirror instance on GCE
    ```bash
    export PROJECT="my-project"
    make -j24
-   sudo docker build -f Dockerfile-ct-mirror -t gcr.io/${PROJECT}/super_mirror:test .
+   sudo docker build -f Dockerfile-ct-mirror -t gcr.io/${PROJECT}/ct-mirror:test .
    sudo docker build -t gcr.io/${PROJECT}/etcd:test cloud/etcd
-   gcloud docker push gcr.io/${PROJECT}/super_mirror:test
+   gcloud docker push gcr.io/${PROJECT}/ct-mirror:test
    gcloud docker push gcr.io/${PROJECT}/etcd:test
    ```
 

@@ -976,7 +976,7 @@ cpp_merkletree_merkle_tree_large_test_SOURCES = \
 	cpp/util/util.cc
 
 docker: all
-	sudo docker build -t gcr.io/${PROJECT}/super_duper:test .
-	sudo docker build -f Dockerfile-ct-mirror -t gcr.io/${PROJECT}/super_mirror:test .
+	sudo docker build -t gcr.io/${PROJECT}/ct-log:test .
+	sudo docker build -f Dockerfile-ct-mirror -t gcr.io/${PROJECT}/ct-mirror:test .
 	sudo docker build -t gcr.io/${PROJECT}/etcd:test cloud/etcd
 	sudo docker build -t gcr.io/${PROJECT}/prometheus:test cloud/prometheus

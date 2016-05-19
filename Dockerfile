@@ -1,5 +1,5 @@
 FROM ubuntu
-RUN echo 'Building new SuperDuper Docker image...'
+RUN echo 'Building new CT Log Docker image...'
 COPY test/testdata/ca-cert.pem /tmp/
 RUN apt-get update && \
     apt-get install -y software-properties-common && \

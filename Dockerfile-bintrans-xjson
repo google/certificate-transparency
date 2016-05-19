@@ -1,5 +1,5 @@
 FROM ubuntu
-RUN echo 'Building new SuperDuper XJSON Docker image...'
+RUN echo 'Building new Certificate Transparency XJSON Docker image...'
 COPY test/testdata/ca-cert.pem /tmp/
 RUN apt-get update && \
     apt-get install -y software-properties-common && \

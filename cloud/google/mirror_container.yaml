@@ -4,11 +4,11 @@ metadata:
   name: "@@CONTAINER_HOST@@"
 spec:
   containers:
-    - name: super-mirror
-      image: "gcr.io/@@PROJECT@@/super_mirror:test"
+    - name: ct-mirror
+      image: "gcr.io/@@PROJECT@@/ct-mirror:test"
       imagePullPolicy: Always
       ports:
-        - name: super-mirror
+        - name: ct-mirror
           containerPort: 80
           hostPort: 80
           protocol: TCP

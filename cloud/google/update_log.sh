@@ -27,8 +27,8 @@ while [ $i -lt ${LOG_NUM_REPLICAS} ]; do
   if ! gcloud compute ssh ${LOG_MACHINES[${i}]} \
       --zone ${LOG_ZONES[${i}]} \
       --command \
-          'sudo docker pull gcr.io/'${PROJECT}'/super_duper:test &&
-           sudo docker kill $(sudo docker ps | grep super_duper | awk -- "{print \$1}" )'; then
+          'sudo docker pull gcr.io/'${PROJECT}'/ct-log:test &&
+           sudo docker kill $(sudo docker ps | grep ct-log | awk -- "{print \$1}" )'; then
     echo "Retrying"
     continue
   fi

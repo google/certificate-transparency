@@ -1,7 +1,8 @@
 # HOWTO run a clustered CT log server
 
 ## Intro
-This HOWTO is intended to get you started running a clustered CT "Super Duper" log server.
+This HOWTO is intended to get you started running a clustered CT log server
+using this open-source implementation.
 The scripts in the rep referenced below are targetted at running a log cluster in [Google Compute Engine](https://cloud.google.com)
 , but since it's all based around [Docker](https://docker.io) images it shouldn't be too hard to use the scripts as a reference for getting a log running on any other infrastructure where you can easily run Docker containers.
 

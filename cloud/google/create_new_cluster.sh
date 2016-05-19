@@ -45,7 +45,7 @@ function PopulateEtcdForLog() {
   gcloud compute ssh ${ETCD_MACHINES[1]} \
       --zone ${ETCD_ZONES[1]} \
       --command "\
-    sudo docker run gcr.io/${PROJECT}/super_duper:test \
+    sudo docker run gcr.io/${PROJECT}/ct-log:test \
       /usr/local/bin/ct-clustertool initlog \
       --key=/usr/local/etc/server-key.pem \
       --etcd_servers=${ETCD_MACHINES[1]}:4001 \
@@ -92,7 +92,7 @@ case "${INSTANCE_TYPE}" in
 esac
 
 echo "============================================================="
-echo "Creating superduper ${INSTANCE_TYPE} instances..."
+echo "Creating distributed CT log ${INSTANCE_TYPE} instances..."
 case "${INSTANCE_TYPE}" in
   "log")
     ${DIR}/start_log.sh ${CONFIG_FILE}

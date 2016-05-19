@@ -332,8 +332,8 @@ void HttpHandler::BlockingGetEntries(evhttp_request* req, int64_t start,
     json_entry.AddBase64("extra_data", extra_data);
 
     if (include_scts) {
-      // This is non-standard, and currently only used by other SuperDuper log
-      // nodes when "following" to fetch data from each other:
+      // This is non-standard for this implementation, and is currently only
+      // used by other nodes when "following" to fetch data from each other:
       json_entry.AddBase64("sct", sct_data);
     }
 
