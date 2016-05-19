@@ -24,7 +24,7 @@ class EtcdConsistentStore;
 template <class T>
 class EntryHandle {
  public:
-  EntryHandle() = default;
+  EntryHandle() : entry_(), has_handle_(false) {}
 
   const T& Entry() const {
     return entry_;
