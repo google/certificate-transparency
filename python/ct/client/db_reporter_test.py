@@ -1,7 +1,9 @@
 #!/usr/bin/env python
 import mock
+import sys
 import unittest
 from ct.client import db_reporter
+import gflags
 
 
 class DbReporterTest(unittest.TestCase):
@@ -16,4 +18,5 @@ class DbReporterTest(unittest.TestCase):
 
 
 if __name__ == '__main__':
+  sys.argv = gflags.FLAGS(sys.argv)
   unittest.main()
