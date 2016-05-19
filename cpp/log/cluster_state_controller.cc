@@ -1,6 +1,3 @@
-#ifndef CERT_TRANS_LOG_CLUSTER_STATE_CONTROLLER_INL_H_
-#define CERT_TRANS_LOG_CLUSTER_STATE_CONTROLLER_INL_H_
-
 #include "log/cluster_state_controller.h"
 
 #include <stdint.h>
@@ -12,10 +9,30 @@
 #include "monitoring/monitoring.h"
 #include "proto/ct.pb.h"
 
+using ct::ClusterConfig;
+using ct::ClusterNodeState;
+using ct::SignedTreeHead;
+using std::bind;
+using std::lock_guard;
+using std::make_pair;
+using std::make_shared;
+using std::map;
+using std::mutex;
+using std::pair;
+using std::placeholders::_1;
+using std::shared_ptr;
+using std::string;
+using std::to_string;
+using std::unique_lock;
+using std::unique_ptr;
+using std::vector;
+using util::Executor;
+using util::Status;
+using util::StatusOr;
 
 namespace cert_trans {
-
 namespace {
+
 
 Gauge<>* serving_tree_size =
     Gauge<>::New("serving_tree_size", "Size of the current serving STH");
@@ -25,17 +42,17 @@ Gauge<>* serving_tree_timestamp =
                  "Timestamp of the current serving STH");
 
 
-std::unique_ptr<AsyncLogClient> BuildAsyncLogClient(
-    const std::shared_ptr<libevent::Base>& base, UrlFetcher* fetcher,
-    const ct::ClusterNodeState& state) {
+unique_ptr<AsyncLogClient> BuildAsyncLogClient(
+    const shared_ptr<libevent::Base>& base, UrlFetcher* fetcher,
+    const ClusterNodeState& state) {
   CHECK(!state.hostname().empty());
   CHECK_GT(state.log_port(), 0);
   CHECK_LE(state.log_port(), UINT16_MAX);
 
   // TODO(pphaneuf): We'd like to support HTTPS at some point.
-  return std::unique_ptr<AsyncLogClient>(new AsyncLogClient(
+  return unique_ptr<AsyncLogClient>(new AsyncLogClient(
       base.get(), fetcher,
-      "http://" + state.hostname() + ":" + std::to_string(state.log_port())));
+      "http://" + state.hostname() + ":" + to_string(state.log_port())));
 }
 
 
@@ -43,21 +60,21 @@ std::unique_ptr<AsyncLogClient> BuildAsyncLogClient(
 
 
 ClusterStateController::ClusterPeer::ClusterPeer(
-    const std::shared_ptr<libevent::Base>& base, UrlFetcher* fetcher,
-    const ct::ClusterNodeState& state)
+    const shared_ptr<libevent::Base>& base, UrlFetcher* fetcher,
+    const ClusterNodeState& state)
     : Peer(BuildAsyncLogClient(base, fetcher, state)), state_(state) {
 }
 
 
 int64_t ClusterStateController::ClusterPeer::TreeSize() const {
-  std::lock_guard<std::mutex> lock(lock_);
+  lock_guard<mutex> lock(lock_);
   return state_.newest_sth().tree_size();
 }
 
 
 void ClusterStateController::ClusterPeer::UpdateClusterNodeState(
-    const ct::ClusterNodeState& new_state) {
-  std::lock_guard<std::mutex> lock(lock_);
+    const ClusterNodeState& new_state) {
+  lock_guard<mutex> lock(lock_);
   // TODO(pphaneuf): We have no way of changing the AsyncLogClient in
   // our parent, maybe we should?
   CHECK_EQ(state_.hostname(), new_state.hostname());
@@ -66,23 +83,22 @@ void ClusterStateController::ClusterPeer::UpdateClusterNodeState(
 }
 
 
-ct::ClusterNodeState ClusterStateController::ClusterPeer::state() const {
-  std::lock_guard<std::mutex> lock(lock_);
+ClusterNodeState ClusterStateController::ClusterPeer::state() const {
+  lock_guard<mutex> lock(lock_);
   return state_;
 }
 
 
-std::pair<std::string, int> ClusterStateController::ClusterPeer::GetHostPort()
-    const {
-  std::lock_guard<std::mutex> lock(lock_);
-  return std::make_pair(state_.hostname(), state_.log_port());
+pair<string, int> ClusterStateController::ClusterPeer::GetHostPort() const {
+  lock_guard<mutex> lock(lock_);
+  return make_pair(state_.hostname(), state_.log_port());
 }
 
 
 // TODO(alcutter): Need a better system for hanging tasks onto events,
 // Pierre's task-a-palooza idea perhaps?
 ClusterStateController::ClusterStateController(
-    util::Executor* executor, const std::shared_ptr<libevent::Base>& base,
+    Executor* executor, const shared_ptr<libevent::Base>& base,
     UrlFetcher* url_fetcher, Database* database,
     ConsistentStore<LoggedEntry>* store, MasterElection* election,
     ContinuousFetcher* fetcher)
@@ -98,20 +114,17 @@ ClusterStateController::ClusterStateController(
       exiting_(false),
       update_required_(false),
       cluster_serving_sth_update_thread_(
-          std::bind(&ClusterStateController::ClusterServingSTHUpdater, this)) {
+          bind(&ClusterStateController::ClusterServingSTHUpdater, this)) {
   CHECK_NOTNULL(base_.get());
   store_->WatchClusterNodeStates(
-      std::bind(&ClusterStateController::OnClusterStateUpdated, this,
-                std::placeholders::_1),
+      bind(&ClusterStateController::OnClusterStateUpdated, this, _1),
       watch_node_states_task_.task());
   store_->WatchClusterConfig(
-      std::bind(&ClusterStateController::OnClusterConfigUpdated, this,
-                std::placeholders::_1),
+      bind(&ClusterStateController::OnClusterConfigUpdated, this, _1),
       watch_config_task_.task());
-  store_->WatchServingSTH(
-      std::bind(&ClusterStateController::OnServingSthUpdated, this,
-                std::placeholders::_1),
-      watch_serving_sth_task_.task());
+  store_->WatchServingSTH(bind(&ClusterStateController::OnServingSthUpdated,
+                               this, _1),
+                          watch_serving_sth_task_.task());
 }
 
 
@@ -120,7 +133,7 @@ ClusterStateController::~ClusterStateController() {
   watch_node_states_task_.Cancel();
   watch_serving_sth_task_.Cancel();
   {
-    std::lock_guard<std::mutex> lock(mutex_);
+    lock_guard<mutex> lock(mutex_);
     exiting_ = true;
   }
   update_required_cv_.notify_all();
@@ -131,9 +144,9 @@ ClusterStateController::~ClusterStateController() {
 }
 
 
-void ClusterStateController::NewTreeHead(const ct::SignedTreeHead& sth) {
-  std::unique_lock<std::mutex> lock(mutex_);
-  ct::SignedTreeHead db_sth;
+void ClusterStateController::NewTreeHead(const SignedTreeHead& sth) {
+  unique_lock<mutex> lock(mutex_);
+  SignedTreeHead db_sth;
   const Database::LookupResult result(database_->LatestTreeHead(&db_sth));
 
   const bool serving_sth_newer_than_db_sth(
@@ -154,7 +167,7 @@ void ClusterStateController::NewTreeHead(const ct::SignedTreeHead& sth) {
   local_node_state_.mutable_newest_sth()->CopyFrom(sth);
   PushLocalNodeState(lock);
 
-  ct::SignedTreeHead sth_to_write;
+  SignedTreeHead sth_to_write;
   if (write_sth) {
     sth_to_write = *actual_serving_sth_;
   }
@@ -174,28 +187,26 @@ void ClusterStateController::NewTreeHead(const ct::SignedTreeHead& sth) {
 }
 
 
-util::StatusOr<ct::SignedTreeHead>
-ClusterStateController::GetCalculatedServingSTH() const {
-  std::lock_guard<std::mutex> lock(mutex_);
+StatusOr<SignedTreeHead> ClusterStateController::GetCalculatedServingSTH()
+    const {
+  lock_guard<mutex> lock(mutex_);
   if (!calculated_serving_sth_) {
-    return util::StatusOr<ct::SignedTreeHead>(
-        util::Status(util::error::NOT_FOUND, "No calculated STH"));
+    return Status(util::error::NOT_FOUND, "No calculated STH");
   }
-  return util::StatusOr<ct::SignedTreeHead>(*calculated_serving_sth_);
+  return *calculated_serving_sth_;
 }
 
 
-void ClusterStateController::GetLocalNodeState(
-    ct::ClusterNodeState* state) const {
+void ClusterStateController::GetLocalNodeState(ClusterNodeState* state) const {
   CHECK_NOTNULL(state);
-  std::lock_guard<std::mutex> lock(mutex_);
+  lock_guard<mutex> lock(mutex_);
   *state = local_node_state_;
 }
 
 
-void ClusterStateController::SetNodeHostPort(const std::string& host,
+void ClusterStateController::SetNodeHostPort(const string& host,
                                              const uint16_t port) {
-  std::unique_lock<std::mutex> lock(mutex_);
+  unique_lock<mutex> lock(mutex_);
   local_node_state_.set_hostname(host);
   local_node_state_.set_log_port(port);
   PushLocalNodeState(lock);
@@ -203,13 +214,13 @@ void ClusterStateController::SetNodeHostPort(const std::string& host,
 
 
 void ClusterStateController::RefreshNodeState() {
-  std::unique_lock<std::mutex> lock(mutex_);
+  unique_lock<mutex> lock(mutex_);
   PushLocalNodeState(lock);
 }
 
 
 bool ClusterStateController::NodeIsStale() const {
-  std::lock_guard<std::mutex> lock(mutex_);
+  lock_guard<mutex> lock(mutex_);
   if (!actual_serving_sth_) {
     return true;
   }
@@ -217,14 +228,13 @@ bool ClusterStateController::NodeIsStale() const {
 }
 
 
-std::vector<ct::ClusterNodeState> ClusterStateController::GetFreshNodes()
-    const {
-  std::lock_guard<std::mutex> lock(mutex_);
+vector<ClusterNodeState> ClusterStateController::GetFreshNodes() const {
+  lock_guard<mutex> lock(mutex_);
   if (!actual_serving_sth_) {
     LOG(WARNING) << "Cluster has no ServingSTH, all nodes are stale.";
     return {};
   }
-  std::vector<ct::ClusterNodeState> fresh;  // for 1983.
+  vector<ClusterNodeState> fresh;  // for 1983.
   // Here we go:
   for (const auto& node : all_peers_) {
     const bool is_self(
@@ -242,19 +252,19 @@ std::vector<ct::ClusterNodeState> ClusterStateController::GetFreshNodes()
 
 
 void ClusterStateController::PushLocalNodeState(
-    const std::unique_lock<std::mutex>& lock) {
+    const unique_lock<mutex>& lock) {
   CHECK(lock.owns_lock());
 
-  const util::Status status(store_->SetClusterNodeState(local_node_state_));
+  const Status status(store_->SetClusterNodeState(local_node_state_));
   LOG_IF(WARNING, !status.ok()) << "Couldn't set ClusterNodeState: " << status;
 }
 
 
 void ClusterStateController::OnClusterStateUpdated(
-    const std::vector<Update<ct::ClusterNodeState>>& updates) {
-  std::unique_lock<std::mutex> lock(mutex_);
+    const vector<Update<ClusterNodeState>>& updates) {
+  unique_lock<mutex> lock(mutex_);
   for (const auto& update : updates) {
-    const std::string& node_id(update.handle_.Key());
+    const string& node_id(update.handle_.Key());
     if (update.exists_) {
       auto it(all_peers_.find(node_id));
       VLOG_IF(1, it == all_peers_.end()) << "Node joined: " << node_id;
@@ -263,8 +273,8 @@ void ClusterStateController::OnClusterStateUpdated(
       // we re-create it.
       if (it != all_peers_.end() &&
           it->second->GetHostPort() !=
-              std::make_pair(update.handle_.Entry().hostname(),
-                             update.handle_.Entry().log_port())) {
+              make_pair(update.handle_.Entry().hostname(),
+                        update.handle_.Entry().log_port())) {
         all_peers_.erase(it);
         it = all_peers_.end();
       }
@@ -272,9 +282,9 @@ void ClusterStateController::OnClusterStateUpdated(
       if (it != all_peers_.end()) {
         it->second->UpdateClusterNodeState(update.handle_.Entry());
       } else {
-        const std::shared_ptr<ClusterPeer> peer(
-            std::make_shared<ClusterPeer>(base_, url_fetcher_,
-                                          update.handle_.Entry()));
+        const shared_ptr<ClusterPeer> peer(
+            make_shared<ClusterPeer>(base_, url_fetcher_,
+                                     update.handle_.Entry()));
         // TODO(pphaneuf): all_peers_ and fetcher_ both maintain a
         // list of cluster members, this should be split off into its
         // own class, and share an instance between the interested
@@ -294,8 +304,8 @@ void ClusterStateController::OnClusterStateUpdated(
 
 
 void ClusterStateController::OnClusterConfigUpdated(
-    const Update<ct::ClusterConfig>& update) {
-  std::unique_lock<std::mutex> lock(mutex_);
+    const Update<ClusterConfig>& update) {
+  unique_lock<mutex> lock(mutex_);
   if (!update.exists_) {
     LOG(WARNING) << "No ClusterConfig exists.";
     return;
@@ -312,8 +322,8 @@ void ClusterStateController::OnClusterConfigUpdated(
 
 
 void ClusterStateController::OnServingSthUpdated(
-    const Update<ct::SignedTreeHead>& update) {
-  std::unique_lock<std::mutex> lock(mutex_);
+    const Update<SignedTreeHead>& update) {
+  unique_lock<mutex> lock(mutex_);
   bool write_sth(true);
 
   if (!update.exists_) {
@@ -328,7 +338,7 @@ void ClusterStateController::OnServingSthUpdated(
       return;
     }
 
-    actual_serving_sth_.reset(new ct::SignedTreeHead(update.handle_.Entry()));
+    actual_serving_sth_.reset(new SignedTreeHead(update.handle_.Entry()));
     LOG(INFO) << "Received new Serving STH: "
               << actual_serving_sth_->ShortDebugString();
     serving_tree_size->Set(actual_serving_sth_->tree_size());
@@ -336,7 +346,7 @@ void ClusterStateController::OnServingSthUpdated(
 
     // Double check this STH is newer than, or idential to, what we have in
     // the database. (It definitely should be!)
-    ct::SignedTreeHead db_sth;
+    SignedTreeHead db_sth;
     const Database::LookupResult lookup_result(
         database_->LatestTreeHead(&db_sth));
     switch (lookup_result) {
@@ -374,7 +384,7 @@ void ClusterStateController::OnServingSthUpdated(
     }
   }
 
-  ct::SignedTreeHead sth_to_write;
+  SignedTreeHead sth_to_write;
   if (write_sth) {
     sth_to_write = *actual_serving_sth_;
   }
@@ -389,16 +399,16 @@ void ClusterStateController::OnServingSthUpdated(
 
 
 void ClusterStateController::CalculateServingSTH(
-    const std::unique_lock<std::mutex>& lock) {
+    const unique_lock<mutex>& lock) {
   VLOG(1) << "Calculating new ServingSTH...";
   CHECK(lock.owns_lock());
 
   // First, create a mapping of tree size to number of nodes at that size, and
   // a mapping of the newst STH for any given size:
-  std::map<int64_t, ct::SignedTreeHead> sth_by_size;
-  std::map<int64_t, int> num_nodes_by_sth_size;
+  map<int64_t, SignedTreeHead> sth_by_size;
+  map<int64_t, int> num_nodes_by_sth_size;
   for (const auto& node : all_peers_) {
-    const ct::ClusterNodeState node_state(node.second->state());
+    const ClusterNodeState node_state(node.second->state());
     if (node_state.has_newest_sth()) {
       const int64_t tree_size(node_state.newest_sth().tree_size());
       CHECK_LE(0, tree_size);
@@ -441,7 +451,7 @@ void ClusterStateController::CalculateServingSTH(
                                   all_peers_.size());
     if (serving_fraction >= cluster_config_.minimum_serving_fraction() &&
         num_nodes_seen >= cluster_config_.minimum_serving_nodes()) {
-      const ct::SignedTreeHead& candidate_sth(sth_by_size[it->first]);
+      const SignedTreeHead& candidate_sth(sth_by_size[it->first]);
 
       // This STH isn't a viable candidate unless its timestamp is strictly
       // newer than any current serving STH:
@@ -458,7 +468,7 @@ void ClusterStateController::CalculateServingSTH(
       LOG(INFO) << "Can serve @" << it->first << " with " << num_nodes_seen
                 << " nodes (" << (serving_fraction * 100) << "% of cluster)";
       calculated_serving_sth_.reset(
-          new ct::SignedTreeHead(sth_by_size[it->first]));
+          new SignedTreeHead(sth_by_size[it->first]));
       // Push this STH out to the cluster if we're master:
       if (election_->IsMaster()) {
         VLOG(1) << "Pushing new STH out to cluster";
@@ -484,7 +494,7 @@ void ClusterStateController::CalculateServingSTH(
 void ClusterStateController::ClusterServingSTHUpdater() {
   while (true) {
     VLOG(1) << "ClusterServingSTHUpdater going again.";
-    std::unique_lock<std::mutex> lock(mutex_);
+    unique_lock<mutex> lock(mutex_);
     update_required_cv_.wait(lock, [this]() {
       return update_required_ || exiting_;
     });
@@ -495,7 +505,7 @@ void ClusterStateController::ClusterServingSTHUpdater() {
     }
     CHECK(update_required_);
     CHECK_NOTNULL(calculated_serving_sth_.get());
-    const ct::SignedTreeHead local_sth(*calculated_serving_sth_);
+    const SignedTreeHead local_sth(*calculated_serving_sth_);
 
     update_required_ = false;
 
@@ -506,7 +516,7 @@ void ClusterStateController::ClusterServingSTHUpdater() {
 
     if (election_->IsMaster()) {
       LOG(INFO) << "Setting cluster serving STH @ " << local_sth.timestamp();
-      util::Status status(store_->SetServingSTH(local_sth));
+      Status status(store_->SetServingSTH(local_sth));
       LOG_IF(WARNING, !status.ok()) << "SetServingSTH @ "
                                     << local_sth.timestamp()
                                     << " failed: " << status;
@@ -518,6 +528,3 @@ void ClusterStateController::ClusterServingSTHUpdater() {
 
 
 }  // namespace cert_trans
-
-
-#endif  // CERT_TRANS_LOG_CLUSTER_STATE_CONTROLLER_INL_H_
