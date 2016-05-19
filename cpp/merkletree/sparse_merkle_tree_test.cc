@@ -158,7 +158,7 @@ class SparseMerkleTreeTest : public testing::Test {
   SparseMerkleTreeTest()
       : tree_hasher_(unique_ptr<Sha256Hasher>(new Sha256Hasher)),
         tree_(new Sha256Hasher),
-        rand_({1234}) {
+        rand_(1234) {
   }
 
  protected:
@@ -236,7 +236,7 @@ TEST_F(SparseMerkleTreeTest, SimpleTest) {
   ValueList values;
   for (auto r : vector<uint64_t>{1, 5, 10}) {
     const string value(to_string(r));
-    values.emplace_back(std::move(Value(r, value)));
+    values.emplace_back(Value(r, value));
     SparseMerkleTree::Path p(PathLow(r));
     tree_.SetLeaf(p, value);
   }
@@ -254,7 +254,7 @@ TEST_F(SparseMerkleTreeTest, RandomReferenceTest) {
   for (int i(0); i < 10000; ++i) {
     uint64_t r(rand_() + i);
     const string value(to_string(r));
-    values.emplace_back(std::move(Value(r, value)));
+    values.emplace_back(Value(r, value));
     const SparseMerkleTree::Path p(PathLow(r));
     tree_.SetLeaf(p, value);
   }
@@ -280,7 +280,7 @@ TEST_F(SparseMerkleTreeTest, DISABLED_RefMemTest) {
   for (int i(0); i < 10000000; ++i) {
     uint64_t r(rand_() + i);
     const string value(to_string(r));
-    values.emplace_back(std::move(Value(r, value)));
+    values.emplace_back(Value(r, value));
   }
   LOG(INFO) << "Calculating Root";
   const string ref_root(ref.HStar2(256, &values));
