@@ -1,6 +1,5 @@
-/* -*- mode: c++; indent-tabs-mode: nil -*- */
-#ifndef CMS_VERIFIER_H
-#define CMS_VERIFIER_H
+#ifndef CERT_TRANS_LOG_CMS_VERIFIER_H_
+#define CERT_TRANS_LOG_CMS_VERIFIER_H_
 
 #include <openssl/asn1.h>
 #include <openssl/bio.h>
@@ -72,4 +71,5 @@ class CmsVerifier {
 };
 
 }  // namespace cert_trans
-#endif
+
+#endif  // CERT_TRANS_LOG_CMS_VERIFIER_H_

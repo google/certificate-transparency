@@ -1,5 +1,5 @@
-#ifndef FRONTEND_SIGNER_H
-#define FRONTEND_SIGNER_H
+#ifndef CERT_TRANS_LOG_FRONTEND_SIGNER_H_
+#define CERT_TRANS_LOG_FRONTEND_SIGNER_H_
 
 #include <stdint.h>
 #include <string>
@@ -43,4 +43,5 @@ class FrontendSigner {
 
   DISALLOW_COPY_AND_ASSIGN(FrontendSigner);
 };
-#endif
+
+#endif  // CERT_TRANS_LOG_FRONTEND_SIGNER_H_

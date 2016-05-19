@@ -1,6 +1,5 @@
-/* -*- mode: c++; indent-tabs-mode: nil -*- */
-#ifndef LOG_VERIFIER_H
-#define LOG_VERIFIER_H
+#ifndef CERT_TRANS_LOG_LOG_VERIFIER_H_
+#define CERT_TRANS_LOG_LOG_VERIFIER_H_
 
 #include <glog/logging.h>
 #include <stdint.h>
@@ -121,4 +120,5 @@ class LogVerifier {
 
   DISALLOW_COPY_AND_ASSIGN(LogVerifier);
 };
-#endif
+
+#endif  // CERT_TRANS_LOG_LOG_VERIFIER_H_

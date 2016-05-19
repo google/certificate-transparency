@@ -1,5 +1,5 @@
-#ifndef OPENSSL_UTIL_H
-#define OPENSSL_UTIL_H
+#ifndef CERT_TRANS_UTIL_OPENSSL_UTIL_H_
+#define CERT_TRANS_UTIL_OPENSSL_UTIL_H_
 
 #include <glog/logging.h>
 #include <openssl/err.h>
@@ -32,4 +32,4 @@ std::string ReadBIO(BIO* bio);
     util::ClearOpenSSLErrors();                     \
   } while (0);
 
-#endif  // OPENSSL_UTIL_H
+#endif  // CERT_TRANS_UTIL_OPENSSL_UTIL_H_

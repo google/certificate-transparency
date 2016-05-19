@@ -1,6 +1,5 @@
-/* -*- mode: c++; indent-tabs-mode: nil -*- */
-#ifndef MERKLETREE_H
-#define MERKLETREE_H
+#ifndef CERT_TRANS_MERKLETREE_MERKLE_TREE_H_
+#define CERT_TRANS_MERKLETREE_MERKLE_TREE_H_
 
 #include <stddef.h>
 #include <memory>
@@ -209,4 +208,5 @@ class MerkleTree : public cert_trans::MerkleTreeInterface {
   // The "true" level count for a fully evaluated tree.
   size_t level_count_;
 };
-#endif
+
+#endif  // CERT_TRANS_MERKLETREE_MERKLE_TREE_H_

@@ -1,5 +1,6 @@
-#ifndef MERKLE_TREE_MATH_H
-#define MERKLE_TREE_MATH_H
+#ifndef CERT_TRANS_MERKLETREE_MERKLE_TREE_MATH_H_
+#define CERT_TRANS_MERKLETREE_MERKLE_TREE_MATH_H_
+
 #include <stddef.h>
 
 class MerkleTreeMath {
@@ -19,4 +20,5 @@ class MerkleTreeMath {
  private:
   MerkleTreeMath();
 };
-#endif
+
+#endif  // CERT_TRANS_MERKLETREE_MERKLE_TREE_MATH_H_

@@ -1,5 +1,5 @@
-#ifndef LOG_SIGNER_H
-#define LOG_SIGNER_H
+#ifndef CERT_TRANS_LOG_LOG_SIGNER_H_
+#define CERT_TRANS_LOG_LOG_SIGNER_H_
 
 #include <openssl/evp.h>
 #include <openssl/x509.h>  // for i2d_PUBKEY
@@ -107,4 +107,5 @@ class LogSigVerifier : public cert_trans::Verifier {
 
   static VerifyResult GetDeserializeSignatureError(DeserializeResult result);
 };
-#endif
+
+#endif  // CERT_TRANS_LOG_LOG_SIGNER_H_

@@ -1,6 +1,5 @@
-/* -*- mode: c++; indent-tabs-mode: nil -*- */
-#ifndef SERIALIZER_H
-#define SERIALIZER_H
+#ifndef CERT_TRANS_PROTO_SERIALIZER_H_
+#define CERT_TRANS_PROTO_SERIALIZER_H_
 
 #include <glog/logging.h>
 #include <google/protobuf/repeated_field.h>
@@ -311,4 +310,4 @@ class Deserializer {
   DISALLOW_COPY_AND_ASSIGN(Deserializer);
 };
 
-#endif
+#endif  // CERT_TRANS_PROTO_SERIALIZER_H_

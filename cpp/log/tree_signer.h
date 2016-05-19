@@ -1,5 +1,5 @@
-#ifndef TREE_SIGNER_H
-#define TREE_SIGNER_H
+#ifndef CERT_TRANS_LOG_TREE_SIGNER_H_
+#define CERT_TRANS_LOG_TREE_SIGNER_H_
 
 #include <stdint.h>
 #include <algorithm>
@@ -92,4 +92,4 @@ struct PendingEntriesOrder
 
 }  // namespace cert_trans
 
-#endif
+#endif  // CERT_TRANS_LOG_TREE_SIGNER_H_

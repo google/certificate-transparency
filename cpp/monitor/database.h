@@ -1,5 +1,5 @@
-#ifndef MONITOR_DATABASE_H
-#define MONITOR_DATABASE_H
+#ifndef CERT_TRANS_MONITOR_DATABASE_H_
+#define CERT_TRANS_MONITOR_DATABASE_H_
 
 #include <glog/logging.h>
 #include <stdint.h>
@@ -109,4 +109,4 @@ class Database {
 
 }  // namespace monitor
 
-#endif  // MONITOR_DATABASE_H
+#endif  // CERT_TRANS_MONITOR_DATABASE_H_

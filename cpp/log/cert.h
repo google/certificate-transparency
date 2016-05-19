@@ -1,6 +1,5 @@
-/* -*- mode: c++; indent-tabs-mode: nil -*- */
-#ifndef CERT_H
-#define CERT_H
+#ifndef CERT_TRANS_LOG_CERT_H_
+#define CERT_TRANS_LOG_CERT_H_
 
 #include <gtest/gtest_prod.h>
 #include <openssl/asn1.h>
@@ -377,4 +376,5 @@ class PreCertChain : public CertChain {
 };
 
 }  // namespace cert_trans
-#endif
+
+#endif  // CERT_TRANS_LOG_CERT_H_

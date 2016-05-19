@@ -1,6 +1,5 @@
-/* -*- mode: c++; indent-tabs-mode: nil -*- */
-#ifndef CERT_CHECKER_H
-#define CERT_CHECKER_H
+#ifndef CERT_TRANS_LOG_CERT_CHECKER_H_
+#define CERT_TRANS_LOG_CERT_CHECKER_H_
 
 #include <openssl/pem.h>
 #include <openssl/x509.h>
@@ -107,4 +106,4 @@ class CertChecker {
 
 }  // namespace cert_trans
 
-#endif
+#endif  // CERT_TRANS_LOG_CERT_CHECKER_H_

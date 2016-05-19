@@ -1,8 +1,8 @@
 // A base class for verifying signatures of unstructured data.  This class is
 // mockable.
 
-#ifndef SRC_LOG_VERIFIER_H_
-#define SRC_LOG_VERIFIER_H_
+#ifndef CERT_TRANS_LOG_VERIFIER_H_
+#define CERT_TRANS_LOG_VERIFIER_H_
 
 #include <openssl/evp.h>
 #include <openssl/x509.h>  // for i2d_PUBKEY
@@ -50,4 +50,4 @@ class Verifier {
 
 }  // namespace cert_trans
 
-#endif  // SRC_LOG_VERIFIER_H_
+#endif  // CERT_TRANS_LOG_VERIFIER_H_

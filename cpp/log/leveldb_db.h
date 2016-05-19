@@ -1,5 +1,5 @@
-#ifndef CERTIFICATE_LEVELDB_DB_H
-#define CERTIFICATE_LEVELDB_DB_H
+#ifndef CERT_TRANS_LOG_LEVELDB_DB_H_
+#define CERT_TRANS_LOG_LEVELDB_DB_H_
 
 #include "config.h"
 
@@ -93,4 +93,4 @@ class LevelDB : public Database {
 
 }  // namespace cert_trans
 
-#endif  // CERTIFICATE_LEVELDB_DB_H
+#endif  // CERT_TRANS_LOG_LEVELDB_DB_H_

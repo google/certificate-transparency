@@ -206,4 +206,4 @@ class TaskHold {
 
 }  // namespace util
 
-#endif  // CERT_TRANS_UTIL_Task_H_
+#endif  // CERT_TRANS_UTIL_TASK_H_

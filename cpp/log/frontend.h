@@ -1,6 +1,5 @@
-/* -*- mode: c++; indent-tabs-mode: nil -*- */
-#ifndef FRONTEND_H
-#define FRONTEND_H
+#ifndef CERT_TRANS_LOG_FRONTEND_H_
+#define CERT_TRANS_LOG_FRONTEND_H_
 
 #include <memory>
 #include <mutex>
@@ -31,4 +30,5 @@ class Frontend {
 
   DISALLOW_COPY_AND_ASSIGN(Frontend);
 };
-#endif
+
+#endif  // CERT_TRANS_LOG_FRONTEND_H_

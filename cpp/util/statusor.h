@@ -12,8 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#ifndef UTIL_STATUSOR_H__
-#define UTIL_STATUSOR_H__
+#ifndef CERT_TRANS_UTIL_STATUSOR_H_
+#define CERT_TRANS_UTIL_STATUSOR_H_
 
 #include <utility>
 
@@ -137,4 +137,4 @@ inline const StatusOr<T>& StatusOr<T>::operator=(const StatusOr<U>& other) {
 
 }  // namespace util
 
-#endif  // UTIL_STATUSOR_H__
+#endif  // CERT_TRANS_UTIL_STATUSOR_H_

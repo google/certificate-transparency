@@ -1,5 +1,5 @@
-#ifndef MONITOR_H
-#define MONITOR_H
+#ifndef CERT_TRANS_MONITOR_MONITOR_H_
+#define CERT_TRANS_MONITOR_MONITOR_H_
 
 #include <stdint.h>
 
@@ -88,4 +88,4 @@ class Monitor {
 
 }  // namespace monitor
 
-#endif  // MONITOR_H
+#endif  // CERT_TRANS_MONITOR_MONITOR_H_

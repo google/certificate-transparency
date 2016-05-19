@@ -1,5 +1,5 @@
-#ifndef MONITOR_SQLITE_DB_H
-#define MONITOR_SQLITE_DB_H
+#ifndef CERT_TRANS_MONITOR_SQLITE_DB_H_
+#define CERT_TRANS_MONITOR_SQLITE_DB_H_
 
 #include <stdint.h>
 #include <string>
@@ -56,4 +56,4 @@ class SQLiteDB : public Database {
 
 }  // namespace monitor
 
-#endif  // MONITOR_SQLITE_DB_H
+#endif  // CERT_TRANS_MONITOR_SQLITE_DB_H_

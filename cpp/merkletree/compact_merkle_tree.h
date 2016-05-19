@@ -1,5 +1,5 @@
-#ifndef COMPACT_MERKLETREE_H
-#define COMPACT_MERKLETREE_H
+#ifndef CERT_TRANS_MERKLETREE_COMPACT_MERKLE_TREE_H_
+#define CERT_TRANS_MERKLETREE_COMPACT_MERKLE_TREE_H_
 
 #include <stddef.h>
 #include <memory>
@@ -154,4 +154,5 @@ class CompactMerkleTree : public cert_trans::MerkleTreeInterface {
   // The root for |leaves_processed_| leaves.
   std::string root_;
 };
-#endif
+
+#endif  // CERT_TRANS_MERKLETREE_COMPACT_MERKLE_TREE_H_

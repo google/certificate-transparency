@@ -1,5 +1,5 @@
-#ifndef CERT_SUBMISSION_HANDLER_H
-#define CERT_SUBMISSION_HANDLER_H
+#ifndef CERT_TRANS_LOG_CERT_SUBMISSION_HANDLER_H_
+#define CERT_TRANS_LOG_CERT_SUBMISSION_HANDLER_H_
 
 #include <string>
 
@@ -43,4 +43,4 @@ class CertSubmissionHandler {
 
 }  // namespace cert_trans
 
-#endif
+#endif  // CERT_TRANS_LOG_CERT_SUBMISSION_HANDLER_H_

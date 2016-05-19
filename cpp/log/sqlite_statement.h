@@ -1,7 +1,5 @@
-/* -*- mode: c++; indent-tabs-mode: nil -*- */
-
-#ifndef SQLITE_STATEMENT_H
-#define SQLITE_STATEMENT_H
+#ifndef CERT_TRANS_LOG_SQLITE_STATEMENT_H_
+#define CERT_TRANS_LOG_SQLITE_STATEMENT_H_
 
 #include <glog/logging.h>
 #include <sqlite3.h>
@@ -68,4 +66,4 @@ class Statement {
 
 }  // namespace sqlite
 
-#endif  // SQLITE_STATEMENT_H
+#endif  // CERT_TRANS_LOG_SQLITE_STATEMENT_H_

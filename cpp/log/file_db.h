@@ -1,6 +1,5 @@
-/* -*- mode: c++; indent-tabs-mode: nil -*- */
-#ifndef CERTIFICATE_DB_H
-#define CERTIFICATE_DB_H
+#ifndef CERT_TRANS_LOG_FILE_DB_H_
+#define CERT_TRANS_LOG_FILE_DB_H_
 
 #include <stdint.h>
 #include <map>
@@ -108,4 +107,4 @@ class FileDB : public Database {
 
 }  // namespace cert_trans
 
-#endif
+#endif  // CERT_TRANS_LOG_FILE_DB_H_

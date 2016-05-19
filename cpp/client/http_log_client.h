@@ -1,6 +1,5 @@
-/* -*- mode: c++; indent-tabs-mode: nil -*- */
-#ifndef HTTP_LOG_CLIENT_H
-#define HTTP_LOG_CLIENT_H
+#ifndef CERT_TRANS_CLIENT_HTTP_LOG_CLIENT_H_
+#define CERT_TRANS_CLIENT_HTTP_LOG_CLIENT_H_
 
 #include <stdint.h>
 #include <memory>
@@ -50,4 +49,4 @@ class HTTPLogClient {
 
 }  // namespace cert_trans
 
-#endif
+#endif  // CERT_TRANS_CLIENT_HTTP_LOG_CLIENT_H_

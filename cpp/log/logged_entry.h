@@ -1,7 +1,5 @@
-/* -*- mode: c++; indent-tabs-mode: nil -*- */
-
-#ifndef LOGGED_ENTRY_H
-#define LOGGED_ENTRY_H
+#ifndef CERT_TRANS_LOG_LOGGED_ENTRY_H_
+#define CERT_TRANS_LOG_LOGGED_ENTRY_H_
 
 #include <glog/logging.h>
 
@@ -161,4 +159,4 @@ inline bool operator==(const ct::SignedCertificateTimestamp& lhs,
 
 }  // namespace cert_trans
 
-#endif  // LOGGED_ENTRY_H
+#endif  // CERT_TRANS_LOG_LOGGED_ENTRY_H_

@@ -1,5 +1,5 @@
-#ifndef CT_EXTENSIONS_H
-#define CT_EXTENSIONS_H
+#ifndef CERT_TRANS_LOG_CT_EXTENSIONS_H_
+#define CERT_TRANS_LOG_CT_EXTENSIONS_H_
 
 #include <openssl/asn1t.h>
 
@@ -46,4 +46,4 @@ extern const char kV2PrecertPayloadContentType[];
 
 }  // namespace cert_trans
 
-#endif  // CT_EXTENSIONS_H
+#endif  // CERT_TRANS_LOG_CT_EXTENSIONS_H_

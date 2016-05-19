@@ -1,5 +1,5 @@
-#ifndef TEST_SIGNER_H
-#define TEST_SIGNER_H
+#ifndef CERT_TRANS_LOG_TEST_SIGNER_H_
+#define CERT_TRANS_LOG_TEST_SIGNER_H_
 
 #include <gtest/gtest.h>
 #include <stdint.h>
@@ -118,4 +118,5 @@ class TestSigner {
   std::string default_cert_;
   TreeHasher tree_hasher_;
 };
-#endif
+
+#endif  // CERT_TRANS_LOG_TEST_SIGNER_H_

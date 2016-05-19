@@ -1,6 +1,5 @@
-/* -*- mode: c++; indent-tabs-mode: nil -*- */
-#ifndef SQLITE_DB_H
-#define SQLITE_DB_H
+#ifndef CERT_TRANS_LOG_SQLITE_DB_H_
+#define CERT_TRANS_LOG_SQLITE_DB_H_
 
 #include <mutex>
 #include <string>
@@ -91,4 +90,4 @@ class SQLiteDB : public Database {
 
 }  // namespace cert_trans
 
-#endif
+#endif  // CERT_TRANS_LOG_SQLITE_DB_H_

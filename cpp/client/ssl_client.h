@@ -1,6 +1,5 @@
-/* -*- mode: c++; indent-tabs-mode: nil -*- */
-#ifndef SSL_CLIENT_H
-#define SSL_CLIENT_H
+#ifndef CERT_TRANS_CLIENT_SSL_CLIENT_H_
+#define CERT_TRANS_CLIENT_SSL_CLIENT_H_
 
 #include <openssl/ssl.h>
 #include <openssl/x509.h>
@@ -111,4 +110,4 @@ class SSLClient {
 
 }  // namespace cert_trans
 
-#endif
+#endif  // CERT_TRANS_CLIENT_SSL_CLIENT_H_

@@ -1,5 +1,5 @@
-#ifndef MERKLEVERIFIER_H
-#define MERKLEVERIFIER_H
+#ifndef CERT_TRANS_MERKLETREE_MERKLE_VERIFIER_H_
+#define CERT_TRANS_MERKLETREE_MERKLE_VERIFIER_H_
 
 #include <stddef.h>
 #include <memory>
@@ -54,4 +54,4 @@ class MerkleVerifier {
   TreeHasher treehasher_;
 };
 
-#endif
+#endif  // CERT_TRANS_MERKLETREE_MERKLE_VERIFIER_H_

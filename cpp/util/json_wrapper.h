@@ -1,6 +1,5 @@
-/* -*- mode: c++; indent-tabs-mode: nil -*- */
-#ifndef JSON_WRAPPER_H
-#define JSON_WRAPPER_H
+#ifndef CERT_TRANS_UTIL_JSON_WRAPPER_H_
+#define CERT_TRANS_UTIL_JSON_WRAPPER_H_
 
 #include <glog/logging.h>
 #include <json.h>
@@ -214,4 +213,4 @@ class JsonArray : public JsonObject {
   }
 };
 
-#endif
+#endif  // CERT_TRANS_UTIL_JSON_WRAPPER_H_

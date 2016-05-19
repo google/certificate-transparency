@@ -1,5 +1,5 @@
-#ifndef UTIL_TEST_DB_H
-#define UTIL_TEST_DB_H
+#ifndef CERT_TRANS_UTIL_TEST_DB_H_
+#define CERT_TRANS_UTIL_TEST_DB_H_
 
 #include <gflags/gflags.h>
 #include <glog/logging.h>
@@ -67,4 +67,4 @@ class TestDB {
   DISALLOW_COPY_AND_ASSIGN(TestDB);
 };
 
-#endif  // UTIL_TEST_DB_H
+#endif  // CERT_TRANS_UTIL_TEST_DB_H_

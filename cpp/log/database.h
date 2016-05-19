@@ -1,6 +1,5 @@
-/* -*- mode: c++; indent-tabs-mode: nil -*- */
-#ifndef DATABASE_H
-#define DATABASE_H
+#ifndef CERT_TRANS_LOG_DATABASE_H_
+#define CERT_TRANS_LOG_DATABASE_H_
 
 #include <glog/logging.h>
 #include <stdint.h>
@@ -165,4 +164,4 @@ class DatabaseNotifierHelper {
 
 }  // namespace cert_trans
 
-#endif  // DATABASE_H
+#endif  // CERT_TRANS_LOG_DATABASE_H_

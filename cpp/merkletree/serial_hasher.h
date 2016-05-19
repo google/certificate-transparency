@@ -1,5 +1,5 @@
-#ifndef SERIAL_HASHER_H
-#define SERIAL_HASHER_H
+#ifndef CERT_TRANS_MERKLETREE_SERIAL_HASHER_H_
+#define CERT_TRANS_MERKLETREE_SERIAL_HASHER_H_
 
 #include <openssl/sha.h>
 #include <stddef.h>
@@ -58,4 +58,4 @@ class Sha256Hasher : public SerialHasher {
   DISALLOW_COPY_AND_ASSIGN(Sha256Hasher);
 };
 
-#endif
+#endif  // CERT_TRANS_MERKLETREE_SERIAL_HASHER_H_

@@ -1,6 +1,5 @@
-/* -*- mode: c++; indent-tabs-mode: nil -*- */
-#ifndef LOG_LOOKUP_H
-#define LOG_LOOKUP_H
+#ifndef CERT_TRANS_LOG_LOG_LOOKUP_H_
+#define CERT_TRANS_LOG_LOG_LOOKUP_H_
 
 #include <stdint.h>
 #include <map>
@@ -90,4 +89,4 @@ class LogLookup {
 
 }  // namespace cert_trans
 
-#endif
+#endif  // CERT_TRANS_LOG_LOG_LOOKUP_H_

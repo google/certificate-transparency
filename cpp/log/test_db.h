@@ -1,6 +1,5 @@
-/* -*- mode: c++; indent-tabs-mode: nil -*- */
-#ifndef LOG_TEST_DB_H
-#define LOG_TEST_DB_H
+#ifndef CERT_TRANS_LOG_TEST_DB_H_
+#define CERT_TRANS_LOG_TEST_DB_H_
 
 #include <sys/stat.h>
 
@@ -75,4 +74,5 @@ template <>
 cert_trans::FileStorage* TestDB<cert_trans::FileStorage>::SecondDB() {
   return new cert_trans::FileStorage(tmp_.TmpStorageDir(), kCertStorageDepth);
 }
-#endif  // LOG_TEST_DB_H
+
+#endif  // CERT_TRANS_LOG_TEST_DB_H_
