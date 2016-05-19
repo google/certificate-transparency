@@ -66,7 +66,7 @@ static const bool sign_dummy =
 
 namespace cert_trans {
 
-void SignMerkleTree(TreeSigner<LoggedEntry>* tree_signer,
+void SignMerkleTree(TreeSigner* tree_signer,
                     ConsistentStore<LoggedEntry>* store,
                     ClusterStateController<LoggedEntry>* controller) {
   CHECK_NOTNULL(tree_signer);
@@ -80,17 +80,16 @@ void SignMerkleTree(TreeSigner<LoggedEntry>* tree_signer,
     {
       ScopedLatency signer_run_latency(
           signer_run_latency_ms.GetScopedLatency());
-      const TreeSigner<LoggedEntry>::UpdateResult result(
-          tree_signer->UpdateTree());
+      const TreeSigner::UpdateResult result(tree_signer->UpdateTree());
       switch (result) {
-        case TreeSigner<LoggedEntry>::OK: {
+        case TreeSigner::OK: {
           const SignedTreeHead latest_sth(tree_signer->LatestSTH());
           latest_local_tree_size_gauge->Set(latest_sth.tree_size());
           controller->NewTreeHead(latest_sth);
           signer_total_runs->Increment(true /* successful */);
           break;
         }
-        case TreeSigner<LoggedEntry>::INSUFFICIENT_DATA:
+        case TreeSigner::INSUFFICIENT_DATA:
           LOG(INFO) << "Can't update tree because we don't have all the "
                     << "entries locally, will try again later.";
           signer_total_runs->Increment(false /* successful */);
@@ -144,7 +143,7 @@ void CleanUpEntries(ConsistentStore<LoggedEntry>* store,
 }
 
 
-void SequenceEntries(TreeSigner<LoggedEntry>* tree_signer,
+void SequenceEntries(TreeSigner* tree_signer,
                      const function<bool()>& is_master) {
   CHECK_NOTNULL(tree_signer);
   CHECK(is_master);

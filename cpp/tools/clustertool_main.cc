@@ -84,14 +84,14 @@ unique_ptr<LogSigner> BuildLogSigner() {
 }
 
 
-unique_ptr<TreeSigner<LoggedEntry>> BuildTreeSigner(
+unique_ptr<TreeSigner> BuildTreeSigner(
     Database* db, ConsistentStore<LoggedEntry>* consistent_store,
     LogSigner* log_signer) {
-  return unique_ptr<TreeSigner<LoggedEntry>>(new TreeSigner<LoggedEntry>(
-      std::chrono::duration<double>(0), db,
-      unique_ptr<CompactMerkleTree>(
-          new CompactMerkleTree(unique_ptr<Sha256Hasher>(new Sha256Hasher))),
-      consistent_store, log_signer));
+  return unique_ptr<TreeSigner>(
+      new TreeSigner(std::chrono::duration<double>(0), db,
+                     unique_ptr<CompactMerkleTree>(new CompactMerkleTree(
+                         unique_ptr<Sha256Hasher>(new Sha256Hasher))),
+                     consistent_store, log_signer));
 }
 
 
@@ -170,7 +170,7 @@ int main(int argc, char* argv[]) {
   Status status;
   if (command == "initlog") {
     unique_ptr<LogSigner> log_signer(BuildLogSigner());
-    unique_ptr<TreeSigner<LoggedEntry>> tree_signer(
+    unique_ptr<TreeSigner> tree_signer(
         BuildTreeSigner(&db, &consistent_store, log_signer.get()));
     status = InitLog(LoadConfig(), tree_signer.get(), &consistent_store);
   } else if (command == "set_config") {

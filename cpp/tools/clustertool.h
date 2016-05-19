@@ -17,7 +17,7 @@ namespace cert_trans {
 //  - Creates the /cluster_config entry.
 template <class Logged>
 util::Status InitLog(const ct::ClusterConfig& cluster_config,
-                     TreeSigner<Logged>* tree_signer,
+                     TreeSigner* tree_signer,
                      ConsistentStore<Logged>* consistent_store);
 
 // Sets the cluster config

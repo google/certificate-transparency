@@ -15,10 +15,10 @@ namespace cert_trans {
 void CleanUpEntries(ConsistentStore<LoggedEntry>* store,
                     const std::function<bool()>& is_master);
 
-void SequenceEntries(TreeSigner<LoggedEntry>* tree_signer,
+void SequenceEntries(TreeSigner* tree_signer,
                      const std::function<bool()>& is_master);
 
-void SignMerkleTree(TreeSigner<LoggedEntry>* tree_signer,
+void SignMerkleTree(TreeSigner* tree_signer,
                     ConsistentStore<LoggedEntry>* store,
                     ClusterStateController<LoggedEntry>* controller);
 }

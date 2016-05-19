@@ -159,7 +159,7 @@ int main(int argc, char* argv[]) {
   handler.SetProxy(server.proxy());
   handler.Add(server.http_server());
 
-  TreeSigner<LoggedEntry> tree_signer(
+  TreeSigner tree_signer(
       std::chrono::duration<double>(FLAGS_guard_window_seconds), db.get(),
       server.log_lookup()->GetCompactMerkleTree(new Sha256Hasher),
       server.consistent_store(), &log_signer);
@@ -198,7 +198,7 @@ int main(int argc, char* argv[]) {
 
     // Do an initial signing run to get the initial STH, again this is
     // temporary until we re-populate FakeEtcd from the DB.
-    CHECK_EQ(tree_signer.UpdateTree(), TreeSigner<LoggedEntry>::OK);
+    CHECK_EQ(tree_signer.UpdateTree(), TreeSigner::OK);
 
     // Need to boot-strap the Serving STH too because we consider it an error
     // if it's not set, which in turn causes us to not attempt to become
