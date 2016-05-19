@@ -126,11 +126,9 @@ void CertificateHttpHandler::GetRoots(evhttp_request* req) const {
   }
 
   JsonArray roots;
-  multimap<string, const Cert*>::const_iterator it;
-  for (it = cert_checker_->GetTrustedCertificates().begin();
-       it != cert_checker_->GetTrustedCertificates().end(); ++it) {
+  for (const auto& trusted_cert : cert_checker_->GetTrustedCertificates()) {
     string cert;
-    if (it->second->DerEncoding(&cert) != util::Status::OK) {
+    if (trusted_cert.second->DerEncoding(&cert) != util::Status::OK) {
       LOG(ERROR) << "Cert encoding failed";
       return SendJsonError(event_base_, req, HTTP_INTERNAL,
                            "Serialisation failed.");

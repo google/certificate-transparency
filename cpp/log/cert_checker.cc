@@ -19,6 +19,9 @@
 #include "util/openssl_util.h"  // for LOG_OPENSSL_ERRORS
 #include "util/util.h"
 
+using std::move;
+using std::multimap;
+using std::pair;
 using std::string;
 using std::unique_ptr;
 using std::vector;
@@ -28,12 +31,6 @@ using util::StatusOr;
 using util::error::Code;
 
 namespace cert_trans {
-
-CertChecker::~CertChecker() {
-  for (auto& entry : trusted_) {
-    delete entry.second;
-  }
-}
 
 bool CertChecker::LoadTrustedCertificates(const string& cert_file) {
   // A read-only BIO.
@@ -73,7 +70,7 @@ bool CertChecker::LoadTrustedCertificates(
 
 bool CertChecker::LoadTrustedCertificatesFromBIO(BIO* bio_in) {
   CHECK_NOTNULL(bio_in);
-  std::vector<std::pair<string, Cert*> > certs_to_add;
+  vector<pair<string, unique_ptr<const Cert>>> certs_to_add;
   bool error = false;
   // certs_to_add may be empty if no new certs were added, so keep track of
   // successfully parsed cert count separately.
@@ -94,7 +91,7 @@ bool CertChecker::LoadTrustedCertificatesFromBIO(BIO* bio_in) {
 
       ++cert_count;
       if (!is_trusted.ValueOrDie()) {
-        certs_to_add.push_back(make_pair(subject_name, cert.release()));
+        certs_to_add.push_back(make_pair(subject_name, move(cert)));
       }
     } else {
       // See if we reached the end of the file.
@@ -114,16 +111,12 @@ bool CertChecker::LoadTrustedCertificatesFromBIO(BIO* bio_in) {
   }
 
   if (error || !cert_count) {
-    while (!certs_to_add.empty()) {
-      delete certs_to_add.back().second;
-      certs_to_add.pop_back();
-    }
     return false;
   }
 
   size_t new_certs = certs_to_add.size();
   while (!certs_to_add.empty()) {
-    trusted_.insert(certs_to_add.back());
+    trusted_.insert(move(certs_to_add.back()));
     certs_to_add.pop_back();
   }
   LOG(INFO) << "Added " << new_certs << " new certificate(s) to trusted store";
@@ -286,15 +279,12 @@ Status CertChecker::GetTrustedCa(CertChain* chain) const {
                   "untrusted self-signed certificate");
   }
 
-  std::pair<std::multimap<string, const Cert*>::const_iterator,
-            std::multimap<string, const Cert*>::const_iterator> issuer_range =
-      trusted_.equal_range(issuer_name);
-
+  const auto issuer_range(trusted_.equal_range(issuer_name));
   const Cert* issuer(nullptr);
-  for (std::multimap<string, const Cert*>::const_iterator it =
+  for (multimap<string, unique_ptr<const Cert>>::const_iterator it =
            issuer_range.first;
        it != issuer_range.second; ++it) {
-    const Cert* issuer_cand = it->second;
+    const unique_ptr<const Cert>& issuer_cand(it->second);
 
     StatusOr<bool> signed_by_issuer = subject->IsSignedBy(*issuer_cand);
     if (signed_by_issuer.status().CanonicalCode() == Code::UNIMPLEMENTED) {
@@ -309,7 +299,7 @@ Status CertChecker::GetTrustedCa(CertChain* chain) const {
                     "failed to check signature for trusted root");
     }
     if (signed_by_issuer.ValueOrDie()) {
-      issuer = issuer_cand;
+      issuer = issuer_cand.get();
       break;
     }
   }
@@ -341,14 +331,11 @@ StatusOr<bool> CertChecker::IsTrusted(const Cert& cert,
 
   *subject_name = cert_name;
 
-  std::pair<std::multimap<string, const Cert*>::const_iterator,
-            std::multimap<string, const Cert*>::const_iterator> cand_range =
-      trusted_.equal_range(cert_name);
-  for (std::multimap<string, const Cert*>::const_iterator it =
-           cand_range.first;
+  const auto cand_range(trusted_.equal_range(cert_name));
+  for (multimap<string, unique_ptr<const Cert>>::const_iterator it(
+           cand_range.first);
        it != cand_range.second; ++it) {
-    const Cert* cand = it->second;
-    if (cert.IsIdenticalTo(*cand)) {
+    if (cert.IsIdenticalTo(*it->second)) {
       return true;
     }
   }

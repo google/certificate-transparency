@@ -6,6 +6,7 @@
 #include <openssl/x509v3.h>
 
 #include <map>
+#include <memory>
 #include <string>
 #include <vector>
 
@@ -31,8 +32,7 @@ class PreCertChain;
 class CertChecker {
  public:
   CertChecker() = default;
-
-  virtual ~CertChecker();
+  virtual ~CertChecker() = default;
 
   // Load a file of concatenated PEM-certs.
   // Returns true if at least one certificate was successfully loaded, and no
@@ -46,7 +46,7 @@ class CertChecker {
   virtual bool LoadTrustedCertificates(
       const std::vector<std::string>& trusted_certs);
 
-  virtual const std::multimap<std::string, const Cert*>&
+  virtual const std::multimap<std::string, std::unique_ptr<const Cert>>&
   GetTrustedCertificates() const {
     return trusted_;
   }
@@ -95,7 +95,7 @@ class CertChecker {
   // A map by the DER encoding of the subject name.
   // All code manipulating this container must ensure contained elements are
   // deallocated appropriately.
-  std::multimap<std::string, const Cert*> trusted_;
+  std::multimap<std::string, std::unique_ptr<const Cert>> trusted_;
 
   // Helper for LoadTrustedCertificates, whether reading from file or memory.
   // Takes ownership of bio_in and frees it.
