@@ -22,9 +22,9 @@ DEFINE_int32(staleness_check_delay_secs, 5,
              "number of seconds between node staleness checks");
 
 
-StalenessTracker::StalenessTracker(
-    const ClusterStateController<LoggedEntry>* controller, ThreadPool* pool,
-    libevent::Base* event_base)
+StalenessTracker::StalenessTracker(const ClusterStateController* controller,
+                                   ThreadPool* pool,
+                                   libevent::Base* event_base)
     : controller_(CHECK_NOTNULL(controller)),
       pool_(CHECK_NOTNULL(pool)),
       event_base_(CHECK_NOTNULL(event_base)),

@@ -12,7 +12,6 @@
 
 namespace cert_trans {
 
-template <class T>
 class ClusterStateController;
 class ThreadPool;
 
@@ -21,8 +20,8 @@ class StalenessTracker {
  public:
   // Does not take ownership of its parameters, which must outlive
   // this instance.
-  StalenessTracker(const ClusterStateController<LoggedEntry>* controller,
-                   ThreadPool* pool, libevent::Base* event_base);
+  StalenessTracker(const ClusterStateController* controller, ThreadPool* pool,
+                   libevent::Base* event_base);
   virtual ~StalenessTracker();
 
   // Check if we consider our node to be stale
@@ -32,7 +31,7 @@ class StalenessTracker {
   void UpdateNodeStaleness();
 
  private:
-  const ClusterStateController<LoggedEntry>* const controller_;
+  const ClusterStateController* const controller_;
   ThreadPool* const pool_;
   libevent::Base* const event_base_;
 

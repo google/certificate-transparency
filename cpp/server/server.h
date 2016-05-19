@@ -18,7 +18,6 @@ class LogVerifier;
 
 namespace cert_trans {
 
-template <class Logged>
 class ClusterStateController;
 // TODO(pphaneuf): Not needed?
 template <class Logged>
@@ -52,7 +51,7 @@ class Server {
   bool IsMaster() const;
   MasterElection* election();
   ConsistentStore<LoggedEntry>* consistent_store();
-  ClusterStateController<LoggedEntry>* cluster_state_controller();
+  ClusterStateController* cluster_state_controller();
   LogLookup* log_lookup();
   ContinuousFetcher* continuous_fetcher();
   Proxy* proxy();
@@ -77,7 +76,7 @@ class Server {
   StrictConsistentStore<LoggedEntry> consistent_store_;
   const std::unique_ptr<Frontend> frontend_;
   std::unique_ptr<LogLookup> log_lookup_;
-  std::unique_ptr<ClusterStateController<LoggedEntry>> cluster_controller_;
+  std::unique_ptr<ClusterStateController> cluster_controller_;
   std::unique_ptr<ContinuousFetcher> fetcher_;
   ThreadPool* const http_pool_;
   std::unique_ptr<Proxy> proxy_;
