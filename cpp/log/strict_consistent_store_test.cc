@@ -42,7 +42,7 @@ class StrictConsistentStoreTest : public ::testing::TestWithParam<bool> {
   NiceMock<MockMasterElection> election_;
   // strict_store_ takes ownership of this:
   NiceMock<MockConsistentStore<LoggedEntry>>* peer_;
-  StrictConsistentStore<LoggedEntry> strict_store_;
+  StrictConsistentStore strict_store_;
 };
 
 

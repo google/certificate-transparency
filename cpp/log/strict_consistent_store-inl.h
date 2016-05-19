@@ -5,16 +5,15 @@
 
 namespace cert_trans {
 
-template <class Logged>
-StrictConsistentStore<Logged>::StrictConsistentStore(
-    const MasterElection* election, ConsistentStore<Logged>* peer)
+
+StrictConsistentStore::StrictConsistentStore(
+    const MasterElection* election, ConsistentStore<LoggedEntry>* peer)
     : election_(CHECK_NOTNULL(election)), peer_(CHECK_NOTNULL(peer)) {
 }
 
 
-template <class Logged>
-util::StatusOr<int64_t>
-StrictConsistentStore<Logged>::NextAvailableSequenceNumber() const {
+util::StatusOr<int64_t> StrictConsistentStore::NextAvailableSequenceNumber()
+    const {
   if (!election_->IsMaster()) {
     return util::Status(util::error::PERMISSION_DENIED,
                         "Not currently master.");
@@ -23,8 +22,7 @@ StrictConsistentStore<Logged>::NextAvailableSequenceNumber() const {
 }
 
 
-template <class Logged>
-util::Status StrictConsistentStore<Logged>::SetServingSTH(
+util::Status StrictConsistentStore::SetServingSTH(
     const ct::SignedTreeHead& new_sth) {
   if (!election_->IsMaster()) {
     return util::Status(util::error::PERMISSION_DENIED,
@@ -34,8 +32,7 @@ util::Status StrictConsistentStore<Logged>::SetServingSTH(
 }
 
 
-template <class Logged>
-util::Status StrictConsistentStore<Logged>::UpdateSequenceMapping(
+util::Status StrictConsistentStore::UpdateSequenceMapping(
     EntryHandle<ct::SequenceMapping>* entry) {
   if (!election_->IsMaster()) {
     return util::Status(util::error::PERMISSION_DENIED,
@@ -45,8 +42,7 @@ util::Status StrictConsistentStore<Logged>::UpdateSequenceMapping(
 }
 
 
-template <class Logged>
-util::Status StrictConsistentStore<Logged>::SetClusterConfig(
+util::Status StrictConsistentStore::SetClusterConfig(
     const ct::ClusterConfig& config) {
   if (!election_->IsMaster()) {
     return util::Status(util::error::PERMISSION_DENIED,
@@ -56,8 +52,7 @@ util::Status StrictConsistentStore<Logged>::SetClusterConfig(
 }
 
 
-template <class Logged>
-util::StatusOr<int64_t> StrictConsistentStore<Logged>::CleanupOldEntries() {
+util::StatusOr<int64_t> StrictConsistentStore::CleanupOldEntries() {
   if (!election_->IsMaster()) {
     return util::Status(util::error::PERMISSION_DENIED,
                         "Not currently master.");
