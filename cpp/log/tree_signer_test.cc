@@ -11,7 +11,6 @@
 #include "log/sqlite_db.h"
 #include "log/test_db.h"
 #include "log/test_signer.h"
-#include "log/tree_signer-inl.h"
 #include "log/tree_signer.h"
 #include "merkletree/merkle_verifier.h"
 #include "proto/cert_serializer.h"
@@ -42,7 +41,6 @@ using std::vector;
 using testing::NiceMock;
 using util::Status;
 
-typedef TreeSigner<LoggedEntry> TS;
 
 // TODO(alcutter): figure out if/how we can keep abstract rather than
 // hardcoding LoggedEntry in here.
@@ -69,10 +67,10 @@ class TreeSignerTest : public ::testing::Test {
         base_.get(), &pool_, &etcd_client_, &election_, "/root", "id"));
     log_signer_.reset(TestSigner::DefaultLogSigner());
     tree_signer_.reset(
-        new TS(std::chrono::duration<double>(0), db(),
-               unique_ptr<CompactMerkleTree>(new CompactMerkleTree(
-                   unique_ptr<Sha256Hasher>(new Sha256Hasher))),
-               store_.get(), log_signer_.get()));
+        new TreeSigner(std::chrono::duration<double>(0), db(),
+                       unique_ptr<CompactMerkleTree>(new CompactMerkleTree(
+                           unique_ptr<Sha256Hasher>(new Sha256Hasher))),
+                       store_.get(), log_signer_.get()));
     // Set a default empty STH so that we can call UpdateTree() on the signer.
     store_->SetServingSTH(SignedTreeHead());
     // Force an empty sequence mapping file:
@@ -113,12 +111,12 @@ class TreeSignerTest : public ::testing::Test {
   }
 
 
-  TS* GetSimilar() {
-    return new TS(std::chrono::duration<double>(0), db(),
-                  unique_ptr<CompactMerkleTree>(new CompactMerkleTree(
-                      *tree_signer_->cert_tree_,
-                      unique_ptr<Sha256Hasher>(new Sha256Hasher))),
-                  store_.get(), log_signer_.get());
+  TreeSigner* GetSimilar() {
+    return new TreeSigner(std::chrono::duration<double>(0), db(),
+                          unique_ptr<CompactMerkleTree>(new CompactMerkleTree(
+                              *tree_signer_->cert_tree_,
+                              unique_ptr<Sha256Hasher>(new Sha256Hasher))),
+                          store_.get(), log_signer_.get());
   }
 
   T* db() const {
@@ -134,7 +132,7 @@ class TreeSignerTest : public ::testing::Test {
   TestSigner test_signer_;
   unique_ptr<LogVerifier> verifier_;
   unique_ptr<LogSigner> log_signer_;
-  unique_ptr<TS> tree_signer_;
+  unique_ptr<TreeSigner> tree_signer_;
 };
 
 typedef testing::Types<FileDB, SQLiteDB> Databases;
@@ -150,7 +148,7 @@ EntryHandle<LoggedEntry> H(const LoggedEntry& l) {
 TYPED_TEST_CASE(TreeSignerTest, Databases);
 
 TYPED_TEST(TreeSignerTest, PendingEntriesOrder) {
-  PendingEntriesOrder<LoggedEntry> ordering;
+  PendingEntriesOrder ordering;
   LoggedEntry lowest;
   this->test_signer_.CreateUnique(&lowest);
 
@@ -181,7 +179,7 @@ TYPED_TEST(TreeSignerTest, Sign) {
   this->AddPendingEntry(&logged_cert);
   // this->AddSequencedEntry(&logged_cert, 0);
   EXPECT_OK(this->tree_signer_->SequenceNewEntries());
-  EXPECT_EQ(TS::OK, this->tree_signer_->UpdateTree());
+  EXPECT_EQ(TreeSigner::OK, this->tree_signer_->UpdateTree());
 
   const SignedTreeHead sth(this->tree_signer_->LatestSTH());
   EXPECT_EQ(1U, sth.tree_size());
@@ -194,7 +192,7 @@ TYPED_TEST(TreeSignerTest, Timestamp) {
   this->test_signer_.CreateUnique(&logged_cert);
   this->AddSequencedEntry(&logged_cert, 0);
 
-  EXPECT_EQ(TS::OK, this->tree_signer_->UpdateTree());
+  EXPECT_EQ(TreeSigner::OK, this->tree_signer_->UpdateTree());
   uint64_t last_update = this->tree_signer_->LastUpdateTime();
   EXPECT_GE(last_update, logged_cert.sct().timestamp());
 
@@ -206,7 +204,7 @@ TYPED_TEST(TreeSignerTest, Timestamp) {
   logged_cert2.mutable_sct()->set_timestamp(future);
   this->AddSequencedEntry(&logged_cert2, 1);
 
-  EXPECT_EQ(TS::OK, this->tree_signer_->UpdateTree());
+  EXPECT_EQ(TreeSigner::OK, this->tree_signer_->UpdateTree());
   EXPECT_GE(this->tree_signer_->LastUpdateTime(), future);
 }
 
@@ -216,7 +214,7 @@ TYPED_TEST(TreeSignerTest, Verify) {
   this->test_signer_.CreateUnique(&logged_cert);
   this->AddSequencedEntry(&logged_cert, 0);
 
-  EXPECT_EQ(TS::OK, this->tree_signer_->UpdateTree());
+  EXPECT_EQ(TreeSigner::OK, this->tree_signer_->UpdateTree());
 
   const SignedTreeHead sth(this->tree_signer_->LatestSTH());
   EXPECT_EQ(LogVerifier::VERIFY_OK,
@@ -229,7 +227,7 @@ TYPED_TEST(TreeSignerTest, ResumeClean) {
   this->test_signer_.CreateUnique(&logged_cert);
   this->AddSequencedEntry(&logged_cert, 0);
 
-  EXPECT_EQ(TS::OK, this->tree_signer_->UpdateTree());
+  EXPECT_EQ(TreeSigner::OK, this->tree_signer_->UpdateTree());
   const SignedTreeHead sth(this->tree_signer_->LatestSTH());
   {
     // Simulate the caller of UpdateTree() pushing this new tree out to the
@@ -239,10 +237,10 @@ TYPED_TEST(TreeSignerTest, ResumeClean) {
     CHECK_EQ(util::Status::OK, this->store_->SetClusterNodeState(node_state));
   }
 
-  unique_ptr<TS> signer2(this->GetSimilar());
+  unique_ptr<TreeSigner> signer2(this->GetSimilar());
 
   // Update
-  EXPECT_EQ(TS::OK, signer2->UpdateTree());
+  EXPECT_EQ(TreeSigner::OK, signer2->UpdateTree());
 
   const SignedTreeHead sth2(signer2->LatestSTH());
   EXPECT_LT(sth.timestamp(), sth2.timestamp());
@@ -254,7 +252,7 @@ TYPED_TEST(TreeSignerTest, ResumeClean) {
 // Test resuming when the tree head signature is lagging behind the
 // sequence number commits.
 TYPED_TEST(TreeSignerTest, ResumePartialSign) {
-  EXPECT_EQ(TS::OK, this->tree_signer_->UpdateTree());
+  EXPECT_EQ(TreeSigner::OK, this->tree_signer_->UpdateTree());
   const SignedTreeHead sth(this->tree_signer_->LatestSTH());
   {
     // Simulate the caller of UpdateTree() pushing this new tree out to the
@@ -268,8 +266,8 @@ TYPED_TEST(TreeSignerTest, ResumePartialSign) {
   this->test_signer_.CreateUnique(&logged_cert);
   this->AddSequencedEntry(&logged_cert, 0);
 
-  unique_ptr<TS> signer2(this->GetSimilar());
-  EXPECT_EQ(TS::OK, signer2->UpdateTree());
+  unique_ptr<TreeSigner> signer2(this->GetSimilar());
+  EXPECT_EQ(TreeSigner::OK, signer2->UpdateTree());
   const SignedTreeHead sth2(signer2->LatestSTH());
   // The signer should have picked up the sequence number commit.
   EXPECT_EQ(1U, sth2.tree_size());
@@ -279,7 +277,7 @@ TYPED_TEST(TreeSignerTest, ResumePartialSign) {
 
 
 TYPED_TEST(TreeSignerTest, SignEmpty) {
-  EXPECT_EQ(TS::OK, this->tree_signer_->UpdateTree());
+  EXPECT_EQ(TreeSigner::OK, this->tree_signer_->UpdateTree());
 
   const SignedTreeHead sth(this->tree_signer_->LatestSTH());
   EXPECT_GT(sth.timestamp(), 0U);
@@ -292,7 +290,7 @@ TYPED_TEST(TreeSignerTest, SequenceNewEntriesCleansUpOldSequenceMappings) {
   this->test_signer_.CreateUnique(&logged_cert);
   this->AddPendingEntry(&logged_cert);
   EXPECT_OK(this->tree_signer_->SequenceNewEntries());
-  EXPECT_EQ(TS::OK, this->tree_signer_->UpdateTree());
+  EXPECT_EQ(TreeSigner::OK, this->tree_signer_->UpdateTree());
   EXPECT_EQ(Status::OK,
             this->store_->SetServingSTH(this->tree_signer_->LatestSTH()));
   sleep(1);

@@ -164,7 +164,7 @@ cpp_libcore_a_SOURCES = \
 	cpp/log/signer.cc \
 	cpp/log/sqlite_db.cc \
 	cpp/log/strict_consistent_store_cert.cc \
-	cpp/log/tree_signer_cert.cc \
+	cpp/log/tree_signer.cc \
 	cpp/log/verifier.cc \
 	cpp/merkletree/compact_merkle_tree.cc \
 	cpp/merkletree/merkle_tree.cc \

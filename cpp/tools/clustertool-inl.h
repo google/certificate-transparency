@@ -27,9 +27,9 @@ namespace cert_trans {
 
 template <class Logged>
 util::Status InitLog(const ct::ClusterConfig& cluster_config,
-                     TreeSigner<Logged>* tree_signer,
+                     TreeSigner* tree_signer,
                      ConsistentStore<Logged>* consistent_store) {
-  if (tree_signer->UpdateTree() != TreeSigner<LoggedEntry>::OK) {
+  if (tree_signer->UpdateTree() != TreeSigner::OK) {
     return util::Status(util::error::UNKNOWN, "Failed to Update Tree");
   }
 

@@ -1,7 +1,3 @@
-/* -*- indent-tabs-mode: nil -*- */
-#ifndef CERT_TRANS_LOG_TREE_SIGNER_INL_H_
-#define CERT_TRANS_LOG_TREE_SIGNER_INL_H_
-
 #include "log/tree_signer.h"
 
 #include <glog/logging.h>
@@ -17,15 +13,34 @@
 #include "util/status.h"
 #include "util/util.h"
 
+using ct::ClusterNodeState;
+using ct::SequenceMapping;
+using ct::SequenceMapping_Mapping;
+using ct::SignedTreeHead;
+using std::chrono::duration;
+using std::chrono::milliseconds;
+using std::chrono::system_clock;
+using std::make_pair;
+using std::map;
+using std::max;
+using std::move;
+using std::pair;
+using std::sort;
+using std::string;
+using std::unique_ptr;
+using std::unordered_map;
+using std::vector;
+using util::Status;
+using util::StatusOr;
+using util::TimeInMilliseconds;
+using util::ToBase64;
 
 namespace cert_trans {
-
-
 namespace {
 
 
-bool LessThanBySequence(const ct::SequenceMapping::Mapping& lhs,
-                        const ct::SequenceMapping::Mapping& rhs) {
+bool LessThanBySequence(const SequenceMapping::Mapping& lhs,
+                        const SequenceMapping::Mapping& rhs) {
   CHECK(lhs.has_sequence_number());
   CHECK(rhs.has_sequence_number());
   return lhs.sequence_number() < rhs.sequence_number();
@@ -37,42 +52,36 @@ bool LessThanBySequence(const ct::SequenceMapping::Mapping& lhs,
 
 // Comparator for ordering pending hashes.
 // Order by timestamp then hash.
-template <class Logged>
-struct PendingEntriesOrder
-    : std::binary_function<const cert_trans::EntryHandle<Logged>&,
-                           const cert_trans::EntryHandle<Logged>&, bool> {
-  bool operator()(const cert_trans::EntryHandle<Logged>& x,
-                  const cert_trans::EntryHandle<Logged>& y) const {
-    CHECK(x.Entry().contents().sct().has_timestamp());
-    CHECK(y.Entry().contents().sct().has_timestamp());
-    const uint64_t x_time(x.Entry().contents().sct().timestamp());
-    const uint64_t y_time(y.Entry().contents().sct().timestamp());
-    if (x_time < y_time) {
-      return true;
-    } else if (x_time > y_time) {
-      return false;
-    }
-
-    // Fallback to Hash as a final tie-breaker:
-    return x.Entry().Hash() < y.Entry().Hash();
+bool PendingEntriesOrder::operator()(const EntryHandle<LoggedEntry>& x,
+                                     const EntryHandle<LoggedEntry>& y) const {
+  CHECK(x.Entry().contents().sct().has_timestamp());
+  CHECK(y.Entry().contents().sct().has_timestamp());
+  const uint64_t x_time(x.Entry().contents().sct().timestamp());
+  const uint64_t y_time(y.Entry().contents().sct().timestamp());
+  if (x_time < y_time) {
+    return true;
+  } else if (x_time > y_time) {
+    return false;
   }
-};
+
+  // Fallback to Hash as a final tie-breaker:
+  return x.Entry().Hash() < y.Entry().Hash();
+}
 
 
-template <class Logged>
-TreeSigner<Logged>::TreeSigner(
-    const std::chrono::duration<double>& guard_window, Database* db,
-    std::unique_ptr<CompactMerkleTree> merkle_tree,
-    cert_trans::ConsistentStore<Logged>* consistent_store, LogSigner* signer)
+TreeSigner::TreeSigner(const duration<double>& guard_window, Database* db,
+                       unique_ptr<CompactMerkleTree> merkle_tree,
+                       ConsistentStore<LoggedEntry>* consistent_store,
+                       LogSigner* signer)
     : guard_window_(guard_window),
       db_(db),
       consistent_store_(consistent_store),
       signer_(signer),
-      cert_tree_(std::move(merkle_tree)),
+      cert_tree_(move(merkle_tree)),
       latest_tree_head_() {
   CHECK(cert_tree_);
   // Try to get any STH previously published by this node.
-  const util::StatusOr<ct::ClusterNodeState> node_state(
+  const StatusOr<ClusterNodeState> node_state(
       consistent_store_->GetClusterNodeState());
   CHECK(node_state.ok() ||
         node_state.status().CanonicalCode() == util::error::NOT_FOUND)
@@ -84,17 +93,14 @@ TreeSigner<Logged>::TreeSigner(
 }
 
 
-template <class Logged>
-uint64_t TreeSigner<Logged>::LastUpdateTime() const {
+uint64_t TreeSigner::LastUpdateTime() const {
   return latest_tree_head_.timestamp();
 }
 
 
-template <class Logged>
-util::Status TreeSigner<Logged>::SequenceNewEntries() {
-  const std::chrono::system_clock::time_point now(
-      std::chrono::system_clock::now());
-  util::StatusOr<int64_t> status_or_sequence_number(
+Status TreeSigner::SequenceNewEntries() {
+  const system_clock::time_point now(system_clock::now());
+  StatusOr<int64_t> status_or_sequence_number(
       consistent_store_->NextAvailableSequenceNumber());
   if (!status_or_sequence_number.ok()) {
     return status_or_sequence_number.status();
@@ -103,31 +109,28 @@ util::Status TreeSigner<Logged>::SequenceNewEntries() {
   CHECK_GE(next_sequence_number, 0);
   VLOG(1) << "Next available sequence number: " << next_sequence_number;
 
-  EntryHandle<ct::SequenceMapping> mapping;
-  util::Status status(consistent_store_->GetSequenceMapping(&mapping));
+  EntryHandle<SequenceMapping> mapping;
+  Status status(consistent_store_->GetSequenceMapping(&mapping));
   if (!status.ok()) {
     return status;
   }
 
   // Hashes which are already sequenced.
-  std::unordered_map<std::string, std::pair<int64_t, bool /*present*/>>
-      sequenced_hashes;
+  unordered_map<string, pair<int64_t, bool /*present*/>> sequenced_hashes;
   for (const auto& m : mapping.Entry().mapping()) {
     // Go home clang-format, you're drunk.
-    CHECK(
-        sequenced_hashes
-            .insert(std::make_pair(m.entry_hash(),
-                                   std::make_pair(m.sequence_number(), false)))
-            .second);
+    CHECK(sequenced_hashes
+              .insert(make_pair(m.entry_hash(),
+                                make_pair(m.sequence_number(), false)))
+              .second);
   }
 
-  std::vector<cert_trans::EntryHandle<Logged>> pending_entries;
+  vector<EntryHandle<LoggedEntry>> pending_entries;
   status = consistent_store_->GetPendingEntries(&pending_entries);
   if (!status.ok()) {
     return status;
   }
-  std::sort(pending_entries.begin(), pending_entries.end(),
-            PendingEntriesOrder<Logged>());
+  sort(pending_entries.begin(), pending_entries.end(), PendingEntriesOrder());
 
   VLOG(1) << "Sequencing " << pending_entries.size() << " entr"
           << (pending_entries.size() == 1 ? "y" : "ies");
@@ -139,24 +142,24 @@ util::Status TreeSigner<Logged>::SequenceNewEntries() {
   //    gain one.
   // 3) mappings whose corresponding PendingEntry no longer exists will be
   //    removed from the sequence mapping file.
-  google::protobuf::RepeatedPtrField<ct::SequenceMapping_Mapping> new_mapping;
-  std::map<int64_t, const Logged*> seq_to_entry;
+  google::protobuf::RepeatedPtrField<SequenceMapping_Mapping> new_mapping;
+  map<int64_t, const LoggedEntry*> seq_to_entry;
   int num_sequenced(0);
   for (auto& pending_entry : pending_entries) {
-    const std::string& pending_hash(pending_entry.Entry().Hash());
-    const std::chrono::system_clock::time_point cert_time(
-        std::chrono::milliseconds(pending_entry.Entry().timestamp()));
+    const string& pending_hash(pending_entry.Entry().Hash());
+    const system_clock::time_point cert_time(
+        milliseconds(pending_entry.Entry().timestamp()));
     if (now - cert_time < guard_window_) {
       VLOG(1) << "Entry too recent: "
-              << util::ToBase64(pending_entry.Entry().Hash());
+              << ToBase64(pending_entry.Entry().Hash());
       continue;
     }
     const auto seq_it(sequenced_hashes.find(pending_hash));
-    ct::SequenceMapping::Mapping* const seq_mapping(new_mapping.Add());
+    SequenceMapping::Mapping* const seq_mapping(new_mapping.Add());
 
     if (seq_it == sequenced_hashes.end()) {
       // Need to sequence this one.
-      VLOG(1) << util::ToBase64(pending_hash) << " = " << next_sequence_number;
+      VLOG(1) << ToBase64(pending_hash) << " = " << next_sequence_number;
 
       // Record the sequence -> hash mapping
       seq_mapping->set_sequence_number(next_sequence_number);
@@ -165,8 +168,8 @@ util::Status TreeSigner<Logged>::SequenceNewEntries() {
       ++num_sequenced;
       ++next_sequence_number;
     } else {
-      VLOG(1) << "Previously sequenced " << util::ToBase64(pending_hash)
-              << " = " << seq_it->second.first;
+      VLOG(1) << "Previously sequenced " << ToBase64(pending_hash) << " = "
+              << seq_it->second.first;
       CHECK(!seq_it->second.second /*present*/)
           << "Saw same sequenced cert twice.";
       CHECK(!pending_entry.Entry().has_sequence_number());
@@ -176,14 +179,13 @@ util::Status TreeSigner<Logged>::SequenceNewEntries() {
       seq_mapping->set_sequence_number(seq_it->second.first);
       pending_entry.MutableEntry()->set_sequence_number(seq_it->second.first);
     }
-    CHECK(
-        seq_to_entry.insert(
-                        std::make_pair(pending_entry.Entry().sequence_number(),
-                                       pending_entry.MutableEntry()))
-            .second);
+    CHECK(seq_to_entry
+              .insert(make_pair(pending_entry.Entry().sequence_number(),
+                                pending_entry.MutableEntry()))
+              .second);
   }
 
-  const util::StatusOr<ct::SignedTreeHead> serving_sth(
+  const StatusOr<SignedTreeHead> serving_sth(
       consistent_store_->GetServingSTH());
   if (!serving_sth.ok()) {
     LOG(WARNING) << "Failed to get ServingSTH: " << serving_sth.status();
@@ -225,15 +227,14 @@ util::Status TreeSigner<Logged>::SequenceNewEntries() {
 
   VLOG(1) << "Sequenced " << num_sequenced << " entries.";
 
-  return util::Status::OK;
+  return Status::OK;
 }
 
 
 // DB_ERROR: the database is inconsistent with our inner self.
 // However, if the database itself is giving inconsistent answers, or failing
 // reads/writes, then we die.
-template <class Logged>
-typename TreeSigner<Logged>::UpdateResult TreeSigner<Logged>::UpdateTree() {
+typename TreeSigner::UpdateResult TreeSigner::UpdateTree() {
   // Try to make local timestamps unique, but there's always a chance that
   // multiple nodes in the cluster may make STHs with the same timestamp.
   // That'll get handled by the Serving STH selection code.
@@ -242,13 +243,13 @@ typename TreeSigner<Logged>::UpdateResult TreeSigner<Logged>::UpdateTree() {
   // Add any newly sequenced entries from our local DB.
   auto it(db_->ScanEntries(cert_tree_->LeafCount()));
   for (int64_t i(cert_tree_->LeafCount());; ++i) {
-    Logged logged;
+    LoggedEntry logged;
     if (!it->GetNextEntry(&logged) || logged.sequence_number() != i) {
       break;
     }
     CHECK_EQ(logged.sequence_number(), i);
     AppendToTree(logged);
-    min_timestamp = std::max(min_timestamp, logged.sct().timestamp());
+    min_timestamp = max(min_timestamp, logged.sct().timestamp());
   }
   int64_t next_seq(cert_tree_->LeafCount());
   CHECK_GE(next_seq, 0);
@@ -256,7 +257,7 @@ typename TreeSigner<Logged>::UpdateResult TreeSigner<Logged>::UpdateTree() {
   // Our tree is consistent with the database, i.e., each leaf in the tree has
   // a matching sequence number in the database (at least assuming overwriting
   // the sequence number is not allowed).
-  ct::SignedTreeHead new_sth;
+  SignedTreeHead new_sth;
   TimestampAndSign(min_timestamp, &new_sth);
 
   // We don't actually store this STH anywhere durable yet, but rather let the
@@ -268,10 +269,9 @@ typename TreeSigner<Logged>::UpdateResult TreeSigner<Logged>::UpdateTree() {
 }
 
 
-template <class Logged>
-bool TreeSigner<Logged>::Append(const Logged& logged) {
+bool TreeSigner::Append(const LoggedEntry& logged) {
   // Serialize for inclusion in the tree.
-  std::string serialized_leaf;
+  string serialized_leaf;
   CHECK(logged.SerializeForLeaf(&serialized_leaf));
 
   CHECK_LE(cert_tree_->LeafCount(), static_cast<uint64_t>(INT64_MAX));
@@ -293,10 +293,9 @@ bool TreeSigner<Logged>::Append(const Logged& logged) {
 }
 
 
-template <class Logged>
-void TreeSigner<Logged>::AppendToTree(const Logged& logged) {
+void TreeSigner::AppendToTree(const LoggedEntry& logged) {
   // Serialize for inclusion in the tree.
-  std::string serialized_leaf;
+  string serialized_leaf;
   CHECK(logged.SerializeForLeaf(&serialized_leaf));
 
   // Update in-memory tree.
@@ -304,12 +303,11 @@ void TreeSigner<Logged>::AppendToTree(const Logged& logged) {
 }
 
 
-template <class Logged>
-void TreeSigner<Logged>::TimestampAndSign(uint64_t min_timestamp,
-                                          ct::SignedTreeHead* sth) {
+void TreeSigner::TimestampAndSign(uint64_t min_timestamp,
+                                  SignedTreeHead* sth) {
   sth->set_version(ct::V1);
   sth->set_sha256_root_hash(cert_tree_->CurrentRoot());
-  uint64_t timestamp = util::TimeInMilliseconds();
+  uint64_t timestamp = TimeInMilliseconds();
   if (timestamp < min_timestamp)
     // TODO(ekasper): shouldn't really happen if everyone's clocks are in sync;
     // log a warning if the skew is over some threshold?
@@ -324,6 +322,3 @@ void TreeSigner<Logged>::TimestampAndSign(uint64_t min_timestamp,
 
 
 }  // namespace cert_trans
-
-
-#endif  // CERT_TRANS_LOG_TREE_SIGNER_INL_H_

@@ -196,7 +196,7 @@ class RemotePeerTest : public ::testing::Test {
   cert_trans::EtcdConsistentStore<LoggedEntry> store_;
   TestSigner test_signer_;
   unique_ptr<LogSigner> log_signer_;
-  TreeSigner<LoggedEntry> tree_signer_;
+  TreeSigner tree_signer_;
   SyncTask task_;
   MockUrlFetcher fetcher_;
   unique_ptr<RemotePeer> peer_;

@@ -47,8 +47,6 @@ using std::string;
 using std::unique_ptr;
 using testing::NiceMock;
 
-typedef TreeSigner<LoggedEntry> TS;
-
 
 template <class T>
 class LogLookupTest : public ::testing::Test {
@@ -111,7 +109,7 @@ class LogLookupTest : public ::testing::Test {
     }
 
     // then do the actual update.
-    EXPECT_EQ(TS::OK, this->tree_signer_.UpdateTree());
+    EXPECT_EQ(TreeSigner::OK, this->tree_signer_.UpdateTree());
     this->db()->WriteTreeHead(this->tree_signer_.LatestSTH());
   }
 
@@ -129,7 +127,7 @@ class LogLookupTest : public ::testing::Test {
   cert_trans::EtcdConsistentStore<LoggedEntry> store_;
   TestSigner test_signer_;
   unique_ptr<LogSigner> log_signer_;
-  TS tree_signer_;
+  TreeSigner tree_signer_;
   LogVerifier verifier_;
 };
 
