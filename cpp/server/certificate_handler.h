@@ -17,7 +17,7 @@ class CertificateHttpHandler : public HttpHandler {
   // in which case this server will not accept "add-chain" and "add-pre-chain"
   // requests.
   CertificateHttpHandler(LogLookup* log_lookup, const ReadOnlyDatabase* db,
-                         const ClusterStateController<LoggedEntry>* controller,
+                         const ClusterStateController* controller,
                          const CertChecker* cert_checker, Frontend* frontend,
                          ThreadPool* pool, libevent::Base* event_base,
                          StalenessTracker* staleness_tracker);

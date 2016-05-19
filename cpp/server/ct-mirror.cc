@@ -161,8 +161,7 @@ static const bool follow_dummy =
 }  // namespace
 
 
-void STHUpdater(Database* db,
-                ClusterStateController<LoggedEntry>* cluster_state_controller,
+void STHUpdater(Database* db, ClusterStateController* cluster_state_controller,
                 mutex* queue_mutex, map<int64_t, ct::SignedTreeHead>* queue,
                 LogLookup* log_lookup, Task* task) {
   CHECK_NOTNULL(db);

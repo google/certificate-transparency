@@ -57,10 +57,10 @@ static Latency<milliseconds, string> http_server_request_latency_ms(
 }  // namespace
 
 
-HttpHandlerV2::HttpHandlerV2(
-    LogLookup* log_lookup, const ReadOnlyDatabase* db,
-    const ClusterStateController<LoggedEntry>* controller, ThreadPool* pool,
-    libevent::Base* event_base, StalenessTracker* staleness_tracker)
+HttpHandlerV2::HttpHandlerV2(LogLookup* log_lookup, const ReadOnlyDatabase* db,
+                             const ClusterStateController* controller,
+                             ThreadPool* pool, libevent::Base* event_base,
+                             StalenessTracker* staleness_tracker)
     : log_lookup_(CHECK_NOTNULL(log_lookup)),
       db_(CHECK_NOTNULL(db)),
       controller_(CHECK_NOTNULL(controller)),

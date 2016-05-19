@@ -147,7 +147,7 @@ cpp_libcore_a_SOURCES = \
 	cpp/log/cert.cc \
 	cpp/log/cert_checker.cc \
 	cpp/log/cert_submission_handler.cc \
-	cpp/log/cluster_state_controller_cert.cc \
+	cpp/log/cluster_state_controller.cc \
 	cpp/log/ct_extensions.cc \
 	cpp/log/database.cc \
 	cpp/log/etcd_consistent_store_cert.cc \

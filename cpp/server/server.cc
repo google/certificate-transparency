@@ -56,8 +56,7 @@ Gauge<>* latest_local_tree_size_gauge() {
 namespace {
 
 
-void RefreshNodeState(ClusterStateController<LoggedEntry>* controller,
-                      util::Task* task) {
+void RefreshNodeState(ClusterStateController* controller, util::Task* task) {
   CHECK_NOTNULL(task);
   const steady_clock::duration period(
       (seconds(FLAGS_node_state_refresh_seconds)));
@@ -173,7 +172,7 @@ ConsistentStore<LoggedEntry>* Server::consistent_store() {
 }
 
 
-ClusterStateController<LoggedEntry>* Server::cluster_state_controller() {
+ClusterStateController* Server::cluster_state_controller() {
   return cluster_controller_.get();
 }
 
@@ -221,9 +220,10 @@ void Server::Initialise(bool is_mirror) {
 
   log_lookup_.reset(new LogLookup(db_));
 
-  cluster_controller_.reset(new ClusterStateController<LoggedEntry>(
-      internal_pool_, event_base_, url_fetcher_, db_, &consistent_store_,
-      &election_, fetcher_.get()));
+  cluster_controller_.reset(
+      new ClusterStateController(internal_pool_, event_base_, url_fetcher_,
+                                 db_, &consistent_store_, &election_,
+                                 fetcher_.get()));
 
   // Publish this node's hostname:port info
   cluster_controller_->SetNodeHostPort(FLAGS_server, FLAGS_port);
@@ -244,11 +244,10 @@ void Server::Initialise(bool is_mirror) {
                                         cluster_controller_.get(),
                                         server_task_.task()));
 
-  proxy_.reset(
-      new Proxy(event_base_.get(),
-                bind(&ClusterStateController<LoggedEntry>::GetFreshNodes,
-                     cluster_controller_.get()),
-                url_fetcher_, http_pool_));
+  proxy_.reset(new Proxy(event_base_.get(),
+                         bind(&ClusterStateController::GetFreshNodes,
+                              cluster_controller_.get()),
+                         url_fetcher_, http_pool_));
 }
 
 

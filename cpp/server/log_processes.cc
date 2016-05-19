@@ -68,7 +68,7 @@ namespace cert_trans {
 
 void SignMerkleTree(TreeSigner* tree_signer,
                     ConsistentStore<LoggedEntry>* store,
-                    ClusterStateController<LoggedEntry>* controller) {
+                    ClusterStateController* controller) {
   CHECK_NOTNULL(tree_signer);
   CHECK_NOTNULL(store);
   CHECK_NOTNULL(controller);
