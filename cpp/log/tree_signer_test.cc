@@ -11,7 +11,6 @@
 #include "log/sqlite_db.h"
 #include "log/test_db.h"
 #include "log/test_signer.h"
-#include "log/tree_signer-inl.h"
 #include "log/tree_signer.h"
 #include "merkletree/merkle_verifier.h"
 #include "proto/cert_serializer.h"
