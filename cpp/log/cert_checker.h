@@ -47,8 +47,6 @@ class CertChecker {
   virtual bool LoadTrustedCertificates(
       const std::vector<std::string>& trusted_certs);
 
-  virtual void ClearAllTrustedCertificates();
-
   virtual const std::multimap<std::string, const Cert*>&
   GetTrustedCertificates() const {
     return trusted_;

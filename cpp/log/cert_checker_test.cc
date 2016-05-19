@@ -333,9 +333,6 @@ TEST_F(CertCheckerTest, LoadTrustedCertificates) {
   EXPECT_TRUE(
       checker_.LoadTrustedCertificates(cert_dir_ + "/" + kIntermediateCert));
   EXPECT_EQ(2U, checker_.NumTrustedCertificates());
-
-  checker_.ClearAllTrustedCertificates();
-  EXPECT_EQ(0U, checker_.NumTrustedCertificates());
 }
 
 TEST_F(CertCheckerTest, LoadTrustedCertificatesFromMemory) {
@@ -625,7 +622,6 @@ TEST_F(CertCheckerTest, TestDsaPrecertFailsRootNotTrusted) {
 
 TEST_F(CertCheckerTest, TestDsaPrecertChain) {
   // Explicitly set the root of this chain as trusted
-  checker_.ClearAllTrustedCertificates();
   vector<string> roots;
   roots.push_back(kDsaPrecertChainRootOnly);
   checker_.LoadTrustedCertificates(roots);
@@ -644,7 +640,6 @@ TEST_F(CertCheckerTest, TestDsaPrecertChain) {
 
 TEST_F(CertCheckerTest, TestDsaPrecertChainRejectsInvalidDsaSig) {
   // Explicitly set the root of this chain as trusted
-  checker_.ClearAllTrustedCertificates();
   vector<string> roots;
   roots.push_back(kDsaPrecertChainRootOnly);
   checker_.LoadTrustedCertificates(roots);

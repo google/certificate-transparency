@@ -30,7 +30,9 @@ using util::error::Code;
 namespace cert_trans {
 
 CertChecker::~CertChecker() {
-  ClearAllTrustedCertificates();
+  for (auto& entry : trusted_) {
+    delete entry.second;
+  }
 }
 
 bool CertChecker::LoadTrustedCertificates(const string& cert_file) {
@@ -127,14 +129,6 @@ bool CertChecker::LoadTrustedCertificatesFromBIO(BIO* bio_in) {
   LOG(INFO) << "Added " << new_certs << " new certificate(s) to trusted store";
 
   return true;
-}
-
-void CertChecker::ClearAllTrustedCertificates() {
-  std::multimap<string, const Cert*>::iterator it = trusted_.begin();
-  for (; it != trusted_.end(); ++it) {
-    delete it->second;
-  }
-  trusted_.clear();
 }
 
 Status CertChecker::CheckCertChain(CertChain* chain) const {
