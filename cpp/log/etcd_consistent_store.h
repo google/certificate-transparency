@@ -56,15 +56,15 @@ class EtcdConsistentStore : public ConsistentStore<LoggedEntry> {
   util::Status SetClusterNodeState(const ct::ClusterNodeState& state) override;
 
   void WatchServingSTH(
-      const typename ConsistentStore<LoggedEntry>::ServingSTHCallback& cb,
+      const ConsistentStore<LoggedEntry>::ServingSTHCallback& cb,
       util::Task* task) override;
 
-  void WatchClusterNodeStates(const typename ConsistentStore<
-                                  LoggedEntry>::ClusterNodeStateCallback& cb,
-                              util::Task* task) override;
+  void WatchClusterNodeStates(
+      const ConsistentStore<LoggedEntry>::ClusterNodeStateCallback& cb,
+      util::Task* task) override;
 
   void WatchClusterConfig(
-      const typename ConsistentStore<LoggedEntry>::ClusterConfigCallback& cb,
+      const ConsistentStore<LoggedEntry>::ClusterConfigCallback& cb,
       util::Task* task) override;
 
   util::Status SetClusterConfig(const ct::ClusterConfig& config) override;
