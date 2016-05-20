@@ -163,7 +163,7 @@ cpp_libcore_a_SOURCES = \
 	cpp/log/logged_entry.cc \
 	cpp/log/signer.cc \
 	cpp/log/sqlite_db.cc \
-	cpp/log/strict_consistent_store_cert.cc \
+	cpp/log/strict_consistent_store.cc \
 	cpp/log/tree_signer.cc \
 	cpp/log/verifier.cc \
 	cpp/merkletree/compact_merkle_tree.cc \
@@ -598,7 +598,7 @@ cpp_log_strict_consistent_store_test_LDADD = \
 	$(libevent_LIBS) \
 	-lprotobuf
 cpp_log_strict_consistent_store_test_SOURCES = \
-	cpp/log/strict_consistent_store_cert.cc \
+	cpp/log/strict_consistent_store.cc \
 	cpp/log/strict_consistent_store_test.cc \
 	cpp/util/json_wrapper.cc \
 	cpp/util/libevent_wrapper.cc \

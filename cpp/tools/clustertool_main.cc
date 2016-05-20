@@ -158,13 +158,12 @@ int main(int argc, char* argv[]) {
   unique_ptr<MasterElection> election(
       BuildAndJoinMasterElection(node_id, event_base, &etcd_client));
   ThreadPool internal_pool(4);
-  StrictConsistentStore<LoggedEntry> consistent_store(
+  StrictConsistentStore consistent_store(
       election.get(),
       new EtcdConsistentStore<LoggedEntry>(event_base.get(), &internal_pool,
                                            &etcd_client, election.get(),
                                            "/root", node_id));
   SQLiteDB db("/tmp/clustertooldb");
-
 
   const string command(argv[1]);
   Status status;

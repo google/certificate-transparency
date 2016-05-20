@@ -2,6 +2,7 @@
 #define CERT_TRANS_LOG_STRICT_CONSISTENT_STORE_H_
 
 #include "log/consistent_store.h"
+#include "log/logged_entry.h"
 #include "util/masterelection.h"
 
 namespace cert_trans {
@@ -14,12 +15,11 @@ namespace cert_trans {
 // action (especially a long running action, e.g. a signing run) with a check
 // to IsMaster(), it is still necessarily racy because etcd doesn't support
 // atomic updates across keys.)
-template <class Logged>
-class StrictConsistentStore : public ConsistentStore<Logged> {
+class StrictConsistentStore : public ConsistentStore<LoggedEntry> {
  public:
   // Takes ownership of |peer|, but not |election|
   StrictConsistentStore(const MasterElection* election,
-                        ConsistentStore<Logged>* peer);
+                        ConsistentStore<LoggedEntry>* peer);
 
   virtual ~StrictConsistentStore() = default;
 
@@ -42,17 +42,18 @@ class StrictConsistentStore : public ConsistentStore<Logged> {
     return peer_->GetServingSTH();
   }
 
-  util::Status AddPendingEntry(Logged* entry) override {
+  util::Status AddPendingEntry(LoggedEntry* entry) override {
     return peer_->AddPendingEntry(entry);
   }
 
   util::Status GetPendingEntryForHash(
-      const std::string& hash, EntryHandle<Logged>* entry) const override {
+      const std::string& hash,
+      EntryHandle<LoggedEntry>* entry) const override {
     return peer_->GetPendingEntryForHash(hash, entry);
   }
 
   util::Status GetPendingEntries(
-      std::vector<EntryHandle<Logged>>* entries) const override {
+      std::vector<EntryHandle<LoggedEntry>>* entries) const override {
     return peer_->GetPendingEntries(entries);
   }
 
@@ -71,26 +72,26 @@ class StrictConsistentStore : public ConsistentStore<Logged> {
   }
 
   void WatchServingSTH(
-      const typename ConsistentStore<Logged>::ServingSTHCallback& cb,
+      const typename ConsistentStore<LoggedEntry>::ServingSTHCallback& cb,
       util::Task* task) override {
     return peer_->WatchServingSTH(cb, task);
   }
 
-  void WatchClusterNodeStates(
-      const typename ConsistentStore<Logged>::ClusterNodeStateCallback& cb,
-      util::Task* task) override {
+  void WatchClusterNodeStates(const typename ConsistentStore<
+                                  LoggedEntry>::ClusterNodeStateCallback& cb,
+                              util::Task* task) override {
     return peer_->WatchClusterNodeStates(cb, task);
   }
 
   void WatchClusterConfig(
-      const typename ConsistentStore<Logged>::ClusterConfigCallback& cb,
+      const typename ConsistentStore<LoggedEntry>::ClusterConfigCallback& cb,
       util::Task* task) override {
     return peer_->WatchClusterConfig(cb, task);
   }
 
  private:
   const MasterElection* const election_;  // Not owned by us
-  const std::unique_ptr<ConsistentStore<Logged>> peer_;
+  const std::unique_ptr<ConsistentStore<LoggedEntry>> peer_;
 };
 
 

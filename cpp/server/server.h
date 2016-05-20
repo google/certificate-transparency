@@ -73,7 +73,7 @@ class Server {
   MasterElection election_;
   ThreadPool* const internal_pool_;
   util::SyncTask server_task_;
-  StrictConsistentStore<LoggedEntry> consistent_store_;
+  StrictConsistentStore consistent_store_;
   const std::unique_ptr<Frontend> frontend_;
   std::unique_ptr<LogLookup> log_lookup_;
   std::unique_ptr<ClusterStateController> cluster_controller_;
