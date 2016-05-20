@@ -29,14 +29,13 @@
 #include "merkletree/merkle_tree.h"
 #include "merkletree/merkle_verifier.h"
 #include "merkletree/serial_hasher.h"
-#include "monitor/database.h"
-#include "monitor/monitor.h"
-#include "monitor/sqlite_db.h"
+#include "proto/cert_serializer.h"
 #include "proto/ct.pb.h"
 #include "proto/serializer.h"
 #include "util/init.h"
 #include "util/openssl_scoped_types.h"
 #include "util/read_key.h"
+#include "util/util.h"
 
 DEFINE_string(ssl_client_trusted_cert_dir, "",
               "Trusted root certificates for the ssl client");
@@ -83,17 +82,6 @@ DEFINE_int32(get_last, 0, "Last entry to retrieve with the 'get' command");
 DEFINE_string(certificate_base, "",
               "Base name for retrieved certificates - "
               "files will be <base><entry>.<cert>.der");
-DEFINE_string(
-    monitor_action, "loop",
-    "Step the monitor shall do (or loop). "
-    "Available actions are:\n"
-    "get_sth - put current STH from log into monitor database\n"
-    "verify_sth - verify a STH (latest written or for a given timestamp)\n"
-    "get_entries - put entries from log into monitor database\n"
-    "confirm_tree - build merkletree (latest STH in db OR a given timestamp)\n"
-    "init - initiate monitor (i.e. database) prior to its first run\n"
-    "loop - start the monitor in a loop (default)");
-DEFINE_string(sqlite_db, "", "Database for certificate and tree storage");
 DEFINE_uint64(timestamp, 0,
               "The timestamp to be used in the monitor actions "
               "verify_sth and confirm_tree.");
@@ -121,7 +109,6 @@ static const char kUsage[] =
     "get_entries - get entries from the log\n"
     "sth - get the current STH from the log\n"
     "consistency - get and check consistency of two STHs\n"
-    "monitor - use the monitor (see monitor_action flag)\n"
     "Use --help to display command-line flag options\n";
 
 using cert_trans::AsyncLogClient;
@@ -938,42 +925,6 @@ int GetSTH() {
   return 0;
 }
 
-static monitor::Database* GetMonitorDBFromFlags() {
-  CHECK_NE(FLAGS_sqlite_db, "");
-  monitor::Database* db;
-  db = new monitor::SQLiteDB(FLAGS_sqlite_db);
-  return db;
-}
-
-// Return code 0 indicates success.
-// See monitor class for the monitor action specific return codes.
-int Monitor() {
-  CHECK_NE(FLAGS_monitor_action, "");
-  CHECK_NE(FLAGS_ct_server, "");
-
-  HTTPLogClient client(FLAGS_ct_server);
-  monitor::Monitor monitor(GetMonitorDBFromFlags(), GetLogVerifierFromFlags(),
-                           &client, FLAGS_monitor_sleep_time_secs);
-
-  int ret = 0;
-  if (FLAGS_monitor_action == "get_sth") {
-    ret = monitor.GetSTH();
-  } else if (FLAGS_monitor_action == "verify_sth") {
-    ret = monitor.VerifySTH(FLAGS_timestamp);
-  } else if (FLAGS_monitor_action == "get_entries") {
-    ret = monitor.GetEntries(FLAGS_get_first, FLAGS_get_last);
-  } else if (FLAGS_monitor_action == "confirm_tree") {
-    ret = monitor.ConfirmTree(FLAGS_timestamp);
-  } else if (FLAGS_monitor_action == "init") {
-    monitor.Init();
-  } else if (FLAGS_monitor_action == "loop") {
-    monitor.Loop();
-  } else {
-    LOG(FATAL) << "Wrong monitor_action flag given.";
-  }
-  return ret;
-}
-
 
 // Exit code upon normal exit:
 // 0: success
@@ -1026,8 +977,6 @@ int main(int argc, char** argv) {
     GetEntries();
   } else if (cmd == "get_roots") {
     ret = GetRoots();
-  } else if (cmd == "monitor") {
-    ret = Monitor();
   } else if (cmd == "sth") {
     ret = GetSTH();
   } else {

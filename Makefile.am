@@ -96,7 +96,6 @@ TESTS = \
 	cpp/merkletree/sparse_merkle_tree_test \
 	cpp/merkletree/tree_hasher_test \
 	cpp/merkletree/verifiable_map_test \
-	cpp/monitor/database_test \
 	cpp/monitoring/counter_test \
 	cpp/monitoring/gauge_test \
 	cpp/monitoring/registry_test \
@@ -353,9 +352,6 @@ cpp_client_ct_SOURCES = \
 	cpp/client/ct.cc \
 	cpp/client/http_log_client.cc \
 	cpp/client/ssl_client.cc \
-	cpp/monitor/database.cc \
-	cpp/monitor/monitor.cc \
-	cpp/monitor/sqlite_db.cc \
 	cpp/proto/cert_serializer.cc \
 	cpp/proto/serializer.cc \
 	cpp/util/init.cc \
@@ -633,21 +629,6 @@ cpp_log_signer_verifier_test_LDADD = \
 cpp_log_signer_verifier_test_SOURCES = \
 	cpp/log/signer_verifier_test.cc \
 	cpp/log/test_signer.cc \
-	cpp/proto/cert_serializer.cc \
-	cpp/proto/serializer.cc \
-	cpp/util/util.cc
-
-cpp_monitor_database_test_LDADD = \
-	cpp/libcore.a \
-	cpp/libtest.a \
-	$(evhtp_LIBS) \
-	$(libevent_LIBS) \
-	-lprotobuf -lsqlite3
-cpp_monitor_database_test_SOURCES = \
-	cpp/log/test_signer.cc \
-	cpp/monitor/database.cc \
-	cpp/monitor/database_test.cc \
-	cpp/monitor/sqlite_db.cc \
 	cpp/proto/cert_serializer.cc \
 	cpp/proto/serializer.cc \
 	cpp/util/util.cc
