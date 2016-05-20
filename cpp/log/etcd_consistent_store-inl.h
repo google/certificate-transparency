@@ -660,16 +660,15 @@ util::Status EtcdConsistentStore<Logged>::ForceSetEntryWithTTL(
 
 
 template <class Logged>
-template <class T>
-util::Status EtcdConsistentStore<Logged>::DeleteEntry(EntryHandle<T>* entry) {
+util::Status EtcdConsistentStore<Logged>::DeleteEntry(
+    const EntryHandleBase& entry) {
   ScopedLatency scoped_latency(
       etcd_latency_by_op_ms.GetScopedLatency("delete_entry"));
 
-  CHECK_NOTNULL(entry);
-  CHECK(entry->HasHandle());
-  CHECK(entry->HasKey());
+  CHECK(entry.HasHandle());
+  CHECK(entry.HasKey());
   util::SyncTask task(executor_);
-  client_->Delete(entry->Key(), entry->Handle(), task.task());
+  client_->Delete(entry.Key(), entry.Handle(), task.task());
   task.Wait();
   return task.status();
 }

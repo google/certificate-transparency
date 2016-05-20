@@ -91,7 +91,7 @@ class TreeSignerTest : public ::testing::Test {
     EntryHandle<LoggedEntry> e;
     CHECK_EQ(Status::OK,
              this->store_->GetPendingEntryForHash(logged_cert.Hash(), &e));
-    CHECK_EQ(Status::OK, this->store_->DeleteEntry(&e));
+    CHECK_EQ(Status::OK, this->store_->DeleteEntry(e));
   }
 
   void AddSequencedEntry(LoggedEntry* logged_cert, int64_t seq) const {

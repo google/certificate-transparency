@@ -97,8 +97,7 @@ class EtcdConsistentStore : public ConsistentStore<Logged> {
   util::Status ForceSetEntryWithTTL(const std::chrono::seconds& ttl,
                                     EntryHandle<T>* entry);
 
-  template <class T>
-  util::Status DeleteEntry(EntryHandle<T>* entry);
+  util::Status DeleteEntry(const EntryHandleBase& entry);
 
   std::string GetEntryPath(const Logged& entry) const;
 
