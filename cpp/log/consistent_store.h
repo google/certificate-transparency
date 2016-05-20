@@ -15,31 +15,12 @@
 namespace cert_trans {
 
 
-template <class Logged>
 class EtcdConsistentStore;
 
 
-// Wraps an instance of |T| and associates it with a versioning handle
-// (required for atomic 'compare-and-update' semantics.)
-template <class T>
-class EntryHandle {
+class EntryHandleBase {
  public:
-  EntryHandle() : entry_(), has_handle_(false) {}
-
-  const T& Entry() const {
-    return entry_;
-  }
-
-  T* MutableEntry() {
-    return &entry_;
-  }
-
-  bool HasHandle() const {
-    return has_handle_;
-  }
-
-  int Handle() const {
-    return handle_;
+  EntryHandleBase() : has_handle_(false) {
   }
 
   bool HasKey() const {
@@ -50,17 +31,65 @@ class EntryHandle {
     return key_;
   }
 
+  void SetKey(const std::string& key) {
+    key_ = key;
+  }
+
+  bool HasHandle() const {
+    return has_handle_;
+  }
+
+  int Handle() const {
+    return handle_;
+  }
+
+  void SetHandle(int new_handle) {
+    handle_ = new_handle;
+    has_handle_ = true;
+  }
+
+ protected:
+  EntryHandleBase(int handle) : has_handle_(true), handle_(handle) {
+  }
+  EntryHandleBase(const std::string& key, int handle)
+      : key_(key), has_handle_(true), handle_(handle) {
+  }
+  EntryHandleBase(const std::string& key) : key_(key), has_handle_(false) {
+  }
+
+  std::string key_;
+  bool has_handle_;
+  int handle_;
+};
+
+
+// Wraps an instance of |T| and associates it with a versioning handle
+// (required for atomic 'compare-and-update' semantics.)
+template <class T>
+class EntryHandle : public EntryHandleBase {
+ public:
+  EntryHandle() : entry_() {
+  }
+
+  const T& Entry() const {
+    return entry_;
+  }
+
+  T* MutableEntry() {
+    return &entry_;
+  }
+
  private:
   EntryHandle(const T& entry, int handle)
-      : entry_(entry), has_handle_(true), handle_(handle) {
+      : EntryHandleBase(handle), entry_(entry) {
   }
 
   EntryHandle(const std::string& key, const T& entry, int handle)
-      : key_(key), entry_(entry), has_handle_(true), handle_(handle) {
+      : EntryHandleBase(key, handle), entry_(entry) {
   }
 
   explicit EntryHandle(const std::string& key, const T& entry)
-      : key_(key), entry_(entry), has_handle_(false) {
+      : EntryHandleBase(key), entry_(entry) {
   }
 
   void Set(const std::string& key, const T& entry, int handle) {
@@ -70,21 +99,8 @@ class EntryHandle {
     has_handle_ = true;
   }
 
-  void SetHandle(int new_handle) {
-    handle_ = new_handle;
-    has_handle_ = true;
-  }
-
-  void SetKey(const std::string& key) {
-    key_ = key;
-  }
-
-  std::string key_;
   T entry_;
-  bool has_handle_;
-  int handle_;
 
-  template <class Logged>
   friend class EtcdConsistentStore;
   friend class EtcdConsistentStoreTest;
 };
