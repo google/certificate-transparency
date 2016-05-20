@@ -150,7 +150,7 @@ cpp_libcore_a_SOURCES = \
 	cpp/log/cluster_state_controller.cc \
 	cpp/log/ct_extensions.cc \
 	cpp/log/database.cc \
-	cpp/log/etcd_consistent_store_cert.cc \
+	cpp/log/etcd_consistent_store.cc \
 	cpp/log/file_db.cc \
 	cpp/log/file_storage.cc \
 	cpp/log/filesystem_ops.cc \
