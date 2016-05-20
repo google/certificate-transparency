@@ -15,7 +15,6 @@
 namespace cert_trans {
 
 
-template <class Logged>
 class EtcdConsistentStore;
 
 
@@ -102,7 +101,6 @@ class EntryHandle : public EntryHandleBase {
 
   T entry_;
 
-  template <class Logged>
   friend class EtcdConsistentStore;
   friend class EtcdConsistentStoreTest;
 };

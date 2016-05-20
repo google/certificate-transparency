@@ -54,15 +54,12 @@ class ClusterStateControllerTest : public ::testing::Test {
         base_(make_shared<libevent::Base>()),
         pump_(base_),
         etcd_(base_.get()),
-        store1_(new EtcdConsistentStore<LoggedEntry>(base_.get(), &pool_,
-                                                     &etcd_, &election1_, "",
-                                                     kNodeId1)),
-        store2_(new EtcdConsistentStore<LoggedEntry>(base_.get(), &pool_,
-                                                     &etcd_, &election2_, "",
-                                                     kNodeId2)),
-        store3_(new EtcdConsistentStore<LoggedEntry>(base_.get(), &pool_,
-                                                     &etcd_, &election3_, "",
-                                                     kNodeId3)),
+        store1_(new EtcdConsistentStore(base_.get(), &pool_, &etcd_,
+                                        &election1_, "", kNodeId1)),
+        store2_(new EtcdConsistentStore(base_.get(), &pool_, &etcd_,
+                                        &election2_, "", kNodeId2)),
+        store3_(new EtcdConsistentStore(base_.get(), &pool_, &etcd_,
+                                        &election3_, "", kNodeId3)),
         controller_(&pool_, base_, &url_fetcher_, test_db_.db(), store1_.get(),
                     &election1_, &fetcher_) {
     // There will be many calls to ContinuousFetcher::AddPeer during
@@ -135,9 +132,9 @@ class ClusterStateControllerTest : public ::testing::Test {
   NiceMock<MockMasterElection> election1_;
   NiceMock<MockMasterElection> election2_;
   NiceMock<MockMasterElection> election3_;
-  std::unique_ptr<EtcdConsistentStore<LoggedEntry>> store1_;
-  std::unique_ptr<EtcdConsistentStore<LoggedEntry>> store2_;
-  std::unique_ptr<EtcdConsistentStore<LoggedEntry>> store3_;
+  std::unique_ptr<EtcdConsistentStore> store1_;
+  std::unique_ptr<EtcdConsistentStore> store2_;
+  std::unique_ptr<EtcdConsistentStore> store3_;
   ClusterStateController controller_;
 };
 

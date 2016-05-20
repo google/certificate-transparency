@@ -141,7 +141,7 @@ class FrontendTest : public ::testing::Test {
   FakeEtcdClient etcd_client_;
   ThreadPool pool_;
   NiceMock<MockMasterElection> election_;
-  EtcdConsistentStore<LoggedEntry> store_;
+  EtcdConsistentStore store_;
   unique_ptr<LogSigner> log_signer_;
   CertSubmissionHandler submission_handler_;
   FE frontend_;

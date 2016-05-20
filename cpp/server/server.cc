@@ -130,9 +130,10 @@ Server::Server(const shared_ptr<libevent::Base>& event_base,
       internal_pool_(CHECK_NOTNULL(internal_pool)),
       server_task_(internal_pool_),
       consistent_store_(&election_,
-                        new EtcdConsistentStore<LoggedEntry>(
-                            event_base_.get(), internal_pool_, etcd_client_,
-                            &election_, FLAGS_etcd_root, node_id_)),
+                        new EtcdConsistentStore(event_base_.get(),
+                                                internal_pool_, etcd_client_,
+                                                &election_, FLAGS_etcd_root,
+                                                node_id_)),
       http_pool_(CHECK_NOTNULL(http_pool)) {
   CHECK_LT(0, FLAGS_port);
 

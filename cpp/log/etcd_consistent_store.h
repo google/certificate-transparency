@@ -8,6 +8,7 @@
 
 #include "base/macros.h"
 #include "log/consistent_store.h"
+#include "log/logged_entry.h"
 #include "proto/ct.pb.h"
 #include "util/etcd.h"
 #include "util/libevent_wrapper.h"
@@ -19,8 +20,7 @@ namespace cert_trans {
 class MasterElection;
 
 
-template <class Logged>
-class EtcdConsistentStore : public ConsistentStore<Logged> {
+class EtcdConsistentStore : public ConsistentStore<LoggedEntry> {
  public:
   // No change of ownership for |client|, |executor| must continue to be valid
   // at least as long as this object is, and should not be the libevent::Base
@@ -37,13 +37,13 @@ class EtcdConsistentStore : public ConsistentStore<Logged> {
 
   util::StatusOr<ct::SignedTreeHead> GetServingSTH() const override;
 
-  util::Status AddPendingEntry(Logged* entry) override;
+  util::Status AddPendingEntry(LoggedEntry* entry) override;
 
   util::Status GetPendingEntryForHash(
-      const std::string& hash, EntryHandle<Logged>* entry) const override;
+      const std::string& hash, EntryHandle<LoggedEntry>* entry) const override;
 
   util::Status GetPendingEntries(
-      std::vector<EntryHandle<Logged>>* entries) const override;
+      std::vector<EntryHandle<LoggedEntry>>* entries) const override;
 
   util::Status GetSequenceMapping(
       EntryHandle<ct::SequenceMapping>* entry) const override;
@@ -56,15 +56,15 @@ class EtcdConsistentStore : public ConsistentStore<Logged> {
   util::Status SetClusterNodeState(const ct::ClusterNodeState& state) override;
 
   void WatchServingSTH(
-      const typename ConsistentStore<Logged>::ServingSTHCallback& cb,
+      const typename ConsistentStore<LoggedEntry>::ServingSTHCallback& cb,
       util::Task* task) override;
 
-  void WatchClusterNodeStates(
-      const typename ConsistentStore<Logged>::ClusterNodeStateCallback& cb,
-      util::Task* task) override;
+  void WatchClusterNodeStates(const typename ConsistentStore<
+                                  LoggedEntry>::ClusterNodeStateCallback& cb,
+                              util::Task* task) override;
 
   void WatchClusterConfig(
-      const typename ConsistentStore<Logged>::ClusterConfigCallback& cb,
+      const typename ConsistentStore<LoggedEntry>::ClusterConfigCallback& cb,
       util::Task* task) override;
 
   util::Status SetClusterConfig(const ct::ClusterConfig& config) override;
@@ -80,9 +80,9 @@ class EtcdConsistentStore : public ConsistentStore<Logged> {
   template <class T>
   util::Status GetEntry(const std::string& path, EntryHandle<T>* entry) const;
 
-  template <class T>
-  util::Status GetAllEntriesInDir(const std::string& dir,
-                                  std::vector<EntryHandle<T>>* entries) const;
+  util::Status GetAllEntriesInDir(
+      const std::string& dir,
+      std::vector<EntryHandle<LoggedEntry>>* entries) const;
 
   template <class T>
   util::Status UpdateEntry(EntryHandle<T>* entry);
@@ -99,7 +99,7 @@ class EtcdConsistentStore : public ConsistentStore<Logged> {
 
   util::Status DeleteEntry(const EntryHandleBase& entry);
 
-  std::string GetEntryPath(const Logged& entry) const;
+  std::string GetEntryPath(const LoggedEntry& entry) const;
 
   std::string GetEntryPath(const std::string& hash) const;
 
@@ -109,7 +109,6 @@ class EtcdConsistentStore : public ConsistentStore<Logged> {
 
   void CheckMappingIsContiguousWithServingTree(
       const ct::SequenceMapping& mapping) const;
-
 
   // The following 3 methods are static just so that they have friend access to
   // the private c'tor/setters of Update<>

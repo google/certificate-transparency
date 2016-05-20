@@ -107,11 +107,12 @@ util::StatusOr<int64_t> CalculateNumEtcdEntries(
 }  // namespace
 
 
-template <class Logged>
-EtcdConsistentStore<Logged>::EtcdConsistentStore(
-    libevent::Base* base, util::Executor* executor, EtcdClient* client,
-    const MasterElection* election, const std::string& root,
-    const std::string& node_id)
+EtcdConsistentStore::EtcdConsistentStore(libevent::Base* base,
+                                         util::Executor* executor,
+                                         EtcdClient* client,
+                                         const MasterElection* election,
+                                         const std::string& root,
+                                         const std::string& node_id)
     : client_(CHECK_NOTNULL(client)),
       base_(CHECK_NOTNULL(base)),
       executor_(CHECK_NOTNULL(executor)),
@@ -125,14 +126,12 @@ EtcdConsistentStore<Logged>::EtcdConsistentStore(
       exiting_(false),
       num_etcd_entries_(0) {
   // Set up watches on things we're interested in...
-  WatchServingSTH(
-      std::bind(&EtcdConsistentStore<Logged>::OnEtcdServingSTHUpdated, this,
-                std::placeholders::_1),
-      serving_sth_watch_task_.task());
-  WatchClusterConfig(
-      std::bind(&EtcdConsistentStore<Logged>::OnClusterConfigUpdated, this,
-                std::placeholders::_1),
-      cluster_config_watch_task_.task());
+  WatchServingSTH(std::bind(&EtcdConsistentStore::OnEtcdServingSTHUpdated,
+                            this, std::placeholders::_1),
+                  serving_sth_watch_task_.task());
+  WatchClusterConfig(std::bind(&EtcdConsistentStore::OnClusterConfigUpdated,
+                               this, std::placeholders::_1),
+                     cluster_config_watch_task_.task());
 
   StartEtcdStatsFetch();
 
@@ -145,8 +144,7 @@ EtcdConsistentStore<Logged>::EtcdConsistentStore(
 }
 
 
-template <class Logged>
-EtcdConsistentStore<Logged>::~EtcdConsistentStore() {
+EtcdConsistentStore::~EtcdConsistentStore() {
   VLOG(1) << "Cancelling watch tasks.";
   serving_sth_watch_task_.Cancel();
   cluster_config_watch_task_.Cancel();
@@ -165,9 +163,8 @@ EtcdConsistentStore<Logged>::~EtcdConsistentStore() {
 }
 
 
-template <class Logged>
-util::StatusOr<int64_t>
-EtcdConsistentStore<Logged>::NextAvailableSequenceNumber() const {
+util::StatusOr<int64_t> EtcdConsistentStore::NextAvailableSequenceNumber()
+    const {
   ScopedLatency scoped_latency(etcd_latency_by_op_ms.GetScopedLatency(
       "next_available_sequence_number"));
 
@@ -194,8 +191,7 @@ EtcdConsistentStore<Logged>::NextAvailableSequenceNumber() const {
 }
 
 
-template <class Logged>
-void EtcdConsistentStore<Logged>::WaitForServingSTHVersion(
+void EtcdConsistentStore::WaitForServingSTHVersion(
     std::unique_lock<std::mutex>* lock, const int version) {
   VLOG(1) << "Waiting for ServingSTH version " << version;
   serving_sth_cv_.wait(*lock, [this, version]() {
@@ -207,8 +203,7 @@ void EtcdConsistentStore<Logged>::WaitForServingSTHVersion(
 }
 
 
-template <class Logged>
-util::Status EtcdConsistentStore<Logged>::SetServingSTH(
+util::Status EtcdConsistentStore::SetServingSTH(
     const ct::SignedTreeHead& new_sth) {
   ScopedLatency scoped_latency(
       etcd_latency_by_op_ms.GetScopedLatency("set_serving_sth"));
@@ -253,9 +248,7 @@ util::Status EtcdConsistentStore<Logged>::SetServingSTH(
 }
 
 
-template <class Logged>
-util::StatusOr<ct::SignedTreeHead> EtcdConsistentStore<Logged>::GetServingSTH()
-    const {
+util::StatusOr<ct::SignedTreeHead> EtcdConsistentStore::GetServingSTH() const {
   std::lock_guard<std::mutex> lock(mutex_);
   if (serving_sth_) {
     return serving_sth_->Entry();
@@ -265,8 +258,7 @@ util::StatusOr<ct::SignedTreeHead> EtcdConsistentStore<Logged>::GetServingSTH()
 }
 
 
-template <class Logged>
-bool LeafEntriesMatch(const Logged& a, const Logged& b) {
+bool LeafEntriesMatch(const LoggedEntry& a, const LoggedEntry& b) {
   CHECK_EQ(a.entry().type(), b.entry().type());
   switch (a.entry().type()) {
     case ct::X509_ENTRY:
@@ -290,8 +282,7 @@ bool LeafEntriesMatch(const Logged& a, const Logged& b) {
 }
 
 
-template <class Logged>
-util::Status EtcdConsistentStore<Logged>::AddPendingEntry(Logged* entry) {
+util::Status EtcdConsistentStore::AddPendingEntry(LoggedEntry* entry) {
   ScopedLatency scoped_latency(
       etcd_latency_by_op_ms.GetScopedLatency("add_pending_entry"));
 
@@ -304,11 +295,11 @@ util::Status EtcdConsistentStore<Logged>::AddPendingEntry(Logged* entry) {
   }
 
   const std::string full_path(GetEntryPath(*entry));
-  EntryHandle<Logged> handle(full_path, *entry);
+  EntryHandle<LoggedEntry> handle(full_path, *entry);
   status = CreateEntry(&handle);
   if (status.CanonicalCode() == util::error::FAILED_PRECONDITION) {
     // Entry with that hash already exists.
-    EntryHandle<Logged> preexisting_entry;
+    EntryHandle<LoggedEntry> preexisting_entry;
     status = GetEntry(full_path, &preexisting_entry);
     if (!status.ok()) {
       LOG(ERROR) << "Couldn't create or fetch " << full_path << " : "
@@ -326,9 +317,9 @@ util::Status EtcdConsistentStore<Logged>::AddPendingEntry(Logged* entry) {
   return status;
 }
 
-template <class Logged>
-util::Status EtcdConsistentStore<Logged>::GetPendingEntryForHash(
-    const std::string& hash, EntryHandle<Logged>* entry) const {
+
+util::Status EtcdConsistentStore::GetPendingEntryForHash(
+    const std::string& hash, EntryHandle<LoggedEntry>* entry) const {
   ScopedLatency scoped_latency(
       etcd_latency_by_op_ms.GetScopedLatency("get_pending_entry_for_hash"));
 
@@ -341,9 +332,8 @@ util::Status EtcdConsistentStore<Logged>::GetPendingEntryForHash(
 }
 
 
-template <class Logged>
-util::Status EtcdConsistentStore<Logged>::GetPendingEntries(
-    std::vector<EntryHandle<Logged>>* entries) const {
+util::Status EtcdConsistentStore::GetPendingEntries(
+    std::vector<EntryHandle<LoggedEntry>>* entries) const {
   ScopedLatency scoped_latency(
       etcd_latency_by_op_ms.GetScopedLatency("get_pending_entries"));
 
@@ -358,8 +348,7 @@ util::Status EtcdConsistentStore<Logged>::GetPendingEntries(
 }
 
 
-template <class Logged>
-util::Status EtcdConsistentStore<Logged>::GetSequenceMapping(
+util::Status EtcdConsistentStore::GetSequenceMapping(
     EntryHandle<ct::SequenceMapping>* sequence_mapping) const {
   ScopedLatency scoped_latency(
       etcd_latency_by_op_ms.GetScopedLatency("get_sequence_mapping"));
@@ -376,8 +365,7 @@ util::Status EtcdConsistentStore<Logged>::GetSequenceMapping(
 }
 
 
-template <class Logged>
-util::Status EtcdConsistentStore<Logged>::UpdateSequenceMapping(
+util::Status EtcdConsistentStore::UpdateSequenceMapping(
     EntryHandle<ct::SequenceMapping>* entry) {
   ScopedLatency scoped_latency(
       etcd_latency_by_op_ms.GetScopedLatency("update_sequence_mapping"));
@@ -389,9 +377,8 @@ util::Status EtcdConsistentStore<Logged>::UpdateSequenceMapping(
 }
 
 
-template <class Logged>
-util::StatusOr<ct::ClusterNodeState>
-EtcdConsistentStore<Logged>::GetClusterNodeState() const {
+util::StatusOr<ct::ClusterNodeState> EtcdConsistentStore::GetClusterNodeState()
+    const {
   ScopedLatency scoped_latency(
       etcd_latency_by_op_ms.GetScopedLatency("get_cluster_node_state"));
 
@@ -404,8 +391,7 @@ EtcdConsistentStore<Logged>::GetClusterNodeState() const {
 }
 
 
-template <class Logged>
-util::Status EtcdConsistentStore<Logged>::SetClusterNodeState(
+util::Status EtcdConsistentStore::SetClusterNodeState(
     const ct::ClusterNodeState& state) {
   ScopedLatency scoped_latency(
       etcd_latency_by_op_ms.GetScopedLatency("set_cluster_node_state"));
@@ -421,9 +407,8 @@ util::Status EtcdConsistentStore<Logged>::SetClusterNodeState(
 
 
 // static
-template <class Logged>
 template <class T, class CB>
-void EtcdConsistentStore<Logged>::ConvertSingleUpdate(
+void EtcdConsistentStore::ConvertSingleUpdate(
     const std::string& full_path, const CB& callback,
     const std::vector<EtcdClient::Node>& updates) {
   CHECK_LE(static_cast<size_t>(0), updates.size());
@@ -438,9 +423,8 @@ void EtcdConsistentStore<Logged>::ConvertSingleUpdate(
 
 
 // static
-template <class Logged>
 template <class T, class CB>
-void EtcdConsistentStore<Logged>::ConvertMultipleUpdate(
+void EtcdConsistentStore::ConvertMultipleUpdate(
     const CB& callback, const std::vector<EtcdClient::Node>& watch_updates) {
   std::vector<Update<T>> updates;
   for (auto& w : watch_updates) {
@@ -450,53 +434,50 @@ void EtcdConsistentStore<Logged>::ConvertMultipleUpdate(
 }
 
 
-template <class Logged>
-void EtcdConsistentStore<Logged>::WatchServingSTH(
-    const typename ConsistentStore<Logged>::ServingSTHCallback& cb,
+void EtcdConsistentStore::WatchServingSTH(
+    const typename ConsistentStore<LoggedEntry>::ServingSTHCallback& cb,
     util::Task* task) {
   const std::string full_path(GetFullPath(kServingSthFile));
   client_->Watch(
       full_path,
       std::bind(&ConvertSingleUpdate<
                     ct::SignedTreeHead,
-                    typename ConsistentStore<Logged>::ServingSTHCallback>,
+                    typename ConsistentStore<LoggedEntry>::ServingSTHCallback>,
                 full_path, cb, std::placeholders::_1),
       task);
 }
 
 
-template <class Logged>
-void EtcdConsistentStore<Logged>::WatchClusterNodeStates(
-    const typename ConsistentStore<Logged>::ClusterNodeStateCallback& cb,
+void EtcdConsistentStore::WatchClusterNodeStates(
+    const typename ConsistentStore<LoggedEntry>::ClusterNodeStateCallback& cb,
     util::Task* task) {
   client_->Watch(
       GetFullPath(kNodesDir),
       std::bind(
           &ConvertMultipleUpdate<
               ct::ClusterNodeState,
-              typename ConsistentStore<Logged>::ClusterNodeStateCallback>,
+              typename ConsistentStore<LoggedEntry>::ClusterNodeStateCallback>,
           cb, std::placeholders::_1),
       task);
 }
 
 
-template <class Logged>
-void EtcdConsistentStore<Logged>::WatchClusterConfig(
-    const typename ConsistentStore<Logged>::ClusterConfigCallback& cb,
+void EtcdConsistentStore::WatchClusterConfig(
+    const typename ConsistentStore<LoggedEntry>::ClusterConfigCallback& cb,
     util::Task* task) {
   const std::string full_path(GetFullPath(kClusterConfigFile));
   client_->Watch(
       full_path,
-      std::bind(&ConvertSingleUpdate<
-                    ct::ClusterConfig,
-                    typename ConsistentStore<Logged>::ClusterConfigCallback>,
-                full_path, cb, std::placeholders::_1),
+      std::bind(
+          &ConvertSingleUpdate<
+              ct::ClusterConfig,
+              typename ConsistentStore<LoggedEntry>::ClusterConfigCallback>,
+          full_path, cb, std::placeholders::_1),
       task);
 }
 
 
-template <class Logged>
-util::Status EtcdConsistentStore<Logged>::SetClusterConfig(
+util::Status EtcdConsistentStore::SetClusterConfig(
     const ct::ClusterConfig& config) {
   ScopedLatency scoped_latency(
       etcd_latency_by_op_ms.GetScopedLatency("set_cluster_config"));
@@ -507,10 +488,9 @@ util::Status EtcdConsistentStore<Logged>::SetClusterConfig(
 }
 
 
-template <class Logged>
 template <class T>
-util::Status EtcdConsistentStore<Logged>::GetEntry(
-    const std::string& path, EntryHandle<T>* entry) const {
+util::Status EtcdConsistentStore::GetEntry(const std::string& path,
+                                           EntryHandle<T>* entry) const {
   ScopedLatency scoped_latency(
       etcd_latency_by_op_ms.GetScopedLatency("get_entry"));
 
@@ -529,10 +509,9 @@ util::Status EtcdConsistentStore<Logged>::GetEntry(
 }
 
 
-template <class Logged>
-template <class T>
-util::Status EtcdConsistentStore<Logged>::GetAllEntriesInDir(
-    const std::string& dir, std::vector<EntryHandle<T>>* entries) const {
+util::Status EtcdConsistentStore::GetAllEntriesInDir(
+    const std::string& dir,
+    std::vector<EntryHandle<LoggedEntry>>* entries) const {
   ScopedLatency scoped_latency(
       etcd_latency_by_op_ms.GetScopedLatency("get_all_entries_in_dir"));
 
@@ -550,18 +529,17 @@ util::Status EtcdConsistentStore<Logged>::GetAllEntriesInDir(
                         "node is not a directory: " + dir);
   }
   for (const auto& node : resp.node.nodes_) {
-    T t;
-    CHECK(t.ParseFromString(util::FromBase64(node.value_.c_str())));
+    LoggedEntry entry;
+    CHECK(entry.ParseFromString(util::FromBase64(node.value_.c_str())));
     entries->emplace_back(
-        EntryHandle<Logged>(node.key_, t, node.modified_index_));
+        EntryHandle<LoggedEntry>(node.key_, entry, node.modified_index_));
   }
   return util::Status::OK;
 }
 
 
-template <class Logged>
 template <class T>
-util::Status EtcdConsistentStore<Logged>::UpdateEntry(EntryHandle<T>* t) {
+util::Status EtcdConsistentStore::UpdateEntry(EntryHandle<T>* t) {
   ScopedLatency scoped_latency(
       etcd_latency_by_op_ms.GetScopedLatency("update_entry"));
 
@@ -582,9 +560,8 @@ util::Status EtcdConsistentStore<Logged>::UpdateEntry(EntryHandle<T>* t) {
 }
 
 
-template <class Logged>
 template <class T>
-util::Status EtcdConsistentStore<Logged>::CreateEntry(EntryHandle<T>* t) {
+util::Status EtcdConsistentStore::CreateEntry(EntryHandle<T>* t) {
   ScopedLatency scoped_latency(
       etcd_latency_by_op_ms.GetScopedLatency("create_entry"));
 
@@ -604,9 +581,8 @@ util::Status EtcdConsistentStore<Logged>::CreateEntry(EntryHandle<T>* t) {
 }
 
 
-template <class Logged>
 template <class T>
-util::Status EtcdConsistentStore<Logged>::ForceSetEntry(EntryHandle<T>* t) {
+util::Status EtcdConsistentStore::ForceSetEntry(EntryHandle<T>* t) {
   ScopedLatency scoped_latency(
       etcd_latency_by_op_ms.GetScopedLatency("force_set_entry"));
 
@@ -630,9 +606,8 @@ util::Status EtcdConsistentStore<Logged>::ForceSetEntry(EntryHandle<T>* t) {
 }
 
 
-template <class Logged>
 template <class T>
-util::Status EtcdConsistentStore<Logged>::ForceSetEntryWithTTL(
+util::Status EtcdConsistentStore::ForceSetEntryWithTTL(
     const std::chrono::seconds& ttl, EntryHandle<T>* t) {
   ScopedLatency scoped_latency(
       etcd_latency_by_op_ms.GetScopedLatency("force_set_entry_with_ttl"));
@@ -659,9 +634,7 @@ util::Status EtcdConsistentStore<Logged>::ForceSetEntryWithTTL(
 }
 
 
-template <class Logged>
-util::Status EtcdConsistentStore<Logged>::DeleteEntry(
-    const EntryHandleBase& entry) {
+util::Status EtcdConsistentStore::DeleteEntry(const EntryHandleBase& entry) {
   ScopedLatency scoped_latency(
       etcd_latency_by_op_ms.GetScopedLatency("delete_entry"));
 
@@ -674,38 +647,29 @@ util::Status EtcdConsistentStore<Logged>::DeleteEntry(
 }
 
 
-template <class Logged>
-std::string EtcdConsistentStore<Logged>::GetEntryPath(
-    const Logged& entry) const {
+std::string EtcdConsistentStore::GetEntryPath(const LoggedEntry& entry) const {
   return GetEntryPath(entry.Hash());
 }
 
 
-template <class Logged>
-std::string EtcdConsistentStore<Logged>::GetEntryPath(
-    const std::string& hash) const {
+std::string EtcdConsistentStore::GetEntryPath(const std::string& hash) const {
   return GetFullPath(std::string(kEntriesDir) + util::HexString(hash));
 }
 
 
-template <class Logged>
-std::string EtcdConsistentStore<Logged>::GetNodePath(
-    const std::string& id) const {
+std::string EtcdConsistentStore::GetNodePath(const std::string& id) const {
   return GetFullPath(std::string(kNodesDir) + id);
 }
 
 
-template <class Logged>
-std::string EtcdConsistentStore<Logged>::GetFullPath(
-    const std::string& key) const {
+std::string EtcdConsistentStore::GetFullPath(const std::string& key) const {
   CHECK(key.size() > 0);
   CHECK_EQ('/', key[0]);
   return root_ + key;
 }
 
 
-template <class Logged>
-void EtcdConsistentStore<Logged>::CheckMappingIsContiguousWithServingTree(
+void EtcdConsistentStore::CheckMappingIsContiguousWithServingTree(
     const ct::SequenceMapping& mapping) const {
   std::lock_guard<std::mutex> lock(mutex_);
   if (serving_sth_ && mapping.mapping_size() > 0) {
@@ -736,9 +700,8 @@ void EtcdConsistentStore<Logged>::CheckMappingIsContiguousWithServingTree(
 
 
 // static
-template <class Logged>
 template <class T>
-Update<T> EtcdConsistentStore<Logged>::TypedUpdateFromNode(
+Update<T> EtcdConsistentStore::TypedUpdateFromNode(
     const EtcdClient::Node& node) {
   const std::string raw_value(util::FromBase64(node.value_.c_str()));
   T thing;
@@ -751,8 +714,7 @@ Update<T> EtcdConsistentStore<Logged>::TypedUpdateFromNode(
 }
 
 
-template <class Logged>
-void EtcdConsistentStore<Logged>::UpdateLocalServingSTH(
+void EtcdConsistentStore::UpdateLocalServingSTH(
     const std::unique_lock<std::mutex>& lock,
     const EntryHandle<ct::SignedTreeHead>& handle) {
   CHECK(lock.owns_lock());
@@ -764,8 +726,7 @@ void EtcdConsistentStore<Logged>::UpdateLocalServingSTH(
 }
 
 
-template <class Logged>
-void EtcdConsistentStore<Logged>::OnEtcdServingSTHUpdated(
+void EtcdConsistentStore::OnEtcdServingSTHUpdated(
     const Update<ct::SignedTreeHead>& update) {
   std::unique_lock<std::mutex> lock(mutex_);
 
@@ -784,8 +745,7 @@ void EtcdConsistentStore<Logged>::OnEtcdServingSTHUpdated(
 }
 
 
-template <class Logged>
-void EtcdConsistentStore<Logged>::OnClusterConfigUpdated(
+void EtcdConsistentStore::OnClusterConfigUpdated(
     const Update<ct::ClusterConfig>& update) {
   if (update.exists_) {
     VLOG(1) << "Got ClusterConfig version " << update.handle_.Handle() << ": "
@@ -799,8 +759,7 @@ void EtcdConsistentStore<Logged>::OnClusterConfigUpdated(
 }
 
 
-template <class Logged>
-util::StatusOr<int64_t> EtcdConsistentStore<Logged>::CleanupOldEntries() {
+util::StatusOr<int64_t> EtcdConsistentStore::CleanupOldEntries() {
   ScopedLatency scoped_latency(
       etcd_latency_by_op_ms.GetScopedLatency("cleanup_old_entries"));
 
@@ -853,22 +812,20 @@ util::StatusOr<int64_t> EtcdConsistentStore<Logged>::CleanupOldEntries() {
 }
 
 
-template <class Logged>
-void EtcdConsistentStore<Logged>::StartEtcdStatsFetch() {
+void EtcdConsistentStore::StartEtcdStatsFetch() {
   if (etcd_stats_task_.task()->CancelRequested()) {
     etcd_stats_task_.task()->Return(util::Status::CANCELLED);
     return;
   }
   EtcdClient::StatsResponse* response(new EtcdClient::StatsResponse);
   util::Task* stats_task(etcd_stats_task_.task()->AddChild(
-      std::bind(&EtcdConsistentStore<Logged>::EtcdStatsFetchDone, this,
-                response, std::placeholders::_1)));
+      std::bind(&EtcdConsistentStore::EtcdStatsFetchDone, this, response,
+                std::placeholders::_1)));
   client_->GetStoreStats(response, stats_task);
 }
 
 
-template <class Logged>
-void EtcdConsistentStore<Logged>::EtcdStatsFetchDone(
+void EtcdConsistentStore::EtcdStatsFetchDone(
     EtcdClient::StatsResponse* response, util::Task* task) {
   CHECK_NOTNULL(response);
   CHECK_NOTNULL(task);
@@ -896,7 +853,7 @@ void EtcdConsistentStore<Logged>::EtcdStatsFetchDone(
   base_->Delay(
       std::chrono::seconds(FLAGS_etcd_stats_collection_interval_seconds),
       etcd_stats_task_.task()->AddChild(
-          std::bind(&EtcdConsistentStore<Logged>::StartEtcdStatsFetch, this)));
+          std::bind(&EtcdConsistentStore::StartEtcdStatsFetch, this)));
 }
 
 // This method attempts to modulate the incoming traffic in response to the
@@ -905,9 +862,7 @@ void EtcdConsistentStore<Logged>::EtcdStatsFetchDone(
 // Once the number of entries is above reject_threshold, we will start
 // returning a RESOURCE_EXHAUSTED status, which should result in a 503 being
 // sent to the client.
-template <class Logged>
-util::Status EtcdConsistentStore<Logged>::MaybeReject(
-    const std::string& type) const {
+util::Status EtcdConsistentStore::MaybeReject(const std::string& type) const {
   std::unique_lock<std::mutex> lock(mutex_);
 
   if (!cluster_config_) {

@@ -4,7 +4,7 @@
 #include <memory>
 #include <string>
 
-#include "log/etcd_consistent_store-inl.h"
+#include "log/etcd_consistent_store.h"
 #include "log/file_db.h"
 #include "log/log_signer.h"
 #include "log/log_verifier.h"
@@ -63,8 +63,8 @@ class TreeSignerTest : public ::testing::Test {
     verifier_.reset(new LogVerifier(
         TestSigner::DefaultLogSigVerifier(),
         new MerkleVerifier(unique_ptr<Sha256Hasher>(new Sha256Hasher))));
-    store_.reset(new EtcdConsistentStore<LoggedEntry>(
-        base_.get(), &pool_, &etcd_client_, &election_, "/root", "id"));
+    store_.reset(new EtcdConsistentStore(base_.get(), &pool_, &etcd_client_,
+                                         &election_, "/root", "id"));
     log_signer_.reset(TestSigner::DefaultLogSigner());
     tree_signer_.reset(
         new TreeSigner(std::chrono::duration<double>(0), db(),
@@ -128,7 +128,7 @@ class TreeSignerTest : public ::testing::Test {
   FakeEtcdClient etcd_client_;
   ThreadPool pool_;
   NiceMock<MockMasterElection> election_;
-  std::unique_ptr<EtcdConsistentStore<LoggedEntry>> store_;
+  std::unique_ptr<EtcdConsistentStore> store_;
   TestSigner test_signer_;
   unique_ptr<LogVerifier> verifier_;
   unique_ptr<LogSigner> log_signer_;

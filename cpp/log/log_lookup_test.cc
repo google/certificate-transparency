@@ -124,7 +124,7 @@ class LogLookupTest : public ::testing::Test {
   FakeEtcdClient etcd_client_;
   ThreadPool pool_;
   NiceMock<MockMasterElection> election_;
-  cert_trans::EtcdConsistentStore<LoggedEntry> store_;
+  cert_trans::EtcdConsistentStore store_;
   TestSigner test_signer_;
   unique_ptr<LogSigner> log_signer_;
   TreeSigner tree_signer_;
