@@ -117,7 +117,7 @@ public class Deserializer {
       logEntryBuilder.setX509Entry(x509EntryChain);
 
     } else if (entryType == Ct.LogEntryType.PRECERT_ENTRY) {
-      Ct.PrecertChainEntry preCertChain = parsePrecerChainEntry(extraData,
+      Ct.PrecertChainEntry preCertChain = parsePrecertChainEntry(extraData,
         treeLeaf.getTimestampedEntry().getSignedEntry().getPrecert());
        logEntryBuilder.setPrecertEntry(preCertChain);
 
@@ -230,7 +230,7 @@ public class Deserializer {
    * @param preCert Precertificate.
    * @return {@link Ct.PrecertChainEntry} proto object.
    */
-  public static Ct.PrecertChainEntry parsePrecerChainEntry(InputStream in, Ct.PreCert preCert) {
+  public static Ct.PrecertChainEntry parsePrecertChainEntry(InputStream in, Ct.PreCert preCert) {
     Ct.PrecertChainEntry.Builder preCertChain = Ct.PrecertChainEntry.newBuilder();
     preCertChain.setPreCert(preCert);
 
