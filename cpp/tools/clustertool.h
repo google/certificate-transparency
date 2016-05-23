@@ -21,11 +21,11 @@ namespace cert_trans {
 //  - Creates the /cluster_config entry.
 util::Status InitLog(const ct::ClusterConfig& cluster_config,
                      TreeSigner* tree_signer,
-                     ConsistentStore<LoggedEntry>* consistent_store);
+                     ConsistentStore* consistent_store);
 
 // Sets the cluster config
 util::Status SetClusterConfig(const ct::ClusterConfig& cluster_config,
-                              ConsistentStore<LoggedEntry>* consistent_store);
+                              ConsistentStore* consistent_store);
 
 
 }  // namespace cert_trans

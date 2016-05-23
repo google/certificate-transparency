@@ -20,7 +20,7 @@ namespace cert_trans {
 class MasterElection;
 
 
-class EtcdConsistentStore : public ConsistentStore<LoggedEntry> {
+class EtcdConsistentStore : public ConsistentStore {
  public:
   // No change of ownership for |client|, |executor| must continue to be valid
   // at least as long as this object is, and should not be the libevent::Base
@@ -55,17 +55,15 @@ class EtcdConsistentStore : public ConsistentStore<LoggedEntry> {
 
   util::Status SetClusterNodeState(const ct::ClusterNodeState& state) override;
 
-  void WatchServingSTH(
-      const ConsistentStore<LoggedEntry>::ServingSTHCallback& cb,
-      util::Task* task) override;
+  void WatchServingSTH(const ConsistentStore::ServingSTHCallback& cb,
+                       util::Task* task) override;
 
   void WatchClusterNodeStates(
-      const ConsistentStore<LoggedEntry>::ClusterNodeStateCallback& cb,
+      const ConsistentStore::ClusterNodeStateCallback& cb,
       util::Task* task) override;
 
-  void WatchClusterConfig(
-      const ConsistentStore<LoggedEntry>::ClusterConfigCallback& cb,
-      util::Task* task) override;
+  void WatchClusterConfig(const ConsistentStore::ClusterConfigCallback& cb,
+                          util::Task* task) override;
 
   util::Status SetClusterConfig(const ct::ClusterConfig& config) override;
 

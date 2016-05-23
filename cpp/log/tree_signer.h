@@ -36,8 +36,7 @@ class TreeSigner {
   // is moved into this object.
   TreeSigner(const std::chrono::duration<double>& guard_window, Database* db,
              std::unique_ptr<CompactMerkleTree> merkle_tree,
-             cert_trans::ConsistentStore<LoggedEntry>* consistent_store,
-             LogSigner* signer);
+             cert_trans::ConsistentStore* consistent_store, LogSigner* signer);
 
   enum UpdateResult {
     OK,
@@ -70,7 +69,7 @@ class TreeSigner {
 
   const std::chrono::duration<double> guard_window_;
   Database* const db_;
-  cert_trans::ConsistentStore<LoggedEntry>* const consistent_store_;
+  cert_trans::ConsistentStore* const consistent_store_;
   LogSigner* const signer_;
   const std::unique_ptr<CompactMerkleTree> cert_tree_;
   ct::SignedTreeHead latest_tree_head_;

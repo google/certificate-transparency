@@ -20,8 +20,7 @@ using std::string;
 using util::Status;
 
 
-FrontendSigner::FrontendSigner(Database* db,
-                               ConsistentStore<LoggedEntry>* store,
+FrontendSigner::FrontendSigner(Database* db, ConsistentStore* store,
                                LogSigner* signer)
     : db_(CHECK_NOTNULL(db)),
       store_(CHECK_NOTNULL(store)),

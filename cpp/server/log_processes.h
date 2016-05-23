@@ -12,14 +12,13 @@ namespace cert_trans {
 // code is shared by binaries that write to logs, currently ct-server
 // (all versions) and xjson-server.
 
-void CleanUpEntries(ConsistentStore<LoggedEntry>* store,
+void CleanUpEntries(ConsistentStore* store,
                     const std::function<bool()>& is_master);
 
 void SequenceEntries(TreeSigner* tree_signer,
                      const std::function<bool()>& is_master);
 
-void SignMerkleTree(TreeSigner* tree_signer,
-                    ConsistentStore<LoggedEntry>* store,
+void SignMerkleTree(TreeSigner* tree_signer, ConsistentStore* store,
                     ClusterStateController* controller);
 }
 

@@ -109,8 +109,7 @@ class ClusterStateControllerTest : public ::testing::Test {
     return it->second->state();
   }
 
-  static void SetClusterConfig(ConsistentStore<LoggedEntry>* store,
-                               const int min_nodes,
+  static void SetClusterConfig(ConsistentStore* store, const int min_nodes,
                                const double min_fraction) {
     ClusterConfig config;
     config.set_minimum_serving_nodes(min_nodes);

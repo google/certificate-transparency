@@ -99,9 +99,8 @@ pair<string, int> ClusterStateController::ClusterPeer::GetHostPort() const {
 // Pierre's task-a-palooza idea perhaps?
 ClusterStateController::ClusterStateController(
     Executor* executor, const shared_ptr<libevent::Base>& base,
-    UrlFetcher* url_fetcher, Database* database,
-    ConsistentStore<LoggedEntry>* store, MasterElection* election,
-    ContinuousFetcher* fetcher)
+    UrlFetcher* url_fetcher, Database* database, ConsistentStore* store,
+    MasterElection* election, ContinuousFetcher* fetcher)
     : base_(base),
       url_fetcher_(CHECK_NOTNULL(url_fetcher)),
       database_(CHECK_NOTNULL(database)),

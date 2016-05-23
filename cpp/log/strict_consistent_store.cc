@@ -7,8 +7,8 @@ using util::StatusOr;
 namespace cert_trans {
 
 
-StrictConsistentStore::StrictConsistentStore(
-    const MasterElection* election, ConsistentStore<LoggedEntry>* peer)
+StrictConsistentStore::StrictConsistentStore(const MasterElection* election,
+                                             ConsistentStore* peer)
     : election_(CHECK_NOTNULL(election)), peer_(CHECK_NOTNULL(peer)) {
 }
 

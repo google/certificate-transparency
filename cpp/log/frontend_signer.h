@@ -22,8 +22,7 @@ class Database;
 class FrontendSigner {
  public:
   // Does not take ownership of |db|, |store| or |signer|.
-  FrontendSigner(cert_trans::Database* db,
-                 cert_trans::ConsistentStore<cert_trans::LoggedEntry>* store,
+  FrontendSigner(cert_trans::Database* db, cert_trans::ConsistentStore* store,
                  LogSigner* signer);
 
   // Log the entry if it's not already in the database,
@@ -38,7 +37,7 @@ class FrontendSigner {
                         ct::SignedCertificateTimestamp* sct) const;
 
   cert_trans::Database* const db_;
-  cert_trans::ConsistentStore<cert_trans::LoggedEntry>* const store_;
+  cert_trans::ConsistentStore* const store_;
   LogSigner* const signer_;
 
   DISALLOW_COPY_AND_ASSIGN(FrontendSigner);

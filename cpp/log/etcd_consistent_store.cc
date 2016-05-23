@@ -454,40 +454,36 @@ void EtcdConsistentStore::ConvertMultipleUpdate(
 
 
 void EtcdConsistentStore::WatchServingSTH(
-    const ConsistentStore<LoggedEntry>::ServingSTHCallback& cb, Task* task) {
+    const ConsistentStore::ServingSTHCallback& cb, Task* task) {
   const string full_path(GetFullPath(kServingSthFile));
   client_->Watch(full_path,
                  bind(&ConvertSingleUpdate<
-                          SignedTreeHead,
-                          ConsistentStore<LoggedEntry>::ServingSTHCallback>,
+                          SignedTreeHead, ConsistentStore::ServingSTHCallback>,
                       full_path, cb, _1),
                  task);
 }
 
 
 void EtcdConsistentStore::WatchClusterNodeStates(
-    const ConsistentStore<LoggedEntry>::ClusterNodeStateCallback& cb,
-    Task* task) {
+    const ConsistentStore::ClusterNodeStateCallback& cb, Task* task) {
   client_->Watch(
       GetFullPath(kNodesDir),
-      bind(&ConvertMultipleUpdate<
-               ClusterNodeState,
-               ConsistentStore<LoggedEntry>::ClusterNodeStateCallback>,
+      bind(&ConvertMultipleUpdate<ClusterNodeState,
+                                  ConsistentStore::ClusterNodeStateCallback>,
            cb, _1),
       task);
 }
 
 
 void EtcdConsistentStore::WatchClusterConfig(
-    const ConsistentStore<LoggedEntry>::ClusterConfigCallback& cb,
-    Task* task) {
+    const ConsistentStore::ClusterConfigCallback& cb, Task* task) {
   const string full_path(GetFullPath(kClusterConfigFile));
-  client_->Watch(full_path,
-                 bind(&ConvertSingleUpdate<
-                          ClusterConfig,
-                          ConsistentStore<LoggedEntry>::ClusterConfigCallback>,
-                      full_path, cb, _1),
-                 task);
+  client_->Watch(
+      full_path,
+      bind(&ConvertSingleUpdate<ClusterConfig,
+                                ConsistentStore::ClusterConfigCallback>,
+           full_path, cb, _1),
+      task);
 }
 
 

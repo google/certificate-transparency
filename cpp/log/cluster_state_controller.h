@@ -34,8 +34,8 @@ class ClusterStateController {
   ClusterStateController(util::Executor* executor,
                          const std::shared_ptr<libevent::Base>& base,
                          UrlFetcher* url_fetcher, Database* database,
-                         ConsistentStore<LoggedEntry>* store,
-                         MasterElection* election, ContinuousFetcher* fetcher);
+                         ConsistentStore* store, MasterElection* election,
+                         ContinuousFetcher* fetcher);
 
   ~ClusterStateController();
 
@@ -117,11 +117,11 @@ class ClusterStateController {
   void ClusterServingSTHUpdater();
 
   const std::shared_ptr<libevent::Base> base_;
-  UrlFetcher* const url_fetcher_;         // Not owned by us
-  Database* const database_;              // Not owned by us
-  ConsistentStore<LoggedEntry>* const store_;  // Not owned by us
-  MasterElection* const election_;        // Not owned by us
-  ContinuousFetcher* const fetcher_;      // Not owned by us
+  UrlFetcher* const url_fetcher_;     // Not owned by us
+  Database* const database_;          // Not owned by us
+  ConsistentStore* const store_;      // Not owned by us
+  MasterElection* const election_;    // Not owned by us
+  ContinuousFetcher* const fetcher_;  // Not owned by us
   util::SyncTask watch_config_task_;
   util::SyncTask watch_node_states_task_;
   util::SyncTask watch_serving_sth_task_;

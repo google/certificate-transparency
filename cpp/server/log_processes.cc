@@ -66,8 +66,7 @@ static const bool sign_dummy =
 
 namespace cert_trans {
 
-void SignMerkleTree(TreeSigner* tree_signer,
-                    ConsistentStore<LoggedEntry>* store,
+void SignMerkleTree(TreeSigner* tree_signer, ConsistentStore* store,
                     ClusterStateController* controller) {
   CHECK_NOTNULL(tree_signer);
   CHECK_NOTNULL(store);
@@ -107,7 +106,7 @@ void SignMerkleTree(TreeSigner* tree_signer,
   }
 }
 
-void CleanUpEntries(ConsistentStore<LoggedEntry>* store,
+void CleanUpEntries(ConsistentStore* store,
                     const function<bool()>& is_master) {
   CHECK_NOTNULL(store);
   CHECK(is_master);

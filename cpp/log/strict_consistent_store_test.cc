@@ -29,7 +29,7 @@ using util::testing::StatusIs;
 class StrictConsistentStoreTest : public ::testing::TestWithParam<bool> {
  public:
   StrictConsistentStoreTest()
-      : peer_(new NiceMock<MockConsistentStore<LoggedEntry>>()),
+      : peer_(new NiceMock<MockConsistentStore>()),
         strict_store_(&election_, peer_) {
     ON_CALL(election_, IsMaster()).WillByDefault(Return(IsMaster()));
   }
@@ -41,7 +41,7 @@ class StrictConsistentStoreTest : public ::testing::TestWithParam<bool> {
 
   NiceMock<MockMasterElection> election_;
   // strict_store_ takes ownership of this:
-  NiceMock<MockConsistentStore<LoggedEntry>>* peer_;
+  NiceMock<MockConsistentStore>* peer_;
   StrictConsistentStore strict_store_;
 };
 

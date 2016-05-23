@@ -71,8 +71,7 @@ bool PendingEntriesOrder::operator()(const EntryHandle<LoggedEntry>& x,
 
 TreeSigner::TreeSigner(const duration<double>& guard_window, Database* db,
                        unique_ptr<CompactMerkleTree> merkle_tree,
-                       ConsistentStore<LoggedEntry>* consistent_store,
-                       LogSigner* signer)
+                       ConsistentStore* consistent_store, LogSigner* signer)
     : guard_window_(guard_window),
       db_(db),
       consistent_store_(consistent_store),

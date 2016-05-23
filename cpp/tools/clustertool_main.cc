@@ -84,9 +84,9 @@ unique_ptr<LogSigner> BuildLogSigner() {
 }
 
 
-unique_ptr<TreeSigner> BuildTreeSigner(
-    Database* db, ConsistentStore<LoggedEntry>* consistent_store,
-    LogSigner* log_signer) {
+unique_ptr<TreeSigner> BuildTreeSigner(Database* db,
+                                       ConsistentStore* consistent_store,
+                                       LogSigner* log_signer) {
   return unique_ptr<TreeSigner>(
       new TreeSigner(std::chrono::duration<double>(0), db,
                      unique_ptr<CompactMerkleTree>(new CompactMerkleTree(

@@ -6,11 +6,11 @@
 #include <vector>
 
 #include "base/macros.h"
+#include "log/logged_entry.h"
 #include "proto/ct.pb.h"
 #include "util/status.h"
 #include "util/statusor.h"
 #include "util/task.h"
-
 
 namespace cert_trans {
 
@@ -119,7 +119,6 @@ struct Update {
 };
 
 
-template <class Logged>
 class ConsistentStore {
  public:
   typedef std::function<void(const Update<ct::SignedTreeHead>& update)>
@@ -139,13 +138,13 @@ class ConsistentStore {
 
   virtual util::StatusOr<ct::SignedTreeHead> GetServingSTH() const = 0;
 
-  virtual util::Status AddPendingEntry(Logged* entry) = 0;
+  virtual util::Status AddPendingEntry(LoggedEntry* entry) = 0;
 
   virtual util::Status GetPendingEntryForHash(
-      const std::string& hash, EntryHandle<Logged>* entry) const = 0;
+      const std::string& hash, EntryHandle<LoggedEntry>* entry) const = 0;
 
   virtual util::Status GetPendingEntries(
-      std::vector<EntryHandle<Logged>>* entries) const = 0;
+      std::vector<EntryHandle<LoggedEntry>>* entries) const = 0;
 
   virtual util::Status GetSequenceMapping(
       EntryHandle<ct::SequenceMapping>* entry) const = 0;

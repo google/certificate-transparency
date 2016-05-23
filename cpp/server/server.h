@@ -20,7 +20,6 @@ namespace cert_trans {
 
 class ClusterStateController;
 // TODO(pphaneuf): Not needed?
-template <class Logged>
 class ConsistentStore;
 class ContinuousFetcher;
 class Database;
@@ -50,7 +49,7 @@ class Server {
 
   bool IsMaster() const;
   MasterElection* election();
-  ConsistentStore<LoggedEntry>* consistent_store();
+  ConsistentStore* consistent_store();
   ClusterStateController* cluster_state_controller();
   LogLookup* log_lookup();
   ContinuousFetcher* continuous_fetcher();

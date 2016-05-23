@@ -168,7 +168,7 @@ MasterElection* Server::election() {
 }
 
 
-ConsistentStore<LoggedEntry>* Server::consistent_store() {
+ConsistentStore* Server::consistent_store() {
   return &consistent_store_;
 }
 

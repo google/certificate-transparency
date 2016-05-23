@@ -7,8 +7,7 @@
 
 namespace cert_trans {
 
-template <class Logged>
-class MockConsistentStore : public ConsistentStore<Logged> {
+class MockConsistentStore : public ConsistentStore {
  public:
   MOCK_CONST_METHOD0_T(NextAvailableSequenceNumber, util::StatusOr<int64_t>());
 
@@ -16,15 +15,15 @@ class MockConsistentStore : public ConsistentStore<Logged> {
 
   MOCK_CONST_METHOD0_T(GetServingSTH, util::StatusOr<ct::SignedTreeHead>());
 
-  MOCK_METHOD1_T(AddPendingEntry, util::Status(Logged* entry));
+  MOCK_METHOD1_T(AddPendingEntry, util::Status(LoggedEntry* entry));
 
   MOCK_CONST_METHOD2_T(GetPendingEntryForHash,
                        util::Status(const std::string& hash,
-                                    EntryHandle<Logged>* entry));
+                                    EntryHandle<LoggedEntry>* entry));
 
   MOCK_CONST_METHOD1_T(
       GetPendingEntries,
-      util::Status(std::vector<EntryHandle<Logged>>* entries));
+      util::Status(std::vector<EntryHandle<LoggedEntry>>* entries));
 
   MOCK_CONST_METHOD1_T(
       GetSequenceMapping,
@@ -39,21 +38,17 @@ class MockConsistentStore : public ConsistentStore<Logged> {
   MOCK_METHOD1_T(SetClusterNodeState,
                  util::Status(const ct::ClusterNodeState& state));
 
-  MOCK_METHOD2_T(
-      WatchServingSTH,
-      void(const typename ConsistentStore<Logged>::ServingSTHCallback& cb,
-           util::Task* task));
+  MOCK_METHOD2_T(WatchServingSTH,
+                 void(const ConsistentStore::ServingSTHCallback& cb,
+                      util::Task* task));
 
-  MOCK_METHOD2_T(
-      WatchClusterNodeStates,
-      void(
-          const typename ConsistentStore<Logged>::ClusterNodeStateCallback& cb,
-          util::Task* task));
+  MOCK_METHOD2_T(WatchClusterNodeStates,
+                 void(const ConsistentStore::ClusterNodeStateCallback& cb,
+                      util::Task* task));
 
-  MOCK_METHOD2_T(
-      WatchClusterConfig,
-      void(const typename ConsistentStore<Logged>::ClusterConfigCallback& cb,
-           util::Task* task));
+  MOCK_METHOD2_T(WatchClusterConfig,
+                 void(const ConsistentStore::ClusterConfigCallback& cb,
+                      util::Task* task));
 
   MOCK_METHOD1(SetClusterConfig, util::Status(const ct::ClusterConfig&));
 

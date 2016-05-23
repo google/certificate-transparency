@@ -15,11 +15,10 @@ namespace cert_trans {
 // action (especially a long running action, e.g. a signing run) with a check
 // to IsMaster(), it is still necessarily racy because etcd doesn't support
 // atomic updates across keys.)
-class StrictConsistentStore : public ConsistentStore<LoggedEntry> {
+class StrictConsistentStore : public ConsistentStore {
  public:
   // Takes ownership of |peer|, but not |election|
-  StrictConsistentStore(const MasterElection* election,
-                        ConsistentStore<LoggedEntry>* peer);
+  StrictConsistentStore(const MasterElection* election, ConsistentStore* peer);
 
   virtual ~StrictConsistentStore() = default;
 
@@ -71,27 +70,25 @@ class StrictConsistentStore : public ConsistentStore<LoggedEntry> {
     return peer_->SetClusterNodeState(state);
   }
 
-  void WatchServingSTH(
-      const typename ConsistentStore<LoggedEntry>::ServingSTHCallback& cb,
-      util::Task* task) override {
+  void WatchServingSTH(const ConsistentStore::ServingSTHCallback& cb,
+                       util::Task* task) override {
     return peer_->WatchServingSTH(cb, task);
   }
 
-  void WatchClusterNodeStates(const typename ConsistentStore<
-                                  LoggedEntry>::ClusterNodeStateCallback& cb,
-                              util::Task* task) override {
+  void WatchClusterNodeStates(
+      const ConsistentStore::ClusterNodeStateCallback& cb,
+      util::Task* task) override {
     return peer_->WatchClusterNodeStates(cb, task);
   }
 
-  void WatchClusterConfig(
-      const typename ConsistentStore<LoggedEntry>::ClusterConfigCallback& cb,
-      util::Task* task) override {
+  void WatchClusterConfig(const ConsistentStore::ClusterConfigCallback& cb,
+                          util::Task* task) override {
     return peer_->WatchClusterConfig(cb, task);
   }
 
  private:
   const MasterElection* const election_;  // Not owned by us
-  const std::unique_ptr<ConsistentStore<LoggedEntry>> peer_;
+  const std::unique_ptr<ConsistentStore> peer_;
 };
 
 
