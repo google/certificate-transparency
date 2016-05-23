@@ -317,6 +317,7 @@ cpp_tools_ct_clustertool_LDADD = \
 	-lprotobuf -lsqlite3
 cpp_tools_ct_clustertool_SOURCES = \
 	cpp/proto/serializer.cc \
+	cpp/tools/clustertool.cc \
 	cpp/tools/clustertool_main.cc \
 	cpp/util/init.cc \
 	cpp/util/json_wrapper.cc \
