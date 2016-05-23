@@ -17,6 +17,7 @@ certificate-transparency: Auditing for TLS certificates
     - [Unit Tests](#unit-tests)
     - [Testing and Logging Options](#testing-and-logging-options)
  - [Deploying a Log](#deploying-a-log)
+ - [Operating a Log](#operating-a-log)
 
 Introduction
 ------------
@@ -291,3 +292,11 @@ In particular, as show in the following diagram:
 
 Configuring and setting up a distributed production log is covered in a
 [separate document](docs/Deployment.md).
+
+
+Operating a Log
+---------------
+
+Running a successful, trusted, certificate transparency log involves more than
+just deploying a set of binaries.  Information and advice on operating a
+running CT log is covered in a [separate document](docs/Operation.md)
