@@ -1,7 +1,9 @@
 #ifndef CERT_TRANS_TOOLS_CLUSTERTOOL_H_
 #define CERT_TRANS_TOOLS_CLUSTERTOOL_H_
 
+#include "log/consistent_store.h"
 #include "log/logged_entry.h"
+#include "log/tree_signer.h"
 
 namespace ct {
 class ClusterConfig;
