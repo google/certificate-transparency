@@ -216,7 +216,7 @@
 
   <target name="run.ctlogclient.tests" depends="compile.ctlogclient.tests" description="Run ctlogclient tests." unless="skip.tests">
     <mkdir dir="${ctlogclient.testlogs.dir}"/>
-    <junit printsummary="on" fork="true" logfailedtests="true">
+    <junit printsummary="on" fork="true" logfailedtests="true" haltonfailure="true">
       <classpath refid="ctlogclient.test.runtime.classpath"/>
       <formatter type="plain"/>
       <batchtest todir="${ctlogclient.testlogs.dir}">
