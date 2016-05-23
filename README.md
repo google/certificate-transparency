@@ -26,14 +26,14 @@ This repository holds open-source code for functionality related
 to [certificate transparency](https://www.certificate-transparency.org/) (CT).
 The main areas covered are:
 
- - An open-source, distributed, implementation of a CT log server, also including:
-    - An implementation of a read-only "mirror" server that mimics a remote log.
-    - Ancillary tools needed for managing and maintaining the log.
- - A collection of client tools and libraries for interacting with a CT log, in
+ - An open-source, distributed, implementation of a CT Log server, also including:
+    - An implementation of a read-only "mirror" server that mimics a remote Log.
+    - Ancillary tools needed for managing and maintaining the Log.
+ - A collection of client tools and libraries for interacting with a CT Log, in
    various programming languages.
  - An **experimental** implementation of a [DNS server](docs/DnsServer.md) that
    returns CT proofs in the form of DNS records.
- - An **experimental** implementation of a [general log](docs/XjsonServer.md)
+ - An **experimental** implementation of a [general Log](docs/XjsonServer.md)
    that allows arbitrary data (not just TLS certificates) to be logged.
 
 The supported platforms are:
@@ -50,7 +50,7 @@ Build Quick Start
 First, ensure that the build machine has all of the required [build dependencies](#build-dependencies).
 Then use
 [gclient](https://www.chromium.org/developers/how-tos/depottools#TOC-gclient) to
-retrieve and build the [other software](#software-dependencies) needed by the log,
+retrieve and build the [other software](#software-dependencies) needed by the Log,
 and then use (GNU) `make` to build and test the CT code:
 
 ```bash
@@ -70,22 +70,22 @@ The source code is generally arranged according to implementation language, in
 the `cpp`, `go`, `java` and `python` subdirectories.  The key subdirectories
 are:
 
- - For the main distributed CT log itself:
-   - `cpp/log`: Main distributed CT log implementation.
+ - For the main distributed CT Log itself:
+   - `cpp/log`: Main distributed CT Log implementation.
    - `cpp/merkletree`: Merkle tree implementation.
    - `cpp/server`: Top-level code for server implementations.
-   - `cpp/monitoring`: Code to export operation statistics from CT log.
- - The CT mirror log implementation also uses:
-   - `cpp/fetcher`: Code to fetch entries from another log
- - Client code for accessing a CT log instance:
-   - `cpp/client`: CT log client code in C++
-   - `go/client`: CT log client code in Go
-   - `python/ct`: CT log client code in Python
-   - `java/src/org/certificatetransparency/ctlog`: CT log client code in Java
+   - `cpp/monitoring`: Code to export operation statistics from CT Log.
+ - The CT mirror Log implementation also uses:
+   - `cpp/fetcher`: Code to fetch entries from another Log
+ - Client code for accessing a CT Log instance:
+   - `cpp/client`: CT Log client code in C++
+   - `go/client`: CT Log client code in Go
+   - `python/ct`: CT Log client code in Python
+   - `java/src/org/certificatetransparency/ctlog`: CT Log client code in Java
  - Other tools:
    - `go/fixchain`: Tool to fix up certificate chains
    - `go/gossip`: Code to allow gossip-based synchronization of cert info
-   - `go/scanner`: CT log scanner tool
+   - `go/scanner`: CT Log scanner tool
    - `go/merkletree`: Merkle tree implementation in Go.
 
 Building the Code
@@ -112,7 +112,7 @@ longer supported.
 Within a main top-level directory, gclient handles the process of:
 
  - generating subdirectories for each dependency
- - generating a subdirectory for for the CT log code itself
+ - generating a subdirectory for for the CT Log code itself
  - building all of the dependencies
  - installing the built dependencies into an `install/` subdirectory
  - configuring the CT build to reference the built dependencies.
@@ -151,7 +151,7 @@ For a Debian-based system, the relevant packages are:
 ### Software Dependencies
 
 The following collections of additional software are used by the main CT
-log codebase.
+Log codebase.
 
  - Google utility libraries:
     - [gflags](https://github.com/gflags/gflags): command-line flag handling
@@ -190,7 +190,7 @@ dependencies:
  - The experimental CT [DNS server](docs/DnsServer.md) uses:
     - [ldnbs](http://www.nlnetlabs.nl/projects/ldns/): DNS library, including
       DNSSEC function (which relies on OpenSSL for crypto functionality)
- - The experimental [general log](docs/XjsonServer.md) uses:
+ - The experimental [general Log](docs/XjsonServer.md) uses:
     - [objecthash](https://github.com/benlaurie/objecthash): tools for
       hashing objects in a language/encoding-agnostic manner
     - [ICU](http://site.icu-project.org/): Unicode libraries (needed to
@@ -281,22 +281,22 @@ Deploying a Log
 ---------------
 
 The build process described so far generates a set of executables; however,
-other components and configuration is needed to set up a running CT log.
+other components and configuration is needed to set up a running CT Log.
 In particular, as show in the following diagram:
  - A set of web servers that act as HTTPS terminators and load
-   balancers is needed in front of the CT log instances.
+   balancers is needed in front of the CT Log instances.
  - A cluster of [etcd](https://github.com/coreos/etcd) instances is needed to
-   provide replication and synchronization services for the CT log instances.
+   provide replication and synchronization services for the CT Log instances.
 
 <img src="docs/images/SystemDiagram.png" width="650">
 
-Configuring and setting up a distributed production log is covered in a
+Configuring and setting up a distributed production Log is covered in a
 [separate document](docs/Deployment.md).
 
 
 Operating a Log
 ---------------
 
-Running a successful, trusted, certificate transparency log involves more than
+Running a successful, trusted, certificate transparency Log involves more than
 just deploying a set of binaries.  Information and advice on operating a
-running CT log is covered in a [separate document](docs/Operation.md)
+running CT Log is covered in a [separate document](docs/Operation.md)
