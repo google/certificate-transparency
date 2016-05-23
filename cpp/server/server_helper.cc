@@ -10,7 +10,7 @@ using std::unique_ptr;
 
 // Main server configuration flags
 DEFINE_string(server, "localhost", "Server host");
-DEFINE_int32(port, 9999, "Server port");
+DEFINE_int32(port, 6962, "Server port");
 DEFINE_string(etcd_root, "/root", "Root of cluster entries in etcd.");
 DEFINE_string(etcd_servers, "",
               "Comma separated list of 'hostname:port' of the etcd server(s)");
