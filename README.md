@@ -15,7 +15,6 @@ certificate-transparency: Auditing for TLS certificates
     - [Using BoringSSL](#using-boringssl)
  - [Testing the code](#testing-the-code)
     - [Unit Tests](#unit-tests)
-    - [End-To-End Test](#end-to-end-test)
     - [Testing and Logging Options](#testing-and-logging-options)
  - [Deploying a Log](#deploying-a-log)
 
@@ -259,15 +258,6 @@ Testing the Code
 The unit tests for the CT code can be run with the `make check` target of
 `certificate-transparency/Makefile`.
 
-### End-To-End Test
-
-The CT codebase includes end-to-end tests that verify the entire process of
-logging a certificate and subsequently proving that the log has the cert.
-This requires a local installation of the [Apache](https://httpd.apache.org/)
-webserver, together with test configuration for it; see
-[test/README](test/README) for instructions.
-
-
 ## Testing and Logging Options ##
 
 Note that several tests write files on disk. The default directory for
@@ -284,8 +274,6 @@ For logging options, see the
 By default, unit tests log to `stderr`, and log only messages with a FATAL
 level (i.e., those that result in abnormal program termination).  You can
 override the defaults with command-line flags.
-
-End-to-end tests log everything at INFO level and above.
 
 
 Deploying a Log
