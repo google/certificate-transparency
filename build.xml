@@ -172,7 +172,7 @@
     <mkdir dir="${ctlogclient.generated.dir}"/>
     <exec executable="${protoc.bin}">
       <arg value="--java_out=${ctlogclient.generated.dir}"/>
-      <arg value="proto/ct.proto"/>
+      <arg value="java/ct.proto"/>
     </exec>
   </target>
 
