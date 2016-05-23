@@ -1,21 +1,21 @@
 package org.certificatetransparency.ctlog;
 
-import org.certificatetransparency.ctlog.proto.Ct;
+import org.certificatetransparency.ctlog.MerkleAuditProof;
 
 /**
  * ParsedLogEntry data type contains an entry retrieved from Log with it's audit proof.
  */
 public class ParsedLogEntryWithProof  {
   private final ParsedLogEntry parsedLogEntry;
-  private final Ct.MerkleAuditProof auditProof;
+  private final MerkleAuditProof auditProof;
 
-  private ParsedLogEntryWithProof(ParsedLogEntry parsedLogEntry, Ct.MerkleAuditProof auditProof) {
+  private ParsedLogEntryWithProof(ParsedLogEntry parsedLogEntry, MerkleAuditProof auditProof) {
     this.parsedLogEntry = parsedLogEntry;
     this.auditProof = auditProof;
   }
 
   public static ParsedLogEntryWithProof newInstance(ParsedLogEntry logEntry,
-    Ct.MerkleAuditProof proof) {
+    MerkleAuditProof proof) {
     return new ParsedLogEntryWithProof(logEntry, proof);
   }
 
@@ -23,7 +23,7 @@ public class ParsedLogEntryWithProof  {
     return parsedLogEntry;
   }
 
-  public Ct.MerkleAuditProof getAuditProof() {
+  public MerkleAuditProof getAuditProof() {
     return auditProof;
   }
 }

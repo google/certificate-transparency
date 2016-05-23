@@ -108,13 +108,6 @@ message MerkleTreeLeaf {
   optional TimestampedEntry timestamped_entry = 3;
 }
 
-message MerkleAuditProof {
-  optional Version version = 1 [ default = UNKNOWN_VERSION ];
-  optional int64 tree_size = 3;
-  optional int64 leaf_index = 5;
-  repeated bytes path_node = 6;
-}
-
 message SignedTreeHead {
   optional Version version = 1 [ default = UNKNOWN_VERSION ];
   optional uint64 timestamp = 3;

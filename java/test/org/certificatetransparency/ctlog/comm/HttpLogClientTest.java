@@ -403,15 +403,15 @@ public class HttpLogClientTest {
         .getCertificateChain(0).toByteArray();
       chainCert = (X509Certificate) CertificateFactory.getInstance("X509").generateCertificate(
         new ByteArrayInputStream(chainCertBytes));
-  
+
     } catch (CertificateException  e) {
       Assert.fail();
     }
 
     Assert.assertTrue(testCert.equals(leafCert));
     Assert.assertTrue(testChainCert.equals(chainCert));
-    Assert.assertEquals(2, entry.getAuditProof().getPathNodeList().size());
-    Assert.assertEquals(1, entry.getAuditProof().getLeafIndex());
-    Assert.assertEquals(2, entry.getAuditProof().getTreeSize());
+    Assert.assertEquals(2, entry.getAuditProof().pathNode.size());
+    Assert.assertEquals(1, entry.getAuditProof().leafIndex);
+    Assert.assertEquals(2, entry.getAuditProof().treeSize);
   }
 }
