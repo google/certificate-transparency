@@ -15,7 +15,7 @@
 #include "log/tree_signer.h"
 #include "proto/cert_serializer.h"
 #include "proto/ct.pb.h"
-#include "tools/clustertool-inl.h"
+#include "tools/clustertool.h"
 #include "util/etcd.h"
 #include "util/init.h"
 #include "util/masterelection.h"
