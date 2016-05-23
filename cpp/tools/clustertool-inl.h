@@ -25,10 +25,9 @@
 namespace cert_trans {
 
 
-template <class Logged>
 util::Status InitLog(const ct::ClusterConfig& cluster_config,
                      TreeSigner* tree_signer,
-                     ConsistentStore<Logged>* consistent_store) {
+                     ConsistentStore<LoggedEntry>* consistent_store) {
   if (tree_signer->UpdateTree() != TreeSigner::OK) {
     return util::Status(util::error::UNKNOWN, "Failed to Update Tree");
   }
@@ -43,9 +42,8 @@ util::Status InitLog(const ct::ClusterConfig& cluster_config,
 }
 
 
-template <class Logged>
 util::Status SetClusterConfig(const ct::ClusterConfig& cluster_config,
-                              ConsistentStore<Logged>* consistent_store) {
+                              ConsistentStore<LoggedEntry>* consistent_store) {
   if (cluster_config.etcd_reject_add_pending_threshold() < 0) {
     return util::Status(util::error::INVALID_ARGUMENT,
                         "etcd_reject_add_pending_threshold cannot be less "
