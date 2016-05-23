@@ -1,7 +1,6 @@
 syntax = "proto2";
 
 package ct;
-option java_package = "org.certificatetransparency.ctlog.proto";
 
 
 ////////////////////////////////////////////////////////////////////////////////
