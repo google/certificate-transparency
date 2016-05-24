@@ -102,12 +102,6 @@ message TimestampedEntry {
   optional SignedEntry signed_entry = 3;
 }
 
-message MerkleTreeLeaf {
-  optional Version version = 1 [ default = UNKNOWN_VERSION ];
-  optional MerkleLeafType type = 2 [ default = UNKNOWN_LEAF_TYPE ];
-  optional TimestampedEntry timestamped_entry = 3;
-}
-
 message SignedTreeHead {
   optional Version version = 1 [ default = UNKNOWN_VERSION ];
   optional uint64 timestamp = 3;

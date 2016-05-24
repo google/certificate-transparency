@@ -5,6 +5,7 @@ import com.google.protobuf.ByteString;
 
 import org.apache.commons.codec.binary.Base64;
 import org.certificatetransparency.ctlog.MerkleAuditProof;
+import org.certificatetransparency.ctlog.MerkleTreeLeaf;
 import org.certificatetransparency.ctlog.ParsedLogEntry;
 import org.certificatetransparency.ctlog.ParsedLogEntryWithProof;
 import org.certificatetransparency.ctlog.proto.Ct;
@@ -104,19 +105,19 @@ public class Deserializer {
    * @return {@link ParsedLogEntry}
    */
   public static ParsedLogEntry parseLogEntry(InputStream merkleTreeLeaf, InputStream extraData) {
-    Ct.MerkleTreeLeaf treeLeaf = parseMerkleTreeLeaf(merkleTreeLeaf);
+    MerkleTreeLeaf treeLeaf = parseMerkleTreeLeaf(merkleTreeLeaf);
     Ct.LogEntry.Builder logEntryBuilder = Ct.LogEntry.newBuilder();
 
-    Ct.LogEntryType entryType = treeLeaf.getTimestampedEntry().getEntryType();
+    Ct.LogEntryType entryType = treeLeaf.timestampedEntry.getEntryType();
 
     if (entryType == Ct.LogEntryType.X509_ENTRY) {
       Ct.X509ChainEntry x509EntryChain = parseX509ChainEntry(extraData,
-        treeLeaf.getTimestampedEntry().getSignedEntry().getX509());
+        treeLeaf.timestampedEntry.getSignedEntry().getX509());
       logEntryBuilder.setX509Entry(x509EntryChain);
 
     } else if (entryType == Ct.LogEntryType.PRECERT_ENTRY) {
       Ct.PrecertChainEntry preCertChain = parsePrecertChainEntry(extraData,
-        treeLeaf.getTimestampedEntry().getSignedEntry().getPrecert());
+        treeLeaf.timestampedEntry.getSignedEntry().getPrecert());
        logEntryBuilder.setPrecertEntry(preCertChain);
 
     } else {
@@ -127,28 +128,23 @@ public class Deserializer {
   }
 
   /**
-   * Parses a {@link Ct.MerkleTreeLeaf} from binary encoding.
+   * Parses a {@link MerkleTreeLeaf} from binary encoding.
    * @param in byte stream of binary encoding.
-   * @return Built {@link Ct.MerkleTreeLeaf}.
+   * @return Built {@link MerkleTreeLeaf}.
    * @throws SerializationException if the data stream is too short.
    */
-  public static Ct.MerkleTreeLeaf parseMerkleTreeLeaf(InputStream in) {
-    Ct.MerkleTreeLeaf.Builder merkleTreeLeafBuilder = Ct.MerkleTreeLeaf.newBuilder();
-
+  public static MerkleTreeLeaf parseMerkleTreeLeaf(InputStream in) {
     int version = (int) readNumber(in, CTConstants.VERSION_LENGTH);
     if (version != Ct.Version.V1.getNumber()) {
       throw new SerializationException(String.format("Unknown version: %d", version));
     }
-    merkleTreeLeafBuilder.setVersion(Ct.Version.valueOf(version));
 
     int leafType = (int) readNumber(in, 1);
     if (leafType != Ct.MerkleLeafType.TIMESTAMPED_ENTRY_VALUE) {
       throw new SerializationException(String.format("Unknown entry type: %d", leafType));
     }
-    merkleTreeLeafBuilder.setType(Ct.MerkleLeafType.valueOf(leafType));
-    merkleTreeLeafBuilder.setTimestampedEntry((parseTimestampedEntry(in)));
 
-    return merkleTreeLeafBuilder.build();
+    return new MerkleTreeLeaf(Ct.Version.valueOf(version), Ct.MerkleLeafType.valueOf(leafType), parseTimestampedEntry(in));
   }
 
   /**
