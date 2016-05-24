@@ -118,7 +118,7 @@ public class Deserializer {
     } else if (entryType == Ct.LogEntryType.PRECERT_ENTRY) {
       Ct.PrecertChainEntry preCertChain = parsePrecertChainEntry(extraData,
         treeLeaf.timestampedEntry.getSignedEntry().getPrecert());
-       logEntry.preCertEntry = preCertChain;
+       logEntry.precertEntry = preCertChain;
     } else {
       throw new SerializationException(String.format("Unknown entry type: %d", entryType));
     }
