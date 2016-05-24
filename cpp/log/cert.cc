@@ -16,6 +16,7 @@
 #include <openssl/x509.h>
 #include <openssl/x509v3.h>
 #include <time.h>
+#include <algorithm>
 #include <memory>
 #include <string>
 #include <vector>
@@ -233,6 +234,34 @@ util::Status Cert::LoadFromDerBio(BIO* bio_in) {
     return util::Status(Code::INVALID_ARGUMENT, "Not a valid encoded cert");
   }
   return util::Status::OK;
+}
+
+
+string Cert::PrintVersion() const {
+  if (!IsLoaded()) {
+    LOG(ERROR) << "Cert not loaded";
+    return string();
+  }
+
+  const long version(X509_get_version(x509_.get()));
+  return to_string(1 + version);
+}
+
+
+string Cert::PrintSerialNumber() const {
+  if (!IsLoaded()) {
+    LOG(ERROR) << "Cert not loaded";
+    return string();
+  }
+
+  ScopedBIGNUM serial_number_BN(
+      ASN1_INTEGER_to_BN(X509_get_serialNumber(x509_.get()), NULL));
+
+  ScopedOpenSSLString serial_number_hex(BN_bn2hex(serial_number_BN.get()));
+
+  string serial(serial_number_hex.get());
+  std::transform(serial.begin(), serial.end(), serial.begin(), ::toupper);
+  return serial;
 }
 
 
@@ -671,7 +700,7 @@ util::Status Cert::PublicKeySha256Digest(string* result) const {
 }
 
 
-util::Status Cert::SPKISha256Digest(string* result) const {
+StatusOr<string> Cert::SPKI() const {
   if (!IsLoaded()) {
     LOG(ERROR) << "Cert not loaded";
     return util::Status(Code::FAILED_PRECONDITION, "Cert not loaded");
@@ -681,19 +710,29 @@ util::Status Cert::SPKISha256Digest(string* result) const {
   int der_length =
       i2d_X509_PUBKEY(X509_get_X509_PUBKEY(x509_.get()), &der_buf);
   if (der_length < 0) {
-    // Failed to serialize. Several possible reasons but we will just reject
-    // the input rather than trying to interpret the cause
+    // What does this return value mean? Let's assume it means the cert
+    // is bad until proven otherwise.
     LOG(WARNING) << "Failed to serialize the Subject Public Key Info";
     LOG_OPENSSL_ERRORS(WARNING);
-    return util::Status(Code::INVALID_ARGUMENT, "SPKI SHA256 digest failed");
+    return util::Status(Code::INVALID_ARGUMENT, "Cert::SPKI() failed");
   }
 
-  string sha256_digest = Sha256Hasher::Sha256Digest(
-      string(reinterpret_cast<char*>(der_buf), der_length));
+  string result;
+  result.assign(
+      string(reinterpret_cast<char*>(CHECK_NOTNULL(der_buf)), der_length));
 
-  result->assign(sha256_digest);
   OPENSSL_free(der_buf);
-  return util::Status::OK;
+  return result;
+}
+
+
+util::Status Cert::SPKISha256Digest(string* result) const {
+  const util::StatusOr<string> spki(SPKI());
+  if (spki.ok()) {
+    string sha256_digest = Sha256Hasher::Sha256Digest(spki.ValueOrDie());
+    CHECK_NOTNULL(result)->assign(sha256_digest);
+  }
+  return spki.status();
 }
 
 util::Status Cert::OctetStringExtensionData(int extension_nid,
@@ -837,6 +876,34 @@ bool IsValidRedactedHost(const string& hostname) {
 
 namespace {
 
+util::Status ExtractSubjectAltNames(STACK_OF(GENERAL_NAME)* subject_alt_names,
+                                    vector<string>* dns_alt_names) {
+  CHECK_NOTNULL(subject_alt_names);
+  CHECK_NOTNULL(dns_alt_names);
+
+  dns_alt_names->clear();
+  const int subject_alt_name_count = sk_GENERAL_NAME_num(subject_alt_names);
+
+  for (int i = 0; i < subject_alt_name_count; ++i) {
+    GENERAL_NAME* const name(sk_GENERAL_NAME_value(subject_alt_names, i));
+
+    util::Status name_status;
+    if (name->type == GEN_DNS) {
+      const string dns_name =
+          ASN1ToStringAndCheckForNulls(name->d.dNSName, "DNS name",
+                                         &name_status);
+
+      if (!name_status.ok()) {
+        return name_status;
+      }
+
+      dns_alt_names->push_back(dns_name);
+    }
+  }
+  return util::Status::OK;
+}
+
+
 
 bool ValidateRedactionSubjectAltNames(STACK_OF(GENERAL_NAME) *
                                           subject_alt_names,
@@ -846,35 +913,19 @@ bool ValidateRedactionSubjectAltNames(STACK_OF(GENERAL_NAME) *
   // First. Check all the Subject Alt Name extension records. Any that are of
   // type DNS must pass validation if they are attempting to redact labels
   if (subject_alt_names) {
-    const int subject_alt_name_count = sk_GENERAL_NAME_num(subject_alt_names);
+    *CHECK_NOTNULL(status) = ExtractSubjectAltNames(
+        subject_alt_names, CHECK_NOTNULL(dns_alt_names));
 
-    for (int i = 0; i < subject_alt_name_count; ++i) {
-      GENERAL_NAME* const name(sk_GENERAL_NAME_value(subject_alt_names, i));
-
-      util::Status name_status;
-
-      if (name->type == GEN_DNS) {
-        const string dns_name =
-            ASN1ToStringAndCheckForNulls(name->d.dNSName, "DNS name",
-                                         &name_status);
-
-        if (!name_status.ok()) {
-          *status = name_status;
+    for (const auto& dns_name : *dns_alt_names) {
+      if (IsRedactedHost(dns_name)) {
+        if (!IsValidRedactedHost(dns_name)) {
+          LOG(WARNING) << "Invalid redacted host: " << dns_name;
+          *status = util::Status(Code::INVALID_ARGUMENT,
+                                 "Invalid redacted hostname");
           return true;
         }
 
-        dns_alt_names->push_back(dns_name);
-
-        if (IsRedactedHost(dns_name)) {
-          if (!IsValidRedactedHost(dns_name)) {
-            LOG(WARNING) << "Invalid redacted host: " << dns_name;
-            *status = util::Status(Code::INVALID_ARGUMENT,
-                                   "Invalid redacted hostname");
-            return true;
-          }
-
-          redacted_name_count++;
-        }
+        (*redacted_name_count)++;
       }
     }
   }
@@ -885,6 +936,20 @@ bool ValidateRedactionSubjectAltNames(STACK_OF(GENERAL_NAME) *
 
 
 }  // namespace
+
+
+util::Status Cert::SubjectAltNames(vector<string>* dns_alt_names) const {
+  ScopedGENERAL_NAMEStack subject_alt_names(
+      static_cast<STACK_OF(GENERAL_NAME)*>(X509_get_ext_d2i(
+          x509_.get(), NID_subject_alt_name, nullptr, nullptr)));
+
+  if (subject_alt_names) {
+    return ExtractSubjectAltNames(subject_alt_names.get(),
+                                  CHECK_NOTNULL(dns_alt_names));
+  }
+
+  return util::Status::OK;
+}
 
 
 // Helper method for validating V2 redaction rules. If it returns true
