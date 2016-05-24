@@ -1,4 +1,4 @@
-FROM ubuntu
+FROM ubuntu:14.04
 RUN echo 'Building new CT Log Docker image...'
 COPY test/testdata/ca-cert.pem /tmp/
 RUN apt-get update && \
