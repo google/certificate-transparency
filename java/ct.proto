@@ -61,11 +61,6 @@ message PrecertChainEntry {
   optional PreCert pre_cert = 3;
 }
 
-message LogEntry {
-  optional X509ChainEntry x509_entry = 2;
-  optional PrecertChainEntry precert_entry = 3;
-}
-
 enum Version {
   V1 = 0;
   // Not part of the I-D, and outside the valid range.
