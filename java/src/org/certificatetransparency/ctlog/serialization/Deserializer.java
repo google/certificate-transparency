@@ -4,6 +4,7 @@ import com.google.common.base.Preconditions;
 import com.google.protobuf.ByteString;
 
 import org.apache.commons.codec.binary.Base64;
+import org.certificatetransparency.ctlog.LogEntry;
 import org.certificatetransparency.ctlog.MerkleAuditProof;
 import org.certificatetransparency.ctlog.MerkleTreeLeaf;
 import org.certificatetransparency.ctlog.ParsedLogEntry;
@@ -106,24 +107,22 @@ public class Deserializer {
    */
   public static ParsedLogEntry parseLogEntry(InputStream merkleTreeLeaf, InputStream extraData) {
     MerkleTreeLeaf treeLeaf = parseMerkleTreeLeaf(merkleTreeLeaf);
-    Ct.LogEntry.Builder logEntryBuilder = Ct.LogEntry.newBuilder();
+    LogEntry logEntry = new LogEntry();
 
     Ct.LogEntryType entryType = treeLeaf.timestampedEntry.getEntryType();
 
     if (entryType == Ct.LogEntryType.X509_ENTRY) {
       Ct.X509ChainEntry x509EntryChain = parseX509ChainEntry(extraData,
         treeLeaf.timestampedEntry.getSignedEntry().getX509());
-      logEntryBuilder.setX509Entry(x509EntryChain);
-
+      logEntry.x509Entry = x509EntryChain;
     } else if (entryType == Ct.LogEntryType.PRECERT_ENTRY) {
       Ct.PrecertChainEntry preCertChain = parsePrecertChainEntry(extraData,
         treeLeaf.timestampedEntry.getSignedEntry().getPrecert());
-       logEntryBuilder.setPrecertEntry(preCertChain);
-
+       logEntry.precertEntry = preCertChain;
     } else {
       throw new SerializationException(String.format("Unknown entry type: %d", entryType));
     }
-    Ct.LogEntry logEntry = logEntryBuilder.build();
+
     return ParsedLogEntry.newInstance(treeLeaf, logEntry);
   }
 
