@@ -12,8 +12,32 @@
 
 namespace cert_trans {
 
-class LoggedEntry : public ct::LoggedEntryPB {
+class LoggedEntry : private ct::LoggedEntryPB {
  public:
+  // Pull only what is used.
+  using LoggedEntryPB::Clear;
+  using LoggedEntryPB::DebugString;
+  using LoggedEntryPB::ParseFromArray;
+  using LoggedEntryPB::ParseFromString;
+  using LoggedEntryPB::SerializeToString;
+  using LoggedEntryPB::Swap;
+  using LoggedEntryPB::clear_sequence_number;
+  using LoggedEntryPB::contents;
+  using LoggedEntryPB::has_sequence_number;
+  using LoggedEntryPB::sequence_number;
+  using LoggedEntryPB::merkle_leaf_hash;
+  using LoggedEntryPB::set_merkle_leaf_hash;
+  using LoggedEntryPB::set_sequence_number;
+  void Swap(LoggedEntry* other) {
+    LoggedEntryPB::Swap(other);
+  }
+  void CopyFrom(const ::google::protobuf::Message& from) {
+    LoggedEntryPB::CopyFrom(from);
+  }
+  void CopyFrom(const LoggedEntry& from) {
+    LoggedEntryPB::CopyFrom(from);
+  }
+
   std::string Hash() const {
     return Sha256Hasher::Sha256Digest(Serializer::LeafData(entry()));
   }
