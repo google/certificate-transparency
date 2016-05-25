@@ -48,6 +48,8 @@ class Cert {
   util::Status LoadFromDerBio(BIO* bio_in);
 
   // These just return an empty string if an error occurs.
+  std::string PrintVersion() const;
+  std::string PrintSerialNumber() const;
   std::string PrintIssuerName() const;
   std::string PrintSubjectName() const;
   std::string PrintNotBefore() const;
@@ -148,11 +150,22 @@ class Cert {
   // Returns ERROR if the cert is not loaded.
   util::Status PublicKeySha256Digest(std::string* result) const;
 
+  // Sets the Subject Alternative Name dNSNames in |dns_alt_names|.
+  // Returns Status::OK if the SAN dNSNames were extracted.
+  // Returns INVALID_ARGUMENT if the DAN dNSNames could not be extracted.
+  // Returns FAILED_PRECONDITION if the cert is not loaded.
+  util::Status SubjectAltNames(std::vector<std::string>* dns_alt_names) const;
+
   // Sets the SHA256 digest of the cert's subjectPublicKeyInfo in |result|.
   // Returns TRUE if computing the digest succeeded.
   // Returns FALSE if computing the digest failed.
   // Returns ERROR if the cert is not loaded.
   util::Status SPKISha256Digest(std::string* result) const;
+
+  // Get the cert's subjectPublicKeyInfo.
+  // Returns error INVALID_ARGUMENT if parsing the cert DER failed.
+  // Returns error FAILED_PRECONDITION if the cert is not loaded.
+  util::StatusOr<std::string> SPKI() const;
 
   // Fetch data from an extension if encoded as an ASN1_OCTET_STRING.
   // Useful for handling custom extensions registered with X509V3_EXT_add.

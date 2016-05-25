@@ -4,9 +4,11 @@
 #include <openssl/err.h>
 #include <openssl/evp.h>
 #include <string>
+#include <vector>
 
 #include "log/cert.h"
 #include "log/ct_extensions.h"
+#include "merkletree/serial_hasher.h"
 #include "util/status_test_util.h"
 #include "util/testing.h"
 #include "util/util.h"
@@ -17,12 +19,15 @@ using cert_trans::PreCertChain;
 using cert_trans::TbsCertificate;
 using std::string;
 using std::unique_ptr;
+using std::vector;
 using util::error::Code;
+using util::StatusOr;
 using util::testing::StatusIs;
 
 // TODO(ekasper): add test certs with intermediates.
 // Valid certificates.
 static const char kCaCert[] = "ca-cert.pem";
+static const char kGoogleCert[] = "google-cert.pem";
 // Issued by ca-cert.pem
 static const char kLeafCert[] = "test-cert.pem";
 // Issued by ca-cert.pem
@@ -231,6 +236,7 @@ namespace {
 class CertTest : public ::testing::Test {
  protected:
   string leaf_pem_;
+  string google_pem_;
   string ca_pem_;
   string ca_precert_pem_;
   string precert_pem_;
@@ -269,6 +275,7 @@ class CertTest : public ::testing::Test {
         << "Could not read test data from " << cert_dir
         << ". Wrong --test_srcdir?";
     CHECK(util::ReadTextFile(cert_dir + "/" + kCaCert, &ca_pem_));
+    CHECK(util::ReadTextFile(cert_dir + "/" + kGoogleCert, &google_pem_));
     CHECK(util::ReadTextFile(cert_dir + "/" + kCaPreCert, &ca_precert_pem_));
     CHECK(util::ReadTextFile(cert_dir + "/" + kPreCert, &precert_pem_));
     CHECK(util::ReadTextFile(cert_dir + "/" + kLeafWithIntermediateCert,
@@ -369,6 +376,19 @@ TEST_F(CertTest, LoadInvalidFromDer) {
   EXPECT_THAT(second.LoadFromDerString(der.substr(2)),
               StatusIs(util::error::INVALID_ARGUMENT));
   EXPECT_FALSE(second.IsLoaded());
+}
+
+TEST_F(CertTest, PrintVersion) {
+  EXPECT_EQ("3", Cert(ca_pem_).PrintVersion());
+  EXPECT_EQ("3", Cert(leaf_pem_).PrintVersion());
+  EXPECT_EQ("3", Cert(google_pem_).PrintVersion());
+}
+
+TEST_F(CertTest, PrintSerialNumber) {
+  EXPECT_EQ("0", Cert(ca_pem_).PrintSerialNumber());
+  EXPECT_EQ("01", Cert(ca_precert_pem_).PrintSerialNumber());
+  EXPECT_EQ("06", Cert(leaf_pem_).PrintSerialNumber());
+  EXPECT_EQ("605381F50001000088BD", Cert(google_pem_).PrintSerialNumber());
 }
 
 TEST_F(CertTest, PrintSubjectName) {
@@ -497,6 +517,37 @@ TEST_F(CertTest, IllegalSignatureAlgorithmParameter) {
   #else
   EXPECT_TRUE(cert.IsLoaded());
   #endif
+}
+
+TEST_F(CertTest, TestSubjectAltNames) {
+  Cert cert(google_pem_);
+  vector<string> sans;
+  EXPECT_OK(cert.SubjectAltNames(&sans));
+  EXPECT_EQ(44, sans.size());
+  EXPECT_EQ("*.google.com", sans[0]);
+  EXPECT_EQ("*.android.com", sans[1]);
+  EXPECT_EQ("youtubeeducation.com", sans[43]);
+}
+
+TEST_F(CertTest, SPKI) {
+  Cert leaf(leaf_pem_);
+  const StatusOr<string> spki(leaf.SPKI());
+  EXPECT_OK(spki.status());
+  EXPECT_EQ(162, spki.ValueOrDie().size());
+  EXPECT_EQ("Ojz4hdfbFTowDio/KDGC4/pN9dy/EBfIAsnO2yDbKiE=",
+            util::ToBase64(Sha256Hasher::Sha256Digest(spki.ValueOrDie())));
+}
+
+TEST_F(CertTest, SPKISha256Digest) {
+  string digest;
+
+  EXPECT_OK(Cert(leaf_pem_).SPKISha256Digest(&digest));
+  EXPECT_EQ("Ojz4hdfbFTowDio/KDGC4/pN9dy/EBfIAsnO2yDbKiE=",
+            util::ToBase64(digest));
+
+  EXPECT_OK(Cert(google_pem_).SPKISha256Digest(&digest));
+  EXPECT_EQ("VCXa3FxokfQkIcY2SygQMz4BuQHcRANCXdqRCLkoflg=",
+            util::ToBase64(digest));
 }
 
 TEST_F(CertTest, TestIsRedactedHost) {
