@@ -8,7 +8,7 @@ export PYTHONPATH=${PYTHONPATH}:../python
 SERVER=$1
 PUBKEY=$2 # PEM encoded file
 #CT_SERVER='ct.googleapis.com/pilot'
-CT_SERVER='localhost:8888'
+CT_SERVER='http://localhost:6962'
 TMP=`mktemp /tmp/cert.XXXXXX`
 
 openssl s_client -connect $SERVER:443 -showcerts < /dev/null | tee $TMP
