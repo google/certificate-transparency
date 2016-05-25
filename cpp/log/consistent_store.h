@@ -48,6 +48,8 @@ class EntryHandleBase {
     has_handle_ = true;
   }
 
+  virtual bool SerializeToString(std::string* output) const = 0;
+
  protected:
   EntryHandleBase(int handle) : has_handle_(true), handle_(handle) {
   }
@@ -77,6 +79,10 @@ class EntryHandle : public EntryHandleBase {
 
   T* MutableEntry() {
     return &entry_;
+  }
+
+  bool SerializeToString(std::string* output) const override {
+    return entry_.SerializeToString(output);
   }
 
  private:

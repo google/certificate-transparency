@@ -545,8 +545,7 @@ Status EtcdConsistentStore::GetAllEntriesInDir(
 }
 
 
-template <class T>
-Status EtcdConsistentStore::UpdateEntry(EntryHandle<T>* t) {
+Status EtcdConsistentStore::UpdateEntry(EntryHandleBase* t) {
   ScopedLatency scoped_latency(
       etcd_latency_by_op_ms.GetScopedLatency("update_entry"));
 
@@ -554,7 +553,7 @@ Status EtcdConsistentStore::UpdateEntry(EntryHandle<T>* t) {
   CHECK(t->HasHandle());
   CHECK(t->HasKey());
   string flat_entry;
-  CHECK(t->Entry().SerializeToString(&flat_entry));
+  CHECK(t->SerializeToString(&flat_entry));
   SyncTask task(executor_);
   EtcdClient::Response resp;
   client_->Update(t->Key(), ToBase64(flat_entry), t->Handle(), &resp,
@@ -567,8 +566,7 @@ Status EtcdConsistentStore::UpdateEntry(EntryHandle<T>* t) {
 }
 
 
-template <class T>
-Status EtcdConsistentStore::CreateEntry(EntryHandle<T>* t) {
+Status EtcdConsistentStore::CreateEntry(EntryHandleBase* t) {
   ScopedLatency scoped_latency(
       etcd_latency_by_op_ms.GetScopedLatency("create_entry"));
 
@@ -576,7 +574,7 @@ Status EtcdConsistentStore::CreateEntry(EntryHandle<T>* t) {
   CHECK(!t->HasHandle());
   CHECK(t->HasKey());
   string flat_entry;
-  CHECK(t->Entry().SerializeToString(&flat_entry));
+  CHECK(t->SerializeToString(&flat_entry));
   SyncTask task(executor_);
   EtcdClient::Response resp;
   client_->Create(t->Key(), ToBase64(flat_entry), &resp, task.task());
@@ -588,8 +586,7 @@ Status EtcdConsistentStore::CreateEntry(EntryHandle<T>* t) {
 }
 
 
-template <class T>
-Status EtcdConsistentStore::ForceSetEntry(EntryHandle<T>* t) {
+Status EtcdConsistentStore::ForceSetEntry(EntryHandleBase* t) {
   ScopedLatency scoped_latency(
       etcd_latency_by_op_ms.GetScopedLatency("force_set_entry"));
 
@@ -601,7 +598,7 @@ Status EtcdConsistentStore::ForceSetEntry(EntryHandle<T>* t) {
   // handle.
   CHECK(!t->HasHandle());
   string flat_entry;
-  CHECK(t->Entry().SerializeToString(&flat_entry));
+  CHECK(t->SerializeToString(&flat_entry));
   SyncTask task(executor_);
   EtcdClient::Response resp;
   client_->ForceSet(t->Key(), ToBase64(flat_entry), &resp, task.task());
@@ -613,9 +610,8 @@ Status EtcdConsistentStore::ForceSetEntry(EntryHandle<T>* t) {
 }
 
 
-template <class T>
 Status EtcdConsistentStore::ForceSetEntryWithTTL(const seconds& ttl,
-                                                 EntryHandle<T>* t) {
+                                                 EntryHandleBase* t) {
   ScopedLatency scoped_latency(
       etcd_latency_by_op_ms.GetScopedLatency("force_set_entry_with_ttl"));
 
@@ -628,7 +624,7 @@ Status EtcdConsistentStore::ForceSetEntryWithTTL(const seconds& ttl,
   CHECK(!t->HasHandle());
   CHECK_LE(0, ttl.count());
   string flat_entry;
-  CHECK(t->Entry().SerializeToString(&flat_entry));
+  CHECK(t->SerializeToString(&flat_entry));
   SyncTask task(executor_);
   EtcdClient::Response resp;
   client_->ForceSetWithTTL(t->Key(), ToBase64(flat_entry), ttl, &resp,

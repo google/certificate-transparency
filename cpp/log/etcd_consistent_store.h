@@ -82,18 +82,14 @@ class EtcdConsistentStore : public ConsistentStore {
       const std::string& dir,
       std::vector<EntryHandle<LoggedEntry>>* entries) const;
 
-  template <class T>
-  util::Status UpdateEntry(EntryHandle<T>* entry);
+  util::Status UpdateEntry(EntryHandleBase* entry);
 
-  template <class T>
-  util::Status CreateEntry(EntryHandle<T>* entry);
+  util::Status CreateEntry(EntryHandleBase* entry);
 
-  template <class T>
-  util::Status ForceSetEntry(EntryHandle<T>* entry);
+  util::Status ForceSetEntry(EntryHandleBase* entry);
 
-  template <class T>
   util::Status ForceSetEntryWithTTL(const std::chrono::seconds& ttl,
-                                    EntryHandle<T>* entry);
+                                    EntryHandleBase* entry);
 
   util::Status DeleteEntry(const EntryHandleBase& entry);
 
