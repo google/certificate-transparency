@@ -155,12 +155,9 @@ Database::LookupResult FileDB::LookupByHash(const string& hash,
   // Gotta be there, or we're in trouble...
   CHECK_EQ(status, util::Status::OK);
 
-  LoggedEntry logged;
-  CHECK(logged.ParseFromString(cert_data));
-  CHECK_EQ(logged.Hash(), hash);
-
   if (result) {
-    logged.Swap(result);
+    CHECK(result->ParseFromString(cert_data));
+    CHECK_EQ(result->Hash(), hash);
   }
 
   return this->LOOKUP_OK;

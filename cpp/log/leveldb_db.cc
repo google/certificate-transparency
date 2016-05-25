@@ -205,12 +205,9 @@ Database::LookupResult LevelDB::LookupByHash(const string& hash,
   CHECK(status.ok()) << "Failed to get entry by hash(" << util::HexString(hash)
                      << "): " << status.ToString();
 
-  LoggedEntry logged;
-  CHECK(logged.ParseFromString(cert_data));
-  CHECK_EQ(logged.Hash(), hash);
-
   if (result) {
-    logged.Swap(result);
+    CHECK(result->ParseFromString(cert_data));
+    CHECK_EQ(result->Hash(), hash);
   }
 
   return this->LOOKUP_OK;

@@ -28,9 +28,6 @@ class LoggedEntry : private ct::LoggedEntryPB {
   using LoggedEntryPB::merkle_leaf_hash;
   using LoggedEntryPB::set_merkle_leaf_hash;
   using LoggedEntryPB::set_sequence_number;
-  void Swap(LoggedEntry* other) {
-    LoggedEntryPB::Swap(other);
-  }
   void CopyFrom(const ::google::protobuf::Message& from) {
     LoggedEntryPB::CopyFrom(from);
   }
