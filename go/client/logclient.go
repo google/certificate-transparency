@@ -16,9 +16,11 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/google/certificate-transparency/go"
 	"github.com/mreiferson/go-httpclient"
 	"golang.org/x/net/context"
+
+	pb "github.com/gdbelvin/certificate-transparency/proto"
+	ct "github.com/google/certificate-transparency/go"
 )
 
 // URI paths for CT Log endpoints
@@ -33,70 +35,6 @@ const (
 type LogClient struct {
 	uri        string       // the base URI of the log. e.g. http://ct.googleapis/pilot
 	httpClient *http.Client // used to interact with the log via HTTP
-}
-
-//////////////////////////////////////////////////////////////////////////////////
-// JSON structures follow.
-// These represent the structures returned by the CT Log server.
-//////////////////////////////////////////////////////////////////////////////////
-
-// addChainRequest represents the JSON request body sent to the add-chain CT
-// method.
-type addChainRequest struct {
-	Chain []string `json:"chain"`
-}
-
-// addChainResponse represents the JSON response to the add-chain CT method.
-// An SCT represents a Log's promise to integrate a [pre-]certificate into the
-// log within a defined period of time.
-type addChainResponse struct {
-	SCTVersion ct.Version `json:"sct_version"` // SCT structure version
-	ID         string     `json:"id"`          // Log ID
-	Timestamp  uint64     `json:"timestamp"`   // Timestamp of issuance
-	Extensions string     `json:"extensions"`  // Holder for any CT extensions
-	Signature  string     `json:"signature"`   // Log signature for this SCT
-}
-
-// getSTHResponse respresents the JSON response to the get-sth CT method
-type getSTHResponse struct {
-	TreeSize          uint64 `json:"tree_size"`           // Number of certs in the current tree
-	Timestamp         uint64 `json:"timestamp"`           // Time that the tree was created
-	SHA256RootHash    string `json:"sha256_root_hash"`    // Root hash of the tree
-	TreeHeadSignature string `json:"tree_head_signature"` // Log signature for this STH
-}
-
-// base64LeafEntry respresents a Base64 encoded leaf entry
-type base64LeafEntry struct {
-	LeafInput string `json:"leaf_input"`
-	ExtraData string `json:"extra_data"`
-}
-
-// getEntriesReponse respresents the JSON response to the CT get-entries method
-type getEntriesResponse struct {
-	Entries []base64LeafEntry `json:"entries"` // the list of returned entries
-}
-
-// getConsistencyProofResponse represents the JSON response to the CT get-consistency-proof method
-type getConsistencyProofResponse struct {
-	Consistency []string `json:"consistency"`
-}
-
-// getAuditProofResponse represents the JSON response to the CT get-audit-proof method
-type getAuditProofResponse struct {
-	Hash     []string `json:"hash"`      // the hashes which make up the proof
-	TreeSize uint64   `json:"tree_size"` // the tree size against which this proof is constructed
-}
-
-// getAcceptedRootsResponse represents the JSON response to the CT get-roots method.
-type getAcceptedRootsResponse struct {
-	Certificates []string `json:"certificates"`
-}
-
-// getEntryAndProodReponse represents the JSON response to the CT get-entry-and-proof method
-type getEntryAndProofResponse struct {
-	LeafInput string   `json:"leaf_input"` // the entry itself
-	ExtraData string   `json:"extra_data"` // any chain provided when the entry was added to the log
-	AuditPath []string `json:"audit_path"` // the corresponding proof
 }
 
 // New constructs a new LogClient instance.
@@ -196,8 +134,8 @@ func backoffForRetry(ctx context.Context, d time.Duration) error {
 // |path|. If provided context expires before submission is complete an
 // error will be returned.
 func (c *LogClient) addChainWithRetry(ctx context.Context, path string, chain []ct.ASN1Cert) (*ct.SignedCertificateTimestamp, error) {
-	var resp addChainResponse
-	var req addChainRequest
+	var resp pb.AddChainResponse
+	var req pb.AddChainRequest
 	for _, link := range chain {
 		req.Chain = append(req.Chain, base64.StdEncoding.EncodeToString(link))
 	}
@@ -239,11 +177,11 @@ func (c *LogClient) addChainWithRetry(ctx context.Context, path string, chain []
 		httpStatus = httpResp.Status
 	}
 
-	rawLogID, err := base64.StdEncoding.DecodeString(resp.ID)
+	rawLogID, err := base64.StdEncoding.DecodeString(*resp.Id)
 	if err != nil {
 		return nil, err
 	}
-	rawSignature, err := base64.StdEncoding.DecodeString(resp.Signature)
+	rawSignature, err := base64.StdEncoding.DecodeString(*resp.Signature)
 	if err != nil {
 		return nil, err
 	}
@@ -254,10 +192,10 @@ func (c *LogClient) addChainWithRetry(ctx context.Context, path string, chain []
 	var logID ct.SHA256Hash
 	copy(logID[:], rawLogID)
 	return &ct.SignedCertificateTimestamp{
-		SCTVersion: resp.SCTVersion,
+		Version:    resp.SctVersion,
 		LogID:      logID,
-		Timestamp:  resp.Timestamp,
-		Extensions: ct.CTExtensions(resp.Extensions),
+		Timestamp:  &resp.Timestamp,
+		Extensions: resp.Extensions,
 		Signature:  *ds}, nil
 }
 
@@ -280,7 +218,7 @@ func (c *LogClient) AddChainWithContext(ctx context.Context, chain []ct.ASN1Cert
 // GetSTH retrieves the current STH from the log.
 // Returns a populated SignedTreeHead, or a non-nil error.
 func (c *LogClient) GetSTH() (sth *ct.SignedTreeHead, err error) {
-	var resp getSTHResponse
+	var resp pb.GetSTHResponse
 	if err = c.fetchAndParse(c.uri+GetSTHPath, &resp); err != nil {
 		return
 	}
@@ -321,7 +259,7 @@ func (c *LogClient) GetEntries(start, end int64) ([]ct.LogEntry, error) {
 	if end < start {
 		return nil, errors.New("start should be <= end")
 	}
-	var resp getEntriesResponse
+	var resp pb.GetEntriesResponse
 	err := c.fetchAndParse(fmt.Sprintf("%s%s?start=%d&end=%d", c.uri, GetEntriesPath, start, end), &resp)
 	if err != nil {
 		return nil, err
