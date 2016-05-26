@@ -16,7 +16,7 @@ deps = {
      "glog":             "https://github.com/benlaurie/glog.git@0.3.4-fix",
      "googlemock": 			 "https://github.com/google/googlemock.git@release-1.7.0",
      "googlemock/gtest": "https://github.com/google/googletest.git@release-1.7.0",
-     "icu4c":            "https://github.com/icu-project/icu4c.git@bbd17a792336de5873550794f8304a4b548b0663",
+     "icu4c":            "https://github.com/icu-project/icu4c.git@8ce90b88807aa2bd031a4b7608b23b1c5984cf08",
      "json-c": 					 "https://github.com/AlCutter/json-c.git@json-c-0.12-20140410-fix",
      "ldns":             "https://github.com/benlaurie/ldns.git@1.6.17-fix",
      "leveldb": 				 "https://github.com/google/leveldb.git@v1.18",
