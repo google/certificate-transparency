@@ -22,9 +22,10 @@ bool IsValidRedactedHost(const std::string& hostname);
 
 class Cert {
  public:
-  // Takes ownership of the X509 structure. It's advisable to check
-  // IsLoaded() after construction to verify the copy operation succeeded.
-  explicit Cert(X509* x509);
+  // If |x509| comes directly from a copy, it is advisable to check
+  // IsLoaded() after construction to verify the copy operation
+  // succeeded.
+  explicit Cert(ScopedX509 x509);
   // May fail, but we don't want to die on invalid inputs,
   // so caller should check IsLoaded() before doing anything else.
   // All attempts to operate on an unloaded cert will fail with ERROR.

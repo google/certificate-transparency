@@ -30,6 +30,7 @@ using util::ClearOpenSSLErrors;
 using util::StatusOr;
 using util::error::Code;
 
+
 #if OPENSSL_VERSION_NUMBER < 0x10002000L || defined(OPENSSL_IS_BORINGSSL)
 // Backport from 1.0.2-beta3.
 static int i2d_re_X509_tbs(X509* x, unsigned char** pp) {
@@ -172,7 +173,7 @@ string ASN1ToStringAndCheckForNulls(ASN1_STRING* asn1_string,
 }
 
 
-Cert::Cert(X509* x509) : x509_(x509) {
+Cert::Cert(ScopedX509 x509) : x509_(move(x509)) {
 }
 
 
@@ -198,13 +199,14 @@ Cert::Cert(const string& pem_string) {
 
 
 unique_ptr<Cert> Cert::Clone() const {
-  X509* x509(nullptr);
+  ScopedX509 x509;
   if (x509_) {
-    x509 = X509_dup(x509_.get());
-    if (!x509)
+    x509.reset(X509_dup(x509_.get()));
+    if (!x509) {
       LOG_OPENSSL_ERRORS(ERROR);
+    }
   }
-  return unique_ptr<Cert>(new Cert(x509));
+  return unique_ptr<Cert>(new Cert(move(x509)));
 }
 
 
@@ -1437,9 +1439,10 @@ CertChain::CertChain(const string& pem_string) {
     return;
   }
 
-  X509* x509(nullptr);
-  while ((x509 = PEM_read_bio_X509(bio_in.get(), nullptr, nullptr, nullptr))) {
-    chain_.push_back(unique_ptr<Cert>(new Cert(x509)));
+  ScopedX509 x509;
+  while ((x509 = ScopedX509(
+              PEM_read_bio_X509(bio_in.get(), nullptr, nullptr, nullptr)))) {
+    chain_.push_back(unique_ptr<Cert>(new Cert(move(x509))));
   }
 
   // The last error must be EOF.

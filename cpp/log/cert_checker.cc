@@ -81,7 +81,7 @@ bool CertChecker::LoadTrustedCertificatesFromBIO(BIO* bio_in) {
     if (x509) {
       // TODO(ekasper): check that the issuing CA cert is temporally valid
       // and at least warn if it isn't.
-      unique_ptr<Cert> cert(new Cert(x509.release()));
+      unique_ptr<Cert> cert(new Cert(move(x509)));
       string subject_name;
       const StatusOr<bool> is_trusted(IsTrusted(*cert, &subject_name));
       if (!is_trusted.ok()) {
