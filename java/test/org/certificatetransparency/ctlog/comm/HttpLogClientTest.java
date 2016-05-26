@@ -25,6 +25,7 @@ import org.apache.http.message.BasicNameValuePair;
 import org.certificatetransparency.ctlog.CertificateTransparencyException;
 import org.certificatetransparency.ctlog.ParsedLogEntry;
 import org.certificatetransparency.ctlog.ParsedLogEntryWithProof;
+import org.certificatetransparency.ctlog.SignedTreeHead;
 import org.certificatetransparency.ctlog.TestData;
 import org.certificatetransparency.ctlog.proto.Ct;
 import org.certificatetransparency.ctlog.serialization.CryptoDataLoader;
@@ -208,7 +209,7 @@ public class HttpLogClientTest {
 
     verifySCTContents(res);
   }
-  
+
   @Test
   public void getLogSTH() throws IllegalAccessException, IllegalArgumentException,
     InvocationTargetException, NoSuchMethodException, SecurityException {
@@ -216,15 +217,15 @@ public class HttpLogClientTest {
     when(mockInvoker.makeGetRequest(eq("http://ctlog/get-sth"))).thenReturn(STH_RESPONSE);
 
     HttpLogClient client = new HttpLogClient("http://ctlog/", mockInvoker);
-    Ct.SignedTreeHead sth = client.getLogSTH();
+    SignedTreeHead sth = client.getLogSTH();
 
     Assert.assertNotNull(sth);
-    Assert.assertEquals(1402415255382L, sth.getTimestamp());
-    Assert.assertEquals(4301837, sth.getTreeSize());
-    String rootHash = Base64.encodeBase64String(sth.getSha256RootHash().toByteArray());
+    Assert.assertEquals(1402415255382L, sth.timestamp);
+    Assert.assertEquals(4301837, sth.treeSize);
+    String rootHash = Base64.encodeBase64String(sth.sha256RootHash);
     Assert.assertTrue("jdH9k+/lb9abMz3N8rVmwrw8MWU7v55+nSAXej3hqPg=".equals(rootHash));
   }
-  
+
   @Test
   public void getLogSTHBadResponseTimestamp() {
     HttpInvoker mockInvoker = mock(HttpInvoker.class);

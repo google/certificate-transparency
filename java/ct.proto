@@ -96,11 +96,3 @@ message TimestampedEntry {
   optional LogEntryType entry_type = 2;
   optional SignedEntry signed_entry = 3;
 }
-
-message SignedTreeHead {
-  optional Version version = 1 [ default = UNKNOWN_VERSION ];
-  optional uint64 timestamp = 3;
-  optional int64 tree_size = 4;
-  optional bytes sha256_root_hash = 5;
-  optional DigitallySigned signature = 6;
-}
