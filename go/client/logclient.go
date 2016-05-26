@@ -58,10 +58,10 @@ type addChainResponse struct {
 	Signature  string     `json:"signature"`   // Log signature for this SCT
 }
 
-// addJSONRequest represents the JSON request bodoy sent ot the add-json CT
+// addJSONRequest represents the JSON request body sent ot the add-json CT
 // method.
 type addJSONRequest struct {
-	Data string `json:"data"`
+	Data interface{} `json:"data"`
 }
 
 // getSTHResponse respresents the JSON response to the get-sth CT method
@@ -284,9 +284,9 @@ func (c *LogClient) AddChainWithContext(ctx context.Context, chain []ct.ASN1Cert
 	return c.addChainWithRetry(ctx, AddChainPath, chain)
 }
 
-func (c *LogClient) AddJSON(data []byte) (*ct.SignedCertificateTimestamp, error) {
+func (c *LogClient) AddJSON(data interface{}) (*ct.SignedCertificateTimestamp, error) {
 	req := addJSONRequest{
-		Data: base64.StdEncoding.EncodeToString(data),
+		Data: data,
 	}
 	var resp addChainResponse
 	_, _, err := c.postAndParse(c.uri+AddJSONPath, &req, &resp)
