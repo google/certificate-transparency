@@ -27,7 +27,8 @@ to [certificate transparency](https://www.certificate-transparency.org/) (CT).
 The main areas covered are:
 
  - An open-source, distributed, implementation of a CT Log server, also including:
-    - An implementation of a read-only "mirror" server that mimics a remote Log.
+    - An implementation of a read-only ["mirror" server](docs/MirrorLog.md)
+      that mimics a remote Log.
     - Ancillary tools needed for managing and maintaining the Log.
  - A collection of client tools and libraries for interacting with a CT Log, in
    various programming languages.
@@ -75,7 +76,7 @@ are:
    - `cpp/merkletree`: Merkle tree implementation.
    - `cpp/server`: Top-level code for server implementations.
    - `cpp/monitoring`: Code to export operation statistics from CT Log.
- - The CT mirror Log implementation also uses:
+ - The [CT mirror Log](docs/MirrorLog.md) implementation also uses:
    - `cpp/fetcher`: Code to fetch entries from another Log
  - Client code for accessing a CT Log instance:
    - `cpp/client`: CT Log client code in C++
