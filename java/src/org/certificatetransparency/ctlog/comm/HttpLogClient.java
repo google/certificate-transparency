@@ -15,6 +15,7 @@ import org.certificatetransparency.ctlog.CertificateInfo;
 import org.certificatetransparency.ctlog.CertificateTransparencyException;
 import org.certificatetransparency.ctlog.ParsedLogEntry;
 import org.certificatetransparency.ctlog.ParsedLogEntryWithProof;
+import org.certificatetransparency.ctlog.SignedTreeHead;
 import org.certificatetransparency.ctlog.proto.Ct;
 import org.certificatetransparency.ctlog.serialization.Deserializer;
 import org.json.simple.JSONArray;
@@ -154,13 +155,13 @@ public class HttpLogClient {
     String response = postInvoker.makePostRequest(logUrl + methodPath, jsonPayload);
     return parseServerResponse(response);
   }
-  
+
   /**
    * Retrieves Latest Signed Tree Head from the log.
    * The signature of the Signed Tree Head component is not verified.
    * @return latest STH
    */
-  public Ct.SignedTreeHead getLogSTH() {
+  public SignedTreeHead getLogSTH() {
     String response = postInvoker.makeGetRequest(logUrl + GET_STH_PATH);
     return parseSTHResponse(response);
   }
@@ -292,41 +293,40 @@ public class HttpLogClient {
    * @param sthResponse Log response to parse
    * @return a proto object of SignedTreeHead type.
    */
-  Ct.SignedTreeHead parseSTHResponse(String sthResponse) {
+  SignedTreeHead parseSTHResponse(String sthResponse) {
     Preconditions.checkNotNull(
       sthResponse, "Sign Tree Head response from a CT log should not be null");
 
     JSONObject response = (JSONObject) JSONValue.parse(sthResponse);
     long treeSize = (Long) response.get("tree_size");
-    long timeStamp = (Long) response.get("timestamp");
-    if (treeSize < 0 || timeStamp < 0) {
+    long timestamp = (Long) response.get("timestamp");
+    if (treeSize < 0 || timestamp < 0) {
       throw new CertificateTransparencyException(
         String.format("Bad response. Size of tree or timestamp cannot be a negative value. "
-          + "Log Tree size: %d Timestamp: %d", treeSize, timeStamp));
+          + "Log Tree size: %d Timestamp: %d", treeSize, timestamp));
     }
     String base64Signature = (String) response.get("tree_head_signature");
     String sha256RootHash = (String) response.get("sha256_root_hash");
 
-    Ct.SignedTreeHead.Builder builder =  Ct.SignedTreeHead.newBuilder();
-    builder.setVersion(Ct.Version.V1);
-    builder.setTreeSize(treeSize);
-    builder.setTimestamp(timeStamp);
-    builder.setSha256RootHash(ByteString.copyFrom(Base64.decodeBase64(sha256RootHash)));
-    builder.setSignature(Deserializer.parseDigitallySignedFromBinary(
-      new ByteArrayInputStream(Base64.decodeBase64(base64Signature))));
-    if (builder.getSha256RootHash().size() != 32) {
+    SignedTreeHead sth = new SignedTreeHead(Ct.Version.V1);
+    sth.treeSize = treeSize;
+    sth.timestamp = timestamp;
+    sth.sha256RootHash = Base64.decodeBase64(sha256RootHash);
+    sth.signature = Deserializer.parseDigitallySignedFromBinary(new ByteArrayInputStream(Base64.decodeBase64(base64Signature)));
+
+    if (sth.sha256RootHash.length != 32) {
        throw new CertificateTransparencyException(
          String.format("Bad response. The root hash of the Merkle Hash Tree must be 32 bytes. "
-           + "The size of the root hash is %d", builder.getSha256RootHash().size()));
+           + "The size of the root hash is %d", sth.sha256RootHash.length));
       }
-    return builder.build();
+    return sth;
   }
 
   /**
    * Parses the response from "get-roots" GET method.
    *
    * @param response JSONObject with certificates to parse.
-   * @return a list of root certificates. 
+   * @return a list of root certificates.
    */
   List<Certificate> parseRootCertsResponse(String response) {
     List<Certificate> certs = new ArrayList<>();
