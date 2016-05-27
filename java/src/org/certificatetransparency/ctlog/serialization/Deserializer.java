@@ -9,6 +9,7 @@ import org.certificatetransparency.ctlog.MerkleAuditProof;
 import org.certificatetransparency.ctlog.MerkleTreeLeaf;
 import org.certificatetransparency.ctlog.ParsedLogEntry;
 import org.certificatetransparency.ctlog.ParsedLogEntryWithProof;
+import org.certificatetransparency.ctlog.SignedEntry;
 import org.certificatetransparency.ctlog.TimestampedEntry;
 import org.certificatetransparency.ctlog.proto.Ct;
 import org.json.simple.JSONArray;
@@ -114,12 +115,12 @@ public class Deserializer {
 
     if (entryType == Ct.LogEntryType.X509_ENTRY) {
       Ct.X509ChainEntry x509EntryChain = parseX509ChainEntry(extraData,
-          treeLeaf.timestampedEntry.signedEntry.getX509());
+          treeLeaf.timestampedEntry.signedEntry.x509);
       logEntry.x509Entry = x509EntryChain;
     } else if (entryType == Ct.LogEntryType.PRECERT_ENTRY) {
       Ct.PrecertChainEntry preCertChain = parsePrecertChainEntry(extraData,
-          treeLeaf.timestampedEntry.signedEntry.getPrecert());
-       logEntry.precertEntry = preCertChain;
+          treeLeaf.timestampedEntry.signedEntry.preCert);
+      logEntry.precertEntry = preCertChain;
     } else {
       throw new SerializationException(String.format("Unknown entry type: %d", entryType));
     }
@@ -161,13 +162,10 @@ public class Deserializer {
     int entryType = (int) readNumber(in, CTConstants.LOG_ENTRY_TYPE_LENGTH);
     timestampedEntry.entryType = Ct.LogEntryType.valueOf(entryType);
 
-    Ct.SignedEntry.Builder signedEntryBuilder = Ct.SignedEntry.newBuilder();
+    SignedEntry signedEntry = new SignedEntry();
     if (entryType == Ct.LogEntryType.X509_ENTRY_VALUE) {
-
       int length = (int) readNumber(in, 3);
-      ByteString x509 = ByteString.copyFrom(readFixedLength(in, length));
-      signedEntryBuilder.setX509(x509);
-
+      signedEntry.x509 = readFixedLength(in, length);
     } else if (entryType == Ct.LogEntryType.PRECERT_ENTRY_VALUE) {
       Ct.PreCert.Builder preCertBuilder = Ct.PreCert.newBuilder();
 
@@ -179,13 +177,12 @@ public class Deserializer {
       int length = (int) readNumber(in, 2);
 
       preCertBuilder.setTbsCertificate(ByteString.copyFrom(readFixedLength(in, length)));
-      preCertBuilder.build();
 
-      signedEntryBuilder.setPrecert(preCertBuilder);
+      signedEntry.preCert = preCertBuilder.build();
     } else {
       throw new SerializationException(String.format("Unknown entry type: %d", entryType));
     }
-    timestampedEntry.signedEntry = signedEntryBuilder.build();
+    timestampedEntry.signedEntry = signedEntry;
 
     return timestampedEntry;
   }
@@ -197,9 +194,9 @@ public class Deserializer {
    * @throws SerializationException if an I/O error occurs.
    * @return {@link Ct.X509ChainEntry} proto object.
    */
-  public static Ct.X509ChainEntry parseX509ChainEntry(InputStream in, ByteString x509Cert) {
+  public static Ct.X509ChainEntry parseX509ChainEntry(InputStream in, byte[] x509Cert) {
     Ct.X509ChainEntry.Builder x509EntryChain = Ct.X509ChainEntry.newBuilder();
-    x509EntryChain.setLeafCertificate(x509Cert);
+    x509EntryChain.setLeafCertificate(ByteString.copyFrom(x509Cert));
 
     try {
       if (readNumber(in, 3) != in.available()) {

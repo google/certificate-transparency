@@ -85,8 +85,3 @@ enum MerkleLeafType {
   TIMESTAMPED_ENTRY = 0;
   UNKNOWN_LEAF_TYPE = 256;
 }
-
-message SignedEntry {
-  optional bytes x509 = 1;
-  optional PreCert precert = 2;
-}
