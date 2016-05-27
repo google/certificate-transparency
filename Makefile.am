@@ -19,8 +19,6 @@ BUILT_SOURCES = \
 	proto/ct.pb.cc \
 	proto/ct.pb.h
 
-BUILD_VERSION = `git describe --abbrev=0 --dirty --always --tags`
-
 AM_TESTS_ENVIRONMENT = \
 	LD_LIBRARY_PATH=$(INSTALL_DIR)/lib
 
@@ -28,9 +26,12 @@ AM_TESTS_ENVIRONMENT = \
 export PROTOC
 export INSTALL_DIR
 
-.PHONY: cpp/version.cc
-cpp/version.o: \
-	CXXFLAGS+=-DBUILD_VERSION="\"$(BUILD_VERSION)\""
+BUILD_VERSION = `git describe --abbrev=0 --dirty --always --tags`
+
+.PHONY: FORCE
+cpp/version.cc: FORCE
+	$(AM_V_GEN)sed -e "s/%BUILD_VERSION%/$(BUILD_VERSION)/" cpp/version.cc.in >cpp/version.cc.tmp && diff cpp/version.cc.tmp cpp/version.cc >/dev/null 2>&1 || mv -f cpp/version.cc.tmp cpp/version.cc
+	$(AM_V_at)$(RM) cpp/version.cc.tmp
 
 bin_PROGRAMS = \
 	cpp/client/ct \
