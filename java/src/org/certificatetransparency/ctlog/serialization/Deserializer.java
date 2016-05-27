@@ -9,6 +9,7 @@ import org.certificatetransparency.ctlog.MerkleAuditProof;
 import org.certificatetransparency.ctlog.MerkleTreeLeaf;
 import org.certificatetransparency.ctlog.ParsedLogEntry;
 import org.certificatetransparency.ctlog.ParsedLogEntryWithProof;
+import org.certificatetransparency.ctlog.TimestampedEntry;
 import org.certificatetransparency.ctlog.proto.Ct;
 import org.json.simple.JSONArray;
 
@@ -109,15 +110,15 @@ public class Deserializer {
     MerkleTreeLeaf treeLeaf = parseMerkleTreeLeaf(merkleTreeLeaf);
     LogEntry logEntry = new LogEntry();
 
-    Ct.LogEntryType entryType = treeLeaf.timestampedEntry.getEntryType();
+    Ct.LogEntryType entryType = treeLeaf.timestampedEntry.entryType;
 
     if (entryType == Ct.LogEntryType.X509_ENTRY) {
       Ct.X509ChainEntry x509EntryChain = parseX509ChainEntry(extraData,
-        treeLeaf.timestampedEntry.getSignedEntry().getX509());
+          treeLeaf.timestampedEntry.signedEntry.getX509());
       logEntry.x509Entry = x509EntryChain;
     } else if (entryType == Ct.LogEntryType.PRECERT_ENTRY) {
       Ct.PrecertChainEntry preCertChain = parsePrecertChainEntry(extraData,
-        treeLeaf.timestampedEntry.getSignedEntry().getPrecert());
+          treeLeaf.timestampedEntry.signedEntry.getPrecert());
        logEntry.precertEntry = preCertChain;
     } else {
       throw new SerializationException(String.format("Unknown entry type: %d", entryType));
@@ -147,19 +148,18 @@ public class Deserializer {
   }
 
   /**
-   * Parses a {@link Ct.TimestampedEntry} from binary encoding.
+   * Parses a {@link TimestampedEntry} from binary encoding.
    * @param in byte stream of binary encoding.
-   * @return Built {@link Ct.TimestampedEntry}.
+   * @return Built {@link TimestampedEntry}.
    * @throws SerializationException if the data stream is too short.
    */
-  public static Ct.TimestampedEntry parseTimestampedEntry(InputStream in) {
-    Ct.TimestampedEntry.Builder timestampedEntry = Ct.TimestampedEntry.newBuilder();
+  public static TimestampedEntry parseTimestampedEntry(InputStream in) {
+    TimestampedEntry timestampedEntry = new TimestampedEntry();
 
-    long timestamp = readNumber(in, CTConstants.TIMESTAMP_LENGTH);
-    timestampedEntry.setTimestamp(timestamp);
+    timestampedEntry.timestamp = readNumber(in, CTConstants.TIMESTAMP_LENGTH);
 
     int entryType = (int) readNumber(in, CTConstants.LOG_ENTRY_TYPE_LENGTH);
-    timestampedEntry.setEntryType(Ct.LogEntryType.valueOf(entryType));
+    timestampedEntry.entryType = Ct.LogEntryType.valueOf(entryType);
 
     Ct.SignedEntry.Builder signedEntryBuilder = Ct.SignedEntry.newBuilder();
     if (entryType == Ct.LogEntryType.X509_ENTRY_VALUE) {
@@ -185,10 +185,9 @@ public class Deserializer {
     } else {
       throw new SerializationException(String.format("Unknown entry type: %d", entryType));
     }
-    signedEntryBuilder.build();
-    timestampedEntry.setSignedEntry(signedEntryBuilder);
+    timestampedEntry.signedEntry = signedEntryBuilder.build();
 
-    return timestampedEntry.build();
+    return timestampedEntry;
   }
 
   /**

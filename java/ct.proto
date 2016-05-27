@@ -90,9 +90,3 @@ message SignedEntry {
   optional bytes x509 = 1;
   optional PreCert precert = 2;
 }
-
-message TimestampedEntry {
-  optional uint64 timestamp = 1;
-  optional LogEntryType entry_type = 2;
-  optional SignedEntry signed_entry = 3;
-}
