@@ -19,6 +19,10 @@ BUILT_SOURCES = \
 	proto/ct.pb.cc \
 	proto/ct.pb.h
 
+CLEANFILES = \
+	$(BUILT_SOURCES) \
+	cpp/version.cc
+
 AM_TESTS_ENVIRONMENT = \
 	LD_LIBRARY_PATH=$(INSTALL_DIR)/lib
 
