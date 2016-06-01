@@ -527,7 +527,7 @@ The running instances can then be updated with the appropriate
 `cloud/google/update_<type>.sh` script using the Log configuration file
 [created previously](#configuring-the-log), for example:
 ```bash
-cloud/google/update_log gcp-config.sh
+cloud/google/update_log.sh gcp-config.sh
  ```
 
 This will restart the containers with the new image for the binary, but as the

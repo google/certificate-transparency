@@ -17,8 +17,6 @@ Log.
  - [Key Management](#key-management)
  - [Tuning](#tuning)
  - [Adjusting a Running Cluster](#adjusting-a-running-cluster)
-    - [Changing Software Versions](#changing-software-versions)
-    - [Changing Cluster Size](#changing-cluster-size)
  - [Troubleshooting](#troubleshooting)
  - [Submitting a Log](#submitting-a-log)
 
@@ -43,20 +41,59 @@ The corresponding public key is needed in order to register as a
 Tuning
 ------
 
-TODO what are the knobs that can be twiddled, and why?  what monitored
-statistics would mean that knobs should be moved, and in what direction?
+The capacity and resilience of a Log cluster can be increased by running
+additional instances of `ct-server`; each instance communicates with the `etcd`
+cluster to discover information about the Log cluster, so does not need
+individual configuration.
+
+However, the distributed CT Log relies on configuration stored in `etcd` to
+govern how many Log instances are _required_ for serving.  This is configured
+using the `ClusterConfig` [protobuf](../proto/ctproto) message, which includes:
+
+ - `minimum_serving_nodes`: Minimum number of available Log instances (defaults
+   to 2); an STH must have been replicated to at least this many nodes in order
+   to be eligible as the overall cluster STH.
+ - `minimum_serving_fraction`: Minimum fraction of Log instances that must be
+   available to serve a given STH (default 0.75).
+
+The Log configuration also includes the `etcd_reject_add_pending_threshold` config
+value (default 30000), which limits how many pending certificate chains can be
+pending at once.  This should be large enough to accomodate the maximum number
+of certificates that could arrive during a maximum-merge-delay (MMD) period, but
+not so large that an adversary spamming the Log could cause problems.
+
+These configuration values can be changed using the `cpp/tools/ct-clustertool`
+tool, with the `set-config --cluster_config=<ascii-proto-file>` options; the
+input file is an text format protobuf file, for example:
+
+```
+minimum_serving_nodes: 2
+minimum_serving_fraction: 0.75
+```
+
+Because these limits affect the ability of the Log to operate, **monitoring and
+alerting rules should be set up** to detect when the limits are near to being
+reached.
 
 
 Adjusting a Running Cluster
 ---------------------------
 
-### Changing Software Versions
+Because the `etcd` cluster handles synchronization between the CT Log server
+instances, it is possible to adjust a running cluster by bringing
+individual `ct-server` instance down or up.  However, to ensure that the cluster
+as a whole continues to operate during the process, only a small number
+of instances should be brought down at a time.
 
-TODO describe more here, cf. [Docker instructions](Deployment.md#updating-log-software)
+For example, upgrading the CT Log software could be done safely by bringing down
+each instance of the old version and replacing it with an instance of the new
+version one at a time (as long as the [cluster configuration](#tuning) allows
+this).
 
-### Changing Cluster Size
-
-TODO describe how to scale the log up/down safely
+For the [Docker-based deployment](Deployment.md#docker-setup), the
+[`update_log.sh` script](Deployment.md#updating-log-software) handles this; it
+checks that each instance of the new version is up and responding before moving
+on to replacement of the next instance.
 
 Troubleshooting
 ---------------
