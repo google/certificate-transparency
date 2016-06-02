@@ -233,197 +233,187 @@ static const char kMismatchingSigAlgsCertIssuerString[] =
 
 namespace {
 
+unique_ptr<Cert> ReadCertFromFile(const string& filename) {
+  string content;
+  CHECK(util::ReadTextFile(filename, &content))
+      << "Could not read test data from " << filename
+      << ". Wrong --test_srcdir?";
+  unique_ptr<Cert> cert(Cert::FromPemString(content));
+  CHECK(cert.get());
+  return std::move(cert);
+}
+
 class CertTest : public ::testing::Test {
  protected:
-  string leaf_pem_;
-  string google_pem_;
-  string ca_pem_;
-  string ca_precert_pem_;
-  string precert_pem_;
-  string leaf_with_intermediate_pem_;
-  string legacy_ca_pem_;
-
-  string v2_wildcard_test5_pem_;
-  string v2_wildcard_test6_pem_;
-  string v2_wildcard_test7_pem_;
-  string v2_wildcard_test8_pem_;
-  string v2_wildcard_test9_pem_;
-  string v2_wildcard_test10_pem_;
-  string v2_wildcard_test11_pem_;
-  string v2_wildcard_test12_pem_;
-  string v2_wildcard_test13_pem_;
-  string v2_wildcard_test14_pem_;
-  string v2_wildcard_test15_pem_;
-  string v2_wildcard_test22_pem_;
-  string v2_wildcard_test23_pem_;
-  string v2_wildcard_test24_pem_;
-
-  string v2_constraint_test2_pem_;
-  string v2_constraint_test3_pem_;
-  string v2_constraint_test4_pem_;
-  string v2_constraint_test5_pem_;
-  string v2_constraint_test6_pem_;
-  string v2_constraint_test7_pem_;
-  string v2_constraint_test8_pem_;
-  string v2_constraint_test9_pem_;
-
-  void SetUp() {
-    const string cert_dir(FLAGS_test_srcdir + "/test/testdata");
-    const string cert_dir_v2(cert_dir + "/v2/");
-
-    CHECK(util::ReadTextFile(cert_dir + "/" + kLeafCert, &leaf_pem_))
-        << "Could not read test data from " << cert_dir
-        << ". Wrong --test_srcdir?";
-    CHECK(util::ReadTextFile(cert_dir + "/" + kCaCert, &ca_pem_));
-    CHECK(util::ReadTextFile(cert_dir + "/" + kGoogleCert, &google_pem_));
-    CHECK(util::ReadTextFile(cert_dir + "/" + kCaPreCert, &ca_precert_pem_));
-    CHECK(util::ReadTextFile(cert_dir + "/" + kPreCert, &precert_pem_));
-    CHECK(util::ReadTextFile(cert_dir + "/" + kLeafWithIntermediateCert,
-                             &leaf_with_intermediate_pem_));
-    CHECK(util::ReadTextFile(cert_dir + "/" + kLegacyCaCert, &legacy_ca_pem_));
-
-    // V2 Wildcard redaction test certs
-    CHECK(util::ReadTextFile(cert_dir_v2 + kV2WildcardRedactTest5,
-                             &v2_wildcard_test5_pem_));
-    CHECK(util::ReadTextFile(cert_dir_v2 + kV2WildcardRedactTest6,
-                             &v2_wildcard_test6_pem_));
-    CHECK(util::ReadTextFile(cert_dir_v2 + kV2WildcardRedactTest7,
-                             &v2_wildcard_test7_pem_));
-    CHECK(util::ReadTextFile(cert_dir_v2 + kV2WildcardRedactTest8,
-                             &v2_wildcard_test8_pem_));
-    CHECK(util::ReadTextFile(cert_dir_v2 + kV2WildcardRedactTest9,
-                             &v2_wildcard_test9_pem_));
-    CHECK(util::ReadTextFile(cert_dir_v2 + kV2WildcardRedactTest10,
-                             &v2_wildcard_test10_pem_));
-    CHECK(util::ReadTextFile(cert_dir_v2 + kV2WildcardRedactTest11,
-                             &v2_wildcard_test11_pem_));
-    CHECK(util::ReadTextFile(cert_dir_v2 + kV2WildcardRedactTest12,
-                             &v2_wildcard_test12_pem_));
-    CHECK(util::ReadTextFile(cert_dir_v2 + kV2WildcardRedactTest13,
-                             &v2_wildcard_test13_pem_));
-    CHECK(util::ReadTextFile(cert_dir_v2 + kV2WildcardRedactTest14,
-                             &v2_wildcard_test14_pem_));
-    CHECK(util::ReadTextFile(cert_dir_v2 + kV2WildcardRedactTest15,
-                             &v2_wildcard_test15_pem_));
-    CHECK(util::ReadTextFile(cert_dir_v2 + kV2WildcardRedactTest22,
-                             &v2_wildcard_test22_pem_));
-    CHECK(util::ReadTextFile(cert_dir_v2 + kV2WildcardRedactTest23,
-                             &v2_wildcard_test23_pem_));
-    CHECK(util::ReadTextFile(cert_dir_v2 + kV2WildcardRedactTest24,
-                             &v2_wildcard_test24_pem_));
-
-    // V2 Name constraint test certs
-    CHECK(util::ReadTextFile(cert_dir_v2 + kV2ConstraintTest2,
-                             &v2_constraint_test2_pem_));
-    CHECK(util::ReadTextFile(cert_dir_v2 + kV2ConstraintTest3,
-                             &v2_constraint_test3_pem_));
-    CHECK(util::ReadTextFile(cert_dir_v2 + kV2ConstraintTest4,
-                             &v2_constraint_test4_pem_));
-    CHECK(util::ReadTextFile(cert_dir_v2 + kV2ConstraintTest5,
-                             &v2_constraint_test5_pem_));
-    CHECK(util::ReadTextFile(cert_dir_v2 + kV2ConstraintTest6,
-                             &v2_constraint_test6_pem_));
-    CHECK(util::ReadTextFile(cert_dir_v2 + kV2ConstraintTest7,
-                             &v2_constraint_test7_pem_));
-    CHECK(util::ReadTextFile(cert_dir_v2 + kV2ConstraintTest8,
-                             &v2_constraint_test8_pem_));
-    CHECK(util::ReadTextFile(cert_dir_v2 + kV2ConstraintTest9,
-                             &v2_constraint_test9_pem_));
+  CertTest()
+      : cert_dir_(FLAGS_test_srcdir + "/test/testdata"),
+        cert_dir_v2_(cert_dir_ + "/v2/"),
+        leaf_cert_(ReadCertFromFile(cert_dir_ + "/" + kLeafCert)),
+        ca_cert_(ReadCertFromFile(cert_dir_ + "/" + kCaCert)),
+        ca_precert_cert_(ReadCertFromFile(cert_dir_ + "/" + kCaPreCert)),
+        precert_cert_(ReadCertFromFile(cert_dir_ + "/" + kPreCert)),
+        google_cert_(ReadCertFromFile(cert_dir_ + "/" + kGoogleCert)),
+        legacy_ca_cert_(ReadCertFromFile(cert_dir_ + "/" + kLegacyCaCert)),
+        leaf_with_intermediate_cert_(
+            ReadCertFromFile(cert_dir_ + "/" + kLeafWithIntermediateCert)),
+        v2_wildcard_test5_cert_(
+            ReadCertFromFile(cert_dir_v2_ + kV2WildcardRedactTest5)),
+        v2_wildcard_test6_cert_(
+            ReadCertFromFile(cert_dir_v2_ + kV2WildcardRedactTest6)),
+        v2_wildcard_test7_cert_(
+            ReadCertFromFile(cert_dir_v2_ + kV2WildcardRedactTest7)),
+        v2_wildcard_test8_cert_(
+            ReadCertFromFile(cert_dir_v2_ + kV2WildcardRedactTest8)),
+        v2_wildcard_test9_cert_(
+            ReadCertFromFile(cert_dir_v2_ + kV2WildcardRedactTest9)),
+        v2_wildcard_test10_cert_(
+            ReadCertFromFile(cert_dir_v2_ + kV2WildcardRedactTest10)),
+        v2_wildcard_test11_cert_(
+            ReadCertFromFile(cert_dir_v2_ + kV2WildcardRedactTest11)),
+        v2_wildcard_test12_cert_(
+            ReadCertFromFile(cert_dir_v2_ + kV2WildcardRedactTest12)),
+        v2_wildcard_test13_cert_(
+            ReadCertFromFile(cert_dir_v2_ + kV2WildcardRedactTest13)),
+        v2_wildcard_test14_cert_(
+            ReadCertFromFile(cert_dir_v2_ + kV2WildcardRedactTest14)),
+        v2_wildcard_test15_cert_(
+            ReadCertFromFile(cert_dir_v2_ + kV2WildcardRedactTest15)),
+        v2_wildcard_test22_cert_(
+            ReadCertFromFile(cert_dir_v2_ + kV2WildcardRedactTest22)),
+        v2_wildcard_test23_cert_(
+            ReadCertFromFile(cert_dir_v2_ + kV2WildcardRedactTest23)),
+        v2_wildcard_test24_cert_(
+            ReadCertFromFile(cert_dir_v2_ + kV2WildcardRedactTest24)),
+        v2_constraint_test2_cert_(
+            ReadCertFromFile(cert_dir_v2_ + kV2ConstraintTest2)),
+        v2_constraint_test3_cert_(
+            ReadCertFromFile(cert_dir_v2_ + kV2ConstraintTest3)),
+        v2_constraint_test4_cert_(
+            ReadCertFromFile(cert_dir_v2_ + kV2ConstraintTest4)),
+        v2_constraint_test5_cert_(
+            ReadCertFromFile(cert_dir_v2_ + kV2ConstraintTest5)),
+        v2_constraint_test6_cert_(
+            ReadCertFromFile(cert_dir_v2_ + kV2ConstraintTest6)),
+        v2_constraint_test7_cert_(
+            ReadCertFromFile(cert_dir_v2_ + kV2ConstraintTest7)),
+        v2_constraint_test8_cert_(
+            ReadCertFromFile(cert_dir_v2_ + kV2ConstraintTest8)),
+        v2_constraint_test9_cert_(
+            ReadCertFromFile(cert_dir_v2_ + kV2ConstraintTest9)) {
+    CHECK(util::ReadTextFile(cert_dir_ + "/" + kLeafCert, &leaf_pem_));
+    CHECK(util::ReadTextFile(cert_dir_ + "/" + kCaCert, &ca_pem_));
+    CHECK(util::ReadTextFile(cert_dir_ + "/" + kPreCert, &precert_pem_));
   }
+
+  const string cert_dir_;
+  const string cert_dir_v2_;
+  const unique_ptr<Cert> leaf_cert_;
+  const unique_ptr<Cert> ca_cert_;
+  const unique_ptr<Cert> ca_precert_cert_;
+  const unique_ptr<Cert> precert_cert_;
+  const unique_ptr<Cert> google_cert_;
+  const unique_ptr<Cert> legacy_ca_cert_;
+  const unique_ptr<Cert> leaf_with_intermediate_cert_;
+
+  const unique_ptr<Cert> v2_wildcard_test5_cert_;
+  const unique_ptr<Cert> v2_wildcard_test6_cert_;
+  const unique_ptr<Cert> v2_wildcard_test7_cert_;
+  const unique_ptr<Cert> v2_wildcard_test8_cert_;
+  const unique_ptr<Cert> v2_wildcard_test9_cert_;
+  const unique_ptr<Cert> v2_wildcard_test10_cert_;
+  const unique_ptr<Cert> v2_wildcard_test11_cert_;
+  const unique_ptr<Cert> v2_wildcard_test12_cert_;
+  const unique_ptr<Cert> v2_wildcard_test13_cert_;
+  const unique_ptr<Cert> v2_wildcard_test14_cert_;
+  const unique_ptr<Cert> v2_wildcard_test15_cert_;
+  const unique_ptr<Cert> v2_wildcard_test22_cert_;
+  const unique_ptr<Cert> v2_wildcard_test23_cert_;
+  const unique_ptr<Cert> v2_wildcard_test24_cert_;
+
+  const unique_ptr<Cert> v2_constraint_test2_cert_;
+  const unique_ptr<Cert> v2_constraint_test3_cert_;
+  const unique_ptr<Cert> v2_constraint_test4_cert_;
+  const unique_ptr<Cert> v2_constraint_test5_cert_;
+  const unique_ptr<Cert> v2_constraint_test6_cert_;
+  const unique_ptr<Cert> v2_constraint_test7_cert_;
+  const unique_ptr<Cert> v2_constraint_test8_cert_;
+  const unique_ptr<Cert> v2_constraint_test9_cert_;
+
+  string leaf_pem_;
+  string ca_pem_;
+  string precert_pem_;
 };
 
 class TbsCertificateTest : public CertTest {};
 class CertChainTest : public CertTest {};
 
-// TODO(ekasper): test encoding methods.
-TEST_F(CertTest, LoadValid) {
-  Cert leaf(leaf_pem_);
-  EXPECT_TRUE(leaf.IsLoaded());
-
-  Cert ca(ca_pem_);
-  EXPECT_TRUE(ca.IsLoaded());
-
-  Cert ca_pre(ca_precert_pem_);
-  EXPECT_TRUE(ca_pre.IsLoaded());
-
-  Cert pre(precert_pem_);
-  EXPECT_TRUE(pre.IsLoaded());
-}
-
 TEST_F(CertTest, LoadInvalid) {
   // Bogus certs.
-  Cert invalid("");
-  EXPECT_FALSE(invalid.IsLoaded());
-  Cert invalid2(kInvalidCertString);
-  EXPECT_FALSE(invalid2.IsLoaded());
+  const unique_ptr<Cert> invalid(Cert::FromPemString(""));
+  EXPECT_FALSE(invalid.get());
+  const unique_ptr<Cert> invalid2(Cert::FromPemString(kInvalidCertString));
+  EXPECT_FALSE(invalid2.get());
 }
 
 TEST_F(CertTest, LoadValidFromDer) {
-  Cert leaf(leaf_pem_);
   string der;
-  ASSERT_OK(leaf.DerEncoding(&der));
+  ASSERT_OK(leaf_cert_->DerEncoding(&der));
   const unique_ptr<Cert> second(Cert::FromDerString(der));
   EXPECT_TRUE(second.get());
   EXPECT_TRUE(second->IsLoaded());
 }
 
 TEST_F(CertTest, LoadInvalidFromDer) {
-  Cert leaf(leaf_pem_);
   // Make it look almost good for extra fun.
   string der;
-  ASSERT_OK(leaf.DerEncoding(&der));
+  ASSERT_OK(leaf_cert_->DerEncoding(&der));
   const unique_ptr<Cert> second(Cert::FromDerString(der.substr(2)));
   EXPECT_FALSE(second.get());
 }
 
 TEST_F(CertTest, PrintVersion) {
-  EXPECT_EQ("3", Cert(ca_pem_).PrintVersion());
-  EXPECT_EQ("3", Cert(leaf_pem_).PrintVersion());
-  EXPECT_EQ("3", Cert(google_pem_).PrintVersion());
+  EXPECT_EQ("3", ca_cert_->PrintVersion());
+  EXPECT_EQ("3", leaf_cert_->PrintVersion());
+  EXPECT_EQ("3", google_cert_->PrintVersion());
 }
 
 TEST_F(CertTest, PrintSerialNumber) {
-  EXPECT_EQ("0", Cert(ca_pem_).PrintSerialNumber());
-  EXPECT_EQ("01", Cert(ca_precert_pem_).PrintSerialNumber());
-  EXPECT_EQ("06", Cert(leaf_pem_).PrintSerialNumber());
-  EXPECT_EQ("605381F50001000088BD", Cert(google_pem_).PrintSerialNumber());
+  EXPECT_EQ("0", ca_cert_->PrintSerialNumber());
+  EXPECT_EQ("01", ca_precert_cert_->PrintSerialNumber());
+  EXPECT_EQ("06", leaf_cert_->PrintSerialNumber());
+  EXPECT_EQ("605381F50001000088BD", google_cert_->PrintSerialNumber());
 }
 
 TEST_F(CertTest, PrintSubjectName) {
-  Cert leaf(leaf_pem_);
   EXPECT_EQ("C=GB, O=Certificate Transparency, ST=Wales, L=Erw Wen",
-            leaf.PrintSubjectName());
+            leaf_cert_->PrintSubjectName());
 }
 
 TEST_F(CertTest, PrintIssuerName) {
-  Cert leaf(leaf_pem_);
   EXPECT_EQ("C=GB, O=Certificate Transparency CA, ST=Wales, L=Erw Wen",
-            leaf.PrintIssuerName());
+            leaf_cert_->PrintIssuerName());
 }
 
 TEST_F(CertTest, PrintNotBefore) {
-  Cert leaf(leaf_pem_);
-  EXPECT_EQ("Jun  1 00:00:00 2012 GMT", leaf.PrintNotBefore());
+  EXPECT_EQ("Jun  1 00:00:00 2012 GMT", leaf_cert_->PrintNotBefore());
 }
 
 TEST_F(CertTest, PrintNotAfter) {
-  Cert leaf(leaf_pem_);
-  EXPECT_EQ("Jun  1 00:00:00 2022 GMT", leaf.PrintNotAfter());
+  EXPECT_EQ("Jun  1 00:00:00 2022 GMT", leaf_cert_->PrintNotAfter());
 }
 
 TEST_F(CertTest, PrintSignatureAlgorithm) {
-  Cert leaf(leaf_pem_);
-  EXPECT_EQ("sha1WithRSAEncryption", leaf.PrintSignatureAlgorithm());
+  EXPECT_EQ("sha1WithRSAEncryption", leaf_cert_->PrintSignatureAlgorithm());
 }
 
 TEST_F(CertTest, TestUnsupportedAlgorithm) {
-  Cert legacy(legacy_ca_pem_);
-  ASSERT_EQ("md2WithRSAEncryption", legacy.PrintSignatureAlgorithm());
-// MD2 is disabled by default on modern OpenSSL and you should be surprised to
-// see anything else. Make the test fail if this is not the case to notify the
-// user that their setup is insecure.
+  ASSERT_EQ("md2WithRSAEncryption",
+            legacy_ca_cert_->PrintSignatureAlgorithm());
+// MD2 is disabled by default on modern OpenSSL and you should be
+// surprised to see anything else. Make the test fail if this is not
+// the case to notify the user that their setup is insecure.
 #ifdef OPENSSL_NO_MD2
-  EXPECT_THAT(legacy.IsSignedBy(legacy).status(),
+  EXPECT_THAT(legacy_ca_cert_->IsSignedBy(*legacy_ca_cert_).status(),
               StatusIs(Code::UNIMPLEMENTED));
 #else
   LOG(WARNING) << "Skipping test: MD2 is enabled! You should configure "
@@ -432,66 +422,53 @@ TEST_F(CertTest, TestUnsupportedAlgorithm) {
 }
 
 TEST_F(CertTest, Identical) {
-  Cert leaf(leaf_pem_);
-  Cert ca(ca_pem_);
-  EXPECT_TRUE(leaf.IsIdenticalTo(leaf));
-  EXPECT_FALSE(leaf.IsIdenticalTo(ca));
-  EXPECT_FALSE(ca.IsIdenticalTo(leaf));
+  EXPECT_TRUE(leaf_cert_->IsIdenticalTo(*leaf_cert_));
+  EXPECT_FALSE(leaf_cert_->IsIdenticalTo(*ca_cert_));
+  EXPECT_FALSE(ca_cert_->IsIdenticalTo(*leaf_cert_));
 }
 
 TEST_F(CertTest, Extensions) {
-  Cert leaf(leaf_pem_);
-  Cert ca(ca_pem_);
-  Cert ca_pre(ca_precert_pem_);
-  Cert pre(precert_pem_);
-
-
   // Some facts we know are true about those test certs.
-  EXPECT_TRUE(leaf.HasExtension(NID_authority_key_identifier).ValueOrDie());
-  EXPECT_FALSE(
-      leaf.HasCriticalExtension(NID_authority_key_identifier).ValueOrDie());
-  EXPECT_TRUE(pre.HasCriticalExtension(cert_trans::NID_ctPoison).ValueOrDie());
-
-  EXPECT_FALSE(leaf.HasBasicConstraintCATrue().ValueOrDie());
-  EXPECT_TRUE(ca.HasBasicConstraintCATrue().ValueOrDie());
   EXPECT_TRUE(
-      ca_pre.HasExtendedKeyUsage(cert_trans::NID_ctPrecertificateSigning)
+      leaf_cert_->HasExtension(NID_authority_key_identifier).ValueOrDie());
+  EXPECT_FALSE(leaf_cert_->HasCriticalExtension(NID_authority_key_identifier)
+                   .ValueOrDie());
+  EXPECT_TRUE(precert_cert_->HasCriticalExtension(cert_trans::NID_ctPoison)
+                  .ValueOrDie());
+
+  EXPECT_FALSE(leaf_cert_->HasBasicConstraintCATrue().ValueOrDie());
+  EXPECT_TRUE(ca_cert_->HasBasicConstraintCATrue().ValueOrDie());
+  EXPECT_TRUE(
+      ca_precert_cert_
+          ->HasExtendedKeyUsage(cert_trans::NID_ctPrecertificateSigning)
           .ValueOrDie());
 }
 
 TEST_F(CertTest, Issuers) {
-  Cert leaf(leaf_pem_);
-  Cert ca(ca_pem_);
-  Cert ca_pre(ca_precert_pem_);
-  Cert pre(precert_pem_);
+  EXPECT_TRUE(leaf_cert_->IsIssuedBy(*ca_cert_).ValueOrDie());
+  EXPECT_TRUE(leaf_cert_->IsSignedBy(*ca_cert_).ValueOrDie());
 
-  EXPECT_TRUE(leaf.IsIssuedBy(ca).ValueOrDie());
-  EXPECT_TRUE(leaf.IsSignedBy(ca).ValueOrDie());
+  EXPECT_FALSE(ca_cert_->IsIssuedBy(*leaf_cert_).ValueOrDie());
+  EXPECT_FALSE(ca_cert_->IsSignedBy(*leaf_cert_).ValueOrDie());
 
-  EXPECT_FALSE(ca.IsIssuedBy(leaf).ValueOrDie());
-  EXPECT_FALSE(ca.IsSignedBy(leaf).ValueOrDie());
-
-  EXPECT_FALSE(leaf.IsSelfSigned().ValueOrDie());
-  EXPECT_TRUE(ca.IsSelfSigned().ValueOrDie());
+  EXPECT_FALSE(leaf_cert_->IsSelfSigned().ValueOrDie());
+  EXPECT_TRUE(ca_cert_->IsSelfSigned().ValueOrDie());
 }
 
 TEST_F(CertTest, DerEncodedNames) {
-  Cert leaf(leaf_pem_);
-  Cert ca(ca_pem_);
-
-  ASSERT_TRUE(leaf.IsIssuedBy(ca).ValueOrDie());
+  ASSERT_TRUE(leaf_cert_->IsIssuedBy(*ca_cert_).ValueOrDie());
 
   string leaf_subject, leaf_issuer, ca_subject, ca_issuer;
-  EXPECT_OK(leaf.DerEncodedSubjectName(&leaf_subject));
+  EXPECT_OK(leaf_cert_->DerEncodedSubjectName(&leaf_subject));
   EXPECT_FALSE(leaf_subject.empty());
 
-  EXPECT_OK(leaf.DerEncodedIssuerName(&leaf_issuer));
+  EXPECT_OK(leaf_cert_->DerEncodedIssuerName(&leaf_issuer));
   EXPECT_FALSE(leaf_issuer.empty());
 
-  EXPECT_OK(ca.DerEncodedSubjectName(&ca_subject));
+  EXPECT_OK(ca_cert_->DerEncodedSubjectName(&ca_subject));
   EXPECT_FALSE(ca_subject.empty());
 
-  EXPECT_OK(ca.DerEncodedIssuerName(&ca_issuer));
+  EXPECT_OK(ca_cert_->DerEncodedIssuerName(&ca_issuer));
   EXPECT_FALSE(ca_issuer.empty());
 
   EXPECT_EQ(leaf_issuer, ca_subject);
@@ -500,27 +477,34 @@ TEST_F(CertTest, DerEncodedNames) {
 }
 
 TEST_F(CertTest, SignatureAlgorithmMatches) {
-  Cert matching_algs(kMatchingSigAlgsCertString);
-  Cert issuer(kMismatchingSigAlgsCertIssuerString);
-  EXPECT_TRUE(matching_algs.IsSignedBy(issuer).ValueOrDie());
-  Cert mismatched_algs(kMismatchingSigAlgsCertString);
-  EXPECT_FALSE(mismatched_algs.IsSignedBy(issuer).ValueOrDie());
+  const unique_ptr<Cert> matching_algs(
+      Cert::FromPemString(kMatchingSigAlgsCertString));
+  const unique_ptr<Cert> issuer(
+      Cert::FromPemString(kMismatchingSigAlgsCertIssuerString));
+  ASSERT_TRUE(matching_algs.get());
+  ASSERT_TRUE(issuer.get());
+  EXPECT_TRUE(matching_algs->IsSignedBy(*issuer).ValueOrDie());
+
+  const unique_ptr<Cert> mismatched_algs(
+      Cert::FromPemString(kMismatchingSigAlgsCertString));
+  ASSERT_TRUE(mismatched_algs.get());
+  EXPECT_FALSE(mismatched_algs->IsSignedBy(*issuer).ValueOrDie());
 }
 
 TEST_F(CertTest, IllegalSignatureAlgorithmParameter) {
-  Cert cert(kIllegalSigAlgParameterCertString);
-  #if defined(OPENSSL_IS_BORINGSSL) && \
-              (defined(BORINGSSL_201603) || defined(BORINGSSL_201512))
-  EXPECT_FALSE(cert.IsLoaded());
-  #else
-  EXPECT_TRUE(cert.IsLoaded());
-  #endif
+  const unique_ptr<Cert> cert(
+      Cert::FromPemString(kIllegalSigAlgParameterCertString));
+#if defined(OPENSSL_IS_BORINGSSL) && \
+    (defined(BORINGSSL_201603) || defined(BORINGSSL_201512))
+  EXPECT_FALSE(cert.get());
+#else
+  EXPECT_TRUE(cert.get());
+#endif
 }
 
 TEST_F(CertTest, TestSubjectAltNames) {
-  Cert cert(google_pem_);
   vector<string> sans;
-  EXPECT_OK(cert.SubjectAltNames(&sans));
+  EXPECT_OK(google_cert_->SubjectAltNames(&sans));
   EXPECT_EQ(44, sans.size());
   EXPECT_EQ("*.google.com", sans[0]);
   EXPECT_EQ("*.android.com", sans[1]);
@@ -528,8 +512,7 @@ TEST_F(CertTest, TestSubjectAltNames) {
 }
 
 TEST_F(CertTest, SPKI) {
-  Cert leaf(leaf_pem_);
-  const StatusOr<string> spki(leaf.SPKI());
+  const StatusOr<string> spki(leaf_cert_->SPKI());
   EXPECT_OK(spki.status());
   EXPECT_EQ(162, spki.ValueOrDie().size());
   EXPECT_EQ("Ojz4hdfbFTowDio/KDGC4/pN9dy/EBfIAsnO2yDbKiE=",
@@ -539,11 +522,11 @@ TEST_F(CertTest, SPKI) {
 TEST_F(CertTest, SPKISha256Digest) {
   string digest;
 
-  EXPECT_OK(Cert(leaf_pem_).SPKISha256Digest(&digest));
+  EXPECT_OK(leaf_cert_->SPKISha256Digest(&digest));
   EXPECT_EQ("Ojz4hdfbFTowDio/KDGC4/pN9dy/EBfIAsnO2yDbKiE=",
             util::ToBase64(digest));
 
-  EXPECT_OK(Cert(google_pem_).SPKISha256Digest(&digest));
+  EXPECT_OK(google_cert_->SPKISha256Digest(&digest));
   EXPECT_EQ("VCXa3FxokfQkIcY2SygQMz4BuQHcRANCXdqRCLkoflg=",
             util::ToBase64(digest));
 }
@@ -572,185 +555,165 @@ TEST_F(CertTest, TestIsValidRedactedHost) {
 }
 
 TEST_F(CertTest, TestNoWildcardRedactionIsValid) {
-  Cert leaf(leaf_pem_);
-  EXPECT_OK(leaf.IsValidWildcardRedaction());
+  EXPECT_OK(leaf_cert_->IsValidWildcardRedaction());
 }
 
 TEST_F(CertTest, TestWildcardRedactTestCase5) {
   // This is invalid because the CN is redacted, no DNS or extension
-  Cert leaf(v2_wildcard_test5_pem_);
-  EXPECT_THAT(leaf.IsValidWildcardRedaction(),
+  EXPECT_THAT(v2_wildcard_test5_cert_->IsValidWildcardRedaction(),
               StatusIs(util::error::INVALID_ARGUMENT));
 }
 
 TEST_F(CertTest, TestWildcardRedactTestCase6) {
   // This is invalid because the CN differs from the first DNS-ID
-  Cert leaf(v2_wildcard_test6_pem_);
-  EXPECT_THAT(leaf.IsValidWildcardRedaction(),
+  EXPECT_THAT(v2_wildcard_test6_cert_->IsValidWildcardRedaction(),
               StatusIs(util::error::INVALID_ARGUMENT));
 }
 
 TEST_F(CertTest, TestWildcardRedactTestCase7) {
   // This should be a valid redaction of 1 label with everything set
   // correctly in the extension
-  Cert leaf(v2_wildcard_test7_pem_);
-  EXPECT_OK(leaf.IsValidWildcardRedaction());
+  EXPECT_OK(v2_wildcard_test7_cert_->IsValidWildcardRedaction());
 }
 
 TEST_F(CertTest, TestWildcardRedactTestCase8) {
   // This should be a valid redaction of 1 label with everything set
   // correctly in the extension and a '*' at left of name.
-  Cert leaf(v2_wildcard_test8_pem_);
-  EXPECT_OK(leaf.IsValidWildcardRedaction());
+  EXPECT_OK(v2_wildcard_test8_cert_->IsValidWildcardRedaction());
 }
 
 TEST_F(CertTest, TestWildcardRedactTestCase9) {
   // Should be invalid as the redacted label does not follow RFC rules
-  Cert leaf(v2_wildcard_test9_pem_);
-  EXPECT_THAT(leaf.IsValidWildcardRedaction(),
+  EXPECT_THAT(v2_wildcard_test9_cert_->IsValidWildcardRedaction(),
               StatusIs(util::error::INVALID_ARGUMENT));
 }
 
 TEST_F(CertTest, TestWildcardRedactTestCase10) {
   // Should be invalid as redacted label uses '*' incorrectly
-  Cert leaf(v2_wildcard_test10_pem_);
-  EXPECT_THAT(leaf.IsValidWildcardRedaction(),
+  EXPECT_THAT(v2_wildcard_test10_cert_->IsValidWildcardRedaction(),
               StatusIs(util::error::INVALID_ARGUMENT));
 }
 
 TEST_F(CertTest, TestWildcardRedactTestCase11) {
   // Should be invalid as there are too many label count values
-  Cert leaf(v2_wildcard_test11_pem_);
-  EXPECT_THAT(leaf.IsValidWildcardRedaction(),
+  EXPECT_THAT(v2_wildcard_test11_cert_->IsValidWildcardRedaction(),
               StatusIs(util::error::INVALID_ARGUMENT));
 }
 
 TEST_F(CertTest, TestWildcardRedactTestCase12) {
   // This should be invalid because the CT extension contains -ve value
-  Cert leaf(v2_wildcard_test12_pem_);
-  EXPECT_THAT(leaf.IsValidWildcardRedaction(),
+  EXPECT_THAT(v2_wildcard_test12_cert_->IsValidWildcardRedaction(),
               StatusIs(util::error::INVALID_ARGUMENT));
 }
 
 TEST_F(CertTest, TestWildcardRedactTestCase13) {
-  Cert leaf(v2_wildcard_test13_pem_);
-  EXPECT_OK(leaf.IsValidWildcardRedaction());
+  EXPECT_OK(v2_wildcard_test13_cert_->IsValidWildcardRedaction());
 }
 
 TEST_F(CertTest, TestWildcardRedactTestCase14) {
-  Cert leaf(v2_wildcard_test14_pem_);
-  EXPECT_OK(leaf.IsValidWildcardRedaction());
+  EXPECT_OK(v2_wildcard_test14_cert_->IsValidWildcardRedaction());
 }
 
 TEST_F(CertTest, TestWildcardRedactTestCase15) {
   // This should be invalid because the CT extension has too many values
-  Cert leaf(v2_wildcard_test15_pem_);
-  EXPECT_THAT(leaf.IsValidWildcardRedaction(),
+  EXPECT_THAT(v2_wildcard_test15_cert_->IsValidWildcardRedaction(),
               StatusIs(util::error::INVALID_ARGUMENT));
 }
 
 TEST_F(CertTest, TestWildcardRedactTestCase22) {
   // This should be a redaction of 1 label but no extension required by
   // RFC section 3.2.2
-  Cert leaf(v2_wildcard_test22_pem_);
-  EXPECT_THAT(leaf.IsValidWildcardRedaction(),
+  EXPECT_THAT(v2_wildcard_test22_cert_->IsValidWildcardRedaction(),
               StatusIs(util::error::INVALID_ARGUMENT));
 }
 
 TEST_F(CertTest, TestWildcardRedactTestCase23) {
   // Should not be valid because the CT extension is not a SEQUENCE OF
   // type
-  Cert leaf(v2_wildcard_test23_pem_);
-  EXPECT_THAT(leaf.IsValidWildcardRedaction(),
+  EXPECT_THAT(v2_wildcard_test23_cert_->IsValidWildcardRedaction(),
               StatusIs(util::error::INVALID_ARGUMENT));
 }
 
 TEST_F(CertTest, TestWildcardRedactTestCase24) {
   // Should not be valid because not all the items in the CT extension sequence
   // are ASN1_INTEGER type
-  Cert leaf(v2_wildcard_test24_pem_);
-  EXPECT_THAT(leaf.IsValidWildcardRedaction(),
+  EXPECT_THAT(v2_wildcard_test24_cert_->IsValidWildcardRedaction(),
               StatusIs(util::error::INVALID_ARGUMENT));
 }
 
 TEST_F(CertTest, TestConstraintTestCase2) {
   // This should be valid as the cert is non CA and the checks do not apply
-  Cert leaf(v2_constraint_test2_pem_);
-  EXPECT_OK(leaf.IsValidNameConstrainedIntermediateCa());
+  EXPECT_OK(v2_constraint_test2_cert_->IsValidNameConstrainedIntermediateCa());
 }
 
 TEST_F(CertTest, TestConstraintTestCase3) {
   // This should be valid as the cert is CA but has no name constraint
-  Cert leaf(v2_constraint_test3_pem_);
-  EXPECT_OK(leaf.IsValidNameConstrainedIntermediateCa());
+  EXPECT_OK(v2_constraint_test3_cert_->IsValidNameConstrainedIntermediateCa());
 }
 
 TEST_F(CertTest, TestConstraintTestCase4) {
   // Not valid as there is a constraint but no CT ext
-  Cert leaf(v2_constraint_test4_pem_);
-  EXPECT_THAT(leaf.IsValidNameConstrainedIntermediateCa(),
-              StatusIs(util::error::INVALID_ARGUMENT));
+  EXPECT_THAT(
+      v2_constraint_test4_cert_->IsValidNameConstrainedIntermediateCa(),
+      StatusIs(util::error::INVALID_ARGUMENT));
 }
 
 TEST_F(CertTest, TestConstraintTestCase5) {
   // Not valid as there is no DNS entry in name constraints
-  Cert leaf(v2_constraint_test5_pem_);
-  EXPECT_THAT(leaf.IsValidNameConstrainedIntermediateCa(),
-              StatusIs(util::error::INVALID_ARGUMENT));
+  EXPECT_THAT(
+      v2_constraint_test5_cert_->IsValidNameConstrainedIntermediateCa(),
+      StatusIs(util::error::INVALID_ARGUMENT));
 }
 
 TEST_F(CertTest, TestConstraintTestCase6) {
   // This should be valid as the CA cert contains valid name constraints +
   // CT extension
-  Cert leaf(v2_constraint_test6_pem_);
-  EXPECT_OK(leaf.IsValidNameConstrainedIntermediateCa());
+  EXPECT_OK(v2_constraint_test6_cert_->IsValidNameConstrainedIntermediateCa());
 }
 
 TEST_F(CertTest, TestConstraintTestCase7) {
   // This should be valid as the CA cert contains valid name constraints +
   // CT extension + multiple DNS entries
-  Cert leaf(v2_constraint_test7_pem_);
-  EXPECT_OK(leaf.IsValidNameConstrainedIntermediateCa());
+  EXPECT_OK(v2_constraint_test7_cert_->IsValidNameConstrainedIntermediateCa());
 }
 
 TEST_F(CertTest, TestConstraintTestCase8) {
   // This should be invalid as there is no IP exclusion in name constraint
-  Cert leaf(v2_constraint_test8_pem_);
-  EXPECT_THAT(leaf.IsValidNameConstrainedIntermediateCa(),
-              StatusIs(util::error::INVALID_ARGUMENT));
+  EXPECT_THAT(
+      v2_constraint_test8_cert_->IsValidNameConstrainedIntermediateCa(),
+      StatusIs(util::error::INVALID_ARGUMENT));
 }
 
 TEST_F(CertTest, TestConstraintTestCase9) {
   // This should be invalid as both IPv4 and v6 ranges not excluded
-  Cert leaf(v2_constraint_test9_pem_);
-  EXPECT_THAT(leaf.IsValidNameConstrainedIntermediateCa(),
-              StatusIs(util::error::INVALID_ARGUMENT));
+  EXPECT_THAT(
+      v2_constraint_test9_cert_->IsValidNameConstrainedIntermediateCa(),
+      StatusIs(util::error::INVALID_ARGUMENT));
 }
 
 TEST_F(TbsCertificateTest, DerEncoding) {
-  Cert leaf(leaf_pem_);
-  TbsCertificate tbs(leaf);
+  TbsCertificate tbs(*leaf_cert_);
 
   string cert_tbs_der, raw_tbs_der;
-  EXPECT_OK(leaf.DerEncodedTbsCertificate(&cert_tbs_der));
+  EXPECT_OK(leaf_cert_->DerEncodedTbsCertificate(&cert_tbs_der));
   EXPECT_OK(tbs.DerEncoding(&raw_tbs_der));
   EXPECT_EQ(cert_tbs_der, raw_tbs_der);
 }
 
 TEST_F(TbsCertificateTest, DeleteExtension) {
-  Cert leaf(leaf_pem_);
+  ASSERT_TRUE(
+      leaf_cert_->HasExtension(NID_authority_key_identifier).ValueOrDie());
 
-  ASSERT_TRUE(leaf.HasExtension(NID_authority_key_identifier).ValueOrDie());
-
-  TbsCertificate tbs(leaf);
+  TbsCertificate tbs(*leaf_cert_);
   string der_before, der_after;
   EXPECT_OK(tbs.DerEncoding(&der_before));
   EXPECT_OK(tbs.DeleteExtension(NID_authority_key_identifier));
   EXPECT_OK(tbs.DerEncoding(&der_after));
   EXPECT_NE(der_before, der_after);
 
-  ASSERT_FALSE(leaf.HasExtension(cert_trans::NID_ctPoison).ValueOrDie());
-  TbsCertificate tbs2(leaf);
+  ASSERT_FALSE(
+      leaf_cert_->HasExtension(cert_trans::NID_ctPoison).ValueOrDie());
+  TbsCertificate tbs2(*leaf_cert_);
   string der_before2, der_after2;
   EXPECT_OK(tbs2.DerEncoding(&der_before2));
   EXPECT_THAT(tbs2.DeleteExtension(cert_trans::NID_ctPoison),
@@ -760,20 +723,17 @@ TEST_F(TbsCertificateTest, DeleteExtension) {
 }
 
 TEST_F(TbsCertificateTest, CopyIssuer) {
-  Cert leaf(leaf_pem_);
-  Cert different(leaf_with_intermediate_pem_);
-
-  TbsCertificate tbs(leaf);
+  TbsCertificate tbs(*leaf_cert_);
   string der_before, der_after;
   EXPECT_OK(tbs.DerEncoding(&der_before));
-  EXPECT_OK(tbs.CopyIssuerFrom(different));
+  EXPECT_OK(tbs.CopyIssuerFrom(*leaf_with_intermediate_cert_));
   EXPECT_OK(tbs.DerEncoding(&der_after));
   EXPECT_NE(der_before, der_after);
 
-  TbsCertificate tbs2(leaf);
+  TbsCertificate tbs2(*leaf_cert_);
   string der_before2, der_after2;
   EXPECT_OK(tbs2.DerEncoding(&der_before2));
-  EXPECT_OK(tbs2.CopyIssuerFrom(leaf));
+  EXPECT_OK(tbs2.CopyIssuerFrom(*leaf_cert_));
   EXPECT_OK(tbs2.DerEncoding(&der_after2));
   EXPECT_EQ(der_before2, der_after2);
 }
@@ -804,13 +764,13 @@ TEST_F(CertChainTest, AddCert) {
   CertChain chain(leaf_pem_);
   EXPECT_EQ(chain.Length(), 1U);
 
-  chain.AddCert(unique_ptr<Cert>(new Cert(ca_pem_)));
+  ASSERT_TRUE(chain.AddCert(Cert::FromPemString(ca_pem_)));
   EXPECT_EQ(chain.Length(), 2U);
 
-  chain.AddCert(NULL);
+  EXPECT_FALSE(chain.AddCert(nullptr));
   EXPECT_EQ(chain.Length(), 2U);
 
-  chain.AddCert(unique_ptr<Cert>(new Cert("bogus")));
+  EXPECT_FALSE(chain.AddCert(Cert::FromPemString("bogus")));
   EXPECT_EQ(chain.Length(), 2U);
 }
 

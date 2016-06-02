@@ -401,7 +401,7 @@ TEST_F(CertCheckerTest, Certificate) {
 TEST_F(CertCheckerTest, CertificateWithRoot) {
   CertChain chain(leaf_pem_);
   ASSERT_TRUE(chain.IsLoaded());
-  ASSERT_TRUE(chain.AddCert(unique_ptr<Cert>(new Cert(ca_pem_))));
+  ASSERT_TRUE(chain.AddCert(Cert::FromPemString(ca_pem_)));
 
   // Fail as even though we give a CA cert, it's not in the local store.
   EXPECT_THAT(checker_.CheckCertChain(&chain),
@@ -416,8 +416,8 @@ TEST_F(CertCheckerTest, CertificateWithRoot) {
 TEST_F(CertCheckerTest, TrimsRepeatedRoots) {
   CertChain chain(leaf_pem_);
   ASSERT_TRUE(chain.IsLoaded());
-  ASSERT_TRUE(chain.AddCert(unique_ptr<Cert>(new Cert(ca_pem_))));
-  ASSERT_TRUE(chain.AddCert(unique_ptr<Cert>(new Cert(ca_pem_))));
+  ASSERT_TRUE(chain.AddCert(Cert::FromPemString(ca_pem_)));
+  ASSERT_TRUE(chain.AddCert(Cert::FromPemString(ca_pem_)));
 
   // Load CA certs and expect success.
   EXPECT_TRUE(checker_.LoadTrustedCertificates(cert_dir_ + "/" + kCaCert));
@@ -435,7 +435,7 @@ TEST_F(CertCheckerTest, Intermediates) {
   EXPECT_THAT(checker_.CheckCertChain(&chain),
               StatusIs(util::error::FAILED_PRECONDITION));
   // Add the intermediate and expect success.
-  ASSERT_TRUE(chain.AddCert(unique_ptr<Cert>(new Cert(intermediate_pem_))));
+  ASSERT_TRUE(chain.AddCert(Cert::FromPemString(intermediate_pem_)));
   ASSERT_EQ(2U, chain.Length());
   EXPECT_OK(checker_.CheckCertChain(&chain));
   EXPECT_EQ(3U, chain.Length());
@@ -523,10 +523,11 @@ TEST_F(CertCheckerTest, AcceptNoBasicConstraintsAndMd2) {
 
   string ca_pem;
   ASSERT_TRUE(util::ReadTextFile(cert_dir_ + "/" + kCaNoBCCert, &ca_pem));
-  Cert ca(ca_pem);
+  const unique_ptr<Cert> ca(Cert::FromPemString(ca_pem));
+  ASSERT_TRUE(ca.get());
   // Verify testdata properties: CA is legacy root.
-  ASSERT_EQ("md2WithRSAEncryption", ca.PrintSignatureAlgorithm());
-  ASSERT_FALSE(ca.HasBasicConstraintCATrue().ValueOrDie());
+  ASSERT_EQ("md2WithRSAEncryption", ca->PrintSignatureAlgorithm());
+  ASSERT_FALSE(ca->HasBasicConstraintCATrue().ValueOrDie());
 
   string chain_pem;
   ASSERT_TRUE(util::ReadTextFile(cert_dir_ + "/" + kNoBCChain, &chain_pem));
@@ -593,15 +594,11 @@ TEST_F(CertCheckerTest, ResolveIssuerCollisions) {
   ASSERT_TRUE(
       util::ReadTextFile(cert_dir_ + "/" + kCollisionRoot2, &root2_pem));
   CertChain chain1(chain_pem);
-  unique_ptr<Cert> root1(new Cert(root1_pem));
-  ASSERT_TRUE(root1->IsLoaded());
-  chain1.AddCert(move(root1));
+  ASSERT_TRUE(chain1.AddCert(Cert::FromPemString(root1_pem)));
   EXPECT_OK(checker_.CheckCertChain(&chain1));
 
   CertChain chain2(chain_pem);
-  unique_ptr<Cert> root2(new Cert(root2_pem));
-  ASSERT_TRUE(root2->IsLoaded());
-  chain2.AddCert(move(root2));
+  ASSERT_TRUE(chain2.AddCert(Cert::FromPemString(root2_pem)));
   EXPECT_OK(checker_.CheckCertChain(&chain2));
 }
 

@@ -49,28 +49,33 @@ static const char kCmsTestSubject[] =
 
 namespace {
 
+unique_ptr<Cert> ReadCertFromFile(const string& filename) {
+  string content;
+  CHECK(util::ReadTextFile(filename, &content))
+      << "Could not read test data from " << filename
+      << ". Wrong --test_srcdir?";
+  unique_ptr<Cert> cert(Cert::FromPemString(content));
+  CHECK(cert.get());
+  return std::move(cert);
+}
+
 class CmsVerifierTest : public ::testing::Test {
  protected:
   CmsVerifierTest()
       : cert_dir_(FLAGS_test_srcdir + "/test/testdata"),
-        cert_dir_v2_(FLAGS_test_srcdir + "/test/testdata/v2/") {
+        cert_dir_v2_(FLAGS_test_srcdir + "/test/testdata/v2/"),
+        ca_cert_(ReadCertFromFile(cert_dir_ + "/" + kCaCert)),
+        intermediate_cert_(
+            ReadCertFromFile(cert_dir_ + "/" + kIntermediateCert)),
+        leaf_cert_(ReadCertFromFile(cert_dir_ + "/" + kLeafCert)) {
   }
 
-  string ca_pem_;
-  string intermediate_pem_;
-  string leaf_pem_;
   const string cert_dir_;
   const string cert_dir_v2_;
+  const unique_ptr<Cert> ca_cert_;
+  const unique_ptr<Cert> intermediate_cert_;
+  const unique_ptr<Cert> leaf_cert_;
   CmsVerifier verifier_;
-
-  void SetUp() {
-    CHECK(util::ReadTextFile(cert_dir_ + "/" + kLeafCert, &leaf_pem_))
-        << "Could not read test data from " << cert_dir_
-        << ". Wrong --test_srcdir?";
-    CHECK(util::ReadTextFile(cert_dir_ + "/" + kIntermediateCert,
-                             &intermediate_pem_));
-    CHECK(util::ReadTextFile(cert_dir_ + "/" + kCaCert, &ca_pem_));
-  }
 };
 
 
@@ -86,42 +91,32 @@ BIO* OpenTestFileBio(const string& filename) {
 TEST_F(CmsVerifierTest, CmsSignTestCase2) {
   // In this test the embedded data is not a certificate in DER format
   // but it doesn't get unpacked and the signature is valid.
-  Cert ca(ca_pem_);
-
   ScopedBIO bio(OpenTestFileBio(cert_dir_v2_ + kCmsSignedDataTest2));
   ASSERT_NE(bio.get(), nullptr);
-  EXPECT_TRUE(verifier_.IsCmsSignedByCert(bio.get(), ca).ValueOrDie());
+  EXPECT_TRUE(verifier_.IsCmsSignedByCert(bio.get(), *ca_cert_).ValueOrDie());
 }
 
 
 TEST_F(CmsVerifierTest, CmsSignTestCase3) {
   // The CMS should be signed by the CA that signed the cert
-  Cert ca(ca_pem_);
-
   ScopedBIO bio(OpenTestFileBio(cert_dir_v2_ + kCmsSignedDataTest3));
   ASSERT_NE(bio.get(), nullptr);
-  EXPECT_TRUE(verifier_.IsCmsSignedByCert(bio.get(), ca).ValueOrDie());
+  EXPECT_TRUE(verifier_.IsCmsSignedByCert(bio.get(), *ca_cert_).ValueOrDie());
 }
 
 
 TEST_F(CmsVerifierTest, CmsSignTestCase4) {
   // The CMS is not signed by the CA that signed the cert it contains
-  Cert ca(ca_pem_);
-
   ScopedBIO bio(OpenTestFileBio(cert_dir_v2_ + kCmsSignedDataTest4));
   ASSERT_NE(bio.get(), nullptr);
-  EXPECT_FALSE(verifier_.IsCmsSignedByCert(bio.get(), ca).ValueOrDie());
+  EXPECT_FALSE(verifier_.IsCmsSignedByCert(bio.get(), *ca_cert_).ValueOrDie());
 }
 
 
 TEST_F(CmsVerifierTest, CmsVerifyTestCase2) {
-  // For this test the embedded cert is invalid DER but CMS signed by the CA
-  Cert cert(ca_pem_);
-  ASSERT_TRUE(cert.IsLoaded());
-
   ScopedBIO bio(OpenTestFileBio(cert_dir_v2_ + kCmsSignedDataTest2));
   unique_ptr<Cert> unpacked_cert(
-      verifier_.UnpackCmsSignedCertificate(bio.get(), cert));
+      verifier_.UnpackCmsSignedCertificate(bio.get(), *ca_cert_));
 
   ASSERT_FALSE(unpacked_cert.get());
 }
@@ -129,12 +124,9 @@ TEST_F(CmsVerifierTest, CmsVerifyTestCase2) {
 
 TEST_F(CmsVerifierTest, CmsVerifyTestCase3) {
   // For this test the embedded cert is signed by the CA
-  Cert cert(ca_pem_);
-  ASSERT_TRUE(cert.IsLoaded());
-
   ScopedBIO bio(OpenTestFileBio(cert_dir_v2_ + kCmsSignedDataTest3));
   unique_ptr<Cert> unpacked_cert(
-      verifier_.UnpackCmsSignedCertificate(bio.get(), cert));
+      verifier_.UnpackCmsSignedCertificate(bio.get(), *ca_cert_));
 
   ASSERT_FALSE(unpacked_cert->HasBasicConstraintCATrue().ValueOrDie());
   ASSERT_TRUE(
@@ -148,12 +140,9 @@ TEST_F(CmsVerifierTest, CmsVerifyTestCase3) {
 
 TEST_F(CmsVerifierTest, CmsVerifyTestCase4) {
   // For this test the embedded cert is signed by the intermediate CA
-  Cert cert(ca_pem_);
-  ASSERT_TRUE(cert.IsLoaded());
-
   ScopedBIO bio(OpenTestFileBio(cert_dir_v2_ + kCmsSignedDataTest4));
   unique_ptr<Cert> unpacked_cert(
-      verifier_.UnpackCmsSignedCertificate(bio.get(), cert));
+      verifier_.UnpackCmsSignedCertificate(bio.get(), *ca_cert_));
 
   ASSERT_FALSE(unpacked_cert.get());
 }
@@ -161,12 +150,9 @@ TEST_F(CmsVerifierTest, CmsVerifyTestCase4) {
 
 TEST_F(CmsVerifierTest, CmsVerifyTestCase5) {
   // For this test the embedded cert is signed by the intermediate
-  Cert cert(intermediate_pem_);
-  ASSERT_TRUE(cert.IsLoaded());
-
   ScopedBIO bio(OpenTestFileBio(cert_dir_v2_ + kCmsSignedDataTest5));
   unique_ptr<Cert> unpacked_cert(
-      verifier_.UnpackCmsSignedCertificate(bio.get(), cert));
+      verifier_.UnpackCmsSignedCertificate(bio.get(), *intermediate_cert_));
 
   ASSERT_TRUE(unpacked_cert.get());
   ASSERT_FALSE(unpacked_cert->HasBasicConstraintCATrue().ValueOrDie());
@@ -181,12 +167,9 @@ TEST_F(CmsVerifierTest, CmsVerifyTestCase5) {
 
 TEST_F(CmsVerifierTest, CmsVerifyTestCase7) {
   // For this test the embedded cert is signed by the intermediate
-  Cert cert(leaf_pem_);
-  ASSERT_TRUE(cert.IsLoaded());
-
   ScopedBIO bio(OpenTestFileBio(cert_dir_v2_ + kCmsSignedDataTest5));
   unique_ptr<Cert> unpacked_cert(
-      verifier_.UnpackCmsSignedCertificate(bio.get(), cert));
+      verifier_.UnpackCmsSignedCertificate(bio.get(), *leaf_cert_));
 
   ASSERT_FALSE(unpacked_cert.get());
 }
@@ -194,12 +177,9 @@ TEST_F(CmsVerifierTest, CmsVerifyTestCase7) {
 
 TEST_F(CmsVerifierTest, CmsVerifyTestCase8) {
   // For this test the embedded cert is signed by the intermediate
-  Cert cert(ca_pem_);
-  ASSERT_TRUE(cert.IsLoaded());
-
   ScopedBIO bio(OpenTestFileBio(cert_dir_v2_ + kCmsSignedDataTest5));
   unique_ptr<Cert> unpacked_cert(
-      verifier_.UnpackCmsSignedCertificate(bio.get(), cert));
+      verifier_.UnpackCmsSignedCertificate(bio.get(), *ca_cert_));
 
   ASSERT_FALSE(unpacked_cert.get());
 }

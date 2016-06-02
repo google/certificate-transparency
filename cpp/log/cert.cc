@@ -177,24 +177,27 @@ Cert::Cert(ScopedX509 x509) : x509_(move(x509)) {
 }
 
 
-Cert::Cert(const string& pem_string) {
+unique_ptr<Cert> Cert::FromPemString(const std::string& pem_string) {
   // A read-only bio.
   ScopedBIO bio_in(BIO_new_mem_buf(const_cast<char*>(pem_string.data()),
                                    pem_string.length()));
   if (!bio_in) {
     LOG_OPENSSL_ERRORS(ERROR);
-    return;
+    return nullptr;
   }
 
-  x509_.reset(PEM_read_bio_X509(bio_in.get(), nullptr, nullptr, nullptr));
+  ScopedX509 x509(PEM_read_bio_X509(bio_in.get(), nullptr, nullptr, nullptr));
 
-  if (!x509_) {
+  if (!x509) {
     // At this point most likely the input was just corrupt. There are a few
     // real errors that may have happened (a malloc failure is one) and it is
     // virtually impossible to fish them out.
     LOG(WARNING) << "Input is not a valid PEM-encoded certificate";
     LOG_OPENSSL_ERRORS(WARNING);
+    return nullptr;
   }
+
+  return unique_ptr<Cert>(new Cert(move(x509)));
 }
 
 

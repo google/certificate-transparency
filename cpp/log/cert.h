@@ -28,15 +28,12 @@ class Cert {
   static std::unique_ptr<Cert> FromDerString(const std::string& der_string);
   // Caller still owns the BIO afterwards.
   static std::unique_ptr<Cert> FromDerBio(BIO* bio_in);
+  static std::unique_ptr<Cert> FromPemString(const std::string& pem_string);
 
   // If |x509| comes directly from a copy, it is advisable to check
   // IsLoaded() after construction to verify the copy operation
   // succeeded.
   explicit Cert(ScopedX509 x509);
-  // May fail, but we don't want to die on invalid inputs,
-  // so caller should check IsLoaded() before doing anything else.
-  // All attempts to operate on an unloaded cert will fail with ERROR.
-  explicit Cert(const std::string& pem_string);
   Cert() = delete;
 
   bool IsLoaded() const {
