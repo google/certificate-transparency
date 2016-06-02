@@ -40,8 +40,8 @@ class Cert {
     return x509_ != nullptr;
   }
 
-  // Never returns NULL but check IsLoaded() after Clone to verify the
-  // underlying copy succeeded.
+  // Returns null if there was a problem with the underlying copy, but
+  // IsLoaded() is always true if it returns non-null.
   std::unique_ptr<Cert> Clone() const;
 
   // These just return an empty string if an error occurs.

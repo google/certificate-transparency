@@ -209,7 +209,7 @@ unique_ptr<Cert> Cert::Clone() const {
       LOG_OPENSSL_ERRORS(ERROR);
     }
   }
-  return unique_ptr<Cert>(new Cert(move(x509)));
+  return x509 ? unique_ptr<Cert>(new Cert(move(x509))) : nullptr;
 }
 
 
