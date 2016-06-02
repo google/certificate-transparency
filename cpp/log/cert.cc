@@ -243,24 +243,15 @@ unique_ptr<Cert> Cert::FromDerBio(BIO* bio_in) {
 
 
 string Cert::PrintVersion() const {
-  if (!IsLoaded()) {
-    LOG(ERROR) << "Cert not loaded";
-    return string();
-  }
-
-  const long version(X509_get_version(x509_.get()));
+  const long version(X509_get_version(CHECK_NOTNULL(x509_.get())));
   return to_string(1 + version);
 }
 
 
 string Cert::PrintSerialNumber() const {
-  if (!IsLoaded()) {
-    LOG(ERROR) << "Cert not loaded";
-    return string();
-  }
-
   ScopedBIGNUM serial_number_BN(
-      ASN1_INTEGER_to_BN(X509_get_serialNumber(x509_.get()), NULL));
+      ASN1_INTEGER_to_BN(X509_get_serialNumber(CHECK_NOTNULL(x509_.get())),
+                         nullptr));
 
   ScopedOpenSSLString serial_number_hex(BN_bn2hex(serial_number_BN.get()));
 
@@ -271,22 +262,12 @@ string Cert::PrintSerialNumber() const {
 
 
 string Cert::PrintIssuerName() const {
-  if (!IsLoaded()) {
-    LOG(ERROR) << "Cert not loaded";
-    return string();
-  }
-
-  return PrintName(X509_get_issuer_name(x509_.get()));
+  return PrintName(X509_get_issuer_name(CHECK_NOTNULL(x509_.get())));
 }
 
 
 string Cert::PrintSubjectName() const {
-  if (!IsLoaded()) {
-    LOG(ERROR) << "Cert not loaded";
-    return string();
-  }
-
-  return PrintName(X509_get_subject_name(x509_.get()));
+  return PrintName(X509_get_subject_name(CHECK_NOTNULL(x509_.get())));
 }
 
 
@@ -311,22 +292,12 @@ string Cert::PrintName(X509_NAME* name) {
 
 
 string Cert::PrintNotBefore() const {
-  if (!IsLoaded()) {
-    LOG(ERROR) << "Cert not loaded";
-    return string();
-  }
-
-  return PrintTime(X509_get_notBefore(x509_.get()));
+  return PrintTime(X509_get_notBefore(CHECK_NOTNULL(x509_.get())));
 }
 
 
 string Cert::PrintNotAfter() const {
-  if (!IsLoaded()) {
-    LOG(ERROR) << "Cert not loaded";
-    return string();
-  }
-
-  return PrintTime(X509_get_notAfter(x509_.get()));
+  return PrintTime(X509_get_notAfter(CHECK_NOTNULL(x509_.get())));
 }
 
 
@@ -365,10 +336,7 @@ bool Cert::IsIdenticalTo(const Cert& other) const {
 
 
 util::StatusOr<bool> Cert::HasExtension(int extension_nid) const {
-  if (!IsLoaded()) {
-    LOG(ERROR) << "Cert not loaded";
-    return util::Status(Code::FAILED_PRECONDITION, "Cert not loaded");
-  }
+  CHECK(x509_);
 
   const StatusOr<int> index(ExtensionIndex(extension_nid));
   if (index.ok()) {
@@ -384,10 +352,7 @@ util::StatusOr<bool> Cert::HasExtension(int extension_nid) const {
 
 
 StatusOr<bool> Cert::HasCriticalExtension(int extension_nid) const {
-  if (!IsLoaded()) {
-    LOG(ERROR) << "Cert not loaded";
-    return util::Status(Code::FAILED_PRECONDITION, "Cert not loaded");
-  }
+  CHECK(x509_);
 
   const StatusOr<X509_EXTENSION*> ext(GetExtension(extension_nid));
   if (!ext.ok()) {
@@ -404,11 +369,7 @@ StatusOr<bool> Cert::HasCriticalExtension(int extension_nid) const {
 
 
 StatusOr<bool> Cert::HasBasicConstraintCATrue() const {
-  if (!IsLoaded()) {
-    LOG(ERROR) << "Cert not loaded";
-    return util::Status(Code::FAILED_PRECONDITION, "Cert not loaded");
-  }
-
+  CHECK(x509_);
   const StatusOr<void*> ext_struct(ExtensionStructure(NID_basic_constraints));
 
   if (ext_struct.status().CanonicalCode() == Code::NOT_FOUND) {
@@ -429,10 +390,7 @@ StatusOr<bool> Cert::HasBasicConstraintCATrue() const {
 
 
 StatusOr<bool> Cert::HasExtendedKeyUsage(int key_usage_nid) const {
-  if (!IsLoaded()) {
-    LOG(ERROR) << "Cert not loaded";
-    return util::Status(Code::FAILED_PRECONDITION, "Cert not loaded");
-  }
+  CHECK(x509_);
 
   const ASN1_OBJECT* key_usage_obj = OBJ_nid2obj(key_usage_nid);
   if (!key_usage_obj) {
@@ -469,13 +427,9 @@ StatusOr<bool> Cert::HasExtendedKeyUsage(int key_usage_nid) const {
 
 
 StatusOr<bool> Cert::IsIssuedBy(const Cert& issuer) const {
-  if (!IsLoaded() || !issuer.IsLoaded()) {
-    LOG(ERROR) << "Cert not loaded";
-    return util::Status(Code::FAILED_PRECONDITION, "Cert not loaded");
-  }
   // Seemingly no negative "real" error codes are returned from openssl api.
-  return X509_check_issued(const_cast<X509*>(issuer.x509_.get()),
-                           x509_.get()) == X509_V_OK;
+  return X509_check_issued(CHECK_NOTNULL(issuer.x509_.get()),
+                           CHECK_NOTNULL(x509_.get())) == X509_V_OK;
 }
 
 StatusOr<bool> Cert::LogUnsupportedAlgorithm() const {
@@ -485,19 +439,15 @@ StatusOr<bool> Cert::LogUnsupportedAlgorithm() const {
 }
 
 StatusOr<bool> Cert::IsSignedBy(const Cert& issuer) const {
-  if (!IsLoaded() || !issuer.IsLoaded()) {
-    LOG(ERROR) << "Cert not loaded";
-    return util::Status(Code::FAILED_PRECONDITION, "Cert not loaded");
-  }
-
-  const ScopedEVP_PKEY issuer_key(X509_get_pubkey(issuer.x509_.get()));
+  const ScopedEVP_PKEY issuer_key(
+      X509_get_pubkey(CHECK_NOTNULL(issuer.x509_.get())));
   if (!issuer_key) {
     LOG(WARNING) << "NULL issuer key";
     LOG_OPENSSL_ERRORS(WARNING);
     return false;
   }
 
-  const int ret(X509_verify(x509_.get(), issuer_key.get()));
+  const int ret(X509_verify(CHECK_NOTNULL(x509_.get()), issuer_key.get()));
   if (ret == 1) {
     return true;
   }
@@ -562,13 +512,8 @@ StatusOr<bool> Cert::IsSignedBy(const Cert& issuer) const {
 
 
 util::Status Cert::DerEncoding(string* result) const {
-  if (!IsLoaded()) {
-    LOG(ERROR) << "Cert not loaded";
-    return util::Status(Code::FAILED_PRECONDITION, "Cert not loaded");
-  }
-
   unsigned char* der_buf(nullptr);
-  int der_length = i2d_X509(x509_.get(), &der_buf);
+  int der_length = i2d_X509(CHECK_NOTNULL(x509_.get()), &der_buf);
 
   if (der_length < 0) {
     // Failed to decode. Several possible reasons but we will just reject
@@ -585,13 +530,8 @@ util::Status Cert::DerEncoding(string* result) const {
 
 
 util::Status Cert::PemEncoding(string* result) const {
-  if (!IsLoaded()) {
-    LOG(ERROR) << "Cert not loaded";
-    return util::Status(Code::FAILED_PRECONDITION, "Cert not loaded");
-  }
-
   ScopedBIO bp(BIO_new(BIO_s_mem()));
-  if (!PEM_write_bio_X509(bp.get(), x509_.get())) {
+  if (!PEM_write_bio_X509(bp.get(), CHECK_NOTNULL(x509_.get()))) {
     LOG(WARNING) << "Failed to serialize cert";
     LOG_OPENSSL_ERRORS(WARNING);
     return util::Status(Code::INVALID_ARGUMENT, "PEM serialize failed");
@@ -609,14 +549,10 @@ util::Status Cert::PemEncoding(string* result) const {
 
 
 util::Status Cert::Sha256Digest(string* result) const {
-  if (!IsLoaded()) {
-    LOG(ERROR) << "Cert not loaded";
-    return util::Status(Code::FAILED_PRECONDITION, "Cert not loaded");
-  }
-
   unsigned char digest[EVP_MAX_MD_SIZE];
   unsigned int len;
-  if (X509_digest(x509_.get(), EVP_sha256(), digest, &len) != 1) {
+  if (X509_digest(CHECK_NOTNULL(x509_.get()), EVP_sha256(), digest, &len) !=
+      1) {
     // Failed to digest. Several possible reasons but we will just reject
     // the input rather than trying to interpret the cause
     LOG(WARNING) << "Failed to compute cert digest";
@@ -630,13 +566,8 @@ util::Status Cert::Sha256Digest(string* result) const {
 
 
 util::Status Cert::DerEncodedTbsCertificate(string* result) const {
-  if (!IsLoaded()) {
-    LOG(ERROR) << "Cert not loaded";
-    return util::Status(Code::FAILED_PRECONDITION, "Cert not loaded");
-  }
-
   unsigned char* der_buf(nullptr);
-  int der_length = i2d_re_X509_tbs(x509_.get(), &der_buf);
+  int der_length = i2d_re_X509_tbs(CHECK_NOTNULL(x509_.get()), &der_buf);
   if (der_length < 0) {
     // Failed to serialize. Several possible reasons but we will just reject
     // the input rather than trying to interpret the cause
@@ -651,20 +582,14 @@ util::Status Cert::DerEncodedTbsCertificate(string* result) const {
 
 
 util::Status Cert::DerEncodedSubjectName(string* result) const {
-  if (!IsLoaded()) {
-    LOG(ERROR) << "Cert not loaded";
-    return util::Status(Code::FAILED_PRECONDITION, "Cert not loaded");
-  }
-  return DerEncodedName(X509_get_subject_name(x509_.get()), result);
+  return DerEncodedName(X509_get_subject_name(CHECK_NOTNULL(x509_.get())),
+                        result);
 }
 
 
 util::Status Cert::DerEncodedIssuerName(string* result) const {
-  if (!IsLoaded()) {
-    LOG(ERROR) << "Cert not loaded";
-    return util::Status(Code::FAILED_PRECONDITION, "Cert not loaded");
-  }
-  return DerEncodedName(X509_get_issuer_name(x509_.get()), result);
+  return DerEncodedName(X509_get_issuer_name(CHECK_NOTNULL(x509_.get())),
+                        result);
 }
 
 
@@ -686,14 +611,10 @@ util::Status Cert::DerEncodedName(X509_NAME* name, string* result) {
 
 
 util::Status Cert::PublicKeySha256Digest(string* result) const {
-  if (!IsLoaded()) {
-    LOG(ERROR) << "Cert not loaded";
-    return util::Status(Code::FAILED_PRECONDITION, "Cert not loaded");
-  }
-
   unsigned char digest[EVP_MAX_MD_SIZE];
   unsigned int len;
-  if (X509_pubkey_digest(x509_.get(), EVP_sha256(), digest, &len) != 1) {
+  if (X509_pubkey_digest(CHECK_NOTNULL(x509_.get()), EVP_sha256(), digest,
+                         &len) != 1) {
     // Failed to digest. Several possible reasons but we will just reject
     // the input rather than trying to interpret the cause
     LOG(WARNING) << "Failed to compute public key digest";
@@ -706,14 +627,10 @@ util::Status Cert::PublicKeySha256Digest(string* result) const {
 
 
 StatusOr<string> Cert::SPKI() const {
-  if (!IsLoaded()) {
-    LOG(ERROR) << "Cert not loaded";
-    return util::Status(Code::FAILED_PRECONDITION, "Cert not loaded");
-  }
-
   unsigned char* der_buf(nullptr);
-  int der_length =
-      i2d_X509_PUBKEY(X509_get_X509_PUBKEY(x509_.get()), &der_buf);
+  const int der_length(
+      i2d_X509_PUBKEY(X509_get_X509_PUBKEY(CHECK_NOTNULL(x509_.get())),
+                      &der_buf));
   if (der_length < 0) {
     // What does this return value mean? Let's assume it means the cert
     // is bad until proven otherwise.
@@ -742,10 +659,7 @@ util::Status Cert::SPKISha256Digest(string* result) const {
 
 util::Status Cert::OctetStringExtensionData(int extension_nid,
                                             string* result) const {
-  if (!IsLoaded()) {
-    LOG(ERROR) << "Cert not loaded";
-    return util::Status(Code::FAILED_PRECONDITION, "Cert not loaded");
-  }
+  CHECK(x509_);
 
   // Callers don't care whether extension is missing or invalid as they
   // usually call this method after confirming it to be present.
@@ -765,7 +679,8 @@ util::Status Cert::OctetStringExtensionData(int extension_nid,
 
 
 util::StatusOr<int> Cert::ExtensionIndex(int extension_nid) const {
-  const int index(X509_get_ext_by_NID(x509_.get(), extension_nid, -1));
+  const int index(
+      X509_get_ext_by_NID(CHECK_NOTNULL(x509_.get()), extension_nid, -1));
   if (index < -1) {
     // The most likely and possibly only cause for a return code
     // other than -1 is an unrecognized NID.
@@ -966,8 +881,9 @@ bool Cert::ValidateRedactionSubjectAltNameAndCN(int* dns_alt_name_count,
   vector<string> dns_alt_names;
 
   ScopedGENERAL_NAMEStack subject_alt_names(
-      static_cast<STACK_OF(GENERAL_NAME)*>(X509_get_ext_d2i(
-          x509_.get(), NID_subject_alt_name, nullptr, nullptr)));
+      static_cast<STACK_OF(GENERAL_NAME)*>(
+          X509_get_ext_d2i(CHECK_NOTNULL(x509_.get()), NID_subject_alt_name,
+                           nullptr, nullptr)));
 
   // Apply validation rules for subject alt names, if this returns true
   // status is already final.
@@ -1042,11 +958,6 @@ bool Cert::ValidateRedactionSubjectAltNameAndCN(int* dns_alt_name_count,
 
 
 util::Status Cert::IsValidWildcardRedaction() const {
-  if (!IsLoaded()) {
-    LOG(ERROR) << "Cert not loaded";
-    return util::Status(Code::FAILED_PRECONDITION, "Cert not loaded");
-  }
-
   util::Status status(Code::UNKNOWN, "Unknown error");
   int dns_alt_name_count = 0;
 
@@ -1133,11 +1044,6 @@ util::Status Cert::IsValidWildcardRedaction() const {
 
 
 util::Status Cert::IsValidNameConstrainedIntermediateCa() const {
-  if (!IsLoaded()) {
-    LOG(ERROR) << "Cert not loaded";
-    return util::Status(Code::FAILED_PRECONDITION, "Cert not loaded");
-  }
-
   // If it's not a CA cert or there is no name constraint extension then we
   // don't need to apply the rules any further
   const StatusOr<bool> has_ca_constraint = HasBasicConstraintCATrue();
@@ -1252,12 +1158,7 @@ util::Status Cert::IsValidNameConstrainedIntermediateCa() const {
 }
 
 TbsCertificate::TbsCertificate(const Cert& cert) {
-  if (!cert.IsLoaded()) {
-    LOG(ERROR) << "Cert not loaded";
-    return;
-  }
-
-  x509_.reset(X509_dup(cert.x509_.get()));
+  x509_.reset(X509_dup(CHECK_NOTNULL(cert.x509_.get())));
 
   if (!x509_)
     LOG_OPENSSL_ERRORS(ERROR);
@@ -1331,11 +1232,6 @@ util::Status TbsCertificate::DeleteExtension(int extension_nid) {
 
 
 util::Status TbsCertificate::CopyIssuerFrom(const Cert& from) {
-  if (!from.IsLoaded()) {
-    LOG(ERROR) << "Cert not loaded";
-    return util::Status(Code::FAILED_PRECONDITION, "Cert not loaded");
-  }
-
   if (!IsLoaded()) {
     LOG(ERROR) << "TBS not loaded";
     return util::Status(Code::FAILED_PRECONDITION, "Cert not loaded (TBS)");
@@ -1463,7 +1359,7 @@ CertChain::CertChain(const string& pem_string) {
 
 
 bool CertChain::AddCert(unique_ptr<Cert> cert) {
-  if (!cert || !cert->IsLoaded()) {
+  if (!cert) {
     LOG(ERROR) << "Attempting to add an invalid cert";
     return false;
   }

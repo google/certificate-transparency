@@ -23,8 +23,7 @@ bool IsValidRedactedHost(const std::string& hostname);
 class Cert {
  public:
   // The following factory static methods return null if the input is
-  // not valid, but otherwise, the object is guaranteed to be loaded
-  // (if non-null, no need to check IsLoaded()).
+  // not valid.
   static std::unique_ptr<Cert> FromDerString(const std::string& der_string);
   // Caller still owns the BIO afterwards.
   static std::unique_ptr<Cert> FromDerBio(BIO* bio_in);
@@ -32,12 +31,7 @@ class Cert {
   // Will return null if |x509| is null.
   static std::unique_ptr<Cert> FromX509(ScopedX509 x509);
 
-  bool IsLoaded() const {
-    return x509_ != nullptr;
-  }
-
-  // Returns null if there was a problem with the underlying copy, but
-  // IsLoaded() is always true if it returns non-null.
+  // Returns null if there was a problem with the underlying copy.
   std::unique_ptr<Cert> Clone() const;
 
   // These just return an empty string if an error occurs.

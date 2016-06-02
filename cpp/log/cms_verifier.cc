@@ -14,11 +14,6 @@ util::StatusOr<bool> CmsVerifier::IsCmsSignedByCert(BIO* cms_bio_in,
                                                     const Cert& cert) const {
   CHECK_NOTNULL(cms_bio_in);
 
-  if (!cert.IsLoaded()) {
-    LOG(ERROR) << "Can't check cert signer as it's not loaded";
-    return Status(util::error::FAILED_PRECONDITION, "Cert not loaded");
-  }
-
   ScopedCMS_ContentInfo cms_content_info(d2i_CMS_bio(cms_bio_in, nullptr));
 
   if (!cms_content_info) {
@@ -48,11 +43,6 @@ util::StatusOr<bool> CmsVerifier::IsCmsSignedByCert(BIO* cms_bio_in,
 StatusOr<bool> CmsVerifier::IsCmsSignedByCert(const string& cms_object,
                                               const Cert* cert) const {
   CHECK_NOTNULL(cert);
-
-  if (!cert->IsLoaded()) {
-    LOG(ERROR) << "Can't check cert signer as it's not loaded";
-    return Status(util::error::FAILED_PRECONDITION, "Cert not loaded");
-  }
 
   // Load a source bio with the CMS signed data object and parse it
   ScopedBIO source_bio(BIO_new(BIO_s_mem()));
@@ -112,11 +102,6 @@ StatusOr<bool> CmsVerifier::IsCmsSignedByCert(const string& cms_object,
 util::Status CmsVerifier::UnpackCmsDerBio(BIO* cms_bio_in, const Cert& cert,
                                           BIO* cms_bio_out) {
   CHECK_NOTNULL(cms_bio_in);
-
-  if (!cert.IsLoaded()) {
-    LOG(ERROR) << "Cert for CMS verify not loaded";
-    return Status(util::error::FAILED_PRECONDITION, "Cert not loaded");
-  }
 
   ScopedCMS_ContentInfo cms_content_info(d2i_CMS_bio(cms_bio_in, nullptr));
 

@@ -26,10 +26,6 @@ namespace {
 
 
 bool SerializedTbs(const Cert& cert, string* result) {
-  if (!cert.IsLoaded()) {
-    return false;
-  }
-
   const StatusOr<bool> has_embedded_proof = cert.HasExtension(
       cert_trans::NID_ctEmbeddedSignedCertificateTimestampList);
   if (!has_embedded_proof.ok()) {

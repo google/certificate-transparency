@@ -360,7 +360,6 @@ TEST_F(CertTest, LoadValidFromDer) {
   ASSERT_OK(leaf_cert_->DerEncoding(&der));
   const unique_ptr<Cert> second(Cert::FromDerString(der));
   EXPECT_TRUE(second.get());
-  EXPECT_TRUE(second->IsLoaded());
 }
 
 TEST_F(CertTest, LoadInvalidFromDer) {

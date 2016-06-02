@@ -245,7 +245,7 @@ Status CertChecker::CheckPreCertChain(PreCertChain* chain,
 
 Status CertChecker::GetTrustedCa(CertChain* chain) const {
   const Cert* subject = chain->LastCert();
-  if (!subject || !subject->IsLoaded()) {
+  if (!subject) {
     LOG(ERROR) << "Chain has no valid certs";
     return Status(util::error::INTERNAL, "chain has no valid certificate");
   }
