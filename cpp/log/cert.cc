@@ -223,19 +223,18 @@ unique_ptr<Cert> Cert::FromDerString(const string& der_string) {
 }
 
 
-util::Status Cert::LoadFromDerBio(BIO* bio_in) {
-  x509_.reset(d2i_X509_bio(bio_in, nullptr));
-  CHECK_NOTNULL(bio_in);
+unique_ptr<Cert> Cert::FromDerBio(BIO* bio_in) {
+  ScopedX509 x509(d2i_X509_bio(CHECK_NOTNULL(bio_in), nullptr));
 
-  if (!x509_) {
+  if (!x509) {
     // At this point most likely the input was just corrupt. There are few
     // real errors that may have happened (a malloc failure is one) and it is
     // virtually impossible to fish them out.
     LOG(WARNING) << "Input is not a valid encoded certificate";
     LOG_OPENSSL_ERRORS(WARNING);
-    return util::Status(Code::INVALID_ARGUMENT, "Not a valid encoded cert");
+    return nullptr;
   }
-  return util::Status::OK;
+  return unique_ptr<Cert>(new Cert(move(x509)));
 }
 
 

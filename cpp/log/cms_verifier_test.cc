@@ -123,7 +123,7 @@ TEST_F(CmsVerifierTest, CmsVerifyTestCase2) {
   unique_ptr<Cert> unpacked_cert(
       verifier_.UnpackCmsSignedCertificate(bio.get(), cert));
 
-  ASSERT_FALSE(unpacked_cert->IsLoaded());
+  ASSERT_FALSE(unpacked_cert.get());
 }
 
 
@@ -155,7 +155,7 @@ TEST_F(CmsVerifierTest, CmsVerifyTestCase4) {
   unique_ptr<Cert> unpacked_cert(
       verifier_.UnpackCmsSignedCertificate(bio.get(), cert));
 
-  ASSERT_FALSE(unpacked_cert->IsLoaded());
+  ASSERT_FALSE(unpacked_cert.get());
 }
 
 
@@ -168,6 +168,7 @@ TEST_F(CmsVerifierTest, CmsVerifyTestCase5) {
   unique_ptr<Cert> unpacked_cert(
       verifier_.UnpackCmsSignedCertificate(bio.get(), cert));
 
+  ASSERT_TRUE(unpacked_cert.get());
   ASSERT_FALSE(unpacked_cert->HasBasicConstraintCATrue().ValueOrDie());
   ASSERT_TRUE(
       unpacked_cert->HasExtension(NID_authority_key_identifier).ValueOrDie());
@@ -187,7 +188,7 @@ TEST_F(CmsVerifierTest, CmsVerifyTestCase7) {
   unique_ptr<Cert> unpacked_cert(
       verifier_.UnpackCmsSignedCertificate(bio.get(), cert));
 
-  ASSERT_FALSE(unpacked_cert->IsLoaded());
+  ASSERT_FALSE(unpacked_cert.get());
 }
 
 
@@ -200,7 +201,7 @@ TEST_F(CmsVerifierTest, CmsVerifyTestCase8) {
   unique_ptr<Cert> unpacked_cert(
       verifier_.UnpackCmsSignedCertificate(bio.get(), cert));
 
-  ASSERT_FALSE(unpacked_cert->IsLoaded());
+  ASSERT_FALSE(unpacked_cert.get());
 }
 
 }  // namespace

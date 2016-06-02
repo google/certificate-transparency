@@ -204,15 +204,15 @@ Cert* CmsVerifier::UnpackCmsSignedCertificate(BIO* cms_bio_in,
                                               const Cert& verify_cert) {
   CHECK_NOTNULL(cms_bio_in);
   ScopedBIO unpacked_bio(BIO_new(BIO_s_mem()));
-  unique_ptr<Cert> cert(new Cert());
+  unique_ptr<Cert> cert;
 
   if (UnpackCmsDerBio(cms_bio_in, verify_cert, unpacked_bio.get()).ok()) {
     // The unpacked data should be a valid DER certificate.
     // TODO: The RFC does not yet define this as the format so this may
     // need to change.
-    util::Status status = cert->LoadFromDerBio(unpacked_bio.get());
+    cert = Cert::FromDerBio(unpacked_bio.get());
 
-    if (!status.ok()) {
+    if (!cert) {
       LOG(WARNING) << "Could not unpack cert from CMS DER encoded data";
     }
   } else {
@@ -228,15 +228,15 @@ Cert* CmsVerifier::UnpackCmsSignedCertificate(const string& cms_object) {
   BIO_write(source_bio.get(), cms_object.c_str(), cms_object.length());
 
   ScopedBIO unpacked_bio(BIO_new(BIO_s_mem()));
-  unique_ptr<Cert> cert(new Cert);
+  unique_ptr<Cert> cert;
 
   if (UnpackCmsDerBio(source_bio.get(), unpacked_bio.get()).ok()) {
     // The unpacked data should be a valid DER certificate.
     // TODO: The RFC does not yet define this as the format so this may
     // need to change.
-    const Status status = cert->LoadFromDerBio(unpacked_bio.get());
+    cert = Cert::FromDerBio(unpacked_bio.get());
 
-    if (!status.ok()) {
+    if (!cert) {
       LOG(WARNING) << "Could not unpack cert from CMS DER encoded data";
     }
   } else {
