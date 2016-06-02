@@ -37,8 +37,7 @@ class Cert {
   // so caller should check IsLoaded() before doing anything else.
   // All attempts to operate on an unloaded cert will fail with ERROR.
   explicit Cert(const std::string& pem_string);
-  Cert() {
-  }
+  Cert() = delete;
 
   bool IsLoaded() const {
     return x509_ != nullptr;
