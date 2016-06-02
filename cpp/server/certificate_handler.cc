@@ -58,9 +58,8 @@ bool ExtractChain(libevent::Base* base, evhttp_request* req,
       return false;
     }
 
-    unique_ptr<Cert> cert(new Cert);
-    cert->LoadFromDerString(json_cert.FromBase64());
-    if (!cert->IsLoaded()) {
+    unique_ptr<Cert> cert(Cert::FromDerString(json_cert.FromBase64()));
+    if (!cert) {
       SendJsonError(base, req, HTTP_BADREQUEST,
                     "Unable to parse provided chain.");
       return false;

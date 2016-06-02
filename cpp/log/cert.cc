@@ -210,16 +210,16 @@ unique_ptr<Cert> Cert::Clone() const {
 }
 
 
-util::Status Cert::LoadFromDerString(const string& der_string) {
+unique_ptr<Cert> Cert::FromDerString(const string& der_string) {
   const unsigned char* start =
       reinterpret_cast<const unsigned char*>(der_string.data());
-  x509_.reset(d2i_X509(nullptr, &start, der_string.size()));
-  if (!x509_) {
+  ScopedX509 x509(d2i_X509(nullptr, &start, der_string.size()));
+  if (!x509) {
     LOG(WARNING) << "Input is not a valid DER-encoded certificate";
     LOG_OPENSSL_ERRORS(WARNING);
-    return util::Status(Code::INVALID_ARGUMENT, "Not a valid encoded cert");
+    return nullptr;
   }
-  return util::Status::OK;
+  return unique_ptr<Cert>(new Cert(move(x509)));
 }
 
 

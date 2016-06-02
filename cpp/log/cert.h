@@ -22,6 +22,11 @@ bool IsValidRedactedHost(const std::string& hostname);
 
 class Cert {
  public:
+  // Returns null if the input is not valid, but otherwise, the object
+  // is guaranteed to be loaded (if non-null, no need to check
+  // IsLoaded()).
+  static std::unique_ptr<Cert> FromDerString(const std::string& der_string);
+
   // If |x509| comes directly from a copy, it is advisable to check
   // IsLoaded() after construction to verify the copy operation
   // succeeded.
@@ -40,9 +45,6 @@ class Cert {
   // Never returns NULL but check IsLoaded() after Clone to verify the
   // underlying copy succeeded.
   std::unique_ptr<Cert> Clone() const;
-
-  // Frees the old X509 and attempts to load a new one.
-  util::Status LoadFromDerString(const std::string& der_string);
 
   // Frees the old X509 and attempts to load from BIO in DER form. Caller
   // still owns the BIO afterwards.

@@ -362,9 +362,9 @@ TEST_F(CertTest, LoadValidFromDer) {
   Cert leaf(leaf_pem_);
   string der;
   ASSERT_OK(leaf.DerEncoding(&der));
-  Cert second;
-  EXPECT_OK(second.LoadFromDerString(der));
-  EXPECT_TRUE(second.IsLoaded());
+  const unique_ptr<Cert> second(Cert::FromDerString(der));
+  EXPECT_TRUE(second.get());
+  EXPECT_TRUE(second->IsLoaded());
 }
 
 TEST_F(CertTest, LoadInvalidFromDer) {
@@ -372,10 +372,8 @@ TEST_F(CertTest, LoadInvalidFromDer) {
   // Make it look almost good for extra fun.
   string der;
   ASSERT_OK(leaf.DerEncoding(&der));
-  Cert second;
-  EXPECT_THAT(second.LoadFromDerString(der.substr(2)),
-              StatusIs(util::error::INVALID_ARGUMENT));
-  EXPECT_FALSE(second.IsLoaded());
+  const unique_ptr<Cert> second(Cert::FromDerString(der.substr(2)));
+  EXPECT_FALSE(second.get());
 }
 
 TEST_F(CertTest, PrintVersion) {
