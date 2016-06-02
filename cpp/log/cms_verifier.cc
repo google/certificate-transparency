@@ -4,6 +4,7 @@
 #include "util/cms_scoped_types.h"
 #include "util/openssl_scoped_types.h"
 
+using std::move;
 using std::string;
 using std::unique_ptr;
 using util::Status;
@@ -41,9 +42,7 @@ util::StatusOr<bool> CmsVerifier::IsCmsSignedByCert(BIO* cms_bio_in,
 }
 
 StatusOr<bool> CmsVerifier::IsCmsSignedByCert(const string& cms_object,
-                                              const Cert* cert) const {
-  CHECK_NOTNULL(cert);
-
+                                              const Cert& cert) const {
   // Load a source bio with the CMS signed data object and parse it
   ScopedBIO source_bio(BIO_new(BIO_s_mem()));
   BIO_write(source_bio.get(), cms_object.c_str(), cms_object.length());
@@ -63,7 +62,7 @@ StatusOr<bool> CmsVerifier::IsCmsSignedByCert(const string& cms_object,
   // expected signing cert that can be used by CMS_verify.
   ScopedWeakX509Stack validation_chain(sk_X509_new(nullptr));
 
-  sk_X509_push(validation_chain.get(), cert->x509_.get());
+  sk_X509_push(validation_chain.get(), CHECK_NOTNULL(cert.x509_.get()));
 
   // Must set CMS_NOINTERN as the RFC says certs SHOULD be omitted from the
   // message but the client might not have obeyed this. CMS_BINARY is required
@@ -89,7 +88,7 @@ StatusOr<bool> CmsVerifier::IsCmsSignedByCert(const string& cms_object,
     for (int s = 0; s < sk_CMS_SignerInfo_num(signers); ++s) {
       CMS_SignerInfo* const signer = sk_CMS_SignerInfo_value(signers, s);
 
-      if (CMS_SignerInfo_cert_cmp(signer, cert->x509_.get()) == 0) {
+      if (CMS_SignerInfo_cert_cmp(signer, cert.x509_.get()) == 0) {
         return true;
       }
     }
@@ -185,8 +184,8 @@ util::Status CmsVerifier::UnpackCmsDerBio(BIO* cms_bio_in, BIO* cms_bio_out) {
 }
 
 
-Cert* CmsVerifier::UnpackCmsSignedCertificate(BIO* cms_bio_in,
-                                              const Cert& verify_cert) {
+unique_ptr<Cert> CmsVerifier::UnpackCmsSignedCertificate(
+    BIO* cms_bio_in, const Cert& verify_cert) {
   CHECK_NOTNULL(cms_bio_in);
   ScopedBIO unpacked_bio(BIO_new(BIO_s_mem()));
   unique_ptr<Cert> cert;
@@ -204,10 +203,11 @@ Cert* CmsVerifier::UnpackCmsSignedCertificate(BIO* cms_bio_in,
     LOG_OPENSSL_ERRORS(ERROR);
   }
 
-  return cert.release();
+  return move(cert);
 }
 
-Cert* CmsVerifier::UnpackCmsSignedCertificate(const string& cms_object) {
+unique_ptr<Cert> CmsVerifier::UnpackCmsSignedCertificate(
+    const string& cms_object) {
   // Load the source bio with the CMS signed data object
   ScopedBIO source_bio(BIO_new(BIO_s_mem()));
   BIO_write(source_bio.get(), cms_object.c_str(), cms_object.length());
@@ -228,7 +228,7 @@ Cert* CmsVerifier::UnpackCmsSignedCertificate(const string& cms_object) {
     LOG_OPENSSL_ERRORS(ERROR);
   }
 
-  return cert.release();
+  return move(cert);
 }
 
 }  // namespace cert_trans

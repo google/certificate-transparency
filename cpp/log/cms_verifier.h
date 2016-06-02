@@ -31,14 +31,15 @@ class CmsVerifier {
   // Checks that a CMS_ContentInfo has a signer that matches a specified
   // certificate. Does not verify the signature or check the payload.
   virtual util::StatusOr<bool> IsCmsSignedByCert(const std::string& cms_object,
-                                                 const Cert* cert) const;
+                                                 const Cert& cert) const;
 
   // Unpacks a CMS signed data object that is assumed to contain a certificate
   // Does not do any checks on signatures or cert validity at this point,
   // the caller must do these separately. Returns a new Cert object built from
   // the unpacked data, which will only be valid if we successfully unpacked
   // the CMS blob.
-  virtual Cert* UnpackCmsSignedCertificate(const std::string& cms_object);
+  virtual std::unique_ptr<Cert> UnpackCmsSignedCertificate(
+      const std::string& cms_object);
 
   // Unpacks a CMS signed data object that is assumed to contain a certificate
   // If the CMS signature verifies as being signed by the supplied Cert
@@ -49,8 +50,8 @@ class CmsVerifier {
   // NOTE: Certificate validity checks must be done separately. This
   // only checks that the CMS signature is validly made by the supplied
   // certificate.
-  virtual Cert* UnpackCmsSignedCertificate(BIO* cms_bio_in,
-                                           const Cert& verify_cert);
+  virtual std::unique_ptr<Cert> UnpackCmsSignedCertificate(
+      BIO* cms_bio_in, const Cert& verify_cert);
 
  private:
   // Verifies that data from a DER BIO is signed by a given certificate.
