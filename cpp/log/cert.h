@@ -29,12 +29,8 @@ class Cert {
   // Caller still owns the BIO afterwards.
   static std::unique_ptr<Cert> FromDerBio(BIO* bio_in);
   static std::unique_ptr<Cert> FromPemString(const std::string& pem_string);
-
-  // If |x509| comes directly from a copy, it is advisable to check
-  // IsLoaded() after construction to verify the copy operation
-  // succeeded.
-  explicit Cert(ScopedX509 x509);
-  Cert() = delete;
+  // Will return null if |x509| is null.
+  static std::unique_ptr<Cert> FromX509(ScopedX509 x509);
 
   bool IsLoaded() const {
     return x509_ != nullptr;
@@ -204,6 +200,10 @@ class Cert {
   FRIEND_TEST(CtExtensionsTest, TestPrecertSigning);
 
  private:
+  // Will CHECK-fail if |x509| is null.
+  explicit Cert(ScopedX509 x509);
+  Cert() = delete;
+
   util::StatusOr<int> ExtensionIndex(int extension_nid) const;
   util::StatusOr<X509_EXTENSION*> GetExtension(int extension_nid) const;
   util::StatusOr<void*> ExtensionStructure(int extension_nid) const;
@@ -213,7 +213,7 @@ class Cert {
   static std::string PrintName(X509_NAME* name);
   static std::string PrintTime(ASN1_TIME* when);
   static util::Status DerEncodedName(X509_NAME* name, std::string* result);
-  ScopedX509 x509_;
+  const ScopedX509 x509_;
 
   DISALLOW_COPY_AND_ASSIGN(Cert);
 };

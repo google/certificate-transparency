@@ -173,7 +173,13 @@ string ASN1ToStringAndCheckForNulls(ASN1_STRING* asn1_string,
 }
 
 
+unique_ptr<Cert> Cert::FromX509(ScopedX509 x509) {
+  return x509 ? unique_ptr<Cert>(new Cert(move(x509))) : nullptr;
+}
+
+
 Cert::Cert(ScopedX509 x509) : x509_(move(x509)) {
+  CHECK(x509_);
 }
 
 
@@ -187,17 +193,15 @@ unique_ptr<Cert> Cert::FromPemString(const std::string& pem_string) {
   }
 
   ScopedX509 x509(PEM_read_bio_X509(bio_in.get(), nullptr, nullptr, nullptr));
-
   if (!x509) {
     // At this point most likely the input was just corrupt. There are a few
     // real errors that may have happened (a malloc failure is one) and it is
     // virtually impossible to fish them out.
     LOG(WARNING) << "Input is not a valid PEM-encoded certificate";
     LOG_OPENSSL_ERRORS(WARNING);
-    return nullptr;
   }
 
-  return unique_ptr<Cert>(new Cert(move(x509)));
+  return FromX509(move(x509));
 }
 
 
@@ -209,7 +213,7 @@ unique_ptr<Cert> Cert::Clone() const {
       LOG_OPENSSL_ERRORS(ERROR);
     }
   }
-  return x509 ? unique_ptr<Cert>(new Cert(move(x509))) : nullptr;
+  return FromX509(move(x509));
 }
 
 
@@ -220,24 +224,21 @@ unique_ptr<Cert> Cert::FromDerString(const string& der_string) {
   if (!x509) {
     LOG(WARNING) << "Input is not a valid DER-encoded certificate";
     LOG_OPENSSL_ERRORS(WARNING);
-    return nullptr;
   }
-  return unique_ptr<Cert>(new Cert(move(x509)));
+  return FromX509(move(x509));
 }
 
 
 unique_ptr<Cert> Cert::FromDerBio(BIO* bio_in) {
   ScopedX509 x509(d2i_X509_bio(CHECK_NOTNULL(bio_in), nullptr));
-
   if (!x509) {
     // At this point most likely the input was just corrupt. There are few
     // real errors that may have happened (a malloc failure is one) and it is
     // virtually impossible to fish them out.
     LOG(WARNING) << "Input is not a valid encoded certificate";
     LOG_OPENSSL_ERRORS(WARNING);
-    return nullptr;
   }
-  return unique_ptr<Cert>(new Cert(move(x509)));
+  return FromX509(move(x509));
 }
 
 
@@ -1444,7 +1445,7 @@ CertChain::CertChain(const string& pem_string) {
   ScopedX509 x509;
   while ((x509 = ScopedX509(
               PEM_read_bio_X509(bio_in.get(), nullptr, nullptr, nullptr)))) {
-    chain_.push_back(unique_ptr<Cert>(new Cert(move(x509))));
+    chain_.push_back(Cert::FromX509(move(x509)));
   }
 
   // The last error must be EOF.
