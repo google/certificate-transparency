@@ -9,6 +9,7 @@ import org.certificatetransparency.ctlog.MerkleAuditProof;
 import org.certificatetransparency.ctlog.MerkleTreeLeaf;
 import org.certificatetransparency.ctlog.ParsedLogEntry;
 import org.certificatetransparency.ctlog.ParsedLogEntryWithProof;
+import org.certificatetransparency.ctlog.PreCert;
 import org.certificatetransparency.ctlog.PrecertChainEntry;
 import org.certificatetransparency.ctlog.SignedEntry;
 import org.certificatetransparency.ctlog.TimestampedEntry;
@@ -168,18 +169,17 @@ public class Deserializer {
       int length = (int) readNumber(in, 3);
       signedEntry.x509 = readFixedLength(in, length);
     } else if (entryType == Ct.LogEntryType.PRECERT_ENTRY_VALUE) {
-      Ct.PreCert.Builder preCertBuilder = Ct.PreCert.newBuilder();
+      PreCert preCert = new PreCert();
 
-      byte[] arr = readFixedLength(in, 32);
-      preCertBuilder.setIssuerKeyHash(ByteString.copyFrom(arr));
+      preCert.issuerKeyHash = readFixedLength(in, 32);
 
       // set tbs certificate
-      arr = readFixedLength(in, 2);
+      byte[] arr = readFixedLength(in, 2);
       int length = (int) readNumber(in, 2);
 
-      preCertBuilder.setTbsCertificate(ByteString.copyFrom(readFixedLength(in, length)));
+      preCert.tbsCertificate = readFixedLength(in, length);
 
-      signedEntry.preCert = preCertBuilder.build();
+      signedEntry.preCert = preCert;
     } else {
       throw new SerializationException(String.format("Unknown entry type: %d", entryType));
     }
@@ -220,7 +220,7 @@ public class Deserializer {
    * @param preCert Precertificate.
    * @return {@link PrecertChainEntry} proto object.
    */
-  public static PrecertChainEntry parsePrecertChainEntry(InputStream in, Ct.PreCert preCert) {
+  public static PrecertChainEntry parsePrecertChainEntry(InputStream in, PreCert preCert) {
     PrecertChainEntry preCertChain = new PrecertChainEntry();
     preCertChain.preCert = preCert;
 

@@ -46,11 +46,6 @@ message X509ChainEntry {
   repeated bytes certificate_chain = 2;
 }
 
-message PreCert {
-  optional bytes issuer_key_hash = 1;
-  optional bytes tbs_certificate = 2;
-}
-
 enum Version {
   V1 = 0;
   // Not part of the I-D, and outside the valid range.
