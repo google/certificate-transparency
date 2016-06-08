@@ -9,6 +9,7 @@ import org.certificatetransparency.ctlog.MerkleAuditProof;
 import org.certificatetransparency.ctlog.MerkleTreeLeaf;
 import org.certificatetransparency.ctlog.ParsedLogEntry;
 import org.certificatetransparency.ctlog.ParsedLogEntryWithProof;
+import org.certificatetransparency.ctlog.PrecertChainEntry;
 import org.certificatetransparency.ctlog.SignedEntry;
 import org.certificatetransparency.ctlog.TimestampedEntry;
 import org.certificatetransparency.ctlog.proto.Ct;
@@ -118,7 +119,7 @@ public class Deserializer {
           treeLeaf.timestampedEntry.signedEntry.x509);
       logEntry.x509Entry = x509EntryChain;
     } else if (entryType == Ct.LogEntryType.PRECERT_ENTRY) {
-      Ct.PrecertChainEntry preCertChain = parsePrecertChainEntry(extraData,
+      PrecertChainEntry preCertChain = parsePrecertChainEntry(extraData,
           treeLeaf.timestampedEntry.signedEntry.preCert);
       logEntry.precertEntry = preCertChain;
     } else {
@@ -217,11 +218,11 @@ public class Deserializer {
    * Parses PrecertChainEntry structure.
    * @param in PrecertChainEntry structure, byte stream of binary encoding.
    * @param preCert Precertificate.
-   * @return {@link Ct.PrecertChainEntry} proto object.
+   * @return {@link PrecertChainEntry} proto object.
    */
-  public static Ct.PrecertChainEntry parsePrecertChainEntry(InputStream in, Ct.PreCert preCert) {
-    Ct.PrecertChainEntry.Builder preCertChain = Ct.PrecertChainEntry.newBuilder();
-    preCertChain.setPreCert(preCert);
+  public static PrecertChainEntry parsePrecertChainEntry(InputStream in, Ct.PreCert preCert) {
+    PrecertChainEntry preCertChain = new PrecertChainEntry();
+    preCertChain.preCert = preCert;
 
     try {
       if (readNumber(in, 3) != in.available()) {
@@ -229,13 +230,13 @@ public class Deserializer {
       }
       while (in.available() > 0) {
         int length = (int) readNumber(in, 3);
-        preCertChain.addPrecertificateChain(ByteString.copyFrom(readFixedLength(in, length)));
+        preCertChain.precertificateChain.add(readFixedLength(in, length));
       }
     } catch (IOException e) {
       throw new SerializationException("Cannot parse PrecertEntryChain."
         + e.getLocalizedMessage());
     }
-    return preCertChain.build();
+    return preCertChain;
   }
 
   /**

@@ -51,16 +51,6 @@ message PreCert {
   optional bytes tbs_certificate = 2;
 }
 
-message PrecertChainEntry {
-  // The chain certifying the precertificate, as submitted by the CA.
-  repeated bytes precertificate_chain = 2;
-
-  // PreCert input to the SCT. Can be computed from the above.
-  // Store it alongside the entry data so that the signers don't have to
-  // parse certificates to recompute it.
-  optional PreCert pre_cert = 3;
-}
-
 enum Version {
   V1 = 0;
   // Not part of the I-D, and outside the valid range.
