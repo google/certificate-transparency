@@ -292,16 +292,14 @@ public class HttpLogClientTest {
     X509Certificate leafCert = null ;
     try {
 
-      byte[] leafCertBytes = entries.get(0).getLogEntry().x509Entry.getLeafCertificate()
-        .toByteArray();
+      byte[] leafCertBytes = entries.get(0).getLogEntry().x509Entry.leafCertificate;
       leafCert = (X509Certificate) CertificateFactory.getInstance("X509").generateCertificate(
         new ByteArrayInputStream(leafCertBytes));
 
-      byte[] chainCertBytes = entries.get(0).getLogEntry().x509Entry.getCertificateChain(0)
-        .toByteArray();
+      byte[] chainCertBytes = entries.get(0).getLogEntry().x509Entry.certificateChain.get(0);
       chainCert = (X509Certificate) CertificateFactory.getInstance("X509").generateCertificate(
         new ByteArrayInputStream(chainCertBytes));
-  
+
     } catch (CertificateException  e) {
       Assert.fail();
     }
@@ -395,13 +393,11 @@ public class HttpLogClientTest {
     X509Certificate leafCert = null;
     try {
 
-      byte[] leafCertBytes = entry.getParsedLogEntry().getLogEntry().x509Entry
-        .getLeafCertificate().toByteArray();
+      byte[] leafCertBytes = entry.getParsedLogEntry().getLogEntry().x509Entry.leafCertificate;
       leafCert = (X509Certificate) CertificateFactory.getInstance("X509").generateCertificate(
         new ByteArrayInputStream(leafCertBytes));
 
-      byte[] chainCertBytes = entry.getParsedLogEntry().getLogEntry().x509Entry
-        .getCertificateChain(0).toByteArray();
+      byte[] chainCertBytes = entry.getParsedLogEntry().getLogEntry().x509Entry.certificateChain.get(0);
       chainCert = (X509Certificate) CertificateFactory.getInstance("X509").generateCertificate(
         new ByteArrayInputStream(chainCertBytes));
 
