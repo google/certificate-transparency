@@ -1,5 +1,6 @@
 package org.certificatetransparency.ctlog;
 
+import java.util.ArrayList;
 import java.util.List;
 import org.certificatetransparency.ctlog.PreCert;
 
@@ -14,6 +15,6 @@ public class PrecertChainEntry {
   public PreCert preCert;
 
   public PrecertChainEntry() {
-    precertificateChain = new java.util.ArrayList<byte[]>();
+    precertificateChain = new ArrayList<byte[]>();
   }
 }
