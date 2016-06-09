@@ -633,6 +633,31 @@ Validity Check
 Finally, we want to check the validity of the SCT that was returned when we
 [uploaded a certificate](#certificate-upload).
 
-TODO: describe how to use `ct audit` to do this.
+ - First, wrap up the uploaded certificate chain and corresponding SCT together:
 
+   ```
+   % cpp/client/ct wrap ${CT_CLIENT_OPTS} --sct_in=sct.out --certificate_chain_in=sample-cert-chain.pem --ssl_client_ct_data_out=sample.ctdata
+   ```
+ - Then confirm that the log has the uploaded certificate, by retrieving a
+   [proof by leaf hash](https://tools.ietf.org/html/rfc6962#section-4.5):
 
+   ```
+   % cpp/client/ct audit ${CT_CLIENT_OPTS} --ssl_client_ct_data_in=sample.ctdata --logtostderr
+   ...
+   I0609 16:46:01.964999  4812 ct.cc:643] Received proof:
+   version: V1
+   id {
+     key_id: "\244\271\t\220\264\030X\024\207\273\023\242\314gp\n<5\230\004\371\033\337\270\343w\315\016\310\r\334\020"
+   }
+   tree_size: 19948496
+   timestamp: 1465484237467
+   leaf_index: 17761460
+   path_node: "\ru\316\371C\025,\256\360\242<U\344<D\367\341L\213\242:\317\220y\241\211\264\217s)\214\034"
+   ...
+   tree_head_signature {
+     hash_algorithm: SHA256
+     sig_algorithm: ECDSA
+     signature: "0D\002 \005\262\246]\357D\207f%\247HF\205\010\010\233\206\350J\237\t\223f\246\226\251\317_i\337\237\010\002 Pd\354\255\315\225X\237\272dv\336w\3720\035\027\361\006H\347\222\222\320\t\t\370F\247|\372\222"
+   }
+   I0609 16:46:01.965592  4812 ct.cc:653] Proof verified.
+   ```
