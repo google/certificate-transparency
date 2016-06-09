@@ -174,9 +174,7 @@ public class Deserializer {
       preCert.issuerKeyHash = readFixedLength(in, 32);
 
       // set tbs certificate
-      byte[] arr = readFixedLength(in, 2);
       int length = (int) readNumber(in, 2);
-
       preCert.tbsCertificate = readFixedLength(in, length);
 
       signedEntry.preCert = preCert;
