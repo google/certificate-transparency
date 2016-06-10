@@ -41,7 +41,12 @@ SerializeResult CheckJsonFormat(const string& json) {
 
 string V1LeafData(const LogEntry& entry) {
   CHECK(entry.has_x_json_entry());
-  return entry.x_json_entry().json();
+  hash h;
+  if (!common_json_hash(entry.x_json_entry().json().c_str(), h)) {
+	LOG(ERROR) << "Faild to compute object hash: "
+	           << entry.x_json_entry().json() << ".";
+  }
+  return string(reinterpret_cast<const char*>(&h[0]), sizeof(h));
 }
 
 
@@ -69,7 +74,7 @@ SerializeResult SerializeV1SCTSignatureInput(
   serializer.WriteUint(sct.timestamp(), Serializer::kTimestampLengthInBytes);
   serializer.WriteUint(ct::X_JSON_ENTRY,
                        Serializer::kLogEntryTypeLengthInBytes);
-  serializer.WriteVarBytes(json, kMaxJsonLength);
+  serializer.WriteVarBytes(V1LeafData(entry), kMaxJsonLength);  
   serializer.WriteVarBytes(extensions, Serializer::kMaxExtensionsLength);
   result->assign(serializer.SerializedString());
   return SerializeResult::OK;
@@ -100,7 +105,7 @@ SerializeResult SerializeV1SCTMerkleTreeLeaf(
   serializer.WriteUint(sct.timestamp(), Serializer::kTimestampLengthInBytes);
   serializer.WriteUint(ct::X_JSON_ENTRY,
                        Serializer::kLogEntryTypeLengthInBytes);
-  serializer.WriteVarBytes(json, kMaxJsonLength);
+  serializer.WriteVarBytes(V1LeafData(entry), kMaxJsonLength);  
   serializer.WriteVarBytes(extensions, Serializer::kMaxExtensionsLength);
   result->assign(serializer.SerializedString());
   return SerializeResult::OK;
