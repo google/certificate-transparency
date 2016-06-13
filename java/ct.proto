@@ -37,30 +37,6 @@ enum LogEntryType {
   UNKNOWN_ENTRY_TYPE = 65536;
 }
 
-message X509ChainEntry {
-  // For V1 this entry just includes the certificate in the leaf_certificate
-  // field
-  optional bytes leaf_certificate = 1;
-  // A chain from the leaf to a trusted root
-  // (excluding leaf and possibly root).
-  repeated bytes certificate_chain = 2;
-}
-
-message PreCert {
-  optional bytes issuer_key_hash = 1;
-  optional bytes tbs_certificate = 2;
-}
-
-message PrecertChainEntry {
-  // The chain certifying the precertificate, as submitted by the CA.
-  repeated bytes precertificate_chain = 2;
-
-  // PreCert input to the SCT. Can be computed from the above.
-  // Store it alongside the entry data so that the signers don't have to
-  // parse certificates to recompute it.
-  optional PreCert pre_cert = 3;
-}
-
 enum Version {
   V1 = 0;
   // Not part of the I-D, and outside the valid range.
