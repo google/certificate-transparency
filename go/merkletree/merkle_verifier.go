@@ -6,6 +6,15 @@ import (
 	"fmt"
 )
 
+type RootMismatchError struct {
+	ExpectedRoot   []byte
+	CalculatedRoot []byte
+}
+
+func (e RootMismatchError) Error() string {
+	return fmt.Sprintf("calculated root:\n%v\n does not match expected root:\n%v", e.CalculatedRoot, e.ExpectedRoot)
+}
+
 // MerkleVerifier is a class which knows how to verify merkle inclusion and consistency proofs.
 type MerkleVerifier struct {
 	treeHasher *TreeHasher
@@ -18,9 +27,9 @@ func NewMerkleVerifier(h HasherFunc) MerkleVerifier {
 	}
 }
 
-// VerifyInclusionProof verifies the correctness of the passed in proof given the passed in information about the tree and leaf.
-func (m MerkleVerifier) VerifyInclusionProof(leafIndex, treeSize int64, proof [][]byte, root []byte, data []byte) error {
-	calcRoot, err := m.RootFromInclusionProof(leafIndex, treeSize, proof, data)
+// VerifyInclusionProof verifies the correctness of the proof given the passed in information about the tree and leaf.
+func (m MerkleVerifier) VerifyInclusionProof(leafIndex, treeSize int64, proof [][]byte, root []byte, leaf []byte) error {
+	calcRoot, err := m.RootFromInclusionProof(leafIndex, treeSize, proof, leaf)
 	if err != nil {
 		return err
 	}
@@ -28,7 +37,10 @@ func (m MerkleVerifier) VerifyInclusionProof(leafIndex, treeSize int64, proof []
 		return errors.New("calculated empty root")
 	}
 	if !bytes.Equal(calcRoot, root) {
-		return fmt.Errorf("calculated root:\n%v\n does not match provided root:\n%s", calcRoot, root)
+		return RootMismatchError{
+			CalculatedRoot: calcRoot,
+			ExpectedRoot:   root,
+		}
 	}
 	return nil
 }
