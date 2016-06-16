@@ -187,7 +187,7 @@ class SparseMerkleTreeTest : public testing::Test {
   // Returns a random Path.
   SparseMerkleTree::Path RandomPath() {
     SparseMerkleTree::Path ret;
-    for (int i(0); i < ret.size(); ++i) {
+    for (SparseMerkleTree::Path::size_type i(0); i < ret.size(); ++i) {
       ret[i] = rand_() & 0xff;
     }
     return ret;

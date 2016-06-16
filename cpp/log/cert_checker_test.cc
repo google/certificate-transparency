@@ -628,9 +628,9 @@ TEST_F(CertCheckerTest, TestDsaPrecertChain) {
 
   EXPECT_OK(checker_.CheckPreCertChain(&pre_chain, &issuer_key_hash, &tbs));
   // Added a root CA.
-  EXPECT_EQ(2, pre_chain.Length());
+  EXPECT_EQ(2U, pre_chain.Length());
   // And set a SHA256 HASH
-  EXPECT_EQ(32, issuer_key_hash.size());
+  EXPECT_EQ(32U, issuer_key_hash.size());
   // And the TBS fields
   EXPECT_FALSE(tbs.empty());
 }

@@ -504,7 +504,7 @@ TEST_F(CertTest, IllegalSignatureAlgorithmParameter) {
 TEST_F(CertTest, TestSubjectAltNames) {
   vector<string> sans;
   EXPECT_OK(google_cert_->SubjectAltNames(&sans));
-  EXPECT_EQ(44, sans.size());
+  EXPECT_EQ(44U, sans.size());
   EXPECT_EQ("*.google.com", sans[0]);
   EXPECT_EQ("*.android.com", sans[1]);
   EXPECT_EQ("youtubeeducation.com", sans[43]);
@@ -513,7 +513,7 @@ TEST_F(CertTest, TestSubjectAltNames) {
 TEST_F(CertTest, SPKI) {
   const StatusOr<string> spki(leaf_cert_->SPKI());
   EXPECT_OK(spki.status());
-  EXPECT_EQ(162, spki.ValueOrDie().size());
+  EXPECT_EQ(162U, spki.ValueOrDie().size());
   EXPECT_EQ("Ojz4hdfbFTowDio/KDGC4/pN9dy/EBfIAsnO2yDbKiE=",
             util::ToBase64(Sha256Hasher::Sha256Digest(spki.ValueOrDie())));
 }
