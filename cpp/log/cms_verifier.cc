@@ -4,7 +4,6 @@
 #include "util/cms_scoped_types.h"
 #include "util/openssl_scoped_types.h"
 
-using std::move;
 using std::string;
 using std::unique_ptr;
 using util::Status;
@@ -203,7 +202,7 @@ unique_ptr<Cert> CmsVerifier::UnpackCmsSignedCertificate(
     LOG_OPENSSL_ERRORS(ERROR);
   }
 
-  return move(cert);
+  return cert;
 }
 
 unique_ptr<Cert> CmsVerifier::UnpackCmsSignedCertificate(
@@ -228,7 +227,7 @@ unique_ptr<Cert> CmsVerifier::UnpackCmsSignedCertificate(
     LOG_OPENSSL_ERRORS(ERROR);
   }
 
-  return move(cert);
+  return cert;
 }
 
 }  // namespace cert_trans
