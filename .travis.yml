@@ -13,7 +13,6 @@ addons:
   apt:
     sources: &common_sources
       - ubuntu-toolchain-r-test
-      - llvm-toolchain-precise-3.6
       - kalakris-cmake
     packages: &common_packages
       - autoconf
@@ -31,31 +30,28 @@ matrix:
       env: SSL=openssl
     - compiler: clang
       os: linux
-      env: SSL=boringssl REAL_CC=clang-3.6 REAL_CXX=clang++-3.6
+      env: SSL=boringssl LLVM=3.6.2
       addons:
         apt:
           sources: *common_sources
           packages:
           - *common_packages
-          - clang-3.6
     - compiler: clang
       os: linux
-      env: SSL=openssl REAL_CC=clang-3.6 REAL_CXX=clang++-3.6
+      env: SSL=openssl LLVM=3.6.2
       addons:
         apt:
           sources: *common_sources
           packages:
           - *common_packages
-          - clang-3.6
     - compiler: clang
       os: linux
-      env: SSL=openssl REAL_CC=clang-3.6 REAL_CXX=clang++-3.6 SANITIZE="-fsanitize=address -fno-omit-frame-pointer" ASAN_OPTIONS="detect_leaks=1:check_initialization_order=1" LSAN_OPTIONS="suppressions=${HOME}/lsan.supp"
+      env: SSL=openssl LLVM=3.6.2 SANITIZE="-fsanitize=address -fno-omit-frame-pointer" ASAN_OPTIONS="detect_leaks=1:check_initialization_order=1" LSAN_OPTIONS="suppressions=${HOME}/lsan.supp"
       addons:
         apt:
           sources: *common_sources
           packages:
           - *common_packages
-          - clang-3.6
   exclude:
     - compiler: gcc
       os: linux
@@ -95,6 +91,13 @@ before_install:
  - echo "protoc.bin = ${PROTOC}" >> local.properties
 
 install:
+# Workaround LLVM's apt mirror being feeble and underpowered
+ - |
+   if [ "$LLVM" != "" ]; then
+     CLANG_URL="http://llvm.org/releases/${LLVM}/clang+llvm-${LLVM}-x86_64-linux-gnu-ubuntu-14.04.tar.xz"
+     mkdir /tmp/clang && travis_retry wget --quiet -O - ${CLANG_URL} | tar --strip-components=1 -xJ -C /tmp/clang
+     export PATH="/tmp/clang/bin:${PATH}"
+    fi
  - autoconf --version
  - pushd ..
  - mkdir -p ct
