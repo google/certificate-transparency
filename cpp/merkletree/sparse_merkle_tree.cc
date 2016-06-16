@@ -21,7 +21,9 @@ const vector<string>* GetNullHashes(const TreeHasher& hasher) {
   static unique_ptr<const vector<string>> null_hashes;
   if (!null_hashes) {
     vector<string> r{hasher.HashLeaf("")};
-    for (int i(1); i < hasher.DigestSize() * 8; ++i) {
+    const int end(hasher.DigestSize() * 8);
+    CHECK_LT(0, end);
+    for (int i(1); i < end; ++i) {
       r.emplace_back(hasher.HashChildren(r.back(), r.back()));
     }
     reverse(r.begin(), r.end());
@@ -135,7 +137,9 @@ string SparseMerkleTree::CalculateSubtreeHash(size_t depth, IndexType index) {
 
       case TreeNode::LEAF: {
         string ret(it->second.hash_);
-        for (int i(kDigestSizeBits - 1); i > depth; --i) {
+        const int64_t signed_depth(depth);
+        CHECK_LE(0, signed_depth);
+        for (int i(kDigestSizeBits - 1); i > signed_depth; --i) {
           if (PathBit(*(it->second.path_), i) == 0) {
             ret = treehasher_.HashChildren(ret, null_hashes_->at(i));
           } else {

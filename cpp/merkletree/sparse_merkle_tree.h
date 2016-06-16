@@ -21,94 +21,94 @@ class SerialHasher;
 const std::vector<std::string>* GetNullHashes(const TreeHasher& hasher);
 
 
-// Implementation of a Sparse Merkle Tree.
-//
-// The design is inspired by the tree described in
-// http://www.links.org/files/RevocationTransparency.pdf), but with some
-// tweaks, most notably:
-//   1) Leaf values are hashed before being incorporated into the tree.
-//   2) Similar to the way it works in the CT MerkleTree, hashes are domain
-//      separated by prefixing the preimage with \x00 for leaves, and \x01 for
-//      internal nodes.
-//
-//
-// These mean that level 2 nodes are of the form:
-//      H(\x01||H(\0x00||valueL)||H(\0x00||valueR))
-// and so on.
-//
-// Nodes are addressed by a Path, which is a bit-string of the same length as
-// the output of the hashing fuction used.  This string describes a path down
-// from the root to a leaf, with the 0-bits indicating the path takes the
-// left-hand child branch, and 1-bits the right. e.g:
-//        Root
-//        /  \
-//      0/    \1
-//      /      \
-//     i0      i3
-//   0/ \1   0/  \1
-//   /   \   /    \
-//  l0  l1  l2    l3
-//
-//  The paths to the 4 leaves would then be:
-//  l0: "00"
-//  l1: "01"
-//  l2: "10"
-//  l3: "11"
-//
-// To help with memory consumption, leaves inserted into the tree are stored
-// at the first unused node along their path.  An example is given below:
-//
-// * Empty tree:
-//      Root
-//
-// * Add "10" = "hi":
-// Since the tree is empty, the first bit of the added path is sufficient to
-// identify a unique prefix, so the leaf is stored as the "1" entry
-// immediately below the root.
-//              Root
-//                |
-//                |_______1
-//                       p:"10"
-//                       v:"hi"
-//
-// * Add "11" = "to":
-// The first bit of the added path is not enough to provide a unique
-// prefix so the leaf node currently occupying the "1" node immediately below
-// the root must be pushed down a level, resulting in:
-//              Root
-//                |
-//                |_______1
-//                        |
-//                        |
-//                  0_____|_____1
-//                  |           |
-//                p:"10"      p:"11"
-//                v:"hi"      v:"to"
-//
-// (In the case where paths are longer and multiple bits of the prefix collide,
-// the existing node is repeated pushed down a level until a unique prefix is
-// found.)
-//
-// * Add "00" = "aa":
-// The first bit of the added path is unique, and so the resulting tree is:
-//              Root
-//                |
-//        0_______|_______1
-//        |               |
-//      p:"00"            |
-//      v:"aa"      0_____|_____1
-//                  |           |
-//                p:"10"      p:"11"
-//                v:"hi"      v:"to"
-//
-// * Calculating the root hash
-// Calculating the root of the tree is similar to a regular MerkleTree, but is
-// optimised by cribbing the value of "missing" nodes from a simple cache. This
-// removes the need to calculate the vast majority of nodes from scratch.
-//
-// TODO(alcutter): LOTS!
-//
-// This class is thread-compatible, but not thread-safe.
+/* Implementation of a Sparse Merkle Tree.
+ *
+ * The design is inspired by the tree described in
+ * http://www.links.org/files/RevocationTransparency.pdf), but with some
+ * tweaks, most notably:
+ *   1) Leaf values are hashed before being incorporated into the tree.
+ *   2) Similar to the way it works in the CT MerkleTree, hashes are domain
+ *      separated by prefixing the preimage with \x00 for leaves, and \x01 for
+ *      internal nodes.
+ *
+ * These mean that level 2 nodes are of the form:
+ *      H(\x01||H(\0x00||valueL)||H(\0x00||valueR))
+ * and so on.
+ *
+ * Nodes are addressed by a Path, which is a bit-string of the same length as
+ * the output of the hashing fuction used.  This string describes a path down
+ * from the root to a leaf, with the 0-bits indicating the path takes the
+ * left-hand child branch, and 1-bits the right. e.g:
+ *        Root
+ *        /  \
+ *      0/    \1
+ *      /      \
+ *     i0      i3
+ *   0/ \1   0/  \1
+ *   /   \   /    \
+ *  l0  l1  l2    l3
+ *
+ *  The paths to the 4 leaves would then be:
+ *  l0: "00"
+ *  l1: "01"
+ *  l2: "10"
+ *  l3: "11"
+ *
+ * To help with memory consumption, leaves inserted into the tree are stored
+ * at the first unused node along their path.  An example is given below:
+ *
+ * * Empty tree:
+ *      Root
+ *
+ * * Add "10" = "hi":
+ * Since the tree is empty, the first bit of the added path is sufficient to
+ * identify a unique prefix, so the leaf is stored as the "1" entry
+ * immediately below the root.
+ *              Root
+ *                |
+ *                |_______1
+ *                       p:"10"
+ *                       v:"hi"
+ *
+ * * Add "11" = "to":
+ * The first bit of the added path is not enough to provide a unique
+ * prefix so the leaf node currently occupying the "1" node immediately below
+ * the root must be pushed down a level, resulting in:
+ *              Root
+ *                |
+ *                |_______1
+ *                        |
+ *                        |
+ *                  0_____|_____1
+ *                  |           |
+ *                p:"10"      p:"11"
+ *                v:"hi"      v:"to"
+ *
+ * (In the case where paths are longer and multiple bits of the prefix collide,
+ * the existing node is repeated pushed down a level until a unique prefix is
+ * found.)
+ *
+ * * Add "00" = "aa":
+ * The first bit of the added path is unique, and so the resulting tree is:
+ *              Root
+ *                |
+ *        0_______|_______1
+ *        |               |
+ *      p:"00"            |
+ *      v:"aa"      0_____|_____1
+ *                  |           |
+ *                p:"10"      p:"11"
+ *                v:"hi"      v:"to"
+ *
+ * * Calculating the root hash
+ * Calculating the root of the tree is similar to a regular MerkleTree, but is
+ * optimised by cribbing the value of "missing" nodes from a simple cache. This
+ * removes the need to calculate the vast majority of nodes from scratch.
+ *
+ * TODO(alcutter): LOTS!
+ *
+ * This class is thread-compatible, but not thread-safe.
+ */
 class SparseMerkleTree {
  public:
   static const int kDigestSizeBits = 256;

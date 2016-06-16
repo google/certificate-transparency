@@ -121,6 +121,7 @@ std::ostream& operator<<(std::ostream& stream, const SerializeResult& r) {
     case SerializeResult::EXTENSIONS_NOT_ORDERED:
       return stream << "EXTENSIONS_NOT_ORDERED";
   }
+  return stream << "<unknown>";
 }
 
 
@@ -153,6 +154,7 @@ std::ostream& operator<<(std::ostream& stream, const DeserializeResult& r) {
     case DeserializeResult::EXTENSIONS_NOT_ORDERED:
       return stream << "EXTENSIONS_NOT_ORDERED";
   }
+  return stream << "<unknown>";
 }
 
 
@@ -491,11 +493,11 @@ SerializeResult CheckExtensionsFormat(const string& extensions) {
 // They must be in ascending order of extension type.
 SerializeResult CheckSthExtensionsFormat(
     const repeated_sth_extension& extension) {
-  if (extension.size() > Serializer::kMaxV2ExtensionsCount) {
+  if (extension.size() > static_cast<int>(Serializer::kMaxV2ExtensionsCount)) {
     return SerializeResult::EXTENSIONS_TOO_LONG;
   }
 
-  int32_t last_type_seen = 0;
+  uint32_t last_type_seen = 0;
 
   for (auto it = extension.begin(); it != extension.end(); ++it) {
     if (it->sth_extension_type() > Serializer::kMaxV2ExtensionType) {
@@ -523,11 +525,11 @@ SerializeResult CheckSthExtensionsFormat(
 // must be in ascending order of extension type
 SerializeResult CheckSctExtensionsFormat(
     const RepeatedPtrField<SctExtension>& extension) {
-  if (extension.size() > Serializer::kMaxV2ExtensionsCount) {
+  if (extension.size() > static_cast<int>(Serializer::kMaxV2ExtensionsCount)) {
     return SerializeResult::EXTENSIONS_TOO_LONG;
   }
 
-  int32_t last_type_seen = 0;
+  uint32_t last_type_seen = 0;
 
   for (auto it = extension.begin(); it != extension.end(); ++it) {
     if (it->sct_extension_data().size() > Serializer::kMaxExtensionsLength) {
@@ -748,7 +750,7 @@ DeserializeResult TLSDeserializer::ReadSctExtension(
     return DeserializeResult::EXTENSIONS_TOO_LONG;
   }
 
-  for (int ext = 0; ext < ext_count; ++ext) {
+  for (uint32_t ext = 0; ext < ext_count; ++ext) {
     uint32_t ext_type;
     if (!ReadUint(kV2ExtensionTypeLengthInBytes, &ext_type)) {
       return DeserializeResult::INPUT_TOO_SHORT;
