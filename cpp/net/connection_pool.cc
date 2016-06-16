@@ -210,9 +210,13 @@ int EvConnection::SSLVerifyCallback(const int preverify_ok,
     if (connection->ev_conn_->request) {
       connection->ev_conn_->request->status = kSSLErrorStatus;
     }
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wunknown-pragmas"
+#pragma clang diagnostic ignored "-Wunused-local-typedef"
     LOG_EVERY_N(WARNING, 100)
         << "Failed to validate SSL certificate: " << error << " : "
         << DumpOpenSSLErrorStack();
+#pragma clang diagnostic pop
     ClearOpenSSLErrors();
     return 0;
   }

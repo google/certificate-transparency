@@ -419,12 +419,20 @@ struct EtcdClient::RequestState {
     if (FLAGS_etcd_consistent) {
       params.insert(make_pair("consistent", "true"));
     } else {
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wunknown-pragmas"
+#pragma clang diagnostic ignored "-Wunused-local-typedef"
       LOG_EVERY_N(WARNING, 100) << "Sending request without 'consistent=true'";
+#pragma clang diagnotic pop
     }
     if (FLAGS_etcd_quorum) {
       params.insert(make_pair("quorum", "true"));
     } else {
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wunknown-pragmas"
+#pragma clang diagnostic ignored "-Wunused-local-typedef"
       LOG_EVERY_N(WARNING, 100) << "Sending request without 'quorum=true'";
+#pragma clang diagnotic pop
     }
 
     req_.url.SetPath(key_space + key);
