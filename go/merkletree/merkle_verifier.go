@@ -46,7 +46,7 @@ func (m MerkleVerifier) VerifyInclusionProof(leafIndex, treeSize int64, proof []
 }
 
 // RootFromInclusionProof calculates the expected tree root given the proof and leaf.
-func (m MerkleVerifier) RootFromInclusionProof(leafIndex, treeSize int64, proof [][]byte, data []byte) ([]byte, error) {
+func (m MerkleVerifier) RootFromInclusionProof(leafIndex, treeSize int64, proof [][]byte, leaf []byte) ([]byte, error) {
 	if leafIndex > treeSize {
 		return nil, fmt.Errorf("leafIndex %d > treeSize %d", leafIndex, treeSize)
 	}
@@ -56,7 +56,7 @@ func (m MerkleVerifier) RootFromInclusionProof(leafIndex, treeSize int64, proof 
 
 	node := leafIndex - 1
 	lastNode := treeSize - 1
-	nodeHash := m.treeHasher.HashLeaf(data)
+	nodeHash := m.treeHasher.HashLeaf(leaf)
 	proofIndex := 0
 
 	for lastNode > 0 {
