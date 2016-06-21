@@ -143,7 +143,7 @@ func verifierConsistencyCheck(v *MerkleVerifier, snapshot1, snapshot2 int64, roo
 		return errors.New("incorrectly verified against swapped roots")
 	}
 
-	// Wrong inclusion proofs
+	// Wrong consistency proofs
 	// Empty proof
 	if err := v.VerifyConsistencyProof(snapshot1, snapshot2, root2, root1, [][]byte{}); err == nil {
 		return errors.New("incorrectly verified against empty proof")
