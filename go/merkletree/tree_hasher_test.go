@@ -79,7 +79,7 @@ func TestCollisionEmptyHashZeroLengthLeaf(t *testing.T) {
 		t.Fatalf("Empty leaf digest has length %d, but expected %d", got, want)
 	}
 
-	if bytes.Compare(leaf1Digest, leaf2Digest) == 0 {
+	if bytes.Equal(leaf1Digest, leaf2Digest) {
 		t.Fatalf("Digests of empty string (%v) and zero-length leaf (%v) should differ", leaf1Digest, leaf2Digest)
 	}
 }
@@ -118,7 +118,7 @@ func TestCollisionDifferentLeaves(t *testing.T) {
 		t.Fatalf("Got unexpected node2Digest size %d, expected %d", got, want)
 	}
 
-	if bytes.Compare(node1Digest, node2Digest) == 0 {
+	if bytes.Equal(node1Digest, node2Digest) {
 		t.Fatalf("node1Digest (%v) and node2Digest (%v) should differ", node1Digest, node2Digest)
 	}
 
@@ -128,7 +128,7 @@ func TestCollisionDifferentLeaves(t *testing.T) {
 		t.Fatalf("Got unexpected node3 digest size %d, expected %d", got, want)
 	}
 
-	if bytes.Compare(node1Digest, node3Digest) == 0 {
+	if bytes.Equal(node1Digest, node3Digest) {
 		t.Fatalf("node1Digest (%v) and node3Digest (%v) should differ", node1Digest, node3Digest)
 	}
 }
