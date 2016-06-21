@@ -12,35 +12,35 @@ const (
 	sha256EmptyTreeHash = "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
 )
 
-func verifierCheck(v *MerkleVerifier, leafIndex, treeSize int64, proof [][]byte, root []byte, data []byte) error {
+func verifierCheck(v *MerkleVerifier, leafIndex, treeSize int64, proof [][]byte, root []byte, leaf []byte) error {
 	// Verify original inclusion proof
-	got, err := v.RootFromInclusionProof(leafIndex, treeSize, proof, data)
+	got, err := v.RootFromInclusionProof(leafIndex, treeSize, proof, leaf)
 	if err != nil {
 		return err
 	}
 	if want := root; !bytes.Equal(got, want) {
 		return fmt.Errorf("got root:\n%v\nexpected:\n%v", got, want)
 	}
-	if err := v.VerifyInclusionProof(leafIndex, treeSize, proof, root, data); err != nil {
+	if err := v.VerifyInclusionProof(leafIndex, treeSize, proof, root, leaf); err != nil {
 		return err
 	}
 
 	// Wrong leaf index
-	if err := v.VerifyInclusionProof(leafIndex-1, treeSize, proof, root, data); err == nil {
+	if err := v.VerifyInclusionProof(leafIndex-1, treeSize, proof, root, leaf); err == nil {
 		return errors.New("incorrectly verified against leafIndex - 1")
 	}
-	if err := v.VerifyInclusionProof(leafIndex+1, treeSize, proof, root, data); err == nil {
+	if err := v.VerifyInclusionProof(leafIndex+1, treeSize, proof, root, leaf); err == nil {
 		return errors.New("incorrectly verified against leafIndex + 1")
 	}
-	if err := v.VerifyInclusionProof(leafIndex^2, treeSize, proof, root, data); err == nil {
+	if err := v.VerifyInclusionProof(leafIndex^2, treeSize, proof, root, leaf); err == nil {
 		return errors.New("incorrectly verified against leafIndex ^ 2")
 	}
 
 	// Wrong tree height
-	if err := v.VerifyInclusionProof(leafIndex, treeSize*2, proof, root, data); err == nil {
+	if err := v.VerifyInclusionProof(leafIndex, treeSize*2, proof, root, leaf); err == nil {
 		return errors.New("incorrectly verified against treeSize * 2")
 	}
-	if err := v.VerifyInclusionProof(leafIndex, treeSize/2, proof, root, data); err == nil {
+	if err := v.VerifyInclusionProof(leafIndex, treeSize/2, proof, root, leaf); err == nil {
 		return errors.New("incorrectly verified against treeSize / 2")
 	}
 
@@ -50,7 +50,7 @@ func verifierCheck(v *MerkleVerifier, leafIndex, treeSize int64, proof [][]byte,
 	}
 
 	// Wrong root
-	if err := v.VerifyInclusionProof(leafIndex, treeSize, proof, dh(sha256EmptyTreeHash), data); err == nil {
+	if err := v.VerifyInclusionProof(leafIndex, treeSize, proof, dh(sha256EmptyTreeHash), leaf); err == nil {
 		return errors.New("incorrectly verified against empty root hash")
 	}
 
@@ -60,7 +60,7 @@ func verifierCheck(v *MerkleVerifier, leafIndex, treeSize int64, proof [][]byte,
 	for i := 0; i < len(proof); i++ {
 		tmp := proof[i]
 		proof[i] = dh(sha256EmptyTreeHash)
-		if err := v.VerifyInclusionProof(leafIndex, treeSize, proof, root, data); err == nil {
+		if err := v.VerifyInclusionProof(leafIndex, treeSize, proof, root, leaf); err == nil {
 			return errors.New("incorrectly verified against incorrect inclusion proof")
 		}
 		proof[i] = tmp
@@ -68,31 +68,31 @@ func verifierCheck(v *MerkleVerifier, leafIndex, treeSize int64, proof [][]byte,
 
 	// Add garbage at the end
 	wrongProof := append(proof, []byte(""))
-	if err := v.VerifyInclusionProof(leafIndex, treeSize, wrongProof, root, data); err == nil {
+	if err := v.VerifyInclusionProof(leafIndex, treeSize, wrongProof, root, leaf); err == nil {
 		return errors.New("incorrectly verified against proof with trailing garbage")
 	}
 
 	wrongProof = append(proof, root)
-	if err := v.VerifyInclusionProof(leafIndex, treeSize, wrongProof, root, data); err == nil {
+	if err := v.VerifyInclusionProof(leafIndex, treeSize, wrongProof, root, leaf); err == nil {
 		return errors.New("incorrectly verified against proof with trailing root")
 	}
 
 	if len(proof) > 0 {
 		// Remove a node from the end
 		wrongProof = proof[:len(proof)-1]
-		if err := v.VerifyInclusionProof(leafIndex, treeSize, wrongProof, root, data); err == nil {
+		if err := v.VerifyInclusionProof(leafIndex, treeSize, wrongProof, root, leaf); err == nil {
 			return errors.New("incorrectly verified against truncated proof")
 		}
 	}
 
 	// Add garbage at the front
 	wrongProof = append([][]byte{{}}, proof...)
-	if err := v.VerifyInclusionProof(leafIndex, treeSize, wrongProof, root, data); err == nil {
+	if err := v.VerifyInclusionProof(leafIndex, treeSize, wrongProof, root, leaf); err == nil {
 		return errors.New("incorrectly verified against proof with preceding garbage")
 	}
 
 	wrongProof = append([][]byte{root}, proof...)
-	if err := v.VerifyInclusionProof(leafIndex, treeSize, wrongProof, root, data); err == nil {
+	if err := v.VerifyInclusionProof(leafIndex, treeSize, wrongProof, root, leaf); err == nil {
 		return errors.New("incorrectly verified against proof with preceding garbage")
 	}
 
