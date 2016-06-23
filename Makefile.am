@@ -105,6 +105,7 @@ TESTS = \
 	cpp/monitoring/gauge_test \
 	cpp/monitoring/registry_test \
 	cpp/proto/serializer_test \
+	cpp/proto/serializer_v2_test \
 	cpp/server/proxy_test \
 	cpp/util/bignum_test \
 	cpp/util/etcd_delete_test \
@@ -189,6 +190,7 @@ cpp_libcore_a_SOURCES = \
 	cpp/net/url_fetcher.cc \
 	cpp/proto/cert_serializer.cc \
 	cpp/proto/serializer.cc \
+	cpp/proto/serializer_v2.cc \
 	cpp/server/metrics.cc \
 	cpp/server/proxy.cc \
 	cpp/server/server.cc \
@@ -706,6 +708,17 @@ cpp_proto_serializer_test_SOURCES = \
 	cpp/proto/cert_serializer.cc \
 	cpp/proto/serializer.cc \
 	cpp/proto/serializer_test.cc \
+	cpp/util/util.cc
+
+cpp_proto_serializer_v2_test_LDADD = \
+	cpp/libcore.a \
+	cpp/libtest.a \
+	$(evhtp_LIBS) \
+	$(libevent_LIBS) \
+	-lprotobuf -lcrypto
+cpp_proto_serializer_v2_test_SOURCES = \
+	cpp/proto/serializer_v2.cc \
+	cpp/proto/serializer_v2_test.cc \
 	cpp/util/util.cc
 
 cpp_server_proxy_test_LDADD = \
