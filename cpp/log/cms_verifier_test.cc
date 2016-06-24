@@ -56,7 +56,7 @@ unique_ptr<Cert> ReadCertFromFile(const string& filename) {
       << ". Wrong --test_srcdir?";
   unique_ptr<Cert> cert(Cert::FromPemString(content));
   CHECK(cert.get());
-  return std::move(cert);
+  return cert;
 }
 
 class CmsVerifierTest : public ::testing::Test {
