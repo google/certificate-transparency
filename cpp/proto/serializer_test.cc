@@ -15,6 +15,8 @@ DECLARE_bool(allow_reconfigure_serializer_test_only);
 
 namespace {
 
+using cert_trans::serialization::SerializeResult;
+using cert_trans::serialization::DeserializeResult;
 using ct::DigitallySigned;
 using ct::LogEntry;
 using ct::LogEntryType;

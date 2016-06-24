@@ -8,6 +8,12 @@
 #include "proto/ct.pb.h"
 #include "proto/serializer.h"
 
+using cert_trans::serialization::SerializeResult;
+using cert_trans::serialization::DeserializeResult;
+using cert_trans::serialization::WriteFixedBytes;
+using cert_trans::serialization::WriteList;
+using cert_trans::serialization::WriteUint;
+using cert_trans::serialization::WriteVarBytes;
 using ct::DigitallySigned;
 using ct::LogEntry;
 using ct::LogEntryType_IsValid;
@@ -74,15 +80,13 @@ SerializeResult SerializeV1CertSCTSignatureInput(uint64_t timestamp,
   if (res != SerializeResult::OK) {
     return res;
   }
-  TLSSerializer serializer;
-  serializer.WriteUint(ct::V1, Serializer::kVersionLengthInBytes);
-  serializer.WriteUint(ct::CERTIFICATE_TIMESTAMP,
-                       Serializer::kSignatureTypeLengthInBytes);
-  serializer.WriteUint(timestamp, Serializer::kTimestampLengthInBytes);
-  serializer.WriteUint(ct::X509_ENTRY, Serializer::kLogEntryTypeLengthInBytes);
-  serializer.WriteVarBytes(certificate, kMaxCertificateLength);
-  serializer.WriteVarBytes(extensions, Serializer::kMaxExtensionsLength);
-  result->assign(serializer.SerializedString());
+  WriteUint(ct::V1, Serializer::kVersionLengthInBytes, result);
+  WriteUint(ct::CERTIFICATE_TIMESTAMP, Serializer::kSignatureTypeLengthInBytes,
+            result);
+  WriteUint(timestamp, Serializer::kTimestampLengthInBytes, result);
+  WriteUint(ct::X509_ENTRY, Serializer::kLogEntryTypeLengthInBytes, result);
+  WriteVarBytes(certificate, kMaxCertificateLength, result);
+  WriteVarBytes(extensions, Serializer::kMaxExtensionsLength, result);
   return SerializeResult::OK;
 }
 
@@ -102,17 +106,15 @@ SerializeResult SerializeV1PrecertSCTSignatureInput(
   if (res != SerializeResult::OK) {
     return res;
   }
-  TLSSerializer serializer;
-  serializer.WriteUint(ct::V1, Serializer::kVersionLengthInBytes);
-  serializer.WriteUint(ct::CERTIFICATE_TIMESTAMP,
-                       Serializer::kSignatureTypeLengthInBytes);
-  serializer.WriteUint(timestamp, Serializer::kTimestampLengthInBytes);
-  serializer.WriteUint(ct::PRECERT_ENTRY,
-                       Serializer::kLogEntryTypeLengthInBytes);
-  serializer.WriteFixedBytes(issuer_key_hash);
-  serializer.WriteVarBytes(tbs_certificate, kMaxCertificateLength);
-  serializer.WriteVarBytes(extensions, Serializer::kMaxExtensionsLength);
-  result->assign(serializer.SerializedString());
+  result->clear();
+  WriteUint(ct::V1, Serializer::kVersionLengthInBytes, result);
+  WriteUint(ct::CERTIFICATE_TIMESTAMP, Serializer::kSignatureTypeLengthInBytes,
+            result);
+  WriteUint(timestamp, Serializer::kTimestampLengthInBytes, result);
+  WriteUint(ct::PRECERT_ENTRY, Serializer::kLogEntryTypeLengthInBytes, result);
+  WriteFixedBytes(issuer_key_hash, result);
+  WriteVarBytes(tbs_certificate, kMaxCertificateLength, result);
+  WriteVarBytes(extensions, Serializer::kMaxExtensionsLength, result);
   return SerializeResult::OK;
 }
 
@@ -123,6 +125,7 @@ SerializeResult SerializeV1SCTSignatureInput(
   if (sct.version() != ct::V1) {
     return SerializeResult::UNSUPPORTED_VERSION;
   }
+  result->clear();
   switch (entry.type()) {
     case ct::X509_ENTRY:
       return SerializeV1CertSCTSignatureInput(
@@ -151,15 +154,14 @@ SerializeResult SerializeV1CertSCTMerkleTreeLeaf(uint64_t timestamp,
   if (res != SerializeResult::OK) {
     return res;
   }
-  TLSSerializer serializer;
-  serializer.WriteUint(ct::V1, Serializer::kVersionLengthInBytes);
-  serializer.WriteUint(ct::TIMESTAMPED_ENTRY,
-                       Serializer::kMerkleLeafTypeLengthInBytes);
-  serializer.WriteUint(timestamp, Serializer::kTimestampLengthInBytes);
-  serializer.WriteUint(ct::X509_ENTRY, Serializer::kLogEntryTypeLengthInBytes);
-  serializer.WriteVarBytes(certificate, kMaxCertificateLength);
-  serializer.WriteVarBytes(extensions, Serializer::kMaxExtensionsLength);
-  result->assign(serializer.SerializedString());
+  result->clear();
+  WriteUint(ct::V1, Serializer::kVersionLengthInBytes, result);
+  WriteUint(ct::TIMESTAMPED_ENTRY, Serializer::kMerkleLeafTypeLengthInBytes,
+            result);
+  WriteUint(timestamp, Serializer::kTimestampLengthInBytes, result);
+  WriteUint(ct::X509_ENTRY, Serializer::kLogEntryTypeLengthInBytes, result);
+  WriteVarBytes(certificate, kMaxCertificateLength, result);
+  WriteVarBytes(extensions, Serializer::kMaxExtensionsLength, result);
   return SerializeResult::OK;
 }
 
@@ -179,17 +181,15 @@ SerializeResult SerializeV1PrecertSCTMerkleTreeLeaf(
   if (res != SerializeResult::OK) {
     return res;
   }
-  TLSSerializer serializer;
-  serializer.WriteUint(ct::V1, Serializer::kVersionLengthInBytes);
-  serializer.WriteUint(ct::TIMESTAMPED_ENTRY,
-                       Serializer::kMerkleLeafTypeLengthInBytes);
-  serializer.WriteUint(timestamp, Serializer::kTimestampLengthInBytes);
-  serializer.WriteUint(ct::PRECERT_ENTRY,
-                       Serializer::kLogEntryTypeLengthInBytes);
-  serializer.WriteFixedBytes(issuer_key_hash);
-  serializer.WriteVarBytes(tbs_certificate, kMaxCertificateLength);
-  serializer.WriteVarBytes(extensions, Serializer::kMaxExtensionsLength);
-  result->assign(serializer.SerializedString());
+  result->clear();
+  WriteUint(ct::V1, Serializer::kVersionLengthInBytes, result);
+  WriteUint(ct::TIMESTAMPED_ENTRY, Serializer::kMerkleLeafTypeLengthInBytes,
+            result);
+  WriteUint(timestamp, Serializer::kTimestampLengthInBytes, result);
+  WriteUint(ct::PRECERT_ENTRY, Serializer::kLogEntryTypeLengthInBytes, result);
+  WriteFixedBytes(issuer_key_hash, result);
+  WriteVarBytes(tbs_certificate, kMaxCertificateLength, result);
+  WriteVarBytes(extensions, Serializer::kMaxExtensionsLength, result);
   return SerializeResult::OK;
 }
 
@@ -200,6 +200,7 @@ SerializeResult SerializeV1SCTMerkleTreeLeaf(
   if (sct.version() != ct::V1) {
     return SerializeResult::UNSUPPORTED_VERSION;
   }
+  result->clear();
   switch (entry.type()) {
     case ct::X509_ENTRY:
       return SerializeV1CertSCTMerkleTreeLeaf(
@@ -329,16 +330,15 @@ SerializeResult SerializeV2CertSCTSignatureInput(
   if (res != SerializeResult::OK) {
     return res;
   }
-  TLSSerializer serializer;
-  serializer.WriteUint(ct::V2, Serializer::kVersionLengthInBytes);
-  serializer.WriteUint(ct::CERTIFICATE_TIMESTAMP,
-                       Serializer::kSignatureTypeLengthInBytes);
-  serializer.WriteUint(timestamp, Serializer::kTimestampLengthInBytes);
-  serializer.WriteUint(ct::X509_ENTRY, Serializer::kLogEntryTypeLengthInBytes);
-  serializer.WriteFixedBytes(issuer_key_hash);
-  serializer.WriteVarBytes(tbs_certificate, kMaxCertificateLength);
-  serializer.WriteSctExtension(sct_extension);
-  result->assign(serializer.SerializedString());
+  result->clear();
+  WriteUint(ct::V2, Serializer::kVersionLengthInBytes, result);
+  WriteUint(ct::CERTIFICATE_TIMESTAMP, Serializer::kSignatureTypeLengthInBytes,
+            result);
+  WriteUint(timestamp, Serializer::kTimestampLengthInBytes, result);
+  WriteUint(ct::X509_ENTRY, Serializer::kLogEntryTypeLengthInBytes, result);
+  WriteFixedBytes(issuer_key_hash, result);
+  WriteVarBytes(tbs_certificate, kMaxCertificateLength, result);
+  WriteSctExtension(sct_extension, result);
   return SerializeResult::OK;
 }
 
@@ -356,17 +356,16 @@ SerializeResult SerializeV2PrecertSCTSignatureInput(
   if (res != SerializeResult::OK) {
     return res;
   }
-  TLSSerializer serializer;
-  serializer.WriteUint(ct::V2, Serializer::kVersionLengthInBytes);
-  serializer.WriteUint(ct::CERTIFICATE_TIMESTAMP,
-                       Serializer::kSignatureTypeLengthInBytes);
-  serializer.WriteUint(timestamp, Serializer::kTimestampLengthInBytes);
-  serializer.WriteUint(ct::PRECERT_ENTRY_V2,
-                       Serializer::kLogEntryTypeLengthInBytes);
-  serializer.WriteFixedBytes(issuer_key_hash);
-  serializer.WriteVarBytes(tbs_certificate, kMaxCertificateLength);
-  serializer.WriteSctExtension(sct_extension);
-  result->assign(serializer.SerializedString());
+  result->clear();
+  WriteUint(ct::V2, Serializer::kVersionLengthInBytes, result);
+  WriteUint(ct::CERTIFICATE_TIMESTAMP, Serializer::kSignatureTypeLengthInBytes,
+            result);
+  WriteUint(timestamp, Serializer::kTimestampLengthInBytes, result);
+  WriteUint(ct::PRECERT_ENTRY_V2, Serializer::kLogEntryTypeLengthInBytes,
+            result);
+  WriteFixedBytes(issuer_key_hash, result);
+  WriteVarBytes(tbs_certificate, kMaxCertificateLength, result);
+  WriteSctExtension(sct_extension, result);
   return SerializeResult::OK;
 }
 
@@ -377,6 +376,7 @@ SerializeResult SerializeV2SCTSignatureInput(
   if (sct.version() != ct::V2) {
     return SerializeResult::UNSUPPORTED_VERSION;
   }
+  result->clear();
   switch (entry.type()) {
     case ct::X509_ENTRY:
       return SerializeV2CertSCTSignatureInput(
@@ -407,16 +407,15 @@ SerializeResult SerializeV2CertSCTMerkleTreeLeaf(
   if (res != SerializeResult::OK) {
     return res;
   }
-  TLSSerializer serializer;
-  serializer.WriteUint(ct::V2, Serializer::kVersionLengthInBytes);
-  serializer.WriteUint(ct::TIMESTAMPED_ENTRY,
-                       Serializer::kMerkleLeafTypeLengthInBytes);
-  serializer.WriteUint(timestamp, Serializer::kTimestampLengthInBytes);
-  serializer.WriteUint(ct::X509_ENTRY, Serializer::kLogEntryTypeLengthInBytes);
-  serializer.WriteFixedBytes(issuer_key_hash);
-  serializer.WriteVarBytes(tbs_certificate, kMaxCertificateLength);
-  serializer.WriteSctExtension(sct_extension);
-  result->assign(serializer.SerializedString());
+  result->clear();
+  WriteUint(ct::V2, Serializer::kVersionLengthInBytes, result);
+  WriteUint(ct::TIMESTAMPED_ENTRY, Serializer::kMerkleLeafTypeLengthInBytes,
+            result);
+  WriteUint(timestamp, Serializer::kTimestampLengthInBytes, result);
+  WriteUint(ct::X509_ENTRY, Serializer::kLogEntryTypeLengthInBytes, result);
+  WriteFixedBytes(issuer_key_hash, result);
+  WriteVarBytes(tbs_certificate, kMaxCertificateLength, result);
+  WriteSctExtension(sct_extension, result);
   return SerializeResult::OK;
 }
 
@@ -438,17 +437,16 @@ SerializeResult SerializeV2PrecertSCTMerkleTreeLeaf(
   if (res != SerializeResult::OK) {
     return res;
   }
-  TLSSerializer serializer;
-  serializer.WriteUint(ct::V2, Serializer::kVersionLengthInBytes);
-  serializer.WriteUint(ct::TIMESTAMPED_ENTRY,
-                       Serializer::kMerkleLeafTypeLengthInBytes);
-  serializer.WriteUint(timestamp, Serializer::kTimestampLengthInBytes);
-  serializer.WriteUint(ct::PRECERT_ENTRY_V2,
-                       Serializer::kLogEntryTypeLengthInBytes);
-  serializer.WriteFixedBytes(issuer_key_hash);
-  serializer.WriteVarBytes(tbs_certificate, kMaxCertificateLength);
-  serializer.WriteSctExtension(sct_extension);
-  result->assign(serializer.SerializedString());
+  result->clear();
+  WriteUint(ct::V2, Serializer::kVersionLengthInBytes, result);
+  WriteUint(ct::TIMESTAMPED_ENTRY, Serializer::kMerkleLeafTypeLengthInBytes,
+            result);
+  WriteUint(timestamp, Serializer::kTimestampLengthInBytes, result);
+  WriteUint(ct::PRECERT_ENTRY_V2, Serializer::kLogEntryTypeLengthInBytes,
+            result);
+  WriteFixedBytes(issuer_key_hash, result);
+  WriteVarBytes(tbs_certificate, kMaxCertificateLength, result);
+  WriteSctExtension(sct_extension, result);
   return SerializeResult::OK;
 }
 
@@ -457,6 +455,7 @@ SerializeResult SerializeV2SCTMerkleTreeLeaf(
     const ct::SignedCertificateTimestamp& sct, const ct::LogEntry& entry,
     string* result) {
   CHECK_EQ(ct::V2, sct.version());
+  result->clear();
   switch (entry.type()) {
     case ct::X509_ENTRY:
       return SerializeV2CertSCTMerkleTreeLeaf(
@@ -581,7 +580,6 @@ SerializeResult SerializePrecertChainEntry(const ct::PrecertChainEntry& entry,
 SerializeResult SerializePrecertChainEntry(
     const std::string& pre_certificate,
     const repeated_string& precertificate_chain, std::string* result) {
-  TLSSerializer serializer;
   if (pre_certificate.size() > kMaxCertificateLength) {
     return SerializeResult::CERTIFICATE_TOO_LONG;
   }
@@ -589,15 +587,15 @@ SerializeResult SerializePrecertChainEntry(
     return SerializeResult::EMPTY_CERTIFICATE;
   }
 
-  serializer.WriteVarBytes(pre_certificate, kMaxCertificateLength);
+  result->clear();
+  WriteVarBytes(pre_certificate, kMaxCertificateLength, result);
 
-  SerializeResult res =
-      serializer.WriteList(precertificate_chain, kMaxCertificateLength,
-                           kMaxCertificateChainLength);
+  SerializeResult res = WriteList(precertificate_chain, kMaxCertificateLength,
+                                  kMaxCertificateChainLength, result);
   if (res != SerializeResult::OK) {
+    result->clear();
     return res;
   }
-  result->assign(serializer.SerializedString());
   return SerializeResult::OK;
 }
 
@@ -608,10 +606,9 @@ SerializeResult SerializeV1SignedCertEntryWithType(
   if (res != SerializeResult::OK) {
     return res;
   }
-  TLSSerializer serializer;
-  serializer.WriteUint(ct::X509_ENTRY, Serializer::kLogEntryTypeLengthInBytes);
-  serializer.WriteVarBytes(leaf_certificate, kMaxCertificateLength);
-  result->assign(serializer.SerializedString());
+  result->clear();
+  WriteUint(ct::X509_ENTRY, Serializer::kLogEntryTypeLengthInBytes, result);
+  WriteVarBytes(leaf_certificate, kMaxCertificateLength, result);
   return SerializeResult::OK;
 }
 
@@ -627,12 +624,10 @@ SerializeResult SerializeV1SignedPrecertEntryWithType(
   if (res != SerializeResult::OK) {
     return res;
   }
-  TLSSerializer serializer;
-  serializer.WriteUint(ct::PRECERT_ENTRY,
-                       Serializer::kLogEntryTypeLengthInBytes);
-  serializer.WriteFixedBytes(issuer_key_hash);
-  serializer.WriteVarBytes(tbs_certificate, kMaxCertificateLength);
-  result->assign(serializer.SerializedString());
+  result->clear();
+  WriteUint(ct::PRECERT_ENTRY, Serializer::kLogEntryTypeLengthInBytes, result);
+  WriteFixedBytes(issuer_key_hash, result);
+  WriteVarBytes(tbs_certificate, kMaxCertificateLength, result);
   return SerializeResult::OK;
 }
 

@@ -39,6 +39,7 @@ using cert_trans::LevelDB;
 using cert_trans::LoggedEntry;
 using cert_trans::ReadOnlyDatabase;
 using cert_trans::SQLiteDB;
+using cert_trans::serialization::SerializeResult;
 using std::cerr;
 using std::cout;
 using std::function;

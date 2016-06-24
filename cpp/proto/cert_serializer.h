@@ -17,72 +17,73 @@ void ConfigureSerializerForV2CT();
 
 // NB This serializes the certificate_chain component of the X509 chain only.
 // Needed for the GetEntries flow.
-SerializeResult SerializeX509Chain(const ct::X509ChainEntry& entry,
-                                   std::string* result);
+cert_trans::serialization::SerializeResult SerializeX509Chain(
+    const ct::X509ChainEntry& entry, std::string* result);
 
-SerializeResult SerializeX509ChainV1(const repeated_string& certificate_chain,
-                                     std::string* result);
+cert_trans::serialization::SerializeResult SerializeX509ChainV1(
+    const repeated_string& certificate_chain, std::string* result);
 
-SerializeResult SerializePrecertChainEntry(const ct::PrecertChainEntry& entry,
-                                           std::string* result);
+cert_trans::serialization::SerializeResult SerializePrecertChainEntry(
+    const ct::PrecertChainEntry& entry, std::string* result);
 
-SerializeResult SerializePrecertChainEntry(
+cert_trans::serialization::SerializeResult SerializePrecertChainEntry(
     const std::string& pre_certificate,
     const repeated_string& precertificate_chain, std::string* result);
 
 // These two functions are depended on externally.
-SerializeResult SerializeV1SignedCertEntryWithType(
+cert_trans::serialization::SerializeResult SerializeV1SignedCertEntryWithType(
     const std::string& leaf_certificate, std::string* result);
 
-SerializeResult SerializeV1SignedPrecertEntryWithType(
-    const std::string& issuer_key_hash, const std::string& tbs_certificate,
-    std::string* result);
+cert_trans::serialization::SerializeResult
+SerializeV1SignedPrecertEntryWithType(const std::string& issuer_key_hash,
+                                      const std::string& tbs_certificate,
+                                      std::string* result);
 
-DeserializeResult DeserializeX509Chain(const std::string& in,
-                                       ct::X509ChainEntry* x509_chain_entry);
+cert_trans::serialization::DeserializeResult DeserializeX509Chain(
+    const std::string& in, ct::X509ChainEntry* x509_chain_entry);
 
-DeserializeResult DeserializePrecertChainEntry(
+cert_trans::serialization::DeserializeResult DeserializePrecertChainEntry(
     const std::string& in, ct::PrecertChainEntry* precert_chain_entry);
 
 // Test helpers
 //
-SerializeResult SerializeV1CertSCTMerkleTreeLeaf(
+cert_trans::serialization::SerializeResult SerializeV1CertSCTMerkleTreeLeaf(
     uint64_t timestamp, const std::string& certificate,
     const std::string& extensions, std::string* result);
 
-SerializeResult SerializeV1PrecertSCTMerkleTreeLeaf(
+cert_trans::serialization::SerializeResult SerializeV1PrecertSCTMerkleTreeLeaf(
     uint64_t timestamp, const std::string& issuer_key_hash,
     const std::string& tbs_certificate, const std::string& extensions,
     std::string* result);
 
-SerializeResult SerializeV2CertSCTMerkleTreeLeaf(
+cert_trans::serialization::SerializeResult SerializeV2CertSCTMerkleTreeLeaf(
     uint64_t timestamp, const std::string& issuer_key_hash,
     const std::string& tbs_certificate,
     const google::protobuf::RepeatedPtrField<ct::SctExtension>& sct_extension,
     std::string* result);
 
-SerializeResult SerializeV2PrecertSCTMerkleTreeLeaf(
+cert_trans::serialization::SerializeResult SerializeV2PrecertSCTMerkleTreeLeaf(
     uint64_t timestamp, const std::string& issuer_key_hash,
     const std::string& tbs_certificate,
     const google::protobuf::RepeatedPtrField<ct::SctExtension>& sct_extension,
     std::string* result);
 
-SerializeResult SerializeV2CertSCTSignatureInput(
+cert_trans::serialization::SerializeResult SerializeV2CertSCTSignatureInput(
     uint64_t timestamp, const std::string& issuer_key_hash,
     const std::string& tbs_certificate,
     const google::protobuf::RepeatedPtrField<ct::SctExtension>& sct_extension,
     std::string* result);
 
-SerializeResult SerializeV1CertSCTSignatureInput(
+cert_trans::serialization::SerializeResult SerializeV1CertSCTSignatureInput(
     uint64_t timestamp, const std::string& certificate,
     const std::string& extensions, std::string* result);
 
-SerializeResult SerializeV1PrecertSCTSignatureInput(
+cert_trans::serialization::SerializeResult SerializeV1PrecertSCTSignatureInput(
     uint64_t timestamp, const std::string& issuer_key_hash,
     const std::string& tbs_certificate, const std::string& extensions,
     std::string* result);
 
-SerializeResult SerializeV2PrecertSCTSignatureInput(
+cert_trans::serialization::SerializeResult SerializeV2PrecertSCTSignatureInput(
     uint64_t timestamp, const std::string& issuer_key_hash,
     const std::string& tbs_certificate,
     const google::protobuf::RepeatedPtrField<ct::SctExtension>& sct_extension,

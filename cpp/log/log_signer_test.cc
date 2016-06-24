@@ -14,6 +14,8 @@
 
 namespace {
 
+using cert_trans::serialization::SerializeResult;
+using cert_trans::serialization::DeserializeResult;
 using ct::LogEntry;
 using ct::SignedCertificateTimestamp;
 using ct::DigitallySigned;

@@ -17,6 +17,7 @@ using cert_trans::CertChain;
 using cert_trans::PreCertChain;
 using cert_trans::URL;
 using cert_trans::UrlFetcher;
+using cert_trans::serialization::DeserializeResult;
 using ct::DigitallySigned;
 using ct::MerkleAuditProof;
 using ct::SignedCertificateTimestamp;

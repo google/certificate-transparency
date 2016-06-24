@@ -10,6 +10,7 @@
 #include "proto/serializer.h"
 #include "util/util.h"
 
+using cert_trans::serialization::SerializeResult;
 using ct::LogEntry;
 using ct::MerkleAuditProof;
 using ct::SignedCertificateTimestamp;

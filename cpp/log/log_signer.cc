@@ -12,6 +12,8 @@
 #include "util/util.h"
 
 using cert_trans::Verifier;
+using cert_trans::serialization::SerializeResult;
+using cert_trans::serialization::DeserializeResult;
 using ct::DigitallySigned;
 using ct::LogEntry;
 using ct::LogEntryType;

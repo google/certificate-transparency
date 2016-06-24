@@ -470,7 +470,7 @@ void TestSigner::FillData(LoggedEntry* logged_cert) {
            Sha256Hasher::Sha256Digest(
                Serializer::LeafData(logged_cert->entry())));
   string serialized_leaf;
-  CHECK_EQ(SerializeResult::OK,
+  CHECK_EQ(cert_trans::serialization::SerializeResult::OK,
            Serializer::SerializeSCTMerkleTreeLeaf(logged_cert->sct(),
                                                   logged_cert->entry(),
                                                   &serialized_leaf));

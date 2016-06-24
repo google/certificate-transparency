@@ -9,6 +9,12 @@
 #include "proto/ct.pb.h"
 #include "proto/serializer.h"
 
+using cert_trans::serialization::SerializeResult;
+using cert_trans::serialization::DeserializeResult;
+using cert_trans::serialization::WriteDigitallySigned;
+using cert_trans::serialization::WriteFixedBytes;
+using cert_trans::serialization::WriteUint;
+using cert_trans::serialization::WriteVarBytes;
 using ct::DigitallySigned;
 using ct::DigitallySigned_HashAlgorithm_IsValid;
 using ct::DigitallySigned_SignatureAlgorithm_IsValid;
@@ -62,16 +68,14 @@ SerializeResult SerializeV1SCTSignatureInput(
   if (res != SerializeResult::OK) {
     return res;
   }
-  TLSSerializer serializer;
-  serializer.WriteUint(ct::V1, Serializer::kVersionLengthInBytes);
-  serializer.WriteUint(ct::CERTIFICATE_TIMESTAMP,
-                       Serializer::kSignatureTypeLengthInBytes);
-  serializer.WriteUint(sct.timestamp(), Serializer::kTimestampLengthInBytes);
-  serializer.WriteUint(ct::X_JSON_ENTRY,
-                       Serializer::kLogEntryTypeLengthInBytes);
-  serializer.WriteVarBytes(json, kMaxJsonLength);
-  serializer.WriteVarBytes(extensions, Serializer::kMaxExtensionsLength);
-  result->assign(serializer.SerializedString());
+  result->clear();
+  WriteUint(ct::V1, Serializer::kVersionLengthInBytes, result);
+  WriteUint(ct::CERTIFICATE_TIMESTAMP, Serializer::kSignatureTypeLengthInBytes,
+            result);
+  WriteUint(sct.timestamp(), Serializer::kTimestampLengthInBytes, result);
+  WriteUint(ct::X_JSON_ENTRY, Serializer::kLogEntryTypeLengthInBytes, result);
+  WriteVarBytes(json, kMaxJsonLength, result);
+  WriteVarBytes(extensions, Serializer::kMaxExtensionsLength, result);
   return SerializeResult::OK;
 }
 
@@ -93,16 +97,14 @@ SerializeResult SerializeV1SCTMerkleTreeLeaf(
   if (res != SerializeResult::OK) {
     return res;
   }
-  TLSSerializer serializer;
-  serializer.WriteUint(ct::V1, Serializer::kVersionLengthInBytes);
-  serializer.WriteUint(ct::TIMESTAMPED_ENTRY,
-                       Serializer::kMerkleLeafTypeLengthInBytes);
-  serializer.WriteUint(sct.timestamp(), Serializer::kTimestampLengthInBytes);
-  serializer.WriteUint(ct::X_JSON_ENTRY,
-                       Serializer::kLogEntryTypeLengthInBytes);
-  serializer.WriteVarBytes(json, kMaxJsonLength);
-  serializer.WriteVarBytes(extensions, Serializer::kMaxExtensionsLength);
-  result->assign(serializer.SerializedString());
+  result->clear();
+  WriteUint(ct::V1, Serializer::kVersionLengthInBytes, result);
+  WriteUint(ct::TIMESTAMPED_ENTRY, Serializer::kMerkleLeafTypeLengthInBytes,
+            result);
+  WriteUint(sct.timestamp(), Serializer::kTimestampLengthInBytes, result);
+  WriteUint(ct::X_JSON_ENTRY, Serializer::kLogEntryTypeLengthInBytes, result);
+  WriteVarBytes(json, kMaxJsonLength, result);
+  WriteVarBytes(extensions, Serializer::kMaxExtensionsLength, result);
   return SerializeResult::OK;
 }
 

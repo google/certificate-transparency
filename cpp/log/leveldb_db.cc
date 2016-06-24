@@ -12,6 +12,7 @@
 #include "proto/serializer.h"
 #include "util/util.h"
 
+using cert_trans::serialization::DeserializeResult;
 using std::chrono::milliseconds;
 using std::lock_guard;
 using std::make_pair;

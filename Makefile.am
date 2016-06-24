@@ -191,6 +191,7 @@ cpp_libcore_a_SOURCES = \
 	cpp/proto/cert_serializer.cc \
 	cpp/proto/serializer.cc \
 	cpp/proto/serializer_v2.cc \
+	cpp/proto/tls_encoding.cc \
 	cpp/server/metrics.cc \
 	cpp/server/proxy.cc \
 	cpp/server/server.cc \

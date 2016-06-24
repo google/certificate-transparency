@@ -127,6 +127,8 @@ using cert_trans::ScopedRSA;
 using cert_trans::ScopedX509;
 using cert_trans::ScopedX509_NAME;
 using cert_trans::TbsCertificate;
+using cert_trans::serialization::SerializeResult;
+using cert_trans::serialization::DeserializeResult;
 using ct::LogEntry;
 using ct::MerkleAuditProof;
 using ct::SSLClientCTData;

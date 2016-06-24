@@ -8,6 +8,16 @@
 
 #include "proto/ct.pb.h"
 
+using cert_trans::serialization::internal::PrefixLength;
+using cert_trans::serialization::SerializeResult;
+using cert_trans::serialization::DeserializeResult;
+using cert_trans::serialization::WriteDigitallySigned;
+using cert_trans::serialization::WriteFixedBytes;
+using cert_trans::serialization::WriteUint;
+using cert_trans::serialization::WriteVarBytes;
+using cert_trans::serialization::constants::kMaxSignatureLength;
+using cert_trans::serialization::constants::kHashAlgorithmLengthInBytes;
+using cert_trans::serialization::constants::kSigAlgorithmLengthInBytes;
 using ct::DigitallySigned;
 using ct::DigitallySigned_HashAlgorithm_IsValid;
 using ct::DigitallySigned_SignatureAlgorithm_IsValid;
@@ -24,7 +34,6 @@ using google::protobuf::RepeatedPtrField;
 using std::function;
 using std::string;
 
-const size_t Serializer::kMaxSignatureLength = (1 << 16) - 1;
 const size_t Serializer::kMaxV2ExtensionType = (1 << 16) - 1;
 const size_t Serializer::kMaxV2ExtensionsCount = (1 << 16) - 2;
 const size_t Serializer::kMaxExtensionsLength = (1 << 16) - 1;
@@ -33,8 +42,6 @@ const size_t Serializer::kMaxSCTListLength = (1 << 16) - 1;
 
 const size_t Serializer::kLogEntryTypeLengthInBytes = 2;
 const size_t Serializer::kSignatureTypeLengthInBytes = 1;
-const size_t Serializer::kHashAlgorithmLengthInBytes = 1;
-const size_t Serializer::kSigAlgorithmLengthInBytes = 1;
 const size_t Serializer::kVersionLengthInBytes = 1;
 const size_t Serializer::kKeyIDLengthInBytes = 32;
 const size_t Serializer::kMerkleLeafTypeLengthInBytes = 1;
@@ -47,7 +54,6 @@ DEFINE_bool(allow_reconfigure_serializer_test_only, false,
 // TODO(pphaneuf): This is just to avoid causing diff churn while
 // refactoring. Functions for internal use only should be put together
 // in an anonymous namespace.
-SerializeResult CheckSignatureFormat(const DigitallySigned& sig);
 SerializeResult CheckSthExtensionsFormat(
     const repeated_sth_extension& extension);
 
@@ -82,89 +88,6 @@ function<DeserializeResult(TLSDeserializer* d, ct::MerkleTreeLeaf* leaf)>
 }  // namespace
 
 
-std::ostream& operator<<(std::ostream& stream, const SerializeResult& r) {
-  switch (r) {
-    case SerializeResult::OK:
-      return stream << "OK";
-    case SerializeResult::INVALID_ENTRY_TYPE:
-      return stream << "INVALID_ENTRY_TYPE";
-    case SerializeResult::EMPTY_CERTIFICATE:
-      return stream << "EMPTY_CERTIFICATE";
-    case SerializeResult::CERTIFICATE_TOO_LONG:
-      return stream << "CERTIFICATE_TOO_LONG";
-    case SerializeResult::CERTIFICATE_CHAIN_TOO_LONG:
-      return stream << "CERTIFICATE_CHAIN_TOO_LONG";
-    case SerializeResult::INVALID_HASH_ALGORITHM:
-      return stream << "INVALID_HASH_ALGORITHM";
-    case SerializeResult::INVALID_SIGNATURE_ALGORITHM:
-      return stream << "INVALID_SIGNATURE_ALGORITHM";
-    case SerializeResult::SIGNATURE_TOO_LONG:
-      return stream << "SIGNATURE_TOO_LONG";
-    case SerializeResult::INVALID_HASH_LENGTH:
-      return stream << "INVALID_HASH_LENGTH";
-    case SerializeResult::EMPTY_PRECERTIFICATE_CHAIN:
-      return stream << "EMPTY_PRECERTIFICATE_CHAIN";
-    case SerializeResult::UNSUPPORTED_VERSION:
-      return stream << "UNSUPPORTED_VERSION";
-    case SerializeResult::EXTENSIONS_TOO_LONG:
-      return stream << "EXTENSIONS_TOO_LONG";
-    case SerializeResult::INVALID_KEYID_LENGTH:
-      return stream << "INVALID_KEYID_LENGTH";
-    case SerializeResult::EMPTY_LIST:
-      return stream << "EMPTY_LIST";
-    case SerializeResult::EMPTY_ELEM_IN_LIST:
-      return stream << "EMPTY_ELEM_IN_LIST";
-    case SerializeResult::LIST_ELEM_TOO_LONG:
-      return stream << "LIST_ELEM_TOO_LONG";
-    case SerializeResult::LIST_TOO_LONG:
-      return stream << "LIST_TOO_LONG";
-    case SerializeResult::EXTENSIONS_NOT_ORDERED:
-      return stream << "EXTENSIONS_NOT_ORDERED";
-  }
-  return stream << "<unknown>";
-}
-
-
-std::ostream& operator<<(std::ostream& stream, const DeserializeResult& r) {
-  switch (r) {
-    case DeserializeResult::OK:
-      return stream << "OK";
-    case DeserializeResult::INPUT_TOO_SHORT:
-      return stream << "INPUT_TOO_SHORT";
-    case DeserializeResult::INVALID_HASH_ALGORITHM:
-      return stream << "INVALID_HASH_ALGORITHM";
-    case DeserializeResult::INVALID_SIGNATURE_ALGORITHM:
-      return stream << "INVALID_SIGNATURE_ALGORITHM";
-    case DeserializeResult::INPUT_TOO_LONG:
-      return stream << "INPUT_TOO_LONG";
-    case DeserializeResult::UNSUPPORTED_VERSION:
-      return stream << "UNSUPPORTED_VERSION";
-    case DeserializeResult::INVALID_LIST_ENCODING:
-      return stream << "INVALID_LIST_ENCODING";
-    case DeserializeResult::EMPTY_LIST:
-      return stream << "EMPTY_LIST";
-    case DeserializeResult::EMPTY_ELEM_IN_LIST:
-      return stream << "EMPTY_ELEM_IN_LIST";
-    case DeserializeResult::UNKNOWN_LEAF_TYPE:
-      return stream << "UNKNOWN_LEAF_TYPE";
-    case DeserializeResult::UNKNOWN_LOGENTRY_TYPE:
-      return stream << "UNKNOWN_LOGENTRY_TYPE";
-    case DeserializeResult::EXTENSIONS_TOO_LONG:
-      return stream << "EXTENSIONS_TOO_LONG";
-    case DeserializeResult::EXTENSIONS_NOT_ORDERED:
-      return stream << "EXTENSIONS_NOT_ORDERED";
-  }
-  return stream << "<unknown>";
-}
-
-
-// Returns the number of bytes needed to store a value up to max_length.
-size_t PrefixLength(size_t max_length) {
-  CHECK_GT(max_length, 0U);
-  return ceil(log2(max_length) / float(8));
-}
-
-
 // static
 string Serializer::LeafData(const LogEntry& entry) {
   CHECK(leaf_data);
@@ -177,6 +100,7 @@ SerializeResult Serializer::SerializeV1STHSignatureInput(
     uint64_t timestamp, int64_t tree_size, const string& root_hash,
     string* result) {
   CHECK(result);
+  // result will be cleared by SerializeV1STHSignatureInput
   CHECK(serialize_sth_sig_input_v1);
   return serialize_sth_sig_input_v1(timestamp, tree_size, root_hash, result);
 }
@@ -187,15 +111,14 @@ static SerializeResult SerializeV1STHSignatureInput(uint64_t timestamp,
                                                     const string& root_hash,
                                                     string* result) {
   CHECK_GE(tree_size, 0);
+  result->clear();
   if (root_hash.size() != 32)
     return SerializeResult::INVALID_HASH_LENGTH;
-  TLSSerializer serializer;
-  serializer.WriteUint(ct::V1, Serializer::kVersionLengthInBytes);
-  serializer.WriteUint(ct::TREE_HEAD, Serializer::kSignatureTypeLengthInBytes);
-  serializer.WriteUint(timestamp, Serializer::kTimestampLengthInBytes);
-  serializer.WriteUint(tree_size, 8);
-  serializer.WriteFixedBytes(root_hash);
-  result->assign(serializer.SerializedString());
+  WriteUint(ct::V1, Serializer::kVersionLengthInBytes, result);
+  WriteUint(ct::TREE_HEAD, Serializer::kSignatureTypeLengthInBytes, result);
+  WriteUint(timestamp, Serializer::kTimestampLengthInBytes, result);
+  WriteUint(tree_size, 8, result);
+  WriteFixedBytes(root_hash, result);
   return SerializeResult::OK;
 }
 
@@ -217,6 +140,7 @@ static SerializeResult SerializeV2STHSignatureInput(
     const RepeatedPtrField<SthExtension>& sth_extension, const string& log_id,
     string* result) {
   CHECK_GE(tree_size, 0);
+  result->clear();
   if (root_hash.size() != 32) {
     return SerializeResult::INVALID_HASH_LENGTH;
   }
@@ -227,22 +151,22 @@ static SerializeResult SerializeV2STHSignatureInput(
   if (log_id.size() != Serializer::kKeyIDLengthInBytes) {
     return SerializeResult::INVALID_KEYID_LENGTH;
   }
-  TLSSerializer serializer;
-  serializer.WriteUint(ct::V2, Serializer::kVersionLengthInBytes);
-  serializer.WriteUint(ct::TREE_HEAD, Serializer::kSignatureTypeLengthInBytes);
-  serializer.WriteFixedBytes(log_id);
-  serializer.WriteUint(timestamp, Serializer::kTimestampLengthInBytes);
-  serializer.WriteUint(tree_size, 8);
-  serializer.WriteFixedBytes(root_hash);
+
+  WriteUint(ct::V2, Serializer::kVersionLengthInBytes, result);
+  WriteUint(ct::TREE_HEAD, Serializer::kSignatureTypeLengthInBytes, result);
+  // TODO(eranm): This is wrong, V2 Log IDs are OIDs.
+  WriteFixedBytes(log_id, result);
+  WriteUint(timestamp, Serializer::kTimestampLengthInBytes, result);
+  WriteUint(tree_size, 8, result);
+  WriteFixedBytes(root_hash, result);
   // V2 STH can have multiple extensions
-  serializer.WriteUint(sth_extension.size(), 2);
+  WriteUint(sth_extension.size(), 2, result);
   for (auto it = sth_extension.begin(); it != sth_extension.end(); ++it) {
-    serializer.WriteUint(it->sth_extension_type(), 2);
-    serializer.WriteVarBytes(it->sth_extension_data(),
-                             Serializer::kMaxExtensionsLength);
+    WriteUint(it->sth_extension_type(), 2, result);
+    WriteVarBytes(it->sth_extension_data(), Serializer::kMaxExtensionsLength,
+                  result);
   }
 
-  result->assign(serializer.SerializedString());
   return SerializeResult::OK;
 }
 
@@ -251,6 +175,8 @@ static SerializeResult SerializeV2STHSignatureInput(
 SerializeResult Serializer::SerializeSTHSignatureInput(
     const ct::SignedTreeHead& sth, std::string* result) {
   CHECK(result);
+  // result will be cleared by
+  // SerializeV1STHSignatureInput or SerializeV2STHSignatureInput
   // TODO(alcutter): this should know whether it's V1 or V2 from the
   // Configure()
   switch (sth.version()) {
@@ -288,10 +214,10 @@ SerializeResult Serializer::SerializeSCTSignatureInput(
   return serialize_sct_sig_input(sct, entry, result);
 }
 
-
-SerializeResult TLSSerializer::WriteSCTV1(
-    const SignedCertificateTimestamp& sct) {
+SerializeResult WriteSCTV1(const SignedCertificateTimestamp& sct,
+                           std::string* output) {
   CHECK(sct.version() == ct::V1);
+  // output is cleared by SerializeSCT
   SerializeResult res = CheckExtensionsFormat(sct.extensions());
   if (res != SerializeResult::OK) {
     return res;
@@ -299,16 +225,27 @@ SerializeResult TLSSerializer::WriteSCTV1(
   if (sct.id().key_id().size() != Serializer::kKeyIDLengthInBytes) {
     return SerializeResult::INVALID_KEYID_LENGTH;
   }
-  WriteUint(sct.version(), Serializer::kVersionLengthInBytes);
-  WriteFixedBytes(sct.id().key_id());
-  WriteUint(sct.timestamp(), Serializer::kTimestampLengthInBytes);
-  WriteVarBytes(sct.extensions(), Serializer::kMaxExtensionsLength);
-  return WriteDigitallySigned(sct.signature());
+  WriteUint(sct.version(), Serializer::kVersionLengthInBytes, output);
+  WriteFixedBytes(sct.id().key_id(), output);
+  WriteUint(sct.timestamp(), Serializer::kTimestampLengthInBytes, output);
+  WriteVarBytes(sct.extensions(), Serializer::kMaxExtensionsLength, output);
+  return WriteDigitallySigned(sct.signature(), output);
 }
 
-SerializeResult TLSSerializer::WriteSCTV2(
-    const SignedCertificateTimestamp& sct) {
+void WriteSctExtension(const RepeatedPtrField<SctExtension>& extension,
+                       std::string* output) {
+  WriteUint(extension.size(), 2, output);
+  for (auto it = extension.begin(); it != extension.end(); ++it) {
+    WriteUint(it->sct_extension_type(), 2, output);
+    WriteVarBytes(it->sct_extension_data(), Serializer::kMaxExtensionsLength,
+                  output);
+  }
+}
+
+SerializeResult WriteSCTV2(const SignedCertificateTimestamp& sct,
+                           std::string* output) {
   CHECK(sct.version() == ct::V2);
+  // output is cleared by SerializeSCT
   SerializeResult res = CheckSctExtensionsFormat(sct.sct_extension());
   if (res != SerializeResult::OK) {
     return res;
@@ -316,35 +253,35 @@ SerializeResult TLSSerializer::WriteSCTV2(
   if (sct.id().key_id().size() != Serializer::kKeyIDLengthInBytes) {
     return SerializeResult::INVALID_KEYID_LENGTH;
   }
-  WriteUint(sct.version(), Serializer::kVersionLengthInBytes);
-  WriteFixedBytes(sct.id().key_id());
-  WriteUint(sct.timestamp(), Serializer::kTimestampLengthInBytes);
+  WriteUint(sct.version(), Serializer::kVersionLengthInBytes, output);
+  WriteFixedBytes(sct.id().key_id(), output);
+  WriteUint(sct.timestamp(), Serializer::kTimestampLengthInBytes, output);
   // V2 SCT can have a number of extensions. They must be ordered by type
   // but we already checked that above.
-  WriteSctExtension(sct.sct_extension());
-  return WriteDigitallySigned(sct.signature());
+  WriteSctExtension(sct.sct_extension(), output);
+  return WriteDigitallySigned(sct.signature(), output);
 }
 
 // static
 SerializeResult Serializer::SerializeSCT(const SignedCertificateTimestamp& sct,
                                          string* result) {
-  TLSSerializer serializer;
   SerializeResult res = SerializeResult::UNSUPPORTED_VERSION;
 
+  result->clear();
   switch (sct.version()) {
     case ct::V1:
-      res = serializer.WriteSCTV1(sct);
+      res = WriteSCTV1(sct, result);
       break;
     case ct::V2:
-      res = serializer.WriteSCTV2(sct);
+      res = WriteSCTV2(sct, result);
       break;
     default:
       res = SerializeResult::UNSUPPORTED_VERSION;
   }
   if (res != SerializeResult::OK) {
+    result->clear();
     return res;
   }
-  result->assign(serializer.SerializedString());
   return SerializeResult::OK;
 }
 
@@ -362,121 +299,28 @@ SerializeResult Serializer::SerializeSCTList(
 // static
 SerializeResult Serializer::SerializeDigitallySigned(
     const DigitallySigned& sig, string* result) {
-  TLSSerializer serializer;
-  SerializeResult res = serializer.WriteDigitallySigned(sig);
-  if (res != SerializeResult::OK) {
-    return res;
-  }
-  result->assign(serializer.SerializedString());
-  return SerializeResult::OK;
+  result->clear();
+  return WriteDigitallySigned(sig, result);
 }
-
-void TLSSerializer::WriteFixedBytes(const string& in) {
-  output_.append(in);
-}
-
-void TLSSerializer::WriteVarBytes(const string& in, size_t max_length) {
-  CHECK_LE(in.size(), max_length);
-
-  size_t prefix_length = PrefixLength(max_length);
-  WriteUint(in.size(), prefix_length);
-  WriteFixedBytes(in);
-}
-
-// This does not enforce extension ordering, which must be done separately.
-void TLSSerializer::WriteSctExtension(
-    const RepeatedPtrField<SctExtension>& extension) {
-  WriteUint(extension.size(), 2);
-  for (auto it = extension.begin(); it != extension.end(); ++it) {
-    WriteUint(it->sct_extension_type(), 2);
-    WriteVarBytes(it->sct_extension_data(), Serializer::kMaxExtensionsLength);
-  }
-}
-
-
-size_t SerializedListLength(const repeated_string& in, size_t max_elem_length,
-                            size_t max_total_length) {
-  size_t elem_prefix_length = PrefixLength(max_elem_length);
-  size_t total_length = 0;
-
-  for (int i = 0; i < in.size(); ++i) {
-    if (in.Get(i).size() > max_elem_length ||
-        max_total_length - total_length < elem_prefix_length ||
-        max_total_length - total_length - elem_prefix_length <
-            in.Get(i).size())
-      return 0;
-
-    total_length += elem_prefix_length + in.Get(i).size();
-  }
-
-  return total_length + PrefixLength(max_total_length);
-}
-
 
 // static
 SerializeResult Serializer::SerializeList(const repeated_string& in,
                                           size_t max_elem_length,
                                           size_t max_total_length,
                                           string* result) {
-  TLSSerializer serializer;
+  std::string output;
   SerializeResult res =
-      serializer.WriteList(in, max_elem_length, max_total_length);
+      cert_trans::serialization::WriteList(in, max_elem_length,
+                                           max_total_length, &output);
   if (res != SerializeResult::OK)
     return res;
-  result->assign(serializer.SerializedString());
+  result->assign(output);
   return SerializeResult::OK;
 }
-
-
-SerializeResult TLSSerializer::WriteList(const repeated_string& in,
-                                         size_t max_elem_length,
-                                         size_t max_total_length) {
-  for (int i = 0; i < in.size(); ++i) {
-    if (in.Get(i).empty())
-      return SerializeResult::EMPTY_ELEM_IN_LIST;
-    if (in.Get(i).size() > max_elem_length)
-      return SerializeResult::LIST_ELEM_TOO_LONG;
-  }
-  size_t length = SerializedListLength(in, max_elem_length, max_total_length);
-  if (length == 0)
-    return SerializeResult::LIST_TOO_LONG;
-  size_t prefix_length = PrefixLength(max_total_length);
-  CHECK_GE(length, prefix_length);
-
-  WriteUint(length - prefix_length, prefix_length);
-
-  for (int i = 0; i < in.size(); ++i)
-    WriteVarBytes(in.Get(i), max_elem_length);
-  return SerializeResult::OK;
-}
-
-SerializeResult TLSSerializer::WriteDigitallySigned(
-    const DigitallySigned& sig) {
-  SerializeResult res = CheckSignatureFormat(sig);
-  if (res != SerializeResult::OK)
-    return res;
-  WriteUint(sig.hash_algorithm(), Serializer::kHashAlgorithmLengthInBytes);
-  WriteUint(sig.sig_algorithm(), Serializer::kSigAlgorithmLengthInBytes);
-  WriteVarBytes(sig.signature(), Serializer::kMaxSignatureLength);
-  return SerializeResult::OK;
-}
-
 
 SerializeResult CheckKeyHashFormat(const string& key_hash) {
   if (key_hash.size() != Serializer::kKeyHashLengthInBytes)
     return SerializeResult::INVALID_HASH_LENGTH;
-  return SerializeResult::OK;
-}
-
-
-SerializeResult CheckSignatureFormat(const DigitallySigned& sig) {
-  // This is just DCHECKED upon setting, so check again.
-  if (!DigitallySigned_HashAlgorithm_IsValid(sig.hash_algorithm()))
-    return SerializeResult::INVALID_HASH_ALGORITHM;
-  if (!DigitallySigned_SignatureAlgorithm_IsValid(sig.sig_algorithm()))
-    return SerializeResult::INVALID_SIGNATURE_ALGORITHM;
-  if (sig.signature().size() > Serializer::kMaxSignatureLength)
-    return SerializeResult::SIGNATURE_TOO_LONG;
   return SerializeResult::OK;
 }
 
@@ -775,17 +619,17 @@ DeserializeResult TLSDeserializer::ReadSctExtension(
 
 DeserializeResult TLSDeserializer::ReadDigitallySigned(DigitallySigned* sig) {
   int hash_algo = -1, sig_algo = -1;
-  if (!ReadUint(Serializer::kHashAlgorithmLengthInBytes, &hash_algo))
+  if (!ReadUint(kHashAlgorithmLengthInBytes, &hash_algo))
     return DeserializeResult::INPUT_TOO_SHORT;
   if (!DigitallySigned_HashAlgorithm_IsValid(hash_algo))
     return DeserializeResult::INVALID_HASH_ALGORITHM;
-  if (!ReadUint(Serializer::kSigAlgorithmLengthInBytes, &sig_algo))
+  if (!ReadUint(kSigAlgorithmLengthInBytes, &sig_algo))
     return DeserializeResult::INPUT_TOO_SHORT;
   if (!DigitallySigned_SignatureAlgorithm_IsValid(sig_algo))
     return DeserializeResult::INVALID_SIGNATURE_ALGORITHM;
 
   string sig_string;
-  if (!ReadVarBytes(Serializer::kMaxSignatureLength, &sig_string))
+  if (!ReadVarBytes(kMaxSignatureLength, &sig_string))
     return DeserializeResult::INPUT_TOO_SHORT;
   sig->set_hash_algorithm(
       static_cast<DigitallySigned::HashAlgorithm>(hash_algo));

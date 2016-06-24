@@ -13,6 +13,7 @@
 #include "merkletree/serial_hasher.h"
 #include "proto/serializer.h"
 
+using cert_trans::serialization::DeserializeResult;
 using ct::LogEntry;
 using ct::SSLClientCTData;
 using ct::SignedCertificateTimestamp;
