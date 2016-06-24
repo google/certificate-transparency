@@ -26,71 +26,14 @@ cert_trans::serialization::SerializeResult CheckSctExtensionsFormat(
 void WriteSctExtension(const repeated_sct_extension& extension,
                        std::string* output);
 
-class TLSDeserializer {
- public:
-  // We do not make a copy, so input must remain valid.
-  // TODO(pphaneuf): And so we should take a string *, not a string &
-  // (which could be to a temporary, and not valid once the
-  // constructor returns).
-  explicit TLSDeserializer(const std::string& input);
+cert_trans::serialization::DeserializeResult ReadExtensionsV1(
+    TLSDeserializer* deserializer, ct::TimestampedEntry* entry);
 
-  bool ReachedEnd() const {
-    return bytes_remaining_ == 0;
-  }
+cert_trans::serialization::DeserializeResult ReadSCT(
+    TLSDeserializer* deserializer, ct::SignedCertificateTimestamp* sct);
 
-  cert_trans::serialization::DeserializeResult ReadSCT(
-      ct::SignedCertificateTimestamp* sct);
-
-  cert_trans::serialization::DeserializeResult ReadList(
-      size_t max_total_length, size_t max_elem_length, repeated_string* out);
-
-  cert_trans::serialization::DeserializeResult ReadDigitallySigned(
-      ct::DigitallySigned* sig);
-
-  cert_trans::serialization::DeserializeResult ReadMerkleTreeLeaf(
-      ct::MerkleTreeLeaf* leaf);
-  bool ReadVarBytes(size_t max_length, std::string* result);
-
-  template <class T>
-  bool ReadUint(size_t bytes, T* result) {
-    if (bytes_remaining_ < bytes)
-      return false;
-    T res = 0;
-    for (size_t i = 0; i < bytes; ++i) {
-      res = (res << 8) | static_cast<unsigned char>(*current_pos_);
-      ++current_pos_;
-    }
-
-    bytes_remaining_ -= bytes;
-    *result = res;
-    return true;
-  }
-
-  cert_trans::serialization::DeserializeResult ReadExtensions(
-      ct::TimestampedEntry* entry);
-  bool ReadFixedBytes(size_t bytes, std::string* result);
-
- private:
-  static const size_t kV2ExtensionCountLengthInBytes;
-  static const size_t kV2ExtensionTypeLengthInBytes;
-
-  cert_trans::serialization::DeserializeResult ReadSctExtension(
-      repeated_sct_extension* extension);
-  cert_trans::serialization::DeserializeResult ReadMerkleTreeLeafV1(
-      ct::MerkleTreeLeaf* leaf);
-  cert_trans::serialization::DeserializeResult ReadMerkleTreeLeafV2(
-      ct::MerkleTreeLeaf* leaf);
-  cert_trans::serialization::DeserializeResult ReadSCTV1(
-      ct::SignedCertificateTimestamp* sct);
-  cert_trans::serialization::DeserializeResult ReadSCTV2(
-      ct::SignedCertificateTimestamp* sct);
-  bool ReadLengthPrefix(size_t max_length, size_t* result);
-
-  const char* current_pos_;
-  size_t bytes_remaining_;
-
-  DISALLOW_COPY_AND_ASSIGN(TLSDeserializer);
-};
+cert_trans::serialization::DeserializeResult ReadMerkleTreeLeaf(
+    TLSDeserializer* deserializer, ct::MerkleTreeLeaf* leaf);
 
 // A utility class for writing protocol buffer fields in canonical TLS style.
 class Serializer {

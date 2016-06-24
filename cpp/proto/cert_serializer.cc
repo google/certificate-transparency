@@ -265,7 +265,7 @@ DeserializeResult DeserializeV1SCTMerkleTreeLeaf(TLSDeserializer* des,
         return DeserializeResult::INPUT_TOO_SHORT;
       }
       entry->mutable_signed_entry()->set_x509(x509);
-      return des->ReadExtensions(entry);
+      return ReadExtensionsV1(des, entry);
     }
 
     case ct::PRECERT_ENTRY: {
@@ -281,7 +281,7 @@ DeserializeResult DeserializeV1SCTMerkleTreeLeaf(TLSDeserializer* des,
       }
       entry->mutable_signed_entry()->mutable_precert()->set_tbs_certificate(
           tbs_certificate);
-      return des->ReadExtensions(entry);
+      return ReadExtensionsV1(des, entry);
     }
   }
 
@@ -530,7 +530,9 @@ DeserializeResult DeserializeV2SCTMerkleTreeLeaf(TLSDeserializer* des,
       }
       entry->mutable_signed_entry()->mutable_cert_info()->set_tbs_certificate(
           tbs_certificate);
-      return des->ReadExtensions(entry);
+      // TODO(eranm): This is wrong, V2 Extensions should be read using
+      // ReadSctExtensions
+      return ReadExtensionsV1(des, entry);
     }
 
     case ct::UNKNOWN_ENTRY_TYPE: {

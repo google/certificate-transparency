@@ -1129,7 +1129,7 @@ TEST_F(SerializerTestV1, DeserializeSCTTooLong) {
 
   // We can still read from the beginning of a longer string...
   TLSDeserializer deserializer(token);
-  EXPECT_EQ(DeserializeResult::OK, deserializer.ReadSCT(&sct));
+  EXPECT_EQ(DeserializeResult::OK, ReadSCT(&deserializer, &sct));
   EXPECT_FALSE(deserializer.ReachedEnd());
   CompareSCT(DefaultSCT(), sct);
 

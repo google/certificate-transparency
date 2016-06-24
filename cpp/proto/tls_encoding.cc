@@ -177,3 +177,90 @@ size_t PrefixLength(size_t max_length) {
 }  // namespace serialization
 
 }  // namespace cert_trans
+
+
+// TODO(pphaneuf): The following is outside of the namespace to ease
+// review, should be moved inside.
+
+
+using cert_trans::serialization::DeserializeResult;
+namespace constants = cert_trans::serialization::constants;
+
+
+TLSDeserializer::TLSDeserializer(const std::string& input)
+    : current_pos_(input.data()), bytes_remaining_(input.size()) {
+}
+
+
+bool TLSDeserializer::ReadFixedBytes(size_t bytes, std::string* result) {
+  if (bytes_remaining_ < bytes)
+    return false;
+  result->assign(current_pos_, bytes);
+  current_pos_ += bytes;
+  bytes_remaining_ -= bytes;
+  return true;
+}
+
+
+bool TLSDeserializer::ReadLengthPrefix(size_t max_length, size_t* result) {
+  size_t prefix_length = cert_trans::serialization::internal::PrefixLength(max_length);
+  size_t length;
+  if (!ReadUint(prefix_length, &length) || length > max_length)
+    return false;
+  *result = length;
+  return true;
+}
+
+
+bool TLSDeserializer::ReadVarBytes(size_t max_length, std::string* result) {
+  size_t length;
+  if (!ReadLengthPrefix(max_length, &length))
+    return false;
+  return ReadFixedBytes(length, result);
+}
+
+DeserializeResult TLSDeserializer::ReadList(size_t max_total_length,
+                                            size_t max_elem_length,
+                                            repeated_string* out) {
+  std::string serialized_list;
+  if (!ReadVarBytes(max_total_length, &serialized_list))
+    // TODO(ekasper): could also be a length that's too large, if
+    // length limits don't follow byte boundaries.
+    return DeserializeResult::INPUT_TOO_SHORT;
+  if (!ReachedEnd())
+    return DeserializeResult::INPUT_TOO_LONG;
+
+  TLSDeserializer list_reader(serialized_list);
+  while (!list_reader.ReachedEnd()) {
+    std::string elem;
+    if (!list_reader.ReadVarBytes(max_elem_length, &elem))
+      return DeserializeResult::INVALID_LIST_ENCODING;
+    if (elem.empty())
+      return DeserializeResult::EMPTY_ELEM_IN_LIST;
+    *(out->Add()) = elem;
+  }
+  return DeserializeResult::OK;
+}
+
+
+DeserializeResult TLSDeserializer::ReadDigitallySigned(DigitallySigned* sig) {
+  int hash_algo = -1, sig_algo = -1;
+  if (!ReadUint(constants::kHashAlgorithmLengthInBytes, &hash_algo))
+    return DeserializeResult::INPUT_TOO_SHORT;
+  if (!ct::DigitallySigned_HashAlgorithm_IsValid(hash_algo))
+    return DeserializeResult::INVALID_HASH_ALGORITHM;
+  if (!ReadUint(constants::kSigAlgorithmLengthInBytes, &sig_algo))
+    return DeserializeResult::INPUT_TOO_SHORT;
+  if (!ct::DigitallySigned_SignatureAlgorithm_IsValid(sig_algo))
+    return DeserializeResult::INVALID_SIGNATURE_ALGORITHM;
+
+  std::string sig_string;
+  if (!ReadVarBytes(constants::kMaxSignatureLength, &sig_string))
+    return DeserializeResult::INPUT_TOO_SHORT;
+  sig->set_hash_algorithm(
+      static_cast<DigitallySigned::HashAlgorithm>(hash_algo));
+  sig->set_sig_algorithm(
+      static_cast<DigitallySigned::SignatureAlgorithm>(sig_algo));
+  sig->set_signature(sig_string);
+  return DeserializeResult::OK;
+}

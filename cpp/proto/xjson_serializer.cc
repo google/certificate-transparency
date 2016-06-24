@@ -156,7 +156,7 @@ DeserializeResult DeserializeV1SCTMerkleTreeLeaf(TLSDeserializer* des,
         return DeserializeResult::INPUT_TOO_SHORT;
       }
       entry->mutable_signed_entry()->set_json(json);
-      return des->ReadExtensions(entry);
+      return ReadExtensionsV1(des, entry);
     }
 
     case ct::UNKNOWN_ENTRY_TYPE: {

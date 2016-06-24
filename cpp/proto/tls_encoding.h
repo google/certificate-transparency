@@ -4,6 +4,7 @@
 #include <glog/logging.h>
 #include <string>
 
+#include "base/macros.h"
 #include "proto/ct.pb.h"
 
 typedef google::protobuf::RepeatedPtrField<std::string> repeated_string;
@@ -99,5 +100,51 @@ size_t PrefixLength(size_t max_length);
 }  // namespace serializer
 
 }  // namespace cert_trans
+
+class TLSDeserializer {
+ public:
+  // We do not make a copy, so input must remain valid.
+  // TODO(pphaneuf): And so we should take a string *, not a string &
+  // (which could be to a temporary, and not valid once the
+  // constructor returns).
+  explicit TLSDeserializer(const std::string& input);
+
+  bool ReadFixedBytes(size_t bytes, std::string* result);
+
+  bool ReadVarBytes(size_t max_length, std::string* result);
+
+  cert_trans::serialization::DeserializeResult ReadList(
+      size_t max_total_length, size_t max_elem_length, repeated_string* out);
+
+  cert_trans::serialization::DeserializeResult ReadDigitallySigned(
+      ct::DigitallySigned* sig);
+
+  bool ReachedEnd() const {
+    return bytes_remaining_ == 0;
+  }
+
+  template <class T>
+  bool ReadUint(size_t bytes, T* result) {
+    if (bytes_remaining_ < bytes)
+      return false;
+    T res = 0;
+    for (size_t i = 0; i < bytes; ++i) {
+      res = (res << 8) | static_cast<unsigned char>(*current_pos_);
+      ++current_pos_;
+    }
+
+    bytes_remaining_ -= bytes;
+    *result = res;
+    return true;
+  }
+
+ private:
+  bool ReadLengthPrefix(size_t max_length, size_t* result);
+  const char* current_pos_;
+  size_t bytes_remaining_;
+
+  DISALLOW_COPY_AND_ASSIGN(TLSDeserializer);
+};
+
 
 #endif
