@@ -56,11 +56,12 @@ using the `ClusterConfig` [protobuf](../proto/ctproto) message, which includes:
  - `minimum_serving_fraction`: Minimum fraction of Log instances that must be
    available to serve a given STH (default 0.75).
 
-The Log configuration also includes the `etcd_reject_add_pending_threshold` config
-value (default 30000), which limits how many pending certificate chains can be
-pending at once.  This should be large enough to accomodate the maximum number
-of certificates that could arrive during a maximum-merge-delay (MMD) period, but
-not so large that an adversary spamming the Log could cause problems.
+The Log configuration also includes the `etcd_reject_add_pending_threshold`
+config value (default 30000), which limits how many certificate chains can be
+pending (added, but not yet integrated) at once.  This should be large enough
+to accomodate the maximum number of certificates that could arrive during a
+maximum-merge-delay (MMD) period, but not so large that an adversary spamming
+the Log could cause problems.
 
 These configuration values can be changed using the `cpp/tools/ct-clustertool`
 tool, with the `set-config --cluster_config=<ascii-proto-file>` options; the

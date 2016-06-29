@@ -283,7 +283,7 @@ Deploying a Log
 
 The build process described so far generates a set of executables; however,
 other components and configuration is needed to set up a running CT Log.
-In particular, as show in the following diagram:
+In particular, as shown in the following diagram:
  - A set of web servers that act as HTTPS terminators and load
    balancers is needed in front of the CT Log instances.
  - A cluster of [etcd](https://github.com/coreos/etcd) instances is needed to

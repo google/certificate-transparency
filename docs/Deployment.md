@@ -91,8 +91,9 @@ are:
 Other configuration options that need to be set to non-default values are:
 
  - `--server=<hostname>` identifies the local machine; this is used to
-   distinguish different clustered Log instances when synchronizing, so needs to
-   be distinct for each `ct-server` instance (i.e. cannot be `localhost`).
+   distinguish different clustered Log instances when synchronizing, so needs
+   to be distinct and resolvable/routable for each `ct-server` instance
+   (i.e. cannot be `localhost`).
  - `--port=<port>` specifies the port that `ct-server` serves HTTP on; for a
    normal configuration (behind a reverse-proxy) this should be set to the
    standard web port (80).
@@ -281,6 +282,18 @@ At this point, both CT Log instances should come up and it should be possible to
 [check basic operation](#checking-basic-operation), with `CT_LOG_URL` set to either
 `http://localhost:6962` or `http://localhost:6963`.
 
+Alternatively, it's possible to change the [Log configuration](../proto/ct.proto) so that only a
+single log instance is required:
+
+```console
+% echo "minimum_serving_nodes: 1" > /tmp/cluster_config
+% cpp/tools/ct-clustertool set_config --etcd_servers=localhost:2379 --cluster_config=/tmp/cluster_config
+... # and wait...
+I0629 13:03:40.500687 26392 clustertool_main.cc:128] Using config:
+minimum_serving_nodes: 1
+...
+% cpp/server/ct-server ${CT_LOG_OPTS} --leveldb_db=cert-db.ldb --port=6962 > ct-log.out 2>&1 &
+```
 
 
 Docker Setup
@@ -430,7 +443,7 @@ The values that must be provided are:
  - `MONITORING`: `"gcm"` or `"prometheus"`
  - `REGION`: set to the
    [region](https://cloud.google.com/compute/docs/regions-zones/regions-zones)
-   that the Log will run in, e.g. `"us-central"`.
+   that the Log will run in, e.g. `"us-central1"`.
  - `ZONES`: space-separated list of the
    [zones](https://cloud.google.com/compute/docs/regions-zones/regions-zones) to
    run instances in, e.g. `"b c f"`
@@ -602,8 +615,8 @@ this, use the CT client tool to upload an arbitrary certificate.
 ```
 
 This certificate will not appear in the Log immediately, but after waiting
-longer than the Log's configured `--tree_signing_frequency_seconds` a new tree
-should be visible:
+longer than the Log's configured `--tree_signing_frequency_seconds` (plus the
+`--guard_window_seconds`) a new tree should be visible:
 
 ```bash
 % curl ${CT_LOG_URL}/ct/v1/get-sth
