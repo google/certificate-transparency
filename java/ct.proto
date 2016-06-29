@@ -56,8 +56,3 @@ message SignedCertificateTimestamp {
   optional DigitallySigned signature = 4;
   optional bytes extensions = 5;
 }
-
-enum MerkleLeafType {
-  TIMESTAMPED_ENTRY = 0;
-  UNKNOWN_LEAF_TYPE = 256;
-}

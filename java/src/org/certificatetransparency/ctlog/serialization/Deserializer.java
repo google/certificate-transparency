@@ -24,6 +24,8 @@ import java.io.InputStream;
  * Converting binary data to CT structures.
  */
 public class Deserializer {
+  public static final int TIMESTAMPED_ENTRY_LEAF_TYPE = 0;
+
   /**
    * Parses a SignedCertificateTimestamp from binary encoding.
    * @param inputStream byte stream of binary encoding.
@@ -144,11 +146,11 @@ public class Deserializer {
     }
 
     int leafType = (int) readNumber(in, 1);
-    if (leafType != Ct.MerkleLeafType.TIMESTAMPED_ENTRY_VALUE) {
+    if (leafType != TIMESTAMPED_ENTRY_LEAF_TYPE) {
       throw new SerializationException(String.format("Unknown entry type: %d", leafType));
     }
 
-    return new MerkleTreeLeaf(Ct.Version.valueOf(version), Ct.MerkleLeafType.valueOf(leafType), parseTimestampedEntry(in));
+    return new MerkleTreeLeaf(Ct.Version.valueOf(version), parseTimestampedEntry(in));
   }
 
   /**
