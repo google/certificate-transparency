@@ -68,6 +68,7 @@
 /cpp/monitoring/registry_test
 /cpp/net/url_fetcher_test
 /cpp/proto/serializer_test
+/cpp/proto/serializer_v2_test
 /cpp/server/blob-server
 /cpp/server/ct-dns-server
 /cpp/server/ct-mirror
