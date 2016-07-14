@@ -29,8 +29,18 @@ const (
 	GetEntriesPath  = "/ct/v1/get-entries"
 )
 
-// LogClient represents a client for a given CT Log instance
-type LogClient struct {
+// LogClient defines an interface for Log Clients.  This aids testing.
+type LogClient interface {
+	AddChain(chain []ct.ASN1Cert) (*ct.SignedCertificateTimestamp, error)
+	AddPreChain(chain []ct.ASN1Cert) (*ct.SignedCertificateTimestamp, error)
+	AddChainWithContext(ctx context.Context, chain []ct.ASN1Cert) (*ct.SignedCertificateTimestamp, error)
+	AddJSON(data interface{}) (*ct.SignedCertificateTimestamp, error)
+	GetSTH() (sth *ct.SignedTreeHead, err error)
+	GetEntries(start, end int64) ([]ct.LogEntry, error)
+}
+
+// logClientImpl conforms to LogClient and represents a client for a given CT Log instance
+type logClientImpl struct {
 	uri        string       // the base URI of the log. e.g. http://ct.googleapis/pilot
 	httpClient *http.Client // used to interact with the log via HTTP
 }
@@ -105,21 +115,21 @@ type getEntryAndProofResponse struct {
 	AuditPath []string `json:"audit_path"` // the corresponding proof
 }
 
-// New constructs a new LogClient instance.
+// New constructs a new logClientImpl instance.
 // |uri| is the base URI of the CT log instance to interact with, e.g.
 // http://ct.googleapis.com/pilot
 // |hc| is the underlying client to be used for HTTP requests to the CT log.
-func New(uri string, hc *http.Client) *LogClient {
+func New(uri string, hc *http.Client) LogClient {
 	if hc == nil {
 		hc = new(http.Client)
 	}
-	return &LogClient{uri: uri, httpClient: hc}
+	return &logClientImpl{uri: uri, httpClient: hc}
 }
 
 // Makes a HTTP call to |uri|, and attempts to parse the response as a JSON
 // representation of the structure in |res|.
 // Returns a non-nil |error| if there was a problem.
-func (c *LogClient) fetchAndParse(uri string, res interface{}) error {
+func (c *logClientImpl) fetchAndParse(uri string, res interface{}) error {
 	req, err := http.NewRequest("GET", uri, nil)
 	if err != nil {
 		return err
@@ -146,7 +156,7 @@ func (c *LogClient) fetchAndParse(uri string, res interface{}) error {
 // Makes a HTTP POST call to |uri|, and attempts to parse the response as a JSON
 // representation of the structure in |res|.
 // Returns a non-nil |error| if there was a problem.
-func (c *LogClient) postAndParse(uri string, req interface{}, res interface{}) (*http.Response, string, error) {
+func (c *logClientImpl) postAndParse(uri string, req interface{}, res interface{}) (*http.Response, string, error) {
 	postBody, err := json.Marshal(req)
 	if err != nil {
 		return nil, "", err
@@ -195,7 +205,7 @@ func backoffForRetry(ctx context.Context, d time.Duration) error {
 // Attempts to add |chain| to the log, using the api end-point specified by
 // |path|. If provided context expires before submission is complete an
 // error will be returned.
-func (c *LogClient) addChainWithRetry(ctx context.Context, path string, chain []ct.ASN1Cert) (*ct.SignedCertificateTimestamp, error) {
+func (c *logClientImpl) addChainWithRetry(ctx context.Context, path string, chain []ct.ASN1Cert) (*ct.SignedCertificateTimestamp, error) {
 	var resp addChainResponse
 	var req addChainRequest
 	for _, link := range chain {
@@ -262,22 +272,22 @@ func (c *LogClient) addChainWithRetry(ctx context.Context, path string, chain []
 }
 
 // AddChain adds the (DER represented) X509 |chain| to the log.
-func (c *LogClient) AddChain(chain []ct.ASN1Cert) (*ct.SignedCertificateTimestamp, error) {
+func (c *logClientImpl) AddChain(chain []ct.ASN1Cert) (*ct.SignedCertificateTimestamp, error) {
 	return c.addChainWithRetry(nil, AddChainPath, chain)
 }
 
 // AddPreChain adds the (DER represented) Precertificate |chain| to the log.
-func (c *LogClient) AddPreChain(chain []ct.ASN1Cert) (*ct.SignedCertificateTimestamp, error) {
+func (c *logClientImpl) AddPreChain(chain []ct.ASN1Cert) (*ct.SignedCertificateTimestamp, error) {
 	return c.addChainWithRetry(nil, AddPreChainPath, chain)
 }
 
 // AddChainWithContext adds the (DER represented) X509 |chain| to the log and
 // fails if the provided context expires before the chain is submitted.
-func (c *LogClient) AddChainWithContext(ctx context.Context, chain []ct.ASN1Cert) (*ct.SignedCertificateTimestamp, error) {
+func (c *logClientImpl) AddChainWithContext(ctx context.Context, chain []ct.ASN1Cert) (*ct.SignedCertificateTimestamp, error) {
 	return c.addChainWithRetry(ctx, AddChainPath, chain)
 }
 
-func (c *LogClient) AddJSON(data interface{}) (*ct.SignedCertificateTimestamp, error) {
+func (c *logClientImpl) AddJSON(data interface{}) (*ct.SignedCertificateTimestamp, error) {
 	req := addJSONRequest{
 		Data: data,
 	}
@@ -310,7 +320,7 @@ func (c *LogClient) AddJSON(data interface{}) (*ct.SignedCertificateTimestamp, e
 
 // GetSTH retrieves the current STH from the log.
 // Returns a populated SignedTreeHead, or a non-nil error.
-func (c *LogClient) GetSTH() (sth *ct.SignedTreeHead, err error) {
+func (c *logClientImpl) GetSTH() (sth *ct.SignedTreeHead, err error) {
 	var resp getSTHResponse
 	if err = c.fetchAndParse(c.uri+GetSTHPath, &resp); err != nil {
 		return
@@ -345,7 +355,7 @@ func (c *LogClient) GetSTH() (sth *ct.SignedTreeHead, err error) {
 // GetEntries attempts to retrieve the entries in the sequence [|start|, |end|] from the CT
 // log server. (see section 4.6.)
 // Returns a slice of LeafInputs or a non-nil error.
-func (c *LogClient) GetEntries(start, end int64) ([]ct.LogEntry, error) {
+func (c *logClientImpl) GetEntries(start, end int64) ([]ct.LogEntry, error) {
 	if end < 0 {
 		return nil, errors.New("end should be >= 0")
 	}

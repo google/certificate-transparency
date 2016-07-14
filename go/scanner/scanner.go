@@ -150,7 +150,7 @@ func DefaultScannerOptions() *ScannerOptions {
 // Scanner is a tool to scan all the entries in a CT Log.
 type Scanner struct {
 	// Client used to talk to the CT log instance
-	logClient *client.LogClient
+	logClient client.LogClient
 
 	// Configuration options for this Scanner instance
 	opts ScannerOptions
@@ -401,7 +401,7 @@ func (s *Scanner) Scan(foundCert func(*ct.LogEntry),
 
 // Creates a new Scanner instance using |client| to talk to the log, and taking
 // configuration options from |opts|.
-func NewScanner(client *client.LogClient, opts ScannerOptions) *Scanner {
+func NewScanner(client client.LogClient, opts ScannerOptions) *Scanner {
 	var scanner Scanner
 	scanner.logClient = client
 	// Set a default match-everything regex if none was provided:

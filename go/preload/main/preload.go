@@ -91,7 +91,7 @@ func sctWriterJob(addedCerts <-chan *preload.AddedCert, sctWriter io.Writer, wg 
 	wg.Done()
 }
 
-func certSubmitterJob(addedCerts chan<- *preload.AddedCert, log_client *client.LogClient, certs <-chan *ct.LogEntry,
+func certSubmitterJob(addedCerts chan<- *preload.AddedCert, log_client client.LogClient, certs <-chan *ct.LogEntry,
 	wg *sync.WaitGroup) {
 	for c := range certs {
 		chain := make([]ct.ASN1Cert, len(c.Chain)+1)
@@ -111,7 +111,7 @@ func certSubmitterJob(addedCerts chan<- *preload.AddedCert, log_client *client.L
 	wg.Done()
 }
 
-func precertSubmitterJob(addedCerts chan<- *preload.AddedCert, log_client *client.LogClient,
+func precertSubmitterJob(addedCerts chan<- *preload.AddedCert, log_client client.LogClient,
 	precerts <-chan *ct.LogEntry,
 	wg *sync.WaitGroup) {
 	for c := range precerts {
