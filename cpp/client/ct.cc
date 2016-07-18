@@ -262,7 +262,8 @@ static bool VerifySCTAndPopulateSSLClientCTData(
       verifier->VerifySignedCertificateTimestamp(
           ct_data->reconstructed_entry(), sct, &merkle_leaf);
   if (result != LogVerifier::VERIFY_OK) {
-    LOG(ERROR) << "Verifier returned " << result;
+    LOG(ERROR) << "Verifier returned '" << LogVerifier::VerifyResultString(result)
+               << "' (" << result << ")";
     return false;
   }
 

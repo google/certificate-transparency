@@ -26,21 +26,22 @@ done
 wait
 
 MANIFEST=/tmp/prometheus_container.yaml
-sed --e "s^@@PROJECT@@^${PROJECT}^" \
-    < ${DIR}/prometheus_container.yaml > ${MANIFEST}
-
 
 Header "Creating prometheus instances..."
 for i in `seq 0 $((${PROMETHEUS_NUM_REPLICAS} - 1))`; do
   echo "Creating instance ${PROMETHEUS_MACHINES[$i]}"
 
+  sed --e "s^@@PROJECT@@^${PROJECT}^
+           s^@@CONTAINER_HOST@@^${PROMETHEUS_MACHINES[$i]}^" \
+      < ${DIR}/prometheus_container.yaml > ${MANIFEST}.${i}
+
   ${GCLOUD} compute instances create -q ${PROMETHEUS_MACHINES[${i}]} \
-      --zone=${PROMETHEUS_ZONES[${i}]} \
+      --zone ${PROMETHEUS_ZONES[${i}]} \
       --machine-type ${PROMETHEUS_MACHINE_TYPE} \
       --image container-vm \
       --disk name=${PROMETHEUS_DISKS[${i}]},mode=rw,boot=no,auto-delete=yes \
       --tags prometheus-node \
-      --metadata-from-file startup-script=${DIR}/node_init.sh,google-container-manifest=${MANIFEST} &
+      --metadata-from-file startup-script=${DIR}/node_init.sh,google-container-manifest=${MANIFEST}.${i} &
 done
 wait
 

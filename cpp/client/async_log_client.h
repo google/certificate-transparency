@@ -65,7 +65,7 @@ class AsyncLogClient {
   void GetEntries(int first, int last, std::vector<Entry>* entries,
                   const Callback& done);
 
-  // This is NON-standard, and only works with SuperDuper logs.
+  // This is NON-standard, and only works with this log implementation.
   // It's intended for internal use when running in a clustered configuration.
   // This does not clear "entries" before appending the retrieved
   // entries.

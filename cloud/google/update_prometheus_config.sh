@@ -12,17 +12,17 @@ GCLOUD="gcloud"
 
 LOG_HOSTS=$(
   for i in ${LOG_MACHINES[@]}; do
-    echo -n "target: \"http://${i}.c.${PROJECT}.internal:80/metrics\"\n";
-    echo -n "target: \"http://${i}.c.${PROJECT}.internal:8080/metrics\"\n";
+    echo -n "    - ${i}.c.${PROJECT}.internal:80\n";
+    echo -n "    - ${i}.c.${PROJECT}.internal:8080\n";
   done)
 MIRROR_HOSTS=$(
   for i in ${MIRROR_MACHINES[@]}; do
-    echo -n "target: \"http://${i}.c.${PROJECT}.internal:80/metrics\"\n";
-    echo -n "target: \"http://${i}.c.${PROJECT}.internal:8080/metrics\"\n";
+    echo -n "    - ${i}.c.${PROJECT}.internal:80\n";
+    echo -n "    - ${i}.c.${PROJECT}.internal:8080\n";
   done)
 ETCD_HOSTS=$(
   for i in ${ETCD_MACHINES[@]}; do
-    echo -n "target: \"http://${i}.c.${PROJECT}.internal:8080/metrics\"\n";
+    echo -n "    - ${i}.c.${PROJECT}.internal:8080\n";
   done)
 
 export TMP_CONFIG=/tmp/prometheus.conf

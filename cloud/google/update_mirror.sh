@@ -27,8 +27,8 @@ while [ $i -lt ${MIRROR_NUM_REPLICAS} ]; do
   if ! gcloud compute ssh ${MIRROR_MACHINES[${i}]} \
       --zone ${MIRROR_ZONES[${i}]} \
       --command \
-          'sudo docker pull gcr.io/'${PROJECT}'/super_mirror:test &&
-           sudo docker kill $(sudo docker ps | grep super_mirror | awk -- "{print \$1}" )'; then
+          'sudo docker pull gcr.io/'${PROJECT}'/ct-mirror:test &&
+           sudo docker kill $(sudo docker ps | grep ct-mirror | awk -- "{print \$1}" )'; then
     echo "Retrying"
     continue
   fi

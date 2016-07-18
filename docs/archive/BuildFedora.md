@@ -1,20 +1,26 @@
-## Quickstart on Fedora 22 ##
+Package-Based Build on Fedora
+=============================
 
-Please attempt to use the GClient build as documented in the 
-[main readme](README.md) as this is an easier process and will be
-maintained in future.
+This **deprecated** document describes how to build the CT software using
+RPM packaged versions of (most of) the
+[software dependencies](README.md#software-dependencies).  This build method
+has been superceded by the recommended
+[gclient-based method](README.md#building-the-code), which avoids the version
+incompatibility issues that affected this method.
 
-If GClient works and tests pass then the following procedures are not
-required.
 
-## Deprecated Manual Build Process ##
+Quickstart on Fedora 22
+-----------------------
 
 Note: This assumes a Workstation install for x64. The additional dependency
 packages that need to be installed may vary if you are starting with a
 different base system.
 
+Packaged Dependencies
+---------------------
 
-Install Dependencies:
+First, install those dependencies of the CT software (and the tools needed to
+build them) that are available as packages:
 
 ```bash
 sudo dnf update
@@ -26,11 +32,11 @@ sudo dnf install cmake gcc-g++ libevent-devel golang autoconf pkgconfig \
     libtool shtool libunwind-devel
 ```
 
-Other Libraries
-
+Unpackaged Dependencies
+-----------------------
 
 The `gflags` in Fedora is v2.1 and is using the new default namespace option of
-‘gflags’ rather than ‘google’ so we need to build our own version. 
+‘gflags’ rather than ‘google’ so we need to build our own version.
 
 ```bash
 git clone https://github.com/gflags/gflags.git
@@ -60,6 +66,10 @@ ways between packaged releases:
 wget https://googlemock.googlecode.com/files/gmock-1.7.0.zip
 unzip gmock-1.7.0.zip
 ```
+
+CT Build
+--------
+
 Now, clone the CT repo:
 
 ```bash
@@ -84,8 +94,8 @@ Build CT server C++ code:
     CPPFLAGS="-I../libevhtp-1.2.10 -I../libevhtp-1.2.10/evthr \
     -I../libevhtp-1.2.10/htparse -I../gflags/include" \
     LDFLAGS=”-L../libevhtp-1.2.10 -L../gflags/lib”
-make check 
+make check
 ```
 
 The remainder of the Java, Go and Python steps should be very similar to those
-documented for Ubuntu in the [main readme file](README.md).
+[documented for Ubuntu](BuildUbuntu.md#ct-build).
