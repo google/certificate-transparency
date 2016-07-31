@@ -94,7 +94,7 @@ util::StatusOr<OID> OID::FromString(const std::string& oid_string) {
                   + util::DumpOpenSSLErrorStack());
   }
 
-  return std::move(OID(oid));
+  return OID(oid);
 }
 
 // static
@@ -111,7 +111,7 @@ util::StatusOr<OID> OID::FromTagMissingDER(
                   std::string("Bad DER in OID: ") +
                   util::DumpOpenSSLErrorStack());
   }
-  return std::move(OID(oid));
+  return OID(oid);
 }
 
 }  // namespace rfc6962_bis
