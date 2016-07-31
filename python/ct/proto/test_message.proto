@@ -41,4 +41,7 @@ message TestMessage {
   optional EmbeddedMessage embedded_message = 16;
   repeated EmbeddedMessage repeated_message = 17
       [(tls_opts).max_total_length = 8];
+  repeated bytes vector_fixed_bytes = 18 [(tls_opts).fixed_length = 4,
+                                          (tls_opts).min_total_length = 4,
+                                          (tls_opts).max_total_length = 16];
 }

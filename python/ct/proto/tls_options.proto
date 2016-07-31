@@ -5,8 +5,7 @@ import "google/protobuf/descriptor.proto";
 package ct;
 
 // TLS field options specify the wire format for parsing TLS wire messages
-// to protocol buffers, using the custom decoder in tls_message.py.
-// TODO(ekasper): encoder.
+// to protocol buffers, using the custom encoder/decoder in tls_message.py.
 // For example, to implement the following TLS specification:
 //
 // enum { apple(0), orange(1), (255) } Fruit;
@@ -62,8 +61,8 @@ message TLSOptions {
   // Applies to enums, allowing to restrict the maximum value.
   optional uint32 max_value = 2;
   // Applies to 'bytes' fields, indicating the fixed length of the element.
-  // TODO(ekasper): this syntax is also specified for TLS vectors but is
-  // currently unimplemented for repeated fields.
+  // This syntax can also be specified for TLS vectors of bytes (denoted by
+  // repeated 'bytes' fields).
   optional uint32 fixed_length = 3;
   // The following two options apply to |bytes| fields, indicating the variable
   // length range of the bytes vector.

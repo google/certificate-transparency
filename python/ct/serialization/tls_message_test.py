@@ -26,6 +26,8 @@ valid_test_message.select_uint32 = 2
 valid_test_message.embedded_message.uint_32 = 3
 valid_test_message.repeated_message.add().uint_32 = 4
 valid_test_message.repeated_message.add().uint_32 = 256
+valid_test_message.vector_fixed_bytes.append("\xff\x00\xee\x01")
+valid_test_message.vector_fixed_bytes.append("\xfe\x00\xa0\x03")
 
 
 # Test vectors are given as a list of serialized, hex-encoded components.
@@ -46,6 +48,7 @@ serialized_valid_test_message = [
  "00000002", # 12: select_uint32
  "0003",  # 13: embedded_message.uint_32
  "0400040100",  # 14: repeated_message
+ "08ff00ee01fe00a003", # 15: vector_fixed_bytes
 ]
 
 
@@ -144,6 +147,16 @@ class TLSReaderTest(unittest.TestCase):
                          msg = "%s vs %s" % (valid_test_message, message))
         self.assertFalse(reader.finished())
 
+    def test_decode_repeated_fixed_wrong_length_fails(self):
+        test_vector = serialized_valid_test_message[:]
+        test_vector[15] = "06ff00ee01fe00"
+        self.verify_decode_fail(test_vector)
+
+    def test_decode_repeated_fixed_too_short_fails(self):
+        test_vector = serialized_valid_test_message[:]
+        test_vector[15] = "08ff00ee01fe00"
+        self.verify_decode_fail(test_vector)
+
 
 class TLSWriterTest(unittest.TestCase):
     def verify_encode(self, test_message, test_vector):
@@ -207,6 +220,27 @@ class TLSWriterTest(unittest.TestCase):
         test_message = test_message_pb2.TestMessage()
         test_message.CopyFrom(valid_test_message)
         test_message.ClearField("vector_uint32")
+        self.verify_encode_fails(test_message)
+
+    def test_encode_repeated_fixed_length_too_few_fails(self):
+        test_message = test_message_pb2.TestMessage()
+        test_message.CopyFrom(valid_test_message)
+        test_message.ClearField("vector_fixed_bytes")
+        self.verify_encode_fails(test_message)
+
+    def test_encode_repeated_fixed_length_wrong_length_fails(self):
+        test_message = test_message_pb2.TestMessage()
+        test_message.CopyFrom(valid_test_message)
+        test_message.vector_fixed_bytes.append("\xab\x00")
+        self.verify_encode_fails(test_message)
+
+    def test_encode_repeated_fixed_length_too_many_fails(self):
+        test_message = test_message_pb2.TestMessage()
+        test_message.CopyFrom(valid_test_message)
+        # The test message has 2, add 3 more to go over the total
+        # allowed which is 4.
+        for i in range(3):
+          test_message.vector_fixed_bytes.append("\xab\x00\xa0\xa0")
         self.verify_encode_fails(test_message)
 
 
