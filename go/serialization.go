@@ -6,9 +6,11 @@ import (
 	"crypto"
 	"encoding/asn1"
 	"encoding/binary"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
+	"strings"
 )
 
 // Variable size structure prefix-header byte lengths
@@ -18,6 +20,7 @@ const (
 	ExtensionsLengthBytes       = 2
 	CertificateChainLengthBytes = 3
 	SignatureLengthBytes        = 2
+	JSONLengthBytes             = 3
 )
 
 // Max lengths
@@ -169,6 +172,13 @@ func SerializeTimestampedEntry(w io.Writer, t *TimestampedEntry) error {
 			return err
 		}
 		if err := writeVarBytes(w, t.PrecertEntry.TBSCertificate, PreCertificateLengthBytes); err != nil {
+			return err
+		}
+	case XJSONLogEntryType:
+		// TODO: Pending google/certificate-transparency#1243, replace
+		// with ObjectHash once supported by CT server.
+		//jsonhash := objecthash.CommonJSONHash(string(t.JSONData))
+		if err := writeVarBytes(w, []byte(t.JSONData), JSONLengthBytes); err != nil {
 			return err
 		}
 	default:
@@ -619,6 +629,33 @@ func SerializeV1SCTMerkleTreeLeafX509(w io.Writer, timestamp uint64, cert ASN1Ce
 			Timestamp: timestamp,
 			EntryType: X509LogEntryType,
 			X509Entry: cert,
+		},
+	}
+	return SerializeMerkleTreeLeaf(w, m)
+}
+
+// SerializeV1SCTMerkleTreeLeafJSON writes the merkle tree leaf for json data to Writer.
+func SerializeV1SCTMerkleTreeLeafJSON(w io.Writer, timestamp uint64, data interface{}) error {
+	jsonData, err := json.Marshal(AddJSONRequest{Data: data})
+	if err != nil {
+		return nil
+	}
+	// Match the JSON serialization implemented by json-c
+	jsonStr := strings.Replace(string(jsonData), ":", ": ", -1)
+	jsonStr = strings.Replace(jsonStr, ",", ", ", -1)
+	jsonStr = strings.Replace(jsonStr, "{", "{ ", -1)
+	jsonStr = strings.Replace(jsonStr, "}", " }", -1)
+	jsonStr = strings.Replace(jsonStr, "/", `\/`, -1)
+	// TODO: Pending google/certificate-transparency#1243, replace with
+	// ObjectHash once supported by CT server.
+
+	m := &MerkleTreeLeaf{
+		Version:  V1,
+		LeafType: TimestampedEntryLeafType,
+		TimestampedEntry: TimestampedEntry{
+			Timestamp: timestamp,
+			EntryType: XJSONLogEntryType,
+			JSONData:  []byte(jsonStr),
 		},
 	}
 	return SerializeMerkleTreeLeaf(w, m)
