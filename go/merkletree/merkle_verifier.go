@@ -47,14 +47,14 @@ func (m MerkleVerifier) VerifyInclusionProof(leafIndex, treeSize int64, proof []
 
 // RootFromInclusionProof calculates the expected tree root given the proof and leaf.
 func (m MerkleVerifier) RootFromInclusionProof(leafIndex, treeSize int64, proof [][]byte, leaf []byte) ([]byte, error) {
-	if leafIndex > treeSize {
+	if leafIndex >= treeSize {
 		return nil, fmt.Errorf("leafIndex %d > treeSize %d", leafIndex, treeSize)
 	}
-	if leafIndex == 0 {
-		return nil, errors.New("leafIndex is zero")
+	if leafIndex < 0 || treeSize < 0 {
+		return nil, errors.New("leafIndex or treeSize is less than zero")
 	}
 
-	node := leafIndex - 1
+	nodeIndex := leafIndex
 	lastNode := treeSize - 1
 	nodeHash := m.treeHasher.HashLeaf(leaf)
 	proofIndex := 0
@@ -63,16 +63,16 @@ func (m MerkleVerifier) RootFromInclusionProof(leafIndex, treeSize int64, proof 
 		if proofIndex == len(proof) {
 			return nil, fmt.Errorf("insuficient number of proof components (%d) for treeSize %d", len(proof), treeSize)
 		}
-		if isRightChild(node) {
+		if isRightChild(nodeIndex) {
 			nodeHash = m.treeHasher.HashChildren(proof[proofIndex], nodeHash)
 			proofIndex++
-		} else if node < lastNode {
+		} else if nodeIndex < lastNode {
 			nodeHash = m.treeHasher.HashChildren(nodeHash, proof[proofIndex])
 			proofIndex++
 		} else {
 			// the sibling does not exist and the parent is a dummy copy; do nothing.
 		}
-		node = parent(node)
+		nodeIndex = parent(nodeIndex)
 		lastNode = parent(lastNode)
 	}
 	if proofIndex != len(proof) {

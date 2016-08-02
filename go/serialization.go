@@ -6,9 +6,11 @@ import (
 	"crypto"
 	"encoding/asn1"
 	"encoding/binary"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
+	"strings"
 )
 
 // Variable size structure prefix-header byte lengths
@@ -18,6 +20,7 @@ const (
 	ExtensionsLengthBytes       = 2
 	CertificateChainLengthBytes = 3
 	SignatureLengthBytes        = 2
+	JSONLengthBytes             = 3
 )
 
 // Max lengths
@@ -148,6 +151,40 @@ func ReadTimestampedEntryInto(r io.Reader, t *TimestampedEntry) error {
 		return fmt.Errorf("unknown EntryType: %d", t.EntryType)
 	}
 	t.Extensions, err = readVarBytes(r, ExtensionsLengthBytes)
+	return nil
+}
+
+// SerializeTimestampedEntry writes timestamped entry to Writer.
+func SerializeTimestampedEntry(w io.Writer, t *TimestampedEntry) error {
+	if err := binary.Write(w, binary.BigEndian, t.Timestamp); err != nil {
+		return err
+	}
+	if err := binary.Write(w, binary.BigEndian, t.EntryType); err != nil {
+		return err
+	}
+	switch t.EntryType {
+	case X509LogEntryType:
+		if err := writeVarBytes(w, t.X509Entry, CertificateLengthBytes); err != nil {
+			return err
+		}
+	case PrecertLogEntryType:
+		if err := binary.Write(w, binary.BigEndian, t.PrecertEntry.IssuerKeyHash); err != nil {
+			return err
+		}
+		if err := writeVarBytes(w, t.PrecertEntry.TBSCertificate, PreCertificateLengthBytes); err != nil {
+			return err
+		}
+	case XJSONLogEntryType:
+		// TODO: Pending google/certificate-transparency#1243, replace
+		// with ObjectHash once supported by CT server.
+		//jsonhash := objecthash.CommonJSONHash(string(t.JSONData))
+		if err := writeVarBytes(w, []byte(t.JSONData), JSONLengthBytes); err != nil {
+			return err
+		}
+	default:
+		return fmt.Errorf("unknown EntryType: %d", t.EntryType)
+	}
+	writeVarBytes(w, t.Extensions, ExtensionsLengthBytes)
 	return nil
 }
 
@@ -560,4 +597,66 @@ func SerializeSCTList(scts []SignedCertificateTimestamp) ([]byte, error) {
 		}
 	}
 	return asn1.Marshal(buf.Bytes()) // transform to Octet String
+}
+
+// SerializeMerkleTreeLeaf writes MerkleTreeLeaf to Writer.
+func SerializeMerkleTreeLeaf(w io.Writer, m *MerkleTreeLeaf) error {
+	if m.Version != V1 {
+		return fmt.Errorf("unknown Version %d", m.Version)
+	}
+	if err := binary.Write(w, binary.BigEndian, m.Version); err != nil {
+		return err
+	}
+	if m.LeafType != TimestampedEntryLeafType {
+		return fmt.Errorf("unknown LeafType %d", m.LeafType)
+	}
+	if err := binary.Write(w, binary.BigEndian, m.LeafType); err != nil {
+		return err
+	}
+	if err := SerializeTimestampedEntry(w, &m.TimestampedEntry); err != nil {
+		return err
+	}
+	return nil
+}
+
+// SerializeV1SCTMerkleTreeLeafX509 write the merkle tree leaf for cert
+// to Writer.
+func SerializeV1SCTMerkleTreeLeafX509(w io.Writer, timestamp uint64, cert ASN1Cert) error {
+	m := &MerkleTreeLeaf{
+		Version:  V1,
+		LeafType: TimestampedEntryLeafType,
+		TimestampedEntry: TimestampedEntry{
+			Timestamp: timestamp,
+			EntryType: X509LogEntryType,
+			X509Entry: cert,
+		},
+	}
+	return SerializeMerkleTreeLeaf(w, m)
+}
+
+// SerializeV1SCTMerkleTreeLeafJSON writes the merkle tree leaf for json data to Writer.
+func SerializeV1SCTMerkleTreeLeafJSON(w io.Writer, timestamp uint64, data interface{}) error {
+	jsonData, err := json.Marshal(AddJSONRequest{Data: data})
+	if err != nil {
+		return nil
+	}
+	// Match the JSON serialization implemented by json-c
+	jsonStr := strings.Replace(string(jsonData), ":", ": ", -1)
+	jsonStr = strings.Replace(jsonStr, ",", ", ", -1)
+	jsonStr = strings.Replace(jsonStr, "{", "{ ", -1)
+	jsonStr = strings.Replace(jsonStr, "}", " }", -1)
+	jsonStr = strings.Replace(jsonStr, "/", `\/`, -1)
+	// TODO: Pending google/certificate-transparency#1243, replace with
+	// ObjectHash once supported by CT server.
+
+	m := &MerkleTreeLeaf{
+		Version:  V1,
+		LeafType: TimestampedEntryLeafType,
+		TimestampedEntry: TimestampedEntry{
+			Timestamp: timestamp,
+			EntryType: XJSONLogEntryType,
+			JSONData:  []byte(jsonStr),
+		},
+	}
+	return SerializeMerkleTreeLeaf(w, m)
 }
