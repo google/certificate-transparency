@@ -25,8 +25,7 @@ export ETCD_SERVER_LIST=`AppendAndJoin ":4001" "," ${ETCD_MACHINES[@]}`
 
 if [ "${INSTANCE_TYPE}" == "mirror" ]; then
   if [ "${MIRROR_TARGET_URL}" == "" ]; then
-    echo "Must set MIRROR_TARGET_URL for mirror instance type."
-    exit 1
+    echo "MIRROR_TARGET_URL unset, mirroring will be DISABLED"
   fi
   if [ "${MIRROR_TARGET_PUBLIC_KEY}" == "" ]; then
     echo "Must set MIRROR_TARGET_PUBLIC_KEY for mirror instance type."
