@@ -36,7 +36,8 @@ for i in `seq 0 $((${MIRROR_NUM_REPLICAS} - 1))`; do
   ${GCLOUD} compute instances create -q ${MIRROR_MACHINES[${i}]} \
       --zone ${MIRROR_ZONES[${i}]} \
       --machine-type ${MIRROR_MACHINE_TYPE} \
-      --image container-vm \
+      --image-family=container-vm \
+      --image-project=google-containers \
       --disk name=${MIRROR_DISKS[${i}]},mode=rw,boot=no,auto-delete=yes \
       --tags mirror-node \
       --scopes "monitoring,storage-ro,compute-ro,logging-write" \
