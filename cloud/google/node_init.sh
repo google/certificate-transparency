@@ -6,6 +6,23 @@ sudo mkdir ${DATA_DIR}
 sudo /usr/share/google/safe_format_and_mount \
   -m "mkfs.ext4 -F" ${DATA_DEV} ${DATA_DIR}
 
+# Install the Stackdriver agent to pass metrics to Stackdriver Monitoring.
+AGENT_INSTALL_SCRIPT="stack-install.sh"
+EXPECTED_SHA256="3d298c1e8a06efa08bbf237cd663710ae124c631fc976f70098f0fde642bb29b  ./${AGENT_INSTALL_SCRIPT}"
+curl -O https://repo.stackdriver.com/${AGENT_INSTALL_SCRIPT}
+if ! echo "${EXPECTED_SHA256}" | sha256sum --quiet -c; then
+  echo "Got ${AGENT_INSTALL_SCRIPT} with sha256sum "
+  sha256sum ./${AGENT_INSTALL_SCRIPT}
+  echo "But expected:"
+  echo "${EXPECTED_SHA256}"
+  echo "${AGENT_INSTALL_SCRIPT} may have been updated, verify the new sum at"
+  echo "https://cloud.google.com/monitoring/agent/install-agent and update"
+  echo "this script with the new sha256sum if necessary."
+  exit 1
+fi
+
+sudo bash ./${AGENT_INSTALL_SCRIPT} --write-gcm
+
 # Install google-fluentd which pushes application log files up into the Google
 # Cloud Logs Monitor.
 AGENT_INSTALL_SCRIPT="install-logging-agent.sh"
@@ -22,6 +39,8 @@ if ! echo "${EXPECTED_SHA256}" | sha256sum --quiet -c; then
   exit 1
 fi
 
+# TODO(robpercival): For CT mirrors, the path below should be "/data/ctmirror/",
+# not "/data/ctlog/".
 sudo bash ./${AGENT_INSTALL_SCRIPT}
 cat > /tmp/ct-info.conf <<EOF
 <source>
