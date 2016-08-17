@@ -106,7 +106,7 @@ OBJNAME=${INSTANCE_TYPE}-lb-backend
 PRESENT=`gcloud compute backend-services list ${OBJNAME} | grep ${OBJNAME} || true`
 if [ "$PRESENT" == "" ]; then
   gcloud compute backend-services create "${OBJNAME}" \
-      --http-health-check "get-sth-check" \
+      --http-health-checks "get-sth-check" \
       --timeout "30"
 else
   echo "  ...${OBJNAME} already present"
@@ -119,7 +119,7 @@ for zone in ${ZONE_LIST}; do
   if [ "$PRESENT" == "" ]; then
     gcloud compute backend-services add-backend "${OBJNAME}" \
       --instance-group "${SUBOBJNAME}" \
-      --zone ${zone} \
+      --instance-group-zone ${zone} \
       --balancing-mode "UTILIZATION" \
       --capacity-scaler "1" \
       --max-utilization "0.8"
@@ -156,7 +156,7 @@ if [ "$PRESENT" == "" ]; then
       --global \
       --address "${EXTERNAL_IP}" \
       --ip-protocol "TCP" \
-      --port-range "80" \
+      --ports "80" \
       --target-http-proxy "${INSTANCE_TYPE}-lb-http-proxy"
 else
   echo "  ...${OBJNAME} already present"
