@@ -8,7 +8,7 @@ source ${DIR}/config.sh $1
 source ${DIR}/util.sh
 
 set -e
-GCLOUD="gcloud"
+GCLOUD="gcloud --project ${PROJECT}"
 
 Header "Creating etcd persistent disks..."
 for i in `seq 0 $((${ETCD_NUM_REPLICAS} - 1))`; do

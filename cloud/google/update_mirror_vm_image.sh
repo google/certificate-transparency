@@ -8,7 +8,7 @@ source ${DIR}/config.sh $1
 source ${DIR}/util.sh
 
 set -e
-GCLOUD="gcloud"
+GCLOUD="gcloud --project ${PROJECT}"
 
 ${GCLOUD} config set project ${PROJECT}
 
@@ -36,7 +36,7 @@ function recreate_instance()
 
   rm "${MANIFEST}"
 
-  gcloud compute instance-groups unmanaged add-instances \
+  ${GCLOUD} compute instance-groups unmanaged add-instances \
       "mirror-group-${MIRROR_ZONES[$1]}" \
       --zone ${MIRROR_ZONES[$1]} \
       --instances ${MIRROR_MACHINES[$1]} &

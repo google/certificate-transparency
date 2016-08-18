@@ -7,7 +7,7 @@ fi
 source ${DIR}/util.sh
 source ${DIR}/config.sh $1
 
-GCLOUD="gcloud"
+GCLOUD="gcloud --project ${PROJECT}"
 
 Header "Updating mirror instances..."
 i=0
@@ -17,7 +17,7 @@ while [ $i -lt ${MIRROR_NUM_REPLICAS} ]; do
   MANIFEST=$(mktemp)
   echo "${MIRROR_META[${i}]}" > ${MANIFEST}
 
-  if ! gcloud compute instances add-metadata \
+  if ! ${GCLOUD} compute instances add-metadata \
       ${MIRROR_MACHINES[${i}]} \
       --zone ${MIRROR_ZONES[${i}]} \
       --metadata-from-file google-container-manifest=${MANIFEST}; then
@@ -25,7 +25,7 @@ while [ $i -lt ${MIRROR_NUM_REPLICAS} ]; do
     continue
   fi
 
-  if ! gcloud compute ssh ${MIRROR_MACHINES[${i}]} \
+  if ! ${GCLOUD} compute ssh ${MIRROR_MACHINES[${i}]} \
       --zone ${MIRROR_ZONES[${i}]} \
       --command \
           'sudo docker pull gcr.io/'${PROJECT}'/ct-mirror:test &&

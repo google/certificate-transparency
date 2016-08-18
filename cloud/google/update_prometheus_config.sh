@@ -8,7 +8,7 @@ source ${DIR}/config.sh $1
 source ${DIR}/util.sh
 
 set -e
-GCLOUD="gcloud"
+GCLOUD="gcloud --project ${PROJECT}"
 
 LOG_HOSTS=$(
   for i in ${LOG_MACHINES[@]}; do
@@ -37,12 +37,12 @@ for i in `seq 0 $((${PROMETHEUS_NUM_REPLICAS} - 1))`; do
   WaitMachineUp ${INSTANCE} ${ZONE}
 
   # Workaround copy-files ignoring the --zone flag:
-  gcloud config set compute/zone ${ETCD_ZONES[1]}
+  ${GCLOUD} config set compute/zone ${ETCD_ZONES[1]}
   ${GCLOUD} compute copy-files \
       --zone ${ZONE} \
       ${TMP_CONFIG} ${INSTANCE}:.
   # Remove workaround
-  gcloud config unset compute/zone
+  ${GCLOUD} config unset compute/zone
 
   ${GCLOUD} compute ssh ${INSTANCE} \
       --zone ${ZONE} \

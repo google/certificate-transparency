@@ -8,7 +8,7 @@ source ${DIR}/util.sh
 source ${DIR}/config.sh $1
 
 set -e
-GCLOUD="gcloud"
+GCLOUD="gcloud --project ${PROJECT}"
 
 Header "Updating log instances..."
 i=0

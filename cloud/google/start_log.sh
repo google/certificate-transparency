@@ -8,7 +8,7 @@ source ${DIR}/util.sh
 source ${DIR}/config.sh $1
 
 set -e
-GCLOUD="gcloud"
+GCLOUD="gcloud --project ${PROJECT}"
 
 Header "Creating log persistent disks..."
 for i in `seq 0 $((${LOG_NUM_REPLICAS} - 1))`; do

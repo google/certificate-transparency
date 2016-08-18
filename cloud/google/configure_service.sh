@@ -1,7 +1,6 @@
 #!/bin/bash
 set -e
 DIR=$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )
-GCLOUD="gcloud"
 if [ "$1" == "" ]; then
   echo "Usage: $0 <config-file>"
   exit 1
@@ -9,6 +8,7 @@ fi
 CONFIG_FILE="$1"
 
 . ${DIR}/config.sh ${CONFIG_FILE}
+GCLOUD="gcloud --project ${PROJECT}"
 
 case "${INSTANCE_TYPE}" in
   "mirror")
@@ -36,9 +36,9 @@ echo "============================================================="
 echo "Creating network rules..."
 echo "  http-health-checks create..."
 OBJNAME=get-sth-check
-PRESENT=`gcloud compute http-health-checks list ${OBJNAME} | grep ${OBJNAME} || true`
+PRESENT=`${GCLOUD} compute http-health-checks list ${OBJNAME} | grep ${OBJNAME} || true`
 if [ "$PRESENT" == "" ]; then
-  gcloud compute http-health-checks create ${OBJNAME} \
+  ${GCLOUD} compute http-health-checks create ${OBJNAME} \
       --port 80 \
       --request-path /ct/v1/get-sth
 else
@@ -46,9 +46,9 @@ else
 fi
 echo "  firewall-rules create..."
 OBJNAME=${INSTANCE_TYPE}-node-80
-PRESENT=`gcloud compute firewall-rules list ${OBJNAME} | grep ${OBJNAME} || true`
+PRESENT=`${GCLOUD} compute firewall-rules list ${OBJNAME} | grep ${OBJNAME} || true`
 if [ "$PRESENT" == "" ]; then
-  gcloud compute firewall-rules create ${OBJNAME} \
+  ${GCLOUD} compute firewall-rules create ${OBJNAME} \
       --allow tcp:80 \
       --target-tags ${INSTANCE_TYPE}-node
 else
@@ -58,9 +58,9 @@ fi
 echo "  instance-groups unmanaged create..."
 for zone in ${ZONE_LIST}; do
   OBJNAME=${INSTANCE_TYPE}-group-${zone}
-  PRESENT=`gcloud compute instance-groups unmanaged list ${OBJNAME} | grep ${OBJNAME} || true`
+  PRESENT=`${GCLOUD} compute instance-groups unmanaged list ${OBJNAME} | grep ${OBJNAME} || true`
   if [ "$PRESENT" == "" ]; then
-    gcloud compute instance-groups unmanaged \
+    ${GCLOUD} compute instance-groups unmanaged \
         create "${OBJNAME}" \
         --zone ${zone} &
   else
@@ -74,10 +74,10 @@ for i in `seq 0 $((${NODE_NUM_REPLICAS} - 1))`; do
   ZONE=${NODE_ZONES[${i}]}
   MACHINE="${NODE_MACHINES[${i}]}"
   OBJNAME=${INSTANCE_TYPE}-group-${ZONE}
-  PRESENT=`gcloud compute instance-groups unmanaged list-instances ${OBJNAME} --zone ${ZONE} | grep ${MACHINE} || true`
+  PRESENT=`${GCLOUD} compute instance-groups unmanaged list-instances ${OBJNAME} --zone ${ZONE} | grep ${MACHINE} || true`
   echo "PRESENT=$PRESENT:"
   if [ "$PRESENT" == "" ]; then
-    gcloud compute instance-groups unmanaged add-instances \
+    ${GCLOUD} compute instance-groups unmanaged add-instances \
         "${OBJNAME}" \
         --zone ${ZONE} \
         --instances ${MACHINE} &
@@ -89,23 +89,23 @@ wait
 
 echo "  addresses create..."
 OBJNAME=${INSTANCE_TYPE}-ip
-PRESENT=`gcloud compute addresses list "${OBJNAME}" | grep ${OBJNAME} || true`
+PRESENT=`${GCLOUD} compute addresses list "${OBJNAME}" | grep ${OBJNAME} || true`
 if [ "$PRESENT" == "" ]; then
-  gcloud compute addresses create "${OBJNAME}" \
+  ${GCLOUD} compute addresses create "${OBJNAME}" \
       --global
 else
   echo "  ...${OBJNAME} already present"
 fi
-export EXTERNAL_IP=$(gcloud compute addresses list "${OBJNAME}" |
+export EXTERNAL_IP=$(${GCLOUD} compute addresses list "${OBJNAME}" |
                      awk -- "/${OBJNAME}/ {print \$2}")
 echo "Service IP: ${EXTERNAL_IP}"
 
 
 echo "  backend-services create..."
 OBJNAME=${INSTANCE_TYPE}-lb-backend
-PRESENT=`gcloud compute backend-services list ${OBJNAME} | grep ${OBJNAME} || true`
+PRESENT=`${GCLOUD} compute backend-services list ${OBJNAME} | grep ${OBJNAME} || true`
 if [ "$PRESENT" == "" ]; then
-  gcloud compute backend-services create "${OBJNAME}" \
+  ${GCLOUD} compute backend-services create "${OBJNAME}" \
       --http-health-checks "get-sth-check" \
       --timeout "30"
 else
@@ -115,9 +115,9 @@ fi
 echo "    backend-services add-backend..."
 for zone in ${ZONE_LIST}; do
   SUBOBJNAME=${INSTANCE_TYPE}-group-${zone}
-  PRESENT=`gcloud compute backend-services list ${OBJNAME} | grep ${SUBOBJNAME} || true`
+  PRESENT=`${GCLOUD} compute backend-services list ${OBJNAME} | grep ${SUBOBJNAME} || true`
   if [ "$PRESENT" == "" ]; then
-    gcloud compute backend-services add-backend "${OBJNAME}" \
+    ${GCLOUD} compute backend-services add-backend "${OBJNAME}" \
       --instance-group "${SUBOBJNAME}" \
       --instance-group-zone ${zone} \
       --balancing-mode "UTILIZATION" \
@@ -130,9 +130,9 @@ done
 
 echo "  url-maps create..."
 OBJNAME=${INSTANCE_TYPE}-lb-url-map
-PRESENT=`gcloud compute url-maps list ${OBJNAME} | grep ${OBJNAME} || true`
+PRESENT=`${GCLOUD} compute url-maps list ${OBJNAME} | grep ${OBJNAME} || true`
 if [ "$PRESENT" == "" ]; then
-  gcloud compute url-maps create "${OBJNAME}" \
+  ${GCLOUD} compute url-maps create "${OBJNAME}" \
       --default-service "${INSTANCE_TYPE}-lb-backend"
 else
   echo "  ...${OBJNAME} already present"
@@ -140,9 +140,9 @@ fi
 
 echo "  target-http-proxies create..."
 OBJNAME=${INSTANCE_TYPE}-lb-http-proxy
-PRESENT=`gcloud compute target-http-proxies list ${OBJNAME} | grep ${OBJNAME} || true`
+PRESENT=`${GCLOUD} compute target-http-proxies list ${OBJNAME} | grep ${OBJNAME} || true`
 if [ "$PRESENT" == "" ]; then
-  gcloud compute target-http-proxies create "${OBJNAME}" \
+  ${GCLOUD} compute target-http-proxies create "${OBJNAME}" \
       --url-map "${INSTANCE_TYPE}-lb-url-map"
 else
   echo "  ...${OBJNAME} already present"
@@ -150,9 +150,9 @@ fi
 
 echo "  forwarding-rules create..."
 OBJNAME=${INSTANCE_TYPE}-fwd
-PRESENT=`gcloud compute forwarding-rules list ${OBJNAME} | grep ${OBJNAME} || true`
+PRESENT=`${GCLOUD} compute forwarding-rules list ${OBJNAME} | grep ${OBJNAME} || true`
 if [ "$PRESENT" == "" ]; then
-  gcloud compute forwarding-rules create "${OBJNAME}" \
+  ${GCLOUD} compute forwarding-rules create "${OBJNAME}" \
       --global \
       --address "${EXTERNAL_IP}" \
       --ip-protocol "TCP" \
@@ -164,6 +164,6 @@ fi
 
 echo "============================================================="
 echo "External IPs:"
-gcloud compute forwarding-rules list
+${GCLOUD} compute forwarding-rules list
 echo "============================================================="
 
