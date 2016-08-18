@@ -14,12 +14,14 @@ Header "Updating log instances..."
 i=0
 while [ $i -lt ${LOG_NUM_REPLICAS} ]; do
   echo "Updating ${LOG_MACHINES[${i}]}"
-  echo "${LOG_META[${i}]}" > /tmp/metadata.${i}
+
+  METADATA=$(mktemp)
+  echo "${LOG_META[${i}]}" > ${METADATA}
 
   if ! gcloud compute instances add-metadata \
       ${LOG_MACHINES[${i}]} \
       --zone ${LOG_ZONES[${i}]} \
-      --metadata-from-file google-container-manifest=/tmp/metadata.${i}; then
+      --metadata-from-file google-container-manifest=${METADATA}; then
     echo "Retrying"
     continue
   fi
@@ -35,6 +37,8 @@ while [ $i -lt ${LOG_NUM_REPLICAS} ]; do
 
   WaitHttpStatus ${LOG_MACHINES[${i}]} ${LOG_ZONES[${i}]} /ct/v1/get-sth 200
   i=$(($i + 1))
+
+  rm "${METADATA}"
 done;
 
 

@@ -25,7 +25,6 @@ for i in `seq 0 $((${ETCD_NUM_REPLICAS} - 1))`; do
 done
 wait
 
-MANIFEST=/tmp/etcd_container.yaml
 echo -n "Getting Discovery URL"
 while [ "${DISCOVERY}" == "" ]; do
   DISCOVERY=$(curl -s https://discovery.etcd.io/new?size=${ETCD_NUM_REPLICAS})
@@ -37,25 +36,32 @@ echo
 echo "Using Discovery URL: ${DISCOVERY}"
 echo
 
+function create_instance()
+{
+  echo "Creating instance ${ETCD_MACHINES[$1]}"
 
-Header "Creating etcd instances..."
-for i in `seq 0 $((${ETCD_NUM_REPLICAS} - 1))`; do
-  echo "Creating instance ${ETCD_MACHINES[$i]}"
-
+  MANIFEST=$(mktemp)
   sed --e "s^@@PROJECT@@^${PROJECT}^
            s^@@DISCOVERY@@^${DISCOVERY}^
-           s^@@ETCD_NAME@@^${ETCD_MACHINES[$i]}^
-           s^@@CONTAINER_HOST@@^${ETCD_MACHINES[$i]}^" \
-          < ${DIR}/etcd_container.yaml  > ${MANIFEST}.${i}
+           s^@@ETCD_NAME@@^${ETCD_MACHINES[$1]}^
+           s^@@CONTAINER_HOST@@^${ETCD_MACHINES[$1]}^" \
+          < ${DIR}/etcd_container.yaml  > ${MANIFEST}
 
-  ${GCLOUD} compute instances create -q ${ETCD_MACHINES[${i}]} \
-      --zone ${ETCD_ZONES[${i}]} \
+  ${GCLOUD} compute instances create -q ${ETCD_MACHINES[$1]} \
+      --zone ${ETCD_ZONES[$1]} \
       --machine-type ${ETCD_MACHINE_TYPE} \
       --image-family=container-vm \
       --image-project=google-containers \
-      --disk name=${ETCD_DISKS[${i}]},mode=rw,boot=no,auto-delete=yes \
+      --disk name=${ETCD_DISKS[$1]},mode=rw,boot=no,auto-delete=yes \
       --tags etcd-node \
-      --metadata-from-file startup-script=${DIR}/node_init.sh,google-container-manifest=${MANIFEST}.${i} &
+      --metadata-from-file startup-script=${DIR}/node_init.sh,google-container-manifest=${MANIFEST}
+
+  rm "${MANIFEST}"
+}
+
+Header "Creating etcd instances..."
+for i in `seq 0 $((${ETCD_NUM_REPLICAS} - 1))`; do
+  create_instance $i &
 done
 wait
 

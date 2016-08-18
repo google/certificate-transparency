@@ -25,23 +25,29 @@ for i in `seq 0 $((${MIRROR_NUM_REPLICAS} - 1))`; do
 done
 wait
 
-MANIFEST=/tmp/mirror_container.yaml
+function create_instance()
+{
+  echo "Creating instance ${MIRROR_MACHINES[$1]}"
 
-Header "Creating mirror instances..."
-for i in `seq 0 $((${MIRROR_NUM_REPLICAS} - 1))`; do
-  echo "Creating instance ${MIRROR_MACHINES[$i]}"
+  MANIFEST=$(mktemp)
+  echo "${MIRROR_META[${i}]}" > ${MANIFEST}
 
-  echo "${MIRROR_META[${i}]}" > ${MANIFEST}.${i}
-
-  ${GCLOUD} compute instances create -q ${MIRROR_MACHINES[${i}]} \
-      --zone ${MIRROR_ZONES[${i}]} \
+  ${GCLOUD} compute instances create -q ${MIRROR_MACHINES[$1]} \
+      --zone ${MIRROR_ZONES[$1]} \
       --machine-type ${MIRROR_MACHINE_TYPE} \
       --image-family=container-vm \
       --image-project=google-containers \
-      --disk name=${MIRROR_DISKS[${i}]},mode=rw,boot=no,auto-delete=yes \
+      --disk name=${MIRROR_DISKS[$1]},mode=rw,boot=no,auto-delete=yes \
       --tags mirror-node \
       --scopes "monitoring,storage-ro,compute-ro,logging-write" \
-      --metadata-from-file startup-script=${DIR}/node_init.sh,google-container-manifest=${MANIFEST}.${i} &
+      --metadata-from-file startup-script=${DIR}/node_init.sh,google-container-manifest=${MANIFEST}
+
+  rm "${MANIFEST}"
+}
+
+Header "Creating mirror instances..."
+for i in `seq 0 $((${MIRROR_NUM_REPLICAS} - 1))`; do
+  create_instance $i &
 done
 wait
 

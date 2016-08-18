@@ -25,7 +25,7 @@ ETCD_HOSTS=$(
     echo -n "    - ${i}.c.${PROJECT}.internal:8080\n";
   done)
 
-export TMP_CONFIG=/tmp/prometheus.conf
+export TMP_CONFIG=$(mktemp)
 sed -- "s%@@LOG_TARGETS@@%${LOG_HOSTS}%g
         s%@@MIRROR_TARGETS@@%${MIRROR_HOSTS}%g
         s%@@ETCD_TARGETS@@%${ETCD_HOSTS}%g" < ${DIR}/../prometheus/prometheus.conf > ${TMP_CONFIG}
@@ -61,3 +61,5 @@ for i in `seq 0 $((${PROMETHEUS_NUM_REPLICAS} - 1))`; do
       echo "Prometheus container not yet running."
     fi'
 done
+
+rm ${TMP_CONFIG}

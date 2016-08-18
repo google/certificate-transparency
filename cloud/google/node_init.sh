@@ -42,7 +42,7 @@ fi
 # TODO(robpercival): For CT mirrors, the path below should be "/data/ctmirror/",
 # not "/data/ctlog/".
 sudo bash ./${AGENT_INSTALL_SCRIPT}
-cat > /tmp/ct-info.conf <<EOF
+sudo cat > /etc/google-fluentd/config.d/ct-info.conf <<EOF
 <source>
   type tail
   format none
@@ -76,7 +76,6 @@ cat > /tmp/ct-info.conf <<EOF
   tag ct-error
 </source>
 EOF
-sudo cp /tmp/ct-info.conf /etc/google-fluentd/config.d/ct-info.conf
 sudo service google-fluentd restart
 # End google-fluentd stuff
 
