@@ -231,7 +231,7 @@ contains the options that were passed in `CXXFLAGS`.
 
 If you're trying to clone from a branch on the CT repository then you'll need
 to substitute the following command for the `gclient config` command
-[above](build-quick-start), replacing `branch` as appropriate
+[above](#build-quick-start), replacing `branch` as appropriate
 
 ```bash
 gclient config --name="certificate-transparency" https://github.com/google/certificate-transparency.git@branch
