@@ -3,7 +3,6 @@ ACLOCAL_AMFLAGS = -Im4
 AM_CPPFLAGS = \
 	-I$(GMOCK_DIR)/include \
 	-I$(GTEST_DIR)/include \
-	-Ithird_party/objecthash \
 	$(evhtp_CFLAGS) \
 	$(icu_CFLAGS) \
 	$(json_c_CFLAGS)
@@ -43,12 +42,8 @@ bin_PROGRAMS = \
 	cpp/server/ct-mirror-v2 \
 	cpp/server/ct-server \
 	cpp/server/ct-server-v2 \
+	cpp/server/xjson-server \
 	cpp/tools/ct-clustertool
-
-if HAVE_OBJECTHASH
-bin_PROGRAMS += \
-	cpp/server/xjson-server
-endif
 
 noinst_PROGRAMS = \
 	cpp/tools/dump_cert \
@@ -314,8 +309,7 @@ cpp_server_xjson_server_SOURCES = \
 	cpp/server/server_helper.cc \
 	cpp/server/x_json_handler.cc \
 	cpp/server/xjson-server.cc \
-	cpp/util/json_wrapper.cc \
-	third_party/objecthash/objecthash.cc
+	cpp/util/json_wrapper.cc
 
 cpp_tools_ct_clustertool_LDADD = \
 	cpp/libcore.a \
