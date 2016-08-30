@@ -1,6 +1,6 @@
 dnspython
 ecdsa
-https://google-visualization-python.googlecode.com/files/gviz_api_py-1.8.2.tar.gz
+git+https://github.com/google/google-visualization-python.git@04e4c03909980bc12be2ebb3ecf476716d9855d4
 mock>=1.0
 protobuf
 python-gflags
