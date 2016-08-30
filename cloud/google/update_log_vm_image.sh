@@ -11,8 +11,6 @@ source ${DIR}/util.sh
 set -e
 GCLOUD="gcloud --project ${PROJECT}"
 
-${GCLOUD} config set project ${PROJECT}
-
 Header "Recreating log instances..."
 for i in `seq 0 $((${LOG_NUM_REPLICAS} - 1))`; do
   echo "Deleting instance ${LOG_MACHINES[$i]}"

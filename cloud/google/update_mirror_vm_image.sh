@@ -10,8 +10,6 @@ source ${DIR}/util.sh
 set -e
 GCLOUD="gcloud --project ${PROJECT}"
 
-${GCLOUD} config set project ${PROJECT}
-
 function recreate_instance()
 {
   echo "Deleting instance ${MIRROR_MACHINES[$1]}"
