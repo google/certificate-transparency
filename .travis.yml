@@ -126,6 +126,6 @@ script:
  - ${MAKE} -C python test
  - pushd ${GOPATH}
  - |
-   GODEBUG=cgocheck=0 CGO_CPPFLAGS="-I${INSTALL_DIR}/include" CGO_LDFLAGS="-L${INSTALL_DIR}/lib" go test -v ./src/github.com/google/certificate-transparency/go/...
+   CGO_CPPFLAGS="-I${INSTALL_DIR}/include" CGO_LDFLAGS="-L${INSTALL_DIR}/lib" go test -v ./src/github.com/google/certificate-transparency/go/...
  - popd
 
