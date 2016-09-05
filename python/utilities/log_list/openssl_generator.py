@@ -22,28 +22,21 @@ def _enabled_logs_conf(logs):
         _openssl_list(_log_id(log) for log in logs)
     )
 
-def _log_conf(log, operators):
-    operated_by = (operators[i]["name"] for i in log["operated_by"])
-
+def _log_conf(log):
     return (
         "[%(id)s]\n"
         "description = %(description)s\n"
-        "key = %(key)s\n"
-        "url = https://%(url)s\n"
-        "operated_by = %(operated_by)s\n" % {
+        "key = %(key)s\n" % {
             "id": _log_id(log),
             "description": log["description"],
             "key": log["key"],
-            "url": log["url"],
-            "operated_by": _openssl_list(operated_by),
     })
 
 def generate_openssl_conf(json_log_list, output_path):
     '''Given a log list read from JSON, writes an OpenSSL log list to a file'''
     with open(output_path, "w") as output:
         logs = json_log_list["logs"]
-        operators = json_log_list["operators"]
-        log_confs = (_log_conf(log, operators) for log in logs)
+        log_confs = (_log_conf(log) for log in logs)
 
         output.write(_enabled_logs_conf(logs) + "\n")
         output.write("\n".join(log_confs))
