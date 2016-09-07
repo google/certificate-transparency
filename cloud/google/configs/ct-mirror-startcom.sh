@@ -1,0 +1,9 @@
+export INSTANCE_TYPE="mirror"
+export PROJECT="ct-mirror-startcom"
+export REGION="europe-west1"
+export CLUSTER="ct-mirror-startcom"
+export ZONES="b c d"
+export MIRROR_NUM_REPLICAS_PER_ZONE=2
+export MIRROR_TARGET_URL="https://ct.startssl.com"
+export MIRROR_TARGET_PUBLIC_KEY="startcom.pem"
+export MONITORING="gcm"
