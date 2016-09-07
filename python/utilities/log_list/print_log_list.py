@@ -105,7 +105,9 @@ def run():
     if FLAGS.openssl_output:
         generate_openssl_conf(parsed_json, FLAGS.openssl_output)
 
-    if not FLAGS.header_output and not FLAGS.java_output:
+    if not FLAGS.header_output and \
+       not FLAGS.java_output and \
+       not FLAGS.openssl_output:
         print_formatted_log_list(parsed_json)
 
 

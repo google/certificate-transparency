@@ -1,7 +1,7 @@
 '''
 Generates a list of CT logs for use by OpenSSL.
 It is in OpenSSL CONF format and the schema is documented here:
-https://github.com/openssl/openssl/blob/master/doc/ssl/SSL_CTX_set_ctlog_list_file.pod
+https://github.com/openssl/openssl/blob/OpenSSL_1_1_0/doc/crypto/CTLOG_STORE_new.pod
 '''
 
 def _log_id(log):
