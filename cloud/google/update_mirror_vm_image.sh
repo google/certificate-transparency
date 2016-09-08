@@ -26,7 +26,8 @@ function recreate_instance()
   ${GCLOUD} compute instances create -q ${MIRROR_MACHINES[$1]} \
       --zone ${MIRROR_ZONES[$1]} \
       --machine-type ${MIRROR_MACHINE_TYPE} \
-      --image container-vm \
+      --image-family=container-vm \
+      --image-project=google-containers \
       --disk name=${MIRROR_DISKS[$1]},mode=rw,boot=no,auto-delete=no \
       --tags mirror-node \
       --scopes "monitoring,storage-ro,compute-ro,logging-write" \
