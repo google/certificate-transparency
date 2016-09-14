@@ -344,12 +344,17 @@ void LevelDB::InitializeNode(const string& node_id) {
 
 Database::LookupResult LevelDB::NodeId(string* node_id) {
   CHECK_NOTNULL(node_id);
-  if (!db_->Get(leveldb::ReadOptions(), string(kMetaPrefix) + kMetaNodeIdKey,
-                node_id)
-           .ok()) {
+  leveldb::Status status =
+      db_->Get(leveldb::ReadOptions(), string(kMetaPrefix) + kMetaNodeIdKey,
+               node_id);
+
+  if (status.ok()) {
+    return this->LOOKUP_OK;
+  }
+  if (status.IsNotFound()) {
     return this->NOT_FOUND;
   }
-  return this->LOOKUP_OK;
+  LOG(FATAL) << "Node ID lookup failed: " << status.ToString();
 }
 
 
