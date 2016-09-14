@@ -329,15 +329,14 @@ void LevelDB::InitializeNode(const string& node_id) {
   ScopedLatency latency(latency_by_op_ms.GetScopedLatency("initialize_node"));
   unique_lock<mutex> lock(lock_);
   string existing_id;
-  leveldb::Status status(db_->Get(leveldb::ReadOptions(),
-                                  string(kMetaPrefix) + kMetaNodeIdKey,
-                                  &existing_id));
-  if (!status.IsNotFound()) {
-    LOG(FATAL) << "Attempting to initialize DB belonging to node with node_id: "
-               << existing_id;
+  if (NodeId(&existing_id) != this->NOT_FOUND) {
+    LOG(FATAL)
+        << "Attempting to initialize DB belonging to node with node_id: "
+        << existing_id;
   }
-  status = db_->Put(leveldb::WriteOptions(),
-                    string(kMetaPrefix) + kMetaNodeIdKey, node_id);
+  leveldb::Status status =
+      db_->Put(leveldb::WriteOptions(), string(kMetaPrefix) + kMetaNodeIdKey,
+               node_id);
   CHECK(status.ok()) << "Failed to store NodeId: " << status.ToString();
 }
 
