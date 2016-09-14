@@ -333,7 +333,7 @@ void LevelDB::InitializeNode(const string& node_id) {
                                   string(kMetaPrefix) + kMetaNodeIdKey,
                                   &existing_id));
   if (!status.IsNotFound()) {
-    LOG(FATAL) << "Attempting to initialize DB beloging to node with node_id: "
+    LOG(FATAL) << "Attempting to initialize DB belonging to node with node_id: "
                << existing_id;
   }
   status = db_->Put(leveldb::WriteOptions(),
