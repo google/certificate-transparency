@@ -152,7 +152,7 @@ Status CertChecker::CheckIssuerChain(CertChain* chain) const {
   // because we will later check that it is trusted.
   Status status = chain->IsValidCaIssuerChainMaybeLegacyRoot();
   if (!status.ok()) {
-    LOG(ERROR) << "Failed to check issuer chain";
+    LOG(ERROR) << "Failed to check issuer chain: " << status;
     return Status(status.CanonicalCode(), "invalid certificate chain");
   }
 
