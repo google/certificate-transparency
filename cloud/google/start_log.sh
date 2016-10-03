@@ -8,7 +8,7 @@ source ${DIR}/util.sh
 source ${DIR}/config.sh $1
 
 set -e
-GCLOUD="gcloud"
+GCLOUD="gcloud --project ${PROJECT}"
 
 Header "Creating log persistent disks..."
 for i in `seq 0 $((${LOG_NUM_REPLICAS} - 1))`; do
@@ -25,22 +25,28 @@ for i in `seq 0 $((${LOG_NUM_REPLICAS} - 1))`; do
 done
 wait
 
-MANIFEST=/tmp/log_container.yaml
+function create_instance()
+{
+  echo "Creating instance ${LOG_MACHINES[$1]}"
+
+  MANIFEST=$(mktemp)
+  echo "${LOG_META[$1]}" > ${MANIFEST}
+
+  ${GCLOUD} compute instances create -q ${LOG_MACHINES[$1]} \
+      --zone=${LOG_ZONES[$1]} \
+      --machine-type ${LOG_MACHINE_TYPE} \
+      --image container-vm \
+      --disk name=${LOG_DISKS[$1]},mode=rw,boot=no,auto-delete=yes \
+      --tags log-node \
+      --scopes "monitoring,storage-ro,compute-ro,logging-write" \
+      --metadata-from-file startup-script=${DIR}/node_init.sh,google-container-manifest=${MANIFEST}
+
+  rm "${MANIFEST}"
+}
 
 Header "Creating log instances..."
 for i in `seq 0 $((${LOG_NUM_REPLICAS} - 1))`; do
-  echo "Creating instance ${LOG_MACHINES[$i]}"
-
-  echo "${LOG_META[${i}]}" > ${MANIFEST}.${i}
-
-  ${GCLOUD} compute instances create -q ${LOG_MACHINES[${i}]} \
-      --zone=${LOG_ZONES[${i}]} \
-      --machine-type ${LOG_MACHINE_TYPE} \
-      --image container-vm \
-      --disk name=${LOG_DISKS[${i}]},mode=rw,boot=no,auto-delete=yes \
-      --tags log-node \
-      --scopes "monitoring,storage-ro,compute-ro,logging-write" \
-      --metadata-from-file startup-script=${DIR}/node_init.sh,google-container-manifest=${MANIFEST}.${i} &
+  create_instance $i &
 done
 wait
 
@@ -49,5 +55,4 @@ for i in `seq 0 $((${LOG_NUM_REPLICAS} - 1))`; do
   WaitForStatus instances ${LOG_MACHINES[${i}]} ${LOG_ZONES[${i}]} RUNNING &
 done
 wait
-
 

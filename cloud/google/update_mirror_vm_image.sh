@@ -8,37 +8,42 @@ source ${DIR}/config.sh $1
 source ${DIR}/util.sh
 
 set -e
-GCLOUD="gcloud"
+GCLOUD="gcloud --project ${PROJECT}"
 
-${GCLOUD} config set project ${PROJECT}
-
-MANIFEST=/tmp/mirror_container.yaml
-
-Header "Recreating mirror instances..."
-for i in `seq 0 $((${MIRROR_NUM_REPLICAS} - 1))`; do
-  echo "Deleting instance ${MIRROR_MACHINES[$i]}"
+function recreate_instance()
+{
+  echo "Deleting instance ${MIRROR_MACHINES[$1]}"
   set +e
-   ${GCLOUD} compute instances delete -q ${MIRROR_MACHINES[${i}]} \
-      --zone ${MIRROR_ZONES[${i}]} \
+   ${GCLOUD} compute instances delete -q ${MIRROR_MACHINES[$1]} \
+      --zone ${MIRROR_ZONES[$1]} \
       --keep-disks data
   set -e
 
-  echo "${MIRROR_META[${i}]}" > ${MANIFEST}.${i}
+  MANIFEST=$(mktemp)
+  echo "${MIRROR_META[$1]}" > ${MANIFEST}
 
-  echo "Recreating instance ${MIRROR_MACHINES[$i]}"
-  ${GCLOUD} compute instances create -q ${MIRROR_MACHINES[${i}]} \
-      --zone ${MIRROR_ZONES[${i}]} \
+  echo "Recreating instance ${MIRROR_MACHINES[$1]}"
+  ${GCLOUD} compute instances create -q ${MIRROR_MACHINES[$1]} \
+      --zone ${MIRROR_ZONES[$1]} \
       --machine-type ${MIRROR_MACHINE_TYPE} \
-      --image container-vm \
-      --disk name=${MIRROR_DISKS[${i}]},mode=rw,boot=no,auto-delete=no \
+      --image-family=container-vm \
+      --image-project=google-containers \
+      --disk name=${MIRROR_DISKS[$1]},mode=rw,boot=no,auto-delete=no \
       --tags mirror-node \
       --scopes "monitoring,storage-ro,compute-ro,logging-write" \
-      --metadata-from-file startup-script=${DIR}/node_init.sh,google-container-manifest=${MANIFEST}.${i}
+      --metadata-from-file startup-script=${DIR}/node_init.sh,google-container-manifest=${MANIFEST}
 
-  gcloud compute instance-groups unmanaged add-instances \
-      "mirror-group-${MIRROR_ZONES[${i}]}" \
-      --zone ${MIRROR_ZONES[${i}]} \
-      --instances ${MIRROR_MACHINES[${i}]} &
+  rm "${MANIFEST}"
+
+  ${GCLOUD} compute instance-groups unmanaged add-instances \
+      "mirror-group-${MIRROR_ZONES[$1]}" \
+      --zone ${MIRROR_ZONES[$1]} \
+      --instances ${MIRROR_MACHINES[$1]} &
+}
+
+Header "Recreating mirror instances..."
+for i in `seq 0 $((${MIRROR_NUM_REPLICAS} - 1))`; do
+  recreate_instance $i
 
   set +e
   echo "Waiting for instance ${MIRROR_MACHINES[${i}]}..."

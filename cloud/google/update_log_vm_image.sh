@@ -9,11 +9,7 @@ source ${DIR}/config.sh $1
 source ${DIR}/util.sh
 
 set -e
-GCLOUD="gcloud"
-
-${GCLOUD} config set project ${PROJECT}
-
-MANIFEST=/tmp/log_container.yaml
+GCLOUD="gcloud --project ${PROJECT}"
 
 Header "Recreating log instances..."
 for i in `seq 0 $((${LOG_NUM_REPLICAS} - 1))`; do
@@ -24,7 +20,8 @@ for i in `seq 0 $((${LOG_NUM_REPLICAS} - 1))`; do
       --keep-disks data
   set -e
 
-  echo "${LOG_META[${i}]}" > ${MANIFEST}.${i}
+  MANIFEST=$(mktemp)
+  echo "${LOG_META[${i}]}" > ${MANIFEST}
 
   echo "Recreating instance ${LOG_MACHINES[$i]}"
   ${GCLOUD} compute instances create -q ${LOG_MACHINES[${i}]} \
@@ -34,9 +31,9 @@ for i in `seq 0 $((${LOG_NUM_REPLICAS} - 1))`; do
       --disk name=${LOG_DISKS[${i}]},mode=rw,boot=no,auto-delete=no \
       --tags log-node \
       --scopes "monitoring,storage-ro,compute-ro,logging-write" \
-      --metadata-from-file startup-script=${DIR}/node_init.sh,google-container-manifest=${MANIFEST}.${i}
+      --metadata-from-file startup-script=${DIR}/node_init.sh,google-container-manifest=${MANIFEST}
 
-  gcloud compute instance-groups unmanaged add-instances \
+  ${GCLOUD} compute instance-groups unmanaged add-instances \
       "log-group-${LOG_ZONES[${i}]}" \
       --zone ${LOG_ZONES[${i}]} \
       --instances ${LOG_MACHINES[${i}]} &
@@ -47,4 +44,5 @@ for i in `seq 0 $((${LOG_NUM_REPLICAS} - 1))`; do
   echo "Waiting for log service on ${LOG_MACHINES[${i}]}..."
   WaitHttpStatus ${LOG_MACHINES[${i}]} ${LOG_ZONES[${i}]} /ct/v1/get-sth 200
   set -e
+  rm "${MANIFEST}"
 done

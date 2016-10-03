@@ -7,7 +7,7 @@ fi
 source ${DIR}/config.sh $1
 source ${DIR}/util.sh
 
-GCLOUD="gcloud"
+GCLOUD="gcloud --project ${PROJECT}"
 
 Header "Deleting prometheus instances..."
 for i in `seq 0 $((${PROMETHEUS_NUM_REPLICAS} - 1))`; do

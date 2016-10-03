@@ -18,8 +18,11 @@ if [ $? -ne 0 ]; then
   exit 1
 fi
 
-echo -e "${LOADER_CONF}" > /tmp/loader.conf
-${GSUTIL} cp /tmp/loader.conf gs://${PROJECT}/loader.conf
+LOADER_CONF_TMP_PATH=$(mktemp)
+echo -e "${LOADER_CONF}" > ${LOADER_CONF_TMP_PATH}
+${GSUTIL} cp ${LOADER_CONF_TMP_PATH} gs://${PROJECT}/loader.conf
+
+LOAD_INIT_TMP_PATH=$(mktemp)
 
 echo "
 ulimit -n 100000
@@ -36,7 +39,7 @@ gsutil -m cp gs://${PROJECT}/curl-loader .
 gsutil -m cp gs://${PROJECT}/loader.conf .
 chmod 755 curl-loader
 sed -i s/@IP@/\${MY_IP}/ loader.conf
-yes | ./curl-loader -r -f loader.conf" > /tmp/load-init.sh
+yes | ./curl-loader -r -f loader.conf" > ${LOAD_INIT_TMP_PATH}
 
 Header "Creating load instances..."
 for i in `seq 0 $((${LOAD_NUM_REPLICAS} - 1))`; do
@@ -47,7 +50,7 @@ for i in `seq 0 $((${LOAD_NUM_REPLICAS} - 1))`; do
       --machine-type n1-standard-2 \
       --image ubuntu-14-10 \
       --tags load \
-      --metadata-from-file startup-script=/tmp/load-init.sh &
+      --metadata-from-file startup-script=${LOAD_INIT_TMP_PATH} &
 done
 wait
 
@@ -56,3 +59,5 @@ for i in `seq 0 $((${LOAD_NUM_REPLICAS} - 1))`; do
   WaitForStatus instances load-${i} ${ZONE} RUNNING &
 done
 wait
+
+rm "${LOADER_CONF_TMP_PATH}" "${LOAD_INIT_TMP_PATH}"
