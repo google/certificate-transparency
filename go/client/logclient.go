@@ -5,18 +5,28 @@ package client
 
 import (
 	"bytes"
+	"crypto"
+	"crypto/ecdsa"
+	"crypto/elliptic"
+	"crypto/rsa"
 	"crypto/sha256"
 	"encoding/base64"
+	"encoding/binary"
 	"encoding/json"
+	"encoding/pem"
+	"errors"
 	"fmt"
 	"io/ioutil"
 	"log"
+	"math/big"
 	"net/http"
 	"net/url"
 	"strconv"
 	"time"
 
 	ct "github.com/google/certificate-transparency/go"
+	"github.com/google/certificate-transparency/go/asn1"
+	"github.com/google/certificate-transparency/go/x509"
 	"golang.org/x/net/context"
 )
 
@@ -33,8 +43,9 @@ const (
 
 // LogClient represents a client for a given CT Log instance
 type LogClient struct {
-	uri        string       // the base URI of the log. e.g. http://ct.googleapis/pilot
-	httpClient *http.Client // used to interact with the log via HTTP
+	uri        string           // the base URI of the log. e.g. http://ct.googleapis/pilot
+	httpClient *http.Client     // used to interact with the log via HTTP
+	pubkey     crypto.PublicKey // public key for log if available; normally ecdsa.PublicKey
 }
 
 //////////////////////////////////////////////////////////////////////////////////
@@ -59,7 +70,7 @@ type addChainResponse struct {
 	Signature  []byte     `json:"signature"`   // Log signature for this SCT
 }
 
-// addJSONRequest represents the JSON request body sent ot the add-json CT
+// addJSONRequest represents the JSON request body sent to the add-json CT
 // method.
 type addJSONRequest struct {
 	Data interface{} `json:"data"`
@@ -111,6 +122,46 @@ func New(uri string, hc *http.Client) *LogClient {
 		hc = new(http.Client)
 	}
 	return &LogClient{uri: uri, httpClient: hc}
+}
+
+// NewWithPubKey constructs a new LogClient instance that includes public
+// key information for the log; this instance will check signatures on
+// responses from the log.
+func NewWithPubKey(uri string, hc *http.Client, pemEncodedKey string) (*LogClient, error) {
+	publicBlock, rest := pem.Decode([]byte(pemEncodedKey))
+
+	if publicBlock == nil {
+		return nil, errors.New("could not decode PEM for public key")
+	}
+	if len(rest) > 0 {
+		return nil, errors.New("extra data found after PEM key decoded")
+	}
+
+	pubkey, err := x509.ParsePKIXPublicKey(publicBlock.Bytes)
+	if err != nil {
+		return nil, errors.New("unable to parse public key")
+	}
+
+	switch pubkey := pubkey.(type) {
+	case *rsa.PublicKey:
+		// RFC 6962 s2.1.4 requires >= 2048 bits.
+		if pubkey.N.BitLen() < 2048 {
+			return nil, fmt.Errorf("RSA key too short, %d bits", pubkey.N.BitLen())
+		}
+	case *ecdsa.PublicKey:
+		// RFC 6962 s2.1.4 only allows the NIST P-256 curve.
+		curve := pubkey.Params().Name
+		if curve != elliptic.P256().Params().Name {
+			return nil, fmt.Errorf("Unexpected ECDSA curve %v", curve)
+		}
+	default:
+		return nil, fmt.Errorf("Unknown public key type %T", pubkey)
+	}
+
+	if hc == nil {
+		hc = new(http.Client)
+	}
+	return &LogClient{uri: uri, httpClient: hc, pubkey: pubkey}, nil
 }
 
 // Makes a HTTP call to |uri|, and attempts to parse the response as a
@@ -314,9 +365,70 @@ func (c *LogClient) GetSTH() (sth *ct.SignedTreeHead, err error) {
 	if err != nil {
 		return nil, err
 	}
-	// TODO(alcutter): Verify signature
 	sth.TreeHeadSignature = *ds
+	err = c.verifySTH(sth)
+	if err != nil {
+		return nil, err
+	}
 	return
+}
+
+func (c *LogClient) verifySignature(data []byte, signed ct.DigitallySigned) error {
+	// Only support SHA-256 for the hash function.
+	if signed.HashAlgorithm != ct.SHA256 {
+		return fmt.Errorf("Unexpected hash algorithm %v", signed.HashAlgorithm)
+	}
+	hash := sha256.Sum256(data)
+
+	switch pubkey := c.pubkey.(type) {
+	case *rsa.PublicKey:
+		if signed.SignatureAlgorithm != ct.RSA {
+			return fmt.Errorf("Unexpected signature algorithm %v", signed.SignatureAlgorithm)
+		}
+		if err := rsa.VerifyPKCS1v15(pubkey, crypto.SHA256, hash[:], signed.Signature); err != nil {
+			return fmt.Errorf("RSA signature validation failed %v", err.Error())
+		}
+		return nil
+	case *ecdsa.PublicKey:
+		if signed.SignatureAlgorithm != ct.ECDSA {
+			return fmt.Errorf("Unexpected signature algorithm %v", signed.SignatureAlgorithm)
+		}
+		var rs struct {
+			R, S *big.Int
+		}
+		if _, err := asn1.Unmarshal(signed.Signature, &rs); err != nil {
+			return fmt.Errorf("Failed to unmarshall ECDSA signature")
+		}
+		if !ecdsa.Verify(pubkey, hash[:], rs.R, rs.S) {
+			return errors.New("ECDSA signature validation failed")
+		}
+		return nil
+	default:
+		return fmt.Errorf("Unknown public key type %T", c.pubkey)
+	}
+
+}
+
+func (c *LogClient) verifySTH(sth *ct.SignedTreeHead) error {
+	if c.pubkey == nil {
+		// Can't verify signatures without the public key.
+		return nil
+	}
+
+	// RFC 6962 s3.5 specifies that the signature is over the following 50 bytes:
+	//  [0]     : 1-byte version = v1(0)
+	//  [1]     : 1-byte signature_type = tree_hash
+	//  [2:10]  : 8-byte timestamp
+	//  [10:18] : 8-byte tree size
+	//  [18:50] : 32-byte root hash
+	data := make([]byte, 50)
+	data[0] = byte(sth.Version)
+	data[1] = byte(ct.TreeHashSignatureType)
+	binary.BigEndian.PutUint64(data[2:], sth.Timestamp)
+	binary.BigEndian.PutUint64(data[10:], sth.TreeSize)
+	copy(data[18:], sth.SHA256RootHash[:])
+
+	return c.verifySignature(data, sth.TreeHeadSignature)
 }
 
 // GetSTHConsistency retrieves the consistency proof between two snapshots.
