@@ -246,7 +246,7 @@ func backoffForRetry(ctx context.Context, d time.Duration) error {
 // Attempts to add |chain| to the log, using the api end-point specified by
 // |path|. If provided context expires before submission is complete an
 // error will be returned.
-func (c *LogClient) addChainWithRetry(ctx context.Context, path string, chain []ct.ASN1Cert) (*ct.SignedCertificateTimestamp, error) {
+func (c *LogClient) addChainWithRetry(ctx context.Context, ctype ct.LogEntryType, path string, chain []ct.ASN1Cert) (*ct.SignedCertificateTimestamp, error) {
 	var resp addChainResponse
 	var req addChainRequest
 	for _, link := range chain {
@@ -294,30 +294,36 @@ func (c *LogClient) addChainWithRetry(ctx context.Context, path string, chain []
 	if err != nil {
 		return nil, err
 	}
+
 	var logID ct.SHA256Hash
 	copy(logID[:], resp.ID)
-	return &ct.SignedCertificateTimestamp{
+	sct := &ct.SignedCertificateTimestamp{
 		SCTVersion: resp.SCTVersion,
 		LogID:      logID,
 		Timestamp:  resp.Timestamp,
 		Extensions: ct.CTExtensions(resp.Extensions),
-		Signature:  *ds}, nil
+		Signature:  *ds}
+	err = c.verifySCT(sct, ctype, chain[0])
+	if err != nil {
+		return nil, err
+	}
+	return sct, nil
 }
 
 // AddChain adds the (DER represented) X509 |chain| to the log.
 func (c *LogClient) AddChain(chain []ct.ASN1Cert) (*ct.SignedCertificateTimestamp, error) {
-	return c.addChainWithRetry(nil, AddChainPath, chain)
+	return c.addChainWithRetry(nil, ct.X509LogEntryType, AddChainPath, chain)
 }
 
 // AddPreChain adds the (DER represented) Precertificate |chain| to the log.
 func (c *LogClient) AddPreChain(chain []ct.ASN1Cert) (*ct.SignedCertificateTimestamp, error) {
-	return c.addChainWithRetry(nil, AddPreChainPath, chain)
+	return c.addChainWithRetry(nil, ct.PrecertLogEntryType, AddPreChainPath, chain)
 }
 
 // AddChainWithContext adds the (DER represented) X509 |chain| to the log and
 // fails if the provided context expires before the chain is submitted.
 func (c *LogClient) AddChainWithContext(ctx context.Context, chain []ct.ASN1Cert) (*ct.SignedCertificateTimestamp, error) {
-	return c.addChainWithRetry(ctx, AddChainPath, chain)
+	return c.addChainWithRetry(ctx, ct.X509LogEntryType, AddChainPath, chain)
 }
 
 // AddJSON submits arbitrary data to to XJSON server.
@@ -429,6 +435,58 @@ func (c *LogClient) verifySTH(sth *ct.SignedTreeHead) error {
 	copy(data[18:], sth.SHA256RootHash[:])
 
 	return c.verifySignature(data, sth.TreeHeadSignature)
+}
+
+func (c *LogClient) verifySCT(sct *ct.SignedCertificateTimestamp, ctype ct.LogEntryType, certData ct.ASN1Cert) error {
+	if c.pubkey == nil {
+		// Can't verify signatures without the public key.
+		return nil
+	}
+
+	// RFC 6962 s3.2 specifies that the signature is over the following data:
+	//   [0]    : 1-byte version = v1(0)
+	//   [1]    : 1-byte signature_type = certificate_timestamp
+	//   [2:10] : 8-byte timestamp
+	//   [10:12]: 2-byte entry_type (0=cert, 1=precert)
+	//   [12:x] : [pre-]certificate data
+	//   [x+2:] : 0-65535 bytes of extension data
+	// where the certificate data is either:
+	//  - normal cert: the DER-encoded leaf certificate from the request, preceded by 3-byte length
+	//  - pre-cert: inner data
+	//       [0:32]  : SHA-256 hash of cert issuer's public key
+	//       [32:y]  : the DER-encoded TBSCertificate within the precert from the request
+
+	data := make([]byte, 12+3+len(certData)+2+len(sct.Extensions))
+	data[0] = byte(sct.SCTVersion)
+	data[1] = byte(ct.CertificateTimestampSignatureType)
+	binary.BigEndian.PutUint64(data[2:], sct.Timestamp)
+	binary.BigEndian.PutUint16(data[10:], uint16(ctype))
+	offset := 12
+
+	switch ctype {
+	case ct.X509LogEntryType:
+		// Want a 3-byte length, so encode into 4 bytes and skip.
+		len4 := make([]byte, 4)
+		binary.BigEndian.PutUint32(len4, uint32(len(certData)))
+		if len4[0] != 0 {
+			return fmt.Errorf("Certificate data too long, %d", len(certData))
+		}
+		copy(data[offset:], len4[1:])
+		offset += 3
+		copy(data[offset:], certData)
+		offset += len(certData)
+	case ct.PrecertLogEntryType:
+		// TODO(drysdale): cope with pre-certificates
+		return nil
+	default:
+		return fmt.Errorf("Unexpected log entry type %v", ctype)
+	}
+
+	binary.BigEndian.PutUint16(data[offset:], uint16(len(sct.Extensions)))
+	offset += 2
+	copy(data[offset:], sct.Extensions)
+
+	return c.verifySignature(data, sct.Signature)
 }
 
 // GetSTHConsistency retrieves the consistency proof between two snapshots.
