@@ -1,4 +1,19 @@
 #!/bin/bash
+#
+# This script deletes & re-creates the etcd VMs, one-by-one waiting for each
+# updated node to boot and become healthy before moving on to the next.
+#
+# It's intended to be used to update the software running on the etcd nodes,
+# but can also be useful in situations where the etcd node(s) are unable to
+# boot/function properly (e.g. if their root disks fill up.)
+#
+# The persistent disks are left intact, and are attached to the updated
+# VM instances.
+#
+# The expected outcome from running this script is that the etcd cluster
+# updates to the newest project etcd image, and the data within etcd remains
+# intact.
+
 # TODO(alcutter): Factor out common code with update_mirror_vm_image.sh script
 DIR=$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )
 if [ "$1" == "" ]; then
