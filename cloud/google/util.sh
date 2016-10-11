@@ -36,7 +36,8 @@ function WaitHttpStatus() {
   ZONE=${2}
   HTTP_PATH=${3}
   WANTED_STATUS=${4:-200}
-  URL=${INSTANCE}:80${HTTP_PATH}
+  PORT=${5:-80}
+  URL=${INSTANCE}:${PORT}${HTTP_PATH}
   echo "Waiting for HTTP ${WANTED_STATUS} from ${URL} "
   ${GCLOUD} compute ssh ${INSTANCE} \
     --zone ${ZONE} \
