@@ -5,28 +5,19 @@ package client
 
 import (
 	"bytes"
-	"crypto"
-	"crypto/ecdsa"
-	"crypto/elliptic"
-	"crypto/rsa"
 	"crypto/sha256"
 	"encoding/base64"
-	"encoding/binary"
 	"encoding/json"
-	"encoding/pem"
 	"errors"
 	"fmt"
 	"io/ioutil"
 	"log"
-	"math/big"
 	"net/http"
 	"net/url"
 	"strconv"
 	"time"
 
 	ct "github.com/google/certificate-transparency/go"
-	"github.com/google/certificate-transparency/go/asn1"
-	"github.com/google/certificate-transparency/go/x509"
 	"golang.org/x/net/context"
 )
 
@@ -43,9 +34,9 @@ const (
 
 // LogClient represents a client for a given CT Log instance
 type LogClient struct {
-	uri        string           // the base URI of the log. e.g. http://ct.googleapis/pilot
-	httpClient *http.Client     // used to interact with the log via HTTP
-	pubkey     crypto.PublicKey // public key for log if available; normally ecdsa.PublicKey
+	uri        string                // the base URI of the log. e.g. http://ct.googleapis/pilot
+	httpClient *http.Client          // used to interact with the log via HTTP
+	verifier   *ct.SignatureVerifier // nil if no public key for log available
 }
 
 //////////////////////////////////////////////////////////////////////////////////
@@ -128,40 +119,23 @@ func New(uri string, hc *http.Client) *LogClient {
 // key information for the log; this instance will check signatures on
 // responses from the log.
 func NewWithPubKey(uri string, hc *http.Client, pemEncodedKey string) (*LogClient, error) {
-	publicBlock, rest := pem.Decode([]byte(pemEncodedKey))
-
-	if publicBlock == nil {
-		return nil, errors.New("could not decode PEM for public key")
+	pubkey, _, rest, err := ct.PublicKeyFromPEM([]byte(pemEncodedKey))
+	if err != nil {
+		return nil, err
 	}
 	if len(rest) > 0 {
 		return nil, errors.New("extra data found after PEM key decoded")
 	}
 
-	pubkey, err := x509.ParsePKIXPublicKey(publicBlock.Bytes)
+	verifier, err := ct.NewSignatureVerifier(pubkey)
 	if err != nil {
-		return nil, errors.New("unable to parse public key")
-	}
-
-	switch pubkey := pubkey.(type) {
-	case *rsa.PublicKey:
-		// RFC 6962 s2.1.4 requires >= 2048 bits.
-		if pubkey.N.BitLen() < 2048 {
-			return nil, fmt.Errorf("RSA key too short, %d bits", pubkey.N.BitLen())
-		}
-	case *ecdsa.PublicKey:
-		// RFC 6962 s2.1.4 only allows the NIST P-256 curve.
-		curve := pubkey.Params().Name
-		if curve != elliptic.P256().Params().Name {
-			return nil, fmt.Errorf("Unexpected ECDSA curve %v", curve)
-		}
-	default:
-		return nil, fmt.Errorf("Unknown public key type %T", pubkey)
+		return nil, err
 	}
 
 	if hc == nil {
 		hc = new(http.Client)
 	}
-	return &LogClient{uri: uri, httpClient: hc, pubkey: pubkey}, nil
+	return &LogClient{uri: uri, httpClient: hc, verifier: verifier}, nil
 }
 
 // Makes a HTTP call to |uri|, and attempts to parse the response as a
@@ -303,7 +277,7 @@ func (c *LogClient) addChainWithRetry(ctx context.Context, ctype ct.LogEntryType
 		Timestamp:  resp.Timestamp,
 		Extensions: ct.CTExtensions(resp.Extensions),
 		Signature:  *ds}
-	err = c.verifySCT(sct, ctype, chain[0])
+	err = c.VerifySCTSignature(*sct, ctype, chain)
 	if err != nil {
 		return nil, err
 	}
@@ -372,121 +346,48 @@ func (c *LogClient) GetSTH() (sth *ct.SignedTreeHead, err error) {
 		return nil, err
 	}
 	sth.TreeHeadSignature = *ds
-	err = c.verifySTH(sth)
+	err = c.VerifySTHSignature(*sth)
 	if err != nil {
 		return nil, err
 	}
 	return
 }
 
-func (c *LogClient) verifySignature(data []byte, signed ct.DigitallySigned) error {
-	// Only support SHA-256 for the hash function.
-	if signed.HashAlgorithm != ct.SHA256 {
-		return fmt.Errorf("Unexpected hash algorithm %v", signed.HashAlgorithm)
-	}
-	hash := sha256.Sum256(data)
-
-	switch pubkey := c.pubkey.(type) {
-	case *rsa.PublicKey:
-		if signed.SignatureAlgorithm != ct.RSA {
-			return fmt.Errorf("Unexpected signature algorithm %v", signed.SignatureAlgorithm)
-		}
-		if err := rsa.VerifyPKCS1v15(pubkey, crypto.SHA256, hash[:], signed.Signature); err != nil {
-			return fmt.Errorf("RSA signature validation failed %v", err.Error())
-		}
+// VerifySTHSignature checks the signature in sth, returning any error encountered or nil if verification is
+// successful.
+func (c *LogClient) VerifySTHSignature(sth ct.SignedTreeHead) error {
+	if c.verifier == nil {
+		// Can't verify signatures without a verifier
 		return nil
-	case *ecdsa.PublicKey:
-		if signed.SignatureAlgorithm != ct.ECDSA {
-			return fmt.Errorf("Unexpected signature algorithm %v", signed.SignatureAlgorithm)
-		}
-		var rs struct {
-			R, S *big.Int
-		}
-		if _, err := asn1.Unmarshal(signed.Signature, &rs); err != nil {
-			return fmt.Errorf("Failed to unmarshall ECDSA signature")
-		}
-		if !ecdsa.Verify(pubkey, hash[:], rs.R, rs.S) {
-			return errors.New("ECDSA signature validation failed")
-		}
-		return nil
-	default:
-		return fmt.Errorf("Unknown public key type %T", c.pubkey)
 	}
-
+	return c.verifier.VerifySTHSignature(sth)
 }
 
-func (c *LogClient) verifySTH(sth *ct.SignedTreeHead) error {
-	if c.pubkey == nil {
-		// Can't verify signatures without the public key.
+// VerifySCTSignature checks the signature in sct for the given LogEntryType, with associated certificate chain.
+func (c *LogClient) VerifySCTSignature(sct ct.SignedCertificateTimestamp, ctype ct.LogEntryType, certData []ct.ASN1Cert) error {
+	if c.verifier == nil {
+		// Can't verify signatures without a verifier
 		return nil
 	}
 
-	// RFC 6962 s3.5 specifies that the signature is over the following 50 bytes:
-	//  [0]     : 1-byte version = v1(0)
-	//  [1]     : 1-byte signature_type = tree_hash
-	//  [2:10]  : 8-byte timestamp
-	//  [10:18] : 8-byte tree size
-	//  [18:50] : 32-byte root hash
-	data := make([]byte, 50)
-	data[0] = byte(sth.Version)
-	data[1] = byte(ct.TreeHashSignatureType)
-	binary.BigEndian.PutUint64(data[2:], sth.Timestamp)
-	binary.BigEndian.PutUint64(data[10:], sth.TreeSize)
-	copy(data[18:], sth.SHA256RootHash[:])
-
-	return c.verifySignature(data, sth.TreeHeadSignature)
-}
-
-func (c *LogClient) verifySCT(sct *ct.SignedCertificateTimestamp, ctype ct.LogEntryType, certData ct.ASN1Cert) error {
-	if c.pubkey == nil {
-		// Can't verify signatures without the public key.
-		return nil
+	if ctype == ct.PrecertLogEntryType {
+		// TODO(drysdale): cope with pre-certs, which need to have the
+		// following fields set:
+		//    leaf.PrecertEntry.TBSCertificate
+		//    leaf.PrecertEntry.IssuerKeyHash  (SHA-256 of issuer's public key)
+		return errors.New("SCT verification for pre-certificates unimplemented")
 	}
-
-	// RFC 6962 s3.2 specifies that the signature is over the following data:
-	//   [0]    : 1-byte version = v1(0)
-	//   [1]    : 1-byte signature_type = certificate_timestamp
-	//   [2:10] : 8-byte timestamp
-	//   [10:12]: 2-byte entry_type (0=cert, 1=precert)
-	//   [12:x] : [pre-]certificate data
-	//   [x+2:] : 0-65535 bytes of extension data
-	// where the certificate data is either:
-	//  - normal cert: the DER-encoded leaf certificate from the request, preceded by 3-byte length
-	//  - pre-cert: inner data
-	//       [0:32]  : SHA-256 hash of cert issuer's public key
-	//       [32:y]  : the DER-encoded TBSCertificate within the precert from the request
-
-	data := make([]byte, 12+3+len(certData)+2+len(sct.Extensions))
-	data[0] = byte(sct.SCTVersion)
-	data[1] = byte(ct.CertificateTimestampSignatureType)
-	binary.BigEndian.PutUint64(data[2:], sct.Timestamp)
-	binary.BigEndian.PutUint16(data[10:], uint16(ctype))
-	offset := 12
-
-	switch ctype {
-	case ct.X509LogEntryType:
-		// Want a 3-byte length, so encode into 4 bytes and skip.
-		len4 := make([]byte, 4)
-		binary.BigEndian.PutUint32(len4, uint32(len(certData)))
-		if len4[0] != 0 {
-			return fmt.Errorf("Certificate data too long, %d", len(certData))
-		}
-		copy(data[offset:], len4[1:])
-		offset += 3
-		copy(data[offset:], certData)
-		offset += len(certData)
-	case ct.PrecertLogEntryType:
-		// TODO(drysdale): cope with pre-certificates
-		return nil
-	default:
-		return fmt.Errorf("Unexpected log entry type %v", ctype)
-	}
-
-	binary.BigEndian.PutUint16(data[offset:], uint16(len(sct.Extensions)))
-	offset += 2
-	copy(data[offset:], sct.Extensions)
-
-	return c.verifySignature(data, sct.Signature)
+	// Build enough of a Merkle tree leaf for the verifier to work on.
+	leaf := ct.MerkleTreeLeaf{
+		Version:  sct.SCTVersion,
+		LeafType: ct.TimestampedEntryLeafType,
+		TimestampedEntry: ct.TimestampedEntry{
+			Timestamp:  sct.Timestamp,
+			EntryType:  ctype,
+			X509Entry:  certData[0],
+			Extensions: sct.Extensions}}
+	entry := ct.LogEntry{Leaf: leaf}
+	return c.verifier.VerifySCTSignature(sct, entry)
 }
 
 // GetSTHConsistency retrieves the consistency proof between two snapshots.

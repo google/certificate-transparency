@@ -7,6 +7,7 @@ import (
 	"io/ioutil"
 	"log"
 	"net/http"
+	"os"
 	"time"
 
 	ct "github.com/google/certificate-transparency/go"
@@ -69,6 +70,15 @@ func addChain(logClient *client.LogClient) {
 	fmt.Printf("%v\n", signatureToString(&sct.Signature))
 }
 
+func dieWithUsage(msg string) {
+	fmt.Fprintf(os.Stderr, msg)
+	fmt.Fprintf(os.Stderr, "Usage: ctclient [options] <cmd>\n"+
+		"where cmd is one of:\n"+
+		"   sth       retrieve signed tree head\n"+
+		"   upload    upload cert chain and show SCT (requires -cert_chain)\n")
+	os.Exit(1)
+}
+
 func main() {
 	flag.Parse()
 	httpClient := &http.Client{
@@ -94,7 +104,7 @@ func main() {
 	}
 	args := flag.Args()
 	if len(args) != 1 {
-		log.Fatal("Need command argument")
+		dieWithUsage("Need command argument")
 	}
 	cmd := args[0]
 	switch cmd {
@@ -103,6 +113,6 @@ func main() {
 	case "upload":
 		addChain(logClient)
 	default:
-		log.Fatalf("Unknown command '%s'", cmd)
+		dieWithUsage(fmt.Sprintf("Unknown command '%s'", cmd))
 	}
 }
