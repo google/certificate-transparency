@@ -15,3 +15,6 @@ brew upgrade go
 for i in homebrew/dupes/tcl-tk ant; do
 	brew install $i
 done
+
+# Python tests rely on Twisted's trial script being in the path
+export PATH=$PATH:${HOME}/Library/Python/2.7/bin
