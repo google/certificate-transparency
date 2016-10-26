@@ -227,14 +227,14 @@ func (c *LogClient) addChainWithRetry(ctx context.Context, ctype ct.LogEntryType
 		req.Chain = append(req.Chain, link)
 	}
 	httpStatus := "Unknown"
+	// Retry after 1s, 2s, 4s, 8s, 16s, 32s, 64s, 128s, 128s, ....
+	maxInterval := 128.0
 	backoffInterval := 1.0
 	backoffSeconds := 0
-	// Retry after 1s, 2s, 4s, 8s, 16s, 32s, 64s
-	retries := 7
 loop:
-	for ; retries > 0; retries-- {
+	for {
 		if backoffSeconds > 0 {
-			log.Printf("Got %s, backing-off %d seconds, %d retries left", httpStatus, backoffSeconds, retries)
+			log.Printf("Got %s, backing-off %d seconds", httpStatus, backoffSeconds)
 		}
 		err := backoffForRetry(ctx, time.Second*time.Duration(backoffSeconds))
 		if err != nil {
@@ -246,7 +246,9 @@ loop:
 		httpResp, _, err := c.postAndParse(c.uri+path, &req, &resp)
 		if err != nil {
 			backoffSeconds = int(backoffInterval)
-			backoffInterval *= 2.0
+			if backoffInterval < maxInterval {
+				backoffInterval *= 2.0
+			}
 			continue
 		}
 		switch {
@@ -257,7 +259,9 @@ loop:
 		case httpResp.StatusCode == 503:
 			// Retry
 			backoffSeconds = int(backoffInterval)
-			backoffInterval *= 2.0
+			if backoffInterval < maxInterval {
+				backoffInterval *= 2.0
+			}
 			if retryAfter := httpResp.Header.Get("Retry-After"); retryAfter != "" {
 				if seconds, err := strconv.Atoi(retryAfter); err == nil {
 					backoffSeconds = seconds
@@ -267,9 +271,6 @@ loop:
 			return nil, fmt.Errorf("got HTTP Status %s", httpResp.Status)
 		}
 		httpStatus = httpResp.Status
-	}
-	if retries == 0 {
-		return nil, fmt.Errorf("repeated failures, last HTTP Status %s", httpStatus)
 	}
 
 	ds, err := ct.UnmarshalDigitallySigned(bytes.NewReader(resp.Signature))

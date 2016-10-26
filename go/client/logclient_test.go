@@ -215,8 +215,7 @@ func TestAddChainWithContext(t *testing.T) {
 		{6, fiveSeconds, 5, 1, true},
 		{5, fiveSeconds, 10, 1, false},
 		{10, fiveSeconds, 1, 5, true},
-		{1, instant * 6, 0, 6, true},
-		{1, instant * 8, 0, 8, false},
+		{1, instant * 10, 0, 10, true},
 	}
 
 	for i, tc := range testCases {
