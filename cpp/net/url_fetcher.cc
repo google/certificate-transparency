@@ -209,7 +209,8 @@ void State::RequestDone(evhtp_request_t* req) {
     return;
   }
 
-  response_->status_code = req->status;
+  // Use evhtp_request_status, as req->status is not set correctly. Related to https://github.com/ellzey/libevhtp/issues/78
+  response_->status_code = evhtp_request_status(req);
   if (response_->status_code < 100) {
     util::Status status;
     switch (response_->status_code) {
