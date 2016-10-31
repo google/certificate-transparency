@@ -32,6 +32,7 @@ using cert_trans::EtcdConsistentStore;
 using cert_trans::LoggedEntry;
 using cert_trans::MasterElection;
 using cert_trans::ReadPrivateKey;
+using cert_trans::ReadEnginePrivateKey;
 using cert_trans::SQLiteDB;
 using cert_trans::SplitHosts;
 using cert_trans::StrictConsistentStore;
@@ -56,7 +57,7 @@ DEFINE_string(cluster_config, "",
 DEFINE_string(etcd_servers, "",
               "Comma separated list of 'hostname:port' of the etcd server(s)");
 DEFINE_string(key, "", "PEM-encoded server private key file");
-
+DEFINE_string(engine, "", "OpenSSL engine to initialize and use");
 
 namespace {
 
@@ -78,7 +79,12 @@ void Usage() {
 
 unique_ptr<LogSigner> BuildLogSigner() {
   CHECK(!FLAGS_key.empty());
-  util::StatusOr<EVP_PKEY*> pkey(ReadPrivateKey(FLAGS_key));
+  util::StatusOr<EVP_PKEY*> pkey = NULL;
+  if (FLAGS_engine == "") {
+    pkey = ReadPrivateKey(FLAGS_key);
+  } else {
+    pkey = ReadEnginePrivateKey(FLAGS_key, FLAGS_engine);
+  }
   CHECK_EQ(pkey.status(), util::Status::OK);
   return unique_ptr<LogSigner>(new LogSigner(pkey.ValueOrDie()));
 }

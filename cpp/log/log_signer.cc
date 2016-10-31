@@ -125,6 +125,7 @@ LogSigner::SignResult LogSigner::SignV1TreeHead(uint64_t timestamp,
                                                 int64_t tree_size,
                                                 const string& root_hash,
                                                 string* result) const {
+  LOG(INFO) << "Starting SignV1TreeHead for size: " << tree_size << std::endl;
   CHECK_GE(tree_size, 0);
   string serialized_sth;
   SerializeResult res =
@@ -142,6 +143,7 @@ LogSigner::SignResult LogSigner::SignV1TreeHead(uint64_t timestamp,
 }
 
 LogSigner::SignResult LogSigner::SignTreeHead(SignedTreeHead* sth) const {
+  LOG(INFO) << "Starting SignTreeHead for size: " << sth->tree_size() << std::endl;
   string serialized_sth;
   SerializeResult res =
       Serializer::SerializeSTHSignatureInput(*sth, &serialized_sth);

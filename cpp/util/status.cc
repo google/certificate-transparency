@@ -111,6 +111,8 @@ string ErrorCodeString(util::error::Code error) {
       return "UNAVAILABLE";
     case util::error::DATA_LOSS:
       return "DATA_LOSS";
+    case util::error::ENGINE_INIT_FAILED:
+      return "ENGINE_INIT_FAILED";
   }
   // Avoid using a "default" in the switch, so that the compiler can
   // give us a warning, but still provide a fallback here.

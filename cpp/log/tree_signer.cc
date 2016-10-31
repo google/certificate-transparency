@@ -6,6 +6,7 @@
 #include <chrono>
 #include <set>
 #include <unordered_map>
+#include <iostream>
 
 #include "log/database.h"
 #include "log/log_signer.h"
@@ -314,9 +315,11 @@ void TreeSigner::TimestampAndSign(uint64_t min_timestamp,
   sth->set_timestamp(timestamp);
   sth->set_tree_size(cert_tree_->LeafCount());
   LogSigner::SignResult ret = signer_->SignTreeHead(sth);
-  if (ret != LogSigner::OK)
+  if (ret != LogSigner::OK) {
+    std::cout << "Log Signer Error" << std::endl;
     // Make this one a hard fail. There is really no excuse for it.
     abort();
+  }
 }
 
 

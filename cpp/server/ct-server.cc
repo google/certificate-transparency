@@ -7,6 +7,10 @@
 #include <unistd.h>
 #include <iostream>
 #include <string>
+#include <execinfo.h>
+#include <signal.h>
+#include <stdlib.h>
+#include <unistd.h>
 
 #include "config.h"
 #include "log/cert_checker.h"
@@ -42,6 +46,7 @@ DEFINE_double(guard_window_seconds, 60,
               "number of seconds will not be sequenced.");
 DEFINE_int32(num_http_server_threads, 16,
              "Number of threads for servicing the incoming HTTP requests.");
+DEFINE_string(engine, "", "OpenSSL engine to initialize and use");
 
 namespace libevent = cert_trans::libevent;
 
@@ -55,6 +60,7 @@ using cert_trans::EtcdClient;
 using cert_trans::EtcdConsistentStore;
 using cert_trans::LoggedEntry;
 using cert_trans::ReadPrivateKey;
+using cert_trans::ReadEnginePrivateKey;
 using cert_trans::SequenceEntries;
 using cert_trans::Server;
 using cert_trans::SignMerkleTree;
@@ -92,6 +98,18 @@ static const bool cert_dummy =
 
 }  // namespace
 
+void handler(int sig) {
+  void *array[90];
+  size_t size;
+
+  // get void*'s for all entries on the stack
+  size = backtrace(array, 90);
+
+  // print out all the frames to stderr
+  fprintf(stderr, "Error: signal %d:\n", sig);
+  backtrace_symbols_fd(array, size, STDERR_FILENO);
+  exit(1);
+}
 
 int main(int argc, char* argv[]) {
   // Ignore various signals whilst we start up.
@@ -99,12 +117,20 @@ int main(int argc, char* argv[]) {
   signal(SIGINT, SIG_IGN);
   signal(SIGTERM, SIG_IGN);
 
+  signal(SIGSEGV, handler);
+  signal(SIGABRT, handler);
+
   ConfigureSerializerForV1CT();
   util::InitCT(&argc, &argv);
 
   Server::StaticInit();
 
-  util::StatusOr<EVP_PKEY*> pkey(ReadPrivateKey(FLAGS_key));
+  util::StatusOr<EVP_PKEY*> pkey = NULL;
+  if (FLAGS_engine == "") {
+    pkey = ReadPrivateKey(FLAGS_key);
+  } else {
+    pkey = ReadEnginePrivateKey(FLAGS_key, FLAGS_engine);
+  }
   CHECK_EQ(pkey.status(), util::Status::OK);
   LogSigner log_signer(pkey.ValueOrDie());
 
