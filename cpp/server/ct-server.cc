@@ -42,6 +42,7 @@ DEFINE_double(guard_window_seconds, 60,
               "number of seconds will not be sequenced.");
 DEFINE_int32(num_http_server_threads, 16,
              "Number of threads for servicing the incoming HTTP requests.");
+DEFINE_bool(synchronize_signing, false, "true if signing should be synchronized");
 
 namespace libevent = cert_trans::libevent;
 
@@ -106,7 +107,7 @@ int main(int argc, char* argv[]) {
 
   util::StatusOr<EVP_PKEY*> pkey(ReadPrivateKey(FLAGS_key));
   CHECK_EQ(pkey.status(), util::Status::OK);
-  LogSigner log_signer(pkey.ValueOrDie());
+  LogSigner log_signer(pkey.ValueOrDie(), FLAGS_synchronize_signing);
 
   CertChecker checker;
   CHECK(checker.LoadTrustedCertificates(FLAGS_trusted_cert_file))

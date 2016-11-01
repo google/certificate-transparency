@@ -15,7 +15,7 @@ namespace cert_trans {
 
 class Signer {
  public:
-  explicit Signer(EVP_PKEY* pkey);
+  explicit Signer(EVP_PKEY* pkey, bool synchronize_signing = false);
   virtual ~Signer() = default;
 
   virtual std::string KeyID() const;
@@ -34,6 +34,7 @@ class Signer {
   ct::DigitallySigned::HashAlgorithm hash_algo_;
   ct::DigitallySigned::SignatureAlgorithm sig_algo_;
   std::string key_id_;
+  bool synchronize_signing_;
 
   DISALLOW_COPY_AND_ASSIGN(Signer);
 };

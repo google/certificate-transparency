@@ -5,6 +5,7 @@
 #include <openssl/evp.h>
 #include <openssl/opensslv.h>
 #include <stdint.h>
+#include <mutex>
 
 #include "log/verifier.h"
 #include "proto/ct.pb.h"
@@ -18,7 +19,9 @@ using cert_trans::Verifier;
 
 namespace cert_trans {
 
-Signer::Signer(EVP_PKEY* pkey) : pkey_(CHECK_NOTNULL(pkey)) {
+std::mutex lock_;
+
+Signer::Signer(EVP_PKEY* pkey, bool synchronize_signing) : pkey_(CHECK_NOTNULL(pkey)) {
   switch (pkey_->type) {
     case EVP_PKEY_EC:
       hash_algo_ = ct::DigitallySigned::SHA256;
@@ -32,6 +35,7 @@ Signer::Signer(EVP_PKEY* pkey) : pkey_(CHECK_NOTNULL(pkey)) {
       LOG(FATAL) << "Unsupported key type " << pkey_->type;
   }
   key_id_ = Verifier::ComputeKeyID(pkey_.get());
+  synchronize_signing_ = synchronize_signing;
 }
 
 std::string Signer::KeyID() const {
@@ -59,7 +63,12 @@ std::string Signer::RawSign(const std::string& data) const {
   unsigned int sig_size = EVP_PKEY_size(pkey_.get());
   unsigned char* sig = new unsigned char[sig_size];
 
-  CHECK_EQ(1, EVP_SignFinal(&ctx, sig, &sig_size, pkey_.get()));
+  if (synchronize_signing_) {
+    std::lock_guard<std::mutex> lock(lock_);
+    CHECK_EQ(1, EVP_SignFinal(&ctx, sig, &sig_size, pkey_.get()));
+  } else {
+    CHECK_EQ(1, EVP_SignFinal(&ctx, sig, &sig_size, pkey_.get()));
+  }
 
   EVP_MD_CTX_cleanup(&ctx);
   std::string ret(reinterpret_cast<char*>(sig), sig_size);
