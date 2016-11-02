@@ -37,6 +37,7 @@ type LogClient struct {
 	uri        string                // the base URI of the log. e.g. http://ct.googleapis/pilot
 	httpClient *http.Client          // used to interact with the log via HTTP
 	verifier   *ct.SignatureVerifier // nil if no public key for log available
+	logger     Logger
 }
 
 //////////////////////////////////////////////////////////////////////////////////
@@ -104,15 +105,29 @@ type GetProofByHashResponse struct {
 	AuditPath [][]byte `json:"audit_path"` // An array of base64-encoded Merkle Tree nodes proving the inclusion of the chosen certificate.
 }
 
+// Logger ...
+type Logger interface {
+	Info(string, ...interface{})
+}
+
+type basicLogger struct{}
+
+func (bl *basicLogger) Info(msg string, args ...interface{}) {
+	log.Printf(msg, args...)
+}
+
 // New constructs a new LogClient instance.
 // |uri| is the base URI of the CT log instance to interact with, e.g.
 // http://ct.googleapis.com/pilot
 // |hc| is the underlying client to be used for HTTP requests to the CT log.
-func New(uri string, hc *http.Client) *LogClient {
+func New(uri string, hc *http.Client, logger Logger) *LogClient {
 	if hc == nil {
 		hc = new(http.Client)
 	}
-	return &LogClient{uri: uri, httpClient: hc}
+	if logger == nil {
+		logger = &basicLogger{}
+	}
+	return &LogClient{uri: uri, httpClient: hc, logger: logger}
 }
 
 // NewWithPubKey constructs a new LogClient instance that includes public
@@ -227,20 +242,18 @@ func (c *LogClient) addChainWithRetry(ctx context.Context, ctype ct.LogEntryType
 		req.Chain = append(req.Chain, link)
 	}
 	httpStatus := "Unknown"
-	// Retry after 1s, 2s, 4s, 8s, 16s, 32s, 64s, 128s, 128s, ....
+	// Retry after 1s, 2s, 4s, 8s, 16s, 32s, 64s, 128s, 128s
 	maxInterval := 128.0
 	backoffInterval := 1.0
 	backoffSeconds := 0
 loop:
 	for {
 		if backoffSeconds > 0 {
-			log.Printf("Got %s, backing-off %d seconds", httpStatus, backoffSeconds)
-		}
-		err := backoffForRetry(ctx, time.Second*time.Duration(backoffSeconds))
-		if err != nil {
-			return nil, err
-		}
-		if backoffSeconds > 0 {
+			c.logger.Info("Request failed, got status %s, backing-off for %d seconds", httpStatus, backoffSeconds)
+			err := backoffForRetry(ctx, time.Second*time.Duration(backoffSeconds))
+			if err != nil {
+				return nil, err
+			}
 			backoffSeconds = 0
 		}
 		httpResp, _, err := c.postAndParse(c.uri+path, &req, &resp)
@@ -251,26 +264,28 @@ loop:
 			}
 			continue
 		}
+		httpStatus = httpResp.Status
 		switch {
-		case httpResp.StatusCode == 200:
+		case httpResp.StatusCode == http.StatusOK:
 			break loop
-		case httpResp.StatusCode == 408:
+		case httpResp.StatusCode == http.StatusRequestTimeout:
 			// request timeout, retry immediately
-		case httpResp.StatusCode == 503:
-			// Retry
-			backoffSeconds = int(backoffInterval)
-			if backoffInterval < maxInterval {
-				backoffInterval *= 2.0
-			}
+			c.logger.Info("Request timed out, retrying immediately")
+		case httpResp.StatusCode == http.StatusServiceUnavailable:
+			// retry after back-off
 			if retryAfter := httpResp.Header.Get("Retry-After"); retryAfter != "" {
 				if seconds, err := strconv.Atoi(retryAfter); err == nil {
 					backoffSeconds = seconds
+				}
+			} else {
+				backoffSeconds = int(backoffInterval)
+				if backoffInterval < maxInterval {
+					backoffInterval *= 2.0
 				}
 			}
 		default:
 			return nil, fmt.Errorf("got HTTP Status %s", httpResp.Status)
 		}
-		httpStatus = httpResp.Status
 	}
 
 	ds, err := ct.UnmarshalDigitallySigned(bytes.NewReader(resp.Signature))
