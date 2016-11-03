@@ -2,6 +2,8 @@ package org.certificatetransparency.ctlog;
 
 import org.certificatetransparency.ctlog.serialization.CryptoDataLoader;
 
+import com.google.common.io.BaseEncoding;
+
 import java.io.File;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
@@ -47,11 +49,20 @@ public class LogInfo {
     try {
       MessageDigest sha256 = MessageDigest.getInstance("SHA-256");
       sha256.update(logKey.getEncoded());
-      return sha256.digest();
+      final byte[] sha256result = sha256.digest();
+      System.out.println("SHA256 of key:" + bytesToHex(sha256result));
+      return sha256result;
 
     } catch (NoSuchAlgorithmException e) {
       throw new UnsupportedCryptoPrimitiveException("Missing SHA-256", e);
     }
+  }
+
+  /**
+   * Convert bytes to string of upper case hex digits.
+   */
+  public static String bytesToHex(byte[] bytes) {
+    return BaseEncoding.base16().encode(bytes);
   }
 
   /**

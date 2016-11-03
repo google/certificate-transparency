@@ -6,19 +6,6 @@ import static org.certificatetransparency.ctlog.serialization.CTConstants.MAX_EX
 import static org.certificatetransparency.ctlog.serialization.CTConstants.TIMESTAMP_LENGTH;
 import static org.certificatetransparency.ctlog.serialization.CTConstants.VERSION_LENGTH;
 
-import com.google.common.base.Preconditions;
-
-import org.bouncycastle.asn1.ASN1InputStream;
-import org.bouncycastle.asn1.ASN1ObjectIdentifier;
-import org.bouncycastle.asn1.x500.X500Name;
-import org.bouncycastle.asn1.x509.Extension;
-import org.bouncycastle.asn1.x509.Extensions;
-import org.bouncycastle.asn1.x509.TBSCertificate;
-import org.bouncycastle.asn1.x509.V3TBSCertificateGenerator;
-import org.certificatetransparency.ctlog.proto.Ct;
-import org.certificatetransparency.ctlog.serialization.CTConstants;
-import org.certificatetransparency.ctlog.serialization.Serializer;
-
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.security.InvalidKeyException;
@@ -34,6 +21,19 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Iterator;
 import java.util.List;
+
+import org.bouncycastle.asn1.ASN1InputStream;
+import org.bouncycastle.asn1.ASN1ObjectIdentifier;
+import org.bouncycastle.asn1.x500.X500Name;
+import org.bouncycastle.asn1.x509.Extension;
+import org.bouncycastle.asn1.x509.Extensions;
+import org.bouncycastle.asn1.x509.TBSCertificate;
+import org.bouncycastle.asn1.x509.V3TBSCertificateGenerator;
+import org.certificatetransparency.ctlog.proto.Ct;
+import org.certificatetransparency.ctlog.serialization.CTConstants;
+import org.certificatetransparency.ctlog.serialization.Serializer;
+
+import com.google.common.base.Preconditions;
 
 
 /**
@@ -167,7 +167,7 @@ public class LogSignatureVerifier {
   boolean verifySignature(Ct.SignedCertificateTimestamp sct, Certificate leafCert) {
     if (!logInfo.isSameLogId(sct.getId().getKeyId().toByteArray())) {
       throw new CertificateTransparencyException(String.format(
-          "Log ID of SCT (%s) does not match this log's ID.", sct.getId().getKeyId()));
+          "Log ID of SCT (%s) does not match this log's ID (%s).", LogInfo.bytesToHex(sct.getId().getKeyId().toByteArray()), LogInfo.bytesToHex(logInfo.getID())));
     }
     byte[] toVerify = serializeSignedSCTData(leafCert, sct);
 
@@ -286,14 +286,15 @@ public class LogSignatureVerifier {
   }
 
   private boolean verifySCTSignatureOverBytes(Ct.SignedCertificateTimestamp sct, byte[] toVerify) {
-    if (!logInfo.getSignatureAlgorithm().equals("EC")) {
-      throw new CertificateTransparencyException(
-          String.format("Non-EC signature %s not supported yet",
-              logInfo.getSignatureAlgorithm()));
+    final String signatureAlgorithm = logInfo.getSignatureAlgorithm();
+    if (!(signatureAlgorithm.equals("EC") || signatureAlgorithm.equals("RSA"))) {
+      throw new CertificateTransparencyException(String.format("Only EC or RSA signatures are supported. %s is not supported.", signatureAlgorithm));
     }
 
     try {
-      Signature signature = Signature.getInstance("SHA256withECDSA");
+      Signature signature = signatureAlgorithm.equals("EC")
+          ? Signature.getInstance("SHA256withECDSA")
+          : Signature.getInstance("SHA256withRSA");
       signature.initVerify(logInfo.getKey());
       signature.update(toVerify);
       return signature.verify(sct.getSignature().getSignature().toByteArray());
