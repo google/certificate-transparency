@@ -26,7 +26,7 @@ func ctTimestampToTime(ts uint64) time.Time {
 }
 
 func signatureToString(signed *ct.DigitallySigned) string {
-	return fmt.Sprintf("Signature: Hash=%v Sign=%v Value=%x", signed.HashAlgorithm, signed.SignatureAlgorithm, signed.Signature)
+	return fmt.Sprintf("Signature: Hash=%v Sign=%v Value=%x", signed.Algorithm.Hash, signed.Algorithm.Signature, signed.Signature)
 }
 
 func getSTH(logClient *client.LogClient) {
@@ -91,13 +91,13 @@ func main() {
 		}}
 	var logClient *client.LogClient
 	if *pubKey == "" {
-		logClient = client.New(*logURI, httpClient)
+		logClient = client.New(*logURI, httpClient, nil)
 	} else {
 		pubkey, err := ioutil.ReadFile(*pubKey)
 		if err != nil {
 			log.Fatal(err)
 		}
-		logClient, err = client.NewWithPubKey(*logURI, httpClient, string(pubkey))
+		logClient, err = client.NewWithPubKey(*logURI, httpClient, string(pubkey), nil)
 		if err != nil {
 			log.Fatal(err)
 		}

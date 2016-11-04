@@ -107,7 +107,7 @@ func main() {
 			MaxIdleConnsPerHost:   10,
 			DisableKeepAlives:     false,
 		},
-	})
+	}, nil)
 	matcher, err := createMatcherFromFlags()
 	if err != nil {
 		log.Fatal(err)

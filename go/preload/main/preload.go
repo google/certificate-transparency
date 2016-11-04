@@ -160,7 +160,7 @@ func main() {
 
 	fetchLogClient := client.New(*sourceLogUri, &http.Client{
 		Transport: transport,
-	})
+	}, nil)
 
 	matcher, err := createMatcher()
 	if err != nil {
@@ -187,7 +187,7 @@ func main() {
 
 	submitLogClient := client.New(*targetLogUri, &http.Client{
 		Transport: transport,
-	})
+	}, nil)
 
 	var submitterWG sync.WaitGroup
 	for w := 0; w < *parallelSubmit; w++ {
