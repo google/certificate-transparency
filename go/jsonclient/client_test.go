@@ -106,6 +106,14 @@ func MockServer(t *testing.T, failCount int, retryAfter int) *httptest.Server {
 			} else {
 				fmt.Fprintf(w, `{"tree_size": 11, "timestamp": 99}`)
 			}
+		case "/retry-rfc1123":
+			if failCount > 0 {
+				failCount--
+				w.Header().Add("Retry-After", time.Now().Add(time.Duration(retryAfter)*time.Second).Format(time.RFC1123))
+				w.WriteHeader(http.StatusServiceUnavailable)
+			} else {
+				fmt.Fprintf(w, `{"tree_size": 11, "timestamp": 99}`)
+			}
 		default:
 			t.Fatalf("Unhandled URL path: %s", r.URL.Path)
 		}
@@ -226,7 +234,9 @@ func TestPostAndParse(t *testing.T) {
 }
 
 func TestPostAndParseWithRetry(t *testing.T) {
-	leeway := time.Millisecond * 100
+	// leeway is quite large to accommodate for the RFC1123 Retry-After
+	// test
+	leeway := time.Millisecond * 750
 	jiffy := time.Millisecond
 
 	tests := []struct {
@@ -246,6 +256,7 @@ func TestPostAndParseWithRetry(t *testing.T) {
 		{"/retry", nil, 5, 5 * time.Second, 10, 1, "deadline exceeded"},
 		{"/retry", nil, 10, 5 * time.Second, 1, 5, ""},
 		{"/retry", nil, 1, 10 * jiffy, 0, 10, ""},
+		{"/retry-rfc1123", nil, -1, 2 * time.Second, 2, 1, ""},
 	}
 	for _, test := range tests {
 		ts := MockServer(t, test.failCount, test.retryAfter)
