@@ -127,5 +127,7 @@ script:
  - pushd ${GOPATH}
  - |
    CGO_CPPFLAGS="-I${INSTALL_DIR}/include" CGO_LDFLAGS="-L${INSTALL_DIR}/lib" go test -v ./src/github.com/google/certificate-transparency/go/...
+ - |
+   CGO_CPPFLAGS="-I${INSTALL_DIR}/include" CGO_LDFLAGS="-L${INSTALL_DIR}/lib" go test -v -race ./src/github.com/google/certificate-transparency/go/...
  - popd
 
