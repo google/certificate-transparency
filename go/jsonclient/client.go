@@ -139,7 +139,7 @@ func (c *JSONClient) PostAndParse(ctx context.Context, path string, req, rsp int
 
 var maxBackoffInterval = 128 * time.Second
 
-func setBackoff(interval time.Duration) (time.Duration, time.Duration) {
+func calculateBackoff(interval time.Duration) (time.Duration, time.Duration) {
 	backoff := interval
 	interval *= 2
 	if interval > maxBackoffInterval {
@@ -171,7 +171,7 @@ func (c *JSONClient) PostAndParseWithRetry(ctx context.Context, path string, req
 		}
 		httpRsp, err := c.PostAndParse(ctx, path, req, rsp)
 		if err != nil {
-			backoffSeconds, backoffInterval = setBackoff(backoffInterval)
+			backoffSeconds, backoffInterval = calculateBackoff(backoffInterval)
 			continue
 		}
 		switch {
@@ -181,16 +181,14 @@ func (c *JSONClient) PostAndParseWithRetry(ctx context.Context, path string, req
 			// Request timeout, retry immediately
 		case httpRsp.StatusCode == http.StatusServiceUnavailable:
 			// Retry
-			backoffSeconds, backoffInterval = setBackoff(backoffInterval)
+			backoffSeconds, backoffInterval = calculateBackoff(backoffInterval)
+			// Retry-After may be either a number of seconds as a int or a RFC 1123
+			// date string (RFC 7231 Section 7.1.3)
 			if retryAfter := httpRsp.Header.Get("Retry-After"); retryAfter != "" {
 				if seconds, err := strconv.Atoi(retryAfter); err == nil {
 					backoffSeconds = time.Duration(seconds) * time.Second
-				} else {
-					// Attempt to parse as a RFC1123 date
-					date, err := time.Parse(time.RFC1123, retryAfter)
-					if err == nil {
-						backoffSeconds = date.Sub(time.Now())
-					}
+				} else if date, err := time.Parse(time.RFC1123, retryAfter); err == nil {
+					backoffSeconds = date.Sub(time.Now())
 				}
 			}
 		default:
