@@ -24,11 +24,12 @@ type JSONClient struct {
 	uri        string                // the base URI of the server. e.g. http://ct.googleapis/pilot
 	httpClient *http.Client          // used to interact with the server via HTTP
 	Verifier   *ct.SignatureVerifier // nil for no verification (e.g. no public key available)
-	logger     Logger
+	logger     Logger                // interface to use for logging warnings and errors
 }
 
 // Logger is a simple logging interface used to log internal errors and warnings
 type Logger interface {
+	// Printf formats and logs a message
 	Printf(string, ...interface{})
 }
 
