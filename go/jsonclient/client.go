@@ -33,6 +33,16 @@ type Logger interface {
 	Printf(string, ...interface{})
 }
 
+// Options are the options for creating a new JSONClient.
+type Options struct {
+	// Interface to use for logging warnings and errors, if nil the
+	// standard library log package will be used.
+	Logger Logger
+	// PEM format public key to use for signature verification, if
+	// empty signatures will not be verified.
+	PublicKey string
+}
+
 type basicLogger struct{}
 
 func (bl *basicLogger) Printf(msg string, args ...interface{}) {
@@ -40,47 +50,35 @@ func (bl *basicLogger) Printf(msg string, args ...interface{}) {
 }
 
 // New constructs a new JSONClient instance, for the given base URI, using the
-// given http.Client object (if provided) and (PEM encoded) public key. If
-// the provided logger is nil  the standard lib log package will be used
-// for logging.
-func New(uri string, hc *http.Client, pemKey string, logger Logger) (*JSONClient, error) {
+// given http.Client object (if provided) and the Options object.
+func New(uri string, hc *http.Client, opts Options) (*JSONClient, error) {
 	var verifier *ct.SignatureVerifier
-	pubkey, _ /* keyhash */, rest, err := ct.PublicKeyFromPEM([]byte(pemKey))
-	if err != nil {
-		return nil, err
-	}
-	if len(rest) > 0 {
-		return nil, errors.New("extra data found after PEM key decoded")
-	}
-
-	verifier, err = ct.NewSignatureVerifier(pubkey)
-	if err != nil {
-		return nil, err
+	if opts.PublicKey != "" {
+		pubkey, _ /* keyhash */, rest, err := ct.PublicKeyFromPEM([]byte(opts.PublicKey))
+		if err != nil {
+			return nil, err
+		}
+		if len(rest) > 0 {
+			return nil, errors.New("extra data found after PEM key decoded")
+		}
+		verifier, err = ct.NewSignatureVerifier(pubkey)
+		if err != nil {
+			return nil, err
+		}
 	}
 	if hc == nil {
 		hc = new(http.Client)
 	}
+	logger := opts.Logger
 	if logger == nil {
 		logger = &basicLogger{}
 	}
-	client := &JSONClient{
+	return &JSONClient{
 		uri:        strings.TrimRight(uri, "/"),
 		httpClient: hc,
-		Verifier:   verifier}
-	return client, nil
-}
-
-// NewWithoutVerification constructs a new JSONClient instance, for the given
-// base URI, using the given http.Client object (if provided); however, this
-// client will not perform verification of signed responses from the server.
-func NewWithoutVerification(uri string, hc *http.Client, logger Logger) (*JSONClient, error) {
-	if hc == nil {
-		hc = new(http.Client)
-	}
-	if logger == nil {
-		logger = &basicLogger{}
-	}
-	return &JSONClient{uri: strings.TrimRight(uri, "/"), httpClient: hc, logger: logger}, nil
+		Verifier:   verifier,
+		logger:     logger,
+	}, nil
 }
 
 // GetAndParse makes a HTTP GET call to the given path, and attempt to parse

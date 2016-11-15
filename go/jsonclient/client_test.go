@@ -22,7 +22,6 @@ func TestNewJSONClient(t *testing.T) {
 		pubKey string
 		errstr string
 	}{
-		{"", "no PEM block"},
 		{"bogus", "no PEM block"},
 		{testdata.RsaPublicKeyPEM, ""},
 		{testdata.EcdsaPublicKeyPEM, ""},
@@ -30,7 +29,7 @@ func TestNewJSONClient(t *testing.T) {
 		{testdata.RsaPublicKeyPEM + "bogus", "extra data found"},
 	}
 	for _, test := range tests {
-		client, err := New("http://127.0.0.1", nil, test.pubKey, nil)
+		client, err := New("http://127.0.0.1", nil, Options{PublicKey: test.pubKey})
 		if test.errstr != "" {
 			if err == nil {
 				t.Errorf("New()=%p,nil; want error %q", client, test.errstr)
@@ -137,7 +136,7 @@ func TestGetAndParse(t *testing.T) {
 	ts := MockServer(t, -1, 0)
 	defer ts.Close()
 
-	logClient, err := NewWithoutVerification(ts.URL, &http.Client{}, nil)
+	logClient, err := New(ts.URL, &http.Client{}, Options{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -194,7 +193,7 @@ func TestPostAndParse(t *testing.T) {
 	ts := MockServer(t, -1, 0)
 	defer ts.Close()
 
-	logClient, err := NewWithoutVerification(ts.URL, &http.Client{}, nil)
+	logClient, err := New(ts.URL, &http.Client{}, Options{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -251,7 +250,7 @@ func TestPostAndParseWithRetry(t *testing.T) {
 		ts := MockServer(t, test.failCount, test.retryAfter)
 		defer ts.Close()
 
-		logClient, err := NewWithoutVerification(ts.URL, &http.Client{}, nil)
+		logClient, err := New(ts.URL, &http.Client{}, Options{})
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -288,7 +287,7 @@ func TestContextRequired(t *testing.T) {
 	ts := MockServer(t, -1, 0)
 	defer ts.Close()
 
-	logClient, err := NewWithoutVerification(ts.URL, &http.Client{}, nil)
+	logClient, err := New(ts.URL, &http.Client{}, Options{})
 	if err != nil {
 		t.Fatal(err)
 	}
