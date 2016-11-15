@@ -1,0 +1,186 @@
+syntax = "proto2";
+
+package ct;
+
+import "ct/proto/client.proto";
+import "ct/proto/tls_options.proto";
+
+// Actually X509ChainEntry in RFC6962-bis
+message X509ChainEntryV2 {
+  // leaf_certificate, opaque (ASN.1Cert) <1..2^24-1>
+  optional bytes leaf_certificate = 1 [ (tls_opts).min_length = 1,
+                                        (tls_opts).max_length = 0xffffff ];
+  // certificate_chain, repeated opaque (ASN.1Cert) <0..2^24-1>
+  // A chain from the leaf to a trusted root, excluding the leaf, including
+  // the trusted root. May be empty if the submitted leaf_certificate is a
+  // trusted root.
+  repeated bytes certificate_chain = 2 [ (tls_opts).min_length = 0,
+                                         (tls_opts).max_length = 0xffffff,
+                                         (tls_opts).max_total_length = 0xffffff ];
+}
+
+message PrecertChainEntryV2 {
+  // pre_certificate, opaque (CMSPrecert) <1..2^24-1>
+  optional bytes pre_certificate = 1 [
+    (tls_opts).min_length = 1,
+    (tls_opts).max_length = 0xffffff ];
+
+  // precertificate_chain, repeated opaque (ASN.1Cert) <1..2^24-1>
+  // A chain from the precert to a trusted root, excluding the precert itself.
+  // Must have at least one certificate.
+  repeated bytes precertificate_chain = 2 [
+    (tls_opts).min_length = 0,
+    (tls_opts).max_length = 0xffffff,
+    (tls_opts).min_total_length = 1,
+    (tls_opts).max_total_length = 0xffffff ];
+}
+
+message LogIDV2 {
+  // DER-encoded OID without the tag byte.
+  optional bytes log_id = 1 [ (tls_opts).min_length = 2,
+                              (tls_opts).max_length = 0x7f];
+}
+
+enum SctExtensionType {
+  option (tls_enum_opts).max_value = 65535;
+
+  SCT_EXTENSION_RESERVED=65535;
+}
+
+message SctExtensionV2 {
+  optional SctExtensionType sct_extension_type = 1;
+  optional bytes sct_extension_data = 2 [(tls_opts).min_length = 0,
+                                      (tls_opts).max_length = 65535];
+}
+
+message SignedCertificateTimestampDataV2 {
+  optional LogIDV2 log_id = 1;
+  // UTC time in milliseconds, since January 1, 1970, 00:00.
+  optional uint64 timestamp = 2;
+  repeated SctExtensionV2 sct_extensions = 3 [
+    (tls_opts).min_total_length = 0,
+    (tls_opts).max_total_length = 0xffff];
+    // Signature over a TransItem of type x509_entry_v2 or precert_entry_v2.
+  optional DigitallySigned signature = 4;
+}
+
+message TimestampedCertificateEntryDataV2 {
+  optional uint64 timestamp = 1;
+  optional bytes issuer_key_hash = 2 [
+    (tls_opts).min_length = 32,
+    (tls_opts).max_length = 0xff];
+  optional bytes tbs_certificate = 3 [
+    (tls_opts).min_length = 1,
+    (tls_opts).max_length = 0xffffff ];
+  // The extensions in the vector must be ordered by the value of the
+  // "sct_extension_type" field, smallest value first.
+  repeated SctExtensionV2 sct_extensions = 4 [
+    (tls_opts).min_total_length = 0,
+    (tls_opts).max_total_length = 0xffff];
+}
+
+enum SthExtensionType {
+  option (tls_enum_opts).max_value = 65535;
+
+  STH_EXTENSION_RESERVED = 65535;
+}
+
+message SthExtension {
+  optional SthExtensionType sth_extension_type = 1;
+  optional bytes sth_extension_data = 2 [(tls_opts).min_length = 0,
+                                      (tls_opts).max_length = 65535];
+}
+
+message TreeHeadDataV2 {
+  optional uint64 timestamp = 1;
+  optional uint64 tree_size = 2;
+  optional bytes root_hash = 3 [
+    (tls_opts).min_length = 32,
+    (tls_opts).max_length = 0xff];
+  // The extensions in the vector must be ordered by the value of the
+  // "sth_extension_type" field, smallest value first.
+  repeated SthExtension sth_extensions = 4 [
+    (tls_opts).min_total_length = 0,
+    (tls_opts).max_total_length = 0xffff];
+}
+
+message SignedTreeHeadDataV2 {
+  optional LogIDV2 log_id = 1;
+  optional TreeHeadDataV2 tree_head = 2;
+  // Signature over a TreeHeadDataV2 structure.
+  optional DigitallySigned signature = 3;
+}
+
+message ConsistencyProofDataV2 {
+  optional LogIDV2 log_id = 1;
+  optional uint64 tree_size_1 = 2;
+  optional uint64 tree_size_2 = 3;
+  repeated bytes consistency_path = 4 [
+    (tls_opts).min_length = 32,
+    (tls_opts).max_length = 0xff,
+    (tls_opts).min_total_length = 32,
+    (tls_opts).max_total_length = 0xffff];
+}
+
+message InclusionProofDataV2 {
+  optional LogIDV2 log_id = 1;
+  optional uint64 tree_size = 2;
+  optional uint64 leaf_index = 3;
+  repeated bytes inclusion_path = 4 [
+    (tls_opts).min_length = 32,
+    (tls_opts).max_length = 0xff,
+    (tls_opts).min_total_length = 32,
+    (tls_opts).max_total_length = 0xffff];
+}
+
+message SCTWithProofDataV2 {
+  optional SignedCertificateTimestampDataV2 sct = 1;
+  optional SignedTreeHeadDataV2 sth = 2;
+  optional InclusionProofDataV2 inclusion_proof = 3;
+}
+
+enum VersionedTransType {
+  option (tls_enum_opts).max_value = 65535;
+
+  RESERVED = 0;
+  X509_ENTRY_V2 = 1;
+  PRECERT_ENTRY_V2 = 2;
+  X509_SCT_V2 = 3;
+  PRECERT_SCT_V2 = 4;
+  SIGNED_TREE_HEAD_V2 = 5;
+  CONSISTENCY_PROOF_V2 = 6;
+  INCLUSION_PROOF_V2 = 7;
+  X509_SCT_WITH_PROOF_V2 = 8;
+  PRECERT_SCT_WITH_PROOF_V2 = 9;
+}
+
+message TransItem {
+  optional VersionedTransType versioned_type = 1;
+  optional TimestampedCertificateEntryDataV2 x509_entry_v2 = 2
+      [(tls_opts).select_field = "versioned_type",
+       (tls_opts).select_value = 1];
+  optional TimestampedCertificateEntryDataV2 precert_entry_v2 = 3
+      [(tls_opts).select_field = "versioned_type",
+       (tls_opts).select_value = 2];
+  optional SignedCertificateTimestampDataV2 x509_sct_v2 = 4
+      [(tls_opts).select_field = "versioned_type",
+       (tls_opts).select_value = 3];
+  optional SignedCertificateTimestampDataV2 precert_sct_v2 = 5
+      [(tls_opts).select_field = "versioned_type",
+       (tls_opts).select_value = 4];
+  optional SignedTreeHeadDataV2 signed_tree_head_v2 = 6
+      [(tls_opts).select_field = "versioned_type",
+       (tls_opts).select_value = 5];
+  optional ConsistencyProofDataV2 consistency_proof_v2 = 7
+      [(tls_opts).select_field = "versioned_type",
+       (tls_opts).select_value = 6];
+  optional InclusionProofDataV2 inclusion_proof_v2 = 8
+      [(tls_opts).select_field = "versioned_type",
+       (tls_opts).select_value = 7];
+  optional SCTWithProofDataV2 x509_sct_with_proof_v2 = 9
+      [(tls_opts).select_field = "versioned_type",
+       (tls_opts).select_value = 8];
+  optional SCTWithProofDataV2 precert_sct_with_proof_v2 = 10
+      [(tls_opts).select_field = "versioned_type",
+       (tls_opts).select_value = 9];
+}

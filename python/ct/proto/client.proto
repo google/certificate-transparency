@@ -95,6 +95,8 @@ message MonitorState {
 enum Version {
   option (tls_enum_opts).max_value = 255;
   V1 = 0;
+  // RFC6962-bis
+  V2 = 1;
   // Not part of the I-D, and outside the valid range.
   UNKNOWN_VERSION = 256;
 }
