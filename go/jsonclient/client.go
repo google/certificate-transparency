@@ -156,6 +156,17 @@ func (c *JSONClient) PostAndParse(ctx context.Context, path string, req, rsp int
 	return httpRsp, nil
 }
 
+var maxBackoffInterval = 128 * time.Second
+
+func calculateBackoff(interval time.Duration) (time.Duration, time.Duration) {
+	backoff := interval
+	interval *= 2
+	if interval > maxBackoffInterval {
+		interval = maxBackoffInterval
+	}
+	return backoff, interval
+}
+
 // PostAndParseWithRetry makes a HTTP POST call, but retries (with backoff) on
 // retriable errors.
 func (c *JSONClient) PostAndParseWithRetry(ctx context.Context, path string, req, rsp interface{}) (*http.Response, error) {
@@ -163,7 +174,6 @@ func (c *JSONClient) PostAndParseWithRetry(ctx context.Context, path string, req
 		return nil, errors.New("context.Context required")
 	}
 	// Retry after 1s, 2s, 4s, 8s, 16s, 32s, 64s, 128s, 128s, ....
-	maxInterval := 128 * time.Second
 	backoffInterval := 1 * time.Second
 	backoffSeconds := time.Duration(0)
 	for {
@@ -176,11 +186,7 @@ func (c *JSONClient) PostAndParseWithRetry(ctx context.Context, path string, req
 		}
 		httpRsp, err := c.PostAndParse(ctx, path, req, rsp)
 		if err != nil {
-			backoffSeconds = backoffInterval
-			backoffInterval *= 2.0
-			if backoffInterval > maxInterval {
-				backoffInterval = maxInterval
-			}
+			backoffSeconds, backoffInterval = calculateBackoff(backoffInterval)
 			c.logger.Printf("Request failed, backing-off for %d seconds: %s", backoffSeconds, err)
 			continue
 		}
@@ -192,15 +198,14 @@ func (c *JSONClient) PostAndParseWithRetry(ctx context.Context, path string, req
 			c.logger.Printf("Request timed out, retrying immediately")
 		case httpRsp.StatusCode == http.StatusServiceUnavailable:
 			// Retry
-			backoffSeconds = backoffInterval
-			backoffInterval *= 2.0
-			if backoffInterval > maxInterval {
-				backoffInterval = maxInterval
-			}
+			backoffSeconds, backoffInterval = calculateBackoff(backoffInterval)
+			// Retry-After may be either a number of seconds as a int or a RFC 1123
+			// date string (RFC 7231 Section 7.1.3)
 			if retryAfter := httpRsp.Header.Get("Retry-After"); retryAfter != "" {
-				// TODO(drysdale): cope with a retry-after timestamp (RFC 7231 s7.1.3)
 				if seconds, err := strconv.Atoi(retryAfter); err == nil {
 					backoffSeconds = time.Duration(seconds) * time.Second
+				} else if date, err := time.Parse(time.RFC1123, retryAfter); err == nil {
+					backoffSeconds = date.Sub(time.Now())
 				}
 			}
 			c.logger.Printf("Request failed, backing-off for %d seconds: got HTTP status %s", backoffSeconds, httpRsp.Status)

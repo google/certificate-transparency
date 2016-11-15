@@ -233,3 +233,11 @@ message SignedCertificateTimestampList {
                                 (tls_opts).max_length = 0xffff,
                                 (tls_opts).max_total_length = 0xffff ];
 }
+
+message TreeHeadSignature {
+  optional Version version = 1 [ default = UNKNOWN_VERSION ];
+  optional SignatureType signature_type = 2 [ default = TREE_HASH ];
+  optional uint64 timestamp = 3;
+  optional uint64 tree_size = 4;
+  optional bytes sha256_root_hash = 5 [(tls_opts).fixed_length = 32];
+}
