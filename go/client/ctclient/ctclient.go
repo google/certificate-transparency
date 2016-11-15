@@ -12,6 +12,8 @@ import (
 
 	ct "github.com/google/certificate-transparency/go"
 	"github.com/google/certificate-transparency/go/client"
+	"github.com/google/certificate-transparency/go/x509"
+	"github.com/google/certificate-transparency/go/x509util"
 	httpclient "github.com/mreiferson/go-httpclient"
 	"golang.org/x/net/context"
 )
@@ -19,6 +21,7 @@ import (
 var logURI = flag.String("log_uri", "http://ct.googleapis.com/aviator", "CT log base URI")
 var pubKey = flag.String("pub_key", "", "Name of file containing log's public key")
 var certChain = flag.String("cert_chain", "", "Name of file containing certificate chain as concatenated PEM files")
+var textOut = flag.Bool("text", true, "Display certificates as text")
 
 func ctTimestampToTime(ts uint64) time.Time {
 	secs := int64(ts / 1000)
@@ -30,8 +33,8 @@ func signatureToString(signed *ct.DigitallySigned) string {
 	return fmt.Sprintf("Signature: Hash=%v Sign=%v Value=%x", signed.Algorithm.Hash, signed.Algorithm.Signature, signed.Signature)
 }
 
-func getSTH(logClient *client.LogClient) {
-	sth, err := logClient.GetSTH(context.Background())
+func getSTH(ctx context.Context, logClient *client.LogClient) {
+	sth, err := logClient.GetSTH(ctx)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -41,7 +44,7 @@ func getSTH(logClient *client.LogClient) {
 	fmt.Printf("%v\n", signatureToString(&sth.TreeHeadSignature))
 }
 
-func addChain(logClient *client.LogClient) {
+func addChain(ctx context.Context, logClient *client.LogClient) {
 	if *certChain == "" {
 		log.Fatalf("No certificate chain file specified with -cert_chain")
 	}
@@ -61,7 +64,7 @@ func addChain(logClient *client.LogClient) {
 		}
 	}
 
-	sct, err := logClient.AddChain(context.Background(), chain)
+	sct, err := logClient.AddChain(ctx, chain)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -71,12 +74,33 @@ func addChain(logClient *client.LogClient) {
 	fmt.Printf("%v\n", signatureToString(&sct.Signature))
 }
 
+func getRoots(ctx context.Context, logClient *client.LogClient) {
+	roots, err := logClient.GetAcceptedRoots(ctx)
+	if err != nil {
+		log.Fatal(err)
+	}
+	for _, root := range roots {
+		if *textOut {
+			cert, err := x509.ParseCertificate(root)
+			if err != nil {
+				log.Printf("Error parsing certificate: %q", err.Error())
+				continue
+			}
+			fmt.Printf("%s\n", x509util.CertificateToString(cert))
+		} else {
+			if err := pem.Encode(os.Stdout, &pem.Block{Type: "CERTIFICATE", Bytes: root}); err != nil {
+				log.Printf("Failed to PEM encode cert: %q", err.Error())
+			}
+		}
+	}
+}
 func dieWithUsage(msg string) {
 	fmt.Fprintf(os.Stderr, msg)
 	fmt.Fprintf(os.Stderr, "Usage: ctclient [options] <cmd>\n"+
 		"where cmd is one of:\n"+
 		"   sth       retrieve signed tree head\n"+
-		"   upload    upload cert chain and show SCT (requires -cert_chain)\n")
+		"   upload    upload cert chain and show SCT (requires -cert_chain)\n"+
+		"   getroots  show accepted roots\n")
 	os.Exit(1)
 }
 
@@ -107,12 +131,15 @@ func main() {
 	if len(args) != 1 {
 		dieWithUsage("Need command argument")
 	}
+	ctx := context.Background()
 	cmd := args[0]
 	switch cmd {
 	case "sth":
-		getSTH(logClient)
+		getSTH(ctx, logClient)
 	case "upload":
-		addChain(logClient)
+		addChain(ctx, logClient)
+	case "getroots", "get_roots", "get-roots":
+		getRoots(ctx, logClient)
 	default:
 		dieWithUsage(fmt.Sprintf("Unknown command '%s'", cmd))
 	}

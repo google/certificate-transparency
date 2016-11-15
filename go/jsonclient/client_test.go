@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"reflect"
+	"regexp"
 	"strconv"
 	"strings"
 	"testing"
@@ -106,6 +107,14 @@ func MockServer(t *testing.T, failCount int, retryAfter int) *httptest.Server {
 			} else {
 				fmt.Fprintf(w, `{"tree_size": 11, "timestamp": 99}`)
 			}
+		case "/retry-rfc1123":
+			if failCount > 0 {
+				failCount--
+				w.Header().Add("Retry-After", time.Now().Add(time.Duration(retryAfter)*time.Second).Format(time.RFC1123))
+				w.WriteHeader(http.StatusServiceUnavailable)
+			} else {
+				fmt.Fprintf(w, `{"tree_size": 11, "timestamp": 99}`)
+			}
 		default:
 			t.Fatalf("Unhandled URL path: %s", r.URL.Path)
 		}
@@ -113,16 +122,17 @@ func MockServer(t *testing.T, failCount int, retryAfter int) *httptest.Server {
 }
 
 func TestGetAndParse(t *testing.T) {
+	rc := regexp.MustCompile
 	tests := []struct {
 		uri    string
 		params map[string]string
 		status int
 		result TestStruct
-		errstr string
+		errstr *regexp.Regexp
 	}{
-		{uri: "[invalid-uri]", errstr: "too many colons"},
-		{uri: "/short%", errstr: "invalid URL escape"},
-		{uri: "/malformed", status: http.StatusOK, errstr: "unexpected EOF"},
+		{uri: "[invalid-uri]", errstr: rc("too many colons|unexpected .* in address")},
+		{uri: "/short%", errstr: rc("invalid URL escape")},
+		{uri: "/malformed", status: http.StatusOK, errstr: rc("unexpected EOF")},
 		{uri: "/error", params: map[string]string{"rc": "404"}, status: http.StatusNotFound},
 		{uri: "/error", params: map[string]string{"rc": "403"}, status: http.StatusForbidden},
 		{uri: "/struct/path", status: http.StatusOK, result: TestStruct{11, 99, ""}},
@@ -146,11 +156,11 @@ func TestGetAndParse(t *testing.T) {
 	for _, test := range tests {
 		var result TestStruct
 		httpRsp, err := logClient.GetAndParse(ctx, test.uri, test.params, &result)
-		if test.errstr != "" {
+		if test.errstr != nil {
 			if err == nil {
-				t.Errorf("GetAndParse(%q)=%+v,nil; want error %q", test.uri, result, test.errstr)
-			} else if !strings.Contains(err.Error(), test.errstr) {
-				t.Errorf("GetAndParse(%q)=nil,%q; want error %q", test.uri, err.Error(), test.errstr)
+				t.Errorf("GetAndParse(%q)=%+v,nil; want error matching %q", test.uri, result, test.errstr)
+			} else if !test.errstr.MatchString(err.Error()) {
+				t.Errorf("GetAndParse(%q)=nil,%q; want error matching %q", test.uri, err.Error(), test.errstr)
 			}
 			continue
 		}
@@ -169,17 +179,18 @@ func TestGetAndParse(t *testing.T) {
 }
 
 func TestPostAndParse(t *testing.T) {
+	rc := regexp.MustCompile
 	tests := []struct {
 		uri     string
 		request interface{}
 		status  int
 		result  TestStruct
-		errstr  string
+		errstr  *regexp.Regexp
 	}{
-		{uri: "[invalid-uri]", errstr: "too many colons"},
-		{uri: "/short%", errstr: "invalid URL escape"},
-		{uri: "/struct/params", request: json.Number(`invalid`), errstr: "invalid number literal"},
-		{uri: "/malformed", status: http.StatusOK, errstr: "unexpected end of JSON"},
+		{uri: "[invalid-uri]", errstr: rc("too many colons|unexpected .* in address")},
+		{uri: "/short%", errstr: rc("invalid URL escape")},
+		{uri: "/struct/params", request: json.Number(`invalid`), errstr: rc("invalid number literal")},
+		{uri: "/malformed", status: http.StatusOK, errstr: rc("unexpected end of JSON")},
 		{uri: "/error", request: TestParams{RespCode: 404}, status: http.StatusNotFound},
 		{uri: "/error", request: TestParams{RespCode: 403}, status: http.StatusForbidden},
 		{uri: "/struct/path", status: http.StatusOK, result: TestStruct{11, 99, ""}},
@@ -203,11 +214,11 @@ func TestPostAndParse(t *testing.T) {
 	for _, test := range tests {
 		var result TestStruct
 		httpRsp, err := logClient.PostAndParse(ctx, test.uri, test.request, &result)
-		if test.errstr != "" {
+		if test.errstr != nil {
 			if err == nil {
-				t.Errorf("PostAndParse(%q)=%+v,nil; want %q", test.uri, result, test.errstr)
-			} else if !strings.Contains(err.Error(), test.errstr) {
-				t.Errorf("PostAndParse(%q)=nil,%q; want error %q", test.uri, err.Error(), test.errstr)
+				t.Errorf("PostAndParse(%q)=%+v,nil; want error matching %q", test.uri, result, test.errstr)
+			} else if !test.errstr.MatchString(err.Error()) {
+				t.Errorf("PostAndParse(%q)=nil,%q; want error matching %q", test.uri, err.Error(), test.errstr)
 			}
 			continue
 		}
@@ -226,7 +237,7 @@ func TestPostAndParse(t *testing.T) {
 }
 
 func TestPostAndParseWithRetry(t *testing.T) {
-	leeway := time.Millisecond * 100
+	shortLeeway := time.Millisecond * 100
 	jiffy := time.Millisecond
 
 	tests := []struct {
@@ -234,18 +245,20 @@ func TestPostAndParseWithRetry(t *testing.T) {
 		request      interface{}
 		deadlineSecs int // -1 indicates no deadline
 		expected     time.Duration
+		leeway       time.Duration
 		retryAfter   int // -1 indicates generate 503 with no Retry-After
 		failCount    int
 		errstr       string
 	}{
-		{"/retry", nil, -1, jiffy, 0, 0, ""},
-		{"/error", TestParams{RespCode: 418}, 2, jiffy, 0, 0, "teapot"},
-		{"/short%", nil, 2, 2 * time.Second, 0, 0, "deadline exceeded"},
-		{"/retry", nil, -1, 7 * time.Second, -1, 3, ""},
-		{"/retry", nil, 6, 5 * time.Second, 5, 1, ""},
-		{"/retry", nil, 5, 5 * time.Second, 10, 1, "deadline exceeded"},
-		{"/retry", nil, 10, 5 * time.Second, 1, 5, ""},
-		{"/retry", nil, 1, 10 * jiffy, 0, 10, ""},
+		{"/retry", nil, -1, jiffy, shortLeeway, 0, 0, ""},
+		{"/error", TestParams{RespCode: 418}, 2, jiffy, shortLeeway, 0, 0, "teapot"},
+		{"/short%", nil, 2, 2 * time.Second, shortLeeway, 0, 0, "deadline exceeded"},
+		{"/retry", nil, -1, 7 * time.Second, shortLeeway, -1, 3, ""},
+		{"/retry", nil, 6, 5 * time.Second, shortLeeway, 5, 1, ""},
+		{"/retry", nil, 5, 5 * time.Second, shortLeeway, 10, 1, "deadline exceeded"},
+		{"/retry", nil, 10, 5 * time.Second, shortLeeway, 1, 5, ""},
+		{"/retry", nil, 1, 10 * jiffy, shortLeeway, 0, 10, ""},
+		{"/retry-rfc1123", nil, -1, 2 * time.Second, 1 * time.Second, 2, 1, ""},
 	}
 	for _, test := range tests {
 		ts := MockServer(t, test.failCount, test.retryAfter)
@@ -265,7 +278,7 @@ func TestPostAndParseWithRetry(t *testing.T) {
 		httpRsp, err := logClient.PostAndParseWithRetry(ctx, test.uri, test.request, &result)
 		took := time.Since(started)
 
-		if math.Abs(float64(took-test.expected)) > float64(leeway) {
+		if math.Abs(float64(took-test.expected)) > float64(test.leeway) {
 			t.Errorf("PostAndParseWithRetry() took %s; want ~%s", took, test.expected)
 		}
 		if test.errstr != "" {
