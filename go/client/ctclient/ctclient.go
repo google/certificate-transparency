@@ -13,6 +13,7 @@ import (
 	ct "github.com/google/certificate-transparency/go"
 	"github.com/google/certificate-transparency/go/client"
 	httpclient "github.com/mreiferson/go-httpclient"
+	"golang.org/x/net/context"
 )
 
 var logURI = flag.String("log_uri", "http://ct.googleapis.com/aviator", "CT log base URI")
@@ -30,7 +31,7 @@ func signatureToString(signed *ct.DigitallySigned) string {
 }
 
 func getSTH(logClient *client.LogClient) {
-	sth, err := logClient.GetSTH()
+	sth, err := logClient.GetSTH(context.Background())
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -60,7 +61,7 @@ func addChain(logClient *client.LogClient) {
 		}
 	}
 
-	sct, err := logClient.AddChain(chain)
+	sct, err := logClient.AddChain(context.Background(), chain)
 	if err != nil {
 		log.Fatal(err)
 	}

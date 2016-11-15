@@ -135,7 +135,7 @@ func TestGetSTHWorks(t *testing.T) {
 	defer ts.Close()
 
 	client := New(ts.URL, &http.Client{})
-	sth, err := client.GetSTH()
+	sth, err := client.GetSTH(context.Background())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -167,7 +167,7 @@ func TestGetSTHWorks(t *testing.T) {
 	}
 }
 
-func TestAddChainWithContext(t *testing.T) {
+func TestAddChain(t *testing.T) {
 	retryAfter := 0
 	currentFailures := 0
 	failuresBeforeSuccess := 0
@@ -228,7 +228,7 @@ func TestAddChainWithContext(t *testing.T) {
 		currentFailures = 0
 
 		started := time.Now()
-		sct, err := c.AddChainWithContext(deadline, chain)
+		sct, err := c.AddChain(deadline, chain)
 		took := time.Since(started)
 		if math.Abs(float64(took-tc.expected)) > float64(leeway) {
 			t.Errorf("#%d Submission took an unexpected length of time: %s, expected ~%s", i, took, tc.expected)
@@ -236,7 +236,7 @@ func TestAddChainWithContext(t *testing.T) {
 		if tc.success && err != nil {
 			t.Errorf("#%d Failed to submit chain: %s", i, err)
 		} else if !tc.success && err == nil {
-			t.Errorf("#%d Expected AddChainWithContext to fail", i)
+			t.Errorf("#%d Expected AddChain to fail", i)
 		}
 		if tc.success && sct == nil {
 			t.Errorf("#%d Nil SCT returned", i)
@@ -263,7 +263,7 @@ func TestAddJSON(t *testing.T) {
 	}
 
 	for _, tc := range tests {
-		sct, err := c.AddJSON(tc.data)
+		sct, err := c.AddJSON(context.Background(), tc.data)
 		if tc.success && err != nil {
 			t.Fatalf("Failed to submit json: %s", err)
 		} else if !tc.success && err == nil {

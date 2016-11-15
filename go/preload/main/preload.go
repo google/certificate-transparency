@@ -18,6 +18,7 @@ import (
 	"github.com/google/certificate-transparency/go/preload"
 	"github.com/google/certificate-transparency/go/scanner"
 	httpclient "github.com/mreiferson/go-httpclient"
+	"golang.org/x/net/context"
 )
 
 const (
@@ -97,7 +98,7 @@ func certSubmitterJob(addedCerts chan<- *preload.AddedCert, log_client *client.L
 		chain := make([]ct.ASN1Cert, len(c.Chain)+1)
 		chain[0] = c.X509Cert.Raw
 		copy(chain[1:], c.Chain)
-		sct, err := log_client.AddChain(chain)
+		sct, err := log_client.AddChain(context.Background(), chain)
 		if err != nil {
 			log.Printf("failed to add chain with CN %s: %v\n", c.X509Cert.Subject.CommonName, err)
 			recordFailure(addedCerts, chain[0], err)
@@ -115,7 +116,7 @@ func precertSubmitterJob(addedCerts chan<- *preload.AddedCert, log_client *clien
 	precerts <-chan *ct.LogEntry,
 	wg *sync.WaitGroup) {
 	for c := range precerts {
-		sct, err := log_client.AddPreChain(c.Chain)
+		sct, err := log_client.AddPreChain(context.Background(), c.Chain)
 		if err != nil {
 			log.Printf("failed to add pre-chain with CN %s: %v", c.Precert.TBSCertificate.Subject.CommonName, err)
 			recordFailure(addedCerts, c.Chain[0], err)
