@@ -15,6 +15,7 @@ import (
 
 	ct "github.com/google/certificate-transparency/go"
 	"github.com/google/certificate-transparency/go/client"
+	"github.com/google/certificate-transparency/go/jsonclient"
 	"github.com/google/certificate-transparency/go/preload"
 	"github.com/google/certificate-transparency/go/scanner"
 	httpclient "github.com/mreiferson/go-httpclient"
@@ -159,9 +160,12 @@ func main() {
 		DisableKeepAlives:     false,
 	}
 
-	fetchLogClient := client.New(*sourceLogUri, &http.Client{
+	fetchLogClient, err := client.New(*sourceLogUri, &http.Client{
 		Transport: transport,
-	})
+	}, jsonclient.Options{})
+	if err != nil {
+		log.Fatal(err)
+	}
 
 	matcher, err := createMatcher()
 	if err != nil {
@@ -186,9 +190,12 @@ func main() {
 	sctWriterWG.Add(1)
 	go sctWriterJob(addedCerts, sctWriter, &sctWriterWG)
 
-	submitLogClient := client.New(*targetLogUri, &http.Client{
+	submitLogClient, err := client.New(*targetLogUri, &http.Client{
 		Transport: transport,
-	})
+	}, jsonclient.Options{})
+	if err != nil {
+		log.Fatal(err)
+	}
 
 	backgroundCtx := context.Background()
 	var submitterWG sync.WaitGroup
