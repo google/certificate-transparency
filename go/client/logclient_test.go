@@ -227,7 +227,7 @@ func TestAddChain(t *testing.T) {
 	}
 
 	for i, tc := range testCases {
-		var deadline context.Context
+		deadline := context.Background()
 		if tc.deadlineLength >= 0 {
 			deadline, _ = context.WithDeadline(context.Background(), time.Now().Add(time.Duration(tc.deadlineLength)*time.Second))
 		}

@@ -124,9 +124,6 @@ func NewWithPubKey(uri string, hc *http.Client, pemEncodedKey string) (*LogClien
 // |path|. If provided context expires before submission is complete an
 // error will be returned.
 func (c *LogClient) addChainWithRetry(ctx context.Context, ctype ct.LogEntryType, path string, chain []ct.ASN1Cert) (*ct.SignedCertificateTimestamp, error) {
-	if ctx == nil {
-		ctx = context.TODO()
-	}
 	var resp addChainResponse
 	var req addChainRequest
 	for _, link := range chain {
