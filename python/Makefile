@@ -12,6 +12,7 @@ ct/proto/ct_pb2.py: ../proto/ct.proto
 
 # TODO(laiqu) use unittest ability to detect tests
 test: all
+	PYTHONPATH=$(PYTHONPATH):. ./ct/crypto/in_memory_merkle_tree_test.py
 	PYTHONPATH=$(PYTHONPATH):. ./ct/crypto/verify_test.py
 	PYTHONPATH=$(PYTHONPATH):. ./ct/crypto/merkle_test.py
 	PYTHONPATH=$(PYTHONPATH):. ./ct/crypto/pem_test.py
