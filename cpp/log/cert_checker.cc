@@ -72,9 +72,6 @@ bool CertChecker::LoadTrustedCertificatesFromBIO(BIO* bio_in) {
   CHECK_NOTNULL(bio_in);
   vector<pair<string, unique_ptr<const Cert>>> certs_to_add;
   bool error = false;
-  // certs_to_add may be empty if no new certs were added, so keep track of
-  // successfully parsed cert count separately.
-  size_t cert_count = 0;
 
   while (!error) {
     ScopedX509 x509(PEM_read_bio_X509(bio_in, nullptr, nullptr, nullptr));
@@ -89,7 +86,6 @@ bool CertChecker::LoadTrustedCertificatesFromBIO(BIO* bio_in) {
         break;
       }
 
-      ++cert_count;
       if (!is_trusted.ValueOrDie()) {
         certs_to_add.push_back(make_pair(subject_name, move(cert)));
       }
@@ -110,7 +106,7 @@ bool CertChecker::LoadTrustedCertificatesFromBIO(BIO* bio_in) {
     }
   }
 
-  if (error || !cert_count) {
+  if (error) {
     return false;
   }
 
