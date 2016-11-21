@@ -71,14 +71,14 @@ bool CertChecker::LoadTrustedCertificates(
 bool CertChecker::LoadTrustedCertificatesFromBIO(BIO* bio_in) {
   CHECK_NOTNULL(bio_in);
   vector<pair<string, unique_ptr<const Cert>>> certs_to_add;
-  bool error = false;
 
-  while (!error) {
+  while (!BIO_eof(bio_in)) {
     ScopedX509 x509(PEM_read_bio_X509(bio_in, nullptr, nullptr, nullptr));
     if (!x509) {
       // See if we reached the end of the file.
       auto err = ERR_peek_last_error();
-      if (ERR_GET_LIB(err) == ERR_LIB_PEM &&
+      if (BIO_eof(bio_in) &&
+          ERR_GET_LIB(err) == ERR_LIB_PEM &&
           ERR_GET_REASON(err) == PEM_R_NO_START_LINE) {
         ClearOpenSSLErrors();
         break;
@@ -86,8 +86,7 @@ bool CertChecker::LoadTrustedCertificatesFromBIO(BIO* bio_in) {
       // A real error.
       LOG(ERROR) << "Badly encoded certificate file.";
       LOG_OPENSSL_ERRORS(WARNING);
-      error = true;
-      break;
+      return false;
     }
 
     // TODO(ekasper): check that the issuing CA cert is temporally valid
@@ -96,17 +95,12 @@ bool CertChecker::LoadTrustedCertificatesFromBIO(BIO* bio_in) {
     string subject_name;
     const StatusOr<bool> is_trusted(IsTrusted(*cert, &subject_name));
     if (!is_trusted.ok()) {
-      error = true;
-      break;
+      return false;
     }
 
     if (!is_trusted.ValueOrDie()) {
       certs_to_add.push_back(make_pair(subject_name, move(cert)));
     }
-  }
-
-  if (error) {
-    return false;
   }
 
   size_t new_certs = certs_to_add.size();
