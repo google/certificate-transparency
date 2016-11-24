@@ -114,10 +114,7 @@ enum Code {
   UNAVAILABLE = 14,
 
   // Unrecoverable data loss or corruption.
-  DATA_LOSS = 15,
-
-  // Failed to initialize engine
-  ENGINE_INIT_FAILED = 16
+  DATA_LOSS = 15
 };
 
 

@@ -2,9 +2,9 @@
 #include "log/signer.h"
 
 #include <glog/logging.h>
+#include <openssl/err.h>
 #include <openssl/evp.h>
 #include <openssl/opensslv.h>
-#include <openssl/err.h>
 #include <stdint.h>
 
 #include "log/verifier.h"
@@ -63,7 +63,7 @@ std::string Signer::RawSign(const std::string& data) const {
   if (!EVP_SignFinal(&ctx, sig, &sig_size, pkey_.get())) {
     static char buf[1024];
     ERR_error_string(ERR_get_error(), buf);
-    LOG(FATAL) << "Failed to sign data. " << std::string(buf);
+    LOG(FATAL) << "Failed to sign data: " << std::string(buf);
   }
 
   EVP_MD_CTX_cleanup(&ctx);
