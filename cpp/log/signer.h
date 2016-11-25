@@ -3,6 +3,7 @@
 #ifndef CERT_TRANS_LOG_SIGNER_H_
 #define CERT_TRANS_LOG_SIGNER_H_
 
+#include <mutex>
 #include <openssl/evp.h>
 #include <openssl/x509.h>  // for i2d_PUBKEY
 #include <stdint.h>
@@ -15,7 +16,7 @@ namespace cert_trans {
 
 class Signer {
  public:
-  explicit Signer(EVP_PKEY* pkey, bool synchronize_signing = false);
+  explicit Signer(EVP_PKEY* pkey, const bool synchronize_signing = false);
   virtual ~Signer() = default;
 
   virtual std::string KeyID() const;
@@ -34,7 +35,8 @@ class Signer {
   ct::DigitallySigned::HashAlgorithm hash_algo_;
   ct::DigitallySigned::SignatureAlgorithm sig_algo_;
   std::string key_id_;
-  bool synchronize_signing_;
+  const bool synchronize_signing_;
+  mutable std::mutex signer_lock_;
 
   DISALLOW_COPY_AND_ASSIGN(Signer);
 };

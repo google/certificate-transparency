@@ -2,10 +2,10 @@
 #include "log/signer.h"
 
 #include <glog/logging.h>
+#include <mutex>
 #include <openssl/evp.h>
 #include <openssl/opensslv.h>
 #include <stdint.h>
-#include <mutex>
 
 #include "log/verifier.h"
 #include "proto/ct.pb.h"
@@ -16,12 +16,13 @@
 #endif
 
 using cert_trans::Verifier;
+using std::lock_guard;
+using std::mutex;
 
 namespace cert_trans {
 
-std::mutex lock_;
-
-Signer::Signer(EVP_PKEY* pkey, bool synchronize_signing) : pkey_(CHECK_NOTNULL(pkey)) {
+Signer::Signer(EVP_PKEY* pkey, const bool synchronize_signing)
+    : pkey_(CHECK_NOTNULL(pkey)), synchronize_signing_(synchronize_signing) {
   switch (pkey_->type) {
     case EVP_PKEY_EC:
       hash_algo_ = ct::DigitallySigned::SHA256;
@@ -35,7 +36,6 @@ Signer::Signer(EVP_PKEY* pkey, bool synchronize_signing) : pkey_(CHECK_NOTNULL(p
       LOG(FATAL) << "Unsupported key type " << pkey_->type;
   }
   key_id_ = Verifier::ComputeKeyID(pkey_.get());
-  synchronize_signing_ = synchronize_signing;
 }
 
 std::string Signer::KeyID() const {
@@ -51,7 +51,8 @@ void Signer::Sign(const std::string& data,
 
 Signer::Signer()
     : hash_algo_(ct::DigitallySigned::NONE),
-      sig_algo_(ct::DigitallySigned::ANONYMOUS) {
+      sig_algo_(ct::DigitallySigned::ANONYMOUS),
+      synchronize_signing_(false) {
 }
 
 std::string Signer::RawSign(const std::string& data) const {
@@ -64,7 +65,11 @@ std::string Signer::RawSign(const std::string& data) const {
   unsigned char* sig = new unsigned char[sig_size];
 
   if (synchronize_signing_) {
-    std::lock_guard<std::mutex> lock(lock_);
+    // This is a workaround for a threading issue when using PKCS11 openssl engine and Safenet HSM library.
+    // The problem occurs when multiple executions of PKCS11 engine do_sign() method,
+    // which relies on HSM library to generate the signature on Safenet device.
+    // EVP_SignFinal() calls do_sign() method internally, so we need to synchronize here to get signing working.
+    lock_guard<mutex> lock(signer_lock_);
     CHECK_EQ(1, EVP_SignFinal(&ctx, sig, &sig_size, pkey_.get()));
   } else {
     CHECK_EQ(1, EVP_SignFinal(&ctx, sig, &sig_size, pkey_.get()));

@@ -12,7 +12,7 @@
 
 class LogSigner : public cert_trans::Signer {
  public:
-  explicit LogSigner(EVP_PKEY* pkey, bool synchronize_signing = false);
+  explicit LogSigner(EVP_PKEY* pkey, const bool synchronize_signing = false);
   virtual ~LogSigner();
 
   enum SignResult {

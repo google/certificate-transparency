@@ -42,7 +42,9 @@ DEFINE_double(guard_window_seconds, 60,
               "number of seconds will not be sequenced.");
 DEFINE_int32(num_http_server_threads, 16,
              "Number of threads for servicing the incoming HTTP requests.");
-DEFINE_bool(synchronize_signing, false, "true if signing should be synchronized");
+DEFINE_bool(synchronize_signing, false,
+            "Flag to synchronize signing in order to workaround a "
+            "threading issue when using PKCS11 openssl engine and Safenet HSM library");
 
 namespace libevent = cert_trans::libevent;
 

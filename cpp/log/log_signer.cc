@@ -43,7 +43,7 @@ LogSigVerifier::VerifyResult ConvertStatus(const Verifier::Status status) {
 
 }  // namespace
 
-LogSigner::LogSigner(EVP_PKEY* pkey, bool synchronize_signing) : cert_trans::Signer(pkey, synchronize_signing) {
+LogSigner::LogSigner(EVP_PKEY* pkey, const bool synchronize_signing) : cert_trans::Signer(pkey, synchronize_signing) {
 }
 
 LogSigner::~LogSigner() {
