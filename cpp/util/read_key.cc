@@ -3,9 +3,13 @@
 #ifndef OPENSSL_IS_BORINGSSL
 #include <openssl/conf.h>
 #include <openssl/engine.h>
-#endif
+#endif  // OPENSSL_IS_BORINGSSL
 #include <openssl/pem.h>
 #include <memory>
+
+#ifndef OPENSSL_IS_BORINGSSL
+#include "util/openssl_util.h"
+#endif  // OPENSSL_IS_BORINGSSL
 
 using std::unique_ptr;
 
@@ -34,7 +38,7 @@ static void EngineFree() {
 static void EngineFinish() {
   ENGINE_finish(engine);
 }
-#endif
+#endif  // OPENSSL_IS_BORINGSSL
 
 util::StatusOr<EVP_PKEY*> ReadPrivateKey(const std::string& file, const std::string& engine_name) {
   unique_ptr<FILE, void (*)(FILE*)> fp(fopen(file.c_str(), "r"), FileCloser);
@@ -63,9 +67,7 @@ util::StatusOr<EVP_PKEY*> ReadPrivateKey(const std::string& file, const std::str
       atexit(EngineFree);
 
       if (!ENGINE_init(engine)) {
-        static char buf[1024];
-        ERR_error_string(ERR_get_error(), buf);
-        return util::Status(util::error::FAILED_PRECONDITION, "engine init failed: " + std::string(buf));
+        return util::Status(util::error::FAILED_PRECONDITION, "engine init failed: " + util::DumpOpenSSLErrorStack());
       }
       atexit(EngineFinish);
 
@@ -74,7 +76,7 @@ util::StatusOr<EVP_PKEY*> ReadPrivateKey(const std::string& file, const std::str
 
     retval = ENGINE_load_private_key(engine, file.c_str(), nullptr, nullptr);
   }
-#endif
+#endif  // OPENSSL_IS_BORINGSSL
   if (!retval) {
     return util::Status(util::error::FAILED_PRECONDITION, "invalid key: " + file);
   }

@@ -58,6 +58,7 @@ DEFINE_string(etcd_servers, "",
 DEFINE_string(key, "", "PEM-encoded server private key file");
 DEFINE_string(engine, "", "OpenSSL engine to initialize and use");
 
+
 namespace {
 
 
@@ -78,7 +79,7 @@ void Usage() {
 
 unique_ptr<LogSigner> BuildLogSigner() {
   CHECK(!FLAGS_key.empty());
-  util::StatusOr<EVP_PKEY*> pkey(ReadPrivateKey(FLAGS_key, FLAGS_engine));
+  const util::StatusOr<EVP_PKEY*> pkey(ReadPrivateKey(FLAGS_key, FLAGS_engine));
   CHECK_EQ(pkey.status(), util::Status::OK);
   return unique_ptr<LogSigner>(new LogSigner(pkey.ValueOrDie()));
 }

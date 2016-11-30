@@ -9,6 +9,7 @@
 
 #include "log/verifier.h"
 #include "proto/ct.pb.h"
+#include "util/openssl_util.h"
 #include "util/util.h"
 
 #if OPENSSL_VERSION_NUMBER < 0x10000000
@@ -61,9 +62,7 @@ std::string Signer::RawSign(const std::string& data) const {
   unsigned char* sig = new unsigned char[sig_size];
 
   if (!EVP_SignFinal(&ctx, sig, &sig_size, pkey_.get())) {
-    static char buf[1024];
-    ERR_error_string(ERR_get_error(), buf);
-    LOG(FATAL) << "Failed to sign data: " << std::string(buf);
+    LOG(FATAL) << "Failed to sign data: " << util::DumpOpenSSLErrorStack();
   }
 
   EVP_MD_CTX_cleanup(&ctx);

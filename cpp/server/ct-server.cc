@@ -96,6 +96,7 @@ static const bool cert_dummy =
 
 }  // namespace
 
+
 int main(int argc, char* argv[]) {
   // Ignore various signals whilst we start up.
   signal(SIGHUP, SIG_IGN);
@@ -107,7 +108,7 @@ int main(int argc, char* argv[]) {
 
   Server::StaticInit();
 
-  util::StatusOr<EVP_PKEY*> pkey(ReadPrivateKey(FLAGS_key, FLAGS_engine));
+  const util::StatusOr<EVP_PKEY*> pkey(ReadPrivateKey(FLAGS_key, FLAGS_engine));
   CHECK_EQ(pkey.status(), util::Status::OK);
   LogSigner log_signer(pkey.ValueOrDie());
 
