@@ -1,7 +1,6 @@
 #!/usr/bin/env trial
 import copy
 import difflib
-import gflags
 import logging
 import mock
 import os
@@ -20,10 +19,8 @@ from twisted.trial import unittest
 from twisted.web import iweb
 from zope.interface import implements
 
-FLAGS = gflags.FLAGS
-
-#TODO(ekasper) to make this setup common to all tests
-gflags.DEFINE_bool("verbose_tests", False, "Print test logs")
+# Print test logs
+VERBOSE_TESTS=False
 
 
 def dummy_compute_projected_sth(old_sth):
@@ -153,7 +150,7 @@ class MonitorTest(unittest.TestCase):
             _DEFAULT_STATE.verified_tree)
 
     def setUp(self):
-        if not FLAGS.verbose_tests:
+        if not VERBOSE_TESTS:
           logging.disable(logging.CRITICAL)
         self.db = sqlite_log_db.SQLiteLogDB(
             sqlitecon.SQLiteConnectionManager(":memory:", keepalive=True))
@@ -507,5 +504,3 @@ class MonitorTest(unittest.TestCase):
                 ).addCallback(try_again_with_all_entries).addCallback(lambda _:
                     fake_fetch.assert_called_once_with(15, 19))
 
-if __name__ == "__main__" or __name__ == "ct.client.monitor_test":
-    sys.argv = FLAGS(sys.argv)
