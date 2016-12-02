@@ -19,9 +19,6 @@ from twisted.trial import unittest
 from twisted.web import iweb
 from zope.interface import implements
 
-# Print test logs
-VERBOSE_TESTS=False
-
 
 def dummy_compute_projected_sth(old_sth):
     sth = client_pb2.SthResponse()
@@ -150,8 +147,9 @@ class MonitorTest(unittest.TestCase):
             _DEFAULT_STATE.verified_tree)
 
     def setUp(self):
-        if not VERBOSE_TESTS:
-          logging.disable(logging.CRITICAL)
+        # For verbose tests, comment out the next line.
+        logging.disable(logging.CRITICAL)
+
         self.db = sqlite_log_db.SQLiteLogDB(
             sqlitecon.SQLiteConnectionManager(":memory:", keepalive=True))
         # We can't simply use DB in memory with keepalive True, because different
