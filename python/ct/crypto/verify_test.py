@@ -3,7 +3,6 @@
 import unittest
 
 import base64
-import gflags
 import os
 import sys
 
@@ -15,9 +14,8 @@ from ct.proto import client_pb2
 from ct.serialization import tls_message
 import mock
 
-FLAGS = gflags.FLAGS
-gflags.DEFINE_string("testdata_dir", "../test/testdata",
-                     "Location of test certs")
+# Location of test certs
+TESTDATA_DIR="../test/testdata"
 
 SYMANTEC_B64_KEY = (
     'MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEluqsHEYMG1XcDfy1lCdGV0JwOmkY4r'
@@ -34,7 +32,7 @@ VENAFI_B64_KEY = (
 )
 
 def read_testdata_file(test_file):
-    with open(os.path.join(FLAGS.testdata_dir, test_file), 'rb') as f:
+    with open(os.path.join(TESTDATA_DIR, test_file), 'rb') as f:
         return f.read()
 
 
@@ -189,7 +187,7 @@ class LogVerifierTest(object):
             sct.timestamp = fake_timestamp
 
         chain = map(lambda name: cert.Certificate.from_pem_file(
-                        os.path.join(FLAGS.testdata_dir, name)), chain)
+                        os.path.join(TESTDATA_DIR, name)), chain)
 
         key_info = client_pb2.KeyInfo()
         key_info.type = client_pb2.KeyInfo.ECDSA
@@ -200,7 +198,7 @@ class LogVerifierTest(object):
 
     def _test_verify_embedded_scts(self, chain):
         chain = map(lambda name: cert.Certificate.from_pem_file(
-                        os.path.join(FLAGS.testdata_dir, name)), chain)
+                        os.path.join(TESTDATA_DIR, name)), chain)
 
         key_info = client_pb2.KeyInfo()
         key_info.type = client_pb2.KeyInfo.ECDSA
@@ -482,7 +480,3 @@ class CreateKeyInfoTest(unittest.TestCase):
         self.assertEqual(key_info.type, client_pb2.KeyInfo.ECDSA)
         self.assertTrue('PUBLIC KEY' in key_info.pem_key)
 
-
-if __name__ == "__main__":
-    sys.argv = FLAGS(sys.argv)
-    unittest.main()
