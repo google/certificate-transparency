@@ -387,5 +387,5 @@ class AsyncLogClientTest(unittest.TestCase):
         self.pump_get_entries()
         self.assertTrue(consumer.result.check(ValueError))
 
-if __name__ == "__main__" or __name__ == "ct.client.async_log_client_test":
+if __name__ == "__main__":
     sys.argv = FLAGS(sys.argv)
