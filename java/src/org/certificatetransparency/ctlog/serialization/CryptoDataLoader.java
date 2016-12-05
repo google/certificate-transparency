@@ -83,21 +83,28 @@ public class CryptoDataLoader {
     String b64string = Joiner.on("").join(pemLines.subList(1, pemLines.size() - 1));
     // Extract public key
     X509EncodedKeySpec spec = new X509EncodedKeySpec(Base64.decodeBase64(b64string));
-    // Note: EC KeyFactory does not exist in openjdk, only Oracle's JDK.
-    KeyFactory kf = null;
+    KeyFactory kf;
     try {
-      kf = KeyFactory.getInstance("EC");
-      return kf.generatePublic(spec);
-    } catch (NoSuchAlgorithmException e) {
-      // EC is known to be missing from openjdk; Oracle's JDK must be used.
-      throw new UnsupportedCryptoPrimitiveException("EC support missing", e);
-    } catch (InvalidKeySpecException e) {
-      throw new InvalidInputException("Log public key is invalid", e);
+        // First try to parse as an RSA key. If it's an EC key then generatePublic throws.
+        // On OpenJDK it throws NPE, but a different exception might be thrown on other Java implementations
+        kf = KeyFactory.getInstance("RSA");
+        return kf.generatePublic(spec);
+    } catch (Exception e1) {
+      try {
+        // Note: EC KeyFactory does not exist in openjdk, only Oracle's JDK.
+        kf = KeyFactory.getInstance("EC");
+        return kf.generatePublic(spec);
+      } catch (NoSuchAlgorithmException e) {
+        // EC is known to be missing from openjdk; Oracle's JDK must be used.
+        throw new UnsupportedCryptoPrimitiveException("EC support missing", e);
+      } catch (InvalidKeySpecException e) {
+        throw new InvalidInputException("Log public key is invalid", e);
+      }
     }
   }
 
   /**
-   * Load EC public key from a PEM file.
+   * Load EC or RSA public key from a PEM file.
    * @param pemFile File containing the key.
    * @return Public key represented by this file.
    */

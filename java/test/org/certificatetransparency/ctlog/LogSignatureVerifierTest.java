@@ -6,9 +6,11 @@ import static org.certificatetransparency.ctlog.TestData.PRE_CERT_SIGNING_CERT;
 import static org.certificatetransparency.ctlog.TestData.ROOT_CA_CERT;
 import static org.certificatetransparency.ctlog.TestData.TEST_CERT;
 import static org.certificatetransparency.ctlog.TestData.TEST_CERT_SCT;
+import static org.certificatetransparency.ctlog.TestData.TEST_CERT_SCT_RSA;
 import static org.certificatetransparency.ctlog.TestData.TEST_INTERMEDIATE_CERT;
 import static org.certificatetransparency.ctlog.TestData.TEST_INTERMEDIATE_CERT_SCT;
 import static org.certificatetransparency.ctlog.TestData.TEST_LOG_KEY;
+import static org.certificatetransparency.ctlog.TestData.TEST_LOG_KEY_RSA;
 import static org.certificatetransparency.ctlog.TestData.TEST_PRE_CERT;
 import static org.certificatetransparency.ctlog.TestData.TEST_PRE_CERT_PRECA_SCT;
 import static org.certificatetransparency.ctlog.TestData.TEST_PRE_CERT_SIGNED_BY_INTERMEDIATE;
@@ -17,6 +19,7 @@ import static org.certificatetransparency.ctlog.TestData.TEST_PRE_CERT_SIGNED_BY
 import static org.certificatetransparency.ctlog.TestData.TEST_PRE_CERT_SIGNED_BY_PRECA_INTERMEDIATE;
 import static org.certificatetransparency.ctlog.TestData.TEST_PRE_CERT_SIGNED_BY_PRECA_INTERMEDIATE_SCT;
 import static org.certificatetransparency.ctlog.TestData.TEST_PRE_SCT;
+import static org.certificatetransparency.ctlog.TestData.TEST_PRE_SCT_RSA;
 import static org.certificatetransparency.ctlog.TestData.loadCertificates;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotNull;
@@ -51,10 +54,17 @@ import java.util.List;
  */
 @RunWith(JUnit4.class)
 public class LogSignatureVerifierTest {
+  /** Returns a LogSignatureVerifier for the test log with an EC key */
   private LogSignatureVerifier getVerifier() {
     LogInfo logInfo = LogInfo.fromKeyFile(TEST_LOG_KEY);
     return new LogSignatureVerifier(logInfo);
   }
+
+  /** Returns a LogSignatureVerifier for the test log with an RSA key */
+  private LogSignatureVerifier getVerifierRSA() {
+      LogInfo logInfo = LogInfo.fromKeyFile(TEST_LOG_KEY_RSA);
+      return new LogSignatureVerifier(logInfo);
+    }
 
   /**
    * Tests for package-visible methods.
@@ -66,6 +76,15 @@ public class LogSignatureVerifierTest {
     Ct.SignedCertificateTimestamp sct = Deserializer.parseSCTFromBinary(
         new ByteArrayInputStream(Files.toByteArray(new File(TEST_CERT_SCT))));
     LogSignatureVerifier verifier = getVerifier();
+    assertTrue(verifier.verifySignature(sct, certs.get(0)));
+  }
+
+  @Test
+  public void signatureVerifiesRSA() throws IOException {
+    List<Certificate> certs = loadCertificates(TEST_CERT);
+    Ct.SignedCertificateTimestamp sct = Deserializer.parseSCTFromBinary(
+        new ByteArrayInputStream(Files.toByteArray(new File(TEST_CERT_SCT_RSA))));
+    LogSignatureVerifier verifier = getVerifierRSA();
     assertTrue(verifier.verifySignature(sct, certs.get(0)));
   }
 
@@ -83,6 +102,25 @@ public class LogSignatureVerifierTest {
         new ByteArrayInputStream(Files.toByteArray(new File(TEST_PRE_SCT))));
 
     LogSignatureVerifier verifier = getVerifier();
+    assertTrue("Expected signature to verify OK",
+        verifier.verifySCTOverPreCertificate(sct, (X509Certificate) preCertificate,
+            LogSignatureVerifier.issuerInformationFromCertificateIssuer(signerCert)));
+  }
+
+  @Test
+  public void signatureOnPreCertificateVerifiesRSA() throws IOException {
+    List<Certificate> preCertificatesList = loadCertificates(TEST_PRE_CERT);
+    assertEquals(1, preCertificatesList.size());
+    Certificate preCertificate = preCertificatesList.get(0);
+
+    List<Certificate> caList = loadCertificates(ROOT_CA_CERT);
+    assertEquals(1, caList.size());
+    Certificate signerCert = caList.get(0);
+
+    Ct.SignedCertificateTimestamp sct = Deserializer.parseSCTFromBinary(
+        new ByteArrayInputStream(Files.toByteArray(new File(TEST_PRE_SCT_RSA))));
+
+    LogSignatureVerifier verifier = getVerifierRSA();
     assertTrue("Expected signature to verify OK",
         verifier.verifySCTOverPreCertificate(sct, (X509Certificate) preCertificate,
             LogSignatureVerifier.issuerInformationFromCertificateIssuer(signerCert)));
