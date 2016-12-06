@@ -5,26 +5,47 @@ import java.security.cert.Certificate;
 import java.security.cert.CertificateEncodingException;
 import java.security.cert.CertificateException;
 import java.security.cert.CertificateFactory;
+import java.security.cert.CertificateParsingException;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
 
 import org.apache.commons.codec.binary.Base64;
+import org.apache.commons.logging.Log;
+import org.apache.commons.logging.LogFactory;
 import org.apache.http.NameValuePair;
 import org.apache.http.message.BasicNameValuePair;
+import org.bouncycastle.asn1.ASN1Primitive;
+import org.bouncycastle.asn1.ASN1Sequence;
+import org.bouncycastle.asn1.x509.TBSCertificate;
+import org.bouncycastle.jce.provider.X509CertificateObject;
+import org.certificatetransparency.ctlog.CTLogOutput;
+import org.certificatetransparency.ctlog.CertificateData;
 import org.certificatetransparency.ctlog.CertificateInfo;
 import org.certificatetransparency.ctlog.CertificateTransparencyException;
+import org.certificatetransparency.ctlog.LogEntry;
 import org.certificatetransparency.ctlog.ParsedLogEntry;
 import org.certificatetransparency.ctlog.ParsedLogEntryWithProof;
 import org.certificatetransparency.ctlog.SignedTreeHead;
 import org.certificatetransparency.ctlog.proto.Ct;
+import org.certificatetransparency.ctlog.proto.Ct.LogEntryType;
 import org.certificatetransparency.ctlog.serialization.Deserializer;
 import org.json.simple.JSONArray;
 import org.json.simple.JSONObject;
 import org.json.simple.JSONValue;
 
 import com.google.common.base.Function;
+import com.google.common.base.Objects;
 import com.google.common.base.Preconditions;
+import com.google.common.base.Predicate;
+import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableList.Builder;
+import com.google.common.collect.Iterables;
 import com.google.common.collect.Lists;
+import com.google.common.primitives.Bytes;
 import com.google.protobuf.ByteString;
 
 /**
@@ -39,8 +60,13 @@ public class HttpLogClient {
   private static final String GET_STH_CONSISTENCY = "get-sth-consistency";
   private static final String GET_ENTRY_AND_PROOF = "get-entry-and-proof";
 
+  private static final Log LOG = LogFactory.getLog("CTLog");
+
+  private static final int PAGE_SIZE = getIntProperty("ct.log.client.page.size", "1000");
+  private static final int THREAD_POOL_SIZE = getIntProperty("ct.log.client.threads", "20");
+
   private final String logUrl;
-  private final HttpInvoker postInvoker;
+  private final HttpInvoker invoker;
 
   /**
    * New HttpLogClient.
@@ -53,11 +79,24 @@ public class HttpLogClient {
   /**
    * For testing specify an HttpInvoker
    * @param logUrl URL of the log.
-   * @param postInvoker HttpInvoker instance to use.
+   * @param invoker HttpInvoker instance to use.
    */
-  public HttpLogClient(String logUrl, HttpInvoker postInvoker) {
+  public HttpLogClient(String logUrl, HttpInvoker invoker) {
     this.logUrl = logUrl;
-    this.postInvoker = postInvoker;
+    this.invoker = invoker;
+  }
+
+  private static int getIntProperty(String name, String defaultValue) {
+    String value = System.getProperty(name, defaultValue);
+    try {
+      return Integer.parseInt(value);
+    } catch (NumberFormatException e) {
+      if (Objects.equal(value, defaultValue))
+        throw e;
+      LOG.warn(String.format("Failed to parse property '%s' with value '%s' to an integer. "
+          + "Trying with default value of '%s'.", name, value, defaultValue));
+      return Integer.parseInt(defaultValue);
+    }
   }
 
   /**
@@ -152,7 +191,7 @@ public class HttpLogClient {
       methodPath = ADD_CHAIN_PATH;
     }
 
-    String response = postInvoker.makePostRequest(logUrl + methodPath, jsonPayload);
+    String response = invoker.makePostRequest(logUrl + methodPath, jsonPayload);
     return parseServerResponse(response);
   }
 
@@ -162,7 +201,7 @@ public class HttpLogClient {
    * @return latest STH
    */
   public SignedTreeHead getLogSTH() {
-    String response = postInvoker.makeGetRequest(logUrl + GET_STH_PATH);
+    String response = invoker.makeGetRequest(logUrl + GET_STH_PATH);
     return parseSTHResponse(response);
   }
 
@@ -171,7 +210,7 @@ public class HttpLogClient {
    * @return a list of root certificates.
    */
   public List<Certificate> getLogRoots() {
-    String response = postInvoker.makeGetRequest(logUrl + GET_ROOTS_PATH);
+    String response = invoker.makeGetRequest(logUrl + GET_ROOTS_PATH);
 
     return parseRootCertsResponse(response);
   }
@@ -188,9 +227,106 @@ public class HttpLogClient {
     List<NameValuePair> params = createParamsList("start", "end", Long.toString(start),
       Long.toString(end));
 
-    String response = postInvoker.makeGetRequest(logUrl + GET_ENTRIES, params);
+    String response = invoker.makeGetRequest(logUrl + GET_ENTRIES, params);
     return parseLogEntries(response);
   }
+
+  /**
+   * @return the size of the tree (total number of entries).
+   */
+  public long getTreeSize() {
+    return parseSTHResponse(invoker.executeGetRequestWithRetry(logUrl + GET_STH_PATH, ImmutableList.<NameValuePair>of())).treeSize;
+  }
+
+  private final ExecutorService threadPool = Executors.newFixedThreadPool(THREAD_POOL_SIZE);
+
+  /**
+   * Retrieve all {@link LogEntry} entities between the start and end indexes.
+   * Entries are passed in batches to the {@link CTLogOutput} callback that is passed as a parameter.
+   */
+  public void getLogEntries(long start, long end, final CTLogOutput output) throws InterruptedException, ExecutionException {
+    Preconditions.checkArgument(start < end, "Strating index %d should be smaller than the end index %d.", start, end);
+    Preconditions.checkArgument(start >= 0, "Starting index %d should be greater than 0.", start);
+
+    List<Future<Long>> futures = Lists.newArrayList();
+    for (long current = start; current <= end; current += PAGE_SIZE) {
+      final long currentStart = current;
+      final long currentEnd = Math.min(end, current + PAGE_SIZE - 1);
+
+      futures.add(threadPool.submit(new Runnable() {
+        @Override public void run() {
+          LOG.info(String.format("Retrieving from %d to %d.", currentStart, currentEnd));
+          List<ParsedLogEntry> entries = parseLogEntries(invoker.executeGetRequestWithRetry(logUrl + GET_ENTRIES, createParamsList("start", "end", Long.toString(currentStart), Long.toString(currentEnd))));
+          output.addAll(Lists.transform(entries, entryToCertificateData), currentStart, currentEnd);
+        }
+      }, 1L));
+    }
+
+    Iterables.all(futures, new Predicate<Future<Long>>() {
+      @Override
+      public boolean apply(Future<Long> future) {
+        try {
+          future.get();
+        } catch (InterruptedException | ExecutionException e) {
+          e.printStackTrace();
+        }
+        return true;
+      }
+    });
+  }
+
+  private List<X509CertificateObject> getExtraCertificates(List<byte[]> extraData) {
+    Builder<X509CertificateObject> list = ImmutableList.builder();
+    int tag = 0;
+    for (byte[] cert : extraData) {
+      try {
+        ASN1Primitive asn1Primitive = org.bouncycastle.asn1.x509.Certificate.getInstance(cert).toASN1Primitive();
+        if (asn1Primitive instanceof ASN1Sequence && ((ASN1Sequence) asn1Primitive).size() == 3) {
+          X509CertificateObject certificate =
+              new X509CertificateObject(org.bouncycastle.asn1.x509.Certificate.getInstance(asn1Primitive));
+          list.add(certificate);
+          LOG.debug(String.format("Extra Certificate: %s", certificate));
+        } else
+          LOG.debug(String.format("tag: %d: %s:%s", tag, asn1Primitive.getClass().getSimpleName(),
+              asn1Primitive.toString()));
+      } catch (Exception e) {
+        e.printStackTrace();
+      }
+    }
+
+    return list.build();
+  }
+
+  private Function<ParsedLogEntry, CertificateData> entryToCertificateData =
+    new Function<ParsedLogEntry, CertificateData>() {
+    @Override public CertificateData apply(ParsedLogEntry entry) {
+      X509CertificateObject certificate = null;
+      TBSCertificate preCertificate = null;
+      List<byte[]> extraCertificates = new ArrayList<>();
+
+      LogEntryType entryType = entry.getMerkleTreeLeaf().timestampedEntry.entryType;
+        switch (entryType) {
+          case X509_ENTRY:
+            try {
+              certificate = new X509CertificateObject(org.bouncycastle.asn1.x509.Certificate.getInstance(entry.getLogEntry().x509Entry.leafCertificate));
+              LOG.debug("cert Issuer: " + certificate.getIssuerDN());
+              extraCertificates = entry.getLogEntry().x509Entry.certificateChain;
+              break;
+            } catch (CertificateParsingException e) {
+              e.printStackTrace();
+            }
+          case PRECERT_ENTRY:
+            preCertificate = TBSCertificate.getInstance(entry.getLogEntry().precertEntry.preCert.tbsCertificate);
+            LOG.debug("issuerKeyHash: " + Bytes.asList(entry.getLogEntry().precertEntry.preCert.issuerKeyHash));
+            extraCertificates = entry.getLogEntry().precertEntry.precertificateChain;
+            break;
+          default:
+            break;
+        }
+
+        return CertificateData.newData(entryType, certificate, preCertificate, new byte[0], getExtraCertificates(extraCertificates));
+      }
+    };
 
   /**
    * Retrieve Merkle Consistency Proof between Two Signed Tree Heads.
@@ -201,10 +337,8 @@ public class HttpLogClient {
   public List<ByteString> getSTHConsistency(long first, long second) {
     Preconditions.checkArgument(0 <= first && second >= first);
 
-    List<NameValuePair> params = createParamsList("first", "second", Long.toString(first),
-      Long.toString(second));
-
-    String response = postInvoker.makeGetRequest(logUrl + GET_STH_CONSISTENCY, params);
+    String response = invoker.makeGetRequest(logUrl + GET_STH_CONSISTENCY,
+        createParamsList("first", "second", Long.toString(first), Long.toString(second)));
     return parseConsistencyProof(response);
   }
 
@@ -217,10 +351,8 @@ public class HttpLogClient {
   public ParsedLogEntryWithProof getLogEntryAndProof(long leafindex, long treeSize) {
     Preconditions.checkArgument(0 <= leafindex && treeSize >= leafindex);
 
-    List<NameValuePair> params = createParamsList("leaf_index", "tree_size",
-      Long.toString(leafindex), Long.toString(treeSize));
-
-    String response = postInvoker.makeGetRequest(logUrl + GET_ENTRY_AND_PROOF, params);
+    String response = invoker.makeGetRequest(logUrl + GET_ENTRY_AND_PROOF,
+        createParamsList("leaf_index", "tree_size", Long.toString(leafindex), Long.toString(treeSize)));
     JSONObject entry = (JSONObject) JSONValue.parse(response);
     JSONArray auditPath = (JSONArray) entry.get("audit_path");
 
@@ -236,12 +368,10 @@ public class HttpLogClient {
    * @param secondParamValue The second parameter value.
    * @return A list of NameValuePair objects.
    */
-  private List<NameValuePair> createParamsList(String firstParamName, String secondParamName,
+  private ImmutableList<NameValuePair> createParamsList(String firstParamName, String secondParamName,
     String firstParamValue, String secondParamValue) {
-    List<NameValuePair> params = new ArrayList<NameValuePair>();
-    params.add(new BasicNameValuePair(firstParamName, firstParamValue));
-    params.add(new BasicNameValuePair(secondParamName, secondParamValue));
-    return params;
+    return ImmutableList.<NameValuePair>of(new BasicNameValuePair(firstParamName, firstParamValue),
+      new BasicNameValuePair(secondParamName, secondParamValue));
   }
 
   /**

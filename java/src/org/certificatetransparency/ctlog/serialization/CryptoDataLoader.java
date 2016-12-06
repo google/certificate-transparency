@@ -91,8 +91,16 @@ public class CryptoDataLoader {
     } catch (NoSuchAlgorithmException e) {
       // EC is known to be missing from openjdk; Oracle's JDK must be used.
       throw new UnsupportedCryptoPrimitiveException("EC support missing", e);
-    } catch (InvalidKeySpecException e) {
-      throw new InvalidInputException("Log public key is invalid", e);
+    } catch (NullPointerException | InvalidKeySpecException e) {
+      // Not EC key, so try to parse as RSA
+      try {
+        kf = KeyFactory.getInstance("RSA");
+        PublicKey pk = kf.generatePublic(spec);
+        System.out.println("Public key parsed");
+        return pk;
+      } catch (InvalidKeySpecException | NoSuchAlgorithmException e1) {
+        throw new InvalidInputException("Log public key is invalid. " + e1.getMessage(), e);
+      }
     }
   }
 
