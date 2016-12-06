@@ -15,14 +15,17 @@ public class TestData {
   private static final String DATA_ROOT = "test/testdata/";
   // Public log key
   public static final String TEST_LOG_KEY = DATA_ROOT + "ct-server-key-public.pem";
+  public static final String TEST_LOG_KEY_RSA = DATA_ROOT + "rsa/ct-server-key-public-rsa.pem";
   // Root CA cert.
   public static final String ROOT_CA_CERT = DATA_ROOT + "ca-cert.pem";
   // Ordinary cert signed by ca-cert, with SCT served separately.
   public static final String TEST_CERT = DATA_ROOT + "test-cert.pem";
   public static final String TEST_CERT_SCT = DATA_ROOT + "test-cert.proof";
+  public static final String TEST_CERT_SCT_RSA = DATA_ROOT + "rsa/test-cert-rsa.proof";
   // PreCertificate signed by ca-cert.
   public static final String TEST_PRE_CERT = DATA_ROOT + "test-embedded-pre-cert.pem";
   public static final String TEST_PRE_SCT = DATA_ROOT + "test-embedded-pre-cert.proof";
+  public static final String TEST_PRE_SCT_RSA = DATA_ROOT + "rsa/test-embedded-pre-cert-rsa.proof";
   // PreCertificate Signing cert, signed by ca-cert.pem
   public static final String PRE_CERT_SIGNING_CERT = DATA_ROOT + "ca-pre-cert.pem";
   // PreCertificate signed by the PreCertificate Signing Cert above.

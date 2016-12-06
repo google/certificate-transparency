@@ -56,6 +56,7 @@ public class LogInfo {
 
   /**
    * Creates a LogInfo instance from the Log's public key file.
+   * Supports both EC and RSA keys.
    *
    * @param pemKeyFilePath Path of the log's public key file.
    * @return new LogInfo instance.

@@ -286,14 +286,19 @@ public class LogSignatureVerifier {
   }
 
   private boolean verifySCTSignatureOverBytes(Ct.SignedCertificateTimestamp sct, byte[] toVerify) {
-    if (!logInfo.getSignatureAlgorithm().equals("EC")) {
+    final String sigAlg;
+    if (logInfo.getSignatureAlgorithm().equals("EC")) {
+      sigAlg = "SHA256withECDSA";
+    } else if (logInfo.getSignatureAlgorithm().equals("RSA")) {
+      sigAlg = "SHA256withRSA";
+    } else {
       throw new CertificateTransparencyException(
-          String.format("Non-EC signature %s not supported yet",
+          String.format("Unsupported signature algorithm %s",
               logInfo.getSignatureAlgorithm()));
     }
 
     try {
-      Signature signature = Signature.getInstance("SHA256withECDSA");
+      Signature signature = Signature.getInstance(sigAlg);
       signature.initVerify(logInfo.getKey());
       signature.update(toVerify);
       return signature.verify(sct.getSignature().getSignature().toByteArray());
@@ -304,7 +309,7 @@ public class LogSignatureVerifier {
       throw new CertificateTransparencyException("Log's public key cannot be used", e);
     } catch (NoSuchAlgorithmException e) {
       throw new UnsupportedCryptoPrimitiveException(
-          "Sha-256 with ECDSA not supported by this JVM", e);
+          sigAlg + " not supported by this JVM", e);
     }
   }
 
