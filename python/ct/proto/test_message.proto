@@ -1,6 +1,6 @@
 syntax = "proto2";
 
-package ct;
+package ctpy;
 
 import "ct/proto/tls_options.proto";
 

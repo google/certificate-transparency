@@ -2,7 +2,7 @@ syntax = "proto2";
 
 import "google/protobuf/descriptor.proto";
 
-package ct;
+package ctpy;
 
 // TLS field options specify the wire format for parsing TLS wire messages
 // to protocol buffers, using the custom encoder/decoder in tls_message.py.
