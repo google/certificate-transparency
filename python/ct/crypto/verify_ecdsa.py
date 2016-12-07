@@ -1,16 +1,12 @@
 from ct.crypto import error
 from ct.crypto import pem
-from ct.crypto.asn1 import types
 from ct.proto import client_pb2
 
-import hashlib
-import ecdsa
-
-class _ECDSASignature(types.Sequence):
-    components = (
-            (types.Component("r", types.Integer)),
-            (types.Component("s", types.Integer))
-    )
+import cryptography
+from cryptography.hazmat.backends import default_backend as crypto_backend
+from cryptography.hazmat.primitives.asymmetric import ec
+from cryptography.hazmat.primitives import hashes
+from cryptography.hazmat.primitives import serialization
 
 class EcdsaVerifier(object):
     """Verifies ECDSA signatures."""
@@ -20,11 +16,6 @@ class EcdsaVerifier(object):
     # The hash algorithm used for this public key."""
     HASH_ALGORITHM = client_pb2.DigitallySigned.SHA256
 
-    # Markers to look for when reading a PEM-encoded ECDSA public key."""
-    __READ_MARKERS = ("PUBLIC KEY", "ECDSA PUBLIC KEY")
-    # A marker to write when writing a PEM-encoded ECDSA public key."""
-    __WRITE_MARKER = "ECDSA PUBLIC KEY"
-
     def __init__(self, key_info):
         """Creates a verifier that uses a PEM-encoded ECDSA public key.
 
@@ -33,22 +24,27 @@ class EcdsaVerifier(object):
 
         Raises:
         - PemError: If the key has an invalid encoding
+        - UnsupportedAlgorithmError: If the key uses an unsupported algorithm
         """
         if (key_info.type != client_pb2.KeyInfo.ECDSA):
             raise error.UnsupportedAlgorithmError(
                 "Expected ECDSA key, but got key type %d" % key_info.type)
 
-        # Will raise a PemError on invalid encoding
-        self.__der, _ = pem.from_pem(key_info.pem_key, self.__READ_MARKERS)
+        pem_key = str(key_info.pem_key)
+
         try:
-            self.__key = ecdsa.VerifyingKey.from_der(self.__der)
-        except ecdsa.der.UnexpectedDER as e:
-            raise error.EncodingError(e)
+            self.__key = crypto_backend().load_pem_public_key(pem_key)
+        except ValueError as e:
+            raise pem.PemError(e)
+        except cryptography.exceptions.UnsupportedAlgorithm as e:
+            raise error.UnsupportedAlgorithmError(e)
 
     def __repr__(self):
-        return "%s(public key: %r)" % (self.__class__.__name__,
-                                       pem.to_pem(self.__der,
-                                                  self.__WRITE_MARKER))
+        key_pem = self.__key.public_bytes(
+            serialization.Encoding.PEM,
+            serialization.PublicFormat.SubjectPublicKeyInfo)
+
+        return "%s(public key: %r)" % (self.__class__.__name__, key_pem)
 
     @error.returns_true_or_raises
     def verify(self, signature_input, signature):
@@ -62,18 +58,16 @@ class EcdsaVerifier(object):
         - True if the signature verifies.
 
         Raises:
-        - error.EncodingError: If the signature encoding is invalid.
         - error.SignatureError: If the signature fails verification.
         """
+        verifier = self.__key.verifier(signature, ec.ECDSA(hashes.SHA256()))
+        verifier.update(signature_input)
+
         try:
-            _ECDSASignature.decode(signature)
-            return self.__key.verify(signature, signature_input,
-                                     hashfunc=hashlib.sha256,
-                                     sigdecode=ecdsa.util.sigdecode_der)
-        except (ecdsa.der.UnexpectedDER, error.ASN1Error) as e:
-            raise error.EncodingError("Invalid DER encoding for signature %s",
-                                      signature.encode("hex"), e)
-        except ecdsa.keys.BadSignatureError:
-            raise error.SignatureError("Signature did not verify: %s",
+            verifier.verify()
+        except cryptography.exceptions.InvalidSignature:
+            raise error.SignatureError("Signature did not verify: %s" %
                                        signature.encode("hex"))
+
+        return True
 
