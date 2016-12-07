@@ -493,8 +493,7 @@ TEST_F(CertTest, SignatureAlgorithmMatches) {
 TEST_F(CertTest, IllegalSignatureAlgorithmParameter) {
   const unique_ptr<Cert> cert(
       Cert::FromPemString(kIllegalSigAlgParameterCertString));
-#if defined(OPENSSL_IS_BORINGSSL) && \
-    (defined(BORINGSSL_201603) || defined(BORINGSSL_201512))
+#if defined(OPENSSL_IS_BORINGSSL)
   EXPECT_FALSE(cert.get());
 #else
   EXPECT_TRUE(cert.get());
