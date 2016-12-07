@@ -8,6 +8,7 @@ protobuf
 mock
 twisted (at least 12.1; tested with 13.2)
 cryptography
+ecdsa (needed for deterministic ECDSA signatures in ct/crypto/signing)
 
 If you use pip, simply run `pip install -r requirements.txt`
 
