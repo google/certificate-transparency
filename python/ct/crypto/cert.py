@@ -221,6 +221,14 @@ class Certificate(object):
         """
         return self._asn1_cert["tbsCertificate"]["extensions"] or []
 
+    def tbscertificate(self):
+        """Returns the underlying tbsCertificate
+
+        Returns:
+            An x509.TBSCertificate instance.
+        """
+        return self._asn1_cert["tbsCertificate"]
+
     def version(self):
         """Get the version.
 

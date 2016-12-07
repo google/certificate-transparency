@@ -7,8 +7,10 @@ import time
 from ct.crypto import cert
 from ct.crypto import error
 from ct.crypto.asn1 import oid
+from ct.crypto.asn1 import x509_common
 from ct.crypto.asn1 import x509_extension as x509_ext
 from ct.crypto.asn1 import x509_name
+from ct.crypto.asn1 import x509
 from ct.test import test_config
 
 class CertificateTest(unittest.TestCase):
@@ -723,6 +725,14 @@ class CertificateTest(unittest.TestCase):
                                oid.ID_CE_CERTIFICATE_POLICIES,
                                oid.ID_CE_CRL_DISTRIBUTION_POINTS),
                               extensions_oids)
+
+    def test_tbscertificate(self):
+        c = self.cert_from_pem_file(self._PEM_FILE)
+        tbs = c.tbscertificate()
+        self.assertTrue(isinstance(tbs, x509.TBSCertificate))
+        self.assertEqual(
+                x509_common.CertificateSerialNumber(454887626504608315115709L),
+                tbs["serialNumber"])
 
     def test_indefinite_encoding(self):
         self.assertRaises(error.ASN1Error, self.cert_from_pem_file,
