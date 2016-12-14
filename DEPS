@@ -7,7 +7,7 @@ vars = {
 
      # SSL implementation alternatives:
      "openssl": 				 "https://github.com/openssl/openssl.git@OpenSSL_1_0_2d",
-     "boringssl":        "https://boringssl.googlesource.com/boringssl.git@2661"
+     "boringssl":        "https://boringssl.googlesource.com/boringssl.git@2883"
 }
 
 deps = {
