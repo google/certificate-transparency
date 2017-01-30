@@ -34,12 +34,16 @@ class HTTPError(Error):
 
 class HTTPClientError(HTTPError):
     """HTTP 4xx."""
-    pass
+    def __init__(self, code, reason, content, headers):
+      super(HTTPError, self).__init__("%s (%s) %s" % (reason, content, headers))
+      self.code = code
 
 
 class HTTPServerError(HTTPError):
     """HTTP 5xx."""
-    pass
+    def __init__(self, code, reason, content, headers):
+      super(HTTPError, self).__init__("%s (%s) %s" % (reason, content, headers))
+      self.code = code
 
 
 class InvalidRequestError(Error):
@@ -197,9 +201,9 @@ class RequestHandler(object):
         if code == 200:
             return
         elif 400 <= code < 500:
-            raise HTTPClientError("%s (%s) %s" % (reason, content, headers))
+            raise HTTPClientError(code, reason, content, headers)
         elif 500 <= code < 600:
-            raise HTTPServerError("%s (%s) %s" % (reason, content, headers))
+            raise HTTPServerError(code, reason, content, headers)
         else:
             raise HTTPError("%s (%s) %s" % (reason, content, headers))
 
