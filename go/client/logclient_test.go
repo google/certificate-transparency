@@ -227,6 +227,7 @@ func TestAddChainRetries(t *testing.T) {
 		t.Fatalf("Failed to create client: %v", err)
 	}
 	leeway := time.Millisecond * 100
+	leewayRatio := 0.1 // 10%
 	instant := time.Millisecond
 	fiveSeconds := time.Second * 5
 	sevenSeconds := time.Second * 7 // = 1 + 2 + 4
@@ -258,7 +259,9 @@ func TestAddChainRetries(t *testing.T) {
 		started := time.Now()
 		sct, err := client.AddChain(deadline, chain)
 		took := time.Since(started)
-		if math.Abs(float64(took-test.expected)) > float64(leeway) {
+		delta := math.Abs(float64(took - test.expected))
+		ratio := delta / float64(test.expected.Nanoseconds())
+		if delta > float64(leeway) && ratio > leewayRatio {
 			t.Errorf("#%d Submission took an unexpected length of time: %s, expected ~%s", i, took, test.expected)
 		}
 		if test.success && err != nil {
