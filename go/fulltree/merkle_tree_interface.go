@@ -1,4 +1,4 @@
-package merkletree
+package fulltree
 
 // MerkleTreeInterface represents the common interface for basic MerkleTree functions.
 type MerkleTreeInterface interface {

@@ -1,4 +1,4 @@
-package merkletree
+package fulltree
 
 /*
 #cgo LDFLAGS: -lcrypto

@@ -37,7 +37,7 @@ TREE NewMerkleTree(HASHER hasher);
 void DeleteMerkleTree(TREE tree);
 
 // MerkleTree methods below.
-// See the comments in ../../merkletree/merkle_tree.h for details
+// See the comments in ../../fulltree/merkle_tree.h for details
 
 size_t NodeSize(TREE tree);
 size_t LeafCount(TREE tree);
