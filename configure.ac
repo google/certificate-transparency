@@ -84,9 +84,7 @@ AC_CHECK_HEADER([gtest/gtest.h],, [missing_gtest=1])
 AS_VAR_APPEND([CPPFLAGS], [" -I$GMOCK_DIR/include"])
 AC_CHECK_HEADER([gmock/gmock.h],, [missing_gmock=1])
 AS_VAR_APPEND([CPPFLAGS], [" -I$GTEST_DIR"])
-AC_CHECK_HEADER([$GTEST_DIR/src/gtest-all.cc],, [missing_gtest=1])
 AS_VAR_APPEND([CPPFLAGS], [" -I$GMOCK_DIR"])
-AC_CHECK_HEADER([$GMOCK_DIR/src/gmock-all.cc],, [missing_gmock=1])
 CPPFLAGS="$saved_CPPFLAGS"
 AS_IF([test -n "$missing_gtest"],
       [AC_MSG_ERROR([could not find a working Google Test])])
@@ -106,7 +104,7 @@ AC_SEARCH_LIBS([clock_gettime], [rt],,, [$save_LIBS])
 
 AC_MSG_CHECKING([checking for gflags library])
 LIBS="-lgflags $LIBS"
-AC_LINK_IFELSE([AC_LANG_PROGRAM([[#include <gflags/gflags.h>]], [[google::ParseCommandLineFlags(NULL, NULL, true)]])], [have_gflags=yes], [have_gflags=no])
+AC_LINK_IFELSE([AC_LANG_PROGRAM([[#include <gflags/gflags.h>]], [[gflags::ParseCommandLineFlags(NULL, NULL, true)]])], [have_gflags=yes], [have_gflags=no])
 AC_MSG_RESULT([$have_gflags])
 AS_IF([test "x$have_gflags" = "xno"],
       [AC_MSG_ERROR([gflags library could not be found])])
@@ -117,6 +115,9 @@ AC_LINK_IFELSE([AC_LANG_PROGRAM([[#include <glog/logging.h>]], [[google::InitGoo
 AC_MSG_RESULT([$have_glog])
 AS_IF([test "x$have_glog" = "xno"],
       [AC_MSG_ERROR([glog library could not be found])])
+
+# Required for "make check" to build.
+LIBS="$LIBS -lgtest -lgmock"
 
 save_LIBS="$LIBS"
 AS_UNSET([LIBS])
@@ -144,6 +145,17 @@ AC_COMPILE_IFELSE([AC_LANG_PROGRAM([[#include <openssl/base.h>]],
                                    ]])
                   ],
                   [AC_MSG_RESULT([yes]); openssl_is_boringssl=1],
+                  [AC_MSG_RESULT([no])])
+
+AC_MSG_CHECKING([for LibreSSL])
+AC_COMPILE_IFELSE([AC_LANG_PROGRAM([[#include <openssl/opensslv.h>]],
+                                   [[
+                                     #ifndef LIBRESSL_VERSION_NUMBER
+                                     # error not LibreSSL
+                                     #endif
+                                   ]])
+                  ],
+                  [AC_MSG_RESULT([yes]); openssl_is_libressl=1],
                   [AC_MSG_RESULT([no])])
 
 save_LIBS="$LIBS"
@@ -212,6 +224,7 @@ AM_CONDITIONAL([HAVE_ANT], [test -n "$ANT"])
 AM_CONDITIONAL([HAVE_LDNS], [test -z "$missing_ldns"])
 AM_CONDITIONAL([HAVE_OBJECTHASH], [test -z "$missing_objecthash"])
 AM_CONDITIONAL([OPENSSL_IS_BORINGSSL], [test -n "$openssl_is_boringssl"])
+AM_CONDITIONAL([OPENSSL_NO_CMS], [test -z "$openssl_is_boringssl" -o -z "$openssl_is_boringssl"])
 AC_DEFINE_UNQUOTED([TEST_SRCDIR], ["$srcdir"], [Top of the source directory, for tests.])
 AC_SUBST([INSTALL_DIR])
 AC_CONFIG_FILES([Makefile])
