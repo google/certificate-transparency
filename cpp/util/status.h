@@ -181,6 +181,8 @@ extern ::std::ostream& operator<<(::std::ostream& os,
                                   ::util::error::Code code);
 extern ::std::ostream& operator<<(::std::ostream& os, const Status& other);
 
+// Returns an OK status, equivalent to a default constructed instance.
+inline Status OkStatus() { return Status(); }
 
 }  // namespace util
 

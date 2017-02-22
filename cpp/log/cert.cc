@@ -166,7 +166,7 @@ string ASN1ToStringAndCheckForNulls(ASN1_STRING* asn1_string,
     *status =
         util::Status(Code::INVALID_ARGUMENT, "Embedded null in asn1 string");
   } else {
-    *status = util::Status::OK;
+    *status = util::OkStatus();
   }
 
   return cpp_string;
@@ -508,7 +508,7 @@ util::Status Cert::DerEncoding(string* result) const {
 
   result->assign(reinterpret_cast<char*>(der_buf), der_length);
   OPENSSL_free(der_buf);
-  return util::Status::OK;
+  return util::OkStatus();
 }
 
 
@@ -527,7 +527,7 @@ util::Status Cert::PemEncoding(string* result) const {
 
   result->assign(data, len);
 
-  return util::Status::OK;
+  return util::OkStatus();
 }
 
 
@@ -544,7 +544,7 @@ util::Status Cert::Sha256Digest(string* result) const {
   }
 
   result->assign(reinterpret_cast<char*>(digest), len);
-  return util::Status::OK;
+  return util::OkStatus();
 }
 
 
@@ -560,7 +560,7 @@ util::Status Cert::DerEncodedTbsCertificate(string* result) const {
   }
   result->assign(reinterpret_cast<char*>(der_buf), der_length);
   OPENSSL_free(der_buf);
-  return util::Status::OK;
+  return util::OkStatus();
 }
 
 
@@ -589,7 +589,7 @@ util::Status Cert::DerEncodedName(X509_NAME* name, string* result) {
   }
   result->assign(reinterpret_cast<char*>(der_buf), der_length);
   OPENSSL_free(der_buf);
-  return util::Status::OK;
+  return util::OkStatus();
 }
 
 
@@ -605,7 +605,7 @@ util::Status Cert::PublicKeySha256Digest(string* result) const {
     return util::Status(Code::INVALID_ARGUMENT, "SHA256 digest failed");
   }
   result->assign(reinterpret_cast<char*>(digest), len);
-  return util::Status::OK;
+  return util::OkStatus();
 }
 
 
@@ -657,7 +657,7 @@ util::Status Cert::OctetStringExtensionData(int extension_nid,
   ScopedASN1_OCTET_STRING octet(
       static_cast<ASN1_OCTET_STRING*>(ext_struct.ValueOrDie()));
   result->assign(reinterpret_cast<const char*>(octet->data), octet->length);
-  return util::Status::OK;
+  return util::OkStatus();
 }
 
 
@@ -803,7 +803,7 @@ util::Status ExtractSubjectAltNames(STACK_OF(GENERAL_NAME)* subject_alt_names,
       dns_alt_names->push_back(dns_name);
     }
   }
-  return util::Status::OK;
+  return util::OkStatus();
 }
 
 
@@ -851,7 +851,7 @@ util::Status Cert::SubjectAltNames(vector<string>* dns_alt_names) const {
                                   CHECK_NOTNULL(dns_alt_names));
   }
 
-  return util::Status::OK;
+  return util::OkStatus();
 }
 
 
@@ -931,7 +931,7 @@ bool Cert::ValidateRedactionSubjectAltNameAndCN(int* dns_alt_name_count,
   // we found any redacted names. First though if nothing is redacted
   // then the rest of the rules need not be applied
   if (redacted_name_count == 0 && !IsRedactedHost(common_name)) {
-    *status = util::Status::OK;
+    *status = util::OkStatus();
     return true;
   }
 
@@ -1022,7 +1022,7 @@ util::Status Cert::IsValidWildcardRedaction() const {
                         "Failed to unpack integer sequence in ext");
   }
 
-  return util::Status::OK;
+  return util::OkStatus();
 }
 
 
@@ -1044,7 +1044,7 @@ util::Status Cert::IsValidNameConstrainedIntermediateCa() const {
   }
 
   if (!has_ca_constraint.ValueOrDie() || !has_name_constraints.ValueOrDie()) {
-    return util::Status::OK;
+    return util::OkStatus();
   }
 
   // So there now must be a CT extension and the name constraint must not be
@@ -1137,7 +1137,7 @@ util::Status Cert::IsValidNameConstrainedIntermediateCa() const {
                         "Does not exclude all IPv4 and v6 range");
   }
 
-  return util::Status::OK;
+  return util::OkStatus();
 }
 
 TbsCertificate::TbsCertificate(const Cert& cert) {
@@ -1165,7 +1165,7 @@ util::Status TbsCertificate::DerEncoding(string* result) const {
   }
   result->assign(reinterpret_cast<char*>(der_buf), der_length);
   OPENSSL_free(der_buf);
-  return util::Status::OK;
+  return util::OkStatus();
 }
 
 
@@ -1210,7 +1210,7 @@ util::Status TbsCertificate::DeleteExtension(int extension_nid) {
     return ignored_index.status();
   }
 
-  return util::Status::OK;
+  return util::OkStatus();
 }
 
 
@@ -1240,7 +1240,7 @@ util::Status TbsCertificate::CopyIssuerFrom(const Cert& from) {
   StatusOr<int> status = ExtensionIndex(NID_authority_key_identifier);
   if (status.status().CanonicalCode() == Code::NOT_FOUND) {
     // No extension found = nothing to copy
-    return util::Status::OK;
+    return util::OkStatus();
   }
 
   if (!status.ok() || !status.ValueOrDie()) {
@@ -1287,7 +1287,7 @@ util::Status TbsCertificate::CopyIssuerFrom(const Cert& from) {
     return util::Status(Code::INTERNAL, "Failed to copy extension data");
   }
 
-  return util::Status::OK;
+  return util::OkStatus();
 }
 
 
@@ -1426,7 +1426,7 @@ util::Status CertChain::IsValidCaIssuerChainMaybeLegacyRoot() const {
       return util::Status(Code::INVALID_ARGUMENT, "Issuer check failed");
     }
   }
-  return util::Status::OK;
+  return util::OkStatus();
 }
 
 
@@ -1463,7 +1463,7 @@ util::Status CertChain::IsValidSignatureChain() const {
     }
   }
 
-  return util::Status::OK;
+  return util::OkStatus();
 }
 
 

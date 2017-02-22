@@ -210,11 +210,11 @@ Status CertChecker::CheckPreCertChain(PreCertChain* chain,
   string key_hash;
   if (uses_pre_issuer.ValueOrDie()) {
     if (chain->Length() < 3 ||
-        chain->CertAt(2)->SPKISha256Digest(&key_hash) != util::Status::OK)
+        chain->CertAt(2)->SPKISha256Digest(&key_hash) != util::OkStatus())
       return Status(util::error::INTERNAL, "internal error");
   } else if (chain->Length() < 2 ||
              chain->CertAt(1)->SPKISha256Digest(&key_hash) !=
-                 util::Status::OK) {
+                 util::OkStatus()) {
     return Status(util::error::INTERNAL, "internal error");
   }
   // A well-formed chain always has a precert.
@@ -267,7 +267,7 @@ Status CertChecker::GetTrustedCa(CertChain* chain) const {
 
   string issuer_name;
   util::Status status = subject->DerEncodedIssuerName(&issuer_name);
-  if (status != util::Status::OK) {
+  if (status != util::OkStatus()) {
     // Doesn't matter whether the extension doesn't or exist or is corrupt,
     // it's still a bad chain
     return Status(util::error::INVALID_ARGUMENT, "invalid certificate chain");
@@ -324,7 +324,7 @@ StatusOr<bool> CertChecker::IsTrusted(const Cert& cert,
                                       string* subject_name) const {
   string cert_name;
   util::Status status = cert.DerEncodedSubjectName(&cert_name);
-  if (status != util::Status::OK) {
+  if (status != util::OkStatus()) {
     // Doesn't matter whether it failed to decode or did not exist
     return Status(util::error::INVALID_ARGUMENT, "invalid certificate chain");
   }
