@@ -63,7 +63,7 @@ util::Status FileStorage::CreateEntry(const string& key, const string& data) {
                         "entry already exists: " + key);
   }
   WriteStorageEntry(key, data);
-  return util::Status::OK;
+  return ::util::OkStatus();
 }
 
 
@@ -73,7 +73,7 @@ util::Status FileStorage::UpdateEntry(const string& key, const string& data) {
                         "tried to update non-existent entry: " + key);
   }
   WriteStorageEntry(key, data);
-  return util::Status::OK;
+  return ::util::OkStatus();
 }
 
 
@@ -86,7 +86,7 @@ util::Status FileStorage::LookupEntry(const string& key,
   if (result) {
     CHECK(util::ReadBinaryFile(data_file, result));
   }
-  return util::Status::OK;
+  return ::util::OkStatus();
 }
 
 

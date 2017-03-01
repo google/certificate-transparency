@@ -94,7 +94,7 @@ void XJsonHttpHandler::BlockingAddJson(evhttp_request* req,
   entry.mutable_x_json_entry()->set_json(json->ToString());
 
   AddEntryReply(req, CHECK_NOTNULL(frontend_)
-                         ->QueueProcessedEntry(Status::OK, entry, &sct),
+                         ->QueueProcessedEntry(::util::OkStatus(), entry, &sct),
                 sct);
 }
 

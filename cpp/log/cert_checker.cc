@@ -210,11 +210,11 @@ Status CertChecker::CheckPreCertChain(PreCertChain* chain,
   string key_hash;
   if (uses_pre_issuer.ValueOrDie()) {
     if (chain->Length() < 3 ||
-        chain->CertAt(2)->SPKISha256Digest(&key_hash) != util::OkStatus())
+        chain->CertAt(2)->SPKISha256Digest(&key_hash) != ::util::OkStatus())
       return Status(util::error::INTERNAL, "internal error");
   } else if (chain->Length() < 2 ||
              chain->CertAt(1)->SPKISha256Digest(&key_hash) !=
-                 util::OkStatus()) {
+                 ::util::OkStatus()) {
     return Status(util::error::INTERNAL, "internal error");
   }
   // A well-formed chain always has a precert.
@@ -240,7 +240,7 @@ Status CertChecker::CheckPreCertChain(PreCertChain* chain,
 
   issuer_key_hash->assign(key_hash);
   tbs_certificate->assign(der_tbs);
-  return Status::OK;
+  return ::util::OkStatus();
 }
 
 Status CertChecker::GetTrustedCa(CertChain* chain) const {
@@ -267,7 +267,7 @@ Status CertChecker::GetTrustedCa(CertChain* chain) const {
 
   string issuer_name;
   util::Status status = subject->DerEncodedIssuerName(&issuer_name);
-  if (status != util::OkStatus()) {
+  if (status != ::util::OkStatus()) {
     // Doesn't matter whether the extension doesn't or exist or is corrupt,
     // it's still a bad chain
     return Status(util::error::INVALID_ARGUMENT, "invalid certificate chain");
@@ -317,14 +317,14 @@ Status CertChecker::GetTrustedCa(CertChain* chain) const {
                   "failed to add trusted root to chain");
   }
 
-  return Status::OK;
+  return ::util::OkStatus();
 }
 
 StatusOr<bool> CertChecker::IsTrusted(const Cert& cert,
                                       string* subject_name) const {
   string cert_name;
   util::Status status = cert.DerEncodedSubjectName(&cert_name);
-  if (status != util::OkStatus()) {
+  if (status != ::util::OkStatus()) {
     // Doesn't matter whether it failed to decode or did not exist
     return Status(util::error::INVALID_ARGUMENT, "invalid certificate chain");
   }

@@ -138,7 +138,7 @@ class Cert {
   util::Status PublicKeySha256Digest(std::string* result) const;
 
   // Sets the Subject Alternative Name dNSNames in |dns_alt_names|.
-  // Returns Status::OK if the SAN dNSNames were extracted.
+  // Returns ::util::OkStatus() if the SAN dNSNames were extracted.
   // Returns INVALID_ARGUMENT if the DAN dNSNames could not be extracted.
   // Returns FAILED_PRECONDITION if the cert is not loaded.
   util::Status SubjectAltNames(std::vector<std::string>* dns_alt_names) const;

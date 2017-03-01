@@ -123,13 +123,13 @@ Database::WriteResult FileDB::CreateSequencedEntry_(
   if (status.CanonicalCode() == util::error::ALREADY_EXISTS) {
     string existing_data;
     status = cert_storage_->LookupEntry(seq_str, &existing_data);
-    CHECK_EQ(status, util::Status::OK);
+    CHECK_EQ(status, ::util::OkStatus());
     if (existing_data == data) {
       return this->OK;
     }
     return this->SEQUENCE_NUMBER_ALREADY_IN_USE;
   }
-  CHECK_EQ(status, util::Status::OK);
+  CHECK_EQ(status, ::util::OkStatus());
 
   InsertEntryMapping(logged.sequence_number(), logged.Hash());
 
@@ -154,7 +154,7 @@ Database::LookupResult FileDB::LookupByHash(const string& hash,
   string cert_data;
   const util::Status status(cert_storage_->LookupEntry(seq_str, &cert_data));
   // Gotta be there, or we're in trouble...
-  CHECK_EQ(status, util::Status::OK);
+  CHECK_EQ(status, ::util::OkStatus());
 
   if (result) {
     CHECK(result->ParseFromString(cert_data));
@@ -205,14 +205,14 @@ Database::WriteResult FileDB::WriteTreeHead_(const ct::SignedTreeHead& sth) {
   if (status.CanonicalCode() == util::error::ALREADY_EXISTS) {
     string existing_sth_data;
     status = tree_storage_->LookupEntry(timestamp_key, &existing_sth_data);
-    CHECK_EQ(status, util::Status::OK);
+    CHECK_EQ(status, ::util::OkStatus());
     if (existing_sth_data == data) {
       LOG(WARNING) << "Attempted to store identical STH in DB.";
       return this->OK;
     }
     return this->DUPLICATE_TREE_HEAD_TIMESTAMP;
   }
-  CHECK_EQ(status, util::Status::OK);
+  CHECK_EQ(status, ::util::OkStatus());
 
   if (sth.timestamp() > latest_tree_timestamp_) {
     latest_tree_timestamp_ = sth.timestamp();
@@ -301,7 +301,7 @@ void FileDB::BuildIndex() {
     string cert_data;
     // Read the data; tolerate no errors.
     CHECK_EQ(cert_storage_->LookupEntry(seq_path, &cert_data),
-             util::Status::OK)
+             ::util::OkStatus())
         << "Failed to read entry with sequence number " << seq;
 
     LoggedEntry logged;
@@ -336,7 +336,7 @@ Database::LookupResult FileDB::LatestTreeHeadNoLock(
 
   string tree_data;
   CHECK_EQ(tree_storage_->LookupEntry(latest_timestamp_key_, &tree_data),
-           util::Status::OK);
+           ::util::OkStatus());
 
   CHECK(result->ParseFromString(tree_data));
   CHECK_EQ(result->timestamp(), latest_tree_timestamp_);

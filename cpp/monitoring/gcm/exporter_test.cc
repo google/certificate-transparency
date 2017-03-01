@@ -87,7 +87,7 @@ class GCMExporterTest : public ::testing::Test {
     FLAGS_google_compute_monitoring_service_account = kServiceAccount;
 
     ON_CALL(fetcher_, Fetch(_, _, _))
-        .WillByDefault(Invoke(bind(&HandleFetch, util::Status::OK, 200,
+        .WillByDefault(Invoke(bind(&HandleFetch, ::util::OkStatus(), 200,
                                    UrlFetcher::Headers{}, "", _1, _2, _3)));
   }
 
@@ -117,7 +117,7 @@ TEST_F(GCMExporterTest, TestCredentials) {
                 ""),
             _, _))
       .WillRepeatedly(
-          Invoke(bind(&HandleFetch, util::Status::OK, 200,
+          Invoke(bind(&HandleFetch, ::util::OkStatus(), 200,
                       UrlFetcher::Headers{}, kCredentialsJson, _1, _2, _3)));
   EXPECT_CALL(
       fetcher_,
@@ -128,7 +128,7 @@ TEST_F(GCMExporterTest, TestCredentials) {
                 ""),
             _, _))
       .WillRepeatedly(
-          Invoke(bind(&HandleFetch, util::Status::OK, 200,
+          Invoke(bind(&HandleFetch, ::util::OkStatus(), 200,
                       UrlFetcher::Headers{}, kCredentialsJson, _1, _2, _3)));
   EXPECT_CALL(fetcher_,
               Fetch(IsUrlFetchRequest(
@@ -138,7 +138,7 @@ TEST_F(GCMExporterTest, TestCredentials) {
                             make_pair("Authorization", "Bearer token")},
                         _),
                     _, _))
-      .WillRepeatedly(Invoke(bind(&HandleFetch, util::Status::OK, 200,
+      .WillRepeatedly(Invoke(bind(&HandleFetch, ::util::OkStatus(), 200,
                                   UrlFetcher::Headers{}, "", _1, _2, _3)));
   EXPECT_CALL(fetcher_,
               Fetch(IsUrlFetchRequest(
@@ -148,7 +148,7 @@ TEST_F(GCMExporterTest, TestCredentials) {
                             make_pair("Authorization", "Bearer token")},
                         _),
                     _, _))
-      .WillRepeatedly(Invoke(bind(&HandleFetch, util::Status::OK, 200,
+      .WillRepeatedly(Invoke(bind(&HandleFetch, ::util::OkStatus(), 200,
                                   UrlFetcher::Headers{}, "", _1, _2, _3)));
   GCMExporter exporter("instance", &fetcher_, &pool_);
   while (!HasFetchedToken(exporter)) {
@@ -168,7 +168,7 @@ TEST_F(GCMExporterTest, TestRetriesFetchingCredentials) {
                 ""),
             _, _))
       .WillRepeatedly(
-          Invoke(bind(&HandleFetch, util::Status::OK, 200,
+          Invoke(bind(&HandleFetch, ::util::OkStatus(), 200,
                       UrlFetcher::Headers{}, kCredentialsJson, _1, _2, _3)));
   {
     InSequence s;
@@ -192,7 +192,7 @@ TEST_F(GCMExporterTest, TestRetriesFetchingCredentials) {
                   UrlFetcher::Headers{make_pair("Metadata-Flavor", "Google")},
                   ""),
               _, _))
-        .WillOnce(Invoke(bind(&HandleFetch, util::Status::OK, 500,
+        .WillOnce(Invoke(bind(&HandleFetch, ::util::OkStatus(), 500,
                               UrlFetcher::Headers{}, "", _1, _2, _3)));
     // Ok, all good now
     EXPECT_CALL(
@@ -204,7 +204,7 @@ TEST_F(GCMExporterTest, TestRetriesFetchingCredentials) {
                   ""),
               _, _))
         .WillRepeatedly(
-            Invoke(bind(&HandleFetch, util::Status::OK, 200,
+            Invoke(bind(&HandleFetch, ::util::OkStatus(), 200,
                         UrlFetcher::Headers{}, kCredentialsJson, _1, _2, _3)));
   }
 
@@ -216,7 +216,7 @@ TEST_F(GCMExporterTest, TestRetriesFetchingCredentials) {
                             make_pair("Authorization", "Bearer token")},
                         _),
                     _, _))
-      .WillRepeatedly(Invoke(bind(&HandleFetch, util::Status::OK, 200,
+      .WillRepeatedly(Invoke(bind(&HandleFetch, ::util::OkStatus(), 200,
                                   UrlFetcher::Headers{}, "", _1, _2, _3)));
   EXPECT_CALL(fetcher_,
               Fetch(IsUrlFetchRequest(
@@ -226,7 +226,7 @@ TEST_F(GCMExporterTest, TestRetriesFetchingCredentials) {
                             make_pair("Authorization", "Bearer token")},
                         _),
                     _, _))
-      .WillRepeatedly(Invoke(bind(&HandleFetch, util::Status::OK, 200,
+      .WillRepeatedly(Invoke(bind(&HandleFetch, ::util::OkStatus(), 200,
                                   UrlFetcher::Headers{}, "", _1, _2, _3)));
   GCMExporter exporter("instance", &fetcher_, &pool_);
   while (!HasFetchedToken(exporter)) {
@@ -254,7 +254,7 @@ TEST_F(GCMExporterTest, TestPushesMetrics) {
                 ""),
             _, _))
       .WillRepeatedly(
-          Invoke(bind(&HandleFetch, util::Status::OK, 200,
+          Invoke(bind(&HandleFetch, ::util::OkStatus(), 200,
                       UrlFetcher::Headers{}, kCredentialsJson, _1, _2, _3)));
   EXPECT_CALL(fetcher_,
               Fetch(IsUrlFetchRequest(
@@ -264,7 +264,7 @@ TEST_F(GCMExporterTest, TestPushesMetrics) {
                             make_pair("Authorization", "Bearer token")},
                         _),
                     _, _))
-      .WillRepeatedly(Invoke(bind(&HandleFetch, util::Status::OK, 200,
+      .WillRepeatedly(Invoke(bind(&HandleFetch, ::util::OkStatus(), 200,
                                   UrlFetcher::Headers{}, "", _1, _2, _3)));
   {
     InSequence s;
@@ -276,7 +276,7 @@ TEST_F(GCMExporterTest, TestPushesMetrics) {
                               make_pair("Authorization", "Bearer token")},
                           AllOf(HasSubstr("one"), HasSubstr("two"))),
                       _, _))
-        .WillOnce(Invoke(bind(&HandleFetch, util::Status::OK, 200,
+        .WillOnce(Invoke(bind(&HandleFetch, ::util::OkStatus(), 200,
                               UrlFetcher::Headers{}, "", _1, _2, _3)));
     EXPECT_CALL(fetcher_,
                 Fetch(IsUrlFetchRequest(
@@ -287,7 +287,7 @@ TEST_F(GCMExporterTest, TestPushesMetrics) {
                           AllOf(HasSubstr("one"), HasSubstr("two"))),
                       _, _))
         .WillOnce(DoAll(InvokeWithoutArgs([&sync] { sync.task()->Return(); }),
-                        Invoke(bind(&HandleFetch, util::Status::OK, 200,
+                        Invoke(bind(&HandleFetch, ::util::OkStatus(), 200,
                                     UrlFetcher::Headers{}, "", _1, _2, _3))));
   }
   GCMExporter exporter("instance", &fetcher_, &pool_);
@@ -312,7 +312,7 @@ TEST_F(GCMExporterTest, TestRetriesWhenPushingMetricsFails) {
                 ""),
             _, _))
       .WillRepeatedly(
-          Invoke(bind(&HandleFetch, util::Status::OK, 200,
+          Invoke(bind(&HandleFetch, ::util::OkStatus(), 200,
                       UrlFetcher::Headers{}, kCredentialsJson, _1, _2, _3)));
   EXPECT_CALL(fetcher_,
               Fetch(IsUrlFetchRequest(
@@ -322,7 +322,7 @@ TEST_F(GCMExporterTest, TestRetriesWhenPushingMetricsFails) {
                             make_pair("Authorization", "Bearer token")},
                         _),
                     _, _))
-      .WillRepeatedly(Invoke(bind(&HandleFetch, util::Status::OK, 200,
+      .WillRepeatedly(Invoke(bind(&HandleFetch, ::util::OkStatus(), 200,
                                   UrlFetcher::Headers{}, "", _1, _2, _3)));
 
   {
@@ -347,7 +347,7 @@ TEST_F(GCMExporterTest, TestRetriesWhenPushingMetricsFails) {
                               make_pair("Authorization", "Bearer token")},
                           AllOf(HasSubstr("one"), HasSubstr("two"))),
                       _, _))
-        .WillOnce(Invoke(bind(&HandleFetch, util::Status::OK, 500,
+        .WillOnce(Invoke(bind(&HandleFetch, ::util::OkStatus(), 500,
                               UrlFetcher::Headers{}, "", _1, _2, _3)));
     // OK!
     EXPECT_CALL(fetcher_,
@@ -358,7 +358,7 @@ TEST_F(GCMExporterTest, TestRetriesWhenPushingMetricsFails) {
                               make_pair("Authorization", "Bearer token")},
                           AllOf(HasSubstr("one"), HasSubstr("two"))),
                       _, _))
-        .WillOnce(Invoke(bind(&HandleFetch, util::Status::OK, 200,
+        .WillOnce(Invoke(bind(&HandleFetch, ::util::OkStatus(), 200,
                               UrlFetcher::Headers{}, "", _1, _2, _3)));
     // trigger test exit next time around
     EXPECT_CALL(fetcher_,
@@ -370,7 +370,7 @@ TEST_F(GCMExporterTest, TestRetriesWhenPushingMetricsFails) {
                           AllOf(HasSubstr("one"), HasSubstr("two"))),
                       _, _))
         .WillOnce(DoAll(InvokeWithoutArgs([&sync] { sync.task()->Return(); }),
-                        Invoke(bind(&HandleFetch, util::Status::OK, 200,
+                        Invoke(bind(&HandleFetch, ::util::OkStatus(), 200,
                                     UrlFetcher::Headers{}, "", _1, _2, _3))));
   }
   GCMExporter exporter("instance", &fetcher_, &pool_);

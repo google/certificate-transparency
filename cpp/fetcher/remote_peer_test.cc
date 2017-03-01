@@ -165,7 +165,7 @@ class RemotePeerTest : public ::testing::Test {
                                                     _, ""),
                                   _, _))
           .WillOnce(
-              Invoke(bind(&HandleFetch, Status::OK, 200, UrlFetcher::Headers{},
+              Invoke(bind(&HandleFetch, ::util::OkStatus(), 200, UrlFetcher::Headers{},
                           Jsonify(return_sth), _1, _2, _3)));
     } else {
       EXPECT_CALL(fetcher_, Fetch(IsUrlFetchRequest(UrlFetcher::Verb::GET,
@@ -174,7 +174,7 @@ class RemotePeerTest : public ::testing::Test {
                                                     _, ""),
                                   _, _))
           .WillRepeatedly(
-              Invoke(bind(&HandleFetch, Status::OK, 200, UrlFetcher::Headers{},
+              Invoke(bind(&HandleFetch, ::util::OkStatus(), 200, UrlFetcher::Headers{},
                           Jsonify(return_sth), _1, _2, _3)));
     }
   }
@@ -182,7 +182,7 @@ class RemotePeerTest : public ::testing::Test {
   void ReturnLatestSTH(const UrlFetcher::Request& req,
                        UrlFetcher::Response* resp, Task* task) {
     tree_signer_.UpdateTree();
-    HandleFetch(Status::OK, 200, UrlFetcher::Headers{},
+    HandleFetch(::util::OkStatus(), 200, UrlFetcher::Headers{},
                 Jsonify(tree_signer_.LatestSTH()), req, resp, task);
   }
 

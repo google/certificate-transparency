@@ -226,7 +226,7 @@ class EtcdTest : public ::testing::Test {
                                 IsEmpty(), ""),
               _, _))
         .WillRepeatedly(
-            Invoke(bind(HandleFetch, Status::OK, 200, UrlFetcher::Headers{},
+            Invoke(bind(HandleFetch, ::util::OkStatus(), 200, UrlFetcher::Headers{},
                         kVersionString, _1, _2, _3)));
   }
 
@@ -252,7 +252,7 @@ TEST_F(EtcdTest, Get) {
                                       IsEmpty(), ""),
                     _, _))
       .WillOnce(
-          Invoke(bind(HandleFetch, Status::OK, 200,
+          Invoke(bind(HandleFetch, ::util::OkStatus(), 200,
                       UrlFetcher::Headers{make_pair("x-etcd-index", "11")},
                       kGetJson, _1, _2, _3)));
 
@@ -276,7 +276,7 @@ TEST_F(EtcdTest, GetRecursive) {
                         IsEmpty(), ""),
                     _, _))
       .WillOnce(
-          Invoke(bind(HandleFetch, Status::OK, 200,
+          Invoke(bind(HandleFetch, ::util::OkStatus(), 200,
                       UrlFetcher::Headers{make_pair("x-etcd-index", "11")},
                       kGetJson, _1, _2, _3)));
 
@@ -301,7 +301,7 @@ TEST_F(EtcdTest, GetForInvalidKey) {
                                       IsEmpty(), ""),
                     _, _))
       .WillOnce(
-          Invoke(bind(HandleFetch, Status::OK, 404,
+          Invoke(bind(HandleFetch, ::util::OkStatus(), 404,
                       UrlFetcher::Headers{make_pair("x-etcd-index", "17")},
                       kKeyNotFoundJson, _1, _2, _3)));
   SyncTask task(base_.get());
@@ -322,7 +322,7 @@ TEST_F(EtcdTest, GetAll) {
                                       IsEmpty(), ""),
                     _, _))
       .WillOnce(
-          Invoke(bind(HandleFetch, Status::OK, 200,
+          Invoke(bind(HandleFetch, ::util::OkStatus(), 200,
                       UrlFetcher::Headers{make_pair("x-etcd-index", "1")},
                       kGetAllJson, _1, _2, _3)));
   SyncTask task(base_.get());
@@ -352,7 +352,7 @@ TEST_F(EtcdTest, GetWaitTooOld) {
                                       IsEmpty(), ""),
                     _, _))
       .WillOnce(Invoke(bind(
-          HandleFetch, Status::OK, 404,
+          HandleFetch, ::util::OkStatus(), 404,
           UrlFetcher::Headers{make_pair("x-etcd-index", to_string(kNewIndex))},
           kKeyNotFoundJson, _1, _2, _3)));
   SyncTask task(base_.get());
@@ -379,7 +379,7 @@ TEST_F(EtcdTest, Create) {
                 "consistent=true&prevExist=false&quorum=true&value=123"),
             _, _))
       .WillOnce(
-          Invoke(bind(HandleFetch, Status::OK, 200,
+          Invoke(bind(HandleFetch, ::util::OkStatus(), 200,
                       UrlFetcher::Headers{make_pair("x-etcd-index", "1")},
                       kCreateJson, _1, _2, _3)));
   SyncTask task(base_.get());
@@ -401,7 +401,7 @@ TEST_F(EtcdTest, CreateFails) {
                 "consistent=true&prevExist=false&quorum=true&value=123"),
             _, _))
       .WillOnce(
-          Invoke(bind(HandleFetch, Status::OK, 412,
+          Invoke(bind(HandleFetch, ::util::OkStatus(), 412,
                       UrlFetcher::Headers{make_pair("x-etcd-index", "1")},
                       kKeyAlreadyExistsJson, _1, _2, _3)));
   SyncTask task(base_.get());
@@ -424,7 +424,7 @@ TEST_F(EtcdTest, CreateWithTTL) {
               "consistent=true&prevExist=false&quorum=true&ttl=100&value=123"),
           _, _))
       .WillOnce(
-          Invoke(bind(HandleFetch, Status::OK, 200,
+          Invoke(bind(HandleFetch, ::util::OkStatus(), 200,
                       UrlFetcher::Headers{make_pair("x-etcd-index", "1")},
                       kCreateJson, _1, _2, _3)));
   SyncTask task(base_.get());
@@ -447,7 +447,7 @@ TEST_F(EtcdTest, CreateWithTTLFails) {
               "consistent=true&prevExist=false&quorum=true&ttl=100&value=123"),
           _, _))
       .WillOnce(
-          Invoke(bind(HandleFetch, Status::OK, 412,
+          Invoke(bind(HandleFetch, ::util::OkStatus(), 412,
                       UrlFetcher::Headers{make_pair("x-etcd-index", "1")},
                       kKeyAlreadyExistsJson, _1, _2, _3)));
   SyncTask task(base_.get());
@@ -468,7 +468,7 @@ TEST_F(EtcdTest, Update) {
                         "consistent=true&prevIndex=5&quorum=true&value=123"),
                     _, _))
       .WillOnce(
-          Invoke(bind(HandleFetch, Status::OK, 200,
+          Invoke(bind(HandleFetch, ::util::OkStatus(), 200,
                       UrlFetcher::Headers{make_pair("x-etcd-index", "1")},
                       kUpdateJson, _1, _2, _3)));
   SyncTask task(base_.get());
@@ -489,7 +489,7 @@ TEST_F(EtcdTest, UpdateFails) {
                         "consistent=true&prevIndex=5&quorum=true&value=123"),
                     _, _))
       .WillOnce(
-          Invoke(bind(HandleFetch, Status::OK, 412,
+          Invoke(bind(HandleFetch, ::util::OkStatus(), 412,
                       UrlFetcher::Headers{make_pair("x-etcd-index", "1")},
                       kCompareFailedJson, _1, _2, _3)));
   SyncTask task(base_.get());
@@ -511,7 +511,7 @@ TEST_F(EtcdTest, UpdateWithTTL) {
                 "consistent=true&prevIndex=5&quorum=true&ttl=100&value=123"),
             _, _))
       .WillOnce(
-          Invoke(bind(HandleFetch, Status::OK, 200,
+          Invoke(bind(HandleFetch, ::util::OkStatus(), 200,
                       UrlFetcher::Headers{make_pair("x-etcd-index", "1")},
                       kUpdateJson, _1, _2, _3)));
   SyncTask task(base_.get());
@@ -533,7 +533,7 @@ TEST_F(EtcdTest, UpdateWithTTLFails) {
                 "consistent=true&prevIndex=5&quorum=true&ttl=100&value=123"),
             _, _))
       .WillOnce(
-          Invoke(bind(HandleFetch, Status::OK, 412,
+          Invoke(bind(HandleFetch, ::util::OkStatus(), 412,
                       UrlFetcher::Headers{make_pair("x-etcd-index", "1")},
                       kCompareFailedJson, _1, _2, _3)));
   SyncTask task(base_.get());
@@ -554,7 +554,7 @@ TEST_F(EtcdTest, ForceSetForPreexistingKey) {
                         "consistent=true&quorum=true&value=123"),
                     _, _))
       .WillOnce(
-          Invoke(bind(HandleFetch, Status::OK, 200,
+          Invoke(bind(HandleFetch, ::util::OkStatus(), 200,
                       UrlFetcher::Headers{make_pair("x-etcd-index", "1")},
                       kUpdateJson, _1, _2, _3)));
   SyncTask task(base_.get());
@@ -575,7 +575,7 @@ TEST_F(EtcdTest, ForceSetForNewKey) {
                         "consistent=true&quorum=true&value=123"),
                     _, _))
       .WillOnce(
-          Invoke(bind(HandleFetch, Status::OK, 200,
+          Invoke(bind(HandleFetch, ::util::OkStatus(), 200,
                       UrlFetcher::Headers{make_pair("x-etcd-index", "1")},
                       kCreateJson, _1, _2, _3)));
   SyncTask task(base_.get());
@@ -596,7 +596,7 @@ TEST_F(EtcdTest, ForceSetWithTTLForPreexistingKey) {
                         "consistent=true&quorum=true&ttl=100&value=123"),
                     _, _))
       .WillOnce(
-          Invoke(bind(HandleFetch, Status::OK, 200,
+          Invoke(bind(HandleFetch, ::util::OkStatus(), 200,
                       UrlFetcher::Headers{make_pair("x-etcd-index", "1")},
                       kUpdateJson, _1, _2, _3)));
   SyncTask task(base_.get());
@@ -618,7 +618,7 @@ TEST_F(EtcdTest, ForceSetWithTTLForNewKey) {
                         "consistent=true&quorum=true&ttl=100&value=123"),
                     _, _))
       .WillOnce(
-          Invoke(bind(HandleFetch, Status::OK, 200,
+          Invoke(bind(HandleFetch, ::util::OkStatus(), 200,
                       UrlFetcher::Headers{make_pair("x-etcd-index", "1")},
                       kCreateJson, _1, _2, _3)));
   SyncTask task(base_.get());
@@ -639,7 +639,7 @@ TEST_F(EtcdTest, Delete) {
                               IsEmpty(), ""),
             _, _))
       .WillOnce(
-          Invoke(bind(HandleFetch, Status::OK, 200,
+          Invoke(bind(HandleFetch, ::util::OkStatus(), 200,
                       UrlFetcher::Headers{make_pair("x-etcd-index", "1")},
                       kDeleteJson, _1, _2, _3)));
   SyncTask task(base_.get());
@@ -658,7 +658,7 @@ TEST_F(EtcdTest, DeleteFails) {
                               IsEmpty(), ""),
             _, _))
       .WillOnce(
-          Invoke(bind(HandleFetch, Status::OK, 412,
+          Invoke(bind(HandleFetch, ::util::OkStatus(), 412,
                       UrlFetcher::Headers{make_pair("x-etcd-index", "1")},
                       kCompareFailedJson, _1, _2, _3)));
   SyncTask task(base_.get());
@@ -677,7 +677,7 @@ TEST_F(EtcdTest, ForceDelete) {
                                       IsEmpty(), ""),
                     _, _))
       .WillOnce(
-          Invoke(bind(HandleFetch, Status::OK, 200,
+          Invoke(bind(HandleFetch, ::util::OkStatus(), 200,
                       UrlFetcher::Headers{make_pair("x-etcd-index", "1")},
                       kDeleteJson, _1, _2, _3)));
   SyncTask task(base_.get());
@@ -707,7 +707,7 @@ TEST_F(EtcdTest, WatchInitialGetFailureCausesRetry) {
                                         IsEmpty(), ""),
                       _, _))
         .WillOnce(
-            Invoke(bind(HandleFetch, Status::OK, 200,
+            Invoke(bind(HandleFetch, ::util::OkStatus(), 200,
                         UrlFetcher::Headers{make_pair("x-etcd-index", "9")},
                         kGetJson, _1, _2, _3)));
   }
@@ -750,7 +750,7 @@ TEST_F(EtcdTest, WatchInitialGetFailureRetriesOnNextEtcd) {
                                 IsEmpty(), ""),
               _, _))
         .WillOnce(
-            Invoke(bind(HandleFetch, Status::OK, 200,
+            Invoke(bind(HandleFetch, ::util::OkStatus(), 200,
                         UrlFetcher::Headers{make_pair("x-etcd-index", "9")},
                         kGetJson, _1, _2, _3)));
   }
@@ -780,7 +780,7 @@ TEST_F(EtcdTest, WatchHangingGetTimeoutCausesRetry) {
                                         IsEmpty(), ""),
                       _, _))
         .WillOnce(
-            Invoke(bind(HandleFetch, Status::OK, 200,
+            Invoke(bind(HandleFetch, ::util::OkStatus(), 200,
                         UrlFetcher::Headers{make_pair("x-etcd-index", "9")},
                         kGetJson, _1, _2, _3)));
     EXPECT_CALL(url_fetcher_,
@@ -803,7 +803,7 @@ TEST_F(EtcdTest, WatchHangingGetTimeoutCausesRetry) {
                                         IsEmpty(), ""),
                       _, _))
         .WillOnce(
-            Invoke(bind(HandleFetch, Status::OK, 200,
+            Invoke(bind(HandleFetch, ::util::OkStatus(), 200,
                         UrlFetcher::Headers{make_pair("x-etcd-index", "9")},
                         kGetJson, _1, _2, _3)));
   }
@@ -884,7 +884,7 @@ TEST_F(EtcdTest, UnavailableEtcdRetriesOnNewServer) {
                   "consistent=true&prevIndex=5&quorum=true&ttl=100&value=123"),
               _, _))
         .WillOnce(
-            Invoke(bind(HandleFetch, Status::OK, 200, UrlFetcher::Headers{},
+            Invoke(bind(HandleFetch, ::util::OkStatus(), 200, UrlFetcher::Headers{},
                         kUpdateJson, _1, _2, _3)));
   }
 
@@ -917,7 +917,7 @@ TEST_F(EtcdTest, FollowsMasterChangeRedirectToNewHost) {
                   "consistent=true&prevIndex=5&quorum=true&ttl=100&value=123"),
               _, _))
         .WillOnce(
-            Invoke(bind(HandleFetch, Status::OK, 307,
+            Invoke(bind(HandleFetch, ::util::OkStatus(), 307,
                         UrlFetcher::Headers{make_pair(
                             "location", GetEtcdUrl(kEntryKey, kDefaultSpace,
                                                    kEtcdHost3, kEtcdPort3))},
@@ -934,7 +934,7 @@ TEST_F(EtcdTest, FollowsMasterChangeRedirectToNewHost) {
                   "consistent=true&prevIndex=5&quorum=true&ttl=100&value=123"),
               _, _))
         .WillOnce(
-            Invoke(bind(HandleFetch, Status::OK, 200, UrlFetcher::Headers{},
+            Invoke(bind(HandleFetch, ::util::OkStatus(), 200, UrlFetcher::Headers{},
                         kUpdateJson, _1, _2, _3)));
   }
 
@@ -966,7 +966,7 @@ TEST_F(EtcdTest, FollowsMasterChangeRedirectToKnownHost) {
                   "consistent=true&prevIndex=5&quorum=true&ttl=100&value=123"),
               _, _))
         .WillOnce(
-            Invoke(bind(HandleFetch, Status::OK, 307,
+            Invoke(bind(HandleFetch, ::util::OkStatus(), 307,
                         UrlFetcher::Headers{make_pair(
                             "location", GetEtcdUrl(kEntryKey, kDefaultSpace,
                                                    kEtcdHost2, kEtcdPort2))},
@@ -983,7 +983,7 @@ TEST_F(EtcdTest, FollowsMasterChangeRedirectToKnownHost) {
                   "consistent=true&prevIndex=5&quorum=true&ttl=100&value=123"),
               _, _))
         .WillOnce(
-            Invoke(bind(HandleFetch, Status::OK, 200, UrlFetcher::Headers{},
+            Invoke(bind(HandleFetch, ::util::OkStatus(), 200, UrlFetcher::Headers{},
                         kUpdateJson, _1, _2, _3)));
   }
 
@@ -1004,7 +1004,7 @@ TEST_F(EtcdTest, GetStoreStats) {
                                       IsEmpty(), ""),
                     _, _))
       .WillOnce(
-          Invoke(bind(HandleFetch, Status::OK, 200,
+          Invoke(bind(HandleFetch, ::util::OkStatus(), 200,
                       UrlFetcher::Headers{make_pair("x-etcd-index", "1")},
                       kStoreStatsJson, _1, _2, _3)));
   SyncTask task(base_.get());
@@ -1131,7 +1131,7 @@ TEST_F(EtcdTest, LogsVersion) {
                     _, _))
       .Times(2)
       .WillRepeatedly(
-          Invoke(bind(HandleFetch, Status::OK, 200,
+          Invoke(bind(HandleFetch, ::util::OkStatus(), 200,
                       UrlFetcher::Headers{make_pair("x-etcd-index", "11")},
                       kGetJson, _1, _2, _3)));
 
@@ -1141,7 +1141,7 @@ TEST_F(EtcdTest, LogsVersion) {
                                       IsEmpty(), ""),
                     _, _))
       .WillOnce(
-          Invoke(bind(HandleFetch, Status::OK, 200, UrlFetcher::Headers{},
+          Invoke(bind(HandleFetch, ::util::OkStatus(), 200, UrlFetcher::Headers{},
                       kVersionString, _1, _2, _3)));
 
   // Version fetching is lazy, so we have to run some other request to kick
@@ -1173,7 +1173,7 @@ TEST_F(EtcdTest, LogsVersionWhenChangingServer) {
                                         IsEmpty(), ""),
                       _, _))
         .WillOnce(Invoke(bind(
-            HandleFetch, Status::OK, 307,
+            HandleFetch, ::util::OkStatus(), 307,
             UrlFetcher::Headers{make_pair("x-etcd-index", "11"),
                                 make_pair("location", GetEtcdUrl("/", ""))},
             kGetJson, _1, _2, _3)));
@@ -1185,7 +1185,7 @@ TEST_F(EtcdTest, LogsVersionWhenChangingServer) {
                                         IsEmpty(), ""),
                       _, _))
         .WillOnce(
-            Invoke(bind(HandleFetch, Status::OK, 200,
+            Invoke(bind(HandleFetch, ::util::OkStatus(), 200,
                         UrlFetcher::Headers{make_pair("x-etcd-index", "11")},
                         kGetJson, _1, _2, _3)));
   }
@@ -1197,7 +1197,7 @@ TEST_F(EtcdTest, LogsVersionWhenChangingServer) {
                     _, _))
       .Times(2)
       .WillRepeatedly(
-          Invoke(bind(HandleFetch, Status::OK, 200, UrlFetcher::Headers{},
+          Invoke(bind(HandleFetch, ::util::OkStatus(), 200, UrlFetcher::Headers{},
                       kVersionString, _1, _2, _3)));
 
   // Version fetching is lazy, so we have to run some other request to kick
