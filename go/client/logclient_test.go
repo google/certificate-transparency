@@ -193,7 +193,7 @@ func TestGetSTH(t *testing.T) {
 }
 
 func TestAddChainRetries(t *testing.T) {
-	retryAfter := 0
+	retryAfter := 0 * time.Second
 	currentFailures := 0
 	failuresBeforeSuccess := 0
 	hs := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -201,7 +201,7 @@ func TestAddChainRetries(t *testing.T) {
 			currentFailures++
 			if retryAfter != 0 {
 				if retryAfter > 0 {
-					w.Header().Add("Retry-After", strconv.Itoa(retryAfter))
+					w.Header().Add("Retry-After", strconv.Itoa(int(retryAfter.Seconds())))
 				}
 				w.WriteHeader(503)
 				return
@@ -228,21 +228,56 @@ func TestAddChainRetries(t *testing.T) {
 	}
 	const leeway = time.Millisecond * 100
 	const leewayRatio = 0.1 // 10%
-	const instant = time.Millisecond
 
 	tests := []struct {
 		deadlineLength        time.Duration // -1 indicates no deadline
 		expected              time.Duration
-		retryAfter            int // -1 indicates: generate 503 with no Retry-After
+		retryAfter            time.Duration // -1 indicates: generate 503 with no Retry-After
 		failuresBeforeSuccess int
 		success               bool
 	}{
-		{-1, instant, 0, 0, true},
-		{-1, 7 * time.Second /* 1 + 2 + 4 */, -1, 3, true},
-		{6 * time.Second, 5 * time.Second, 5, 1, true},
-		{5 * time.Second, 5 * time.Second, 10, 1, false},
-		{10 * time.Second, 5 * time.Second, 1, 5, true},
-		{1 * time.Second, instant * 10, 0, 10, true},
+		{
+			deadlineLength:        -1,
+			expected:              1 * time.Millisecond,
+			retryAfter:            0,
+			failuresBeforeSuccess: 0,
+			success:               true,
+		},
+		{
+			deadlineLength:        -1,
+			expected:              7 * time.Second, /* 1 + 2 + 4 */
+			retryAfter:            -1,
+			failuresBeforeSuccess: 3,
+			success:               true,
+		},
+		{
+			deadlineLength:        6 * time.Second,
+			expected:              5 * time.Second,
+			retryAfter:            5 * time.Second,
+			failuresBeforeSuccess: 1,
+			success:               true,
+		},
+		{
+			deadlineLength:        5 * time.Second,
+			expected:              5 * time.Second,
+			retryAfter:            10 * time.Second,
+			failuresBeforeSuccess: 1,
+			success:               false,
+		},
+		{
+			deadlineLength:        10 * time.Second,
+			expected:              5 * time.Second,
+			retryAfter:            1 * time.Second,
+			failuresBeforeSuccess: 5,
+			success:               true,
+		},
+		{
+			deadlineLength:        1 * time.Second,
+			expected:              10 * time.Millisecond,
+			retryAfter:            0,
+			failuresBeforeSuccess: 10,
+			success:               true,
+		},
 	}
 
 	for i, test := range tests {
