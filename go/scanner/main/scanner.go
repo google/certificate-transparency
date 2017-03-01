@@ -18,8 +18,8 @@ import (
 )
 
 const (
-	// MatchesNothingRegex is a regex which cannot match any input.
-	MatchesNothingRegex = "a^"
+	// matchesNothingRegex is a regex which cannot match any input.
+	matchesNothingRegex = "a^"
 )
 
 var logURI = flag.String("log_uri", "http://ct.googleapis.com/aviator", "CT log base URI")
@@ -67,7 +67,7 @@ func createRegexes(regexValue string) (*regexp.Regexp, *regexp.Regexp) {
 	precertRegex := regexp.MustCompile(regexValue)
 	switch *precertsOnly {
 	case true:
-		certRegex = regexp.MustCompile(MatchesNothingRegex)
+		certRegex = regexp.MustCompile(matchesNothingRegex)
 	case false:
 		certRegex = precertRegex
 	}

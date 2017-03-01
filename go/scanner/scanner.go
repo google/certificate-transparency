@@ -73,7 +73,7 @@ func (m MatchSerialNumber) PrecertificateMatches(p *ct.Precertificate) bool {
 
 // MatchSubjectRegex is a Matcher which will use CertificateSubjectRegex and PrecertificateSubjectRegex
 // to determine whether Certificates and Precertificates are interesting.
-// The two regexes are tested against Subject Common Name as well as all
+// The two regexes are tested against Subject CN (Common Name) as well as all
 // Subject Alternative Names
 type MatchSubjectRegex struct {
 	CertificateSubjectRegex    *regexp.Regexp
@@ -106,7 +106,7 @@ func (m MatchSubjectRegex) PrecertificateMatches(p *ct.Precertificate) bool {
 	return false
 }
 
-// MatchIssuerRegex matches on issuer common name by regex
+// MatchIssuerRegex matches on issuer CN (common name) by regex
 type MatchIssuerRegex struct {
 	CertificateIssuerRegex    *regexp.Regexp
 	PrecertificateIssuerRegex *regexp.Regexp

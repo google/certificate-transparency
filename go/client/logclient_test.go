@@ -229,29 +229,27 @@ func TestAddChainRetries(t *testing.T) {
 	const leeway = time.Millisecond * 100
 	const leewayRatio = 0.1 // 10%
 	const instant = time.Millisecond
-	const five = time.Second * 5
-	const seven = time.Second * 7 // = 1 + 2 + 4
 
 	tests := []struct {
-		deadlineLength        int
+		deadlineLength        time.Duration // -1 indicates no deadline
 		expected              time.Duration
 		retryAfter            int // -1 indicates: generate 503 with no Retry-After
 		failuresBeforeSuccess int
 		success               bool
 	}{
 		{-1, instant, 0, 0, true},
-		{-1, seven, -1, 3, true},
-		{6, five, 5, 1, true},
-		{5, five, 10, 1, false},
-		{10, five, 1, 5, true},
-		{1, instant * 10, 0, 10, true},
+		{-1, 7 * time.Second /* 1 + 2 + 4 */, -1, 3, true},
+		{6 * time.Second, 5 * time.Second, 5, 1, true},
+		{5 * time.Second, 5 * time.Second, 10, 1, false},
+		{10 * time.Second, 5 * time.Second, 1, 5, true},
+		{1 * time.Second, instant * 10, 0, 10, true},
 	}
 
 	for i, test := range tests {
 		deadline := context.Background()
 		if test.deadlineLength >= 0 {
 			var cancel context.CancelFunc
-			deadline, cancel = context.WithDeadline(context.Background(), time.Now().Add(time.Duration(test.deadlineLength)*time.Second))
+			deadline, cancel = context.WithDeadline(context.Background(), time.Now().Add(test.deadlineLength))
 			defer cancel()
 		}
 		retryAfter = test.retryAfter
