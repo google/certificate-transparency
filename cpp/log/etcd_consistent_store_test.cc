@@ -316,7 +316,7 @@ TEST_F(EtcdConsistentStoreTest, TestAddPendingEntryWorks) {
   client_.Get(string(kRoot) + "/entries/" + util::HexString(cert.Hash()),
               &resp, task.task());
   task.Wait();
-  EXPECT_EQ(::util::OkStatus(), task.status());
+  EXPECT_OK(task.status());
   EXPECT_EQ(Serialize(cert), resp.node.value_);
 }
 
@@ -460,17 +460,17 @@ TEST_F(EtcdConsistentStoreDeathTest,
 TEST_F(EtcdConsistentStoreTest, TestUpdateSequenceMapping) {
   EntryHandle<SequenceMapping> mapping;
   Status status(store_->GetSequenceMapping(&mapping));
-  EXPECT_EQ(::util::OkStatus(), status);
+  EXPECT_OK(status);
 
   const SequenceMapping original(mapping.Entry());
 
   SequenceMapping::Mapping* m(mapping.MutableEntry()->add_mapping());
   m->set_sequence_number(0);
   m->set_entry_hash("zero");
-  EXPECT_EQ(::util::OkStatus(), store_->UpdateSequenceMapping(&mapping));
+  EXPECT_OK(store_->UpdateSequenceMapping(&mapping));
 
   status = store_->GetSequenceMapping(&mapping);
-  EXPECT_EQ(::util::OkStatus(), status);
+  EXPECT_OK(status);
 
   EXPECT_EQ(mapping.Entry().mapping_size(), original.mapping_size() + 1);
   EXPECT_EQ(0, mapping.Entry()
@@ -486,7 +486,7 @@ TEST_F(EtcdConsistentStoreDeathTest,
        TestUpdateSequenceMappingBarfsWithOutOfOrderSequenceNumber) {
   EntryHandle<SequenceMapping> mapping;
   Status status(store_->GetSequenceMapping(&mapping));
-  EXPECT_EQ(::util::OkStatus(), status);
+  EXPECT_OK(status);
 
   SequenceMapping::Mapping* m1(mapping.MutableEntry()->add_mapping());
   m1->set_sequence_number(2);
@@ -507,7 +507,7 @@ TEST_F(EtcdConsistentStoreDeathTest,
 
   EntryHandle<SequenceMapping> mapping;
   Status status(store_->GetSequenceMapping(&mapping));
-  EXPECT_EQ(::util::OkStatus(), status);
+  EXPECT_OK(status);
 
   SequenceMapping::Mapping* m1(mapping.MutableEntry()->add_mapping());
   m1->set_sequence_number(sth.tree_size() + 1);
