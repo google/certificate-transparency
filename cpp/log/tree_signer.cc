@@ -226,7 +226,7 @@ Status TreeSigner::SequenceNewEntries() {
 
   VLOG(1) << "Sequenced " << num_sequenced << " entries.";
 
-  return Status::OK;
+  return ::util::OkStatus();
 }
 
 

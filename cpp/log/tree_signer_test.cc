@@ -89,9 +89,9 @@ class TreeSignerTest : public ::testing::Test {
 
   void DeletePendingEntry(const LoggedEntry& logged_cert) const {
     EntryHandle<LoggedEntry> e;
-    CHECK_EQ(Status::OK,
+    CHECK_EQ(::util::OkStatus(),
              this->store_->GetPendingEntryForHash(logged_cert.Hash(), &e));
-    CHECK_EQ(Status::OK, this->store_->DeleteEntry(e));
+    CHECK_EQ(::util::OkStatus(), this->store_->DeleteEntry(e));
   }
 
   void AddSequencedEntry(LoggedEntry* logged_cert, int64_t seq) const {
@@ -234,7 +234,7 @@ TYPED_TEST(TreeSignerTest, ResumeClean) {
     // cluster.
     ClusterNodeState node_state;
     *node_state.mutable_newest_sth() = sth;
-    CHECK_EQ(util::Status::OK, this->store_->SetClusterNodeState(node_state));
+    CHECK_EQ(::util::OkStatus(), this->store_->SetClusterNodeState(node_state));
   }
 
   unique_ptr<TreeSigner> signer2(this->GetSimilar());
@@ -259,7 +259,7 @@ TYPED_TEST(TreeSignerTest, ResumePartialSign) {
     // cluster.
     ClusterNodeState node_state;
     *node_state.mutable_newest_sth() = sth;
-    CHECK_EQ(util::Status::OK, this->store_->SetClusterNodeState(node_state));
+    CHECK_EQ(::util::OkStatus(), this->store_->SetClusterNodeState(node_state));
   }
 
   LoggedEntry logged_cert;
@@ -291,13 +291,13 @@ TYPED_TEST(TreeSignerTest, SequenceNewEntriesCleansUpOldSequenceMappings) {
   this->AddPendingEntry(&logged_cert);
   EXPECT_OK(this->tree_signer_->SequenceNewEntries());
   EXPECT_EQ(TreeSigner::OK, this->tree_signer_->UpdateTree());
-  EXPECT_EQ(Status::OK,
+  EXPECT_EQ(::util::OkStatus(),
             this->store_->SetServingSTH(this->tree_signer_->LatestSTH()));
   sleep(1);
 
   {
     EntryHandle<SequenceMapping> mapping;
-    CHECK_EQ(Status::OK, this->store_->GetSequenceMapping(&mapping));
+    CHECK_EQ(::util::OkStatus(), this->store_->GetSequenceMapping(&mapping));
     EXPECT_EQ(1, mapping.Entry().mapping_size());
     EXPECT_EQ(logged_cert.Hash(), mapping.Entry().mapping(0).entry_hash());
   }
@@ -315,7 +315,7 @@ TYPED_TEST(TreeSignerTest, SequenceNewEntriesCleansUpOldSequenceMappings) {
 
   {
     EntryHandle<SequenceMapping> mapping;
-    CHECK_EQ(Status::OK, this->store_->GetSequenceMapping(&mapping));
+    CHECK_EQ(::util::OkStatus(), this->store_->GetSequenceMapping(&mapping));
     CHECK_GE(mapping.Entry().mapping_size(), 0);
     EXPECT_EQ(new_logged_certs.size(),
               static_cast<size_t>(mapping.Entry().mapping_size()));

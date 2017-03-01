@@ -83,9 +83,9 @@ template <class T>
 
 
 #define EXPECT_OK(expr) \
-  EXPECT_EQ(util::Status::OK, util::testing::ToStatus(expr))
+  EXPECT_EQ(::util::OkStatus(), util::testing::ToStatus(expr))
 #define ASSERT_OK(expr) \
-  ASSERT_EQ(util::Status::OK, util::testing::ToStatus(expr))
+  ASSERT_EQ(::util::OkStatus(), util::testing::ToStatus(expr))
 
 
 }  // namespace testing

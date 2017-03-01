@@ -101,7 +101,7 @@ int main(int argc, char* argv[]) {
   Server::StaticInit();
 
   util::StatusOr<EVP_PKEY*> pkey(ReadPrivateKey(FLAGS_key));
-  CHECK_EQ(pkey.status(), util::Status::OK);
+  CHECK_EQ(pkey.status(), ::util::OkStatus());
   LogSigner log_signer(pkey.ValueOrDie());
 
   cert_trans::EnsureValidatorsRegistered();
@@ -175,7 +175,7 @@ int main(int argc, char* argv[]) {
       util::SyncTask task(event_base.get());
       etcd_client->Create("/root/sequence_mapping", "", &resp, task.task());
       task.Wait();
-      CHECK_EQ(util::Status::OK, task.status());
+      CHECK_EQ(::util::OkStatus(), task.status());
     }
 
     // Do an initial signing run to get the initial STH, again this is

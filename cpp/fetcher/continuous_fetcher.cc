@@ -147,7 +147,7 @@ void ContinuousFetcherImpl::FetchDone(Task* task) {
 void ContinuousFetcherImpl::FetchDelayDone(Task* task) {
   // "task" can be null, if we're restarting a fetch.
   if (task) {
-    CHECK_EQ(util::Status::OK, task->status());
+    CHECK_EQ(::util::OkStatus(), task->status());
     delete task;
   }
 

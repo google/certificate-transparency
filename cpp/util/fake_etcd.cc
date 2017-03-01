@@ -115,7 +115,7 @@ FakeEtcdClient::FakeEtcdClient(libevent::Base* base)
 FakeEtcdClient::~FakeEtcdClient() {
   parent_task_.task()->Return();
   parent_task_.Wait();
-  CHECK_EQ(parent_task_.status(), Status::OK);
+  CHECK_EQ(parent_task_.status(), ::util::OkStatus());
 }
 
 

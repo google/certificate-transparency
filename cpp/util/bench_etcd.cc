@@ -71,7 +71,7 @@ void State::MakeRequest() {
 
 
 void State::RequestDone(Task* child_task) {
-  CHECK_EQ(Status::OK, child_task->status());
+  CHECK_EQ(::util::OkStatus(), child_task->status());
   --num_left_;
   next_key_ = resp_.etcd_index;
 
