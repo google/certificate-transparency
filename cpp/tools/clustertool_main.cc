@@ -79,7 +79,7 @@ void Usage() {
 unique_ptr<LogSigner> BuildLogSigner() {
   CHECK(!FLAGS_key.empty());
   util::StatusOr<EVP_PKEY*> pkey(ReadPrivateKey(FLAGS_key));
-  CHECK_EQ(pkey.status(), util::Status::OK);
+  CHECK_EQ(pkey.status(), ::util::OkStatus());
   return unique_ptr<LogSigner>(new LogSigner(pkey.ValueOrDie()));
 }
 

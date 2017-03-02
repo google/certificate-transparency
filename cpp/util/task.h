@@ -86,7 +86,7 @@ class Task {
   // through destructors of locally scoped objects (such as
   // std::lock_guard, for example). An option is to use a TaskHold to
   // ensure the task does not reach the DONE state prematurely.
-  bool Return(const Status& status = Status::OK);
+  bool Return(const Status& status = ::util::OkStatus());
 
   // This can be used to prevent the task from advancing to the DONE
   // state.

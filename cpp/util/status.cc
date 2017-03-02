@@ -24,11 +24,6 @@ namespace util {
 namespace {
 
 
-const Status& GetOk() {
-  static const Status status;
-  return status;
-}
-
 const Status& GetCancelled() {
   static const Status status(::util::error::CANCELLED, "");
   return status;
@@ -63,7 +58,6 @@ Status& Status::operator=(const Status& other) {
   return *this;
 }
 
-const Status& Status::OK = GetOk();
 const Status& Status::CANCELLED = GetCancelled();
 const Status& Status::UNKNOWN = GetUnknown();
 

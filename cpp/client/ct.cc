@@ -676,7 +676,7 @@ static int CheckConsistency() {
 
   const StatusOr<vector<string>> proof(
       client.GetSTHConsistency(sth1.tree_size(), sth2.tree_size()));
-  CHECK_EQ(Status::OK, proof.status());
+  CHECK_EQ(::util::OkStatus(), proof.status());
 
   if (!verifier->VerifyConsistency(sth1, sth2, proof.ValueOrDie())) {
     LOG(ERROR) << "Consistency proof does not verify";
@@ -807,7 +807,7 @@ void WrapEmbedded() {
             .ValueOrDie());
 
   string serialized_scts;
-  CHECK_EQ(::util::Status::OK,
+  CHECK_EQ(::util::OkStatus(),
            chain.LeafCert()->OctetStringExtensionData(
                cert_trans::NID_ctEmbeddedSignedCertificateTimestampList,
                &serialized_scts));
@@ -843,7 +843,7 @@ void GetEntries() {
   HTTPLogClient client(FLAGS_ct_server);
   const StatusOr<vector<AsyncLogClient::Entry>> entries(
       client.GetEntries(FLAGS_get_first, FLAGS_get_last));
-  CHECK_EQ(entries.status(), Status::OK);
+  CHECK_EQ(entries.status(), ::util::OkStatus());
 
   CHECK(!FLAGS_certificate_base.empty());
 
@@ -877,14 +877,14 @@ int GetRoots() {
   HTTPLogClient client(FLAGS_ct_server);
 
   const StatusOr<vector<unique_ptr<Cert>>> roots(client.GetRoots());
-  CHECK_EQ(roots.status(), Status::OK);
+  CHECK_EQ(roots.status(), ::util::OkStatus());
 
   LOG(INFO) << "number of certs: " << roots.ValueOrDie().size();
   for (vector<unique_ptr<Cert>>::const_iterator it =
            roots.ValueOrDie().begin();
        it != roots.ValueOrDie().end(); ++it) {
     string pem_cert;
-    CHECK_EQ((*it)->PemEncoding(&pem_cert), util::Status::OK);
+    CHECK_EQ((*it)->PemEncoding(&pem_cert), ::util::OkStatus());
     std::cout << pem_cert;
   }
 
@@ -899,7 +899,7 @@ int GetSTH() {
   HTTPLogClient client(FLAGS_ct_server);
 
   const StatusOr<SignedTreeHead> sth(client.GetSTH());
-  CHECK_EQ(sth.status(), Status::OK);
+  CHECK_EQ(sth.status(), ::util::OkStatus());
 
   const unique_ptr<LogVerifier> verifier(GetLogVerifierFromFlags());
 

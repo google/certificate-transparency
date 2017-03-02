@@ -101,7 +101,7 @@ class LogLookupTest : public ::testing::Test {
 
     for (const auto& m : mapping.Entry().mapping()) {
       EntryHandle<LoggedEntry> entry;
-      CHECK_EQ(util::Status::OK,
+      CHECK_EQ(::util::OkStatus(),
                this->store_.GetPendingEntryForHash(m.entry_hash(), &entry));
       entry.MutableEntry()->set_sequence_number(m.sequence_number());
       CHECK_EQ(this->db()->OK,

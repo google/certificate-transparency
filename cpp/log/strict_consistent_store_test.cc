@@ -66,7 +66,7 @@ TEST_P(StrictConsistentStoreTest, TestNextAvailableSequenceNumber) {
 
 TEST_P(StrictConsistentStoreTest, TestSetServingSTH) {
   if (IsMaster()) {
-    EXPECT_CALL(*peer_, SetServingSTH(_)).WillOnce(Return(util::Status::OK));
+    EXPECT_CALL(*peer_, SetServingSTH(_)).WillOnce(Return(::util::OkStatus()));
   } else {
     EXPECT_CALL(*peer_, SetServingSTH(_)).Times(0);
   }
@@ -86,7 +86,7 @@ TEST_P(StrictConsistentStoreTest, TestSetServingSTH) {
 TEST_P(StrictConsistentStoreTest, TestUpdateSequenceMapping) {
   if (IsMaster()) {
     EXPECT_CALL(*peer_, UpdateSequenceMapping(_))
-        .WillOnce(Return(util::Status::OK));
+        .WillOnce(Return(::util::OkStatus()));
   } else {
     EXPECT_CALL(*peer_, UpdateSequenceMapping(_)).Times(0);
   }
@@ -106,7 +106,7 @@ TEST_P(StrictConsistentStoreTest, TestUpdateSequenceMapping) {
 TEST_P(StrictConsistentStoreTest, TestClusterConfig) {
   if (IsMaster()) {
     EXPECT_CALL(*peer_, SetClusterConfig(_))
-        .WillOnce(Return(util::Status::OK));
+        .WillOnce(Return(::util::OkStatus()));
   } else {
     EXPECT_CALL(*peer_, SetClusterConfig(_)).Times(0);
   }

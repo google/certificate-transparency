@@ -136,7 +136,7 @@ util::Status CmsVerifier::UnpackCmsDerBio(BIO* cms_bio_in, const Cert& cert,
                  nullptr, cms_bio_out,
                  CMS_NO_SIGNER_CERT_VERIFY | CMS_NOINTERN | CMS_BINARY);
 
-  return (verified == 1) ? util::Status::OK
+  return (verified == 1) ? ::util::OkStatus()
                          : util::Status(util::error::INVALID_ARGUMENT,
                                         "CMS verification failed");
 }
@@ -177,7 +177,7 @@ util::Status CmsVerifier::UnpackCmsDerBio(BIO* cms_bio_in, BIO* cms_bio_out) {
                  cms_bio_out, CMS_NO_SIGNER_CERT_VERIFY | CMS_NOINTERN |
                                   CMS_BINARY | CMS_NO_CONTENT_VERIFY);
 
-  return (verified == 1) ? util::Status::OK
+  return (verified == 1) ? ::util::OkStatus()
                          : util::Status(util::error::INVALID_ARGUMENT,
                                         "CMS unpack failed");
 }

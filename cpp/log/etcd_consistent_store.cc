@@ -242,7 +242,7 @@ Status EtcdConsistentStore::SetServingSTH(const SignedTreeHead& new_sth) {
       return status;
     }
     WaitForServingSTHVersion(&lock, sth_handle.Handle());
-    return Status::OK;
+    return ::util::OkStatus();
   }
 
   // Looks like we're updating an existing serving_sth.
@@ -264,7 +264,7 @@ Status EtcdConsistentStore::SetServingSTH(const SignedTreeHead& new_sth) {
     return status;
   }
   WaitForServingSTHVersion(&lock, sth_to_etcd.Handle());
-  return Status::OK;
+  return ::util::OkStatus();
 }
 
 
@@ -381,7 +381,7 @@ Status EtcdConsistentStore::GetSequenceMapping(
   CheckMappingIsContiguousWithServingTree(sequence_mapping->Entry());
   etcd_total_entries->Set("sequenced",
                           sequence_mapping->Entry().mapping_size());
-  return Status::OK;
+  return ::util::OkStatus();
 }
 
 
@@ -513,7 +513,7 @@ Status EtcdConsistentStore::GetEntry(const string& path,
   T t;
   CHECK(t.ParseFromString(FromBase64(resp.node.value_.c_str())));
   entry->Set(path, t, resp.node.modified_index_);
-  return Status::OK;
+  return ::util::OkStatus();
 }
 
 
@@ -541,7 +541,7 @@ Status EtcdConsistentStore::GetAllEntriesInDir(
     entries->emplace_back(
         EntryHandle<LoggedEntry>(node.key_, entry, node.modified_index_));
   }
-  return Status::OK;
+  return ::util::OkStatus();
 }
 
 
@@ -868,7 +868,7 @@ Status EtcdConsistentStore::MaybeReject(const string& type) const {
 
   if (!cluster_config_) {
     // No config, whatever.
-    return Status::OK;
+    return ::util::OkStatus();
   }
 
   const int64_t etcd_size(num_etcd_entries_);
@@ -881,7 +881,7 @@ Status EtcdConsistentStore::MaybeReject(const string& type) const {
     return Status(util::error::RESOURCE_EXHAUSTED,
                   "Rejected due to high number of pending entries.");
   }
-  return Status::OK;
+  return ::util::OkStatus();
 }
 
 
