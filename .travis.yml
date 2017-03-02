@@ -2,6 +2,9 @@ sudo: false
 
 language: cpp
 
+go:
+  - 1.7.1
+
 env:
   global:
     - INSTALL_DIR=${TRAVIS_BUILD_DIR}/../install
@@ -75,7 +78,7 @@ cache:
 
 
 before_install:
- - eval "$(gimme 1.6)"
+ - eval "$(gimme 1.7)"
 # Set compiler version overrides if we have any:
  - if [ "${REAL_CC}" != "" ]; then export CC=${REAL_CC} CXX=${REAL_CXX}; fi
  - if [ "$TRAVIS_OS_NAME" == "osx" ]; then . ./build/travis.osx.before_install.sh; fi
@@ -130,4 +133,3 @@ script:
  - |
    CGO_CPPFLAGS="-I${INSTALL_DIR}/include" CGO_LDFLAGS="-L${INSTALL_DIR}/lib" go test -v -race ./src/github.com/google/certificate-transparency/go/...
  - popd
-
