@@ -54,6 +54,9 @@ public class TestData {
   public static final String TEST_ROOT_CERTS = DATA_ROOT + "test-root-certs";
 
   static List<Certificate> loadCertificates(String filename) {
-    return CryptoDataLoader.certificatesFromFile(new File(filename));
+    System.out.println("filename = " + filename);
+    System.out.println("TestData.class.getResource(filename) = " + TestData.class.getResource(filename));
+    File file = new File(TestData.class.getClassLoader().getResource(filename).getFile());
+    return CryptoDataLoader.certificatesFromFile(file);
   }
 }

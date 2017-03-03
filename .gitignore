@@ -124,6 +124,8 @@
 /java/.idea/dictionaries/
 /java/.idea/workspace.xml
 /java/out
+/java/target
+/java/ctlog.iml
 
 # Eclipse artefacts
 /java/.classpath
