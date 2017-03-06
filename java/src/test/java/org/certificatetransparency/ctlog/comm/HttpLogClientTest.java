@@ -1,11 +1,21 @@
 package org.certificatetransparency.ctlog.comm;
 
-import static org.junit.Assert.assertArrayEquals;
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertNotNull;
-import static org.mockito.Matchers.eq;
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.when;
+import com.google.protobuf.ByteString;
+import org.apache.commons.codec.binary.Base64;
+import org.apache.http.NameValuePair;
+import org.apache.http.message.BasicNameValuePair;
+import org.certificatetransparency.ctlog.*;
+import org.certificatetransparency.ctlog.proto.Ct;
+import org.certificatetransparency.ctlog.serialization.CryptoDataLoader;
+import org.json.simple.JSONArray;
+import org.json.simple.JSONObject;
+import org.json.simple.parser.JSONParser;
+import org.json.simple.parser.ParseException;
+import org.junit.Assert;
+import org.junit.Test;
+import org.junit.runner.RunWith;
+import org.junit.runners.JUnit4;
+import org.mockito.Matchers;
 
 import java.io.ByteArrayInputStream;
 import java.io.File;
@@ -19,27 +29,10 @@ import java.security.cert.X509Certificate;
 import java.util.ArrayList;
 import java.util.List;
 
-import org.apache.commons.codec.binary.Base64;
-import org.apache.http.NameValuePair;
-import org.apache.http.message.BasicNameValuePair;
-import org.certificatetransparency.ctlog.CertificateTransparencyException;
-import org.certificatetransparency.ctlog.ParsedLogEntry;
-import org.certificatetransparency.ctlog.ParsedLogEntryWithProof;
-import org.certificatetransparency.ctlog.SignedTreeHead;
-import org.certificatetransparency.ctlog.TestData;
-import org.certificatetransparency.ctlog.proto.Ct;
-import org.certificatetransparency.ctlog.serialization.CryptoDataLoader;
-import org.json.simple.JSONArray;
-import org.json.simple.JSONObject;
-import org.json.simple.parser.JSONParser;
-import org.json.simple.parser.ParseException;
-import org.junit.Assert;
-import org.junit.Test;
-import org.junit.runner.RunWith;
-import org.junit.runners.JUnit4;
-import org.mockito.Matchers;
-
-import com.google.protobuf.ByteString;
+import static org.junit.Assert.*;
+import static org.mockito.Matchers.eq;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 
 /**
@@ -47,7 +40,7 @@ import com.google.protobuf.ByteString;
  */
 @RunWith(JUnit4.class)
 public class HttpLogClientTest {
-  public static final String TEST_DATA_PATH = "test/testdata/test-colliding-roots.pem";
+  public static final String TEST_DATA_PATH = "/testdata/test-colliding-roots.pem";
 
   public static final String STH_RESPONSE = ""
       + "{\"timestamp\":1402415255382,"
@@ -168,7 +161,7 @@ public class HttpLogClientTest {
 
   @Test
   public void certificatesAreEncoded() throws CertificateException, IOException {
-    List<Certificate> inputCerts = CryptoDataLoader.certificatesFromFile(new File(TEST_DATA_PATH));
+    List<Certificate> inputCerts = CryptoDataLoader.certificatesFromFile(new File(HttpLogClientTest.class.getResource(TEST_DATA_PATH).getFile()));
     HttpLogClient client = new HttpLogClient("");
 
     JSONObject encoded = client.encodeCertificates(inputCerts);
@@ -203,7 +196,7 @@ public class HttpLogClientTest {
       .thenReturn(JSON_RESPONSE);
 
     HttpLogClient client = new HttpLogClient("http://ctlog/", mockInvoker);
-    List<Certificate> certs = CryptoDataLoader.certificatesFromFile(new File(TEST_DATA_PATH));
+    List<Certificate> certs = CryptoDataLoader.certificatesFromFile(new File(HttpLogClientTest.class.getResource(TEST_DATA_PATH).getFile()));
     Ct.SignedCertificateTimestamp res = client.addCertificate(certs);
     assertNotNull("Should have a meaningful SCT", res);
 
@@ -257,7 +250,7 @@ public class HttpLogClientTest {
   @Test
   public void getRootCerts() throws IOException, ParseException {
     JSONParser parser = new JSONParser();
-    Object obj = parser.parse(new FileReader(TestData.TEST_ROOT_CERTS));
+    Object obj = parser.parse(new FileReader(HttpLogClientTest.class.getResource(TestData.TEST_ROOT_CERTS).getFile()));
     JSONObject response = (JSONObject) obj;
     
     HttpInvoker mockInvoker = mock(HttpInvoker.class);
@@ -283,9 +276,9 @@ public class HttpLogClientTest {
 
     HttpLogClient client = new HttpLogClient("http://ctlog/", mockInvoker);
     X509Certificate testChainCert= (X509Certificate) CryptoDataLoader.certificatesFromFile(
-        new File(TestData.ROOT_CA_CERT)).get(0);
+        new File(HttpLogClientTest.class.getResource(TestData.ROOT_CA_CERT).getFile())).get(0);
     X509Certificate testCert= (X509Certificate) CryptoDataLoader.certificatesFromFile(
-        new File(TestData.TEST_CERT)).get(0);
+        new File(HttpLogClientTest.class.getResource(TestData.TEST_CERT).getFile())).get(0);
     List<ParsedLogEntry> entries = client.getLogEntries(0, 0);
 
     X509Certificate  chainCert = null ;
@@ -384,9 +377,9 @@ public class HttpLogClientTest {
 
     HttpLogClient client = new HttpLogClient("http://ctlog/", mockInvoker);
     X509Certificate testChainCert= (X509Certificate) CryptoDataLoader.certificatesFromFile(
-        new File(TestData.ROOT_CA_CERT)).get(0);
+        new File(HttpLogClientTest.class.getResource(TestData.ROOT_CA_CERT).getFile())).get(0);
     X509Certificate testCert= (X509Certificate) CryptoDataLoader.certificatesFromFile(
-        new File(TestData.TEST_CERT)).get(0);
+        new File(HttpLogClientTest.class.getResource(TestData.TEST_CERT).getFile())).get(0);
     ParsedLogEntryWithProof entry = client.getLogEntryAndProof(1, 2);
 
     X509Certificate  chainCert = null;

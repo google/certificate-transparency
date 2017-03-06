@@ -18,7 +18,7 @@ import java.io.IOException;
  */
 @RunWith(JUnit4.class)
 public class TestSerializer {
-  public static final String TEST_CERT_SCT = "test/testdata/test-cert.proof";
+  public static final String TEST_CERT_SCT = "/testdata/test-cert.proof";
 
   @Test
   public void serializeSCT() throws IOException {
@@ -42,7 +42,7 @@ public class TestSerializer {
     builder.setSignature(signatureBuilder.build());
 
     byte[] generatedBytes = Serializer.serializeSctToBinary(builder.build());
-    byte[] readBytes = Files.toByteArray(new File(TEST_CERT_SCT));
+    byte[] readBytes = Files.toByteArray(new File(TestSerializer.class.getResource(TEST_CERT_SCT).getFile()));
     Assert.assertArrayEquals(readBytes, generatedBytes);
   }
 }

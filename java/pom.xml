@@ -200,7 +200,7 @@
                     </execution>
                 </executions>
                 <configuration>
-                    <mainClass>no.hackeriet.certParser.Application</mainClass>
+                    <mainClass>org.certificatetransparency.ctlog.CTLogClient</mainClass>
                     <executable>maven</executable>
                 </configuration>
             </plugin>

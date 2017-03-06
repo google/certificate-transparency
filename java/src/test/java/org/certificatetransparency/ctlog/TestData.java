@@ -12,7 +12,7 @@ import java.util.List;
  */
 @Ignore
 public class TestData {
-  private static final String DATA_ROOT = "test/testdata/";
+  private static final String DATA_ROOT = "/testdata/";
   // Public log key
   public static final String TEST_LOG_KEY = DATA_ROOT + "ct-server-key-public.pem";
   public static final String TEST_LOG_KEY_RSA = DATA_ROOT + "rsa/ct-server-key-public-rsa.pem";
@@ -54,9 +54,7 @@ public class TestData {
   public static final String TEST_ROOT_CERTS = DATA_ROOT + "test-root-certs";
 
   static List<Certificate> loadCertificates(String filename) {
-    System.out.println("filename = " + filename);
-    System.out.println("TestData.class.getResource(filename) = " + TestData.class.getResource(filename));
-    File file = new File(TestData.class.getClassLoader().getResource(filename).getFile());
+    File file = new File(TestData.class.getResource(filename).getFile());
     return CryptoDataLoader.certificatesFromFile(file);
   }
 }
