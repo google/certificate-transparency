@@ -121,6 +121,7 @@
 /test/testdata/urlfetcher_test_certs/
 
 # IntelliJ artefacts
+/java/.idea
 /java/.idea/dictionaries/
 /java/.idea/workspace.xml
 /java/out
