@@ -1,7 +1,6 @@
 package org.certificatetransparency.ctlog;
 
 import org.apache.commons.codec.binary.Base64;
-import org.junit.Assert;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
@@ -11,6 +10,8 @@ import java.security.NoSuchAlgorithmException;
 import java.security.PublicKey;
 import java.security.spec.InvalidKeySpecException;
 import java.security.spec.X509EncodedKeySpec;
+
+import static org.junit.Assert.assertTrue;
 
 /**
  * Mostly for verifying the log info calculates the log ID correctly.
@@ -51,12 +52,12 @@ public class LogInfoTest {
   @Test
   public void testCalculatesLogIdCorrectly() {
     LogInfo logInfo = new LogInfo(getKey(PUBLIC_KEY, "EC"));
-    Assert.assertTrue(logInfo.isSameLogId(LOG_ID));
+    assertTrue(logInfo.isSameLogId(LOG_ID));
   }
 
   @Test
   public void testCalculatesLogIdCorrectlyRSA() {
     LogInfo logInfo = new LogInfo(getKey(PUBLIC_KEY_RSA, "RSA"));
-    Assert.assertTrue(logInfo.isSameLogId(LOG_ID_RSA));
+    assertTrue(logInfo.isSameLogId(LOG_ID_RSA));
   }
 }

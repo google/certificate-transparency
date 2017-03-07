@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-    xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
     <modelVersion>4.0.0</modelVersion>
 
     <groupId>org.certificate-transparency</groupId>
@@ -22,7 +22,6 @@
         <maven-shade-plugin.version>2.4.2</maven-shade-plugin.version>
         <os-maven-plugin.version>1.4.1.Final</os-maven-plugin.version>
         <protobuf.version>3.2.0</protobuf.version>
-
     </properties>
 
     <dependencies>
@@ -90,9 +89,7 @@
         </dependency>
     </dependencies>
 
-
     <build>
-
         <extensions>
             <!-- provides os.detected.classifier (i.e. linux-x86_64, osx-x86_64) property -->
             <extension>
@@ -143,16 +140,18 @@
                         <phase>generate-sources</phase>
                         <configuration>
                             <target>
-                                <property name="protoc.filename" value="protoc-${protobuf.version}-${os.detected.classifier}.exe"/>
+                                <property name="protoc.filename"
+                                          value="protoc-${protobuf.version}-${os.detected.classifier}.exe"/>
                                 <property name="protoc.filepath" value="${project.build.directory}/${protoc.filename}"/>
                                 <chmod file="${protoc.filepath}" perm="ugo+rx"/>
-                                <mkdir dir="${protobuf.output.directory}" />
+                                <mkdir dir="${protobuf.output.directory}"/>
                                 <path id="protobuf.input.filepaths.path">
                                     <fileset dir="${protobuf.input.directory}">
                                         <include name="**/*.proto"/>
                                     </fileset>
                                 </path>
-                                <pathconvert pathsep=" " property="protobuf.input.filepaths" refid="protobuf.input.filepaths.path"/>
+                                <pathconvert pathsep=" " property="protobuf.input.filepaths"
+                                             refid="protobuf.input.filepaths.path"/>
                                 <exec executable="${protoc.filepath}" failonerror="true">
                                     <arg value="-I"/>
                                     <arg value="${protobuf.input.directory}"/>
@@ -166,9 +165,24 @@
                             <goal>run</goal>
                         </goals>
                     </execution>
+
+                    <execution>
+                        <id>symlink-testdata</id>
+                        <phase>generate-test-resources</phase>
+                        <configuration>
+                            <target>
+                                <mkdir dir="${project.basedir}/src/test/resources"/>
+                                <symlink link="${project.basedir}/src/test/resources/testdata"
+                                         resource="${project.basedir}/../test/testdata"
+                                         overwrite="true"/>
+                            </target>
+                        </configuration>
+                        <goals>
+                            <goal>run</goal>
+                        </goals>
+                    </execution>
                 </executions>
             </plugin>
-
 
             <plugin>
                 <groupId>org.codehaus.mojo</groupId>
@@ -187,7 +201,6 @@
                     </execution>
                 </executions>
             </plugin>
-
 
             <plugin>
                 <groupId>org.codehaus.mojo</groupId>
@@ -211,9 +224,9 @@
                 <version>3.6.0</version>
                 <inherited>true</inherited>
                 <configuration>
-                    <source>1.8</source>
-                    <target>1.8</target>
-                    <encoding>UTF-8</encoding>
+                    <source>${java.version}</source>
+                    <target>${java.version}</target>
+                    <encoding>${project.build.sourceEncoding}</encoding>
                 </configuration>
             </plugin>
 
@@ -228,7 +241,6 @@
                     </dependency>
                 </dependencies>
                 <configuration combine.self="override">
-
                     <forkCount>1</forkCount>
                     <reuseForks>true</reuseForks>
                     <includes>
@@ -236,7 +248,6 @@
                     </includes>
                 </configuration>
             </plugin>
-
 
             <plugin>
                 <!-- Build an executable JAR -->
@@ -248,20 +259,6 @@
                         <manifest>
                             <addClasspath>true</addClasspath>
                             <classpathPrefix>lib/</classpathPrefix>
-                            <mainClass>com.mypackage.MyClass</mainClass>
-                        </manifest>
-                    </archive>
-                </configuration>
-            </plugin>
-            <plugin>
-                <!-- Build an executable JAR -->
-                <groupId>org.apache.maven.plugins</groupId>
-                <artifactId>maven-jar-plugin</artifactId>
-                <version>3.0.2</version>
-                <configuration>
-                    <archive>
-                        <manifest>
-                            <addClasspath>true</addClasspath>
                             <mainClass>org.certificatetransparency.ctlog.CTLogClient</mainClass>
                         </manifest>
                     </archive>
@@ -269,5 +266,4 @@
             </plugin>
         </plugins>
     </build>
-
 </project>

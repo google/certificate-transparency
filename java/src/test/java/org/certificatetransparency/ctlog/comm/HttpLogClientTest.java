@@ -4,14 +4,17 @@ import com.google.protobuf.ByteString;
 import org.apache.commons.codec.binary.Base64;
 import org.apache.http.NameValuePair;
 import org.apache.http.message.BasicNameValuePair;
-import org.certificatetransparency.ctlog.*;
+import org.certificatetransparency.ctlog.CertificateTransparencyException;
+import org.certificatetransparency.ctlog.ParsedLogEntry;
+import org.certificatetransparency.ctlog.ParsedLogEntryWithProof;
+import org.certificatetransparency.ctlog.SignedTreeHead;
+import org.certificatetransparency.ctlog.TestData;
 import org.certificatetransparency.ctlog.proto.Ct;
 import org.certificatetransparency.ctlog.serialization.CryptoDataLoader;
 import org.json.simple.JSONArray;
 import org.json.simple.JSONObject;
 import org.json.simple.parser.JSONParser;
 import org.json.simple.parser.ParseException;
-import org.junit.Assert;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
@@ -29,7 +32,11 @@ import java.security.cert.X509Certificate;
 import java.util.ArrayList;
 import java.util.List;
 
-import static org.junit.Assert.*;
+import static org.junit.Assert.assertArrayEquals;
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.fail;
 import static org.mockito.Matchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
@@ -161,11 +168,12 @@ public class HttpLogClientTest {
 
   @Test
   public void certificatesAreEncoded() throws CertificateException, IOException {
-    List<Certificate> inputCerts = CryptoDataLoader.certificatesFromFile(new File(HttpLogClientTest.class.getResource(TEST_DATA_PATH).getFile()));
+    List<Certificate> inputCerts = CryptoDataLoader.certificatesFromFile(
+            new File(getClass().getResource(TEST_DATA_PATH).getFile()));
     HttpLogClient client = new HttpLogClient("");
 
     JSONObject encoded = client.encodeCertificates(inputCerts);
-    Assert.assertTrue(encoded.containsKey("chain"));
+    assertTrue(encoded.containsKey("chain"));
     JSONArray chain = (JSONArray) encoded.get("chain");
     assertEquals("Expected to have two certificates in the chain", 2, chain.size());
     // Make sure the order is reversed.
@@ -196,7 +204,8 @@ public class HttpLogClientTest {
       .thenReturn(JSON_RESPONSE);
 
     HttpLogClient client = new HttpLogClient("http://ctlog/", mockInvoker);
-    List<Certificate> certs = CryptoDataLoader.certificatesFromFile(new File(HttpLogClientTest.class.getResource(TEST_DATA_PATH).getFile()));
+    List<Certificate> certs = CryptoDataLoader.certificatesFromFile(
+            new File(getClass().getResource(TEST_DATA_PATH).getFile()));
     Ct.SignedCertificateTimestamp res = client.addCertificate(certs);
     assertNotNull("Should have a meaningful SCT", res);
 
@@ -212,11 +221,11 @@ public class HttpLogClientTest {
     HttpLogClient client = new HttpLogClient("http://ctlog/", mockInvoker);
     SignedTreeHead sth = client.getLogSTH();
 
-    Assert.assertNotNull(sth);
-    Assert.assertEquals(1402415255382L, sth.timestamp);
-    Assert.assertEquals(4301837, sth.treeSize);
+    assertNotNull(sth);
+    assertEquals(1402415255382L, sth.timestamp);
+    assertEquals(4301837, sth.treeSize);
     String rootHash = Base64.encodeBase64String(sth.sha256RootHash);
-    Assert.assertTrue("jdH9k+/lb9abMz3N8rVmwrw8MWU7v55+nSAXej3hqPg=".equals(rootHash));
+    assertTrue("jdH9k+/lb9abMz3N8rVmwrw8MWU7v55+nSAXej3hqPg=".equals(rootHash));
   }
 
   @Test
@@ -228,7 +237,7 @@ public class HttpLogClientTest {
     HttpLogClient client = new HttpLogClient("http://ctlog/", mockInvoker);
     try {
       client.getLogSTH();
-      Assert.fail();
+      fail();
     } catch (CertificateTransparencyException e) {
     }
   }
@@ -242,7 +251,7 @@ public class HttpLogClientTest {
     HttpLogClient client = new HttpLogClient("http://ctlog/", mockInvoker);
     try {
       client.getLogSTH();
-      Assert.fail();
+      fail();
     } catch (CertificateTransparencyException e) {
     }
   }
@@ -250,7 +259,7 @@ public class HttpLogClientTest {
   @Test
   public void getRootCerts() throws IOException, ParseException {
     JSONParser parser = new JSONParser();
-    Object obj = parser.parse(new FileReader(HttpLogClientTest.class.getResource(TestData.TEST_ROOT_CERTS).getFile()));
+    Object obj = parser.parse(new FileReader(getClass().getResource(TestData.TEST_ROOT_CERTS).getFile()));
     JSONObject response = (JSONObject) obj;
     
     HttpInvoker mockInvoker = mock(HttpInvoker.class);
@@ -260,14 +269,14 @@ public class HttpLogClientTest {
     HttpLogClient client = new HttpLogClient("http://ctlog/", mockInvoker);
     List<Certificate> rootCerts = client.getLogRoots();
 
-    Assert.assertNotNull(rootCerts);
-    Assert.assertEquals(2, rootCerts.size());
+    assertNotNull(rootCerts);
+    assertEquals(2, rootCerts.size());
   }
 
   @Test
   public void getLogEntries() {
     HttpInvoker mockInvoker = mock(HttpInvoker.class);
-    List<NameValuePair> params = new ArrayList<NameValuePair>();
+    List<NameValuePair> params = new ArrayList<>();
     params.add(new BasicNameValuePair("start", Long.toString(0)));
     params.add(new BasicNameValuePair("end", Long.toString(0)));
 
@@ -276,9 +285,9 @@ public class HttpLogClientTest {
 
     HttpLogClient client = new HttpLogClient("http://ctlog/", mockInvoker);
     X509Certificate testChainCert= (X509Certificate) CryptoDataLoader.certificatesFromFile(
-        new File(HttpLogClientTest.class.getResource(TestData.ROOT_CA_CERT).getFile())).get(0);
+        new File(getClass().getResource(TestData.ROOT_CA_CERT).getFile())).get(0);
     X509Certificate testCert= (X509Certificate) CryptoDataLoader.certificatesFromFile(
-        new File(HttpLogClientTest.class.getResource(TestData.TEST_CERT).getFile())).get(0);
+        new File(getClass().getResource(TestData.TEST_CERT).getFile())).get(0);
     List<ParsedLogEntry> entries = client.getLogEntries(0, 0);
 
     X509Certificate  chainCert = null ;
@@ -294,16 +303,16 @@ public class HttpLogClientTest {
         new ByteArrayInputStream(chainCertBytes));
 
     } catch (CertificateException  e) {
-      Assert.fail();
+      fail();
     }
-    Assert.assertTrue(testCert.equals(leafCert));;
-    Assert.assertTrue(testChainCert.equals(chainCert));;
+    assertTrue(testCert.equals(leafCert));
+    assertTrue(testChainCert.equals(chainCert));
   }
 
   @Test
   public void getLogEntriesCorruptedEntry() {
     HttpInvoker mockInvoker = mock(HttpInvoker.class);
-    List<NameValuePair> params = new ArrayList<NameValuePair>();
+    List<NameValuePair> params = new ArrayList<>();
     params.add(new BasicNameValuePair("start", Long.toString(0)));
     params.add(new BasicNameValuePair("end", Long.toString(0)));
 
@@ -314,7 +323,7 @@ public class HttpLogClientTest {
     try {
       // Must get an actual entry as the list of entries is lazily transformed.
       client.getLogEntries(0, 0).get(0);
-      Assert.fail();
+      fail();
     } catch (CertificateTransparencyException expected) {
     }
   }
@@ -322,7 +331,7 @@ public class HttpLogClientTest {
   @Test
   public void getLogEntriesEmptyEntry() {
     HttpInvoker mockInvoker = mock(HttpInvoker.class);
-    List<NameValuePair> params = new ArrayList<NameValuePair>();
+    List<NameValuePair> params = new ArrayList<>();
     params.add(new BasicNameValuePair("start", Long.toString(0)));
     params.add(new BasicNameValuePair("end", Long.toString(0)));
 
@@ -330,13 +339,13 @@ public class HttpLogClientTest {
       .thenReturn(LOG_ENTRY_EMPTY);
 
     HttpLogClient client = new HttpLogClient("http://ctlog/", mockInvoker);
-    Assert.assertTrue(client.getLogEntries(0, 0).isEmpty());
+    assertTrue(client.getLogEntries(0, 0).isEmpty());
   }
 
   @Test
   public void getSTHConsistency() {
     HttpInvoker mockInvoker = mock(HttpInvoker.class);
-    List<NameValuePair> params = new ArrayList<NameValuePair>();
+    List<NameValuePair> params = new ArrayList<>();
     params.add(new BasicNameValuePair("first", Long.toString(1)));
     params.add(new BasicNameValuePair("second", Long.toString(3)));
 
@@ -345,14 +354,14 @@ public class HttpLogClientTest {
 
     HttpLogClient client = new HttpLogClient("http://ctlog/", mockInvoker);
     List<ByteString> proof = client.getSTHConsistency(1, 3);
-    Assert.assertNotNull(proof);
-    Assert.assertEquals(2, proof.size());
+    assertNotNull(proof);
+    assertEquals(2, proof.size());
   }
 
   @Test
   public void getSTHConsistencyEmpty() {
     HttpInvoker mockInvoker = mock(HttpInvoker.class);
-    List<NameValuePair> params = new ArrayList<NameValuePair>();
+    List<NameValuePair> params = new ArrayList<>();
     params.add(new BasicNameValuePair("first", Long.toString(1)));
     params.add(new BasicNameValuePair("second", Long.toString(3)));
 
@@ -361,14 +370,14 @@ public class HttpLogClientTest {
 
     HttpLogClient client = new HttpLogClient("http://ctlog/", mockInvoker);
     List<ByteString> proof = client.getSTHConsistency(1, 3);
-    Assert.assertNotNull(proof);
-    Assert.assertTrue(proof.isEmpty());
+    assertNotNull(proof);
+    assertTrue(proof.isEmpty());
   }
 
   @Test
   public void getLogEntrieAndProof() {
     HttpInvoker mockInvoker = mock(HttpInvoker.class);
-    List<NameValuePair> params = new ArrayList<NameValuePair>();
+    List<NameValuePair> params = new ArrayList<>();
     params.add(new BasicNameValuePair("leaf_index", Long.toString(1)));
     params.add(new BasicNameValuePair("tree_size", Long.toString(2)));
 
@@ -377,9 +386,9 @@ public class HttpLogClientTest {
 
     HttpLogClient client = new HttpLogClient("http://ctlog/", mockInvoker);
     X509Certificate testChainCert= (X509Certificate) CryptoDataLoader.certificatesFromFile(
-        new File(HttpLogClientTest.class.getResource(TestData.ROOT_CA_CERT).getFile())).get(0);
+        new File(getClass().getResource(TestData.ROOT_CA_CERT).getFile())).get(0);
     X509Certificate testCert= (X509Certificate) CryptoDataLoader.certificatesFromFile(
-        new File(HttpLogClientTest.class.getResource(TestData.TEST_CERT).getFile())).get(0);
+        new File(getClass().getResource(TestData.TEST_CERT).getFile())).get(0);
     ParsedLogEntryWithProof entry = client.getLogEntryAndProof(1, 2);
 
     X509Certificate  chainCert = null;
@@ -395,13 +404,13 @@ public class HttpLogClientTest {
         new ByteArrayInputStream(chainCertBytes));
 
     } catch (CertificateException  e) {
-      Assert.fail();
+      fail();
     }
 
-    Assert.assertTrue(testCert.equals(leafCert));
-    Assert.assertTrue(testChainCert.equals(chainCert));
-    Assert.assertEquals(2, entry.getAuditProof().pathNode.size());
-    Assert.assertEquals(1, entry.getAuditProof().leafIndex);
-    Assert.assertEquals(2, entry.getAuditProof().treeSize);
+    assertTrue(testCert.equals(leafCert));
+    assertTrue(testChainCert.equals(chainCert));
+    assertEquals(2, entry.getAuditProof().pathNode.size());
+    assertEquals(1, entry.getAuditProof().leafIndex);
+    assertEquals(2, entry.getAuditProof().treeSize);
   }
 }
