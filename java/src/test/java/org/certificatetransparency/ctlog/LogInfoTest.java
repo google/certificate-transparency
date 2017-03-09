@@ -1,5 +1,7 @@
 package org.certificatetransparency.ctlog;
 
+import static org.junit.Assert.assertTrue;
+
 import org.apache.commons.codec.binary.Base64;
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -10,8 +12,6 @@ import java.security.NoSuchAlgorithmException;
 import java.security.PublicKey;
 import java.security.spec.InvalidKeySpecException;
 import java.security.spec.X509EncodedKeySpec;
-
-import static org.junit.Assert.assertTrue;
 
 /**
  * Mostly for verifying the log info calculates the log ID correctly.

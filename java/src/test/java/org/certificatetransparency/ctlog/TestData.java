@@ -4,6 +4,8 @@ import org.certificatetransparency.ctlog.serialization.CryptoDataLoader;
 import org.junit.Ignore;
 
 import java.io.File;
+import java.io.FileNotFoundException;
+import java.io.FileReader;
 import java.security.cert.Certificate;
 import java.util.List;
 
@@ -56,5 +58,17 @@ public class TestData {
   static List<Certificate> loadCertificates(String filename) {
     File file = new File(TestData.class.getResource(filename).getFile());
     return CryptoDataLoader.certificatesFromFile(file);
+  }
+
+  public static FileReader fileReader(String name) throws FileNotFoundException {
+    return new FileReader(TestData.class.getResource(name).getFile());
+  }
+
+  public static File file(String name) {
+    return new File(TestData.class.getResource(name).getFile());
+  }
+
+  public static String fileName(String name) {
+    return TestData.class.getResource(name).getFile();
   }
 }

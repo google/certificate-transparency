@@ -1,25 +1,5 @@
 package org.certificatetransparency.ctlog;
 
-import com.google.common.io.Files;
-import org.certificatetransparency.ctlog.proto.Ct;
-import org.certificatetransparency.ctlog.serialization.Deserializer;
-import org.junit.Test;
-import org.junit.runner.RunWith;
-import org.junit.runners.JUnit4;
-
-import java.io.ByteArrayInputStream;
-import java.io.File;
-import java.io.IOException;
-import java.security.InvalidKeyException;
-import java.security.NoSuchAlgorithmException;
-import java.security.SignatureException;
-import java.security.cert.Certificate;
-import java.security.cert.CertificateException;
-import java.security.cert.X509Certificate;
-import java.security.spec.InvalidKeySpecException;
-import java.util.ArrayList;
-import java.util.List;
-
 import static org.certificatetransparency.ctlog.TestData.INTERMEDIATE_CA_CERT;
 import static org.certificatetransparency.ctlog.TestData.PRE_CERT_SIGNING_BY_INTERMEDIATE;
 import static org.certificatetransparency.ctlog.TestData.PRE_CERT_SIGNING_CERT;
@@ -46,6 +26,26 @@ import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 
+import com.google.common.io.Files;
+import org.certificatetransparency.ctlog.proto.Ct;
+import org.certificatetransparency.ctlog.serialization.Deserializer;
+import org.junit.Test;
+import org.junit.runner.RunWith;
+import org.junit.runners.JUnit4;
+
+import java.io.ByteArrayInputStream;
+import java.io.File;
+import java.io.IOException;
+import java.security.InvalidKeyException;
+import java.security.NoSuchAlgorithmException;
+import java.security.SignatureException;
+import java.security.cert.Certificate;
+import java.security.cert.CertificateException;
+import java.security.cert.X509Certificate;
+import java.security.spec.InvalidKeySpecException;
+import java.util.ArrayList;
+import java.util.List;
+
 
 /**
  * This test verifies that the data is correctly serialized for signature comparison, so
@@ -55,13 +55,13 @@ import static org.junit.Assert.fail;
 public class LogSignatureVerifierTest {
   /** Returns a LogSignatureVerifier for the test log with an EC key */
   private LogSignatureVerifier getVerifier() {
-    LogInfo logInfo = LogInfo.fromKeyFile(getClass().getResource(TEST_LOG_KEY).getFile());
+    LogInfo logInfo = LogInfo.fromKeyFile(TestData.fileName(TEST_LOG_KEY));
     return new LogSignatureVerifier(logInfo);
   }
 
   /** Returns a LogSignatureVerifier for the test log with an RSA key */
   private LogSignatureVerifier getVerifierRSA() {
-      LogInfo logInfo = LogInfo.fromKeyFile(getClass().getResource(TEST_LOG_KEY_RSA).getFile());
+      LogInfo logInfo = LogInfo.fromKeyFile(TestData.fileName(TEST_LOG_KEY_RSA));
       return new LogSignatureVerifier(logInfo);
     }
 
@@ -73,8 +73,7 @@ public class LogSignatureVerifierTest {
       InvalidKeySpecException, NoSuchAlgorithmException, SignatureException, InvalidKeyException {
     List<Certificate> certs = loadCertificates(TEST_CERT);
     Ct.SignedCertificateTimestamp sct = Deserializer.parseSCTFromBinary(
-        new ByteArrayInputStream(Files.toByteArray(
-                new File(getClass().getResource(TEST_CERT_SCT).getFile()))));
+        new ByteArrayInputStream(Files.toByteArray(TestData.file(TEST_CERT_SCT))));
     LogSignatureVerifier verifier = getVerifier();
     assertTrue(verifier.verifySignature(sct, certs.get(0)));
   }
@@ -83,8 +82,7 @@ public class LogSignatureVerifierTest {
   public void signatureVerifiesRSA() throws IOException {
     List<Certificate> certs = loadCertificates(TEST_CERT);
     Ct.SignedCertificateTimestamp sct = Deserializer.parseSCTFromBinary(
-        new ByteArrayInputStream(Files.toByteArray(
-                new File(getClass().getResource(TEST_CERT_SCT_RSA).getFile()))));
+        new ByteArrayInputStream(Files.toByteArray(TestData.file(TEST_CERT_SCT_RSA))));
     LogSignatureVerifier verifier = getVerifierRSA();
     assertTrue(verifier.verifySignature(sct, certs.get(0)));
   }
@@ -100,8 +98,7 @@ public class LogSignatureVerifierTest {
     Certificate signerCert = caList.get(0);
 
     Ct.SignedCertificateTimestamp sct = Deserializer.parseSCTFromBinary(
-        new ByteArrayInputStream(Files.toByteArray(
-                new File(getClass().getResource(TEST_PRE_SCT).getFile()))));
+        new ByteArrayInputStream(Files.toByteArray(TestData.file(TEST_PRE_SCT))));
 
     LogSignatureVerifier verifier = getVerifier();
     assertTrue("Expected signature to verify OK",
@@ -120,8 +117,7 @@ public class LogSignatureVerifierTest {
     Certificate signerCert = caList.get(0);
 
     Ct.SignedCertificateTimestamp sct = Deserializer.parseSCTFromBinary(
-        new ByteArrayInputStream(Files.toByteArray(
-                new File(getClass().getResource(TEST_PRE_SCT_RSA).getFile()))));
+        new ByteArrayInputStream(Files.toByteArray(TestData.file(TEST_PRE_SCT_RSA))));
 
     LogSignatureVerifier verifier = getVerifierRSA();
     assertTrue("Expected signature to verify OK",
@@ -138,8 +134,7 @@ public class LogSignatureVerifierTest {
     // test-cert.pem -> ca-cert.pem
     List<Certificate> certs = loadCertificates(TEST_CERT);
     Ct.SignedCertificateTimestamp sct = Deserializer.parseSCTFromBinary(
-        new ByteArrayInputStream(Files.toByteArray(
-                new File(getClass().getResource(TEST_CERT_SCT).getFile()))));
+        new ByteArrayInputStream(Files.toByteArray(TestData.file(TEST_CERT_SCT))));
 
     assertTrue(getVerifier().verifySignature(sct, certs));
   }
@@ -153,8 +148,7 @@ public class LogSignatureVerifierTest {
     certsChain.addAll(loadCertificates(INTERMEDIATE_CA_CERT));
     certsChain.addAll(loadCertificates(ROOT_CA_CERT));
     Ct.SignedCertificateTimestamp sct = Deserializer.parseSCTFromBinary(
-        new ByteArrayInputStream(Files.toByteArray(
-                new File(getClass().getResource(TEST_INTERMEDIATE_CERT_SCT).getFile()))));
+        new ByteArrayInputStream(Files.toByteArray(TestData.file(TEST_INTERMEDIATE_CERT_SCT))));
 
     assertTrue(getVerifier().verifySignature(sct, certsChain));
   }
@@ -169,8 +163,7 @@ public class LogSignatureVerifierTest {
     certsChain.addAll(loadCertificates(ROOT_CA_CERT));
 
     Ct.SignedCertificateTimestamp sct = Deserializer.parseSCTFromBinary(
-        new ByteArrayInputStream(Files.toByteArray(
-                new File(getClass().getResource(TEST_PRE_SCT).getFile()))));
+        new ByteArrayInputStream(Files.toByteArray(TestData.file(TEST_PRE_SCT))));
 
     assertTrue(getVerifier().verifySignature(sct, certsChain));
   }
@@ -186,8 +179,7 @@ public class LogSignatureVerifierTest {
     certsChain.addAll(loadCertificates(ROOT_CA_CERT));
 
     Ct.SignedCertificateTimestamp sct = Deserializer.parseSCTFromBinary(
-        new ByteArrayInputStream(Files.toByteArray(
-                new File(getClass().getResource(TEST_PRE_CERT_PRECA_SCT).getFile()))));
+        new ByteArrayInputStream(Files.toByteArray(TestData.file(TEST_PRE_CERT_PRECA_SCT))));
 
     assertTrue("Expected PreCertificate to verify OK",
         getVerifier().verifySignature(sct, certsChain));
@@ -203,9 +195,8 @@ public class LogSignatureVerifierTest {
     certsChain.addAll(loadCertificates(INTERMEDIATE_CA_CERT));
     certsChain.addAll(loadCertificates(ROOT_CA_CERT));
 
-    Ct.SignedCertificateTimestamp sct = Deserializer.parseSCTFromBinary(
-        new ByteArrayInputStream(Files.toByteArray(
-                new File(getClass().getResource(TEST_PRE_CERT_SIGNED_BY_INTERMEDIATE_SCT).getFile()))));
+    Ct.SignedCertificateTimestamp sct = Deserializer.parseSCTFromBinary(new ByteArrayInputStream(
+            Files.toByteArray(TestData.file(TEST_PRE_CERT_SIGNED_BY_INTERMEDIATE_SCT))));
 
     assertTrue("Expected PreCertificate to verify OK",
         getVerifier().verifySignature(sct, certsChain));
@@ -223,9 +214,8 @@ public class LogSignatureVerifierTest {
     certsChain.addAll(loadCertificates(INTERMEDIATE_CA_CERT));
     certsChain.addAll(loadCertificates(ROOT_CA_CERT));
 
-    Ct.SignedCertificateTimestamp sct = Deserializer.parseSCTFromBinary(
-        new ByteArrayInputStream(Files.toByteArray(
-                new File(getClass().getResource(TEST_PRE_CERT_SIGNED_BY_PRECA_INTERMEDIATE_SCT).getFile()))));
+    Ct.SignedCertificateTimestamp sct = Deserializer.parseSCTFromBinary(new ByteArrayInputStream(
+            Files.toByteArray(TestData.file(TEST_PRE_CERT_SIGNED_BY_PRECA_INTERMEDIATE_SCT))));
 
     assertTrue("Expected PreCertificate to verify OK",
         getVerifier().verifySignature(sct, certsChain));
@@ -239,8 +229,7 @@ public class LogSignatureVerifierTest {
     certsChain.addAll(loadCertificates(PRE_CERT_SIGNING_CERT));
 
     Ct.SignedCertificateTimestamp sct = Deserializer.parseSCTFromBinary(
-        new ByteArrayInputStream(Files.toByteArray(
-                new File(getClass().getResource(TEST_PRE_CERT_PRECA_SCT).getFile()))));
+        new ByteArrayInputStream(Files.toByteArray(TestData.file(TEST_PRE_CERT_PRECA_SCT))));
 
     try {
       getVerifier().verifySignature(sct, certsChain);
