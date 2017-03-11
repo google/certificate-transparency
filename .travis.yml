@@ -2,6 +2,8 @@ sudo: false
 
 language: cpp
 
+sudo: required
+
 go:
   - 1.7.1
 
