@@ -25,6 +25,9 @@ addons:
       - libstdc++-4.9-dev
       - tcl8.5
       - cmake
+      - oracle-java8-installer
+      - oracle-java8-set-default
+      - maven
 
 matrix:
   include:
@@ -91,8 +94,6 @@ before_install:
  - echo "INSTALL_DIR=${INSTALL_DIR}"
  - mkdir -p $GOPATH/src/github.com/google
  - ln -sf $PWD $GOPATH/src/github.com/google
- - echo "jars.protobuf = ${INSTALL_DIR}/java/protobuf.jar" > local.properties
- - echo "protoc.bin = ${PROTOC}" >> local.properties
 
 install:
 # Workaround LLVM's apt mirror being feeble and underpowered
@@ -105,7 +106,6 @@ install:
  - autoconf --version
  - pushd ..
  - mkdir -p ct
- - wget http://central.maven.org/maven2/com/google/protobuf/protobuf-java/2.6.0/protobuf-java-2.6.0.jar -O ${INSTALL_DIR}/java/protobuf.jar
  - if [ ! -e depot_tools/gclient ]; then git clone https://chromium.googlesource.com/chromium/tools/depot_tools.git; fi
  - export PATH="$PATH:/usr/local/bin:"`pwd`/depot_tools
  - cd ct
@@ -121,11 +121,12 @@ install:
  - go get github.com/stretchr/testify
  - go get -v -d -t ./...
  - popd
+ - export JAVA_HOME=/usr/lib/jvm/java-8-oracle/jre
 
 script:
  - getconf _NPROCESSORS_ONLN
  - ${MAKE} -j$(getconf _NPROCESSORS_ONLN) check VERBOSE=1 V=${ENV_VERBOSE}
- - ant build test
+ - mvn -f java/pom.xml clean test
  - ${MAKE} -C python test
  - pushd ${GOPATH}
  - |
