@@ -81,6 +81,7 @@ cache:
 
 
 before_install:
+ - sudo apt-get -qq update
  - eval "$(gimme 1.7)"
 # Set compiler version overrides if we have any:
  - if [ "${REAL_CC}" != "" ]; then export CC=${REAL_CC} CXX=${REAL_CXX}; fi
