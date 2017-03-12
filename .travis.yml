@@ -7,6 +7,9 @@ sudo: required
 go:
   - 1.7.1
 
+jdk:
+  - oraclejdk8
+
 env:
   global:
     - INSTALL_DIR=${TRAVIS_BUILD_DIR}/../install
@@ -27,8 +30,6 @@ addons:
       - libstdc++-4.9-dev
       - tcl8.5
       - cmake
-      - oracle-java8-installer
-      - oracle-java8-set-default
       - maven
 
 matrix:
@@ -83,7 +84,6 @@ cache:
 
 
 before_install:
- - sudo apt-get -qq update
  - eval "$(gimme 1.7)"
 # Set compiler version overrides if we have any:
  - if [ "${REAL_CC}" != "" ]; then export CC=${REAL_CC} CXX=${REAL_CXX}; fi
@@ -124,7 +124,6 @@ install:
  - go get github.com/stretchr/testify
  - go get -v -d -t ./...
  - popd
- - export JAVA_HOME=/usr/lib/jvm/java-8-oracle/jre
 
 script:
  - getconf _NPROCESSORS_ONLN
