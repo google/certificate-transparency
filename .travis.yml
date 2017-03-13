@@ -95,6 +95,9 @@ before_install:
  - echo "INSTALL_DIR=${INSTALL_DIR}"
  - mkdir -p $GOPATH/src/github.com/google
  - ln -sf $PWD $GOPATH/src/github.com/google
+ - java -version
+ - mvn -version
+ - unset JAVA_HOME
 
 install:
 # Workaround LLVM's apt mirror being feeble and underpowered
