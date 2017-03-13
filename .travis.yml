@@ -97,7 +97,7 @@ before_install:
  - ln -sf $PWD $GOPATH/src/github.com/google
  - java -version
  - mvn -version
- - unset JAVA_HOME
+ - export JAVA_HOME="$(java -XshowSettings:properties -version 2>&1 | grep 'java.home' | awk -F' = ' '{print $2}')"
 
 install:
 # Workaround LLVM's apt mirror being feeble and underpowered
