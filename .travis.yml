@@ -128,7 +128,7 @@ install:
 script:
  - getconf _NPROCESSORS_ONLN
  - ${MAKE} -j$(getconf _NPROCESSORS_ONLN) check VERBOSE=1 V=${ENV_VERBOSE}
- - export JAVA_HOME="$(java -XshowSettings:properties -version 2>&1 | grep 'java.home' | awk -F' = ' '{print $2}')"
+ - if [ -e "/usr/lib/jvm/java-8-oracle/" ]; then export JAVA_HOME=/usr/lib/jvm/java-8-oracle/; fi
  - mvn -version
  - mvn -f java/pom.xml clean test
  - ${MAKE} -C python test
