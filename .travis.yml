@@ -95,6 +95,8 @@ before_install:
  - echo "INSTALL_DIR=${INSTALL_DIR}"
  - mkdir -p $GOPATH/src/github.com/google
  - ln -sf $PWD $GOPATH/src/github.com/google
+ - if [ -e "/usr/lib/jvm/java-8-oracle/" ]; then export PATH="/usr/lib/jvm/java-8-oracle/bin:$PATH"; export JAVA_HOME=/usr/lib/jvm/java-8-oracle/; fi
+ - echo "JAVA_HOME=$JAVA_HOME"
  - java -version
  - mvn -version
 
@@ -128,8 +130,6 @@ install:
 script:
  - getconf _NPROCESSORS_ONLN
  - ${MAKE} -j$(getconf _NPROCESSORS_ONLN) check VERBOSE=1 V=${ENV_VERBOSE}
- - if [ -e "/usr/lib/jvm/java-8-oracle/" ]; then export JAVA_HOME=/usr/lib/jvm/java-8-oracle/; fi
- - mvn -version
  - mvn -f java/pom.xml clean test
  - ${MAKE} -C python test
  - pushd ${GOPATH}
