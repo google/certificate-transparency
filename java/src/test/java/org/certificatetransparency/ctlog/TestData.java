@@ -4,6 +4,8 @@ import org.certificatetransparency.ctlog.serialization.CryptoDataLoader;
 import org.junit.Ignore;
 
 import java.io.File;
+import java.io.FileNotFoundException;
+import java.io.FileReader;
 import java.security.cert.Certificate;
 import java.util.List;
 
@@ -12,7 +14,7 @@ import java.util.List;
  */
 @Ignore
 public class TestData {
-  private static final String DATA_ROOT = "test/testdata/";
+  private static final String DATA_ROOT = "/testdata/";
   // Public log key
   public static final String TEST_LOG_KEY = DATA_ROOT + "ct-server-key-public.pem";
   public static final String TEST_LOG_KEY_RSA = DATA_ROOT + "rsa/ct-server-key-public-rsa.pem";
@@ -54,6 +56,19 @@ public class TestData {
   public static final String TEST_ROOT_CERTS = DATA_ROOT + "test-root-certs";
 
   static List<Certificate> loadCertificates(String filename) {
-    return CryptoDataLoader.certificatesFromFile(new File(filename));
+    File file = new File(TestData.class.getResource(filename).getFile());
+    return CryptoDataLoader.certificatesFromFile(file);
+  }
+
+  public static FileReader fileReader(String name) throws FileNotFoundException {
+    return new FileReader(TestData.class.getResource(name).getFile());
+  }
+
+  public static File file(String name) {
+    return new File(TestData.class.getResource(name).getFile());
+  }
+
+  public static String fileName(String name) {
+    return TestData.class.getResource(name).getFile();
   }
 }

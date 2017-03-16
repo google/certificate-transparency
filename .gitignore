@@ -121,9 +121,15 @@
 /test/testdata/urlfetcher_test_certs/
 
 # IntelliJ artefacts
+/java/.idea
 /java/.idea/dictionaries/
 /java/.idea/workspace.xml
 /java/out
+/java/target
+/java/ctlog.iml
+
+# maven litter
+/java/src/test/resources/testdata
 
 # Eclipse artefacts
 /java/.classpath

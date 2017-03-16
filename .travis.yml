@@ -5,6 +5,9 @@ language: cpp
 go:
   - 1.7.1
 
+jdk:
+  - oraclejdk8
+
 env:
   global:
     - INSTALL_DIR=${TRAVIS_BUILD_DIR}/../install
@@ -25,6 +28,7 @@ addons:
       - libstdc++-4.9-dev
       - tcl8.5
       - cmake
+      - maven
 
 matrix:
   include:
@@ -76,7 +80,6 @@ cache:
     - $TRAVIS_BUILD_DIR/../depot_tools
     - $TRAVIS_BUILD_DIR/../install
 
-
 before_install:
  - eval "$(gimme 1.7)"
 # Set compiler version overrides if we have any:
@@ -91,8 +94,10 @@ before_install:
  - echo "INSTALL_DIR=${INSTALL_DIR}"
  - mkdir -p $GOPATH/src/github.com/google
  - ln -sf $PWD $GOPATH/src/github.com/google
- - echo "jars.protobuf = ${INSTALL_DIR}/java/protobuf.jar" > local.properties
- - echo "protoc.bin = ${PROTOC}" >> local.properties
+ - if [ -e "/usr/lib/jvm/java-8-oracle/" ]; then export PATH="/usr/lib/jvm/java-8-oracle/bin:$PATH"; export JAVA_HOME=/usr/lib/jvm/java-8-oracle/; fi
+ - echo "JAVA_HOME=$JAVA_HOME"
+ - java -version
+ - mvn -version
 
 install:
 # Workaround LLVM's apt mirror being feeble and underpowered
@@ -105,7 +110,6 @@ install:
  - autoconf --version
  - pushd ..
  - mkdir -p ct
- - wget http://central.maven.org/maven2/com/google/protobuf/protobuf-java/2.6.0/protobuf-java-2.6.0.jar -O ${INSTALL_DIR}/java/protobuf.jar
  - if [ ! -e depot_tools/gclient ]; then git clone https://chromium.googlesource.com/chromium/tools/depot_tools.git; fi
  - export PATH="$PATH:/usr/local/bin:"`pwd`/depot_tools
  - cd ct
@@ -125,7 +129,7 @@ install:
 script:
  - getconf _NPROCESSORS_ONLN
  - ${MAKE} -j$(getconf _NPROCESSORS_ONLN) check VERBOSE=1 V=${ENV_VERBOSE}
- - ant build test
+ - mvn -f java/pom.xml clean test
  - ${MAKE} -C python test
  - pushd ${GOPATH}
  - |

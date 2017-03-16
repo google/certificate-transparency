@@ -1,16 +1,17 @@
 package org.certificatetransparency.ctlog.serialization;
 
+import static org.junit.Assert.assertArrayEquals;
+
 import com.google.common.io.Files;
 import com.google.protobuf.ByteString;
 
 import org.apache.commons.codec.binary.Base64;
+import org.certificatetransparency.ctlog.TestData;
 import org.certificatetransparency.ctlog.proto.Ct;
-import org.junit.Assert;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
 
-import java.io.File;
 import java.io.IOException;
 
 /**
@@ -18,7 +19,7 @@ import java.io.IOException;
  */
 @RunWith(JUnit4.class)
 public class TestSerializer {
-  public static final String TEST_CERT_SCT = "test/testdata/test-cert.proof";
+  public static final String TEST_CERT_SCT = "/testdata/test-cert.proof";
 
   @Test
   public void serializeSCT() throws IOException {
@@ -42,7 +43,7 @@ public class TestSerializer {
     builder.setSignature(signatureBuilder.build());
 
     byte[] generatedBytes = Serializer.serializeSctToBinary(builder.build());
-    byte[] readBytes = Files.toByteArray(new File(TEST_CERT_SCT));
-    Assert.assertArrayEquals(readBytes, generatedBytes);
+    byte[] readBytes = Files.toByteArray(TestData.file(TEST_CERT_SCT));
+    assertArrayEquals(readBytes, generatedBytes);
   }
 }
