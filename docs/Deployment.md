@@ -410,11 +410,11 @@ For each software release:
    images by running the following commands.
 
    ```bash
-   % gcloud docker push gcr.io/${PROJECT}/ct-log:${TAG}
-   % gcloud docker push gcr.io/${PROJECT}/ct-mirror:${TAG}
-   % gcloud docker push gcr.io/${PROJECT}/etcd:${TAG}
-   % gcloud docker push gcr.io/${PROJECT}/prometheus:${TAG}
-   % gcloud docker search gcr.io/${PROJECT}
+   % gcloud docker -- push gcr.io/${PROJECT}/ct-log:${TAG}
+   % gcloud docker -- push gcr.io/${PROJECT}/ct-mirror:${TAG}
+   % gcloud docker -- push gcr.io/${PROJECT}/etcd:${TAG}
+   % gcloud docker -- push gcr.io/${PROJECT}/prometheus:${TAG}
+   % gcloud docker -- search gcr.io/${PROJECT}
    NAME                         DESCRIPTION   STARS     OFFICIAL   AUTOMATED
    ct-log-docs-test/ct-log                    0
    ct-log-docs-test/ct-mirror                 0
@@ -534,7 +534,7 @@ from above to make an updated Docker image available to GCP:
  - re-generate the appropriate Docker image (e.g.
    `docker build -f Dockerfile -t gcr.io/${PROJECT}/ct-log:${TAG} .`)
  - push the Docker image to **gcr.io** (e.g.
-   `gcloud docker push gcr.io/${PROJECT}/ct-log:${TAG}`)
+   `gcloud docker -- push gcr.io/${PROJECT}/ct-log:${TAG}`)
 
 The running instances can then be updated with the appropriate
 `cloud/google/update_<type>.sh` script using the Log configuration file
