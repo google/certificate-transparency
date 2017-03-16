@@ -3,11 +3,9 @@ RUN echo 'Building new CT Log Docker image...'
 COPY test/testdata/ca-cert.pem /tmp/
 RUN apt-get update && \
     apt-get install -y software-properties-common && \
-    apt-add-repository -y ppa:jbboehr/coreos && \
     apt-get update && \
     apt-get install -qqy \
-        ca-certificates \
-        etcdctl
+        ca-certificates
 RUN update-ca-certificates && \
     cat /etc/ssl/certs/* /tmp/ca-cert.pem > /usr/local/etc/ctlog_ca_roots.pem
 RUN groupadd -r ctlog && useradd -r -g ctlog ctlog
