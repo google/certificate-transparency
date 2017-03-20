@@ -19,11 +19,11 @@ First, install those dependencies of the CT software (and the tools needed to
 build them) that are available as packages:
 
     sudo apt-get update -qq
-    sudo apt-get install -qq unzip cmake g++ libevent-dev golang-go autoconf pkg-config \
-        libjson-c-dev libgflags-dev libgoogle-glog-dev libprotobuf-dev libleveldb-dev \
-        libssl-dev libgoogle-perftools-dev protobuf-compiler libsqlite3-dev ant openjdk-7-jdk \
-        libprotobuf-java python-gflags python-protobuf python-ecdsa python-mock \
-        python-httplib2 git libldns-dev
+    sudo apt-get install -qq unzip cmake g++ libevent-dev golang-go autoconf \
+        pkg-config libjson-c-dev libgflags-dev libgoogle-glog-dev \
+        libprotobuf-dev libleveldb-dev libssl-dev libgoogle-perftools-dev \
+        protobuf-compiler libsqlite3-dev python-gflags python-protobuf \
+        python-ecdsa python-mock python-httplib2 git libldns-dev
 
 Unpackaged Dependencies
 -----------------------
@@ -66,10 +66,6 @@ Build CT server C++ code:
         CPPFLAGS="-I../libevhtp-1.2.10 -I../libevhtp-1.2.10/evthr \
         -I../libevhtp-1.2.10/htparse" LDFLAGS=-L../libevhtp-1.2.10
     make check
-
-Build and test Java code:
-
-    ant build test
 
 Build and test Python code:
 

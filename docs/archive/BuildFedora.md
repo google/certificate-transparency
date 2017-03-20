@@ -26,10 +26,9 @@ build them) that are available as packages:
 sudo dnf update
 sudo dnf install cmake gcc-g++ libevent-devel golang autoconf pkgconfig \
     json-c-devel gflags-devel glog-devel protobuf-devel leveldb-devel \
-    openssl-devel gperftools-devel protobuf-compiler sqlite-devel ant \
-    java-1.8.0-openjdk-devel protobuf-java python-gflags protobuf-python \
-    python-ecdsa python-mock python-httplib2 git ldns-devel automake \
-    libtool shtool libunwind-devel
+    openssl-devel gperftools-devel protobuf-compiler sqlite-devel \
+    python-gflags protobuf-python python-ecdsa python-mock python-httplib2 \
+    git ldns-devel automake libtool shtool libunwind-devel
 ```
 
 Unpackaged Dependencies
@@ -97,5 +96,5 @@ Build CT server C++ code:
 make check
 ```
 
-The remainder of the Java, Go and Python steps should be very similar to those
+The remainder of the Go and Python steps should be very similar to those
 [documented for Ubuntu](BuildUbuntu.md#ct-build).

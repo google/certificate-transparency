@@ -68,8 +68,9 @@ Code Layout
 -----------
 
 The source code is generally arranged according to implementation language, in
-the `cpp`, `go`, `java` and `python` subdirectories.  The key subdirectories
-are:
+the `cpp`, `go`, and `python` subdirectories (Java is in a
+[separate repository](https://github.com/google/certificate-transparency-java)).
+The key subdirectories are:
 
  - For the main distributed CT Log itself:
    - `cpp/log`: Main distributed CT Log implementation.
@@ -82,7 +83,6 @@ are:
    - `cpp/client`: CT Log client code in C++
    - `go/client`: CT Log client code in Go
    - `python/ct`: CT Log client code in Python
-   - `java/src/org/certificatetransparency/ctlog`: CT Log client code in Java
  - Other tools:
    - `go/fixchain`: Tool to fix up certificate chains
    - `go/gossip`: Code to allow gossip-based synchronization of cert info
