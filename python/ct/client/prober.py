@@ -35,22 +35,26 @@ class ProberThread(threading.Thread):
                 raise RuntimeError("Cannot start monitor: log proto has "
                                    "missing or empty fields: %s" % log)
 
-            temp_db = temp_db_factory.create_storage(log.log_server)
-            client = async_log_client.AsyncLogClient(agent,
-                                               log.log_server,
-                                               temp_db)
-            hasher = merkle.TreeHasher()
-            verifier = verify.LogVerifier(log.public_key_info,
-                                          merkle.MerkleVerifier(hasher))
-            # Convert from standard Base64 to URL-safe Base64 so that the log ID
-            # can be used as part of a file path.
-            log_id_urlsafe = log.log_id.replace('/', '_').replace('+', '-')
-            state_keeper = state_keeper_class(monitor_state_dir +
-                                             "/" + log_id_urlsafe)
-            log_key = db.get_log_id(log.log_server)
-            self.__monitors.append(monitor.Monitor(client, verifier, hasher, db,
-                                                   cert_db, log_key,
-                                                   state_keeper))
+            try:
+                temp_db = temp_db_factory.create_storage(log.log_server)
+                client = async_log_client.AsyncLogClient(agent,
+                                                   log.log_server,
+                                                   temp_db)
+                hasher = merkle.TreeHasher()
+                verifier = verify.LogVerifier(log.public_key_info,
+                                              merkle.MerkleVerifier(hasher))
+                # Convert from standard Base64 to URL-safe Base64 so that the
+                # log ID can be used as part of a file path.
+                log_id_urlsafe = log.log_id.replace('/', '_').replace('+', '-')
+                state_keeper = state_keeper_class(monitor_state_dir +
+                                                 "/" + log_id_urlsafe)
+                log_key = db.get_log_id(log.log_server)
+                self.__monitors.append(monitor.Monitor(client, verifier, hasher,
+                                                       db, cert_db, log_key,
+                                                       state_keeper))
+            except:
+                logging.error("Error starting monitor for log: %s" % log)
+                raise
 
         self.__last_update_start_time = 0
         self.__stopped = False
