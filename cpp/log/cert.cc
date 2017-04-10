@@ -1007,8 +1007,7 @@ util::Status Cert::IsValidWildcardRedaction() const {
       ASN1_INTEGER* const redacted_labels(asn1_type->value.integer);
       ScopedBIGNUM value(ASN1_INTEGER_to_BN(redacted_labels, nullptr));
 
-      const bool neg = value->neg;
-      if (neg) {
+      if (BN_is_negative(value.get())) {
         ScopedOpenSSLString bn_hex(BN_bn2hex(value.get()));
         LOG(WARNING) << "Invalid negative redaction label count: "
                      << bn_hex.get();
