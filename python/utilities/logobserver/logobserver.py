@@ -32,6 +32,9 @@ def create_directory(directory):
         os.makedirs(directory)
 
 if __name__ == '__main__':
+    reload(sys)
+    # we really need utf-8 for all accented characters and such in certificates
+    sys.setdefaultencoding('UTF-8')
     sys.argv = FLAGS(sys.argv)
     logging.basicConfig(level=FLAGS.log_level)
 
