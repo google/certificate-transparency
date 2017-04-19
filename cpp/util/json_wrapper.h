@@ -101,7 +101,7 @@ class JsonObject {
   }
 
   const char* ToString() const {
-    return json_object_to_json_string(obj_);
+    return json_object_to_json_string_ext(obj_, JSON_C_TO_STRING_PLAIN);
   }
 
   std::string DebugString() const {
