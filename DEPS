@@ -21,7 +21,7 @@ deps = {
      "ldns":             "https://github.com/benlaurie/ldns.git@1.6.17-fix",
      "leveldb": 				 "https://github.com/google/leveldb.git@v1.18",
      "libevent": 				 "https://github.com/libevent/libevent.git@release-2.0.22-stable",
-     "libevhtp": 				 "https://github.com/ellzey/libevhtp.git@a89d9b3f9fdf2ebef41893b3d5e4466f4b0ecfda",
+     "libevhtp": 				 "https://github.com/RJPercival/libevhtp.git@a89d9b3f9fdf2ebef41893b3d5e4466f4b0ecfda",
      "certificate-transparency/third_party/objecthash":
                          "https://github.com/benlaurie/objecthash.git@798f66bd8c5313da226aa7a60c114147910a7407",
      "protobuf":         "https://github.com/google/protobuf.git@v2.6.1",
