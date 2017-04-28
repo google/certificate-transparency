@@ -2,14 +2,10 @@ sudo: false
 
 language: cpp
 
-go:
-  - 1.7.1
-
 env:
   global:
     - INSTALL_DIR=${TRAVIS_BUILD_DIR}/../install
     - PROTOC="${INSTALL_DIR}/bin/protoc"
-    - GOPATH=${INSTALL_DIR}/go
     - MAKE=make
 
 addons:
@@ -88,8 +84,6 @@ before_install:
  - if [ "${CLEAR_CACHE}" != "" ]; then echo "Clearing cache"; rm -fr ${TRAVIS_BUILD_DIR}/../ct ${TRAVIS_BUILD_DIR}/../install ${HOME}/.ccache; fi
  - mkdir -p ${INSTALL_DIR}/include ${INSTALL_DIR}/lib
  - echo "INSTALL_DIR=${INSTALL_DIR}"
- - mkdir -p $GOPATH/src/github.com/google
- - ln -sf $PWD $GOPATH/src/github.com/google
 
 install:
 # Workaround LLVM's apt mirror being feeble and underpowered
@@ -112,19 +106,8 @@ install:
  - popd
  - export PYTHONPATH=$(python -m site --user-site)
  - pip install --user --upgrade -r python/requirements.txt
-# Sigh, go get -t will fetch part of this package, but doesn't catch the transitive deps so grab it manually:
- - pushd go
- - go get github.com/stretchr/testify
- - go get -v -d -t ./...
- - popd
 
 script:
  - getconf _NPROCESSORS_ONLN
  - ${MAKE} -j$(getconf _NPROCESSORS_ONLN) check VERBOSE=1 V=${ENV_VERBOSE}
  - ${MAKE} -C python test
- - pushd ${GOPATH}
- - |
-   CGO_CPPFLAGS="-I${INSTALL_DIR}/include" CGO_LDFLAGS="-L${INSTALL_DIR}/lib" go test -v ./src/github.com/google/certificate-transparency/go/...
- - |
-   CGO_CPPFLAGS="-I${INSTALL_DIR}/include" CGO_LDFLAGS="-L${INSTALL_DIR}/lib" go test -v -race ./src/github.com/google/certificate-transparency/go/...
- - popd
