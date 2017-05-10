@@ -39,44 +39,52 @@ if ! echo "${EXPECTED_SHA256}" | sha256sum --quiet -c; then
   exit 1
 fi
 
-# TODO(robpercival): For CT mirrors, the path below should be "/data/ctmirror/",
-# not "/data/ctlog/".
 sudo bash ./${AGENT_INSTALL_SCRIPT}
-sudo cat > /etc/google-fluentd/config.d/ct-info.conf <<EOF
+
+# Examine what kind of Docker image is on this machine to determine what to log.
+if docker images | grep ct-server; then
+  CT_LOGS_PREFIX="${DATA_DIR}/ctlog/logs/ct-server"
+elif docker images | grep ct-mirror; then
+  CT_LOGS_PREFIX="${DATA_DIR}/ctmirror/logs/ct-mirror"
+fi
+
+if [[ -n "${CT_LOGS_PREFIX}" ]]; then
+  sudo cat > /etc/google-fluentd/config.d/ct-info.conf <<EOF
 <source>
   type tail
   format none
-  path /data/ctlog/logs/ct-server.*.INFO.*
-  pos_file /data/ctlog/logs/ct-server.INFO.pos
+  path ${CT_LOGS_PREFIX}.*.INFO.*
+  pos_file ${CT_LOGS_PREFIX}.INFO.pos
   read_from_head true
   tag ct-info
 </source>
 <source>
   type tail
   format none
-  path /data/ctlog/logs/ct-server.*.ERROR.*
-  pos_file /data/ctlog/logs/ct-server.ERROR.pos
+  path ${CT_LOGS_PREFIX}.*.ERROR.*
+  pos_file ${CT_LOGS_PREFIX}.ERROR.pos
   read_from_head true
   tag ct-warn
 </source>
 <source>
   type tail
   format none
-  path /data/ctlog/logs/ct-server.*.WARNING.*
-  pos_file /data/ctlog/logs/ct-server.WARNING.pos
+  path ${CT_LOGS_PREFIX}.*.WARNING.*
+  pos_file ${CT_LOGS_PREFIX}.WARNING.pos
   read_from_head true
   tag ct-warn
 </source>
 <source>
   type tail
   format none
-  path /data/ctlog/logs/ct-server.*.FATAL.*
-  pos_file /data/ctlog/logs/ct-server.FATAL.pos
+  path ${CT_LOGS_PREFIX}.*.FATAL.*
+  pos_file ${CT_LOGS_PREFIX}.FATAL.pos
   read_from_head true
   tag ct-error
 </source>
 EOF
-sudo service google-fluentd restart
+  sudo service google-fluentd restart
+fi
 # End google-fluentd stuff
 
 cat > /etc/logrotate.d/docker <<EOF
