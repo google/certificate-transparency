@@ -65,6 +65,28 @@ for i in `seq 0 $((${ETCD_NUM_REPLICAS} - 1))`; do
 done
 wait
 
+echo "Configuring firewall..."
+
+SOURCE_RANGES=""
+while IFS='' read -r ip || [[ -n "${ip}" ]]; do
+  if [[ -n "${SOURCE_RANGES}" ]]; then
+    SOURCE_RANGES+=","
+  fi
+  SOURCE_RANGES+="${ip}"
+done < "uptime-source-ips.txt"
+
+OBJNAME=etcd-node-4001-stackdriver
+PRESENT=`${GCLOUD} compute firewall-rules list ${OBJNAME} | grep ${OBJNAME} || true`
+if [ "$PRESENT" == "" ]; then
+  ${GCLOUD} compute firewall-rules create ${OBJNAME} \
+      --allow tcp:4001 \
+      --target-tags etcd-node \
+      --source-ranges "${SOURCE_RANGES}" \
+      --description "Allow connections to etcd by Stackdriver uptime checks."
+else
+  echo "...${OBJNAME} firewall rule already present"
+fi
+
 for i in `seq 0 $((${ETCD_NUM_REPLICAS} - 1))`; do
   echo "Waiting for instance ${ETCD_MACHINES[${i}]}..."
   WaitForStatus instances ${ETCD_MACHINES[${i}]} ${ETCD_ZONES[${i}]} RUNNING &
