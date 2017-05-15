@@ -1,7 +1,6 @@
 #ifndef CERT_TRANS_UTIL_SYNC_TASK_H_
 #define CERT_TRANS_UTIL_SYNC_TASK_H_
 
-#include "base/macros.h"
 #include "base/notification.h"
 #include "util/task.h"
 
@@ -12,6 +11,8 @@ namespace util {
 class SyncTask {
  public:
   SyncTask(Executor* executor);
+  SyncTask(const SyncTask&) = delete;
+  SyncTask& operator=(const SyncTask&) = delete;
 
   // REQUIRES: IsDone() returns true.
   ~SyncTask();
@@ -40,8 +41,6 @@ class SyncTask {
  private:
   cert_trans::Notification notifier_;
   Task task_;
-
-  DISALLOW_COPY_AND_ASSIGN(SyncTask);
 };
 
 

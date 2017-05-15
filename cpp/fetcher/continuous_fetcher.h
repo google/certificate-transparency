@@ -7,7 +7,6 @@
 #include <set>
 #include <string>
 
-#include "base/macros.h"
 #include "fetcher/peer.h"
 #include "log/database.h"
 #include "log/logged_entry.h"
@@ -27,6 +26,8 @@ class ContinuousFetcher {
       const LogVerifier* log_verifier, bool fetch_scts);
 
   virtual ~ContinuousFetcher() = default;
+  ContinuousFetcher(const ContinuousFetcher&) = delete;
+  ContinuousFetcher& operator=(const ContinuousFetcher&) = delete;
 
   virtual void AddPeer(const std::string& node_id,
                        const std::shared_ptr<Peer>& peer) = 0;
@@ -35,9 +36,6 @@ class ContinuousFetcher {
 
  protected:
   ContinuousFetcher() = default;
-
- private:
-  DISALLOW_COPY_AND_ASSIGN(ContinuousFetcher);
 };
 
 

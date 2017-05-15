@@ -7,7 +7,6 @@
 #include <set>
 #include <vector>
 
-#include "base/macros.h"
 #include "client/async_log_client.h"
 #include "fetcher/peer.h"
 #include "util/task.h"
@@ -23,6 +22,8 @@ namespace cert_trans {
 class PeerGroup {
  public:
   explicit PeerGroup(bool fetch_scts_);
+  PeerGroup(const PeerGroup&) = delete;
+  PeerGroup& operator=(const PeerGroup&) = delete;
 
   // Adding a peer twice is not allowed.
   void Add(const std::shared_ptr<Peer>& peer);
@@ -45,8 +46,6 @@ class PeerGroup {
   mutable std::mutex lock_;
   const bool fetch_scts_;
   std::map<std::shared_ptr<Peer>, PeerState> peers_;
-
-  DISALLOW_COPY_AND_ASSIGN(PeerGroup);
 };
 
 

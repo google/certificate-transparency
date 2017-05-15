@@ -35,6 +35,8 @@ class HttpHandler {
               const ClusterStateController* controller, ThreadPool* pool,
               libevent::Base* event_base, StalenessTracker* staleness_tracker);
   virtual ~HttpHandler();
+  HttpHandler(const HttpHandler&) = delete;
+  HttpHandler& operator=(const HttpHandler&) = delete;
 
   void Add(libevent::HttpServer* server);
 
@@ -70,8 +72,6 @@ class HttpHandler {
   ThreadPool* const pool_;
   libevent::Base* const event_base_;
   StalenessTracker* const staleness_tracker_;
-
-  DISALLOW_COPY_AND_ASSIGN(HttpHandler);
 };
 
 

@@ -6,7 +6,6 @@
 #include <openssl/cms.h>
 #include <memory>
 
-#include "base/macros.h"
 #include "log/cert.h"
 #include "util/openssl_util.h"  // for LOG_OPENSSL_ERRORS
 #include "util/status.h"
@@ -18,6 +17,8 @@ class CmsVerifier {
   CmsVerifier() = default;
 
   virtual ~CmsVerifier() = default;
+  CmsVerifier(const CmsVerifier&) = delete;
+  CmsVerifier& operator=(const CmsVerifier&) = delete;
 
   // NOTE: CMS related API is provisional and may evolve over the near
   // future. Public API does not refer to OpenSSL CMS data objects to
@@ -67,8 +68,6 @@ class CmsVerifier {
   // The unpacked data may not be a valid X.509 cert. The caller must
   // apply any additional checks necessary.
   util::Status UnpackCmsDerBio(BIO* cms_bio_in, BIO* cms_bio_out);
-
-  DISALLOW_COPY_AND_ASSIGN(CmsVerifier);
 };
 
 }  // namespace cert_trans

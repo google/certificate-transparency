@@ -4,14 +4,14 @@
 #include <chrono>
 #include <functional>
 
-#include "base/macros.h"
-
 namespace util {
 class Task;
 
 
 class Executor {
  public:
+  Executor(const Executor&) = delete;
+  Executor& operator=(const Executor&) = delete;
   virtual ~Executor() = default;
 
   virtual void Add(const std::function<void()>& closure) = 0;
@@ -20,9 +20,6 @@ class Executor {
 
  protected:
   Executor() = default;
-
- private:
-  DISALLOW_COPY_AND_ASSIGN(Executor);
 };
 
 

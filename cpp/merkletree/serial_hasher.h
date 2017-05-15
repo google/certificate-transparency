@@ -6,12 +6,12 @@
 #include <memory>
 #include <string>
 
-#include "base/macros.h"
-
 class SerialHasher {
  public:
   SerialHasher() = default;
   virtual ~SerialHasher() = default;
+  SerialHasher(const SerialHasher&) = delete;
+  SerialHasher& operator=(const SerialHasher&) = delete;
 
   virtual size_t DigestSize() const = 0;
 
@@ -29,14 +29,13 @@ class SerialHasher {
 
   // A virtual constructor, creates a new instance of the same type.
   virtual std::unique_ptr<SerialHasher> Create() const = 0;
-
- private:
-  DISALLOW_COPY_AND_ASSIGN(SerialHasher);
 };
 
 class Sha256Hasher : public SerialHasher {
  public:
   Sha256Hasher();
+  Sha256Hasher(const Sha256Hasher&) = delete;
+  Sha256Hasher& operator=(const Sha256Hasher&) = delete;
 
   size_t DigestSize() const {
     return kDigestSize;
@@ -54,8 +53,6 @@ class Sha256Hasher : public SerialHasher {
   SHA256_CTX ctx_;
   bool initialized_;
   static const size_t kDigestSize;
-
-  DISALLOW_COPY_AND_ASSIGN(Sha256Hasher);
 };
 
 #endif  // CERT_TRANS_MERKLETREE_SERIAL_HASHER_H_

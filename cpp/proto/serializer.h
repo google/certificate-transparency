@@ -7,7 +7,6 @@
 #include <functional>
 #include <string>
 
-#include "base/macros.h"
 #include "proto/ct.pb.h"
 #include "proto/tls_encoding.h"
 
@@ -130,6 +129,9 @@ class Serializer {
 
 class Deserializer {
  public:
+  Deserializer(const Deserializer&) = delete;
+  Deserializer& operator=(const Deserializer&) = delete;
+
   static void Configure(
       const std::function<cert_trans::serialization::DeserializeResult(
           TLSDeserializer* d, ct::MerkleTreeLeaf* leaf)>&
@@ -172,9 +174,6 @@ class Deserializer {
   // This class is mostly a namespace for static methods.
   // TODO(pphaneuf): Make this into normal functions in a namespace.
   Deserializer() = delete;
-
-  // This should never do anything, but just in case...
-  DISALLOW_COPY_AND_ASSIGN(Deserializer);
 };
 
 #endif  // CERT_TRANS_PROTO_SERIALIZER_H_

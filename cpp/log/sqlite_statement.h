@@ -5,8 +5,6 @@
 #include <sqlite3.h>
 #include <string>
 
-#include "base/macros.h"
-
 namespace sqlite {
 
 // Reduce the ugliness of the sqlite3 API.
@@ -26,6 +24,9 @@ class Statement {
     // can get SQLITE_CONSTRAINT if an insert failed due to a duplicate key.
     CHECK(ret == SQLITE_OK || ret == SQLITE_CONSTRAINT);
   }
+
+  Statement(const Statement&) = delete;
+  Statement& operator=(const Statement&) = delete;
 
   // Fields start at 0! |value| must have lifetime that covers its
   // use, which is up until the SQL statement finishes executing
@@ -60,8 +61,6 @@ class Statement {
 
  private:
   sqlite3_stmt* stmt_;
-
-  DISALLOW_COPY_AND_ASSIGN(Statement);
 };
 
 }  // namespace sqlite

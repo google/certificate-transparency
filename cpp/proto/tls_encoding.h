@@ -4,7 +4,6 @@
 #include <glog/logging.h>
 #include <string>
 
-#include "base/macros.h"
 #include "proto/ct.pb.h"
 
 typedef google::protobuf::RepeatedPtrField<std::string> repeated_string;
@@ -108,6 +107,8 @@ class TLSDeserializer {
   // (which could be to a temporary, and not valid once the
   // constructor returns).
   explicit TLSDeserializer(const std::string& input);
+  TLSDeserializer(const TLSDeserializer&) = delete;
+  TLSDeserializer& operator=(const TLSDeserializer&) = delete;
 
   bool ReadFixedBytes(size_t bytes, std::string* result);
 
@@ -142,8 +143,6 @@ class TLSDeserializer {
   bool ReadLengthPrefix(size_t max_length, size_t* result);
   const char* current_pos_;
   size_t bytes_remaining_;
-
-  DISALLOW_COPY_AND_ASSIGN(TLSDeserializer);
 };
 
 

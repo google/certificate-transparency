@@ -7,7 +7,6 @@
 #include <stdint.h>
 #include <string>
 
-#include "base/macros.h"
 #include "proto/ct.pb.h"
 #include "proto/serializer.h"
 

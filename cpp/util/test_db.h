@@ -5,7 +5,6 @@
 #include <glog/logging.h>
 #include <stdlib.h>
 
-#include "base/macros.h"
 #include "util/util.h"
 
 DEFINE_string(database_test_dir, "/tmp",
@@ -47,6 +46,8 @@ class TestDB {
   TestDB() : tmp_() {
     Setup();
   }
+  TestDB(const TestDB&) = delete;
+  TestDB& operator=(const TestDB&) = delete;
 
   void Setup();
 
@@ -63,8 +64,6 @@ class TestDB {
  private:
   TmpStorage tmp_;
   std::unique_ptr<T> db_;
-
-  DISALLOW_COPY_AND_ASSIGN(TestDB);
 };
 
 #endif  // CERT_TRANS_UTIL_TEST_DB_H_

@@ -4,14 +4,14 @@
 #include <stdint.h>
 #include <string>
 
-#include "base/macros.h"
-
 // Socket creation for client connections.
 class Client {
  public:
   Client(const std::string& server, const std::string& port);
 
   ~Client();
+  Client(const Client&) = delete;
+  Client& operator=(const Client&) = delete;
 
   // Create a TCP socket and attempt to connect to server:port.
   // The Connect()-Disconnect() sequence can be called repeatedly.
@@ -36,8 +36,6 @@ class Client {
   const std::string server_;
   const std::string port_;
   int fd_;
-
-  DISALLOW_COPY_AND_ASSIGN(Client);
 };
 
 #endif  // CERT_TRANS_CLIENT_CLIENT_H_

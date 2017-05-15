@@ -10,7 +10,6 @@
 #include <sstream>
 #include <string>
 
-#include "base/macros.h"
 #include "proto/serializer.h"
 #include "util/util.h"
 
@@ -52,6 +51,9 @@ class JsonObject {
     if (obj_)
       json_object_put(obj_);
   }
+
+  JsonObject(const JsonObject&) = delete;
+  JsonObject& operator=(const JsonObject&) = delete;
 
   // Get the object out, and stop tracking it so we _won't_ put() it
   // when we are destroyed. The caller needs to ensure it is freed.
@@ -136,8 +138,6 @@ class JsonObject {
   void Add(const char* name, json_object* obj) {
     json_object_object_add(obj_, name, obj);
   }
-
-  DISALLOW_COPY_AND_ASSIGN(JsonObject);
 };
 
 class JsonBoolean : public JsonObject {

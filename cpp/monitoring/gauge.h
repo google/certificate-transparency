@@ -5,7 +5,6 @@
 #include <mutex>
 #include <string>
 
-#include "base/macros.h"
 #include "monitoring/labelled_values.h"
 #include "monitoring/metric.h"
 
@@ -21,6 +20,9 @@ class Gauge : public Metric {
       const typename NameType<LabelTypes>::name&... label_names,
       const std::string& help);
 
+  Gauge(const Gauge&) = delete;
+  Gauge& operator=(const Gauge&) = delete;
+
   double Get(const LabelTypes&...) const;
 
   void Set(const LabelTypes&... labels, double value);
@@ -35,8 +37,6 @@ class Gauge : public Metric {
         const std::string& help);
 
   LabelledValues<LabelTypes...> values_;
-
-  DISALLOW_COPY_AND_ASSIGN(Gauge);
 };
 
 

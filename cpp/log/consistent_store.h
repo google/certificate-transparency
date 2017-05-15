@@ -5,7 +5,6 @@
 #include <mutex>
 #include <vector>
 
-#include "base/macros.h"
 #include "log/logged_entry.h"
 #include "proto/ct.pb.h"
 #include "util/status.h"
@@ -135,6 +134,8 @@ class ConsistentStore {
       ClusterConfigCallback;
 
   ConsistentStore() = default;
+  ConsistentStore(const ConsistentStore&) = delete;
+  ConsistentStore& operator=(const ConsistentStore&) = delete;
 
   virtual ~ConsistentStore() = default;
 
@@ -178,9 +179,6 @@ class ConsistentStore {
   // Returns either the number of entries cleaned up, or a Status describing
   // the error.
   virtual util::StatusOr<int64_t> CleanupOldEntries() = 0;
-
- private:
-  DISALLOW_COPY_AND_ASSIGN(ConsistentStore);
 };
 
 

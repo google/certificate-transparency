@@ -7,7 +7,6 @@
 #include <mutex>
 #include <string>
 
-#include "base/macros.h"
 #include "monitoring/labelled_values.h"
 #include "monitoring/metric.h"
 
@@ -21,6 +20,9 @@ class Counter : public Metric {
       const std::string& name,
       const typename NameType<LabelTypes>::name&... label_names,
       const std::string& help);
+
+  Counter(const Counter&) = delete;
+  Counter& operator=(const Counter&) = delete;
 
   void Increment(const LabelTypes&... labels);
 
@@ -37,8 +39,6 @@ class Counter : public Metric {
           const std::string& help);
 
   LabelledValues<LabelTypes...> values_;
-
-  DISALLOW_COPY_AND_ASSIGN(Counter);
 };
 
 

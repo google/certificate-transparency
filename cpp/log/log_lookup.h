@@ -6,7 +6,6 @@
 #include <mutex>
 #include <string>
 
-#include "base/macros.h"
 #include "log/database.h"
 #include "merkletree/compact_merkle_tree.h"
 #include "merkletree/merkle_tree.h"
@@ -22,6 +21,8 @@ class LogLookup {
   // The constructor loads the content from the database.
   explicit LogLookup(ReadOnlyDatabase* db);
   ~LogLookup();
+  LogLookup(const LogLookup&) = delete;
+  LogLookup& operator=(const LogLookup&) = delete;
 
   enum LookupResult {
     OK,
@@ -82,8 +83,6 @@ class LogLookup {
   ct::SignedTreeHead latest_tree_head_;
 
   const Database::NotifySTHCallback update_from_sth_cb_;
-
-  DISALLOW_COPY_AND_ASSIGN(LogLookup);
 };
 
 

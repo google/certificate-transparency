@@ -16,6 +16,8 @@ class LabelledValues {
  public:
   LabelledValues(const std::string& name,
                  const typename NameType<LabelTypes>::name&... label_names);
+  LabelledValues(const LabelledValues&) = delete;
+  LabelledValues& operator=(const LabelledValues&) = delete;
 
   double Get(const LabelTypes&...) const;
 
@@ -34,8 +36,6 @@ class LabelledValues {
   mutable std::mutex mutex_;
   std::map<std::tuple<LabelTypes...>,
            std::pair<std::chrono::system_clock::time_point, double>> values_;
-
-  DISALLOW_COPY_AND_ASSIGN(LabelledValues);
 };
 
 

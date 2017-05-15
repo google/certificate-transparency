@@ -16,7 +16,6 @@
 #include <thread>
 #include <vector>
 
-#include "base/macros.h"
 #include "util/executor.h"
 #include "util/task.h"
 
@@ -40,6 +39,8 @@ class Base : public util::Executor {
   Base();
   Base(std::unique_ptr<Resolver> resolver);
   ~Base();
+  Base(const Base&) = delete;
+  Base& operator=(const Base&) = delete;
 
   // Arranges to run the closure on the main loop.
   void Add(const std::function<void()>& cb) override;
@@ -76,8 +77,6 @@ class Base : public util::Executor {
   const std::unique_ptr<event, void (*)(event*)> wake_closures_;
   std::vector<std::function<void()>> closures_;
   std::unique_ptr<Resolver> resolver_;
-
-  DISALLOW_COPY_AND_ASSIGN(Base);
 };
 
 
@@ -88,6 +87,8 @@ class Event {
   Event(const Base& base, evutil_socket_t sock, short events,
         const Callback& cb);
   ~Event();
+  Event(const Event&) = delete;
+  Event& operator=(const Event&) = delete;
 
   void Add(const std::chrono::duration<double>& timeout) const;
   // Note that this is only public so |Base| can use it.
@@ -96,8 +97,6 @@ class Event {
  private:
   const Callback cb_;
   event* const ev_;
-
-  DISALLOW_COPY_AND_ASSIGN(Event);
 };
 
 
@@ -107,6 +106,8 @@ class HttpServer {
 
   explicit HttpServer(const Base& base);
   ~HttpServer();
+  HttpServer(const HttpServer&) = delete;
+  HttpServer& operator=(const HttpServer&) = delete;
 
   void Bind(const char* address, ev_uint16_t port);
 
@@ -122,8 +123,6 @@ class HttpServer {
   // Could have been a vector<Handler>, but it is important that
   // pointers to entries remain valid.
   std::vector<Handler*> handlers_;
-
-  DISALLOW_COPY_AND_ASSIGN(HttpServer);
 };
 
 typedef std::multimap<std::string, std::string> QueryParams;
@@ -142,14 +141,14 @@ class EventPumpThread {
  public:
   EventPumpThread(const std::shared_ptr<Base>& base);
   ~EventPumpThread();
+  EventPumpThread(const EventPumpThread&) = delete;
+  EventPumpThread& operator=(const EventPumpThread&) = delete;
 
  private:
   void Pump();
 
   const std::shared_ptr<Base> base_;
   std::thread pump_thread_;
-
-  DISALLOW_COPY_AND_ASSIGN(EventPumpThread);
 };
 
 

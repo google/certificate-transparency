@@ -7,7 +7,6 @@
 #include <ostream>
 #include <string>
 
-#include "base/macros.h"
 #include "net/url.h"
 #include "util/compare.h"
 #include "util/task.h"
@@ -56,6 +55,8 @@ class UrlFetcher {
 
   UrlFetcher(libevent::Base* base, ThreadPool* thread_pool);
   virtual ~UrlFetcher();
+  UrlFetcher(const UrlFetcher&) = delete;
+  UrlFetcher& operator=(const UrlFetcher&) = delete;
 
   // If the status on the task is not OK, the response will be in an
   // undefined state. If it is OK, it only means that the transaction
@@ -69,8 +70,6 @@ class UrlFetcher {
  private:
   struct Impl;
   const std::unique_ptr<Impl> impl_;
-
-  DISALLOW_COPY_AND_ASSIGN(UrlFetcher);
 };
 
 

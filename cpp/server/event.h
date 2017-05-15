@@ -10,8 +10,6 @@
 #include <deque>
 #include <string>
 
-#include "base/macros.h"
-
 class Services {
  public:
   // because time is expensive, for most tasks we can just use some
@@ -47,6 +45,8 @@ class FD {
   FD(EventLoop* loop, int fd, CanDelete deletable = DELETE);
 
   virtual ~FD() = default;
+  FD(const FD&) = delete;
+  FD& operator=(const FD&) = delete;
 
   virtual bool WantsWrite() const = 0;
 
@@ -100,8 +100,6 @@ class FD {
   // also.
   static const int kFDLimit = 1000;
   static const int kFDLimitWindow = 1;
-
-  DISALLOW_COPY_AND_ASSIGN(FD);
 };
 
 class Listener : public FD {
@@ -153,6 +151,8 @@ class EventLoop {
  public:
   EventLoop() : go_(true) {
   }
+  EventLoop(const EventLoop&) = delete;
+  EventLoop& operator=(const EventLoop&) = delete;
 
   void Add(FD* fd) {
     fds_.push_back(fd);
@@ -187,8 +187,6 @@ class EventLoop {
   static const time_t kIdleTime = 20;
 
   bool go_;
-
-  DISALLOW_COPY_AND_ASSIGN(EventLoop);
 };
 
 class Server : public FD {

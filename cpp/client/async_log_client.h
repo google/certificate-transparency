@@ -8,7 +8,6 @@
 #include <utility>
 #include <vector>
 
-#include "base/macros.h"
 #include "net/url_fetcher.h"
 #include "proto/ct.pb.h"
 
@@ -53,6 +52,8 @@ class AsyncLogClient {
   // instead of a string?
   AsyncLogClient(util::Executor* const executor, UrlFetcher* fetcher,
                  const std::string& server_uri);
+  AsyncLogClient(const AsyncLogClient&) = delete;
+  AsyncLogClient& operator=(const AsyncLogClient&) = delete;
 
   void GetSTH(ct::SignedTreeHead* sth, const Callback& done);
 
@@ -102,8 +103,6 @@ class AsyncLogClient {
   util::Executor* const executor_;
   UrlFetcher* const fetcher_;
   const URL server_url_;
-
-  DISALLOW_COPY_AND_ASSIGN(AsyncLogClient);
 };
 
 

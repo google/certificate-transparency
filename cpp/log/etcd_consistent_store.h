@@ -6,7 +6,6 @@
 #include <mutex>
 #include <vector>
 
-#include "base/macros.h"
 #include "log/consistent_store.h"
 #include "log/logged_entry.h"
 #include "proto/ct.pb.h"
@@ -30,6 +29,8 @@ class EtcdConsistentStore : public ConsistentStore {
                       const std::string& root, const std::string& node_id);
 
   virtual ~EtcdConsistentStore();
+  EtcdConsistentStore(const EtcdConsistentStore&) = delete;
+  EtcdConsistentStore& operator=(const EtcdConsistentStore&) = delete;
 
   util::StatusOr<int64_t> NextAvailableSequenceNumber() const override;
 
@@ -159,8 +160,6 @@ class EtcdConsistentStore : public ConsistentStore {
   friend class EtcdConsistentStoreTest;
   template <class T>
   friend class TreeSignerTest;
-
-  DISALLOW_COPY_AND_ASSIGN(EtcdConsistentStore);
 };
 
 

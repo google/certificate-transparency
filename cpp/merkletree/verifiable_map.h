@@ -5,7 +5,6 @@
 #include <unordered_map>
 #include <vector>
 
-#include "base/macros.h"
 #include "merkletree/sparse_merkle_tree.h"
 #include "util/statusor.h"
 
@@ -16,6 +15,8 @@ namespace cert_trans {
 class VerifiableMap {
  public:
   VerifiableMap(SerialHasher* hasher);
+  VerifiableMap(const VerifiableMap&) = delete;
+  VerifiableMap& operator=(const VerifiableMap&) = delete;
 
   std::string CurrentRoot() {
     return merkle_tree_.CurrentRoot();
@@ -35,8 +36,6 @@ class VerifiableMap {
 
   // TODO(alcutter): allow arbitrary stores here.
   std::unordered_map<SparseMerkleTree::Path, std::string, PathHasher> values_;
-
-  DISALLOW_COPY_AND_ASSIGN(VerifiableMap);
 };
 
 

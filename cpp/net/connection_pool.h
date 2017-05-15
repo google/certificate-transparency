@@ -9,7 +9,6 @@
 #include <mutex>
 #include <string>
 
-#include "base/macros.h"
 #include "net/url.h"
 #include "util/libevent_wrapper.h"
 
@@ -45,6 +44,8 @@ class ConnectionPool {
   class Connection {
    public:
     Connection(const std::shared_ptr<EvConnection>& evc);
+    Connection(const Connection&) = delete;
+    Connection& operator=(const Connection&) = delete;
 
     evhtp_connection_t* connection() const;
 
@@ -55,11 +56,11 @@ class ConnectionPool {
    private:
     std::shared_ptr<EvConnection> connection_;
     friend class ConnectionPool;
-
-    DISALLOW_COPY_AND_ASSIGN(Connection);
   };
 
   ConnectionPool(libevent::Base* base);
+  ConnectionPool(const ConnectionPool&) = delete;
+  ConnectionPool& operator=(const ConnectionPool&) = delete;
 
   std::unique_ptr<Connection> Get(const URL& url);
   void Put(std::unique_ptr<Connection> conn);
@@ -83,8 +84,6 @@ class ConnectionPool {
   bool cleanup_scheduled_;
 
   std::unique_ptr<evhtp_ssl_ctx_t, void (*)(evhtp_ssl_ctx_t*)> ssl_ctx_;
-
-  DISALLOW_COPY_AND_ASSIGN(ConnectionPool);
 };
 
 

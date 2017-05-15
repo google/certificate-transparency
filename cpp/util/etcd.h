@@ -11,7 +11,6 @@
 #include <utility>
 #include <vector>
 
-#include "base/macros.h"
 #include "net/url_fetcher.h"
 #include "util/status.h"
 #include "util/sync_task.h"
@@ -89,6 +88,8 @@ class EtcdClient {
              const std::list<HostPortPair>& etcds);
 
   virtual ~EtcdClient();
+  EtcdClient(const EtcdClient&) = delete;
+  EtcdClient& operator=(const EtcdClient&) = delete;
 
   virtual void Get(const Request& req, GetResponse* resp, util::Task* task);
 
@@ -162,8 +163,6 @@ class EtcdClient {
   mutable std::mutex lock_;
   std::list<HostPortPair> etcds_;
   bool logged_version_;
-
-  DISALLOW_COPY_AND_ASSIGN(EtcdClient);
 };
 
 

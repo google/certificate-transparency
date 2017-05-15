@@ -5,7 +5,6 @@
 #include <mutex>
 #include <string>
 
-#include "base/macros.h"
 #include "monitoring/counter.h"
 #include "monitoring/monitoring.h"
 
@@ -25,6 +24,8 @@ class EventMetric {
   EventMetric(const std::string& base_name,
               const typename NameType<LabelTypes>::name&... label_names,
               const std::string& help);
+  EventMetric(const EventMetric&) = delete;
+  EventMetric& operator=(const EventMetric&) = delete;
 
   // Records an increment of |amount| specified by |labels|.
   // This increments the "|base_name|_overall_sum" metric by |amount|, and
@@ -35,8 +36,6 @@ class EventMetric {
   std::mutex mutex_;
   std::unique_ptr<Counter<LabelTypes...>> totals_;
   std::unique_ptr<Counter<LabelTypes...>> counts_;
-
-  DISALLOW_COPY_AND_ASSIGN(EventMetric);
 };
 
 

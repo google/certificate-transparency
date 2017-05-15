@@ -7,7 +7,6 @@
 #include <openssl/x509.h>  // for i2d_PUBKEY
 #include <stdint.h>
 
-#include "base/macros.h"
 #include "proto/ct.pb.h"
 #include "util/openssl_scoped_types.h"
 
@@ -17,6 +16,8 @@ class Signer {
  public:
   explicit Signer(EVP_PKEY* pkey);
   virtual ~Signer() = default;
+  Signer(const Signer&) = delete;
+  Signer& operator=(const Signer&) = delete;
 
   virtual std::string KeyID() const;
 
@@ -34,8 +35,6 @@ class Signer {
   ct::DigitallySigned::HashAlgorithm hash_algo_;
   ct::DigitallySigned::SignatureAlgorithm sig_algo_;
   std::string key_id_;
-
-  DISALLOW_COPY_AND_ASSIGN(Signer);
 };
 
 }  // namespace cert_trans

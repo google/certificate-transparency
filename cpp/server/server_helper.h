@@ -11,7 +11,6 @@
 #include <memory>
 #include <mutex>
 
-#include "base/macros.h"
 #include "log/database.h"
 #include "log/file_db.h"
 #include "log/file_storage.h"

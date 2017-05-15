@@ -15,7 +15,6 @@
 #include <unordered_map>
 #include <vector>
 
-#include "base/macros.h"
 #include "log/database.h"
 #include "proto/ct.pb.h"
 
@@ -28,6 +27,8 @@ class LevelDB : public Database {
 
   explicit LevelDB(const std::string& dbfile);
   ~LevelDB() = default;
+  LevelDB(const LevelDB&) = delete;
+  LevelDB& operator=(const LevelDB&) = delete;
 
   // Implement abstract functions, see database.h for comments.
   Database::WriteResult CreateSequencedEntry_(
@@ -86,8 +87,6 @@ class LevelDB : public Database {
   uint64_t latest_tree_timestamp_;
   std::string latest_timestamp_key_;
   cert_trans::DatabaseNotifierHelper callbacks_;
-
-  DISALLOW_COPY_AND_ASSIGN(LevelDB);
 };
 
 

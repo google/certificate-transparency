@@ -36,6 +36,8 @@ class HttpHandlerV2 {
                 libevent::Base* event_base,
                 StalenessTracker* staleness_tracker);
   virtual ~HttpHandlerV2();
+  HttpHandlerV2(const HttpHandlerV2&) = delete;
+  HttpHandlerV2& operator=(const HttpHandlerV2&) = delete;
 
   void Add(libevent::HttpServer* server);
 
@@ -71,8 +73,6 @@ class HttpHandlerV2 {
   ThreadPool* const pool_;
   libevent::Base* const event_base_;
   StalenessTracker* const staleness_tracker_;
-
-  DISALLOW_COPY_AND_ASSIGN(HttpHandlerV2);
 };
 
 

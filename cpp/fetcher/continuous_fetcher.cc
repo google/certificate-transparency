@@ -32,6 +32,8 @@ class ContinuousFetcherImpl : public ContinuousFetcher {
  public:
   ContinuousFetcherImpl(libevent::Base* base, Executor* executor, Database* db,
                         const LogVerifier* log_verifier, bool fetch_scts);
+  ContinuousFetcherImpl(const ContinuousFetcherImpl&) = delete;
+  ContinuousFetcherImpl& operator=(const ContinuousFetcherImpl&) = delete;
 
   void AddPeer(const string& node_id, const shared_ptr<Peer>& peer) override;
   void RemovePeer(const string& node_id) override;
@@ -52,8 +54,6 @@ class ContinuousFetcherImpl : public ContinuousFetcher {
 
   bool restart_fetch_;
   unique_ptr<Task> fetch_task_;
-
-  DISALLOW_COPY_AND_ASSIGN(ContinuousFetcherImpl);
 };
 
 

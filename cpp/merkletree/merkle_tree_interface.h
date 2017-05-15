@@ -7,8 +7,6 @@
 #include <stddef.h>
 #include <string>
 
-#include "base/macros.h"
-
 namespace cert_trans {
 
 // An interface for Merkle trees.  See specializations in
@@ -17,6 +15,8 @@ class MerkleTreeInterface {
  public:
   MerkleTreeInterface() = default;
   virtual ~MerkleTreeInterface() = default;
+  MerkleTreeInterface(const MerkleTreeInterface&) = delete;
+  MerkleTreeInterface& operator=(const MerkleTreeInterface&) = delete;
 
   // Length of a node (i.e., a hash), in bytes.
   virtual size_t NodeSize() const = 0;
@@ -56,9 +56,6 @@ class MerkleTreeInterface {
   // Returns the hash of an empty string if the tree has no leaves
   // (and hence, no root).
   virtual std::string CurrentRoot() = 0;
-
- private:
-  DISALLOW_COPY_AND_ASSIGN(MerkleTreeInterface);
 };
 
 }  // namespace cert_trans

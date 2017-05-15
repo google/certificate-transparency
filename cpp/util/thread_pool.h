@@ -6,7 +6,6 @@
 #include <map>
 #include <memory>
 
-#include "base/macros.h"
 #include "util/executor.h"
 
 namespace cert_trans {
@@ -25,6 +24,9 @@ class ThreadPool : public util::Executor {
   // The destructor will wait for any outstanding closures to finish.
   ~ThreadPool();
 
+  ThreadPool(const ThreadPool&) = delete;
+  ThreadPool& operator=(const ThreadPool&) = delete;
+
   // Arranges for "closure" to be called in the thread pool. The
   // function must not be empty.
   void Add(const std::function<void()>& closure) override;
@@ -35,8 +37,6 @@ class ThreadPool : public util::Executor {
  private:
   class Impl;
   const std::unique_ptr<Impl> impl_;
-
-  DISALLOW_COPY_AND_ASSIGN(ThreadPool);
 };
 
 

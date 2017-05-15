@@ -5,7 +5,6 @@
 #include <memory>
 #include <string>
 
-#include "base/macros.h"
 #include "client/async_log_client.h"
 #include "proto/ct.pb.h"
 #include "util/libevent_wrapper.h"
@@ -20,6 +19,8 @@ class Cert;
 class HTTPLogClient {
  public:
   explicit HTTPLogClient(const std::string& server);
+  HTTPLogClient(const HTTPLogClient&) = delete;
+  HTTPLogClient& operator=(const HTTPLogClient&) = delete;
 
   util::StatusOr<ct::SignedCertificateTimestamp> UploadSubmission(
       const std::string& submission, bool pre);
@@ -42,8 +43,6 @@ class HTTPLogClient {
   ThreadPool pool_;
   UrlFetcher fetcher_;
   AsyncLogClient client_;
-
-  DISALLOW_COPY_AND_ASSIGN(HTTPLogClient);
 };
 
 

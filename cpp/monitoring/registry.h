@@ -5,8 +5,6 @@
 #include <set>
 #include <sstream>
 
-#include "base/macros.h"
-
 namespace cert_trans {
 class Metric;
 
@@ -14,6 +12,9 @@ class Metric;
 class Registry {
  public:
   static Registry* Instance();
+
+  Registry(const Registry&) = delete;
+  Registry& operator=(const Registry&) = delete;
 
   // Registers a new Metric to be exported.
   // |metric| must remain valid for at least the lifetime of this object
@@ -33,8 +34,6 @@ class Registry {
   std::set<const Metric*> metrics_;
 
   friend class RegistryTest;
-
-  DISALLOW_COPY_AND_ASSIGN(Registry);
 };
 
 

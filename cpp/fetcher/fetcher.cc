@@ -5,7 +5,6 @@
 #include <memory>
 #include <mutex>
 
-#include "base/macros.h"
 #include "log/log_verifier.h"
 #include "monitoring/monitoring.h"
 
@@ -64,6 +63,8 @@ struct Range {
 struct FetchState {
   FetchState(Database* db, unique_ptr<PeerGroup> peer_group,
              const LogVerifier* log_verifier, Task* task);
+  FetchState(const FetchState&) = delete;
+  FetchState& operator=(const FetchState&) = delete;
 
   void WalkEntries();
   void FetchRange(const unique_lock<mutex>& lock, Range* current,
@@ -80,9 +81,6 @@ struct FetchState {
   mutex lock_;
   int64_t start_;
   unique_ptr<Range> entries_;
-
- private:
-  DISALLOW_COPY_AND_ASSIGN(FetchState);
 };
 
 

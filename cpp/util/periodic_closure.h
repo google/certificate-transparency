@@ -5,7 +5,6 @@
 #include <functional>
 #include <memory>
 
-#include "base/macros.h"
 #include "util/libevent_wrapper.h"
 
 namespace cert_trans {
@@ -23,6 +22,8 @@ class PeriodicClosure {
   PeriodicClosure(const std::shared_ptr<libevent::Base>& base,
                   const std::chrono::duration<double>& period,
                   const std::function<void()>& closure);
+  PeriodicClosure(const PeriodicClosure&) = delete;
+  PeriodicClosure& operator=(const PeriodicClosure&) = delete;
 
  private:
   typedef std::chrono::steady_clock clock;
@@ -35,8 +36,6 @@ class PeriodicClosure {
 
   libevent::Event event_;
   clock::time_point target_run_time_;
-
-  DISALLOW_COPY_AND_ASSIGN(PeriodicClosure);
 };
 
 

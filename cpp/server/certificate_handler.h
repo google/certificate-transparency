@@ -23,6 +23,8 @@ class CertificateHttpHandler : public HttpHandler {
                          StalenessTracker* staleness_tracker);
 
   ~CertificateHttpHandler() = default;
+  CertificateHttpHandler(const CertificateHttpHandler&) = delete;
+  CertificateHttpHandler& operator=(const CertificateHttpHandler&) = delete;
 
  protected:
   void AddHandlers(libevent::HttpServer* server) override;
@@ -40,8 +42,6 @@ class CertificateHttpHandler : public HttpHandler {
                         const std::shared_ptr<CertChain>& chain) const;
   void BlockingAddPreChain(evhttp_request* req,
                            const std::shared_ptr<PreCertChain>& chain) const;
-
-  DISALLOW_COPY_AND_ASSIGN(CertificateHttpHandler);
 };
 
 

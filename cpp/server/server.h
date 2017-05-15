@@ -6,7 +6,6 @@
 #include <string>
 #include <thread>
 
-#include "base/macros.h"
 #include "log/strict_consistent_store.h"
 #include "monitoring/gauge.h"
 #include "util/libevent_wrapper.h"
@@ -46,6 +45,8 @@ class Server {
          EtcdClient* etcd_client, UrlFetcher* url_fetcher,
          const LogVerifier* log_verifier);
   ~Server();
+  Server(const Server&) = delete;
+  Server& operator=(const Server&) = delete;
 
   bool IsMaster() const;
   MasterElection* election();
@@ -81,8 +82,6 @@ class Server {
   std::unique_ptr<Proxy> proxy_;
   std::unique_ptr<std::thread> node_refresh_thread_;
   std::unique_ptr<GCMExporter> gcm_exporter_;
-
-  DISALLOW_COPY_AND_ASSIGN(Server);
 };
 
 

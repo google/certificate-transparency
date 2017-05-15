@@ -53,11 +53,11 @@ class DeleteMarker {
   ~DeleteMarker() {
     notifier_->Notify();
   }
+  DeleteMarker(const DeleteMarker&) = delete;
+  DeleteMarker& operator=(const DeleteMarker&) = delete;
 
  private:
   Notification* const notifier_;
-
-  DISALLOW_COPY_AND_ASSIGN(DeleteMarker);
 };
 
 
@@ -88,6 +88,9 @@ class TaskTester {
     EXPECT_TRUE(done_finished_.WaitForNotificationWithTimeout(
         milliseconds(FLAGS_task_test_jiffy_ms)));
   }
+
+  TaskTester(const TaskTester&) = delete;
+  TaskTester& operator=(const TaskTester&) = delete;
 
   util::Task* task() {
     return &task_;
@@ -128,8 +131,6 @@ class TaskTester {
   Notification done_started_;
   Notification done_continue_;
   Notification done_finished_;
-
-  DISALLOW_COPY_AND_ASSIGN(TaskTester);
 };
 
 

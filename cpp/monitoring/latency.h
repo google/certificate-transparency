@@ -3,7 +3,6 @@
 
 #include <string>
 
-#include "base/macros.h"
 #include "monitoring/counter.h"
 #include "monitoring/event_metric.h"
 #include "monitoring/monitoring.h"
@@ -59,6 +58,8 @@ class Latency {
   Latency(const std::string& base_name,
           const typename NameType<LabelTypes>::name&... label_names,
           const std::string& help);
+  Latency(const Latency&) = delete;
+  Latency& operator=(const Latency&) = delete;
 
   void RecordLatency(const LabelTypes&... labels,
                      std::chrono::duration<double> latency);
@@ -67,8 +68,6 @@ class Latency {
 
  private:
   EventMetric<LabelTypes...> metric_;
-
-  DISALLOW_COPY_AND_ASSIGN(Latency);
 };
 
 
@@ -78,6 +77,8 @@ class Latency {
 class ScopedLatency {
  public:
   ScopedLatency(ScopedLatency&& other) = default;
+  ScopedLatency(const ScopedLatency&) = delete;
+  ScopedLatency& operator=(const ScopedLatency&) = delete;
 
   ~ScopedLatency() {
     record_latency_(std::chrono::steady_clock::now() - start_);
@@ -95,8 +96,6 @@ class ScopedLatency {
 
   template <class TimeUnit, class... LabelTypes>
   friend class Latency;
-
-  DISALLOW_COPY_AND_ASSIGN(ScopedLatency);
 };
 
 

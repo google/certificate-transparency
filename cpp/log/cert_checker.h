@@ -10,7 +10,6 @@
 #include <string>
 #include <vector>
 
-#include "base/macros.h"
 #include "log/cert.h"
 #include "util/status.h"
 #include "util/statusor.h"
@@ -33,6 +32,8 @@ class CertChecker {
  public:
   CertChecker() = default;
   virtual ~CertChecker() = default;
+  CertChecker(const CertChecker&) = delete;
+  CertChecker& operator=(const CertChecker&) = delete;
 
   // Load a file of concatenated PEM-certs.
   // Returns true if at least one certificate was successfully loaded, and no
@@ -100,8 +101,6 @@ class CertChecker {
   // Helper for LoadTrustedCertificates, whether reading from file or memory.
   // Takes ownership of bio_in and frees it.
   bool LoadTrustedCertificatesFromBIO(BIO* bio_in);
-
-  DISALLOW_COPY_AND_ASSIGN(CertChecker);
 };
 
 }  // namespace cert_trans

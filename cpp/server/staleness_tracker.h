@@ -23,6 +23,8 @@ class StalenessTracker {
   StalenessTracker(const ClusterStateController* controller, ThreadPool* pool,
                    libevent::Base* event_base);
   virtual ~StalenessTracker();
+  StalenessTracker(const StalenessTracker&) = delete;
+  StalenessTracker& operator=(const StalenessTracker&) = delete;
 
   // Check if we consider our node to be stale
   bool IsNodeStale() const;
@@ -38,8 +40,6 @@ class StalenessTracker {
   util::SyncTask task_;
   mutable std::mutex mutex_;
   bool node_is_stale_;
-
-  DISALLOW_COPY_AND_ASSIGN(StalenessTracker);
 };
 
 

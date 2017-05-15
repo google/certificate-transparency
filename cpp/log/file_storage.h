@@ -6,7 +6,6 @@
 #include <set>
 #include <string>
 
-#include "base/macros.h"
 #include "util/status.h"
 
 namespace cert_trans {
@@ -50,6 +49,8 @@ class FileStorage {
   FileStorage(const std::string& file_base, int storage_depth,
               cert_trans::FilesystemOps* file_op);
   ~FileStorage();
+  FileStorage(const FileStorage&) = delete;
+  FileStorage& operator=(const FileStorage&) = delete;
 
   // Scan the entire database and return the list of keys.
   std::set<std::string> Scan() const;
@@ -87,8 +88,6 @@ class FileStorage {
   const std::string tmp_file_template_;
   const int storage_depth_;
   const std::unique_ptr<cert_trans::FilesystemOps> file_op_;
-
-  DISALLOW_COPY_AND_ASSIGN(FileStorage);
 };
 
 

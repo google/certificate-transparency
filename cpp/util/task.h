@@ -27,7 +27,6 @@
 #include <mutex>
 #include <vector>
 
-#include "base/macros.h"
 #include "util/executor.h"
 #include "util/status.h"
 
@@ -49,6 +48,8 @@ namespace util {
 class Task {
  public:
   Task(const std::function<void(Task*)>& done_callback, Executor* executor);
+  Task(const Task&) = delete;
+  Task& operator=(const Task&) = delete;
 
   // REQUIRES: task is in DONE state.
   // Tasks can be deleted in their done callback.
@@ -181,8 +182,6 @@ class Task {
   std::vector<std::shared_ptr<Task>> child_tasks_;
   std::vector<std::function<void()>> cancel_callbacks_;
   std::vector<std::function<void()>> cleanup_callbacks_;
-
-  DISALLOW_COPY_AND_ASSIGN(Task);
 };
 
 
@@ -196,11 +195,11 @@ class TaskHold {
   ~TaskHold() {
     task_->RemoveHold();
   }
+  TaskHold(const TaskHold&) = delete;
+  TaskHold& operator=(const TaskHold&) = delete;
 
  private:
   Task* const task_;
-
-  DISALLOW_COPY_AND_ASSIGN(TaskHold);
 };
 
 

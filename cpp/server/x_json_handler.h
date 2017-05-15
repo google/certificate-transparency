@@ -22,6 +22,8 @@ class XJsonHttpHandler : public HttpHandler {
                    libevent::Base* event_base, StalenessTracker*);
 
   ~XJsonHttpHandler() = default;
+  XJsonHttpHandler(const XJsonHttpHandler&) = delete;
+  XJsonHttpHandler& operator=(const XJsonHttpHandler&) = delete;
 
  protected:
   void AddHandlers(libevent::HttpServer* server) override;
@@ -33,8 +35,6 @@ class XJsonHttpHandler : public HttpHandler {
 
   void BlockingAddJson(evhttp_request* req,
                        std::shared_ptr<JsonObject> json) const;
-
-  DISALLOW_COPY_AND_ASSIGN(XJsonHttpHandler);
 };
 
 

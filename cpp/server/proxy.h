@@ -4,7 +4,6 @@
 #include <functional>
 #include <vector>
 
-#include "base/macros.h"
 #include "net/url_fetcher.h"
 
 
@@ -39,6 +38,8 @@ class Proxy {
         UrlFetcher* fetcher, util::Executor* executor);
 
   virtual ~Proxy() = default;
+  Proxy(const Proxy&) = delete;
+  Proxy& operator=(const Proxy&) = delete;
 
   virtual void ProxyRequest(evhttp_request* req) const;
 
@@ -47,8 +48,6 @@ class Proxy {
   const GetFreshNodesFunction get_fresh_nodes_;
   UrlFetcher* const fetcher_;
   util::Executor* const executor_;
-
-  DISALLOW_COPY_AND_ASSIGN(Proxy);
 };
 
 

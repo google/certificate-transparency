@@ -4,8 +4,6 @@
 #include <sys/types.h>
 #include <string>
 
-#include "base/macros.h"
-
 namespace cert_trans {
 
 
@@ -14,6 +12,8 @@ namespace cert_trans {
 class FilesystemOps {
  public:
   virtual ~FilesystemOps() = default;
+  FilesystemOps(const FilesystemOps&) = delete;
+  FilesystemOps& operator=(const FilesystemOps&) = delete;
 
   virtual int mkdir(const std::string& path, mode_t mode) = 0;
   virtual int remove(const std::string& path) = 0;
@@ -23,9 +23,6 @@ class FilesystemOps {
 
  protected:
   FilesystemOps() = default;
-
- private:
-  DISALLOW_COPY_AND_ASSIGN(FilesystemOps);
 };
 
 

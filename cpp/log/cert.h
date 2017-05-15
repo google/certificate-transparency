@@ -8,7 +8,6 @@
 #include <string>
 #include <vector>
 
-#include "base/macros.h"
 #include "util/openssl_scoped_types.h"
 #include "util/statusor.h"
 
@@ -30,6 +29,9 @@ class Cert {
   static std::unique_ptr<Cert> FromPemString(const std::string& pem_string);
   // Will return null if |x509| is null.
   static std::unique_ptr<Cert> FromX509(ScopedX509 x509);
+
+  Cert(const Cert&) = delete;
+  Cert& operator=(const Cert&) = delete;
 
   // Returns null if there was a problem with the underlying copy.
   std::unique_ptr<Cert> Clone() const;
@@ -208,8 +210,6 @@ class Cert {
   static std::string PrintTime(ASN1_TIME* when);
   static util::Status DerEncodedName(X509_NAME* name, std::string* result);
   const ScopedX509 x509_;
-
-  DISALLOW_COPY_AND_ASSIGN(Cert);
 };
 
 // A wrapper around X509_CINF for chopping at the TBS to CT-sign it or verify
@@ -219,6 +219,8 @@ class TbsCertificate {
  public:
   // TODO(ekasper): add construction from PEM and DER as needed.
   explicit TbsCertificate(const Cert& cert);
+  TbsCertificate(const TbsCertificate&) = delete;
+  TbsCertificate& operator=(const TbsCertificate&) = delete;
 
   bool IsLoaded() const {
     return x509_ != NULL;
@@ -256,14 +258,14 @@ class TbsCertificate {
   // OpenSSL does not expose a TBSCertificate API, so we keep the TBS wrapped
   // in the X509.
   ScopedX509 x509_;
-
-  DISALLOW_COPY_AND_ASSIGN(TbsCertificate);
 };
 
 
 class CertChain {
  public:
   CertChain() = default;
+  CertChain(const CertChain&) = delete;
+  CertChain& operator=(const CertChain&) = delete;
 
   // Loads a chain of PEM-encoded certificates. If any of the PEM-strings
   // in the chain are invalid, clears the entire chain.
@@ -327,8 +329,6 @@ class CertChain {
  private:
   void ClearChain();
   std::vector<std::unique_ptr<Cert>> chain_;
-
-  DISALLOW_COPY_AND_ASSIGN(CertChain);
 };
 
 // Note: CT extensions must be loaded to use this class. See

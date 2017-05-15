@@ -4,7 +4,6 @@
 #include <glog/logging.h>
 #include <stdint.h>
 
-#include "base/macros.h"
 #include "log/log_signer.h"
 #include "proto/ct.pb.h"
 
@@ -16,6 +15,8 @@ class LogVerifier {
  public:
   LogVerifier(LogSigVerifier* sig_verifier, MerkleVerifier* tree_verifier);
   ~LogVerifier();
+  LogVerifier(const LogVerifier&) = delete;
+  LogVerifier& operator=(const LogVerifier&) = delete;
 
   enum LogVerifyResult {
     VERIFY_OK,
@@ -117,8 +118,6 @@ class LogVerifier {
 
   static bool IsBetween(uint64_t timestamp, uint64_t earliest,
                         uint64_t latest);
-
-  DISALLOW_COPY_AND_ASSIGN(LogVerifier);
 };
 
 #endif  // CERT_TRANS_LOG_LOG_VERIFIER_H_

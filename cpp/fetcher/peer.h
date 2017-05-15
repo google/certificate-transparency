@@ -3,7 +3,6 @@
 
 #include <memory>
 
-#include "base/macros.h"
 #include "client/async_log_client.h"
 
 namespace cert_trans {
@@ -12,8 +11,9 @@ namespace cert_trans {
 class Peer {
  public:
   Peer(std::unique_ptr<AsyncLogClient> client);
-  virtual ~Peer() {
-  }
+  virtual ~Peer() = default;
+  Peer(const Peer&) = delete;
+  Peer& operator=(const Peer&) = delete;
 
   AsyncLogClient& client() {
     return *client_;
@@ -24,9 +24,6 @@ class Peer {
 
  protected:
   const std::unique_ptr<AsyncLogClient> client_;
-
- private:
-  DISALLOW_COPY_AND_ASSIGN(Peer);
 };
 
 

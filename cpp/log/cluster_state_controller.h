@@ -38,6 +38,8 @@ class ClusterStateController {
                          ContinuousFetcher* fetcher);
 
   ~ClusterStateController();
+  ClusterStateController(const ClusterStateController&) = delete;
+  ClusterStateController& operator=(const ClusterStateController&) = delete;
 
   // Updates *this* node's ClusterNodeState to reflect the new STH available.
   void NewTreeHead(const ct::SignedTreeHead& sth);
@@ -73,6 +75,8 @@ class ClusterStateController {
    public:
     ClusterPeer(const std::shared_ptr<libevent::Base>& base,
                 UrlFetcher* fetcher, const ct::ClusterNodeState& state);
+    ClusterPeer(const ClusterPeer&) = delete;
+    ClusterPeer& operator=(const ClusterPeer&) = delete;
 
     int64_t TreeSize() const override;
     void UpdateClusterNodeState(const ct::ClusterNodeState& new_state);
@@ -82,8 +86,6 @@ class ClusterStateController {
    private:
     mutable std::mutex lock_;
     ct::ClusterNodeState state_;
-
-    DISALLOW_COPY_AND_ASSIGN(ClusterPeer);
   };
 
   // Updates the representation of *this* node's state in the consistent store.
@@ -138,8 +140,6 @@ class ClusterStateController {
   std::thread cluster_serving_sth_update_thread_;
 
   friend class ClusterStateControllerTest;
-
-  DISALLOW_COPY_AND_ASSIGN(ClusterStateController);
 };
 
 

@@ -7,7 +7,6 @@
 #include <string>
 #include <vector>
 
-#include "base/macros.h"
 #include "monitoring/registry.h"
 
 namespace cert_trans {
@@ -74,6 +73,8 @@ class Metric {
   }
 
   virtual ~Metric() = default;
+  Metric(const Metric&) = delete;
+  Metric& operator=(const Metric&) = delete;
 
  private:
   const enum Type type_;
@@ -83,8 +84,6 @@ class Metric {
 
   friend class CounterTest;
   friend class GaugeTest;
-
-  DISALLOW_COPY_AND_ASSIGN(Metric);
 };
 
 }  // namespace cert_trans
