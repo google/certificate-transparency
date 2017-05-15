@@ -27,7 +27,6 @@ AC_PROG_LN_S
 AC_PROG_RANLIB
 AM_PROG_AR
 AX_CXX_COMPILE_STDCXX_11
-AC_CHECK_PROGS([ANT], [ant])
 
 PKG_CHECK_MODULES([json_c], [json-c])
 PKG_CHECK_MODULES([evhtp], [evhtp])
@@ -208,7 +207,6 @@ AC_CHECK_FUNCS([alarm gettimeofday memset mkdir select socket strdup strerror st
 # the user.
 
 
-AM_CONDITIONAL([HAVE_ANT], [test -n "$ANT"])
 AM_CONDITIONAL([HAVE_LDNS], [test -z "$missing_ldns"])
 AM_CONDITIONAL([HAVE_OBJECTHASH], [test -z "$missing_objecthash"])
 AM_CONDITIONAL([OPENSSL_IS_BORINGSSL], [test -n "$openssl_is_boringssl"])
