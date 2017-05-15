@@ -30,6 +30,7 @@ class Cert {
   // Will return null if |x509| is null.
   static std::unique_ptr<Cert> FromX509(ScopedX509 x509);
 
+  Cert() = delete;
   Cert(const Cert&) = delete;
   Cert& operator=(const Cert&) = delete;
 
@@ -198,7 +199,6 @@ class Cert {
  private:
   // Will CHECK-fail if |x509| is null.
   explicit Cert(ScopedX509 x509);
-  Cert() = delete;
 
   util::StatusOr<int> ExtensionIndex(int extension_nid) const;
   util::StatusOr<X509_EXTENSION*> GetExtension(int extension_nid) const;
