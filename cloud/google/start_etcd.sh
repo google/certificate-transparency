@@ -73,7 +73,7 @@ while IFS='' read -r ip || [[ -n "${ip}" ]]; do
     SOURCE_RANGES+=","
   fi
   SOURCE_RANGES+="${ip}"
-done < "uptime-source-ips.txt"
+done < "${DIR}/uptime-source-ips.txt"
 
 OBJNAME=etcd-node-4001-stackdriver
 PRESENT=`${GCLOUD} compute firewall-rules list ${OBJNAME} | grep ${OBJNAME} || true`
