@@ -107,7 +107,8 @@ PRESENT=`${GCLOUD} compute backend-services list ${OBJNAME} | grep ${OBJNAME} ||
 if [ "$PRESENT" == "" ]; then
   ${GCLOUD} compute backend-services create "${OBJNAME}" \
       --http-health-checks "get-sth-check" \
-      --timeout "30"
+      --timeout "30" \
+      --global
 else
   echo "  ...${OBJNAME} already present"
 fi
@@ -122,7 +123,8 @@ for zone in ${ZONE_LIST}; do
       --instance-group-zone ${zone} \
       --balancing-mode "UTILIZATION" \
       --capacity-scaler "1" \
-      --max-utilization "0.8"
+      --max-utilization "0.8" \
+      --global
   else
     echo "    ...${SUBOBJNAME} already present in ${OBJNAME}"
   fi
