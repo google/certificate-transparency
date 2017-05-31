@@ -102,7 +102,7 @@ install:
  - ln -s ../certificate-transparency certificate-transparency
  - |-
    gclient config --spec "solutions=[{\"name\": \"certificate-transparency\", \"url\": \"https://github.com/google/certificate-transparency.git\", \"deps_file\": \"DEPS\", \"managed\": False, \"custom_deps\": {}, \"safesync_url\": \"\", \"custom_vars\": { \"ssl_impl\": \"${SSL}\" } },]"
- - gclient sync
+ - gclient sync --disable-syntax-validation
  - popd
  - export PYTHONPATH=$(python -m site --user-site)
  - pip install --user --upgrade -r python/requirements.txt
