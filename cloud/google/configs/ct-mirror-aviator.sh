@@ -7,3 +7,4 @@ export MIRROR_NUM_REPLICAS_PER_ZONE=2
 export MIRROR_TARGET_URL="https://ct.googleapis.com/aviator"
 export MIRROR_TARGET_PUBLIC_KEY="aviator.pem"
 export MONITORING="gcm"
+export MIRROR_MACHINE_TYPE="n1-highmem-4"
