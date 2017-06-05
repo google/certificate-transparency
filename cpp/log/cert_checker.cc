@@ -71,47 +71,36 @@ bool CertChecker::LoadTrustedCertificates(
 bool CertChecker::LoadTrustedCertificatesFromBIO(BIO* bio_in) {
   CHECK_NOTNULL(bio_in);
   vector<pair<string, unique_ptr<const Cert>>> certs_to_add;
-  bool error = false;
-  // certs_to_add may be empty if no new certs were added, so keep track of
-  // successfully parsed cert count separately.
-  size_t cert_count = 0;
 
-  while (!error) {
+  while (!BIO_eof(bio_in)) {
     ScopedX509 x509(PEM_read_bio_X509(bio_in, nullptr, nullptr, nullptr));
-    if (x509) {
-      // TODO(ekasper): check that the issuing CA cert is temporally valid
-      // and at least warn if it isn't.
-      unique_ptr<Cert> cert(Cert::FromX509(move(x509)));
-      string subject_name;
-      const StatusOr<bool> is_trusted(IsTrusted(*cert, &subject_name));
-      if (!is_trusted.ok()) {
-        error = true;
-        break;
-      }
-
-      ++cert_count;
-      if (!is_trusted.ValueOrDie()) {
-        certs_to_add.push_back(make_pair(subject_name, move(cert)));
-      }
-    } else {
+    if (!x509) {
       // See if we reached the end of the file.
       auto err = ERR_peek_last_error();
-      if (ERR_GET_LIB(err) == ERR_LIB_PEM &&
+      if (BIO_eof(bio_in) &&
+          ERR_GET_LIB(err) == ERR_LIB_PEM &&
           ERR_GET_REASON(err) == PEM_R_NO_START_LINE) {
         ClearOpenSSLErrors();
         break;
-      } else {
-        // A real error.
-        LOG(ERROR) << "Badly encoded certificate file.";
-        LOG_OPENSSL_ERRORS(WARNING);
-        error = true;
-        break;
       }
+      // A real error.
+      LOG(ERROR) << "Badly encoded certificate file.";
+      LOG_OPENSSL_ERRORS(WARNING);
+      return false;
     }
-  }
 
-  if (error || !cert_count) {
-    return false;
+    // TODO(ekasper): check that the issuing CA cert is temporally valid
+    // and at least warn if it isn't.
+    unique_ptr<Cert> cert(Cert::FromX509(move(x509)));
+    string subject_name;
+    const StatusOr<bool> is_trusted(IsTrusted(*cert, &subject_name));
+    if (!is_trusted.ok()) {
+      return false;
+    }
+
+    if (!is_trusted.ValueOrDie()) {
+      certs_to_add.push_back(make_pair(subject_name, move(cert)));
+    }
   }
 
   size_t new_certs = certs_to_add.size();

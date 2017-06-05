@@ -59,6 +59,8 @@ static const char kMd2Chain[] = "test-md2-chain.pem";
 static const char kNonexistent[] = "test-nonexistent.pem";
 // A file with corrupted contents (bit flip from ca-cert.pem).
 static const char kCorrupted[] = "test-corrupted.pem";
+// A file that is empty.
+static const char kEmpty[] = "test-empty.pem";
 
 // Corresponds to kCaCert.
 static const char kCaCertPem[] =
@@ -381,6 +383,13 @@ TEST_F(CertCheckerTest, LoadTrustedCertificatesCorruptedFile) {
   EXPECT_EQ(0U, checker_.NumTrustedCertificates());
 
   EXPECT_FALSE(checker_.LoadTrustedCertificates(cert_dir_ + "/" + kCorrupted));
+  EXPECT_EQ(0U, checker_.NumTrustedCertificates());
+}
+
+TEST_F(CertCheckerTest, LoadTrustedCertificatesEmptyFile) {
+  EXPECT_EQ(0U, checker_.NumTrustedCertificates());
+
+  EXPECT_TRUE(checker_.LoadTrustedCertificates(cert_dir_ + "/" + kEmpty));
   EXPECT_EQ(0U, checker_.NumTrustedCertificates());
 }
 
