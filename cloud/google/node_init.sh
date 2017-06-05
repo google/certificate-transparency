@@ -42,11 +42,16 @@ fi
 sudo bash ./${AGENT_INSTALL_SCRIPT}
 
 # Examine what kind of Docker image is on this machine to determine what to log.
-if docker images | grep ct-server; then
+DOCKER_REPOS_FILE=$(mktemp)
+docker images --format '{{ .Repository }}' > "${DOCKER_REPOS_FILE}"
+
+if grep '/ct-server$' "${DOCKER_REPOS_FILE}"; then
   CT_LOGS_PREFIX="${DATA_DIR}/ctlog/logs/ct-server"
-elif docker images | grep ct-mirror; then
+elif grep '/ct-mirror$' "${DOCKER_REPOS_FILE}"; then
   CT_LOGS_PREFIX="${DATA_DIR}/ctmirror/logs/ct-mirror"
 fi
+
+rm "${DOCKER_REPOS_FILE}"
 
 if [[ -n "${CT_LOGS_PREFIX}" ]]; then
   sudo cat > /etc/google-fluentd/config.d/ct-info.conf <<EOF
