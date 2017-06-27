@@ -44,10 +44,6 @@ class CertificateReportTest(unittest.TestCase):
             for desc, log_index in result:
                 self._certs[log_index] = desc
 
-    def setUp(self):
-        self.cert_db = sqlite_cert_db.SQLiteCertDB(
-                sqlitecon.SQLiteConnectionManager(":memory:", keepalive=True))
-
     def test_scan_der_cert(self):
         report = self.CertificateReportBase()
         report.scan_der_certs([(0, STRICT_DER, [], client_pb2.X509_ENTRY)])
