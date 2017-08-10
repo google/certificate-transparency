@@ -219,11 +219,11 @@ class MutableMerkleTree : public MerkleTree {
 
   // Update |leaf|th leaf in the tree. Indexing starts from 1.
   // Returns false if |leaf| is out of bounds.
-  bool UpdateLeaf(size_t leaf, const string& data);
+  bool UpdateLeaf(size_t leaf, const std::string& data);
 
   // Update |leaf|th leaf hash in the tree. Indexing starts from 1.
   // Returns false if |leaf| is out of bounds.
-  bool UpdateLeafHash(size_t leaf, const string& hash);
+  bool UpdateLeafHash(size_t leaf, const std::string& hash);
 
   // Truncate the tree by removing all leafs beyond |leaf|th leaf. Indexing
   // starts from 1. Returns false if |leaf| is out of bounds.
