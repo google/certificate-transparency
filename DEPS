@@ -11,7 +11,7 @@ vars = {
 }
 
 deps = {
-     Var("ssl_impl"):    Var(Var("ssl_impl")),
+     "openssl": 				 "https://github.com/openssl/openssl.git@OpenSSL_1_0_2d",
      "gflags":  	 			 "https://github.com/gflags/gflags.git@v2.1.2",
      "glog":             "https://github.com/benlaurie/glog.git@0.3.4-fix",
      "googlemock": 			 "https://github.com/google/googlemock.git@release-1.7.0",
@@ -70,7 +70,7 @@ else:
 
 num_cores = multiprocessing.cpu_count()
 
-print("Building with %s" % Var("ssl_impl"))
+print("Building with %s" % "openssl")
 print("Using make %s with %d jobs" % (make, num_cores))
 
 here = os.getcwd()
@@ -88,8 +88,8 @@ hooks = [
     },
     {
         "name": "ssl",
-        "pattern": Var("ssl_impl") + "/",
-        "action": [ make, "-f", os.path.join(here, "certificate-transparency/build.gclient"), "_" + Var("ssl_impl") ],
+        "pattern": "openssl/",
+        "action": [ make, "-f", os.path.join(here, "certificate-transparency/build.gclient"), "_" + "openssl" ],
     },
     {
         "name": "libevent",
@@ -148,15 +148,12 @@ hooks = [
     }]
 
 # Currently only Openssl is supported for building the DNS server due to LDNS's dependency.
-if Var("ssl_impl") == 'openssl':
-  hooks.append(
-      {
+hooks.append(
+    {
           "name": "ldns",
           "pattern": "^ldns/",
           "action": [ make, "-f", os.path.join(here, "certificate-transparency/build.gclient"), "_ldns" ],
-      })
-else:
-  print("NOT building DNS server since we're using BoringSSL.")
+    })
 
 # Do this last
 hooks.append(
