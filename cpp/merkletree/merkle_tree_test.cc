@@ -144,6 +144,8 @@ class MerkleTreeFuzzTest : public MerkleTreeTest {
   }
 };
 
+class MutableMerkleTreeTest : public MerkleTreeTest {};
+
 class CompactMerkleTreeTest : public MerkleTreeTest {};
 
 class CompactMerkleTreeFuzzTest : public MerkleTreeFuzzTest {
@@ -330,6 +332,65 @@ TEST_F(MerkleTreeTest, RootTestVectors) {
   EXPECT_EQ(tree3.LeafCount(), 8U);
   EXPECT_EQ(tree3.LevelCount(), kLevelCounts[7]);
   EXPECT_STREQ(H(tree3.CurrentRoot()).c_str(), kSHA256Roots[7].str);
+}
+
+// Test Truncate(), indirectly this tests UpdateLeaf() and UpdateLeafHash().
+TEST_F(MutableMerkleTreeTest, RootTestVectors) {
+  const size_t kMaxLeavesCount = 8;
+
+  // Test truncation prior to processing any leaves.
+  for (size_t trunc_idx = 1; trunc_idx <= kMaxLeavesCount; ++trunc_idx) {
+    // Prepare the tree.
+    MutableMerkleTree tree(NewSha256Hasher());
+    for (size_t leaf_idx = 0; leaf_idx < kMaxLeavesCount; ++leaf_idx) {
+      tree.AddLeaf(S(kInputs[leaf_idx]));
+    }
+
+    EXPECT_FALSE(tree.Truncate(kMaxLeavesCount + 1));
+
+    EXPECT_TRUE(tree.Truncate(kMaxLeavesCount));
+    EXPECT_EQ(tree.LeafCount(), kMaxLeavesCount);
+    EXPECT_EQ(tree.LevelCount(), kLevelCounts[kMaxLeavesCount - 1]);
+
+    EXPECT_TRUE(tree.Truncate(kMaxLeavesCount - trunc_idx));
+    EXPECT_EQ(tree.LeafCount(), kMaxLeavesCount - trunc_idx);
+    EXPECT_EQ(tree.LevelCount(),
+              trunc_idx == kMaxLeavesCount
+                  ? 0
+                  : kLevelCounts[kMaxLeavesCount - 1 - trunc_idx]);
+  }
+
+  // Test truncation after processing all leaves.
+  for (size_t trunc_idx = 1; trunc_idx <= kMaxLeavesCount; ++trunc_idx) {
+    // Prepare the tree.
+    MutableMerkleTree tree(NewSha256Hasher());
+    for (size_t leaf_idx = 0; leaf_idx < kMaxLeavesCount; ++leaf_idx) {
+      tree.AddLeaf(S(kInputs[leaf_idx]));
+    }
+
+    // Process all leaves.
+    EXPECT_STREQ(H(tree.CurrentRoot()).c_str(),
+                 kSHA256Roots[kMaxLeavesCount - 1].str);
+
+    EXPECT_FALSE(tree.Truncate(kMaxLeavesCount + 1));
+
+    EXPECT_TRUE(tree.Truncate(kMaxLeavesCount));
+    EXPECT_EQ(tree.LeafCount(), kMaxLeavesCount);
+    EXPECT_EQ(tree.LevelCount(), kLevelCounts[kMaxLeavesCount - 1]);
+    EXPECT_STREQ(H(tree.CurrentRoot()).c_str(),
+                 kSHA256Roots[kMaxLeavesCount - 1].str);
+
+    EXPECT_TRUE(tree.Truncate(kMaxLeavesCount - trunc_idx));
+    EXPECT_EQ(tree.LeafCount(), kMaxLeavesCount - trunc_idx);
+    EXPECT_EQ(tree.LevelCount(),
+              trunc_idx == kMaxLeavesCount
+                  ? 0
+                  : kLevelCounts[kMaxLeavesCount - 1 - trunc_idx]);
+    EXPECT_STREQ(H(tree.CurrentRoot()).c_str(),
+                 trunc_idx == kMaxLeavesCount
+                     ? kSHA256EmptyTreeHash.str
+                     : kSHA256Roots[kMaxLeavesCount - 1 - trunc_idx].str);
+  }
 }
 
 TEST_F(CompactMerkleTreeTest, RootTestVectors) {
