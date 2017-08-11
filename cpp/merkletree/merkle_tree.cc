@@ -336,11 +336,9 @@ bool MutableMerkleTree::Truncate(size_t leaf) {
   if (leaf > LeafCount()) return false;
 
   if (leaf == 0) {
-    if (leaves_processed_ > 0) {
       tree_.clear();
       leaves_processed_ = 0;
       level_count_ = 0;
-    }
 
     return true;
   }
