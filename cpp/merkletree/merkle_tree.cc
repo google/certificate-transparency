@@ -295,11 +295,6 @@ MutableMerkleTree::MutableMerkleTree(unique_ptr<SerialHasher> hasher)
 
 MutableMerkleTree::~MutableMerkleTree() {}
 
-bool MutableMerkleTree::UpdateLeaf(size_t leaf, const string& data) {
-  // Optimized for success: hash computed before validating the leaf's position.
-  return UpdateLeafHash(leaf, treehasher_.HashLeaf(data));
-}
-
 bool MutableMerkleTree::UpdateLeafHash(size_t leaf, const string& hash) {
   if (leaf == 0 || leaf > LeafCount()) return false;
 

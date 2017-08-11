@@ -217,10 +217,6 @@ class MutableMerkleTree : public MerkleTree {
   explicit MutableMerkleTree(std::unique_ptr<SerialHasher> hasher);
   virtual ~MutableMerkleTree();
 
-  // Update |leaf|th leaf in the tree. Indexing starts from 1.
-  // Returns false if |leaf| is out of bounds.
-  bool UpdateLeaf(size_t leaf, const std::string& data);
-
   // Update |leaf|th leaf hash in the tree. Indexing starts from 1.
   // Returns false if |leaf| is out of bounds.
   bool UpdateLeafHash(size_t leaf, const std::string& hash);
