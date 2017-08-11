@@ -11,12 +11,11 @@ vars = {
 }
 
 deps = {
-     Var("ssl_impl"):    Var(Var("ssl_impl")),
+     "openssl": 				 "https://github.com/openssl/openssl.git@OpenSSL_1_0_2d",
      "gflags":  	 			 "https://github.com/gflags/gflags.git@v2.1.2",
      "glog":             "https://github.com/benlaurie/glog.git@0.3.4-fix",
      "googlemock": 			 "https://github.com/google/googlemock.git@release-1.7.0",
      "googlemock/gtest": "https://github.com/google/googletest.git@release-1.7.0",
-     "icu4c":            "https://github.com/icu-project/icu4c.git@8ce90b88807aa2bd031a4b7608b23b1c5984cf08",
      "json-c": 					 "https://github.com/AlCutter/json-c.git@json-c-0.12-20140410-fix",
      "ldns":             "https://github.com/benlaurie/ldns.git@1.6.17-fix",
      "leveldb": 				 "https://github.com/google/leveldb.git@v1.18",
@@ -70,7 +69,7 @@ else:
 
 num_cores = multiprocessing.cpu_count()
 
-print("Building with %s" % Var("ssl_impl"))
+print("Building with %s" % "openssl")
 print("Using make %s with %d jobs" % (make, num_cores))
 
 here = os.getcwd()
@@ -88,8 +87,8 @@ hooks = [
     },
     {
         "name": "ssl",
-        "pattern": Var("ssl_impl") + "/",
-        "action": [ make, "-f", os.path.join(here, "certificate-transparency/build.gclient"), "_" + Var("ssl_impl") ],
+        "pattern": "openssl/",
+        "action": [ make, "-f", os.path.join(here, "certificate-transparency/build.gclient"), "_" + "openssl" ],
     },
     {
         "name": "libevent",
@@ -137,26 +136,18 @@ hooks = [
         "action": [ make, "-f", os.path.join(here, "certificate-transparency/build.gclient"), "_json-c" ],
     },
     {
-        "name": "icu4c",
-        "pattern": "^icu4c/",
-        "action": [ make, "-f", os.path.join(here, "certificate-transparency/build.gclient"), "_icu4c" ],
-    },
-    {
         "name": "objecthash",
         "pattern": "^certificate-transparency/third_party/objecthash/",
         "action": [ make, "-f", os.path.join(here, "certificate-transparency/build.gclient"), "_objecthash" ],
     }]
 
 # Currently only Openssl is supported for building the DNS server due to LDNS's dependency.
-if Var("ssl_impl") == 'openssl':
-  hooks.append(
-      {
+hooks.append(
+    {
           "name": "ldns",
           "pattern": "^ldns/",
           "action": [ make, "-f", os.path.join(here, "certificate-transparency/build.gclient"), "_ldns" ],
-      })
-else:
-  print("NOT building DNS server since we're using BoringSSL.")
+    })
 
 # Do this last
 hooks.append(
