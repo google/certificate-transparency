@@ -289,3 +289,98 @@ void MerkleTree::AddLevel() {
 size_t MerkleTree::LazyLevelCount() const {
   return tree_.size();
 }
+
+MutableMerkleTree::MutableMerkleTree(unique_ptr<SerialHasher> hasher)
+    : MerkleTree(move(hasher)) {
+}
+
+MutableMerkleTree::~MutableMerkleTree() {
+}
+
+bool MutableMerkleTree::UpdateLeafHash(size_t leaf, const string& hash) {
+  if (leaf == 0 || leaf > LeafCount())
+    return false;
+
+  // Update the leaf node.
+  size_t child = leaf - 1;
+  tree_[0].replace(treehasher_.DigestSize() * child, treehasher_.DigestSize(),
+                   hash);
+
+  if (leaf > leaves_processed_)
+    return true;
+
+  // Update the parents chain, level by level.
+  size_t child_level = 0;
+  size_t parent = MerkleTreeMath::Parent(child);
+  string parent_hash;
+  while (child) {
+    if (MerkleTreeMath::IsRightChild(child)) {
+      parent_hash = treehasher_.HashChildren(Node(child_level, child - 1),
+                                             Node(child_level, child));
+    } else if (child < NodeCount(child_level) - 1) {
+      parent_hash = treehasher_.HashChildren(Node(child_level, child),
+                                             Node(child_level, child + 1));
+    } else {
+      // Propagate the "dummy" node.
+      parent_hash = Node(child_level, child);
+    }
+
+    tree_[child_level + 1].replace(treehasher_.DigestSize() * parent,
+                                   treehasher_.DigestSize(), parent_hash);
+
+    child = parent;
+    parent = MerkleTreeMath::Parent(parent);
+    ++child_level;
+  }
+
+  return true;
+}
+
+bool MutableMerkleTree::Truncate(size_t leaf) {
+  if (leaf > LeafCount())
+    return false;
+
+  if (leaf == 0) {
+    tree_.clear();
+    leaves_processed_ = 0;
+    level_count_ = 0;
+
+    return true;
+  }
+
+  // Truncate leaves level.
+  size_t child = leaf - 1;
+  tree_[0].erase(treehasher_.DigestSize() * (child + 1));
+
+  // Update levels count.
+  level_count_ = 1;
+  while (child) {
+    ++level_count_;
+    child = MerkleTreeMath::Parent(child);
+  }
+
+  if (leaf > leaves_processed_)
+    return true;
+
+  // Truncate each level above the leaves level.
+  child = leaf - 1;
+  size_t child_level = 0;
+  size_t parent = MerkleTreeMath::Parent(child);
+  while (child) {
+    tree_[child_level + 1].erase(treehasher_.DigestSize() * (parent + 1));
+
+    child = parent;
+    parent = MerkleTreeMath::Parent(parent);
+    ++child_level;
+  }
+
+  // The current child_level value corresponds to the root level - remove empty
+  // levels.
+  if (child_level + 1 < tree_.size())
+    tree_.erase(tree_.begin() + child_level + 1, tree_.end());
+
+  // Update rightmost chain of nodes.
+  assert(UpdateLeafHash(leaf, LeafHash(leaf)));
+
+  return true;
+}
