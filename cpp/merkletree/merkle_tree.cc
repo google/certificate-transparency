@@ -291,19 +291,23 @@ size_t MerkleTree::LazyLevelCount() const {
 }
 
 MutableMerkleTree::MutableMerkleTree(unique_ptr<SerialHasher> hasher)
-    : MerkleTree(move(hasher)) {}
+    : MerkleTree(move(hasher)) {
+}
 
-MutableMerkleTree::~MutableMerkleTree() {}
+MutableMerkleTree::~MutableMerkleTree() {
+}
 
 bool MutableMerkleTree::UpdateLeafHash(size_t leaf, const string& hash) {
-  if (leaf == 0 || leaf > LeafCount()) return false;
+  if (leaf == 0 || leaf > LeafCount())
+    return false;
 
   // Update the leaf node.
   size_t child = leaf - 1;
   tree_[0].replace(treehasher_.DigestSize() * child, treehasher_.DigestSize(),
                    hash);
 
-  if (leaf > leaves_processed_) return true;
+  if (leaf > leaves_processed_)
+    return true;
 
   // Update the parents chain, level by level.
   size_t child_level = 0;
@@ -333,12 +337,13 @@ bool MutableMerkleTree::UpdateLeafHash(size_t leaf, const string& hash) {
 }
 
 bool MutableMerkleTree::Truncate(size_t leaf) {
-  if (leaf > LeafCount()) return false;
+  if (leaf > LeafCount())
+    return false;
 
   if (leaf == 0) {
-      tree_.clear();
-      leaves_processed_ = 0;
-      level_count_ = 0;
+    tree_.clear();
+    leaves_processed_ = 0;
+    level_count_ = 0;
 
     return true;
   }
@@ -354,7 +359,8 @@ bool MutableMerkleTree::Truncate(size_t leaf) {
     child = MerkleTreeMath::Parent(child);
   }
 
-  if (leaf > leaves_processed_) return true;
+  if (leaf > leaves_processed_)
+    return true;
 
   // Truncate each level above the leaves level.
   child = leaf - 1;
