@@ -3,6 +3,7 @@
 #include <glog/logging.h>
 #include <openssl/asn1.h>
 #include <openssl/asn1t.h>
+#include <openssl/crypto.h>
 #include <openssl/objects.h>
 #include <openssl/x509v3.h>
 #include <string.h>
@@ -70,7 +71,7 @@ static const char kASN1NullValue[] = "NULL";
 static char* ASN1NullToString(X509V3_EXT_METHOD*, ASN1_NULL* asn1_null) {
   if (asn1_null == NULL)
     return NULL;
-  char* buf = strdup(kASN1NullValue);
+  char* buf = OPENSSL_strdup(kASN1NullValue);
   return buf;
 }
 
