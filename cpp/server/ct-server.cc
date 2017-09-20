@@ -117,7 +117,13 @@ int main(int argc, char* argv[]) {
   CHECK(db) << "No database instance created, check flag settings";
 
   shared_ptr<libevent::Base> event_base(make_shared<libevent::Base>());
-  ThreadPool internal_pool(8);
+
+   // We need to create internal pool with at least double of http server threads,
+   // in order to avoid thread starvation. The issue occurs when all threads from
+   // internal pool are processing add-chain request, as during processing
+   // additional thread from internal pool is needed for each request for adding
+   // pending entry to etcd server.
+  ThreadPool internal_pool(FLAGS_num_http_server_threads * 2);
   UrlFetcher url_fetcher(event_base.get(), &internal_pool);
 
   const bool stand_alone_mode(cert_trans::IsStandalone(true));
