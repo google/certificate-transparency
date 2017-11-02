@@ -29,11 +29,11 @@ Known commands:
 """
 
 import sys
+from absl import flags as gflags
 from ct.crypto import cert
 from ct.crypto import error
 from ct.crypto import pem
 from ct.crypto.asn1 import print_util
-import gflags
 
 FLAGS = gflags.FLAGS
 gflags.DEFINE_bool("subject", False, "Print option: prints certificate subject")
@@ -46,7 +46,7 @@ gflags.DEFINE_bool("debug", False,
 gflags.DEFINE_string("filetype", "", "Read option: specify an input file "
                      "format (pem or der). If no format is specified, the "
                      "parser attempts to detect the format automatically.")
-gflags.RegisterValidator("filetype", lambda value: not value or
+gflags.register_validator("filetype", lambda value: not value or
                          value.lower() in {"pem", "der"},
                          message="--filetype must be one of pem or der")
 
@@ -115,14 +115,14 @@ def main(argv):
         try:
             argv = FLAGS(argv)
             exit_with_message("No command")
-        except gflags.FlagsError as e:
+        except gflags.Error as e:
             exit_with_message("Error parsing flags: %s" % e)
 
     argv = argv[1:]
 
     try:
         argv = FLAGS(argv)
-    except gflags.FlagsError as e:
+    except gflags.Error as e:
         exit_with_message("Error parsing flags: %s" % e)
 
     command, argv = argv[0], argv[1:]

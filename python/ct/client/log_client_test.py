@@ -8,11 +8,11 @@ import mock
 import requests
 import sys
 
+from absl import flags as gflags
 from ct.client import log_client
 from ct.client import log_client_test_util as test_util
 from ct.crypto import merkle
 from ct.proto import client_pb2
-import gflags
 
 FLAGS = gflags.FLAGS
 

@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-import gflags
+from absl import flags as gflags
 from google.protobuf import text_format
 import logging
 import os

@@ -1,5 +1,4 @@
 import abc
-import gflags
 import hashlib
 import logging
 import multiprocessing
@@ -7,6 +6,7 @@ import sys
 import threading
 import traceback
 
+from absl import flags as gflags
 from ct.client.db import cert_desc
 from ct.crypto import cert
 from ct.crypto import error

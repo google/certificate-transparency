@@ -1,8 +1,8 @@
 """RFC 6962 client API."""
 
+from absl import flags as gflags
 from ct.client import log_client
 from ct.client.db import database
-import gflags
 import logging
 import random
 

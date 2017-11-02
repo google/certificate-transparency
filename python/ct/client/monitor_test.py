@@ -1,12 +1,12 @@
 #!/usr/bin/env trial
 import copy
 import difflib
-import gflags
 import logging
 import mock
 import os
 import sys
 
+from absl import flags as gflags
 from ct.client import log_client
 from ct.client.db import sqlite_connection as sqlitecon
 from ct.client.db import sqlite_log_db

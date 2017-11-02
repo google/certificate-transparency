@@ -1,6 +1,6 @@
 import logging
 import threading
-import gflags
+from absl import flags as gflags
 from ct.client import reporter
 from Queue import Queue
 

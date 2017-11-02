@@ -8,7 +8,7 @@ import os
 import sys
 import time
 
-import gflags
+from absl import flags as gflags
 import jsonschema
 import M2Crypto
 
@@ -19,7 +19,7 @@ from openssl_generator import generate_openssl_conf
 FLAGS = gflags.FLAGS
 
 gflags.DEFINE_string("log_list", None, "Logs list file to parse and print.")
-gflags.MarkFlagAsRequired("log_list")
+gflags.mark_flag_as_required("log_list")
 gflags.DEFINE_string("signature", None, "Signature file over the list of logs.")
 gflags.DEFINE_string("signer_key", None, "Public key of the log list signer.")
 gflags.DEFINE_string("log_list_schema",

@@ -1,7 +1,8 @@
-import gflags
 import logging
 import threading
 import time
+
+from absl import flags as gflags
 
 FLAGS = gflags.FLAGS
 

@@ -3,6 +3,7 @@ import unittest
 
 import sys
 from collections import defaultdict
+from absl import flags as gflags
 from ct.client import reporter
 from ct.client.db import cert_desc
 from ct.client.db import sqlite_cert_db
@@ -11,7 +12,6 @@ from ct.crypto import cert
 from ct.proto import certificate_pb2
 from ct.proto import client_pb2
 from ct.test import test_config
-import gflags
 
 STRICT_DER = cert.Certificate.from_der_file(
         test_config.get_test_file_path('google_cert.der'), False).to_der()

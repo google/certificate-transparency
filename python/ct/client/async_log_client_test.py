@@ -1,5 +1,5 @@
 #!/usr/bin/env trial
-import gflags
+from absl import flags as gflags
 import json
 import mock
 import sys

@@ -2,9 +2,9 @@
 import base64
 import json
 
+from absl import flags as gflags
 from ct.crypto import verify
 from ct.proto import client_pb2
-import gflags
 import logging
 import requests
 import urllib

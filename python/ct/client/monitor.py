@@ -1,6 +1,6 @@
-import gflags
 import logging
 
+from absl import flags as gflags
 from ct.client import entry_decoder
 from ct.client import state
 from ct.client import aggregated_reporter
