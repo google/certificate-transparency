@@ -1,6 +1,6 @@
 import sqlite3
-import gflags
 
+from absl import flags as gflags
 from ct.client.db import cert_db
 from ct.client.db import cert_desc
 

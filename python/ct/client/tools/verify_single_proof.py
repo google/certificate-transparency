@@ -4,12 +4,12 @@
 import struct
 import sys
 
+from absl import flags as gflags
 from ct.client import log_client
 from ct.crypto import cert
 from ct.crypto import merkle
 from ct.proto import client_pb2
 from ct.serialization import tls_message
-import gflags
 
 FLAGS = gflags.FLAGS
 

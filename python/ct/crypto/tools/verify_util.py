@@ -17,12 +17,12 @@ Known commands:
 """
 
 import sys
+from absl import flags as gflags
 from ct.crypto import cert
 from ct.crypto import pem
 from ct.crypto import verify
 from ct.proto import client_pb2
 from ct.serialization import tls_message
-import gflags
 
 FLAGS = gflags.FLAGS
 gflags.DEFINE_string("sct", None, "TLS-encoded SCT file")
@@ -51,14 +51,14 @@ def main(argv):
         try:
             argv = FLAGS(argv)
             exit_with_message("No command")
-        except gflags.FlagsError as e:
+        except gflags.Error as e:
             exit_with_message("Error parsing flags: %s" % e)
 
     argv = argv[1:]
 
     try:
         argv = FLAGS(argv)
-    except gflags.FlagsError as e:
+    except gflags.Error as e:
         exit_with_message("Error parsing flags: %s" % e)
 
     command, cert_file = argv[0:2]

@@ -1,6 +1,6 @@
-import gflags
 import logging
 
+from absl import flags as gflags
 from collections import defaultdict
 from ct.client import reporter
 

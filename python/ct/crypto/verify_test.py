@@ -3,10 +3,10 @@
 import unittest
 
 import base64
-import gflags
 import os
 import sys
 
+from absl import flags as gflags
 from ct.crypto import cert
 from ct.crypto import error
 from ct.crypto import pem

@@ -3,8 +3,8 @@ import unittest
 
 import mock
 import sys
+from absl import flags as gflags
 from ct.client import db_reporter
-import gflags
 
 
 class DbReporterTest(unittest.TestCase):

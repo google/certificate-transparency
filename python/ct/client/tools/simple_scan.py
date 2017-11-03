@@ -3,7 +3,7 @@
 import os
 import sys
 
-import gflags
+from absl import flags as gflags
 
 from ct.client import scanner
 

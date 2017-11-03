@@ -4,11 +4,11 @@ import unittest
 
 import time
 import sys
+from absl import flags as gflags
 from ct.client.db import cert_desc
 from ct.crypto import cert
 from ct.test import test_config
 from ct.test import time_utils
-import gflags
 
 CERT = cert.Certificate.from_der_file(
         test_config.get_test_file_path("google_cert.der"))

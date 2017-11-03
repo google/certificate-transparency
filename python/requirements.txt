@@ -1,9 +1,9 @@
+absl-py
 dnspython
 ecdsa
 git+https://github.com/google/google-visualization-python.git@04e4c03909980bc12be2ebb3ecf476716d9855d4
 mock>=1.0
 protobuf
-python-gflags
 requests>=1.0
 Twisted>=12.1
 bitstring
