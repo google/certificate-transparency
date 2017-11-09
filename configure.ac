@@ -70,6 +70,8 @@ AC_CHECK_HEADER([google/protobuf/message.h],,
                 [AC_MSG_ERROR([protobuf headers could not be found])])
 AC_CHECK_HEADER([leveldb/db.h],,
                 [AC_MSG_ERROR([leveldb headers could not be found])])
+AC_CHECK_HEADER([sqlite3.h],,
+                [AC_MSG_ERROR([sqlite3 headers could not be found])])
 AC_CHECK_HEADER([ldns/ldns.h],, [missing_ldns=yes])
 AC_CHECK_HEADER([objecthash.h],, [missing_objecthash=yes])
 
@@ -123,6 +125,14 @@ AC_SEARCH_LIBS([leveldb_open], [leveldb],, [missing_leveldb=1], [$save_LIBS])
 AC_SUBST([leveldb_LIBS], [$LIBS])
 AS_IF([test -n "$missing_leveldb"],
       [AC_MSG_ERROR([could not find the leveldb/snappy libraries])])
+LIBS="$save_LIBS"
+
+save_LIBS="$LIBS"
+AS_UNSET([LIBS])
+AC_SEARCH_LIBS([sqlite3_open], [sqlite3],, [missing_sqlite3=1], [$save_LIBS])
+AC_SUBST([sqlite3_LIBS], [$LIBS])
+AS_IF([test -n "$missing_sqlite3"],
+      [AC_MSG_ERROR([could not find the sqlite3 library])])
 LIBS="$save_LIBS"
 
 dnl We're pretty crypto-centric, having the OpenSSL libraries in LIBS
