@@ -233,7 +233,8 @@ cpp_server_ct_mirror_LDADD = \
 	$(json_c_LIBS) \
 	$(libevent_LIBS) \
 	$(leveldb_LIBS) \
-	-lprotobuf -lsqlite3
+	$(sqlite3_LIBS) \
+	-lprotobuf
 cpp_server_ct_mirror_SOURCES = \
 	cpp/client/async_log_client.cc \
 	cpp/server/ct-mirror.cc \
@@ -248,7 +249,8 @@ cpp_server_ct_mirror_v2_LDADD = \
 	$(json_c_LIBS) \
 	$(libevent_LIBS) \
 	$(leveldb_LIBS) \
-	-lprotobuf -lsqlite3
+	$(sqlite3_LIBS) \
+	-lprotobuf
 cpp_server_ct_mirror_v2_SOURCES = \
 	cpp/client/async_log_client.cc \
 	cpp/server/ct-mirror_v2.cc \
@@ -263,7 +265,8 @@ cpp_server_ct_server_LDADD = \
 	$(json_c_LIBS) \
 	$(libevent_LIBS) \
 	$(leveldb_LIBS) \
-	-lprotobuf -lsqlite3
+	$(sqlite3_LIBS) \
+	-lprotobuf
 cpp_server_ct_server_SOURCES = \
 	cpp/client/async_log_client.cc \
 	cpp/server/ct-server.cc \
@@ -279,7 +282,8 @@ cpp_server_ct_server_v2_LDADD = \
 	$(json_c_LIBS) \
 	$(libevent_LIBS) \
 	$(leveldb_LIBS) \
-	-lprotobuf -lsqlite3
+	$(sqlite3_LIBS) \
+	-lprotobuf
 cpp_server_ct_server_v2_SOURCES = \
 	cpp/client/async_log_client.cc \
 	cpp/server/ct-server_v2.cc \
@@ -296,7 +300,8 @@ cpp_server_xjson_server_LDADD = \
 	$(json_c_LIBS) \
 	$(libevent_LIBS) \
 	$(leveldb_LIBS) \
-	-lprotobuf -lsqlite3
+	$(sqlite3_LIBS) \
+	-lprotobuf
 cpp_server_xjson_server_SOURCES = \
 	cpp/client/async_log_client.cc \
 	cpp/proto/xjson_serializer.cc \
@@ -313,7 +318,8 @@ cpp_tools_ct_clustertool_LDADD = \
 	$(evhtp_LIBS) \
 	$(json_c_LIBS) \
 	$(libevent_LIBS) \
-	-lprotobuf -lsqlite3
+	$(sqlite3_LIBS) \
+	-lprotobuf
 cpp_tools_ct_clustertool_SOURCES = \
 	cpp/proto/serializer.cc \
 	cpp/tools/clustertool.cc \
@@ -332,7 +338,8 @@ cpp_tools_db_tool_LDADD = \
 	$(evhtp_LIBS) \
 	$(libevent_LIBS) \
 	$(leveldb_LIBS) \
-	-lprotobuf -lsqlite3
+	$(sqlite3_LIBS) \
+	-lprotobuf
 cpp_tools_db_tool_SOURCES = \
 	cpp/proto/serializer.cc \
 	cpp/tools/db_tool.cc \
@@ -345,7 +352,8 @@ cpp_client_ct_LDADD = \
 	$(evhtp_LIBS) \
 	$(json_c_LIBS) \
 	$(libevent_LIBS) \
-	-lprotobuf -lsqlite3
+	$(sqlite3_LIBS) \
+	-lprotobuf
 cpp_client_ct_SOURCES = \
 	cpp/client/async_log_client.cc \
 	cpp/client/client.cc \
@@ -365,7 +373,8 @@ cpp_server_ct_dns_server_LDADD = \
 	cpp/libcore.a \
 	$(evhtp_LIBS) \
 	${libevent_LIBS} \
-	-lprotobuf -lldns -lsqlite3
+	$(sqlite3_LIBS) \
+	-lprotobuf -lldns
 cpp_server_ct_dns_server_SOURCES = \
 	cpp/proto/serializer.cc \
 	cpp/server/ct-dns-server.cc \
@@ -444,7 +453,8 @@ cpp_fetcher_remote_peer_test_LDADD = \
 	$(json_c_LIBS) \
 	$(libevent_LIBS) \
 	$(leveldb_LIBS) \
-	-lprotobuf -lsqlite3
+	$(sqlite3_LIBS) \
+	-lprotobuf
 cpp_fetcher_remote_peer_test_SOURCES = \
 	cpp/client/async_log_client.cc \
 	cpp/fetcher/remote_peer.cc \
@@ -465,7 +475,8 @@ cpp_log_cluster_state_controller_test_LDADD = \
 	$(json_c_LIBS) \
 	$(libevent_LIBS) \
 	$(leveldb_LIBS) \
-	-lprotobuf -lsqlite3
+	$(sqlite3_LIBS) \
+	-lprotobuf
 cpp_log_cluster_state_controller_test_SOURCES = \
 	cpp/client/async_log_client.cc \
 	cpp/log/cluster_state_controller_test.cc \
@@ -483,7 +494,8 @@ cpp_log_database_test_LDADD = \
 	$(evhtp_LIBS) \
 	$(libevent_LIBS) \
 	$(leveldb_LIBS) \
-	-lprotobuf -lsqlite3
+	$(sqlite3_LIBS) \
+	-lprotobuf
 cpp_log_database_test_SOURCES = \
 	cpp/log/database_test.cc \
 	cpp/log/test_signer.cc \
@@ -515,7 +527,8 @@ cpp_log_file_storage_test_LDADD = \
 	$(evhtp_LIBS) \
 	$(libevent_LIBS) \
 	$(leveldb_LIBS) \
-	-lprotobuf -lsqlite3
+	$(sqlite3_LIBS) \
+	-lprotobuf
 cpp_log_file_storage_test_SOURCES = \
 	cpp/log/file_storage.cc \
 	cpp/log/file_storage_test.cc \
@@ -531,7 +544,8 @@ cpp_log_frontend_signer_test_LDADD = \
 	$(json_c_LIBS) \
 	$(libevent_LIBS) \
 	$(leveldb_LIBS) \
-	-lprotobuf -lsqlite3
+	$(sqlite3_LIBS) \
+	-lprotobuf
 cpp_log_frontend_signer_test_SOURCES = \
 	cpp/log/frontend_signer_test.cc \
 	cpp/log/test_signer.cc \
@@ -550,7 +564,8 @@ cpp_log_log_lookup_test_LDADD = \
 	$(json_c_LIBS) \
 	$(libevent_LIBS) \
 	$(leveldb_LIBS) \
-	-lprotobuf -lsqlite3
+	$(sqlite3_LIBS) \
+	-lprotobuf
 cpp_log_log_lookup_test_SOURCES = \
 	cpp/log/log_lookup_test.cc \
 	cpp/log/test_signer.cc \
@@ -608,7 +623,8 @@ cpp_log_tree_signer_test_LDADD = \
 	$(json_c_LIBS) \
 	$(libevent_LIBS) \
 	$(leveldb_LIBS) \
-	-lprotobuf -lsqlite3
+	$(sqlite3_LIBS) \
+	-lprotobuf
 cpp_log_tree_signer_test_SOURCES = \
 	cpp/log/test_signer.cc \
 	cpp/log/tree_signer_test.cc \
@@ -930,7 +946,8 @@ cpp_log_database_large_test_LDADD = \
 	$(evhtp_LIBS) \
 	$(libevent_LIBS) \
 	$(leveldb_LIBS) \
-	-lprotobuf -lsqlite3
+	$(sqlite3_LIBS) \
+	-lprotobuf
 cpp_log_database_large_test_SOURCES = \
 	cpp/log/database_large_test.cc \
 	cpp/log/test_signer.cc \
@@ -946,7 +963,8 @@ cpp_log_frontend_test_LDADD = \
 	$(json_c_LIBS) \
 	$(libevent_LIBS) \
 	$(leveldb_LIBS) \
-	-lprotobuf -lsqlite3
+	$(sqlite3_LIBS) \
+	-lprotobuf
 cpp_log_frontend_test_SOURCES = \
 	cpp/log/frontend_test.cc \
 	cpp/log/test_signer.cc \
