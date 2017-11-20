@@ -9,4 +9,3 @@ Twisted[tls]>=12.1
 bitstring
 jsonschema
 cryptography>=1.0
-pyopenssl
