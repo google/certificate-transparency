@@ -74,6 +74,8 @@ AC_CHECK_HEADER([sqlite3.h],,
                 [AC_MSG_ERROR([sqlite3 headers could not be found])])
 AC_CHECK_HEADER([ldns/ldns.h],, [missing_ldns=yes])
 AC_CHECK_HEADER([objecthash.h],, [missing_objecthash=yes])
+AC_CHECK_HEADER([sqlite3.h],,
+                [AC_MSG_ERROR([sqlite3 headers could not be found])])
 
 # Check for working GTest/GMock.
 saved_CPPFLAGS="$CPPFLAGS"
