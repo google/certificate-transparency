@@ -5,7 +5,7 @@ git+https://github.com/google/google-visualization-python.git@04e4c03909980bc12b
 mock>=1.0
 protobuf
 requests>=1.0
-Twisted>=12.1
+Twisted[tls]>=12.1
 bitstring
 jsonschema
 cryptography>=1.0
