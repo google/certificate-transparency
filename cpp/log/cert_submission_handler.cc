@@ -99,7 +99,7 @@ StatusOr<size_t> CertSubmissionHandler::X509ChainToEntries(
     // precert entry (2nd option in RFC 6962, section 3.1). The other
     // certificates only when they have the 1.3.6.1.4.1.11129.2.4.4 extension.
     for (size_t i = 1; i < chain.Length(); ++i) {
-      StatusOr<bool> is_special_signer;
+      StatusOr<bool> is_authority, is_special_signer;
 
       if (i != 1) {
         is_special_signer = chain.CertAt(i)->HasExtendedKeyUsage(
@@ -108,9 +108,16 @@ StatusOr<size_t> CertSubmissionHandler::X509ChainToEntries(
           return util::Status(util::error::INVALID_ARGUMENT,
                               "Failed to check special signer extension.");
         }
+
+        is_authority = chain.CertAt(i)->HasBasicConstraintCATrue();
+        if (!is_authority.ok()) {
+          return util::Status(util::error::INVALID_ARGUMENT,
+                              "Failed to check basic constraint.");
+        }
       }
 
-      if (i == 1 || is_special_signer.ValueOrDie()) {
+      if (i == 1 || (is_special_signer.ValueOrDie() &&
+                     is_authority.ValueOrDie())) {
         LogEntry entry;
         entry.set_type(ct::PRECERT_ENTRY);
         string key_hash;
@@ -125,7 +132,7 @@ StatusOr<size_t> CertSubmissionHandler::X509ChainToEntries(
 
         string tbs;
         if (!SerializedTbs(*chain.LeafCert(), &tbs)) {
-          return util::Status(util::error::UNKNOWN,
+          return util::Status(util::error::INVALID_ARGUMENT,
                               "TBS certificate serialization failed.");
         }
 
