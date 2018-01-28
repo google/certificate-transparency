@@ -125,7 +125,7 @@ StatusOr<size_t> CertSubmissionHandler::X509ChainToEntries(
 
         string tbs;
         if (!SerializedTbs(*chain.LeafCert(), &tbs)) {
-          return util::Status(util::error::INVALID_ARGUMENT,
+          return util::Status(util::error::UNKNOWN,
                               "TBS certificate serialization failed.");
         }
 
