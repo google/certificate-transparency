@@ -29,6 +29,10 @@ static const char kPreWithPreCaCert[] =
 static const char kIntermediateCert[] = "intermediate-cert.pem";
 // Issued by intermediate-cert.pem
 static const char kChainLeafCert[] = "test-intermediate-cert.pem";
+// With embedded SCTs presigned by ca-cert.pem
+static const char kEmbeddedCert[] = "test-embedded-cert.pem";
+// With embedded SCTs presigned by ca-pre-cert.pem
+static const char kEmbeddedPreCaCert[] = "test-embedded-with-preca-cert.pem";
 
 namespace {
 
@@ -50,6 +54,8 @@ class CertSubmissionHandlerTest : public ::testing::Test {
   string precert_with_preca_;
   string intermediate_;
   string chain_leaf_;
+  string embedded_;
+  string embedded_preca_;
   const string cert_dir_;
   CertSubmissionHandler* handler_;
   CertChecker* checker_;
@@ -74,6 +80,9 @@ class CertSubmissionHandlerTest : public ::testing::Test {
                                &intermediate_));
     CHECK(
         util::ReadBinaryFile(cert_dir_ + "/" + kChainLeafCert, &chain_leaf_));
+    CHECK(util::ReadBinaryFile(cert_dir_ + "/" + kEmbeddedCert, &embedded_));
+    CHECK(util::ReadBinaryFile(cert_dir_ + "/" + kEmbeddedPreCaCert,
+                               &embedded_preca_));
   }
 
   ~CertSubmissionHandlerTest() {
@@ -204,6 +213,62 @@ TEST_F(CertSubmissionHandlerTest, SubmitInvalidPreCertChain) {
 
   LogEntry entry;
   EXPECT_FALSE(handler_->ProcessPreCertSubmission(&submission, &entry).ok());
+}
+
+TEST_F(CertSubmissionHandlerTest, ConvertChainWithoutEmbeddedSCTs) {
+  CertChain chain(leaf_ + ca_);
+  std::vector<ct::LogEntry> entries;
+  EXPECT_EQ(1, CertSubmissionHandler::X509ChainToEntries(
+      chain, &entries).ValueOrDie());
+  EXPECT_EQ(1, entries.size());
+  EXPECT_EQ(ct::LogEntryType::X509_ENTRY, entries[0].type());
+  EXPECT_TRUE(entries[0].has_x509_entry());
+  EXPECT_FALSE(entries[0].has_precert_entry());
+  EXPECT_TRUE(entries[0].x509_entry().has_leaf_certificate());
+}
+
+TEST_F(CertSubmissionHandlerTest, ConvertChainWithSCTsPresignedByIssuer) {
+  CertChain chain(embedded_ + ca_);
+  std::vector<ct::LogEntry> entries;
+  EXPECT_EQ(2, CertSubmissionHandler::X509ChainToEntries(
+      chain, &entries).ValueOrDie());
+  EXPECT_EQ(2, entries.size());
+
+  EXPECT_EQ(ct::LogEntryType::X509_ENTRY, entries[0].type());
+  EXPECT_TRUE(entries[0].has_x509_entry());
+  EXPECT_FALSE(entries[0].has_precert_entry());
+  EXPECT_TRUE(entries[0].x509_entry().has_leaf_certificate());
+
+  EXPECT_EQ(ct::LogEntryType::PRECERT_ENTRY, entries[1].type());
+  EXPECT_FALSE(entries[1].has_x509_entry());
+  EXPECT_TRUE(entries[1].has_precert_entry());
+  EXPECT_TRUE(entries[1].precert_entry().pre_cert().has_issuer_key_hash());
+  EXPECT_TRUE(entries[1].precert_entry().pre_cert().has_tbs_certificate());
+}
+
+TEST_F(CertSubmissionHandlerTest, ConvertChainWithSCTsPresignedBySpecialCrt) {
+  CertChain chain(embedded_preca_ + ca_ + ca_precert_);
+  std::vector<ct::LogEntry> entries;
+  EXPECT_EQ(3, CertSubmissionHandler::X509ChainToEntries(
+      chain, &entries).ValueOrDie());
+  EXPECT_EQ(3, entries.size());
+
+  EXPECT_EQ(ct::LogEntryType::X509_ENTRY, entries[0].type());
+  EXPECT_TRUE(entries[0].has_x509_entry());
+  EXPECT_FALSE(entries[0].has_precert_entry());
+  EXPECT_TRUE(entries[0].x509_entry().has_leaf_certificate());
+
+  EXPECT_EQ(ct::LogEntryType::PRECERT_ENTRY, entries[1].type());
+  EXPECT_FALSE(entries[1].has_x509_entry());
+  EXPECT_TRUE(entries[1].has_precert_entry());
+  EXPECT_TRUE(entries[1].precert_entry().pre_cert().has_issuer_key_hash());
+  EXPECT_TRUE(entries[1].precert_entry().pre_cert().has_tbs_certificate());
+
+  EXPECT_EQ(ct::LogEntryType::PRECERT_ENTRY, entries[2].type());
+  EXPECT_FALSE(entries[2].has_x509_entry());
+  EXPECT_TRUE(entries[2].has_precert_entry());
+  EXPECT_TRUE(entries[2].precert_entry().pre_cert().has_issuer_key_hash());
+  EXPECT_TRUE(entries[2].precert_entry().pre_cert().has_tbs_certificate());
 }
 
 }  // namespace
