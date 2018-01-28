@@ -2,6 +2,7 @@
 #define CERT_TRANS_LOG_CERT_SUBMISSION_HANDLER_H_
 
 #include <string>
+#include <vector>
 
 #include "log/cert_checker.h"
 #include "proto/ct.pb.h"
@@ -29,9 +30,20 @@ class CertSubmissionHandler {
   util::Status ProcessPreCertSubmission(cert_trans::PreCertChain* chain,
                                         ct::LogEntry* entry) const;
 
-  // For clients, to reconstruct the bytestring under the signature
-  // from the observed chain. Does not check whether the entry
-  // has valid format (i.e., does not check length limits).
+  // For clients, to reconstruct all possible bytestrings under the signature
+  // from the observed chain. Does not check whether the entry has valid format
+  // (i.e., does not check length limits). Returns the number of entries
+  // written or an error meesage.
+  static util::StatusOr<size_t> X509ChainToEntries(
+      const cert_trans::CertChain& chain,
+      std::vector<ct::LogEntry>* entries);
+
+  // Deprecated version, please use X509ChainToEntries.
+  // Same as X509ChainToEntries, but does not support log entries that are
+  // signed by a special-purpose certificate (the 1st option in RFC6962,
+  // section 3.1) neither certificates with embedded SCTs that were again
+  // submitted to a certificate log in order to get new SCTs that can be
+  // sent in a TLS handshake extension or in a stapled OCSP response.
   static bool X509ChainToEntry(const cert_trans::CertChain& chain,
                                ct::LogEntry* entry);
 
