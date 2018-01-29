@@ -68,7 +68,7 @@ CertSubmissionHandler::CertSubmissionHandler(const CertChecker* cert_checker)
 // static
 Status CertSubmissionHandler::X509ChainToEntries(
     const CertChain& chain,
-    LogEntry *x509_entries,
+    LogEntry *x509_entry,
     vector<LogEntry>* precert_entries) {
   if (!chain.IsLoaded()) {
     return Status(util::error::INVALID_ARGUMENT,
@@ -145,7 +145,7 @@ Status CertSubmissionHandler::X509ChainToEntries(
   }
 
   // Everything was successful, write the results.
-  *x509_entries = full_entry;
+  *x509_entry = full_entry;
   for (const auto &log_entry : tmp_entries) {
     precert_entries->push_back(log_entry);
   }

@@ -36,7 +36,7 @@ class CertSubmissionHandler {
   // written or an error meesage.
   static util::Status X509ChainToEntries(
       const cert_trans::CertChain& chain,
-      ct::LogEntry *x509_entries,
+      ct::LogEntry *x509_entry,
       std::vector<ct::LogEntry>* precert_entries);
 
   // Deprecated version, please use X509ChainToEntries.

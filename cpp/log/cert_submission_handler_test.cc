@@ -217,15 +217,15 @@ TEST_F(CertSubmissionHandlerTest, SubmitInvalidPreCertChain) {
 
 TEST_F(CertSubmissionHandlerTest, ConvertChainWithoutEmbeddedSCTs) {
   CertChain chain(leaf_ + ca_);
-  ct::LogEntry x509_entries;
+  ct::LogEntry x509_entry;
   std::vector<ct::LogEntry> precert_entries;
   EXPECT_EQ(CertSubmissionHandler::X509ChainToEntries(
-      chain, &x509_entries, &precert_entries), util::OkStatus());
+      chain, &x509_entry, &precert_entries), util::OkStatus());
 
-  EXPECT_EQ(ct::LogEntryType::X509_ENTRY, x509_entries.type());
-  EXPECT_TRUE(x509_entries.has_x509_entry());
-  EXPECT_FALSE(x509_entries.has_precert_entry());
-  EXPECT_TRUE(x509_entries.x509_entry().has_leaf_certificate());
+  EXPECT_EQ(ct::LogEntryType::X509_ENTRY, x509_entry.type());
+  EXPECT_TRUE(x509_entry.has_x509_entry());
+  EXPECT_FALSE(x509_entry.has_precert_entry());
+  EXPECT_TRUE(x509_entry.x509_entry().has_leaf_certificate());
 
   EXPECT_EQ(0, precert_entries.size());
 }
@@ -233,15 +233,15 @@ TEST_F(CertSubmissionHandlerTest, ConvertChainWithoutEmbeddedSCTs) {
 TEST_F(CertSubmissionHandlerTest, ConvertChainWithSCTsPresignedByIssuer) {
   CertChain chain(embedded_ + ca_);
   std::vector<ct::LogEntry> entries;
-  ct::LogEntry x509_entries;
+  ct::LogEntry x509_entry;
   std::vector<ct::LogEntry> precert_entries;
   EXPECT_EQ(CertSubmissionHandler::X509ChainToEntries(
-      chain, &x509_entries, &precert_entries), util::OkStatus());
+      chain, &x509_entry, &precert_entries), util::OkStatus());
 
-  EXPECT_EQ(ct::LogEntryType::X509_ENTRY, x509_entries.type());
-  EXPECT_TRUE(x509_entries.has_x509_entry());
-  EXPECT_FALSE(x509_entries.has_precert_entry());
-  EXPECT_TRUE(x509_entries.x509_entry().has_leaf_certificate());
+  EXPECT_EQ(ct::LogEntryType::X509_ENTRY, x509_entry.type());
+  EXPECT_TRUE(x509_entry.has_x509_entry());
+  EXPECT_FALSE(x509_entry.has_precert_entry());
+  EXPECT_TRUE(x509_entry.x509_entry().has_leaf_certificate());
 
   EXPECT_EQ(1, precert_entries.size());
 
@@ -257,15 +257,15 @@ TEST_F(CertSubmissionHandlerTest, ConvertChainWithSCTsPresignedByIssuer) {
 TEST_F(CertSubmissionHandlerTest, ConvertChainWithSCTsPresignedBySpecialCrt) {
   CertChain chain(embedded_preca_ + ca_ + ca_precert_);
   std::vector<ct::LogEntry> entries;
-  ct::LogEntry x509_entries;
+  ct::LogEntry x509_entry;
   std::vector<ct::LogEntry> precert_entries;
   EXPECT_EQ(CertSubmissionHandler::X509ChainToEntries(
-      chain, &x509_entries, &precert_entries), util::OkStatus());
+      chain, &x509_entry, &precert_entries), util::OkStatus());
 
-  EXPECT_EQ(ct::LogEntryType::X509_ENTRY, x509_entries.type());
-  EXPECT_TRUE(x509_entries.has_x509_entry());
-  EXPECT_FALSE(x509_entries.has_precert_entry());
-  EXPECT_TRUE(x509_entries.x509_entry().has_leaf_certificate());
+  EXPECT_EQ(ct::LogEntryType::X509_ENTRY, x509_entry.type());
+  EXPECT_TRUE(x509_entry.has_x509_entry());
+  EXPECT_FALSE(x509_entry.has_precert_entry());
+  EXPECT_TRUE(x509_entry.x509_entry().has_leaf_certificate());
 
   EXPECT_EQ(2, precert_entries.size());
 
