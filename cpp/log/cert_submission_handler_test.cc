@@ -217,58 +217,73 @@ TEST_F(CertSubmissionHandlerTest, SubmitInvalidPreCertChain) {
 
 TEST_F(CertSubmissionHandlerTest, ConvertChainWithoutEmbeddedSCTs) {
   CertChain chain(leaf_ + ca_);
-  std::vector<ct::LogEntry> entries;
-  EXPECT_EQ(1, CertSubmissionHandler::X509ChainToEntries(
-      chain, &entries).ValueOrDie());
-  EXPECT_EQ(1, entries.size());
-  EXPECT_EQ(ct::LogEntryType::X509_ENTRY, entries[0].type());
-  EXPECT_TRUE(entries[0].has_x509_entry());
-  EXPECT_FALSE(entries[0].has_precert_entry());
-  EXPECT_TRUE(entries[0].x509_entry().has_leaf_certificate());
+  ct::LogEntry x509_entries;
+  std::vector<ct::LogEntry> precert_entries;
+  EXPECT_EQ(CertSubmissionHandler::X509ChainToEntries(
+      chain, &x509_entries, &precert_entries), util::OkStatus());
+
+  EXPECT_EQ(ct::LogEntryType::X509_ENTRY, x509_entries.type());
+  EXPECT_TRUE(x509_entries.has_x509_entry());
+  EXPECT_FALSE(x509_entries.has_precert_entry());
+  EXPECT_TRUE(x509_entries.x509_entry().has_leaf_certificate());
+
+  EXPECT_EQ(0, precert_entries.size());
 }
 
 TEST_F(CertSubmissionHandlerTest, ConvertChainWithSCTsPresignedByIssuer) {
   CertChain chain(embedded_ + ca_);
   std::vector<ct::LogEntry> entries;
-  EXPECT_EQ(2, CertSubmissionHandler::X509ChainToEntries(
-      chain, &entries).ValueOrDie());
-  EXPECT_EQ(2, entries.size());
+  ct::LogEntry x509_entries;
+  std::vector<ct::LogEntry> precert_entries;
+  EXPECT_EQ(CertSubmissionHandler::X509ChainToEntries(
+      chain, &x509_entries, &precert_entries), util::OkStatus());
 
-  EXPECT_EQ(ct::LogEntryType::X509_ENTRY, entries[0].type());
-  EXPECT_TRUE(entries[0].has_x509_entry());
-  EXPECT_FALSE(entries[0].has_precert_entry());
-  EXPECT_TRUE(entries[0].x509_entry().has_leaf_certificate());
+  EXPECT_EQ(ct::LogEntryType::X509_ENTRY, x509_entries.type());
+  EXPECT_TRUE(x509_entries.has_x509_entry());
+  EXPECT_FALSE(x509_entries.has_precert_entry());
+  EXPECT_TRUE(x509_entries.x509_entry().has_leaf_certificate());
 
-  EXPECT_EQ(ct::LogEntryType::PRECERT_ENTRY, entries[1].type());
-  EXPECT_FALSE(entries[1].has_x509_entry());
-  EXPECT_TRUE(entries[1].has_precert_entry());
-  EXPECT_TRUE(entries[1].precert_entry().pre_cert().has_issuer_key_hash());
-  EXPECT_TRUE(entries[1].precert_entry().pre_cert().has_tbs_certificate());
+  EXPECT_EQ(1, precert_entries.size());
+
+  EXPECT_EQ(ct::LogEntryType::PRECERT_ENTRY, precert_entries[0].type());
+  EXPECT_FALSE(precert_entries[0].has_x509_entry());
+  EXPECT_TRUE(precert_entries[0].has_precert_entry());
+  EXPECT_TRUE(
+      precert_entries[0].precert_entry().pre_cert().has_issuer_key_hash());
+  EXPECT_TRUE(
+      precert_entries[0].precert_entry().pre_cert().has_tbs_certificate());
 }
 
 TEST_F(CertSubmissionHandlerTest, ConvertChainWithSCTsPresignedBySpecialCrt) {
   CertChain chain(embedded_preca_ + ca_ + ca_precert_);
   std::vector<ct::LogEntry> entries;
-  EXPECT_EQ(3, CertSubmissionHandler::X509ChainToEntries(
-      chain, &entries).ValueOrDie());
-  EXPECT_EQ(3, entries.size());
+  ct::LogEntry x509_entries;
+  std::vector<ct::LogEntry> precert_entries;
+  EXPECT_EQ(CertSubmissionHandler::X509ChainToEntries(
+      chain, &x509_entries, &precert_entries), util::OkStatus());
 
-  EXPECT_EQ(ct::LogEntryType::X509_ENTRY, entries[0].type());
-  EXPECT_TRUE(entries[0].has_x509_entry());
-  EXPECT_FALSE(entries[0].has_precert_entry());
-  EXPECT_TRUE(entries[0].x509_entry().has_leaf_certificate());
+  EXPECT_EQ(ct::LogEntryType::X509_ENTRY, x509_entries.type());
+  EXPECT_TRUE(x509_entries.has_x509_entry());
+  EXPECT_FALSE(x509_entries.has_precert_entry());
+  EXPECT_TRUE(x509_entries.x509_entry().has_leaf_certificate());
 
-  EXPECT_EQ(ct::LogEntryType::PRECERT_ENTRY, entries[1].type());
-  EXPECT_FALSE(entries[1].has_x509_entry());
-  EXPECT_TRUE(entries[1].has_precert_entry());
-  EXPECT_TRUE(entries[1].precert_entry().pre_cert().has_issuer_key_hash());
-  EXPECT_TRUE(entries[1].precert_entry().pre_cert().has_tbs_certificate());
+  EXPECT_EQ(2, precert_entries.size());
 
-  EXPECT_EQ(ct::LogEntryType::PRECERT_ENTRY, entries[2].type());
-  EXPECT_FALSE(entries[2].has_x509_entry());
-  EXPECT_TRUE(entries[2].has_precert_entry());
-  EXPECT_TRUE(entries[2].precert_entry().pre_cert().has_issuer_key_hash());
-  EXPECT_TRUE(entries[2].precert_entry().pre_cert().has_tbs_certificate());
+  EXPECT_EQ(ct::LogEntryType::PRECERT_ENTRY, precert_entries[0].type());
+  EXPECT_FALSE(precert_entries[0].has_x509_entry());
+  EXPECT_TRUE(precert_entries[0].has_precert_entry());
+  EXPECT_TRUE(
+      precert_entries[0].precert_entry().pre_cert().has_issuer_key_hash());
+  EXPECT_TRUE(
+      precert_entries[0].precert_entry().pre_cert().has_tbs_certificate());
+
+  EXPECT_EQ(ct::LogEntryType::PRECERT_ENTRY, precert_entries[1].type());
+  EXPECT_FALSE(precert_entries[1].has_x509_entry());
+  EXPECT_TRUE(precert_entries[1].has_precert_entry());
+  EXPECT_TRUE(
+      precert_entries[1].precert_entry().pre_cert().has_issuer_key_hash());
+  EXPECT_TRUE(
+      precert_entries[1].precert_entry().pre_cert().has_tbs_certificate());
 }
 
 }  // namespace

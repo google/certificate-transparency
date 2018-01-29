@@ -34,9 +34,10 @@ class CertSubmissionHandler {
   // from the observed chain. Does not check whether the entry has valid format
   // (i.e., does not check length limits). Returns the number of entries
   // written or an error meesage.
-  static util::StatusOr<size_t> X509ChainToEntries(
+  static util::Status X509ChainToEntries(
       const cert_trans::CertChain& chain,
-      std::vector<ct::LogEntry>* entries);
+      ct::LogEntry *x509_entries,
+      std::vector<ct::LogEntry>* precert_entries);
 
   // Deprecated version, please use X509ChainToEntries.
   // Same as X509ChainToEntries, but does not support log entries that are
