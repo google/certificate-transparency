@@ -105,7 +105,11 @@ install:
  - gclient sync --disable-syntax-validation
  - popd
  - export PYTHONPATH=$(python -m site --user-site)
- - python -m pip install --user --upgrade -r python/requirements.txt
+ - if [[ "$TRAVIS_OS_NAME" == "osx" ]]; then
+     pip2 install --upgrade -r python/requirements.txt;
+   else
+     pip install --user --upgrade -r python/requirements.txt;
+   fi
 
 script:
  - getconf _NPROCESSORS_ONLN
