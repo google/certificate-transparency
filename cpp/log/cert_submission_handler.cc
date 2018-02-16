@@ -82,19 +82,19 @@ Status CertSubmissionHandler::X509ChainToEntries(
                   "Failed to check embedded SCT extension.");
   }
 
-  // Always create the full entry for the whole X509. It can be always used
-  // for SCTs provided in TLS handshake or in stapled OCSP response.
+  // Always create the full entry for the whole X509 certificate.
+  // It can be always used for SCTs provided in TLS handshake or in stapled
+  // OCSP response.
   LogEntry full_entry;
-  vector<LogEntry> tmp_entries;
   full_entry.set_type(ct::X509_ENTRY);
   string der_cert;
   if (chain.LeafCert()->DerEncoding(&der_cert) != ::util::OkStatus()) {
     return Status(util::error::INVALID_ARGUMENT,
                   "Encoding of the leaf cert to DER failed.");
   }
-
   full_entry.mutable_x509_entry()->set_leaf_certificate(der_cert);
 
+  vector<LogEntry> tmp_entries;
   if (has_embedded_proof.ValueOrDie() && chain.Length() > 1) {
     // Issuer (the second certificate in the chain) can always create a
     // precert entry (2nd option in RFC 6962, section 3.1). The other

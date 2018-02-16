@@ -32,8 +32,7 @@ class CertSubmissionHandler {
 
   // For clients, to reconstruct all possible bytestrings under the signature
   // from the observed chain. Does not check whether the entry has valid format
-  // (i.e., does not check length limits). Returns the number of entries
-  // written or an error meesage.
+  // (i.e., does not check length limits).
   static util::Status X509ChainToEntries(
       const cert_trans::CertChain& chain,
       ct::LogEntry *x509_entry,
@@ -42,7 +41,7 @@ class CertSubmissionHandler {
   // Deprecated version, please use X509ChainToEntries.
   // Same as X509ChainToEntries, but does not support log entries that are
   // signed by a special-purpose certificate (the 1st option in RFC6962,
-  // section 3.1) neither certificates with embedded SCTs that were again
+  // section 3.1) nor certificates with embedded SCTs that were again
   // submitted to a certificate log in order to get new SCTs that can be
   // sent in a TLS handshake extension or in a stapled OCSP response.
   static bool X509ChainToEntry(const cert_trans::CertChain& chain,
