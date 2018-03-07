@@ -152,7 +152,9 @@ the leaf certificate: the final certificate with embedded SCT list.
 
 The extra level of indirection comes in the form of a "pre-issuer": the key used
 to sign (just) the precertificate is embedded in a CA cert of its own, and this
-pre-issuer cert is signed by the true issuer.
+pre-issuer cert is signed by the true issuer.  To make it clear that this is a
+special case, this pre-issuer cert needs to have the Certificate Transparency
+extended key usage (EKU).
 
 However, this involves yet more modifications to the submitted precertificate:
 as it is now issued by a different intermediate, those parts of the certificate
@@ -187,6 +189,12 @@ So to sum up *pre-issued* precertificates:
  - The CA builds an SCT list extension that includes this SCT, attaches it to
    the original (un-poisoned) certificate, and signs the whole thing with the
    true issuer's key.
+
+This is complicated, but it's worth pointing out that only the CA and the Log
+need to deal with all of this; the SCT (and the tree leaf it corresponds to)
+only covers data that pertains to the final certificate.  This means that a
+client who receives a certificate with an embedded SCT can just do the
+[same checks](#embedded-scts) as for any other embedded SCT.
 
 
 ## SCT Validation Steps
