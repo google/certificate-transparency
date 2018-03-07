@@ -1,5 +1,16 @@
 # Signed Certificate Timestamp (SCT) Validation
 
+ - [SCT Concepts](#sct-concepts)
+ - [SCT Contents](#sct-contents)
+ - [SCT Delivery Mechanism](#sct-delivery-mechanism)
+ - [Precertificates](#precertificates)
+   - [Pre-Issued Precertificates](#pre-issued-precertificates)
+ - [SCT Validation Steps](#sct-validation-steps)
+   - [Embedded SCTs](#embedded-scts)
+   - [Inclusion Checking](#inclusion-checking)
+
+## SCT Concepts
+
 Certificate Transparency (CT) involves recording X.509 certificates in a CT Log.
 Because the Log might not be able to incorporate a certificate into its data
 store right away, it returns a **Signed Certificate Timestamp** (SCT), which is
