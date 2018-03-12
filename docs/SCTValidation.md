@@ -178,6 +178,17 @@ These modifications won't be present in the final version of the certificate
 that the true issuer signs, so the Log has to reverse these modifications before
 storing and signing over the precertificate.
 
+The extra pre-issuer certificate also makes the Log's job more complicated when
+verifying the submitted certificate chain.  The chain of signatures has to be
+verified using the full chain, including the pre-issuer, but other validity
+checks need to be done as if the pre-issuer were not present.  For example:
+ - The pre-issuer has the CT EKU, but the leaf cert does not, so any check that
+   the leaf's EKUs are a subset of its issuer's EKUs will incorrectly fail.
+ - Any path length constraint (in a
+   [Basic Constraints](https://tools.ietf.org/html/rfc5280#section-4.2.1.9)
+   extension) for a CA certificate in the chain may be off by one (and so
+   theoretically not allow the pre-issuer to be a CA certificate).
+
 So to sum up *pre-issued* precertificates:
  - The CA builds a precertificate version of the certificate that includes the
    poison.
