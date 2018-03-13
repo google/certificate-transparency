@@ -151,9 +151,8 @@ So to sum up precertificates:
 
 But wait, it (optionally) gets more complicated!
 
-(Feel free to skip this section &ndash; in practice, we are not aware of this
-mechanism being used in the wild, i.e. other than by explicit CT
-testing/monitoring systems.)
+(Feel free to skip this section &ndash; in practice, this mechanism is rarely
+used in the wild, i.e. other than by explicit CT testing/monitoring systems.)
 
 To allow for the possibility that the "valid" certificate loophole might not be
 enough, RFC 6962 also allows an extra level of indirection: the pre-certificate
