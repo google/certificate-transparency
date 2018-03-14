@@ -273,7 +273,7 @@ event* Base::EventNew(evutil_socket_t& sock, short events,
 
 evhttp* Base::HttpNew() const {
   const ev_ssize_t max_http_header_size = 4096;
-  const ev_ssize_t max_http_post_body_size = 32768;
+  const ev_ssize_t max_http_post_body_size = 65536;
   evhttp* http_session = CHECK_NOTNULL(evhttp_new(base_.get()));
   evhttp_set_max_headers_size(http_session, max_http_header_size);
   evhttp_set_max_body_size(http_session, max_http_post_body_size);
