@@ -91,11 +91,11 @@ get an SCT which covers a precursor version of the certificate, known as a
 **precertificate**.
 
 This is conceptually just the final certificate without the embedded SCT list,
-but there's a technical difficulty: CAs are supposed to ensure that certificates
-have a serial number that is unique for a given issuing key.  If a CA signed the
-same certificate both with and without the embedded SCT list, this would be in
-violation of this rule &ndash; there would be two different certificates that
-shared the same issuer and serial number.
+but there's a technical difficulty: CAs are supposed to ensure that valid
+certificates have a serial number that is unique for a given issuing key.  If a
+CA signed the same certificate both with and without the embedded SCT
+list, some felt that this might be in violation of this rule &ndash; there would
+be two different valid certificates that shared the same issuer and serial number.
 
 Precertificates take advantage of the weasel word "valid" in the previous
 description: the precertificate version of the certificate (which the CA signs
