@@ -59,10 +59,14 @@ once we've touched on how SCTs get to users.
 We've seen that an SCT is a promise that a certificate has been logged, so it
 also shows that the certificate issuance was public.  If an HTTPS client gets a
 certificate that has one or more SCTs associated with it, that's a pretty good
-sign that the certificate was legitimately issued &ndash; but only if the
+sign that the certificate was publicly issued &ndash; but only if the
 client:
  * gets the SCTs
  * validates the SCTs.
+
+(Of course, *publicly issued* isn't necessarily the same as *legitimately
+issued*, but that's a
+[different topic](https://tools.ietf.org/html/rfc6962#section-5.3).)
 
 [RFC 6962](https://tools.ietf.org/html/rfc6962#section-3.3) describes three ways
 for SCTs to make their way to users:
