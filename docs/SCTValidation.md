@@ -41,12 +41,13 @@ As described above, a signed certificate timestamp includes some key components:
 
 The precise contents of the SCT are defined by
 [RFC 6962](https://tools.ietf.org/html/rfc6962#section-3.2) (and shown in
-[this diagram](images/RFC6962Structures.png)), but there's a couple of
+[this diagram](images/RFC6962Structures.png)), but there are a couple of
 features that are worth pointing out.
 
-First, the SCT includes a signature *over* the timestamp and certificate details,
-but doesn't include the certificate data.  This means that you can't verify the
-SCT on its own &ndash; you need to have the certificate that it corresponds to.
+First, the SCT includes a signature *over* the timestamp and certificate details
+(among other things), but doesn't include the certificate data.  This means that
+you can't verify the SCT on its own &ndash; you also need to have the
+certificate that it corresponds to.
 
 Secondly, the SCT structure has two variants: one for certificates, and one for
 *precertificates*.  That's the subject of a [later section](#precertificates),
@@ -55,10 +56,11 @@ once we've touched on how SCTs get to users.
 
 ## SCT Delivery Mechanisms
 
-We've seen that an SCT is a promise that a certificate has been logged, so
-it also shows that the certificate issuance was public.  If an HTTPS client gets
-a certificate that has some SCTs associated with it, that's a pretty good sign
-that the certificate was legitimately issued &ndash; but only if the client:
+We've seen that an SCT is a promise that a certificate has been logged, so it
+also shows that the certificate issuance was public.  If an HTTPS client gets a
+certificate that has one or more SCTs associated with it, that's a pretty good
+sign that the certificate was legitimately issued &ndash; but only if the
+client:
  * gets the SCTs
  * validates the SCTs.
 
@@ -85,10 +87,11 @@ get an SCT which covers a precursor version of the certificate, known as a
 **precertificate**.
 
 This is conceptually just the final certificate without the embedded SCT list,
-but there's a technical difficulty: CAs are only supposed to issue a single
-version of a given valid certificate, and are not supposed to allow duplicates.
-If a CA signed the same certificate both with and without the embedded SCT list,
-this would be in violation of this rule.
+but there's a technical difficulty: CAs are supposed to ensure that certificates
+have a serial number that is unique for a given issuing key.  If a CA signed the
+same certificate both with and without the embedded SCT list, this would be in
+violation of this rule &ndash; there would be two different certificates that
+shared the same issuer and serial number.
 
 Precertificates take advantage of the weasel word "valid" in the previous
 description: the precertificate version of the certificate (which the CA signs
@@ -227,13 +230,16 @@ There are two main aspects to validating an SCT:
      - (for a precertificate) the issuer's public key
  - Inclusion Checking: this requires the following (in addition to the SCT
    itself):
-     - enough time to have passed (the MMD) for the certificate to be incorporated
+     - enough time to have passed (at most, the Log's MMD) for the certificate
+       to be incorporated
      - the Log's URL (for accessing the `get-proof-by-hash`
        [entrypoint](https://tools.ietf.org/html/rfc6962#section-4.5))
      - the [pre]certificate data that the signature encompasses
      - (for a precertificate) the issuer's public key
-     - a published tree size for the Log (via the `get-sth`
-       [entrypoint](https://tools.ietf.org/html/rfc6962#section-4.1)).
+     - a published tree size and root hash for the Log (via the `get-sth`
+       [entrypoint](https://tools.ietf.org/html/rfc6962#section-4.1))
+     - the Log's public key (to allow validation of the signed tree head (STH)
+       that provided the tree size/root hash).
 
 
 ### Embedded SCTs
