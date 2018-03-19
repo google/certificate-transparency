@@ -19,12 +19,12 @@ a promise to incorporate that certificate soon.
 That description included a couple of
 [weasel words](https://en.wikipedia.org/wiki/Weasel_word):
 
- - "Soon": A CT Log publishes its *maximum merge delay* (often 24 hours), which
-   says how soon.  If a Log hasn't incorporated a certificate within that
+ - "**Soon**": A CT Log publishes its *maximum merge delay* (often 24 hours),
+   which says how soon.  If a Log hasn't incorporated a certificate within that
    period, it is misbehaving and may be punished.  A "signed certificate
    timestamp" includes a "timestamp" to allow this to be checked.
- - "Promise": A CT Log includes a cryptographic signature in the contents of the
-   SCT; this means that the Log cannot later claim that it never saw the
+ - "**Promise**": A CT Log includes a cryptographic signature in the contents of
+   the SCT; this means that the Log cannot later claim that it never saw the
    original certificate.  This is the origin of the "signed" part of "signed
    certificate timestamp".
 
@@ -32,12 +32,12 @@ That description included a couple of
 ## SCT Contents
 
 As described above, a signed certificate timestamp includes some key components:
- - "signed": a cryptographic signature over the data, which proves that the Log
-   definitely saw the submitted certificate.
- - "certificate": some way of confirming that the SCT applies to a particular
-   X.509 certificate.
- - "timestamp": a timestamp that gives a limit to how soon the certificate must
-   be visible in the Log.
+ - "**signed**": a cryptographic signature over the data, which proves that the
+   Log definitely saw the submitted certificate.
+ - "**certificate**": some way of confirming that the SCT applies to a
+   particular X.509 certificate.
+ - "**timestamp**": something that gives a limit on when the certificate must be
+   visible in the Log.
 
 The precise contents of the SCT are defined by
 [RFC 6962](https://tools.ietf.org/html/rfc6962#section-3.2) (and shown in
@@ -196,24 +196,27 @@ checks need to be done as if the pre-issuer were not present.  For example:
    theoretically not allow the pre-issuer to be a CA certificate).
 
 So to sum up *pre-issued* precertificates:
- - The CA builds a precertificate version of the certificate that includes the
-   poison.
- - Next, the CA modifies the Issuer and (optional) Authority Key Identifier
-   extension in the precertificate to match the pre-issuer rather than the true
-   issuer.
- - The CA signs the resulting precertificate using the pre-issuer's key.
- - The submits the whole chain (precert, pre-issuer, true-issuer, ... root) to
-   the Log.
- - The Log removes the poison and extracts the inner `tbsCertificate`.
- - The Log notices that the direct issuer has the Certificate Transparency
-   extended key usage, so treats the next entry in the chain as the true issuer.
- - The Log updates the Issuer and (optional) Authority Key Identifier extension
-   to match the true issuer rather than the pre-issuer.
- - The Log combines the resulting inner `tbsCertificate` with the hash of the
-   (true) issuer's key, to form the core `PreCert` data that the Log deals with.
- - The Log sends an SCT back to the CA, which includes a timestamp as usual but
-   has a signature over data including the `PreCert` bundle of `tbsCertificate`
-   and issuer key hash.
+ - The CA:
+     - builds a precertificate version of the certificate that includes the
+       poison
+     - modifies the Issuer and (optional) Authority Key Identifier extension in
+       the precertificate to match the pre-issuer rather than the true issuer.
+     - signs the resulting precertificate using the pre-issuer's key
+     - submits the whole chain (precert, pre-issuer, true-issuer, ... root) to
+       the Log.
+ - The Log:
+     - adjusts its validation of the submitted chain to allow for the extra
+       ephemeral pre-issuer certificate (e.g. for EKU and path length checking)
+     - removes the poison and extracts the inner `tbsCertificate`
+     - notices that the direct issuer has the Certificate Transparency extended
+       key usage, so treats the next entry in the chain as the true issuer
+     - updates the certificate's Issuer and (optional) Authority Key Identifier
+       extension to match the true issuer rather than the pre-issuer
+     - combines the resulting inner `tbsCertificate` with the hash of the (true)
+       issuer's key, to form the core `PreCert` data that the Log deals with
+     - sends an SCT back to the CA, which includes a timestamp as usual but has
+       a signature over data including the `PreCert` bundle of `tbsCertificate`
+       and issuer key hash.
  - The CA builds an SCT list extension that includes this SCT, attaches it to
    the original (un-poisoned) certificate, and signs the whole thing with the
    true issuer's key.
@@ -228,11 +231,12 @@ client who receives a certificate with an embedded SCT can just do the
 ## SCT Validation Steps
 
 There are two main aspects to validating an SCT:
- - Signature Validation: this requires the following (in addition to the SCT itself):
+ - **Signature Validation**: this requires the following (in addition to the SCT
+     itself):
      - the Log's public key
      - the [pre]certificate data that the signature encompasses
      - (for a precertificate) the issuer's public key
- - Inclusion Checking: this requires the following (in addition to the SCT
+ - **Inclusion Checking**: this requires the following (in addition to the SCT
    itself):
      - enough time to have passed (at most, the Log's MMD) for the certificate
        to be incorporated
