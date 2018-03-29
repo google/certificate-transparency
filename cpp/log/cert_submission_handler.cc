@@ -18,6 +18,7 @@ using ct::LogEntry;
 using ct::PrecertChainEntry;
 using ct::X509ChainEntry;
 using std::string;
+using std::vector;
 using util::Status;
 using util::StatusOr;
 
@@ -64,6 +65,93 @@ CertSubmissionHandler::CertSubmissionHandler(const CertChecker* cert_checker)
     : cert_checker_(CHECK_NOTNULL(cert_checker)) {
 }
 
+// static
+Status CertSubmissionHandler::X509ChainToEntries(
+    const CertChain& chain,
+    LogEntry *x509_entry,
+    vector<LogEntry>* precert_entries) {
+  if (!chain.IsLoaded()) {
+    return Status(util::error::INVALID_ARGUMENT,
+                  "Certificate chain not loaded");
+  }
+
+  const StatusOr<bool> has_embedded_proof(chain.LeafCert()->HasExtension(
+      cert_trans::NID_ctEmbeddedSignedCertificateTimestampList));
+  if (!has_embedded_proof.ok()) {
+    return Status(util::error::INVALID_ARGUMENT,
+                  "Failed to check embedded SCT extension.");
+  }
+
+  // Always create the full entry for the whole X509 certificate.
+  // It can be always used for SCTs provided in TLS handshake or in stapled
+  // OCSP response.
+  LogEntry full_entry;
+  full_entry.set_type(ct::X509_ENTRY);
+  string der_cert;
+  if (chain.LeafCert()->DerEncoding(&der_cert) != ::util::OkStatus()) {
+    return Status(util::error::INVALID_ARGUMENT,
+                  "Encoding of the leaf cert to DER failed.");
+  }
+  full_entry.mutable_x509_entry()->set_leaf_certificate(der_cert);
+
+  vector<LogEntry> tmp_entries;
+  if (has_embedded_proof.ValueOrDie() && chain.Length() > 1) {
+    // Issuer (the second certificate in the chain) can always create a
+    // precert entry (2nd option in RFC 6962, section 3.1). The other
+    // certificates only when they have the 1.3.6.1.4.1.11129.2.4.4 extension.
+    for (size_t i = 1; i < chain.Length(); ++i) {
+      StatusOr<bool> is_authority, is_precert_signing;
+
+      if (i != 1) {
+        is_precert_signing = chain.CertAt(i)->HasExtendedKeyUsage(
+            cert_trans::NID_ctPrecertificateSigning);
+        if (!is_precert_signing.ok()) {
+          return Status(util::error::INVALID_ARGUMENT,
+                        "Failed to check special signer extension.");
+        }
+
+        is_authority = chain.CertAt(i)->HasBasicConstraintCATrue();
+        if (!is_authority.ok()) {
+          return Status(util::error::INVALID_ARGUMENT,
+                        "Failed to check basic constraint.");
+        }
+      }
+
+      if (i == 1 || (is_precert_signing.ValueOrDie() &&
+                     is_authority.ValueOrDie())) {
+        LogEntry entry;
+        entry.set_type(ct::PRECERT_ENTRY);
+        string key_hash;
+        if (chain.CertAt(i)->SPKISha256Digest(&key_hash) !=
+            ::util::OkStatus()) {
+          return Status(util::error::INVALID_ARGUMENT,
+                        "SHA256 fingerprint computation failed.");
+        }
+
+        entry.mutable_precert_entry()->mutable_pre_cert()->set_issuer_key_hash(
+            key_hash);
+
+        string tbs;
+        if (!SerializedTbs(*chain.LeafCert(), &tbs)) {
+          return Status(util::error::INVALID_ARGUMENT,
+                        "TBS certificate serialization failed.");
+        }
+
+        entry.mutable_precert_entry()->mutable_pre_cert()->set_tbs_certificate(
+            tbs);
+        tmp_entries.push_back(entry);
+      }
+    }
+  }
+
+  // Everything was successful, write the results.
+  *x509_entry = full_entry;
+  for (const auto &log_entry : tmp_entries) {
+    precert_entries->push_back(log_entry);
+  }
+
+  return util::OkStatus();
+}
 
 // static
 bool CertSubmissionHandler::X509ChainToEntry(const CertChain& chain,
