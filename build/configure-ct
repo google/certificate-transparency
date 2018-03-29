@@ -28,7 +28,7 @@ then
   case `uname` in
     Darwin)
       EXTRA_LIBS="-lresolv"
-      EXTRA_CPPFLAGS="-Wno-deprecated-declarations"
+      EXTRA_CPPFLAGS="-Wno-deprecated-declarations -Wno-null-dereference"
       ;;
     FreeBSD)
       EXTRA_LDFLAGS="${EXTRA_LDFLAGS} -L/usr/local/lib"
