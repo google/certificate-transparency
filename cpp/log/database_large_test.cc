@@ -78,7 +78,6 @@ TYPED_TEST_CASE(LargeDBTest, Databases);
 TYPED_TEST(LargeDBTest, Benchmark) {
   int entries = FLAGS_database_size;
   CHECK_GE(entries, 0);
-  int original_log_level = FLAGS_minloglevel;
 
   struct rusage ru_before, ru_after;
   getrusage(RUSAGE_SELF, &ru_before);
@@ -88,12 +87,10 @@ TYPED_TEST(LargeDBTest, Benchmark) {
   realtime_after = util::TimeInMilliseconds();
   getrusage(RUSAGE_SELF, &ru_after);
 
-  FLAGS_minloglevel = 0;
-  LOG(INFO) << "Real time spent creating " << FLAGS_database_size
-            << " entries: " << realtime_after - realtime_before << " ms";
-  LOG(INFO) << "Peak RSS delta (as reported by getrusage()) was "
-            << ru_after.ru_maxrss - ru_before.ru_maxrss << " kB";
-  FLAGS_minloglevel = original_log_level;
+  LOG(WARNING) << "Real time spent creating " << FLAGS_database_size
+               << " entries: " << realtime_after - realtime_before << " ms";
+  LOG(WARNING) << "Peak RSS delta (as reported by getrusage()) was "
+               << ru_after.ru_maxrss - ru_before.ru_maxrss << " kB";
 
   getrusage(RUSAGE_SELF, &ru_before);
   realtime_before = util::TimeInMilliseconds();
@@ -102,13 +99,11 @@ TYPED_TEST(LargeDBTest, Benchmark) {
   realtime_after = util::TimeInMilliseconds();
   getrusage(RUSAGE_SELF, &ru_after);
 
-  FLAGS_minloglevel = 0;
-  LOG(INFO) << "Real time spent reading " << FLAGS_database_size
-            << " entries, sorted by key: " << realtime_after - realtime_before
-            << " ms";
-  LOG(INFO) << "Peak RSS delta (as reported by getrusage()) was "
-            << ru_after.ru_maxrss - ru_before.ru_maxrss << " kB";
-  FLAGS_minloglevel = original_log_level;
+  LOG(WARNING) << "Real time spent reading " << FLAGS_database_size
+               << " entries, sorted by key: " << realtime_after - realtime_before
+               << " ms";
+  LOG(WARNING) << "Peak RSS delta (as reported by getrusage()) was "
+               << ru_after.ru_maxrss - ru_before.ru_maxrss << " kB";
 }
 
 }  // namespace
