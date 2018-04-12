@@ -25,11 +25,8 @@ class MerkleTreeLargeTest : public ::testing::Test {
 
 TEST_F(MerkleTreeLargeTest, BuildLargeTree) {
   std::vector<MerkleTree*> trees;
-  int original_log_level = FLAGS_minloglevel;
   for (size_t tree_size = 1024; tree_size <= 4194304; tree_size *= 4) {
-    FLAGS_minloglevel = 0;
-    LOG(INFO) << "Building a tree with " << tree_size << " leaves";
-    FLAGS_minloglevel = original_log_level;
+    LOG(WARNING) << "Building a tree with " << tree_size << " leaves";
 
     struct rusage ru;
     getrusage(RUSAGE_SELF, &ru);
@@ -46,12 +43,10 @@ TEST_F(MerkleTreeLargeTest, BuildLargeTree) {
     getrusage(RUSAGE_SELF, &ru);
     uint64_t time_after = util::TimeInMilliseconds();
 
-    FLAGS_minloglevel = 0;
-    LOG(INFO) << "Peak RSS delta (as reported by getrusage()) was "
-              << ru.ru_maxrss - max_rss_before << " kB";
+    LOG(WARNING) << "Peak RSS delta (as reported by getrusage()) was "
+                 << ru.ru_maxrss - max_rss_before << " kB";
 
-    LOG(INFO) << "Elapsed time: " << time_after - time_before << " ms";
-    FLAGS_minloglevel = original_log_level;
+    LOG(WARNING) << "Elapsed time: " << time_after - time_before << " ms";
   }
 
   for (size_t i = 0; i < trees.size(); ++i) {
