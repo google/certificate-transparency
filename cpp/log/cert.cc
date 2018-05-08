@@ -31,7 +31,10 @@ using util::StatusOr;
 using util::error::Code;
 
 
-#if OPENSSL_VERSION_NUMBER < 0x10002000L || defined(OPENSSL_IS_BORINGSSL)
+// TODO(davidben): Remove this after syncing past
+// https://boringssl-review.googlesource.com/c/boringssl/+/28224.
+#if OPENSSL_VERSION_NUMBER < 0x10002000L || \
+    (defined(OPENSSL_IS_BORINGSSL) && BORINGSSL_API_VERSION < 9)
 // Backport from 1.0.2-beta3.
 static int i2d_re_X509_tbs(X509* x, unsigned char** pp) {
   x->cert_info->enc.modified = 1;
