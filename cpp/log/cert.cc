@@ -644,11 +644,8 @@ util::Status Cert::OctetStringExtensionData(int extension_nid,
                                             string* result) const {
   CHECK(x509_);
 
-  // Callers don't care whether extension is missing or invalid as they
-  // usually call this method after confirming it to be present.
   const StatusOr<void*> ext_struct = ExtensionStructure(extension_nid);
-  if (!ext_struct.ok() &&
-      ext_struct.status().CanonicalCode() == Code::NOT_FOUND) {
+  if (!ext_struct.ok()) {
     return ext_struct.status();
   }
 
