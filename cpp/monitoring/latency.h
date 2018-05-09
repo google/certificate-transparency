@@ -1,6 +1,7 @@
 #ifndef CERT_TRANS_MONITORING_LATENCY_H_
 #define CERT_TRANS_MONITORING_LATENCY_H_
 
+#include <functional>
 #include <string>
 
 #include "monitoring/counter.h"
