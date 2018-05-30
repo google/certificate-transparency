@@ -8,4 +8,4 @@ requests>=1.0
 Twisted[tls]>=12.1
 bitstring
 jsonschema
-cryptography>=1.0
+cryptography>=1.5

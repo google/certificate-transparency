@@ -60,11 +60,9 @@ class RsaVerifier(object):
         Raises:
         - error.SignatureError: If the signature fails verification.
         """
-        verifier = self.__key.verifier(signature, padding.PKCS1v15(), hashes.SHA256())
-        verifier.update(signature_input)
-
         try:
-            verifier.verify()
+            self.__key.verify(signature, signature_input, padding.PKCS1v15(),
+                              hashes.SHA256())
         except cryptography.exceptions.InvalidSignature:
             raise error.SignatureError("Signature did not verify: %s" %
                                        signature.encode("hex"))
