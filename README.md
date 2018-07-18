@@ -19,6 +19,22 @@ certificate-transparency: Auditing for TLS certificates
  - [Deploying a Log](#deploying-a-log)
  - [Operating a Log](#operating-a-log)
 
+C++ Log Server Deprecation Notice
+---------------------------------
+
+The CT log server implementation in this repository is no longer under
+active development. We recommend that new deployments use the new Go
+based server, which can handle much larger Merkle trees:
+
+[CT Personality](https://github.com/google/certificate-transparency-go)
+[Generic Backend](https://github.com/google/trillian)
+
+For more information on why we recommend this see the
+[Deprecation Notes](DEPRECATED.md)
+
+N.B. This notice refers to the servers only, not the other client code in this
+repository.
+
 Introduction
 ------------
 
