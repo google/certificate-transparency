@@ -19,6 +19,33 @@ certificate-transparency: Auditing for TLS certificates
  - [Deploying a Log](#deploying-a-log)
  - [Operating a Log](#operating-a-log)
 
+Introduction
+------------
+
+This repository holds open-source code for functionality related
+to [certificate transparency](https://www.certificate-transparency.org/) (CT).
+The main areas covered are:
+
+ - A collection of client tools and libraries for interacting with a CT Log, in
+   various programming languages.
+ - An **experimental** implementation of a [DNS server](docs/DnsServer.md) that
+   returns CT proofs in the form of DNS records.
+ - An **experimental** implementation of a [general Log](docs/XjsonServer.md)
+   that allows arbitrary data (not just TLS certificates) to be logged.
+ - (**Deprecated**, see [below](#c++-log-server-deprecation-notice))
+   An open-source, distributed, implementation of a CT Log server, also
+   including:
+    - An implementation of a read-only ["mirror" server](docs/MirrorLog.md)
+      that mimics a remote Log.
+    - Ancillary tools needed for managing and maintaining the Log.
+
+The supported platforms are:
+
+ - **Linux**: tested on Ubuntu 14.04; other variants (Fedora 22, CentOS 7) may
+   require tweaking of [compiler options](#build-troubleshooting).
+ - **OS X**: version 10.10
+ - **FreeBSD**: version 10.*
+
 C++ Log Server Deprecation Notice
 ---------------------------------
 
@@ -34,31 +61,6 @@ For more information on why we recommend this see the
 
 N.B. This notice refers to the servers only, not the other client code in this
 repository.
-
-Introduction
-------------
-
-This repository holds open-source code for functionality related
-to [certificate transparency](https://www.certificate-transparency.org/) (CT).
-The main areas covered are:
-
- - An open-source, distributed, implementation of a CT Log server, also including:
-    - An implementation of a read-only ["mirror" server](docs/MirrorLog.md)
-      that mimics a remote Log.
-    - Ancillary tools needed for managing and maintaining the Log.
- - A collection of client tools and libraries for interacting with a CT Log, in
-   various programming languages.
- - An **experimental** implementation of a [DNS server](docs/DnsServer.md) that
-   returns CT proofs in the form of DNS records.
- - An **experimental** implementation of a [general Log](docs/XjsonServer.md)
-   that allows arbitrary data (not just TLS certificates) to be logged.
-
-The supported platforms are:
-
- - **Linux**: tested on Ubuntu 14.04; other variants (Fedora 22, CentOS 7) may
-   require tweaking of [compiler options](#build-troubleshooting).
- - **OS X**: version 10.10
- - **FreeBSD**: version 10.*
 
 
 Build Quick Start
