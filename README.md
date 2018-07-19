@@ -26,16 +26,18 @@ This repository holds open-source code for functionality related
 to [certificate transparency](https://www.certificate-transparency.org/) (CT).
 The main areas covered are:
 
- - An open-source, distributed, implementation of a CT Log server, also including:
-    - An implementation of a read-only ["mirror" server](docs/MirrorLog.md)
-      that mimics a remote Log.
-    - Ancillary tools needed for managing and maintaining the Log.
  - A collection of client tools and libraries for interacting with a CT Log, in
    various programming languages.
  - An **experimental** implementation of a [DNS server](docs/DnsServer.md) that
    returns CT proofs in the form of DNS records.
  - An **experimental** implementation of a [general Log](docs/XjsonServer.md)
    that allows arbitrary data (not just TLS certificates) to be logged.
+ - (**Deprecated**, see [below](#c++-log-server-deprecation-notice))
+   An open-source, distributed, implementation of a CT Log server, also
+   including:
+    - An implementation of a read-only ["mirror" server](docs/MirrorLog.md)
+      that mimics a remote Log.
+    - Ancillary tools needed for managing and maintaining the Log.
 
 The supported platforms are:
 
@@ -43,6 +45,22 @@ The supported platforms are:
    require tweaking of [compiler options](#build-troubleshooting).
  - **OS X**: version 10.10
  - **FreeBSD**: version 10.*
+
+C++ Log Server Deprecation Notice
+---------------------------------
+
+The CT log server implementation in this repository is no longer under
+active development. We recommend that new deployments use the new Go
+based server, which can handle much larger Merkle trees:
+
+[CT Personality](https://github.com/google/certificate-transparency-go)
+[Generic Backend](https://github.com/google/trillian)
+
+For more information on why we recommend this see the
+[Deprecation Notes](DEPRECATED.md)
+
+N.B. This notice refers to the servers only, not the other client code in this
+repository.
 
 
 Build Quick Start
