@@ -59,7 +59,7 @@ using the `ClusterConfig` [protobuf](../proto/ctproto) message, which includes:
 The Log configuration also includes the `etcd_reject_add_pending_threshold`
 config value (default 30000), which limits how many certificate chains can be
 pending (added, but not yet integrated) at once.  This should be large enough
-to accomodate the maximum number of certificates that could arrive during a
+to accommodate the maximum number of certificates that could arrive during a
 maximum-merge-delay (MMD) period, but not so large that an adversary spamming
 the Log could cause problems.
 
