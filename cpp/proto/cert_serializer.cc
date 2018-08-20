@@ -220,8 +220,8 @@ SerializeResult SerializeV1SCTMerkleTreeLeaf(
 
 DeserializeResult DeserializeV1SCTMerkleTreeLeaf(TLSDeserializer* des,
                                                  MerkleTreeLeaf* leaf) {
-  CHECK_NOTNULL(des);
-  CHECK_NOTNULL(leaf);
+  CHECK(des != nullptr);
+  CHECK(leaf != nullptr);
 
   unsigned int version;
   if (!des->ReadUint(Serializer::kVersionLengthInBytes, &version)) {
@@ -476,8 +476,8 @@ SerializeResult SerializeV2SCTMerkleTreeLeaf(
 
 DeserializeResult DeserializeV2SCTMerkleTreeLeaf(TLSDeserializer* des,
                                                  MerkleTreeLeaf* leaf) {
-  CHECK_NOTNULL(des);
-  CHECK_NOTNULL(leaf);
+  CHECK(des != nullptr);
+  CHECK(leaf != nullptr);
 
   unsigned int version;
   if (!des->ReadUint(Serializer::kVersionLengthInBytes, &version)) {

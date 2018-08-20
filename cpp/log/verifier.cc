@@ -18,7 +18,7 @@ using ct::DigitallySigned;
 
 namespace cert_trans {
 
-Verifier::Verifier(EVP_PKEY* pkey) : pkey_(CHECK_NOTNULL(pkey)) {
+Verifier::Verifier(EVP_PKEY* pkey) : pkey_(ABSL_DIE_IF_NULL(pkey)) {
   switch (pkey_->type) {
     case EVP_PKEY_EC:
       hash_algo_ = DigitallySigned::SHA256;
