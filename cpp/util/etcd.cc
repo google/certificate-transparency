@@ -1033,7 +1033,7 @@ void EtcdClient::MaybeLogEtcdVersion() {
                                     to_string(etcds_.front().second) +
                                     "/version"));
   UrlFetcher::Response* const resp(new UrlFetcher::Response);
-  fetcher_->Fetch(req, resp, log_version_task_->task()->AddChild([this, resp](
+  fetcher_->Fetch(req, resp, log_version_task_->task()->AddChild([resp](
                                  Task* child_task) {
     unique_ptr<UrlFetcher::Response> resp_deleter(resp);
     if (!child_task->status().ok()) {

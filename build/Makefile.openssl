@@ -4,6 +4,11 @@ OPENSSLDIR := $(shell openssl version -d | awk '{ print $$2 }')
 
 all: $(INSTALL_DIR)/bin/openssl
 
+# Work around issues with aes-related instructions crashing on Travis builds.
+ifeq ($(TRAVIS),true)
+EXTRA_CONFIG="no-asm"
+endif
+
 $(INSTALL_DIR)/bin/openssl: Makefile
 	$(MAKE)
 	$(MAKE) test
@@ -11,6 +16,6 @@ $(INSTALL_DIR)/bin/openssl: Makefile
 
 Makefile: config Configure Makefile.org
 	# Force a 64 bit build on MacOS
-	KERNEL_BITS=64 ./config --install_prefix=$(INSTALL_DIR) --prefix=/ --libdir=lib --openssldir=$(OPENSSLDIR) no-shared enable-static-engine -fPIC
+	KERNEL_BITS=64 ./config --install_prefix=$(INSTALL_DIR) --prefix=/ --libdir=lib --openssldir=$(OPENSSLDIR) $(EXTRA_CONFIG) no-shared enable-static-engine -fPIC
 	# just to be sure we don't have dregs left over
 	$(MAKE) clean
