@@ -12,7 +12,7 @@ sysctl -n hw.ncpu
 
 brew update > /dev/null
 brew upgrade go
-for i in homebrew/dupes/tcl-tk ant cmake; do
+for i in homebrew/dupes/tcl-tk ant; do
 	brew install $i
 done
 
