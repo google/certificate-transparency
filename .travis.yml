@@ -29,7 +29,7 @@ matrix:
       env: SSL=openssl
     - compiler: clang
       os: linux
-      env: SSL=boringssl LLVM=3.8.1
+      env: SSL=boringssl LLVM=3.9.1
       addons:
         apt:
           sources: *common_sources
@@ -37,7 +37,7 @@ matrix:
           - *common_packages
     - compiler: clang
       os: linux
-      env: SSL=openssl LLVM=3.8.1
+      env: SSL=openssl LLVM=3.9.1
       addons:
         apt:
           sources: *common_sources
@@ -45,7 +45,7 @@ matrix:
           - *common_packages
     - compiler: clang
       os: linux
-      env: SSL=openssl LLVM=3.8.1 SANITIZE="-fsanitize=address -fno-omit-frame-pointer" ASAN_OPTIONS="detect_leaks=1:check_initialization_order=1" LSAN_OPTIONS="suppressions=${HOME}/lsan.supp"
+      env: SSL=openssl LLVM=3.9.1 SANITIZE="-fsanitize=address -fno-omit-frame-pointer" ASAN_OPTIONS="detect_leaks=1:check_initialization_order=1" LSAN_OPTIONS="suppressions=${HOME}/lsan.supp"
       addons:
         apt:
           sources: *common_sources
