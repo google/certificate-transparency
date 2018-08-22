@@ -161,7 +161,7 @@ EVP_PKEY* PrivateKeyFromPem(const string& pemkey) {
   ScopedBIO bio(
       BIO_new_mem_buf(const_cast<char*>(pemkey.data()), pemkey.size()));
   EVP_PKEY* pkey = PEM_read_bio_PrivateKey(bio.get(), NULL, NULL, NULL);
-  CHECK_NOTNULL(pkey);
+  CHECK(pkey != nullptr);
   return pkey;
 }
 
@@ -169,7 +169,7 @@ EVP_PKEY* PublicKeyFromPem(const string& pemkey) {
   ScopedBIO bio(
       BIO_new_mem_buf(const_cast<char*>(pemkey.data()), pemkey.size()));
   EVP_PKEY* pkey = PEM_read_bio_PUBKEY(bio.get(), NULL, NULL, NULL);
-  CHECK_NOTNULL(pkey);
+  CHECK(pkey != nullptr);
   return pkey;
 }
 
@@ -183,7 +183,7 @@ TestSigner::TestSigner()
   counter_ = util::TimeInMilliseconds();
   srand(counter_);
   EVP_PKEY* pkey = PrivateKeyFromPem(kEcP256PrivateKey);
-  CHECK_NOTNULL(pkey);
+  CHECK(pkey != nullptr);
   default_signer_ = new LogSigner(pkey);
 }
 
@@ -196,7 +196,7 @@ TestSigner::~TestSigner() {
 // static
 Signer* TestSigner::DefaultSigner() {
   EVP_PKEY* pkey = PrivateKeyFromPem(kEcP256PrivateKey);
-  CHECK_NOTNULL(pkey);
+  CHECK(pkey != nullptr);
   return new Signer(pkey);
 }
 
@@ -205,7 +205,7 @@ Signer* TestSigner::DefaultSigner() {
 // static
 LogSigner* TestSigner::DefaultLogSigner() {
   EVP_PKEY* pkey = PrivateKeyFromPem(kEcP256PrivateKey);
-  CHECK_NOTNULL(pkey);
+  CHECK(pkey != nullptr);
   return new LogSigner(pkey);
 }
 
@@ -214,7 +214,7 @@ LogSigner* TestSigner::DefaultLogSigner() {
 // static
 Verifier* TestSigner::DefaultVerifier() {
   EVP_PKEY* pubkey = PublicKeyFromPem(kEcP256PublicKey);
-  CHECK_NOTNULL(pubkey);
+  CHECK(pubkey != nullptr);
   return new Verifier(pubkey);
 }
 
@@ -223,7 +223,7 @@ Verifier* TestSigner::DefaultVerifier() {
 // static
 LogSigVerifier* TestSigner::DefaultLogSigVerifier() {
   EVP_PKEY* pubkey = PublicKeyFromPem(kEcP256PublicKey);
-  CHECK_NOTNULL(pubkey);
+  CHECK(pubkey != nullptr);
   return new LogSigVerifier(pubkey);
 }
 

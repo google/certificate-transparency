@@ -61,9 +61,9 @@ bool SerializedTbs(const Cert& cert, string* result) {
 // TODO(ekasper): handle Cert errors consistently and log some errors here
 // if they fail.
 CertSubmissionHandler::CertSubmissionHandler(const CertChecker* cert_checker)
-    : cert_checker_(CHECK_NOTNULL(cert_checker)) {
+    : cert_checker_(cert_checker) {
+  CHECK(cert_checker != nullptr);
 }
-
 
 // static
 bool CertSubmissionHandler::X509ChainToEntry(const CertChain& chain,

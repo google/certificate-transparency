@@ -69,7 +69,7 @@ bool CertChecker::LoadTrustedCertificates(
 }
 
 bool CertChecker::LoadTrustedCertificatesFromBIO(BIO* bio_in) {
-  CHECK_NOTNULL(bio_in);
+  CHECK(bio_in != nullptr);
   vector<pair<string, unique_ptr<const Cert>>> certs_to_add;
   bool error = false;
   // certs_to_add may be empty if no new certs were added, so keep track of

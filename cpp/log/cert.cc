@@ -233,7 +233,8 @@ unique_ptr<Cert> Cert::FromDerString(const string& der_string) {
 
 
 unique_ptr<Cert> Cert::FromDerBio(BIO* bio_in) {
-  ScopedX509 x509(d2i_X509_bio(CHECK_NOTNULL(bio_in), nullptr));
+  CHECK(bio_in != nullptr);
+  ScopedX509 x509(d2i_X509_bio(bio_in, nullptr));
   if (!x509) {
     // At this point most likely the input was just corrupt. There are few
     // real errors that may have happened (a malloc failure is one) and it is
@@ -246,15 +247,16 @@ unique_ptr<Cert> Cert::FromDerBio(BIO* bio_in) {
 
 
 string Cert::PrintVersion() const {
-  const long version(X509_get_version(CHECK_NOTNULL(x509_.get())));
+  CHECK(x509_ != nullptr);
+  const long version(X509_get_version(x509_.get()));
   return to_string(1 + version);
 }
 
 
 string Cert::PrintSerialNumber() const {
+  CHECK(x509_ != nullptr);
   ScopedBIGNUM serial_number_BN(
-      ASN1_INTEGER_to_BN(X509_get_serialNumber(CHECK_NOTNULL(x509_.get())),
-                         nullptr));
+      ASN1_INTEGER_to_BN(X509_get_serialNumber(x509_.get()), nullptr));
 
   ScopedOpenSSLString serial_number_hex(BN_bn2hex(serial_number_BN.get()));
 
@@ -265,12 +267,14 @@ string Cert::PrintSerialNumber() const {
 
 
 string Cert::PrintIssuerName() const {
-  return PrintName(X509_get_issuer_name(CHECK_NOTNULL(x509_.get())));
+  CHECK(x509_ != nullptr);
+  return PrintName(X509_get_issuer_name(x509_.get()));
 }
 
 
 string Cert::PrintSubjectName() const {
-  return PrintName(X509_get_subject_name(CHECK_NOTNULL(x509_.get())));
+  CHECK(x509_ != nullptr);
+  return PrintName(X509_get_subject_name(x509_.get()));
 }
 
 
@@ -295,12 +299,14 @@ string Cert::PrintName(X509_NAME* name) {
 
 
 string Cert::PrintNotBefore() const {
-  return PrintTime(X509_get_notBefore(CHECK_NOTNULL(x509_.get())));
+  CHECK(x509_ != nullptr);
+  return PrintTime(X509_get_notBefore(x509_.get()));
 }
 
 
 string Cert::PrintNotAfter() const {
-  return PrintTime(X509_get_notAfter(CHECK_NOTNULL(x509_.get())));
+  CHECK(x509_ != nullptr);
+  return PrintTime(X509_get_notAfter(x509_.get()));
 }
 
 
@@ -431,8 +437,9 @@ StatusOr<bool> Cert::HasExtendedKeyUsage(int key_usage_nid) const {
 
 StatusOr<bool> Cert::IsIssuedBy(const Cert& issuer) const {
   // Seemingly no negative "real" error codes are returned from openssl api.
-  return X509_check_issued(CHECK_NOTNULL(issuer.x509_.get()),
-                           CHECK_NOTNULL(x509_.get())) == X509_V_OK;
+  CHECK(issuer.x509_ != nullptr);
+  CHECK(x509_ != nullptr);
+  return X509_check_issued(issuer.x509_.get(), x509_.get()) == X509_V_OK;
 }
 
 StatusOr<bool> Cert::LogUnsupportedAlgorithm() const {
@@ -442,15 +449,16 @@ StatusOr<bool> Cert::LogUnsupportedAlgorithm() const {
 }
 
 StatusOr<bool> Cert::IsSignedBy(const Cert& issuer) const {
-  const ScopedEVP_PKEY issuer_key(
-      X509_get_pubkey(CHECK_NOTNULL(issuer.x509_.get())));
+  CHECK(issuer.x509_ != nullptr);
+  const ScopedEVP_PKEY issuer_key(X509_get_pubkey(issuer.x509_.get()));
   if (!issuer_key) {
     LOG(WARNING) << "NULL issuer key";
     LOG_OPENSSL_ERRORS(WARNING);
     return false;
   }
 
-  const int ret(X509_verify(CHECK_NOTNULL(x509_.get()), issuer_key.get()));
+  CHECK(x509_ != nullptr);
+  const int ret(X509_verify(x509_.get(), issuer_key.get()));
   if (ret == 1) {
     return true;
   }
@@ -499,7 +507,8 @@ StatusOr<bool> Cert::IsSignedBy(const Cert& issuer) const {
 
 util::Status Cert::DerEncoding(string* result) const {
   unsigned char* der_buf(nullptr);
-  int der_length = i2d_X509(CHECK_NOTNULL(x509_.get()), &der_buf);
+  CHECK(x509_ != nullptr);
+  int der_length = i2d_X509(x509_.get(), &der_buf);
 
   if (der_length < 0) {
     // Failed to decode. Several possible reasons but we will just reject
@@ -517,7 +526,8 @@ util::Status Cert::DerEncoding(string* result) const {
 
 util::Status Cert::PemEncoding(string* result) const {
   ScopedBIO bp(BIO_new(BIO_s_mem()));
-  if (!PEM_write_bio_X509(bp.get(), CHECK_NOTNULL(x509_.get()))) {
+  CHECK(x509_ != nullptr);
+  if (!PEM_write_bio_X509(bp.get(), x509_.get())) {
     LOG(WARNING) << "Failed to serialize cert";
     LOG_OPENSSL_ERRORS(WARNING);
     return util::Status(Code::INVALID_ARGUMENT, "PEM serialize failed");
@@ -537,8 +547,8 @@ util::Status Cert::PemEncoding(string* result) const {
 util::Status Cert::Sha256Digest(string* result) const {
   unsigned char digest[EVP_MAX_MD_SIZE];
   unsigned int len;
-  if (X509_digest(CHECK_NOTNULL(x509_.get()), EVP_sha256(), digest, &len) !=
-      1) {
+  CHECK(x509_ != nullptr);
+  if (X509_digest(x509_.get(), EVP_sha256(), digest, &len) != 1) {
     // Failed to digest. Several possible reasons but we will just reject
     // the input rather than trying to interpret the cause
     LOG(WARNING) << "Failed to compute cert digest";
@@ -553,7 +563,8 @@ util::Status Cert::Sha256Digest(string* result) const {
 
 util::Status Cert::DerEncodedTbsCertificate(string* result) const {
   unsigned char* der_buf(nullptr);
-  int der_length = i2d_re_X509_tbs(CHECK_NOTNULL(x509_.get()), &der_buf);
+  CHECK(x509_ != nullptr);
+  int der_length = i2d_re_X509_tbs(x509_.get(), &der_buf);
   if (der_length < 0) {
     // Failed to serialize. Several possible reasons but we will just reject
     // the input rather than trying to interpret the cause
@@ -568,14 +579,14 @@ util::Status Cert::DerEncodedTbsCertificate(string* result) const {
 
 
 util::Status Cert::DerEncodedSubjectName(string* result) const {
-  return DerEncodedName(X509_get_subject_name(CHECK_NOTNULL(x509_.get())),
-                        result);
+  CHECK(x509_ != nullptr);
+  return DerEncodedName(X509_get_subject_name(x509_.get()), result);
 }
 
 
 util::Status Cert::DerEncodedIssuerName(string* result) const {
-  return DerEncodedName(X509_get_issuer_name(CHECK_NOTNULL(x509_.get())),
-                        result);
+  CHECK(x509_ != nullptr);
+  return DerEncodedName(X509_get_issuer_name(x509_.get()), result);
 }
 
 
@@ -599,8 +610,8 @@ util::Status Cert::DerEncodedName(X509_NAME* name, string* result) {
 util::Status Cert::PublicKeySha256Digest(string* result) const {
   unsigned char digest[EVP_MAX_MD_SIZE];
   unsigned int len;
-  if (X509_pubkey_digest(CHECK_NOTNULL(x509_.get()), EVP_sha256(), digest,
-                         &len) != 1) {
+  CHECK(x509_ != nullptr);
+  if (X509_pubkey_digest(x509_.get(), EVP_sha256(), digest, &len) != 1) {
     // Failed to digest. Several possible reasons but we will just reject
     // the input rather than trying to interpret the cause
     LOG(WARNING) << "Failed to compute public key digest";
@@ -614,9 +625,9 @@ util::Status Cert::PublicKeySha256Digest(string* result) const {
 
 StatusOr<string> Cert::SPKI() const {
   unsigned char* der_buf(nullptr);
+  CHECK(x509_ != nullptr);
   const int der_length(
-      i2d_X509_PUBKEY(X509_get_X509_PUBKEY(CHECK_NOTNULL(x509_.get())),
-                      &der_buf));
+      i2d_X509_PUBKEY(X509_get_X509_PUBKEY(x509_.get()), &der_buf));
   if (der_length < 0) {
     // What does this return value mean? Let's assume it means the cert
     // is bad until proven otherwise.
@@ -626,8 +637,8 @@ StatusOr<string> Cert::SPKI() const {
   }
 
   string result;
-  result.assign(
-      string(reinterpret_cast<char*>(CHECK_NOTNULL(der_buf)), der_length));
+  CHECK(der_buf != nullptr);
+  result.assign(string(reinterpret_cast<char*>(der_buf), der_length));
 
   OPENSSL_free(der_buf);
   return result;
@@ -638,7 +649,8 @@ util::Status Cert::SPKISha256Digest(string* result) const {
   const util::StatusOr<string> spki(SPKI());
   if (spki.ok()) {
     string sha256_digest = Sha256Hasher::Sha256Digest(spki.ValueOrDie());
-    CHECK_NOTNULL(result)->assign(sha256_digest);
+    CHECK(result != nullptr);
+    result->assign(sha256_digest);
   }
   return spki.status();
 }
@@ -662,8 +674,8 @@ util::Status Cert::OctetStringExtensionData(int extension_nid,
 
 
 util::StatusOr<int> Cert::ExtensionIndex(int extension_nid) const {
-  const int index(
-      X509_get_ext_by_NID(CHECK_NOTNULL(x509_.get()), extension_nid, -1));
+  CHECK(x509_ != nullptr);
+  const int index(X509_get_ext_by_NID(x509_.get(), extension_nid, -1));
   if (index < -1) {
     // The most likely and possibly only cause for a return code
     // other than -1 is an unrecognized NID.
@@ -781,8 +793,8 @@ namespace {
 
 util::Status ExtractSubjectAltNames(STACK_OF(GENERAL_NAME)* subject_alt_names,
                                     vector<string>* dns_alt_names) {
-  CHECK_NOTNULL(subject_alt_names);
-  CHECK_NOTNULL(dns_alt_names);
+  CHECK(subject_alt_names != nullptr);
+  CHECK(dns_alt_names != nullptr);
 
   dns_alt_names->clear();
   const int subject_alt_name_count = sk_GENERAL_NAME_num(subject_alt_names);
@@ -816,8 +828,9 @@ bool ValidateRedactionSubjectAltNames(STACK_OF(GENERAL_NAME) *
   // First. Check all the Subject Alt Name extension records. Any that are of
   // type DNS must pass validation if they are attempting to redact labels
   if (subject_alt_names) {
-    *CHECK_NOTNULL(status) = ExtractSubjectAltNames(
-        subject_alt_names, CHECK_NOTNULL(dns_alt_names));
+    CHECK(status != nullptr);
+    CHECK(dns_alt_names != nullptr);
+    *status = ExtractSubjectAltNames(subject_alt_names, dns_alt_names);
 
     for (const auto& dns_name : *dns_alt_names) {
       if (IsRedactedHost(dns_name)) {
@@ -847,8 +860,8 @@ util::Status Cert::SubjectAltNames(vector<string>* dns_alt_names) const {
           x509_.get(), NID_subject_alt_name, nullptr, nullptr)));
 
   if (subject_alt_names) {
-    return ExtractSubjectAltNames(subject_alt_names.get(),
-                                  CHECK_NOTNULL(dns_alt_names));
+    CHECK(dns_alt_names != nullptr);
+    return ExtractSubjectAltNames(subject_alt_names.get(), dns_alt_names);
   }
 
   return ::util::OkStatus();
@@ -863,10 +876,10 @@ bool Cert::ValidateRedactionSubjectAltNameAndCN(int* dns_alt_name_count,
   int redacted_name_count = 0;
   vector<string> dns_alt_names;
 
+  CHECK(x509_ != nullptr);
   ScopedGENERAL_NAMEStack subject_alt_names(
-      static_cast<STACK_OF(GENERAL_NAME)*>(
-          X509_get_ext_d2i(CHECK_NOTNULL(x509_.get()), NID_subject_alt_name,
-                           nullptr, nullptr)));
+      static_cast<STACK_OF(GENERAL_NAME)*>(X509_get_ext_d2i(
+          x509_.get(), NID_subject_alt_name, nullptr, nullptr)));
 
   // Apply validation rules for subject alt names, if this returns true
   // status is already final.
@@ -1140,7 +1153,8 @@ util::Status Cert::IsValidNameConstrainedIntermediateCa() const {
 }
 
 TbsCertificate::TbsCertificate(const Cert& cert) {
-  x509_.reset(X509_dup(CHECK_NOTNULL(cert.x509_.get())));
+  CHECK(cert.x509_ != nullptr);
+  x509_.reset(X509_dup(cert.x509_.get()));
 
   if (!x509_)
     LOG_OPENSSL_ERRORS(ERROR);

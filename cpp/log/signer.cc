@@ -18,7 +18,8 @@ using cert_trans::Verifier;
 
 namespace cert_trans {
 
-Signer::Signer(EVP_PKEY* pkey) : pkey_(CHECK_NOTNULL(pkey)) {
+Signer::Signer(EVP_PKEY* pkey) : pkey_(pkey) {
+  CHECK(pkey != nullptr);
   switch (pkey_->type) {
     case EVP_PKEY_EC:
       hash_algo_ = ct::DigitallySigned::SHA256;

@@ -25,7 +25,10 @@ CompactMerkleTree::CompactMerkleTree(unique_ptr<SerialHasher> hasher)
 CompactMerkleTree::CompactMerkleTree(MerkleTree* model,
                                      unique_ptr<SerialHasher> hasher)
     : MerkleTreeInterface(),
-      tree_(std::max<int64_t>(0, CHECK_NOTNULL(model)->LevelCount() - 1)),
+      tree_(std::max<int64_t>(0, [model]() {
+        CHECK(model != nullptr);
+        return model->LevelCount() - 1;
+      }())),
       treehasher_(move(hasher)),
       leaf_count_(model->LeafCount()),
       leaves_processed_(0),
@@ -96,7 +99,6 @@ CompactMerkleTree::CompactMerkleTree(MerkleTree* model,
   assert(model->LeafCount() == LeafCount());
   assert(model->LevelCount() == LevelCount());
 }
-
 
 CompactMerkleTree::CompactMerkleTree(const CompactMerkleTree& other,
                                      unique_ptr<SerialHasher> hasher)

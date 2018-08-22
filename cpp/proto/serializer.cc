@@ -487,13 +487,14 @@ DeserializeResult ReadSCTV2(TLSDeserializer* deserializer,
 
 DeserializeResult ReadExtensionsV1(TLSDeserializer* deserializer,
                                    ct::TimestampedEntry* entry) {
-  CHECK_NOTNULL(deserializer);
+  CHECK(deserializer != nullptr);
   string extensions;
   if (!deserializer->ReadVarBytes(Serializer::kMaxExtensionsLength,
                                   &extensions)) {
     return DeserializeResult::INPUT_TOO_SHORT;
   }
-  CHECK_NOTNULL(entry)->set_extensions(extensions);
+  CHECK(entry != nullptr);
+  entry->set_extensions(extensions);
   return DeserializeResult::OK;
 }
 
