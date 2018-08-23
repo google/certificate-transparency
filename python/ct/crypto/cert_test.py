@@ -415,11 +415,6 @@ class CertificateTest(unittest.TestCase):
         # notBefore: Sat Aug 22 16:41:51 1998 GMT
         # notAfter: Wed Aug 22 16:41:51 2018 GMT
         c = certs[2]
-        # These two will start failing in 2018.
-        self.assertTrue(c.is_temporally_valid_now())
-        self.assertFalse(c.is_expired())
-
-        self.assertFalse(c.is_not_yet_valid())
 
         # Aug 22 16:41:51 2018
         self.assertTrue(c.is_temporally_valid_at(time.gmtime(1534956111)))
