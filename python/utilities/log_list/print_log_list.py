@@ -9,8 +9,10 @@ import sys
 import time
 
 from absl import flags as gflags
+from cryptography.exceptions import InvalidSignature
+from cryptography.hazmat.primitives import hashes, serialization
+from cryptography.hazmat.primitives.asymmetric import padding
 import jsonschema
-import M2Crypto
 
 from cpp_generator import generate_cpp_header
 from java_generator import generate_java_source
@@ -51,13 +53,15 @@ def is_log_list_valid(json_log_list, schema_file):
 
 
 def is_signature_valid(log_list_data, signature_file, public_key_file):
-    loaded_pubkey = M2Crypto.RSA.load_pub_key(public_key_file)
-    pubkey = M2Crypto.EVP.PKey()
-    pubkey.assign_rsa(loaded_pubkey)
-    pubkey.reset_context(md="sha256")
-    pubkey.verify_init()
-    pubkey.verify_update(log_list_data)
-    return pubkey.verify_final(open(signature_file, "rb").read())
+    pubkey_pem = open(public_key_file, "rb").read()
+    pubkey = serialization.load_pem_public_key(pubkey_pem)
+    try:
+        pubkey.verify(
+            open(signature_file, "rb").read(), log_list_data, padding.PKCS1v15(),
+            hashes.SHA256())
+        return True
+    except InvalidSignature:
+        return False
 
 
 def print_formatted_log_list(json_log_list):
