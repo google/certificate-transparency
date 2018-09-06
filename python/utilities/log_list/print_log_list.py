@@ -8,6 +8,7 @@ import os
 import sys
 import time
 
+from absl import app
 from absl import flags as gflags
 from cryptography.exceptions import InvalidSignature
 from cryptography.hazmat.primitives import hashes, serialization
@@ -21,23 +22,20 @@ from openssl_generator import generate_openssl_conf
 FLAGS = gflags.FLAGS
 
 gflags.DEFINE_string("log_list", None, "Logs list file to parse and print.")
-gflags.mark_flag_as_required("log_list")
 gflags.DEFINE_string("signature", None, "Signature file over the list of logs.")
 gflags.DEFINE_string("signer_key", None, "Public key of the log list signer.")
-gflags.DEFINE_string("log_list_schema",
-                     os.path.join(os.path.dirname(sys.argv[0]),
-                                  "data", "log_list_schema.json"),
+gflags.DEFINE_string("log_list_schema", None,
                      "JSON schema for the list of logs.")
 gflags.DEFINE_string("header_output", None,
-                     "If specifed, generates C++ code for Chromium.")
+                     "If specified, generates C++ code for Chromium.")
 gflags.DEFINE_string("java_output", None,
-                     "If specifed, generates Java code.")
+                     "If specified, generates Java code.")
 gflags.DEFINE_string("java_class", "org.conscrypt.ct.KnownLogs",
                      "Fully qualified name of the generated class.")
 gflags.DEFINE_string("openssl_output", None,
                      "If specified, generates a CONF file for OpenSSL.")
-gflags.DEFINE_boolean("skip_signature_check", False,
-                     "Skip signature check (only validate schema).")
+gflags.DEFINE_boolean("skip_signature_check", None,
+                      "Skip signature check (only validate schema).")
 
 
 def is_log_list_valid(json_log_list, schema_file):
@@ -89,19 +87,27 @@ def print_formatted_log_list(json_log_list):
                 final_sth["tree_size"])
         print "-" * 80
 
-def run():
+
+def main(argv):
+    del argv  # Unused; all arguments provided via flags.
     with open(FLAGS.log_list, "rb") as f:
         json_data = f.read()
 
-    if (not FLAGS.skip_signature_check) and not is_signature_valid(
-        json_data, FLAGS.signature, FLAGS.signer_key):
-        print "ERROR: Signature over list of logs is not valid, not proceeding."
-        sys.exit(1)
+    if not FLAGS.skip_signature_check:
+        if not FLAGS.signature:
+            raise app.UsageError("ERROR: --signature flag not set.")
+        if not FLAGS.signer_key:
+            raise app.UsageError("ERROR: --signer_key flag not set.")
+        if not is_signature_valid(json_data, FLAGS.signature, FLAGS.signer_key):
+            raise app.UsageError(
+                "ERROR: Signature over list of logs is not valid.")
 
     parsed_json = json.loads(json_data)
+    if not FLAGS.log_list_schema:
+        raise app.UsageError("ERROR: --log_list_schema flag not set.")
     if not is_log_list_valid(parsed_json, FLAGS.log_list_schema):
-        print "ERROR: Log list is signed but does not conform to the schema."
-        sys.exit(2)
+        raise app.UsageError(
+            "ERROR: Log list is signed but does not conform to the schema.", 2)
     if FLAGS.header_output:
         generate_cpp_header(parsed_json, FLAGS.header_output)
     if FLAGS.java_output:
@@ -116,5 +122,7 @@ def run():
 
 
 if __name__ == "__main__":
-    sys.argv = FLAGS(sys.argv)
-    run()
+    gflags.mark_flags_as_required(["log_list", "log_list_schema"])
+    gflags.mark_flags_as_mutual_exclusive(["signature", "skip_signature_check"],
+                                          required=True)
+    app.run(main)
