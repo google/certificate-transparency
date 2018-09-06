@@ -8,7 +8,8 @@ def _log_id(log):
     # Use log URL as its ID because it should be unique and is probably
     # shorter and more readable in a comma-separated list than the log
     # description.
-    return log["url"].replace(",", "")
+    # Replace ':' with '_' because ':' is not allowed by the CONF format.
+    return log["url"].replace(":", "_").replace(",", "")
 
 def _openssl_list(items):
     '''
