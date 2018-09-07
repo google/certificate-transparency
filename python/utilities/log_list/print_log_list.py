@@ -55,7 +55,9 @@ def is_signature_valid(log_list_data, signature_file, public_key_file):
     pubkey = serialization.load_pem_public_key(pubkey_pem)
     try:
         pubkey.verify(
-            open(signature_file, "rb").read(), log_list_data, padding.PKCS1v15(),
+            open(signature_file, "rb").read(),
+            log_list_data,
+            padding.PKCS1v15(),
             hashes.SHA256())
         return True
     except InvalidSignature:
