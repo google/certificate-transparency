@@ -88,8 +88,7 @@ def print_formatted_log_list(json_log_list):
         print "-" * 80
 
 
-def main(argv):
-    del argv  # Unused; all arguments provided via flags.
+def main(_unused_argv):
     with open(FLAGS.log_list, "rb") as f:
         json_data = f.read()
 
