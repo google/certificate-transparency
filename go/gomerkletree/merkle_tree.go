@@ -1,0 +1,191 @@
+// Package gomerkletree provides a means to generate RFC6962-compliant
+// Merkle Hash Trees.
+package gomerkletree
+
+import (
+	"bytes"
+	"errors"
+	"fmt"
+	"hash"
+)
+
+// MerkleTree is a type which calculates the hashes within a Merkle Hash
+// Tree, and to query the tree for inclusion and transparency proofs.
+type MerkleTree struct {
+	dao   MerkleTreeDataInterface
+	cache MerkleTreeCacheInterface
+
+	hasher func() hash.Hash
+}
+
+// New creates a new merkle hash tree.  The number of "leaves" of the tree,
+// as well as their contents, are retrieved through |dao|.  If you wish to
+// have acceptable performance on non-trivial tree sizes, you'll want to
+// provide |cache| (otherwise, pass `nil`).  The hash function used for all
+// nodes in the tree is specified by |hasher|.
+func New(dao MerkleTreeDataInterface, cache MerkleTreeCacheInterface, hasher func() hash.Hash) *MerkleTree {
+	return &MerkleTree{dao: dao, cache: cache, hasher: hasher}
+}
+
+func (mt *MerkleTree) CurrentRoot() (Hash, error) {
+	if mt.dao.Size() == 0 {
+		// Special case: empty trees get hashes of empty strings
+		h := mt.hasher()
+		return h.Sum([]byte{}), nil
+	}
+	return mt.subtreeRoot(0, mt.dao.Size()-1)
+}
+
+// InclusionProof returns a list of subtree hashes which can be used, in
+// conjunction with the leaf item at (zero-indexed) |leaf|, to prove that
+// the leaf item at |leaf| is, indeed, contained within the tree, and we're
+// not just making this stuff up.
+func (mt *MerkleTree) InclusionProof(leaf uint64) ([]Hash, error) {
+	if mt.dao.Size() == 0 {
+		return nil, errors.New("MerkleTree: Can't calculate an inclusion proof on an empty tree")
+	}
+
+	if leaf >= mt.dao.Size() {
+		return nil, fmt.Errorf("MerkleTree: Invalid leaf index: %v", leaf)
+	}
+
+	return mt.inclusionSubtree(leaf, 0, mt.dao.Size()-1)
+}
+
+// ConsistencyProof returns a list of subtree hashes which allow the
+// recipient to prove that the tree head of the tree with size |to| contains
+// all of the elements of the tree of size |from|.  Both |from| and |to| are
+// tree sizes (that is, they are the number of elements in the tree, *not*
+// the zero-based index of the last item, as |InclusionProof| takes).
+func (mt *MerkleTree) ConsistencyProof(from, to uint64) ([]Hash, error) {
+	switch {
+	case from == 0:
+		// There's no algorithmic basis for this that I know of, but it is how
+		// existing implementations do it
+		return []Hash{}, nil
+	case to > mt.dao.Size():
+		return nil, fmt.Errorf("MerkleTree.ConsistencyProof: Value for 'to' greater than tree size (to=%v, tree size=%v)", to, mt.dao.Size())
+	case from > to:
+		return nil, fmt.Errorf("MerkleTree.ConsistencyProof: 'to' greater than 'from'")
+	default:
+		return mt.subproof(from, 0, to-1, true)
+	}
+}
+
+func (mt *MerkleTree) hash(s []byte) Hash {
+	h := mt.hasher()
+	h.Write(s)
+	return h.Sum([]byte{})
+}
+
+func (mt *MerkleTree) leafHash(s []byte) Hash {
+	return mt.hash(bytes.Join([][]byte{{0x0}, s}, []byte{}))
+}
+
+func (mt *MerkleTree) nodeHash(h1, h2 Hash) Hash {
+	return mt.hash(bytes.Join([][]byte{{0x1}, h1, h2}, []byte{}))
+}
+
+func (mt *MerkleTree) subtreeRoot(n1, n2 uint64) (Hash, error) {
+	if n1 == n2 {
+		l, err := mt.dao.EntryAt(n1)
+		if err != nil {
+			return nil, err
+		}
+		return mt.leafHash(l), nil
+	}
+	pivot := largestPowerOfTwoLessThan(n2 - n1 + 1)
+
+	s1, err1 := mt.subtreeRoot(n1, n1+pivot-1)
+	if err1 != nil {
+		return nil, err1
+	}
+
+	s2, err2 := mt.subtreeRoot(n1+pivot, n2)
+	if err2 != nil {
+		return nil, err2
+	}
+
+	return mt.nodeHash(s1, s2), nil
+}
+
+func (mt *MerkleTree) inclusionSubtree(leaf, n1, n2 uint64) ([]Hash, error) {
+	if n1 == n2 {
+		// Inclusion proof of a single element is the empty list
+		return []Hash{}, nil
+	}
+	pivot := largestPowerOfTwoLessThan(n2 - n1 + 1)
+
+	if leaf < pivot {
+		h, err := mt.subtreeRoot(n1+pivot, n2)
+		if err != nil {
+			return nil, err
+		}
+
+		sp, err := mt.inclusionSubtree(leaf, n1, n1+pivot-1)
+		if err != nil {
+			return nil, err
+		}
+
+		return append(sp, h), nil
+	}
+
+	h, err := mt.subtreeRoot(n1, n1+pivot-1)
+	if err != nil {
+		return nil, err
+	}
+
+	sp, err := mt.inclusionSubtree(n1+leaf-pivot, n1+pivot, n2)
+	if err != nil {
+		return nil, err
+	}
+
+	return append(sp, h), nil
+}
+
+func largestPowerOfTwoLessThan(n uint64) uint64 {
+	p := uint64(1)
+	for n -= 1; n > 1; n >>= 1 {
+		p <<= 1
+	}
+
+	return p
+}
+
+func (mt *MerkleTree) subproof(from, t1, t2 uint64, b bool) ([]Hash, error) {
+	switch {
+	case t2 == from-1:
+		if b {
+			return []Hash{}, nil
+		}
+		h, err := mt.subtreeRoot(t1, t2)
+
+		return []Hash{h}, err
+	case t1 == t2:
+		h, err := mt.subtreeRoot(t1, t2)
+		return []Hash{h}, err
+	default:
+		pivot := largestPowerOfTwoLessThan(t2 - t1 + 1)
+		var (
+			sp            []Hash
+			h             Hash
+			err_sp, err_h error
+		)
+
+		if from <= pivot+t1 {
+			sp, err_sp = mt.subproof(from, t1, t1+pivot-1, b)
+			h, err_h = mt.subtreeRoot(t1+pivot, t2)
+		} else {
+			sp, err_sp = mt.subproof(from, t1+pivot, t2, false)
+			h, err_h = mt.subtreeRoot(t1, t1+pivot-1)
+		}
+
+		if err_sp != nil {
+			return nil, err_sp
+		}
+		if err_h != nil {
+			return nil, err_h
+		}
+		return append(sp, h), nil
+	}
+}
