@@ -88,6 +88,7 @@ LogVerifier::LogVerifyResult LogVerifier::VerifyMerkleAuditProof(
     return INVALID_FORMAT;
 
   std::vector<string> path;
+  path.reserve(merkle_proof.path_node_size());
   for (int i = 0; i < merkle_proof.path_node_size(); ++i)
     path.push_back(merkle_proof.path_node(i));
 
