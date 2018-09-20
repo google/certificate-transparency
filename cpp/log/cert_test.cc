@@ -239,7 +239,7 @@ unique_ptr<Cert> ReadCertFromFile(const string& filename) {
       << "Could not read test data from " << filename
       << ". Wrong --test_srcdir?";
   unique_ptr<Cert> cert(Cert::FromPemString(content));
-  CHECK(cert.get());
+  CHECK(cert);
   return cert;
 }
 
@@ -350,9 +350,9 @@ class CertChainTest : public CertTest {};
 TEST_F(CertTest, LoadInvalid) {
   // Bogus certs.
   const unique_ptr<Cert> invalid(Cert::FromPemString(""));
-  EXPECT_FALSE(invalid.get());
+  EXPECT_FALSE(invalid);
   const unique_ptr<Cert> invalid2(Cert::FromPemString(kInvalidCertString));
-  EXPECT_FALSE(invalid2.get());
+  EXPECT_FALSE(invalid2);
 }
 
 TEST_F(CertTest, LoadValidFromDer) {
@@ -367,7 +367,7 @@ TEST_F(CertTest, LoadInvalidFromDer) {
   string der;
   ASSERT_OK(leaf_cert_->DerEncoding(&der));
   const unique_ptr<Cert> second(Cert::FromDerString(der.substr(2)));
-  EXPECT_FALSE(second.get());
+  EXPECT_FALSE(second);
 }
 
 TEST_F(CertTest, PrintVersion) {
@@ -494,7 +494,7 @@ TEST_F(CertTest, IllegalSignatureAlgorithmParameter) {
   const unique_ptr<Cert> cert(
       Cert::FromPemString(kIllegalSigAlgParameterCertString));
 #if defined(OPENSSL_IS_BORINGSSL)
-  EXPECT_FALSE(cert.get());
+  EXPECT_FALSE(cert);
 #else
   EXPECT_TRUE(cert.get());
 #endif

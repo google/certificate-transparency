@@ -5,7 +5,6 @@
 #include "util/util.h"
 
 using cert_trans::serialization::SerializeResult;
-using ct::CertInfo;
 using ct::LogEntry;
 using ct::PreCert;
 using ct::SignedCertificateTimestamp;

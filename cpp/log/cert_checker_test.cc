@@ -18,7 +18,6 @@ using cert_trans::Cert;
 using cert_trans::CertChain;
 using cert_trans::CertChecker;
 using cert_trans::PreCertChain;
-using std::move;
 using std::string;
 using std::unique_ptr;
 using std::vector;
