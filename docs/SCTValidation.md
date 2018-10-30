@@ -126,6 +126,7 @@ without the issuer's signature; this is known as the `tbsCertificate`, where
 either case, dropping the certificate signature and any embedded CT-related
 extension (poison or SCT list) should give the same bytes.
 
+<a name="cert-order"></a>
 **Note**: this has an important corollary: to make sure this is true, any code
 that manipulates [pre]certificates has to make sure that *nothing else* changes
 in the certificate.  In particular:
@@ -133,8 +134,8 @@ in the certificate.  In particular:
    stay in the same order
  - extension contents have to stay in the same order (e.g. for the
    [SAN](https://tools.ietf.org/html/rfc5280#section-4.2.1.6))
- - all ASN.1 types have to stay the same (no switching from `UTF8String` to
-   `PrintableString`).
+ - all ASN.1 types have to stay the same (e.g. no switching from `UTF8String`
+   to `PrintableString`).
 
 That leaves one more complication: if the SCT only covers the `tbsCertificate`,
 what guarantee do we have that the issuer of the final certificate matches the
