@@ -8,21 +8,18 @@
 #include "proto/ct.pb.h"
 #include "proto/serializer.h"
 
-using cert_trans::serialization::SerializeResult;
 using cert_trans::serialization::DeserializeResult;
+using cert_trans::serialization::SerializeResult;
 using cert_trans::serialization::WriteFixedBytes;
 using cert_trans::serialization::WriteList;
 using cert_trans::serialization::WriteUint;
 using cert_trans::serialization::WriteVarBytes;
-using ct::DigitallySigned;
 using ct::LogEntry;
 using ct::LogEntryType_IsValid;
 using ct::MerkleTreeLeaf;
 using ct::PrecertChainEntry;
-using ct::SignedCertificateTimestamp;
-using ct::SignedCertificateTimestampList;
-using ct::SthExtension;
 using ct::SctExtension;
+using ct::SignedCertificateTimestamp;
 using ct::X509ChainEntry;
 using google::protobuf::RepeatedPtrField;
 using std::string;

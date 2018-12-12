@@ -8,28 +8,20 @@
 
 #include "proto/ct.pb.h"
 
-using cert_trans::serialization::internal::PrefixLength;
-using cert_trans::serialization::SerializeResult;
 using cert_trans::serialization::DeserializeResult;
+using cert_trans::serialization::SerializeResult;
 using cert_trans::serialization::WriteDigitallySigned;
 using cert_trans::serialization::WriteFixedBytes;
 using cert_trans::serialization::WriteUint;
 using cert_trans::serialization::WriteVarBytes;
-using cert_trans::serialization::constants::kMaxSignatureLength;
-using cert_trans::serialization::constants::kHashAlgorithmLengthInBytes;
-using cert_trans::serialization::constants::kSigAlgorithmLengthInBytes;
 using ct::DigitallySigned;
-using ct::DigitallySigned_HashAlgorithm_IsValid;
-using ct::DigitallySigned_SignatureAlgorithm_IsValid;
 using ct::LogEntry;
 using ct::MerkleTreeLeaf;
-using ct::PrecertChainEntry;
+using ct::SctExtension;
 using ct::SignedCertificateTimestamp;
 using ct::SignedCertificateTimestampList;
 using ct::SthExtension;
-using ct::SctExtension;
 using ct::Version_IsValid;
-using ct::X509ChainEntry;
 using google::protobuf::RepeatedPtrField;
 using std::function;
 using std::string;
