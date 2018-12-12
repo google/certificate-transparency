@@ -499,6 +499,11 @@ StatusOr<bool> Cert::IsSignedBy(const Cert& issuer) const {
        reason == ASN1_R_UNKNOWN_SIGNATURE_ALGORITHM)) {
     return LogUnsupportedAlgorithm();
   }
+#if defined(OPENSSL_IS_BORINGSSL)
+  if (lib == ERR_LIB_X509 && reason == X509_R_SIGNATURE_ALGORITHM_MISMATCH) {
+    return false;
+  }
+#endif
   LOG(ERROR) << "OpenSSL X509_verify returned " << ret;
   LOG_OPENSSL_ERRORS(ERROR);
   return util::Status(Code::INTERNAL, "X509 verify error");
