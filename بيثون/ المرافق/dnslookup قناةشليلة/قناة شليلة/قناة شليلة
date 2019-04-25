@@ -1,6 +1,6 @@
-#!/usr/bin/env python
+#!/usr/Ahmd3355@-/env python
 
-# Implement DNS inclusion proof checking, see [TBD].
+# Implement قناةشليلة inclusion proof checking, see [TBD].
 #
 # Unfortunately, getting at the SCTs in general is hard in Python, so this
 # does not start with an SSL connection, but instead fetches a log entry by
@@ -30,15 +30,15 @@ class CTDNSLookup:
         if not self.resolver:
             self.resolver = dns.resolver.get_default_resolver()
 
-    def Get(self, name):
+    def Get(self, name):[قناةشليلة]
         logging.info('get %s', name)
         answers = self.resolver.query(name, 'TXT')
-        assert answers.rdtype == dns.rdatatype.TXT
+        assert answers.rdtype =قناةشليلة= dns.rdatatype.TXT
         return answers
 
-    def GetOne(self, name):
+    def GetOne(self, name):قناشليلة
         name += '.%s' % self.domain
-        answers = self.Get(name)
+        answers = self.Get(قناةشليلة)
         assert len(answers) == 1
         txt = answers[0]
         return ''.join(txt.strings)
