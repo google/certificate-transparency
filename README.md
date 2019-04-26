@@ -28,16 +28,6 @@ The main areas covered are:
 
  - A collection of client tools and libraries for interacting with a CT Log, in
    various programming languages.
- - An **experimental** implementation of a [DNS server](docs/DnsServer.md) that
-   returns CT proofs in the form of DNS records.
- - An **experimental** implementation of a [general Log](docs/XjsonServer.md)
-   that allows arbitrary data (not just TLS certificates) to be logged.
- - (**Deprecated**, see [below](#c++-log-server-deprecation-notice))
-   An open-source, distributed, implementation of a CT Log server, also
-   including:
-    - An implementation of a read-only ["mirror" server](docs/MirrorLog.md)
-      that mimics a remote Log.
-    - Ancillary tools needed for managing and maintaining the Log.
 
 The supported platforms are:
 
@@ -49,9 +39,9 @@ The supported platforms are:
 C++ Log Server Deprecation Notice
 ---------------------------------
 
-The CT log server implementation in this repository is no longer under
-active development. We recommend that new deployments use the new Go
-based server, which can handle much larger Merkle trees:
+The CT log server implementation which used to be in this repository is no
+longer under active development. We recommend that new deployments use the new
+Go based server, which can handle much larger Merkle trees:
 
 [CT Personality](https://github.com/google/certificate-transparency-go)
 [Generic Backend](https://github.com/google/trillian)
@@ -96,7 +86,6 @@ The key subdirectories are:
  - For the main distributed CT Log itself:
    - `cpp/log`: Main distributed CT Log implementation.
    - `cpp/merkletree`: Merkle tree implementation.
-   - `cpp/server`: Top-level code for server implementations.
    - `cpp/monitoring`: Code to export operation statistics from CT Log.
  - The [CT mirror Log](docs/MirrorLog.md) implementation also uses:
    - `cpp/fetcher`: Code to fetch entries from another Log
@@ -200,19 +189,6 @@ Log codebase.
        - [Snappy](http://google.github.io/snappy/): compression library
     - [SQLite](https://www.sqlite.org/): file-based SQL library
 
-The extra (experimental) CT projects in this repo involve additional
-dependencies:
-
- - The experimental CT [DNS server](docs/DnsServer.md) uses:
-    - [ldnbs](http://www.nlnetlabs.nl/projects/ldns/): DNS library, including
-      DNSSEC function (which relies on OpenSSL for crypto functionality)
- - The experimental [general Log](docs/XjsonServer.md) uses:
-    - [objecthash](https://github.com/benlaurie/objecthash): tools for
-      hashing objects in a language/encoding-agnostic manner
-    - [ICU](http://site.icu-project.org/): Unicode libraries (needed to
-      normalize international text in objects)
-
-
 
 Build Troubleshooting
 ---------------------
@@ -254,11 +230,9 @@ gclient config --name="certificate-transparency" https://github.com/google/certi
 
 ### Using BoringSSL
 
-The BoringSSL fork of OpenSSL can be used in place of OpenSSL (but note that
-the experimental [CT DNS server](docs/DnsServer.md) does not support this
-configuration).  To enable this, after the first step (`gclient config ...`)
-in the gclient [build process](#build-quick-start), modify the top-level
-`.gclient` to add:
+The BoringSSL fork of OpenSSL can be used in place of OpenSSL.  To enable this,
+after the first step (`gclient config ...`) in the gclient [build
+process](#build-quick-start), modify the top-level `.gclient` to add:
 
 ```python
       "custom_vars": { "ssl_impl": "boringssl" } },
@@ -291,28 +265,3 @@ For logging options, see the
 By default, unit tests log to `stderr`, and log only messages with a FATAL
 level (i.e., those that result in abnormal program termination).  You can
 override the defaults with command-line flags.
-
-
-Deploying a Log
----------------
-
-The build process described so far generates a set of executables; however,
-other components and configuration is needed to set up a running CT Log.
-In particular, as shown in the following diagram:
- - A set of web servers that act as HTTPS terminators and load
-   balancers is needed in front of the CT Log instances.
- - A cluster of [etcd](https://github.com/coreos/etcd) instances is needed to
-   provide replication and synchronization services for the CT Log instances.
-
-<img src="docs/images/SystemDiagram.png" width="650">
-
-Configuring and setting up a distributed production Log is covered in a
-[separate document](docs/Deployment.md).
-
-
-Operating a Log
----------------
-
-Running a successful, trusted, certificate transparency Log involves more than
-just deploying a set of binaries.  Information and advice on operating a
-running CT Log is covered in a [separate document](docs/Operation.md)
