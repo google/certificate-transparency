@@ -1,6 +1,0 @@
-export INSTANCE_TYPE="log"
-export PROJECT="ct-log-test"
-export CLUSTER="testlog"
-export REGION="us-central1"
-export ZONES="b c"
-export MONITORING="prometheus"

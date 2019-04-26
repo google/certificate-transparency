@@ -1,7 +1,7 @@
 AC_PREREQ([2.68])
 AC_INIT([certificate-transparency], [0.9], [certificate-transparency@googlegroups.com])
 AM_INIT_AUTOMAKE([-Wall -Werror foreign subdir-objects])
-AC_CONFIG_SRCDIR([cpp/server/ct-server.cc])
+AC_CONFIG_SRCDIR([cpp/merkletree/merkle_tree.cc])
 AC_CONFIG_HEADERS([cpp/config.h])
 AC_CONFIG_MACRO_DIR([m4])
 AM_SILENT_RULES([yes])
@@ -70,9 +70,6 @@ AC_CHECK_HEADER([google/protobuf/message.h],,
                 [AC_MSG_ERROR([protobuf headers could not be found])])
 AC_CHECK_HEADER([leveldb/db.h],,
                 [AC_MSG_ERROR([leveldb headers could not be found])])
-AC_CHECK_HEADER([sqlite3.h],,
-                [AC_MSG_ERROR([sqlite3 headers could not be found])])
-AC_CHECK_HEADER([ldns/ldns.h],, [missing_ldns=yes])
 AC_CHECK_HEADER([objecthash.h],, [missing_objecthash=yes])
 
 # Check for working GTest/GMock.
@@ -125,14 +122,6 @@ AC_SEARCH_LIBS([leveldb_open], [leveldb],, [missing_leveldb=1], [$save_LIBS])
 AC_SUBST([leveldb_LIBS], [$LIBS])
 AS_IF([test -n "$missing_leveldb"],
       [AC_MSG_ERROR([could not find the leveldb/snappy libraries])])
-LIBS="$save_LIBS"
-
-save_LIBS="$LIBS"
-AS_UNSET([LIBS])
-AC_SEARCH_LIBS([sqlite3_open], [sqlite3],, [missing_sqlite3=1], [$save_LIBS])
-AC_SUBST([sqlite3_LIBS], [$LIBS])
-AS_IF([test -n "$missing_sqlite3"],
-      [AC_MSG_ERROR([could not find the sqlite3 library])])
 LIBS="$save_LIBS"
 
 dnl We're pretty crypto-centric, having the OpenSSL libraries in LIBS
@@ -216,7 +205,6 @@ AC_CHECK_FUNCS([alarm gettimeofday memset mkdir select socket strdup strerror st
 # the user.
 
 
-AM_CONDITIONAL([HAVE_LDNS], [test -z "$missing_ldns"])
 AM_CONDITIONAL([HAVE_OBJECTHASH], [test -z "$missing_objecthash"])
 AM_CONDITIONAL([OPENSSL_IS_BORINGSSL], [test -n "$openssl_is_boringssl"])
 AC_DEFINE_UNQUOTED([TEST_SRCDIR], ["$srcdir"], [Top of the source directory, for tests.])
