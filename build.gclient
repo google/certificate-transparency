@@ -5,7 +5,7 @@ export INSTALL_DIR
 PKG_CONFIG_PATH=$(shell pwd)/install/lib/pkgconfig
 export PKG_CONFIG_PATH
 
-PHONY: libunwind tcmalloc objecthash boringssl openssl protobuf libevent libevhtp gflags glog ldns sqlite3 leveldb json-c configure-ct
+PHONY: libunwind tcmalloc boringssl openssl protobuf libevent libevhtp gflags glog json-c configure-ct
 
 all: configure-ct
 
@@ -18,12 +18,6 @@ _libunwind:
 _tcmalloc:
 	$(MAKE) -C tcmalloc -f ../certificate-transparency/build/Makefile.tcmalloc
 	cd tcmalloc && git checkout --
-
-_icu4c:
-	$(MAKE) -C icu4c/source -f `pwd`/certificate-transparency/build/Makefile.icu4c
-
-_objecthash:
-	$(MAKE) -C certificate-transparency/third_party/objecthash -f `pwd`/certificate-transparency/build/Makefile.objecthash
 
 _boringssl:
 	$(MAKE) -C boringssl -f `pwd`/certificate-transparency/build/Makefile.boringssl
@@ -53,22 +47,6 @@ _glog:
 	$(MAKE) -C glog -f ../certificate-transparency/build/Makefile.glog
 	# TODO(alcutter): get these removed in Ben's "fix" branch
 	cd glog && git checkout -- config.guess config.sub install-sh
-
-_ldns:
-	$(MAKE) -C ldns -f ../certificate-transparency/build/Makefile.ldns
-	cd ldns && git checkout --
-
-_sqlite3:
-	$(MAKE) -C sqlite3 -f ../certificate-transparency/build/Makefile.sqlite3
-	cd sqlite3 && git checkout --
-
-_libsnappy:
-	$(MAKE) -C libsnappy -f ../certificate-transparency/build/Makefile.libsnappy
-	cd libsnappy && git checkout --
-
-_leveldb:
-	$(MAKE) -C leveldb -f ../certificate-transparency/build/Makefile.leveldb
-	cd leveldb && git checkout --
 
 _json-c:
 	$(MAKE) -C json-c -f ../certificate-transparency/build/Makefile.json-c

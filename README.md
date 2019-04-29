@@ -87,8 +87,6 @@ The key subdirectories are:
    - `cpp/log`: Main distributed CT Log implementation.
    - `cpp/merkletree`: Merkle tree implementation.
    - `cpp/monitoring`: Code to export operation statistics from CT Log.
- - The [CT mirror Log](docs/MirrorLog.md) implementation also uses:
-   - `cpp/fetcher`: Code to fetch entries from another Log
  - Client code for accessing a CT Log instance:
    - `cpp/client`: CT Log client code in C++
    - `python/ct`: CT Log client code in Python
@@ -182,12 +180,6 @@ Log codebase.
       cryptography library.
     - [BoringSSL](https://boringssl.googlesource.com/boringssl/): Google's
       fork of OpenSSL
- - Data storage functionality: one of the following, defaulting (and highly
-   recommended to stick with) LevelDB.
-    - [LevelDB](https://github.com/google/leveldb): fast key-value store,
-      which uses:
-       - [Snappy](http://google.github.io/snappy/): compression library
-    - [SQLite](https://www.sqlite.org/): file-based SQL library
 
 
 Build Troubleshooting

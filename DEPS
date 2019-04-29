@@ -17,19 +17,11 @@ deps = {
      "googlemock": 			 "https://github.com/google/googlemock.git@release-1.7.0",
      "googlemock/gtest": "https://github.com/google/googletest.git@release-1.7.0",
      "json-c": 					 "https://github.com/AlCutter/json-c.git@json-c-0.12-20140410-fix",
-     "ldns":             "https://github.com/benlaurie/ldns.git@1.6.17-fix",
-     "leveldb": 				 "https://github.com/google/leveldb.git@v1.18",
      "libevent": 				 "https://github.com/libevent/libevent.git@release-2.0.22-stable",
      "libevhtp": 				 "https://github.com/RJPercival/libevhtp.git@a89d9b3f9fdf2ebef41893b3d5e4466f4b0ecfda",
-     "certificate-transparency/third_party/objecthash":
-                         "https://github.com/benlaurie/objecthash.git@798f66bd8c5313da226aa7a60c114147910a7407",
      "protobuf":         "https://github.com/google/protobuf.git@v2.6.1",
      "protobuf/gtest":   "https://github.com/google/googletest.git@release-1.7.0",
-     "libsnappy":        "https://github.com/google/snappy.git@1.1.3",
-     # Randomly chosen github mirror
-     "sqlite3-export": 	 "http://repo.or.cz/sqlite-export.git",
-     "sqlite3": 				 "http://repo.or.cz/sqlite.git@version-3.8.10.1",
-		 "tcmalloc":				 "https://github.com/gperftools/gperftools.git@gperftools-2.4"
+     "tcmalloc":				 "https://github.com/gperftools/gperftools.git@gperftools-2.4"
 }
 
 # Can't use deps_os for this because it doesn't know about freebsd :/
@@ -116,38 +108,10 @@ hooks = [
         "action": [ make, "-f", os.path.join(here, "certificate-transparency/build.gclient"), "_protobuf" ],
     },
     {
-        "name": "sqlite3",
-        "pattern": "^sqlite3/",
-        "action": [ make, "-f", os.path.join(here, "certificate-transparency/build.gclient"), "_sqlite3" ],
-    },
-    {
-        "name": "libsnappy",
-        "pattern": "^libsnappy/",
-        "action": [ make, "-f", os.path.join(here, "certificate-transparency/build.gclient"), "_libsnappy" ],
-    },
-    {
-        "name": "leveldb",
-        "pattern": "^leveldb/",
-        "action": [ make, "-f", os.path.join(here, "certificate-transparency/build.gclient"), "_leveldb" ],
-    },
-    {
         "name": "json-c",
         "pattern": "^json-c/",
         "action": [ make, "-f", os.path.join(here, "certificate-transparency/build.gclient"), "_json-c" ],
-    },
-    {
-        "name": "objecthash",
-        "pattern": "^certificate-transparency/third_party/objecthash/",
-        "action": [ make, "-f", os.path.join(here, "certificate-transparency/build.gclient"), "_objecthash" ],
     }]
-
-# Currently only Openssl is supported for building the DNS server due to LDNS's dependency.
-hooks.append(
-    {
-          "name": "ldns",
-          "pattern": "^ldns/",
-          "action": [ make, "-f", os.path.join(here, "certificate-transparency/build.gclient"), "_ldns" ],
-    })
 
 # Do this last
 hooks.append(

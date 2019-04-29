@@ -59,7 +59,7 @@ AC_PATH_PROG([PROTOC], [protoc],,)
 
 # Checks for header files.
 AC_HEADER_RESOLV
-AC_CHECK_HEADERS([arpa/inet.h fcntl.h limits.h netinet/in.h stddef.h stdint.h stdlib.h string.h sys/socket.h sys/time.h unistd.h leveldb/filter_policy.h])
+AC_CHECK_HEADERS([arpa/inet.h fcntl.h limits.h netinet/in.h stddef.h stdint.h stdlib.h string.h sys/socket.h sys/time.h unistd.h])
 AC_CHECK_HEADER([event2/event.h],,
                 [AC_MSG_ERROR([libevent headers could not be found])])
 AC_CHECK_HEADER([gflags/gflags.h],,
@@ -68,9 +68,6 @@ AC_CHECK_HEADER([glog/logging.h],,
                 [AC_MSG_ERROR([glog headers could not be found])])
 AC_CHECK_HEADER([google/protobuf/message.h],,
                 [AC_MSG_ERROR([protobuf headers could not be found])])
-AC_CHECK_HEADER([leveldb/db.h],,
-                [AC_MSG_ERROR([leveldb headers could not be found])])
-AC_CHECK_HEADER([objecthash.h],, [missing_objecthash=yes])
 
 # Check for working GTest/GMock.
 saved_CPPFLAGS="$CPPFLAGS"
@@ -114,15 +111,6 @@ AC_LINK_IFELSE([AC_LANG_PROGRAM([[#include <glog/logging.h>]], [[google::InitGoo
 AC_MSG_RESULT([$have_glog])
 AS_IF([test "x$have_glog" = "xno"],
       [AC_MSG_ERROR([glog library could not be found])])
-
-save_LIBS="$LIBS"
-AS_UNSET([LIBS])
-AC_SEARCH_LIBS([snappy_compress], [snappy],,, [$save_LIBS])
-AC_SEARCH_LIBS([leveldb_open], [leveldb],, [missing_leveldb=1], [$save_LIBS])
-AC_SUBST([leveldb_LIBS], [$LIBS])
-AS_IF([test -n "$missing_leveldb"],
-      [AC_MSG_ERROR([could not find the leveldb/snappy libraries])])
-LIBS="$save_LIBS"
 
 dnl We're pretty crypto-centric, having the OpenSSL libraries in LIBS
 dnl is fine.
@@ -205,7 +193,6 @@ AC_CHECK_FUNCS([alarm gettimeofday memset mkdir select socket strdup strerror st
 # the user.
 
 
-AM_CONDITIONAL([HAVE_OBJECTHASH], [test -z "$missing_objecthash"])
 AM_CONDITIONAL([OPENSSL_IS_BORINGSSL], [test -n "$openssl_is_boringssl"])
 AC_DEFINE_UNQUOTED([TEST_SRCDIR], ["$srcdir"], [Top of the source directory, for tests.])
 AC_SUBST([INSTALL_DIR])
