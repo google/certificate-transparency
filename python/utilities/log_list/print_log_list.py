@@ -11,6 +11,7 @@ import time
 from absl import app
 from absl import flags as gflags
 from cryptography.exceptions import InvalidSignature
+from cryptography.hazmat.backends import default_backend
 from cryptography.hazmat.primitives import hashes, serialization
 from cryptography.hazmat.primitives.asymmetric import padding
 import jsonschema
@@ -52,7 +53,7 @@ def is_log_list_valid(json_log_list, schema_file):
 
 def is_signature_valid(log_list_data, signature_file, public_key_file):
     pubkey_pem = open(public_key_file, "rb").read()
-    pubkey = serialization.load_pem_public_key(pubkey_pem)
+    pubkey = serialization.load_pem_public_key(pubkey_pem, backend=default_backend())
     try:
         pubkey.verify(
             open(signature_file, "rb").read(),
