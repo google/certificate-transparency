@@ -6,12 +6,12 @@ vars = {
      "ssl_impl":         "openssl",
 
      # SSL implementation alternatives:
-     "openssl": 				 "https://github.com/openssl/openssl.git@OpenSSL_1_0_2d",
+     "openssl": 				 "https://github.com/openssl/openssl.git@OpenSSL_1_1_1c",
      "boringssl":        "https://boringssl.googlesource.com/boringssl.git@2883"
 }
 
 deps = {
-     "openssl": 				 "https://github.com/openssl/openssl.git@OpenSSL_1_0_2d",
+     "openssl": 				 "https://github.com/openssl/openssl.git@OpenSSL_1_1_1c",
      "gflags":  	 			 "https://github.com/gflags/gflags.git@v2.1.2",
      "glog":             "https://github.com/benlaurie/glog.git@0.3.4-fix",
      "googlemock": 			 "https://github.com/google/googlemock.git@release-1.7.0",
