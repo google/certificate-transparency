@@ -152,8 +152,8 @@ namespace cert_trans {
 // Convert string from ASN1 and check it doesn't contain nul characters
 string ASN1ToStringAndCheckForNulls(ASN1_STRING* asn1_string,
                                     const string& tag, util::Status* status) {
-  const string cpp_string(reinterpret_cast<char*>(
-                              ASN1_STRING_data(asn1_string)),
+  const string cpp_string(reinterpret_cast<const char*>(
+                              ASN1_STRING_get0_data(asn1_string)),
                           ASN1_STRING_length(asn1_string));
 
   // Unfortunately ASN1_STRING_length returns a signed value
@@ -955,91 +955,6 @@ bool Cert::ValidateRedactionSubjectAltNameAndCN(int* dns_alt_name_count,
 
   *dns_alt_name_count = dns_alt_names.size();
   return false;  // validation has no definite result yet
-}
-
-
-util::Status Cert::IsValidWildcardRedaction() const {
-  util::Status status(Code::UNKNOWN, "Unknown error");
-  int dns_alt_name_count = 0;
-
-  // First we apply all the checks to the subject CN and the list of DNS
-  // names in subject alt names. If these checks have a definite result
-  // then return it immediately.
-  if (ValidateRedactionSubjectAltNameAndCN(&dns_alt_name_count, &status)) {
-    return status;
-  }
-
-  // If we reach here then the RFC says the CT redaction count extension
-  // MUST BE present.
-  const StatusOr<X509_EXTENSION*> exty(
-      GetExtension(NID_ctPrecertificateRedactedLabelCount));
-  if (!exty.ok()) {
-    LOG(WARNING)
-        << "required CT redaction count extension could not be found in cert";
-    return util::Status(Code::INVALID_ARGUMENT,
-                        "No CT redaction count extension");
-  }
-
-  // Ensure the data in the extension is a sequence. DER encoding is same for
-  // SEQUENCE and SEQUENCE OF and we'll check types later.
-  if (exty.ValueOrDie()->value->data[0] !=
-      (V_ASN1_SEQUENCE | V_ASN1_CONSTRUCTED)) {
-    LOG(WARNING) << "CT redaction count extension is not a SEQUENCE OF";
-    return util::Status(Code::INVALID_ARGUMENT,
-                        "CT redaction count extension not a sequence");
-  }
-
-  // Unpack the extension contents, which should be SEQUENCE OF INTEGER.
-  // For compatibility we unpack any sequence and check integer type as we go.
-  // Don't pass the pointer from the extension directly as it gets incremented
-  // during parsing.
-  const unsigned char* sequence_data(
-      const_cast<const unsigned char*>(exty.ValueOrDie()->value->data));
-  ScopedASN1_TYPEStack asn1_types(static_cast<STACK_OF(ASN1_TYPE)*>(
-      d2i_ASN1_SEQUENCE_ANY(nullptr, &sequence_data,
-                            exty.ValueOrDie()->value->length)));
-
-  if (asn1_types) {
-    const int num_integers(sk_ASN1_TYPE_num(asn1_types.get()));
-
-    // RFC text says there MUST NOT be more integers than there are DNS ids
-    if (num_integers > dns_alt_name_count) {
-      LOG(WARNING) << "Too many integers in extension: " << num_integers
-                   << " but only " << dns_alt_name_count << " DNS names";
-      return util::Status(Code::INVALID_ARGUMENT,
-                          "More integers in ext than redacted labels");
-    }
-
-    // All the integers in the sequence must be positive, check the sign
-    // after conversion to BIGNUM
-    for (int i = 0; i < num_integers; ++i) {
-      ASN1_TYPE* const asn1_type(sk_ASN1_TYPE_value(asn1_types.get(), i));
-
-      if (asn1_type->type != V_ASN1_INTEGER) {
-        LOG(WARNING) << "Redaction count has non-integer in sequence"
-                     << asn1_type->type;
-        return util::Status(Code::INVALID_ARGUMENT,
-                            "Non integer found in redaction label count");
-      }
-
-      ASN1_INTEGER* const redacted_labels(asn1_type->value.integer);
-      ScopedBIGNUM value(ASN1_INTEGER_to_BN(redacted_labels, nullptr));
-
-      if (BN_is_negative(value.get())) {
-        ScopedOpenSSLString bn_hex(BN_bn2hex(value.get()));
-        LOG(WARNING) << "Invalid negative redaction label count: "
-                     << bn_hex.get();
-        return util::Status(Code::INVALID_ARGUMENT, "Invalid -ve label count");
-      }
-    }
-
-  } else {
-    LOG(WARNING) << "Failed to unpack SEQUENCE OF in CT extension";
-    return util::Status(Code::INVALID_ARGUMENT,
-                        "Failed to unpack integer sequence in ext");
-  }
-
-  return ::util::OkStatus();
 }
 
 

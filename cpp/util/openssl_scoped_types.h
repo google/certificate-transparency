@@ -170,12 +170,11 @@ using ScopedEVP_AEAD_CTX =
                          EVP_AEAD_CTX_cleanup>;
 #endif  // OPENSSL_IS_BORINGSSL
 using ScopedEVP_CIPHER_CTX =
-    ScopedOpenSSLContext<EVP_CIPHER_CTX, int, EVP_CIPHER_CTX_init,
-                         EVP_CIPHER_CTX_cleanup>;
+    ScopedOpenSSLType<EVP_CIPHER_CTX, EVP_CIPHER_CTX_free>;
 using ScopedEVP_MD_CTX =
-    ScopedOpenSSLContext<EVP_MD_CTX, int, EVP_MD_CTX_init, EVP_MD_CTX_cleanup>;
+    ScopedOpenSSLType<EVP_MD_CTX, EVP_MD_CTX_free>;
 using ScopedHMAC_CTX =
-    ScopedOpenSSLContext<HMAC_CTX, void, HMAC_CTX_init, HMAC_CTX_cleanup>;
+    ScopedOpenSSLType<HMAC_CTX, HMAC_CTX_free>;
 
 using ScopedOpenSSLBytes = std::unique_ptr<uint8_t, OpenSSLFree<uint8_t>>;
 using ScopedOpenSSLString = std::unique_ptr<char, OpenSSLFree<char>>;

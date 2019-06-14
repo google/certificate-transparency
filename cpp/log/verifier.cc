@@ -20,7 +20,8 @@ namespace cert_trans {
 
 Verifier::Verifier(EVP_PKEY* pkey) : pkey_(pkey) {
   CHECK(pkey != nullptr);
-  switch (pkey_->type) {
+  const int key_type(EVP_PKEY_base_id(pkey_.get()));
+  switch (key_type) {
     case EVP_PKEY_EC:
       hash_algo_ = DigitallySigned::SHA256;
       sig_algo_ = DigitallySigned::ECDSA;
@@ -30,7 +31,7 @@ Verifier::Verifier(EVP_PKEY* pkey) : pkey_(pkey) {
       sig_algo_ = DigitallySigned::RSA;
       break;
     default:
-      LOG(FATAL) << "Unsupported key type " << pkey_->type;
+      LOG(FATAL) << "Unsupported key type " << key_type;
   }
   key_id_ = ComputeKeyID(pkey_.get());
 }
@@ -72,15 +73,14 @@ Verifier::Verifier()
 
 bool Verifier::RawVerify(const std::string& data,
                          const std::string& sig_string) const {
-  EVP_MD_CTX ctx;
-  EVP_MD_CTX_init(&ctx);
+  EVP_MD_CTX* ctx(EVP_MD_CTX_new());
   // NOTE: this syntax for setting the hash function requires OpenSSL >= 1.0.0.
-  CHECK_EQ(1, EVP_VerifyInit(&ctx, EVP_sha256()));
-  CHECK_EQ(1, EVP_VerifyUpdate(&ctx, data.data(), data.size()));
-  bool ret = (EVP_VerifyFinal(&ctx, reinterpret_cast<const unsigned char*>(
+  CHECK_EQ(1, EVP_VerifyInit(ctx, EVP_sha256()));
+  CHECK_EQ(1, EVP_VerifyUpdate(ctx, data.data(), data.size()));
+  bool ret = (EVP_VerifyFinal(ctx, reinterpret_cast<const unsigned char*>(
                                         sig_string.data()),
                               sig_string.size(), pkey_.get()) == 1);
-  EVP_MD_CTX_cleanup(&ctx);
+  EVP_MD_CTX_free(ctx);
   return ret;
 }
 
