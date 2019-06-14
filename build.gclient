@@ -24,7 +24,6 @@ _boringssl:
 
 _openssl:
 	$(MAKE) -C openssl -f `pwd`/certificate-transparency/build/Makefile.openssl
-	cd openssl && git checkout -- apps/progs.h crypto/bn/bn_prime.h
 
 _protobuf:
 	$(MAKE) -C protobuf -f `pwd`/certificate-transparency/build/Makefile.protobuf
