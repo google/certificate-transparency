@@ -18,7 +18,7 @@ deps = {
      "googlemock/gtest": "https://github.com/google/googletest.git@release-1.7.0",
      "json-c": 					 "https://github.com/AlCutter/json-c.git@json-c-0.12-20140410-fix",
      "libevent": 				 "https://github.com/libevent/libevent.git@release-2.1.10-stable",
-     "libevhtp": 				 "https://github.com/RJPercival/libevhtp.git@a89d9b3f9fdf2ebef41893b3d5e4466f4b0ecfda",
+     "libevhtp":         "https://github.com/criticalstack/libevhtp.git@1.2.18",
      "protobuf":         "https://github.com/google/protobuf.git@v2.6.1",
      "protobuf/gtest":   "https://github.com/google/googletest.git@release-1.7.0",
      "tcmalloc":				 "https://github.com/gperftools/gperftools.git@gperftools-2.4"
