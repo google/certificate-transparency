@@ -66,7 +66,6 @@ TESTS = \
 	cpp/monitoring/registry_test \
 	cpp/proto/serializer_test \
 	cpp/proto/serializer_v2_test \
-	cpp/util/bignum_test \
 	cpp/util/json_wrapper_test \
 	cpp/util/libevent_wrapper_test \
 	cpp/util/sync_task_test \
@@ -120,7 +119,6 @@ cpp_libcore_a_SOURCES = \
 	cpp/proto/tls_encoding.cc \
 	cpp/third_party/curl/hostcheck.c \
 	cpp/third_party/isec_partners/openssl_hostname_validation.c \
-	cpp/util/bignum.cc \
 	cpp/util/init.cc \
 	cpp/util/json_wrapper.cc \
 	cpp/util/libevent_wrapper.cc \
@@ -280,14 +278,6 @@ cpp_proto_serializer_v2_test_SOURCES = \
 	cpp/proto/serializer_v2.cc \
 	cpp/proto/serializer_v2_test.cc \
 	cpp/util/util.cc
-
-cpp_util_bignum_test_LDADD = \
-	cpp/libtest.a \
-	$(evhtp_LIBS) \
-	$(libevent_LIBS)
-cpp_util_bignum_test_SOURCES = \
-	cpp/util/bignum.cc \
-	cpp/util/bignum_test.cc
 
 cpp_util_json_wrapper_test_LDADD = \
 	cpp/libtest.a \
