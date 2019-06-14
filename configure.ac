@@ -114,11 +114,11 @@ AS_IF([test "x$have_glog" = "xno"],
 
 dnl We're pretty crypto-centric, having the OpenSSL libraries in LIBS
 dnl is fine.
-AC_SEARCH_LIBS([CRYPTO_set_locking_callback], [crypto],, [missing_openssl=1],
+AC_SEARCH_LIBS([CRYPTO_malloc], [crypto],, [missing_openssl=1],
                [$save_LIBS])
 AC_SEARCH_LIBS([SSL_CTX_new], [ssl],, [missing_openssl=1], [$save_LIBS])
 AS_IF([test -n "$missing_openssl"],
-      [AC_MSG_ERROR([could not find the OpenSSL 1.0.x libraries])])
+      [AC_MSG_ERROR([could not find the OpenSSL 1.1.x libraries])])
 
 AC_MSG_CHECKING([for BoringSSL])
 AC_COMPILE_IFELSE([AC_LANG_PROGRAM([[#include <openssl/base.h>]],
