@@ -64,7 +64,6 @@ TEST_F(CtExtensionsTest, TestEmbeddedSCTExtension) {
   // Check we can find the extension by its advertised NID.
   // We should really be checking that the OID matches the expected OID but
   // what other extension could this cert be having that the other one doesn't?
-  auto r(embedded_sct_cert->HasExtension(NID_ct_precert_scts));
   ASSERT_TRUE(embedded_sct_cert
                   ->HasExtension(NID_ct_precert_scts).ValueOrDie());
   string ext_data;
