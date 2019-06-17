@@ -203,7 +203,7 @@ static bool PrecertChainToEntry(const cert_trans::PreCertChain& chain,
   }
 
   const StatusOr<bool> has_poison =
-      chain.LeafCert()->HasExtension(cert_trans::NID_ctPoison);
+      chain.LeafCert()->HasExtension(NID_ct_precert_poison);
   if (!has_poison.ok()) {
     LOG(ERROR) << "Failed to test for poison extension.";
     return false;
@@ -236,7 +236,7 @@ static bool PrecertChainToEntry(const cert_trans::PreCertChain& chain,
   }
   // DeleteExtension can return NOT_FOUND but we checked the extension exists
   // above so this is not expected.
-  if (!tbs.DeleteExtension(cert_trans::NID_ctPoison).ok()) {
+  if (!tbs.DeleteExtension(NID_ct_precert_poison).ok()) {
     LOG(ERROR) << "Failed to delete poison extension.";
     return false;
   }
@@ -432,7 +432,7 @@ static void MakeCert() {
 
   // And finally, the proof in an extension
   const string serialized_sct_list(SCTToList(sct));
-  AddOctetExtension(x.get(), cert_trans::NID_ctSignedCertificateTimestampList,
+  AddOctetExtension(x.get(), NID_ct_cert_scts,
                     reinterpret_cast<const unsigned char*>(
                         serialized_sct_list.data()),
                     serialized_sct_list.size(), 1);
@@ -701,7 +701,7 @@ static void DiagnoseCertChain() {
 
 
   const StatusOr<bool> has_timestamp_list = chain.LeafCert()->HasExtension(
-      cert_trans::NID_ctEmbeddedSignedCertificateTimestampList);
+      NID_ct_precert_scts);
   if (!has_timestamp_list.ok() || !has_timestamp_list.ValueOrDie()) {
     LOG(ERROR) << "Certificate has no embedded SCTs";
     return;
@@ -720,8 +720,7 @@ static void DiagnoseCertChain() {
 
   string serialized_scts;
   util::Status status = chain.LeafCert()->OctetStringExtensionData(
-      cert_trans::NID_ctEmbeddedSignedCertificateTimestampList,
-      &serialized_scts);
+      NID_ct_precert_scts, &serialized_scts);
   if (!status.ok()) {
     LOG(ERROR) << "SCT extension data is missing / invalid.";
     return;
@@ -801,15 +800,11 @@ void WrapEmbedded() {
   CertChain chain(pem_chain);
   CHECK(chain.IsLoaded()) << cert_file
                           << " is not a valid PEM-encoded certificate chain";
-  CHECK(chain.LeafCert()
-            ->HasExtension(
-                cert_trans::NID_ctEmbeddedSignedCertificateTimestampList)
-            .ValueOrDie());
+  CHECK(chain.LeafCert()->HasExtension(NID_ct_precert_scts).ValueOrDie());
 
   string serialized_scts;
   CHECK_EQ(::util::OkStatus(),
-           chain.LeafCert()->OctetStringExtensionData(
-               cert_trans::NID_ctEmbeddedSignedCertificateTimestampList,
+           chain.LeafCert()->OctetStringExtensionData(NID_ct_precert_scts,
                &serialized_scts));
   SignedCertificateTimestampList sct_list;
   CHECK_EQ(DeserializeResult::OK,

@@ -191,14 +191,13 @@ int SSLClient::VerifyCallback(X509_STORE_CTX* ctx, void* arg) {
   string serialized_scts;
   // First, see if the cert has an embedded proof.
   const StatusOr<bool> has_embedded_proof = chain.LeafCert()->HasExtension(
-      cert_trans::NID_ctEmbeddedSignedCertificateTimestampList);
+      NID_ct_precert_scts);
 
   // Pull out the superfluous cert extension if it exists for use later
   // Let's assume the superfluous cert is always last in the chain.
   const StatusOr<bool> superf_has_timestamp_list =
       input_chain.Length() > 1
-          ? input_chain.LastCert()->HasExtension(
-                cert_trans::NID_ctSignedCertificateTimestampList)
+          ? input_chain.LastCert()->HasExtension(NID_ct_cert_scts)
           : util::Status::UNKNOWN;
 
   // First check for embedded proof, if not present then look for the proof in
@@ -207,8 +206,7 @@ int SSLClient::VerifyCallback(X509_STORE_CTX* ctx, void* arg) {
     LOG(INFO) << "Embedded proof extension found in certificate, "
               << "verifying...";
     util::Status status = chain.LeafCert()->OctetStringExtensionData(
-        cert_trans::NID_ctEmbeddedSignedCertificateTimestampList,
-        &serialized_scts);
+        NID_ct_precert_scts, &serialized_scts);
     if (!status.ok()) {
       // Any error here is likely OpenSSL acting up, so just die. Previously
       // was CHECK_EQ(FALSE..., which meant fail check if not an error and not
@@ -220,7 +218,7 @@ int SSLClient::VerifyCallback(X509_STORE_CTX* ctx, void* arg) {
              superf_has_timestamp_list.ValueOrDie()) {
     LOG(INFO) << "Proof extension found in certificate, verifying...";
     util::Status status = input_chain.LastCert()->OctetStringExtensionData(
-        cert_trans::NID_ctSignedCertificateTimestampList, &serialized_scts);
+        NID_ct_cert_scts, &serialized_scts);
     if (!status.ok()) {
       // Any error here is likely OpenSSL acting up, so just die.
       CHECK_EQ(Code::NOT_FOUND, status.CanonicalCode());

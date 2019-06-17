@@ -27,7 +27,7 @@ namespace {
 
 bool SerializedTbs(const Cert& cert, string* result) {
   const StatusOr<bool> has_embedded_proof = cert.HasExtension(
-      cert_trans::NID_ctEmbeddedSignedCertificateTimestampList);
+      NID_ct_precert_scts);
   if (!has_embedded_proof.ok()) {
     return false;
   }
@@ -39,9 +39,7 @@ bool SerializedTbs(const Cert& cert, string* result) {
   }
 
   if (has_embedded_proof.ValueOrDie() &&
-      !tbs.DeleteExtension(
-              cert_trans::NID_ctEmbeddedSignedCertificateTimestampList)
-           .ok()) {
+      !tbs.DeleteExtension(NID_ct_precert_scts).ok()) {
     return false;
   }
 
@@ -73,7 +71,7 @@ bool CertSubmissionHandler::X509ChainToEntry(const CertChain& chain,
   }
 
   const StatusOr<bool> has_embedded_proof = chain.LeafCert()->HasExtension(
-      cert_trans::NID_ctEmbeddedSignedCertificateTimestampList);
+      NID_ct_precert_scts);
   if (!has_embedded_proof.ok()) {
     LOG(ERROR) << "Failed to check embedded SCT extension.";
     return false;

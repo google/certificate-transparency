@@ -1412,7 +1412,7 @@ util::StatusOr<bool> PreCertChain::UsesPrecertSigningCertificate() const {
     return false;
   }
 
-  return issuer->HasExtendedKeyUsage(cert_trans::NID_ctPrecertificateSigning);
+  return issuer->HasExtendedKeyUsage(NID_ct_precert_signer);
 }
 
 
@@ -1426,7 +1426,7 @@ util::StatusOr<bool> PreCertChain::IsWellFormed() const {
 
   // (1) Check that the leaf contains the critical poison extension.
   const StatusOr<bool> has_poison =
-      pre->HasCriticalExtension(cert_trans::NID_ctPoison);
+      pre->HasCriticalExtension(NID_ct_precert_poison);
   if (!has_poison.ok() || !has_poison.ValueOrDie()) {
     return has_poison;
   }

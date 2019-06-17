@@ -432,14 +432,13 @@ TEST_F(CertTest, Extensions) {
       leaf_cert_->HasExtension(NID_authority_key_identifier).ValueOrDie());
   EXPECT_FALSE(leaf_cert_->HasCriticalExtension(NID_authority_key_identifier)
                    .ValueOrDie());
-  EXPECT_TRUE(precert_cert_->HasCriticalExtension(cert_trans::NID_ctPoison)
+  EXPECT_TRUE(precert_cert_->HasCriticalExtension(NID_ct_precert_poison)
                   .ValueOrDie());
-
   EXPECT_FALSE(leaf_cert_->HasBasicConstraintCATrue().ValueOrDie());
   EXPECT_TRUE(ca_cert_->HasBasicConstraintCATrue().ValueOrDie());
   EXPECT_TRUE(
       ca_precert_cert_
-          ->HasExtendedKeyUsage(cert_trans::NID_ctPrecertificateSigning)
+          ->HasExtendedKeyUsage(NID_ct_precert_signer)
           .ValueOrDie());
 }
 
@@ -600,11 +599,11 @@ TEST_F(TbsCertificateTest, DeleteExtension) {
   EXPECT_NE(der_before, der_after);
 
   ASSERT_FALSE(
-      leaf_cert_->HasExtension(cert_trans::NID_ctPoison).ValueOrDie());
+      leaf_cert_->HasExtension(NID_ct_precert_poison).ValueOrDie());
   TbsCertificate tbs2(*leaf_cert_);
   string der_before2, der_after2;
   EXPECT_OK(tbs2.DerEncoding(&der_before2));
-  EXPECT_THAT(tbs2.DeleteExtension(cert_trans::NID_ctPoison),
+  EXPECT_THAT(tbs2.DeleteExtension(NID_ct_precert_poison),
               StatusIs(util::error::NOT_FOUND));
   EXPECT_OK(tbs2.DerEncoding(&der_after2));
   EXPECT_EQ(der_before2, der_after2);
