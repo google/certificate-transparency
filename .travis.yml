@@ -29,14 +29,6 @@ matrix:
       env: SSL=openssl
     - compiler: clang
       os: linux
-      env: SSL=boringssl LLVM=3.6.2
-      addons:
-        apt:
-          sources: *common_sources
-          packages:
-          - *common_packages
-    - compiler: clang
-      os: linux
       env: SSL=openssl LLVM=3.6.2
       addons:
         apt:

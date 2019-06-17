@@ -5,7 +5,7 @@ export INSTALL_DIR
 PKG_CONFIG_PATH=$(shell pwd)/install/lib/pkgconfig
 export PKG_CONFIG_PATH
 
-PHONY: libunwind tcmalloc boringssl openssl protobuf libevent libevhtp gflags glog json-c configure-ct
+PHONY: libunwind tcmalloc openssl protobuf libevent libevhtp gflags glog json-c configure-ct
 
 all: configure-ct
 
@@ -18,9 +18,6 @@ _libunwind:
 _tcmalloc:
 	$(MAKE) -C tcmalloc -f ../certificate-transparency/build/Makefile.tcmalloc
 	cd tcmalloc && git checkout --
-
-_boringssl:
-	$(MAKE) -C boringssl -f `pwd`/certificate-transparency/build/Makefile.boringssl
 
 _openssl:
 	$(MAKE) -C openssl -f `pwd`/certificate-transparency/build/Makefile.openssl

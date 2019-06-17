@@ -120,17 +120,6 @@ AC_SEARCH_LIBS([SSL_CTX_new], [ssl],, [missing_openssl=1], [$save_LIBS])
 AS_IF([test -n "$missing_openssl"],
       [AC_MSG_ERROR([could not find the OpenSSL 1.1.x libraries])])
 
-AC_MSG_CHECKING([for BoringSSL])
-AC_COMPILE_IFELSE([AC_LANG_PROGRAM([[#include <openssl/base.h>]],
-                                   [[
-                                     #ifndef OPENSSL_IS_BORINGSSL
-                                     # error not boringssl
-                                     #endif
-                                   ]])
-                  ],
-                  [AC_MSG_RESULT([yes]); openssl_is_boringssl=1],
-                  [AC_MSG_RESULT([no])])
-
 save_LIBS="$LIBS"
 AS_UNSET([LIBS])
 AC_SEARCH_LIBS([event_base_dispatch], [event],, [missing_libevent=1],
@@ -193,7 +182,6 @@ AC_CHECK_FUNCS([alarm gettimeofday memset mkdir select socket strdup strerror st
 # the user.
 
 
-AM_CONDITIONAL([OPENSSL_IS_BORINGSSL], [test -n "$openssl_is_boringssl"])
 AC_DEFINE_UNQUOTED([TEST_SRCDIR], ["$srcdir"], [Top of the source directory, for tests.])
 AC_SUBST([INSTALL_DIR])
 AC_CONFIG_FILES([Makefile])

@@ -31,120 +31,12 @@ using util::StatusOr;
 using util::error::Code;
 
 
-// TODO(davidben): Remove this after syncing past
-// https://boringssl-review.googlesource.com/c/boringssl/+/28224.
-#if OPENSSL_VERSION_NUMBER < 0x10002000L || \
-    (defined(OPENSSL_IS_BORINGSSL) && BORINGSSL_API_VERSION < 9)
-// Backport from 1.0.2-beta3.
-static int i2d_re_X509_tbs(X509* x, unsigned char** pp) {
-  x->cert_info->enc.modified = 1;
-  return i2d_X509_CINF(x->cert_info, pp);
-}
-#endif
-
 #if OPENSSL_VERSION_NUMBER < 0x10002000L
 static int X509_get_signature_nid(const X509* x) {
   return OBJ_obj2nid(x->sig_alg->algorithm);
 }
 #endif
 
-
-namespace {
-#if defined(OPENSSL_IS_BORINGSSL)
-// BoringSSL doesn't have DSA hooked up so to accept these certs we have
-// to do the work ourselves. Can be called with a non DSA issuer key but will
-// always return false in that case.
-//
-// cert is the certificate that is to be checked
-// issuer_key is the public key of the certificate issuer (should be DSA)
-// Returns true if the DSA signature was correctly verified or false if
-// it did not or there was any error along the way.
-StatusOr<bool> check_dsa_signature(const X509* cert,
-                                   EVP_PKEY* issuer_key) {
-  // Before we start rummaging about through pointers ensure everything we need
-  // is present
-  if (!cert || !issuer_key || !X509_get_cert_info(cert)) {
-    return ::util::Status(Code::FAILED_PRECONDITION,
-                          "cert is null or missing cert_info");
-  }
-
-  X509_CINF* cert_info = X509_get_cert_info(cert);
-  const X509_ALGOR* sig = X509_CINF_get_signature(cert_info);
-
-  if (!sig) {
-    return ::util::Status(Code::FAILED_PRECONDITION,
-                          "cert is missing a signature");
-  }
-
-  if (EVP_PKEY_type(issuer_key->type) != EVP_PKEY_DSA) {
-    return ::util::Status(Code::FAILED_PRECONDITION,
-                          "issuer does not have a DSA public key");
-  }
-
-  const int alg_nid = X509_get_signature_nid(cert);
-
-  int digest_nid;
-  // We need the nid of the digest so we can create an EVP_MD for it later.
-  // Should succeed as we already checked we have a DSA key
-  if (!OBJ_find_sigid_algs(alg_nid, &digest_nid, nullptr)) {
-    return ::util::Status(Code::INTERNAL, "lookup sigid for algorithm failed");
-  }
-
-  // Get the DER encoded certificate info from the cert
-  unsigned char* der_buf(nullptr);
-  const int der_length = i2d_X509_CINF(cert_info, &der_buf);
-  if (der_length < 0) {
-    // Failed to decode. Several possible reasons but we will just reject
-    // the input rather than trying to interpret the cause
-    LOG(WARNING) << "Failed to serialize the CINF component";
-    LOG_OPENSSL_ERRORS(WARNING);
-    return ::util::Status(Code::INVALID_ARGUMENT,
-                          "failed to serialize cert info");
-  }
-
-  string der_buf_str;
-  der_buf_str.assign(string(reinterpret_cast<char*>(der_buf), der_length));
-  OPENSSL_free(der_buf);
-
-  // If the key is missing parameters we don't accept it. This is allowed
-  // by RFC 3279 but we have not found any examples in the wild where it's
-  // used.
-  if (EVP_PKEY_missing_parameters(issuer_key)) {
-    LOG(WARNING) << "DSA sig check needs key params but not available";
-    return ::util::Status(Code::INVALID_ARGUMENT,
-                          "DSA key in cert has missing parameters");
-  }
-
-  const DSA* dsa = EVP_PKEY_get0_DSA(issuer_key);
-  const EVP_MD* md = EVP_get_digestbynid(digest_nid);
-
-  if (dsa == nullptr || md == nullptr) {
-    return ::util::Status(Code::INTERNAL,
-                          "failed to create hasher or get DSA sig");
-  }
-
-  unsigned char md_buffer[EVP_MAX_MD_SIZE];
-  unsigned int md_size;
-
-  // Build the digest of the cert info. Can't use higher level APIs for
-  // this unfortunately as DSA is not connected up.
-  if (!EVP_Digest(der_buf_str.c_str(), der_length, md_buffer, &md_size, md,
-                  nullptr)) {
-    return ::util::Status(Code::INTERNAL, "digest failed");
-  }
-
-  int out_valid;
-  if (!DSA_check_signature(&out_valid, md_buffer, md_size,
-                           cert->signature->data, cert->signature->length,
-                           dsa)) {
-    return ::util::Status(Code::INTERNAL, "failed to check DSA signature");
-  }
-
-  return out_valid == 1;
-}
-
-#endif
-}
 
 namespace cert_trans {
 
@@ -463,31 +355,10 @@ StatusOr<bool> Cert::IsSignedBy(const Cert& issuer) const {
     return true;
   }
 
-#if defined(OPENSSL_IS_BORINGSSL)
-  // With BoringSSL we might have a signature algorithm that is not supported
-  // by X509_verify but we still want to accept into a log. This is a weaker
-  // check than x509_verify but sufficient for our needs as we are rejecting
-  // spam rather than intending to trust the certificate.
-  // Let's see if we can verify a DSA signature
-  const StatusOr<bool> is_valid_dsa_sig =
-      check_dsa_signature(x509_.get(), issuer_key.get());
-
-  if (is_valid_dsa_sig.ok()) {
-    if (is_valid_dsa_sig.ValueOrDie()) {
-      ClearOpenSSLErrors();
-      return true;
-    } else {
-      // Ensure we return the same status as we'd have got from calling
-      // IsValidSignatureChain() under OpenSSL when the signature is not valid.
-      return util::Status(Code::INVALID_ARGUMENT, "invalid certificate chain");
-    }
-  }
-#endif
-
   unsigned long err = ERR_peek_last_error();
   const int reason = ERR_GET_REASON(err);
   const int lib = ERR_GET_LIB(err);
-  // OpenSSL and BoringSSL use ERR_R_EVP_LIB when a signature fails to verify.
+  // OpenSSL uses ERR_R_EVP_LIB when a signature fails to verify.
   // Clear errors in this case, but log unusual failures.
   if (err == 0 || ((lib == ERR_LIB_X509 || lib == ERR_LIB_ASN1) &&
                    reason == ERR_R_EVP_LIB)) {
@@ -499,11 +370,6 @@ StatusOr<bool> Cert::IsSignedBy(const Cert& issuer) const {
        reason == ASN1_R_UNKNOWN_SIGNATURE_ALGORITHM)) {
     return LogUnsupportedAlgorithm();
   }
-#if defined(OPENSSL_IS_BORINGSSL)
-  if (lib == ERR_LIB_X509 && reason == X509_R_SIGNATURE_ALGORITHM_MISMATCH) {
-    return false;
-  }
-#endif
   LOG(ERROR) << "OpenSSL X509_verify returned " << ret;
   LOG_OPENSSL_ERRORS(ERROR);
   return util::Status(Code::INTERNAL, "X509 verify error");
