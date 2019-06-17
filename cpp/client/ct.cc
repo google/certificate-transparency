@@ -369,8 +369,8 @@ static void WriteProofToConfig() {
   PCHECK(conf_out.good()) << "Could not open extensions configuration file "
                           << conf_file << " for writing.";
 
-  conf_out << string(cert_trans::kEmbeddedSCTListOID)
-           << "=ASN1:FORMAT:HEX,OCTETSTRING:";
+  // Embedded SCT list
+  conf_out << "1.3.6.1.4.1.11129.2.4.2" << "=ASN1:FORMAT:HEX,OCTETSTRING:";
 
   conf_out << util::HexString(serialized_sct_list) << std::endl;
   conf_out.close();
