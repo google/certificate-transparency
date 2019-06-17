@@ -29,11 +29,11 @@ _protobuf:
 
 _libevent:
 	$(MAKE) -C libevent -f ../certificate-transparency/build/Makefile.libevent
-	cd libevent && git checkout --
+	cd libevent && git reset --hard
 
 _libevhtp:
 	$(MAKE) -C libevhtp -f `pwd`/certificate-transparency/build/Makefile.libevhtp
-	cd libevhtp && git checkout --
+	cd libevhtp && git reset --hard
 
 _gflags:
 	$(MAKE) -C gflags -f ../certificate-transparency/build/Makefile.gflags
