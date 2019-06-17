@@ -12,7 +12,6 @@ addons:
   apt:
     sources: &common_sources
       - ubuntu-toolchain-r-test
-      - kalakris-cmake
     packages: &common_packages
       - autoconf
       - automake
