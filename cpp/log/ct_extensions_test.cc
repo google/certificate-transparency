@@ -21,7 +21,6 @@ using util::StatusOr;
 
 static const char kSimpleCert[] = "test-cert.pem";
 static const char kSimpleCaCert[] = "ca-cert.pem";
-static const char kFakeCertWithSCT[] = "test-cert-proof.pem";
 static const char kCertWithPrecertSigning[] = "ca-pre-cert.pem";
 static const char kCertWithPoison[] = "test-embedded-pre-cert.pem";
 static const char kCertWithEmbeddedSCT[] = "test-embedded-cert.pem";
@@ -30,7 +29,6 @@ class CtExtensionsTest : public ::testing::Test {
  protected:
   string simple_cert_;
   string simple_ca_cert_;
-  string sct_cert_;
   string pre_signing_cert_;
   string poison_cert_;
   string embedded_sct_cert_;
@@ -42,7 +40,6 @@ class CtExtensionsTest : public ::testing::Test {
         << ". Wrong --test_srcdir?";
     CHECK(
         util::ReadTextFile(cert_dir + "/" + kSimpleCaCert, &simple_ca_cert_));
-    CHECK(util::ReadTextFile(cert_dir + "/" + kFakeCertWithSCT, &sct_cert_));
     CHECK(util::ReadTextFile(cert_dir + "/" + kCertWithPrecertSigning,
                              &pre_signing_cert_));
     CHECK(util::ReadTextFile(cert_dir + "/" + kCertWithPoison, &poison_cert_));
@@ -50,43 +47,6 @@ class CtExtensionsTest : public ::testing::Test {
                              &embedded_sct_cert_));
   }
 };
-
-TEST_F(CtExtensionsTest, TestSCTExtension) {
-  // Sanity check
-  const unique_ptr<Cert> simple_cert(Cert::FromPemString(simple_cert_));
-  ASSERT_TRUE(simple_cert.get());
-  EXPECT_FALSE(
-      simple_cert->HasExtension(NID_ct_cert_scts).ValueOrDie());
-
-  const unique_ptr<Cert> sct_cert(Cert::FromPemString(sct_cert_));
-  ASSERT_TRUE(sct_cert.get());
-  // Check we can find the extension by its advertised NID.
-  // We should really be checking that the OID matches the expected OID but
-  // what other extension could this cert be having that the other one doesn't?
-  ASSERT_TRUE(
-      sct_cert->HasExtension(NID_ct_cert_scts).ValueOrDie());
-
-  string ext_data;
-  EXPECT_OK(sct_cert->OctetStringExtensionData(NID_ct_cert_scts, &ext_data));
-  EXPECT_FALSE(ext_data.empty());
-
-  // Now fish the extension data out using the print methods and check they
-  // operate as expected.
-  // TODO(ekasper):
-  const StatusOr<X509_EXTENSION*> ext(sct_cert->GetExtension(
-        NID_ct_cert_scts));
-  ASSERT_OK(ext);
-  ScopedBIO buf(BIO_new(BIO_s_mem()));
-  ASSERT_NE(buf.get(), static_cast<BIO*>(NULL));
-
-  EXPECT_EQ(1, X509V3_EXT_print(buf.get(), ext.ValueOrDie(), 0, 0));
-  CHECK_EQ(1, BIO_write(buf.get(), "", 1));  // NULL-terminate
-  char* result;
-  BIO_get_mem_data(buf.get(), &result);
-
-  // Should be printing the octet string contents in hex.
-  EXPECT_STRCASEEQ(util::HexString(ext_data, ':').c_str(), result);
-}
 
 TEST_F(CtExtensionsTest, TestEmbeddedSCTExtension) {
   // Sanity check
