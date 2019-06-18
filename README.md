@@ -12,7 +12,6 @@ certificate-transparency: Auditing for TLS certificates
  - [Build Troubleshooting](#build-troubleshooting)
     - [Compiler Warnings/Errors](#compiler-warnings-errors)
     - [Working on a Branch](#working-on-a-branch)
-    - [Using BoringSSL](#using-boringssl)
  - [Testing the code](#testing-the-code)
     - [Unit Tests](#unit-tests)
     - [Testing and Logging Options](#testing-and-logging-options)
@@ -174,12 +173,8 @@ Log codebase.
     - [json-c](https://github.com/json-c/json-c): JSON processing library
     - [libunwind](http://www.nongnu.org/libunwind/): library for generating
       stack traces
- - Cryptographic library: one of the following, selected via the `SSL` build
-   variable.
     - [OpenSSL](https://github.com/google/googletest.git): default
       cryptography library.
-    - [BoringSSL](https://boringssl.googlesource.com/boringssl/): Google's
-      fork of OpenSSL
 
 
 Build Troubleshooting
@@ -218,16 +213,6 @@ to substitute the following command for the `gclient config` command
 
 ```bash
 gclient config --name="certificate-transparency" https://github.com/google/certificate-transparency.git@branch
-```
-
-### Using BoringSSL
-
-The BoringSSL fork of OpenSSL can be used in place of OpenSSL.  To enable this,
-after the first step (`gclient config ...`) in the gclient [build
-process](#build-quick-start), modify the top-level `.gclient` to add:
-
-```python
-      "custom_vars": { "ssl_impl": "boringssl" } },
 ```
 
 Then continue the [build process](#build-quick-start) with the `gclient sync` step.

@@ -1,24 +1,12 @@
-vars = {
-     # Change this variable to the name of one of the alternative SSL
-     # implementations below.
-     # If you change this in an existing client, you should probably rm -fr
-     # all the deps and rebuild everything from scratch.
-     "ssl_impl":         "openssl",
-
-     # SSL implementation alternatives:
-     "openssl": 				 "https://github.com/openssl/openssl.git@OpenSSL_1_0_2d",
-     "boringssl":        "https://boringssl.googlesource.com/boringssl.git@2883"
-}
-
 deps = {
-     "openssl": 				 "https://github.com/openssl/openssl.git@OpenSSL_1_0_2d",
+     "openssl": 				 "https://github.com/openssl/openssl.git@OpenSSL_1_1_1c",
      "gflags":  	 			 "https://github.com/gflags/gflags.git@v2.1.2",
      "glog":             "https://github.com/benlaurie/glog.git@0.3.4-fix",
      "googlemock": 			 "https://github.com/google/googlemock.git@release-1.7.0",
      "googlemock/gtest": "https://github.com/google/googletest.git@release-1.7.0",
      "json-c": 					 "https://github.com/AlCutter/json-c.git@json-c-0.12-20140410-fix",
-     "libevent": 				 "https://github.com/libevent/libevent.git@release-2.0.22-stable",
-     "libevhtp": 				 "https://github.com/RJPercival/libevhtp.git@a89d9b3f9fdf2ebef41893b3d5e4466f4b0ecfda",
+     "libevent": 				 "https://github.com/libevent/libevent.git@release-2.1.10-stable",
+     "libevhtp":         "https://github.com/criticalstack/libevhtp.git@1.2.18",
      "protobuf":         "https://github.com/google/protobuf.git@v2.6.1",
      "protobuf/gtest":   "https://github.com/google/googletest.git@release-1.7.0",
      "tcmalloc":				 "https://github.com/gperftools/gperftools.git@gperftools-2.4"

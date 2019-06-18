@@ -70,7 +70,7 @@ int SSLClient::ExtensionCallback(SSL*, unsigned ext_type,
 SSLClient::SSLClient(const string& server, const string& port,
                      const string& ca_dir, LogVerifier* verifier)
     : client_(server, port),
-      ctx_(CHECK_NOTNULL(SSL_CTX_new(TLSv1_client_method()))),
+      ctx_(CHECK_NOTNULL(SSL_CTX_new(TLS_client_method()))),
       verify_args_(verifier),
       connected_(false) {
   // SSL_VERIFY_PEER makes the connection abort immediately
@@ -164,41 +164,40 @@ int SSLClient::VerifyCallback(X509_STORE_CTX* ctx, void* arg) {
     return vfy;
   }
 
-  // If verify passed then surely we must have a cert.
-  CHECK_NOTNULL(ctx->cert);
-
   CertChain chain, input_chain;
   // ctx->untrusted is the input chain.
   // ctx->chain is the chain of X509s that OpenSSL constructed and verified.
-  CHECK_NOTNULL(ctx->chain);
-  int chain_size = sk_X509_num(ctx->chain);
+  STACK_OF(X509)* chain_sk(X509_STORE_CTX_get0_chain(ctx));
+  CHECK_NOTNULL(chain_sk);
+  int chain_size = sk_X509_num(chain_sk);
   // Should contain at least the leaf.
   CHECK_GE(chain_size, 1);
   for (int i = 0; i < chain_size; ++i) {
     chain.AddCert(
-        Cert::FromX509(ScopedX509(X509_dup(sk_X509_value(ctx->chain, i)))));
+        Cert::FromX509(ScopedX509(X509_dup(sk_X509_value(chain_sk, i)))));
   }
 
-  CHECK_NOTNULL(ctx->untrusted);
-  chain_size = sk_X509_num(ctx->untrusted);
+  STACK_OF(X509)* untrusted_sk(X509_STORE_CTX_get0_untrusted(ctx));
+  CHECK_NOTNULL(untrusted_sk);
+
+  chain_size = sk_X509_num(untrusted_sk);
   // Should contain at least the leaf.
   CHECK_GE(chain_size, 1);
   for (int i = 0; i < chain_size; ++i) {
     input_chain.AddCert(Cert::FromX509(
-        ScopedX509(X509_dup(sk_X509_value(ctx->untrusted, i)))));
+        ScopedX509(X509_dup(sk_X509_value(untrusted_sk, i)))));
   }
 
   string serialized_scts;
   // First, see if the cert has an embedded proof.
   const StatusOr<bool> has_embedded_proof = chain.LeafCert()->HasExtension(
-      cert_trans::NID_ctEmbeddedSignedCertificateTimestampList);
+      NID_ct_precert_scts);
 
   // Pull out the superfluous cert extension if it exists for use later
   // Let's assume the superfluous cert is always last in the chain.
   const StatusOr<bool> superf_has_timestamp_list =
       input_chain.Length() > 1
-          ? input_chain.LastCert()->HasExtension(
-                cert_trans::NID_ctSignedCertificateTimestampList)
+          ? input_chain.LastCert()->HasExtension(NID_ct_cert_scts)
           : util::Status::UNKNOWN;
 
   // First check for embedded proof, if not present then look for the proof in
@@ -207,8 +206,7 @@ int SSLClient::VerifyCallback(X509_STORE_CTX* ctx, void* arg) {
     LOG(INFO) << "Embedded proof extension found in certificate, "
               << "verifying...";
     util::Status status = chain.LeafCert()->OctetStringExtensionData(
-        cert_trans::NID_ctEmbeddedSignedCertificateTimestampList,
-        &serialized_scts);
+        NID_ct_precert_scts, &serialized_scts);
     if (!status.ok()) {
       // Any error here is likely OpenSSL acting up, so just die. Previously
       // was CHECK_EQ(FALSE..., which meant fail check if not an error and not
@@ -220,7 +218,7 @@ int SSLClient::VerifyCallback(X509_STORE_CTX* ctx, void* arg) {
              superf_has_timestamp_list.ValueOrDie()) {
     LOG(INFO) << "Proof extension found in certificate, verifying...";
     util::Status status = input_chain.LastCert()->OctetStringExtensionData(
-        cert_trans::NID_ctSignedCertificateTimestampList, &serialized_scts);
+        NID_ct_cert_scts, &serialized_scts);
     if (!status.ok()) {
       // Any error here is likely OpenSSL acting up, so just die.
       CHECK_EQ(Code::NOT_FOUND, status.CanonicalCode());

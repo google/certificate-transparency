@@ -7,10 +7,6 @@
 #include "util/openssl_util.h"
 #include "util/openssl_scoped_types.h"
 
-#if defined(OPENSSL_IS_BORINGSSL)
-#include <openssl/asn1.h>
-#endif
-
 namespace rfc6962_bis {
 using util::StatusOr;
 using util::Status;

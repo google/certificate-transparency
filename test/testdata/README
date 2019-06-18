@@ -35,9 +35,6 @@ test-cert.pem: a certificate issued by ca-cert.pem, no CT extensions
 test-cert.proof: an SCT for this cert, obtained with 'ct upload', in
 raw serialized TLS format
 
-test-cert-proof.pem: a fake "certificate" that contains this SCT in an
-X509v3 extension with OID 1.3.6.1.4.1.11129.2.4.1
-
 test-cert-chain.pem: same as test-cert-proof.pem (= a chain of "intermediates"
 for Apache)
 

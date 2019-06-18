@@ -130,9 +130,9 @@ Status CertChecker::CheckCertChain(CertChain* chain) const {
 
   // Weed out things that should obviously be precert chains instead.
   const StatusOr<bool> has_poison =
-      chain->LeafCert()->HasCriticalExtension(cert_trans::NID_ctPoison);
+      chain->LeafCert()->HasCriticalExtension(NID_ct_precert_poison);
   if (!has_poison.ok()) {
-    return Status(util::error::INTERNAL, "internal error");
+    return Status(util::error::INTERNAL, "internal error checking poison");
   }
   if (has_poison.ValueOrDie()) {
     return Status(util::error::INVALID_ARGUMENT,
@@ -176,7 +176,6 @@ Status CertChecker::CheckPreCertChain(PreCertChain* chain,
     return Status(util::error::INVALID_ARGUMENT, "prechain not well formed");
   }
   if (!chain_well_formed.ok()) {
-    LOG(ERROR) << "Failed to check precert chain format";
     return Status(util::error::INTERNAL, "internal error");
   }
 
@@ -219,7 +218,7 @@ Status CertChecker::CheckPreCertChain(PreCertChain* chain,
   }
   // A well-formed chain always has a precert.
   TbsCertificate tbs(*chain->PreCert());
-  if (!tbs.IsLoaded() || !tbs.DeleteExtension(cert_trans::NID_ctPoison).ok()) {
+  if (!tbs.IsLoaded() || !tbs.DeleteExtension(NID_ct_precert_poison).ok()) {
     return Status(util::error::INTERNAL, "internal error");
   }
 

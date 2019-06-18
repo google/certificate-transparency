@@ -432,14 +432,13 @@ TEST_F(CertTest, Extensions) {
       leaf_cert_->HasExtension(NID_authority_key_identifier).ValueOrDie());
   EXPECT_FALSE(leaf_cert_->HasCriticalExtension(NID_authority_key_identifier)
                    .ValueOrDie());
-  EXPECT_TRUE(precert_cert_->HasCriticalExtension(cert_trans::NID_ctPoison)
+  EXPECT_TRUE(precert_cert_->HasCriticalExtension(NID_ct_precert_poison)
                   .ValueOrDie());
-
   EXPECT_FALSE(leaf_cert_->HasBasicConstraintCATrue().ValueOrDie());
   EXPECT_TRUE(ca_cert_->HasBasicConstraintCATrue().ValueOrDie());
   EXPECT_TRUE(
       ca_precert_cert_
-          ->HasExtendedKeyUsage(cert_trans::NID_ctPrecertificateSigning)
+          ->HasExtendedKeyUsage(NID_ct_precert_signer)
           .ValueOrDie());
 }
 
@@ -493,11 +492,7 @@ TEST_F(CertTest, SignatureAlgorithmMatches) {
 TEST_F(CertTest, IllegalSignatureAlgorithmParameter) {
   const unique_ptr<Cert> cert(
       Cert::FromPemString(kIllegalSigAlgParameterCertString));
-#if defined(OPENSSL_IS_BORINGSSL)
-  EXPECT_FALSE(cert);
-#else
   EXPECT_TRUE(cert.get());
-#endif
 }
 
 TEST_F(CertTest, TestSubjectAltNames) {
@@ -527,116 +522,6 @@ TEST_F(CertTest, SPKISha256Digest) {
   EXPECT_OK(google_cert_->SPKISha256Digest(&digest));
   EXPECT_EQ("VCXa3FxokfQkIcY2SygQMz4BuQHcRANCXdqRCLkoflg=",
             util::ToBase64(digest));
-}
-
-TEST_F(CertTest, TestIsRedactedHost) {
-  EXPECT_FALSE(cert_trans::IsRedactedHost(""));
-  EXPECT_FALSE(cert_trans::IsRedactedHost("example.com"));
-
-  EXPECT_TRUE(cert_trans::IsRedactedHost("?.example.com"));
-  EXPECT_TRUE(cert_trans::IsRedactedHost("?.?.example.com"));
-  EXPECT_TRUE(cert_trans::IsRedactedHost("top.?.example.com"));
-}
-
-TEST_F(CertTest, TestIsValidRedactedHost) {
-  EXPECT_TRUE(cert_trans::IsValidRedactedHost("?.example.com"));
-  EXPECT_TRUE(cert_trans::IsValidRedactedHost("?.?.example.com"));
-  EXPECT_TRUE(cert_trans::IsValidRedactedHost("*.?.example.com"));
-  EXPECT_TRUE(cert_trans::IsValidRedactedHost("*.?.?.example.com"));
-
-  EXPECT_FALSE(cert_trans::IsValidRedactedHost("top.?.example.com"));
-  EXPECT_FALSE(cert_trans::IsValidRedactedHost("top.secret.example.?"));
-  EXPECT_FALSE(cert_trans::IsValidRedactedHost("top.secret.?.com"));
-  EXPECT_FALSE(cert_trans::IsValidRedactedHost("top.*.secret.?.com"));
-  EXPECT_FALSE(cert_trans::IsValidRedactedHost("?.*.example.com"));
-  EXPECT_FALSE(cert_trans::IsValidRedactedHost("*.secret.?.com"));
-}
-
-TEST_F(CertTest, TestNoWildcardRedactionIsValid) {
-  EXPECT_OK(leaf_cert_->IsValidWildcardRedaction());
-}
-
-TEST_F(CertTest, TestWildcardRedactTestCase5) {
-  // This is invalid because the CN is redacted, no DNS or extension
-  EXPECT_THAT(v2_wildcard_test5_cert_->IsValidWildcardRedaction(),
-              StatusIs(util::error::INVALID_ARGUMENT));
-}
-
-TEST_F(CertTest, TestWildcardRedactTestCase6) {
-  // This is invalid because the CN differs from the first DNS-ID
-  EXPECT_THAT(v2_wildcard_test6_cert_->IsValidWildcardRedaction(),
-              StatusIs(util::error::INVALID_ARGUMENT));
-}
-
-TEST_F(CertTest, TestWildcardRedactTestCase7) {
-  // This should be a valid redaction of 1 label with everything set
-  // correctly in the extension
-  EXPECT_OK(v2_wildcard_test7_cert_->IsValidWildcardRedaction());
-}
-
-TEST_F(CertTest, TestWildcardRedactTestCase8) {
-  // This should be a valid redaction of 1 label with everything set
-  // correctly in the extension and a '*' at left of name.
-  EXPECT_OK(v2_wildcard_test8_cert_->IsValidWildcardRedaction());
-}
-
-TEST_F(CertTest, TestWildcardRedactTestCase9) {
-  // Should be invalid as the redacted label does not follow RFC rules
-  EXPECT_THAT(v2_wildcard_test9_cert_->IsValidWildcardRedaction(),
-              StatusIs(util::error::INVALID_ARGUMENT));
-}
-
-TEST_F(CertTest, TestWildcardRedactTestCase10) {
-  // Should be invalid as redacted label uses '*' incorrectly
-  EXPECT_THAT(v2_wildcard_test10_cert_->IsValidWildcardRedaction(),
-              StatusIs(util::error::INVALID_ARGUMENT));
-}
-
-TEST_F(CertTest, TestWildcardRedactTestCase11) {
-  // Should be invalid as there are too many label count values
-  EXPECT_THAT(v2_wildcard_test11_cert_->IsValidWildcardRedaction(),
-              StatusIs(util::error::INVALID_ARGUMENT));
-}
-
-TEST_F(CertTest, TestWildcardRedactTestCase12) {
-  // This should be invalid because the CT extension contains -ve value
-  EXPECT_THAT(v2_wildcard_test12_cert_->IsValidWildcardRedaction(),
-              StatusIs(util::error::INVALID_ARGUMENT));
-}
-
-TEST_F(CertTest, TestWildcardRedactTestCase13) {
-  EXPECT_OK(v2_wildcard_test13_cert_->IsValidWildcardRedaction());
-}
-
-TEST_F(CertTest, TestWildcardRedactTestCase14) {
-  EXPECT_OK(v2_wildcard_test14_cert_->IsValidWildcardRedaction());
-}
-
-TEST_F(CertTest, TestWildcardRedactTestCase15) {
-  // This should be invalid because the CT extension has too many values
-  EXPECT_THAT(v2_wildcard_test15_cert_->IsValidWildcardRedaction(),
-              StatusIs(util::error::INVALID_ARGUMENT));
-}
-
-TEST_F(CertTest, TestWildcardRedactTestCase22) {
-  // This should be a redaction of 1 label but no extension required by
-  // RFC section 3.2.2
-  EXPECT_THAT(v2_wildcard_test22_cert_->IsValidWildcardRedaction(),
-              StatusIs(util::error::INVALID_ARGUMENT));
-}
-
-TEST_F(CertTest, TestWildcardRedactTestCase23) {
-  // Should not be valid because the CT extension is not a SEQUENCE OF
-  // type
-  EXPECT_THAT(v2_wildcard_test23_cert_->IsValidWildcardRedaction(),
-              StatusIs(util::error::INVALID_ARGUMENT));
-}
-
-TEST_F(CertTest, TestWildcardRedactTestCase24) {
-  // Should not be valid because not all the items in the CT extension sequence
-  // are ASN1_INTEGER type
-  EXPECT_THAT(v2_wildcard_test24_cert_->IsValidWildcardRedaction(),
-              StatusIs(util::error::INVALID_ARGUMENT));
 }
 
 TEST_F(CertTest, TestConstraintTestCase2) {
@@ -710,11 +595,11 @@ TEST_F(TbsCertificateTest, DeleteExtension) {
   EXPECT_NE(der_before, der_after);
 
   ASSERT_FALSE(
-      leaf_cert_->HasExtension(cert_trans::NID_ctPoison).ValueOrDie());
+      leaf_cert_->HasExtension(NID_ct_precert_poison).ValueOrDie());
   TbsCertificate tbs2(*leaf_cert_);
   string der_before2, der_after2;
   EXPECT_OK(tbs2.DerEncoding(&der_before2));
-  EXPECT_THAT(tbs2.DeleteExtension(cert_trans::NID_ctPoison),
+  EXPECT_THAT(tbs2.DeleteExtension(NID_ct_precert_poison),
               StatusIs(util::error::NOT_FOUND));
   EXPECT_OK(tbs2.DerEncoding(&der_after2));
   EXPECT_EQ(der_before2, der_after2);

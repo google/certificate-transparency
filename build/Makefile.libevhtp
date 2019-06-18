@@ -1,4 +1,5 @@
 all: Makefile
+	sed -ibak 's/@LIB_INSTALL_DIR@/$${prefix}\/lib/; s/@INCLUDE_INSTALL_DIR@\/evhtp/$${prefix}\/include/' evhtp.pc.in
 	$(MAKE)
 	$(MAKE) install
 
@@ -6,6 +7,8 @@ Makefile: CMakeLists.txt
 	cmake \
 		-DBUILD_SHARED_LIBS=FALSE \
 		-DCMAKE_INSTALL_PREFIX:STRING=$(INSTALL_DIR) \
+		-DINCLUDE_INSTALL_DIR=$(INSTALL_DIR)/include \
+		-DLIB_INSTALL_DIR=$(INSTALL_DIR)/lib \
 		-DLIBEVENT_INCLUDE_DIRS:STRING=$(INSTALL_DIR)/include \
 		-DLIBEVENT_LIBRARY_DIRS:STRING=$(INSTALL_DIR)/lib \
 		-DLIBEVENT_LIBRARY:STRING=$(INSTALL_DIR)/lib/libevent.a \

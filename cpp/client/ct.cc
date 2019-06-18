@@ -166,32 +166,6 @@ static LogVerifier* GetLogVerifierFromFlags() {
                              unique_ptr<Sha256Hasher>(new Sha256Hasher)));
 }
 
-// Adds the data to the cert as an extension, formatted as a single
-// ASN.1 octet string.
-static void AddOctetExtension(X509* cert, int nid, const unsigned char* data,
-                              int data_len, int critical) {
-  // The extension as a single octet string.
-  ScopedASN1_OCTET_STRING inner(ASN1_OCTET_STRING_new());
-  CHECK_NOTNULL(inner.get());
-  CHECK_EQ(1, ASN1_OCTET_STRING_set(inner.get(), data, data_len));
-  int buf_len = i2d_ASN1_OCTET_STRING(inner.get(), NULL);
-  CHECK_GT(buf_len, 0);
-
-  unsigned char buf[buf_len];
-  unsigned char* p = buf;
-
-  CHECK_EQ(buf_len, i2d_ASN1_OCTET_STRING(inner.get(), &p));
-
-  // The outer, opaque octet string.
-  ScopedASN1_OCTET_STRING asn1_data(ASN1_OCTET_STRING_new());
-  CHECK_NOTNULL(asn1_data.get());
-  CHECK_EQ(1, ASN1_OCTET_STRING_set(asn1_data.get(), buf, buf_len));
-
-  X509_EXTENSION* ext =
-      X509_EXTENSION_create_by_NID(NULL, nid, critical, asn1_data.get());
-  CHECK_EQ(1, X509_add_ext(cert, ext, -1));
-}
-
 // Reconstructs a LogEntry from the given precert chain.
 // Used for verifying a Precert SCT.
 // Returns true iff the LogEntry was correctly populated.
@@ -203,7 +177,7 @@ static bool PrecertChainToEntry(const cert_trans::PreCertChain& chain,
   }
 
   const StatusOr<bool> has_poison =
-      chain.LeafCert()->HasExtension(cert_trans::NID_ctPoison);
+      chain.LeafCert()->HasExtension(NID_ct_precert_poison);
   if (!has_poison.ok()) {
     LOG(ERROR) << "Failed to test for poison extension.";
     return false;
@@ -236,7 +210,7 @@ static bool PrecertChainToEntry(const cert_trans::PreCertChain& chain,
   }
   // DeleteExtension can return NOT_FOUND but we checked the extension exists
   // above so this is not expected.
-  if (!tbs.DeleteExtension(cert_trans::NID_ctPoison).ok()) {
+  if (!tbs.DeleteExtension(NID_ct_precert_poison).ok()) {
     LOG(ERROR) << "Failed to delete poison extension.";
     return false;
   }
@@ -368,78 +342,6 @@ static int Upload() {
   return 0;
 }
 
-// FIXME: fix all the memory leaks in this code.
-static void MakeCert() {
-  string sct;
-  PCHECK(util::ReadBinaryFile(FLAGS_sct_token, &sct))
-      << "Could not read SCT data from " << FLAGS_sct_token;
-
-  string cert_file = FLAGS_certificate_out;
-
-  int cert_fd = open(cert_file.c_str(), O_CREAT | O_TRUNC | O_WRONLY, 0666);
-  PCHECK(cert_fd > 0) << "Could not open certificate file " << cert_file
-                      << " for writing.";
-
-  ScopedBIO out(BIO_new_fd(cert_fd, BIO_CLOSE));
-
-  ScopedX509 x(X509_new());
-
-  // X509v3 (== 2)
-  X509_set_version(x.get(), 2);
-
-  // Random 128 bit serial number
-  ScopedBIGNUM serial(BN_new());
-  BN_rand(serial.get(), 128, 0, 0);
-  BN_to_ASN1_INTEGER(serial.get(), X509_get_serialNumber(x.get()));
-
-  // Set signature algorithm
-  // FIXME: is there an opaque way to get the algorithm structure?
-  // FIXME: Sort out const/non-const OpenssL/BoringSSL mismatch.
-  x->cert_info->signature->algorithm = const_cast<ASN1_OBJECT*>(OBJ_nid2obj(NID_sha1WithRSAEncryption));
-  x->cert_info->signature->parameter = NULL;
-
-  // Set the start date to now
-  X509_gmtime_adj(X509_get_notBefore(x.get()), 0);
-  // End date to now + 1 second
-  X509_gmtime_adj(X509_get_notAfter(x.get()), 1);
-
-  // Create the issuer name
-  ScopedX509_NAME issuer(X509_NAME_new());
-  X509_NAME_add_entry_by_NID(
-      issuer.get(), NID_commonName, V_ASN1_PRINTABLESTRING,
-      const_cast<unsigned char*>(
-          reinterpret_cast<const unsigned char*>("Test")),
-      4, 0, -1);
-  X509_set_issuer_name(x.get(), issuer.release());
-
-  // Create the subject name
-  ScopedX509_NAME subject(X509_NAME_new());
-  X509_NAME_add_entry_by_NID(
-      subject.get(), NID_commonName, V_ASN1_PRINTABLESTRING,
-      const_cast<unsigned char*>(
-          reinterpret_cast<const unsigned char*>("tseT")),
-      4, 0, -1);
-  X509_set_subject_name(x.get(), subject.release());
-
-  // Public key
-  ScopedRSA rsa(RSA_new());
-  static const unsigned char bits[1] = {3};
-  rsa->n = BN_bin2bn(bits, 1, NULL);
-  rsa->e = BN_bin2bn(bits, 1, NULL);
-  ScopedEVP_PKEY evp_pkey(EVP_PKEY_new());
-  EVP_PKEY_assign_RSA(evp_pkey.get(), rsa.release());
-  X509_PUBKEY_set(&X509_get_X509_PUBKEY(x), evp_pkey.release());
-
-  // And finally, the proof in an extension
-  const string serialized_sct_list(SCTToList(sct));
-  AddOctetExtension(x.get(), cert_trans::NID_ctSignedCertificateTimestampList,
-                    reinterpret_cast<const unsigned char*>(
-                        serialized_sct_list.data()),
-                    serialized_sct_list.size(), 1);
-
-  CHECK_GT(i2d_X509_bio(out.get(), x.get()), 0);
-}
-
 // A sample tool for CAs showing how to add the CT proof as an extension.
 // We write the CT proof to the certificate config, so that we can
 // sign using the standard openssl signing flow.
@@ -467,8 +369,8 @@ static void WriteProofToConfig() {
   PCHECK(conf_out.good()) << "Could not open extensions configuration file "
                           << conf_file << " for writing.";
 
-  conf_out << string(cert_trans::kEmbeddedSCTListOID)
-           << "=ASN1:FORMAT:HEX,OCTETSTRING:";
+  // Embedded SCT list
+  conf_out << "1.3.6.1.4.1.11129.2.4.2" << "=ASN1:FORMAT:HEX,OCTETSTRING:";
 
   conf_out << util::HexString(serialized_sct_list) << std::endl;
   conf_out.close();
@@ -701,7 +603,7 @@ static void DiagnoseCertChain() {
 
 
   const StatusOr<bool> has_timestamp_list = chain.LeafCert()->HasExtension(
-      cert_trans::NID_ctEmbeddedSignedCertificateTimestampList);
+      NID_ct_precert_scts);
   if (!has_timestamp_list.ok() || !has_timestamp_list.ValueOrDie()) {
     LOG(ERROR) << "Certificate has no embedded SCTs";
     return;
@@ -720,8 +622,7 @@ static void DiagnoseCertChain() {
 
   string serialized_scts;
   util::Status status = chain.LeafCert()->OctetStringExtensionData(
-      cert_trans::NID_ctEmbeddedSignedCertificateTimestampList,
-      &serialized_scts);
+      NID_ct_precert_scts, &serialized_scts);
   if (!status.ok()) {
     LOG(ERROR) << "SCT extension data is missing / invalid.";
     return;
@@ -801,15 +702,11 @@ void WrapEmbedded() {
   CertChain chain(pem_chain);
   CHECK(chain.IsLoaded()) << cert_file
                           << " is not a valid PEM-encoded certificate chain";
-  CHECK(chain.LeafCert()
-            ->HasExtension(
-                cert_trans::NID_ctEmbeddedSignedCertificateTimestampList)
-            .ValueOrDie());
+  CHECK(chain.LeafCert()->HasExtension(NID_ct_precert_scts).ValueOrDie());
 
   string serialized_scts;
   CHECK_EQ(::util::OkStatus(),
-           chain.LeafCert()->OctetStringExtensionData(
-               cert_trans::NID_ctEmbeddedSignedCertificateTimestampList,
+           chain.LeafCert()->OctetStringExtensionData(NID_ct_precert_scts,
                &serialized_scts));
   SignedCertificateTimestampList sct_list;
   CHECK_EQ(DeserializeResult::OK,
@@ -964,8 +861,6 @@ int main(int argc, char** argv) {
     ret = Audit();
   } else if (cmd == "consistency") {
     ret = CheckConsistency();
-  } else if (cmd == "certificate") {
-    MakeCert();
   } else if (cmd == "extension_data") {
     ProofToExtensionData();
   } else if (cmd == "configure_proof") {

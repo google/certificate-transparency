@@ -19,26 +19,14 @@
 #include <stdio.h>
 #include <memory>
 
-#ifdef OPENSSL_IS_BORINGSSL
-#include <openssl/aead.h>
-#endif  // OPENSSL_IS_BORINGSSL
 #include <openssl/bio.h>
 #include <openssl/bn.h>
 #include <openssl/cmac.h>
 #include <openssl/dh.h>
 #include <openssl/ec.h>
-#ifdef OPENSSL_IS_BORINGSSL
-#include <openssl/ec_key.h>
-#endif  // OPENSSL_IS_BORINGSSL
 #include <openssl/ecdsa.h>
 #include <openssl/evp.h>
 #include <openssl/hmac.h>
-#ifdef OPENSSL_IS_BORINGSSL
-#include <openssl/mem.h>
-#endif  // OPENSSL_IS_BORINGSSL
-#ifdef OPENSSL_IS_BORINGSSL
-#include <openssl/pkcs8.h>
-#endif  // OPENSSL_IS_BORINGSSL
 #include <openssl/rsa.h>
 #include <openssl/stack.h>
 #include <openssl/x509.h>
@@ -144,9 +132,6 @@ using ScopedEXTENDED_KEY_USAGE =
     ScopedOpenSSLType<EXTENDED_KEY_USAGE, EXTENDED_KEY_USAGE_free>;
 using ScopedPKCS8_PRIV_KEY_INFO =
     ScopedOpenSSLType<PKCS8_PRIV_KEY_INFO, PKCS8_PRIV_KEY_INFO_free>;
-#ifdef OPENSSL_IS_BORINGSSL
-using ScopedPKCS12 = ScopedOpenSSLType<PKCS12, PKCS12_free>;
-#endif  // OPENSSL_IS_BORINGSSL
 using ScopedRSA = ScopedOpenSSLType<RSA, RSA_free>;
 using ScopedX509 = ScopedOpenSSLType<X509, X509_free>;
 using ScopedX509_ALGOR = ScopedOpenSSLType<X509_ALGOR, X509_ALGOR_free>;
@@ -163,19 +148,12 @@ using ScopedGENERAL_NAMEStack =
 using ScopedX509Stack = ScopedOpenSSLStack<STACK_OF(X509), X509, X509_free>;
 using ScopedWeakX509Stack = ScopedWeakOpenSSLStack<STACK_OF(X509)>;
 
-#ifdef OPENSSL_IS_BORINGSSL
-using ScopedCBB = ScopedOpenSSLContext<CBB, void, CBB_zero, CBB_cleanup>;
-using ScopedEVP_AEAD_CTX =
-    ScopedOpenSSLContext<EVP_AEAD_CTX, void, EVP_AEAD_CTX_zero,
-                         EVP_AEAD_CTX_cleanup>;
-#endif  // OPENSSL_IS_BORINGSSL
 using ScopedEVP_CIPHER_CTX =
-    ScopedOpenSSLContext<EVP_CIPHER_CTX, int, EVP_CIPHER_CTX_init,
-                         EVP_CIPHER_CTX_cleanup>;
+    ScopedOpenSSLType<EVP_CIPHER_CTX, EVP_CIPHER_CTX_free>;
 using ScopedEVP_MD_CTX =
-    ScopedOpenSSLContext<EVP_MD_CTX, int, EVP_MD_CTX_init, EVP_MD_CTX_cleanup>;
+    ScopedOpenSSLType<EVP_MD_CTX, EVP_MD_CTX_free>;
 using ScopedHMAC_CTX =
-    ScopedOpenSSLContext<HMAC_CTX, void, HMAC_CTX_init, HMAC_CTX_cleanup>;
+    ScopedOpenSSLType<HMAC_CTX, HMAC_CTX_free>;
 
 using ScopedOpenSSLBytes = std::unique_ptr<uint8_t, OpenSSLFree<uint8_t>>;
 using ScopedOpenSSLString = std::unique_ptr<char, OpenSSLFree<char>>;

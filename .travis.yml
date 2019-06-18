@@ -1,4 +1,4 @@
-sudo: false
+dist: xenial
 
 language: cpp
 
@@ -12,7 +12,6 @@ addons:
   apt:
     sources: &common_sources
       - ubuntu-toolchain-r-test
-      - kalakris-cmake
     packages: &common_packages
       - autoconf
       - automake
@@ -27,14 +26,6 @@ matrix:
     - compiler: clang
       os: osx
       env: SSL=openssl
-    - compiler: clang
-      os: linux
-      env: SSL=boringssl LLVM=3.6.2
-      addons:
-        apt:
-          sources: *common_sources
-          packages:
-          - *common_packages
     - compiler: clang
       os: linux
       env: SSL=openssl LLVM=3.6.2
@@ -78,9 +69,7 @@ before_install:
  - if [ "${REAL_CC}" != "" ]; then export CC=${REAL_CC} CXX=${REAL_CXX}; fi
  - if [ "$TRAVIS_OS_NAME" == "osx" ]; then . ./build/travis.osx.before_install.sh; fi
 # Set up sanitizer blacklists:
- - echo "leak:InitModule" > ${HOME}/lsan.supp
- - echo "leak:SetExitLoopHandler" >> ${HOME}/lsan.supp
- - echo "leak:masterelection_test" >> ${HOME}/lsan.supp
+ - echo "leak:ct_extensions_test" >> ${HOME}/lsan.supp
  - if [ "${CLEAR_CACHE}" != "" ]; then echo "Clearing cache"; rm -fr ${TRAVIS_BUILD_DIR}/../ct ${TRAVIS_BUILD_DIR}/../install ${HOME}/.ccache; fi
  - mkdir -p ${INSTALL_DIR}/include ${INSTALL_DIR}/lib
  - echo "INSTALL_DIR=${INSTALL_DIR}"

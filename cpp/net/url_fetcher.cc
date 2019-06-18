@@ -3,8 +3,8 @@
 #include <event2/buffer.h>
 #include <event2/keyvalq_struct.h>
 #include <evhtp.h>
+#include <evhtp/parser.h>
 #include <glog/logging.h>
-#include <htparse.h>
 
 #include "net/connection_pool.h"
 #include "util/thread_pool.h"
@@ -236,7 +236,7 @@ void State::RequestDone(evhtp_request_t* req) {
   }
 
   response_->headers.clear();
-  for (evhtp_kv_s* ptr = req->headers_in->tqh_first; ptr;
+  for (evhtp_kv* ptr = req->headers_in->tqh_first; ptr;
        ptr = ptr->next.tqe_next) {
     response_->headers.insert(make_pair(ptr->key, ptr->val));
   }
