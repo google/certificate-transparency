@@ -7,7 +7,7 @@ deps = {
      "json-c": 					 "https://github.com/AlCutter/json-c.git@json-c-0.12-20140410-fix",
      "libevent": 				 "https://github.com/libevent/libevent.git@release-2.1.10-stable",
      "libevhtp":         "https://github.com/criticalstack/libevhtp.git@1.2.18",
-     "protobuf":         "https://github.com/google/protobuf.git@v2.6.1",
+     "protobuf":         "https://github.com/google/protobuf.git@v3.8.0",
      "protobuf/gtest":   "https://github.com/google/googletest.git@release-1.7.0",
      "tcmalloc":				 "https://github.com/gperftools/gperftools.git@gperftools-2.4"
 }
