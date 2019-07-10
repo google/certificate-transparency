@@ -1,12 +1,13 @@
 #!/usr/bin/env python
 
+from __future__ import print_function
 from ct.client import async_log_client
 from twisted.internet import reactor
 from twisted.web import client as twisted_client
 
 
 def sth_callback(sth):
-    print sth
+    print(sth)
 
 
 def stop_callback(ignored):

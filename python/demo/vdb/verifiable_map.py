@@ -1,3 +1,4 @@
+from __future__ import print_function
 import hashlib, base64, sys
 
 from verifiable_log import VerifiableLog
@@ -52,7 +53,7 @@ class SequencedData:
   # For debug
   def debug_dump(self):
     for s, v in zip(self._seqs, self._vals):
-      print 's', repr(s), 'v', repr(v)
+      print('s', repr(s), 'v', repr(v))
 
 # Represent node in sparse merkle tree
 class Node:
@@ -152,24 +153,24 @@ class Node:
 
   # Dump all info out for debugging
   def debug_dump(self, seq):
-    print ('  ' * self._depth) + "H: " + base64.b64encode(self.hash(seq))
+    print(('  ' * self._depth) + "H: " + base64.b64encode(self.hash(seq)))
     v = self._value.get(seq)
     if v is None:
       x = self.left(seq)
       if x:
-        print ('  ' * self._depth) + "L:"
+        print(('  ' * self._depth) + "L:")
         x.debug_dump(seq)
       else:
-        print ('  ' * self._depth) + "L: " + base64.b64encode(self.left_hash(seq))
+        print(('  ' * self._depth) + "L: " + base64.b64encode(self.left_hash(seq)))
       x = self.right(seq)
       if x:
-        print ('  ' * self._depth) + "R:"
+        print(('  ' * self._depth) + "R:")
         x.debug_dump(seq)
       else:
-        print ('  ' * self._depth) + "R: " + base64.b64encode(self.right_hash(seq))
+        print(('  ' * self._depth) + "R: " + base64.b64encode(self.right_hash(seq)))
     else:
-        print ('  ' * self._depth) + "V:" + repr(v)
-        print ('  ' * self._depth) + "P:" + ''.join([str(int(x)) for x in self.path(seq)])
+        print(('  ' * self._depth) + "V:" + repr(v))
+        print(('  ' * self._depth) + "P:" + ''.join([str(int(x)) for x in self.path(seq)]))
 
 # Take a key as string and produce 256 boolean values indicating left (False) or right (True)
 def construct_key_path(key):

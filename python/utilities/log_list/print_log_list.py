@@ -1,5 +1,6 @@
 #!/usr/bin/env python
 """Parse and print the list of logs, after validating signature."""
+from __future__ import print_function
 
 import base64
 import hashlib
@@ -46,7 +47,7 @@ def is_log_list_valid(json_log_list, schema_file):
             json.load(open(schema_file, "rb")))
         return True
     except jsonschema.exceptions.ValidationError as e:
-        print e
+        print(e)
         return False
     return False
 
@@ -70,25 +71,25 @@ def print_formatted_log_list(json_log_list):
         [(o["id"], o["name"]) for o in json_log_list["operators"]])
 
     for log_info in json_log_list["logs"]:
-        print "%s:" % log_info["description"]
+        print("%s:" % log_info["description"])
         log_operators = [
             operator_id_to_name[i].encode("utf-8")
             for i in log_info["operated_by"]]
-        print "  Operated by %s and has MMD of %f hours" % (
+        print("  Operated by %s and has MMD of %f hours" % (
             ", ".join(log_operators),
-            log_info["maximum_merge_delay"] / (60.0 ** 2))
-        print "  At: %s" % (log_info["url"])
+            log_info["maximum_merge_delay"] / (60.0 ** 2)))
+        print("  At: %s" % (log_info["url"]))
         key = base64.decodestring(log_info["key"])
         hasher = hashlib.sha256()
         hasher.update(key)
         key_hash = hasher.digest()
-        print "  Key ID: %s" % (base64.encodestring(key_hash)),
+        print("  Key ID: %s" % (base64.encodestring(key_hash)), end=' ')
         if "final_sth" in log_info:
             final_sth = log_info["final_sth"]
-            print "  Log is frozen as of %s, final tree size %d" % (
+            print("  Log is frozen as of %s, final tree size %d" % (
                 time.asctime(time.gmtime(final_sth["timestamp"] / 1000.0)),
-                final_sth["tree_size"])
-        print "-" * 80
+                final_sth["tree_size"]))
+        print("-" * 80)
 
 
 def main(_unused_argv):

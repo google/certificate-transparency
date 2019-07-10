@@ -27,6 +27,7 @@ Known commands:
   cert_util.py print --fingerprint --digest="sha256" cert.pem
                                         - print the SHA-256 fingerprint
 """
+from __future__ import print_function
 
 import sys
 from absl import flags as gflags
@@ -54,19 +55,19 @@ gflags.register_validator("filetype", lambda value: not value or
 def print_cert(certificate):
     if not FLAGS.subject and not FLAGS.issuer and not FLAGS.fingerprint:
         if FLAGS.debug:
-            print "%r" % certificate
+            print("%r" % certificate)
         else:
-            print certificate
+            print(certificate)
     else:
         if FLAGS.subject:
-            print "subject:\n%s" % certificate.print_subject_name()
+            print("subject:\n%s" % certificate.print_subject_name())
         if FLAGS.issuer:
-            print "issuer:\n%s" % certificate.print_issuer_name()
+            print("issuer:\n%s" % certificate.print_issuer_name())
         if FLAGS.fingerprint:
             # Print in a format familiar from OpenSSL.
-            print "%s fingerprint: %s\n" % (
+            print("%s fingerprint: %s\n" % (
                 FLAGS.digest.upper(), print_util.bytes_to_hex(
-                    certificate.fingerprint(hashfunc=FLAGS.digest)))
+                    certificate.fingerprint(hashfunc=FLAGS.digest))))
 
 
 def print_certs(cert_file):
@@ -78,7 +79,7 @@ def print_certs(cert_file):
     printed = False
     if not FLAGS.filetype or FLAGS.filetype.lower() == "pem":
         if not FLAGS.filetype:
-            print "Attempting to read PEM"
+            print("Attempting to read PEM")
 
         try:
             for c in cert.certs_from_pem_file(cert_file, strict_der=False):
@@ -87,7 +88,7 @@ def print_certs(cert_file):
         except pem.PemError as e:
             if not printed:
                 # Immediate error
-                print "File is not a valid PEM file: %s" % e
+                print("File is not a valid PEM file: %s" % e)
             else:
                 exit_with_message("Error while scanning PEM blocks: %s" % e)
         except error.ASN1Error as e:
@@ -95,7 +96,7 @@ def print_certs(cert_file):
 
     if not printed and FLAGS.filetype.lower() != "pem":
         if not FLAGS.filetype:
-            print "Attempting to read raw DER"
+            print("Attempting to read raw DER")
         try:
             print_cert(cert.Certificate.from_der_file(cert_file,
                                                       strict_der=False))
@@ -104,8 +105,8 @@ def print_certs(cert_file):
 
 
 def exit_with_message(error_message):
-    print error_message
-    print "Use --helpshort or --help to get help."
+    print(error_message)
+    print("Use --helpshort or --help to get help.")
     sys.exit(1)
 
 

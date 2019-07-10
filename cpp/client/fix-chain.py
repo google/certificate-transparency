@@ -5,6 +5,7 @@
 
 # Based on pyasn1 example code.
 
+from __future__ import print_function
 from base64 import b64encode
 from ct.crypto.pem import PemError
 from ct.crypto.pem import from_pem
@@ -23,8 +24,8 @@ import sys
 from urllib2 import urlopen
 
 if len(sys.argv) != 2:
-  print """Usage:
-  $ %s somecertificates.pem""" % sys.argv[0]
+  print("""Usage:
+  $ %s somecertificates.pem""" % sys.argv[0])
   sys.exit(-1)
 
 cStart = '-----BEGIN CERTIFICATE-----'
@@ -69,7 +70,7 @@ def getIssuersFromAIA(cert):
     if oid != id_pe_authorityInfoAccess:
       continue
     
-    print extension.prettyPrint()
+    print(extension.prettyPrint())
 
     value, rest = decoder.decode(extension.getComponentByName('extnValue'),
                                  asn1Spec=univ.OctetString())
@@ -77,25 +78,25 @@ def getIssuersFromAIA(cert):
     aia, rest = decoder.decode(value, asn1Spec=AuthorityInfoAccessSyntax())
     assert rest == ""
 
-    print aia.prettyPrint()
+    print(aia.prettyPrint())
 
     for ad in aia:
       oid = ad.getComponentByName('accessMethod')
       if oid != id_ad_caIssuers:
         continue
       
-      print ad.prettyPrint()
+      print(ad.prettyPrint())
 
       loc = ad.getComponentByName('accessLocation').\
         getComponentByName('uniformResourceIdentifier')
-      print type(loc), loc
+      print(type(loc), loc)
 
       certHandle = urlopen(str(loc))
       # RFC 5280 says this should either be 'application/pkix-cert' or
       # 'application/pkcs7-mime' (in which case the result should be a
       # "certs-only" PCKS#7 response, as specified in RFC 2797). Of
       # course, we see other values, so just try both formats.
-      print certHandle.info().gettype()
+      print(certHandle.info().gettype())
       issuer = certHandle.read()
 
       # Have we got an (incorrect, but let's fix it) PEM encoded cert?
@@ -103,8 +104,8 @@ def getIssuersFromAIA(cert):
         try:
           (issuer, _) = from_pem(issuer, ['CERTIFICATE'])
         except PemError as e:
-          print "PEM decode failed:", e
-          print "For cert:", issuer
+          print("PEM decode failed:", e)
+          print("For cert:", issuer)
 
       # Is it a certificate?
       try:
@@ -114,7 +115,7 @@ def getIssuersFromAIA(cert):
         continue
       except PyAsn1Error as e:
         # On failure, try the next thing
-        print "Cert decode failed:", e
+        print("Cert decode failed:", e)
         pass
 
       # If not, it had better be PKCS#7 "certs-only"
@@ -126,15 +127,15 @@ def getIssuersFromAIA(cert):
                                     asn1Spec=rfc2315.SignedData())
       except PyAsn1Error as e:
         # Give up
-        print "PKCS#7 decode also failed:", e
-        print "Skipping issuer URL:", loc
+        print("PKCS#7 decode also failed:", e)
+        print("Skipping issuer URL:", loc)
         continue
 
       for signedDatum in signedData:
         # FIXME: why does this happen? Example is at
         # http://crt.usertrust.com/AddTrustExternalCARoot.p7c.
         if signedDatum == '':
-          print "** Skipping strange Any('') in PKCS7 **"
+          print("** Skipping strange Any('') in PKCS7 **")
           continue
         certs = signedDatum.getComponentByName('certificates')
         for c in certs:
@@ -180,7 +181,7 @@ def DNToString(dn):
         elif valt == 'utf8String':
           val = str(val)
         else:
-          print valt
+          print(valt)
           assert False
         
       assert val is not None
@@ -207,7 +208,7 @@ while 1:
   tbs = cert.getComponentByName('tbsCertificate')
 
   subjectDN = tbs.getComponentByName('subject')
-  print DNToString(subjectDN)
+  print(DNToString(subjectDN))
 
   certs[DNToString(subjectDN)] = cert
   inChain.append(cert)
@@ -226,14 +227,14 @@ while True:
   tbs = cert.getComponentByName('tbsCertificate')
 
   subjectDN = tbs.getComponentByName('subject')
-  print 'subject:', DNToString(subjectDN)
+  print('subject:', DNToString(subjectDN))
 
   issuerDN = tbs.getComponentByName('issuer')
   #print issuerDN.prettyPrint()
   issuerDNstr = DNToString(issuerDN)
-  print 'issuer:', issuerDNstr
+  print('issuer:', issuerDNstr)
 
-  print
+  print()
 
   if issuerDN == subjectDN:
     break
@@ -243,14 +244,14 @@ while True:
   else:
     issuers = getIssuersFromAIA(cert)
     if len(issuers) == 0:
-      print "Can't get issuer, giving up"
+      print("Can't get issuer, giving up")
       break
 
     issuer = None
     for i in issuers:
       tbs = i.getComponentByName('tbsCertificate')
       subjectDN = tbs.getComponentByName('subject')
-      print 'issuer subject:', DNToString(subjectDN)
+      print('issuer subject:', DNToString(subjectDN))
       if subjectDN == issuerDN:
         issuer = i
         break
@@ -265,15 +266,15 @@ if len(outChain) == 1:
   subjectDN = tbs.getComponentByName('subject')
   issuerDN = tbs.getComponentByName('issuer')
   if subjectDN == issuerDN:
-    print "Chain consists of 1 self-signed certificate"
+    print("Chain consists of 1 self-signed certificate")
     exit(1)
 
 for cert in outChain:
-    print cStart
+    print(cStart)
     b64 = b64encode(encoder.encode(cert))
     for n in range(0, len(b64), 64):
-      print b64[n:n+64]
-    print cEnd
+      print(b64[n:n+64])
+    print(cEnd)
 
 print('*** %d PEM cert(s) deserialized, fixed chain is %d long' % (
   len(inChain),

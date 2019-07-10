@@ -7,6 +7,7 @@
 
 # Based on pyasn1 example code.
 
+from __future__ import print_function
 from base64 import b64encode
 from pyasn1.codec.der import decoder
 from pyasn1.codec.der import encoder
@@ -18,8 +19,8 @@ import sys
 from urllib2 import urlopen
 
 if len(sys.argv) != 1:
-  print """Usage:
-  $ %s < somecertificates.pem""" % sys.argv[0]
+  print("""Usage:
+  $ %s < somecertificates.pem""" % sys.argv[0])
   sys.exit(-1)
 
 cStart = '-----BEGIN CERTIFICATE-----'
@@ -67,7 +68,7 @@ while 1:
 
   if rest: substrate = substrate[:-len(rest)]
 
-  print cert.prettyPrint()
+  print(cert.prettyPrint())
 
   tbs = cert.getComponentByName('tbsCertificate')
   extensions = tbs.getComponentByName('extensions') or []
@@ -77,7 +78,7 @@ while 1:
     if oid != id_pe_authorityInfoAccess:
       continue
     
-    print extension.prettyPrint()
+    print(extension.prettyPrint())
 
     value, rest = decoder.decode(extension.getComponentByName('extnValue'),
                                  asn1Spec=univ.OctetString())
@@ -85,26 +86,26 @@ while 1:
     aia, rest = decoder.decode(value, asn1Spec=AuthorityInfoAccessSyntax())
     assert rest == ""
 
-    print aia.prettyPrint()
+    print(aia.prettyPrint())
 
     for ad in aia:
       oid = ad.getComponentByName('accessMethod')
       if oid != id_ad_caIssuers:
         continue
       
-      print ad.prettyPrint()
+      print(ad.prettyPrint())
 
       loc = ad.getComponentByName('accessLocation').\
         getComponentByName('uniformResourceIdentifier')
-      print type(loc), loc
+      print(type(loc), loc)
 
       certHandle = urlopen(str(loc))
       cert = certHandle.read()
-      print cStart
+      print(cStart)
       b64 = b64encode(cert)
       for n in range(0, len(b64), 64):
-        print b64[n:n+64]
-      print cEnd
+        print(b64[n:n+64])
+      print(cEnd)
     
   certCnt = certCnt + 1
 

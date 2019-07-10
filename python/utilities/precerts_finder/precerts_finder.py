@@ -1,5 +1,6 @@
 #!/usr/bin/env python
 """Extracts all Precertificates from the log."""
+from __future__ import print_function
 
 import os
 import sys
@@ -44,8 +45,8 @@ def run():
         write_matched_certificate,
         start_entry=FLAGS.start_entry)
 
-    print "Scanned %d, %d matched and %d failed strict or partial parsing" % (
-        res.total, res.matches, res.errors)
+    print("Scanned %d, %d matched and %d failed strict or partial parsing" % (
+        res.total, res.matches, res.errors))
 
 
 if __name__ == "__main__":

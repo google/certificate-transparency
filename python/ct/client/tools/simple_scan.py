@@ -1,5 +1,6 @@
 #!/usr/bin/env python
 
+from __future__ import print_function
 import os
 import sys
 
@@ -38,8 +39,8 @@ def run():
     res = scanner.scan_log(
         match, "https://ct.googleapis.com/pilot", FLAGS.multi,
         write_matched_certificate)
-    print "Scanned %d, %d matched and %d failed strict or partial parsing" % (
-        res.total, res.matches, res.errors)
+    print("Scanned %d, %d matched and %d failed strict or partial parsing" % (
+        res.total, res.matches, res.errors))
 
 
 if __name__ == "__main__":
