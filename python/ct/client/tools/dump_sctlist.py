@@ -3,6 +3,7 @@
     SignedCertificateTimestampList structure.
     This structure is used to represent a collection of SCTs being passed over
     a TLS handshake.  See RFC6962 section 3.3 for more details. """
+from __future__ import print_function
 import sys
 from ct.proto import client_pb2
 from ct.serialization import tls_message
@@ -18,11 +19,11 @@ def dump_sctlist(sct_list):
     for s in sctlist.sct_list:
         sct = client_pb2.SignedCertificateTimestamp()
         tls_message.decode(s, sct)
-        print sct
+        print(sct)
 
 if __name__ == "__main__":
     if len(sys.argv) == 1:
-        print "Usage: dump_sctlist.py <file_containing_sct_list>"
+        print("Usage: dump_sctlist.py <file_containing_sct_list>")
         sys.exit(1)
 
     with open(sys.argv[1]) as f:

@@ -1,5 +1,6 @@
 #!/usr/bin/env python
 
+from __future__ import print_function
 import collections
 import functools
 import multiprocessing
@@ -76,8 +77,8 @@ def process_entries(entry_queue, output_queue, match_callback):
                         "Entry %d failed strict parsing:\n%s" %
                         (count, c)))
             except Exception as e:
-                print "Unknown parsing failure for entry %d:\n%s" % (
-                    count, e)
+                print("Unknown parsing failure for entry %d:\n%s" % (
+                    count, e))
                 traceback.print_exc()
                 output_queue.put(QueueMessage(
                     _ERROR_PARSING_ENTRY,
@@ -111,8 +112,8 @@ def _scan(entry_queue, log_url, range_description):
             entry_queue.put((scanned, entry.SerializeToString()))
             scanned += 1
     except Exception as e:
-        print "Exception when fetching range %d to %d:\n%s" % (
-            range_start, range_end, e)
+        print("Exception when fetching range %d to %d:\n%s" % (
+            range_start, range_end, e))
         traceback.print_exc()
 
 ScanResults = collections.namedtuple(
@@ -122,7 +123,7 @@ ScanResults = collections.namedtuple(
 def _get_tree_size(log_url):
     client = log_client.LogClient(log_url)
     sth = client.get_sth()
-    print "Got STH: %s" % sth
+    print("Got STH: %s" % sth)
     return sth.tree_size
 
 
@@ -156,19 +157,19 @@ def _process_worker_messages(
             elif (msg.msg_type == _PROGRESS_REPORT and
                   msg.certificates_scanned > 0):
                 scan_progress += msg.certificates_scanned
-                print msg.msg, " Total: %d" % scan_progress
+                print(msg.msg, " Total: %d" % scan_progress)
             else:
-                print msg.msg
+                print(msg.msg)
         except Queue.Empty:
             are_active = ""
             if scanners_done.value:
                 are_active = "NOT"
-            print "Scanners are %s active, Workers done: %d" % (
-                are_active, workers_done)
+            print("Scanners are %s active, Workers done: %d" % (
+                are_active, workers_done))
         # Done handling the message, now let's check if the scanners
         # are done and if so stop the workers
         if scanners_done.value and not stop_sent:
-            print "All scanners done, stopping."
+            print("All scanners done, stopping.")
             _send_stop_to_workers(workers_input_queue, num_workers)
             # To avoid re-sending stop
             stop_sent = True
@@ -185,8 +186,8 @@ def scan_log(match_callback, log_url,total_processes=2,
     num_scanners = total_processes - num_workers
     entry_queue = m.Queue(num_scanners * _BATCH_SIZE)
     output_queue = multiprocessing.Queue(10000)
-    print "Allocating %d fetchers and %d processing workers" % (
-        num_scanners, num_workers)
+    print("Allocating %d fetchers and %d processing workers" % (
+        num_scanners, num_workers))
 
     tree_size = _get_tree_size(log_url)
     workers_done = multiprocessing.Value('b', 0)

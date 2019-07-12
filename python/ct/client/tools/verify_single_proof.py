@@ -1,5 +1,6 @@
 #!/usr/bin/env python
 """This utility fetches the proof for a single certificate by its hash."""
+from __future__ import print_function
 
 import struct
 import sys
@@ -50,8 +51,8 @@ def fetch_single_proof(leaf_hash, log_url):
     client = log_client.LogClient(log_url)
     sth = client.get_sth()
     if FLAGS.verbose:
-      print "The log contains %d certificates." % (sth.tree_size)
-      print "Tree root hash: %s" % (sth.sha256_root_hash.encode("hex"))
+      print("The log contains %d certificates." % (sth.tree_size))
+      print("Tree root hash: %s" % (sth.sha256_root_hash.encode("hex")))
 
     proof_from_hash = client.get_proof_by_hash(
             leaf_hash, sth.tree_size)
@@ -68,25 +69,25 @@ def run():
         else:
             cert_sct.ParseFromString(sct_data)
         sct_timestamp = cert_sct.timestamp
-        print 'SCT for cert:', cert_sct
+        print('SCT for cert:', cert_sct)
     else:
         sct_timestamp = FLAGS.timestamp
 
     constructed_leaf = construct_leaf_from_file(FLAGS.cert, sct_timestamp)
     leaf_hash = merkle.TreeHasher().hash_leaf(constructed_leaf)
     if FLAGS.verbose:
-      print "Leaf hash: %s" % (leaf_hash.encode("hex"))
+      print("Leaf hash: %s" % (leaf_hash.encode("hex")))
 
     (sth, proof) = fetch_single_proof(leaf_hash, FLAGS.log_url);
     if FLAGS.verbose:
-      print "Leaf index in tree is %d, proof has %d hashes" % (
-          proof.leaf_index, len(proof.audit_path))
-      print "Audit path: %s" % ([t.encode('hex') for t in proof.audit_path])
+      print("Leaf index in tree is %d, proof has %d hashes" % (
+          proof.leaf_index, len(proof.audit_path)))
+      print("Audit path: %s" % ([t.encode('hex') for t in proof.audit_path]))
 
     verifier = merkle.MerkleVerifier()
     if verifier.verify_leaf_inclusion(constructed_leaf, proof.leaf_index,
                                       proof.audit_path, sth):
-      print 'Proof verifies OK.'
+      print('Proof verifies OK.')
 
 if __name__ == '__main__':
     sys.argv = FLAGS(sys.argv)

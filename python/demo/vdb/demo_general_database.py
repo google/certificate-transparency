@@ -1,3 +1,4 @@
+from __future__ import print_function
 import json, sys, cmd
 import cPickle as pickle
 
@@ -57,16 +58,16 @@ class ReplCmd(cmd.Cmd):
     except:
       self.help_sth()
       return
-    print self.db.get_tree_head(seq)
+    print(self.db.get_tree_head(seq))
 
   def help_sth(self):
-    print 'sth <integer> - Updates tree to sequence number and print STH. Leave blank for latest.'
+    print('sth <integer> - Updates tree to sequence number and print STH. Leave blank for latest.')
 
   def do_new(self, arg=''):
     self.db = VerifiableDatabase()
 
   def help_new(self):
-    print 'new - creates a new database, called by default upon launch'
+    print('new - creates a new database, called by default upon launch')
 
   def do_save(self, arg):
     arg = arg.strip()
@@ -76,7 +77,7 @@ class ReplCmd(cmd.Cmd):
     pickle.dump(self.db, file(arg, 'wb'))
 
   def help_save(self):
-    print 'save <path> - save state to a path'
+    print('save <path> - save state to a path')
 
   def do_load(self, arg):
     arg = arg.strip()
@@ -86,7 +87,7 @@ class ReplCmd(cmd.Cmd):
     self.db = pickle.load(file(arg, 'rb'))
 
   def help_load(self):
-    print 'load <path> - load state from path'
+    print('load <path> - load state from path')
 
   def do_set(self, arg):
     try:
@@ -100,7 +101,7 @@ class ReplCmd(cmd.Cmd):
     self.do_get(n)
 
   def help_set(self):
-    print 'set <key> <value> - set key (string) to the specified value (string)'
+    print('set <key> <value> - set key (string) to the specified value (string)')
 
   def do_get(self, arg):
     try:
@@ -118,16 +119,16 @@ class ReplCmd(cmd.Cmd):
     try:
       val, proof = self.db.get(n, v)
     except ValueError:
-      print 'Tree size does not exist.'
+      print('Tree size does not exist.')
       return
-    print 'Value:     ', val
-    print 'Proof:     ', proof
-    print 'Map hash:  ', self.db.get_tree_head(v)['sha256_root_hash']
-    print 'Log hash:  ', self.db.get_tree_head(v)['log_tree_head']['sha256_root_hash']
-    print 'Tree size: ', self.db.get_tree_head(v)['tree_size']
+    print('Value:     ', val)
+    print('Proof:     ', proof)
+    print('Map hash:  ', self.db.get_tree_head(v)['sha256_root_hash'])
+    print('Log hash:  ', self.db.get_tree_head(v)['log_tree_head']['sha256_root_hash'])
+    print('Tree size: ', self.db.get_tree_head(v)['tree_size'])
 
   def help_get(self):
-    print 'get <key> <integer> - get value as of this sequence number.  Leave blank for latest.'
+    print('get <key> <integer> - get value as of this sequence number.  Leave blank for latest.')
 
   def do_del(self, arg):
     n = arg.strip()
@@ -135,7 +136,7 @@ class ReplCmd(cmd.Cmd):
     self.do_get(n)
 
   def help_del(self):
-    print 'del <key> - delete key (string) from database'
+    print('del <key> - delete key (string) from database')
 
   def do_dump(self, arg=''):
     try:
@@ -146,18 +147,18 @@ class ReplCmd(cmd.Cmd):
     except:
       self.help_dump()
       return
-    print 'Tree:'
+    print('Tree:')
     self.db.debug_dump(seq)
 
   def help_dump(self):
-    print 'dump <integer> - dump the tree as of this sequence number.  Leave blank for latest.'
+    print('dump <integer> - dump the tree as of this sequence number.  Leave blank for latest.')
 
   def do_log(self, arg=''):
     for i, x in enumerate(self.db.get_log_entries(0, self.db.get_tree_head()['tree_size'] - 1)):
-      print i, x
+      print(i, x)
 
   def help_log(self):
-    print 'log - dump all ops'
+    print('log - dump all ops')
 
 
 db = VerifiableDatabase()

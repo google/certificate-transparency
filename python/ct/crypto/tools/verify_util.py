@@ -15,6 +15,7 @@ Known commands:
 
   verify_util.py verify_sct --sct=cert_sct.tls --log_key=log_key.pem cert.pem
 """
+from __future__ import print_function
 
 import sys
 from absl import flags as gflags
@@ -29,8 +30,8 @@ gflags.DEFINE_string("sct", None, "TLS-encoded SCT file")
 gflags.DEFINE_string("log_key", None, "PEM-encoded CT log key")
 
 def exit_with_message(error_message):
-    print error_message
-    print "Use --helpshort or --help to get help."
+    print(error_message)
+    print("Use --helpshort or --help to get help.")
     sys.exit(1)
 
 
@@ -42,7 +43,7 @@ def verify_sct(chain, sct_tls, log_key_pem):
     key_info = verify.create_key_info_from_raw_key(log_key)
 
     lv = verify.LogVerifier(key_info)
-    print lv.verify_sct(sct, chain)
+    print(lv.verify_sct(sct, chain))
 
 
 def main(argv):
