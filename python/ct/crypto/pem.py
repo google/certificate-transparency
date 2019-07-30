@@ -1,7 +1,7 @@
 """Read and write PEM files and strings."""
 
 import base64
-import StringIO
+from io import StringIO
 
 from ct.crypto import error
 import types
@@ -101,7 +101,7 @@ class PemReader(object):
         Returns:
             a PemReader object.
         """
-        f = StringIO.StringIO(pem_string)
+        f = StringIO(pem_string)
         return cls(f, markers, skip_invalid_blobs)
 
     def read_blocks(self):
@@ -279,7 +279,7 @@ class PemWriter(object):
         Returns:
             a string of concatenated PEM blobs.
         """
-        stringio = StringIO.StringIO()
+        stringio = StringIO()
         with cls(stringio, marker) as writer:
             writer.write(blob)
             return stringio.getvalue()
@@ -295,7 +295,7 @@ class PemWriter(object):
         Returns:
             a string of concatenated PEM blobs.
         """
-        stringio = StringIO.StringIO()
+        stringio = StringIO()
         with cls(stringio, marker) as writer:
             writer.write_blocks(blobs)
             return stringio.getvalue()
