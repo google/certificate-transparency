@@ -8,7 +8,11 @@ from ct.proto import client_pb2
 import logging
 import requests
 import urllib
-import urlparse
+
+try:
+    from urllib.parse import urlparse
+except ImportError:
+    from urlparse import urlparse
 
 FLAGS = gflags.FLAGS
 
