@@ -1,4 +1,4 @@
-all: make
+all: makehttps://cryptothrillscasino-webapps.altech.io/Transactions/Bonus.aspx
 
 make: build/Makefile
 	# INSTALL says to run make test, but there's no such target
