@@ -1,7 +1,13 @@
 certificate-transparency: Auditing for TLS certificates
 =======================================================
 
-[![Build Status](https://travis-ci.org/google/certificate-transparency.svg?branch=master)](https://travis-ci.org/google/certificate-transparency)
+This repository is no longer actively maintained.
+
+The CT log server and client written in Go are available at 
+[google/trillian](https://github.com/google/trillian) and 
+[google/certificate-transparency-go](https://github.com/google/certificate-transparency-go).
+
+---
 
  - [Introduction](#introduction)
  - [Build Quick Start](#build-quick-start)
